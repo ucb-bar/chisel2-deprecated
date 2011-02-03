@@ -1093,7 +1093,7 @@ object Lit {
     var res = 0;
     for (i <- 0 until 4) {
       val idx = off+i;
-      val c   = if (idx < 0) '0' else x(idx);
+      val c   = if (idx < 0 || idx >= x.length) '0' else x(idx);
       res = 2 * res + (if (c == '1') 1 else 0);
     }
     hexNibbles(res)
@@ -1124,6 +1124,10 @@ object Lit {
   def apply(x: Int, width: Int): Lit = { val res = new Lit(); res.init(x.toString, width); res }
   def apply(n: String): Lit = { 
     val (bits, mask, width) = parseLit(n);
+    val res = new Lit(); res.init(n, width); res.isBinary = true; res 
+  }
+  def apply(n: String, width: Int): Lit = { 
+    val (bits, mask, swidth) = parseLit(n);
     val res = new Lit(); res.init(n, width); res.isBinary = true; res 
   }
 }
