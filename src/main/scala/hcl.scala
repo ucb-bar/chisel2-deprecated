@@ -200,8 +200,7 @@ abstract class Mod {
   def emitWidth: String = "[" + (width-1) + ":0]"
   def emitDec: String = "  wire" + (if (isSigned) " signed " else "") + emitWidth + " " + emitRef + ";\n";
   // C backend
-  def emitDecC: String = "  dat_t " + emitRef + ";\n";
-  def emitInitC: String = "    " + emitRef + " = SIG(" + width + ");\n";
+  def emitDecC: String = "  dat_t<" + width + "> " + emitRef + ";\n";
   def emitDefLoC: String = ""
   def emitDefHiC: String = ""
   def emitRefC: String = emitRefV;
@@ -601,10 +600,10 @@ class Comp extends Mod {
       maxDepth = max(m.depth, maxDepth);
     // for ((n, c) <- hist) 
     println("%6s: %s".format("name", "count"));
-    for (n <- hist.keys.toList.sort((a, b) => a < b)) 
+    for (n <- hist.keys.toList.sortWith((a, b) => a < b)) 
       println("%6s: %4d".format(n, hist(n)));
     println("%6s: %s".format("width", "count"));
-    for (w <- whist.keys.toList.sort((a, b) => a < b)) 
+    for (w <- whist.keys.toList.sortWith((a, b) => a < b)) 
       println("%3d: %4d".format(w, whist(w)));
     var widths = new Array[Int](maxDepth+1);
     for (i <- 0 until maxDepth+1)
@@ -725,7 +724,7 @@ class Comp extends Mod {
     out_h.write(" public:\n");
     if (isEmittingComponents) {
       for ((n, w) <- wires) 
-        out_h.write("  dat_t " + w.emitRef + ";\n");
+        out_h.write("  dat_t<" + w.width + "> " + w.emitRef + ";\n");
     }
     for (m <- omods) 
       out_h.write(m.emitDecC);
@@ -735,8 +734,8 @@ class Comp extends Mod {
     }
     out_h.write("\n");
     out_h.write("  void init ( void );\n");
-    out_h.write("  void clock_lo ( dat_t reset );\n");
-    out_h.write("  void clock_hi ( dat_t reset );\n");
+    out_h.write("  void clock_lo ( dat_t<1> reset );\n");
+    out_h.write("  void clock_hi ( dat_t<1> reset );\n");
     out_h.write("};\n");
     out_h.close();
 
@@ -745,25 +744,19 @@ class Comp extends Mod {
     out_c.write("\n");
     out_c.write("void " + name + "_t::init ( void ) {\n");
     if (isEmittingComponents) {
-      for ((n, w) <- wires) 
-        out_c.write("  " + w.emitRef + " = SIG(" + w.width + ");\n");
-    }
-    for (m <- omods) 
-      out_c.write(m.emitInitC);
-    if (isEmittingComponents) {
       for (c <- children) {
         out_c.write("  " + c.emitRef + " = new " + c.emitRef + "_t();\n");
         out_c.write("  " + c.emitRef + "->init();\n");
       }
     }
     out_c.write("}\n");
-    out_c.write("void " + name + "_t::clock_lo ( dat_t reset ) {\n");
+    out_c.write("void " + name + "_t::clock_lo ( dat_t<1> reset ) {\n");
     for (m <- omods) 
       out_c.write(m.emitDefLoC);
     // for (c <- children) 
     //   out_c.write("    " + c.emitRef + "->clock_lo(reset);\n");
     out_c.write("}\n");
-    out_c.write("void " + name + "_t::clock_hi ( dat_t reset ) {\n");
+    out_c.write("void " + name + "_t::clock_hi ( dat_t<1> reset ) {\n");
     for (m <- omods) 
       out_c.write(m.emitDefHiC);
     // for (c <- children) 
@@ -949,8 +942,6 @@ class Binding extends Mod {
   override def toString: String = "BINDING(" + inputs(0) + ")+";
   override def emitDecC: String = 
     if (isEmittingComponents) "  dat_t " + emitRef + ";\n"; else "";
-  override def emitInitC: String = 
-    if (isEmittingComponents) "    " + emitRef + " = SIG(" + width + ");\n"; else "";
   override def emitDefLoC: String = ""
   override def emitDefHiC: String = ""
   override def emitRefC: String = 
@@ -1142,15 +1133,13 @@ class Lit extends Mod {
   override def findMods(depth: Int): Unit = { }
   def value: Int = name.toInt;
   override def toString: String = name;
-  override def emitInitC: String = "";
   override def emitDecC: String = "";
   override def emitRefC: String = 
     if (isBinary) { 
       var (bits, mask, width) = parseLit(name);
-      ("LITZ(" + width + ", 0x" + toHex(bits) + ", 0x" + toHex(mask) + ")")
-      // ("LITZ(" + width + ", 0b" + bits + ", 0b" + mask + ")")
+      ("LITZ<" + width + ">(0x" + toHex(bits) + ", 0x" + toHex(mask) + ")")
     } else 
-      ("LIT(" + width + ", " + name + ")")
+      ("LIT<" + width + ">(" + name + ")")
   override def emitDec: String = "";
   override def emitRefV: String = 
     if (width == -1) name 
@@ -1198,10 +1187,10 @@ class Mem extends Delay {
     "  reg[" + (width-1) + ":0] " + emitRef + "[" + (n-1) + ":0];\n";
   override def emitDefHiC: String = {
     var res = 
-      "    if (" + inputs(0).emitRef + ".value)\n" +
+      "    if (" + inputs(0).emitRef + ".to_bool())\n" +
       "      " + emitRef + ".put(" + inputs(1).emitRef + ", " + inputs(2).emitRef + ");\n";
     if (!(resetVal == null)) {
-      res += "    if (reset.value) {\n";
+      res += "    if (reset.to_bool()) {\n";
       for (i <- 0 until n) 
         res += "      " + emitRef + ".put(" + i + ", " + resetVal.emitRef + ");\n";
       res += "    }\n";
@@ -1209,9 +1198,7 @@ class Mem extends Delay {
     res
   }
   override def emitDecC: String = 
-    "  mem_t " + emitRef + ";\n";
-  override def emitInitC: String = 
-    "    " + emitRef + " = MEM(" + width + ", " + n + ");\n";
+    "  mem_t<" + width + "," + n + "> " + emitRef + ";\n";
   override def apply(addr: Mod): Mod = MemRef(this, addr);
 }
 
@@ -1261,7 +1248,7 @@ class Lookup extends Mod {
     var res = "";
     for ((addr, data) <- map) 
       res = res +
-        "    if (EQZ(" + addr.emitRef + ", " + inputs(0).emitRef + ")) " + emitRef + " = " + data.emitRef + ";\n";
+        "    if ((" + addr.emitRef + " == " + inputs(0).emitRef + ").to_bool()) " + emitRef + " = " + data.emitRef + ";\n";
     res
   }
   override def emitDec: String = 
@@ -1310,7 +1297,7 @@ class Probe extends Mod {
   override def emitDef: String = 
     "  assign " + emitTmp + " = " + inputs(0).emitRef + ";\n"
   override def emitDefLoC: String = 
-    "    " + "printf(\"" + name + ": %lx\\n\", " + inputs(0).emitRef + ".value);\n" +
+    "    " + "printf(\"" + name + ": %lx\\n\", " + inputs(0).emitRef + ".to_ulong());\n" +
     "    " + emitTmp + " = " + inputs(0).emitRef + ";\n";
 }
 
@@ -1329,7 +1316,7 @@ class Fill extends Mod {
   override def emitDef: String = 
     "  assign " + emitTmp + " = {" + n + "{" + inputs(0).emitRef + "}};\n";
   override def emitDefLoC: String = 
-    "    " + emitTmp + " = " + inputs(0).emitRef + ".fill(" + n + ");\n";
+    "    " + emitTmp + " = " + inputs(0).emitRef + ".fill<" + width + "," + n + ">();\n";
 }
 
 object Bits {
@@ -1374,7 +1361,7 @@ class Bits extends Mod {
     if (hi == lo)
       "    " + emitTmp + " = " + inputs(0).emitRef + ".bit(" + hi.emitRef + ");\n"
     else
-      "    " + emitTmp + " = " + inputs(0).emitRef + ".extract(" + hi.emitRef + "," + lo.emitRef + ");\n"
+      "    " + emitTmp + " = " + inputs(0).emitRef + ".extract<" + width + ">(" + hi.emitRef + "," + lo.emitRef + ");\n"
 }
 
 object Cat {
@@ -1404,7 +1391,7 @@ class Cat extends Mod {
     res + "};\n"
   }
   override def emitDefLoC: String = {
-    var res = "    " + emitTmp + " = cat(" 
+    var res = "    " + emitTmp + " = cat<" + width + ">(" 
     var is_first = true;
     for (i <- inputs) {
       if (!is_first) res = res + ", ";
@@ -1425,7 +1412,7 @@ class Mux extends Op {
   override def emitDef: String = 
     "  assign " + emitTmp + " = " + inputs(0).emitRef + " ? " + inputs(1).emitRef + " : " + inputs(2).emitRef + ";\n"
   override def emitDefLoC: String = 
-    "    " + emitTmp + " = mux(" + inputs(0).emitRef + ", " + inputs(1).emitRef + ", " + inputs(2).emitRef + ");\n"
+    "    " + emitTmp + " = mux<" + width + ">(" + inputs(0).emitRef + ", " + inputs(1).emitRef + ", " + inputs(2).emitRef + ");\n"
 }
 
 object Reg {
@@ -1488,15 +1475,14 @@ class Reg extends Delay {
     "  reg[" + (width-1) + ":0] " + emitRef + ";\n";
 
   override def emitDefLoC: String = 
-    "    " + emitRef + ".shadow = " + 
-    (if (inputs(0) == null) "" else "mux(reset, " + inputs(0).emitRef + ", ") + 
+    "    " + emitRef + "_shadow = " + 
+    (if (inputs(0) == null) "" else "mux<" + width + ">(reset, " + inputs(0).emitRef + ", ") + 
     inputs(1).emitRef + ");\n"
   override def emitDefHiC: String =
-    "    " + emitRef + " = " + emitRef + ".shadow;\n";
+    "    " + emitRef + " = " + emitRef + "_shadow;\n";
   override def emitDecC: String = 
-    "  reg_t " + emitRef + ";\n";
-  override def emitInitC: String = 
-    "    " + emitRef + " = REG(" + width + ");\n";
+    "  dat_t<" + width + "> " + emitRef + ";\n" +
+    "  dat_t<" + width + "> " + emitRef + "_shadow;\n";
 }
 
 }
