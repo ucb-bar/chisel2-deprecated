@@ -915,7 +915,12 @@ class Wire extends Interface {
     } else
       "  assign " + emitTmp + " = " + inputs(0).emitRef + ";\n" }
   override def emitDefLoC: String = 
-    "    " + emitTmp + " = " + inputs(0).emitRef + ";\n"
+    // TODO: NEED THIS TO BE A CHECK
+    if (inputs.length == 1)
+      "    " + emitTmp + " = " + inputs(0).emitRef + ";\n"
+    else
+      ""
+    // "    " + emitTmp + " = " + inputs(0).emitRef + ";\n"
 }
 
 // used for component to component connections
@@ -1027,7 +1032,7 @@ class IO extends Wire {
         }
       case default => println("Connecting Input " + this + " to Mod " + default);
       }
-    } else {
+    } else { // DIR == OUTPUT
       // println("<>'ing " + this + " & " + src);
       src match { 
         case other: IO  => 
@@ -1059,7 +1064,7 @@ class IO extends Wire {
         case default => 
           println("// Extending Input " + this + " to Mod " + default);
       }
-    } else {
+    } else { // dir == OUTPUT
       val isChild = 
         (component == null ||  // other inside me?
          (!(src.component == null) && src.component.parent == component));
@@ -1221,6 +1226,24 @@ class MemRef extends Mod {
     "    " + emitTmp + " = " + inputs(0).emitRef + ".get(" + inputs(1).emitRef + ");\n"
 }
 
+object MuxLookup {
+  def apply (key: Mod, default: Mod, mapping: Map[Mod, Mod]): Mod = {
+    var res = default;
+    for ((k, v) <- mapping)
+      res := Mux(key === k, v, res);
+    res
+  }
+}
+
+object MuxCase {
+  def apply (default: Mod, mapping: Map[Mod, Mod]): Mod = {
+    var res = default;
+    for ((t, v) <- mapping)
+      res := Mux(t, v, res);
+    res
+  }
+}
+
 object Lookup {
   def apply (addr: Mod, default: Mod, mapping: Map[Lit, Mod]): Lookup = {
     val res = new Lookup();
@@ -1231,6 +1254,7 @@ object Lookup {
     res
   }
 }
+
 class Lookup extends Mod {
   var map: Map[Lit, Mod] = null;
   override def toString: String = "LOOKUP(" + inputs(0) + ")";
