@@ -688,8 +688,8 @@ class Comp extends Mod {
       child.nameAllIO();
   }
   def compileC(): Unit = {
-    val out_h = new java.io.FileWriter("app.h");
-    val out_c = new java.io.FileWriter("app.cpp");
+    val out_h = new java.io.FileWriter(name + ".h");
+    val out_c = new java.io.FileWriter(name + ".cpp");
     isEmittingC = true;
     println("// COMPILING " + this);
     if (isEmittingComponents) {
