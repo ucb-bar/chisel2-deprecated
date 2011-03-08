@@ -740,7 +740,7 @@ class Comp extends Mod {
     out_h.close();
 
     out_c.write("#include \"emulator.h\"\n");
-    out_c.write("#include \"app.h\"\n");
+    out_c.write("#include \"" + name + ".h\"\n");
     out_c.write("\n");
     out_c.write("void " + name + "_t::init ( void ) {\n");
     if (isEmittingComponents) {
@@ -1227,19 +1227,19 @@ class MemRef extends Mod {
 }
 
 object MuxLookup {
-  def apply (key: Mod, default: Mod, mapping: Map[Mod, Mod]): Mod = {
+  def apply (key: Mod, default: Mod, mapping: Vector[(Mod, Mod)]): Mod = {
     var res = default;
-    for ((k, v) <- mapping)
-      res := Mux(key === k, v, res);
+    for ((k, v) <- mapping.reverse)
+      res = Mux(key === k, v, res);
     res
   }
 }
 
 object MuxCase {
-  def apply (default: Mod, mapping: Map[Mod, Mod]): Mod = {
+  def apply (default: Mod, mapping: Vector[(Mod, Mod)]): Mod = {
     var res = default;
-    for ((t, v) <- mapping)
-      res := Mux(t, v, res);
+    for ((t, v) <- mapping.reverse)
+      res = Mux(t, v, res);
     res
   }
 }
@@ -1359,7 +1359,7 @@ object Bits {
   }
   def apply (mod: Mod, bit: Mod): Mod = {
     val res = new Bits();
-    res.init("", 1, mod, bit);
+    res.init("", fixWidth(1), mod, bit);
     res.hi = bit; 
     res.lo = bit;
     res
