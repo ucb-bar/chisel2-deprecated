@@ -821,6 +821,9 @@ class Bundle extends Interface {
     res += ")";
     res
   }
+  def view (elts: Map[String, Interface]): Bundle = { 
+    elementsCache = elts; this 
+  }
   override def name_it (path: String) = {
     for ((n, i) <- elements) {
       i.name = (if (path.length > 0) path + "_" else "") + n;
@@ -1087,6 +1090,7 @@ class IO extends Wire {
 };
 
 object Lit {
+  implicit def intToLit (x: Int) = Lit(x);
   def sizeof(x: Int): Int = { 
     val y = max(1, abs(x)).toDouble;
     val res = max(1, (ceil(log(y+1)/log(2.0))).toInt);
@@ -1154,6 +1158,7 @@ class Lit extends Mod {
     if (width == -1) name 
     else if (isBinary) ("" + width + "'b" + name)
     else ("" + width + "'d" + name);
+  def dec (x: Int): Lit = Lit(x, value)
 }
 
 class Delay extends Mod {
