@@ -115,6 +115,7 @@ abstract class Mod {
   def >>>(b: Mod): Mod = Op(">>", maxWidth _,  this, b );
   def +(b: Mod): Mod = Op("+",   maxWidth _,  this, b );
   def ^(b: Mod): Mod = Op("^",   maxWidth _,  this, b );
+  def ?(b: Mod): Mod = Mux(this, b, null);
   def -(b: Mod): Mod = Op("-",   maxWidth _,  this, b );
   def >(b: Mod): Mod = Op(">",   fixWidth(1), this, b );
   def ===(b: Mod): Mod = Op("==", fixWidth(1), this, b );
@@ -677,7 +678,7 @@ class Comp extends Mod {
     // println("// " + depthString(depth) + "DONE");
   }
   def compileV(): Unit = {
-    val out = new java.io.FileWriter("app.v");
+    val out = new java.io.FileWriter("../" + name + ".v");
     doCompileV(out, 0);
     out.close();
   }
@@ -688,8 +689,8 @@ class Comp extends Mod {
       child.nameAllIO();
   }
   def compileC(): Unit = {
-    val out_h = new java.io.FileWriter(name + ".h");
-    val out_c = new java.io.FileWriter(name + ".cpp");
+    val out_h = new java.io.FileWriter("../" + name + ".h");
+    val out_c = new java.io.FileWriter("../" + name + ".cpp");
     isEmittingC = true;
     println("// COMPILING " + this);
     if (isEmittingComponents) {
@@ -1158,7 +1159,7 @@ class Lit extends Mod {
     if (width == -1) name 
     else if (isBinary) ("" + width + "'b" + name)
     else ("" + width + "'d" + name);
-  def dec (x: Int): Lit = Lit(x, value)
+  def d (x: Int): Lit = Lit(x, value)
 }
 
 class Delay extends Mod {
@@ -1446,6 +1447,7 @@ class Mux extends Op {
     "  assign " + emitTmp + " = " + inputs(0).emitRef + " ? " + inputs(1).emitRef + " : " + inputs(2).emitRef + ";\n"
   override def emitDefLoC: String = 
     "    " + emitTmp + " = mux<" + width + ">(" + inputs(0).emitRef + ", " + inputs(1).emitRef + ", " + inputs(2).emitRef + ");\n"
+  def ::(a: Mod): Mux = { inputs(2) = a; this }
 }
 
 object Reg {
