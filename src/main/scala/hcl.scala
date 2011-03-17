@@ -726,7 +726,7 @@ class Component extends Node {
         val o = m.invoke(this);
         o match { 
           case child: Component => child.markComponents(this);
-          case node: Node => if (node.name == null) node.name = name;
+          case node: Node => if (node.name == "" || node.name == null) node.name = name;
           case any =>
         }
       }
@@ -990,6 +990,7 @@ object Wire {
     res.init(name, width, null);
     res
   }
+  def apply(width: Int): Wire = apply("", width);
 }
 class Wire extends Interface {
   // override def toString: String = "W(" + name + ")"
