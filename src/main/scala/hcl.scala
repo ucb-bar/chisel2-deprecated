@@ -721,11 +721,14 @@ class Component extends Node {
     for (m <- c.getDeclaredMethods) {
       val name = m.getName();
       // println("LOOKING FOR " + name);
-      val o = m.invoke(this);
-      o match { 
-        case child: Component => child.markComponents(this);
-        case node: Node => if (node.name == null) node.name = name;
-        case any =>
+      val types = m.getParameterTypes();
+      if (types.length == 0) {
+        val o = m.invoke(this);
+        o match { 
+          case child: Component => child.markComponents(this);
+          case node: Node => if (node.name == null) node.name = name;
+          case any =>
+        }
       }
     }
   }
