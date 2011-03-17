@@ -276,7 +276,7 @@ abstract class Node {
             case io: IO => 
               if (io.dir == OUTPUT) {
                 val c = node.component.parent;
-                println("BINDING " + node + " I " + i + " NODE-PARENT " + node.component.parent + " -> " + this + " PARENT " + component.parent);
+                // println("BINDING " + node + " I " + i + " NODE-PARENT " + node.component.parent + " -> " + this + " PARENT " + component.parent);
                 val b = Binding(node, c);
                 inputs(i) = b;
                 c.mods += b;  c.isWalked += b;
