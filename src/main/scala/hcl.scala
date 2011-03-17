@@ -13,6 +13,7 @@ import scala.math.log;
 import scala.math.abs;
 import scala.math.ceil;
 import scala.math.max;
+import scala.math.min;
 import Node._;
 import Wire._;
 import Lit._;
@@ -1177,17 +1178,20 @@ object Lit {
   val hexNibbles = "0123456789abcdef";
   def toHexNibble(x: String, off: Int): Char = {
     var res = 0;
+    // println("OFF = " + off);
     for (i <- 0 until 4) {
       val idx = off+i;
-      val c   = if (idx < 0 || idx >= x.length) '0' else x(idx);
-      res = 2 * res + (if (c == '1') 1 else 0);
+      val c   = if (idx < 0) '0' else x(idx);
+      res     = 2 * res + (if (c == '1') 1 else 0);
     }
     hexNibbles(res)
   }
+  val pads = Vector(0, 3, 2, 1);
   def toHex(x: String): String = {
     var res = "";
-    val pad        = x.length % 4;
-    val numNibbles = x.length / 4 + (if (pad > 0) 1 else 0);
+    val numNibbles = (x.length-1) / 4 + 1;
+    val pad = pads(x.length % 4);
+    // println("X = " + x + " NN = " + numNibbles + " PAD = " + pad);
     for (i <- 0 until numNibbles) {
       res += toHexNibble(x, i*4 - pad);
     }
@@ -1209,15 +1213,16 @@ object Lit {
   def apply(x: Int): Lit = { val res = new Lit(); res.init(x.toString, sizeof(x)); res }
   def apply(x: Int, width: Int): Lit = { val res = new Lit(); res.init(x.toString, width); res }
   def apply(n: String): Lit = { 
-    val (bits, mask, width) = parseLit(n);
-    val res = new Lit(); res.init(n, width); res.isBinary = true; res 
+    val (bits, mask, width) = parseLit(n);  apply(n, width);
   }
   def apply(n: String, width: Int): Lit = { 
     val (bits, mask, swidth) = parseLit(n);
-    val res = new Lit(); res.init(n, width); res.isBinary = true; res 
+    val isZ = (n.contains('?'));
+    val res = new Lit(); res.init(n, width); res.isZ = isZ; res.isBinary = true; res 
   }
 }
 class Lit extends Node {
+  var isZ = false;
   var isBinary = false;
   // override def toString: String = "LIT(" + name + ")"
   override def findNodes(depth: Int): Unit = { }
@@ -1227,7 +1232,10 @@ class Lit extends Node {
   override def emitRefC: String = 
     if (isBinary) { 
       var (bits, mask, width) = parseLit(name);
-      ("LITZ<" + width + ">(0x" + toHex(bits) + ", 0x" + toHex(mask) + ")")
+      if (isZ) {
+        ("LITZ<" + width + ">(0x" + toHex(bits) + ", 0x" + toHex(mask) + ")")
+      } else
+        ("LIT<" + width + ">(0x" + toHex(bits) + ")")
     } else 
       ("LIT<" + width + ">(" + name + ")")
   override def emitDec: String = "";
