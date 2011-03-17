@@ -859,7 +859,7 @@ class Bundle(view_arg: Seq[String] = null) extends Interface {
         var isFound = false;
         var isInterface = false;
         var c = rtype;
-        val sc = Class.forName("hcl.Interface");
+        val sc = Class.forName("Chisel.Interface");
         do {
           if (c == sc) {
             isFound = true; isInterface = true;
