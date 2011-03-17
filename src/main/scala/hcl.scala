@@ -276,7 +276,7 @@ abstract class Node {
             case io: IO => 
               if (io.dir == OUTPUT) {
                 val c = node.component.parent;
-                // println("BINDING " + node + " I " + i + " NODE-PARENT " + node.component.parent + " -> " + this + " PARENT " + component.parent);
+                println("BINDING " + node + " I " + i + " NODE-PARENT " + node.component.parent + " -> " + this + " PARENT " + component.parent);
                 val b = Binding(node, c);
                 inputs(i) = b;
                 c.mods += b;  c.isWalked += b;
@@ -457,15 +457,9 @@ class Component extends Node {
               res += io.inputs(0).emitRef;
           } else {
             if (io.consumers.length == 0) 
-              println("// " + io + " UNCONNECTED IN " + io.component); 
+              println("// " + io + " UNCONNECTED IN " + io.component + " BINDING " + findBinding(io)); 
             else {
-              var consumer: Node = null;
-              for (c <- io.consumers) {
-                if (c.component == parent)
-                  consumer = c;
-                // else
-                //   println("  " + c + "(" + c.component + ")" + " PARENT=" + c.component + " PARENT " + parent);
-              }
+              var consumer: Node = parent.findBinding(io);
               if (consumer == null) 
                 println("// " + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + io.consumers.length + ") IN " + parent); 
               else 
