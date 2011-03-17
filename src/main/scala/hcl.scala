@@ -1,6 +1,6 @@
 // author: jonathan bachrach
 
-package hcl {
+package Chisel {
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Queue
