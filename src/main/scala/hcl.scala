@@ -127,11 +127,12 @@ abstract class Node {
   def ^(b: Node): Node = Op("^",   maxWidth _,  this, b );
   def ?(b: Node): Node = Mux(this, b, null);
   def -(b: Node): Node = Op("-",   maxWidth _,  this, b );
-  def >(b: Node): Node = Op(">",   fixWidth(1), this, b );
   def ===(b: Node): Node = Op("==", fixWidth(1), this, b );
   def !=(b: Node): Node = Op("!=", fixWidth(1), this, b );
-  def <=(b: Node): Node = Op("<=", fixWidth(1), this, b );
+  def >(b: Node): Node = Op(">",   fixWidth(1), this, b );
   def <(b: Node): Node = Op("<", fixWidth(1), this, b );
+  def <=(b: Node): Node = Op("<=", fixWidth(1), this, b );
+  def >=(b: Node): Node = Op(">=", fixWidth(1), this, b );
   def &&(b: Node): Node = Op("&&", fixWidth(1), this, b );
   def ||(b: Node): Node = Op("||", fixWidth(1), this, b );
   def &(b: Node): Node = Op("&", maxWidth _, this, b );
