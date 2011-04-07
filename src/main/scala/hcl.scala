@@ -750,7 +750,7 @@ class Component extends Node {
   }
   def compileC(): Unit = {
     markComponents(null);
-    val out_h = new java.io.FileWriter("../emulator" + name + ".h");
+    val out_h = new java.io.FileWriter("../emulator/" + name + ".h");
     val out_c = new java.io.FileWriter("../emulator/" + name + ".cpp");
     isEmittingC = true;
     println("// COMPILING " + this + " NC = " + children.length);
@@ -1214,6 +1214,7 @@ object Lit {
   }
   def apply(x: Int): Lit = { val res = new Lit(); res.init(x.toString, sizeof(x)); res }
   def apply(x: Int, width: Int): Lit = { val res = new Lit(); res.init(x.toString, width); res }
+  def apply(x: Long, width: Int): Lit = { val res = new Lit(); res.init(x.toString, width); res }
   def apply(n: String): Lit = { 
     val (bits, mask, width) = parseLit(n);  apply(n, width);
   }
