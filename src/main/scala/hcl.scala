@@ -124,6 +124,7 @@ abstract class Node {
   def >>(b: Node): Node = Op(">>",   maxWidth _,  this, b );
   def >>>(b: Node): Node = Op(">>", maxWidth _,  this, b );
   def +(b: Node): Node = Op("+",   maxWidth _,  this, b );
+  def *(b: Node): Node = Op("*",   sumWidth _,  this, b );
   def ^(b: Node): Node = Op("^",   maxWidth _,  this, b );
   def ?(b: Node): Node = Mux(this, b, null);
   def -(b: Node): Node = Op("-",   maxWidth _,  this, b );
@@ -736,7 +737,7 @@ class Component extends Node {
   }
   def compileV(): Unit = {
     markComponents(null);
-    val out = new java.io.FileWriter("../" + name + ".v");
+    val out = new java.io.FileWriter("../verilog/" + name + ".v");
     currentComp = this;
     doCompileV(out, 0);
     out.close();
@@ -749,8 +750,8 @@ class Component extends Node {
   }
   def compileC(): Unit = {
     markComponents(null);
-    val out_h = new java.io.FileWriter("../" + name + ".h");
-    val out_c = new java.io.FileWriter("../" + name + ".cpp");
+    val out_h = new java.io.FileWriter("../emulator" + name + ".h");
+    val out_c = new java.io.FileWriter("../emulator/" + name + ".cpp");
     isEmittingC = true;
     println("// COMPILING " + this + " NC = " + children.length);
     if (isEmittingComponents) {
