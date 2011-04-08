@@ -118,6 +118,7 @@ abstract class Node {
   def width: Int = width_;
   def width_=(w: Int) = { isFixedWidth = true; width_ = width; inferWidth = fixWidth(w); }
   def name_it (path: String) = { name = path; }
+  def unary_-(): Node = Op("-", widthOf(0), this);
   def unary_~(): Node = Op("~", widthOf(0), this);
   def unary_!(): Node = Op("!", fixWidth(1), this);
   def <<(b: Node): Node = Op("<<",   maxWidth _,  this, b );
@@ -345,6 +346,7 @@ abstract class Node {
 
 object Component {
   var compIndex = -1;
+  var compIndices = HashMap.empty[String,Int];
   var isEmittingComponents = false;
   var isEmittingC = false;
   var topComponent: Component = null;
@@ -404,11 +406,14 @@ class Component extends Node {
   }
   def name_it() = {
     if (name == "") { 
-      compIndex += 1;
       val cname  = getClass().getName(); 
       val dotPos = cname.lastIndexOf('.');
       name = if (dotPos >= 0) cname.substring(dotPos+1) else cname;
-      name = name + "_" + compIndex;
+      if (compIndices contains name) {
+        compIndices += (name -> (compIndices(name) + 1));
+        name = name + "_" + compIndex;
+      } else
+        compIndices += (name -> 0);
     }
   }
   def findBinding(m: Node): Binding = {
