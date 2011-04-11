@@ -37,6 +37,26 @@ object Node {
       res = max(res, i.width);
     res
   }
+  def lshWidth(m: Node): Int = maxWidth(m);
+  def rshWidth(m: Node): Int = maxWidth(m);
+  /*
+  def lshWidth(m: Node): Int = {
+    val field = m.inputs(0);
+    val n     = m.inputs(1);
+    n match {
+      case l: Lit => field.width + l.value;
+      case o => max(field.width, n.width);
+    }
+  }
+  def rshWidth(m: Node): Int = {
+    val field = m.inputs(0);
+    val n     = m.inputs(1);
+    n match {
+      case l: Lit => field.width - l.value;
+      case o => max(field.width, n.width);
+    }
+  }
+  */
   def sumWidth(m: Node): Int = {
     var res = 0;
     for (i <- m.inputs)
@@ -121,8 +141,8 @@ abstract class Node {
   def unary_-(): Node = Op("-", widthOf(0), this);
   def unary_~(): Node = Op("~", widthOf(0), this);
   def unary_!(): Node = Op("!", fixWidth(1), this);
-  def <<(b: Node): Node = Op("<<",   maxWidth _,  this, b );
-  def >>(b: Node): Node = Op(">>",   maxWidth _,  this, b );
+  def <<(b: Node): Node = Op("<<",   lshWidth _,  this, b );
+  def >>(b: Node): Node = Op(">>",   rshWidth _,  this, b );
   def >>>(b: Node): Node = Op(">>", maxWidth _,  this, b );
   def +(b: Node): Node = Op("+",   maxWidth _,  this, b );
   def *(b: Node): Node = Op("*",   sumWidth _,  this, b );
