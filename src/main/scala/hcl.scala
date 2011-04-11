@@ -410,7 +410,8 @@ class Component extends Node {
       val dotPos = cname.lastIndexOf('.');
       name = if (dotPos >= 0) cname.substring(dotPos+1) else cname;
       if (compIndices contains name) {
-        compIndices += (name -> (compIndices(name) + 1));
+        val compIndex = (compIndices(name) + 1);
+        compIndices += (name -> compIndex);
         name = name + "_" + compIndex;
       } else
         compIndices += (name -> 0);
