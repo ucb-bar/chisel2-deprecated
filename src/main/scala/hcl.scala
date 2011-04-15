@@ -441,7 +441,10 @@ class Component extends Node {
         compIndices += (name -> 0);
     }
   }
-  def register_child(c: Component) = registered_children += c;
+  def register_child(c: Component): Component = {
+    registered_children += c;
+    c
+  }
   def findBinding(m: Node): Binding = {
     // println("FINDING BINDING " + m + " OUT OF " + bindings.length);
     for (b <- bindings) {
