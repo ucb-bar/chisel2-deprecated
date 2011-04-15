@@ -301,6 +301,9 @@ abstract class Node {
               if (io.dir == OUTPUT) {
                 val c = node.component.parent;
                 // println("BINDING " + node + " I " + i + " NODE-PARENT " + node.component.parent + " -> " + this + " PARENT " + component.parent);
+                if (c == null) {
+                  println("UNKNOWN COMPONENT FOR " + node);
+                }
                 val b = Binding(node, c);
                 inputs(i) = b;
                 c.mods += b;  c.isWalked += b;
@@ -409,6 +412,7 @@ class Component extends Node {
   var wiresCache: Array[(String, IO)] = null;
   var parent: Component = null;
   var children = new ArrayBuffer[Component];
+  var registered_children = new ArrayBuffer[Component];
 
   var mods  = new ArrayBuffer[Node];
   var omods = new ArrayBuffer[Node];
@@ -437,6 +441,7 @@ class Component extends Node {
         compIndices += (name -> 0);
     }
   }
+  def register_child(c: Component) = registered_children += c;
   def findBinding(m: Node): Binding = {
     // println("FINDING BINDING " + m + " OUT OF " + bindings.length);
     for (b <- bindings) {
@@ -760,6 +765,8 @@ class Component extends Node {
         }
       }
     }
+    for (c <- registered_children)
+      c.markComponents(this);
   }
   def compileV(): Unit = {
     markComponents(null);
