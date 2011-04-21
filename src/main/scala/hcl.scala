@@ -227,7 +227,7 @@ abstract class Node {
   def emitIndex: Int = { if (index == -1) index = componentOf.nextIndex; index }
   def emitTmp: String = emitRef;
   def emitRef: String = if (isEmittingC) emitRefC else emitRefV;
-  def emitRefV: String = if (name == "") "T" + emitIndex else name;
+  def emitRefV: String = if (name == "") "T" + emitIndex else name
   // def emitRef: String = "T" + emitIndex;
   def emitDef: String = ""
   def emitReg: String = ""
@@ -734,7 +734,10 @@ class Component extends Node {
       };
     }
     out.write(");\n\n");
-    out.write(emitDecs)
+    // TODO: NOT SURE EXACTLY WHY I NEED TO PRECOMPUTE TMPS HERE
+    for (m <- mods)
+      m.emitTmp;
+    out.write(emitDecs);
     out.write("\n");
     out.write(emitDefs)
     // for (o <- outputs)
