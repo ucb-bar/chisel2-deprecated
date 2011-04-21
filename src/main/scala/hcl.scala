@@ -185,19 +185,6 @@ abstract class Node {
   def apply(hi: Lit, lo: Lit): Node = { apply(hi.value, lo.value) };
   def apply(bit: Node): Node = { Bits(this, bit); }
   def apply(hi: Node, lo: Node): Node = { Bits(this, hi, lo) };
-  def findBinding(): Binding = 
-    componentOf.findBinding(this);
-  def binding(): Node = {
-    if (isEmittingComponents) {
-      val b = findBinding();
-      if (b == null) {
-        println("// UNABLE TO FIND BINDING FOR " + this);
-        this
-      } else
-        b
-    } else
-      this
-  }
   def initOf (n: String, width: (Node) => Int, ins: List[Node]): Node = { 
     component = currentComp;
     name = n; 
@@ -306,8 +293,10 @@ abstract class Node {
                 }
                 val b = Binding(node, c);
                 inputs(i) = b;
-                c.mods += b;  c.isWalked += b;
-                // println("OUTPUT " + io + " BINDING " + inputs(n) + " INPUT " + this);
+                if (!c.isWalked.contains(b)) {
+                  c.mods += b;  c.isWalked += b;
+                  // println("OUTPUT " + io + " BINDING " + inputs(n) + " INPUT " + this);
+                }
               }
             case any => 
           }
@@ -395,8 +384,19 @@ object Component {
     res
   }
   def apply (name: String): Component = Component(name, nullBundle);
+  def initChisel () = {
+    cond = new Stack[Node];
+    compStack = new Stack[Component]();
+    currentComp = null;
+    compIndex = -1;
+    compIndices.clear();
+    isEmittingComponents = false;
+    isEmittingC = false;
+    topComponent = null;
+  }
   def chisel_main(args: Array[String], gen: () => Component) = {
     val isEmitV = args.length > 0 && args(0) == "--v";
+    initChisel();
     isEmittingComponents = isEmitV;
     println("EMITTING COMPONENTS = " + isEmittingComponents);
     val c = gen();
@@ -446,9 +446,9 @@ class Component extends Node {
     c
   }
   def findBinding(m: Node): Binding = {
-    // println("FINDING BINDING " + m + " OUT OF " + bindings.length);
+    // println("FINDING BINDING " + m + " OUT OF " + bindings.length + " IN " + this);
     for (b <- bindings) {
-      // println("LOOKING AT " + b);
+      // println("LOOKING AT " + b + " INPUT " + b.inputs(0));
       if (b.inputs(0) == m)
         return b
     }
@@ -1058,7 +1058,7 @@ object Binding {
   def apply(m: Node, c: Component): Node = {
     // println("BINDING " + m);
     if (isEmittingComponents) {
-      val res = m.findBinding();
+      val res = c.findBinding(m);
       if (res == null) {
         val res = new Binding();
         res.component = c;
