@@ -287,7 +287,7 @@ abstract class Node {
             case io: IO => 
               if (io.dir == OUTPUT) {
                 val c = node.component.parent;
-                // println("BINDING " + node + " I " + i + " NODE-PARENT " + node.component.parent + " -> " + this + " PARENT " + component.parent);
+                println("BINDING " + node + " I " + i + " NODE-PARENT " + node.component.parent + " -> " + this + " PARENT " + component.parent);
                 if (c == null) {
                   println("UNKNOWN COMPONENT FOR " + node);
                 }
@@ -886,6 +886,14 @@ object Bundle {
     res
   }
 }
+
+class BlackBox extends Component {
+  override def doCompileV(out: java.io.FileWriter, depth: Int): Unit = {
+    name_it();
+    io.name_it("");
+  }
+}
+
 class Bundle(view_arg: Seq[String] = null) extends Interface {
   var view = view_arg;
   var elementsCache: Map[String, Interface] = null;
