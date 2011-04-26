@@ -29,6 +29,7 @@ object Node {
   implicit def intToNode(x: Int): Node = Lit(x);
   var compStack = new Stack[Component]();
   var currentComp: Component = null;
+  var isCoercingArgs = false;
   def fixWidth(w: Int) = { (m: Node) => w };
   def widthOf(i: Int) = { (m: Node) => m.inputs(i).width }
   def maxWidth(m: Node): Int = {
@@ -138,27 +139,27 @@ abstract class Node {
   def width: Int = width_;
   def width_=(w: Int) = { isFixedWidth = true; width_ = width; inferWidth = fixWidth(w); }
   def name_it (path: String) = { name = path; }
-  def unary_-(): Node = Op("-", widthOf(0), this);
-  def unary_~(): Node = Op("~", widthOf(0), this);
-  def unary_!(): Node = Op("!", fixWidth(1), this);
-  def <<(b: Node): Node = Op("<<",   lshWidth _,  this, b );
-  def >>(b: Node): Node = Op(">>",   rshWidth _,  this, b );
-  def >>>(b: Node): Node = Op(">>", maxWidth _,  this, b );
-  def +(b: Node): Node = Op("+",   maxWidth _,  this, b );
-  def *(b: Node): Node = Op("*",   sumWidth _,  this, b );
-  def ^(b: Node): Node = Op("^",   maxWidth _,  this, b );
-  def ?(b: Node): Node = Mux(this, b, null);
-  def -(b: Node): Node = Op("-",   maxWidth _,  this, b );
-  def ===(b: Node): Node = Op("==", fixWidth(1), this, b );
-  def !=(b: Node): Node = Op("!=", fixWidth(1), this, b );
-  def >(b: Node): Node = Op(">",   fixWidth(1), this, b );
-  def <(b: Node): Node = Op("<", fixWidth(1), this, b );
-  def <=(b: Node): Node = Op("<=", fixWidth(1), this, b );
-  def >=(b: Node): Node = Op(">=", fixWidth(1), this, b );
-  def &&(b: Node): Node = Op("&&", fixWidth(1), this, b );
-  def ||(b: Node): Node = Op("||", fixWidth(1), this, b );
-  def &(b: Node): Node = Op("&", maxWidth _, this, b );
-  def |(b: Node): Node = Op("|", maxWidth _, this, b );
+  def unary_-(): Node    = Op("-",  1, widthOf(0), this);
+  def unary_~(): Node    = Op("~",  1, widthOf(0), this);
+  def unary_!(): Node    = Op("!",  1, fixWidth(1), this);
+  def <<(b: Node): Node  = Op("<<", 0, rshWidth _,  this, b ); // TODO: FIX THIS
+  def >>(b: Node): Node  = Op(">>", 0, rshWidth _,  this, b ); // TODO: FIX THIS
+  def >>>(b: Node): Node = Op(">>", 0, rshWidth _,  this, b ); // TODO: FIX THIS
+  def +(b: Node): Node   = Op("+",  2, maxWidth _,  this, b );
+  def *(b: Node): Node   = Op("*",  0, sumWidth _,  this, b );
+  def ^(b: Node): Node   = Op("^",  2, maxWidth _,  this, b );
+  def ?(b: Node): Node   = Mux(this, b, null);
+  def -(b: Node): Node   = Op("-",  2, maxWidth _,  this, b );
+  def ===(b: Node): Node = Op("==", 2, fixWidth(1), this, b );
+  def !=(b: Node): Node  = Op("!=", 2, fixWidth(1), this, b );
+  def >(b: Node): Node   = Op(">",  2, fixWidth(1), this, b );
+  def <(b: Node): Node   = Op("<",  2, fixWidth(1), this, b );
+  def <=(b: Node): Node  = Op("<=", 2, fixWidth(1), this, b );
+  def >=(b: Node): Node  = Op(">=", 2, fixWidth(1), this, b );
+  def &&(b: Node): Node  = Op("&&", 2, fixWidth(1), this, b );
+  def ||(b: Node): Node  = Op("||", 2, fixWidth(1), this, b );
+  def &(b: Node): Node   = Op("&",  2, maxWidth _, this, b );
+  def |(b: Node): Node   = Op("|",  2, maxWidth _, this, b );
   def signed: Node = { 
     val res = Wire();
     res := this;
@@ -245,7 +246,7 @@ abstract class Node {
           }
         }
       }
-      // println("ADDING MOD " + this);
+      // println("ADDING MOD " + this.name);
       comp.omods += this;
     }
   }
@@ -267,9 +268,20 @@ abstract class Node {
       comp.gmods += this;
     }
   }
-  def findNodes(depth: Int): Unit = {
+  def findNodes(depth: Int, c: Component): Unit = {
     // untraced or same component?
-    val comp = componentOf;
+    val (comp, nextComp, markComp) = 
+      if (isEmittingComponents) {
+        this match {
+          case io: IO => {
+            val ioComp = io.component;
+            val nxtComp = if (io.dir == OUTPUT) ioComp else ioComp.parent;
+            (ioComp, nxtComp, nxtComp);
+          }
+          case any    => (c, c, c);
+        }
+      } else
+        (c, c, component);
     if (comp == null) {
       if (name != "reset")
         println("NULL COMPONENT FOR " + this);
@@ -281,13 +293,13 @@ abstract class Node {
         if (node != null) {
           // println(depthString(depth+1) + "INPUT " + node);
           if (node.component == null) // unmarked input
-            node.component = component;
-          node.findNodes(depth + 2);
+            node.component = markComp;
+          node.findNodes(depth + 2, nextComp);
           node match { 
             case io: IO => 
               if (io.dir == OUTPUT) {
                 val c = node.component.parent;
-                println("BINDING " + node + " I " + i + " NODE-PARENT " + node.component.parent + " -> " + this + " PARENT " + component.parent);
+                // println("BINDING " + node + " I " + i + " NODE-PARENT " + node.component.parent + " -> " + this + " PARENT " + component.parent);
                 if (c == null) {
                   println("UNKNOWN COMPONENT FOR " + node);
                 }
@@ -303,19 +315,8 @@ abstract class Node {
         }
         i += 1;
       }
-      // println("ADDING MOD " + this);
       comp.mods += this;
-      // this match {
-      //   case o: Output => ;
-      //   case _ => 
-      // }
     }
-    // else if (component != null) {
-    // if (!c.children.contains(component)) {
-    //   println("ADDING CHILD " + component.name + " TO " + c.name);
-    //   c.children += component;
-    // }
-    // }
   }
   def addConsumers(): Boolean = {
     /*
@@ -387,6 +388,7 @@ object Component {
   def initChisel () = {
     cond = new Stack[Node];
     compStack = new Stack[Component]();
+    isCoercingArgs = false;
     currentComp = null;
     compIndex = -1;
     compIndices.clear();
@@ -395,12 +397,18 @@ object Component {
     topComponent = null;
   }
   def chisel_main(args: Array[String], gen: () => Component) = {
-    val isEmitV = args.length > 0 && args(0) == "--v";
     initChisel();
-    isEmittingComponents = isEmitV;
+    for (arg <- args) {
+      println("ARG " + arg);
+      arg match {
+        case "--v" => isEmittingComponents = true;
+        case "--is-coercing-args" => isCoercingArgs = true;
+        case any => println("UNKNOWN ARG");
+      }
+    }
     println("EMITTING COMPONENTS = " + isEmittingComponents);
     val c = gen();
-    if (isEmitV)
+    if (isEmittingComponents)
       c.compileV();
     else
       c.compileC();
@@ -700,8 +708,8 @@ class Component extends Node {
       }
     }
   }
-  override def findNodes(depth: Int): Unit = {
-    io.findNodes(depth);
+  override def findNodes(depth: Int, c: Component): Unit = {
+    io.findNodes(depth, c);
   }
   def doCompileV(out: java.io.FileWriter, depth: Int): Unit = {
     name_it();
@@ -714,7 +722,6 @@ class Component extends Node {
     } else
       topComponent = this;
     // isWalked.clear();
-    findNodes(0);
     findConsumers();
     inferAll();
     collectNodes();
@@ -776,6 +783,7 @@ class Component extends Node {
   }
   def compileV(): Unit = {
     markComponents(null);
+    findNodes(0, this);
     val out = new java.io.FileWriter("../verilog/" + name + ".v");
     currentComp = this;
     doCompileV(out, 0);
@@ -802,7 +810,7 @@ class Component extends Node {
       topComponent = this;
     }
     // isWalked.clear();
-    findNodes(0);
+    findNodes(0, this);
     findConsumers();
     inferAll();
     collectNodes();
@@ -978,9 +986,9 @@ class Bundle(view_arg: Seq[String] = null) extends Interface {
       i.flip()
     this
   }
-  override def findNodes(depth: Int): Unit = {
+  override def findNodes(depth: Int, c: Component): Unit = {
     for ((n, elt) <- elements) 
-      elt.findNodes(depth);
+      elt.findNodes(depth, c);
     /*
     val elts = flatten;
     println(depthString(depth) + "BUNDLE " + this + " => " + elts);
@@ -1275,7 +1283,7 @@ class Lit extends Node {
   var isZ = false;
   var isBinary = false;
   // override def toString: String = "LIT(" + name + ")"
-  override def findNodes(depth: Int): Unit = { }
+  override def findNodes(depth: Int, c: Component): Unit = { }
   def value: Int = name.toInt;
   override def toString: String = name;
   override def emitDecC: String = "";
@@ -1424,26 +1432,38 @@ class Lookup extends Node {
 }
 
 object Op {
-  def apply (name: String, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
+  def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
     val res = new Op();
     res.init("", widthInfer, a, b);
     res.op = name;
+    res.nGrow = nGrow;
     res
   }
-  def apply (name: String, widthInfer: (Node) => Int, a: Node): Node = {
+  def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node): Node = {
     val res = new Op();
     res.init("", widthInfer, a);
     res.op = name;
+    res.nGrow = nGrow;
     res
   }
 }
 class Op extends Node {
   var op: String = "";
+  var nGrow: Int = 0;
   override def toString: String =
     if (inputs.length == 1)
       op + inputs(0)
     else
       inputs(0) + op + inputs(1)
+  def emitOpRef (k: Int): String = {
+    var w = 0;
+    for (i <- 0 until nGrow)
+      w = max(w, inputs(i).width);
+    if (isCoercingArgs && nGrow > 0 && k < nGrow && w > inputs(k).width)
+      "DAT<" + w + ">(" + inputs(k).emitRef + ")"
+    else
+      inputs(k).emitRef
+  }
   override def emitDef: String = 
     if (inputs.length == 1)
       "  assign " + emitTmp + " = " + op + " " + inputs(0).emitRef + ";\n"
@@ -1453,7 +1473,7 @@ class Op extends Node {
     if (inputs.length == 1)
       "    " + emitTmp + " = " + op + inputs(0).emitRef + ";\n"
     else
-      "    " + emitTmp + " = " + inputs(0).emitRef + " " + op + " " + inputs(1).emitRef + ";\n"
+      "    " + emitTmp + " = " + emitOpRef(0) + " " + op + " " + emitOpRef(1) + ";\n"
 }
 
 object Probe {
