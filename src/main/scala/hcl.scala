@@ -38,26 +38,6 @@ object Node {
       res = max(res, i.width);
     res
   }
-  def lshWidth(m: Node): Int = maxWidth(m);
-  def rshWidth(m: Node): Int = maxWidth(m);
-  /*
-  def lshWidth(m: Node): Int = {
-    val field = m.inputs(0);
-    val n     = m.inputs(1);
-    n match {
-      case l: Lit => field.width + l.value;
-      case o => max(field.width, n.width);
-    }
-  }
-  def rshWidth(m: Node): Int = {
-    val field = m.inputs(0);
-    val n     = m.inputs(1);
-    n match {
-      case l: Lit => field.width - l.value;
-      case o => max(field.width, n.width);
-    }
-  }
-  */
   def sumWidth(m: Node): Int = {
     var res = 0;
     for (i <- m.inputs)
@@ -142,14 +122,15 @@ abstract class Node {
   def unary_-(): Node    = Op("-",  1, widthOf(0), this);
   def unary_~(): Node    = Op("~",  1, widthOf(0), this);
   def unary_!(): Node    = Op("!",  1, fixWidth(1), this);
-  def <<(b: Node): Node  = Op("<<", 0, rshWidth _,  this, b ); // TODO: FIX THIS
-  def >>(b: Node): Node  = Op(">>", 0, rshWidth _,  this, b ); // TODO: FIX THIS
-  def >>>(b: Node): Node = Op(">>", 0, rshWidth _,  this, b ); // TODO: FIX THIS
+  def <<(b: Node): Node  = Op("<<", 0, fixWidth(0),  this, b );
+  def >>(b: Node): Node  = Op(">>", 0, fixWidth(0),  this, b );
+  def >>>(b: Node): Node = Op(">>", 0, fixWidth(0),  this, b );
   def +(b: Node): Node   = Op("+",  2, maxWidth _,  this, b );
   def *(b: Node): Node   = Op("*",  0, sumWidth _,  this, b );
   def ^(b: Node): Node   = Op("^",  2, maxWidth _,  this, b );
   def ?(b: Node): Node   = Mux(this, b, null);
   def -(b: Node): Node   = Op("-",  2, maxWidth _,  this, b );
+  def ##(b: Node): Node  = Op("##", 2, sumWidth _,  this, b );
   def ===(b: Node): Node = Op("==", 2, fixWidth(1), this, b );
   def !=(b: Node): Node  = Op("!=", 2, fixWidth(1), this, b );
   def >(b: Node): Node   = Op(">",  2, fixWidth(1), this, b );
@@ -1464,28 +1445,40 @@ class Op extends Node {
     else
       inputs(k).emitRef
   }
-  override def emitDef: String = 
-    if (inputs.length == 1)
-      "  assign " + emitTmp + " = " + op + " " + inputs(0).emitRef + ";\n"
-    else
-      "  assign " + emitTmp + " = " + inputs(0).emitRef + " " + op + " " + inputs(1).emitRef + ";\n"
-  override def emitDefLoC: String = 
-    if (inputs.length == 1)
-      "    " + emitTmp + " = " + op + inputs(0).emitRef + ";\n"
-    else
-      "    " + emitTmp + " = " + emitOpRef(0) + " " + op + " " + emitOpRef(1) + ";\n"
+  override def emitDef: String = {
+    "  assign " + emitTmp + " = " + 
+      (if (op == "##") 
+        "{" + inputs(0).emitRef + " " + op + " " + inputs(1).emitRef + "}"
+       else if (inputs.length == 1)
+         op + " " + inputs(0).emitRef
+       else
+         inputs(0).emitRef + " " + op + " " + inputs(1).emitRef
+      ) + ";\n"
+  }
+  override def emitDefLoC: String = {
+    "    " + emitTmp + " = " + 
+      (if (op == "##") 
+        "cat<" + width + ">(" + emitOpRef(0) + ", " + emitOpRef(1) + ")"
+       else if (inputs.length == 1)
+         op + inputs(0).emitRef
+       else
+         emitOpRef(0) + " " + op + " " + emitOpRef(1)) +
+    ";\n"
+  }
 }
 
 object Probe {
   def apply(x: Node, name: String): Probe = { val res = new Probe(); res.init(name, widthOf(0), x); res }
+  def apply(x: Node): Probe = apply(x, "");
 }
 class Probe extends Node {
+  def my_name: String = if (name == "") inputs(0).emitRefV else name
   override def toString: String =
-    "Probe(" + inputs(0) + ", " + name + ")"
+    "Probe(" + inputs(0) + ", " + my_name + ")"
   override def emitDef: String = 
     "  assign " + emitTmp + " = " + inputs(0).emitRef + ";\n"
   override def emitDefLoC: String = 
-    "    " + "printf(\"" + name + ": %lx\\n\", " + inputs(0).emitRef + ".to_ulong());\n" +
+    "    " + "printf(\"DBG " + my_name + ": %s\\n\", " + inputs(0).emitRef + ".to_str().c_str());\n" +
     "    " + emitTmp + " = " + inputs(0).emitRef + ";\n";
 }
 
