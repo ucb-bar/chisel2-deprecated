@@ -44,6 +44,7 @@ object Node {
       res = res + i.width;
     res
   }
+  def Cat (mod: Node, mods: Node*): Node = mods.foldLeft(mod){(a, b) => a ## b}
   def when(c: Node)(block: => Unit) = {
     cond.push(c); 
     // println("WHEN " + c + " {");
@@ -122,9 +123,9 @@ abstract class Node {
   def unary_-(): Node    = Op("-",  1, widthOf(0), this);
   def unary_~(): Node    = Op("~",  1, widthOf(0), this);
   def unary_!(): Node    = Op("!",  1, fixWidth(1), this);
-  def <<(b: Node): Node  = Op("<<", 0, fixWidth(0),  this, b );
-  def >>(b: Node): Node  = Op(">>", 0, fixWidth(0),  this, b );
-  def >>>(b: Node): Node = Op(">>", 0, fixWidth(0),  this, b );
+  def <<(b: Node): Node  = Op("<<", 0, widthOf(0),  this, b );
+  def >>(b: Node): Node  = Op(">>", 0, widthOf(0),  this, b );
+  def >>>(b: Node): Node = Op(">>", 0, widthOf(0),  this, b );
   def +(b: Node): Node   = Op("+",  2, maxWidth _,  this, b );
   def *(b: Node): Node   = Op("*",  0, sumWidth _,  this, b );
   def ^(b: Node): Node   = Op("^",  2, maxWidth _,  this, b );
@@ -1448,7 +1449,7 @@ class Op extends Node {
   override def emitDef: String = {
     "  assign " + emitTmp + " = " + 
       (if (op == "##") 
-        "{" + inputs(0).emitRef + " " + op + " " + inputs(1).emitRef + "}"
+        "{" + inputs(0).emitRef + ", " + inputs(1).emitRef + "}"
        else if (inputs.length == 1)
          op + " " + inputs(0).emitRef
        else
@@ -1543,44 +1544,6 @@ class Bits extends Node {
       "    " + emitTmp + " = " + inputs(0).emitRef + ".bit(" + hi.emitRef + ");\n"
     else
       "    " + emitTmp + " = " + inputs(0).emitRef + ".extract<" + width + ">(" + hi.emitRef + "," + lo.emitRef + ");\n"
-}
-
-object Cat {
-  def apply (mods: Node*): Node = {
-    val res = new Cat();
-    res.init("", sumWidth _);
-    for (m <- mods)
-      res.inputs += m;
-    res
-  }
-}
-class Cat extends Node {
-  override def toString: String = {
-    var res = "Cat(";
-    for (i <- inputs)
-      res = res + i + " ";
-    res + ")"
-  }
-  override def emitDef: String = {
-    var res = "  assign " + emitTmp + " = {" 
-    var is_first = true;
-    for (i <- inputs) {
-      if (!is_first) res = res + ", ";
-      res = res + i.emitRef;
-      is_first = false;
-    }
-    res + "};\n"
-  }
-  override def emitDefLoC: String = {
-    var res = "    " + emitTmp + " = cat<" + width + ">(" 
-    var is_first = true;
-    for (i <- inputs) {
-      if (!is_first) res = res + ", ";
-      res = res + i.emitRef;
-      is_first = false;
-    }
-    res + ");\n"
-  }
 }
 
 object Mux {
