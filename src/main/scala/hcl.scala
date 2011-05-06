@@ -168,6 +168,7 @@ abstract class Node {
   def apply(hi: Lit, lo: Lit): Node = { apply(hi.value, lo.value) };
   def apply(bit: Node): Node = { Bits(this, bit); }
   def apply(hi: Node, lo: Node): Node = { Bits(this, hi, lo) };
+  def isIo = false;
   def initOf (n: String, width: (Node) => Int, ins: List[Node]): Node = { 
     component = currentComp;
     name = n; 
@@ -195,7 +196,14 @@ abstract class Node {
       return false;
   }
   def emitIndex: Int = { if (index == -1) index = componentOf.nextIndex; index }
-  def emitTmp: String = emitRef;
+  def emitTmp: String = 
+    if (isEmittingC) {
+      if (isIo)
+        emitRef
+      else
+        "dat_t<" + width + "> " + emitRef
+    } else
+      emitRef
   def emitRef: String = if (isEmittingC) emitRefC else emitRefV;
   def emitRefV: String = if (name == "") "T" + emitIndex else name
   // def emitRef: String = "T" + emitIndex;
@@ -818,7 +826,8 @@ class Component extends Node {
         out_h.write("  dat_t<" + w.width + "> " + w.emitRef + ";\n");
     }
     for (m <- omods) 
-      out_h.write(m.emitDecC);
+      if (m.isIo)
+        out_h.write(m.emitDecC);
     if (isEmittingComponents) {
       for (c <- children) 
         out_h.write("  " + c.emitRef + "_t* " + c.emitRef + ";\n");
@@ -842,8 +851,9 @@ class Component extends Node {
     }
     out_c.write("}\n");
     out_c.write("void " + name + "_t::clock_lo ( dat_t<1> reset ) {\n");
-    for (m <- omods) 
+    for (m <- omods) {
       out_c.write(m.emitDefLoC);
+    }
     // for (c <- children) 
     //   out_c.write("    " + c.emitRef + "->clock_lo(reset);\n");
     out_c.write("}\n");
@@ -1116,6 +1126,7 @@ object IO {
 }
 class IO extends Wire { 
   var dir: IOdir = null;
+  override def isIo = true;
   override def emitDef: String = {
     if (dir == INPUT)
       ""
