@@ -1512,6 +1512,27 @@ class Fill extends Node {
     "    " + emitTmp + " = " + inputs(0).emitRef + ".fill<" + width + "," + n + ">();\n";
 }
 
+object Log2 {
+  // def log2WidthOf() = { (m: Node, n: Int) => log2(m.inputs(0).width) }
+  def apply (mod: Node, n: Int): Node = {
+    if (isEmittingComponents) {
+      var res: Node = Lit(n);
+      for (i <- 1 to n) 
+        res = Mux(mod(i), Lit(i, sizeof(n)), res);
+      res
+    } else {
+      val res = new Log2();
+      res.init("", fixWidth(sizeof(n)), mod);
+      res
+    }
+  }
+}
+class Log2 extends Node {
+  override def toString: String = "LOG2(" + inputs(0) + ")";
+  override def emitDefLoC: String = 
+    "    " + emitTmp + " = " + inputs(0).emitRef + ".log2<" + width + ">();\n";
+}
+
 object Bits {
   def apply (mod: Node, bit: Int): Node = 
     apply(mod, Lit(bit));
