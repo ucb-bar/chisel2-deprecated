@@ -142,6 +142,9 @@ abstract class Node {
   def ||(b: Node): Node  = Op("||", 2, fixWidth(1), this, b );
   def &(b: Node): Node   = Op("&",  2, maxWidth _, this, b );
   def |(b: Node): Node   = Op("|",  2, maxWidth _, this, b );
+  def maxNum: Int = 1 << width;
+  def isLit = false;
+  def value = -1;
   def signed: Node = { 
     val res = Wire();
     res := this;
@@ -1247,6 +1250,12 @@ object Lit {
     }
     res
   }
+  def toLitVal(x: String): Int = {
+    var res = 0;
+    for (c <- x.substring(2, x.length)) 
+      res = res * 16 + c.asDigit;
+    res
+  }
   def parseLit(x: String): (String, String, Int) = {
     var bits = "";
     var mask = "";
@@ -1260,9 +1269,9 @@ object Lit {
     }
     (bits, mask, width)
   }
-  def apply(x: Int): Lit = { val res = new Lit(); res.init(x.toString, sizeof(x)); res }
-  def apply(x: Int, width: Int): Lit = { val res = new Lit(); res.init(x.toString, width); res }
-  def apply(x: Long, width: Int): Lit = { val res = new Lit(); res.init(x.toString, width); res }
+  def apply(x: Int): Lit = { val res = new Lit(); res.init("0x%x".format(x), sizeof(x)); res }
+  def apply(x: Int, width: Int): Lit = { val res = new Lit(); res.init("0x%x".format(x), width); res }
+  def apply(x: Long, width: Int): Lit = { val res = new Lit(); res.init("0x%x".format(x), width); res }
   def apply(n: String): Lit = { 
     val (bits, mask, width) = parseLit(n);  apply(n, width);
   }
@@ -1277,7 +1286,9 @@ class Lit extends Node {
   var isBinary = false;
   // override def toString: String = "LIT(" + name + ")"
   override def findNodes(depth: Int, c: Component): Unit = { }
-  def value: Int = name.toInt;
+  override def value: Int = toLitVal(name);
+  override def maxNum = value;
+  override def isLit = true;
   override def toString: String = name;
   override def emitDecC: String = "";
   override def emitRefC: String = 
@@ -1288,12 +1299,12 @@ class Lit extends Node {
       } else
         ("LIT<" + width + ">(0x" + toHex(bits) + ")")
     } else 
-      ("LIT<" + width + ">(" + name + ")")
+      ("LIT<" + width + ">(" + name + "L)")
   override def emitDec: String = "";
   override def emitRefV: String = 
     if (width == -1) name 
     else if (isBinary) ("" + width + "'b" + name)
-    else ("" + width + "'d" + name);
+    else ("" + width + "'h" + name.substring(2, name.length));
   def d (x: Int): Lit = Lit(x, value)
 }
 
@@ -1495,21 +1506,24 @@ class Probe extends Node {
 }
 
 object Fill {
-  def fillWidthOf(i: Int, n: Int) = { (m: Node) => m.inputs(i).width * n }
-  def apply (mod: Node, n: Int): Node = {
+  def fillWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).width * n.maxNum }
+  def apply (mod: Node, n: Node): Node = {
     val res = new Fill();
-    res.init("", fillWidthOf(0, n), mod);
+    res.init("", fillWidthOf(0, n), mod, n);
     res.n = n;
     res
   }
 }
 class Fill extends Node {
-  var n: Int = 0;
+  var n: Node = null;
   override def toString: String = "FILL(" + inputs(0) + ", " + n + ")";
   override def emitDef: String = 
-    "  assign " + emitTmp + " = {" + n + "{" + inputs(0).emitRef + "}};\n";
+    "  assign " + emitTmp + " = {" + n.emitRef + "{" + inputs(0).emitRef + "}};\n";
   override def emitDefLoC: String = 
-    "    " + emitTmp + " = " + inputs(0).emitRef + ".fill<" + width + "," + n + ">();\n";
+    if (n.isLit)
+      "    " + emitTmp + " = " + inputs(0).emitRef + ".fill<" + width + "," + n.value + ">();\n";
+    else
+      "    " + emitTmp + " = " + inputs(0).emitRef + ".fill<" + width + ">(" + n.emitRef + ");\n";
 }
 
 object Log2 {
