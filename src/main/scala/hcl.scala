@@ -29,7 +29,7 @@ object Node {
   implicit def intToNode(x: Int): Node = Lit(x);
   var compStack = new Stack[Component]();
   var currentComp: Component = null;
-  var isCoercingArgs = false;
+  var isCoercingArgs = true;
   def fixWidth(w: Int) = { (m: Node) => w };
   def widthOf(i: Int) = { (m: Node) => m.inputs(i).width }
   def maxWidth(m: Node): Int = {
@@ -44,6 +44,8 @@ object Node {
       res = res + i.width;
     res
   }
+  def lshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).width + n.maxNum }
+  def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).width - n.minNum }
   def Cat (mod: Node, mods: Node*): Node = mods.foldLeft(mod){(a, b) => a ## b}
   def when(c: Node)(block: => Unit) = {
     cond.push(c); 
@@ -123,9 +125,9 @@ abstract class Node {
   def unary_-(): Node    = Op("-",  1, widthOf(0), this);
   def unary_~(): Node    = Op("~",  1, widthOf(0), this);
   def unary_!(): Node    = Op("!",  1, fixWidth(1), this);
-  def <<(b: Node): Node  = Op("<<", 0, widthOf(0),  this, b );
-  def >>(b: Node): Node  = Op(">>", 0, widthOf(0),  this, b );
-  def >>>(b: Node): Node = Op(">>", 0, widthOf(0),  this, b );
+  def <<(b: Node): Node  = Op("<<", 0, lshWidthOf(0, b),  this, b );
+  def >>(b: Node): Node  = Op(">>", 0, rshWidthOf(0, b),  this, b );
+  def >>>(b: Node): Node = Op(">>", 0, rshWidthOf(0, b),  this, b );
   def +(b: Node): Node   = Op("+",  2, maxWidth _,  this, b );
   def *(b: Node): Node   = Op("*",  0, sumWidth _,  this, b );
   def ^(b: Node): Node   = Op("^",  2, maxWidth _,  this, b );
@@ -142,7 +144,8 @@ abstract class Node {
   def ||(b: Node): Node  = Op("||", 2, fixWidth(1), this, b );
   def &(b: Node): Node   = Op("&",  2, maxWidth _, this, b );
   def |(b: Node): Node   = Op("|",  2, maxWidth _, this, b );
-  def maxNum: Int = 1 << width;
+  def maxNum: Int = (1 << width)-1;
+  def minNum: Int = 0;
   def isLit = false;
   def value = -1;
   def signed: Node = { 
@@ -381,7 +384,7 @@ object Component {
   def initChisel () = {
     cond = new Stack[Node];
     compStack = new Stack[Component]();
-    isCoercingArgs = false;
+    isCoercingArgs = true;
     currentComp = null;
     compIndex = -1;
     compIndices.clear();
@@ -394,8 +397,8 @@ object Component {
     for (arg <- args) {
       println("ARG " + arg);
       arg match {
-        case "--v" => isEmittingComponents = true;
-        case "--is-coercing-args" => isCoercingArgs = true;
+        case "--v" => isEmittingComponents = true; isCoercingArgs = false;
+        // case "--is-coercing-args" => isCoercingArgs = true;
         case any => println("UNKNOWN ARG");
       }
     }
@@ -1288,6 +1291,7 @@ class Lit extends Node {
   override def findNodes(depth: Int, c: Component): Unit = { }
   override def value: Int = toLitVal(name);
   override def maxNum = value;
+  override def minNum = value;
   override def isLit = true;
   override def toString: String = name;
   override def emitDecC: String = "";
