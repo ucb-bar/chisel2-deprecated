@@ -1221,7 +1221,7 @@ class IO extends Wire {
 };
 
 object Lit {
-  implicit def intToLit (x: Int) = Lit(x);
+  //implicit def intToLit (x: Int) = Lit(x);
   def sizeof(x: Int): Int = { 
     val y = max(1, abs(x)).toDouble;
     val res = max(1, (ceil(log(y+1)/log(2.0))).toInt);
@@ -1256,6 +1256,14 @@ object Lit {
       res = res * 16 + c.asDigit;
     res
   }
+
+  def toLitVal(x: String, shamt: Int): Int = {
+    var res = 0;
+    for(c <- x)
+      res = res * shamt + c.asDigit;
+    res
+  }
+
   def parseLit(x: String): (String, String, Int) = {
     var bits = "";
     var mask = "";
@@ -1269,6 +1277,19 @@ object Lit {
     }
     (bits, mask, width)
   }
+  def stringToVal(base: Char, x: String): Int = {
+    if(base == 'x')
+      toLitVal(x);
+    else if(base == 'd')
+      x.toInt
+    else if(base == 'h')
+      toLitVal(x, 16)
+    else if(base == 'b')
+      toLitVal(x, 2)  
+    else
+      -1
+  }
+
   def apply(x: Int): Lit = { val res = new Lit(); res.init("0x%x".format(x), sizeof(x)); res }
   def apply(x: Int, width: Int): Lit = { val res = new Lit(); res.init("0x%x".format(x), width); res }
   def apply(x: Long, width: Int): Lit = { val res = new Lit(); res.init("0x%x".format(x), width); res }
@@ -1280,13 +1301,21 @@ object Lit {
     val isZ = (n.contains('?'));
     val res = new Lit(); res.init(n, width); res.isZ = isZ; res.isBinary = true; res 
   }
+  def apply(width: Int, base: Char, literal: String): Lit = {
+    val res = new Lit();
+    res.init(literal, width); res.base = base;
+    if (base == 'b') {res.isZ = literal.contains('?'); res.isBinary = true;}
+    res
+  }
 }
 class Lit extends Node {
+  //implicit def intToLit (x: Int) = Lit(x);
   var isZ = false;
   var isBinary = false;
+  var base = 'x';
   // override def toString: String = "LIT(" + name + ")"
   override def findNodes(depth: Int, c: Component): Unit = { }
-  override def value: Int = toLitVal(name);
+  override def value: Int = stringToVal(base, name);
   override def maxNum = value;
   override def isLit = true;
   override def toString: String = name;
@@ -1298,14 +1327,22 @@ class Lit extends Node {
         ("LITZ<" + width + ">(0x" + toHex(bits) + ", 0x" + toHex(mask) + ")")
       } else
         ("LIT<" + width + ">(0x" + toHex(bits) + ")")
-    } else 
+    } else if(base == 'd' || base == 'x'){
       ("LIT<" + width + ">(" + name + "L)")
+    } else
+      ("Lit<" + width + ">(0x" + name + "L)")
+  
+
   override def emitDec: String = "";
   override def emitRefV: String = 
     if (width == -1) name 
-    else if (isBinary) ("" + width + "'b" + name)
-    else ("" + width + "'h" + name.substring(2, name.length));
+    else if(isBinary) ("" + width + "'b" + name)
+    else if(base == 'x') ("" + width + "'h" + name.substring(2, name.length))
+    else if(base == 'd') ("" + width + "'d" + name)
+    else if(base == 'h') ("" + width + "'h" + name)
+    else "";
   def d (x: Int): Lit = Lit(x, value)
+  def ~(x: String): Lit = Lit(value, x(0), x.substring(1, x.length));
 }
 
 class Delay extends Node {
