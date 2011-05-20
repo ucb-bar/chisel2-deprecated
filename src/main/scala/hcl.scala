@@ -1,5 +1,4 @@
 // author: jonathan bachrach
-
 package Chisel {
 
 import scala.collection.mutable.ArrayBuffer
@@ -44,6 +43,7 @@ object Node {
       res = res + i.width;
     res
   }
+  def widthSL() = {(m: Node) => m.inputs(0).width + m.inputs(1).value}
   def Cat (mod: Node, mods: Node*): Node = mods.foldLeft(mod){(a, b) => a ## b}
   def when(c: Node)(block: => Unit) = {
     cond.push(c); 
@@ -123,7 +123,8 @@ abstract class Node {
   def unary_-(): Node    = Op("-",  1, widthOf(0), this);
   def unary_~(): Node    = Op("~",  1, widthOf(0), this);
   def unary_!(): Node    = Op("!",  1, fixWidth(1), this);
-  def <<(b: Node): Node  = Op("<<", 0, widthOf(0),  this, b );
+  //def <<(b: Node): Node  = Op("<<", 0, widthOf(0),  this, b );
+  def <<(b: Node): Node  = Op("<<", 0, widthSL(),   this, b );
   def >>(b: Node): Node  = Op(">>", 0, widthOf(0),  this, b );
   def >>>(b: Node): Node = Op(">>", 0, widthOf(0),  this, b );
   def +(b: Node): Node   = Op("+",  2, maxWidth _,  this, b );
@@ -1221,7 +1222,7 @@ class IO extends Wire {
 };
 
 object Lit {
-  //implicit def intToLit (x: Int) = Lit(x);
+  implicit def intToLit (x: Int) = Lit(x);
   def sizeof(x: Int): Int = { 
     val y = max(1, abs(x)).toDouble;
     val res = max(1, (ceil(log(y+1)/log(2.0))).toInt);
@@ -1302,6 +1303,7 @@ object Lit {
     val res = new Lit(); res.init(n, width); res.isZ = isZ; res.isBinary = true; res 
   }
   def apply(width: Int, base: Char, literal: String): Lit = {
+    if (!"dhb".contains(base)) throw new IllegalArgumentException("invalid base");
     val res = new Lit();
     res.init(literal, width); res.base = base;
     if (base == 'b') {res.isZ = literal.contains('?'); res.isBinary = true;}
