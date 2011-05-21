@@ -1,5 +1,4 @@
 // author: jonathan bachrach
-
 package Chisel {
 
 import scala.collection.mutable.ArrayBuffer
@@ -1229,7 +1228,7 @@ class IO extends Wire {
 };
 
 object Lit {
-  //implicit def intToLit (x: Int) = Lit(x);
+  implicit def intToLit (x: Int) = Lit(x);
   def sizeof(x: Int): Int = { 
     val y = max(1, abs(x)).toDouble;
     val res = max(1, (ceil(log(y+1)/log(2.0))).toInt);
@@ -1310,6 +1309,7 @@ object Lit {
     val res = new Lit(); res.init(n, width); res.isZ = isZ; res.isBinary = true; res 
   }
   def apply(width: Int, base: Char, literal: String): Lit = {
+    if (!"dhb".contains(base)) throw new IllegalArgumentException("invalid base");
     val res = new Lit();
     res.init(literal, width); res.base = base;
     if (base == 'b') {res.isZ = literal.contains('?'); res.isBinary = true;}
