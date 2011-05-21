@@ -174,6 +174,7 @@ abstract class Node {
   def apply(bit: Node): Node = { Bits(this, bit); }
   def apply(hi: Node, lo: Node): Node = { Bits(this, hi, lo) };
   def isIo = false;
+  def isMem = false;
   def initOf (n: String, width: (Node) => Int, ins: List[Node]): Node = { 
     component = currentComp;
     name = n; 
@@ -219,6 +220,7 @@ abstract class Node {
   // C backend
   def emitDecC: String = "  dat_t<" + width + "> " + emitRef + ";\n";
   def emitDefLoC: String = ""
+  def emitInitC: String = ""
   def emitDefHiC: String = ""
   def emitRefC: String = emitRefV;
   def depthString(depth: Int): String = {
@@ -518,7 +520,7 @@ class Component extends Node {
       w match {
         case io: IO  => 
           if (io.dir == INPUT)
-            res += "    " + emitRef + "->" + n + " = " + io.inputs(0).emitRef + ";\n";
+            res += "  " + emitRef + "->" + n + " = " + io.inputs(0).emitRef + ";\n";
       };
     }
     res += emitRef + "->clock_lo(reset);\n";
@@ -526,7 +528,7 @@ class Component extends Node {
       w match {
         case io: IO => 
           if (io.dir == OUTPUT)
-            res += "    " + io.consumers(0).emitRef + " = " + emitRef + "->" + n + ";\n";
+            res += "  " + io.consumers(0).emitRef + " = " + emitRef + "->" + n + ";\n";
       };
     }
     res
@@ -831,7 +833,7 @@ class Component extends Node {
         out_h.write("  dat_t<" + w.width + "> " + w.emitRef + ";\n");
     }
     for (m <- omods) 
-      if (m.isIo)
+      if (m.isIo || m.isMem)
         out_h.write(m.emitDecC);
     if (isEmittingComponents) {
       for (c <- children) 
@@ -853,6 +855,9 @@ class Component extends Node {
         out_c.write("  " + c.emitRef + " = new " + c.emitRef + "_t();\n");
         out_c.write("  " + c.emitRef + "->init();\n");
       }
+    }
+    for (m <- omods) {
+      out_c.write(m.emitInitC);
     }
     out_c.write("}\n");
     out_c.write("void " + name + "_t::clock_lo ( dat_t<1> reset ) {\n");
@@ -1060,10 +1065,10 @@ class Wire extends Interface {
   override def emitDefLoC: String = 
     // TODO: NEED THIS TO BE A CHECK
     if (inputs.length == 1)
-      "    " + emitTmp + " = " + inputs(0).emitRef + ";\n"
+      "  " + emitTmp + " = " + inputs(0).emitRef + ";\n"
     else
       ""
-    // "    " + emitTmp + " = " + inputs(0).emitRef + ";\n"
+    // "  " + emitTmp + " = " + inputs(0).emitRef + ";\n"
 }
 
 // used for component to component connections
@@ -1147,9 +1152,9 @@ class IO extends Wire {
     if (dir == INPUT) {
       // TODO: HACK
       if (inputs.length == 1)
-        "    " + emitTmp + " = " + inputs(0).emitRef + ";\n"
+        "  " + emitTmp + " = " + inputs(0).emitRef + ";\n"
       // else if (consumers.length == 1)
-      //   "    " + consumers(0).emitRef + " = " + emitTmp + ";// CONSUMER=1 \n"
+      //   "  " + consumers(0).emitRef + " = " + emitTmp + ";// CONSUMER=1 \n"
       else
         ""
     } else
@@ -1352,6 +1357,58 @@ class Lit extends Node {
 class Delay extends Node {
 }
 
+object Rom {
+  def romWidth(data: Array[Lit]) = { 
+    (m: Node) => { 
+      var res = 0; 
+      for (d <- data) 
+        res = max(d.width, res); 
+      res  }
+  }
+  def apply (data: Array[Lit]): Rom = {
+    val res = new Rom(data);
+    res.init("", romWidth(data));
+    res
+  }
+}
+class Rom(data_vals: Array[Lit]) extends Delay {
+  val data = data_vals;
+  override def isMem = true;
+  override def toString: String = "ROM(" + data + ")";
+  override def emitDef: String = {
+    var res = "  initial begin\n";
+    for (i <- 0 until data.length) 
+      res += "    " + emitRef + "[" + i + "] = " + data(i).emitRef + ";\n";
+    res += "  end\n";
+    res
+  }
+  override def emitDec: String = 
+    "  reg[" + (width-1) + ":0] " + emitRef + "[" + (data.length-1) + ":0];\n";
+  override def emitInitC: String = {
+    var res = "";
+    for (i <- 0 until data.length) 
+      res += "  " + emitRef + ".put(" + i + ", " + data(i).emitRef + ");\n";
+    res
+  }
+  override def emitDecC: String = 
+    "  mem_t<" + width + "," + data.length + "> " + emitRef + ";\n";
+  override def apply(addr: Node): Node = MemRef(this, addr);
+}
+
+object MemRef {
+  def apply (mem: Node, addr: Node): Node = {
+    val res = new MemRef();
+    res.init("", widthOf(0), mem, addr);
+    res
+  }
+}
+class MemRef extends Node {
+  override def toString: String = inputs(0) + "[" + inputs(1) + "]";
+  override def emitDef: String = 
+    "  assign " + emitTmp + " = " + inputs(0).emitRef + "[" + inputs(1).emitRef + "];\n"
+  override def emitDefLoC: String = 
+    "  " + emitTmp + " = " + inputs(0).emitRef + ".get(" + inputs(1).emitRef + ");\n"
+}
 
 object Mem {
   def apply (n: Int, isEnable: Node, wrAddr: Node, wrData: Node): Mem = {
@@ -1370,6 +1427,7 @@ object Mem {
 class Mem extends Delay {
   var n = 0;
   var resetVal: Node = null;
+  override def isMem = true;
   override def toString: String = "MEM(" + inputs(0) + " " + inputs(1) + " " + inputs(2) + ")";
   override def emitDef: String = {
     var res = 
@@ -1389,34 +1447,19 @@ class Mem extends Delay {
     "  reg[" + (width-1) + ":0] " + emitRef + "[" + (n-1) + ":0];\n";
   override def emitDefHiC: String = {
     var res = 
-      "    if (" + inputs(0).emitRef + ".to_bool())\n" +
-      "      " + emitRef + ".put(" + inputs(1).emitRef + ", " + inputs(2).emitRef + ");\n";
+      "  if (" + inputs(0).emitRef + ".to_bool())\n" +
+      "    " + emitRef + ".put(" + inputs(1).emitRef + ", " + inputs(2).emitRef + ");\n";
     if (!(resetVal == null)) {
-      res += "    if (reset.to_bool()) {\n";
+      res += "  if (reset.to_bool()) {\n";
       for (i <- 0 until n) 
-        res += "      " + emitRef + ".put(" + i + ", " + resetVal.emitRef + ");\n";
-      res += "    }\n";
+        res += "    " + emitRef + ".put(" + i + ", " + resetVal.emitRef + ");\n";
+      res += "  }\n";
     }
     res
   }
   override def emitDecC: String = 
     "  mem_t<" + width + "," + n + "> " + emitRef + ";\n";
   override def apply(addr: Node): Node = MemRef(this, addr);
-}
-
-object MemRef {
-  def apply (mem: Node, addr: Node): Node = {
-    val res = new MemRef();
-    res.init("", widthOf(0), mem, addr);
-    res
-  }
-}
-class MemRef extends Node {
-  override def toString: String = inputs(0) + "[" + inputs(1) + "]";
-  override def emitDef: String = 
-    "  assign " + emitTmp + " = " + inputs(0).emitRef + "[" + inputs(1).emitRef + "];\n"
-  override def emitDefLoC: String = 
-    "    " + emitTmp + " = " + inputs(0).emitRef + ".get(" + inputs(1).emitRef + ");\n"
 }
 
 object MuxLookup {
@@ -1469,7 +1512,7 @@ class Lookup extends Node {
     var res = "";
     for ((addr, data) <- map) 
       res = res +
-        "    if ((" + addr.emitRef + " == " + inputs(0).emitRef + ").to_bool()) " + emitRef + " = " + data.emitRef + ";\n";
+        "  if ((" + addr.emitRef + " == " + inputs(0).emitRef + ").to_bool()) " + emitRef + " = " + data.emitRef + ";\n";
     res
   }
   override def emitDec: String = 
@@ -1529,7 +1572,7 @@ class Op extends Node {
       ) + ";\n"
   }
   override def emitDefLoC: String = {
-    "    " + emitTmp + " = " + 
+    "  " + emitTmp + " = " + 
       (if (op == "##") 
         "cat<" + width + ">(" + emitOpRef(0) + ", " + emitOpRef(1) + ")"
        else if (inputs.length == 1)
@@ -1551,8 +1594,8 @@ class Probe extends Node {
   override def emitDef: String = 
     "  assign " + emitTmp + " = " + inputs(0).emitRef + ";\n"
   override def emitDefLoC: String = 
-    "    " + "printf(\"DBG " + my_name + ": %s\\n\", " + inputs(0).emitRef + ".to_str().c_str());\n" +
-    "    " + emitTmp + " = " + inputs(0).emitRef + ";\n";
+    "  " + "printf(\"DBG " + my_name + ": %s\\n\", " + inputs(0).emitRef + ".to_str().c_str());\n" +
+    "  " + emitTmp + " = " + inputs(0).emitRef + ";\n";
 }
 
 object Fill {
@@ -1571,9 +1614,9 @@ class Fill extends Node {
     "  assign " + emitTmp + " = {" + n.emitRef + "{" + inputs(0).emitRef + "}};\n";
   override def emitDefLoC: String = 
     if (n.isLit)
-      "    " + emitTmp + " = " + inputs(0).emitRef + ".fill<" + width + "," + n.value + ">();\n";
+      "  " + emitTmp + " = " + inputs(0).emitRef + ".fill<" + width + "," + n.value + ">();\n";
     else
-      "    " + emitTmp + " = " + inputs(0).emitRef + ".fill<" + width + ">(" + n.emitRef + ");\n";
+      "  " + emitTmp + " = " + inputs(0).emitRef + ".fill<" + width + ">(" + n.emitRef + ");\n";
 }
 
 object Log2 {
@@ -1594,7 +1637,7 @@ object Log2 {
 class Log2 extends Node {
   override def toString: String = "LOG2(" + inputs(0) + ")";
   override def emitDefLoC: String = 
-    "    " + emitTmp + " = " + inputs(0).emitRef + ".log2<" + width + ">();\n";
+    "  " + emitTmp + " = " + inputs(0).emitRef + ".log2<" + width + ">();\n";
 }
 
 object Bits {
@@ -1637,9 +1680,9 @@ class Bits extends Node {
       "  assign " + emitTmp + " = " + inputs(0).emitRef + "[" + hi.emitRef + ":" + lo.emitRef + "];\n"
   override def emitDefLoC: String = 
     if (hi == lo)
-      "    " + emitTmp + " = " + inputs(0).emitRef + ".bit(" + hi.emitRef + ");\n"
+      "  " + emitTmp + " = " + inputs(0).emitRef + ".bit(" + hi.emitRef + ");\n"
     else
-      "    " + emitTmp + " = " + inputs(0).emitRef + ".extract<" + width + ">(" + hi.emitRef + "," + lo.emitRef + ");\n"
+      "  " + emitTmp + " = " + inputs(0).emitRef + ".extract<" + width + ">(" + hi.emitRef + "," + lo.emitRef + ");\n"
 }
 
 object Mux {
@@ -1652,7 +1695,7 @@ class Mux extends Op {
   override def emitDef: String = 
     "  assign " + emitTmp + " = " + inputs(0).emitRef + " ? " + inputs(1).emitRef + " : " + inputs(2).emitRef + ";\n"
   override def emitDefLoC: String = 
-    "    " + emitTmp + " = mux<" + width + ">(" + inputs(0).emitRef + ", " + inputs(1).emitRef + ", " + inputs(2).emitRef + ");\n"
+    "  " + emitTmp + " = mux<" + width + ">(" + inputs(0).emitRef + ", " + inputs(1).emitRef + ", " + inputs(2).emitRef + ");\n"
   def ::(a: Node): Mux = { inputs(2) = a; this }
 }
 
@@ -1716,11 +1759,11 @@ class Reg extends Delay {
     "  reg[" + (width-1) + ":0] " + emitRef + ";\n";
 
   override def emitDefLoC: String = 
-    "    " + emitRef + "_shadow = " + 
+    "  " + emitRef + "_shadow = " + 
     (if (inputs(0) == null) "" else "mux<" + width + ">(reset, " + inputs(0).emitRef + ", ") + 
     inputs(1).emitRef + ");\n"
   override def emitDefHiC: String =
-    "    " + emitRef + " = " + emitRef + "_shadow;\n";
+    "  " + emitRef + " = " + emitRef + "_shadow;\n";
   override def emitDecC: String = 
     "  dat_t<" + width + "> " + emitRef + ";\n" +
     "  dat_t<" + width + "> " + emitRef + "_shadow;\n";
