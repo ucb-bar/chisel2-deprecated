@@ -174,7 +174,7 @@ abstract class Node {
   def apply(bit: Node): Node = { Bits(this, bit); }
   def apply(hi: Node, lo: Node): Node = { Bits(this, hi, lo) };
   def isIo = false;
-  def isMem = false;
+  def isReg = false;
   def initOf (n: String, width: (Node) => Int, ins: List[Node]): Node = { 
     component = currentComp;
     name = n; 
@@ -833,7 +833,7 @@ class Component extends Node {
         out_h.write("  dat_t<" + w.width + "> " + w.emitRef + ";\n");
     }
     for (m <- omods) 
-      if (m.isIo || m.isMem)
+      if (m.isIo || m.isReg)
         out_h.write(m.emitDecC);
     if (isEmittingComponents) {
       for (c <- children) 
@@ -1355,6 +1355,7 @@ class Lit extends Node {
 }
 
 class Delay extends Node {
+  override def isReg = true;
 }
 
 object Rom {
@@ -1373,7 +1374,6 @@ object Rom {
 }
 class Rom(data_vals: Array[Lit]) extends Delay {
   val data = data_vals;
-  override def isMem = true;
   override def toString: String = "ROM(" + data + ")";
   override def emitDef: String = {
     var res = "  initial begin\n";
@@ -1427,7 +1427,6 @@ object Mem {
 class Mem extends Delay {
   var n = 0;
   var resetVal: Node = null;
-  override def isMem = true;
   override def toString: String = "MEM(" + inputs(0) + " " + inputs(1) + " " + inputs(2) + ")";
   override def emitDef: String = {
     var res = 
@@ -1706,7 +1705,7 @@ object Reg {
 class Reg extends Delay {
   // var clauses = new ArrayBuffer[Pair[Node, Node]];
   def reset(init: Node): Reg = { inputs(0) = init; this }
-  def <==(src: Node) = {
+  def <==(src: Node): Reg = {
     if (cond.length == 0)
       inputs(1) = src;
     else if (inputs(1) == null) {
@@ -1723,6 +1722,7 @@ class Reg extends Delay {
       // println(this.name + " <== " + res + " " + cond.length);
       inputs(1) = Mux(res, src, inputs(1))
     }
+    this
     // clauses += Pair(cond.head, src);
   }
   def nameOpt: String = if (name.length > 0) name else "REG"
