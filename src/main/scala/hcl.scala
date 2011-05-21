@@ -1501,13 +1501,22 @@ class Op extends Node {
     else
       inputs(0) + op + inputs(1)
   def emitOpRef (k: Int): String = {
-    var w = 0;
-    for (i <- 0 until nGrow)
-      w = max(w, inputs(i).width);
-    if (isCoercingArgs && nGrow > 0 && k < nGrow && w > inputs(k).width)
-      "DAT<" + w + ">(" + inputs(k).emitRef + ")"
-    else
+    if (op == "<<") {
+      if (k == 0 && inputs(k).width < width)
+	"/* C */DAT<" + width + ">(" + inputs(k).emitRef + ")"
+      else
+	inputs(k).emitRef
+    } else if (op == "##" || op == ">>" || op == ">>>" || op == "*")
       inputs(k).emitRef
+    else {
+      var w = 0;
+      for (i <- 0 until nGrow)
+	w = max(w, inputs(i).width);
+      if (isCoercingArgs && nGrow > 0 && k < nGrow && w > inputs(k).width)
+	"/* C */DAT<" + w + ">(" + inputs(k).emitRef + ")"
+      else
+	inputs(k).emitRef
+    }
   }
   override def emitDef: String = {
     "  assign " + emitTmp + " = " + 
