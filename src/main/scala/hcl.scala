@@ -7,6 +7,7 @@ import scala.collection.mutable.Stack
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashMap
 import java.lang.reflect.Modifier._;
+import java.io.File;
 
 import scala.math.log;
 import scala.math.abs;
@@ -53,17 +54,17 @@ object Node {
     cond.pop();
     // println("} ");
   }
-  def ifelse(c: Node, con_block: () => Unit, alt_block: () => Unit) = {
+  def ifelse(c: Node)(con_block: => Unit)(alt_block: => Unit) = {
     val tt = c;
     cond.push(tt);  
     // println("  IF " + tt + " {");
-    con_block(); 
+    con_block; 
     // println("  }");
     cond.pop();
     val et = !c;
     cond.push(et); 
     // println("  ELSE IF " + et + " {");
-    alt_block(); 
+    alt_block; 
     cond.pop();
     // println("  }");
   }
@@ -102,6 +103,18 @@ object Node {
       val res = block(c);
       c.ioVal = Output("res", res);
     });
+  }
+  def ListLookup (addr: Node, default: List[Node], mapping: Array[(Lit, List[Node])]): List[Node] = {
+    val ll = new ListLookup(mapping, default);
+    ll.init("", widthOf(1), addr); 
+    for (w <- ll.wires)
+      w.lookup = ll;
+    for (e <- default) 
+      ll.inputs += e;
+    for ((addr, data) <- mapping)
+      for (e <- data)
+        ll.inputs += e;
+    ll.wires
   }
 }
 
@@ -175,6 +188,13 @@ abstract class Node {
   def apply(hi: Node, lo: Node): Node = { Bits(this, hi, lo) };
   def isIo = false;
   def isReg = false;
+  def isUsedByRam: Boolean = {
+    for (c <- consumers) 
+      if (c.isRamWriteInput(this))
+        return true;
+    return false;
+  }
+  def isRamWriteInput(i: Node) = false;
   def initOf (n: String, width: (Node) => Int, ins: List[Node]): Node = { 
     component = currentComp;
     name = n; 
@@ -204,7 +224,7 @@ abstract class Node {
   def emitIndex: Int = { if (index == -1) index = componentOf.nextIndex; index }
   def emitTmp: String = 
     if (isEmittingC) {
-      if (isIo)
+      if (isIo || isReg || isUsedByRam)
         emitRef
       else
         "dat_t<" + width + "> " + emitRef
@@ -341,6 +361,15 @@ abstract class Node {
     }
     true;
   }
+  def extract (widths: Array[Int]): List[Node] = {
+    var res: List[Node] = Nil;
+    var off = 0;
+    for (w <- widths) {
+      res  = this(off+w-1, off) :: res;
+      off += w.value;
+    }
+    res.reverse
+  }
   def Match(mods: Array[Node]) {
     var off = 0;
     for (m <- mods.reverse) {
@@ -355,6 +384,10 @@ abstract class Node {
 }
 
 object Component {
+  var isGenHarness = false;
+  var targetEmulatorRootDir: String = null;
+  var targetVerilogRootDir: String = null;
+  var targetDir: String = null;
   var compIndex = -1;
   var compIndices = HashMap.empty[String,Int];
   var isEmittingComponents = false;
@@ -385,7 +418,13 @@ object Component {
   def initChisel () = {
     cond = new Stack[Node];
     compStack = new Stack[Component]();
+    isGenHarness = false;
     isCoercingArgs = true;
+    targetEmulatorRootDir = System.getProperty("CHISEL_EMULATOR_ROOT");
+    if (targetEmulatorRootDir == null) targetEmulatorRootDir = "../emulator";
+    targetVerilogRootDir = System.getProperty("CHISEL_VERILOG_ROOT");
+    if (targetVerilogRootDir == null) targetVerilogRootDir = "../verilog";
+    targetDir = "";
     currentComp = null;
     compIndex = -1;
     compIndices.clear();
@@ -395,13 +434,17 @@ object Component {
   }
   def chisel_main(args: Array[String], gen: () => Component) = {
     initChisel();
-    for (arg <- args) {
-      println("ARG " + arg);
+    var i = 0;
+    while (i < args.length) {
+      val arg = args(i);
       arg match {
+        case "--gen-harness" => isGenHarness = true; 
         case "--v" => isEmittingComponents = true; isCoercingArgs = false;
+        case "--target-dir" => targetDir = args(i+1); i += 1;
         // case "--is-coercing-args" => isCoercingArgs = true;
         case any => println("UNKNOWN ARG");
       }
+      i += 1;
     }
     println("EMITTING COMPONENTS = " + isEmittingComponents);
     val c = gen();
@@ -778,10 +821,16 @@ class Component extends Node {
     for (c <- registered_children)
       c.markComponents(this);
   }
+  def ensure_dir(dir: String) = {
+    val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/");
+    new File(d).mkdirs();
+    d
+  }
   def compileV(): Unit = {
     markComponents(null);
     findNodes(0, this);
-    val out = new java.io.FileWriter("../verilog/" + name + ".v");
+    val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
+    val out = new java.io.FileWriter(base_name + name + ".v");
     currentComp = this;
     doCompileV(out, 0);
     out.close();
@@ -792,10 +841,38 @@ class Component extends Node {
     for (child <- children) 
       child.nameAllIO();
   }
+  def genHarness(base_name: String, name: String) = {
+    val makefile = new java.io.FileWriter(base_name + name + "-makefile");
+    makefile.write("CPPFLAGS = -O2 -I../\n\n");
+    makefile.write(name + ": " + name + ".o" + " " + name + "-emulator.o\n");
+    makefile.write("\tg++ -o " + name + " " + name + ".o " + name + "-emulator.o\n\n");
+    makefile.write(name + ".o: " + name + ".cpp " + name + ".h\n");
+    makefile.write("\tg++ -c ${CPPFLAGS} " + name + ".cpp\n\n");
+    makefile.write(name + "emulator.o: " + name + "-emulator.cpp " + name + ".h\n");
+    makefile.write("\tg++ -c ${CPPFLAGS} " + name + "-emulator.cpp\n\n");
+    makefile.close();
+    val harness  = new java.io.FileWriter(base_name + name + "-emulator.cpp");
+    harness.write("#include \"emulator.h\"\n");
+    harness.write("#include \"" + name + ".h\"\n");
+    harness.write("int main (int argc, char* argv[]) {\n");
+    harness.write("  mod_t* c = new " + name + "_t();\n");
+    harness.write("  int lim = (argc > 1) ? atoi(argv[1]) : -1;\n");
+    harness.write("  c->init();\n");
+    harness.write("  for (int t = 0; lim < 0 || t < lim; t++) {\n");
+    harness.write("    dat_t<1> reset = LIT<1>(t == 0);\n");
+    harness.write("    c->clock_lo(reset);\n");
+    harness.write("    c->clock_hi(reset);\n");
+    harness.write("  }\n");
+    harness.write("}\n");
+    harness.close();
+  }
   def compileC(): Unit = {
     markComponents(null);
-    val out_h = new java.io.FileWriter("../emulator/" + name + ".h");
-    val out_c = new java.io.FileWriter("../emulator/" + name + ".cpp");
+    val base_name = ensure_dir(targetEmulatorRootDir + "/" + targetDir);
+    val out_h = new java.io.FileWriter(base_name + name + ".h");
+    val out_c = new java.io.FileWriter(base_name + name + ".cpp");
+    if (isGenHarness)
+      genHarness(base_name, name);
     isEmittingC = true;
     println("// COMPILING " + this + " NC = " + children.length);
     if (isEmittingComponents) {
@@ -833,7 +910,7 @@ class Component extends Node {
         out_h.write("  dat_t<" + w.width + "> " + w.emitRef + ";\n");
     }
     for (m <- omods) 
-      if (m.isIo || m.isReg)
+      if (m.isIo || m.isReg || m.isUsedByRam)
         out_h.write(m.emitDecC);
     if (isEmittingComponents) {
       for (c <- children) 
@@ -1411,29 +1488,34 @@ class MemRef extends Node {
 }
 
 object Mem {
-  def apply (n: Int, isEnable: Node, wrAddr: Node, wrData: Node): Mem = {
-    val res = new Mem();
-    res.init("", widthOf(2), isEnable, wrAddr, wrData);
-    res.n = n;
-    res
-  }
-  def apply (n: Int, isEnable: Node, wrAddr: Node, wrData: Node, reset: Node): Mem = {
-    val res = apply(n, isEnable, wrAddr, wrData);
-    res.resetVal = reset;
-    res.inputs  += res.resetVal;
+  val noResetVal = Lit(0);
+  def apply (n: Int, isEnable: Node = Lit(0), wrAddr: Node = Lit(0), wrData: Node = Lit(0), resetVal: Node = noResetVal): Mem = {
+    val res = new Mem(n);
+    res.init("", widthOf(2), isEnable, wrAddr, wrData, resetVal);
+    res.isResetVal = resetVal != noResetVal;
     res
   }
 }
-class Mem extends Delay {
-  var n = 0;
-  var resetVal: Node = null;
-  override def toString: String = "MEM(" + inputs(0) + " " + inputs(1) + " " + inputs(2) + ")";
+class Mem(n_val: Int) extends Delay {
+  val n          = n_val;
+  var isResetVal = false;
+  def wrEnable   = inputs(0);
+  def wrEnable_= (x: Node) = inputs(0) = x;
+  def wrAddr     = inputs(1);
+  def wrAddr_= (x: Node) = inputs(1) = x;
+  def wrData     = inputs(2);
+  def wrData_= (x: Node) = inputs(2) = x;
+  def resetVal   = inputs(3);
+  def resetVal_= (x: Node) = { isResetVal = true; inputs(3) = x; }
+  override def isRamWriteInput(i: Node) = 
+    i == wrEnable || i == wrAddr || i == wrData;
+  override def toString: String = "MEM(" + wrEnable + " " + wrAddr + " " + wrData + ")";
   override def emitDef: String = {
     var res = 
       "  always @(posedge clk) begin\n" +
-      "    if (" + inputs(0).emitRef + ")\n" +
-      "      " + emitRef + "[" + inputs(1).emitRef + "] <= " + inputs(2).emitRef + ";\n";
-    if (!(resetVal == null)) {
+      "    if (" + wrEnable.emitRef + ")\n" +
+      "      " + emitRef + "[" + wrAddr.emitRef + "] <= " + wrData.emitRef + ";\n";
+    if (isResetVal) {
       res += "    else if (reset) begin\n";
       for (i <- 0 until n) 
         res += "      " + emitRef + "[" + i + "] <= " + resetVal.emitRef + ";\n";
@@ -1446,9 +1528,9 @@ class Mem extends Delay {
     "  reg[" + (width-1) + ":0] " + emitRef + "[" + (n-1) + ":0];\n";
   override def emitDefHiC: String = {
     var res = 
-      "  if (" + inputs(0).emitRef + ".to_bool())\n" +
-      "    " + emitRef + ".put(" + inputs(1).emitRef + ", " + inputs(2).emitRef + ");\n";
-    if (!(resetVal == null)) {
+      "  if (" + wrEnable.emitRef + ".to_bool())\n" +
+      "    " + emitRef + ".put(" + wrAddr.emitRef + ", " + wrData.emitRef + ");\n";
+    if (isResetVal) {
       res += "  if (reset.to_bool()) {\n";
       for (i <- 0 until n) 
         res += "    " + emitRef + ".put(" + i + ", " + resetVal.emitRef + ");\n";
@@ -1490,7 +1572,7 @@ object Lookup {
   }
 }
 
-class Lookup extends Node {
+class Lookup extends Delay {
   var map: Map[Lit, Node] = null;
   override def toString: String = "LOOKUP(" + inputs(0) + ")";
   override def emitDef: String = {
@@ -1516,6 +1598,53 @@ class Lookup extends Node {
   }
   override def emitDec: String = 
     "  reg[" + (width-1) + ":0] " + emitRef + ";\n";
+}
+
+class ListLookup(mapping: Array[(Lit, List[Node])], defaultVal: List[Node]) extends Node {
+  val map = mapping;
+  val default = defaultVal;
+  val wires = defaultVal.map(a => new ListLookupRef());
+  override def toString: String = "LIST-LOOKUP(" + inputs(0) + ")";
+  override def emitDef: String = {
+    var res = 
+      "  always @(*) begin\n" +
+      "    " + emitRef + " = " + inputs(1).emitRef + ";\n" +
+      "    casez (" + inputs(0).emitRef + ")" + "\n";
+    
+    for ((addr, data) <- map) {
+      res = res + "      " + addr.emitRef + " : \n";
+      for ((w, e) <- wires zip data) 
+        res = res + "        " + w.emitRef + " = " + e.emitRef + ";\n";
+    }
+    res = res + 
+      "    endcase\n" +
+      "  end\n";
+    res
+  }
+  override def emitDefLoC: String = {
+    var res = "";
+    for ((addr, data) <- map) {
+      res = res + "  if ((" + addr.emitRef + " == " + inputs(0).emitRef + ").to_bool()) {\n";
+      for ((w, e) <- wires zip data) 
+        res = res + "    " + w.emitRef + " = " + e.emitRef + ";\n";
+      res = res + "  }\n";
+    }
+    res
+  }
+}
+class ListLookupRef extends Delay {
+  def lookup = inputs(0);
+  def lookup_= (ll: ListLookup) = { inputs(0) = ll; }
+  inputs += null;
+  inferWidth = widthOf(0); // TODO: PROBABLY NOT RIGHT
+  // override def toString: String = "W(" + name + ")"
+  override def toString: String = name
+  override def emitDef = "";
+  override def emitDefLoC = "";
+  override def emitDec: String = 
+    "  reg[" + (width-1) + ":0] " + emitRef + ";\n";
+  override def emitDecC: String = 
+    "  dat_t<" + width + "> " + emitRef + ";\n";
 }
 
 object Op {
@@ -1768,5 +1897,14 @@ class Reg extends Delay {
     "  dat_t<" + width + "> " + emitRef + ";\n" +
     "  dat_t<" + width + "> " + emitRef + "_shadow;\n";
 }
+
+/*
+object Nodes {
+  def apply (nodes: Node*): Nodes = new Nodes(nodes.toList);
+  def unapplySeq(nodes: List[Node]): Nodes = 
+}
+class Nodes extends Node {
+}
+*/
 
 }
