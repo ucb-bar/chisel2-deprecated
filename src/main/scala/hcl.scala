@@ -22,7 +22,6 @@ import Reg._;
 import Component._;
 import Bundle._;
 import IOdir._;
-import IO._;
 
 object Node {
   var cond = new Stack[Node];
@@ -1193,22 +1192,23 @@ class IOdir (idi: Int) {
   override def toString: String = if (id == 0) "INPUT-DIR" else "OUTPUT-DIR";
 }
 
-object IO {
-  def Input(width: Int): IO = Input("", width)
-  def Input(name: String): IO = Input(name, widthOf(0))
-  def Input(name: String, width: Int): IO = 
+object Input {
+  def apply(width: Int): IO = apply("", width)
+  def apply(name: String): IO = apply(name, widthOf(0))
+  def apply(name: String, width: Int): IO = 
     { val res = new IO(); res.dir = INPUT; res.init(name, width); res }
-  def Input(name: String, inferWidth: (Node) => Int): IO = 
+  def apply(name: String, inferWidth: (Node) => Int): IO = 
     { val res = new IO(); res.dir = INPUT; res.init(name, inferWidth); res }
-
-  def Output(width: Int): IO = Output("", width);
-  def Output(name: String): IO = Output(name, widthOf(0), null)
-  def Output(name: String, inferWidth: (Node) => Int, x: Node): IO = 
+}
+object Output {
+  def apply(width: Int): IO = apply("", width);
+  def apply(name: String): IO = apply(name, widthOf(0), null)
+  def apply(name: String, inferWidth: (Node) => Int, x: Node): IO = 
     { val res = new IO(); res.dir = OUTPUT; res.init(name, inferWidth, x); res }
-  def Output(name: String, width: Int): IO = 
+  def apply(name: String, width: Int): IO = 
     { val res = new IO(); res.dir = OUTPUT; res.init(name, width); res }
-  def Output(name: String, x: Node): IO = Output(name, maxWidth _, x); 
-  def Output(x: Node): IO = Output("", x);
+  def apply(name: String, x: Node): IO = apply(name, maxWidth _, x); 
+  def apply(x: Node): IO = apply("", x);
 }
 class IO extends Wire { 
   var dir: IOdir = null;
