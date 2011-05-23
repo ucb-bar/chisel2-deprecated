@@ -1404,15 +1404,16 @@ class Lit extends Node {
   override def emitDecC: String = "";
   override def emitRefC: String = 
     if (isBinary) { 
-      var (bits, mask, width) = parseLit(name);
+      var (bits, mask, swidth) = parseLit(name);
+      var bwidth = if(base == 'b') width else swidth;
       if (isZ) {
-        ("LITZ<" + width + ">(0x" + toHex(bits) + ", 0x" + toHex(mask) + ")")
+        ("LITZ<" + bwidth + ">(0x" + toHex(bits) + ", 0x" + toHex(mask) + ")")
       } else
-        ("LIT<" + width + ">(0x" + toHex(bits) + ")")
+        ("LIT<" + bwidth + ">(0x" + toHex(bits) + ")")
     } else if(base == 'd' || base == 'x'){
       ("LIT<" + width + ">(" + name + "L)")
     } else
-      ("Lit<" + width + ">(0x" + name + "L)")
+      ("LIT<" + width + ">(0x" + name + "L)")
   
 
   override def emitDec: String = "";
@@ -1424,7 +1425,7 @@ class Lit extends Node {
     else if(base == 'h') ("" + width + "'h" + name)
     else "";
   def d (x: Int): Lit = Lit(x, value)
-  def ~(x: String): Lit = Lit(value, x(0), x.substring(1, x.length));
+  //def ~(x: String): Lit = Lit(value, x(0), x.substring(1, x.length));
 }
 
 class Delay extends Node {
