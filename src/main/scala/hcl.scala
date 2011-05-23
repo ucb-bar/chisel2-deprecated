@@ -854,7 +854,7 @@ class Component extends Node {
     harness.write("#include \"emulator.h\"\n");
     harness.write("#include \"" + name + ".h\"\n");
     harness.write("int main (int argc, char* argv[]) {\n");
-    harness.write("  mod_t* c = new " + name + "_t();\n");
+    harness.write("  " + name + "_t* c = new " + name + "_t();\n");
     harness.write("  int lim = (argc > 1) ? atoi(argv[1]) : -1;\n");
     harness.write("  c->init();\n");
     harness.write("  for (int t = 0; lim < 0 || t < lim; t++) {\n");
