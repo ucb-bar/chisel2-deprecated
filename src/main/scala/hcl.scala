@@ -446,7 +446,6 @@ object Component {
       }
       i += 1;
     }
-    println("EMITTING COMPONENTS = " + isEmittingComponents);
     val c = gen();
     if (isEmittingComponents)
       c.compileV();
@@ -1541,7 +1540,7 @@ class Mem(n_val: Int) extends Delay {
 }
 
 object MuxLookup {
-  def apply (key: Node, default: Node, mapping: Vector[(Node, Node)]): Node = {
+  def apply (key: Node, default: Node, mapping: Seq[(Node, Node)]): Node = {
     var res = default;
     for ((k, v) <- mapping.reverse)
       res = Mux(key === k, v, res);
@@ -1550,7 +1549,7 @@ object MuxLookup {
 }
 
 object MuxCase {
-  def apply (default: Node, mapping: Vector[(Node, Node)]): Node = {
+  def apply (default: Node, mapping: Seq[(Node, Node)]): Node = {
     var res = default;
     for ((t, v) <- mapping.reverse)
       res = Mux(t, v, res);
@@ -1559,7 +1558,7 @@ object MuxCase {
 }
 
 object Lookup {
-  def apply (addr: Node, default: Node, mapping: Map[Lit, Node]): Lookup = {
+  def apply (addr: Node, default: Node, mapping: Seq[(Lit, Node)]): Lookup = {
     val res = new Lookup();
     res.init("", widthOf(1), addr, default); 
     for ((addr, data) <- mapping)
@@ -1570,7 +1569,7 @@ object Lookup {
 }
 
 class Lookup extends Delay {
-  var map: Map[Lit, Node] = null;
+  var map: Seq[(Lit, Node)] = null;
   override def toString: String = "LOOKUP(" + inputs(0) + ")";
   override def emitDef: String = {
     var res = 
@@ -1826,11 +1825,11 @@ class Mux extends Op {
 
 object Reg {
   def apply(n: String, u: Node): Reg = 
-    new Reg().init(n, maxWidth _, null, u).asInstanceOf[Reg];
+    new Reg().init(n, maxWidth _, u).asInstanceOf[Reg];
   def apply(u: Node): Reg = Reg("", u)
   def apply(n: String): Reg = Reg(n, null)
   def apply(n: String, w: Int): Reg = {
-    val res = new Reg().init(n, fixWidth(w), Lit(0, w), null).asInstanceOf[Reg];
+    val res = new Reg().init(n, fixWidth(w), null).asInstanceOf[Reg];
     res.width_ = w;
     res
   }
@@ -1838,24 +1837,34 @@ object Reg {
   def apply(): Reg = Reg("", null)
 }
 class Reg extends Delay {
-  // var clauses = new ArrayBuffer[Pair[Node, Node]];
-  def reset(init: Node): Reg = { inputs(0) = init; this }
+  def updateVal = inputs(0);
+  def resetVal  = inputs(1);
+  def isReset  = inputs.length == 2;
+  def isUpdate = !(updateVal == null);
+  def update (x: Node) = { inputs(0) = x };
+  def reset(init: Node): Reg = { 
+    if (isReset)
+      inputs(1) = init; 
+    else
+      inputs += init;
+    this 
+  }
   def <==(src: Node): Reg = {
     if (cond.length == 0)
-      inputs(1) = src;
-    else if (inputs(1) == null) {
+      update(src);
+    else if (!isUpdate) {
       var res = cond(0);
       for (i <- 1 until cond.length)
         res = cond(i) && res;
       // println(this.name + " <== " + res + " " + cond.length);
       // val res = cond.foldRight(Lit(1,1)){(a, b) => a&&b}
-      inputs(1) = Mux(res, src, this)
+      update(Mux(res, src, this))
     } else {
       var res = cond(0);
       for (i <- 1 until cond.length)
         res = cond(i) && res;
       // println(this.name + " <== " + res + " " + cond.length);
-      inputs(1) = Mux(res, src, inputs(1))
+      update(Mux(res, src, updateVal))
     }
     this
     // clauses += Pair(cond.head, src);
@@ -1866,11 +1875,10 @@ class Reg extends Delay {
       nameOpt
     else {
       component.isWalking += this;
-      val res = 
-      if (inputs(1) == null) 
-        nameOpt + "(" + inputs(0) + ")"
-      else
-        nameOpt + "(" + inputs(0) + "," + inputs(1) + ")";
+      var res = nameOpt + "(";
+      if (isUpdate) res = res + " " + updateVal;
+      if (isReset)  res = res + " " + resetVal;
+      res += ")";
       component.isWalking -= this;
       res;
     }
@@ -1879,15 +1887,15 @@ class Reg extends Delay {
   override def emitDef: String = "";
   override def emitReg: String =
     "    " + emitRef + " <= " + 
-    (if (inputs(0) == null) "" else "reset ? " + inputs(0).emitRef + " : ") + 
-    inputs(1).emitRef + ";\n"
+    (if (isReset) "reset ? " + resetVal.emitRef + " : " else "" ) + 
+    updateVal.emitRef + ";\n"
   override def emitDec: String = 
     "  reg[" + (width-1) + ":0] " + emitRef + ";\n";
 
   override def emitDefLoC: String = 
     "  " + emitRef + "_shadow = " + 
-    (if (inputs(0) == null) "" else "mux<" + width + ">(reset, " + inputs(0).emitRef + ", ") + 
-    inputs(1).emitRef + ");\n"
+    (if (isReset) "mux<" + width + ">(reset, " + resetVal.emitRef + ", " else "") + 
+    updateVal.emitRef + ");\n"
   override def emitDefHiC: String =
     "  " + emitRef + " = " + emitRef + "_shadow;\n";
   override def emitDecC: String = 
