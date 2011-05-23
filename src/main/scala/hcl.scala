@@ -1377,14 +1377,11 @@ object Lit {
   def apply(x: Int): Lit = { val res = new Lit(); res.init("0x%x".format(x), sizeof(x)); res }
   def apply(x: Int, width: Int): Lit = { val res = new Lit(); res.init("0x%x".format(x), width); res }
   def apply(x: Long, width: Int): Lit = { val res = new Lit(); res.init("0x%x".format(x), width); res }
-  def apply(n: String): Lit = { 
-    val (bits, mask, width) = parseLit(n);  apply(n, width);
-  }
-  def apply(n: String, width: Int): Lit = { 
-    val (bits, mask, swidth) = parseLit(n);
-    val isZ = (n.contains('?'));
-    val res = new Lit(); res.init(n, width); res.isZ = isZ; res.isBinary = true; res 
-  }
+  // def apply(n: String): Lit = { 
+  //   val (bits, mask, width) = parseLit(n);  apply(n, width);
+  // }
+  def apply(n: String, width: Int): Lit = 
+    apply(width, n(0), n.substring(1, n.length));
   def apply(width: Int, base: Char, literal: String): Lit = {
     if (!"dhb".contains(base)) throw new IllegalArgumentException("invalid base");
     val res = new Lit();
