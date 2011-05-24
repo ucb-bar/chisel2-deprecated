@@ -45,28 +45,6 @@ object Node {
   }
   def lshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).width + n.maxNum }
   def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).width - n.minNum }
-  def Cat (mod: Node, mods: Node*): Node = mods.foldLeft(mod){(a, b) => a ## b}
-  def when(c: Node)(block: => Unit) = {
-    cond.push(c); 
-    // println("WHEN " + c + " {");
-    block; 
-    cond.pop();
-    // println("} ");
-  }
-  def ifelse(c: Node)(con_block: => Unit)(alt_block: => Unit) = {
-    val tt = c;
-    cond.push(tt);  
-    // println("  IF " + tt + " {");
-    con_block; 
-    // println("  }");
-    cond.pop();
-    val et = !c;
-    cond.push(et); 
-    // println("  ELSE IF " + et + " {");
-    alt_block; 
-    cond.pop();
-    // println("  }");
-  }
   var reset: Node = Input("reset", 1);
   var resets = Queue[Node]();
   var clk: Node = Input("clk", 1);
@@ -116,7 +94,50 @@ object Node {
     ll.wires
   }
 }
-
+object Cat {
+  def apply (mod: Node, mods: Node*): Node = mods.foldLeft(mod){(a, b) => a ## b}
+}
+object when {
+  def apply(c: Node)(block: => Unit) = {
+    cond.push(c); 
+    // println("WHEN " + c + " {");
+    block; 
+    cond.pop();
+    // println("} ");
+  }
+}
+object pmux {
+  def apply(c: Node)(con_block: => Unit)(alt_block: => Unit) = {
+    val tt = c;
+    cond.push(tt);  
+    // println("  IF " + tt + " {");
+    con_block; 
+    // println("  }");
+    cond.pop();
+    val et = !c;
+    cond.push(et); 
+    // println("  ELSE IF " + et + " {");
+    alt_block; 
+    cond.pop();
+    // println("  }");
+  }
+}
+object pcond {
+  def apply(cases: Seq[(Node, () => Node)]) = {
+    var tst: Node = Lit(1);
+    for ((ctst, block) <- cases) {
+      cond.push(tst && ctst);  
+      block(); 
+      cond.pop();
+      tst = tst && !ctst;
+    }
+    this;
+  }
+}
+object pcase {
+  def apply(x: Node, cases: Seq[(Lit, () => Node)]) = 
+    pcond(cases.map(tb => (tb._1 === x, tb._2)))
+}
 abstract class Node {
   var component: Component = null;
   var depth = 0;
@@ -175,6 +196,20 @@ abstract class Node {
     // println("M <>'ing " + this + " & " + src);
     this := src 
   }
+  def ><(src: Node) = {
+    src match {
+      case b: Bundle =>
+        var off = 0;
+        for ((n, io) <- b.flatten) {
+          if (io.dir == INPUT) {
+            io := this(off+io.width-1,off);
+            off += io.width;
+          }
+        }
+      case n =>
+    }
+    this
+  }
   def ^^(src: Node) = { 
     // println("^^ " + this + " & " + src);
     this := src 
@@ -187,6 +222,7 @@ abstract class Node {
   def apply(hi: Node, lo: Node): Node = { Bits(this, hi, lo) };
   def isIo = false;
   def isReg = false;
+  def isProbe = false;
   def isUsedByRam: Boolean = {
     for (c <- consumers) 
       if (c.isRamWriteInput(this))
@@ -221,9 +257,10 @@ abstract class Node {
       return false;
   }
   def emitIndex: Int = { if (index == -1) index = componentOf.nextIndex; index }
+  def isInObject = isIo || isReg || isUsedByRam || isProbe;
   def emitTmp: String = 
     if (isEmittingC) {
-      if (isIo || isReg || isUsedByRam)
+      if (isInObject)
         emitRef
       else
         "dat_t<" + width + "> " + emitRef
@@ -369,6 +406,18 @@ abstract class Node {
     }
     res.reverse
   }
+  def extract (b: Bundle): List[Node] = {
+    var res: List[Node] = Nil;
+    var off = 0;
+    for ((n, io) <- b.flatten) {
+      if (io.dir == OUTPUT) {
+        val w = io.width;
+        res  = this(off+w-1, off) :: res;
+        off += w;
+      }
+    }
+    res.reverse
+  }
   def Match(mods: Array[Node]) {
     var off = 0;
     for (m <- mods.reverse) {
@@ -384,6 +433,11 @@ abstract class Node {
 
 object Component {
   var isGenHarness = false;
+  var isReportDims = false;
+  var scanFormat = "";
+  var scanArgs: List[String] = Nil;
+  var printFormat = "";
+  var printArgs: List[String] = Nil;
   var targetEmulatorRootDir: String = null;
   var targetVerilogRootDir: String = null;
   var targetDir: String = null;
@@ -414,10 +468,16 @@ object Component {
     res
   }
   def apply (name: String): Component = Component(name, nullBundle);
+  def splitArg (s: String) = s.split(' ').toList;
   def initChisel () = {
     cond = new Stack[Node];
     compStack = new Stack[Component]();
     isGenHarness = false;
+    isReportDims = false;
+    scanFormat = "";
+    scanArgs = Nil;
+    printFormat = "";
+    printArgs = Nil;
     isCoercingArgs = true;
     targetEmulatorRootDir = System.getProperty("CHISEL_EMULATOR_ROOT");
     if (targetEmulatorRootDir == null) targetEmulatorRootDir = "../emulator";
@@ -431,7 +491,9 @@ object Component {
     isEmittingC = false;
     topComponent = null;
   }
-  def chisel_main(args: Array[String], gen: () => Component) = {
+}
+object chisel_main {
+  def apply(args: Array[String], gen: () => Component) = {
     initChisel();
     var i = 0;
     while (i < args.length) {
@@ -440,6 +502,10 @@ object Component {
         case "--gen-harness" => isGenHarness = true; 
         case "--v" => isEmittingComponents = true; isCoercingArgs = false;
         case "--target-dir" => targetDir = args(i+1); i += 1;
+        case "--scan-format" => scanFormat = args(i+1); i += 1;
+        case "--scan-args" => scanArgs = splitArg(args(i+1)); i += 1;
+        case "--print-format" => printFormat = args(i+1); i += 1;
+        case "--print-args" => printArgs = splitArg(args(i+1)); i += 1;
         // case "--is-coercing-args" => isCoercingArgs = true;
         case any => println("UNKNOWN ARG");
       }
@@ -858,8 +924,10 @@ class Component extends Node {
     harness.write("  c->init();\n");
     harness.write("  for (int t = 0; lim < 0 || t < lim; t++) {\n");
     harness.write("    dat_t<1> reset = LIT<1>(t == 0);\n");
+    harness.write("    c->scan(stdin);\n");
     harness.write("    c->clock_lo(reset);\n");
     harness.write("    c->clock_hi(reset);\n");
+    harness.write("    c->print(stdout);\n");
     harness.write("  }\n");
     harness.write("}\n");
     harness.close();
@@ -872,7 +940,7 @@ class Component extends Node {
     if (isGenHarness)
       genHarness(base_name, name);
     isEmittingC = true;
-    println("// COMPILING " + this + " NC = " + children.length);
+    println("// COMPILING " + this + "(" + children.length + ")");
     if (isEmittingComponents) {
       io.name_it("");
       for (top <- children)
@@ -888,8 +956,6 @@ class Component extends Node {
     collectNodes();
     findOrdering(); // search from roots  -- create omods
     findGraph();    // search from leaves -- create gmods
-    val (numNodes, maxWidth, maxDepth) = findGraphDims();
-    println("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     for (m <- omods) {
       m match {
         case l: Lit => ;
@@ -898,6 +964,10 @@ class Component extends Node {
             m.name = m.component.name + "_" + m.name;
       }
       // println(">> " + m.name);
+    }
+    if (isReportDims) {
+    val (numNodes, maxWidth, maxDepth) = findGraphDims();
+    println("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
     // for (m <- omods)
     //   println("MOD " + m + " IN " + m.component.name);
@@ -908,7 +978,7 @@ class Component extends Node {
         out_h.write("  dat_t<" + w.width + "> " + w.emitRef + ";\n");
     }
     for (m <- omods) 
-      if (m.isIo || m.isReg || m.isUsedByRam)
+      if (m.isInObject)
         out_h.write(m.emitDecC);
     if (isEmittingComponents) {
       for (c <- children) 
@@ -918,6 +988,8 @@ class Component extends Node {
     out_h.write("  void init ( void );\n");
     out_h.write("  void clock_lo ( dat_t<1> reset );\n");
     out_h.write("  void clock_hi ( dat_t<1> reset );\n");
+    out_h.write("  void print ( FILE* f );\n");
+    out_h.write("  void scan ( FILE* f );\n");
     out_h.write("};\n");
     out_h.close();
 
@@ -947,6 +1019,69 @@ class Component extends Node {
       out_c.write(m.emitDefHiC);
     // for (c <- children) 
     //   out_c.write("    " + c.emitRef + "->clock_hi(reset);\n");
+    out_c.write("}\n");
+    def splitPrintFormat(s: String) = {
+      var off = 0;
+      var res: List[String] = Nil;
+      for (i <- 0 until s.length) {
+        if (s(i) == '%') {
+          if (off < i) 
+            res = s.substring(off, i) :: res;
+          res = "%" :: res;
+          off = i + 1;
+        }
+      }
+      if (off < (s.length-1))
+        res = s.substring(off, s.length) :: res;
+      res.reverse
+    }
+    out_c.write("void " + name + "_t::print ( FILE* f ) {\n");
+    if (printArgs.length > 0) {
+      val format =
+        if (printFormat == "") printArgs.map(a => "%").reduceLeft((y,z) => z + " " + y) 
+        else printFormat;
+      val toks = splitPrintFormat(format);
+      var i = 0;
+      for (tok <- toks) {
+        if (tok(0) == '%') {
+          out_c.write("  fprintf(f, \"%s\", " + name + "_" + printArgs(i) + ".to_str().c_str());\n");
+          i += 1;
+        } else {
+          out_c.write("  fprintf(f, \"%s\", \"" + tok + "\");\n");
+        }
+      }
+      out_c.write("  fprintf(f, \"\\n\");\n");
+    }
+    out_c.write("}\n");
+    def constantArgSplit(arg: String) = arg.split('=');
+    def isConstantArg(arg: String) = constantArgSplit(arg).length == 2;
+    out_c.write("void " + name + "_t::scan ( FILE* f ) {\n");
+    if (scanArgs.length > 0) {
+      val format = 
+        if (scanFormat == "") {
+          var res = "";
+          for (arg <- scanArgs) {
+            if (!isConstantArg(arg)) {
+              if (res.length > 0) res = res + " ";
+              res = res + "%llx";
+            }
+          }
+          res
+        } else 
+          scanFormat;
+      out_c.write("  fscanf(f, \"" + format + "\"");
+      for (arg <- scanArgs) {
+        if (!isConstantArg(arg))
+          out_c.write(",  &" + name + "_" + arg + ".values[0]");
+      }
+      out_c.write(");\n");
+      for (arg <- scanArgs) {
+        val argParts = constantArgSplit(arg);
+        if (argParts.length == 2)
+          out_c.write("  " + name + "_" + argParts(0) + ".values[0] = " + 
+                      argParts(1).substring(0, argParts(1).length) + ";\n");
+      }
+    }
     out_c.write("}\n");
     out_c.close();
   }
@@ -1114,12 +1249,16 @@ class Bundle(view_arg: Seq[String] = null) extends Interface {
 }
 
 object Wire {
-  def apply(): Wire = Wire("")
-  def apply(name: String): Wire = {
+  def apply(): Wire = apply("")
+  def apply(name: String, x: Node): Wire = {
     val res = new Wire();
-    res.init(name, widthOf(0), null);
+    res.init(name, widthOf(0), x);
     res
   }
+  def apply(x: Node): Wire = 
+    apply("", x);
+  def apply(name: String): Wire = 
+    apply(name, null);
   def apply(name: String, width: Int): Wire = {
     val res = new Wire();
     res.init(name, width, null);
@@ -1129,6 +1268,17 @@ object Wire {
 }
 class Wire extends Interface {
   // override def toString: String = "W(" + name + ")"
+  def <==(src: Node): Wire = {
+    if (cond.length == 0)
+      inputs(0) = src;
+    else {
+      var res = cond(0);
+      for (i <- 1 until cond.length)
+        res = cond(i) && res;
+      inputs(0) = Mux(res, src, inputs(0))
+    }
+    this
+  }
   override def toString: String = name
   override def emitDef: String = { 
     if (inputs.length == 0) {
@@ -1714,12 +1864,13 @@ object Probe {
 }
 class Probe extends Node {
   def my_name: String = if (name == "") inputs(0).emitRefV else name
+  override def isProbe = true;
   override def toString: String =
     "Probe(" + inputs(0) + ", " + my_name + ")"
   override def emitDef: String = 
     "  assign " + emitTmp + " = " + inputs(0).emitRef + ";\n"
   override def emitDefLoC: String = 
-    "  " + "printf(\"DBG " + my_name + ": %s\\n\", " + inputs(0).emitRef + ".to_str().c_str());\n" +
+    // "  " + "printf(\"DBG " + my_name + ": %s\\n\", " + inputs(0).emitRef + ".to_str().c_str());\n" 
     "  " + emitTmp + " = " + inputs(0).emitRef + ";\n";
 }
 

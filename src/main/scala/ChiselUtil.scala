@@ -1,4 +1,4 @@
-package Chisel{
+package Chisel {
 
 class intWrapper(x: Int) {
   val myVal = x;
@@ -9,7 +9,7 @@ class intWrapper(x: Int) {
   def ~(x: Symbol): Lit = Lit(myVal, x.name(0), x.name.substring(1, x.name.length))
 }
 
-object ChiselUtil {
+object Literal {
   implicit def intToIntWrapper(x: Int) = new intWrapper(x);
 }
 
