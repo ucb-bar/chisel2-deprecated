@@ -2047,7 +2047,7 @@ class Reg extends Delay {
   override def emitDefLoC: String = 
     "  " + emitRef + "_shadow = " + 
     (if (isReset) "mux<" + width + ">(reset, " + resetVal.emitRef + ", " else "") + 
-    updateVal.emitRef + ");\n"
+    updateVal.emitRef + (if (isReset) ");\n" else ";\n");
   override def emitDefHiC: String =
     "  " + emitRef + " = " + emitRef + "_shadow;\n";
   override def emitDecC: String = 
