@@ -1873,7 +1873,7 @@ class Probe extends Node {
   override def emitDef: String = 
     "  assign " + emitTmp + " = " + inputs(0).emitRef + ";\n"
   override def emitDefLoC: String = 
-    // "  " + "printf(\"DBG " + my_name + ": %s\\n\", " + inputs(0).emitRef + ".to_str().c_str());\n" 
+    "  " + "printf(\"DBG " + my_name + ": %s\\n\", " + inputs(0).emitRef + ".to_str().c_str());\n" +
     "  " + emitTmp + " = " + inputs(0).emitRef + ";\n";
 }
 
