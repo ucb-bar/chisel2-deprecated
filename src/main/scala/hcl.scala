@@ -1682,10 +1682,11 @@ class Mem(n_val: Int) extends Delay {
       "    " + emitRef + ".put(" + wrAddr.emitRef + ", " + wrData.emitRef + ");\n";
     if (isResetVal) {
       res += "  if (reset.to_bool()) {\n";
-      for (i <- 0 until n) 
-        res += "    " + emitRef + ".put(" + i + ", " + resetVal.emitRef + ");\n";
+      res += "    for (int i = 0; i < " + n + "; i++) \n";
+      res += "      "  + emitRef + ".put(i, " + resetVal.emitRef + ");\n";
       res += "  }\n";
     }
+    println("RESET MEM" + res);
     res
   }
   override def emitDecC: String = 
