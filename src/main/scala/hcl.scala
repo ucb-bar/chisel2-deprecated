@@ -1775,8 +1775,9 @@ class ListLookup(mapping: Array[(Lit, List[Node])], defaultVal: List[Node]) exte
     var res = "";
     for ((addr, data) <- map) {
       res = res + "  if ((" + addr.emitRef + " == " + inputs(0).emitRef + ").to_bool()) {\n";
-      for ((w, e) <- wires zip data) 
-        res = res + "    " + w.emitRef + " = " + e.emitRef + ";\n";
+      for ((w, e) <- wires zip data)
+	if(w.component != null)
+          res = res + "    " + w.emitRef + "/*" + w.component + "*/" +  " = " + e.emitRef + ";\n";
       res = res + "  }\n";
     }
     res
