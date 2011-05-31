@@ -303,7 +303,8 @@ abstract class Node {
         }
       }
       // println("ADDING MOD " + this.name);
-      comp.omods += this;
+      if (this != reset)
+        comp.omods += this;
     }
   }
   def visitNodeRev(newDepth: Int): Unit = {
@@ -339,7 +340,7 @@ abstract class Node {
       } else
         (c, c, component);
     if (comp == null) {
-      if (name != "reset")
+      if (this != reset)
         println("NULL COMPONENT FOR " + this);
     } else if (!comp.isWalked.contains(this)) {
       // println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
@@ -963,7 +964,7 @@ class Component extends Node {
       m match {
         case l: Lit => ;
         case any    => 
-          if (m.name != "" && !(m.component == null)) 
+          if (m.name != "" && m != reset && !(m.component == null)) 
             m.name = m.component.name + "_" + m.name;
       }
       // println(">> " + m.name);
@@ -1775,7 +1776,8 @@ class ListLookup(mapping: Array[(Lit, List[Node])], defaultVal: List[Node]) exte
   override def emitDefLoC: String = {
     var res = "";
     for ((addr, data) <- map) {
-      res = res + "  if ((" + addr.emitRef + " == " + inputs(0).emitRef + ").to_bool()) {\n";
+      res = res + "  " + (if (res.length > 0) "else " else "");
+      res = res + "if ((" + addr.emitRef + " == " + inputs(0).emitRef + ").to_bool()) {\n";
       for ((w, e) <- wires zip data)
 	if(w.component != null)
           res = res + "    " + w.emitRef + "/*" + w.component + "*/" +  " = " + e.emitRef + ";\n";
