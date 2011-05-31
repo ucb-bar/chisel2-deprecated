@@ -1707,8 +1707,9 @@ object MuxLookup {
 object MuxCase {
   def apply (default: Node, mapping: Seq[(Node, Node)]): Node = {
     var res = default;
-    for ((t, v) <- mapping.reverse)
+    for ((t, v) <- mapping.reverse){
       res = Mux(t, v, res);
+    }
     res
   }
 }
@@ -2004,8 +2005,9 @@ class Reg extends Delay {
   def reset(init: Node): Reg = { 
     if (isReset)
       inputs(1) = init; 
-    else
+    else 
       inputs += init;
+    inferWidth = widthOf(1);
     this 
   }
   def <==(src: Node): Reg = {
@@ -2030,6 +2032,7 @@ class Reg extends Delay {
   }
   def nameOpt: String = if (name.length > 0) name else "REG"
   override def toString: String = {
+    if (component == null) return "";
     if (component.isWalking.contains(this)) 
       nameOpt
     else {
