@@ -23,8 +23,16 @@ import Component._;
 import Bundle._;
 import IOdir._;
 
+class Update(val reg: Node, val update: Node) {
+}
+class Rule(val cond: Node) {
+  val updates = new ArrayBuffer[Update]();
+  def addUpdate(update: Update) = updates += update;
+}
+
 object Node {
   var cond = new Stack[Node];
+  var ruleStack = new Stack[Rule];
   implicit def intToNode(x: Int): Node = Lit(x);
   var compStack = new Stack[Component]();
   var currentComp: Component = null;
@@ -524,17 +532,18 @@ object chisel_main {
 }
 class Component extends Node {
   var ioVal: Interface = null;
-  var bindings = new ArrayBuffer[Binding];
+  val rules = new ArrayBuffer[Rule];
+  val bindings = new ArrayBuffer[Binding];
   var wiresCache: Array[(String, IO)] = null;
   var parent: Component = null;
-  var children = new ArrayBuffer[Component];
-  var registered_children = new ArrayBuffer[Component];
+  val children = new ArrayBuffer[Component];
+  val registered_children = new ArrayBuffer[Component];
 
-  var mods  = new ArrayBuffer[Node];
-  var omods = new ArrayBuffer[Node];
-  var gmods = new ArrayBuffer[Node];
-  var regs = new ArrayBuffer[Node];
-  var nexts = new Queue[Node];
+  val mods  = new ArrayBuffer[Node];
+  val omods = new ArrayBuffer[Node];
+  val gmods = new ArrayBuffer[Node];
+  val regs  = new ArrayBuffer[Node];
+  val nexts = new Queue[Node];
   var nindex = -1;
   var defaultWidth = 32;
   def ownIo() = {
