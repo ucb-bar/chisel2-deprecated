@@ -103,7 +103,7 @@ object Node {
   }
 }
 object Enum {
-  def apply(l:List[Symbol]) = (l zip (Range(0, l.length, 1).map(x => Lit(x)))).toMap;
+  def apply(l:List[Symbol]) = (l zip (Range(0, l.length, 1).map(x => Lit(x, sizeof(l.length-1))))).toMap;
 }
 object Cat {
   def apply (mod: Node, mods: Node*): Node = mods.foldLeft(mod){(a, b) => a ## b}
@@ -1696,7 +1696,7 @@ class Mem(n_val: Int) extends Delay {
       res += "      "  + emitRef + ".put(i, " + resetVal.emitRef + ");\n";
       res += "  }\n";
     }
-    println("RESET MEM" + res);
+    // println("RESET MEM" + res);
     res
   }
   override def emitDecC: String = 
