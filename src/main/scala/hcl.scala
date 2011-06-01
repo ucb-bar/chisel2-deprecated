@@ -1765,9 +1765,11 @@ class ListLookup(mapping: Array[(Lit, List[Node])], defaultVal: List[Node]) exte
       "    casez (" + inputs(0).emitRef + ")" + "\n";
     
     for ((addr, data) <- map) {
-      res = res + "      " + addr.emitRef + " : \n";
+      res = res + "      " + addr.emitRef + " : begin\n";
       for ((w, e) <- wires zip data) 
-        res = res + "        " + w.emitRef + " = " + e.emitRef + ";\n";
+	if(w.component != null)
+          res = res + "        " + w.emitRef + " = " + e.emitRef + ";\n";
+      res = res + "      end\n" 
     }
     res = res + 
       "    endcase\n" +
@@ -1984,6 +1986,7 @@ class Mux extends Op {
 }
 
 object Reg {
+  /*
   def apply(n: String, u: Node): Reg = 
     new Reg().init(n, maxWidth _, u).asInstanceOf[Reg];
   def apply(u: Node): Reg = Reg("", u)
@@ -1994,7 +1997,20 @@ object Reg {
     res
   }
   def apply(w: Int): Reg = Reg("", w);
-  def apply(): Reg = Reg("", null)
+  def apply(): Reg = Reg("", null); */
+  def regWidth(w: Int) = {
+    if(w <= 0)
+      maxWidth _;
+    else 
+      fixWidth(w)
+  }
+  def apply(d: Node = null, name: String = "", width: Int = -1, reset: Node = Lit(0)): Reg = {
+    if(reset == null)
+      new Reg().init(name, regWidth(width), d).asInstanceOf[Reg];
+    else {
+      new Reg().init(name, regWidth(width), d, reset).asInstanceOf[Reg];
+    }
+  } 
 }
 class Reg extends Delay {
   def updateVal = inputs(0);
@@ -2002,6 +2018,7 @@ class Reg extends Delay {
   def isReset  = inputs.length == 2;
   def isUpdate = !(updateVal == null);
   def update (x: Node) = { inputs(0) = x };
+  /*
   def reset(init: Node): Reg = { 
     if (isReset)
       inputs(1) = init; 
@@ -2009,7 +2026,7 @@ class Reg extends Delay {
       inputs += init;
     inferWidth = widthOf(1);
     this 
-  }
+  }*/
   def <==(src: Node): Reg = {
     if (cond.length == 0)
       update(src);
