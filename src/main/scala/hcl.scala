@@ -278,6 +278,7 @@ abstract class Node {
     } else
       emitRef
   def emitRef: String = if (isEmittingC) emitRefC else emitRefV;
+  def emitOpArgRef(c: Component): String = emitRef;
   def emitRefV: String = if (name == "") "T" + emitIndex else name
   // def emitRef: String = "T" + emitIndex;
   def emitDef: String = ""
@@ -1353,7 +1354,13 @@ class Binding extends Node {
   override def emitDefHiC: String = ""
   override def emitRefC: String = 
     if (isEmittingComponents) emitRefV; else inputs(0).emitRefC;
-
+  override def emitOpArgRef(component: Component): String = 
+    if (isEmittingC) 
+      emitRefC;
+    else if(component != null) 
+      if(component.mods.contains(this)) emitRefV else inputs(0).emitRefV;
+    else 
+      inputs(0).emitRefV;
 }
 
 object IOdir {
@@ -1776,12 +1783,12 @@ class Lookup extends Delay {
 class ListLookup(mapping: Array[(Lit, List[Node])], defaultVal: List[Node]) extends Node {
   val map = mapping;
   val default = defaultVal;
-  val wires = defaultVal.map(a => new ListLookupRef());
+  val wires = defaultVal.map(a => new ListLookupRef(a));
   override def toString: String = "LIST-LOOKUP(" + inputs(0) + ")";
   override def emitDef: String = {
     var res = 
       "  always @(*) begin\n" +
-      "    " + emitRef + " = " + inputs(1).emitRef + ";\n" +
+      //"    " + emitRef + " = " + inputs(1).emitRef + ";\n" +
       "    casez (" + inputs(0).emitRef + ")" + "\n";
     
     for ((addr, data) <- map) {
@@ -1791,6 +1798,12 @@ class ListLookup(mapping: Array[(Lit, List[Node])], defaultVal: List[Node]) exte
           res = res + "        " + w.emitRef + " = " + e.emitRef + ";\n";
       res = res + "      end\n" 
     }
+    res = res + "      default: begin\n"
+    for ((w, e) <- wires zip defaultVal) {
+      if(w.component != null)
+	res = res + "        " + w.emitRef + " = " + e.emitRef + ";\n";
+    }
+    res = res + "      end\n";
     res = res + 
       "    endcase\n" +
       "  end\n";
@@ -1813,11 +1826,11 @@ class ListLookup(mapping: Array[(Lit, List[Node])], defaultVal: List[Node]) exte
     res
   }
 }
-class ListLookupRef extends Delay {
+class ListLookupRef(defaultVal: Node =  Lit(0)) extends Delay {
   def lookup = inputs(0);
   def lookup_= (ll: ListLookup) = { inputs(0) = ll; }
   inputs += null;
-  inferWidth = widthOf(0); // TODO: PROBABLY NOT RIGHT
+  inferWidth = (m: Node) => defaultVal.width; // TODO: PROBABLY NOT RIGHT
   // override def toString: String = "W(" + name + ")"
   override def toString: String = name
   override def emitDef = "";
@@ -1871,6 +1884,7 @@ class Op extends Node {
     }
   }
   override def emitDef: String = {
+    val c = component;
     "  assign " + emitTmp + " = " + 
       (if (op == "##") 
         "{" + inputs(0).emitRef + ", " + inputs(1).emitRef + "}"
