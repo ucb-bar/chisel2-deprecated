@@ -363,7 +363,7 @@ abstract class Node {
           node.findNodes(depth + 2, nextComp);
           node match { 
             case io: IO => 
-              if (io.dir == OUTPUT) {
+              if (io.dir == OUTPUT && !(component == io.component)) {
                 val c = node.component.parent;
                 // println("BINDING " + node + " I " + i + " NODE-PARENT " + node.component.parent + " -> " + this + " PARENT " + component.parent);
                 if (c == null) {
@@ -1872,11 +1872,11 @@ class Op extends Node {
     val c = component;
     "  assign " + emitTmp + " = " + 
       (if (op == "##") 
-        "{" + inputs(0).emitOpArgRef(c) + ", " + inputs(1).emitOpArgRef(c) + "}"
+        "{" + inputs(0).emitRef + ", " + inputs(1).emitRef + "}"
        else if (inputs.length == 1)
-         op + " " + inputs(0).emitOpArgRef(c)
+         op + " " + inputs(0).emitRef
        else
-         inputs(0).emitOpArgRef(c) + " " + op + " " + inputs(1).emitOpArgRef(c)
+         inputs(0).emitRef + " " + op + " " + inputs(1).emitRef
       ) + ";\n"
   }
   override def emitDefLoC: String = {
