@@ -299,6 +299,7 @@ abstract class Node {
   def visitNode(newDepth: Int): Unit = {
     val comp = componentOf;
     depth = max(depth, newDepth);
+    println("THINKING MOD(" + depth + ") " + comp.name + ": " + this.name);
     if (!comp.isWalked.contains(this)) {
       // println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
       comp.isWalked += this;
@@ -310,7 +311,7 @@ abstract class Node {
           }
         }
       }
-      // println("ADDING MOD " + this.name);
+      println("ADDING MOD " + this.name);
       if (this != reset)
         comp.omods += this;
     }
@@ -336,24 +337,31 @@ abstract class Node {
   def findNodes(depth: Int, c: Component): Unit = {
     // untraced or same component?
     val (comp, nextComp, markComp) = 
-      if (isEmittingComponents) {
-        this match {
-          case io: IO => {
-            val ioComp = io.component;
-            val nxtComp = if (io.dir == OUTPUT) ioComp else ioComp.parent;
-            (ioComp, nxtComp, nxtComp);
+      this match {
+        case io: IO => {
+          val ioComp = io.component;
+          val nxtComp = if (io.dir == OUTPUT) ioComp else ioComp.parent;
+          if (io.dir == OUTPUT && ioComp.parent == null && !(ioComp == topComponent)) {
+            ioComp.parent = c;
+            c.children += ioComp;
+            // println("PARENTING " + c.name + "(" + c.children.length + ") CHILD " + ioComp);
           }
-          case any    => (c, c, c);
+          (ioComp,  // if (isEmittingComponents) ioComp else topComponent, 
+           nxtComp, // if (isEmittingComponents) nxtComp else topComponent, 
+           nxtComp);
         }
-      } else
-        (c, c, component);
+        case any => (c, c, c);
+      }
     if (comp == null) {
       if (this != reset)
         println("NULL COMPONENT FOR " + this);
     } else if (!comp.isWalked.contains(this)) {
-      // println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
+      // println(depthString(depth) + "FiND MODS " + name + " IN " + comp.name);
+      // println("FiND MODS(" + depth + ") " + name + " IN " + comp.name);
       comp.isWalked += this;
       var i = 0;
+      // if (component == null) 
+      //   component = markComp;
       for (node <- inputs) {
         if (node != null) {
           // println(depthString(depth+1) + "INPUT " + node);
@@ -454,10 +462,11 @@ object Component {
   var targetVerilogRootDir: String = null;
   var targetDir: String = null;
   var compIndex = -1;
-  var compIndices = HashMap.empty[String,Int];
+  val compIndices = HashMap.empty[String,Int];
   var isEmittingComponents = false;
   var isEmittingC = false;
   var topComponent: Component = null;
+  val components = ArrayBuffer[Component]();
   def nextCompIndex : Int = { compIndex = compIndex + 1; compIndex }
   def apply (name: String, i: Interface): Component = {
     val res = new Component();
@@ -499,6 +508,7 @@ object Component {
     currentComp = null;
     compIndex = -1;
     compIndices.clear();
+    components.clear();
     isEmittingComponents = false;
     isEmittingC = false;
     topComponent = null;
@@ -537,7 +547,6 @@ class Component extends Node {
   var wiresCache: Array[(String, IO)] = null;
   var parent: Component = null;
   val children = new ArrayBuffer[Component];
-  val registered_children = new ArrayBuffer[Component];
 
   val mods  = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
@@ -546,7 +555,9 @@ class Component extends Node {
   val nexts = new Queue[Node];
   var nindex = -1;
   var defaultWidth = 32;
+  components += this;
   def ownIo() = {
+    // println("COMPONENT " + name + " IO " + io);
     val wires = io.flatten;
     for ((n, w) <- wires) {
       // println(">>> " + w + " IN " + this);
@@ -554,7 +565,8 @@ class Component extends Node {
     }
   }
   def name_it() = {
-    if (name == "") { 
+    // *H* COMMENT OUT IF
+    // if (name == "") { 
       val cname  = getClass().getName(); 
       val dotPos = cname.lastIndexOf('.');
       name = if (dotPos >= 0) cname.substring(dotPos+1) else cname;
@@ -564,11 +576,7 @@ class Component extends Node {
         name = name + "_" + compIndex;
       } else
         compIndices += (name -> 0);
-    }
-  }
-  def register_child(c: Component): Component = {
-    registered_children += c;
-    c
+    // }
   }
   def findBinding(m: Node): Binding = {
     // println("FINDING BINDING " + m + " OUT OF " + bindings.length + " IN " + this);
@@ -812,8 +820,9 @@ class Component extends Node {
       maxWidth = max(maxWidth, widths(i));
     (numNodes, maxWidth, maxDepth)
   }
-  def collectNodes() = {
-    for (m <- mods) {
+  def collectNodes(c: Component) = {
+    for (m <- c.mods) {
+      // println("M " + m.name);
       m match {
         case io: IO  => 
           if (io.dir == INPUT) 
@@ -829,8 +838,6 @@ class Component extends Node {
     io.findNodes(depth, c);
   }
   def doCompileV(out: java.io.FileWriter, depth: Int): Unit = {
-    name_it();
-    io.name_it("");
     // println("COMPILING COMP " + name);
     println("// " + depthString(depth) + "COMPILING " + this + " " + children.length + " CHILDREN");
     if (isEmittingComponents) {
@@ -841,7 +848,7 @@ class Component extends Node {
     // isWalked.clear();
     findConsumers();
     inferAll();
-    collectNodes();
+    collectNodes(this);
     // for (m <- mods) {
     //   println("// " + depthString(depth+1) + " MOD " + m);
     // }
@@ -873,14 +880,11 @@ class Component extends Node {
     out.write("endmodule\n\n");
     // println("// " + depthString(depth) + "DONE");
   }
-  def markComponents(the_parent: Component): Unit = {
+  def markComponent() = {
     name_it();
     ownIo();
-    if (the_parent != null) {
-      parent = the_parent;
-      parent.children += this;
-    }
-    // println("WALKING " + name + " PARENT " + parent);
+    io.name_it("");
+    // println("COMPONENT " + name);
     val c = getClass();
     for (m <- c.getDeclaredMethods) {
       val name = m.getName();
@@ -889,14 +893,11 @@ class Component extends Node {
       if (types.length == 0) {
         val o = m.invoke(this);
         o match { 
-          case child: Component => child.markComponents(this);
           case node: Node => if (node.name == "" || node.name == null) node.name = name;
           case any =>
         }
       }
     }
-    for (c <- registered_children)
-      c.markComponents(this);
   }
   def ensure_dir(dir: String) = {
     val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/");
@@ -904,7 +905,10 @@ class Component extends Node {
     d
   }
   def compileV(): Unit = {
-    markComponents(null);
+    topComponent = this;
+    // *H*
+    for (c <- components) 
+      c.markComponent();
     findNodes(0, this);
     val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
     val out = new java.io.FileWriter(base_name + name + ".v");
@@ -946,7 +950,8 @@ class Component extends Node {
     harness.close();
   }
   def compileC(): Unit = {
-    markComponents(null);
+    for (c <- components) 
+      c.markComponent();
     val base_name = ensure_dir(targetEmulatorRootDir + "/" + targetDir);
     val out_h = new java.io.FileWriter(base_name + name + ".h");
     val out_c = new java.io.FileWriter(base_name + name + ".cpp");
@@ -959,14 +964,19 @@ class Component extends Node {
       for (top <- children)
         top.compileC();
     } else {
-      nameAllIO();
+      // *H* COMMENT OUT NEXT LINE
+      // nameAllIO();
       topComponent = this;
     }
     // isWalked.clear();
     findNodes(0, this);
+    if (!isEmittingComponents)
+      for (c <- components)
+        if (!(c == this))
+          mods ++= c.mods;
     findConsumers();
     inferAll();
-    collectNodes();
+    collectNodes(this);
     findOrdering(); // search from roots  -- create omods
     findGraph();    // search from leaves -- create gmods
     for (m <- omods) {
@@ -1374,7 +1384,8 @@ object Output {
 }
 class IO extends Wire { 
   var dir: IOdir = null;
-  override def isIo = true;
+  // TODO: OPTIONALLY ONLY EMIT TOP COMPONENT IO IN OBJECT
+  override def isIo = true; // = component == topComponent; // true; 
   override def emitDef: String = {
     if (dir == INPUT)
       ""
@@ -1792,8 +1803,12 @@ class ListLookup(mapping: Array[(Lit, List[Node])], defaultVal: List[Node]) exte
   }
   override def emitDefLoC: String = {
     var res = "";
+    var isFirst = true;
+    for (w <- wires)
+      if(w.component != null) // TODO: WHY IS COMPONENT EVER NULL?
+        res = res + "  dat_t<" + w.width + "> " + w.emitRef + ";\n";
     for ((addr, data) <- map) {
-      res = res + "  " + (if (res.length > 0) "else " else "");
+      res = res + "  " + (if (isFirst) { isFirst = false; "" } else "else ");
       res = res + "if ((" + addr.emitRef + " == " + inputs(0).emitRef + ").to_bool()) {\n";
       for ((w, e) <- wires zip data)
 	if(w.component != null)
@@ -1814,8 +1829,8 @@ class ListLookupRef(defaultVal: Node =  Lit(0)) extends Delay {
   override def emitDefLoC = "";
   override def emitDec: String = 
     "  reg[" + (width-1) + ":0] " + emitRef + ";\n";
-  override def emitDecC: String = 
-    "  dat_t<" + width + "> " + emitRef + ";\n";
+  // override def emitDecC: String = 
+  //   "  dat_t<" + width + "> " + emitRef + ";\n";
 }
 
 object Op {
@@ -2019,8 +2034,9 @@ object Reg {
     else 
       fixWidth(w)
   }
-  def apply(d: Node = null, name: String = "", width: Int = -1, reset: Node = Lit(0)): Reg = {
-    if(reset == null)
+  val noInit = Lit(0);
+  def apply(d: Node = null, name: String = "", width: Int = -1, reset: Node = noInit): Reg = {
+    if(reset == noInit)
       new Reg().init(name, regWidth(width), d).asInstanceOf[Reg];
     else {
       new Reg().init(name, regWidth(width), d, reset).asInstanceOf[Reg];
