@@ -278,7 +278,6 @@ abstract class Node {
     } else
       emitRef
   def emitRef: String = if (isEmittingC) emitRefC else emitRefV;
-  def emitOpArgRef(c: Component): String = emitRef;
   def emitRefV: String = if (name == "") "T" + emitIndex else name
   // def emitRef: String = "T" + emitIndex;
   def emitDef: String = ""
@@ -1344,13 +1343,6 @@ class Binding extends Node {
   override def emitDefHiC: String = ""
   override def emitRefC: String = 
     if (isEmittingComponents) emitRefV; else inputs(0).emitRefC;
-  override def emitOpArgRef(component: Component): String = 
-    if (isEmittingC) 
-      emitRefC;
-    else if(component != null) 
-      if(component.mods.contains(this)) emitRefV else inputs(0).emitRefV;
-    else 
-      inputs(0).emitRefV;
 }
 
 object IOdir {
