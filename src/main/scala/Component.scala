@@ -34,7 +34,7 @@ object Component {
   var topComponent: Component = null;
   val components = ArrayBuffer[Component]();
   def nextCompIndex : Int = { compIndex = compIndex + 1; compIndex }
-  def apply (name: String, i: Interface): Component = {
+  /*def apply (name: String, i: Interface): Component = {
     val res = new Component();
     res.name = name + "_" + nextCompIndex;
     res.ioVal = i;
@@ -53,8 +53,8 @@ object Component {
       };
     }
     res
-  }
-  def apply (name: String): Component = Component(name, nullBundle);
+  }* */
+  /*def apply (name: String): Component = Component(name, nullBundle);* */
   def splitArg (s: String) = s.split(' ').toList;
   def initChisel () = {
     cond = new Stack[Node];
@@ -81,7 +81,7 @@ object Component {
   }
 }
 
-class Component extends Node {
+abstract class Component extends Node {
   var ioVal: Interface = null;
   val rules = new ArrayBuffer[Rule];
   val bindings = new ArrayBuffer[Binding];
@@ -129,7 +129,8 @@ class Component extends Node {
     // println("UNABLE TO FIND BINDING FOR " + m);
     return null
   }
-  def io: Interface = ioVal;
+  //def io: Interface = ioVal;
+  def io: Interface
   def nextIndex : Int = { nindex = nindex + 1; nindex }
   def genName (name: String): String = 
     if (name == null || name.length() == 0) "" else name + "_" + nextIndex;

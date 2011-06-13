@@ -99,7 +99,7 @@ abstract class Interface extends Node {
 }
 
 
-class BlackBox extends Component {
+abstract class BlackBox extends Component {
   override def doCompileV(out: java.io.FileWriter, depth: Int): Unit = {
     name_it();
     io.name_it("");
