@@ -1,42 +1,9 @@
 // author: jonathan bachrach
 package Chisel {
 
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.Queue
-import scala.collection.mutable.Stack
-import scala.collection.mutable.HashSet
-import scala.collection.mutable.HashMap
-import java.lang.reflect.Modifier._;
-import java.io.File;
-
-import scala.math.log;
-import scala.math.abs;
-import scala.math.ceil;
-import scala.math.max;
-import scala.math.min;
 import Node._;
-import Wire._;
-import Lit._;
-import Op._;
-import Reg._;
-import Component._;
-import Bundle._;
-import IOdir._;
-
 
 object Reg {
-  /*
-  def apply(n: String, u: Node): Reg = 
-    new Reg().init(n, maxWidth _, u).asInstanceOf[Reg];
-  def apply(u: Node): Reg = Reg("", u)
-  def apply(n: String): Reg = Reg(n, null)
-  def apply(n: String, w: Int): Reg = {
-    val res = new Reg().init(n, fixWidth(w), null).asInstanceOf[Reg];
-    res.width_ = w;
-    res
-  }
-  def apply(w: Int): Reg = Reg("", w);
-  def apply(): Reg = Reg("", null); */
   def regWidth(w: Int) = {
     if(w <= 0)
       maxWidth _;

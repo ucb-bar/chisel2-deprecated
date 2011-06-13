@@ -9,21 +9,11 @@ import scala.collection.mutable.HashMap
 import java.lang.reflect.Modifier._;
 import java.io.File;
 
-import scala.math.log;
-import scala.math.abs;
-import scala.math.ceil;
 import scala.math.max;
-import scala.math.min;
 import Node._;
-import Wire._;
-import Lit._;
-import Op._;
-import Reg._;
 import Component._;
 import Bundle._;
 import IOdir._;
-import Mux._;
-import Op._;
 
 
 object Component {
