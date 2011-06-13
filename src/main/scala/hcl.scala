@@ -106,6 +106,7 @@ object Node {
 }
 object Enum {
   def apply(l:List[Symbol]) = (l zip (Range(0, l.length, 1).map(x => Lit(x, sizeof(l.length-1))))).toMap;
+  def apply(l: Symbol *) = (l.toList zip (Range(0, l.length, 1).map(x => Lit(x, sizeof(l.length-1))))).toMap;
 }
 object Cat {
   def apply (mod: Node, mods: Node*): Node = mods.foldLeft(mod){(a, b) => a ## b}
