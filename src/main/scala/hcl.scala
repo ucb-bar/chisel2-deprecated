@@ -101,6 +101,8 @@ object Node {
         ll.inputs += e;
     ll.wires
   }
+
+  
 }
 object Enum {
   def apply(l:List[Symbol]) = (l zip (Range(0, l.length, 1).map(x => Lit(x, sizeof(l.length-1))))).toMap;
@@ -458,6 +460,7 @@ object Component {
   var scanArgs: List[String] = Nil;
   var printFormat = "";
   var printArgs: List[String] = Nil;
+  var includeArgs: List[String] = Nil;
   var targetEmulatorRootDir: String = null;
   var targetVerilogRootDir: String = null;
   var targetDir: String = null;
@@ -528,6 +531,7 @@ object chisel_main {
         case "--scan-args" => scanArgs = splitArg(args(i+1)); i += 1;
         case "--print-format" => printFormat = args(i+1); i += 1;
         case "--print-args" => printArgs = splitArg(args(i+1)); i += 1;
+	case "--include" => includeArgs = splitArg(args(i+1)); i += 1;
         // case "--is-coercing-args" => isCoercingArgs = true;
         case any => println("UNKNOWN ARG");
       }
@@ -1018,6 +1022,7 @@ class Component extends Node {
 
     out_c.write("#include \"emulator.h\"\n");
     out_c.write("#include \"" + name + ".h\"\n");
+    for(str <- includeArgs) out_c.write("#include \"" + str + "\"\n"); 
     out_c.write("\n");
     out_c.write("void " + name + "_t::init ( void ) {\n");
     if (isEmittingComponents) {
@@ -1897,6 +1902,116 @@ class Op extends Node {
     ";\n"
   }
 }
+
+object cppComp {
+  def apply(fctn: String, outWidths: List[Int], input: Node*): cppComp = {
+    val res = new cppComp(fctn, outWidths);
+    res.initOf("", fixWidth(1), input.toList);
+    for((w, node) <- outWidths zip res.outputNodes)
+      node.init("", fixWidth(w), res);
+    res
+  }
+  def apply(fctn: String, fctnIO: Bundle): cppComp = {
+    val ioList = fctnIO.flatten;
+    val input = new ArrayBuffer[Node]();
+    val output = new ArrayBuffer[Node]();
+    for ((s, node) <- ioList)
+      if (node.dir == INPUT) input += node else output += node
+    val res = new cppComp(fctn, output.map(a => a.width).toList);
+    res.initOf("", fixWidth(1), input.toList);
+    for((ioNode, node) <- output zip res.outputNodes){
+      node.init("", ioNode.width, res); ioNode := node;
+    }
+    res
+  }
+}
+
+class cppComp(fctn: String, outWidths: List[Int]) extends Node {
+  val fctnName = fctn;
+  var outputNodes: List[Node] = (outWidths.indices zip outWidths).map{case (i, w) => new cppCompOutput(this, w, i)}.toList;
+  override def toString: String = inputs.toString;
+  override def isInObject = true;
+  override def emitDefLoC: String = {
+    var res = "";
+    res = res + "  " + emitRef + " = " + fctn + "(";
+    var first = true;
+    for(node <- inputs) 
+      res = res + (if(first) {first = false; ""} else ", ") + node.emitRef + ".lo_word()";
+    res = res + ");\n";
+    res
+  }
+  override def emitDecC: String = 
+    "  int* " + emitRef + ";\n";
+  
+
+  def apply(): List[Node] = outputNodes;
+}
+
+class cppCompOutput(fctn: cppComp, width: Int, i: Int) extends Node {
+  override def isInObject = true;
+  override def emitDefLoC: String = 
+    "  " + emitRef + " = DAT<" + width + ">(" + fctn.emitRef + "[" + i + "]);\n";
+  
+}
+
+object ScalaComponent {
+
+  def apply(file: String, outputs: Int, inputs: Node*): List[Node] = {
+    val sc = new ScalaComponent(file, outputs);
+    sc.init("", fixWidth(64), ScalaComponentInput(inputs.toList));
+    for(sco <- sc.outputNodes)
+      sco.init("", fixWidth(64), sc);
+    sc.outputNodes
+  }
+}
+
+class ScalaComponent(file: String, numOutputs: Int) extends Node {
+  var outputNodes: List[Node] = Range(0, numOutputs, 1).map(a => new ScalaComponentOutput(this)).toList;
+  override def toString: String = inputs.toString;
+  override def emitDefLoC: String = {
+    var res = "";
+    res = res + "  callout_t<" + outputNodes.length + "> " + emitRef + " = " + "callout_t<" + outputNodes.length +">(\"" + file + "\", "; 
+    res = res + inputs(0).emitRef;
+    res = res + ");\n";
+    for((i, node) <- outputNodes.indices zip outputNodes) {
+      res = res + "  " + node.emitRef + " = " + emitRef + ".get(" + i + ");\n";
+    }
+    res = res + "  " + inputs(0).emitRef + ".clear();\n";
+    res
+  }
+
+}
+
+object ScalaComponentInput {
+  def apply(inputs: List[Node]): ScalaComponentInput = {
+    val res = new ScalaComponentInput();
+    res.initOf("", fixWidth(64), inputs);
+    res
+  }
+}
+
+class ScalaComponentInput() extends Node {
+  override def isInObject = true;
+  override def emitDecC: String = {
+    var res = "";
+    res = res + "  std::vector<dat_t<64>*> " + emitRef + ";\n";
+    res
+  }
+  override def emitDefLoC: String = {
+    var res = "";
+    for(node <- inputs){
+      res = res + "  " + emitRef + ".push_back(&" + node.emitRef + ");\n";
+    }
+    res
+  }
+}
+
+class ScalaComponentOutput(sc: ScalaComponent) extends Node {
+  var scalacomp = sc;
+  override def isInObject = true; 
+  inferWidth = (m: Node) => 64;
+}
+
 
 object Probe {
   def apply(x: Node, name: String): Probe = { val res = new Probe(); res.init(name, widthOf(0), x); res }
