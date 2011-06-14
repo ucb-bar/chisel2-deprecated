@@ -1,7 +1,6 @@
 // author: jonathan bachrach
 package Chisel {
 
-
 import Node._;
 
 object Lookup {

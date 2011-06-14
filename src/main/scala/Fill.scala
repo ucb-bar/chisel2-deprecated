@@ -1,7 +1,6 @@
 // author: jonathan bachrach
 package Chisel {
 
-
 object Fill {
   def fillWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).width * n.maxNum }
   def apply (mod: Node, n: Node): Node = {

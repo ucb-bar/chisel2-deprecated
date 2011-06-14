@@ -1,8 +1,6 @@
 // author: jonathan bachrach
 package Chisel {
 
-
-
 class ListLookup(mapping: Array[(Lit, List[Node])], defaultVal: List[Node]) extends Node {
   val map = mapping;
   val default = defaultVal;
@@ -43,7 +41,7 @@ class ListLookup(mapping: Array[(Lit, List[Node])], defaultVal: List[Node]) exte
       res = res + "if ((" + addr.emitRef + " == " + inputs(0).emitRef + ").to_bool()) {\n";
       for ((w, e) <- wires zip data)
 	if(w.component != null)
-          res = res + "    " + w.emitRef + "/*" + w.component + "*/" +  " = " + e.emitRef + ";\n";
+          res = res + "    " + w.emitRef + " = " + e.emitRef + ";\n";
       res = res + "  }\n";
     }
     res

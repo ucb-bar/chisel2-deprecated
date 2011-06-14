@@ -21,8 +21,6 @@ object Bundle {
   }
 }
 
-
-
 class Bundle(view_arg: Seq[String] = null) extends Interface {
   var view = view_arg;
   var elementsCache: Map[String, Interface] = null;

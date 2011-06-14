@@ -14,8 +14,6 @@ object Node {
   var cond = new Stack[Node];
   var ruleStack = new Stack[Rule];
   implicit def intToNode(x: Int): Node = Lit(x);
-  var compStack = new Stack[Component]();
-  var currentComp: Component = null;
   var isCoercingArgs = true;
   def fixWidth(w: Int) = { (m: Node) => w };
   def widthOf(i: Int) = { (m: Node) => m.inputs(i).width }
@@ -44,33 +42,6 @@ object Node {
     reset = resBak;
     res
   }
-  def pushComponent(c: Component) = {
-    compStack.push(c);
-    currentComp = c;
-    c.name_it();
-    c.ownIo();
-  }
-  def popComponent(c: Component) = {
-    val parent = if (compStack.length > 1) compStack(1); else null;
-    if (!(parent == null) && c.parent == null) {
-      c.parent = parent;
-      parent.children += c;
-    }
-    currentComp = parent;
-  }
-  def withComponent(c: Component, block: Component => Unit) = {
-    pushComponent(c);
-    block(c);
-    popComponent(c);
-  }
-  /*
-  def withSimpleComponent(block: Component => Node) = {
-    withComponent(Component("MAIN"), c => {
-      val res = block(c);
-      c.ioVal = Output("res", res);
-    });
-  }
-  * */
   def ListLookup (addr: Node, default: List[Node], mapping: Array[(Lit, List[Node])]): List[Node] = {
     val ll = new ListLookup(mapping, default);
     ll.init("", widthOf(1), addr); 
@@ -180,7 +151,6 @@ abstract class Node {
   }
   def isRamWriteInput(i: Node) = false;
   def initOf (n: String, width: (Node) => Int, ins: List[Node]): Node = { 
-    component = currentComp;
     name = n; 
     inferWidth = width;
     // if (name == "") index = component.nextIndex;
@@ -237,7 +207,7 @@ abstract class Node {
   def visitNode(newDepth: Int): Unit = {
     val comp = componentOf;
     depth = max(depth, newDepth);
-    println("THINKING MOD(" + depth + ") " + comp.name + ": " + this.name);
+    // println("THINKING MOD(" + depth + ") " + comp.name + ": " + this.name);
     if (!comp.isWalked.contains(this)) {
       // println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
       comp.isWalked += this;
@@ -249,7 +219,7 @@ abstract class Node {
           }
         }
       }
-      println("ADDING MOD " + this.name);
+      // println("ADDING MOD " + this.name);
       if (this != reset)
         comp.omods += this;
     }

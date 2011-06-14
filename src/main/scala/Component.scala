@@ -38,7 +38,6 @@ object Component {
     val res = new Component();
     res.name = name + "_" + nextCompIndex;
     res.ioVal = i;
-    res.parent = currentComp;
     if (res.parent != null)
       res.parent.children += res;
     val wires = res.io.flatten;
@@ -58,7 +57,6 @@ object Component {
   def splitArg (s: String) = s.split(' ').toList;
   def initChisel () = {
     cond = new Stack[Node];
-    compStack = new Stack[Component]();
     isGenHarness = false;
     isReportDims = false;
     scanFormat = "";
@@ -71,7 +69,6 @@ object Component {
     targetVerilogRootDir = System.getProperty("CHISEL_VERILOG_ROOT");
     if (targetVerilogRootDir == null) targetVerilogRootDir = "../verilog";
     targetDir = "";
-    currentComp = null;
     compIndex = -1;
     compIndices.clear();
     components.clear();
@@ -107,18 +104,15 @@ abstract class Component extends Node {
     }
   }
   def name_it() = {
-    // *H* COMMENT OUT IF
-    // if (name == "") { 
-      val cname  = getClass().getName(); 
-      val dotPos = cname.lastIndexOf('.');
-      name = if (dotPos >= 0) cname.substring(dotPos+1) else cname;
-      if (compIndices contains name) {
-        val compIndex = (compIndices(name) + 1);
-        compIndices += (name -> compIndex);
-        name = name + "_" + compIndex;
-      } else
-        compIndices += (name -> 0);
-    // }
+    val cname  = getClass().getName(); 
+    val dotPos = cname.lastIndexOf('.');
+    name = if (dotPos >= 0) cname.substring(dotPos+1) else cname;
+    if (compIndices contains name) {
+      val compIndex = (compIndices(name) + 1);
+      compIndices += (name -> compIndex);
+      name = name + "_" + compIndex;
+    } else
+      compIndices += (name -> 0);
   }
   def findBinding(m: Node): Binding = {
     // println("FINDING BINDING " + m + " OUT OF " + bindings.length + " IN " + this);
@@ -468,13 +462,11 @@ abstract class Component extends Node {
   }
   def compileV(): Unit = {
     topComponent = this;
-    // *H*
     for (c <- components) 
       c.markComponent();
     findNodes(0, this);
     val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
     val out = new java.io.FileWriter(base_name + name + ".v");
-    currentComp = this;
     doCompileV(out, 0);
     out.close();
   }
@@ -526,8 +518,6 @@ abstract class Component extends Node {
       for (top <- children)
         top.compileC();
     } else {
-      // *H* COMMENT OUT NEXT LINE
-      // nameAllIO();
       topComponent = this;
     }
     // isWalked.clear();
