@@ -87,6 +87,7 @@ abstract class Component extends Node {
   val bindings = new ArrayBuffer[Binding];
   var wiresCache: Array[(String, IO)] = null;
   var parent: Component = null;
+  var containsReg = false;
   val children = new ArrayBuffer[Component];
 
   val mods  = new ArrayBuffer[Node];
@@ -154,10 +155,14 @@ abstract class Component extends Node {
   }
   override def emitRefV: String = name;
   override def emitDef: String = {
-    var res = "  " + emitRef + " " + emitRef + "(.clk(clk), .reset(reset)";
+    var res = "  " + emitRef + " " + emitRef + "(";
+    val hasReg = containsReg || childrenContainsReg;
+    res = res + (if(hasReg) ".clk(clk), .reset(reset)" else "");
     var isFirst = true;
+    var nl = ""
     for ((n, w) <- wires) {
-      res += ",\n       ." + n + "( ";
+      if (isFirst && !hasReg) {isFirst = false; nl = "\n"} else nl = ",\n";
+      res += nl + "       ." + n + "( ";
       w match {
         case io: IO  => 
           if (io.dir == INPUT) {
@@ -379,6 +384,15 @@ abstract class Component extends Node {
   override def findNodes(depth: Int, c: Component): Unit = {
     io.findNodes(depth, c);
   }
+  def childrenContainsReg: Boolean = {
+    var res = containsReg;
+    if(children.isEmpty) return res; 
+    for(child <- children){
+      res = res || child.containsReg || child.childrenContainsReg;
+      if(res) return res;
+    }
+    res
+  }
   def doCompileV(out: java.io.FileWriter, depth: Int): Unit = {
     // println("COMPILING COMP " + name);
     println("// " + depthString(depth) + "COMPILING " + this + " " + children.length + " CHILDREN");
@@ -394,14 +408,18 @@ abstract class Component extends Node {
     // for (m <- mods) {
     //   println("// " + depthString(depth+1) + " MOD " + m);
     // }
-    out.write("module " + name + "(input clk, input reset");
+    val hasReg = containsReg || childrenContainsReg;
+    out.write("module " + name + "(" + (if (hasReg) "input clk, input reset" else ""));
+    var first = true;
+    var nl = "";
     for ((n, w) <- wires) {
+      if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
       w match {
         case io: IO => {
           if (io.dir == INPUT) {
-            out.write(",\n    input " + io.emitWidth + " " + io.emitRef);
+            out.write(nl + "    input " + io.emitWidth + " " + io.emitRef);
           } else {
-            out.write(",\n    output" + io.emitWidth + " " + io.emitRef);
+            out.write(nl + "    output" + io.emitWidth + " " + io.emitRef);
           }
         }
       };
@@ -435,7 +453,9 @@ abstract class Component extends Node {
       if (types.length == 0) {
         val o = m.invoke(this);
         o match { 
-          case node: Node => if (node.name == "" || node.name == null) node.name = name;
+          case node: Node => { if (node.name == "" || node.name == null) node.name = name;
+			       if (node.isReg) containsReg = true;
+			     }
           case any =>
         }
       }
