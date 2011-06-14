@@ -35,6 +35,7 @@ object Output {
 }
 class IO extends Wire { 
   var dir: IOdir = null;
+  var assigned = false;
   // TODO: OPTIONALLY ONLY EMIT TOP COMPONENT IO IN OBJECT
   override def isIo = true; // = component == topComponent; // true; 
   override def emitDef: String = {
@@ -124,6 +125,11 @@ class IO extends Wire {
           println("// ^^ing Output " + this + " to Node " + default);
       } 
     }
+  }
+  override def :=(src: Node) = {
+    if(assigned)
+      throw new IllegalStateException("resassignment to output");
+    else { assigned = true; super.:=(src)}
   }
 };
 
