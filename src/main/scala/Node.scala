@@ -63,12 +63,14 @@ object Node {
     block(c);
     popComponent(c);
   }
+  /*
   def withSimpleComponent(block: Component => Node) = {
     withComponent(Component("MAIN"), c => {
       val res = block(c);
       c.ioVal = Output("res", res);
     });
   }
+  * */
   def ListLookup (addr: Node, default: List[Node], mapping: Array[(Lit, List[Node])]): List[Node] = {
     val ll = new ListLookup(mapping, default);
     ll.init("", widthOf(1), addr); 
