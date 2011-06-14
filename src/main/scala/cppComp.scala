@@ -15,13 +15,13 @@ object cppComp {
       node.init("", fixWidth(w), res);
     res
   }
-  def apply(fctn: String, fctnIO: Bundle): cppComp = {
+  def apply(fctnName: String, fctnIO: Bundle): cppComp = {
     val ioList = fctnIO.flatten;
     val input = new ArrayBuffer[Node]();
     val output = new ArrayBuffer[Node]();
     for ((s, node) <- ioList)
       if (node.dir == INPUT) input += node else output += node
-    val res = new cppComp(fctn, output.map(a => a.width).toList);
+    val res = new cppComp(fctnName, output.map(a => a.width).toList);
     res.initOf("", fixWidth(1), input.toList);
     for((ioNode, node) <- output zip res.outputNodes){
       node.init("", ioNode.width, res); ioNode := node;
@@ -30,24 +30,20 @@ object cppComp {
   }
 }
 
-class cppComp(fctn: String, outWidths: List[Int]) extends Node {
-  val fctnName = fctn;
+class cppComp(fctnName: String, outWidths: List[Int]) extends Node {
   var outputNodes: List[Node] = (outWidths.indices zip outWidths).map{case (i, w) => new cppCompOutput(this, w, i)}.toList;
   override def toString: String = inputs.toString;
   override def isInObject = true;
   override def emitDefLoC: String = {
     var res = "";
-    res = res + "  " + emitRef + " = " + fctn + "(";
+    res = res + "  " + emitRef + " = " + fctnName + "(";
     var first = true;
     for(node <- inputs) 
       res = res + (if(first) {first = false; ""} else ", ") + node.emitRef + ".lo_word()";
     res = res + ");\n";
     res
   }
-  override def emitDecC: String = 
-    "  int* " + emitRef + ";\n";
-  
-
+  override def emitDecC: String = "  int* " + emitRef + ";\n";
   def apply(): List[Node] = outputNodes;
 }
 
