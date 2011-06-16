@@ -29,10 +29,16 @@ object Component {
   var targetDir: String = null;
   var compIndex = -1;
   val compIndices = HashMap.empty[String,Int];
+  val compDefs = new HashMap[String, String];
   var isEmittingComponents = false;
   var isEmittingC = false;
   var topComponent: Component = null;
   val components = ArrayBuffer[Component]();
+  var genCount = 0;
+  def genCompName(name: String): String = {
+    genCount += 1;
+    name + "_" + genCount
+  }
   def nextCompIndex : Int = { compIndex = compIndex + 1; compIndex }
   /*def apply (name: String, i: Interface): Component = {
     val res = new Component();
@@ -86,7 +92,7 @@ abstract class Component extends Node {
   var parent: Component = null;
   var containsReg = false;
   val children = new ArrayBuffer[Component];
-
+  
   val mods  = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
   val gmods = new ArrayBuffer[Node];
@@ -94,6 +100,8 @@ abstract class Component extends Node {
   val nexts = new Queue[Node];
   var nindex = -1;
   var defaultWidth = 32;
+  var moduleName: String = "";
+  var className:  String = "";
   components += this;
   def ownIo() = {
     // println("COMPONENT " + name + " IO " + io);
@@ -107,12 +115,14 @@ abstract class Component extends Node {
     val cname  = getClass().getName(); 
     val dotPos = cname.lastIndexOf('.');
     name = if (dotPos >= 0) cname.substring(dotPos+1) else cname;
+    className = name;
     if (compIndices contains name) {
       val compIndex = (compIndices(name) + 1);
       compIndices += (name -> compIndex);
       name = name + "_" + compIndex;
-    } else
+    } else {
       compIndices += (name -> 0);
+    }
   }
   def findBinding(m: Node): Binding = {
     // println("FINDING BINDING " + m + " OUT OF " + bindings.length + " IN " + this);
@@ -149,7 +159,7 @@ abstract class Component extends Node {
   }
   override def emitRefV: String = name;
   override def emitDef: String = {
-    var res = "  " + emitRef + " " + emitRef + "(";
+    var res = "  " + moduleName + " " + name + "(";
     val hasReg = containsReg || childrenContainsReg;
     res = res + (if(hasReg) ".clk(clk), .reset(reset)" else "");
     var isFirst = true;
@@ -403,7 +413,8 @@ abstract class Component extends Node {
     //   println("// " + depthString(depth+1) + " MOD " + m);
     // }
     val hasReg = containsReg || childrenContainsReg;
-    out.write("module " + name + "(" + (if (hasReg) "input clk, input reset" else ""));
+    //out.write("module " + name + "(" + (if (hasReg) "input clk, input reset" else ""));
+    var res = (if (hasReg) "input clk, input reset" else "");
     var first = true;
     var nl = "";
     for ((n, w) <- wires) {
@@ -411,27 +422,41 @@ abstract class Component extends Node {
       w match {
         case io: IO => {
           if (io.dir == INPUT) {
-            out.write(nl + "    input " + io.emitWidth + " " + io.emitRef);
+            //out.write(nl + "    input " + io.emitWidth + " " + io.emitRef);
+	    res += nl + "    input " + io.emitWidth + " " + io.emitRef;
           } else {
-            out.write(nl + "    output" + io.emitWidth + " " + io.emitRef);
+            //out.write(nl + "    output" + io.emitWidth + " " + io.emitRef);
+	    res += nl + "    output" + io.emitWidth + " " + io.emitRef;
           }
         }
       };
     }
-    out.write(");\n\n");
+    //out.write(");\n\n");
+    res += ");\n\n";
     // TODO: NOT SURE EXACTLY WHY I NEED TO PRECOMPUTE TMPS HERE
     for (m <- mods)
       m.emitTmp;
-    out.write(emitDecs);
-    out.write("\n");
-    out.write(emitDefs)
+    //out.write(emitDecs);
+    //out.write("\n");
+    //out.write(emitDefs)
+    res += emitDecs + "\n" + emitDefs
     // for (o <- outputs)
     //   out.writeln("  assign " + o.emitRef + " = " + o.inputs(0).emitRef + ";");
     if (regs.size > 0) {
-      out.write("\n");
-      out.write(emitRegs)
+      //out.write("\n");
+      //out.write(emitRegs)
+      res += "\n" + emitRegs;
     }
-    out.write("endmodule\n\n");
+    //out.write("endmodule\n\n");
+    res += "endmodule\n\n";
+    if(compDefs contains res){
+      moduleName = compDefs(res);
+    }else{
+      if(compDefs.values.toList contains name) name = genCompName(name);
+      compDefs += (res -> name);
+      moduleName = name;
+      res = "module " + name + "(" + res;
+      out.write(res); }
     // println("// " + depthString(depth) + "DONE");
   }
   def markComponent() = {
@@ -447,6 +472,7 @@ abstract class Component extends Node {
       if (types.length == 0) {
         val o = m.invoke(this);
         o match { 
+	  case comp: Component => { comp.component = this;}
           case node: Node => { if (node.name == "" || node.name == null) node.name = name;
 			       if (node.isReg) containsReg = true;
 			     }
@@ -455,20 +481,36 @@ abstract class Component extends Node {
       }
     }
   }
+  def nameChildren() = {
+    val childNameCount = new HashMap[String, Int];
+    for(child <-children){
+      if (childNameCount contains child.className){
+	childNameCount(child.className)+=1;
+	child.name = child.className + "_" + childNameCount(child.className);
+      } else {
+	childNameCount += (child.className -> 0)
+	child.name = child.className;
+      }
+    }
+  }
   def ensure_dir(dir: String) = {
     val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/");
     new File(d).mkdirs();
     d
   }
+
   def compileV(): Unit = {
     topComponent = this;
     for (c <- components) 
       c.markComponent();
     findNodes(0, this);
+    for(c <- components)
+      c.nameChildren();
     val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
     val out = new java.io.FileWriter(base_name + name + ".v");
     doCompileV(out, 0);
     out.close();
+    compDefs.clear;
   }
   def nameAllIO(): Unit = {
     // println("NAMING " + this);
