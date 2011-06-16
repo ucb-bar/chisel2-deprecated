@@ -20,7 +20,23 @@ object Enum {
   def apply(l: Symbol *) = (l.toList zip (Range(0, l.length, 1).map(x => Lit(x, sizeof(l.length-1))))).toMap;
 }
 object Cat {
-  def apply (mod: Node, mods: Node*): Node = mods.foldLeft(mod){(a, b) => a ## b}
+  def apply (mod: Node, mods: Node*): Node = 
+    if(isEmittingComponents) {
+      val res = new Cat();
+      res.initOf("", sumWidth _, mod :: mods.toList);
+      res
+    } else
+      mods.foldLeft(mod){(a, b) => a ## b};
+}
+class Cat extends Node {
+  override def emitDef: String = {
+    var res = "  assign " + emitTmp + " = {";
+    var first = true;
+    for(node <- inputs)
+      res += (if(first) {first = false; ""} else ", ") + node.emitRef;
+    res += "};\n";
+    res
+  }
 }
 object when {
   def apply(c: Node)(block: => Unit) = {
@@ -139,7 +155,7 @@ object Log2 {
   // def log2WidthOf() = { (m: Node, n: Int) => log2(m.inputs(0).width) }
   def apply (mod: Node, n: Int): Node = {
     if (isEmittingComponents) {
-      var res: Node = Lit(n);
+      var res: Node = Lit(0);
       for (i <- 1 to n) 
         res = Mux(mod(i), Lit(i, sizeof(n)), res);
       res
