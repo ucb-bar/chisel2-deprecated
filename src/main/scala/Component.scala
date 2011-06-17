@@ -14,6 +14,7 @@ import Node._;
 import Component._;
 import Bundle._;
 import IOdir._;
+import ChiselError._;
 
 
 object Component {
@@ -478,7 +479,6 @@ abstract class Component extends Node {
   }
   def nameChild(child: Component) = {
     if(!child.named){
-      if(child.className == "shift_round_position") println("NAMING CHILD: " + child.className + "\n");
       if(childNames contains child.className){
 	childNames(child.className)+=1;
 	child.name = child.className + "_" + childNames(child.className);
@@ -503,7 +503,10 @@ abstract class Component extends Node {
     val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
     val out = new java.io.FileWriter(base_name + name + ".v");
     doCompileV(out, 0);
-    out.close();
+    if(ChiselErrors isEmpty)
+      out.close();
+    else 
+      for(err <- ChiselErrors)	err.printError;
     compDefs.clear;
     genCount = 0;
   }
@@ -544,6 +547,10 @@ abstract class Component extends Node {
     for (c <- components) 
       c.markComponent();
     val base_name = ensure_dir(targetEmulatorRootDir + "/" + targetDir);
+    if(!ChiselErrors.isEmpty){
+      for(err <- ChiselErrors)	err.printError;
+      return
+    }
     val out_h = new java.io.FileWriter(base_name + name + ".h");
     val out_c = new java.io.FileWriter(base_name + name + ".cpp");
     if (isGenHarness)

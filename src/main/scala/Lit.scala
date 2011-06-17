@@ -7,6 +7,7 @@ import scala.math.ceil;
 import scala.math.max;
 import scala.math.min;
 import Lit._;
+import ChiselError._;
 
 object Lit {
   implicit def intToLit (x: Int) = Lit(x);
@@ -87,7 +88,7 @@ object Lit {
   def apply(n: String, width: Int): Lit = 
     apply(width, n(0), n.substring(1, n.length));
   def apply(width: Int, base: Char, literal: String): Lit = {
-    if (!"dhb".contains(base)) throw new IllegalArgumentException("invalid base");
+    if (!"dhb".contains(base)) ChiselErrors += IllegalArgument("no base specified", 4);
     val res = new Lit();
     res.init(literal, width); res.base = base;
     if (base == 'b') {res.isZ = literal.contains('?'); res.isBinary = true;}

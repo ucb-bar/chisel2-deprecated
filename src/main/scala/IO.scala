@@ -4,6 +4,7 @@ package Chisel {
 import Node._;
 import Component._;
 import IOdir._;
+import ChiselError._;
 
 object IOdir {
   val INPUT  = new IOdir(0)
@@ -127,7 +128,7 @@ class IO extends Wire {
   }
   override def :=(src: Node) = {
     if(assigned)
-      throw new IllegalStateException("resassignment to output");
+      ChiselErrors += IllegalState("reassignment to output", 3);
     else { assigned = true; super.:=(src)}
   }
 };
