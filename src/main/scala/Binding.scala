@@ -6,7 +6,7 @@ import Node._;
 
 // used for component to component connections
 object Binding {
-  def apply(m: Node, c: Component): Node = {
+  def apply(m: Node, c: Component, ioComp: Component): Node = {
     // println("BINDING " + m);
     if (isEmittingComponents) {
       val res = c.findBinding(m);
@@ -14,7 +14,7 @@ object Binding {
         val res = new Binding();
         res.component = c;
         res.init("", widthOf(0), m);
-        res.name = c.genName(m.name); // TODO: NAME
+        res.name = ioComp.genName(m.name); // TODO: NAME
         // println("ADDING NEW BINDING " + m);
         // println("ADDING BINDING " + res + " TO " + res.component.name);
         // res.component.bindings += res;
