@@ -102,6 +102,8 @@ abstract class Component extends Node {
   var defaultWidth = 32;
   var moduleName: String = "";
   var className:  String = "";
+  val childNames = new HashMap[String, Int];
+  var named = false;
   components += this;
   def ownIo() = {
     // println("COMPONENT " + name + " IO " + io);
@@ -138,7 +140,7 @@ abstract class Component extends Node {
   def io: Interface
   def nextIndex : Int = { nindex = nindex + 1; nindex }
   def genName (name: String): String = 
-    if (name == null || name.length() == 0) "" else name + "_" + nextIndex;
+    if (name == null || name.length() == 0) "" else this.name + "_" + name;
   var isWalking = new HashSet[Node];
   var isWalked = new HashSet[Node];
   override def toString: String = name
@@ -413,7 +415,6 @@ abstract class Component extends Node {
     //   println("// " + depthString(depth+1) + " MOD " + m);
     // }
     val hasReg = containsReg || childrenContainsReg;
-    //out.write("module " + name + "(" + (if (hasReg) "input clk, input reset" else ""));
     var res = (if (hasReg) "input clk, input reset" else "");
     var first = true;
     var nl = "";
@@ -422,41 +423,35 @@ abstract class Component extends Node {
       w match {
         case io: IO => {
           if (io.dir == INPUT) {
-            //out.write(nl + "    input " + io.emitWidth + " " + io.emitRef);
 	    res += nl + "    input " + io.emitWidth + " " + io.emitRef;
           } else {
-            //out.write(nl + "    output" + io.emitWidth + " " + io.emitRef);
 	    res += nl + "    output" + io.emitWidth + " " + io.emitRef;
           }
         }
       };
     }
-    //out.write(");\n\n");
     res += ");\n\n";
     // TODO: NOT SURE EXACTLY WHY I NEED TO PRECOMPUTE TMPS HERE
     for (m <- mods)
       m.emitTmp;
-    //out.write(emitDecs);
-    //out.write("\n");
-    //out.write(emitDefs)
     res += emitDecs + "\n" + emitDefs
     // for (o <- outputs)
     //   out.writeln("  assign " + o.emitRef + " = " + o.inputs(0).emitRef + ";");
     if (regs.size > 0) {
-      //out.write("\n");
-      //out.write(emitRegs)
       res += "\n" + emitRegs;
     }
-    //out.write("endmodule\n\n");
     res += "endmodule\n\n";
     if(compDefs contains res){
       moduleName = compDefs(res);
     }else{
-      if(compDefs.values.toList contains name) name = genCompName(name);
-      compDefs += (res -> name);
-      moduleName = name;
-      res = "module " + name + "(" + res;
-      out.write(res); }
+      if(compDefs.values.toList contains name) 
+	moduleName = genCompName(name);
+      else
+	moduleName = name;
+      compDefs += (res -> moduleName);
+      res = "module " + moduleName + "(" + res;
+      out.write(res); 
+    }
     // println("// " + depthString(depth) + "DONE");
   }
   def markComponent() = {
@@ -481,16 +476,17 @@ abstract class Component extends Node {
       }
     }
   }
-  def nameChildren() = {
-    val childNameCount = new HashMap[String, Int];
-    for(child <-children){
-      if (childNameCount contains child.className){
-	childNameCount(child.className)+=1;
-	child.name = child.className + "_" + childNameCount(child.className);
+  def nameChild(child: Component) = {
+    if(!child.named){
+      if(child.className == "shift_round_position") println("NAMING CHILD: " + child.className + "\n");
+      if(childNames contains child.className){
+	childNames(child.className)+=1;
+	child.name = child.className + "_" + childNames(child.className);
       } else {
-	childNameCount += (child.className -> 0)
+	childNames += (child.className -> 0);
 	child.name = child.className;
       }
+      child.named = true;
     }
   }
   def ensure_dir(dir: String) = {
@@ -504,13 +500,12 @@ abstract class Component extends Node {
     for (c <- components) 
       c.markComponent();
     findNodes(0, this);
-    for(c <- components)
-      c.nameChildren();
     val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
     val out = new java.io.FileWriter(base_name + name + ".v");
     doCompileV(out, 0);
     out.close();
     compDefs.clear;
+    genCount = 0;
   }
   def nameAllIO(): Unit = {
     // println("NAMING " + this);
