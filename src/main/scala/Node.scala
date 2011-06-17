@@ -252,6 +252,7 @@ abstract class Node {
           if (io.dir == OUTPUT && ioComp.parent == null && !(ioComp == topComponent)) {
             ioComp.parent = c;
             c.children += ioComp;
+	    if(isEmittingComponents) c.nameChild(ioComp);
             // println("PARENTING " + c.name + "(" + c.children.length + ") CHILD " + ioComp);
           }
           (ioComp,  // if (isEmittingComponents) ioComp else topComponent, 
@@ -284,7 +285,7 @@ abstract class Node {
                 if (c == null) {
                   println("UNKNOWN COMPONENT FOR " + node);
                 }
-                val b = Binding(node, c);
+                val b = Binding(node, c, io.component);
                 inputs(i) = b;
                 if (!c.isWalked.contains(b)) {
                   c.mods += b;  c.isWalked += b;
