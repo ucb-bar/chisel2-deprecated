@@ -53,6 +53,7 @@ class Bundle(view_arg: Seq[String] = null) extends Interface {
             (view == null || view.contains(name))) {
           val o = m.invoke(this);
           o match { 
+	    case bv: BundleVec[Interface] => elts += ((name, bv)); for(elm <- bv.bundleVector) elm.name = name + elm.name;
             case i: Interface => elts += ((name, i)); i.name = name; 
               // println("    ADDING " + name + " -> " + o);
             case any =>
@@ -129,8 +130,9 @@ class Bundle(view_arg: Seq[String] = null) extends Interface {
         for ((n, i) <- elements) {
           if (other.elements.contains(n))
             i <> other(n);
-          else
+          else{
             println("// UNABLE TO FIND " + n + " IN " + other.component);
+	  }
         }
       }
       case default =>
