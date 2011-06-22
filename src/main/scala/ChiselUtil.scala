@@ -13,4 +13,11 @@ object Literal {
   implicit def intToIntWrapper(x: Int) = new intWrapper(x);
 }
 
+object newInst {
+  def apply[T <: Interface: Manifest](): T = {
+    val clazz = manifest[T].erasure.asInstanceOf[Class[T]];
+    clazz.newInstance
+  }
+}
+
 }
