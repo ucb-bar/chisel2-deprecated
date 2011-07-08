@@ -144,8 +144,10 @@ class Bundle(view_arg: Seq[String] = null) extends Interface {
     src match {
       case other: Bundle =>
         for ((n, i) <- elements) {
-          // println(" := ELT " + i + " & " + other(n));
-          i ^^ other(n);
+          if(other.elements.contains(n)) {
+            // println(" := ELT " + i + " & " + other(n));
+            i ^^ other(n);
+          }
         }
     }
   }
