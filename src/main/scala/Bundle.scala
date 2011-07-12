@@ -21,9 +21,10 @@ object Bundle {
   }
 }
 
-class Bundle(view_arg: Seq[String] = null) extends Interface {
+class Bundle(view_arg: Seq[String] = null) extends Interface with AbstractDataType{
   var view = view_arg;
   var elementsCache: Map[String, Interface] = null;
+  var bundledElm: Node = null;
   def calcElements(view: Seq[String]): Map[String, Interface] = {
     val c      = getClass();
     var elts   = Map[String, Interface]();
@@ -53,7 +54,7 @@ class Bundle(view_arg: Seq[String] = null) extends Interface {
             (view == null || view.contains(name))) {
           val o = m.invoke(this);
           o match { 
-	    case bv: BundleVec[Interface] => elts += ((name, bv)); for(elm <- bv.bundleVector) elm.name = name + elm.name;
+	    case bv: BundleVec[Interface] => elts += ((name + bv.name, bv));
             case i: Interface => elts += ((name, i)); i.name = name; 
               // println("    ADDING " + name + " -> " + o);
             case any =>
@@ -92,6 +93,13 @@ class Bundle(view_arg: Seq[String] = null) extends Interface {
       i.name_it(i.name);
       // println("  ELT " + n + " " + i);
     }
+  }
+  override def unname_it() = {
+    if(name equals "")
+      for ((n, i) <- elements) {
+	i.name = "";
+	i.unname_it();
+      }
   }
   def +(other: Bundle): Bundle = {
     var elts = Map[String, Interface]();
@@ -144,8 +152,10 @@ class Bundle(view_arg: Seq[String] = null) extends Interface {
     src match {
       case other: Bundle =>
         for ((n, i) <- elements) {
-          // println(" := ELT " + i + " & " + other(n));
-          i ^^ other(n);
+	  if (other.elements.contains(n)){
+            // println(" := ELT " + i + " & " + other(n));
+            i ^^ other(n);
+	  }
         }
     }
   }
@@ -154,6 +164,34 @@ class Bundle(view_arg: Seq[String] = null) extends Interface {
     for ((n, i) <- elements)
       res = res ++ i.flatten
     res.toArray
+  }
+
+  def pack: Node = {
+    if(bundledElm == null){
+      val nodes = flatten.map{case (n, i) => i};
+      bundledElm = Cat(nodes.head, nodes.tail.toList: _*)
+    }
+    bundledElm
+  }
+  def unPack = elements;
+
+  override def toBits: Node = {
+    if(bundledElm == null) {
+      val nodes = flatten.map{case (n, i) => i};
+      bundledElm = Cat(nodes.head, nodes.tail.toList: _*)
+    }
+    bundledElm
+  }
+
+  override def fromBits(n: Node): this.type = {
+    val res = this.getClass.newInstance.asInstanceOf[this.type];
+    var ind = 0;
+    for((name, io) <- res.elements.toList.reverse) {
+      io.flip;
+      io := n(ind + io.width-1, ind);
+      ind += io.width;
+    }
+    res
   }
 }
 
