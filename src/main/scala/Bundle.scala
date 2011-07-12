@@ -152,10 +152,10 @@ class Bundle(view_arg: Seq[String] = null) extends Interface with AbstractDataTy
     src match {
       case other: Bundle =>
         for ((n, i) <- elements) {
-	  if (other.elements.contains(n)){
+          if(other.elements.contains(n)) {
             // println(" := ELT " + i + " & " + other(n));
             i ^^ other(n);
-	  }
+          }
         }
     }
   }
