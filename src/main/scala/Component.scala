@@ -12,7 +12,7 @@ import java.io.File;
 import scala.math.max;
 import Node._;
 import Component._;
-import Bundle._;
+import bundle_t._;
 import IOdir._;
 import ChiselError._;
 
@@ -41,7 +41,7 @@ object Component {
     name + "_" + genCount
   }
   def nextCompIndex : Int = { compIndex = compIndex + 1; compIndex }
-  /*def apply (name: String, i: Interface): Component = {
+  /*def apply (name: String, i: dat_t): Component = {
     val res = new Component();
     res.name = name + "_" + nextCompIndex;
     res.ioVal = i;
@@ -60,7 +60,7 @@ object Component {
     }
     res
   }* */
-  /*def apply (name: String): Component = Component(name, nullBundle);* */
+  /*def apply (name: String): Component = Component(name, nullbundle_t);* */
   def splitArg (s: String) = s.split(' ').toList;
   def initChisel () = {
     cond = new Stack[Node];
@@ -85,14 +85,17 @@ object Component {
   }
 }
 
-abstract class Component extends Node {
-  var ioVal: Interface = null;
+abstract class Component {
+  var ioVal: dat_t = null;
+  var name: String = "";
   val rules = new ArrayBuffer[Rule];
   val bindings = new ArrayBuffer[Binding];
   var wiresCache: Array[(String, IO)] = null;
   var parent: Component = null;
   var containsReg = false;
   val children = new ArrayBuffer[Component];
+  var inputs = new ArrayBuffer[Node];
+  var outputs = new ArrayBuffer[Node];
   
   val mods  = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
@@ -106,6 +109,12 @@ abstract class Component extends Node {
   val childNames = new HashMap[String, Int];
   var named = false;
   components += this;
+  def depthString(depth: Int): String = {
+    var res = "";
+    for (i <- 0 until depth)
+      res += "  ";
+    res
+  }
   def ownIo() = {
     // println("COMPONENT " + name + " IO " + io);
     val wires = io.flatten;
@@ -137,8 +146,8 @@ abstract class Component extends Node {
     // println("UNABLE TO FIND BINDING FOR " + m);
     return null
   }
-  //def io: Interface = ioVal;
-  def io: Interface
+  //def io: dat_t = ioVal;
+  def io: dat_t
   def nextIndex : Int = { nindex = nindex + 1; nindex }
   def genName (name: String): String = 
     if (name == null || name.length() == 0) "" else this.name + "_" + name;
@@ -151,17 +160,19 @@ abstract class Component extends Node {
     wiresCache
   }
   def <>(src: Component) = io <> src.io;
-  def apply(name: String): Interface = io(name);
+  def apply(name: String): dat_t = io(name);
   // COMPILATION OF REFERENCE
-  override def emitDec: String = {
+  def emitDec: String = {
     var res = "";
     val wires = io.flatten;
     for ((n, w) <- wires) 
       res += w.emitDec;
     res
   }
-  override def emitRefV: String = name;
-  override def emitDef: String = {
+  def emitRef: String = if (isEmittingC) emitRefC else emitRefV;
+  def emitRefC: String = emitRefV;
+  def emitRefV: String = name;
+  def emitDef: String = {
     var res = "  " + moduleName + " " + name + "(";
     val hasReg = containsReg || childrenContainsReg;
     res = res + (if(hasReg) ".clk(clk), .reset(reset)" else "");
@@ -196,7 +207,7 @@ abstract class Component extends Node {
     res += ");\n";
     res
   }
-  override def emitDefLoC: String = {
+  def emitDefLoC: String = {
     var res = "";
     for ((n, w) <- wires) {
       w match {
@@ -215,14 +226,14 @@ abstract class Component extends Node {
     }
     res
   }
-  override def emitDefHiC: String = {
+  def emitDefHiC: String = {
     var res = emitRef + "->clock_hi(reset);\n";
     res
   }
   // COMPILATION OF BODY
   def emitDefs: String = {
     var res = "";
-    for (m <- mods) 
+    for (m <- mods)
       res += m.emitDef;
     for (c <- children) 
       res += c.emitDef;
@@ -301,8 +312,8 @@ abstract class Component extends Node {
     val leaves = new ArrayBuffer[Node];
     for (m <- mods) {
       m match {
-        case io: IO    => if (io.dir == INPUT) { if (io.inputs.length == 0) leaves += m; }
-        case l: Lit    => leaves += m;
+        case io: IO    => if (io.dir == INPUT && !io.isCellIO) { if (io.inputs.length == 0) leaves += m; }
+        case l: Literal    => leaves += m;
         case d: Delay  => leaves += m;
         case any       =>
       }
@@ -327,7 +338,7 @@ abstract class Component extends Node {
     for (m <- mods) {
       m match {
         case o: IO  =>
-        case l: Lit =>
+        case l: Literal =>
         case i      => imods += m;
       }
     }
@@ -388,7 +399,8 @@ abstract class Component extends Node {
       }
     }
   }
-  override def findNodes(depth: Int, c: Component): Unit = {
+  def findNodes(depth: Int, c: Component): Unit = {
+    for((n, elm) <- io.flatten) elm.removeCellIOs();
     io.findNodes(depth, c);
   }
   def childrenContainsReg: Boolean = {
@@ -468,10 +480,14 @@ abstract class Component extends Node {
       if (types.length == 0) {
         val o = m.invoke(this);
         o match { 
-	  case comp: Component => { comp.component = this;}
-          case node: Node => { if (node.name == "" || node.name == null) node.name = name;
-			       if (node.isReg) containsReg = true;
+	  //case comp: Component => { comp.component = this;}
+          case node: Node => { if (name != "io" && (node.isCellIO || (node.name == "" && !node.named) || node.name == null)) node.name_it(name, true);
+			       if (node.isReg || node.isRegOut) containsReg = true;
 			     }
+	  case cell: Cell => { cell.name = name;
+			       cell.named = true;
+			      if(cell.isReg) containsReg = true;
+	  }
           case any =>
         }
       }
@@ -577,7 +593,7 @@ abstract class Component extends Node {
     findGraph();    // search from leaves -- create gmods
     for (m <- omods) {
       m match {
-        case l: Lit => ;
+        case l: Literal => ;
         case any    => 
           if (m.name != "" && m != reset && !(m.component == null)) 
             m.name = m.component.name + "_" + m.name;
@@ -596,7 +612,7 @@ abstract class Component extends Node {
       for ((n, w) <- wires) 
         out_h.write("  dat_t<" + w.width + "> " + w.emitRef + ";\n");
     }
-    for (m <- omods) 
+    for (m <- omods)
       if (m.isInObject)
         out_h.write(m.emitDecC);
     if (isEmittingComponents) {

@@ -15,6 +15,7 @@ object Binding {
         res.component = c;
         res.init("", widthOf(0), m);
         res.name = ioComp.genName(m.name); // TODO: NAME
+	res.named = true;
         // println("ADDING NEW BINDING " + m);
         // println("ADDING BINDING " + res + " TO " + res.component.name);
         // res.component.bindings += res;

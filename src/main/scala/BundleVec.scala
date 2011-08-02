@@ -3,22 +3,44 @@ package Chisel {
 import scala.collection.mutable.ArrayBuffer
 
 object BundleVec {
-  def apply[T <: Interface](count: Int)(bundleGen: => T): BundleVec[T] = {
+/*
+  def apply[T <: dat_t](n: Int)(gen: => T): BundleVec[T] = {
     val res = new BundleVec[T]();
-    for(i <- 0 until count){
-      val t = bundleGen;
+    for(i <- 0 until n){
+      val t = gen;
       res += t;
-      t match {
-	case b: Bundle => b.elements.map{case(n, io) => io.name += i};
-	case io: IO => io.name += i;
-      }
+      t.name += i;
+    }
+    res
+  }
+*/
+  def apply[T <: dat_t](n: Int): (=> T) => BundleVec[T] = {
+   gen(n, _);
+  }
+
+  def gen[T <: dat_t](n: Int, gen: => T): BundleVec[T] = {
+    val res = new BundleVec[T]();
+    for(i <- 0 until n){
+      val t = gen;
+      res += t;
+      t.name += i;
+    }
+    res
+  }
+
+  def apply[T <: dat_t: Manifest](n: Int, args: Any*): BundleVec[T] = {
+    val res = new BundleVec[T]();
+    for(i <- 0 until n) {
+      val t = (if(args == List(None)) Fab[T]() else Fab[T](args: _*));
+      res += t;
+      t.name += i;
     }
     res
   }
 
 }
 
-class BundleVec[T <: Interface]() extends Interface {
+class BundleVec[T <: dat_t]() extends dat_t {
   val bundleVector = new ArrayBuffer[T];
   def +=(b: T) = bundleVector += b;
   override def apply(ind: Int): T = {
@@ -28,7 +50,7 @@ class BundleVec[T <: Interface]() extends Interface {
     val res = new ArrayBuffer[(String, IO)];
     for (elm <- bundleVector)
       elm match {
-	case bundle: Bundle => res ++= bundle.flatten;
+	case bundle: bundle_t => res ++= bundle.flatten;
 	case io: IO => res += ((io.name, io));
       }
     res.toArray
@@ -50,10 +72,32 @@ class BundleVec[T <: Interface]() extends Interface {
 	  b ^^ o
     }
   }
+
+  def <>(src: List[Node]) = {
+    for((b, e) <- bundleVector zip src)
+      e match {
+	case other: bundle_t =>
+	  b <> e;
+      }
+  }
+
   override def findNodes(depth: Int, c: Component): Unit = {
-    if(c == null) println("THIS IS A NULL COMPONENT");
     for(bundle <- bundleVector)
       bundle.findNodes(depth, c);
+  }
+
+  override def flip(): this.type = {
+    for(b <- bundleVector)
+      b.flip();
+    this
+  }
+
+  override def name_it (path: String, named: Boolean = true) = {
+    for (i <- bundleVector) {
+      i.name = (if (path.length > 0) path + "_" else "") + i.name;
+      i.name_it(i.name, named);
+      // println("  ELT " + n + " " + i);
+    }
   }
 
 }

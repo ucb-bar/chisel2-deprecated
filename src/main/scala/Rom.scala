@@ -2,23 +2,51 @@
 package Chisel {
 
 import scala.math.max;
+import Rom._;
+import IOdir._;
 
 object Rom {
-  def romWidth(data: Array[Lit]) = { 
+  def romWidth(data: Array[Node]) = { 
     (m: Node) => { 
       var res = 0; 
       for (d <- data) 
         res = max(d.width, res); 
       res  }
   }
-  def apply (data: Array[Lit]): Rom = {
+  def apply (data: Array[Node]): Rom = {
     val res = new Rom(data);
     res.init("", romWidth(data));
     res
   }
+
+  def apply[T <: dat_t]( data: Array[T], addr: Node): RomCell[T] = {
+    new RomCell(data, addr);
+  }
+
 }
-class Rom(data_vals: Array[Lit]) extends Delay {
-  val data = data_vals;
+
+
+class RomCell[T <: dat_t](data: Array[T], addr: Node) extends Cell {
+  val io = new bundle_t{val addr = int_t(INPUT);
+			val out = data(0).clone.asOutput;
+  }
+  io.setIsCellIO;
+  val dataBits = data.map(x => x.toBits);
+  val primitiveNode = new Rom(dataBits);
+  primitiveNode.init("primitiveNode", romWidth(dataBits), dataBits: _*);
+  val fb = io.out.fromBits(primitiveNode(addr)).asInstanceOf[T];
+  fb.setIsCellIO;
+  fb ^^ io.out;
+  primitiveNode.nameHolder = this;
+}
+
+class Rom(data_vals: Array[Node]) extends Delay {
+  val data = data_vals.toArray;
+  override def getNode() = {
+    for(i <- 0 until data.length)
+      data(i) = data(i).getNode()
+    this
+  }
   override def toString: String = "ROM(" + data + ")";
   override def emitDef: String = {
     var res = "  initial begin\n";

@@ -4,8 +4,9 @@ package Chisel {
 import scala.collection.mutable.ArrayBuffer
 
 import Component._;
-import Lit._;
+import Literal._;
 import Node._;
+import IOdir._;
   
 class Update(val reg: Node, val update: Node) {
 }
@@ -19,25 +20,14 @@ object Enum {
   def apply(l:List[Symbol]) = (l zip (Range(0, l.length, 1).map(x => Lit(x, sizeof(l.length-1))))).toMap;
   def apply(l: Symbol *) = (l.toList zip (Range(0, l.length, 1).map(x => Lit(x, sizeof(l.length-1))))).toMap;
 }
-object Cat {
-  def apply (mod: Node, mods: Node*): Node = 
-    if(isEmittingComponents) {
-      val res = new Cat();
-      res.initOf("", sumWidth _, mod :: mods.toList);
-      res
-    } else
-      mods.foldLeft(mod){(a, b) => a ## b};
-}
-class Cat extends Node {
-  override def emitDef: String = {
-    var res = "  assign " + emitTmp + " = {";
-    var first = true;
-    for(node <- inputs)
-      res += (if(first) {first = false; ""} else ", ") + node.emitRef;
-    res += "};\n";
-    res
+
+object fromBits {
+  def apply[T <: dat_t: Manifest](data: Node): T = {
+    val resT = Fab[T]();
+    resT.fromBits(data);
   }
 }
+
 object when {
   def apply(c: Node)(block: => Unit) = {
     cond.push(c); 
@@ -64,8 +54,8 @@ object pmux {
   }
 }
 object pcond {
-  def apply(cases: Seq[(Node, () => Node)]) = {
-    var tst: Node = Lit(1);
+  def apply(cases: Seq[(int_t, () => int_t)]) = {
+    var tst: int_t = Lit(1);
     for ((ctst, block) <- cases) {
       cond.push(tst && ctst);  
       block(); 
@@ -76,7 +66,7 @@ object pcond {
   }
 }
 object pcase {
-  def apply(x: Node, cases: Seq[(Lit, () => Node)]) = 
+  def apply(x: int_t, cases: Seq[(int_t, () => int_t)]) = 
     pcond(cases.map(tb => (tb._1 === x, tb._2)))
 }
 object chisel_main {
@@ -108,11 +98,66 @@ object chisel_main {
 }
 
 
-abstract class Interface extends Node {
-  def apply(name: String): Interface = null
+abstract class dat_t extends Node {
+  var comp: proc = null;
+  def setIsCellIO = isCellIO = true;
+  def apply(name: String): dat_t = null
   def flatten = Array[(String, IO)]();
   def flip(): this.type = this;
+  def asInput(): this.type = this;
+  def asOutput(): this.type = this;
+  def toBits: Node = this;
+  def fromBits(n: Node): this.type = this;
+  def <==[T <: dat_t](data: T): this.type = {
+    data.setIsCellIO;
+    comp <== data.toBits;
+    this
+  }
+  override def clone(): this.type = {
+    val res = this.getClass.newInstance.asInstanceOf[this.type];
+    res
+  }
+  override def name_it(path: String, setNamed: Boolean = false) = {
+    if (isCellIO && comp != null) 
+      comp.name_it(path, setNamed)
+    else
+      super.name_it(path, setNamed);
+  }
+  def setWidth(w: Int) = this.width = w;
+  override def unary_-()= this;
+  override def unary_~()= this;
+  override def unary_!()= this;
+  def << (b: dat_t) = this;
+  def >> (b: dat_t) = this;
+  def >>>(b: dat_t) = this;
+  def +  (b: dat_t) = this;
+  def *  (b: dat_t) = this;
+  def ^  (b: dat_t) = this;
+  def ?  (b: dat_t) = this;
+  def -  (b: dat_t) = this;
+  def ## (b: dat_t) = this;
+  def ===(b: dat_t) = this;
+  def != (b: dat_t) = this;
+  def >  (b: dat_t) = this;
+  def <  (b: dat_t) = this;
+  def <= (b: dat_t) = this;
+  def >= (b: dat_t) = this;
+  def && (b: dat_t) = this;
+  def || (b: dat_t) = this;
+  def &  (b: dat_t) = this;
+  def |  (b: dat_t) = this;
 }
+
+trait proc extends Node {
+  def <==(src: Node): this.type;
+}
+
+trait nameable {
+  var name: String = "";
+  var named = false;
+}
+
+object nullADT extends dat_t;
 
 
 abstract class BlackBox extends Component {
@@ -131,16 +176,35 @@ class Delay extends Node {
 
 
 object MuxLookup {
+/*
   def apply (key: Node, default: Node, mapping: Seq[(Node, Node)]): Node = {
     var res = default;
     for ((k, v) <- mapping.reverse)
       res = Mux(key === k, v, res);
     res
   }
+  * */
+
+  def apply[T <: dat_t] (key: int_t, default: T, mapping: Seq[(int_t, T)]): T = {
+    var res = default;
+    for ((k, v) <- mapping.reverse)
+      res = Mux(key ===k, v, res);
+    res
+  }
+
 }
 
 object MuxCase {
+/*
   def apply (default: Node, mapping: Seq[(Node, Node)]): Node = {
+    var res = default;
+    for ((t, v) <- mapping.reverse){
+      res = Mux(t, v, res);
+    }
+    res
+  }
+  * */
+  def apply[T <: dat_t] (default: T, mapping: Seq[(int_t, T)]): T = {
     var res = default;
     for ((t, v) <- mapping.reverse){
       res = Mux(t, v, res);
@@ -157,7 +221,7 @@ object Log2 {
     if (isEmittingComponents) {
       var res: Node = Lit(0);
       for (i <- 1 to n) 
-        res = Mux(mod(i), Lit(i, sizeof(n)), res);
+        res = Multiplex(mod(i), Lit(i, sizeof(n)), res);
       res
     } else {
       val res = new Log2();

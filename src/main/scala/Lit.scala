@@ -6,11 +6,42 @@ import scala.math.abs;
 import scala.math.ceil;
 import scala.math.max;
 import scala.math.min;
-import Lit._;
+import Literal._;
+import IOdir._;
 import ChiselError._;
 
 object Lit {
-  implicit def intToLit (x: Int) = Lit(x);
+  def apply(x: Int): int_t = {
+    val cell = new LIT(Literal(x));
+    cell.io
+  }
+  def apply(x: Int, width: Int): int_t = {
+    val cell = new LIT(Literal(x, width));
+    cell.io
+  }
+  def apply(x: Long, width: Int): int_t = {
+    val cell = new LIT(Literal( x, width));
+    cell.io
+  }
+  def apply(n: String, width: Int): int_t = {
+    val cell = new LIT(Literal(n, width));
+    cell.io
+  }
+  def apply(width: Int, base: Char, literal: String): int_t = {
+    val cell = new LIT(Literal(width, base, literal));
+    cell.io
+  }
+}
+
+class LIT(x: Literal) extends Cell {
+  val io = int_t(OUTPUT);
+  io.setIsCellIO;
+  val primitiveNode = x;
+  io := primitiveNode;
+}
+
+object Literal {
+  implicit def intToLit (x: Int) = Literal(x);
   def sizeof(x: Int): Int = { 
     val y = max(1, abs(x)).toDouble;
     val res = max(1, (ceil(log(y+1)/log(2.0))).toInt);
@@ -79,23 +110,23 @@ object Lit {
       -1
   }
 
-  def apply(x: Int): Lit = { val res = new Lit(); res.init("0x%x".format(x), sizeof(x)); res }
-  def apply(x: Int, width: Int): Lit = { val res = new Lit(); res.init("0x%x".format(x), width); res }
-  def apply(x: Long, width: Int): Lit = { val res = new Lit(); res.init("0x%x".format(x), width); res }
+  def apply(x: Int): Literal = { val res = new Literal(); res.init("0x%x".format(x), sizeof(x)); res }
+  def apply(x: Int, width: Int): Literal = { val res = new Literal(); res.init("0x%x".format(x), width); res }
+  def apply(x: Long, width: Int): Literal = { val res = new Literal(); res.init("0x%x".format(x), width); res }
   // def apply(n: String): Lit = { 
   //   val (bits, mask, width) = parseLit(n);  apply(n, width);
   // }
-  def apply(n: String, width: Int): Lit = 
+  def apply(n: String, width: Int): Literal = 
     apply(width, n(0), n.substring(1, n.length));
-  def apply(width: Int, base: Char, literal: String): Lit = {
+  def apply(width: Int, base: Char, literal: String): Literal = {
     if (!"dhb".contains(base)) ChiselErrors += IllegalArgument("no base specified", 4);
-    val res = new Lit();
+    val res = new Literal();
     res.init(literal, width); res.base = base;
     if (base == 'b') {res.isZ = literal.contains('?'); res.isBinary = true;}
     res
   }
 }
-class Lit extends Node {
+class Literal extends Node {
   //implicit def intToLit (x: Int) = Lit(x);
   var isZ = false;
   var isBinary = false;
@@ -130,7 +161,7 @@ class Lit extends Node {
     else if(base == 'd') ("" + width + "'d" + name)
     else if(base == 'h') ("" + width + "'h" + name)
     else "";
-  def d (x: Int): Lit = Lit(x, value)
+  def d (x: Int): Literal = Literal(x, value)
   //def ~(x: String): Lit = Lit(value, x(0), x.substring(1, x.length));
 }
 

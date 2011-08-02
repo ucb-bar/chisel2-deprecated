@@ -1,10 +1,32 @@
 // author: jonathan bachrach
 package Chisel {
 
-class ListLookup(mapping: Array[(Lit, List[Node])], defaultVal: List[Node]) extends Node {
-  val map = mapping;
-  val default = defaultVal;
+class ListLookup(mapping: Array[(Node, List[Node])], defaultVal: List[Node]) extends Node {
+  val map = mapping.map{case(n, l_n) => (n, l_n.toBuffer)}.toBuffer;
+  val default = defaultVal.toBuffer;
   val wires = defaultVal.map(a => new ListLookupRef(a));
+  override def getNode() = {
+    for(((addr, data), i) <- map zip map.indices){
+      map(i) = ((addr.getNode(), data));
+      for(i <- 0 until data.length){
+	data(i) = data(i).getNode()
+      }
+    }
+    for(i <- 0 until default.length){
+      default(i) = default(i).getNode();
+    }
+    val addr = inputs(0);
+    inputs.clear();
+    inputs += addr;
+    for (e <- default)
+      inputs += e;
+    for ((a, data) <- map){
+      for (e <- data){
+        inputs += e;
+      }
+    }
+    this
+  }
   override def toString: String = "LIST-LOOKUP(" + inputs(0) + ")";
   override def emitDef: String = {
     var res = 
@@ -20,7 +42,7 @@ class ListLookup(mapping: Array[(Lit, List[Node])], defaultVal: List[Node]) exte
       res = res + "      end\n" 
     }
     res = res + "      default: begin\n"
-    for ((w, e) <- wires zip defaultVal) {
+    for ((w, e) <- wires zip default) {
       if(w.component != null)
 	res = res + "        " + w.emitRef + " = " + e.emitRef + ";\n";
     }
@@ -47,11 +69,15 @@ class ListLookup(mapping: Array[(Lit, List[Node])], defaultVal: List[Node]) exte
     res
   }
 }
-class ListLookupRef(defaultVal: Node =  Lit(0)) extends Delay {
+class ListLookupRef(defaultVal: Node =  Literal(0)) extends Delay {
+  override def getNode() = {
+    lookup.getNode()
+    this
+  }
   def lookup = inputs(0);
   def lookup_= (ll: ListLookup) = { inputs(0) = ll; }
   inputs += null;
-  inferWidth = (m: Node) => defaultVal.width; // TODO: PROBABLY NOT RIGHT
+  inferWidth = (m: Node) => defaultVal.getWidth; // TODO: PROBABLY NOT RIGHT
   // override def toString: String = "W(" + name + ")"
   override def toString: String = name
   override def emitDef = "";

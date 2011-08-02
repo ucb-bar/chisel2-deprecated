@@ -4,25 +4,58 @@ package Chisel {
 import Node._;
 
 object Mem {
-  val noResetVal = Lit(0);
-  def apply (n: Int, isEnable: Node = Lit(0), wrAddr: Node = Lit(0), wrData: Node = Lit(0), resetVal: Node = noResetVal): Mem = {
-    val res = new Mem(n);
-    res.init("", widthOf(2), isEnable, wrAddr, wrData, resetVal);
-    res.isResetVal = resetVal != noResetVal;
-    res
+  val noResetVal = Literal(0);
+
+  def apply[T <: dat_t](n: Int, isEnable: int_t, wrAddr: int_t, wrData: T, resetVal: T): MemCell[T] ={
+    val memcell = new MemCell(n, wrData, resetVal != null);
+    memcell.io.wrData <> wrData;
+    memcell.io.wrAddr := wrAddr;
+    memcell.io.isEnable := isEnable;
+    if(resetVal != null) memcell.io.resetVal <> resetVal;
+    memcell
   }
 }
+
+
+
+class MemCell[T <: dat_t](n: Int, data: T, isReset: Boolean) extends Cell {
+  val io = new bundle_t(){val wrData = data.clone.asInput;
+			  val wrAddr = Input();
+			  val isEnable = Input();
+			  val resetVal = data.clone.asInput;
+			}
+  io.setIsCellIO;
+  isReg = true;
+  val primitiveNode = new Mem(n);
+  if(isReset)
+    primitiveNode.init("primitiveNode", widthOf(2), io.isEnable, io.wrAddr, io.wrData.toBits, io.resetVal.toBits);
+  else
+    primitiveNode.init("primitiveNode", widthOf(2), io.isEnable, io.wrAddr, io.wrData.toBits);
+  primitiveNode.asInstanceOf[Mem].isResetVal = isReset;
+  def apply(addr: Node): T = {
+    val res = data.fromBits(MemRef(primitiveNode, addr)).asInstanceOf[T];
+    res.setIsCellIO;
+    res
+  }
+  primitiveNode.nameHolder = this;
+}
+
 class Mem(n_val: Int) extends Delay {
   val n          = n_val;
   var isResetVal = false;
-  def wrEnable   = inputs(0);
-  def wrEnable_= (x: Node) = inputs(0) = x;
+  def wrEnable   = inputs(0).getNode;
+  def wrEnable_= (x: Node) = inputs(0) = x
   def wrAddr     = inputs(1);
   def wrAddr_= (x: Node) = inputs(1) = x;
-  def wrData     = inputs(2);
+  def wrData     = inputs(2)
   def wrData_= (x: Node) = inputs(2) = x;
-  def resetVal   = inputs(3);
+  def resetVal   = inputs(3).getNode;
   def resetVal_= (x: Node) = { isResetVal = true; inputs(3) = x; }
+  override def getNode() = {
+    fixName();
+    removeCellIOs();
+    this
+  }
   override def isRamWriteInput(i: Node) = 
     i == wrEnable || i == wrAddr || i == wrData;
   override def toString: String = "MEM(" + wrEnable + " " + wrAddr + " " + wrData + ")";

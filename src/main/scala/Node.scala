@@ -13,67 +13,85 @@ import IOdir._;
 object Node {
   var cond = new Stack[Node];
   var ruleStack = new Stack[Rule];
-  implicit def intToNode(x: Int): Node = Lit(x);
   var isCoercingArgs = true;
   def fixWidth(w: Int) = { (m: Node) => w };
-  def widthOf(i: Int) = { (m: Node) => m.inputs(i).width }
+  def widthOf(i: Int) = { (m: Node) => {if(m.inputs(i).width < 0) m.inputs(i).inferWidth(m.inputs(i)) else m.inputs(i).width }}
   def maxWidth(m: Node): Int = {
     var res = 0;
     for (i <- m.inputs)
       res = max(res, i.width);
     res
   }
+  def maxWidthPlusOne(m: Node): Int = maxWidth(m) + 1;
   def sumWidth(m: Node): Int = {
     var res = 0;
     for (i <- m.inputs)
       res = res + i.width;
     res
   }
-  def lshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).width + n.maxNum }
+  def lshWidthOf(i: Int, n: Node) = { 
+    (m: Node) => {
+      val mwidth = m.inputs(i).width;
+      val nMax = n.maxNum;
+      val res = m.inputs(i).width + n.maxNum;
+      res
+    } 
+  }
   def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).width - n.minNum }
-  var reset: Node = Input("reset", 1);
-  var resets = Queue[Node]();
+  var reset: int_t = Input("reset", 1);
+  var resets = Queue[int_t]();
   var clk: Node = Input("clk", 1);
-  def pushReset(r: Node) { resets.enqueue(reset); reset = r }
+  def pushReset(r: int_t) { resets.enqueue(reset); reset = r }
   def popReset() { reset = resets.dequeue() }
-  def withReset(r: Node)(block: => Node) = {
+  def withReset(r: int_t)(block: => Node) = {
     val resBak = reset; reset = r; 
     val res = block; 
     reset = resBak;
     res
   }
-  def ListLookup (addr: Node, default: List[Node], mapping: Array[(Lit, List[Node])]): List[Node] = {
+  def ListLookup(addr: Node, default: List[Node], mapping: Array[(Node, List[Node])]): List[int_t] = {
     val ll = new ListLookup(mapping, default);
-    ll.init("", widthOf(1), addr); 
+    ll.init("", widthOf(1), addr);
     for (w <- ll.wires)
       w.lookup = ll;
-    for (e <- default) 
+    for (e <- default)
       ll.inputs += e;
-    for ((addr, data) <- mapping)
-      for (e <- data)
+    for ((addr, data) <- mapping){
+      for (e <- data){
         ll.inputs += e;
-    ll.wires
+      }
+    }
+    ll.wires.map(x => {
+      val res = int_t(OUTPUT);
+      res.setIsCellIO;
+      x.nameHolder = res;
+      res := x;
+      res
+    })
   }
-
+  
+  var stop = true;
   
 }
 
-abstract class Node {
+abstract class Node extends nameable{
   var component: Component = null;
+  var flattened = false;
+  var isCellIO = false;
   var depth = 0;
-  def componentOf: Component = if (isEmittingComponents) component else topComponent
+  def componentOf: Component = if (isEmittingComponents && component != null) component else topComponent
   var isSigned = false;
   var width_ = -1;
   var index = -1;
   var isFixedWidth = false;
-  var name: String = "";
   var consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
   var inputs = new ArrayBuffer[Node];
   var outputs = new ArrayBuffer[Node];
   var inferWidth: (Node) => Int = maxWidth;
+  var nameHolder: nameable = null;
   def width: Int = width_;
   def width_=(w: Int) = { isFixedWidth = true; width_ = width; inferWidth = fixWidth(w); }
-  def name_it (path: String) = { name = path; }
+  def name_it (path: String, setNamed: Boolean = true) = { name = path; named = setNamed}
   def unary_-(): Node    = Op("-",  1, widthOf(0), this);
   def unary_~(): Node    = Op("~",  1, widthOf(0), this);
   def unary_!(): Node    = Op("!",  1, fixWidth(1), this);
@@ -83,7 +101,7 @@ abstract class Node {
   def +(b: Node): Node   = Op("+",  2, maxWidth _,  this, b );
   def *(b: Node): Node   = Op("*",  0, sumWidth _,  this, b );
   def ^(b: Node): Node   = Op("^",  2, maxWidth _,  this, b );
-  def ?(b: Node): Node   = Mux(this, b, null);
+  def ?(b: Node): Node   = Multiplex(this, b, null);
   def -(b: Node): Node   = Op("-",  2, maxWidth _,  this, b );
   def ##(b: Node): Node  = Op("##", 2, sumWidth _,  this, b );
   def ===(b: Node): Node = Op("==", 2, fixWidth(1), this, b );
@@ -96,19 +114,19 @@ abstract class Node {
   def ||(b: Node): Node  = Op("||", 2, fixWidth(1), this, b );
   def &(b: Node): Node   = Op("&",  2, maxWidth _, this, b );
   def |(b: Node): Node   = Op("|",  2, maxWidth _, this, b );
-  def maxNum: Int = (1 << width)-1;
+  def maxNum: Int = (1 << (if(width < 0) inferWidth(this) else width))-1;
   def minNum: Int = 0;
   def isLit = false;
   def value = -1;
-  def signed: Node = { 
-    val res = Wire();
-    res := this;
+  def signed: this.type = { 
+    val res = Junction[int_t]();
+    res <== this;
     res.isSigned = true; 
-    res
+    res.asInstanceOf[this.type]
   }
-  def bitSet(off: Node, dat: Node): Node = { 
+  def bitSet(off: int_t, dat: int_t): int_t = { 
     val bit = Lit(1, 1) << off;
-    (this & ~bit) | (dat << off);
+    (this.asInstanceOf[int_t] & ~bit) | (dat << off);
   }
   // TODO: MOVE TO WIRE
   def :=(src: Node) = { if (inputs.length > 0) inputs(0) = src; else inputs += src; }
@@ -118,7 +136,7 @@ abstract class Node {
   }
   def ><(src: Node) = {
     src match {
-      case b: Bundle =>
+      case b: bundle_t =>
         var off = 0;
         for ((n, io) <- b.flatten) {
           if (io.dir == INPUT) {
@@ -132,21 +150,25 @@ abstract class Node {
   }
   def ^^(src: Node) = { 
     // println("^^ " + this + " & " + src);
-    this := src 
+    //this := src 
+    println("NODE ^^ " + this.getClass + " " + src);
+    src := this;
   }
   def apply(bit: Int): Node = { Bits(this, bit) };
   def apply(hi: Int, lo: Int): Node = { Bits(this, hi, lo) };
-  def apply(bit: Lit): Node = { apply(bit.value) };
-  def apply(hi: Lit, lo: Lit): Node = { apply(hi.value, lo.value) };
+  def apply(bit: Literal): Node = { apply(bit.value) };
+  def apply(hi: Literal, lo: Literal): Node = { apply(hi.value, lo.value) };
   def apply(bit: Node): Node = { Bits(this, bit); }
   def apply(hi: Node, lo: Node): Node = { Bits(this, hi, lo) };
+  def getLit = this.asInstanceOf[Literal]
   def isIo = false;
   def isReg = false;
+  var isRegOut = false;
   def isProbe = false;
   def isUsedByRam: Boolean = {
     for (c <- consumers) 
       if (c.isRamWriteInput(this))
-        return true;
+	return true;
     return false;
   }
   def isRamWriteInput(i: Node) = false;
@@ -186,7 +208,8 @@ abstract class Node {
     } else
       emitRef
   def emitRef: String = if (isEmittingC) emitRefC else emitRefV;
-  def emitRefV: String = if (name == "") "T" + emitIndex else name
+  //def emitRefV: String = if (name == "") "T" + emitIndex else name
+  def emitRefV = if(name == "" || !named) "T" + emitIndex else if(!named) name + "_" + emitIndex else name
   // def emitRef: String = "T" + emitIndex;
   def emitDef: String = ""
   def emitReg: String = ""
@@ -215,13 +238,13 @@ abstract class Node {
         if (i != null) {
           i match {
             case d: Delay => 
-            case o => i.visitNode(newDepth+1);
+            case o => {
+	      i.visitNode(newDepth+1);
+	    }
           }
         }
       }
-      // println("ADDING MOD " + this.name);
-      if (this != reset)
-        comp.omods += this;
+      comp.omods += this;
     }
   }
   def visitNodeRev(newDepth: Int): Unit = {
@@ -244,6 +267,8 @@ abstract class Node {
   }
   def findNodes(depth: Int, c: Component): Unit = {
     // untraced or same component?
+    if(isCellIO) println("found");
+    fixName();
     val (comp, nextComp, markComp) = 
       this match {
         case io: IO => {
@@ -273,6 +298,7 @@ abstract class Node {
       //   component = markComp;
       for (node <- inputs) {
         if (node != null) {
+	  node.removeCellIOs;
           // println(depthString(depth+1) + "INPUT " + node);
           if (node.component == null) // unmarked input
             node.component = markComp;
@@ -300,6 +326,41 @@ abstract class Node {
       comp.mods += this;
     }
   }
+
+  def fixName() = {
+    if(nameHolder != null && !named){
+      name = nameHolder.name;
+      nameHolder.name = "";
+      named = nameHolder.named;
+    }
+  }
+
+  def setName(n: String) = {
+    name = n
+    named = true;
+  }
+
+  def getWidth(): Int = {
+    if(width > 0)
+      width
+    else if(inputs.length > 1)
+      inferWidth(this)
+    else if(inputs.length == 1)
+      inputs(0).getWidth
+    else
+      -1
+  }
+
+  def removeCellIOs() {
+    for(i <- 0 until inputs.length)
+      inputs(i) = inputs(i).getNode;
+  }
+  def getNode(): Node = {
+    if(inputs.length == 0 || !isCellIO)
+      this
+    else
+      inputs(0).getNode
+  }
   def addConsumers(): Boolean = {
     /*
     this match {
@@ -315,7 +376,7 @@ abstract class Node {
     var off = 0;
     for (i <- inputs) {
       if (i == null) {
-        println(this + " HAS NULL INPUT " + off + "/" + inputs.length + " IN " + component);
+        println(this + " " + inputs + " HAS NULL INPUT " + off + "/" + inputs.length + " IN " + component);
         // TODO: HACK
         inputs = ArrayBuffer(inputs(0));
         return false;
@@ -326,16 +387,16 @@ abstract class Node {
     }
     true;
   }
-  def extract (widths: Array[Int]): List[Node] = {
-    var res: List[Node] = Nil;
+  def extract (widths: Array[Int]): List[int_t] = {
+    var res: List[int_t] = Nil;
     var off = 0;
     for (w <- widths) {
-      res  = this(off+w-1, off) :: res;
-      off += w.value;
+      res  = this.asInstanceOf[int_t](off+w-1, off) :: res;
+      off += w;
     }
     res.reverse
   }
-  def extract (b: Bundle): List[Node] = {
+  def extract (b: bundle_t): List[Node] = {
     var res: List[Node] = Nil;
     var off = 0;
     for ((n, io) <- b.flatten) {
@@ -350,12 +411,13 @@ abstract class Node {
   def Match(mods: Array[Node]) {
     var off = 0;
     for (m <- mods.reverse) {
-      val res = this(off+m.width-1, off);
+      val res = Bits(this, off+m.getWidth-1, off);
       m match {
         case r: Reg => r <== res;
+	case i: int_t => i <== res;
         case o      => o := res;
       }
-      off += m.width;
+      off += m.getWidth;
     }
   }
 }

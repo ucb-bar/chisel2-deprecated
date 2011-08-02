@@ -58,7 +58,7 @@ class Op extends Node {
       ) + ";\n"
   }
   override def emitDefLoC: String = {
-    "  " + emitTmp + " = " + 
+    "  " + emitTmp + " = " +
       (if (op == "##") 
         "cat<" + width + ">(" + emitOpRef(0) + ", " + emitOpRef(1) + ")"
        else if (inputs.length == 1)

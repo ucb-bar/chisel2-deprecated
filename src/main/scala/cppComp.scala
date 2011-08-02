@@ -15,7 +15,7 @@ object cppComp {
       node.init("", fixWidth(w), res);
     res
   }
-  def apply(fctnName: String, fctnIO: Bundle): cppComp = {
+  def apply(fctnName: String, fctnIO: bundle_t): cppComp = {
     val ioList = fctnIO.flatten;
     val input = new ArrayBuffer[Node]();
     val output = new ArrayBuffer[Node]();
