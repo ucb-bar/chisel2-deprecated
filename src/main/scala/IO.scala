@@ -167,7 +167,7 @@ object int_t {
     res.init("", widthOf(0), n);
     res
   }
-  def apply(dir: IOdir, width: Int = -1): int_t = {
+  def apply(dir: IOdir, width: Int): int_t = {
     val res = new int_t();
     res.dir = dir
     if(width > 0)
@@ -176,17 +176,31 @@ object int_t {
       res.init("", widthOf(0));
     res
   }
+  def apply(dir: IOdir): int_t = {
+    int_t(dir, -1);
+  }
   def apply(dir: Symbol): int_t = {
     if(dir.equals('input))
       int_t(INPUT)
     else
       int_t(OUTPUT)
   }
-  def apply(dir: Symbol, width: Int): int_t = {
-    if(dir.equals('input))
+  def apply(width: Int, dir: Symbol = null): int_t = {
+    if(dir == null){
+      val res = new int_t()
+      res.init("", widthOf(0))
+      res
+    }
+    else if(dir.equals('input))
       int_t(INPUT, width)
-    else
+    else if(dir.equals('output))
       int_t(OUTPUT, width)
+    else{
+      println("INVALID DIRECTION");
+      val res = new int_t();
+      res.init("", widthOf(0))
+      res
+    }
   }
 }
 
