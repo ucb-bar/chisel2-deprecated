@@ -46,6 +46,12 @@ class BundleVec[T <: dat_t]() extends dat_t {
   override def apply(ind: Int): T = {
     bundleVector(ind)
   };
+  def apply(ind: int_t): T = {
+    var res = bundleVector(0).clone;
+    for(i <- 0 until bundleVector.length)
+      res = Mux(Lit(i) === ind, bundleVector(i), res)
+    res
+  }
   override def flatten: Array[(String, IO)] = {
     val res = new ArrayBuffer[(String, IO)];
     for (elm <- bundleVector)
