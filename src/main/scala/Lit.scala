@@ -12,28 +12,28 @@ import ChiselError._;
 
 object Lit {
   def apply(x: Int): int_t = {
-    val cell = new LIT(Literal(x));
+    val cell = new Lit(Literal(x));
     cell.io
   }
   def apply(x: Int, width: Int): int_t = {
-    val cell = new LIT(Literal(x, width));
+    val cell = new Lit(Literal(x, width));
     cell.io
   }
   def apply(x: Long, width: Int): int_t = {
-    val cell = new LIT(Literal( x, width));
+    val cell = new Lit(Literal( x, width));
     cell.io
   }
   def apply(n: String, width: Int): int_t = {
-    val cell = new LIT(Literal(n, width));
+    val cell = new Lit(Literal(n, width));
     cell.io
   }
   def apply(width: Int, base: Char, literal: String): int_t = {
-    val cell = new LIT(Literal(width, base, literal));
+    val cell = new Lit(Literal(width, base, literal));
     cell.io
   }
 }
 
-class LIT(x: Literal) extends Cell {
+class Lit(x: Literal) extends Cell {
   val io = int_t(OUTPUT);
   io.setIsCellIO;
   val primitiveNode = x;
