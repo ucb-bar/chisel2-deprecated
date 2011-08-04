@@ -69,7 +69,8 @@ class ListLookup(mapping: Array[(Node, List[Node])], defaultVal: List[Node]) ext
     res
   }
 }
-class ListLookupRef(defaultVal: Node =  Literal(0)) extends Delay {
+class ListLookupRef(defaultVal: Node =  Literal(0)) extends Node {
+  override def isInObject = true;
   override def getNode() = {
     lookup.getNode()
     this
