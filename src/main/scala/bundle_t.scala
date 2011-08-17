@@ -105,6 +105,10 @@ class bundle_t(view_arg: Seq[String] = null) extends dat_t{
       elts += ((n, i));
     bundle_t(elts)
   }
+  def +=(other: int_t) = {
+    elements;
+    elementsCache += ((other.name, other));
+  }
   override def flip(): this.type = {
     for ((n, i) <- elements) {
       i.flip()
@@ -112,8 +116,10 @@ class bundle_t(view_arg: Seq[String] = null) extends dat_t{
     this
   }
   override def findNodes(depth: Int, c: Component): Unit = {
-    for ((n, elt) <- elements)
+    for ((n, elt) <- elements){
+      elt.removeCellIOs;
       elt.findNodes(depth, c);
+    }
     /*
     val elts = flatten;
     println(depthString(depth) + "BUNDLE " + this + " => " + elts);

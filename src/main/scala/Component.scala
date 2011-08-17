@@ -488,6 +488,7 @@ abstract class Component {
 			       cell.named = true;
 			      if(cell.isReg) containsReg = true;
 	  }
+	  case cm: CactiMem => {cm.name = name; cm.moduleName = name}
           case any =>
         }
       }
