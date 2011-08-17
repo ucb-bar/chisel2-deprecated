@@ -89,6 +89,7 @@ abstract class Node extends nameable{
   var outputs = new ArrayBuffer[Node];
   var inferWidth: (Node) => Int = maxWidth;
   var nameHolder: nameable = null;
+  var isClkInput = false;
   def width: Int = width_;
   def width_=(w: Int) = { isFixedWidth = true; width_ = width; inferWidth = fixWidth(w); }
   def name_it (path: String, setNamed: Boolean = true) = { name = path; named = setNamed}
@@ -119,7 +120,7 @@ abstract class Node extends nameable{
   def isLit = false;
   def value = -1;
   def signed: this.type = { 
-    val res = Junction[int_t]();
+    val res = Junction();
     res <== this;
     res.isSigned = true; 
     res.asInstanceOf[this.type]
@@ -339,6 +340,8 @@ abstract class Node extends nameable{
     name = n
     named = true;
   }
+
+  def setIsClkInput = {};
 
   def getWidth(): Int = {
     if(width > 0)

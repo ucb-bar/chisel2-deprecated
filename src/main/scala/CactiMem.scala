@@ -29,6 +29,7 @@ class CactiMem(numWords: Int) extends BlackBox {
     csb_port.setName("CSB" + id);
     a_port.setName("A" + id);
     r_port.setName("I" + id);
+    ce_port.setIsClkInput;
     a_port := addr;
     io += ce_port;
     io += oeb_port;
@@ -50,6 +51,7 @@ class CactiMem(numWords: Int) extends BlackBox {
     csb_port.setName("CSB" + id);
     a_port.setName("A" + id);
     w_port.setName("W" + id);
+    ce_port.setIsClkInput;
     a_port := addr;
     io += ce_port;
     io += web_port;

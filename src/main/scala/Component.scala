@@ -482,13 +482,13 @@ abstract class Component {
         o match { 
 	  //case comp: Component => { comp.component = this;}
           case node: Node => { if (name != "io" && (node.isCellIO || (node.name == "" && !node.named) || node.name == null)) node.name_it(name, true);
-			       if (node.isReg || node.isRegOut) containsReg = true;
+			       if (node.isReg || node.isRegOut || node.isClkInput) containsReg = true;
 			     }
 	  case cell: Cell => { cell.name = name;
 			       cell.named = true;
 			      if(cell.isReg) containsReg = true;
 	  }
-	  case cm: CactiMem => {cm.name = name; cm.moduleName = name}
+	  case cm: CactiMem => {cm.name = name; cm.moduleName = name; containsReg = true}
           case any =>
         }
       }

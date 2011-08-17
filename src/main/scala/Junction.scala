@@ -3,7 +3,7 @@ package Chisel {
 
 import Node._;
 
-object Junction {
+object PJunction {
 
   def apply[T <: dat_t : Manifest](): T = {
     val junctioncell = new JunctionCell[T](Fab[T](), -1);
@@ -11,6 +11,17 @@ object Junction {
   }
   def apply[T <: dat_t : Manifest](width: Int): T = {
     val junctioncell = new JunctionCell[T](Fab[T](), width);
+    junctioncell.io.out
+  }
+}
+
+object Junction {
+  def apply(): int_t = {
+    val junctioncell = new JunctionCell[int_t](Fab[int_t](), -1);
+    junctioncell.io.out
+  }
+  def apply(width: Int): int_t = {
+    val junctioncell = new JunctionCell[int_t](Fab[int_t](), width);
     junctioncell.io.out
   }
 }

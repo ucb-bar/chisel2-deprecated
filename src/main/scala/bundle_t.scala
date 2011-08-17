@@ -115,6 +115,10 @@ class bundle_t(view_arg: Seq[String] = null) extends dat_t{
     }
     this
   }
+  override def removeCellIOs() = {
+    for ((n, elt) <- elements)
+      elt.removeCellIOs
+  }
   override def findNodes(depth: Int, c: Component): Unit = {
     for ((n, elt) <- elements){
       elt.removeCellIOs;
