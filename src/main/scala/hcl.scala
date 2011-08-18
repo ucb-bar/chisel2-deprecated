@@ -54,7 +54,7 @@ object pmux {
   }
 }
 object pcond {
-  def apply(cases: Seq[(int_t, () => int_t)]) = {
+  def apply(cases: Seq[(int_t, () => Unit)]) = {
     var tst: int_t = Lit(1);
     for ((ctst, block) <- cases) {
       cond.push(tst && ctst);  
@@ -66,7 +66,7 @@ object pcond {
   }
 }
 object pcase {
-  def apply(x: int_t, cases: Seq[(int_t, () => int_t)]) = 
+  def apply(x: int_t, cases: Seq[(int_t, () => Unit)]) = 
     pcond(cases.map(tb => (tb._1 === x, tb._2)))
 }
 object chisel_main {
@@ -108,10 +108,9 @@ abstract class dat_t extends Node {
   def asOutput(): this.type = this;
   def toBits: Node = this;
   def fromBits(n: Node): this.type = this;
-  def <==[T <: dat_t](data: T): this.type = {
+  def <==[T <: dat_t](data: T) = {
     data.setIsCellIO;
     comp <== data.toBits;
-    this
   }
   override def clone(): this.type = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
@@ -149,7 +148,7 @@ abstract class dat_t extends Node {
 }
 
 trait proc extends Node {
-  def <==(src: Node): this.type;
+  def <==(src: Node);
 }
 
 trait nameable {
