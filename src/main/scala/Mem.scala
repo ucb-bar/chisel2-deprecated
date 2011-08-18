@@ -6,12 +6,12 @@ import Node._;
 object Mem {
   val noResetVal = Literal(0);
 
-  def apply[T <: dat_t](n: Int, isEnable: int_t, wrAddr: int_t, wrData: T, resetVal: T): MemCell[T] ={
+  def apply[T <: dat_t](n: Int, isEnable: int_t, wrAddr: int_t, wrData: T, resetVal: T <:< Null = null): MemCell[T] ={
     val memcell = new MemCell(n, wrData, resetVal != null);
     memcell.io.wrData <> wrData;
     memcell.io.wrAddr := wrAddr;
     memcell.io.isEnable := isEnable;
-    if(resetVal != null) memcell.io.resetVal <> resetVal;
+    if(resetVal != null) memcell.io.resetVal <> resetVal.asInstanceOf[T];
     memcell
   }
 }
