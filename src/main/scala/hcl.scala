@@ -17,8 +17,9 @@ class Rule(val cond: Node) {
 
 
 object Enum {
-  def apply(l:List[Symbol]) = (l zip (Range(0, l.length, 1).map(x => Lit(x, sizeof(l.length-1))))).toMap;
+  def apply(l: List[Symbol]) = (l zip (Range(0, l.length, 1).map(x => Lit(x, sizeof(l.length-1))))).toMap;
   def apply(l: Symbol *) = (l.toList zip (Range(0, l.length, 1).map(x => Lit(x, sizeof(l.length-1))))).toMap;
+  def apply(n: Int) = (Range(0, n, 1).map(x => Lit(x, sizeof(n-1)))).toList;
 }
 
 object fromBits {
@@ -54,7 +55,7 @@ object pmux {
   }
 }
 object pcond {
-  def apply(cases: Seq[(int_t, () => int_t)]) = {
+  def apply(cases: Seq[(int_t, () => Any)]) = {
     var tst: int_t = Lit(1);
     for ((ctst, block) <- cases) {
       cond.push(tst && ctst);  
@@ -66,8 +67,12 @@ object pcond {
   }
 }
 object pcase {
-  def apply(x: int_t, cases: Seq[(int_t, () => int_t)]) = 
+  def apply(x: int_t, cases: Seq[(int_t, () => Any)]) = 
     pcond(cases.map(tb => (tb._1 === x, tb._2)))
+  def apply(x: int_t, default: () => Any, cases: Seq[(int_t, () => Any)]) = {
+    val elts = cases.map(tb => (tb._1 === x, tb._2)).toList;
+    pcond(elts ::: List((Lit(1), default)))
+  }
 }
 object chisel_main {
   def apply(args: Array[String], gen: () => Component) = {
