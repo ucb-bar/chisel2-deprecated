@@ -52,7 +52,7 @@ class Junction extends dat_t with proc{
     res := src;
     res
   }
-  def <==(src: Node): this.type = {
+  def <==(src: Node) = {
     if (cond.length == 0){
       inputs(0) = src;
     }
@@ -65,7 +65,6 @@ class Junction extends dat_t with proc{
       else 
 	inputs(0) = Multiplex(res, src, this);
     }
-    this
   }
   override def toString: String = name
   override def emitDef: String = { 

@@ -113,10 +113,9 @@ abstract class dat_t extends Node {
   def asOutput(): this.type = this;
   def toBits: Node = this;
   def fromBits(n: Node): this.type = this;
-  def <==[T <: dat_t](data: T): this.type = {
+  def <==[T <: dat_t](data: T) = {
     data.setIsCellIO;
     comp <== data.toBits;
-    this
   }
   override def clone(): this.type = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
@@ -154,7 +153,7 @@ abstract class dat_t extends Node {
 }
 
 trait proc extends Node {
-  def <==(src: Node): this.type;
+  def <==(src: Node);
 }
 
 trait nameable {

@@ -52,9 +52,8 @@ class int_t extends IO {
     val res = int_t(OUTPUT).asInstanceOf[this.type]; 
     res := n; 
     res};
-  def <==(src: int_t): this.type = {
+  def <==(src: int_t) = {
     comp <== src.toBits;
-    this
   }
   override def apply(bit: Int): int_t = { Bits(this, bit)};
   override def apply(hi: Int, lo: Int): int_t = {Bits(this, hi, lo)};

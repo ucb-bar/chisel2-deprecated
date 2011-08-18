@@ -53,7 +53,7 @@ class Reg extends Delay with proc{
   def isReset  = inputs.length == 2;
   def isUpdate = !(updateVal == null);
   def update (x: Node) = { inputs(0) = x };
-  def <==(src: Node): this.type = {
+  def <==(src: Node) = {
     if (cond.length == 0)
       update(src);
     else if (!isUpdate) {
@@ -70,7 +70,6 @@ class Reg extends Delay with proc{
       // println(this.name + " <== " + res + " " + cond.length);
       update(Multiplex(res, src, updateVal))
     }
-    this
     // clauses += Pair(cond.head, src);
   }
   def nameOpt: String = if (name.length > 0) name else "REG"
