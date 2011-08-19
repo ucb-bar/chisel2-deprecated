@@ -34,10 +34,9 @@ object Output {
   def apply(name: String, x: Node): IO = apply(name, maxWidth _, x); 
   def apply(x: Node): IO = apply("", x);
 }
-class IO extends Junction { 
+class IO extends Wire { 
   var dir: IOdir = null;
   var unnamed = false;
-  var assigned = false;
   // TODO: OPTIONALLY ONLY EMIT TOP COMPONENT IO IN OBJECT
   override def isIo = true; // = component == topComponent; // true; 
   override def emitDef: String = {
@@ -131,7 +130,10 @@ class IO extends Junction {
   override def :=(src: Node) = {
     if(assigned)
       ChiselErrors += IllegalState("reassignment to output", 3);
-    else { assigned = true; super.:=(src)}
+    else { 
+      assigned = true; 
+      if (inputs.length > 0) inputs(0) = src; else inputs += src;
+    }
   }
   override def asInput(): this.type = {
     dir = INPUT;

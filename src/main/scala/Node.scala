@@ -120,8 +120,8 @@ abstract class Node extends nameable{
   def isLit = false;
   def value = -1;
   def signed: this.type = { 
-    val res = Junction();
-    res <== this;
+    val res = Wire();
+    res <== this.asInstanceOf[int_t];
     res.isSigned = true; 
     res.asInstanceOf[this.type]
   }
@@ -414,7 +414,7 @@ abstract class Node extends nameable{
   def Match(mods: Array[Node]) {
     var off = 0;
     for (m <- mods.reverse) {
-      val res = Bits(this, off+m.getWidth-1, off);
+      val res = Bits(this.asInstanceOf[int_t], off+m.getWidth-1, off);
       m match {
         case r: Reg => r <== res;
 	case i: int_t => i <== res;

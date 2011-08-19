@@ -55,6 +55,12 @@ class int_t extends IO {
   def <==(src: int_t) = {
     comp <== src.toBits;
   }
+  def := (src: int_t) = {
+    if (comp == null)
+      this.asInstanceOf[IO] := src
+    else
+      comp := src.toBits;
+  }
   override def apply(bit: Int): int_t = { Bits(this, bit)};
   override def apply(hi: Int, lo: Int): int_t = {Bits(this, hi, lo)};
   def apply(hi: int_t, lo: int_t): int_t = {Bits(this, hi, lo)};

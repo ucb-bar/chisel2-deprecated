@@ -2,58 +2,69 @@
 package Chisel {
 
 import Node._;
+import ChiselError._;
 
-object PJunction {
+object PWire {
 
   def apply[T <: dat_t : Manifest](): T = {
-    val junctioncell = new JunctionCell[T](Fab[T](), -1);
+    val junctioncell = new WireCell[T](Fab[T](), -1);
     junctioncell.io.out
   }
   def apply[T <: dat_t : Manifest](width: Int): T = {
-    val junctioncell = new JunctionCell[T](Fab[T](), width);
+    val junctioncell = new WireCell[T](Fab[T](), width);
     junctioncell.io.out
   }
 }
 
-object Junction {
+object Wire {
   def apply(): int_t = {
-    val junctioncell = new JunctionCell[int_t](Fab[int_t](), -1);
+    val junctioncell = new WireCell[int_t](Fab[int_t](), -1);
     junctioncell.io.out
   }
   def apply(width: Int): int_t = {
-    val junctioncell = new JunctionCell[int_t](Fab[int_t](), width);
+    val junctioncell = new WireCell[int_t](Fab[int_t](), width);
+    junctioncell.io.out
+  }
+  def apply(default: int_t): int_t = {
+    val junctioncell = new WireCell[int_t](default, -1, true);
+    junctioncell.io.in := default;
     junctioncell.io.out
   }
 }
 
 
-class JunctionCell[T <: dat_t](data: T, width: Int){
+class WireCell[T <: dat_t](data: T, width: Int, hasDefault: Boolean = false){
   val io = new bundle_t(){val in = data.clone.asInput();
 			  val out = data.clone.asOutput();
 		      }
   io.setIsCellIO;
-  val primitiveNode = new Junction();
+  val primitiveNode = new Wire();
   if(width > -1)
     primitiveNode.init("primitiveNode", width, null)
+  else if(hasDefault)
+    primitiveNode.init("primitiveNode", widthOf(0), io.in)
   else
     primitiveNode.init("primitiveNode", widthOf(0), null);
   val fb = data.fromBits(primitiveNode).asInstanceOf[T] 
   fb.setIsCellIO;
   fb ^^ io.out;
-  io.out.comp = primitiveNode.asInstanceOf[Junction];
+  io.out.comp = primitiveNode.asInstanceOf[Wire];
   primitiveNode.nameHolder = io.out;
 }
 
-class Junction extends dat_t with proc{
+class Wire extends dat_t with proc{
   // override def toString: String = "W(" + name + ")"
+  var assigned = false;
   override def toBits = this;
   override def fromBits(src: Node) = {
-    val res = new Junction().asInstanceOf[this.type];
+    val res = new Wire().asInstanceOf[this.type];
     res := src;
     res
   }
   def <==(src: Node) = {
-    if (cond.length == 0){
+    if (assigned)
+      ChiselErrors += IllegalState("reassignment to output", 3);
+    else if (cond.length == 0){
       inputs(0) = src;
     }
     else {
@@ -81,6 +92,12 @@ class Junction extends dat_t with proc{
     else
       ""
     // "  " + emitTmp + " = " + inputs(0).emitRef + ";\n"
+
+  override def :=(src: Node) = {
+    if(assigned || inputs(0) != null)
+      ChiselErrors += IllegalState("reassignment to output", 3);
+    else { assigned = true; super.:=(src)}
+  }
 }
 
 }

@@ -3,6 +3,7 @@ package Chisel {
 
 import Node._;
 import Reg._;
+import ChiselError._;
 
 object Reg {
   def regWidth(w: Int) = {
@@ -53,7 +54,10 @@ class Reg extends Delay with proc{
   def isReset  = inputs.length == 2;
   def isUpdate = !(updateVal == null);
   def update (x: Node) = { inputs(0) = x };
+  var assigned = false;
   def <==(src: Node) = {
+    if (assigned)
+      ChiselErrors += IllegalState("reassignment to output", 3);
     if (cond.length == 0)
       update(src);
     else if (!isUpdate) {
@@ -86,6 +90,11 @@ class Reg extends Delay with proc{
       component.isWalking -= this;
       res;
     }
+  }
+  override def :=(src: Node) = {
+    if(assigned || inputs(0) != null)
+      ChiselErrors += IllegalState("reassignment to output", 3);
+    else { assigned = true; super.:=(src)}
   }
   override def emitRefV: String = if (name == "") "R" + emitIndex else name;
   override def emitDef: String = "";
