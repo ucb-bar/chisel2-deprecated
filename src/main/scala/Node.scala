@@ -9,35 +9,36 @@ import scala.math.max;
 import Node._;
 import Component._;
 import IOdir._;
+import ChiselError._;
 
 object Node {
   var cond = new Stack[Node];
   var ruleStack = new Stack[Rule];
   var isCoercingArgs = true;
   def fixWidth(w: Int) = { (m: Node) => w };
-  def widthOf(i: Int) = { (m: Node) => {if(m.inputs(i).width < 0) m.inputs(i).inferWidth(m.inputs(i)) else m.inputs(i).width }}
+  def widthOf(i: Int) = { (m: Node) => {m.inputs(i).getWidth }}
   def maxWidth(m: Node): Int = {
     var res = 0;
     for (i <- m.inputs)
-      res = max(res, i.width);
+      res = max(res, i.getWidth);
     res
   }
   def maxWidthPlusOne(m: Node): Int = maxWidth(m) + 1;
   def sumWidth(m: Node): Int = {
     var res = 0;
     for (i <- m.inputs)
-      res = res + i.width;
+      res = res + i.getWidth;
     res
   }
   def lshWidthOf(i: Int, n: Node) = { 
     (m: Node) => {
-      val mwidth = m.inputs(i).width;
+      val mwidth = m.inputs(i).getWidth;
       val nMax = n.maxNum;
-      val res = m.inputs(i).width + n.maxNum;
+      val res = m.inputs(i).getWidth + n.maxNum;
       res
     } 
   }
-  def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).width - n.minNum }
+  def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).getWidth - n.minNum }
   var reset: int_t = Input("reset", 1);
   var resets = Queue[int_t]();
   var clk: Node = Input("clk", 1);
@@ -288,8 +289,9 @@ abstract class Node extends nameable{
         case any => (c, c, c);
       }
     if (comp == null) {
-      if (this != reset)
+      if (this != reset){
         println("NULL COMPONENT FOR " + this);
+      }
     } else if (!comp.isWalked.contains(this)) {
       // println(depthString(depth) + "FiND MODS " + name + " IN " + comp.name);
       // println("FiND MODS(" + depth + ") " + name + " IN " + comp.name);
@@ -346,17 +348,21 @@ abstract class Node extends nameable{
   def getWidth(): Int = {
     if(width > 0)
       width
-    else if(inputs.length > 1)
-      inferWidth(this)
-    else if(inputs.length == 1)
+    else if(isCellIO)
       inputs(0).getWidth
+    else if(inputs.length > 1 && !isInstanceOf[Reg] && !isInstanceOf[Wire])
+      inferWidth(this)
     else
       -1
   }
 
   def removeCellIOs() {
     for(i <- 0 until inputs.length)
-      inputs(i) = inputs(i).getNode;
+      if(inputs(i) == null){
+	ChiselErrors += IllegalState("NULL Input for " + this, 0);
+      }
+      else
+	inputs(i) = inputs(i).getNode;
   }
   def getNode(): Node = {
     if(inputs.length == 0 || !isCellIO)

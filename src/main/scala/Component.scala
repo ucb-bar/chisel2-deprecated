@@ -488,7 +488,12 @@ abstract class Component {
 			       cell.named = true;
 			      if(cell.isReg) containsReg = true;
 	  }
-	  case cm: CactiMem => {cm.name = name; cm.moduleName = name; containsReg = true}
+	  case bb: BlackBox => {bb.name = name;
+				bb.named = true;
+				 for((n, elm) <- io.flatten)
+				   if(elm.isClkInput)
+				     containsReg = true
+	  }
           case any =>
         }
       }
@@ -564,10 +569,6 @@ abstract class Component {
     for (c <- components) 
       c.markComponent();
     val base_name = ensure_dir(targetEmulatorRootDir + "/" + targetDir);
-    if(!ChiselErrors.isEmpty){
-      for(err <- ChiselErrors)	err.printError;
-      return
-    }
     val out_h = new java.io.FileWriter(base_name + name + ".h");
     val out_c = new java.io.FileWriter(base_name + name + ".cpp");
     if (isGenHarness)
@@ -583,6 +584,10 @@ abstract class Component {
     }
     // isWalked.clear();
     findNodes(0, this);
+    if(!ChiselErrors.isEmpty){
+      for(err <- ChiselErrors)	err.printError;
+      return
+    }
     if (!isEmittingComponents)
       for (c <- components)
         if (!(c == this))

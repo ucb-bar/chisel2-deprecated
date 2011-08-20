@@ -166,9 +166,13 @@ object nullADT extends dat_t;
 
 abstract class BlackBox extends Component {
   override def doCompileV(out: java.io.FileWriter, depth: Int): Unit = {
-    name_it();
-    io.name_it("");
     findNodes(depth, this);
+    println("module: " + moduleName + "  name: " + name);
+  }
+  override def name_it() = {
+    val cname = getClass().getName();
+    val dotPos = cname.lastIndexOf('.');
+    moduleName = if (dotPos >= 0) cname.substring(dotPos+1) else cname;
   }
 }
 
