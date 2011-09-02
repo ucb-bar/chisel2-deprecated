@@ -21,9 +21,9 @@ object Component {
   var isGenHarness = false;
   var isReportDims = false;
   var scanFormat = "";
-  var scanArgs: List[String] = Nil;
+  var scanArgs: Seq[Node] = null;
   var printFormat = "";
-  var printArgs: List[String] = Nil;
+  var printArgs: Seq[Node] = null;
   var includeArgs: List[String] = Nil;
   var targetEmulatorRootDir: String = null;
   var targetVerilogRootDir: String = null;
@@ -67,9 +67,9 @@ object Component {
     isGenHarness = false;
     isReportDims = false;
     scanFormat = "";
-    scanArgs = Nil;
+    scanArgs = new Array[Node](0);
     printFormat = "";
-    printArgs = Nil;
+    printArgs = new Array[Node](0);
     isCoercingArgs = true;
     targetEmulatorRootDir = System.getProperty("CHISEL_EMULATOR_ROOT");
     if (targetEmulatorRootDir == null) targetEmulatorRootDir = "../emulator";
@@ -686,7 +686,7 @@ abstract class Component {
       var i = 0;
       for (tok <- toks) {
         if (tok(0) == '%') {
-          out_c.write("  fprintf(f, \"%s\", " + name + "_" + printArgs(i) + ".to_str().c_str());\n");
+          out_c.write("  fprintf(f, \"%s\", " + printArgs(i).emitRef + ".to_str().c_str());\n");
           i += 1;
         } else {
           out_c.write("  fprintf(f, \"%s\", \"" + tok + "\");\n");
@@ -703,26 +703,17 @@ abstract class Component {
         if (scanFormat == "") {
           var res = "";
           for (arg <- scanArgs) {
-            if (!isConstantArg(arg)) {
-              if (res.length > 0) res = res + " ";
-              res = res + "%llx";
-            }
+            if (res.length > 0) res = res + " ";
+            res = res + "%llx";
           }
           res
         } else 
           scanFormat;
       out_c.write("  fscanf(f, \"" + format + "\"");
       for (arg <- scanArgs) {
-        if (!isConstantArg(arg))
-          out_c.write(",  &" + name + "_" + arg + ".values[0]");
+        out_c.write(",  &" + arg.emitRef + ".values[0]");
       }
       out_c.write(");\n");
-      for (arg <- scanArgs) {
-        val argParts = constantArgSplit(arg);
-        if (argParts.length == 2)
-          out_c.write("  " + name + "_" + argParts(0) + ".values[0] = " + 
-                      argParts(1).substring(0, argParts(1).length) + ";\n");
-      }
     }
     out_c.write("}\n");
     out_c.close();
