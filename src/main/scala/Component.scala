@@ -549,7 +549,6 @@ abstract class Component {
     makefile.write("\tg++ -c ${CPPFLAGS} " + name + "-emulator.cpp\n\n");
     makefile.close();
     val harness  = new java.io.FileWriter(base_name + name + "-emulator.cpp");
-    harness.write("#include \"emulator.h\"\n");
     harness.write("#include \"" + name + ".h\"\n");
     harness.write("int main (int argc, char* argv[]) {\n");
     harness.write("  " + name + "_t* c = new " + name + "_t();\n");
@@ -612,6 +611,7 @@ abstract class Component {
     }
     // for (m <- omods)
     //   println("MOD " + m + " IN " + m.component.name);
+    out_h.write("#include \"emulator.h\"\n\n");
     out_h.write("class " + name + "_t : public mod_t {\n");
     out_h.write(" public:\n");
     if (isEmittingComponents) {
@@ -634,7 +634,6 @@ abstract class Component {
     out_h.write("};\n");
     out_h.close();
 
-    out_c.write("#include \"emulator.h\"\n");
     out_c.write("#include \"" + name + ".h\"\n");
     for(str <- includeArgs) out_c.write("#include \"" + str + "\"\n"); 
     out_c.write("\n");
