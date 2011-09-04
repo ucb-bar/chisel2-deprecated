@@ -74,8 +74,16 @@ object pcase {
     pcond(elts ::: List((Lit(1), default)))
   }
 }
+class TstObject(val scanFormat: String, 
+     val scan_args: Seq[Node] = null,
+     val printFormat: String,            
+     val print_args: Seq[Node] = null) { }
+
 object chisel_main {
-  def apply(args: Array[String], gen: () => Component) = {
+  def apply[T <: Component]
+    (args: Array[String], 
+     gen: () => T,
+     tst: T => TstObject = null) {
     initChisel();
     var i = 0;
     while (i < args.length) {
@@ -84,10 +92,8 @@ object chisel_main {
         case "--gen-harness" => isGenHarness = true; 
         case "--v" => isEmittingComponents = true; isCoercingArgs = false;
         case "--target-dir" => targetDir = args(i+1); i += 1;
-        case "--scan-format" => scanFormat = args(i+1); i += 1;
-        case "--scan-args" => scanArgs = splitArg(args(i+1)); i += 1;
-        case "--print-format" => printFormat = args(i+1); i += 1;
-        case "--print-args" => printArgs = splitArg(args(i+1)); i += 1;
+        // case "--scan-format" => scanFormat = args(i+1); i += 1;
+        // case "--print-format" => printFormat = args(i+1); i += 1;
 	case "--include" => includeArgs = splitArg(args(i+1)); i += 1;
         // case "--is-coercing-args" => isCoercingArgs = true;
         case any => println("UNKNOWN ARG");
@@ -95,6 +101,13 @@ object chisel_main {
       i += 1;
     }
     val c = gen();
+    if (tst != null) {
+      val tstObj = tst(c);
+      scanArgs = tstObj.scan_args;
+      printArgs = tstObj.print_args;
+      scanFormat = tstObj.scanFormat;
+      printFormat = tstObj.printFormat;
+    }
     if (isEmittingComponents)
       c.compileV();
     else
@@ -257,3 +270,4 @@ class Nodes extends Node {
 */
 
 }
+
