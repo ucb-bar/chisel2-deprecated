@@ -527,8 +527,10 @@ abstract class Component {
     doCompileV(out, 0);
     if(ChiselErrors isEmpty)
       out.close();
-    else 
+    else {
       for(err <- ChiselErrors)	err.printError;
+      throw new IllegalStateException("Code has errors");
+    }
     compDefs.clear;
     genCount = 0;
   }
@@ -586,6 +588,7 @@ abstract class Component {
     findNodes(0, this);
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors)	err.printError;
+      throw new IllegalStateException("Code has errors");
       return
     }
     if (!isEmittingComponents)
