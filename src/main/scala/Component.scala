@@ -21,9 +21,9 @@ object Component {
   var isGenHarness = false;
   var isReportDims = false;
   var scanFormat = "";
-  var scanArgs: List[String] = Nil;
+  var scanArgs: Seq[Node] = null;
   var printFormat = "";
-  var printArgs: List[String] = Nil;
+  var printArgs: Seq[Node] = null;
   var includeArgs: List[String] = Nil;
   var targetEmulatorRootDir: String = null;
   var targetVerilogRootDir: String = null;
@@ -67,9 +67,9 @@ object Component {
     isGenHarness = false;
     isReportDims = false;
     scanFormat = "";
-    scanArgs = Nil;
+    scanArgs = new Array[Node](0);
     printFormat = "";
-    printArgs = Nil;
+    printArgs = new Array[Node](0);
     isCoercingArgs = true;
     targetEmulatorRootDir = System.getProperty("CHISEL_EMULATOR_ROOT");
     if (targetEmulatorRootDir == null) targetEmulatorRootDir = "../emulator";
@@ -551,7 +551,6 @@ abstract class Component {
     makefile.write("\tg++ -c ${CPPFLAGS} " + name + "-emulator.cpp\n\n");
     makefile.close();
     val harness  = new java.io.FileWriter(base_name + name + "-emulator.cpp");
-    harness.write("#include \"emulator.h\"\n");
     harness.write("#include \"" + name + ".h\"\n");
     harness.write("int main (int argc, char* argv[]) {\n");
     harness.write("  " + name + "_t* c = new " + name + "_t();\n");
@@ -615,6 +614,7 @@ abstract class Component {
     }
     // for (m <- omods)
     //   println("MOD " + m + " IN " + m.component.name);
+    out_h.write("#include \"emulator.h\"\n\n");
     out_h.write("class " + name + "_t : public mod_t {\n");
     out_h.write(" public:\n");
     if (isEmittingComponents) {
@@ -637,7 +637,6 @@ abstract class Component {
     out_h.write("};\n");
     out_h.close();
 
-    out_c.write("#include \"emulator.h\"\n");
     out_c.write("#include \"" + name + ".h\"\n");
     for(str <- includeArgs) out_c.write("#include \"" + str + "\"\n"); 
     out_c.write("\n");
@@ -689,7 +688,7 @@ abstract class Component {
       var i = 0;
       for (tok <- toks) {
         if (tok(0) == '%') {
-          out_c.write("  fprintf(f, \"%s\", " + name + "_" + printArgs(i) + ".to_str().c_str());\n");
+          out_c.write("  fprintf(f, \"%s\", " + printArgs(i).emitRef + ".to_str().c_str());\n");
           i += 1;
         } else {
           out_c.write("  fprintf(f, \"%s\", \"" + tok + "\");\n");
@@ -706,26 +705,17 @@ abstract class Component {
         if (scanFormat == "") {
           var res = "";
           for (arg <- scanArgs) {
-            if (!isConstantArg(arg)) {
-              if (res.length > 0) res = res + " ";
-              res = res + "%llx";
-            }
+            if (res.length > 0) res = res + " ";
+            res = res + "%llx";
           }
           res
         } else 
           scanFormat;
       out_c.write("  fscanf(f, \"" + format + "\"");
       for (arg <- scanArgs) {
-        if (!isConstantArg(arg))
-          out_c.write(",  &" + name + "_" + arg + ".values[0]");
+        out_c.write(",  &" + arg.emitRef + ".values[0]");
       }
       out_c.write(");\n");
-      for (arg <- scanArgs) {
-        val argParts = constantArgSplit(arg);
-        if (argParts.length == 2)
-          out_c.write("  " + name + "_" + argParts(0) + ".values[0] = " + 
-                      argParts(1).substring(0, argParts(1).length) + ";\n");
-      }
     }
     out_c.write("}\n");
     out_c.close();
