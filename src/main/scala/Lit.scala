@@ -109,9 +109,10 @@ object Literal {
   def toLitVal(x: String, shamt: Int): Int = {
     var res = 0;
     for(c <- x)
-      if(c != '_')
-	if(!"01".contains(d)) ChiselErrors += IllegalState("Literal: " + x + " contains illegal character: " + c, 4);
+      if(c != '_'){
+	if(!hexNibbles.contains(c)) ChiselErrors += IllegalState("Literal: " + x + " contains illegal character: " + c, 4);
 	res = res * shamt + c.asDigit;
+      }
     res
   }
 
