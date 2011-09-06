@@ -23,7 +23,7 @@ object Lit {
     val cell = new Lit(Literal( x, width));
     cell.io
   }
-  def apply(n: String, width: Int): int_t = {
+  def apply(n: String, width: Int = -1): int_t = {
     val cell = new Lit(Literal(n, width));
     cell.io
   }
@@ -31,10 +31,19 @@ object Lit {
     val cell = new Lit(Literal(width, base, literal));
     cell.io
   }
+  def apply(value: Boolean): bool_t = 
+    new BoolLit((if(value) Literal(1) else Literal(0))).io;
 }
 
 class Lit(x: Literal) extends Cell {
   val io = int_t(OUTPUT);
+  io.setIsCellIO;
+  val primitiveNode = x;
+  io := primitiveNode;
+}
+
+class BoolLit(x: Literal) extends Cell {
+  val io = bool_t(OUTPUT);
   io.setIsCellIO;
   val primitiveNode = x;
   io := primitiveNode;
@@ -46,6 +55,18 @@ object Literal {
     val y = max(1, abs(x)).toDouble;
     val res = max(1, (ceil(log(y+1)/log(2.0))).toInt);
     // println("SIZEOF " + y + " LOG2 " + (log(y)/log(2.0)) + " IS " + res);
+    res
+  }
+  def sizeof(base: Char, x: String): Int = {
+    var res = 0;
+    val size = 
+      if(base == 'b')
+	1
+      else if(base == 'h')
+	4
+      else
+	-1	
+    for(c <- x) if(c != '_') res += size;
     res
   }
   val hexNibbles = "0123456789abcdef";
@@ -80,7 +101,8 @@ object Literal {
   def toLitVal(x: String, shamt: Int): Int = {
     var res = 0;
     for(c <- x)
-      res = res * shamt + c.asDigit;
+      if(c != '_')
+	res = res * shamt + c.asDigit;
     res
   }
 
@@ -106,6 +128,8 @@ object Literal {
       toLitVal(x, 16)
     else if(base == 'b')
       toLitVal(x, 2)  
+    else if(base == 'o')
+      toLitVal(x, 8)
     else
       -1
   }
@@ -119,9 +143,13 @@ object Literal {
   def apply(n: String, width: Int): Literal = 
     apply(width, n(0), n.substring(1, n.length));
   def apply(width: Int, base: Char, literal: String): Literal = {
-    if (!"dhb".contains(base)) ChiselErrors += IllegalArgument("no base specified", 4);
+    if (!"dhbo".contains(base)) ChiselErrors += IllegalArgument("no base specified", 4);
     val res = new Literal();
-    res.init(literal, width); res.base = base;
+    if(width == -1)
+      res.init(literal, sizeof(base, literal));
+    else
+      res.init(literal, width); 
+    res.base = base;
     if (base == 'b') {res.isZ = literal.contains('?'); res.isBinary = true;}
     res
   }
