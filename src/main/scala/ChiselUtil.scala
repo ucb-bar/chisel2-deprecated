@@ -29,7 +29,7 @@ class boolWrapper(x: Boolean) {
   }
 }
 
-package object LitConv {
+object LitConv {
   implicit def intToIntWrapper(x: Int) = new intWrapper(x);
   implicit def symbolToSymbolWrapper(x: Symbol) = new symbolWrapper(x);
   implicit def boolToBoolWrapper(x: Boolean) = new boolWrapper(x);
