@@ -9,8 +9,30 @@ class intWrapper(x: Int) {
   def ~(x: Symbol) = Lit(myVal, x.name(0), x.name.substring(1, x.name.length))
 }
 
-object LitConv {
+class symbolWrapper(x: Symbol) {
+  val myVal = x;
+  //def unary_#() = Lit(myVal.name.substring(1, x.name.length).toInt);
+  def unary_~() = Lit(myVal.name.substring(1, x.name.length).toInt);
+  //def unary_$() = Lit(myVal.name.substring(1, x.name.length).toInt);
+}
+
+
+class boolWrapper(x: Boolean) {
+  val myVal = x;
+  def unary_~() = {
+    val res = bool_t('output);
+    if(myVal)
+      res := Lit(1)
+    else
+      res := Lit(0)
+    res
+  }
+}
+
+package object LitConv {
   implicit def intToIntWrapper(x: Int) = new intWrapper(x);
+  implicit def symbolToSymbolWrapper(x: Symbol) = new symbolWrapper(x);
+  implicit def boolToBoolWrapper(x: Boolean) = new boolWrapper(x);
 }
 
 object Fab {
@@ -24,8 +46,9 @@ object Fab {
 	case default => ;
       }
     val clazz = manifest[T].erasure.asInstanceOf[Class[T]];
-    val constructor = clazz.getConstructor(t: _*);
-    constructor.newInstance(inputs.map(t => t.asInstanceOf[AnyRef]): _*);
+    clazz.newInstance
+    //val constructor = clazz.getConstructor(t: _*);
+    //constructor.newInstance(inputs.map(t => t.asInstanceOf[AnyRef]): _*);
   }
 }
 

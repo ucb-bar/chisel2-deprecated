@@ -42,11 +42,13 @@ class RomCell[T <: dat_t](data: Array[T], addr: Node) extends Cell {
 
 class Rom(data_vals: Array[Node]) extends Delay {
   val data = data_vals.toArray;
-  override def getNode() = {
+
+  override def removeCellIOs() = {
     for(i <- 0 until data.length)
-      data(i) = data(i).getNode()
-    this
+      if(data(i).isCellIO)
+	data(i) = data(i).getNode()
   }
+
   override def toString: String = "ROM(" + data + ")";
   override def emitDef: String = {
     var res = "  initial begin\n";

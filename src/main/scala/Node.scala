@@ -73,6 +73,9 @@ object Node {
   
   var stop = true;
   
+  def apply(): int_t = Wire[int_t]();
+  def apply(width: Int): int_t = Wire[int_t](width);
+  def apply(default: int_t): int_t = Wire[int_t](default);
 }
 
 abstract class Node extends nameable{
@@ -121,7 +124,7 @@ abstract class Node extends nameable{
   def isLit = false;
   def value = -1;
   def signed: this.type = { 
-    val res = Wire();
+    val res = Node();
     res <== this.asInstanceOf[int_t];
     res.isSigned = true; 
     res.asInstanceOf[this.type]
@@ -312,6 +315,7 @@ abstract class Node extends nameable{
                 val c = node.component.parent;
                 // println("BINDING " + node + " I " + i + " NODE-PARENT " + node.component.parent + " -> " + this + " PARENT " + component.parent);
                 if (c == null) {
+		  println(component + " " + io.component + " ")
                   println("UNKNOWN COMPONENT FOR " + node);
                 }
                 val b = Binding(node, c, io.component);
@@ -361,13 +365,13 @@ abstract class Node extends nameable{
       if(inputs(i) == null){
 	ChiselErrors += IllegalState("NULL Input for " + this, 0);
       }
-      else
+      else if(inputs(i).isCellIO)
 	inputs(i) = inputs(i).getNode;
   }
   def getNode(): Node = {
-    if(inputs.length == 0 || !isCellIO)
+    if(!isCellIO || inputs.length == 0)
       this
-    else
+    else 
       inputs(0).getNode
   }
   def addConsumers(): Boolean = {

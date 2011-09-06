@@ -105,9 +105,10 @@ class bundle_t(view_arg: Seq[String] = null) extends dat_t{
       elts += ((n, i));
     bundle_t(elts)
   }
-  def +=(other: int_t) = {
+  def +=[T <: dat_t](other: T) = {
     elements;
     elementsCache += ((other.name, other));
+    if(isCellIO) other.setIsCellIO;
   }
   override def flip(): this.type = {
     for ((n, i) <- elements) {
@@ -143,8 +144,9 @@ class bundle_t(view_arg: Seq[String] = null) extends dat_t{
     src match {
       case other: bundle_t => {
         for ((n, i) <- elements) {
-          if (other.elements.contains(n))
+          if (other.elements.contains(n)){
             i <> other(n);
+	  }
           else{
             println("// UNABLE TO FIND " + n + " IN " + other.component);
 	  }

@@ -38,11 +38,14 @@ class LookupCell[T <: dat_t](data: T, mapping: Seq[(int_t, T)]){
 class Lookup extends Node {
   override def isInObject = true;
   var map: Array[(Node, Node)] = null;
-  override def getNode() = {
+
+  override def removeCellIOs() = {
+    super.removeCellIOs();
     for(((i, n), m) <- map zip map.indices)
       map(m) = ((i.getNode, n.getNode));
     this
   }
+
   override def toString: String = "LOOKUP(" + inputs(0) + ")";
   override def emitDef: String = {
     var res = 
