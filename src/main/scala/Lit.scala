@@ -59,14 +59,22 @@ object Literal {
   }
   def sizeof(base: Char, x: String): Int = {
     var res = 0;
+    var first = true;
     val size = 
       if(base == 'b')
 	1
       else if(base == 'h')
 	4
+      else if(base == 'o')
+	3
       else
 	-1	
-    for(c <- x) if(c != '_') res += size;
+    for(c <- x) 
+      if(first) {
+	first = false;
+	res += sizeof(c.asDigit);
+      } else if (c != '_') 
+	res += size;
     res
   }
   val hexNibbles = "0123456789abcdef";
@@ -147,8 +155,11 @@ object Literal {
     val res = new Literal();
     if(width == -1)
       res.init(literal, sizeof(base, literal));
-    else
+    else{
       res.init(literal, width); 
+      if(width < sizeof(base, literal)) 
+	ChiselErrors += IllegalState("width " + width + " is too small for literal: " + res + " with width " + sizeof(base, literal), 4)
+    }
     res.base = base;
     if (base == 'b') {res.isZ = literal.contains('?'); res.isBinary = true;}
     res
