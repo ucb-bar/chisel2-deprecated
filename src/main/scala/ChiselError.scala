@@ -33,6 +33,14 @@ object IllegalState {
   }
 }
 
+object IllegalConnection {
+  def apply(m: String, index: Int): ChiselError = {
+    val res = new ChiselError("IllegalConnection", m, Thread.currentThread.getStackTrace);
+    res.index = index;
+    res
+  }
+}
+
 object IllegalName {
   def apply(m: String): ChiselError = {
     new ChiselError("Illegal Name", m, Thread.currentThread.getStackTrace);

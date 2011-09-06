@@ -57,7 +57,7 @@ class Reg extends Delay with proc{
   var assigned = false;
   def <==(src: Node) = {
     if (assigned)
-      ChiselErrors += IllegalState("reassignment to output", 3);
+      ChiselErrors += IllegalState("reassignment to Reg", 3);
     if (cond.length == 0)
       update(src);
     else if (!isUpdate) {
@@ -93,7 +93,7 @@ class Reg extends Delay with proc{
   }
   override def :=(src: Node) = {
     if(assigned || inputs(0) != null)
-      ChiselErrors += IllegalState("reassignment to output", 3);
+      ChiselErrors += IllegalState("reassignment to Reg", 3);
     else { assigned = true; super.:=(src)}
   }
   override def emitRefV: String = if (name == "") "R" + emitIndex else name;

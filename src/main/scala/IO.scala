@@ -84,9 +84,9 @@ class IO extends Wire {
         if (other.dir == OUTPUT || isCellIO) {
           this := other;
         } else {
-          println("Connecting Input " + this + " to Input " + other);
+          ChiselErrors += IllegalConnection("Connecting Input " + this + " to Input " + other, 2);
         }
-      case default => println("Connecting Input " + this + " to Node " + default);
+      case default => ChiselErrors += IllegalConnection("Connecting Input " + this + " to Node " + default, 2);
       }
     } else { // DIR == OUTPUT
       // println("<>'ing " + this + " --> " + src);
@@ -95,7 +95,7 @@ class IO extends Wire {
           if (other.dir == INPUT || isCellIO) {
             other := this;
           } else {
-            println("Connecting Output " + this + " to Output " + other);
+            ChiselErrors += IllegalConnection("Connecting Output " + this + " to Output " + other, 2);
           }
         case default => 
           //println("Connecting Output " + this + " to Node " + default);
@@ -110,9 +110,9 @@ class IO extends Wire {
           if (other.dir == INPUT || isCellIO) {
             this := other;
           } else 
-            println("// ^^ing Input " + this + " to Output " + other);
+            ChiselErrors += IllegalConnection("^^ing Input " + this + " to Output " + other, 2);
         case default => 
-          println("// ^^ing Input " + this + " to Node " + default);
+          ChiselErrors += IllegalConnection("// ^^ing Input " + this + " to Node " + default, 2);
       }
     } else { // dir == OUTPUT
       // println("^^ing " + this + " COMP " + component + " & " + src + " SRC COMP " + src.component + " CHILD? " + isChild);
@@ -121,9 +121,9 @@ class IO extends Wire {
           if (other.dir == OUTPUT || isCellIO) {
             other := this;
           } else
-            println("// ^^ing Output " + this + " to Input " + other);
+            ChiselErrors += IllegalConnection("^^ing Output " + this + " to Input " + other, 2);
         case default => 
-          println("// ^^ing Output " + this + " to Node " + default);
+          ChiselErrors += IllegalConnection("^^ing Output " + this + " to Node " + default, 2);
       } 
     }
   }

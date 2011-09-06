@@ -17,16 +17,16 @@ object PWire {
 }
 
 object Wire {
-  def apply(): int_t = {
-    val junctioncell = new WireCell[int_t](Fab[int_t](), -1);
+  def apply[T <: dat_t: Manifest](): T = {
+    val junctioncell = new WireCell[T](Fab[T](), -1);
     junctioncell.io.out
   }
-  def apply(width: Int): int_t = {
-    val junctioncell = new WireCell[int_t](Fab[int_t](), width);
+  def apply[T <: dat_t: Manifest](width: Int): T = {
+    val junctioncell = new WireCell[T](Fab[T](), width);
     junctioncell.io.out
   }
-  def apply(default: int_t): int_t = {
-    val junctioncell = new WireCell[int_t](default, -1, true);
+  def apply[T <: dat_t](default: T): T = {
+    val junctioncell = new WireCell[T](default, -1, true);
     junctioncell.io.in := default;
     junctioncell.io.out
   }
@@ -63,7 +63,7 @@ class Wire extends dat_t with proc{
   }
   def <==(src: Node) = {
     if (assigned)
-      ChiselErrors += IllegalState("reassignment to output", 3);
+      ChiselErrors += IllegalState("reassignment to Node", 3);
     else if (cond.length == 0){
       inputs(0) = src;
     }
@@ -95,7 +95,7 @@ class Wire extends dat_t with proc{
 
   override def :=(src: Node) = {
     if(assigned || inputs(0) != null)
-      ChiselErrors += IllegalState("reassignment to output", 3);
+      ChiselErrors += IllegalState("reassignment to Node", 3);
     else { assigned = true; super.:=(src)}
   }
 }
