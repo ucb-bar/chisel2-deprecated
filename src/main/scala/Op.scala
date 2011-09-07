@@ -62,7 +62,12 @@ class Op extends Node {
       (if (op == "##") 
         "cat<" + width + ">(" + emitOpRef(0) + ", " + emitOpRef(1) + ")"
        else if (inputs.length == 1)
-         op + inputs(0).emitRef
+         if (op == "|")
+           "reduction_or(" + inputs(0).emitRef + ")"
+         else if (op == "&")
+           "reduction_and(" + inputs(0).emitRef + ")"
+         else
+           op + inputs(0).emitRef
        else
          emitOpRef(0) + " " + op + " " + emitOpRef(1)) +
     ";\n"

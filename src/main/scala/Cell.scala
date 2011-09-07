@@ -97,6 +97,28 @@ class LogicalNodeCell(op: String) extends Cell {
 
 }
 
+object ReductionNodeCell {
+  def apply(x: int_t, op: String): bool_t = {
+    val res = new ReductionNodeCell(op);
+    res.io.In := x;
+    res.io.Out
+  }
+}
+
+class ReductionNodeCell(op: String) extends Cell {
+  val io = new bundle_t() {val In = int_t(INPUT);
+                           val Out = bool_t(OUTPUT);}
+  io.setIsCellIO;
+  val primitiveNode = op match {
+    case "&" => Op("&",  1, fixWidth(1), io.In);
+    case "|" => Op("|",  1, fixWidth(1), io.In);
+    case any => null;
+  }
+  primitiveNode.name = "primitiveNode";
+  primitiveNode.nameHolder = io.Out;
+  io.Out := primitiveNode;
+}
+
 
 object UnaryBoolCell {
   def apply(x: bool_t, op: String): bool_t = {
@@ -154,7 +176,27 @@ class BinaryBoolCell(op: String) extends Cell {
   primitiveNode.name = "primitiveNode";
   primitiveNode.nameHolder = io.Z;
   io.Z := primitiveNode;
+} 
+
+object or {
+    def apply(x: int_t): bool_t = {
+		val res = new or(); // trick the compiler to keeping the class
+    	ReductionNodeCell(x, "|")
+    }
 }
 
+class or extends ReductionNodeCell("|") {
+}
+
+object and {
+    def apply(x: int_t): bool_t = {
+		val res = new and(); // trick the compiler to keeping the class
+    	ReductionNodeCell(x, "&")
+    }
+}
+
+class and extends ReductionNodeCell("&") {
+
+}
 }
 

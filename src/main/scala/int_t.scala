@@ -68,6 +68,8 @@ class int_t extends IO {
   override def unary_-(): int_t = UnaryNodeCell(this, "-");
   override def unary_~(): int_t = UnaryNodeCell(this, "~");
   override def unary_!(): int_t = UnaryNodeCell(this, "!");
+  override def and(): bool_t    = ReductionNodeCell(this, "&");
+  override def or():  bool_t    = ReductionNodeCell(this, "|");
   def << (b: int_t): int_t = BinaryNodeCell(this, b, "<<");
   def >> (b: int_t): int_t = BinaryNodeCell(this, b, ">>");
   def >>>(b: int_t): int_t = BinaryNodeCell(this, b, ">>>");
