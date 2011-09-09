@@ -47,6 +47,7 @@ class bool_t extends int_t {
   def || (b: bool_t): bool_t = BinaryBoolCell(this, b, "||");
   def &  (b: bool_t): bool_t = BinaryBoolCell(this, b, "&");
   def |  (b: bool_t): bool_t = BinaryBoolCell(this, b, "|");
+  def ^  (b: bool_t): bool_t = BinaryBoolCell(this, b, "^");
 }
 }
 

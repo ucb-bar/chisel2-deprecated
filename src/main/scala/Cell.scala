@@ -112,6 +112,7 @@ class ReductionNodeCell(op: String) extends Cell {
   val primitiveNode = op match {
     case "&" => Op("&",  1, fixWidth(1), io.In);
     case "|" => Op("|",  1, fixWidth(1), io.In);
+    case "^" => Op("^",  1, fixWidth(1), io.In);
     case any => null;
   }
   primitiveNode.name = "primitiveNode";
@@ -171,6 +172,7 @@ class BinaryBoolCell(op: String) extends Cell {
     case "||"  => io.X.asInstanceOf[Node] ||  io.Y;
     case "&"   => io.X.asInstanceOf[Node] &   io.Y;
     case "|"   => io.X.asInstanceOf[Node] |   io.Y;
+    case "^"   => io.X.asInstanceOf[Node] ^   io.Y;
     case any   => null;
   }
   primitiveNode.name = "primitiveNode";
@@ -181,7 +183,8 @@ class BinaryBoolCell(op: String) extends Cell {
 object or {
     def apply(x: int_t): bool_t = {
 		val res = new or(); // trick the compiler to keeping the class
-    	ReductionNodeCell(x, "|")
+        res.io.In := x;
+        res.io.Out
     }
 }
 
@@ -191,12 +194,24 @@ class or extends ReductionNodeCell("|") {
 object and {
     def apply(x: int_t): bool_t = {
 		val res = new and(); // trick the compiler to keeping the class
-    	ReductionNodeCell(x, "&")
+        res.io.In := x;
+        res.io.Out
     }
 }
 
 class and extends ReductionNodeCell("&") {
-
 }
+
+object xor {
+    def apply(x: int_t): bool_t = {
+        val res = new xor()
+        res.io.In := x;
+        res.io.Out
+    }
+}
+
+class xor extends ReductionNodeCell("^") {
+}
+
 }
 

@@ -66,6 +66,8 @@ class Op extends Node {
            "reduction_or(" + inputs(0).emitRef + ")"
          else if (op == "&")
            "reduction_and(" + inputs(0).emitRef + ")"
+         else if (op == "^")
+           "reduction_xor(" + inputs(0).emitRef + ")"
          else
            op + inputs(0).emitRef
        else

@@ -102,6 +102,7 @@ abstract class Node extends nameable{
   def unary_!(): Node    = Op("!",  1, fixWidth(1), this);
   def andR(): Node       = Op("&",  1, fixWidth(1), this);
   def orR(): Node        = Op("|",  1, fixWidth(1), this);
+  def xorR(): Node       = Op("^",  1, fixWidth(1), this);
   def <<(b: Node): Node  = Op("<<", 0, lshWidthOf(0, b),  this, b );
   def >>(b: Node): Node  = Op(">>", 0, rshWidthOf(0, b),  this, b );
   def >>>(b: Node): Node = Op(">>", 0, rshWidthOf(0, b),  this, b );
