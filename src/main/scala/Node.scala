@@ -39,18 +39,18 @@ object Node {
     } 
   }
   def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).getWidth - n.minNum }
-  var reset: int_t = Input("reset", 1);
-  var resets = Queue[int_t]();
+  var reset: Fix = Input("reset", 1);
+  var resets = Queue[Fix]();
   var clk: Node = Input("clk", 1);
-  def pushReset(r: int_t) { resets.enqueue(reset); reset = r }
+  def pushReset(r: Fix) { resets.enqueue(reset); reset = r }
   def popReset() { reset = resets.dequeue() }
-  def withReset(r: int_t)(block: => Node) = {
+  def withReset(r: Fix)(block: => Node) = {
     val resBak = reset; reset = r; 
     val res = block; 
     reset = resBak;
     res
   }
-  def ListLookup(addr: Node, default: List[Node], mapping: Array[(Node, List[Node])]): List[int_t] = {
+  def ListLookup(addr: Node, default: List[Node], mapping: Array[(Node, List[Node])]): List[Fix] = {
     val ll = new ListLookup(mapping, default);
     ll.init("", widthOf(1), addr);
     for (w <- ll.wires)
@@ -63,7 +63,7 @@ object Node {
       }
     }
     ll.wires.map(x => {
-      val res = int_t(OUTPUT);
+      val res = Fix('output);
       res.setIsCellIO;
       x.nameHolder = res;
       res := x;
@@ -73,9 +73,9 @@ object Node {
   
   var stop = true;
   
-  def apply(): int_t = Wire[int_t]();
-  def apply(width: Int): int_t = Wire[int_t](width);
-  def apply(default: int_t): int_t = Wire[int_t](default);
+  def apply(): Fix = Wire[Fix]();
+  def apply(width: Int): Fix = Wire[Fix](width);
+  def apply(default: Fix): Fix = Wire[Fix](default);
 }
 
 abstract class Node extends nameable{
@@ -127,13 +127,13 @@ abstract class Node extends nameable{
   def value = -1;
   def signed: this.type = { 
     val res = Node();
-    res <== this.asInstanceOf[int_t];
+    res <== this.asInstanceOf[Fix];
     res.isSigned = true; 
     res.asInstanceOf[this.type]
   }
-  def bitSet(off: int_t, dat: int_t): int_t = { 
+  def bitSet(off: Fix, dat: Fix): Fix = { 
     val bit = Lit(1, 1) << off;
-    (this.asInstanceOf[int_t] & ~bit) | (dat << off);
+    (this.asInstanceOf[Fix] & ~bit) | (dat << off);
   }
   // TODO: MOVE TO WIRE
   def :=(src: Node) = { if (inputs.length > 0) inputs(0) = src; else inputs += src; }
@@ -161,12 +161,12 @@ abstract class Node extends nameable{
     println("NODE ^^ " + this.getClass + " " + src);
     src := this;
   }
-  def apply(bit: Int): Node = { Bits(this, bit) };
-  def apply(hi: Int, lo: Int): Node = { Bits(this, hi, lo) };
+  def apply(bit: Int): Node = { Extract(this, bit) };
+  def apply(hi: Int, lo: Int): Node = { Extract(this, hi, lo) };
   def apply(bit: Literal): Node = { apply(bit.value) };
   def apply(hi: Literal, lo: Literal): Node = { apply(hi.value, lo.value) };
-  def apply(bit: Node): Node = { Bits(this, bit); }
-  def apply(hi: Node, lo: Node): Node = { Bits(this, hi, lo) };
+  def apply(bit: Node): Node = { Extract(this, bit); }
+  def apply(hi: Node, lo: Node): Node = { Extract(this, hi, lo) };
   def getLit = this.asInstanceOf[Literal]
   def isIo = false;
   def isReg = false;
@@ -402,11 +402,11 @@ abstract class Node extends nameable{
     }
     true;
   }
-  def extract (widths: Array[Int]): List[int_t] = {
-    var res: List[int_t] = Nil;
+  def extract (widths: Array[Int]): List[Fix] = {
+    var res: List[Fix] = Nil;
     var off = 0;
     for (w <- widths) {
-      res  = this.asInstanceOf[int_t](off+w-1, off) :: res;
+      res  = this.asInstanceOf[Fix](off+w-1, off) :: res;
       off += w;
     }
     res.reverse
@@ -426,10 +426,10 @@ abstract class Node extends nameable{
   def Match(mods: Array[Node]) {
     var off = 0;
     for (m <- mods.reverse) {
-      val res = Bits(this.asInstanceOf[int_t], off+m.getWidth-1, off);
+      val res = Extract(this.asInstanceOf[Fix], off+m.getWidth-1, off){Fix()};
       m match {
         case r: Reg => r <== res;
-	case i: int_t => i <== res;
+	case i: Fix => i <== res;
         case o      => o := res;
       }
       off += m.getWidth;

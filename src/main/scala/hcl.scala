@@ -55,8 +55,8 @@ object pmux {
   }
 }
 object pcond {
-  def apply(cases: Seq[(int_t, () => Any)]) = {
-    var tst: int_t = Lit(1);
+  def apply(cases: Seq[(Fix, () => Any)]) = {
+    var tst: Fix = Lit(1);
     for ((ctst, block) <- cases) {
       cond.push(tst && ctst);  
       block(); 
@@ -67,9 +67,9 @@ object pcond {
   }
 }
 object pcase {
-  def apply(x: int_t, cases: Seq[(int_t, () => Any)]) = 
+  def apply(x: Fix, cases: Seq[(Fix, () => Any)]) = 
     pcond(cases.map(tb => (tb._1 === x, tb._2)))
-  def apply(x: int_t, default: () => Any, cases: Seq[(int_t, () => Any)]) = {
+  def apply(x: Fix, default: () => Any, cases: Seq[(Fix, () => Any)]) = {
     val elts = cases.map(tb => (tb._1 === x, tb._2)).toList;
     pcond(elts ::: List((Lit(1), default)))
   }
@@ -180,7 +180,6 @@ object nullADT extends dat_t;
 abstract class BlackBox extends Component {
   override def doCompileV(out: java.io.FileWriter, depth: Int): Unit = {
     findNodes(depth, this);
-    println("module: " + moduleName + "  name: " + name);
   }
   override def name_it() = {
     val cname = getClass().getName();
@@ -207,7 +206,7 @@ object MuxLookup {
   }
   * */
 
-  def apply[T <: dat_t] (key: int_t, default: T, mapping: Seq[(int_t, T)]): T = {
+  def apply[T <: dat_t] (key: Fix, default: T, mapping: Seq[(Fix, T)]): T = {
     var res = default;
     for ((k, v) <- mapping.reverse)
       res = Mux(key ===k, v, res);
@@ -226,7 +225,7 @@ object MuxCase {
     res
   }
   * */
-  def apply[T <: dat_t] (default: T, mapping: Seq[(int_t, T)]): T = {
+  def apply[T <: dat_t] (default: T, mapping: Seq[(Fix, T)]): T = {
     var res = default;
     for ((t, v) <- mapping.reverse){
       res = Mux(t, v, res);

@@ -11,39 +11,39 @@ import IOdir._;
 import ChiselError._;
 
 object Lit {
-  def apply(x: Int): int_t = {
+  def apply(x: Int): Fix = {
     val cell = new Lit(Literal(x));
     cell.io
   }
-  def apply(x: Int, width: Int): int_t = {
+  def apply(x: Int, width: Int): Fix = {
     val cell = new Lit(Literal(x, width));
     cell.io
   }
-  def apply(x: Long, width: Int): int_t = {
+  def apply(x: Long, width: Int): Fix = {
     val cell = new Lit(Literal( x, width));
     cell.io
   }
-  def apply(n: String, width: Int = -1): int_t = {
+  def apply(n: String, width: Int = -1): Fix = {
     val cell = new Lit(Literal(n, width));
     cell.io
   }
-  def apply(width: Int, base: Char, literal: String): int_t = {
+  def apply(width: Int, base: Char, literal: String): Fix = {
     val cell = new Lit(Literal(width, base, literal));
     cell.io
   }
-  def apply(value: Boolean): bool_t = 
+  def apply(value: Boolean): Bool = 
     new BoolLit((if(value) Literal(1) else Literal(0))).io;
 }
 
 class Lit(x: Literal) extends Cell {
-  val io = int_t(OUTPUT);
+  val io = Fix('output);
   io.setIsCellIO;
   val primitiveNode = x;
   io := primitiveNode;
 }
 
 class BoolLit(x: Literal) extends Cell {
-  val io = bool_t(OUTPUT);
+  val io = Bool(OUTPUT);
   io.setIsCellIO;
   val primitiveNode = x;
   io := primitiveNode;

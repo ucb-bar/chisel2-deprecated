@@ -17,15 +17,15 @@ class IOdir (idi: Int) {
 
 object Input {
   def apply(): IO = apply("", widthOf(0))
-  def apply(width: Int): int_t = int_t(INPUT, width);
+  def apply(width: Int): Fix = Fix(width, 'input);
   def apply(name: String): IO = apply(name, widthOf(0))
-  def apply(name: String, width: Int): int_t = 
-    { val res = new int_t(); res.dir = INPUT; if(name != "") res.named = true; res.init(name, width); res }
+  def apply(name: String, width: Int): Fix = 
+    { val res = new Fix(); res.dir = INPUT; if(name != "") res.named = true; res.init(name, width); res }
   def apply(name: String, inferWidth: (Node) => Int): IO = 
     { val res = new IO(); res.dir = INPUT; res.init(name, inferWidth); res }
 }
 object Output {
-  def apply(width: Int): int_t = int_t(OUTPUT, width);
+  def apply(width: Int): Fix = Fix(width, 'output);
   def apply(name: String): IO = apply(name, widthOf(0), null)
   def apply(name: String, inferWidth: (Node) => Int, x: Node): IO = 
     { val res = new IO(); res.dir = OUTPUT; res.init(name, inferWidth, x); res }
