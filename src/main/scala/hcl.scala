@@ -16,7 +16,7 @@ object Enum {
 }
 
 object fromNode {
-  def apply[T <: dat_t: Manifest](data: Node): T = {
+  def apply[T <: Data: Manifest](data: Node): T = {
     val resT = Fab[T]();
     resT.fromNode(data);
   }
@@ -75,16 +75,21 @@ object is {
     }
   }
 }
-class TstObject(val scanFormat: String, 
-     val scan_args: Seq[Node] = null,
-     val printFormat: String,            
-     val print_args: Seq[Node] = null) { }
 
-object chisel_main {
+class TestIO(val format: String, val args: Seq[Node] = null) { }
+
+object Scanner {
+  def apply (format: String, args: Node*) = 
+    new TestIO(format, args.toList);
+}
+object Printer {
+  def apply (format: String, args: Node*) = 
+    new TestIO(format, args.toList);
+}
+
+object chiselMain {
   def apply[T <: Component]
-    (args: Array[String], 
-     gen: () => T,
-     tst: T => TstObject = null) {
+      (args: Array[String], gen: () => T, scanner: T => TestIO = null, printer: T => TestIO = null) {
     initChisel();
     var i = 0;
     while (i < args.length) {
@@ -102,12 +107,15 @@ object chisel_main {
       i += 1;
     }
     val c = gen();
-    if (tst != null) {
-      val tstObj = tst(c);
-      scanArgs = tstObj.scan_args;
-      printArgs = tstObj.print_args;
-      scanFormat = tstObj.scanFormat;
-      printFormat = tstObj.printFormat;
+    if (scanner != null) {
+      val s = scanner(c);
+      scanArgs   = s.args;
+      scanFormat = s.format;
+    }
+    if (printer != null) {
+      val p = printer(c);
+      printArgs   = p.args;
+      printFormat = p.format;
     }
     if (isEmittingComponents)
       c.compileV();
@@ -117,21 +125,21 @@ object chisel_main {
 }
 
 
-abstract class dat_t extends Node {
+abstract class Data extends Node {
   var comp: proc = null;
   def toFix(): Fix = chiselCast(this){Fix()};
   def toUFix(): UFix = chiselCast(this){UFix()};
   def toBits(): Bits = chiselCast(this){Bits()};
   def toBool(): Bool = chiselCast(this){Bool()};
   def setIsCellIO = isCellIO = true;
-  def apply(name: String): dat_t = null
+  def apply(name: String): Data = null
   def flatten = Array[(String, IO)]();
   def flip(): this.type = this;
   def asInput(): this.type = this;
   def asOutput(): this.type = this;
   def toNode: Node = this;
   def fromNode(n: Node): this.type = this;
-  def <==[T <: dat_t](data: T) = {
+  def <==[T <: Data](data: T) = {
     data.setIsCellIO;
     comp <== data.toNode;
   }
@@ -149,25 +157,25 @@ abstract class dat_t extends Node {
   override def unary_-()= this;
   override def unary_~()= this;
   override def unary_!()= this;
-  def << (b: dat_t) = this;
-  def >> (b: dat_t) = this;
-  def >>>(b: dat_t) = this;
-  def +  (b: dat_t) = this;
-  def *  (b: dat_t) = this;
-  def ^  (b: dat_t) = this;
-  def ?  (b: dat_t) = this;
-  def -  (b: dat_t) = this;
-  def ## (b: dat_t) = this;
-  def ===(b: dat_t) = this;
-  def != (b: dat_t) = this;
-  def >  (b: dat_t) = this;
-  def <  (b: dat_t) = this;
-  def <= (b: dat_t) = this;
-  def >= (b: dat_t) = this;
-  def && (b: dat_t) = this;
-  def || (b: dat_t) = this;
-  def &  (b: dat_t) = this;
-  def |  (b: dat_t) = this;
+  def << (b: Data) = this;
+  def >> (b: Data) = this;
+  def >>>(b: Data) = this;
+  def +  (b: Data) = this;
+  def *  (b: Data) = this;
+  def ^  (b: Data) = this;
+  def ?  (b: Data) = this;
+  def -  (b: Data) = this;
+  def ## (b: Data) = this;
+  def ===(b: Data) = this;
+  def != (b: Data) = this;
+  def >  (b: Data) = this;
+  def <  (b: Data) = this;
+  def <= (b: Data) = this;
+  def >= (b: Data) = this;
+  def && (b: Data) = this;
+  def || (b: Data) = this;
+  def &  (b: Data) = this;
+  def |  (b: Data) = this;
 }
 
 trait proc extends Node {
@@ -178,21 +186,11 @@ trait proc extends Node {
         println("NO UPDATES SPECIFIED"); // error();
     } else {
       val (lastCond, lastValue) = updates.pop();
-      val backstop: Node =
-        if (lastCond.isTrue) {
-          if (lastValue == null)
-            println("NO CONDITIONAL UPDATE DEFAULT"); // error();
-          lastValue
-        } else if (lastValue == null) {
-	  println("here2");
-          if (default == null)
-            println("NO CONDITIONAL UPDATE DEFAULT"); // error();
-          default
-        } else {
-          lastValue
-	}
-      updates.push((lastCond, backstop));
-      inputs(0) = if(default != null) default else backstop;
+      if (default == null && !lastCond.isTrue) {
+        println("NO DEFAULT SPECIFIED FOR WIRE"); // error()
+      }
+      updates.push((lastCond, lastValue));
+      inputs(0) = if (default != null) default else lastValue;
       for ((cond, value) <- updates) {
         inputs(0) = Multiplex(cond, value, inputs(0));
       }
@@ -207,7 +205,7 @@ trait nameable {
   var named = false;
 }
 
-object nullADT extends dat_t;
+object nullADT extends Data;
 
 
 abstract class BlackBox extends Component {
@@ -239,7 +237,7 @@ object MuxLookup {
   }
   * */
 
-  def apply[T <: dat_t] (key: Fix, default: T, mapping: Seq[(Fix, T)]): T = {
+  def apply[T <: Data] (key: Fix, default: T, mapping: Seq[(Fix, T)]): T = {
     var res = default;
     for ((k, v) <- mapping.reverse)
       res = Mux(key ===k, v, res);
@@ -258,7 +256,7 @@ object MuxCase {
     res
   }
   * */
-  def apply[T <: dat_t] (default: T, mapping: Seq[(Fix, T)]): T = {
+  def apply[T <: Data] (default: T, mapping: Seq[(Fix, T)]): T = {
     var res = default;
     for ((t, v) <- mapping.reverse){
       res = Mux(t, v, res);

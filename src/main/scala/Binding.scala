@@ -34,7 +34,7 @@ class Binding extends Node {
   override def emitDef: String = "";
   override def toString: String = "BINDING(" + inputs(0) + ")";
   override def emitDecC: String = 
-    if (isEmittingComponents) "  dat_t " + emitRef + ";\n"; else "";
+    if (isEmittingComponents) "  Data " + emitRef + ";\n"; else "";
   override def emitDefLoC: String = ""
   override def emitDefHiC: String = ""
   override def emitRefC: String = 

@@ -7,7 +7,7 @@ object Mem {
   val noResetVal = Literal(0);
 
 
-  def apply[T <: dat_t](n: Int, isEnable: Fix, wrAddr: Fix, wrData: T, resetVal: T): MemCell[T] ={
+  def apply[T <: Data](n: Int, isEnable: Bool, wrAddr: UFix, wrData: T, resetVal: T): MemCell[T] ={
     val memcell = new MemCell(n, wrData, resetVal != null);
     memcell.io.wrData <> wrData;
     memcell.io.wrAddr := wrAddr;
@@ -20,12 +20,13 @@ object Mem {
 
 
 
-class MemCell[T <: dat_t](n: Int, data: T, isReset: Boolean) extends Cell {
-  val io = new bundle_t(){val wrData = data.clone.asInput;
-			  val wrAddr = Input();
-			  val isEnable = Input();
-			  val resetVal = data.clone.asInput;
-			}
+class MemCell[T <: Data](n: Int, data: T, isReset: Boolean) extends Cell {
+  val io = new Bundle(){
+    val wrData = data.clone.asInput;
+    val wrAddr = Input();
+    val isEnable = Input();
+    val resetVal = data.clone.asInput;
+  }
   io.setIsCellIO;
   isReg = true;
   val primitiveNode = new Mem(n);

@@ -8,10 +8,10 @@ import Node._;
 import Component._;
 import IOdir._;
 
-object bundle_t {
-  def nullbundle_t = bundle_t(Map[String, dat_t]());
-  def apply (elts: Map[String, dat_t]): bundle_t = {
-    val res = new bundle_t();
+object Bundle {
+  def nullbundle_t = Bundle(Map[String, Data]());
+  def apply (elts: Map[String, Data]): Bundle = {
+    val res = new Bundle();
     // println("NEW BUNDLE");
     res.elementsCache = elts; // TODO: REMOVE REDUNDANT CREATION
     for ((n, i) <- elts) {
@@ -22,13 +22,13 @@ object bundle_t {
   }
 }
 
-class bundle_t(view_arg: Seq[String] = null) extends dat_t{
+class Bundle(view_arg: Seq[String] = null) extends Data{
   var view = view_arg;
-  var elementsCache: Map[String, dat_t] = null;
+  var elementsCache: Map[String, Data] = null;
   var bundledElm: Node = null;
-  def calcElements(view: Seq[String]): Map[String, dat_t] = {
+  def calcElements(view: Seq[String]): Map[String, Data] = {
     val c      = getClass();
-    var elts   = Map[String, dat_t]();
+    var elts   = Map[String, Data]();
     var isCollecting = true;
     // println("COLLECTING " + c + " IN VIEW " + view);
     for (m <- c.getMethods) {
@@ -41,7 +41,7 @@ class bundle_t(view_arg: Seq[String] = null) extends dat_t{
         var isFound = false;
         var isInterface = false;
         var c = rtype;
-        val sc = Class.forName("Chisel.dat_t");
+        val sc = Class.forName("Chisel.Data");
         do {
           if (c == sc) {
             isFound = true; isInterface = true;
@@ -55,8 +55,8 @@ class bundle_t(view_arg: Seq[String] = null) extends dat_t{
             (view == null || view.contains(name))) {
           val o = m.invoke(this);
           o match { 
-	    case bv: BundleVec[dat_t] => elts += ((name + bv.name, bv));
-            case i: dat_t => elts += ((name, i)); i.name = name; 
+	    case bv: BundleVec[Data] => elts += ((name + bv.name, bv));
+            case i: Data => elts += ((name, i)); i.name = name; 
               // println("    ADDING " + name + " -> " + o);
             case any =>
               // println("    FOUND " + o);
@@ -69,7 +69,7 @@ class bundle_t(view_arg: Seq[String] = null) extends dat_t{
     // println("END ->>>>");
     elts
   }
-  def elements: Map[String, dat_t] = {
+  def elements: Map[String, Data] = {
     if (elementsCache == null) {
       elementsCache = calcElements(view);
     }
@@ -85,7 +85,7 @@ class bundle_t(view_arg: Seq[String] = null) extends dat_t{
     res += ")";
     res
   }
-  def view (elts: Map[String, dat_t]): bundle_t = { 
+  def view (elts: Map[String, Data]): Bundle = { 
     elementsCache = elts; this 
   }
   override def name_it (path: String, named: Boolean = true) = {
@@ -97,15 +97,15 @@ class bundle_t(view_arg: Seq[String] = null) extends dat_t{
     }
   }
 
-  def +(other: bundle_t): bundle_t = {
-    var elts = Map[String, dat_t]();
+  def +(other: Bundle): Bundle = {
+    var elts = Map[String, Data]();
     for ((n, i) <- elements) 
       elts += ((n, i));
     for ((n, i) <- other.elements) 
       elts += ((n, i));
-    bundle_t(elts)
+    Bundle(elts)
   }
-  def +=[T <: dat_t](other: T) = {
+  def +=[T <: Data](other: T) = {
     elements;
     elementsCache += ((other.name, other));
     if(isCellIO) other.setIsCellIO;
@@ -138,11 +138,11 @@ class bundle_t(view_arg: Seq[String] = null) extends dat_t{
     }
     */
   }
-  override def apply(name: String): dat_t = elements(name)
+  override def apply(name: String): Data = elements(name)
   override def <>(src: Node) = { 
     // println("B <>'ing " + this + " & " + src);
     src match {
-      case other: bundle_t => {
+      case other: Bundle => {
         for ((n, i) <- elements) {
           if (other.elements.contains(n)){
             i <> other(n);
@@ -159,7 +159,7 @@ class bundle_t(view_arg: Seq[String] = null) extends dat_t{
   override def ^^(src: Node) = { 
     // println("B <>'ing " + this + " & " + src);
     src match {
-      case other: bundle_t =>
+      case other: Bundle =>
         for ((n, i) <- elements) {
           if(other.elements.contains(n)) {
             // println(" := ELT " + i + " & " + other(n));

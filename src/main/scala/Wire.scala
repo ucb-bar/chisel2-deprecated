@@ -6,26 +6,26 @@ import ChiselError._;
 
 object PWire {
 
-  def apply[T <: dat_t : Manifest](): T = {
+  def apply[T <: Data : Manifest](): T = {
     val junctioncell = new WireCell[T](Fab[T](), -1);
     junctioncell.io.out
   }
-  def apply[T <: dat_t : Manifest](width: Int): T = {
+  def apply[T <: Data : Manifest](width: Int): T = {
     val junctioncell = new WireCell[T](Fab[T](), width);
     junctioncell.io.out
   }
 }
 
 object Wire {
-  def apply[T <: dat_t: Manifest](): T = {
+  def apply[T <: Data: Manifest](): T = {
     val junctioncell = new WireCell[T](Fab[T](), -1);
     junctioncell.io.out
   }
-  def apply[T <: dat_t: Manifest](width: Int): T = {
+  def apply[T <: Data: Manifest](width: Int): T = {
     val junctioncell = new WireCell[T](Fab[T](), width);
     junctioncell.io.out
   }
-  def apply[T <: dat_t](default: T): T = {
+  def apply[T <: Data](default: T): T = {
     val junctioncell = new WireCell[T](default, -1, true);
     junctioncell.io.in := default;
     junctioncell.io.out
@@ -33,10 +33,11 @@ object Wire {
 }
 
 
-class WireCell[T <: dat_t](data: T, width: Int, hasDefault: Boolean = false){
-  val io = new bundle_t(){val in = data.clone.asInput();
-			  val out = data.clone.asOutput();
-		      }
+class WireCell[T <: Data](data: T, width: Int, hasDefault: Boolean = false){
+  val io = new Bundle(){
+    val in = data.clone.asInput();
+    val out = data.clone.asOutput();
+  }
   io.setIsCellIO;
   val primitiveNode = new Wire();
   if(width > -1)
@@ -52,7 +53,7 @@ class WireCell[T <: dat_t](data: T, width: Int, hasDefault: Boolean = false){
   primitiveNode.nameHolder = io.out;
 }
 
-class Wire extends dat_t with proc{
+class Wire extends Data with proc{
   // override def toString: String = "W(" + name + ")"
   var assigned = false;
   override def toNode = this;

@@ -4,7 +4,7 @@ import scala.collection.mutable.ArrayBuffer
 
 object BundleVec {
 /*
-  def apply[T <: dat_t](n: Int)(gen: => T): BundleVec[T] = {
+  def apply[T <: Data](n: Int)(gen: => T): BundleVec[T] = {
     val res = new BundleVec[T]();
     for(i <- 0 until n){
       val t = gen;
@@ -14,11 +14,11 @@ object BundleVec {
     res
   }
 */
-  def apply[T <: dat_t](n: Int): (=> T) => BundleVec[T] = {
+  def apply[T <: Data](n: Int): (=> T) => BundleVec[T] = {
    gen(n, _);
   }
 
-  def gen[T <: dat_t](n: Int, gen: => T): BundleVec[T] = {
+  def gen[T <: Data](n: Int, gen: => T): BundleVec[T] = {
     val res = new BundleVec[T]();
     for(i <- 0 until n){
       val t = gen;
@@ -28,7 +28,7 @@ object BundleVec {
     res
   }
 
-  def apply[T <: dat_t: Manifest](n: Int, args: Any*): BundleVec[T] = {
+  def apply[T <: Data: Manifest](n: Int, args: Any*): BundleVec[T] = {
     val res = new BundleVec[T]();
     for(i <- 0 until n) {
       val t = (if(args == List(None)) Fab[T]() else Fab[T](args: _*));
@@ -40,7 +40,7 @@ object BundleVec {
 
 }
 
-class BundleVec[T <: dat_t]() extends dat_t {
+class BundleVec[T <: Data]() extends Data {
   val bundleVector = new ArrayBuffer[T];
   def +=(b: T) = bundleVector += b;
   override def apply(ind: Int): T = {
@@ -56,7 +56,7 @@ class BundleVec[T <: dat_t]() extends dat_t {
     val res = new ArrayBuffer[(String, IO)];
     for (elm <- bundleVector)
       elm match {
-	case bundle: bundle_t => res ++= bundle.flatten;
+	case bundle: Bundle => res ++= bundle.flatten;
 	case io: IO => res += ((io.name, io));
       }
     res.toArray
@@ -82,7 +82,7 @@ class BundleVec[T <: dat_t]() extends dat_t {
   def <>(src: List[Node]) = {
     for((b, e) <- bundleVector zip src)
       e match {
-	case other: bundle_t =>
+	case other: Bundle =>
 	  b <> e;
       }
   }

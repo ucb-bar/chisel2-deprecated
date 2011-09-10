@@ -5,6 +5,8 @@ import Node._;
 
 object Bits {
 
+  def apply(x: Int): Bits = Lit(x){Bits()};
+  def apply(x: Int, width: Int): Bits = Lit(x, width){Bits()};
   def apply(x: String): Bits = Lit(x){Bits()};
   def apply(x: String, width: Int): Bits = Lit(x, width){Bits()};
   

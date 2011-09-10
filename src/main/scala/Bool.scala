@@ -45,7 +45,7 @@ class Bool extends Fix {
   def <  (b: Bool): Bool = BinaryBoolCell(this, b, "<");
   def <= (b: Bool): Bool = BinaryBoolCell(this, b, "<=");
   def >= (b: Bool): Bool = BinaryBoolCell(this, b, ">=");
-  def && (b: Bool): Bool = BinaryBoolCell(this, b, "&&");
+  def && (b: Bool): Bool = if (b.isTrue) this else BinaryBoolCell(this, b, "&&");
   def || (b: Bool): Bool = BinaryBoolCell(this, b, "||");
   def &  (b: Bool): Bool = BinaryBoolCell(this, b, "&");
   def |  (b: Bool): Bool = BinaryBoolCell(this, b, "|");

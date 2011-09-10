@@ -9,7 +9,7 @@ object MemRef {
     res.init("", widthOf(0), mem, addr);
     res
   }
-  def apply[T <: dat_t](mem: Node, addr:Node, data: T): T = {
+  def apply[T <: Data](mem: Node, addr: Node, data: T): T = {
     val memRes = new MemRef();
     memRes.init("", widthOf(0), mem, addr);
     val res = data.fromNode(memRes).asInstanceOf[T];

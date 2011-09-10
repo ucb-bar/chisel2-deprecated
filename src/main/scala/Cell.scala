@@ -4,13 +4,13 @@ import IOdir._;
 import Node._;
 
 abstract class Cell extends nameable{
-  val io: dat_t;
+  val io: Data;
   val primitiveNode: Node;
   var isReg = false;
 }
 
 object chiselCast {
-  def apply[S <: dat_t, T <: Bits](x: S)(gen: => T): T = {
+  def apply[S <: Data, T <: Bits](x: S)(gen: => T): T = {
     val cell = new ConversionCell()(gen);
     cell.io := x
     cell.io
@@ -24,17 +24,18 @@ class ConversionCell[T <: Bits]()(gen: => T) extends Cell {
 }
 
 object UnaryNodeCell {
-  def apply[T <: dat_t](x: T, op: String)(gen: => T): T = {
+  def apply[T <: Data](x: T, op: String)(gen: => T): T = {
     val res = new UnaryNodeCell(op)(gen);
     res.io.In := x;
     res.io.Out
   }
 }
 
-class UnaryNodeCell[T <: dat_t](op: String)(gen: => T) extends Cell {
-  val io = new bundle_t(){val In = gen.asInput;
-			val Out = gen.asOutput;
-		      }
+class UnaryNodeCell[T <: Data](op: String)(gen: => T) extends Cell {
+  val io = new Bundle(){
+    val In  = gen.asInput;
+    val Out = gen.asOutput;
+  }
   io.setIsCellIO;
   val primitiveNode = op match {
     case "-" => Op("-",  1, widthOf(0), io.In);
@@ -48,7 +49,7 @@ class UnaryNodeCell[T <: dat_t](op: String)(gen: => T) extends Cell {
 }
 
 object BinaryNodeCell {
-  def apply[T <: dat_t](x: T, y: T, op: String)(gen: => T): T = {
+  def apply[T <: Data](x: T, y: T, op: String)(gen: => T): T = {
     val res = new BinaryNodeCell(op)(gen);
     res.io.X := x;
     res.io.Y := y;
@@ -56,10 +57,12 @@ object BinaryNodeCell {
   }
 }
 
-class BinaryNodeCell[T <: dat_t](op: String)(gen: => T) extends Cell {
-  val io = new bundle_t(){val X = gen.asInput;
-			  val Y = gen.asInput;
-			  val Z = gen.asOutput;}
+class BinaryNodeCell[T <: Data](op: String)(gen: => T) extends Cell {
+  val io = new Bundle(){
+    val X = gen.asInput;
+    val Y = gen.asInput;
+    val Z = gen.asOutput;
+  }
   io.setIsCellIO;
   val primitiveNode = op match {
     case "<<"  => io.X.asInstanceOf[Node] <<  io.Y;
@@ -81,7 +84,7 @@ class BinaryNodeCell[T <: dat_t](op: String)(gen: => T) extends Cell {
 }
 
 object LogicalNodeCell {
-  def apply[T <: dat_t](x: T, y: T, op: String)(gen: => T): Bool = {
+  def apply[T <: Data](x: T, y: T, op: String)(gen: => T): Bool = {
     val res = new LogicalNodeCell(op)(gen);
     res.io.X := x;
     res.io.Y := y;
@@ -89,10 +92,12 @@ object LogicalNodeCell {
   }
 }
 
-class LogicalNodeCell[T <: dat_t](op: String)(gen: => T) extends Cell {
-  val io = new bundle_t(){val X = gen.asInput;
-			  val Y = gen.asOutput;
-			  val Z = Bool('output);}
+class LogicalNodeCell[T <: Data](op: String)(gen: => T) extends Cell {
+  val io = new Bundle(){
+    val X = gen.asInput;
+    val Y = gen.asOutput;
+    val Z = Bool('output);
+  }
   io.setIsCellIO;
   val primitiveNode = op match {
     case "===" => io.X.asInstanceOf[Node] === io.Y;
@@ -112,16 +117,18 @@ class LogicalNodeCell[T <: dat_t](op: String)(gen: => T) extends Cell {
 }
 
 object ReductionNodeCell {
-  def apply[T <: dat_t](x: T, op: String)(gen: => T): Bool = {
+  def apply[T <: Data](x: T, op: String)(gen: => T): Bool = {
     val res = new ReductionNodeCell(op)(gen);
     res.io.In := x;
     res.io.Out
   }
 }
 
-class ReductionNodeCell[T <: dat_t](op: String)(gen: => T) extends Cell {
-  val io = new bundle_t() {val In = gen.asInput;
-                           val Out = Bool('output);}
+class ReductionNodeCell[T <: Data](op: String)(gen: => T) extends Cell {
+  val io = new Bundle() {
+    val In = gen.asInput;
+    val Out = Bool('output);
+  }
   io.setIsCellIO;
   val primitiveNode = op match {
     case "&" => Op("&",  1, fixWidth(1), io.In);
@@ -144,9 +151,10 @@ object UnaryBoolCell {
 }
 
 class UnaryBoolCell(op: String) extends Cell {
-  val io = new bundle_t(){val In = Bool('input);
-			val Out = Bool('output);
-		      }
+  val io = new Bundle(){
+    val In = Bool('input);
+    val Out = Bool('output);
+  }
   io.setIsCellIO;
   val primitiveNode = op match {
     case "-" => Op("-",  1, widthOf(0), io.In);
@@ -170,10 +178,11 @@ object BinaryBoolCell {
 }
 
 class BinaryBoolCell(op: String) extends Cell {
-  val io = new bundle_t(){val X = Bool('input);
-		      val Y = Bool('input);
-		      val Z = Bool('output);
-		    }
+  val io = new Bundle(){
+    val X = Bool('input);
+    val Y = Bool('input);
+    val Z = Bool('output);
+  }
   io.setIsCellIO;
   val primitiveNode = op match {
     case "^"   => io.X.asInstanceOf[Node] ^   io.Y;

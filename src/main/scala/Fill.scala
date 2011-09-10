@@ -6,7 +6,7 @@ import IOdir._;
 
 object Fill {
   def fillWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).width * n.maxNum }
-  def apply[T <: dat_t](mod: T, n: Fix): Fix = {
+  def apply[T <: Data](mod: T, n: Fix): Fix = {
     val fillcell = new FillCell(mod);
     fillcell.io.mod <> mod;
     fillcell.io.n <> n;
@@ -17,11 +17,12 @@ object Fill {
 }
 
 
-class FillCell[T <: dat_t](data: T) extends Cell {
-  val io = new bundle_t(){val mod = data.clone.asInput();
-			  val n = Fix('input);
-			  val out = Fix('output);
-			}
+class FillCell[T <: Data](data: T) extends Cell {
+  val io = new Bundle(){
+    val mod = data.clone.asInput();
+    val n = Fix('input);
+    val out = Fix('output);
+  }
   io.setIsCellIO;
   val primitiveNode = new Fill();
   primitiveNode.init("primitiveNode", Fill.fillWidthOf(0, io.n), io.mod.toNode, io.n);

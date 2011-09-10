@@ -13,32 +13,33 @@ object Reg {
       fixWidth(w)
   }
   val noInit = Lit(0){Fix()};
-  def apply[T <: dat_t: Manifest](d: T = null, width: Int = -1, rVal: T = null): T = {
-    val data = if(d == null) if(rVal == null) Fab[T]() else rVal else d;
-    val regCell = new RegCell[T](data, width, d != null, rVal != null);
-    if(d != null) regCell.io.d <> d;
-    if(rVal != null) regCell.io.rVal <> rVal;
+  def apply[T <: Data: Manifest](data: T = null, width: Int = -1, resetVal: T = null): T = {
+    val dataVal = if(data == null) if(resetVal == null) Fab[T]() else resetVal else data;
+    val regCell = new RegCell[T](dataVal, width, data != null, resetVal != null);
+    if(data != null) regCell.io.data <> data;
+    if(resetVal != null) regCell.io.resetVal <> resetVal;
     regCell.io.q
 }
 
-  def apply[T <: dat_t](d: T): T = {
-    val regCell = new RegCell(d, -1, true, false);
-    regCell.io.d <> d;
+  def apply[T <: Data](data: T): T = {
+    val regCell = new RegCell(data, -1, true, false);
+    regCell.io.data <> data;
     regCell.io.q
   }
 }
 
 
-class RegCell[T <: dat_t](data: T, w: Int, hasInput: Boolean, isReset: Boolean) extends Cell {
-  val io = new bundle_t(){val d = data.clone().asInput();
-			  val rVal = data.clone().asInput();
-			  val q = data.clone().asOutput();
-		      }
+class RegCell[T <: Data](d: T, w: Int, hasInput: Boolean, isReset: Boolean) extends Cell {
+  val io = new Bundle(){
+    val data  = d.clone().asInput();
+    val resetVal = d.clone().asInput();
+    val q     = d.clone().asOutput();
+  }
   io.setIsCellIO;
   val primitiveNode = new Reg();
-  val dInput: Node = if(hasInput) io.d.toNode else null;
+  val dInput: Node = if(hasInput) io.data.toNode else null;
   if(isReset)
-    primitiveNode.init("", regWidth(w), dInput, io.rVal.toNode);
+    primitiveNode.init("", regWidth(w), dInput, io.resetVal.toNode);
   else
     primitiveNode.init("", regWidth(w), dInput);
   val fb = io.q.fromNode(primitiveNode).asInstanceOf[T] 
@@ -59,7 +60,7 @@ class Reg extends Delay with proc{
     if (assigned)
       ChiselErrors += IllegalState("reassignment to Reg", 3);
     var res = Bool(true);
-    for (i <- 0 until conds.length){
+    for (i <- 0 until conds.length) {
       res = conds(i) && res;
     }
     // println(this.name + " <== " + res + " " + conds.length);

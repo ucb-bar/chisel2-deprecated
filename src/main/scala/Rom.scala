@@ -19,16 +19,17 @@ object Rom {
     res
   }
 
-  def apply[T <: dat_t]( data: Array[T], addr: Node): RomCell[T] = {
+  def apply[T <: Data]( data: Array[T], addr: Node): RomCell[T] = {
     new RomCell(data, addr);
   }
 
 }
 
 
-class RomCell[T <: dat_t](data: Array[T], addr: Node) extends Cell {
-  val io = new bundle_t{val addr = Fix('input);
-			val out = data(0).clone.asOutput;
+class RomCell[T <: Data](data: Array[T], addr: Node) extends Cell {
+  val io = new Bundle{
+    val addr = Fix('input);
+    val out = data(0).clone.asOutput;
   }
   io.setIsCellIO;
   val dataBits = data.map(x => x.toNode);

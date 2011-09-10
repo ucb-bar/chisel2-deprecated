@@ -145,7 +145,7 @@ abstract class Node extends nameable{
   }
   def ><(src: Node) = {
     src match {
-      case b: bundle_t =>
+      case b: Bundle =>
         var off = 0;
         for ((n, io) <- b.flatten) {
           if (io.dir == INPUT) {
@@ -413,7 +413,7 @@ abstract class Node extends nameable{
     }
     res.reverse
   }
-  def extract (b: bundle_t): List[Node] = {
+  def extract (b: Bundle): List[Node] = {
     var res: List[Node] = Nil;
     var off = 0;
     for ((n, io) <- b.flatten) {

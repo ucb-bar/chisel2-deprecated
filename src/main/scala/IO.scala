@@ -48,7 +48,7 @@ class IO extends Wire {
   override def emitDec: String = "";
   override def emitDecC: String = if (isEmittingComponents) ""; else super.emitDecC;
   // override def emitDef: String = "";
-  override def apply(name: String): dat_t = this
+  override def apply(name: String): Data = this
   override def flatten = Array((name, this));
   override def emitDefLoC: String = {
     if (dir == INPUT) {

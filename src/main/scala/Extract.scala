@@ -53,11 +53,12 @@ object Extract {
 }
 
 abstract class ExtractCell[T <: Bits](gen: => T){
-  val io = new bundle_t(){val in = gen.asInput;
-			val hi = Fix('input);
-			val lo = Fix('input);
-			val out = gen.asOutput;
-		      }
+  val io = new Bundle(){
+    val in = gen.asInput;
+    val hi = Fix('input);
+    val lo = Fix('input);
+    val out = gen.asOutput;
+  }
   io.setIsCellIO;
   val primitiveNode = new Extract();
   val fb = io.out.fromNode(primitiveNode)

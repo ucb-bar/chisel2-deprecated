@@ -6,7 +6,7 @@ import Literal._;
 import scala.collection.mutable.ArrayBuffer;
 
 object Lookup {
-  def apply[T <: dat_t](addr: Fix, default: T, mapping: Seq[(Fix, T)]): T = {
+  def apply[T <: Data](addr: Fix, default: T, mapping: Seq[(Fix, T)]): T = {
     val lookupCell = new LookupCell(default, mapping);
     lookupCell.io.default <> default;
     lookupCell.io.addr := addr;
@@ -16,11 +16,12 @@ object Lookup {
 }
 
 
-class LookupCell[T <: dat_t](data: T, mapping: Seq[(Fix, T)]){
-  val io = new bundle_t(){val default = data.clone.asInput;
-			  val addr = Input();
-			  val out = data.clone.asOutput;
-		      }
+class LookupCell[T <: Data](data: T, mapping: Seq[(Fix, T)]){
+  val io = new Bundle(){
+    val default = data.clone.asInput;
+    val addr = Input();
+    val out = data.clone.asOutput;
+  }
   io.setIsCellIO;
   val primitiveNode = new Lookup()
   primitiveNode.init("primitiveNode", widthOf(1), io.addr, io.default.toNode);

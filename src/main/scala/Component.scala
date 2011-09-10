@@ -12,7 +12,7 @@ import java.io.File;
 import scala.math.max;
 import Node._;
 import Component._;
-import bundle_t._;
+import Bundle._;
 import IOdir._;
 import ChiselError._;
 
@@ -42,7 +42,7 @@ object Component {
     name + "_" + genCount
   }
   def nextCompIndex : Int = { compIndex = compIndex + 1; compIndex }
-  /*def apply (name: String, i: dat_t): Component = {
+  /*def apply (name: String, i: Data): Component = {
     val res = new Component();
     res.name = name + "_" + nextCompIndex;
     res.ioVal = i;
@@ -87,7 +87,7 @@ object Component {
 }
 
 abstract class Component {
-  var ioVal: dat_t = null;
+  var ioVal: Data = null;
   var name: String = "";
   val bindings = new ArrayBuffer[Binding];
   var wiresCache: Array[(String, IO)] = null;
@@ -146,8 +146,8 @@ abstract class Component {
     // println("UNABLE TO FIND BINDING FOR " + m);
     return null
   }
-  //def io: dat_t = ioVal;
-  def io: dat_t
+  //def io: Data = ioVal;
+  def io: Data
   def nextIndex : Int = { nindex = nindex + 1; nindex }
   def genName (name: String): String = 
     if (name == null || name.length() == 0) "" else this.name + "_" + name;
@@ -160,7 +160,7 @@ abstract class Component {
     wiresCache
   }
   def <>(src: Component) = io <> src.io;
-  def apply(name: String): dat_t = io(name);
+  def apply(name: String): Data = io(name);
   // COMPILATION OF REFERENCE
   def emitDec: String = {
     var res = "";
