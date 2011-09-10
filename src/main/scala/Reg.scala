@@ -58,9 +58,10 @@ class Reg extends Delay with proc{
   def <==(src: Node) = {
     if (assigned)
       ChiselErrors += IllegalState("reassignment to Reg", 3);
-    var res = Lit(true);
-    for (i <- 0 until conds.length)
+    var res = Bool(true);
+    for (i <- 0 until conds.length){
       res = conds(i) && res;
+    }
     // println(this.name + " <== " + res + " " + conds.length);
     // val res = conds.foldRight(Lit(1,1)){(a, b) => a&&b}
     updates.push((res, src));

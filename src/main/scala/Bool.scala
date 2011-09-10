@@ -52,7 +52,7 @@ class Bool extends Fix {
 
   def isTrue = {
     inputs(0) match {
-      case l: Literal => l.value == 1;
+      case l: Literal => {l.isLit && l.value == 1};
       case any        => false;
     }
   }

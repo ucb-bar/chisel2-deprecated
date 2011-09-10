@@ -14,7 +14,7 @@ import ChiselError._;
 object Node {
   // var cond = new Stack[Node];
   var isCoercingArgs = true;
-  var conds = new Stack[bool_t]();
+  var conds = new Stack[Bool]();
   var keys  = new Stack[Node]();
   def fixWidth(w: Int) = { (m: Node) => w };
   def widthOf(i: Int) = { (m: Node) => {m.inputs(i).getWidth }}

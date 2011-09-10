@@ -55,8 +55,8 @@ class UFix extends Num {
   override def unary_-(): UFix = UnaryNodeCell(this, "-"){UFix()};
   override def unary_~(): UFix = UnaryNodeCell(this, "~"){UFix()};
   override def unary_!(): UFix = UnaryNodeCell(this, "!"){UFix()};
-  override def and(): Bool    = ReductionNodeCell(this, "&"){UFix()};
-  override def or():  Bool    = ReductionNodeCell(this, "|"){UFix()};
+  override def andR(): Bool    = ReductionNodeCell(this, "&"){UFix()};
+  override def orR():  Bool    = ReductionNodeCell(this, "|"){UFix()};
   def << (b: UFix): UFix = BinaryNodeCell(this, b, "<<"){UFix()};
   def >> (b: UFix): UFix = BinaryNodeCell(this, b, ">>"){UFix()};
   def +  (b: UFix): UFix = BinaryNodeCell(this, b, "+"){UFix()};

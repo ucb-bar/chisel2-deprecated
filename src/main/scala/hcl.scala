@@ -23,14 +23,14 @@ object fromNode {
 }
 
 object when {
-  def apply(c: bool_t)(block: => Unit) = {
+  def apply(c: Bool)(block: => Unit) = {
     conds.push(c); 
     block; 
     conds.pop();
   }
 }
 object unless {
-  def apply(c: bool_t)(block: => Unit) = 
+  def apply(c: Bool)(block: => Unit) = 
     when (!c) { block }
 }
 
@@ -184,13 +184,15 @@ trait proc extends Node {
             println("NO CONDITIONAL UPDATE DEFAULT"); // error();
           lastValue
         } else if (lastValue == null) {
+	  println("here2");
           if (default == null)
             println("NO CONDITIONAL UPDATE DEFAULT"); // error();
           default
-        } else
-          lastValue;
+        } else {
+          lastValue
+	}
       updates.push((lastCond, backstop));
-      inputs(0) = backstop;
+      inputs(0) = if(default != null) default else backstop;
       for ((cond, value) <- updates) {
         inputs(0) = Multiplex(cond, value, inputs(0));
       }

@@ -12,7 +12,7 @@ object MemRef {
   def apply[T <: dat_t](mem: Node, addr:Node, data: T): T = {
     val memRes = new MemRef();
     memRes.init("", widthOf(0), mem, addr);
-    val res = data.fromBits(memRes).asInstanceOf[T];
+    val res = data.fromNode(memRes).asInstanceOf[T];
     res
   }
 }

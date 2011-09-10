@@ -187,7 +187,6 @@ class BinaryBoolCell(op: String) extends Cell {
     case "||"  => io.X.asInstanceOf[Node] ||  io.Y;
     case "&"   => io.X.asInstanceOf[Node] &   io.Y;
     case "|"   => io.X.asInstanceOf[Node] |   io.Y;
-    case "^"   => io.X.asInstanceOf[Node] ^   io.Y;
     case any   => null;
   }
   primitiveNode.name = "primitiveNode";
