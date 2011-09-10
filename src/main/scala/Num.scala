@@ -4,7 +4,5 @@ import IOdir._;
 import Node._;
 
 abstract class Num extends Bits {
-  override def toBits = this;
 }
-
 }

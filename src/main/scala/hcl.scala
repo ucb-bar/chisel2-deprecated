@@ -17,15 +17,15 @@ class Rule(val cond: Node) {
 
 
 object Enum {
-  def apply(l: List[Symbol]) = (l zip (Range(0, l.length, 1).map(x => Lit(x, sizeof(l.length-1))))).toMap;
-  def apply(l: Symbol *) = (l.toList zip (Range(0, l.length, 1).map(x => Lit(x, sizeof(l.length-1))))).toMap;
-  def apply(n: Int) = (Range(0, n, 1).map(x => Lit(x, sizeof(n-1)))).toList;
+  def apply(l: List[Symbol]) = (l zip (Range(0, l.length, 1).map(x => Fix(x, sizeof(l.length-1))))).toMap;
+  def apply(l: Symbol *) = (l.toList zip (Range(0, l.length, 1).map(x => Fix(x, sizeof(l.length-1))))).toMap;
+  def apply(n: Int) = (Range(0, n, 1).map(x => Fix(x, sizeof(n-1)))).toList;
 }
 
-object fromBits {
+object fromNode {
   def apply[T <: dat_t: Manifest](data: Node): T = {
     val resT = Fab[T]();
-    resT.fromBits(data);
+    resT.fromNode(data);
   }
 }
 
@@ -56,7 +56,7 @@ object pmux {
 }
 object pcond {
   def apply(cases: Seq[(Fix, () => Any)]) = {
-    var tst: Fix = Lit(1);
+    var tst: Fix = Fix(1);
     for ((ctst, block) <- cases) {
       cond.push(tst && ctst);  
       block(); 
@@ -71,7 +71,7 @@ object pcase {
     pcond(cases.map(tb => (tb._1 === x, tb._2)))
   def apply(x: Fix, default: () => Any, cases: Seq[(Fix, () => Any)]) = {
     val elts = cases.map(tb => (tb._1 === x, tb._2)).toList;
-    pcond(elts ::: List((Lit(1), default)))
+    pcond(elts ::: List((Fix(1), default)))
   }
 }
 class TstObject(val scanFormat: String, 
@@ -118,17 +118,21 @@ object chisel_main {
 
 abstract class dat_t extends Node {
   var comp: proc = null;
+  def toFix(): Fix = chiselCast(this){Fix()};
+  def toUFix(): UFix = chiselCast(this){UFix()};
+  def toBits(): Bits = chiselCast(this){Bits()};
+  def toBool(): Bool = chiselCast(this){Bool()};
   def setIsCellIO = isCellIO = true;
   def apply(name: String): dat_t = null
   def flatten = Array[(String, IO)]();
   def flip(): this.type = this;
   def asInput(): this.type = this;
   def asOutput(): this.type = this;
-  def toBits: Node = this;
-  def fromBits(n: Node): this.type = this;
+  def toNode: Node = this;
+  def fromNode(n: Node): this.type = this;
   def <==[T <: dat_t](data: T) = {
     data.setIsCellIO;
-    comp <== data.toBits;
+    comp <== data.toNode;
   }
   override def clone(): this.type = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
@@ -240,9 +244,9 @@ object Log2 {
   // def log2WidthOf() = { (m: Node, n: Int) => log2(m.inputs(0).width) }
   def apply (mod: Node, n: Int): Node = {
     if (isEmittingComponents) {
-      var res: Node = Lit(0);
+      var res: Node = Fix(0);
       for (i <- 1 to n) 
-        res = Multiplex(mod(i), Lit(i, sizeof(n)), res);
+        res = Multiplex(mod(i), Fix(i, sizeof(n)), res);
       res
     } else {
       val res = new Log2();

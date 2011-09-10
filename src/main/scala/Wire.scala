@@ -45,7 +45,7 @@ class WireCell[T <: dat_t](data: T, width: Int, hasDefault: Boolean = false){
     primitiveNode.init("primitiveNode", widthOf(0), io.in)
   else
     primitiveNode.init("primitiveNode", widthOf(0), null);
-  val fb = data.fromBits(primitiveNode).asInstanceOf[T] 
+  val fb = data.fromNode(primitiveNode).asInstanceOf[T] 
   fb.setIsCellIO;
   fb ^^ io.out;
   io.out.comp = primitiveNode.asInstanceOf[Wire];
@@ -55,8 +55,8 @@ class WireCell[T <: dat_t](data: T, width: Int, hasDefault: Boolean = false){
 class Wire extends dat_t with proc{
   // override def toString: String = "W(" + name + ")"
   var assigned = false;
-  override def toBits = this;
-  override def fromBits(src: Node) = {
+  override def toNode = this;
+  override def fromNode(src: Node) = {
     val res = new Wire().asInstanceOf[this.type];
     res := src;
     res

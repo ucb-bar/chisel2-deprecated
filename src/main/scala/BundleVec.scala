@@ -49,7 +49,7 @@ class BundleVec[T <: dat_t]() extends dat_t {
   def apply(ind: Fix): T = {
     var res = bundleVector(0).clone;
     for(i <- 0 until bundleVector.length)
-      res = Mux(Lit(i) === ind, bundleVector(i), res)
+      res = Mux(Fix(i) === ind, bundleVector(i), res)
     res
   }
   override def flatten: Array[(String, IO)] = {

@@ -11,39 +11,39 @@ import IOdir._;
 import ChiselError._;
 
 object Lit {
-  def apply(x: Int): Fix = {
-    val cell = new Lit(Literal(x));
+  def apply[T <: Bits](x: Int)(gen: => T): T = {
+    val cell = new Lit(Literal(x))(gen);
     cell.io
   }
-  def apply(x: Int, width: Int): Fix = {
-    val cell = new Lit(Literal(x, width));
+  def apply[T <: Bits](x: Int, width: Int)(gen: => T): T = {
+    val cell = new Lit(Literal(x, width))(gen);
     cell.io
   }
-  def apply(x: Long, width: Int): Fix = {
-    val cell = new Lit(Literal( x, width));
+  def apply[T <: Bits](x: Long, width: Int)(gen: => T): T = {
+    val cell = new Lit(Literal( x, width))(gen);
     cell.io
   }
-  def apply(n: String, width: Int = -1): Fix = {
-    val cell = new Lit(Literal(n, width));
+  def apply[T <: Bits](n: String, width: Int = -1)(gen: => T): T = {
+    val cell = new Lit(Literal(n, width))(gen);
     cell.io
   }
-  def apply(width: Int, base: Char, literal: String): Fix = {
-    val cell = new Lit(Literal(width, base, literal));
+  def apply[T <: Bits](width: Int, base: Char, literal: String)(gen: => T): T = {
+    val cell = new Lit(Literal(width, base, literal))(gen);
     cell.io
   }
   def apply(value: Boolean): Bool = 
     new BoolLit((if(value) Literal(1) else Literal(0))).io;
 }
 
-class Lit(x: Literal) extends Cell {
-  val io = Fix('output);
+class Lit[T <: Bits](x: Literal)(gen: => T) extends Cell {
+  val io = gen.asOutput;
   io.setIsCellIO;
   val primitiveNode = x;
   io := primitiveNode;
 }
 
 class BoolLit(x: Literal) extends Cell {
-  val io = Bool(OUTPUT);
+  val io = Bool('output);
   io.setIsCellIO;
   val primitiveNode = x;
   io := primitiveNode;

@@ -12,7 +12,7 @@ object Reg {
     else 
       fixWidth(w)
   }
-  val noInit = Lit(0);
+  val noInit = Lit(0){Fix()};
   def apply[T <: dat_t: Manifest](d: T = null, width: Int = -1, rVal: T = null): T = {
     val data = if(d == null) if(rVal == null) Fab[T]() else rVal else d;
     val regCell = new RegCell[T](data, width, d != null, rVal != null);
@@ -36,12 +36,12 @@ class RegCell[T <: dat_t](data: T, w: Int, hasInput: Boolean, isReset: Boolean) 
 		      }
   io.setIsCellIO;
   val primitiveNode = new Reg();
-  val dInput: Node = if(hasInput) io.d.toBits else null;
+  val dInput: Node = if(hasInput) io.d.toNode else null;
   if(isReset)
-    primitiveNode.init("", regWidth(w), dInput, io.rVal.toBits);
+    primitiveNode.init("", regWidth(w), dInput, io.rVal.toNode);
   else
     primitiveNode.init("", regWidth(w), dInput);
-  val fb = io.q.fromBits(primitiveNode).asInstanceOf[T] 
+  val fb = io.q.fromNode(primitiveNode).asInstanceOf[T] 
   fb.setIsCellIO;
   fb ^^ io.q;
   io.q.comp = primitiveNode.asInstanceOf[Reg];

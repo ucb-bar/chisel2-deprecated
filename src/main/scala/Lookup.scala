@@ -23,13 +23,13 @@ class LookupCell[T <: dat_t](data: T, mapping: Seq[(Fix, T)]){
 		      }
   io.setIsCellIO;
   val primitiveNode = new Lookup()
-  primitiveNode.init("primitiveNode", widthOf(1), io.addr, io.default.toBits);
+  primitiveNode.init("primitiveNode", widthOf(1), io.addr, io.default.toNode);
   for((addr, data) <- mapping){
     data.setIsCellIO;
-    primitiveNode.inputs += data.toBits;
+    primitiveNode.inputs += data.toNode;
   }
-  primitiveNode.asInstanceOf[Lookup].map = mapping.map{case(addr, data) => (addr, data.toBits)}.toArray;
-  val fb = io.out.fromBits(primitiveNode).asInstanceOf[T] 
+  primitiveNode.asInstanceOf[Lookup].map = mapping.map{case(addr, data) => (addr, data.toNode)}.toArray;
+  val fb = io.out.fromNode(primitiveNode).asInstanceOf[T] 
   fb.setIsCellIO;
   fb ^^ io.out;
 }

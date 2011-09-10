@@ -13,7 +13,7 @@ object Fill {
     fillcell.io.out
   }
   def apply(mod: Int, n: Int): Fix =
-    Fill(Lit(mod), Lit(n));
+    Fill(Fix(mod), Fix(n));
 }
 
 
@@ -24,7 +24,7 @@ class FillCell[T <: dat_t](data: T) extends Cell {
 			}
   io.setIsCellIO;
   val primitiveNode = new Fill();
-  primitiveNode.init("primitiveNode", Fill.fillWidthOf(0, io.n), io.mod.toBits, io.n);
+  primitiveNode.init("primitiveNode", Fill.fillWidthOf(0, io.n), io.mod.toNode, io.n);
   io.out := primitiveNode;
   primitiveNode.nameHolder = io.out;
 }

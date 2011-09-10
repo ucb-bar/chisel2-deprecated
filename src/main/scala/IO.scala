@@ -146,8 +146,8 @@ class IO extends Wire {
   override def emitRefV = if(name == "") super.emitRefV else if(!named) name + "_" + emitIndex else name
   override def setIsCellIO = isCellIO = true;
   override def setIsClkInput = {isClkInput = true; this := clk;}
-  override def toBits = this;
-  override def fromBits(src: Node) = {
+  override def toNode = this;
+  override def fromNode(src: Node) = {
     val res = new IO().asInstanceOf[this.type];
     res.init("", widthOf(0), src);
     res.dir = dir;

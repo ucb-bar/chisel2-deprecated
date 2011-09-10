@@ -18,8 +18,8 @@ class MuxCell[T <: dat_t](cI: T, aI: T) extends Cell {
 			val out: T = cI.clone().asOutput();
 		      }
   io.setIsCellIO;
-  val primitiveNode: Node = Multiplex(io.t, io.c.toBits, io.a.toBits);
-  val fb = io.out.fromBits(primitiveNode).asInstanceOf[T];
+  val primitiveNode: Node = Multiplex(io.t, io.c.toNode, io.a.toNode);
+  val fb = io.out.fromNode(primitiveNode).asInstanceOf[T];
   fb.setIsCellIO;
   fb ^^ io.out;
   primitiveNode.nameHolder = io.out;

@@ -132,7 +132,7 @@ abstract class Node extends nameable{
     res.asInstanceOf[this.type]
   }
   def bitSet(off: Fix, dat: Fix): Fix = { 
-    val bit = Lit(1, 1) << off;
+    val bit = Fix(1, 1) << off;
     (this.asInstanceOf[Fix] & ~bit) | (dat << off);
   }
   // TODO: MOVE TO WIRE
@@ -274,7 +274,7 @@ abstract class Node extends nameable{
   }
   def findNodes(depth: Int, c: Component): Unit = {
     // untraced or same component?
-    if(isCellIO) println("found");
+    if(isCellIO) println("found " + this);
     fixName();
     val (comp, nextComp, markComp) = 
       this match {

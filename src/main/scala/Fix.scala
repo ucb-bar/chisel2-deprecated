@@ -4,7 +4,11 @@ import IOdir._;
 import Node._;
 
 object Fix {
-  def apply(width: Int, dir: Symbol): Fix = {
+
+  def apply(x: Int): Fix = Lit(x){Fix()};
+  def apply(x: Int, width: Int): Fix = Lit(x, width){Fix()};
+  
+  def apply(width: Int = -1, dir: Symbol = null): Fix = {
     val res = new Fix();
     if(dir == null)
       res.dir = null;
@@ -21,24 +25,29 @@ object Fix {
     res
   }
   
-  def apply(dir: Symbol = null): Fix = Fix(-1, dir) 
+  def apply(dir: Symbol): Fix = Fix(-1, dir) 
+  
+  def apply(): Fix = Fix(-1, null);
 
 }
 
 class Fix extends Num {
-  override def fromBits(n: Node) = {
+  override def fromNode(n: Node) = {
     val res = Fix('output).asInstanceOf[this.type]; 
     res := n; 
     res};
   def <==(src: Fix) = {
-    comp <== src.toBits;
+    comp <== src.toNode;
   }
   def := (src: Fix) = {
     if (comp == null)
       this.asInstanceOf[IO] := src
     else
-      comp := src.toBits;
+      comp := src.toNode;
   }
+  
+  def gen[T <: Num](): T = Fix().asInstanceOf[T];
+
   override def apply(bit: Int): Fix = { Extract(this, bit){Fix()}};
   override def apply(hi: Int, lo: Int): Fix = {Extract(this, hi, lo){Fix()}};
   def apply(hi: Fix, lo: Fix): Fix = Extract(this, hi, lo, -1){Fix()};

@@ -18,10 +18,10 @@ class CatCell[T <: dat_t](mod: T, mods: List[T]){
   val primitiveNode = 
     if(isEmittingComponents){
       val res = new Cat();
-      res.initOf("primitiveNode", sumWidth _, mod.toBits :: mods.map(x => x.toBits));
+      res.initOf("primitiveNode", sumWidth _, mod.toNode :: mods.map(x => x.toNode));
       res
     } else
-      mods.foldLeft(mod.toBits){(a, b) => a ## b.toBits}
+      mods.foldLeft(mod.toNode){(a, b) => a ## b.toNode}
   io.out := primitiveNode;
   primitiveNode.nameHolder = io.out
 }

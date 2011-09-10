@@ -27,14 +27,14 @@ object Rom {
 
 
 class RomCell[T <: dat_t](data: Array[T], addr: Node) extends Cell {
-  val io = new bundle_t{val addr = int_t(INPUT);
+  val io = new bundle_t{val addr = Fix('input);
 			val out = data(0).clone.asOutput;
   }
   io.setIsCellIO;
-  val dataBits = data.map(x => x.toBits);
+  val dataBits = data.map(x => x.toNode);
   val primitiveNode = new Rom(dataBits);
   primitiveNode.init("primitiveNode", romWidth(dataBits), dataBits: _*);
-  val fb = io.out.fromBits(primitiveNode(addr)).asInstanceOf[T];
+  val fb = io.out.fromNode(primitiveNode(addr)).asInstanceOf[T];
   fb.setIsCellIO;
   fb ^^ io.out;
   primitiveNode.nameHolder = this;

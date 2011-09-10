@@ -1,36 +1,36 @@
 package Chisel {
+
 import IOdir._;
+import Node._;
 
 object Bool {
-  def apply(dir: IOdir): Bool = {
+  def apply(x: Boolean) = Lit(x);
+  
+  def apply(width: Int = -1, dir: Symbol = null): Bool = {
     val res = new Bool();
-    res.dir = dir;
-    res.init("", 1);
+    if(dir == null)
+      res.dir = null;
+    else if(dir.equals('input))
+      res.dir = INPUT;
+    else if(dir.equals('output))
+      res.dir = OUTPUT;
+    else
+      println("INVALID DIRECTION");
+    if(width > 0)
+      res.init("", width);
+    else 
+      res.init("", widthOf(0))
     res
   }
-  def apply(dir: Symbol = null): Bool = {
-    if (dir == null){
-      val res = new Bool()
-      res.init("", 1)
-      res
-    }
-    else if(dir.equals('input))
-      Bool(INPUT)
-    else if(dir.equals('output))
-      Bool(OUTPUT)
-    else {
-      println("INVALID DIRECTION")
-      val res = new Bool()
-      res.init("", 1)
-      res
-    }
-  }
+  
+  def apply(dir: Symbol): Bool = Bool(-1, dir) 
+  
+  def apply(): Bool = Bool(-1, null);
 }
 
 class Bool extends Fix {
-  override def toBits = this;
-  override def fromBits(n: Node) = {
-    val res = Bool(OUTPUT).asInstanceOf[this.type];
+  override def fromNode(n: Node) = {
+    val res = Bool('output).asInstanceOf[this.type];
     res := n;
     res
   }

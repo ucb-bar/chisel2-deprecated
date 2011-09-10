@@ -9,6 +9,20 @@ abstract class Cell extends nameable{
   var isReg = false;
 }
 
+object chiselCast {
+  def apply[S <: dat_t, T <: Bits](x: S)(gen: => T): T = {
+    val cell = new ConversionCell()(gen);
+    cell.io := x
+    cell.io
+  }
+}
+
+class ConversionCell[T <: Bits]()(gen: => T) extends Cell {
+  val io = gen.asOutput;
+  io.setIsCellIO;
+  val primitiveNode = null;
+}
+
 object UnaryNodeCell {
   def apply[T <: dat_t](x: T, op: String)(gen: => T): T = {
     val res = new UnaryNodeCell(op)(gen);
@@ -78,7 +92,7 @@ object LogicalNodeCell {
 class LogicalNodeCell[T <: dat_t](op: String)(gen: => T) extends Cell {
   val io = new bundle_t(){val X = gen.asInput;
 			  val Y = gen.asOutput;
-			  val Z = Bool(OUTPUT);}
+			  val Z = Bool('output);}
   io.setIsCellIO;
   val primitiveNode = op match {
     case "===" => io.X.asInstanceOf[Node] === io.Y;
@@ -107,7 +121,7 @@ object ReductionNodeCell {
 
 class ReductionNodeCell[T <: dat_t](op: String)(gen: => T) extends Cell {
   val io = new bundle_t() {val In = gen.asInput;
-                           val Out = Bool(OUTPUT);}
+                           val Out = Bool('output);}
   io.setIsCellIO;
   val primitiveNode = op match {
     case "&" => Op("&",  1, fixWidth(1), io.In);
@@ -129,8 +143,8 @@ object UnaryBoolCell {
 }
 
 class UnaryBoolCell(op: String) extends Cell {
-  val io = new bundle_t(){val In = Bool(INPUT);
-			val Out = Bool(OUTPUT);
+  val io = new bundle_t(){val In = Bool('input);
+			val Out = Bool('output);
 		      }
   io.setIsCellIO;
   val primitiveNode = op match {
@@ -155,9 +169,9 @@ object BinaryBoolCell {
 }
 
 class BinaryBoolCell(op: String) extends Cell {
-  val io = new bundle_t(){val X = Bool(INPUT);
-		      val Y = Bool(INPUT);
-		      val Z = Bool(OUTPUT);
+  val io = new bundle_t(){val X = Bool('input);
+		      val Y = Bool('input);
+		      val Z = Bool('output);
 		    }
   io.setIsCellIO;
   val primitiveNode = op match {

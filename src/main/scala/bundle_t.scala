@@ -51,7 +51,7 @@ class bundle_t(view_arg: Seq[String] = null) extends dat_t{
             c = c.getSuperclass();
         } while (!isFound);
         if (types.length == 0 && !isStatic(modifiers) && isInterface &&
-            name != "elements" && name != "flip" && name != "toString" && name != "flatten" && name != "binding" && name != "asInput" && name != "asOutput" && name != "unary_$tilde" && name != "unary_$bang" && name != "unary_$minus" && name != "clone" &&
+            name != "elements" && name != "flip" && name != "toString" && name != "flatten" && name != "binding" && name != "asInput" && name != "asOutput" && name != "unary_$tilde" && name != "unary_$bang" && name != "unary_$minus" && name != "clone" && name != "toUFix" && name != "toBits" && name != "toBool" && name != "toFix" &&
             (view == null || view.contains(name))) {
           val o = m.invoke(this);
           o match { 
@@ -175,7 +175,7 @@ class bundle_t(view_arg: Seq[String] = null) extends dat_t{
     res.toArray
   }
 
-  override def toBits: Node = {
+  override def toNode: Node = {
     if(bundledElm == null) {
       val nodes = flatten.map{case (n, i) => i};
       bundledElm = Concatanate(nodes.head, nodes.tail.toList: _*)
@@ -183,7 +183,7 @@ class bundle_t(view_arg: Seq[String] = null) extends dat_t{
     bundledElm
   }
 
-  override def fromBits(n: Node): this.type = {
+  override def fromNode(n: Node): this.type = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
     var ind = 0;
     for((name, io) <- res.flatten.toList.reverse) {

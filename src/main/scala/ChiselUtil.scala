@@ -2,17 +2,17 @@ package Chisel {
 
 class intWrapper(x: Int) {
   val myVal = x;
-  def ~(x: String) = Lit(myVal, x(0), x.substring(1, x.length));
-  def ~(x: Int) = Lit(myVal, 'd', x.toString);
+  def ~(x: String) = Lit(myVal, x(0), x.substring(1, x.length)){Fix()};
+  def ~(x: Int) = Lit(myVal, 'd', x.toString){Fix()};
   //def d(x: Int): Lit = Lit(x, myVal);
   //def $(x: String): Lit = Lit(myVal, x(0), x.substring(1, x.length));
-  def ~(x: Symbol) = Lit(myVal, x.name(0), x.name.substring(1, x.name.length))
+  def ~(x: Symbol) = Lit(myVal, x.name(0), x.name.substring(1, x.name.length)){Fix()}
 }
 
 class symbolWrapper(x: Symbol) {
   val myVal = x;
   //def unary_#() = Lit(myVal.name.substring(1, x.name.length).toInt);
-  def unary_~() = Lit(myVal.name.substring(1, x.name.length).toInt);
+  def unary_~() = Lit(myVal.name.substring(1, x.name.length).toInt){Fix()};
   //def unary_$() = Lit(myVal.name.substring(1, x.name.length).toInt);
 }
 
@@ -22,9 +22,9 @@ class boolWrapper(x: Boolean) {
   def unary_~() = {
     val res = Bool('output);
     if(myVal)
-      res := Lit(1)
+      res := Lit(true)
     else
-      res := Lit(0)
+      res := Lit(false)
     res
   }
 }
