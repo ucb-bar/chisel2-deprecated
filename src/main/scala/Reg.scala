@@ -13,27 +13,38 @@ object Reg {
       fixWidth(w)
   }
   val noInit = Lit(0){Fix()};
-  def apply[T <: Data: Manifest](data: T = null, width: Int = -1, resetVal: T = null): T = {
-    val dataVal = if(data == null) if(resetVal == null) Fab[T]() else resetVal else data;
-    val regCell = new RegCell[T](dataVal, width, data != null, resetVal != null);
+  def apply[T <: Data](data: T, width: Int, resetVal: T)(gen: => T): T = {
+    val dataIn: T = 
+      (if(data == null) 
+	data 
+       else if(gen != null) 
+	 gen
+       else {
+	 ChiselErrors += IllegalState("no type specified for Reg", 4)
+	 Bits().asInstanceOf[T]
+       })
+    val regCell = new RegCell[T](dataIn, width, data != null, resetVal != null)(gen);
     if(data != null) regCell.io.data <> data;
     if(resetVal != null) regCell.io.resetVal <> resetVal;
     regCell.io.q
-}
-
-  def apply[T <: Data](data: T): T = {
-    val regCell = new RegCell(data, -1, true, false);
-    regCell.io.data <> data;
-    regCell.io.q
   }
+
+  def apply[T <: Data](data: T): T = Reg[T](data, -1, null.asInstanceOf[T]){data.clone}
+
+  def apply[T <: Data](data: T, resetVal: T): T = Reg[T](data, -1, resetVal){data.clone}
+
+  def apply[T <: Data](width: Int = -1, resetVal: T): T = Reg[T](null.asInstanceOf[T], -1, resetVal){resetVal.clone}
+
+  def apply[T <: Data]()(gen: => T): T = Reg[T](null.asInstanceOf[T], -1, null.asInstanceOf[T])(gen)
+
 }
 
 
-class RegCell[T <: Data](d: T, w: Int, hasInput: Boolean, isReset: Boolean) extends Cell {
+class RegCell[T <: Data](d: T, w: Int, hasInput: Boolean, isReset: Boolean)(gen: => T) extends Cell {
   val io = new Bundle(){
-    val data  = d.clone().asInput();
-    val resetVal = d.clone().asInput();
-    val q     = d.clone().asOutput();
+    val data  = gen.asInput();
+    val resetVal = gen.asInput();
+    val q     = gen.asOutput();
   }
   io.setIsCellIO;
   val primitiveNode = new Reg();

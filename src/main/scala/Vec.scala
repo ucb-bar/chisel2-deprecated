@@ -2,10 +2,10 @@ package Chisel {
 
 import scala.collection.mutable.ArrayBuffer
 
-object BundleVec {
+object Vec {
 /*
-  def apply[T <: Data](n: Int)(gen: => T): BundleVec[T] = {
-    val res = new BundleVec[T]();
+  def apply[T <: Data](n: Int)(gen: => T): Vec[T] = {
+    val res = new Vec[T]();
     for(i <- 0 until n){
       val t = gen;
       res += t;
@@ -14,12 +14,12 @@ object BundleVec {
     res
   }
 */
-  def apply[T <: Data](n: Int): (=> T) => BundleVec[T] = {
+  def apply[T <: Data](n: Int): (=> T) => Vec[T] = {
    gen(n, _);
   }
 
-  def gen[T <: Data](n: Int, gen: => T): BundleVec[T] = {
-    val res = new BundleVec[T]();
+  def gen[T <: Data](n: Int, gen: => T): Vec[T] = {
+    val res = new Vec[T]();
     for(i <- 0 until n){
       val t = gen;
       res += t;
@@ -28,8 +28,8 @@ object BundleVec {
     res
   }
 
-  def apply[T <: Data: Manifest](n: Int, args: Any*): BundleVec[T] = {
-    val res = new BundleVec[T]();
+  def apply[T <: Data: Manifest](n: Int, args: Any*): Vec[T] = {
+    val res = new Vec[T]();
     for(i <- 0 until n) {
       val t = (if(args == List(None)) Fab[T]() else Fab[T](args: _*));
       res += t;
@@ -40,7 +40,7 @@ object BundleVec {
 
 }
 
-class BundleVec[T <: Data]() extends Data {
+class Vec[T <: Data]() extends Data {
   val bundleVector = new ArrayBuffer[T];
   def +=(b: T) = bundleVector += b;
   override def apply(ind: Int): T = {
@@ -64,7 +64,7 @@ class BundleVec[T <: Data]() extends Data {
 
   override def <>(src: Node) = {
     src match {
-      case other: BundleVec[T] => {
+      case other: Vec[T] => {
 	for((b, o) <- bundleVector zip other.bundleVector)
 	  b <> o
       }
@@ -73,7 +73,7 @@ class BundleVec[T <: Data]() extends Data {
 
   override def ^^(src: Node) = {
     src match {
-      case other: BundleVec[T] => 
+      case other: Vec[T] => 
 	for((b, o) <- bundleVector zip other.bundleVector)
 	  b ^^ o
     }

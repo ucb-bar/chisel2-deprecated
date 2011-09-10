@@ -6,22 +6,22 @@ import IOdir._;
 
 object Fill {
   def fillWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).width * n.maxNum }
-  def apply[T <: Data](mod: T, n: Fix): Fix = {
+  def apply(mod: Bits, n: Fix): Bits = {
     val fillcell = new FillCell(mod);
     fillcell.io.mod <> mod;
     fillcell.io.n <> n;
     fillcell.io.out
   }
-  def apply(mod: Int, n: Int): Fix =
-    Fill(Fix(mod), Fix(n));
+  def apply(mod: Int, n: Int): Bits =
+    Fill(Bits("d" + mod), Fix(n));
 }
 
 
 class FillCell[T <: Data](data: T) extends Cell {
   val io = new Bundle(){
-    val mod = data.clone.asInput();
+    val mod = Bits('input);
     val n = Fix('input);
-    val out = Fix('output);
+    val out = Bits('output);
   }
   io.setIsCellIO;
   val primitiveNode = new Fill();

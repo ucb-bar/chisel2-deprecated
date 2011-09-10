@@ -55,7 +55,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
             (view == null || view.contains(name))) {
           val o = m.invoke(this);
           o match { 
-	    case bv: BundleVec[Data] => elts += ((name + bv.name, bv));
+	    case bv: Vec[Data] => elts += ((name + bv.name, bv));
             case i: Data => elts += ((name, i)); i.name = name; 
               // println("    ADDING " + name + " -> " + o);
             case any =>
