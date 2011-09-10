@@ -34,6 +34,7 @@ class Bool extends Fix {
     res := n;
     res
   }
+
   override def unary_-(): Bool = UnaryBoolCell(this, "-");
   override def unary_~(): Bool = UnaryBoolCell(this, "~");
   override def unary_!(): Bool = UnaryBoolCell(this, "!");
@@ -48,6 +49,13 @@ class Bool extends Fix {
   def || (b: Bool): Bool = BinaryBoolCell(this, b, "||");
   def &  (b: Bool): Bool = BinaryBoolCell(this, b, "&");
   def |  (b: Bool): Bool = BinaryBoolCell(this, b, "|");
+
+  def isTrue = {
+    inputs(0) match {
+      case l: Literal => l.value == 1;
+      case any        => false;
+    }
+  }
 }
 }
 

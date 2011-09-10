@@ -126,6 +126,7 @@ class ReductionNodeCell[T <: dat_t](op: String)(gen: => T) extends Cell {
   val primitiveNode = op match {
     case "&" => Op("&",  1, fixWidth(1), io.In);
     case "|" => Op("|",  1, fixWidth(1), io.In);
+    case "^" => Op("^",  1, fixWidth(1), io.In);
     case any => null;
   }
   primitiveNode.name = "primitiveNode";
@@ -186,6 +187,7 @@ class BinaryBoolCell(op: String) extends Cell {
     case "||"  => io.X.asInstanceOf[Node] ||  io.Y;
     case "&"   => io.X.asInstanceOf[Node] &   io.Y;
     case "|"   => io.X.asInstanceOf[Node] |   io.Y;
+    case "^"   => io.X.asInstanceOf[Node] ^   io.Y;
     case any   => null;
   }
   primitiveNode.name = "primitiveNode";
@@ -197,6 +199,8 @@ object or {
     def apply(x: Fix): Bool = {
 		val res = new or(); // trick the compiler to keeping the class
     	ReductionNodeCell(x, "|"){Fix()}
+        res.io.In := x;
+        res.io.Out
     }
 }
 
@@ -206,12 +210,24 @@ class or extends ReductionNodeCell[Fix]("|")(Fix()) {
 object and {
     def apply(x: Fix): Bool = {
 		val res = new and(); // trick the compiler to keeping the class
-    	ReductionNodeCell(x, "&"){Fix()}
+        res.io.In := x;
+        res.io.Out
+    }
+}
+class and extends ReductionNodeCell[Fix]("&")(Fix()) {
+}
+
+
+object xor {
+    def apply(x: Fix): Bool = {
+        val res = new xor()
+        res.io.In := x;
+        res.io.Out
     }
 }
 
-class and extends ReductionNodeCell[Fix]("&")(Fix()) {
-
+class xor extends ReductionNodeCell("^")(Fix()) {
 }
+
 }
 

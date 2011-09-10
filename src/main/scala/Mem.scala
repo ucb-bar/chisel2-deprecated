@@ -6,6 +6,7 @@ import Node._;
 object Mem {
   val noResetVal = Literal(0);
 
+
   def apply[T <: dat_t](n: Int, isEnable: Fix, wrAddr: Fix, wrData: T, resetVal: T): MemCell[T] ={
     val memcell = new MemCell(n, wrData, resetVal != null);
     memcell.io.wrData <> wrData;

@@ -58,23 +58,12 @@ class Reg extends Delay with proc{
   def <==(src: Node) = {
     if (assigned)
       ChiselErrors += IllegalState("reassignment to Reg", 3);
-    if (cond.length == 0)
-      update(src);
-    else if (!isUpdate) {
-      var res = cond(0);
-      for (i <- 1 until cond.length)
-        res = cond(i) && res;
-      // println(this.name + " <== " + res + " " + cond.length);
-      // val res = cond.foldRight(Lit(1,1)){(a, b) => a&&b}
-      update(Multiplex(res, src, this))
-    } else {
-      var res = cond(0);
-      for (i <- 1 until cond.length)
-        res = cond(i) && res;
-      // println(this.name + " <== " + res + " " + cond.length);
-      update(Multiplex(res, src, updateVal))
-    }
-    // clauses += Pair(cond.head, src);
+    var res = Lit(true);
+    for (i <- 0 until conds.length)
+      res = conds(i) && res;
+    // println(this.name + " <== " + res + " " + conds.length);
+    // val res = conds.foldRight(Lit(1,1)){(a, b) => a&&b}
+    updates.push((res, src));
   }
   def nameOpt: String = if (name.length > 0) name else "REG"
   override def toString: String = {

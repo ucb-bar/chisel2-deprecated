@@ -12,9 +12,10 @@ import IOdir._;
 import ChiselError._;
 
 object Node {
-  var cond = new Stack[Node];
-  var ruleStack = new Stack[Rule];
+  // var cond = new Stack[Node];
   var isCoercingArgs = true;
+  var conds = new Stack[bool_t]();
+  var keys  = new Stack[Node]();
   def fixWidth(w: Int) = { (m: Node) => w };
   def widthOf(i: Int) = { (m: Node) => {m.inputs(i).getWidth }}
   def maxWidth(m: Node): Int = {
@@ -100,8 +101,9 @@ abstract class Node extends nameable{
   def unary_-(): Node    = Op("-",  1, widthOf(0), this);
   def unary_~(): Node    = Op("~",  1, widthOf(0), this);
   def unary_!(): Node    = Op("!",  1, fixWidth(1), this);
-  def and(): Node        = Op("&",  1, fixWidth(1), this);
-  def or(): Node         = Op("|",  1, fixWidth(1), this);
+  def andR(): Node       = Op("&",  1, fixWidth(1), this);
+  def orR(): Node        = Op("|",  1, fixWidth(1), this);
+  def xorR(): Node       = Op("^",  1, fixWidth(1), this);
   def <<(b: Node): Node  = Op("<<", 0, lshWidthOf(0, b),  this, b );
   def >>(b: Node): Node  = Op(">>", 0, rshWidthOf(0, b),  this, b );
   def >>>(b: Node): Node = Op(">>", 0, rshWidthOf(0, b),  this, b );
