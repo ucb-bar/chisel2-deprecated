@@ -4,39 +4,27 @@ package Chisel {
 import Node._;
 import ChiselError._;
 
-object PWire {
-
-  def apply[T <: Data : Manifest](): T = {
-    val junctioncell = new WireCell[T](Fab[T](), -1);
-    junctioncell.io.out
-  }
-  def apply[T <: Data : Manifest](width: Int): T = {
-    val junctioncell = new WireCell[T](Fab[T](), width);
-    junctioncell.io.out
-  }
-}
-
 object Wire {
-  def apply[T <: Data: Manifest](): T = {
-    val junctioncell = new WireCell[T](Fab[T](), -1);
+  def apply[T <: Data]()(gen: => T): T = {
+    val junctioncell = new WireCell[T](gen, -1)(gen);
     junctioncell.io.out
   }
-  def apply[T <: Data: Manifest](width: Int): T = {
-    val junctioncell = new WireCell[T](Fab[T](), width);
+  def apply[T <: Data](width: Int)(gen: =>T): T = {
+    val junctioncell = new WireCell[T](gen, width)(gen);
     junctioncell.io.out
   }
-  def apply[T <: Data](default: T): T = {
-    val junctioncell = new WireCell[T](default, -1, true);
+  def apply[T <: Data](default: T)(gen: =>T): T = {
+    val junctioncell = new WireCell[T](gen, -1, true)(gen);
     junctioncell.io.in := default;
     junctioncell.io.out
   }
 }
 
 
-class WireCell[T <: Data](data: T, width: Int, hasDefault: Boolean = false){
+class WireCell[T <: Data](data: T, width: Int, hasDefault: Boolean = false)(gen: => T){
   val io = new Bundle(){
-    val in = data.clone.asInput();
-    val out = data.clone.asOutput();
+    val in = gen.asInput();
+    val out = gen.asOutput();
   }
   io.setIsCellIO;
   val primitiveNode = new Wire();

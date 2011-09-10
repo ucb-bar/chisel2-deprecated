@@ -34,6 +34,11 @@ object Bits {
 
 class Bits extends IO {
   override def toNode = this;
+  override def fromNode(n: Node) = {
+    val res = Bits('output).asInstanceOf[this.type];
+    res := n;
+    res
+  }
 
   override def apply(bit: Int): Bits = { Extract(this, bit){Bits()}};
   override def apply(hi: Int, lo: Int): Bits = {Extract(this, hi, lo){Bits()}};

@@ -74,9 +74,6 @@ object Node {
   
   var stop = true;
   
-  def apply(): Fix = Wire[Fix]();
-  def apply(width: Int): Fix = Wire[Fix](width);
-  def apply(default: Fix): Fix = Wire[Fix](default);
 }
 
 abstract class Node extends nameable{
@@ -128,7 +125,7 @@ abstract class Node extends nameable{
   def isLit = false;
   def value = -1;
   def signed: this.type = { 
-    val res = Node();
+    val res = Wire(){Fix()};
     res <== this.asInstanceOf[Fix];
     res.isSigned = true; 
     res.asInstanceOf[this.type]
