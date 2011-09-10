@@ -2,20 +2,13 @@
 package Chisel {
 
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.Stack
 
 import Component._;
 import Literal._;
 import Node._;
 import IOdir._;
   
-class Update(val reg: Node, val update: Node) {
-}
-class Rule(val cond: Node) {
-  val updates = new ArrayBuffer[Update]();
-  def addUpdate(update: Update) = updates += update;
-}
-
-
 object Enum {
   def apply(l: List[Symbol]) = (l zip (Range(0, l.length, 1).map(x => Lit(x, sizeof(l.length-1))))).toMap;
   def apply(l: Symbol *) = (l.toList zip (Range(0, l.length, 1).map(x => Lit(x, sizeof(l.length-1))))).toMap;
@@ -30,48 +23,36 @@ object fromBits {
 }
 
 object when {
-  def apply(c: Node)(block: => Unit) = {
-    cond.push(c); 
-    // println("WHEN " + c + " {");
+  def apply(c: bool_t)(block: => Unit) = {
+    conds.push(c); 
     block; 
-    cond.pop();
-    // println("} ");
+    conds.pop();
   }
 }
-object pmux {
-  def apply(c: Node)(con_block: => Unit)(alt_block: => Unit) = {
-    val tt = c;
-    cond.push(tt);  
-    // println("  IF " + tt + " {");
-    con_block; 
-    // println("  }");
-    cond.pop();
-    val et = !c;
-    cond.push(et); 
-    // println("  ELSE IF " + et + " {");
-    alt_block; 
-    cond.pop();
-    // println("  }");
+object unless {
+  def apply(c: bool_t)(block: => Unit) = 
+    when (!c) { block }
+}
+object otherwise {
+  def apply(block: => Unit) = 
+    when (Lit(true)) { block }
+}
+object switch {
+  def apply(c: Node)(block: => Unit) = {
+    keys.push(c); 
+    block; 
+    keys.pop();
   }
 }
-object pcond {
-  def apply(cases: Seq[(int_t, () => Any)]) = {
-    var tst: int_t = Lit(1);
-    for ((ctst, block) <- cases) {
-      cond.push(tst && ctst);  
-      block(); 
-      cond.pop();
-      tst = tst && !ctst;
+object is {
+  def apply(v: Node)(block: => Unit) = {
+    if (keys.length == 0) 
+      println("NO KEY SPECIFIED");
+    else {
+      val c = new bool_t();
+      c := keys(0) === v;
+      when (c) { block; }
     }
-    this;
-  }
-}
-object pcase {
-  def apply(x: int_t, cases: Seq[(int_t, () => Any)]) = 
-    pcond(cases.map(tb => (tb._1 === x, tb._2)))
-  def apply(x: int_t, default: () => Any, cases: Seq[(int_t, () => Any)]) = {
-    val elts = cases.map(tb => (tb._1 === x, tb._2)).toList;
-    pcond(elts ::: List((Lit(1), default)))
   }
 }
 class TstObject(val scanFormat: String, 
@@ -166,7 +147,33 @@ abstract class dat_t extends Node {
 }
 
 trait proc extends Node {
+  var updates = new Stack[(bool_t, Node)];
+  def genMuxes(default: Node) = {
+    if (updates.length == 0) {
+      if (inputs.length == 0 || inputs(0) == null)
+        println("NO UPDATES SPECIFIED"); // error();
+    } else {
+      val (lastCond, lastValue) = updates.pop();
+      val backstop: Node =
+        if (lastCond.isTrue) {
+          if (lastValue == null)
+            println("NO CONDITIONAL UPDATE DEFAULT"); // error();
+          lastValue
+        } else if (lastValue == null) {
+          if (default == null)
+            println("NO CONDITIONAL UPDATE DEFAULT"); // error();
+          default
+        } else
+          lastValue;
+      updates.push((lastCond, backstop));
+      inputs(0) = backstop;
+      for ((cond, value) <- updates) {
+        inputs(0) = Multiplex(cond, value, inputs(0));
+      }
+    }
+  }
   def <==(src: Node);
+  procs += this;
 }
 
 trait nameable {

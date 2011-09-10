@@ -62,19 +62,13 @@ class Wire extends dat_t with proc{
     res
   }
   def <==(src: Node) = {
-    if (assigned)
+    if (assigned) {
       ChiselErrors += IllegalState("reassignment to Node", 3);
-    else if (cond.length == 0){
-      inputs(0) = src;
-    }
-    else {
-      var res = cond(0);
-      for (i <- 1 until cond.length)
-        res = cond(i) && res;
-      if(inputs(0) != null)
-	inputs(0) = Multiplex(res, src, inputs(0))
-      else 
-	inputs(0) = Multiplex(res, src, this);
+    } else {
+      var res = Lit(true);
+      for (i <- 0 until conds.length)
+        res = conds(i) && res;
+      updates.push((res, src));
     }
   }
   override def toString: String = name

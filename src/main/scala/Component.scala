@@ -35,6 +35,7 @@ object Component {
   var isEmittingC = false;
   var topComponent: Component = null;
   val components = ArrayBuffer[Component]();
+  val procs = ArrayBuffer[proc]();
   var genCount = 0;
   def genCompName(name: String): String = {
     genCount += 1;
@@ -63,7 +64,6 @@ object Component {
   /*def apply (name: String): Component = Component(name, nullbundle_t);* */
   def splitArg (s: String) = s.split(' ').toList;
   def initChisel () = {
-    cond = new Stack[Node];
     isGenHarness = false;
     isReportDims = false;
     scanFormat = "";
@@ -79,6 +79,7 @@ object Component {
     compIndex = -1;
     compIndices.clear();
     components.clear();
+    procs.clear();
     isEmittingComponents = false;
     isEmittingC = false;
     topComponent = null;
@@ -88,7 +89,6 @@ object Component {
 abstract class Component {
   var ioVal: dat_t = null;
   var name: String = "";
-  val rules = new ArrayBuffer[Rule];
   val bindings = new ArrayBuffer[Binding];
   var wiresCache: Array[(String, IO)] = null;
   var parent: Component = null;
@@ -521,6 +521,7 @@ abstract class Component {
     topComponent = this;
     for (c <- components) 
       c.markComponent();
+    genAllMuxes;
     findNodes(0, this);
     val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
     val out = new java.io.FileWriter(base_name + name + ".v");
@@ -539,6 +540,15 @@ abstract class Component {
     io.name_it("");
     for (child <- children) 
       child.nameAllIO();
+  }
+  def genAllMuxes = {
+    for (p <- procs) {
+      p match {
+        case io: IO  =>
+        case w: Wire => w.genMuxes(null);
+        case r: Reg  => r.genMuxes(r);
+      }
+    }
   }
   def genHarness(base_name: String, name: String) = {
     val makefile = new java.io.FileWriter(base_name + name + "-makefile");
@@ -569,6 +579,7 @@ abstract class Component {
   def compileC(): Unit = {
     for (c <- components) 
       c.markComponent();
+    genAllMuxes;
     val base_name = ensure_dir(targetEmulatorRootDir + "/" + targetDir);
     val out_h = new java.io.FileWriter(base_name + name + ".h");
     val out_c = new java.io.FileWriter(base_name + name + ".cpp");

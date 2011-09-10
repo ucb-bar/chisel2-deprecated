@@ -48,6 +48,12 @@ class bool_t extends int_t {
   def &  (b: bool_t): bool_t = BinaryBoolCell(this, b, "&");
   def |  (b: bool_t): bool_t = BinaryBoolCell(this, b, "|");
   def ^  (b: bool_t): bool_t = BinaryBoolCell(this, b, "^");
+  def isTrue = {
+    inputs(0) match {
+      case l: Literal => l.value == 1;
+      case any        => false;
+    }
+  }
 }
 }
 
