@@ -11,7 +11,7 @@ class ChiselError(err: String, m: String, st: Array[StackTraceElement]) {
   def printError = {
     println("  " + err + ": " + m);  
     if(index != 0)
-      for(i <- 0 until 6)
+      for(i <- 0 until 10)
 	println("     " + (if(index != 0) st(i).toString else ""));
     println();
   }

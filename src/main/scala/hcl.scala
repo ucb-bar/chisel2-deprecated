@@ -12,7 +12,7 @@ import IOdir._;
 object Enum {
   def apply(l: List[Symbol]) = (l zip (Range(0, l.length, 1).map(x => Fix(x, sizeof(l.length-1))))).toMap;
   def apply(l: Symbol *) = (l.toList zip (Range(0, l.length, 1).map(x => Fix(x, sizeof(l.length-1))))).toMap;
-  def apply(n: Int) = (Range(0, n, 1).map(x => Fix(x, sizeof(n-1)))).toList;
+  def apply[T <: Bits](n: Int)(gen: => T) = (Range(0, n, 1).map(x => (Lit(x, sizeof(n-1))(gen)))).toList;
 }
 
 object fromNode {

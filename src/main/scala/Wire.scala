@@ -34,7 +34,7 @@ class WireCell[T <: Data](data: T, width: Int, hasDefault: Boolean = false)(gen:
     primitiveNode.init("primitiveNode", widthOf(0), io.in)
   else
     primitiveNode.init("primitiveNode", widthOf(0), null);
-  val fb = data.fromNode(primitiveNode).asInstanceOf[T] 
+  val fb = io.out.fromNode(primitiveNode).asInstanceOf[T] 
   fb.setIsCellIO;
   fb ^^ io.out;
   io.out.comp = primitiveNode.asInstanceOf[Wire];
