@@ -40,15 +40,15 @@ object Node {
     } 
   }
   def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).getWidth - n.minNum }
-  var reset: Fix = Input("reset", 1);
-  var resets = Queue[Fix]();
+  var resetSignal: Fix = Input("reset", 1);
+  var resetSignals = Queue[Fix]();
   var clk: Node = Input("clk", 1);
-  def pushReset(r: Fix) { resets.enqueue(reset); reset = r }
-  def popReset() { reset = resets.dequeue() }
+  def pushReset(r: Fix) { resetSignals.enqueue(resetSignal); resetSignal = r }
+  def popReset() { resetSignal = resetSignals.dequeue() }
   def withReset(r: Fix)(block: => Node) = {
-    val resBak = reset; reset = r; 
+    val resBak = resetSignal; resetSignal = r; 
     val res = block; 
-    reset = resBak;
+    resetSignal = resBak;
     res
   }
   def ListLookup(addr: Node, default: List[Node], mapping: Array[(Node, List[Node])]): List[Fix] = {
@@ -293,7 +293,7 @@ abstract class Node extends nameable{
         case any => (c, c, c);
       }
     if (comp == null) {
-      if (this != reset){
+      if (this != resetSignal){
         println("NULL COMPONENT FOR " + this);
       }
     } else if (!comp.isWalked.contains(this)) {

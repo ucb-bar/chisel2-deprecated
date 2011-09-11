@@ -69,7 +69,7 @@ object is {
     if (keys.length == 0) 
       println("NO KEY SPECIFIED");
     else {
-      val c = new Bool();
+      val c = Bool('output);
       c := keys(0) === v;
       when (c) { block; }
     }

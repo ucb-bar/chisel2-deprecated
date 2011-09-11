@@ -13,8 +13,8 @@ object Wire {
     val junctioncell = new WireCell[T](gen, width)(gen);
     junctioncell.io.out
   }
-  def apply[T <: Data](default: T)(gen: =>T): T = {
-    val junctioncell = new WireCell[T](gen, -1, true)(gen);
+  def apply[T <: Data](default: T): T = {
+    val junctioncell = new WireCell[T](default, -1, true)(default.clone.asInstanceOf[T]);
     junctioncell.io.in := default;
     junctioncell.io.out
   }

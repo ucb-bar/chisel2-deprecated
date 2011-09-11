@@ -110,7 +110,7 @@ object Literal {
     var res = 0;
     for(c <- x)
       if(c != '_'){
-	if(!hexNibbles.contains(c)) ChiselErrors += IllegalState("Literal: " + x + " contains illegal character: " + c, 4);
+	if(!(hexNibbles + "?").contains(c)) ChiselErrors += IllegalState("Literal: " + x + " contains illegal character: " + c, 4);
 	res = res * shamt + c.asDigit;
       }
     res
@@ -122,7 +122,7 @@ object Literal {
     var width = 0;
     for (d <- x) {
       if (d != '_') {
-	if(!"01".contains(d)) ChiselErrors += IllegalState("Literal: " + x + " contains illegal character: " + d, 4);
+	if(!"01?".contains(d)) ChiselErrors += IllegalState("Literal: " + x + " contains illegal character: " + d, 4);
         width += 1;
         mask   = mask + (if (d == '?') "0" else "1");
         bits   = bits + (if (d == '?') "0" else d.toString);

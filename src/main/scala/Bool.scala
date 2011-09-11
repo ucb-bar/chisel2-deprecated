@@ -6,7 +6,7 @@ import Node._;
 object Bool {
   def apply(x: Boolean) = Lit(x);
   
-  def apply(width: Int = -1, dir: Symbol = null): Bool = {
+  def apply(dir: Symbol = null): Bool = {
     val res = new Bool();
     if(dir == null)
       res.dir = null;
@@ -16,16 +16,11 @@ object Bool {
       res.dir = OUTPUT;
     else
       println("INVALID DIRECTION");
-    if(width > 0)
-      res.init("", width);
-    else 
-      res.init("", widthOf(0))
+      res.init("", fixWidth(1))
     res
   }
   
-  def apply(dir: Symbol): Bool = Bool(-1, dir) 
-  
-  def apply(): Bool = Bool(-1, null);
+  def apply(): Bool = Bool(null);
 }
 
 class Bool extends Fix {
