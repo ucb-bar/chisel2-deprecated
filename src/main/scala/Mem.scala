@@ -26,8 +26,8 @@ object Mem {
     memcell
   }
 
-  def apply[T <: Data](n: Int, wrDataProto: T): MemCell[T] = {
-    val memcell = new MemCell(n, wrDataProto);
+  def apply[T <: Data](depth: Int, wrDataProto: T): MemCell[T] = {
+    val memcell = new MemCell(depth, wrDataProto);
     memcell
   }
 }
