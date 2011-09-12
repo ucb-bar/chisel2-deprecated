@@ -545,7 +545,7 @@ abstract class Component {
     for (p <- procs) {
       p match {
         case io: IO  =>
-        case w: Wire => w.genMuxes(null);
+        case w: Wire => w.genMuxes(w.default);
         case r: Reg  => r.genMuxes(r);
       }
     }

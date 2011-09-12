@@ -30,9 +30,9 @@ class WireCell[T <: Data](data: T, width: Int, hasDefault: Boolean = false)(gen:
   val primitiveNode = new Wire();
   if(width > -1)
     primitiveNode.init("primitiveNode", width, null)
-  else if(hasDefault)
+  else if(hasDefault) {
     primitiveNode.init("primitiveNode", widthOf(0), io.in)
-  else
+  } else
     primitiveNode.init("primitiveNode", widthOf(0), null);
   val fb = io.out.fromNode(primitiveNode).asInstanceOf[T] 
   fb.setIsCellIO;
@@ -44,6 +44,7 @@ class WireCell[T <: Data](data: T, width: Int, hasDefault: Boolean = false)(gen:
 class Wire extends Data with proc{
   // override def toString: String = "W(" + name + ")"
   var assigned = false;
+  def default: Node = if (inputs(0) == null) null else inputs(0);
   override def toNode = this;
   override def fromNode(src: Node) = {
     val res = new Wire().asInstanceOf[this.type];
