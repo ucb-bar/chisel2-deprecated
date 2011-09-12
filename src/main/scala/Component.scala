@@ -683,7 +683,12 @@ abstract class Component {
           if (off < i) 
             res = s.substring(off, i) :: res;
           res = "%" :: res;
-          off = i + 1;
+          if (i == (s.length-1)) {
+            println("Badly formed format argument kind: %");
+          } else if (s(i+1) != '=') {
+            println("Unsupported format argument kind: %" + s(i+1));
+          } 
+          off = i + 2;
         }
       }
       if (off < (s.length-1))
@@ -693,7 +698,7 @@ abstract class Component {
     out_c.write("void " + name + "_t::print ( FILE* f ) {\n");
     if (printArgs.length > 0) {
       val format =
-        if (printFormat == "") printArgs.map(a => "%").reduceLeft((y,z) => z + " " + y) 
+        if (printFormat == "") printArgs.map(a => "%=").reduceLeft((y,z) => z + " " + y) 
         else printFormat;
       val toks = splitPrintFormat(format);
       var i = 0;
