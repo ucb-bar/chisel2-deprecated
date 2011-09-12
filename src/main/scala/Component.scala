@@ -614,7 +614,7 @@ abstract class Component {
       m match {
         case l: Literal => ;
         case any    => 
-          if (m.name != "" && m != resetSignal && !(m.component == null)) 
+          if (m.name != "" && m != reset && !(m.component == null)) 
             m.name = m.component.name + "_" + m.name;
       }
       // println(">> " + m.name);

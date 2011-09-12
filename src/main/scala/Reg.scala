@@ -13,7 +13,7 @@ object Reg {
       fixWidth(w)
   }
   val noInit = Lit(0){Fix()};
-  def apply[T <: Data](data: T, width: Int, reset: T)(gen: => T): T = {
+  def apply[T <: Data](data: T, width: Int, resetVal: T)(gen: => T): T = {
     val dataIn: T = 
       (if(data == null) 
 	data 
@@ -23,17 +23,17 @@ object Reg {
 	 ChiselErrors += IllegalState("no type specified for Reg", 4)
 	 Bits().asInstanceOf[T]
        })
-    val regCell = new RegCell[T](dataIn, width, data != null, reset != null)(gen);
+    val regCell = new RegCell[T](dataIn, width, data != null, resetVal != null)(gen);
     if(data != null) regCell.io.data <> data;
-    if(reset != null) regCell.io.reset <> reset;
+    if(resetVal != null) regCell.io.resetVal <> resetVal;
     regCell.io.q
   }
 
   def apply[T <: Data](data: T): T = Reg[T](data, -1, null.asInstanceOf[T]){data.clone}
 
-  def apply[T <: Data](data: T, reset: T): T = Reg[T](data, -1, reset){data.clone}
+  def apply[T <: Data](data: T, resetVal: T): T = Reg[T](data, -1, resetVal){data.clone}
 
-  def apply[T <: Data](width: Int = -1, reset: T): T = Reg[T](null.asInstanceOf[T], -1, reset){reset.clone}
+  def apply[T <: Data](width: Int = -1, resetVal: T): T = Reg[T](null.asInstanceOf[T], -1, resetVal){resetVal.clone}
 
   def apply[T <: Data]()(gen: => T): T = Reg[T](null.asInstanceOf[T], -1, null.asInstanceOf[T])(gen)
 
@@ -42,15 +42,15 @@ object Reg {
 
 class RegCell[T <: Data](d: T, w: Int, hasInput: Boolean, isReset: Boolean)(gen: => T) extends Cell {
   val io = new Bundle(){
-    val data  = gen.asInput();
-    val reset = gen.asInput();
-    val q     = gen.asOutput();
+    val data     = gen.asInput();
+    val resetVal = gen.asInput();
+    val q        = gen.asOutput();
   }
   io.setIsCellIO;
   val primitiveNode = new Reg();
   val dInput: Node = if(hasInput) io.data.toNode else null;
   if(isReset)
-    primitiveNode.init("", regWidth(w), dInput, io.reset.toNode);
+    primitiveNode.init("", regWidth(w), dInput, io.resetVal.toNode);
   else
     primitiveNode.init("", regWidth(w), dInput);
   val fb = io.q.fromNode(primitiveNode).asInstanceOf[T] 

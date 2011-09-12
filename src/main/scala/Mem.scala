@@ -13,10 +13,10 @@ import Node._;
 object Mem {
   val noResetVal = Literal(0);
 
-  def apply[T <: Data](depth: Int, isEnable: Fix, wrAddr: Num, wrData: T, wrMask: T = null, reset: T): MemCell[T] = {
+  def apply[T <: Data](depth: Int, isEnable: Fix, wrAddr: Num, wrData: T, wrMask: T = null, resetVal: T): MemCell[T] = {
     val memcell = new MemCell(depth, wrData);
     memcell.write(isEnable, wrAddr, wrData, wrMask);
-    if (reset != null) memcell.reset_val(reset);
+    if (resetVal != null) memcell.reset_val(resetVal);
     memcell
   }
 
