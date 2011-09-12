@@ -15,7 +15,7 @@ object Node {
   // var cond = new Stack[Node];
   var isCoercingArgs = true;
   var conds = new Stack[Bool]();
-  var keys  = new Stack[Node]();
+  var keys  = new Stack[Bits]();
   def fixWidth(w: Int) = { (m: Node) => w };
   def widthOf(i: Int) = { (m: Node) => {m.inputs(i).getWidth }}
   def maxWidth(m: Node): Int = {

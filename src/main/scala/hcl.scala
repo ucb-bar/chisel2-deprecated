@@ -58,19 +58,20 @@ object otherwise {
     when (Bool(true)) { block }
 }
 object switch {
-  def apply(c: Node)(block: => Unit) = {
+  def apply(c: Bits)(block: => Unit) = {
     keys.push(c); 
     block; 
     keys.pop();
   }
 }
 object is {
-  def apply(v: Node)(block: => Unit) = {
+  def apply(v: Bits)(block: => Unit) = {
     if (keys.length == 0) 
       println("NO KEY SPECIFIED");
     else {
-      val c = Bool('output);
-      c := keys(0) === v;
+      //val c = Bool('output);
+      //c := keys(0) === v;
+      val c = keys(0) === v;
       when (c) { block; }
     }
   }
