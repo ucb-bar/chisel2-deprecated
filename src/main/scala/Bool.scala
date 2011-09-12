@@ -45,7 +45,8 @@ class Bool extends Fix {
   def &  (b: Bool): Bool = BinaryBoolCell(this, b, "&");
   def |  (b: Bool): Bool = BinaryBoolCell(this, b, "|");
 
-  def isTrue = {
+  def isTrue: Boolean = {
+    if(inputs.length == 0) return false
     inputs(0) match {
       case l: Literal => {l.isLit && l.value == 1};
       case any        => false;
