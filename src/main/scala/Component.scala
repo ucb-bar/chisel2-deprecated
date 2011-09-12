@@ -552,7 +552,7 @@ abstract class Component {
   }
   def genHarness(base_name: String, name: String) = {
     val makefile = new java.io.FileWriter(base_name + name + "-makefile");
-    makefile.write("CPPFLAGS = -O2 -I../\n\n");
+    makefile.write("CPPFLAGS = -O2 -I../ -I${CHISEL_EMULATOR_INCLUDE}/\n\n");
     makefile.write(name + ": " + name + ".o" + " " + name + "-emulator.o\n");
     makefile.write("\tg++ -o " + name + " " + name + ".o " + name + "-emulator.o\n\n");
     makefile.write(name + ".o: " + name + ".cpp " + name + ".h\n");
