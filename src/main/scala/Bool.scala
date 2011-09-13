@@ -16,7 +16,7 @@ object Bool {
       res.dir = OUTPUT;
     else
       println("INVALID DIRECTION");
-      res.init("", fixWidth(1))
+      res.init("", 1)
     res
   }
   
