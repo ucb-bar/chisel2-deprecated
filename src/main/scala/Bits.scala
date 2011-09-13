@@ -39,6 +39,12 @@ class Bits extends IO {
     res := n;
     res
   }
+  def := (src: Bits) = {
+    if (comp == null)
+      this.asInstanceOf[IO] := src
+    else
+      comp := src.toNode
+  }
 
   override def apply(bit: Int): Bits = { Extract(this, bit){Bits()}};
   override def apply(hi: Int, lo: Int): Bits = {Extract(this, hi, lo){Bits()}};

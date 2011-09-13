@@ -30,6 +30,14 @@ class Bool extends Fix {
     res
   }
 
+  
+  def := (src: Bool) = {
+    if (comp == null)
+      this.asInstanceOf[IO] := src
+    else
+      comp := src.toNode;
+  }
+
   override def unary_-(): Bool = UnaryBoolCell(this, "-");
   override def unary_~(): Bool = UnaryBoolCell(this, "~");
   override def unary_!(): Bool = UnaryBoolCell(this, "!");
