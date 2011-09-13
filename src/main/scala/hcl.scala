@@ -238,7 +238,7 @@ object MuxLookup {
   }
   * */
 
-  def apply[S <: Data, T <: Data] (key: S, default: T, mapping: Seq[(S, T)]): T = {
+  def apply[S <: Bits, T <: Data] (key: S, default: T, mapping: Seq[(S, T)]): T = {
     var res = default;
     for ((k, v) <- mapping.reverse)
       res = Mux(key ===k, v, res);
