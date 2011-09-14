@@ -27,7 +27,7 @@ class MuxCell[T <: Data](cI: T, aI: T) extends Cell {
 }
 
 object Mux {
-  def apply[T <: Data](t: Fix, c: T, a: T): T = {
+  def apply[T <: Data](t: Bool, c: T, a: T): T = {
     val muxcell = new MuxCell(c, a);
     muxcell.io.t := t;
     muxcell.io.c <> c;
