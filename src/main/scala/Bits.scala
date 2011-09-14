@@ -46,6 +46,10 @@ class Bits extends IO {
       comp := src.toNode
   }
 
+  def <==(src: Bits) = {
+    comp <== src.toNode;
+  }
+
   override def apply(bit: Int): Bits = { Extract(this, bit){Bits()}};
   override def apply(hi: Int, lo: Int): Bits = {Extract(this, hi, lo){Bits()}};
 

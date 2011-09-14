@@ -38,6 +38,10 @@ class Bool extends Fix {
       comp := src.toNode;
   }
 
+  def <==(src: Bool) = {
+    comp <== src.toNode;
+  }
+
   override def unary_-(): Bool = UnaryBoolCell(this, "-");
   override def unary_~(): Bool = UnaryBoolCell(this, "~");
   override def unary_!(): Bool = UnaryBoolCell(this, "!");
