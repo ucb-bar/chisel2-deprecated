@@ -19,9 +19,9 @@ object chiselCast {
 class ConversionCell[S <: Data, T <: Bits](x: S)(gen: => T) extends Cell {
   val io = gen.asOutput;
   io.setIsCellIO;
-  val primitiveNode = gen.asInput;
+  val primitiveNode = new Wire();
   primitiveNode.nameHolder = io;
-  primitiveNode := x;
+  primitiveNode.init("", widthOf(0), x);
   io := primitiveNode
 }
 
