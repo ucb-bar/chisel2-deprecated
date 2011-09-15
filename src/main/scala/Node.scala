@@ -51,7 +51,7 @@ object Node {
     reset = resBak;
     res
   }
-  def ListLookup(addr: Node, default: List[Node], mapping: Array[(Node, List[Node])]): List[Fix] = {
+  def ListLookup(addr: Node, default: List[Node], mapping: Array[(Node, List[Node])]): List[UFix] = {
     val ll = new ListLookup(mapping, default);
     ll.init("", widthOf(1), addr);
     for (w <- ll.wires)
@@ -64,7 +64,7 @@ object Node {
       }
     }
     ll.wires.map(x => {
-      val res = Fix('output);
+      val res = UFix('output);
       res.setIsCellIO;
       x.nameHolder = res;
       res := x;
