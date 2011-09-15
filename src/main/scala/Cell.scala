@@ -11,16 +11,18 @@ abstract class Cell extends nameable{
 
 object chiselCast {
   def apply[S <: Data, T <: Bits](x: S)(gen: => T): T = {
-    val cell = new ConversionCell()(gen);
-    cell.io := x
+    val cell = new ConversionCell(x)(gen);
     cell.io
   }
 }
 
-class ConversionCell[T <: Bits]()(gen: => T) extends Cell {
+class ConversionCell[S <: Data, T <: Bits](x: S)(gen: => T) extends Cell {
   val io = gen.asOutput;
   io.setIsCellIO;
-  val primitiveNode = null;
+  val primitiveNode = gen.asInput;
+  primitiveNode.nameHolder = io;
+  primitiveNode := x;
+  io := primitiveNode
 }
 
 object UnaryNodeCell {
