@@ -10,8 +10,8 @@ import Node._;
 import IOdir._;
   
 object Enum {
-  def apply(l: List[Symbol]) = (l zip (Range(0, l.length, 1).map(x => Fix(x, sizeof(l.length-1))))).toMap;
-  def apply(l: Symbol *) = (l.toList zip (Range(0, l.length, 1).map(x => Fix(x, sizeof(l.length-1))))).toMap;
+  def apply(l: List[Symbol]) = (l zip (Range(0, l.length, 1).map(x => UFix(x, sizeof(l.length-1))))).toMap;
+  def apply(l: Symbol *) = (l.toList zip (Range(0, l.length, 1).map(x => UFix(x, sizeof(l.length-1))))).toMap;
   def apply[T <: Bits](n: Int)(gen: => T) = (Range(0, n, 1).map(x => (Lit(x, sizeof(n-1))(gen)))).toList;
 }
 
@@ -97,6 +97,7 @@ object chiselMain {
       val arg = args(i);
       arg match {
         case "--gen-harness" => isGenHarness = true; 
+        case "--debug" => isDebug = true; 
         case "--v" => isEmittingComponents = true; isCoercingArgs = false;
         case "--target-dir" => targetDir = args(i+1); i += 1;
         // case "--scan-format" => scanFormat = args(i+1); i += 1;
@@ -188,7 +189,7 @@ trait proc extends Node {
     } else {
       val (lastCond, lastValue) = updates.pop();
       if (default == null && !lastCond.isTrue) {
-        println("NO DEFAULT SPECIFIED FOR WIRE"); // error()
+        println("NO DEFAULT SPECIFIED FOR WIRE: " + this); // error()
       }
       updates.push((lastCond, lastValue));
       inputs(0) = if (default != null) default else lastValue;

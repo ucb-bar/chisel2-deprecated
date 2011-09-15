@@ -18,6 +18,7 @@ import ChiselError._;
 
 
 object Component {
+  var isDebug = false;
   var isGenHarness = false;
   var isReportDims = false;
   var scanFormat = "";
@@ -65,6 +66,7 @@ object Component {
   def splitArg (s: String) = s.split(' ').toList;
   def initChisel () = {
     isGenHarness = false;
+    isDebug = false;
     isReportDims = false;
     scanFormat = "";
     scanArgs = new Array[Node](0);
