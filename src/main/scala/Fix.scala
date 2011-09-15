@@ -54,10 +54,10 @@ class Fix extends Num {
   def apply(bit: Fix): Fix = {Extract(this, bit){Fix()}};
   override def unary_-(): Fix = UnaryNodeCell(this, "-"){Fix()};
   override def unary_~(): Fix = UnaryNodeCell(this, "~"){Fix()};
-  override def unary_!(): Fix = UnaryNodeCell(this, "!"){Fix()};
-  override def andR(): Bool    = ReductionNodeCell(this, "&"){Fix()};
-  override def orR():  Bool    = ReductionNodeCell(this, "|"){Fix()};
-  override def xorR(): Bool   = ReductionNodeCell(this, "^"){Fix()};
+  def unary_!(): Fix = UnaryNodeCell(this, "!"){Fix()};
+  def andR(): Bool    = ReductionNodeCell(this, "&"){Fix()};
+  def orR():  Bool    = ReductionNodeCell(this, "|"){Fix()};
+  def xorR(): Bool   = ReductionNodeCell(this, "^"){Fix()};
   def << (b: Fix): Fix = BinaryNodeCell(this, b, "<<"){Fix()};
   def >> (b: Fix): Fix = BinaryNodeCell(this, b, ">>"){Fix()};
   def >>> (b: Fix): Fix = BinaryNodeCell(this, b, ">>>"){Fix()};

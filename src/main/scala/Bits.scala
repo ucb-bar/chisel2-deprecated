@@ -53,8 +53,8 @@ class Bits extends IO {
   override def apply(bit: Int): Bits = { Extract(this, bit){Bits()}};
   override def apply(hi: Int, lo: Int): Bits = {Extract(this, hi, lo){Bits()}};
 
-  override def unary_-(): Bits = UnaryNodeCell(this, "-"){Bits()};
-  override def unary_~(): Bits = UnaryNodeCell(this, "~"){Bits()};
+  def unary_-(): Bits = UnaryNodeCell(this, "-"){Bits()};
+  def unary_~(): Bits = UnaryNodeCell(this, "~"){Bits()};
   def ===(b: Bits): Bool = LogicalNodeCell(this, b, "==="){Bits()};
   def != (b: Bits): Bool = LogicalNodeCell(this, b, "!="){Bits()};
   def << (b: Bits): Bits = BinaryNodeCell(this, b, "<<"){Bits()};
