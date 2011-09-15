@@ -204,7 +204,7 @@ abstract class Node extends nameable{
       return false;
   }
   def emitIndex: Int = { if (index == -1) index = componentOf.nextIndex; index }
-  def isInObject = isIo || isReg || isUsedByRam || isProbe;
+  def isInObject = isIo || isReg || isUsedByRam || isProbe || isDebug;
   def emitTmp: String = 
     if (isEmittingC) {
       if (isInObject)
