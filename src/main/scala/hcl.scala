@@ -116,7 +116,7 @@ object chiselMain {
     }
     if (printer != null) {
       val p = printer(c);
-      printArgs   = p.args;
+      printArgs   ++= p.args;
       printFormat = p.format;
     }
     if (isEmittingComponents)
