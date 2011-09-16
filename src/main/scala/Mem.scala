@@ -39,7 +39,7 @@ class MemCell[T <: Data](n: Int, data: T) extends Cell {
   isReg = true;
   val primitiveNode = new Mem[T](n, data);
 
-  primitiveNode.init("primitiveNode", data.getWidth);
+  primitiveNode.init("primitiveNode", data.toNode.getWidth);
 
   def apply(addr: Node): T = read(addr);
   def read(addr: Node): T = {
@@ -76,7 +76,7 @@ class MemWPort[T <: Data](mem: Mem[T], io: Bundle, addr: Node, data: T, wen: Nod
   val data_port = data.clone.asInput;
   data_port.setName("data_" + (port_offset + 1));
   io += data_port;
-  mem.inputs += data_port;
+  mem.inputs += data_port.toNode;
   data_port <> data;
 
   val wen_port  = Fix(1, 'input);
@@ -89,7 +89,7 @@ class MemWPort[T <: Data](mem: Mem[T], io: Bundle, addr: Node, data: T, wen: Nod
     val wbm_port = wbm.clone.asInput;
     wbm_port.setName("wbm_" + (port_offset + 3));
     io += wbm_port;
-    mem.inputs += wbm_port;
+    mem.inputs += wbm_port.toNode;
     wbm_port <> wbm;
   }
 
@@ -146,7 +146,7 @@ class MemResetPort[T <: Data](mem: Mem[T], io: Bundle, reset_val: T) {
   val reset_val_port = reset_val.clone.asInput;
   reset_val_port.setName("reset_val_" + (port_offset + 1));
   io += reset_val_port;
-  mem.inputs += reset_val_port;
+  mem.inputs += reset_val_port.toNode;
   reset_val_port <> reset_val;
 
   def resetVal = mem.inputs(port_offset);
