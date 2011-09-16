@@ -357,7 +357,7 @@ abstract class Node extends nameable{
       width
     else if(isCellIO)
       inputs(0).getWidth
-    else if(inputs.length > 1 && !isInstanceOf[Reg] && !isInstanceOf[Wire])
+    else if(inputs.length >= 1 && !isInstanceOf[Reg] && (isInstanceOf[IO] || !isInstanceOf[Wire]))
       inferWidth(this)
     else
       -1

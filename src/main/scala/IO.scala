@@ -146,6 +146,11 @@ class IO extends Wire {
   override def emitRefV = if(name == "") super.emitRefV else if(!named) name + "_" + emitIndex else name
   override def setIsCellIO = isCellIO = true;
   override def setIsClkInput = {isClkInput = true; this := clk;}
+  override def clone = {
+    val res = this.getClass.newInstance.asInstanceOf[this.type];
+    res.init("", widthOf(0), null);
+    res
+  }
   override def toNode = this;
   override def fromNode(src: Node) = {
     val res = new IO().asInstanceOf[this.type];
