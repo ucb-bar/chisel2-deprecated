@@ -13,6 +13,20 @@ object Lookup {
     lookupCell.io.out
   }
 
+  def apply[T <: Data, S <: Bits](addr: S, gen: () => T, mapping: Seq[(S, (T) => Any)]): T = {
+    var map = List[(Bits, T)]();
+    for((s, f) <- mapping){
+      val data = gen();
+      f(data);
+      map = (s -> data) :: map;
+    }
+    val default = map(0)._2;
+    val lookupCell = new LookupCell(default, map.toSeq)
+    lookupCell.io.default <> default;
+    lookupCell.io.addr <> addr;
+    lookupCell.io.out
+  }
+
 }
 
 

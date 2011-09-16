@@ -24,7 +24,7 @@ object Component {
   var scanFormat = "";
   var scanArgs: Seq[Node] = null;
   var printFormat = "";
-  var printArgs: Seq[Node] = null;
+  var printArgs: ArrayBuffer[Node] = null;
   var includeArgs: List[String] = Nil;
   var targetEmulatorRootDir: String = null;
   var targetVerilogRootDir: String = null;
@@ -71,7 +71,7 @@ object Component {
     scanFormat = "";
     scanArgs = new Array[Node](0);
     printFormat = "";
-    printArgs = new Array[Node](0);
+    printArgs = new ArrayBuffer[Node]();
     isCoercingArgs = true;
     targetEmulatorRootDir = System.getProperty("CHISEL_EMULATOR_ROOT");
     if (targetEmulatorRootDir == null) targetEmulatorRootDir = "../emulator";
@@ -704,6 +704,8 @@ abstract class Component {
         else printFormat;
       val toks = splitPrintFormat(format);
       var i = 0;
+      for(i <- 0 until printArgs.length)
+	printArgs(i) = printArgs(i).getNode
       for (tok <- toks) {
         if (tok(0) == '%') {
           out_c.write("  fprintf(f, \"%s\", " + printArgs(i).emitRef + ".to_str().c_str());\n");

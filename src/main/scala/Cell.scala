@@ -11,16 +11,19 @@ abstract class Cell extends nameable{
 
 object chiselCast {
   def apply[S <: Data, T <: Bits](x: S)(gen: => T): T = {
-    val cell = new ConversionCell()(gen);
-    cell.io := x
+    val cell = new ConversionCell(x)(gen);
     cell.io
   }
 }
 
-class ConversionCell[T <: Bits]()(gen: => T) extends Cell {
+class ConversionCell[S <: Data, T <: Bits](x: S)(gen: => T) extends Cell {
   val io = gen.asOutput;
   io.setIsCellIO;
-  val primitiveNode = null;
+  val primitiveNode = new Wire();
+  //val primitiveNode = x;
+  primitiveNode.nameHolder = io;
+  primitiveNode.init("", widthOf(0), x);
+  io := primitiveNode
 }
 
 object UnaryNodeCell {
@@ -65,17 +68,17 @@ class BinaryNodeCell[T <: Data](op: String)(gen: => T) extends Cell {
   }
   io.setIsCellIO;
   val primitiveNode = op match {
-    case "<<"  => io.X.asInstanceOf[Node] <<  io.Y;
-    case ">>"  => io.X.asInstanceOf[Node] >>  io.Y;
-    case ">>>" => io.X.asInstanceOf[Node] >>> io.Y; 
-    case "+"   => io.X.asInstanceOf[Node] +   io.Y;
-    case "*"   => io.X.asInstanceOf[Node] *   io.Y;
-    case "^"   => io.X.asInstanceOf[Node] ^   io.Y;
-    case "?"   => io.X.asInstanceOf[Node] ?   io.Y;
-    case "-"   => io.X.asInstanceOf[Node] -   io.Y;
-    case "##"  => io.X.asInstanceOf[Node] ##  io.Y;
-    case "&"   => io.X.asInstanceOf[Node] &   io.Y;
-    case "|"   => io.X.asInstanceOf[Node] |   io.Y;
+    case "<<"  => Op("<<", 0, lshWidthOf(0, io.Y),  io.X, io.Y );
+    case ">>"  => Op(">>", 0, rshWidthOf(0, io.Y),  io.X, io.Y );
+    case ">>>" => Op(">>", 0, rshWidthOf(0, io.Y),  io.X, io.Y );
+    case "+"   => Op("+",  2, maxWidth _,  io.X, io.Y );
+    case "*"   => Op("*",  0, sumWidth _,  io.X, io.Y );
+    case "^"   => Op("^",  2, maxWidth _,  io.X, io.Y );
+    case "?"   => Multiplex(io.X, io.Y, null);
+    case "-"   => Op("-",  2, maxWidth _,  io.X, io.Y );
+    case "##"  => Op("##", 2, sumWidth _,  io.X, io.Y );
+    case "&"   => Op("&",  2, maxWidth _, io.X, io.Y );
+    case "|"   => Op("|",  2, maxWidth _, io.X, io.Y );
     case any   => null;
   }
   primitiveNode.name = "primitiveNode";
@@ -100,14 +103,14 @@ class LogicalNodeCell[T <: Data](op: String)(gen: => T) extends Cell {
   }
   io.setIsCellIO;
   val primitiveNode = op match {
-    case "===" => io.X.asInstanceOf[Node] === io.Y;
-    case "!="  => io.X.asInstanceOf[Node] !=  io.Y;
-    case ">"   => io.X.asInstanceOf[Node] >   io.Y;
-    case "<"   => io.X.asInstanceOf[Node] <   io.Y;
-    case "<="  => io.X.asInstanceOf[Node] <=  io.Y;
-    case ">="  => io.X.asInstanceOf[Node] >=  io.Y;
-    case "&&"  => io.X.asInstanceOf[Node] &&  io.Y;
-    case "||"  => io.X.asInstanceOf[Node] ||  io.Y;
+    case "===" => Op("==", 2, fixWidth(1), io.X, io.Y );
+    case "!="  => Op("!=", 2, fixWidth(1), io.X, io.Y );
+    case ">"   => Op(">",  2, fixWidth(1), io.X, io.Y );
+    case "<"   => Op("<",  2, fixWidth(1), io.X, io.Y );
+    case "<="  => Op("<=", 2, fixWidth(1), io.X, io.Y );
+    case ">="  => Op(">=", 2, fixWidth(1), io.X, io.Y );
+    case "&&"  => Op("&&", 2, fixWidth(1), io.X, io.Y );
+    case "||"  => Op("||", 2, fixWidth(1), io.X, io.Y );
     case any   => null;
   }
   primitiveNode.name = "primitiveNode";
@@ -185,17 +188,17 @@ class BinaryBoolCell(op: String) extends Cell {
   }
   io.setIsCellIO;
   val primitiveNode = op match {
-    case "^"   => io.X.asInstanceOf[Node] ^   io.Y;
-    case "===" => io.X.asInstanceOf[Node] === io.Y;
-    case "!="  => io.X.asInstanceOf[Node] !=  io.Y;
-    case ">"   => io.X.asInstanceOf[Node] >   io.Y;
-    case "<"   => io.X.asInstanceOf[Node] <   io.Y;
-    case "<="  => io.X.asInstanceOf[Node] <=  io.Y;
-    case ">="  => io.X.asInstanceOf[Node] >=  io.Y;
-    case "&&"  => io.X.asInstanceOf[Node] &&  io.Y;
-    case "||"  => io.X.asInstanceOf[Node] ||  io.Y;
-    case "&"   => io.X.asInstanceOf[Node] &   io.Y;
-    case "|"   => io.X.asInstanceOf[Node] |   io.Y;
+    case "^"   => Op("^",  2, maxWidth _,  io.X, io.Y );
+    case "===" => Op("==", 2, fixWidth(1), io.X, io.Y );
+    case "!="  => Op("!=", 2, fixWidth(1), io.X, io.Y );
+    case ">"   => Op(">",  2, fixWidth(1), io.X, io.Y );
+    case "<"   => Op("<",  2, fixWidth(1), io.X, io.Y );
+    case "<="  => Op("<=", 2, fixWidth(1), io.X, io.Y );
+    case ">="  => Op(">=", 2, fixWidth(1), io.X, io.Y );
+    case "&&"  => Op("&&", 2, fixWidth(1), io.X, io.Y );
+    case "||"  => Op("||", 2, fixWidth(1), io.X, io.Y );
+    case "&"   => Op("&",  2, maxWidth _, io.X, io.Y );
+    case "|"   => Op("|",  2, maxWidth _, io.X, io.Y );
     case any   => null;
   }
   primitiveNode.name = "primitiveNode";

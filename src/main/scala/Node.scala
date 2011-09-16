@@ -95,6 +95,7 @@ abstract class Node extends nameable{
   def width: Int = width_;
   def width_=(w: Int) = { isFixedWidth = true; width_ = width; inferWidth = fixWidth(w); }
   def name_it (path: String, setNamed: Boolean = true) = { name = path; named = setNamed}
+  /*
   def unary_-(): Node    = Op("-",  1, widthOf(0), this);
   def unary_~(): Node    = Op("~",  1, widthOf(0), this);
   def unary_!(): Node    = Op("!",  1, fixWidth(1), this);
@@ -109,7 +110,6 @@ abstract class Node extends nameable{
   def ^(b: Node): Node   = Op("^",  2, maxWidth _,  this, b );
   def ?(b: Node): Node   = Multiplex(this, b, null);
   def -(b: Node): Node   = Op("-",  2, maxWidth _,  this, b );
-  def ##(b: Node): Node  = Op("##", 2, sumWidth _,  this, b );
   def ===(b: Node): Node = Op("==", 2, fixWidth(1), this, b );
   def !=(b: Node): Node  = Op("!=", 2, fixWidth(1), this, b );
   def >(b: Node): Node   = Op(">",  2, fixWidth(1), this, b );
@@ -120,6 +120,8 @@ abstract class Node extends nameable{
   def ||(b: Node): Node  = Op("||", 2, fixWidth(1), this, b );
   def &(b: Node): Node   = Op("&",  2, maxWidth _, this, b );
   def |(b: Node): Node   = Op("|",  2, maxWidth _, this, b );
+  * */
+  def ##(b: Node): Node  = Op("##", 2, sumWidth _,  this, b );
   def maxNum: Int = (1 << (if(width < 0) inferWidth(this) else width))-1;
   def minNum: Int = 0;
   def isLit = false;

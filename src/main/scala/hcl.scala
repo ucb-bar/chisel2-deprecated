@@ -116,7 +116,7 @@ object chiselMain {
     }
     if (printer != null) {
       val p = printer(c);
-      printArgs   = p.args;
+      printArgs   ++= p.args;
       printFormat = p.format;
     }
     if (isEmittingComponents)
@@ -156,28 +156,6 @@ abstract class Data extends Node {
       super.name_it(path, setNamed);
   }
   def setWidth(w: Int) = this.width = w;
-  override def unary_-()= this;
-  override def unary_~()= this;
-  override def unary_!()= this;
-  def << (b: Data) = this;
-  def >> (b: Data) = this;
-  def >>>(b: Data) = this;
-  def +  (b: Data) = this;
-  def *  (b: Data) = this;
-  def ^  (b: Data) = this;
-  def ?  (b: Data) = this;
-  def -  (b: Data) = this;
-  def ## (b: Data) = this;
-  def ===(b: Data) = this;
-  def != (b: Data) = this;
-  def >  (b: Data) = this;
-  def <  (b: Data) = this;
-  def <= (b: Data) = this;
-  def >= (b: Data) = this;
-  def && (b: Data) = this;
-  def || (b: Data) = this;
-  def &  (b: Data) = this;
-  def |  (b: Data) = this;
 }
 
 trait proc extends Node {
