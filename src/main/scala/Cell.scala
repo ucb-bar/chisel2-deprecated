@@ -207,37 +207,37 @@ class BinaryBoolCell(op: String) extends Cell {
 } 
 
 object or {
-    def apply(x: Fix): Bool = {
+    def apply(x: Bits): Bool = {
 		val res = new or(); // trick the compiler to keeping the class
-    	ReductionNodeCell(x, "|"){Fix()}
+    	ReductionNodeCell(x, "|"){Bits()}
         res.io.In := x;
         res.io.Out
     }
 }
 
-class or extends ReductionNodeCell[Fix]("|")(Fix()) {
+class or extends ReductionNodeCell[Bits]("|")(Bits()) {
 }
 
 object and {
-    def apply(x: Fix): Bool = {
+    def apply(x: Bits): Bool = {
 		val res = new and(); // trick the compiler to keeping the class
         res.io.In := x;
         res.io.Out
     }
 }
-class and extends ReductionNodeCell[Fix]("&")(Fix()) {
+class and extends ReductionNodeCell[Bits]("&")(Bits()) {
 }
 
 
 object xor {
-    def apply(x: Fix): Bool = {
+    def apply(x: Bits): Bool = {
         val res = new xor()
         res.io.In := x;
         res.io.Out
     }
 }
 
-class xor extends ReductionNodeCell("^")(Fix()) {
+class xor extends ReductionNodeCell("^")(Bits()) {
 }
 
 }

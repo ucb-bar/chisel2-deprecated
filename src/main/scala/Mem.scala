@@ -13,14 +13,14 @@ import Node._;
 object Mem {
   val noResetVal = Literal(0);
 
-  def apply[T <: Data](depth: Int, isEnable: Fix, wrAddr: Num, wrData: T, wrMask: T = null, resetVal: T): MemCell[T] = {
+  def apply[T <: Data](depth: Int, isEnable: Bool, wrAddr: Num, wrData: T, wrMask: T = null, resetVal: T): MemCell[T] = {
     val memcell = new MemCell(depth, wrData);
     memcell.write(isEnable, wrAddr, wrData, wrMask);
     if (resetVal != null) memcell.reset_val(resetVal);
     memcell
   }
 
-  def apply[T <: Data](depth: Int, isEnable: Fix, wrAddr: Num, wrData: T): MemCell[T] = {
+  def apply[T <: Data](depth: Int, isEnable: Bool, wrAddr: Num, wrData: T): MemCell[T] = {
     val memcell = new MemCell(depth, wrData);
     memcell.write(isEnable, wrAddr, wrData, null.asInstanceOf[T]);
     memcell
@@ -79,7 +79,7 @@ class MemWPort[T <: Data](mem: Mem[T], io: Bundle, addr: Node, data: T, wen: Nod
   mem.inputs += data_port.toNode;
   data_port <> data;
 
-  val wen_port  = Fix(1, 'input);
+  val wen_port  = Bool('input);
   wen_port.setName("wen_" + (port_offset + 2));
   io += wen_port;
   mem.inputs += wen_port;

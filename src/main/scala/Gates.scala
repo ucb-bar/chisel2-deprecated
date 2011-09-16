@@ -2,52 +2,52 @@ package Chisel {
 import IOdir._;
 
 object makeCell {
-  def apply(x: Fix, y: Fix, op: String): Fix = {
-    val res = new BinaryNodeCell(op)(Fix());
+  def apply(x: Bits, y: Bits, op: String): Bits = {
+    val res = new BinaryNodeCell(op)(Bits());
     res.io.X := x;
     res.io.Y := y;
     res.io.Z
   }
-  def apply(op: String): BinaryNodeCell[Fix] = {
-    new BinaryNodeCell(op)(Fix());
+  def apply(op: String): BinaryNodeCell[Bits] = {
+    new BinaryNodeCell(op)(Bits());
   }
 }
 
 object AND {
-  def apply(x: Fix, y: Fix): Fix = {
+  def apply(x: Bits, y: Bits): Bits = {
     makeCell(x, y, "&");
   }
-  def apply(): BinaryNodeCell[Fix] = {
+  def apply(): BinaryNodeCell[Bits] = {
     makeCell("&");
   }
 }
 
 object OR {
-  def apply(x: Fix, y: Fix): Fix = {
+  def apply(x: Bits, y: Bits): Bits = {
     makeCell(x, y, "|");
   }
-  def apply(): BinaryNodeCell[Fix] = {
+  def apply(): BinaryNodeCell[Bits] = {
     makeCell("|");
   }
 }
 
 object XOR {
-  def apply(x: Fix, y: Fix): Fix = {
+  def apply(x: Bits, y: Bits): Bits = {
     makeCell(x, y, "^");
   }
-  def apply(): BinaryNodeCell[Fix] = {
+  def apply(): BinaryNodeCell[Bits] = {
     makeCell("^")
   }
 }
 
 object NOT {
-  def apply(in: Fix): Fix = {
-    val res = new UnaryNodeCell("!")(Fix());
+  def apply(in: Bits): Bits = {
+    val res = new UnaryNodeCell("!")(Bits());
     res.io.In := in;
     res.io.Out
   }
-  def apply(): UnaryNodeCell[Fix] = {
-     new UnaryNodeCell("!")(Fix());
+  def apply(): UnaryNodeCell[Bits] = {
+     new UnaryNodeCell("!")(Bits());
   }
 }
 

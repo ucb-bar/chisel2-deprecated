@@ -23,7 +23,7 @@ object Bool {
   def apply(): Bool = Bool(null);
 }
 
-class Bool extends Fix {
+class Bool extends Bits {
   override def fromNode(n: Node) = {
     val res = Bool('output).asInstanceOf[this.type];
     res := n;
@@ -44,7 +44,7 @@ class Bool extends Fix {
 
   override def unary_-(): Bool = UnaryBoolCell(this, "-");
   override def unary_~(): Bool = UnaryBoolCell(this, "~");
-  override def unary_!(): Bool = UnaryBoolCell(this, "!");
+  def unary_!(): Bool = UnaryBoolCell(this, "!");
   def ^  (b: Bool): Bool = BinaryBoolCell(this, b, "^");
   def ===(b: Bool): Bool = BinaryBoolCell(this, b, "===");
   def != (b: Bool): Bool = BinaryBoolCell(this, b, "!=");

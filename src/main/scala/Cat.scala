@@ -4,7 +4,7 @@ import IOdir._;
 import Node._;
 
 object Cat {
-  def apply[T <: Data](mod: T, mods: T*): Fix = {
+  def apply[T <: Data](mod: T, mods: T*): Bits = {
     val res = new CatCell(mod, mods.toList);
     res.io.out
   }
@@ -12,7 +12,7 @@ object Cat {
 
 
 class CatCell[T <: Data](mod: T, mods: List[T]){
-  val io = new Bundle(){val out = Fix('output);
+  val io = new Bundle(){val out = Bits('output);
 			}
   io.setIsCellIO;
   val primitiveNode = 
