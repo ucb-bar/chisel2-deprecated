@@ -32,6 +32,7 @@ object Fix {
 }
 
 class Fix extends Num {
+  type T = Fix;
   override def fromNode(n: Node) = {
     val res = Fix('output).asInstanceOf[this.type]; 
     res := n; 

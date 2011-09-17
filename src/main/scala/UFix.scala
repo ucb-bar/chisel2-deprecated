@@ -31,6 +31,7 @@ object UFix {
 }
 
 class UFix extends Num {
+  type T = UFix;
   override def fromNode(n: Node) = {
     val res = UFix('output).asInstanceOf[this.type];
     res := n;

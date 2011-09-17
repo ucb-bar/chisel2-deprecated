@@ -189,14 +189,18 @@ object nullADT extends Data;
 
 
 abstract class BlackBox extends Component {
+  var moduleNameSet = false;
   override def doCompileV(out: java.io.FileWriter, depth: Int): Unit = {
     findNodes(depth, this);
   }
   override def name_it() = {
-    val cname = getClass().getName();
-    val dotPos = cname.lastIndexOf('.');
-    moduleName = if (dotPos >= 0) cname.substring(dotPos+1) else cname;
+    if(!moduleNameSet) {
+      val cname = getClass().getName();
+      val dotPos = cname.lastIndexOf('.');
+      moduleName = if (dotPos >= 0) cname.substring(dotPos+1) else cname;
+    }
   }
+  def setName(name: String) = {moduleName = name; moduleNameSet = true}
 }
 
 

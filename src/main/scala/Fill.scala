@@ -6,14 +6,14 @@ import IOdir._;
 
 object Fill {
   def fillWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).width * n.maxNum }
-  def apply(mod: Bits, n: Fix): Bits = {
+  def apply(mod: Bits, n: Num): Bits = {
     val fillcell = new FillCell(mod);
     fillcell.io.mod <> mod;
     fillcell.io.n <> n;
     fillcell.io.out
   }
   def apply(mod: Int, n: Int): Bits =
-    Fill(Bits("d" + mod), Fix(n));
+    Fill(Bits("d" + mod), UFix(n));
 }
 
 

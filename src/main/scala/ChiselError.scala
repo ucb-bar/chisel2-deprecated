@@ -47,4 +47,12 @@ object IllegalName {
   }
 }
 
+object TypeError {
+  def apply(op: String, a: String, b: String): ChiselError = {
+    val res = new ChiselError("Type Error", op + " is not defined on " + a + " and " + b, Thread.currentThread.getStackTrace);
+    res.index = 4;
+    res
+  }
+}
+
 }

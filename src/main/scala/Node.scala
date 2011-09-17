@@ -21,7 +21,9 @@ object Node {
   def maxWidth(m: Node): Int = {
     var res = 0;
     for (i <- m.inputs)
-      res = max(res, i.getWidth);
+      if(!(i == null) && !(i == m)){
+	res = max(res, i.getWidth);
+      }
     res
   }
   def maxWidthPlusOne(m: Node): Int = maxWidth(m) + 1;
@@ -132,9 +134,9 @@ abstract class Node extends nameable{
     res.isSigned = true; 
     res.asInstanceOf[this.type]
   }
-  def bitSet(off: Fix, dat: Fix): Fix = { 
-    val bit = Fix(1, 1) << off;
-    (this.asInstanceOf[Fix] & ~bit) | (dat << off);
+  def bitSet(off: Num, dat: Bits): Bits = { 
+    val bit = Bits(1, 1) << off;
+    (this.asInstanceOf[Bits] & ~bit) | (dat << off);
   }
   // TODO: MOVE TO WIRE
   def :=(src: Node) = { if (inputs.length > 0) inputs(0) = src; else inputs += src; }
@@ -352,17 +354,22 @@ abstract class Node extends nameable{
 
   def setIsClkInput = {};
 
+  var isWidthWalked = false;
+
   def getWidth(): Int = {
     if(width > 0)
       width
     else if(isCellIO)
       inputs(0).getWidth
-    else if(inputs.length >= 1 && !isInstanceOf[Reg] && (isInstanceOf[IO] || !isInstanceOf[Wire]))
+    else if(isInstanceOf[Reg] && !isWidthWalked){
+      isWidthWalked = true;
+      inferWidth(this)
+    }else if(inputs.length >= 1 && !isInstanceOf[Reg] && (isInstanceOf[IO] || !isInstanceOf[Wire]))
       inferWidth(this)
     else
       -1
   }
-
+  
   def removeCellIOs() {
     for(i <- 0 until inputs.length)
       if(inputs(i) == null){
@@ -430,7 +437,7 @@ abstract class Node extends nameable{
       val res = Extract(this.asInstanceOf[Fix], off+m.getWidth-1, off){Fix()};
       m match {
         case r: Reg => r <== res;
-	case i: Fix => i <== res;
+	case i: Bits => i <== res;
         case o      => o := res;
       }
       off += m.getWidth;
