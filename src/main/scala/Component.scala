@@ -19,6 +19,7 @@ import ChiselError._;
 
 object Component {
   var isDebug = false;
+  var isVCD = false;
   var isGenHarness = false;
   var isReportDims = false;
   var scanFormat = "";
@@ -67,6 +68,7 @@ object Component {
   def initChisel () = {
     isGenHarness = false;
     isDebug = false;
+    isVCD = false;
     isReportDims = false;
     scanFormat = "";
     scanArgs = new Array[Node](0);
@@ -568,15 +570,61 @@ abstract class Component {
     harness.write("  " + name + "_t* c = new " + name + "_t();\n");
     harness.write("  int lim = (argc > 1) ? atoi(argv[1]) : -1;\n");
     harness.write("  c->init();\n");
+    if (isVCD)
+      harness.write("  FILE *f = fopen(\"" + name + ".vcd\", \"w\");\n");
     harness.write("  for (int t = 0; lim < 0 || t < lim; t++) {\n");
     harness.write("    dat_t<1> reset = LIT<1>(t == 0);\n");
-    harness.write("    c->scan(stdin);\n");
+    harness.write("    if (!c->scan(stdin)) break;\n");
     harness.write("    c->clock_lo(reset);\n");
     harness.write("    c->clock_hi(reset);\n");
     harness.write("    c->print(stdout);\n");
+    if (isVCD)
+      harness.write("    c->dump(f, t);\n");
     harness.write("  }\n");
     harness.write("}\n");
     harness.close();
+  }
+  def dumpVCDScope(file: java.io.FileWriter, top: Component, names: HashMap[Node, String]): Unit = {
+    file.write("    fprintf(f, \"" + "$scope module " + name + " $end" + "\\n\");\n");
+    for (mod <- top.omods) {
+      if (mod.component == this && mod.isInObject) {
+        file.write("    fprintf(f, \"$var wire " + mod.width + " " + names(mod) + " " + stripComponent(mod.emitRef) + " $end\\n\");\n");
+      
+      }
+    }
+    for (child <- children) {
+      child.dumpVCDScope(file, top, names);
+    }
+    file.write("    fprintf(f, \"$upscope $end\\n\");\n");
+  }
+  def stripComponent(s: String) = s.split("__").last
+  def dumpVCD(file: java.io.FileWriter): Unit = {
+    var num = 0;
+    val names = new HashMap[Node, String];
+    for (mod <- omods) {
+      if (mod.isInObject) {
+        names(mod) = "N" + num;
+        num += 1;
+      }
+    }
+    file.write("void " + name + "_t::dump(FILE *f, int t) {\n");
+    if (isVCD) {
+    file.write("  static bool is_init = false;\n");
+    file.write("  if (!is_init) {\n");
+    file.write("    is_init = true;\n");
+    file.write("    fprintf(f, \"$timescale 1ps $end\\n\");\n");
+    dumpVCDScope(file, this, names);
+    file.write("    fprintf(f, \"$enddefinitions\\n\");\n");
+    file.write("    fprintf(f, \"$dumpvars\\n\");\n");
+    file.write("    fprintf(f, \"$end\\n\");\n");
+    file.write("  }\n");
+    file.write("  fprintf(f, \"#%d\\n\", t);\n");
+    for (mod <- omods) {
+      if (mod.isInObject)
+        file.write("  dat_dump(f, " + mod.emitRef + ", \"" + names(mod) + "\");\n");
+    }
+    }
+    file.write("}\n");
   }
   def compileC(): Unit = {
     for (c <- components) 
@@ -617,7 +665,7 @@ abstract class Component {
         case l: Literal => ;
         case any    => 
           if (m.name != "" && m != reset && !(m.component == null)) 
-            m.name = m.component.name + "_" + m.name;
+            m.name = m.component.name + "__" + m.name;
       }
       // println(">> " + m.name);
     }
@@ -646,7 +694,8 @@ abstract class Component {
     out_h.write("  void clock_lo ( dat_t<1> reset );\n");
     out_h.write("  void clock_hi ( dat_t<1> reset );\n");
     out_h.write("  void print ( FILE* f );\n");
-    out_h.write("  void scan ( FILE* f );\n");
+    out_h.write("  bool scan ( FILE* f );\n");
+    out_h.write("  void dump ( FILE* f, int t );\n");
     out_h.write("};\n");
     out_h.close();
 
@@ -719,7 +768,7 @@ abstract class Component {
     out_c.write("}\n");
     def constantArgSplit(arg: String) = arg.split('=');
     def isConstantArg(arg: String) = constantArgSplit(arg).length == 2;
-    out_c.write("void " + name + "_t::scan ( FILE* f ) {\n");
+    out_c.write("bool " + name + "_t::scan ( FILE* f ) {\n");
     if (scanArgs.length > 0) {
       val format = 
         if (scanFormat == "") {
@@ -731,13 +780,15 @@ abstract class Component {
           res
         } else 
           scanFormat;
-      out_c.write("  fscanf(f, \"" + format + "\"");
+      out_c.write("  int n = fscanf(f, \"" + format + "\"");
       for (arg <- scanArgs) {
         out_c.write(",  &" + arg.emitRef + ".values[0]");
       }
       out_c.write(");\n");
+      out_c.write("  return n == " + scanArgs.length + ";\n");
     }
     out_c.write("}\n");
+    dumpVCD(out_c);
     out_c.close();
   }
 };
