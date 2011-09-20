@@ -614,7 +614,7 @@ abstract class Component {
     file.write("    is_init = true;\n");
     file.write("    fprintf(f, \"$timescale 1ps $end\\n\");\n");
     dumpVCDScope(file, this, names);
-    file.write("    fprintf(f, \"$enddefinitions\\n\");\n");
+    file.write("    fprintf(f, \"$enddefinitions $end\\n\");\n");
     file.write("    fprintf(f, \"$dumpvars\\n\");\n");
     file.write("    fprintf(f, \"$end\\n\");\n");
     file.write("  }\n");
