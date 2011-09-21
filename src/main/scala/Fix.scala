@@ -17,7 +17,7 @@ object Fix {
     else if(dir.equals('output))
       res.dir = OUTPUT;
     else
-      println("INVALID DIRECTION");
+      println("INVALID DIRECTION" + dir);
     if(width > 0)
       res.init("", width);
     else 

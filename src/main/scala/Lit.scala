@@ -12,17 +12,17 @@ import ChiselError._;
 
 object Lit {
   def apply[T <: Bits](x: Int)(gen: => T): T = {
-    val cell = new Lit(Literal(x))(gen);
+    val cell = new Lit(Literal(x, signed = gen.isInstanceOf[Fix]))(gen);
     cell.io
   }
   def apply[T <: Bits](x: Int, width: Int)(gen: => T): T = {
-    val cell = new Lit(Literal(x, width))(gen);
+    val cell = new Lit(Literal(x, width, gen.isInstanceOf[Fix]))(gen);
     cell.io
   }
-  def apply[T <: Bits](x: Long, width: Int)(gen: => T): T = {
-    val cell = new Lit(Literal( x, width))(gen);
-    cell.io
-  }
+  // def apply[T <: Bits](x: Long, width: Int)(gen: => T): T = {
+  //   val cell = new Lit(Literal( x, width))(gen);
+  //   cell.io
+  // }
   def apply[T <: Bits](n: String, width: Int = -1)(gen: => T): T = {
     val cell = new Lit(Literal(n, width))(gen);
     cell.io
@@ -55,8 +55,36 @@ object Literal {
     val y = max(1, abs(x)).toDouble;
     val res = max(1, (ceil(log(y+1)/log(2.0))).toInt);
     // println("SIZEOF " + y + " LOG2 " + (log(y)/log(2.0)) + " IS " + res);
-    res
+     res
+   }
+
+  def signedsizeof(x: Int, width: Int = -1, signed: Boolean = false): (Int, String) = {
+    var count = 0;
+    var n = x;
+    var resNum = 0;
+    while((x > 0 && n != 0) || (x < 0 && n != -1)){
+      resNum += (n & 1) << count;
+      count += 1;
+      n >>= 1;
+    }
+    var resWidth = count + (if(x == -1) 2 
+			    else if(signed || x == 0) 1
+			    else 0);
+    resNum += (if(x == -1) 3
+	       else if(x < 0) 1 << (resWidth-1)
+	       else 0); 
+    if(width > 0)
+      if(width < resWidth)
+	ChiselErrors += IllegalState("width " + width + " is too small for literal " + x, 4);
+      else if(width > resWidth && x < 0){
+	while(width > resWidth){
+	  resWidth += 1;
+	  resNum   += 1 << (resWidth-1);
+	}
+      } else {resWidth = width}
+    ((resWidth, resNum.toHexString))
   }
+  
   def sizeof(base: Char, x: String): Int = {
     var res = 0;
     var first = true;
@@ -145,9 +173,21 @@ object Literal {
       -1
   }
 
-  def apply(x: Int): Literal = { val res = new Literal(); res.init("0x%x".format(x), sizeof(x)); res }
-  def apply(x: Int, width: Int): Literal = { val res = new Literal(); res.init("0x%x".format(x), width); res }
-  def apply(x: Long, width: Int): Literal = { val res = new Literal(); res.init("0x%x".format(x), width); res }
+  def apply(x: Int, width: Int = -1, signed: Boolean = false): Literal = { 
+    val res = new Literal(); 
+    val (w, numString) = signedsizeof(x, width, signed);
+    //val n = "0x" + numString;
+    res.init("0x" + numString, w); 
+    res.inputVal = x;
+    res 
+  }
+  // def apply(x: Int, width: Int, signed: Boolean = false): Literal = { 
+  //   val res = new Literal(); 
+  //   val (w, numString) = signedsizeof(x, width, signed);
+  //   res.init("0x" + numString, width); 
+  //   res 
+  // }
+  //def apply(x: Long, width: Int): Literal = { val res = new Literal(); res.init("0x%x".format(x), width); res }
   // def apply(n: String): Lit = { 
   //   val (bits, mask, width) = parseLit(n);  apply(n, width);
   // }
@@ -173,6 +213,7 @@ class Literal extends Node {
   var isZ = false;
   var isBinary = false;
   var base = 'x';
+  var inputVal = 0;
   // override def toString: String = "LIT(" + name + ")"
   override def findNodes(depth: Int, c: Component): Unit = { }
   override def value: Int = stringToVal(base, name);
@@ -182,7 +223,7 @@ class Literal extends Node {
   override def toString: String = name;
   override def emitDecC: String = "";
   override def emitRefC: String = 
-    if (isBinary) { 
+    (if (isBinary) { 
       var (bits, mask, swidth) = parseLit(name);
       var bwidth = if(base == 'b') width else swidth;
       if (isZ) {
@@ -193,16 +234,17 @@ class Literal extends Node {
       ("LIT<" + width + ">(" + name + "L)")
     } else
       ("LIT<" + width + ">(0x" + name + "L)")
-  
+   ) + "/* " + inputVal + "*/";
+    
 
   override def emitDec: String = "";
   override def emitRefV: String = 
-    if (width == -1) name 
+    (if (width == -1) name 
     else if(isBinary) ("" + width + "'b" + name)
     else if(base == 'x') ("" + width + "'h" + name.substring(2, name.length))
     else if(base == 'd') ("" + width + "'d" + name)
     else if(base == 'h') ("" + width + "'h" + name)
-    else "";
+    else "") + "/* " + inputVal + "*/";
   def d (x: Int): Literal = Literal(x, value)
   //def ~(x: String): Lit = Lit(value, x(0), x.substring(1, x.length));
 }

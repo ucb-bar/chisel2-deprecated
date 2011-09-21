@@ -10,6 +10,8 @@ object Op {
     res.init("", widthInfer, a, b);
     res.op = name;
     res.nGrow = nGrow;
+    res.isSigned = a.isInstanceOf[Fix] && b.isInstanceOf[Fix]
+    if(res.isSigned) println("SIGNED OPERATION DETECTED " + name);
     res
   }
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node): Node = {
@@ -28,6 +30,7 @@ class Op extends Node {
       op + inputs(0)
     else
       inputs(0) + op + inputs(1)
+
   def emitOpRef (k: Int): String = {
     if (op == "<<") {
       if (k == 0 && inputs(k).width < width)
@@ -46,6 +49,7 @@ class Op extends Node {
 	inputs(k).emitRef
     }
   }
+
   override def emitDef: String = {
     val c = component;
     "  assign " + emitTmp + " = " + 
@@ -53,10 +57,20 @@ class Op extends Node {
         "{" + inputs(0).emitRef + ", " + inputs(1).emitRef + "}"
        else if (inputs.length == 1)
          op + " " + inputs(0).emitRef
+       else if(isSigned)
+	 emitDefSigned
        else
          inputs(0).emitRef + " " + op + " " + inputs(1).emitRef
       ) + ";\n"
   }
+
+  def emitDefSigned: String = {
+    if(op == ">" || op == "<" || op == ">=" || op == "<=" || op == ">>")
+      "$signed(" + inputs(0).emitRef +") " + op + " $signed(" + inputs(1).emitRef + ")"
+    else
+      inputs(0).emitRef + " " + op + " " + inputs(1).emitRef
+  }
+
   override def emitDefLoC: String = {
     "  " + emitTmp + " = " +
       (if (op == "##") 
@@ -70,9 +84,26 @@ class Op extends Node {
            "reduction_xor(" + inputs(0).emitRef + ")"
          else
            op + inputs(0).emitRef
+       else if(isSigned)
+	 emitSignedDefLoC;
        else
          emitOpRef(0) + " " + op + " " + emitOpRef(1)) +
     ";\n"
+  }
+
+  def emitSignedDefLoC: String = {
+    if(op == ">>")
+      emitOpRef(0) + " >>> " + emitOpRef(1)
+    else if(op == ">")
+      emitOpRef(0) + ".gt(" + emitOpRef(1) + ")"
+    else if(op == ">=")
+      emitOpRef(0) + ".gte(" + emitOpRef(1) + ")"
+    else if(op == "<")
+      emitOpRef(0) + ".lt(" + emitOpRef(1) + ")"
+    else if(op == "<=")
+      emitOpRef(0) + ".lt(" + emitOpRef(1) + ")"
+    else 
+      emitOpRef(0) + " " + op + " " + emitOpRef(1)
   }
 }
 
