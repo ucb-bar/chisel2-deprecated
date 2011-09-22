@@ -62,6 +62,7 @@ class Bits extends IO {
   def &  (b: Bits): Bits = BinaryNodeCell(this, b, "&"){Bits()};
   def |  (b: Bits): Bits = BinaryNodeCell(this, b, "|"){Bits()};
   def ^  (b: Bits): Bits = BinaryNodeCell(this, b, "^"){Bits()};
+  def ## (b: Bits): Bits = BinaryNodeCell(this, b, "##"){Bits()};
 }
 
 }
