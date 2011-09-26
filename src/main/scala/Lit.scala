@@ -39,14 +39,14 @@ class Lit[T <: Bits](x: Literal)(gen: => T) extends Cell {
   val io = gen.asOutput;
   io.setIsCellIO;
   val primitiveNode = x;
-  io := primitiveNode;
+  io assign primitiveNode;
 }
 
 class BoolLit(x: Literal) extends Cell {
   val io = Bool('output);
   io.setIsCellIO;
   val primitiveNode = x;
-  io := primitiveNode;
+  io assign primitiveNode;
 }
 
 object Literal {

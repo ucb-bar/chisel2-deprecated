@@ -26,7 +26,7 @@ class FillCell[T <: Data](data: T) extends Cell {
   io.setIsCellIO;
   val primitiveNode = new Fill();
   primitiveNode.init("primitiveNode", Fill.fillWidthOf(0, io.n), io.mod.toNode, io.n);
-  io.out := primitiveNode;
+  io.out assign primitiveNode;
   primitiveNode.nameHolder = io.out;
 }
 

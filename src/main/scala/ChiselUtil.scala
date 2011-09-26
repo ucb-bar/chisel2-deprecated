@@ -22,9 +22,9 @@ class boolWrapper(x: Boolean) {
   def unary_~() = {
     val res = Bool('output);
     if(myVal)
-      res := Lit(true)
+      res assign Lit(true)
     else
-      res := Lit(false)
+      res assign Lit(false)
     res
   }
 }

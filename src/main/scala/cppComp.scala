@@ -24,7 +24,7 @@ object cppComp {
     val res = new cppComp(fctnName, output.map(a => a.width).toList);
     res.initOf("", fixWidth(1), input.toList);
     for((ioNode, node) <- output zip res.outputNodes){
-      node.init("", ioNode.width, res); ioNode := node;
+      node.init("", ioNode.width, res); ioNode assign node;
     }
     res
   }

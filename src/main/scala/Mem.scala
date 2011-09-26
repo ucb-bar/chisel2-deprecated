@@ -71,7 +71,7 @@ class MemWPort[T <: Data](mem: Mem[T], io: Bundle, addr: Node, data: T, wen: Nod
   addr_port.setName("addr_" + port_offset);
   io += addr_port;
   mem.inputs += addr_port;
-  addr_port := addr;
+  addr_port assign addr;
 
   val data_port = data.clone.asInput;
   data_port.setName("data_" + (port_offset + 1));
@@ -83,7 +83,7 @@ class MemWPort[T <: Data](mem: Mem[T], io: Bundle, addr: Node, data: T, wen: Nod
   wen_port.setName("wen_" + (port_offset + 2));
   io += wen_port;
   mem.inputs += wen_port;
-  wen_port := wen;
+  wen_port assign wen;
 
   if (wbm != null) {
     val wbm_port = wbm.clone.asInput;

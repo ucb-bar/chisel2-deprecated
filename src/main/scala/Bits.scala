@@ -2,6 +2,7 @@ package Chisel {
 
 import IOdir._;
 import Node._;
+import ChiselError._
 
 object Bits {
 
@@ -36,22 +37,28 @@ class Bits extends IO {
   override def toNode = this;
   override def fromNode(n: Node) = {
     val res = Bits('output).asInstanceOf[this.type];
-    res := n;
+    res assign n;
     res
   }
   def := (src: Bits) = {
+    if(this.getClass != src.getClass) 
+      ChiselErrors += TypeError(":=", this.getClass.toString, src.getClass.toString);
     if (comp == null)
-      this.asInstanceOf[IO] := src
+      this.asInstanceOf[IO] assign src
     else
-      comp := src.toNode
+      comp assign src.toNode
   }
 
   def <==(src: Bits) = {
-    comp <== src.toNode;
+    if(this.getClass != src.getClass) 
+      ChiselErrors += TypeError("<==", this.getClass.toString, src.getClass.toString);
+    comp procAssign src.toNode;
   }
 
   override def apply(bit: Int): Bits = { Extract(this, bit){Bits()}};
   override def apply(hi: Int, lo: Int): Bits = {Extract(this, hi, lo){Bits()}};
+  def apply(bit: UFix): Bits = Extract(this, bit){Bits()};
+  def apply(hi: UFix, lo: UFix): Bits = Extract(this, hi, lo, -1){Bits()};
 
   def unary_-(): Bits = UnaryNodeCell(this, "-"){Bits()};
   def unary_~(): Bits = UnaryNodeCell(this, "~"){Bits()};

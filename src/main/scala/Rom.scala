@@ -72,7 +72,7 @@ class Rom(data_vals: Array[Node]) extends Delay {
   def apply(addr: UFix): Fix = {
     val res = Fix('output);
     res.setIsCellIO;
-    res := MemRef(this, addr);
+    res assign MemRef(this, addr);
     res
   }
 }

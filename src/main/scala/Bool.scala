@@ -26,20 +26,20 @@ object Bool {
 class Bool extends Bits {
   override def fromNode(n: Node) = {
     val res = Bool('output).asInstanceOf[this.type];
-    res := n;
+    res assign n;
     res
   }
 
   
   def := (src: Bool) = {
     if (comp == null)
-      this.asInstanceOf[IO] := src
+      this.asInstanceOf[IO] assign src
     else
-      comp := src.toNode;
+      comp assign src.toNode;
   }
 
   def <==(src: Bool) = {
-    comp <== src.toNode;
+    comp procAssign src.toNode;
   }
 
   override def unary_-(): Bool = UnaryBoolCell(this, "-");

@@ -34,25 +34,27 @@ class UFix extends Num {
   type T = UFix;
   override def fromNode(n: Node) = {
     val res = UFix('output).asInstanceOf[this.type];
-    res := n;
+    res assign n;
     res
   }
 
   def <==(src: UFix) = {
-    comp <== src.toNode;
+    comp procAssign src.toNode;
   }
 
   def := (src: UFix) = {
     if (comp == null)
-      this.asInstanceOf[IO] := src
+      this.asInstanceOf[IO] assign src
     else
-      comp := src.toNode
+      comp assign src.toNode
   }
 
 
   
   override def apply(bit: Int): UFix = { Extract(this, bit){UFix()}};
   override def apply(hi: Int, lo: Int): UFix = {Extract(this, hi, lo){UFix()}};
+  override def apply(bit: UFix): UFix = {Extract(this, bit){UFix()}};
+
   override def unary_-(): UFix = UnaryNodeCell(this, "-"){UFix()};
   override def unary_~(): UFix = UnaryNodeCell(this, "~"){UFix()};
   def unary_!(): UFix = UnaryNodeCell(this, "!"){UFix()};

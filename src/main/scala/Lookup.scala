@@ -9,7 +9,7 @@ object Lookup {
   def apply[T <: Data](addr: Bits, default: T, mapping: Seq[(Bits, T)]): T = {
     val lookupCell = new LookupCell(default, mapping);
     lookupCell.io.default <> default;
-    lookupCell.io.addr := addr;
+    lookupCell.io.addr assign addr;
     lookupCell.io.out
   }
 

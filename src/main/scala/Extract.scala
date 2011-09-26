@@ -14,16 +14,17 @@ object Extract {
     res.lo = bit;
     res
   }
-  def apply[T <: Bits](mod: T, bit: Fix)(gen: => T): T = {
+  def apply[T <: Bits](mod: T, bit: UFix)(gen: => T): T = {
     val bitcell = new BitExtractCell(gen);
     bitcell.io.in <> mod;
     bitcell.io.hi <> bit;
     bitcell.io.out;
   }
   def apply (mod: Node, bit: Int): Node = 
-    apply(mod, Fix(bit));
+    apply(mod, UFix(bit));
   def apply[T <: Bits](mod: T, bit: Int)(gen: => T): T = 
-    apply(mod, Fix(bit))(gen);
+     apply(mod, UFix(bit))(gen);
+
   // extract bit range
   def apply (mod: Node, hi: Node, lo: Node): Node = {
     val res = new Extract();
@@ -32,11 +33,11 @@ object Extract {
     res.lo = lo;
     res
   }
-  def apply[T <: Bits](mod: T, hi: Fix, lo: Fix, w: Int = -1)(gen: => T): T = {
+  def apply[T <: Bits](mod: T, hi: UFix, lo: UFix, w: Int = -1)(gen: => T): T = {
     val bitcell = new RangeExtractCell(w)(gen);
     bitcell.io.in <> mod;
-    bitcell.io.hi := hi;
-    bitcell.io.lo := lo;
+    bitcell.io.hi assign hi;
+    bitcell.io.lo assign lo;
     bitcell.io.out
   }
   def apply (mod: Node, hi: Int, lo: Int): Node = {
@@ -48,15 +49,15 @@ object Extract {
     res
   }
   def apply[T <: Bits](mod: T, hi: Int, lo: Int)(gen: => T): T ={
-    apply(mod, Fix(hi), Fix(lo), hi-lo+1)(gen);
+    apply(mod, UFix(hi), UFix(lo), hi-lo+1)(gen);
   }
 }
 
 abstract class ExtractCell[T <: Bits](gen: => T){
   val io = new Bundle(){
     val in = gen.asInput;
-    val hi = Fix('input);
-    val lo = Fix('input);
+    val hi = UFix('input);
+    val lo = UFix('input);
     val out = gen.asOutput;
   }
   io.setIsCellIO;

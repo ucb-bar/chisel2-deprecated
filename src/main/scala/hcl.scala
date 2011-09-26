@@ -143,8 +143,9 @@ abstract class Data extends Node {
   def toNode: Node = this;
   def fromNode(n: Node): this.type = this;
   def <==[T <: Data](data: T) = {
+    if(this.getClass != data.getClass) println("Mismatched types: " + this.getClass + " " + data.getClass);
     data.setIsCellIO;
-    comp <== data.toNode;
+    comp procAssign data.toNode;
   }
   override def clone(): this.type = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
@@ -177,7 +178,7 @@ trait proc extends Node {
       }
     }
   }
-  def <==(src: Node);
+  def procAssign(src: Node);
   procs += this;
 }
 

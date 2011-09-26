@@ -22,7 +22,7 @@ class CatCell[T <: Data](mod: T, mods: List[T]){
       res
     } else
       mods.foldLeft(mod.toNode){(a, b) => a ## b.toNode}
-  io.out := primitiveNode;
+  io.out assign primitiveNode;
   primitiveNode.nameHolder = io.out
 }
 

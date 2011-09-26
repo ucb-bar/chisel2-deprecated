@@ -69,7 +69,7 @@ object Node {
       val res = UFix('output);
       res.setIsCellIO;
       x.nameHolder = res;
-      res := x;
+      res assign x;
       res
     })
   }
@@ -139,10 +139,10 @@ abstract class Node extends nameable{
     (this.asInstanceOf[Bits] & ~bit) | (dat << off);
   }
   // TODO: MOVE TO WIRE
-  def :=(src: Node) = { if (inputs.length > 0) inputs(0) = src; else inputs += src; }
+  def assign(src: Node) = { if (inputs.length > 0) inputs(0) = src; else inputs += src; }
   def <>(src: Node) = { 
     // println("M <>'ing " + this + " & " + src);
-    this := src 
+    this assign src 
   }
   def ><(src: Node) = {
     src match {
@@ -150,7 +150,7 @@ abstract class Node extends nameable{
         var off = 0;
         for ((n, io) <- b.flatten) {
           if (io.dir == INPUT) {
-            io := this(off+io.width-1,off);
+            io assign this(off+io.width-1,off);
             off += io.width;
           }
         }
@@ -162,7 +162,7 @@ abstract class Node extends nameable{
     // println("^^ " + this + " & " + src);
     //this := src 
     println("NODE ^^ " + this.getClass + " " + src);
-    src := this;
+    src assign this;
   }
   def apply(bit: Int): Node = { Extract(this, bit) };
   def apply(hi: Int, lo: Int): Node = { Extract(this, hi, lo) };
@@ -434,11 +434,11 @@ abstract class Node extends nameable{
   def Match(mods: Array[Node]) {
     var off = 0;
     for (m <- mods.reverse) {
-      val res = Extract(this.asInstanceOf[Fix], off+m.getWidth-1, off){Fix()};
+      val res = Extract(this.asInstanceOf[Bits], off+m.getWidth-1, off){Bits()};
       m match {
-        case r: Reg => r <== res;
+        case r: Reg => r procAssign res;
 	case i: Bits => i <== res;
-        case o      => o := res;
+        case o      => o assign res;
       }
       off += m.getWidth;
     }

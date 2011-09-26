@@ -15,7 +15,7 @@ object Wire {
   }
   def apply[T <: Data](default: T): T = {
     val junctioncell = new WireCell[T](default, -1, true)(default.clone.asInstanceOf[T]);
-    junctioncell.io.in := default;
+    junctioncell.io.in assign default;
     junctioncell.io.out
   }
 }
@@ -48,10 +48,10 @@ class Wire extends Data with proc{
   override def toNode = this;
   override def fromNode(src: Node) = {
     val res = new Wire().asInstanceOf[this.type];
-    res := src;
+    res assign src;
     res
   }
-  def <==(src: Node) = {
+  def procAssign(src: Node) = {
     if (assigned) {
       ChiselErrors += IllegalState("reassignment to Node", 3);
     } else {
@@ -77,10 +77,10 @@ class Wire extends Data with proc{
       ""
     // "  " + emitTmp + " = " + inputs(0).emitRef + ";\n"
 
-  override def :=(src: Node) = {
+  override def assign(src: Node) = {
     if(assigned || inputs(0) != null)
       ChiselErrors += IllegalState("reassignment to Node", 3);
-    else { assigned = true; super.:=(src)}
+    else { assigned = true; super.assign(src)}
   }
 }
 

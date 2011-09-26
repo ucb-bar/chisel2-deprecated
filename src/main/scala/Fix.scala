@@ -35,24 +35,22 @@ class Fix extends Num {
   type T = Fix;
   override def fromNode(n: Node) = {
     val res = Fix('output).asInstanceOf[this.type]; 
-    res := n; 
+    res assign n; 
     res};
   def <==(src: Fix) = {
-    comp <== src.toNode;
+    comp procAssign src.toNode;
   }
   def := (src: Fix) = {
     if (comp == null)
-      this.asInstanceOf[IO] := src
+      this.asInstanceOf[IO] assign src
     else
-      comp := src.toNode;
+      comp assign src.toNode;
   }
   
   def gen[T <: Num](): T = Fix().asInstanceOf[T];
 
   override def apply(bit: Int): Fix = { Extract(this, bit){Fix()}};
   override def apply(hi: Int, lo: Int): Fix = {Extract(this, hi, lo){Fix()}};
-  def apply(hi: Fix, lo: Fix): Fix = Extract(this, hi, lo, -1){Fix()};
-  def apply(bit: Fix): Fix = {Extract(this, bit){Fix()}};
   override def unary_-(): Fix = UnaryNodeCell(this, "-"){Fix()};
   override def unary_~(): Fix = UnaryNodeCell(this, "~"){Fix()};
   def unary_!(): Fix = UnaryNodeCell(this, "!"){Fix()};

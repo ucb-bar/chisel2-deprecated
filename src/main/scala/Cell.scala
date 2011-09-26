@@ -23,13 +23,13 @@ class ConversionCell[S <: Data, T <: Bits](x: S)(gen: => T) extends Cell {
   //val primitiveNode = x;
   primitiveNode.nameHolder = io;
   primitiveNode.init("", widthOf(0), x);
-  io := primitiveNode
+  io assign primitiveNode
 }
 
 object UnaryNodeCell {
   def apply[T <: Data](x: T, op: String)(gen: => T): T = {
     val res = new UnaryNodeCell(op)(gen);
-    res.io.In := x;
+    res.io.In assign x;
     res.io.Out
   }
 }
@@ -48,14 +48,14 @@ class UnaryNodeCell[T <: Data](op: String)(gen: => T) extends Cell {
   }
   primitiveNode.name = "primitiveNode"
   primitiveNode.nameHolder = io.Out;
-  io.Out := primitiveNode;
+  io.Out assign primitiveNode;
 }
 
 object BinaryNodeCell {
   def apply[T <: Data](x: T, y: T, op: String)(gen: => T): T = {
     val res = new BinaryNodeCell(op)(gen);
-    res.io.X := x;
-    res.io.Y := y;
+    res.io.X assign x;
+    res.io.Y assign y;
     res.io.Z
   }
 }
@@ -83,14 +83,14 @@ class BinaryNodeCell[T <: Data](op: String)(gen: => T) extends Cell {
   }
   primitiveNode.name = "primitiveNode";
   primitiveNode.nameHolder = io.Z;
-  io.Z := primitiveNode;
+  io.Z assign primitiveNode;
 }
 
 object LogicalNodeCell {
   def apply[T <: Data](x: T, y: T, op: String)(gen: => T): Bool = {
     val res = new LogicalNodeCell(op)(gen);
-    res.io.X := x;
-    res.io.Y := y;
+    res.io.X assign x;
+    res.io.Y assign y;
     res.io.Z
   }
 }
@@ -115,14 +115,14 @@ class LogicalNodeCell[T <: Data](op: String)(gen: => T) extends Cell {
   }
   primitiveNode.name = "primitiveNode";
   primitiveNode.nameHolder = io.Z;
-  io.Z := primitiveNode;
+  io.Z assign primitiveNode;
 
 }
 
 object ReductionNodeCell {
   def apply[T <: Data](x: T, op: String)(gen: => T): Bool = {
     val res = new ReductionNodeCell(op)(gen);
-    res.io.In := x;
+    res.io.In assign x;
     res.io.Out
   }
 }
@@ -141,14 +141,14 @@ class ReductionNodeCell[T <: Data](op: String)(gen: => T) extends Cell {
   }
   primitiveNode.name = "primitiveNode";
   primitiveNode.nameHolder = io.Out;
-  io.Out := primitiveNode;
+  io.Out assign primitiveNode;
 }
 
 
 object UnaryBoolCell {
   def apply(x: Bool, op: String): Bool = {
     val res = new UnaryBoolCell(op);
-    res.io.In := x;
+    res.io.In assign x;
     res.io.Out
   }
 }
@@ -167,15 +167,15 @@ class UnaryBoolCell(op: String) extends Cell {
   }
   primitiveNode.name = "primitiveNode"
   primitiveNode.nameHolder = io.Out;
-  io.Out := primitiveNode;
+  io.Out assign primitiveNode;
 }
 
 
 object BinaryBoolCell {
   def apply(x: Bool, y: Bool, op: String): Bool = {
     val res = new BinaryBoolCell(op);
-    res.io.X := x;
-    res.io.Y := y;
+    res.io.X assign x;
+    res.io.Y assign y;
     res.io.Z
   }
 }
@@ -203,14 +203,14 @@ class BinaryBoolCell(op: String) extends Cell {
   }
   primitiveNode.name = "primitiveNode";
   primitiveNode.nameHolder = io.Z;
-  io.Z := primitiveNode;
+  io.Z assign primitiveNode;
 } 
 
 object or {
     def apply(x: Bits): Bool = {
 		val res = new or(); // trick the compiler to keeping the class
     	ReductionNodeCell(x, "|"){Bits()}
-        res.io.In := x;
+        res.io.In assign x;
         res.io.Out
     }
 }
@@ -221,7 +221,7 @@ class or extends ReductionNodeCell[Bits]("|")(Bits()) {
 object and {
     def apply(x: Bits): Bool = {
 		val res = new and(); // trick the compiler to keeping the class
-        res.io.In := x;
+        res.io.In assign x;
         res.io.Out
     }
 }
@@ -232,7 +232,7 @@ class and extends ReductionNodeCell[Bits]("&")(Bits()) {
 object xor {
     def apply(x: Bits): Bool = {
         val res = new xor()
-        res.io.In := x;
+        res.io.In assign x;
         res.io.Out
     }
 }

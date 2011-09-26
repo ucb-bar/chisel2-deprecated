@@ -188,7 +188,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     var ind = 0;
     for((name, io) <- res.flatten.toList.reverse) {
       io.asOutput();
-      if(io.width > 1) io := Extract(n, ind + io.width-1, ind) else io := Extract(n, ind);
+      if(io.width > 1) io assign Extract(n, ind + io.width-1, ind) else io assign Extract(n, ind);
       ind += io.width;
     }
     res

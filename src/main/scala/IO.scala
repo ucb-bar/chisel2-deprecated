@@ -82,7 +82,7 @@ class IO extends Wire {
       src match { 
       case other: IO => 
         if (other.dir == OUTPUT || isCellIO) {
-          this := other;
+          this assign other;
         } else {
           ChiselErrors += IllegalConnection("Connecting Input " + this + " to Input " + other, 2);
         }
@@ -93,7 +93,7 @@ class IO extends Wire {
       src match { 
         case other: IO  => 
           if (other.dir == INPUT || isCellIO) {
-            other := this;
+            other assign this;
           } else {
             ChiselErrors += IllegalConnection("Connecting Output " + this + " to Output " + other, 2);
           }
@@ -108,7 +108,7 @@ class IO extends Wire {
       parent match { 
         case other: IO => 
           if (other.dir == INPUT || isCellIO) {
-            this := other;
+            this assign other;
           } else 
             ChiselErrors += IllegalConnection("^^ing Input " + this + " to Output " + other, 2);
         case default => 
@@ -119,7 +119,7 @@ class IO extends Wire {
       parent match { 
         case other: IO  => 
           if (other.dir == OUTPUT || isCellIO) {
-            other := this;
+            other assign this;
           } else
             ChiselErrors += IllegalConnection("^^ing Output " + this + " to Input " + other, 2);
         case default => 
@@ -127,7 +127,7 @@ class IO extends Wire {
       } 
     }
   }
-  override def :=(src: Node) = {
+  override def assign(src: Node) = {
     if(assigned)
       ChiselErrors += IllegalState("reassignment to output", 3);
     else { 
@@ -145,7 +145,7 @@ class IO extends Wire {
   }
   override def emitRefV = if(name == "") super.emitRefV else if(!named) name + "_" + emitIndex else name
   override def setIsCellIO = isCellIO = true;
-  override def setIsClkInput = {isClkInput = true; this := clk;}
+  override def setIsClkInput = {isClkInput = true; this assign clk;}
   override def clone = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
     res.init("", widthOf(0), null);
@@ -156,7 +156,7 @@ class IO extends Wire {
     val res = new IO().asInstanceOf[this.type];
     res.init("", widthOf(0), src);
     res.dir = dir;
-    res := src;
+    res assign src;
     res
   }
   override def maxNum = {
