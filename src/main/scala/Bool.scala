@@ -31,14 +31,14 @@ class Bool extends Bits {
   }
 
   
-  def := (src: Bool) = {
+  override def := (src: Bool) = {
     if (comp == null)
       this.asInstanceOf[IO] assign src
     else
       comp assign src.toNode;
   }
 
-  def <==(src: Bool) = {
+  override def <==(src: Bool) = {
     comp procAssign src.toNode;
   }
 

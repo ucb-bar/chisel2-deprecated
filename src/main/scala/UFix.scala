@@ -38,11 +38,11 @@ class UFix extends Num {
     res
   }
 
-  def <==(src: UFix) = {
+  override def <==(src: UFix) = {
     comp procAssign src.toNode;
   }
 
-  def := (src: UFix) = {
+  override def := (src: UFix) = {
     if (comp == null)
       this.asInstanceOf[IO] assign src
     else

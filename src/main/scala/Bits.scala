@@ -40,20 +40,38 @@ class Bits extends IO {
     res assign n;
     res
   }
-  def := (src: Bits) = {
-    if(this.getClass != src.getClass) 
-      ChiselErrors += TypeError(":=", this.getClass.toString, src.getClass.toString);
-    if (comp == null)
+
+  def generateError(src: Bits) = {
+    val myClass = this.getClass;
+    val srcClass = src.getClass;
+    if(myClass != classOf[Bits] && myClass == srcClass)
+      ChiselErrors += TypeError(":=", myClass.toString, classOf[Bits].toString)
+    else if(myClass != classOf[Bits])
+      ChiselErrors += TypeError(":=", myClass.toString, srcClass.toString)
+  }
+
+  private def colonEqual(src: Bits) = {
+    generateError(src);
+    if(comp == null)
       this.asInstanceOf[IO] assign src
     else
       comp assign src.toNode
   }
 
-  def <==(src: Bits) = {
-    if(this.getClass != src.getClass) 
-      ChiselErrors += TypeError("<==", this.getClass.toString, src.getClass.toString);
+  private def lessEqEq(src: Bits) = {
+    generateError(src);
     comp procAssign src.toNode;
   }
+
+  def := (src: Bits) = colonEqual(src);
+  def := (src: Bool) = colonEqual(src);
+  def := (src: Fix)  = colonEqual(src);
+  def := (src: UFix) = colonEqual(src);
+
+  def <== (src: Bits) = lessEqEq(src);
+  def <== (src: Bool) = lessEqEq(src);
+  def <== (src: Fix)  = lessEqEq(src);
+  def <== (src: UFix) = lessEqEq(src);
 
   override def apply(bit: Int): Bits = { Extract(this, bit){Bits()}};
   override def apply(hi: Int, lo: Int): Bits = {Extract(this, hi, lo){Bits()}};

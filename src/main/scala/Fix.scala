@@ -37,16 +37,24 @@ class Fix extends Num {
     val res = Fix('output).asInstanceOf[this.type]; 
     res assign n; 
     res};
-  def <==(src: Fix) = {
+  
+  private def lessEqEq(src: Num) = {
     comp procAssign src.toNode;
   }
-  def := (src: Fix) = {
+
+  private def colonEqual(src: Num) = {
     if (comp == null)
       this.asInstanceOf[IO] assign src
     else
-      comp assign src.toNode;
+      comp assign src.toNode
   }
-  
+
+  override def :=(src: Fix)  = colonEqual(src);
+  override def :=(src: UFix) = colonEqual(Cat(Bits(0), src).toUFix);
+
+  override def <==(src: Fix)  = lessEqEq(src);
+  override def <==(src: UFix) = lessEqEq(Cat(Bits(0), src).toUFix);
+
   def gen[T <: Num](): T = Fix().asInstanceOf[T];
 
   override def apply(bit: Int): Fix = { Extract(this, bit){Fix()}};
