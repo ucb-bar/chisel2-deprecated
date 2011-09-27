@@ -201,11 +201,14 @@ abstract class Node extends nameable{
   def infer: Boolean = {
     val res = inferWidth(this);
     // println("INFER " + this + " -> " + res);
-    if (res != width) {
+    if(res == -1) 
+      return true
+    else if (res != width) {
       width_ = res;
       return true;
-    } else
+    } else{
       return false;
+    }
   }
   def emitIndex: Int = { if (index == -1) index = componentOf.nextIndex; index }
   def isInObject = isIo || isReg || isUsedByRam || isProbe || (isDebug && named);

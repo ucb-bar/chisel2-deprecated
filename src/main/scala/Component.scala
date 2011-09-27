@@ -291,8 +291,9 @@ abstract class Component {
           // println("ENQUEUING " + c);
           nexts.enqueue(c);
         }
-        for (i <- next.inputs)
+        for (i <- next.inputs){
           nexts.enqueue(i);
+	}
       }
     }
   }
