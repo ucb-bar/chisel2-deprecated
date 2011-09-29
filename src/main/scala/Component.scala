@@ -498,15 +498,19 @@ abstract class Component {
 			       cell.named = true;
 			      if(cell.isReg) containsReg = true;
 			    }
-	  case bb: BlackBox => {bb.name = name;
-				bb.named = true;
-				for((n, elm) <- io.flatten)
-				  if(elm.isClkInput)
-				    containsReg = true
-			      }
-	  case comp: Component => {if(!comp.named) {comp.instanceName = name; comp.named = true};
-				   comp.pathParent = this;
-				 }
+	  case bb: BlackBox => {
+            if(!bb.named) {bb.instanceName = name; bb.named = true};
+            bb.pathParent = this;
+            //bb.name = name;
+            //bb.named = true;
+            for((n, elm) <- io.flatten) {
+              if (elm.isClkInput) containsReg = true
+            }
+          }
+	  case comp: Component => {
+            if(!comp.named) {comp.instanceName = name; comp.named = true};
+            comp.pathParent = this;
+          }
           case any =>
         }
       }
