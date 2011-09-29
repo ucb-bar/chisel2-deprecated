@@ -59,30 +59,42 @@ class Fix extends Num {
 
   override def apply(bit: Int): Fix = { Extract(this, bit){Fix()}};
   override def apply(hi: Int, lo: Int): Fix = {Extract(this, hi, lo){Fix()}};
-  override def unary_-(): Fix = UnaryNodeCell(this, "-"){Fix()};
-  override def unary_~(): Fix = UnaryNodeCell(this, "~"){Fix()};
-  def unary_!(): Fix = UnaryNodeCell(this, "!"){Fix()};
+
   def andR(): Bool    = ReductionNodeCell(this, "&"){Fix()};
   def orR():  Bool    = ReductionNodeCell(this, "|"){Fix()};
   def xorR(): Bool   = ReductionNodeCell(this, "^"){Fix()};
+  override def unary_-(): Fix = UnaryNodeCell(this, "-"){Fix()};
+  override def unary_~(): Fix = UnaryNodeCell(this, "~"){Fix()};
+  def unary_!(): Fix = UnaryNodeCell(this, "!"){Fix()};
   def << (b: Fix): Fix = BinaryNodeCell(this, b, "<<"){Fix()};
   def >> (b: Fix): Fix = BinaryNodeCell(this, b, ">>"){Fix()};
   def >>> (b: Fix): Fix = BinaryNodeCell(this, b, ">>>"){Fix()};
-  def +  (b: Fix): Fix = BinaryNodeCell(this, b, "+"){Fix()};
-  def *  (b: Fix): Fix = BinaryNodeCell(this, b, "*"){Fix()};
   def ^  (b: Fix): Fix = BinaryNodeCell(this, b, "^"){Fix()};
   def ?  (b: Fix): Fix = BinaryNodeCell(this, b, "?"){Fix()};
-  def -  (b: Fix): Fix = BinaryNodeCell(this, b, "-"){Fix()};
   def ## (b: Fix): Fix = BinaryNodeCell(this, b, "##"){Fix()};
+  def &  (b: Fix): Fix = BinaryNodeCell(this, b, "&"){Fix()};
+  def |  (b: Fix): Fix = BinaryNodeCell(this, b, "|"){Fix()};
+
+  //Fix to Fix arithmetic
+  def +  (b: Fix): Fix = BinaryNodeCell(this, b, "+"){Fix()};
+  def *  (b: Fix): Fix = BinaryNodeCell(this, b, "*"){Fix()};
   def ===(b: Fix): Bool = LogicalNodeCell(this, b, "==="){Fix()};
+  def -  (b: Fix): Fix = BinaryNodeCell(this, b, "-"){Fix()};
   def != (b: Fix): Bool = LogicalNodeCell(this, b, "!="){Fix()};
   def >  (b: Fix): Bool = LogicalNodeCell(this, b, ">"){Fix()};
   def <  (b: Fix): Bool = LogicalNodeCell(this, b, "<"){Fix()};
   def <= (b: Fix): Bool = LogicalNodeCell(this, b, "<="){Fix()};
   def >= (b: Fix): Bool = LogicalNodeCell(this, b, ">="){Fix()};
-  def && (b: Fix): Bool = LogicalNodeCell(this, b, "&&"){Fix()};
-  def || (b: Fix): Bool = LogicalNodeCell(this, b, "||"){Fix()};
-  def &  (b: Fix): Fix = BinaryNodeCell(this, b, "&"){Fix()};
-  def |  (b: Fix): Fix = BinaryNodeCell(this, b, "|"){Fix()};
+
+  //Fix to UFix arithmetic
+  def +   (b: UFix): Fix = this + Cat(Bits(0, 1), b).toFix;
+  def *   (b: UFix): Fix = this * Cat(Bits(0, 1), b).toFix;
+  def -   (b: UFix): Fix = this - Cat(Bits(0, 1), b).toFix;
+  def === (b: UFix): Bool = this === Cat(Bits(0, 1), b).toFix;
+  def !=  (b: UFix): Bool = this != Cat(Bits(0, 1), b).toFix;
+  def >   (b: UFix): Bool = this > Cat(Bits(1, 1), b).toFix;
+  def <   (b: UFix): Bool = this < Cat(Bits(1, 1), b).toFix;
+  def >=  (b: UFix): Bool = this >= Cat(Bits(1, 1), b).toFix;
+  def <=  (b: UFix): Bool = this <= Cat(Bits(1, 1), b).toFix;
 }
 }

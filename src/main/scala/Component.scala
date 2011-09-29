@@ -110,8 +110,12 @@ abstract class Component {
   var defaultWidth = 32;
   var moduleName: String = "";
   var className:  String = "";
+  var instanceName: String = "";
+  var pathName: String = "";
+  var pathParent: Component = null;
   val childNames = new HashMap[String, Int];
   var named = false;
+  var verilog_parameters = "";
   components += this;
   def depthString(depth: Int): String = {
     var res = "";
@@ -177,7 +181,8 @@ abstract class Component {
   def emitRefC: String = emitRefV;
   def emitRefV: String = name;
   def emitDef: String = {
-    var res = "  " + moduleName + " " + name + "(";
+    val spacing = (if(verilog_parameters != "") " " else "");
+    var res = "  " + moduleName + " " +verilog_parameters+ spacing + instanceName + "(";
     val hasReg = containsReg || childrenContainsReg;
     res = res + (if(hasReg) ".clk(clk), .reset(reset)" else "");
     var isFirst = true;
@@ -488,17 +493,20 @@ abstract class Component {
 	  //case comp: Component => { comp.component = this;}
           case node: Node => { if (name != "io" && (node.isCellIO || (node.name == "" && !node.named) || node.name == null)) node.name_it(name, true);
 			       if (node.isReg || node.isRegOut || node.isClkInput) containsReg = true;
-			     }
+			    }
 	  case cell: Cell => { cell.name = name;
 			       cell.named = true;
 			      if(cell.isReg) containsReg = true;
-	  }
+			    }
 	  case bb: BlackBox => {bb.name = name;
 				bb.named = true;
-				 for((n, elm) <- io.flatten)
-				   if(elm.isClkInput)
-				     containsReg = true
-	  }
+				for((n, elm) <- io.flatten)
+				  if(elm.isClkInput)
+				    containsReg = true
+			      }
+	  case comp: Component => {if(!comp.named) {comp.instanceName = name; comp.named = true};
+				   comp.pathParent = this;
+				 }
           case any =>
         }
       }
@@ -513,6 +521,7 @@ abstract class Component {
 	childNames += (child.className -> 0);
 	child.name = child.className;
       }
+      child.instanceName = child.name;
       child.named = true;
     }
   }
@@ -627,6 +636,15 @@ abstract class Component {
     }
     file.write("}\n");
   }
+
+  def getPathName: String = {
+    val res = (if(instanceName != "") instanceName else name);
+    if(pathParent == null)
+      return res;
+    else
+      pathParent.getPathName + "_" + res;
+  }
+
   def compileC(): Unit = {
     for (c <- components) 
       c.markComponent();
@@ -649,7 +667,7 @@ abstract class Component {
     findNodes(0, this);
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors)	err.printError;
-      throw new IllegalStateException("Code has errors");
+      throw new IllegalStateException("Code has " + ChiselErrors.length + " errors");
       return
     }
     if (!isEmittingComponents)
@@ -665,8 +683,10 @@ abstract class Component {
       m match {
         case l: Literal => ;
         case any    => 
-          if (m.name != "" && m != reset && !(m.component == null)) 
-            m.name = m.component.name + "__" + m.name;
+          if (m.name != "" && m != reset && !(m.component == null)) {
+            //m.name = m.component.name + (if(m.component.instanceName != "") "_" else "") + m.component.instanceName + "__" + m.name;
+	    m.name = m.component.getPathName + "__" + m.name;
+	  }
       }
       // println(">> " + m.name);
     }

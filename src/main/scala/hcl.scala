@@ -195,6 +195,10 @@ abstract class BlackBox extends Component {
   override def doCompileV(out: java.io.FileWriter, depth: Int): Unit = {
     findNodes(depth, this);
   }
+
+  def setVerilogParamters(string: String) = 
+    this.asInstanceOf[Component].verilog_parameters = string;
+
   override def name_it() = {
     if(!moduleNameSet) {
       val cname = getClass().getName();

@@ -79,7 +79,7 @@ class Wire extends Data with proc{
 
   override def assign(src: Node) = {
     if(assigned || inputs(0) != null)
-      ChiselErrors += IllegalState("reassignment to Node", 3);
+      ChiselErrors += IllegalState("reassignment to Wire", 3);
     else { assigned = true; super.assign(src)}
   }
 }

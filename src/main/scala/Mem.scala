@@ -62,6 +62,7 @@ class MemCell[T <: Data](n: Int, data: T) extends Cell {
 class MemWPort[T <: Data](mem: Mem[T], io: Bundle, addr: Node, data: T, wen: Node, wbm: T = null.asInstanceOf[T]) {
   val port_offset = mem.inputs.length;
   val m = mem;
+  var indent = "";
 
   //mem.inputs += addr;
   //mem.inputs += data;
@@ -102,20 +103,20 @@ class MemWPort[T <: Data](mem: Mem[T], io: Bundle, addr: Node, data: T, wen: Nod
     i == wrData || i == wrAddr || i == wrEnable;
   }
   def emitDef: String = {
-    var res = 
-      "  always @(posedge clk) begin\n"
+    var res = "";
+      //"  always @(posedge clk) begin\n"
     if (wbm == null) {
       res +=
-      "    if (" + wrEnable.emitRef + ")\n" +
-      "      " + m.emitRef + "[" + wrAddr.emitRef + "] <= " + wrData.emitRef + ";\n"
+      indent + "    if (" + wrEnable.emitRef + ")\n" +
+      indent + "      " + m.emitRef + "[" + wrAddr.emitRef + "] <= " + wrData.emitRef + ";\n"
     } else {
       res +=
-      "    if (" + wrEnable.emitRef + ")\n" +
-      "      " + m.emitRef + "[" + wrAddr.emitRef + "] <= " +
+      indent + "    if (" + wrEnable.emitRef + ")\n" +
+      indent + "      " + m.emitRef + "[" + wrAddr.emitRef + "] <= " +
         wrData.emitRef + " & " + wrBitMask.emitRef + " | " +
         m.emitRef + "[" + wrAddr.emitRef + "] & ~" + wrBitMask.emitRef + ";\n"
     }
-    res += "  end\n";
+    //res += indent + "  end\n";
     res
   }
   def emitDefHiC: String = {
@@ -153,13 +154,14 @@ class MemResetPort[T <: Data](mem: Mem[T], io: Bundle, reset_val: T) {
 
   def emitDef: String = {
     var res = 
-      "  always @(posedge clk) begin\n" +
+      //"  always @(posedge clk) begin\n" +
       "    if (reset) begin\n"
     for (i <- 0 until m.n) {
       res += "      " + m.emitRef + "[" + i + "] <= " + resetVal.emitRef + ";\n";
     }
-    res += "    end\n";
-    res += "  end\n";
+    //res += "    end\n";
+    res += "    end else begin\n"; 
+    //res += "  end\n";
     res
   }
   def emitDefHiC: String = {
@@ -199,10 +201,19 @@ class Mem[T <: Data](n_val: Int, w_data: T) extends Delay {
 
   override def toString: String = "MEM(" + ")";
   override def emitDef: String = {
-    var res = ("" /: write_ports) { (s, p) => s + p.emitDef };
-    if (reset_port_opt != None) {
-      res += reset_port_opt.get.emitDef;
+    val hasReset = reset_port_opt != None;
+    var res = "  always @(posedge clk) begin\n"
+    if(hasReset){
+      res += reset_port_opt.get.emitDef
     }
+    res += ("" /: write_ports) { (s, p) => {if(hasReset) p.indent = "  "; s + p.emitDef} };
+    if(hasReset){
+      res += "    end\n"
+    }
+    res += "  end\n"
+    //if (reset_port_opt != None) {
+    //  res += reset_port_opt.get.emitDef;
+    //}
     res
   }
   override def emitDec: String = 
