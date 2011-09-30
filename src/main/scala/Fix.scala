@@ -59,6 +59,8 @@ class Fix extends Num {
 
   override def apply(bit: Int): Fix = { Extract(this, bit){Fix()}};
   override def apply(hi: Int, lo: Int): Fix = {Extract(this, hi, lo){Fix()}};
+  override def apply(bit: UFix): Fix = {Extract(this, bit){Fix()}};
+  override def apply(hi: UFix, lo: UFix): Fix = {Extract(this, hi, lo, -1){Fix()}};
 
   def andR(): Bool    = ReductionNodeCell(this, "&"){Fix()};
   def orR():  Bool    = ReductionNodeCell(this, "|"){Fix()};
@@ -66,9 +68,8 @@ class Fix extends Num {
   override def unary_-(): Fix = UnaryNodeCell(this, "-"){Fix()};
   override def unary_~(): Fix = UnaryNodeCell(this, "~"){Fix()};
   def unary_!(): Fix = UnaryNodeCell(this, "!"){Fix()};
-  def << (b: Fix): Fix = BinaryNodeCell(this, b, "<<"){Fix()};
-  def >> (b: Fix): Fix = BinaryNodeCell(this, b, ">>"){Fix()};
-  def >>> (b: Fix): Fix = BinaryNodeCell(this, b, ">>>"){Fix()};
+  override def << (b: UFix): Fix = BinaryNodeCell(this, b.toFix, "<<"){Fix()};
+  override def >> (b: UFix): Fix = BinaryNodeCell(this, b.toFix, ">>"){Fix()};
   def ^  (b: Fix): Fix = BinaryNodeCell(this, b, "^"){Fix()};
   def ?  (b: Fix): Fix = BinaryNodeCell(this, b, "?"){Fix()};
   def ## (b: Fix): Fix = BinaryNodeCell(this, b, "##"){Fix()};

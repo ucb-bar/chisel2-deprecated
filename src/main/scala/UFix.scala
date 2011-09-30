@@ -54,14 +54,15 @@ class UFix extends Num {
   override def apply(bit: Int): UFix = { Extract(this, bit){UFix()}};
   override def apply(hi: Int, lo: Int): UFix = {Extract(this, hi, lo){UFix()}};
   override def apply(bit: UFix): UFix = {Extract(this, bit){UFix()}};
+  override def apply(hi: UFix, lo: UFix): UFix = {Extract(this, hi, lo, -1){UFix()}};
 
   override def unary_-(): UFix = UnaryNodeCell(this, "-"){UFix()};
   override def unary_~(): UFix = UnaryNodeCell(this, "~"){UFix()};
   def unary_!(): UFix = UnaryNodeCell(this, "!"){UFix()};
   def andR(): Bool    = ReductionNodeCell(this, "&"){UFix()};
   def orR():  Bool    = ReductionNodeCell(this, "|"){UFix()};
-  def << (b: UFix): UFix = BinaryNodeCell(this, b, "<<"){UFix()};
-  def >> (b: UFix): UFix = BinaryNodeCell(this, b, ">>"){UFix()};
+  override def << (b: UFix): UFix = BinaryNodeCell(this, b, "<<"){UFix()};
+  override def >> (b: UFix): UFix = BinaryNodeCell(this, b, ">>"){UFix()};
   def +  (b: UFix): UFix = BinaryNodeCell(this, b, "+"){UFix()};
   def *  (b: UFix): UFix = BinaryNodeCell(this, b, "*"){UFix()};
   def ^  (b: UFix): UFix = BinaryNodeCell(this, b, "^"){UFix()};

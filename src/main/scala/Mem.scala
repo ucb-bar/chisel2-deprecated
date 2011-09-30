@@ -228,7 +228,7 @@ class Mem[T <: Data](n_val: Int, w_data: T) extends Delay {
   }
   override def emitDecC: String = 
     "  mem_t<" + width + "," + n + "> " + emitRef + ";\n";
-  override def apply(addr: Node): Node = MemRef(this, addr);
+  def apply(addr: Node): Node = MemRef(this, addr);
 }
 
 }

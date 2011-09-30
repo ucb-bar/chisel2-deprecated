@@ -5,7 +5,8 @@ import Node._;
 import Component._;
 import IOdir._;
 
-object Extract {
+object NodeExtract {
+  
   // extract one bit
   def apply (mod: Node, bit: Node): Node = {
     val res = new Extract();
@@ -14,16 +15,9 @@ object Extract {
     res.lo = bit;
     res
   }
-  def apply[T <: Bits](mod: T, bit: UFix)(gen: => T): T = {
-    val bitcell = new BitExtractCell(gen);
-    bitcell.io.in <> mod;
-    bitcell.io.hi <> bit;
-    bitcell.io.out;
-  }
+
   def apply (mod: Node, bit: Int): Node = 
     apply(mod, UFix(bit));
-  def apply[T <: Bits](mod: T, bit: Int)(gen: => T): T = 
-     apply(mod, UFix(bit))(gen);
 
   // extract bit range
   def apply (mod: Node, hi: Node, lo: Node): Node = {
@@ -33,13 +27,7 @@ object Extract {
     res.lo = lo;
     res
   }
-  def apply[T <: Bits](mod: T, hi: UFix, lo: UFix, w: Int = -1)(gen: => T): T = {
-    val bitcell = new RangeExtractCell(w)(gen);
-    bitcell.io.in <> mod;
-    bitcell.io.hi assign hi;
-    bitcell.io.lo assign lo;
-    bitcell.io.out
-  }
+
   def apply (mod: Node, hi: Int, lo: Int): Node = {
     val res = new Extract();
     if(mod.name == "foo") println(hi + " " + lo);
@@ -48,6 +36,29 @@ object Extract {
     res.init("", fixWidth(hi-lo+1), mod, res.hi, res.lo);
     res
   }
+}
+
+object Extract {
+  //extract 1 bit
+  def apply[T <: Bits](mod: T, bit: UFix)(gen: => T): T = {
+    val bitcell = new BitExtractCell(gen);
+    bitcell.io.in <> mod;
+    bitcell.io.hi <> bit;
+    bitcell.io.out;
+  }
+
+  def apply[T <: Bits](mod: T, bit: Int)(gen: => T): T = 
+     apply(mod, UFix(bit))(gen);
+
+  // extract bit range
+  def apply[T <: Bits](mod: T, hi: UFix, lo: UFix, w: Int = -1)(gen: => T): T = {
+    val bitcell = new RangeExtractCell(w)(gen);
+    bitcell.io.in <> mod;
+    bitcell.io.hi assign hi;
+    bitcell.io.lo assign lo;
+    bitcell.io.out
+  }
+
   def apply[T <: Bits](mod: T, hi: Int, lo: Int)(gen: => T): T ={
     apply(mod, UFix(hi), UFix(lo), hi-lo+1)(gen);
   }

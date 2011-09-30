@@ -73,8 +73,8 @@ class Bits extends IO {
   def <== (src: Fix)  = lessEqEq(src);
   def <== (src: UFix) = lessEqEq(src);
 
-  override def apply(bit: Int): Bits = { Extract(this, bit){Bits()}};
-  override def apply(hi: Int, lo: Int): Bits = {Extract(this, hi, lo){Bits()}};
+  def apply(bit: Int): Bits = { Extract(this, bit){Bits()}};
+  def apply(hi: Int, lo: Int): Bits = {Extract(this, hi, lo){Bits()}};
   def apply(bit: UFix): Bits = Extract(this, bit){Bits()};
   def apply(hi: UFix, lo: UFix): Bits = Extract(this, hi, lo, -1){Bits()};
 
@@ -82,8 +82,8 @@ class Bits extends IO {
   def unary_~(): Bits = UnaryNodeCell(this, "~"){Bits()};
   def ===(b: Bits): Bool = LogicalNodeCell(this, b, "==="){Bits()};
   def != (b: Bits): Bool = LogicalNodeCell(this, b, "!="){Bits()};
-  def << (b: Bits): Bits = BinaryNodeCell(this, b, "<<"){Bits()};
-  def >> (b: Bits): Bits = BinaryNodeCell(this, b, ">>"){Bits()};
+  def << (b: UFix): Bits = BinaryNodeCell(this, b.toBits, "<<"){Bits()};
+  def >> (b: UFix): Bits = BinaryNodeCell(this, b.toBits, ">>"){Bits()};
   def &  (b: Bits): Bits = BinaryNodeCell(this, b, "&"){Bits()};
   def |  (b: Bits): Bits = BinaryNodeCell(this, b, "|"){Bits()};
   def ^  (b: Bits): Bits = BinaryNodeCell(this, b, "^"){Bits()};

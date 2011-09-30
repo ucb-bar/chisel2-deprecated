@@ -263,7 +263,7 @@ object Log2 {
     if (isEmittingComponents) {
       var res: Node = Fix(0);
       for (i <- 1 to n) 
-        res = Multiplex(mod(i), Fix(i, sizeof(n)), res);
+        res = Multiplex(NodeExtract(mod,i), Fix(i, sizeof(n)), res);
       res
     } else {
       val res = new Log2();

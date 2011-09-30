@@ -134,7 +134,7 @@ abstract class Node extends nameable{
     res.isSigned = true; 
     res.asInstanceOf[this.type]
   }
-  def bitSet(off: Num, dat: Bits): Bits = { 
+  def bitSet(off: UFix, dat: Bits): Bits = { 
     val bit = Bits(1, 1) << off;
     (this.asInstanceOf[Bits] & ~bit) | (dat << off);
   }
@@ -150,7 +150,7 @@ abstract class Node extends nameable{
         var off = 0;
         for ((n, io) <- b.flatten) {
           if (io.dir == INPUT) {
-            io assign this(off+io.width-1,off);
+            io assign NodeExtract(this,off+io.width-1,off);
             off += io.width;
           }
         }
@@ -164,12 +164,12 @@ abstract class Node extends nameable{
     println("NODE ^^ " + this.getClass + " " + src);
     src assign this;
   }
-  def apply(bit: Int): Node = { Extract(this, bit) };
-  def apply(hi: Int, lo: Int): Node = { Extract(this, hi, lo) };
-  def apply(bit: Literal): Node = { apply(bit.value) };
-  def apply(hi: Literal, lo: Literal): Node = { apply(hi.value, lo.value) };
-  def apply(bit: Node): Node = { Extract(this, bit); }
-  def apply(hi: Node, lo: Node): Node = { Extract(this, hi, lo) };
+  // def apply(bit: Int): Node = { Extract(this, bit) };
+  // def apply(hi: Int, lo: Int): Node = { Extract(this, hi, lo) };
+  // def apply(bit: Literal): Node = { apply(bit.value) };
+  // def apply(hi: Literal, lo: Literal): Node = { apply(hi.value, lo.value) };
+  // def apply(bit: Node): Node = { Extract(this, bit); }
+  // def apply(hi: Node, lo: Node): Node = { Extract(this, hi, lo) };
   def getLit = this.asInstanceOf[Literal]
   def isIo = false;
   def isReg = false;
@@ -428,7 +428,7 @@ abstract class Node extends nameable{
     for ((n, io) <- b.flatten) {
       if (io.dir == OUTPUT) {
         val w = io.width;
-        res  = this(off+w-1, off) :: res;
+        res  = NodeExtract(this,off+w-1, off) :: res;
         off += w;
       }
     }

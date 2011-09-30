@@ -43,7 +43,7 @@ object Vec {
 class Vec[T <: Data]() extends Data {
   val bundleVector = new ArrayBuffer[T];
   def +=(b: T) = bundleVector += b;
-  override def apply(ind: Int): T = {
+  def apply(ind: Int): T = {
     bundleVector(ind)
   };
   def apply(ind: Fix): T = {

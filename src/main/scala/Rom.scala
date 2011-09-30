@@ -68,7 +68,7 @@ class Rom(data_vals: Array[Node]) extends Delay {
   }
   override def emitDecC: String = 
     "  mem_t<" + width + "," + data.length + "> " + emitRef + ";\n";
-  override def apply(addr: Node): Node = MemRef(this, addr);
+  def apply(addr: Node): Node = MemRef(this, addr);
   def apply(addr: UFix): Fix = {
     val res = Fix('output);
     res.setIsCellIO;

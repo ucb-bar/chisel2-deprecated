@@ -2,6 +2,7 @@ package Chisel {
 
 import IOdir._;
 import Node._;
+import ChiselError._;
 
 object Bool {
   def apply(x: Boolean) = Lit(x);
@@ -42,16 +43,21 @@ class Bool extends Bits {
     comp procAssign src.toNode;
   }
 
+  def generateError = {
+    ChiselErrors += IllegalState("Cannot perform extraction on a Bool", 4);
+  }
+
+  override def apply(bit: Int): Bool = { generateError; this};
+  override def apply(hi: Int, lo: Int): Bool = {generateError; this};
+  override def apply(bit: UFix): Bool = {generateError; this};
+  override def apply(hi: UFix, lo: UFix): Bool = {generateError; this};
+
   override def unary_-(): Bool = UnaryBoolCell(this, "-");
   override def unary_~(): Bool = UnaryBoolCell(this, "~");
   def unary_!(): Bool = UnaryBoolCell(this, "!");
   def ^  (b: Bool): Bool = BinaryBoolCell(this, b, "^");
   def ===(b: Bool): Bool = BinaryBoolCell(this, b, "===");
   def != (b: Bool): Bool = BinaryBoolCell(this, b, "!=");
-  def >  (b: Bool): Bool = BinaryBoolCell(this, b, ">");
-  def <  (b: Bool): Bool = BinaryBoolCell(this, b, "<");
-  def <= (b: Bool): Bool = BinaryBoolCell(this, b, "<=");
-  def >= (b: Bool): Bool = BinaryBoolCell(this, b, ">=");
   def && (b: Bool): Bool = if (b.isTrue) this else BinaryBoolCell(this, b, "&&");
   def || (b: Bool): Bool = BinaryBoolCell(this, b, "||");
   def &  (b: Bool): Bool = BinaryBoolCell(this, b, "&");
