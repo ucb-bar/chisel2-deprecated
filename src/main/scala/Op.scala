@@ -95,7 +95,7 @@ class Op extends Node {
 
   def emitSignedDefLoC: String = {
     if(op == ">>")
-      emitOpRef(0) + " rsha " + emitOpRef(1)
+      emitOpRef(0) + ".rsha(" + emitOpRef(1) +")"
     else if(op == ">")
       emitOpRef(0) + ".gt(" + emitOpRef(1) + ")"
     else if(op == ">=")
