@@ -13,7 +13,7 @@ import Node._;
 object Mem {
   val noResetVal = Literal(0);
 
-  def apply[T <: Data](depth: Int, isEnable: Bool, wrAddr: Num, wrData: T, wrMask: T = null, resetVal: T): MemCell[T] = {
+  def apply[T <: Data](depth: Int, isEnable: Bool, wrAddr: Num, wrData: T, wrMask: Bits = null, resetVal: T = null): MemCell[T] = {
     val memcell = new MemCell(depth, wrData);
     memcell.write(isEnable, wrAddr, wrData, wrMask);
     if (resetVal != null) memcell.reset_val(resetVal);
@@ -22,7 +22,7 @@ object Mem {
 
   def apply[T <: Data](depth: Int, isEnable: Bool, wrAddr: Num, wrData: T): MemCell[T] = {
     val memcell = new MemCell(depth, wrData);
-    memcell.write(isEnable, wrAddr, wrData, null.asInstanceOf[T]);
+    memcell.write(isEnable, wrAddr, wrData, null);
     memcell
   }
 
@@ -48,7 +48,7 @@ class MemCell[T <: Data](n: Int, data: T) extends Cell {
     res
   }
 
-  def write(wen: Node, addr: Node, w_data: T, w_mask: T = null.asInstanceOf[T]) = {
+  def write(wen: Node, addr: Node, w_data: T, w_mask: Bits = null) = {
     primitiveNode.AddWritePort(io, addr, w_data, wen, w_mask);
   }
 
@@ -59,7 +59,7 @@ class MemCell[T <: Data](n: Int, data: T) extends Cell {
   primitiveNode.nameHolder = this;
 }
 
-class MemWPort[T <: Data](mem: Mem[T], io: Bundle, addr: Node, data: T, wen: Node, wbm: T = null.asInstanceOf[T]) {
+class MemWPort[T <: Data](mem: Mem[T], io: Bundle, addr: Node, data: T, wen: Node, wbm: Bits = null) {
   val port_offset = mem.inputs.length;
   val m = mem;
   var indent = "";
@@ -179,7 +179,7 @@ class Mem[T <: Data](n_val: Int, w_data: T) extends Delay {
   var reset_port_opt: Option[MemResetPort[T]] = None;
   val write_ports           = ListBuffer[MemWPort[T]]();
 
-  def AddWritePort(io: Bundle, addr: Node, data: T, wen: Node, wbm: T) = {
+  def AddWritePort(io: Bundle, addr: Node, data: T, wen: Node, wbm: Bits) = {
     val write_port = new MemWPort[T](this, io, addr, data, wen, wbm);
     write_ports += write_port;
   }
