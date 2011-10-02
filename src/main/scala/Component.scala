@@ -288,6 +288,8 @@ abstract class Component {
   }
   def inferAll() = {
     initInference;
+    var inferMax = 0;
+    var maxNode: Node = null;
     while (!nexts.isEmpty) {
       val next = nexts.dequeue();
       if (next.infer) {
@@ -300,7 +302,12 @@ abstract class Component {
           nexts.enqueue(i);
 	}
       }
+      if(next.inferCount > inferMax) {
+	inferMax = next.inferCount;
+	maxNode = next;
+      }
     }
+    //println("MAXIMUM INFER WALK = " + inferMax + " ON " + maxNode + " which is a " + maxNode.getClass);
   }
   def findConsumers() = {
     for (m <- mods) {
@@ -432,6 +439,10 @@ abstract class Component {
       topComponent = this;
     // isWalked.clear();
     findConsumers();
+    if(!ChiselErrors.isEmpty){
+      for(err <- ChiselErrors) err.printError;
+      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
+    }
     inferAll();
     collectNodes(this);
     // for (m <- mods) {
@@ -548,7 +559,7 @@ abstract class Component {
       out.close();
     else {
       for(err <- ChiselErrors)	err.printError;
-      throw new IllegalStateException("Code has errors");
+      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
     }
     compDefs.clear;
     genCount = 0;
@@ -671,7 +682,7 @@ abstract class Component {
     findNodes(0, this);
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors)	err.printError;
-      throw new IllegalStateException("Code has " + ChiselErrors.length + " errors");
+      throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
       return
     }
     if (!isEmittingComponents)
@@ -680,6 +691,11 @@ abstract class Component {
           mods ++= c.mods;
     findConsumers();
     inferAll();
+    if(!ChiselErrors.isEmpty){
+      for(err <- ChiselErrors)	err.printError;
+      throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
+      return
+    }
     collectNodes(this);
     findOrdering(); // search from roots  -- create omods
     findGraph();    // search from leaves -- create gmods

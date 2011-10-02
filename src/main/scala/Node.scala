@@ -94,6 +94,8 @@ abstract class Node extends nameable{
   var inferWidth: (Node) => Int = maxWidth;
   var nameHolder: nameable = null;
   var isClkInput = false;
+  var inferCount = 0;
+  var genError = false;
   def width: Int = width_;
   def width_=(w: Int) = { isFixedWidth = true; width_ = width; inferWidth = fixWidth(w); }
   def name_it (path: String, setNamed: Boolean = true) = { name = path; named = setNamed}
@@ -200,11 +202,20 @@ abstract class Node extends nameable{
   }
   def infer: Boolean = {
     val res = inferWidth(this);
+    if(inferCount > 100) {
+      if(genError)
+	ChiselErrors += IllegalState("Unable to infer width of " + this, 0);
+      else
+	genError = true;
+      return false;
+    }
     // println("INFER " + this + " -> " + res);
-    if(res == -1) 
+    if(res == -1) {
+      inferCount += 1;
       return true
-    else if (res != width) {
+    } else if (res != width) {
       width_ = res;
+      inferCount += 1;
       return true;
     } else{
       return false;
