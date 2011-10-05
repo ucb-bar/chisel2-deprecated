@@ -20,6 +20,12 @@ object Mem {
     memcell
   }
 
+  def apply[T <: Data](depth: Int, isEnable: Bool, wrAddr: Num, wrData: T, wrMask: Bits): MemCell[T] = {
+    val memcell = new MemCell(depth, wrData)
+    memcell.write(isEnable, wrAddr, wrData, wrMask);
+    memcell
+  }
+
   def apply[T <: Data](depth: Int, isEnable: Bool, wrAddr: Num, wrData: T): MemCell[T] = {
     val memcell = new MemCell(depth, wrData);
     memcell.write(isEnable, wrAddr, wrData, null);
