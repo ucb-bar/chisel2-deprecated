@@ -57,7 +57,7 @@ class Vec[T <: Data]() extends Data {
   def apply(ind: UFix): T = {
     var res = bundleVector(0).clone;
     for(i <- 0 until bundleVector.length)
-      res = Mux(Fix(i) === ind, bundleVector(i), res)
+      res = Mux(UFix(i) === ind, bundleVector(i), res)
     res
   }
   override def flatten: Array[(String, IO)] = {
