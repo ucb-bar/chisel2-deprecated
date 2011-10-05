@@ -80,11 +80,11 @@ class MemIPPort[T <: Data](memSpec: MemorySpec, mem: MemCell[T], port_type: Symb
     if (wbm == null) {
       wbm;
     } else if (out_width < dup) {
-      Fill(UFix(out_width), wbm(0));
+      Fill(out_width, wbm(0));
     } else {
       val next_bit_mask = if(mask_bits == 1) wbm(0) else wbm(mask_bits-1,1);
       Cat(expand_wbm_to_bits(next_bit_mask, dup, out_width - dup),
-          Fill(UFix(dup), wbm(0)));
+          Fill(dup, wbm(0)));
     }
   }
 

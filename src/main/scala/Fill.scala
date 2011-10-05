@@ -6,16 +6,12 @@ import IOdir._;
 
 object Fill {
   def fillWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).width * n.maxNum }
-  def apply(n: Num, mod: Bits): Bits = {
+  def apply(n: Int, mod: Bits): Bits = {
     val fillcell = new FillCell(mod);
     fillcell.io.mod <> mod;
-    fillcell.io.n <> n;
+    fillcell.io.n <> UFix(n);
     fillcell.io.out
   }
-  def apply(n: Int, mod: Int): Bits =
-    Fill(UFix(n), Bits("d" + mod));
-  def apply(n: Int, mod: Bits): Bits =
-    Fill(UFix(n), mod)
 }
 
 
