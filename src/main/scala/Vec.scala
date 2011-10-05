@@ -27,6 +27,14 @@ object Vec {
     }
     res
   }
+  
+  def apply[T <: Data: Manifest](n: Int, fixed: T): Vec[T] = {
+    val res = new Vec[T]();
+    for(i <- 0 until n){
+        res += fixed
+    }
+    res
+  }
 
   def apply[T <: Data: Manifest](n: Int, args: Any*): Vec[T] = {
     val res = new Vec[T]();
@@ -46,7 +54,7 @@ class Vec[T <: Data]() extends Data {
   def apply(ind: Int): T = {
     bundleVector(ind)
   };
-  def apply(ind: Fix): T = {
+  def apply(ind: UFix): T = {
     var res = bundleVector(0).clone;
     for(i <- 0 until bundleVector.length)
       res = Mux(Fix(i) === ind, bundleVector(i), res)
