@@ -70,7 +70,7 @@ class Fix extends Num {
   def unary_!(): Fix = UnaryNodeCell(this, "!"){Fix()};
   override def << (b: UFix): Fix = BinaryNodeCell(this, b.toFix, "<<"){Fix()};
   override def >> (b: UFix): Fix = BinaryNodeCell(this, b.toFix, ">>"){Fix()};
-  override def >>> (b: UFix): Fix = BinarynodeCell(this, b.toFix, ">>>"){Fix()};
+  def >>> (b: UFix): Fix = BinaryNodeCell(this, b.toFix, ">>>"){Fix()};
   def ^  (b: Fix): Fix = BinaryNodeCell(this, b, "^"){Fix()};
   def ?  (b: Fix): Fix = BinaryNodeCell(this, b, "?"){Fix()};
   def ## (b: Fix): Fix = BinaryNodeCell(this, b, "##"){Fix()};
