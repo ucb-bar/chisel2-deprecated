@@ -128,7 +128,7 @@ object chiselMain {
 }
 
 
-abstract class Data extends Node {
+abstract class Data extends Node with Cloneable{
   var comp: proc = null;
   def toFix(): Fix = chiselCast(this){Fix()};
   def toUFix(): UFix = chiselCast(this){UFix()};
@@ -180,6 +180,13 @@ trait proc extends Node {
   }
   def procAssign(src: Node);
   procs += this;
+}
+
+trait Cloneable {
+  override def clone(): this.type = {
+    val res = this.getClass.newInstance.asInstanceOf[this.type];
+    res
+  }
 }
 
 trait nameable {

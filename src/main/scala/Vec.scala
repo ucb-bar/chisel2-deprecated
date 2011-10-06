@@ -20,6 +20,8 @@ object Vec {
 
   def gen[T <: Data](n: Int, gen: => T): Vec[T] = {
     val res = new Vec[T]();
+    res.size = n;
+    res.gen = () => gen;
     for(i <- 0 until n){
       val t = gen;
       res += t;
@@ -28,19 +30,12 @@ object Vec {
     res
   }
 
-  def apply[T <: Data: Manifest](n: Int, args: Any*): Vec[T] = {
-    val res = new Vec[T]();
-    for(i <- 0 until n) {
-      val t = (if(args == List(None)) Fab[T]() else Fab[T](args: _*));
-      res += t;
-      t.name += i;
-    }
-    res
-  }
-
 }
 
-class Vec[T <: Data]() extends Data {
+class Vec[T <: Data]() extends Data with Cloneable {
+  var size = 0;
+  var gen: () => T = () => bundleVector(0);
+  var flattenedVec: Node = null;
   val bundleVector = new ArrayBuffer[T];
   def +=(b: T) = bundleVector += b;
   def apply(ind: Int): T = {
@@ -106,6 +101,50 @@ class Vec[T <: Data]() extends Data {
     }
   }
 
+  override def clone(): this.type = {
+    val res = Vec(size){gen()};
+    res.asInstanceOf[this.type]
+  }
+
+  override def toNode: Node = {
+    if(flattenedVec == null){
+      val nodes = flatten.map{case(n, i) => i};
+      flattenedVec = Concatanate(nodes.head, nodes.tail.toList: _*)
+    }
+    flattenedVec
+  }
+
+  override def fromNode(n: Node): this.type = {
+    val res = this.clone();
+    var ind = 0;
+    for((name, io) <- res.flatten.toList.reverse) {
+      io.asOutput();
+      if(io.width > 1)
+	io assign NodeExtract(n, ind + io.width-1, ind)
+      else
+	io assign NodeExtract(n, ind);
+      ind += io.width;
+    }
+    res
+  }
+
+  override def asOutput(): this.type = {
+    for(elm <- bundleVector)
+      elm.asOutput;
+    this
+  }
+
+  override def asInput(): this.type = {
+    for(elm <- bundleVector)
+      elm.asInput
+    this
+  }
+
+  override def setIsCellIO() = {
+    isCellIO = true;
+    for(elm <- bundleVector)
+      elm.setIsCellIO
+  }
 }
 
 }

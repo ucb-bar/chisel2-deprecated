@@ -34,7 +34,7 @@ object Output {
   def apply(name: String, x: Node): IO = apply(name, maxWidth _, x); 
   def apply(x: Node): IO = apply("", x);
 }
-class IO extends Wire { 
+class IO extends Wire with Cloneable{ 
   var dir: IOdir = null;
   var unnamed = false;
   // TODO: OPTIONALLY ONLY EMIT TOP COMPONENT IO IN OBJECT
@@ -149,6 +149,9 @@ class IO extends Wire {
   override def clone = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
     res.init("", widthOf(0), null);
+    res.width = this.width;
+    res.dir = this.dir;
+    res.name = this.name;
     res
   }
   override def toNode = this;
