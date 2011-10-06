@@ -55,8 +55,8 @@ class Vec[T <: Data]() extends Data {
     bundleVector(ind)
   };
   def apply(ind: UFix): T = {
-    var res = bundleVector(0).clone;
-    for(i <- 0 until bundleVector.length)
+    var res = bundleVector(0);
+    for(i <- 1 until bundleVector.length)
       res = Mux(UFix(i) === ind, bundleVector(i), res)
     res
   }
