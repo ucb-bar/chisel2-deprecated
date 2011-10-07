@@ -32,6 +32,8 @@ object Vec {
   
   def apply[T <: Data: Manifest](n: Int, fixed: T): Vec[T] = {
     val res = new Vec[T]();
+    res.size = n;
+    res.gen = () => fixed.clone;
     for(i <- 0 until n){
         res += fixed
     }
