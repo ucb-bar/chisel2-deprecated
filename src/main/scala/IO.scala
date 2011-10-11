@@ -149,7 +149,7 @@ class IO extends Wire with Cloneable{
   override def clone = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
     res.init("", widthOf(0), null);
-    res.width = this.width;
+    res.width_ = this.width_;
     res.dir = this.dir;
     res.name = this.name;
     res
