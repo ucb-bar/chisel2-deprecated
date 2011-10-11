@@ -73,7 +73,7 @@ object Literal {
     resNum += (if(x == -1) 3
 	       else if(x < 0) 1 << (resWidth-1)
 	       else 0); 
-    if(width > 0)
+    if(width != -1)
       if(width < resWidth)
 	ChiselErrors += IllegalState("width " + width + " is too small for literal " + x, 4);
       else if(width > resWidth && x < 0){
