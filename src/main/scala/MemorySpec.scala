@@ -8,7 +8,8 @@ import Component._;
 import java.io.File;
 
 class MemorySpecRAMV extends MemorySpec {
-
+  override def emitGeneratedMasterName = "RAM";
+  override val active_high_ctrl = 1;
 }
 
 class MemorySpecUCBSC extends MemorySpec {

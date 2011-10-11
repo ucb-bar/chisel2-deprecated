@@ -203,7 +203,7 @@ abstract class BlackBox extends Component {
     findNodes(depth, this);
   }
 
-  def setVerilogParamters(string: String) = 
+  def setVerilogParameters(string: String) = 
     this.asInstanceOf[Component].verilog_parameters = string;
 
   override def name_it() = {
