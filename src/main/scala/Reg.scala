@@ -35,7 +35,7 @@ object Reg {
 
   def apply[T <: Data](width: Int = -1, resetVal: T): T = Reg[T](null.asInstanceOf[T], width, resetVal){resetVal.clone}
 
-  def apply[T <: Data]()(gen: => T): T = Reg[T](null.asInstanceOf[T], -1, null.asInstanceOf[T])(gen)
+  def apply[T <: Data]()(gen: => T): T = Reg[T](null.asInstanceOf[T], gen.width, null.asInstanceOf[T])(gen)
 
 }
 
