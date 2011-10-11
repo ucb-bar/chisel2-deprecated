@@ -148,7 +148,8 @@ class IO extends Wire with Cloneable{
   override def setIsClkInput = {isClkInput = true; this assign clk;}
   override def clone = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
-    res.init("", widthOf(0), null);
+    //res.init("", widthOf(0), null);
+    res.inferWidth = this.inferWidth
     res.width_ = this.width_;
     res.dir = this.dir;
     res.name = this.name;
