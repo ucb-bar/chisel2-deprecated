@@ -137,7 +137,7 @@ class MemWPort[T <: Data](mem: Mem[T], io: Bundle, addr: Node, data: T, wen: Nod
       res +=
       "    " + m.emitRef + ".put(" + wrAddr.emitRef + ", " +
         wrData.emitRef + " & " + wrBitMask.emitRef + " | " +
-        m.emitRef + ".get(" + wrAddr.emitRef + ") & ~" + wrBitMask.emitRef + ");\n"
+        m.emitRef + ".get(" + wrAddr.emitRef + ") & ~" + wrBitMask.emitRef + ");\n" +
       "  }\n";
     }
     res
