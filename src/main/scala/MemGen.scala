@@ -76,11 +76,17 @@ object MemGen {
   }
 }
 
-class MemGenPort[T <: Data](memSpec: MemorySpec, memIP: MemIP[T],
-                            portType: Symbol, addr: Num, wrData: T, we: Bool,
-                            oe: Bool, cs: Bool = null, wrMask: Bits = null) {
+class MemGenPort[T <: Data](val memSpec: MemorySpec,
+                            val memGen: MemGen[T],
+                            // val memIP: MemIP[T],
+                            val portType: Symbol,
+                            val addr: Num,
+                            val wrData: T,
+                            val we: Bool,
+                            val oe: Bool,
+                            val cs: Bool = null,
+                            val wrMask: Bits = null) {
   var size = wrData.getWidth;
-
   val addr_port = addr.clone.asInput;
   val ce_port   = Bool('input);
   val cs_port   = Bool('input);
@@ -89,35 +95,30 @@ class MemGenPort[T <: Data](memSpec: MemorySpec, memIP: MemIP[T],
   val data_in   = wrData.clone.asInput;
   val we_port   = Bool('input);
   val wr_mask_port = if (wrMask == null) null else wrMask.clone.asInput;
-  addr_port assign addr;
-  cs_port := (if (cs == null) Bool(true) else cs);
-  ce_port.setIsClkInput;
 
-  if (portType.equals('read)) {
-    oe_port := oe;
-    if (memSpec.active_high_ctrl != 0) {
-      memIP.read(addr_port, oe_port, cs_port) ^^ data_out; 
-    } else {
-      memIP.read(addr_port, !oe_port, !cs_port) ^^ data_out;
+  def implement(fake: Int = 0) = {
+    addr_port assign addr;
+    cs_port := (if (cs == null) Bool(true) else cs);
+    ce_port.setIsClkInput;
+
+    if (portType.equals('read)) {
+      oe_port := oe;
+      //memIP.read(addr_port, !oe_port, !cs_port) ^^ data_out;
+    } else if (portType.equals('write)) {
+      data_in ^^ wrData;
+      we_port := we;
+      // memIP.write(!we_port, addr_port, data_in, !cs_port, wrMask = wr_mask_port);
+    } else if (portType.equals('rw)) {
+      data_in ^^ wrData;
+      oe_port := oe;
+      we_port := we;
+      // memIP.rw(!we_port, addr_port, data_in, !oe_port, !cs_port,
+      //         wrMask = wr_mask_port) ^^ data_out;
     }
-  } else if (portType.equals('write)) {
-    data_in ^^ wrData;
-    we_port := we;
-    if (memSpec.active_high_ctrl != 0) {
-      memIP.write(we_port, addr_port, data_in, cs_port, wrMask = wr_mask_port);
-    } else {
-      memIP.write(!we_port, addr_port, data_in, !cs_port, wrMask = wr_mask_port);
-    }
-  } else if (portType.equals('rw)) {
-    data_in ^^ wrData;
-    oe_port := oe;
-    we_port := we;
-    if (memSpec.active_high_ctrl != 0) {
-      memIP.rw(we_port, addr_port, data_in, oe_port, cs_port,
-               wrMask = wr_mask_port) ^^ data_out;
-    } else {
-      memIP.rw(!we_port, addr_port, data_in, !oe_port, !cs_port,
-               wrMask = wr_mask_port) ^^ data_out;
+
+    if (!(wrMask == null)) {
+      wr_mask_port ^^ wrMask;
+      memGen.hasWrMask = true;
     }
   }
 
@@ -127,6 +128,7 @@ class MemGenPort[T <: Data](memSpec: MemorySpec, memIP: MemIP[T],
     addr_port.setName("addr" + port_index);
     io += addr_port;
     cs_port.setName("cs" + port_index);
+    // cs_port.component = memGen;
     io += cs_port;
     if (portType.equals('write) || portType.equals('rw)) {
       data_in.setName("in" + port_index);
@@ -147,37 +149,44 @@ class MemGenPort[T <: Data](memSpec: MemorySpec, memIP: MemIP[T],
   }
 }
 
-class MemGen[T <: Data](memSpec: MemorySpec, numWords: Int, wrData: T) extends Component {
+class MemGen[T <: Data](val memSpec: MemorySpec,
+                        val numWords: Int,
+                        val wrData: T) extends Component {
   val io = new Bundle();
-  val memIP = MemIP(numWords, wrData, memSpec);
+  //val memIP = MemIP(numWords, wrData, memSpec);
+  var memIP: Component = null;
   var masterName = "MemGen";
   var size = wrData.getWidth;
   var id = 0;
-  var read_ports  = ListBuffer[MemGenPort[T]]();
-  var write_ports = ListBuffer[MemGenPort[T]]();
-  var rw_ports    = ListBuffer[MemGenPort[T]]();
-
+  val port_list  = ListBuffer[MemGenPort[T]]();
+  var hasWrMask = false;
   def setMaster(m_name: String) = {
     masterName = m_name;
-    // memIP.setMaster(masterName);
   }
 
-  def check_config = {
-    memIP.check_config;
-    var port_index = 1;
-
+  override def elaborate(fake: Int = 0) = {
+    // println("[info] Elaborating memory "+ name + " of " + masterName);
     // Erase and reattach port elements to the io bundle, allowing the
     // names to change if needed.
     io.elementsCache = null;
-    read_ports.foreach(rp  => {rp.add_io(io, port_index); port_index += 1; });
-    write_ports.foreach(rp => {rp.add_io(io, port_index); port_index += 1; });
-    rw_ports.foreach(rp    => {rp.add_io(io, port_index); port_index += 1; });
+    var port_index = 1;
+    for (p <- port_list) {
+      p.implement(0);
+      p.add_io(io, port_index);
+      port_index += 1;
+    }
+    memIP = MemIP(this);
+    //memIP.setMaster(getPathName);
+    //memIP.setMaster(masterName);
+  }
+  def check_config = {
+    //memIP.check_config;
   }
 
   def read(addr: Num, oe: Bool = Bool(true), cs: Bool = Bool(true),
            rdData: T = null.asInstanceOf[T]): T = {
-    val read_port = new MemGenPort(memSpec, memIP, 'read, addr, wrData, null, oe, cs);
-    read_ports += read_port;
+    val read_port = new MemGenPort(memSpec, this, 'read, addr, wrData, null, oe, cs);
+    port_list += read_port;
     check_config;
     if (!(rdData == null)) {
       // Optional read output: Connect to an IO or wire.
@@ -190,24 +199,24 @@ class MemGen[T <: Data](memSpec: MemorySpec, numWords: Int, wrData: T) extends C
     read_port.data_out;
   }
   def read(rp: ReadMemoryPort[T]) = {
-    val read_port = new MemGenPort(memSpec, memIP, 'read, rp.addr, rp.readData, null, rp.oen, rp.cs);
-    read_ports += read_port;
+    val read_port = new MemGenPort(memSpec, this, 'read, rp.addr, rp.readData, null, rp.oen, rp.cs);
+    port_list += read_port;
     check_config;
     rp.readData <> read_port.data_out;
   }
   def write(we: Bool, addr: Num, write_data: T, cs: Bool = Bool(true),
             wrMask: Bits = null) = {
-    var write_port = new MemGenPort(memSpec, memIP, 'write, addr, write_data,
+    var write_port = new MemGenPort(memSpec, this, 'write, addr, write_data,
                                     we, null, cs, wrMask);
-    write_ports += write_port;
+    port_list += write_port;
     check_config;
   }
   def rw(we: Bool, addr: Num, wrData: T, oe: Bool = Bool(true), 
          cs: Bool = Bool(true), rdData: T = null.asInstanceOf[T],
          wrMask: Bits = null): T = {
-    var rw_port = new MemGenPort(memSpec, memIP, 'rw, addr, wrData, we, oe, cs,
+    var rw_port = new MemGenPort(memSpec, this, 'rw, addr, wrData, we, oe, cs,
                                  wrMask);
-    rw_ports += rw_port;
+    port_list += rw_port;
     check_config;
     if (!(rdData == null)) {
       if (rdData.comp != null) {
@@ -221,9 +230,7 @@ class MemGen[T <: Data](memSpec: MemorySpec, numWords: Int, wrData: T) extends C
   def setSize(s: Int) = {
     size = s;
   }
-
   override def doCompileV(out: java.io.FileWriter, depth: Int): Unit = {
-    memIP.setMaster(getPathName);
     val rval = super.doCompileV(out, depth);
     rval;
   }

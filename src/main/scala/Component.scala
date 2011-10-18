@@ -548,9 +548,11 @@ abstract class Component {
 
   def compileV(): Unit = {
     topComponent = this;
-    for (c <- components) 
+    components.foreach(_.elaborate(0));
+    for (c <- components)
       c.markComponent();
     genAllMuxes;
+    components.foreach(_.postMarkNet(0));
     findNodes(0, this);
     val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
     val out = new java.io.FileWriter(base_name + name + ".v");
@@ -579,6 +581,8 @@ abstract class Component {
       }
     }
   }
+  def elaborate(fake: Int = 0) = {}
+  def postMarkNet(fake: Int = 0) = {}
   def genHarness(base_name: String, name: String) = {
     val makefile = new java.io.FileWriter(base_name + name + "-makefile");
     makefile.write("CPPFLAGS = -O2 -I../ -I${CHISEL_EMULATOR_INCLUDE}/\n\n");
@@ -661,9 +665,11 @@ abstract class Component {
   }
 
   def compileC(): Unit = {
-    for (c <- components) 
+    components.foreach(_.elaborate(0));
+    for (c <- components)
       c.markComponent();
     genAllMuxes;
+    components.foreach(_.postMarkNet(0));
     val base_name = ensure_dir(targetEmulatorRootDir + "/" + targetDir);
     val out_h = new java.io.FileWriter(base_name + name + ".h");
     val out_c = new java.io.FileWriter(base_name + name + ".cpp");

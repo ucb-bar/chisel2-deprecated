@@ -28,95 +28,6 @@ class MemGLPort[T <: Data](val memSpec: MemorySpec,
   val we_post = Wire(){Bits(width=1)};
   val activeHi = memSpec.active_high_ctrl != 0;
 
-  def wire_port(io: Bundle, port_index: Int) = {
-    val addr_port = addr.clone.asInput;
-    val ce_port   = Bool('input);
-    val cs_port   = Bool('input);
-    val data_out  = data.clone.asOutput;
-    val oe_port   = Bool('input);
-    val data_in   = data.clone.asInput;
-    val we_port   = Bool('input);
-    val wr_mask_port = if (wrMask == null) Bits(1,'input) else wrMask.clone.asInput;
-    var wr_mask_bits = 0;
-    var data_in_bits = 0;
-
-    val addr_width = addr.getWidth;
-
-    if (!(wrMask == null)) {
-      wrMask ^^ wr_mask_port;
-      wr_mask_bits = wrMask.getWidth;
-      data_in_bits = data.getWidth;
-      memSpec.data_bits_per_mask_bit = data_in_bits / wr_mask_bits;
-      memSpec.no_bit_mask = false;
-      val extra_bits = data_in_bits % wr_mask_bits;
-      if (extra_bits != 0) {
-        println("[warning] Write data width "+data.getWidth+
-                " is not divisible by write mask width of "+
-                wrMask.getWidth+".");
-      }
-    }
-    addr_port ^^ addr;
-    
-    cs_port := (if (cs == null) Bool(true) else cs);
-
-    ce_port.setIsClkInput;
-
-    if (port_type.equals('write) || port_type.equals('rw)) {
-      //data_in <> data;
-      data_in ^^ data;
-      we_port := we;
-      
-      val expanded_wbm = expand_wbm_to_bits(wrMask, memSpec.data_bits_per_mask_bit, data_in_bits);
-      if (memSpec.active_high_ctrl != 0) {
-        mem.write(we_port && cs_port, addr_port, data_in, expanded_wbm);
-      } else {
-        mem.write(!we_port && !cs_port, addr_port, data_in, expanded_wbm);
-      }
-    }
-
-    if (port_type.equals('read) || port_type.equals('rw)) {
-      val read_data = mem.read(addr_port);
-      val zero_data = Fix(0, read_data.getWidth);
-      val data_mux = Fix(dir = 'output);//zero_data.clone;
-      //val data_out_reg = Reg(resetVal = zero_data);
-      
-      if (memSpec.active_high_ctrl != 0) {
-        data_mux assign (Mux(oe_port && cs_port, read_data, zero_data));
-      } else {
-        data_mux assign (Mux(!oe_port && !cs_port, read_data, zero_data));
-      }
-
-      oe_port := oe;
-      val data_mux_reg = Reg(data_mux, zero_data);
-      // data_out assign data_mux;
-      //data_out <> data_mux_reg;
-      data_mux_reg ^^ data_out;
-    }
-
-    ce_port.setName(memSpec.emitClkEn(port_index));
-    io += ce_port;
-    addr_port.setName(memSpec.emitAddr(port_index));
-    io += addr_port;
-    cs_port.setName(memSpec.emitCS(port_index));
-    io += cs_port;
-    if (port_type.equals('write) || port_type.equals('rw)) {
-      data_in.setName(memSpec.emitDataIn(port_index));
-      io += data_in;
-      we_port.setName(memSpec.emitWE(port_index));
-      io += we_port;
-      if (!(wrMask == null)) {
-        wr_mask_port.setName(memSpec.emitWBM(port_index));
-        io += wr_mask_port;
-      }
-    }
-    if (port_type.equals('read) || port_type.equals('rw)) {
-      data_out.setName(memSpec.emitDataOut(port_index));
-      io += data_out;
-      oe_port.setName(memSpec.emitOE(port_index));
-      io += oe_port;
-    }
-  }
-
   // expand_wbm_to_bits -- Duplicate each input bit in wbm dup times  
   def expand_wbm_to_bits(wbm: Bits, dup: Int, out_width: Int): Bits = {
     val mask_bits = if (wbm == null) 0 else wbm.getWidth;
@@ -130,16 +41,6 @@ class MemGLPort[T <: Data](val memSpec: MemorySpec,
           Fill(dup, wbm(0)));
     }
   }
-  def catAddr(prev: Bits) = {
-    if (prev == null) addr.toBits else Cat(addr, prev);
-  }
-  def catDataIn(prev: Bits) = {
-    if (port_type == 'write || port_type == 'rw) {
-      if (prev == null) data.toBits else Cat(data, prev);
-    } else {
-      if (prev == null) Fill(data.getWidth, Bits(0,1)) else Cat(Fill(data.getWidth, Bits(0,1)), prev);
-    }      
-  }
 
   def weToBits: Bits = { if (we == null) Bits(0,1) else if (activeHi) we.toBits else (!we).toBits }
   def csToBits: Bits = { if (cs == null) Bits(1,1) else if (activeHi) cs.toBits else (!cs).toBits }
@@ -151,8 +52,6 @@ class MemGLPort[T <: Data](val memSpec: MemorySpec,
     val w = data.getWidth;
     val offset = w * ind;
     data_out_vec(offset + w - 1, offset);
-  }
-  def add_io(io: Bundle, port_index: Int) = {
   }
 }
 
@@ -186,7 +85,11 @@ class MemGL[T <: Data](memSpec: MemorySpec, numWords: Int, wrDataProto: T) exten
   def read(addr: Num, oe: Bool, cs: Bool = null): T = {
     val read_port = new MemGLPort(memSpec, mem, 'read, addr, wrDataProto, null, oe, cs);
     port_list += read_port;
-    read_port.data_out_post.toFix.asInstanceOf[T];
+    val read_cast = wrDataProto.fromNode(read_port.data_out_post).asInstanceOf[T];
+    read_cast;
+    //val read_cast = wrDataProto.clone.fromNode(read_port.data_out_post);
+    //read_cast;
+    //read_port.data_out_post.toFix.asInstanceOf[T];
   }
   def write(we: Bool, addr: Num, wrData: T, cs: Bool = null, wrMask: Bits = null) = {
     val write_port = new MemGLPort(memSpec, mem, 'write, addr, wrData, we, null, cs, wrMask);
