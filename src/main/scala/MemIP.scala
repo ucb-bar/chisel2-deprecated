@@ -1,17 +1,48 @@
 package Mem {
 
 import scala.collection.mutable.ListBuffer;
+import java.io.File;
 import Chisel._;
 import Component._;
 
 object MemIP {
-  def apply[T <: Data](depth: Int, wrDataProto: T, memSpec: MemorySpec): MemIP[T] = {
-    new MemIP(memSpec, depth, wrDataProto);
+  def apply[T <: Data](memGen: MemGen[T], depth: Int, wrDataProto: T): MemIP[T] = {
+    new MemIP(memGen, depth, wrDataProto);
+  }
+  def apply[T <: Data](memGen: MemGen[T]): MemIP[T] = {
+    val memIP = new MemIP(memGen, memGen.numWords, memGen.wrData);
+    for (p <- memGen.port_list) {
+      val mip_port = new MemIPPort(memGen.memSpec, memIP.mem, p.portType,
+                                   p.addr_port, p.data_in, p.we_port,
+                                   p.oe_port, p.cs_port, p.wr_mask_port);
+      if (p.portType == 'read) {
+        // Connect the read data to the MemGen output port
+        mip_port.data_out ^^ p.data_out;
+        memIP.read_ports += mip_port;
+      } else if (p.portType == 'write) {
+        memIP.write_ports += mip_port;
+      } else if (p.portType == 'rw) {
+        mip_port.data_out ^^ p.data_out;
+        memIP.rw_ports += mip_port;
+      } else {
+        println("[error] MemIP constructor called with invalid port type" + p.portType);
+      }
+    }
+    memIP;
   }
 }
 
-class MemIPPort[T <: Data](memSpec: MemorySpec, mem: MemCell[T], port_type: Symbol, addr: Num, data: T, we: Bool, oe: Bool, cs: Bool = null, wrMask: Bits = null) {
+class MemIPPort[T <: Data](val memSpec: MemorySpec,
+                           val mem: MemCell[T],
+                           val port_type: Symbol,
+                           val addr: Num,
+                           val data: T,
+                           val we: Bool,
+                           val oe: Bool,
+                           val cs: Bool = null,
+                           val wrMask: Bits = null) {
   var size = 0;//data.toNode.getWidth;
+
   val addr_port = addr.clone.asInput;
   val ce_port   = Bool('input);
   val cs_port   = Bool('input);
@@ -23,55 +54,47 @@ class MemIPPort[T <: Data](memSpec: MemorySpec, mem: MemCell[T], port_type: Symb
   var wr_mask_bits = 0;
   var data_in_bits = 0;
 
-  if (!(wrMask == null)) {
-    wrMask ^^ wr_mask_port;
-    wr_mask_bits = wrMask.getWidth;
-    data_in_bits = data.getWidth;
-    memSpec.data_bits_per_mask_bit = data_in_bits / wr_mask_bits;
-    memSpec.no_bit_mask = false;
-    val extra_bits = data_in_bits % wr_mask_bits;
-    if (extra_bits != 0) {
-      println("[warning] Write data width "+data.getWidth+
-              " is not divisible by write mask width of "+
-              wrMask.getWidth+".");
+  //implement(0);
+  def implement(fake: Int = 0) = {
+    // println("[info] MemIPPort implement");
+    if (!(wrMask == null)) {
+      wr_mask_port := wrMask;
+      wr_mask_bits = wrMask.getWidth;
+      data_in_bits = data.getWidth;
+      memSpec.data_bits_per_mask_bit = data_in_bits / wr_mask_bits;
+      memSpec.no_bit_mask = false;
+      val extra_bits = data_in_bits % wr_mask_bits;
+      if (extra_bits != 0) {
+        println("[warning] Write data width "+data.getWidth+
+                " is not divisible by write mask width of "+
+                wrMask.getWidth+".");
+      }
     }
-  }
-  addr_port ^^ addr;
+    addr_port ^^ addr;
 
-  cs_port := (if (cs == null) Bool(true) else cs);
+    cs_port := (if (cs == null) Bool(false) else !cs);
 
-  ce_port.setIsClkInput;
+    ce_port.setIsClkInput;
 
-  if (port_type.equals('write) || port_type.equals('rw)) {
-    //data_in <> data;
-    data_in ^^ data;
-    we_port := we;
+    if (port_type.equals('write) || port_type.equals('rw)) {
+      data_in ^^ data;
+      we_port := !we;
 
-    val expanded_wbm = expand_wbm_to_bits(wrMask, memSpec.data_bits_per_mask_bit, data_in_bits);
-    if (memSpec.active_high_ctrl != 0) {
-      mem.write(we_port && cs_port, addr_port, data_in, expanded_wbm);
-    } else {
+      val expanded_wbm = expand_wbm_to_bits(wrMask, memSpec.data_bits_per_mask_bit, data_in_bits);
       mem.write(!we_port && !cs_port, addr_port, data_in, expanded_wbm);
     }
-  }
 
-  if (port_type.equals('read) || port_type.equals('rw)) {
-    val read_data = mem.read(addr_port);
-    val zero_data = Fix(0, read_data.getWidth);
-    val data_mux = Fix(dir = 'output);//zero_data.clone;
-    //val data_out_reg = Reg(resetVal = zero_data);
+    if (port_type.equals('read) || port_type.equals('rw)) {
+      val read_data = mem.read(addr_port);
+      val zero_data = Fix(0, read_data.getWidth);
+      val data_mux = Fix(dir = 'output);//zero_data.clone;
 
-    if (memSpec.active_high_ctrl != 0) {
-      data_mux assign (Mux(oe_port && cs_port, read_data, zero_data));
-    } else {
       data_mux assign (Mux(!oe_port && !cs_port, read_data, zero_data));
-    }
 
-    oe_port := oe;
-    val data_mux_reg = Reg(data_mux, zero_data);
-    // data_out assign data_mux;
-    //data_out <> data_mux_reg;
-    data_mux_reg ^^ data_out;
+      oe_port := !oe;
+      val data_mux_reg = Reg(data_mux, zero_data);
+      data_mux_reg ^^ data_out;
+    }
   }
 
   // expand_wbm_to_bits -- Duplicate each input bit in wbm dup times  
@@ -114,7 +137,8 @@ class MemIPPort[T <: Data](memSpec: MemorySpec, mem: MemCell[T], port_type: Symb
   }
 }
 
-class MemIP[T <: Data](memSpec: MemorySpec, numWords: Int, wrDataProto: T) extends BlackBox {
+class MemIP[T <: Data](memGen: MemGen[T], numWords: Int, wrDataProto: T) extends BlackBox {
+  val memSpec = memGen.memSpec;
   val io = new Bundle();
   val mem = Mem(numWords, wrDataProto);
   var size = wrDataProto.getWidth;
@@ -123,23 +147,31 @@ class MemIP[T <: Data](memSpec: MemorySpec, numWords: Int, wrDataProto: T) exten
   var write_ports = ListBuffer[MemIPPort[T]]();
   var rw_ports    = ListBuffer[MemIPPort[T]]();
 
-  def setMaster(m_name: String) = {
-    memSpec.set_master_name(m_name);
-    setName(memSpec.emitGeneratedMasterName);
+  def setMaster(memGen: MemGen[T]) = {
+    setName(emitGeneratedMasterName(memGen));
   }
-
+  def setMaster(n: String) = {
+    setName(n);
+  }
   override def genName(n: String): String = {
     if (n == null || n.length() == 0) "" else "memIP_" + n;
   }
-  def check_config = {
+  override def elaborate(fake: Int = 0) = {
     var port_index = 1;
-
+    //println("[info] MemIP Elaborate");
+    // The ports must be implemented and named before markComponent is run.
     memSpec.set_dimensions(numWords, size, 1);
     memSpec.set_port_count(read_ports.length, write_ports.length, rw_ports.length);
+    
     io.elementsCache = null; // Detach elements from the io bundle.
-    read_ports.foreach(rp  => {rp.add_io(io, port_index); port_index += 1; });
-    write_ports.foreach(rp => {rp.add_io(io, port_index); port_index += 1; });
-    rw_ports.foreach(rp    => {rp.add_io(io, port_index); port_index += 1; });
+    read_ports.foreach(p  => {p.implement(0); p.add_io(io, port_index); port_index += 1; });
+    write_ports.foreach(p => {p.implement(0); p.add_io(io, port_index); port_index += 1; });
+    rw_ports.foreach(p    => {p.implement(0); p.add_io(io, port_index); port_index += 1; });
+  }
+  override def postMarkNet(fake: Int = 0) = {
+    //println("[info] Parent" + getPathName +"|"+name);
+    // The component names are not known until after markComponent is run.
+    setMaster(memGen);
   }
 
   def read(addr: Num, oe: Bool, cs: Bool = null): T = {
@@ -159,7 +191,38 @@ class MemIP[T <: Data](memSpec: MemorySpec, numWords: Int, wrDataProto: T) exten
   def setSize(s: Int) = {
     size = s;
   }
-
+  def emitGeneratedMasterName(memGen: MemGen[T]) = {
+    //println("[info] eGMN: "+memGen.name+"|"+memGen.getPathName);
+    var res = memGen.getPathName + "_" + memGen.size + "x" + memGen.numWords;
+    val port_pat: String = read_ports.length+"_"+write_ports.length+"_"+rw_ports.length;
+    if (port_pat == "1_1_0" || port_pat == "0_0_2") {
+      res += "_2P";
+    } else if (port_pat == "0_0_1") {
+      res += "_1P";
+    } else {
+      res += "_not_supported";
+    }
+    res;
+  }
+  def emitBuild(memGen: MemGen[T]) = {
+    val res =
+      "conf:\n" +
+      "  baseName:   " + memGen.getPathName + "\n" +
+      "  wordLength: " + memGen.size + "\n" +
+      "  numWords:   " + memGen.numWords + "\n" +
+      "  numRWPorts: " + rw_ports.length + "\n" +
+      "  numRPorts:  " + read_ports.length + "\n" +
+      "  numWPorts:  " + write_ports.length + "\n" +
+      "  technology: 65\n" +
+      "  opCond:     Typical\n" +
+      "  debug:      False\n" +
+      "  noBM:       " + (if (memGen.hasWrMask) "True" else "False") + "\n";
+    val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
+    val conf = new java.io.FileWriter(base_name + memGen.getPathName + ".conf");
+    conf.write(res);
+    conf.close;
+    res;
+  }
   // Disable implicit clock insertion.
   override def childrenContainsReg = {
     if (isEmittingC) {
@@ -173,7 +236,7 @@ class MemIP[T <: Data](memSpec: MemorySpec, numWords: Int, wrDataProto: T) exten
     containsReg = false; // Turn off implicit clock generation.
     super.doCompileV(out, depth);
     // The moduleName is set above.
-    memSpec.emitBuild;
+    emitBuild(memGen);
   }
 }
 
