@@ -175,7 +175,14 @@ class MemGen[T <: Data](val memSpec: MemorySpec,
       p.add_io(io, port_index);
       port_index += 1;
     }
-    memIP = MemIP(this);
+    memSpec match {
+      case spec: MemorySpecUCBSC => {
+        memIP = MemIP(this);
+      }
+      case spec: MemorySpecRAMV => {
+        memIP = MemGL(this);
+      }
+    }
     //memIP.setMaster(getPathName);
     //memIP.setMaster(masterName);
   }

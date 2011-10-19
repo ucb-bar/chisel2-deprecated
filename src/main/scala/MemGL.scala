@@ -5,12 +5,32 @@ import Chisel._;
 import Component._;
 
 object MemGL {
-  def apply[T <: Data](depth: Int, wrDataProto: T, memSpec: MemorySpec): MemGL[T] = {
-    new MemGL(memSpec, depth, wrDataProto);
+  def apply[T <: Data](memGen: MemGen[T], depth: Int, wrDataProto: T): MemGL[T] = {
+    new MemGL(memGen, depth, wrDataProto);
+  }
+  def apply[T <: Data](memGen: MemGen[T]): MemGL[T] = {
+    val memGL = new MemGL(memGen, memGen.numWords, memGen.wrData);
+    for (p <- memGen.port_list) {
+      val mgl_port = new MemGLPort(memGen, memGL.mem, p.portType,
+                                   p.addr_port, p.data_in, p.we_port,
+                                   p.oe_port, p.cs_port, p.wr_mask_port);
+      if  (p.portType == 'read || p.portType == 'rw) {
+        // Connect the read data to the MemGen output port
+        val read_cast = memGL.wrDataProto.fromNode(mgl_port.data_out_post).asInstanceOf[T];
+        read_cast;
+        read_cast ^^ p.data_out;
+        memGL.port_list += mgl_port;
+      } else if (p.portType == 'write) {
+        memGL.port_list += mgl_port;
+      } else {
+        println("[error] MemGL constructor called with invalid port type" + p.portType);
+      }
+    }
+    memGL;
   }
 }
 
-class MemGLPort[T <: Data](val memSpec: MemorySpec,
+class MemGLPort[T <: Data](val memGen: MemGen[T],
                            val mem: MemCell[T],
                            val port_type: Symbol,
                            val addr: Num,
@@ -26,7 +46,7 @@ class MemGLPort[T <: Data](val memSpec: MemorySpec,
   val data_out_pre = Wire(){Bits(width=data.getWidth)};
   val data_out_post = Wire(){Bits(width=data.getWidth)};
   val we_post = Wire(){Bits(width=1)};
-  val activeHi = memSpec.active_high_ctrl != 0;
+  val activeHi = true;
 
   // expand_wbm_to_bits -- Duplicate each input bit in wbm dup times  
   def expand_wbm_to_bits(wbm: Bits, dup: Int, out_width: Int): Bits = {
@@ -55,35 +75,40 @@ class MemGLPort[T <: Data](val memSpec: MemorySpec,
   }
 }
 
-class MemGL[T <: Data](memSpec: MemorySpec, numWords: Int, wrDataProto: T) extends BlackBox {
+class MemGL[T <: Data](val memGen: MemGen[T],
+                       val numWords: Int,
+                       val wrDataProto: T) extends BlackBox {
   val io = new Bundle();
+  val memSpec = memGen.memSpec;
   val mem = Mem(numWords, wrDataProto);
   var size = wrDataProto.getWidth;
   var addr_bit_width: Int = 0;
   var id = 0;
   var port_list  = ListBuffer[MemGLPort[T]]();
   var port_count = 0;
-  val activeHi = memSpec.active_high_ctrl != 0;
+  val activeHi = true;
 
   def setMaster(m_name: String) = {
-    memSpec.set_master_name(m_name);
-    setName(memSpec.emitGeneratedMasterName);
+    setName(emitGeneratedMasterName(memGen));
   }
 
   override def genName(n: String): String = {
     if (n == null || n.length() == 0) "" else "memGL_" + n;
   }
+  override def elaborate(fake: Int = 0) = {
+    check_config(0);
+  }
   def check_config(dummy_arg_to_prevent_visit_from_markComponent: Int = 0) = {
     port_count = port_list.length;
     io.elementsCache = null; // Detach elements from the io bundle.
-    wireMem(0);
+    implement(0);
     setVerilogParameters(genVerilogParameters(0));
-    memSpec.set_dimensions(numWords, size, 1);
+    //memSpec.set_dimensions(numWords, size, 1);
     //memSpec.set_port_count(read_ports.length, write_ports.length, rw_ports.length);
   }
 
   def read(addr: Num, oe: Bool, cs: Bool = null): T = {
-    val read_port = new MemGLPort(memSpec, mem, 'read, addr, wrDataProto, null, oe, cs);
+    val read_port = new MemGLPort(memGen, mem, 'read, addr, wrDataProto, null, oe, cs);
     port_list += read_port;
     val read_cast = wrDataProto.fromNode(read_port.data_out_post).asInstanceOf[T];
     read_cast;
@@ -92,17 +117,18 @@ class MemGL[T <: Data](memSpec: MemorySpec, numWords: Int, wrDataProto: T) exten
     //read_port.data_out_post.toFix.asInstanceOf[T];
   }
   def write(we: Bool, addr: Num, wrData: T, cs: Bool = null, wrMask: Bits = null) = {
-    val write_port = new MemGLPort(memSpec, mem, 'write, addr, wrData, we, null, cs, wrMask);
+    val write_port = new MemGLPort(memGen, mem, 'write, addr, wrData, we, null, cs, wrMask);
     port_list += write_port;
   }
   def rw(we: Bool, addr: Num, wrData: T, oe: Bool, cs: Bool = null, wrMask: Bits = null): T = {
-    var rw_port = new MemGLPort(memSpec, mem, 'rw, addr, wrData, we, oe, cs, wrMask);
+    var rw_port = new MemGLPort(memGen, mem, 'rw, addr, wrData, we, oe, cs, wrMask);
     port_list += rw_port;
     rw_port.data_out_post.toFix.asInstanceOf[T];
   }
   def setSize(s: Int) = {
     size = s;
   }
+  def emitGeneratedMasterName(memGen: MemGen[T]) = "RAM";
 
   // Disable implicit clock insertion.
   override def childrenContainsReg = {
@@ -117,8 +143,8 @@ class MemGL[T <: Data](memSpec: MemorySpec, numWords: Int, wrDataProto: T) exten
     val port_sizes = port_list.map(port => port.addr.getWidth);
     port_sizes.max;
   }
-  def wireMem(dummy_arg_to_prevent_visit_from_markComponent: Int = 0) = {
-    println("wireMem");
+  def implement(dummy_arg_to_prevent_visit_from_markComponent: Int = 0) = {
+    println("[info] MemGL.implement");
     val addr_bit_width = getAddrWidth;
 
     val addr_port = Bits(width = addr_bit_width * port_count, dir = 'input);
