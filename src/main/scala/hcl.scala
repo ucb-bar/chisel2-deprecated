@@ -266,16 +266,16 @@ object MuxCase {
 
 object Log2 {
   // def log2WidthOf() = { (m: Node, n: Int) => log2(m.inputs(0).width) }
-  def apply (mod: Node, n: Int): Node = {
+  def apply (mod: UFix, n: Int): UFix = {
     if (isEmittingComponents) {
-      var res: Node = Fix(0);
+      var res = UFix(0);
       for (i <- 1 to n) 
-        res = Multiplex(NodeExtract(mod,i), Fix(i, sizeof(n)), res);
+        res = Mux(mod(i).toBool, UFix(i, sizeof(n)), res);
       res
     } else {
-      val res = new Log2();
-      res.init("", fixWidth(sizeof(n)), mod);
-      res
+      val log2Cell = new Log2Cell(n);
+      log2Cell.io.in := mod;
+      log2Cell.io.out
     }
   }
 }
@@ -283,6 +283,16 @@ class Log2 extends Node {
   override def toString: String = "LOG2(" + inputs(0) + ")";
   override def emitDefLoC: String = 
     "  " + emitTmp + " = " + inputs(0).emitRef + ".log2<" + width + ">();\n";
+}
+class Log2Cell(n: Int) extends Cell {
+  val io = new Bundle{
+    val in = UFix('input);
+    val out = UFix('output);
+  }
+  io.setIsCellIO;
+  val primitiveNode = new Log2();
+  primitiveNode.init("", fixWidth(sizeof(n)), io.in);
+  io.out assign primitiveNode;
 }
 
 
