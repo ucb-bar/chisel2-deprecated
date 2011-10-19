@@ -16,13 +16,7 @@ object Mem {
   def apply[T <: Data](depth: Int, isEnable: Bool, wrAddr: Num, wrData: T, wrMask: Bits = null, resetVal: T = null): MemCell[T] = {
     val memcell = new MemCell(depth, wrData);
     memcell.write(isEnable, wrAddr, wrData, wrMask);
-    if (resetVal != null) memcell.reset_val(resetVal);
-    memcell
-  }
-
-  def apply[T <: Data](depth: Int, isEnable: Bool, wrAddr: Num, wrData: T, wrMask: Bits): MemCell[T] = {
-    val memcell = new MemCell(depth, wrData)
-    memcell.write(isEnable, wrAddr, wrData, wrMask);
+    if (!(resetVal == null)) memcell.reset_val(resetVal);
     memcell
   }
 
@@ -92,7 +86,7 @@ class MemWPort[T <: Data](mem: Mem[T], io: Bundle, addr: Node, data: T, wen: Nod
   mem.inputs += wen_port;
   wen_port assign wen;
 
-  if (wbm != null) {
+  if (!(wbm == null)) {
     val wbm_port = wbm.clone.asInput;
     wbm_port.setName("wbm_" + (port_offset + 3));
     io += wbm_port;
