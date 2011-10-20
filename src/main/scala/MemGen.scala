@@ -76,8 +76,12 @@ object MemGen {
   }
 }
 
+<<<<<<< HEAD
 class MemGenPort[T <: Data](val memSpec: MemorySpec,
                             val memGen: MemGen[T],
+=======
+class MemGenPort[T <: Data](val memGen: MemGen[T],
+>>>>>>> 2b746b4961d454b6f888686cdb5f955d511f5fd3
                             // val memIP: MemIP[T],
                             val portType: Symbol,
                             val addr: Num,
@@ -153,7 +157,10 @@ class MemGen[T <: Data](val memSpec: MemorySpec,
                         val numWords: Int,
                         val wrData: T) extends Component {
   val io = new Bundle();
+<<<<<<< HEAD
   //val memIP = MemIP(numWords, wrData, memSpec);
+=======
+>>>>>>> 2b746b4961d454b6f888686cdb5f955d511f5fd3
   var memIP: Component = null;
   var masterName = "MemGen";
   var size = wrData.getWidth;
@@ -192,7 +199,11 @@ class MemGen[T <: Data](val memSpec: MemorySpec,
 
   def read(addr: Num, oe: Bool = Bool(true), cs: Bool = Bool(true),
            rdData: T = null.asInstanceOf[T]): T = {
+<<<<<<< HEAD
     val read_port = new MemGenPort(memSpec, this, 'read, addr, wrData, null, oe, cs);
+=======
+    val read_port = new MemGenPort(this, 'read, addr, wrData, null, oe, cs);
+>>>>>>> 2b746b4961d454b6f888686cdb5f955d511f5fd3
     port_list += read_port;
     check_config;
     if (!(rdData == null)) {
@@ -206,14 +217,22 @@ class MemGen[T <: Data](val memSpec: MemorySpec,
     read_port.data_out;
   }
   def read(rp: ReadMemoryPort[T]) = {
+<<<<<<< HEAD
     val read_port = new MemGenPort(memSpec, this, 'read, rp.addr, rp.readData, null, rp.oen, rp.cs);
+=======
+    val read_port = new MemGenPort(this, 'read, rp.addr, rp.readData, null, rp.oen, rp.cs);
+>>>>>>> 2b746b4961d454b6f888686cdb5f955d511f5fd3
     port_list += read_port;
     check_config;
     rp.readData <> read_port.data_out;
   }
   def write(we: Bool, addr: Num, write_data: T, cs: Bool = Bool(true),
             wrMask: Bits = null) = {
+<<<<<<< HEAD
     var write_port = new MemGenPort(memSpec, this, 'write, addr, write_data,
+=======
+    var write_port = new MemGenPort(this, 'write, addr, write_data,
+>>>>>>> 2b746b4961d454b6f888686cdb5f955d511f5fd3
                                     we, null, cs, wrMask);
     port_list += write_port;
     check_config;
@@ -221,7 +240,11 @@ class MemGen[T <: Data](val memSpec: MemorySpec,
   def rw(we: Bool, addr: Num, wrData: T, oe: Bool = Bool(true), 
          cs: Bool = Bool(true), rdData: T = null.asInstanceOf[T],
          wrMask: Bits = null): T = {
+<<<<<<< HEAD
     var rw_port = new MemGenPort(memSpec, this, 'rw, addr, wrData, we, oe, cs,
+=======
+    var rw_port = new MemGenPort(this, 'rw, addr, wrData, we, oe, cs,
+>>>>>>> 2b746b4961d454b6f888686cdb5f955d511f5fd3
                                  wrMask);
     port_list += rw_port;
     check_config;

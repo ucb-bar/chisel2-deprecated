@@ -168,26 +168,26 @@ class MemGL[T <: Data](val memGen: MemGen[T],
     // Concatenate all address ports into a single address vector.
     val concatAddr = Wire(){Bits(width=addr_bit_width * port_count)};
     concatAddr := port_list.reverse.map(_.addr.toBits).reduceLeft(Cat(_,_));
-    concatAddr ^^ addr_port;
+    addr_port := concatAddr;
 
     // Concatenate all data write ports into a single data vector.
     val concatDataIn = Wire(){Bits(width=size * port_count)};
     concatDataIn := port_list.reverse.map(_.data.toBits).reduceLeft(Cat(_,_));
-    concatDataIn ^^ data_in;
+    data_in := concatDataIn;
 
     // Concatenate all write enables
     val concatWriteEn = Wire(){Bits(width=port_count)};
     concatWriteEn := port_list.reverse.map(_.andCsWeToBits).reduceLeft(Cat(_,_));
-    concatWriteEn ^^ we_port;
+    we_port := concatWriteEn;
 
     // Concatenate all output enables
     val concatOutEn = Wire(){Bits(width=port_count)};
     concatOutEn := port_list.reverse.map(_.andCsOeToBits).reduceLeft(Cat(_,_));
-    concatOutEn ^^ oe_port;
+    oe_port := concatOutEn;
 
     // Create all reset inputs tied low
     val concatReset = Bits("h0", port_count);
-    concatReset ^^ rst_port;
+    rst_port := concatReset;
 
     val concatDataOut = Wire(){Bits(width = size * port_count)};
 
@@ -199,7 +199,7 @@ class MemGL[T <: Data](val memGen: MemGen[T],
       if (p.port_type == 'write || p.port_type == 'rw) {
         p.we_post := we_port(ind);
         mem.write(p.we_post, addr_port(addr_offset + addr_bit_width - 1, addr_offset),
-                  data_out(data_offset + size - 1, data_offset).toFix.asInstanceOf[T]);
+                  p.data.fromNode(data_out(data_offset + size - 1, data_offset)));
       }
 
       // Add emulation read ports or zero fill if none for the port.
