@@ -293,6 +293,8 @@ abstract class Node extends nameable{
     // untraced or same component?
     if(isCellIO) println("found " + this);
     fixName();
+    if ((isReg || isRegOut || isClkInput) && !(component == null))
+        component.containsReg = true
     val (comp, nextComp, markComp) = 
       this match {
         case io: IO => {
