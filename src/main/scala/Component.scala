@@ -514,6 +514,7 @@ abstract class Component {
 	  case bb: BlackBox => {
             if(!bb.named) {bb.instanceName = name; bb.named = true};
             bb.pathParent = this;
+	    println("Setting bb path parent of " + bb + " to be " + this.getClass + " " + this);
             //bb.name = name;
             //bb.named = true;
             for((n, elm) <- io.flatten) {
@@ -523,6 +524,7 @@ abstract class Component {
 	  case comp: Component => {
             if(!comp.named) {comp.instanceName = name; comp.named = true};
             comp.pathParent = this;
+	    println("Setting comp path parent of " + comp + " to be " + this.getClass + " " + this + " INTROSPECT NAME: " + name);
           }
           case any =>
         }
@@ -586,7 +588,7 @@ abstract class Component {
   }
   def verifyAllMuxes = {
     for(m <- muxes) {
-      if(m.inputs(0).width != 1 && m.component != null)
+      if(m.inputs(0).width != 1 && m.component != null && (!isEmittingComponents || !m.component.isInstanceOf[BlackBox]))
 	ChiselErrors += IllegalState("Mux " + m.name + " has " + m.inputs(0).width +"-bit selector " + m.inputs(0).name, m.stack);
     }
   }

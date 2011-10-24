@@ -86,10 +86,10 @@ class MemIPPort[T <: Data](val memSpec: MemorySpec,
 
     if (port_type.equals('read) || port_type.equals('rw)) {
       val read_data = mem.read(addr_port);
-      val zero_data = Fix(0, read_data.getWidth);
+      val zero_data = Fix(0);
       val data_mux = Fix(dir = 'output);//zero_data.clone;
 
-      data_mux assign (Mux(!oe_port && !cs_port, read_data, zero_data));
+      data_mux assign (Multiplex(!oe_port && !cs_port, read_data, zero_data));
 
       oe_port := !oe;
       val data_mux_reg = Reg(data_mux, zero_data);

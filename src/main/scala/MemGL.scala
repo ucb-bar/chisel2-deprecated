@@ -75,7 +75,7 @@ class MemGLPort[T <: Data](val memGen: MemGen[T],
   }
 }
 
-class MemGL[T <: Data](val memGen: MemGen[T],
+class MemGL[T <: Data](memGen: MemGen[T],
                        val numWords: Int,
                        val wrDataProto: T) extends BlackBox {
   val io = new Bundle();
