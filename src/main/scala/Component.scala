@@ -514,7 +514,6 @@ abstract class Component {
 	  case bb: BlackBox => {
             if(!bb.named) {bb.instanceName = name; bb.named = true};
             bb.pathParent = this;
-	    println("Setting bb path parent of " + bb + " to be " + this.getClass + " " + this);
             //bb.name = name;
             //bb.named = true;
             for((n, elm) <- io.flatten) {
@@ -524,7 +523,6 @@ abstract class Component {
 	  case comp: Component => {
             if(!comp.named) {comp.instanceName = name; comp.named = true};
             comp.pathParent = this;
-	    println("Setting comp path parent of " + comp + " to be " + this.getClass + " " + this + " INTROSPECT NAME: " + name);
           }
           case any =>
         }
