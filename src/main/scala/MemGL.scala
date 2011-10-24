@@ -14,7 +14,7 @@ object MemGL {
       val mgl_port = new MemGLPort(memGen, memGL.mem, p.portType,
                                    p.addr_port, p.data_in, p.we_port,
                                    p.oe_port, p.cs_port, p.wr_mask_port);
-      if (p.portType == 'read || p.portType == 'rw) {
+      if  (p.portType == 'read || p.portType == 'rw) {
         // Connect the read data to the MemGen output port
         val read_cast = memGL.wrDataProto.fromNode(mgl_port.data_out_post).asInstanceOf[T];
         read_cast;
@@ -48,7 +48,7 @@ class MemGLPort[T <: Data](val memGen: MemGen[T],
   val we_post = Wire(){Bits(width=1)};
   val activeHi = true;
 
-  // expand_wbm_to_bits -- Duplicate each input bit in wbm dup times
+  // expand_wbm_to_bits -- Duplicate each input bit in wbm dup times  
   def expand_wbm_to_bits(wbm: Bits, dup: Int, out_width: Int): Bits = {
     val mask_bits = if (wbm == null) 0 else wbm.getWidth;
     if (wbm == null) {
@@ -84,7 +84,7 @@ class MemGL[T <: Data](val memGen: MemGen[T],
   var size = wrDataProto.getWidth;
   var addr_bit_width: Int = 0;
   var id = 0;
-  var port_list = ListBuffer[MemGLPort[T]]();
+  var port_list  = ListBuffer[MemGLPort[T]]();
   var port_count = 0;
   val activeHi = true;
 
@@ -148,13 +148,13 @@ class MemGL[T <: Data](val memGen: MemGen[T],
     val addr_bit_width = getAddrWidth;
 
     val addr_port = Bits(width = addr_bit_width * port_count, dir = 'input);
-    val ce_port = Bits(width = port_count, dir = 'input);
-    //val cs_port = Bits(width = port_count, dir = 'input);
-    val data_out = Bits(width = size * port_count, dir = 'output);
-    val oe_port = Bits(width = port_count, dir = 'input);
-    val data_in = Bits(width = size * port_count, dir = 'input);
-    val we_port = Bits(width = port_count, dir = 'input);
-    val rst_port = Bits(width = port_count, dir = 'input);
+    val ce_port   = Bits(width = port_count, dir = 'input);
+    //val cs_port   = Bits(width = port_count, dir = 'input);
+    val data_out  = Bits(width = size * port_count, dir = 'output);
+    val oe_port   = Bits(width = port_count, dir = 'input);
+    val data_in   = Bits(width = size * port_count, dir = 'input);
+    val we_port   = Bits(width = port_count, dir = 'input);
+    val rst_port  = Bits(width = port_count, dir = 'input);
 
     // Connect Clock inputs on each port.
     val concatClock = Wire(){Bits(width=port_count)};
@@ -204,7 +204,7 @@ class MemGL[T <: Data](val memGen: MemGen[T],
 
       // Add emulation read ports or zero fill if none for the port.
       if (p.port_type == 'read || p.port_type == 'rw) {
-        val mem_read = mem.read(addr_port(addr_offset + addr_bit_width - 1, addr_offset)).toBits
+        val mem_read =  mem.read(addr_port(addr_offset + addr_bit_width - 1, addr_offset)).toBits
         val out_en = oe_port(ind);
         p.data_out_pre := Reg(Mux(out_en.toBool, mem_read, Bits(0, size)));
       } else {

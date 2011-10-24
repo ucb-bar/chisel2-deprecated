@@ -65,10 +65,12 @@ class Op extends Node {
   }
 
   def emitDefSigned: String = {
-    if (op == ">>>" || op == ">>")
-      "$signed(" + inputs(0).emitRef +") " + op + " " + inputs(1).emitRef
-    else
+    if(op == ">" || op == "<" || op == ">=" || op == "<=")
       "$signed(" + inputs(0).emitRef +") " + op + " $signed(" + inputs(1).emitRef + ")"
+    else if (op == ">>>")
+      "$signed(" + inputs(0).emitRef +") " + ">>> " + inputs(1).emitRef
+    else
+      inputs(0).emitRef + " " + op + " " + inputs(1).emitRef
   }
 
   override def emitDefLoC: String = {

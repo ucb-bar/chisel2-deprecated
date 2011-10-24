@@ -10,19 +10,19 @@ object MemGen {
   }
 
   def apply[T <: Data](
-      wen: Bool,
-      wrAddr: UFix,
-      wrData: T,
-      oen: Bool = null,
-      rdAddr: UFix = null,
-      rdData: T = null,
-      cs: Bool = null,
-      depth: Int = 0,
-      rinLatency: Int = 1,
-      routLatency: Int = 1,
-      wLatency: Int = 1,
-      moduleName: String = "MemGen",
-      memSpec: MemorySpec = null): MemGen[T] = {
+      wen:         Bool,
+      wrAddr:      UFix,
+      wrData:      T,
+      oen:         Bool       = null,
+      rdAddr:      UFix       = null,
+      rdData:      T          = null,
+      cs:          Bool       = null,
+      depth:       Int        = 0,
+      rinLatency:  Int        = 1,
+      routLatency: Int        = 1,
+      wLatency:    Int        = 1,
+      moduleName:  String     = "MemGen",
+      memSpec:     MemorySpec = null): MemGen[T] = {
     val memorySpec = if (memSpec == null) new MemorySpecUCBSC else memSpec;
       
     val bit_width = wrData.getWidth;
@@ -87,12 +87,12 @@ class MemGenPort[T <: Data](val memGen: MemGen[T],
                             val wrMask: Bits = null) {
   var size = wrData.getWidth;
   val addr_port = addr.clone.asInput;
-  val ce_port = Bool('input);
-  val cs_port = Bool('input);
-  val data_out = wrData.clone.asOutput;
-  val oe_port = Bool('input);
-  val data_in = wrData.clone.asInput;
-  val we_port = Bool('input);
+  val ce_port   = Bool('input);
+  val cs_port   = Bool('input);
+  val data_out  = wrData.clone.asOutput;
+  val oe_port   = Bool('input);
+  val data_in   = wrData.clone.asInput;
+  val we_port   = Bool('input);
   val wr_mask_port = if (wrMask == null) null else wrMask.clone.asInput;
 
   def implement(fake: Int = 0) = {
@@ -112,7 +112,7 @@ class MemGenPort[T <: Data](val memGen: MemGen[T],
       oe_port := oe;
       we_port := we;
       // memIP.rw(!we_port, addr_port, data_in, !oe_port, !cs_port,
-      // wrMask = wr_mask_port) ^^ data_out;
+      //         wrMask = wr_mask_port) ^^ data_out;
     }
 
     if (!(wrMask == null)) {
@@ -156,7 +156,7 @@ class MemGen[T <: Data](val memSpec: MemorySpec,
   var masterName = "MemGen";
   var size = wrData.getWidth;
   var id = 0;
-  val port_list = ListBuffer[MemGenPort[T]]();
+  val port_list  = ListBuffer[MemGenPort[T]]();
   var hasWrMask = false;
   def setMaster(m_name: String) = {
     masterName = m_name;
@@ -216,7 +216,7 @@ class MemGen[T <: Data](val memSpec: MemorySpec,
     port_list += write_port;
     check_config;
   }
-  def rw(we: Bool, addr: Num, wrData: T, oe: Bool = Bool(true),
+  def rw(we: Bool, addr: Num, wrData: T, oe: Bool = Bool(true), 
          cs: Bool = Bool(true), rdData: T = null.asInstanceOf[T],
          wrMask: Bits = null): T = {
     var rw_port = new MemGenPort(this, 'rw, addr, wrData, we, oe, cs,
