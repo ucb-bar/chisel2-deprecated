@@ -31,6 +31,11 @@ object IllegalState {
     res.index = index;
     res
   }
+  def apply(m: String, st: Array[StackTraceElement]) = {
+    val res = new ChiselError("Illegal State", m, st);
+    res.index = 1;
+    res
+  }
 }
 
 object IllegalConnection {

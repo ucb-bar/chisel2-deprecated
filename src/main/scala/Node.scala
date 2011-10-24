@@ -96,6 +96,7 @@ abstract class Node extends nameable{
   var isClkInput = false;
   var inferCount = 0;
   var genError = false;
+  var stack: Array[StackTraceElement] = null;
   def width: Int = width_;
   def width_=(w: Int) = { isFixedWidth = true; width_ = width; inferWidth = fixWidth(w); }
   def name_it (path: String, setNamed: Boolean = true) = { name = path; named = setNamed}

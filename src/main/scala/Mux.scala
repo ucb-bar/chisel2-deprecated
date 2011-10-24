@@ -13,7 +13,7 @@ object Multiplex{
 
 class MuxCell[T <: Data](cI: T, aI: T) extends Cell {
   val io = new Bundle(){
-    val t = Input();
+    val t = Bits('input);
     val c: T = cI.clone().asInput();
     val a: T = aI.clone().asInput();
     val out: T = cI.clone().asOutput();
@@ -27,7 +27,7 @@ class MuxCell[T <: Data](cI: T, aI: T) extends Cell {
 }
 
 object Mux {
-  def apply[T <: Data](t: Bool, c: T, a: T): T = {
+  def apply[T <: Data](t: Bits, c: T, a: T): T = {
     val muxcell = new MuxCell(c, a);
     muxcell.io.t assign t;
     muxcell.io.c <> c;
@@ -36,6 +36,8 @@ object Mux {
   }
 }
 class Mux extends Op {
+  muxes += this;
+  stack = Thread.currentThread.getStackTrace;
   override def toString: String =
     inputs(0) + " ? " + inputs(1) + " : " + inputs(2)
   override def emitDef: String = 

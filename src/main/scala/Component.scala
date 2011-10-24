@@ -38,6 +38,7 @@ object Component {
   var topComponent: Component = null;
   val components = ArrayBuffer[Component]();
   val procs = ArrayBuffer[proc]();
+  val muxes = ArrayBuffer[Node]();
   var genCount = 0;
   def genCompName(name: String): String = {
     genCount += 1;
@@ -84,6 +85,7 @@ object Component {
     compIndices.clear();
     components.clear();
     procs.clear();
+    muxes.clear();
     isEmittingComponents = false;
     isEmittingC = false;
     topComponent = null;
@@ -557,6 +559,7 @@ abstract class Component {
     val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
     val out = new java.io.FileWriter(base_name + name + ".v");
     doCompileV(out, 0);
+    verifyAllMuxes;
     if(ChiselErrors isEmpty)
       out.close();
     else {
@@ -579,6 +582,12 @@ abstract class Component {
         case w: Wire => w.genMuxes(w.default);
         case r: Reg  => r.genMuxes(r);
       }
+    }
+  }
+  def verifyAllMuxes = {
+    for(m <- muxes) {
+      if(m.inputs(0).width != 1 && m.component != null)
+	ChiselErrors += IllegalState("Mux " + m.name + " has " + m.inputs(0).width +"-bit selector " + m.inputs(0).name, m.stack);
     }
   }
   def elaborate(fake: Int = 0) = {}
@@ -697,6 +706,7 @@ abstract class Component {
           mods ++= c.mods;
     findConsumers();
     inferAll();
+    verifyAllMuxes;
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors)	err.printError;
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
