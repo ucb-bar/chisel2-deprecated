@@ -17,6 +17,7 @@ object MemGL {
       if  (p.portType == 'read || p.portType == 'rw) {
         // Connect the read data to the MemGen output port
         val read_cast = memGL.wrDataProto.fromNode(mgl_port.data_out_post).asInstanceOf[T];
+	read_cast.setIsCellIO;
         read_cast;
         read_cast ^^ p.data_out;
         memGL.port_list += mgl_port;
@@ -111,6 +112,7 @@ class MemGL[T <: Data](memGen: MemGen[T],
     val read_port = new MemGLPort(memGen, mem, 'read, addr, wrDataProto, null, oe, cs);
     port_list += read_port;
     val read_cast = wrDataProto.fromNode(read_port.data_out_post).asInstanceOf[T];
+    read_cast.setIsCellIO;
     read_cast;
     //val read_cast = wrDataProto.clone.fromNode(read_port.data_out_post);
     //read_cast;
@@ -172,17 +174,17 @@ class MemGL[T <: Data](memGen: MemGen[T],
 
     // Concatenate all data write ports into a single data vector.
     val concatDataIn = Wire(){Bits(width=size * port_count)};
-    concatDataIn := port_list.reverse.map(_.data.toBits).reduceLeft(Cat(_,_));
+    concatDataIn := port_list.reverse.filter(_.port_type == 'write).map(_.data.toBits).reduceLeft(Cat(_,_));
     data_in := concatDataIn;
 
     // Concatenate all write enables
     val concatWriteEn = Wire(){Bits(width=port_count)};
-    concatWriteEn := port_list.reverse.map(_.andCsWeToBits).reduceLeft(Cat(_,_));
+    concatWriteEn := port_list.reverse.filter(x => {x.port_type == 'write || x.port_type == 'rw}).map(_.andCsWeToBits).reduceLeft(Cat(_,_));
     we_port := concatWriteEn;
 
     // Concatenate all output enables
     val concatOutEn = Wire(){Bits(width=port_count)};
-    concatOutEn := port_list.reverse.map(_.andCsOeToBits).reduceLeft(Cat(_,_));
+    concatOutEn := port_list.reverse.filter(x => {x.port_type == 'read || x.port_type == 'rw}).map(_.andCsOeToBits).reduceLeft(Cat(_,_));
     oe_port := concatOutEn;
 
     // Create all reset inputs tied low
@@ -198,8 +200,10 @@ class MemGL[T <: Data](memGen: MemGen[T],
       // Add a memory write port for emulation.
       if (p.port_type == 'write || p.port_type == 'rw) {
         p.we_post := we_port(ind);
+	val data_in = p.data.fromNode(data_out(data_offset + size - 1, data_offset));
+	data_in.setIsCellIO;
         mem.write(p.we_post, addr_port(addr_offset + addr_bit_width - 1, addr_offset),
-                  p.data.fromNode(data_out(data_offset + size - 1, data_offset)));
+                  data_in);
       }
 
       // Add emulation read ports or zero fill if none for the port.
