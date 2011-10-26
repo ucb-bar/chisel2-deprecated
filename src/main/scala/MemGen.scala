@@ -173,16 +173,8 @@ class MemGen[T <: Data](val memSpec: MemorySpec,
       p.add_io(io, port_index);
       port_index += 1;
     }
-    memSpec match {
-      case spec: MemorySpecUCBSC => {
-        memIP = MemIP(this);
-      }
-      case spec: MemorySpecRAMV => {
-        memIP = MemGL(this);
-      }
-    }
-    //memIP.setMaster(getPathName);
-    //memIP.setMaster(masterName);
+
+    MemRTL(this);
   }
   def check_config = {
     //memIP.check_config;
