@@ -204,7 +204,7 @@ class Mem4Port[T <: Data](mem:        Mem4[T],
         res += 
         indent+"    "+pre_read_buf+" = "+m.emitRef+"["+wrAddr.emitRef+"];\n"+
         indent+"    if ("+wrEnable.emitRef+(if(hasCS) " & "+chipSel.emitRef else "")+") begin\n"+
-        indent+"      generate for ("+gen_i+" = 0; "+gen_i+" < "+m.width+"; "+gen_i+" = "+gen_i+" + 1) begin:"+
+        indent+"      for ("+gen_i+" = 0; "+gen_i+" < "+m.width+"; "+gen_i+" = "+gen_i+" + 1) begin:"+
                             m.emitRef+"__W"+port_index+"\n"+
         indent+"        if("+wrBitMask.emitRef+"["+gen_i+"]) "+pre_read_buf+"["+gen_i+"] = "+
                             wrData.emitRef+"["+gen_i+"];\n"+
@@ -228,7 +228,7 @@ class Mem4Port[T <: Data](mem:        Mem4[T],
         res += "  assign "+read_out+" = ";
       }
       if (oe == null) {
-        res += m.emitRef+"["+wrAddr.emitRef+"]\n";
+        res += m.emitRef+"["+wrAddr.emitRef+"];\n";
       } else {
         res += "("+outEn.emitRef+(if (hasCS) " & "+chipSel.emitRef else "")+") ? "+
             m.emitRef+"["+wrAddr.emitRef+"] : "+
@@ -421,7 +421,7 @@ class Mem4[T <: Data](n_val: Int, w_data: T, readLatency: Int) extends Delay {
       }
     }
     if (hasWBM) {
-      res += "  genvar "+emitRef+"__i;\n";
+      res += "  integer "+emitRef+"__i;\n";
     }
     res;
   }
