@@ -243,6 +243,7 @@ class Mem4Port[T <: Data](mem:        Mem4[T],
   }
   def emitDefHiC: String = {
     var res = "";
+    val read_buf = m.emitRef+"__read"+port_index;
     if (port_type == 'write || port_type == 'rw) {
       res +=  "  if (" + wrEnable.emitRef + ".to_bool()) {\n"
       if (wbm == null) {
@@ -259,7 +260,18 @@ class Mem4Port[T <: Data](mem:        Mem4[T],
       }
     }
     if (port_type == 'read || port_type == 'rw) {
-      res += "  " + memRef.emitTmp + " = " + m.emitRef + ".get(" + wrAddr.emitRef + ");\n"
+      val read_mem = m.emitRef + ".get(" + wrAddr.emitRef + ")";
+      if (m.getReadLatency > 0) {
+        res += "  "+memRef.emitRef+" = "+read_buf+";\n";
+      }
+      res += "  " + (if (m.getReadLatency > 0) read_buf else memRef.emitRef) + " = ";
+      if (oe == null) {
+        res += read_mem+";\n";
+      } else if (hasCS) {
+        res += "("+outEn.emitRef+" & "+chipSel.emitRef+") ? "+read_mem+" : LIT<"+m.getWidth+">(0L);\n";
+      } else {
+        res += "("+outEn.emitRef+") ? "+read_mem+" : LIT<"+m.getWidth+">(0L);\n";
+      }
     }
     res
   }
@@ -426,8 +438,20 @@ class Mem4[T <: Data](n_val: Int, w_data: T, readLatency: Int) extends Delay {
     //val res = ("" /: mem_refs) { (s, r) => s + r.emitDefLoCLocal };
     res
   }
-  override def emitDecC: String = 
-    "  mem_t<" + width + "," + n + "> " + emitRef + ";\n";
+  override def emitDecC: String = {
+    var hasWBM = false;
+    var res = "  mem_t<" + width + "," + n + "> " + emitRef + ";\n";
+    for (p <- port_list) {
+      if (p.hasWrBitMask) {
+        hasWBM = true;
+        res += "  dat_t<" + width + "> " + emitRef + "__next"+p.port_index+";\n";
+      }
+      if (readLatency > 0 && (p.getPortType == 'read || p.getPortType == 'rw)) {
+        res += "  dat_t<" + width + "> " + emitRef + "__read"+p.port_index+";\n";
+      }
+    }   
+    res;
+  }
 /*
   def apply(addr: Node, oe: Bool = null.asInstanceOf[Bool], cs: Bool = null): Node = {
     Mem4Ref(this, addr, oe, cs);
