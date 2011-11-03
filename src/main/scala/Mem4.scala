@@ -268,9 +268,9 @@ class Mem4Port[T <: Data](mem:        Mem4[T],
       if (oe == null) {
         res += read_mem+";\n";
       } else if (hasCS) {
-        res += "("+outEn.emitRef+" & "+chipSel.emitRef+") ? "+read_mem+" : LIT<"+m.getWidth+">(0L);\n";
+        res += "("+outEn.emitRef+".to_bool() & "+chipSel.emitRef+".to_bool()) ? "+read_mem+" : LIT<"+m.getWidth+">(0L);\n";
       } else {
-        res += "("+outEn.emitRef+") ? "+read_mem+" : LIT<"+m.getWidth+">(0L);\n";
+        res += "("+outEn.emitRef+".to_bool()) ? "+read_mem+" : LIT<"+m.getWidth+">(0L);\n";
       }
     }
     res
@@ -447,9 +447,10 @@ class Mem4[T <: Data](n_val: Int, w_data: T, readLatency: Int) extends Delay {
         res += "  dat_t<" + width + "> " + emitRef + "__next"+p.port_index+";\n";
       }
       if (readLatency > 0 && (p.getPortType == 'read || p.getPortType == 'rw)) {
+        res += "  " + p.memRef.emitTmp + ";\n";
         res += "  dat_t<" + width + "> " + emitRef + "__read"+p.port_index+";\n";
       }
-    }   
+    }
     res;
   }
 /*
