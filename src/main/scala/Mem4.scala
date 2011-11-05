@@ -8,6 +8,7 @@
 package Chisel {
 
 import scala.collection.mutable.ListBuffer;
+import java.io.File;
 import Node._;
 
 object Mem4 {
@@ -20,19 +21,26 @@ object Mem4 {
                        wrMask:   Bits = null.asInstanceOf[Bits],
                        cs:       Bool = null.asInstanceOf[Bool],
                        resetVal: T    = null.asInstanceOf[T],
-                       readLatency: Int = 1
+                       readLatency: Int = 1,
+                       hexInitFile: String = ""
                      ): Mem4Cell[T] = {
     val memcell = new Mem4Cell(depth, wrData, readLatency);
     if (!(wrAddr == null) && !(wrEnable == null)) {
       memcell.write(wrAddr, wrData, wrEnable, wrMask, cs);
     }
     if (!(resetVal == null)) memcell.reset_val(resetVal);
+    if (hexInitFile != "") memcell.setHexInitFile(hexInitFile);
     memcell;
   }
   def apply[T <: Data](depth: Int, isEnable: Bool, wrAddr: Num, wrData: T): Mem4Cell[T] = {
     val memcell = new Mem4Cell(depth, wrData, 1);
     memcell.write(wrAddr, wrData, isEnable, null);
     memcell
+  }
+  def ensure_dir(dir: String) = {
+    val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/");
+    new File(d).mkdirs();
+    d
   }
 }
 
@@ -60,9 +68,11 @@ class Mem4Cell[T <: Data](n: Int, data: T, readLatency: Int) extends Cell {
   def rw(addr: Node, we: Node = null, w_mask: Bits = null, cs: Bool = null.asInstanceOf[Bool], oe: Bool = null): Mem4Port[T] = {
     primitiveNode.addRWPort(io, addr, null.asInstanceOf[T], we, w_mask, cs, oe);
   }
-
   def write(addr: Node, w_data: T, we: Node = null, w_mask: Bits = null, cs: Bool = null.asInstanceOf[Bool]) = {
     primitiveNode.addWritePort(io, addr, w_data, we, w_mask, cs);
+  }
+  def setHexInitFile(hexInitFileName: String) = {
+    primitiveNode.setHexInitFile(hexInitFileName);
   }
 
   def getReadLatency = readLatency;
@@ -318,6 +328,7 @@ class Mem4[T <: Data](n_val: Int, w_data: T, readLatency: Int) extends Delay {
   var port_count            = 0;
   var mem_refs              = ListBuffer[Mem4Ref]();
   var target                = 'rtl;
+  var hexInitFile           = "";
 
   def addWritePort(io: Bundle, addr: Node, data: T, we: Node, wbm: Bits, cs: Bool) = {
     val we_opt = (if (we == null) Bool(true) else we);
@@ -346,7 +357,9 @@ class Mem4[T <: Data](n_val: Int, w_data: T, readLatency: Int) extends Delay {
     val reset_port = new Mem4ResetPort[T](this, io, r_val);
     reset_port_opt = Some(reset_port);
   }
-
+  def setHexInitFile(hexInitFileName: String) = {
+    hexInitFile = hexInitFileName;
+  }
   override def getNode() = {
     fixName();
     removeCellIOs();
@@ -411,6 +424,10 @@ class Mem4[T <: Data](n_val: Int, w_data: T, readLatency: Int) extends Delay {
   def emitRTLDec: String = {
     var hasWBM = false;
     var res = "  reg[" + (width-1) + ":0] " + emitRef + "[" + (n-1) + ":0];\n";
+    if (hexInitFile != "") {
+    println("hesInitFile: "+hexInitFile);
+      res += "  initial $readmemh(\""+hexInitFile+"\", "+emitRef+");\n";
+    }
     for (p <- port_list) {
       if (p.hasWrBitMask) {
         hasWBM = true;
@@ -437,6 +454,13 @@ class Mem4[T <: Data](n_val: Int, w_data: T, readLatency: Int) extends Delay {
     val res = "";
     //val res = ("" /: mem_refs) { (s, r) => s + r.emitDefLoCLocal };
     res
+  }
+  override def emitInitC: String = {
+    if (hexInitFile != "") {
+      "  "+emitRef+".read_hex(\""+hexInitFile+"\");\n"
+    } else {
+      ""
+    }
   }
   override def emitDecC: String = {
     var hasWBM = false;
