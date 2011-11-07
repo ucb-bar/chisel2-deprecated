@@ -180,12 +180,12 @@ class Mem4Port[T <: Data](mem:        Mem4[T],
 
   def emitInstanceDef: String = {
     var res = "";
-    if (port_type == 'read || port_type == 'rw) {
+    if (getPortType == 'read || getPortType == 'rw) {
       res +=
         "  .O"+port_index+"("+memRef.emitTmp+"),\n" +
         "  .OE"+port_index+"("+(if (oe == null) "1'b1" else outEn.emitRef)+"),\n";
     }
-    if (port_type == 'write || port_type == 'rw) {
+    if (getPortType == 'write || getPortType == 'rw) {
       res +=
         "  .I"+port_index+"("+wrData.emitRef+"),\n" +
         "  .A"+port_index+"("+wrAddr.emitRef+"),\n" +
@@ -203,7 +203,7 @@ class Mem4Port[T <: Data](mem:        Mem4[T],
       return "<no write data>";
     }
     var res = "";
-    if (port_type == 'write || port_type == 'rw) {
+    if (getPortType == 'write || getPortType == 'rw) {
       if (wbm == null) {
         res +=
         indent + "    if (" + wrEnable.emitRef + ")\n" +
@@ -230,7 +230,7 @@ class Mem4Port[T <: Data](mem:        Mem4[T],
     val read_buf = m.emitRef+"__read"+port_index;
     def read_out = memRef.emitTmp;
 
-    if (port_type == 'read || port_type == 'rw) {
+    if (getPortType == 'read || getPortType == 'rw) {
       if (m.getReadLatency > 0) {
         res += "  always @(posedge clk) begin\n";
         res += "    "+read_buf+" <= ";
@@ -254,7 +254,7 @@ class Mem4Port[T <: Data](mem:        Mem4[T],
   def emitDefHiC: String = {
     var res = "";
     val read_buf = m.emitRef+"__read"+port_index;
-    if (port_type == 'write || port_type == 'rw) {
+    if (getPortType == 'write || getPortType == 'rw) {
       res +=  "  if (" + wrEnable.emitRef + ".to_bool()) {\n"
       if (wbm == null) {
         res +=
@@ -269,7 +269,7 @@ class Mem4Port[T <: Data](mem:        Mem4[T],
         "  }\n";
       }
     }
-    if (port_type == 'read || port_type == 'rw) {
+    if (getPortType == 'read || getPortType == 'rw) {
       val read_mem = m.emitRef + ".get(" + wrAddr.emitRef + ")";
       if (m.getReadLatency > 0) {
         res += "  "+memRef.emitRef+" = "+read_buf+";\n";
@@ -329,6 +329,7 @@ class Mem4[T <: Data](n_val: Int, w_data: T, readLatency: Int) extends Delay {
   var mem_refs              = ListBuffer[Mem4Ref]();
   var target                = 'rtl;
   var hexInitFile           = "";
+  var hasWBM                = false;
 
   def addWritePort(io: Bundle, addr: Node, data: T, we: Node, wbm: Bits, cs: Bool) = {
     val we_opt = (if (we == null) Bool(true) else we);
@@ -378,9 +379,34 @@ class Mem4[T <: Data](n_val: Int, w_data: T, readLatency: Int) extends Delay {
         <port>{p.getPortType.toString}</port>
       )}
     </memory>
-
+  def toJSON(indent: String = "") = {
+    var read_port_count = 0;
+    var write_port_count = 0;
+    var rw_port_count = 0;
+    var comma = "";
+    var res =
+      indent+"{\"Mem\" : {\n"+
+      indent+"  \"name\":         \""+getPathName+"\",\n"+
+      indent+"  \"depth\":        "+n+",\n"+
+      indent+"  \"width\":        "+w_data.getWidth+",\n"+
+      indent+"  \"read_latency\": "+getReadLatency+",\n"+
+      indent+"  \"port_types\":   [";
+    for (p <- port_list) {
+      if (p.hasWrBitMask) hasWBM = true;
+      if (p.getPortType == 'read)       { read_port_count += 1;  res += comma+"\"read\""; comma = ", "; }
+      else if (p.getPortType == 'write) { write_port_count += 1; res += comma+"\"write\""; comma = ", "; }
+      else if (p.getPortType == 'rw)    { rw_port_count += 1;    res += comma+"\"rw\""; comma = ", ";}
+    }
+    res += "],\n"+
+      indent+"  \"read_ports\":   "+read_port_count+",\n"+
+      indent+"  \"write_ports\":  "+write_port_count+",\n"+
+      indent+"  \"rw_ports\":     "+rw_port_count+",\n"+
+      indent+"  \"hasWriteMask\": "+(if(hasWBM) "true" else "false")+"\n";
+    res += indent+"}}\n";
+    res;    
+  }
   override def emitDef: String = {
-    println(""+toXML);
+    println(""+toJSON());
     if (target == 'rtl) {
       emitRTLDef;
     } else if (target == 'inst) {
@@ -422,10 +448,9 @@ class Mem4[T <: Data](n_val: Int, w_data: T, readLatency: Int) extends Delay {
     }
   }
   def emitRTLDec: String = {
-    var hasWBM = false;
     var res = "  reg[" + (width-1) + ":0] " + emitRef + "[" + (n-1) + ":0];\n";
     if (hexInitFile != "") {
-    println("hesInitFile: "+hexInitFile);
+      // println("hexInitFile: "+hexInitFile);
       res += "  initial $readmemh(\""+hexInitFile+"\", "+emitRef+");\n";
     }
     for (p <- port_list) {
@@ -463,7 +488,6 @@ class Mem4[T <: Data](n_val: Int, w_data: T, readLatency: Int) extends Delay {
     }
   }
   override def emitDecC: String = {
-    var hasWBM = false;
     var res = "  mem_t<" + width + "," + n + "> " + emitRef + ";\n";
     for (p <- port_list) {
       if (p.hasWrBitMask) {
