@@ -15,17 +15,23 @@ object Mem4 {
   val noResetVal = Literal(0);
 
   def apply[T <: Data](depth:    Int,
-                       wrData:   T, // If no address, this defines the data prototype.
+                       gen:      T): Mem4Cell[T] = {
+    val memcell = new Mem4Cell(depth, gen);
+    memcell;
+  }
+  def apply[T <: Data](depth:    Int,
                        wrEnable: Bool = null.asInstanceOf[Bool],
                        wrAddr:   Num  = null.asInstanceOf[Num],
+                       wrData:   T    = null.asInstanceOf[T],
                        wrMask:   Bits = null.asInstanceOf[Bits],
                        cs:       Bool = null.asInstanceOf[Bool],
                        resetVal: T    = null.asInstanceOf[T],
                        readLatency: Int = 1,
                        hexInitFile: String = ""
-                     ): Mem4Cell[T] = {
-    val memcell = new Mem4Cell(depth, wrData, readLatency);
-    if (!(wrAddr == null) && !(wrEnable == null)) {
+                     )(gen: => T): Mem4Cell[T] = {
+    val memcell = new Mem4Cell(depth, gen);
+    memcell.setReadLatency(readLatency);
+    if (!(wrAddr == null) && !(wrEnable == null) && !(wrData == null)) {
       memcell.write(wrAddr, wrData, wrEnable, wrMask, cs);
     }
     if (!(resetVal == null)) memcell.reset_val(resetVal);
@@ -33,7 +39,7 @@ object Mem4 {
     memcell;
   }
   def apply[T <: Data](depth: Int, isEnable: Bool, wrAddr: Num, wrData: T): Mem4Cell[T] = {
-    val memcell = new Mem4Cell(depth, wrData, 1);
+    val memcell = new Mem4Cell(depth, wrData);
     memcell.write(wrAddr, wrData, isEnable, null);
     memcell
   }
@@ -44,12 +50,12 @@ object Mem4 {
   }
 }
 
-class Mem4Cell[T <: Data](n: Int, data: T, readLatency: Int) extends Cell {
+class Mem4Cell[T <: Data](n: Int, data: T) extends Cell {
   val io = new Bundle();
 
   io.setIsCellIO;
   isReg = true;
-  val primitiveNode = new Mem4[T](n, data, readLatency);
+  val primitiveNode = new Mem4[T](n, data);
 
   primitiveNode.init("primitiveNode", data.toNode.getWidth);
   primitiveNode.nameHolder = this;
@@ -75,7 +81,8 @@ class Mem4Cell[T <: Data](n: Int, data: T, readLatency: Int) extends Cell {
     primitiveNode.setHexInitFile(hexInitFileName);
   }
 
-  def getReadLatency = readLatency;
+  def getReadLatency = primitiveNode.getReadLatency;
+  def setReadLatency(latency: Int) = primitiveNode.setReadLatency(latency);
   def reset_val(r_val: T) = { primitiveNode.addResetVal(io, r_val); }
   def setTarget(s: Symbol) = { primitiveNode.target = s; }
 }
@@ -321,7 +328,7 @@ class Mem4ResetPort[T <: Data](mem: Mem4[T], io: Bundle, reset_val: T) {
   }
 }
 
-class Mem4[T <: Data](n_val: Int, w_data: T, readLatency: Int) extends Delay {
+class Mem4[T <: Data](n_val: Int, w_data: T) extends Delay {
   val n                     = n_val;
   var reset_port_opt: Option[Mem4ResetPort[T]] = None;
   val port_list             = ListBuffer[Mem4Port[T]]();
@@ -329,6 +336,7 @@ class Mem4[T <: Data](n_val: Int, w_data: T, readLatency: Int) extends Delay {
   var mem_refs              = ListBuffer[Mem4Ref]();
   var target                = 'rtl;
   var hexInitFile           = "";
+  var readLatency           = 1;
   var hasWBM                = false;
 
   def addWritePort(io: Bundle, addr: Node, data: T, we: Node, wbm: Bits, cs: Bool) = {
@@ -372,6 +380,7 @@ class Mem4[T <: Data](n_val: Int, w_data: T, readLatency: Int) extends Delay {
   }
 
   def getReadLatency = readLatency;
+  def setReadLatency(latency: Int) = { readLatency = latency }
   override def toString: String = "MEM(" + emitRef + ")";
   def toXML =
     <memory module={getPathName} depth={""+n} width={""+w_data.getWidth}>
