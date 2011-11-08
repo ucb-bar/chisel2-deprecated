@@ -390,7 +390,7 @@ abstract class Node extends nameable{
   def removeCellIOs() {
     for(i <- 0 until inputs.length)
       if(inputs(i) == null){
-	ChiselErrors += IllegalState("NULL Input for " + this, 0);
+	ChiselErrors += IllegalState("NULL Input for " + this.getClass + " " + this + " in Component " + component, 0);
       }
       else if(inputs(i).isCellIO)
 	inputs(i) = inputs(i).getNode;

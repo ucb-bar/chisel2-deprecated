@@ -84,12 +84,9 @@ class Vec[T <: Data]() extends Data with Cloneable {
     }
   }
 
-  def <>(src: List[Node]) = {
+  def <>(src: Iterable[T]) = {
     for((b, e) <- bundleVector zip src)
-      e match {
-	case other: Bundle =>
-	  b <> e;
-      }
+      b <> e;
   }
 
   override def findNodes(depth: Int, c: Component): Unit = {

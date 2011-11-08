@@ -63,20 +63,33 @@ class RegCell[T <: Data](d: T, w: Int, hasInput: Boolean, isReset: Boolean)(gen:
 class Reg extends Delay with proc{
   def updateVal = inputs(0);
   def resetVal  = inputs(1);
-  def isReset  = inputs.length == 2;
+  def enableSignal = inputs(enableIndex);
+  var enableIndex = 0;
+  def isReset  = inputs.length == 2 && !isEnable || inputs.length > 2 && isEnable;
+  var isEnable = false;
   def isUpdate = !(updateVal == null);
   def update (x: Node) = { inputs(0) = x };
   var assigned = false;
+  var enable = Bool(false);
   def procAssign(src: Node) = {
     if (assigned)
       ChiselErrors += IllegalState("reassignment to Reg", 3);
     var res = Bool(true);
     for (i <- 0 until conds.length) {
       res = conds(i) && res;
+      enable = enable || conds(i);
+      isEnable = true;
     }
     // println(this.name + " <== " + res + " " + conds.length);
     // val res = conds.foldRight(Lit(1,1)){(a, b) => a&&b}
     updates.push((res, src));
+  }
+  override def genMuxes(default: Node) = {
+    if(isEnable){
+      inputs += enable;
+      enableIndex = inputs.length - 1;
+    }
+    super.genMuxes(default);
   }
   def nameOpt: String = if (name.length > 0) name else "REG"
   override def toString: String = {
@@ -100,10 +113,54 @@ class Reg extends Delay with proc{
   }
   override def emitRefV: String = if (name == "") "R" + emitIndex else name;
   override def emitDef: String = "";
-  override def emitReg: String =
-    "    " + emitRef + " <= " + 
-    (if (isReset) "reset ? " + resetVal.emitRef + " : " else "" ) + 
-    updateVal.emitRef + ";\n"
+  override def emitReg: String = {
+    if(isEnable){
+      if(isReset){
+	"    if(reset) begin\n" + 
+	"      " + emitRef + " <= " + resetVal.emitRef + ";\n" +
+	"    end else if(" + enableSignal.emitRef + ") begin\n" + 
+	"      " + emitRef + " <= " + updateVal.emitRef + ";\n" +
+	"    end\n"
+      } else {
+	"    if(" + enableSignal.emitRef + ") begin\n" +
+	"      " + emitRef + " <= " + updateVal.emitRef + ";\n" +
+	"    end\n"
+      }
+    } else {
+      "    " + emitRef + " <= " + 
+      (if (isReset) "reset ? " + resetVal.emitRef + " : " else "" ) + 
+      updateVal.emitRef + ";\n"
+    }
+  }
+  // override def emitReg: String = 
+  //   {
+  //     var res = "";
+  //     if(isReset)
+  // 	{
+  // 	  res += "    if(reset) begin\n";
+  // 	  res += "      " + emitRef + " <= " + resetVal.emitRef + ";\n";
+  // 	  res += "    end"
+  // 	}
+  //     var first = !isReset;
+  //     for((cond, value) <- updates) 
+  // 	{
+  // 	  if(first)
+  // 	    {
+  // 	      res += "    if(" + cond.emitRef + ") begin\n"
+  // 	      res += "    " + emitRef + " <= " + value.emitRef + ";\n";
+  // 	      res += "    end"
+  // 	      first = false;
+  // 	    } 
+  // 	  else 
+  // 	    {
+  // 	      res += " else if(" + cond.emitRef + ") begin\n"
+  // 	      res += "    " + emitRef + " <= " + value.emitRef + ";\n";
+  // 	      res += "    end"
+  // 	    }
+  // 	}
+  //     res += "\n"
+  //     res
+  //   }
   override def emitDec: String = 
     "  reg[" + (width-1) + ":0] " + emitRef + ";\n";
 

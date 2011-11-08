@@ -89,7 +89,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     elementsCache = elts; this 
   }
   override def name_it (path: String, named: Boolean = true) = {
-    if(path.length > 0 && name == "") name = path;
+    if(path.length > 0 && !this.named) {name = path; this.named = named};
     for ((n, i) <- elements) {
       i.name = (if (path.length > 0) path + "_" else "") + n;
       i.name_it(i.name, named);
@@ -141,19 +141,29 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
   override def apply(name: String): Data = elements(name)
   override def <>(src: Node) = { 
     // println("B <>'ing " + this + " & " + src);
-    src match {
-      case other: Bundle => {
-        for ((n, i) <- elements) {
-          if (other.elements.contains(n)){
-            i <> other(n);
-	  }
-          else{
-            println("// UNABLE TO FIND " + n + " IN " + other.component);
-	  }
-        }
+    if(comp == null){
+      src match {
+	case other: Bundle => {
+          for ((n, i) <- elements) {
+            if (other.elements.contains(n)){
+              i <> other(n);
+	    }
+            else{
+              println("// UNABLE TO FIND " + n + " IN " + other.component);
+	    }
+          }
+	}
+	case default =>
+          println("// TRYING TO CONNECT BUNDLE TO NON BUNDLE " + default);
       }
-      case default =>
-        println("// TRYING TO CONNECT BUNDLE TO NON BUNDLE " + default);
+    } else {
+      src match { 
+	case other: Bundle => {
+	  comp assign other.toNode
+	}
+	case default =>
+	  println("CONNECTING INCORRECT TYPES INTO WIRE OR REG")
+      }
     }
   }
   override def ^^(src: Node) = { 

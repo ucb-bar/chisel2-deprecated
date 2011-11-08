@@ -40,7 +40,10 @@ class Bool extends Bits {
   }
 
   override def <==(src: Bool) = {
-    comp procAssign src.toNode;
+    if(comp != null)
+      comp procAssign src.toNode;
+    else
+      this.asInstanceOf[Wire] procAssign src.toNode;
   }
 
   def generateError = {

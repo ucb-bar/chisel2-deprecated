@@ -578,7 +578,7 @@ abstract class Component {
   def genAllMuxes = {
     for (p <- procs) {
       p match {
-        case io: IO  =>
+        case io: IO  => if(io.updates.length > 0) io.genMuxes(io.default);
         case w: Wire => w.genMuxes(w.default);
         case r: Reg  => r.genMuxes(r);
       }

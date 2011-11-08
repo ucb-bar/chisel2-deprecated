@@ -172,7 +172,10 @@ trait proc extends Node {
         println("NO DEFAULT SPECIFIED FOR WIRE: " + this); // error()
       }
       updates.push((lastCond, lastValue));
-      inputs(0) = if (default != null) default else lastValue;
+      if(inputs.length > 0)
+	inputs(0) = if (default != null) default else lastValue;
+      else
+	inputs += (if (default != null) default else lastValue);
       for ((cond, value) <- updates) {
         inputs(0) = Multiplex(cond, value, inputs(0));
       }

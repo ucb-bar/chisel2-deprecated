@@ -39,7 +39,10 @@ class Fix extends Num {
     res};
   
   private def lessEqEq(src: Num) = {
-    comp procAssign src.toNode;
+    if(comp != null)
+      comp procAssign src.toNode;
+    else
+      this.asInstanceOf[Wire] procAssign src.toNode;
   }
 
   private def colonEqual(src: Num) = {

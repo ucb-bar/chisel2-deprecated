@@ -60,7 +60,10 @@ class Bits extends IO {
 
   private def lessEqEq(src: Bits) = {
     generateError(src);
-    comp procAssign src.toNode;
+    if(comp != null)
+      comp procAssign src.toNode;
+    else
+      this.asInstanceOf[Wire] procAssign src.toNode;
   }
 
   def := (src: Bits) = colonEqual(src);

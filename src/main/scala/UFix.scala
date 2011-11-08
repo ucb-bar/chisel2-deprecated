@@ -39,7 +39,10 @@ class UFix extends Num {
   }
 
   override def <==(src: UFix) = {
-    comp procAssign src.toNode;
+    if(comp != null)
+      comp procAssign src.toNode;
+    else
+      this.asInstanceOf[Wire] procAssign src.toNode;
   }
 
   override def := (src: UFix) = {
