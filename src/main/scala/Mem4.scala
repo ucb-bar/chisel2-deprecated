@@ -415,11 +415,13 @@ class Mem4[T <: Data](n_val: Int, w_data: T) extends Delay {
     res;    
   }
   override def emitDef: String = {
-    println(""+toJSON());
+    // println(""+toJSON());
     if (target == 'rtl) {
       emitRTLDef;
     } else if (target == 'inst) {
-      emitInstanceDef;
+      val res = emitInstanceDef;
+      Component.configStr += toJSON();
+      res;
     } else {
       "// target = "+target+" is undefined.";
     }

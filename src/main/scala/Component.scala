@@ -30,6 +30,7 @@ object Component {
   var targetEmulatorRootDir: String = null;
   var targetVerilogRootDir: String = null;
   var targetDir: String = null;
+  var configStr: String = null;
   var compIndex = -1;
   val compIndices = HashMap.empty[String,Int];
   val compDefs = new HashMap[String, String];
@@ -81,6 +82,7 @@ object Component {
     targetVerilogRootDir = System.getProperty("CHISEL_VERILOG_ROOT");
     if (targetVerilogRootDir == null) targetVerilogRootDir = "../verilog";
     targetDir = "";
+    configStr = "";
     compIndex = -1;
     compIndices.clear();
     components.clear();
@@ -565,6 +567,11 @@ abstract class Component {
     else {
       for(err <- ChiselErrors)	err.printError;
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
+    }
+    if (configStr.length > 0) {
+      val out_conf = new java.io.FileWriter(base_name+Component.topComponent.name+".conf");
+      out_conf.write(configStr);
+      out_conf.close();
     }
     compDefs.clear;
     genCount = 0;
