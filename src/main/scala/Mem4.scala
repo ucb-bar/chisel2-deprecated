@@ -20,16 +20,16 @@ object Mem4 {
     memcell;
   }
   def apply[T <: Data](depth:    Int,
-                       wrEnable: Bool = null.asInstanceOf[Bool],
-                       wrAddr:   Num  = null.asInstanceOf[Num],
-                       wrData:   T    = null.asInstanceOf[T],
+                       wrEnable: Bool,
+                       wrAddr:   Num,
+                       wrData:   T,
                        wrMask:   Bits = null.asInstanceOf[Bits],
                        cs:       Bool = null.asInstanceOf[Bool],
                        resetVal: T    = null.asInstanceOf[T],
                        readLatency: Int = 1,
                        hexInitFile: String = ""
-                     )(gen: => T): Mem4Cell[T] = {
-    val memcell = new Mem4Cell(depth, gen);
+                     ): Mem4Cell[T] = {
+    val memcell = new Mem4Cell(depth, wrData);
     memcell.setReadLatency(readLatency);
     if (!(wrAddr == null) && !(wrEnable == null) && !(wrData == null)) {
       memcell.write(wrAddr, wrData, wrEnable, wrMask, cs);
