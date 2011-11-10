@@ -58,6 +58,7 @@ class UFix extends Num {
   override def apply(hi: Int, lo: Int): UFix = {Extract(this, hi, lo){UFix()}};
   override def apply(bit: UFix): UFix = {Extract(this, bit){UFix()}};
   override def apply(hi: UFix, lo: UFix): UFix = {Extract(this, hi, lo, -1){UFix()}};
+  override def apply(range: (Int, Int)): UFix = this(range._1, range._2);
 
   override def unary_-(): UFix = UnaryNodeCell(this, "-"){UFix()};
   override def unary_~(): UFix = UnaryNodeCell(this, "~"){UFix()};

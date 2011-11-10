@@ -80,7 +80,8 @@ class Bits extends IO {
   def apply(hi: Int, lo: Int): Bits = {Extract(this, hi, lo){Bits()}};
   def apply(bit: UFix): Bits = Extract(this, bit){Bits()};
   def apply(hi: UFix, lo: UFix): Bits = Extract(this, hi, lo, -1){Bits()};
-
+  def apply(range: (Int, Int)): Bits = this(range._1, range._2);
+  
   def unary_-(): Bits = UnaryNodeCell(this, "-"){Bits()};
   def unary_~(): Bits = UnaryNodeCell(this, "~"){Bits()};
   def ===(b: Bits): Bool = LogicalNodeCell(this, b, "==="){Bits()};

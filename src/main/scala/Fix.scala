@@ -64,6 +64,7 @@ class Fix extends Num {
   override def apply(hi: Int, lo: Int): Fix = {Extract(this, hi, lo){Fix()}};
   override def apply(bit: UFix): Fix = {Extract(this, bit){Fix()}};
   override def apply(hi: UFix, lo: UFix): Fix = {Extract(this, hi, lo, -1){Fix()}};
+  override def apply(range: (Int, Int)): Fix = this(range._1, range._2);
 
   def andR(): Bool    = ReductionNodeCell(this, "&"){Fix()};
   def orR():  Bool    = ReductionNodeCell(this, "|"){Fix()};
