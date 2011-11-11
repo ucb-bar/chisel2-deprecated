@@ -77,9 +77,9 @@ class Reg extends Delay with proc{
     var res = Bool(true);
     for (i <- 0 until conds.length) {
       res = conds(i) && res;
-      enable = enable || conds(i);
       isEnable = true;
     }
+    enable = enable || res;
     // println(this.name + " <== " + res + " " + conds.length);
     // val res = conds.foldRight(Lit(1,1)){(a, b) => a&&b}
     updates.push((res, src));
