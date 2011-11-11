@@ -53,7 +53,7 @@ object Mem4 {
   def getDefaultReadLatency = defReadLatency;
 
   var defMemoryImplementation = 'rtl;
-  def setDefaultMemoryImplementation(impl: Symbol) = { defMemoryImplementation = 'rtl; }
+  def setDefaultMemoryImplementation(impl: Symbol) = { defMemoryImplementation = impl; }
   def getDefaultMemoryImplementation = defMemoryImplementation;
 }
 
