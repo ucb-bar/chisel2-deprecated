@@ -17,7 +17,17 @@ object Node {
   var conds = new Stack[Bool]();
   var keys  = new Stack[Bits]();
   def fixWidth(w: Int) = { (m: Node) => w };
-  def widthOf(i: Int) = { (m: Node) => {m.inputs(i).getWidth }}
+  def widthOf(i: Int) = { (m: Node) => { 
+    try { 
+      m.inputs(i).getWidth 
+    } catch { 
+        case e: java.lang.IndexOutOfBoundsException => {
+          val error = IllegalState(m + " in " + m.component + " is unconnected. Ensure that is assigned.", 0)
+          if (!ChiselErrors.contains(error))
+            ChiselErrors += error
+          -1
+        }
+    }}}
   def maxWidth(m: Node): Int = {
     var res = 0;
     for (i <- m.inputs)
