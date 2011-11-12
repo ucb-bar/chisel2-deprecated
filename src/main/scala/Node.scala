@@ -214,10 +214,12 @@ abstract class Node extends nameable{
   def infer: Boolean = {
     val res = inferWidth(this);
     if(inferCount > 100) {
-      if(genError)
-	ChiselErrors += IllegalState("Unable to infer width of " + this, 0);
-      else
-	genError = true;
+      if(genError) {
+	    val error = IllegalState("Unable to infer width of " + this, 0);
+        if (!ChiselErrors.contains(error))
+          ChiselErrors += error
+      } else
+	    genError = true;
       return false;
     }
     // println("INFER " + this + " -> " + res);
@@ -400,7 +402,9 @@ abstract class Node extends nameable{
   def removeCellIOs() {
     for(i <- 0 until inputs.length)
       if(inputs(i) == null){
-	ChiselErrors += IllegalState("NULL Input for " + this.getClass + " " + this + " in Component " + component, 0);
+        val error = IllegalState("NULL Input for " + this.getClass + " " + this + " in Component " + component, 0);
+        if (!ChiselErrors.contains(error))
+          ChiselErrors += error
       }
       else if(inputs(i).isCellIO)
 	inputs(i) = inputs(i).getNode;
