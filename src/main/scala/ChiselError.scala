@@ -6,7 +6,7 @@ object ChiselError {
   val ChiselErrors = new ArrayBuffer[ChiselError];
 }
 
-class ChiselError(err: String, m: String, st: Array[StackTraceElement]) {
+class ChiselError(val err: String, val m: String, val st: Array[StackTraceElement]) {
   var index: Int = 0;
   def printError = {
     println("  " + err + ": " + m);  
@@ -14,6 +14,12 @@ class ChiselError(err: String, m: String, st: Array[StackTraceElement]) {
       for(i <- 0 until 10)
 	println("     " + (if(index != 0) st(i).toString else ""));
     println();
+  }
+  override def equals(x: Any): Boolean = {
+      if (!x.isInstanceOf[ChiselError])
+          return false
+      val xError = x.asInstanceOf[ChiselError]
+      xError.err == err && xError.m == m && xError.index == index && ((index > 0) && xError.st == st || index == 0)
   }
 }
 

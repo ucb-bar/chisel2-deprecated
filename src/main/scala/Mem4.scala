@@ -53,7 +53,7 @@ object Mem4 {
   def getDefaultReadLatency = defReadLatency;
 
   var defMemoryImplementation = 'rtl;
-  def setDefaultMemoryImplementation(impl: Symbol) = { defMemoryImplementation = 'rtl; }
+  def setDefaultMemoryImplementation(impl: Symbol) = { defMemoryImplementation = impl; }
   def getDefaultMemoryImplementation = defMemoryImplementation;
 }
 
@@ -504,6 +504,22 @@ class Mem4[T <: Data](n_val: Int, val cell: Mem4Cell[T]) extends Delay with proc
 
   override def toString: String = "MEM( + emitRef + )";
 
+  def toCMD = {
+    var read_port_count = 0;
+    var write_port_count = 0;
+    var rw_port_count = 0;
+    var delim = "";
+    var res = "gen_chisel_mem -name \""+getPathName+"\" -depth "+n+" -width "+cell.getWidth;
+    res += " -read_latency "+getReadLatency+" -port_types \"";
+    for (p <- cell.port_list) {
+      if (p.hasWrBitMask) hasWBM = true;
+      if (p.getPortType == 'read)       { read_port_count += 1;  res += delim+"read";  delim = " "; }
+      else if (p.getPortType == 'write) { write_port_count += 1; res += delim+"write"; delim = " "; }
+      else if (p.getPortType == 'rw)    { rw_port_count += 1;    res += delim+"rw";    delim = " "; }
+    }
+    res += "\" -has_write_mask "+(if(hasWBM) "true" else "false")+"\n";
+    res;
+  }
   def toJSON(indent: String = "") = {
     var read_port_count = 0;
     var write_port_count = 0;
@@ -531,12 +547,11 @@ class Mem4[T <: Data](n_val: Int, val cell: Mem4Cell[T]) extends Delay with proc
     res;    
   }
   override def emitDef: String = {
-    // println(""+toJSON());
     if (target == 'rtl) {
       emitRTLDef;
     } else if (target == 'inst) {
       val res = emitInstanceDef;
-      Component.configStr += toJSON();
+      Component.configStr += toCMD;
       res;
     } else {
       "// target = "+target+" is undefined.";
