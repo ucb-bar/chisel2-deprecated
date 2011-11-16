@@ -174,9 +174,9 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
       if (mem.addr_width > 0) {
         if (mem.addr_width != addr.getWidth) {
           println("[error] Memory address width differs from other memory ports");
-        } else {
-          mem.addr_width = addr.getWidth;
         }
+      } else {
+        mem.addr_width = addr.getWidth;
       }
     }
   }
