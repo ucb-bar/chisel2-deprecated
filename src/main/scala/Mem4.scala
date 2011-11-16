@@ -23,7 +23,7 @@ object Mem4 {
                        wrEnable: Bool,
                        wrAddr:   Num,
                        wrData:   T,
-                       wrMask:   Bits = null.asInstanceOf[Bits],
+                       w_mask:   Bits = null.asInstanceOf[Bits],
                        cs:       Bool = null.asInstanceOf[Bool],
                        resetVal: T    = null.asInstanceOf[T],
                        readLatency: Int = 1,
@@ -32,7 +32,7 @@ object Mem4 {
     val memcell = new Mem4Cell(depth, wrData);
     memcell.setReadLatency(readLatency);
     if (!(wrAddr == null) && !(wrEnable == null) && !(wrData == null)) {
-      memcell.write(wrAddr, wrData, wrEnable, wrMask, cs);
+      memcell.write(wrAddr, wrData, wrEnable, w_mask, cs);
     }
     if (!(resetVal == null)) memcell.reset_val(resetVal);
     if (hexInitFile != "") memcell.setHexInitFile(hexInitFile);
@@ -48,7 +48,7 @@ object Mem4 {
     new File(d).mkdirs();
     d
   }
-  var defReadLatency = 1;
+  var defReadLatency = 0;
   def setDefaultReadLatency(latency: Int) = { defReadLatency = latency; }
   def getDefaultReadLatency = defReadLatency;
 
