@@ -171,6 +171,13 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
       cell.io += addr_port;
       mem.inputs += addr_port;
       addr_port assign addr;
+      if (mem.addr_width > 0) {
+        if (mem.addr_width != addr.getWidth) {
+          println("[error] Memory address width differs from other memory ports");
+        } else {
+          mem.addr_width = addr.getWidth;
+        }
+      }
     }
   }
   def assign_data(data: T) = {
@@ -446,7 +453,7 @@ class Mem4ResetPort[T <: Data](mem: Mem4[T], cell: Mem4Cell[T], reset_val: T) {
     var res = 
       //"  always @(posedge clk) begin\n" +
       "    if (reset) begin\n"
-    for (i <- 0 until mem.n) {
+    for (i <- 0 until mem.getDepth) {
       res += "      " + mem.emitRef + "[" + i + "] <= " + resetVal.emitRef + ";\n";
     }
     //res += "    end\n";
@@ -457,21 +464,21 @@ class Mem4ResetPort[T <: Data](mem: Mem4[T], cell: Mem4Cell[T], reset_val: T) {
   def emitDefHiC: String = {
     val res =
       "  if (reset.to_bool()) {\n" +
-      "    for (int i = 0; i < " + mem.n + "; i++) \n" +
+      "    for (int i = 0; i < " + mem.getDepth + "; i++) \n" +
       "      "  + mem.emitRef + ".put(i, " + resetVal.emitRef + ");\n" +
       "  }\n"
     res
   }
 }
 
-class Mem4[T <: Data](n_val: Int, val cell: Mem4Cell[T]) extends Delay with proc {
-  val n                     = n_val;
+class Mem4[T <: Data](depth: Int, val cell: Mem4Cell[T]) extends Delay with proc {
   var reset_port_opt: Option[Mem4ResetPort[T]] = None;
   var mem_refs              = ListBuffer[Mem4Ref]();
   var target                = Mem4.getDefaultMemoryImplementation;
   var hexInitFile           = "";
   var readLatency           = Mem4.getDefaultReadLatency;
   var hasWBM                = false;
+  var addr_width            = 0;
 
   // proc trait methods.
   def procAssign(src: Node) = {}
@@ -481,6 +488,8 @@ class Mem4[T <: Data](n_val: Int, val cell: Mem4Cell[T]) extends Delay with proc
     }
   }
 
+  def getDepth = depth;
+  def getAddrWidth = addr_width;
   def getDataWidth = cell.getWidth;
   def addResetVal(cell: Mem4Cell[T], r_val: T) = {
     val reset_port = new Mem4ResetPort[T](this, cell, r_val);
@@ -509,8 +518,8 @@ class Mem4[T <: Data](n_val: Int, val cell: Mem4Cell[T]) extends Delay with proc
     var write_port_count = 0;
     var rw_port_count = 0;
     var delim = "";
-    var res = "gen_chisel_mem -name \""+getPathName+"\" -depth "+n+" -width "+cell.getWidth;
-    res += " -read_latency "+getReadLatency+" -port_types \"";
+    var res = "gen_chisel_mem -name \""+getPathName+"\" -depth "+depth+" -width "+cell.getWidth;
+    res += " -addr_width "+getAddrWidth+" -read_latency "+getReadLatency+" -port_types \"";
     for (p <- cell.port_list) {
       if (p.hasWrBitMask) hasWBM = true;
       if (p.getPortType == 'read)       { read_port_count += 1;  res += delim+"read";  delim = " "; }
@@ -528,7 +537,7 @@ class Mem4[T <: Data](n_val: Int, val cell: Mem4Cell[T]) extends Delay with proc
     var res =
       indent+"{\"Mem\" : {\n"+
       indent+"  \"name\":         \""+getPathName+"\",\n"+
-      indent+"  \"depth\":        "+n+",\n"+
+      indent+"  \"depth\":        "+depth+",\n"+
       indent+"  \"width\":        "+cell.getWidth+",\n"+
       indent+"  \"read_latency\": "+getReadLatency+",\n"+
       indent+"  \"port_types\":   [";
@@ -580,7 +589,7 @@ class Mem4[T <: Data](n_val: Int, val cell: Mem4Cell[T]) extends Delay with proc
   }
   def getPathName = { component.getPathName + "_" + emitRef; }
   def emitInstanceDef: String = {
-    var res = getPathName + " #(.depth("+n+"), .width("+cell.getWidth+")) " + emitRef + "(.CLK(clk), .RST(reset)";
+    var res = getPathName + " #(.depth("+depth+"), .width("+cell.getWidth+")) " + emitRef + "(.CLK(clk), .RST(reset)";
     val mapped_ports = cell.port_list.filter(_.isMapped);
     res +=
       ("" /: mapped_ports) { (s, p) => {s + p.emitInstanceDef}};
@@ -596,7 +605,7 @@ class Mem4[T <: Data](n_val: Int, val cell: Mem4Cell[T]) extends Delay with proc
     }
   }
   def emitRTLDec: String = {
-    var res = "  reg[" + (width-1) + ":0] " + emitRef + "[" + (n-1) + ":0];\n";
+    var res = "  reg[" + (width-1) + ":0] " + emitRef + "[" + (depth-1) + ":0];\n";
     if (hexInitFile != "") {
       // println("hexInitFile: "+hexInitFile);
       res += "  initial $readmemh(\""+hexInitFile+"\", "+emitRef+");\n";
@@ -638,7 +647,7 @@ class Mem4[T <: Data](n_val: Int, val cell: Mem4Cell[T]) extends Delay with proc
     }
   }
   override def emitDecC: String = {
-    var res = "  mem_t<" + width + "," + n + "> " + emitRef + ";\n";
+    var res = "  mem_t<"+width+","+depth+"> "+emitRef+";\n";
     setPortIndices;
     for (p <- cell.port_list) {
       if (p.hasWrBitMask) {
