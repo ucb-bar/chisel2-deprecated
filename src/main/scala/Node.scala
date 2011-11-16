@@ -345,7 +345,7 @@ abstract class Node extends nameable{
           node.findNodes(depth + 2, nextComp);
           node match { 
             case io: IO => 
-	      if (io.dir == OUTPUT && ((!(component == io.component)) || this.isInstanceOf[IO])) {
+	      if (io.dir == OUTPUT && (!(component.parent == io.component) && !(component == io.component && !this.isInstanceOf[IO]))) {
                 val c = node.component.parent;
                 // println("BINDING " + node + " I " + i + " NODE-PARENT " + node.component.parent + " -> " + this + " PARENT " + component.parent);
                 if (c == null) {
