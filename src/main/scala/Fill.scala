@@ -12,6 +12,7 @@ object Fill {
     fillcell.io.n <> UFix(n);
     fillcell.io.out
   }
+  def apply(mod: Bits, n: Int): Bits = apply(n, mod)
 }
 
 
