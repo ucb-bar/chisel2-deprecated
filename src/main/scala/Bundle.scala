@@ -194,7 +194,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
   }
 
   override def fromNode(n: Node): this.type = {
-    val res = this.getClass.newInstance.asInstanceOf[this.type];
+    val res = this.clone()
     var ind = 0;
     for((name, io) <- res.flatten.toList.reverse) {
       io.asOutput();
