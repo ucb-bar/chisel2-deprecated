@@ -77,29 +77,30 @@ class Mem4Cell[T <: Data](n: Int, data: T) extends Cell {
     val read_port = new Mem4Port[T](this, 'read, addr, data, null, null, cs, oe, memRef);
     port_count += 1;
     port_list += read_port;
-    val res = data.fromNode(memRef).asInstanceOf[T];
-    res.setIsCellIO;
-    res;
+    read_port.read;
   }
   def port: Mem4Port[T] = {
-    w(null);
+    println("Mem4Cell.port");
+    val virtual_port = new Mem4Port[T](this, 'physical, null, null.asInstanceOf[T]);
+    // w(null);
+    port_count += 1;
+    port_list += virtual_port;
+    virtual_port;
   }
   def w(addr: Node, we: Node = null, w_mask: Bits = null, cs: Bool = null.asInstanceOf[Bool]): Mem4Port[T] = {
-    //primitiveNode.addWritePort(this, addr, null.asInstanceOf[T], we, w_mask, cs);
     val we_opt = (if (we == null) Bool(true) else we);
     val write_port = new Mem4Port[T](this, 'write, addr, null.asInstanceOf[T], we_opt, w_mask, cs, null);
     port_count += 1;
     port_list += write_port;
     write_port;
   }
-  def rw(addr: Node, we: Node = null, w_mask: Bits = null, cs: Bool = null.asInstanceOf[Bool], oe: Bool = null): Mem4Port[T] = {
-    // primitiveNode.addRWPort(this, addr, null.asInstanceOf[T], we, w_mask, cs, oe);
+  def rw(addr: Node, w_data: T, we: Node = null, w_mask: Bits = null, cs: Bool = null.asInstanceOf[Bool], oe: Bool = null): T = {
     val memRef = Mem4Ref(primitiveNode);
     val we_opt = (if (we == null) Bool(true) else we);
-    val rw_port = new Mem4Port[T](this, 'rw, addr, null.asInstanceOf[T], we_opt, w_mask, cs, oe, memRef);
+    val rw_port = new Mem4Port[T](this, 'rw, addr, w_data, we_opt, w_mask, cs, oe, memRef);
     port_count += 1;
     port_list += rw_port;
-    rw_port;
+    rw_port.read;
   }
   def write(addr: Node, w_data: T, we: Node = null, w_mask: Bits = null, cs: Bool = null.asInstanceOf[Bool]) = {
     // primitiveNode.addWritePort(this, addr, w_data, we, w_mask, cs);
@@ -128,7 +129,7 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
                           cs:         Bool = null,
                           oe:         Bool = null,
                           val memRef: Mem4Ref = null.asInstanceOf[Mem4Ref]
-                        ) extends Node {
+                        ) {
   val mem = cell.primitiveNode;
   var port_type = prt_type;
   def next_input_index = mem.inputs.length;
@@ -136,7 +137,7 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
   var indent = "";
   // The virtual_ports are implemented by this port.
   val virtual_ports = ListBuffer[Mem4Port[T]]();
-  var physical_port: Option[Mem4Port[T]] = None;
+  var physical_port: Mem4Port[T] = null;
   var when_conditions: List[Bool] = null;
   var when_expr = Lit(true);
 
@@ -148,13 +149,13 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
   var oe_offset = -1;
 
   if (!(addr == null)) {
-    connectToCell;
+    connectToCell(0);
   } else {
-    port_type = 'no_addr;
-    println("[info] Found an unmapped virtual port (no address assigned).");
+    // println("[info] Found an unmapped virtual port (no address assigned). Type was: "+getPortType);
+    port_type = 'physical;
   }
 
-  def connectToCell = {
+  def connectToCell(arg_to_prevent_reflection: Int) = {
     assign_data(data);
     assign_addr(addr);
     assign_we(we);
@@ -200,6 +201,8 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
       cell.io += we_port;
       mem.inputs += we_port;
       we_port assign we;
+    } else {
+      // println("[error] assign_we: null signal");
     }
   }
   def assign_wbm(wbm: Bits) = {
@@ -230,10 +233,11 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
     }
   }
 
-  def getWE = (if (we == null) Lit(true) else we);
-  def getData = (if (data == null) Bits(1) else data);
-  def getAddr = (if (addr == null) Bits(0) else addr);
+  def getWE = (if (hasWrEnable) wrEnable else Bool(true))
+  def getData = (if (hasWrData) wrData else Bits(1));
+  def getAddr = (if (hasWrAddr) wrAddr else Bits(0));
 
+  def setPortType(p_type: Symbol) = { port_type = p_type; }
   def getPortType = port_type;
   def isReadable = (port_type == 'read || port_type == 'rw);
   def isWritable = (port_type == 'write || port_type == 'rw);
@@ -241,30 +245,50 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
    
   def getReadLatency = mem.getReadLatency;
 
-  def wrAddr = { if (addr_offset < 0) println("[error] Using bad wrAddr"); mem.inputs(addr_offset); }
-  def wrData = { if (data_offset < 0) println("[error] Using bad wrData"); mem.inputs(data_offset); }
-  def wrEnable = { if (we_offset < 0) println("[error] Using bad wrEnable"); mem.inputs(we_offset); }
-  def wrBitMask = { if (wbm_offset < 0) println("[error] Using bad wrBitMask"); mem.inputs(wbm_offset); }
-  def hasWrBitMask = !(wbm == null);
-  def chipSel = { if (cs_offset < 0) println("[error] Using bad chipSel"); mem.inputs(cs_offset); }
-  def hasCS = !(cs == null);
-  def outEn = { if (oe_offset < 0) println("[error] Using bad outEn"); mem.inputs(oe_offset); }
+  def wrAddr =       { if (addr_offset < 0) println("[error] Using bad wrAddr"); mem.inputs(addr_offset); }
+  def hasWrAddr =    { addr_offset >= 0; }
+  def wrData =       { if (data_offset < 0) println("[error] Using bad wrData"); mem.inputs(data_offset); }
+  def hasWrData =      { data_offset >= 0; }
+  def wrEnable =     { if (we_offset < 0) println("[error] Using bad wrEnable"); mem.inputs(we_offset); }
+  def hasWrEnable =  { we_offset >= 0; }
+  def wrBitMask =    { if (wbm_offset < 0) println("[error] Using bad wrBitMask"); mem.inputs(wbm_offset); }
+  def hasWrBitMask = { wbm_offset >= 0; }
+  def chipSel =      { if (cs_offset < 0) println("[error] Using bad chipSel"); mem.inputs(cs_offset); }
+  def hasChipSel =   { cs_offset >= 0; }
+  def outEn =        { if (oe_offset < 0) println("[error] Using bad outEn"); mem.inputs(oe_offset); }
+  def hasOutEn =     { oe_offset >= 0; }
 
+  def r: T = read;
+  def read: T = {
+    val res = data.fromNode(memRef).asInstanceOf[T];
+    res.setIsCellIO;
+    res;
+  }
   def apply(addr: Node, we: Bool = null, wbm: Bits = null.asInstanceOf[Bits], cs: Bool = null, oe: Bool = null): Mem4Port[T] = {
     val memRef = Mem4Ref(mem);
     val we_opt = (if (we == null) Bool(true) else we);
     val virtual_port = new Mem4Port[T](cell, 'virtual, addr, null.asInstanceOf[T], we_opt, wbm, cs, oe, memRef);
     cell.port_count += 1;
     cell.port_list += virtual_port;
-    if (virtual_port.physical_port == None) {
-      virtual_port.physical_port = Some(this);
+    if (virtual_port.physical_port == null) {
+      virtual_port.physical_port = this;
       virtual_ports += virtual_port;
+    } else {
+      // This shouldn't happen...
+      println("[error] Virtual port already has a physical port");
     }
     virtual_port;
   }
 
   def lessEqEq(src: Bits) = {
     if (getPortType == 'virtual) {
+      // Update the port type if needed.
+      val phy_port_type = physical_port.getPortType
+      if (phy_port_type == 'read || phy_port_type == 'rw) {
+        physical_port.setPortType('rw);
+      } else if (phy_port_type == 'physical || phy_port_type == 'write) {
+        physical_port.setPortType('write);
+      }
       // Procedural assignment: Assign the src data to this virtual port.
       assign_data(src.asInstanceOf[T]);
       if (when_conditions == null) {
@@ -296,11 +320,8 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
   def := (src: UFix) = colonEqual(src);
 
   def genMux: Unit = {
-    if (getPortType != 'no_addr) {
-      return;
-    }
     if (virtual_ports.length == 0) {
-      println("[warning] No memory port assignments specified.");
+      // println("[warning] No memory port assignments specified.");
       return;
     }
     var we_mux: Node = Lit(false); // No memory write unless otherwise specified.
@@ -312,30 +333,33 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
       addr_mux = Multiplex(p.when_expr, p.getAddr, addr_mux);
       data_mux = Multiplex(p.when_expr, p.getData, data_mux);
     }
+    // println("Inferred port type: "+port_type);
     assign_we(we_mux);
     assign_addr(addr_mux);
-    println("Data mux width: "+data_mux.getWidth);
     assign_data(cell.getDataType.fromNode(data_mux));
-    port_type = 'write;
   }
   def emitInstanceDef: String = {
     var res = "";
     if (isMapped) {
       res += ",\n"+
         "  .A"+port_index+"("+wrAddr.emitRef+"),\n" +
-        "  .CS"+port_index+"("+(if(hasCS) chipSel.emitRef else "1'b1")+")";
+        "  .CS"+port_index+"("+(if(hasChipSel) chipSel.emitRef else "1'b1")+")";
     }
     if (isReadable) {
       res += ",\n"+
         "  .O"+port_index+"("+memRef.emitTmp+"),\n" +
-        "  .OE"+port_index+"("+(if (oe == null) "1'b1" else outEn.emitRef)+")";
+        "  .OE"+port_index+"("+(if (!hasOutEn) "1'b1" else outEn.emitRef)+")";
     }
     if (isWritable) {
       res += ",\n"+
         "  .I"+port_index+"("+wrData.emitRef+"),\n" +
-        "  .WE"+port_index+"("+(if (we == null) "1'b1" else wrEnable.emitRef)+")";
-      if (!(wbm == null)) {
-        res += ",\n" + indent + "  .WBM"+port_index+"("+wrBitMask.emitRef+")";
+        "  .WE"+port_index+"("+(if (!hasWrEnable) "1'b1" else wrEnable.emitRef)+")";
+      if (mem.hasWBM) {
+        if (hasWrBitMask) {
+          res += ",\n" + indent + "  .WBM"+port_index+"("+wrBitMask.emitRef+")";
+        } else {
+          res += ",\n" + indent + "  .WBM"+port_index+"({"+mem.getDataWidth+"{1'b1}})";
+        }
       }
     }
     res
@@ -347,7 +371,7 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
     }
     var res = "";
     if (isWritable) {
-      if (wbm == null) {
+      if (!hasWrBitMask) {
         res +=
         indent + "    if (" + wrEnable.emitRef + ")\n" +
         indent + "      " + mem.emitRef + "[" + wrAddr.emitRef + "] <= " + wrData.emitRef + ";\n"
@@ -356,7 +380,7 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
         val pre_read_buf = mem.emitRef+"__next"+port_index;
         res += 
         indent+"    "+pre_read_buf+" = "+mem.emitRef+"["+wrAddr.emitRef+"];\n"+
-        indent+"    if ("+wrEnable.emitRef+(if(hasCS) " & "+chipSel.emitRef else "")+") begin\n"+
+        indent+"    if ("+wrEnable.emitRef+(if(hasChipSel) " & "+chipSel.emitRef else "")+") begin\n"+
         indent+"      for ("+gen_i+" = 0; "+gen_i+" < "+mem.width+"; "+gen_i+" = "+gen_i+" + 1) begin:"+
                             mem.emitRef+"__W"+port_index+"\n"+
         indent+"        if("+wrBitMask.emitRef+"["+gen_i+"]) "+pre_read_buf+"["+gen_i+"] = "+
@@ -380,10 +404,10 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
       } else {
         res += "  assign "+read_out+" = ";
       }
-      if (oe == null) {
+      if (!hasOutEn) {
         res += mem.emitRef+"["+wrAddr.emitRef+"];\n";
       } else {
-        res += "("+outEn.emitRef+(if (hasCS) " & "+chipSel.emitRef else "")+") ? "+
+        res += "("+outEn.emitRef+(if (hasChipSel) " & "+chipSel.emitRef else "")+") ? "+
             mem.emitRef+"["+wrAddr.emitRef+"] : "+
             mem.getWidth+"'bz;\n";
       }
@@ -397,12 +421,12 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
     }
     res;
   }
-  override def emitDefHiC: String = {
+  def emitDefHiC: String = {
     var res = "";
     val read_buf = mem.emitRef+"__read"+port_index+"_";
     if (isWritable) {
       res +=  "  if (" + wrEnable.emitRef + ".to_bool()) {\n"
-      if (wbm == null) {
+      if (!hasWrBitMask) {
         res +=
         "    " + mem.emitRef + ".put(" + wrAddr.emitRef + ", " +
         wrData.emitRef + ");\n" +
@@ -425,9 +449,9 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
         }
       }
       res += "  " + (if (read_lat > 0) read_buf+0 else memRef.emitRef) + " = ";
-      if (oe == null) {
+      if (!hasOutEn) {
         res += read_mem+";\n";
-      } else if (hasCS) {
+      } else if (hasChipSel) {
         res += "("+outEn.emitRef+".to_bool() & "+chipSel.emitRef+".to_bool()) ? "+read_mem+" : LIT<"+mem.getWidth+">(0L);\n";
       } else {
         res += "("+outEn.emitRef+".to_bool()) ? "+read_mem+" : LIT<"+mem.getWidth+">(0L);\n";
@@ -589,8 +613,10 @@ class Mem4[T <: Data](depth: Int, val cell: Mem4Cell[T]) extends Delay with proc
   }
   def getPathName = { component.getPathName + "_" + emitRef; }
   def emitInstanceDef: String = {
+    hasWBM = false;
     var res = getPathName + " #(.depth("+depth+"), .width("+cell.getWidth+")) " + emitRef + "(.CLK(clk), .RST(reset)";
     val mapped_ports = cell.port_list.filter(_.isMapped);
+    for (p <- mapped_ports) { if (p.hasWrBitMask) hasWBM = true; }
     res +=
       ("" /: mapped_ports) { (s, p) => {s + p.emitInstanceDef}};
     res += ");\n";
