@@ -84,6 +84,8 @@ class Bits extends IO {
   
   def unary_-(): Bits = UnaryNodeCell(this, "-"){Bits()};
   def unary_~(): Bits = UnaryNodeCell(this, "~"){Bits()};
+  def andR(): Bool    = ReductionNodeCell(this, "&"){Bits()};
+  def orR():  Bool    = ReductionNodeCell(this, "|"){Bits()};
   def ===(b: Bits): Bool = LogicalNodeCell(this, b, "==="){Bits()};
   def != (b: Bits): Bool = LogicalNodeCell(this, b, "!="){Bits()};
   def << (b: UFix): Bits = BinaryNodeCell(this, b.toBits, "<<"){Bits()};
