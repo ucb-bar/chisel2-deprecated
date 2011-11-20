@@ -37,9 +37,10 @@ class Op extends Node {
 	"/* C */DAT<" + width + ">(" + inputs(k).emitRef + ")"
       else
 	inputs(k).emitRef
-    } else if (op == "##" || op == ">>" || op == ">>>" || op == "*")
+    } else if (op == "##" || op == ">>" || op == ">>>" || op == "*" ||
+             op == "s*s" || op == "u*s" || op == "s*u") {
       inputs(k).emitRef
-    else {
+    } else {
       var w = 0;
       for (i <- 0 until nGrow)
 	w = max(w, inputs(i).width);
@@ -57,6 +58,8 @@ class Op extends Node {
         "{" + inputs(0).emitRef + ", " + inputs(1).emitRef + "}"
        else if (inputs.length == 1)
          op + " " + inputs(0).emitRef
+       else if (op == "s*s" || op == "s*u" || op == "u*s")
+         inputs(0).emitRef + " * " + inputs(1).emitRef
        else if(isSigned)
 	 emitDefSigned
        else
@@ -75,6 +78,12 @@ class Op extends Node {
     "  " + emitTmp + " = " +
       (if (op == "##") 
         "cat<" + width + ">(" + emitOpRef(0) + ", " + emitOpRef(1) + ")"
+       else if (op == "s*s")
+         inputs(0).emitRef + ".fix_times_fix(" + inputs(1).emitRef + ")"
+       else if (op == "s*u")
+         inputs(0).emitRef + ".fix_times_ufix(" + inputs(1).emitRef + ")"
+       else if (op == "u*s")
+         inputs(0).emitRef + ".ufix_times_fix(" + inputs(1).emitRef + ")"
        else if (inputs.length == 1)
          if (op == "|")
            "reduction_or(" + inputs(0).emitRef + ")"

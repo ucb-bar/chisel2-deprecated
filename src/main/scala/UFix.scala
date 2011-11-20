@@ -81,6 +81,9 @@ class UFix extends Num {
   def >= (b: UFix): Bool = LogicalNodeCell(this, b, ">="){UFix()};
   def &  (b: UFix): UFix = BinaryNodeCell(this, b, "&"){UFix()};
   def |  (b: UFix): UFix = BinaryNodeCell(this, b, "|"){UFix()};
+
+  //UFix op Fix arithmetic
+  def *   (b: Fix): Fix = BinaryNodeCell(this, b, "u*s"){Fix()}.toFix;
 }
 
 }
