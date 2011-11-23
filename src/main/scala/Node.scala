@@ -346,6 +346,7 @@ abstract class Node extends nameable{
           node match { 
             case io: IO => 
 	      if (io.dir == OUTPUT && (!(component.parent == io.component) && !(component == io.component && !this.isInstanceOf[IO]))) {
+		// && !(component == io.component && !this.isInstanceOf[IO])
                 val c = node.component.parent;
                 // println("BINDING " + node + " I " + i + " NODE-PARENT " + node.component.parent + " -> " + this + " PARENT " + component.parent);
                 if (c == null) {
@@ -358,7 +359,7 @@ abstract class Node extends nameable{
                   c.mods += b;  c.isWalked += b;
                   // println("OUTPUT " + io + " BINDING " + inputs(n) + " INPUT " + this);
                 }
-              }
+              }  
             case any => 
           }
         }

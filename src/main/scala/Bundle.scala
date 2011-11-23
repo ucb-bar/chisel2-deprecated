@@ -178,6 +178,17 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
         }
     }
   }
+  def <==(src: Bundle) = {
+    src match {
+      case other: Bundle => {
+	if (this.comp != null) {
+	  this.comp procAssign other.toNode;
+	} else {
+	  println("INCORRECT USE OF <== ON BUNDLES");
+	}
+      }
+    }
+  }
   override def flatten: Array[(String, IO)] = {
     var res = ArrayBuffer[(String, IO)]();
     for ((n, i) <- elements)
