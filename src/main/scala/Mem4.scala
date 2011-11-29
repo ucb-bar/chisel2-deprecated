@@ -614,7 +614,7 @@ class Mem4[T <: Data](depth: Int, val cell: Mem4Cell[T]) extends Delay with proc
   def getPathName = { component.getPathName + "_" + emitRef; }
   def emitInstanceDef: String = {
     hasWBM = false;
-    var res = getPathName + " #(.depth("+depth+"), .width("+cell.getWidth+")) " + emitRef + "(.CLK(clk), .RST(reset)";
+    var res = getPathName + " " + emitRef + "(.CLK(clk), .RST(reset)";
     val mapped_ports = cell.port_list.filter(_.isMapped);
     for (p <- mapped_ports) { if (p.hasWrBitMask) hasWBM = true; }
     res +=
