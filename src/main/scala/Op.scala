@@ -58,8 +58,12 @@ class Op extends Node {
         "{" + inputs(0).emitRef + ", " + inputs(1).emitRef + "}"
        else if (inputs.length == 1)
          op + " " + inputs(0).emitRef
-       else if (op == "s*s" || op == "s*u" || op == "u*s")
-         inputs(0).emitRef + " * " + inputs(1).emitRef
+       else if (op == "s*s")
+         "$signed(" + inputs(0).emitRef + ") * $signed(" + inputs(1).emitRef + ")"
+       else if (op == "s*u")
+         "$signed(" + inputs(0).emitRef + ") * " + inputs(1).emitRef
+       else if (op == "u*s")
+         inputs(0).emitRef + " * $signed(" + inputs(1).emitRef + ")"
        else if(isSigned)
 	 emitDefSigned
        else
