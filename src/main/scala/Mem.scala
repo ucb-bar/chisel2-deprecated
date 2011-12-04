@@ -100,8 +100,9 @@ class MemWPort[T <: Data](mem: Mem[T], io: Bundle, addr: Node, data: T, wen: Nod
   def wrBitMask = mem.inputs(port_offset + 3);
 
   def isRamWriteInput(i: Node) = {
-    i == wrData || i == wrAddr || i == wrEnable;
+    i == wrData || i == wrAddr || i == wrEnable || i == wrBitMask;
   }
+
   def emitDef: String = {
     var res = "";
       //"  always @(posedge clk) begin\n"
