@@ -634,7 +634,7 @@ abstract class Component {
     file.write("    fprintf(f, \"" + "$scope module " + name + " $end" + "\\n\");\n");
     for (mod <- top.omods) {
       if (mod.component == this && mod.isInObject) {
-        file.write("    fprintf(f, \"$var wire " + mod.width + " " + names(mod) + " " + stripComponent(mod.emitRef) + " $end\\n\");\n");
+        file.write("    fprintf(f, \"$var wire " + mod.width + " " + names(mod) + " " + stripComponent(mod.emitRefVCD) + " $end\\n\");\n");
       
       }
     }

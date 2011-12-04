@@ -235,7 +235,20 @@ class Literal extends Node {
     } else
       ("LIT<" + width + ">(0x" + name + "L)")
    ) + "/* " + inputVal + "*/";
-    
+
+  override def emitRefVCD: String = 
+    (if (isBinary) { 
+      var (bits, mask, swidth) = parseLit(name);
+      var bwidth = if(base == 'b') width else swidth;
+      if (isZ) {
+        ("LITZ<" + bwidth + ">(0x" + toHex(bits) + ", 0x" + toHex(mask) + ")")
+      } else
+        ("LIT<" + bwidth + ">(0x" + toHex(bits) + ")")
+    } else if(base == 'd' || base == 'x'){
+      ("LIT<" + width + ">(" + name + "L)")
+    } else
+      ("LIT<" + width + ">(0x" + name + "L)")
+   );
 
   override def emitDec: String = "";
   override def emitRefV: String = 

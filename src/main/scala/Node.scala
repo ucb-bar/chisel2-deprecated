@@ -85,6 +85,36 @@ object Node {
   }
   
   var stop = true;
+
+  def printTree(n: Node, depth: Int = 4, indent: String = ""): Unit = {
+    if (depth < 1) return;
+    println(indent+n.getClass+" width="+n.getWidth+" #inputs="+n.inputs.length);
+    n match {
+      case fix: Fix => {
+        if (!(fix.comp == null)) {
+          println(indent+"  (has comp "+fix.comp+" of type "+fix.comp.getClass+")");
+        }
+      }
+      case ufix: UFix => {
+        if (!(ufix.comp == null)) {
+          println(indent+"(has comp"+ufix.comp+")");
+        }
+      }
+      case bits: Bits => {
+        if (!(bits.comp == null)) {
+          println(indent+"(has comp"+bits.comp+")");
+        }
+      }
+      case any =>
+    }
+    for (in <- n.inputs) {
+      if (in == null) {
+        println("null");
+      } else {
+        printTree(in, depth-1, indent+"  ");
+      }
+    }
+  }
   
 }
 
@@ -244,6 +274,7 @@ abstract class Node extends nameable{
         "dat_t<" + width + "> " + emitRef
     } else
       emitRef
+  def emitRefVCD: String = emitRef;
   def emitRef: String = if (isEmittingC) emitRefC else emitRefV;
   //def emitRefV: String = if (name == "") "T" + emitIndex else name
   def emitRefV = if(name == "" || !named) "T" + emitIndex else if(!named) name + "_" + emitIndex else name
