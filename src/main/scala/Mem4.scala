@@ -421,6 +421,29 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
     }
     res;
   }
+  def emitDefLoC: String = {
+    var res = "";
+    val read_buf = mem.emitRef+"__read"+port_index+"_";
+    if (isReadable) {
+      val read_mem = mem.emitRef + ".get(" + wrAddr.emitRef + ")";
+      val read_lat = mem.getReadLatency;
+      if (read_lat > 0) {
+        res += "  "+memRef.emitRef+" = "+read_buf+(read_lat-1)+";\n";
+        for (lat <- 1 until read_lat) {
+          res += "  "+read_buf+(read_lat-lat)+"_shadow = "+read_buf+(read_lat-lat-1)+";\n";
+        }
+      }
+      res += "  " + (if (read_lat > 0) read_buf+"0_shadow" else memRef.emitRef) + " = ";
+      if (!hasOutEn) {
+        res += read_mem+";\n";
+      } else if (hasChipSel) {
+        res += "("+outEn.emitRef+".to_bool() & "+chipSel.emitRef+".to_bool()) ? "+read_mem+" : LIT<"+mem.getWidth+">(0L);\n";
+      } else {
+        res += "("+outEn.emitRef+".to_bool()) ? "+read_mem+" : LIT<"+mem.getWidth+">(0L);\n";
+      }
+    }
+    res;
+  }
   def emitDefHiC: String = {
     var res = "";
     val read_buf = mem.emitRef+"__read"+port_index+"_";
@@ -440,21 +463,13 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
       }
     }
     if (isReadable) {
-      val read_mem = mem.emitRef + ".get(" + wrAddr.emitRef + ")";
+      val read_buf = mem.emitRef+"__read"+port_index+"_";
       val read_lat = mem.getReadLatency;
       if (read_lat > 0) {
-        res += "  "+memRef.emitRef+" = "+read_buf+(read_lat-1)+";\n";
-        for (lat <- 1 until read_lat) {
-          res += "  "+read_buf+(read_lat-lat)+" = "+read_buf+(read_lat-lat-1)+";\n";
+        // res += "  "+memRef.emitRef+" = "+memRef.emitRef+"_shadow;\n";
+        for (lat <- 0 until read_lat) {
+          res += "  "+read_buf+(read_lat-lat-1)+" = "+read_buf+(read_lat-lat-1)+"_shadow;\n";
         }
-      }
-      res += "  " + (if (read_lat > 0) read_buf+0 else memRef.emitRef) + " = ";
-      if (!hasOutEn) {
-        res += read_mem+";\n";
-      } else if (hasChipSel) {
-        res += "("+outEn.emitRef+".to_bool() & "+chipSel.emitRef+".to_bool()) ? "+read_mem+" : LIT<"+mem.getWidth+">(0L);\n";
-      } else {
-        res += "("+outEn.emitRef+".to_bool()) ? "+read_mem+" : LIT<"+mem.getWidth+">(0L);\n";
       }
     }
     res
@@ -661,7 +676,7 @@ class Mem4[T <: Data](depth: Int, val cell: Mem4Cell[T]) extends Delay with proc
     res
   }
   override def emitDefLoC: String = {
-    val res = "";
+    var res = ("" /: cell.port_list) { (s, p) => s + p.emitDefLoC };
     //val res = ("" /: mem_refs) { (s, r) => s + r.emitDefLoCLocal };
     res
   }
@@ -684,6 +699,7 @@ class Mem4[T <: Data](depth: Int, val cell: Mem4Cell[T]) extends Delay with proc
         res += "  " + p.memRef.emitTmp + ";\n";
         for (lat <- 0 until readLatency) {
           res += "  dat_t<" + width + "> " + emitRef + "__read"+p.port_index+"_"+lat+";\n";
+          res += "  dat_t<" + width + "> " + emitRef + "__read"+p.port_index+"_"+lat+"_shadow;\n";
         }
       }
     }
