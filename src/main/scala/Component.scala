@@ -589,6 +589,7 @@ abstract class Component {
         case w: Wire => w.genMuxes(w.default);
         case r: Reg  => r.genMuxes(r);
         case m: Mem4[_] => m.genMuxes(m);
+        case a: Assign[_] =>
       }
     }
   }
