@@ -76,7 +76,12 @@ abstract class ExtractCell[T <: Bits](gen: => T){
   val fb = io.out.fromNode(primitiveNode)
   fb.setIsCellIO;
   fb ^^ io.out;
+  io.out.comp = primitiveNode;
   primitiveNode.nameHolder = io.out;
+
+  def := (src: Bits) = {
+    println("ColonEqual in Extract");
+  }
 }
 
 class BitExtractCell[T <: Bits](gen: => T) extends ExtractCell[T](gen) {
@@ -91,9 +96,15 @@ class RangeExtractCell[T <: Bits](w: Int = -1)(gen: => T) extends ExtractCell[T]
   primitiveNode.lo = primitiveNode.inputs(2);
 }
 
-class Extract extends Node {
+class Extract extends Node with proc {
   var lo: Node = null;
   var hi: Node = null;
+
+  // Define proc trait methods.
+  def procAssign(src: Node) = {}
+  override def genMuxes(default: Node) = {
+  }
+
   override def toString: String =
     if (hi == lo)
       "BITS(" + inputs(0) + ", " + lo + ")";
@@ -109,6 +120,16 @@ class Extract extends Node {
       "  " + emitTmp + " = " + inputs(0).emitRef + ".bit(" + inputs(1).emitRef + ");\n"
     else{
       "  " + emitTmp + " = " + inputs(0).emitRef + ".extract<" + width + ">(" + inputs(1).emitRef + "," + inputs(2).emitRef + ");\n"}
+
+  override def assign(src: Node): Unit = {
+    // If assigning to an extract output, search forward to an Assign node.
+    val assign_node = findAssignNode(8);
+    if (assign_node == null) {
+      println("[error] Unable to determine assignment destination from extract.");
+      return Unit;
+    }
+    println("[info] Found an Assign node from an Extract");
+  }
 }
 
 }

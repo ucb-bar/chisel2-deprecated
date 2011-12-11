@@ -73,8 +73,7 @@ class Mem4Cell[T <: Data](n: Int, data: T) extends Cell {
   def apply(addr: Node, oe: Bool = null.asInstanceOf[Bool], cs: Bool = null): T = read(addr, oe, cs);
   def read(addr: Node, oe: Bool = null.asInstanceOf[Bool], cs: Bool = null): T = {
     //val read_port = primitiveNode.addReadPort(this, addr, cs, oe);
-    val memRef = Mem4Ref(primitiveNode);
-    val read_port = new Mem4Port[T](this, 'read, addr, data, null, null, cs, oe, memRef);
+    val read_port = new Mem4Port[T](this, 'read, addr, data, null, null, cs, oe);
     port_count += 1;
     port_list += read_port;
     read_port.read;
@@ -89,15 +88,14 @@ class Mem4Cell[T <: Data](n: Int, data: T) extends Cell {
   }
   def w(addr: Node, we: Node = null, w_mask: Bits = null, cs: Bool = null.asInstanceOf[Bool]): Mem4Port[T] = {
     val we_opt = (if (we == null) Bool(true) else we);
-    val write_port = new Mem4Port[T](this, 'write, addr, null.asInstanceOf[T], we_opt, w_mask, cs, null);
+    val write_port = new Mem4Port[T](this, 'write, addr, null.asInstanceOf[T], we_opt, w_mask, cs);
     port_count += 1;
     port_list += write_port;
     write_port;
   }
   def rw(addr: Node, w_data: T, we: Node = null, w_mask: Bits = null, cs: Bool = null.asInstanceOf[Bool], oe: Bool = null): T = {
-    val memRef = Mem4Ref(primitiveNode);
     val we_opt = (if (we == null) Bool(true) else we);
-    val rw_port = new Mem4Port[T](this, 'rw, addr, w_data, we_opt, w_mask, cs, oe, memRef);
+    val rw_port = new Mem4Port[T](this, 'rw, addr, w_data, we_opt, w_mask, cs, oe);
     port_count += 1;
     port_list += rw_port;
     rw_port.read;
@@ -127,10 +125,10 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
                           we:         Node = null,
                           wbm:        Bits = null,
                           cs:         Bool = null,
-                          oe:         Bool = null,
-                          val memRef: Mem4Ref = null.asInstanceOf[Mem4Ref]
+                          oe:         Bool = null
                         ) {
   val mem = cell.primitiveNode;
+  val memRef = Mem4Ref(this);
   var port_type = prt_type;
   def next_input_index = mem.inputs.length;
   var port_index = cell.port_count;
@@ -181,15 +179,15 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
       }
     }
   }
-  def assign_data(data: T) = {
+  def assign_data(data: Node) = {
     if (data_offset != -1) {
       println("[warning] Memory data input is already assigned");
     } else if (!(data == null)) {
-      val data_port = data.clone.asInput;
+      val data_port = Bits(data.getWidth, 'input);
       data_offset = next_input_index;
       cell.io += data_port;
       mem.inputs += data_port.toNode;
-      data_port <> data;
+      data_port assign data;
     }
   }
   def assign_we(we: Node) = {
@@ -260,14 +258,19 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
 
   def r: T = read;
   def read: T = {
-    val res = data.fromNode(memRef).asInstanceOf[T];
-    res.setIsCellIO;
+    var res: T = null.asInstanceOf[T];
+    if (cell.getDataType == null) {
+      println("[error] read has no data prototype");
+    } else {
+      res = cell.getDataType.fromNode(memRef).asInstanceOf[T];
+      res.setIsCellIO;
+      res.comp = memRef; // Make this Data node assignable through the memory reference.
+    }
     res;
   }
-  def apply(addr: Node, we: Bool = null, wbm: Bits = null.asInstanceOf[Bits], cs: Bool = null, oe: Bool = null): Mem4Port[T] = {
-    val memRef = Mem4Ref(mem);
+  def apply(addr: Node, we: Bool = null, wbm: Bits = null.asInstanceOf[Bits], cs: Bool = null, oe: Bool = null): T = {
     val we_opt = (if (we == null) Bool(true) else we);
-    val virtual_port = new Mem4Port[T](cell, 'virtual, addr, null.asInstanceOf[T], we_opt, wbm, cs, oe, memRef);
+    val virtual_port = new Mem4Port[T](cell, 'virtual, addr, null.asInstanceOf[T], we_opt, wbm, cs, oe);
     cell.port_count += 1;
     cell.port_list += virtual_port;
     if (virtual_port.physical_port == null) {
@@ -277,7 +280,7 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
       // This shouldn't happen...
       println("[error] Virtual port already has a physical port");
     }
-    virtual_port;
+    virtual_port.read;
   }
 
   def lessEqEq(src: Bits) = {
@@ -297,6 +300,7 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
           when_expr = node && when_expr;
         }
       }
+      // println("When expr: "+when_expr);
     } else {
       // This operator only applies to a virtual port.
       println("[error] Assignment to a non-virtual port is not supported.");
@@ -336,7 +340,8 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
     // println("Inferred port type: "+port_type);
     assign_we(we_mux);
     assign_addr(addr_mux);
-    assign_data(cell.getDataType.fromNode(data_mux));
+    //assign_data(cell.getDataType.fromNode(data_mux));
+    assign_data(data_mux);
   }
   def emitInstanceDef: String = {
     var res = "";
@@ -512,7 +517,6 @@ class Mem4ResetPort[T <: Data](mem: Mem4[T], cell: Mem4Cell[T], reset_val: T) {
 
 class Mem4[T <: Data](depth: Int, val cell: Mem4Cell[T]) extends Delay with proc {
   var reset_port_opt: Option[Mem4ResetPort[T]] = None;
-  var mem_refs              = ListBuffer[Mem4Ref]();
   var target                = Mem4.getDefaultMemoryImplementation;
   var hexInitFile           = "";
   var readLatency           = Mem4.getDefaultReadLatency;
@@ -520,7 +524,9 @@ class Mem4[T <: Data](depth: Int, val cell: Mem4Cell[T]) extends Delay with proc
   var addr_width            = 0;
 
   // proc trait methods.
-  def procAssign(src: Node) = {}
+  def procAssign(src: Node) = {
+    println("Mem4.procAssign");
+  }
   override def genMuxes(default: Node) = {
     for (p <- cell.port_list) {
       p.genMux;
@@ -677,7 +683,6 @@ class Mem4[T <: Data](depth: Int, val cell: Mem4Cell[T]) extends Delay with proc
   }
   override def emitDefLoC: String = {
     var res = ("" /: cell.port_list) { (s, p) => s + p.emitDefLoC };
-    //val res = ("" /: mem_refs) { (s, r) => s + r.emitDefLoCLocal };
     res
   }
   override def emitInitC: String = {
@@ -713,18 +718,19 @@ class Mem4[T <: Data](depth: Int, val cell: Mem4Cell[T]) extends Delay with proc
 }
 
 object Mem4Ref {
-  def apply[T <: Data](mem: Mem4[T]) = {
-    val memRef = new Mem4Ref();
+  def apply[T <: Data](mem_port: Mem4Port[T]) = {
+    val memRef = new Mem4Ref(mem_port);
+    val mem = mem_port.mem;
     memRef.init("", widthOf(0), mem);
-    mem.mem_refs += memRef; /// Still needed?
     memRef;
   }
   /// Still needed?
-  def apply[T <: Data](mem:  Mem4[T],
+  def apply[T <: Data](mem_port:  Mem4Port[T],
                        addr: Node,
                        oe:   Bool = null.asInstanceOf[Bool],
                        cs:   Bool = null.asInstanceOf[Bool]): Node = {
-    val memRef = new Mem4Ref();
+    val memRef = new Mem4Ref(mem_port);
+    val mem = mem_port.mem;
     memRef.port_index = mem.cell.port_count;
     mem.cell.port_count += 1;
     if (oe == null && cs == null) {
@@ -734,17 +740,32 @@ object Mem4Ref {
     } else {
       memRef.init("", widthOf(0), mem, addr, (if (oe == null) Bool(true) else oe), cs);
     }
-    mem.mem_refs += memRef;
     memRef;
   }
 }
-class Mem4Ref extends Node {
+class Mem4Ref[T <: Data](mem_port: Mem4Port[T]) extends Node with proc {
   var port_index: Int = 0;
+
+  // proc trait methods. Note that the proc trait is expected so that
+  // this node can be assigned to Node.comp to support assignment.
+  def procAssign(src: Node) = {
+    src match {
+      case data: Data => {
+        // Add an input port if none has been assigned
+        mem_port.lessEqEq(data.toBits);
+      }
+      case any => {
+        println("[warning] Procedural assignment to Mem through MemRef: Unrecognized node type: "+src.getClass);
+      }
+    }
+  }
+  override def genMuxes(default: Node) = {}
+
   def colonEqual(src: Bits) = {
     println("[info] Using MemRef colonEqual");
     // generateError(src);
     // Assign src as the write value.
-    inputs += src;
+    mem_port.colonEqual(src);
   }
   def := (src: Bits) = colonEqual(src);
   def := (src: Bool) = colonEqual(src);
@@ -759,6 +780,18 @@ class Mem4Ref extends Node {
     "  .OE"+port_index+"("+(if(inputs.length > 2) inputs(2).emitRef else "1'b1")+"),\n" +
     "  .CS"+port_index+"("+(if(inputs.length > 3) inputs(3).emitRef else "1'b1")+")";
     res
+  }
+
+  override def assign(src: Node) = {
+    src match {
+      case data: Data => {
+        // Add an input port if none has been assigned
+        mem_port.colonEqual(data.toBits);
+      }
+      case any => {
+        println("[warning] Assigning to Mem through MemRef: Unrecognized node type: "+src.getClass);
+      }
+    }
   }
 }
 

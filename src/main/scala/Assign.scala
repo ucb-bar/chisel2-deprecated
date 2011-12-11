@@ -63,6 +63,7 @@ class AssignCell[T <: Data](data: T, width: Int)(gen: => T){
     assign_ports += assign_port;
   }
   def apply(value: T): Unit = apply(value, null, null, null);
+  def apply(value: T, max_index: Int, min_index: Int, condition: Bool): Unit = apply(value, UFix(max_index), UFix(min_index), condition);
   def apply(value: T, max_index: UFix, min_index: UFix): Unit = apply(value, max_index, min_index, null);
   def apply(value: T, max_index: Int,  min_index: Int): Unit = apply(value, UFix(max_index), UFix(min_index), null);
   def apply(value: T, bit_index: UFix, condition: Bool): Unit = apply(value, bit_index, null, condition);
@@ -114,14 +115,18 @@ class AssignPort[T <: Data](cell: AssignCell[T],
   def getMinIndex =  cell.get_input("min"+id);
   def getCondition = cell.get_input("cond"+id);
 
+  def emitValue = (if (getValue == null) "null" else getValue.emitRef);
+  def emitMaxIndex =  (if (getMaxIndex == null) "nullMaxIndex" else getMaxIndex.emitRef);
+  def emitMinIndex =  (if (getMinIndex == null) "nullMinIndex" else getMinIndex.emitRef);
+
   def emitDefAssign: String = {
     var res = cell.primitiveNode.emitTmp;
     if (getMinIndex == null && getMaxIndex == null) {
       res += " = ";
     } else if (getMinIndex == null) {
-      res += "["+getMaxIndex.emitRef+"] = ";
+      res += "["+emitMaxIndex+"] = ";
     } else {
-      res += "["+getMaxIndex.emitRef+":"+getMinIndex.emitRef+"] = ";
+      res += "["+emitMaxIndex+":"+emitMinIndex+"] = ";
     }
     if (getValue == null) {
       // Undefined behavior!
@@ -133,6 +138,21 @@ class AssignPort[T <: Data](cell: AssignCell[T],
     res;
   }
   def emitDefIf: String = {
+    (if (getCondition == null) "" else "if ("+getCondition.emitRef+")");
+  }
+
+  def emitDefAssignLoC: String = {
+    var res = cell.primitiveNode.emitTmp;
+    if (getMinIndex == null && getMaxIndex == null) {
+      res += " = "+emitValue+";\n";
+    } else if (getMinIndex == null) {
+      res += ".inject("+emitValue+","+emitMaxIndex+","+emitMaxIndex+");\n";
+    } else {
+      res += ".inject("+emitValue+","+emitMaxIndex+","+emitMinIndex+");\n";
+    }
+    res;
+  }
+  def emitDefIfLoC: String = {
     (if (getCondition == null) "" else "if ("+getCondition.emitRef+")");
   }
 }
@@ -159,6 +179,7 @@ class Assign[T <: Data](cell: AssignCell[T]) extends Data with proc {
     }
   }
   override def toString: String = name
+  override def emitDec: String = "  reg" + (if (isSigned) " signed " else "") + emitWidth + " " + emitRef + ";\n";
   override def emitDef: String = {
     var res = "  always@(*) begin\n";
     if (inputs.length == 0) {
@@ -197,19 +218,59 @@ class Assign[T <: Data](cell: AssignCell[T]) extends Data with proc {
     res += "  end\n";
     res;
   }
-
-  override def emitDefLoC: String = 
-    // TODO: NEED THIS TO BE A CHECK
-    if (inputs.length == 1)
-      "  " + emitTmp + " = " + inputs(0).emitRef + ";\n"
-    else
-      ""
-    // "  " + emitTmp + " = " + inputs(0).emitRef + ";\n"
+  override def emitDefLoC: String = {
+    var res = "";
+    if (inputs.length == 0) {
+      println("[error] No assignments made to "+emitTmp);
+      return res;
+    }
+    var active_condition = cell.assign_ports(0).getCondition;
+    var inside_if_body = false;
+    var indent = "  ";
+    for (ap <- cell.assign_ports) {
+      if (ap.getCondition == active_condition) {
+        // Add an assignment to the current body:
+      } else if (ap == null) {
+        // Set the default value, outside of IF:
+        active_condition = null;
+        if (inside_if_body == true) {
+          res += "  }\n";
+          indent = "  ";
+          inside_if_body = false;
+        }
+      } else {
+        // This is a new IF condition:
+        active_condition = ap.getCondition;
+        if (!inside_if_body) {
+          res += "  "+ap.emitDefIfLoC+" {\n";
+          indent = "      ";
+          inside_if_body = true;
+        } else {
+          res += "  } else "+ap.emitDefIfLoC+" {\n";
+        }
+      }
+      res += indent+ap.emitDefAssignLoC;
+    }
+    if (inside_if_body) res += "  }\n";
+    res;
+  }
 
   override def assign(src: Node) = {
-    if(assigned || inputs(0) != null)
-      ChiselErrors += IllegalState("reassignment to Assign", 3);
-    else { assigned = true; super.assign(src)}
+    src match {
+      case data: Data => {
+        cell(data.asInstanceOf[T]);
+      }
+      case any => {
+        println("[error] Unrecognized assign data type");
+      }
+    }
+    //if(assigned || inputs(0) != null)
+    //  ChiselErrors += IllegalState("reassignment to Assign", 3);
+    //else { assigned = true; super.assign(src)}
+  }
+  def assign_from_extract(extract: Extract, src: Bits) = {
+    println("[info] Trying assign_from_extract");
+    cell(src.asInstanceOf[T], extract.inputs(1).asInstanceOf[UFix], extract.inputs(2).asInstanceOf[UFix]);
   }
 }
 

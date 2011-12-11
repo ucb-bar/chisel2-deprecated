@@ -85,36 +85,6 @@ object Node {
   }
   
   var stop = true;
-
-  def printTree(n: Node, depth: Int = 4, indent: String = ""): Unit = {
-    if (depth < 1) return;
-    println(indent+n.getClass+" width="+n.getWidth+" #inputs="+n.inputs.length);
-    n match {
-      case fix: Fix => {
-        if (!(fix.comp == null)) {
-          println(indent+"  (has comp "+fix.comp+" of type "+fix.comp.getClass+")");
-        }
-      }
-      case ufix: UFix => {
-        if (!(ufix.comp == null)) {
-          println(indent+"(has comp"+ufix.comp+")");
-        }
-      }
-      case bits: Bits => {
-        if (!(bits.comp == null)) {
-          println(indent+"(has comp"+bits.comp+")");
-        }
-      }
-      case any =>
-    }
-    for (in <- n.inputs) {
-      if (in == null) {
-        println("null");
-      } else {
-        printTree(in, depth-1, indent+"  ");
-      }
-    }
-  }
   
 }
 
@@ -333,6 +303,51 @@ abstract class Node extends nameable{
       comp.gmods += this;
     }
   }
+
+  def printTree(depth: Int = 4, indent: String = ""): Unit = {
+    if (depth < 1) return;
+    println(indent+getClass+" width="+getWidth+" #inputs="+inputs.length);
+    this match {
+      case fix: Fix => {
+        if (!(fix.comp == null)) {
+          println(indent+"  (has comp "+fix.comp+" of type "+fix.comp.getClass+")");
+        }
+      }
+      case ufix: UFix => {
+        if (!(ufix.comp == null)) {
+          println(indent+"(has comp "+ufix.comp+")");
+        }
+      }
+      case bits: Bits => {
+        if (!(bits.comp == null)) {
+          println(indent+"(has comp "+bits.comp+")");
+        }
+      }
+      case any =>
+    }
+    for (in <- inputs) {
+      if (in == null) {
+        println("null");
+      } else {
+        in.printTree(depth-1, indent+"  ");
+      }
+    }
+  }
+  def findAssignNode(depth: Int = 5): Node = {
+    if (depth < 1) return null;
+    this match {
+      case assign: Assign[_] => {
+        // println("[info] Found Assign Node at depth "+depth);
+        return assign;
+      }
+      case any =>
+    }
+    if (inputs.length > 0) {
+      val in = inputs(0);
+      if (!(in == null)) return in.findAssignNode(depth-1);
+    }
+    null;
+  }
   def findNodes(depth: Int, c: Component): Unit = {
     // untraced or same component?
     if(isCellIO) println("found " + this);
@@ -447,6 +462,7 @@ abstract class Node extends nameable{
     else 
       inputs(0).getNode
   }
+  def getCell(): Cell = null;
   def addConsumers(): Boolean = {
     /*
     this match {
