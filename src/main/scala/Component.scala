@@ -261,8 +261,9 @@ abstract class Component {
   }
   def emitDecs: String = {
     var res = "";
-    for (m <- mods) 
+    for (m <- mods) {
       res += m.emitDec;
+    }
     res
   }
   def isInferenceTerminal(m: Node): Boolean = {
@@ -589,7 +590,9 @@ abstract class Component {
         case w: Wire => w.genMuxes(w.default);
         case r: Reg  => r.genMuxes(r);
         case m: Mem4[_] => m.genMuxes(m);
+        case mr: Mem4Ref[_] =>
         case a: Assign[_] =>
+        case e: Extract =>
       }
     }
   }
