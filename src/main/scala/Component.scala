@@ -194,6 +194,9 @@ abstract class Component {
     for ((n, w) <- wires) {
       if (isFirst && !hasReg) {isFirst = false; nl = "\n"} else nl = ",\n";
       res += nl + "       ." + n + "( ";
+      //if(w.isInstanceOf[IO]) println("WALKED TO " + w + ": " + w.walked);
+      //if(w.isInstanceOf[IO])
+	//println("COMP WALKED " + w + " is " + this.isWalked.contains(w));
       w match {
         case io: IO  => 
           if (io.dir == INPUT) {
@@ -201,6 +204,9 @@ abstract class Component {
               println("// " + io + " UNCONNECTED IN " + io.component); 
             else if (io.inputs.length > 1) 
               println("// " + io + " CONNECTED TOO MUCH " + io.inputs.length); 
+	    else if (!this.isWalked.contains(w)) {
+	      println ("// UNUSED INPUT " +io+ " OF " + this + " IS REMOVED");
+	    }
             else 
               res += io.inputs(0).emitRef;
           } else {

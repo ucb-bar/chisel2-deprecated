@@ -3,6 +3,7 @@ package Chisel {
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Queue
+import scala.collection.mutable.Queue._;
 import scala.collection.mutable.Stack
 
 import scala.math.max;
@@ -89,6 +90,7 @@ object Node {
 }
 
 abstract class Node extends nameable{
+  var walked = false;
   var component: Component = null;
   var flattened = false;
   var isCellIO = false;
@@ -272,6 +274,7 @@ abstract class Node extends nameable{
     if (!comp.isWalked.contains(this)) {
       // println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
       comp.isWalked += this;
+      this.walked = true;
       for (i <- inputs) {
         if (i != null) {
           i match {
@@ -389,9 +392,14 @@ abstract class Node extends nameable{
           if (node.component == null) // unmarked input
             node.component = markComp;
           node.findNodes(depth + 2, nextComp);
+	  //This code finds a binding for a node
+	  //We search for a binding only if it is an output
+	  //and the logic's grandfather component is not the same as the 
+	  //io's component
+	  //and the logic's component is not the same as the output's component unless the logic is an input
           node match { 
             case io: IO => 
-	      if (io.dir == OUTPUT && (!(component.parent == io.component) && !(component == io.component && !this.isInstanceOf[IO]))) {
+	      if (io.dir == OUTPUT && (!(component.parent == io.component) && !(component == io.component && !(this.isInstanceOf[IO] && this.asInstanceOf[IO].dir == INPUT)))) {
 		// && !(component == io.component && !this.isInstanceOf[IO])
                 val c = node.component.parent;
                 // println("BINDING " + node + " I " + i + " NODE-PARENT " + node.component.parent + " -> " + this + " PARENT " + component.parent);
