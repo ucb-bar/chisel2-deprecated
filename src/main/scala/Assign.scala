@@ -1,4 +1,17 @@
-// author: jonathan bachrach
+// Author: Brian Richards, U. C. Berkeley, December 2011.
+// Based on Wire.scala, by jonathan bachrach
+// Description:  Assign is a signal assignment block like Wire, with support for
+// multiple conditional assignment, optionally to subranges of bits.  If this
+// operator is followed by an Extract operator, the Extract operator converts
+// to a bit field specification.
+// The Assign operator is proposed as an internal mechanism to support conditional
+// and bit-field assignment to Wire, Reg, Mem, and IO, and could replace the
+// genMux mechanism.
+// The initial implementation declares a Verilog reg rather than a wire, and
+// produces an always@(*) block instead of chains of muxes for conditionals.
+// For C++ emulation, an 'inject' operator is defined as the opposite of 'extract',
+// for bit-field updates.
+//
 package Chisel {
 
 import scala.collection.mutable.HashMap;
