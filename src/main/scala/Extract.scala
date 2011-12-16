@@ -101,7 +101,6 @@ class Extract extends Node with proc {
   var hi: Node = null;
 
   // Define proc trait methods.
-  def procAssign(src: Node) = {}
   override def genMuxes(default: Node) = {
   }
 
@@ -121,6 +120,9 @@ class Extract extends Node with proc {
     else{
       "  " + emitTmp + " = " + inputs(0).emitRef + ".extract<" + width + ">(" + inputs(1).emitRef + "," + inputs(2).emitRef + ");\n"}
 
+  def procAssign(src: Node) = {
+    assign(src);
+  }
   override def assign(src: Node): Unit = {
     // If assigning to an extract output, search forward to an Assign node.
     val assign_node = findAssignNode(8);
@@ -128,7 +130,15 @@ class Extract extends Node with proc {
       println("[error] Unable to determine assignment destination from extract.");
       return Unit;
     }
-    println("[info] Found an Assign node from an Extract");
+    // println("[info] Found an Assign node from an Extract");
+    assign_node match {
+      case a: Assign[_] => {
+        a.assign_from_extract(this, src.asInstanceOf[Data].toBits);
+      }
+      case any => {
+        println("[error] Assignment to Extract: Unable to find associated Assign block.");
+      }
+    }
   }
 }
 

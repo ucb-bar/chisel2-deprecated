@@ -55,10 +55,7 @@ class Wire extends Data with proc{
     if (assigned) {
       ChiselErrors += IllegalState("reassignment to Node", 3);
     } else {
-      var res = Lit(true);
-      for (i <- 0 until conds.length)
-        res = conds(i) && res;
-      updates.push((res, src));
+      updates.push((conds.top, src));
     }
   }
   override def toString: String = name

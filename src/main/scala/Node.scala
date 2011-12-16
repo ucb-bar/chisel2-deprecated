@@ -16,6 +16,7 @@ object Node {
   // var cond = new Stack[Node];
   var isCoercingArgs = true;
   var conds = new Stack[Bool]();
+  conds.push(Bool(true));
   var keys  = new Stack[Bits]();
   def fixWidth(w: Int) = { (m: Node) => w };
   def widthOf(i: Int) = { (m: Node) => { 

@@ -76,6 +76,7 @@ class AssignCell[T <: Data](data: T, width: Int)(gen: => T){
     assign_ports += assign_port;
   }
   def apply(value: T): Unit = apply(value, null, null, null);
+  def apply(value: T, condition: Bool): Unit = apply(value, null, null, condition);
   def apply(value: T, max_index: Int, min_index: Int, condition: Bool): Unit = apply(value, UFix(max_index), UFix(min_index), condition);
   def apply(value: T, max_index: UFix, min_index: UFix): Unit = apply(value, max_index, min_index, null);
   def apply(value: T, max_index: Int,  min_index: Int): Unit = apply(value, UFix(max_index), UFix(min_index), null);
@@ -181,16 +182,6 @@ class Assign[T <: Data](cell: AssignCell[T]) extends Data with proc {
     //res assign src;
     this;
   }
-  def procAssign(src: Node) = {
-    if (assigned) {
-      ChiselErrors += IllegalState("reassignment to Node", 3);
-    } else {
-      var res = Lit(true);
-      for (i <- 0 until conds.length)
-        res = conds(i) && res;
-      updates.push((res, src));
-    }
-  }
   override def toString: String = name
   override def emitDec: String = "  reg" + (if (isSigned) " signed " else "") + emitWidth + " " + emitRef + ";\n";
   override def emitDef: String = {
@@ -267,8 +258,18 @@ class Assign[T <: Data](cell: AssignCell[T]) extends Data with proc {
     if (inside_if_body) res += "  }\n";
     res;
   }
-
+  def procAssign(src: Node) = {
+    src match {
+      case data: Data => {
+        cell(data.asInstanceOf[T], conds.top);
+      }
+      case any => {
+        println("[error] Unrecognized procAssign data type");
+      }
+    }
+  }
   override def assign(src: Node) = {
+    // Note that assign and procAssign can both occur, since bit subfields may differ.
     src match {
       case data: Data => {
         cell(data.asInstanceOf[T]);
@@ -277,13 +278,19 @@ class Assign[T <: Data](cell: AssignCell[T]) extends Data with proc {
         println("[error] Unrecognized assign data type");
       }
     }
-    //if(assigned || inputs(0) != null)
-    //  ChiselErrors += IllegalState("reassignment to Assign", 3);
-    //else { assigned = true; super.assign(src)}
   }
   def assign_from_extract(extract: Extract, src: Bits) = {
-    println("[info] Trying assign_from_extract");
-    cell(src.asInstanceOf[T], extract.inputs(1).asInstanceOf[UFix], extract.inputs(2).asInstanceOf[UFix]);
+    // println("[info] Trying assign_from_extract");
+    val assign_cond = (if (conds.length > 1) conds.top else null);
+    if (extract.inputs.length == 2) {
+      // This is a single bit extract.
+      cell(src.asInstanceOf[T], extract.inputs(1).asInstanceOf[UFix], assign_cond);
+    } else if (extract.inputs.length == 3) {
+      // This is a bit range extract.
+      cell(src.asInstanceOf[T], extract.inputs(1).asInstanceOf[UFix], extract.inputs(2).asInstanceOf[UFix], assign_cond);
+    } else {
+      println("[error] Unknown bit range in Extract");
+    }
   }
 }
 

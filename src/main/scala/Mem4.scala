@@ -136,8 +136,7 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
   // The virtual_ports are implemented by this port.
   val virtual_ports = ListBuffer[Mem4Port[T]]();
   var physical_port: Mem4Port[T] = null;
-  var when_conditions: List[Bool] = null;
-  var when_expr = Lit(true);
+  var when_expr = Bool(true);
 
   var addr_offset = -1;
   var data_offset = -1;
@@ -294,13 +293,9 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
       }
       // Procedural assignment: Assign the src data to this virtual port.
       assign_data(src.asInstanceOf[T]);
-      if (when_conditions == null) {
-        when_conditions = Node.conds.toList;
-        for (node <- when_conditions) {
-          when_expr = node && when_expr;
-        }
+      if (when_expr == null) {
+        when_expr = Node.conds.top;
       }
-      // println("When expr: "+when_expr);
     } else {
       // This operator only applies to a virtual port.
       println("[error] Assignment to a non-virtual port is not supported.");

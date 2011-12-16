@@ -24,7 +24,7 @@ object fromNode {
 
 object when {
   def apply(c: Bool)(block: => Unit) = {
-    conds.push(c); 
+    conds.push(c && conds.top);
     block; 
     conds.pop();
   }
