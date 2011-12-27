@@ -5,8 +5,17 @@ import Node._;
 
 object Cat {
   def apply[T <: Data](mod: T, mods: T*): Bits = {
-    val res = new CatCell(mod, mods.toList);
-    res.io.out
+    val modsList = mods.toList;
+    if(modsList.length == 1 && modsList(0) == null){
+      val res = Bits('output);
+      res.setIsCellIO;
+      res assign mod.toNode;
+      res
+    }
+    else {
+      val res = new CatCell(mod, mods.toList);
+      res.io.out
+    }
   }
 }
 
