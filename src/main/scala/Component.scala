@@ -121,6 +121,8 @@ abstract class Component {
   var named = false;
   var verilog_parameters = "";
   components += this;
+
+
   def depthString(depth: Int): String = {
     var res = "";
     for (i <- 0 until depth)
@@ -161,8 +163,9 @@ abstract class Component {
   //def io: Data = ioVal;
   def io: Data
   def nextIndex : Int = { nindex = nindex + 1; nindex }
+  val nameSpace = new HashSet[String];
   def genName (name: String): String = 
-    if (name == null || name.length() == 0) "" else this.name + "_" + name;
+    if (name == null || name.length() == 0) "" else this.instanceName + "_" + name;
   var isWalking = new HashSet[Node];
   var isWalked = new HashSet[Node];
   override def toString: String = name
@@ -515,10 +518,12 @@ abstract class Component {
 	  //case comp: Component => { comp.component = this;}
           case node: Node => { if (name != "io" && (node.isCellIO || (node.name == "" && !node.named) || node.name == null)) node.name_it(name, true);
 			       if (node.isReg || node.isRegOut || node.isClkInput) containsReg = true;
+			      nameSpace += name;
 			    }
 	  case cell: Cell => { cell.name = name;
 			       cell.named = true;
 			      if(cell.isReg) containsReg = true;
+			      nameSpace += name;
 			    }
 	  case bb: BlackBox => {
             if(!bb.named) {bb.instanceName = name; bb.named = true};
@@ -528,10 +533,12 @@ abstract class Component {
             for((n, elm) <- io.flatten) {
               if (elm.isClkInput) containsReg = true
             }
+	    nameSpace += name;
           }
 	  case comp: Component => {
             if(!comp.named) {comp.instanceName = name; comp.named = true};
             comp.pathParent = this;
+	    nameSpace += name;
           }
           case any =>
         }
