@@ -14,6 +14,8 @@ object Wire {
     junctioncell.io.out
   }
   def apply[T <: Data](default: T): T = {
+    if(default.inputs.length == 0)
+      ChiselErrors += IllegalState("incorrect usage of wire", 3);
     val junctioncell = new WireCell[T](default, -1, true)(default.clone.asInstanceOf[T]);
     junctioncell.io.in assign default;
     junctioncell.io.out
