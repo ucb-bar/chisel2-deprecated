@@ -40,6 +40,10 @@ object Component {
   val components = ArrayBuffer[Component]();
   val procs = ArrayBuffer[proc]();
   val muxes = ArrayBuffer[Node]();
+  val compStack = new Stack[Component]();
+  var stackIndent = 0;
+  var printStackStruct = ArrayBuffer[(Int, Component)]();
+  var firstComp = true;
   var genCount = 0;
   def genCompName(name: String): String = {
     genCount += 1;
@@ -86,12 +90,85 @@ object Component {
     compIndex = -1;
     compIndices.clear();
     components.clear();
+    compStack.clear();
+    firstComp = true;
+    printStackStruct.clear();
     procs.clear();
     muxes.clear();
     isEmittingComponents = false;
     isEmittingC = false;
     topComponent = null;
   }
+
+  //component stack handling stuff
+  
+  def isSubclassOfComponent(x: java.lang.Class[ _ ]): Boolean = {
+    val classString = x.toString;
+    if(classString == "class java.lang.Object")
+      return false;
+    else if(classString == "class Chisel.Component")
+      return true;
+    else
+      isSubclassOfComponent(x.getSuperclass)
+  }
+
+  def printStack = {
+    var res = "";
+    for((i, c) <- printStackStruct){
+      val dispName = if(c.moduleName == "") c.className else c.moduleName;
+      res += (genIndent(i) + dispName + " " + c.instanceName + "\n")
+    }
+    println(res);
+  }
+
+  def genIndent(x: Int): String = {
+    if(x == 0)
+      return ""
+    else 
+      return "    " + genIndent(x-1);
+  }
+
+  def push(c: Component){
+    if(firstComp){
+      compStack.push(c);
+      firstComp = false;
+      printStackStruct += ((stackIndent, c));
+    } else {
+      val st = Thread.currentThread.getStackTrace;
+      //for(elm <- st)
+      //println(elm.getClassName + " " + elm.getMethodName + " " + elm.getLineNumber);
+      var skip = 4;
+      for(elm <- st){
+	if(skip > 0) {
+	  skip -= 1;
+	} else {
+
+	  if(elm.getMethodName == "<init>") {
+
+	    val className = elm.getClassName;
+
+	    if(isSubclassOfComponent(Class.forName(className))) {
+	      println("marking " + className + " as parent of " + c.getClass);
+	      while(compStack.top.getClass != Class.forName(className)){
+		pop;
+	      }
+
+	      compStack.push(c);
+	      stackIndent += 1;
+	      printStackStruct += ((stackIndent, c));
+	      return;
+	    }
+	  }
+	}
+      }
+    }
+  }
+
+  def pop(){
+    compStack.pop;
+    stackIndent -= 1;
+  }
+
 }
 
 abstract class Component {
@@ -122,6 +199,7 @@ abstract class Component {
   var verilog_parameters = "";
   components += this;
 
+  push(this);
 
   def depthString(depth: Int): String = {
     var res = "";
@@ -587,6 +665,7 @@ abstract class Component {
       out_conf.write(configStr);
       out_conf.close();
     }
+    printStack;
     compDefs.clear;
     genCount = 0;
   }
@@ -872,6 +951,7 @@ abstract class Component {
     out_c.write("}\n");
     dumpVCD(out_c);
     out_c.close();
+    printStack;
   }
 };
 
