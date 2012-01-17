@@ -678,10 +678,11 @@ class Mem4[T <: Data](depth: Int, val cell: Mem4Cell[T]) extends Delay with proc
     }
     res
   }
-  override def emitDefLoC: String = {
-    var res = ("" /: cell.port_list) { (s, p) => s + p.emitDefLoC };
-    res
-  }
+  // Move call to p.emitDefLoC to the Mem4Ref Class to properly schedule reads
+  //override def emitDefLoC: String = {
+  //  var res = ("" /: cell.port_list) { (s, p) => s + p.emitDefLoC };
+  //  res
+  //}
   override def emitInitC: String = {
     if (hexInitFile != "") {
       "  "+emitRef+".read_hex(\""+hexInitFile+"\");\n"
@@ -789,6 +790,10 @@ class Mem4Ref[T <: Data](mem_port: Mem4Port[T]) extends Node with proc {
         println("[warning] Assigning to Mem through MemRef: Unrecognized node type: "+src.getClass);
       }
     }
+  }
+  override def emitDefLoC: String = {
+    // Emit port read code (may be combinational).
+    mem_port.emitDefLoC;
   }
 }
 
