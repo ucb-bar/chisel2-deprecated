@@ -91,6 +91,7 @@ object Component {
     compIndices.clear();
     components.clear();
     compStack.clear();
+    stackIndent = 0;
     firstComp = true;
     printStackStruct.clear();
     procs.clear();
@@ -594,7 +595,7 @@ abstract class Component {
         val o = m.invoke(this);
         o match { 
 	  //case comp: Component => { comp.component = this;}
-          case node: Node => { if (name != "io" && (node.isCellIO || (node.name == "" && !node.named) || node.name == null)) node.name_it(name, true);
+          case node: Node => { if ((node.isCellIO || (node.name == "" && !node.named) || node.name == null)) node.name_it(name, true);
 			       if (node.isReg || node.isRegOut || node.isClkInput) containsReg = true;
 			      nameSpace += name;
 			    }
