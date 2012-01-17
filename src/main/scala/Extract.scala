@@ -67,8 +67,8 @@ object Extract {
 abstract class ExtractCell[T <: Bits](gen: => T){
   val io = new Bundle(){
     val in = gen.asInput;
-    val hi = UFix('input);
-    val lo = UFix('input);
+    val hi = UFix(INPUT);
+    val lo = UFix(INPUT);
     val out = gen.asOutput;
   }
   io.setIsCellIO;

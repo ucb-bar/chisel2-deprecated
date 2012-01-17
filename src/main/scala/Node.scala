@@ -14,6 +14,7 @@ import ChiselError._;
 
 object Node {
   // var cond = new Stack[Node];
+  var isHiC = false;
   var isCoercingArgs = true;
   var conds = new Stack[Bool]();
   conds.push(Bool(true));
@@ -78,7 +79,7 @@ object Node {
       }
     }
     ll.wires.map(x => {
-      val res = UFix('output);
+      val res = UFix(OUTPUT);
       res.setIsCellIO;
       x.nameHolder = res;
       res assign x;

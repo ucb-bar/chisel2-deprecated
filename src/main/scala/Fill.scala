@@ -18,9 +18,9 @@ object Fill {
 
 class FillCell[T <: Data](data: T) extends Cell {
   val io = new Bundle(){
-    val mod = Bits('input);
-    val n = Fix('input);
-    val out = Bits('output);
+    val mod = Bits(INPUT);
+    val n = Fix(INPUT);
+    val out = Bits(OUTPUT);
   }
   io.setIsCellIO;
   val primitiveNode = new Fill();

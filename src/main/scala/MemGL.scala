@@ -149,14 +149,14 @@ class MemGL[T <: Data](memGen: MemGen[T],
     println("[info] MemGL.implement");
     val addr_bit_width = getAddrWidth;
 
-    val addr_port = Bits(width = addr_bit_width * port_count, dir = 'input);
-    val ce_port   = Bits(width = port_count, dir = 'input);
-    //val cs_port   = Bits(width = port_count, dir = 'input);
-    val data_out  = Bits(width = size * port_count, dir = 'output);
-    val oe_port   = Bits(width = port_count, dir = 'input);
-    val data_in   = Bits(width = size * port_count, dir = 'input);
-    val we_port   = Bits(width = port_count, dir = 'input);
-    val rst_port  = Bits(width = port_count, dir = 'input);
+    val addr_port = Bits(width = addr_bit_width * port_count, dir = INPUT);
+    val ce_port   = Bits(width = port_count, dir = INPUT);
+    //val cs_port   = Bits(width = port_count, dir = INPUT);
+    val data_out  = Bits(width = size * port_count, dir = OUTPUT);
+    val oe_port   = Bits(width = port_count, dir = INPUT);
+    val data_in   = Bits(width = size * port_count, dir = INPUT);
+    val we_port   = Bits(width = port_count, dir = INPUT);
+    val rst_port  = Bits(width = port_count, dir = INPUT);
 
     // Connect Clock inputs on each port.
     val concatClock = Wire(){Bits(width=port_count)};

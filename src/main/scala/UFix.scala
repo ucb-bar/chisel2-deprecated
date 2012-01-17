@@ -8,16 +8,9 @@ object UFix {
   def apply(x: Int): UFix = Lit(x){UFix()};
   def apply(x: Int, width: Int): UFix = Lit(x, width){UFix()};
   
-  def apply(width: Int = -1, dir: Symbol = null): UFix = {
+  def apply(width: Int = -1, dir: IODirection = null): UFix = {
     val res = new UFix();
-    if(dir == null)
-      res.dir = null;
-    else if(dir.equals('input))
-      res.dir = INPUT;
-    else if(dir.equals('output))
-      res.dir = OUTPUT;
-    else
-      println("INVALID DIRECTION");
+    res.dir = dir;
     if(width > 0)
       res.init("", width);
     else 
@@ -25,7 +18,7 @@ object UFix {
     res
   }
   
-  def apply(dir: Symbol): UFix = UFix(-1, dir) 
+  def apply(dir: IODirection): UFix = UFix(-1, dir) 
   
   def apply(): UFix = UFix(-1, null);
 }
@@ -33,7 +26,7 @@ object UFix {
 class UFix extends Num {
   type T = UFix;
   override def fromNode(n: Node) = {
-    val res = UFix('output).asInstanceOf[this.type];
+    val res = UFix(OUTPUT).asInstanceOf[this.type];
     res assign n;
     res
   }

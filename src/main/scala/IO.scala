@@ -15,9 +15,21 @@ class IOdir (idi: Int) {
   override def toString: String = if (id == 0) "INPUT-DIR" else "OUTPUT-DIR";
 }
 
+trait IODirection {
+
+}
+
+object INPUT extends IODirection {
+
+}
+
+object OUTPUT extends IODirection {
+
+}
+
 object Input {
   def apply(): IO = apply("", widthOf(0))
-  def apply(width: Int): Fix = Fix(width, 'input);
+  def apply(width: Int): Fix = Fix(width, INPUT);
   def apply(name: String): IO = apply(name, widthOf(0))
   def apply(name: String, width: Int): Fix = 
     { val res = new Fix(); res.dir = INPUT; if(name != "") res.named = true; res.init(name, width); res }
@@ -25,7 +37,7 @@ object Input {
     { val res = new IO(); res.dir = INPUT; res.init(name, inferWidth); res }
 }
 object Output {
-  def apply(width: Int): Fix = Fix(width, 'output);
+  def apply(width: Int): Fix = Fix(width, OUTPUT);
   def apply(name: String): IO = apply(name, widthOf(0), null)
   def apply(name: String, inferWidth: (Node) => Int, x: Node): IO = 
     { val res = new IO(); res.dir = OUTPUT; res.init(name, inferWidth, x); res }
@@ -35,7 +47,7 @@ object Output {
   def apply(x: Node): IO = apply("", x);
 }
 class IO extends Wire with Cloneable{ 
-  var dir: IOdir = null;
+  var dir: IODirection = null;
   var unnamed = false;
   // TODO: OPTIONALLY ONLY EMIT TOP COMPONENT IO IN OBJECT
   override def isIo = true; // = component == topComponent; // true; 

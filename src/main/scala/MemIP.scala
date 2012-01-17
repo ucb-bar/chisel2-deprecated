@@ -44,13 +44,13 @@ class MemIPPort[T <: Data](val memSpec: MemorySpec,
   var size = 0;//data.toNode.getWidth;
 
   val addr_port = addr.clone.asInput;
-  val ce_port   = Bool('input);
-  val cs_port   = Bool('input);
+  val ce_port   = Bool(INPUT);
+  val cs_port   = Bool(INPUT);
   val data_out  = data.clone.asOutput;
-  val oe_port   = Bool('input);
+  val oe_port   = Bool(INPUT);
   val data_in   = data.clone.asInput;
-  val we_port   = Bool('input);
-  val wr_mask_port = if (wrMask == null) Bits(1,'input) else wrMask.clone.asInput;
+  val we_port   = Bool(INPUT);
+  val wr_mask_port = if (wrMask == null) Bits(1,INPUT) else wrMask.clone.asInput;
   var wr_mask_bits = 0;
   var data_in_bits = 0;
 
@@ -87,7 +87,7 @@ class MemIPPort[T <: Data](val memSpec: MemorySpec,
     if (port_type.equals('read) || port_type.equals('rw)) {
       val read_data = mem.read(addr_port);
       val zero_data = Fix(0);
-      val data_mux = Fix(dir = 'output);//zero_data.clone;
+      val data_mux = Fix(dir = OUTPUT);//zero_data.clone;
 
       data_mux assign (Multiplex(!oe_port && !cs_port, read_data, zero_data));
 

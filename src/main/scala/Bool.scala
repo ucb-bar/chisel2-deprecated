@@ -7,17 +7,10 @@ import ChiselError._;
 object Bool {
   def apply(x: Boolean) = Lit(x);
   
-  def apply(dir: Symbol = null): Bool = {
+  def apply(dir: IODirection = null): Bool = {
     val res = new Bool();
-    if(dir == null)
-      res.dir = null;
-    else if(dir.equals('input))
-      res.dir = INPUT;
-    else if(dir.equals('output))
-      res.dir = OUTPUT;
-    else
-      println("INVALID DIRECTION");
-      res.init("", 1)
+    res.dir = dir;
+    res.init("", 1)
     res
   }
   
@@ -26,7 +19,7 @@ object Bool {
 
 class Bool extends Bits {
   override def fromNode(n: Node) = {
-    val res = Bool('output).asInstanceOf[this.type];
+    val res = Bool(OUTPUT).asInstanceOf[this.type];
     res assign n;
     res
   }

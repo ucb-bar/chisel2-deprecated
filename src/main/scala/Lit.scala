@@ -43,7 +43,7 @@ class Lit[T <: Bits](x: Literal)(gen: => T) extends Cell {
 }
 
 class BoolLit(x: Literal) extends Cell {
-  val io = Bool('output);
+  val io = Bool(OUTPUT);
   io.setIsCellIO;
   val primitiveNode = x;
   io assign primitiveNode;

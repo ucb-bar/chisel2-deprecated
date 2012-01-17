@@ -69,7 +69,7 @@ object is {
     if (keys.length == 0) 
       println("NO KEY SPECIFIED");
     else {
-      //val c = Bool('output);
+      //val c = Bool(OUTPUT);
       //c := keys(0) === v;
       val c = keys(0) === v;
       when (c) { block; }
@@ -144,7 +144,6 @@ abstract class Data extends Node with Cloneable{
   def fromNode(n: Node): this.type = this;
   def <==[T <: Data](data: T) = {
     if(this.getClass != data.getClass) println("Mismatched types: " + this.getClass + " " + data.getClass);
-    data.setIsCellIO;
     comp procAssign data.toNode;
   }
   override def clone(): this.type = {
@@ -287,8 +286,8 @@ class Log2 extends Node {
 }
 class Log2Cell(n: Int) extends Cell {
   val io = new Bundle{
-    val in = UFix('input);
-    val out = UFix('output);
+    val in = UFix(INPUT);
+    val out = UFix(OUTPUT);
   }
   io.setIsCellIO;
   val primitiveNode = new Log2();

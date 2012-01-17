@@ -28,7 +28,7 @@ object Rom {
 
 class RomCell[T <: Data](data: Array[T], addr: Node) extends Cell {
   val io = new Bundle{
-    val addr = Fix('input);
+    val addr = Fix(INPUT);
     val out = data(0).clone.asOutput;
   }
   io.setIsCellIO;
@@ -70,7 +70,7 @@ class Rom(data_vals: Array[Node]) extends Delay {
     "  mem_t<" + width + "," + data.length + "> " + emitRef + ";\n";
   def apply(addr: Node): Node = MemRef(this, addr);
   def apply(addr: UFix): Fix = {
-    val res = Fix('output);
+    val res = Fix(OUTPUT);
     res.setIsCellIO;
     res assign MemRef(this, addr);
     res

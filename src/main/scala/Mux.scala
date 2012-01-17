@@ -13,7 +13,7 @@ object Multiplex{
 
 class MuxCell[T <: Data](cI: T, aI: T) extends Cell {
   val io = new Bundle(){
-    val t = Bits('input);
+    val t = Bits(INPUT);
     val c: T = cI.clone().asInput();
     val a: T = aI.clone().asInput();
     val out: T = cI.clone().asOutput();

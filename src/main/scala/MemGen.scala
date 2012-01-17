@@ -87,12 +87,12 @@ class MemGenPort[T <: Data](val memGen: MemGen[T],
                             val wrMask: Bits = null) {
   var size = wrData.getWidth;
   val addr_port = addr.clone.asInput;
-  val ce_port   = Bool('input);
-  val cs_port   = Bool('input);
+  val ce_port   = Bool(INPUT);
+  val cs_port   = Bool(INPUT);
   val data_out  = wrData.clone.asOutput;
-  val oe_port   = Bool('input);
+  val oe_port   = Bool(INPUT);
   val data_in   = wrData.clone.asInput;
-  val we_port   = Bool('input);
+  val we_port   = Bool(INPUT);
   val wr_mask_port = if (wrMask == null) null else wrMask.clone.asInput;
 
   def implement(fake: Int = 0) = {

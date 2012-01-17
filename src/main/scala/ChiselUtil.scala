@@ -20,7 +20,7 @@ class symbolWrapper(x: Symbol) {
 class boolWrapper(x: Boolean) {
   val myVal = x;
   def unary_~() = {
-    val res = Bool('output);
+    val res = Bool(OUTPUT);
     if(myVal)
       res assign Lit(true)
     else

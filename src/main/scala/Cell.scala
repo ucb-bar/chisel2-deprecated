@@ -102,7 +102,7 @@ class LogicalNodeCell[T <: Data](op: String)(gen: => T) extends Cell {
   val io = new Bundle(){
     val X = gen.asInput;
     val Y = gen.asOutput;
-    val Z = Bool('output);
+    val Z = Bool(OUTPUT);
   }
   io.setIsCellIO;
   val primitiveNode = op match {
@@ -133,7 +133,7 @@ object ReductionNodeCell {
 class ReductionNodeCell[T <: Data](op: String)(gen: => T) extends Cell {
   val io = new Bundle() {
     val In = gen.asInput;
-    val Out = Bool('output);
+    val Out = Bool(OUTPUT);
   }
   io.setIsCellIO;
   val primitiveNode = op match {
@@ -158,8 +158,8 @@ object UnaryBoolCell {
 
 class UnaryBoolCell(op: String) extends Cell {
   val io = new Bundle(){
-    val In = Bool('input);
-    val Out = Bool('output);
+    val In = Bool(INPUT);
+    val Out = Bool(OUTPUT);
   }
   io.setIsCellIO;
   val primitiveNode = op match {
@@ -185,9 +185,9 @@ object BinaryBoolCell {
 
 class BinaryBoolCell(op: String) extends Cell {
   val io = new Bundle(){
-    val X = Bool('input);
-    val Y = Bool('input);
-    val Z = Bool('output);
+    val X = Bool(INPUT);
+    val Y = Bool(INPUT);
+    val Z = Bool(OUTPUT);
   }
   io.setIsCellIO;
   val primitiveNode = op match {

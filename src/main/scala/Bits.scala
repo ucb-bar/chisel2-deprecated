@@ -11,16 +11,9 @@ object Bits {
   def apply(x: String): Bits = Lit(x){Bits()};
   def apply(x: String, width: Int): Bits = Lit(x, width){Bits()};
   
-  def apply(width: Int = -1, dir: Symbol = null): Bits = {
+  def apply(width: Int = -1, dir: IODirection = null): Bits = {
     val res = new Bits();
-    if(dir == null)
-      res.dir = null;
-    else if(dir.equals('input))
-      res.dir = INPUT;
-    else if(dir.equals('output))
-      res.dir = OUTPUT;
-    else
-      println("INVALID DIRECTION");
+    res.dir = dir;
     if(width > 0)
       res.init("", width);
     else 
@@ -28,7 +21,7 @@ object Bits {
     res
   }
   
-  def apply(dir: Symbol): Bits = Bits(-1, dir) 
+  def apply(dir: IODirection): Bits = Bits(-1, dir) 
   
   def apply(): Bits = Bits(-1, null);
 }
@@ -36,7 +29,7 @@ object Bits {
 class Bits extends IO {
   override def toNode = this;
   override def fromNode(n: Node) = {
-    val res = Bits('output).asInstanceOf[this.type];
+    val res = Bits(OUTPUT).asInstanceOf[this.type];
     res assign n;
     res
   }
@@ -60,10 +53,12 @@ class Bits extends IO {
 
   private def lessEqEq(src: Bits) = {
     generateError(src);
-    if(comp != null)
+    if(comp != null){
       comp procAssign src.toNode;
-    else
+    }
+    else {
       this.asInstanceOf[Wire] procAssign src.toNode;
+    }
   }
 
   def := (src: Bits) = colonEqual(src);
@@ -71,7 +66,7 @@ class Bits extends IO {
   def := (src: Fix)  = colonEqual(src);
   def := (src: UFix) = colonEqual(src);
 
-  def <== (src: Bits) = lessEqEq(src);
+  def <== (src: Bits) = lessEqEq(src);;
   def <== (src: Bool) = lessEqEq(src);
   def <== (src: Fix)  = lessEqEq(src);
   def <== (src: UFix) = lessEqEq(src);

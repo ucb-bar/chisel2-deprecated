@@ -7,7 +7,7 @@ object Cat {
   def apply[T <: Data](mod: T, mods: T*): Bits = {
     val modsList = mods.toList;
     if(modsList.length == 1 && modsList(0) == null){
-      val res = Bits('output);
+      val res = Bits(OUTPUT);
       res.setIsCellIO;
       res assign mod.toNode;
       res
@@ -21,7 +21,7 @@ object Cat {
 
 
 class CatCell[T <: Data](mod: T, mods: List[T]){
-  val io = new Bundle(){val out = Bits('output);
+  val io = new Bundle(){val out = Bits(OUTPUT);
 			}
   io.setIsCellIO;
   val primitiveNode = 

@@ -8,16 +8,9 @@ object Fix {
   def apply(x: Int): Fix = Lit(x){Fix()};
   def apply(x: Int, width: Int): Fix = Lit(x, width){Fix()};
   
-  def apply(width: Int = -1, dir: Symbol = null): Fix = {
+  def apply(width: Int = -1, dir: IODirection = null): Fix = {
     val res = new Fix();
-    if(dir == null)
-      res.dir = null;
-    else if(dir.equals('input))
-      res.dir = INPUT;
-    else if(dir.equals('output))
-      res.dir = OUTPUT;
-    else
-      println("INVALID DIRECTION" + dir);
+    res.dir = dir;
     if(width > 0)
       res.init("", width);
     else 
@@ -25,7 +18,7 @@ object Fix {
     res
   }
   
-  def apply(dir: Symbol): Fix = Fix(-1, dir) 
+  def apply(dir: IODirection): Fix = Fix(-1, dir) 
   
   def apply(): Fix = Fix(-1, null);
 
@@ -34,7 +27,7 @@ object Fix {
 class Fix extends Num {
   type T = Fix;
   override def fromNode(n: Node) = {
-    val res = Fix('output).asInstanceOf[this.type]; 
+    val res = Fix(OUTPUT).asInstanceOf[this.type]; 
     res assign n; 
     res};
   
