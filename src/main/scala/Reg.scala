@@ -168,7 +168,7 @@ class Reg extends Delay with proc{
     updateVal.emitRef + (if (isReset) ");\n" else ";\n");
 
     "  " + emitRef + "_shadow = " +  updateLogic +
-    "  " + emitRef + "_shadow_out = " + updateLogic;
+    "  " + emitRef + "_shadow_out = " + emitRef + "\n";
     
   }
   override def emitDefHiC: String = {
