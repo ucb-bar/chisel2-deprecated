@@ -107,6 +107,8 @@ class Reg extends Delay with proc{
       ChiselErrors += IllegalState("reassignment to Reg", 3);
     else { assigned = true; super.assign(src)}
   }
+  override def emitRefC: String = 
+    if(isHiC) emitRefV + "_shadow_out" else emitRefV
   override def emitRefV: String = if (name == "") "R" + emitIndex else name;
   override def emitDef: String = "";
   override def emitReg: String = {
@@ -160,15 +162,22 @@ class Reg extends Delay with proc{
   override def emitDec: String = 
     "  reg[" + (width-1) + ":0] " + emitRef + ";\n";
 
-  override def emitDefLoC: String = 
-    "  " + emitRef + "_shadow = " + 
-    (if (isReset) "mux<" + width + ">(reset, " + resetVal.emitRef + ", " else "") + 
+  override def emitDefLoC: String = {
+    val updateLogic = 
+      (if (isReset) "mux<" + width + ">(reset, " + resetVal.emitRef + ", " else "") + 
     updateVal.emitRef + (if (isReset) ");\n" else ";\n");
-  override def emitDefHiC: String =
+
+    "  " + emitRef + "_shadow = " +  updateLogic +
+    "  " + emitRef + "_shadow_out = " + updateLogic;
+    
+  }
+  override def emitDefHiC: String = {
     "  " + emitRef + " = " + emitRef + "_shadow;\n";
+  }
   override def emitDecC: String = 
     "  dat_t<" + width + "> " + emitRef + ";\n" +
-    "  dat_t<" + width + "> " + emitRef + "_shadow;\n";
+    "  dat_t<" + width + "> " + emitRef + "_shadow;\n" +
+    "  dat_t<" + width + "> " + emitRef + "_shadow_out;\n";
 }
 
 }

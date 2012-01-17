@@ -164,7 +164,7 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
     if (addr_offset != -1) {
       println("[warning] Memory addr input is already assigned");
     } else if (!(addr == null)) {
-      val addr_port = Fix('input);
+      val addr_port = Fix(INPUT);
       addr_offset = next_input_index;
       cell.io += addr_port;
       mem.inputs += addr_port;
@@ -182,7 +182,7 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
     if (data_offset != -1) {
       println("[warning] Memory data input is already assigned");
     } else if (!(data == null)) {
-      val data_port = Bits(data.getWidth, 'input);
+      val data_port = Bits(data.getWidth, INPUT);
       data_offset = next_input_index;
       cell.io += data_port;
       mem.inputs += data_port.toNode;
@@ -193,7 +193,7 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
     if (we_offset != -1) {
       println("[warning] Memory we input is already assigned");
     } else if (!(we == null)) {
-      val we_port  = Bool('input);
+      val we_port  = Bool(INPUT);
       we_offset = next_input_index;
       cell.io += we_port;
       mem.inputs += we_port;
@@ -213,7 +213,7 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
   }
   def assign_cs(cs: Bool) = {
     if (!(cs == null)) {
-      val cs_port = Bool('input);
+      val cs_port = Bool(INPUT);
       cs_offset = next_input_index;
       cell.io += cs_port;
       mem.inputs += cs_port;
@@ -222,7 +222,7 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
   }
   def assign_oe(oe: Bool) = {
      if (!(oe == null)) {
-      val oe_port = Bool('input);
+      val oe_port = Bool(INPUT);
       oe_offset = next_input_index;
       cell.io += oe_port;
       mem.inputs += oe_port;
@@ -445,6 +445,7 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
     res;
   }
   def emitDefHiC: String = {
+    isHiC = true;
     var res = "";
     val read_buf = mem.emitRef+"__read"+port_index+"_";
     if (isWritable) {
@@ -472,6 +473,7 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
         }
       }
     }
+    isHiC = false;
     res
   }
 }

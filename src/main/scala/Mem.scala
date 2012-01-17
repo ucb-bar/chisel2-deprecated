@@ -68,7 +68,7 @@ class MemWPort[T <: Data](mem: Mem[T], io: Bundle, addr: Node, data: T, wen: Nod
   //mem.inputs += data;
   //mem.inputs += wen;
 
-  val addr_port = Fix('input);
+  val addr_port = Fix(INPUT);
   addr_port.setName("addr_" + port_offset);
   io += addr_port;
   mem.inputs += addr_port;
@@ -80,7 +80,7 @@ class MemWPort[T <: Data](mem: Mem[T], io: Bundle, addr: Node, data: T, wen: Nod
   mem.inputs += data_port.toNode;
   data_port <> data;
 
-  val wen_port  = Bool('input);
+  val wen_port  = Bool(INPUT);
   wen_port.setName("wen_" + (port_offset + 2));
   io += wen_port;
   mem.inputs += wen_port;
@@ -121,6 +121,7 @@ class MemWPort[T <: Data](mem: Mem[T], io: Bundle, addr: Node, data: T, wen: Nod
     res
   }
   def emitDefHiC: String = {
+    isHiC = true;
     var res = 
       "  if (" + wrEnable.emitRef + ".to_bool()) {\n"
     if (wbm == null) {
@@ -135,6 +136,7 @@ class MemWPort[T <: Data](mem: Mem[T], io: Bundle, addr: Node, data: T, wen: Nod
         m.emitRef + ".get(" + wrAddr.emitRef + ") & ~" + wrBitMask.emitRef + ");\n" +
       "  }\n";
     }
+    isHiC = false;
     res
   }
 }
