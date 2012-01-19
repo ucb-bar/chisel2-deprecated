@@ -94,6 +94,7 @@ object Node {
 abstract class Node extends nameable{
   var walked = false;
   var component: Component = null;
+  var staticComp: Component = if(compStack.length != 0) compStack.top else null;
   var flattened = false;
   var isCellIO = false;
   var depth = 0;
@@ -111,6 +112,7 @@ abstract class Node extends nameable{
   var inferCount = 0;
   var genError = false;
   var stack: Array[StackTraceElement] = null;
+  
   def width: Int = width_;
   def width_=(w: Int) = { isFixedWidth = true; width_ = width; inferWidth = fixWidth(w); }
   def name_it (path: String, setNamed: Boolean = true) = { name = path; named = setNamed}
@@ -393,6 +395,7 @@ abstract class Node extends nameable{
           // println(depthString(depth+1) + "INPUT " + node);
           if (node.component == null) // unmarked input
             node.component = markComp;
+	  if(nextComp == null) println(c + " " + this);
           node.findNodes(depth + 2, nextComp);
 	  //This code finds a binding for a node
 	  //We search for a binding only if it is an output
@@ -415,7 +418,18 @@ abstract class Node extends nameable{
                   c.mods += b;  c.isWalked += b;
                   // println("OUTPUT " + io + " BINDING " + inputs(n) + " INPUT " + this);
                 }
-              }  
+              } 
+	    //In this case, we are trying to use the input of a submodule
+	    //as part of the logic outside of the submodule.
+	    //If the logic is outside the submodule, we do not use the input
+	    //name. Instead, we use whatever is driving the input. In other
+	    //words, we do not use the Input name, if the component of the
+	    //logic is the part of Input's component.
+	    //We also do the same when assigning to the output if the output
+	    //is the parent of the subcomponent;
+		else if (io.dir == INPUT && ((!this.isInstanceOf[IO] && this.component == io.component.parent) || (this.isInstanceOf[IO] && this.asInstanceOf[IO].dir == OUTPUT && this.component == io.component.parent))) {
+		  if(io.inputs.length > 0) inputs(i) = io.inputs(0);
+		} 
             case any => 
           }
         }

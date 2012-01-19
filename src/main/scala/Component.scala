@@ -138,22 +138,23 @@ object Component {
       val st = Thread.currentThread.getStackTrace;
       //for(elm <- st)
       //println(elm.getClassName + " " + elm.getMethodName + " " + elm.getLineNumber);
-      var skip = 4;
+      var skip = 3;
       for(elm <- st){
 	if(skip > 0) {
 	  skip -= 1;
 	} else {
-
 	  if(elm.getMethodName == "<init>") {
 
 	    val className = elm.getClassName;
 
-	    if(isSubclassOfComponent(Class.forName(className))) {
+	    if(isSubclassOfComponent(Class.forName(className)) && !c.isSubclassOf(Class.forName(className))) {
 	      println("marking " + className + " as parent of " + c.getClass);
 	      while(compStack.top.getClass != Class.forName(className)){
 		pop;
 	      }
 
+
+	      c.staticParent = compStack.top;
 	      compStack.push(c);
 	      stackIndent += 1;
 	      printStackStruct += ((stackIndent, c));
@@ -178,6 +179,7 @@ abstract class Component {
   val bindings = new ArrayBuffer[Binding];
   var wiresCache: Array[(String, IO)] = null;
   var parent: Component = null;
+  var staticParent: Component = null;
   var containsReg = false;
   val children = new ArrayBuffer[Component];
   var inputs = new ArrayBuffer[Node];
@@ -201,6 +203,16 @@ abstract class Component {
   components += this;
 
   push(this);
+
+  //true if this is a subclass of x
+  def isSubclassOf(x: java.lang.Class[ _ ]): Boolean = {
+    var className = this.getClass;
+    while(className.toString != x.toString){
+      if(className.toString == "class Chisel.Component") return false;
+      className = className.getSuperclass;
+    }
+    return true;
+  }
 
   def depthString(depth: Int): String = {
     var res = "";
