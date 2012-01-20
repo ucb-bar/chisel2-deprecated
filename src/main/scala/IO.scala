@@ -88,6 +88,7 @@ class IO extends Wire with Cloneable{
     }
     this
   }
+  /*
   override def <>(src: Node) = { 
     if (dir == INPUT) {
       // println("<>'ing " + this + " <-- " + src);
@@ -114,6 +115,59 @@ class IO extends Wire with Cloneable{
       }
     } 
   }
+  * */
+
+  override def <>(src: Node) = { 
+    if (dir == INPUT) {
+      // println("<>'ing " + this + " <-- " + src);
+      src match { 
+      case other: IO => 
+	if (other.dir == OUTPUT && this.staticComp == other.staticComp && !isCellIO) {
+	  other assign this;
+        } else if ((other.dir == OUTPUT && this.staticComp.staticParent == other.staticComp.staticParent) || isCellIO) {
+          this assign other;
+        } else if (other.dir == INPUT) {
+	  if(this.staticComp == other.staticComp.staticParent)
+	    other assign this;
+	  else if(this.staticComp.staticParent == other.staticComp)
+	    this assign other;
+	  else
+	    ChiselErrors += IllegalConnection("Connecting Input " + this + " Input " + other, 2);
+	} else {
+          ChiselErrors += IllegalConnection("Connecting Input " + this + " to " + other, 2);
+        }
+      case default => ChiselErrors += IllegalConnection("Connecting Input " + this + " to IO without direction " + default, 2);
+      }
+    } else { // DIR == OUTPUT
+      // println("<>'ing " + this + " --> " + src);i
+      src match { 
+        case other: IO  => 
+	  if (other.dir == INPUT && this.staticComp == other.staticComp && !isCellIO){
+	    this assign other;
+	  } else if ((other.dir == INPUT && this.staticComp.staticParent == other.staticComp.staticParent) || isCellIO) {
+            other assign this;
+          } else if (other.dir == OUTPUT) {
+	    if(this.staticComp == other.staticComp.staticParent)
+	      this assign other;
+	    else if (this.staticComp.staticParent == other.staticComp)
+	      other assign this;
+	    else if (this.isCellIO && other.isCellIO)
+	      ChiselErrors += IllegalConnection("Ambiguous Connection of Two Nodes", 2);
+	    else if (this.isCellIO){
+	      other assign this; println("first case");}
+	    else if (other.isCellIO){
+	      this assign other; println("secon case");}
+	    else
+	      ChiselErrors += IllegalConnection("Connecting Output " + this + " to Output " + other, 2);
+	  } else {
+            ChiselErrors += IllegalConnection("Connecting Output " + this + " to IO without direction " + other, 2);
+          }
+        case default => 
+          //println("Connecting Output " + this + " to Node " + default);
+      }
+    } 
+  }  
+
   override def ^^(parent: Node) = { 
     if (dir == INPUT) {
       // println("^^ " + this + " COMP " + component + " & " + src + " SRC COMP " + src.component);
@@ -176,7 +230,9 @@ class IO extends Wire with Cloneable{
     res
   }
   override def maxNum = {
-    if(inputs(0).isLit)
+    if(inputs.length == 0) 
+      width;
+    else if(inputs(0).isLit)
       inputs(0).value
     else if (inputs.length == 1 && isCellIO)
       inputs(0).maxNum
