@@ -69,7 +69,7 @@ class Bits extends IO {
     }
   }
 
-  def := (src: Bits) = colonEqual(src);
+  //def := (src: Bits) = colonEqual(src);
   def := (src: Bool) = colonEqual(src);
   def := (src: Fix)  = colonEqual(src);
   def := (src: UFix) = colonEqual(src);
@@ -86,17 +86,36 @@ class Bits extends IO {
 	this := ufix
       }
       case bits: Bits => {
-	this := bits;
+	this colonEqual(bits);
       }
       case any =>
 	ChiselErrors += IllegalState(":= not defined on " + this.getClass + " and " + src.getClass, 1);
     }
   }
 
-  def <== (src: Bits) = lessEqEq(src);;
   def <== (src: Bool) = lessEqEq(src);
   def <== (src: Fix)  = lessEqEq(src);
   def <== (src: UFix) = lessEqEq(src);
+
+  
+  override def <== [T <: Data](src: T): Unit = {
+    src match {
+      case bool: Bool => {
+	this <== bool;
+      }
+      case fix: Fix => {
+	this <== fix;
+      }
+      case ufix: UFix => {
+	this <== ufix
+      }
+      case bits: Bits => {
+	this lessEqEq(bits);
+      }
+      case any =>
+	ChiselErrors += IllegalState("<== not defined on " + this.getClass + " and " + src.getClass, 1);
+    }
+  }
 
   def apply(bit: Int): Bits = { Extract(this, bit){Bits()}};
   def apply(hi: Int, lo: Int): Bits = {Extract(this, hi, lo){Bits()}};

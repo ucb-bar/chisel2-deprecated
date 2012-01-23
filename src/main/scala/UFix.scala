@@ -2,6 +2,7 @@ package Chisel {
 
 import IOdir._;
 import Node._;
+import ChiselError._;
 
 object UFix {
   
@@ -45,7 +46,25 @@ class UFix extends Num {
       comp assign src.toNode
   }
 
+  override def :=[T <: Data](src: T): Unit = {
+    src match {
+      case ufix: UFix => {
+	this := ufix;
+      }
+      case any => 
+	ChiselErrors += IllegalState(":= not defined on " + this.getClass + " and " + src.getClass, 1)
+    }
+  }
 
+  override def <==[T <: Data](src: T): Unit = {
+    src match {
+      case ufix: UFix => {
+	this <== ufix;
+      }
+      case any => 
+	ChiselErrors += IllegalState("<== not defined on " + this.getClass + " and " + src.getClass, 1)
+    }
+  }
   
   override def apply(bit: Int): UFix = { Extract(this, bit){UFix()}};
   override def apply(hi: Int, lo: Int): UFix = {Extract(this, hi, lo){UFix()}};

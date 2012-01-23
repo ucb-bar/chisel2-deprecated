@@ -2,6 +2,7 @@ package Chisel {
 
 import IOdir._;
 import Node._;
+import ChiselError._;
 
 object Fix {
 
@@ -47,6 +48,33 @@ class Fix extends Num {
 
   override def :=(src: Fix)  = colonEqual(src);
   override def :=(src: UFix) = colonEqual(Cat(Bits(0), src).toUFix);
+
+  
+  override def :=[T <: Data](src: T): Unit = {
+    src match {
+      case ufix: UFix => {
+	this := ufix;
+      }
+      case fix: Fix => {
+	this := fix;
+      }
+      case any => 
+	ChiselErrors += IllegalState(":= not defined on " + this.getClass + " and " + src.getClass, 1)
+    }
+  }
+
+  override def <==[T <: Data](src: T): Unit = {
+    src match {
+      case ufix: UFix => {
+	this <== ufix;
+      }
+      case fix: Fix => {
+	this <== fix;
+      }
+      case any => 
+	ChiselErrors += IllegalState("<== not defined on " + this.getClass + " and " + src.getClass, 1)
+    }
+  }
 
   override def <==(src: Fix)  = lessEqEq(src);
   override def <==(src: UFix) = lessEqEq(Cat(Bits(0), src).toUFix);
