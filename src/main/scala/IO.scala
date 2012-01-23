@@ -154,9 +154,9 @@ class IO extends Wire with Cloneable{
 	    else if (this.isCellIO && other.isCellIO)
 	      ChiselErrors += IllegalConnection("Ambiguous Connection of Two Nodes", 2);
 	    else if (this.isCellIO){
-	      other assign this; println("first case");}
+	      other assign this; }
 	    else if (other.isCellIO){
-	      this assign other; println("secon case");}
+	      this assign other; }
 	    else
 	      ChiselErrors += IllegalConnection("Connecting Output " + this + " to Output " + other, 2);
 	  } else {

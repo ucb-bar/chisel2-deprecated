@@ -147,6 +147,9 @@ abstract class Data extends Node with Cloneable{
     if(this.getClass != data.getClass) println("Mismatched types: " + this.getClass + " " + data.getClass);
     comp procAssign data.toNode;
   }
+  def :=[T <: Data](data: T){
+    this assign data.toNode;
+  }
   override def clone(): this.type = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
     res

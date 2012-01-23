@@ -23,6 +23,7 @@ object Bundle {
 }
 
 class Bundle(view_arg: Seq[String] = null) extends Data{
+  var dir = "";
   var view = view_arg;
   var elementsCache: Map[String, Data] = null;
   var bundledElm: Node = null;
@@ -141,7 +142,9 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
   override def apply(name: String): Data = elements(name)
   override def <>(src: Node) = { 
     // println("B <>'ing " + this + " & " + src);
-    if(comp == null){
+    if(comp == null || (dir == "output" && 
+			src.isInstanceOf[Bundle] && 
+			src.asInstanceOf[Bundle].dir == "output")){
       src match {
 	case other: Bundle => {
           for ((n, i) <- elements) {
@@ -218,12 +221,14 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
   override def asInput(): this.type = {
     for ((n, i) <- elements)
       i.asInput();
+    this.dir = "input";
     this
   }
 
   override def asOutput(): this.type = {
     for ((n, i) <- elements)
       i.asOutput();
+    this.dir = "output"
     this
   }
   override def setIsCellIO() = {

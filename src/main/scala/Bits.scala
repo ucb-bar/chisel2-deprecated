@@ -74,6 +74,25 @@ class Bits extends IO {
   def := (src: Fix)  = colonEqual(src);
   def := (src: UFix) = colonEqual(src);
 
+  override def :=[T <: Data](src: T): Unit = {
+    src match {
+      case bool: Bool => {
+	this := bool;
+      }
+      case fix: Fix => {
+	this := fix;
+      }
+      case ufix: UFix => {
+	this := ufix
+      }
+      case bits: Bits => {
+	this := bits;
+      }
+      case any =>
+	ChiselErrors += IllegalState(":= not defined on " + this.getClass + " and " + src.getClass, 1);
+    }
+  }
+
   def <== (src: Bits) = lessEqEq(src);;
   def <== (src: Bool) = lessEqEq(src);
   def <== (src: Fix)  = lessEqEq(src);
