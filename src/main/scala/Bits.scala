@@ -2,9 +2,17 @@ package Chisel {
 
 import IOdir._;
 import Node._;
+import Bits._;
 import ChiselError._
 
 object Bits {
+  def conv(x: Bits): Bool = {
+    if(x.getWidth > 1)
+      ChiselErrors += IllegalState("multi bit signal " + x + " converted to Bool",1);
+    if(x.getWidth == -1)
+      ChiselErrors += IllegalState("unable to automatically convert " + x + " to Bool, convert manually instead",1);
+    x.toBool
+  }
 
   def apply(x: Int): Bits = Lit(x){Bits()};
   def apply(x: Int, width: Int): Bits = Lit(x, width){Bits()};
@@ -76,24 +84,6 @@ class Bits extends IO {
   def apply(bit: UFix): Bits = Extract(this, bit){Bits()};
   def apply(hi: UFix, lo: UFix): Bits = Extract(this, hi, lo, -1){Bits()};
   def apply(range: (Int, Int)): Bits = this(range._1, range._2);
-
-/*
-  override def + (b: Bits): UFix = BinaryNodeCell(this.toUFix,b.toUFix,"+"){UFix()}
-  override def - (b: Bits): UFix = BinaryNodeCell(this.toUFix,b.toUFix,"-"){UFix()}
-  override def * (b: Bits): UFix = BinaryNodeCell(this.toUFix,b.toUFix,"*"){UFix()}
-  override def > (b: Bits): UFix = BinaryNodeCell(this.toUFix,b.toUFix,">"){UFix()}
-  override def < (b: Bits): UFix = BinaryNodeCell(this.toUFix,b.toUFix,"<"){UFix()}
-  override def >= (b: Bits): UFix = BinaryNodeCell(this.toUFix,b.toUFix,">="){UFix()}
-  override def <= (b: Bits): UFix = BinaryNodeCell(this.toUFix,b.toUFix,"<="){UFix()}
-
-  override def + (b: UFix): UFix = BinaryNodeCell(this.toUFix,b,"+"){UFix()}
-  override def - (b: UFix): UFix = BinaryNodeCell(this.toUFix,b,"-"){UFix()}
-  override def * (b: UFix): UFix = BinaryNodeCell(this.toUFix,b,"*"){UFix()}
-  override def > (b: UFix): UFix = BinaryNodeCell(this.toUFix,b,">"){UFix()}
-  override def < (b: UFix): UFix = BinaryNodeCell(this.toUFix,b,"<"){UFix()}
-  override def >= (b: UFix): UFix = BinaryNodeCell(this.toUFix,b,">="){UFix()}
-  override def <= (b: UFix): UFix = BinaryNodeCell(this.toUFix,b,"<="){UFix()}
-  * */
   
   def unary_-(): Bits = UnaryNodeCell(this, "-"){Bits()};
   def unary_~(): Bits = UnaryNodeCell(this, "~"){Bits()};
@@ -107,6 +97,10 @@ class Bits extends IO {
   def |  (b: Bits): Bits = BinaryNodeCell(this, b, "|"){Bits()};
   def ^  (b: Bits): Bits = BinaryNodeCell(this, b, "^"){Bits()};
   def ## (b: Bits): Bits = BinaryNodeCell(this, b, "##"){Bits()};
+
+  def && (b: Bool): Bool = conv(this) && b;
+  def || (b: Bool): Bool = conv(this) || b;
+  
 }
 
 }

@@ -16,17 +16,15 @@ object Node {
   // var cond = new Stack[Node];
 
   //implicits
-  implicit def convBitsToUFix(x: Bits): UFix = x.toUFix;
-/*
   implicit def convBitsToBool(x: Bits): Bool = {
-    val res = x.toBool;
-    if(x.getWidth > 1)
+      if(x.getWidth > 1)
       ChiselErrors += IllegalState("multi bit signal " + x + " converted to Bool",1);
     if(x.getWidth == -1)
       ChiselErrors += IllegalState("unable to automatically convert " + x + " to Bool, convert manually instead",1);
-    res
+    x.toBool
   }
-*/
+
+  implicit def convBitsToUFix(x: Bits): UFix = x.toUFix;
 
   var isHiC = false;
   var isCoercingArgs = true;

@@ -72,8 +72,8 @@ class Bool extends Bits {
   def ^  (b: Bool): Bool = BinaryBoolCell(this, b, "^");
   def ===(b: Bool): Bool = BinaryBoolCell(this, b, "===");
   def != (b: Bool): Bool = BinaryBoolCell(this, b, "!=");
-  def && (b: Bool): Bool = if (b.isTrue) this else BinaryBoolCell(this, b, "&&");
-  def || (b: Bool): Bool = BinaryBoolCell(this, b, "||");
+  override def && (b: Bool): Bool = if (b.isTrue) this else BinaryBoolCell(this, b, "&&");
+  override def || (b: Bool): Bool = BinaryBoolCell(this, b, "||");
   def &  (b: Bool): Bool = BinaryBoolCell(this, b, "&");
   def |  (b: Bool): Bool = BinaryBoolCell(this, b, "|");
 
