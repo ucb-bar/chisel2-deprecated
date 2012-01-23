@@ -611,6 +611,40 @@ abstract class Component {
 			       if (node.isReg || node.isRegOut || node.isClkInput) containsReg = true;
 			      nameSpace += name;
 			    }
+	  case buf: ArrayBuffer[Node] => {
+	    var i = 0;
+	    if(buf(0).isInstanceOf[Node]){
+	      for(elm <- buf){
+		if ((elm.isCellIO || (elm.name == "" && !elm.named) || elm.name == null)) 
+		  elm.name_it(name + "_" + i, true);
+		if (elm.isReg || elm.isRegOut || elm.isClkInput) 
+		  containsReg = true;
+		nameSpace += name + "_" + i;
+		i += 1;
+	      }
+	    }
+	  }
+	  case bufbuf: ArrayBuffer[ArrayBuffer[ _ ]] => {
+	    var i = 0;
+	    println(name);
+	    for(buf <- bufbuf){
+	      var j = 0;
+	      for(elm <- buf){
+		elm match {
+		  case node: Node => {
+		    if ((node.isCellIO || (node.name == "" && !node.named) || node.name == null)) 
+		      node.name_it(name + "_" + i + "_" + j, true);
+		    if (node.isReg || node.isRegOut || node.isClkInput) 
+		      containsReg = true;
+		    nameSpace += name + "_" + i + "_" + j;
+		    j += 1;
+		  }
+		  case any =>
+		}
+	      }
+	      i += 1;
+	    }
+	  }
 	  case cell: Cell => { cell.name = name;
 			       cell.named = true;
 			      if(cell.isReg) containsReg = true;

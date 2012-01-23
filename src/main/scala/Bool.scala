@@ -32,11 +32,29 @@ class Bool extends Bits {
       comp assign src.toNode;
   }
 
+  override def := (src: Bits) = {
+    val res = src.toBool;
+    if(src.getWidth > 1)
+      ChiselErrors += IllegalState("multi bit signal " + src + " converted to Bool",1);
+    if(src.getWidth == -1)
+      ChiselErrors += IllegalState("unable to automatically convert " + src + " to Bool, convert manually instead",1);
+    this := res;
+  }
+
   override def <==(src: Bool) = {
     if(comp != null)
       comp procAssign src.toNode;
     else
       this.asInstanceOf[Wire] procAssign src.toNode;
+  }
+
+  override def <== (src: Bits) = {
+    val res = src.toBool;
+    if(src.getWidth > 1)
+      ChiselErrors += IllegalState("multi bit signal " + src + " converted to Bool",1);
+    if(src.getWidth == -1)
+      ChiselErrors += IllegalState("unable to automatically convert " + src + " to Bool, convert manually instead",1);
+    this <== res;
   }
 
   def generateError = {

@@ -29,7 +29,14 @@ object Reg {
     regCell.io.q
   }
 
-  def apply[T <: Data](data: T): T = Reg[T](data, -1, null.asInstanceOf[T]){data.clone}
+  def apply[T <: Data](data: T): T = {
+    if(data.inputs.length == 0){
+      ChiselErrors += IllegalState("incorrect wire syntax", 3);
+      Reg[T](){data.clone};
+    }
+    else
+      Reg[T](data, -1, null.asInstanceOf[T]){data.clone}
+  }
 
   def apply[T <: Data](data: T, resetVal: T): T = Reg[T](data, -1, resetVal){data.clone}
 

@@ -8,6 +8,7 @@ import Component._;
 import Literal._;
 import Node._;
 import IOdir._;
+import ChiselError._;
   
 object Enum {
   def apply(l: List[Symbol]) = (l zip (Range(0, l.length, 1).map(x => UFix(x, sizeof(l.length-1))))).toMap;
@@ -163,8 +164,11 @@ trait proc extends Node {
   var updates = new Stack[(Bool, Node)];
   def genMuxes(default: Node) = {
     if (updates.length == 0) {
-      if (inputs.length == 0 || inputs(0) == null)
-        println("NO UPDATES SPECIFIED"); // error();
+      if (inputs.length == 0 || inputs(0) == null){
+        //println("NO UPDATES SPECIFIED ON" + this); // error();
+
+	ChiselErrors += IllegalState("NO UPDATES ON ", this); 
+      }
     } else {
       val (lastCond, lastValue) = updates.pop();
       if (default == null && !lastCond.isTrue) {

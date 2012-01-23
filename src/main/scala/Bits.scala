@@ -76,6 +76,24 @@ class Bits extends IO {
   def apply(bit: UFix): Bits = Extract(this, bit){Bits()};
   def apply(hi: UFix, lo: UFix): Bits = Extract(this, hi, lo, -1){Bits()};
   def apply(range: (Int, Int)): Bits = this(range._1, range._2);
+
+/*
+  override def + (b: Bits): UFix = BinaryNodeCell(this.toUFix,b.toUFix,"+"){UFix()}
+  override def - (b: Bits): UFix = BinaryNodeCell(this.toUFix,b.toUFix,"-"){UFix()}
+  override def * (b: Bits): UFix = BinaryNodeCell(this.toUFix,b.toUFix,"*"){UFix()}
+  override def > (b: Bits): UFix = BinaryNodeCell(this.toUFix,b.toUFix,">"){UFix()}
+  override def < (b: Bits): UFix = BinaryNodeCell(this.toUFix,b.toUFix,"<"){UFix()}
+  override def >= (b: Bits): UFix = BinaryNodeCell(this.toUFix,b.toUFix,">="){UFix()}
+  override def <= (b: Bits): UFix = BinaryNodeCell(this.toUFix,b.toUFix,"<="){UFix()}
+
+  override def + (b: UFix): UFix = BinaryNodeCell(this.toUFix,b,"+"){UFix()}
+  override def - (b: UFix): UFix = BinaryNodeCell(this.toUFix,b,"-"){UFix()}
+  override def * (b: UFix): UFix = BinaryNodeCell(this.toUFix,b,"*"){UFix()}
+  override def > (b: UFix): UFix = BinaryNodeCell(this.toUFix,b,">"){UFix()}
+  override def < (b: UFix): UFix = BinaryNodeCell(this.toUFix,b,"<"){UFix()}
+  override def >= (b: UFix): UFix = BinaryNodeCell(this.toUFix,b,">="){UFix()}
+  override def <= (b: UFix): UFix = BinaryNodeCell(this.toUFix,b,"<="){UFix()}
+  * */
   
   def unary_-(): Bits = UnaryNodeCell(this, "-"){Bits()};
   def unary_~(): Bits = UnaryNodeCell(this, "~"){Bits()};

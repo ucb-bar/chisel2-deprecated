@@ -8,8 +8,9 @@ object ChiselError {
 
 class ChiselError(val err: String, val m: String, val st: Array[StackTraceElement]) {
   var index: Int = 0;
+  var node: Node = null;
   def printError = {
-    println("  " + err + ": " + m);  
+    println("  " + err + ": " + m + (if(node != null) node.name + node.width else ""));  
     if(index != 0)
       for(i <- 0 until 10)
 	println("     " + (if(index != 0) st(i).toString else ""));
@@ -35,6 +36,12 @@ object IllegalState {
   def apply(m: String, index: Int): ChiselError = {
     val res = new ChiselError("Illegal State", m, Thread.currentThread.getStackTrace);
     res.index = index;
+    res
+  }
+  def apply(m: String, node: Node): ChiselError = {
+    val res = new ChiselError("Illegal State", m, Thread.currentThread.getStackTrace);
+    res.index = 0;
+    res.node = node;
     res
   }
   def apply(m: String, st: Array[StackTraceElement]) = {

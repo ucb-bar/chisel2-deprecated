@@ -75,6 +75,16 @@ class UFix extends Num {
   def &  (b: UFix): UFix = BinaryNodeCell(this, b, "&"){UFix()};
   def |  (b: UFix): UFix = BinaryNodeCell(this, b, "|"){UFix()};
 
+/*
+  override def + (b: Bits) : UFix = BinaryNodeCell(this,b.toUFix,"+"){UFix()}
+  override def - (b: Bits): UFix = BinaryNodeCell(this,b.toUFix,"-"){UFix()}
+  override def * (b: Bits): UFix = BinaryNodeCell(this,b.toUFix,"*"){UFix()}
+  override def > (b: Bits): UFix = BinaryNodeCell(this,b.toUFix,">"){UFix()}
+  override def < (b: Bits): UFix = BinaryNodeCell(this,b.toUFix,"<"){UFix()}
+  override def >= (b: Bits): UFix = BinaryNodeCell(this,b.toUFix,">="){UFix()}
+  override def <= (b: Bits): UFix = BinaryNodeCell(this,b.toUFix,"<="){UFix()}
+*/
+
   //UFix op Fix arithmetic
   def *   (b: Fix): Fix = BinaryNodeCell(this, b, "u*s"){Fix()}.toFix;
 }

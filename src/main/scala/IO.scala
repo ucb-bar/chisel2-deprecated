@@ -124,7 +124,7 @@ class IO extends Wire with Cloneable{
       case other: IO => 
 	if (other.dir == OUTPUT && this.staticComp == other.staticComp && !isCellIO) {
 	  other assign this;
-        } else if ((other.dir == OUTPUT && this.staticComp.staticParent == other.staticComp.staticParent) || isCellIO) {
+        } else if (isCellIO || (other.dir == OUTPUT && this.staticComp.staticParent == other.staticComp.staticParent)) {
           this assign other;
         } else if (other.dir == INPUT) {
 	  if(this.staticComp == other.staticComp.staticParent)
@@ -144,7 +144,7 @@ class IO extends Wire with Cloneable{
         case other: IO  => 
 	  if (other.dir == INPUT && this.staticComp == other.staticComp && !isCellIO){
 	    this assign other;
-	  } else if ((other.dir == INPUT && this.staticComp.staticParent == other.staticComp.staticParent) || isCellIO) {
+	  } else if (isCellIO || (other.dir == INPUT && this.staticComp.staticParent == other.staticComp.staticParent)) {
             other assign this;
           } else if (other.dir == OUTPUT) {
 	    if(this.staticComp == other.staticComp.staticParent)
