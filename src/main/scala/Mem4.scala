@@ -128,7 +128,7 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
                           oe:         Bool = null
                         ) {
   val mem = cell.primitiveNode;
-  val memRef = Mem4Ref(this);
+  val memRef = Mem4Ref(this, addr);
   var port_type = prt_type;
   def next_input_index = mem.inputs.length;
   var port_index = cell.port_count;
@@ -726,7 +726,7 @@ object Mem4Ref {
   def apply[T <: Data](mem_port:  Mem4Port[T],
                        addr: Node,
                        oe:   Bool = null.asInstanceOf[Bool],
-                       cs:   Bool = null.asInstanceOf[Bool]): Node = {
+                       cs:   Bool = null.asInstanceOf[Bool]) = {
     val memRef = new Mem4Ref(mem_port);
     val mem = mem_port.mem;
     memRef.port_index = mem.cell.port_count;
