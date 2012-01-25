@@ -4,6 +4,7 @@ import IOdir._;
 import Node._;
 import Bits._;
 import ChiselError._
+import Component._
 
 object Bits {
   def conv(x: Bits): Bool = {
@@ -36,6 +37,8 @@ object Bits {
 
 class Bits extends IO {
   override def toNode = this;
+  ioMap += ((this, ioCount));
+  ioCount += 1;
   override def fromNode(n: Node) = {
     val res = Bits(OUTPUT).asInstanceOf[this.type];
     res assign n;
