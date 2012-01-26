@@ -66,6 +66,11 @@ class ListLookup(mapping: Array[(Node, List[Node])], defaultVal: List[Node]) ext
           res = res + "    " + w.emitRef + " = " + e.emitRef + ";\n";
       res = res + "  }\n";
     }
+    res = res + "  else {\n";
+    for ((w, e) <- wires zip default)
+      if(w.component != null)
+        res = res + "    " + w.emitRef + " = " + e.emitRef + ";\n";
+    res = res + "  }\n";
     res
   }
 }
