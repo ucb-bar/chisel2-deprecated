@@ -182,7 +182,8 @@ class Assign[T <: Data](cell: AssignCell[T]) extends Data with proc {
     //res assign src;
     this;
   }
-  override def toString: String = name
+  override def isInObject = true;
+  override def toString: String = name;
   override def emitDec: String = "  reg" + (if (isSigned) " signed " else "") + emitWidth + " " + emitRef + ";\n";
   override def emitDef: String = {
     var res = "  always@(*) begin\n";
