@@ -196,7 +196,7 @@ class Assign[T <: Data](cell: AssignCell[T]) extends Data with proc {
     for (ap <- cell.assign_ports) {
       if (ap.getCondition == active_condition) {
         // Add an assignment to the current body:
-      } else if (ap == null) {
+      } else if (ap.getCondition == null) {
         // Set the default value, outside of IF:
         active_condition = null;
         if (inside_if_body == true) {
@@ -208,13 +208,10 @@ class Assign[T <: Data](cell: AssignCell[T]) extends Data with proc {
       } else {
         // This is a new IF condition:
         active_condition = ap.getCondition;
-        if (!inside_if_body) {
-          res += "    "+ap.emitDefIf+" begin\n";
-          indent = "      ";
-          inside_if_body = true;
-        } else {
-          res += "    end else "+ap.emitDefIf+" begin\n";
-        }
+        if (inside_if_body) res += "    end\n";
+        res += "    "+ap.emitDefIf+" begin\n";
+        indent = "      ";
+        inside_if_body = true;
       }
       res += indent+ap.emitDefAssign+";\n";
     }
@@ -234,7 +231,7 @@ class Assign[T <: Data](cell: AssignCell[T]) extends Data with proc {
     for (ap <- cell.assign_ports) {
       if (ap.getCondition == active_condition) {
         // Add an assignment to the current body:
-      } else if (ap == null) {
+      } else if (ap.getCondition == null) {
         // Set the default value, outside of IF:
         active_condition = null;
         if (inside_if_body == true) {
@@ -245,13 +242,10 @@ class Assign[T <: Data](cell: AssignCell[T]) extends Data with proc {
       } else {
         // This is a new IF condition:
         active_condition = ap.getCondition;
-        if (!inside_if_body) {
-          res += "  "+ap.emitDefIfLoC+" {\n";
-          indent = "      ";
-          inside_if_body = true;
-        } else {
-          res += "  } else "+ap.emitDefIfLoC+" {\n";
-        }
+        if (inside_if_body) res += "  }\n";
+        res += "  "+ap.emitDefIfLoC+"  {\n";
+        indent = "      ";
+        inside_if_body = true;
       }
       res += indent+ap.emitDefAssignLoC;
     }
