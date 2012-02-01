@@ -699,7 +699,6 @@ class Mem4[T <: Data](depth: Int, val cell: Mem4Cell[T]) extends Delay with proc
         res += "  dat_t<" + width + "> " + emitRef + "__next"+p.port_index+";\n";
       }
       if (p.isReadable) {
-        res += "  " + p.memRef.emitTmp + ";\n";
         for (lat <- 0 until readLatency) {
           res += "  dat_t<" + width + "> " + emitRef + "__read"+p.port_index+"_"+lat+";\n";
           res += "  dat_t<" + width + "> " + emitRef + "__read"+p.port_index+"_"+lat+"_shadow;\n";
@@ -743,6 +742,8 @@ object Mem4Ref {
 }
 class Mem4Ref[T <: Data](mem_port: Mem4Port[T]) extends Node with proc {
   var port_index: Int = 0;
+
+  override def isInObject = true; 
 
   // proc trait methods. Note that the proc trait is expected so that
   // this node can be assigned to Node.comp to support assignment.
