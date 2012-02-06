@@ -26,7 +26,7 @@ object INPUT extends IODirection {
 object OUTPUT extends IODirection {
 
 }
-
+/*
 object Input {
   def apply(): IO = apply("", widthOf(0))
   def apply(width: Int): Fix = Fix(width, INPUT);
@@ -46,6 +46,7 @@ object Output {
   def apply(name: String, x: Node): IO = apply(name, maxWidth _, x); 
   def apply(x: Node): IO = apply("", x);
 }
+* */
 class IO extends Wire with Cloneable{ 
   var dir: IODirection = null;
   var unnamed = false;
