@@ -48,6 +48,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
   def calcElements(view: Seq[String]): ArrayBuffer[(String, Data)] = {
     val c      = getClass();
     var elts   = ArrayBuffer[(String, Data)]();
+    val seen   = ArrayBuffer[Object]();
     var isCollecting = true;
     // println("COLLECTING " + c + " IN VIEW " + view);
     for (m <- c.getMethods) {
@@ -71,7 +72,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
         } while (!isFound);
         if (types.length == 0 && !isStatic(modifiers) && isInterface &&
             name != "elements" && name != "flip" && name != "toString" && name != "flatten" && name != "binding" && name != "asInput" && name != "asOutput" && name != "unary_$tilde" && name != "unary_$bang" && name != "unary_$minus" && name != "clone" && name != "toUFix" && name != "toBits" && name != "toBool" && name != "toFix" &&
-            (view == null || view.contains(name))) {
+            (view == null || view.contains(name)) && !seen.contains(m.invoke(this))) {
           val o = m.invoke(this);
           o match { 
 	    case bv: Vec[Data] => elts += ((name + bv.name, bv));
@@ -80,6 +81,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
             case any =>
               // println("    FOUND " + o);
           }
+          seen += o;
         }
       } else if (name == "elementsCache") 
         // println("IS-COLLECTING");
