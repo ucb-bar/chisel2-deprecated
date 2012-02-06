@@ -42,6 +42,10 @@ class Bits extends IO {
     res
   }
 
+  override def toString: String = {
+    "BITS(" + name + ", " + super.toString + ")"
+  }
+
   def generateError(src: Bits) = {
     val myClass = this.getClass;
     val srcClass = src.getClass;

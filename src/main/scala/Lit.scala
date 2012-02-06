@@ -51,19 +51,19 @@ class BoolLit(x: Literal) extends Cell {
 
 object Literal {
   implicit def intToLit (x: Int) = Literal(x);
-  def sizeof(x: Int): Int = { 
+  def sizeof(x: Long): Int = { 
     val y = max(1, abs(x)).toDouble;
     val res = max(1, (ceil(log(y+1)/log(2.0))).toInt);
     // println("SIZEOF " + y + " LOG2 " + (log(y)/log(2.0)) + " IS " + res);
      res
    }
 
-  def signedsizeof(x: Int, width: Int = -1, signed: Boolean = false): (Int, String) = {
+  def signedsizeof(x: Long, width: Int = -1, signed: Boolean = false): (Int, String) = {
     var count = 0;
     var n = x;
-    var resNum = 0;
+    var resNum = 0L;
     while((x > 0 && n != 0) || (x < 0 && n != -1)){
-      resNum += (n & 1) << count;
+      resNum += (n & 1L) << count;
       count += 1;
       n >>= 1;
     }
@@ -127,15 +127,15 @@ object Literal {
     }
     res
   }
-  def toLitVal(x: String): Int = {
-    var res = 0;
+  def toLitVal(x: String): Long = {
+    var res = 0.toLong;
     for (c <- x.substring(2, x.length)) 
       res = res * 16 + c.asDigit;
     res
   }
 
-  def toLitVal(x: String, shamt: Int): Int = {
-    var res = 0;
+  def toLitVal(x: String, shamt: Int): Long = {
+    var res = 0.toLong;
     for(c <- x)
       if(c != '_'){
 	if(!(hexNibbles + "?").contains(c)) ChiselErrors += IllegalState("Literal: " + x + " contains illegal character: " + c, 4);
@@ -158,7 +158,7 @@ object Literal {
     }
     (bits, mask, width)
   }
-  def stringToVal(base: Char, x: String): Int = {
+  def stringToVal(base: Char, x: String): Long = {
     if(base == 'x')
       toLitVal(x);
     else if(base == 'd')
@@ -170,10 +170,12 @@ object Literal {
     else if(base == 'o')
       toLitVal(x, 8)
     else
-      -1
+      -1L
   }
 
-  def apply(x: Int, width: Int = -1, signed: Boolean = false): Literal = { 
+  // def apply(x: Int, width: Int = -1, signed: Boolean = false): Literal = 
+  //   apply(x.toLong, width, signed)
+  def apply(x: Long, width: Int = -1, signed: Boolean = false): Literal = { 
     val res = new Literal(); 
     val (w, numString) = signedsizeof(x, width, signed);
     //val n = "0x" + numString;
@@ -213,10 +215,10 @@ class Literal extends Node {
   var isZ = false;
   var isBinary = false;
   var base = 'x';
-  var inputVal = 0;
+  var inputVal = 0L;
   // override def toString: String = "LIT(" + name + ")"
   override def findNodes(depth: Int, c: Component): Unit = { }
-  override def value: Int = stringToVal(base, name);
+  override def value: Long = stringToVal(base, name);
   override def maxNum = value;
   override def minNum = value;
   override def isLit = true;
@@ -258,7 +260,7 @@ class Literal extends Node {
     else if(base == 'd') ("" + width + "'d" + name)
     else if(base == 'h') ("" + width + "'h" + name)
     else "") + "/* " + inputVal + "*/";
-  def d (x: Int): Literal = Literal(x, value)
+  def d (x: Long): Literal = Literal(x, value.toInt)
   //def ~(x: String): Lit = Lit(value, x(0), x.substring(1, x.length));
 }
 

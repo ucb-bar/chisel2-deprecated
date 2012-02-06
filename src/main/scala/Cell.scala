@@ -53,19 +53,19 @@ class UnaryNodeCell[T <: Data](op: String)(gen: => T) extends Cell {
 
 object BinaryNodeCell {
   def apply[T <: Data](x: T, y: T, op: String)(gen: => T): T = {
-    val res = new BinaryNodeCell(op)(gen);
-    res.io.X assign x;
-    res.io.Y assign y;
+    val res = new BinaryNodeCell(op, x, y)(gen);
     res.io.Z
   }
 }
 
-class BinaryNodeCell[T <: Data](op: String)(gen: => T) extends Cell {
+class BinaryNodeCell[T <: Data](op: String, x: T, y: T)(gen: => T) extends Cell {
   val io = new Bundle(){
     val X = gen.asInput;
     val Y = gen.asInput;
     val Z = gen.asOutput;
   }
+  io.X assign x;
+  io.Y assign y;
   io.setIsCellIO;
   val primitiveNode = op match {
     case "<<"  => Op("<<", 0, lshWidthOf(0, io.Y),  io.X, io.Y );
@@ -73,9 +73,9 @@ class BinaryNodeCell[T <: Data](op: String)(gen: => T) extends Cell {
     case ">>>" => Op(">>>", 0, rshWidthOf(0, io.Y),  io.X, io.Y );
     case "+"   => Op("+",  2, maxWidth _,  io.X, io.Y );
     case "*"   => Op("*",  0, sumWidth _,  io.X, io.Y );
-    case "s*s"   => Op("s*s",  0, sumWidth _,  io.X, io.Y );
-    case "s*u"   => Op("s*u",  0, sumWidth _,  io.X, io.Y );
-    case "u*s"   => Op("u*s",  0, sumWidth _,  io.X, io.Y );
+    case "s*s" => Op("s*s",  0, sumWidth _,  io.X, io.Y );
+    case "s*u" => Op("s*u",  0, sumWidth _,  io.X, io.Y );
+    case "u*s" => Op("u*s",  0, sumWidth _,  io.X, io.Y );
     case "^"   => Op("^",  2, maxWidth _,  io.X, io.Y );
     case "?"   => Multiplex(io.X, io.Y, null);
     case "-"   => Op("-",  2, maxWidth _,  io.X, io.Y );
@@ -84,8 +84,12 @@ class BinaryNodeCell[T <: Data](op: String)(gen: => T) extends Cell {
     case "|"   => Op("|",  2, maxWidth _, io.X, io.Y );
     case any   => null;
   }
-  primitiveNode.name = "primitiveNode";
-  primitiveNode.nameHolder = io.Z;
+  primitiveNode match {
+    case l: Literal => 
+    case _          => 
+      primitiveNode.name = "primitiveNode";
+      primitiveNode.nameHolder = io.Z;
+  }
   io.Z assign primitiveNode;
 }
 

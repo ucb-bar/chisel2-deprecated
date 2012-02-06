@@ -29,8 +29,9 @@ class CatCell[T <: Data](mod: T, mods: List[T]){
       val res = new Cat();
       res.initOf("primitiveNode", sumWidth _, mod.toNode :: mods.map(x => x.toNode));
       res
-    } else
+    } else {
       mods.foldLeft(mod.toNode){(a, b) => a ## b.toNode}
+    }
   io.out assign primitiveNode;
   primitiveNode.nameHolder = io.out
 }

@@ -6,12 +6,27 @@ import Node._;
 
 object Op {
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
+    val a_lit = a.litOf;
+    val b_lit = b.litOf;
+    val isFoldable = a_lit != null && b_lit != null;
+    // println("OP " + name + " " + a_lit + " " + b_lit);
+    if (name == "##" && isFoldable) {
+      // println("AVAL = " + a_lit.value + " BVAL = " + b_lit.value);
+      val new_width = a_lit.width + b_lit.width;
+      if (new_width < 64) {
+        val new_value = a_lit.value << b_lit.width | b_lit.value;
+        // println("REALLY FOLDING " + new_value + " WIDTH " + new_width);
+        val res = Literal(new_value, new_width);
+        return res
+      }
+    } 
     val res = new Op();
     res.init("", widthInfer, a, b);
     res.op = name;
     res.nGrow = nGrow;
     res.isSigned = a.isInstanceOf[Fix] && b.isInstanceOf[Fix]
-    if(res.isSigned) println("SIGNED OPERATION DETECTED " + name);
+    // println(a + " " + a.litOf + " " + name + " " + b + " " + b.litOf);
+    // if(res.isSigned) println("SIGNED OPERATION DETECTED " + name);
     res
   }
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node): Node = {

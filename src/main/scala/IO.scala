@@ -78,9 +78,9 @@ class IO extends Wire with Cloneable{
   }
   override def toString: String = {
     if (dir == INPUT)
-      "INPUT(" + name + "." + component + ")";
+      "INPUT(" + name + (if (component == null) "" else ("." + component)) + ")";
     else 
-      "OUTPUT(" + name + "." + component + ")";
+      "OUTPUT(" + name + (if (component == null) "" else ("." + component)) + ")";
   }
   override def flip(): this.type = {
     if (dir == INPUT) {
