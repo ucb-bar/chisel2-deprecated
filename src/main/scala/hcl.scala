@@ -3,6 +3,7 @@ package Chisel {
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
+import scala.collection.mutable.Queue
 
 import Component._;
 import Literal._;
@@ -23,10 +24,18 @@ object fromNode {
   }
 }
 
+
 object when {
   def apply(c: Bool)(block: => Unit) = {
-    conds.push(c && conds.top);
+    if(rules.isInRules){
+      conds.push(c && conds.top && rules.top);
+      rules.push(!c);
+    } else {
+      conds.push(c && conds.top);
+    }
+    rules.clearFlag(); //when clears the flag during execution of body
     block; 
+    rules.setFlag(); //when reasserts after completion of execution
     conds.pop();
   }
 }
@@ -53,6 +62,29 @@ object unless {
 //   def apply(x: Fix, default: () => Any, cases: Seq[(Fix, () => Any)]) = {
 //     val elts = cases.map(tb => (tb._1 === x, tb._2)).toList;
 //     pcond(elts ::: List((Fix(1), default)))
+
+object rules {
+  def beginRules() = {
+    rulesConds.push(Bool(true));
+    rulesFlags.push(true);
+  }
+  def endRules() = {
+    rulesConds.pop;
+    rulesFlags.pop();
+  }
+  def isInRules = rulesFlags.top;
+  def setFlag() = rulesFlags.pop;
+  def clearFlag() = rulesFlags.push(false);
+
+  def top = rulesConds.top;
+  def push(c: Bool) = rulesConds.push(c && rulesConds.pop);
+
+  def apply(cases: => Unit) = {
+    beginRules();
+    cases;
+    endRules();
+  }
+}
 
 object otherwise {
   def apply(block: => Unit) = 
@@ -164,7 +196,7 @@ abstract class Data extends Node with Cloneable{
 }
 
 trait proc extends Node {
-  var updates = new Stack[(Bool, Node)];
+  var updates = new Queue[(Bool, Node)];
   def genMuxes(default: Node) = {
     if (updates.length == 0) {
       if (inputs.length == 0 || inputs(0) == null){
@@ -173,11 +205,11 @@ trait proc extends Node {
 	ChiselErrors += IllegalState("NO UPDATES ON ", this); 
       }
     } else {
-      val (lastCond, lastValue) = updates.pop();
+      val (lastCond, lastValue) = updates.front;//updates.pop();
       if (default == null && !lastCond.isTrue) {
         println("NO DEFAULT SPECIFIED FOR WIRE: " + this); // error()
       }
-      updates.push((lastCond, lastValue));
+      //updates.push((lastCond, lastValue));
       if(inputs.length > 0)
 	inputs(0) = if (default != null) default else lastValue;
       else
