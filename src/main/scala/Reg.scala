@@ -76,11 +76,11 @@ class Reg extends Delay with proc{
   def procAssign(src: Node) = {
     if (assigned)
       ChiselErrors += IllegalState("reassignment to Reg", 3);
-    if (conds.length > 1) {
+    if (conds.length >= 1) {
       isEnable = true;
       enable = enable || conds.top;
     }
-    updates.push((conds.top, src));
+    updates.enqueue((conds.top, src));
   }
   override def genMuxes(default: Node) = {
     if(isEnable){

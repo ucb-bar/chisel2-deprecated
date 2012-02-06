@@ -30,6 +30,10 @@ object Node {
   var isCoercingArgs = true;
   var conds = new Stack[Bool]();
   conds.push(Bool(true));
+  var rulesFlags = new Stack[Boolean]();
+  rulesFlags.push(false);
+  var rulesConds = new Stack[Bool]();
+  //var whens = new Stack[when]();
   var keys  = new Stack[Bits]();
   def fixWidth(w: Int) = { (m: Node) => w };
   def widthOf(i: Int) = { (m: Node) => { 
@@ -70,7 +74,7 @@ object Node {
   var reset: Fix = Fix(1, INPUT);
   reset.name_it("reset")
   var resets = Queue[Fix]();
-  var clk: Node = Bits(1, INPUT);
+  var clk: Node = Bits(1, INPUT);//Input("clk", 1);
   clk.name_it("clk");
   def pushReset(r: Fix) { resets.enqueue(reset); reset = r }
   def popReset() { reset = resets.dequeue() }

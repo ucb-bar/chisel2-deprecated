@@ -33,7 +33,7 @@ object Lookup {
 class LookupCell[T <: Data](data: T, mapping: Seq[(Bits, T)]){
   val io = new Bundle(){
     val default = data.clone.asInput;
-    val addr = UFix(INPUT);
+    val addr = Bits(dir=INPUT);//Input();
     val out = data.clone.asOutput;
   }
   io.setIsCellIO;

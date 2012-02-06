@@ -9,8 +9,8 @@ import Component._;
 import IOdir._;
 
 object Bundle {
-  def nullbundle_t = Bundle(Map[String, Data]());
-  def apply (elts: Map[String, Data]): Bundle = {
+  def nullbundle_t = Bundle(ArrayBuffer[(String, Data)]());
+  def apply (elts: ArrayBuffer[(String, Data)]): Bundle = {
     val res = new Bundle();
     // println("NEW BUNDLE");
     res.elementsCache = elts; // TODO: REMOVE REDUNDANT CREATION
@@ -22,14 +22,33 @@ object Bundle {
   }
 }
 
+object sort {
+  def apply(a: Array[(String, IO)]): Array[(String, IO)] = {
+    var i = 0
+    for (j <- 1 until a.length) {
+      val keyElm = a(j);
+      val key = ioMap(keyElm._2)
+      i = j - 1
+
+      while (i >= 0 && ioMap(a(i)._2) > key) {
+        a(i + 1) = a(i)
+        i = i - 1
+      }
+      a(i + 1) = keyElm
+    }
+    a
+  }
+}
+
 class Bundle(view_arg: Seq[String] = null) extends Data{
   var dir = "";
   var view = view_arg;
-  var elementsCache: Map[String, Data] = null;
+  var elementsCache: ArrayBuffer[(String, Data)] = null;
   var bundledElm: Node = null;
-  def calcElements(view: Seq[String]): Map[String, Data] = {
+  def calcElements(view: Seq[String]): ArrayBuffer[(String, Data)] = {
     val c      = getClass();
-    var elts   = Map[String, Data]();
+    var elts   = ArrayBuffer[(String, Data)]();
+    val seen   = ArrayBuffer[Object]();
     var isCollecting = true;
     // println("COLLECTING " + c + " IN VIEW " + view);
     for (m <- c.getMethods) {
@@ -53,7 +72,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
         } while (!isFound);
         if (types.length == 0 && !isStatic(modifiers) && isInterface &&
             name != "elements" && name != "flip" && name != "toString" && name != "flatten" && name != "binding" && name != "asInput" && name != "asOutput" && name != "unary_$tilde" && name != "unary_$bang" && name != "unary_$minus" && name != "clone" && name != "toUFix" && name != "toBits" && name != "toBool" && name != "toFix" &&
-            (view == null || view.contains(name))) {
+            (view == null || view.contains(name)) && !seen.contains(m.invoke(this))) {
           val o = m.invoke(this);
           o match { 
 	    case bv: Vec[Data] => elts += ((name + bv.name, bv));
@@ -62,6 +81,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
             case any =>
               // println("    FOUND " + o);
           }
+          seen += o;
         }
       } else if (name == "elementsCache") 
         // println("IS-COLLECTING");
@@ -70,7 +90,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     // println("END ->>>>");
     elts
   }
-  def elements: Map[String, Data] = {
+  def elements: ArrayBuffer[(String, Data)] = {
     if (elementsCache == null) {
       elementsCache = calcElements(view);
     }
@@ -86,7 +106,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     res += ")";
     res
   }
-  def view (elts: Map[String, Data]): Bundle = { 
+  def view (elts: ArrayBuffer[(String, Data)]): Bundle = { 
     elementsCache = elts; this 
   }
   override def name_it (path: String, named: Boolean = true) = {
@@ -99,7 +119,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
   }
 
   def +(other: Bundle): Bundle = {
-    var elts = Map[String, Data]();
+    var elts = ArrayBuffer[(String, Data)]();
     for ((n, i) <- elements) 
       elts += ((n, i));
     for ((n, i) <- other.elements) 
@@ -139,7 +159,12 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     }
     */
   }
-  override def apply(name: String): Data = elements(name)
+  override def apply(name: String): Data = {
+    for((n,i) <- elements)
+      if(name == n) return i;
+    throw new NoSuchElementException();
+    return null;
+  }
   override def <>(src: Node) = { 
     // println("B <>'ing " + this + " & " + src);
     if(comp == null || (dir == "output" && 
@@ -148,7 +173,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
       src match {
 	case other: Bundle => {
           for ((n, i) <- elements) {
-            if (other.elements.contains(n)){
+            if (other.contains(n)){
               i <> other(n);
 	    }
             else{
@@ -174,13 +199,20 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     src match {
       case other: Bundle =>
         for ((n, i) <- elements) {
-          if(other.elements.contains(n)) {
+          if(other.contains(n)) {
             // println(" := ELT " + i + " & " + other(n));
             i ^^ other(n);
           }
         }
     }
   }
+
+  def contains(name: String): Boolean = {
+    for((n,i) <- elements)
+      if(n == name) return true;
+    return false;
+  }
+
   def <==(src: Bundle) = {
     src match {
       case other: Bundle => {
@@ -194,9 +226,10 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
   }
   override def flatten: Array[(String, IO)] = {
     var res = ArrayBuffer[(String, IO)]();
-    for ((n, i) <- elements)
+    for ((n, i) <- elements){
       res = res ++ i.flatten
-    res.toArray
+    }
+    sort(res.toArray)
   }
 
   override def toNode: Node = {

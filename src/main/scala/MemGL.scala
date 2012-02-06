@@ -160,7 +160,7 @@ class MemGL[T <: Data](memGen: MemGen[T],
 
     // Connect Clock inputs on each port.
     val concatClock = Wire(){Bits(width=port_count)};
-    val fake_clk: Bits = Bits(1, INPUT);
+    val fake_clk: Bits = Bits(1, INPUT);//Input("clk", 1);
     fake_clk.name_it("clk");
     concatClock := Fill(port_count, fake_clk);
     concatClock ^^ ce_port;

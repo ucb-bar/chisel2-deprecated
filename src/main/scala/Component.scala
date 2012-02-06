@@ -40,6 +40,8 @@ object Component {
   val components = ArrayBuffer[Component]();
   val procs = ArrayBuffer[proc]();
   val muxes = ArrayBuffer[Node]();
+  var ioMap = Map[Node, Int]();
+  var ioCount = 0;
   val compStack = new Stack[Component]();
   var stackIndent = 0;
   var printStackStruct = ArrayBuffer[(Int, Component)]();
@@ -96,6 +98,8 @@ object Component {
     printStackStruct.clear();
     procs.clear();
     muxes.clear();
+    ioMap = Map[Node, Int]();
+    ioCount = 0;
     isEmittingComponents = false;
     isEmittingC = false;
     topComponent = null;
