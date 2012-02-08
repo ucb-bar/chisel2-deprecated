@@ -51,19 +51,20 @@ class BoolLit(x: Literal) extends Cell {
 
 object Literal {
   implicit def intToLit (x: Int) = Literal(x);
-  def sizeof(x: Long): Int = { 
-    val y = max(1, abs(x)).toDouble;
+  def bigMax(x: BigInt, y: BigInt) = if (x > y) x else y;
+  def sizeof(x: BigInt): Int = { 
+    val y = bigMax(BigInt(1), x.abs).toDouble;
     val res = max(1, (ceil(log(y+1)/log(2.0))).toInt);
     // println("SIZEOF " + y + " LOG2 " + (log(y)/log(2.0)) + " IS " + res);
      res
    }
 
-  def signedsizeof(x: Long, width: Int = -1, signed: Boolean = false): (Int, String) = {
+  def signedsizeof(x: BigInt, width: Int = -1, signed: Boolean = false): (Int, String) = {
     var count = 0;
     var n = x;
-    var resNum = 0L;
+    var resNum = BigInt(0);
     while((x > 0 && n != 0) || (x < 0 && n != -1)){
-      resNum += (n & 1L) << count;
+      resNum += (n & BigInt(1)) << count;
       count += 1;
       n >>= 1;
     }
@@ -82,7 +83,7 @@ object Literal {
 	  resNum   += 1 << (resWidth-1);
 	}
       } else {resWidth = width}
-    ((resWidth, resNum.toHexString))
+    ((resWidth, resNum.toString(16)))
   }
   
   def sizeof(base: Char, x: String): Int = {
@@ -127,15 +128,15 @@ object Literal {
     }
     res
   }
-  def toLitVal(x: String): Long = {
-    var res = 0.toLong;
+  def toLitVal(x: String): BigInt = {
+    var res = BigInt(0);
     for (c <- x.substring(2, x.length)) 
       res = res * 16 + c.asDigit;
     res
   }
 
-  def toLitVal(x: String, shamt: Int): Long = {
-    var res = 0.toLong;
+  def toLitVal(x: String, shamt: Int): BigInt = {
+    var res = BigInt(0);
     for(c <- x)
       if(c != '_'){
 	if(!(hexNibbles + "?").contains(c)) ChiselErrors += IllegalState("Literal: " + x + " contains illegal character: " + c, 4);
@@ -158,7 +159,7 @@ object Literal {
     }
     (bits, mask, width)
   }
-  def stringToVal(base: Char, x: String): Long = {
+  def stringToVal(base: Char, x: String): BigInt = {
     if(base == 'x')
       toLitVal(x);
     else if(base == 'd')
@@ -175,7 +176,7 @@ object Literal {
 
   // def apply(x: Int, width: Int = -1, signed: Boolean = false): Literal = 
   //   apply(x.toLong, width, signed)
-  def apply(x: Long, width: Int = -1, signed: Boolean = false): Literal = { 
+  def apply(x: BigInt, width: Int = -1, signed: Boolean = false): Literal = { 
     val res = new Literal(); 
     val (w, numString) = signedsizeof(x, width, signed);
     //val n = "0x" + numString;
@@ -215,10 +216,10 @@ class Literal extends Node {
   var isZ = false;
   var isBinary = false;
   var base = 'x';
-  var inputVal = 0L;
+  var inputVal = BigInt(0);
   // override def toString: String = "LIT(" + name + ")"
   override def findNodes(depth: Int, c: Component): Unit = { }
-  override def value: Long = stringToVal(base, name);
+  override def value: BigInt = stringToVal(base, name);
   override def maxNum = value;
   override def minNum = value;
   override def isLit = true;
@@ -260,7 +261,7 @@ class Literal extends Node {
     else if(base == 'd') ("" + width + "'d" + name)
     else if(base == 'h') ("" + width + "'h" + name)
     else "") + "/* " + inputVal + "*/";
-  def d (x: Long): Literal = Literal(x, value.toInt)
+  def d (x: BigInt): Literal = Literal(x, value.toInt)
   //def ~(x: String): Lit = Lit(value, x(0), x.substring(1, x.length));
 }
 

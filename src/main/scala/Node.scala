@@ -66,11 +66,11 @@ object Node {
     (m: Node) => {
       val mwidth = m.inputs(i).getWidth;
       val nMax = n.maxNum;
-      val res = m.inputs(i).getWidth + n.maxNum;
-      res.toInt
+      val res = m.inputs(i).getWidth + n.maxNum.toInt;
+      res
     } 
   }
-  def rshWidthOf(i: Int, n: Node) = { (m: Node) => (m.inputs(i).getWidth - n.minNum).toInt }
+  def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).getWidth - n.minNum.toInt }
   var reset: Fix = Fix(1, INPUT);
   reset.name_it("reset")
   var resets = Queue[Fix]();
@@ -162,9 +162,11 @@ abstract class Node extends nameable{
   */
   def ##(b: Node): Node  = Op("##", 2, sumWidth _,  this, b ); 
   // def ##(b: Node): Node  = BinaryNodeCell(this, b, "##"){Bits()};
-  def maxNum: Long = (1 << (if(width < 0) inferWidth(this) else width))-1;
-  def minNum: Long = 0;
+  def maxNum: BigInt = (1 << (if(width < 0) inferWidth(this) else width))-1;
+  def minNum: BigInt = BigInt(0);
+  // TODO: SHOULD BE GENERALIZED TO DIG FOR LIT AS litOf DOES
   def isLit = false;
+  // TODO: SHOULD AGREE WITH isLit
   def litOf: Literal = {
     if(inputs.length == 0)
       if (isLit) this.asInstanceOf[Literal] else null
@@ -173,7 +175,7 @@ abstract class Node extends nameable{
     else
       null
   }
-  def value = -1L;
+  def value = BigInt(-1);
   def signed: this.type = { 
     val res = Wire(){Fix()};
     res <== this.asInstanceOf[Fix];
