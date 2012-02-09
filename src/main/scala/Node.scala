@@ -72,10 +72,10 @@ object Node {
   }
   def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).getWidth - n.minNum }
   var reset: Fix = Fix(1, INPUT);//Input("reset", 1);
-  reset.name_it("reset");
+  reset.setName("reset");
   var resets = Queue[Fix]();
   var clk: Node = Bits(1, INPUT);//Input("clk", 1);
-  clk.name_it("clk");
+  clk.setName("clk");
   def pushReset(r: Fix) { resets.enqueue(reset); reset = r }
   def popReset() { reset = resets.dequeue() }
   def withReset(r: Fix)(block: => Node) = {
