@@ -6,12 +6,32 @@ import Node._;
 
 object Op {
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
+    val a_lit = a.litOf;
+    val b_lit = b.litOf;
+    val isFoldable = a_lit != null && b_lit != null;
+    // println("OP " + name + " " + a_lit + " " + b_lit);
+    if (isFoldable) {
+      val (aw, bw) = (a_lit.width, b_lit.width);
+      val (av, bv) = (a_lit.value, b_lit.value);
+      name match {
+        case "##" => return Literal(av << bw | bv, aw + bw);
+        case "+"  => return Literal(av + bv, max(aw, bw)+1);
+        case "-"  => return Literal(av - bv, max(aw, bw)+1);
+        case "|"  => return Literal(av | bv, max(aw, bw));
+        case "&"  => return Literal(av & bv, max(aw, bw));
+        case "^"  => return Literal(av ^ bv, max(aw, bw));
+        case "<<" => return Literal(av << bv.toInt, aw + bv.toInt);
+        case ">>" => return Literal(av >> bv.toInt, aw - bv.toInt);
+        case _ => ;
+      } 
+    }
     val res = new Op();
     res.init("", widthInfer, a, b);
     res.op = name;
     res.nGrow = nGrow;
     res.isSigned = a.isInstanceOf[Fix] && b.isInstanceOf[Fix]
-    if(res.isSigned) println("SIGNED OPERATION DETECTED " + name);
+    // println(a + " " + a.litOf + " " + name + " " + b + " " + b.litOf);
+    // if(res.isSigned) println("SIGNED OPERATION DETECTED " + name);
     res
   }
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node): Node = {

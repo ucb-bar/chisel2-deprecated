@@ -10,7 +10,7 @@ object Rom {
     (m: Node) => { 
       var res = 0; 
       for (d <- data) 
-        res = max(d.width, res); 
+        res = max(d.getWidth, res); 
       res  }
   }
   def apply (data: Array[Node]): Rom = {
@@ -44,6 +44,10 @@ class RomCell[T <: Data](data: Array[T], addr: Node) extends Cell {
 class Rom(data_vals: Array[Node]) extends Delay {
   val data = data_vals.toArray;
 
+  for (e <- data) {
+    if (e.litOf == null)
+      println("$$$ NON-LITERAL DATA ELEMENT TO ROM " + e);
+  }
   override def removeCellIOs() = {
     for(i <- 0 until data.length)
       if(data(i).isCellIO)
@@ -62,6 +66,8 @@ class Rom(data_vals: Array[Node]) extends Delay {
     "  reg[" + (width-1) + ":0] " + emitRef + "[" + (data.length-1) + ":0];\n";
   override def emitInitC: String = {
     var res = "";
+    for (i <- 0 until data.length) 
+      res += data(i).emitDef;
     for (i <- 0 until data.length) 
       res += "  " + emitRef + ".put(" + i + ", " + data(i).emitRef + ");\n";
     res

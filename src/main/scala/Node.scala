@@ -66,7 +66,7 @@ object Node {
     (m: Node) => {
       val mwidth = m.inputs(i).getWidth;
       val nMax = n.maxNum;
-      val res = m.inputs(i).getWidth + n.maxNum;
+      val res = m.inputs(i).getWidth + n.maxNum.toInt;
       res
     } 
   }
@@ -159,12 +159,23 @@ abstract class Node extends nameable{
   def ||(b: Node): Node  = Op("||", 2, fixWidth(1), this, b );
   def &(b: Node): Node   = Op("&",  2, maxWidth _, this, b );
   def |(b: Node): Node   = Op("|",  2, maxWidth _, this, b );
-  * */
-  def ##(b: Node): Node  = Op("##", 2, sumWidth _,  this, b );
-  def maxNum: Int = (1 << (if(width < 0) inferWidth(this) else width))-1;
-  def minNum: Int = 0;
+  */
+  def ##(b: Node): Node  = Op("##", 2, sumWidth _,  this, b ); 
+  // def ##(b: Node): Node  = BinaryNodeCell(this, b, "##"){Bits()};
+  def maxNum: BigInt = (1 << (if(width < 0) inferWidth(this) else width))-1;
+  def minNum: BigInt = BigInt(0);
+  // TODO: SHOULD BE GENERALIZED TO DIG FOR LIT AS litOf DOES
   def isLit = false;
-  def value = -1;
+  // TODO: SHOULD AGREE WITH isLit
+  def litOf: Literal = {
+    if(inputs.length == 0)
+      if (isLit) this.asInstanceOf[Literal] else null
+    else if(inputs.length == 1 && isCellIO)
+      inputs(0).litOf
+    else
+      null
+  }
+  def value = BigInt(-1);
   def signed: this.type = { 
     val res = Wire(){Fix()};
     res <== this.asInstanceOf[Fix];
@@ -239,11 +250,11 @@ abstract class Node extends nameable{
     val res = inferWidth(this);
     if(inferCount > 100) {
       if(genError) {
-	    val error = IllegalState("Unable to infer width of " + this, 0);
+	val error = IllegalState("Unable to infer width of " + this, 0);
         if (!ChiselErrors.contains(error))
           ChiselErrors += error
       } else
-	    genError = true;
+	genError = true;
       return false;
     }
     // println("INFER " + this + " -> " + res);
