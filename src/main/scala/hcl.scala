@@ -27,7 +27,7 @@ object fromNode {
 
 object when {
   def execWhen(cond: Bool)(block: => Unit) = {
-    conds.push(cond);
+    conds.push(conds.top && cond);
     block;
     conds.pop(); 
   }
@@ -39,7 +39,7 @@ object when {
 class when (prevCond: Bool) {
   def elsewhen (cond: Bool)(block: => Unit) = {
     when.execWhen(!prevCond && cond){ block }
-    new when(prevCond && cond);
+    new when(prevCond || cond);
   }
   def otherwise (block: => Unit) = {
     when.execWhen(!prevCond){ block }
@@ -69,31 +69,6 @@ object unless {
 //   def apply(x: Fix, default: () => Any, cases: Seq[(Fix, () => Any)]) = {
 //     val elts = cases.map(tb => (tb._1 === x, tb._2)).toList;
 //     pcond(elts ::: List((Fix(1), default)))
-
-/*
-object rules {
-  def beginRules() = {
-    rulesConds.push(Bool(true));
-    rulesFlags.push(true);
-  }
-  def endRules() = {
-    rulesConds.pop;
-    rulesFlags.pop();
-  }
-  def isInRules = rulesFlags.top;
-  def setFlag() = rulesFlags.pop;
-  def clearFlag() = rulesFlags.push(false);
-
-  def top = rulesConds.top;
-  def push(c: Bool) = rulesConds.push(c && rulesConds.pop);
-
-  def apply(cases: => Unit) = {
-    beginRules();
-    cases;
-    endRules();
-  }
-}
-*/
 
 object otherwise {
   def apply(block: => Unit) = 
@@ -205,12 +180,8 @@ abstract class Data extends Node with Cloneable{
 
 trait proc extends Node {
   var updates = new Queue[(Bool, Node)];
-  def genCond() = {
-    if (conds.size == 0)
-      Bool(true)
-    else 
-      conds.reduceLeft((a,b) => a && b);
-  }
+  // def genCond() = conds.reduceLeft((a,b) => a && b);
+  def genCond() = conds.top;
   def genMuxes(default: Node) = {
     if (updates.length == 0) {
       if (inputs.length == 0 || inputs(0) == null){
@@ -224,12 +195,18 @@ trait proc extends Node {
         println("NO DEFAULT SPECIFIED FOR WIRE: " + this); // error()
       }
       //updates.push((lastCond, lastValue));
-      val firstValue = if (default != null) default else lastValue;
+      val (start, firstValue) = 
+        if (default != null) 
+          (0, default)
+        else 
+          (1, lastValue)
       if(inputs.length > 0)
 	inputs(0) = firstValue;
       else
 	inputs   += firstValue;
-      for ((cond, value) <- updates) {
+      // for ((cond, value) <- updates) 
+      for (i <- start until updates.size) {
+        val (cond, value) = updates(i);
         inputs(0) = Multiplex(cond, value, inputs(0));
       }
     }

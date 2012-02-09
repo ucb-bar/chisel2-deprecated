@@ -70,7 +70,7 @@ object Node {
       res
     } 
   }
-  def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).getWidth - n.minNum }
+  def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).getWidth - n.minNum.toInt }
   var reset: Fix = Fix(1, INPUT);//Input("reset", 1);
   reset.setName("reset");
   var resets = Queue[Fix]();
