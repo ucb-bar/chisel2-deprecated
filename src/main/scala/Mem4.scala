@@ -282,7 +282,7 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
     virtual_port.read;
   }
 
-  def lessEqEq(src: Bits) = {
+  def colonEqual(src: Bits) = {
     if (getPortType == 'virtual) {
       // Update the port type if needed.
       val phy_port_type = physical_port.getPortType
@@ -302,21 +302,21 @@ class Mem4Port[T <: Data](cell:       Mem4Cell[T],
     }
   }
 
-  def <== (src: Bits) = lessEqEq(src);
-  def <== (src: Bool) = lessEqEq(src);
-  def <== (src: Fix) =  lessEqEq(src);
-  def <== (src: UFix) = lessEqEq(src);
-
-  // Procedural assignment to memory:
-  def colonEqual(src: Bits) = {
-    println("[info] Using Mem4Port colonEqual");
-    // generateError(src);
-    assign_data(src.asInstanceOf[T]);
-  }
   def := (src: Bits) = colonEqual(src);
   def := (src: Bool) = colonEqual(src);
-  def := (src: Fix)  = colonEqual(src);
+  def := (src: Fix) =  colonEqual(src);
   def := (src: UFix) = colonEqual(src);
+
+  // // Procedural assignment to memory:
+  // def colonEqualEqual(src: Bits) = {
+  //   println("[info] Using Mem4Port colonEqualEqual");
+  //   // generateError(src);
+  //   assign_data(src.asInstanceOf[T]);
+  // }
+  // def :== (src: Bits) = colonEqualEqual(src);
+  // def :== (src: Bool) = colonEqualEqual(src);
+  // def :== (src: Fix)  = colonEqualEqual(src);
+  // def :== (src: UFix) = colonEqualEqual(src);
 
   def genMux: Unit = {
     if (virtual_ports.length == 0) {
@@ -751,7 +751,7 @@ class Mem4Ref[T <: Data](mem_port: Mem4Port[T]) extends Node with proc {
     src match {
       case data: Data => {
         // Add an input port if none has been assigned
-        mem_port.lessEqEq(data.toBits);
+        mem_port.colonEqual(data.toBits);
       }
       case any => {
         println("[warning] Procedural assignment to Mem through MemRef: Unrecognized node type: "+src.getClass);
@@ -760,16 +760,16 @@ class Mem4Ref[T <: Data](mem_port: Mem4Port[T]) extends Node with proc {
   }
   override def genMuxes(default: Node) = {}
 
-  def colonEqual(src: Bits) = {
-    println("[info] Using MemRef colonEqual");
-    // generateError(src);
-    // Assign src as the write value.
-    mem_port.colonEqual(src);
-  }
-  def := (src: Bits) = colonEqual(src);
-  def := (src: Bool) = colonEqual(src);
-  def := (src: Fix)  = colonEqual(src);
-  def := (src: UFix) = colonEqual(src);
+  // def colonEqualEqual(src: Bits) = {
+  //   println("[info] Using MemRef colonEqualEqual");
+  //   // generateError(src);
+  //   // Assign src as the write value.
+  //   mem_port.colonEqualEqual(src);
+  // }
+  // def :== (src: Bits) = colonEqualEqual(src);
+  // def :== (src: Bool) = colonEqualEqual(src);
+  // def :== (src: Fix)  = colonEqualEqual(src);
+  // def :== (src: UFix) = colonEqualEqual(src);
 
   override def toString: String = inputs(0) + "[" + inputs(1) + "]";
   def emitInstanceDef: String = {
@@ -781,17 +781,18 @@ class Mem4Ref[T <: Data](mem_port: Mem4Port[T]) extends Node with proc {
     res
   }
 
-  override def assign(src: Node) = {
-    src match {
-      case data: Data => {
-        // Add an input port if none has been assigned
-        mem_port.colonEqual(data.toBits);
-      }
-      case any => {
-        println("[warning] Assigning to Mem through MemRef: Unrecognized node type: "+src.getClass);
-      }
-    }
-  }
+  // override def assign(src: Node) = {
+  //   src match {
+  //     case data: Data => {
+  //       // Add an input port if none has been assigned
+  //       mem_port.colonEqualEqual(data.toBits);
+  //     }
+  //     case any => {
+  //       println("[warning] Assigning to Mem through MemRef: Unrecognized node type: "+src.getClass);
+  //     }
+  //   }
+  // }
+
   override def emitDefLoC: String = {
     // Emit port read code (may be combinational).
     mem_port.emitDefLoC;

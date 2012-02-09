@@ -58,17 +58,18 @@ class Bits extends IO {
       ChiselErrors += TypeError(":=", myClass.toString, srcClass.toString)
   }
 
+  // private def colonEqualEqual(src: Bits) = {
+  //   generateError(src);
+  //   if(comp == null)
+  //     this.asInstanceOf[IO] assign src
+  //   else
+  //     comp assign src.toNode
+  // }
+
   private def colonEqual(src: Bits) = {
     generateError(src);
-    if(comp == null)
-      this.asInstanceOf[IO] assign src
-    else
-      comp assign src.toNode
-  }
-
-  private def lessEqEq(src: Bits) = {
-    generateError(src);
     if(comp != null){
+      // println("COMP " + comp + " SRC " + src + " SRC.TONODE " + src.toNode);
       comp procAssign src.toNode;
     }
     else {
@@ -76,12 +77,35 @@ class Bits extends IO {
     }
   }
 
-  //def := (src: Bits) = colonEqual(src);
+  // //def :== (src: Bits) = colonEqualEqual(src);
+  // def :== (src: Bool) = colonEqualEqual(src);
+  // def :== (src: Fix)  = colonEqualEqual(src);
+  // def :== (src: UFix) = colonEqualEqual(src);
+  // 
+  // override def :==[T <: Data](src: T): Unit = {
+  // src match {
+  // case bool: Bool => {
+  // this :== bool;
+  // }
+  // case fix: Fix => {
+  // this :== fix;
+  // }
+  // case ufix: UFix => {
+  // this :== ufix
+  // }
+  // case bits: Bits => {
+  // this colonEqualEqual(bits);
+  // }
+  // case any =>
+  // ChiselErrors += IllegalState(":== not defined on " + this.getClass + " and " + src.getClass, 1);
+  // }
+  // }
+
   def := (src: Bool) = colonEqual(src);
   def := (src: Fix)  = colonEqual(src);
   def := (src: UFix) = colonEqual(src);
 
-  override def :=[T <: Data](src: T): Unit = {
+  override def := [T <: Data](src: T): Unit = {
     src match {
       case bool: Bool => {
 	this := bool;
@@ -97,30 +121,6 @@ class Bits extends IO {
       }
       case any =>
 	ChiselErrors += IllegalState(":= not defined on " + this.getClass + " and " + src.getClass, 1);
-    }
-  }
-
-  def <== (src: Bool) = lessEqEq(src);
-  def <== (src: Fix)  = lessEqEq(src);
-  def <== (src: UFix) = lessEqEq(src);
-
-  
-  override def <== [T <: Data](src: T): Unit = {
-    src match {
-      case bool: Bool => {
-	this <== bool;
-      }
-      case fix: Fix => {
-	this <== fix;
-      }
-      case ufix: UFix => {
-	this <== ufix
-      }
-      case bits: Bits => {
-	this lessEqEq(bits);
-      }
-      case any =>
-	ChiselErrors += IllegalState("<== not defined on " + this.getClass + " and " + src.getClass, 1);
     }
   }
 

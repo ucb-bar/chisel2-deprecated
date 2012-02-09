@@ -45,7 +45,7 @@ object Concatanate {
       res
     } else
       mods.foldLeft(mod){(a, b) => a ## b};
-}
+  }
 class Cat extends Node {
   override def emitDef: String = {
     var res = "  assign " + emitTmp + " = {";

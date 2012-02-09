@@ -32,19 +32,29 @@ class UFix extends Num {
     res
   }
 
-  override def <==(src: UFix) = {
+  override def :=(src: UFix) = {
     if(comp != null)
       comp procAssign src.toNode;
     else
       this.asInstanceOf[Wire] procAssign src.toNode;
   }
 
-  override def := (src: UFix) = {
-    if (comp == null)
-      this.asInstanceOf[IO] assign src
-    else
-      comp assign src.toNode
-  }
+  // override def :== (src: UFix) = {
+  //   if (comp == null)
+  //     this.asInstanceOf[IO] assign src
+  //   else
+  //     comp assign src.toNode
+  // }
+
+  // override def :==[T <: Data](src: T): Unit = {
+  //   src match {
+  //     case ufix: UFix => {
+  //       this :== ufix;
+  //     }
+  //     case any => 
+  //       ChiselErrors += IllegalState(":== not defined on " + this.getClass + " and " + src.getClass, 1)
+  //   }
+  // }
 
   override def :=[T <: Data](src: T): Unit = {
     src match {
@@ -53,16 +63,6 @@ class UFix extends Num {
       }
       case any => 
 	ChiselErrors += IllegalState(":= not defined on " + this.getClass + " and " + src.getClass, 1)
-    }
-  }
-
-  override def <==[T <: Data](src: T): Unit = {
-    src match {
-      case ufix: UFix => {
-	this <== ufix;
-      }
-      case any => 
-	ChiselErrors += IllegalState("<== not defined on " + this.getClass + " and " + src.getClass, 1)
     }
   }
   

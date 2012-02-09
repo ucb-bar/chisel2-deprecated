@@ -26,19 +26,26 @@ object fromNode {
 
 
 object when {
-  def apply(c: Bool)(block: => Unit) = {
-    if(rules.isInRules){
-      conds.push(c && conds.top && rules.top);
-      rules.push(!c);
-    } else {
-      conds.push(c && conds.top);
-    }
-    rules.clearFlag(); //when clears the flag during execution of body
-    block; 
-    rules.setFlag(); //when reasserts after completion of execution
-    conds.pop();
+  def execWhen(cond: Bool)(block: => Unit) = {
+    conds.push(cond);
+    block;
+    conds.pop(); 
+  }
+  def apply(cond: Bool)(block: => Unit) = {
+    execWhen(cond){ block }
+    new when(cond);
   }
 }
+class when (prevCond: Bool) {
+  def elsewhen (cond: Bool)(block: => Unit) = {
+    when.execWhen(!prevCond && cond){ block }
+    new when(prevCond && cond);
+  }
+  def otherwise (block: => Unit) = {
+    when.execWhen(!prevCond){ block }
+  }
+}
+
 object unless {
   def apply(c: Bool)(block: => Unit) = 
     when (!c) { block }
@@ -63,6 +70,7 @@ object unless {
 //     val elts = cases.map(tb => (tb._1 === x, tb._2)).toList;
 //     pcond(elts ::: List((Fix(1), default)))
 
+/*
 object rules {
   def beginRules() = {
     rulesConds.push(Bool(true));
@@ -85,6 +93,7 @@ object rules {
     endRules();
   }
 }
+*/
 
 object otherwise {
   def apply(block: => Unit) = 
@@ -103,7 +112,6 @@ object is {
       println("NO KEY SPECIFIED");
     else {
       //val c = Bool(OUTPUT);
-      //c := keys(0) === v;
       val c = keys(0) === v;
       when (c) { block; }
     }
@@ -175,13 +183,13 @@ abstract class Data extends Node with Cloneable{
   def asOutput(): this.type = this;
   def toNode: Node = this;
   def fromNode(n: Node): this.type = this;
-  def <==[T <: Data](data: T) = {
+  def :=[T <: Data](data: T) = {
     if(this.getClass != data.getClass) println("Mismatched types: " + this.getClass + " " + data.getClass);
     comp procAssign data.toNode;
   }
-  def :=[T <: Data](data: T){
-    this assign data.toNode;
-  }
+  // def :==[T <: Data](data: T){
+  //   this assign data.toNode;
+  // }
   override def clone(): this.type = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
     res
@@ -197,6 +205,12 @@ abstract class Data extends Node with Cloneable{
 
 trait proc extends Node {
   var updates = new Queue[(Bool, Node)];
+  def genCond() = {
+    if (conds.size == 0)
+      Bool(true)
+    else 
+      conds.reduceLeft((a,b) => a && b);
+  }
   def genMuxes(default: Node) = {
     if (updates.length == 0) {
       if (inputs.length == 0 || inputs(0) == null){
@@ -210,10 +224,11 @@ trait proc extends Node {
         println("NO DEFAULT SPECIFIED FOR WIRE: " + this); // error()
       }
       //updates.push((lastCond, lastValue));
+      val firstValue = if (default != null) default else lastValue;
       if(inputs.length > 0)
-	inputs(0) = if (default != null) default else lastValue;
+	inputs(0) = firstValue;
       else
-	inputs += (if (default != null) default else lastValue);
+	inputs   += firstValue;
       for ((cond, value) <- updates) {
         inputs(0) = Multiplex(cond, value, inputs(0));
       }

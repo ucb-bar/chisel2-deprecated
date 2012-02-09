@@ -171,7 +171,7 @@ class MemGL[T <: Data](memGen: MemGen[T],
     // Concatenate all address ports into a single address vector.
     val concatAddr = Wire(){Bits(width=addr_bit_width * port_count)};
     concatAddr := port_list.reverse.map(_.addr.toBits).reduceLeft(Cat(_,_));
-    addr_port := concatAddr;
+    addr_port  := concatAddr;
 
     // Concatenate all data write ports into a single data vector.
     val concatDataIn = Wire(){Bits(width=size * port_count)};

@@ -213,13 +213,13 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     return false;
   }
 
-  def <==(src: Bundle) = {
+  def :=(src: Bundle) = {
     src match {
       case other: Bundle => {
 	if (this.comp != null) {
 	  this.comp procAssign other.toNode;
 	} else {
-	  println("INCORRECT USE OF <== ON BUNDLES");
+	  println("INCORRECT USE OF := ON BUNDLES");
 	}
       }
     }

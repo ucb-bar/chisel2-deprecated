@@ -30,10 +30,10 @@ object Node {
   var isCoercingArgs = true;
   var conds = new Stack[Bool]();
   conds.push(Bool(true));
-  var rulesFlags = new Stack[Boolean]();
-  rulesFlags.push(false);
-  var rulesConds = new Stack[Bool]();
-  //var whens = new Stack[when]();
+  // var rulesFlags = new Stack[Boolean]();
+  // rulesFlags.push(false);
+  // var rulesConds = new Stack[Bool]();
+  // var whens = new Stack[when]();
   var keys  = new Stack[Bits]();
   def fixWidth(w: Int) = { (m: Node) => w };
   def widthOf(i: Int) = { (m: Node) => { 
@@ -178,7 +178,7 @@ abstract class Node extends nameable{
   def value = BigInt(-1);
   def signed: this.type = { 
     val res = Wire(){Fix()};
-    res <== this.asInstanceOf[Fix];
+    res := this.asInstanceOf[Fix];
     res.isSigned = true; 
     res.asInstanceOf[this.type]
   }
@@ -187,7 +187,12 @@ abstract class Node extends nameable{
     (this.asInstanceOf[Bits] & ~bit) | (dat << off);
   }
   // TODO: MOVE TO WIRE
-  def assign(src: Node) = { if (inputs.length > 0) inputs(0) = src; else inputs += src; }
+  def assign(src: Node) = { 
+    if (inputs.length > 0) 
+      inputs(0) = src; 
+    else 
+      inputs += src; 
+  }
   def <>(src: Node) = { 
     // println("M <>'ing " + this + " & " + src);
     this assign src 
@@ -568,9 +573,9 @@ abstract class Node extends nameable{
     for (m <- mods.reverse) {
       val res = Extract(this.asInstanceOf[Bits], off+m.getWidth-1, off){Bits()};
       m match {
-        case r: Reg => r procAssign res;
-	case i: Bits => i <== res;
-        case o      => o assign res;
+        case r: Reg  => r procAssign res;
+	case i: Bits => i := res;
+        case o       => o assign res;
       }
       off += m.getWidth;
     }

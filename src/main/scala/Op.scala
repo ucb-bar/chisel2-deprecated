@@ -6,11 +6,21 @@ import Node._;
 
 object Op {
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
-    val a_lit = a.litOf;
-    val b_lit = b.litOf;
-    val isFoldable = a_lit != null && b_lit != null;
-    // println("OP " + name + " " + a_lit + " " + b_lit);
-    if (isFoldable) {
+    val (a_lit, b_lit) = (a.litOf, b.litOf);
+    // println("OP " + name + " " + a + " " + a_lit + " " + b + " " + b_lit);
+    if (a_lit != null && b_lit == null) {
+      name match {
+        case "&&" => return if (a_lit.value == 0) Literal(0) else b;
+        case "||" => return if (a_lit.value == 0) b else Literal(1);
+        case _ => ;
+      }
+    } else if (a_lit == null && b_lit != null) {
+      name match {
+        case "&&" => return if (b_lit.value == 0) Literal(0) else a;
+        case "||" => return if (b_lit.value == 0) a else Literal(1);
+        case _ => ;
+      }
+    } else if (a_lit != null && b_lit != null) {
       val (aw, bw) = (a_lit.width, b_lit.width);
       val (av, bv) = (a_lit.value, b_lit.value);
       name match {

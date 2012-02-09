@@ -76,11 +76,12 @@ class Reg extends Delay with proc{
   def procAssign(src: Node) = {
     if (assigned)
       ChiselErrors += IllegalState("reassignment to Reg", 3);
+    val cond = genCond();
     if (conds.length >= 1) {
       isEnable = true;
-      enable = enable || conds.top;
+      enable = enable || cond;
     }
-    updates.enqueue((conds.top, src));
+    updates.enqueue((cond, src));
   }
   override def genMuxes(default: Node) = {
     if(isEnable){
@@ -105,9 +106,11 @@ class Reg extends Delay with proc{
     }
   }
   override def assign(src: Node) = {
-    if(assigned || inputs(0) != null)
+    if(assigned || inputs(0) != null) {
       ChiselErrors += IllegalState("reassignment to Reg", 3);
-    else { assigned = true; super.assign(src)}
+    } else { 
+      assigned = true; super.assign(src)
+    }
   }
   override def emitRefC: String = 
     if(isHiC) emitRefV + "_shadow_out" else emitRefV

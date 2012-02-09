@@ -79,9 +79,9 @@ abstract class ExtractCell[T <: Bits](gen: => T){
   io.out.comp = primitiveNode;
   primitiveNode.nameHolder = io.out;
 
-  def := (src: Bits) = {
-    println("ColonEqual in Extract");
-  }
+  // def :== (src: Bits) = {
+  //   println("ColonEqual in Extract");
+  // }
 }
 
 class BitExtractCell[T <: Bits](gen: => T) extends ExtractCell[T](gen) {
@@ -128,6 +128,9 @@ class Extract extends Node with proc {
     val assign_node = findAssignNode(8);
     if (assign_node == null) {
       println("[error] Unable to determine assignment destination from extract.");
+      // stack = Thread.currentThread.getStackTrace;
+      // for (e <- stack)
+      //   println(e);
       return Unit;
     }
     // println("[info] Found an Assign node from an Extract");

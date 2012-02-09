@@ -53,13 +53,6 @@ class Wire extends Data with proc{
     res assign src;
     res
   }
-  def procAssign(src: Node) = {
-    if (assigned) {
-      ChiselErrors += IllegalState("reassignment to Node", 3);
-    } else {
-      updates.enqueue((conds.top, src));
-    }
-  }
   override def toString: String = name
   override def emitDef: String = { 
     if (inputs.length == 0) {
@@ -76,10 +69,19 @@ class Wire extends Data with proc{
       ""
     // "  " + emitTmp + " = " + inputs(0).emitRef + ";\n"
 
+  def procAssign(src: Node) = {
+    if (assigned) {
+      ChiselErrors += IllegalState("reassignment to Node", 3);
+    } else {
+      updates.enqueue((genCond(), src));
+    }
+  }
   override def assign(src: Node) = {
-    if(assigned || inputs(0) != null)
+    if(assigned || inputs(0) != null) {
       ChiselErrors += IllegalState("reassignment to Wire", 3);
-    else { assigned = true; super.assign(src)}
+    } else { 
+      assigned = true; super.assign(src)
+    }
   }
 }
 
