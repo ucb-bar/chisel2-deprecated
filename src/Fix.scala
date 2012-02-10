@@ -46,22 +46,6 @@ class Fix extends Num {
       comp assign src.toNode
   }
 
-  // override def :==(src: Fix)  = colonEqualEqual(src);
-  // override def :==(src: UFix) = colonEqualEqual(Cat(Bits(0), src).toUFix);
-  
-  // override def :==[T <: Data](src: T): Unit = {
-  //   src match {
-  //     case ufix: UFix => {
-  //       this :== ufix;
-  //     }
-  //     case fix: Fix => {
-  //       this :== fix;
-  //  }
-  //     case any => 
-  //    ChiselErrors += IllegalState(":== not defined on " + this.getClass + " and " + src.getClass, 1)
-  //   }
-  // }
-
   override def :=[T <: Data](src: T): Unit = {
     src match {
       case ufix: UFix => {

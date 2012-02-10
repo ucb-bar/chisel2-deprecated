@@ -78,10 +78,6 @@ abstract class ExtractCell[T <: Bits](gen: => T){
   fb ^^ io.out;
   io.out.comp = primitiveNode;
   primitiveNode.nameHolder = io.out;
-
-  // def :== (src: Bits) = {
-  //   println("ColonEqual in Extract");
-  // }
 }
 
 class BitExtractCell[T <: Bits](gen: => T) extends ExtractCell[T](gen) {

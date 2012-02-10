@@ -24,35 +24,6 @@ class Bool extends Bits {
     res
   }
 
-  // override def :== (src: Bool) = {
-  //   if (comp == null)
-  //     this.asInstanceOf[IO] assign src
-  //   else
-  //     comp assign src.toNode;
-  // }
-
-  // def :== (src: Bits): Unit = {
-  //   val res = src.toBool;
-  //   if(src.getWidth > 1)
-  //     ChiselErrors += IllegalState("multi bit signal " + src + " converted to Bool",1);
-  //   if(src.getWidth == -1)
-  //     ChiselErrors += IllegalState("unable to automatically convert " + src + " to Bool, convert manually instead",1);
-  //   this :== res;
-  // }
-  
-  // override def :==[T <: Data](src: T): Unit = {
-  //   src match {
-  //     case bool: Bool => {
-  //     this :== bool;
-  //     }
-  //     case bits: Bits => {
-  //       this :== bits;
-  //     }
-  //     case any => 
-  //       ChiselErrors += IllegalState(":== not defined on " + this.getClass + " and " + src.getClass, 1)
-  //   }
-  // }
-
   override def :=(src: Bool) = {
     if(comp != null)
       comp procAssign src.toNode;

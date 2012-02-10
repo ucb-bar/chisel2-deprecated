@@ -732,8 +732,8 @@ abstract class Component {
         case io: IO  => if(io.updates.length > 0) io.genMuxes(io.default);
         case w: Wire => w.genMuxes(w.default);
         case r: Reg  => r.genMuxes(r);
-        case m: Mem4[_] => m.genMuxes(m);
-        case mr: Mem4Ref[_] =>
+        case m: Mem[_] => m.genMuxes(m);
+        case mr: MemRef[_] =>
         case a: Assign[_] =>
         case e: Extract =>
       }

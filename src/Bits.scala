@@ -58,14 +58,6 @@ class Bits extends IO {
       ChiselErrors += TypeError(":=", myClass.toString, srcClass.toString)
   }
 
-  // private def colonEqualEqual(src: Bits) = {
-  //   generateError(src);
-  //   if(comp == null)
-  //     this.asInstanceOf[IO] assign src
-  //   else
-  //     comp assign src.toNode
-  // }
-
   private def colonEqual(src: Bits) = {
     generateError(src);
     if(comp != null){
@@ -76,30 +68,6 @@ class Bits extends IO {
       this.asInstanceOf[Wire] procAssign src.toNode;
     }
   }
-
-  // //def :== (src: Bits) = colonEqualEqual(src);
-  // def :== (src: Bool) = colonEqualEqual(src);
-  // def :== (src: Fix)  = colonEqualEqual(src);
-  // def :== (src: UFix) = colonEqualEqual(src);
-  // 
-  // override def :==[T <: Data](src: T): Unit = {
-  // src match {
-  // case bool: Bool => {
-  // this :== bool;
-  // }
-  // case fix: Fix => {
-  // this :== fix;
-  // }
-  // case ufix: UFix => {
-  // this :== ufix
-  // }
-  // case bits: Bits => {
-  // this colonEqualEqual(bits);
-  // }
-  // case any =>
-  // ChiselErrors += IllegalState(":== not defined on " + this.getClass + " and " + src.getClass, 1);
-  // }
-  // }
 
   def := (src: Bool) = colonEqual(src);
   def := (src: Fix)  = colonEqual(src);

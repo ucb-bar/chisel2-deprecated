@@ -2,6 +2,7 @@
 package Chisel {
 
 import scala.math.max;
+import Node._;
 import Rom._;
 import IOdir._;
 
@@ -74,13 +75,34 @@ class Rom(data_vals: Array[Node]) extends Delay {
   }
   override def emitDecC: String = 
     "  mem_t<" + width + "," + data.length + "> " + emitRef + ";\n";
-  def apply(addr: Node): Node = MemRef(this, addr);
+  def apply(addr: Node): Node = RomRef(this, addr);
   def apply(addr: UFix): Fix = {
     val res = Fix(OUTPUT);
     res.setIsCellIO;
-    res assign MemRef(this, addr);
+    res assign RomRef(this, addr);
     res
   }
+}
+
+object RomRef {
+  def apply (mem: Node, addr: Node): Node = {
+    val res = new RomRef();
+    res.init("", widthOf(0), mem, addr);
+    res
+  }
+  def apply[T <: Data](mem: Node, addr: Node, data: T): T = {
+    val memRes = new RomRef();
+    memRes.init("", widthOf(0), mem, addr);
+    val res = data.fromNode(memRes).asInstanceOf[T];
+    res
+  }
+}
+class RomRef extends Node {
+  override def toString: String = inputs(0) + "[" + inputs(1) + "]";
+  override def emitDef: String = 
+    "  assign " + emitTmp + " = " + inputs(0).emitRef + "[" + inputs(1).emitRef + "];\n"
+  override def emitDefLoC: String = 
+    "  " + emitTmp + " = " + inputs(0).emitRef + ".get(" + inputs(1).emitRef + ");\n"
 }
 
 }
