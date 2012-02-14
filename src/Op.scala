@@ -8,6 +8,7 @@ object Op {
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
     val (a_lit, b_lit) = (a.litOf, b.litOf);
     // println("OP " + name + " " + a + " " + a_lit + " " + b + " " + b_lit);
+    if (isFolding) {
     if (a_lit != null && b_lit == null) {
       name match {
         case "&&" => return if (a_lit.value == 0) Literal(0) else b;
@@ -34,6 +35,7 @@ object Op {
         case ">>" => return Literal(av >> bv.toInt, aw - bv.toInt);
         case _ => ;
       } 
+    }
     }
     val res = new Op();
     res.init("", widthInfer, a, b);

@@ -20,6 +20,7 @@ import ChiselError._;
 object Component {
   var isDebug = false;
   var isVCD = false;
+  var isFolding = false;
   var isGenHarness = false;
   var isReportDims = false;
   var scanFormat = "";
@@ -59,7 +60,7 @@ object Component {
   def initChisel () = {
     isGenHarness = false;
     isDebug = false;
-    isVCD = false;
+    isFolding = false;
     isReportDims = false;
     scanFormat = "";
     scanArgs = new Array[Node](0);
