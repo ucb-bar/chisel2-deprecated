@@ -3,6 +3,7 @@ package Chisel {
 
 import scala.math.max;
 import Node._;
+import Component._;
 
 object Op {
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
