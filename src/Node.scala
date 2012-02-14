@@ -80,6 +80,7 @@ object Node {
     reset = resBak;
     res
   }
+  // TODO: WHY IS THIS HERE?
   def ListLookup(addr: Node, default: List[Node], mapping: Array[(Node, List[Node])]): List[UFix] = {
     val ll = new ListLookup(mapping, default);
     ll.init("", widthOf(1), addr);
@@ -130,34 +131,8 @@ abstract class Node extends nameable{
   def width: Int = width_;
   def width_=(w: Int) = { isFixedWidth = true; width_ = width; inferWidth = fixWidth(w); }
   def name_it (path: String, setNamed: Boolean = true) = { name = path; named = setNamed}
-  /*
-  def unary_-(): Node    = Op("-",  1, widthOf(0), this);
-  def unary_~(): Node    = Op("~",  1, widthOf(0), this);
-  def unary_!(): Node    = Op("!",  1, fixWidth(1), this);
-  def andR(): Node       = Op("&",  1, fixWidth(1), this);
-  def orR(): Node        = Op("|",  1, fixWidth(1), this);
-  def xorR(): Node       = Op("^",  1, fixWidth(1), this);
-  def <<(b: Node): Node  = Op("<<", 0, lshWidthOf(0, b),  this, b );
-  def >>(b: Node): Node  = Op(">>", 0, rshWidthOf(0, b),  this, b );
-  def >>>(b: Node): Node = Op(">>", 0, rshWidthOf(0, b),  this, b );
-  def +(b: Node): Node   = Op("+",  2, maxWidth _,  this, b );
-  def *(b: Node): Node   = Op("*",  0, sumWidth _,  this, b );
-  def ^(b: Node): Node   = Op("^",  2, maxWidth _,  this, b );
-  def ?(b: Node): Node   = Multiplex(this, b, null);
-  def -(b: Node): Node   = Op("-",  2, maxWidth _,  this, b );
-  def ===(b: Node): Node = Op("==", 2, fixWidth(1), this, b );
-  def !=(b: Node): Node  = Op("!=", 2, fixWidth(1), this, b );
-  def >(b: Node): Node   = Op(">",  2, fixWidth(1), this, b );
-  def <(b: Node): Node   = Op("<",  2, fixWidth(1), this, b );
-  def <=(b: Node): Node  = Op("<=", 2, fixWidth(1), this, b );
-  def >=(b: Node): Node  = Op(">=", 2, fixWidth(1), this, b );
-  def &&(b: Node): Node  = Op("&&", 2, fixWidth(1), this, b );
-  def ||(b: Node): Node  = Op("||", 2, fixWidth(1), this, b );
-  def &(b: Node): Node   = Op("&",  2, maxWidth _, this, b );
-  def |(b: Node): Node   = Op("|",  2, maxWidth _, this, b );
-  */
+  // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
   def ##(b: Node): Node  = Op("##", 2, sumWidth _,  this, b ); 
-  // def ##(b: Node): Node  = BinaryNodeCell(this, b, "##"){Bits()};
   def maxNum: BigInt = (1 << (if(width < 0) inferWidth(this) else width))-1;
   def minNum: BigInt = BigInt(0);
   // TODO: SHOULD BE GENERALIZED TO DIG FOR LIT AS litOf DOES
@@ -178,10 +153,6 @@ abstract class Node extends nameable{
     res.isSigned = true; 
     res.asInstanceOf[this.type]
   }
-  def bitSet(off: UFix, dat: Bits): Bits = { 
-    val bit = Bits(1, 1) << off;
-    (this.asInstanceOf[Bits] & ~bit) | (dat << off);
-  }
   // TODO: MOVE TO WIRE
   def assign(src: Node) = { 
     if (inputs.length > 0) 
@@ -193,32 +164,12 @@ abstract class Node extends nameable{
     // println("M <>'ing " + this + " & " + src);
     this assign src 
   }
-  def ><(src: Node) = {
-    src match {
-      case b: Bundle =>
-        var off = 0;
-        for ((n, io) <- b.flatten) {
-          if (io.dir == INPUT) {
-            io assign NodeExtract(this,off+io.width-1,off);
-            off += io.width;
-          }
-        }
-      case n =>
-    }
-    this
-  }
   def ^^(src: Node) = { 
     // println("^^ " + this + " & " + src);
     //this := src 
     println("NODE ^^ " + this.getClass + " " + src);
     src assign this;
   }
-  // def apply(bit: Int): Node = { Extract(this, bit) };
-  // def apply(hi: Int, lo: Int): Node = { Extract(this, hi, lo) };
-  // def apply(bit: Literal): Node = { apply(bit.value) };
-  // def apply(hi: Literal, lo: Literal): Node = { apply(hi.value, lo.value) };
-  // def apply(bit: Node): Node = { Extract(this, bit); }
-  // def apply(hi: Node, lo: Node): Node = { Extract(this, hi, lo) };
   def getLit = this.asInstanceOf[Literal]
   def isIo = false;
   def isReg = false;
@@ -271,6 +222,8 @@ abstract class Node extends nameable{
     }
   }
   def emitIndex: Int = { if (index == -1) index = componentOf.nextIndex; index }
+  // TODO: SUBCLASS FROM SOMETHING INSTEAD OR OVERRIDE METHOD
+  // TODO: RENAME METHOD TO ISVOLATILE
   def isInObject = isIo || isReg || isUsedByRam || isProbe || (isDebug && named);
   def emitTmp: String = 
     if (isEmittingC) {
@@ -543,6 +496,7 @@ abstract class Node extends nameable{
     }
     true;
   }
+  // TODO: SUPERCEDED BY toBits with bundle
   def extract (widths: Array[Int]): List[Fix] = {
     var res: List[Fix] = Nil;
     var off = 0;
@@ -564,6 +518,7 @@ abstract class Node extends nameable{
     }
     res.reverse
   }
+  // TODO: SUPERCEDED BY fromBits with bundle
   def Match(mods: Array[Node]) {
     var off = 0;
     for (m <- mods.reverse) {

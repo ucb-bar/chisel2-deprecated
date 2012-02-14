@@ -52,27 +52,10 @@ object Component {
     name + "_" + genCount
   }
   def nextCompIndex : Int = { compIndex = compIndex + 1; compIndex }
-  /*def apply (name: String, i: Data): Component = {
-    val res = new Component();
-    res.name = name + "_" + nextCompIndex;
-    res.ioVal = i;
-    if (res.parent != null)
-      res.parent.children += res;
-    val wires = res.io.flatten;
-    for ((n, w) <- wires) {
-      w.component = res;
-      w match {
-        case io: IO => 
-          if (io.dir == INPUT)
-            res.inputs  += io; 
-          else
-            res.outputs += io; 
-      };
-    }
-    res
-  }* */
-  /*def apply (name: String): Component = Component(name, nullbundle_t);* */
   def splitArg (s: String) = s.split(' ').toList;
+  // TODO: MAYBE CHANGE NAME TO INITCOMPONENT??
+  // TODO: ADD INIT OF TOP LEVEL NODE STATE
+  // TODO: BETTER YET MOVE ALL TOP LEVEL STATE FROM NODE TO COMPONENT
   def initChisel () = {
     isGenHarness = false;
     isDebug = false;
@@ -628,6 +611,7 @@ abstract class Component {
 	      }
 	    }
 	  }
+          // TODO: THIS CASE MAY NEVER MATCH
 	  case bufbuf: ArrayBuffer[ArrayBuffer[ _ ]] => {
 	    var i = 0;
 	    println(name);

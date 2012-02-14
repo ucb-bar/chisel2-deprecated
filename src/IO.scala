@@ -26,27 +26,6 @@ object INPUT extends IODirection {
 object OUTPUT extends IODirection {
 
 }
-/*
-object Input {
-  def apply(): IO = apply("", widthOf(0))
-  def apply(width: Int): Fix = Fix(width, INPUT);
-  def apply(name: String): IO = apply(name, widthOf(0))
-  def apply(name: String, width: Int): Fix = 
-    { val res = new Fix(); res.dir = INPUT; if(name != "") res.named = true; res.init(name, width); res }
-  def apply(name: String, inferWidth: (Node) => Int): IO = 
-    { val res = new IO(); res.dir = INPUT; res.init(name, inferWidth); res }
-}
-object Output {
-  def apply(width: Int): Fix = Fix(width, OUTPUT);
-  def apply(name: String): IO = apply(name, widthOf(0), null)
-  def apply(name: String, inferWidth: (Node) => Int, x: Node): IO = 
-    { val res = new IO(); res.dir = OUTPUT; res.init(name, inferWidth, x); res }
-  def apply(name: String, width: Int): IO = 
-    { val res = new IO(); res.dir = OUTPUT; res.init(name, width); res }
-  def apply(name: String, x: Node): IO = apply(name, maxWidth _, x); 
-  def apply(x: Node): IO = apply("", x);
-}
-* */
 class IO extends Wire with Cloneable{ 
   var dir: IODirection = null;
   var unnamed = false;
@@ -89,34 +68,6 @@ class IO extends Wire with Cloneable{
     }
     this
   }
-  /*
-  override def <>(src: Node) = { 
-    if (dir == INPUT) {
-      // println("<>'ing " + this + " <-- " + src);
-      src match { 
-      case other: IO => 
-        if (other.dir == OUTPUT || isCellIO) {
-          this assign other;
-        } else {
-          ChiselErrors += IllegalConnection("Connecting Input " + this + " to Input " + other, 2);
-        }
-      case default => ChiselErrors += IllegalConnection("Connecting Input " + this + " to Node " + default, 2);
-      }
-    } else { // DIR == OUTPUT
-      // println("<>'ing " + this + " --> " + src);
-      src match { 
-        case other: IO  => 
-          if (other.dir == INPUT || isCellIO) {
-            other assign this;
-          } else {
-            ChiselErrors += IllegalConnection("Connecting Output " + this + " to Output " + other, 2);
-          }
-        case default => 
-          //println("Connecting Output " + this + " to Node " + default);
-      }
-    } 
-  }
-  * */
 
   override def <>(src: Node) = { 
     if (dir == INPUT) {

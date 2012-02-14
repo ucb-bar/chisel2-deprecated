@@ -8,7 +8,7 @@ abstract class Num extends Bits {
   type T <: Num;
   def <<(b: Num): Num = {ChiselErrors += TypeError("<<", this.getClass.toString, b.getClass.toString); this}
   def >>(b: Num): Num = {ChiselErrors += TypeError(">>", this.getClass.toString, b.getClass.toString); this}
-  def >>>(b: Num): Num = {ChiselErrors += TypeError(">>>", this.getClass.toString, b.getClass.toString); this}
+  // def >>>(b: Num): Num = {ChiselErrors += TypeError(">>>", this.getClass.toString, b.getClass.toString); this}
   def +(b: Num): Num = {ChiselErrors += TypeError("+", this.getClass.toString, b.getClass.toString); this}
   def *(b: Num): Num = {ChiselErrors += TypeError("*", this.getClass.toString, b.getClass.toString); this}
   def ^(b: Num): Num = {ChiselErrors += TypeError("^", this.getClass.toString, b.getClass.toString); this}

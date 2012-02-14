@@ -39,7 +39,6 @@ object Vec {
     }
     res
   }
-
 }
 
 class Vec[T <: Data]() extends Data with Cloneable {

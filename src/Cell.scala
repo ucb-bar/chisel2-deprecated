@@ -70,7 +70,6 @@ class BinaryNodeCell[T <: Data](op: String, x: T, y: T)(gen: => T) extends Cell 
   val primitiveNode = op match {
     case "<<"  => Op("<<", 0, lshWidthOf(0, io.Y),  io.X, io.Y );
     case ">>"  => Op(">>", 0, rshWidthOf(0, io.Y),  io.X, io.Y );
-    case ">>>" => Op(">>>", 0, rshWidthOf(0, io.Y),  io.X, io.Y );
     case "+"   => Op("+",  2, maxWidth _,  io.X, io.Y );
     case "*"   => Op("*",  0, sumWidth _,  io.X, io.Y );
     case "s*s" => Op("s*s",  0, sumWidth _,  io.X, io.Y );

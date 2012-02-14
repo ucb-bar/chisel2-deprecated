@@ -1,6 +1,7 @@
 // author: jonathan bachrach
 package Chisel {
 
+// TODO: PARAMETERIZE THIS
 class ListLookup(mapping: Array[(Node, List[Node])], defaultVal: List[Node]) extends Node {
   val map = mapping.map{case(n, l_n) => (n, l_n.toBuffer)}.toBuffer;
   val default = defaultVal.toBuffer;

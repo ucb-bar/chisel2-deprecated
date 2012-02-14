@@ -135,35 +135,6 @@ class Reg extends Delay with proc{
       updateVal.emitRef + ";\n"
     }
   }
-  // override def emitReg: String = 
-  //   {
-  //     var res = "";
-  //     if(isReset)
-  // 	{
-  // 	  res += "    if(reset) begin\n";
-  // 	  res += "      " + emitRef + " <= " + resetVal.emitRef + ";\n";
-  // 	  res += "    end"
-  // 	}
-  //     var first = !isReset;
-  //     for((cond, value) <- updates) 
-  // 	{
-  // 	  if(first)
-  // 	    {
-  // 	      res += "    if(" + cond.emitRef + ") begin\n"
-  // 	      res += "    " + emitRef + " <= " + value.emitRef + ";\n";
-  // 	      res += "    end"
-  // 	      first = false;
-  // 	    } 
-  // 	  else 
-  // 	    {
-  // 	      res += " else if(" + cond.emitRef + ") begin\n"
-  // 	      res += "    " + emitRef + " <= " + value.emitRef + ";\n";
-  // 	      res += "    end"
-  // 	    }
-  // 	}
-  //     res += "\n"
-  //     res
-  //   }
   override def emitDec: String = 
     "  reg[" + (width-1) + ":0] " + emitRef + ";\n";
 

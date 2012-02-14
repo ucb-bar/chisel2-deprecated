@@ -67,7 +67,7 @@ class Op extends Node {
 	"/* C */DAT<" + width + ">(" + inputs(k).emitRef + ")"
       else
 	inputs(k).emitRef
-    } else if (op == "##" || op == ">>" || op == ">>>" || op == "*" ||
+    } else if (op == "##" || op == ">>" || op == "*" ||
              op == "s*s" || op == "u*s" || op == "s*u") {
       inputs(k).emitRef
     } else {
@@ -102,7 +102,7 @@ class Op extends Node {
   }
 
   def emitDefSigned: String = {
-    if (op == ">>>" || op == ">>")
+    if (op == ">>")
       "$signed(" + inputs(0).emitRef +") " + op + " " + inputs(1).emitRef
     else
       "$signed(" + inputs(0).emitRef +") " + op + " $signed(" + inputs(1).emitRef + ")"
@@ -135,9 +135,7 @@ class Op extends Node {
   }
 
   def emitSignedDefLoC: String = {
-    if(op == ">>>")
-      emitOpRef(0) + ".rsha(" + emitOpRef(1) +")"
-    else if(op == ">")
+    if(op == ">")
       emitOpRef(0) + ".gt(" + emitOpRef(1) + ")"
     else if(op == ">=")
       emitOpRef(0) + ".gte(" + emitOpRef(1) + ")"

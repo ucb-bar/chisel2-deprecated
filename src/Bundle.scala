@@ -70,6 +70,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
           } else 
             c = c.getSuperclass();
         } while (!isFound);
+        // TODO: SPLIT THIS OUT TO TOP LEVEL LIST
         if (types.length == 0 && !isStatic(modifiers) && isInterface &&
             name != "elements" && name != "flip" && name != "toString" && name != "flatten" && name != "binding" && name != "asInput" && name != "asOutput" && name != "unary_$tilde" && name != "unary_$bang" && name != "unary_$minus" && name != "clone" && name != "toUFix" && name != "toBits" && name != "toBool" && name != "toFix" &&
             (view == null || view.contains(name)) && !seen.contains(m.invoke(this))) {

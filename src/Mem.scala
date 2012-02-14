@@ -23,6 +23,7 @@ object Mem {
                        wrEnable: Bool,
                        wrAddr:   Num,
                        wrData:   T,
+                       // TODO: WHY NOT wrMask?
                        w_mask:   Bits = null.asInstanceOf[Bits],
                        cs:       Bool = null.asInstanceOf[Bool],
                        resetVal: T    = null.asInstanceOf[T],

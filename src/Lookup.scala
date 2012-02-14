@@ -5,6 +5,7 @@ import Node._;
 import Literal._;
 import scala.collection.mutable.ArrayBuffer;
 
+// TODO: LOOK INTO REMOVING THIS
 object Lookup {
   def apply[T <: Data](addr: Bits, default: T, mapping: Seq[(Bits, T)]): T = {
     val lookupCell = new LookupCell(default, mapping);

@@ -63,8 +63,7 @@ class Bits extends IO {
     if(comp != null){
       // println("COMP " + comp + " SRC " + src + " SRC.TONODE " + src.toNode);
       comp procAssign src.toNode;
-    }
-    else {
+    } else {
       this.asInstanceOf[Wire] procAssign src.toNode;
     }
   }
