@@ -7,6 +7,8 @@ import java.lang.reflect.Modifier._;
 import Node._;
 import Component._;
 import IOdir._;
+import ChiselError._
+import sort._
 
 object Bundle {
   def nullbundle_t = Bundle(ArrayBuffer[(String, Data)]());
@@ -20,6 +22,7 @@ object Bundle {
     }
     res
   }
+
 }
 
 object sort {
@@ -38,8 +41,22 @@ object sort {
     }
     a
   }
-}
 
+  def checkPorts(x: Data, y: Data) = {
+
+    if(x.isInstanceOf[IO] && !y.isInstanceOf[IO]) {
+
+      val xIO = x.asInstanceOf[IO];
+      val yIO = y.asInstanceOf[IO];
+
+      if(xIO.dir == null || xIO.dir != INPUT) {
+	ChiselErrors += IllegalState("left hand side of bulk := must be OUTPUT", 3);
+      } else if (!yIO.isCellIO || yIO.dir != OUTPUT)
+	ChiselErrors += IllegalState("right hand side of bulk := must be INPUT", 3);
+    }
+  }
+
+}
 class Bundle(view_arg: Seq[String] = null) extends Data{
   var dir = "";
   var view = view_arg;
@@ -217,14 +234,27 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
   def :=(src: Bundle) = {
     src match {
       case other: Bundle => {
+
 	if (this.comp != null) {
 	  this.comp procAssign other.toNode;
 	} else {
-	  println("INCORRECT USE OF := ON BUNDLES");
+	  for ((n, i) <- elements) {
+	    if(other.contains(n)){
+	      checkPorts(i, other(n));
+	      i := other(n)
+	    }
+	    else {
+	      println("// UNABLE TO FIND " + n + " IN " + other.component);
+	    }
+	  }
 	}
+	
       }
+      case default =>
+	println("// TRYING TO := BUNDLE TO NON BUNDLE " + default);
     }
   }
+
   override def flatten: Array[(String, IO)] = {
     var res = ArrayBuffer[(String, IO)]();
     for ((n, i) <- elements){
