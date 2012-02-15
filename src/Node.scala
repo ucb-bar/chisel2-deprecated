@@ -153,6 +153,10 @@ abstract class Node extends nameable{
     res.isSigned = true; 
     res.asInstanceOf[this.type]
   }
+  def bitSet(off: UFix, dat: Bits): Bits = { 
+    val bit = Bits(1, 1) << off;
+    (this.asInstanceOf[Bits] & ~bit) | (dat << off);
+  }
   // TODO: MOVE TO WIRE
   def assign(src: Node) = { 
     if (inputs.length > 0) 
