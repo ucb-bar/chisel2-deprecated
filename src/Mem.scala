@@ -154,7 +154,7 @@ class MemPort[T <: Data](cell:       MemCell[T],
   }
 
   def connectToCell(arg_to_prevent_reflection: Int) = {
-    assign_data(data);
+    assign_data(data.toNode);
     assign_addr(addr);
     assign_we(we);
     assign_wbm(wbm);
