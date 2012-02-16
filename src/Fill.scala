@@ -15,6 +15,15 @@ object Fill {
   def apply(mod: Bits, n: Int): Bits = apply(n, mod)
 }
 
+object NodeFill {
+  def apply(n: Int, mod: Node): Node = {
+    val res = new Fill()
+    res.init("", (m: Node) => {m.inputs(0).width * n}, mod, Literal(n))
+    res
+  }
+  def apply(mod: Node, n: Int): Node = apply(n, mod)
+}
+
 
 class FillCell[T <: Data](data: T) extends Cell {
   val io = new Bundle(){

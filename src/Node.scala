@@ -204,7 +204,7 @@ abstract class Node extends nameable{
   }
   def infer: Boolean = {
     val res = inferWidth(this);
-    if(inferCount > 100) {
+    if(inferCount > 1000000) {
       if(genError) {
 	val error = IllegalState("Unable to infer width of " + this, 0);
         if (!ChiselErrors.contains(error))
@@ -215,11 +215,11 @@ abstract class Node extends nameable{
     }
     // println("INFER " + this + " -> " + res);
     if(res == -1) {
-      inferCount += 1;
+      //inferCount += 1;
       return true
     } else if (res != width) {
       width_ = res;
-      inferCount += 1;
+      //inferCount += 1;
       return true;
     } else{
       return false;
