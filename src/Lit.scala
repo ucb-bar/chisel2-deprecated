@@ -146,9 +146,9 @@ object Literal {
   }
 
   def removeUnderscore(x: String): String = {
-    val res = ""
+    var res = ""
     for(c <- x){
-      if(c != "_"){
+      if(c != '_'){
 	res = res + c
       }
     }
