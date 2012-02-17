@@ -23,8 +23,7 @@ object Mem {
                        wrEnable: Bool,
                        wrAddr:   Num,
                        wrData:   T,
-                       // TODO: WHY NOT wrMask?
-                       w_mask:   Bits = null.asInstanceOf[Bits],
+                       wrMask:   Bits = null.asInstanceOf[Bits],
                        cs:       Bool = null.asInstanceOf[Bool],
                        resetVal: T    = null.asInstanceOf[T],
                        readLatency: Int = 0,
@@ -33,7 +32,7 @@ object Mem {
     val memcell = new MemCell(depth, wrData);
     memcell.setReadLatency(readLatency);
     if (!(wrAddr == null) && !(wrEnable == null) && !(wrData == null)) {
-      memcell.write(wrAddr, wrData, wrEnable, w_mask, cs);
+      memcell.write(wrAddr, wrData, wrEnable, wrMask, cs);
     }
     if (!(resetVal == null)) memcell.reset_val(resetVal);
     if (hexInitFile != "") memcell.setHexInitFile(hexInitFile);
