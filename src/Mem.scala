@@ -516,14 +516,14 @@ class MemResetPort[T <: Data](mem: Mem[T], cell: MemCell[T], reset_val: T) {
   def resetVal = mem.inputs(reset_port_index);
 
   def emitDef: String = {
-    var res = 
+    var res = ""
       //"  always @(posedge clk) begin\n" +
-      "    if (reset) begin\n"
+      //"    if (reset) begin\n"
     for (i <- 0 until mem.getDepth) {
       res += "      " + mem.emitRef + "[" + i + "] <= " + resetVal.emitRef + ";\n";
     }
     //res += "    end\n";
-    res += "    end else begin\n"; 
+    //res += "    end else begin\n"; 
     //res += "  end\n";
     res
   }
