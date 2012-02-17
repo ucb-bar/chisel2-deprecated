@@ -9,6 +9,7 @@ package Chisel {
 
 import scala.collection.mutable.ListBuffer;
 import java.io.File;
+import Component._;
 import Node._;
 
 object Mem {
@@ -114,12 +115,14 @@ class MemCell[T <: Data](n: Int, data: T) extends Cell {
 
   def getReadLatency = primitiveNode.getReadLatency;
   def setReadLatency(latency: Int) = {
-    primitiveNode.setReadLatency(0);
-    primitiveNode.setSecretLatency(latency);
-    for(port <- port_list){
-      if(port.port_type == 'read || port.port_type == 'rw)
-	port.genRegChain(latency)
-    }
+    primitiveNode.setReadLatency(latency);
+    primitiveNode.setCppReadLatency(latency);
+
+    if(!isEmittingComponents)
+      for(port <- port_list){
+        if(port.port_type == 'read || port.port_type == 'rw)
+	  port.genRegChain(latency)
+      }
   }
   def reset_val(r_val: T) = { primitiveNode.addResetVal(this, r_val); }
   def setTarget(s: Symbol) = { primitiveNode.target = s; }
@@ -280,15 +283,22 @@ class MemPort[T <: Data](cell:       MemCell[T],
       println("[error] read has no data prototype");
     } else {
       //res = cell.getDataType.fromNode(memRef).asInstanceOf[T];
-      holder = Bits(data.toNode.getWidth, OUTPUT)
-      holder.inputs += memRef;
-      res = cell.getDataType.fromNode(holder);
+
+      if(isEmittingComponents) {
+        res = cell.getDataType.fromNode(memRef).asInstanceOf[T]
+        res.comp = memRef
+      } else {
+        holder = Bits(data.toNode.getWidth, OUTPUT)
+        holder.inputs += memRef;
+        res = cell.getDataType.fromNode(holder);
+        res.comp = holder
+        genRegChain(mem.cppReadLatency)
+      }
       res.setIsCellIO;
-      res.comp = holder; // Make this Data node assignable through the memory reference.
     }
-    genRegChain(mem.secretLatency)
     res;
   }
+
   def apply(addr: Node, we: Bool = null, wbm: Bits = null.asInstanceOf[Bits], cs: Bool = null, oe: Bool = null): T = {
     val we_opt = (if (we == null) Bool(true) else we);
     val virtual_port = new MemPort[T](cell, 'virtual, addr, null.asInstanceOf[T], we_opt, wbm, cs, oe);
@@ -566,11 +576,14 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
   }
 
   def getReadLatency = readLatency;
-  def setReadLatency(latency: Int) = { readLatency = latency }
+  def setReadLatency(latency: Int) = { 
+    if(isEmittingComponents) 
+      readLatency = latency 
+  }
 
-  var secretLatency = 0
+  var cppReadLatency = 0
 
-  def setSecretLatency(latency: Int) = secretLatency = latency
+  def setCppReadLatency(latency: Int) = cppReadLatency = latency
 
   override def toString: String = "MEM( + emitRef + )";
 
