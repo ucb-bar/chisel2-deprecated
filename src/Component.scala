@@ -492,6 +492,7 @@ abstract class Component {
       m match {
         case io: IO => if (io.dir == OUTPUT) { if (io.consumers.length == 0) roots += m; }
         case d: Delay  => roots += m;
+	case mr: MemRef[ _ ] => if(mr.isReg) roots += m;
         case any       =>
       }
     }
@@ -504,6 +505,7 @@ abstract class Component {
         case io: IO    => if (io.dir == INPUT && !io.isCellIO) { if (io.inputs.length == 0) leaves += m; }
         case l: Literal    => leaves += m;
         case d: Delay  => leaves += m;
+	case mr: MemRef[ _ ] => if(mr.isReg) leaves += m;
         case any       =>
       }
     }

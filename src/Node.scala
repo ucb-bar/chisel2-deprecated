@@ -261,14 +261,15 @@ abstract class Node extends nameable{
   def visitNode(newDepth: Int): Unit = {
     val comp = componentOf;
     depth = max(depth, newDepth);
-    // println("THINKING MOD(" + depth + ") " + comp.name + ": " + this.name);
+    //println("THINKING MOD(" + depth + ") " + comp.name + ": " + this.name);
     if (!comp.isWalked.contains(this)) {
-      // println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
+      //println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
       comp.isWalked += this;
       this.walked = true;
       for (i <- inputs) {
         if (i != null) {
           i match {
+	    case m: MemRef[ _ ] => if(!m.isReg) i.visitNode(newDepth+1);
             case d: Delay => 
             case o => {
 	      i.visitNode(newDepth+1);
@@ -283,11 +284,12 @@ abstract class Node extends nameable{
     val comp = componentOf;
     depth = max(depth, newDepth);
     if (!comp.isWalked.contains(this)) {
-      // println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
+      //println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
       comp.isWalked += this;
       for (c <- consumers) {
         if (c != null) {
           c match {
+	    case m: MemRef[ _ ] => if(!m.isReg) c.visitNodeRev(newDepth+1);
             case d: Delay => 
             case o => c.visitNodeRev(newDepth+1);
           }
