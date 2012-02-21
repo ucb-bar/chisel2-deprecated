@@ -719,7 +719,7 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
     if (hexInitFile != "") {
       "  "+emitRef+".read_hex(\""+hexInitFile+"\");\n"
     } else {
-      ""
+      "  if (random_initialization) "+emitRef+".randomize();\n"
     }
   }
   override def emitDecC: String = {

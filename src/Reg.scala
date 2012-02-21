@@ -112,6 +112,9 @@ class Reg extends Delay with proc{
       assigned = true; super.assign(src)
     }
   }
+  override def emitInitC: String = {
+    "  " + emitRef + " = random_initialization ? dat_t<" + width + ">::rand() : LIT<" + width + ">(0);\n"
+  }
   override def emitRefC: String = 
     if(isHiC) emitRefV + "_shadow_out" else emitRefV
   override def emitRefV: String = if (name == "") "R" + emitIndex else name;

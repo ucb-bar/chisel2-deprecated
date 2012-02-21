@@ -971,7 +971,7 @@ abstract class Component {
         out_h.write("  " + c.emitRef + "_t* " + c.emitRef + ";\n");
     }
     out_h.write("\n");
-    out_h.write("  void init ( void );\n");
+    out_h.write("  void init ( bool random_initialization = false );\n");
     out_h.write("  void clock_lo ( dat_t<1> reset );\n");
     out_h.write("  void clock_hi ( dat_t<1> reset );\n");
     out_h.write("  void print ( FILE* f );\n");
@@ -983,11 +983,11 @@ abstract class Component {
     out_c.write("#include \"" + name + ".h\"\n");
     for(str <- includeArgs) out_c.write("#include \"" + str + "\"\n"); 
     out_c.write("\n");
-    out_c.write("void " + name + "_t::init ( void ) {\n");
+    out_c.write("void " + name + "_t::init ( bool random_initialization ) {\n");
     if (isEmittingComponents) {
       for (c <- children) {
         out_c.write("  " + c.emitRef + " = new " + c.emitRef + "_t();\n");
-        out_c.write("  " + c.emitRef + "->init();\n");
+        out_c.write("  " + c.emitRef + "->init(random_initialization);\n");
       }
     }
     for (m <- omods) {
