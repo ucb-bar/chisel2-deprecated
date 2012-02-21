@@ -52,7 +52,7 @@ class RegCell[T <: Data](d: T, w: Int, hasInput: Boolean, isReset: Boolean)(gen:
   val primitiveNode = new Reg();
   val dInput: Node = if(hasInput) io.data.toNode else null;
   if(isReset)
-    primitiveNode.init("", widthOf(1), dInput, io.resetVal.toNode);
+    primitiveNode.init("", regWidth(w), dInput, io.resetVal.toNode);
   else
     primitiveNode.init("", regWidth(w), dInput);
   val fb = io.q.fromNode(primitiveNode).asInstanceOf[T] 
