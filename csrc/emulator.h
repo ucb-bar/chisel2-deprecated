@@ -3,6 +3,7 @@
 
 #include <inttypes.h>
 #include <stdio.h>
+#include <limits.h>
 #include <math.h>
 #include <vector>
 #include <stdarg.h>
