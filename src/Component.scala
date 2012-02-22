@@ -461,6 +461,48 @@ abstract class Component {
     println(count)
   }
 
+  def removeCellIOs() {
+    val walked = new HashSet[Node]
+    val bfsQueue = new Queue[Node]
+
+    def getNode(x: Node): Node = {
+      var res = x
+      while(res.isCellIO && res.inputs.length == 1){
+	res = res.inputs(0)
+      }
+      res
+    }
+
+    // initialize bfsQueue
+    for((n, elm) <- io.flatten) 
+      if(elm.isInstanceOf[IO] && elm.asInstanceOf[IO].dir == OUTPUT)
+  	bfsQueue.enqueue(elm)
+
+    var count = 0
+
+    while(!bfsQueue.isEmpty) {
+      val top = bfsQueue.dequeue
+      walked += top
+      count += 1
+
+      for(i <- 0 until top.inputs.length) {
+	val input = top.inputs(i)
+	if(input == null)
+	  ChiselErrors += IllegalState("NULL Input for " + top.getClass + " " + top, 1)
+	else if(input.isCellIO) {
+	  val node = input.getNode
+	  top.inputs(i) = node
+	  if(!walked.contains(node)) bfsQueue.enqueue(node)
+	} else {
+	  if(!walked.contains(input)) bfsQueue.enqueue(input)
+	}
+      }
+
+    }
+    
+    println(count)
+  }
+
   def forceMatchingWidths = {
     for((io, i) <- ioMap) {
 
@@ -786,6 +828,7 @@ abstract class Component {
       c.markComponent();
     genAllMuxes;
     components.foreach(_.postMarkNet(0));
+    //removeCellIOs()
     inferAll();
     forceMatchingWidths;
     traceNodes();
@@ -946,6 +989,7 @@ abstract class Component {
       topComponent = this;
     }
     // isWalked.clear();
+    //removeCellIOs()
     inferAll();    
     forceMatchingWidths;
     traceNodes();

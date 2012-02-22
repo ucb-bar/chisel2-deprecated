@@ -81,6 +81,7 @@ object Node {
     res
   }
   // TODO: WHY IS THIS HERE?
+/*
   def ListLookup(addr: Node, default: List[Node], mapping: Array[(Node, List[Node])]): List[UFix] = {
     val ll = new ListLookup(mapping, default);
     ll.init("", widthOf(1), addr);
@@ -101,7 +102,9 @@ object Node {
       res
     })
   }
-  
+
+* */
+
   var stop = true;
   
 }
