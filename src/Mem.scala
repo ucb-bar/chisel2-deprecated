@@ -11,14 +11,22 @@ import scala.collection.mutable.ListBuffer;
 import java.io.File;
 import Node._;
 
+object Rom {
+  def apply[T <: Data](data: Array[T])(gen: => T): MemCell[T] = {
+    val memcell = new MemCell(data.size, gen);
+    memcell.setInitData(data);
+    memcell
+  }
+}
+
 object Mem {
   val noResetVal = Literal(0);
-
-  def apply[T <: Data](depth:    Int,
-                       gen:      T): MemCell[T] = {
+  // PORTLESS MEM
+  def apply[T <: Data](depth: Int)(gen: => T): MemCell[T] = {
     val memcell = new MemCell(depth, gen);
     memcell;
   }
+  // ONELINER MEMORY
   def apply[T <: Data](depth:    Int,
                        wrEnable: Bool,
                        wrAddr:   Num,
@@ -108,9 +116,12 @@ class MemCell[T <: Data](n: Int, data: T) extends Cell {
     port_count += 1;
     port_list += write_port;
     write_port;
-}
+  }
   def setHexInitFile(hexInitFileName: String) = {
     primitiveNode.setHexInitFile(hexInitFileName);
+  }
+  def setInitData(data: Array[T]) = {
+    primitiveNode.initData = data.map(x => x.toNode);
   }
 
   def getReadLatency = primitiveNode.getReadLatency;
@@ -246,7 +257,7 @@ class MemPort[T <: Data](cell:       MemCell[T],
   def wrAddr =       { if (addr_offset < 0) println("[error] Using bad wrAddr"); mem.inputs(addr_offset); }
   def hasWrAddr =    { addr_offset >= 0; }
   def wrData =       { if (data_offset < 0) println("[error] Using bad wrData"); mem.inputs(data_offset); }
-  def hasWrData =      { data_offset >= 0; }
+  def hasWrData =    { data_offset >= 0; }
   def wrEnable =     { if (we_offset < 0) println("[error] Using bad wrEnable"); mem.inputs(we_offset); }
   def hasWrEnable =  { we_offset >= 0; }
   def wrBitMask =    { if (wbm_offset < 0) println("[error] Using bad wrBitMask"); mem.inputs(wbm_offset); }
@@ -506,13 +517,27 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
   var reset_port_opt: Option[MemResetPort[T]] = None;
   var target                = Mem.getDefaultMemoryImplementation;
   var hexInitFile           = "";
+  var initData: Array[Node] = null;
   var readLatency           = Mem.getDefaultReadLatency;
   var hasWBM                = false;
   var addr_width            = 0;
 
+  if (initData != null) {
+    for (e <- initData) {
+      if (e.litOf == null)
+        println("$$$ NON-LITERAL DATA ELEMENT TO ROM " + e);
+    }
+  }
   // proc trait methods.
   def procAssign(src: Node) = {
     println("Mem.procAssign");
+  }
+  override def removeCellIOs() = {
+    super.removeCellIOs();
+    if (initData != null)
+      for(i <- 0 until initData.length) 
+        if(initData(i).isCellIO) 
+	  initData(i) = initData(i).getNode();
   }
   override def genMuxes(default: Node) = {
     for (p <- cell.port_list) {
@@ -643,6 +668,11 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
     if (hexInitFile != "") {
       // println("hexInitFile: "+hexInitFile);
       res += "  initial $readmemh(\""+hexInitFile+"\", "+emitRef+");\n";
+    } else if (initData != null) {
+      res += "  initial begin\n";
+      for (i <- 0 until initData.length) 
+        res += "    " + emitRef + "[" + i + "] = " + initData(i).emitRef + ";\n";
+      res += "  end\n";
     }
     for (p <- cell.port_list) {
       if (p.hasWrBitMask) {
@@ -676,6 +706,13 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
   override def emitInitC: String = {
     if (hexInitFile != "") {
       "  "+emitRef+".read_hex(\""+hexInitFile+"\");\n"
+    } else if (initData != null) {
+      var res = "";
+      for (i <- 0 until initData.length) 
+        res += initData(i).emitDef;
+      for (i <- 0 until initData.length) 
+        res += "  " + emitRef + ".put(" + i + ", " + initData(i).emitRef + ");\n";
+      res
     } else {
       ""
     }

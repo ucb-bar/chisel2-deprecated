@@ -106,10 +106,14 @@ object Node {
   
 }
 
+class TraceWork (val f: () => ArrayBuffer[TraceWork]) { 
+  def apply() = f();
+}
+
 abstract class Node extends nameable{
   var walked = false;
+  var staticComp: Component = getComponent();
   var component: Component = null;
-  var staticComp: Component = if(compStack.length != 0) compStack.top else null;
   var flattened = false;
   var isCellIO = false;
   var depth = 0;
@@ -120,6 +124,7 @@ abstract class Node extends nameable{
   var isFixedWidth = false;
   var consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
   var inputs = new ArrayBuffer[Node];
+  def traceableNodes = Array[Node]();
   var outputs = new ArrayBuffer[Node];
   var inferWidth: (Node) => Int = maxWidth;
   var nameHolder: nameable = null;
@@ -338,88 +343,72 @@ abstract class Node extends nameable{
     }
     null;
   }
-  def findNodes(depth: Int, c: Component): Unit = {
-    // untraced or same component?
-    if(isCellIO) println("found " + this);
+
+  def traceNode(c: Component): ArrayBuffer[TraceWork] = {
+    val toTrace = ArrayBuffer[TraceWork]();
+    removeCellIOs;
     fixName();
     if ((isReg || isRegOut || isClkInput) && !(component == null))
         component.containsReg = true
-    val (comp, nextComp, markComp) = 
+    val (comp, nextComp) = 
       this match {
-        case io: IO => {
-          val ioComp = io.component;
-          val nxtComp = if (io.dir == OUTPUT) ioComp else ioComp.parent;
-          if (io.dir == OUTPUT && ioComp.parent == null && !(ioComp == topComponent)) {
-            ioComp.parent = c;
-            c.children += ioComp;
-	    if(isEmittingComponents) c.nameChild(ioComp);
-            // println("PARENTING " + c.name + "(" + c.children.length + ") CHILD " + ioComp);
-          }
-          (ioComp,  // if (isEmittingComponents) ioComp else topComponent, 
-           nxtComp, // if (isEmittingComponents) nxtComp else topComponent, 
-           nxtComp);
-        }
-        case any => (c, c, c);
+        case io: IO => (io.component, if (io.dir == OUTPUT) io.component else io.component.parent);
+        case any    => (c, c);
       }
-    if (comp == null) {
-      if (this != reset){
-        println("NULL COMPONENT FOR " + this);
-      }
-    } else if (!comp.isWalked.contains(this)) {
-      // println(depthString(depth) + "FiND MODS " + name + " IN " + comp.name);
-      // println("FiND MODS(" + depth + ") " + name + " IN " + comp.name);
+    if (comp != null && !comp.isWalked.contains(this)) {
       comp.isWalked += this;
+      for (node <- traceableNodes) {
+        if (node != null) 
+          toTrace += new TraceWork(() => node.traceNode(nextComp));
+      }
       var i = 0;
-      // if (component == null) 
-      //   component = markComp;
       for (node <- inputs) {
         if (node != null) {
-	  node.removeCellIOs;
-          // println(depthString(depth+1) + "INPUT " + node);
-          if (node.component == null) // unmarked input
-            node.component = markComp;
-	  if(nextComp == null) println(c + " " + this);
-          node.findNodes(depth + 2, nextComp);
-	  //This code finds a binding for a node
-	  //We search for a binding only if it is an output
-	  //and the logic's grandfather component is not the same as the 
-	  //io's component
-	  //and the logic's component is not the same as the output's component unless the logic is an input
-          node match { 
-            case io: IO => 
-	      if (io.dir == OUTPUT && (!(component.parent == io.component) && !(component == io.component && !(this.isInstanceOf[IO] && this.asInstanceOf[IO].dir == INPUT)))) {
-		// && !(component == io.component && !this.isInstanceOf[IO])
-                val c = node.component.parent;
-                // println("BINDING " + node + " I " + i + " NODE-PARENT " + node.component.parent + " -> " + this + " PARENT " + component.parent);
-                if (c == null) {
-		  println(component + " " + io.component + " ")
-                  println("UNKNOWN COMPONENT FOR " + node);
-                }
-                val b = Binding(node, c, io.component);
-                inputs(i) = b;
-                if (!c.isWalked.contains(b)) {
-                  c.mods += b;  c.isWalked += b;
-                  // println("OUTPUT " + io + " BINDING " + inputs(n) + " INPUT " + this);
-                }
-              } 
-	    //In this case, we are trying to use the input of a submodule
-	    //as part of the logic outside of the submodule.
-	    //If the logic is outside the submodule, we do not use the input
-	    //name. Instead, we use whatever is driving the input. In other
-	    //words, we do not use the Input name, if the component of the
-	    //logic is the part of Input's component.
-	    //We also do the same when assigning to the output if the output
-	    //is the parent of the subcomponent;
-		else if (io.dir == INPUT && ((!this.isInstanceOf[IO] && this.component == io.component.parent) || (this.isInstanceOf[IO] && this.asInstanceOf[IO].dir == OUTPUT && this.component == io.component.parent))) {
-		  if(io.inputs.length > 0) inputs(i) = io.inputs(0);
-		} 
-            case any => 
-          }
+          if (node.component == null)
+            node.component = nextComp;
+          toTrace += new TraceWork(() => node.traceNode(nextComp));
+          val j = i;
+          val n = node;
+          toTrace += new TraceWork(() => {
+	    // This code finds a binding for a node. We search for a binding only if it is an output
+	    // and the logic's grandfather component is not the same as the io's component and
+	    // the logic's component is not same as output's component unless the logic is an input
+            n match { 
+              case io: IO => 
+                if (io.dir == OUTPUT && 
+                    (!(component.parent == io.component) && 
+                     !(component == io.component && 
+                       !(this.isInstanceOf[IO] && this.asInstanceOf[IO].dir == INPUT)))) {
+                  val c = n.component.parent;
+                  val b = Binding(n, c, io.component);
+                  inputs(j) = b;
+                  if (!c.isWalked.contains(b)) {
+                    c.mods += b;  c.isWalked += b;
+                  }
+	        // In this case, we are trying to use the input of a submodule 
+                // as part of the logic outside of the submodule.
+	        // If the logic is outside the submodule, we do not use the input
+	        // name. Instead, we use whatever is driving the input. In other
+	        // words, we do not use the Input name, if the component of the
+	        // logic is the part of Input's component.
+	        // We also do the same when assigning to the output if the output
+	        // is the parent of the subcomponent;
+                } else if (io.dir == INPUT && 
+                           ((!this.isInstanceOf[IO] && this.component == io.component.parent) || 
+                            (this.isInstanceOf[IO] && this.asInstanceOf[IO].dir == OUTPUT && 
+                             this.component == io.component.parent))) {
+                   if (io.inputs.length > 0) inputs(j) = io.inputs(0);
+                } 
+              case any => 
+            };
+           ArrayBuffer[TraceWork]();
+          });
         }
         i += 1;
       }
       comp.mods += this;
     }
+    toTrace
   }
 
   def fixName() = {

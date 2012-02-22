@@ -141,8 +141,11 @@ object Component {
 		pop;
 	      }
 
+              val dad = compStack.top;
+	      c.parent = dad;
+              dad.children += c;
+	      if(isEmittingComponents) dad.nameChild(c);
 
-	      c.staticParent = compStack.top;
 	      compStack.push(c);
 	      stackIndent += 1;
 	      printStackStruct += ((stackIndent, c));
@@ -159,6 +162,15 @@ object Component {
     stackIndent -= 1;
   }
 
+  def getComponent(): Component = if(compStack.length != 0) compStack.top else { 
+    // val st = Thread.currentThread.getStackTrace;
+    // println("UNKNOWN COMPONENT "); 
+    // for(frame <- st)
+    //   println("  " + frame);
+    null 
+  };
+  
+
 }
 
 abstract class Component {
@@ -167,7 +179,6 @@ abstract class Component {
   val bindings = new ArrayBuffer[Binding];
   var wiresCache: Array[(String, IO)] = null;
   var parent: Component = null;
-  var staticParent: Component = null;
   var containsReg = false;
   val children = new ArrayBuffer[Component];
   var inputs = new ArrayBuffer[Node];
@@ -509,10 +520,7 @@ abstract class Component {
       }
     }
   }
-  def findNodes(depth: Int, c: Component): Unit = {
-    for((n, elm) <- io.flatten) elm.removeCellIOs();
-    io.findNodes(depth, c);
-  }
+  def traceableNodes = io.traceableNodes;
   def childrenContainsReg: Boolean = {
     var res = containsReg;
     if(children.isEmpty) return res; 
@@ -685,7 +693,7 @@ abstract class Component {
       c.markComponent();
     genAllMuxes;
     components.foreach(_.postMarkNet(0));
-    findNodes(0, this);
+    traceNodes();
     val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
     val out = new java.io.FileWriter(base_name + name + ".v");
     doCompileV(out, 0);
@@ -813,6 +821,15 @@ abstract class Component {
       pathParent.getPathName + "_" + res;
   }
 
+  def traceNodes() = {
+    val queue = Stack[TraceWork]();
+    queue.push(new TraceWork(() => io.traceNode(this)));
+    while (queue.length > 0) {
+      val work = queue.pop();
+      queue.pushAll(work());
+    }
+  }
+
   def compileC(): Unit = {
     components.foreach(_.elaborate(0));
     for (c <- components)
@@ -834,7 +851,7 @@ abstract class Component {
       topComponent = this;
     }
     // isWalked.clear();
-    findNodes(0, this);
+    traceNodes();
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors)	err.printError;
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
