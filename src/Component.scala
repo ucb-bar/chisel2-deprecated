@@ -522,18 +522,30 @@ abstract class Component {
     }
     leaves
   }
-  def findOrdering() = {
-    val roots = findRoots();
+  def visitNodes(roots: Array[Node]) = {
+    val stack = new Stack[(Int, Node)]();
+    for (root <- roots)
+      stack.push((0, root));
     isWalked.clear();
-    for (r <- roots)
-      r.visitNode(0);
+    while (stack.length > 0) {
+      val (depth, node) = stack.pop();
+      node.visitNode(depth, stack);
+    }
   }
-  def findGraph() = {
-    val leaves = findLeaves();
+  def visitNodesRev(roots: Array[Node]) = {
+    val stack = new Stack[(Int, Node)]();
+    for (root <- roots)
+      stack.push((0, root));
     isWalked.clear();
-    for (r <- leaves)
-      r.visitNodeRev(0);
+    while (stack.length > 0) {
+      val (depth, node) = stack.pop();
+      node.visitNodeRev(depth, stack);
+    }
   }
+
+  def findOrdering() = visitNodes(findRoots().toArray);
+  def findGraph() = visitNodesRev(findLeaves().toArray);
+
   def findGraphDims(): (Int, Int, Int) = {
     var maxDepth = 0;
     val imods = new ArrayBuffer[Node]();
@@ -905,11 +917,11 @@ abstract class Component {
   }
 
   def traceNodes() = {
-    val queue = Stack[TraceWork]();
-    queue.push(new TraceWork(() => io.traceNode(this)));
+    val queue = Stack[() => Any]();
+    queue.push(() => io.traceNode(this, queue));
     while (queue.length > 0) {
       val work = queue.pop();
-      queue.pushAll(work());
+      work();
     }
   }
 

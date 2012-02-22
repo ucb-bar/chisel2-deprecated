@@ -106,10 +106,6 @@ object Node {
   
 }
 
-class TraceWork (val f: () => ArrayBuffer[TraceWork]) { 
-  def apply() = f();
-}
-
 abstract class Node extends nameable{
   var walked = false;
   var staticComp: Component = getComponent();
@@ -263,45 +259,53 @@ abstract class Node extends nameable{
       res += "  ";
     res
   }
-  def visitNode(newDepth: Int): Unit = {
+
+  def visitNode(newDepth: Int, stack: Stack[(Int, Node)]): Unit = {
     val comp = componentOf;
-    depth = max(depth, newDepth);
-    //println("THINKING MOD(" + depth + ") " + comp.name + ": " + this.name);
-    if (!comp.isWalked.contains(this)) {
-      //println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
-      comp.isWalked += this;
-      this.walked = true;
-      for (i <- inputs) {
-        if (i != null) {
-          i match {
-	    case m: MemRef[ _ ] => if(!m.isReg) i.visitNode(newDepth+1);
-            case d: Delay => 
-            case o => {
-	      i.visitNode(newDepth+1);
-	    }
+    // println("VISIT NODE(" + newDepth + ") " + comp.name + ": " + this.name);
+    if (newDepth == -1) 
+      comp.omods += this;
+    else {
+      depth = max(depth, newDepth);
+      //println("THINKING MOD(" + depth + ") " + comp.name + ": " + this.name);
+      if (!comp.isWalked.contains(this)) {
+        //println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
+        comp.isWalked += this;
+        this.walked = true;
+        stack.push((-1, this));
+        for (i <- inputs) {
+          if (i != null) {
+            i match {
+              case m: MemRef[ _ ] => if(!m.isReg) stack.push((newDepth+1, i));
+              case d: Delay       => 
+              case o              => stack.push((newDepth+1, o)); 
+            }
           }
         }
+        // println("VISITING MOD " + this + " DEPTH " + depth);
       }
-      comp.omods += this;
     }
   }
-  def visitNodeRev(newDepth: Int): Unit = {
+  def visitNodeRev(newDepth: Int, stack: Stack[(Int, Node)]): Unit = {
     val comp = componentOf;
-    depth = max(depth, newDepth);
-    if (!comp.isWalked.contains(this)) {
-      //println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
-      comp.isWalked += this;
-      for (c <- consumers) {
-        if (c != null) {
-          c match {
-	    case m: MemRef[ _ ] => if(!m.isReg) c.visitNodeRev(newDepth+1);
-            case d: Delay => 
-            case o => c.visitNodeRev(newDepth+1);
+    if (newDepth == -1)
+      comp.gmods += this;
+    else {
+      depth = max(depth, newDepth);
+      if (!comp.isWalked.contains(this)) {
+        // println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
+        comp.isWalked += this;
+        stack.push((-1, this));
+        for (c <- consumers) {
+          if (c != null) {
+            c match {
+              case m: MemRef[ _ ] => if(!m.isReg) stack.push((newDepth+1, m));
+              case d: Delay       => 
+              case o              => stack.push((newDepth+1, o));
+            }
           }
         }
       }
-      // println("ADDING MOD " + this);
-      comp.gmods += this;
     }
   }
 
@@ -350,8 +354,7 @@ abstract class Node extends nameable{
     null;
   }
 
-  def traceNode(c: Component): ArrayBuffer[TraceWork] = {
-    val toTrace = ArrayBuffer[TraceWork]();
+  def traceNode(c: Component, stack: Stack[() => Any]): Any = {
     removeCellIOs;
     fixName();
     if ((isReg || isRegOut || isClkInput) && !(component == null))
@@ -365,17 +368,17 @@ abstract class Node extends nameable{
       comp.isWalked += this;
       for (node <- traceableNodes) {
         if (node != null) 
-          toTrace += new TraceWork(() => node.traceNode(nextComp));
+          stack.push(() => node.traceNode(nextComp, stack));
       }
       var i = 0;
       for (node <- inputs) {
         if (node != null) {
           if (node.component == null)
             node.component = nextComp;
-          toTrace += new TraceWork(() => node.traceNode(nextComp));
+          stack.push(() => node.traceNode(nextComp, stack));
           val j = i;
           val n = node;
-          toTrace += new TraceWork(() => {
+          stack.push(() => {
 	    // This code finds a binding for a node. We search for a binding only if it is an output
 	    // and the logic's grandfather component is not the same as the io's component and
 	    // the logic's component is not same as output's component unless the logic is an input
@@ -407,14 +410,12 @@ abstract class Node extends nameable{
                 } 
               case any => 
             };
-           ArrayBuffer[TraceWork]();
           });
         }
         i += 1;
       }
       comp.mods += this;
     }
-    toTrace
   }
 
   def fixName() = {
