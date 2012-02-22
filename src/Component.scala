@@ -381,6 +381,8 @@ abstract class Component {
     isAllKnown
     */
   }
+
+/*
   def initInference() = {
     for (m <- mods) {
       // if (isInferenceTerminal(m)) {
@@ -413,6 +415,83 @@ abstract class Component {
     }
     //println("MAXIMUM INFER WALK = " + inferMax + " ON " + maxNode + " which is a " + maxNode.getClass);
   }
+*/
+
+  def inferAll(): Unit = {
+    var nodesList = ArrayBuffer[Node]()
+    val walked = new HashSet[Node]
+    val bfsQueue = new Queue[Node]
+
+    // initialize bfsQueue
+    for((n, elm) <- io.flatten) 
+      if(elm.isInstanceOf[IO] && elm.asInstanceOf[IO].dir == OUTPUT)
+  	bfsQueue.enqueue(elm)
+    
+    // conduct bfs to find all reachable nodes
+    while(!bfsQueue.isEmpty){
+      val top = bfsQueue.dequeue
+      walked += top
+      nodesList += top
+      for(i <- top.inputs) 
+  	if(!walked.contains(i)) {
+  	  bfsQueue.enqueue(i) 
+  	}
+    }
+    var count = 0
+
+    // bellman-ford to infer all widths
+    for(i <- 0 until nodesList.length) {
+
+      var done = true;
+      for(elm <- nodesList){
+	val updated = elm.infer
+  	done = done && !updated
+	//done = done && !(elm.infer) TODO: why is this line not the same as previous two?
+      }
+
+      count += 1
+
+      if(done){
+  	for(elm <- nodesList)
+  	  if (elm.width == -1) println("Error");
+  	println(count)
+  	return;
+      }
+    }
+    println(count)
+  }
+
+  def forceMatchingWidths = {
+    for((io, i) <- ioMap) {
+
+      if(!io.isCellIO && io.isInstanceOf[IO] && io.inputs.length == 1) {
+
+	if (io.width > io.inputs(0).width){
+
+	  println("too long " + io)
+	  if(io.inputs(0).isInstanceOf[Fix]){
+	    val topBit = NodeExtract(io.inputs(0), io.inputs(0).width-1); topBit.infer
+	    val fill = NodeFill(io.width - io.inputs(0).width, topBit); fill.infer
+	    val res = Concatanate(fill, io.inputs(0)); res.infer
+	    io.inputs(0) = res
+	  } else {
+	    val topBit = Literal(0,1)
+	    val fill = NodeFill(io.width - io.inputs(0).width, topBit); fill.infer
+	    val res = Concatanate(fill, io.inputs(0)); res.infer
+	    io.inputs(0) = res
+	  }
+
+	} else if (io.width < io.inputs(0).width) {
+	  println("too short " + io)
+	  val res = NodeExtract(io.inputs(0), io.width-1, 0); res.infer
+	  io.inputs(0) = res
+	}
+
+      }
+
+    }
+  }
+
   def findConsumers() = {
     for (m <- mods) {
       m.addConsumers;
@@ -424,6 +503,7 @@ abstract class Component {
       m match {
         case io: IO => if (io.dir == OUTPUT) { if (io.consumers.length == 0) roots += m; }
         case d: Delay  => roots += m;
+	case mr: MemRef[ _ ] => if(mr.isReg) roots += m;
         case any       =>
       }
     }
@@ -436,6 +516,7 @@ abstract class Component {
         case io: IO    => if (io.dir == INPUT && !io.isCellIO) { if (io.inputs.length == 0) leaves += m; }
         case l: Literal    => leaves += m;
         case d: Delay  => leaves += m;
+	case mr: MemRef[ _ ] => if(mr.isReg) leaves += m;
         case any       =>
       }
     }
@@ -544,7 +625,7 @@ abstract class Component {
       for(err <- ChiselErrors) err.printError;
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
     }
-    inferAll();
+    //inferAll();
     collectNodes(this);
     // for (m <- mods) {
     //   println("// " + depthString(depth+1) + " MOD " + m);
@@ -693,6 +774,8 @@ abstract class Component {
       c.markComponent();
     genAllMuxes;
     components.foreach(_.postMarkNet(0));
+    inferAll();
+    forceMatchingWidths;
     traceNodes();
     val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
     val out = new java.io.FileWriter(base_name + name + ".v");
@@ -851,6 +934,8 @@ abstract class Component {
       topComponent = this;
     }
     // isWalked.clear();
+    inferAll();    
+    forceMatchingWidths;
     traceNodes();
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors)	err.printError;
@@ -862,7 +947,6 @@ abstract class Component {
         if (!(c == this))
           mods ++= c.mods;
     findConsumers();
-    inferAll();
     verifyAllMuxes;
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors)	err.printError;
@@ -904,7 +988,7 @@ abstract class Component {
         out_h.write("  " + c.emitRef + "_t* " + c.emitRef + ";\n");
     }
     out_h.write("\n");
-    out_h.write("  void init ( void );\n");
+    out_h.write("  void init ( bool random_initialization = false );\n");
     out_h.write("  void clock_lo ( dat_t<1> reset );\n");
     out_h.write("  void clock_hi ( dat_t<1> reset );\n");
     out_h.write("  void print ( FILE* f );\n");
@@ -916,11 +1000,11 @@ abstract class Component {
     out_c.write("#include \"" + name + ".h\"\n");
     for(str <- includeArgs) out_c.write("#include \"" + str + "\"\n"); 
     out_c.write("\n");
-    out_c.write("void " + name + "_t::init ( void ) {\n");
+    out_c.write("void " + name + "_t::init ( bool random_initialization ) {\n");
     if (isEmittingComponents) {
       for (c <- children) {
         out_c.write("  " + c.emitRef + " = new " + c.emitRef + "_t();\n");
-        out_c.write("  " + c.emitRef + "->init();\n");
+        out_c.write("  " + c.emitRef + "->init(random_initialization);\n");
       }
     }
     for (m <- omods) {

@@ -9,6 +9,7 @@ package Chisel {
 
 import scala.collection.mutable.ListBuffer;
 import java.io.File;
+import Component._;
 import Node._;
 
 object Rom {
@@ -31,8 +32,7 @@ object Mem {
                        wrEnable: Bool,
                        wrAddr:   Num,
                        wrData:   T,
-                       // TODO: WHY NOT wrMask?
-                       w_mask:   Bits = null.asInstanceOf[Bits],
+                       wrMask:   Bits = null.asInstanceOf[Bits],
                        cs:       Bool = null.asInstanceOf[Bool],
                        resetVal: T    = null.asInstanceOf[T],
                        readLatency: Int = 0,
@@ -41,7 +41,7 @@ object Mem {
     val memcell = new MemCell(depth, wrData);
     memcell.setReadLatency(readLatency);
     if (!(wrAddr == null) && !(wrEnable == null) && !(wrData == null)) {
-      memcell.write(wrAddr, wrData, wrEnable, w_mask, cs);
+      memcell.write(wrAddr, wrData, wrEnable, wrMask, cs);
     }
     if (!(resetVal == null)) memcell.reset_val(resetVal);
     if (hexInitFile != "") memcell.setHexInitFile(hexInitFile);
@@ -125,7 +125,16 @@ class MemCell[T <: Data](n: Int, data: T) extends Cell {
   }
 
   def getReadLatency = primitiveNode.getReadLatency;
-  def setReadLatency(latency: Int) = primitiveNode.setReadLatency(latency);
+  def setReadLatency(latency: Int) = {
+    primitiveNode.setReadLatency(latency);
+    primitiveNode.setCppReadLatency(latency);
+
+    if(!isEmittingComponents)
+      for(port <- port_list){
+        if(port.port_type == 'read || port.port_type == 'rw)
+	  port.genRegChain(latency)
+      }
+  }
   def reset_val(r_val: T) = { primitiveNode.addResetVal(this, r_val); }
   def setTarget(s: Symbol) = { primitiveNode.target = s; }
 }
@@ -141,6 +150,8 @@ class MemPort[T <: Data](cell:       MemCell[T],
                         ) {
   val mem = cell.primitiveNode;
   val memRef = MemRef(this, addr);
+  var holder: Bits = null;
+  memRef.port_type = prt_type;
   var port_type = prt_type;
   def next_input_index = mem.inputs.length;
   var port_index = cell.port_count;
@@ -165,7 +176,7 @@ class MemPort[T <: Data](cell:       MemCell[T],
   }
 
   def connectToCell(arg_to_prevent_reflection: Int) = {
-    assign_data(data);
+    assign_data(data.toNode);
     assign_addr(addr);
     assign_we(we);
     assign_wbm(wbm);
@@ -254,6 +265,15 @@ class MemPort[T <: Data](cell:       MemCell[T],
    
   def getReadLatency = mem.getReadLatency;
 
+  def genRegChain(x: Int) = {
+    println("called " + x)
+    for(i <- 0 until x){
+      val reg = new Reg();
+      reg.init("", widthOf(0), holder.inputs(0));
+      holder.inputs(0) = reg;
+    }
+  }
+
   def wrAddr =       { if (addr_offset < 0) println("[error] Using bad wrAddr"); mem.inputs(addr_offset); }
   def hasWrAddr =    { addr_offset >= 0; }
   def wrData =       { if (data_offset < 0) println("[error] Using bad wrData"); mem.inputs(data_offset); }
@@ -273,12 +293,23 @@ class MemPort[T <: Data](cell:       MemCell[T],
     if (cell.getDataType == null) {
       println("[error] read has no data prototype");
     } else {
-      res = cell.getDataType.fromNode(memRef).asInstanceOf[T];
+      //res = cell.getDataType.fromNode(memRef).asInstanceOf[T];
+
+      if(isEmittingComponents) {
+        res = cell.getDataType.fromNode(memRef).asInstanceOf[T]
+        res.comp = memRef
+      } else {
+        holder = Bits(data.toNode.getWidth, OUTPUT)
+        holder.inputs += memRef;
+        res = cell.getDataType.fromNode(holder);
+        res.comp = holder
+        genRegChain(mem.cppReadLatency)
+      }
       res.setIsCellIO;
-      res.comp = memRef; // Make this Data node assignable through the memory reference.
     }
     res;
   }
+
   def apply(addr: Node, we: Bool = null, wbm: Bits = null.asInstanceOf[Bits], cs: Bool = null, oe: Bool = null): T = {
     val we_opt = (if (we == null) Bool(true) else we);
     val virtual_port = new MemPort[T](cell, 'virtual, addr, null.asInstanceOf[T], we_opt, wbm, cs, oe);
@@ -422,6 +453,7 @@ class MemPort[T <: Data](cell:       MemCell[T],
     }
     res;
   }
+
   def emitDefLoC: String = {
     var res = "";
     val read_buf = mem.emitRef+"__read"+port_index+"_";
@@ -445,38 +477,41 @@ class MemPort[T <: Data](cell:       MemCell[T],
     }
     res;
   }
+
+
   def emitDefHiC: String = {
     isHiC = true;
     var res = "";
     val read_buf = mem.emitRef+"__read"+port_index+"_";
     if (isWritable) {
-      res +=  "  if (" + wrEnable.emitRef + ".to_bool()) {\n"
+      res += " if (" + wrEnable.emitRef + ".to_bool()) {\n"
       if (!hasWrBitMask) {
         res +=
-        "    " + mem.emitRef + ".put(" + wrAddr.emitRef + ", " +
+        " " + mem.emitRef + ".put(" + wrAddr.emitRef + ", " +
         wrData.emitRef + ");\n" +
-        "  }\n";
+        " }\n";
       } else {
         res +=
-        "    " + mem.emitRef + ".put(" + wrAddr.emitRef + ", " +
+        " " + mem.emitRef + ".put(" + wrAddr.emitRef + ", " +
         wrData.emitRef + " & " + wrBitMask.emitRef + " | " +
         mem.emitRef + ".get(" + wrAddr.emitRef + ") & ~" + wrBitMask.emitRef + ");\n" +
-        "  }\n";
+        " }\n";
       }
     }
     if (isReadable) {
       val read_buf = mem.emitRef+"__read"+port_index+"_";
       val read_lat = mem.getReadLatency;
       if (read_lat > 0) {
-        // res += "  "+memRef.emitRef+" = "+memRef.emitRef+"_shadow;\n";
+        // res += " "+memRef.emitRef+" = "+memRef.emitRef+"_shadow;\n";
         for (lat <- 0 until read_lat) {
-          res += "  "+read_buf+(read_lat-lat-1)+" = "+read_buf+(read_lat-lat-1)+"_shadow;\n";
+          res += " "+read_buf+(read_lat-lat-1)+" = "+read_buf+(read_lat-lat-1)+"_shadow;\n";
         }
       }
     }
     isHiC = false;
     res
   }
+  
 }
 
 class MemResetPort[T <: Data](mem: Mem[T], cell: MemCell[T], reset_val: T) {
@@ -492,14 +527,14 @@ class MemResetPort[T <: Data](mem: Mem[T], cell: MemCell[T], reset_val: T) {
   def resetVal = mem.inputs(reset_port_index);
 
   def emitDef: String = {
-    var res = 
+    var res = ""
       //"  always @(posedge clk) begin\n" +
-      "    if (reset) begin\n"
+      //"    if (reset) begin\n"
     for (i <- 0 until mem.getDepth) {
       res += "      " + mem.emitRef + "[" + i + "] <= " + resetVal.emitRef + ";\n";
     }
     //res += "    end\n";
-    res += "    end else begin\n"; 
+    //res += "    end else begin\n"; 
     //res += "  end\n";
     res
   }
@@ -566,7 +601,14 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
   }
 
   def getReadLatency = readLatency;
-  def setReadLatency(latency: Int) = { readLatency = latency }
+  def setReadLatency(latency: Int) = { 
+    if(isEmittingComponents) 
+      readLatency = latency 
+  }
+
+  var cppReadLatency = 0
+
+  def setCppReadLatency(latency: Int) = cppReadLatency = latency
 
   override def toString: String = "MEM( + emitRef + )";
 
@@ -714,7 +756,7 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
         res += "  " + emitRef + ".put(" + i + ", " + initData(i).emitRef + ");\n";
       res
     } else {
-      ""
+      "  if (random_initialization) "+emitRef+".randomize();\n"
     }
   }
   override def emitDecC: String = {
@@ -770,7 +812,9 @@ object MemRef {
 class MemRef[T <: Data](mem_port: MemPort[T]) extends Node with proc {
   var port_index: Int = 0;
 
+  var port_type = 'read
   override def isInObject = true; 
+  override def isReg = inputs(0).asInstanceOf[Mem[ _ ]].getReadLatency > 0 && port_type == 'rw
 
   // proc trait methods. Note that the proc trait is expected so that
   // this node can be assigned to Node.comp to support assignment.

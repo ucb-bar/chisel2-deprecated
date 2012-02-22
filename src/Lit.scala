@@ -145,6 +145,16 @@ object Literal {
     res
   }
 
+  def removeUnderscore(x: String): String = {
+    var res = ""
+    for(c <- x){
+      if(c != '_'){
+	res = res + c
+      }
+    }
+    res
+  }
+
   def parseLit(x: String): (String, String, Int) = {
     var bits = "";
     var mask = "";
@@ -200,9 +210,9 @@ object Literal {
     if (!"dhbo".contains(base)) ChiselErrors += IllegalArgument("no base specified", 4);
     val res = new Literal();
     if(width == -1)
-      res.init(literal, sizeof(base, literal));
+      res.init(removeUnderscore(literal), sizeof(base, literal));
     else{
-      res.init(literal, width); 
+      res.init(removeUnderscore(literal), width); 
       if(width < sizeof(base, literal)) 
 	ChiselErrors += IllegalState("width " + width + " is too small for literal: " + res + " with min width " + sizeof(base, literal), 4)
     }

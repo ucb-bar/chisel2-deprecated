@@ -14,6 +14,7 @@ object Binding {
         val res = new Binding();
         res.component = c;
         res.init("", widthOf(0), m);
+	res.infer;
 	var genName = ioComp.genName(m.name);
 	if(c.nameSpace.contains(genName)) genName += ("_" + res.emitIndex);
         //res.name = ioComp.genName(m.name); 

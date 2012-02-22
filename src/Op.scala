@@ -106,7 +106,7 @@ class Op extends Node {
 
   def emitDefSigned: String = {
     if (op == ">>")
-      "$signed(" + inputs(0).emitRef +") " + op + " " + inputs(1).emitRef
+      "$signed(" + inputs(0).emitRef +") " + ">>>" + " " + inputs(1).emitRef
     else
       "$signed(" + inputs(0).emitRef +") " + op + " $signed(" + inputs(1).emitRef + ")"
   }
@@ -138,7 +138,9 @@ class Op extends Node {
   }
 
   def emitSignedDefLoC: String = {
-    if(op == ">")
+    if(op == ">>")
+      emitOpRef(0) + ".rsha(" + emitOpRef(1) + ")"
+    else if(op == ">")
       emitOpRef(0) + ".gt(" + emitOpRef(1) + ")"
     else if(op == ">=")
       emitOpRef(0) + ".gte(" + emitOpRef(1) + ")"

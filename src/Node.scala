@@ -158,6 +158,10 @@ abstract class Node extends nameable{
     res.isSigned = true; 
     res.asInstanceOf[this.type]
   }
+  def bitSet(off: UFix, dat: Bits): Bits = { 
+    val bit = Bits(1, 1) << off;
+    (this.asInstanceOf[Bits] & ~bit) | (dat << off);
+  }
   // TODO: MOVE TO WIRE
   def assign(src: Node) = { 
     if (inputs.length > 0) 
@@ -205,7 +209,7 @@ abstract class Node extends nameable{
   }
   def infer: Boolean = {
     val res = inferWidth(this);
-    if(inferCount > 100) {
+    if(inferCount > 1000000) {
       if(genError) {
 	val error = IllegalState("Unable to infer width of " + this, 0);
         if (!ChiselErrors.contains(error))
@@ -216,11 +220,11 @@ abstract class Node extends nameable{
     }
     // println("INFER " + this + " -> " + res);
     if(res == -1) {
-      inferCount += 1;
+      //inferCount += 1;
       return true
     } else if (res != width) {
       width_ = res;
-      inferCount += 1;
+      //inferCount += 1;
       return true;
     } else{
       return false;
@@ -262,14 +266,15 @@ abstract class Node extends nameable{
   def visitNode(newDepth: Int): Unit = {
     val comp = componentOf;
     depth = max(depth, newDepth);
-    // println("THINKING MOD(" + depth + ") " + comp.name + ": " + this.name);
+    //println("THINKING MOD(" + depth + ") " + comp.name + ": " + this.name);
     if (!comp.isWalked.contains(this)) {
-      // println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
+      //println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
       comp.isWalked += this;
       this.walked = true;
       for (i <- inputs) {
         if (i != null) {
           i match {
+	    case m: MemRef[ _ ] => if(!m.isReg) i.visitNode(newDepth+1);
             case d: Delay => 
             case o => {
 	      i.visitNode(newDepth+1);
@@ -284,11 +289,12 @@ abstract class Node extends nameable{
     val comp = componentOf;
     depth = max(depth, newDepth);
     if (!comp.isWalked.contains(this)) {
-      // println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
+      //println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
       comp.isWalked += this;
       for (c <- consumers) {
         if (c != null) {
           c match {
+	    case m: MemRef[ _ ] => if(!m.isReg) c.visitNodeRev(newDepth+1);
             case d: Delay => 
             case o => c.visitNodeRev(newDepth+1);
           }

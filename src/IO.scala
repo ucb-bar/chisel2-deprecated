@@ -29,6 +29,7 @@ object OUTPUT extends IODirection {
 class IO extends Wire with Cloneable{ 
   var dir: IODirection = null;
   var unnamed = false;
+  
   // TODO: OPTIONALLY ONLY EMIT TOP COMPONENT IO IN OBJECT
   override def isIo = true; // = component == topComponent; // true; 
   override def emitDef: String = {
