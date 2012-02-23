@@ -51,9 +51,10 @@ class RegCell[T <: Data](d: T, w: Int, hasInput: Boolean, isReset: Boolean)(gen:
   io.setIsCellIO;
   val primitiveNode = new Reg();
   val dInput: Node = if(hasInput) io.data.toNode else null;
-  if(isReset)
+  if(isReset) {
+    primitiveNode.isReset = true
     primitiveNode.init("", regWidth(w), dInput, io.resetVal.toNode);
-  else
+  } else
     primitiveNode.init("", regWidth(w), dInput);
   val fb = io.q.fromNode(primitiveNode).asInstanceOf[T] 
   fb.setIsCellIO;
@@ -67,7 +68,8 @@ class Reg extends Delay with proc{
   def resetVal  = inputs(1);
   def enableSignal = inputs(enableIndex);
   var enableIndex = 0;
-  def isReset  = inputs.length == 2 && !isEnable || inputs.length > 2 && isEnable;
+  var hasResetSignal = false
+  var isReset = false
   var isEnable = false;
   def isUpdate = !(updateVal == null);
   def update (x: Node) = { inputs(0) = x };
@@ -143,7 +145,7 @@ class Reg extends Delay with proc{
 
   override def emitDefLoC: String = {
     val updateLogic = 
-      (if (isReset) "mux<" + width + ">(reset, " + resetVal.emitRef + ", " else "") + 
+      (if (isReset) "mux<" + width + ">(" + inputs.last.emitRef + ", " + resetVal.emitRef + ", " else "") + 
     updateVal.emitRef + (if (isReset) ");\n" else ";\n");
 
     "  " + emitRef + "_shadow = " +  updateLogic +

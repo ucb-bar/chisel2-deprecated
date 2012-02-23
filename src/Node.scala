@@ -67,11 +67,14 @@ object Node {
     } 
   }
   def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).getWidth - n.minNum.toInt }
-  var reset: Fix = Fix(1, INPUT);//Input("reset", 1);
-  reset.setName("reset");
-  var resets = Queue[Fix]();
+  //var reset: Fix = Fix(1, INPUT);//Input("reset", 1);
+  //reset.setName("reset");
+  //var resets = Queue[Fix]();
+
   var clk: Node = Bits(1, INPUT);//Input("clk", 1);
   clk.setName("clk");
+
+  /*
   def pushReset(r: Fix) { resets.enqueue(reset); reset = r }
   def popReset() { reset = resets.dequeue() }
   def withReset(r: Fix)(block: => Node) = {
@@ -80,6 +83,7 @@ object Node {
     reset = resBak;
     res
   }
+  * */
   // TODO: WHY IS THIS HERE?
 /*
   def ListLookup(addr: Node, default: List[Node], mapping: Array[(Node, List[Node])]): List[UFix] = {
@@ -349,7 +353,14 @@ abstract class Node extends nameable{
   }
   def findNodes(depth: Int, c: Component): Unit = {
     // untraced or same component?
-    if(isCellIO) println("found " + this);
+
+    def trace(x: Node): Node = {
+      var res = x;
+      while(res.isCellIO && res.inputs.length > 0) { res = res.inputs(0) }
+      res
+    }
+
+    if(isCellIO) println("found " + this.name + " " + trace(this).getClass);
     fixName();
     if ((isReg || isRegOut || isClkInput) && !(component == null))
         component.containsReg = true
@@ -368,10 +379,15 @@ abstract class Node extends nameable{
            nxtComp, // if (isEmittingComponents) nxtComp else topComponent, 
            nxtComp);
         }
+	case reg: Reg => {
+	  if(reg.isReset) reg.inputs += reg.component.reset
+	  reg.hasResetSignal = true
+	  (c, c, c)
+	}
         case any => (c, c, c);
       }
     if (comp == null) {
-      if (this != reset){
+      if (this != c.reset){
         println("NULL COMPONENT FOR " + this);
       }
     } else if (!comp.isWalked.contains(this)) {
@@ -383,7 +399,7 @@ abstract class Node extends nameable{
       //   component = markComp;
       for (node <- inputs) {
         if (node != null) {
-	  node.removeCellIOs;
+	  //node.removeCellIOs;
           // println(depthString(depth+1) + "INPUT " + node);
           if (node.component == null) // unmarked input
             node.component = markComp;
