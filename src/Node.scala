@@ -67,11 +67,14 @@ object Node {
     } 
   }
   def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).getWidth - n.minNum.toInt }
-  var reset: Fix = Fix(1, INPUT);//Input("reset", 1);
-  reset.setName("reset");
-  var resets = Queue[Fix]();
+  //var reset: Fix = Fix(1, INPUT);//Input("reset", 1);
+  //reset.setName("reset");
+  //var resets = Queue[Fix]();
+
   var clk: Node = Bits(1, INPUT);//Input("clk", 1);
   clk.setName("clk");
+
+  /*
   def pushReset(r: Fix) { resets.enqueue(reset); reset = r }
   def popReset() { reset = resets.dequeue() }
   def withReset(r: Fix)(block: => Node) = {
@@ -80,6 +83,7 @@ object Node {
     reset = resBak;
     res
   }
+  * */
   // TODO: WHY IS THIS HERE?
 /*
   def ListLookup(addr: Node, default: List[Node], mapping: Array[(Node, List[Node])]): List[UFix] = {
@@ -233,6 +237,7 @@ abstract class Node extends nameable{
   // TODO: SUBCLASS FROM SOMETHING INSTEAD OR OVERRIDE METHOD
   // TODO: RENAME METHOD TO ISVOLATILE
   def isInObject = isIo || isReg || isUsedByRam || isProbe || (isDebug && named);
+  def isInVCD = isIo || isReg || isProbe || (isDebug && named);
   def emitTmp: String = 
     if (isEmittingC) {
       if (isInObject)
@@ -251,10 +256,16 @@ abstract class Node extends nameable{
   def emitWidth: String = "[" + (width-1) + ":0]"
   def emitDec: String = "  wire" + (if (isSigned) " signed " else "") + emitWidth + " " + emitRef + ";\n";
   // C backend
+  def emitDecVCD: String = if (isVCD) "  dat_t<" + width + "> " +emitRef + "__prev" + ";\n" else "";
   def emitDecC: String = "  dat_t<" + width + "> " + emitRef + ";\n";
   def emitDefLoC: String = ""
   def emitInitC: String = ""
   def emitDefHiC: String = ""
+  def emitDefVCD(vcdname: String) = {
+    "  if (t == 0 || (" + emitRef + " != " + emitRef + "__prev).to_bool())\n" +
+    "    dat_dump(f, " + emitRef + ", \"" + vcdname + "\");\n" +
+    "  " + emitRef + "__prev = " + emitRef + ";\n"
+  }
   def emitRefC: String = emitRefV;
   def depthString(depth: Int): String = {
     var res = "";

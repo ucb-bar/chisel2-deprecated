@@ -39,6 +39,7 @@ object Component {
   var topComponent: Component = null;
   val components = ArrayBuffer[Component]();
   val procs = ArrayBuffer[proc]();
+  val resetList = ArrayBuffer[Node]();
   val muxes = ArrayBuffer[Node]();
   var ioMap = Map[Node, Int]();
   var ioCount = 0;
@@ -170,10 +171,15 @@ object Component {
     null 
   };
   
-
+  def assignResets() {
+    for(c <- components) {
+      if(c.reset.inputs.length == 0 && c.staticParent != null)
+	c.reset.inputs += c.staticParent.reset
+    }
+  }
 }
 
-abstract class Component {
+abstract class Component(resetSignal: Bool = null) {
   var ioVal: Data = null;
   var name: String = "";
   val bindings = new ArrayBuffer[Binding];
@@ -277,6 +283,13 @@ abstract class Component {
       res += w.emitDec;
     res
   }
+
+  val reset = Bool(INPUT)
+  resetList += reset
+  reset.component = this
+  reset.setName("reset")
+  if(!(resetSignal == null)) reset := resetSignal
+
   def emitRef: String = if (isEmittingC) emitRefC else emitRefV;
   def emitRefC: String = emitRefV;
   def emitRefV: String = name;
@@ -284,40 +297,42 @@ abstract class Component {
     val spacing = (if(verilog_parameters != "") " " else "");
     var res = "  " + moduleName + " " +verilog_parameters+ spacing + instanceName + "(";
     val hasReg = containsReg || childrenContainsReg;
-    res = res + (if(hasReg) ".clk(clk), .reset(reset)" else "");
+    res = res + (if(hasReg) ".clk(clk), .reset(" + (if(reset.inputs.length==0) "reset" else reset.inputs(0).emitRef) + ")" else "");
     var isFirst = true;
     var nl = ""
     for ((n, w) <- wires) {
-      if (isFirst && !hasReg) {isFirst = false; nl = "\n"} else nl = ",\n";
-      res += nl + "       ." + n + "( ";
-      //if(w.isInstanceOf[IO]) println("WALKED TO " + w + ": " + w.walked);
-      //if(w.isInstanceOf[IO])
+      if(n != "reset") {
+	if (isFirst && !hasReg) {isFirst = false; nl = "\n"} else nl = ",\n";
+	res += nl + "       ." + n + "( ";
+	//if(w.isInstanceOf[IO]) println("WALKED TO " + w + ": " + w.walked);
+	//if(w.isInstanceOf[IO])
 	//println("COMP WALKED " + w + " is " + this.isWalked.contains(w));
-      w match {
-        case io: IO  => 
-          if (io.dir == INPUT) {
-            if (io.inputs.length == 0)
-              println("// " + io + " UNCONNECTED IN " + io.component); 
-            else if (io.inputs.length > 1) 
-              println("// " + io + " CONNECTED TOO MUCH " + io.inputs.length); 
-	    else if (!this.isWalked.contains(w)) {
-	      println ("// UNUSED INPUT " +io+ " OF " + this + " IS REMOVED");
-	    }
-            else 
-              res += io.inputs(0).emitRef;
-          } else {
-            if (io.consumers.length == 0) 
-              println("// " + io + " UNCONNECTED IN " + io.component + " BINDING " + findBinding(io)); 
-            else {
-              var consumer: Node = parent.findBinding(io);
-              if (consumer == null) 
-                println("// " + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + io.consumers.length + ") IN " + parent); 
+	w match {
+          case io: IO  => 
+            if (io.dir == INPUT) {
+              if (io.inputs.length == 0)
+		println("// " + io + " UNCONNECTED IN " + io.component); 
+              else if (io.inputs.length > 1) 
+		println("// " + io + " CONNECTED TOO MUCH " + io.inputs.length); 
+	      else if (!this.isWalked.contains(w)) {
+		println ("// UNUSED INPUT " +io+ " OF " + this + " IS REMOVED");
+	      }
               else 
-                res += consumer.emitRef; // TODO: FIX THIS?
+		res += io.inputs(0).emitRef;
+            } else {
+              if (io.consumers.length == 0) 
+		println("// " + io + " UNCONNECTED IN " + io.component + " BINDING " + findBinding(io)); 
+              else {
+		var consumer: Node = parent.findBinding(io);
+		if (consumer == null) 
+                  println("// " + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + io.consumers.length + ") IN " + parent); 
+		else 
+                  res += consumer.emitRef; // TODO: FIX THIS?
+              }
             }
-          }
-      };
-      res += " )";
+	};
+	res += " )";
+      }
     }
     res += ");\n";
     res
@@ -432,6 +447,8 @@ abstract class Component {
     for(a <- asserts) 
       bfsQueue.enqueue(a)
     
+    for(r <- resetList)
+      bfsQueue.enqueue(r)
     // conduct bfs to find all reachable nodes
     while(!bfsQueue.isEmpty){
       val top = bfsQueue.dequeue
@@ -472,35 +489,33 @@ abstract class Component {
 
     def getNode(x: Node): Node = {
       var res = x
-      while(res.isCellIO && res.inputs.length == 1){
+      while(res.isCellIO && res.inputs.length != 0){
 	res = res.inputs(0)
       }
       res
     }
 
     // initialize bfsQueue
-    for((n, elm) <- io.flatten) 
+    for((n, elm) <- io.flatten) {
+      elm.removeCellIOs
       if(elm.isInstanceOf[IO] && elm.asInstanceOf[IO].dir == OUTPUT)
   	bfsQueue.enqueue(elm)
+    }
+
+    for(r <- resetList)
+      bfsQueue.enqueue(r)
 
     var count = 0
 
     while(!bfsQueue.isEmpty) {
       val top = bfsQueue.dequeue
+      top.removeCellIOs
       walked += top
       count += 1
 
-      for(i <- 0 until top.inputs.length) {
-	val input = top.inputs(i)
-	if(input == null)
-	  ChiselErrors += IllegalState("NULL Input for " + top.getClass + " " + top, 1)
-	else if(input.isCellIO) {
-	  val node = input.getNode
-	  top.inputs(i) = node
-	  if(!walked.contains(node)) bfsQueue.enqueue(node)
-	} else {
-	  if(!walked.contains(input)) bfsQueue.enqueue(input)
-	}
+      for(node <- top.inputs) {
+	node.removeCellIOs
+	if(!walked.contains(node)) bfsQueue.enqueue(node)
       }
 
     }
@@ -517,7 +532,7 @@ abstract class Component {
 
 	  println("too long " + io)
 	  if(io.inputs(0).isInstanceOf[Fix]){
-	    val topBit = NodeExtract(io.inputs(0), io.inputs(0).width-1); topBit.infer
+	    val topBit = NodeExtract(io.inputs(0), Literal(io.inputs(0).width-1)); topBit.infer
 	    val fill = NodeFill(io.width - io.inputs(0).width, topBit); fill.infer
 	    val res = Concatanate(fill, io.inputs(0)); res.infer
 	    io.inputs(0) = res
@@ -530,7 +545,7 @@ abstract class Component {
 
 	} else if (io.width < io.inputs(0).width) {
 	  println("too short " + io)
-	  val res = NodeExtract(io.inputs(0), io.width-1, 0); res.infer
+	  val res = NodeExtract(io.inputs(0), Literal(io.width-1), Literal(0,1)); res.infer
 	  io.inputs(0) = res
 	}
 
@@ -835,7 +850,8 @@ abstract class Component {
       c.markComponent();
     genAllMuxes;
     components.foreach(_.postMarkNet(0));
-    //removeCellIOs()
+    assignResets()
+    removeCellIOs()
     inferAll();
     forceMatchingWidths;
     traceNodes();
@@ -918,7 +934,7 @@ abstract class Component {
   def dumpVCDScope(file: java.io.FileWriter, top: Component, names: HashMap[Node, String]): Unit = {
     file.write("    fprintf(f, \"" + "$scope module " + name + " $end" + "\\n\");\n");
     for (mod <- top.omods) {
-      if (mod.component == this && mod.isInObject) {
+      if (mod.component == this && mod.isInVCD) {
         file.write("    fprintf(f, \"$var wire " + mod.width + " " + names(mod) + " " + stripComponent(mod.emitRefVCD) + " $end\\n\");\n");
       
       }
@@ -933,16 +949,14 @@ abstract class Component {
     var num = 0;
     val names = new HashMap[Node, String];
     for (mod <- omods) {
-      if (mod.isInObject) {
+      if (mod.isInVCD) {
         names(mod) = "N" + num;
         num += 1;
       }
     }
     file.write("void " + name + "_t::dump(FILE *f, int t) {\n");
     if (isVCD) {
-    file.write("  static bool is_init = false;\n");
-    file.write("  if (!is_init) {\n");
-    file.write("    is_init = true;\n");
+    file.write("  if (t == 0) {\n");
     file.write("    fprintf(f, \"$timescale 1ps $end\\n\");\n");
     dumpVCDScope(file, this, names);
     file.write("    fprintf(f, \"$enddefinitions $end\\n\");\n");
@@ -951,8 +965,8 @@ abstract class Component {
     file.write("  }\n");
     file.write("  fprintf(f, \"#%d\\n\", t);\n");
     for (mod <- omods) {
-      if (mod.isInObject)
-        file.write("  dat_dump(f, " + mod.emitRef + ", \"" + names(mod) + "\");\n");
+      if (mod.isInVCD && !(mod.name == "reset" && mod.component == this))
+        file.write(mod.emitDefVCD(names(mod)));
     }
     }
     file.write("}\n");
@@ -998,7 +1012,8 @@ abstract class Component {
       topComponent = this;
     }
     // isWalked.clear();
-    //removeCellIOs()
+    assignResets()
+    removeCellIOs()
     inferAll();    
     forceMatchingWidths;
     traceNodes();
@@ -1010,7 +1025,7 @@ abstract class Component {
     if (!isEmittingComponents) {
       for (c <- components) {
         if (!(c == this)) {
-          mods ++= c.mods;
+          mods    ++= c.mods;
           asserts ++= c.asserts;
         }
       }
@@ -1031,7 +1046,9 @@ abstract class Component {
         case any    => 
           if (m.name != "" && m != reset && !(m.component == null)) {
             //m.name = m.component.name + (if(m.component.instanceName != "") "_" else "") + m.component.instanceName + "__" + m.name;
-	    m.name = m.component.getPathName + "__" + m.name;
+	    // only modify name if it is not the reset signal of the top component
+	    if(m.name != "reset" || !(m.component == this)) 
+	      m.name = m.component.getPathName + "__" + m.name;
 	  }
       }
       // println(">> " + m.name);
@@ -1049,9 +1066,14 @@ abstract class Component {
       for ((n, w) <- wires) 
         out_h.write("  dat_t<" + w.width + "> " + w.emitRef + ";\n");
     }
-    for (m <- omods)
-      if (m.isInObject)
-        out_h.write(m.emitDecC);
+    for (m <- omods) {
+      if(m.name != "reset" || !(m.component == this)) {
+        if (m.isInObject)
+          out_h.write(m.emitDecC);
+        if (m.isInVCD)
+          out_h.write(m.emitDecVCD);
+      }
+    }
     if (isEmittingComponents) {
       for (c <- children) 
         out_h.write("  " + c.emitRef + "_t* " + c.emitRef + ";\n");
