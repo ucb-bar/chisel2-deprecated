@@ -236,6 +236,7 @@ abstract class Node extends nameable{
   // TODO: SUBCLASS FROM SOMETHING INSTEAD OR OVERRIDE METHOD
   // TODO: RENAME METHOD TO ISVOLATILE
   def isInObject = isIo || isReg || isUsedByRam || isProbe || (isDebug && named);
+  def isInVCD = isIo || isReg || isProbe || (isDebug && named);
   def emitTmp: String = 
     if (isEmittingC) {
       if (isInObject)
@@ -254,10 +255,16 @@ abstract class Node extends nameable{
   def emitWidth: String = "[" + (width-1) + ":0]"
   def emitDec: String = "  wire" + (if (isSigned) " signed " else "") + emitWidth + " " + emitRef + ";\n";
   // C backend
+  def emitDecVCD: String = if (isVCD) "  dat_t<" + width + "> " +emitRef + "__prev" + ";\n" else "";
   def emitDecC: String = "  dat_t<" + width + "> " + emitRef + ";\n";
   def emitDefLoC: String = ""
   def emitInitC: String = ""
   def emitDefHiC: String = ""
+  def emitDefVCD(vcdname: String) = {
+    "  if (t == 0 || (" + emitRef + " != " + emitRef + "__prev).to_bool())\n" +
+    "    dat_dump(f, " + emitRef + ", \"" + vcdname + "\");\n" +
+    "  " + emitRef + "__prev = " + emitRef + ";\n"
+  }
   def emitRefC: String = emitRefV;
   def depthString(depth: Int): String = {
     var res = "";

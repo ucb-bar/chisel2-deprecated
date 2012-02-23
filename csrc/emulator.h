@@ -1645,26 +1645,6 @@ size_t dat_from_hex(std::string hex_line, dat_t<w>& res, size_t offset = 0) {
 
 template <int w>
 void dat_dump (FILE* file, dat_t<w> val, const char* name) {
-  // XXX this probably shouldn't be a static map.
-  // Note that the use of const char* means that we're comparing pointers,
-  // not strings, so all strings must be statically allocated (as they are).
-  static std::map<const char*, dat_t<w> > prev_values;
-  typeof(prev_values.begin()) it = prev_values.find(name);
-
-  if (it != prev_values.end())
-  {
-    const dat_t<w>& prev = it->second;
-
-    int changed = 0;
-    for (int i = 0; i < val.n_words && !changed; i++)
-      changed |= prev.values[i] != val.values[i];
-
-    if (!changed)
-      return;
-  }
-
-  prev_values[name] = val;
-
   int namelen = strlen(name), pos = 0;
   char str[1 + w + 1 + namelen + 1 + 1];
 

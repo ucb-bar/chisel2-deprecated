@@ -710,6 +710,7 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
     }
     res
   }
+  override def emitDefVCD(vcdname: String): String = ""
   // Move call to p.emitDefLoC to the MemRef Class to properly schedule reads
   //override def emitDefLoC: String = {
   //  var res = ("" /: cell.port_list) { (s, p) => s + p.emitDefLoC };

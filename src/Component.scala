@@ -909,7 +909,7 @@ abstract class Component(resetSignal: Bool = null) {
   def dumpVCDScope(file: java.io.FileWriter, top: Component, names: HashMap[Node, String]): Unit = {
     file.write("    fprintf(f, \"" + "$scope module " + name + " $end" + "\\n\");\n");
     for (mod <- top.omods) {
-      if (mod.component == this && mod.isInObject) {
+      if (mod.component == this && mod.isInVCD) {
         file.write("    fprintf(f, \"$var wire " + mod.width + " " + names(mod) + " " + stripComponent(mod.emitRefVCD) + " $end\\n\");\n");
       
       }
@@ -924,16 +924,14 @@ abstract class Component(resetSignal: Bool = null) {
     var num = 0;
     val names = new HashMap[Node, String];
     for (mod <- omods) {
-      if (mod.isInObject) {
+      if (mod.isInVCD) {
         names(mod) = "N" + num;
         num += 1;
       }
     }
     file.write("void " + name + "_t::dump(FILE *f, int t) {\n");
     if (isVCD) {
-    file.write("  static bool is_init = false;\n");
-    file.write("  if (!is_init) {\n");
-    file.write("    is_init = true;\n");
+    file.write("  if (t == 0) {\n");
     file.write("    fprintf(f, \"$timescale 1ps $end\\n\");\n");
     dumpVCDScope(file, this, names);
     file.write("    fprintf(f, \"$enddefinitions $end\\n\");\n");
@@ -942,8 +940,8 @@ abstract class Component(resetSignal: Bool = null) {
     file.write("  }\n");
     file.write("  fprintf(f, \"#%d\\n\", t);\n");
     for (mod <- omods) {
-      if (mod.isInObject)
-        file.write("  dat_dump(f, " + mod.emitRef + ", \"" + names(mod) + "\");\n");
+      if (mod.isInVCD && !(mod.name == "reset" && mod.component == this))
+        file.write(mod.emitDefVCD(names(mod)));
     }
     }
     file.write("}\n");
@@ -1028,10 +1026,14 @@ abstract class Component(resetSignal: Bool = null) {
       for ((n, w) <- wires) 
         out_h.write("  dat_t<" + w.width + "> " + w.emitRef + ";\n");
     }
-    for (m <- omods)
-      if (m.isInObject)
-	if(m.name != "reset" || !(m.component == this))
+    for (m <- omods) {
+      if(m.name != "reset" || !(m.component == this)) {
+        if (m.isInObject)
           out_h.write(m.emitDecC);
+        if (m.isInVCD)
+          out_h.write(m.emitDecVCD);
+      }
+    }
     if (isEmittingComponents) {
       for (c <- children) 
         out_h.write("  " + c.emitRef + "_t* " + c.emitRef + ";\n");
