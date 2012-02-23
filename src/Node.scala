@@ -453,14 +453,16 @@ abstract class Node extends nameable{
   }
   
   def removeCellIOs() {
-    for(i <- 0 until inputs.length)
+    for(i <- 0 until inputs.length) {
       if(inputs(i) == null){
         val error = IllegalState("NULL Input for " + this.getClass + " " + this + " in Component " + component, 0);
         if (!ChiselErrors.contains(error))
           ChiselErrors += error
       }
-      else if(inputs(i).isCellIO)
+      else if(inputs(i).isCellIO) {
 	inputs(i) = inputs(i).getNode;
+      }
+    }
   }
   def getNode(): Node = {
     if(!isCellIO || inputs.length == 0)

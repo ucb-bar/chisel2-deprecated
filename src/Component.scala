@@ -16,7 +16,6 @@ import Bundle._;
 import IOdir._;
 import ChiselError._;
 
-
 object Component {
   var isDebug = false;
   var isVCD = false;
@@ -117,6 +116,7 @@ object Component {
       return "    " + genIndent(x-1);
   }
 
+
   def push(c: Component){
     if(firstComp){
       compStack.push(c);
@@ -183,6 +183,7 @@ abstract class Component {
   val children = new ArrayBuffer[Component];
   var inputs = new ArrayBuffer[Node];
   var outputs = new ArrayBuffer[Node];
+  val asserts = ArrayBuffer[Assert]();
   
   val mods  = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
@@ -264,6 +265,8 @@ abstract class Component {
       wiresCache = io.flatten;
     wiresCache
   }
+  def assert(cond: Bool, message: String) = 
+    asserts += Assert(cond, message);
   def <>(src: Component) = io <> src.io;
   def apply(name: String): Data = io(name);
   // COMPILATION OF REFERENCE
@@ -426,6 +429,8 @@ abstract class Component {
     for((n, elm) <- io.flatten) 
       if(elm.isInstanceOf[IO] && elm.asInstanceOf[IO].dir == OUTPUT)
   	bfsQueue.enqueue(elm)
+    for(a <- asserts) 
+      bfsQueue.enqueue(a)
     
     // conduct bfs to find all reachable nodes
     while(!bfsQueue.isEmpty){
@@ -541,6 +546,8 @@ abstract class Component {
   }
   def findRoots(): ArrayBuffer[Node] = {
     val roots = new ArrayBuffer[Node];
+    for (a <- asserts) 
+      roots += a.cond;
     for (m <- mods) {
       m match {
         case io: IO => if (io.dir == OUTPUT) { if (io.consumers.length == 0) roots += m; }
@@ -962,6 +969,8 @@ abstract class Component {
   def traceNodes() = {
     val queue = Stack[() => Any]();
     queue.push(() => io.traceNode(this, queue));
+    for (a <- asserts)
+      queue.push(() => a.traceNode(this, queue));
     while (queue.length > 0) {
       val work = queue.pop();
       work();
@@ -998,10 +1007,14 @@ abstract class Component {
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
       return
     }
-    if (!isEmittingComponents)
-      for (c <- components)
-        if (!(c == this))
+    if (!isEmittingComponents) {
+      for (c <- components) {
+        if (!(c == this)) {
           mods ++= c.mods;
+          asserts ++= c.asserts;
+        }
+      }
+    }
     findConsumers();
     verifyAllMuxes;
     if(!ChiselErrors.isEmpty){
@@ -1070,6 +1083,9 @@ abstract class Component {
     out_c.write("void " + name + "_t::clock_lo ( dat_t<1> reset ) {\n");
     for (m <- omods) {
       out_c.write(m.emitDefLoC);
+    }
+    for (a <- asserts) {
+      out_c.write("  ASSERT(" + a.cond.emitRefC + ", \"" + a.message + "\");\n");
     }
     // for (c <- children) 
     //   out_c.write("    " + c.emitRef + "->clock_lo(reset);\n");
