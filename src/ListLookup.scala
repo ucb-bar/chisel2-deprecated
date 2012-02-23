@@ -117,7 +117,7 @@ class ListLookupRef[T <: Bits]() extends Node {
 }
 
 object ListNode {
-  def apply[T <: Bits](nodes: List[T]): ListNode = {
+  def apply[T <: Data](nodes: List[T]): ListNode = {
     val res = new ListNode()
     res.init("", widthOf(0), nodes: _*)
     res

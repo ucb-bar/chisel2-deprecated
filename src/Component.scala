@@ -173,8 +173,8 @@ object Component {
   
   def assignResets() {
     for(c <- components) {
-      if(c.reset.inputs.length == 0 && c.staticParent != null)
-	c.reset.inputs += c.staticParent.reset
+      if(c.reset.inputs.length == 0 && c.parent != null)
+	c.reset.inputs += c.parent.reset
     }
   }
 }
