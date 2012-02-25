@@ -534,9 +534,9 @@ Bundles and Vecs can be arbitrarily nested to build complex data
 structures:
 \begin{example}
 class BigBundle extends Bundle {
-   val myVec = Vec(5) { Fix(width = 23) } // Vector of 5 23-bit signed integers.
-   val flag = Bool()
-   val f = new MyFloat() // Previously defined bundle.
+  val myVec = Vec(5) { Fix(width = 23) } // Vector of 5 23-bit signed integers.
+  val flag = Bool()
+  val f = new MyFloat() // Previously defined bundle.
 }
 \end{example}
 
@@ -769,6 +769,7 @@ Using registers, we can quickly define a number of useful circuit
 constructs.  For example, a rising-edge detector that takes a boolean
 signal in and outputs true when the current value is true and the
 previous value is false is given by:
+
 \begin{example}
 def risingedge(x: Bool) = x && !Reg(x)
 \end{example}
@@ -877,7 +878,7 @@ block following \code{when} can only contain update statements using
 the assignment operator \verb+:=+, simple expressions, and named wires
 defined with \code{val}.
 
-Cascaded conditional updates are prioritized from bottom to top in
+Cascaded conditional updates are prioritized from bottom to top
 following semantics of assignments to variables in Scala.  In particular, the last conditional
 update whose condition evaluates to true is chosen to execute its
 updates.  For example,
@@ -1002,9 +1003,9 @@ We introduce the \code{switch} statement for conditional updates
 involving a series of comparisons against a common key.  For example,
 \begin{example}
 switch(idx) {
- is(v1)    { u1 };
- is(v2)    { u2 };
- default   { ud };
+ is(v1)  { u1 };
+ is(v2)  { u2 };
+ default { ud };
 }
 \end{example}
 
@@ -1150,7 +1151,7 @@ Users can define read only memories with:
 
 %%  TODO: FIX Rom to take Seq
 \begin{example}
-Rom(inits: Seq[Data]) (gen: => T)
+Rom(inits: Seq[Data])(gen: => T)
 \end{example}
 
 \noindent
@@ -1226,7 +1227,7 @@ mimic common static memory (SRAM) behaviors:
 %% TODO: CHANGE TO CURRIED TYPE 
 \begin{example}
 Mem.setDefaultReadLatency(1);                 // Default: 0
-val regfile = Mem(64, io.data_in1);           // A memory with no ports, with data width derived from another signal.
+val regfile = Mem(64){ io.data_in1.clone }; // A memory with no ports, with data width derived from another signal.
 regfile.setHexInitFile("hex_init_values.txt"); // Data formatted for Verilog readmemh
 regfile.write(io.addr_in, io.data_in1, io.wen, wrMask = io.bit_mask);
 val read_data = regfile.read(io.addr_in, io.data_in1, oe = !io.wen, cs = Bool(true));
@@ -1250,13 +1251,13 @@ combined read/write ports.  The following example defines a memory with two read
 ports:
 
 \begin{example}
-val rw_mem = Mem(64, io.data_in1);
+val rw_mem = Mem(64){ io.data_in1.clone };
 rw_mem.setReadLatency(1);
 val rw_data_out = rw_mem.rw(io.addr_in, io.data_in1, io.wen);
 io.data_out2 := rw_mem.rw(io.addr_in,
                           io.data_in2,
                           we = Bool(true),      // Active high write enable
-                          w_mask = ~Bits(0,32), // Optional write mask
+                          wrMask = ~Bits(0,32), // Optional write mask
                           cs = Bool(true),      // Active high chip select
                           oe = Bool(true));     // Active high output enable
 \end{example}
@@ -1375,7 +1376,7 @@ Chisel warns users if ports have other than exactly one connection to them.
 \subsection{Port Views}
 
 \begin{figure}
-\centerline{\includegraphics[width=3.5in]{cpu.png}}
+\centerline{\includegraphics[width=3.5in]{figs/cpu.png}}
 \caption{Simple CPU involving control and data path subcomponents and host and memory interfaces.}
 \label{fig:cpu}
 \end{figure}
