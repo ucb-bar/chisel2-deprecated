@@ -117,6 +117,23 @@ object Component {
       return "    " + genIndent(x-1);
   }
 
+  def nameChildren(root: Component) = {
+    val walked = new HashSet[Component] // this is overkill, but just to be safe
+    
+    //initialize bfs queue of Components
+    val bfsQueue = new Queue[Component]()
+    bfsQueue.enqueue(root)
+
+    // if it popped off the queue, then it already has an instance name
+    while(!bfsQueue.isEmpty) {
+      val top = bfsQueue.dequeue
+      walked += top
+      for(child <- top.children){
+        top.nameChild(child)
+        if(!walked.contains(child)) bfsQueue.enqueue(child)
+      }
+    }
+  }
 
   def push(c: Component){
     if(firstComp){
@@ -145,7 +162,6 @@ object Component {
               val dad = compStack.top;
 	      c.parent = dad;
               dad.children += c;
-	      if(isEmittingComponents) dad.nameChild(c);
 
 	      compStack.push(c);
 	      stackIndent += 1;
@@ -824,6 +840,7 @@ abstract class Component(resetSignal: Bool = null) {
       }
     }
   }
+
   def nameChild(child: Component) = {
     if(!child.named){
       if(childNames contains child.className){
@@ -837,6 +854,7 @@ abstract class Component(resetSignal: Bool = null) {
       child.named = true;
     }
   }
+
   def ensure_dir(dir: String) = {
     val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/");
     new File(d).mkdirs();
@@ -855,6 +873,7 @@ abstract class Component(resetSignal: Bool = null) {
     inferAll();
     forceMatchingWidths;
     traceNodes();
+    nameChildren(topComponent)
     val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
     val out = new java.io.FileWriter(base_name + name + ".v");
     doCompileV(out, 0);

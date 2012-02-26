@@ -369,15 +369,29 @@ abstract class Node extends nameable{
   }
 
   def traceNode(c: Component, stack: Stack[() => Any]): Any = {
-    removeCellIOs;
-    fixName();
+    fixName(); 
+
+    // determine whether or not the component needs a clock input
     if ((isReg || isRegOut || isClkInput) && !(component == null))
         component.containsReg = true
+
+    // pushes and pops components as necessary in order to later mark the parent of nodes
     val (comp, nextComp) = 
       this match {
-        case io: IO => (io.component, if (io.dir == OUTPUT) io.component else io.component.parent);
+        case io: IO => {
+          assert(io.dir == OUTPUT || io.dir == INPUT, {println("IO w/o direction" + io)})
+          (io.component, if (io.dir == OUTPUT) io.component else io.component.parent);
+        }
         case any    => (c, c);
       }
+
+    // give the components reset signal to the current node
+    if(this.isInstanceOf[Reg]) {
+      val reg = this.asInstanceOf[Reg]
+      if(reg.isReset) reg.inputs += reg.component.reset
+      reg.hasResetSignal = true
+    }
+
     if (comp != null && !comp.isWalked.contains(this)) {
       comp.isWalked += this;
       for (node <- traceableNodes) {
