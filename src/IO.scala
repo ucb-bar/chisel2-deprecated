@@ -77,12 +77,12 @@ class IO extends Wire with Cloneable{
       case other: IO => 
 	if (other.dir == OUTPUT && this.staticComp == other.staticComp && !isCellIO) {
 	  other assign this;
-        } else if (isCellIO || (other.dir == OUTPUT && this.staticComp.staticParent == other.staticComp.staticParent)) {
+        } else if (isCellIO || (other.dir == OUTPUT && this.staticComp.parent == other.staticComp.parent)) {
           this assign other;
         } else if (other.dir == INPUT) {
-	  if(this.staticComp == other.staticComp.staticParent)
+	  if(this.staticComp == other.staticComp.parent)
 	    other assign this;
-	  else if(this.staticComp.staticParent == other.staticComp)
+	  else if(this.staticComp.parent == other.staticComp)
 	    this assign other;
 	  else
 	    ChiselErrors += IllegalConnection("Connecting Input " + this + " Input " + other, 2);
@@ -97,12 +97,12 @@ class IO extends Wire with Cloneable{
         case other: IO  => 
 	  if (other.dir == INPUT && this.staticComp == other.staticComp && !isCellIO){
 	    this assign other;
-	  } else if (isCellIO || (other.dir == INPUT && this.staticComp.staticParent == other.staticComp.staticParent)) {
+	  } else if (isCellIO || (other.dir == INPUT && this.staticComp.parent == other.staticComp.parent)) {
             other assign this;
           } else if (other.dir == OUTPUT) {
-	    if(this.staticComp == other.staticComp.staticParent)
+	    if(this.staticComp == other.staticComp.parent)
 	      this assign other;
-	    else if (this.staticComp.staticParent == other.staticComp)
+	    else if (this.staticComp.parent == other.staticComp)
 	      other assign this;
 	    else if (this.isCellIO && other.isCellIO)
 	      ChiselErrors += IllegalConnection("Ambiguous Connection of Two Nodes", 2);

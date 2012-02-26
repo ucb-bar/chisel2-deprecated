@@ -560,7 +560,7 @@ struct bit_word_funs {
     // printf("\n");
   }
 
-  static void inject (val_t d[], val_t s0[], int e, int s, int nb) {
+  static void inject (val_t d[], val_t s0[], int e, int s) {
     // Opposite of extract: Assign s0 to a subfield of d.
     const int bw = e-s+1;
     val_t msk[nw];
@@ -682,7 +682,7 @@ struct bit_word_funs<1> {
     d[0] = (s0[0] >> s) & mask_val(bw);
   }
 
-  static void inject (val_t d[], val_t s0[], int e, int s, int nb) {
+  static void inject (val_t d[], val_t s0[], int e, int s) {
     // Opposite of extract: Assign s0 to a subfield of d.
     const int bw = e-s+1;
     val_t msk = mask_val(bw);
@@ -813,7 +813,7 @@ struct bit_word_funs<2> {
     }
   }
 
-  static void inject (val_t d[], val_t s0[], int e, int s, int nb) {
+  static void inject (val_t d[], val_t s0[], int e, int s) {
     // Opposite of extract: Assign s0 to a subfield of d.
     const int bw = e-s+1;
     val_t msk[2];
@@ -997,7 +997,7 @@ struct bit_word_funs<3> {
     }
   }
 
-  static void inject (val_t d[], val_t s0[], int e, int s, int nb) {
+  static void inject (val_t d[], val_t s0[], int e, int s) {
     const int bw = e-s+1;
     val_t msk[3];
     val_t msk_lsh[3];
@@ -1397,17 +1397,17 @@ class dat_t {
     return extract<dw>(e.lo_word(), s.lo_word());
   }
 
-  template <int dw, int sw>
-  dat_t<dw> inject(dat_t<sw> src, val_t e, val_t s) {
+  template <int sw>
+  dat_t<w> inject(dat_t<sw> src, val_t e, val_t s) {
     // Modify this.values in place.
     dat_t<w> inject_src(src); // Enlarged if needed to match inject_dst
-    bit_word_funs<n_words>::inject(values, inject_src.values, e, s, dw);
-    return this;
+    bit_word_funs<n_words>::inject(values, inject_src.values, e, s);
+    return *this;
   }
 
-  template <int dw, int sw, int iwe, int iws>
-  inline dat_t<dw> inject(dat_t<sw> src, dat_t<iwe> e, dat_t<iws> s) { 
-    return inject<dw>(src, e.lo_word(), s.lo_word());
+  template <int sw, int iwe, int iws>
+  inline dat_t<w> inject(dat_t<sw> src, dat_t<iwe> e, dat_t<iws> s) { 
+    return inject<w>(src, e.lo_word(), s.lo_word());
   }
 
 
@@ -1645,26 +1645,6 @@ size_t dat_from_hex(std::string hex_line, dat_t<w>& res, size_t offset = 0) {
 
 template <int w>
 void dat_dump (FILE* file, dat_t<w> val, const char* name) {
-  // XXX this probably shouldn't be a static map.
-  // Note that the use of const char* means that we're comparing pointers,
-  // not strings, so all strings must be statically allocated (as they are).
-  static std::map<const char*, dat_t<w> > prev_values;
-  typeof(prev_values.begin()) it = prev_values.find(name);
-
-  if (it != prev_values.end())
-  {
-    const dat_t<w>& prev = it->second;
-
-    int changed = 0;
-    for (int i = 0; i < val.n_words && !changed; i++)
-      changed |= prev.values[i] != val.values[i];
-
-    if (!changed)
-      return;
-  }
-
-  prev_values[name] = val;
-
   int namelen = strlen(name), pos = 0;
   char str[1 + w + 1 + namelen + 1 + 1];
 

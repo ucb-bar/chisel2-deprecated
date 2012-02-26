@@ -16,7 +16,6 @@ import Bundle._;
 import IOdir._;
 import ChiselError._;
 
-
 object Component {
   var isDebug = false;
   var isVCD = false;
@@ -118,6 +117,24 @@ object Component {
       return "    " + genIndent(x-1);
   }
 
+  def nameChildren(root: Component) = {
+    val walked = new HashSet[Component] // this is overkill, but just to be safe
+    
+    //initialize bfs queue of Components
+    val bfsQueue = new Queue[Component]()
+    bfsQueue.enqueue(root)
+
+    // if it popped off the queue, then it already has an instance name
+    while(!bfsQueue.isEmpty) {
+      val top = bfsQueue.dequeue
+      walked += top
+      for(child <- top.children){
+        top.nameChild(child)
+        if(!walked.contains(child)) bfsQueue.enqueue(child)
+      }
+    }
+  }
+
   def push(c: Component){
     if(firstComp){
       compStack.push(c);
@@ -142,8 +159,10 @@ object Component {
 		pop;
 	      }
 
+              val dad = compStack.top;
+	      c.parent = dad;
+              dad.children += c;
 
-	      c.staticParent = compStack.top;
 	      compStack.push(c);
 	      stackIndent += 1;
 	      printStackStruct += ((stackIndent, c));
@@ -160,10 +179,18 @@ object Component {
     stackIndent -= 1;
   }
 
+  def getComponent(): Component = if(compStack.length != 0) compStack.top else { 
+    // val st = Thread.currentThread.getStackTrace;
+    // println("UNKNOWN COMPONENT "); 
+    // for(frame <- st)
+    //   println("  " + frame);
+    null 
+  };
+  
   def assignResets() {
     for(c <- components) {
-      if(c.reset.inputs.length == 0 && c.staticParent != null)
-	c.reset.inputs += c.staticParent.reset
+      if(c.reset.inputs.length == 0 && c.parent != null)
+	c.reset.inputs += c.parent.reset
     }
   }
 }
@@ -174,11 +201,11 @@ abstract class Component(resetSignal: Bool = null) {
   val bindings = new ArrayBuffer[Binding];
   var wiresCache: Array[(String, IO)] = null;
   var parent: Component = null;
-  var staticParent: Component = null;
   var containsReg = false;
   val children = new ArrayBuffer[Component];
   var inputs = new ArrayBuffer[Node];
   var outputs = new ArrayBuffer[Node];
+  val asserts = ArrayBuffer[Assert]();
   
   val mods  = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
@@ -260,6 +287,8 @@ abstract class Component(resetSignal: Bool = null) {
       wiresCache = io.flatten;
     wiresCache
   }
+  def assert(cond: Bool, message: String) = 
+    asserts += Assert(cond, message);
   def <>(src: Component) = io <> src.io;
   def apply(name: String): Data = io(name);
   // COMPILATION OF REFERENCE
@@ -431,10 +460,11 @@ abstract class Component(resetSignal: Bool = null) {
     for((n, elm) <- io.flatten) 
       if(elm.isInstanceOf[IO] && elm.asInstanceOf[IO].dir == OUTPUT)
   	bfsQueue.enqueue(elm)
-
+    for(a <- asserts) 
+      bfsQueue.enqueue(a)
+    
     for(r <- resetList)
       bfsQueue.enqueue(r)
-
     // conduct bfs to find all reachable nodes
     while(!bfsQueue.isEmpty){
       val top = bfsQueue.dequeue
@@ -558,6 +588,8 @@ abstract class Component(resetSignal: Bool = null) {
   }
   def findRoots(): ArrayBuffer[Node] = {
     val roots = new ArrayBuffer[Node];
+    for (a <- asserts) 
+      roots += a.cond;
     for (m <- mods) {
       m match {
         case io: IO => if (io.dir == OUTPUT) { if (io.consumers.length == 0) roots += m; }
@@ -581,18 +613,30 @@ abstract class Component(resetSignal: Bool = null) {
     }
     leaves
   }
-  def findOrdering() = {
-    val roots = findRoots();
+  def visitNodes(roots: Array[Node]) = {
+    val stack = new Stack[(Int, Node)]();
+    for (root <- roots)
+      stack.push((0, root));
     isWalked.clear();
-    for (r <- roots)
-      r.visitNode(0);
+    while (stack.length > 0) {
+      val (depth, node) = stack.pop();
+      node.visitNode(depth, stack);
+    }
   }
-  def findGraph() = {
-    val leaves = findLeaves();
+  def visitNodesRev(roots: Array[Node]) = {
+    val stack = new Stack[(Int, Node)]();
+    for (root <- roots)
+      stack.push((0, root));
     isWalked.clear();
-    for (r <- leaves)
-      r.visitNodeRev(0);
+    while (stack.length > 0) {
+      val (depth, node) = stack.pop();
+      node.visitNodeRev(depth, stack);
+    }
   }
+
+  def findOrdering() = visitNodes(findRoots().toArray);
+  def findGraph() = visitNodesRev(findLeaves().toArray);
+
   def findGraphDims(): (Int, Int, Int) = {
     var maxDepth = 0;
     val imods = new ArrayBuffer[Node]();
@@ -660,10 +704,7 @@ abstract class Component(resetSignal: Bool = null) {
       }
     }
   }
-  def findNodes(depth: Int, c: Component): Unit = {
-    for((n, elm) <- io.flatten) elm.removeCellIOs();
-    io.findNodes(depth, c);
-  }
+  def traceableNodes = io.traceableNodes;
   def childrenContainsReg: Boolean = {
     var res = containsReg;
     if(children.isEmpty) return res; 
@@ -810,6 +851,7 @@ abstract class Component(resetSignal: Bool = null) {
       }
     }
   }
+
   def nameChild(child: Component) = {
     if(!child.named){
       if(childNames contains child.className){
@@ -823,6 +865,7 @@ abstract class Component(resetSignal: Bool = null) {
       child.named = true;
     }
   }
+
   def ensure_dir(dir: String) = {
     val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/");
     new File(d).mkdirs();
@@ -840,7 +883,8 @@ abstract class Component(resetSignal: Bool = null) {
     removeCellIOs()
     inferAll();
     forceMatchingWidths;
-    findNodes(0, this);
+    traceNodes();
+    nameChildren(topComponent)
     val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
     val out = new java.io.FileWriter(base_name + name + ".v");
     doCompileV(out, 0);
@@ -920,7 +964,7 @@ abstract class Component(resetSignal: Bool = null) {
   def dumpVCDScope(file: java.io.FileWriter, top: Component, names: HashMap[Node, String]): Unit = {
     file.write("    fprintf(f, \"" + "$scope module " + name + " $end" + "\\n\");\n");
     for (mod <- top.omods) {
-      if (mod.component == this && mod.isInObject) {
+      if (mod.component == this && mod.isInVCD) {
         file.write("    fprintf(f, \"$var wire " + mod.width + " " + names(mod) + " " + stripComponent(mod.emitRefVCD) + " $end\\n\");\n");
       
       }
@@ -935,16 +979,14 @@ abstract class Component(resetSignal: Bool = null) {
     var num = 0;
     val names = new HashMap[Node, String];
     for (mod <- omods) {
-      if (mod.isInObject) {
+      if (mod.isInVCD) {
         names(mod) = "N" + num;
         num += 1;
       }
     }
     file.write("void " + name + "_t::dump(FILE *f, int t) {\n");
     if (isVCD) {
-    file.write("  static bool is_init = false;\n");
-    file.write("  if (!is_init) {\n");
-    file.write("    is_init = true;\n");
+    file.write("  if (t == 0) {\n");
     file.write("    fprintf(f, \"$timescale 1ps $end\\n\");\n");
     dumpVCDScope(file, this, names);
     file.write("    fprintf(f, \"$enddefinitions $end\\n\");\n");
@@ -953,8 +995,8 @@ abstract class Component(resetSignal: Bool = null) {
     file.write("  }\n");
     file.write("  fprintf(f, \"#%d\\n\", t);\n");
     for (mod <- omods) {
-      if (mod.isInObject)
-        file.write("  dat_dump(f, " + mod.emitRef + ", \"" + names(mod) + "\");\n");
+      if (mod.isInVCD && !(mod.name == "reset" && mod.component == this))
+        file.write(mod.emitDefVCD(names(mod)));
     }
     }
     file.write("}\n");
@@ -966,6 +1008,17 @@ abstract class Component(resetSignal: Bool = null) {
       return res;
     else
       pathParent.getPathName + "_" + res;
+  }
+
+  def traceNodes() = {
+    val queue = Stack[() => Any]();
+    queue.push(() => io.traceNode(this, queue));
+    for (a <- asserts)
+      queue.push(() => a.traceNode(this, queue));
+    while (queue.length > 0) {
+      val work = queue.pop();
+      work();
+    }
   }
 
   def compileC(): Unit = {
@@ -993,16 +1046,20 @@ abstract class Component(resetSignal: Bool = null) {
     removeCellIOs()
     inferAll();    
     forceMatchingWidths;
-    findNodes(0, this);
+    traceNodes();
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors)	err.printError;
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
       return
     }
-    if (!isEmittingComponents)
-      for (c <- components)
-        if (!(c == this))
-          mods ++= c.mods;
+    if (!isEmittingComponents) {
+      for (c <- components) {
+        if (!(c == this)) {
+          mods    ++= c.mods;
+          asserts ++= c.asserts;
+        }
+      }
+    }
     findConsumers();
     verifyAllMuxes;
     if(!ChiselErrors.isEmpty){
@@ -1039,10 +1096,14 @@ abstract class Component(resetSignal: Bool = null) {
       for ((n, w) <- wires) 
         out_h.write("  dat_t<" + w.width + "> " + w.emitRef + ";\n");
     }
-    for (m <- omods)
-      if (m.isInObject)
-	if(m.name != "reset" || !(m.component == this))
+    for (m <- omods) {
+      if(m.name != "reset" || !(m.component == this)) {
+        if (m.isInObject)
           out_h.write(m.emitDecC);
+        if (m.isInVCD)
+          out_h.write(m.emitDecVCD);
+      }
+    }
     if (isEmittingComponents) {
       for (c <- children) 
         out_h.write("  " + c.emitRef + "_t* " + c.emitRef + ";\n");
@@ -1074,6 +1135,9 @@ abstract class Component(resetSignal: Bool = null) {
     out_c.write("void " + name + "_t::clock_lo ( dat_t<1> reset ) {\n");
     for (m <- omods) {
       out_c.write(m.emitDefLoC);
+    }
+    for (a <- asserts) {
+      out_c.write("  ASSERT(" + a.cond.emitRefC + ", \"" + a.message + "\");\n");
     }
     // for (c <- children) 
     //   out_c.write("    " + c.emitRef + "->clock_lo(reset);\n");

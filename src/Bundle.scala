@@ -57,6 +57,7 @@ object sort {
   }
 
 }
+
 class Bundle(view_arg: Seq[String] = null) extends Data{
   var dir = "";
   var view = view_arg;
@@ -95,8 +96,9 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
           o match { 
 	    case bv: Vec[Data] => elts += ((name + bv.name, bv));
             case i: Data => elts += ((name, i)); i.name = name; 
-              // println("    ADDING " + name + " -> " + o);
-            case any =>
+              // if (view != null)
+              //   println("    ADDING " + name + " -> " + o + " COMP " + i.component + " DONE " + (i.component == null));
+           case any =>
               // println("    FOUND " + o);
           }
           seen += o;
@@ -159,24 +161,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     for ((n, elt) <- elements)
       elt.removeCellIOs
   }
-  override def findNodes(depth: Int, c: Component): Unit = {
-    for ((n, elt) <- elements){
-      elt.removeCellIOs;
-      elt.findNodes(depth, c);
-    }
-    /*
-    val elts = flatten;
-    println(depthString(depth) + "BUNDLE " + this + " => " + elts);
-    for ((n, elt) <- elts) {
-      println(depthString(depth+1) + "I: " + elt);
-      elt match { case i: Input => i.findNodes(depth); case o => ; }
-    }
-    for ((n, elt) <- elts) {
-      println(depthString(depth+1) + "O: " + elt);
-      elt match { case o: Output => o.findNodes(depth); case i => ; }
-    }
-    */
-  }
+  override def traceableNodes = elements.map(tup => tup._2).toArray;
   override def apply(name: String): Data = {
     for((n,i) <- elements)
       if(name == n) return i;

@@ -115,8 +115,8 @@ object Node {
 
 abstract class Node extends nameable{
   var walked = false;
+  var staticComp: Component = getComponent();
   var component: Component = null;
-  var staticComp: Component = if(compStack.length != 0) compStack.top else null;
   var flattened = false;
   var isCellIO = false;
   var depth = 0;
@@ -127,6 +127,7 @@ abstract class Node extends nameable{
   var isFixedWidth = false;
   var consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
   var inputs = new ArrayBuffer[Node];
+  def traceableNodes = Array[Node]();
   var outputs = new ArrayBuffer[Node];
   var inferWidth: (Node) => Int = maxWidth;
   var nameHolder: nameable = null;
@@ -236,6 +237,7 @@ abstract class Node extends nameable{
   // TODO: SUBCLASS FROM SOMETHING INSTEAD OR OVERRIDE METHOD
   // TODO: RENAME METHOD TO ISVOLATILE
   def isInObject = isIo || isReg || isUsedByRam || isProbe || (isDebug && named);
+  def isInVCD = isIo || isReg || isProbe || (isDebug && named);
   def emitTmp: String = 
     if (isEmittingC) {
       if (isInObject)
@@ -254,10 +256,16 @@ abstract class Node extends nameable{
   def emitWidth: String = "[" + (width-1) + ":0]"
   def emitDec: String = "  wire" + (if (isSigned) " signed " else "") + emitWidth + " " + emitRef + ";\n";
   // C backend
+  def emitDecVCD: String = if (isVCD) "  dat_t<" + width + "> " +emitRef + "__prev" + ";\n" else "";
   def emitDecC: String = "  dat_t<" + width + "> " + emitRef + ";\n";
   def emitDefLoC: String = ""
   def emitInitC: String = ""
   def emitDefHiC: String = ""
+  def emitDefVCD(vcdname: String) = {
+    "  if (t == 0 || (" + emitRef + " != " + emitRef + "__prev).to_bool())\n" +
+    "    dat_dump(f, " + emitRef + ", \"" + vcdname + "\");\n" +
+    "  " + emitRef + "__prev = " + emitRef + ";\n"
+  }
   def emitRefC: String = emitRefV;
   def depthString(depth: Int): String = {
     var res = "";
@@ -265,45 +273,53 @@ abstract class Node extends nameable{
       res += "  ";
     res
   }
-  def visitNode(newDepth: Int): Unit = {
+
+  def visitNode(newDepth: Int, stack: Stack[(Int, Node)]): Unit = {
     val comp = componentOf;
-    depth = max(depth, newDepth);
-    //println("THINKING MOD(" + depth + ") " + comp.name + ": " + this.name);
-    if (!comp.isWalked.contains(this)) {
-      //println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
-      comp.isWalked += this;
-      this.walked = true;
-      for (i <- inputs) {
-        if (i != null) {
-          i match {
-	    case m: MemRef[ _ ] => if(!m.isReg) i.visitNode(newDepth+1);
-            case d: Delay => 
-            case o => {
-	      i.visitNode(newDepth+1);
-	    }
+    // println("VISIT NODE(" + newDepth + ") " + comp.name + ": " + this.name);
+    if (newDepth == -1) 
+      comp.omods += this;
+    else {
+      depth = max(depth, newDepth);
+      //println("THINKING MOD(" + depth + ") " + comp.name + ": " + this.name);
+      if (!comp.isWalked.contains(this)) {
+        //println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
+        comp.isWalked += this;
+        this.walked = true;
+        stack.push((-1, this));
+        for (i <- inputs) {
+          if (i != null) {
+            i match {
+              case m: MemRef[ _ ] => if(!m.isReg) stack.push((newDepth+1, i));
+              case d: Delay       => 
+              case o              => stack.push((newDepth+1, o)); 
+            }
           }
         }
+        // println("VISITING MOD " + this + " DEPTH " + depth);
       }
-      comp.omods += this;
     }
   }
-  def visitNodeRev(newDepth: Int): Unit = {
+  def visitNodeRev(newDepth: Int, stack: Stack[(Int, Node)]): Unit = {
     val comp = componentOf;
-    depth = max(depth, newDepth);
-    if (!comp.isWalked.contains(this)) {
-      //println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
-      comp.isWalked += this;
-      for (c <- consumers) {
-        if (c != null) {
-          c match {
-	    case m: MemRef[ _ ] => if(!m.isReg) c.visitNodeRev(newDepth+1);
-            case d: Delay => 
-            case o => c.visitNodeRev(newDepth+1);
+    if (newDepth == -1)
+      comp.gmods += this;
+    else {
+      depth = max(depth, newDepth);
+      if (!comp.isWalked.contains(this)) {
+        // println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
+        comp.isWalked += this;
+        stack.push((-1, this));
+        for (c <- consumers) {
+          if (c != null) {
+            c match {
+              case m: MemRef[ _ ] => if(!m.isReg) stack.push((newDepth+1, m));
+              case d: Delay       => 
+              case o              => stack.push((newDepth+1, o));
+            }
           }
         }
       }
-      // println("ADDING MOD " + this);
-      comp.gmods += this;
     }
   }
 
@@ -351,95 +367,78 @@ abstract class Node extends nameable{
     }
     null;
   }
-  def findNodes(depth: Int, c: Component): Unit = {
-    // untraced or same component?
 
-    def trace(x: Node): Node = {
-      var res = x;
-      while(res.isCellIO && res.inputs.length > 0) { res = res.inputs(0) }
-      res
-    }
+  def traceNode(c: Component, stack: Stack[() => Any]): Any = {
+    fixName(); 
 
-    if(isCellIO) println("found " + this.name + " " + trace(this).getClass);
-    fixName();
+    // determine whether or not the component needs a clock input
     if ((isReg || isRegOut || isClkInput) && !(component == null))
         component.containsReg = true
-    val (comp, nextComp, markComp) = 
+
+    // pushes and pops components as necessary in order to later mark the parent of nodes
+    val (comp, nextComp) = 
       this match {
         case io: IO => {
-          val ioComp = io.component;
-          val nxtComp = if (io.dir == OUTPUT) ioComp else ioComp.parent;
-          if (io.dir == OUTPUT && ioComp.parent == null && !(ioComp == topComponent)) {
-            ioComp.parent = c;
-            c.children += ioComp;
-	    if(isEmittingComponents) c.nameChild(ioComp);
-            // println("PARENTING " + c.name + "(" + c.children.length + ") CHILD " + ioComp);
-          }
-          (ioComp,  // if (isEmittingComponents) ioComp else topComponent, 
-           nxtComp, // if (isEmittingComponents) nxtComp else topComponent, 
-           nxtComp);
+          assert(io.dir == OUTPUT || io.dir == INPUT, {println("IO w/o direction" + io)})
+          (io.component, if (io.dir == OUTPUT) io.component else io.component.parent);
         }
-	case reg: Reg => {
-	  if(reg.isReset) reg.inputs += reg.component.reset
-	  reg.hasResetSignal = true
-	  (c, c, c)
-	}
-        case any => (c, c, c);
+        case any    => (c, c);
       }
-    if (comp == null) {
-      if (this != c.reset){
-        println("NULL COMPONENT FOR " + this);
-      }
-    } else if (!comp.isWalked.contains(this)) {
-      // println(depthString(depth) + "FiND MODS " + name + " IN " + comp.name);
-      // println("FiND MODS(" + depth + ") " + name + " IN " + comp.name);
+
+    // give the components reset signal to the current node
+    if(this.isInstanceOf[Reg]) {
+      val reg = this.asInstanceOf[Reg]
+      if(reg.isReset) reg.inputs += reg.component.reset
+      reg.hasResetSignal = true
+    }
+
+    if (comp != null && !comp.isWalked.contains(this)) {
       comp.isWalked += this;
+      for (node <- traceableNodes) {
+        if (node != null) 
+          stack.push(() => node.traceNode(nextComp, stack));
+      }
       var i = 0;
-      // if (component == null) 
-      //   component = markComp;
       for (node <- inputs) {
         if (node != null) {
-	  //node.removeCellIOs;
-          // println(depthString(depth+1) + "INPUT " + node);
-          if (node.component == null) // unmarked input
-            node.component = markComp;
-	  if(nextComp == null) println(c + " " + this);
-          node.findNodes(depth + 2, nextComp);
-	  //This code finds a binding for a node
-	  //We search for a binding only if it is an output
-	  //and the logic's grandfather component is not the same as the 
-	  //io's component
-	  //and the logic's component is not the same as the output's component unless the logic is an input
-          node match { 
-            case io: IO => 
-	      if (io.dir == OUTPUT && (!(component.parent == io.component) && !(component == io.component && !(this.isInstanceOf[IO] && this.asInstanceOf[IO].dir == INPUT)))) {
-		// && !(component == io.component && !this.isInstanceOf[IO])
-                val c = node.component.parent;
-                // println("BINDING " + node + " I " + i + " NODE-PARENT " + node.component.parent + " -> " + this + " PARENT " + component.parent);
-                if (c == null) {
-		  println(component + " " + io.component + " ")
-                  println("UNKNOWN COMPONENT FOR " + node);
-                }
-                val b = Binding(node, c, io.component);
-                inputs(i) = b;
-                if (!c.isWalked.contains(b)) {
-                  c.mods += b;  c.isWalked += b;
-                  // println("OUTPUT " + io + " BINDING " + inputs(n) + " INPUT " + this);
-                }
-              } 
-	    //In this case, we are trying to use the input of a submodule
-	    //as part of the logic outside of the submodule.
-	    //If the logic is outside the submodule, we do not use the input
-	    //name. Instead, we use whatever is driving the input. In other
-	    //words, we do not use the Input name, if the component of the
-	    //logic is the part of Input's component.
-	    //We also do the same when assigning to the output if the output
-	    //is the parent of the subcomponent;
-		else if (io.dir == INPUT && ((!this.isInstanceOf[IO] && this.component == io.component.parent) || (this.isInstanceOf[IO] && this.asInstanceOf[IO].dir == OUTPUT && this.component == io.component.parent))) {
-		  if(io.inputs.length > 0) inputs(i) = io.inputs(0);
-		} 
-            case any => 
-          }
+          if (node.component == null)
+            node.component = nextComp;
+          stack.push(() => node.traceNode(nextComp, stack));
+          val j = i;
+          val n = node;
+          stack.push(() => {
+	    // This code finds a binding for a node. We search for a binding only if it is an output
+	    // and the logic's grandfather component is not the same as the io's component and
+	    // the logic's component is not same as output's component unless the logic is an input
+            n match { 
+              case io: IO => 
+                if (io.dir == OUTPUT && 
+                    (!(component.parent == io.component) && 
+                     !(component == io.component && 
+                       !(this.isInstanceOf[IO] && this.asInstanceOf[IO].dir == INPUT)))) {
+                  val c = n.component.parent;
+                  val b = Binding(n, c, io.component);
+                  inputs(j) = b;
+                  if (!c.isWalked.contains(b)) {
+                    c.mods += b;  c.isWalked += b;
+                  }
+	        // In this case, we are trying to use the input of a submodule 
+                // as part of the logic outside of the submodule.
+	        // If the logic is outside the submodule, we do not use the input
+	        // name. Instead, we use whatever is driving the input. In other
+	        // words, we do not use the Input name, if the component of the
+	        // logic is the part of Input's component.
+	        // We also do the same when assigning to the output if the output
+	        // is the parent of the subcomponent;
+                } else if (io.dir == INPUT && 
+                           ((!this.isInstanceOf[IO] && this.component == io.component.parent) || 
+                            (this.isInstanceOf[IO] && this.asInstanceOf[IO].dir == OUTPUT && 
+                             this.component == io.component.parent))) {
+                   if (io.inputs.length > 0) inputs(j) = io.inputs(0);
+                } 
+              case any => 
+            };
+          });
         }
         i += 1;
       }
@@ -479,14 +478,16 @@ abstract class Node extends nameable{
   }
   
   def removeCellIOs() {
-    for(i <- 0 until inputs.length)
+    for(i <- 0 until inputs.length) {
       if(inputs(i) == null){
         val error = IllegalState("NULL Input for " + this.getClass + " " + this + " in Component " + component, 0);
         if (!ChiselErrors.contains(error))
           ChiselErrors += error
       }
-      else if(inputs(i).isCellIO)
+      else if(inputs(i).isCellIO) {
 	inputs(i) = inputs(i).getNode;
+      }
+    }
   }
   def getNode(): Node = {
     if(!isCellIO || inputs.length == 0)

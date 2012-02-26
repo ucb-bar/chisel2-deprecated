@@ -231,7 +231,7 @@ object nullADT extends Data;
 abstract class BlackBox extends Component {
   var moduleNameSet = false;
   override def doCompileV(out: java.io.FileWriter, depth: Int): Unit = {
-    findNodes(depth, this);
+    traceNodes();
   }
 
   def setVerilogParameters(string: String) = 
