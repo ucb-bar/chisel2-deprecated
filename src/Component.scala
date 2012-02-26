@@ -441,9 +441,11 @@ abstract class Component(resetSignal: Bool = null) {
       walked += top
       nodesList += top
       for(i <- top.inputs) 
-  	if(!walked.contains(i)) {
-  	  bfsQueue.enqueue(i) 
-  	}
+        if(!(i == null)) {
+  	  if(!walked.contains(i)) {
+  	    bfsQueue.enqueue(i) 
+  	  }
+        }
     }
     var count = 0
 
@@ -495,13 +497,22 @@ abstract class Component(resetSignal: Bool = null) {
 
     while(!bfsQueue.isEmpty) {
       val top = bfsQueue.dequeue
-      top.removeCellIOs
+      //top.removeCellIOs
       walked += top
       count += 1
 
-      for(node <- top.inputs) {
-	node.removeCellIOs
-	if(!walked.contains(node)) bfsQueue.enqueue(node)
+      // for(node <- top.inputs) {
+      //   if(!(node == null)) {
+      //     node.removeCellIOs
+      //     if(!walked.contains(node)) bfsQueue.enqueue(node)
+      //   }
+      // }
+
+      for(i <- 0 until top.inputs.length) {
+        if(!(top.inputs(i) == null)) {
+          if(top.inputs(i).isCellIO) top.inputs(i) = getNode(top.inputs(i))
+          if(!walked.contains(top.inputs(i))) bfsQueue.enqueue(top.inputs(i))
+        }
       }
 
     }
