@@ -250,7 +250,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
 
   override def getWidth(): Int = {
     var w = 0
-    for((name, io) <- res.flatten)
+    for((name, io) <- elements)
       w += io.getWidth
     w
   }
