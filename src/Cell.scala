@@ -40,6 +40,7 @@ object UnaryOp {
     output.setIsCellIO
     node.nameHolder = output
     output assign node
+    output
   }
 }
 
@@ -207,7 +208,7 @@ object ReductionOp {
     }
     
     // make output
-    val output = Bool(output)
+    val output = Bool(OUTPUT)
     output.setIsCellIO
     node.nameHolder = node
     output assign node
@@ -244,9 +245,9 @@ class UnaryBoolCell(op: String) extends Cell {
 object UnaryBoolOp {
   def apply(x: Bool, op: String): Bool = {
     val node = op match {
-    case "-" => Op("-",  1, widthOf(0), io.In);
-    case "~" => Op("~",  1, widthOf(0), io.In);
-    case "!" => Op("!",  1, fixWidth(1), io.In);
+    case "-" => Op("-",  1, widthOf(0), x);
+    case "~" => Op("~",  1, widthOf(0), x);
+    case "!" => Op("!",  1, fixWidth(1), x);
     case any => null;
     }
 
@@ -298,17 +299,17 @@ class BinaryBoolCell(op: String) extends Cell {
 object BinaryBoolOp {
   def apply(x: Bool, y: Bool, op: String): Bool = {
     val node = op match {
-      case "^"   => Op("^",  2, maxWidth _,  io.X, io.Y );
-      case "===" => Op("==", 2, fixWidth(1), io.X, io.Y );
-      case "!="  => Op("!=", 2, fixWidth(1), io.X, io.Y );
-      case ">"   => Op(">",  2, fixWidth(1), io.X, io.Y );
-      case "<"   => Op("<",  2, fixWidth(1), io.X, io.Y );
-      case "<="  => Op("<=", 2, fixWidth(1), io.X, io.Y );
-      case ">="  => Op(">=", 2, fixWidth(1), io.X, io.Y );
-      case "&&"  => Op("&&", 2, fixWidth(1), io.X, io.Y );
-      case "||"  => Op("||", 2, fixWidth(1), io.X, io.Y );
-      case "&"   => Op("&",  2, maxWidth _, io.X, io.Y );
-      case "|"   => Op("|",  2, maxWidth _, io.X, io.Y );
+      case "^"   => Op("^",  2, maxWidth _,  x, y );
+      case "===" => Op("==", 2, fixWidth(1), x, y );
+      case "!="  => Op("!=", 2, fixWidth(1), x, y );
+      case ">"   => Op(">",  2, fixWidth(1), x, y );
+      case "<"   => Op("<",  2, fixWidth(1), x, y );
+      case "<="  => Op("<=", 2, fixWidth(1), x, y );
+      case ">="  => Op(">=", 2, fixWidth(1), x, y );
+      case "&&"  => Op("&&", 2, fixWidth(1), x, y );
+      case "||"  => Op("||", 2, fixWidth(1), x, y );
+      case "&"   => Op("&",  2, maxWidth _, x, y );
+      case "|"   => Op("|",  2, maxWidth _, x, y );
       case any   => null;
     }
 
