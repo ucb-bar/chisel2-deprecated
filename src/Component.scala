@@ -516,7 +516,7 @@ abstract class Component(resetSignal: Bool = null) {
 
 	if (io.width > io.inputs(0).width){
 
-	  println("too long " + io)
+	  println("too long " + io.width + " bit(s) assigned to " + io.inputs(0).width + " bit(s). " + io)
 	  if(io.inputs(0).isInstanceOf[Fix]){
 	    val topBit = NodeExtract(io.inputs(0), Literal(io.inputs(0).width-1)); topBit.infer
 	    val fill = NodeFill(io.width - io.inputs(0).width, topBit); fill.infer
@@ -530,7 +530,7 @@ abstract class Component(resetSignal: Bool = null) {
 	  }
 
 	} else if (io.width < io.inputs(0).width) {
-	  println("too short " + io)
+	  println("too short " + io.width + " bit(s) assigned to " + io.inputs(0).width + " bit(s). " + io)
 	  val res = NodeExtract(io.inputs(0), Literal(io.width-1), Literal(0,1)); res.infer
 	  io.inputs(0) = res
 	}
