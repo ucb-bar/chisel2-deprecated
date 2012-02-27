@@ -26,35 +26,59 @@ class ConversionCell[S <: Data, T <: Bits](x: S)(gen: => T) extends Cell {
   io assign primitiveNode
 }
 
-object UnaryNodeCell {
+object UnaryOp {
   def apply[T <: Data](x: T, op: String)(gen: => T): T = {
-    val res = new UnaryNodeCell(op)(gen);
-    res.io.In assign x;
-    res.io.Out
-  }
-}
-
-class UnaryNodeCell[T <: Data](op: String)(gen: => T) extends Cell {
-  val io = new Bundle(){
-    val In  = gen.asInput;
-    val Out = gen.asOutput;
-  }
-  io.setIsCellIO;
-  val primitiveNode = op match {
-    case "-" => Op("-",  1, widthOf(0), io.In);
-    case "~" => Op("~",  1, widthOf(0), io.In);
-    case "!" => Op("!",  1, fixWidth(1), io.In);
+    val node = op match {
+    case "-" => Op("-",  1, widthOf(0), x);
+    case "~" => Op("~",  1, widthOf(0), x);
+    case "!" => Op("!",  1, fixWidth(1), x);
     case any => null;
+    }
+
+    // make output
+    val output = gen.asOutput
+    output.setIsCellIO
+    node.nameHolder = output
+    output assign node
   }
-  primitiveNode.name = "primitiveNode"
-  primitiveNode.nameHolder = io.Out;
-  io.Out assign primitiveNode;
 }
 
 object BinaryNodeCell {
   def apply[T <: Data](x: T, y: T, op: String)(gen: => T): T = {
     val res = new BinaryNodeCell(op, x, y)(gen);
     res.io.Z
+  }
+}
+
+object BinaryOp {
+  def apply[T <: Data](x: T, y: T, op: String)(gen: => T): T = {
+    val node = op match {
+      case "<<"  => Op("<<", 0, lshWidthOf(0, y),  x, y );
+      case ">>"  => Op(">>", 0, rshWidthOf(0, y),  x, y );
+      case "+"   => Op("+",  2, maxWidth _,  x, y );
+      case "*"   => Op("*",  0, sumWidth _,  x, y );
+      case "s*s" => Op("s*s",  0, sumWidth _,  x, y );
+      case "s*u" => Op("s*u",  0, sumWidth _,  x, y );
+      case "u*s" => Op("u*s",  0, sumWidth _,  x, y );
+      case "^"   => Op("^",  2, maxWidth _,  x, y );
+      case "?"   => Multiplex(x, y, null);
+      case "-"   => Op("-",  2, maxWidth _,  x, y );
+      case "##"  => Op("##", 2, sumWidth _,  x, y );
+      case "&"   => Op("&",  2, maxWidth _, x, y );
+      case "|"   => Op("|",  2, maxWidth _, x, y );
+      case any   => null;
+    }
+
+    // make output
+    val output = gen.asOutput
+    output.setIsCellIO
+    node match {
+      case l: Literal =>
+      case _          =>
+        node.nameHolder = output
+    }
+    output assign node
+    output
   }
 }
 
@@ -98,6 +122,29 @@ object LogicalNodeCell {
     res.io.X assign x;
     res.io.Y assign y;
     res.io.Z
+  }
+}
+
+object LogicalOp {
+  def apply[T <: Data](x: T, y: T, op: String)(gen: => T): Bool = {
+    val node = op match {
+    case "===" => Op("==", 2, fixWidth(1), x, y );
+    case "!="  => Op("!=", 2, fixWidth(1), x, y );
+    case ">"   => Op(">",  2, fixWidth(1), x, y );
+    case "<"   => Op("<",  2, fixWidth(1), x, y );
+    case "<="  => Op("<=", 2, fixWidth(1), x, y );
+    case ">="  => Op(">=", 2, fixWidth(1), x, y );
+    case "&&"  => Op("&&", 2, fixWidth(1), x, y );
+    case "||"  => Op("||", 2, fixWidth(1), x, y );
+    case any   => null;
+    }
+
+    // make output
+    val output = Bool(OUTPUT)
+    output.setIsCellIO
+    node.nameHolder = output
+    output assign node
+    output
   }
 }
 
@@ -150,6 +197,24 @@ class ReductionNodeCell[T <: Data](op: String)(gen: => T) extends Cell {
   io.Out assign primitiveNode;
 }
 
+object ReductionOp {
+  def apply[T <: Data](x: T, op: String)(gen: => T): Bool = {
+    val node = op match {
+      case "&" => Op("&",  1, fixWidth(1), x);
+      case "|" => Op("|",  1, fixWidth(1), x);
+      case "^" => Op("^",  1, fixWidth(1), x);
+      case any => null;
+    }
+    
+    // make output
+    val output = Bool(output)
+    output.setIsCellIO
+    node.nameHolder = node
+    output assign node
+    output
+  }
+}
+
 
 object UnaryBoolCell {
   def apply(x: Bool, op: String): Bool = {
@@ -174,6 +239,24 @@ class UnaryBoolCell(op: String) extends Cell {
   primitiveNode.name = "primitiveNode"
   primitiveNode.nameHolder = io.Out;
   io.Out assign primitiveNode;
+}
+
+object UnaryBoolOp {
+  def apply(x: Bool, op: String): Bool = {
+    val node = op match {
+    case "-" => Op("-",  1, widthOf(0), io.In);
+    case "~" => Op("~",  1, widthOf(0), io.In);
+    case "!" => Op("!",  1, fixWidth(1), io.In);
+    case any => null;
+    }
+
+    //make ouput
+    val output = Bool(OUTPUT)
+    output.setIsCellIO
+    node.nameHolder = io.out
+    output assign node
+    output
+  }
 }
 
 
@@ -210,7 +293,33 @@ class BinaryBoolCell(op: String) extends Cell {
   primitiveNode.name = "primitiveNode";
   primitiveNode.nameHolder = io.Z;
   io.Z assign primitiveNode;
-} 
+}
+
+object BinaryBoolOp {
+  def apply(x: Bool, y: Bool, op: String): Bool = {
+    val node = op match {
+      case "^"   => Op("^",  2, maxWidth _,  io.X, io.Y );
+      case "===" => Op("==", 2, fixWidth(1), io.X, io.Y );
+      case "!="  => Op("!=", 2, fixWidth(1), io.X, io.Y );
+      case ">"   => Op(">",  2, fixWidth(1), io.X, io.Y );
+      case "<"   => Op("<",  2, fixWidth(1), io.X, io.Y );
+      case "<="  => Op("<=", 2, fixWidth(1), io.X, io.Y );
+      case ">="  => Op(">=", 2, fixWidth(1), io.X, io.Y );
+      case "&&"  => Op("&&", 2, fixWidth(1), io.X, io.Y );
+      case "||"  => Op("||", 2, fixWidth(1), io.X, io.Y );
+      case "&"   => Op("&",  2, maxWidth _, io.X, io.Y );
+      case "|"   => Op("|",  2, maxWidth _, io.X, io.Y );
+      case any   => null;
+    }
+
+    // make output
+    val output = Bool(OUTPUT)
+    output.setIsCellIO
+    node.nameHolder = output
+    output assign node
+    output
+  }
+}
 
 object or {
     def apply(x: Bits): Bool = {
