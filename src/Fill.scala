@@ -11,7 +11,7 @@ object Fill {
 
     // initialize
     val fillConst = UFix(n)
-    fill.init("", fillWidthOf(0, fillConst), io.mod, io.n)
+    fill.init("", fillWidthOf(0, fillConst), mod, fillConst)
 
     // make output
     val output = Bits(OUTPUT)
