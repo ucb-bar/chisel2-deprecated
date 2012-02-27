@@ -41,10 +41,18 @@ object NodeExtract {
 object Extract {
   //extract 1 bit
   def apply[T <: Bits](mod: T, bit: UFix)(gen: => T): T = {
-    val bitcell = new BitExtractCell(gen);
-    bitcell.io.in <> mod;
-    bitcell.io.hi <> bit;
-    bitcell.io.out;
+    // initialize 
+    val extract = new Extract()
+    extract.init("", fixWidth(1), mod.toNode, bit)
+    extract.hi = bit
+    extract.lo = bit
+
+    // make output
+    val output = gen.fromNode(extract)
+    output.setIsCellIO
+    extract.nameHolder = output
+    output.comp = extract
+    output
   }
 
   def apply[T <: Bits](mod: T, bit: Int)(gen: => T): T = 
@@ -52,44 +60,23 @@ object Extract {
 
   // extract bit range
   def apply[T <: Bits](mod: T, hi: UFix, lo: UFix, w: Int = -1)(gen: => T): T = {
-    val bitcell = new RangeExtractCell(w)(gen);
-    bitcell.io.in <> mod;
-    bitcell.io.hi assign hi;
-    bitcell.io.lo assign lo;
-    bitcell.io.out
+    // initialize
+    val extract = new Extract()
+    extract.init("", if(w == -1) widthOf(0) else fixWidth(w), mod.toNode, hi, lo)
+    extract.hi = hi
+    extract.lo = lo
+
+    // make output
+    val output = gen.fromNode(extract)
+    output.setIsCellIO
+    extract.nameHolder = output
+    output.comp = extract
+    output
   }
 
   def apply[T <: Bits](mod: T, hi: Int, lo: Int)(gen: => T): T ={
     apply(mod, UFix(hi), UFix(lo), hi-lo+1)(gen);
   }
-}
-
-abstract class ExtractCell[T <: Bits](gen: => T){
-  val io = new Bundle(){
-    val in = gen.asInput;
-    val hi = UFix(INPUT);
-    val lo = UFix(INPUT);
-    val out = gen.asOutput;
-  }
-  io.setIsCellIO;
-  val primitiveNode = new Extract();
-  val fb = io.out.fromNode(primitiveNode)
-  fb.setIsCellIO;
-  fb ^^ io.out;
-  io.out.comp = primitiveNode;
-  primitiveNode.nameHolder = io.out;
-}
-
-class BitExtractCell[T <: Bits](gen: => T) extends ExtractCell[T](gen) {
-  primitiveNode.init("primitiveNode", fixWidth(1), io.in.toNode, io.hi.toNode);
-  primitiveNode.hi = primitiveNode.inputs(1)
-  primitiveNode.lo = primitiveNode.hi;
-}
-
-class RangeExtractCell[T <: Bits](w: Int = -1)(gen: => T) extends ExtractCell[T](gen) {
-  primitiveNode.init("primitiveNode", if(w == -1) widthOf(0) else fixWidth(w), io.in.toNode, io.hi, io.lo);
-  primitiveNode.hi = primitiveNode.inputs(1);
-  primitiveNode.lo = primitiveNode.inputs(2);
 }
 
 class Extract extends Node with proc {

@@ -16,6 +16,7 @@ object Fill {
     // make output
     val output = Bits(OUTPUT)
     output.setIsCellIO
+    fill.nameHolder = output
     output assign fill
     output
   }
@@ -29,20 +30,6 @@ object NodeFill {
     res
   }
   def apply(mod: Node, n: Int): Node = apply(n, mod)
-}
-
-
-class FillCell[T <: Data](data: T) extends Cell {
-  val io = new Bundle(){
-    val mod = Bits(INPUT);
-    val n = Fix(INPUT);
-    val out = Bits(OUTPUT);
-  }
-  io.setIsCellIO;
-  val primitiveNode = new Fill();
-  primitiveNode.init("primitiveNode", Fill.fillWidthOf(0, io.n), io.mod.toNode, io.n);
-  io.out assign primitiveNode;
-  primitiveNode.nameHolder = io.out;
 }
 
 class Fill extends Node {
