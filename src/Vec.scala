@@ -56,6 +56,7 @@ object Vec {
       t.name += i;
     }
     res.eltWidth = res(0).getWidth
+    if(res.eltWidth <= 0) throw new Exception("widths on elemen in Vec must be > 0")
     res
   }
 }

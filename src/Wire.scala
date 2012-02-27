@@ -9,8 +9,11 @@ object Wire {
     val wire = new Wire()
 
     // initialize
+    val genWidth = gen.getWidth
     if(width > -1)
       wire.init("", width, null)
+    else if(genWidth > -1)
+      wire.init("", genWidth, null)
     else
       wire.init("", widthOf(0), null)
 
