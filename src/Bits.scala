@@ -97,18 +97,18 @@ class Bits extends IO {
   def apply(hi: UFix, lo: UFix): Bits = Extract(this, hi, lo, -1){Bits()};
   def apply(range: (Int, Int)): Bits = this(range._1, range._2);
   
-  def unary_-(): Bits = UnaryNodeCell(this, "-"){Bits()};
-  def unary_~(): Bits = UnaryNodeCell(this, "~"){Bits()};
-  def andR(): Bool    = ReductionNodeCell(this, "&"){Bits()};
-  def orR():  Bool    = ReductionNodeCell(this, "|"){Bits()};
-  def ===(b: Bits): Bool = LogicalNodeCell(this, b, "==="){Bits()};
-  def != (b: Bits): Bool = LogicalNodeCell(this, b, "!="){Bits()};
-  def << (b: UFix): Bits = BinaryNodeCell(this, b.toBits, "<<"){Bits()};
-  def >> (b: UFix): Bits = BinaryNodeCell(this, b.toBits, ">>"){Bits()};
-  def &  (b: Bits): Bits = BinaryNodeCell(this, b, "&"){Bits()};
-  def |  (b: Bits): Bits = BinaryNodeCell(this, b, "|"){Bits()};
-  def ^  (b: Bits): Bits = BinaryNodeCell(this, b, "^"){Bits()};
-  def ## (b: Bits): Bits = BinaryNodeCell(this, b, "##"){Bits()};
+  def unary_-(): Bits = UnaryOp(this, "-"){Bits()};
+  def unary_~(): Bits = UnaryOp(this, "~"){Bits()};
+  def andR(): Bool    = ReductionOp(this, "&"){Bits()};
+  def orR():  Bool    = ReductionOp(this, "|"){Bits()};
+  def ===(b: Bits): Bool = LogicalOp(this, b, "==="){Bits()};
+  def != (b: Bits): Bool = LogicalOp(this, b, "!="){Bits()};
+  def << (b: UFix): Bits = BinaryOp(this, b.toBits, "<<"){Bits()};
+  def >> (b: UFix): Bits = BinaryOp(this, b.toBits, ">>"){Bits()};
+  def &  (b: Bits): Bits = BinaryOp(this, b, "&"){Bits()};
+  def |  (b: Bits): Bits = BinaryOp(this, b, "|"){Bits()};
+  def ^  (b: Bits): Bits = BinaryOp(this, b, "^"){Bits()};
+  def ## (b: Bits): Bits = BinaryOp(this, b, "##"){Bits()};
 
   def && (b: Bool): Bool = conv(this) && b;
   def || (b: Bool): Bool = conv(this) || b;
