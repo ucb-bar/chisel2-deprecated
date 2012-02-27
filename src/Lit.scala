@@ -228,7 +228,6 @@ class Literal extends Node {
   var base = 'x';
   var inputVal = BigInt(0);
   // override def toString: String = "LIT(" + name + ")"
-  override def findNodes(depth: Int, c: Component): Unit = { }
   override def value: BigInt = stringToVal(base, name);
   override def maxNum = value;
   override def minNum = value;
