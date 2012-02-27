@@ -883,8 +883,8 @@ abstract class Component(resetSignal: Bool = null) {
     removeCellIOs()
     inferAll();
     forceMatchingWidths;
-    traceNodes();
     nameChildren(topComponent)
+    traceNodes();
     val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
     val out = new java.io.FileWriter(base_name + name + ".v");
     doCompileV(out, 0);

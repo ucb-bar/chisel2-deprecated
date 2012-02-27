@@ -132,10 +132,16 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
     }
   }
 
+  def <>(src: Vec[T]) = {
+    for((b, e) <- self zip src)
+      b <> e;
+  }
+
   def <>(src: Iterable[T]) = {
     for((b, e) <- self zip src)
       b <> e;
   }
+
 
   // TODO: CHECK FOR ALL OUT
   def :=[T <: Data](src: Vec[T]) = {
