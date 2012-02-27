@@ -73,9 +73,9 @@ class Fix extends Num {
   override def andR(): Bool    = ReductionNodeCell(this, "&"){Fix()};
   override def orR():  Bool    = ReductionNodeCell(this, "|"){Fix()};
   def xorR(): Bool   = ReductionNodeCell(this, "^"){Fix()};
-  override def unary_-(): Fix = UnaryNodeCell(this, "-"){Fix()};
-  override def unary_~(): Fix = UnaryNodeCell(this, "~"){Fix()};
-  def unary_!(): Fix = UnaryNodeCell(this, "!"){Fix()};
+  override def unary_-(): Fix = UnaryOp(this, "-"){Fix()};
+  override def unary_~(): Fix = UnaryOp(this, "~"){Fix()};
+  def unary_!(): Fix = UnaryOp(this, "!"){Fix()};
   override def << (b: UFix): Fix = BinaryNodeCell(this, b.toFix, "<<"){Fix()};
   override def >> (b: UFix): Fix = BinaryNodeCell(this, b.toFix, ">>"){Fix()};
   def ^  (b: Fix): Fix = BinaryNodeCell(this, b, "^"){Fix()};
