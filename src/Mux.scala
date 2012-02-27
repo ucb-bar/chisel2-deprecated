@@ -19,7 +19,7 @@ object Mux {
     res.init("", maxWidth _, t, c.toNode, a.toNode)
 
     // make output
-    val output = io.out.fromNode(res).asInstanceOf[T]
+    val output = c.fromNode(res).asInstanceOf[T]
     output.setIsCellIO
     res.nameHolder = output
     output

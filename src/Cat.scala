@@ -19,7 +19,7 @@ object Cat {
           val res = new Cat();
           res.initOf("", sumWidth _, mod.toNode :: mods.toList.map(x => x.toNode))
         } else {
-          mod.foldLeft(mod.toNode){(a,b) => a ## b.toNode}
+          mods.foldLeft(mod.toNode){(a,b) => a ## b.toNode}
         }
       
       // make output

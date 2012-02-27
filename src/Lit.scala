@@ -30,7 +30,7 @@ object Lit {
   def apply(value: Boolean): Bool = 
     makeBool((if(value) Literal(1) else Literal(0)))
 
-  def makeLit(x: Literal)(gen: => T): T = {
+  def makeLit[T <: Bits](x: Literal)(gen: => T): T = {
     val output= gen.asOutput
     output.setIsCellIO
     output assign x
