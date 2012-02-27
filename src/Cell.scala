@@ -161,39 +161,5 @@ object BinaryBoolOp {
   }
 }
 
-object or {
-    def apply(x: Bits): Bool = {
-		val res = new or(); // trick the compiler to keeping the class
-    	ReductionNodeCell(x, "|"){Bits()}
-        res.io.In assign x;
-        res.io.Out
-    }
-}
-
-class or extends ReductionNodeCell[Bits]("|")(Bits()) {
-}
-
-object and {
-    def apply(x: Bits): Bool = {
-		val res = new and(); // trick the compiler to keeping the class
-        res.io.In assign x;
-        res.io.Out
-    }
-}
-class and extends ReductionNodeCell[Bits]("&")(Bits()) {
-}
-
-
-object xor {
-    def apply(x: Bits): Bool = {
-        val res = new xor()
-        res.io.In assign x;
-        res.io.Out
-    }
-}
-
-class xor extends ReductionNodeCell("^")(Bits()) {
-}
-
 }
 
