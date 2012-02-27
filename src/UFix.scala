@@ -57,27 +57,27 @@ class UFix extends Num {
 
   override def unary_-(): UFix = UnaryOp(this, "-"){UFix()};
   override def unary_~(): UFix = UnaryOp(this, "~"){UFix()};
-  override def andR(): Bool    = ReductionNodeCell(this, "&"){UFix()};
-  override def orR():  Bool    = ReductionNodeCell(this, "|"){UFix()};
-  override def << (b: UFix): UFix = BinaryNodeCell(this, b, "<<"){UFix()};
-  override def >> (b: UFix): UFix = BinaryNodeCell(this, b, ">>"){UFix()};
-  def +  (b: UFix): UFix = BinaryNodeCell(this, b, "+"){UFix()};
-  def *  (b: UFix): UFix = BinaryNodeCell(this, b, "*"){UFix()};
-  def ^  (b: UFix): UFix = BinaryNodeCell(this, b, "^"){UFix()};
-  def ?  (b: UFix): UFix = BinaryNodeCell(this, b, "?"){UFix()};
-  def -  (b: UFix): UFix = BinaryNodeCell(this, b, "-"){UFix()};
-  def ## (b: UFix): UFix = BinaryNodeCell(this, b, "##"){UFix()};
-  def ===(b: UFix): Bool = LogicalNodeCell(this, b, "==="){UFix()};
-  def != (b: UFix): Bool = LogicalNodeCell(this, b, "!="){UFix()};
-  def >  (b: UFix): Bool = LogicalNodeCell(this, b, ">"){UFix()};
-  def <  (b: UFix): Bool = LogicalNodeCell(this, b, "<"){UFix()};
-  def <= (b: UFix): Bool = LogicalNodeCell(this, b, "<="){UFix()};
-  def >= (b: UFix): Bool = LogicalNodeCell(this, b, ">="){UFix()};
-  def &  (b: UFix): UFix = BinaryNodeCell(this, b, "&"){UFix()};
-  def |  (b: UFix): UFix = BinaryNodeCell(this, b, "|"){UFix()};
+  override def andR(): Bool    = ReductionOp(this, "&"){UFix()};
+  override def orR():  Bool    = ReductionOp(this, "|"){UFix()};
+  override def << (b: UFix): UFix = BinaryOp(this, b, "<<"){UFix()};
+  override def >> (b: UFix): UFix = BinaryOp(this, b, ">>"){UFix()};
+  def +  (b: UFix): UFix = BinaryOp(this, b, "+"){UFix()};
+  def *  (b: UFix): UFix = BinaryOp(this, b, "*"){UFix()};
+  def ^  (b: UFix): UFix = BinaryOp(this, b, "^"){UFix()};
+  def ?  (b: UFix): UFix = BinaryOp(this, b, "?"){UFix()};
+  def -  (b: UFix): UFix = BinaryOp(this, b, "-"){UFix()};
+  def ## (b: UFix): UFix = BinaryOp(this, b, "##"){UFix()};
+  def ===(b: UFix): Bool = LogicalOp(this, b, "==="){UFix()};
+  def != (b: UFix): Bool = LogicalOp(this, b, "!="){UFix()};
+  def >  (b: UFix): Bool = LogicalOp(this, b, ">"){UFix()};
+  def <  (b: UFix): Bool = LogicalOp(this, b, "<"){UFix()};
+  def <= (b: UFix): Bool = LogicalOp(this, b, "<="){UFix()};
+  def >= (b: UFix): Bool = LogicalOp(this, b, ">="){UFix()};
+  def &  (b: UFix): UFix = BinaryOp(this, b, "&"){UFix()};
+  def |  (b: UFix): UFix = BinaryOp(this, b, "|"){UFix()};
 
   //UFix op Fix arithmetic
-  def *   (b: Fix): Fix = BinaryNodeCell(this, b, "u*s"){Fix()}.toFix;
+  def *   (b: Fix): Fix = BinaryOp(this, b, "u*s"){Fix()}.toFix;
 }
 
 }

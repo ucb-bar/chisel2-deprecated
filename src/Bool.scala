@@ -62,16 +62,16 @@ class Bool extends Bits {
   override def apply(bit: UFix): Bool = {generateError; this};
   override def apply(hi: UFix, lo: UFix): Bool = {generateError; this};
 
-  override def unary_-(): Bool = UnaryBoolCell(this, "-");
-  override def unary_~(): Bool = UnaryBoolCell(this, "~");
-  def unary_!(): Bool = UnaryBoolCell(this, "!");
-  def ^  (b: Bool): Bool = BinaryBoolCell(this, b, "^");
-  def ===(b: Bool): Bool = BinaryBoolCell(this, b, "===");
-  def != (b: Bool): Bool = BinaryBoolCell(this, b, "!=");
-  override def && (b: Bool): Bool = if (b.isTrue) this else BinaryBoolCell(this, b, "&&");
-  override def || (b: Bool): Bool = BinaryBoolCell(this, b, "||");
-  def &  (b: Bool): Bool = BinaryBoolCell(this, b, "&");
-  def |  (b: Bool): Bool = BinaryBoolCell(this, b, "|");
+  override def unary_-(): Bool = UnaryBoolOp(this, "-");
+  override def unary_~(): Bool = UnaryBoolOp(this, "~");
+  def unary_!(): Bool = UnaryBoolOp(this, "!");
+  def ^  (b: Bool): Bool = BinaryBoolOp(this, b, "^");
+  def ===(b: Bool): Bool = BinaryBoolOp(this, b, "===");
+  def != (b: Bool): Bool = BinaryBoolOp(this, b, "!=");
+  override def && (b: Bool): Bool = if (b.isTrue) this else BinaryBoolOp(this, b, "&&");
+  override def || (b: Bool): Bool = BinaryBoolOp(this, b, "||");
+  def &  (b: Bool): Bool = BinaryBoolOp(this, b, "&");
+  def |  (b: Bool): Bool = BinaryBoolOp(this, b, "|");
 
   def isTrue: Boolean = {
     if(inputs.length == 0) return false
