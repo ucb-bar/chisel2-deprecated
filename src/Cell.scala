@@ -210,7 +210,7 @@ object ReductionOp {
     // make output
     val output = Bool(OUTPUT)
     output.setIsCellIO
-    node.nameHolder = node
+    node.nameHolder = output
     output assign node
     output
   }
@@ -254,7 +254,7 @@ object UnaryBoolOp {
     //make ouput
     val output = Bool(OUTPUT)
     output.setIsCellIO
-    node.nameHolder = io.out
+    node.nameHolder = output
     output assign node
     output
   }
