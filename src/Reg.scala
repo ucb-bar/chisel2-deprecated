@@ -20,9 +20,9 @@ object Reg {
     // initialize
     if(resetVal != null){
       reg.isReset = true
-      reg.init("", regWidth(w), d, resetVal.toNode)
+      reg.init("", regWidth(width), d, resetVal.toNode)
     } else
-      reg.init("", regWidth(w), d)
+      reg.init("", regWidth(width), d)
 
     // make output
     val output = gen.fromNode(reg).asInstanceOf[T]

@@ -41,6 +41,7 @@ object Lit {
     val output = Bool(OUTPUT)
     output.setIsCellIO
     output assign x
+    output
   }
 }
 
