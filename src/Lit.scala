@@ -12,41 +12,36 @@ import ChiselError._;
 
 object Lit {
   def apply[T <: Bits](x: Int)(gen: => T): T = {
-    val cell = new Lit(Literal(x, signed = gen.isInstanceOf[Fix]))(gen);
-    cell.io
+    makeLit(Literal(x, signed = gen.isInstanceOf[Fix]))(gen)
   }
+
   def apply[T <: Bits](x: Int, width: Int)(gen: => T): T = {
-    val cell = new Lit(Literal(x, width, gen.isInstanceOf[Fix]))(gen);
-    cell.io
+    makeLit(Literal(x, width, gen.isInstanceOf[Fix]))(gen)
   }
-  // def apply[T <: Bits](x: Long, width: Int)(gen: => T): T = {
-  //   val cell = new Lit(Literal( x, width))(gen);
-  //   cell.io
-  // }
+
   def apply[T <: Bits](n: String, width: Int = -1)(gen: => T): T = {
-    val cell = new Lit(Literal(n, width))(gen);
-    cell.io
+    makeLit(Literal(n, width))(gen)
   }
+
   def apply[T <: Bits](width: Int, base: Char, literal: String)(gen: => T): T = {
-    val cell = new Lit(Literal(width, base, literal))(gen);
-    cell.io
+    makeLit(Literal(width, base, literal))(gen)
   }
+
   def apply(value: Boolean): Bool = 
-    new BoolLit((if(value) Literal(1) else Literal(0))).io;
-}
+    makeBool((if(value) Literal(1) else Literal(0)))
 
-class Lit[T <: Bits](x: Literal)(gen: => T) extends Cell {
-  val io = gen.asOutput;
-  io.setIsCellIO;
-  val primitiveNode = x;
-  io assign primitiveNode;
-}
+  def makeLit(x: Literal)(gen: => T): T = {
+    val output= gen.asOutput
+    output.setIsCellIO
+    output assign x
+    output
+  }
 
-class BoolLit(x: Literal) extends Cell {
-  val io = Bool(OUTPUT);
-  io.setIsCellIO;
-  val primitiveNode = x;
-  io assign primitiveNode;
+  def makeBool(x: Literal): Bool = {
+    val output = Bool(OUTPUT)
+    output.setIsCellIO
+    output assign x
+  }
 }
 
 object Literal {

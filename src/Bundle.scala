@@ -255,7 +255,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     }
     bundledElm
   }
-
+  
   override def fromNode(n: Node): this.type = {
     val res = this.clone()
     var ind = 0;
