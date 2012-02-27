@@ -7,10 +7,17 @@ import IOdir._;
 object Fill {
   def fillWidthOf(i: Int, n: Node) = { (m: Node) => (m.inputs(i).width * n.maxNum.toInt) }
   def apply(n: Int, mod: Bits): Bits = {
-    val fillcell = new FillCell(mod);
-    fillcell.io.mod <> mod;
-    fillcell.io.n <> UFix(n);
-    fillcell.io.out
+    val fill = new Fill()
+
+    // initialize
+    val fillConst = UFix(n)
+    fill.init("", fillWidthOf(0, fillConst), io.mod, io.n)
+
+    // make output
+    val output = Bits(OUTPUT)
+    output.setIsCellIO
+    output assign fill
+    output
   }
   def apply(mod: Bits, n: Int): Bits = apply(n, mod)
 }
