@@ -214,6 +214,13 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
     for(elm <- self)
       elm.setIsCellIO
   }
+
+  override def toBits(): Bits = {
+    var res: Bits = null
+    for(i <- 0 until length)
+      res = Cat(this(i), res)
+    res
+  }
 }
 
 }
