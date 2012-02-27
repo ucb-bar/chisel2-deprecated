@@ -13,27 +13,23 @@ object Cat {
       res
     }
     else {
-      val res = new CatCell(mod, mods.toList);
-      res.io.out
+      // initialize
+      val res = 
+        if(isEmittingComponents){
+          val res = new Cat();
+          res.initOf("", sumWidth _, mod.toNode :: mods.toList.map(x => x.toNode))
+        } else {
+          mods.foldLeft(mod.toNode){(a,b) => a ## b.toNode}
+        }
+      
+      // make output
+      val output = Bits(OUTPUT)
+      output.setIsCellIO
+      output assign res
+      res.nameHolder = output
+      output
     }
   }
-}
-
-
-class CatCell[T <: Data](mod: T, mods: List[T]){
-  val io = new Bundle(){val out = Bits(OUTPUT);
-			}
-  io.setIsCellIO;
-  val primitiveNode = 
-    if(isEmittingComponents){
-      val res = new Cat();
-      res.initOf("primitiveNode", sumWidth _, mod.toNode :: mods.map(x => x.toNode));
-      res
-    } else {
-      mods.foldLeft(mod.toNode){(a, b) => a ## b.toNode}
-    }
-  io.out assign primitiveNode;
-  primitiveNode.nameHolder = io.out
 }
 
 
@@ -45,7 +41,8 @@ object Concatanate {
       res
     } else
       mods.foldLeft(mod){(a, b) => a ## b};
-  }
+}
+
 class Cat extends Node {
   override def emitDef: String = {
     var res = "  assign " + emitTmp + " = {";

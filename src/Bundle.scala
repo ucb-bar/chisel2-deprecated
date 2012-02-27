@@ -248,6 +248,13 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     sort(res.toArray)
   }
 
+  override def getWidth(): Int = {
+    var w = 0
+    for((name, io) <- elements)
+      w += io.getWidth
+    w
+  }
+
   override def toNode: Node = {
     if(bundledElm == null) {
       val nodes = flatten.map{case (n, i) => i};
@@ -255,7 +262,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     }
     bundledElm
   }
-
+  
   override def fromNode(n: Node): this.type = {
     val res = this.clone()
     var ind = 0;

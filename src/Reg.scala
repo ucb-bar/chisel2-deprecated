@@ -14,19 +14,23 @@ object Reg {
   }
   val noInit = Lit(0){Fix()};
   def apply[T <: Data](data: T, width: Int, resetVal: T)(gen: => T): T = {
-    val dataIn: T = 
-      (if(data == null) 
-	data 
-       else if(gen != null) 
-	 gen
-       else {
-	 ChiselErrors += IllegalState("no type specified for Reg", 4)
-	 Bits().asInstanceOf[T]
-       })
-    val regCell = new RegCell[T](dataIn, width, data != null, resetVal != null)(gen);
-    if(data != null) regCell.io.data <> data;
-    if(resetVal != null) regCell.io.resetVal <> resetVal;
-    regCell.io.q
+    val reg = new Reg()
+    val d = if(data == null) null else data.toNode
+
+    // initialize
+    if(resetVal != null){
+      reg.isReset = true
+      reg.init("", regWidth(width), d, resetVal.toNode)
+    } else
+      reg.init("", regWidth(width), d)
+
+    // make output
+    val output = gen.fromNode(reg).asInstanceOf[T]
+    output.setIsCellIO
+    output.comp = reg
+    reg.nameHolder = output
+    output.isRegOut = true
+    output
   }
 
   def apply[T <: Data](data: T): T = {
@@ -39,28 +43,6 @@ object Reg {
 
   def apply[T <: Data]()(gen: => T): T = Reg[T](null.asInstanceOf[T], gen.width, null.asInstanceOf[T])(gen)
 
-}
-
-
-class RegCell[T <: Data](d: T, w: Int, hasInput: Boolean, isReset: Boolean)(gen: => T) extends Cell {
-  val io = new Bundle(){
-    val data     = gen.asInput();
-    val resetVal = gen.asInput();
-    val q        = gen.asOutput();
-  }
-  io.setIsCellIO;
-  val primitiveNode = new Reg();
-  val dInput: Node = if(hasInput) io.data.toNode else null;
-  if(isReset) {
-    primitiveNode.isReset = true
-    primitiveNode.init("", regWidth(w), dInput, io.resetVal.toNode);
-  } else
-    primitiveNode.init("", regWidth(w), dInput);
-  val fb = io.q.fromNode(primitiveNode).asInstanceOf[T] 
-  fb.setIsCellIO;
-  fb ^^ io.q;
-  io.q.comp = primitiveNode.asInstanceOf[Reg];
-  io.q.isRegOut = true;
 }
 
 class Reg extends Delay with proc{

@@ -11,28 +11,18 @@ object Multiplex{
 }
 
 
-class MuxCell[T <: Data](cI: T, aI: T) extends Cell {
-  val io = new Bundle(){
-    val t = Bits(INPUT);
-    val c: T = cI.clone().asInput();
-    val a: T = aI.clone().asInput();
-    val out: T = cI.clone().asOutput();
-  }
-  io.setIsCellIO;
-  val primitiveNode: Node = Multiplex(io.t, io.c.toNode, io.a.toNode);
-  val fb = io.out.fromNode(primitiveNode).asInstanceOf[T];
-  fb.setIsCellIO;
-  fb ^^ io.out;
-  primitiveNode.nameHolder = io.out;
-}
-
 object Mux {
   def apply[T <: Data](t: Bits, c: T, a: T): T = {
-    val muxcell = new MuxCell(c, a);
-    muxcell.io.t assign t;
-    muxcell.io.c <> c;
-    muxcell.io.a <> a;
-    muxcell.io.out
+    val res = new Mux()
+
+    // initialize
+    res.init("", maxWidth _, t, c.toNode, a.toNode)
+
+    // make output
+    val output = c.fromNode(res).asInstanceOf[T]
+    output.setIsCellIO
+    res.nameHolder = output
+    output
   }
 }
 class Mux extends Op {

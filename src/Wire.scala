@@ -5,42 +5,41 @@ import Node._;
 import ChiselError._;
 
 object Wire {
-  def apply[T <: Data]()(gen: => T): T = {
-    val junctioncell = new WireCell[T](gen, -1)(gen);
-    junctioncell.io.out
+  def apply[T <: Data](width: Int = -1)(gen: =>T): T = {
+    val wire = new Wire()
+
+    // initialize
+    val genWidth = gen.getWidth
+    if(width > -1)
+      wire.init("", width, null)
+    else if(genWidth > -1)
+      wire.init("", genWidth, null)
+    else
+      wire.init("", widthOf(0), null)
+
+    // make output
+    val output = gen.fromNode(wire)
+    output.setIsCellIO
+    output.comp = wire
+    wire.nameHolder = output
+    output
   }
-  def apply[T <: Data](width: Int)(gen: =>T): T = {
-    val junctioncell = new WireCell[T](gen, width)(gen);
-    junctioncell.io.out
-  }
+
   def apply[T <: Data](default: T): T = {
     if(default.inputs.length == 0)
       ChiselErrors += IllegalState("incorrect wire syntax", 3);
-    val junctioncell = new WireCell[T](default, -1, true)(default.clone.asInstanceOf[T]);
-    junctioncell.io.in assign default;
-    junctioncell.io.out
-  }
-}
+    val wire = new Wire()
 
+    //initialize
+    wire.init("", widthOf(0), default)
 
-class WireCell[T <: Data](data: T, width: Int, hasDefault: Boolean = false)(gen: => T){
-  val io = new Bundle(){
-    val in = gen.asInput();
-    val out = gen.asOutput();
+    // make output
+    val output = default.fromNode(wire)
+    output.setIsCellIO
+    output.comp = wire
+    wire.nameHolder = output
+    output
   }
-  io.setIsCellIO;
-  val primitiveNode = new Wire();
-  if(width > -1)
-    primitiveNode.init("primitiveNode", width, null)
-  else if(hasDefault) {
-    primitiveNode.init("primitiveNode", widthOf(0), io.in)
-  } else
-    primitiveNode.init("primitiveNode", widthOf(0), null);
-  val fb = io.out.fromNode(primitiveNode).asInstanceOf[T] 
-  fb.setIsCellIO;
-  fb ^^ io.out;
-  io.out.comp = primitiveNode.asInstanceOf[Wire];
-  primitiveNode.nameHolder = io.out;
 }
 
 class Wire extends Data with proc {

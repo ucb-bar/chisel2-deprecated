@@ -93,6 +93,7 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
   }
 
   def read(addr: UFix): T = {
+    if(eltWidth <= 0) throw new Exception("widths on element in Vec must be > 0 if you want to use .read")
     val mux1h = new Mux1H_(length, eltWidth)
     val onehot = UFixToOH(addr, length)
     for(i <- 0 until length){

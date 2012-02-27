@@ -7,10 +7,18 @@ import IOdir._;
 object Fill {
   def fillWidthOf(i: Int, n: Node) = { (m: Node) => (m.inputs(i).width * n.maxNum.toInt) }
   def apply(n: Int, mod: Bits): Bits = {
-    val fillcell = new FillCell(mod);
-    fillcell.io.mod <> mod;
-    fillcell.io.n <> UFix(n);
-    fillcell.io.out
+    val fill = new Fill()
+
+    // initialize
+    val fillConst = UFix(n)
+    fill.init("", fillWidthOf(0, fillConst), mod, fillConst)
+
+    // make output
+    val output = Bits(OUTPUT)
+    output.setIsCellIO
+    fill.nameHolder = output
+    output assign fill
+    output
   }
   def apply(mod: Bits, n: Int): Bits = apply(n, mod)
 }
@@ -22,20 +30,6 @@ object NodeFill {
     res
   }
   def apply(mod: Node, n: Int): Node = apply(n, mod)
-}
-
-
-class FillCell[T <: Data](data: T) extends Cell {
-  val io = new Bundle(){
-    val mod = Bits(INPUT);
-    val n = Fix(INPUT);
-    val out = Bits(OUTPUT);
-  }
-  io.setIsCellIO;
-  val primitiveNode = new Fill();
-  primitiveNode.init("primitiveNode", Fill.fillWidthOf(0, io.n), io.mod.toNode, io.n);
-  io.out assign primitiveNode;
-  primitiveNode.nameHolder = io.out;
 }
 
 class Fill extends Node {
