@@ -193,13 +193,6 @@ class MemPort[T <: Data](cell:       MemCell[T],
       cell.io += addr_port;
       mem.inputs += addr_port;
       addr_port assign addr;
-      if (mem.addr_width > 0) {
-        if (mem.addr_width != addr.getWidth) {
-          println("[error] Memory address width differs from other memory ports");
-        }
-      } else {
-        mem.addr_width = addr.getWidth;
-      }
     }
   }
   def assign_data(data: Node) = {
@@ -556,7 +549,6 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
   var initData: ListNode    = null;
   var readLatency           = Mem.getDefaultReadLatency;
   var hasWBM                = false;
-  var addr_width            = 0;
 
   if (initData != null) {
     for (e <- initData.inputs) {
@@ -575,7 +567,6 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
   }
 
   def getDepth = depth;
-  def getAddrWidth = addr_width;
   def getDataWidth = cell.getWidth;
   def addResetVal(cell: MemCell[T], r_val: T) = {
     val reset_port = new MemResetPort[T](this, cell, r_val);
@@ -612,7 +603,7 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
     var rw_port_count = 0;
     var delim = "";
     var res = "gen_chisel_mem -name \""+getPathName+"\" -depth "+depth+" -width "+cell.getWidth;
-    res += " -addr_width "+getAddrWidth+" -read_latency "+getReadLatency+" -port_types \"";
+    res += " -read_latency "+getReadLatency+" -port_types \"";
     for (p <- cell.port_list) {
       if (p.hasWrBitMask) hasWBM = true;
       if (p.getPortType == 'read)       { read_port_count += 1;  res += delim+"read";  delim = " "; }
