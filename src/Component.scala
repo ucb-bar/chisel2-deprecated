@@ -343,26 +343,30 @@ abstract class Component(resetSignal: Bool = null) {
 	w match {
           case io: IO  => 
             if (io.dir == INPUT) {
-              if (io.inputs.length == 0 && saveConnectionWarnings)
-		  connWriter.write("// " + io + " UNCONNECTED IN " + io.component + "\n"); 
-              else if (io.inputs.length > 1 && saveConnectionWarnings)
-		  connWriter.write("// " + io + " CONNECTED TOO MUCH " + io.inputs.length + "\n"); 
-	      else if (!this.isWalked.contains(w)) {
-                if(saveConnectionWarnings)
-		  connWriter.write("// UNUSED INPUT " +io+ " OF " + this + " IS REMOVED" + "\n");
-	      }
-              else 
+              if (io.inputs.length == 0) { 
+                  if(saveConnectionWarnings)
+		    connWriter.write("// " + io + " UNCONNECTED IN " + io.component + "\n"); 
+              } else if (io.inputs.length > 1) {
+                  if(saveConnectionWarnings)
+		    connWriter.write("// " + io + " CONNECTED TOO MUCH " + io.inputs.length + "\n"); 
+	      } else if (!this.isWalked.contains(w)){ 
+                  if(saveConnectionWarnings)
+		    connWriter.write("// UNUSED INPUT " +io+ " OF " + this + " IS REMOVED" + "\n");
+              } else {
 		res += io.inputs(0).emitRef;
+              }
             } else {
-              if (io.consumers.length == 0 && saveConnectionWarnings)
-		  connWriter.write("// " + io + " UNCONNECTED IN " + io.component + " BINDING " + findBinding(io) + "\n"); 
-              else {
+              if (io.consumers.length == 0) {
+                  if(saveConnectionWarnings)
+		    connWriter.write("// " + io + " UNCONNECTED IN " + io.component + " BINDING " + findBinding(io) + "\n"); 
+              } else {
 		var consumer: Node = parent.findBinding(io);
 		if (consumer == null) {
                   if(saveConnectionWarnings)
                     connWriter.write("// " + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + io.consumers.length + ") IN " + parent + "\n"); 
-		} else 
+		} else {
                   res += consumer.emitRef; // TODO: FIX THIS?
+                }
               }
             }
 	};
@@ -576,8 +580,9 @@ abstract class Component(resetSignal: Bool = null) {
 
 	if (io.width > io.inputs(0).width){
 
-          if(saveWidthWarnings)
+          if(saveWidthWarnings) {
 	    widthWriter.write("TOO LONG! IO " + io + " with width " + io.width + " bit(s) is assigned a wire with width " + io.inputs(0).width + " bit(s).\n")
+          }
 	  if(io.inputs(0).isInstanceOf[Fix]){
 	    val topBit = NodeExtract(io.inputs(0), Literal(io.inputs(0).width-1)); topBit.infer
 	    val fill = NodeFill(io.width - io.inputs(0).width, topBit); fill.infer
@@ -591,8 +596,9 @@ abstract class Component(resetSignal: Bool = null) {
 	  }
 
 	} else if (io.width < io.inputs(0).width) {
-          if(saveWidthWarnings)
+          if(saveWidthWarnings) {
 	    widthWriter.write("TOO SHORT! IO " + io + " width width " + io.width + " bit(s) is assigned a wire with width " + io.inputs(0).width + " bit(s).\n")
+          }
 	  val res = NodeExtract(io.inputs(0), Literal(io.width-1), Literal(0,1)); res.infer
 	  io.inputs(0) = res
 	}
