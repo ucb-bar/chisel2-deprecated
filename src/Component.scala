@@ -361,10 +361,10 @@ abstract class Component(resetSignal: Bool = null) {
 		  connWriter.write("// " + io + " UNCONNECTED IN " + io.component + " BINDING " + findBinding(io) + "\n"); 
               else {
 		var consumer: Node = parent.findBinding(io);
-		if (consumer == null) 
+		if (consumer == null) {
                   if(saveConnectionWarnings)
                     connWriter.write("// " + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + io.consumers.length + ") IN " + parent + "\n"); 
-		else 
+		} else 
                   res += consumer.emitRef; // TODO: FIX THIS?
               }
             }
