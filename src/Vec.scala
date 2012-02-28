@@ -44,6 +44,31 @@ object Mux1H {
     
     pairs.map{case(bool, bits) => bits & Fill(inferredWidth, bool)}.reduceLeft(_ | _)
   }
+
+  
+  def apply[T <: Data](pairs: Seq[(Bool, T)], gen: () => T): T = {
+    val res = gen().asOutput
+    res.setIsCellIO
+    
+    val inferredWidth = (pairs.map{case(bool, data) => data.getWidth}).max
+    assert(inferredWidth > 0, {println("UNABLE TO INFER WIDTH ON MUX1H")})
+
+    var filter: List[List[IO]] = pairs(0)._2.flatten.map(x => List()).toList
+    for((bool, data) <- pairs) {
+      filter = (filter zip data.flatten).map{case(a, (b, c)) => a :+ c}
+    }
+
+    val bools = pairs.map{case(bool, data) => bool}
+
+    for(((n, i), data) <- res.flatten zip filter) {
+      val p = new ArrayBuffer[(Bool, Bits)]
+      for((b, d) <- bools zip data)
+        p += (b -> d.toBits)
+      i := Mux1H(-1, p)
+    }
+
+    res
+  }
 }
 
 object VecBuf{
@@ -59,7 +84,6 @@ object Vec {
   def apply[T <: Data](n: Int)(gen: => T): Vec[T] = {
     val res = new Vec[T]();
     res.gen = () => gen;
-    println("MAKE VEC");
     for(i <- 0 until n){
       val t   = gen;
       res    += t;
@@ -110,12 +134,10 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
     if(eltWidth <= 0) 
       throw new Exception("widths on element in Vec must be > 0 if you want to use .read")
     val onehot = UFixToOH(addr, length)
-    val pairs = new ArrayBuffer[(Bool, Bits)]
+    val pairs = new ArrayBuffer[(Bool, T)]
     for(i <- 0 until length)
-      pairs += (onehot(i).toBool -> this(i).toBits)
-    val res = this(0).clone
-    res.setIsCellIO
-    res assign Mux1H(eltWidth, pairs)
+      pairs += (onehot(i).toBool -> this(i))
+    val res = Mux1H(pairs, gen)
     readPortCache += (addr -> res)
     res
   }
