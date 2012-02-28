@@ -154,5 +154,17 @@ object BinaryBoolOp {
   }
 }
 
+object andR {
+    def apply(x: Bits): Bool = ReductionOp(x, "&"){Bits()}
+}
+
+object orR {
+    def apply(x: Bits): Bool = ReductionOp(x, "|"){Bits()}
+}
+
+object xorR {
+    def apply(x: Bits): Bool = ReductionOp(x, "^"){Bits()}
+}
+
 }
 
