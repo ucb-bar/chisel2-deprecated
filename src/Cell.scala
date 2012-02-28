@@ -14,7 +14,7 @@ object chiselCast {
     val res = gen.asOutput
     res.setIsCellIO
     x.nameHolder = res
-    res.inputs += x
+    res.inputs += x.toNode
     res
   }
 }

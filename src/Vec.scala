@@ -36,6 +36,15 @@ class Mux1H_(n: Int, w: Int) extends Component
   }
 }
 
+object Mux1H {
+  def apply(w: Int = -1, pairs: Seq[(Bool, Bits)]): Bits = {
+    val inferredWidth = (w +: pairs.map{case(bool, bits) => bits.getWidth}).max
+    assert(inferredWidth > 0, {println("UNABLE TO INFER WIDTH ON MUX1H")})
+    
+    pairs.map{case(bool, bits) => bits & Fill(inferredWidth, bool)}.reduceLeft(_ | _)
+  }
+}
+
 object VecBuf{
   def apply[T <: Data](n: Int)(gen: => Vec[T]): ArrayBuffer[Vec[T]] = {
     val res = new ArrayBuffer[Vec[T]]
@@ -94,15 +103,20 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
 
   def read(addr: UFix): T = {
     if(eltWidth <= 0) throw new Exception("widths on element in Vec must be > 0 if you want to use .read")
-    val mux1h = new Mux1H_(length, eltWidth)
+    //val mux1h = new Mux1H_(length, eltWidth)
     val onehot = UFixToOH(addr, length)
-    for(i <- 0 until length){
-      mux1h.io.sel(i) := onehot(i).toBool
-      mux1h.io.in(i)  assign this(i)
-    }
+    val pairs = new ArrayBuffer[(Bool, Bits)]
+    for(i <- 0 until length)
+      pairs += (onehot(i).toBool -> this(i).toBits)
+    /*
     val res = this(0).clone
     res.setIsCellIO
     res assign mux1h.io.out
+    res
+    * */
+    val res = this(0).clone
+    res.setIsCellIO
+    res assign Mux1H(eltWidth, pairs)
     res
   }
 
