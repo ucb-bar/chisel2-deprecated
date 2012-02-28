@@ -14,8 +14,9 @@ object Reg {
   }
   val noInit = Lit(0){Fix()};
   def apply[T <: Data](data: T, width: Int, resetVal: T)(gen: => T): T = {
+
+    /*
     val reg = new Reg()
-    val d = if(data == null) null else data.toNode
 
     // initialize
     if(resetVal != null){
@@ -31,6 +32,43 @@ object Reg {
     reg.nameHolder = output
     output.isRegOut = true
     output
+    * */
+
+    val d: Array[(String, IO)] = 
+      if(data == null) 
+        gen.flatten.map{case(x, y) => (x -> null)}
+      else 
+        data.flatten
+
+    val res = gen.asOutput
+    res.setIsCellIO
+
+    if(resetVal != null) {
+      for((((res_n, res_i), (data_n, data_i)), (rval_n, rval_i)) <- res.flatten zip d zip resetVal.flatten) {
+        val w = res_i.getWidth
+        assert(w > 0, {println("Negative width to wire " + res_i)})
+        val reg = new Reg()
+        reg.init("", regWidth(w), data_i, rval_i)
+
+        // make output
+        reg.isReset = true
+        res_i.inputs += reg
+        res_i.comp = reg
+      }
+    } else {
+      for(((res_n, res_i), (data_n, data_i)) <- res.flatten zip d) {
+        val w = res_i.getWidth
+        assert(w > 0, {println("Negative width to reg " + res_i)})
+        val reg = new Reg()
+        reg.init("", regWidth(w), data_i)
+
+        // make output
+        res_i.inputs += reg
+        res_i.comp = reg
+      }
+    }
+
+    res
   }
 
   def apply[T <: Data](data: T): T = {
