@@ -112,6 +112,15 @@ object chiselMain {
     while (i < args.length) {
       val arg = args(i);
       arg match {
+        case "--Wall" => {
+          saveWidthWarnings = true
+          saveConnectionWarnings = true
+          saveComponentTrace = true
+        }
+        case "--Wwidth" => saveWidthWarnings = true
+        case "--Wconnection" => saveConnectionWarnings = true
+        case "--Wcomponent" => saveComponentTrace = true
+        case "--findCombLoop" => findCombLoop = true 
         case "--gen-harness" => isGenHarness = true; 
         case "--debug" => isDebug = true; 
         case "--folding" => isFolding = true; 

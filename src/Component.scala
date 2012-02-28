@@ -17,6 +17,12 @@ import IOdir._;
 import ChiselError._;
 
 object Component {
+  var saveWidthWarnings = false
+  var saveConnectionWarnings = false
+  var saveComponentTrace = false
+  var findCombLoop = false
+  var widthWriter: java.io.FileWriter = null
+  var connWriter: java.io.FileWriter = null
   var isDebug = false;
   var isVCD = false;
   var isFolding = false;
@@ -58,6 +64,10 @@ object Component {
   // TODO: ADD INIT OF TOP LEVEL NODE STATE
   // TODO: BETTER YET MOVE ALL TOP LEVEL STATE FROM NODE TO COMPONENT
   def initChisel () = {
+    saveWidthWarnings = false
+    saveConnectionWarnings = false
+    saveComponentTrace = false
+    findCombLoop = false
     isGenHarness = false;
     isDebug = false;
     isFolding = false;
@@ -89,6 +99,12 @@ object Component {
     topComponent = null;
   }
 
+  def ensure_dir(dir: String) = {
+    val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/");
+    new File(d).mkdirs();
+    d
+  }
+
   //component stack handling stuff
   
   def isSubclassOfComponent(x: java.lang.Class[ _ ]): Boolean = {
@@ -102,12 +118,12 @@ object Component {
   }
 
   def printStack = {
-    var res = "";
+    var res = ""
     for((i, c) <- printStackStruct){
-      val dispName = if(c.moduleName == "") c.className else c.moduleName;
+      val dispName = if(c.moduleName == "") c.className else c.moduleName
       res += (genIndent(i) + dispName + " " + c.instanceName + "\n")
     }
-    println(res);
+    println(res)
   }
 
   def genIndent(x: Int): String = {
@@ -154,7 +170,8 @@ object Component {
 	    val className = elm.getClassName;
 
 	    if(isSubclassOfComponent(Class.forName(className)) && !c.isSubclassOf(Class.forName(className))) {
-	      println("marking " + className + " as parent of " + c.getClass);
+              if(saveComponentTrace)
+	        println("marking " +className+ " as parent of " + c.getClass);
 	      while(compStack.top.getClass != Class.forName(className)){
 		pop;
 	      }
@@ -327,21 +344,26 @@ abstract class Component(resetSignal: Bool = null) {
           case io: IO  => 
             if (io.dir == INPUT) {
               if (io.inputs.length == 0)
-		println("// " + io + " UNCONNECTED IN " + io.component); 
+                if(saveConnectionWarnings)
+		  connWriter.write("// " + io + " UNCONNECTED IN " + io.component + "\n"); 
               else if (io.inputs.length > 1) 
-		println("// " + io + " CONNECTED TOO MUCH " + io.inputs.length); 
+                if(saveConnectionWarnings)
+		  connWriter.write("// " + io + " CONNECTED TOO MUCH " + io.inputs.length + "\n"); 
 	      else if (!this.isWalked.contains(w)) {
-		println ("// UNUSED INPUT " +io+ " OF " + this + " IS REMOVED");
+                if(saveConnectionWarnings)
+		  connWriter.write("// UNUSED INPUT " +io+ " OF " + this + " IS REMOVED" + "\n");
 	      }
               else 
 		res += io.inputs(0).emitRef;
             } else {
               if (io.consumers.length == 0) 
-		println("// " + io + " UNCONNECTED IN " + io.component + " BINDING " + findBinding(io)); 
+                if(saveConnectionWarnings)
+		  connWriter.write("// " + io + " UNCONNECTED IN " + io.component + " BINDING " + findBinding(io) + "\n"); 
               else {
 		var consumer: Node = parent.findBinding(io);
 		if (consumer == null) 
-                  println("// " + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + io.consumers.length + ") IN " + parent); 
+                  if(saveConnectionWarnings)
+                    connWriter.write("// " + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + io.consumers.length + ") IN " + parent + "\n"); 
 		else 
                   res += consumer.emitRef; // TODO: FIX THIS?
               }
@@ -557,7 +579,8 @@ abstract class Component(resetSignal: Bool = null) {
 
 	if (io.width > io.inputs(0).width){
 
-	  println("too long " + io.width + " bit(s) assigned to " + io.inputs(0).width + " bit(s). " + io)
+          if(saveWidthWarnings)
+	    widthWriter.write("TOO LONG! IO " + io + " with width " + io.width + " bit(s) is assigned a wire with width " + io.inputs(0).width + " bit(s).\n")
 	  if(io.inputs(0).isInstanceOf[Fix]){
 	    val topBit = NodeExtract(io.inputs(0), Literal(io.inputs(0).width-1)); topBit.infer
 	    val fill = NodeFill(io.width - io.inputs(0).width, topBit); fill.infer
@@ -571,7 +594,8 @@ abstract class Component(resetSignal: Bool = null) {
 	  }
 
 	} else if (io.width < io.inputs(0).width) {
-	  println("too short " + io.width + " bit(s) assigned to " + io.inputs(0).width + " bit(s). " + io)
+          if(saveWidthWarnings)
+	    widthWriter.write("TOO SHORT! IO " + io + " width width " + io.width + " bit(s) is assigned a wire with width " + io.inputs(0).width + " bit(s).\n")
 	  val res = NodeExtract(io.inputs(0), Literal(io.width-1), Literal(0,1)); res.infer
 	  io.inputs(0) = res
 	}
@@ -579,6 +603,7 @@ abstract class Component(resetSignal: Bool = null) {
       }
 
     }
+    if(saveWidthWarnings) widthWriter.close()
   }
 
   def findConsumers() = {
@@ -866,12 +891,6 @@ abstract class Component(resetSignal: Bool = null) {
     }
   }
 
-  def ensure_dir(dir: String) = {
-    val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/");
-    new File(d).mkdirs();
-    d
-  }
-
   def compileV(): Unit = {
     topComponent = this;
     components.foreach(_.elaborate(0));
@@ -882,13 +901,19 @@ abstract class Component(resetSignal: Bool = null) {
     assignResets()
     removeCellIOs()
     inferAll();
+    val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
+    if(saveWidthWarnings)
+      widthWriter = new java.io.FileWriter(base_name + name + ".width.warnings")
     forceMatchingWidths;
     nameChildren(topComponent)
     traceNodes();
-    val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
     val out = new java.io.FileWriter(base_name + name + ".v");
+    if(saveConnectionWarnings)
+      connWriter = new java.io.FileWriter(base_name + name + ".connection.warnings")
     doCompileV(out, 0);
     verifyAllMuxes;
+    if(saveConnectionWarnings)
+      connWriter.close()
     if(ChiselErrors isEmpty)
       out.close();
     else {
@@ -900,7 +925,8 @@ abstract class Component(resetSignal: Bool = null) {
       out_conf.write(configStr);
       out_conf.close();
     }
-    printStack;
+    if(saveComponentTrace)
+      printStack
     compDefs.clear;
     genCount = 0;
   }
@@ -1044,7 +1070,9 @@ abstract class Component(resetSignal: Bool = null) {
     // isWalked.clear();
     assignResets()
     removeCellIOs()
-    inferAll();    
+    inferAll();
+    if(saveWidthWarnings)
+      widthWriter = new java.io.FileWriter(base_name + name + ".width.warnings")
     forceMatchingWidths;
     traceNodes();
     if(!ChiselErrors.isEmpty){
@@ -1212,7 +1240,8 @@ abstract class Component(resetSignal: Bool = null) {
     out_c.write("}\n");
     dumpVCD(out_c);
     out_c.close();
-    printStack;
+    if(saveComponentTrace)
+      printStack
   }
 };
 
