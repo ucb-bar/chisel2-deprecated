@@ -4,6 +4,7 @@ package Chisel {
 import Node._;
 import ChiselError._;
 
+/*
 object Wire {
   def apply[T <: Data](width: Int = -1)(gen: =>T): T = {
     val wire = new Wire()
@@ -23,6 +24,44 @@ object Wire {
     output.comp = wire
     wire.nameHolder = output
     output
+  }
+
+  def apply[T <: Data](default: T): T = {
+    if(default.inputs.length == 0)
+      ChiselErrors += ChiselError("incorrect wire syntax", Thread.currentThread().getStackTrace);
+    val wire = new Wire()
+
+    //initialize
+    wire.init("", widthOf(0), default)
+
+    // make output
+    val output = default.fromNode(wire)
+    output.setIsCellIO
+    output.comp = wire
+    wire.nameHolder = output
+    output
+  }
+}
+* */
+
+object Wire {
+  def apply[T <: Data](width: Int = -1)(gen: =>T): T = {
+    val res = gen.asOutput
+    res.setIsCellIO
+
+    for((n, i) <- res.flatten) {
+      // initialize wire
+      val w = i.getWidth
+      assert(w > 0, {println("Negative width to wire " + i)})
+      val wire = new Wire()
+      wire.init("", w, null)
+
+      // make output
+      i.inputs += wire
+      i.comp = wire
+    }
+
+    res
   }
 
   def apply[T <: Data](default: T): T = {
