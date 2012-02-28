@@ -2,6 +2,7 @@
 package Chisel {
 
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.Stack
 import java.lang.reflect.Modifier._;
 
 import Node._;
@@ -162,6 +163,13 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
       elt.removeCellIOs
   }
   override def traceableNodes = elements.map(tup => tup._2).toArray;
+  
+  override def traceNode(c: Component, stack: Stack[() => Any]) = {
+    for((n, i) <- elements) {
+      stack.push(() => i.traceNode(c, stack))
+    }
+  }
+  
   override def apply(name: String): Data = {
     for((n,i) <- elements)
       if(name == n) return i;
