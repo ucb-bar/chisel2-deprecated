@@ -34,9 +34,9 @@ class Bool extends Bits {
   def := (src: Bits): Unit = {
     val res = src.toBool;
     if(src.getWidth > 1)
-      ChiselErrors += IllegalState("multi bit signal " + src + " converted to Bool",1);
+      throw new Exception("multi bit signal " + src + " converted to Bool");
     if(src.getWidth == -1)
-      ChiselErrors += IllegalState("unable to automatically convert " + src + " to Bool, convert manually instead",1);
+      throw new Exception("unable to automatically convert " + src + " to Bool, convert manually instead");
     this := res;
   }
   
@@ -49,12 +49,12 @@ class Bool extends Bits {
 	this := bits;
       }
       case any => 
-	ChiselErrors += IllegalState(":= not defined on " + this.getClass + " and " + src.getClass, 1)
+	ChiselErrors += ChiselError(":= not defined on " + this.getClass + " and " + src.getClass, Thread.currentThread().getStackTrace)
     }
   }
 
   def generateError = {
-    ChiselErrors += IllegalState("Cannot perform extraction on a Bool", 4);
+    ChiselErrors += ChiselError("Cannot perform extraction on a Bool", Thread.currentThread().getStackTrace);
   }
 
   override def apply(bit: Int): Bool = { generateError; this};

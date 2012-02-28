@@ -45,7 +45,7 @@ class UFix extends Num {
 	this := ufix;
       }
       case any => 
-	ChiselErrors += IllegalState(":= not defined on " + this.getClass + " and " + src.getClass, 1)
+	ChiselErrors += ChiselError(":= not defined on " + this.getClass + " and " + src.getClass, Thread.currentThread().getStackTrace)
     }
   }
   

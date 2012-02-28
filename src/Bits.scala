@@ -9,9 +9,9 @@ import Component._
 object Bits {
   def conv(x: Bits): Bool = {
     if(x.getWidth > 1)
-      ChiselErrors += IllegalState("multi bit signal " + x + " converted to Bool",1);
+      throw new Exception("multi bit signal " + x + " converted to Bool");
     if(x.getWidth == -1)
-      ChiselErrors += IllegalState("unable to automatically convert " + x + " to Bool, convert manually instead",1);
+      throw new Exception("unable to automatically convert " + x + " to Bool, convert manually instead")
     x.toBool
   }
 
@@ -53,9 +53,9 @@ class Bits extends IO {
     val myClass = this.getClass;
     val srcClass = src.getClass;
     if(myClass != classOf[Bits] && myClass == srcClass)
-      ChiselErrors += TypeError(":=", myClass.toString, classOf[Bits].toString)
+      ChiselErrors += ChiselError(":= not defined on " + myClass.toString + " " + classOf[Bits].toString, Thread.currentThread().getStackTrace)
     else if(myClass != classOf[Bits])
-      ChiselErrors += TypeError(":=", myClass.toString, srcClass.toString)
+      ChiselErrors += ChiselError(":= not defined on " + myClass.toString + " " + srcClass.toString, Thread.currentThread().getStackTrace)
   }
 
   private def colonEqual(src: Bits) = {
@@ -87,7 +87,7 @@ class Bits extends IO {
 	this colonEqual(bits);
       }
       case any =>
-	ChiselErrors += IllegalState(":= not defined on " + this.getClass + " and " + src.getClass, 1);
+	ChiselErrors += ChiselError(":= not defined on " + this.getClass + " and " + src.getClass, Thread.currentThread().getStackTrace);
     }
   }
 

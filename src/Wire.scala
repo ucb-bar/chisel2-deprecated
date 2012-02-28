@@ -27,7 +27,7 @@ object Wire {
 
   def apply[T <: Data](default: T): T = {
     if(default.inputs.length == 0)
-      ChiselErrors += IllegalState("incorrect wire syntax", 3);
+      ChiselErrors += ChiselError("incorrect wire syntax", Thread.currentThread().getStackTrace);
     val wire = new Wire()
 
     //initialize
@@ -70,14 +70,14 @@ class Wire extends Data with proc {
 
   def procAssign(src: Node) = {
     if (assigned) {
-      ChiselErrors += IllegalState("reassignment to Node", 3);
+      ChiselErrors += ChiselError("reassignment to Node", Thread.currentThread().getStackTrace);
     } else {
       updates.enqueue((genCond(), src));
     }
   }
   override def assign(src: Node) = {
     if(assigned || inputs(0) != null) {
-      ChiselErrors += IllegalState("reassignment to Wire", 3);
+      ChiselErrors += ChiselError("reassignment to Wire", Thread.currentThread().getStackTrace);
     } else { 
       assigned = true; super.assign(src)
     }

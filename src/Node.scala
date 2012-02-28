@@ -18,9 +18,9 @@ object Node {
   //implicits
   implicit def convBitsToBool(x: Bits): Bool = {
       if(x.getWidth > 1)
-      ChiselErrors += IllegalState("multi bit signal " + x + " converted to Bool",1);
+      throw new Exception("multi bit signal " + x + " converted to Bool");
     if(x.getWidth == -1)
-      ChiselErrors += IllegalState("unable to automatically convert " + x + " to Bool, convert manually instead",1);
+      throw new Exception("unable to automatically convert " + x + " to Bool, convert manually instead");
     x.toBool
   }
 
@@ -37,7 +37,7 @@ object Node {
       m.inputs(i).getWidth 
     } catch { 
         case e: java.lang.IndexOutOfBoundsException => {
-          val error = IllegalState(m + " in " + m.component + " is unconnected. Ensure that is assigned.", 0)
+          val error = ChiselError(m + " in " + m.component + " is unconnected. Ensure that is assigned.", m)
           if (!ChiselErrors.contains(error))
             ChiselErrors += error
           -1
@@ -135,6 +135,7 @@ abstract class Node extends nameable{
   var inferCount = 0;
   var genError = false;
   var stack: Array[StackTraceElement] = null;
+  var line: Array[StackTraceElement] = Thread.currentThread().getStackTrace
   
   def width: Int = width_;
   def width_=(w: Int) = { isFixedWidth = true; width_ = width; inferWidth = fixWidth(w); }
@@ -214,7 +215,7 @@ abstract class Node extends nameable{
     val res = inferWidth(this);
     if(inferCount > 1000000) {
       if(genError) {
-	val error = IllegalState("Unable to infer width of " + this, 0);
+	val error = ChiselError("Unable to infer width of " + this, this);
         if (!ChiselErrors.contains(error))
           ChiselErrors += error
       } else
@@ -480,7 +481,7 @@ abstract class Node extends nameable{
   def removeCellIOs() {
     for(i <- 0 until inputs.length) {
       if(inputs(i) == null){
-        val error = IllegalState("NULL Input for " + this.getClass + " " + this + " in Component " + component, 0);
+        val error = ChiselError("NULL Input for " + this.getClass + " " + this + " in Component " + component, this);
         if (!ChiselErrors.contains(error))
           ChiselErrors += error
       }

@@ -59,7 +59,7 @@ class Reg extends Delay with proc{
   var enable = Bool(false);
   def procAssign(src: Node) = {
     if (assigned)
-      ChiselErrors += IllegalState("reassignment to Reg", 3);
+      ChiselErrors += ChiselError("reassignment to Reg", Thread.currentThread().getStackTrace);
     val cond = genCond();
     if (conds.length >= 1) {
       isEnable = true;
@@ -91,7 +91,7 @@ class Reg extends Delay with proc{
   }
   override def assign(src: Node) = {
     if(assigned || inputs(0) != null) {
-      ChiselErrors += IllegalState("reassignment to Reg", 3);
+      ChiselErrors += ChiselError("reassignment to Reg", Thread.currentThread().getStackTrace);
     } else { 
       assigned = true; super.assign(src)
     }

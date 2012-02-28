@@ -72,7 +72,7 @@ object Literal {
 	       else 0); 
     if(width != -1)
       if(width < resWidth)
-	ChiselErrors += IllegalState("width " + width + " is too small for literal " + x, 4);
+	ChiselErrors += ChiselError("width " + width + " is too small for literal " + x, Thread.currentThread().getStackTrace);
       else if(width > resWidth && x < 0){
 	while(width > resWidth){
 	  resWidth += 1;
@@ -135,7 +135,7 @@ object Literal {
     var res = BigInt(0);
     for(c <- x)
       if(c != '_'){
-	if(!(hexNibbles + "?").contains(c)) ChiselErrors += IllegalState("Literal: " + x + " contains illegal character: " + c, 4);
+	if(!(hexNibbles + "?").contains(c)) ChiselErrors += ChiselError("Literal: " + x + " contains illegal character: " + c, Thread.currentThread().getStackTrace);
 	res = res * shamt + c.asDigit;
       }
     res
@@ -157,7 +157,7 @@ object Literal {
     var width = 0;
     for (d <- x) {
       if (d != '_') {
-	if(!"01?".contains(d)) ChiselErrors += IllegalState("Literal: " + x + " contains illegal character: " + d, 4);
+	if(!"01?".contains(d)) ChiselErrors += ChiselError("Literal: " + x + " contains illegal character: " + d, Thread.currentThread().getStackTrace);
         width += 1;
         mask   = mask + (if (d == '?') "0" else "1");
         bits   = bits + (if (d == '?') "0" else d.toString);
@@ -203,14 +203,14 @@ object Literal {
   def apply(n: String, width: Int): Literal = 
     apply(width, n(0), n.substring(1, n.length));
   def apply(width: Int, base: Char, literal: String): Literal = {
-    if (!"dhbo".contains(base)) ChiselErrors += IllegalArgument("no base specified", 4);
+    if (!"dhbo".contains(base)) ChiselErrors += ChiselError("no base specified", Thread.currentThread().getStackTrace);
     val res = new Literal();
     if(width == -1)
       res.init(removeUnderscore(literal), sizeof(base, literal));
     else{
       res.init(removeUnderscore(literal), width); 
       if(width < sizeof(base, literal)) 
-	ChiselErrors += IllegalState("width " + width + " is too small for literal: " + res + " with min width " + sizeof(base, literal), 4)
+	ChiselErrors += ChiselError("width " + width + " is too small for literal: " + res + " with min width " + sizeof(base, literal), Thread.currentThread().getStackTrace)
     }
     res.base = base;
     if (base == 'b') {res.isZ = literal.contains('?'); res.isBinary = true;}

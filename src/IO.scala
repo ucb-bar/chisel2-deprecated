@@ -85,11 +85,11 @@ class IO extends Wire with Cloneable{
 	  else if(this.staticComp.parent == other.staticComp)
 	    this assign other;
 	  else
-	    ChiselErrors += IllegalConnection("Connecting Input " + this + " Input " + other, 2);
+	    ChiselErrors += ChiselError("Connecting Input " + this + " Input " + other, Thread.currentThread().getStackTrace);
 	} else {
-          ChiselErrors += IllegalConnection("Connecting Input " + this + " to " + other, 2);
+          ChiselErrors += ChiselError("Connecting Input " + this + " to " + other, Thread.currentThread().getStackTrace);
         }
-      case default => ChiselErrors += IllegalConnection("Connecting Input " + this + " to IO without direction " + default, 2);
+      case default => ChiselErrors += ChiselError("Connecting Input " + this + " to IO without direction " + default, Thread.currentThread().getStackTrace);
       }
     } else { // DIR == OUTPUT
       // println("<>'ing " + this + " --> " + src);i
@@ -105,15 +105,15 @@ class IO extends Wire with Cloneable{
 	    else if (this.staticComp.parent == other.staticComp)
 	      other assign this;
 	    else if (this.isCellIO && other.isCellIO)
-	      ChiselErrors += IllegalConnection("Ambiguous Connection of Two Nodes", 2);
+	      ChiselErrors += ChiselError("Ambiguous Connection of Two Nodes", Thread.currentThread().getStackTrace);
 	    else if (this.isCellIO){
 	      other assign this; }
 	    else if (other.isCellIO){
 	      this assign other; }
 	    else
-	      ChiselErrors += IllegalConnection("Connecting Output " + this + " to Output " + other, 2);
+	      ChiselErrors += ChiselError("Connecting Output " + this + " to Output " + other, Thread.currentThread().getStackTrace);
 	  } else {
-            ChiselErrors += IllegalConnection("Connecting Output " + this + " to IO without direction " + other, 2);
+            ChiselErrors += ChiselError("Connecting Output " + this + " to IO without direction " + other, Thread.currentThread().getStackTrace);
           }
         case default => 
           //println("Connecting Output " + this + " to Node " + default);
@@ -129,9 +129,9 @@ class IO extends Wire with Cloneable{
           if (other.dir == INPUT || isCellIO) {
             this assign other;
           } else 
-            ChiselErrors += IllegalConnection("^^ing Input " + this + " to Output " + other, 2);
+            ChiselErrors += ChiselError("^^ing Input " + this + " to Output " + other, Thread.currentThread().getStackTrace);
         case default => 
-          ChiselErrors += IllegalConnection("// ^^ing Input " + this + " to Node " + default, 2);
+          ChiselErrors += ChiselError("// ^^ing Input " + this + " to Node " + default, Thread.currentThread().getStackTrace);
       }
     } else { // dir == OUTPUT
       // println("^^ing " + this + " COMP " + component + " & " + src + " SRC COMP " + src.component + " CHILD? " + isChild);
@@ -140,15 +140,15 @@ class IO extends Wire with Cloneable{
           if (other.dir == OUTPUT || isCellIO) {
             other assign this;
           } else
-            ChiselErrors += IllegalConnection("^^ing Output " + this + " to Input " + other, 2);
+            ChiselErrors += ChiselError("^^ing Output " + this + " to Input " + other, Thread.currentThread().getStackTrace);
         case default => 
-          ChiselErrors += IllegalConnection("^^ing Output " + this + " to Node " + default, 2);
+          ChiselErrors += ChiselError("^^ing Output " + this + " to Node " + default, Thread.currentThread().getStackTrace);
       } 
     }
   }
   override def assign(src: Node) = {
     if(assigned)
-      ChiselErrors += IllegalState("reassignment to output", 3);
+      ChiselErrors += ChiselError("reassignment to output", Thread.currentThread().getStackTrace);
     else { 
       assigned = true; 
       if (inputs.length > 0) inputs(0) = src; else inputs += src;

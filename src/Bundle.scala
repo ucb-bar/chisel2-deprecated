@@ -50,9 +50,9 @@ object sort {
       val yIO = y.asInstanceOf[IO];
 
       if(xIO.dir == null || xIO.dir != INPUT) {
-	ChiselErrors += IllegalState("left hand side of bulk := must be OUTPUT", 3);
+	ChiselErrors += ChiselError("left hand side of bulk := must be OUTPUT", Thread.currentThread().getStackTrace);
       } else if (!yIO.isCellIO || yIO.dir != OUTPUT)
-	ChiselErrors += IllegalState("right hand side of bulk := must be INPUT", 3);
+	ChiselErrors += ChiselError("right hand side of bulk := must be INPUT", Thread.currentThread().getStackTrace);
     }
   }
 

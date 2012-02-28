@@ -1,75 +1,37 @@
 package Chisel {
 
 import scala.collection.mutable.ArrayBuffer;
+import ChiselError._
 
 object ChiselError {
   val ChiselErrors = new ArrayBuffer[ChiselError];
+
+  def apply(m: String, n: Node): ChiselError = 
+    new ChiselError(m, n.line)
+
+  def apply(m: String, stack: Array[StackTraceElement]): ChiselError =
+    new ChiselError(m, stack)
+
+  def findFirstUserLine(stack: Array[StackTraceElement]): StackTraceElement = {
+    for(i <- 1 until stack.length) {
+      val ste = stack(i)
+      val classname = ste.getClassName
+      val dotPos = classname.lastIndexOf('.')
+      val pkg = classname.subSequence(0, dotPos)
+      if (pkg != "Chisel")
+        return ste
+    }
+    println("COULDN'T FIND LINE NUMBER")
+    return stack(0)
+  }
 }
 
-class ChiselError(val err: String, val m: String, val st: Array[StackTraceElement]) {
-  var index: Int = 0;
-  var node: Node = null;
+class ChiselError(val msg: String, val stack: Array[StackTraceElement]) {
   def printError = {
-    println("  " + err + ": " + m + (if(node != null) node.name + node.width else ""));  
-    if(index != 0)
-      for(i <- 0 until 10)
-	println("     " + (if(index != 0) st(i).toString else ""));
-    println();
-  }
-  override def equals(x: Any): Boolean = {
-      if (!x.isInstanceOf[ChiselError])
-          return false
-      val xError = x.asInstanceOf[ChiselError]
-      xError.err == err && xError.m == m && xError.index == index && ((index > 0) && xError.st == st || index == 0)
-  }
-}
-
-object IllegalArgument {
-  def apply(m: String, index: Int): ChiselError = {
-    val res = new ChiselError("Illegal Argument", m, Thread.currentThread.getStackTrace);
-    res.index = index;
-    res
-  }
-}
-
-object IllegalState {
-  def apply(m: String, index: Int): ChiselError = {
-    val res = new ChiselError("Illegal State", m, Thread.currentThread.getStackTrace);
-    res.index = index;
-    res
-  }
-  def apply(m: String, node: Node): ChiselError = {
-    val res = new ChiselError("Illegal State", m, Thread.currentThread.getStackTrace);
-    res.index = 0;
-    res.node = node;
-    res
-  }
-  def apply(m: String, st: Array[StackTraceElement]) = {
-    val res = new ChiselError("Illegal State", m, st);
-    res.index = 1;
-    res
-  }
-}
-
-object IllegalConnection {
-  def apply(m: String, index: Int): ChiselError = {
-    val res = new ChiselError("IllegalConnection", m, Thread.currentThread.getStackTrace);
-    res.index = index;
-    res
-  }
-}
-
-object IllegalName {
-  def apply(m: String): ChiselError = {
-    new ChiselError("Illegal Name", m, Thread.currentThread.getStackTrace);
-  }
-}
-
-object TypeError {
-  def apply(op: String, a: String, b: String): ChiselError = {
-    val res = new ChiselError("Type Error", op + " is not defined on " + a + " and " + b, Thread.currentThread.getStackTrace);
-    res.index = 4;
-    res
+    val ste = findFirstUserLine(stack)
+    println(msg + " on line " + ste.getLineNumber + 
+            " in class " + ste.getClassName + 
+            " in file " + ste.getFileName)
   }
 }
 
