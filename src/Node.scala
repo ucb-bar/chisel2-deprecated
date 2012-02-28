@@ -254,7 +254,7 @@ abstract class Node extends nameable{
   // def emitRef: String = "T" + emitIndex;
   def emitDef: String = ""
   def emitReg: String = ""
-  def emitWidth: String = "[" + (width-1) + ":0]"
+  def emitWidth: String = if(width == 1) "" else "[" + (width-1) + ":0]"
   def emitDec: String = "  wire" + (if (isSigned) " signed " else "") + emitWidth + " " + emitRef + ";\n";
   // C backend
   def emitDecVCD: String = if (isVCD) "  dat_t<" + width + "> " +emitRef + "__prev" + ";\n" else "";
