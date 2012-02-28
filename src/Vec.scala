@@ -1,6 +1,7 @@
 package Chisel {
 
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.HashMap
 import scala.collection.mutable.BufferProxy;
 import scala.math._;
 
@@ -70,10 +71,11 @@ object Vec {
 }
 
 class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] { 
-  var eltWidth = 0;
-  val self = new ArrayBuffer[T];
-  var gen: () => T = () => self(0);
-  var flattenedVec: Node = null;
+  var eltWidth = 0
+  val self = new ArrayBuffer[T]
+  val readPortCache = new HashMap[UFix, T]
+  var gen: () => T = () => self(0)
+  var flattenedVec: Node = null
   override def apply(idx: Int): T = {
     super.apply(idx)
   };
@@ -102,21 +104,19 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
   }
 
   def read(addr: UFix): T = {
-    if(eltWidth <= 0) throw new Exception("widths on element in Vec must be > 0 if you want to use .read")
-    //val mux1h = new Mux1H_(length, eltWidth)
+    if(readPortCache.contains(addr))
+      readPortCache(addr)
+
+    if(eltWidth <= 0) 
+      throw new Exception("widths on element in Vec must be > 0 if you want to use .read")
     val onehot = UFixToOH(addr, length)
     val pairs = new ArrayBuffer[(Bool, Bits)]
     for(i <- 0 until length)
       pairs += (onehot(i).toBool -> this(i).toBits)
-    /*
-    val res = this(0).clone
-    res.setIsCellIO
-    res assign mux1h.io.out
-    res
-    * */
     val res = this(0).clone
     res.setIsCellIO
     res assign Mux1H(eltWidth, pairs)
+    readPortCache += (addr -> res)
     res
   }
 
