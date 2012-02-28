@@ -399,55 +399,70 @@ class MemPort[T <: Data](cell:       MemCell[T],
     if (isWritable) {
       if (!hasWrBitMask) {
         res +=
-        indent + "    if (" + wrEnable.emitRef + ")\n" +
-        indent + "      " + mem.emitRef + "[" + wrAddr.emitRef + "] <= " + wrData.emitRef + ";\n"
+          "if (" + wrEnable.emitRef + ")\n" +
+          "  " + mem.emitRef + "[" + wrAddr.emitRef + "] <= " + wrData.emitRef + ";\n"
       } else {
         val gen_i = mem.emitRef+"__i";
         val pre_read_buf = mem.emitRef+"__next"+port_index;
-        res += 
-        indent+"    "+pre_read_buf+" = "+mem.emitRef+"["+wrAddr.emitRef+"];\n"+
-        indent+"    if ("+wrEnable.emitRef+(if(hasChipSel) " & "+chipSel.emitRef else "")+") begin\n"+
-        indent+"      for ("+gen_i+" = 0; "+gen_i+" < "+mem.width+"; "+gen_i+" = "+gen_i+" + 1) begin:"+
-                            mem.emitRef+"__W"+port_index+"\n"+
-        indent+"        if("+wrBitMask.emitRef+"["+gen_i+"]) "+pre_read_buf+"["+gen_i+"] = "+
-                            wrData.emitRef+"["+gen_i+"];\n"+
-        indent+"      end\n"+
-        indent+"    end\n"+
-        indent+"    "+mem.emitRef+"["+wrAddr.emitRef+"] = "+pre_read_buf+";\n"
+        val emitWrMaskWrite =
+          pre_read_buf+" = "+mem.emitRef+"["+wrAddr.emitRef+"];\n"+
+          "for ("+gen_i+" = 0; "+gen_i+" < "+mem.width+"; "+gen_i+" = "+gen_i+" + 1) begin:"+
+                        mem.emitRef+"__W"+port_index+"\n"+
+          "  if("+wrBitMask.emitRef+"["+gen_i+"]) "+pre_read_buf+"["+gen_i+"] = "+
+                        wrData.emitRef+"["+gen_i+"];\n"+
+          "end\n";
+        res += emitVerilogIf(wrEnable, emitWrMaskWrite) +
+          mem.emitRef+"["+wrAddr.emitRef+"] = "+pre_read_buf+";\n"
       }
     }
     res;
   }
-  def emitDefRead: String = {
+  def emitDefReadReg: String = {
     var res = "";
-    val read_buf = mem.emitRef+"__read"+port_index+"_";
-    def read_out = memRef.emitTmp;
-
-    if (isReadable) {
-      if (mem.getReadLatency > 0) {
-        res += "  always @(posedge clk) begin\n";
-        res += "    "+read_buf+"0 <= ";
-      } else {
-        res += "  assign "+read_out+" = ";
-      }
-      if (!hasOutEn) {
-        res += mem.emitRef+"["+wrAddr.emitRef+"];\n";
-      } else {
-        res += "("+outEn.emitRef+(if (hasChipSel) " & "+chipSel.emitRef else "")+") ? "+
-            mem.emitRef+"["+wrAddr.emitRef+"] : "+
-            mem.getWidth+"'bz;\n";
-      }
-      if (mem.getReadLatency > 0) {
-        for (lat <- 1 until mem.getReadLatency) {
-          res += "    "+read_buf+lat+" <= "+read_buf+(lat-1)+";\n";
-        } 
-        res += "  end\n";
-        res += "  assign "+read_out+" = "+read_buf+(mem.getReadLatency-1)+";\n";
+    if (isReadable && mem.getReadLatency > 0) {
+      val read_buf = mem.emitRef+"__read"+port_index+"_";
+      res += read_buf+"0 <= "+mem.emitRef+"["+wrAddr.emitRef+"];\n";
+      for (lat <- 1 until mem.getReadLatency) {
+        res += read_buf+lat+" <== "+read_buf+(lat-1)+";\n";
       }
     }
     res;
   }
-
+  def emitDefReadAssign: String = {
+    def read_out = memRef.emitTmp;
+    if (!isReadable) {
+      ""
+    } else if (mem.getReadLatency > 0) {
+      val read_buf = mem.emitRef+"__read"+port_index+"_";
+      "assign "+read_out+" = "+read_buf+(mem.getReadLatency-1)+";\n";
+    } else {
+      "assign "+read_out+" = "+mem.emitRef+"["+wrAddr.emitRef+"];\n";
+    }
+  }
+  def emitIndented(code: String) = (if (code.length > 0) ("" /: code.split("\n"))(_+"  "+_+"\n") else "");
+  def emitVerilogIf(ifCond: Node, trueBody: String): String = {
+    val lit_cond = ifCond.litOf;
+    if (lit_cond != null && lit_cond.value == 1) {
+      // Remove the constant IF condition, and only emit the body:
+      trueBody;
+    } else {
+      "if (" + ifCond.emitRef + ") begin\n" + emitIndented(trueBody) + "end\n";
+    }
+  }
+  def emitVerilogAlways(body: String): String = {
+    if (body.length > 0) {
+      "always @(posedge clk) begin\n" + emitIndented(body) + "end\n";
+    } else {
+      ""
+    }
+  }
+  def emitDefReadWrite: String = {
+    if (hasChipSel) {
+      emitIndented(emitVerilogAlways(emitVerilogIf(chipSel, emitDefWrite + emitDefReadReg)) + emitDefReadAssign);
+    } else {
+      emitIndented(emitVerilogAlways(emitDefWrite + emitDefReadReg) + emitDefReadAssign);
+    }
+  }
   def emitDefLoC: String = {
     var res = "";
     val read_buf = mem.emitRef+"__read"+port_index+"_";
@@ -656,19 +671,11 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
   }
   def emitRTLDef: String = {
     val hasReset = reset_port_opt != None;
-    var res = "  always @(posedge clk) begin\n";
+    var res = "";
     if(hasReset){
-      res +=
-      "    if (reset) begin\n" +
-              reset_port_opt.get.emitDef +
-      "    end else begin\n" +
-              ("" /: cell.port_list) { (s, p) => {p.indent = "  "; s + p.emitDefWrite} } +
-      "    end\n";
-    } else {
-      res += ("" /: cell.port_list) { (s, p) => {s + p.emitDefWrite} };
+      println("[Error] The Mem object reset port has been deprecated.\n");
     }
-    res += "  end\n"
-    res += ("" /: cell.port_list) { (s, p) => {s + p.emitDefRead} };
+    res += ("" /: cell.port_list) { (s, p) => {s + p.emitDefReadWrite} };
     res
   }
   def getPathName = { component.getPathName + "_" + emitRef; }
