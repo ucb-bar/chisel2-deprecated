@@ -343,11 +343,9 @@ abstract class Component(resetSignal: Bool = null) {
 	w match {
           case io: IO  => 
             if (io.dir == INPUT) {
-              if (io.inputs.length == 0)
-                if(saveConnectionWarnings)
+              if (io.inputs.length == 0 && saveConnectionWarnings)
 		  connWriter.write("// " + io + " UNCONNECTED IN " + io.component + "\n"); 
-              else if (io.inputs.length > 1) 
-                if(saveConnectionWarnings)
+              else if (io.inputs.length > 1 && saveConnectionWarnings)
 		  connWriter.write("// " + io + " CONNECTED TOO MUCH " + io.inputs.length + "\n"); 
 	      else if (!this.isWalked.contains(w)) {
                 if(saveConnectionWarnings)
@@ -356,8 +354,7 @@ abstract class Component(resetSignal: Bool = null) {
               else 
 		res += io.inputs(0).emitRef;
             } else {
-              if (io.consumers.length == 0) 
-                if(saveConnectionWarnings)
+              if (io.consumers.length == 0 && saveConnectionWarnings)
 		  connWriter.write("// " + io + " UNCONNECTED IN " + io.component + " BINDING " + findBinding(io) + "\n"); 
               else {
 		var consumer: Node = parent.findBinding(io);
