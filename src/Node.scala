@@ -467,9 +467,9 @@ abstract class Node extends nameable{
   def getWidth(): Int = {
     if(width > 0)
       width
-    else if(isCellIO)
-      inputs(0).getWidth
-    else if(isInstanceOf[Reg] && !isWidthWalked){
+    else if(isCellIO) {
+      if(inputs.length == 0) -1 else inputs(0).getWidth
+    } else if(isInstanceOf[Reg] && !isWidthWalked){
       isWidthWalked = true;
       inferWidth(this)
     }else if(inputs.length >= 1 && !isInstanceOf[Reg] && (isInstanceOf[IO] || !isInstanceOf[Wire]))

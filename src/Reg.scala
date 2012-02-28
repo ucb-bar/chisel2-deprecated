@@ -45,7 +45,7 @@ object Reg {
 
     if(resetVal != null) {
       for((((res_n, res_i), (data_n, data_i)), (rval_n, rval_i)) <- res.flatten zip d zip resetVal.flatten) {
-        val w = res_i.getWidth
+        val w = rval_i.getWidth
         assert(w > 0, {println("Negative width to wire " + res_i)})
         val reg = new Reg()
         reg.init("", regWidth(w), data_i, rval_i)
@@ -58,7 +58,6 @@ object Reg {
     } else {
       for(((res_n, res_i), (data_n, data_i)) <- res.flatten zip d) {
         val w = res_i.getWidth
-        assert(w > 0, {println("Negative width to reg " + res_i)})
         val reg = new Reg()
         reg.init("", regWidth(w), data_i)
 

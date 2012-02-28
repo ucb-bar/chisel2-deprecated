@@ -52,9 +52,9 @@ object Wire {
     for((n, i) <- res.flatten) {
       // initialize wire
       val w = i.getWidth
-      assert(w > 0, {println("Negative width to wire " + i)})
+      val wFun = if(w < 0) widthOf(0) else fixWidth(w)
       val wire = new Wire()
-      wire.init("", w, null)
+      wire.init("", wFun, null)
 
       // make output
       i.inputs += wire
