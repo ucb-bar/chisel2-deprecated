@@ -464,24 +464,30 @@ class MemPort[T <: Data](cell:       MemCell[T],
     }
   }
   def emitDefLoC: String = {
+    def chipSelMux(next: String, old: String) = if (hasChipSel) "("+chipSel.emitRef+".to_bool()) ? "+next+" : "+old else next
     var res = "";
     val read_buf = mem.emitRef+"__read"+port_index+"_";
     if (isReadable) {
       val read_mem = mem.emitRef + ".get(" + wrAddr.emitRef + ")";
       val read_lat = mem.getReadLatency;
       if (read_lat > 0) {
-        res += "  "+memRef.emitRef+" = "+read_buf+(read_lat-1)+";\n";
+        res += "  "+memRef.emitRef+" = "+chipSelMux(read_buf+(read_lat-1), memRef.emitRef)+";\n";
         for (lat <- 1 until read_lat) {
-          res += "  "+read_buf+(read_lat-lat)+"_shadow = "+read_buf+(read_lat-lat-1)+";\n";
+          res += "  "+read_buf+(read_lat-lat)+"_shadow = "+chipSelMux(read_buf+(read_lat-lat-1), read_buf+(read_lat-lat)+"_shadow")+";\n";
         }
       }
-      res += "  " + (if (read_lat > 0) read_buf+"0_shadow" else memRef.emitRef) + " = ";
+      val output = (if (read_lat > 0) read_buf+"0_shadow" else memRef.emitRef)
+      res += "  " +  output + " = ";
       if (!hasOutEn) {
-        res += read_mem+";\n";
-      } else if (hasChipSel) {
-        res += "("+outEn.emitRef+".to_bool() & "+chipSel.emitRef+".to_bool()) ? "+read_mem+" : LIT<"+mem.getWidth+">(0L);\n";
+        if (hasChipSel)
+          res += chipSelMux(read_mem, output)+";\n";
+        else
+          res += read_mem+";\n";
       } else {
-        res += "("+outEn.emitRef+".to_bool()) ? "+read_mem+" : LIT<"+mem.getWidth+">(0L);\n";
+        if (hasChipSel)
+          res += "(!"+outEn.emitRef+".to_bool()) ? LIT<"+mem.getWidth+">(0L) : "+chipSelMux(read_mem, output)+";\n";
+        else
+          res += "(!"+outEn.emitRef+".to_bool()) ? LIT<"+mem.getWidth+">(0L) : "+read_mem+";\n";
       }
     }
     res;
@@ -493,7 +499,10 @@ class MemPort[T <: Data](cell:       MemCell[T],
     var res = "";
     val read_buf = mem.emitRef+"__read"+port_index+"_";
     if (isWritable) {
-      res += " if (" + wrEnable.emitRef + ".to_bool()) {\n"
+      res += " if (" + wrEnable.emitRef + ".to_bool()"
+      if (hasChipSel)
+          res += " && " + chipSel.emitRef + ".to_bool()"
+      res +=") {\n"
       if (!hasWrBitMask) {
         res +=
         " " + mem.emitRef + ".put(" + wrAddr.emitRef + ", " +
