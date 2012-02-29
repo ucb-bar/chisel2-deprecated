@@ -92,10 +92,19 @@ class Extract extends Node with proc {
     else
       "BITS(" + inputs(0) + ", " + hi + ", " + lo + ")";
   override def emitDef: String =
-    if (inputs.length < 3)
-      "  assign " + emitTmp + " = " + inputs(0).emitRef + "[" + inputs(1).emitRef + "];\n"
-    else
-      "  assign " + emitTmp + " = " + inputs(0).emitRef + "[" + inputs(1).emitRef + ":" + inputs(2).emitRef + "];\n"
+    if (inputs.length < 3) {
+      if(inputs(0).width > 1) {
+        "  assign " + emitTmp + " = " + inputs(0).emitRef + "[" + inputs(1).emitRef + "];\n"
+      } else {
+        "  assign " + emitTmp + " = " + inputs(0).emitRef + ";\n"
+      }
+    } else {
+      if(inputs(0).width > 1) {
+        "  assign " + emitTmp + " = " + inputs(0).emitRef + "[" + inputs(1).emitRef + ":" + inputs(2).emitRef + "];\n"
+      } else {
+        "  assign " + emitTmp + " = " + inputs(0).emitRef + ";\n"
+      }
+    }
   override def emitDefLoC: String = 
     if (inputs.length < 3 )
       "  " + emitTmp + " = " + inputs(0).emitRef + ".bit(" + inputs(1).emitRef + ");\n"

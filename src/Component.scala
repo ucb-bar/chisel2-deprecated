@@ -550,6 +550,7 @@ abstract class Component(resetSignal: Bool = null) {
 
     while(!bfsQueue.isEmpty) {
       val top = bfsQueue.dequeue
+      top.fixName()
       //top.removeCellIOs
       walked += top
       count += 1
@@ -603,13 +604,10 @@ abstract class Component(resetSignal: Bool = null) {
 
     for(node <- nodesList) {
 
-      if(node.inputs.length == 1 && (node.nameHolder != null || node.name != "")) {
+      if(node.inputs.length == 1 && (node.isInstanceOf[IO] || node.isInstanceOf[Wire])) {
 
 	if (node.width > node.inputs(0).width){
 
-          if(saveWidthWarnings) {
-	    widthWriter.write("TOO LONG! NODE " + node + " with width " + node.width + " bit(s) is assigned a wire with width " + node.inputs(0).width + " bit(s).\n")
-          }
 	  if(node.inputs(0).isInstanceOf[Fix]){
 	    val topBit = NodeExtract(node.inputs(0), node.inputs(0).width-1); topBit.infer
 	    val fill = NodeFill(node.width - node.inputs(0).width, topBit); fill.infer
@@ -623,9 +621,6 @@ abstract class Component(resetSignal: Bool = null) {
 	  }
 
 	} else if (node.width < node.inputs(0).width) {
-          if(saveWidthWarnings) {
-	    widthWriter.write("TOO SHORT! NODE " + node + " width width " + node.width + " bit(s) is assigned a wire with width " + node.inputs(0).width + " bit(s).\n")
-          }
 	  val res = NodeExtract(node.inputs(0), node.width-1, 0); res.infer
 	  node.inputs(0) = res
 	}

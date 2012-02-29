@@ -31,7 +31,7 @@ object Node {
   var conds = new Stack[Bool]();
   conds.push(Bool(true));
   var keys  = new Stack[Bits]();
-  def fixWidth(w: Int) = { (m: Node) => w };
+  def fixWidth(w: Int) = { (m: Node) => {m.isFixedWidth = true; w} };
   def widthOf(i: Int) = { (m: Node) => { 
     try { 
       m.inputs(i).getWidth 
@@ -370,7 +370,6 @@ abstract class Node extends nameable{
   }
 
   def traceNode(c: Component, stack: Stack[() => Any]): Any = {
-    fixName(); 
 
     // determine whether or not the component needs a clock input
     if ((isReg || isRegOut || isClkInput) && !(component == null))
