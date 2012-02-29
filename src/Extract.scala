@@ -17,7 +17,7 @@ object NodeExtract {
   }
 
   def apply (mod: Node, bit: Int): Node = 
-    apply(mod, UFix(bit));
+    apply(mod, Literal(bit));
 
   // extract bit range
   def apply (mod: Node, hi: Node, lo: Node): Node = {
