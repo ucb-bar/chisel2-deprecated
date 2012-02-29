@@ -229,8 +229,11 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
 
   // TODO: CHECK FOR ALL OUT
   def :=[T <: Data](src: Vec[T]) = {
-    for((src, dest) <- this zip src){
-      src := dest
+    for((me, other) <- this zip src){
+      if(other.isInstanceOf[Bundle])
+        me.asInstanceOf[Bundle] := other.asInstanceOf[Bundle]
+      else
+        me := other
     }
   }
 
