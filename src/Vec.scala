@@ -94,17 +94,32 @@ object Vec {
   }
 }
 
+class VecProc extends proc {
+  var addr: UFix = null
+  var elms: ArrayBuffer[Bits] = null
+
+  override def genMuxes(default: Node) = {}
+
+  def procAssign(src: Node) = {
+    val onehot = UFixToOH(addr, elms.length)
+    for(i <- 0 until elms.length){
+      when (onehot(i).toBool) {
+        elms(i).comp procAssign src.asInstanceOf[Bits]
+      }
+    }
+  }
+}
+
 class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] { 
   var eltWidth = 0
   val self = new ArrayBuffer[T]
   val readPortCache = new HashMap[UFix, T]
+  var sortedElementsCache: ArrayBuffer[ArrayBuffer[Bits]] = null
   var gen: () => T = () => self(0)
   var flattenedVec: Node = null
   override def apply(idx: Int): T = {
     super.apply(idx)
   };
-
-  var sortedElementsCache: ArrayBuffer[ArrayBuffer[Bits]] = null
 
   def sortedElements: ArrayBuffer[ArrayBuffer[Bits]] = {
     if (sortedElementsCache == null) {
@@ -117,19 +132,20 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
       // fill out buckets
       for(elm <- this) {
         for(((n, io), i) <- elm.flatten zip elm.flatten.indices) {
-          sortedElementsCache(i) += io.toBits
+          val bits = io.toBits
+          bits.comp = io.comp
+          sortedElementsCache(i) += bits
         }
       }
     }
     sortedElementsCache
   }
   
-  def apply(ind: UFix): T = {
-    var res = this(0);
-    for(i <- 1 until length)
-      res = Mux(UFix(i) === ind, self(i), res)
-    res
-  }
+  def apply(ind: UFix): T = 
+    read(ind)
+
+  def apply(ind: Bits): T =
+    read(ind)
 
   def write(addr: UFix, data: T) = {
     if(data.isInstanceOf[Node]){
@@ -157,10 +173,17 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
       val w = io.getWidth
       val onehot = UFixToOH(addr, length)
       val pairs = new ArrayBuffer[(Bool, Bits)]
-      for(i <- 0 until length)
+      for(i <- 0 until length){
         pairs += (onehot(i).toBool -> sortedElm(i))
+      }
       val io_res = Mux1H(w, pairs)
       io assign io_res
+
+      // setup the comp for writes
+      val io_comp = new VecProc()
+      io_comp.addr = addr
+      io_comp.elms = sortedElm
+      io.comp = io_comp
     }
     readPortCache += (addr -> res)
     res

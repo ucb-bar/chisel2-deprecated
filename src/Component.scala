@@ -949,6 +949,7 @@ abstract class Component(resetSignal: Bool = null) {
         case mr: MemRef[_] =>
         case a: Assign[_] =>
         case e: Extract =>
+        case v: VecProc =>
       }
     }
   }
