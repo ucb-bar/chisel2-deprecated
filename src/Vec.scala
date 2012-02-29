@@ -64,7 +64,7 @@ object Mux1H {
       val p = new ArrayBuffer[(Bool, Bits)]
       for((b, d) <- bools zip data)
         p += (b -> d.toBits)
-      i := Mux1H(-1, p)
+      i.inputs(0) = Mux1H(-1, p)
     }
 
     res
@@ -103,6 +103,26 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
   override def apply(idx: Int): T = {
     super.apply(idx)
   };
+
+  var sortedElementsCache: ArrayBuffer[ArrayBuffer[Bits]] = null
+
+  def sortedElements: ArrayBuffer[ArrayBuffer[Bits]] = {
+    if (sortedElementsCache == null) {
+      sortedElementsCache = new ArrayBuffer[ArrayBuffer[Bits]]
+      
+      // create buckets for each elm in data type
+      for(i <- 0 until this(0).flatten.length) 
+        sortedElementsCache += new ArrayBuffer[Bits]
+
+      // fill out buckets
+      for(elm <- this) {
+        for(((n, io), i) <- elm.flatten zip elm.flatten.indices) {
+          sortedElementsCache(i) += io.toBits
+        }
+      }
+    }
+    sortedElementsCache
+  }
   
   def apply(ind: UFix): T = {
     var res = this(0);
@@ -131,13 +151,17 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
     if(readPortCache.contains(addr))
       readPortCache(addr)
 
-    if(eltWidth <= 0) 
-      throw new Exception("widths on element in Vec must be > 0 if you want to use .read")
-    val onehot = UFixToOH(addr, length)
-    val pairs = new ArrayBuffer[(Bool, T)]
-    for(i <- 0 until length)
-      pairs += (onehot(i).toBool -> this(i))
-    val res = Mux1H(pairs, gen)
+    val res = this(0).clone
+    res.setIsCellIO
+    for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
+      val w = io.getWidth
+      val onehot = UFixToOH(addr, length)
+      val pairs = new ArrayBuffer[(Bool, Bits)]
+      for(i <- 0 until length)
+        pairs += (onehot(i).toBool -> sortedElm(i))
+      val io_res = Mux1H(w, pairs)
+      io assign io_res
+    }
     readPortCache += (addr -> res)
     res
   }
