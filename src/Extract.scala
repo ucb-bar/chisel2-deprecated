@@ -30,9 +30,8 @@ object NodeExtract {
 
   def apply (mod: Node, hi: Int, lo: Int): Node = {
     val res = new Extract();
-    if(mod.name == "foo") println(hi + " " + lo);
-    res.hi = Fix(hi);
-    res.lo = Fix(lo);
+    res.hi = Literal(hi);
+    res.lo = Literal(lo);
     res.init("", fixWidth(hi-lo+1), mod, res.hi, res.lo);
     res
   }

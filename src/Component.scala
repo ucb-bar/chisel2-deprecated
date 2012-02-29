@@ -599,7 +599,7 @@ abstract class Component(resetSignal: Bool = null) {
           if(saveWidthWarnings) {
 	    widthWriter.write("TOO SHORT! IO " + io + " width width " + io.width + " bit(s) is assigned a wire with width " + io.inputs(0).width + " bit(s).\n")
           }
-	  val res = NodeExtract(io.inputs(0), Literal(io.width-1), Literal(0,1)); res.infer
+	  val res = NodeExtract(io.inputs(0), io.width-1, 0); res.infer
 	  io.inputs(0) = res
 	}
 
