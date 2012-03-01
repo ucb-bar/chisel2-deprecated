@@ -55,8 +55,16 @@ object Component {
   var firstComp = true;
   var genCount = 0;
   def genCompName(name: String): String = {
-    genCount += 1;
-    name + "_" + genCount
+    // genCount += 1;
+    // name + "_" + genCount
+    if (compIndices contains name) {
+      val count = (compIndices(name) + 1)
+      compIndices += (name -> count)
+      name + "_" + count
+    } else {
+      compIndices += (name -> 1)
+      name + "_" + 1
+    }
   }
   def nextCompIndex : Int = { compIndex = compIndex + 1; compIndex }
   def splitArg (s: String) = s.split(' ').toList;
@@ -272,12 +280,14 @@ abstract class Component(resetSignal: Bool = null) {
     val dotPos = cname.lastIndexOf('.');
     name = if (dotPos >= 0) cname.substring(dotPos+1) else cname;
     className = name;
-    if (compIndices contains name) {
-      val compIndex = (compIndices(name) + 1);
-      compIndices += (name -> compIndex);
-      name = name + "_" + compIndex;
-    } else {
-      compIndices += (name -> 0);
+    if(!isEmittingComponents) {
+      if (compIndices contains name) {
+        val compIndex = (compIndices(name) + 1);
+        compIndices += (name -> compIndex);
+        name = name + "_" + compIndex;
+      } else {
+        compIndices += (name -> 0);
+      }
     }
   }
   def findBinding(m: Node): Binding = {
@@ -864,10 +874,13 @@ abstract class Component(resetSignal: Bool = null) {
     if(compDefs contains res){
       moduleName = compDefs(res);
     }else{
-      if(compDefs.values.toList contains name) 
+      if(compDefs.values.toList contains name) {
 	moduleName = genCompName(name);
-      else
+        if(name == "queue") println(moduleName + " " + name + " " + genCount)
+      } else {
+        if(name.contains("queue")) println(name)
 	moduleName = name;
+      }
       compDefs += (res -> moduleName);
       res = "module " + moduleName + "(" + res;
       out.write(res); 
