@@ -475,6 +475,7 @@ abstract class Component(resetSignal: Bool = null) {
 */
 
   def inferAll(): Unit = {
+    println("started inference")
     var nodesList = ArrayBuffer[Node]()
     val walked = new HashSet[Node]
     val bfsQueue = new Queue[Node]
@@ -497,6 +498,7 @@ abstract class Component(resetSignal: Bool = null) {
         if(!(i == null)) {
   	  if(!walked.contains(i)) {
   	    bfsQueue.enqueue(i) 
+            walked += i
   	  }
         }
     }
@@ -516,15 +518,21 @@ abstract class Component(resetSignal: Bool = null) {
 
       if(done){
   	for(elm <- nodesList)
-  	  if (elm.width == -1) println("Error");
+  	  if (elm.infer || elm.width == -1) println("Error");
   	println(count)
+        println("finished inference")
   	return;
       }
     }
+    for(elm <- nodesList)
+      if (elm.infer || elm.width == -1) println("Error");
+
     println(count)
+    println("finished inference")
   }
 
   def removeCellIOs() {
+    println("started flattenning")
     val walked = new HashSet[Node]
     val bfsQueue = new Queue[Node]
 
@@ -538,9 +546,9 @@ abstract class Component(resetSignal: Bool = null) {
 
     // initialize bfsQueue
     for((n, elm) <- io.flatten) {
-      elm.removeCellIOs
-      if(elm.isInstanceOf[IO] && elm.asInstanceOf[IO].dir == OUTPUT)
+      if(elm.isInstanceOf[IO] && elm.asInstanceOf[IO].dir == OUTPUT) {
   	bfsQueue.enqueue(elm)
+      }
     }
 
     for(r <- resetList)
@@ -565,16 +573,22 @@ abstract class Component(resetSignal: Bool = null) {
       for(i <- 0 until top.inputs.length) {
         if(!(top.inputs(i) == null)) {
           if(top.inputs(i).isCellIO) top.inputs(i) = getNode(top.inputs(i))
-          if(!walked.contains(top.inputs(i))) bfsQueue.enqueue(top.inputs(i))
+          if(!walked.contains(top.inputs(i))) {
+            bfsQueue.enqueue(top.inputs(i))
+            walked += top.inputs(i)
+          }
         }
       }
 
     }
     
     println(count)
+    println("finished flattening")
   }
 
   def forceMatchingWidths = {
+    println("start width checking")
+
     var nodesList = ArrayBuffer[Node]()
     val walked = new HashSet[Node]
     val bfsQueue = new Queue[Node]
@@ -597,6 +611,7 @@ abstract class Component(resetSignal: Bool = null) {
         if(!(i == null)) {
   	  if(!walked.contains(i)) {
   	    bfsQueue.enqueue(i) 
+            walked += i
   	  }
         }
     }
@@ -664,6 +679,7 @@ abstract class Component(resetSignal: Bool = null) {
     }
     if(saveWidthWarnings) widthWriter.close()
     * */
+    println("finished width checking")
   }
 
   def findConsumers() = {

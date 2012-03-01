@@ -370,7 +370,7 @@ abstract class Node extends nameable{
   }
 
   def traceNode(c: Component, stack: Stack[() => Any]): Any = {
-
+    if(this.isCellIO) println("found")
     // determine whether or not the component needs a clock input
     if ((isReg || isRegOut || isClkInput) && !(component == null))
         component.containsReg = true
