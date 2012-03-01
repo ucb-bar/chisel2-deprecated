@@ -456,11 +456,23 @@ class MemPort[T <: Data](cell:       MemCell[T],
       ""
     }
   }
-  def emitDefReadWrite: String = {
+  def emitDefReadWrite(cmd: Symbol): String = {
     if (hasChipSel) {
-      emitIndented(emitVerilogAlways(emitVerilogIf(chipSel, emitDefWrite + emitDefReadReg)) + emitDefReadAssign);
+      if(cmd == 'write) {
+        emitIndented(emitVerilogIf(chipSel, emitDefWrite + emitDefReadReg));
+      } else if(cmd == 'read) {
+        emitIndented(emitDefReadAssign);
+      } else {
+        ""
+      }
     } else {
-      emitIndented(emitVerilogAlways(emitDefWrite + emitDefReadReg) + emitDefReadAssign);
+      if(cmd == 'write) {
+        emitIndented((emitDefWrite + emitDefReadReg));
+      } else if (cmd == 'read) {
+        emitIndented(emitDefReadAssign);
+      } else {
+        ""
+      }
     }
   }
   def emitDefLoC: String = {
@@ -684,7 +696,9 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
     if(hasReset){
       println("[Error] The Mem object reset port has been deprecated.\n");
     }
-    res += ("" /: cell.port_list) { (s, p) => {s + p.emitDefReadWrite} };
+    res += ("" /: cell.port_list) { (s, p) => {s + p.emitDefReadWrite('write)} };
+    res = cell.port_list(0).emitIndented(cell.port_list(0).emitVerilogAlways(res))
+    res += ("" /: cell.port_list) { (s, p) => {s + p.emitDefReadWrite('read)} };
     res
   }
   def getPathName = { component.getPathName + "_" + emitRef; }
