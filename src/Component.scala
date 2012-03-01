@@ -876,9 +876,7 @@ abstract class Component(resetSignal: Bool = null) {
     }else{
       if(compDefs.values.toList contains name) {
 	moduleName = genCompName(name);
-        if(name == "queue") println(moduleName + " " + name + " " + genCount)
       } else {
-        if(name.contains("queue")) println(name)
 	moduleName = name;
       }
       compDefs += (res -> moduleName);
