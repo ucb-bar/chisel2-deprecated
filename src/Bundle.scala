@@ -224,6 +224,15 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     return false;
   }
 
+  override def :=[T <: Data](src: T) = {
+    src match {
+      case other: Bundle => {
+        this := other
+      }
+      case default =>
+    }
+  }
+
   def :=(src: Bundle) = {
     src match {
       case other: Bundle => {

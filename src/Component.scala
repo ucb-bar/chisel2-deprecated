@@ -1118,10 +1118,10 @@ abstract class Component(resetSignal: Bool = null) {
 
   def getPathName: String = {
     val res = (if(instanceName != "") instanceName else name);
-    if(pathParent == null)
+    if(parent == null)
       return res;
     else
-      pathParent.getPathName + "_" + res;
+      parent.getPathName + "_" + res;
   }
 
   def traceNodes() = {
