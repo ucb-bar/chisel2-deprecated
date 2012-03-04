@@ -1,6 +1,7 @@
 // author: jonathan bachrach
 package Chisel {
 
+import scala.math._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Queue
 import scala.collection.mutable.Stack
@@ -1132,6 +1133,86 @@ abstract class Component(resetSignal: Bool = null) {
     while (queue.length > 0) {
       val work = queue.pop();
       work();
+    }
+  }
+
+  def findCombLoop() = {
+    println("checking Comb Loop")
+    var nodesList = ArrayBuffer[Node]()
+    val walked = new HashSet[Node]
+    val bfsQueue = new Queue[Node]
+
+    // initialize bfsQueue
+    for((n, elm) <- io.flatten) 
+      if(elm.isInstanceOf[IO] && elm.asInstanceOf[IO].dir == OUTPUT)
+  	bfsQueue.enqueue(elm)
+
+    for(a <- asserts) 
+      bfsQueue.enqueue(a)
+    
+    for(r <- resetList)
+      bfsQueue.enqueue(r)
+
+    // conduct bfs to find all reachable nodes, also remove registers as we go
+    while(!bfsQueue.isEmpty){
+      val top = bfsQueue.dequeue
+      walked += top
+      nodesList += top
+
+      for(i <- 0 until top.inputs.length) {
+        if(!(top.inputs(i) == null)) {
+          
+          if(!walked.contains(top.inputs(i))) {
+            bfsQueue.enqueue(top.inputs(i))
+            walked += top.inputs(i)
+          }
+          
+          if(top.inputs(i).isInstanceOf[Delay]) // a register so remove it
+            top.inputs(i) == null
+        }
+      }
+    }
+
+    // Tarjan's strongly connected components algorithm to find loops
+    var sccIndex = 0
+    val stack = new Stack[Node]
+    val sccList = new ArrayBuffer[ArrayBuffer[Node]]
+
+    def tarjanSCC(n: Node): Unit = {
+      n.sccIndex = sccIndex
+      n.sccLowlink = sccIndex
+      sccIndex += 1
+      stack.push(n)
+
+      for(i <- n.inputs) {
+        if(i.sccIndex == -1) {
+          tarjanSCC(i)
+          n.sccLowlink = min(n.sccLowlink, i.sccLowlink)
+        } else if(stack.contains(i)) {
+          n.sccLowlink = min(n.sccLowlink, i.sccIndex)
+        }
+      }
+
+      if(n.sccLowlink == n.sccIndex) {
+        val scc = new ArrayBuffer[Node]
+        
+        var top: Node = null
+        do {
+          top = stack.pop()
+          scc += top
+        } while (n != top)
+      }
+    }
+
+    for (node <- nodesList) {
+      if(node.sccIndex == -1)
+        tarjanSCC(node)
+    }
+
+    // check for combinational loops
+    for (nodelist <- sccList) {
+      if(nodelist.length > 1) 
+        println("found COMB PATH")
     }
   }
 

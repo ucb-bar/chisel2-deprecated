@@ -105,9 +105,7 @@ object Printer {
 }
 
 object chiselMain {
-  def apply[T <: Component]
-      (args: Array[String], gen: () => T, scanner: T => TestIO = null, printer: T => TestIO = null) {
-    initChisel();
+  def readArgs(args: Array[String]) = {
     var i = 0;
     while (i < args.length) {
       val arg = args(i);
@@ -135,6 +133,21 @@ object chiselMain {
       }
       i += 1;
     }
+  }
+
+  def apply[T <: Component]
+      (args: Array[String], gen: () => T, scanner: T => TestIO = null, printer: T => TestIO = null) {
+    initChisel();
+    readArgs(args)
+
+    if(findCombLoop) {
+      gen().findCombLoop()
+      
+      // nead to reinitialize state
+      initChisel()
+      readArgs(args)
+    }
+
     val c = gen();
     if (scanner != null) {
       val s = scanner(c);

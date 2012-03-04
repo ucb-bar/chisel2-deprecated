@@ -114,6 +114,8 @@ object Node {
 }
 
 abstract class Node extends nameable{
+  var sccIndex = -1
+  var sccLowlink = -1
   var walked = false;
   var staticComp: Component = getComponent();
   var component: Component = null;
