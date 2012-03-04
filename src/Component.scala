@@ -1138,6 +1138,23 @@ abstract class Component(resetSignal: Bool = null) {
 
   def findCombLoop() = {
     println("checking Comb Loop")
+
+    println("initialize circuit")
+    topComponent = this;
+    components.foreach(_.elaborate(0));
+    for (c <- components)
+      c.markComponent();
+    genAllMuxes;
+    components.foreach(_.postMarkNet(0));
+    assignResets()
+    removeCellIOs()
+    inferAll();
+    forceMatchingWidths;
+    nameChildren(topComponent)
+    traceNodes();
+    println("finished circuit initalization")
+    println("begin search for comb loop")
+
     var nodesList = ArrayBuffer[Node]()
     val walked = new HashSet[Node]
     val bfsQueue = new Queue[Node]
@@ -1185,11 +1202,13 @@ abstract class Component(resetSignal: Bool = null) {
       stack.push(n)
 
       for(i <- n.inputs) {
-        if(i.sccIndex == -1) {
-          tarjanSCC(i)
-          n.sccLowlink = min(n.sccLowlink, i.sccLowlink)
-        } else if(stack.contains(i)) {
-          n.sccLowlink = min(n.sccLowlink, i.sccIndex)
+        if(!(i == null)) {
+          if(i.sccIndex == -1) {
+            tarjanSCC(i)
+            n.sccLowlink = min(n.sccLowlink, i.sccLowlink)
+          } else if(stack.contains(i)) {
+            n.sccLowlink = min(n.sccLowlink, i.sccIndex)
+          }
         }
       }
 
@@ -1201,6 +1220,7 @@ abstract class Component(resetSignal: Bool = null) {
           top = stack.pop()
           scc += top
         } while (n != top)
+        sccList += scc
       }
     }
 
@@ -1211,9 +1231,11 @@ abstract class Component(resetSignal: Bool = null) {
 
     // check for combinational loops
     for (nodelist <- sccList) {
-      if(nodelist.length > 1) 
-        println("found COMB PATH")
+      if(nodelist.length > 1) {
+        throw new Exception("found COMB PATH")
+      }
     }
+    println("no comb loop")
   }
 
   def compileC(): Unit = {
