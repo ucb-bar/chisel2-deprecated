@@ -259,7 +259,7 @@ abstract class Node extends nameable{
   def emitWidth: String = if(width == 1) "" else "[" + (width-1) + ":0]"
   def emitDec: String = "  wire" + (if (isSigned) " signed " else "") + emitWidth + " " + emitRef + ";\n";
   // C backend
-  def emitDecVCD: String = if (isVCD) "  dat_t<" + width + "> " +emitRef + "__prev" + ";\n" else "";
+  def emitDecVCD: String = if (isVCD && !isLit) "  dat_t<" + width + "> " +emitRef + "__prev" + ";\n" else "";
   def emitDecC: String = "  dat_t<" + width + "> " + emitRef + ";\n";
   def emitDefLoC: String = ""
   def emitInitC: String = ""
@@ -450,7 +450,7 @@ abstract class Node extends nameable{
   }
 
   def fixName() = {
-    if(nameHolder != null && !named){
+    if(nameHolder != null && !named && !isInstanceOf[Literal]){
       name = nameHolder.name;
       nameHolder.name = "";
       named = nameHolder.named;

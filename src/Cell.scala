@@ -31,7 +31,7 @@ object UnaryOp {
     // make output
     val output = gen.asOutput
     output.setIsCellIO
-    node.nameHolder = output
+    if(!node.isInstanceOf[Literal]) node.nameHolder = output
     output assign node
     output
   }
@@ -59,11 +59,8 @@ object BinaryOp {
     // make output
     val output = gen.asOutput
     output.setIsCellIO
-    node match {
-      case l: Literal =>
-      case _          =>
-        node.nameHolder = output
-    }
+
+    if(!node.isInstanceOf[Literal]) node.nameHolder = output
     output assign node
     output
   }
@@ -86,7 +83,7 @@ object LogicalOp {
     // make output
     val output = Bool(OUTPUT)
     output.setIsCellIO
-    node.nameHolder = output
+    if(!node.isInstanceOf[Literal]) node.nameHolder = output
     output assign node
     output
   }
@@ -104,7 +101,7 @@ object ReductionOp {
     // make output
     val output = Bool(OUTPUT)
     output.setIsCellIO
-    node.nameHolder = output
+    if(!node.isInstanceOf[Literal]) node.nameHolder = output
     output assign node
     output
   }
@@ -122,7 +119,7 @@ object UnaryBoolOp {
     //make ouput
     val output = Bool(OUTPUT)
     output.setIsCellIO
-    node.nameHolder = output
+    if(!node.isInstanceOf[Literal]) node.nameHolder = output
     output assign node
     output
   }
@@ -148,7 +145,7 @@ object BinaryBoolOp {
     // make output
     val output = Bool(OUTPUT)
     output.setIsCellIO
-    node.nameHolder = output
+    if(!node.isInstanceOf[Literal]) node.nameHolder = output
     output assign node
     output
   }

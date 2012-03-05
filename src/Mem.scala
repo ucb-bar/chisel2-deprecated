@@ -772,8 +772,9 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
       var res = "";
       for (i <- 0 until getInitData.inputs.length) 
         res += getInitData.inputs(i).emitDef;
-      for (i <- 0 until getInitData.inputs.length) 
+      for (i <- 0 until getInitData.inputs.length) {
         res += "  " + emitRef + ".put(" + i + ", " + getInitData.inputs(i).emitRef + ");\n";
+      }
       res
     } else {
       "  if (random_initialization) "+emitRef+".randomize();\n"
