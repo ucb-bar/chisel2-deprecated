@@ -123,6 +123,7 @@ class MemCell[T <: Data](n: Int, data: T) extends Cell {
   def setInitData(data: Array[T]) = {
     primitiveNode.initData = ListNode(data.toList);
     primitiveNode.inputs  += primitiveNode.initData;
+    primitiveNode.initDataIndex = primitiveNode.inputs.length-1
   }
 
   def getReadLatency = primitiveNode.getReadLatency;
@@ -583,8 +584,11 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
   var target                = Mem.getDefaultMemoryImplementation;
   var hexInitFile           = "";
   var initData: ListNode    = null;
+  var initDataIndex          = -1
   var readLatency           = Mem.getDefaultReadLatency;
   var hasWBM                = false;
+
+  def getInitData = inputs(initDataIndex)
 
   if (initData != null) {
     for (e <- initData.inputs) {
@@ -725,10 +729,10 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
     if (hexInitFile != "") {
       // println("hexInitFile: "+hexInitFile);
       res += "  initial $readmemh(\""+hexInitFile+"\", "+emitRef+");\n";
-    } else if (initData != null) {
+    } else if (initDataIndex != -1) {
       res += "  initial begin\n";
-      for (i <- 0 until initData.inputs.length) 
-        res += "    " + emitRef + "[" + i + "] = " + initData.inputs(i).emitRef + ";\n";
+      for (i <- 0 until getInitData.inputs.length) 
+        res += "    " + emitRef + "[" + i + "] = " + getInitData.inputs(i).emitRef + ";\n";
       res += "  end\n";
     }
     for (p <- cell.port_list) {
@@ -764,12 +768,12 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
   override def emitInitC: String = {
     if (hexInitFile != "") {
       "  "+emitRef+".read_hex(\""+hexInitFile+"\");\n"
-    } else if (initData != null) {
+    } else if (initDataIndex != -1) {
       var res = "";
-      for (i <- 0 until initData.inputs.length) 
-        res += initData.inputs(i).emitDef;
-      for (i <- 0 until initData.inputs.length) 
-        res += "  " + emitRef + ".put(" + i + ", " + initData.inputs(i).emitRef + ");\n";
+      for (i <- 0 until getInitData.inputs.length) 
+        res += getInitData.inputs(i).emitDef;
+      for (i <- 0 until getInitData.inputs.length) 
+        res += "  " + emitRef + ".put(" + i + ", " + getInitData.inputs(i).emitRef + ");\n";
       res
     } else {
       "  if (random_initialization) "+emitRef+".randomize();\n"
