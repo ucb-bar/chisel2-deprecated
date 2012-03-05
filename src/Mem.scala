@@ -830,7 +830,7 @@ class MemRef[T <: Data](mem_port: MemPort[T]) extends Node with proc {
 
   var port_type = 'read
   override def isInObject = true; 
-  override def isReg = inputs(0).asInstanceOf[Mem[ _ ]].getReadLatency > 0 && port_type == 'rw
+  override def isReg = isEmittingComponents && inputs(0).asInstanceOf[Mem[ _ ]].getReadLatency > 0
 
   // proc trait methods. Note that the proc trait is expected so that
   // this node can be assigned to Node.comp to support assignment.

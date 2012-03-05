@@ -48,7 +48,7 @@ object Component {
   val procs = ArrayBuffer[proc]();
   val resetList = ArrayBuffer[Node]();
   val muxes = ArrayBuffer[Node]();
-  var ioMap = Map[Node, Int]();
+  var ioMap = new HashMap[Node, Int];
   var ioCount = 0;
   val compStack = new Stack[Component]();
   var stackIndent = 0;
@@ -69,6 +69,7 @@ object Component {
   }
   def nextCompIndex : Int = { compIndex = compIndex + 1; compIndex }
   def splitArg (s: String) = s.split(' ').toList;
+
   // TODO: MAYBE CHANGE NAME TO INITCOMPONENT??
   // TODO: ADD INIT OF TOP LEVEL NODE STATE
   // TODO: BETTER YET MOVE ALL TOP LEVEL STATE FROM NODE TO COMPONENT
@@ -77,6 +78,8 @@ object Component {
     saveConnectionWarnings = false
     saveComponentTrace = false
     findCombLoop = false
+    widthWriter = null
+    connWriter = null
     isGenHarness = false;
     isDebug = false;
     isFolding = false;
@@ -100,12 +103,16 @@ object Component {
     firstComp = true;
     printStackStruct.clear();
     procs.clear();
+    resetList.clear()
     muxes.clear();
-    ioMap = Map[Node, Int]();
+    ioMap.clear()
     ioCount = 0;
     isEmittingComponents = false;
     isEmittingC = false;
     topComponent = null;
+
+    conds.clear()
+    conds.push(Bool(true))
   }
 
   def ensure_dir(dir: String) = {
@@ -570,16 +577,8 @@ abstract class Component(resetSignal: Bool = null) {
     while(!bfsQueue.isEmpty) {
       val top = bfsQueue.dequeue
       top.fixName()
-      //top.removeCellIOs
       walked += top
       count += 1
-
-      // for(node <- top.inputs) {
-      //   if(!(node == null)) {
-      //     node.removeCellIOs
-      //     if(!walked.contains(node)) bfsQueue.enqueue(node)
-      //   }
-      // }
 
       for(i <- 0 until top.inputs.length) {
         if(!(top.inputs(i) == null)) {
@@ -1137,9 +1136,9 @@ abstract class Component(resetSignal: Bool = null) {
   }
 
   def findCombLoop() = {
-    println("checking Comb Loop")
+    println("BEGINNING COMBINATIONAL LOOP CHECKING")
 
-    println("initialize circuit")
+    println("INITIALIZING CIRCUIT")
     topComponent = this;
     components.foreach(_.elaborate(0));
     for (c <- components)
@@ -1148,18 +1147,16 @@ abstract class Component(resetSignal: Bool = null) {
     components.foreach(_.postMarkNet(0));
     assignResets()
     removeCellIOs()
-    inferAll();
-    forceMatchingWidths;
     nameChildren(topComponent)
     traceNodes();
-    println("finished circuit initalization")
-    println("begin search for comb loop")
+    println("FINISHED INITALIZING CIRCUIT")
 
     var nodesList = ArrayBuffer[Node]()
     val walked = new HashSet[Node]
     val bfsQueue = new Queue[Node]
 
     // initialize bfsQueue
+    // search for all reachable nodes, then pass this graph into tarjanSCC
     for((n, elm) <- io.flatten) 
       if(elm.isInstanceOf[IO] && elm.asInstanceOf[IO].dir == OUTPUT)
   	bfsQueue.enqueue(elm)
@@ -1170,7 +1167,6 @@ abstract class Component(resetSignal: Bool = null) {
     for(r <- resetList)
       bfsQueue.enqueue(r)
 
-    // conduct bfs to find all reachable nodes, also remove registers as we go
     while(!bfsQueue.isEmpty){
       val top = bfsQueue.dequeue
       walked += top
@@ -1184,25 +1180,26 @@ abstract class Component(resetSignal: Bool = null) {
             walked += top.inputs(i)
           }
           
-          if(top.inputs(i).isInstanceOf[Delay]) // a register so remove it
-            top.inputs(i) == null
         }
       }
     }
 
     // Tarjan's strongly connected components algorithm to find loops
+    println("BEGINNING SEARCHING CIRCUIT FOR COMBINATIONAL LOOP")
     var sccIndex = 0
     val stack = new Stack[Node]
     val sccList = new ArrayBuffer[ArrayBuffer[Node]]
 
     def tarjanSCC(n: Node): Unit = {
+      if(n.isInstanceOf[Delay]) throw new Exception("trying to DFS on a register")
+
       n.sccIndex = sccIndex
       n.sccLowlink = sccIndex
       sccIndex += 1
       stack.push(n)
 
       for(i <- n.inputs) {
-        if(!(i == null)) {
+        if(!(i == null) && !i.isInstanceOf[Delay] && !i.isReg) {
           if(i.sccIndex == -1) {
             tarjanSCC(i)
             n.sccLowlink = min(n.sccLowlink, i.sccLowlink)
@@ -1219,23 +1216,35 @@ abstract class Component(resetSignal: Bool = null) {
         do {
           top = stack.pop()
           scc += top
-        } while (n != top)
+        } while (!(n == top))
         sccList += scc
       }
     }
 
     for (node <- nodesList) {
-      if(node.sccIndex == -1)
+      if(node.sccIndex == -1 && !node.isInstanceOf[Delay] && !(node.isReg))
         tarjanSCC(node)
     }
 
+ 
     // check for combinational loops
+    println("FINISHED ANALYZING CIRCUIT")
+    var containsCombPath = false
     for (nodelist <- sccList) {
       if(nodelist.length > 1) {
-        throw new Exception("found COMB PATH")
+        containsCombPath = true
+        println("FOUND COMBINATIONAL PATH!")
+        for((node, ind) <- nodelist zip nodelist.indices) {
+          val ste = findFirstUserLine(node.line)
+          println("  (" + ind +  ") on line " + ste.getLineNumber + 
+                                  " in class " + ste.getClassName +
+                                  " in file " + ste.getFileName + 
+                                  ", " + node.name)
+        }
       }
     }
-    println("no comb loop")
+    if(containsCombPath) throw new Exception("CIRCUIT CONTAINS COMBINATIONAL PATH")
+    println("NO COMBINATIONAL LOOP FOUND")
   }
 
   def compileC(): Unit = {

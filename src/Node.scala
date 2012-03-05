@@ -403,7 +403,8 @@ abstract class Node extends nameable{
       var i = 0;
       for (node <- inputs) {
         if (node != null) {
-          if (node.component == null)
+           //tmp fix, what happens if multiple componenets reference static nodes?
+          if (node.component == null || !components.contains(node.component))
             node.component = nextComp;
           stack.push(() => node.traceNode(nextComp, stack));
           val j = i;
