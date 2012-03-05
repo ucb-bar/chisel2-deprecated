@@ -6,14 +6,8 @@ import Literal._;
 import scala.collection.mutable.ArrayBuffer;
 
 // TODO: LOOK INTO REMOVING THIS
+/*
 object Lookup {
-  def apply[T <: Data](addr: Bits, default: T, mapping: Seq[(Bits, T)]): T = {
-    val lookupCell = new LookupCell(default, mapping);
-    lookupCell.io.default <> default;
-    lookupCell.io.addr assign addr;
-    lookupCell.io.out
-  }
-
   def apply[T <: Data, S <: Bits](addr: S, gen: () => T, mapping: Seq[(S, (T) => Any)]): T = {
     var map = List[(Bits, T)]();
     for((s, f) <- mapping){
@@ -30,37 +24,44 @@ object Lookup {
 
 }
 
+* */
 
-class LookupCell[T <: Data](data: T, mapping: Seq[(Bits, T)]){
-  val io = new Bundle(){
-    val default = data.clone.asInput;
-    val addr = Bits(dir=INPUT);//Input();
-    val out = data.clone.asOutput;
+object Lookup {
+  def apply[T <: Data](addr: Bits, default: T, mapping: Seq[(Bits, T)]): T = {
+    val lookup = new Lookup()
+    val mappingNode = mapping.map(x => LookupMap(x))
+    lookup.initOf("", widthOf(1), List(addr, default) ++ mappingNode)
+
+    // make output
+    val output = default.fromNode(lookup).asInstanceOf[T]
+    output.setIsCellIO
+    lookup.nameHolder = output
+    output
   }
-  io.setIsCellIO;
-  val primitiveNode = new Lookup()
-  primitiveNode.init("primitiveNode", widthOf(1), io.addr, io.default.toNode);
-  for((addr, data) <- mapping){
-    data.setIsCellIO;
-    primitiveNode.inputs += data.toNode;
-  }
-  primitiveNode.asInstanceOf[Lookup].map = mapping.map{case(addr, data) => (addr, data.toNode)}.toArray;
-  val fb = io.out.fromNode(primitiveNode).asInstanceOf[T] 
-  fb.setIsCellIO;
-  fb ^^ io.out;
 }
 
+object LookupMap {
+  def apply[T <: Data](map: (Bits, T)): LookupMap = {
+    val res = new LookupMap()
+    res.init("", widthOf(0), map._1, map._2)
+    res
+  }
+}
+
+class LookupMap extends Node {
+  override def emitDefLoC: String = ""
+  override def emitDef: String = ""
+  override def emitDec: String = ""
+  override def emitDecC: String = ""
+
+  def addr = inputs(0)
+  def data = inputs(1)
+}
 
 class Lookup extends Node {
   override def isInObject = true;
-  var map: Array[(Node, Node)] = null;
 
-  override def removeCellIOs() = {
-    super.removeCellIOs();
-    for(((i, n), m) <- map zip map.indices)
-      map(m) = ((i.getNode, n.getNode));
-    this
-  }
+  def map = inputs.slice(2, inputs.length).map(x => x.asInstanceOf[LookupMap])
 
   override def toString: String = "LOOKUP(" + inputs(0) + ")";
   override def emitDef: String = {
@@ -69,9 +70,9 @@ class Lookup extends Node {
       "    " + emitRef + " = " + inputs(1).emitRef + ";\n" +
       "    casez (" + inputs(0).emitRef + ")" + "\n";
     
-    for ((addr, data) <- map) 
+    for (node <- map) 
       res = res +
-        "      " + addr.emitRef + " : " + emitRef + " = " + data.emitRef + ";\n";
+        "      " + node.addr.emitRef + " : " + emitRef + " = " + node.data.emitRef + ";\n";
     res = res + 
       "    endcase\n" +
       "  end\n";
@@ -79,9 +80,9 @@ class Lookup extends Node {
   }
   override def emitDefLoC: String = {
     var res = "";
-    for ((addr, data) <- map) 
+    for (node <- map) 
       res = res +
-        "  if ((" + addr.emitRef + " == " + inputs(0).emitRef + ").to_bool()) " + emitRef + " = " + data.emitRef + ";\n";
+        "  if ((" + node.addr.emitRef + " == " + inputs(0).emitRef + ").to_bool()) " + emitRef + " = " + node.data.emitRef + ";\n";
     res
   }
   override def emitDec: String = 
