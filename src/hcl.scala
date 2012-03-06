@@ -118,7 +118,7 @@ object chiselMain {
         case "--Wwidth" => saveWidthWarnings = true
         case "--Wconnection" => saveConnectionWarnings = true
         case "--Wcomponent" => saveComponentTrace = true
-        case "--findCombLoop" => findCombLoop = true 
+        case "--noCombLoop" => dontFindCombLoop = true
         case "--gen-harness" => isGenHarness = true; 
         case "--debug" => isDebug = true; 
         case "--folding" => isFolding = true; 
@@ -139,14 +139,6 @@ object chiselMain {
       (args: Array[String], gen: () => T, scanner: T => TestIO = null, printer: T => TestIO = null) {
     initChisel();
     readArgs(args)
-
-    if(findCombLoop) {
-      gen().findCombLoop()
-      
-      // nead to reinitialize state
-      initChisel()
-      readArgs(args)
-    }
 
     val c = gen();
     if (scanner != null) {

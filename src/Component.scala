@@ -21,7 +21,7 @@ object Component {
   var saveWidthWarnings = false
   var saveConnectionWarnings = false
   var saveComponentTrace = false
-  var findCombLoop = false
+  var dontFindCombLoop = false
   var widthWriter: java.io.FileWriter = null
   var connWriter: java.io.FileWriter = null
   var isDebug = false;
@@ -77,7 +77,7 @@ object Component {
     saveWidthWarnings = false
     saveConnectionWarnings = false
     saveComponentTrace = false
-    findCombLoop = false
+    dontFindCombLoop = false
     widthWriter = null
     connWriter = null
     isGenHarness = false;
@@ -994,6 +994,11 @@ abstract class Component(resetSignal: Bool = null) {
     forceMatchingWidths;
     nameChildren(topComponent)
     traceNodes();
+    if(!ChiselErrors.isEmpty){
+      for(err <- ChiselErrors) err.printError;
+      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
+    }
+    if(!dontFindCombLoop) findCombLoop();
     val out = new java.io.FileWriter(base_name + name + ".v");
     if(saveConnectionWarnings)
       connWriter = new java.io.FileWriter(base_name + name + ".connection.warnings")
@@ -1138,19 +1143,6 @@ abstract class Component(resetSignal: Bool = null) {
   def findCombLoop() = {
     println("BEGINNING COMBINATIONAL LOOP CHECKING")
 
-    println("INITIALIZING CIRCUIT")
-    topComponent = this;
-    components.foreach(_.elaborate(0));
-    for (c <- components)
-      c.markComponent();
-    genAllMuxes;
-    components.foreach(_.postMarkNet(0));
-    assignResets()
-    removeCellIOs()
-    nameChildren(topComponent)
-    traceNodes();
-    println("FINISHED INITALIZING CIRCUIT")
-
     var nodesList = ArrayBuffer[Node]()
     val walked = new HashSet[Node]
     val bfsQueue = new Queue[Node]
@@ -1280,6 +1272,7 @@ abstract class Component(resetSignal: Bool = null) {
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
       return
     }
+    if(!dontFindCombLoop) findCombLoop();
     if (!isEmittingComponents) {
       for (c <- components) {
         if (!(c == this)) {
