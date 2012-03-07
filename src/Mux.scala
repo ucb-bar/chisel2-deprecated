@@ -6,17 +6,18 @@ import Component._;
 import IOdir._;
 
 object Multiplex{
-  def apply (t: Node, c: Node, a: Node): Node = 
+  def apply (t: Node, c: Node, a: Node): Node = {
+    if (isFolding && t.litOf != null)
+      return if (t.litOf.value == 0) a else c
+
     new Mux().init("", maxWidth _, t, c, a);
+  }
 }
 
 
 object Mux {
   def apply[T <: Data](t: Bits, c: T, a: T): T = {
-    val res = new Mux()
-
-    // initialize
-    res.init("", maxWidth _, t, c.toNode, a.toNode)
+    val res = Multiplex(t, c.toNode, a.toNode)
 
     // make output
     val output = c.fromNode(res).asInstanceOf[T]
