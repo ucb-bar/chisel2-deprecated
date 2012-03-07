@@ -381,7 +381,8 @@ abstract class Node extends nameable{
     val (comp, nextComp) = 
       this match {
         case io: IO => {
-          //assert(io.dir == OUTPUT || io.dir == INPUT, {println(" IO w/o direction " + io + " name: " + io.name + " " + io.inputs)})
+          //assert(io.dir == OUTPUT || io.dir == INPUT, 
+                 //{println(" IO w/o direction " + io + " name: " + io.name + " " + io.inputs + " in comp: " + c + " of class: " + io.getClass + " on line " + findFirstUserLine(io.line))})
           (io.component, if (io.dir == OUTPUT) io.component else io.component.parent);
         }
         case any    => (c, c);

@@ -199,8 +199,9 @@ class MemPort[T <: Data](cell:       MemCell[T],
   def assign_data(data: Node) = {
     if (data_offset != -1) {
       println("[warning] Memory data input is already assigned");
-    } else if (!(data == null)) {
+    } else if (!(data == null) && prt_type != 'read) {
       val data_port = Bits(data.getWidth, INPUT);
+      data_port.setIsCellIO
       data_offset = next_input_index;
       cell.io += data_port;
       mem.inputs += data_port.toNode;
@@ -261,7 +262,6 @@ class MemPort[T <: Data](cell:       MemCell[T],
   def getReadLatency = mem.getReadLatency;
 
   def genRegChain(x: Int) = {
-    println("called " + x)
     for(i <- 0 until x){
       val reg = new Reg();
       reg.init("", widthOf(0), holder.inputs(0));
@@ -298,6 +298,7 @@ class MemPort[T <: Data](cell:       MemCell[T],
         holder.inputs += memRef;
         res = cell.getDataType.fromNode(holder);
         res.comp = holder
+        res.setIsCellIO
         genRegChain(mem.cppReadLatency)
       }
       res.setIsCellIO;
@@ -392,7 +393,7 @@ class MemPort[T <: Data](cell:       MemCell[T],
     res
   }
   def emitDefWrite: String = {
-    if (data_offset == -1) {
+    if (data_offset == -1 && isWritable) {
       println("[error] Memory write operation has no assigned value.");
       return "<no write data>";
     }
