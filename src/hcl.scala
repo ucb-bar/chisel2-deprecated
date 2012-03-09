@@ -122,7 +122,7 @@ object chiselMain {
         case "--gen-harness" => isGenHarness = true; 
         case "--debug" => isDebug = true; 
         case "--folding" => isFolding = true; 
-        case "--vcd" => isDebug = true; isVCD = true; 
+        case "--vcd" => isVCD = true;
         case "--v" => isEmittingComponents = true; isCoercingArgs = false;
         case "--target-dir" => targetDir = args(i+1); i += 1;
         // case "--scan-format" => scanFormat = args(i+1); i += 1;
