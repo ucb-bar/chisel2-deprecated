@@ -905,7 +905,7 @@ abstract class Component(resetSignal: Bool = null) {
 			    }
 	  case buf: ArrayBuffer[Node] => {
 	    var i = 0;
-	    if(buf(0).isInstanceOf[Node]){
+	    if(!buf.isEmpty && buf(0).isInstanceOf[Node]){
 	      for(elm <- buf){
 		if ((elm.isCellIO || (elm.name == "" && !elm.named) || elm.name == null)) 
 		  elm.name_it(name + "_" + i, true);
@@ -987,6 +987,10 @@ abstract class Component(resetSignal: Bool = null) {
     components.foreach(_.postMarkNet(0));
     assignResets()
     removeCellIOs()
+    if(!ChiselErrors.isEmpty){
+      for(err <- ChiselErrors) err.printError;
+      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
+    }
     inferAll();
     val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
     if(saveWidthWarnings)
@@ -1262,6 +1266,11 @@ abstract class Component(resetSignal: Bool = null) {
     // isWalked.clear();
     assignResets()
     removeCellIOs()
+    if(!ChiselErrors.isEmpty){
+      for(err <- ChiselErrors)	err.printError;
+      throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
+      return
+    }
     inferAll();
     if(saveWidthWarnings)
       widthWriter = new java.io.FileWriter(base_name + name + ".width.warnings")
