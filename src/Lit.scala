@@ -23,6 +23,14 @@ object Lit {
     makeLit(Literal(n, width))(gen)
   }
 
+  def apply[T <: Bits](n: BigInt)(gen: => T): T = {
+    makeLit(Literal(n))(gen)
+  }
+
+  def apply[T <: Bits](n: BigInt, width: Int)(gen: => T): T = {
+    makeLit(Literal(n, width))(gen)
+  }
+
   def apply[T <: Bits](width: Int, base: Char, literal: String)(gen: => T): T = {
     makeLit(Literal(width, base, literal))(gen)
   }
@@ -135,7 +143,7 @@ object Literal {
     var res = BigInt(0);
     for(c <- x)
       if(c != '_'){
-	if(!(hexNibbles + "?").contains(c)) ChiselErrors += ChiselError("Literal: " + x + " contains illegal character: " + c, Thread.currentThread().getStackTrace);
+	if(!(hexNibbles + "?").contains(c.toLowerCase)) ChiselErrors += ChiselError("Literal: " + x + " contains illegal character: " + c, Thread.currentThread().getStackTrace);
 	res = res * shamt + c.asDigit;
       }
     res

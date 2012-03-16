@@ -26,6 +26,14 @@ object Op {
       val (aw, bw) = (a_lit.width, b_lit.width);
       val (av, bv) = (a_lit.value, b_lit.value);
       name match {
+        case "&&" => return if (av == 0) Literal(0) else b;
+        case "||" => return if (bv == 0) a else Literal(1);
+        case "===" => return Literal(if (av == bv) 1 else 0)
+        case "!=" => return Literal(if (av != bv) 1 else 0);
+        case "<"  => return Literal(if (av <  bv) 1 else 0);
+        case ">"  => return Literal(if (av >  bv) 1 else 0);
+        case "<=" => return Literal(if (av <= bv) 1 else 0);
+        case ">=" => return Literal(if (av >= bv) 1 else 0);
         case "##" => return Literal(av << bw | bv, aw + bw);
         case "+"  => return Literal(av + bv, max(aw, bw)+1);
         case "-"  => return Literal(av - bv, max(aw, bw)+1);
@@ -48,6 +56,14 @@ object Op {
     res
   }
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node): Node = {
+    if (isFolding && a.litOf != null) {
+      name match {
+        case "!" => return if (a.litOf.value == 0) Literal(1) else Literal(0);
+        case "-" => return Literal(-a.litOf.value, a.litOf.width);
+        case "~" => return Literal(-a.litOf.value-1, a.litOf.width);
+        case _ => ;
+      } 
+    }
     val res = new Op();
     res.init("", widthInfer, a);
     res.op = name;

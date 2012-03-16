@@ -7,9 +7,16 @@ import IOdir._;
 
 object Multiplex{
   def apply (t: Node, c: Node, a: Node): Node = {
-    if (isFolding && t.litOf != null)
-      return if (t.litOf.value == 0) a else c
-
+    if (isFolding) {
+      if (t.litOf != null)
+        return if (t.litOf.value == 0) a else c
+      if (c.litOf != null && a.litOf != null) {
+        if (c.litOf.value == a.litOf.value)
+          return c
+        if (c.litOf.value == 1 && a.litOf.value == 0)
+          return t
+      }
+    }
     new Mux().init("", maxWidth _, t, c, a);
   }
 }
