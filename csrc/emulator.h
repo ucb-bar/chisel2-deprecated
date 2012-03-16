@@ -84,73 +84,27 @@ const static char hex_digs[] =
   {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
 
 static void add_n (val_t d[], val_t s0[], val_t s1[], int nw, int nb) {
-  /*
-  int n_half_words = nw*2;
-  half_val_t *hres = (half_val_t*)d;
-  half_val_t *val0 = (half_val_t*)s0;
-  half_val_t *val1 = (half_val_t*)s1;
-  val_t carry      = 0;
-  for (int i = 0; i < n_half_words; i++) {
-    val_t sum = ((val_t)val0[i]) + ((val_t)val1[i]) + carry;
-    hres[i] = val_lo_half(sum);
-    carry   = val_hi_half(sum);
-  }
-  */
   val_t carry = 0;
   for (int i = 0; i < nw; i++) {
-    val_t s0i = s0[i];
-    val_t s1i = s1[i];
-    val_t sum = s0i + s1i + carry;
-    d[i]  = sum;
-    carry = (sum < s0i);
-    // printf("S0I %llx S1I %llx SUM %llx CARRY %llx\n", s0i, s1i, sum, carry);
-  }
-}
-
-static void add_n_one (val_t d[], val_t s0[], int nw, int nb) {
-  /*
-  int n_half_words = nw*2;
-  half_val_t *hres = (half_val_t*)d;
-  half_val_t *val0 = (half_val_t*)s0;
-  val_t carry      = 1;
-  for (int i = 0; i < n_half_words; i++) {
-    val_t sum = ((val_t)val0[i]) + carry;
-    hres[i] = val_lo_half(sum);
-    carry   = val_hi_half(sum);
-  }
-  */
-  val_t carry = 1;
-  for (int i = 0; i < nw; i++) {
-    val_t tmp = s0[i];
-    val_t sum = s0[i] + carry;
-    d[i]  = sum;
-    carry = (sum < tmp);
-//    carry = (sum < s0[i]);
+    d[i] = s0[i] + s1[i] + carry;
+    carry = ((s0[i] + s1[i]) < s0[i]) || (d[i] < carry);
   }
 }
 
 static void neg_n (val_t d[], val_t s0[], int nw, int nb) {
-  for (int i = 0; i < nw; i++)
-    d[i] = ~s0[i];
-  add_n_one(d, d, nw, nb);
+  val_t borrow = 0;
+  for (int i = 0; i < nw; i++) {
+    d[i]  = -s0[i] - borrow;
+    borrow = s0[i] || d[i];
+  }
 }
 
 static void sub_n (val_t d[], val_t s0[], val_t s1[], int nw, int nb) {
-  neg_n(d, s1, nw, nb);
-  add_n(d, s0, d, nw, nb);
-  /*
-  // TODO: FIX BORROW -- PERHAPS SIGN EXTEND BORROW?
-  int n_half_words = nw*2;
-  half_val_t *hres = (half_val_t*)d;
-  half_val_t *val0 = (half_val_t*)s0;
-  half_val_t *val1 = (half_val_t*)s1;
-  val_t borrow     = 0;
-  for (int i = n_half_words-1; i >= 0; i--) {
-    val_t diff = ((val_t)val0[i]) - ((val_t)val1[i]) + borrow;
-    hres[i] = val_lo_half(diff);
-    borrow  = val_hi_half(diff);
+  val_t borrow = 0;
+  for (int i = 0; i < nw; i++) {
+    d[i]  = s0[i] - s1[i] - borrow;
+    borrow = (s0[i] < (s0[i] - s1[i])) || (s0[i] - s1[i]) < d[i];
   }
-  */
 }
 
 static void mul_n (val_t d[], val_t s0[], val_t s1[], int nw, int nb) {
@@ -616,38 +570,33 @@ struct bit_word_funs<1> {
     d[0] = (s0[0] < s1[0]);
   }
   static void lt (val_t d[], val_t s0[], val_t s1[], int w) {
-    int msb_0 = (s0[0] >> (w - 1)) & 0x1;
-    int msb_1 = (s1[0] >> (w - 1)) & 0x1;
-    
-    int cond = msb_0 ^ msb_1; 
-    d[0] = (cond && msb_0) || (!cond && (s0[0] < s1[0]));
+    sval_t a = s0[0] << (val_n_bits() - w);
+    sval_t b = s0[0] << (val_n_bits() - w);
+    d[0] = (a < b);
   }
   static void gtu (val_t d[], val_t s0[], val_t s1[]) {
     d[0] = (s0[0] > s1[0]);
   }
   static void gt (val_t d[], val_t s0[], val_t s1[], int w) {
-    int msb_0 = (s0[0] >> (w - 1)) & 0x1;
-    int msb_1 = (s1[0] >> (w - 1)) & 0x1;
-    int cond = msb_0 ^ msb_1;
-    d[0] = (cond && msb_1) || (!cond && (s0[0] > s1[0]));
+    sval_t a = s0[0] << (val_n_bits() - w);
+    sval_t b = s0[0] << (val_n_bits() - w);
+    d[0] = (a > b);
   }
   static void lteu (val_t d[], val_t s0[], val_t s1[]) {
     d[0] = (s0[0] <= s1[0]);
   }
   static void lte (val_t d[], val_t s0[], val_t s1[], int w) {
-    int msb_0 = (s0[0] >> (w - 1)) & 0x1;
-    int msb_1 = (s1[0] >> (w - 1)) & 0x1;
-    int cond = msb_0 ^ msb_1;
-    d[0] = (cond && msb_0) || (!cond && (s0[0] <= s1[0]));
+    sval_t a = s0[0] << (val_n_bits() - w);
+    sval_t b = s0[0] << (val_n_bits() - w);
+    d[0] = (a <= b);
   }
   static void gteu (val_t d[], val_t s0[], val_t s1[]) {
     d[0] = (s0[0] >= s1[0]);
   }
   static void gte (val_t d[], val_t s0[], val_t s1[], int w) {
-    int msb_0 = (s0[0] >> (w - 1)) & 0x1;
-    int msb_1 = (s1[0] >> (w - 1)) & 0x1;
-    int cond = msb_0 ^ msb_1;
-    d[0] = (cond && msb_1) || (!cond && (s0[0] >= s1[0]));
+    sval_t a = s0[0] << (val_n_bits() - w);
+    sval_t b = s0[0] << (val_n_bits() - w);
+    d[0] = (a >= b);
   }
   static void bit_neg (val_t d[], val_t s0[], int nb) {
     d[0] = ~s0[0] & mask_val(nb);
@@ -716,23 +665,22 @@ struct bit_word_funs<2> {
     d[1] = mask_val(nb - val_n_bits());
   }
   static void add (val_t d[], val_t x[], val_t y[], int nb) {
-    // dub_val_t *hres = (dub_val_t*)d;
-    // dub_val_t *val0 = (dub_val_t*)x;
-    // dub_val_t *val1 = (dub_val_t*)y;
-    // d[0] = val0[0] + val1[0];
     val_t x0     = x[0];
     val_t sum0   = x0 + y[0];
     val_t carry0 = (sum0 < x0);
     d[0]         = sum0;
     val_t sum1   = x[1] + y[1] + carry0;
     d[1]         = sum1;
-    // add_n(d, x, y, 2, nb);
   }
   static void sub (val_t d[], val_t s0[], val_t s1[], int nb) {
-    sub_n(d, s0, s1, 2, nb);
+    val_t d0 = s0[0] - s1[0];
+    d[1] = s0[1] - s1[1] - (s0[0] < d0);
+    d[0] = d0;
   }
   static void neg (val_t d[], val_t s0[], int nb) {
-    neg_n(d, s0, 2, nb);
+    val_t d0 = -s0[0];
+    d[1] = -s0[1] - (s0[0] != 0);
+    d[0] = d0;
   }
   static void mul (val_t d[], val_t s0[], val_t s1[], int nb) {
     mul_n(d, s0, s1, 2, nb);
