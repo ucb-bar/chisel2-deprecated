@@ -3,6 +3,7 @@ package Chisel {
 
 import Component._;
 import Fill._;
+import Component._;
 import IOdir._;
 import Lit._;
 
@@ -37,6 +38,15 @@ object Fill {
 
 object NodeFill {
   def apply(n: Int, mod: Node): Node = {
+    if (isFolding && mod.litOf != null) {
+      var c = BigInt(0)
+      val w = mod.litOf.width
+      val a = mod.litOf.value
+      for (i <- 0 until n)
+        c = (c << w) | a
+      return Lit(c,n*w){Bits()}
+    }
+
     val res = new Fill()
     res.init("", (m: Node) => {m.inputs(0).width * n}, mod, Literal(n))
     res
