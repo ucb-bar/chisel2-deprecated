@@ -1,24 +1,36 @@
 // author: jonathan bachrach
 package Chisel {
 
+import Component._;
 import Fill._;
 import IOdir._;
+import Lit._;
 
 object Fill {
   def fillWidthOf(i: Int, n: Node) = { (m: Node) => (m.inputs(i).width * n.maxNum.toInt) }
   def apply(n: Int, mod: Bits): Bits = {
-    val fill = new Fill()
+    val (bits_lit) = (mod.litOf);
+    if (isFolding && bits_lit != null) {
+      // println("FOLDING EXTRACT " + bits_lit.value + "(" + off_lit.value + ")");
+      var res = bits_lit.value;
+      val w   = mod.getWidth();
+      for (i <- 0 until n) 
+        res = (res << w)|bits_lit.value;
+      Bits(res, n * w);
+    } else {
+      val fill = new Fill()
 
-    // initialize
-    val fillConst = UFix(n)
-    fill.init("", fillWidthOf(0, fillConst), mod, fillConst)
+      // initialize
+      val fillConst = UFix(n)
+      fill.init("", fillWidthOf(0, fillConst), mod, fillConst)
 
-    // make output
-    val output = Bits(OUTPUT)
-    output.setIsCellIO
-    fill.nameHolder = output
-    output assign fill
-    output
+      // make output
+      val output = Bits(OUTPUT)
+      output.setIsCellIO
+      fill.nameHolder = output
+      output assign fill
+      output
+    }
   }
   def apply(mod: Bits, n: Int): Bits = apply(n, mod)
 }

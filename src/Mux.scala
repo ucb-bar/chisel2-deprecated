@@ -7,23 +7,28 @@ import IOdir._;
 
 object Multiplex{
   def apply (t: Node, c: Node, a: Node): Node = {
-    if (isFolding && t.litOf != null)
-      return if (t.litOf.value == 0) a else c
-
-    new Mux().init("", maxWidth _, t, c, a);
+    if (isFolding && t.litOf != null) {
+       if (t.litOf.value == 0) a else c
+    } else {
+      new Mux().init("", maxWidth _, t, c, a);
+    }
   }
 }
 
 
 object Mux {
   def apply[T <: Data](t: Bits, c: T, a: T): T = {
-    val res = Multiplex(t, c.toNode, a.toNode)
+    if (isFolding && t.litOf != null) {
+       if (t.litOf.value == 0) a else c
+    } else {
+      val res = Multiplex(t, c.toNode, a.toNode)
 
-    // make output
-    val output = c.fromNode(res).asInstanceOf[T]
-    output.setIsCellIO
-    res.nameHolder = output
-    output
+      // make output
+      val output = c.fromNode(res).asInstanceOf[T]
+      output.setIsCellIO
+      res.nameHolder = output
+      output
+    }
   }
 }
 class Mux extends Op {

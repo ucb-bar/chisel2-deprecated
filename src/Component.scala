@@ -1310,6 +1310,8 @@ abstract class Component(resetSignal: Bool = null) {
     }
     // for (m <- omods)
     //   println("MOD " + m + " IN " + m.component.name);
+    out_h.write("#ifndef __IS_" + name + "__\n");
+    out_h.write("#define __IS_" + name + "__\n");
     out_h.write("#include \"emulator.h\"\n\n");
     out_h.write("class " + name + "_t : public mod_t {\n");
     out_h.write(" public:\n");
@@ -1337,6 +1339,7 @@ abstract class Component(resetSignal: Bool = null) {
     out_h.write("  bool scan ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
     out_h.write("};\n");
+    out_h.write("#endif\n");
     out_h.close();
 
     out_c.write("#include \"" + name + ".h\"\n");

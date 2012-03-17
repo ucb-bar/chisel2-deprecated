@@ -11,11 +11,11 @@ import IOdir._;
 import ChiselError._;
 
 object Lit {
-  def apply[T <: Bits](x: Int)(gen: => T): T = {
+  def apply[T <: Bits](x: BigInt)(gen: => T): T = {
     makeLit(Literal(x, signed = gen.isInstanceOf[Fix]))(gen)
   }
 
-  def apply[T <: Bits](x: Int, width: Int)(gen: => T): T = {
+  def apply[T <: Bits](x: BigInt, width: Int)(gen: => T): T = {
     makeLit(Literal(x, width, gen.isInstanceOf[Fix]))(gen)
   }
 
