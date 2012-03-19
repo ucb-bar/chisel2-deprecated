@@ -92,6 +92,7 @@ class Wire extends Data with proc {
     res
   }
   override def toString: String = name
+  override def dotName = super.dotName + "(" + name + ")";
   override def emitDef: String = { 
     if (inputs.length == 0) {
       println("// UNCONNECTED " + this + " IN " + component); ""

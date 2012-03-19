@@ -40,6 +40,7 @@ object Mux {
 class Mux extends Op {
   muxes += this;
   stack = Thread.currentThread.getStackTrace;
+  op = "Mux";
   override def toString: String =
     inputs(0) + " ? " + inputs(1) + " : " + inputs(2)
   override def emitDef: String = 

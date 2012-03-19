@@ -23,14 +23,6 @@ object Lit {
     makeLit(Literal(n, width))(gen)
   }
 
-  def apply[T <: Bits](n: BigInt)(gen: => T): T = {
-    makeLit(Literal(n))(gen)
-  }
-
-  def apply[T <: Bits](n: BigInt, width: Int)(gen: => T): T = {
-    makeLit(Literal(n, width))(gen)
-  }
-
   def apply[T <: Bits](width: Int, base: Char, literal: String)(gen: => T): T = {
     makeLit(Literal(width, base, literal))(gen)
   }
@@ -250,7 +242,7 @@ class Literal extends Node {
       ("LIT<" + width + ">(" + name + "L)")
     } else
       ("LIT<" + width + ">(0x" + name + "L)")
-   ) + "/* " + inputVal + "*/";
+   ) + "/*" + inputVal + "*/";
 
   override def emitRefVCD: String = 
     (if (isBinary) { 
@@ -273,7 +265,8 @@ class Literal extends Node {
     else if(base == 'x') ("" + width + "'h" + name.substring(2, name.length))
     else if(base == 'd') ("" + width + "'d" + name)
     else if(base == 'h') ("" + width + "'h" + name)
-    else "") + "/* " + inputVal + "*/";
+    else "") + "/*" + inputVal + "*/";
+  override def emitRefDot = emitRefV;
   def d (x: BigInt): Literal = Literal(x, value.toInt)
   //def ~(x: String): Lit = Lit(value, x(0), x.substring(1, x.length));
 }
