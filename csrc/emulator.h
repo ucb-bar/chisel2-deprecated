@@ -1013,6 +1013,7 @@ class dat_t {
       for (int j = 0; j < sizeof(val_t)/sizeof(int); j++)
         r.values[i] |= val_t(::rand()) << (j*CHAR_BIT*sizeof(int));
     }
+    r.values[n_words-1] &= mask_val(val_n_word_bits(w));
     return r;
   }
   inline dat_t<w> () { 
