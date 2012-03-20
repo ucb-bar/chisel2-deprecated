@@ -571,7 +571,7 @@ struct bit_word_funs<1> {
   }
   static void lt (val_t d[], val_t s0[], val_t s1[], int w) {
     sval_t a = s0[0] << (val_n_bits() - w);
-    sval_t b = s0[0] << (val_n_bits() - w);
+    sval_t b = s1[0] << (val_n_bits() - w);
     d[0] = (a < b);
   }
   static void gtu (val_t d[], val_t s0[], val_t s1[]) {
@@ -579,7 +579,7 @@ struct bit_word_funs<1> {
   }
   static void gt (val_t d[], val_t s0[], val_t s1[], int w) {
     sval_t a = s0[0] << (val_n_bits() - w);
-    sval_t b = s0[0] << (val_n_bits() - w);
+    sval_t b = s1[0] << (val_n_bits() - w);
     d[0] = (a > b);
   }
   static void lteu (val_t d[], val_t s0[], val_t s1[]) {
@@ -587,7 +587,7 @@ struct bit_word_funs<1> {
   }
   static void lte (val_t d[], val_t s0[], val_t s1[], int w) {
     sval_t a = s0[0] << (val_n_bits() - w);
-    sval_t b = s0[0] << (val_n_bits() - w);
+    sval_t b = s1[0] << (val_n_bits() - w);
     d[0] = (a <= b);
   }
   static void gteu (val_t d[], val_t s0[], val_t s1[]) {
@@ -595,7 +595,7 @@ struct bit_word_funs<1> {
   }
   static void gte (val_t d[], val_t s0[], val_t s1[], int w) {
     sval_t a = s0[0] << (val_n_bits() - w);
-    sval_t b = s0[0] << (val_n_bits() - w);
+    sval_t b = s1[0] << (val_n_bits() - w);
     d[0] = (a >= b);
   }
   static void bit_neg (val_t d[], val_t s0[], int nb) {
@@ -624,7 +624,7 @@ struct bit_word_funs<1> {
   }
   static void rsha (val_t d[], val_t s0[], int amount, int w) {
     d[0] = s0[0] << (val_n_bits() - w);
-    d[0] = sval_t(d[0]) >> (val_n_bits() - w + amount);
+    d[0] = (sval_t(d[0]) >> (val_n_bits() - w + amount)) & mask_val(w);
   }
   static void extract (val_t d[], val_t s0[], int e, int s, int nb) {
     const int bw = e-s+1;
@@ -788,7 +788,7 @@ struct bit_word_funs<2> {
       d[0] = s0[0] >> amount;
       d[0] = d[0] | ((hi >> (2*val_n_bits() - w)) << (val_n_bits() - amount));
       d[1] = hi >> (s >= val_n_bits() ? val_n_bits()-1 : s);
-      d[1] = d[1] & mask_val(w);
+      d[1] = d[1] & mask_val(w - val_n_bits());
     }
   }
   static void rsh (val_t d[], val_t s0[], int amount) {
