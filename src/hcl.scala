@@ -93,14 +93,14 @@ object is {
   }
 }
 
-class TestIO(val format: String, val args: Seq[Data] = null) { }
+class TestIO(val format: String, val args: Seq[Node] = null) { }
 
 object Scanner {
-  def apply (format: String, args: Data*) = 
+  def apply (format: String, args: Node*) = 
     new TestIO(format, args.toList);
 }
 object Printer {
-  def apply (format: String, args: Data*) = 
+  def apply (format: String, args: Node*) = 
     new TestIO(format, args.toList);
 }
 

@@ -11,34 +11,23 @@ object Cat {
       res.setIsCellIO;
       res assign mod.toNode;
       res
-    } else {
-      val isLit = mods.foldLeft(mod.litOf != null){(a,b) => a && (b.litOf != null)}
-      if (isLit) {
-        var res = mod.litOf.value;
-        var tw  = mod.getWidth();
-        for (n <- mods) {
-          val w = n.getWidth();
-          res  = (res << w)|n.value;
-          tw  += w;
+    }
+    else {
+      // initialize
+      val res = 
+        if(isEmittingComponents){
+          val res = new Cat();
+          res.initOf("", sumWidth _, mod.toNode :: mods.toList.map(x => x.toNode))
+        } else {
+          mods.foldLeft(mod.toNode){(a,b) => a ## b.toNode}
         }
-        Bits(res, tw);
-      } else {
-        // initialize
-        val res = 
-          if(isEmittingComponents){
-            val res = new Cat();
-            res.initOf("", sumWidth _, mod.toNode :: mods.toList.map(x => x.toNode))
-          } else {
-            mods.foldLeft(mod.toNode){(a,b) => a ## b.toNode}
-          }
-
-        // make output
-        val output = Bits(OUTPUT)
-        output.setIsCellIO
-        output assign res
-        res.nameHolder = output
-        output
-      }
+      
+      // make output
+      val output = Bits(OUTPUT)
+      output.setIsCellIO
+      output assign res
+      res.nameHolder = output
+      output
     }
   }
 }

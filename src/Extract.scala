@@ -4,7 +4,6 @@ package Chisel {
 import Node._;
 import Component._;
 import IOdir._;
-import Lit._;
 
 object NodeExtract {
   
@@ -41,24 +40,18 @@ object NodeExtract {
 object Extract {
   //extract 1 bit
   def apply[T <: Bits](mod: T, bit: UFix)(gen: => T): T = {
-    val (bits_lit, off_lit) = (mod.litOf, bit.litOf);
-    if (isFolding && bits_lit != null && off_lit != null) {
-      // println("FOLDING EXTRACT " + bits_lit.value + "(" + off_lit.value + ")");
-      makeLit(Literal((bits_lit.value >> off_lit.value.toInt)&1, 1)){ gen };
-    } else {
-      // initialize 
-      val extract = new Extract()
-      extract.init("", fixWidth(1), mod.toNode, bit)
-      extract.hi = bit
-      extract.lo = bit
+    // initialize 
+    val extract = new Extract()
+    extract.init("", fixWidth(1), mod.toNode, bit)
+    extract.hi = bit
+    extract.lo = bit
 
-      // make output
-      val output = gen.fromNode(extract)
-      output.setIsCellIO
-      extract.nameHolder = output
-      output.comp = extract
-      output
-    }
+    // make output
+    val output = gen.fromNode(extract)
+    output.setIsCellIO
+    extract.nameHolder = output
+    output.comp = extract
+    output
   }
 
   def apply[T <: Bits](mod: T, bit: Int)(gen: => T): T = 
@@ -66,24 +59,18 @@ object Extract {
 
   // extract bit range
   def apply[T <: Bits](mod: T, hi: UFix, lo: UFix, w: Int = -1)(gen: => T): T = {
-    val (bits_lit, hi_lit, lo_lit) = (mod.litOf, hi.litOf, lo.litOf);
-    if (isFolding && bits_lit != null && hi_lit != null && lo_lit != null) {
-      val dw = if (w == -1) (hi_lit.value - lo_lit.value + 1).toInt else w;
-      makeLit(Literal((bits_lit.value >> lo_lit.value.toInt)&((BigInt(1)<<dw) - BigInt(1)), dw)){ gen };
-    } else {
-      // initialize
-      val extract = new Extract()
-      extract.init("", if(w == -1) widthOf(0) else fixWidth(w), mod.toNode, hi, lo)
-      extract.hi = hi
-      extract.lo = lo
+    // initialize
+    val extract = new Extract()
+    extract.init("", if(w == -1) widthOf(0) else fixWidth(w), mod.toNode, hi, lo)
+    extract.hi = hi
+    extract.lo = lo
 
-      // make output
-      val output = gen.fromNode(extract)
-      output.setIsCellIO
-      extract.nameHolder = output
-      output.comp = extract
-      output
-    }
+    // make output
+    val output = gen.fromNode(extract)
+    output.setIsCellIO
+    extract.nameHolder = output
+    output.comp = extract
+    output
   }
 
   def apply[T <: Bits](mod: T, hi: Int, lo: Int)(gen: => T): T ={

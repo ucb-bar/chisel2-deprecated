@@ -24,23 +24,18 @@ object Multiplex{
 
 object Mux {
   def apply[T <: Data](t: Bits, c: T, a: T): T = {
-    if (isFolding && t.litOf != null) {
-       if (t.litOf.value == 0) a else c
-    } else {
-      val res = Multiplex(t, c.toNode, a.toNode)
+    val res = Multiplex(t, c.toNode, a.toNode)
 
-      // make output
-      val output = c.fromNode(res).asInstanceOf[T]
-      output.setIsCellIO
-      res.nameHolder = output
-      output
-    }
+    // make output
+    val output = c.fromNode(res).asInstanceOf[T]
+    output.setIsCellIO
+    res.nameHolder = output
+    output
   }
 }
 class Mux extends Op {
   muxes += this;
   stack = Thread.currentThread.getStackTrace;
-  op = "Mux";
   override def toString: String =
     inputs(0) + " ? " + inputs(1) + " : " + inputs(2)
   override def emitDef: String = 

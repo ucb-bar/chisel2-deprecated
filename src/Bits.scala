@@ -15,8 +15,8 @@ object Bits {
     x.toBool
   }
 
-  def apply(x: BigInt): Bits = Lit(x){Bits()};
-  def apply(x: BigInt, width: Int): Bits = Lit(x, width){Bits()};
+  def apply(x: Int): Bits = Lit(x){Bits()};
+  def apply(x: Int, width: Int): Bits = Lit(x, width){Bits()};
   def apply(x: String): Bits = Lit(x){Bits()};
   def apply(x: String, width: Int): Bits = Lit(x, width){Bits()};
   
