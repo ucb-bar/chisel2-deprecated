@@ -34,9 +34,7 @@ object Component {
   var printFormat = "";
   var printArgs: ArrayBuffer[Node] = null;
   var includeArgs: List[String] = Nil;
-  var targetEmulatorRootDir: String = null;
-  var targetVerilogRootDir: String = null;
-  var targetDir: String = null;
+  var targetDir: String = null
   var configStr: String = null;
   var compIndex = -1;
   val compIndices = HashMap.empty[String,Int];
@@ -89,11 +87,7 @@ object Component {
     printFormat = "";
     printArgs = new ArrayBuffer[Node]();
     isCoercingArgs = true;
-    targetEmulatorRootDir = System.getProperty("CHISEL_EMULATOR_ROOT");
-    if (targetEmulatorRootDir == null) targetEmulatorRootDir = "../emulator";
-    targetVerilogRootDir = System.getProperty("CHISEL_VERILOG_ROOT");
-    if (targetVerilogRootDir == null) targetVerilogRootDir = "../verilog";
-    targetDir = "";
+    targetDir = "."
     configStr = "";
     compIndex = -1;
     compIndices.clear();
@@ -992,7 +986,7 @@ abstract class Component(resetSignal: Bool = null) {
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
     }
     inferAll();
-    val base_name = ensure_dir(targetVerilogRootDir + "/" + targetDir);
+    val base_name = ensure_dir(targetDir)
     if(saveWidthWarnings)
       widthWriter = new java.io.FileWriter(base_name + name + ".width.warnings")
     forceMatchingWidths;
@@ -1249,7 +1243,7 @@ abstract class Component(resetSignal: Bool = null) {
       c.markComponent();
     genAllMuxes;
     components.foreach(_.postMarkNet(0));
-    val base_name = ensure_dir(targetEmulatorRootDir + "/" + targetDir);
+    val base_name = ensure_dir(targetDir)
     val out_h = new java.io.FileWriter(base_name + name + ".h");
     val out_c = new java.io.FileWriter(base_name + name + ".cpp");
     if (isGenHarness)
