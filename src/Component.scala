@@ -960,14 +960,14 @@ abstract class Component(resetSignal: Bool = null) {
 
   def nameChild(child: Component) = {
     if(!child.named){
+      Predef.assert(child.className != "")
       if(childNames contains child.className){
 	childNames(child.className)+=1;
-	child.name = child.className + "_" + childNames(child.className);
+	child.instanceName = child.className + "_" + childNames(child.className);
       } else {
 	childNames += (child.className -> 0);
-	child.name = child.className;
+	child.instanceName = child.className;
       }
-      child.instanceName = child.name;
       child.named = true;
     }
   }
