@@ -6,6 +6,8 @@ import ChiselError._;
 
 object UFix {
   
+  // def apply(x: BigInt): UFix = Lit(x){UFix()};
+  // def apply(x: BigInt, width: Int): UFix = Lit(x, width){UFix()};
   def apply(x: Int): UFix = Lit(x){UFix()};
   def apply(x: Int, width: Int): UFix = Lit(x, width){UFix()};
   
@@ -78,6 +80,12 @@ class UFix extends Num {
 
   //UFix op Fix arithmetic
   def *   (b: Fix): Fix = BinaryOp(this, b, "u*s"){Fix()}.toFix;
+}
+
+class Eyum extends UFix { };
+object Eyum {
+  def apply[T <: Eyum](x: Int, w: Int)(gen: => T): T = { Lit(x, w){ gen } }
+  def apply[T <: Eyum](w: Int)(gen: => T): Int => T = { (x: Int) => Lit(x, w){ gen } }
 }
 
 }

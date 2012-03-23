@@ -11,24 +11,24 @@ import IOdir._;
 import ChiselError._;
 
 object Lit {
-  def apply[T <: Bits](x: Int)(gen: => T): T = {
-    makeLit(Literal(x, signed = gen.isInstanceOf[Fix]))(gen)
-  }
+  // def apply[T <: Bits](x: Int)(gen: => T): T = {
+  //   makeLit(Literal(x, signed = gen.isInstanceOf[Fix]))(gen)
+  // }
 
-  def apply[T <: Bits](x: Int, width: Int)(gen: => T): T = {
-    makeLit(Literal(x, width, gen.isInstanceOf[Fix]))(gen)
-  }
+  // def apply[T <: Bits](x: Int, width: Int)(gen: => T): T = {
+  //   makeLit(Literal(x, width, gen.isInstanceOf[Fix]))(gen)
+  // }
 
   def apply[T <: Bits](n: String, width: Int = -1)(gen: => T): T = {
     makeLit(Literal(n, width))(gen)
   }
 
   def apply[T <: Bits](n: BigInt)(gen: => T): T = {
-    makeLit(Literal(n))(gen)
+    makeLit(Literal(n, signed = gen.isInstanceOf[Fix]))(gen)
   }
 
   def apply[T <: Bits](n: BigInt, width: Int)(gen: => T): T = {
-    makeLit(Literal(n, width))(gen)
+    makeLit(Literal(n, width, signed = gen.isInstanceOf[Fix]))(gen)
   }
 
   def apply[T <: Bits](width: Int, base: Char, literal: String)(gen: => T): T = {
@@ -177,7 +177,7 @@ object Literal {
     if(base == 'x')
       toLitVal(x);
     else if(base == 'd')
-      x.toInt
+      BigInt(x.toInt)
     else if(base == 'h')
       toLitVal(x, 16)
     else if(base == 'b')
@@ -185,7 +185,7 @@ object Literal {
     else if(base == 'o')
       toLitVal(x, 8)
     else
-      -1L
+      BigInt(-1)
   }
 
   // def apply(x: Int, width: Int = -1, signed: Boolean = false): Literal = 
@@ -238,28 +238,19 @@ class Literal extends Node {
   override def isLit = true;
   override def toString: String = name;
   override def emitDecC: String = "";
-  override def emitRefC: String = {
-    val bits_per_lit = 64
-    if (isZ) {
-      require(isBinary)
+  override def emitRefC: String = 
+    (if (isBinary) { 
       var (bits, mask, swidth) = parseLit(name);
       var bwidth = if(base == 'b') width else swidth;
-      require(bwidth <= bits_per_lit)
-      ("LITZ<" + bwidth + ">(0x" + toHex(bits) + ", 0x" + toHex(mask) + ")")
-    } else {
-      var hex = value.toString(16)
-      var res = "LIT<" + width + ">(0x" + hex.takeRight(bits_per_lit/4) + "L)"
-      hex = hex.dropRight(bits_per_lit/4)
-
-      var shift = bits_per_lit
-      while (hex.length > 0) {
-        res = "LIT<" + width + ">(0x" + hex.takeRight(bits_per_lit/4) + "L) << " + shift + " | " + res
-        hex = hex.dropRight(bits_per_lit/4)
-        shift += bits_per_lit
-      }
-      "(" + res + ")"
-    }
-  }
+      if (isZ) {
+        ("LITZ<" + bwidth + ">(0x" + toHex(bits) + ", 0x" + toHex(mask) + ")")
+      } else
+        ("LIT<" + bwidth + ">(0x" + toHex(bits) + ")")
+    } else if(base == 'd' || base == 'x'){
+      ("LIT<" + width + ">(" + name + "L)")
+    } else
+      ("LIT<" + width + ">(0x" + name + "L)")
+   ) + "/* " + inputVal + "*/";
 
   override def emitRefVCD: String = 
     (if (isBinary) { 

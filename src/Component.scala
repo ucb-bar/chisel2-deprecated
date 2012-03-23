@@ -21,6 +21,7 @@ object Component {
   var saveWidthWarnings = false
   var saveConnectionWarnings = false
   var saveComponentTrace = false
+  var saveDot = true
   var dontFindCombLoop = false
   var widthWriter: java.io.FileWriter = null
   var connWriter: java.io.FileWriter = null
@@ -75,6 +76,7 @@ object Component {
     saveWidthWarnings = false
     saveConnectionWarnings = false
     saveComponentTrace = false
+    saveDot = true
     dontFindCombLoop = false
     widthWriter = null
     connWriter = null
@@ -1237,6 +1239,17 @@ abstract class Component(resetSignal: Bool = null) {
     println("NO COMBINATIONAL LOOP FOUND")
   }
 
+  def maybeFlatten(node: Node): Seq[Node] = {
+    node match {
+      case b:Bundle => 
+        val buf = ArrayBuffer[Node]();
+        for ((n, e) <- b.flatten) buf += e;
+        buf
+      case o        => 
+        Array[Node](node);
+    }
+  }
+
   def compileC(): Unit = {
     components.foreach(_.elaborate(0));
     for (c <- components)
@@ -1399,11 +1412,12 @@ abstract class Component(resetSignal: Bool = null) {
         else printFormat;
       val toks = splitPrintFormat(format);
       var i = 0;
-      for(i <- 0 until printArgs.length)
-	printArgs(i) = printArgs(i).getNode
+      // for(i <- 0 until printArgs.length)
+      //   printArgs(i) = printArgs(i).getNode
       for (tok <- toks) {
         if (tok(0) == '%') {
-          out_c.write("  fprintf(f, \"%s\", " + printArgs(i).emitRef + ".to_str().c_str());\n");
+          for (node <- maybeFlatten(printArgs(i))) 
+            out_c.write("  fprintf(f, \"%s\", " + node.emitRef + ".to_str().c_str());\n");
           i += 1;
         } else {
           out_c.write("  fprintf(f, \"%s\", \"" + tok + "\");\n");
@@ -1420,15 +1434,18 @@ abstract class Component(resetSignal: Bool = null) {
         if (scanFormat == "") {
           var res = "";
           for (arg <- scanArgs) {
-            if (res.length > 0) res = res + " ";
-            res = res + "%llx";
+            for (subarg <- maybeFlatten(arg)) {
+              if (res.length > 0) res = res + " ";
+              res = res + "%llx";
+            }
           }
           res
         } else 
           scanFormat;
       out_c.write("  int n = fscanf(f, \"" + format + "\"");
       for (arg <- scanArgs) {
-        out_c.write(",  &" + arg.emitRef + ".values[0]");
+        for (subarg <- maybeFlatten(arg))
+          out_c.write(",  &" + subarg.emitRef + ".values[0]");
       }
       out_c.write(");\n");
       out_c.write("  return n == " + scanArgs.length + ";\n");
@@ -1438,6 +1455,81 @@ abstract class Component(resetSignal: Bool = null) {
     out_c.close();
     if(saveComponentTrace)
       printStack
+    def isDottable (m: Node) = {
+      if (m == reset) {
+        false
+      } else {
+        m match {
+          case x: Literal  => false;
+          case x: MapNode  => false;
+          case x: ListNode => false;
+          case _           => true;
+        }
+      }
+    }
+    if(saveDot) {
+      var gn = -1;
+      val out_cd = new java.io.FileWriter(base_name + name + "_c.dot");
+      out_cd.write("digraph TopTop {\n");
+      out_cd.write("rankdir = LR;\n");
+      def genNum = { gn += 1; gn };
+      def dumpComponent (c: Component): Unit = {
+        out_cd.write("subgraph cluster" + c.name + "{\n");
+        out_cd.write("label = \"" + c.name + "\";\n");
+        def dumpIo (n: String, d: Data): Unit = {
+          d match {
+            case b: Bundle => 
+              out_cd.write("subgraph cluster" + n + "__" + genNum + "{\n");
+              out_cd.write("node [shape=box];\n");
+              out_cd.write("label = \"" + n + "\";\n");
+              for ((cn, cd) <- b.elements)
+                dumpIo(cn, cd);
+              out_cd.write("}\n");
+            case o => 
+              out_cd.write(d.emitRefDot + "[label=\"" + n + "\"];\n");
+              for (in <- d.inputs) 
+                if (isDottable(in))
+                  out_cd.write(in.emitRefDot + " -> " + d.emitRefDot + "[label=\"" + in.getWidth + "\"];\n");
+          }
+        }
+        dumpIo("io", c.io);
+        for (cc <- c.children) 
+          dumpComponent(cc);
+        out_cd.write("}\n");
+      }
+      dumpComponent(this);
+      out_cd.write("}");
+      out_cd.close();
+      val out_d = new java.io.FileWriter(base_name + name + ".dot");
+      out_d.write("digraph " + name + "{\n");
+      out_d.write("rankdir = LR;\n");
+      for (m <- mods) {
+        if (isDottable(m)) {
+          out_d.write(m.emitRefDot);
+          var label  = m.dotName;
+          val anyLit = m.inputs.find(x => !isDottable(x));
+          if (!anyLit.isEmpty) {
+            var i = 0;
+            label += "(";
+            for (in <- m.inputs) {
+              if (i != 0) label += ", ";
+              label += (if (in.isLit) in.emitRefDot else "_");
+              i += 1;
+            }
+            label += ")";
+          }
+          out_d.write("[label=\"" + label + "\"];\n");
+        }
+      }
+      for (m <- mods) {
+        for (in <- m.inputs) {
+          if (isDottable(m) && isDottable(in)) 
+            out_d.write("  " + in.emitRefDot + " -> " + m.emitRefDot + "[label=\"" + in.getWidth + "\"];\n");
+        }
+      }
+      out_d.write("}");
+      out_d.close();
+    }
   }
 };
 

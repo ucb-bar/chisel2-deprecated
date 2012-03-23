@@ -253,6 +253,8 @@ abstract class Node extends nameable{
   def emitRef: String = if (isEmittingC) emitRefC else emitRefV;
   //def emitRefV: String = if (name == "") "T" + emitIndex else name
   def emitRefV = if(name == "" || !named) "T" + emitIndex else if(!named) name + "_" + emitIndex else name
+  def dotName = { val name = this.getClass.getName; name.substring(7, name.size) };
+  def emitRefDot: String = emitRef;
   // def emitRef: String = "T" + emitIndex;
   def emitDef: String = ""
   def emitReg: String = ""

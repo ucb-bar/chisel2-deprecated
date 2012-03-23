@@ -25,7 +25,6 @@ object Multiplex{
 object Mux {
   def apply[T <: Data](t: Bits, c: T, a: T): T = {
     val res = Multiplex(t, c.toNode, a.toNode)
-
     // make output
     val output = c.fromNode(res).asInstanceOf[T]
     output.setIsCellIO
@@ -36,6 +35,7 @@ object Mux {
 class Mux extends Op {
   muxes += this;
   stack = Thread.currentThread.getStackTrace;
+  op = "Mux";
   override def toString: String =
     inputs(0) + " ? " + inputs(1) + " : " + inputs(2)
   override def emitDef: String = 
