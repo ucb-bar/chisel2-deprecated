@@ -27,7 +27,7 @@ object Component {
   var widthWriter: java.io.FileWriter = null
   var connWriter: java.io.FileWriter = null
   var isDebug = false;
-  var isClockGatingUpdates = true;
+  var isClockGatingUpdates = false;
   var isVCD = false;
   var isFolding = false;
   var isGenHarness = false;
@@ -84,7 +84,7 @@ object Component {
     connWriter = null
     isGenHarness = false;
     isDebug = false;
-    isClockGatingUpdates = true;
+    isClockGatingUpdates = false;
     isFolding = false;
     isReportDims = false;
     scanFormat = "";
