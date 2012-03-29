@@ -11,8 +11,8 @@ object Function {
     val args   = new ArrayBuffer[Node];
     val argMap = new HashMap[Node, Node];
     val res    = new Function(out);
+    res.init(name, out.width);
     val traced = new HashSet[Node];
-    res.setName(name);
     def trace (node: Node): Unit = {
       if (!traced.contains(node)) {
         traced += node;
@@ -24,6 +24,7 @@ object Function {
             node.inputs(i) = argMap(c);
             c.consumers   -= node;
           } else {
+            if (c.isByValue) {
             val in         = Bits(c.getWidth(), INPUT);
             in.name        = if (c.isLit) "T" + c.emitIndex else c.name;
             node.inputs(i) = in;
@@ -32,6 +33,7 @@ object Function {
             res.params    += in;
             args          += c;
             argMap(c)      = in;
+            }
           }
           i += 1;
         }
@@ -39,8 +41,8 @@ object Function {
       }
     }
     trace(out);
-    println("OUT WIDTH " + out.getWidth());
-    res.width    = out.getWidth();
+    // println("OUT " + name + " WIDTH " + out.width);
+    res.setName(name);
     res.inputs  += enable;
     res.inputs ++= args;
     res
@@ -57,6 +59,7 @@ class Function(val out: Node) extends Node {
     for (i <- 0 until params.size) {
       if (i > 0) res += ", ";
       res += "dat_t<" + params(i).width + "> " + params(i).emitRef;
+      res += " /* " + params(i) + " */ ";
     }
     res + ")";
   }
@@ -76,6 +79,7 @@ class Function(val out: Node) extends Node {
     for (i <- 1 until inputs.size) {
       if (i > 1) res += ", ";
       res += inputs(i).emitRef;
+      res += " /* " + inputs(i) + " */ ";
     }
     res += ");\n";
     res

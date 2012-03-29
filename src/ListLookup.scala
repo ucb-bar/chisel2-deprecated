@@ -11,7 +11,7 @@ object ListLookup {
     val ll = new ListLookup[T]()
     ll.initOf("", widthOf(1), List(addr, defaultNode) ++ mappingNode)
     ll.wires = default.map(x => ListLookupRef(x, ll))
-
+    // TODO: GENERALIZE AND SHARE THIS
     (default zip ll.wires).map{case(x, xRef) => {
       val res = x match {
 	case bool: Bool => Bool(OUTPUT);
@@ -46,6 +46,7 @@ class ListLookup[T <: Bits] extends Node {
 
   override def toString: String = "LISTLOOKUP(" + inputs(0) + ")";
 
+  override def isByValue: Boolean = false;
   override def emitDef: String = {
     var res = 
       "  always @(*) begin\n" +

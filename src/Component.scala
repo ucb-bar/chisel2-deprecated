@@ -27,7 +27,7 @@ object Component {
   var widthWriter: java.io.FileWriter = null
   var connWriter: java.io.FileWriter = null
   var isDebug = false;
-  var isClockGatingUpdates = false;
+  var isClockGatingUpdates = true;
   var isVCD = false;
   var isFolding = false;
   var isGenHarness = false;
@@ -84,7 +84,7 @@ object Component {
     connWriter = null
     isGenHarness = false;
     isDebug = false;
-    isClockGatingUpdates = false;
+    isClockGatingUpdates = true;
     isFolding = false;
     isReportDims = false;
     scanFormat = "";
@@ -1406,9 +1406,10 @@ abstract class Component(resetSignal: Bool = null) {
     val toVisit = new Queue[Node];
     toVisit.enqueue(reg.updateVal);
     outsTraced(reg.updateVal) = BitSet(0);
+    // println("FINDING UPDATE " + reg.name);
     while (!toVisit.isEmpty) { 
       val node = toVisit.dequeue;
-      // println("VISITING " + node);
+      // println("VISITING " + node.name + " " + node + " " + node.getClass.getName);
       if (traced.contains(node)) {
         // println("  ALREADY TRACED");
       } else if (node.isReg) {
@@ -1418,25 +1419,24 @@ abstract class Component(resetSignal: Bool = null) {
         traced += node;
         for (c <- node.inputs)  {
           outsTraced(c) = outsTraced.getOrElse(c, BitSet.empty) + c.consumers.indexOf(node);
+          // println("    ENQUEUEING " + c);
           toVisit.enqueue(c);
         }
       } else {
         // println("  PENDING " + outsTraced(node) + " OF " + node.consumers.size);
       }
     }
-    if (traced.size > 5) {
-      println("+++ FOUND COMBINATIONAL BLOCK SIZE " + traced.size);
+    if (traced.size > 1) {
+      // println("+++ FOUND COMBINATIONAL BLOCK SIZE " + traced.size);
       val block = Function(reg.name + "__cond_update", reg.updateVal, reg.enableSignal, traced);
+      reg.updateVal.consumers -= reg;
       reg.inputs(0) = block;
+      reg.updateVal.consumers += reg;
       mods --= traced;
       block.component = reg.component;
       block
     } else
       null
-    // find inputs -- look for nodes with no children in graph
-    // make enable input an input of functionNode as well for scheduling
-    // create combination subgraph node -- 
-    // 
   }
   def renameNodesC(nodes: Seq[Node]) = {
     for (m <- nodes) {

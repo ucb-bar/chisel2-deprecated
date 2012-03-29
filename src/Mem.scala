@@ -587,6 +587,8 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
   var readLatency           = Mem.getDefaultReadLatency;
   var hasWBM                = false;
 
+  override def isByValue: Boolean = false;
+
   def getInitData = inputs(initDataIndex)
 
   if (initData != null) {

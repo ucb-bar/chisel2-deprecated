@@ -139,6 +139,7 @@ abstract class Node extends nameable{
   var stack: Array[StackTraceElement] = null;
   var line: Array[StackTraceElement] = Thread.currentThread().getStackTrace
   
+  def isByValue: Boolean = true;
   def isTerminator = false;
   def isTerminated = (inputs.size == 1 && inputs(0).isTerminator);
   def width: Int = width_;
