@@ -7,6 +7,7 @@ import scala.collection.mutable.Queue
 import scala.collection.mutable.Stack
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashMap
+import scala.collection.mutable.BitSet
 import java.lang.reflect.Modifier._;
 import java.io.File;
 
@@ -26,6 +27,7 @@ object Component {
   var widthWriter: java.io.FileWriter = null
   var connWriter: java.io.FileWriter = null
   var isDebug = false;
+  var isClockGatingUpdates = false;
   var isVCD = false;
   var isFolding = false;
   var isGenHarness = false;
@@ -41,7 +43,7 @@ object Component {
   val compIndices = HashMap.empty[String,Int];
   val compDefs = new HashMap[String, String];
   var isEmittingComponents = false;
-  var isEmittingC = false;
+  var backendName = "c";
   var topComponent: Component = null;
   val components = ArrayBuffer[Component]();
   val procs = ArrayBuffer[proc]();
@@ -82,6 +84,7 @@ object Component {
     connWriter = null
     isGenHarness = false;
     isDebug = false;
+    isClockGatingUpdates = false;
     isFolding = false;
     isReportDims = false;
     scanFormat = "";
@@ -104,7 +107,7 @@ object Component {
     ioMap.clear()
     ioCount = 0;
     isEmittingComponents = false;
-    isEmittingC = false;
+    backendName = "c";
     topComponent = null;
 
     conds.clear()
@@ -239,7 +242,7 @@ abstract class Component(resetSignal: Bool = null) {
   val mods  = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
   val gmods = new ArrayBuffer[Node];
-  val regs  = new ArrayBuffer[Node];
+  val regs  = new ArrayBuffer[Reg];
   val nexts = new Queue[Node];
   var nindex = -1;
   var defaultWidth = 32;
@@ -254,6 +257,20 @@ abstract class Component(resetSignal: Bool = null) {
   components += this;
 
   push(this);
+
+  def nameChild(child: Component) = {
+    if(!child.named){
+      Predef.assert(child.className != "")
+      if(childNames contains child.className){
+	childNames(child.className)+=1;
+	child.instanceName = child.className + "_" + childNames(child.className);
+      } else {
+	childNames += (child.className -> 0);
+	child.instanceName = child.className;
+      }
+      child.named = true;
+    }
+  }
 
   //true if this is a subclass of x
   def isSubclassOf(x: java.lang.Class[ _ ]): Boolean = {
@@ -337,7 +354,7 @@ abstract class Component(resetSignal: Bool = null) {
   reset.setName("reset")
   if(!(resetSignal == null)) reset := resetSignal
 
-  def emitRef: String = if (isEmittingC) emitRefC else emitRefV;
+  def emitRef: String = if (backendName == "c") emitRefC else emitRefV;
   def emitRefC: String = emitRefV;
   def emitRefV: String = name;
   def emitDef: String = {
@@ -699,10 +716,10 @@ abstract class Component(resetSignal: Bool = null) {
       roots += a.cond;
     for (m <- mods) {
       m match {
-        case io: IO => if (io.dir == OUTPUT) { if (io.consumers.length == 0) roots += m; }
-        case d: Delay  => roots += m;
+        case io: IO          => if (io.dir == OUTPUT) { if (io.consumers.length == 0) roots += m; }
+        case d: Delay        => roots += m;
 	case mr: MemRef[ _ ] => if(mr.isReg) roots += m;
-        case any       =>
+        case any             =>
       }
     }
     roots
@@ -711,11 +728,11 @@ abstract class Component(resetSignal: Bool = null) {
     val leaves = new ArrayBuffer[Node];
     for (m <- mods) {
       m match {
-        case io: IO    => if (io.dir == INPUT && !io.isCellIO) { if (io.inputs.length == 0) leaves += m; }
-        case l: Literal    => leaves += m;
-        case d: Delay  => leaves += m;
+        case io: IO          => if (io.dir == INPUT && !io.isCellIO) { if (io.inputs.length == 0) leaves += m; }
+        case l: Literal      => leaves += m;
+        case d: Delay        => leaves += m;
 	case mr: MemRef[ _ ] => if(mr.isReg) leaves += m;
-        case any       =>
+        case any             =>
       }
     }
     leaves
@@ -806,7 +823,7 @@ abstract class Component(resetSignal: Bool = null) {
             inputs += m;
           else
             outputs += m;
-        case r: Reg    => regs += m;
+        case r: Reg    => regs += r;
         case other     =>
       }
     }
@@ -820,66 +837,6 @@ abstract class Component(resetSignal: Bool = null) {
       if(res) return res;
     }
     res
-  }
-  def doCompileV(out: java.io.FileWriter, depth: Int): Unit = {
-    // println("COMPILING COMP " + name);
-    println("// " + depthString(depth) + "COMPILING " + this + " " + children.length + " CHILDREN");
-    if (isEmittingComponents) {
-      for (top <- children)
-        top.doCompileV(out, depth+1);
-    } else
-      topComponent = this;
-    // isWalked.clear();
-    findConsumers();
-    if(!ChiselErrors.isEmpty){
-      for(err <- ChiselErrors) err.printError;
-      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
-    }
-    //inferAll();
-    collectNodes(this);
-    // for (m <- mods) {
-    //   println("// " + depthString(depth+1) + " MOD " + m);
-    // }
-    val hasReg = containsReg || childrenContainsReg;
-    var res = (if (hasReg) "input clk, input reset" else "");
-    var first = true;
-    var nl = "";
-    for ((n, w) <- wires) {
-      if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
-      w match {
-        case io: IO => {
-          if (io.dir == INPUT) {
-	    res += nl + "    input " + io.emitWidth + " " + io.emitRef;
-          } else {
-	    res += nl + "    output" + io.emitWidth + " " + io.emitRef;
-          }
-        }
-      };
-    }
-    res += ");\n\n";
-    // TODO: NOT SURE EXACTLY WHY I NEED TO PRECOMPUTE TMPS HERE
-    for (m <- mods)
-      m.emitTmp;
-    res += emitDecs + "\n" + emitDefs
-    // for (o <- outputs)
-    //   out.writeln("  assign " + o.emitRef + " = " + o.inputs(0).emitRef + ";");
-    if (regs.size > 0) {
-      res += "\n" + emitRegs;
-    }
-    res += "endmodule\n\n";
-    if(compDefs contains res){
-      moduleName = compDefs(res);
-    }else{
-      if(compDefs.values.toList contains name) {
-	moduleName = genCompName(name);
-      } else {
-	moduleName = name;
-      }
-      compDefs += (res -> moduleName);
-      res = "module " + moduleName + "(" + res;
-      out.write(res); 
-    }
-    // println("// " + depthString(depth) + "DONE");
   }
   def markComponent() = {
     name_it();
@@ -960,20 +917,63 @@ abstract class Component(resetSignal: Bool = null) {
     }
   }
 
-  def nameChild(child: Component) = {
-    if(!child.named){
-      Predef.assert(child.className != "")
-      if(childNames contains child.className){
-	childNames(child.className)+=1;
-	child.instanceName = child.className + "_" + childNames(child.className);
-      } else {
-	childNames += (child.className -> 0);
-	child.instanceName = child.className;
-      }
-      child.named = true;
+  def doCompileV(out: java.io.FileWriter, depth: Int): Unit = {
+    // println("COMPILING COMP " + name);
+    println("// " + depthString(depth) + "COMPILING " + this + " " + children.length + " CHILDREN");
+    for (top <- children)
+      top.doCompileV(out, depth+1);
+    // isWalked.clear();
+    findConsumers();
+    if(!ChiselErrors.isEmpty){
+      for(err <- ChiselErrors) err.printError;
+      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
     }
+    //inferAll();
+    collectNodes(this);
+    // for (m <- mods) {
+    //   println("// " + depthString(depth+1) + " MOD " + m);
+    // }
+    val hasReg = containsReg || childrenContainsReg;
+    var res = (if (hasReg) "input clk, input reset" else "");
+    var first = true;
+    var nl = "";
+    for ((n, w) <- wires) {
+      if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
+      w match {
+        case io: IO => {
+          if (io.dir == INPUT) {
+	    res += nl + "    input " + io.emitWidth + " " + io.emitRef;
+          } else {
+	    res += nl + "    output" + io.emitWidth + " " + io.emitRef;
+          }
+        }
+      };
+    }
+    res += ");\n\n";
+    // TODO: NOT SURE EXACTLY WHY I NEED TO PRECOMPUTE TMPS HERE
+    for (m <- mods)
+      m.emitTmp;
+    res += emitDecs + "\n" + emitDefs
+    // for (o <- outputs)
+    //   out.writeln("  assign " + o.emitRef + " = " + o.inputs(0).emitRef + ";");
+    if (regs.size > 0) {
+      res += "\n" + emitRegs;
+    }
+    res += "endmodule\n\n";
+    if(compDefs contains res){
+      moduleName = compDefs(res);
+    }else{
+      if(compDefs.values.toList contains name) {
+	moduleName = genCompName(name);
+      } else {
+	moduleName = name;
+      }
+      compDefs += (res -> moduleName);
+      res = "module " + moduleName + "(" + res;
+      out.write(res); 
+    }
+    // println("// " + depthString(depth) + "DONE");
   }
-
   def compileV(): Unit = {
     topComponent = this;
     components.foreach(_.elaborate(0));
@@ -1022,6 +1022,156 @@ abstract class Component(resetSignal: Bool = null) {
     compDefs.clear;
     genCount = 0;
   }
+
+  /*
+  def doCompileCC(depth: Int): Unit = {
+    println("// " + depthString(depth) + "COMPILING " + this + " " + children.length + " CHILDREN");
+    for (top <- children)
+      top.doCompileCC(depth+1);
+    val base_name = ensure_dir(targetDir)
+    val out_h = new java.io.FileWriter(base_name + name + ".h");
+    val out_c = new java.io.FileWriter(base_name + name + ".cpp");
+    println("COMPILING COMP " + name + " AS " + (base_name + name + ".cpp"));
+    findConsumers();
+    if(!ChiselErrors.isEmpty){
+      for(err <- ChiselErrors) err.printError;
+      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
+    }
+    collectNodes(this);
+    findOrdering(); // search from roots  -- create omods
+    findGraph();    // search from leaves -- create gmods
+    for (m <- omods) {
+      m match {
+        case l: Literal => ;
+        case any    => 
+          if (m.name != "" && m != reset && !(m.component == null)) {
+            //m.name = m.component.name + (if(m.component.instanceName != "") "_" else "") + m.component.instanceName + "__" + m.name;
+	    // only modify name if it is not the reset signal of the top component
+	    if(m.name != "reset" || !(m.component == this)) 
+	      m.name = m.component.getPathName + "__" + m.name;
+	  }
+      }
+      // println(">> " + m.name);
+    }
+    if (isReportDims) {
+      val (numNodes, maxWidth, maxDepth) = findGraphDims();
+      println("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
+    }
+    // for (m <- omods)
+    //   println("MOD " + m + " IN " + m.component.name);
+    out_h.write("#include \"emulator.h\"\n");
+    for (c <- children) 
+      out_h.write("#include \"" + c.name + ".h\";\n");
+    out_h.write("\n");
+    out_h.write("class " + name + "_t : public mod_t {\n");
+    out_h.write(" public:\n");
+    for (c <- children) 
+      out_h.write("  " + c.emitRef + "_t* " + c.emitRef + ";\n");
+    out_h.write("\n");
+    for ((n, w) <- wires) 
+      out_h.write("  dat_t<" + w.width + "> " + w.emitRef + ";\n");
+    for (m <- omods) {
+      if(m.name != "reset" || !(m.component == this)) {
+        if (m.isInObject)
+          out_h.write(m.emitDecC);
+        if (m.isInVCD)
+          out_h.write(m.emitDecVCD);
+      }
+    }
+    out_h.write("\n");
+    out_h.write("  void init ( bool random_initialization = false );\n");
+    out_h.write("  void clock_lo ( dat_t<1> reset );\n");
+    out_h.write("  void clock_hi ( dat_t<1> reset );\n");
+    out_h.write("  void print ( FILE* f );\n");
+    out_h.write("  bool scan ( FILE* f );\n");
+    out_h.write("  void dump ( FILE* f, int t );\n");
+    out_h.write("};\n");
+    out_h.close();
+
+    out_c.write("#include \"" + name + ".h\"\n");
+    for(str <- includeArgs) out_c.write("#include \"" + str + "\"\n"); 
+    out_c.write("\n");
+    out_c.write("void " + name + "_t::init ( bool random_initialization ) {\n");
+    for (c <- children) {
+      out_c.write("  " + c.emitRef + " = new " + c.emitRef + "_t();\n");
+      out_c.write("  " + c.emitRef + "->init(random_initialization);\n");
+    }
+    for (m <- omods) {
+      out_c.write(m.emitInitC);
+    }
+    out_c.write("}\n");
+    out_c.write("void " + name + "_t::clock_lo ( dat_t<1> reset ) {\n");
+    for (c <- children) 
+      out_c.write("  " + c.emitRef + "->clock_lo();\n");
+    for (m <- omods) {
+      out_c.write(m.emitDefLoC);
+    }
+    for (a <- asserts) {
+      out_c.write("  ASSERT(" + a.cond.emitRefC + ", \"" + a.message + "\");\n");
+    }
+    // for (c <- children) 
+    //   out_c.write("    " + c.emitRef + "->clock_lo(reset);\n");
+    out_c.write("}\n");
+    out_c.write("void " + name + "_t::clock_hi ( dat_t<1> reset ) {\n");
+    for (c <- children) 
+      out_c.write("  " + c.emitRef + "->clock_hi();\n");
+    for (m <- omods) 
+      out_c.write(m.emitDefHiC);
+    // for (c <- children) 
+    //   out_c.write("    " + c.emitRef + "->clock_hi(reset);\n");
+    out_c.write("}\n");
+    out_c.close();
+    // TODO: PUT IN RES CACHING
+  }
+
+  def compileCC(): Unit = {
+    println("COMPILING CC");
+    topComponent = this;
+    components.foreach(_.elaborate(0));
+    for (c <- components)
+      c.markComponent();
+    genAllMuxes;
+    components.foreach(_.postMarkNet(0));
+    assignResets()
+    removeCellIOs()
+    if(!ChiselErrors.isEmpty){
+      for(err <- ChiselErrors) err.printError;
+      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
+    }
+    inferAll();
+    val base_name = ensure_dir(targetDir)
+    if(saveWidthWarnings)
+      widthWriter = new java.io.FileWriter(base_name + name + ".width.warnings")
+    forceMatchingWidths;
+    nameChildren(topComponent)
+    traceNodes();
+    if(!ChiselErrors.isEmpty){
+      for(err <- ChiselErrors) err.printError;
+      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
+    }
+    if(!dontFindCombLoop) findCombLoop();
+    if(saveConnectionWarnings)
+      connWriter = new java.io.FileWriter(base_name + name + ".connection.warnings")
+    doCompileCC(0);
+    verifyAllMuxes;
+    if(saveConnectionWarnings)
+      connWriter.close()
+    if(!ChiselErrors.isEmpty) {
+      for(err <- ChiselErrors)	err.printError;
+      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
+    }
+    if (configStr.length > 0) {
+      val out_conf = new java.io.FileWriter(base_name+Component.topComponent.name+".conf");
+      out_conf.write(configStr);
+      out_conf.close();
+    }
+    if(saveComponentTrace)
+      printStack
+    compDefs.clear;
+    genCount = 0;
+  }
+  */
+
   def nameAllIO(): Unit = {
     // println("NAMING " + this);
     io.name_it("");
@@ -1238,7 +1388,6 @@ abstract class Component(resetSignal: Bool = null) {
     if(containsCombPath) throw new Exception("CIRCUIT CONTAINS COMBINATIONAL PATH")
     println("NO COMBINATIONAL LOOP FOUND")
   }
-
   def maybeFlatten(node: Node): Seq[Node] = {
     node match {
       case b:Bundle => 
@@ -1249,7 +1398,59 @@ abstract class Component(resetSignal: Bool = null) {
         Array[Node](node);
     }
   }
-
+  def findCombinationalBlock(reg: Reg): Function = {
+    def isAllOutsTraced (bits: BitSet, node: Node): Boolean = 
+      bits.size == node.consumers.size
+    val traced = new HashSet[Node];
+    val outsTraced = new HashMap[Node, BitSet];
+    val toVisit = new Queue[Node];
+    toVisit.enqueue(reg.updateVal);
+    outsTraced(reg.updateVal) = BitSet(0);
+    while (!toVisit.isEmpty) { 
+      val node = toVisit.dequeue;
+      // println("VISITING " + node);
+      if (traced.contains(node)) {
+        // println("  ALREADY TRACED");
+      } else if (node.isReg) {
+        // println("  STOPPING ON REG");
+      } else if (isAllOutsTraced(outsTraced(node), node)) {
+        // println("  ALL OUTS TRACED");
+        traced += node;
+        for (c <- node.inputs)  {
+          outsTraced(c) = outsTraced.getOrElse(c, BitSet.empty) + c.consumers.indexOf(node);
+          toVisit.enqueue(c);
+        }
+      } else {
+        // println("  PENDING " + outsTraced(node) + " OF " + node.consumers.size);
+      }
+    }
+    if (traced.size > 5) {
+      println("+++ FOUND COMBINATIONAL BLOCK SIZE " + traced.size);
+      val block = Function(reg.name + "__cond_update", reg.updateVal, reg.enableSignal, traced);
+      reg.inputs(0) = block;
+      mods --= traced;
+      block.component = reg.component;
+      block
+    } else
+      null
+    // find inputs -- look for nodes with no children in graph
+    // make enable input an input of functionNode as well for scheduling
+    // create combination subgraph node -- 
+    // 
+  }
+  def renameNodesC(nodes: Seq[Node]) = {
+    for (m <- nodes) {
+      m match {
+        case l: Literal => ;
+        case any        => 
+          if (m.name != "" && !(m == reset) && !(m.component == null)) {
+	    // only modify name if it is not the reset signal or not in top component
+	    if(m.name != "reset" || !(m.component == this)) 
+	      m.name = m.component.getPathName + "__" + m.name;
+	  }
+      }
+    }
+  }
   def compileC(): Unit = {
     components.foreach(_.elaborate(0));
     for (c <- components)
@@ -1261,15 +1462,8 @@ abstract class Component(resetSignal: Bool = null) {
     val out_c = new java.io.FileWriter(base_name + name + ".cpp");
     if (isGenHarness)
       genHarness(base_name, name);
-    isEmittingC = true;
     println("// COMPILING " + this + "(" + children.length + ")");
-    if (isEmittingComponents) {
-      io.name_it("");
-      for (top <- children)
-        top.compileC();
-    } else {
-      topComponent = this;
-    }
+    topComponent = this;
     // isWalked.clear();
     assignResets()
     removeCellIOs()
@@ -1289,12 +1483,10 @@ abstract class Component(resetSignal: Bool = null) {
       return
     }
     if(!dontFindCombLoop) findCombLoop();
-    if (!isEmittingComponents) {
-      for (c <- components) {
-        if (!(c == this)) {
-          mods    ++= c.mods;
-          asserts ++= c.asserts;
-        }
+    for (c <- components) {
+      if (!(c == this)) {
+        mods    ++= c.mods;
+        asserts ++= c.asserts;
       }
     }
     findConsumers();
@@ -1305,45 +1497,42 @@ abstract class Component(resetSignal: Bool = null) {
       return
     }
     collectNodes(this);
+    val funs = new ArrayBuffer[Function];
+    if (isClockGatingUpdates) {
+    for (r <- regs) {
+      if (r.isEnable) {
+        val res = findCombinationalBlock(r);
+        if (!(res == null)) 
+          funs += res;
+      }
+    }
+    }
     findOrdering(); // search from roots  -- create omods
     findGraph();    // search from leaves -- create gmods
-    for (m <- omods) {
-      m match {
-        case l: Literal => ;
-        case any    => 
-          if (m.name != "" && m != reset && !(m.component == null)) {
-            //m.name = m.component.name + (if(m.component.instanceName != "") "_" else "") + m.component.instanceName + "__" + m.name;
-	    // only modify name if it is not the reset signal of the top component
-	    if(m.name != "reset" || !(m.component == this)) 
-	      m.name = m.component.getPathName + "__" + m.name;
-	  }
-      }
-      // println(">> " + m.name);
-    }
+    renameNodesC(omods);
     if (isReportDims) {
     val (numNodes, maxWidth, maxDepth) = findGraphDims();
     println("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
+    
+
     // for (m <- omods)
     //   println("MOD " + m + " IN " + m.component.name);
     out_h.write("#include \"emulator.h\"\n\n");
     out_h.write("class " + name + "_t : public mod_t {\n");
     out_h.write(" public:\n");
-    if (isEmittingComponents) {
-      for ((n, w) <- wires) 
-        out_h.write("  dat_t<" + w.width + "> " + w.emitRef + ";\n");
-    }
-    for (m <- omods) {
+    val funNodes = new ArrayBuffer[Node];
+    for (fun <- funs)
+      funNodes ++= fun.nodes;
+    renameNodesC(funNodes);
+    // renameNodesC(funs);
+    for (m <- (omods ++ funNodes)) {
       if(m.name != "reset" || !(m.component == this)) {
         if (m.isInObject)
           out_h.write(m.emitDecC);
         if (m.isInVCD)
           out_h.write(m.emitDecVCD);
       }
-    }
-    if (isEmittingComponents) {
-      for (c <- children) 
-        out_h.write("  " + c.emitRef + "_t* " + c.emitRef + ";\n");
     }
     out_h.write("\n");
     out_h.write("  void init ( bool random_initialization = false );\n");
@@ -1352,6 +1541,8 @@ abstract class Component(resetSignal: Bool = null) {
     out_h.write("  void print ( FILE* f );\n");
     out_h.write("  bool scan ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
+    for (fun <- funs) 
+      out_h.write(fun.decString);
     out_h.write("};\n");
     out_h.close();
 
@@ -1359,16 +1550,12 @@ abstract class Component(resetSignal: Bool = null) {
     for(str <- includeArgs) out_c.write("#include \"" + str + "\"\n"); 
     out_c.write("\n");
     out_c.write("void " + name + "_t::init ( bool random_initialization ) {\n");
-    if (isEmittingComponents) {
-      for (c <- children) {
-        out_c.write("  " + c.emitRef + " = new " + c.emitRef + "_t();\n");
-        out_c.write("  " + c.emitRef + "->init(random_initialization);\n");
-      }
-    }
     for (m <- omods) {
       out_c.write(m.emitInitC);
     }
     out_c.write("}\n");
+    for (fun <- funs)
+      out_c.write(fun.defString(this));
     out_c.write("void " + name + "_t::clock_lo ( dat_t<1> reset ) {\n");
     for (m <- omods) {
       out_c.write(m.emitDefLoC);
@@ -1531,6 +1718,7 @@ abstract class Component(resetSignal: Bool = null) {
       out_d.close();
     }
   }
+
 };
 
 }

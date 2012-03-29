@@ -5,6 +5,7 @@ import Node._;
 import Component._;
 import IOdir._;
 import ChiselError._;
+import Terminator._;
 
 object IOdir {
   val INPUT  = new IOdir(0)
@@ -38,6 +39,7 @@ class IO extends Wire with Cloneable{
     else
       super.emitDef;
   }
+  override def terminate(): Unit = { this assign terminator }
   override def emitDec: String = "";
   override def emitDecC: String = if (isEmittingComponents) ""; else super.emitDecC;
   // override def emitDef: String = "";
@@ -147,11 +149,13 @@ class IO extends Wire with Cloneable{
     }
   }
   override def assign(src: Node) = {
+    if (!src.isTerminated) {
     if(assigned)
       ChiselErrors += ChiselError("reassignment to output", Thread.currentThread().getStackTrace);
     else { 
       assigned = true; 
       if (inputs.length > 0) inputs(0) = src; else inputs += src;
+    }
     }
   }
   override def asInput(): this.type = {

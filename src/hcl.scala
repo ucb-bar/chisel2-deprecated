@@ -121,9 +121,10 @@ object chiselMain {
         case "--noCombLoop" => dontFindCombLoop = true
         case "--gen-harness" => isGenHarness = true; 
         case "--debug" => isDebug = true; 
+        case "--clockGatingUpdates" => isClockGatingUpdates = true; 
         case "--folding" => isFolding = true; 
         case "--vcd" => isVCD = true;
-        case "--v" => isEmittingComponents = true; isCoercingArgs = false;
+        case "--v" => backendName = "v"; isEmittingComponents = true; isCoercingArgs = false;
         case "--target-dir" => targetDir = args(i+1); i += 1;
         // case "--scan-format" => scanFormat = args(i+1); i += 1;
         // case "--print-format" => printFormat = args(i+1); i += 1;
@@ -151,10 +152,10 @@ object chiselMain {
       printArgs   ++= p.args;
       printFormat = p.format;
     }
-    if (isEmittingComponents)
-      c.compileV();
-    else
-      c.compileC();
+    backendName match {
+    case "v" => c.compileV();
+    case "c" => c.compileC();
+    }
   }
 }
 
@@ -168,6 +169,7 @@ abstract class Data extends Node with Cloneable{
   def setIsCellIO = isCellIO = true;
   def apply(name: String): Data = null
   def flatten = Array[(String, IO)]();
+  def terminate(): Unit = { }
   def flip(): this.type = this;
   def asInput(): this.type = this;
   def asOutput(): this.type = this;

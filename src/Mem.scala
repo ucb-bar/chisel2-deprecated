@@ -513,21 +513,19 @@ class MemPort[T <: Data](cell:       MemCell[T],
     var res = "";
     val read_buf = mem.emitRef+"__read"+port_index+"_";
     if (isWritable) {
-      res += " if (" + wrEnable.emitRef + ".to_bool()"
+      res += "  if (" + wrEnable.emitRef + ".to_bool()"
       if (hasChipSel)
           res += " && " + chipSel.emitRef + ".to_bool()"
-      res +=") {\n"
+      res +=")\n"
       if (!hasWrBitMask) {
         res +=
-        " " + mem.emitRef + ".put(" + wrAddr.emitRef + ", " +
-        wrData.emitRef + ");\n" +
-        " }\n";
+        "    " + mem.emitRef + ".put(" + wrAddr.emitRef + ", " +
+        wrData.emitRef + ");\n";
       } else {
         res +=
-        " " + mem.emitRef + ".put(" + wrAddr.emitRef + ", " +
+        "    " + mem.emitRef + ".put(" + wrAddr.emitRef + ", " +
         wrData.emitRef + " & " + wrBitMask.emitRef + " | " +
-        mem.emitRef + ".get(" + wrAddr.emitRef + ") & ~" + wrBitMask.emitRef + ");\n" +
-        " }\n";
+        mem.emitRef + ".get(" + wrAddr.emitRef + ") & ~" + wrBitMask.emitRef + ");\n";
       }
     }
     if (isReadable) {

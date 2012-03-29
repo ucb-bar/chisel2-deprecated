@@ -139,6 +139,8 @@ abstract class Node extends nameable{
   var stack: Array[StackTraceElement] = null;
   var line: Array[StackTraceElement] = Thread.currentThread().getStackTrace
   
+  def isTerminator = false;
+  def isTerminated = (inputs.size == 1 && inputs(0).isTerminator);
   def width: Int = width_;
   def width_=(w: Int) = { isFixedWidth = true; width_ = width; inferWidth = fixWidth(w); }
   def name_it (path: String, setNamed: Boolean = true) = { name = path; named = setNamed}
@@ -170,10 +172,12 @@ abstract class Node extends nameable{
   }
   // TODO: MOVE TO WIRE
   def assign(src: Node) = { 
-    if (inputs.length > 0) 
-      inputs(0) = src; 
-    else 
-      inputs += src; 
+    if (!src.isTerminated) {
+      if (inputs.length > 0) 
+        inputs(0) = src; 
+      else 
+        inputs += src; 
+    }
   }
   def <>(src: Node) = { 
     // println("M <>'ing " + this + " & " + src);
@@ -242,7 +246,7 @@ abstract class Node extends nameable{
   def isInObject = isIo || isReg || isUsedByRam || isProbe || (isDebug && named);
   def isInVCD = isIo || isReg || isProbe || (isDebug && named);
   def emitTmp: String = 
-    if (isEmittingC) {
+    if (backendName == "c") {
       if (isInObject)
         emitRef
       else
@@ -250,7 +254,7 @@ abstract class Node extends nameable{
     } else
       emitRef
   def emitRefVCD: String = emitRef;
-  def emitRef: String = if (isEmittingC) emitRefC else emitRefV;
+  def emitRef: String = if (backendName == "c") emitRefC else emitRefV;
   //def emitRefV: String = if (name == "") "T" + emitIndex else name
   def emitRefV = if(name == "" || !named) "T" + emitIndex else if(!named) name + "_" + emitIndex else name
   def dotName = { val name = this.getClass.getName; name.substring(7, name.size) };

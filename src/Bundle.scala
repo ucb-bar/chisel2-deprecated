@@ -127,6 +127,10 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     res += ")";
     res
   }
+  override def terminate(): Unit = {
+    for ((n, i) <- elements) 
+      i.terminate();
+  }
   def view (elts: ArrayBuffer[(String, Data)]): Bundle = { 
     elementsCache = elts; this 
   }
