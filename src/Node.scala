@@ -271,6 +271,7 @@ abstract class Node extends nameable{
   def emitDefLoC: String = ""
   def emitInitC: String = ""
   def emitDefHiC: String = ""
+  def emitInitHiC: String = ""
   def emitDefVCD(vcdname: String) = {
     "  if (t == 0 || (" + emitRef + " != " + emitRef + "__prev).to_bool())\n" +
     "    dat_dump(f, " + emitRef + ", \"" + vcdname + "\");\n" +

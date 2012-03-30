@@ -6,12 +6,13 @@ import scala.collection.mutable.HashMap
 import Component._;
 
 object Function {
-  def apply(name: String, out: Node, enable: Node, nodes: HashSet[Node]) = {
-    val params = new ArrayBuffer[Node];
-    val args   = new ArrayBuffer[Node];
-    val argMap = new HashMap[Node, Node];
-    val res    = new Function(out);
-    res.init(name, out.width);
+  def apply(reg: Reg, out: Node, enable: Node, nodes: HashSet[Node]) = {
+    val newName = reg.name + "__cond_update"
+    val params  = new ArrayBuffer[Node];
+    val args    = new ArrayBuffer[Node];
+    val argMap  = new HashMap[Node, Node];
+    val res     = new Function(reg, out);
+    res.init(newName, out.width);
     val traced = new HashSet[Node];
     def trace (node: Node): Unit = {
       if (!traced.contains(node)) {
@@ -42,14 +43,14 @@ object Function {
     }
     trace(out);
     // println("OUT " + name + " WIDTH " + out.width);
-    res.setName(name);
+    res.setName(newName);
     res.inputs  += enable;
     res.inputs ++= args;
     res
   }
 }
 
-class Function(val out: Node) extends Node {
+class Function(val default: Node, val out: Node) extends Node {
   val params = new ArrayBuffer[Node];
   val inMap  = new HashMap[Node, Node];
   val nodes  = new ArrayBuffer[Node];
@@ -59,7 +60,7 @@ class Function(val out: Node) extends Node {
     for (i <- 0 until params.size) {
       if (i > 0) res += ", ";
       res += "dat_t<" + params(i).width + "> " + params(i).emitRef;
-      res += " /* " + params(i) + " */ ";
+      // res += " /* " + params(i) + " */ ";
     }
     res + ")";
   }
@@ -73,13 +74,14 @@ class Function(val out: Node) extends Node {
     res + "}\n";
   }
   override def emitDefLoC: String = {
-    var res = "  dat_t<" + out.width + "> " + name + ";\n";
+    // TODO: COULD BE IMPROVED TO USE ?: EXPRESSION
+    var res = "  dat_t<" + out.width + "> " + name + " = " + default.emitRef + ";\n";
     res += "  if (" + inputs(0).emitRef + ".to_bool())\n";
     res += "    " + name + " = do_" + name + "(";
     for (i <- 1 until inputs.size) {
       if (i > 1) res += ", ";
       res += inputs(i).emitRef;
-      res += " /* " + inputs(i) + " */ ";
+      // res += " /* " + inputs(i) + " */ ";
     }
     res += ");\n";
     res

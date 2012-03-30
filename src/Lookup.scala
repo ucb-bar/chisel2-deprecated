@@ -63,7 +63,6 @@ class Lookup extends Node {
 
   def map = inputs.slice(2, inputs.length).map(x => x.asInstanceOf[LookupMap])
 
-  override def isByValue: Boolean = false;
   override def toString: String = "LOOKUP(" + inputs(0) + ")";
   override def emitDef: String = {
     var res = 

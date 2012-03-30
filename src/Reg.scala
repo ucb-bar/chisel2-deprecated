@@ -167,17 +167,20 @@ class Reg extends Delay with proc{
       (if (isReset) "mux<" + width + ">(" + inputs.last.emitRef + ", " + resetVal.emitRef + ", " else "") + 
     updateVal.emitRef + (if (isReset) ");\n" else ";\n");
 
-    "  " + emitRef + "_shadow = " +  updateLogic +
-    "  " + emitRef + "_shadow_out = " + emitRef + ";\n";
+    "  " + emitRef + "_shadow = " +  updateLogic;
+    // "  " + emitRef + "_shadow_out = " + emitRef + ";\n";
     
   }
   override def emitDefHiC: String = {
     "  " + emitRef + " = " + emitRef + "_shadow;\n";
   }
-  override def emitDecC: String = 
+  override def emitInitHiC: String = {
+    "  dat_t<" + width + "> " + emitRef + "_shadow_out = " + emitRef + ";\n";
+  }
+  override def emitDecC: String = {
     "  dat_t<" + width + "> " + emitRef + ";\n" +
-    "  dat_t<" + width + "> " + emitRef + "_shadow;\n" +
-    "  dat_t<" + width + "> " + emitRef + "_shadow_out;\n";
+    "  dat_t<" + width + "> " + emitRef + "_shadow;\n";
+  }
 }
 
 }

@@ -1426,9 +1426,10 @@ abstract class Component(resetSignal: Bool = null) {
         // println("  PENDING " + outsTraced(node) + " OF " + node.consumers.size);
       }
     }
-    if (traced.size > 1) {
-      // println("+++ FOUND COMBINATIONAL BLOCK SIZE " + traced.size);
-      val block = Function(reg.name + "__cond_update", reg.updateVal, reg.enableSignal, traced);
+    // if (traced.size > 40 && reg.name == "exe_reg_op2_data") 
+    if (traced.size > 7) {
+      println("+++ FOUND COMBINATIONAL BLOCK SIZE " + traced.size + " FOR " + reg.name);
+      val block = Function(reg, reg.updateVal, reg.enableSignal, traced);
       reg.updateVal.consumers -= reg;
       reg.inputs(0) = block;
       reg.updateVal.consumers += reg;
@@ -1567,6 +1568,8 @@ abstract class Component(resetSignal: Bool = null) {
     //   out_c.write("    " + c.emitRef + "->clock_lo(reset);\n");
     out_c.write("}\n");
     out_c.write("void " + name + "_t::clock_hi ( dat_t<1> reset ) {\n");
+    for (r <- omods) 
+      out_c.write(r.emitInitHiC);
     for (m <- omods) 
       out_c.write(m.emitDefHiC);
     // for (c <- children) 
