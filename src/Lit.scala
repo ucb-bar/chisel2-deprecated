@@ -188,28 +188,31 @@ object Literal {
       BigInt(-1)
   }
 
-  // def apply(x: Int, width: Int = -1, signed: Boolean = false): Literal = 
-  //   apply(x.toLong, width, signed)
+  // def apply(x: BigInt, width: Int = -1, signed: Boolean = false): Literal = { 
+  //   val res = new Literal(); 
+  //   val (w, numString) = signedsizeof(x, width, signed);
+  //   res.init("0x" + numString, w); 
+  //   res.inputVal = x;
+  //   res 
+  // }
+
   def apply(x: BigInt, width: Int = -1, signed: Boolean = false): Literal = { 
     val res = new Literal(); 
-    val (w, numString) = signedsizeof(x, width, signed);
-    //val n = "0x" + numString;
+    val xWidth = max(x.bitLength, 1) + (if(signed) 1 else 0)
+    val xString = x.toString(16)
+
+    val w = if(width == -1) xWidth else width
+    if(xWidth > width && width != -1)
+      ChiselErrors += ChiselError("width " + width + " is too small for literal " + x + ". Smallest allowed width is " + xWidth, Thread.currentThread().getStackTrace);
+    val numString = if(x >= 0) xString else xString.substring(1, xString.length)
     res.init("0x" + numString, w); 
     res.inputVal = x;
     res 
   }
-  // def apply(x: Int, width: Int, signed: Boolean = false): Literal = { 
-  //   val res = new Literal(); 
-  //   val (w, numString) = signedsizeof(x, width, signed);
-  //   res.init("0x" + numString, width); 
-  //   res 
-  // }
-  //def apply(x: Long, width: Int): Literal = { val res = new Literal(); res.init("0x%x".format(x), width); res }
-  // def apply(n: String): Lit = { 
-  //   val (bits, mask, width) = parseLit(n);  apply(n, width);
-  // }
+
   def apply(n: String, width: Int): Literal = 
     apply(width, n(0), n.substring(1, n.length));
+
   def apply(width: Int, base: Char, literal: String): Literal = {
     if (!"dhbo".contains(base)) ChiselErrors += ChiselError("no base specified", Thread.currentThread().getStackTrace);
     val res = new Literal();
@@ -224,6 +227,7 @@ object Literal {
     if (base == 'b') {res.isZ = literal.contains('?'); res.isBinary = true;}
     res
   }
+
 }
 class Literal extends Node {
   //implicit def intToLit (x: Int) = Lit(x);
