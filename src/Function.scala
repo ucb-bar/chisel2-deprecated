@@ -7,7 +7,7 @@ import Component._;
 
 object Function {
   def apply(reg: Reg, out: Node, enable: Node, nodes: HashSet[Node]) = {
-    val newName = reg.name + "__cond_update"
+    val newName = reg.emitRef + "__cond_update"
     val params  = new ArrayBuffer[Node];
     val args    = new ArrayBuffer[Node];
     val argMap  = new HashMap[Node, Node];
@@ -19,7 +19,7 @@ object Function {
         traced += node;
         var i = 0;
         for (c <- node.inputs) {
-          if (nodes.contains(c)) {
+          if (nodes.contains(c) && !c.isInstanceOf[ListLookupRef[ _ ]]) {
             trace(c);
           } else if (argMap.contains(c)) {
             node.inputs(i) = argMap(c);

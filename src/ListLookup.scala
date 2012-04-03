@@ -105,7 +105,7 @@ object ListLookupRef {
 }
 
 class ListLookupRef[T <: Bits]() extends Node {
-  override def isInObject = true;
+  //override def isInObject = false;
 
   // override def toString: String = "W(" + name + ")"
   override def toString: String = name
