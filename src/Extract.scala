@@ -10,11 +10,16 @@ object NodeExtract {
   
   // extract one bit
   def apply (mod: Node, bit: Node): Node = {
-    val res = new Extract();
-    res.init("", fixWidth(1), mod, bit);
-    res.hi = bit; 
-    res.lo = bit;
-    res
+    val (bits_lit, off_lit) = (mod.litOf, bit.litOf);
+    if (isFolding && bits_lit != null && off_lit != null) {
+      Literal((bits_lit.value >> off_lit.value.toInt)&1, 1)
+    } else {
+      val res = new Extract();
+      res.init("", fixWidth(1), mod, bit);
+      res.hi = bit; 
+      res.lo = bit;
+      res
+    }
   }
 
   def apply (mod: Node, bit: Int): Node = 
@@ -22,19 +27,31 @@ object NodeExtract {
 
   // extract bit range
   def apply (mod: Node, hi: Node, lo: Node): Node = {
-    val res = new Extract();
-    res.init("", widthOf(0), mod, hi, lo);
-    res.hi = hi;
-    res.lo = lo;
-    res
+    val (bits_lit, hi_lit, lo_lit) = (mod.litOf, hi.litOf, lo.litOf);
+    if (isFolding && bits_lit != null && hi_lit != null && lo_lit != null) {
+      val w = (hi_lit.value - lo_lit.value + 1).toInt
+      Literal((bits_lit.value >> lo_lit.value.toInt) & ((BigInt(1) << w) - BigInt(1)), w)
+    } else {
+      val res = new Extract();
+      res.init("", widthOf(0), mod, hi, lo);
+      res.hi = hi;
+      res.lo = lo;
+      res
+    }
   }
 
   def apply (mod: Node, hi: Int, lo: Int): Node = {
-    val res = new Extract();
-    res.hi = Literal(hi);
-    res.lo = Literal(lo);
-    res.init("", fixWidth(hi-lo+1), mod, res.hi, res.lo);
-    res
+    val bits_lit = mod.litOf
+    if (isFolding && bits_lit != null){
+      val w = hi - lo + 1
+      Literal((bits_lit.value >> lo) & ((BigInt(1) << w) - BigInt(1)), w)
+    } else {
+      val res = new Extract();
+      res.hi = Literal(hi);
+      res.lo = Literal(lo);
+      res.init("", fixWidth(hi-lo+1), mod, res.hi, res.lo);
+      res
+    }
   }
 }
 

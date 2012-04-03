@@ -15,7 +15,7 @@ object Fill {
       // println("FOLDING EXTRACT " + bits_lit.value + "(" + off_lit.value + ")");
       var res = bits_lit.value;
       val w   = mod.getWidth();
-      for (i <- 0 until n) 
+      for (i <- 0 until n-1) 
         res = (res << w)|bits_lit.value;
       Lit(res, n * w){ Bits() };
     } else {
@@ -44,7 +44,7 @@ object NodeFill {
       val a = mod.litOf.value
       for (i <- 0 until n)
         c = (c << w) | a
-      return Lit(c,n*w){Bits()}
+      return Literal(c,n*w)
     }
 
     val res = new Fill()
