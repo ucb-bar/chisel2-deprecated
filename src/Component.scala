@@ -241,7 +241,7 @@ abstract class Component(resetSignal: Bool = null) {
   
   val mods  = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
-  val gmods = new ArrayBuffer[Node];
+  // val gmods = new ArrayBuffer[Node];
   val regs  = new ArrayBuffer[Reg];
   val nexts = new Queue[Node];
   var nindex = -1;
@@ -743,10 +743,36 @@ abstract class Component(resetSignal: Bool = null) {
       stack.push((0, root));
     isWalked.clear();
     while (stack.length > 0) {
-      val (depth, node) = stack.pop();
-      node.visitNode(depth, stack);
+      val (newDepth, node) = stack.pop();
+      val comp = node.componentOf;
+      // println("VISIT NODE(" + newDepth + ") " + comp.name + ": " + node.name);
+      if (newDepth == -1) 
+        comp.omods += node;
+      else {
+        node.depth = max(node.depth, newDepth);
+        //println("THINKING MOD(" + depth + ") " + comp.name + ": " + node.name);
+        if (!comp.isWalked.contains(node)) {
+          //println(depthString(depth) + "FiND MODS " + node + " IN " + comp.name);
+          comp.isWalked += node;
+          node.walked = true;
+          stack.push((-1, node));
+          for (i <- node.inputs) {
+            if (i != null) {
+              i match {
+                case m: MemRef[ _ ] => if(!m.isReg) stack.push((newDepth+1, i));
+                case d: Delay       => ;
+                case o              => stack.push((newDepth+1, o)); 
+              }
+            }
+          }
+          // println("VISITING MOD " + node + " DEPTH " + depth);
+        }
+      }
+      // node.visitNode(depth, stack);
     }
   }
+  def findOrdering() = visitNodes(findRoots().toArray);
+  /*
   def visitNodesRev(roots: Array[Node]) = {
     val stack = new Stack[(Int, Node)]();
     for (root <- roots)
@@ -757,9 +783,8 @@ abstract class Component(resetSignal: Bool = null) {
       node.visitNodeRev(depth, stack);
     }
   }
-
-  def findOrdering() = visitNodes(findRoots().toArray);
   def findGraph() = visitNodesRev(findLeaves().toArray);
+  */
 
   def findGraphDims(): (Int, Int, Int) = {
     var maxDepth = 0;
@@ -1039,7 +1064,7 @@ abstract class Component(resetSignal: Bool = null) {
     }
     collectNodes(this);
     findOrdering(); // search from roots  -- create omods
-    findGraph();    // search from leaves -- create gmods
+    // findGraph();    // search from leaves -- create gmods
     for (m <- omods) {
       m match {
         case l: Literal => ;
@@ -1412,7 +1437,7 @@ abstract class Component(resetSignal: Bool = null) {
       // println("VISITING " + node.name + " " + node + " " + node.getClass.getName);
       if (traced.contains(node)) {
         // println("  ALREADY TRACED");
-      } else if (node.isReg) {
+      } else if (node.isReg || node.isInstanceOf[ListLookupRef[ _ ]]) {
         // println("  STOPPING ON REG");
       } else if (isAllOutsTraced(outsTraced(node), node)) {
         // println("  ALL OUTS TRACED");
@@ -1426,8 +1451,8 @@ abstract class Component(resetSignal: Bool = null) {
         // println("  PENDING " + outsTraced(node) + " OF " + node.consumers.size);
       }
     }
-    // if (traced.size > 40 && reg.name == "exe_reg_op2_data") 
     if (traced.size > 7) {
+    // if (traced.size > 7) 
       println("+++ FOUND COMBINATIONAL BLOCK SIZE " + traced.size + " FOR " + reg.name);
       val block = Function(reg, reg.updateVal, reg.enableSignal, traced);
       reg.updateVal.consumers -= reg;
@@ -1509,7 +1534,7 @@ abstract class Component(resetSignal: Bool = null) {
     }
     }
     findOrdering(); // search from roots  -- create omods
-    findGraph();    // search from leaves -- create gmods
+    // findGraph();    // search from leaves -- create gmods
     renameNodesC(omods);
     if (isReportDims) {
     val (numNodes, maxWidth, maxDepth) = findGraphDims();

@@ -19,7 +19,7 @@ object Function {
         traced += node;
         var i = 0;
         for (c <- node.inputs) {
-          if (nodes.contains(c) && !c.isInstanceOf[ListLookupRef[ _ ]]) {
+          if (nodes.contains(c)) {
             trace(c);
           } else if (argMap.contains(c)) {
             node.inputs(i) = argMap(c);
