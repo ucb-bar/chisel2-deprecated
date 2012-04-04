@@ -108,6 +108,8 @@ class Wire extends Data with proc {
     // TODO: NEED THIS TO BE A CHECK
     if (inputs.length == 1)
       "  " + emitTmp + " = " + inputs(0).emitRef + ";\n"
+    else if (inputs.length == 0)
+      "  " + emitTmp + ";\n"
     else
       ""
     // "  " + emitTmp + " = " + inputs(0).emitRef + ";\n"

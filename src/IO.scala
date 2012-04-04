@@ -52,6 +52,8 @@ class IO extends Wire with Cloneable{
         "  " + emitTmp + " = " + inputs(0).emitRef + ";\n"
       // else if (consumers.length == 1)
       //   "  " + consumers(0).emitRef + " = " + emitTmp + ";// CONSUMER=1 \n"
+      else if (inputs.length == 0)
+        "  " + emitTmp + ";\n"
       else
         ""
     } else
