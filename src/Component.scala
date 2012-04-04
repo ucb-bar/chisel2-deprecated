@@ -27,6 +27,7 @@ object Component {
   var widthWriter: java.io.FileWriter = null
   var connWriter: java.io.FileWriter = null
   var isDebug = false;
+  var isIoDebug = true;
   var isClockGatingUpdates = false;
   var isVCD = false;
   var isFolding = false;
@@ -84,6 +85,7 @@ object Component {
     connWriter = null
     isGenHarness = false;
     isDebug = false;
+    isIoDebug = true;
     isClockGatingUpdates = false;
     isFolding = false;
     isReportDims = false;
@@ -238,6 +240,7 @@ abstract class Component(resetSignal: Bool = null) {
   var inputs = new ArrayBuffer[Node];
   var outputs = new ArrayBuffer[Node];
   val asserts = ArrayBuffer[Assert]();
+  val debugs = HashSet[Node]();
   
   val mods  = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
@@ -337,6 +340,8 @@ abstract class Component(resetSignal: Bool = null) {
   }
   def assert(cond: Bool, message: String) = 
     asserts += Assert(cond, message);
+  def debug(x: Node) = 
+    debugs += x;
   def <>(src: Component) = io <> src.io;
   def apply(name: String): Data = io(name);
   // COMPILATION OF REFERENCE
@@ -1513,6 +1518,7 @@ abstract class Component(resetSignal: Bool = null) {
       if (!(c == this)) {
         mods    ++= c.mods;
         asserts ++= c.asserts;
+        debugs  ++= c.debugs;
       }
     }
     findConsumers();

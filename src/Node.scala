@@ -244,7 +244,8 @@ abstract class Node extends nameable{
   def emitIndex: Int = { if (index == -1) index = componentOf.nextIndex; index }
   // TODO: SUBCLASS FROM SOMETHING INSTEAD OR OVERRIDE METHOD
   // TODO: RENAME METHOD TO ISVOLATILE
-  def isInObject = isIo || isReg || isUsedByRam || isProbe || (isDebug && named);
+  def isInObject = 
+    (isIo && (isIoDebug || component == topComponent)) || (topComponent.debugs.contains(this) && named) || isReg || isUsedByRam || isProbe || (isDebug && named);
   def isInVCD = isIo || isReg || isProbe || (isDebug && named);
   def emitTmp: String = 
     if (backendName == "c") {
@@ -285,6 +286,7 @@ abstract class Node extends nameable{
     res
   }
 
+  /*
   def visitNode(newDepth: Int, stack: Stack[(Int, Node)]): Unit = {
     val comp = componentOf;
     // println("VISIT NODE(" + newDepth + ") " + comp.name + ": " + this.name);
@@ -311,6 +313,7 @@ abstract class Node extends nameable{
       }
     }
   }
+
   def visitNodeRev(newDepth: Int, stack: Stack[(Int, Node)]): Unit = {
     val comp = componentOf;
     if (newDepth == -1)
@@ -333,6 +336,7 @@ abstract class Node extends nameable{
       }
     }
   }
+  */
 
   def printTree(depth: Int = 4, indent: String = ""): Unit = {
     if (depth < 1) return;

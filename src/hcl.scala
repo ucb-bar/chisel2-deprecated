@@ -121,6 +121,8 @@ object chiselMain {
         case "--noCombLoop" => dontFindCombLoop = true
         case "--gen-harness" => isGenHarness = true; 
         case "--debug" => isDebug = true; 
+        case "--ioDebug" => isIoDebug = true; 
+        case "--noIoDebug" => isIoDebug = false; 
         case "--clockGatingUpdates" => isClockGatingUpdates = true; 
         case "--folding" => isFolding = true; 
         case "--vcd" => isVCD = true;
