@@ -29,6 +29,7 @@ object Component {
   var isDebug = false;
   var isIoDebug = true;
   var isClockGatingUpdates = false;
+  var isClockGatingUpdatesInline = false;
   var isVCD = false;
   var isFolding = false;
   var isGenHarness = false;
@@ -87,6 +88,7 @@ object Component {
     isDebug = false;
     isIoDebug = true;
     isClockGatingUpdates = false;
+    isClockGatingUpdatesInline = false;
     isFolding = false;
     isReportDims = false;
     scanFormat = "";
@@ -1428,7 +1430,7 @@ abstract class Component(resetSignal: Bool = null) {
         Array[Node](node);
     }
   }
-  def findCombinationalBlock(reg: Reg): Function = {
+  def findCombinationalBlock(reg: Reg): AbstractFunction = {
     val traced = new HashSet[Node];
     val outsTraced = new HashMap[Node, BitSet];
     val toVisit = new HashSet[Node];
@@ -1547,8 +1549,8 @@ abstract class Component(resetSignal: Bool = null) {
       return
     }
     collectNodes(this);
-    val funs = new ArrayBuffer[Function];
-    if (isClockGatingUpdates) {
+    val funs = new ArrayBuffer[AbstractFunction];
+    if (isClockGatingUpdates || isClockGatingUpdatesInline) {
     for (r <- regs) {
       if(r.isEnable) {
         if(r.enableSignal.isInstanceOf[Literal] && r.enableSignal.asInstanceOf[Literal].value == 1){
@@ -1595,8 +1597,10 @@ abstract class Component(resetSignal: Bool = null) {
     out_h.write("  void print ( FILE* f );\n");
     out_h.write("  bool scan ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
-    for (fun <- funs) 
-      out_h.write(fun.decString);
+    if(isClockGatingUpdates){
+      for (fun <- funs) 
+        out_h.write(fun.decString);
+    }
     out_h.write("};\n");
     out_h.close();
 
@@ -1608,13 +1612,17 @@ abstract class Component(resetSignal: Bool = null) {
       out_c.write(m.emitInitC);
     }
     out_c.write("}\n");
-    for (fun <- funs) {
-      val fun_out_c = new java.io.FileWriter(base_name + fun.name + ".cpp")
-      fun_out_c.write("#include \"" + name + ".h\"\n")
-      fun_out_c.write("\n")
-      fun_out_c.write(fun.defString(this));
-      fun_out_c.close()
+
+    if(isClockGatingUpdates){
+      for (fun <- funs) {
+        val fun_out_c = new java.io.FileWriter(base_name + fun.name + ".cpp")
+        fun_out_c.write("#include \"" + name + ".h\"\n")
+        fun_out_c.write("\n")
+        fun_out_c.write(fun.defString(this));
+        fun_out_c.close()
+      }
     }
+
     out_c.write("void " + name + "_t::clock_lo ( dat_t<1> reset ) {\n");
     for (m <- omods) {
       out_c.write(m.emitDefLoC);
