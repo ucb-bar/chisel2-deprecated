@@ -1473,7 +1473,8 @@ abstract class Component(resetSignal: Bool = null) {
     // if (traced.size > 40 && reg.name == "exe_reg_op2_data") 
     if (traced.size > 40) {
       //println("+++ FOUND COMBINATIONAL BLOCK SIZE " + traced.size + " FOR " + reg.name);
-      val block = Function(reg, reg.updateVal, if(reg.isEnable) reg.enableSignal else Literal(1), traced);
+      val block = Function(reg, reg.updateVal, reg.enableSignal, traced);
+      Predef.assert(!reg.enableSignal.isInstanceOf[Literal])
       reg.updateVal.consumers -= reg;
       reg.inputs(0) = block;
       reg.updateVal.consumers += reg;
@@ -1549,9 +1550,15 @@ abstract class Component(resetSignal: Bool = null) {
     val funs = new ArrayBuffer[Function];
     if (isClockGatingUpdates) {
     for (r <- regs) {
-      val res = findCombinationalBlock(r);
-      if (!(res == null)) 
-        funs += res;
+      if(r.isEnable) {
+        if(r.enableSignal.isInstanceOf[Literal] && r.enableSignal.asInstanceOf[Literal].value == 1){
+          r.isEnable = false
+        } else {
+          val res = findCombinationalBlock(r);
+          if (!(res == null)) 
+            funs += res;
+        }
+      }
     }
     }
     findOrdering(); // search from roots  -- create omods
