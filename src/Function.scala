@@ -25,15 +25,21 @@ object Function {
             node.inputs(i) = argMap(c);
             c.consumers   -= node;
           } else {
-            if (c.isByValue) {
-            val in         = Bits(c.getWidth(), INPUT);
-            in.name        = if (c.isLit) "T" + c.emitIndex else c.name;
-            node.inputs(i) = in;
-            c.consumers   -= node;
-            c.consumers   += res;
-            res.params    += in;
-            args          += c;
-            argMap(c)      = in;
+            if (c.isInstanceOf[Literal]) {
+              val in = Literal(c.value, c.width)
+              node.inputs(i) = in
+              c.consumers -= node
+              argMap(c) = in
+            }
+            else if (c.isByValue) {
+              val in         = Bits(c.getWidth(), INPUT);
+              in.name        = if (c.isLit) "T" + c.emitIndex else c.name;
+              node.inputs(i) = in;
+              c.consumers   -= node;
+              c.consumers   += res;
+              res.params    += in;
+              args          += c;
+              argMap(c)      = in;
             }
           }
           i += 1;

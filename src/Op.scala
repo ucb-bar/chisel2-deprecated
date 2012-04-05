@@ -60,7 +60,7 @@ object Op {
       name match {
         case "!" => return if (a.litOf.value == 0) Literal(1) else Literal(0);
         case "-" => return Literal(-a.litOf.value, a.litOf.width);
-        case "~" => return Literal(-a.litOf.value-1, a.litOf.width);
+        case "~" => return Literal((-a.litOf.value-1)&((BigInt(1) << a.litOf.width)-1), a.litOf.width); // TODO: update to newest version of chisel so that this can work
         case _ => ;
       } 
     }
