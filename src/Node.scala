@@ -532,7 +532,7 @@ abstract class Node extends nameable{
         // TODO: HACK
         inputs = ArrayBuffer(inputs(0));
         return false;
-      } else
+      } else if(!i.consumers.contains(this))
         i.consumers += this;
       // println("ADDING " + this + " AS CONSUMER OF " + i + " " + i.consumers.length + " CONSUMERS");
       off += 1;

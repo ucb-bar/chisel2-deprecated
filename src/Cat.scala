@@ -13,7 +13,7 @@ object Cat {
       res
     } else {
       val isLit = mods.foldLeft(mod.litOf != null){(a,b) => a && (b.litOf != null)}
-      if (false && isFolding && isLit) {
+      if (isFolding && isLit) {
         var res = mod.litOf.value;
         var tw  = mod.litOf.getWidth();
         for (n <- mods) {

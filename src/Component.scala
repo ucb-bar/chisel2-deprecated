@@ -29,6 +29,7 @@ object Component {
   var isDebug = false;
   var isIoDebug = true;
   var isClockGatingUpdates = false;
+  var isClockGatingUpdatesInline = false;
   var isVCD = false;
   var isFolding = false;
   var isGenHarness = false;
@@ -87,6 +88,7 @@ object Component {
     isDebug = false;
     isIoDebug = true;
     isClockGatingUpdates = false;
+    isClockGatingUpdatesInline = false;
     isFolding = false;
     isReportDims = false;
     scanFormat = "";
@@ -1445,42 +1447,60 @@ abstract class Component(resetSignal: Bool = null) {
         Array[Node](node);
     }
   }
-  def findCombinationalBlock(reg: Reg): Function = {
-    def isAllOutsTraced (bits: BitSet, node: Node): Boolean = 
-      bits.size == node.consumers.size
+  def findCombinationalBlock(reg: Reg): AbstractFunction = {
     val traced = new HashSet[Node];
     val outsTraced = new HashMap[Node, BitSet];
-    val toVisit = new Queue[Node];
-    toVisit.enqueue(reg.updateVal);
+    val toVisit = new HashSet[Node];
+    toVisit += reg.updateVal
     outsTraced(reg.updateVal) = BitSet(0);
     // println("FINDING UPDATE " + reg.name);
-    while (!toVisit.isEmpty) { 
-      val node = toVisit.dequeue;
+
+    def dequeue(): Node = {
+      for (n <- toVisit)
+        if(isAllOutsTraced(n)){
+          toVisit.remove(n)
+          return n
+        }
+      return null
+    }
+
+    def isAllOutsTraced(n: Node): Boolean = {
+      outsTraced(n).size == n.consumers.size
+    }
+
+    var break = false
+    while (!toVisit.isEmpty && !break) { 
+      var node = dequeue()
       // println("VISITING " + node.name + " " + node + " " + node.getClass.getName);
-      if (traced.contains(node)) {
+      if (null == node) {
+        break = true
+      } else if (traced.contains(node)) {
         // println("  ALREADY TRACED");
       } else if (node.isReg || node.isInstanceOf[ListLookupRef[ _ ]]) {
         // println("  STOPPING ON REG");
-      } else if (isAllOutsTraced(outsTraced(node), node)) {
+      } else {
         // println("  ALL OUTS TRACED");
+        Predef.assert(isAllOutsTraced(node))
         traced += node;
         for (c <- node.inputs)  {
           outsTraced(c) = outsTraced.getOrElse(c, BitSet.empty) + c.consumers.indexOf(node);
           // println("    ENQUEUEING " + c);
-          toVisit.enqueue(c);
+          toVisit += c
         }
-      } else {
-        // println("  PENDING " + outsTraced(node) + " OF " + node.consumers.size);
       }
     }
-    if (traced.size > 7) {
-    // if (traced.size > 7) 
-      println("+++ FOUND COMBINATIONAL BLOCK SIZE " + traced.size + " FOR " + reg.name);
+    // if (traced.size > 40 && reg.name == "exe_reg_op2_data") 
+    if (traced.size > 40) {
+      //println("+++ FOUND COMBINATIONAL BLOCK SIZE " + traced.size + " FOR " + reg.name);
       val block = Function(reg, reg.updateVal, reg.enableSignal, traced);
+      Predef.assert(!reg.enableSignal.isInstanceOf[Literal])
       reg.updateVal.consumers -= reg;
       reg.inputs(0) = block;
       reg.updateVal.consumers += reg;
-      mods --= traced;
+      for(elm <- traced)
+        while(mods.contains(elm)){
+          mods -= elm
+        }
       block.component = reg.component;
       block
     } else
@@ -1547,13 +1567,17 @@ abstract class Component(resetSignal: Bool = null) {
       return
     }
     collectNodes(this);
-    val funs = new ArrayBuffer[Function];
-    if (isClockGatingUpdates) {
+    val funs = new ArrayBuffer[AbstractFunction];
+    if (isClockGatingUpdates || isClockGatingUpdatesInline) {
     for (r <- regs) {
-      if (r.isEnable) {
-        val res = findCombinationalBlock(r);
-        if (!(res == null)) 
-          funs += res;
+      if(r.isEnable) {
+        if(r.enableSignal.isInstanceOf[Literal] && r.enableSignal.asInstanceOf[Literal].value == 1){
+          r.isEnable = false
+        } else {
+          val res = findCombinationalBlock(r);
+          if (!(res == null)) 
+            funs += res;
+        }
       }
     }
     }
@@ -1591,8 +1615,10 @@ abstract class Component(resetSignal: Bool = null) {
     out_h.write("  void print ( FILE* f );\n");
     out_h.write("  bool scan ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
-    for (fun <- funs) 
-      out_h.write(fun.decString);
+    if(isClockGatingUpdates){
+      for (fun <- funs) 
+        out_h.write(fun.decString);
+    }
     out_h.write("};\n");
     out_h.close();
 
@@ -1604,8 +1630,17 @@ abstract class Component(resetSignal: Bool = null) {
       out_c.write(m.emitInitC);
     }
     out_c.write("}\n");
-    for (fun <- funs)
-      out_c.write(fun.defString(this));
+
+    if(isClockGatingUpdates){
+      for (fun <- funs) {
+        val fun_out_c = new java.io.FileWriter(base_name + fun.name + ".cpp")
+        fun_out_c.write("#include \"" + name + ".h\"\n")
+        fun_out_c.write("\n")
+        fun_out_c.write(fun.defString(this));
+        fun_out_c.close()
+      }
+    }
+
     out_c.write("void " + name + "_t::clock_lo ( dat_t<1> reset ) {\n");
     for (m <- omods) {
       out_c.write(m.emitDefLoC);

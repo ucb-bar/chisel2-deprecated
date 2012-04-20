@@ -124,6 +124,7 @@ object chiselMain {
         case "--ioDebug" => isIoDebug = true; 
         case "--noIoDebug" => isIoDebug = false; 
         case "--clockGatingUpdates" => isClockGatingUpdates = true; 
+        case "--clockGatingUpdatesInline" => isClockGatingUpdatesInline = true; 
         case "--folding" => isFolding = true; 
         case "--vcd" => isVCD = true;
         case "--v" => backendName = "v"; isEmittingComponents = true; isCoercingArgs = false;
