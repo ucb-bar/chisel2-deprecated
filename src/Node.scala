@@ -410,8 +410,9 @@ abstract class Node extends nameable{
     if (comp != null && !comp.isWalked.contains(this)) {
       comp.isWalked += this;
       for (node <- traceableNodes) {
-        if (node != null) 
+        if (node != null) {
           stack.push(() => node.traceNode(nextComp, stack));
+        }
       }
       var i = 0;
       for (node <- inputs) {
@@ -428,7 +429,7 @@ abstract class Node extends nameable{
 	    // the logic's component is not same as output's component unless the logic is an input
             n match { 
               case io: IO => 
-                if (io.dir == OUTPUT && 
+                if (io.dir == OUTPUT && !io.isCellIO &&
                     (!(component.parent == io.component) && 
                      !(component == io.component && 
                        !(this.isInstanceOf[IO] && this.asInstanceOf[IO].dir == INPUT)))) {

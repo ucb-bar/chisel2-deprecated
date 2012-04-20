@@ -247,6 +247,7 @@ object nullADT extends Data;
 
 
 abstract class BlackBox extends Component {
+  parent.blackboxes += this;
   var moduleNameSet = false;
   override def doCompileV(out: java.io.FileWriter, depth: Int): Unit = {
     traceNodes();

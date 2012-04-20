@@ -7,7 +7,6 @@ import Node._;
 // used for component to component connections
 object Binding {
   def apply(m: Node, c: Component, ioComp: Component): Node = {
-    // println("BINDING " + m);
     if (isEmittingComponents) {
       val res = c.findBinding(m);
       if (res == null) {

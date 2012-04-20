@@ -240,6 +240,7 @@ abstract class Component(resetSignal: Bool = null) {
   var inputs = new ArrayBuffer[Node];
   var outputs = new ArrayBuffer[Node];
   val asserts = ArrayBuffer[Assert]();
+  val blackboxes = ArrayBuffer[BlackBox]();
   val debugs = HashSet[Node]();
   
   val mods  = new ArrayBuffer[Node];
@@ -522,6 +523,8 @@ abstract class Component(resetSignal: Bool = null) {
   	bfsQueue.enqueue(elm)
     for(a <- asserts) 
       bfsQueue.enqueue(a)
+    for(b <- blackboxes) 
+      bfsQueue.enqueue(b.io)
     
     for(r <- resetList)
       bfsQueue.enqueue(r)
@@ -587,6 +590,11 @@ abstract class Component(resetSignal: Bool = null) {
       }
     }
 
+    for (b <- blackboxes) {
+      for((n, elm) <- b.io.flatten) 
+        bfsQueue.enqueue(elm)
+    }
+
     for(r <- resetList)
       bfsQueue.enqueue(r)
 
@@ -627,6 +635,8 @@ abstract class Component(resetSignal: Bool = null) {
   	bfsQueue.enqueue(elm)
     for(a <- asserts) 
       bfsQueue.enqueue(a)
+    for(b <- blackboxes) 
+      bfsQueue.enqueue(b.io)
     
     for(r <- resetList)
       bfsQueue.enqueue(r)
@@ -719,6 +729,8 @@ abstract class Component(resetSignal: Bool = null) {
     val roots = new ArrayBuffer[Node];
     for (a <- asserts) 
       roots += a.cond;
+    for (b <- blackboxes) 
+      roots += b.io;
     for (m <- mods) {
       m match {
         case io: IO          => if (io.dir == OUTPUT) { if (io.consumers.length == 0) roots += m; }
@@ -1314,6 +1326,8 @@ abstract class Component(resetSignal: Bool = null) {
     queue.push(() => io.traceNode(this, queue));
     for (a <- asserts)
       queue.push(() => a.traceNode(this, queue));
+    for (b <- blackboxes)
+      queue.push(() => b.io.traceNode(this, queue));
     while (queue.length > 0) {
       val work = queue.pop();
       work();
@@ -1335,6 +1349,9 @@ abstract class Component(resetSignal: Bool = null) {
 
     for(a <- asserts) 
       bfsQueue.enqueue(a)
+    
+    for(b <- blackboxes) 
+      bfsQueue.enqueue(b.io)
     
     for(r <- resetList)
       bfsQueue.enqueue(r)
@@ -1516,9 +1533,10 @@ abstract class Component(resetSignal: Bool = null) {
     if(!dontFindCombLoop) findCombLoop();
     for (c <- components) {
       if (!(c == this)) {
-        mods    ++= c.mods;
-        asserts ++= c.asserts;
-        debugs  ++= c.debugs;
+        mods       ++= c.mods;
+        asserts    ++= c.asserts;
+        blackboxes ++= c.blackboxes;
+        debugs     ++= c.debugs;
       }
     }
     findConsumers();

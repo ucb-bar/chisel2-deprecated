@@ -636,7 +636,7 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
 
   def setCppReadLatency(latency: Int) = cppReadLatency = latency
 
-  override def toString: String = "MEM( + emitRef + )";
+  override def toString: String = "MEM(" + emitRef + ")";
 
   def toCMD = {
     var read_port_count = 0;
