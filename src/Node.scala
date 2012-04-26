@@ -155,7 +155,7 @@ abstract class Node extends nameable{
   def litOf: Literal = {
     if(inputs.length == 0)
       if (isLit) this.asInstanceOf[Literal] else null
-    else if(inputs.length == 1 && isCellIO)
+    else if(inputs.length == 1 && (isCellIO || this.isInstanceOf[Wire]))
       inputs(0).litOf
     else
       null
@@ -245,7 +245,9 @@ abstract class Node extends nameable{
   // TODO: SUBCLASS FROM SOMETHING INSTEAD OR OVERRIDE METHOD
   // TODO: RENAME METHOD TO ISVOLATILE
   def isInObject = 
-    (isIo && (isIoDebug || component == topComponent)) || (topComponent.debugs.contains(this) && named) || isReg || isUsedByRam || isProbe || (isDebug && named);
+    (isIo && (isIoDebug || component == topComponent)) || 
+    (topComponent.debugs.contains(this) && named) || 
+    isReg || isUsedByRam || isProbe || (isDebug && named);
   def isInVCD = isIo || isReg || isProbe || (isDebug && named);
   def emitTmp: String = 
     if (backendName == "c") {

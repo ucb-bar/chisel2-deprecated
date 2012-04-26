@@ -140,7 +140,7 @@ object chiselMain {
   }
 
   def apply[T <: Component]
-      (args: Array[String], gen: () => T, scanner: T => TestIO = null, printer: T => TestIO = null) {
+      (args: Array[String], gen: () => T, scanner: T => TestIO = null, printer: T => TestIO = null): T = {
     initChisel();
     readArgs(args)
 
@@ -159,6 +159,7 @@ object chiselMain {
     case "v" => c.compileV();
     case "c" => c.compileC();
     }
+    c
   }
 }
 
@@ -196,6 +197,7 @@ abstract class Data extends Node with Cloneable{
 }
 
 trait proc extends Node {
+  var isDefaultNeeded = true;
   var updates = new Queue[(Bool, Node)];
   // def genCond() = conds.reduceLeft((a,b) => a && b);
   def genCond() = conds.top;
@@ -208,7 +210,7 @@ trait proc extends Node {
       }
     } else {
       val (lastCond, lastValue) = updates.front;//updates.pop();
-      if (default == null && !lastCond.isTrue) {
+      if (isDefaultNeeded && default == null && !lastCond.isTrue) {
         ChiselErrors += ChiselError("NO DEFAULT SPECIFIED FOR WIRE: " + this, this)
       }
       //updates.push((lastCond, lastValue));

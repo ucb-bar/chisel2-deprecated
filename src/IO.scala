@@ -52,11 +52,11 @@ class IO extends Wire with Cloneable{
         "  " + emitTmp + " = " + inputs(0).emitRef + ";\n"
       // else if (consumers.length == 1)
       //   "  " + consumers(0).emitRef + " = " + emitTmp + ";// CONSUMER=1 \n"
-      else if (inputs.length == 0)
+      else if (inputs.length == 0 && !isInObject) 
         "  " + emitTmp + ";\n"
       else
         ""
-    } else
+    } else 
       super.emitDefLoC
   }
   override def toString: String = {
