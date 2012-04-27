@@ -1,0 +1,377 @@
+\documentclass[10pt]{article}
+\setlength\textwidth{6.875in}
+\setlength\textheight{8.875in}
+% set both margins to 2.5 pc
+\setlength{\oddsidemargin}{-0.1875in}% 1 - (8.5 - 6.875)/2
+\setlength{\evensidemargin}{-0.1875in}
+\setlength{\marginparwidth}{0pc}
+\setlength{\marginparsep}{0pc}%
+\setlength{\topmargin}{0in} \setlength{\headheight}{0pt}
+\setlength{\headsep}{0pt}
+\setlength{\footskip}{37pt}%
+%\setlength{\columnsep}{0.3125in}
+%\setlength{\columnwidth}{3.28125in}% (6.875 - 0.3125)/2 = 3.28125in
+\setlength{\parindent}{1pc}
+\newcommand{\myMargin}{1.00in}
+\usepackage[top=\myMargin, left=\myMargin, right=\myMargin, bottom=\myMargin, nohead]{geometry}
+\usepackage{epsfig,graphicx}
+\usepackage{palatino}
+\usepackage{fancybox}
+
+\newenvironment{commentary}
+{ \vspace{-0.1in}
+  \begin{quotation}
+  \noindent
+  \small \em
+  \rule{\linewidth}{1pt}\\
+}
+{
+  \end{quotation}
+}
+
+\title{Chisel Manual}
+\author{Jonathan Bachrach, Krste Asanovi\'{c}, John Wawrzynek \\
+EECS Department, UC Berkeley\\
+{\tt  \{jrb|krste|johnw\}@eecs.berkeley.edu}
+}
+\date{\today}
+
+\newenvironment{example}{\VerbatimEnvironment\begin{footnotesize}\begin{Verbatim}}{\end{Verbatim}\end{footnotesize}}
+\newcommand{\kode}[1]{\begin{footnotesize}{\tt #1}\end{footnotesize}}
+
+\def\code#1{{\tt #1}}
+
+\def\note#1{\noindent{\bf [Note: #1]}}
+%\def\note#1{}
+
+\begin{document}
+\maketitle{}
+
+% TODO: default
+% TODO: enum yields Bits
+% TODO: why hardware construction languages
+
+\section{Introduction}
+
+This document is a tutorial introduction to {\em Chisel} (Constructing
+Hardware In a Scala Embedded Language).  Chisel is a hardware
+construction language embedded in the high-level programming language
+Scala.  At some point we will provide a proper reference manual, in
+addition to more tutorial examples.  In the meantime, this document
+along with a lot of trial and error should set you on your way to
+using Chisel.  Chisel is really only a set of special class
+definitions, predefined objects, and usage conventions within Scala,
+so when you write a Chisel program you are actually writing a Scala
+program.  However, for the tutorial we don't presume that you
+understand how to program in Scala.  We will point out necessary Scala
+features through the Chisel examples we give, and significant hardware
+designs can be completed using only the material contained herein.
+But as you gain experience and want to make your code simpler or more
+reusable, you will find it important to leverage the underlying power
+of the Scala language. We recommend you consult one of the excellent
+Scala books to become more expert in Scala programming.
+
+Chisel is still in its infancy and you are likely to encounter some
+implementation bugs, and perhaps even a few conceptual design
+problems.  However, we are actively fixing and improving the language,
+and are open to bug reports and suggestions.  Even in its early state,
+we hope Chisel will help designers be more productive in building
+designs that are easy to reuse and maintain.
+
+\begin{commentary}
+Through the tutorial, we format commentary on our design choices as in
+this paragraph.  You should be able to skip the commentary sections
+and still fully understand how to use Chisel, but we hope you'll find
+them interesting.
+
+We were motivated to develop a new hardware language by years of
+struggle with existing hardware description languages in our research
+projects and hardware design courses.  Verilog and VHDL were developed
+as hardware {\em simulation} languages, and only later did they become
+a basis for hardware {\em synthesis}.  Much of the semantics of these
+languages are not appropriate for hardware synthesis and, in fact,
+many constructs are simply not synthesizable.  Other constructs are
+non-intuitive in how they map to hardware implementations, or their
+use can accidently lead to highly inefficient hardware structures.
+While it is possible to use a subset of these languages and yield
+acceptable results, they nonetheless present a cluttered and confusing
+specification model, particularly in an instructional setting.
+
+However, our strongest motivation for developing a new hardware
+language is our desire to change the way that electronic system design
+takes place.  We believe that it is important to not only teach
+students how to design circuits, but also to teach them how to design
+{\em circuit generators}---programs that automatically generate
+designs from a high-level set of design parameters and constraints.
+Through circuit generators, we hope to leverage the hard work of
+design experts and raise the level of design abstraction for everyone.
+To express flexible and scalable circuit construction, circuit
+generators must employ sophisticated programming techniques to make
+decisions concering how to best customize their output circuits
+according to high-level parameter values and constraints.  While
+Verilog and VHDL include some primitive constructs for programmatic
+circuit generation, they lack the powerful facilities present in
+modern programming languages, such as object-oriented programming,
+type inference, support for functional programming, and reflection.
+
+Instead of building a new hardware design language from scratch, we
+chose to embed hardware construction primitives within an existing
+language.  We picked Scala not only because it includes the
+programming features we feel are important for building circuit
+generators, but because it was specifically developed as a base for
+domain-specific languages.
+\end{commentary}
+
+\section{Hardware expressible in Chisel}
+
+The initial version of Chisel only supports the expression of
+synchronous RTL (Register-Transfer Level) designs, with a single
+common clock.  Synchronous RTL circuits can be expressed as a
+hierarchical composition of modules containing combinational logic and
+clocked state elements.  Although Chisel assumes a single global
+clock, local clock gating logic is automatically generated for every
+state element in the design to save power.
+\begin{commentary}
+Modern hardware designs often include multiple islands of logic, where
+each island uses a different clock and where islands must correctly
+communicate across clock island boundaries.  Although clock-crossing
+synchronization circuits are notoriously difficult to design, there
+are known good solutions for most scenarios, which can be packaged as
+library elements for use by designers.  As a result, most effort in
+new designs is spent in developing and verifying the functionality
+within each synchronous island rather than on passing values between
+islands.
+
+In its current form, Chisel can be used to describe each of the
+synchronous islands individually. Existing tool frameworks can tie
+together these islands into a complete design.  For example, a
+separate outer simulation framework can be used to model the assembly
+of islands running together.  It should be noted that exhaustive
+dynamic verification of asynchronous communications is usually
+impossible and that more formal static approaches are usually
+necessary.
+\end{commentary}
+
+This version of Chisel also only supports binary logic, and does not
+support tri-state signals.
+\begin{commentary}
+We focus on binary logic designs as they constitute the vast majority
+of designs in practice.  We omit support for tri-state logic in the
+current Chisel language as this is in any case poorly supported by
+industry flows, and difficult to use reliably outside of controlled
+hard macros.
+\end{commentary}
+
+\section{Types and Literals}
+
+\subsection{Scalars}
+
+\begin{verbatim}
+class Data extends Node {
+}
+class Bits extends Data {
+}
+class Fix extends Bits {
+}
+class Bool extends Fix {
+}
+\end{verbatim}
+
+\subsection{Bundles}
+
+\begin{verbatim}
+class Bundle extends Data {
+}
+\end{verbatim}
+
+\subsection{Vecs}
+
+\begin{verbatim}
+class Vec extends Data {
+}
+\end{verbatim}
+
+\section{Combinational}
+
+\subsection{Operators}
+
+\begin{verbatim}
+\end{verbatim}
+
+\subsection{Bit Width Inference}
+
+\subsection{Named Wires}
+
+\section{Sequential}
+
+\subsection{Registers}
+
+\begin{verbatim}
+class Reg {
+  def <== ...
+}
+\end{verbatim}
+
+\subsection{Conditional Updates}
+
+\begin{verbatim}
+object when {
+  def apply ...
+}
+object unless {
+  def apply ...
+}
+object otherwise {
+  def apply ...
+}
+\end{verbatim}
+
+\section{Memory}
+
+\subsection{ROM}
+
+\begin{verbatim}
+object Rom {
+  def apply(inits: Seq[Data])
+}
+class Rom {
+  def read ...
+}
+\end{verbatim}
+
+\subsection{Mem}
+
+\begin{verbatim}
+object Ram {
+  def apply(depth: Int, ...)
+}
+class Rom {
+  def read ...
+}
+\end{verbatim}
+
+\section{Ports}
+
+\subsection{Direction}
+
+\begin{verbatim}
+dir='input
+dir='output
+\end{verbatim}
+
+
+\subsection{Subclassing}
+
+\begin{verbatim}
+extends Bundle
+\end{verbatim}
+
+\subsection{Views}
+
+\begin{verbatim}
+Bundle(Seq[String])
+\end{verbatim}
+
+\section{Components}
+
+\subsection{IO}
+
+\begin{verbatim}
+val io = ...;
+\end{verbatim}
+
+\subsection{Bulk Connections}
+
+\begin{verbatim}
+<>
+^^
+\end{verbatim}
+
+\subsection{Main}
+
+\begin{verbatim}
+def chiselMain (args: Array[String], gen, scanner, printer) 
+args =
+--debug
+...
+\end{verbatim}
+
+\section{Emulator}
+
+\subsection{dat_t}
+
+\begin{verbatim}
+class dat_t {
+}
+\end{verbatim}
+
+\subsection{mod_t}
+
+\begin{verbatim}
+class mod_t {
+init
+clock_lo
+clock_hi
+scan
+print
+}
+\end{verbatim}
+
+\subsection{Harness}
+
+\begin{verbatim}
+environment variables
+\end{verbatim}
+
+\begin{verbatim}
+#include "cpu.h"
+
+int main (int argc, char* argv) {
+  cpu_t* cpu = new Cpu();  
+  cpu->init();
+  for (size_t t = 0; t < n; t++) {
+    cpu->scan();
+    cpu->clock_lo();
+    cpu->clock_lo();
+    cpu->print();
+  }
+}
+\end{verbatim}
+
+\section{Verilog}
+
+\section{Acknowlegements}
+
+Many people have helped out in the design of Chisel, and we thank them
+for their patience, bravery, and belief in a better way.  Many
+Berkeley EECS students in the Isis group gave weekly feedback as the
+design evolved including but not limited to Yunsup Lee, Andrew
+Waterman, Scott Beamer, Chris Celio, etc.  Yunsup Lee gave us feedback
+in response to the first RISC-V implementation, called TrainWreck,
+translated from Verilog to Chisel.  Andrew Waterman and Yunsup Lee
+helped us get our Verilog backend up and running and Chisel TrainWreck
+running on an FPGA.  Brian Richards was the first actual Chisel user,
+first translating (with Huy Vo) John Hauser's FPU Verilog code to
+Chisel, and later implementing generic memory blocks.  Brian gave many
+invaluable comments on the design and brought a vast experience in
+hardware design and design tools.  Chris Batten shared his fast
+multiword C++ template library that inspired our fast emulation
+library.  Huy Vo became our undergraduate research assistant and was
+the first to actually assist in the Chisel implementation.  We
+appreciate all the EECS students who participated in the Chisel
+bootcamp and proposed and worked on hardware design projects all of
+which pushed the Chisel envelope.  We appreciate the work that James
+Martin and Alex Williams did in writing and translating network and
+memory controllers and non-blocking caches.  Finally, Chisel's
+functional programming and bit-width inference ideas were inspired by
+earlier work on a hardware description language called Gel~\cite{gel} designed in
+collaboration with Dany Qumsiyeh and Mark Tobenkin.
+
+% \note{Who else?}
+
+\begin{thebibliography}{50}
+\bibitem{gel} Bachrach, J., Qumsiyeh, D., Tobenkin, M. \textsl{Hardware Scripting in Gel}.
+in Field-Programmable Custom Computing Machines, 2008. FCCM '08. 16th.
+\end{thebibliography}
+
+\end{document}

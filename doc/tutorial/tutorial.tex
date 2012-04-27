@@ -749,6 +749,15 @@ cut -f 1,2,3 -d " " < test | mux > test.out
 diff test.out test
 \end{example}
 
+Other command arguments are as follows:
+\begin{tabular}{lll}
+\verb+--target-dir+ & target pathname prefix \\
+\verb+--gen-harness+ & generate harness file for C++ \\
+\verb+--v+ & generate verilog \\
+\verb+--vcd+ & enable vcd dumping \\
+\verb+--debug+ & put all wires in class file \\
+\end{tabular}
+
 \section{State Elements}
 \label{sec:sequential}
 

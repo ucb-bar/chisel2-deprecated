@@ -1,0 +1,175 @@
+\documentclass[10pt]{article}
+\setlength\textwidth{6.875in}
+\setlength\textheight{8.875in}
+% set both margins to 2.5 pc
+\setlength{\oddsidemargin}{-0.1875in}% 1 - (8.5 - 6.875)/2
+\setlength{\evensidemargin}{-0.1875in}
+\setlength{\marginparwidth}{0pc}
+\setlength{\marginparsep}{0pc}%
+\setlength{\topmargin}{0in} \setlength{\headheight}{0pt}
+\setlength{\headsep}{0pt}
+\setlength{\footskip}{37pt}%
+%\setlength{\columnsep}{0.3125in}
+%\setlength{\columnwidth}{3.28125in}% (6.875 - 0.3125)/2 = 3.28125in
+\setlength{\parindent}{1pc}
+\newcommand{\myMargin}{1.00in}
+\usepackage[top=\myMargin, left=\myMargin, right=\myMargin, bottom=\myMargin, nohead]{geometry}
+\usepackage{epsfig,graphicx}
+\usepackage{palatino}
+\usepackage{fancybox}
+
+\newenvironment{commentary}
+{ \vspace{-0.1in}
+  \begin{quotation}
+  \noindent
+  \small \em
+  \rule{\linewidth}{1pt}\\
+}
+{
+  \end{quotation}
+}
+
+% \newenvironment{kode}%
+% {\footnotesize
+%  %\setlength{\parskip}{0pt}
+%   %\setlength{\topsep}{0pt}
+%   %\setlength{\partopsep}{0pt}
+%  \verbatim}
+% {\endverbatim 
+% %\vspace*{-0.1in}
+%  }
+
+% \newenvironment{kode}%
+% {\VerbatimEnvironment
+% \footnotesize\begin{Sbox}\begin{minipage}{6in}\begin{Verbatim}}%
+% {\end{Verbatim}\end{minipage}\end{Sbox}
+% \setlength{\fboxsep}{8pt}\fbox{\TheSbox}}
+
+% \newenvironment{kode}
+% {\begin{Sbox}
+% \footnotesize
+% \begin{minipage}{6in}
+%   %\setlength{\parskip}{0pt}
+%   %\setlength{\topsep}{0pt}
+%   %\setlength{\partopsep}{0pt}
+%   \verbatim}
+% {\endverbatim 
+% \end{minipage}
+% \end{Sbox} 
+% \fbox{\TheSbox}
+%  %\vspace*{-0.1in}
+%  }
+
+\title{Chisel Installation}
+\author{Jonathan Bachrach \\
+EECS Department, UC Berkeley\\
+{\tt  \{jrb\}@eecs.berkeley.edu}
+}
+\date{\today}
+
+\newenvironment{example}{\VerbatimEnvironment\begin{footnotesize}\begin{Verbatim}}{\end{Verbatim}\end{footnotesize}}
+\newcommand{\kode}[1]{\begin{footnotesize}{\tt #1}\end{footnotesize}}
+
+\def\code#1{{\tt #1}}
+
+\def\note#1{\noindent{\bf [Note: #1]}}
+%\def\note#1{}
+
+\begin{document}
+\maketitle{}
+
+\section{Introduction}
+
+This document is a installation guide for {\em Chisel} (Constructing
+Hardware In a Scala Embedded Language).  Chisel is a hardware
+construction language embedded in the high-level programming language
+Scala.  
+
+\section{Java}
+
+Install a modern Java runtime and compiler.
+
+\section{Github}
+
+\begin{itemize}
+\item Get an account on \verb|www.github.com|
+\item Register your public key on \verb|github.com|
+\item Tell me your github account name
+\item run \verb|git clone git@github.com:chiselers/chisel.git|
+\end{itemize}
+
+\section{SBT}
+
+SBT is the Scala Build Tool and is similar to Maven for Java.
+
+\begin{itemize}
+\item download the sbt jar file from: 
+\begin{itemize}
+\item \verb|http://code.google.com/p/simple-build-tool/downloads/detail?name=sbt-launch-0.7.5.jar&can=2&q=|
+\end{itemize}
+\item setup sbt following the instructions from:  
+\begin{itemize}
+\item \verb|http://code.google.com/p/simple-build-tool/wiki/Setup|
+\end{itemize}
+\item Put jar in your ~/bin directory, put the line:
+\begin{itemize}
+\item \verb|java –Xmx2GB –jar `dirname $0`/sbt-launch.jar “$@”|
+\end{itemize}
+\item In a file called sbt in your ~/bin dir and do
+\begin{itemize}
+\item \verb|chmod u+x ~/bin/sbt|
+\end{itemize}
+\end{itemize}
+
+SBT has a particular directory structure that we adhere to and
+somewhat improve.  Assuming that we have a project named transactors,
+then the following would be the template:
+
+\begin{verbatim}
+chisel/ # install chisel at same level
+transactors/
+  chisel -> ../chisel
+  sbt/
+    project/
+      build.scala # edit this as shown below
+    chisel -> ../chisel/sbt/chisel/
+    transactors/
+      src/
+        main/
+          scala -> ../../../../src
+  src/ 
+    app.scala # your source files go here
+  emulator/ # your C++ target can go here
+\end{verbatim}
+
+The following is the \verb+build.scala+ template:
+
+\begin{verbatim}
+import sbt._
+import Keys._
+
+object BuildSettings {
+  val buildOrganization = "edu.berkeley.cs"
+  val buildVersion = "1.1"
+  val buildScalaVersion = "2.9.2"
+
+  val buildSettings = Defaults.defaultSettings ++ Seq (
+    organization := buildOrganization,
+    version      := buildVersion,
+    scalaVersion := buildScalaVersion
+  )
+}
+
+object ChiselBuild extends Build {
+  import BuildSettings._
+
+  lazy val chisel = 
+    Project("chisel", file("chisel"), settings = buildSettings)
+  lazy val transactors =
+    Project("transactors", file("transactors"), 
+            settings = buildSettings) 
+      dependsOn(chisel)
+}
+\end{verbatim}
+
+\end{document}
