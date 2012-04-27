@@ -277,7 +277,7 @@ abstract class Component(resetSignal: Bool = null) {
 
   //true if this is a subclass of x
   def isSubclassOf(x: java.lang.Class[ _ ]): Boolean = {
-    var className = this.getClass;
+    var className: java.lang.Class[ _ ] = this.getClass;
     while(className.toString != x.toString){
       if(className.toString == "class Chisel.Component") return false;
       className = className.getSuperclass;

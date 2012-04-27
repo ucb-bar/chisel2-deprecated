@@ -152,7 +152,7 @@ class Extract extends Node with proc {
       // stack = Thread.currentThread.getStackTrace;
       // for (e <- stack)
       //   println(e);
-      return Unit;
+      return;
     }
     // println("[info] Found an Assign node from an Extract");
     assign_node match {

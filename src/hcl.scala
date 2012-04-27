@@ -120,7 +120,7 @@ object chiselMain {
         case "--Wcomponent" => saveComponentTrace = true
         case "--noCombLoop" => dontFindCombLoop = true
         case "--gen-harness" => isGenHarness = true; 
-        case "--debug" => isDebug = true; println("DEBUGGING");
+        case "--debug" => isDebug = true; 
         case "--ioDebug" => isIoDebug = true; 
         case "--noIoDebug" => isIoDebug = false; 
         case "--clockGatingUpdates" => isClockGatingUpdates = true; 
