@@ -111,7 +111,7 @@ class MemCell[T <: Data](n: Int, data: T) extends Cell {
   }
   def write(addr: Node, w_data: T, we: Node = null, w_mask: Bits = null, cs: Bool = null.asInstanceOf[Bool]) = {
     // primitiveNode.addWritePort(this, addr, w_data, we, w_mask, cs);
-    val we_opt = (if (we == null) Bool(true) else we);
+    val we_opt = (if (we == null) conds.top else we);
     val write_port = new MemPort[T](this, 'write, addr, w_data, we_opt, w_mask, cs, null);
     port_count += 1;
     port_list += write_port;

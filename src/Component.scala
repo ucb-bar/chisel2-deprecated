@@ -57,10 +57,7 @@ object Component {
   var stackIndent = 0;
   var printStackStruct = ArrayBuffer[(Int, Component)]();
   var firstComp = true;
-  var genCount = 0;
   def genCompName(name: String): String = {
-    // genCount += 1;
-    // name + "_" + genCount
     if (compIndices contains name) {
       val count = (compIndices(name) + 1)
       compIndices += (name -> count)
@@ -1064,7 +1061,6 @@ abstract class Component(resetSignal: Bool = null) {
     if(saveComponentTrace)
       printStack
     compDefs.clear;
-    genCount = 0;
   }
 
   /*
@@ -1212,7 +1208,6 @@ abstract class Component(resetSignal: Bool = null) {
     if(saveComponentTrace)
       printStack
     compDefs.clear;
-    genCount = 0;
   }
   */
 
@@ -1266,8 +1261,8 @@ abstract class Component(resetSignal: Bool = null) {
     harness.write("    dat_t<1> reset = LIT<1>(t == 0);\n");
     harness.write("    if (!c->scan(stdin)) break;\n");
     harness.write("    c->clock_lo(reset);\n");
-    harness.write("    c->clock_hi(reset);\n");
     harness.write("    c->print(stdout);\n");
+    harness.write("    c->clock_hi(reset);\n");
     if (isVCD)
       harness.write("    c->dump(f, t);\n");
     harness.write("  }\n");
