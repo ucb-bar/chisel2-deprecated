@@ -85,10 +85,6 @@ Hardware In a Scala Embedded Language).  Chisel is a hardware
 construction language embedded in the high-level programming language
 Scala.  
 
-\section{Java}
-
-Install a modern Java runtime and compiler.
-
 \section{Github}
 
 \begin{itemize}
@@ -98,35 +94,25 @@ Install a modern Java runtime and compiler.
 \item run \verb|git clone git@github.com:chiselers/chisel.git|
 \end{itemize}
 
+\section{Java}
+
+Install a modern Java runtime and compiler.
+
 \section{SBT}
 
-SBT is the Scala Build Tool and is similar to Maven for Java.
+SBT is the Scala Build Tool and is similar to Maven for Java.  Install
+and setup SBT using instructions from:
 
-\begin{itemize}
-\item download the sbt jar file from: 
-\begin{itemize}
-\item \verb|http://code.google.com/p/simple-build-tool/downloads/detail?name=sbt-launch-0.7.5.jar&can=2&q=|
-\end{itemize}
-\item setup sbt following the instructions from:  
-\begin{itemize}
-\item \verb|http://code.google.com/p/simple-build-tool/wiki/Setup|
-\end{itemize}
-\item Put jar in your ~/bin directory, put the line:
-\begin{itemize}
-\item \verb|java –Xmx2GB –jar `dirname $0`/sbt-launch.jar “$@”|
-\end{itemize}
-\item In a file called sbt in your ~/bin dir and do
-\begin{itemize}
-\item \verb|chmod u+x ~/bin/sbt|
-\end{itemize}
-\end{itemize}
+\begin{verbatim}
+https://github.com/harrah/xsbt/wiki/Getting-Started-Setup
+\end{verbatim}
 
 SBT has a particular directory structure that we adhere to and
-somewhat improve.  Assuming that we have a project named transactors,
+somewhat improve.  Assuming that we have a project named {\em transactors},
 then the following would be the template:
 
 \begin{verbatim}
-chisel/ # install chisel at same level
+chisel/           # install chisel at same level as your project
 transactors/
   chisel -> ../chisel
   sbt/
@@ -138,8 +124,8 @@ transactors/
         main/
           scala -> ../../../../src
   src/ 
-    app.scala # your source files go here
-  emulator/ # your C++ target can go here
+    app.scala    # your source files go here
+  emulator/      # your C++ target can go here
 \end{verbatim}
 
 The following is the \verb+build.scala+ template:
