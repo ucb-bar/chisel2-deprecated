@@ -1691,7 +1691,7 @@ abstract class Component(resetSignal: Bool = null) {
       for (tok <- toks) {
         if (tok(0) == '%') {
           for (node <- maybeFlatten(printArgs(i))) 
-            out_c.write("  fprintf(f, \"%s\", " + node.emitRef + ".to_str().c_str());\n");
+            out_c.write("  fprintf(f, \"%s\", " + node.getNode.emitRef + ".to_str().c_str());\n");
           i += 1;
         } else {
           out_c.write("  fprintf(f, \"%s\", \"" + tok + "\");\n");
@@ -1719,7 +1719,7 @@ abstract class Component(resetSignal: Bool = null) {
       out_c.write("  int n = fscanf(f, \"" + format + "\"");
       for (arg <- scanArgs) {
         for (subarg <- maybeFlatten(arg))
-          out_c.write(",  &" + subarg.emitRef + ".values[0]");
+          out_c.write(",  &" + subarg.getNode.emitRef + ".values[0]");
       }
       out_c.write(");\n");
       out_c.write("  return n == " + scanArgs.length + ";\n");

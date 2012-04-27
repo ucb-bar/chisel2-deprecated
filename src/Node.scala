@@ -155,7 +155,7 @@ abstract class Node extends nameable{
   def litOf: Literal = {
     if(inputs.length == 0)
       if (isLit) this.asInstanceOf[Literal] else null
-    else if(inputs.length == 1 && (isCellIO || this.isInstanceOf[Wire]))
+    else if(inputs.length == 1 && isCellIO)
       inputs(0).litOf
     else
       null
