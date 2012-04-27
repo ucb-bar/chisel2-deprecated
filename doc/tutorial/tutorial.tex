@@ -314,6 +314,7 @@ expression.
 \section{Builtin Operators}
 
 Chisel defines a set of hardware operators for the builtin types.
+% \begin{table*}[tb]
 \begin{center}
 \begin{tabular}{|l|l|}
 \hline
@@ -350,7 +351,7 @@ Fix, UFix, and Bool. Returns Bool.} \\
 \hline
 \hline
 \verb@val twoToTheX = Fix(1) << x@  & Logical left shift. \\
-\verb@val hiBits = x >> 16@          & Right shift (logical on Bits \&
+\verb@val hiBits = x >> UFix(16)@          & Right shift (logical on Bits \&
 UFix, arithmetic on Fix). \\
 % \verb@val scaledX = x >>> 3@  & Arithmetic right shift, copies in sign bits. \\
 \hline
@@ -392,6 +393,9 @@ bit position. \\
 \hline
 \end{tabular}
 \end{center}
+%\caption{Chisel operators on builtin data types.}
+%\label{tbl:chisel-operators}
+%\end{table*}
 
 \subsection{Bitwidth Inference}
 
@@ -444,7 +448,7 @@ we later reuse multiple times in a design.  For example, we can wrap
 up our earlier example of a simple combinational logic block as
 follows:
 \begin{example}
-def clb(a: Bits, b: Bits, c: Bits, d: Bits): Bits = (a & b) | (~c & d)
+def clb(a: Bits, b: Bits, c: Bits, d: Bits) = (a & b) | (~c & d)
 \end{example}
 
 \noindent
@@ -534,9 +538,9 @@ Bundles and Vecs can be arbitrarily nested to build complex data
 structures:
 \begin{example}
 class BigBundle extends Bundle {
-  val myVec = Vec(5) { Fix(width = 23) } // Vector of 5 23-bit signed integers.
-  val flag = Bool()
-  val f = new MyFloat() // Previously defined bundle.
+   val myVec = Vec(5) { Fix(width = 23) } // Vector of 5 23-bit signed integers.
+   val flag = Bool()
+   val f = new MyFloat() // Previously defined bundle.
 }
 \end{example}
 
@@ -769,7 +773,6 @@ Using registers, we can quickly define a number of useful circuit
 constructs.  For example, a rising-edge detector that takes a boolean
 signal in and outputs true when the current value is true and the
 previous value is false is given by:
-
 \begin{example}
 def risingedge(x: Bool) = x && !Reg(x)
 \end{example}
@@ -878,10 +881,8 @@ block following \code{when} can only contain update statements using
 the assignment operator \verb+:=+, simple expressions, and named wires
 defined with \code{val}.
 
-Cascaded conditional updates are prioritized from bottom to top
-following semantics of assignments to variables in Scala.  In particular, the last conditional
-update whose condition evaluates to true is chosen to execute its
-updates.  For example,
+In a sequence of conditional updates, the last conditional update
+whose condition is true takes priority.  For example,
 \begin{example}
 when (c1)   { r := Bits(1) }
 when (c2)   { r := Bits(2) }
@@ -889,13 +890,20 @@ when (c2)   { r := Bits(2) }
 
 \noindent
 leads to \code{r} being updated according to the following truth table:
-\begin{example}
-c1 c2  r
-0   0  r  // r unchanged
-0   1  2
-1   0  1
-1   1  2  // c2 takes precedence over c1.
-\end{example}
+\begin{center}
+{\small
+\begin{tabular}{|c|c|c|l|}
+\hline
+c1 & c2  &  r & \\
+\hline
+0 &  0 & r &  r unchanged \\
+0 &  1 & 2 & \\
+1 &  0 & 1 & \\
+1 &  1 & 2& c2 takes precedence over c1 \\
+\hline
+\end{tabular}
+}
+\end{center}
 
 \begin{figure}[h]
 \centering
@@ -908,17 +916,15 @@ c1 c2  r
 \end{figure}
 
 Figure~\ref{fig:condupdates} shows how each conditional update can be
-viewed as adding a mux to the input of a register, where the mux
-select is controlled by the \code{when} predicate such that the update
-expression is muxed into the register when the predicate is true, else
-the input comes from following code.  In addition, the predicate is
-OR-ed into a firing signal that drives the load enable of the
-register.  Subsequent \code{when} constructs chain on to the input of
-the earlier muxes and on to the OR chain.  The compiler adds
-termination values to the end of the chain so that if no conditional
-updates fire in a clock cycle, the load enable of the register will be
-deasserted and the register value will not change.
-
+viewed as inserting a mux before the input of a register to select
+either the update expression or the previous input according to the
+\code{when} predicate.  In addition, the predicate is OR-ed into a
+firing signal that drives the load enable of the register.  The
+compiler places initialization values at the beginning of the chain so
+that if no conditional updates fire in a clock cycle, the load enable
+of the register will be deasserted and the register value will not
+change.
+ 
 Chisel provides some syntactic sugar for other common forms of
 conditional update.  The \verb+unless+ construct is the same as
 \verb+when+ but negates its condition.  In other words,
@@ -1003,9 +1009,8 @@ We introduce the \code{switch} statement for conditional updates
 involving a series of comparisons against a common key.  For example,
 \begin{example}
 switch(idx) {
- is(v1)  { u1 };
- is(v2)  { u2 };
- default { ud };
+ is(v1)    { u1 };
+ is(v2)    { u2 };
 }
 \end{example}
 
@@ -1014,7 +1019,6 @@ is equivalent to:
 \begin{example}
 when (idx === v1) { u1 };
 .elsewhen (idx === v2) { u2 };
-.otherwise { ud };
 \end{example}
 
 Chisel also allows a \code{Wire}, i.e., the output of some
@@ -1151,7 +1155,7 @@ Users can define read only memories with:
 
 %%  TODO: FIX Rom to take Seq
 \begin{example}
-Rom(inits: Seq[Data])(gen: => T)
+Rom(inits: Seq[Data]) (gen: => T)
 \end{example}
 
 \noindent
@@ -1183,84 +1187,86 @@ where \verb+amp+ is used to scale the fixpoint values stored in the ROM.
 
 \subsection{RAM}
 
-Simple memories allow users to define simple single write multiple
-read memories.  The basic creation of the memory object looks as follows:
+
+Memories are given special treatment in Chisel since hardware
+implementations of memory have many variations, e.g., FPGA memories
+are instantiated quite differently from ASIC memories.  Chisel defines
+a memory abstraction that can map to either simple Verilog behavioral
+descriptions, or to instances of memory modules that are available
+from external memory generators provided by foundry or IP vendors.  In
+the simplest form, Chisel allows memory to be defined with a single
+write port and multiple read ports as follows:
 
 \begin{example}
-Mem(depth: Int, wrEnable: Bool, wrAddr: UFix, wrData: Data)
+  Mem(depth: Int, 
+      target: Symbol = 'default, readLatency: Int = 0)
 \end{example}
 
 \noindent
-where \verb+n+ is the number is the depth, \verb+wrEnable+ says
-whether writes occur, \verb+wrAddr+ provide the address to write to,
-and \verb+wrData+ give the data to write.  This memory object can then be
-read from using the read method with a read address.  For
-example, an audio recorder could be defined as follows:
+where \verb+depth+ is the number of memory locations, \verb+target+ is the
+type of memory used, \verb+readLatency+ is the latency of read ports to be
+defined on the memory.
+A memory object can then
+be read from using the \verb+read(rdAddress)+ method.  For example, an
+audio recorder could be defined as follows:
 
 \begin{example}
-def audioRecorder(n: Int) = { 
-  val addr = counter(UFix(n)); 
-  Ram(n, button(), addr, mic()).read(Mux(button(), 0, addr))
-}
+  def audioRecorder(n: Int) = { 
+    val addr = counter(UFix(n));
+    val ram = Mem(n).write(button(), addr)
+    ram.read(Mux(button(), UFix(0), addr))
+  } 
 \end{example}
 
 \noindent
 where a counter is used as an address generator into a memory.  
-The device records while the button is held down and plays back when it is released.
+The device records while \verb+button+ is \verb+true+, or plays back when \verb+false+.
 
 We can use simple memory to create register files.
 For example we can make a one write port, two read port register file with 32 registers as follows:
 
 \begin{example}
-val regs = Mem(32, wr_en, wr_addr, wr_data); 
-val idat = regs.read(iaddr);
-val mdat = regs.read(maddr);
+  val regs = Mem(32)
+  regs.write(wr_en, wr_addr, wr_data)
+  val idat = regs.read(iaddr)
+  val mdat = regs.read(maddr)
 \end{example}
 
 \noindent
 where a new read port is created for each call to read.
 
-The following is an example of a memory with
-one read and write port and the setting of additional parameters to
-mimic common static memory (SRAM) behaviors:
-
-%% TODO: CHANGE TO CURRIED TYPE 
-\begin{example}
-Mem.setDefaultReadLatency(1);                 // Default: 0
-val regfile = Mem(64){ io.data_in1.clone }; // A memory with no ports, with data width derived from another signal.
-regfile.setHexInitFile("hex_init_values.txt"); // Data formatted for Verilog readmemh
-regfile.write(io.addr_in, io.data_in1, io.wen, wrMask = io.bit_mask);
-val read_data = regfile.read(io.addr_in, io.data_in1, oe = !io.wen, cs = Bool(true));
-\end{example}
-
-This example can be written more compactly as:
+Additional parameters are available to mimic common memory behaviors,
+to aid with the process of mapping to real-world hardware.  The
+following is an example of a memory that is first defined with no
+memory ports, after which read, write, or read/write ports are added:
 
 \begin{example}
-val regfile = Mem(64, io.wen, io.addr_in, io.data_in1, wrMask = io.bit_mask, readLatency = 1, hexInitFile = "hex_init_values.txt");
-val read_data = regfile(io.addr_in, io.data_in1, oe = !io.wen, cs = Bool(true));
+  val regfile =
+    Mem(64, readLatency = 1, 
+        hexInitFile = "hex_init_values.txt");
+  regfile.write(addr_in, data_in1, wen, w_mask = bit_mask);
+  val read_data = regfile.read(addr_in);
 \end{example}
 
+%                 // Default: 0 (Combinational)
+%           // A memory with no ports, with data width derived from
+%           another signal.
+%  // Data formatted for Verilog readmemh
+
+% This example can be written more compactly as:
+% 
+% \begin{example}
+% val regfile = Mem(64, io.wen, io.addr_in, io.data_in1, w_mask = io.bit_mask,
+%  readLatency = 1, hexInitFile = "hex_init_values.txt");
+% val read_data = regfile(io.addr_in, io.data_in1, oe = !io.wen, cs = Bool(true));
+% \end{example}
+% 
 By default, this memory will be compiled to Verilog RTL.  To produce a
-reference to a verilog instance of a memory module, add
-\verb+regfile.setTarget('inst)+.  When Chisel compiles to Verilog, a
-second file will be generated, eg: \verb+design.conf+, which can be
-used by the synthesis design flow to construct the requested memory objects.
-
-In addition to read and write memory ports, the \verb+Mem+ memory object supports
-combined read/write ports.  The following example defines a memory with two read/write
-ports:
-
-\begin{example}
-val rw_mem = Mem(64){ io.data_in1.clone };
-rw_mem.setReadLatency(1);
-val rw_data_out = rw_mem.rw(io.addr_in, io.data_in1, io.wen);
-io.data_out2 := rw_mem.rw(io.addr_in,
-                          io.data_in2,
-                          we = Bool(true),      // Active high write enable
-                          wrMask = ~Bits(0,32), // Optional write mask
-                          cs = Bool(true),      // Active high chip select
-                          oe = Bool(true));     // Active high output enable
-\end{example}
+reference to a Verilog instance of a memory module, one adds
+\verb+target = 'inst+ to the constructor call.  When Chisel compiles
+to Verilog, a second file will be generated, e.g., \verb+design.conf+,
+which can be used by the synthesis design flow to construct the
+requested memory objects.
 
 \section{Interfaces and Bulk Connections}
 \label{sec:interfaces}
@@ -1376,7 +1382,7 @@ Chisel warns users if ports have other than exactly one connection to them.
 \subsection{Port Views}
 
 \begin{figure}
-\centerline{\includegraphics[width=3.5in]{figs/cpu.png}}
+\centerline{\includegraphics[width=3.5in]{cpu.png}}
 \caption{Simple CPU involving control and data path subcomponents and host and memory interfaces.}
 \label{fig:cpu}
 \end{figure}
@@ -1674,6 +1680,7 @@ where the curly braces \verb+{ }+ denote a zero argument function (aka thunk) th
 
 A generic FIFO could be defined as shown in Figure~\ref{fig:fifo} and
 used as follows:
+
 \begin{example}
 class DataBundle() extends Bundle {
   val A = UFix(width = 32);
@@ -1685,43 +1692,73 @@ object FifoDemo {
 }
 \end{example}
 
-\begin{figure}[h]
+\begin{figure}[ht]
 \begin{example}
 class FifoIO[T <: Data]()(gen: => T) extends Bundle() {
-  val enq_val = Bool(dir = INPUT);
-  val enq_rdy = Bool(dir = OUTPUT);
-  val deq_val = Bool(dir = OUTPUT);
-  val deq_rdy = Bool(dir = INPUT);
-  val enq_dat = gen.asInput;
-  val deq_dat = gen.asOutput;
+  val enq_val = Bool(INPUT)
+  val enq_rdy = Bool(OUTPUT)
+  val deq_val = Bool(OUTPUT)
+  val deq_rdy = Bool(INPUT)
+  val enq_dat = gen.asInput
+  val deq_dat = gen.asOutput
 }
 
 class Fifo[T <: Data] (n: Int)(gen: => T) extends Component {
-  val io           = new FifoIO()( gen );
-  val enq_ptr      = Reg(resetVal = UFix(0, sizeof(n)));
-  val deq_ptr      = Reg(resetVal = UFix(0, sizeof(n)));
-  val is_full      = Reg(resetVal = Bool(false));
-  val do_enq       = io.enq_rdy && io.enq_val;
-  val do_deq       = io.deq_rdy && io.deq_val;
-  val is_empty     = !is_full && (enq_ptr === deq_ptr);
-  val deq_ptr_inc  = deq_ptr + UFix(1);
-  val enq_ptr_inc  = enq_ptr + UFix(1);
+  val io           = new FifoIO()( gen )
+  val enq_ptr      = Reg(resetVal = UFix(0, sizeof(n)))
+  val deq_ptr      = Reg(resetVal = UFix(0, sizeof(n)))
+  val is_full      = Reg(resetVal = Bool(false))
+  val do_enq       = io.enq_rdy && io.enq_val
+  val do_deq       = io.deq_rdy && io.deq_val
+  val is_empty     = !is_full && (enq_ptr === deq_ptr)
+  val deq_ptr_inc  = deq_ptr + UFix(1)
+  val enq_ptr_inc  = enq_ptr + UFix(1)
   val is_full_next = 
-    Mux(do_enq && ~do_deq && ( enq_ptr_inc === deq_ptr ), Bool(true),
-    Mux(do_deq && is_full,                                Bool(false),
-        is_full));
-  enq_ptr := Mux(do_enq, enq_ptr_inc, enq_ptr);
-  deq_ptr := Mux(do_deq, deq_ptr_inc, deq_ptr);
-  is_full   := is_full_next;
-  val ram = Mem(n, do_enq, enq_ptr, io.enq_dat);
-  io.enq_rdy := !is_full;
-  io.deq_val := !is_empty;
-  ram.read(deq_ptr) <> io.deq_dat;
+    Mux(do_enq && ~do_deq && (enq_ptr_inc === deq_ptr), Bool(true),
+    Mux(do_deq && is_full,                              Bool(false),
+        is_full))
+  enq_ptr <== Mux(do_enq, enq_ptr_inc, enq_ptr)
+  deq_ptr <== Mux(do_deq, deq_ptr_inc, deq_ptr)
+  is_full <== is_full_next
+  val ram = Mem(n, do_enq, enq_ptr, io.enq_dat)
+  io.enq_rdy := !is_full
+  io.deq_val := !is_empty
+  ram.read(deq_ptr) <> io.deq_dat
 }
 \end{example}
-\caption{Fifo example.}
+\caption{Parameterized FIFO example.}
 \label{fig:fifo}
 \end{figure}
+
+It is also possible to define a generic decoupled interface:
+
+\begin{example}
+  class ioDecoupled[T <: Data]()(data: => T) extends Bundle() {
+    val ready = Bool(INPUT)
+    val valid = Bool(OUTPUT)
+    val bits  = data.asOutput
+  }
+\end{example}
+
+\noindent
+This template can then be used to add a handshaking protocol to any
+set of signals:
+
+\begin{example}
+  class decoupledDemo extends ioDecoupled()( new DataBundle() )
+\end{example}
+
+\noindent
+The FIFO interface in Figure~\ref{fig:fifo} can be now be simplified as
+follows: 
+
+\begin{example}
+  class FifoIO[T <: Data]()(gen: => T) extends Bundle()  {
+    val enq = new ioDecoupled()( gen ).flip()
+    val deq = new ioDecoupled()( gen )
+  }
+\end{example}
+
 
 \section{Acknowlegements}
 
@@ -1753,6 +1790,10 @@ collaboration with Dany Qumsiyeh and Mark Tobenkin.
 % \note{Who else?}
 
 \begin{thebibliography}{50}
+\bibitem{chisel-dac12} Bachrach, J., Vo, H., Richards, B., Lee, Y., Waterman,
+  A., Avi\v{z}ienis, Wawrzynek, J., Asanovi\'{c} \textsl{Chisel:
+    Constructing Hardware in a Scala Embedded Language}.
+in DAC '12.
 \bibitem{gel} Bachrach, J., Qumsiyeh, D., Tobenkin, M. \textsl{Hardware Scripting in Gel}.
 in Field-Programmable Custom Computing Machines, 2008. FCCM '08. 16th.
 \end{thebibliography}
