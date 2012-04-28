@@ -45,20 +45,6 @@ class IO extends Wire with Cloneable{
   // override def emitDef: String = "";
   override def apply(name: String): Data = this
   override def flatten = Array((name, this));
-  override def emitDefLoC: String = {
-    if (dir == INPUT) {
-      // TODO: HACK
-      if (inputs.length == 1)
-        "  " + emitTmp + " = " + inputs(0).emitRef + ";\n"
-      // else if (consumers.length == 1)
-      //   "  " + consumers(0).emitRef + " = " + emitTmp + ";// CONSUMER=1 \n"
-      else if (inputs.length == 0 && !isInObject) 
-        "  " + emitTmp + ";\n"
-      else
-        ""
-    } else 
-      super.emitDefLoC
-  }
   override def toString: String = {
     if (dir == INPUT)
       "INPUT(" + name + (if (component == null) "" else ("." + component)) + ")";
@@ -168,7 +154,7 @@ class IO extends Wire with Cloneable{
     dir = OUTPUT;
     this
   }
-  override def emitRefV = if(name == "") super.emitRefV else if(!named) name + "_" + emitIndex else name
+  override def emitRefV = if(!isInObject || name == "") super.emitRefV else if(!named) name + "_" + emitIndex else name
   override def setIsCellIO = isCellIO = true;
   override def setIsClkInput = {isClkInput = true; this assign clk;}
   override def clone = {

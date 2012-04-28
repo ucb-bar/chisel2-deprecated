@@ -248,7 +248,7 @@ abstract class Node extends nameable{
     (isIo && (isIoDebug || component == topComponent)) || 
     (topComponent.debugs.contains(this) && named) || 
     isReg || isUsedByRam || isProbe || isDebug;
-  def isInVCD = isIo || isReg || isProbe || (isDebug && named);
+  def isInVCD = (isIo && isInObject) || isReg || isProbe || (isDebug && named);
   def emitTmp: String = 
     if (backendName == "c") {
       if (isInObject)

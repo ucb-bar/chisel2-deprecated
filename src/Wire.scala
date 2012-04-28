@@ -97,6 +97,7 @@ class Wire extends Data with proc {
     // val dname = (if (names.size > 1) names(1) else names(0));
     super.dotName + "(" + name + ")";
   }
+  override def emitRefC: String = if (!isInObject && inputs.length == 1) inputs(0).emitRefC else super.emitRefC
   override def emitDef: String = { 
     if (inputs.length == 0) {
       println("// UNCONNECTED " + this + " IN " + component); ""
@@ -106,7 +107,7 @@ class Wire extends Data with proc {
       "  assign " + emitTmp + " = " + inputs(0).emitRef + ";\n" }
   override def emitDefLoC: String = 
     // TODO: NEED THIS TO BE A CHECK
-    if (inputs.length == 1)
+    if (isInObject && inputs.length == 1)
       "  " + emitTmp + " = " + inputs(0).emitRef + ";\n"
     else if (inputs.length == 0 && !isInObject) {
       "  " + emitTmp + ";\n"
