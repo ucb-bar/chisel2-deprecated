@@ -11,7 +11,9 @@ object Fill {
   def fillWidthOf(i: Int, n: Node) = { (m: Node) => (m.inputs(i).width * n.maxNum.toInt) }
   def apply(n: Int, mod: Bits): Bits = {
     val (bits_lit) = (mod.litOf);
-    if (isFolding && bits_lit != null) {
+    if (n == 1) {
+      mod
+    } else if (isFolding && bits_lit != null) {
       // println("FOLDING EXTRACT " + bits_lit.value + "(" + off_lit.value + ")");
       var res = bits_lit.value;
       val w   = mod.getWidth();
