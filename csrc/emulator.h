@@ -43,7 +43,7 @@ inline val_t val_all_ones_or_zeroes( val_t bit ) {
   return (val_t) ((sval_t) ((sval_t) bit << (val_n_bits() - 1)) >> (val_n_bits() -1));
   }
 inline val_t val_top_bit( val_t v ) { return (v >> (val_n_bits()-1)); }
-inline val_t val_n_words( val_t n_bits ) { return (val_t)(ceilf((float)n_bits / val_n_bits())); }
+#define val_n_words(n_bits) (((n_bits) + 8*sizeof(val_t) - 1)/(8*sizeof(val_t)))
 inline val_t val_n_full_words( val_t n_bits ) { return n_bits / val_n_bits(); }
 inline val_t val_n_word_bits( val_t n_bits ) { return n_bits % val_n_bits(); }
 inline val_t val_n_half_bits( void ) { return val_n_bits()>>1; }
@@ -1203,11 +1203,11 @@ class dat_t {
   inline dat_t<1> operator ! ( void ) {
     return DAT<1>(!lo_word()); 
   }
-  dat_t<1> operator && ( dat_t<w> o ) {
-    return DAT<1>(lo_word() & o.lo_word() & 1); 
+  dat_t<1> operator && ( dat_t<1> o ) {
+    return DAT<1>(lo_word() & o.lo_word()); 
   }
-  dat_t<1> operator || ( dat_t<w> o ) {
-    return DAT<1>((lo_word() | o.lo_word()) & 1); 
+  dat_t<1> operator || ( dat_t<1> o ) {
+    return DAT<1>(lo_word() | o.lo_word()); 
   }
   dat_t<1> operator == ( dat_t<w> o ) {
     dat_t<1> res;
@@ -1329,17 +1329,18 @@ class dat_t {
       // }
   }
   template <int dw>
-  dat_t<dw> extract(val_t e, val_t s) { 
-    dat_t<w> dres;
-    bit_word_funs<n_words>::extract(dres.values, values, e, s, dw);
+  dat_t<dw> extract() {
     dat_t<dw> res;
-    // printf("EXT RES: ");
-    for (int i = 0; i < res.n_words; i++) {
-      res.values[i] = dres.values[i];
-      // printf("%d:%llx ", i, res.values[i]);
-    }
-    // printf("\n");
+    int i;
+    for (i = 0; i < val_n_full_words(dw); i++)
+      res.values[i] = values[i];
+    if (val_n_word_bits(dw))
+      res.values[i] = values[i] & mask_val(val_n_word_bits(dw));
     return res;
+  }
+  template <int dw>
+  dat_t<dw> extract(val_t e, val_t s) {
+    return (*this >> s).extract<dw>();
   }
   template <int dw, int iwe, int iws>
   inline dat_t<dw> extract(dat_t<iwe> e, dat_t<iws> s) { 
@@ -1394,8 +1395,9 @@ template <int w> inline dat_t<w> LIT(val_t value) {
 
 template <int w>
 inline dat_t<w> mux ( dat_t<1> t, dat_t<w> c, dat_t<w> a ) { 
-  dat_t<w> mask = t.fill<w,w>();
-  return (mask&c)|((~mask)&a);
+  dat_t<w> mask;
+  bit_word_funs<val_n_words(w)>::fill(mask.values, -t.lo_word());
+  return a ^ ((a ^ c) & mask);
   // return t.lo_word() != 0 ? c : a; 
 }
 
@@ -1418,6 +1420,8 @@ template <int w> datz_t<w> inline LITZ(val_t value, val_t mask) {
 
 template < int w, int w1, int w2 >
 inline dat_t<w> cat(dat_t<w1> d1, dat_t<w2> d2) { 
+  if (w <= val_n_bits() && w1 + w2 == w)
+    return DAT<w>(d1.values[0] << (w2 & (val_n_bits()-1)) | d2.values[0]);
   return DAT<w>((DAT<w>(d1) << w2) | DAT<w>(d2));
 }
 
