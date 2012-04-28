@@ -254,7 +254,7 @@ class Literal extends Node {
       ("LIT<" + width + ">(" + name + "L)")
     } else
       ("LIT<" + width + ">(0x" + name + "L)")
-   ) + "/* " + inputVal + "*/";
+   ) + "/*" + inputVal + "*/";
 
   override def emitRefVCD: String = 
     (if (isBinary) { 

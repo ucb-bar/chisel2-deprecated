@@ -84,7 +84,7 @@ class Op extends Node {
   def emitOpRef (k: Int): String = {
     if (op == "<<") {
       if (k == 0 && inputs(k).width < width)
-	"/* C */DAT<" + width + ">(" + inputs(k).emitRef + ")"
+	"DAT<" + width + ">(" + inputs(k).emitRef + ")"
       else
 	inputs(k).emitRef
     } else if (op == "##" || op == ">>" || op == "*" ||
@@ -95,7 +95,7 @@ class Op extends Node {
       for (i <- 0 until nGrow)
 	w = max(w, inputs(i).width);
       if (isCoercingArgs && nGrow > 0 && k < nGrow && w > inputs(k).width)
-	"/* C */DAT<" + w + ">(" + inputs(k).emitRef + ")"
+	"DAT<" + w + ">(" + inputs(k).emitRef + ")"
       else
 	inputs(k).emitRef
     }
