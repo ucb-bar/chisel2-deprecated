@@ -80,7 +80,7 @@ object Literal {
 	       else 0); 
     if(width != -1)
       if(width < resWidth)
-	ChiselErrors += ChiselError("width " + width + " is too small for literal " + x, Thread.currentThread().getStackTrace);
+	ChiselErrors += ChiselError({"width " + width + " is too small for literal " + x}, Thread.currentThread().getStackTrace);
       else if(width > resWidth && x < 0){
 	while(width > resWidth){
 	  resWidth += 1;
@@ -143,7 +143,7 @@ object Literal {
     var res = BigInt(0);
     for(c <- x)
       if(c != '_'){
-	if(!(hexNibbles + "?").contains(c.toLowerCase)) ChiselErrors += ChiselError("Literal: " + x + " contains illegal character: " + c, Thread.currentThread().getStackTrace);
+	if(!(hexNibbles + "?").contains(c.toLowerCase)) ChiselErrors += ChiselError({"Literal: " + x + " contains illegal character: " + c}, Thread.currentThread().getStackTrace);
 	res = res * shamt + c.asDigit;
       }
     res
@@ -165,7 +165,7 @@ object Literal {
     var width = 0;
     for (d <- x) {
       if (d != '_') {
-	if(!"01?".contains(d)) ChiselErrors += ChiselError("Literal: " + x + " contains illegal character: " + d, Thread.currentThread().getStackTrace);
+	if(!"01?".contains(d)) ChiselErrors += ChiselError({"Literal: " + x + " contains illegal character: " + d}, Thread.currentThread().getStackTrace);
         width += 1;
         mask   = mask + (if (d == '?') "0" else "1");
         bits   = bits + (if (d == '?') "0" else d.toString);
@@ -203,7 +203,7 @@ object Literal {
 
     val w = if(width == -1) xWidth else width
     if(xWidth > width && width != -1)
-      ChiselErrors += ChiselError("width " + width + " is too small for literal " + x + ". Smallest allowed width is " + xWidth, Thread.currentThread().getStackTrace);
+      ChiselErrors += ChiselError({"width " + width + " is too small for literal " + x + ". Smallest allowed width is " + xWidth}, Thread.currentThread().getStackTrace);
     val numString = if(x >= 0) xString else xString.substring(1, xString.length)
     res.init("0x" + numString, w); 
     res.inputVal = x;
@@ -221,7 +221,7 @@ object Literal {
     else{
       res.init(removeUnderscore(literal), width); 
       if(width < sizeof(base, literal)) 
-	ChiselErrors += ChiselError("width " + width + " is too small for literal: " + res + " with min width " + sizeof(base, literal), Thread.currentThread().getStackTrace)
+	ChiselErrors += ChiselError({"width " + width + " is too small for literal: " + res + " with min width " + sizeof(base, literal)}, Thread.currentThread().getStackTrace)
     }
     res.base = base;
     if (base == 'b') {res.isZ = literal.contains('?'); res.isBinary = true;}

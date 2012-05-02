@@ -37,7 +37,7 @@ object Node {
       m.inputs(i).getWidth 
     } catch { 
         case e: java.lang.IndexOutOfBoundsException => {
-          val error = ChiselError(m + " in " + m.component + " is unconnected. Ensure that is assigned.", m)
+          val error = ChiselError({m + " in " + m.component + " is unconnected. Ensure that is assigned."}, m)
           if (!ChiselErrors.contains(error))
             ChiselErrors += error
           -1
@@ -222,7 +222,7 @@ abstract class Node extends nameable{
     val res = inferWidth(this);
     if(inferCount > 1000000) {
       if(genError) {
-	val error = ChiselError("Unable to infer width of " + this, this);
+	val error = ChiselError({"Unable to infer width of " + this}, this);
         if (!ChiselErrors.contains(error))
           ChiselErrors += error
       } else
@@ -499,7 +499,7 @@ abstract class Node extends nameable{
   def removeCellIOs() {
     for(i <- 0 until inputs.length) {
       if(inputs(i) == null){
-        val error = ChiselError("NULL Input for " + this.getClass + " " + this + " in Component " + component, this);
+        val error = ChiselError({"NULL Input for " + this.getClass + " " + this + " in Component " + component}, this);
         if (!ChiselErrors.contains(error))
           ChiselErrors += error
       }

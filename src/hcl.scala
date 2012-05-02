@@ -206,12 +206,12 @@ trait proc extends Node {
       if (inputs.length == 0 || inputs(0) == null){
         //println("NO UPDATES SPECIFIED ON" + this); // error();
 
-	ChiselErrors += ChiselError("NO UPDATES ON " + this, this); 
+	ChiselErrors += ChiselError({"NO UPDATES ON " + this}, this); 
       }
     } else {
       val (lastCond, lastValue) = updates.front;//updates.pop();
       if (isDefaultNeeded && default == null && !lastCond.isTrue) {
-        ChiselErrors += ChiselError("NO DEFAULT SPECIFIED FOR WIRE: " + this, this)
+        ChiselErrors += ChiselError({"NO DEFAULT SPECIFIED FOR WIRE: " + this}, this)
       }
       //updates.push((lastCond, lastValue));
       val (start, firstValue) = 

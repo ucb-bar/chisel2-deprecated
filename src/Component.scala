@@ -1234,7 +1234,7 @@ abstract class Component(resetSignal: Bool = null) {
   def verifyAllMuxes = {
     for(m <- muxes) {
       if(m.inputs(0).width != 1 && m.component != null && (!isEmittingComponents || !m.component.isInstanceOf[BlackBox]))
-	ChiselErrors += ChiselError("Mux " + m.name + " has " + m.inputs(0).width +"-bit selector " + m.inputs(0).name, m);
+	ChiselErrors += ChiselError({"Mux " + m.name + " has " + m.inputs(0).width +"-bit selector " + m.inputs(0).name}, m);
     }
   }
   def elaborate(fake: Int = 0) = {}
