@@ -12,11 +12,7 @@ object log2up
 
 object UFixToOH
 {
-  def apply(in: UFix, width: Int): Bits =
-  {
-    val out = Bits(1, width)
-    (out << in)(width-1,0)
-  }
+  def apply(in: UFix, width: Int): Bits = (Bits(1,1) << in)(width-1,0)
 }
 
 class Mux1H_(n: Int, w: Int) extends Component
@@ -35,6 +31,18 @@ class Mux1H_(n: Int, w: Int) extends Component
   } else {
     io.out := io.in(0)
   }
+}
+
+object MuxN {
+  def apply(sel: Seq[Bits], in: Seq[Bits]): Bits = {
+    if (in.size == 0)
+      null
+    else if (in.size == 1)
+      in(0)
+    else
+      Mux(sel(log2up(in.size)-1), apply(sel, in.slice((1 << log2up(in.size))/2, in.size)), apply(sel, in.slice(0, (1 << log2up(in.size))/2)))
+  }
+  def apply(sel: Bits, in: Seq[Bits]): Bits = apply((0 until log2up(in.size)).map(sel(_)), in)
 }
 
 object Mux1H {
@@ -171,12 +179,7 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
     res.setIsCellIO
     for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
       val w = io.getWidth
-      val onehot = UFixToOH(addr, length)
-      val pairs = new ArrayBuffer[(Bool, Bits)]
-      for(i <- 0 until length){
-        pairs += (onehot(i).toBool -> sortedElm(i))
-      }
-      val io_res = Mux1H(w, pairs)
+      val io_res = MuxN(addr, sortedElm)
       io assign io_res
 
       // setup the comp for writes
