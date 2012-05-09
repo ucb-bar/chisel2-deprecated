@@ -10,11 +10,6 @@ object log2up
   def apply(in: Int) = if (in == 1) 1 else ceil(log(in)/log(2)).toInt
 }
 
-object UFixToOH
-{
-  def apply(in: UFix, width: Int): Bits = (Bits(1,1) << in)(width-1,0)
-}
-
 class Mux1H_(n: Int, w: Int) extends Component
 {
   val io = new Bundle {
@@ -109,9 +104,8 @@ class VecProc extends proc {
   override def genMuxes(default: Node) = {}
 
   def procAssign(src: Node) = {
-    val onehot = UFixToOH(addr, elms.length)
     for(i <- 0 until elms.length){
-      when (onehot(i).toBool) {
+      when (addr === UFix(i)) {
         elms(i).comp procAssign src.asInstanceOf[Bits]
       }
     }
@@ -157,10 +151,8 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
 
   def write(addr: UFix, data: T) = {
     if(data.isInstanceOf[Node]){
-
-      val onehot = UFixToOH(addr, length)
       for(i <- 0 until length){
-        when (onehot(i).toBool) {
+        when (addr === UFix(i)) {
           this(i).comp procAssign data.toNode
         }
       }
