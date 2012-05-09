@@ -22,7 +22,7 @@ object Component {
   var saveWidthWarnings = false
   var saveConnectionWarnings = false
   var saveComponentTrace = false
-  var saveDot = true
+  var saveDot = false
   var dontFindCombLoop = false
   var widthWriter: java.io.FileWriter = null
   var connWriter: java.io.FileWriter = null
@@ -81,7 +81,7 @@ object Component {
     saveWidthWarnings = false
     saveConnectionWarnings = false
     saveComponentTrace = false
-    saveDot = true
+    saveDot = false
     dontFindCombLoop = false
     widthWriter = null
     connWriter = null
