@@ -48,28 +48,28 @@ class ListLookup[T <: Bits] extends Node {
 
   override def isByValue: Boolean = false;
   override def emitDef: String = {
-    var res = 
-      "  always @(*) begin\n" +
-      //"    " + emitRef + " = " + inputs(1).emitRef + ";\n" +
-      "    casez (" + inputs(0).emitRef + ")" + "\n";
+    val res = new StringBuilder()
+    res.append("  always @(*) begin\n" +
+               //"    " + emitRef + " = " + inputs(1).emitRef + ";\n" +
+               "    casez (" + inputs(0).emitRef + ")" + "\n");
     
     for ((addr, data) <- map) {
-      res = res + "      " + addr.emitRef + " : begin\n";
+      res.append("      " + addr.emitRef + " : begin\n");
       for ((w, e) <- wires zip data) 
 	if(w.component != null)
-          res = res + "        " + w.emitRef + " = " + e.emitRef + ";\n";
-      res = res + "      end\n" 
+          res.append("        " + w.emitRef + " = " + e.emitRef + ";\n");
+      res.append("      end\n")
     }
-    res = res + "      default: begin\n"
+    res.append("      default: begin\n")
     for ((w, e) <- wires zip defaultWires) {
       if(w.component != null)
-	res = res + "        " + w.emitRef + " = " + e.emitRef + ";\n";
+	res.append("        " + w.emitRef + " = " + e.emitRef + ";\n");
     }
-    res = res + "      end\n";
-    res = res + 
+    res.append("      end\n");
+    res.append( 
       "    endcase\n" +
-      "  end\n";
-    res
+      "  end\n");
+    res.toString
   }
 
   override def emitDefLoC: String = {

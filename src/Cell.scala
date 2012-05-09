@@ -68,25 +68,32 @@ object BinaryOp {
 
 object LogicalOp {
   def apply[T <: Data](x: T, y: T, op: String)(gen: => T): Bool = {
-    val node = op match {
-    case "===" => Op("==", 2, fixWidth(1), x, y );
-    case "!="  => Op("!=", 2, fixWidth(1), x, y );
-    case ">"   => Op(">",  2, fixWidth(1), x, y );
-    case "<"   => Op("<",  2, fixWidth(1), x, y );
-    case "<="  => Op("<=", 2, fixWidth(1), x, y );
-    case ">="  => Op(">=", 2, fixWidth(1), x, y );
-    case "&&"  => Op("&&", 2, fixWidth(1), x, y );
-    case "||"  => Op("||", 2, fixWidth(1), x, y );
-    case any   => null;
-    }
+    if(searchAndMap && op == "&&" && chiselAndMap.contains((x, y))) {
+      chiselAndMap((x, y))
+    } else {
+      val node = op match {
+        case "===" => Op("==", 2, fixWidth(1), x, y );
+        case "!="  => Op("!=", 2, fixWidth(1), x, y );
+        case ">"   => Op(">",  2, fixWidth(1), x, y );
+        case "<"   => Op("<",  2, fixWidth(1), x, y );
+        case "<="  => Op("<=", 2, fixWidth(1), x, y );
+        case ">="  => Op(">=", 2, fixWidth(1), x, y );
+        case "&&"  => Op("&&", 2, fixWidth(1), x, y );
+        case "||"  => Op("||", 2, fixWidth(1), x, y );
+        case any   => null;
+      }
 
-    // make output
-    val output = Bool(OUTPUT)
-    output.setIsCellIO
-    if(!node.isInstanceOf[Literal]) node.nameHolder = output
-    output assign node
-    output
-  }
+      // make output
+      val output = Bool(OUTPUT)
+      output.setIsCellIO
+      if(!node.isInstanceOf[Literal]) node.nameHolder = output
+      output assign node
+      if(searchAndMap && op == "&&" && !chiselAndMap.contains((x, y))) {
+        chiselAndMap += ((x, y) -> output)
+      }
+      output
+    }
+  } 
 }
 
 object ReductionOp {
@@ -127,27 +134,34 @@ object UnaryBoolOp {
 
 object BinaryBoolOp {
   def apply(x: Bool, y: Bool, op: String): Bool = {
-    val node = op match {
-      case "^"   => Op("^",  2, maxWidth _,  x, y );
-      case "===" => Op("==", 2, fixWidth(1), x, y );
-      case "!="  => Op("!=", 2, fixWidth(1), x, y );
-      case ">"   => Op(">",  2, fixWidth(1), x, y );
-      case "<"   => Op("<",  2, fixWidth(1), x, y );
-      case "<="  => Op("<=", 2, fixWidth(1), x, y );
-      case ">="  => Op(">=", 2, fixWidth(1), x, y );
-      case "&&"  => Op("&&", 2, fixWidth(1), x, y );
-      case "||"  => Op("||", 2, fixWidth(1), x, y );
-      case "&"   => Op("&",  2, maxWidth _, x, y );
-      case "|"   => Op("|",  2, maxWidth _, x, y );
-      case any   => null;
-    }
+    if(searchAndMap && op == "&&" && chiselAndMap.contains((x, y))) {
+      chiselAndMap((x, y))
+    } else {
+      val node = op match {
+        case "^"   => Op("^",  2, maxWidth _,  x, y );
+        case "===" => Op("==", 2, fixWidth(1), x, y );
+        case "!="  => Op("!=", 2, fixWidth(1), x, y );
+        case ">"   => Op(">",  2, fixWidth(1), x, y );
+        case "<"   => Op("<",  2, fixWidth(1), x, y );
+        case "<="  => Op("<=", 2, fixWidth(1), x, y );
+        case ">="  => Op(">=", 2, fixWidth(1), x, y );
+        case "&&"  => Op("&&", 2, fixWidth(1), x, y );
+        case "||"  => Op("||", 2, fixWidth(1), x, y );
+        case "&"   => Op("&",  2, maxWidth _, x, y );
+        case "|"   => Op("|",  2, maxWidth _, x, y );
+        case any   => null;
+      }
 
-    // make output
-    val output = Bool(OUTPUT)
-    output.setIsCellIO
-    if(!node.isInstanceOf[Literal]) node.nameHolder = output
-    output assign node
-    output
+      // make output
+      val output = Bool(OUTPUT)
+      output.setIsCellIO
+      if(!node.isInstanceOf[Literal]) node.nameHolder = output
+      output assign node
+      if(searchAndMap && op == "&&" && !chiselAndMap.contains((x, y))) {
+        chiselAndMap += ((x, y) -> output)
+      }
+      output
+    }
   }
 }
 
