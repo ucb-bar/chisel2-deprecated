@@ -9,8 +9,8 @@
 \setlength{\topmargin}{0in} \setlength{\headheight}{0pt}
 \setlength{\headsep}{0pt}
 \setlength{\footskip}{37pt}%
-%\setlength{\columnsep}{0.3125in}
-%\setlength{\columnwidth}{3.28125in}% (6.875 - 0.3125)/2 = 3.28125in
+\setlength{\columnsep}{0.3125in}
+\setlength{\columnwidth}{3.28125in}% (6.875 - 0.3125)/2 = 3.28125in
 \setlength{\parindent}{1pc}
 \newcommand{\myMargin}{1.00in}
 \usepackage[top=\myMargin, left=\myMargin, right=\myMargin, bottom=\myMargin, nohead]{geometry}
@@ -75,9 +75,7 @@ and are open to bug reports and suggestions.  Even in its early state,
 we hope Chisel will help designers be more productive in building
 designs that are easy to reuse and maintain.
 
-\section{Types and Literals}
-
-\subsection{Scalars}
+\section{Node}
 
 \begin{verbatim}
 class Node {
@@ -86,7 +84,13 @@ class Node {
   def toNode: Node;
   def fromNode(Node): this.type;
 }
+
 trait proc extends Node;
+\end{verbatim}
+
+\subsection{Data}
+
+\begin{verbatim}
 class Data extends Node with proc {
   def flatten: Array[(String, IO)];
   def toFix: Fix;
@@ -98,17 +102,46 @@ class Data extends Node with proc {
   def asInput: this.type;
   def :=[T <: Data](data: T);
 }
+
 class Wire extends Data;
+
 class IO extends Wire {
 }
-class Bits extends IO;
+
+class Bits extends IO {
+  def unary_-(): Bits;
+  def unary_~(): Bits;
+  def andR(): Bool;
+  def orR():  Bool;
+  def ===(b: Bits): Bool;
+  def != (b: Bits): Bool;
+  def << (b: UFix): Bits;
+  def >> (b: UFix): Bits;
+  def &  (b: Bits): Bits;
+  def |  (b: Bits): Bits;
+  def ^  (b: Bits): Bits;
+  def ## (b: Bits): Bits;
+  def && (b: Bool): Bool;
+  def || (b: Bool): Bool;
+}
+
 class Bool extends Bits;
-class Num extends Bits;
+
+class Num extends Bits {
+  def +(b: Num): Num;
+  def *(b: Num): Num;
+  def -(b: Num): Num;
+  def >(b: Num): Bool;
+  def <=(b: Num): Bool;
+  def >=(b: Num): Bool;
+}
+
 class Fix extends Num; 
+
 class UFix extends Num; 
 \end{verbatim}
 
-\subsection{Bundles}
+\subsection{Bundle}
 
 \begin{verbatim}
 class Bundle extends Data {
@@ -116,7 +149,7 @@ class Bundle extends Data {
 }
 \end{verbatim}
 
-\subsection{Vecs}
+\subsection{Vec}
 
 \begin{verbatim}
 class Vec extends Data {
@@ -206,6 +239,9 @@ Bundle(Seq[String])
 
 \section{Components}
 
+Users write their own components by subclassing Component which is
+defined as follows:
+
 \begin{verbatim}
 abstract class Component {
   val io: IO;
@@ -224,10 +260,11 @@ val io = ...;
 
 \begin{verbatim}
 <>
-^^
 \end{verbatim}
 
 \subsection{Main}
+
+The user calls chiselMain from their main object:
 
 \begin{verbatim}
 object chiselMain {
@@ -239,7 +276,7 @@ object chiselMain {
 }
 \end{verbatim}
 
-Other command arguments are as follows:
+Command arguments are as follows:
 \begin{tabular}{lll}
 \verb+--target-dir+ & target pathname prefix \\
 \verb+--gen-harness+ & generate harness file for C++ \\
@@ -249,6 +286,9 @@ Other command arguments are as follows:
 \end{tabular}
 
 \section{Emulator}
+
+The C++ emulator is based on a fast multiword library using
+C++ templates.  The \verb+dat_t+ represents multiple \verb+val_t+:
 
 \begin{verbatim}
 typedef uint64_t val_t;
@@ -281,9 +321,12 @@ class dat_t {
   dat_t<w> operator - ( dat_t<w> o );
   dat_t<w> operator - ( );
   dat_t<w+w> operator * ( dat_t<w> o );
-  dat_t<w+w> fix_times_fix( dat_t<w> o );
-  dat_t<w+w> ufix_times_fix( dat_t<w> o );
-  dat_t<w+w> fix_times_ufix( dat_t<w> o );
+  dat_t<w+w> 
+    fix_times_fix( dat_t<w> o );
+  dat_t<w+w> 
+    ufix_times_fix( dat_t<w> o );
+  dat_t<w+w> 
+    fix_times_ufix( dat_t<w> o );
   dat_t<1> operator < ( dat_t<w> o );
   dat_t<1> operator > ( dat_t<w> o );
   dat_t<1> operator >= ( dat_t<w> o );
@@ -308,8 +351,8 @@ class dat_t {
   dat_t<w> operator >> ( dat_t<w> o );
   dat_t<w> rsha ( dat_t<w> o);
   dat_t<w>& operator = ( dat_t<w> o );
-  dat_t<w> fill_bit( val_t bit );
-  dat_t<w> fill_byte( val_t byte, int nb, int n );
+  dat_t<w> fill_bit(val_t bit);
+  dat_t<w> fill_byte(val_t byte, int nb, int n);
   template <int dw, int n> 
     dat_t<dw> fill( void );
   template <int dw, int nw> 
@@ -318,12 +361,12 @@ class dat_t {
     dat_t<dw> extract();
   template <int dw> 
     dat_t<dw> extract(val_t e, val_t s);
-  template <int dw, int iwe, int iws> 
-    dat_t<dw> extract(dat_t<iwe> e, dat_t<iws> s);
-  template <int sw> 
-    dat_t<w> inject(dat_t<sw> src, val_t e, val_t s);
-  template <int sw, int iwe, int iws>
-    dat_t<w> inject(dat_t<sw> src, dat_t<iwe> e, dat_t<iws> s)
+  template <int dw, int iwe, int iws> dat_t<dw> 
+    extract(dat_t<iwe> e, dat_t<iws> s);
+  template <int sw> dat_t<w> 
+    inject(dat_t<sw> src, val_t e, val_t s);
+  template <int sw, int iwe, int iws> dat_t<w> 
+    inject(dat_t<sw> src, dat_t<iwe> e, dat_t<iws> s);
   template <int dw> 
     dat_t<dw> log2();
   dat_t<1> bit(val_t b);
@@ -336,26 +379,33 @@ template <int w, int sw>
   dat_t<w> DAT(dat_t<sw> dat);
 template <int w> 
   dat_t<w> LIT(val_t value);
-template <int w>
-  dat_t<w> mux ( dat_t<1> t, dat_t<w> c, dat_t<w> a )
+template <int w> dat_t<w> 
+  mux ( dat_t<1> t, dat_t<w> c, dat_t<w> a )
 \end{verbatim}
+
+The Chisel compiler compiles top level components into a \verb+mod_t+
+class that can be created and executed:
 
 \begin{verbatim}
 class mod_t {
  public:
   std::vector< mod_t* > children;
-  virtual void init ( void ) { };
-  virtual void clock_lo ( dat_t<1> reset ) { };
-  virtual void clock_hi ( dat_t<1> reset ) { };
-  virtual void print ( FILE* f ) { };
-  virtual bool scan ( FILE* f ) { return true; };
-  virtual void dump ( FILE* f, int t ) { };
+  virtual void init (void) { };
+  virtual void clock_lo (dat_t<1> reset) { };
+  virtual void clock_hi (dat_t<1> reset) { };
+  virtual void print (FILE* f) { };
+  virtual bool scan (FILE* f) { return true; };
+  virtual void dump (FILE* f, int t) { };
 };
 \end{verbatim}
 
 \begin{verbatim}
 environment variables
 \end{verbatim}
+
+Either the Chisel compiler can create a harness or the user can write
+a harness themselves.  The following is an example of a harness for a
+CPU component:
 
 \begin{verbatim}
 #include "cpu.h"
