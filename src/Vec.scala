@@ -1,9 +1,11 @@
 package Chisel {
 
+import Component._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.BufferProxy;
 import scala.math._;
+import Vec._
 
 object log2up
 {
@@ -12,7 +14,17 @@ object log2up
 
 object UFixToOH
 {
-  def apply(in: UFix, width: Int): Bits = (Bits(1,1) << in)(width-1,0)
+  def apply(in: UFix, width: Int): Bits =
+  {
+    if(chiselOneHotMap.contains((in, width)))
+      chiselOneHotMap((in, width))
+    else {
+      val out = Bits(1, width)
+      val res = (out << in)(width-1,0)
+      chiselOneHotMap += ((in, width) -> res)
+      res
+    }
+  }
 }
 
 class Mux1H_(n: Int, w: Int) extends Component
@@ -100,6 +112,17 @@ object Vec {
     res.eltWidth = res(0).getWidth
     res
   }
+  
+  def getEnable(onehot: Bits, i: Int): Bool = {
+    var enable: Bool = null
+      if(chiselOneHotBitMap.contains(onehot, i)){
+        enable = chiselOneHotBitMap(onehot, i)
+      } else {
+        enable = onehot(i).toBool
+        chiselOneHotBitMap += ((onehot, i) -> enable)
+      }
+    enable
+  }
 }
 
 class VecProc extends proc {
@@ -110,11 +133,13 @@ class VecProc extends proc {
 
   def procAssign(src: Node) = {
     val onehot = UFixToOH(addr, elms.length)
+    searchAndMap = true
     for(i <- 0 until elms.length){
-      when (onehot(i).toBool) {
+      when (getEnable(onehot, i)) {
         elms(i).comp procAssign src.asInstanceOf[Bits]
       }
     }
+    searchAndMap = false
   }
 }
 
@@ -159,11 +184,13 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
     if(data.isInstanceOf[Node]){
 
       val onehot = UFixToOH(addr, length)
+      searchAndMap = true
       for(i <- 0 until length){
-        when (onehot(i).toBool) {
+        when (getEnable(onehot, i)) {
           this(i).comp procAssign data.toNode
         }
       }
+      searchAndMap = false
     }
   }
 
@@ -179,7 +206,12 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
     res.setIsCellIO
     for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
       val w = io.getWidth
-      val io_res = MuxN(addr, sortedElm)
+      val onehot = UFixToOH(addr, length)
+      val pairs = new ArrayBuffer[(Bool, Bits)]
+      for(i <- 0 until length){
+        pairs += (getEnable(onehot, i) -> sortedElm(i))
+      }
+      val io_res = Mux1H(w, pairs)
       io assign io_res
 
       // setup the comp for writes
@@ -312,10 +344,13 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
   }
 
   override def toBits(): Bits = {
-    var res: Bits = null
-    for(i <- 0 until length)
-      res = Cat(this(i), res)
-    res
+
+    // var res: Bits = null
+    // for(i <- 0 until length)
+    //   res = Cat(this(i), res)
+    // res
+    val reversed = this.reverse
+    Cat(reversed.head, reversed.tail: _*)
   }
 }
 

@@ -4,6 +4,7 @@ package Chisel {
 import Node._;
 import Component._;
 import IOdir._;
+import scala.math._
 
 object Multiplex{
   def apply (t: Node, c: Node, a: Node): Node = {
@@ -13,8 +14,16 @@ object Multiplex{
       if (c.litOf != null && a.litOf != null) {
         if (c.litOf.value == a.litOf.value)
           return c
-        if (c.litOf.value == 1 && a.litOf.value == 0)
-          return t
+        if (c.litOf.value == 1 && a.litOf.value == 0){
+          if(c.litOf.width == 1 && a.litOf.width == 1) return t
+          val fill = NodeFill(max(c.litOf.width-1, a.litOf.width-1), Literal(0,1))
+          fill.infer
+          val bit = NodeExtract(t, 0)
+          bit.infer
+          val cat = Concatanate(fill, bit)
+          cat.infer
+          return cat
+        }
       }
     }
     new Mux().init("", maxWidth _, t, c, a);

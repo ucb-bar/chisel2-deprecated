@@ -223,10 +223,31 @@ trait proc extends Node {
 	inputs(0) = firstValue;
       else
 	inputs   += firstValue;
+
       // for ((cond, value) <- updates) 
+      var startCond: Bool = null
+      def isEquals(x: Node, y: Node): Boolean = {
+        if(x.litOf != null && y.litOf != null)
+          x.litOf.value == y.litOf.value
+        else
+          x.equals(y)
+      }
+
       for (i <- start until updates.size) {
         val (cond, value) = updates(i);
-        inputs(0) = Multiplex(cond, value, inputs(0));
+        if(i == updates.size-1 || !isEquals(updates(i+1)._2, value)) {
+          if(startCond == null) {
+            inputs(0) = Multiplex(cond, value, inputs(0));
+          } else {
+            inputs(0) = Multiplex(startCond || cond, value, inputs(0))
+            startCond = null
+          }
+        } else {
+          if(startCond == null)
+            startCond = cond
+          else
+            startCond = startCond || cond
+        }
       }
     }
   }

@@ -22,7 +22,7 @@ object Component {
   var saveWidthWarnings = false
   var saveConnectionWarnings = false
   var saveComponentTrace = false
-  var saveDot = true
+  var saveDot = false
   var dontFindCombLoop = false
   var widthWriter: java.io.FileWriter = null
   var connWriter: java.io.FileWriter = null
@@ -43,7 +43,7 @@ object Component {
   var configStr: String = null;
   var compIndex = -1;
   val compIndices = HashMap.empty[String,Int];
-  val compDefs = new HashMap[String, String];
+  val compDefs = new HashMap[StringBuilder, String];
   var isEmittingComponents = false;
   var backendName = "c";
   var topComponent: Component = null;
@@ -52,6 +52,10 @@ object Component {
   val resetList = ArrayBuffer[Node]();
   val muxes = ArrayBuffer[Node]();
   var ioMap = new HashMap[Node, Int];
+  var chiselOneHotMap = new HashMap[(UFix, Int), Bits]
+  var chiselOneHotBitMap = new HashMap[(Bits, Int), Bool]
+  var chiselAndMap = new HashMap[(Node, Node), Bool]
+  var searchAndMap = true
   var ioCount = 0;
   val compStack = new Stack[Component]();
   var stackIndent = 0;
@@ -77,7 +81,7 @@ object Component {
     saveWidthWarnings = false
     saveConnectionWarnings = false
     saveComponentTrace = false
-    saveDot = true
+    saveDot = false
     dontFindCombLoop = false
     widthWriter = null
     connWriter = null
@@ -106,6 +110,10 @@ object Component {
     resetList.clear()
     muxes.clear();
     ioMap.clear()
+    chiselOneHotMap.clear()
+    chiselOneHotBitMap.clear()
+    chiselAndMap.clear()
+    searchAndMap = false
     ioCount = 0;
     isEmittingComponents = false;
     backendName = "c";
@@ -436,25 +444,29 @@ abstract class Component(resetSignal: Bool = null) {
     res
   }
   // COMPILATION OF BODY
-  def emitDefs: String = {
-    var res = "";
-    for (m <- mods)
-      res += m.emitDef;
-    for (c <- children) 
-      res += c.emitDef;
-    res
-  }
-  def emitRegs: String = {
-    var res = "  always @(posedge clk) begin\n";
-    for (m <- mods) 
-      res += m.emitReg;
-    res += "  end\n";
-    res
-  }
-  def emitDecs: String = {
-    var res = "";
+  def emitDefs: StringBuilder = {
+    val res = new StringBuilder()
     for (m <- mods) {
-      res += m.emitDec;
+      res.append(m.emitDef)
+    }
+    for (c <- children) {
+      res.append(c.emitDef)
+    }
+    res
+  }
+  def emitRegs: StringBuilder = {
+    val res = new StringBuilder();
+    res.append("  always @(posedge clk) begin\n");
+    for (m <- mods) {
+      res.append(m.emitReg)
+    }
+    res.append("  end\n");
+    res
+  }
+  def emitDecs: StringBuilder = {
+    val res = new StringBuilder();
+    for (m <- mods) {
+      res.append(m.emitDec)
     }
     res
   }
@@ -975,7 +987,8 @@ abstract class Component(resetSignal: Bool = null) {
     //   println("// " + depthString(depth+1) + " MOD " + m);
     // }
     val hasReg = containsReg || childrenContainsReg;
-    var res = (if (hasReg) "input clk, input reset" else "");
+    val res = new StringBuilder()
+    res.append((if (hasReg) "input clk, input reset" else ""));
     var first = true;
     var nl = "";
     for ((n, w) <- wires) {
@@ -983,24 +996,29 @@ abstract class Component(resetSignal: Bool = null) {
       w match {
         case io: IO => {
           if (io.dir == INPUT) {
-	    res += nl + "    input " + io.emitWidth + " " + io.emitRef;
+	    res.append(nl + "    input " + io.emitWidth + " " + io.emitRef);
           } else {
-	    res += nl + "    output" + io.emitWidth + " " + io.emitRef;
+	    res.append(nl + "    output" + io.emitWidth + " " + io.emitRef);
           }
         }
       };
     }
-    res += ");\n\n";
+    res.append(");\n\n");
     // TODO: NOT SURE EXACTLY WHY I NEED TO PRECOMPUTE TMPS HERE
     for (m <- mods)
       m.emitTmp;
-    res += emitDecs + "\n" + emitDefs
+    res.append(emitDecs);
+    res.append("\n");
+    res.append(emitDefs);
+    //res += emitDecs + "\n" + emitDefs
     // for (o <- outputs)
     //   out.writeln("  assign " + o.emitRef + " = " + o.inputs(0).emitRef + ";");
     if (regs.size > 0) {
-      res += "\n" + emitRegs;
+      res.append("\n");
+      res.append(emitRegs);
+      //res += "\n" + emitRegs;
     }
-    res += "endmodule\n\n";
+    res.append("endmodule\n\n");
     if(compDefs contains res){
       moduleName = compDefs(res);
     }else{
@@ -1010,8 +1028,8 @@ abstract class Component(resetSignal: Bool = null) {
 	moduleName = name;
       }
       compDefs += (res -> moduleName);
-      res = "module " + moduleName + "(" + res;
-      out.write(res); 
+      res.insert(0, "module " + moduleName + "(");
+      out.append(res);
     }
     // println("// " + depthString(depth) + "DONE");
   }

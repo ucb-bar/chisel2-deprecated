@@ -141,7 +141,7 @@ class Reg extends Delay with proc{
   override def emitRefV: String = if (name == "") "R" + emitIndex else name;
   override def emitDef: String = "";
   override def emitReg: String = {
-    if(isEnable){
+    if(isEnable && (enableSignal.litOf == null || enableSignal.litOf.value != 1)){
       if(isReset){
 	"    if(reset) begin\n" + 
 	"      " + emitRef + " <= " + resetVal.emitRef + ";\n" +
