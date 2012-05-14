@@ -77,8 +77,20 @@ designs that are easy to reuse and maintain.
 
 \section{Node}
 
+Chisel user code creates a graph of nodes which Chisel then translates
+into Verilog or C++ code.  Nodes are \verb+Nameable+ objects:
+
 \begin{example}
-class Node {
+trait Nameable {
+  var name: String = "";
+  var named = false;
+}
+\end{example}
+\noindent
+of type \verb{Node}:
+
+\begin{example}
+class Node extends Nameable {
   def getWidth: Int;
   def getNode: Node;
   def toNode: Node;
@@ -86,31 +98,30 @@ class Node {
 }
 \end{example}
 
-\begin{example}
-trait proc extends Node;
-\end{example}
+% explain getNode and types interspersed between nodes
+% remove fromNode, toNode
 
 \subsection{Data}
 
 \begin{example}
 Node
   Data
-    Wire
-      IO
-        Bits
-          Bool
-          Num
-            Fix
-            UFix
-    Bundle
-    Vec
-  Delay
+     Bits
+        Bool
+         Num
+           Fix
+           UFix
+     Bundle
+     Vec
+  Wire
+     IO
+  Delay ???
     Reg
     Mem
 \end{example}
 
 \begin{example}
-class Data extends Node with proc {
+class Data extends Node with Cloneable {
   def flatten: Array[(String, IO)];
   def toFix: Fix;
   def toUFix: UFix;
@@ -124,13 +135,34 @@ class Data extends Node with proc {
 \end{example}
 
 \begin{example}
-class Wire extends Data;
+trait Cloneable {
+  override def clone(): this.type =
+    this.getClass.newInstance.asInstanceOf[this.type];
+}
 \end{example}
+
+% why not fromBits ?
+
+\begin{example}
+class Wire extends Data with Updateable;
+\end{example}
+
+\begin{example}
+trait Updateable extends Node {
+  def updates: Queue[(Bool, Node)];
+  def genMuxes(default: Node);
+  def := ...
+}
+\end{example}
+
+% is updateable 
 
 \begin{example}
 class IO extends Wire {
 }
 \end{example}
+
+% is IO a good name?
 
 \begin{example}
 class Bits extends IO {
@@ -177,7 +209,7 @@ class UFix extends Num;
 \subsection{Bundle}
 
 \begin{example}
-class Bundle extends Data {
+class Bundle(view: Seq[String] = null) extends Data {
   def elements: ArrayBuffer[(String, Data)];
 }
 \end{example}
@@ -185,7 +217,11 @@ class Bundle extends Data {
 \subsection{Vec}
 
 \begin{example}
-class Vec extends Data {
+object Vec {
+  def apply[T <: Data](n: Int)(gen: => T): Vec[T];
+}
+class Vec[T <: Data](n: Int, val gen: () => T) extends Data {
+  def apply(idx: UFix): T
 }
 \end{example}
 
@@ -230,15 +266,12 @@ the user either explicitly or from the bitwidth of the reset value.
 From these two requirements, we can show that the bit-width inference
 process will converge to a fixpoint.
 
-\subsection{Named Wires}
-
 \section{Sequential}
 
 \subsection{Registers}
 
 \begin{example}
-class Reg extends Node with proc {
-  def := ...
+class Reg extends Delay with Updateable {
 }
 \end{example}
 
@@ -275,7 +308,8 @@ class Rom {
 object Ram {
   def apply(depth: Int, ...)
 }
-class Mem {
+
+class Mem[T <: Data](n: Int, gen: () => T) extends Delay with Updateable {
   def read ...
 }
 \end{example}
