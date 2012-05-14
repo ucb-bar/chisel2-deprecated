@@ -77,20 +77,39 @@ designs that are easy to reuse and maintain.
 
 \section{Node}
 
-\begin{verbatim}
+\begin{example}
 class Node {
   def getWidth: Int;
   def getNode: Node;
   def toNode: Node;
   def fromNode(Node): this.type;
 }
+\end{example}
 
+\begin{example}
 trait proc extends Node;
-\end{verbatim}
+\end{example}
 
 \subsection{Data}
 
-\begin{verbatim}
+\begin{example}
+Node
+  Data
+    Wire
+      IO
+        Bits
+          Bool
+          Num
+            Fix
+            UFix
+    Bundle
+    Vec
+  Delay
+    Reg
+    Mem
+\end{example}
+
+\begin{example}
 class Data extends Node with proc {
   def flatten: Array[(String, IO)];
   def toFix: Fix;
@@ -102,12 +121,18 @@ class Data extends Node with proc {
   def asInput: this.type;
   def :=[T <: Data](data: T);
 }
+\end{example}
 
+\begin{example}
 class Wire extends Data;
+\end{example}
 
+\begin{example}
 class IO extends Wire {
 }
+\end{example}
 
+\begin{example}
 class Bits extends IO {
   def unary_-(): Bits;
   def unary_~(): Bits;
@@ -124,9 +149,13 @@ class Bits extends IO {
   def && (b: Bool): Bool;
   def || (b: Bool): Bool;
 }
+\end{example}
 
+\begin{example}
 class Bool extends Bits;
+\end{example}
 
+\begin{example}
 class Num extends Bits {
   def +(b: Num): Num;
   def *(b: Num): Num;
@@ -135,35 +164,71 @@ class Num extends Bits {
   def <=(b: Num): Bool;
   def >=(b: Num): Bool;
 }
+\end{example}
 
+\begin{example}
 class Fix extends Num; 
+\end{example}
 
+\begin{example}
 class UFix extends Num; 
-\end{verbatim}
+\end{example}
 
 \subsection{Bundle}
 
-\begin{verbatim}
+\begin{example}
 class Bundle extends Data {
   def elements: ArrayBuffer[(String, Data)];
 }
-\end{verbatim}
+\end{example}
 
 \subsection{Vec}
 
-\begin{verbatim}
+\begin{example}
 class Vec extends Data {
 }
-\end{verbatim}
+\end{example}
 
 \section{Combinational}
 
-\subsection{Operators}
-
-\begin{verbatim}
-\end{verbatim}
+% \subsection{Operators}
 
 \subsection{Bit Width Inference}
+
+Users are required to set bitwidths of ports and registers, but otherwise,
+bit widths on wires are automatically inferred unless set manually by the user.
+% TODO: how do you set the width explicitly?
+The bit-width inference engine starts from the graph's input ports and 
+calculates node output bit widths from their respective input bit widths according to the following set of rules:\\
+
+{\footnotesize
+\begin{tabular}{ll}
+{\bf operation} & {\bf bit width} \\ 
+\verb|z = x + y| & \verb|wz = max(wx, wy) + 1| \\
+\verb+z = x - y+ & \verb|wz = max(wx, wy) + 1|\\
+\verb+z = x & y+ & \verb+wz = max(wx, wy)+ \\
+\verb+z = Mux(c, x, y)+ & \verb+wz = max(wx, wy)+ \\
+\verb+z = w * y+ & \verb!wz = wx + wy! \\
+\verb+z = x << n+ & \verb!wz = wx + maxNum(n)! \\
+\verb+z = x >> n+ & \verb+wz = wx - minNum(n)+ \\
+\verb+z = Cat(x, y)+ & \verb!wz = wx + wy! \\
+\verb+z = Fill(n, x)+ & \verb+wz = wx * maxNum(n)+ \\
+% \verb+z = x < y+ & \verb+<= > >= && || != ===+ & \verb+wz = 1+ \\
+\end{tabular}
+}
+\\[1mm]
+\noindent  
+where for instance $wz$ is the bit width of wire $z$, and the \verb+&+
+rule applies to all bitwise logical operations.
+
+The bit-width inference process continues until no bit width changes.
+Except for right shifts by known constant amounts, the bit-width
+inference rules specify output bit widths that are never smaller than
+the input bit widths, and thus, output bit widths either grow or stay
+the same.  Furthermore, the width of a register must be specified by
+the user either explicitly or from the bitwidth of the reset value.
+From these two requirements, we can show that the bit-width inference
+process will converge to a fixpoint.
 
 \subsection{Named Wires}
 
@@ -171,15 +236,15 @@ class Vec extends Data {
 
 \subsection{Registers}
 
-\begin{verbatim}
+\begin{example}
 class Reg extends Node with proc {
   def := ...
 }
-\end{verbatim}
+\end{example}
 
 \subsection{Conditional Updates}
 
-\begin{verbatim}
+\begin{example}
 object when {
   def apply ...
 }
@@ -189,84 +254,82 @@ object unless {
 object otherwise {
   def apply ...
 }
-\end{verbatim}
+\end{example}
 
 \section{Memory}
 
 \subsection{ROM}
 
-\begin{verbatim}
+\begin{example}
 object Rom {
   def apply(inits: Seq[Data])
 }
 class Rom {
   def read ...
 }
-\end{verbatim}
+\end{example}
 
 \subsection{Mem}
 
-\begin{verbatim}
+\begin{example}
 object Ram {
   def apply(depth: Int, ...)
 }
 class Mem {
   def read ...
 }
-\end{verbatim}
+\end{example}
 
 \section{Ports}
 
 \subsection{Direction}
 
-\begin{verbatim}
+\begin{example}
 dir=INPUT
 dir=OUTPUT
-\end{verbatim}
+\end{example}
 
 
 \subsection{Subclassing}
 
-\begin{verbatim}
+\begin{example}
 extends Bundle
-\end{verbatim}
+\end{example}
 
 \subsection{Views}
 
-\begin{verbatim}
+\begin{example}
 Bundle(Seq[String])
-\end{verbatim}
+\end{example}
 
 \section{Components}
 
 Users write their own components by subclassing Component which is
 defined as follows:
 
-\begin{verbatim}
+\begin{example}
 abstract class Component {
   val io: IO;
   def compileV: Unit;
   def compileC: Unit;
 }
-\end{verbatim}
+\end{example}
 
-\subsection{IO}
-
-\begin{verbatim}
+\begin{example}
 val io = ...;
-\end{verbatim}
+\end{example}
 
 \subsection{Bulk Connections}
 
-\begin{verbatim}
+\begin{example}
 <>
-\end{verbatim}
+\end{example}
 
 \subsection{Main}
 
 The user calls chiselMain from their main object:
 
-\begin{verbatim}
+\begin{example}
 object chiselMain {
   def apply[T <: Component]
     (args: Array[String], 
@@ -274,7 +337,7 @@ object chiselMain {
      scanner: T => TestIO = null, 
      printer: T => TestIO = null): T;
 }
-\end{verbatim}
+\end{example}
 
 Command arguments are as follows:
 \begin{tabular}{lll}
@@ -290,11 +353,13 @@ Command arguments are as follows:
 The C++ emulator is based on a fast multiword library using
 C++ templates.  The \verb+dat_t+ represents multiple \verb+val_t+:
 
-\begin{verbatim}
+\begin{example}
 typedef uint64_t val_t;
 typedef int64_t sval_t; 
 typedef uint32_t half_val_t;
+\end{example}
 
+\begin{example}
 template <int w>
 class dat_t {
  public:
@@ -307,26 +372,23 @@ class dat_t {
   std::string to_str ();
   static dat_t<w> rand();
   dat_t<w> ();
-  template <int sw> 
-    dat_t<w> (const dat_t<sw>& src);
+template <int sw> 
+  dat_t<w> (const dat_t<sw>& src);
   dat_t<w> (const dat_t<w>& src);
   dat_t<w> (val_t val);
-  template <int sw> 
-    dat_t<w> mask(dat_t<sw> fill, int n);
-  template <int dw> 
-    dat_t<dw> mask(int n);
-  template <int n> 
-    dat_t<n> mask(void);
+template <int sw> 
+  dat_t<w> mask(dat_t<sw> fill, int n);
+template <int dw> 
+  dat_t<dw> mask(int n);
+template <int n> 
+  dat_t<n> mask(void);
   dat_t<w> operator + ( dat_t<w> o );
   dat_t<w> operator - ( dat_t<w> o );
   dat_t<w> operator - ( );
   dat_t<w+w> operator * ( dat_t<w> o );
-  dat_t<w+w> 
-    fix_times_fix( dat_t<w> o );
-  dat_t<w+w> 
-    ufix_times_fix( dat_t<w> o );
-  dat_t<w+w> 
-    fix_times_ufix( dat_t<w> o );
+  dat_t<w+w> fix_times_fix( dat_t<w> o );
+  dat_t<w+w> ufix_times_fix( dat_t<w> o );
+  dat_t<w+w> fix_times_ufix( dat_t<w> o );
   dat_t<1> operator < ( dat_t<w> o );
   dat_t<1> operator > ( dat_t<w> o );
   dat_t<1> operator >= ( dat_t<w> o );
@@ -353,40 +415,42 @@ class dat_t {
   dat_t<w>& operator = ( dat_t<w> o );
   dat_t<w> fill_bit(val_t bit);
   dat_t<w> fill_byte(val_t byte, int nb, int n);
-  template <int dw, int n> 
-    dat_t<dw> fill( void );
-  template <int dw, int nw> 
-    dat_t<dw> fill( dat_t<nw> n );
-  template <int dw> 
-    dat_t<dw> extract();
-  template <int dw> 
-    dat_t<dw> extract(val_t e, val_t s);
-  template <int dw, int iwe, int iws> dat_t<dw> 
-    extract(dat_t<iwe> e, dat_t<iws> s);
-  template <int sw> dat_t<w> 
-    inject(dat_t<sw> src, val_t e, val_t s);
-  template <int sw, int iwe, int iws> dat_t<w> 
-    inject(dat_t<sw> src, dat_t<iwe> e, dat_t<iws> s);
-  template <int dw> 
-    dat_t<dw> log2();
+template <int dw, int n> 
+  dat_t<dw> fill( void );
+template <int dw, int nw> 
+  dat_t<dw> fill( dat_t<nw> n );
+template <int dw> 
+  dat_t<dw> extract();
+template <int dw> 
+  dat_t<dw> extract(val_t e, val_t s);
+template <int dw, int iwe, int iws> 
+  dat_t<dw> extract(dat_t<iwe> e, dat_t<iws> s);
+template <int sw> 
+  dat_t<w> inject(dat_t<sw> src, val_t e, val_t s);
+template <int sw, int iwe, int iws> 
+  dat_t<w> inject(dat_t<sw> src, dat_t<iwe> e, dat_t<iws> s);
+template <int dw> 
+  dat_t<dw> log2();
   dat_t<1> bit(val_t b);
   val_t msb();
-  template <int iw>
-    dat_t<1> bit(dat_t<iw> b)
+template <int iw>
+  dat_t<1> bit(dat_t<iw> b)
 }
+\end{example}
 
+\begin{example}
 template <int w, int sw> 
   dat_t<w> DAT(dat_t<sw> dat);
 template <int w> 
   dat_t<w> LIT(val_t value);
 template <int w> dat_t<w> 
   mux ( dat_t<1> t, dat_t<w> c, dat_t<w> a )
-\end{verbatim}
+\end{example}
 
 The Chisel compiler compiles top level components into a \verb+mod_t+
 class that can be created and executed:
 
-\begin{verbatim}
+\begin{example}
 class mod_t {
  public:
   std::vector< mod_t* > children;
@@ -397,17 +461,17 @@ class mod_t {
   virtual bool scan (FILE* f) { return true; };
   virtual void dump (FILE* f, int t) { };
 };
-\end{verbatim}
+\end{example}
 
-\begin{verbatim}
+\begin{example}
 environment variables
-\end{verbatim}
+\end{example}
 
 Either the Chisel compiler can create a harness or the user can write
 a harness themselves.  The following is an example of a harness for a
 CPU component:
 
-\begin{verbatim}
+\begin{example}
 #include "cpu.h"
 
 int main (int argc, char* argv) {
@@ -420,7 +484,7 @@ int main (int argc, char* argv) {
     cpu->print();
   }
 }
-\end{verbatim}
+\end{example}
 
 \section{Verilog}
 
