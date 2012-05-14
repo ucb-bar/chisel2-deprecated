@@ -101,7 +101,7 @@ class Node extends Nameable {
 % explain getNode and types interspersed between nodes
 % remove fromNode, toNode
 
-\subsection{Data}
+\section{Data}
 
 \begin{example}
 Node
@@ -113,11 +113,6 @@ Node
            UFix
      Bundle
      Vec
-  Wire
-     IO
-  Delay ???
-    Reg
-    Mem
 \end{example}
 
 \begin{example}
@@ -143,26 +138,7 @@ trait Cloneable {
 
 % why not fromBits ?
 
-\begin{example}
-class Wire extends Data with Updateable;
-\end{example}
-
-\begin{example}
-trait Updateable extends Node {
-  def updates: Queue[(Bool, Node)];
-  def genMuxes(default: Node);
-  def := ...
-}
-\end{example}
-
-% is updateable 
-
-\begin{example}
-class IO extends Wire {
-}
-\end{example}
-
-% is IO a good name?
+\subsection{Bits}
 
 \begin{example}
 class Bits extends IO {
@@ -209,9 +185,13 @@ class UFix extends Num;
 \subsection{Bundle}
 
 \begin{example}
-class Bundle(view: Seq[String] = null) extends Data {
+class Bundle extends Data {
   def elements: ArrayBuffer[(String, Data)];
 }
+\end{example}
+
+\begin{example}
+class MyFloat extends Bundle ...;
 \end{example}
 
 \subsection{Vec}
@@ -220,14 +200,12 @@ class Bundle(view: Seq[String] = null) extends Data {
 object Vec {
   def apply[T <: Data](n: Int)(gen: => T): Vec[T];
 }
-class Vec[T <: Data](n: Int, val gen: () => T) extends Data {
+
+class Vec[T <: Data](n: Int, val gen: () => T) 
+    extends Data {
   def apply(idx: UFix): T
 }
 \end{example}
-
-\section{Combinational}
-
-% \subsection{Operators}
 
 \subsection{Bit Width Inference}
 
@@ -266,14 +244,26 @@ the user either explicitly or from the bitwidth of the reset value.
 From these two requirements, we can show that the bit-width inference
 process will converge to a fixpoint.
 
-\section{Sequential}
-
-\subsection{Registers}
+\section{Wire}
 
 \begin{example}
-class Reg extends Delay with Updateable {
+object Wire {
+  def apply[T <: Data]()(gen: =>T): T;
+  def apply[T <: Data](default: T): T;
+}
+
+class Wire extends Node with Updateable;
+\end{example}
+
+\begin{example}
+trait Updateable extends Node {
+  def updates: Queue[(Bool, Node)];
+  def genMuxes(default: Node);
+  def := (x: Node): this.type;
 }
 \end{example}
+
+% is updateable 
 
 \subsection{Conditional Updates}
 
@@ -281,26 +271,32 @@ class Reg extends Delay with Updateable {
 object when {
   def apply ...
 }
+
 object unless {
   def apply ...
 }
+
 object otherwise {
   def apply ...
 }
 \end{example}
 
-\section{Memory}
-
-\subsection{ROM}
+\section{Register}
 
 \begin{example}
-object Rom {
-  def apply(inits: Seq[Data])
+class Delay extends Node;
+
+object Reg {
+  def apply[T <: Data](data: T): T;
+  def apply[T <: Data](data: T, resetVal: T): T;
+  def apply[T <: Data](resetVal: T = null)(gen: =>T): T;
 }
-class Rom {
-  def read ...
+ 
+class Reg extends Delay with Updateable {
 }
 \end{example}
+
+\section{Memory}
 
 \subsection{Mem}
 
@@ -309,31 +305,9 @@ object Ram {
   def apply(depth: Int, ...)
 }
 
-class Mem[T <: Data](n: Int, gen: () => T) extends Delay with Updateable {
-  def read ...
+class Mem[T <: Data](n: Int, gen: () => T) 
+    extends Delay with Updateable {
 }
-\end{example}
-
-\section{Ports}
-
-\subsection{Direction}
-
-\begin{example}
-dir=INPUT
-dir=OUTPUT
-\end{example}
-
-
-\subsection{Subclassing}
-
-\begin{example}
-extends Bundle
-\end{example}
-
-\subsection{Views}
-
-\begin{example}
-Bundle(Seq[String])
 \end{example}
 
 \section{Components}
@@ -343,7 +317,7 @@ defined as follows:
 
 \begin{example}
 abstract class Component {
-  val io: IO;
+  val io: Bundle;
   def compileV: Unit;
   def compileC: Unit;
 }
@@ -353,10 +327,32 @@ abstract class Component {
 val io = ...;
 \end{example}
 
-\subsection{Bulk Connections}
+\subsection{Subcomponents}
+
+\subsection{Ports}
 
 \begin{example}
-<>
+Wire
+  IO
+\end{example}
+
+\begin{example}
+object Input {
+  def apply[T <: Data]()(gen: => T): T;
+}
+
+object Output {
+  def apply[T <: Data]()(gen: => T): T;
+}
+
+class IO extends Wire {
+}
+\end{example}
+
+% is IO a good name?
+
+\begin{example}
+def <> (x: Node);
 \end{example}
 
 \subsection{Main}
@@ -382,7 +378,7 @@ Command arguments are as follows:
 \verb+--debug+ & put all wires in class file \\
 \end{tabular}
 
-\section{Emulator}
+\section{C++ Emulator}
 
 The C++ emulator is based on a fast multiword library using
 C++ templates.  The \verb+dat_t+ represents multiple \verb+val_t+:
@@ -521,6 +517,10 @@ int main (int argc, char* argv) {
 \end{example}
 
 \section{Verilog}
+
+\section{Standard Library}
+
+% henry
 
 \section{Acknowlegements}
 
