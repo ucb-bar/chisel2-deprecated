@@ -91,12 +91,15 @@ Scala.
 \item Get an account on \verb|www.github.com|
 \item Register your public key on \verb|github.com|
 \item Tell me your github account name
-\item run \verb|git clone git@github.com:chiselers/chisel.git|
+\item run \verb|git clone git@github.com:ucb-bar/chisel.git|
 \end{itemize}
 
 \section{Java}
 
 Install a modern Java runtime and compiler.
+For Ubuntu, install packages \verb+openjdk-7-jdk+ and
+\verb+openjdk-7-jre+ using \verb+apt-get install+.
+For MacOSX, install \verb+openjdk6+ using \verb+port install+.
 
 \section{SBT}
 
@@ -108,26 +111,30 @@ https://github.com/harrah/xsbt/wiki/Getting-Started-Setup
 \end{verbatim}
 
 SBT has a particular directory structure that we adhere to and
-somewhat improve.  Assuming that we have a project named {\em transactors},
+somewhat improve.  Assuming that we have a project named {\em gpu},
 then the following would be the template:
 
 \begin{verbatim}
 chisel/           # install chisel at same level as your project
-transactors/
+  tutorial/
+  src/
+gpu/
   chisel -> ../chisel
   sbt/
     project/
       build.scala # edit this as shown below
     chisel -> ../chisel/sbt/chisel/
-    transactors/
+    gpu/
       src/
         main/
           scala -> ../../../../src
   src/ 
-    app.scala    # your source files go here
-  emulator/      # your C++ target can go here
+    gpu.scala # your source files go here
+  emulator/   # your C++ target can go here
 \end{verbatim}
 
+Alternatively, you can use \verb+chisel/tutorial+ as a template making
+sure to get the symbolic links correct.
 The following is the \verb+build.scala+ template:
 
 \begin{verbatim}
@@ -151,8 +158,8 @@ object ChiselBuild extends Build {
 
   lazy val chisel = 
     Project("chisel", file("chisel"), settings = buildSettings)
-  lazy val transactors =
-    Project("transactors", file("transactors"), 
+  lazy val gpu =
+    Project("gpu", file("gpu"), 
             settings = buildSettings) 
       dependsOn(chisel)
 }
