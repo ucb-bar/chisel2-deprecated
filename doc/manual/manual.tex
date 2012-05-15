@@ -59,7 +59,7 @@ construction language embedded in the high-level programming language
 Scala.  Chisel is really only a set of special class
 definitions, predefined objects, and usage conventions within Scala,
 so when you write a Chisel program you are actually writing a Scala
-program.  However, for the tutorial we don't presume that you
+program.  However, for the manual we don't presume that you
 understand how to program in Scala.  We will point out necessary Scala
 features through the Chisel examples we give, and significant hardware
 designs can be completed using only the material contained herein.
@@ -67,13 +67,6 @@ But as you gain experience and want to make your code simpler or more
 reusable, you will find it important to leverage the underlying power
 of the Scala language. We recommend you consult one of the excellent
 Scala books to become more expert in Scala programming.
-
-Chisel is still in its infancy and you are likely to encounter some
-implementation bugs, and perhaps even a few conceptual design
-problems.  However, we are actively fixing and improving the language,
-and are open to bug reports and suggestions.  Even in its early state,
-we hope Chisel will help designers be more productive in building
-designs that are easy to reuse and maintain.
 
 \section{Node}
 
@@ -83,25 +76,44 @@ into Verilog or C++ code.  Nodes are \verb+Nameable+ objects:
 \begin{example}
 trait Nameable {
   var name: String = "";
-  var named = false;
+  var isNamed = false; 
 }
 \end{example}
+
+% TODO: named should be changed to isNamed
+
 \noindent
 of type \verb+Node+:
 
 \begin{example}
 class Node extends Nameable {
+  def inputs: ArrayBuffer[Node];
+  def consumers: ArrayBuffer[Node];
+  def infer: Node => Int;
   def getWidth: Int;
   def getNode: Node;
-  def toNode: Node;
-  def fromNode(Node): this.type;
+  def toNode: Node;  
+  def fromNode(Node): this.type; 
 }
 \end{example}
+
+% TODO: toNode SHOULD BE toBits
+% TODO: fromNode SHOULD BE fromBits
+
+\noindent
+where \verb+inputs+ and \verb+consumers+ are the incoming and
+outgoing graph edges.
 
 % explain getNode and types interspersed between nodes
 % remove fromNode, toNode
 
 \section{Data}
+
+The graph contains port, operator, and type nodes.  Type nodes are
+interspersed between port and operator nodes and allow Chisel code to
+check and respond to Chisel types.  Type nodes are erased before
+emission to C++ and Verilog.  \verb+Data+ is the top most type node
+and the following is the built in type node hierarchy:
 
 \begin{example}
 Node
@@ -114,6 +126,12 @@ Node
      Bundle
      Vec
 \end{example}
+
+\noindent
+
+\verb+Data+ itself is a node:
+
+% TODO: data literals
 
 \begin{example}
 class Data extends Node with Cloneable {
@@ -129,6 +147,10 @@ class Data extends Node with Cloneable {
 }
 \end{example}
 
+\noindent
+and delegates a number of methods to its single input.  Type nodes are
+cloneable:
+
 \begin{example}
 trait Cloneable {
   override def clone(): this.type =
@@ -136,12 +158,22 @@ trait Cloneable {
 }
 \end{example}
 
+\noindent
+and users can override this in their own type nodes (e.g., bundles) in
+order to reflect construction parameters that are necessary for cloning.
+
 % why not fromBits ?
 
 \subsection{Bits}
 
+The most basic primitive data node is \verb+Bits+ defined as follows:
+
 \begin{example}
-class Bits extends IO {
+object Bits {
+  def apply(width: Int = -1): Bits;
+  def apply(value: BigInt, width: Int = -1): Bits;
+}
+class Bits extends Data {
   def unary_-(): Bits;
   def unary_~(): Bits;
   def andR(): Bool;
@@ -159,9 +191,24 @@ class Bits extends IO {
 }
 \end{example}
 
+\noindent
+with the simple bit operations.  
+N.B., that \verb+##+ is binary
+concatenation and \verb+===+ is bitwise comparison with \verb+==+.
+Operations produce an
+actual operator node and a type node combining the input type nodes.
+The \verb+getNode+ operator will skip type nodes and return the first
+non type node node.
+
 \begin{example}
+object Bool{
+  def apply():Bool;
+  def apply(value:Boolean): Bool;
+}
 class Bool extends Bits;
 \end{example}
+
+\verb+Num+ is a type node which defines arithmetic operations:
 
 \begin{example}
 class Num extends Bits {
@@ -169,20 +216,38 @@ class Num extends Bits {
   def *(b: Num): Num;
   def -(b: Num): Num;
   def >(b: Num): Bool;
+  def <(b: Num): Bool;
   def <=(b: Num): Bool;
   def >=(b: Num): Bool;
 }
 \end{example}
 
-\begin{example}
-class Fix extends Num; 
-\end{example}
+\noindent
+and \verb+Fix+ and \verb+UFix+ are signed and unsigned fixpoint numbers.
 
 \begin{example}
+object Fix {
+  def apply(width: Int = -1):Fix;
+  def apply(value: BigInt, width: Int = -1): Fix;
+}
+class Fix extends Num; 
+
+object UFix {
+  def apply(width: Int = -1):UFix;
+  def apply(value: BigInt, width: Int = -1): UFix;
+}
 class UFix extends Num; 
 \end{example}
 
-\subsection{Bundle}
+% literal constructors
+
+\subsection{Bundles and Vec}
+
+\code{Bundle} and \code{Vec} are classes that allow the user to expand
+the set of Chisel datatypes with aggregates of other types.
+
+Bundles group together several named fields of potentially different
+types into a coherent unit, much like a \code{struct} in C 
 
 \begin{example}
 class Bundle extends Data {
@@ -190,11 +255,25 @@ class Bundle extends Data {
 }
 \end{example}
 
+\noindent
+A user can get the names and Data corresponding to each element in a
+Bundle with the \verb+elements+ method and recursively using the
+\verb+flatten+ method. 
+% TODO: perhaps flatten should be named allElements
+Users can define their own by subclassing \verb+Bundle+ as follows:
+
 \begin{example}
-class MyFloat extends Bundle ...;
+class MyFloat extends Bundle {
+  val sign =  Bool();
+  val exponent = Bits(width = 8);
+  val significand =  Bits(width = 23);
+}
+
+val x = new MyFloat()
+val xs = x.sign
 \end{example}
 
-\subsection{Vec}
+Vecs create an indexable vector of elements: 
 
 \begin{example}
 object Vec {
@@ -204,10 +283,17 @@ object Vec {
 class Vec[T <: Data](n: Int, val gen: () => T) 
     extends Data {
   def apply(idx: UFix): T
+  def apply(idx: Int): T
 }
 \end{example}
 
+\noindent
+with \verb+n+ elements of type defined with the \verb+gen+ thunk.
+Users can then either dynamically or statically accessed the elements.
+
 \subsection{Bit Width Inference}
+
+% TODO: perhaps IO should be renamed Port
 
 Users are required to set bitwidths of ports and registers, but otherwise,
 bit widths on wires are automatically inferred unless set manually by the user.
@@ -246,6 +332,9 @@ process will converge to a fixpoint.
 
 \section{Wire}
 
+We provide declaration of a wire node that can be used immediately, 
+but whose input will be set later.
+
 \begin{example}
 object Wire {
   def apply[T <: Data]()(gen: =>T): T;
@@ -254,6 +343,12 @@ object Wire {
 
 class Wire extends Node with Updateable;
 \end{example}
+
+%TODO: change proc to Updateable
+
+\noindent
+where \verb+Updateable+ collects updates and code generates a mux
+input for the wire:
 
 \begin{example}
 trait Updateable extends Node {
@@ -269,15 +364,34 @@ trait Updateable extends Node {
 
 \begin{example}
 object when {
-  def apply ...
+  def apply(cond: Bool)(block: => Unit): when;
 }
+class when (prevCond: Bool) {
+  def elsewhen (cond: Bool)(block: => Unit): when;
+  def otherwise (block: => Unit): Unit;
+}
+\end{example}
 
+\begin{example}
 object unless {
-  def apply ...
+  def apply(c: Bool)(block: => Unit) = 
+    when (!c) { block )
 }
+\end{example}
 
+\begin{example}
 object otherwise {
-  def apply ...
+  def apply(block: => Unit) = 
+    when (Bool(true)) { block }
+}
+\end{example}
+
+\begin{example}
+object switch {
+  def apply(c: Bits)(block: => Unit): Unit;
+}
+object is {
+  def apply(v: Bits)(block: => Unit);
 }
 \end{example}
 
@@ -298,16 +412,21 @@ class Reg extends Delay with Updateable {
 
 \section{Memory}
 
-\subsection{Mem}
-
 \begin{example}
-object Ram {
-  def apply(depth: Int, ...)
+object Mem {
+  def apply[T <: Data](depth: Int)(gen: => T): T;
 }
 
 class Mem[T <: Data](n: Int, gen: () => T) 
     extends Delay with Updateable {
+  def apply(idx: UFix): T;
 }
+
+class MemRead[T <: Data]
+    (val mem: Mem, val idx: UFix) extends Node;
+
+class MemWrite[T <: Data]
+    (val mem: Mem, val idx: UFix, val data: T) extends Node;
 \end{example}
 
 \section{Components}
@@ -326,8 +445,6 @@ abstract class Component {
 \begin{example}
 val io = ...;
 \end{example}
-
-\subsection{Subcomponents}
 
 \subsection{Ports}
 
@@ -510,7 +627,7 @@ int main (int argc, char* argv) {
   for (size_t t = 0; t < n; t++) {
     cpu->scan();
     cpu->clock_lo();
-    cpu->clock_lo();
+    cpu->clock_hi();
     cpu->print();
   }
 }
