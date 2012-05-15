@@ -102,8 +102,7 @@ object VecBuf{
 
 object Vec {
   def apply[T <: Data](n: Int)(gen: => T): Vec[T] = {
-    val res = new Vec[T]();
-    res.gen = () => gen;
+    val res = new Vec[T](() => gen);
     for(i <- 0 until n){
       val t   = gen;
       res    += t;
@@ -136,19 +135,21 @@ class VecProc extends proc {
     searchAndMap = true
     for(i <- 0 until elms.length){
       when (getEnable(onehot, i)) {
-        elms(i).comp procAssign src.asInstanceOf[Bits]
+        if(elms(i).comp != null)
+          elms(i).comp procAssign src
+        else
+          elms(i).asInstanceOf[IO] procAssign src
       }
     }
     searchAndMap = false
   }
 }
 
-class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] { 
+class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferProxy[T] { 
   var eltWidth = 0
   val self = new ArrayBuffer[T]
   val readPortCache = new HashMap[UFix, T]
   var sortedElementsCache: ArrayBuffer[ArrayBuffer[Bits]] = null
-  var gen: () => T = () => self(0)
   var flattenedVec: Node = null
   override def apply(idx: Int): T = {
     super.apply(idx)
@@ -165,9 +166,9 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
       // fill out buckets
       for(elm <- this) {
         for(((n, io), i) <- elm.flatten zip elm.flatten.indices) {
-          val bits = io.toBits
-          bits.comp = io.comp
-          sortedElementsCache(i) += bits
+          //val bits = io.toBits
+          //bits.comp = io.comp
+          sortedElementsCache(i) += io.asInstanceOf[Bits]
         }
       }
     }
@@ -200,9 +201,10 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
 
   def read(addr: UFix): T = {
     if(readPortCache.contains(addr))
-      readPortCache(addr)
+      return readPortCache(addr)
 
     val res = this(0).clone
+    //val res = gen()
     res.setIsCellIO
     for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
       val w = io.getWidth
@@ -215,13 +217,13 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
       io assign io_res
 
       // setup the comp for writes
-      val io_comp = new VecProc()
-      io_comp.addr = addr
-      io_comp.elms = sortedElm
-      io.comp = io_comp
+        val io_comp = new VecProc()
+        io_comp.addr = addr
+        io_comp.elms = sortedElm
+        io.comp = io_comp
     }
     readPortCache += (addr -> res)
-    res
+    return res
   }
 
   override def flatten: Array[(String, IO)] = {
