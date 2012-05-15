@@ -95,14 +95,29 @@ Scala.
 \item set \verb+$CHISEL+ to that directory
 \end{itemize}
 
-\section{Java}
+The following is the Chisel directory structure:
+
+\begin{example}
+chisel/      # install chisel at same level as your project
+  tutorial/      
+  src/       # chisel source code 
+  sbt/
+  doc/
+    manual/
+    tutorial/
+    installation/
+\end{example}
+
+\section{Software}
+
+\subsection{Java}
 
 Install a modern Java runtime and compiler.
-For Ubuntu, install packages \verb+openjdk-7-jdk+ and
+For Linux, install packages \verb+openjdk-7-jdk+ and
 \verb+openjdk-7-jre+ using \verb+apt-get install+.
 For MacOSX, install \verb+openjdk6+ using \verb+port install+.
 
-\section{SBT}
+\subsection{SBT}
 
 SBT is the Scala Build Tool and is similar to Maven for Java.  Install
 and setup SBT using instructions from:
@@ -110,6 +125,11 @@ and setup SBT using instructions from:
 \begin{verbatim}
 https://github.com/harrah/xsbt/wiki/Getting-Started-Setup
 \end{verbatim}
+
+\subsection{C++}
+
+Make sure that you have \verb|g++| installed on your system.  On Linux
+install \verb|g++| package.  On MacOSX, install XCode.
 
 \section{Getting Started with Tutorial}
 
@@ -131,7 +151,7 @@ make -f GCD-Makefile
 GCD
 \end{verbatim}
 
-\section{Your Own Projects}
+\section{Creating Your Own Projects}
 
 SBT has a particular directory structure that we adhere to and
 somewhat improve.  Assuming that we have a project named {\em gpu},
