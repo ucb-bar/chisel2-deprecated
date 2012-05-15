@@ -92,6 +92,7 @@ Scala.
 \item Register your public key on \verb|github.com|
 \item Tell me your github account name
 \item run \verb|git clone git@github.com:ucb-bar/chisel.git|
+\item set \verb+$CHISEL+ to that directory
 \end{itemize}
 
 \section{Java}
@@ -109,6 +110,28 @@ and setup SBT using instructions from:
 \begin{verbatim}
 https://github.com/harrah/xsbt/wiki/Getting-Started-Setup
 \end{verbatim}
+
+\section{Getting Started with Tutorial}
+
+To test your configuration as follows:
+
+\begin{verbatim}
+cd $CHISEL/tutorial/sbt
+sbt
+project tutorial
+run GCD
+\end{verbatim}
+
+\noindent
+Then test that C++ was generated correctly as follows:
+
+\begin{verbatim}
+cd $CHISEL/tutorial/emulator
+make -f GCD-Makefile
+GCD
+\end{verbatim}
+
+\section{Your Own Projects}
 
 SBT has a particular directory structure that we adhere to and
 somewhat improve.  Assuming that we have a project named {\em gpu},
