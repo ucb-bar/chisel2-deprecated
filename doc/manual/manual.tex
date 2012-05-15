@@ -107,27 +107,36 @@ outgoing graph edges.
 % explain getNode and types interspersed between nodes
 % remove fromNode, toNode
 
+\begin{figure}[h]
+\centering
+\includegraphics[width=3in]{figs/node-hierarchy.pdf}
+\caption{Node hierarchy.}
+\label{fig:node-hierarchy}
+\end{figure}
+
+\section{Op}
+
+\begin{example}
+class Op {
+  val name: String;
+}
+\end{example}
+
 \section{Data}
 
 The graph contains port, operator, and type nodes.  Type nodes are
 interspersed between port and operator nodes and allow Chisel code to
 check and respond to Chisel types.  Type nodes are erased before
 emission to C++ and Verilog.  \verb+Data+ is the top most type node
-and the following is the built in type node hierarchy:
+and FIgure~\ref{fig:data-hierarchy}
+shows the built in type node hierarchy.
 
-\begin{example}
-Node
-  Data
-     Bits
-        Bool
-         Num
-           Fix
-           UFix
-     Bundle
-     Vec
-\end{example}
-
-\noindent
+\begin{figure}[h]
+\centering
+\includegraphics[width=3in]{figs/data-hierarchy.pdf}
+\caption{Data hierarchy.}
+\label{fig:data-hierarchy}
+\end{figure}
 
 \verb+Data+ itself is a node:
 
