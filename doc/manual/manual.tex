@@ -59,7 +59,7 @@ construction language embedded in the high-level programming language
 Scala.  Chisel is really only a set of special class
 definitions, predefined objects, and usage conventions within Scala,
 so when you write a Chisel program you are actually writing a Scala
-program.  However, for the tutorial we don't presume that you
+program.  However, for the manual we don't presume that you
 understand how to program in Scala.  We will point out necessary Scala
 features through the Chisel examples we give, and significant hardware
 designs can be completed using only the material contained herein.
@@ -68,14 +68,7 @@ reusable, you will find it important to leverage the underlying power
 of the Scala language. We recommend you consult one of the excellent
 Scala books to become more expert in Scala programming.
 
-Chisel is still in its infancy and you are likely to encounter some
-implementation bugs, and perhaps even a few conceptual design
-problems.  However, we are actively fixing and improving the language,
-and are open to bug reports and suggestions.  Even in its early state,
-we hope Chisel will help designers be more productive in building
-designs that are easy to reuse and maintain.
-
-\section{Node}
+\section{Nodes}
 
 Chisel user code creates a graph of nodes which Chisel then translates
 into Verilog or C++ code.  Nodes are \verb+Nameable+ objects:
@@ -83,56 +76,93 @@ into Verilog or C++ code.  Nodes are \verb+Nameable+ objects:
 \begin{example}
 trait Nameable {
   var name: String = "";
-  var named = false;
+  var isNamed = false; 
 }
 \end{example}
+
+% TODO: named should be changed to isNamed
+
 \noindent
-of type \verb{Node}:
+of type \verb+Node+:
 
 \begin{example}
 class Node extends Nameable {
+  def inputs: ArrayBuffer[Node];
+  def consumers: ArrayBuffer[Node];
+  def infer: Node => Int;
   def getWidth: Int;
   def getNode: Node;
-  def toNode: Node;
-  def fromNode(Node): this.type;
+  def toNode: Node;  
+  def fromNode(Node): this.type; 
 }
 \end{example}
+
+% TODO: toNode SHOULD BE toBits
+% TODO: fromNode SHOULD BE fromBits
+
+\noindent
+where \verb+inputs+ and \verb+consumers+ are the incoming and
+outgoing graph edges.
 
 % explain getNode and types interspersed between nodes
 % remove fromNode, toNode
 
-\subsection{Data}
+\begin{figure}[h]
+\centering
+\includegraphics[width=3in]{figs/node-hierarchy.pdf}
+\caption{Node hierarchy.}
+\label{fig:node-hierarchy}
+\end{figure}
+
+\section{Op}
 
 \begin{example}
-Node
-  Data
-     Bits
-        Bool
-         Num
-           Fix
-           UFix
-     Bundle
-     Vec
-  Wire
-     IO
-  Delay ???
-    Reg
-    Mem
+class Op {
+  val name: String;
+}
 \end{example}
+
+\section{Data}
+
+The graph contains port, operator, and type nodes.  Type nodes are
+interspersed between port and operator nodes and allow Chisel code to
+check and respond to Chisel types.  Type nodes are erased before
+emission to C++ and Verilog.  \verb+Data+ is the top most type node
+and FIgure~\ref{fig:data-hierarchy}
+shows the built in type node hierarchy.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=3in]{figs/data-hierarchy.pdf}
+\caption{Data hierarchy.}
+\label{fig:data-hierarchy}
+\end{figure}
+
+\verb+Data+ itself is a node:
+
+% TODO: data literals
 
 \begin{example}
 class Data extends Node with Cloneable {
-  def flatten: Array[(String, IO)];
   def toFix: Fix;
   def toUFix: UFix;
   def toBits: Bits;
   def toBool: Bool;
+  def flatten: Array[(String, IO)];
   def flip: this.type;
   def asOutput: this.type;
   def asInput: this.type;
   def :=[T <: Data](data: T);
+  def <>(data: Data);
 }
 \end{example}
+
+\noindent
+with methods for converting between types and 
+delegating port methods to its single input.   
+We will discuss ports in Section~\ref{sec:ports}.
+
+Type nodes are cloneable:
 
 \begin{example}
 trait Cloneable {
@@ -141,51 +171,61 @@ trait Cloneable {
 }
 \end{example}
 
+\noindent
+and users can override this in their own type nodes (e.g., bundles) in
+order to reflect construction parameters that are necessary for cloning.
+
 % why not fromBits ?
 
-\begin{example}
-class Wire extends Data with Updateable;
-\end{example}
+\subsection{Bits}
+
+In Chisel, a raw collection of
+bits is represented by the \code{Bits} type defined as follows:
 
 \begin{example}
-trait Updateable extends Node {
-  def updates: Queue[(Bool, Node)];
-  def genMuxes(default: Node);
-  def := ...
+object Bits {
+  def apply(width: Int = -1): Bits;
+  def apply(value: BigInt, width: Int = -1): Bits;
 }
-\end{example}
 
-% is updateable 
-
-\begin{example}
-class IO extends Wire {
-}
-\end{example}
-
-% is IO a good name?
-
-\begin{example}
-class Bits extends IO {
+class Bits extends Data {
   def unary_-(): Bits;
   def unary_~(): Bits;
+  def &  (b: Bits): Bits;
+  def |  (b: Bits): Bits;
+  def ^  (b: Bits): Bits;
   def andR(): Bool;
   def orR():  Bool;
+  def && (b: Bool): Bool;
+  def || (b: Bool): Bool;
   def ===(b: Bits): Bool;
   def != (b: Bits): Bool;
   def << (b: UFix): Bits;
   def >> (b: UFix): Bits;
-  def &  (b: Bits): Bits;
-  def |  (b: Bits): Bits;
-  def ^  (b: Bits): Bits;
   def ## (b: Bits): Bits;
-  def && (b: Bool): Bool;
-  def || (b: Bool): Bool;
 }
 \end{example}
 
+\noindent
+and with the simple bit operations.  
+N.B., that \verb+##+ is binary
+concatenation and \verb+===+ is bitwise comparison with \verb+==+.
+Operations produce an
+actual operator node and a type node combining the input type nodes.
+The \verb+getNode+ operator will skip type nodes and return the first
+non type node node.
+
+Boolean values are represented as type \code{Bool}:
+
 \begin{example}
+object Bool{
+  def apply():Bool;
+  def apply(value:Boolean): Bool;
+}
 class Bool extends Bits;
 \end{example}
+
+\verb+Num+ is a type node which defines arithmetic operations:
 
 \begin{example}
 class Num extends Bits {
@@ -193,43 +233,92 @@ class Num extends Bits {
   def *(b: Num): Num;
   def -(b: Num): Num;
   def >(b: Num): Bool;
+  def <(b: Num): Bool;
   def <=(b: Num): Bool;
   def >=(b: Num): Bool;
 }
 \end{example}
 
-\begin{example}
-class Fix extends Num; 
-\end{example}
+Signed and unsigned integers
+are considered subsets of fixed-point numbers and are represented by
+types \code{Fix} and \code{UFix} respectively:
 
 \begin{example}
+object Fix {
+  def apply(width: Int = -1):Fix;
+  def apply(value: BigInt, width: Int = -1): Fix;
+}
+class Fix extends Num; 
+
+object UFix {
+  def apply(width: Int = -1):UFix;
+  def apply(value: BigInt, width: Int = -1): UFix;
+}
 class UFix extends Num; 
 \end{example}
 
-\subsection{Bundle}
+\noindent
+Signed fixed-point
+numbers, including integers, are represented using two's-complement
+format.  
+
+% TODO: literal constructors
+
+\subsection{Bundles and Vecs}
+
+\code{Bundle} and \code{Vec} are classes that allow the user to expand
+the set of Chisel datatypes with aggregates of other types.
+
+Bundles group together several named fields of potentially different
+types into a coherent unit, much like a \code{struct} in C 
 
 \begin{example}
-class Bundle(view: Seq[String] = null) extends Data {
+class Bundle extends Data {
   def elements: ArrayBuffer[(String, Data)];
 }
 \end{example}
 
-\subsection{Vec}
+\noindent
+A user can get the names and Data corresponding to each element in a
+Bundle with the \verb+elements+ method and recursively using the
+\verb+flatten+ method. 
+% TODO: perhaps flatten should be named allElements
+Users can define their own by subclassing \verb+Bundle+ as follows:
+
+\begin{example}
+class MyFloat extends Bundle {
+  val sign =  Bool();
+  val exponent = Bits(width = 8);
+  val significand =  Bits(width = 23);
+}
+
+val x = new MyFloat()
+val xs = x.sign
+\end{example}
+
+Vecs create an indexable vector of elements: 
 
 \begin{example}
 object Vec {
   def apply[T <: Data](n: Int)(gen: => T): Vec[T];
 }
-class Vec[T <: Data](n: Int, val gen: () => T) extends Data {
+
+class Vec[T <: Data](n: Int, val gen: () => T) 
+    extends Data {
   def apply(idx: UFix): T
+  def apply(idx: Int): T
 }
 \end{example}
 
-\section{Combinational}
+\noindent
+with \verb+n+ elements of type defined with the \verb+gen+ thunk.
+Users can then either dynamically or statically accessed the elements.
 
-% \subsection{Operators}
+% TODO: conditionally assigning to elements
 
 \subsection{Bit Width Inference}
+
+% TODO: perhaps IO should be renamed Port
 
 Users are required to set bitwidths of ports and registers, but otherwise,
 bit widths on wires are automatically inferred unless set manually by the user.
@@ -266,84 +355,172 @@ the user either explicitly or from the bitwidth of the reset value.
 From these two requirements, we can show that the bit-width inference
 process will converge to a fixpoint.
 
-\section{Sequential}
+\section{Wires}
 
-\subsection{Registers}
+We provide the declaration of a wire node that can be used immediately, 
+but whose input will be set later:
 
 \begin{example}
-class Reg extends Delay with Updateable {
+object Wire {
+  def apply[T <: Data]()(gen: =>T): T;
+  def apply[T <: Data](default: T): T;
+}
+
+class Wire extends Node with Updateable;
+\end{example}
+
+%TODO: change proc to Updateable
+
+\noindent
+where \verb+Updateable+ collects updates and code generates a mux
+input for the wire:
+
+\begin{example}
+trait Updateable extends Node {
+  def updates: Queue[(Bool, Node)];
+  def genMuxes(default: Node);
+  def := (x: Node): this.type;
 }
 \end{example}
+
+% TODO: is updateable 
 
 \subsection{Conditional Updates}
 
+When describing the operation of state
+elements (and wires), it is often useful to instead specify when updates to the
+registers (and wires) will occur and to specify these updates spread across
+several separate statements.  Chisel provides conditional update rules
+in the form of the \code{when} construct to support this style of
+sequential logic description:
+
 \begin{example}
 object when {
-  def apply ...
+  def apply(cond: Bool)(block: => Unit): when;
 }
+class when (prevCond: Bool) {
+  def elsewhen (cond: Bool)(block: => Unit): when;
+  def otherwise (block: => Unit): Unit;
+}
+\end{example}
+
+Chisel provides some syntactic sugar for other common forms of
+conditional updates:
+
+\begin{example}
 object unless {
-  def apply ...
+  def apply(c: Bool)(block: => Unit) = 
+    when (!c) { block )
 }
+\end{example}
+
+\noindent and
+
+\begin{example}
 object otherwise {
-  def apply ...
+  def apply(block: => Unit) = 
+    when (Bool(true)) { block }
 }
 \end{example}
 
-\section{Memory}
-
-\subsection{ROM}
-
-\begin{example}
-object Rom {
-  def apply(inits: Seq[Data])
-}
-class Rom {
-  def read ...
-}
-\end{example}
-
-\subsection{Mem}
+We introduce the \code{switch} statement for conditional updates
+involving a series of comparisons against a common key:
 
 \begin{example}
-object Ram {
-  def apply(depth: Int, ...)
+object switch {
+  def apply(c: Bits)(block: => Unit): Unit;
 }
-
-class Mem[T <: Data](n: Int, gen: () => T) extends Delay with Updateable {
-  def read ...
+object is {
+  def apply(v: Bits)(block: => Unit);
 }
 \end{example}
 
 \section{Ports}
+\label{sec:ports}
 
-\subsection{Direction}
+Ports are wires used as interfaces to hardware components.  A port is
+a directional wrapper for a primitive \code{Data} object.  
 
 \begin{example}
-dir=INPUT
-dir=OUTPUT
+trait PortDir;
+object INPUT extends PortDir;
+object OUTPUT extends PortDir;
+
+class Port extends Wire {
+  var dir: PortDir;
+  override def flip;
+}
+
+object Input {
+  def apply[T <: Data]()(gen: => T): T;
+}
+object Output {
+  def apply[T <: Data]()(gen: => T): T;
+}
 \end{example}
 
+\noindent
+Aggregate ports can recursively be constructed using either a vec or
+bundle with instances of \verb+Port+ as leaves.
 
-\subsection{Subclassing}
+\section{Registers}
 
 \begin{example}
-extends Bundle
+class Delay extends Node;
+
+object Reg {
+  def apply[T <: Data](data: T): T;
+  def apply[T <: Data](data: T, resetVal: T): T;
+  def apply[T <: Data](resetVal: T = null)(gen: =>T): T;
+}
+ 
+class Reg extends Delay with Updateable {
+}
 \end{example}
 
-\subsection{Views}
+\section{Memories}
+
+Chisel provides facilities for creating both read only and
+read/write memories.  
 
 \begin{example}
-Bundle(Seq[String])
+object Mem {
+  def apply[T <: Data](depth: Int)(gen: => T): T;
+}
+
+class Mem[T <: Data](n: Int, gen: () => T) 
+    extends Delay with Updateable {
+  def apply(idx: UFix): T;
+}
+
+class MemRead[T <: Data]
+      (val mem: Mem, val idx: UFix) 
+    extends Node;
+
+class MemWrite[T <: Data]
+      (val mem: Mem, val idx: UFix, val data: T) 
+    extends Node;
 \end{example}
 
 \section{Components}
+
+In Chisel, {\em components} are very similar to {\em modules} in
+Verilog, defining a hierarchical structure in the generated circuit.
+The hierarchical component namespace is accessible in downstream tools
+to aid in debugging and physical layout.  A user-defined component is
+defined as a {\em class} which:
+\begin{itemize}
+\item inherits from \code{Component},
+\item contains an interface Bundle stored in a field named \code{io}, and
+\item wires together subcircuits in its constructor.
+\end{itemize}
 
 Users write their own components by subclassing Component which is
 defined as follows:
 
 \begin{example}
 abstract class Component {
-  val io: IO;
+  val io: Bundle;
   def compileV: Unit;
   def compileC: Unit;
 }
@@ -353,10 +530,20 @@ abstract class Component {
 val io = ...;
 \end{example}
 
-\subsection{Bulk Connections}
+The \code{:=} assignment operator, used in the body of a
+component definition, is a special operator in Chisel that wires the input of
+left-hand side to the output of the right-hand side.  It is typically
+used to connect an output port to its definition.
+
+% is IO a good name?
+
+The \verb+<>+ operator bulk connects interfaces of opposite gender.
+Bulk connections connect leaf ports of the same name to each other.
+After all connections are made and the circuit is being elaborated,
+Chisel warns users if ports have other than exactly one connection to them.
 
 \begin{example}
-<>
+def <> (x: Node);
 \end{example}
 
 \subsection{Main}
@@ -382,7 +569,7 @@ Command arguments are as follows:
 \verb+--debug+ & put all wires in class file \\
 \end{tabular}
 
-\section{Emulator}
+\section{C++ Emulator}
 
 The C++ emulator is based on a fast multiword library using
 C++ templates.  The \verb+dat_t+ represents multiple \verb+val_t+:
@@ -460,9 +647,11 @@ template <int dw>
 template <int dw, int iwe, int iws> 
   dat_t<dw> extract(dat_t<iwe> e, dat_t<iws> s);
 template <int sw> 
-  dat_t<w> inject(dat_t<sw> src, val_t e, val_t s);
+  dat_t<w> inject
+    (dat_t<sw> src, val_t e, val_t s);
 template <int sw, int iwe, int iws> 
-  dat_t<w> inject(dat_t<sw> src, dat_t<iwe> e, dat_t<iws> s);
+  dat_t<w> inject
+    (dat_t<sw> src, dat_t<iwe> e, dat_t<iws> s);
 template <int dw> 
   dat_t<dw> log2();
   dat_t<1> bit(val_t b);
@@ -514,7 +703,7 @@ int main (int argc, char* argv) {
   for (size_t t = 0; t < n; t++) {
     cpu->scan();
     cpu->clock_lo();
-    cpu->clock_lo();
+    cpu->clock_hi();
     cpu->print();
   }
 }
@@ -522,38 +711,61 @@ int main (int argc, char* argv) {
 
 \section{Verilog}
 
-\section{Acknowlegements}
+\section{Standard Library}
 
-Many people have helped out in the design of Chisel, and we thank them
-for their patience, bravery, and belief in a better way.  Many
-Berkeley EECS students in the Isis group gave weekly feedback as the
-design evolved including but not limited to Yunsup Lee, Andrew
-Waterman, Scott Beamer, Chris Celio, etc.  Yunsup Lee gave us feedback
-in response to the first RISC-V implementation, called TrainWreck,
-translated from Verilog to Chisel.  Andrew Waterman and Yunsup Lee
-helped us get our Verilog backend up and running and Chisel TrainWreck
-running on an FPGA.  Brian Richards was the first actual Chisel user,
-first translating (with Huy Vo) John Hauser's FPU Verilog code to
-Chisel, and later implementing generic memory blocks.  Brian gave many
-invaluable comments on the design and brought a vast experience in
-hardware design and design tools.  Chris Batten shared his fast
-multiword C++ template library that inspired our fast emulation
-library.  Huy Vo became our undergraduate research assistant and was
-the first to actually assist in the Chisel implementation.  We
-appreciate all the EECS students who participated in the Chisel
-bootcamp and proposed and worked on hardware design projects all of
-which pushed the Chisel envelope.  We appreciate the work that James
-Martin and Alex Williams did in writing and translating network and
-memory controllers and non-blocking caches.  Finally, Chisel's
-functional programming and bit-width inference ideas were inspired by
-earlier work on a hardware description language called Gel~\cite{gel} designed in
-collaboration with Dany Qumsiyeh and Mark Tobenkin.
+\begin{example}
+foldR
+log2up
+ispow2
+Match
+Reverse
+PopCount
+OHToUFix
+UFixToOH
+LFSR16
+ShiftRegister
+Mux1H
+Arbiter
+DecoupledIO
+Queues
+Pipes
+\end{example}
 
-% \note{Who else?}
+% henry
 
-\begin{thebibliography}{50}
-\bibitem{gel} Bachrach, J., Qumsiyeh, D., Tobenkin, M. \textsl{Hardware Scripting in Gel}.
-in Field-Programmable Custom Computing Machines, 2008. FCCM '08. 16th.
-\end{thebibliography}
+% \section{Acknowlegements}
+% 
+% Many people have helped out in the design of Chisel, and we thank them
+% for their patience, bravery, and belief in a better way.  Many
+% Berkeley EECS students in the Isis group gave weekly feedback as the
+% design evolved including but not limited to Yunsup Lee, Andrew
+% Waterman, Scott Beamer, Chris Celio, etc.  Yunsup Lee gave us feedback
+% in response to the first RISC-V implementation, called TrainWreck,
+% translated from Verilog to Chisel.  Andrew Waterman and Yunsup Lee
+% helped us get our Verilog backend up and running and Chisel TrainWreck
+% running on an FPGA.  Brian Richards was the first actual Chisel user,
+% first translating (with Huy Vo) John Hauser's FPU Verilog code to
+% Chisel, and later implementing generic memory blocks.  Brian gave many
+% invaluable comments on the design and brought a vast experience in
+% hardware design and design tools.  Chris Batten shared his fast
+% multiword C++ template library that inspired our fast emulation
+% library.  Huy Vo became our undergraduate research assistant and was
+% the first to actually assist in the Chisel implementation.  We
+% appreciate all the EECS students who participated in the Chisel
+% bootcamp and proposed and worked on hardware design projects all of
+% which pushed the Chisel envelope.  We appreciate the work that James
+% Martin and Alex Williams did in writing and translating network and
+% memory controllers and non-blocking caches.  Finally, Chisel's
+% functional programming and bit-width inference ideas were inspired by
+% earlier work on a hardware description language called Gel~\cite{gel} designed in
+% collaboration with Dany Qumsiyeh and Mark Tobenkin.
+% 
+% % \note{Who else?}
+% 
+% \begin{thebibliography}{50}
+% \bibitem{gel} Bachrach, J., Qumsiyeh, D., Tobenkin, M. \textsl{Hardware Scripting in Gel}.
+% in Field-Programmable Custom Computing Machines, 2008. FCCM '08. 16th.
+% \end{thebibliography}
+% 
 
 \end{document}
