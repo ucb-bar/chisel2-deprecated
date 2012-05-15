@@ -1,4 +1,4 @@
-\documentclass[10pt]{article}
+\documentclass[10pt,twocolumn]{article}
 \setlength\textwidth{6.875in}
 \setlength\textheight{8.875in}
 % set both margins to 2.5 pc
@@ -9,8 +9,8 @@
 \setlength{\topmargin}{0in} \setlength{\headheight}{0pt}
 \setlength{\headsep}{0pt}
 \setlength{\footskip}{37pt}%
-%\setlength{\columnsep}{0.3125in}
-%\setlength{\columnwidth}{3.28125in}% (6.875 - 0.3125)/2 = 3.28125in
+\setlength{\columnsep}{0.3125in}
+\setlength{\columnwidth}{3.28125in}% (6.875 - 0.3125)/2 = 3.28125in
 \setlength{\parindent}{1pc}
 \newcommand{\myMargin}{1.00in}
 \usepackage[top=\myMargin, left=\myMargin, right=\myMargin, bottom=\myMargin, nohead]{geometry}
@@ -53,13 +53,10 @@ EECS Department, UC Berkeley\\
 
 \section{Introduction}
 
-This document is a tutorial introduction to {\em Chisel} (Constructing
+This document is a manual for {\em Chisel} (Constructing
 Hardware In a Scala Embedded Language).  Chisel is a hardware
 construction language embedded in the high-level programming language
-Scala.  At some point we will provide a proper reference manual, in
-addition to more tutorial examples.  In the meantime, this document
-along with a lot of trial and error should set you on your way to
-using Chisel.  Chisel is really only a set of special class
+Scala.  Chisel is really only a set of special class
 definitions, predefined objects, and usage conventions within Scala,
 so when you write a Chisel program you are actually writing a Scala
 program.  However, for the tutorial we don't presume that you
@@ -78,143 +75,209 @@ and are open to bug reports and suggestions.  Even in its early state,
 we hope Chisel will help designers be more productive in building
 designs that are easy to reuse and maintain.
 
-\begin{commentary}
-Through the tutorial, we format commentary on our design choices as in
-this paragraph.  You should be able to skip the commentary sections
-and still fully understand how to use Chisel, but we hope you'll find
-them interesting.
+\section{Node}
 
-We were motivated to develop a new hardware language by years of
-struggle with existing hardware description languages in our research
-projects and hardware design courses.  Verilog and VHDL were developed
-as hardware {\em simulation} languages, and only later did they become
-a basis for hardware {\em synthesis}.  Much of the semantics of these
-languages are not appropriate for hardware synthesis and, in fact,
-many constructs are simply not synthesizable.  Other constructs are
-non-intuitive in how they map to hardware implementations, or their
-use can accidently lead to highly inefficient hardware structures.
-While it is possible to use a subset of these languages and yield
-acceptable results, they nonetheless present a cluttered and confusing
-specification model, particularly in an instructional setting.
+Chisel user code creates a graph of nodes which Chisel then translates
+into Verilog or C++ code.  Nodes are \verb+Nameable+ objects:
 
-However, our strongest motivation for developing a new hardware
-language is our desire to change the way that electronic system design
-takes place.  We believe that it is important to not only teach
-students how to design circuits, but also to teach them how to design
-{\em circuit generators}---programs that automatically generate
-designs from a high-level set of design parameters and constraints.
-Through circuit generators, we hope to leverage the hard work of
-design experts and raise the level of design abstraction for everyone.
-To express flexible and scalable circuit construction, circuit
-generators must employ sophisticated programming techniques to make
-decisions concering how to best customize their output circuits
-according to high-level parameter values and constraints.  While
-Verilog and VHDL include some primitive constructs for programmatic
-circuit generation, they lack the powerful facilities present in
-modern programming languages, such as object-oriented programming,
-type inference, support for functional programming, and reflection.
-
-Instead of building a new hardware design language from scratch, we
-chose to embed hardware construction primitives within an existing
-language.  We picked Scala not only because it includes the
-programming features we feel are important for building circuit
-generators, but because it was specifically developed as a base for
-domain-specific languages.
-\end{commentary}
-
-\section{Hardware expressible in Chisel}
-
-The initial version of Chisel only supports the expression of
-synchronous RTL (Register-Transfer Level) designs, with a single
-common clock.  Synchronous RTL circuits can be expressed as a
-hierarchical composition of modules containing combinational logic and
-clocked state elements.  Although Chisel assumes a single global
-clock, local clock gating logic is automatically generated for every
-state element in the design to save power.
-\begin{commentary}
-Modern hardware designs often include multiple islands of logic, where
-each island uses a different clock and where islands must correctly
-communicate across clock island boundaries.  Although clock-crossing
-synchronization circuits are notoriously difficult to design, there
-are known good solutions for most scenarios, which can be packaged as
-library elements for use by designers.  As a result, most effort in
-new designs is spent in developing and verifying the functionality
-within each synchronous island rather than on passing values between
-islands.
-
-In its current form, Chisel can be used to describe each of the
-synchronous islands individually. Existing tool frameworks can tie
-together these islands into a complete design.  For example, a
-separate outer simulation framework can be used to model the assembly
-of islands running together.  It should be noted that exhaustive
-dynamic verification of asynchronous communications is usually
-impossible and that more formal static approaches are usually
-necessary.
-\end{commentary}
-
-This version of Chisel also only supports binary logic, and does not
-support tri-state signals.
-\begin{commentary}
-We focus on binary logic designs as they constitute the vast majority
-of designs in practice.  We omit support for tri-state logic in the
-current Chisel language as this is in any case poorly supported by
-industry flows, and difficult to use reliably outside of controlled
-hard macros.
-\end{commentary}
-
-\section{Types and Literals}
-
-\subsection{Scalars}
-
-\begin{verbatim}
-class Data extends Node {
+\begin{example}
+trait Nameable {
+  var name: String = "";
+  var named = false;
 }
-class Bits extends Data {
-}
-class Fix extends Bits {
-}
-class Bool extends Fix {
-}
-\end{verbatim}
+\end{example}
+\noindent
+of type \verb{Node}:
 
-\subsection{Bundles}
-
-\begin{verbatim}
-class Bundle extends Data {
+\begin{example}
+class Node extends Nameable {
+  def getWidth: Int;
+  def getNode: Node;
+  def toNode: Node;
+  def fromNode(Node): this.type;
 }
-\end{verbatim}
+\end{example}
 
-\subsection{Vecs}
+% explain getNode and types interspersed between nodes
+% remove fromNode, toNode
 
-\begin{verbatim}
-class Vec extends Data {
+\subsection{Data}
+
+\begin{example}
+Node
+  Data
+     Bits
+        Bool
+         Num
+           Fix
+           UFix
+     Bundle
+     Vec
+  Wire
+     IO
+  Delay ???
+    Reg
+    Mem
+\end{example}
+
+\begin{example}
+class Data extends Node with Cloneable {
+  def flatten: Array[(String, IO)];
+  def toFix: Fix;
+  def toUFix: UFix;
+  def toBits: Bits;
+  def toBool: Bool;
+  def flip: this.type;
+  def asOutput: this.type;
+  def asInput: this.type;
+  def :=[T <: Data](data: T);
 }
-\end{verbatim}
+\end{example}
+
+\begin{example}
+trait Cloneable {
+  override def clone(): this.type =
+    this.getClass.newInstance.asInstanceOf[this.type];
+}
+\end{example}
+
+% why not fromBits ?
+
+\begin{example}
+class Wire extends Data with Updateable;
+\end{example}
+
+\begin{example}
+trait Updateable extends Node {
+  def updates: Queue[(Bool, Node)];
+  def genMuxes(default: Node);
+  def := ...
+}
+\end{example}
+
+% is updateable 
+
+\begin{example}
+class IO extends Wire {
+}
+\end{example}
+
+% is IO a good name?
+
+\begin{example}
+class Bits extends IO {
+  def unary_-(): Bits;
+  def unary_~(): Bits;
+  def andR(): Bool;
+  def orR():  Bool;
+  def ===(b: Bits): Bool;
+  def != (b: Bits): Bool;
+  def << (b: UFix): Bits;
+  def >> (b: UFix): Bits;
+  def &  (b: Bits): Bits;
+  def |  (b: Bits): Bits;
+  def ^  (b: Bits): Bits;
+  def ## (b: Bits): Bits;
+  def && (b: Bool): Bool;
+  def || (b: Bool): Bool;
+}
+\end{example}
+
+\begin{example}
+class Bool extends Bits;
+\end{example}
+
+\begin{example}
+class Num extends Bits {
+  def +(b: Num): Num;
+  def *(b: Num): Num;
+  def -(b: Num): Num;
+  def >(b: Num): Bool;
+  def <=(b: Num): Bool;
+  def >=(b: Num): Bool;
+}
+\end{example}
+
+\begin{example}
+class Fix extends Num; 
+\end{example}
+
+\begin{example}
+class UFix extends Num; 
+\end{example}
+
+\subsection{Bundle}
+
+\begin{example}
+class Bundle(view: Seq[String] = null) extends Data {
+  def elements: ArrayBuffer[(String, Data)];
+}
+\end{example}
+
+\subsection{Vec}
+
+\begin{example}
+object Vec {
+  def apply[T <: Data](n: Int)(gen: => T): Vec[T];
+}
+class Vec[T <: Data](n: Int, val gen: () => T) extends Data {
+  def apply(idx: UFix): T
+}
+\end{example}
 
 \section{Combinational}
 
-\subsection{Operators}
-
-\begin{verbatim}
-\end{verbatim}
+% \subsection{Operators}
 
 \subsection{Bit Width Inference}
 
-\subsection{Named Wires}
+Users are required to set bitwidths of ports and registers, but otherwise,
+bit widths on wires are automatically inferred unless set manually by the user.
+% TODO: how do you set the width explicitly?
+The bit-width inference engine starts from the graph's input ports and 
+calculates node output bit widths from their respective input bit widths according to the following set of rules:\\
+
+{\footnotesize
+\begin{tabular}{ll}
+{\bf operation} & {\bf bit width} \\ 
+\verb|z = x + y| & \verb|wz = max(wx, wy) + 1| \\
+\verb+z = x - y+ & \verb|wz = max(wx, wy) + 1|\\
+\verb+z = x & y+ & \verb+wz = max(wx, wy)+ \\
+\verb+z = Mux(c, x, y)+ & \verb+wz = max(wx, wy)+ \\
+\verb+z = w * y+ & \verb!wz = wx + wy! \\
+\verb+z = x << n+ & \verb!wz = wx + maxNum(n)! \\
+\verb+z = x >> n+ & \verb+wz = wx - minNum(n)+ \\
+\verb+z = Cat(x, y)+ & \verb!wz = wx + wy! \\
+\verb+z = Fill(n, x)+ & \verb+wz = wx * maxNum(n)+ \\
+% \verb+z = x < y+ & \verb+<= > >= && || != ===+ & \verb+wz = 1+ \\
+\end{tabular}
+}
+\\[1mm]
+\noindent  
+where for instance $wz$ is the bit width of wire $z$, and the \verb+&+
+rule applies to all bitwise logical operations.
+
+The bit-width inference process continues until no bit width changes.
+Except for right shifts by known constant amounts, the bit-width
+inference rules specify output bit widths that are never smaller than
+the input bit widths, and thus, output bit widths either grow or stay
+the same.  Furthermore, the width of a register must be specified by
+the user either explicitly or from the bitwidth of the reset value.
+From these two requirements, we can show that the bit-width inference
+process will converge to a fixpoint.
 
 \section{Sequential}
 
 \subsection{Registers}
 
-\begin{verbatim}
-class Reg {
-  def <== ...
+\begin{example}
+class Reg extends Delay with Updateable {
 }
-\end{verbatim}
+\end{example}
 
 \subsection{Conditional Updates}
 
-\begin{verbatim}
+\begin{example}
 object when {
   def apply ...
 }
@@ -224,106 +287,225 @@ object unless {
 object otherwise {
   def apply ...
 }
-\end{verbatim}
+\end{example}
 
 \section{Memory}
 
 \subsection{ROM}
 
-\begin{verbatim}
+\begin{example}
 object Rom {
   def apply(inits: Seq[Data])
 }
 class Rom {
   def read ...
 }
-\end{verbatim}
+\end{example}
 
 \subsection{Mem}
 
-\begin{verbatim}
+\begin{example}
 object Ram {
   def apply(depth: Int, ...)
 }
-class Rom {
+
+class Mem[T <: Data](n: Int, gen: () => T) extends Delay with Updateable {
   def read ...
 }
-\end{verbatim}
+\end{example}
 
 \section{Ports}
 
 \subsection{Direction}
 
-\begin{verbatim}
-dir='input
-dir='output
-\end{verbatim}
+\begin{example}
+dir=INPUT
+dir=OUTPUT
+\end{example}
 
 
 \subsection{Subclassing}
 
-\begin{verbatim}
+\begin{example}
 extends Bundle
-\end{verbatim}
+\end{example}
 
 \subsection{Views}
 
-\begin{verbatim}
+\begin{example}
 Bundle(Seq[String])
-\end{verbatim}
+\end{example}
 
 \section{Components}
 
-\subsection{IO}
+Users write their own components by subclassing Component which is
+defined as follows:
 
-\begin{verbatim}
+\begin{example}
+abstract class Component {
+  val io: IO;
+  def compileV: Unit;
+  def compileC: Unit;
+}
+\end{example}
+
+\begin{example}
 val io = ...;
-\end{verbatim}
+\end{example}
 
 \subsection{Bulk Connections}
 
-\begin{verbatim}
+\begin{example}
 <>
-^^
-\end{verbatim}
+\end{example}
 
 \subsection{Main}
 
-\begin{verbatim}
-def chiselMain (args: Array[String], gen, scanner, printer) 
-args =
---debug
-...
-\end{verbatim}
+The user calls chiselMain from their main object:
+
+\begin{example}
+object chiselMain {
+  def apply[T <: Component]
+    (args: Array[String], 
+     gen: () => T, 
+     scanner: T => TestIO = null, 
+     printer: T => TestIO = null): T;
+}
+\end{example}
+
+Command arguments are as follows:
+\begin{tabular}{lll}
+\verb+--target-dir+ & target pathname prefix \\
+\verb+--gen-harness+ & generate harness file for C++ \\
+\verb+--v+ & generate verilog \\
+\verb+--vcd+ & enable vcd dumping \\
+\verb+--debug+ & put all wires in class file \\
+\end{tabular}
 
 \section{Emulator}
 
-\subsection{dat_t}
+The C++ emulator is based on a fast multiword library using
+C++ templates.  The \verb+dat_t+ represents multiple \verb+val_t+:
 
-\begin{verbatim}
+\begin{example}
+typedef uint64_t val_t;
+typedef int64_t sval_t; 
+typedef uint32_t half_val_t;
+\end{example}
+
+\begin{example}
+template <int w>
 class dat_t {
+ public:
+  const static int n_words;
+  inline int width ( void );
+  inline int n_words_of ( void );
+  inline bool to_bool ( void );
+  inline val_t lo_word ( void );
+  inline unsigned long to_ulong ( void );
+  std::string to_str ();
+  static dat_t<w> rand();
+  dat_t<w> ();
+template <int sw> 
+  dat_t<w> (const dat_t<sw>& src);
+  dat_t<w> (const dat_t<w>& src);
+  dat_t<w> (val_t val);
+template <int sw> 
+  dat_t<w> mask(dat_t<sw> fill, int n);
+template <int dw> 
+  dat_t<dw> mask(int n);
+template <int n> 
+  dat_t<n> mask(void);
+  dat_t<w> operator + ( dat_t<w> o );
+  dat_t<w> operator - ( dat_t<w> o );
+  dat_t<w> operator - ( );
+  dat_t<w+w> operator * ( dat_t<w> o );
+  dat_t<w+w> fix_times_fix( dat_t<w> o );
+  dat_t<w+w> ufix_times_fix( dat_t<w> o );
+  dat_t<w+w> fix_times_ufix( dat_t<w> o );
+  dat_t<1> operator < ( dat_t<w> o );
+  dat_t<1> operator > ( dat_t<w> o );
+  dat_t<1> operator >= ( dat_t<w> o );
+  dat_t<1> operator <= ( dat_t<w> o );
+  dat_t<1> gt ( dat_t<w> o );
+  dat_t<1> gte ( dat_t<w> o );
+  dat_t<1> lt ( dat_t<w> o );
+  dat_t<1> lte ( dat_t<w> o );
+  dat_t<w> operator ^ ( dat_t<w> o );
+  dat_t<w> operator & ( dat_t<w> o );
+  dat_t<w> operator | ( dat_t<w> o );
+  dat_t<w> operator ~ ( void );
+  dat_t<1> operator ! ( void );
+  dat_t<1> operator && ( dat_t<1> o );
+  dat_t<1> operator || ( dat_t<1> o );
+  dat_t<1> operator == ( dat_t<w> o );
+  dat_t<1> operator == ( datz_t<w> o );
+  dat_t<1> operator != ( dat_t<w> o );
+  dat_t<w> operator << ( int amount );
+  dat_t<w> operator << ( dat_t<w> o );
+  dat_t<w> operator >> ( int amount );
+  dat_t<w> operator >> ( dat_t<w> o );
+  dat_t<w> rsha ( dat_t<w> o);
+  dat_t<w>& operator = ( dat_t<w> o );
+  dat_t<w> fill_bit(val_t bit);
+  dat_t<w> fill_byte(val_t byte, int nb, int n);
+template <int dw, int n> 
+  dat_t<dw> fill( void );
+template <int dw, int nw> 
+  dat_t<dw> fill( dat_t<nw> n );
+template <int dw> 
+  dat_t<dw> extract();
+template <int dw> 
+  dat_t<dw> extract(val_t e, val_t s);
+template <int dw, int iwe, int iws> 
+  dat_t<dw> extract(dat_t<iwe> e, dat_t<iws> s);
+template <int sw> 
+  dat_t<w> inject(dat_t<sw> src, val_t e, val_t s);
+template <int sw, int iwe, int iws> 
+  dat_t<w> inject(dat_t<sw> src, dat_t<iwe> e, dat_t<iws> s);
+template <int dw> 
+  dat_t<dw> log2();
+  dat_t<1> bit(val_t b);
+  val_t msb();
+template <int iw>
+  dat_t<1> bit(dat_t<iw> b)
 }
-\end{verbatim}
+\end{example}
 
-\subsection{mod_t}
+\begin{example}
+template <int w, int sw> 
+  dat_t<w> DAT(dat_t<sw> dat);
+template <int w> 
+  dat_t<w> LIT(val_t value);
+template <int w> dat_t<w> 
+  mux ( dat_t<1> t, dat_t<w> c, dat_t<w> a )
+\end{example}
 
-\begin{verbatim}
+The Chisel compiler compiles top level components into a \verb+mod_t+
+class that can be created and executed:
+
+\begin{example}
 class mod_t {
-init
-clock_lo
-clock_hi
-scan
-print
-}
-\end{verbatim}
+ public:
+  std::vector< mod_t* > children;
+  virtual void init (void) { };
+  virtual void clock_lo (dat_t<1> reset) { };
+  virtual void clock_hi (dat_t<1> reset) { };
+  virtual void print (FILE* f) { };
+  virtual bool scan (FILE* f) { return true; };
+  virtual void dump (FILE* f, int t) { };
+};
+\end{example}
 
-\subsection{Harness}
-
-\begin{verbatim}
+\begin{example}
 environment variables
-\end{verbatim}
+\end{example}
 
-\begin{verbatim}
+Either the Chisel compiler can create a harness or the user can write
+a harness themselves.  The following is an example of a harness for a
+CPU component:
+
+\begin{example}
 #include "cpu.h"
 
 int main (int argc, char* argv) {
@@ -336,7 +518,7 @@ int main (int argc, char* argv) {
     cpu->print();
   }
 }
-\end{verbatim}
+\end{example}
 
 \section{Verilog}
 
