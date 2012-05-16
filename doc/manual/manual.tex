@@ -71,22 +71,12 @@ Scala books to become more expert in Scala programming.
 \section{Nodes}
 
 Chisel user code creates a graph of nodes which Chisel then translates
-into Verilog or C++ code.  Nodes are \verb+Nameable+ objects:
+into Verilog or C++ code.  Nodes are defined as follows:
 
 \begin{example}
-trait Nameable {
+class Node {
   var name: String = "";
   var isNamed = false; 
-}
-\end{example}
-
-% TODO: named should be changed to isNamed
-
-\noindent
-of type \verb+Node+:
-
-\begin{example}
-class Node extends Nameable {
   def inputs: ArrayBuffer[Node];
   def consumers: ArrayBuffer[Node];
   def infer: Node => Int;
@@ -114,52 +104,48 @@ outgoing graph edges.
 \label{fig:node-hierarchy}
 \end{figure}
 
-\section{Op}
+\section{Lit}
+
+Literal are represented as \verb+Lit+ nodes defined as follows:
 
 \begin{example}
-class Op {
-  val name: String;
+class Lit {
+  val inputVal: BigInt;
 }
 \end{example}
 
-\section{Data}
+\section{Op}
 
-The graph contains port, operator, and type nodes.  Type nodes are
-interspersed between port and operator nodes and allow Chisel code to
-check and respond to Chisel types.  Type nodes are erased before
-emission to C++ and Verilog.  \verb+Data+ is the top most type node
-and FIgure~\ref{fig:data-hierarchy}
-shows the built in type node hierarchy.
-
-\begin{figure}[h]
-\centering
-\includegraphics[height=2.5in]{figs/data-hierarchy.pdf}
-\caption{Data hierarchy.}
-\label{fig:data-hierarchy}
-\end{figure}
-
-\verb+Data+ itself is a node:
-
-\begin{figure}[h]
-\centering
-\includegraphics[height=2in]{figs/bits-and.pdf}
-\caption{Simple bits graph representing {\tt\footnotesize Bits(1)\&Bits(2)}.}
-\label{fig:bits-and}
-\end{figure}
-
-\begin{figure}[h]
-\centering
-\includegraphics[height=2.5in]{figs/bits-or-and.pdf}
-\caption{Second level bits graph constructed with
-  {\tt\footnotesize (Bits(1)\&Bits(2))|Bits(3)} augmenting the graph
-  shown in Figure~\ref{fig:bits-and}.}
-\label{fig:bits-or-and}
-\end{figure}
-
-% TODO: data literals
+Operations are represented as \verb+Op+ nodes defined as follows:
 
 \begin{example}
-class Data extends Node with Cloneable {
+class Op {
+  val op: String;
+}
+\end{example}
+
+\section{Type}
+
+A Chisel graph contains port, op, and type nodes.  Type nodes are
+interspersed between port and operator nodes and allow Chisel code to
+check and respond to Chisel types.  Type nodes are erased before
+emission to C++ and Verilog.  \verb+Type+ is the top most type node
+and FIgure~\ref{fig:type-hierarchy}
+shows the built in type hierarchy.
+
+\begin{figure}[h]
+\centering
+\includegraphics[height=2.5in]{figs/type-hierarchy.pdf}
+\caption{Type hierarchy.}
+\label{fig:type-hierarchy}
+\end{figure}
+
+\verb+Type+ itself is a node:
+
+\begin{example}
+abstract class Type extends Node {
+  override def clone(): this.type =
+    this.getClass.newInstance.asInstanceOf[this.type];
   def toFix: Fix;
   def toUFix: UFix;
   def toBits: Bits;
@@ -168,8 +154,8 @@ class Data extends Node with Cloneable {
   def flip: this.type;
   def asOutput: this.type;
   def asInput: this.type;
-  def :=[T <: Data](data: T);
-  def <>(data: Data);
+  def :=[T <: Type](t: T);
+  def <>(t: Type);
 }
 \end{example}
 
@@ -177,18 +163,7 @@ class Data extends Node with Cloneable {
 with methods for converting between types and 
 delegating port methods to its single input.   
 We will discuss ports in Section~\ref{sec:ports}.
-
-Type nodes are cloneable:
-
-\begin{example}
-trait Cloneable {
-  override def clone(): this.type =
-    this.getClass.newInstance.asInstanceOf[this.type];
-}
-\end{example}
-
-\noindent
-and users can override this in their own type nodes (e.g., bundles) in
+Finally, users can override this in their own type nodes (e.g., bundles) in
 order to reflect construction parameters that are necessary for cloning.
 
 % why not fromBits ?
@@ -204,7 +179,7 @@ object Bits {
   def apply(value: BigInt, width: Int = -1): Bits;
 }
 
-class Bits extends Data {
+class Bits extends Type {
   def unary_-(): Bits;
   def unary_~(): Bits;
   def &  (b: Bits): Bits;
@@ -224,22 +199,56 @@ class Bits extends Data {
 
 \noindent
 and with the simple bit operations.  
+Bits with a value argument produces a \verb+Lit+ as shown in Figure~\ref{fig:bits-1}.
 N.B., that \verb+##+ is binary
 concatenation and \verb+===+ is bitwise comparison with \verb+==+.
+
 Operations produce an
 actual operator node and a type node combining the input type nodes.
+See Figures~\ref{fig:bits-1}, \ref{fig:and}, \ref{fig:bits-or-and} for
+successively more complicated examples.
+
+\begin{figure}[h]
+\centering
+\includegraphics[height=1in]{figs/bits-1.pdf}
+\caption{Chisel graph representing {\tt\footnotesize Bits(1)}.}
+\label{fig:bits-1}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[height=1.5in]{figs/bits-and.pdf}
+\caption{Chisel graph representing {\tt\footnotesize Bits(1)\&Bits(2)}.}
+\label{fig:bits-and}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[height=2.5in]{figs/bits-or-and.pdf}
+\caption{Chisel graph representing 
+  {\tt\footnotesize (Bits(1)\&Bits(2))|Bits(3)} augmenting the graph
+  shown in Figure~\ref{fig:bits-and}.}
+\label{fig:bits-or-and}
+\end{figure}
+
+\noindent
 The \verb+getNode+ operator will skip type nodes and return the first
 non type node node.
 
-Boolean values are represented as type \code{Bool}:
+\subsection{Bool}
+
+Boolean values are represented as \code{Bool}:
 
 \begin{example}
-object Bool{
+object Bool {
   def apply():Bool;
   def apply(value:Boolean): Bool;
 }
+
 class Bool extends Bits;
 \end{example}
+
+\subsection{Num}
 
 \verb+Num+ is a type node which defines arithmetic operations:
 
@@ -264,12 +273,14 @@ object Fix {
   def apply(width: Int = -1):Fix;
   def apply(value: BigInt, width: Int = -1): Fix;
 }
+
 class Fix extends Num; 
 
 object UFix {
   def apply(width: Int = -1):UFix;
   def apply(value: BigInt, width: Int = -1): UFix;
 }
+
 class UFix extends Num; 
 \end{example}
 
@@ -277,8 +288,6 @@ class UFix extends Num;
 Signed fixed-point
 numbers, including integers, are represented using two's-complement
 format.  
-
-% TODO: literal constructors
 
 \subsection{Bundles and Vecs}
 
@@ -289,13 +298,13 @@ Bundles group together several named fields of potentially different
 types into a coherent unit, much like a \code{struct} in C 
 
 \begin{example}
-class Bundle extends Data {
-  def elements: ArrayBuffer[(String, Data)];
+class Bundle extends Type {
+  def elements: ArrayBuffer[(String, Type)];
 }
 \end{example}
 
 \noindent
-A user can get the names and Data corresponding to each element in a
+A user can get the names and Type corresponding to each element in a
 Bundle with the \verb+elements+ method and recursively using the
 \verb+flatten+ method. 
 % TODO: perhaps flatten should be named allElements
@@ -316,11 +325,11 @@ Vecs create an indexable vector of elements:
 
 \begin{example}
 object Vec {
-  def apply[T <: Data](n: Int)(gen: => T): Vec[T];
+  def apply[T <: Type](n: Int)(gen: => T): Vec[T];
 }
 
-class Vec[T <: Data](n: Int, val gen: () => T) 
-    extends Data {
+class Vec[T <: Type](n: Int, val gen: () => T) 
+    extends Type {
   def apply(idx: UFix): T
   def apply(idx: Int): T
 }
@@ -378,8 +387,8 @@ but whose input will be set later:
 
 \begin{example}
 object Wire {
-  def apply[T <: Data]()(gen: =>T): T;
-  def apply[T <: Data](default: T): T;
+  def apply[T <: Type]()(gen: =>T): T;
+  def apply[T <: Type](default: T): T;
 }
 
 class Wire extends Node with Updateable;
@@ -455,7 +464,7 @@ object is {
 \label{sec:ports}
 
 Ports are wires used as interfaces to hardware components.  A port is
-a directional wrapper for a primitive \code{Data} object.  
+a directional wrapper for a primitive \code{Type} object.  
 
 \begin{example}
 trait PortDir;
@@ -468,10 +477,10 @@ class Port extends Wire {
 }
 
 object Input {
-  def apply[T <: Data]()(gen: => T): T;
+  def apply[T <: Type]()(gen: => T): T;
 }
 object Output {
-  def apply[T <: Data]()(gen: => T): T;
+  def apply[T <: Type]()(gen: => T): T;
 }
 \end{example}
 
@@ -485,9 +494,9 @@ bundle with instances of \verb+Port+ as leaves.
 class Delay extends Node;
 
 object Reg {
-  def apply[T <: Data](data: T): T;
-  def apply[T <: Data](data: T, resetVal: T): T;
-  def apply[T <: Data](resetVal: T = null)(gen: =>T): T;
+  def apply[T <: Type](t: T): T;
+  def apply[T <: Type](t: T, resetVal: T): T;
+  def apply[T <: Type](resetVal: T = null)(gen: =>T): T;
 }
  
 class Reg extends Delay with Updateable {
@@ -501,20 +510,20 @@ read/write memories.
 
 \begin{example}
 object Mem {
-  def apply[T <: Data](depth: Int)(gen: => T): T;
+  def apply[T <: Type](depth: Int)(gen: => T): T;
 }
 
-class Mem[T <: Data](n: Int, gen: () => T) 
+class Mem[T <: Type](n: Int, gen: () => T) 
     extends Delay with Updateable {
   def apply(idx: UFix): T;
 }
 
-class MemRead[T <: Data]
+class MemRead[T <: Type]
       (val mem: Mem, val idx: UFix) 
     extends Node;
 
-class MemWrite[T <: Data]
-      (val mem: Mem, val idx: UFix, val data: T) 
+class MemWrite[T <: Type]
+      (val mem: Mem, val idx: UFix, val kind: T) 
     extends Node;
 \end{example}
 
