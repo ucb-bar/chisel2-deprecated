@@ -104,7 +104,7 @@ outgoing graph edges.
 \label{fig:node-hierarchy}
 \end{figure}
 
-\section{Lit}
+\section{Lits}
 
 Literal are represented as \verb+Lit+ nodes defined as follows:
 
@@ -114,7 +114,7 @@ class Lit {
 }
 \end{example}
 
-\section{Op}
+\section{Ops}
 
 Operations are represented as \verb+Op+ nodes defined as follows:
 
@@ -124,7 +124,7 @@ class Op {
 }
 \end{example}
 
-\section{Type}
+\section{Types}
 
 A Chisel graph contains port, op, and type nodes.  Type nodes are
 interspersed between port and operator nodes and allow Chisel code to
@@ -205,7 +205,7 @@ concatenation and \verb+===+ is bitwise comparison with \verb+==+.
 
 Operations produce an
 actual operator node and a type node combining the input type nodes.
-See Figures~\ref{fig:bits-1}, \ref{fig:and}, \ref{fig:bits-or-and} for
+See Figures~\ref{fig:bits-1}, \ref{fig:bits-and}, \ref{fig:bits-or-and} for
 successively more complicated examples.
 
 \begin{figure}[h]
@@ -235,7 +235,7 @@ successively more complicated examples.
 The \verb+getNode+ operator will skip type nodes and return the first
 non type node node.
 
-\subsection{Bool}
+\subsection{Bools}
 
 Boolean values are represented as \code{Bool}:
 
@@ -248,7 +248,7 @@ object Bool {
 class Bool extends Bits;
 \end{example}
 
-\subsection{Num}
+\subsection{Nums}
 
 \verb+Num+ is a type node which defines arithmetic operations:
 
@@ -391,18 +391,19 @@ object Wire {
   def apply[T <: Type](default: T): T;
 }
 
-class Wire extends Node with Updateable;
+class Wire extends Updateable;
 \end{example}
 
 %TODO: change proc to Updateable
 
 \noindent
-where \verb+Updateable+ collects updates and code generates a mux
+where \verb+Updateable+ collects accesses and code generates a mux
 input for the wire:
 
 \begin{example}
-trait Updateable extends Node {
-  def updates: Queue[(Bool, Node)];
+abstract Updateable extends Node {
+  def reads: Queue[(Bool, UFix)];
+  def writes: Queue[(Bool, UFix, Node)];
   def genMuxes(default: Node);
   def := (x: Node): this.type;
 }
@@ -488,22 +489,20 @@ object Output {
 Aggregate ports can recursively be constructed using either a vec or
 bundle with instances of \verb+Port+ as leaves.
 
-\section{Registers}
+\section{Regs}
 
 \begin{example}
-class Delay extends Node;
-
 object Reg {
   def apply[T <: Type](t: T): T;
   def apply[T <: Type](t: T, resetVal: T): T;
   def apply[T <: Type](resetVal: T = null)(gen: =>T): T;
 }
  
-class Reg extends Delay with Updateable {
+class Reg extends Updateable {
 }
 \end{example}
 
-\section{Memories}
+\section{Mems}
 
 Chisel provides facilities for creating both read only and
 read/write memories.  
@@ -514,13 +513,15 @@ object Mem {
 }
 
 class Mem[T <: Type](n: Int, gen: () => T) 
-    extends Delay with Updateable {
+    extends Updateable {
   def apply(idx: UFix): T;
 }
 
 class MemRead[T <: Type]
       (val mem: Mem, val idx: UFix) 
-    extends Node;
+    extends Node {
+  def := (t: T): T;
+}
 
 class MemWrite[T <: Type]
       (val mem: Mem, val idx: UFix, val kind: T) 
@@ -584,6 +585,8 @@ object chiselMain {
      printer: T => TestIO = null): T;
 }
 \end{example}
+
+% TODO: TestIO
 
 Command arguments are as follows:
 \begin{tabular}{lll}
@@ -735,6 +738,12 @@ int main (int argc, char* argv) {
 \end{example}
 
 \section{Verilog}
+
+\begin{example}
+running verilog backend
+multiple modules
+module name caching
+\end{example}
 
 \section{Standard Library}
 
