@@ -500,12 +500,12 @@ define their own bundles by defining a class as a subclass of
 \code{Bundle}:
 \begin{example}
 class MyFloat extends Bundle {
-  val sign =  Bool();
-  val exponent = Bits(width = 8);
-  val significand =  Bits(width = 23);
+  val sign        = Bool();
+  val exponent    = Bits(width = 8);
+  val significand = Bits(width = 23);
 }
 
-val x = new MyFloat()
+val x  = new MyFloat()
 val xs = x.sign
 \end{example}
 
@@ -520,7 +520,7 @@ follows:
 \begin{example}
 val myVec = Vec(5) { Fix(width = 23) } // Vector of 5 23-bit signed integers.
 
-val reg3 = myVec(3) // Connect to one element of vector.
+val reg3  = myVec(3) // Connect to one element of vector.
 \end{example}
 
 \noindent
@@ -538,9 +538,9 @@ Bundles and Vecs can be arbitrarily nested to build complex data
 structures:
 \begin{example}
 class BigBundle extends Bundle {
-   val myVec = Vec(5) { Fix(width = 23) } // Vector of 5 23-bit signed integers.
-   val flag = Bool()
-   val f = new MyFloat() // Previously defined bundle.
+ val myVec = Vec(5) { Fix(width = 23) } // Vector of 5 23-bit signed integers.
+ val flag  = Bool()
+ val f     = new MyFloat()              // Previously defined bundle.
 }
 \end{example}
 
@@ -566,9 +566,9 @@ argument, where the direction is \code{INPUT} or
 An example port declaration is as follows:
 \begin{example}
 class FIFOInput extends Bundle {
-  val rdy =  Bool(dir = OUTPUT)
+  val rdy  = Bool(dir = OUTPUT)
   val data = Bits(width = 32, dir = INPUT)
-  val enq =  Bool(dir = INPUT)
+  val enq  = Bool(dir = INPUT)
 }
 \end{example}
 
@@ -580,9 +580,9 @@ wires.
 The direction of an object can also be assigned at instantation time:
 \begin{example}
 class ScaleIO extends Bundle {
-  val in = new MyFloat().asInput
+  val in    = new MyFloat().asInput
   val scale = new MyFloat().asInput
-  val out = new MyFloat().asOutput
+  val out   = new MyFloat().asOutput
 }
 \end{example}
 
@@ -703,13 +703,10 @@ testing circuits by providing test inputs and printing out results:
 \begin{example}
 object tutorial {
   def main(args: Array[String]) = {
-    chiselMain(
-      args ++ Array("--gen-harness"), 
-      () => new Mux2(),
-      scanner = 
-       (c: Mux2) => Scanner("%x %x %x", c.io.sel, c.io.in0, c.io.in1),
-      printer = 
-       (c: Mux2) => Printer("%= %= %= %=", c.io.sel, c.io.in0, c.io.in1, c.io.out));
+    chiselMainTest(args ++ Array("--gen-harness"), 
+                   () => new Mux2())(
+      c => Scanner("%x %x %x", c.io.sel, c.io.in0, c.io.in1),
+      c => Printer("%= %= %= %=", c.io.sel, c.io.in0, c.io.in1, c.io.out));
   }
 }
 \end{example}

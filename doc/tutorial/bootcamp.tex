@@ -1,0 +1,665 @@
+\documentclass[xcolor=pdflatex,dvipsnames,table]{beamer}
+\usepackage{epsfig,graphicx}
+\usepackage{palatino}
+\usepackage{fancybox}
+\usepackage{relsize}
+\usepackage{listing}
+
+\input{../style/chisel.tex}
+
+\usetheme[height=9mm]{Rochester}
+
+\newenvironment{sample}{\VerbatimEnvironment\begin{footnotesize}\begin{semiverbatim}}{\end{semiverbatim}\end{footnotesize}}
+
+\newenvironment{FramedSemiVerb}%
+{\begin{Sbox}\begin{minipage}{.94\textwidth}\begin{semiverbatim}}%
+{\end{semiverbatim}\end{minipage}\end{Sbox}
+\setlength{\fboxsep}{8pt}\fbox{\TheSbox}}
+
+\newenvironment{FramedVerb}%
+{\VerbatimEnvironment
+\begin{Sbox}\begin{minipage}{.94\textwidth}\begin{Verbatim}}%
+{\end{Verbatim}\end{minipage}\end{Sbox}
+\setlength{\fboxsep}{8pt}\fbox{\TheSbox}}
+
+% \newenvironment{sample}{\VerbatimEnvironment\begin{footnotesize}\begin{Verbatim}}{\end{Verbatim}\end{footnotesize}}
+\newcommand{\kode}[1]{\begin{footnotesize}{\tt #1}\end{footnotesize}}
+\newcommand{\comment}[1]{{\color{Green}\it\smaller #1}}
+
+\title{Chisel Bootcamp}
+\author{Jonathan Bachrach}
+\date{\today}
+%\institution[UC Berkeley]{EECS UC Berkeley}
+
+\begin{document}
+
+\begin{frame}
+\titlepage
+\end{frame}
+
+\begin{frame}[fragile]{git}
+\begin{FramedVerb}
+cd ${HOME}
+git clone git@github.com:ucb-bar/chisel.git
+export CHISEL=${HOME}/chisel
+git pull
+git status 
+git log
+git add filename
+git commit -m "comment"
+git push
+\end{FramedVerb}
+\end{frame}
+
+\begin{frame}[fragile]{sbt}
+\begin{FramedVerb}
+cd ${CHISEL}/tutorial/sbt
+sbt
+project tutorial
+compile
+run
+console
+\end{FramedVerb}
+\end{frame}
+
+\begin{frame}[fragile]{repo}
+\begin{FramedSemiVerb}
+src                     \comment{\# source code}
+sbt                     \comment{\# sbt files}
+sbt/project/build.scala \comment{\# project file}
+doc                     \comment{\# documentation}
+tutorial                \comment{\# tutorial project}
+\end{FramedSemiVerb}
+\end{frame}
+
+\begin{frame}[fragile]{project directory structure}
+\begin{footnotesize}
+\begin{FramedSemiVerb}{0.95}
+chisel/           \comment{\# install chisel at same level as your project}
+  tutorial/
+  src/
+gpu/
+  chisel -> ../chisel
+  sbt/
+    project/
+      build.scala \comment{\# edit this as shown below}
+    chisel -> ../chisel/sbt/chisel/
+    gpu/
+      src/
+        main/
+          scala -> ../../../../src
+  src/ 
+    gpu.scala     \comment{\# your source files go here}
+  emulator/       \comment{\# your C++ target can go here}
+\end{FramedSemiVerb}
+\end{footnotesize}
+
+\end{frame}
+
+\begin{frame}[fragile, shrink]{Project File}
+% \begin{FramedVerb}
+\begin{lstlisting}
+import sbt._
+import Keys._
+
+object BuildSettings {
+  val buildOrganization = "edu.berkeley.cs"
+  val buildVersion = "1.1"
+  val buildScalaVersion = "2.9.2"
+
+  val buildSettings = Defaults.defaultSettings ++ Seq (
+    organization := buildOrganization,
+    version      := buildVersion,
+    scalaVersion := buildScalaVersion
+  )
+}
+
+object ChiselBuild extends Build {
+  import BuildSettings._
+
+  lazy val chisel = 
+    Project("chisel", file("chisel"), 
+      settings = buildSettings)
+  lazy val gpu =
+    Project("gpu", file("gpu"), settings = buildSettings) 
+      dependsOn(chisel)
+}
+\end{lstlisting}
+% \end{FramedVerb}
+\end{frame}
+
+\begin{frame}[fragile, shrink]{bootcamp.scala}
+\begin{lstlisting}
+package Tutorial {
+
+import Chisel._
+
+object Tutorial {
+  def main(args: Array[String]): Unit = { 
+    val tut_args = args.slice(1, args.length) ++ 
+      Array("--target-dir", "../emulator", 
+            "--gen-harness");
+    args(0) match {
+      case "GCD" => 
+        chiselMain(tut_args, () => new GCD());
+      ...
+    }
+  }
+}
+
+}
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile, shrink]{gcd.scala}
+\begin{lstlisting}
+package Tutorial {
+
+import Chisel._
+
+class GCD extends Component {
+  val io = new Bundle {
+    val a   = UFix(16, INPUT);
+    val b   = UFix(16, INPUT);
+    val z   = UFix(16, OUTPUT);
+    val rdy = Bool(OUTPUT);
+  };
+  val x  = Reg(resetVal = io.a);
+  val y  = Reg(resetVal = io.b);
+  when   (x > y) { x := x - y; } 
+  unless (x > y) { y := y - x; }
+  io.z   := x;
+  io.rdy := y === UFix(0);
+}
+
+}
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Scala Functional}
+
+\begin{lstlisting}
+def f (x: Int) = 2 * x;
+
+def g (xs: List[Int]) =  xs.map(f);
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile, shrink]{Scala Object Oriented}
+
+\begin{lstlisting}
+object Blimp {
+  var numBlimps = 0;
+  def apply(r: Double) = {
+    numBlimps += 1;
+    new Blimp(r);
+  }
+}
+
+Blimp.numBlimps;
+Blimp(10.0);
+
+class Blimp(r: Double) {
+  val rad = r;
+  println(“Another Blimp”);
+}
+
+class Zep(r: Double) extends Blimp(r);
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]{Scala Console}
+\begin{lstlisting}
+scala
+1 + 2
+def f (x: Int) = 2 * x;
+f(4)
+\end{lstlisting}
+\end{frame}
+
+% \begin{frame}[fragile]{Scala Console}
+% \begin{FramedVerb}
+% \end{FramedVerb}
+% \end{frame}
+
+\begin{frame}[fragile]{Literals}
+\begin{lstlisting}
+// decimal 1-bit literal from Scala Int. 
+Bits(1)       
+// hexadecimal 4-bit literal from string.
+Bits("ha")    
+// octal 4-bit literal from string. 
+Bits("o12")   
+// binary 4-bit literal from string.
+Bits("b1010") 
+
+// signed decimal 4-bit literal from Scala Int.
+Fix(5)        
+// negative decimal 4-bit literal from Scala Int.
+Fix(-8)       
+// unsigned decimal 3-bit literal from Scala Int.
+UFix(5)       
+
+// Bool literals from Scala literals.
+Bool(true)    
+Bool(false)
+\end{lstlisting}
+\end{frame}
+ 
+\begin{frame}[fragile]{Literals}
+\begin{lstlisting}
+// 32-bit literal of type Bits.
+Bits("h_dead_beef") 
+
+// decimal 1-bit literal from Scala Int.
+Bits(1)             
+// hexadecimal 8-bit literal of type Bits.
+Bits("ha", 8)       
+// octal 6-bit literal of type Bits.
+Bits("o12", 6)      
+// binary 12-bit literal of type Bits.
+Bits("b1010", 12)   
+
+// signed decimal 7-bit literal of type Fix.
+Fix(5, 7)           
+// unsigned decimal 8-bit literal of type UFix.
+UFix(5, 8)          
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Combinational Circuits}
+\begin{lstlisting}
+(a & b) | (~c & d)
+\end{lstlisting}
+\begin{lstlisting}
+val sel = a | b
+val out = (sel & in1) | (~sel & in0)
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Bitwise operators}
+\textbf{Valid on Bits, Fix, UFix, Bool.}
+\begin{lstlisting}
+// Bitwise-NOT
+val invertedX = ~x                      
+// Bitwise-AND 
+val hiBits    = x & Bits("h_ffff_0000") 
+// Bitwise-OR
+val flagsOut  = flagsIn | overflow      
+// Bitwise-XOR
+val flagsOut  = flagsIn ^ toggle        
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Bitwise reductions}
+\textbf{Valid on Bits, Fix, and UFix.  Returns Bool.}
+\begin{lstlisting}
+// AND-reduction 
+val allSet = andR(x)  
+// OR-reduction
+val anySet = orR(x)   
+// XOR-reduction 
+val parity = xorR(x)  
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Equality comparison}
+\textbf{Valid on Bits, Fix, UFix, and Bool. Returns Bool.}
+\begin{lstlisting}
+// Equality
+val equ = x === y 
+// Inequality 
+val neq = x = y   
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Shifts}
+\textbf{Valid on Bits, Fix, and UFix.}
+\begin{lstlisting}
+// Logical left shift.
+val twoToTheX = Fix(1) << x   
+// Right shift 
+// (logical on Bits & UFix, arithmetic on Fix).
+val hiBits    = x >> UFix(16) 
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Bitfield manipulation}
+\textbf{Valid on Bits, Fix, UFix, and Bool.}
+\begin{lstlisting}
+// Extract single bit, LSB has index 0.
+val xLSB       = x(0)                
+// Extract bit field  from end to start bit pos. 
+val xTopNibble = x(15,12)            
+// Replicate a bit string multiple times.
+val usDebt     = Fill(3, Bits("hA")) 
+// Concatenates bit fields, w/ first arg on left
+val float      = Cat(sgn,exp,man)    
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Logical Operations}
+\textbf{Valid on Bools. }
+\begin{lstlisting}
+// Logical NOT. 
+val sleep = !busy                     
+// Logical AND.
+val hit   = tagMatch && valid         
+// Logical OR.
+val stall = src1busy || src2busy      
+// Two-input mux where sel is a Bool.  
+val out   = Mux(sel, inTrue, inFalse) 
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Arithmetic operations}
+\textbf{Valid on Nums: Fix and UFix. }
+\begin{lstlisting}
+// Addition. 
+val sum  = a + b  
+// Subtraction.
+val diff = a - b  
+// Multiplication. 
+val prod = a * b  
+// Division.
+val div  = a / b  
+// Modulus
+val mod  = a % b  
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Arithmetic comparisons}
+\textbf{Valid on Nums: Fix and UFix. Returns Bool.}
+\begin{lstlisting}
+// Greater than.
+val gt  = a > b   
+// Greater than or equal.
+val gte = a >= b  
+// Less than.
+val lt  = a < b   
+// Less than or equal.
+val lte = a <= b  
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Bitwidth Inference}
+\begin{center}
+\begin{tabular}{ll}
+{\bf operation} & {\bf bit width} \\ 
+\verb|z = x + y| & \verb|wz = max(wx, wy) + 1| \\
+\verb+z = x - y+ & \verb|wz = max(wx, wy) + 1|\\
+\verb+z = x & y+ & \verb+wz = max(wx, wy)+ \\
+\verb+z = Mux(c, x, y)+ & \verb+wz = max(wx, wy)+ \\
+\verb+z = w * y+ & \verb!wz = wx + wy! \\
+\verb+z = x << n+ & \verb!wz = wx + maxNum(n)! \\
+\verb+z = x >> n+ & \verb+wz = wx - minNum(n)+ \\
+\verb+z = Cat(x, y)+ & \verb!wz = wx + wy! \\
+\verb+z = Fill(n, x)+ & \verb+wz = wx * maxNum(n)+ \\
+% \verb+z = x < y+ & \verb+<= > >= && || != ===+ & \verb+wz = 1+ \\
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}[fragile]{Combinational Example}
+\begin{lstlisting}
+package Bootcamp {
+
+import Chisel._
+
+class Combinational extends Component {
+  val io = new Bundle {
+    val x = UFix(16, INPUT);
+    val y = UFix(16, INPUT);
+    val z = UFix(16, OUTPUT);
+  };
+  io.z := io.x + io.y;
+}
+
+}
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Functional Abstraction}
+\begin{lstlisting}
+def clb(a: Bits, b: Bits, c: Bits, d: Bits) = 
+  (a & b) | (~c & d)
+
+val out = clb(a,b,c,d)
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile, shrink]{Functional Example}
+\begin{lstlisting}
+package Bootcamp {
+
+import Chisel._
+
+class Functional extends Component {
+  def clb(a: Bits, b: Bits, c: Bits, d: Bits) = 
+    (a & b) | (~c & d)
+  val io = new Bundle {
+    val x = UFix(16, INPUT);
+    val y = UFix(16, INPUT);
+    val z = UFix(16, OUTPUT);
+  };
+  io.z := clb(io.x, io.y, io.x, io.y);
+}
+
+}
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Bundles}
+\begin{lstlisting}
+class MyFloat extends Bundle{
+  val sign        = Bool();
+  val exponent    = UFix(width=8);
+  val significand = UFix(width=23);
+}
+
+val x  = new MyFloat()
+val xs = x.sign
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Vecs}
+\begin{lstlisting}
+// Vector of 5 23-bit signed integers.
+val myVec = Vec(5) { Fix(width = 23) } 
+
+// Connect to one static element of vector.
+val reg3  = myVec(3)                   
+reg3     := data3; 
+myVec(4) := data4;
+
+// Connect to one dynamic element of vector.
+val reg       = myVec(addr)
+reg          := data1;
+myVec(addr2) := data2;
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Ports}
+
+\textbf{Data object with directions assigned to its members}
+
+\begin{lstlisting}
+class FIFOInput extends Bundle {
+  val rdy  = Bool(dir = OUTPUT)
+  val data = Bits(width = 32, dir = INPUT)
+  val enq  = Bool(dir = INPUT)
+}
+\end{lstlisting}
+
+\textbf{Direction assigned at instantiation time}
+
+\begin{lstlisting}
+class ScaleIO extends Bundle {
+  val in    = new MyFloat().asInput
+  val scale = new MyFloat().asInput
+  val out   = new MyFloat().asOutput
+}
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile, shrink]{Component}
+
+\begin{itemize}
+\item inherits from \verb+Component+,
+\item contains an interface stored in a port field named \verb+io+, and
+\item wires together subcircuits in its constructor.
+\end{itemize}
+
+\begin{lstlisting}
+class Mux2 extends Component {
+  val io = new Bundle{
+    val sel = Bits(width = 1, dir = INPUT);
+    val in0 = Bits(width = 1, dir = INPUT);
+    val in1 = Bits(width = 1, dir = INPUT);
+    val out = Bits(width = 1, dir = OUTPUT);
+  };
+  io.out := (io.sel & io.in1) | (~io.sel & io.in0);
+}
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile, shrink]{Component Hierarchy}
+\begin{lstlisting}
+class Mux4 extends Component {
+  val io = new Bundle {
+    val in0 = Bits(width = 1, dir = INPUT);
+    val in1 = Bits(width = 1, dir = INPUT);
+    val in2 = Bits(width = 1, dir = INPUT);
+    val in3 = Bits(width = 1, dir = INPUT);
+    val sel = Bits(width = 2, dir = INPUT);
+    val out = Bits(width = 1, dir = OUTPUT);
+  }
+  val m0 = new Mux2();
+  m0.io.sel := io.sel(0); 
+  m0.io.in0 := io.in0; m0.io.in1 := io.in1;
+
+  val m1 = new Mux2();
+  m1.io.sel := io.sel(0); 
+  m1.io.in0 := io.in2; m1.io.in1 := io.in3;
+
+  val m3 = new Mux2();
+  m3.io.sel := io.sel(1); 
+  m3.io.in0 := m0.io.out; m3.io.in1 := m1.io.out;
+
+  io.out := m3.io.out;
+}
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Running Examples}
+\begin{lstlisting}
+object tutorial {
+  def main(args: Array[String]) = {
+    chiselMain(args, () => new Mux2());
+  }
+}
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile, shrink]{Testing Examples}
+
+\begin{lstlisting}
+object tutorial {
+  def main(args: Array[String]) = {
+    chiselMainTest(args ++ Array("--gen-harness"), 
+                   () => new Mux2())(
+      c => Scanner("%x %x %x", 
+                   c.io.sel, c.io.in0, c.io.in1),
+      c => Printer("%= %= %= %=", 
+                   c.io.sel, c.io.in0, c.io.in1, c.io.out));
+  }
+}
+\end{lstlisting}
+
+\textbf{test.out}
+
+\begin{lstlisting}
+0 0 0 0
+0 0 1 0
+0 1 0 1
+0 1 1 1
+1 0 0 0
+1 0 1 1
+1 1 0 0
+1 1 1 1
+\end{lstlisting}
+
+\textbf{testing}
+
+\begin{lstlisting}
+cut -f 1,2,3 -d " " < test | mux > test.out
+diff test.out test
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]{ChiselMain Command Line Arguments}
+\begin{tabular}{lll}
+\verb+--target-dir+ & target pathname prefix \\
+\verb+--gen-harness+ & generate harness file for C++ \\
+\verb+--v+ & generate verilog \\
+\verb+--vcd+ & enable vcd dumping \\
+\verb+--debug+ & put all wires in class file \\
+\end{tabular}
+\end{frame}
+
+
+\begin{frame}[fragile]{State Elements}
+
+\begin{lstlisting}
+Reg(in)
+\end{lstlisting}
+
+\begin{lstlisting}
+def risingedge(x: Bool) = x && !Reg(x)
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]{Counter}
+
+\begin{lstlisting}
+def wraparound(n: UFix, max: UFix) =
+  Mux(n > max, UFix(0), n)
+
+def counter(max: UFix) = {
+  val x = Reg(resetVal = UFix(0, max.getWidth));
+  x := wraparound(x + UFix(1), max);
+  x
+}
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]{Sequential Circuits}
+
+\begin{lstlisting}
+// Produce pulse every n cycles.
+def pulse(n: UFix) = 
+  counter(n - UFix(1)) === UFix(0)
+\end{lstlisting}
+
+\begin{lstlisting}
+// Flip internal state when input true.
+def toggle(p: Bool) = {
+  val x = Reg(resetVal = Bool(false));
+  x := Mux(p, !x, x)
+  x
+}
+
+// Square wave where 
+// each half cycle has given period.
+def squareWave(period: UFix) = 
+  toggle(pulse(period));
+\end{lstlisting}
+
+\end{frame}
+
+\end{document}
