@@ -155,7 +155,7 @@ A Chisel graph contains raw and type nodes.  Type nodes are
 interspersed between raw nodes and allow Chisel code to
 check and respond to Chisel types.  Type nodes are erased before
 emission to C++ and Verilog.  \code{Data} is the top most type node
-and FIgure~\ref{fig:type-hierarchy} shows the built in type hierarchy.
+and Figure~\ref{fig:type-hierarchy} shows the built in type hierarchy.
 
 \begin{figure}[h]
 \centering
@@ -166,7 +166,7 @@ and FIgure~\ref{fig:type-hierarchy} shows the built in type hierarchy.
 
 \noindent
 Builtin scalar types include \code{Bits}, \code{Bool}, \code{Fix}, and
-\code{UFix} and builtin aggregate types\code{Bundle} and \code{Vec}
+\code{UFix} and builtin aggregate types \code{Bundle} and \code{Vec}
 are classes that allow the user to expand
 the set of Chisel datatypes with collections of other types.
 
@@ -203,7 +203,7 @@ abstract class Data extends Node {
 with methods for converting between types and 
 delegating port methods to its single input.   
 We will discuss ports in Section~\ref{sec:ports}.
-Finally, users can override this in their own type nodes (e.g., bundles) in
+Finally, users can override the \code{clone} method in their own type nodes (e.g., bundles) in
 order to reflect construction parameters that are necessary for cloning.
 
 \subsection{Bits}
@@ -213,6 +213,7 @@ In Chisel, a raw collection of bits is represented by the \code{Bits} type defin
 \begin{lstlisting}
 object Bits {
   def apply(width: Int = -1): Bits;
+  // create literal
   def apply(value: BigInt, width: Int = -1): Bits;
 }
 
@@ -243,7 +244,7 @@ and with the simple bit operations.
 Bits with a value argument produces a \code{Lit} as shown in Figure~\ref{fig:bits-1}.
 N.B., that \code{\#\#} is binary
 concatenation, \code{Cat} is an nary concatentation,
-and in order to not collide with Scala's builtin \code{==}
+and in order to not collide with Scala's builtin \code{==},
 Chisel's bitwise comparison is named \code{===}.
 
 Operations produce an actual operator node and a type node combining the input type nodes.
@@ -275,7 +276,7 @@ successively more complicated examples.
 
 \noindent
 The \code{getNode} operator will skip type nodes and return the first
-non type node node.
+non type node.
 
 \subsection{Bools}
 
@@ -284,7 +285,7 @@ Boolean values are represented as \code{Bool}s:
 \begin{lstlisting}
 object Bool {
   def apply():Bool;
-  def apply(value:Boolean): Bool;
+  def apply(value: Boolean): Bool;
 }
 
 class Bool extends Bits;
@@ -512,7 +513,7 @@ object OUTPUT extends PortDir;
 \end{lstlisting}
 
 \noindent
-Aggregate ports can recursively be constructed using either a vec or
+Aggregate ports can be recursively constructed using either a vec or
 bundle with instances of \code{Port}s as leaves.  
 
 \section{Regs}
@@ -572,10 +573,19 @@ where a \code{:=} method on \code{MemRead} permits the nice syntax for
 memory writes:
 
 \begin{lstlisting}
+// memory construction
 val m = Mem(n){ UFix(width = 32) };
+// memory read
 val d = m(addr);
+// memory write
 m(addr) := x + UFix(1);
+// conditional memory write
+when (en) {
+  m(addr) := x - UFix(1);
+}
 \end{lstlisting}
+
+% TODO: rules for determining number of ports
 
 \section{Components}
 
@@ -640,7 +650,7 @@ Black boxes allow users to define interfaces to circuits defined
 outside of Chisel.  The user defines:
 
 \begin{itemize}
-\item a component as a subclass of \code{BlackBox} 
+\item a component as a subclass of \code{BlackBox} and
 \item defines an \code{io} field with the interface.
 \end{itemize}
 
