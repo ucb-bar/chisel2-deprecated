@@ -17,6 +17,7 @@
 \usepackage{epsfig,graphicx}
 \usepackage{palatino}
 \usepackage{fancybox}
+\usepackage{listings}
 
 \newenvironment{commentary}
 { \vspace{-0.1in}
@@ -30,19 +31,21 @@
 }
 
 \title{Chisel Manual}
-\author{Jonathan Bachrach, Krste Asanovi\'{c}, John Wawrzynek \\
+\author{Jonathan Bachrach, Krste Asanovi\'{c} \\
 EECS Department, UC Berkeley\\
-{\tt  \{jrb|krste|johnw\}@eecs.berkeley.edu}
+{\tt  \{jrb|krste\}@eecs.berkeley.edu}
 }
 \date{\today}
 
 \newenvironment{example}{\VerbatimEnvironment\begin{footnotesize}\begin{Verbatim}}{\end{Verbatim}\end{footnotesize}}
 \newcommand{\kode}[1]{\begin{footnotesize}{\tt #1}\end{footnotesize}}
 
-\def\code#1{{\tt #1}}
+\def\code#1{{\small\tt #1}}
 
 \def\note#1{\noindent{\bf [Note: #1]}}
 %\def\note#1{}
+
+\input{../style/scala.tex}
 
 \begin{document}
 \maketitle{}
@@ -50,6 +53,8 @@ EECS Department, UC Berkeley\\
 % TODO: default
 % TODO: enum yields Bits
 % TODO: why hardware construction languages
+
+
 
 \section{Introduction}
 
@@ -59,43 +64,51 @@ construction language embedded in the high-level programming language
 Scala.  Chisel is really only a set of special class
 definitions, predefined objects, and usage conventions within Scala,
 so when you write a Chisel program you are actually writing a Scala
-program.  However, for the manual we don't presume that you
-understand how to program in Scala.  We will point out necessary Scala
-features through the Chisel examples we give, and significant hardware
-designs can be completed using only the material contained herein.
-But as you gain experience and want to make your code simpler or more
-reusable, you will find it important to leverage the underlying power
-of the Scala language. We recommend you consult one of the excellent
-Scala books to become more expert in Scala programming.
+program.  For this manual we presume that you
+understand the basics of Scala.  
+We recommend you consult one of the excellent
+Scala books before reading this manual.
 
 \section{Nodes}
 
 Chisel user code creates a graph of nodes which Chisel then translates
 into Verilog or C++ code.  Nodes are defined as follows:
 
-\begin{example}
+\begin{lstlisting}
 class Node {
-  var name: String = "";
-  var isNamed = false; 
-  def inputs: ArrayBuffer[Node];
-  def consumers: ArrayBuffer[Node];
-  def infer: Node => Int;
-  def getWidth: Int;
-  def getNode: Node;
-  def toNode: Node;  
-  def fromNode(Node): this.type; 
+  // name assigned by user or from introspection
+  var name: String = ""
+  // incoming graph edges
+  def inputs: ArrayBuffer[Node]
+  // outgoing graph edges
+  def consumers: ArrayBuffer[Node]
+  // node specific width inference
+  def inferWidth: Int
+  // get width immediately inferrable
+  def getWidth: Int
+  // get first non type node
+  def getNode: Node
+  // convert to raw bits 
+  def toBits: Bits
+  // convert to raw bits 
+  def fromBits(x: Bits): this.type
+  // return lit value if inferrable else null
+  def litOf: Lit
 }
-\end{example}
+\end{lstlisting}
 
-% TODO: toNode SHOULD BE toBits
-% TODO: fromNode SHOULD BE fromBits
 
-\noindent
-where \verb+inputs+ and \verb+consumers+ are the incoming and
-outgoing graph edges.
+The topmost node class hierarchy is shown in
+Figure~\ref{fig:node-hierarchy}.  The basic categories are:
 
-% explain getNode and types interspersed between nodes
-% remove fromNode, toNode
+\begin{description}
+\item[Lit] -- constants or literals,
+\item[Op] -- logical or arithmetic operations,
+\item[Updateable] -- conditionally updated nodes,
+\item[Data] -- typed wires or ports,
+\item[Reg] -- positive-edge-triggered registers, and
+\item[Mem] -- memories.
+\end{description}
 
 \begin{figure}[h]
 \centering
@@ -106,32 +119,43 @@ outgoing graph edges.
 
 \section{Lits}
 
-Literal are represented as \verb+Lit+ nodes defined as follows:
+Raw literals are represented as \code{Lit} nodes defined as follows:
 
-\begin{example}
-class Lit {
+\begin{lstlisting}
+class Lit extends Node {
   val inputVal: BigInt;
 }
-\end{example}
+\end{lstlisting}
+
+\noindent
+where \code{inputVal} is the value used to create the literal.  
+Raw literals contain a collection of bits.
+
+% Constant or literal values are expressed using Scala integers or strings passed to constructors for the types:
+
+% TODO: isLit and litOf
 
 \section{Ops}
 
-Operations are represented as \verb+Op+ nodes defined as follows:
+Raw operations are represented as \code{Op} nodes defined as follows:
 
-\begin{example}
-class Op {
+\begin{lstlisting}
+class Op extends Node {
   val op: String;
 }
-\end{example}
+\end{lstlisting}
+
+\noindent
+where \code{op} holds the op name used during emission.  
+Ops compute a combinational function of their inputs.
 
 \section{Types}
 
-A Chisel graph contains port, op, and type nodes.  Type nodes are
-interspersed between port and operator nodes and allow Chisel code to
+A Chisel graph contains raw and type nodes.  Type nodes are
+interspersed between raw nodes and allow Chisel code to
 check and respond to Chisel types.  Type nodes are erased before
-emission to C++ and Verilog.  \verb+Type+ is the top most type node
-and FIgure~\ref{fig:type-hierarchy}
-shows the built in type hierarchy.
+emission to C++ and Verilog.  \code{Data} is the top most type node
+and FIgure~\ref{fig:type-hierarchy} shows the built in type hierarchy.
 
 \begin{figure}[h]
 \centering
@@ -140,24 +164,40 @@ shows the built in type hierarchy.
 \label{fig:type-hierarchy}
 \end{figure}
 
-\verb+Type+ itself is a node:
+\noindent
+Builtin scalar types include \code{Bits}, \code{Bool}, \code{Fix}, and
+\code{UFix} and builtin aggregate types\code{Bundle} and \code{Vec}
+are classes that allow the user to expand
+the set of Chisel datatypes with collections of other types.
 
-\begin{example}
-abstract class Type extends Node {
+\code{Data} itself is a node:
+
+\begin{lstlisting}
+abstract class Data extends Node {
   override def clone(): this.type =
-    this.getClass.newInstance.asInstanceOf[this.type];
+    this.getClass.newInstance.
+      asInstanceOf[this.type];
+  // simple conversions
   def toFix: Fix;
   def toUFix: UFix;
-  def toBits: Bits;
   def toBool: Bool;
-  def flatten: Array[(String, IO)];
-  def flip: this.type;
+  def toBits: Bits;
+  // data leaves if aggregate
+  def leaves: Array[(String, Data)];
+  // port direction if leaf
+  def dir: PortDir;
+  // change dir to OUTPUT
   def asOutput: this.type;
+  // change dir to INPUT
   def asInput: this.type;
-  def :=[T <: Type](t: T);
-  def <>(t: Type);
+  // change polarity of dir
+  def flip: this.type;
+  // assign to input
+  def :=[T <: Data](t: T);
+  // bulk assign to input
+  def <>(t: Data);
 }
-\end{example}
+\end{lstlisting}
 
 \noindent
 with methods for converting between types and 
@@ -166,20 +206,17 @@ We will discuss ports in Section~\ref{sec:ports}.
 Finally, users can override this in their own type nodes (e.g., bundles) in
 order to reflect construction parameters that are necessary for cloning.
 
-% why not fromBits ?
-
 \subsection{Bits}
 
-In Chisel, a raw collection of
-bits is represented by the \code{Bits} type defined as follows:
+In Chisel, a raw collection of bits is represented by the \code{Bits} type defined as follows:
 
-\begin{example}
+\begin{lstlisting}
 object Bits {
   def apply(width: Int = -1): Bits;
   def apply(value: BigInt, width: Int = -1): Bits;
 }
 
-class Bits extends Type {
+class Bits extends Data {
   def unary_-(): Bits;
   def unary_~(): Bits;
   def &  (b: Bits): Bits;
@@ -195,16 +232,21 @@ class Bits extends Type {
   def >> (b: UFix): Bits;
   def ## (b: Bits): Bits;
 }
-\end{example}
+
+object Cat {
+  def apply[T <: Data](elt: T, elts: T*): Bits;
+}
+\end{lstlisting}
 
 \noindent
 and with the simple bit operations.  
-Bits with a value argument produces a \verb+Lit+ as shown in Figure~\ref{fig:bits-1}.
-N.B., that \verb+##+ is binary
-concatenation and \verb+===+ is bitwise comparison with \verb+==+.
+Bits with a value argument produces a \code{Lit} as shown in Figure~\ref{fig:bits-1}.
+N.B., that \code{\#\#} is binary
+concatenation, \code{Cat} is an nary concatentation,
+and in order to not collide with Scala's builtin \code{==}
+Chisel's bitwise comparison is named \code{===}.
 
-Operations produce an
-actual operator node and a type node combining the input type nodes.
+Operations produce an actual operator node and a type node combining the input type nodes.
 See Figures~\ref{fig:bits-1}, \ref{fig:bits-and}, \ref{fig:bits-or-and} for
 successively more complicated examples.
 
@@ -232,27 +274,27 @@ successively more complicated examples.
 \end{figure}
 
 \noindent
-The \verb+getNode+ operator will skip type nodes and return the first
+The \code{getNode} operator will skip type nodes and return the first
 non type node node.
 
 \subsection{Bools}
 
-Boolean values are represented as \code{Bool}:
+Boolean values are represented as \code{Bool}s:
 
-\begin{example}
+\begin{lstlisting}
 object Bool {
   def apply():Bool;
   def apply(value:Boolean): Bool;
 }
 
 class Bool extends Bits;
-\end{example}
+\end{lstlisting}
 
 \subsection{Nums}
 
-\verb+Num+ is a type node which defines arithmetic operations:
+\code{Num} is a type node which defines arithmetic operations:
 
-\begin{example}
+\begin{lstlisting}
 class Num extends Bits {
   def +(b: Num): Num;
   def *(b: Num): Num;
@@ -262,13 +304,13 @@ class Num extends Bits {
   def <=(b: Num): Bool;
   def >=(b: Num): Bool;
 }
-\end{example}
+\end{lstlisting}
 
 Signed and unsigned integers
 are considered subsets of fixed-point numbers and are represented by
 types \code{Fix} and \code{UFix} respectively:
 
-\begin{example}
+\begin{lstlisting}
 object Fix {
   def apply(width: Int = -1):Fix;
   def apply(value: BigInt, width: Int = -1): Fix;
@@ -282,71 +324,76 @@ object UFix {
 }
 
 class UFix extends Num; 
-\end{example}
+\end{lstlisting}
 
 \noindent
 Signed fixed-point
 numbers, including integers, are represented using two's-complement
 format.  
 
-\subsection{Bundles and Vecs}
-
-\code{Bundle} and \code{Vec} are classes that allow the user to expand
-the set of Chisel datatypes with aggregates of other types.
+\subsection{Bundles}
 
 Bundles group together several named fields of potentially different
-types into a coherent unit, much like a \code{struct} in C 
+types into a coherent unit, much like a \code{struct} in C:
 
-\begin{example}
-class Bundle extends Type {
-  def elements: ArrayBuffer[(String, Type)];
+\begin{lstlisting}
+class Bundle extends Data {
+  // shallow named bundle elements
+  def elements: ArrayBuffer[(String, Data)];
 }
-\end{example}
+\end{lstlisting}
 
 \noindent
-A user can get the names and Type corresponding to each element in a
-Bundle with the \verb+elements+ method and recursively using the
-\verb+flatten+ method. 
-% TODO: perhaps flatten should be named allElements
-Users can define their own by subclassing \verb+Bundle+ as follows:
+A user can get the name and type corresponding to each element in a
+Bundle with the \code{elements} method and recursively using the
+\code{leaves} method. 
+Users can define their own by subclassing \code{Bundle} as follows:
 
-\begin{example}
+\begin{lstlisting}
 class MyFloat extends Bundle {
-  val sign =  Bool();
-  val exponent = Bits(width = 8);
-  val significand =  Bits(width = 23);
+  val sign        = Bool();
+  val exponent    = Bits(width = 8);
+  val significand = Bits(width = 23);
 }
 
-val x = new MyFloat()
+val x  = new MyFloat()
 val xs = x.sign
-\end{example}
+\end{lstlisting}
+
+\subsection{Vecs}
 
 Vecs create an indexable vector of elements: 
 
-\begin{example}
+\begin{lstlisting}
 object Vec {
-  def apply[T <: Type](n: Int)(gen: => T): Vec[T];
+  def apply[T <: Data](n: Int)(gen: => T): Vec[T];
 }
 
-class Vec[T <: Type](n: Int, val gen: () => T) 
-    extends Type {
+class Vec[T <: Data](n: Int, val gen: () => T) 
+    extends Data {
   def apply(idx: UFix): T
   def apply(idx: Int): T
 }
-\end{example}
+\end{lstlisting}
 
 \noindent
-with \verb+n+ elements of type defined with the \verb+gen+ thunk.
-Users can then either dynamically or statically accessed the elements.
+with \code{n} elements of type defined with the \code{gen} thunk.
+Users can then either dynamically (using a \code{UFix}) or statically (using
+an \code{Int} accessed the elements,
+where dynamic access creates a virtual type node (representing a read
+``port'') that records the read using the given address.  In either case,
+users can wire to the result of a read as follows:
+
+\begin{lstlisting}
+v(a) := d;
+\end{lstlisting}
 
 % TODO: conditionally assigning to elements
 
 \subsection{Bit Width Inference}
 
-% TODO: perhaps IO should be renamed Port
-
 Users are required to set bitwidths of ports and registers, but otherwise,
-bit widths on wires are automatically inferred unless set manually by the user.
+bit widths on nodes are automatically inferred unless set manually by the user.
 % TODO: how do you set the width explicitly?
 The bit-width inference engine starts from the graph's input ports and 
 calculates node output bit widths from their respective input bit widths according to the following set of rules:\\
@@ -380,153 +427,155 @@ the user either explicitly or from the bitwidth of the reset value.
 From these two requirements, we can show that the bit-width inference
 process will converge to a fixpoint.
 
-\section{Wires}
+\section{Updateables}
 
-We provide the declaration of a wire node that can be used immediately, 
-but whose input will be set later:
+When describing the operation of wire and state
+nodes, it is often useful to instead specify when updates to the
+wires and state will occur and to specify these updates spread across
+several separate statements.  
+For example, Data nodes can be used immediately, but their input set later.
+\code{Updateable} is conditionally updateable and 
+collects accesses and code generates a mux input for the node:
 
-\begin{example}
-object Wire {
-  def apply[T <: Type]()(gen: =>T): T;
-  def apply[T <: Type](default: T): T;
-}
-
-class Wire extends Updateable;
-\end{example}
-
-%TODO: change proc to Updateable
-
-\noindent
-where \verb+Updateable+ collects accesses and code generates a mux
-input for the wire:
-
-\begin{example}
+\begin{lstlisting}
 abstract Updateable extends Node {
+  // conditional reads
   def reads: Queue[(Bool, UFix)];
+  // conditional writes
   def writes: Queue[(Bool, UFix, Node)];
+  // gen mux integrating all conditional writes
   def genMuxes(default: Node);
-  def := (x: Node): this.type;
+  override def := (x: Node): this.type;
 }
-\end{example}
+\end{lstlisting}
 
-% TODO: is updateable 
-
-\subsection{Conditional Updates}
-
-When describing the operation of state
-elements (and wires), it is often useful to instead specify when updates to the
-registers (and wires) will occur and to specify these updates spread across
-several separate statements.  Chisel provides conditional update rules
+Chisel provides conditional update rules
 in the form of the \code{when} construct to support this style of
 sequential logic description:
-
-\begin{example}
+ 
+\begin{lstlisting}
 object when {
   def apply(cond: Bool)(block: => Unit): when;
 }
+
 class when (prevCond: Bool) {
   def elsewhen (cond: Bool)(block: => Unit): when;
   def otherwise (block: => Unit): Unit;
 }
-\end{example}
+\end{lstlisting}
+
+% TODO: talk about conds
 
 Chisel provides some syntactic sugar for other common forms of
 conditional updates:
 
-\begin{example}
+\begin{lstlisting}
 object unless {
   def apply(c: Bool)(block: => Unit) = 
     when (!c) { block )
 }
-\end{example}
+\end{lstlisting}
 
-\noindent and
+\noindent 
+and
 
-\begin{example}
+\begin{lstlisting}
 object otherwise {
   def apply(block: => Unit) = 
     when (Bool(true)) { block }
 }
-\end{example}
+\end{lstlisting}
 
 We introduce the \code{switch} statement for conditional updates
 involving a series of comparisons against a common key:
 
-\begin{example}
+\begin{lstlisting}
 object switch {
   def apply(c: Bits)(block: => Unit): Unit;
 }
 object is {
   def apply(v: Bits)(block: => Unit);
 }
-\end{example}
+\end{lstlisting}
 
 \section{Ports}
 \label{sec:ports}
 
-Ports are wires used as interfaces to hardware components.  A port is
-a directional wrapper for a primitive \code{Type} object.  
+Ports are \code{Data} derived nodes used as interfaces to hardware
+components.   A port is a directional version of a primitive
+\code{Data} object.  Port directions are defined as follows:
 
-\begin{example}
+\begin{lstlisting}
 trait PortDir;
-object INPUT extends PortDir;
+object INPUT  extends PortDir;
 object OUTPUT extends PortDir;
-
-class Port extends Wire {
-  var dir: PortDir;
-  override def flip;
-}
-
-object Input {
-  def apply[T <: Type]()(gen: => T): T;
-}
-object Output {
-  def apply[T <: Type]()(gen: => T): T;
-}
-\end{example}
+\end{lstlisting}
 
 \noindent
 Aggregate ports can recursively be constructed using either a vec or
-bundle with instances of \verb+Port+ as leaves.
+bundle with instances of \code{Port}s as leaves.  
 
 \section{Regs}
 
-\begin{example}
+The simplest form of state element supported by Chisel is a
+positive-edge-triggered register defined as follows:
+
+\begin{lstlisting}
 object Reg {
-  def apply[T <: Type](t: T): T;
-  def apply[T <: Type](t: T, resetVal: T): T;
-  def apply[T <: Type](resetVal: T = null)(gen: =>T): T;
+  def apply[T <: Data]
+        (data: T, resetVal: T = null): T;
+  def apply[T <: Data] (resetVal: T): T;
+  def apply[T <: Data] ()(gen: => T): T;
 }
  
-class Reg extends Updateable {
-}
-\end{example}
+class Reg extends Updateable;
+\end{lstlisting}
+
+\noindent
+where they can be constructed as follows:
+
+\begin{lstlisting}
+val r1 = Reg(io.in);
+val r2 = Reg(resetVal = UFix(1, 8));
+val r3 = Reg(data = io.in, resetVal = UFix(1));
+val r4 = Reg(){ UFix(width = 8) };
+\end{lstlisting}
 
 \section{Mems}
 
 Chisel provides facilities for creating both read only and
 read/write memories.  
 
-\begin{example}
+\begin{lstlisting}
 object Mem {
-  def apply[T <: Type](depth: Int)(gen: => T): T;
+  def apply[T <: Data](depth: Int)(gen: => T): T;
 }
 
-class Mem[T <: Type](n: Int, gen: () => T) 
+class Mem[T <: Data](n: Int, gen: () => T) 
     extends Updateable {
   def apply(idx: UFix): T;
 }
 
-class MemRead[T <: Type]
+class MemRead[T <: Data]
       (val mem: Mem, val idx: UFix) 
     extends Node {
-  def := (t: T): T;
+  override def := (data: T): T;
 }
 
-class MemWrite[T <: Type]
+class MemWrite[T <: Data]
       (val mem: Mem, val idx: UFix, val kind: T) 
     extends Node;
-\end{example}
+\end{lstlisting}
+
+\noindent
+where a \code{:=} method on \code{MemRead} permits the nice syntax for
+memory writes:
+
+\begin{lstlisting}
+val m = Mem(n){ UFix(width = 32) };
+val d = m(addr);
+m(addr) := x + UFix(1);
+\end{lstlisting}
 
 \section{Components}
 
@@ -544,69 +593,192 @@ defined as a {\em class} which:
 Users write their own components by subclassing Component which is
 defined as follows:
 
-\begin{example}
+\begin{lstlisting}
 abstract class Component {
   val io: Bundle;
   def compileV: Unit;
   def compileC: Unit;
 }
-\end{example}
+\end{lstlisting}
 
-\begin{example}
-val io = ...;
-\end{example}
+\noindent
+and defining their own \code{io} field.  For example, to define a two
+input mux, we would define a component as follows:
 
+\begin{lstlisting}
+class Mux2 extends Component {
+  val io = new Bundle{
+    val sel = Bits(width = 1, dir = INPUT);
+    val in0 = Bits(width = 1, dir = INPUT);
+    val in1 = Bits(width = 1, dir = INPUT);
+    val out = Bits(width = 1, dir = OUTPUT);
+  };
+  io.out := (io.sel & io.in1) | (~io.sel & io.in0);
+}
+\end{lstlisting}
+
+\noindent
 The \code{:=} assignment operator, used in the body of a
 component definition, is a special operator in Chisel that wires the input of
 left-hand side to the output of the right-hand side.  It is typically
 used to connect an output port to its definition.
 
-% is IO a good name?
-
-The \verb+<>+ operator bulk connects interfaces of opposite gender.
+The \code{<>} operator bulk connects interfaces of opposite gender.
 Bulk connections connect leaf ports of the same name to each other.
 After all connections are made and the circuit is being elaborated,
 Chisel warns users if ports have other than exactly one connection to them.
 
-\begin{example}
+\begin{lstlisting}
 def <> (x: Node);
-\end{example}
+\end{lstlisting}
 
-\subsection{Main}
+% TODO: what is same name -- is it a pathname?
 
-The user calls chiselMain from their main object:
+\section{BlackBox}
 
-\begin{example}
+Black boxes allow users to define interfaces to circuits defined
+outside of Chisel.  The user defines:
+
+\begin{itemize}
+\item a component as a subclass of \code{BlackBox} 
+\item defines an \code{io} field with the interface.
+\end{itemize}
+
+\noindent
+For example, one could define a simpel ROM blackbox as:
+
+\begin{lstlisting}
+class RomIo extends Bundle {
+  val isVal = Bool(dir = INPUT);
+  val raddr = UFix(width = 32, dir = INPUT);
+  val rdata = Bits(width = 32, dir = OUTPUT);
+}
+
+class Rom extends BlackBox {
+  val io = new RomIo();
+}
+\end{lstlisting}
+
+\section{Main}
+
+In order to construct a circuit, 
+the user calls \code{chiselMain} from their main object:
+
+\begin{lstlisting}
 object chiselMain {
   def apply[T <: Component]
     (args: Array[String], 
-     gen: () => T, 
-     scanner: T => TestIO = null, 
-     printer: T => TestIO = null): T;
+     gen: () => T): T;
 }
+\end{lstlisting}
+
+\noindent
+which when run creates a C++ files named
+\code{{\it component\_name}.cpp} and \code{{\it component\_name}.h} in directory specified with
+\code{--target-dir {\it dir\_name}} argument.
+
+Testing is a crucial part of circuit design.
+Testing can be challenging and thus in Chisel we provide a mechanism for
+testing circuits by providing test inputs and printing out results:
+In order to specify Input / Output on a constructed circuit as follows:
+
+\begin{lstlisting}
+class TestIO
+  (val format: String, 
+   val args: Seq[Data] = null);
+
+class Scanner extends TestIO;
+
+class Printer extends TestIO;
+
+object chiselMainTesting {
+  def apply[T <: Component]
+    (args: Array[String], gen: () => T)(
+     scanner: T => TestIO, 
+     printer: T => TestIO): T;
+}
+\end{lstlisting}
+
+\noindent
+
+We can use the \code{chiselMainTesting} call and \code{TestIO} objects as follows:
+
+\begin{lstlisting}
+object tutorial {
+  def main(args: Array[String]) = {
+    chiselMainTest(args ++ Array("--gen-harness"), 
+                   () => new Mux2())(
+      c => Scanner("%x %x %x", 
+                   c.io.sel, c.io.in0, c.io.in1),
+      c => Printer("%= %= %= %=", 
+                   c.io.sel, c.io.in0, c.io.in1, 
+                   c.io.out));
+  }
+}
+\end{lstlisting}
+
+\noindent
+where the first three hex numbers from each line are read in from
+standard input are bound to the \code{sel}, \code{in0},  and
+\code{in1} inputs of the multiplexer circuit, and the multiplexer
+inputs and \code{out} are printed out in hex format.  
+
+Using \code{--generate-harness} for \code{Mux2}
+creates a \code{Mux2-emulator.cpp}  and \code{Mux2-makefile} in directory
+specified by \code{--target-dir}.  The user can then compile it using:
+
+\begin{example}
+make -f Mux2-makefile
 \end{example}
 
-% TODO: TestIO
+\noindent
 
-Command arguments are as follows:
+A user can test the multiplexer by creating a test file called
+\code{test.out} containing:
+\begin{example}
+0 0 0 0
+0 0 1 0
+0 1 0 1
+0 1 1 1
+1 0 0 0
+1 0 1 1
+1 1 0 0
+1 1 1 1
+\end{example}
+
+\noindent
+and can be compared using a script as follows
+
+\begin{example}
+cut -f 1,2,3 -d " " < test | Mux2 > test.out
+diff test.out test
+\end{example}
+ 
+Finally, command arguments for \code{chiselMain*} are as follows: \\
+
 \begin{tabular}{lll}
-\verb+--target-dir+ & target pathname prefix \\
-\verb+--gen-harness+ & generate harness file for C++ \\
-\verb+--v+ & generate verilog \\
-\verb+--vcd+ & enable vcd dumping \\
-\verb+--debug+ & put all wires in class file \\
+\code{--target-dir} & target pathname prefix \\
+\code{--gen-harness} & generate harness file for C++ \\
+\code{--v} & generate verilog \\
+\code{--vcd} & enable vcd dumping \\
+\code{--debug} & put all wires in class file \\
 \end{tabular}
+
 
 \section{C++ Emulator}
 
 The C++ emulator is based on a fast multiword library using
-C++ templates.  The \verb+dat_t+ represents multiple \verb+val_t+:
+C++ templates.  A single a
+word is defined by \code{val\_t} as follows: 
 
 \begin{example}
 typedef uint64_t val_t;
 typedef int64_t sval_t; 
 typedef uint32_t half_val_t;
 \end{example}
+
+\noindent
+and multiwords are defined by\code{dat\_t} as follows:
 
 \begin{example}
 template <int w>
@@ -698,24 +870,28 @@ template <int w> dat_t<w>
   mux ( dat_t<1> t, dat_t<w> c, dat_t<w> a )
 \end{example}
 
-The Chisel compiler compiles top level components into a \verb+mod_t+
+\noindent
+where \code{w} is the bit width parameter.
+
+The Chisel compiler compiles top level components into a single flattened \code{mod\_t}
 class that can be created and executed:
 
 \begin{example}
 class mod_t {
  public:
-  std::vector< mod_t* > children;
+  // initialize component
   virtual void init (void) { };
+  // compute all combinational logic
   virtual void clock_lo (dat_t<1> reset) { };
+  // commit state updates
   virtual void clock_hi (dat_t<1> reset) { };
+  // print node values specified from printer to stdout
   virtual void print (FILE* f) { };
+  // scan node values specified from scanner from stdin
   virtual bool scan (FILE* f) { return true; };
+  // dump vcd file
   virtual void dump (FILE* f, int t) { };
 };
-\end{example}
-
-\begin{example}
-environment variables
 \end{example}
 
 Either the Chisel compiler can create a harness or the user can write
@@ -725,43 +901,117 @@ CPU component:
 \begin{example}
 #include "cpu.h"
 
-int main (int argc, char* argv) {
-  cpu_t* cpu = new Cpu();  
-  cpu->init();
-  for (size_t t = 0; t < n; t++) {
-    cpu->scan();
-    cpu->clock_lo();
-    cpu->clock_hi();
-    cpu->print();
+int main (int argc, char* argv[]) {
+  cpu_t* c = new cpu_t();
+  int lim = (argc > 1) ? atoi(argv[1]) : -1;
+  c->init();
+  for (int t = 0; lim < 0 || t < lim; t++) {
+    dat_t<1> reset = LIT<1>(t == 0);
+    if (!c->scan(stdin)) break;
+    c->clock_lo(reset);
+    c->clock_hi(reset);
+    c->print(stdout);
   }
 }
 \end{example}
 
 \section{Verilog}
 
+Chisel generates Verilog when the \code{--v} argument is passed into
+\code{chiselMain}.  For example, from SBT, the following
+
 \begin{example}
-running verilog backend
-multiple modules
-module name caching
+run --v
+\end{example}
+
+\noindent
+would produce a single Verilog file named \code{{\it component-name}.v} in
+the target directory.
+The file will contain one module per component defined as subcomponents of
+the top level component created in \code{chiselMain}.  Modules with
+the same interface and body are cached and reused.
+
+\section{Extra Stuff}
+
+\begin{example}
+Lookup
+Enums
+MuxLookup
+MuxCase
+Probe
+Name mangling
 \end{example}
 
 \section{Standard Library}
 
 \begin{example}
-foldR
-log2up
-ispow2
-Match
-Reverse
-PopCount
-OHToUFix
-UFixToOH
-LFSR16
-ShiftRegister
-Mux1H
-Arbiter
-DecoupledIO
+object foldR {
+  def apply[T <: Bits](x: Seq[T])(f: (T, T) => T): T
+}
+
+object log2up {
+  def apply(in: Int) = ceil(log(in)/log(2)).toInt
+}
+
+object ispow2 {
+  def apply(in: Int) = in > 0 && ((in & (in-1)) == 0)
+}
+
+object PopCount {
+  def apply(in: Bits): Bits
+}
+
+object Reverse {
+  def apply(in: Bits): Bits
+}
+
+object OHToUFix {
+  def apply(in: Bits): UFix
+  def apply(in: Seq[Bool]): UFix
+}
+
+object UFixToOH {
+  def apply(in: UFix, width: Int): Bits;
+}
+
+object LFSR16 {
+  def apply(increment: Bool = Bool(true)): Bits
+}
+
+object ShiftRegister {
+  def apply [T <: Data](n: Int, in: T): T;
+}
+
+object Mux1H {
+  def apply [T <: Data](sel: Bits, in: Vec[T]): T;
+  def apply [T <: Data](sel: Vec[Bool], in: Vec[T]): T;
+}
+
+class ioDecoupled[+T <: Data]()(data: => T) 
+    extends Bundle {
+  val ready = Bool(INPUT)
+  val valid = Bool(OUTPUT)
+  val bits  = data.asOutput
+}
+
+class ioPipe[+T <: Data]()(data: => T) 
+    extends Bundle {
+  val valid = Bool(OUTPUT)
+  val bits = data.asOutput
+}
+
+object PriorityEncoder {
+  def apply(in: Bits): UFix;
+}
+
+object PriorityEncoderOH {
+  def apply(in: Bits): UFix;
+}
+
+Arbiters
+
 Queues
+
 Pipes
 \end{example}
 
