@@ -499,7 +499,7 @@ abstract class Node extends nameable{
     else 
       inputs(0).getNode
   }
-  def getCell(): Cell = null;
+
   def addConsumers(): Boolean = {
     /*
     this match {
