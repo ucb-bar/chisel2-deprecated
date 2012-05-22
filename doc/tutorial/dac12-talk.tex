@@ -168,8 +168,8 @@ class GCD extends Component {
     val b   = UFix(16, INPUT)
     val z   = UFix(16, OUTPUT)
     val rdy = Bool(OUTPUT) }
-  val x  = Reg(resetVal = io.a)
-  val y  = Reg(resetVal = io.b)
+  val x = Reg(resetVal = io.a)
+  val y = Reg(resetVal = io.b)
   when (x > y) {
     x := x - y
   } .otherwise {
