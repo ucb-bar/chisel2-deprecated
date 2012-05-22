@@ -116,9 +116,9 @@ John Wawrzynek, Krste Asanovic}
 
 \textbf{Example Literal Constructions}
 \begin{scala}
-val sel = Bool(false);
-val a   = UFix(25);
-val b   = Fix(-35);
+val sel = Bool(false)
+val a   = UFix(25)
+val b   = Fix(-35)
 \end{scala}
 where \verb+val+ is a Scala keyword used to declare variables whose values won't change
 \end{frame}
@@ -136,9 +136,9 @@ where \verb+val+ is a Scala keyword used to declare variables whose values won't
 % \textbf{Bundle Example}
 \begin{scala}
 class MyFloat extends Bundle{
-  val sign        = Bool();
-  val exponent    = UFix(width=8);
-  val significand = UFix(width=23);
+  val sign        = Bool()
+  val exponent    = UFix(width=8)
+  val significand = UFix(width=23)
 }
 \end{scala}
 \end{footnotesize}
@@ -164,19 +164,19 @@ val myVec = Vec(5){ Fix(width=23) }
 \begin{scala}
 class GCD extends Component {
   val io = new Bundle {
-    val a   = UFix(16, INPUT);
-    val b   = UFix(16, INPUT);
-    val z   = UFix(16, OUTPUT);
-    val rdy = Bool(OUTPUT); };
-  val x  = Reg(resetVal = io.a);
-  val y  = Reg(resetVal = io.b);
+    val a   = UFix(16, INPUT)
+    val b   = UFix(16, INPUT)
+    val z   = UFix(16, OUTPUT)
+    val rdy = Bool(OUTPUT) }
+  val x  = Reg(resetVal = io.a)
+  val y  = Reg(resetVal = io.b)
   when (x > y) {
-    x := x - y;
+    x := x - y
   } .otherwise {
-    y := y - x;
+    y := y - x
   }
-  io.z   := x;
-  io.rdy := y === UFix(0);
+  io.z   := x
+  io.rdy := y === UFix(0)
 }
 \end{scala}
 \end{footnotesize}
@@ -194,7 +194,7 @@ class GCD extends Component {
 \textbf{Example Shift Register:}
 \begin{scala}
 def delay[T <: Bits](x: T, n: Int): T = 
-  if(n == 0) x else Reg(delay(x, n – 1))
+  if(n == 0) x else Reg(delay(x, n - 1))
 \end{scala}
 where
 \begin{itemize}
@@ -222,12 +222,12 @@ where
 class Complex(val real: Fix, val imag: Fix) 
     extends Bundle {
   def + (b: Complex): Complex = 
-    new Complex(real + b.real, imag + b.imag);
+    new Complex(real + b.real, imag + b.imag)
   ...
 }
-val a = new Complex(Fix(32), Fix(-16));
-val b = new Complex(Fix(-15), Fix(21));
-val c = a + b;
+val a = new Complex(Fix(32), Fix(-16))
+val b = new Complex(Fix(-15), Fix(21))
+val c = a + b
 \end{scala}
 \end{footnotesize}
 
@@ -243,13 +243,12 @@ class Cache(cache_type:    Int = DIR_MAPPED,
             write_policy:  Int = WRITE_THRU
            ) extends Component {
   val io = new Bundle() {
-    val cpu = new IoCacheToCPU();
-    val mem = new IoCacheToMem().flip();
+    val cpu = new IoCacheToCPU()
+    val mem = new IoCacheToMem().flip()
   }
   val addr_idx_width = log2(cache_depth).toInt
   val addr_off_width = log2(line_size/32).toInt
-  val addr_tag_width = 32 - addr_idx_width - 
-                         addr_off_width - 2
+  val addr_tag_width = 32 - addr_idx_width - addr_off_width - 2
   val log2_assoc     = log2(associativity).toInt
   ...
   if (cache_type == DIR_MAPPED)
@@ -362,8 +361,7 @@ The data-parallel processor layout results using IBM 45nm SOI 10-metal layer pro
 \item Open source with BSD license
 \begin{itemize}
 \item \verb+chisel.eecs.berkeley.edu+
-\item Alpha now
-\item Public Beta Available by end of summer
+\item public alpha now
 \end{itemize}
 \item Library of components
 \begin{itemize}
