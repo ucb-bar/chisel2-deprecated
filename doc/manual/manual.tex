@@ -17,7 +17,7 @@
 \usepackage{epsfig,graphicx}
 \usepackage{palatino}
 \usepackage{fancybox}
-\usepackage{listings}
+\usepackage[procnames]{listings}
 
 \newenvironment{commentary}
 { \vspace{-0.1in}
@@ -88,8 +88,8 @@ class Node {
   def inferWidth: Int
   // get width immediately inferrable
   def getWidth: Int
-  // get first non type node
-  def getNode: Node
+  // get first raw node
+  def getRawNode: Node
   // convert to raw bits 
   def toBits: Bits
   // convert to raw bits 
@@ -131,7 +131,9 @@ class Lit extends Node {
 
 \noindent
 where \code{inputVal} is the value used to create the literal.  
-Raw literals contain a collection of bits.
+Raw literals contain a collection of bits.  
+Users do not create raw lits directly, but instead use type
+constructors defined in Section~\ref{sec:types}.
 
 % Constant or literal values are expressed using Scala integers or strings passed to constructors for the types:
 
@@ -152,6 +154,7 @@ where \code{op} holds the op name used during emission.
 Ops compute a combinational function of their inputs.
 
 \section{Types}
+\label{sec:types}
 
 A Chisel graph contains raw and type nodes.  Type nodes are
 interspersed between raw nodes and allow Chisel code to
@@ -208,6 +211,20 @@ We will discuss ports in Section~\ref{sec:ports}.
 Finally, users can override the \code{clone} method in their own type nodes (e.g., bundles) in
 order to reflect construction parameters that are necessary for cloning.
 
+Data nodes can be used for four purposes:
+
+\begin{itemize}
+\item {\bf types} -- \kode{UFix(width = 8)} -- record intermediate types in the graph
+  specifying at minimum bitwidth (described in this section), 
+\item {\bf wires} -- \kode{UFix(width = 8)} -- serve as forward declarations of data allowing future
+  conditional updates (described in Section~\ref{sec:wires}), 
+\item {\bf ports} -- \kode{UFix(width = 8, dir = OUTPUT)} -- are specialized wires defining component interfaces
+  additionally specifying direction (described in
+  Section~\ref{sec:ports}), and
+\item{\bf literals} -- \kode{UFix(1)} or \kode{UFix(1, 8)} -- can be constructed using type object
+constructors specifying their value and optional width.
+\end{itemize}
+
 \subsection{Bits}
 
 In Chisel, a raw collection of bits is represented by the \code{Bits} type defined as follows:
@@ -242,7 +259,7 @@ object Cat {
 \end{lstlisting}
 
 \noindent
-and with the simple bit operations.  
+with methods for simple bit operations.  
 Bits with a value argument produces a \code{Lit} as shown in Figure~\ref{fig:bits-1}.
 N.B., that \code{\#\#} is binary
 concatenation, \code{Cat} is an nary concatentation,
@@ -277,8 +294,8 @@ successively more complicated examples.
 \end{figure}
 
 \noindent
-The \code{getNode} operator will skip type nodes and return the first
-non type node.
+The \code{getRawNode} operator will skip type nodes and return the first
+raw node.
 
 \subsection{Bools}
 
@@ -432,6 +449,8 @@ process will converge to a fixpoint.
 
 \section{Updateables}
 
+\label{sec:wires}
+
 When describing the operation of wire and state
 nodes, it is often useful to instead specify when updates to the
 wires and state will occur and to specify these updates spread across
@@ -441,7 +460,7 @@ For example, Data nodes can be used immediately, but their input set later.
 collects accesses and code generates a mux input for the node:
 
 \begin{lstlisting}
-abstract Updateable extends Node {
+abstract class Updateable extends Node {
   // conditional reads
   def reads: Queue[(Bool, UFix)];
   // conditional writes
@@ -783,16 +802,18 @@ The C++ emulator is based on a fast multiword library using
 C++ templates.  A single a
 word is defined by \code{val\_t} as follows: 
 
-\begin{example}
+\lstset{language=C++}
+
+\begin{lstlisting}
 typedef uint64_t val_t;
 typedef int64_t sval_t; 
 typedef uint32_t half_val_t;
-\end{example}
+\end{lstlisting}
 
 \noindent
 and multiwords are defined by\code{dat\_t} as follows:
 
-\begin{example}
+\begin{lstlisting}
 template <int w>
 class dat_t {
  public:
@@ -847,7 +868,8 @@ template <int n>
   dat_t<w> rsha ( dat_t<w> o);
   dat_t<w>& operator = ( dat_t<w> o );
   dat_t<w> fill_bit(val_t bit);
-  dat_t<w> fill_byte(val_t byte, int nb, int n);
+  dat_t<w> fill_byte
+    (val_t byte, int nb, int n);
 template <int dw, int n> 
   dat_t<dw> fill( void );
 template <int dw, int nw> 
@@ -857,13 +879,15 @@ template <int dw>
 template <int dw> 
   dat_t<dw> extract(val_t e, val_t s);
 template <int dw, int iwe, int iws> 
-  dat_t<dw> extract(dat_t<iwe> e, dat_t<iws> s);
+  dat_t<dw> extract
+    (dat_t<iwe> e, dat_t<iws> s);
 template <int sw> 
   dat_t<w> inject
     (dat_t<sw> src, val_t e, val_t s);
 template <int sw, int iwe, int iws> 
   dat_t<w> inject
-    (dat_t<sw> src, dat_t<iwe> e, dat_t<iws> s);
+    (dat_t<sw> src, 
+     dat_t<iwe> e, dat_t<iws> s);
 template <int dw> 
   dat_t<dw> log2();
   dat_t<1> bit(val_t b);
@@ -871,16 +895,16 @@ template <int dw>
 template <int iw>
   dat_t<1> bit(dat_t<iw> b)
 }
-\end{example}
+\end{lstlisting}
 
-\begin{example}
+\begin{lstlisting}
 template <int w, int sw> 
   dat_t<w> DAT(dat_t<sw> dat);
 template <int w> 
   dat_t<w> LIT(val_t value);
 template <int w> dat_t<w> 
   mux ( dat_t<1> t, dat_t<w> c, dat_t<w> a )
-\end{example}
+\end{lstlisting}
 
 \noindent
 where \code{w} is the bit width parameter.
@@ -888,7 +912,7 @@ where \code{w} is the bit width parameter.
 The Chisel compiler compiles top level components into a single flattened \code{mod\_t}
 class that can be created and executed:
 
-\begin{example}
+\begin{lstlisting}
 class mod_t {
  public:
   // initialize component
@@ -897,20 +921,20 @@ class mod_t {
   virtual void clock_lo (dat_t<1> reset) { };
   // commit state updates
   virtual void clock_hi (dat_t<1> reset) { };
-  // print node values specified from printer to stdout
+  // print printer specd node values to stdout
   virtual void print (FILE* f) { };
-  // scan node values specified from scanner from stdin
+  // scan scanner specd node values from stdin
   virtual bool scan (FILE* f) { return true; };
   // dump vcd file
   virtual void dump (FILE* f, int t) { };
 };
-\end{example}
+\end{lstlisting}
 
 Either the Chisel compiler can create a harness or the user can write
 a harness themselves.  The following is an example of a harness for a
 CPU component:
 
-\begin{example}
+\begin{lstlisting}
 #include "cpu.h"
 
 int main (int argc, char* argv[]) {
@@ -925,7 +949,7 @@ int main (int argc, char* argv[]) {
     c->print(stdout);
   }
 }
-\end{example}
+\end{lstlisting}
 
 \section{Verilog}
 
@@ -945,6 +969,8 @@ the same interface and body are cached and reused.
 
 \section{Extra Stuff}
 
+\lstset{language=scala}
+
 \begin{example}
 Lookup
 Enums
@@ -956,9 +982,10 @@ Name mangling
 
 \section{Standard Library}
 
-\begin{example}
+\begin{lstlisting}
 object foldR {
-  def apply[T <: Bits](x: Seq[T])(f: (T, T) => T): T
+  def apply[T <: Bits]
+    (x: Seq[T])(f: (T, T) => T): T
 }
 
 object log2up {
@@ -966,7 +993,8 @@ object log2up {
 }
 
 object ispow2 {
-  def apply(in: Int) = in > 0 && ((in & (in-1)) == 0)
+  def apply(in: Int) = 
+    in > 0 && ((in & (in-1)) == 0)
 }
 
 object PopCount {
@@ -995,8 +1023,10 @@ object ShiftRegister {
 }
 
 object Mux1H {
-  def apply [T <: Data](sel: Bits, in: Vec[T]): T;
-  def apply [T <: Data](sel: Vec[Bool], in: Vec[T]): T;
+  def apply [T <: Data]
+    (sel: Bits, in: Vec[T]): T;
+  def apply [T <: Data]
+    (sel: Vec[Bool], in: Vec[T]): T;
 }
 
 class ioDecoupled[+T <: Data]()(data: => T) 
@@ -1025,7 +1055,7 @@ Arbiters
 Queues
 
 Pipes
-\end{example}
+\end{lstlisting}
 
 % henry
 
