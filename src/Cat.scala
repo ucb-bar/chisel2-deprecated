@@ -1,6 +1,5 @@
 package Chisel {
 import Component._;
-import IOdir._;
 import Node._;
 
 object Cat {

@@ -7,7 +7,6 @@ import java.lang.reflect.Modifier._;
 
 import Node._;
 import Component._;
-import IOdir._;
 import ChiselError._
 import sort._
 
@@ -27,7 +26,7 @@ object Bundle {
 }
 
 object sort {
-  def apply(a: Array[(String, IO)]): Array[(String, IO)] = {
+  def apply(a: Array[(String, Bits)]): Array[(String, Bits)] = {
     var i = 0
     for (j <- 1 until a.length) {
       val keyElm = a(j);
@@ -41,20 +40,6 @@ object sort {
       a(i + 1) = keyElm
     }
     a
-  }
-
-  def checkPorts(x: Data, y: Data) = {
-
-    if(x.isInstanceOf[IO] && !y.isInstanceOf[IO]) {
-
-      val xIO = x.asInstanceOf[IO];
-      val yIO = y.asInstanceOf[IO];
-
-      if(xIO.dir == null || xIO.dir != INPUT) {
-	ChiselErrors += ChiselError("left hand side of bulk := must be OUTPUT", Thread.currentThread().getStackTrace);
-      } else if (!yIO.isCellIO || yIO.dir != OUTPUT)
-	ChiselErrors += ChiselError("right hand side of bulk := must be INPUT", Thread.currentThread().getStackTrace);
-    }
   }
 
 }
@@ -246,7 +231,6 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
 	} else {
 	  for ((n, i) <- elements) {
 	    if(other.contains(n)){
-	      checkPorts(i, other(n));
 	      i := other(n)
 	    }
 	    else {
@@ -261,8 +245,8 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     }
   }
 
-  override def flatten: Array[(String, IO)] = {
-    var res = ArrayBuffer[(String, IO)]();
+  override def flatten: Array[(String, Bits)] = {
+    var res = ArrayBuffer[(String, Bits)]();
     for ((n, i) <- elements){
       res = res ++ i.flatten
     }

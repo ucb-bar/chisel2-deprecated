@@ -15,7 +15,6 @@ import scala.math.max;
 import Node._;
 import Component._;
 import Bundle._;
-import IOdir._;
 import ChiselError._;
 
 object Component {
@@ -240,7 +239,7 @@ abstract class Component(resetSignal: Bool = null) {
   var ioVal: Data = null;
   var name: String = "";
   val bindings = new ArrayBuffer[Binding];
-  var wiresCache: Array[(String, IO)] = null;
+  var wiresCache: Array[(String, Bits)] = null;
   var parent: Component = null;
   var containsReg = false;
   val children = new ArrayBuffer[Component];
@@ -341,7 +340,7 @@ abstract class Component(resetSignal: Bool = null) {
   var isWalking = new HashSet[Node];
   var isWalked = new HashSet[Node];
   override def toString: String = name
-  def wires: Array[(String, IO)] = {
+  def wires: Array[(String, Bits)] = {
     if (wiresCache == null)
       wiresCache = io.flatten;
     wiresCache
@@ -385,7 +384,7 @@ abstract class Component(resetSignal: Bool = null) {
 	//if(w.isInstanceOf[IO])
 	//println("COMP WALKED " + w + " is " + this.isWalked.contains(w));
 	w match {
-          case io: IO  => 
+          case io: Bits  => 
             if (io.dir == INPUT) {
               if (io.inputs.length == 0) { 
                   if(saveConnectionWarnings)
@@ -399,7 +398,7 @@ abstract class Component(resetSignal: Bool = null) {
               } else {
 		res += io.inputs(0).emitRef;
               }
-            } else {
+            } else if(io.dir == OUTPUT) {
               if (io.consumers.length == 0) {
                   if(saveConnectionWarnings)
 		    connWriter.write("// " + io + " UNCONNECTED IN " + io.component + " BINDING " + findBinding(io) + "\n"); 
@@ -424,7 +423,7 @@ abstract class Component(resetSignal: Bool = null) {
     var res = "";
     for ((n, w) <- wires) {
       w match {
-        case io: IO  => 
+        case io: Bits  => 
           if (io.dir == INPUT)
             res += "  " + emitRef + "->" + n + " = " + io.inputs(0).emitRef + ";\n";
       };
@@ -432,7 +431,7 @@ abstract class Component(resetSignal: Bool = null) {
     res += emitRef + "->clock_lo(reset);\n";
     for ((n, w) <- wires) {
       w match {
-        case io: IO => 
+        case io: Bits => 
           if (io.dir == OUTPUT)
             res += "  " + io.consumers(0).emitRef + " = " + emitRef + "->" + n + ";\n";
       };
@@ -473,7 +472,7 @@ abstract class Component(resetSignal: Bool = null) {
   def isInferenceTerminal(m: Node): Boolean = {
     m.isFixedWidth || (
       m match { 
-        case io: IO => true; 
+        case io: Bits => io.dir != null; 
         case b: Binding => true; 
         case _ => false }
     )
@@ -530,7 +529,7 @@ abstract class Component(resetSignal: Bool = null) {
 
     // initialize bfsQueue
     for((n, elm) <- io.flatten) 
-      if(elm.isInstanceOf[IO] && elm.asInstanceOf[IO].dir == OUTPUT)
+      if(elm.isInstanceOf[Bits] && elm.asInstanceOf[Bits].dir == OUTPUT)
   	bfsQueue.enqueue(elm)
     for(a <- asserts) 
       bfsQueue.enqueue(a)
@@ -596,7 +595,7 @@ abstract class Component(resetSignal: Bool = null) {
 
     // initialize bfsQueue
     for((n, elm) <- io.flatten) {
-      if(elm.isInstanceOf[IO] && elm.asInstanceOf[IO].dir == OUTPUT) {
+      if(elm.isInstanceOf[Bits] && elm.asInstanceOf[Bits].dir == OUTPUT) {
   	bfsQueue.enqueue(elm)
       }
     }
@@ -642,7 +641,7 @@ abstract class Component(resetSignal: Bool = null) {
 
     // initialize bfsQueue
     for((n, elm) <- io.flatten) 
-      if(elm.isInstanceOf[IO] && elm.asInstanceOf[IO].dir == OUTPUT)
+      if(elm.isInstanceOf[Bits] && elm.asInstanceOf[Bits].dir == OUTPUT)
   	bfsQueue.enqueue(elm)
     for(a <- asserts) 
       bfsQueue.enqueue(a)
@@ -668,7 +667,7 @@ abstract class Component(resetSignal: Bool = null) {
 
     for(node <- nodesList) {
 
-      if(node.inputs.length == 1 && (node.isInstanceOf[IO] || node.isInstanceOf[Wire])) {
+      if(node.inputs.length == 1 && node.isInstanceOf[Bits]) {
 
 	if (node.width > node.inputs(0).width){
 
@@ -693,41 +692,6 @@ abstract class Component(resetSignal: Bool = null) {
 
     }
 
-    /*
-    for((io, i) <- ioMap) {
-
-      if(!io.isCellIO && io.isInstanceOf[IO] && io.inputs.length == 1) {
-
-	if (io.width > io.inputs(0).width){
-
-          if(saveWidthWarnings) {
-	    widthWriter.write("TOO LONG! IO " + io + " with width " + io.width + " bit(s) is assigned a wire with width " + io.inputs(0).width + " bit(s).\n")
-          }
-	  if(io.inputs(0).isInstanceOf[Fix]){
-	    val topBit = NodeExtract(io.inputs(0), Literal(io.inputs(0).width-1)); topBit.infer
-	    val fill = NodeFill(io.width - io.inputs(0).width, topBit); fill.infer
-	    val res = Concatanate(fill, io.inputs(0)); res.infer
-	    io.inputs(0) = res
-	  } else {
-	    val topBit = Literal(0,1)
-	    val fill = NodeFill(io.width - io.inputs(0).width, topBit); fill.infer
-	    val res = Concatanate(fill, io.inputs(0)); res.infer
-	    io.inputs(0) = res
-	  }
-
-	} else if (io.width < io.inputs(0).width) {
-          if(saveWidthWarnings) {
-	    widthWriter.write("TOO SHORT! IO " + io + " width width " + io.width + " bit(s) is assigned a wire with width " + io.inputs(0).width + " bit(s).\n")
-          }
-	  val res = NodeExtract(io.inputs(0), io.width-1, 0); res.infer
-	  io.inputs(0) = res
-	}
-
-      }
-
-    }
-    if(saveWidthWarnings) widthWriter.close()
-    * */
     println("finished width checking")
   }
 
@@ -744,7 +708,7 @@ abstract class Component(resetSignal: Bool = null) {
       roots += b.io;
     for (m <- mods) {
       m match {
-        case io: IO          => if (io.dir == OUTPUT) { if (io.consumers.length == 0) roots += m; }
+        case io: Bits          => if (io.dir == OUTPUT) { if (io.consumers.length == 0) roots += m; }
         case d: Delay        => roots += m;
 	case mr: MemRef[ _ ] => if(mr.isReg) roots += m;
         case any             =>
@@ -756,7 +720,7 @@ abstract class Component(resetSignal: Bool = null) {
     val leaves = new ArrayBuffer[Node];
     for (m <- mods) {
       m match {
-        case io: IO          => if (io.dir == INPUT && !io.isCellIO) { if (io.inputs.length == 0) leaves += m; }
+        case io: Bits          => if (io.dir == INPUT && !io.isCellIO) { if (io.inputs.length == 0) leaves += m; }
         case l: Literal      => leaves += m;
         case d: Delay        => leaves += m;
 	case mr: MemRef[ _ ] => if(mr.isReg) leaves += m;
@@ -819,7 +783,6 @@ abstract class Component(resetSignal: Bool = null) {
     val imods = new ArrayBuffer[Node]();
     for (m <- mods) {
       m match {
-        case o: IO  =>
         case l: Literal =>
         case i      => imods += m;
       }
@@ -871,10 +834,10 @@ abstract class Component(resetSignal: Bool = null) {
     for (m <- c.mods) {
       // println("M " + m.name);
       m match {
-        case io: IO  => 
+        case io: Bits  => 
           if (io.dir == INPUT) 
             inputs += m;
-          else
+          else if (io.dir == OUTPUT)
             outputs += m;
         case r: Reg    => regs += r;
         case other     =>
@@ -905,7 +868,7 @@ abstract class Component(resetSignal: Bool = null) {
         val o = m.invoke(this);
         o match { 
 	  //case comp: Component => { comp.component = this;}
-          case node: Node => { if ((node.isCellIO || (node.name == "" && !node.named) || node.name == null)) node.name_it(name, true);
+          case node: Node => { if ((node.isCellIO || (node.name == "" && !node.named) || node.name == null || name != "")) node.name_it(name, true);
 			       if (node.isReg || node.isRegOut || node.isClkInput) containsReg = true;
 			      nameSpace += name;
 			    }
@@ -994,10 +957,10 @@ abstract class Component(resetSignal: Bool = null) {
     for ((n, w) <- wires) {
       if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
       w match {
-        case io: IO => {
+        case io: Bits => {
           if (io.dir == INPUT) {
 	    res.append(nl + "    input " + io.emitWidth + " " + io.emitRef);
-          } else {
+          } else if(io.dir == OUTPUT) {
 	    res.append(nl + "    output" + io.emitWidth + " " + io.emitRef);
           }
         }
@@ -1238,8 +1201,7 @@ abstract class Component(resetSignal: Bool = null) {
   def genAllMuxes = {
     for (p <- procs) {
       p match {
-        case io: IO  => if(io.updates.length > 0) io.genMuxes(io.default);
-        case w: Wire => w.genMuxes(w.default);
+        case b: Bits  => if(b.updates.length > 0) b.genMuxes(b.default);
         case r: Reg  => r.genMuxes(r);
         case m: Mem[_] => m.genMuxes(m);
         case mr: MemRef[_] =>
@@ -1359,7 +1321,7 @@ abstract class Component(resetSignal: Bool = null) {
     // initialize bfsQueue
     // search for all reachable nodes, then pass this graph into tarjanSCC
     for((n, elm) <- io.flatten) 
-      if(elm.isInstanceOf[IO] && elm.asInstanceOf[IO].dir == OUTPUT)
+      if(elm.isInstanceOf[Bits] && elm.asInstanceOf[Bits].dir == OUTPUT)
   	bfsQueue.enqueue(elm)
 
     for(a <- asserts) 

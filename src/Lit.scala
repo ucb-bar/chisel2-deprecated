@@ -7,7 +7,6 @@ import scala.math.ceil;
 import scala.math.max;
 import scala.math.min;
 import Literal._;
-import IOdir._;
 import ChiselError._;
 
 object Lit {

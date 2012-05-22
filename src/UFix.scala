@@ -1,6 +1,5 @@
 package Chisel {
 
-import IOdir._;
 import Node._;
 import ChiselError._;
 
@@ -38,7 +37,7 @@ class UFix extends Num {
     if(comp != null)
       comp procAssign src.toNode;
     else
-      this.asInstanceOf[Wire] procAssign src.toNode;
+      this procAssign src.toNode;
   }
 
   override def :=[T <: Data](src: T): Unit = {

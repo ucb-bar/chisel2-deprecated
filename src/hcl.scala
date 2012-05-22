@@ -8,7 +8,6 @@ import scala.collection.mutable.Queue
 import Component._;
 import Literal._;
 import Node._;
-import IOdir._;
 import ChiselError._;
   
 object Enum {
@@ -172,7 +171,7 @@ abstract class Data extends Node with Cloneable{
   def toBool(): Bool = chiselCast(this){Bool()};
   def setIsCellIO = isCellIO = true;
   def apply(name: String): Data = null
-  def flatten = Array[(String, IO)]();
+  def flatten = Array[(String, Bits)]();
   def terminate(): Unit = { }
   def flip(): this.type = this;
   def asInput(): this.type = this;

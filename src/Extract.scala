@@ -3,7 +3,6 @@ package Chisel {
 
 import Node._;
 import Component._;
-import IOdir._;
 import Lit._;
 
 object NodeExtract {

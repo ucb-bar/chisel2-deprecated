@@ -9,7 +9,6 @@ import scala.collection.mutable.Stack
 import scala.math.max;
 import Node._;
 import Component._;
-import IOdir._;
 import ChiselError._;
 
 object Node {
@@ -162,7 +161,7 @@ abstract class Node extends nameable{
   }
   def value = BigInt(-1);
   def signed: this.type = { 
-    val res = Wire(){Fix()};
+    val res = Fix()
     res := this.asInstanceOf[Fix];
     res.isSigned = true; 
     res.asInstanceOf[this.type]
@@ -394,10 +393,11 @@ abstract class Node extends nameable{
     // pushes and pops components as necessary in order to later mark the parent of nodes
     val (comp, nextComp) = 
       this match {
-        case io: IO => {
-          //assert(io.dir == OUTPUT || io.dir == INPUT, 
-                 //{println(" IO w/o direction " + io + " name: " + io.name + " " + io.inputs + " in comp: " + c + " of class: " + io.getClass + " on line " + findFirstUserLine(io.line))})
-          (io.component, if (io.dir == OUTPUT) io.component else io.component.parent);
+        case io: Bits => {
+          if(io.dir == INPUT || io.dir == OUTPUT)
+            (io.component, if (io.dir == OUTPUT) io.component else io.component.parent)
+          else
+            (c, c)
         }
         case any    => (c, c);
       }
@@ -426,15 +426,15 @@ abstract class Node extends nameable{
           val j = i;
           val n = node;
           stack.push(() => {
-	    // This code finds a binding for a node. We search for a binding only if it is an output
+	    // This code finds an output binding for a node. We search for a binding only if the io is an output
 	    // and the logic's grandfather component is not the same as the io's component and
 	    // the logic's component is not same as output's component unless the logic is an input
             n match { 
-              case io: IO => 
+              case io: Bits => 
                 if (io.dir == OUTPUT && !io.isCellIO &&
                     (!(component.parent == io.component) && 
                      !(component == io.component && 
-                       !(this.isInstanceOf[IO] && this.asInstanceOf[IO].dir == INPUT)))) {
+                       !(this.isInstanceOf[Bits] && this.asInstanceOf[Bits].dir == INPUT)))) {
                   val c = n.component.parent;
                   val b = Binding(n, c, io.component);
                   inputs(j) = b;
@@ -450,8 +450,8 @@ abstract class Node extends nameable{
 	        // We also do the same when assigning to the output if the output
 	        // is the parent of the subcomponent;
                 } else if (io.dir == INPUT && 
-                           ((!this.isInstanceOf[IO] && this.component == io.component.parent) || 
-                            (this.isInstanceOf[IO] && this.asInstanceOf[IO].dir == OUTPUT && 
+                           ((!this.isIo && this.component == io.component.parent) || 
+                            (this.isInstanceOf[Bits] && this.asInstanceOf[Bits].dir == OUTPUT && 
                              this.component == io.component.parent))) {
                    if (io.inputs.length > 0) inputs(j) = io.inputs(0);
                 } 
@@ -490,7 +490,7 @@ abstract class Node extends nameable{
     } else if(isInstanceOf[Reg] && !isWidthWalked){
       isWidthWalked = true;
       inferWidth(this)
-    }else if(inputs.length >= 1 && !isInstanceOf[Reg] && (isInstanceOf[IO] || !isInstanceOf[Wire]))
+    }else if(inputs.length >= 1 && !isInstanceOf[Reg])
       inferWidth(this)
     else
       -1

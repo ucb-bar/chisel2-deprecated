@@ -34,7 +34,7 @@ object Reg {
     output
     * */
 
-    val d: Array[(String, IO)] = 
+    val d: Array[(String, Bits)] = 
       if(data == null) 
         gen.flatten.map{case(x, y) => (x -> null)}
       else 

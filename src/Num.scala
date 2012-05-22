@@ -1,6 +1,5 @@
 package Chisel {
 
-import IOdir._;
 import Node._;
 import ChiselError._
 

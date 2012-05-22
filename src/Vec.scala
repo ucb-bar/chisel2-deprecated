@@ -73,7 +73,7 @@ object Mux1H {
     val inferredWidth = (pairs.map{case(bool, data) => data.getWidth}).max
     assert(inferredWidth > 0, {println("UNABLE TO INFER WIDTH ON MUX1H")})
 
-    var filter: List[List[IO]] = pairs(0)._2.flatten.map(x => List()).toList
+    var filter: List[List[Bits]] = pairs(0)._2.flatten.map(x => List()).toList
     for((bool, data) <- pairs) {
       filter = (filter zip data.flatten).map{case(a, (b, c)) => a :+ c}
     }
@@ -138,7 +138,7 @@ class VecProc extends proc {
         if(elms(i).comp != null)
           elms(i).comp procAssign src
         else
-          elms(i).asInstanceOf[IO] procAssign src
+          elms(i) procAssign src
       }
     }
     searchAndMap = false
@@ -226,12 +226,12 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
     return res
   }
 
-  override def flatten: Array[(String, IO)] = {
-    val res = new ArrayBuffer[(String, IO)];
+  override def flatten: Array[(String, Bits)] = {
+    val res = new ArrayBuffer[(String, Bits)];
     for (elm <- self)
       elm match {
 	case bundle: Bundle => res ++= bundle.flatten;
-	case io: IO         => res += ((io.name, io));
+	case io: Bits         => res += ((io.name, io));
       }
     res.toArray
   }

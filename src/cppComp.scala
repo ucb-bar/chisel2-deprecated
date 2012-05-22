@@ -5,7 +5,6 @@ import scala.collection.mutable.ArrayBuffer
 
 import Node._;
 import Component._;
-import IOdir._;
 
 object cppComp {
   def apply(fctn: String, outWidths: List[Int], input: Node*): cppComp = {

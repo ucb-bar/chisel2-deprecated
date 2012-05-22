@@ -1,6 +1,5 @@
 package Chisel {
 import Component._
-import IOdir._;
 import Node._;
 
 abstract class Cell extends nameable{

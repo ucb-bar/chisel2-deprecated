@@ -4,7 +4,6 @@ package Chisel {
 import Component._;
 import Fill._;
 import Component._;
-import IOdir._;
 import Lit._;
 
 object Fill {
