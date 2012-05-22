@@ -14,7 +14,7 @@ abstract class Cell extends nameable{
 object chiselCast {
   def apply[S <: Data, T <: Bits](x: S)(gen: => T): T = {
     val res = gen.asOutput
-    res.setIsCellIO
+    res.setIsTypeNode
     x.nameHolder = res
     res.inputs += x.toNode
     res
@@ -32,7 +32,7 @@ object UnaryOp {
 
     // make output
     val output = gen.asOutput
-    output.setIsCellIO
+    output.setIsTypeNode
     if(!node.isInstanceOf[Literal]) node.nameHolder = output
     output assign node
     output
@@ -60,7 +60,7 @@ object BinaryOp {
 
     // make output
     val output = gen.asOutput
-    output.setIsCellIO
+    output.setIsTypeNode
 
     if(!node.isInstanceOf[Literal]) node.nameHolder = output
     output assign node
@@ -87,7 +87,7 @@ object LogicalOp {
 
       // make output
       val output = Bool(OUTPUT)
-      output.setIsCellIO
+      output.setIsTypeNode
       if(!node.isInstanceOf[Literal]) node.nameHolder = output
       output assign node
       if(searchAndMap && op == "&&" && !chiselAndMap.contains((x, y))) {
@@ -109,7 +109,7 @@ object ReductionOp {
     
     // make output
     val output = Bool(OUTPUT)
-    output.setIsCellIO
+    output.setIsTypeNode
     if(!node.isInstanceOf[Literal]) node.nameHolder = output
     output assign node
     output
@@ -127,7 +127,7 @@ object UnaryBoolOp {
 
     //make ouput
     val output = Bool(OUTPUT)
-    output.setIsCellIO
+    output.setIsTypeNode
     if(!node.isInstanceOf[Literal]) node.nameHolder = output
     output assign node
     output
@@ -156,7 +156,7 @@ object BinaryBoolOp {
 
       // make output
       val output = Bool(OUTPUT)
-      output.setIsCellIO
+      output.setIsTypeNode
       if(!node.isInstanceOf[Literal]) node.nameHolder = output
       output assign node
       if(searchAndMap && op == "&&" && !chiselAndMap.contains((x, y))) {

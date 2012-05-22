@@ -50,25 +50,6 @@ object unless {
     when (!c) { block }
 }
 
-// object pcond {
-//   def apply(cases: Seq[(Fix, () => Any)]) = {
-//     var tst: Fix = Fix(1);
-//     for ((ctst, block) <- cases) {
-//       cond.push(tst && ctst);  
-//       block(); 
-//       cond.pop();
-//       tst = tst && !ctst;
-//     }
-//     this;
-//   }
-// }
-// object pcase {
-//   def apply(x: Fix, cases: Seq[(Fix, () => Any)]) = 
-//     pcond(cases.map(tb => (tb._1 === x, tb._2)))
-//   def apply(x: Fix, default: () => Any, cases: Seq[(Fix, () => Any)]) = {
-//     val elts = cases.map(tb => (tb._1 === x, tb._2)).toList;
-//     pcond(elts ::: List((Fix(1), default)))
-
 object otherwise {
   def apply(block: => Unit) = 
     when (Bool(true)) { block }
@@ -85,7 +66,6 @@ object is {
     if (keys.length == 0) 
       println("NO KEY SPECIFIED");
     else {
-      //val c = Bool(OUTPUT);
       val c = keys(0) === v;
       when (c) { block; }
     }
@@ -128,10 +108,7 @@ object chiselMain {
         case "--vcd" => isVCD = true;
         case "--v" => backendName = "v"; isEmittingComponents = true; isCoercingArgs = false;
         case "--target-dir" => targetDir = args(i+1); i += 1;
-        // case "--scan-format" => scanFormat = args(i+1); i += 1;
-        // case "--print-format" => printFormat = args(i+1); i += 1;
 	case "--include" => includeArgs = splitArg(args(i+1)); i += 1;
-        // case "--is-coercing-args" => isCoercingArgs = true;
         case any => println("UNKNOWN ARG");
       }
       i += 1;
@@ -169,7 +146,7 @@ abstract class Data extends Node with Cloneable{
   def toUFix(): UFix = chiselCast(this){UFix()};
   def toBits(): Bits = chiselCast(this){Bits()};
   def toBool(): Bool = chiselCast(this){Bool()};
-  def setIsCellIO = isCellIO = true;
+  def setIsTypeNode = isTypeNode = true;
   def apply(name: String): Data = null
   def flatten = Array[(String, Bits)]();
   def terminate(): Unit = { }
@@ -187,7 +164,7 @@ abstract class Data extends Node with Cloneable{
     res
   }
   override def name_it(path: String, setNamed: Boolean = false) = {
-    if (isCellIO && comp != null) 
+    if (isTypeNode && comp != null) 
       comp.name_it(path, setNamed)
     else
       super.name_it(path, setNamed);
@@ -198,21 +175,18 @@ abstract class Data extends Node with Cloneable{
 trait proc extends Node {
   var isDefaultNeeded = true;
   var updates = new Queue[(Bool, Node)];
-  // def genCond() = conds.reduceLeft((a,b) => a && b);
   def genCond() = conds.top;
   def genMuxes(default: Node) = {
     if (updates.length == 0) {
       if (inputs.length == 0 || inputs(0) == null){
-        //println("NO UPDATES SPECIFIED ON" + this); // error();
 
 	ChiselErrors += ChiselError({"NO UPDATES ON " + this}, this); 
       }
     } else {
-      val (lastCond, lastValue) = updates.front;//updates.pop();
+      val (lastCond, lastValue) = updates.front;
       if (isDefaultNeeded && default == null && !lastCond.isTrue) {
         ChiselErrors += ChiselError({"NO DEFAULT SPECIFIED FOR WIRE: " + this}, this)
       }
-      //updates.push((lastCond, lastValue));
       val (start, firstValue) = 
         if (default != null) 
           (0, default)
@@ -223,7 +197,6 @@ trait proc extends Node {
       else
 	inputs   += firstValue;
 
-      // for ((cond, value) <- updates) 
       var startCond: Bool = null
       def isEquals(x: Node, y: Node): Boolean = {
         if(x.litOf != null && y.litOf != null)
@@ -252,13 +225,6 @@ trait proc extends Node {
   }
   def procAssign(src: Node);
   procs += this;
-}
-
-trait Cloneable {
-  override def clone(): this.type = {
-    val res = this.getClass.newInstance.asInstanceOf[this.type];
-    res
-  }
 }
 
 trait nameable {
@@ -298,15 +264,6 @@ class Delay extends Node {
 
 
 object MuxLookup {
-/*
-  def apply (key: Node, default: Node, mapping: Seq[(Node, Node)]): Node = {
-    var res = default;
-    for ((k, v) <- mapping.reverse)
-      res = Mux(key === k, v, res);
-    res
-  }
-  * */
-
   def apply[S <: Bits, T <: Data] (key: S, default: T, mapping: Seq[(S, T)]): T = {
     var res = default;
     for ((k, v) <- mapping.reverse)
@@ -317,15 +274,6 @@ object MuxLookup {
 }
 
 object MuxCase {
-/*
-  def apply (default: Node, mapping: Seq[(Node, Node)]): Node = {
-    var res = default;
-    for ((t, v) <- mapping.reverse){
-      res = Mux(t, v, res);
-    }
-    res
-  }
-  * */
   def apply[T <: Data] (default: T, mapping: Seq[(Bool, T)]): T = {
     var res = default;
     for ((t, v) <- mapping.reverse){
@@ -336,7 +284,6 @@ object MuxCase {
 }
 
 object Log2 {
-  // def log2WidthOf() = { (m: Node, n: Int) => log2(m.inputs(0).width) }
   def apply (mod: UFix, n: Int): UFix = {
     if (isEmittingComponents) {
       var res = UFix(0);
@@ -360,22 +307,11 @@ class Log2Cell(n: Int) extends Cell {
     val in = UFix(INPUT);
     val out = UFix(OUTPUT);
   }
-  io.setIsCellIO;
+  io.setIsTypeNode;
   val primitiveNode = new Log2();
   primitiveNode.init("", fixWidth(sizeof(n)), io.in);
   io.out assign primitiveNode;
 }
-
-
-
-/*
-object Nodes {
-  def apply (nodes: Node*): Nodes = new Nodes(nodes.toList);
-  def unapplySeq(nodes: List[Node]): Nodes = 
-}
-class Nodes extends Node {
-}
-*/
 
 }
 

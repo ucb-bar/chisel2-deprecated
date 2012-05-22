@@ -27,7 +27,7 @@ object Reg {
 
     // make output
     val output = gen.fromNode(reg).asInstanceOf[T]
-    output.setIsCellIO
+    output.setIsTypeNode
     output.comp = reg
     reg.nameHolder = output
     output.isRegOut = true
@@ -41,7 +41,7 @@ object Reg {
         data.flatten
 
     val res = gen.asOutput
-    res.setIsCellIO
+    res.setIsTypeNode
 
     if(resetVal != null) {
       for((((res_n, res_i), (data_n, data_i)), (rval_n, rval_i)) <- res.flatten zip d zip resetVal.flatten) {

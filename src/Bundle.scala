@@ -139,7 +139,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
   def +=[T <: Data](other: T) = {
     elements;
     elementsCache += ((other.name, other));
-    if(isCellIO) other.setIsCellIO;
+    if(isTypeNode) other.setIsTypeNode;
   }
   override def flip(): this.type = {
     for ((n, i) <- elements) {
@@ -147,9 +147,9 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     }
     this
   }
-  override def removeCellIOs() = {
+  override def removeTypeNodes() = {
     for ((n, elt) <- elements)
-      elt.removeCellIOs
+      elt.removeTypeNodes
   }
   override def traceableNodes = elements.map(tup => tup._2).toArray;
   
@@ -263,7 +263,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
   override def toNode: Node = {
     if(bundledElm == null) {
       val nodes = flatten.map{case (n, i) => i};
-      bundledElm = Concatanate(nodes.head, nodes.tail.toList: _*)
+      bundledElm = Concatenate(nodes.head, nodes.tail.toList: _*)
     }
     bundledElm
   }
@@ -292,10 +292,10 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     this.dir = "output"
     this
   }
-  override def setIsCellIO() = {
-    isCellIO = true;
+  override def setIsTypeNode() = {
+    isTypeNode = true;
     for ((n, i) <- elements)
-      i.setIsCellIO
+      i.setIsTypeNode
   }
 }
 }

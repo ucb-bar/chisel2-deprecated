@@ -580,14 +580,14 @@ abstract class Component(resetSignal: Bool = null) {
     println("finished inference")
   }
 
-  def removeCellIOs() {
+  def removeTypeNodes() {
     println("started flattenning")
     val walked = new HashSet[Node]
     val bfsQueue = new Queue[Node]
 
     def getNode(x: Node): Node = {
       var res = x
-      while(res.isCellIO && res.inputs.length != 0){
+      while(res.isTypeNode && res.inputs.length != 0){
 	res = res.inputs(0)
       }
       res
@@ -618,7 +618,7 @@ abstract class Component(resetSignal: Bool = null) {
 
       for(i <- 0 until top.inputs.length) {
         if(!(top.inputs(i) == null)) {
-          if(top.inputs(i).isCellIO) top.inputs(i) = getNode(top.inputs(i))
+          if(top.inputs(i).isTypeNode) top.inputs(i) = getNode(top.inputs(i))
           if(!walked.contains(top.inputs(i))) {
             bfsQueue.enqueue(top.inputs(i))
             walked += top.inputs(i)
@@ -674,12 +674,12 @@ abstract class Component(resetSignal: Bool = null) {
 	  if(node.inputs(0).isInstanceOf[Fix]){
 	    val topBit = NodeExtract(node.inputs(0), node.inputs(0).width-1); topBit.infer
 	    val fill = NodeFill(node.width - node.inputs(0).width, topBit); fill.infer
-	    val res = Concatanate(fill, node.inputs(0)); res.infer
+	    val res = Concatenate(fill, node.inputs(0)); res.infer
 	    node.inputs(0) = res
 	  } else {
 	    val topBit = Literal(0,1)
 	    val fill = NodeFill(node.width - node.inputs(0).width, topBit); fill.infer
-	    val res = Concatanate(fill, node.inputs(0)); res.infer
+	    val res = Concatenate(fill, node.inputs(0)); res.infer
 	    node.inputs(0) = res
 	  }
 
@@ -720,7 +720,7 @@ abstract class Component(resetSignal: Bool = null) {
     val leaves = new ArrayBuffer[Node];
     for (m <- mods) {
       m match {
-        case io: Bits          => if (io.dir == INPUT && !io.isCellIO) { if (io.inputs.length == 0) leaves += m; }
+        case io: Bits          => if (io.dir == INPUT && !io.isTypeNode) { if (io.inputs.length == 0) leaves += m; }
         case l: Literal      => leaves += m;
         case d: Delay        => leaves += m;
 	case mr: MemRef[ _ ] => if(mr.isReg) leaves += m;
@@ -868,7 +868,7 @@ abstract class Component(resetSignal: Bool = null) {
         val o = m.invoke(this);
         o match { 
 	  //case comp: Component => { comp.component = this;}
-          case node: Node => { if ((node.isCellIO || (node.name == "" && !node.named) || node.name == null || name != "")) node.name_it(name, true);
+          case node: Node => { if ((node.isTypeNode || (node.name == "" && !node.named) || node.name == null || name != "")) node.name_it(name, true);
 			       if (node.isReg || node.isRegOut || node.isClkInput) containsReg = true;
 			      nameSpace += name;
 			    }
@@ -876,7 +876,7 @@ abstract class Component(resetSignal: Bool = null) {
 	    var i = 0;
 	    if(!buf.isEmpty && buf(0).isInstanceOf[Node]){
 	      for(elm <- buf){
-		if ((elm.isCellIO || (elm.name == "" && !elm.named) || elm.name == null)) 
+		if ((elm.isTypeNode || (elm.name == "" && !elm.named) || elm.name == null)) 
 		  elm.name_it(name + "_" + i, true);
 		if (elm.isReg || elm.isRegOut || elm.isClkInput) 
 		  containsReg = true;
@@ -894,7 +894,7 @@ abstract class Component(resetSignal: Bool = null) {
 	      for(elm <- buf){
 		elm match {
 		  case node: Node => {
-		    if ((node.isCellIO || (node.name == "" && !node.named) || node.name == null)) 
+		    if ((node.isTypeNode || (node.name == "" && !node.named) || node.name == null)) 
 		      node.name_it(name + "_" + i + "_" + j, true);
 		    if (node.isReg || node.isRegOut || node.isClkInput) 
 		      containsReg = true;
@@ -1004,7 +1004,7 @@ abstract class Component(resetSignal: Bool = null) {
     genAllMuxes;
     components.foreach(_.postMarkNet(0));
     assignResets()
-    removeCellIOs()
+    removeTypeNodes()
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors) err.printError;
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
@@ -1154,7 +1154,7 @@ abstract class Component(resetSignal: Bool = null) {
     genAllMuxes;
     components.foreach(_.postMarkNet(0));
     assignResets()
-    removeCellIOs()
+    removeTypeNodes()
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors) err.printError;
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
@@ -1508,7 +1508,7 @@ abstract class Component(resetSignal: Bool = null) {
     topComponent = this;
     // isWalked.clear();
     assignResets()
-    removeCellIOs()
+    removeTypeNodes()
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors)	err.printError;
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");

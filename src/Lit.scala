@@ -39,14 +39,14 @@ object Lit {
 
   def makeLit[T <: Bits](x: Literal)(gen: => T): T = {
     val output= gen.asOutput
-    output.setIsCellIO
+    output.setIsTypeNode
     output assign x
     output
   }
 
   def makeBool(x: Literal): Bool = {
     val output = Bool(OUTPUT)
-    output.setIsCellIO
+    output.setIsTypeNode
     output assign x
     output
   }

@@ -70,7 +70,7 @@ object Extract {
 
       // make output
       val output = gen.fromNode(extract)
-      output.setIsCellIO
+      output.setIsTypeNode
       extract.nameHolder = output
       output
     }
@@ -94,7 +94,7 @@ object Extract {
 
       // make output
       val output = gen.fromNode(extract)
-      output.setIsCellIO
+      output.setIsTypeNode
       extract.nameHolder = output
       output
     }

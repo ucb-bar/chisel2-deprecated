@@ -7,7 +7,7 @@ object Cat {
     val modsList = mods.toList;
     if(modsList.length == 1 && modsList(0) == null){
       val res = Bits(OUTPUT);
-      res.setIsCellIO;
+      res.setIsTypeNode;
       res assign mod.toNode;
       res
     } else {
@@ -33,7 +33,7 @@ object Cat {
 
         // make output
         val output = Bits(OUTPUT)
-        output.setIsCellIO
+        output.setIsTypeNode
         output assign res
         res.nameHolder = output
         output
@@ -43,7 +43,7 @@ object Cat {
 }
 
 
-object Concatanate {
+object Concatenate {
   def apply (mod: Node, mods: Node*): Node = 
     if(isEmittingComponents) {
       val res = new Cat();

@@ -68,7 +68,7 @@ object Mux1H {
   
   def apply[T <: Data](pairs: Seq[(Bool, T)], gen: () => T): T = {
     val res = gen().asOutput
-    res.setIsCellIO
+    res.setIsTypeNode
     
     val inferredWidth = (pairs.map{case(bool, data) => data.getWidth}).max
     assert(inferredWidth > 0, {println("UNABLE TO INFER WIDTH ON MUX1H")})
@@ -205,7 +205,7 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
 
     val res = this(0).clone
     //val res = gen()
-    res.setIsCellIO
+    res.setIsTypeNode
     for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
       val w = io.getWidth
       val onehot = UFixToOH(addr, length)
@@ -281,9 +281,9 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
 
   override def traceableNodes = self.toArray
 
-  override def removeCellIOs() = {
+  override def removeTypeNodes() = {
     for(bundle <- self)
-      bundle.removeCellIOs
+      bundle.removeTypeNodes
   }
 
   override def flip(): this.type = {
@@ -308,7 +308,7 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
   override def toNode: Node = {
     if(flattenedVec == null){
       val nodes = flatten.map{case(n, i) => i};
-      flattenedVec = Concatanate(nodes.head, nodes.tail.toList: _*)
+      flattenedVec = Concatenate(nodes.head, nodes.tail.toList: _*)
     }
     flattenedVec
   }
@@ -339,10 +339,10 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
     this
   }
 
-  override def setIsCellIO() = {
-    isCellIO = true;
+  override def setIsTypeNode() = {
+    isTypeNode = true;
     for(elm <- self)
-      elm.setIsCellIO
+      elm.setIsTypeNode
   }
 
   override def toBits(): Bits = {

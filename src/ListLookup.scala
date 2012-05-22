@@ -20,7 +20,7 @@ object ListLookup {
 	case bits: Bits => Bits(OUTPUT);
 	case any => Bits(OUTPUT);
       }
-      res.setIsCellIO;
+      res.setIsTypeNode;
       xRef.nameHolder = res;
       res.inputs += xRef
       res.asInstanceOf[T]

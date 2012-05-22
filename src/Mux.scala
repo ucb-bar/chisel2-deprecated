@@ -19,7 +19,7 @@ object Multiplex{
           fill.infer
           val bit = NodeExtract(t, 0)
           bit.infer
-          val cat = Concatanate(fill, bit)
+          val cat = Concatenate(fill, bit)
           cat.infer
           return cat
         }
@@ -35,7 +35,7 @@ object Mux {
     val res = Multiplex(t, c.toNode, a.toNode)
     // make output
     val output = c.fromNode(res).asInstanceOf[T]
-    output.setIsCellIO
+    output.setIsTypeNode
     res.nameHolder = output
     output
   }

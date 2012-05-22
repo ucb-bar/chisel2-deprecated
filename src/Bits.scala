@@ -146,9 +146,9 @@ class Bits extends Data with proc {
       src match { 
       case other: Bits => 
 	if (other.dir == OUTPUT) { // input - output connections
-          if(this.staticComp == other.staticComp && !isCellIO) //passthrough
+          if(this.staticComp == other.staticComp && !isTypeNode) //passthrough
 	    other assign this
-          else if (this.staticComp.parent == other.staticComp.parent || isCellIO) //producer - consumer
+          else if (this.staticComp.parent == other.staticComp.parent || isTypeNode) //producer - consumer
             this assign other
           else
             ChiselErrors += ChiselError({"Undefined connections between " + this + " and " + other}, Thread.currentThread().getStackTrace)
@@ -174,9 +174,9 @@ class Bits extends Data with proc {
       src match { 
         case other: Bits  => 
 	  if (other.dir == INPUT) { // input - output connections
-            if (this.staticComp == other.staticComp && !isCellIO) //passthrough
+            if (this.staticComp == other.staticComp && !isTypeNode) //passthrough
 	      this assign other;
-	    else if (this.staticComp.parent == other.staticComp.parent || isCellIO) //producer - consumer
+	    else if (this.staticComp.parent == other.staticComp.parent || isTypeNode) //producer - consumer
               other assign this;
             else
               ChiselErrors += ChiselError({"Undefined connection between " + this + " and " + other}, Thread.currentThread().getStackTrace)
@@ -185,11 +185,11 @@ class Bits extends Data with proc {
 	      this assign other
 	    else if (this.staticComp.parent == other.staticComp) // child <> parent
 	      other assign this
-	    else if (this.isCellIO && other.isCellIO) //connecting two type nodes together
+	    else if (this.isTypeNode && other.isTypeNode) //connecting two type nodes together
 	      ChiselErrors += ChiselError("Ambiguous Connection of Two Nodes", Thread.currentThread().getStackTrace)
-	    else if (this.isCellIO){ // type <> output
+	    else if (this.isTypeNode){ // type <> output
 	      other assign this; }
-	    else if (other.isCellIO){ // output <> type
+	    else if (other.isTypeNode){ // output <> type
 	      this assign other; }
 	    else
 	      ChiselErrors += ChiselError({"Connecting Output " + this + " to Output " + other}, Thread.currentThread().getStackTrace)
@@ -239,7 +239,7 @@ class Bits extends Data with proc {
     else 
       name
 
-  override def setIsCellIO = isCellIO = true;
+  override def setIsTypeNode = isTypeNode = true;
 
   override def setIsClkInput = {isClkInput = true; this assign clk;}
 
@@ -257,7 +257,7 @@ class Bits extends Data with proc {
       width;
     else if(inputs(0).isLit)
       inputs(0).value
-    else if (inputs.length == 1 && isCellIO)
+    else if (inputs.length == 1 && isTypeNode)
       inputs(0).maxNum
     else
       super.maxNum

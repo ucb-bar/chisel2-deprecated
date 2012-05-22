@@ -70,7 +70,7 @@ class MemCell[T <: Data](n: Int, data: T) extends Cell {
   val io = new Bundle();
   val port_list = ListBuffer[MemPort[T]]();
   var port_count = 0;
-  io.setIsCellIO;
+  io.setIsTypeNode;
   isReg = true;
   val primitiveNode = new Mem[T](n, this);
 
@@ -201,7 +201,7 @@ class MemPort[T <: Data](cell:       MemCell[T],
       println("[warning] Memory data input is already assigned");
     } else if (!(data == null) && prt_type != 'read) {
       val data_port = Bits(data.getWidth, INPUT);
-      data_port.setIsCellIO
+      data_port.setIsTypeNode
       data_offset = next_input_index;
       cell.io += data_port;
       mem.inputs += data_port.toNode;
@@ -298,10 +298,10 @@ class MemPort[T <: Data](cell:       MemCell[T],
         holder.inputs += memRef;
         res = cell.getDataType.fromNode(holder);
         res.comp = holder
-        res.setIsCellIO
+        res.setIsTypeNode
         genRegChain(mem.cppReadLatency)
       }
-      res.setIsCellIO;
+      res.setIsTypeNode;
     }
     res;
   }
@@ -618,7 +618,7 @@ class Mem[T <: Data](depth: Int, val cell: MemCell[T]) extends Delay with proc {
   }
   override def getNode() = {
     fixName();
-    removeCellIOs();
+    removeTypeNodes();
     this
   }
 

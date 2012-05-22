@@ -34,7 +34,7 @@ object Lookup {
 
     // make output
     val output = default.fromNode(lookup).asInstanceOf[T]
-    output.setIsCellIO
+    output.setIsTypeNode
     lookup.nameHolder = output
     output
   }

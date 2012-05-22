@@ -28,7 +28,7 @@ object Fill {
 
       // make output
       val output = Bits(OUTPUT)
-      output.setIsCellIO
+      output.setIsTypeNode
       fill.nameHolder = output
       output assign fill
       output
