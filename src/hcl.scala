@@ -163,6 +163,12 @@ object chiselMain {
   }
 }
 
+object ChiselMainTest {
+  def apply[T <: Component]
+      (args: Array[String], gen: () => T)(scanner: T => TestIO, printer: T => TestIO): T = 
+    ChiselMain(args, gen, scanner, printer);
+}
+
 
 abstract class Data extends Node with Cloneable{
   var comp: proc = null;
