@@ -17,6 +17,11 @@
 \usepackage{epsfig,graphicx}
 \usepackage{palatino}
 \usepackage{fancybox}
+\usepackage[procnames]{listings}
+
+\input{../style/scala.tex}
+
+\lstset{frame=}
 
 \newenvironment{commentary}
 { \vspace{-0.1in}
@@ -213,7 +218,7 @@ values.  Bundles and Vecs will be covered later.
 
 Constant or literal values are expressed using Scala integers or
 strings passed to constructors for the types:
-\begin{example}
+\begin{scala}
 Bits(1)       // decimal 1-bit literal from Scala Int.
 Bits("ha")    // hexadecimal 4-bit literal from string.
 Bits("o12")   // octal 4-bit literal from string.
@@ -225,26 +230,26 @@ UFix(5)       // unsigned decimal 3-bit literal from Scala Int.
 
 Bool(true)    // Bool literals from Scala literals.
 Bool(false)
-\end{example}
+\end{scala}
 
 Underscores can be used as separators in long string literals to aid
 readability, but are ignored when creating the value, e.g.:
-\begin{example}
+\begin{scala}
 Bits("h_dead_beef")   // 32-bit literal of type Bits
-\end{example}
+\end{scala}
 
 By default, the Chisel compiler will size each constant to the minimum
 number of bits required to hold the constant, including a sign bit for
 signed types.  Bit widths can also be specified explicitly on
 literals, as shown below:
-\begin{example}
+\begin{scala}
 Bits("ha", 8)     // hexadecimal 8-bit literal of type Bits
 Bits("o12", 6)    // octal 6-bit literal of type Bits
 Bits("b1010", 12) // binary 12-bit literal of type Bits
 
 Fix(5, 7)         // signed decimal 7-bit literal of type Fix
 UFix(5, 8)        // unsigned decimal 8-bit literal of type UFix
-\end{example}
+\end{scala}
 
 \noindent
 For literals of type \code{Bits} and \code{UFix}, the value is
@@ -278,9 +283,9 @@ to create and wire together nodes is using textual expressions.  For
 example, we could express a simple combinational logic circuit
 using the following expression:
 
-\begin{example}
+\begin{scala}
 (a & b) | (~c & d)
-\end{example}
+\end{scala}
 
 The syntax should look familiar, with \code{\&} and \code{|}
 representing bitwise-AND and -OR respectively, and \code{\~{}}
@@ -299,10 +304,10 @@ a wire that holds a subexpression that we can then reference multiple
 times in subsequent expressions.  We name a wire in Chisel by
 declaring a variable.  For example, consider the select expression,
 which is used twice in the following multiplexer description:
-\begin{example}
+\begin{scala}
 val sel = a | b
 val out = (sel & in1) | (~sel & in0)
-\end{example}
+\end{scala}
 
 \noindent
 The keyword \code{val} is part of Scala, and is used to name variables
@@ -447,9 +452,9 @@ We can define functions to factor out a repeated piece of logic that
 we later reuse multiple times in a design.  For example, we can wrap
 up our earlier example of a simple combinational logic block as
 follows:
-\begin{example}
+\begin{scala}
 def clb(a: Bits, b: Bits, c: Bits, d: Bits) = (a & b) | (~c & d)
-\end{example}
+\end{scala}
 
 \noindent
 where \code{clb} is the function which takes \code{a}, \code{b},
@@ -462,22 +467,22 @@ sign separates the function argument list from the function
 definition.
 
 We can then use the block in another circuit as follows:
-\begin{example}
+\begin{scala}
 val out = clb(a,b,c,d)
-\end{example}
+\end{scala}
 
 % TODO: SHIFTER DONE FUNCTIONAL WITH LOOP
 
 %% Because Scala has powerful type inference, we can in many cases drop
 %% the type declarations on the function:
-%% \begin{example}
+%% \begin{scala}
 %% def clb(a, b, c, d) = (a & b) | (~c & d) // No types needed.
 
 %% def bigblock(a: Bool, b: Bool, c: Bool, d: Bool,
 %%              f: UFix, g: UFix, h: UFix, i: UFix): Bool =
 %%                  clb(a, b, c, clb(f,g,h,i)!=0) 
 
-%% \end{example}
+%% \end{scala}
 
 %% Here, we use \code{clb} twice.  The inner \verb!clb!  works with
 %% fixed-point values to calculate the value of an internal node that is
@@ -498,7 +503,7 @@ Bundles group together several named fields of potentially different
 types into a coherent unit, much like a \code{struct} in C. Users
 define their own bundles by defining a class as a subclass of
 \code{Bundle}:
-\begin{example}
+\begin{scala}
 class MyFloat extends Bundle {
   val sign        = Bool();
   val exponent    = Bits(width = 8);
@@ -507,7 +512,7 @@ class MyFloat extends Bundle {
 
 val x  = new MyFloat()
 val xs = x.sign
-\end{example}
+\end{scala}
 
 \noindent
 A Scala convention is to capitalize the name of new classes and we
@@ -517,11 +522,11 @@ of bits in the type.
 
 Vecs create an indexable vector of elements, and are constructed as
 follows:
-\begin{example}
+\begin{scala}
 val myVec = Vec(5) { Fix(width = 23) } // Vector of 5 23-bit signed integers.
 
 val reg3  = myVec(3) // Connect to one element of vector.
-\end{example}
+\end{scala}
 
 \noindent
 (Note that we have to specify the type of the \code{Vec} elements
@@ -536,13 +541,13 @@ superclass, \code{Data}.  Every object that ultimately inherits from
 
 Bundles and Vecs can be arbitrarily nested to build complex data
 structures:
-\begin{example}
+\begin{scala}
 class BigBundle extends Bundle {
  val myVec = Vec(5) { Fix(width = 23) } // Vector of 5 23-bit signed integers.
  val flag  = Bool()
  val f     = new MyFloat()              // Previously defined bundle.
 }
-\end{example}
+\end{scala}
 
 \noindent
 Note that the builtin Chisel primitive and aggregate classes do not
@@ -564,13 +569,13 @@ argument, where the direction is \code{INPUT} or
 \code{OUTPUT}.
 
 An example port declaration is as follows:
-\begin{example}
+\begin{scala}
 class FIFOInput extends Bundle {
   val rdy  = Bool(dir = OUTPUT)
   val data = Bits(width = 32, dir = INPUT)
   val enq  = Bool(dir = INPUT)
 }
-\end{example}
+\end{scala}
 
 \noindent
 After defining \code{FIFOInput}, it becomes a new type that can be
@@ -578,13 +583,13 @@ used as needed for component interfaces or for named collections of
 wires.
 
 The direction of an object can also be assigned at instantation time:
-\begin{example}
+\begin{scala}
 class ScaleIO extends Bundle {
   val in    = new MyFloat().asInput
   val scale = new MyFloat().asInput
   val out   = new MyFloat().asOutput
 }
-\end{example}
+\end{scala}
 
 \noindent
 The methods \code{asInput} and \code{asOutput} force all components of
@@ -592,7 +597,7 @@ the data object to the requested direction.
 
 By folding directions into the object declarations, Chisel is able to
 provide powerful wiring constructs described later.
-%% \begin{example}
+%% \begin{scala}
 %% class MuxBundle extends Bundle() {
 %%   val sel = Bits(1, INPUT);
 %%   val in0 = Bits(1, INPUT);
@@ -604,7 +609,7 @@ provide powerful wiring constructs described later.
 %%   val io = new MuxBundle();
 %%   io.out := (io.sel & io.in1) | (~io.sel & io.in0);
 %% }
-%% \end{example}
+%% \end{scala}
 
 
 \section{Components}
@@ -626,7 +631,7 @@ defined as a {\em class} which:
 \end{itemize}
 As an example, consider defining your own two-input multiplexer as a
 component:
-\begin{example}
+\begin{scala}
 class Mux2 extends Component {
   val io = new Bundle{
     val sel = Bits(width = 1, dir = INPUT);
@@ -636,7 +641,7 @@ class Mux2 extends Component {
   };
   io.out := (io.sel & io.in1) | (~io.sel & io.in0);
 }
-\end{example}
+\end{scala}
 
 \noindent
 The wiring interface to a component is a collection of ports in the
@@ -655,7 +660,7 @@ of smaller sub-components.  For example, we can build a 4-input
 multiplexer component in terms of the \code{Mux2} component by wiring
 together three 2-input multiplexers:
 
-\begin{example}
+\begin{scala}
 class Mux4 extends Component {
   val io = new Bundle {
     val in0 = Bits(width = 1, dir = INPUT);
@@ -676,7 +681,7 @@ class Mux4 extends Component {
 
   io.out := m3.io.out;
 }
-\end{example}
+\end{scala}
 
 \noindent
 We again define the component interface as \code{io} and wire up the
@@ -689,18 +694,18 @@ the \code{Mux4} interface.
 
 Now that we have defined components, we will discuss how we actually run and test a circuit.  Chisel translates into either \verb@C++@ or Verilog.   In order to build a circuit we need to call \code{chisel\_main}:
 
-\begin{example}
+\begin{scala}
 object tutorial {
   def main(args: Array[String]) = {
     chiselMain(args, () => new Mux2());
   }
 }
-\end{example}
+\end{scala}
 
 Testing is a crucial part of circuit design.
 Testing can be challenging and thus in Chisel we provide a mechanism for
 testing circuits by providing test inputs and printing out results:
-\begin{example}
+\begin{scala}
 object tutorial {
   def main(args: Array[String]) = {
     chiselMainTest(args ++ Array("--gen-harness"), 
@@ -709,7 +714,7 @@ object tutorial {
       c => Printer("%= %= %= %=", c.io.sel, c.io.in0, c.io.in1, c.io.out));
   }
 }
-\end{example}
+\end{scala}
 
 \noindent
 where the first three hex numbers from each line are read in from
@@ -726,7 +731,7 @@ on 64 bit i86 architecture) of each multiword.
 Currently, scanners and printers are only support with the C++ backend.
 \end{commentary}
 A user can test the multiplexer by creating a test file containing:
-\begin{example}
+\begin{scala}
 0 0 0 0
 0 0 1 0
 0 1 0 1
@@ -735,16 +740,16 @@ A user can test the multiplexer by creating a test file containing:
 1 0 1 1
 1 1 0 0
 1 1 1 1
-\end{example}
+\end{scala}
 
 %TODO: FIX THIS TO REALLY WORK
 \noindent
 and can be compared using a script as follows
 
-\begin{example}
+\begin{scala}
 cut -f 1,2,3 -d " " < test | mux > test.out
 diff test.out test
-\end{example}
+\end{scala}
 
 Other command arguments are as follows:
 \begin{tabular}{lll}
@@ -763,9 +768,9 @@ Other command arguments are as follows:
 The simplest form of state element supported by Chisel is a
 positive-edge-triggered register, which can be instantiated
 functionally as:
-\begin{example}
+\begin{scala}
 Reg(in)
-\end{example}
+\end{scala}
 
 \noindent
 This circuit has an output that is a copy of the input signal \verb+in+
@@ -779,14 +784,14 @@ Using registers, we can quickly define a number of useful circuit
 constructs.  For example, a rising-edge detector that takes a boolean
 signal in and outputs true when the current value is true and the
 previous value is false is given by:
-\begin{example}
+\begin{scala}
 def risingedge(x: Bool) = x && !Reg(x)
-\end{example}
+\end{scala}
 
 Counters are an important sequential circuit.  To construct an
 up-counter that counts up to a maximum value, \verb+max+, then wraps
 around back to zero (i.e., modulo \verb!max+1!), we write:
-\begin{example}
+\begin{scala}
 def wraparound(n: UFix, max: UFix) =
   Mux(n > max, UFix(0), n)
 
@@ -795,7 +800,7 @@ def counter(max: UFix) = {
   x := wraparound(x + UFix(1), max);
   x
 }
-\end{example}
+\end{scala}
 
 \noindent
 The \verb!wraparound! function represents the combinational circuit
@@ -811,15 +816,15 @@ side, its input is referenced.
 Counters can be used to build a number of useful sequential circuits.
 For example, we can build a pulse generator by outputting true when
 a counter reaches zero:
-\begin{example}
+\begin{scala}
 // Produce pulse every n cycles.
 def pulse(n: UFix) = counter(n - UFix(1)) === UFix(0)
-\end{example}
+\end{scala}
 
 \noindent
 A square-wave generator can then be toggled by the pulse train,
 toggling between true and false on each pulse:
-\begin{example}
+\begin{scala}
 // Flip internal state when input true.
 def toggle(p: Bool) = {
   val x = Reg(resetVal = Bool(false));
@@ -829,7 +834,7 @@ def toggle(p: Bool) = {
 
 // Square wave where each half cycle has given period.
 def squareWave(period: UFix) = toggle(pulse(period));
-\end{example}
+\end{scala}
 
 \subsection{Forward Declarations}
 
@@ -841,26 +846,24 @@ from nodes that have already been defined.  Sequential circuits
 naturally have feedback between nodes, and so it is sometimes
 necessary to reference an output wire before the producing node has
 been defined.  Because Scala evaluates program statements
-sequentially, we have provided a \verb+Wire+ constructor to provide
-declaration of a wire node that can be used immediately, but whose
+sequentially, we have allow data nodes to serve as a wire providing
+a declaration of a node that can be used immediately, but whose
 input will be set later.  
 For example, in a simple CPU, we need to define the \verb!pcPlus4!
 and \verb!branchTarget! wires so they can be referenced before defined:
-\begin{example}
-val pcPlus4      = Wire(){ UFix() };
-val branchTarget = Wire(){ UFix() };
+\begin{scala}
+val pcPlus4      = UFix();
+val branchTarget = UFix();
 val pcNext       = Mux(io.ctl.pcSel, branchTarget, pcPlus4);
 val pcReg        = Reg(data = pcNext, resetVal = UFix(0, 32));
 pcPlus4         := pcReg + UFix(4);
 ...
 branchTarget    := addOut;
-\end{example}
+\end{scala}
 
 \noindent
-The type given in braces following the \verb!Wire! constructor allows
-the Scala compiler to know the types of \verb!pcPlus4! and
-\verb!branchTarget! before they are defined.  The wiring operator
-\verb!:=! is then used to wire up
+The wiring operator
+\verb!:=! is used to wire up
 the connection after \verb!pcReg! and \verb!addOut! are defined.
 
 \subsection{Conditional Updates}
@@ -872,12 +875,12 @@ registers will occur and to specify these updates spread across
 several separate statements.  Chisel provides conditional update rules
 in the form of the \code{when} construct to support this style of
 sequential logic description. For example,
-\begin{example}
+\begin{scala}
 val r = Reg() { UFix(16) };
 when (c === UFix(0) ) {
   r := r + UFix(1);
 }
-\end{example}
+\end{scala}
 
 \noindent
 where register \code{r} is updated at the end of the current clock
@@ -889,10 +892,10 @@ defined with \code{val}.
 
 In a sequence of conditional updates, the last conditional update
 whose condition is true takes priority.  For example,
-\begin{example}
-when (c1)   { r := Bits(1) }
-when (c2)   { r := Bits(2) }
-\end{example}
+\begin{scala}
+when (c1) { r := Bits(1) }
+when (c2) { r := Bits(2) }
+\end{scala}
 
 \noindent
 leads to \code{r} being updated according to the following truth table:
@@ -934,46 +937,46 @@ change.
 Chisel provides some syntactic sugar for other common forms of
 conditional update.  The \verb+unless+ construct is the same as
 \verb+when+ but negates its condition.  In other words,
-\begin{example}
+\begin{scala}
 unless (c) { body }
-\end{example}
+\end{scala}
 is the same as
-\begin{example}
+\begin{scala}
 when (!c) { body }
-\end{example}
+\end{scala}
 
 % The \verb+otherwise+ construct is the same as \verb+when+ with a true
 % condition.  In other words,
-% \begin{example}
+% \begin{scala}
 % otherwise { body }
-% \end{example}
+% \end{scala}
 % 
 % \noindent
 % is the same as
-% \begin{example}
+% \begin{scala}
 % when (Bool(true)) { body }
-% \end{example}
+% \end{scala}
 
 The update block can target multiple registers, and there can be
 different overlapping subsets of registers present in different update
 blocks.  Each register is only affected by conditions in which it
 appears.  For example:
-\begin{example}
+\begin{scala}
 r := Fix(3); s := Fix(3);
 when (c1)   { r := Fix(1); s := Fix(1) }
 when (c2)   { r := Fix(2) }
-\end{example}
+\end{scala}
 
 \noindent
 leads to \code{r} and \code{s} being updated according to the
 following truth table:
-\begin{example}
+\begin{scala}
 c1 c2  r  s
 0   0  3  3
 0   1  2  3 // r updated in c2 block, s updated in otherwise block.
 1   0  1  1
 1   1  2  1
-\end{example}
+\end{scala}
 
 \begin{commentary}
 We are considering adding a different form of conditional update,
@@ -985,47 +988,47 @@ updates are similar to Bluespec guarded atomic actions.
 Conditional update constructs can be nested and any given block is
 executed under the conjunction of all outer nesting conditions.  For
 example,
-\begin{example}
+\begin{scala}
 when (a) { when (b) { body } }
-\end{example}
+\end{scala}
 
 \noindent
 is the same as:
-\begin{example}
+\begin{scala}
 when (a && b) { body }
-\end{example}
+\end{scala}
 
 Conditionals can be chained together using
 \verb+when+, \verb+.elsewhen+, \verb+.otherwise+ corresponding to
 \verb+if+, \verb+else if+ and \verb+else+ in Scala.  For example,
-\begin{example}
+\begin{scala}
 when (c1) { u1 }
 .elsewhen (c2) { u2 }
 .otherwise { ud }
-\end{example}
+\end{scala}
 \noindent
 is the same as:
-\begin{example}
+\begin{scala}
 when (c1) { u1 }
 when (!c1 && c2) { u2 }
 when (!(c1 || c2)) { ud }
-\end{example}
+\end{scala}
 
 We introduce the \code{switch} statement for conditional updates
 involving a series of comparisons against a common key.  For example,
-\begin{example}
+\begin{scala}
 switch(idx) {
- is(v1)    { u1 };
- is(v2)    { u2 };
+ is(v1) { u1 };
+ is(v2) { u2 };
 }
-\end{example}
+\end{scala}
 
 \noindent
 is equivalent to:
-\begin{example}
+\begin{scala}
 when (idx === v1) { u1 };
 .elsewhen (idx === v2) { u2 };
-\end{example}
+\end{scala}
 
 Chisel also allows a \code{Wire}, i.e., the output of some
 combinational logic, to be the target of conditional update statements
@@ -1051,7 +1054,7 @@ A common type of sequential circuit used in digital design is a Finite
 State Machine (FSM).  An example of a simple FSM is a parity
 generator:
 
-% \begin{example}
+% \begin{scala}
 % class Parity extends Component {
 %   val io = new Bundle {
 %     val in  = Bool(INPUT);
@@ -1063,9 +1066,9 @@ generator:
 %     (s_odd,  () => { when (io.in) { state := s_even } }) ));
 %   io.out := state === s_odd;
 % }
-% \end{example}
+% \end{scala}
 
-\begin{example}
+\begin{scala}
 class Parity extends Component {
   val io = new Bundle {
     val in  = Bool(dir = INPUT);
@@ -1078,7 +1081,7 @@ class Parity extends Component {
   }
   io.out := (state === s_odd);
 }
-\end{example}
+\end{scala}
 
 \noindent
 where \verb+Enum(2){ UFix() }+ generates two \verb+UFix+ literals and
@@ -1088,7 +1091,7 @@ wires, and conditional updates.
 
 Below is a more complicated FSM example which is a circuit for
 accepting money for a vending machine:
-\begin{example}
+\begin{scala}
 class VendingMachine extends Component {
   val io = new Bundle {
     val nickel = Bool(dir = INPUT);
@@ -1117,11 +1120,11 @@ class VendingMachine extends Component {
   }
   io.rdy := (state === s_ok);
 }
-\end{example}
+\end{scala}
 
 \noindent
 Here is the vending machine FSM defined with \code{switch} statement:
-\begin{example}
+\begin{scala}
 class VendingMachine extends Component {
   val io = new Bundle {
     val nickel = Bool(dir = INPUT);
@@ -1148,7 +1151,7 @@ class VendingMachine extends Component {
   }
   io.rdy := (state === s_ok);
 }
-\end{example}
+\end{scala}
 
 \section{Memories}
 
@@ -1160,9 +1163,9 @@ read/write memories.
 Users can define read only memories with:
 
 %%  TODO: FIX Rom to take Seq
-\begin{example}
+\begin{scala}
 Rom(inits: Seq[Data]) (gen: => T)
-\end{example}
+\end{scala}
 
 \noindent
 where \verb+inits+ is a sequence of initial \verb+Data+ literals that
@@ -1171,22 +1174,22 @@ For example,  users can
 create a small ROM initialized to \verb+1, 2, 4, 8+ and 
 loop through all values using a counter as an address generator as follows:
 
-\begin{example}
+\begin{scala}
 val m = Rom(Array(UFix(1), UFix(2), UFix(4), UFix(8))){ UFix(width = 32) };
 val r = m.read(counter(UFix(3)));
-\end{example}
+\end{scala}
 
 \noindent
 We can create an \verb+n+ value sine lookup table using a ROM initialized as follows:
 
-\begin{example}
+\begin{scala}
 def sinTable (amp: Double, n: Int) = {
   val ts = Range(0, n, 1).map(i => (i*2*Pi)/(n.toDouble-1) – Pi); 
   Rom(ts.map(t => Fix(round(amp * sin(t))))){ Fix(width = 32) }
 }
 def sinWave (amp: Double, n: Int) = 
   sinTable(amp, n).read(counter(UFix(n))
-\end{example}
+\end{scala}
 
 \noindent
 where \verb+amp+ is used to scale the fixpoint values stored in the ROM.
@@ -1203,10 +1206,10 @@ from external memory generators provided by foundry or IP vendors.  In
 the simplest form, Chisel allows memory to be defined with a single
 write port and multiple read ports as follows:
 
-\begin{example}
+\begin{scala}
   Mem(depth: Int, 
       target: Symbol = 'default, readLatency: Int = 0)
-\end{example}
+\end{scala}
 
 \noindent
 where \verb+depth+ is the number of memory locations, \verb+target+ is the
@@ -1216,13 +1219,13 @@ A memory object can then
 be read from using the \verb+read(rdAddress)+ method.  For example, an
 audio recorder could be defined as follows:
 
-\begin{example}
+\begin{scala}
   def audioRecorder(n: Int) = { 
     val addr = counter(UFix(n));
     val ram = Mem(n).write(button(), addr)
     ram.read(Mux(button(), UFix(0), addr))
   } 
-\end{example}
+\end{scala}
 
 \noindent
 where a counter is used as an address generator into a memory.  
@@ -1231,12 +1234,12 @@ The device records while \verb+button+ is \verb+true+, or plays back when \verb+
 We can use simple memory to create register files.
 For example we can make a one write port, two read port register file with 32 registers as follows:
 
-\begin{example}
+\begin{scala}
   val regs = Mem(32)
   regs.write(wr_en, wr_addr, wr_data)
   val idat = regs.read(iaddr)
   val mdat = regs.read(maddr)
-\end{example}
+\end{scala}
 
 \noindent
 where a new read port is created for each call to read.
@@ -1246,13 +1249,13 @@ to aid with the process of mapping to real-world hardware.  The
 following is an example of a memory that is first defined with no
 memory ports, after which read, write, or read/write ports are added:
 
-\begin{example}
+\begin{scala}
   val regfile =
     Mem(64, readLatency = 1, 
-        hexInitFile = "hex_init_values.txt");
+        hexInitFile = "hex_init_values.txt"){ Bits(width = 32) }
   regfile.write(addr_in, data_in1, wen, w_mask = bit_mask);
   val read_data = regfile.read(addr_in);
-\end{example}
+\end{scala}
 
 %                 // Default: 0 (Combinational)
 %           // A memory with no ports, with data width derived from
@@ -1261,11 +1264,11 @@ memory ports, after which read, write, or read/write ports are added:
 
 % This example can be written more compactly as:
 % 
-% \begin{example}
+% \begin{scala}
 % val regfile = Mem(64, io.wen, io.addr_in, io.data_in1, w_mask = io.bit_mask,
 %  readLatency = 1, hexInitFile = "hex_init_values.txt");
 % val read_data = regfile(io.addr_in, io.data_in1, oe = !io.wen, cs = Bool(true));
-% \end{example}
+% \end{scala}
 % 
 By default, this memory will be compiled to Verilog RTL.  To produce a
 reference to a Verilog instance of a memory module, one adds
@@ -1292,22 +1295,22 @@ interface.
 As we saw earlier, users can define their own interfaces by defining a class that subclasses \verb+Bundle+.  
 For example, a user could define a simple link for handshaking data as follows:
 
-\begin{example}
+\begin{scala}
 class SimpleLink extends Bundle { 
   val data = Bits(width=16,dir=OUTPUT); 
   val rdy  = Bool(dir=OUTPUT);
 }
-\end{example}
+\end{scala}
 
 \noindent
 We can then extend \verb+SimpleLink+ by adding parity bits using
 bundle inheritance:
 
-\begin{example}
+\begin{scala}
 class PLink extends SimpleLink { 
   val parity = Bits(width=5,dir=OUTPUT); 
 }
-\end{example}
+\end{scala}
 
 \noindent
 In general, users can organize their interfaces into hierarchies using inheritance.  
@@ -1315,12 +1318,12 @@ In general, users can organize their interfaces into hierarchies using inheritan
 From there we can define a filter interface by nesting two
 \verb+PLink+s into a new \verb+FilterIO+ bundle:
 
-\begin{example}
+\begin{scala}
 class FilterIO extends Bundle { 
   val x = new PLink().flip;
   val y = new PLink();
 }
-\end{example}
+\end{scala}
 
 \noindent
 where \verb+flip+ recursively changes the ``gender'' of a bundle,
@@ -1328,12 +1331,12 @@ changing input to output and output to input.
 
 We can now define a filter by defining a filter class extending component:
 
-\begin{example}
+\begin{scala}
 class Filter extends Component { 
   val io = new FilterIO();
   ...
 }
-\end{example}
+\end{scala}
 
 \noindent 
 where the \verb+io+ field contains \verb+FilterIO+. 
@@ -1344,21 +1347,21 @@ Beyond single elements, vectors of elements form richer hierarchical interfaces.
 For example, in order to create a crossbar with a vector of inputs, producing a vector of outputs, and selected by a UFix input, 
 we utilize the \verb+Vec+ constructor:
 
-\begin{example}
+\begin{scala}
 class CrossbarIo(n: Int) extends Bundle {
   val in  = Vec(n){ new PLink().flip() };
   val sel = UFix(width = (log(n)/log(2)).toInt, dir = INPUT);
   val out = Vec(n){ new PLink() };
 }
-\end{example}
+\end{scala}
 
-% \begin{example}
+% \begin{scala}
 % class CrossbarIo(n: Int) extends Bundle {
 %   val in  = Vec(n){ Bits(width = w, dir = INPUT) };
 %   val sel = Vec(n){ UFix(width = (log(n)/log(2)).toInt, dir = INPUT) };
 %   val out = Vec(n){ Bits(width = w, dir = OUTPUT) };
 % }
-% \end{example}
+% \end{scala}
 
 \noindent
 where \verb+Vec+ takes a size as the first argument and a block returning a port as the second argument.
@@ -1367,7 +1370,7 @@ where \verb+Vec+ takes a size as the first argument and a block returning a port
 
 We can now compose two filters into a filter block as follows:
 
-\begin{example}
+\begin{scala}
 class Block extends Component { 
   val io = new FilterIO();
   val f1 = new Filter();
@@ -1377,10 +1380,11 @@ class Block extends Component {
   f1.io.y <> f2.io.x;
   f2.io.y <> io.y;
 }
-\end{example}
+\end{scala}
 
 \noindent
-where \verb+<>+ bulk connects interfaces of opposite gender.
+where \verb+<>+ bulk connects interfaces of opposite gender between
+sibling components or interfaces of same gender between parent/child components. 
 Bulk connections connect leaf ports of the same name to each other.
 After all connections are made and the circuit is being elaborated,
 Chisel warns users if ports have other than exactly one connection to them.
@@ -1399,42 +1403,42 @@ Chisel allows users to do this with interface views without breaking an interfac
 A user first defines the natural interface to say a ROM as follows:
 % Sometimes hierarchical and delegational subinterfaces are awkward to use.
 
-\begin{example}
+\begin{scala}
 class RomIo(view: List[String] = null) extends Bundle(view) {
   val isVal = Bool(dir = INPUT);
   val raddr = UFix(width = 32, dir = INPUT);
   val rdata = Bits(width = 32, dir = OUTPUT);
 }
-\end{example}
+\end{scala}
 
 \noindent
 where \verb+view+ is provided as a constructor parameter that is relayed to the bundle superclass allowing views of \verb+RomIo+ to be constructed.
 From there, multiple ROM view constructors on the ROM interface can be constructed:
 
-\begin{example}
+\begin{scala}
 object RomIo {
   def RomCtlIo() = new RomIo(List("isVal"));
   def RomDatIo() = new RomIo(List("raddr", "rdata"));
 }
-\end{example}
+\end{scala}
 
 \noindent
 for the control and data subsets of the interface.  
 Views are specified by listing out the names of the interface fields that are to be included.  
 Now the control path can build an interface in terms of memory views of their control lines:
 
-\begin{example}
+\begin{scala}
 class CpathIo extends Bundle() {
   val imem = RomCtlIo().flip();
   val dmem = RamCtlIo().flip();
   ...
 }
-\end{example}
+\end{scala}
 
 \noindent
 We can now wire up the CPU using bulk connects of the bundle views as we would with other bundles:
 
-\begin{example}
+\begin{scala}
 class Cpu extends Component {
   val io = new CpuIo();
   val c  = new CtlPath();
@@ -1447,7 +1451,7 @@ class Cpu extends Component {
   d.io.dmem <> io.dmem;
   d.io.host <> io.host;
 }
-\end{example}
+\end{scala}
 
 % A Bool can be automatically treated as a single bit UFix (with values
 % 0 or 1), but an Int or UFix cannot be used as a Bool without an
@@ -1460,14 +1464,14 @@ class Cpu extends Component {
 % drives one output.  An example of a node with zero inputs is a
 % constant generator.
 %
-% \begin{example}
+% \begin{scala}
 % Lit(10, 4) // means a constant node of type Bits that is 4 bits
 %            // wide with decimal 10.
 % Lit(10)
 % LitInt(10, 4)
 % LitUFix(10, 4)
 % Lit(-1,4)
-% \end{example}
+% \end{scala}
 %
 % can more concisely write:
 %
@@ -1482,7 +1486,7 @@ component construction.  For instance, we could build a constructor
 that takes multiplexer inputs as parameters and returns the
 multiplexer output:
 
-\begin{example}
+\begin{scala}
 object Mux2 {
   def apply (sel: Bits, in0: Bits, in1: Bits) = {
     val m = new Mux2();
@@ -1492,7 +1496,7 @@ object Mux2 {
     m.io.out
   }
 }
-\end{example}
+\end{scala}
 
 \noindent
 where \code{object Mux2} creates a Scala singleton object on the \code{Mux2}
@@ -1501,7 +1505,7 @@ component class, and \code{apply} defines a method for creation of a \code{Mux2}
 With this \code{Mux2} creation function, the specification of \code{Mux4} now is
 significantly simpler.
 
-\begin{example}
+\begin{scala}
 class Mux4 extends Component {
   val io = new Bundle {
     val in0 = Bits(width = 1, dir = INPUT);
@@ -1515,7 +1519,7 @@ class Mux4 extends Component {
                  Mux2(io.sel(0), io.in0, io.in1),
                  Mux2(io.sel(0), io.in2, io.in3));
 }
-\end{example}
+\end{scala}
 
 Selecting inputs is so useful that Chisel builds it in and calls it
 \code{Mux}.  However, unlike \code{Mux2} defined above, the builtin version allows any datatype on
@@ -1524,32 +1528,32 @@ In Section~\ref{sec:parameterization} we will see how to define this
 ourselves.
 
 Chisel provides \code{MuxCase} which is an n-way \code{Mux} 
-\begin{example}
+\begin{scala}
 MuxCase(default, Array(c1 -> a, c2 -> b, ...))
-\end{example}
+\end{scala}
  
 \noindent
 where each condition / value is represented as a tuple in a Scala
 array and where \code{MuxCase} can be translated into the following
 \code{Mux} expression:
 
-\begin{example}
+\begin{scala}
 Mux(c1, a, Mux(c2, b, Mux(..., default)));
-\end{example}
+\end{scala}
 
 \noindent
 Chisel also provides \code{MuxLookup} which is an n-way indexed multiplexer:
 
-\begin{example}
+\begin{scala}
 MuxLookup(idx, default, Array(UFix(0) -> a, UFix(1) -> b, ...))
-\end{example}
+\end{scala}
 
 \noindent
 which can be rewritten in terms of:\verb+MuxCase+ as follows:
 
-\begin{example}
+\begin{scala}
 MuxCase(default, Array((idx === UFix(0)) -> a, (idx === UFix(1)) -> b, ...))
-\end{example}
+\end{scala}
 
 \noindent
 Note that the cases (eg. c1, c2) must be in parentheses.
@@ -1563,7 +1567,7 @@ Note that the cases (eg. c1, c2) must be in parentheses.
 %
 % want to go from io to constructor
 %
-% \begin{example}
+% \begin{scala}
 % val io = new Bundle{
 %   val sel = Bits(1, INPUT);
 %   val in0 = Bits(1, INPUT);
@@ -1574,7 +1578,7 @@ Note that the cases (eg. c1, c2) must be in parentheses.
 %   val m = new Mux2();
 %   m.io.wire(Array("sel" => sel, "in0" => in0, "in1" => in1), "out")
 % }
-% \end{example}
+% \end{scala}
 
 % picture of box in box
 
@@ -1595,9 +1599,9 @@ This section is advanced and can be skipped at first reading.
 Earlier we defined \code{Mux2} on \code{Bool}, but now we show how we can define a generic multiplexer function.
 We define this function as taking a boolean condition and con and alt arguments (corresponding to then and else expressions) of type \code{T}:
 
-\begin{example}
+\begin{scala}
 def Mux[T <: Bits](c: Bool, con: T, alt: T): T { ... }
-\end{example}
+\end{scala}
 
 \noindent
 where \code{T} is required to be a subclass of \code{Bits}.
@@ -1605,9 +1609,9 @@ Scala ensures that in each usage of \code{Mux}, it can find a common superclass 
 otherwise it causes a Scala compilation type error.
 For example,
 
-\begin{example}
+\begin{scala}
 Mux(c, UFix(10), UFix(11))
-\end{example}
+\end{scala}
 
 \noindent
 yields a \code{UFix} wire because the \code{con} and \code{alt} arguments are each of type \code{UFix}.
@@ -1615,10 +1619,10 @@ yields a \code{UFix} wire because the \code{con} and \code{alt} arguments are ea
 % Earlier we defined \code{Mux2} on \code{Bool}, but now we show how we can define a generic \code{Mux}.  
 % We define a function that takes a condition and two functions of no arguments (called thunks) for the {\it then} and {\it else} cases:
 % 
-% \begin{example}
+% \begin{scala}
 % def Mux[T <: Bits](c: Bool, con: T, alt: T): T
 % def Mux[T <: Bits](c: Bool)(con: => T)(alt: => T): T
-% \end{example}
+% \end{scala}
 % 
 % \noindent
 % where the two thunk return types are parameterized to be a type \code{T} that is a subclass of \code{Bits}.
@@ -1634,7 +1638,7 @@ y[t] = \sum_j w_j * x_j[t-j]
 where $x$ is the input and $w$ is a vector of weights.
 In Chisel this can be defined as:
 
-\begin{example}
+\begin{scala}
 def innerProductFIR[T <: Num] (w: Array[Int], x: T) = 
   foldR(Range(0, w.length).map(i => Num(w(i)) * delay(x, i)), _ + _)
 
@@ -1643,7 +1647,7 @@ def delay[T <: Bits](x: T, n: Int): T =
 
 def foldR[T <: Bits] (x: Seq[T], f: (T, T) => T): T =
   if (x.length == 1) x(0) else f(x(0), foldR(x.slice(1, x.length), f))
-\end{example}
+\end{scala}
  
 \noindent
 where 
@@ -1658,28 +1662,28 @@ Like parameterized functions, we can also parameterize classes to make them more
 For instance, we can generalize the Filter class to use any kind of link.  
 We do so by parameterizing the \verb+FilterIO+ class and defining the constructor to take a zero argument type constructor function as follow:
 
-\begin{example}
+\begin{scala}
 class FilterIO[T <: Data]()(type: => T) extends Bundle { 
   val x = type.asInput.flip;
   val y = type.asOutput;
 }
-\end{example}
+\end{scala}
 
 \noindent
 We can now define \verb+Filter+ by defining a component class that also takes a link type constructor argument and passes it through to the \verb+FilterIO+ interface constructor:
 
-\begin{example}
+\begin{scala}
 class Filter[T <: Data]()(type: => T) extends Component { 
   val io = (new FilterIO()){ type };
   ...
 }
-\end{example}
+\end{scala}
 
 \noindent
 We can now define a \verb+PLink+ based \verb+Filter+ as follows:
-\begin{example}
+\begin{scala}
 val f = (new Filter()){ new PLink() };
-\end{example}
+\end{scala}
 
 \noindent
 where the curly braces \verb+{ }+ denote a zero argument function (aka thunk) that in this case creates the link type.
@@ -1687,7 +1691,7 @@ where the curly braces \verb+{ }+ denote a zero argument function (aka thunk) th
 A generic FIFO could be defined as shown in Figure~\ref{fig:fifo} and
 used as follows:
 
-\begin{example}
+\begin{scala}
 class DataBundle() extends Bundle {
   val A = UFix(width = 32);
   val B = UFix(width = 32);
@@ -1696,10 +1700,10 @@ class DataBundle() extends Bundle {
 object FifoDemo {
   def apply () = (new Fifo(32)){ new DataBundle() };
 }
-\end{example}
+\end{scala}
 
 \begin{figure}[ht]
-\begin{example}
+\begin{scala}
 class FifoIO[T <: Data]()(gen: => T) extends Bundle() {
   val enq_val = Bool(INPUT)
   val enq_rdy = Bool(OUTPUT)
@@ -1731,39 +1735,39 @@ class Fifo[T <: Data] (n: Int)(gen: => T) extends Component {
   io.deq_val := !is_empty
   ram.read(deq_ptr) <> io.deq_dat
 }
-\end{example}
+\end{scala}
 \caption{Parameterized FIFO example.}
 \label{fig:fifo}
 \end{figure}
 
 It is also possible to define a generic decoupled interface:
 
-\begin{example}
+\begin{scala}
   class ioDecoupled[T <: Data]()(data: => T) extends Bundle() {
     val ready = Bool(INPUT)
     val valid = Bool(OUTPUT)
     val bits  = data.asOutput
   }
-\end{example}
+\end{scala}
 
 \noindent
 This template can then be used to add a handshaking protocol to any
 set of signals:
 
-\begin{example}
+\begin{scala}
   class decoupledDemo extends ioDecoupled()( new DataBundle() )
-\end{example}
+\end{scala}
 
 \noindent
 The FIFO interface in Figure~\ref{fig:fifo} can be now be simplified as
 follows: 
 
-\begin{example}
+\begin{scala}
   class FifoIO[T <: Data]()(gen: => T) extends Bundle()  {
     val enq = new ioDecoupled()( gen ).flip()
     val deq = new ioDecoupled()( gen )
   }
-\end{example}
+\end{scala}
 
 
 \section{Acknowlegements}
