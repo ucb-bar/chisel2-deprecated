@@ -368,21 +368,6 @@ abstract class Node extends nameable{
       }
     }
   }
-  def findAssignNode(depth: Int = 5): Node = {
-    if (depth < 1) return null;
-    this match {
-      case assign: Assign[_] => {
-        // println("[info] Found Assign Node at depth "+depth);
-        return assign;
-      }
-      case any =>
-    }
-    if (inputs.length > 0) {
-      val in = inputs(0);
-      if (!(in == null)) return in.findAssignNode(depth-1);
-    }
-    null;
-  }
 
   def traceNode(c: Component, stack: Stack[() => Any]): Any = {
     if(this.isCellIO) println("found")

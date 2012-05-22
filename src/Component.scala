@@ -1205,7 +1205,6 @@ abstract class Component(resetSignal: Bool = null) {
         case r: Reg  => r.genMuxes(r);
         case m: Mem[_] => m.genMuxes(m);
         case mr: MemRef[_] =>
-        case a: Assign[_] =>
         case e: Extract =>
         case v: VecProc =>
       }
