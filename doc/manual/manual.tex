@@ -231,7 +231,7 @@ In Chisel, a raw collection of bits is represented by the \code{Bits} type defin
 
 \begin{lstlisting}
 object Bits {
-  def apply(width: Int = -1): Bits;
+  def apply(width: Int = -1, dir: PortDir = null): Bits;
   // create literal
   def apply(value: BigInt, width: Int = -1): Bits;
 }
@@ -260,38 +260,31 @@ object Cat {
 
 \noindent
 with methods for simple bit operations.  
-Bits with a value argument produces a \code{Lit} as shown in Figure~\ref{fig:bits-1}.
+Bits with a value argument produces a \code{Lit} as shown in the
+leftmost subfigure of Figure~\ref{fig:bits-expressions}.
 N.B., that \code{\#\#} is binary
 concatenation, \code{Cat} is an nary concatentation,
 and in order to not collide with Scala's builtin \code{==},
 Chisel's bitwise comparison is named \code{===}.
 
 Operations produce an actual operator node and a type node combining the input type nodes.
-See Figures~\ref{fig:bits-1}, \ref{fig:bits-and}, \ref{fig:bits-or-and} for
+See Figure~\ref{fig:bits-expressions} for
 successively more complicated examples.
 
-\begin{figure}[h]
-\centering
-\includegraphics[height=1in]{figs/bits-1.pdf}
-\caption{Chisel graph representing {\tt\footnotesize Bits(1)}.}
-\label{fig:bits-1}
-\end{figure}
-
-\begin{figure}[h]
-\centering
-\includegraphics[height=1.5in]{figs/bits-and.pdf}
-\caption{Chisel graph representing {\tt\footnotesize Bits(1)\&Bits(2)}.}
-\label{fig:bits-and}
-\end{figure}
-
-\begin{figure}[h]
-\centering
-\includegraphics[height=2.5in]{figs/bits-or-and.pdf}
-\caption{Chisel graph representing 
-  {\tt\footnotesize (Bits(1)\&Bits(2))|Bits(3)} augmenting the graph
-  shown in Figure~\ref{fig:bits-and}.}
-\label{fig:bits-or-and}
-\end{figure}
+\begin{figure*}
+\begin{center}
+\begin{tabular}{ccc}
+\includegraphics[height=0.78in]{figs/bits-1.pdf} &
+\includegraphics[height=1.63in]{figs/bits-and.pdf} &
+\includegraphics[height=2.5in]{figs/bits-or-and.pdf} \\
+\kode{Bits(1)} & \kode{Bits(1)\&Bits(2)} &
+\kode{Bits(1)\&Bits(2))|Bits(3)} \\
+\end{tabular}
+\end{center}
+\caption{Chisel Op/Lit graphs constructed with algebraic expressions
+  showing the insertion of type nodes.}
+\label{fig:bits-expressions}
+\end{figure*}
 
 \noindent
 The \code{getRawNode} operator will skip type nodes and return the first
@@ -303,7 +296,7 @@ Boolean values are represented as \code{Bool}s:
 
 \begin{lstlisting}
 object Bool {
-  def apply():Bool;
+  def apply(dir: PortDir = null):Bool;
   def apply(value: Boolean): Bool;
 }
 
@@ -332,14 +325,14 @@ types \code{Fix} and \code{UFix} respectively:
 
 \begin{lstlisting}
 object Fix {
-  def apply(width: Int = -1):Fix;
+  def apply(width: Int = -1, dir: PortDir = null): Fix;
   def apply(value: BigInt, width: Int = -1): Fix;
 }
 
 class Fix extends Num; 
 
 object UFix {
-  def apply(width: Int = -1):UFix;
+  def apply(width: Int = -1, dir: PortDir = null): UFix;
   def apply(value: BigInt, width: Int = -1): UFix;
 }
 
@@ -375,7 +368,12 @@ class MyFloat extends Bundle {
   val exponent    = Bits(width = 8);
   val significand = Bits(width = 23);
 }
+\end{lstlisting}
 
+\noindent
+and access their elements using Scala field access:
+
+\begin{lstlisting}
 val x  = new MyFloat()
 val xs = x.sign
 \end{lstlisting}
@@ -398,8 +396,8 @@ class Vec[T <: Data](n: Int, val gen: () => T)
 
 \noindent
 with \code{n} elements of type defined with the \code{gen} thunk.
-Users can then either dynamically (using a \code{UFix}) or statically (using
-an \code{Int} accessed the elements,
+Users can access elements statically with an \code{Int} index or
+dynamically using a \code{UFix} index, 
 where dynamic access creates a virtual type node (representing a read
 ``port'') that records the read using the given address.  In either case,
 users can wire to the result of a read as follows:
@@ -520,23 +518,6 @@ object is {
 }
 \end{lstlisting}
 
-\section{Ports}
-\label{sec:ports}
-
-Ports are \code{Data} derived nodes used as interfaces to hardware
-components.   A port is a directional version of a primitive
-\code{Data} object.  Port directions are defined as follows:
-
-\begin{lstlisting}
-trait PortDir;
-object INPUT  extends PortDir;
-object OUTPUT extends PortDir;
-\end{lstlisting}
-
-\noindent
-Aggregate ports can be recursively constructed using either a vec or
-bundle with instances of \code{Port}s as leaves.  
-
 \section{Regs}
 
 The simplest form of state element supported by Chisel is a
@@ -607,6 +588,23 @@ when (en) {
 \end{lstlisting}
 
 % TODO: rules for determining number of ports
+
+\section{Ports}
+\label{sec:ports}
+
+Ports are \code{Data} derived nodes used as interfaces to hardware
+components.   A port is a directional version of a primitive
+\code{Data} object.  Port directions are defined as follows:
+
+\begin{lstlisting}
+trait PortDir;
+object INPUT  extends PortDir;
+object OUTPUT extends PortDir;
+\end{lstlisting}
+
+\noindent
+Aggregate ports can be recursively constructed using either a vec or
+bundle with instances of \code{Port}s as leaves.  
 
 \section{Components}
 
