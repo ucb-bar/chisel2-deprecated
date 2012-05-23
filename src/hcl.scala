@@ -163,10 +163,10 @@ object chiselMain {
   }
 }
 
-object ChiselMainTest {
+object chiselMainTest {
   def apply[T <: Component]
       (args: Array[String], gen: () => T)(scanner: T => TestIO, printer: T => TestIO): T = 
-    ChiselMain(args, gen, scanner, printer);
+    chiselMain(args, gen, scanner, printer);
 }
 
 
