@@ -139,39 +139,6 @@ object chiselMain {
   }
 }
 
-
-abstract class Data extends Node with Cloneable{
-  var comp: proc = null;
-  def toFix(): Fix = chiselCast(this){Fix()};
-  def toUFix(): UFix = chiselCast(this){UFix()};
-  def toBits(): Bits = chiselCast(this){Bits()};
-  def toBool(): Bool = chiselCast(this){Bool()};
-  def setIsTypeNode = isTypeNode = true;
-  def apply(name: String): Data = null
-  def flatten = Array[(String, Bits)]();
-  def terminate(): Unit = { }
-  def flip(): this.type = this;
-  def asInput(): this.type = this;
-  def asOutput(): this.type = this;
-  def toNode: Node = this;
-  def fromNode(n: Node): this.type = this;
-  def :=[T <: Data](data: T) = {
-    if(this.getClass != data.getClass) println("Mismatched types: " + this.getClass + " " + data.getClass);
-    comp procAssign data.toNode;
-  }
-  override def clone(): this.type = {
-    val res = this.getClass.newInstance.asInstanceOf[this.type];
-    res
-  }
-  override def name_it(path: String, setNamed: Boolean = false) = {
-    if (isTypeNode && comp != null) 
-      comp.name_it(path, setNamed)
-    else
-      super.name_it(path, setNamed);
-  }
-  def setWidth(w: Int) = this.width = w;
-}
-
 trait proc extends Node {
   var isDefaultNeeded = true;
   var updates = new Queue[(Bool, Node)];
@@ -232,9 +199,6 @@ trait nameable {
   var named = false;
 }
 
-object nullADT extends Data;
-
-
 abstract class BlackBox extends Component {
   parent.blackboxes += this;
   var moduleNameSet = false;
@@ -258,29 +222,6 @@ abstract class BlackBox extends Component {
 
 class Delay extends Node {
   override def isReg = true;
-}
-
-
-
-
-object MuxLookup {
-  def apply[S <: Bits, T <: Data] (key: S, default: T, mapping: Seq[(S, T)]): T = {
-    var res = default;
-    for ((k, v) <- mapping.reverse)
-      res = Mux(key === k, v, res);
-    res
-  }
-
-}
-
-object MuxCase {
-  def apply[T <: Data] (default: T, mapping: Seq[(Bool, T)]): T = {
-    var res = default;
-    for ((t, v) <- mapping.reverse){
-      res = Mux(t, v, res);
-    }
-    res
-  }
 }
 
 object Log2 {

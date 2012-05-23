@@ -5,6 +5,26 @@ import Node._;
 import Component._;
 import scala.math._
 
+object MuxLookup {
+  def apply[S <: Bits, T <: Data] (key: S, default: T, mapping: Seq[(S, T)]): T = {
+    var res = default;
+    for ((k, v) <- mapping.reverse)
+      res = Mux(key === k, v, res);
+    res
+  }
+
+}
+
+object MuxCase {
+  def apply[T <: Data] (default: T, mapping: Seq[(Bool, T)]): T = {
+    var res = default;
+    for ((t, v) <- mapping.reverse){
+      res = Mux(t, v, res);
+    }
+    res
+  }
+}
+
 object Multiplex{
   def apply (t: Node, c: Node, a: Node): Node = {
     if (isFolding) {
