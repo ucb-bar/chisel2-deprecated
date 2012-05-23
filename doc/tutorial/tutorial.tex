@@ -462,9 +462,9 @@ def clb(a: Bits, b: Bits, c: Bits, d: Bits) =
 where \code{clb} is the function which takes \code{a}, \code{b},
 \code{c}, \code{d} as arguments and returns a wire to the output of a
 boolean circuit.  The \code{def} keyword is part of Scala and
-introduces a function definition.  The type of each argument is given
-after the semicolon, and the type the function returns is given after
-the semicolon that follows the argument list.  The equals (\code{=})
+introduces a function definition, with each argument followed by a colon then its type,
+and the function return type given after the colon following the
+argument list.  The equals (\code{=})
 sign separates the function argument list from the function
 definition.
 
@@ -1405,7 +1405,7 @@ Bulk connections connect leaf ports of the same name to each other.
 After all connections are made and the circuit is being elaborated,
 Chisel warns users if ports have other than exactly one connection to them.
 
-\subsection{Port Views}
+\subsection{Interface Views}
 
 \begin{figure}
 \centerline{\includegraphics[width=3in]{cpu.png}}
@@ -1415,44 +1415,60 @@ Chisel warns users if ports have other than exactly one connection to them.
 
 Consider a simple CPU consisting of control path and data path subcomponents and host and memory interfaces shown in Figure~\ref{fig:cpu}.
 In this CPU we can see that the control path and data path each connect only to a part of the instruction and data memory interfaces. 
-Chisel allows users to do this with interface views without breaking an interface into unnatural subinterfaces.
-A user first defines the natural interface to say a ROM as follows:
-% Sometimes hierarchical and delegational subinterfaces are awkward to use.
+Chisel allows users to do this with partial fulfillment of interfaces.
+A user first defines the complete interface to say a ROM as follows:
 
 \begin{scala}
-class RomIo(view: List[String] = null) extends Bundle(view) {
+class RomIo extends Bundle {
   val isVal = Bool(dir = INPUT)
   val raddr = UFix(width = 32, dir = INPUT)
   val rdata = Bits(width = 32, dir = OUTPUT)
 }
-\end{scala}
 
-\noindent
-where \verb+view+ is provided as a constructor parameter that is relayed to the bundle superclass allowing views of \verb+RomIo+ to be constructed.
-From there, multiple ROM view constructors on the ROM interface can be constructed:
-
-\begin{scala}
-object RomIo {
-  def RomCtlIo() = new RomIo(List("isVal"))
-  def RomDatIo() = new RomIo(List("raddr", "rdata"))
+class RamIo extends RomIo {
+  val isWr  = Bool(Dir = INPUT)
+  val wdata = Bits(width = 32, dir = INPUT)
 }
 \end{scala}
 
-\noindent
-for the control and data subsets of the interface.  
-Views are specified by listing out the names of the interface fields that are to be included.  
-Now the control path can build an interface in terms of memory views of their control lines:
+Now the control path can build an interface in terms of these interfaces:
 
 \begin{scala}
 class CpathIo extends Bundle {
-  val imem = RomCtlIo().flip()
-  val dmem = RamCtlIo().flip()
+  val imem = RomIo().flip()
+  val dmem = RamIo().flip()
   ...
 }
 \end{scala}
 
 \noindent
-We can now wire up the CPU using bulk connects of the bundle views as we would with other bundles:
+and the control path component can be built by partially assigning to
+this interfaces as follows:
+
+\begin{scala}
+class Cpath extends Component {
+  val io = new CpathIo();
+  ...
+  io.imem.isVal := ...;
+  io.dmem.isVal := ...;
+  io.dmem.isWr  := ...;
+  ...
+}
+\end{scala}
+
+\begin{scala}
+class Dpath extends Component {
+  val io = new DpathIo();
+  ...
+  io.imem.raddr := ...;
+  io.dmem.raddr := ...;
+  io.dmem.wdata := ...;
+  ...
+}
+\end{scala}
+
+\noindent
+We can now wire up the CPU using bulk connects of as we would with other bundles:
 
 \begin{scala}
 class Cpu extends Component {
@@ -1468,6 +1484,10 @@ class Cpu extends Component {
   d.io.host <> io.host
 }
 \end{scala}
+
+\noindent
+where repeated bulk connections of partially assigned interfaces
+completely connects up destination interface.
 
 % A Bool can be automatically treated as a single bit UFix (with values
 % 0 or 1), but an Int or UFix cannot be used as a Bool without an
@@ -1776,7 +1796,8 @@ This template can then be used to add a handshaking protocol to any
 set of signals:
 
 \begin{scala}
-  class decoupledDemo extends ioDecoupled()( new DataBundle )
+  class decoupledDemo 
+    extends ioDecoupled()( new DataBundle )
 \end{scala}
 
 \noindent

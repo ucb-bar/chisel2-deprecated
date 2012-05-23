@@ -241,24 +241,52 @@ object Bits {
 }
 
 class Bits extends Data with Updateable {
-  def unary_-(): Bits
+  // bitwise-not
   def unary_~(): Bits
+  // bitwise-and
   def &  (b: Bits): Bits
+  // bitwise-or
   def |  (b: Bits): Bits
+  // bitwise-xor
   def ^  (b: Bits): Bits
+  // and-reduction
   def andR(): Bool
+  // or-reduction
   def orR():  Bool
+  // xor-reduction
+  def xorR():  Bool
+  // logical NOT
+  def unary_!(): Bool
+  // logical AND
   def && (b: Bool): Bool
+  // logical OR
   def || (b: Bool): Bool
+  // equality
   def ===(b: Bits): Bool
+  // inequality
   def != (b: Bits): Bool
+  // logical left shift
   def << (b: UFix): Bits
+  // logical right shift
   def >> (b: UFix): Bits
+  // concatenate
   def ## (b: Bits): Bits
+  // extract single bit, LSB is 0
+  def apply(x: Int): Bits
+  // extract bit field from end to start bit pos
+  def apply(hi: Int, lo: Int): Bits
 }
 
 object Cat {
   def apply[T <: Data](elt: T, elts: T*): Bits
+}
+
+object Fill {
+  def apply(n: Int, field: Bits): Bits
+}
+
+object Mux {
+  def apply[T <: Data](sel: Bits, cons: T, alt: T): T
 }
 \end{scala}
 
@@ -316,7 +344,8 @@ object Bool {
   def apply(value: Boolean): Bool
 }
 
-class Bool extends Bits
+class Bool extends Bits {
+}
 \end{scala}
 
 \subsection{Nums}
@@ -325,12 +354,25 @@ class Bool extends Bits
 
 \begin{scala}
 class Num extends Bits {
+  // Negation
+  def unary_-(): Bits
+  // Addition
   def +(b: Num): Num
-  def *(b: Num): Num
+  // Subtraction
   def -(b: Num): Num
+  // Multiplication
+  def *(b: Num): Num
+  // Modulus
+  def %(b: Num): Num
+  // Division
+  def /(b: Num): Num
+  // Greater than
   def >(b: Num): Bool
+  // Less than
   def <(b: Num): Bool
+  // Less than or equal
   def <=(b: Num): Bool
+  // Greater than or equal
   def >=(b: Num): Bool
 }
 \end{scala}
@@ -358,7 +400,10 @@ object UFix {
   def apply(value: String, width: Int = -1): UFix
 }
 
-class UFix extends Num 
+class UFix extends Num {
+  // arithmetic right shift
+  override def >> (b: UFix): Fix
+}
 \end{scala}
 
 \noindent
@@ -1183,10 +1228,14 @@ Pipes
 % 
 % % \note{Who else?}
 % 
-% \begin{thebibliography}{50}
+\begin{thebibliography}{50}
+\bibitem{chisel-dac12} Bachrach, J., Vo, H., Richards, B., Lee, Y., Waterman,
+  A., Avi\v{z}ienis, Wawrzynek, J., Asanovi\'{c} \textsl{Chisel:
+    Constructing Hardware in a Scala Embedded Language}.
+in DAC '12.
 % \bibitem{gel} Bachrach, J., Qumsiyeh, D., Tobenkin, M. \textsl{Hardware Scripting in Gel}.
 % in Field-Programmable Custom Computing Machines, 2008. FCCM '08. 16th.
-% \end{thebibliography}
-% 
+\end{thebibliography}
+ 
 
 \end{document}
