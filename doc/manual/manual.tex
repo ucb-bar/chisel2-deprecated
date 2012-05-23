@@ -125,12 +125,12 @@ Raw literals are represented as \code{Lit} nodes defined as follows:
 
 \begin{scala}
 class Lit extends Node {
+  // original value
   val inputVal: BigInt
 }
 \end{scala}
 
 \noindent
-where \code{inputVal} is the value used to create the literal.  
 Raw literals contain a collection of bits.  
 Users do not create raw lits directly, but instead use type
 constructors defined in Section~\ref{sec:types}.
@@ -280,14 +280,6 @@ class Bits extends Data with Updateable {
 object Cat {
   def apply[T <: Data](elt: T, elts: T*): Bits
 }
-
-object Fill {
-  def apply(n: Int, field: Bits): Bits
-}
-
-object Mux {
-  def apply[T <: Data](sel: Bits, cons: T, alt: T): T
-}
 \end{scala}
 
 \noindent
@@ -296,6 +288,25 @@ N.B., that \code{\#\#} is binary
 concatenation, \code{Cat} is an nary concatentation,
 and in order to not collide with Scala's builtin \code{==},
 Chisel's bitwise comparison is named \code{===}.
+
+A field of width \code{n} can be created from a single bit using \code{Fill}:
+\begin{scala}
+object Fill {
+  def apply(n: Int, field: Bits): Bits
+}
+\end{scala}
+
+\noindent
+and two inputs can be selected using \code{Mux}:
+
+\begin{scala}
+object Mux {
+  def apply[T <: Data]
+    (sel: Bits, cons: T, alt: T): T
+}
+\end{scala}
+
+\noindent
 
 Constant or literal values are expressed using Scala integers or
 strings passed to constructors for the types:
@@ -344,8 +355,7 @@ object Bool {
   def apply(value: Boolean): Bool
 }
 
-class Bool extends Bits {
-}
+class Bool extends Bits
 \end{scala}
 
 \subsection{Nums}
@@ -451,10 +461,10 @@ Vecs create an indexable vector of elements:
 
 \begin{scala}
 object Vec {
-  def apply[T <: Data](n: Int)(gen: => T): Vec[T]
+  def apply[T <: Data](n: Int)(type: => T): Vec[T]
 }
 
-class Vec[T <: Data](n: Int, val gen: () => T) 
+class Vec[T <: Data](n: Int, val type: () => T) 
     extends Data {
   def apply(idx: UFix): T
   def apply(idx: Int): T
@@ -627,7 +637,7 @@ object Reg {
   def apply[T <: Data]
         (data: T, resetVal: T = null): T
   def apply[T <: Data] (resetVal: T): T
-  def apply[T <: Data] ()(gen: => T): T
+  def apply[T <: Data] ()(type: => T): T
 }
  
 class Reg extends Updateable
@@ -650,10 +660,10 @@ read/write memories.
 
 \begin{scala}
 object Mem {
-  def apply[T <: Data](depth: Int)(gen: => T): T
+  def apply[T <: Data](depth: Int)(type: => T): T
 }
 
-class Mem[T <: Data](n: Int, gen: () => T) 
+class Mem[T <: Data](n: Int, type: () => T) 
     extends Updateable {
   def apply(idx: UFix): T
 }
@@ -758,12 +768,6 @@ allowing users to repeatedly bulk connect partially filled interfaces.
 After all connections are made and the circuit is being elaborated,
 Chisel warns users if ports have other than exactly one connection to them.
 
-\begin{scala}
-def <> (x: Node)
-\end{scala}
-
-
-
 % TODO: what is same name -- is it a pathname?
 
 \section{BlackBox}
@@ -799,7 +803,7 @@ the user calls \code{chiselMain} from their main object:
 \begin{scala}
 object chiselMain {
   def apply[T <: Component]
-    (args: Array[String], gen: () => T): T
+    (args: Array[String], comp: () => T): T
 }
 \end{scala}
 
@@ -824,7 +828,7 @@ class Printer extends TestIO
 
 object chiselMainTesting {
   def apply[T <: Component]
-    (args: Array[String], gen: () => T)(
+    (args: Array[String], comp: () => T)(
      scanner: T => TestIO, 
      printer: T => TestIO): T
 }

@@ -841,15 +841,15 @@ class Parity extends Component {
 
 \begin{scala}
 def object Rom {
-  def apply[T <: Data](inits: Seq[T])(gen: => T): Rom
+  def apply[T <: Data](inits: Seq[T])(type: => T): Rom
 }
 
 def object Ram {
-  def apply[T <: Data](n: Int, resetVal: T = null)(gen: => T): Ram
+  def apply[T <: Data](n: Int, resetVal: T = null)(type: => T): Ram
 }
 
 class Ram[T <: Data]
-    (val n: Int, val resetVal: T, val inits: Seq[T], gen: () => T) 
+    (val n: Int, val resetVal: T, val inits: Seq[T], type: () => T) 
       extends Updateable {
   def apply(addr: UFix): T
 }
@@ -1097,9 +1097,9 @@ class ioDecoupled[T <: Data]()(data: => T) extends Bundle {
   val bits  = data.asOutput
 }
 
-class FifoIO[T <: Data]()(gen: => T) extends Bundle  {
-  val enq = new ioDecoupled()( gen ).flip()
-  val deq = new ioDecoupled()( gen )
+class FifoIO[T <: Data]()(type: => T) extends Bundle  {
+  val enq = new ioDecoupled()( type ).flip()
+  val deq = new ioDecoupled()( type )
 }
 \end{scala}
 \end{frame}

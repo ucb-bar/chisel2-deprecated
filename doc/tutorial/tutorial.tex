@@ -1176,7 +1176,7 @@ Users can define read only memories with:
 
 %%  TODO: FIX Rom to take Seq
 \begin{scala}
-Rom(inits: Seq[Data]) (gen: => T)
+Rom(inits: Seq[Data]) (type: => T)
 \end{scala}
 
 \noindent
@@ -1366,7 +1366,7 @@ we utilize the \verb+Vec+ constructor:
 \begin{scala}
 class CrossbarIo(n: Int) extends Bundle {
   val in  = Vec(n){ new PLink().flip() }
-  val sel = UFix(width = (log(n)/log(2)).toInt, dir = INPUT)
+  val sel = UFix(width = log2up(n), dir = INPUT)
   val out = Vec(n){ new PLink() }
 }
 \end{scala}
@@ -1416,7 +1416,7 @@ Chisel warns users if ports have other than exactly one connection to them.
 Consider a simple CPU consisting of control path and data path subcomponents and host and memory interfaces shown in Figure~\ref{fig:cpu}.
 In this CPU we can see that the control path and data path each connect only to a part of the instruction and data memory interfaces. 
 Chisel allows users to do this with partial fulfillment of interfaces.
-A user first defines the complete interface to say a ROM as follows:
+A user first defines the complete interface to a ROM and RAM as follows:
 
 \begin{scala}
 class RomIo extends Bundle {
@@ -1431,6 +1431,7 @@ class RamIo extends RomIo {
 }
 \end{scala}
 
+\noindent
 Now the control path can build an interface in terms of these interfaces:
 
 \begin{scala}
@@ -1442,7 +1443,7 @@ class CpathIo extends Bundle {
 \end{scala}
 
 \noindent
-and the control path component can be built by partially assigning to
+and the control and data path components can be built by partially assigning to
 this interfaces as follows:
 
 \begin{scala}
@@ -1454,9 +1455,7 @@ class Cpath extends Component {
   io.dmem.isWr  := ...;
   ...
 }
-\end{scala}
 
-\begin{scala}
 class Dpath extends Component {
   val io = new DpathIo();
   ...
@@ -1468,7 +1467,7 @@ class Dpath extends Component {
 \end{scala}
 
 \noindent
-We can now wire up the CPU using bulk connects of as we would with other bundles:
+We can now wire up the CPU using bulk connects as we would with other bundles:
 
 \begin{scala}
 class Cpu extends Component {
@@ -1486,8 +1485,8 @@ class Cpu extends Component {
 \end{scala}
 
 \noindent
-where repeated bulk connections of partially assigned interfaces
-completely connects up destination interface.
+Repeated bulk connections of partially assigned control and data path interfaces
+completely connect up the CPU interface.
 
 % A Bool can be automatically treated as a single bit UFix (with values
 % 0 or 1), but an Int or UFix cannot be used as a Bool without an
@@ -1743,18 +1742,18 @@ object FifoDemo {
 
 \begin{figure}[ht]
 \begin{scala}
-class FifoIO[T <: Data]()(gen: => T) extends Bundle {
+class FifoIO[T <: Data]()(type: => T) extends Bundle {
   val enq_val = Bool(INPUT)
   val enq_rdy = Bool(OUTPUT)
   val deq_val = Bool(OUTPUT)
   val deq_rdy = Bool(INPUT)
-  val enq_dat = gen.asInput
-  val deq_dat = gen.asOutput
+  val enq_dat = type.asInput
+  val deq_dat = type.asOutput
 }
 
-class Fifo[T <: Data] (n: Int)(gen: => T) 
+class Fifo[T <: Data] (n: Int)(type: => T) 
     extends Component {
-  val io           = new FifoIO()( gen )
+  val io           = new FifoIO()( type)
   val enq_ptr      = Reg(resetVal = UFix(0, sizeof(n)))
   val deq_ptr      = Reg(resetVal = UFix(0, sizeof(n)))
   val is_full      = Reg(resetVal = Bool(false))
@@ -1805,9 +1804,9 @@ The FIFO interface in Figure~\ref{fig:fifo} can be now be simplified as
 follows: 
 
 \begin{scala}
-  class FifoIO[T <: Data]()(gen: => T) extends Bundle  {
-    val enq = new ioDecoupled()( gen ).flip()
-    val deq = new ioDecoupled()( gen )
+  class FifoIO[T <: Data]()(type: => T) extends Bundle  {
+    val enq = new ioDecoupled()( type ).flip()
+    val deq = new ioDecoupled()( type )
   }
 \end{scala}
 
