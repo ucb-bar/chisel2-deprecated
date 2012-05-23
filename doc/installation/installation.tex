@@ -17,6 +17,12 @@
 \usepackage{epsfig,graphicx}
 \usepackage{palatino}
 \usepackage{fancybox}
+\usepackage{hyperref}
+\usepackage[procnames]{listings}
+
+\input{../style/scala.tex}
+
+\lstset{basicstyle={\footnotesize\ttfamily}}
 
 \newenvironment{commentary}
 { \vspace{-0.1in}
@@ -85,6 +91,37 @@ Hardware In a Scala Embedded Language).  Chisel is a hardware
 construction language embedded in the high-level programming language
 Scala.  
 
+\section{Software}
+
+\subsection{Port}
+
+For MacOSX, install \verb+port+ from:\\
+
+\url{http://www.macports.org/install.php}.
+
+\subsection{Java}
+
+Install a modern Java runtime and compiler.
+For Linux, install packages \verb+openjdk-7-jdk+ and
+\verb+openjdk-7-jre+ using \verb+apt-get install+.
+For MacOSX, install \verb+openjdk6+ using \verb+port install+.
+
+\subsection{SBT}
+
+SBT is the Scala Build Tool and is similar to Maven for Java.  Install
+and setup SBT using instructions from: \\
+
+\url{https://github.com/harrah/xsbt/wiki/Getting-Started-Setup}
+
+\subsection{C++}
+
+Make sure that you have \verb|g++| installed on your system.  On Linux
+install \verb|g++| package.  On MacOSX, install XCode.
+
+\subsection{Git}
+
+Install \verb+git+.
+
 \section{Github}
 
 \begin{itemize}
@@ -108,48 +145,31 @@ chisel/      # install chisel at same level as your project
     installation/
 \end{example}
 
-\section{Software}
+\section{Setting Up Chisel}
 
-\subsection{Java}
-
-Install a modern Java runtime and compiler.
-For Linux, install packages \verb+openjdk-7-jdk+ and
-\verb+openjdk-7-jre+ using \verb+apt-get install+.
-For MacOSX, install \verb+openjdk6+ using \verb+port install+.
-
-\subsection{SBT}
-
-SBT is the Scala Build Tool and is similar to Maven for Java.  Install
-and setup SBT using instructions from:
-
-\begin{verbatim}
-https://github.com/harrah/xsbt/wiki/Getting-Started-Setup
-\end{verbatim}
-
-\subsection{C++}
-
-Make sure that you have \verb|g++| installed on your system.  On Linux
-install \verb|g++| package.  On MacOSX, install XCode.
+\begin{example}
+export CHISEL_EMULATOR_INCLUDE=$CHISEL/csrc
+\end{example}
 
 \section{Getting Started with Tutorial}
 
-To test your configuration as follows:
+Test your configuration as follows:
 
-\begin{verbatim}
+\begin{example}
 cd $CHISEL/tutorial/sbt
 sbt
 project tutorial
 run GCD
-\end{verbatim}
+\end{example}
 
 \noindent
 Then test that C++ was generated correctly as follows:
 
-\begin{verbatim}
+\begin{example}
 cd $CHISEL/tutorial/emulator
 make -f GCD-Makefile
 GCD
-\end{verbatim}
+\end{example}
 
 \section{Creating Your Own Projects}
 
@@ -157,7 +177,7 @@ SBT has a particular directory structure that we adhere to and
 somewhat improve.  Assuming that we have a project named {\em gpu},
 then the following would be the template:
 
-\begin{verbatim}
+\begin{example}
 chisel/           # install chisel at same level as your project
   tutorial/
   src/
@@ -174,13 +194,13 @@ gpu/
   src/ 
     gpu.scala # your source files go here
   emulator/   # your C++ target can go here
-\end{verbatim}
+\end{example}
 
 Alternatively, you can use \verb+chisel/tutorial+ as a template making
 sure to get the symbolic links correct.
 The following is the \verb+build.scala+ template:
 
-\begin{verbatim}
+\begin{scala}
 import sbt._
 import Keys._
 
@@ -202,10 +222,9 @@ object ChiselBuild extends Build {
   lazy val chisel = 
     Project("chisel", file("chisel"), settings = buildSettings)
   lazy val gpu =
-    Project("gpu", file("gpu"), 
-            settings = buildSettings) 
+    Project("gpu", file("gpu"), settings = buildSettings) 
       dependsOn(chisel)
 }
-\end{verbatim}
+\end{scala}
 
 \end{document}
