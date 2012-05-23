@@ -235,9 +235,10 @@ object Bits {
             dir: PortDir = null): Bits
   // create literal
   def apply(value: BigInt, width: Int = -1): Bits
+  def apply(value: String, width: Int = -1): Bits
 }
 
-class Bits extends Data {
+class Bits extends Data with Updateable {
   def unary_-(): Bits
   def unary_~(): Bits
   def &  (b: Bits): Bits
@@ -331,6 +332,7 @@ object Fix {
              dir: PortDir = null): Fix
   // create literal
   def apply (value: BigInt, width: Int = -1): Fix
+  def apply (value: String, width: Int = -1): Fix
 }
 
 class Fix extends Num 
@@ -340,6 +342,7 @@ object UFix {
             dir: PortDir = null): UFix
   // create literal
   def apply(value: BigInt, width: Int = -1): UFix
+  def apply(value: String, width: Int = -1): UFix
 }
 
 class UFix extends Num 
@@ -464,7 +467,7 @@ For example, Data nodes can be used immediately, but their input set later.
 collects accesses and code generates a mux input for the node:
 
 \begin{scala}
-abstract class Updateable extends Node {
+trait Updateable extends Node {
   // conditional reads
   def reads: Queue[(Bool, UFix)]
   // conditional writes
@@ -537,7 +540,7 @@ object Reg {
   def apply[T <: Data] ()(gen: => T): T
 }
  
-class Reg extends Updateable
+class Reg extends Node with Updateable
 \end{scala}
 
 \noindent
@@ -561,7 +564,7 @@ object Mem {
 }
 
 class Mem[T <: Data](n: Int, gen: () => T) 
-    extends Updateable {
+    extends Node with Updateable {
   def apply(idx: UFix): T
 }
 
@@ -975,13 +978,41 @@ the same interface and body are cached and reused.
 \lstset{language=scala}
 
 \begin{scala}
-Lookup
-Enums
-MuxLookup
-MuxCase
-Probe
-Name mangling
+object ListLookup {
+  def apply()
+}
+
+object Lookup {
+  def apply()
+}
+
+object MuxCase {
+  def apply[T <: Data] 
+    (default: T, mapping: Seq[(Bool, T)]): T
+}
+
+object MuxLookup {
+  def apply[S <: Bits, T <: Data] 
+    (key: S, default: T, mapping: Seq[(S, T)]): T
+}
 \end{scala}
+
+\begin{scala}
+Probe
+\end{scala}
+
+\begin{scala}
+Enums
+\end{scala}
+
+\section{Name Mangling}
+
+\begin{itemize}
+\item component prefix
+\item vec element suffixes
+\item naming from fields
+\item bundle field paths
+\end{itemize}
 
 \section{Standard Library}
 
