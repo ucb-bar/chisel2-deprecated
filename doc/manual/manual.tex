@@ -233,8 +233,10 @@ In Chisel, a raw collection of bits is represented by the \code{Bits} type defin
 object Bits {
   def apply(width: Int = -1, 
             dir: PortDir = null): Bits
-  // create literal
+  // create literal from BigInt or Int
   def apply(value: BigInt, width: Int = -1): Bits
+  // create literal from String using 
+  // base_char digit+ string format
   def apply(value: String, width: Int = -1): Bits
 }
 
@@ -262,12 +264,23 @@ object Cat {
 
 \noindent
 with methods for simple bit operations.  
-Bits with a value argument produces a \code{Lit} as shown in the
-leftmost subfigure of Figure~\ref{fig:bits-expressions}.
 N.B., that \code{\#\#} is binary
 concatenation, \code{Cat} is an nary concatentation,
 and in order to not collide with Scala's builtin \code{==},
 Chisel's bitwise comparison is named \code{===}.
+
+Constant or literal values are expressed using Scala integers or
+strings passed to constructors for the types:
+\begin{scala}
+Bits(1)       // decimal 1-bit lit from Scala Int.
+Bits("ha")    // hex 4-bit lit from string.
+Bits("o12")   // octal 4-bit lit from string.
+Bits("b1010") // binary 4-bit lit from string.
+\end{scala}
+
+\noindent
+producing a \code{Lit} as shown in the
+leftmost subfigure of Figure~\ref{fig:bits-expressions}.
 
 Operations produce an actual operator node and a type node combining the input type nodes.
 See Figure~\ref{fig:bits-expressions} for
@@ -467,7 +480,7 @@ For example, Data nodes can be used immediately, but their input set later.
 collects accesses and code generates a mux input for the node:
 
 \begin{scala}
-trait Updateable extends Node {
+abstract class Updateable extends Node {
   // conditional reads
   def reads: Queue[(Bool, UFix)]
   // conditional writes
@@ -527,6 +540,38 @@ object is {
 }
 \end{scala}
 
+\section{Forward Declarations}
+
+Purely combinational circuits cannot have cycles between nodes, and
+Chisel will report an error if such a cycle is detected.  Because they
+do not have cycles, combinational circuits can always be constructed
+in a feed-forward manner, by adding new nodes whose inputs are derived
+from nodes that have already been defined.  Sequential circuits
+naturally have feedback between nodes, and so it is sometimes
+necessary to reference an output wire before the producing node has
+been defined.  Because Scala evaluates program statements
+sequentially, we have allow data nodes to serve as a wire providing
+a declaration of a node that can be used immediately, but whose
+input will be set later.  
+For example, in a simple CPU, we need to define the \verb!pcPlus4!
+and \verb!brTarget! wires so they can be referenced before defined:
+\begin{scala}
+val pcPlus4  = UFix()
+val brTarget = UFix()
+val pcNext   = Mux(io.ctl.pcSel, brTarget, pcPlus4)
+val pcReg    = Reg(data = pcNext, resetVal = UFix(0, 32))
+pcPlus4     := pcReg + UFix(4)
+...
+brTarget    := addOut
+\end{scala}
+
+\noindent
+The wiring operator
+\verb!:=! is used to wire up
+the connection after \verb!pcReg! and \verb!addOut! are defined.
+After all assignments are made and the circuit is being elaborated, 
+it is an error if a forward declaration is unassigned.
+
 \section{Regs}
 
 The simplest form of state element supported by Chisel is a
@@ -540,7 +585,7 @@ object Reg {
   def apply[T <: Data] ()(gen: => T): T
 }
  
-class Reg extends Node with Updateable
+class Reg extends Updateable
 \end{scala}
 
 \noindent
@@ -564,13 +609,12 @@ object Mem {
 }
 
 class Mem[T <: Data](n: Int, gen: () => T) 
-    extends Node with Updateable {
+    extends Updateable {
   def apply(idx: UFix): T
 }
 
 class MemRead[T <: Data]
-      (val mem: Mem, val idx: UFix) 
-    extends Node {
+      (val mem: Mem, val idx: UFix) extends Node {
   override def := (data: T): T
 }
 
@@ -664,12 +708,16 @@ used to connect an output port to its definition.
 The \code{<>} operator bulk connects interfaces of opposite gender between
 sibling components or interfaces of same gender between parent/child components. 
 Bulk connections connect leaf ports of the same name to each other.
+Connections are only made if both ports are non-null,
+allowing users to repeatedly bulk connect partially filled interfaces.
 After all connections are made and the circuit is being elaborated,
 Chisel warns users if ports have other than exactly one connection to them.
 
 \begin{scala}
 def <> (x: Node)
 \end{scala}
+
+
 
 % TODO: what is same name -- is it a pathname?
 
@@ -706,8 +754,7 @@ the user calls \code{chiselMain} from their main object:
 \begin{scala}
 object chiselMain {
   def apply[T <: Component]
-    (args: Array[String], 
-     gen: () => T): T
+    (args: Array[String], gen: () => T): T
 }
 \end{scala}
 
@@ -979,18 +1026,20 @@ the same interface and body are cached and reused.
 
 \begin{scala}
 object ListLookup {
-  def apply()
+  def apply[T <: Data](): List[T]
 }
 
 object Lookup {
   def apply()
 }
 
+// n-way multiplexor
 object MuxCase {
   def apply[T <: Data] 
     (default: T, mapping: Seq[(Bool, T)]): T
 }
 
+// n-way indexed multiplexer:
 object MuxLookup {
   def apply[S <: Bits, T <: Data] 
     (key: S, default: T, mapping: Seq[(S, T)]): T
@@ -1002,7 +1051,12 @@ Probe
 \end{scala}
 
 \begin{scala}
-Enums
+// enumerations 
+object Enum {
+  // create n enum values of given type
+  def apply[T <: Bits]
+    (n: Int)(type: => T): List[T]
+}
 \end{scala}
 
 \section{Name Mangling}
@@ -1022,6 +1076,7 @@ object foldR {
     (x: Seq[T])(f: (T, T) => T): T
 }
 
+// next power of 2
 object log2up {
   def apply(in: Int) = ceil(log(in)/log(2)).toInt
 }
@@ -1031,19 +1086,23 @@ object ispow2 {
     in > 0 && ((in & (in-1)) == 0)
 }
 
+// number of bits on
 object PopCount {
   def apply(in: Bits): Bits
 }
 
+// bit reverse
 object Reverse {
   def apply(in: Bits): Bits
 }
 
+// one hot encoding to int
 object OHToUFix {
   def apply(in: Bits): UFix
   def apply(in: Seq[Bool]): UFix
 }
 
+// int to one hot encoding
 object UFixToOH {
   def apply(in: UFix, width: Int): Bits
 }
@@ -1052,11 +1111,13 @@ object LFSR16 {
   def apply(increment: Bool = Bool(true)): Bits
 }
 
+// n delays of input
 object ShiftRegister {
   def apply [T <: Data](n: Int, in: T): T
 }
 
-object Mux1H {
+// one hot mux lookup
+object MuxOH {
   def apply [T <: Data]
     (sel: Bits, in: Vec[T]): T
   def apply [T <: Data]

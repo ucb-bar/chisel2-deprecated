@@ -1,4 +1,4 @@
-\documentclass[10pt]{article}
+\documentclass[twocolumn, 10pt]{article}
 \setlength\textwidth{6.875in}
 \setlength\textheight{8.875in}
 % set both margins to 2.5 pc
@@ -111,7 +111,9 @@ For MacOSX, install \verb+openjdk6+ using \verb+port install+.
 SBT is the Scala Build Tool and is similar to Maven for Java.  Install
 and setup SBT using instructions from: \\
 
+\begin{scriptsize}
 \url{https://github.com/harrah/xsbt/wiki/Getting-Started-Setup}
+\end{scriptsize}
 
 \subsection{C++}
 
@@ -120,21 +122,20 @@ install \verb|g++| package.  On MacOSX, install XCode.
 
 \subsection{Git}
 
-Install \verb+git+.
+Install \verb+git+ from package.
 
 \section{Github}
 
 \begin{itemize}
 \item Get an account on \verb|www.github.com|
 \item Register your public key on \verb|github.com|
-\item Tell me your github account name
 \item run \verb|git clone git@github.com:ucb-bar/chisel.git|
 \item set \verb+$CHISEL+ to that directory
 \end{itemize}
 
 The following is the Chisel directory structure:
 
-\begin{example}
+\begin{bash}
 chisel/      # install chisel at same level as your project
   tutorial/      
   src/       # chisel source code 
@@ -143,33 +144,35 @@ chisel/      # install chisel at same level as your project
     manual/
     tutorial/
     installation/
-\end{example}
+\end{bash}
 
 \section{Setting Up Chisel}
 
-\begin{example}
-export CHISEL_EMULATOR_INCLUDE=$CHISEL/csrc
-\end{example}
+\begin{bash}
+export CHISEL_EMULATOR_INCLUDE = $CHISEL/csrc
+\end{bash}
 
 \section{Getting Started with Tutorial}
 
 Test your configuration as follows:
 
-\begin{example}
+\begin{bash}
 cd $CHISEL/tutorial/sbt
 sbt
 project tutorial
-run GCD
-\end{example}
+exit
+cd ../emulator
+GCD
+\end{bash}
 
 \noindent
 Then test that C++ was generated correctly as follows:
 
-\begin{example}
+\begin{bash}
 cd $CHISEL/tutorial/emulator
 make -f GCD-Makefile
 GCD
-\end{example}
+\end{bash}
 
 \section{Creating Your Own Projects}
 
@@ -177,7 +180,7 @@ SBT has a particular directory structure that we adhere to and
 somewhat improve.  Assuming that we have a project named {\em gpu},
 then the following would be the template:
 
-\begin{example}
+\begin{bash}
 chisel/           # install chisel at same level as your project
   tutorial/
   src/
@@ -194,7 +197,7 @@ gpu/
   src/ 
     gpu.scala # your source files go here
   emulator/   # your C++ target can go here
-\end{example}
+\end{bash}
 
 Alternatively, you can use \verb+chisel/tutorial+ as a template making
 sure to get the symbolic links correct.
@@ -220,9 +223,11 @@ object ChiselBuild extends Build {
   import BuildSettings._
 
   lazy val chisel = 
-    Project("chisel", file("chisel"), settings = buildSettings)
+    Project("chisel", file("chisel"), 
+            settings = buildSettings)
   lazy val gpu =
-    Project("gpu", file("gpu"), settings = buildSettings) 
+    Project("gpu", file("gpu"), 
+            settings = buildSettings) 
       dependsOn(chisel)
 }
 \end{scala}

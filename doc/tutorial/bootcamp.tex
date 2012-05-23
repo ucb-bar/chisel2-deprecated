@@ -321,8 +321,7 @@ val neq = x = y
 \begin{scala}
 // Logical left shift.
 val twoToTheX = Fix(1) << x   
-// Right shift 
-// (logical on Bits & UFix, arithmetic on Fix).
+// Right shift (logical on Bits & UFix, arithmetic on Fix).
 val hiBits    = x >> UFix(16) 
 \end{scala}
 \end{frame}
@@ -555,7 +554,7 @@ class Mux4 extends Component {
 \end{scala}
 \end{frame}
 
-\begin{frame}[fragile]{Running Scalas}
+\begin{frame}[fragile]{Running Examples}
 \begin{scala}
 object tutorial {
   def main(args: Array[String]) = {
@@ -565,7 +564,7 @@ object tutorial {
 \end{scala}
 \end{frame}
 
-\begin{frame}[fragile, shrink]{Testing Scalas}
+\begin{frame}[fragile, shrink]{Testing Examples}
 
 \begin{scala}
 object tutorial {
@@ -591,7 +590,7 @@ make -f Mux2-makefile
 
 \end{frame}
 
-\begin{frame}[fragile, shrink]{Testing Scalas Continued}
+\begin{frame}[fragile, shrink]{Testing Examples Continued}
 
 test.out
 
@@ -939,7 +938,7 @@ In general, users can organize their interfaces into hierarchies using inheritan
 
 \end{frame}
 
-\begin{frame}[fragile,shrink]{Filter Scala}
+\begin{frame}[fragile,shrink]{Filter Example}
 
 From there we can define a filter interface by nesting two
 \verb+PLink+s into a new \verb+FilterIO+ bundle:
