@@ -1,4 +1,4 @@
-\documentclass[10pt]{article}
+\documentclass[twocolumn,10pt]{article}
 \setlength\textwidth{6.875in}
 \setlength\textheight{8.875in}
 % set both margins to 2.5 pc
@@ -21,7 +21,7 @@
 
 \input{../style/scala.tex}
 
-\lstset{frame=}
+\lstset{frame=, basicstyle={\footnotesize\ttfamily}}
 
 \newenvironment{commentary}
 { \vspace{-0.1in}
@@ -219,23 +219,23 @@ values.  Bundles and Vecs will be covered later.
 Constant or literal values are expressed using Scala integers or
 strings passed to constructors for the types:
 \begin{scala}
-Bits(1)       // decimal 1-bit literal from Scala Int.
-Bits("ha")    // hexadecimal 4-bit literal from string.
-Bits("o12")   // octal 4-bit literal from string.
-Bits("b1010") // binary 4-bit literal from string.
+Bits(1)       // decimal 1-bit lit from Scala Int.
+Bits("ha")    // hexadecimal 4-bit lit from string.
+Bits("o12")   // octal 4-bit lit from string.
+Bits("b1010") // binary 4-bit lit from string.
 
-Fix(5)        // signed decimal 4-bit literal from Scala Int.
-Fix(-8)       // negative decimal 4-bit literal from Scala Int.
-UFix(5)       // unsigned decimal 3-bit literal from Scala Int.
+Fix(5)     // signed decimal 4-bit lit from Scala Int.
+Fix(-8)    // negative decimal 4-bit lit from Scala Int.
+UFix(5)    // unsigned decimal 3-bit lit from Scala Int.
 
-Bool(true)    // Bool literals from Scala literals.
+Bool(true) // Bool lits from Scala lits.
 Bool(false)
 \end{scala}
 
 Underscores can be used as separators in long string literals to aid
 readability, but are ignored when creating the value, e.g.:
 \begin{scala}
-Bits("h_dead_beef")   // 32-bit literal of type Bits
+Bits("h_dead_beef")   // 32-bit lit of type Bits
 \end{scala}
 
 By default, the Chisel compiler will size each constant to the minimum
@@ -243,12 +243,12 @@ number of bits required to hold the constant, including a sign bit for
 signed types.  Bit widths can also be specified explicitly on
 literals, as shown below:
 \begin{scala}
-Bits("ha", 8)     // hexadecimal 8-bit literal of type Bits
-Bits("o12", 6)    // octal 6-bit literal of type Bits
-Bits("b1010", 12) // binary 12-bit literal of type Bits
+Bits("ha", 8)     // hexadecimal 8-bit lit of type Bits
+Bits("o12", 6)    // octal 6-bit lit of type Bits
+Bits("b1010", 12) // binary 12-bit lit of type Bits
 
-Fix(5, 7)         // signed decimal 7-bit literal of type Fix
-UFix(5, 8)        // unsigned decimal 8-bit literal of type UFix
+Fix(5, 7)  // signed decimal 7-bit lit of type Fix
+UFix(5, 8) // unsigned decimal 8-bit lit of type UFix
 \end{scala}
 
 \noindent
@@ -318,8 +318,9 @@ expression.
 
 \section{Builtin Operators}
 
-Chisel defines a set of hardware operators for the builtin types.
-% \begin{table*}[tb]
+Chisel defines a set of hardware operators for the builtin types shown
+in Table~\ref{tbl:chisel-operators}.
+\begin{table*}
 \begin{center}
 \begin{tabular}{|l|l|}
 \hline
@@ -398,9 +399,9 @@ bit position. \\
 \hline
 \end{tabular}
 \end{center}
-%\caption{Chisel operators on builtin data types.}
-%\label{tbl:chisel-operators}
-%\end{table*}
+\caption{Chisel operators on builtin data types.}
+\label{tbl:chisel-operators}
+\end{table*}
 
 \subsection{Bitwidth Inference}
 
@@ -453,7 +454,8 @@ we later reuse multiple times in a design.  For example, we can wrap
 up our earlier example of a simple combinational logic block as
 follows:
 \begin{scala}
-def clb(a: Bits, b: Bits, c: Bits, d: Bits) = (a & b) | (~c & d)
+def clb(a: Bits, b: Bits, c: Bits, d: Bits) = 
+  (a & b) | (~c & d)
 \end{scala}
 
 \noindent
@@ -505,9 +507,9 @@ define their own bundles by defining a class as a subclass of
 \code{Bundle}:
 \begin{scala}
 class MyFloat extends Bundle {
-  val sign        = Bool();
-  val exponent    = Bits(width = 8);
-  val significand = Bits(width = 23);
+  val sign        = Bool()
+  val exponent    = Bits(width = 8)
+  val significand = Bits(width = 23)
 }
 
 val x  = new MyFloat()
@@ -523,9 +525,11 @@ of bits in the type.
 Vecs create an indexable vector of elements, and are constructed as
 follows:
 \begin{scala}
-val myVec = Vec(5) { Fix(width = 23) } // Vector of 5 23-bit signed integers.
+// Vector of 5 23-bit signed integers.
+val myVec = Vec(5) { Fix(width = 23) } 
 
-val reg3  = myVec(3) // Connect to one element of vector.
+// Connect to one element of vector. 
+val reg3  = myVec(3) 
 \end{scala}
 
 \noindent
@@ -543,9 +547,11 @@ Bundles and Vecs can be arbitrarily nested to build complex data
 structures:
 \begin{scala}
 class BigBundle extends Bundle {
- val myVec = Vec(5) { Fix(width = 23) } // Vector of 5 23-bit signed integers.
+ // Vector of 5 23-bit signed integers.
+ val myVec = Vec(5) { Fix(width = 23) } 
  val flag  = Bool()
- val f     = new MyFloat()              // Previously defined bundle.
+ // Previously defined bundle.
+ val f     = new MyFloat()              
 }
 \end{scala}
 
@@ -598,16 +604,16 @@ the data object to the requested direction.
 By folding directions into the object declarations, Chisel is able to
 provide powerful wiring constructs described later.
 %% \begin{scala}
-%% class MuxBundle extends Bundle() {
-%%   val sel = Bits(1, INPUT);
-%%   val in0 = Bits(1, INPUT);
-%%   val in1 = Bits(1, INPUT);
-%%   val out = Bits(1, OUTPUT);
-%% };
+%% class MuxBundle extends Bundle {
+%%   val sel = Bits(1, INPUT)
+%%   val in0 = Bits(1, INPUT)
+%%   val in1 = Bits(1, INPUT)
+%%   val out = Bits(1, OUTPUT)
+%% }
 
 %% class Mux2 extends Component {
-%%   val io = new MuxBundle();
-%%   io.out := (io.sel & io.in1) | (~io.sel & io.in0);
+%%   val io = new MuxBundle()
+%%   io.out := (io.sel & io.in1) | (~io.sel & io.in0)
 %% }
 %% \end{scala}
 
@@ -634,12 +640,12 @@ component:
 \begin{scala}
 class Mux2 extends Component {
   val io = new Bundle{
-    val sel = Bits(width = 1, dir = INPUT);
-    val in0 = Bits(width = 1, dir = INPUT);
-    val in1 = Bits(width = 1, dir = INPUT);
-    val out = Bits(width = 1, dir = OUTPUT);
-  };
-  io.out := (io.sel & io.in1) | (~io.sel & io.in0);
+    val sel = Bits(width = 1, dir = INPUT)
+    val in0 = Bits(width = 1, dir = INPUT)
+    val in1 = Bits(width = 1, dir = INPUT)
+    val out = Bits(width = 1, dir = OUTPUT)
+  }
+  io.out := (io.sel & io.in1) | (~io.sel & io.in0)
 }
 \end{scala}
 
@@ -663,23 +669,26 @@ together three 2-input multiplexers:
 \begin{scala}
 class Mux4 extends Component {
   val io = new Bundle {
-    val in0 = Bits(width = 1, dir = INPUT);
-    val in1 = Bits(width = 1, dir = INPUT);
-    val in2 = Bits(width = 1, dir = INPUT);
-    val in3 = Bits(width = 1, dir = INPUT);
-    val sel = Bits(width = 2, dir = INPUT);
-    val out = Bits(width = 1, dir = OUTPUT);
+    val in0 = Bits(width = 1, dir = INPUT)
+    val in1 = Bits(width = 1, dir = INPUT)
+    val in2 = Bits(width = 1, dir = INPUT)
+    val in3 = Bits(width = 1, dir = INPUT)
+    val sel = Bits(width = 2, dir = INPUT)
+    val out = Bits(width = 1, dir = OUTPUT)
   }
-  val m0 = new Mux2();
-  m0.io.sel := io.sel(0); m0.io.in0 := io.in0; m0.io.in1 := io.in1;
+  val m0 = new Mux2()
+  m0.io.sel := io.sel(0) 
+  m0.io.in0 := io.in0; m0.io.in1 := io.in1
 
-  val m1 = new Mux2();
-  m1.io.sel := io.sel(0); m1.io.in0 := io.in2; m1.io.in1 := io.in3;
+  val m1 = new Mux2()
+  m1.io.sel := io.sel(0) 
+  m1.io.in0 := io.in2; m1.io.in1 := io.in3
 
-  val m3 = new Mux2();
-  m3.io.sel := io.sel(1); m3.io.in0 := m0.io.out; m3.io.in1 := m1.io.out;
+  val m3 = new Mux2()
+  m3.io.sel := io.sel(1) 
+  m3.io.in0 := m0.io.out; m3.io.in1 := m1.io.out
 
-  io.out := m3.io.out;
+  io.out := m3.io.out
 }
 \end{scala}
 
@@ -697,7 +706,7 @@ Now that we have defined components, we will discuss how we actually run and tes
 \begin{scala}
 object tutorial {
   def main(args: Array[String]) = {
-    chiselMain(args, () => new Mux2());
+    chiselMain(args, () => new Mux2())
   }
 }
 \end{scala}
@@ -710,8 +719,10 @@ object tutorial {
   def main(args: Array[String]) = {
     chiselMainTest(args ++ Array("--gen-harness"), 
                    () => new Mux2())(
-      c => Scanner("%x %x %x", c.io.sel, c.io.in0, c.io.in1),
-      c => Printer("%= %= %= %=", c.io.sel, c.io.in0, c.io.in1, c.io.out));
+      c => Scanner("%x %x %x", 
+                   c.io.sel, c.io.in0, c.io.in1),
+      c => Printer("%= %= %= %=", 
+                   c.io.sel, c.io.in0, c.io.in1, c.io.out))
   }
 }
 \end{scala}
@@ -796,8 +807,8 @@ def wraparound(n: UFix, max: UFix) =
   Mux(n > max, UFix(0), n)
 
 def counter(max: UFix) = {
-  val x = Reg(resetVal = UFix(0, max.getWidth));
-  x := wraparound(x + UFix(1), max);
+  val x = Reg(resetVal = UFix(0, max.getWidth))
+  x := wraparound(x + UFix(1), max)
   x
 }
 \end{scala}
@@ -827,13 +838,13 @@ toggling between true and false on each pulse:
 \begin{scala}
 // Flip internal state when input true.
 def toggle(p: Bool) = {
-  val x = Reg(resetVal = Bool(false));
+  val x = Reg(resetVal = Bool(false))
   x := Mux(p, !x, x)
   x
 }
 
 // Square wave where each half cycle has given period.
-def squareWave(period: UFix) = toggle(pulse(period));
+def squareWave(period: UFix) = toggle(pulse(period))
 \end{scala}
 
 \subsection{Forward Declarations}
@@ -852,13 +863,13 @@ input will be set later.
 For example, in a simple CPU, we need to define the \verb!pcPlus4!
 and \verb!branchTarget! wires so they can be referenced before defined:
 \begin{scala}
-val pcPlus4      = UFix();
-val branchTarget = UFix();
-val pcNext       = Mux(io.ctl.pcSel, branchTarget, pcPlus4);
-val pcReg        = Reg(data = pcNext, resetVal = UFix(0, 32));
-pcPlus4         := pcReg + UFix(4);
+val pcPlus4  = UFix()
+val brTarget = UFix()
+val pcNext   = Mux(io.ctl.pcSel, brTarget, pcPlus4)
+val pcReg    = Reg(data = pcNext, resetVal = UFix(0, 32))
+pcPlus4     := pcReg + UFix(4)
 ...
-branchTarget    := addOut;
+brTarget    := addOut
 \end{scala}
 
 \noindent
@@ -876,9 +887,9 @@ several separate statements.  Chisel provides conditional update rules
 in the form of the \code{when} construct to support this style of
 sequential logic description. For example,
 \begin{scala}
-val r = Reg() { UFix(16) };
+val r = Reg() { UFix(16) }
 when (c === UFix(0) ) {
-  r := r + UFix(1);
+  r := r + UFix(1)
 }
 \end{scala}
 
@@ -916,7 +927,7 @@ c1 & c2  &  r & \\
 
 \begin{figure}[h]
 \centering
-\includegraphics[height=3in]{figs/condupdates.pdf}
+\includegraphics[width=3in]{figs/condupdates.pdf}
 \caption{Equivalent hardware constructed for conditional updates.
   Each \code{when} statement adds another level of data mux and ORs
   the predicate into the enable chain.  The compiler effectively adds
@@ -962,7 +973,7 @@ different overlapping subsets of registers present in different update
 blocks.  Each register is only affected by conditions in which it
 appears.  For example:
 \begin{scala}
-r := Fix(3); s := Fix(3);
+r := Fix(3); s := Fix(3)
 when (c1)   { r := Fix(1); s := Fix(1) }
 when (c2)   { r := Fix(2) }
 \end{scala}
@@ -973,7 +984,7 @@ following truth table:
 \begin{scala}
 c1 c2  r  s
 0   0  3  3
-0   1  2  3 // r updated in c2 block, s updated in otherwise block.
+0   1  2  3 // r updated in c2 block, s at top level.
 1   0  1  1
 1   1  2  1
 \end{scala}
@@ -1018,16 +1029,16 @@ We introduce the \code{switch} statement for conditional updates
 involving a series of comparisons against a common key.  For example,
 \begin{scala}
 switch(idx) {
- is(v1) { u1 };
- is(v2) { u2 };
+ is(v1) { u1 }
+ is(v2) { u2 }
 }
 \end{scala}
 
 \noindent
 is equivalent to:
 \begin{scala}
-when (idx === v1) { u1 };
-.elsewhen (idx === v2) { u2 };
+when (idx === v1) { u1 }
+.elsewhen (idx === v2) { u2 }
 \end{scala}
 
 Chisel also allows a \code{Wire}, i.e., the output of some
@@ -1057,29 +1068,29 @@ generator:
 % \begin{scala}
 % class Parity extends Component {
 %   val io = new Bundle {
-%     val in  = Bool(INPUT);
-%     val out = Bool(OUTPUT); }
-%   val s_even :: s_odd :: Nil = Enum(2){ UFix() };
-%   val state  = Reg(resetVal = s_even);
+%     val in  = Bool(INPUT)
+%     val out = Bool(OUTPUT) }
+%   val s_even :: s_odd :: Nil = Enum(2){ UFix() }
+%   val state  = Reg(resetVal = s_even)
 %   switch(state, Array(
 %     (s_even, () => { when (io.in) { state := s_odd } }),
-%     (s_odd,  () => { when (io.in) { state := s_even } }) ));
-%   io.out := state === s_odd;
+%     (s_odd,  () => { when (io.in) { state := s_even } }) ))
+%   io.out := state === s_odd
 % }
 % \end{scala}
 
 \begin{scala}
 class Parity extends Component {
   val io = new Bundle {
-    val in  = Bool(dir = INPUT);
-    val out = Bool(dir = OUTPUT); }
-  val s_even :: s_odd :: Nil = Enum(2){ UFix() };
-  val state  = Reg(resetVal = s_even);
+    val in  = Bool(dir = INPUT)
+    val out = Bool(dir = OUTPUT) }
+  val s_even :: s_odd :: Nil = Enum(2){ UFix() }
+  val state  = Reg(resetVal = s_even)
   when (s.in) {
-    when (state === s_even) { state := s_odd  };
-    when (state === s_odd)  { state := s_even };
+    when (state === s_even) { state := s_odd  }
+    when (state === s_odd)  { state := s_even }
   }
-  io.out := (state === s_odd);
+  io.out := (state === s_odd)
 }
 \end{scala}
 
@@ -1094,31 +1105,32 @@ accepting money for a vending machine:
 \begin{scala}
 class VendingMachine extends Component {
   val io = new Bundle {
-    val nickel = Bool(dir = INPUT);
-    val dime   = Bool(dir = INPUT);
-    val rdy    = Bool(dir = OUTPUT); }
-  val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = Enum(5){ UFix() };
-  val state = Reg(resetVal = s_idle);
+    val nickel = Bool(dir = INPUT)
+    val dime   = Bool(dir = INPUT)
+    val rdy    = Bool(dir = OUTPUT) }
+  val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = 
+    Enum(5){ UFix() }
+  val state = Reg(resetVal = s_idle)
   when (state === s_idle) {
-    when (io.nickel) { state := s_5; }
-    when (io.dime)   { state := s_10; }
+    when (io.nickel) { state := s_5 }
+    when (io.dime)   { state := s_10 }
   }
   when (state === s_5) {
-    when (io.nickel) { state := s_10; }
-    when (io.dime)   { state := s_15; }
+    when (io.nickel) { state := s_10 }
+    when (io.dime)   { state := s_15 }
   }
   when (state === s_10) {
-    when (io.nickel) { state := s_15; }
-    when (io.dime)   { state := s_ok; }
+    when (io.nickel) { state := s_15 }
+    when (io.dime)   { state := s_ok }
   }
   when (state === s_15) {
-    when (io.nickel) { state := s_ok; }
-    when (io.dime)   { state := s_ok; }
+    when (io.nickel) { state := s_ok }
+    when (io.dime)   { state := s_ok }
   }
   when (state === s_ok) {
-    state := s_idle;
+    state := s_idle
   }
-  io.rdy := (state === s_ok);
+  io.rdy := (state === s_ok)
 }
 \end{scala}
 
@@ -1127,29 +1139,29 @@ Here is the vending machine FSM defined with \code{switch} statement:
 \begin{scala}
 class VendingMachine extends Component {
   val io = new Bundle {
-    val nickel = Bool(dir = INPUT);
-    val dime   = Bool(dir = INPUT);
-    val rdy    = Bool(dir = OUTPUT); }
-  val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = Enum(5){ UFIx() };
-  val state = Reg(resetVal = s_idle);
+    val nickel = Bool(dir = INPUT)
+    val dime   = Bool(dir = INPUT)
+    val rdy    = Bool(dir = OUTPUT) }
+  val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = Enum(5){ UFIx() }
+  val state = Reg(resetVal = s_idle)
   switch (state) {
       is (s_idle) {
-      when (io.nickel) { state := s_5; }
-      when (io.dime)   { state := s_10; }
+      when (io.nickel) { state := s_5 }
+      when (io.dime)   { state := s_10 }
     } is (s_5) {
-      when (io.nickel) { state := s_10; }
-      when (io.dime)   { state := s_15; }
+      when (io.nickel) { state := s_10 }
+      when (io.dime)   { state := s_15 }
     } is (s_10) {
-      when (io.nickel) { state := s_15; }
-      when (io.dime)   { state := s_ok; }
+      when (io.nickel) { state := s_15 }
+      when (io.dime)   { state := s_ok }
     } is (s_15) {
-      when (io.nickel) { state := s_ok; }
-      when (io.dime)   { state := s_ok; }
+      when (io.nickel) { state := s_ok }
+      when (io.dime)   { state := s_ok }
     } is (s_ok) {
-      state := s_idle;
+      state := s_idle
     }
   }
-  io.rdy := (state === s_ok);
+  io.rdy := (state === s_ok)
 }
 \end{scala}
 
@@ -1175,8 +1187,9 @@ create a small ROM initialized to \verb+1, 2, 4, 8+ and
 loop through all values using a counter as an address generator as follows:
 
 \begin{scala}
-val m = Rom(Array(UFix(1), UFix(2), UFix(4), UFix(8))){ UFix(width = 32) };
-val r = m.read(counter(UFix(3)));
+val i = Array(UFix(1), UFix(2), UFix(4), UFix(8))
+val m = Rom(i){ UFix(width = 32) }
+val r = m.read(counter(UFix(i.length)))
 \end{scala}
 
 \noindent
@@ -1184,8 +1197,11 @@ We can create an \verb+n+ value sine lookup table using a ROM initialized as fol
 
 \begin{scala}
 def sinTable (amp: Double, n: Int) = {
-  val ts = Range(0, n, 1).map(i => (i*2*Pi)/(n.toDouble-1) – Pi); 
-  Rom(ts.map(t => Fix(round(amp * sin(t))))){ Fix(width = 32) }
+  val times = 
+    Range(0, n, 1).map(i => (i*2*Pi)/(n.toDouble-1) - Pi)
+  val inits = 
+    times.map(t => Fix(round(amp * sin(t))))
+  Rom(inits){ Fix(width = 32) }
 }
 def sinWave (amp: Double, n: Int) = 
   sinTable(amp, n).read(counter(UFix(n))
@@ -1221,7 +1237,7 @@ audio recorder could be defined as follows:
 
 \begin{scala}
   def audioRecorder(n: Int) = { 
-    val addr = counter(UFix(n));
+    val addr = counter(UFix(n))
     val ram = Mem(n).write(button(), addr)
     ram.read(Mux(button(), UFix(0), addr))
   } 
@@ -1253,8 +1269,8 @@ memory ports, after which read, write, or read/write ports are added:
   val regfile =
     Mem(64, readLatency = 1, 
         hexInitFile = "hex_init_values.txt"){ Bits(width = 32) }
-  regfile.write(addr_in, data_in1, wen, w_mask = bit_mask);
-  val read_data = regfile.read(addr_in);
+  regfile.write(addr_in, data_in1, wen, w_mask = bit_mask)
+  val read_data = regfile.read(addr_in)
 \end{scala}
 
 %                 // Default: 0 (Combinational)
@@ -1266,8 +1282,8 @@ memory ports, after which read, write, or read/write ports are added:
 % 
 % \begin{scala}
 % val regfile = Mem(64, io.wen, io.addr_in, io.data_in1, w_mask = io.bit_mask,
-%  readLatency = 1, hexInitFile = "hex_init_values.txt");
-% val read_data = regfile(io.addr_in, io.data_in1, oe = !io.wen, cs = Bool(true));
+%  readLatency = 1, hexInitFile = "hex_init_values.txt")
+% val read_data = regfile(io.addr_in, io.data_in1, oe = !io.wen, cs = Bool(true))
 % \end{scala}
 % 
 By default, this memory will be compiled to Verilog RTL.  To produce a
@@ -1297,8 +1313,8 @@ For example, a user could define a simple link for handshaking data as follows:
 
 \begin{scala}
 class SimpleLink extends Bundle { 
-  val data = Bits(width=16,dir=OUTPUT); 
-  val rdy  = Bool(dir=OUTPUT);
+  val data = Bits(width=16,dir=OUTPUT) 
+  val rdy  = Bool(dir=OUTPUT)
 }
 \end{scala}
 
@@ -1308,7 +1324,7 @@ bundle inheritance:
 
 \begin{scala}
 class PLink extends SimpleLink { 
-  val parity = Bits(width=5,dir=OUTPUT); 
+  val parity = Bits(width=5,dir=OUTPUT) 
 }
 \end{scala}
 
@@ -1320,8 +1336,8 @@ From there we can define a filter interface by nesting two
 
 \begin{scala}
 class FilterIO extends Bundle { 
-  val x = new PLink().flip;
-  val y = new PLink();
+  val x = new PLink().flip
+  val y = new PLink()
 }
 \end{scala}
 
@@ -1333,7 +1349,7 @@ We can now define a filter by defining a filter class extending component:
 
 \begin{scala}
 class Filter extends Component { 
-  val io = new FilterIO();
+  val io = new FilterIO()
   ...
 }
 \end{scala}
@@ -1349,17 +1365,17 @@ we utilize the \verb+Vec+ constructor:
 
 \begin{scala}
 class CrossbarIo(n: Int) extends Bundle {
-  val in  = Vec(n){ new PLink().flip() };
-  val sel = UFix(width = (log(n)/log(2)).toInt, dir = INPUT);
-  val out = Vec(n){ new PLink() };
+  val in  = Vec(n){ new PLink().flip() }
+  val sel = UFix(width = (log(n)/log(2)).toInt, dir = INPUT)
+  val out = Vec(n){ new PLink() }
 }
 \end{scala}
 
 % \begin{scala}
 % class CrossbarIo(n: Int) extends Bundle {
-%   val in  = Vec(n){ Bits(width = w, dir = INPUT) };
-%   val sel = Vec(n){ UFix(width = (log(n)/log(2)).toInt, dir = INPUT) };
-%   val out = Vec(n){ Bits(width = w, dir = OUTPUT) };
+%   val in  = Vec(n){ Bits(width = w, dir = INPUT) }
+%   val sel = Vec(n){ UFix(width = (log(n)/log(2)).toInt, dir = INPUT) }
+%   val out = Vec(n){ Bits(width = w, dir = OUTPUT) }
 % }
 % \end{scala}
 
@@ -1372,13 +1388,13 @@ We can now compose two filters into a filter block as follows:
 
 \begin{scala}
 class Block extends Component { 
-  val io = new FilterIO();
-  val f1 = new Filter();
-  val f2 = new Filter();
+  val io = new FilterIO()
+  val f1 = new Filter()
+  val f2 = new Filter()
 
-  f1.io.x <> io.x;
-  f1.io.y <> f2.io.x;
-  f2.io.y <> io.y;
+  f1.io.x <> io.x
+  f1.io.y <> f2.io.x
+  f2.io.y <> io.y
 }
 \end{scala}
 
@@ -1392,7 +1408,7 @@ Chisel warns users if ports have other than exactly one connection to them.
 \subsection{Port Views}
 
 \begin{figure}
-\centerline{\includegraphics[width=3.5in]{cpu.png}}
+\centerline{\includegraphics[width=3in]{cpu.png}}
 \caption{Simple CPU involving control and data path subcomponents and host and memory interfaces.}
 \label{fig:cpu}
 \end{figure}
@@ -1405,9 +1421,9 @@ A user first defines the natural interface to say a ROM as follows:
 
 \begin{scala}
 class RomIo(view: List[String] = null) extends Bundle(view) {
-  val isVal = Bool(dir = INPUT);
-  val raddr = UFix(width = 32, dir = INPUT);
-  val rdata = Bits(width = 32, dir = OUTPUT);
+  val isVal = Bool(dir = INPUT)
+  val raddr = UFix(width = 32, dir = INPUT)
+  val rdata = Bits(width = 32, dir = OUTPUT)
 }
 \end{scala}
 
@@ -1417,8 +1433,8 @@ From there, multiple ROM view constructors on the ROM interface can be construct
 
 \begin{scala}
 object RomIo {
-  def RomCtlIo() = new RomIo(List("isVal"));
-  def RomDatIo() = new RomIo(List("raddr", "rdata"));
+  def RomCtlIo() = new RomIo(List("isVal"))
+  def RomDatIo() = new RomIo(List("raddr", "rdata"))
 }
 \end{scala}
 
@@ -1428,9 +1444,9 @@ Views are specified by listing out the names of the interface fields that are to
 Now the control path can build an interface in terms of memory views of their control lines:
 
 \begin{scala}
-class CpathIo extends Bundle() {
-  val imem = RomCtlIo().flip();
-  val dmem = RamCtlIo().flip();
+class CpathIo extends Bundle {
+  val imem = RomCtlIo().flip()
+  val dmem = RamCtlIo().flip()
   ...
 }
 \end{scala}
@@ -1440,16 +1456,16 @@ We can now wire up the CPU using bulk connects of the bundle views as we would w
 
 \begin{scala}
 class Cpu extends Component {
-  val io = new CpuIo();
-  val c  = new CtlPath();
-  val d  = new DatPath();
-  c.io.ctl  <> d.io.ctl;
-  c.io.dat  <> d.io.dat;
-  c.io.imem <> io.imem;
-  d.io.imem <> io.imem;
-  c.io.dmem <> io.dmem;
-  d.io.dmem <> io.dmem;
-  d.io.host <> io.host;
+  val io = new CpuIo()
+  val c  = new CtlPath()
+  val d  = new DatPath()
+  c.io.ctl  <> d.io.ctl
+  c.io.dat  <> d.io.dat
+  c.io.imem <> io.imem
+  d.io.imem <> io.imem
+  c.io.dmem <> io.dmem
+  d.io.dmem <> io.dmem
+  d.io.host <> io.host
 }
 \end{scala}
 
@@ -1489,10 +1505,10 @@ multiplexer output:
 \begin{scala}
 object Mux2 {
   def apply (sel: Bits, in0: Bits, in1: Bits) = {
-    val m = new Mux2();
-    m.io.in0 := in0;
-    m.io.in1 := in1;
-    m.io.sel := sel;
+    val m = new Mux2()
+    m.io.in0 := in0
+    m.io.in1 := in1
+    m.io.sel := sel
     m.io.out
   }
 }
@@ -1508,16 +1524,16 @@ significantly simpler.
 \begin{scala}
 class Mux4 extends Component {
   val io = new Bundle {
-    val in0 = Bits(width = 1, dir = INPUT);
-    val in1 = Bits(width = 1, dir = INPUT);
-    val in2 = Bits(width = 1, dir = INPUT);
-    val in3 = Bits(width = 1, dir = INPUT);
-    val sel = Bits(width = 2, dir = INPUT);
-    val out = Bits(width = 1, dir = OUTPUT);
-  };
+    val in0 = Bits(width = 1, dir = INPUT)
+    val in1 = Bits(width = 1, dir = INPUT)
+    val in2 = Bits(width = 1, dir = INPUT)
+    val in3 = Bits(width = 1, dir = INPUT)
+    val sel = Bits(width = 2, dir = INPUT)
+    val out = Bits(width = 1, dir = OUTPUT)
+  }
   io.out := Mux2(io.sel(1),
                  Mux2(io.sel(0), io.in0, io.in1),
-                 Mux2(io.sel(0), io.in2, io.in3));
+                 Mux2(io.sel(0), io.in2, io.in3))
 }
 \end{scala}
 
@@ -1538,21 +1554,24 @@ array and where \code{MuxCase} can be translated into the following
 \code{Mux} expression:
 
 \begin{scala}
-Mux(c1, a, Mux(c2, b, Mux(..., default)));
+Mux(c1, a, Mux(c2, b, Mux(..., default)))
 \end{scala}
 
 \noindent
 Chisel also provides \code{MuxLookup} which is an n-way indexed multiplexer:
 
 \begin{scala}
-MuxLookup(idx, default, Array(UFix(0) -> a, UFix(1) -> b, ...))
+MuxLookup(idx, default, 
+          Array(UFix(0) -> a, UFix(1) -> b, ...))
 \end{scala}
 
 \noindent
 which can be rewritten in terms of:\verb+MuxCase+ as follows:
 
 \begin{scala}
-MuxCase(default, Array((idx === UFix(0)) -> a, (idx === UFix(1)) -> b, ...))
+MuxCase(default, 
+        Array((idx === UFix(0)) -> a, 
+              (idx === UFix(1)) -> b, ...))
 \end{scala}
 
 \noindent
@@ -1569,13 +1588,13 @@ Note that the cases (eg. c1, c2) must be in parentheses.
 %
 % \begin{scala}
 % val io = new Bundle{
-%   val sel = Bits(1, INPUT);
-%   val in0 = Bits(1, INPUT);
-%   val in1 = Bits(1, INPUT);
-%   val out = Bits(1, OUTPUT);
-% };
+%   val sel = Bits(1, INPUT)
+%   val in0 = Bits(1, INPUT)
+%   val in1 = Bits(1, INPUT)
+%   val out = Bits(1, OUTPUT)
+% }
 % def Mux2(sel: Bits, in0: Bits, in0: Bits): Bits = {
-%   val m = new Mux2();
+%   val m = new Mux2()
 %   m.io.wire(Array("sel" => sel, "in0" => in0, "in1" => in1), "out")
 % }
 % \end{scala}
@@ -1664,8 +1683,8 @@ We do so by parameterizing the \verb+FilterIO+ class and defining the constructo
 
 \begin{scala}
 class FilterIO[T <: Data]()(type: => T) extends Bundle { 
-  val x = type.asInput.flip;
-  val y = type.asOutput;
+  val x = type.asInput.flip
+  val y = type.asOutput
 }
 \end{scala}
 
@@ -1674,7 +1693,7 @@ We can now define \verb+Filter+ by defining a component class that also takes a 
 
 \begin{scala}
 class Filter[T <: Data]()(type: => T) extends Component { 
-  val io = (new FilterIO()){ type };
+  val io = (new FilterIO()){ type }
   ...
 }
 \end{scala}
@@ -1682,7 +1701,7 @@ class Filter[T <: Data]()(type: => T) extends Component {
 \noindent
 We can now define a \verb+PLink+ based \verb+Filter+ as follows:
 \begin{scala}
-val f = (new Filter()){ new PLink() };
+val f = (new Filter()){ new PLink() }
 \end{scala}
 
 \noindent
@@ -1692,19 +1711,19 @@ A generic FIFO could be defined as shown in Figure~\ref{fig:fifo} and
 used as follows:
 
 \begin{scala}
-class DataBundle() extends Bundle {
-  val A = UFix(width = 32);
-  val B = UFix(width = 32);
+class DataBundle extends Bundle {
+  val A = UFix(width = 32)
+  val B = UFix(width = 32)
 }
 
 object FifoDemo {
-  def apply () = (new Fifo(32)){ new DataBundle() };
+  def apply () = (new Fifo(32)){ new DataBundle }
 }
 \end{scala}
 
 \begin{figure}[ht]
 \begin{scala}
-class FifoIO[T <: Data]()(gen: => T) extends Bundle() {
+class FifoIO[T <: Data]()(gen: => T) extends Bundle {
   val enq_val = Bool(INPUT)
   val enq_rdy = Bool(OUTPUT)
   val deq_val = Bool(OUTPUT)
@@ -1713,7 +1732,8 @@ class FifoIO[T <: Data]()(gen: => T) extends Bundle() {
   val deq_dat = gen.asOutput
 }
 
-class Fifo[T <: Data] (n: Int)(gen: => T) extends Component {
+class Fifo[T <: Data] (n: Int)(gen: => T) 
+    extends Component {
   val io           = new FifoIO()( gen )
   val enq_ptr      = Reg(resetVal = UFix(0, sizeof(n)))
   val deq_ptr      = Reg(resetVal = UFix(0, sizeof(n)))
@@ -1724,9 +1744,9 @@ class Fifo[T <: Data] (n: Int)(gen: => T) extends Component {
   val deq_ptr_inc  = deq_ptr + UFix(1)
   val enq_ptr_inc  = enq_ptr + UFix(1)
   val is_full_next = 
-    Mux(do_enq && ~do_deq && (enq_ptr_inc === deq_ptr), Bool(true),
-    Mux(do_deq && is_full,                              Bool(false),
-        is_full))
+    Mux(do_enq && ~do_deq && (enq_ptr_inc === deq_ptr), 
+        Bool(true),
+        Mux(do_deq && is_full, Bool(false), is_full))
   enq_ptr <== Mux(do_enq, enq_ptr_inc, enq_ptr)
   deq_ptr <== Mux(do_deq, deq_ptr_inc, deq_ptr)
   is_full <== is_full_next
@@ -1743,7 +1763,8 @@ class Fifo[T <: Data] (n: Int)(gen: => T) extends Component {
 It is also possible to define a generic decoupled interface:
 
 \begin{scala}
-  class ioDecoupled[T <: Data]()(data: => T) extends Bundle() {
+  class ioDecoupled[T <: Data]()(data: => T) 
+      extends Bundle {
     val ready = Bool(INPUT)
     val valid = Bool(OUTPUT)
     val bits  = data.asOutput
@@ -1755,7 +1776,7 @@ This template can then be used to add a handshaking protocol to any
 set of signals:
 
 \begin{scala}
-  class decoupledDemo extends ioDecoupled()( new DataBundle() )
+  class decoupledDemo extends ioDecoupled()( new DataBundle )
 \end{scala}
 
 \noindent
@@ -1763,7 +1784,7 @@ The FIFO interface in Figure~\ref{fig:fifo} can be now be simplified as
 follows: 
 
 \begin{scala}
-  class FifoIO[T <: Data]()(gen: => T) extends Bundle()  {
+  class FifoIO[T <: Data]()(gen: => T) extends Bundle  {
     val enq = new ioDecoupled()( gen ).flip()
     val deq = new ioDecoupled()( gen )
   }
