@@ -145,12 +145,12 @@ Raw operations are represented as \code{Op} nodes defined as follows:
 
 \begin{scala}
 class Op extends Node {
+  // op name used during emission
   val op: String
 }
 \end{scala}
 
 \noindent
-where \code{op} holds the op name used during emission.  
 Ops compute a combinational function of their inputs.
 
 \section{Types}
@@ -328,11 +328,11 @@ successively more complicated examples.
 \begin{figure*}
 \begin{center}
 \begin{tabular}{ccc}
-\includegraphics[height=0.78in]{figs/bits-1.pdf} &
-\includegraphics[height=1.63in]{figs/bits-and.pdf} &
-\includegraphics[height=2.5in]{figs/bits-or-and.pdf} \\
+\includegraphics[height=0.94in]{figs/bits-1.pdf} &
+\includegraphics[height=1.96in]{figs/bits-and.pdf} &
+\includegraphics[height=3.0in]{figs/bits-or-and.pdf} \\
 \kode{Bits(1)} & \kode{Bits(1)\&Bits(2)} &
-\kode{Bits(1)\&Bits(2))|Bits(3)} \\
+\kode{(Bits(1)\&Bits(2)) | Bits(3)} \\
 \end{tabular}
 \end{center}
 \caption{Chisel Op/Lit graphs constructed with algebraic expressions
@@ -341,8 +341,8 @@ successively more complicated examples.
 \end{figure*}
 
 \noindent
-The \code{getRawNode} operator will skip type nodes and return the first
-raw node.
+The \code{getRawNode} operator skips type nodes returning the first
+found raw node.
 
 \subsection{Bools}
 
@@ -357,6 +357,9 @@ object Bool {
 
 class Bool extends Bits
 \end{scala}
+
+\noindent
+\code{Bool} is equivalent to \code{Bits(width = 1)}.
 
 \subsection{Nums}
 
@@ -454,6 +457,9 @@ and access their elements using Scala field access:
 val x  = new MyFloat()
 val xs = x.sign
 \end{scala}
+
+Bundles elements get their emitted names from their bundle field names
+which are obtained using Scala introspection.
 
 \subsection{Vecs}
 
@@ -561,6 +567,28 @@ class when (prevCond: Bool) {
 }
 \end{scala}
 
+\noindent
+\code{when} manipulates a global condition stack with dynamic scope.
+Therefore, \code{when} creates a new condition that is in force across
+function calls.  For example:
+
+\begin{scala}
+def updateWhen (c: Bool, d: Data) =
+  when (c) { r := d }
+when (a) { 
+  updateWhen(b, x)
+}
+\end{scala}
+
+\noindent
+is the same as:
+
+\begin{scala}
+when (a) { 
+  when (b) { r := x } 
+}
+\end{scala}
+
 % TODO: talk about conds
 
 Chisel provides some syntactic sugar for other common forms of
@@ -613,8 +641,8 @@ and \verb!brTarget! wires so they can be referenced before defined:
 \begin{scala}
 val pcPlus4  = UFix()
 val brTarget = UFix()
-val pcNext   = Mux(io.ctl.pcSel, brTarget, pcPlus4)
-val pcReg    = Reg(data = pcNext, resetVal = UFix(0, 32))
+val pcNext   = Mux(pcSel, brTarget, pcPlus4)
+val pcReg    = Reg(pcNext)
 pcPlus4     := pcReg + UFix(4)
 ...
 brTarget    := addOut
@@ -644,7 +672,7 @@ class Reg extends Updateable
 \end{scala}
 
 \noindent
-where they can be constructed as follows:
+where it can be constructed as follows:
 
 \begin{scala}
 val r1 = Reg(io.in)
@@ -652,6 +680,10 @@ val r2 = Reg(resetVal = UFix(1, 8))
 val r3 = Reg(data = io.in, resetVal = UFix(1))
 val r4 = Reg(){ UFix(width = 8) }
 \end{scala}
+
+\noindent
+where \code{resetVal} is the value a reg takes on when implicit
+\code{reset} is \code{Bool(true)}.
 
 \section{Mems}
 
@@ -763,10 +795,13 @@ used to connect an output port to its definition.
 The \code{<>} operator bulk connects interfaces of opposite gender between
 sibling components or interfaces of same gender between parent/child components. 
 Bulk connections connect leaf ports of the same name to each other.
-Connections are only made if both ports are non-null,
+Connections are only made if one of the ports is non-null,
 allowing users to repeatedly bulk connect partially filled interfaces.
 After all connections are made and the circuit is being elaborated,
 Chisel warns users if ports have other than exactly one connection to them.
+
+Nodes and subcomponents stored in component fields get their emitted
+names from their field names which are obtained using Scala introspection.
 
 % TODO: what is same name -- is it a pathname?
 
@@ -777,11 +812,11 @@ outside of Chisel.  The user defines:
 
 \begin{itemize}
 \item a component as a subclass of \code{BlackBox} and
-\item defines an \code{io} field with the interface.
+\item an \code{io} field with the interface.
 \end{itemize}
 
 \noindent
-For example, one could define a simpel ROM blackbox as:
+For example, one could define a simple ROM blackbox as:
 
 \begin{scala}
 class RomIo extends Bundle {
@@ -798,7 +833,7 @@ class Rom extends BlackBox {
 \section{Main}
 
 In order to construct a circuit, 
-the user calls \code{chiselMain} from their main object:
+the user calls \code{chiselMain} from their top level \code{main} function:
 
 \begin{scala}
 object chiselMain {
@@ -819,8 +854,7 @@ In order to specify Input / Output on a constructed circuit as follows:
 
 \begin{scala}
 class TestIO
-  (val format: String, 
-   val args: Seq[Data] = null)
+  (val format: String, val args: Seq[Data] = null)
 
 class Scanner extends TestIO
 
@@ -903,8 +937,8 @@ Finally, command arguments for \code{chiselMain*} are as follows: \\
 \section{C++ Emulator}
 
 The C++ emulator is based on a fast multiword library using
-C++ templates.  A single a
-word is defined by \code{val\_t} as follows: 
+C++ templates.  
+A single word is defined by \code{val\_t} as follows: 
 
 \begin{cpp}
 typedef uint64_t val_t;
@@ -913,7 +947,7 @@ typedef uint32_t half_val_t;
 \end{cpp}
 
 \noindent
-and multiwords are defined by\code{dat\_t} as follows:
+and multiwords are defined by \code{dat\_t} as follows:
 
 \begin{cpp}
 template <int w>
@@ -1119,6 +1153,26 @@ object Enum {
 
 \section{Standard Library}
 
+\subsection{Math}
+
+\begin{scala}
+// next power of 2
+object log2up {
+  def apply(in: Int) = ceil(log(in)/log(2)).toInt
+}
+
+object ispow2 {
+  def apply(in: Int) = 
+    in > 0 && ((in & (in-1)) == 0)
+}
+
+object LFSR16 {
+  def apply(increment: Bool = Bool(true)): Bits
+}
+\end{scala}
+
+\subsection{Sequential}
+
 \begin{scala}
 object PosEdge {
   def apply(x: Bool): Bool = 
@@ -1157,22 +1211,21 @@ object SquareWave {
   def apply(period: UFix) =
     toggle(pulse(period))
 }
+\end{scala}
 
+\subsection{Functional}
+
+
+\begin{scala}
 object foldR {
   def apply[T <: Bits]
     (x: Seq[T])(f: (T, T) => T): T
 }
+\end{scala}
 
-// next power of 2
-object log2up {
-  def apply(in: Int) = ceil(log(in)/log(2)).toInt
-}
+\subsection{Bits}
 
-object ispow2 {
-  def apply(in: Int) = 
-    in > 0 && ((in & (in-1)) == 0)
-}
-
+\begin{scala}
 // number of bits on
 object PopCount {
   def apply(in: Bits): Bits
@@ -1194,10 +1247,6 @@ object UFixToOH {
   def apply(in: UFix, width: Int): Bits
 }
 
-object LFSR16 {
-  def apply(increment: Bool = Bool(true)): Bits
-}
-
 // one hot mux lookup
 object MuxOH {
   def apply [T <: Data]
@@ -1206,6 +1255,18 @@ object MuxOH {
     (sel: Vec[Bool], in: Vec[T]): T
 }
 
+object PriorityEncoder {
+  def apply(in: Bits): UFix
+}
+
+object PriorityEncoderOH {
+  def apply(in: Bits): UFix
+}
+\end{scala}
+
+\subsection{Decoupled}
+
+\begin{scala}
 class ioDecoupled[+T <: Data]()(data: => T) 
     extends Bundle {
   val ready = Bool(INPUT)
@@ -1217,14 +1278,6 @@ class ioPipe[+T <: Data]()(data: => T)
     extends Bundle {
   val valid = Bool(OUTPUT)
   val bits = data.asOutput
-}
-
-object PriorityEncoder {
-  def apply(in: Bits): UFix
-}
-
-object PriorityEncoderOH {
-  def apply(in: Bits): UFix
 }
 
 Arbiters
