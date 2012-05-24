@@ -226,32 +226,23 @@ class Delay extends Node {
 
 object Log2 {
   def apply (mod: UFix, n: Int): UFix = {
-    if (isEmittingComponents) {
-      var res = UFix(0);
-      for (i <- 1 to n)
-        res = Mux(mod(i), UFix(i, sizeof(n)), res);
-      res
-    } else {
-      val log2Cell = new Log2Cell(n);
-      log2Cell.io.in := mod;
-      log2Cell.io.out
+    backendName match {
+      case "v" => {
+        var res = UFix(0);
+        for (i <- 1 to n)
+          res = Mux(mod(i), UFix(i, sizeof(n)), res);
+        res
+      }
+      case "c" => 
+        (new Log2).setTypeNode(UFix())
     }
   }
 }
+
 class Log2 extends Node {
   override def toString: String = "LOG2(" + inputs(0) + ")";
   override def emitDefLoC: String =
     " " + emitTmp + " = " + inputs(0).emitRef + ".log2<" + width + ">();\n";
-}
-class Log2Cell(n: Int) extends Cell {
-  val io = new Bundle{
-    val in = UFix(INPUT);
-    val out = UFix(OUTPUT);
-  }
-  io.setIsTypeNode;
-  val primitiveNode = new Log2();
-  primitiveNode.init("", fixWidth(sizeof(n)), io.in);
-  io.out assign primitiveNode;
 }
 
 }

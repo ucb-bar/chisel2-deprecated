@@ -5,38 +5,12 @@ import Node._;
 import Literal._;
 import scala.collection.mutable.ArrayBuffer;
 
-// TODO: LOOK INTO REMOVING THIS
-/*
-object Lookup {
-  def apply[T <: Data, S <: Bits](addr: S, gen: () => T, mapping: Seq[(S, (T) => Any)]): T = {
-    var map = List[(Bits, T)]();
-    for((s, f) <- mapping){
-      val data = gen();
-      f(data);
-      map = (s -> data) :: map;
-    }
-    val default = map(0)._2;
-    val lookupCell = new LookupCell(default, map.toSeq)
-    lookupCell.io.default <> default;
-    lookupCell.io.addr <> addr;
-    lookupCell.io.out
-  }
-
-}
-
-* */
-
 object Lookup {
   def apply[T <: Data](addr: Bits, default: T, mapping: Seq[(Bits, T)]): T = {
     val lookup = new Lookup()
     val mappingNode = mapping.map(x => LookupMap(x))
     lookup.initOf("", widthOf(1), List(addr, default) ++ mappingNode)
-
-    // make output
-    val output = default.fromNode(lookup).asInstanceOf[T]
-    output.setIsTypeNode
-    lookup.nameHolder = output
-    output
+    lookup.setTypeNodeNoAssign(default.fromNode(lookup).asInstanceOf[T])
   }
 }
 

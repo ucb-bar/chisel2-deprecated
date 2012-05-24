@@ -53,11 +53,7 @@ object Multiplex{
 object Mux {
   def apply[T <: Data](t: Bits, c: T, a: T): T = {
     val res = Multiplex(t, c.toNode, a.toNode)
-    // make output
-    val output = c.fromNode(res).asInstanceOf[T]
-    output.setIsTypeNode
-    res.nameHolder = output
-    output
+    res.setTypeNodeNoAssign(c.fromNode(res).asInstanceOf[T])
   }
 }
 class Mux extends Op {

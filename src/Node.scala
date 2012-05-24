@@ -376,6 +376,17 @@ abstract class Node extends nameable{
       -1
   }
   
+  def setTypeNodeNoAssign[T <: Data](typeNode: T): T = {
+    typeNode.setIsTypeNode 
+    if(!isInstanceOf[Literal]) nameHolder = typeNode
+    typeNode
+  }
+  def setTypeNode[T <: Data](typeNode: T): T = {
+    setTypeNodeNoAssign(typeNode)
+    typeNode assign this
+    typeNode
+  }
+
   def removeTypeNodes() {
     for(i <- 0 until inputs.length) {
       if(inputs(i) == null){

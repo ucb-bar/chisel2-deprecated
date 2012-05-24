@@ -25,13 +25,7 @@ object Fill {
       // initialize
       val fillConst = UFix(n)
       fill.init("", fillWidthOf(0, fillConst), mod, fillConst)
-
-      // make output
-      val output = Bits(OUTPUT)
-      output.setIsTypeNode
-      fill.nameHolder = output
-      output assign fill
-      output
+      fill.setTypeNode(Bits(OUTPUT))
     }
   }
   def apply(mod: Bits, n: Int): Bits = apply(n, mod)

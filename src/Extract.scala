@@ -67,12 +67,7 @@ object Extract {
       extract.init("", fixWidth(1), mod.toNode, bit)
       extract.hi = bit
       extract.lo = bit
-
-      // make output
-      val output = gen.fromNode(extract)
-      output.setIsTypeNode
-      extract.nameHolder = output
-      output
+      extract.setTypeNodeNoAssign(gen.fromNode(extract))
     }
   }
 
@@ -91,12 +86,7 @@ object Extract {
       extract.init("", if(w == -1) widthOf(0) else fixWidth(w), mod.toNode, hi, lo)
       extract.hi = hi
       extract.lo = lo
-
-      // make output
-      val output = gen.fromNode(extract)
-      output.setIsTypeNode
-      extract.nameHolder = output
-      output
+      extract.setTypeNodeNoAssign(gen.fromNode(extract))
     }
   }
 

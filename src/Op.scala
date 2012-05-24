@@ -29,13 +29,7 @@ object UnaryOp {
     case "!" => Op("!",  1, fixWidth(1), x);
     case any => null;
     }
-
-    // make output
-    val output = gen.asOutput
-    output.setIsTypeNode
-    if(!node.isInstanceOf[Literal]) node.nameHolder = output
-    output assign node
-    output
+    node.setTypeNode(gen.asOutput)
   }
 }
 
@@ -57,14 +51,7 @@ object BinaryOp {
       case "|"   => Op("|",  2, maxWidth _, x, y );
       case any   => null;
     }
-
-    // make output
-    val output = gen.asOutput
-    output.setIsTypeNode
-
-    if(!node.isInstanceOf[Literal]) node.nameHolder = output
-    output assign node
-    output
+    node.setTypeNode(gen.asOutput)
   }
 }
 
@@ -87,13 +74,9 @@ object LogicalOp {
 
       // make output
       val output = Bool(OUTPUT)
-      output.setIsTypeNode
-      if(!node.isInstanceOf[Literal]) node.nameHolder = output
-      output assign node
-      if(searchAndMap && op == "&&" && !chiselAndMap.contains((x, y))) {
+      if(searchAndMap && op == "&&" && !chiselAndMap.contains((x, y))) 
         chiselAndMap += ((x, y) -> output)
-      }
-      output
+      node.setTypeNode(output)
     }
   } 
 }
@@ -106,13 +89,7 @@ object ReductionOp {
       case "^" => Op("^",  1, fixWidth(1), x);
       case any => null;
     }
-    
-    // make output
-    val output = Bool(OUTPUT)
-    output.setIsTypeNode
-    if(!node.isInstanceOf[Literal]) node.nameHolder = output
-    output assign node
-    output
+    node.setTypeNode(Bool(OUTPUT))
   }
 }
 
@@ -124,13 +101,7 @@ object UnaryBoolOp {
     case "!" => Op("!",  1, fixWidth(1), x);
     case any => null;
     }
-
-    //make ouput
-    val output = Bool(OUTPUT)
-    output.setIsTypeNode
-    if(!node.isInstanceOf[Literal]) node.nameHolder = output
-    output assign node
-    output
+    node.setTypeNode(Bool(OUTPUT))
   }
 }
 
@@ -153,16 +124,10 @@ object BinaryBoolOp {
         case "|"   => Op("|",  2, maxWidth _, x, y );
         case any   => null;
       }
-
-      // make output
       val output = Bool(OUTPUT)
-      output.setIsTypeNode
-      if(!node.isInstanceOf[Literal]) node.nameHolder = output
-      output assign node
-      if(searchAndMap && op == "&&" && !chiselAndMap.contains((x, y))) {
+      if(searchAndMap && op == "&&" && !chiselAndMap.contains((x, y))) 
         chiselAndMap += ((x, y) -> output)
-      }
-      output
+      node.setTypeNode(output)
     }
   }
 }

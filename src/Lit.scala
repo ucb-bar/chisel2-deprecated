@@ -37,19 +37,11 @@ object Lit {
   def apply(value: Boolean): Bool = 
     makeBool((if(value) Literal(1) else Literal(0)))
 
-  def makeLit[T <: Bits](x: Literal)(gen: => T): T = {
-    val output= gen.asOutput
-    output.setIsTypeNode
-    output assign x
-    output
-  }
+  def makeLit[T <: Bits](x: Literal)(gen: => T): T = 
+    x.setTypeNode(gen.asOutput)
 
-  def makeBool(x: Literal): Bool = {
-    val output = Bool(OUTPUT)
-    output.setIsTypeNode
-    output assign x
-    output
-  }
+  def makeBool(x: Literal): Bool = 
+    x.setTypeNode(Bool(OUTPUT))
 }
 
 object Literal {

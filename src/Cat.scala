@@ -6,10 +6,7 @@ object Cat {
   def apply[T <: Data](mod: T, mods: T*): Bits = {
     val modsList = mods.toList;
     if(modsList.length == 1 && modsList(0) == null){
-      val res = Bits(OUTPUT);
-      res.setIsTypeNode;
-      res assign mod.toNode;
-      res
+      mod.setTypeNode(Bits(OUTPUT))
     } else {
       val isLit = mods.foldLeft(mod.litOf != null){(a,b) => a && (b.litOf != null)}
       if (isFolding && isLit) {
@@ -30,13 +27,7 @@ object Cat {
           } else {
             mods.foldLeft(mod.toNode){(a,b) => a ## b.toNode}
           }
-
-        // make output
-        val output = Bits(OUTPUT)
-        output.setIsTypeNode
-        output assign res
-        res.nameHolder = output
-        output
+        res.setTypeNode(Bits(OUTPUT))
       }
     }
   }
