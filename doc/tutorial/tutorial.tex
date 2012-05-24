@@ -1223,23 +1223,22 @@ the simplest form, Chisel allows memory to be defined with a single
 write port and multiple read ports as follows:
 
 \begin{scala}
-  Mem(depth: Int, 
-      target: Symbol = 'default, readLatency: Int = 0)
+  Mem(depth: Int)
 \end{scala}
 
 \noindent
-where \verb+depth+ is the number of memory locations, \verb+target+ is the
-type of memory used, \verb+readLatency+ is the latency of read ports to be
-defined on the memory.
+where \verb+depth+ is the number of memory locations.
+%, \verb+target+ is the type of memory used.
 A memory object can then
-be read from using the \verb+read(rdAddress)+ method.  For example, an
+be read from using the \verb+apply(rdAddress)+ method.  For example, an
 audio recorder could be defined as follows:
 
 \begin{scala}
   def audioRecorder(n: Int) = { 
-    val addr = counter(UFix(n))
-    val ram = Mem(n).write(button(), addr)
-    ram.read(Mux(button(), UFix(0), addr))
+    val addr   = counter(UFix(n))
+    val ram    = Mem(n)
+    ram(addr) := button()
+    ram(Mux(button(), UFix(0), addr))
   } 
 \end{scala}
 
@@ -1252,13 +1251,15 @@ For example we can make a one write port, two read port register file with 32 re
 
 \begin{scala}
   val regs = Mem(32)
-  regs.write(wr_en, wr_addr, wr_data)
-  val idat = regs.read(iaddr)
-  val mdat = regs.read(maddr)
+  when (wr_en) {
+    regs(wr_addr) := wr_data
+  }
+  val idat = regs(iaddr)
+  val mdat = regs(maddr)
 \end{scala}
 
 \noindent
-where a new read port is created for each call to read.
+where a new read port is created for each call to \code{apply}.
 
 Additional parameters are available to mimic common memory behaviors,
 to aid with the process of mapping to real-world hardware.  The
@@ -1266,11 +1267,11 @@ following is an example of a memory that is first defined with no
 memory ports, after which read, write, or read/write ports are added:
 
 \begin{scala}
-  val regfile =
-    Mem(64, readLatency = 1, 
-        hexInitFile = "hex_init_values.txt"){ Bits(width = 32) }
-  regfile.write(addr_in, data_in1, wen, w_mask = bit_mask)
-  val read_data = regfile.read(addr_in)
+  val regfile = Mem(64){ Bits(width = 32) }
+  when (wen) {
+    regfile.write(addr_in, data_in1, w_mask = bit_mask)
+  }
+  val read_data = regfile(addr_in)
 \end{scala}
 
 %                 // Default: 0 (Combinational)
