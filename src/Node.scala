@@ -101,8 +101,6 @@ abstract class Node extends nameable{
   var line: Array[StackTraceElement] = Thread.currentThread().getStackTrace
   
   def isByValue: Boolean = true;
-  def isTerminator = false;
-  def isTerminated = (inputs.size == 1 && inputs(0).isTerminator);
   def width: Int = width_;
   def width_=(w: Int) = { isFixedWidth = true; width_ = width; inferWidth = fixWidth(w); }
   def name_it (path: String, setNamed: Boolean = true) = { name = path; named = setNamed}
@@ -134,12 +132,10 @@ abstract class Node extends nameable{
   }
   // TODO: MOVE TO WIRE
   def assign(src: Node) = { 
-    if (!src.isTerminated) {
-      if (inputs.length > 0) 
-        inputs(0) = src; 
-      else 
-        inputs += src; 
-    }
+    if (inputs.length > 0) 
+      inputs(0) = src; 
+    else 
+      inputs += src; 
   }
   def <>(src: Node) = { 
     this assign src 
