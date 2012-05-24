@@ -141,7 +141,7 @@ object Tutorial {
     val tut_args = args.slice(1, args.length) ++ 
       Array("--target-dir", "../emulator", "--gen-harness")
     args(0) match {
-      case "GCD" => 
+      case "gcd" => 
         chiselMain(tut_args, () => new GCD())
       ...
     }
@@ -439,9 +439,9 @@ class Functional extends Component {
   def clb(a: Bits, b: Bits, c: Bits, d: Bits) = 
     (a & b) | (~c & d)
   val io = new Bundle {
-    val x = UFix(16, INPUT)
-    val y = UFix(16, INPUT)
-    val z = UFix(16, OUTPUT)
+    val x = Bits(16, INPUT)
+    val y = Bits(16, INPUT)
+    val z = Bits(16, OUTPUT)
   }
   io.z := clb(io.x, io.y, io.x, io.y)
 }

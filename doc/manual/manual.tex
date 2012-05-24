@@ -1120,6 +1120,44 @@ object Enum {
 \section{Standard Library}
 
 \begin{scala}
+object PosEdge {
+  def apply(x: Bool): Bool = 
+    x & !Reg(x);
+}
+
+object Counter {
+  def overflow(n: UFix, max: UFix) =
+    Mux(n > max, UFix(0), n)
+  def apply (max: UFix): UFix = {
+    val x = Reg(resetVal = UFix(0, max.getWidth))
+    x := overflow(x + UFix(1), max)
+    x
+  }
+}
+
+// n delays of input
+object ShiftRegister {
+  def apply [T <: Data](n: Int, in: T): T
+}
+
+object Pulse {
+  def apply(n: UFix) = 
+    counter(n - UFix(1)) === UFix(0)
+}
+
+object Toggle {
+  def apply(p: Bool) = {
+    val x = Reg(resetVal = Bool(false))
+    x := Mux(p, !x, x)
+    x
+  }
+}
+
+object SquareWave {
+  def apply(period: UFix) =
+    toggle(pulse(period))
+}
+
 object foldR {
   def apply[T <: Bits]
     (x: Seq[T])(f: (T, T) => T): T
@@ -1158,11 +1196,6 @@ object UFixToOH {
 
 object LFSR16 {
   def apply(increment: Bool = Bool(true)): Bits
-}
-
-// n delays of input
-object ShiftRegister {
-  def apply [T <: Data](n: Int, in: T): T
 }
 
 // one hot mux lookup
