@@ -233,8 +233,11 @@ object Log2 {
           res = Mux(mod(i), UFix(i, sizeof(n)), res);
         res
       }
-      case "c" => 
-        (new Log2).setTypeNode(UFix())
+      case "c" => {
+        val log2 = new Log2()
+        log2.init("", fixWidth(sizeof(n)), mod)
+        log2.setTypeNode(UFix())
+      }
     }
   }
 }
