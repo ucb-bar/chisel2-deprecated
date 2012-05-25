@@ -263,7 +263,6 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
       b <> e;
   }
 
-
   // TODO: CHECK FOR ALL OUT
   def :=[T <: Data](src: Vec[T]) = {
     for((me, other) <- this zip src){
@@ -293,10 +292,12 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
   }
 
   override def name_it (path: String, named: Boolean = true) = {
-    for (i <- self) {
-      i.name = (if (path.length > 0) path + "_" else "") + i.name;
-      i.name_it(i.name, named);
-      // println("  ELT " + n + " " + i);
+    if(!this.named) {
+      if(path.length > 0) name = path
+      this.named = named
+      for (i <- self) {
+        i.name_it( (if (path.length > 0) path + "_" else "") + i.name, named )
+      }
     }
   }
 

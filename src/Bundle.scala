@@ -80,7 +80,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
             (view == null || view.contains(name)) && !seen.contains(m.invoke(this))) {
           val o = m.invoke(this);
           o match { 
-	    case bv: Vec[Data] => elts += ((name + bv.name, bv));
+	    case bv: Vec[Data] => elts += ((name + bv.name, bv))
             case i: Data => elts += ((name, i)); i.name = name; 
               // if (view != null)
               //   println("    ADDING " + name + " -> " + o + " COMP " + i.component + " DONE " + (i.component == null));
@@ -119,12 +119,16 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
   def view (elts: ArrayBuffer[(String, Data)]): Bundle = { 
     elementsCache = elts; this 
   }
+
   override def name_it (path: String, named: Boolean = true) = {
-    if(path.length > 0 && !this.named) {name = path; this.named = named};
-    for ((n, i) <- elements) {
-      i.name = (if (path.length > 0) path + "_" else "") + n;
-      i.name_it(i.name, named);
-      // println("  ELT " + n + " " + i);
+    if(!this.named) {
+      if(path.length > 0) {
+        name = path
+        this.named = named
+      }
+      for ((n, i) <- elements) {
+        i.name_it( (if (path.length > 0) path + "_" else "") + n, named )
+      }
     }
   }
 
@@ -221,6 +225,8 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
       case default =>
     }
   }
+
+  def procAssign(src: Node) = {}
 
   def :=(src: Bundle) = {
     src match {

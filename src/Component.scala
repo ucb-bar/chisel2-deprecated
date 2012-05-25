@@ -491,23 +491,30 @@ abstract class Component(resetSignal: Bool = null) {
   }
 
 
-  def inferAll(): Unit = {
-    println("started inference")
-    var nodesList = ArrayBuffer[Node]()
-    val walked = new HashSet[Node]
-    val bfsQueue = new Queue[Node]
+  def initializeBFS: Queue[Node] = {
+    val res = new Queue[Node]
 
     // initialize bfsQueue
     for((n, elm) <- io.flatten) 
       if(elm.isInstanceOf[Bits] && elm.asInstanceOf[Bits].dir == OUTPUT)
-  	bfsQueue.enqueue(elm)
+  	res.enqueue(elm)
     for(a <- asserts) 
-      bfsQueue.enqueue(a)
+      res.enqueue(a)
     for(b <- blackboxes) 
-      bfsQueue.enqueue(b.io)
+      res.enqueue(b.io)
     
     for(r <- resetList)
-      bfsQueue.enqueue(r)
+      res.enqueue(r)
+
+    res
+  }
+
+  def inferAll(): Unit = {
+    println("started inference")
+    var nodesList = ArrayBuffer[Node]()
+    val walked = new HashSet[Node]
+    val bfsQueue = initializeBFS
+
     // conduct bfs to find all reachable nodes
     while(!bfsQueue.isEmpty){
       val top = bfsQueue.dequeue
@@ -553,7 +560,7 @@ abstract class Component(resetSignal: Bool = null) {
   def removeTypeNodes() {
     println("started flattenning")
     val walked = new HashSet[Node]
-    val bfsQueue = new Queue[Node]
+    val bfsQueue = initializeBFS
 
     def getNode(x: Node): Node = {
       var res = x
@@ -562,21 +569,6 @@ abstract class Component(resetSignal: Bool = null) {
       }
       res
     }
-
-    // initialize bfsQueue
-    for((n, elm) <- io.flatten) {
-      if(elm.isInstanceOf[Bits] && elm.asInstanceOf[Bits].dir == OUTPUT) {
-  	bfsQueue.enqueue(elm)
-      }
-    }
-
-    for (b <- blackboxes) {
-      for((n, elm) <- b.io.flatten) 
-        bfsQueue.enqueue(elm)
-    }
-
-    for(r <- resetList)
-      bfsQueue.enqueue(r)
 
     var count = 0
 
@@ -607,19 +599,8 @@ abstract class Component(resetSignal: Bool = null) {
 
     var nodesList = ArrayBuffer[Node]()
     val walked = new HashSet[Node]
-    val bfsQueue = new Queue[Node]
+    val bfsQueue = initializeBFS
 
-    // initialize bfsQueue
-    for((n, elm) <- io.flatten) 
-      if(elm.isInstanceOf[Bits] && elm.asInstanceOf[Bits].dir == OUTPUT)
-  	bfsQueue.enqueue(elm)
-    for(a <- asserts) 
-      bfsQueue.enqueue(a)
-    for(b <- blackboxes) 
-      bfsQueue.enqueue(b.io)
-    
-    for(r <- resetList)
-      bfsQueue.enqueue(r)
     // conduct bfs to find all reachable nodes
     while(!bfsQueue.isEmpty){
       val top = bfsQueue.dequeue
@@ -814,7 +795,7 @@ abstract class Component(resetSignal: Bool = null) {
   def markComponent() = {
     name_it();
     ownIo();
-    io.name_it("");
+    io.name_it("io", true);
     // println("COMPONENT " + name);
     val c = getClass();
     for (m <- c.getDeclaredMethods) {
@@ -1159,22 +1140,10 @@ abstract class Component(resetSignal: Bool = null) {
 
     var nodesList = ArrayBuffer[Node]()
     val walked = new HashSet[Node]
-    val bfsQueue = new Queue[Node]
+    val bfsQueue = initializeBFS
 
     // initialize bfsQueue
     // search for all reachable nodes, then pass this graph into tarjanSCC
-    for((n, elm) <- io.flatten) 
-      if(elm.isInstanceOf[Bits] && elm.asInstanceOf[Bits].dir == OUTPUT)
-  	bfsQueue.enqueue(elm)
-
-    for(a <- asserts) 
-      bfsQueue.enqueue(a)
-    
-    for(b <- blackboxes) 
-      bfsQueue.enqueue(b.io)
-    
-    for(r <- resetList)
-      bfsQueue.enqueue(r)
 
     while(!bfsQueue.isEmpty){
       val top = bfsQueue.dequeue
