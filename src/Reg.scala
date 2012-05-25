@@ -82,7 +82,7 @@ object Reg {
 
 }
 
-class Reg extends Delay with proc{
+class Reg extends Delay with proc {
   def updateVal = inputs(0);
   def resetVal  = inputs(1);
   def enableSignal = inputs(enableIndex);
