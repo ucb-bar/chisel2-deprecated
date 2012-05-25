@@ -69,7 +69,7 @@ so when you write a Chisel program you are actually writing a Scala
 program.  For this manual we presume that you
 understand the basics of Scala.  
 We recommend you consult one of the excellent
-Scala books before reading this manual.
+Scala books (\cite{programming-scala}, \cite{programming-in-scala}) before reading this manual.
 
 \section{Nodes}
 
@@ -331,8 +331,8 @@ successively more complicated examples.
 \includegraphics[height=0.94in]{figs/bits-1.pdf} &
 \includegraphics[height=1.96in]{figs/bits-and.pdf} &
 \includegraphics[height=3.0in]{figs/bits-or-and.pdf} \\
-\kode{Bits(1)} & \kode{Bits(1)\&Bits(2)} &
-\kode{(Bits(1)\&Bits(2)) | Bits(3)} \\
+\kode{Bits(1)} & \kode{Bits(1) \& Bits(2)} &
+\kode{(Bits(1) \& Bits(2)) | Bits(3)} \\
 \end{tabular}
 \end{center}
 \caption{Chisel Op/Lit graphs constructed with algebraic expressions
@@ -494,8 +494,8 @@ v(a) := d
 \subsection{Bit Width Inference}
 
 Users are required to set bitwidths of ports and registers, but otherwise,
-bit widths on nodes are automatically inferred unless set manually by the user.
-% TODO: how do you set the width explicitly?
+bit widths on nodes are automatically inferred unless set manually by
+the user (using \code{Extract} or \code{Cat}).
 The bit-width inference engine starts from the graph's input ports and 
 calculates node output bit widths from their respective input bit widths according to the following set of rules:\\
 
@@ -727,7 +727,12 @@ when (en) {
 }
 \end{scala}
 
-% TODO: rules for determining number of ports
+\begin{example}
+todo: rules for 
+o determining number of ports
+o for setting read latency
+o for inferring write mask
+\end{example}
 
 \section{Ports}
 \label{sec:ports}
@@ -765,6 +770,7 @@ defined as follows:
 \begin{scala}
 abstract class Component {
   val io: Bundle
+  var name: String = ""
   def compileV: Unit
   def compileC: Unit
 }
@@ -794,7 +800,7 @@ used to connect an output port to its definition.
 
 The \code{<>} operator bulk connects interfaces of opposite gender between
 sibling components or interfaces of same gender between parent/child components. 
-Bulk connections connect leaf ports of the same name to each other.
+Bulk connections connect leaf ports using pathname matching.
 Connections are only made if one of the ports is non-null,
 allowing users to repeatedly bulk connect partially filled interfaces.
 After all connections are made and the circuit is being elaborated,
@@ -860,24 +866,24 @@ class Scanner extends TestIO
 
 class Printer extends TestIO
 
-object chiselMainTesting {
+object chiselMainTest {
   def apply[T <: Component]
     (args: Array[String], comp: () => T)(
      scanner: T => TestIO, 
-     printer: T => TestIO): T
+     printer: T => TestIO)
 }
 \end{scala}
 
 \noindent
 
-We can use the \code{chiselMainTesting} call and \code{TestIO} objects as follows:
+We can use the \code{chiselMainDebug} call and \code{TestIO} objects as follows:
 
 \begin{scala}
 object tutorial {
   def main(args: Array[String]) = {
-    chiselMainTest(args ++ Array("--gen-harness"), 
-                   () => new Mux2())(
-      c => Scanner("%x %x %x", 
+    chiselMainDebug(args ++ Array("--gen-harness"), 
+                    () => new Mux2())(
+      c => Scanner("%x %x %x",
                    c.io.sel, c.io.in0, c.io.in1),
       c => Printer("%= %= %= %=", 
                    c.io.sel, c.io.in0, c.io.in1, 
@@ -892,6 +898,22 @@ standard input are bound to the \code{sel}, \code{in0},  and
 \code{in1} inputs of the multiplexer circuit, and the multiplexer
 inputs and \code{out} are printed out in hex format.  
 
+Alternatively, a user can specify the scanned inputs and printed
+outputs using aggregate data and one format directive per aggregate.  
+For example, the following accomplishes the same scanning / printing
+as above:
+
+\begin{scala}
+object tutorial {
+  def main(args: Array[String]) = {
+    chiselMainDebug(args ++ Array("--gen-harness"), 
+                    () => new Mux2())(
+      c => Scanner("%x", c.io),
+      c => Printer("%x", c.io)
+  }
+}
+\end{scala}
+ 
 Using \code{--generate-harness} for \code{Mux2}
 creates a \code{Mux2-emulator.cpp}  and \code{Mux2-makefile} in directory
 specified by \code{--target-dir}.  The user can then compile it using:
@@ -923,6 +945,41 @@ cut -f 1,2,3 -d " " < test | Mux2 > test.out
 diff test.out test
 \end{scala}
  
+Another way to test circuits is with the \code{chiselMainTest}
+function by directly supplying test vectors.
+Users specify a \code{Tester} object consisting of test vectors and
+test vector bindings.
+Test vectors are sequences of \code{BitInt}s, 
+where  each test vector has an input prefix and a non-input suffix.
+The test vector bindings are nodes that are flattened and split into
+input and non-input leaves.
+\code{chiselMainTest} generates code that scans test vectors one a
+time, binding inputs,  running the circuit, and then comparing the
+produced non input values to the supplied test vector ones.
+The app exits with the return code equal to all test vectors matching.
+For example, we can test \code{Mux2} using the following:
+
+\begin{scala}
+object tutorial {
+  val tsts = 
+     Array(Array(0, 0, 0, 0),
+           Array(0, 0, 1, 0),
+           Array(0, 1, 0, 1),
+           Array(0, 1, 1, 1),
+           Array(1, 0, 0, 0),
+           Array(1, 0, 1, 1),
+           Array(1, 1, 0, 0),
+           Array(1, 1, 1, 1))
+  def main(args: Array[String]) = {
+    chiselMainTest(args ++ Array("--gen-harness"), 
+                   () => new Mux2())(
+      c => Printer("%x", c.io),
+      c => Tester(tsts, c.io)
+   )
+  }
+}
+\end{scala}
+
 Finally, command arguments for \code{chiselMain*} are as follows: \\
 
 \begin{tabular}{lll}
@@ -1109,11 +1166,15 @@ the same interface and body are cached and reused.
 
 \begin{scala}
 object ListLookup {
-  def apply[T <: Data](): List[T]
+  def apply[T <: Bits]
+    (addr: Bits, default: List[T], 
+     mapping: Array[(Bits, List[T])]): List[T]
 }
 
 object Lookup {
-  def apply()
+  def apply[T <: Data]
+    (addr: Bits, default: T, 
+     mapping: Seq[(Bits, T)]): T
 }
 
 // n-way multiplexor
@@ -1142,14 +1203,16 @@ object Enum {
 }
 \end{scala}
 
-\section{Name Mangling}
-
-\begin{itemize}
-\item component prefix
-\item vec element suffixes
-\item naming from fields
-\item bundle field paths
-\end{itemize}
+% \section{Name Mangling}
+% 
+% \begin{itemize}
+% \item separate and escape sequence
+% \item component prefix
+% \item vec element suffixes
+% \item naming from fields
+% \item bundle field paths
+% \item target language reserve word avoidance
+% \end{itemize}
 
 \section{Standard Library}
 
@@ -1321,8 +1384,12 @@ Pipes
 \begin{thebibliography}{50}
 \bibitem{chisel-dac12} Bachrach, J., Vo, H., Richards, B., Lee, Y., Waterman,
   A., Avi\v{z}ienis, Wawrzynek, J., Asanovi\'{c} \textsl{Chisel:
-    Constructing Hardware in a Scala Embedded Language}.
+    Constructing Hardware in a Scala Embedded Language}
 in DAC '12.
+\bibitem{programming-in-scala}Odersky, M., Spoon, L., Venners,
+  B. \textsl{Programming in Scala} by Artima.
+\bibitem{programming-scala}Payne, A., Wampler, D.
+  \textsl{Programming Scala} by O'Reilly books.
 % \bibitem{gel} Bachrach, J., Qumsiyeh, D., Tobenkin, M. \textsl{Hardware Scripting in Gel}.
 % in Field-Programmable Custom Computing Machines, 2008. FCCM '08. 16th.
 \end{thebibliography}

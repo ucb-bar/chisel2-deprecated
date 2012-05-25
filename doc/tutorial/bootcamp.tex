@@ -860,8 +860,9 @@ class Ram[T <: Data]
 \begin{frame}[fragile]{Rom}
 
 \begin{scala}
-val m = Rom(Array(UFix(1), UFix(2), UFix(4))){ UFix(width = 32) }
-val r = m(counter(UFix(2)))
+val i = Array(UFix(1), UFix(2), UFix(4), UFix(8))
+val m = Rom(i){ UFix(width = 32) }
+val r = m(counter(UFix(3)))
 
 def sinTable (amp: Double, n: Int) = {
   val ts = Range(0, n, 1).map(i => (i*2*Pi)/(n.toDouble-1) - Pi) 
@@ -972,7 +973,7 @@ where the \verb+io+ field contains \verb+FilterIO+.
 \begin{scala}
 class CrossbarIo(n: Int) extends Bundle {
   val in  = Vec(n){ new PLink().flip() }
-  val sel = UFix(width = (log(n)/log(2)).toInt, dir = INPUT)
+  val sel = UFix(width = log2up(n), dir = INPUT)
   val out = Vec(n){ new PLink() }
 }
 \end{scala}

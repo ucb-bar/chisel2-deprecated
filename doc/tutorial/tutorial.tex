@@ -722,7 +722,8 @@ object tutorial {
       c => Scanner("%x %x %x", 
                    c.io.sel, c.io.in0, c.io.in1),
       c => Printer("%= %= %= %=", 
-                   c.io.sel, c.io.in0, c.io.in1, c.io.out))
+                   c.io.sel, c.io.in0, c.io.in1, 
+                   c.io.out))
   }
 }
 \end{scala}
