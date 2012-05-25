@@ -866,7 +866,7 @@ class Scanner extends TestIO
 
 class Printer extends TestIO
 
-object chiselMainTest {
+object chiselMainDebug {
   def apply[T <: Component]
     (args: Array[String], comp: () => T)(
      scanner: T => TestIO, 
@@ -946,8 +946,23 @@ diff test.out test
 \end{scala}
  
 Another way to test circuits is with the \code{chiselMainTest}
-function by directly supplying test vectors.
-Users specify a \code{Tester} object consisting of test vectors and
+function by directly supplying test vectors:
+
+\begin{scala}
+class Tester
+  (val vecs: Array[Array[BigInt]], 
+   val args: Seq[Data])
+
+object chiselMainTest {
+  def apply[T <: Component]
+    (args: Array[String], comp: () => T)(
+     tester: T => Tester, 
+     printer: T => TestIO = null)
+}
+\end{scala}
+
+\noindent
+where users specify a \code{Tester} object consisting of test vectors and
 test vector bindings.
 Test vectors are sequences of \code{BitInt}s, 
 where  each test vector has an input prefix and a non-input suffix.
