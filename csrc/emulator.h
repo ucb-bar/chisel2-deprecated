@@ -1511,8 +1511,27 @@ class mem_t {
 };
 
 static char hex_to_char[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
+static int  char_to_hex[] = { 
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
+   0, 1, 2, 3, 4, 5, 6, 7, 8, 9,-1,-1,-1,-1,-1,-1, 
+  -1,-1,10,11,12,13,14,15,-1,-1,-1,-1,-1,-1,-1,-1, 
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
+  -1,-1,10,11,12,13,14,15,-1,-1,-1,-1,-1,-1,-1,-1, 
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1 };
 
 #define MIN(x, y) ((x)<(y) ? (x) : (y))
+
+#define TO_CSTR(d) (d.to_str().c_str())
 
 template <int w>
 std::string dat_to_str (dat_t<w> val, int n_bits = 4, bool for_vcd = false) {
@@ -1529,6 +1548,27 @@ std::string dat_to_str (dat_t<w> val, int n_bits = 4, bool for_vcd = false) {
     res.push_back(rev_res[j]);
   }
   return res;
+}
+
+template <int w>
+void str_to_dat(std::string str, dat_t<w>& res) {
+  val_t word_accum = 0;
+  int digit_val, digit, w_index, bit;
+  for (digit = str.size()-1, w_index = 0, bit = 0; digit >= 0 && w_index < res.n_words; digit--) {
+    digit_val = char_to_hex[str[digit]];
+    if (digit_val >= 0) {
+      word_accum |= ((val_t)digit_val) << bit;
+      bit += 4;
+      if (bit == 64) {
+        res.values[w_index] = word_accum;
+        word_accum          = 0L;
+        bit                 = 0;
+        w_index++;
+      }
+    }
+  }
+  if (bit != 0) 
+    res.values[w_index] = word_accum;
 }
 
 // dat_from_hex: Read a hex value from a std::string into a given dat_t variable.
@@ -1563,21 +1603,7 @@ size_t dat_from_hex(std::string hex_line, dat_t<w>& res, size_t offset = 0) {
   val_t word_accum = 0;
   int digit, w_index, bit;
   for (digit = last_digit, w_index = 0, bit = 0; digit >= (int)first_digit && w_index < res.n_words; digit--) {
-    digit_val = hex_line[digit];
-    switch (digit_val) {
-    case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
-      digit_val = digit_val - 'a' + 10;
-      break;
-    case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
-      digit_val = digit_val - 'A' + 10;
-      break;
-    case '0': case '1': case '2': case '3': case '4':
-    case '5': case '6': case '7': case '8': case '9':
-      digit_val -= '0';
-      break;
-    default:
-      digit_val = -1;
-    }
+    digit_val = char_to_hex[hex_line[digit]];
     if (digit_val >= 0) {
       word_accum |= ((val_t)digit_val) << bit;
       bit += 4;

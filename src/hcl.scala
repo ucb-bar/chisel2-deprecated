@@ -72,7 +72,7 @@ object is {
   }
 }
 
-class TestIO(val format: String, val args: Seq[Data] = null) { }
+class TestIO(val format: String, val args: Seq[Data] = null)
 
 object Scanner {
   def apply (format: String, args: Data*) = 
@@ -81,6 +81,12 @@ object Scanner {
 object Printer {
   def apply (format: String, args: Data*) = 
     new TestIO(format, args.toList);
+}
+
+class Tester(val vecs: Array[Array[BigInt]], val args: Seq[Data])
+object Tester {
+  def apply (vecs: Array[Array[BigInt]], args: Data*): Tester =
+    new Tester(vecs, args)
 }
 
 object chiselMain {
@@ -116,7 +122,8 @@ object chiselMain {
   }
 
   def apply[T <: Component]
-      (args: Array[String], gen: () => T, scanner: T => TestIO = null, printer: T => TestIO = null): T = {
+      (args: Array[String], gen: () => T, 
+       scanner: T => TestIO = null, printer: T => TestIO = null, tester: T => Tester = null): T = {
     initChisel();
     readArgs(args)
 
@@ -131,6 +138,11 @@ object chiselMain {
       printArgs   ++= p.args;
       printFormat = p.format;
     }
+    if (tester != null) {
+      val t = tester(c);
+      testArgs  ++= t.args;
+      testVecs    = t.vecs;
+    }
     backendName match {
     case "v" => c.compileV();
     case "c" => c.compileC();
@@ -138,6 +150,20 @@ object chiselMain {
     c
   }
 }
+
+object chiselMainDebug {
+  def apply[T <: Component]
+      (args: Array[String], gen: () => T)(scanner: T => TestIO, printer: T => TestIO): T = 
+    chiselMain(args, gen, scanner, printer);
+}
+
+
+object chiselMainTest {
+  def apply[T <: Component]
+      (args: Array[String], gen: () => T)(tester: T => Tester, printer: T => TestIO = null): T = 
+    chiselMain(args, gen, null, printer, tester);
+}
+
 
 trait proc extends Node {
   var isDefaultNeeded = true;

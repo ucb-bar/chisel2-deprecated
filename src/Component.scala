@@ -37,6 +37,8 @@ object Component {
   var scanArgs: Seq[Node] = null;
   var printFormat = "";
   var printArgs: ArrayBuffer[Node] = null;
+  var testArgs: ArrayBuffer[Node] = null;
+  var testVecs: Array[Array[BigInt]] = null;
   var includeArgs: List[String] = Nil;
   var targetDir: String = null
   var configStr: String = null;
@@ -95,6 +97,8 @@ object Component {
     scanArgs = new Array[Node](0);
     printFormat = "";
     printArgs = new ArrayBuffer[Node]();
+    testArgs = new ArrayBuffer[Node]();
+    testVecs = null;
     isCoercingArgs = true;
     targetDir = "."
     configStr = "";
@@ -1034,22 +1038,57 @@ abstract class Component(resetSignal: Bool = null) {
     makefile.write("\tg++ -c ${CPPFLAGS} " + name + "-emulator.cpp\n\n");
     makefile.close();
     val harness  = new java.io.FileWriter(base_name + name + "-emulator.cpp");
+    val testNodes = testArgs.map(maybeFlatten).reduceLeft(_ ++ _).map(x => x.getNode);
+    val testInputNodes = keepInputs(testNodes)
+    val testNonInputNodes = removeInputs(testNodes)
+    val isTester = testNodes.length > 0;
     harness.write("#include \"" + name + ".h\"\n");
+    if (isTester) {
+      harness.write("#include <vector>\n")
+      harness.write("std::string tests[] = {\n")
+      for (tv <- testVecs) {
+        harness.write("  ")
+        for (e <- tv) 
+          harness.write("\"" + e.toString(16) + "\", ")
+        harness.write("\n")
+      }
+      harness.write("};\n")
+    }
     harness.write("int main (int argc, char* argv[]) {\n");
     harness.write("  " + name + "_t* c = new " + name + "_t();\n");
     harness.write("  int lim = (argc > 1) ? atoi(argv[1]) : -1;\n");
     harness.write("  c->init();\n");
     if (isVCD)
       harness.write("  FILE *f = fopen(\"" + name + ".vcd\", \"w\");\n");
-    harness.write("  for (int t = 0; lim < 0 || t < lim; t++) {\n");
+    if (isTester) {
+      harness.write("  bool is_error = false;\n");
+      harness.write("  std::string *vecptr = tests;\n");
+      harness.write("  for (int t = 0; t < " + testVecs.length + "; t++) {\n");
+    } else 
+      harness.write("  for (int t = 0; lim < 0 || t < lim; t++) {\n");
     harness.write("    dat_t<1> reset = LIT<1>(t == 0);\n");
+    for (i <- 0 until testInputNodes.length) 
+      harness.write("    str_to_dat(*vecptr++, c->" + testInputNodes(i).emitRefC + ");\n")
     harness.write("    if (!c->scan(stdin)) break;\n");
     harness.write("    c->clock_lo(reset);\n");
     harness.write("    c->print(stdout);\n");
+    if (isTester) {
+      for (i <- 0 until testNonInputNodes.length) {
+        val node = testNonInputNodes(i)
+        harness.write("  " + node.emitDecC)
+        harness.write("    str_to_dat(*vecptr++, " + node.emitRefC + ");\n")
+        harness.write("    if ((" + node.emitRefC + " != c->" + node.emitRefC + ").to_bool()) {\n")
+        harness.write("      fprintf(stderr, \"MISMATCH ON OUT TEST %d OUT %d\\n\", t, " + i + ");\n")
+        harness.write("      is_error = true;\n")
+        harness.write("    }\n")
+      }
+    }
     harness.write("    c->clock_hi(reset);\n");
     if (isVCD)
       harness.write("    c->dump(f, t);\n");
     harness.write("  }\n");
+    if (isTester) 
+      harness.write("  exit(is_error);\n")
     harness.write("}\n");
     harness.close();
   }
@@ -1220,12 +1259,18 @@ abstract class Component(resetSignal: Bool = null) {
     node match {
       case b:Bundle => 
         val buf = ArrayBuffer[Node]();
-        for ((n, e) <- b.flatten) buf += e;
+        for ((n, e) <- b.flatten) buf += e.getNode;
         buf
       case o        => 
-        Array[Node](node);
+        Array[Node](node.getNode);
     }
   }
+  def isInput(node: Node) = 
+    node match { case b:Bits => b.dir == INPUT; case o => false }
+  def keepInputs(nodes: Seq[Node]): Seq[Node] = 
+    nodes.filter(isInput)
+  def removeInputs(nodes: Seq[Node]): Seq[Node] = 
+    nodes.filter(n => !isInput(n))
   def findCombinationalBlock(reg: Reg): AbstractFunction = {
     val traced = new HashSet[Node];
     val outsTraced = new HashMap[Node, BitSet];
@@ -1307,8 +1352,6 @@ abstract class Component(resetSignal: Bool = null) {
     val base_name = ensure_dir(targetDir)
     val out_h = new java.io.FileWriter(base_name + name + ".h");
     val out_c = new java.io.FileWriter(base_name + name + ".cpp");
-    if (isGenHarness)
-      genHarness(base_name, name);
     println("// COMPILING " + this + "(" + children.length + ")");
     topComponent = this;
     // isWalked.clear();
@@ -1369,6 +1412,8 @@ abstract class Component(resetSignal: Bool = null) {
     }
     
 
+    if (isGenHarness)
+      genHarness(base_name, name);
     // for (m <- omods)
     //   println("MOD " + m + " IN " + m.component.name);
     out_h.write("#include \"emulator.h\"\n\n");
@@ -1465,12 +1510,12 @@ abstract class Component(resetSignal: Bool = null) {
         else printFormat;
       val toks = splitPrintFormat(format);
       var i = 0;
-      // for(i <- 0 until printArgs.length)
-      //   printArgs(i) = printArgs(i).getNode
       for (tok <- toks) {
         if (tok(0) == '%') {
-          for (node <- maybeFlatten(printArgs(i))) 
-            out_c.write("  fprintf(f, \"%s\", " + node.getNode.emitRef + ".to_str().c_str());\n");
+          val nodes = maybeFlatten(printArgs(i))
+          for (j <- 0 until nodes.length) 
+            out_c.write("  fprintf(f, \"" + (if (j > 0) " " else "") + 
+                        "%s\", TO_CSTR(" + nodes(j).emitRef + "));\n");
           i += 1;
         } else {
           out_c.write("  fprintf(f, \"%s\", \"" + tok + "\");\n");
@@ -1487,7 +1532,7 @@ abstract class Component(resetSignal: Bool = null) {
         if (scanFormat == "") {
           var res = "";
           for (arg <- scanArgs) {
-            for (subarg <- maybeFlatten(arg)) {
+            for (subarg <- keepInputs(maybeFlatten(arg))) {
               if (res.length > 0) res = res + " ";
               res = res + "%llx";
             }
@@ -1497,8 +1542,8 @@ abstract class Component(resetSignal: Bool = null) {
           scanFormat;
       out_c.write("  int n = fscanf(f, \"" + format + "\"");
       for (arg <- scanArgs) {
-        for (subarg <- maybeFlatten(arg))
-          out_c.write(",  &" + subarg.getNode.emitRef + ".values[0]");
+        for (subarg <- keepInputs(maybeFlatten(arg)))
+          out_c.write(",  &" + subarg.emitRef + ".values[0]");
       }
       out_c.write(");\n");
       out_c.write("  return n == " + scanArgs.length + ";\n");
