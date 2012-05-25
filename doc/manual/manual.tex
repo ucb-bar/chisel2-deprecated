@@ -1219,14 +1219,16 @@ object Enum {
 \subsection{Math}
 
 \begin{scala}
-// next power of 2
-object log2up {
-  def apply(in: Int) = ceil(log(in)/log(2)).toInt
+// Returns the log base 2 of the input Scala 
+// Integer rounded up
+object log2Up {
+  def apply(in: Int): Int
 }
 
-object ispow2 {
-  def apply(in: Int) = 
-    in > 0 && ((in & (in-1)) == 0)
+// Returns true if the input Scala Integer 
+// is a power of 2
+object isPow2 {
+  def apply(in: Int): Boolean
 }
 
 object LFSR16 {
@@ -1237,9 +1239,16 @@ object LFSR16 {
 \subsection{Sequential}
 
 \begin{scala}
+// Returns a Bool that is asserted only 
+// when x transistions from low to high
 object PosEdge {
   def apply(x: Bool): Bool = 
-    x & !Reg(x);
+}
+
+// Returns the n-cycle delayed version 
+// of the input signal
+object ShiftRegister {
+  def apply [T <: Data](n: Int, in: T): T
 }
 
 object Counter {
@@ -1252,13 +1261,8 @@ object Counter {
   }
 }
 
-// n delays of input
-object ShiftRegister {
-  def apply [T <: Data](n: Int, in: T): T
-}
-
 object Pulse {
-  def apply(n: UFix) = 
+  def apply(n: UFix) =
     counter(n - UFix(1)) === UFix(0)
 }
 
@@ -1274,6 +1278,7 @@ object SquareWave {
   def apply(period: UFix) =
     toggle(pulse(period))
 }
+
 \end{scala}
 
 \subsection{Functional}
@@ -1281,55 +1286,70 @@ object SquareWave {
 
 \begin{scala}
 object foldR {
-  def apply[T <: Bits]
-    (x: Seq[T])(f: (T, T) => T): T
+  def apply[T <: Bits] (x: Seq[T])(f: (T, T) => T): T
 }
 \end{scala}
 
 \subsection{Bits}
 
 \begin{scala}
-// number of bits on
+// Returns the number of bits set in the 
+// input signal. Causes an exception if 
+// the input is wider than 32 bits.
 object PopCount {
   def apply(in: Bits): Bits
 }
 
-// bit reverse
+// Returns the reverse the input signal
 object Reverse {
   def apply(in: Bits): Bits
 }
 
-// one hot encoding to int
-object OHToUFix {
-  def apply(in: Bits): UFix
-  def apply(in: Seq[Bool]): UFix
-}
-
-// int to one hot encoding
+// returns the one hot encoding of
+// the input UFix
 object UFixToOH {
   def apply(in: UFix, width: Int): Bits
 }
 
-// one hot mux lookup
-object MuxOH {
-  def apply [T <: Data]
-    (sel: Bits, in: Vec[T]): T
-  def apply [T <: Data]
-    (sel: Vec[Bool], in: Vec[T]): T
+// does the inverse of UFixToOH
+object OHToUFix {
+  def apply(in: Bits): UFix
+
+  def apply(in: Seq[Bool]): UFix
 }
 
+// Builds a Mux tree out of the input signal 
+// vector using a one hot encoded select signal.
+// Returns the output of the Mux tree
+object MuxOH {
+  def apply [T <: Data] (sel: Bits, in: Vec[T]): T
+  def apply [T <: Data] (sel: Vec[Bool], in: Vec[T]): T
+}
+
+// Returns the bit position of the trailing 1 in 
+// the input vector with the assumption that 
+// multiple bits of the input bit vector can be 
+// set
 object PriorityEncoder {
   def apply(in: Bits): UFix
+  def apply(in: Seq[Bool]): UFix
 }
 
+// Returns the bit position of the trailing 1 in 
+// the input vector with the assumption that only 
+// one bit in the input vector can be set
 object PriorityEncoderOH {
   def apply(in: Bits): UFix
+  def apply(in: Seq[Boo]): UFix
 }
 \end{scala}
 
 \subsection{Decoupled}
 
 \begin{scala}
+// Adds a ready-valid handshaking protocol to any 
+// interface. The standard used is that the 
+// consumer uses the flipped interface.
 class ioDecoupled[+T <: Data]()(data: => T) 
     extends Bundle {
   val ready = Bool(INPUT)
@@ -1337,17 +1357,54 @@ class ioDecoupled[+T <: Data]()(data: => T)
   val bits  = data.asOutput
 }
 
+// Adds a valid protocol to any interface. The
+// standard used is that the consumer uses the
+// fliped interface.
 class ioPipe[+T <: Data]()(data: => T) 
     extends Bundle {
   val valid = Bool(OUTPUT)
   val bits = data.asOutput
 }
 
-Arbiters
+// Hardware module that is used to sequence 
+// n producers into 1 consumer. Priority is
+// given to lower producer
+// Example usage:
+//    val arb = new Arbiter(2){ Bits() }
+//    arb.io.in(0) <> producer0.io.out
+//    arb.io.in(1) <> producer1.io.out
+//    consumer.io.in <> arb.io.out
+class Arbiter[T <: Data](n: Int)(data: => T) extends Component 
 
-Queues
+// Hardware module that is used to sequence 
+// n producers into 1 consumer. Producers are
+// chosen in round robin order
+// Example usage:
+//    val arb = new RRArbiter(2){ Bits() }
+//    arb.io.in(0) <> producer0.io.out
+//    arb.io.in(1) <> producer1.io.out
+//    consumer.io.in <> arb.io.out
+class RRArbiter[T <: Data](n: Int)(data: => T) extends Component 
 
-Pipes
+// Generic hardware queue. Required parameter
+// entries parameter controls the depth of the 
+// queues. The width of the queue is 
+// determined from the inputs. Optional
+// parameters pipe and flushable determines
+// if the queue is flowthrough and if the 
+// contents can be flushed respectively.
+// Example usage:
+//    val q = new queue(16){ Bits() }
+//    q.io.enq <> producer.io.out
+//    consumer.io.in <> q.io.deq
+class queue[T <: Data]
+    (
+     entries: Int, 
+     pipe: Boolean = false, 
+     flushable: Boolean = false
+    )
+    (data: => T) extends Component  
+
 \end{scala}
 
 % henry
