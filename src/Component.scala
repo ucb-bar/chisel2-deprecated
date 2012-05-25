@@ -1008,6 +1008,14 @@ abstract class Component(resetSignal: Bool = null) {
   }
   def elaborate(fake: Int = 0) = {}
   def postMarkNet(fake: Int = 0) = {}
+  def splitFlattenNodes(args: Seq[Node]): (Seq[Node], Seq[Node]) = {
+    if (args.length == 0) {
+      (Array[Node](), Array[Node]())
+    } else {
+      val testNodes = testArgs.map(maybeFlatten).reduceLeft(_ ++ _).map(x => x.getNode);
+      (keepInputs(testNodes), removeInputs(testNodes))
+    }
+  }
   def genHarness(base_name: String, name: String) = {
     val makefile = new java.io.FileWriter(base_name + name + "-makefile");
     makefile.write("CPPFLAGS = -O2 -I../ -I${CHISEL_EMULATOR_INCLUDE}/\n\n");
@@ -1019,10 +1027,8 @@ abstract class Component(resetSignal: Bool = null) {
     makefile.write("\tg++ -c ${CPPFLAGS} " + name + "-emulator.cpp\n\n");
     makefile.close();
     val harness  = new java.io.FileWriter(base_name + name + "-emulator.cpp");
-    val testNodes = testArgs.map(maybeFlatten).reduceLeft(_ ++ _).map(x => x.getNode);
-    val testInputNodes = keepInputs(testNodes)
-    val testNonInputNodes = removeInputs(testNodes)
-    val isTester = testNodes.length > 0;
+    val (testInputNodes, testNonInputNodes) = splitFlattenNodes(testArgs)
+    val isTester = testArgs.length > 0;
     harness.write("#include \"" + name + ".h\"\n");
     if (isTester) {
       harness.write("#include <vector>\n")
@@ -1452,7 +1458,7 @@ abstract class Component(resetSignal: Bool = null) {
     // for (c <- children) 
     //   out_c.write("    " + c.emitRef + "->clock_hi(reset);\n");
     out_c.write("}\n");
-    def splitPrintFormat(s: String) = {
+    def splitFormat(s: String) = {
       var off = 0;
       var res: List[String] = Nil;
       for (i <- 0 until s.length) {
@@ -1462,7 +1468,7 @@ abstract class Component(resetSignal: Bool = null) {
           res = "%" :: res;
           if (i == (s.length-1)) {
             println("Badly formed format argument kind: %");
-          } else if (s(i+1) != '=') {
+          } else if (s(i+1) != 'x') {
             println("Unsupported format argument kind: %" + s(i+1));
           } 
           off = i + 2;
@@ -1477,7 +1483,7 @@ abstract class Component(resetSignal: Bool = null) {
       val format =
         if (printFormat == "") printArgs.map(a => "%=").reduceLeft((y,z) => z + " " + y) 
         else printFormat;
-      val toks = splitPrintFormat(format);
+      val toks = splitFormat(format);
       var i = 0;
       for (tok <- toks) {
         if (tok(0) == '%') {
@@ -1497,26 +1503,24 @@ abstract class Component(resetSignal: Bool = null) {
     def isConstantArg(arg: String) = constantArgSplit(arg).length == 2;
     out_c.write("bool " + name + "_t::scan ( FILE* f ) {\n");
     if (scanArgs.length > 0) {
-      val format = 
-        if (scanFormat == "") {
-          var res = "";
-          for (arg <- scanArgs) {
-            for (subarg <- keepInputs(maybeFlatten(arg))) {
-              if (res.length > 0) res = res + " ";
-              res = res + "%llx";
-            }
-          }
-          res
-        } else 
-          scanFormat;
-      out_c.write("  int n = fscanf(f, \"" + format + "\"");
-      for (arg <- scanArgs) {
-        for (subarg <- keepInputs(maybeFlatten(arg)))
-          out_c.write(",  &" + subarg.emitRef + ".values[0]");
+      val format =
+        if (scanFormat == "") scanArgs.map(a => "%=").reduceLeft((y,z) => z + " " + y) 
+        else scanFormat;
+      val toks = splitFormat(format);
+      var i = 0;
+      for (tok <- toks) {
+        if (tok(0) == '%') {
+          val nodes = keepInputs(maybeFlatten(scanArgs(i)))
+          for (j <- 0 until nodes.length) 
+            out_c.write("  str_to_dat(read_tok(f), " + nodes(j).emitRef + ");\n");
+          i += 1;
+        } else {
+          out_c.write("  fscanf(f, \"%s\", \"" + tok + "\");\n");
+        }
       }
-      out_c.write(");\n");
-      out_c.write("  return n == " + scanArgs.length + ";\n");
+      out_c.write("  getc(f);\n");
     }
+    out_c.write("  return(!feof(f));\n");
     out_c.write("}\n");
     dumpVCD(out_c);
     out_c.close();
