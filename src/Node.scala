@@ -12,8 +12,6 @@ import Component._;
 import ChiselError._;
 
 object Node {
-  // var cond = new Stack[Node];
-
   //implicits
   implicit def convBitsToBool(x: Bits): Bool = {
       if(x.getWidth > 1)

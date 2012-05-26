@@ -14,12 +14,9 @@ object Bundle {
   def nullbundle_t = Bundle(ArrayBuffer[(String, Data)]());
   def apply (elts: ArrayBuffer[(String, Data)]): Bundle = {
     val res = new Bundle();
-    // println("NEW BUNDLE");
     res.elementsCache = elts; // TODO: REMOVE REDUNDANT CREATION
-    for ((n, i) <- elts) {
+    for ((n, i) <- elts) 
       i.name = n;
-      // println("  ELT " + n + " " + i);
-    }
     res
   }
 
@@ -54,12 +51,10 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     var elts   = ArrayBuffer[(String, Data)]();
     val seen   = ArrayBuffer[Object]();
     var isCollecting = true;
-    // println("COLLECTING " + c + " IN VIEW " + view);
     for (m <- c.getMethods) {
       val name = m.getName();
       if (isCollecting) {
         val modifiers = m.getModifiers();
-        // println("  CHECKING " + name + " MODS " + modifiers);
         val types = m.getParameterTypes();
         val rtype = m.getReturnType();
         var isFound = false;
@@ -82,18 +77,13 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
           o match { 
 	    case bv: Vec[Data] => elts += ((name + bv.name, bv))
             case i: Data => elts += ((name, i)); i.name = name; 
-              // if (view != null)
-              //   println("    ADDING " + name + " -> " + o + " COMP " + i.component + " DONE " + (i.component == null));
-           case any =>
-              // println("    FOUND " + o);
+            case any =>
           }
           seen += o;
         }
       } else if (name == "elementsCache") 
-        // println("IS-COLLECTING");
         isCollecting = true;
     }
-    // println("END ->>>>");
     elts
   }
   def elements: ArrayBuffer[(String, Data)] = {
@@ -170,7 +160,6 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     return null;
   }
   override def <>(src: Node) = { 
-    // println("B <>'ing " + this + " & " + src);
     if(comp == null || (dir == "output" && 
 			src.isInstanceOf[Bundle] && 
 			src.asInstanceOf[Bundle].dir == "output")){
@@ -199,12 +188,10 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     }
   }
   override def ^^(src: Node) = { 
-    // println("B <>'ing " + this + " & " + src);
     src match {
       case other: Bundle =>
         for ((n, i) <- elements) {
           if(other.contains(n)) {
-            // println(" := ELT " + i + " & " + other(n));
             i ^^ other(n);
           }
         }

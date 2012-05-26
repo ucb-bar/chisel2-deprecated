@@ -4,7 +4,6 @@ import Node._;
 import ChiselError._;
 
 object UFix {
-  
   // def apply(x: BigInt): UFix = Lit(x){UFix()};
   // def apply(x: BigInt, width: Int): UFix = Lit(x, width){UFix()};
   def apply(x: Int): UFix = Lit(x){UFix()};

@@ -105,16 +105,11 @@ object ListLookupRef {
 }
 
 class ListLookupRef[T <: Bits]() extends Node {
-  //override def isInObject = false;
-
-  // override def toString: String = "W(" + name + ")"
   override def toString: String = name
   override def emitDef = "";
   override def emitDefLoC = "";
   override def emitDec: String = 
     "  reg[" + (width-1) + ":0] " + emitRef + ";\n";
-  // override def emitDecC: String = 
-  //   "  dat_t<" + width + "> " + emitRef + ";\n";
 }
 
 object ListNode {

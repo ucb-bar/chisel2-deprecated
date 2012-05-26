@@ -1,16 +1,10 @@
 // author: jonathan bachrach
 package Chisel {
 
-trait IODirection {
+trait IODirection;
 
-}
+object INPUT extends IODirection;
 
-object INPUT extends IODirection {
-
-}
-
-object OUTPUT extends IODirection {
-
-}
+object OUTPUT extends IODirection;
 
 }

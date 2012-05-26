@@ -14,26 +14,6 @@ object Reg {
   }
   val noInit = Lit(0){Fix()};
   def apply[T <: Data](data: T, width: Int, resetVal: T)(gen: => T): T = {
-
-    /*
-    val reg = new Reg()
-
-    // initialize
-    if(resetVal != null){
-      reg.isReset = true
-      reg.init("", regWidth(width), d, resetVal.toNode)
-    } else
-      reg.init("", regWidth(width), d)
-
-    // make output
-    val output = gen.fromNode(reg).asInstanceOf[T]
-    output.setIsTypeNode
-    output.comp = reg
-    reg.nameHolder = output
-    output.isRegOut = true
-    output
-    * */
-
     val d: Array[(String, Bits)] = 
       if(data == null) 
         gen.flatten.map{case(x, y) => (x -> null)}
@@ -168,8 +148,6 @@ class Reg extends Delay with proc {
     updateVal.emitRef + (if (isReset) ");\n" else ";\n");
 
     "  " + emitRef + "_shadow = " +  updateLogic;
-    // "  " + emitRef + "_shadow_out = " + emitRef + ";\n";
-    
   }
   override def emitDefHiC: String = {
     "  " + emitRef + " = " + emitRef + "_shadow;\n";

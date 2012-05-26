@@ -59,10 +59,8 @@ object Extract {
   def apply[T <: Bits](mod: T, bit: UFix)(gen: => T): T = {
     val (bits_lit, off_lit) = (mod.litOf, bit.litOf);
     if (isFolding && bits_lit != null && off_lit != null) {
-      // println("FOLDING EXTRACT " + bits_lit.value + "(" + off_lit.value + ")");
       makeLit(Literal((bits_lit.value >> off_lit.value.toInt)&1, 1)){ gen };
     } else {
-      // initialize 
       val extract = new Extract()
       extract.init("", fixWidth(1), mod.toNode, bit)
       extract.hi = bit
@@ -81,7 +79,6 @@ object Extract {
       val dw = if (w == -1) (hi_lit.value - lo_lit.value + 1).toInt else w;
       makeLit(Literal((bits_lit.value >> lo_lit.value.toInt)&((BigInt(1)<<dw) - BigInt(1)), dw)){ gen };
     } else {
-      // initialize
       val extract = new Extract()
       extract.init("", if(w == -1) widthOf(0) else fixWidth(w), mod.toNode, hi, lo)
       extract.hi = hi

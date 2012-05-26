@@ -347,7 +347,6 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
   }
 
   override def toBits(): Bits = {
-
     // var res: Bits = null
     // for(i <- 0 until length)
     //   res = Cat(this(i), res)

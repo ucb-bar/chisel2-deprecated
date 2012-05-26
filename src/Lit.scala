@@ -10,14 +10,6 @@ import Literal._;
 import ChiselError._;
 
 object Lit {
-  // def apply[T <: Bits](x: Int)(gen: => T): T = {
-  //   makeLit(Literal(x, signed = gen.isInstanceOf[Fix]))(gen)
-  // }
-
-  // def apply[T <: Bits](x: Int, width: Int)(gen: => T): T = {
-  //   makeLit(Literal(x, width, gen.isInstanceOf[Fix]))(gen)
-  // }
-
   def apply[T <: Bits](n: String, width: Int = -1)(gen: => T): T = {
     makeLit(Literal(n, width))(gen)
   }
@@ -117,7 +109,6 @@ object Literal {
     var res = "";
     val numNibbles = (x.length-1) / 4 + 1;
     val pad = pads(x.length % 4);
-    // println("X = " + x + " NN = " + numNibbles + " PAD = " + pad);
     for (i <- 0 until numNibbles) {
       res += toHexNibble(x, i*4 - pad);
     }
@@ -179,14 +170,6 @@ object Literal {
       BigInt(-1)
   }
 
-  // def apply(x: BigInt, width: Int = -1, signed: Boolean = false): Literal = { 
-  //   val res = new Literal(); 
-  //   val (w, numString) = signedsizeof(x, width, signed);
-  //   res.init("0x" + numString, w); 
-  //   res.inputVal = x;
-  //   res 
-  // }
-
   def apply(x: BigInt, width: Int = -1, signed: Boolean = false): Literal = { 
     val res = new Literal(); 
     val xWidth = max(x.bitLength, 1) + (if(signed) 1 else 0)
@@ -226,7 +209,6 @@ class Literal extends Node {
   var isBinary = false;
   var base = 'x';
   var inputVal = BigInt(0);
-  // override def toString: String = "LIT(" + name + ")"
   override def value: BigInt = stringToVal(base, name);
   override def maxNum = value;
   override def minNum = value;

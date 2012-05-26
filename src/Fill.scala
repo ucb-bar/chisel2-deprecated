@@ -13,7 +13,6 @@ object Fill {
     if (n == 1) {
       mod
     } else if (isFolding && bits_lit != null) {
-      // println("FOLDING EXTRACT " + bits_lit.value + "(" + off_lit.value + ")");
       var res = bits_lit.value;
       val w   = mod.getWidth();
       for (i <- 0 until n-1) 
@@ -21,8 +20,6 @@ object Fill {
       Lit(res, n * w){ Bits() };
     } else {
       val fill = new Fill()
-
-      // initialize
       val fillConst = UFix(n)
       fill.init("", fillWidthOf(0, fillConst), mod, fillConst)
       fill.setTypeNode(Bits(OUTPUT))

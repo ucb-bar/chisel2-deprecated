@@ -667,19 +667,6 @@ abstract class Component(resetSignal: Bool = null) {
     }
     roots
   }
-  def findLeaves(): ArrayBuffer[Node] = {
-    val leaves = new ArrayBuffer[Node];
-    for (m <- mods) {
-      m match {
-        case io: Bits          => if (io.dir == INPUT && !io.isTypeNode) { if (io.inputs.length == 0) leaves += m; }
-        case l: Literal      => leaves += m;
-        case d: Delay        => leaves += m;
-	case mr: MemRef[ _ ] => if(mr.isReg) leaves += m;
-        case any             =>
-      }
-    }
-    leaves
-  }
   def visitNodes(roots: Array[Node]) = {
     val stack = new Stack[(Int, Node)]();
     for (root <- roots)
@@ -688,14 +675,11 @@ abstract class Component(resetSignal: Bool = null) {
     while (stack.length > 0) {
       val (newDepth, node) = stack.pop();
       val comp = node.componentOf;
-      // println("VISIT NODE(" + newDepth + ") " + comp.name + ": " + node.name);
       if (newDepth == -1) 
         comp.omods += node;
       else {
         node.depth = max(node.depth, newDepth);
-        //println("THINKING MOD(" + depth + ") " + comp.name + ": " + node.name);
         if (!comp.isWalked.contains(node)) {
-          //println(depthString(depth) + "FiND MODS " + node + " IN " + comp.name);
           comp.isWalked += node;
           node.walked = true;
           stack.push((-1, node));
@@ -708,10 +692,8 @@ abstract class Component(resetSignal: Bool = null) {
               }
             }
           }
-          // println("VISITING MOD " + node + " DEPTH " + depth);
         }
       }
-      // node.visitNode(depth, stack);
     }
   }
   def findOrdering() = visitNodes(findRoots().toArray);
@@ -876,17 +858,12 @@ abstract class Component(resetSignal: Bool = null) {
     println("// " + depthString(depth) + "COMPILING " + this + " " + children.length + " CHILDREN");
     for (top <- children)
       top.doCompileV(out, depth+1);
-    // isWalked.clear();
     findConsumers();
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors) err.printError;
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
     }
-    //inferAll();
     collectNodes(this);
-    // for (m <- mods) {
-    //   println("// " + depthString(depth+1) + " MOD " + m);
-    // }
     val hasReg = containsReg || childrenContainsReg;
     val res = new StringBuilder()
     res.append((if (hasReg) "input clk, input reset" else ""));
@@ -911,13 +888,9 @@ abstract class Component(resetSignal: Bool = null) {
     res.append(emitDecs);
     res.append("\n");
     res.append(emitDefs);
-    //res += emitDecs + "\n" + emitDefs
-    // for (o <- outputs)
-    //   out.writeln("  assign " + o.emitRef + " = " + o.inputs(0).emitRef + ";");
     if (regs.size > 0) {
       res.append("\n");
       res.append(emitRegs);
-      //res += "\n" + emitRegs;
     }
     res.append("endmodule\n\n");
     if(compDefs contains res){
@@ -932,7 +905,6 @@ abstract class Component(resetSignal: Bool = null) {
       res.insert(0, "module " + moduleName + "(");
       out.append(res);
     }
-    // println("// " + depthString(depth) + "DONE");
   }
   def compileV(): Unit = {
     topComponent = this;
@@ -983,7 +955,6 @@ abstract class Component(resetSignal: Bool = null) {
   }
 
   def nameAllIO(): Unit = {
-    // println("NAMING " + this);
     io.name_it("");
     for (child <- children) 
       child.nameAllIO();
@@ -1329,7 +1300,6 @@ abstract class Component(resetSignal: Bool = null) {
     val out_c = new java.io.FileWriter(base_name + name + ".cpp");
     println("// COMPILING " + this + "(" + children.length + ")");
     topComponent = this;
-    // isWalked.clear();
     assignResets()
     removeTypeNodes()
     if(!ChiselErrors.isEmpty){
@@ -1379,7 +1349,6 @@ abstract class Component(resetSignal: Bool = null) {
     }
     }
     findOrdering(); // search from roots  -- create omods
-    // findGraph();    // search from leaves -- create gmods
     renameNodesC(omods);
     if (isReportDims) {
     val (numNodes, maxWidth, maxDepth) = findGraphDims();
@@ -1389,8 +1358,6 @@ abstract class Component(resetSignal: Bool = null) {
 
     if (isGenHarness)
       genHarness(base_name, name);
-    // for (m <- omods)
-    //   println("MOD " + m + " IN " + m.component.name);
     out_h.write("#include \"emulator.h\"\n\n");
     out_h.write("class " + name + "_t : public mod_t {\n");
     out_h.write(" public:\n");
@@ -1447,16 +1414,12 @@ abstract class Component(resetSignal: Bool = null) {
     for (a <- asserts) {
       out_c.write("  ASSERT(" + a.cond.emitRefC + ", \"" + a.message + "\");\n");
     }
-    // for (c <- children) 
-    //   out_c.write("    " + c.emitRef + "->clock_lo(reset);\n");
     out_c.write("}\n");
     out_c.write("void " + name + "_t::clock_hi ( dat_t<1> reset ) {\n");
     for (r <- omods) 
       out_c.write(r.emitInitHiC);
     for (m <- omods) 
       out_c.write(m.emitDefHiC);
-    // for (c <- children) 
-    //   out_c.write("    " + c.emitRef + "->clock_hi(reset);\n");
     out_c.write("}\n");
     def splitFormat(s: String) = {
       var off = 0;
