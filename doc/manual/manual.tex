@@ -277,9 +277,7 @@ class Bits extends Data with Updateable {
   def apply(hi: Int, lo: Int): Bits
 }
 
-object Cat {
-  def apply[T <: Data](elt: T, elts: T*): Bits
-}
+def Cat[T <: Data](elt: T, elts: T*): Bits
 \end{scala}
 
 \noindent
@@ -291,19 +289,14 @@ Chisel's bitwise comparison is named \code{===}.
 
 A field of width \code{n} can be created from a single bit using \code{Fill}:
 \begin{scala}
-object Fill {
-  def apply(n: Int, field: Bits): Bits
-}
+def Fill(n: Int, field: Bits): Bits
 \end{scala}
 
 \noindent
 and two inputs can be selected using \code{Mux}:
 
 \begin{scala}
-object Mux {
-  def apply[T <: Data]
-    (sel: Bits, cons: T, alt: T): T
-}
+def Mux[T <: Data](sel: Bits, cons: T, alt: T): T
 \end{scala}
 
 \noindent
@@ -836,7 +829,7 @@ class Rom extends BlackBox {
 }
 \end{scala}
 
-\section{Main}
+\section{Main and Testing}
 
 In order to construct a circuit, 
 the user calls \code{chiselMain} from their top level \code{main} function:
@@ -881,8 +874,8 @@ We can use the \code{chiselMainDebug} call and \code{TestIO} objects as follows:
 \begin{scala}
 object tutorial {
   def main(args: Array[String]) = {
-    chiselMainDebug(args ++ Array("--gen-harness"), 
-                    () => new Mux2())(
+    val dargs = args ++ Array("--gen-harness")
+    chiselMainDebug(dargs, () => new Mux2())(
       c => Scanner("%x %x %x",
                    c.io.sel, c.io.in0, c.io.in1),
       c => Printer("%= %= %= %=", 
@@ -906,8 +899,8 @@ as above:
 \begin{scala}
 object tutorial {
   def main(args: Array[String]) = {
-    chiselMainDebug(args ++ Array("--gen-harness"), 
-                    () => new Mux2())(
+    val dargs = args ++ Array("--gen-harness")
+    chiselMainDebug(dargs, () => new Mux2())(
       c => Scanner("%x", c.io),
       c => Printer("%x", c.io)
   }
@@ -986,8 +979,8 @@ object tutorial {
            Array(1, 1, 0, 0),
            Array(1, 1, 1, 1))
   def main(args: Array[String]) = {
-    chiselMainTest(args ++ Array("--gen-harness"), 
-                   () => new Mux2())(
+    val targs = args ++ Array("--gen-harness") 
+    chiselMainTest(targs, () => new Mux2())(
       c => Printer("%x", c.io),
       c => Tester(tsts, c.io)
    )
@@ -1180,42 +1173,32 @@ the same interface and body are cached and reused.
 \lstset{language=scala}
 
 \begin{scala}
-object ListLookup {
-  def apply[T <: Bits]
-    (addr: Bits, default: List[T], 
-     mapping: Array[(Bits, List[T])]): List[T]
-}
+def ListLookup[T <: Bits]
+  (addr: Bits, default: List[T], 
+   mapping: Array[(Bits, List[T])]): List[T]
 
-object Lookup {
-  def apply[T <: Data]
-    (addr: Bits, default: T, 
-     mapping: Seq[(Bits, T)]): T
-}
+def Lookup[T <: Data]
+  (addr: Bits, default: T, 
+   mapping: Seq[(Bits, T)]): T
 
 // n-way multiplexor
-object MuxCase {
-  def apply[T <: Data] 
-    (default: T, mapping: Seq[(Bool, T)]): T
-}
+def MuxCase[T <: Data] 
+  (default: T, mapping: Seq[(Bool, T)]): T
 
 // n-way indexed multiplexer:
-object MuxLookup {
-  def apply[S <: Bits, T <: Data] 
-    (key: S, default: T, mapping: Seq[(S, T)]): T
-}
+def MuxLookup[S <: Bits, T <: Data] 
+  (key: S, default: T, mapping: Seq[(S, T)]): T
 \end{scala}
 
-\begin{scala}
-Probe
-\end{scala}
+% TODO: PROBE
+% \begin{scala}
+% Probe
+% \end{scala}
 
 \begin{scala}
-// enumerations 
-object Enum {
-  // create n enum values of given type
-  def apply[T <: Bits]
-    (n: Int)(type: => T): List[T]
-}
+// create n enum values of given type
+def Enum[T <: Bits]
+  (n: Int)(type: => T): List[T]
 \end{scala}
 
 % \section{Name Mangling}
@@ -1236,19 +1219,14 @@ object Enum {
 \begin{scala}
 // Returns the log base 2 of the input Scala 
 // Integer rounded up
-object log2Up {
-  def apply(in: Int): Int
-}
+def log2Up(in: Int): Int
 
 // Returns true if the input Scala Integer 
 // is a power of 2
-object isPow2 {
-  def apply(in: Int): Boolean
-}
+def isPow2(in: Int): Boolean
 
-object LFSR16 {
-  def apply(increment: Bool = Bool(true)): Bits
-}
+// linear feedback shift register
+def LFSR16(increment: Bool = Bool(true)): Bits
 \end{scala}
 
 \subsection{Sequential}
@@ -1256,53 +1234,40 @@ object LFSR16 {
 \begin{scala}
 // Returns a Bool that is asserted only 
 // when x transistions from low to high
-object PosEdge {
-  def apply(x: Bool): Bool = 
-}
+def PosEdge(x: Bool): Bool = 
+  x && !Reg(x)
 
 // Returns the n-cycle delayed version 
 // of the input signal
-object ShiftRegister {
-  def apply [T <: Data](n: Int, in: T): T
+def ShiftRegister[T <: Data](n: Int, in: T): T
+
+def overflow(n: UFix, max: UFix) =
+  Mux(n > max, UFix(0), n)
+
+def Counter (max: UFix): UFix = {
+  val x = Reg(resetVal = UFix(0, max.getWidth))
+  x := overflow(x + UFix(1), max)
+  x
 }
 
-object Counter {
-  def overflow(n: UFix, max: UFix) =
-    Mux(n > max, UFix(0), n)
-  def apply (max: UFix): UFix = {
-    val x = Reg(resetVal = UFix(0, max.getWidth))
-    x := overflow(x + UFix(1), max)
-    x
-  }
+def Pulse (n: UFix) =
+  counter(n - UFix(1)) === UFix(0)
+
+def Toggle(p: Bool) = {
+  val x = Reg(resetVal = Bool(false))
+  x := Mux(p, !x, x)
+  x
 }
 
-object Pulse {
-  def apply(n: UFix) =
-    counter(n - UFix(1)) === UFix(0)
-}
-
-object Toggle {
-  def apply(p: Bool) = {
-    val x = Reg(resetVal = Bool(false))
-    x := Mux(p, !x, x)
-    x
-  }
-}
-
-object SquareWave {
-  def apply(period: UFix) =
-    toggle(pulse(period))
-}
-
+def SquareWave(period: UFix) =
+  toggle(pulse(period))
 \end{scala}
 
 \subsection{Functional}
 
 
 \begin{scala}
-object foldR {
-  def apply[T <: Bits] (x: Seq[T])(f: (T, T) => T): T
-}
+def foldR[T <: Bits](x: Seq[T])(f: (T, T) => T): T
 \end{scala}
 
 \subsection{Bits}
@@ -1311,52 +1276,38 @@ object foldR {
 // Returns the number of bits set in the 
 // input signal. Causes an exception if 
 // the input is wider than 32 bits.
-object PopCount {
-  def apply(in: Bits): Bits
-}
+def PopCount(in: Bits): Bits
 
 // Returns the reverse the input signal
-object Reverse {
-  def apply(in: Bits): Bits
-}
+def Reverse(in: Bits): Bits
 
 // returns the one hot encoding of
 // the input UFix
-object UFixToOH {
-  def apply(in: UFix, width: Int): Bits
-}
+def UFixToOH(in: UFix, width: Int): Bits
 
 // does the inverse of UFixToOH
-object OHToUFix {
-  def apply(in: Bits): UFix
-
-  def apply(in: Seq[Bool]): UFix
-}
+def OHToUFix(in: Bits): UFix
+def OHToUFix(in: Seq[Bool]): UFix
 
 // Builds a Mux tree out of the input signal 
 // vector using a one hot encoded select signal.
 // Returns the output of the Mux tree
-object MuxOH {
-  def apply [T <: Data] (sel: Bits, in: Vec[T]): T
-  def apply [T <: Data] (sel: Vec[Bool], in: Vec[T]): T
-}
+def MuxOH[T <: Data](sel: Bits, in: Vec[T]): T
+def MuxOH[T <: Data](sel: Vec[Bool], in: Vec[T]): T
 
 // Returns the bit position of the trailing 1 in 
 // the input vector with the assumption that 
 // multiple bits of the input bit vector can be 
 // set
-object PriorityEncoder {
-  def apply(in: Bits): UFix
-  def apply(in: Seq[Bool]): UFix
-}
+def PriorityEncoder(in: Bits): UFix
+
+def PriorityEncoder(in: Seq[Bool]): UFix
 
 // Returns the bit position of the trailing 1 in 
 // the input vector with the assumption that only 
 // one bit in the input vector can be set
-object PriorityEncoderOH {
-  def apply(in: Bits): UFix
-  def apply(in: Seq[Boo]): UFix
-}
+def PriorityEncoderOH(in: Bits): UFix
+def PriorityEncoderOH(in: Seq[Boo]): UFix
 \end{scala}
 
 \subsection{Decoupled}
@@ -1413,13 +1364,10 @@ class RRArbiter[T <: Data](n: Int)(data: => T) extends Component
 //    q.io.enq <> producer.io.out
 //    consumer.io.in <> q.io.deq
 class queue[T <: Data]
-    (
-     entries: Int, 
+    (entries: Int, 
      pipe: Boolean = false, 
-     flushable: Boolean = false
-    )
+     flushable: Boolean = false)
     (data: => T) extends Component  
-
 \end{scala}
 
 % henry
