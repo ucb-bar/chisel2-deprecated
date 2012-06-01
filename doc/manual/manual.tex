@@ -490,7 +490,7 @@ Users are required to set bitwidths of ports and registers, but otherwise,
 bit widths on nodes are automatically inferred unless set manually by
 the user (using \code{Extract} or \code{Cat}).
 The bit-width inference engine starts from the graph's input ports and 
-calculates node output bit widths from their respective input bit widths according to the following set of rules:\\
+calculates node output bit widths from their respective input bit widths according to the following set of rules:\\[-2mm]
 
 {\small
 \begin{tabular}{ll}
@@ -588,32 +588,25 @@ Chisel provides some syntactic sugar for other common forms of
 conditional updates:
 
 \begin{scala}
-object unless {
-  def apply(c: Bool)(block: => Unit) = 
-    when (!c) { block )
-}
+def unless(c: Bool)(block: => Unit) = 
+  when (!c) { block )
 \end{scala}
 
 \noindent 
 and
 
 \begin{scala}
-object otherwise {
-  def apply(block: => Unit) = 
-    when (Bool(true)) { block }
-}
+def otherwise(block: => Unit) = 
+  when (Bool(true)) { block }
 \end{scala}
 
 We introduce the \code{switch} statement for conditional updates
 involving a series of comparisons against a common key:
 
 \begin{scala}
-object switch {
-  def apply(c: Bits)(block: => Unit): Unit
-}
-object is {
-  def apply(v: Bits)(block: => Unit)
-}
+def switch(c: Bits)(block: => Unit): Unit
+
+def is(v: Bits)(block: => Unit)
 \end{scala}
 
 \section{Forward Declarations}
@@ -723,8 +716,8 @@ when (en) {
 \begin{example}
 todo: rules for 
 o determining number of ports
-o for setting read latency
-o for inferring write mask
+o setting read latency
+o inferring write mask
 \end{example}
 
 \section{Ports}
@@ -843,13 +836,14 @@ object chiselMain {
 
 \noindent
 which when run creates a C++ files named
-\code{{\it component\_name}.cpp} and \code{{\it component\_name}.h} in directory specified with
+\code{{\it component\_name}.cpp} and \code{{\it component\_name}.h} in
+the directory specified with
 \code{--target-dir {\it dir\_name}} argument.
 
-Testing is a crucial part of circuit design.
-Testing can be challenging and thus in Chisel we provide a mechanism for
-testing circuits by providing test inputs and printing out results:
-In order to specify Input / Output on a constructed circuit as follows:
+Testing is a crucial part of circuit design, 
+and thus in Chisel we provide a mechanism for
+testing circuits by providing test inputs and printing out results
+in order to specify Input / Output on a constructed circuit as follows:
 
 \begin{scala}
 class TestIO
@@ -878,7 +872,7 @@ object tutorial {
     chiselMainDebug(dargs, () => new Mux2())(
       c => Scanner("%x %x %x",
                    c.io.sel, c.io.in0, c.io.in1),
-      c => Printer("%= %= %= %=", 
+      c => Printer("%x %x %x %x", 
                    c.io.sel, c.io.in0, c.io.in1, 
                    c.io.out))
   }
@@ -887,7 +881,7 @@ object tutorial {
 
 \noindent
 where the first three hex numbers from each line are read in from
-standard input are bound to the \code{sel}, \code{in0},  and
+standard input and bound to the \code{sel}, \code{in0},  and
 \code{in1} inputs of the multiplexer circuit, and the multiplexer
 inputs and \code{out} are printed out in hex format.  
 
@@ -938,13 +932,13 @@ cut -f 1,2,3 -d " " < test | Mux2 > test.out
 diff test.out test
 \end{scala}
  
-Another way to test circuits is with the \code{chiselMainTest}
-function by directly supplying test vectors:
+Yet another way to test circuits is with the \code{chiselMainTest}
+function by directly supplying test vectors in a Chisel program:
 
 \begin{scala}
 class Tester
   (val vecs: Array[Array[BigInt]], 
-   val args: Seq[Data])
+   val bindings: Seq[Data])
 
 object chiselMainTest {
   def apply[T <: Component]
@@ -958,13 +952,14 @@ object chiselMainTest {
 where users specify a \code{Tester} object consisting of test vectors and
 test vector bindings.
 Test vectors are sequences of \code{BitInt}s, 
-where  each test vector has an input prefix and a non-input suffix.
-The test vector bindings are nodes that are flattened and split into
-input and non-input leaves.
-\code{chiselMainTest} generates code that scans test vectors one a
+where  each test vector has input in the first part of the sequence
+and non-input in the remaining part of the sequence.
+The test vector bindings are nodes specified to
+\code{Tester} that are flattened and split into input and non-input leaves.
+\code{chiselMainTest} generates code that scans test vectors one at a
 time, binding inputs,  running the circuit, and then comparing the
 produced non input values to the supplied test vector ones.
-The app exits with the return code equal to all test vectors matching.
+The app exits with its return code equal to all test vectors not matching.
 For example, we can test \code{Mux2} using the following:
 
 \begin{scala}
