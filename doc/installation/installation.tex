@@ -91,47 +91,46 @@ Hardware In a Scala Embedded Language).  Chisel is a hardware
 construction language embedded in the high-level programming language
 Scala.  
 
-\section{Software}
+\section{Setting Up Chisel}
 
-\subsection{Port}
-
-For MacOSX, install \verb+port+ from:\\
-
-\url{http://www.macports.org/install.php}.
-
-\subsection{Java}
-
-Install a modern Java runtime and compiler.
-For Linux, install packages \verb+openjdk-7-jdk+ and
-\verb+openjdk-7-jre+ using \verb+apt-get install+.
-For MacOSX, install \verb+openjdk6+ using \verb+port install+.
-
-\subsection{SBT}
-
-SBT is the Scala Build Tool and is similar to Maven for Java.  Install
-and setup SBT using instructions from: \\
-
-\begin{scriptsize}
-\url{https://github.com/harrah/xsbt/wiki/Getting-Started-Setup}
-\end{scriptsize}
-
-\subsection{C++}
-
-Make sure that you have \verb|g++| installed on your system.  On Linux
-install \verb|g++| package.  On MacOSX, install XCode.
-
-\subsection{Git}
-
-Install \verb+git+ from package.
-
-\section{Github}
+\subsection{Github}
 
 \begin{itemize}
 \item Get an account on \verb|www.github.com|
 \item Register your public key on \verb|github.com|
-\item run \verb|git clone git@github.com:ucb-bar/chisel.git|
-\item set \verb+$CHISEL+ to that directory
 \end{itemize}
+
+\subsection{Install}
+
+To install Chisel, download and run the \verb|install| script 
+provided on the website. Note: python must be installed for 
+this script to work. The script does the following:
+\begin{enumerate}
+  \item installs \verb|g++| if necessary
+  \item installs Java runtime and compiler if necessary
+  \item installs \verb+git+ if necessary
+  \item prompts for a location to install Chisel (needs an absolute path)\label{step:chiseldir}
+  \item clones Chisel into the location provided by Step~\ref{step:chiseldir}
+\end{enumerate}
+
+After running the installation script, you need to set the CHISEL
+environment variable in your bashrc file to point to where you
+installed Chisel in Step~\ref{step:chiseldir}.
+
+\subsection{Verify}
+To verify that everything has been configured correctly, download 
+run the \verb|verify| script provided on teh website. The
+script will run the compiler on simple use case. If everything
+goes correctly, you should find the following files in 
+\$CHISEL/emulator:
+\begin{itemize}
+  \item GCD-emulator.cpp
+  \item GCD-makefile
+  \item GCD.h
+  \item GCD.cpp
+\end{itemize}
+
+\section{Github}
 
 The following is the Chisel directory structure:
 
