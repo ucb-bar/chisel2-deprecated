@@ -19,4 +19,5 @@ object ChiselBuild extends Build
   import BuildSettings._
 
   lazy val chisel = Project("chisel", file("chisel"), settings = buildSettings)
+  lazy val verify = Project("verify", file("verify"), settings = buildSettings) dependsOn(chisel)
 }

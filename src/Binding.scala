@@ -16,17 +16,11 @@ object Binding {
 	res.infer;
 	var genName = ioComp.genName(m.name);
 	if(c.nameSpace.contains(genName)) genName += ("_" + res.emitIndex);
-        //res.name = ioComp.genName(m.name); 
-	// TODO: NAME
 	res.name = genName;
 	res.named = true;
-        // println("ADDING NEW BINDING " + m);
-        // println("ADDING BINDING " + res + " TO " + res.component.name);
-        // res.component.bindings += res;
         c.bindings += res;
         res
       } else {
-        // println("FOUND BINDING " + res);
         res;
       }
     } else
@@ -34,7 +28,6 @@ object Binding {
   }
 }
 class Binding extends Node {
-  // override def emitDec: String = "";
   override def emitDef: String = "";
   override def toString: String = "BINDING(" + inputs(0) + ")";
   override def emitDecC: String = 

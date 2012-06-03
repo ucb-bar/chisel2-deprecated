@@ -9,12 +9,9 @@ import scala.collection.mutable.Stack
 import scala.math.max;
 import Node._;
 import Component._;
-import IOdir._;
 import ChiselError._;
 
 object Node {
-  // var cond = new Stack[Node];
-
   //implicits
   implicit def convBitsToBool(x: Bits): Bool = {
       if(x.getWidth > 1)
@@ -67,47 +64,9 @@ object Node {
     } 
   }
   def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).getWidth - n.minNum.toInt }
-  //var reset: Fix = Fix(1, INPUT);//Input("reset", 1);
-  //reset.setName("reset");
-  //var resets = Queue[Fix]();
 
-  var clk: Node = Bits(1, INPUT);//Input("clk", 1);
-  clk.setName("clk");
-
-  /*
-  def pushReset(r: Fix) { resets.enqueue(reset); reset = r }
-  def popReset() { reset = resets.dequeue() }
-  def withReset(r: Fix)(block: => Node) = {
-    val resBak = reset; reset = r; 
-    val res = block; 
-    reset = resBak;
-    res
-  }
-  * */
-  // TODO: WHY IS THIS HERE?
-/*
-  def ListLookup(addr: Node, default: List[Node], mapping: Array[(Node, List[Node])]): List[UFix] = {
-    val ll = new ListLookup(mapping, default);
-    ll.init("", widthOf(1), addr);
-    for (w <- ll.wires)
-      w.lookup = ll;
-    for (e <- default)
-      ll.inputs += e;
-    for ((addr, data) <- mapping){
-      for (e <- data){
-        ll.inputs += e;
-      }
-    }
-    ll.wires.map(x => {
-      val res = UFix(OUTPUT);
-      res.setIsCellIO;
-      x.nameHolder = res;
-      res assign x;
-      res
-    })
-  }
-
-* */
+  var clk: Node = Bits(1, INPUT)
+  clk.setName("clk")
 
   var stop = true;
   
@@ -120,7 +79,7 @@ abstract class Node extends nameable{
   var staticComp: Component = getComponent();
   var component: Component = null;
   var flattened = false;
-  var isCellIO = false;
+  var isTypeNode = false;
   var depth = 0;
   def componentOf: Component = if (isEmittingComponents && component != null) component else topComponent
   var isSigned = false;
@@ -140,8 +99,6 @@ abstract class Node extends nameable{
   var line: Array[StackTraceElement] = Thread.currentThread().getStackTrace
   
   def isByValue: Boolean = true;
-  def isTerminator = false;
-  def isTerminated = (inputs.size == 1 && inputs(0).isTerminator);
   def width: Int = width_;
   def width_=(w: Int) = { isFixedWidth = true; width_ = width; inferWidth = fixWidth(w); }
   def name_it (path: String, setNamed: Boolean = true) = { name = path; named = setNamed}
@@ -155,14 +112,14 @@ abstract class Node extends nameable{
   def litOf: Literal = {
     if(inputs.length == 0)
       if (isLit) this.asInstanceOf[Literal] else null
-    else if(inputs.length == 1 && isCellIO)
+    else if(inputs.length == 1 && isTypeNode)
       inputs(0).litOf
     else
       null
   }
   def value = BigInt(-1);
   def signed: this.type = { 
-    val res = Wire(){Fix()};
+    val res = Fix()
     res := this.asInstanceOf[Fix];
     res.isSigned = true; 
     res.asInstanceOf[this.type]
@@ -173,20 +130,15 @@ abstract class Node extends nameable{
   }
   // TODO: MOVE TO WIRE
   def assign(src: Node) = { 
-    if (!src.isTerminated) {
-      if (inputs.length > 0) 
-        inputs(0) = src; 
-      else 
-        inputs += src; 
-    }
+    if (inputs.length > 0) 
+      inputs(0) = src; 
+    else 
+      inputs += src; 
   }
   def <>(src: Node) = { 
-    // println("M <>'ing " + this + " & " + src);
     this assign src 
   }
   def ^^(src: Node) = { 
-    // println("^^ " + this + " & " + src);
-    //this := src 
     println("NODE ^^ " + this.getClass + " " + src);
     src assign this;
   }
@@ -205,7 +157,6 @@ abstract class Node extends nameable{
   def initOf (n: String, width: (Node) => Int, ins: List[Node]): Node = { 
     name = n; 
     inferWidth = width;
-    // if (name == "") index = component.nextIndex;
     for (i <- ins)
       inputs += i;
     this
@@ -229,21 +180,16 @@ abstract class Node extends nameable{
 	genError = true;
       return false;
     }
-    // println("INFER " + this + " -> " + res);
     if(res == -1) {
-      //inferCount += 1;
       return true
     } else if (res != width) {
       width_ = res;
-      //inferCount += 1;
       return true;
     } else{
       return false;
     }
   }
   def emitIndex: Int = { if (index == -1) index = componentOf.nextIndex; index }
-  // TODO: SUBCLASS FROM SOMETHING INSTEAD OR OVERRIDE METHOD
-  // TODO: RENAME METHOD TO ISVOLATILE
   def isInObject = 
     (isIo && (isIoDebug || component == topComponent)) || 
     (topComponent.debugs.contains(this) && named) || 
@@ -259,11 +205,9 @@ abstract class Node extends nameable{
       emitRef
   def emitRefVCD: String = emitRef;
   def emitRef: String = if (backendName == "c") emitRefC else emitRefV;
-  //def emitRefV: String = if (name == "") "T" + emitIndex else name
   def emitRefV = if(name == "" || !named) "T" + emitIndex else if(!named) name + "_" + emitIndex else name
   def dotName = { val name = this.getClass.getName; name.substring(7, name.size) };
   def emitRefDot: String = emitRef;
-  // def emitRef: String = "T" + emitIndex;
   def emitDef: String = ""
   def emitReg: String = ""
   def emitWidth: String = if(width == 1) "" else "[" + (width-1) + ":0]"
@@ -287,58 +231,6 @@ abstract class Node extends nameable{
       res += "  ";
     res
   }
-
-  /*
-  def visitNode(newDepth: Int, stack: Stack[(Int, Node)]): Unit = {
-    val comp = componentOf;
-    // println("VISIT NODE(" + newDepth + ") " + comp.name + ": " + this.name);
-    if (newDepth == -1) 
-      comp.omods += this;
-    else {
-      depth = max(depth, newDepth);
-      //println("THINKING MOD(" + depth + ") " + comp.name + ": " + this.name);
-      if (!comp.isWalked.contains(this)) {
-        //println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
-        comp.isWalked += this;
-        this.walked = true;
-        stack.push((-1, this));
-        for (i <- inputs) {
-          if (i != null) {
-            i match {
-              case m: MemRef[ _ ] => if(!m.isReg) stack.push((newDepth+1, i));
-              case d: Delay       => 
-              case o              => stack.push((newDepth+1, o)); 
-            }
-          }
-        }
-        // println("VISITING MOD " + this + " DEPTH " + depth);
-      }
-    }
-  }
-
-  def visitNodeRev(newDepth: Int, stack: Stack[(Int, Node)]): Unit = {
-    val comp = componentOf;
-    if (newDepth == -1)
-      comp.gmods += this;
-    else {
-      depth = max(depth, newDepth);
-      if (!comp.isWalked.contains(this)) {
-        // println(depthString(depth) + "FiND MODS " + this + " IN " + comp.name);
-        comp.isWalked += this;
-        stack.push((-1, this));
-        for (c <- consumers) {
-          if (c != null) {
-            c match {
-              case m: MemRef[ _ ] => if(!m.isReg) stack.push((newDepth+1, m));
-              case d: Delay       => 
-              case o              => stack.push((newDepth+1, o));
-            }
-          }
-        }
-      }
-    }
-  }
-  */
 
   def printTree(depth: Int = 4, indent: String = ""): Unit = {
     if (depth < 1) return;
@@ -369,24 +261,9 @@ abstract class Node extends nameable{
       }
     }
   }
-  def findAssignNode(depth: Int = 5): Node = {
-    if (depth < 1) return null;
-    this match {
-      case assign: Assign[_] => {
-        // println("[info] Found Assign Node at depth "+depth);
-        return assign;
-      }
-      case any =>
-    }
-    if (inputs.length > 0) {
-      val in = inputs(0);
-      if (!(in == null)) return in.findAssignNode(depth-1);
-    }
-    null;
-  }
 
   def traceNode(c: Component, stack: Stack[() => Any]): Any = {
-    if(this.isCellIO) println("found")
+    if(this.isTypeNode) println("found")
     // determine whether or not the component needs a clock input
     if ((isReg || isRegOut || isClkInput) && !(component == null))
         component.containsReg = true
@@ -394,10 +271,11 @@ abstract class Node extends nameable{
     // pushes and pops components as necessary in order to later mark the parent of nodes
     val (comp, nextComp) = 
       this match {
-        case io: IO => {
-          //assert(io.dir == OUTPUT || io.dir == INPUT, 
-                 //{println(" IO w/o direction " + io + " name: " + io.name + " " + io.inputs + " in comp: " + c + " of class: " + io.getClass + " on line " + findFirstUserLine(io.line))})
-          (io.component, if (io.dir == OUTPUT) io.component else io.component.parent);
+        case io: Bits => {
+          if(io.dir == INPUT || io.dir == OUTPUT)
+            (io.component, if (io.dir == OUTPUT) io.component else io.component.parent)
+          else
+            (c, c)
         }
         case any    => (c, c);
       }
@@ -426,15 +304,15 @@ abstract class Node extends nameable{
           val j = i;
           val n = node;
           stack.push(() => {
-	    // This code finds a binding for a node. We search for a binding only if it is an output
+	    // This code finds an output binding for a node. We search for a binding only if the io is an output
 	    // and the logic's grandfather component is not the same as the io's component and
 	    // the logic's component is not same as output's component unless the logic is an input
             n match { 
-              case io: IO => 
-                if (io.dir == OUTPUT && !io.isCellIO &&
+              case io: Bits => 
+                if (io.dir == OUTPUT && !io.isTypeNode &&
                     (!(component.parent == io.component) && 
                      !(component == io.component && 
-                       !(this.isInstanceOf[IO] && this.asInstanceOf[IO].dir == INPUT)))) {
+                       !(this.isInstanceOf[Bits] && this.asInstanceOf[Bits].dir == INPUT)))) {
                   val c = n.component.parent;
                   val b = Binding(n, c, io.component);
                   inputs(j) = b;
@@ -450,8 +328,8 @@ abstract class Node extends nameable{
 	        // We also do the same when assigning to the output if the output
 	        // is the parent of the subcomponent;
                 } else if (io.dir == INPUT && 
-                           ((!this.isInstanceOf[IO] && this.component == io.component.parent) || 
-                            (this.isInstanceOf[IO] && this.asInstanceOf[IO].dir == OUTPUT && 
+                           ((!this.isIo && this.component == io.component.parent) || 
+                            (this.isInstanceOf[Bits] && this.asInstanceOf[Bits].dir == OUTPUT && 
                              this.component == io.component.parent))) {
                    if (io.inputs.length > 0) inputs(j) = io.inputs(0);
                 } 
@@ -485,63 +363,61 @@ abstract class Node extends nameable{
   def getWidth(): Int = {
     if(width > 0)
       width
-    else if(isCellIO) {
+    else if(isTypeNode) {
       if(inputs.length == 0) -1 else inputs(0).getWidth
     } else if(isInstanceOf[Reg] && !isWidthWalked){
       isWidthWalked = true;
       inferWidth(this)
-    }else if(inputs.length >= 1 && !isInstanceOf[Reg] && (isInstanceOf[IO] || !isInstanceOf[Wire]))
+    }else if(inputs.length >= 1 && !isInstanceOf[Reg])
       inferWidth(this)
     else
       -1
   }
   
-  def removeCellIOs() {
+  def setTypeNodeNoAssign[T <: Data](typeNode: T): T = {
+    typeNode.setIsTypeNode 
+    if(!isInstanceOf[Literal]) nameHolder = typeNode
+    typeNode
+  }
+  def setTypeNode[T <: Data](typeNode: T): T = {
+    setTypeNodeNoAssign(typeNode)
+    typeNode assign this
+    typeNode
+  }
+
+  def removeTypeNodes() {
     for(i <- 0 until inputs.length) {
       if(inputs(i) == null){
         val error = ChiselError({"NULL Input for " + this.getClass + " " + this + " in Component " + component}, this);
         if (!ChiselErrors.contains(error))
           ChiselErrors += error
       }
-      else if(inputs(i).isCellIO) {
+      else if(inputs(i).isTypeNode) {
 	inputs(i) = inputs(i).getNode;
       }
     }
   }
   def getNode(): Node = {
-    if(!isCellIO || inputs.length == 0)
+    if(!isTypeNode || inputs.length == 0)
       this
     else 
       inputs(0).getNode
   }
-  def getCell(): Cell = null;
+
   def addConsumers(): Boolean = {
-    /*
-    this match {
-      case o: IO => 
-        if (o.dir == INPUT) {
-          println("ADDING CONSUMERS " + this);
-          for (i <- inputs)
-            println("  INPUT " + i);
-        }
-      case any       =>
-    }
-    */
     var off = 0;
     for (i <- inputs) {
       if (i == null) {
         println(this + " " + inputs + " HAS NULL INPUT " + off + "/" + inputs.length + " IN " + component);
-        // TODO: HACK
         inputs = ArrayBuffer(inputs(0));
         return false;
       } else if(!i.consumers.contains(this))
         i.consumers += this;
-      // println("ADDING " + this + " AS CONSUMER OF " + i + " " + i.consumers.length + " CONSUMERS");
       off += 1;
     }
     true;
   }
-  // TODO: SUPERCEDED BY toBits with bundle
+
   def extract (widths: Array[Int]): List[Fix] = {
     var res: List[Fix] = Nil;
     var off = 0;
@@ -563,19 +439,7 @@ abstract class Node extends nameable{
     }
     res.reverse
   }
-  // TODO: SUPERCEDED BY fromBits with bundle
-  def Match(mods: Array[Node]) {
-    var off = 0;
-    for (m <- mods.reverse) {
-      val res = Extract(this.asInstanceOf[Bits], off+m.getWidth-1, off){Bits()};
-      m match {
-        case r: Reg  => r procAssign res;
-	case i: Bits => i := res;
-        case o       => o assign res;
-      }
-      off += m.getWidth;
-    }
-  }
+
 }
 
 }

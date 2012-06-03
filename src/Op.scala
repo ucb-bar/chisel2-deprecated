@@ -5,10 +5,148 @@ import scala.math.max;
 import Node._;
 import Component._;
 
+abstract class Cell extends nameable{
+  val io: Data;
+  val primitiveNode: Node;
+  var isReg = false;
+}
+
+object chiselCast {
+  def apply[S <: Data, T <: Bits](x: S)(gen: => T): T = {
+    val res = gen.asOutput
+    res.setIsTypeNode
+    x.nameHolder = res
+    res.inputs += x.toNode
+    res
+  }
+}
+
+object UnaryOp {
+  def apply[T <: Data](x: T, op: String)(gen: => T): T = {
+    val node = op match {
+    case "-" => Op("-",  1, widthOf(0), x);
+    case "~" => Op("~",  1, widthOf(0), x);
+    case "!" => Op("!",  1, fixWidth(1), x);
+    case any => null;
+    }
+    node.setTypeNode(gen.asOutput)
+  }
+}
+
+object BinaryOp {
+  def apply[T <: Data](x: T, y: T, op: String)(gen: => T): T = {
+    val node = op match {
+      case "<<"  => Op("<<", 0, lshWidthOf(0, y),  x, y );
+      case ">>"  => Op(">>", 0, rshWidthOf(0, y),  x, y );
+      case "+"   => Op("+",  2, maxWidth _,  x, y );
+      case "*"   => Op("*",  0, sumWidth _,  x, y );
+      case "s*s" => Op("s*s",  0, sumWidth _,  x, y );
+      case "s*u" => Op("s*u",  0, sumWidth _,  x, y );
+      case "u*s" => Op("u*s",  0, sumWidth _,  x, y );
+      case "^"   => Op("^",  2, maxWidth _,  x, y );
+      case "?"   => Multiplex(x, y, null);
+      case "-"   => Op("-",  2, maxWidth _,  x, y );
+      case "##"  => Op("##", 2, sumWidth _,  x, y );
+      case "&"   => Op("&",  2, maxWidth _, x, y );
+      case "|"   => Op("|",  2, maxWidth _, x, y );
+      case any   => null;
+    }
+    node.setTypeNode(gen.asOutput)
+  }
+}
+
+object LogicalOp {
+  def apply[T <: Data](x: T, y: T, op: String)(gen: => T): Bool = {
+    if(searchAndMap && op == "&&" && chiselAndMap.contains((x, y))) {
+      chiselAndMap((x, y))
+    } else {
+      val node = op match {
+        case "===" => Op("==", 2, fixWidth(1), x, y );
+        case "!="  => Op("!=", 2, fixWidth(1), x, y );
+        case ">"   => Op(">",  2, fixWidth(1), x, y );
+        case "<"   => Op("<",  2, fixWidth(1), x, y );
+        case "<="  => Op("<=", 2, fixWidth(1), x, y );
+        case ">="  => Op(">=", 2, fixWidth(1), x, y );
+        case "&&"  => Op("&&", 2, fixWidth(1), x, y );
+        case "||"  => Op("||", 2, fixWidth(1), x, y );
+        case any   => null;
+      }
+
+      // make output
+      val output = Bool(OUTPUT)
+      if(searchAndMap && op == "&&" && !chiselAndMap.contains((x, y))) 
+        chiselAndMap += ((x, y) -> output)
+      node.setTypeNode(output)
+    }
+  } 
+}
+
+object ReductionOp {
+  def apply[T <: Data](x: T, op: String)(gen: => T): Bool = {
+    val node = op match {
+      case "&" => Op("&",  1, fixWidth(1), x);
+      case "|" => Op("|",  1, fixWidth(1), x);
+      case "^" => Op("^",  1, fixWidth(1), x);
+      case any => null;
+    }
+    node.setTypeNode(Bool(OUTPUT))
+  }
+}
+
+object UnaryBoolOp {
+  def apply(x: Bool, op: String): Bool = {
+    val node = op match {
+    case "-" => Op("-",  1, widthOf(0), x);
+    case "~" => Op("~",  1, widthOf(0), x);
+    case "!" => Op("!",  1, fixWidth(1), x);
+    case any => null;
+    }
+    node.setTypeNode(Bool(OUTPUT))
+  }
+}
+
+object BinaryBoolOp {
+  def apply(x: Bool, y: Bool, op: String): Bool = {
+    if(searchAndMap && op == "&&" && chiselAndMap.contains((x, y))) {
+      chiselAndMap((x, y))
+    } else {
+      val node = op match {
+        case "^"   => Op("^",  2, maxWidth _,  x, y );
+        case "===" => Op("==", 2, fixWidth(1), x, y );
+        case "!="  => Op("!=", 2, fixWidth(1), x, y );
+        case ">"   => Op(">",  2, fixWidth(1), x, y );
+        case "<"   => Op("<",  2, fixWidth(1), x, y );
+        case "<="  => Op("<=", 2, fixWidth(1), x, y );
+        case ">="  => Op(">=", 2, fixWidth(1), x, y );
+        case "&&"  => Op("&&", 2, fixWidth(1), x, y );
+        case "||"  => Op("||", 2, fixWidth(1), x, y );
+        case "&"   => Op("&",  2, maxWidth _, x, y );
+        case "|"   => Op("|",  2, maxWidth _, x, y );
+        case any   => null;
+      }
+      val output = Bool(OUTPUT)
+      if(searchAndMap && op == "&&" && !chiselAndMap.contains((x, y))) 
+        chiselAndMap += ((x, y) -> output)
+      node.setTypeNode(output)
+    }
+  }
+}
+
+object andR {
+    def apply(x: Bits): Bool = ReductionOp(x, "&"){Bits()}
+}
+
+object orR {
+    def apply(x: Bits): Bool = ReductionOp(x, "|"){Bits()}
+}
+
+object xorR {
+    def apply(x: Bits): Bool = ReductionOp(x, "^"){Bits()}
+}
+
 object Op {
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
     val (a_lit, b_lit) = (a.litOf, b.litOf);
-    // println("OP " + name + " " + a + " " + a_lit + " " + b + " " + b_lit);
     if (isFolding) {
     if (a_lit != null && b_lit == null) {
       name match {
@@ -51,8 +189,6 @@ object Op {
     res.op = name;
     res.nGrow = nGrow;
     res.isSigned = a.isInstanceOf[Fix] && b.isInstanceOf[Fix]
-    // println(a + " " + a.litOf + " " + name + " " + b + " " + b.litOf);
-    // if(res.isSigned) println("SIGNED OPERATION DETECTED " + name);
     res
   }
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node): Node = {
@@ -60,7 +196,7 @@ object Op {
       name match {
         case "!" => return if (a.litOf.value == 0) Literal(1) else Literal(0);
         case "-" => return Literal(-a.litOf.value, a.litOf.width);
-        case "~" => return Literal((-a.litOf.value-1)&((BigInt(1) << a.litOf.width)-1), a.litOf.width); // TODO: update to newest version of chisel so that this can work
+        case "~" => return Literal((-a.litOf.value-1)&((BigInt(1) << a.litOf.width)-1), a.litOf.width);
         case _ => ;
       } 
     }

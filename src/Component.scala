@@ -15,7 +15,6 @@ import scala.math.max;
 import Node._;
 import Component._;
 import Bundle._;
-import IOdir._;
 import ChiselError._;
 
 object Component {
@@ -38,6 +37,8 @@ object Component {
   var scanArgs: Seq[Node] = null;
   var printFormat = "";
   var printArgs: ArrayBuffer[Node] = null;
+  var testArgs: ArrayBuffer[Node] = null;
+  var testVecs: Array[Array[BigInt]] = null;
   var includeArgs: List[String] = Nil;
   var targetDir: String = null
   var configStr: String = null;
@@ -96,6 +97,8 @@ object Component {
     scanArgs = new Array[Node](0);
     printFormat = "";
     printArgs = new ArrayBuffer[Node]();
+    testArgs = new ArrayBuffer[Node]();
+    testVecs = null;
     isCoercingArgs = true;
     targetDir = "."
     configStr = "";
@@ -240,7 +243,7 @@ abstract class Component(resetSignal: Bool = null) {
   var ioVal: Data = null;
   var name: String = "";
   val bindings = new ArrayBuffer[Binding];
-  var wiresCache: Array[(String, IO)] = null;
+  var wiresCache: Array[(String, Bits)] = null;
   var parent: Component = null;
   var containsReg = false;
   val children = new ArrayBuffer[Component];
@@ -341,7 +344,7 @@ abstract class Component(resetSignal: Bool = null) {
   var isWalking = new HashSet[Node];
   var isWalked = new HashSet[Node];
   override def toString: String = name
-  def wires: Array[(String, IO)] = {
+  def wires: Array[(String, Bits)] = {
     if (wiresCache == null)
       wiresCache = io.flatten;
     wiresCache
@@ -385,7 +388,7 @@ abstract class Component(resetSignal: Bool = null) {
 	//if(w.isInstanceOf[IO])
 	//println("COMP WALKED " + w + " is " + this.isWalked.contains(w));
 	w match {
-          case io: IO  => 
+          case io: Bits  => 
             if (io.dir == INPUT) {
               if (io.inputs.length == 0) { 
                   if(saveConnectionWarnings)
@@ -399,7 +402,7 @@ abstract class Component(resetSignal: Bool = null) {
               } else {
 		res += io.inputs(0).emitRef;
               }
-            } else {
+            } else if(io.dir == OUTPUT) {
               if (io.consumers.length == 0) {
                   if(saveConnectionWarnings)
 		    connWriter.write("// " + io + " UNCONNECTED IN " + io.component + " BINDING " + findBinding(io) + "\n"); 
@@ -424,7 +427,7 @@ abstract class Component(resetSignal: Bool = null) {
     var res = "";
     for ((n, w) <- wires) {
       w match {
-        case io: IO  => 
+        case io: Bits  => 
           if (io.dir == INPUT)
             res += "  " + emitRef + "->" + n + " = " + io.inputs(0).emitRef + ";\n";
       };
@@ -432,7 +435,7 @@ abstract class Component(resetSignal: Bool = null) {
     res += emitRef + "->clock_lo(reset);\n";
     for ((n, w) <- wires) {
       w match {
-        case io: IO => 
+        case io: Bits => 
           if (io.dir == OUTPUT)
             res += "  " + io.consumers(0).emitRef + " = " + emitRef + "->" + n + ";\n";
       };
@@ -473,7 +476,7 @@ abstract class Component(resetSignal: Bool = null) {
   def isInferenceTerminal(m: Node): Boolean = {
     m.isFixedWidth || (
       m match { 
-        case io: IO => true; 
+        case io: Bits => io.dir != null; 
         case b: Binding => true; 
         case _ => false }
     )
@@ -487,58 +490,31 @@ abstract class Component(resetSignal: Bool = null) {
     */
   }
 
-/*
-  def initInference() = {
-    for (m <- mods) {
-      // if (isInferenceTerminal(m)) {
-        // println("ENQUEUE " + m);
-      // println("INIT " + m);
-        nexts.enqueue(m);
-      // }
-    }
+
+  def initializeBFS: Queue[Node] = {
+    val res = new Queue[Node]
+
+    // initialize bfsQueue
+    for((n, elm) <- io.flatten) 
+      if(elm.isInstanceOf[Bits] && elm.asInstanceOf[Bits].dir == OUTPUT)
+  	res.enqueue(elm)
+    for(a <- asserts) 
+      res.enqueue(a)
+    for(b <- blackboxes) 
+      res.enqueue(b.io)
+    
+    for(r <- resetList)
+      res.enqueue(r)
+
+    res
   }
-  def inferAll() = {
-    initInference;
-    var inferMax = 0;
-    var maxNode: Node = null;
-    while (!nexts.isEmpty) {
-      val next = nexts.dequeue();
-      if (next.infer) {
-        nexts.enqueue(next);
-        for (c <- next.consumers) {
-          // println("ENQUEUING " + c);
-          nexts.enqueue(c);
-        }
-        for (i <- next.inputs){
-          nexts.enqueue(i);
-	}
-      }
-      if(next.inferCount > inferMax) {
-	inferMax = next.inferCount;
-	maxNode = next;
-      }
-    }
-    //println("MAXIMUM INFER WALK = " + inferMax + " ON " + maxNode + " which is a " + maxNode.getClass);
-  }
-*/
 
   def inferAll(): Unit = {
     println("started inference")
     var nodesList = ArrayBuffer[Node]()
     val walked = new HashSet[Node]
-    val bfsQueue = new Queue[Node]
+    val bfsQueue = initializeBFS
 
-    // initialize bfsQueue
-    for((n, elm) <- io.flatten) 
-      if(elm.isInstanceOf[IO] && elm.asInstanceOf[IO].dir == OUTPUT)
-  	bfsQueue.enqueue(elm)
-    for(a <- asserts) 
-      bfsQueue.enqueue(a)
-    for(b <- blackboxes) 
-      bfsQueue.enqueue(b.io)
-    
-    for(r <- resetList)
-      bfsQueue.enqueue(r)
     // conduct bfs to find all reachable nodes
     while(!bfsQueue.isEmpty){
       val top = bfsQueue.dequeue
@@ -581,33 +557,18 @@ abstract class Component(resetSignal: Bool = null) {
     println("finished inference")
   }
 
-  def removeCellIOs() {
+  def removeTypeNodes() {
     println("started flattenning")
     val walked = new HashSet[Node]
-    val bfsQueue = new Queue[Node]
+    val bfsQueue = initializeBFS
 
     def getNode(x: Node): Node = {
       var res = x
-      while(res.isCellIO && res.inputs.length != 0){
+      while(res.isTypeNode && res.inputs.length != 0){
 	res = res.inputs(0)
       }
       res
     }
-
-    // initialize bfsQueue
-    for((n, elm) <- io.flatten) {
-      if(elm.isInstanceOf[IO] && elm.asInstanceOf[IO].dir == OUTPUT) {
-  	bfsQueue.enqueue(elm)
-      }
-    }
-
-    for (b <- blackboxes) {
-      for((n, elm) <- b.io.flatten) 
-        bfsQueue.enqueue(elm)
-    }
-
-    for(r <- resetList)
-      bfsQueue.enqueue(r)
 
     var count = 0
 
@@ -619,7 +580,7 @@ abstract class Component(resetSignal: Bool = null) {
 
       for(i <- 0 until top.inputs.length) {
         if(!(top.inputs(i) == null)) {
-          if(top.inputs(i).isCellIO) top.inputs(i) = getNode(top.inputs(i))
+          if(top.inputs(i).isTypeNode) top.inputs(i) = getNode(top.inputs(i))
           if(!walked.contains(top.inputs(i))) {
             bfsQueue.enqueue(top.inputs(i))
             walked += top.inputs(i)
@@ -638,19 +599,8 @@ abstract class Component(resetSignal: Bool = null) {
 
     var nodesList = ArrayBuffer[Node]()
     val walked = new HashSet[Node]
-    val bfsQueue = new Queue[Node]
+    val bfsQueue = initializeBFS
 
-    // initialize bfsQueue
-    for((n, elm) <- io.flatten) 
-      if(elm.isInstanceOf[IO] && elm.asInstanceOf[IO].dir == OUTPUT)
-  	bfsQueue.enqueue(elm)
-    for(a <- asserts) 
-      bfsQueue.enqueue(a)
-    for(b <- blackboxes) 
-      bfsQueue.enqueue(b.io)
-    
-    for(r <- resetList)
-      bfsQueue.enqueue(r)
     // conduct bfs to find all reachable nodes
     while(!bfsQueue.isEmpty){
       val top = bfsQueue.dequeue
@@ -668,19 +618,19 @@ abstract class Component(resetSignal: Bool = null) {
 
     for(node <- nodesList) {
 
-      if(node.inputs.length == 1 && (node.isInstanceOf[IO] || node.isInstanceOf[Wire])) {
+      if(node.inputs.length == 1 && node.isInstanceOf[Bits]) {
 
 	if (node.width > node.inputs(0).width){
 
 	  if(node.inputs(0).isInstanceOf[Fix]){
 	    val topBit = NodeExtract(node.inputs(0), node.inputs(0).width-1); topBit.infer
 	    val fill = NodeFill(node.width - node.inputs(0).width, topBit); fill.infer
-	    val res = Concatanate(fill, node.inputs(0)); res.infer
+	    val res = Concatenate(fill, node.inputs(0)); res.infer
 	    node.inputs(0) = res
 	  } else {
 	    val topBit = Literal(0,1)
 	    val fill = NodeFill(node.width - node.inputs(0).width, topBit); fill.infer
-	    val res = Concatanate(fill, node.inputs(0)); res.infer
+	    val res = Concatenate(fill, node.inputs(0)); res.infer
 	    node.inputs(0) = res
 	  }
 
@@ -693,41 +643,6 @@ abstract class Component(resetSignal: Bool = null) {
 
     }
 
-    /*
-    for((io, i) <- ioMap) {
-
-      if(!io.isCellIO && io.isInstanceOf[IO] && io.inputs.length == 1) {
-
-	if (io.width > io.inputs(0).width){
-
-          if(saveWidthWarnings) {
-	    widthWriter.write("TOO LONG! IO " + io + " with width " + io.width + " bit(s) is assigned a wire with width " + io.inputs(0).width + " bit(s).\n")
-          }
-	  if(io.inputs(0).isInstanceOf[Fix]){
-	    val topBit = NodeExtract(io.inputs(0), Literal(io.inputs(0).width-1)); topBit.infer
-	    val fill = NodeFill(io.width - io.inputs(0).width, topBit); fill.infer
-	    val res = Concatanate(fill, io.inputs(0)); res.infer
-	    io.inputs(0) = res
-	  } else {
-	    val topBit = Literal(0,1)
-	    val fill = NodeFill(io.width - io.inputs(0).width, topBit); fill.infer
-	    val res = Concatanate(fill, io.inputs(0)); res.infer
-	    io.inputs(0) = res
-	  }
-
-	} else if (io.width < io.inputs(0).width) {
-          if(saveWidthWarnings) {
-	    widthWriter.write("TOO SHORT! IO " + io + " width width " + io.width + " bit(s) is assigned a wire with width " + io.inputs(0).width + " bit(s).\n")
-          }
-	  val res = NodeExtract(io.inputs(0), io.width-1, 0); res.infer
-	  io.inputs(0) = res
-	}
-
-      }
-
-    }
-    if(saveWidthWarnings) widthWriter.close()
-    * */
     println("finished width checking")
   }
 
@@ -744,26 +659,13 @@ abstract class Component(resetSignal: Bool = null) {
       roots += b.io;
     for (m <- mods) {
       m match {
-        case io: IO          => if (io.dir == OUTPUT) { if (io.consumers.length == 0) roots += m; }
+        case io: Bits          => if (io.dir == OUTPUT) { if (io.consumers.length == 0) roots += m; }
         case d: Delay        => roots += m;
 	case mr: MemRef[ _ ] => if(mr.isReg) roots += m;
         case any             =>
       }
     }
     roots
-  }
-  def findLeaves(): ArrayBuffer[Node] = {
-    val leaves = new ArrayBuffer[Node];
-    for (m <- mods) {
-      m match {
-        case io: IO          => if (io.dir == INPUT && !io.isCellIO) { if (io.inputs.length == 0) leaves += m; }
-        case l: Literal      => leaves += m;
-        case d: Delay        => leaves += m;
-	case mr: MemRef[ _ ] => if(mr.isReg) leaves += m;
-        case any             =>
-      }
-    }
-    leaves
   }
   def visitNodes(roots: Array[Node]) = {
     val stack = new Stack[(Int, Node)]();
@@ -773,14 +675,11 @@ abstract class Component(resetSignal: Bool = null) {
     while (stack.length > 0) {
       val (newDepth, node) = stack.pop();
       val comp = node.componentOf;
-      // println("VISIT NODE(" + newDepth + ") " + comp.name + ": " + node.name);
       if (newDepth == -1) 
         comp.omods += node;
       else {
         node.depth = max(node.depth, newDepth);
-        //println("THINKING MOD(" + depth + ") " + comp.name + ": " + node.name);
         if (!comp.isWalked.contains(node)) {
-          //println(depthString(depth) + "FiND MODS " + node + " IN " + comp.name);
           comp.isWalked += node;
           node.walked = true;
           stack.push((-1, node));
@@ -793,33 +692,17 @@ abstract class Component(resetSignal: Bool = null) {
               }
             }
           }
-          // println("VISITING MOD " + node + " DEPTH " + depth);
         }
       }
-      // node.visitNode(depth, stack);
     }
   }
   def findOrdering() = visitNodes(findRoots().toArray);
-  /*
-  def visitNodesRev(roots: Array[Node]) = {
-    val stack = new Stack[(Int, Node)]();
-    for (root <- roots)
-      stack.push((0, root));
-    isWalked.clear();
-    while (stack.length > 0) {
-      val (depth, node) = stack.pop();
-      node.visitNodeRev(depth, stack);
-    }
-  }
-  def findGraph() = visitNodesRev(findLeaves().toArray);
-  */
 
   def findGraphDims(): (Int, Int, Int) = {
     var maxDepth = 0;
     val imods = new ArrayBuffer[Node]();
     for (m <- mods) {
       m match {
-        case o: IO  =>
         case l: Literal =>
         case i      => imods += m;
       }
@@ -871,10 +754,10 @@ abstract class Component(resetSignal: Bool = null) {
     for (m <- c.mods) {
       // println("M " + m.name);
       m match {
-        case io: IO  => 
+        case io: Bits  => 
           if (io.dir == INPUT) 
             inputs += m;
-          else
+          else if (io.dir == OUTPUT)
             outputs += m;
         case r: Reg    => regs += r;
         case other     =>
@@ -894,7 +777,7 @@ abstract class Component(resetSignal: Bool = null) {
   def markComponent() = {
     name_it();
     ownIo();
-    io.name_it("");
+    io.name_it("io", true);
     // println("COMPONENT " + name);
     val c = getClass();
     for (m <- c.getDeclaredMethods) {
@@ -905,7 +788,7 @@ abstract class Component(resetSignal: Bool = null) {
         val o = m.invoke(this);
         o match { 
 	  //case comp: Component => { comp.component = this;}
-          case node: Node => { if ((node.isCellIO || (node.name == "" && !node.named) || node.name == null)) node.name_it(name, true);
+          case node: Node => { if ((node.isTypeNode || (node.name == "" && !node.named) || node.name == null || name != "")) node.name_it(name, true);
 			       if (node.isReg || node.isRegOut || node.isClkInput) containsReg = true;
 			      nameSpace += name;
 			    }
@@ -913,7 +796,7 @@ abstract class Component(resetSignal: Bool = null) {
 	    var i = 0;
 	    if(!buf.isEmpty && buf(0).isInstanceOf[Node]){
 	      for(elm <- buf){
-		if ((elm.isCellIO || (elm.name == "" && !elm.named) || elm.name == null)) 
+		if ((elm.isTypeNode || (elm.name == "" && !elm.named) || elm.name == null)) 
 		  elm.name_it(name + "_" + i, true);
 		if (elm.isReg || elm.isRegOut || elm.isClkInput) 
 		  containsReg = true;
@@ -931,7 +814,7 @@ abstract class Component(resetSignal: Bool = null) {
 	      for(elm <- buf){
 		elm match {
 		  case node: Node => {
-		    if ((node.isCellIO || (node.name == "" && !node.named) || node.name == null)) 
+		    if ((node.isTypeNode || (node.name == "" && !node.named) || node.name == null)) 
 		      node.name_it(name + "_" + i + "_" + j, true);
 		    if (node.isReg || node.isRegOut || node.isClkInput) 
 		      containsReg = true;
@@ -975,17 +858,12 @@ abstract class Component(resetSignal: Bool = null) {
     println("// " + depthString(depth) + "COMPILING " + this + " " + children.length + " CHILDREN");
     for (top <- children)
       top.doCompileV(out, depth+1);
-    // isWalked.clear();
     findConsumers();
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors) err.printError;
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
     }
-    //inferAll();
     collectNodes(this);
-    // for (m <- mods) {
-    //   println("// " + depthString(depth+1) + " MOD " + m);
-    // }
     val hasReg = containsReg || childrenContainsReg;
     val res = new StringBuilder()
     res.append((if (hasReg) "input clk, input reset" else ""));
@@ -994,10 +872,10 @@ abstract class Component(resetSignal: Bool = null) {
     for ((n, w) <- wires) {
       if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
       w match {
-        case io: IO => {
+        case io: Bits => {
           if (io.dir == INPUT) {
 	    res.append(nl + "    input " + io.emitWidth + " " + io.emitRef);
-          } else {
+          } else if(io.dir == OUTPUT) {
 	    res.append(nl + "    output" + io.emitWidth + " " + io.emitRef);
           }
         }
@@ -1010,13 +888,9 @@ abstract class Component(resetSignal: Bool = null) {
     res.append(emitDecs);
     res.append("\n");
     res.append(emitDefs);
-    //res += emitDecs + "\n" + emitDefs
-    // for (o <- outputs)
-    //   out.writeln("  assign " + o.emitRef + " = " + o.inputs(0).emitRef + ";");
     if (regs.size > 0) {
       res.append("\n");
       res.append(emitRegs);
-      //res += "\n" + emitRegs;
     }
     res.append("endmodule\n\n");
     if(compDefs contains res){
@@ -1031,7 +905,6 @@ abstract class Component(resetSignal: Bool = null) {
       res.insert(0, "module " + moduleName + "(");
       out.append(res);
     }
-    // println("// " + depthString(depth) + "DONE");
   }
   def compileV(): Unit = {
     topComponent = this;
@@ -1041,7 +914,7 @@ abstract class Component(resetSignal: Bool = null) {
     genAllMuxes;
     components.foreach(_.postMarkNet(0));
     assignResets()
-    removeCellIOs()
+    removeTypeNodes()
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors) err.printError;
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
@@ -1081,156 +954,7 @@ abstract class Component(resetSignal: Bool = null) {
     compDefs.clear;
   }
 
-  /*
-  def doCompileCC(depth: Int): Unit = {
-    println("// " + depthString(depth) + "COMPILING " + this + " " + children.length + " CHILDREN");
-    for (top <- children)
-      top.doCompileCC(depth+1);
-    val base_name = ensure_dir(targetDir)
-    val out_h = new java.io.FileWriter(base_name + name + ".h");
-    val out_c = new java.io.FileWriter(base_name + name + ".cpp");
-    println("COMPILING COMP " + name + " AS " + (base_name + name + ".cpp"));
-    findConsumers();
-    if(!ChiselErrors.isEmpty){
-      for(err <- ChiselErrors) err.printError;
-      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
-    }
-    collectNodes(this);
-    findOrdering(); // search from roots  -- create omods
-    // findGraph();    // search from leaves -- create gmods
-    for (m <- omods) {
-      m match {
-        case l: Literal => ;
-        case any    => 
-          if (m.name != "" && m != reset && !(m.component == null)) {
-            //m.name = m.component.name + (if(m.component.instanceName != "") "_" else "") + m.component.instanceName + "__" + m.name;
-	    // only modify name if it is not the reset signal of the top component
-	    if(m.name != "reset" || !(m.component == this)) 
-	      m.name = m.component.getPathName + "__" + m.name;
-	  }
-      }
-      // println(">> " + m.name);
-    }
-    if (isReportDims) {
-      val (numNodes, maxWidth, maxDepth) = findGraphDims();
-      println("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
-    }
-    // for (m <- omods)
-    //   println("MOD " + m + " IN " + m.component.name);
-    out_h.write("#include \"emulator.h\"\n");
-    for (c <- children) 
-      out_h.write("#include \"" + c.name + ".h\";\n");
-    out_h.write("\n");
-    out_h.write("class " + name + "_t : public mod_t {\n");
-    out_h.write(" public:\n");
-    for (c <- children) 
-      out_h.write("  " + c.emitRef + "_t* " + c.emitRef + ";\n");
-    out_h.write("\n");
-    for ((n, w) <- wires) 
-      out_h.write("  dat_t<" + w.width + "> " + w.emitRef + ";\n");
-    for (m <- omods) {
-      if(m.name != "reset" || !(m.component == this)) {
-        if (m.isInObject)
-          out_h.write(m.emitDecC);
-        if (m.isInVCD)
-          out_h.write(m.emitDecVCD);
-      }
-    }
-    out_h.write("\n");
-    out_h.write("  void init ( bool random_initialization = false );\n");
-    out_h.write("  void clock_lo ( dat_t<1> reset );\n");
-    out_h.write("  void clock_hi ( dat_t<1> reset );\n");
-    out_h.write("  void print ( FILE* f );\n");
-    out_h.write("  bool scan ( FILE* f );\n");
-    out_h.write("  void dump ( FILE* f, int t );\n");
-    out_h.write("};\n");
-    out_h.close();
-
-    out_c.write("#include \"" + name + ".h\"\n");
-    for(str <- includeArgs) out_c.write("#include \"" + str + "\"\n"); 
-    out_c.write("\n");
-    out_c.write("void " + name + "_t::init ( bool random_initialization ) {\n");
-    for (c <- children) {
-      out_c.write("  " + c.emitRef + " = new " + c.emitRef + "_t();\n");
-      out_c.write("  " + c.emitRef + "->init(random_initialization);\n");
-    }
-    for (m <- omods) {
-      out_c.write(m.emitInitC);
-    }
-    out_c.write("}\n");
-    out_c.write("void " + name + "_t::clock_lo ( dat_t<1> reset ) {\n");
-    for (c <- children) 
-      out_c.write("  " + c.emitRef + "->clock_lo();\n");
-    for (m <- omods) {
-      out_c.write(m.emitDefLoC);
-    }
-    for (a <- asserts) {
-      out_c.write("  ASSERT(" + a.cond.emitRefC + ", \"" + a.message + "\");\n");
-    }
-    // for (c <- children) 
-    //   out_c.write("    " + c.emitRef + "->clock_lo(reset);\n");
-    out_c.write("}\n");
-    out_c.write("void " + name + "_t::clock_hi ( dat_t<1> reset ) {\n");
-    for (c <- children) 
-      out_c.write("  " + c.emitRef + "->clock_hi();\n");
-    for (m <- omods) 
-      out_c.write(m.emitDefHiC);
-    // for (c <- children) 
-    //   out_c.write("    " + c.emitRef + "->clock_hi(reset);\n");
-    out_c.write("}\n");
-    out_c.close();
-    // TODO: PUT IN RES CACHING
-  }
-
-  def compileCC(): Unit = {
-    println("COMPILING CC");
-    topComponent = this;
-    components.foreach(_.elaborate(0));
-    for (c <- components)
-      c.markComponent();
-    genAllMuxes;
-    components.foreach(_.postMarkNet(0));
-    assignResets()
-    removeCellIOs()
-    if(!ChiselErrors.isEmpty){
-      for(err <- ChiselErrors) err.printError;
-      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
-    }
-    inferAll();
-    val base_name = ensure_dir(targetDir)
-    if(saveWidthWarnings)
-      widthWriter = new java.io.FileWriter(base_name + name + ".width.warnings")
-    forceMatchingWidths;
-    nameChildren(topComponent)
-    traceNodes();
-    if(!ChiselErrors.isEmpty){
-      for(err <- ChiselErrors) err.printError;
-      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
-    }
-    if(!dontFindCombLoop) findCombLoop();
-    if(saveConnectionWarnings)
-      connWriter = new java.io.FileWriter(base_name + name + ".connection.warnings")
-    doCompileCC(0);
-    verifyAllMuxes;
-    if(saveConnectionWarnings)
-      connWriter.close()
-    if(!ChiselErrors.isEmpty) {
-      for(err <- ChiselErrors)	err.printError;
-      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
-    }
-    if (configStr.length > 0) {
-      val out_conf = new java.io.FileWriter(base_name+Component.topComponent.name+".conf");
-      out_conf.write(configStr);
-      out_conf.close();
-    }
-    if(saveComponentTrace)
-      printStack
-    compDefs.clear;
-  }
-  */
-
   def nameAllIO(): Unit = {
-    // println("NAMING " + this);
     io.name_it("");
     for (child <- children) 
       child.nameAllIO();
@@ -1238,12 +962,10 @@ abstract class Component(resetSignal: Bool = null) {
   def genAllMuxes = {
     for (p <- procs) {
       p match {
-        case io: IO  => if(io.updates.length > 0) io.genMuxes(io.default);
-        case w: Wire => w.genMuxes(w.default);
+        case b: Bits  => if(b.updates.length > 0) b.genMuxes(b.default);
         case r: Reg  => r.genMuxes(r);
         case m: Mem[_] => m.genMuxes(m);
         case mr: MemRef[_] =>
-        case a: Assign[_] =>
         case e: Extract =>
         case v: VecProc =>
       }
@@ -1257,9 +979,17 @@ abstract class Component(resetSignal: Bool = null) {
   }
   def elaborate(fake: Int = 0) = {}
   def postMarkNet(fake: Int = 0) = {}
+  def splitFlattenNodes(args: Seq[Node]): (Seq[Node], Seq[Node]) = {
+    if (args.length == 0) {
+      (Array[Node](), Array[Node]())
+    } else {
+      val testNodes = testArgs.map(maybeFlatten).reduceLeft(_ ++ _).map(x => x.getNode);
+      (keepInputs(testNodes), removeInputs(testNodes))
+    }
+  }
   def genHarness(base_name: String, name: String) = {
     val makefile = new java.io.FileWriter(base_name + name + "-makefile");
-    makefile.write("CPPFLAGS = -O2 -I../ -I${CHISEL_EMULATOR_INCLUDE}/\n\n");
+    makefile.write("CPPFLAGS = -O2 -I../ -I${CHISEL}/csrc\n\n");
     makefile.write(name + ": " + name + ".o" + " " + name + "-emulator.o\n");
     makefile.write("\tg++ -o " + name + " " + name + ".o " + name + "-emulator.o\n\n");
     makefile.write(name + ".o: " + name + ".cpp " + name + ".h\n");
@@ -1268,22 +998,55 @@ abstract class Component(resetSignal: Bool = null) {
     makefile.write("\tg++ -c ${CPPFLAGS} " + name + "-emulator.cpp\n\n");
     makefile.close();
     val harness  = new java.io.FileWriter(base_name + name + "-emulator.cpp");
+    val (testInputNodes, testNonInputNodes) = splitFlattenNodes(testArgs)
+    val isTester = testArgs.length > 0;
     harness.write("#include \"" + name + ".h\"\n");
+    if (isTester) {
+      harness.write("#include <vector>\n")
+      harness.write("std::string tests[] = {\n")
+      for (tv <- testVecs) {
+        harness.write("  ")
+        for (e <- tv) 
+          harness.write("\"" + e.toString(16) + "\", ")
+        harness.write("\n")
+      }
+      harness.write("};\n")
+    }
     harness.write("int main (int argc, char* argv[]) {\n");
     harness.write("  " + name + "_t* c = new " + name + "_t();\n");
     harness.write("  int lim = (argc > 1) ? atoi(argv[1]) : -1;\n");
     harness.write("  c->init();\n");
     if (isVCD)
       harness.write("  FILE *f = fopen(\"" + name + ".vcd\", \"w\");\n");
-    harness.write("  for (int t = 0; lim < 0 || t < lim; t++) {\n");
+    if (isTester) {
+      harness.write("  bool is_error = false;\n");
+      harness.write("  std::string *vecptr = tests;\n");
+      harness.write("  for (int t = 0; t < " + testVecs.length + "; t++) {\n");
+    } else 
+      harness.write("  for (int t = 0; lim < 0 || t < lim; t++) {\n");
     harness.write("    dat_t<1> reset = LIT<1>(t == 0);\n");
+    for (i <- 0 until testInputNodes.length) 
+      harness.write("    str_to_dat(*vecptr++, c->" + testInputNodes(i).emitRefC + ");\n")
     harness.write("    if (!c->scan(stdin)) break;\n");
     harness.write("    c->clock_lo(reset);\n");
     harness.write("    c->print(stdout);\n");
+    if (isTester) {
+      for (i <- 0 until testNonInputNodes.length) {
+        val node = testNonInputNodes(i)
+        harness.write("  " + node.emitDecC)
+        harness.write("    str_to_dat(*vecptr++, " + node.emitRefC + ");\n")
+        harness.write("    if ((" + node.emitRefC + " != c->" + node.emitRefC + ").to_bool()) {\n")
+        harness.write("      fprintf(stderr, \"MISMATCH ON OUT TEST %d OUT %d\\n\", t, " + i + ");\n")
+        harness.write("      is_error = true;\n")
+        harness.write("    }\n")
+      }
+    }
     harness.write("    c->clock_hi(reset);\n");
     if (isVCD)
       harness.write("    c->dump(f, t);\n");
     harness.write("  }\n");
+    if (isTester) 
+      harness.write("  exit(is_error);\n")
     harness.write("}\n");
     harness.close();
   }
@@ -1354,22 +1117,10 @@ abstract class Component(resetSignal: Bool = null) {
 
     var nodesList = ArrayBuffer[Node]()
     val walked = new HashSet[Node]
-    val bfsQueue = new Queue[Node]
+    val bfsQueue = initializeBFS
 
     // initialize bfsQueue
     // search for all reachable nodes, then pass this graph into tarjanSCC
-    for((n, elm) <- io.flatten) 
-      if(elm.isInstanceOf[IO] && elm.asInstanceOf[IO].dir == OUTPUT)
-  	bfsQueue.enqueue(elm)
-
-    for(a <- asserts) 
-      bfsQueue.enqueue(a)
-    
-    for(b <- blackboxes) 
-      bfsQueue.enqueue(b.io)
-    
-    for(r <- resetList)
-      bfsQueue.enqueue(r)
 
     while(!bfsQueue.isEmpty){
       val top = bfsQueue.dequeue
@@ -1454,12 +1205,18 @@ abstract class Component(resetSignal: Bool = null) {
     node match {
       case b:Bundle => 
         val buf = ArrayBuffer[Node]();
-        for ((n, e) <- b.flatten) buf += e;
+        for ((n, e) <- b.flatten) buf += e.getNode;
         buf
       case o        => 
-        Array[Node](node);
+        Array[Node](node.getNode);
     }
   }
+  def isInput(node: Node) = 
+    node match { case b:Bits => b.dir == INPUT; case o => false }
+  def keepInputs(nodes: Seq[Node]): Seq[Node] = 
+    nodes.filter(isInput)
+  def removeInputs(nodes: Seq[Node]): Seq[Node] = 
+    nodes.filter(n => !isInput(n))
   def findCombinationalBlock(reg: Reg): AbstractFunction = {
     val traced = new HashSet[Node];
     val outsTraced = new HashMap[Node, BitSet];
@@ -1541,13 +1298,10 @@ abstract class Component(resetSignal: Bool = null) {
     val base_name = ensure_dir(targetDir)
     val out_h = new java.io.FileWriter(base_name + name + ".h");
     val out_c = new java.io.FileWriter(base_name + name + ".cpp");
-    if (isGenHarness)
-      genHarness(base_name, name);
     println("// COMPILING " + this + "(" + children.length + ")");
     topComponent = this;
-    // isWalked.clear();
     assignResets()
-    removeCellIOs()
+    removeTypeNodes()
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors)	err.printError;
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
@@ -1595,7 +1349,6 @@ abstract class Component(resetSignal: Bool = null) {
     }
     }
     findOrdering(); // search from roots  -- create omods
-    // findGraph();    // search from leaves -- create gmods
     renameNodesC(omods);
     if (isReportDims) {
     val (numNodes, maxWidth, maxDepth) = findGraphDims();
@@ -1603,8 +1356,8 @@ abstract class Component(resetSignal: Bool = null) {
     }
     
 
-    // for (m <- omods)
-    //   println("MOD " + m + " IN " + m.component.name);
+    if (isGenHarness)
+      genHarness(base_name, name);
     out_h.write("#include \"emulator.h\"\n\n");
     out_h.write("class " + name + "_t : public mod_t {\n");
     out_h.write(" public:\n");
@@ -1661,18 +1414,14 @@ abstract class Component(resetSignal: Bool = null) {
     for (a <- asserts) {
       out_c.write("  ASSERT(" + a.cond.emitRefC + ", \"" + a.message + "\");\n");
     }
-    // for (c <- children) 
-    //   out_c.write("    " + c.emitRef + "->clock_lo(reset);\n");
     out_c.write("}\n");
     out_c.write("void " + name + "_t::clock_hi ( dat_t<1> reset ) {\n");
     for (r <- omods) 
       out_c.write(r.emitInitHiC);
     for (m <- omods) 
       out_c.write(m.emitDefHiC);
-    // for (c <- children) 
-    //   out_c.write("    " + c.emitRef + "->clock_hi(reset);\n");
     out_c.write("}\n");
-    def splitPrintFormat(s: String) = {
+    def splitFormat(s: String) = {
       var off = 0;
       var res: List[String] = Nil;
       for (i <- 0 until s.length) {
@@ -1682,7 +1431,7 @@ abstract class Component(resetSignal: Bool = null) {
           res = "%" :: res;
           if (i == (s.length-1)) {
             println("Badly formed format argument kind: %");
-          } else if (s(i+1) != '=') {
+          } else if (s(i+1) != 'x') {
             println("Unsupported format argument kind: %" + s(i+1));
           } 
           off = i + 2;
@@ -1697,14 +1446,14 @@ abstract class Component(resetSignal: Bool = null) {
       val format =
         if (printFormat == "") printArgs.map(a => "%=").reduceLeft((y,z) => z + " " + y) 
         else printFormat;
-      val toks = splitPrintFormat(format);
+      val toks = splitFormat(format);
       var i = 0;
-      // for(i <- 0 until printArgs.length)
-      //   printArgs(i) = printArgs(i).getNode
       for (tok <- toks) {
         if (tok(0) == '%') {
-          for (node <- maybeFlatten(printArgs(i))) 
-            out_c.write("  fprintf(f, \"%s\", " + node.getNode.emitRef + ".to_str().c_str());\n");
+          val nodes = maybeFlatten(printArgs(i))
+          for (j <- 0 until nodes.length) 
+            out_c.write("  fprintf(f, \"" + (if (j > 0) " " else "") + 
+                        "%s\", TO_CSTR(" + nodes(j).emitRef + "));\n");
           i += 1;
         } else {
           out_c.write("  fprintf(f, \"%s\", \"" + tok + "\");\n");
@@ -1717,26 +1466,24 @@ abstract class Component(resetSignal: Bool = null) {
     def isConstantArg(arg: String) = constantArgSplit(arg).length == 2;
     out_c.write("bool " + name + "_t::scan ( FILE* f ) {\n");
     if (scanArgs.length > 0) {
-      val format = 
-        if (scanFormat == "") {
-          var res = "";
-          for (arg <- scanArgs) {
-            for (subarg <- maybeFlatten(arg)) {
-              if (res.length > 0) res = res + " ";
-              res = res + "%llx";
-            }
-          }
-          res
-        } else 
-          scanFormat;
-      out_c.write("  int n = fscanf(f, \"" + format + "\"");
-      for (arg <- scanArgs) {
-        for (subarg <- maybeFlatten(arg))
-          out_c.write(",  &" + subarg.getNode.emitRef + ".values[0]");
+      val format =
+        if (scanFormat == "") scanArgs.map(a => "%=").reduceLeft((y,z) => z + " " + y) 
+        else scanFormat;
+      val toks = splitFormat(format);
+      var i = 0;
+      for (tok <- toks) {
+        if (tok(0) == '%') {
+          val nodes = keepInputs(maybeFlatten(scanArgs(i)))
+          for (j <- 0 until nodes.length) 
+            out_c.write("  str_to_dat(read_tok(f), " + nodes(j).emitRef + ");\n");
+          i += 1;
+        } else {
+          out_c.write("  fscanf(f, \"%s\", \"" + tok + "\");\n");
+        }
       }
-      out_c.write(");\n");
-      out_c.write("  return n == " + scanArgs.length + ";\n");
+      out_c.write("  getc(f);\n");
     }
+    out_c.write("  return(!feof(f));\n");
     out_c.write("}\n");
     dumpVCD(out_c);
     out_c.close();

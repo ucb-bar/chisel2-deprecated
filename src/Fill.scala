@@ -4,7 +4,6 @@ package Chisel {
 import Component._;
 import Fill._;
 import Component._;
-import IOdir._;
 import Lit._;
 
 object Fill {
@@ -14,7 +13,6 @@ object Fill {
     if (n == 1) {
       mod
     } else if (isFolding && bits_lit != null) {
-      // println("FOLDING EXTRACT " + bits_lit.value + "(" + off_lit.value + ")");
       var res = bits_lit.value;
       val w   = mod.getWidth();
       for (i <- 0 until n-1) 
@@ -22,17 +20,9 @@ object Fill {
       Lit(res, n * w){ Bits() };
     } else {
       val fill = new Fill()
-
-      // initialize
       val fillConst = UFix(n)
       fill.init("", fillWidthOf(0, fillConst), mod, fillConst)
-
-      // make output
-      val output = Bits(OUTPUT)
-      output.setIsCellIO
-      fill.nameHolder = output
-      output assign fill
-      output
+      fill.setTypeNode(Bits(OUTPUT))
     }
   }
   def apply(mod: Bits, n: Int): Bits = apply(n, mod)

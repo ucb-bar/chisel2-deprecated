@@ -1,6 +1,5 @@
 package Chisel {
 
-import IOdir._;
 import Node._;
 import ChiselError._;
 
@@ -28,7 +27,7 @@ class Bool extends Bits {
     if(comp != null)
       comp procAssign src.toNode;
     else
-      this.asInstanceOf[Wire] procAssign src.toNode;
+      this procAssign src.toNode;
   }
 
   def := (src: Bits): Unit = {

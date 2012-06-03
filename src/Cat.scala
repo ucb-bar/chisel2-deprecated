@@ -1,16 +1,12 @@
 package Chisel {
 import Component._;
-import IOdir._;
 import Node._;
 
 object Cat {
   def apply[T <: Data](mod: T, mods: T*): Bits = {
     val modsList = mods.toList;
     if(modsList.length == 1 && modsList(0) == null){
-      val res = Bits(OUTPUT);
-      res.setIsCellIO;
-      res assign mod.toNode;
-      res
+      mod.setTypeNode(Bits(OUTPUT))
     } else {
       val isLit = mods.foldLeft(mod.litOf != null){(a,b) => a && (b.litOf != null)}
       if (isFolding && isLit) {
@@ -31,20 +27,14 @@ object Cat {
           } else {
             mods.foldLeft(mod.toNode){(a,b) => a ## b.toNode}
           }
-
-        // make output
-        val output = Bits(OUTPUT)
-        output.setIsCellIO
-        output assign res
-        res.nameHolder = output
-        output
+        res.setTypeNode(Bits(OUTPUT))
       }
     }
   }
 }
 
 
-object Concatanate {
+object Concatenate {
   def apply (mod: Node, mods: Node*): Node = 
     if(isEmittingComponents) {
       val res = new Cat();
