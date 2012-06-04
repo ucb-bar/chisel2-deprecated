@@ -3,8 +3,27 @@ package Chisel {
 
 import Node._;
 import Component._;
-import IOdir._;
 import scala.math._
+
+object MuxLookup {
+  def apply[S <: Bits, T <: Data] (key: S, default: T, mapping: Seq[(S, T)]): T = {
+    var res = default;
+    for ((k, v) <- mapping.reverse)
+      res = Mux(key === k, v, res);
+    res
+  }
+
+}
+
+object MuxCase {
+  def apply[T <: Data] (default: T, mapping: Seq[(Bool, T)]): T = {
+    var res = default;
+    for ((t, v) <- mapping.reverse){
+      res = Mux(t, v, res);
+    }
+    res
+  }
+}
 
 object Multiplex{
   def apply (t: Node, c: Node, a: Node): Node = {
@@ -20,7 +39,7 @@ object Multiplex{
           fill.infer
           val bit = NodeExtract(t, 0)
           bit.infer
-          val cat = Concatanate(fill, bit)
+          val cat = Concatenate(fill, bit)
           cat.infer
           return cat
         }
@@ -34,11 +53,7 @@ object Multiplex{
 object Mux {
   def apply[T <: Data](t: Bits, c: T, a: T): T = {
     val res = Multiplex(t, c.toNode, a.toNode)
-    // make output
-    val output = c.fromNode(res).asInstanceOf[T]
-    output.setIsCellIO
-    res.nameHolder = output
-    output
+    res.setTypeNodeNoAssign(c.fromNode(res).asInstanceOf[T])
   }
 }
 class Mux extends Op {

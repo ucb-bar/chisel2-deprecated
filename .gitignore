@@ -1,3 +1,4 @@
 sbt/chisel/target/
+sbt/verify/target/
 sbt/project/target/
 sbt/target/

@@ -7,7 +7,6 @@ import java.lang.reflect.Modifier._;
 
 import Node._;
 import Component._;
-import IOdir._;
 import ChiselError._
 import sort._
 
@@ -15,19 +14,16 @@ object Bundle {
   def nullbundle_t = Bundle(ArrayBuffer[(String, Data)]());
   def apply (elts: ArrayBuffer[(String, Data)]): Bundle = {
     val res = new Bundle();
-    // println("NEW BUNDLE");
     res.elementsCache = elts; // TODO: REMOVE REDUNDANT CREATION
-    for ((n, i) <- elts) {
+    for ((n, i) <- elts) 
       i.name = n;
-      // println("  ELT " + n + " " + i);
-    }
     res
   }
 
 }
 
 object sort {
-  def apply(a: Array[(String, IO)]): Array[(String, IO)] = {
+  def apply(a: Array[(String, Bits)]): Array[(String, Bits)] = {
     var i = 0
     for (j <- 1 until a.length) {
       val keyElm = a(j);
@@ -43,20 +39,6 @@ object sort {
     a
   }
 
-  def checkPorts(x: Data, y: Data) = {
-
-    if(x.isInstanceOf[IO] && !y.isInstanceOf[IO]) {
-
-      val xIO = x.asInstanceOf[IO];
-      val yIO = y.asInstanceOf[IO];
-
-      if(xIO.dir == null || xIO.dir != INPUT) {
-	ChiselErrors += ChiselError("left hand side of bulk := must be OUTPUT", Thread.currentThread().getStackTrace);
-      } else if (!yIO.isCellIO || yIO.dir != OUTPUT)
-	ChiselErrors += ChiselError("right hand side of bulk := must be INPUT", Thread.currentThread().getStackTrace);
-    }
-  }
-
 }
 
 class Bundle(view_arg: Seq[String] = null) extends Data{
@@ -69,12 +51,10 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     var elts   = ArrayBuffer[(String, Data)]();
     val seen   = ArrayBuffer[Object]();
     var isCollecting = true;
-    // println("COLLECTING " + c + " IN VIEW " + view);
     for (m <- c.getMethods) {
       val name = m.getName();
       if (isCollecting) {
         val modifiers = m.getModifiers();
-        // println("  CHECKING " + name + " MODS " + modifiers);
         val types = m.getParameterTypes();
         val rtype = m.getReturnType();
         var isFound = false;
@@ -95,20 +75,15 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
             (view == null || view.contains(name)) && !seen.contains(m.invoke(this))) {
           val o = m.invoke(this);
           o match { 
-	    case bv: Vec[Data] => elts += ((name + bv.name, bv));
+	    case bv: Vec[Data] => elts += ((name + bv.name, bv))
             case i: Data => elts += ((name, i)); i.name = name; 
-              // if (view != null)
-              //   println("    ADDING " + name + " -> " + o + " COMP " + i.component + " DONE " + (i.component == null));
-           case any =>
-              // println("    FOUND " + o);
+            case any =>
           }
           seen += o;
         }
       } else if (name == "elementsCache") 
-        // println("IS-COLLECTING");
         isCollecting = true;
     }
-    // println("END ->>>>");
     elts
   }
   def elements: ArrayBuffer[(String, Data)] = {
@@ -134,12 +109,16 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
   def view (elts: ArrayBuffer[(String, Data)]): Bundle = { 
     elementsCache = elts; this 
   }
+
   override def name_it (path: String, named: Boolean = true) = {
-    if(path.length > 0 && !this.named) {name = path; this.named = named};
-    for ((n, i) <- elements) {
-      i.name = (if (path.length > 0) path + "_" else "") + n;
-      i.name_it(i.name, named);
-      // println("  ELT " + n + " " + i);
+    if(!this.named) {
+      if(path.length > 0) {
+        name = path
+        this.named = named
+      }
+      for ((n, i) <- elements) {
+        i.name_it( (if (path.length > 0) path + "_" else "") + n, named )
+      }
     }
   }
 
@@ -154,7 +133,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
   def +=[T <: Data](other: T) = {
     elements;
     elementsCache += ((other.name, other));
-    if(isCellIO) other.setIsCellIO;
+    if(isTypeNode) other.setIsTypeNode;
   }
   override def flip(): this.type = {
     for ((n, i) <- elements) {
@@ -162,9 +141,9 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     }
     this
   }
-  override def removeCellIOs() = {
+  override def removeTypeNodes() = {
     for ((n, elt) <- elements)
-      elt.removeCellIOs
+      elt.removeTypeNodes
   }
   override def traceableNodes = elements.map(tup => tup._2).toArray;
   
@@ -181,7 +160,6 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     return null;
   }
   override def <>(src: Node) = { 
-    // println("B <>'ing " + this + " & " + src);
     if(comp == null || (dir == "output" && 
 			src.isInstanceOf[Bundle] && 
 			src.asInstanceOf[Bundle].dir == "output")){
@@ -210,12 +188,10 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     }
   }
   override def ^^(src: Node) = { 
-    // println("B <>'ing " + this + " & " + src);
     src match {
       case other: Bundle =>
         for ((n, i) <- elements) {
           if(other.contains(n)) {
-            // println(" := ELT " + i + " & " + other(n));
             i ^^ other(n);
           }
         }
@@ -237,6 +213,8 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     }
   }
 
+  def procAssign(src: Node) = {}
+
   def :=(src: Bundle) = {
     src match {
       case other: Bundle => {
@@ -246,7 +224,6 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
 	} else {
 	  for ((n, i) <- elements) {
 	    if(other.contains(n)){
-	      checkPorts(i, other(n));
 	      i := other(n)
 	    }
 	    else {
@@ -261,8 +238,8 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     }
   }
 
-  override def flatten: Array[(String, IO)] = {
-    var res = ArrayBuffer[(String, IO)]();
+  override def flatten: Array[(String, Bits)] = {
+    var res = ArrayBuffer[(String, Bits)]();
     for ((n, i) <- elements){
       res = res ++ i.flatten
     }
@@ -279,7 +256,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
   override def toNode: Node = {
     if(bundledElm == null) {
       val nodes = flatten.map{case (n, i) => i};
-      bundledElm = Concatanate(nodes.head, nodes.tail.toList: _*)
+      bundledElm = Concatenate(nodes.head, nodes.tail.toList: _*)
     }
     bundledElm
   }
@@ -308,10 +285,10 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     this.dir = "output"
     this
   }
-  override def setIsCellIO() = {
-    isCellIO = true;
+  override def setIsTypeNode() = {
+    isTypeNode = true;
     for ((n, i) <- elements)
-      i.setIsCellIO
+      i.setIsTypeNode
   }
 }
 }

@@ -68,12 +68,12 @@ object Mux1H {
   
   def apply[T <: Data](pairs: Seq[(Bool, T)], gen: () => T): T = {
     val res = gen().asOutput
-    res.setIsCellIO
+    res.setIsTypeNode
     
     val inferredWidth = (pairs.map{case(bool, data) => data.getWidth}).max
     assert(inferredWidth > 0, {println("UNABLE TO INFER WIDTH ON MUX1H")})
 
-    var filter: List[List[IO]] = pairs(0)._2.flatten.map(x => List()).toList
+    var filter: List[List[Bits]] = pairs(0)._2.flatten.map(x => List()).toList
     for((bool, data) <- pairs) {
       filter = (filter zip data.flatten).map{case(a, (b, c)) => a :+ c}
     }
@@ -102,8 +102,7 @@ object VecBuf{
 
 object Vec {
   def apply[T <: Data](n: Int)(gen: => T): Vec[T] = {
-    val res = new Vec[T]();
-    res.gen = () => gen;
+    val res = new Vec[T](() => gen);
     for(i <- 0 until n){
       val t   = gen;
       res    += t;
@@ -136,19 +135,21 @@ class VecProc extends proc {
     searchAndMap = true
     for(i <- 0 until elms.length){
       when (getEnable(onehot, i)) {
-        elms(i).comp procAssign src.asInstanceOf[Bits]
+        if(elms(i).comp != null)
+          elms(i).comp procAssign src
+        else
+          elms(i) procAssign src
       }
     }
     searchAndMap = false
   }
 }
 
-class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] { 
+class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferProxy[T] { 
   var eltWidth = 0
   val self = new ArrayBuffer[T]
   val readPortCache = new HashMap[UFix, T]
   var sortedElementsCache: ArrayBuffer[ArrayBuffer[Bits]] = null
-  var gen: () => T = () => self(0)
   var flattenedVec: Node = null
   override def apply(idx: Int): T = {
     super.apply(idx)
@@ -165,9 +166,9 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
       // fill out buckets
       for(elm <- this) {
         for(((n, io), i) <- elm.flatten zip elm.flatten.indices) {
-          val bits = io.toBits
-          bits.comp = io.comp
-          sortedElementsCache(i) += bits
+          //val bits = io.toBits
+          //bits.comp = io.comp
+          sortedElementsCache(i) += io.asInstanceOf[Bits]
         }
       }
     }
@@ -200,10 +201,11 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
 
   def read(addr: UFix): T = {
     if(readPortCache.contains(addr))
-      readPortCache(addr)
+      return readPortCache(addr)
 
     val res = this(0).clone
-    res.setIsCellIO
+    //val res = gen()
+    res.setIsTypeNode
     for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
       val w = io.getWidth
       val onehot = UFixToOH(addr, length)
@@ -215,21 +217,21 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
       io assign io_res
 
       // setup the comp for writes
-      val io_comp = new VecProc()
-      io_comp.addr = addr
-      io_comp.elms = sortedElm
-      io.comp = io_comp
+        val io_comp = new VecProc()
+        io_comp.addr = addr
+        io_comp.elms = sortedElm
+        io.comp = io_comp
     }
     readPortCache += (addr -> res)
-    res
+    return res
   }
 
-  override def flatten: Array[(String, IO)] = {
-    val res = new ArrayBuffer[(String, IO)];
+  override def flatten: Array[(String, Bits)] = {
+    val res = new ArrayBuffer[(String, Bits)];
     for (elm <- self)
       elm match {
 	case bundle: Bundle => res ++= bundle.flatten;
-	case io: IO         => res += ((io.name, io));
+	case io: Bits         => res += ((io.name, io));
       }
     res.toArray
   }
@@ -261,7 +263,6 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
       b <> e;
   }
 
-
   // TODO: CHECK FOR ALL OUT
   def :=[T <: Data](src: Vec[T]) = {
     for((me, other) <- this zip src){
@@ -279,9 +280,9 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
 
   override def traceableNodes = self.toArray
 
-  override def removeCellIOs() = {
+  override def removeTypeNodes() = {
     for(bundle <- self)
-      bundle.removeCellIOs
+      bundle.removeTypeNodes
   }
 
   override def flip(): this.type = {
@@ -291,10 +292,12 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
   }
 
   override def name_it (path: String, named: Boolean = true) = {
-    for (i <- self) {
-      i.name = (if (path.length > 0) path + "_" else "") + i.name;
-      i.name_it(i.name, named);
-      // println("  ELT " + n + " " + i);
+    if(!this.named) {
+      if(path.length > 0) name = path
+      this.named = named
+      for (i <- self) {
+        i.name_it( (if (path.length > 0) path + "_" else "") + i.name, named )
+      }
     }
   }
 
@@ -306,7 +309,7 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
   override def toNode: Node = {
     if(flattenedVec == null){
       val nodes = flatten.map{case(n, i) => i};
-      flattenedVec = Concatanate(nodes.head, nodes.tail.toList: _*)
+      flattenedVec = Concatenate(nodes.head, nodes.tail.toList: _*)
     }
     flattenedVec
   }
@@ -337,14 +340,13 @@ class Vec[T <: Data]() extends Data with Cloneable with BufferProxy[T] {
     this
   }
 
-  override def setIsCellIO() = {
-    isCellIO = true;
+  override def setIsTypeNode() = {
+    isTypeNode = true;
     for(elm <- self)
-      elm.setIsCellIO
+      elm.setIsTypeNode
   }
 
   override def toBits(): Bits = {
-
     // var res: Bits = null
     // for(i <- 0 until length)
     //   res = Cat(this(i), res)

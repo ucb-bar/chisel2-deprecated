@@ -1638,6 +1638,28 @@ void dat_dump (FILE* file, dat_t<w> val, const char* name) {
   fputs(str, file);
 }
 
+inline std::string read_tok(FILE* f) {
+  std::string res;
+  bool is_skipping = true;
+  for (;;) {
+    char c = fgetc(f);
+    if (feof(f))
+      return res;
+    if (is_skipping) {
+      if (char_to_hex[c] != -1) {
+        res.push_back(c);
+        is_skipping = false;
+      }
+    } else {
+      if (char_to_hex[c] == -1) {
+        ungetc(c, f);
+        return res;
+      } 
+      res.push_back(c);
+    }
+  }
+}
+
 template <int w, int d>
 void dat_dump (FILE* file, mem_t<w,d> val, std::string name) {
 }

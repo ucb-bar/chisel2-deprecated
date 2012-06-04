@@ -3,7 +3,6 @@ package Chisel {
 
 import Node._;
 import Component._;
-import IOdir._;
 import Lit._;
 
 object NodeExtract {
@@ -60,21 +59,13 @@ object Extract {
   def apply[T <: Bits](mod: T, bit: UFix)(gen: => T): T = {
     val (bits_lit, off_lit) = (mod.litOf, bit.litOf);
     if (isFolding && bits_lit != null && off_lit != null) {
-      // println("FOLDING EXTRACT " + bits_lit.value + "(" + off_lit.value + ")");
       makeLit(Literal((bits_lit.value >> off_lit.value.toInt)&1, 1)){ gen };
     } else {
-      // initialize 
       val extract = new Extract()
       extract.init("", fixWidth(1), mod.toNode, bit)
       extract.hi = bit
       extract.lo = bit
-
-      // make output
-      val output = gen.fromNode(extract)
-      output.setIsCellIO
-      extract.nameHolder = output
-      output.comp = extract
-      output
+      extract.setTypeNodeNoAssign(gen.fromNode(extract))
     }
   }
 
@@ -88,18 +79,11 @@ object Extract {
       val dw = if (w == -1) (hi_lit.value - lo_lit.value + 1).toInt else w;
       makeLit(Literal((bits_lit.value >> lo_lit.value.toInt)&((BigInt(1)<<dw) - BigInt(1)), dw)){ gen };
     } else {
-      // initialize
       val extract = new Extract()
       extract.init("", if(w == -1) widthOf(0) else fixWidth(w), mod.toNode, hi, lo)
       extract.hi = hi
       extract.lo = lo
-
-      // make output
-      val output = gen.fromNode(extract)
-      output.setIsCellIO
-      extract.nameHolder = output
-      output.comp = extract
-      output
+      extract.setTypeNodeNoAssign(gen.fromNode(extract))
     }
   }
 
@@ -108,13 +92,9 @@ object Extract {
   }
 }
 
-class Extract extends Node with proc {
+class Extract extends Node {
   var lo: Node = null;
   var hi: Node = null;
-
-  // Define proc trait methods.
-  override def genMuxes(default: Node) = {
-  }
 
   override def toString: String =
     if (hi == lo)
@@ -147,29 +127,6 @@ class Extract extends Node with proc {
   def validateIndex(x: Node) = {
     val lit = x.litOf
     assert(lit == null || lit.value >= 0 && lit.value < inputs(0).getWidth)
-  }
-  def procAssign(src: Node) = {
-    assign(src);
-  }
-  override def assign(src: Node): Unit = {
-    // If assigning to an extract output, search forward to an Assign node.
-    val assign_node = findAssignNode(8);
-    if (assign_node == null) {
-      println("[error] Unable to determine assignment destination from extract.");
-      // stack = Thread.currentThread.getStackTrace;
-      // for (e <- stack)
-      //   println(e);
-      return;
-    }
-    // println("[info] Found an Assign node from an Extract");
-    assign_node match {
-      case a: Assign[_] => {
-        a.assign_from_extract(this, src.asInstanceOf[Data].toBits);
-      }
-      case any => {
-        println("[error] Assignment to Extract: Unable to find associated Assign block.");
-      }
-    }
   }
 }
 
