@@ -138,6 +138,7 @@ object chiselMain {
     case "v" => c.compileV();
     case "c" => 
       c.compileC(); 
+      // c.name = "Combinational"
       if (isCompilingEmittedC && isGenHarness) c.gcc()
       if (isTestingC) c.tests()
     }

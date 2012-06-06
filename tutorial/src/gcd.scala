@@ -3,15 +3,13 @@ package Tutorial {
 import Chisel._
 import scala.collection.mutable.HashMap
 
-class GCDIO extends Bundle {
-  val a = UFix(16, INPUT)
-  val b = UFix(16, INPUT)
-  val z = UFix(16, OUTPUT)
-  val v = Bool(OUTPUT)
-}
-
 class GCD extends Component {
-  val io = new GCDIO()
+  val io = new Bundle {
+    val a = UFix(16, INPUT)
+    val b = UFix(16, INPUT)
+    val z = UFix(16, OUTPUT)
+    val v = Bool(OUTPUT)
+  }
   val x  = Reg(resetVal = io.a)
   val y  = Reg(resetVal = io.b)
   when   (x > y) { x := x - y } 
