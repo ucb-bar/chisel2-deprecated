@@ -23,6 +23,8 @@ object Tutorial {
         chiselMain(tut_args, () => new Memo())
       case "filter" => 
         chiselMain(tut_args, () => new Filter())
+      case "tbl" => 
+        chiselMain(tut_args, () => new Tbl())
     }
   }
 }
