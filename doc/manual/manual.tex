@@ -495,8 +495,8 @@ calculates node output bit widths from their respective input bit widths accordi
 {\small
 \begin{tabular}{ll}
 {\bf operation} & {\bf bit width} \\ 
-\verb|z = x + y| & \verb|wz = max(wx, wy) + 1| \\
-\verb+z = x - y+ & \verb|wz = max(wx, wy) + 1|\\
+\verb|z = x + y| & \verb+wz = max(wx, wy)+ \\
+\verb+z = x - y+ & \verb+wz = max(wx, wy)+\\
 \verb+z = x & y+ & \verb+wz = max(wx, wy)+ \\
 \verb+z = Mux(c, x, y)+ & \verb+wz = max(wx, wy)+ \\
 \verb+z = w * y+ & \verb!wz = wx + wy! \\
@@ -677,22 +677,22 @@ Chisel provides facilities for creating both read only and
 read/write memories.  
 
 \begin{scala}
-object Mem {
-  def apply[T <: Data](depth: Int)(type: => T): T
+object RAM {
+  def apply[T <: Data](depth: Int)(type: => T): RAM
 }
 
-class Mem[T <: Data](n: Int, type: () => T) 
+class RAM[T <: Data](n: Int, type: () => T) 
     extends Updateable {
   def apply(idx: UFix): T
 }
 
-class MemRead[T <: Data]
-      (val mem: Mem, val idx: UFix) extends Node {
+class RAMRead[T <: Data]
+      (val ram: RAM, val idx: UFix) extends Node {
   override def := (data: T): T
 }
 
-class MemWrite[T <: Data]
-      (val mem: Mem, val idx: UFix, val kind: T) 
+class RAMWrite[T <: Data]
+      (val ram: RAM, val idx: UFix, val kind: T) 
     extends Node
 \end{scala}
 
@@ -702,7 +702,7 @@ memory writes:
 
 \begin{scala}
 // memory construction
-val m = Mem(n){ UFix(width = 32) }
+val m = RAM(n){ UFix(width = 32) }
 // memory read
 val d = m(addr)
 // memory write
@@ -769,10 +769,10 @@ input mux, we would define a component as follows:
 \begin{scala}
 class Mux2 extends Component {
   val io = new Bundle{
-    val sel = Bits(width = 1, dir = INPUT)
-    val in0 = Bits(width = 1, dir = INPUT)
-    val in1 = Bits(width = 1, dir = INPUT)
-    val out = Bits(width = 1, dir = OUTPUT)
+    val sel = Bits(1, INPUT)
+    val in0 = Bits(1, INPUT)
+    val in1 = Bits(1, INPUT)
+    val out = Bits(1, OUTPUT)
   }
   io.out := (io.sel & io.in1) | (~io.sel & io.in0)
 }
@@ -812,9 +812,9 @@ For example, one could define a simple ROM blackbox as:
 
 \begin{scala}
 class RomIo extends Bundle {
-  val isVal = Bool(dir = INPUT)
-  val raddr = UFix(width = 32, dir = INPUT)
-  val rdata = Bits(width = 32, dir = OUTPUT)
+  val isVal = Bool(INPUT)
+  val raddr = UFix(32, INPUT)
+  val rdata = Bits(32, OUTPUT)
 }
 
 class Rom extends BlackBox {
@@ -936,52 +936,64 @@ Yet another way to test circuits is with the \code{chiselMainTest}
 function by directly supplying test vectors in a Chisel program:
 
 \begin{scala}
-class Tester
-  (val vecs: Array[Array[BigInt]], 
-   val bindings: Seq[Data])
-
 object chiselMainTest {
   def apply[T <: Component]
-    (args: Array[String], comp: () => T)(
-     tester: T => Tester, 
-     printer: T => TestIO = null)
+    (args: Array[String], comp: () => T)
 }
 \end{scala}
 
 \noindent
-where users specify a \code{Tester} object consisting of test vectors and
-test vector bindings.
-Test vectors are sequences of \code{BitInt}s, 
-where  each test vector has input in the first part of the sequence
-and non-input in the remaining part of the sequence.
-The test vector bindings are nodes specified to
-\code{Tester} that are flattened and split into input and non-input leaves.
+where the test vector bindings are the component's interface.
 \code{chiselMainTest} generates code that scans test vectors one at a
-time, binding inputs,  running the circuit, and then comparing the
-produced non input values to the supplied test vector ones.
-The app exits with its return code equal to all test vectors not matching.
-For example, we can test \code{Mux2} using the following:
-
+time, binding interface inputs,  running the circuit, and printing the outputs.
+Users write tests using \code{defTests} by creating test
+vectors by creating a bundle and assigning literal inputs and expected
+outputs to it as follows:
 \begin{scala}
-object tutorial {
-  val tsts = 
-     Array(Array(0, 0, 0, 0),
-           Array(0, 0, 1, 0),
-           Array(0, 1, 0, 1),
-           Array(0, 1, 1, 1),
-           Array(1, 0, 0, 0),
-           Array(1, 0, 1, 1),
-           Array(1, 1, 0, 0),
-           Array(1, 1, 1, 1))
-  def main(args: Array[String]) = {
-    val targs = args ++ Array("--gen-harness") 
-    chiselMainTest(targs, () => new Mux2())(
-      c => Printer("%x", c.io),
-      c => Tester(tsts, c.io)
-   )
+class Mux2 extends Component {
+ ...
+
+ defTests(io) {  
+    var allGood = true
+    val n = pow(2, 3).toInt
+    val vars = new Map[Node, Data]()
+    for (i <- 0 until n) {
+      vars.clear()
+      val k  = Bits(i, width = sizeof(n)) 
+      vars(io.sel) = k(0) 
+      vars(io.in0) = k(1) 
+      vars(io.in1) = k(2) 
+      vars(io.out) = Mux(k(0), k(1), k(2)) 
+      allGood = test(vars) && allGood
+    }
+    allGood
   }
 }
 \end{scala}
+
+% The app exits with its return code equal to all test vectors not matching.
+% For example, we can test \code{Mux2} using the following:
+% 
+% \begin{scala}
+% object tutorial {
+%   val tsts = 
+%      Array(Array(0, 0, 0, 0),
+%            Array(0, 0, 1, 0),
+%            Array(0, 1, 0, 1),
+%            Array(0, 1, 1, 1),
+%            Array(1, 0, 0, 0),
+%            Array(1, 0, 1, 1),
+%            Array(1, 1, 0, 0),
+%            Array(1, 1, 1, 1))
+%   def main(args: Array[String]) = {
+%     val targs = args ++ Array("--gen-harness") 
+%     chiselMainTest(targs, () => new Mux2())(
+%       c => Printer("%x", c.io),
+%       c => Tester(tsts, c.io)
+%    )
+%   }
+% }
+% \end{scala}
 
 Finally, command arguments for \code{chiselMain*} are as follows: \\
 

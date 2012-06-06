@@ -413,8 +413,8 @@ calculates node output bit widths from their respective input bit widths accordi
 
 \begin{tabular}{ll}
 {\bf operation} & {\bf bit width} \\ 
-\verb|z = x + y| & \verb|wz = max(wx, wy) + 1| \\
-\verb+z = x - y+ & \verb|wz = max(wx, wy) + 1|\\
+\verb|z = x + y| & \verb|wz = max(wx, wy)| \\
+\verb+z = x - y+ & \verb|wz = max(wx, wy)|\\
 \verb+z = x & y+ & \verb+wz = max(wx, wy)+ \\
 \verb+z = Mux(c, x, y)+ & \verb+wz = max(wx, wy)+ \\
 \verb+z = w * y+ & \verb!wz = wx + wy! \\
@@ -576,10 +576,10 @@ argument, where the direction is \code{INPUT} or
 
 An example port declaration is as follows:
 \begin{scala}
-class FIFOInput extends Bundle {
-  val rdy  = Bool(dir = OUTPUT)
-  val data = Bits(width = 32, dir = INPUT)
-  val enq  = Bool(dir = INPUT)
+class FIFOIO extends Bundle {
+  val ready = Bool(OUTPUT)
+  val data  = Bits(32, INPUT)
+  val valid = Bool(INPUT)
 }
 \end{scala}
 
@@ -640,10 +640,10 @@ component:
 \begin{scala}
 class Mux2 extends Component {
   val io = new Bundle{
-    val sel = Bits(width = 1, dir = INPUT)
-    val in0 = Bits(width = 1, dir = INPUT)
-    val in1 = Bits(width = 1, dir = INPUT)
-    val out = Bits(width = 1, dir = OUTPUT)
+    val sel = Bits(1, INPUT)
+    val in0 = Bits(1, INPUT)
+    val in1 = Bits(1, INPUT)
+    val out = Bits(1, OUTPUT)
   }
   io.out := (io.sel & io.in1) | (~io.sel & io.in0)
 }
@@ -669,12 +669,12 @@ together three 2-input multiplexers:
 \begin{scala}
 class Mux4 extends Component {
   val io = new Bundle {
-    val in0 = Bits(width = 1, dir = INPUT)
-    val in1 = Bits(width = 1, dir = INPUT)
-    val in2 = Bits(width = 1, dir = INPUT)
-    val in3 = Bits(width = 1, dir = INPUT)
-    val sel = Bits(width = 2, dir = INPUT)
-    val out = Bits(width = 1, dir = OUTPUT)
+    val in0 = Bits(1, INPUT)
+    val in1 = Bits(1, INPUT)
+    val in2 = Bits(1, INPUT)
+    val in3 = Bits(1, INPUT)
+    val sel = Bits(2, INPUT)
+    val out = Bits(1, OUTPUT)
   }
   val m0 = new Mux2()
   m0.io.sel := io.sel(0) 
@@ -1177,7 +1177,7 @@ Users can define read only memories with:
 
 %%  TODO: FIX Rom to take Seq
 \begin{scala}
-Rom(inits: Seq[Data]) (type: => T)
+ROM(inits: Seq[Data]) (type: => T)
 \end{scala}
 
 \noindent
@@ -1189,8 +1189,8 @@ loop through all values using a counter as an address generator as follows:
 
 \begin{scala}
 val i = Array(UFix(1), UFix(2), UFix(4), UFix(8))
-val m = Rom(i){ UFix(width = 32) }
-val r = m.read(counter(UFix(i.length)))
+val m = ROM(i){ UFix(width = 32) }
+val r = m(counter(UFix(i.length)))
 \end{scala}
 
 \noindent
@@ -1205,7 +1205,7 @@ def sinTable (amp: Double, n: Int) = {
   Rom(inits){ Fix(width = 32) }
 }
 def sinWave (amp: Double, n: Int) = 
-  sinTable(amp, n).read(counter(UFix(n))
+  sinTable(amp, n)(counter(UFix(n))
 \end{scala}
 
 \noindent
@@ -1224,7 +1224,7 @@ the simplest form, Chisel allows memory to be defined with a single
 write port and multiple read ports as follows:
 
 \begin{scala}
-  Mem(depth: Int)
+  RAM(depth: Int)
 \end{scala}
 
 \noindent
@@ -1235,10 +1235,10 @@ be read from using the \verb+apply(rdAddress)+ method.  For example, an
 audio recorder could be defined as follows:
 
 \begin{scala}
-  def audioRecorder(n: Int) = { 
+  def audioRecorder(n: Int, button: Bool) = { 
     val addr   = counter(UFix(n))
-    val ram    = Mem(n)
-    ram(addr) := button()
+    val ram    = RAM(n)
+    ram(addr) := button
     ram(Mux(button(), UFix(0), addr))
   } 
 \end{scala}
@@ -1251,7 +1251,7 @@ We can use simple memory to create register files.
 For example we can make a one write port, two read port register file with 32 registers as follows:
 
 \begin{scala}
-  val regs = Mem(32)
+  val regs = RAM(32)
   when (wr_en) {
     regs(wr_addr) := wr_data
   }
@@ -1268,7 +1268,7 @@ following is an example of a memory that is first defined with no
 memory ports, after which read, write, or read/write ports are added:
 
 \begin{scala}
-  val regfile = Mem(64){ Bits(width = 32) }
+  val regfile = RAM(64){ Bits(width = 32) }
   when (wen) {
     regfile.write(addr_in, data_in1, w_mask = bit_mask)
   }
@@ -1283,7 +1283,7 @@ memory ports, after which read, write, or read/write ports are added:
 % This example can be written more compactly as:
 % 
 % \begin{scala}
-% val regfile = Mem(64, io.wen, io.addr_in, io.data_in1, w_mask = io.bit_mask,
+% val regfile = RAM(64, io.wen, io.addr_in, io.data_in1, w_mask = io.bit_mask,
 %  readLatency = 1, hexInitFile = "hex_init_values.txt")
 % val read_data = regfile(io.addr_in, io.data_in1, oe = !io.wen, cs = Bool(true))
 % \end{scala}
@@ -1315,8 +1315,8 @@ For example, a user could define a simple link for handshaking data as follows:
 
 \begin{scala}
 class SimpleLink extends Bundle { 
-  val data = Bits(width=16,dir=OUTPUT) 
-  val rdy  = Bool(dir=OUTPUT)
+  val data = Bits(16, OUTPUT) 
+  val rdy  = Bool(OUTPUT)
 }
 \end{scala}
 
@@ -1326,7 +1326,7 @@ bundle inheritance:
 
 \begin{scala}
 class PLink extends SimpleLink { 
-  val parity = Bits(width=5,dir=OUTPUT) 
+  val parity = Bits(5, OUTPUT) 
 }
 \end{scala}
 
@@ -1368,16 +1368,16 @@ we utilize the \verb+Vec+ constructor:
 \begin{scala}
 class CrossbarIo(n: Int) extends Bundle {
   val in  = Vec(n){ new PLink().flip() }
-  val sel = UFix(width = log2up(n), dir = INPUT)
+  val sel = UFix(sizeof(n), INPUT)
   val out = Vec(n){ new PLink() }
 }
 \end{scala}
 
 % \begin{scala}
 % class CrossbarIo(n: Int) extends Bundle {
-%   val in  = Vec(n){ Bits(width = w, dir = INPUT) }
-%   val sel = Vec(n){ UFix(width = (log(n)/log(2)).toInt, dir = INPUT) }
-%   val out = Vec(n){ Bits(width = w, dir = OUTPUT) }
+%   val in  = Vec(n){ Bits(w, INPUT) }
+%   val sel = Vec(n){ UFix(sizeof(n),  INPUT) }
+%   val out = Vec(n){ Bits(w, OUTPUT) }
 % }
 % \end{scala}
 
@@ -1422,14 +1422,14 @@ A user first defines the complete interface to a ROM and RAM as follows:
 
 \begin{scala}
 class RomIo extends Bundle {
-  val isVal = Bool(dir = INPUT)
-  val raddr = UFix(width = 32, dir = INPUT)
-  val rdata = Bits(width = 32, dir = OUTPUT)
+  val isVal = Bool(INPUT)
+  val raddr = UFix(32, INPUT)
+  val rdata = Bits(32, OUTPUT)
 }
 
 class RamIo extends RomIo {
-  val isWr  = Bool(Dir = INPUT)
-  val wdata = Bits(width = 32, dir = INPUT)
+  val isWr  = Bool(INPUT)
+  val wdata = Bits(32, INPUT)
 }
 \end{scala}
 
@@ -1545,12 +1545,12 @@ significantly simpler.
 \begin{scala}
 class Mux4 extends Component {
   val io = new Bundle {
-    val in0 = Bits(width = 1, dir = INPUT)
-    val in1 = Bits(width = 1, dir = INPUT)
-    val in2 = Bits(width = 1, dir = INPUT)
-    val in3 = Bits(width = 1, dir = INPUT)
-    val sel = Bits(width = 2, dir = INPUT)
-    val out = Bits(width = 1, dir = OUTPUT)
+    val in0 = Bits(1, INPUT)
+    val in1 = Bits(1, INPUT)
+    val in2 = Bits(1, INPUT)
+    val in3 = Bits(1, INPUT)
+    val sel = Bits(2, INPUT)
+    val out = Bits(1, OUTPUT)
   }
   io.out := Mux2(io.sel(1),
                  Mux2(io.sel(0), io.in0, io.in1),
@@ -1679,21 +1679,20 @@ where $x$ is the input and $w$ is a vector of weights.
 In Chisel this can be defined as:
 
 \begin{scala}
-def innerProductFIR[T <: Num] (w: Array[Int], x: T) = 
-  foldR(Range(0, w.length).map(i => Num(w(i)) * delay(x, i)), _ + _)
+def innerProductFIR[T <: Num] (w: Array[Int], x: T) = {
+  val delays = Range(0, w.length).map(i => Num(w(i)) * delay(x, i))
+  delays.foldRight(_ + _)
+}
 
 def delay[T <: Bits](x: T, n: Int): T =
   if (n == 0) x else Reg(delay(x, n - 1))
-
-def foldR[T <: Bits] (x: Seq[T], f: (T, T) => T): T =
-  if (x.length == 1) x(0) else f(x(0), foldR(x.slice(1, x.length), f))
 \end{scala}
  
 \noindent
 where 
 \code{delay} creates a \code{n} cycle delayed copy of its input and
-\code{foldR} (for fold right) constructs a reduction circuit given a binary combiner function \code{f}.  
-In this case, \code{foldR} creates a summation circuit.
+\code{foldRight} constructs a reduction circuit given a binary combiner function \code{f}.  
+In this case, \code{foldRight} creates a summation circuit.
 Finally, the \code{innerProductFIR} function is constrained to work on inputs of type \code{Num} where Chisel multiplication and addition are defined.
 
 \subsection{Parameterized Classes}
@@ -1744,18 +1743,16 @@ object FifoDemo {
 
 \begin{figure}[ht]
 \begin{scala}
-class FifoIO[T <: Data]()(type: => T) extends Bundle {
-  val enq_val = Bool(INPUT)
-  val enq_rdy = Bool(OUTPUT)
-  val deq_val = Bool(OUTPUT)
-  val deq_rdy = Bool(INPUT)
-  val enq_dat = type.asInput
-  val deq_dat = type.asOutput
-}
-
 class Fifo[T <: Data] (n: Int)(type: => T) 
     extends Component {
-  val io           = new FifoIO()( type)
+  val io = new Bundle {
+    val enq_val = Bool(INPUT)
+    val enq_rdy = Bool(OUTPUT)
+    val deq_val = Bool(OUTPUT)
+    val deq_rdy = Bool(INPUT)
+    val enq_dat = type.asInput
+    val deq_dat = type.asOutput
+  }
   val enq_ptr      = Reg(resetVal = UFix(0, sizeof(n)))
   val deq_ptr      = Reg(resetVal = UFix(0, sizeof(n)))
   val is_full      = Reg(resetVal = Bool(false))
@@ -1768,13 +1765,16 @@ class Fifo[T <: Data] (n: Int)(type: => T)
     Mux(do_enq && ~do_deq && (enq_ptr_inc === deq_ptr), 
         Bool(true),
         Mux(do_deq && is_full, Bool(false), is_full))
-  enq_ptr <== Mux(do_enq, enq_ptr_inc, enq_ptr)
-  deq_ptr <== Mux(do_deq, deq_ptr_inc, deq_ptr)
-  is_full <== is_full_next
-  val ram = Mem(n, do_enq, enq_ptr, io.enq_dat)
+  enq_ptr := Mux(do_enq, enq_ptr_inc, enq_ptr)
+  deq_ptr := Mux(do_deq, deq_ptr_inc, deq_ptr)
+  is_full := is_full_next
+  val ram = RAM(n)
+  when (do_enq) {
+    ram(enq_ptr) := io.enq_dat
+  }
   io.enq_rdy := !is_full
   io.deq_val := !is_empty
-  ram.read(deq_ptr) <> io.deq_dat
+  ram(deq_ptr) <> io.deq_dat
 }
 \end{scala}
 \caption{Parameterized FIFO example.}
@@ -1784,7 +1784,7 @@ class Fifo[T <: Data] (n: Int)(type: => T)
 It is also possible to define a generic decoupled interface:
 
 \begin{scala}
-  class ioDecoupled[T <: Data]()(data: => T) 
+  class FIFOIO[T <: Data]()(data: => T) 
       extends Bundle {
     val ready = Bool(INPUT)
     val valid = Bool(OUTPUT)
@@ -1797,8 +1797,8 @@ This template can then be used to add a handshaking protocol to any
 set of signals:
 
 \begin{scala}
-  class decoupledDemo 
-    extends ioDecoupled()( new DataBundle )
+  class DecoupledDemo 
+    extends FIFOIO()( new DataBundle )
 \end{scala}
 
 \noindent
@@ -1806,9 +1806,13 @@ The FIFO interface in Figure~\ref{fig:fifo} can be now be simplified as
 follows: 
 
 \begin{scala}
-  class FifoIO[T <: Data]()(type: => T) extends Bundle  {
-    val enq = new ioDecoupled()( type ).flip()
-    val deq = new ioDecoupled()( type )
+  class Fifo[T <: Data] (n: Int)(data: => T) 
+      extends Component {
+    val io = new Bundle {
+      val enq = new FIFOIO()( data ).flip()
+      val deq = new FIFOIO()( data )
+    }
+    ...
   }
 \end{scala}
 

@@ -1560,10 +1560,10 @@ void str_to_dat(std::string str, dat_t<w>& res) {
       word_accum |= ((val_t)digit_val) << bit;
       bit += 4;
       if (bit == 64) {
-        res.values[w_index] = word_accum;
-        word_accum          = 0L;
-        bit                 = 0;
-        w_index++;
+	res.values[w_index] = word_accum;
+	word_accum          = 0L;
+	bit                 = 0;
+	w_index++;
       }
     }
   }
@@ -1582,9 +1582,7 @@ void str_to_dat(std::string str, dat_t<w>& res) {
 //   Fail:    0
 template <int w>
 size_t dat_from_hex(std::string hex_line, dat_t<w>& res, size_t offset = 0) {
-  size_t first_digit;
-  size_t last_digit;
-  size_t comment;
+  size_t first_digit, last_digit, comment;
 
   // Scan for the hex data bounds.
   comment = hex_line.find_first_of("/", offset);

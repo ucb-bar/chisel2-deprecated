@@ -10,6 +10,9 @@
 \lstset{basicstyle={\footnotesize\ttfamily}}
 
 \usetheme[height=9mm]{Rochester}
+\setbeamersize{text margin left=3mm} 
+\setbeamersize{text margin right=3mm} 
+\setbeamertemplate{navigation symbols}{}
 
 \newenvironment{sample}{\VerbatimEnvironment\begin{footnotesize}\begin{semiverbatim}}{\end{semiverbatim}\end{footnotesize}}
 
@@ -160,17 +163,20 @@ import Chisel._
 
 class GCD extends Component {
   val io = new Bundle {
-    val a   = UFix(16, INPUT)
-    val b   = UFix(16, INPUT)
-    val z   = UFix(16, OUTPUT)
-    val rdy = Bool(OUTPUT)
+    val a     = UFix(16, INPUT)
+    val b     = UFix(16, INPUT)
+    val z     = UFix(16, OUTPUT)
+    val valid = Bool(OUTPUT)
   }
   val x  = Reg(resetVal = io.a)
   val y  = Reg(resetVal = io.b)
-  when   (x > y) { x := x - y } 
-  unless (x > y) { y := y - x }
-  io.z   := x
-  io.rdy := y === UFix(0)
+  when (x > y) { 
+    x := x - y 
+  } .otherwise { 
+    y := y - x 
+  }
+  io.z     := x
+  io.valid := y === UFix(0)
 }
 
 }
@@ -226,46 +232,30 @@ f(4)
 
 \begin{frame}[fragile]{Literals}
 \begin{scala}
-// decimal 1-bit literal from Scala Int. 
-Bits(1)       
-// hexadecimal 4-bit literal from string.
-Bits("ha")    
-// octal 4-bit literal from string. 
-Bits("o12")   
-// binary 4-bit literal from string.
-Bits("b1010") 
+Bits(1)       // decimal 1-bit literal from Scala Int. 
+Bits("ha")    // hexadecimal 4-bit literal from string.
+Bits("o12")   // octal 4-bit literal from string. 
+Bits("b1010") // binary 4-bit literal from string.
 
-// signed decimal 4-bit literal from Scala Int.
-Fix(5)        
-// negative decimal 4-bit literal from Scala Int.
-Fix(-8)       
-// unsigned decimal 3-bit literal from Scala Int.
-UFix(5)       
+Fix(5)        // signed decimal 4-bit literal from Scala Int.
+Fix(-8)       // negative decimal 4-bit literal from Scala Int.
+UFix(5)       // unsigned decimal 3-bit literal from Scala Int.
 
-// Bool literals from Scala literals.
-Bool(true)    
+Bool(true)    // Bool literals from Scala literals.
 Bool(false)
 \end{scala}
 \end{frame}
  
 \begin{frame}[fragile]{Literals}
 \begin{scala}
-// 32-bit literal of type Bits.
-Bits("h_dead_beef") 
+Bits("h_dead_beef") // 32-bit literal of type Bits.
+Bits(1)             // decimal 1-bit literal from Scala Int.
+Bits("ha", 8)       // hexadecimal 8-bit literal of type Bits.
+Bits("o12", 6)      // octal 6-bit literal of type Bits.
+Bits("b1010", 12)   // binary 12-bit literal of type Bits.
 
-// decimal 1-bit literal from Scala Int.
-Bits(1)             
-// hexadecimal 8-bit literal of type Bits.
-Bits("ha", 8)       
-// octal 6-bit literal of type Bits.
-Bits("o12", 6)      
-// binary 12-bit literal of type Bits.
-Bits("b1010", 12)   
-
-// signed decimal 7-bit literal of type Fix.
-Fix(5, 7)           
-// unsigned decimal 8-bit literal of type UFix.
-UFix(5, 8)          
+Fix(5, 7)           // signed decimal 7-bit literal of type Fix.
+UFix(5, 8)          // unsigned decimal 8-bit literal of type UFix.
 \end{scala}
 \end{frame}
 
@@ -387,8 +377,8 @@ val lte = a <= b
 \begin{center}
 \begin{tabular}{ll}
 {\bf operation} & {\bf bit width} \\ 
-\verb|z = x + y| & \verb|wz = max(wx, wy) + 1| \\
-\verb+z = x - y+ & \verb|wz = max(wx, wy) + 1|\\
+\verb|z = x + y| & \verb+wz = max(wx, wy)+ \\
+\verb+z = x - y+ & \verb+wz = max(wx, wy)+\\
 \verb+z = x & y+ & \verb+wz = max(wx, wy)+ \\
 \verb+z = Mux(c, x, y)+ & \verb+wz = max(wx, wy)+ \\
 \verb+z = w * y+ & \verb!wz = wx + wy! \\
@@ -486,9 +476,9 @@ myVec(addr2) := data2
 
 \begin{scala}
 class FIFOInput extends Bundle {
-  val rdy  = Bool(dir = OUTPUT)
-  val data = Bits(width = 32, dir = INPUT)
-  val enq  = Bool(dir = INPUT)
+  val ready = Bool(OUTPUT)
+  val bits  = Bits(32, INPUT)
+  val valid = Bool(INPUT)
 }
 \end{scala}
 
@@ -514,10 +504,10 @@ class ScaleIO extends Bundle {
 \begin{scala}
 class Mux2 extends Component {
   val io = new Bundle{
-    val sel = Bits(width = 1, dir = INPUT)
-    val in0 = Bits(width = 1, dir = INPUT)
-    val in1 = Bits(width = 1, dir = INPUT)
-    val out = Bits(width = 1, dir = OUTPUT)
+    val sel = Bits(1, INPUT)
+    val in0 = Bits(1, INPUT)
+    val in1 = Bits(1, INPUT)
+    val out = Bits(1, OUTPUT)
   }
   io.out := (io.sel & io.in1) | (~io.sel & io.in0)
 }
@@ -529,12 +519,12 @@ class Mux2 extends Component {
 \begin{scala}
 class Mux4 extends Component {
   val io = new Bundle {
-    val in0 = Bits(width = 1, dir = INPUT)
-    val in1 = Bits(width = 1, dir = INPUT)
-    val in2 = Bits(width = 1, dir = INPUT)
-    val in3 = Bits(width = 1, dir = INPUT)
-    val sel = Bits(width = 2, dir = INPUT)
-    val out = Bits(width = 1, dir = OUTPUT)
+    val in0 = Bits(1, INPUT)
+    val in1 = Bits(1, INPUT)
+    val in2 = Bits(1, INPUT)
+    val in3 = Bits(1, INPUT)
+    val sel = Bits(2, INPUT)
+    val out = Bits(1, OUTPUT)
   }
   val m0 = new Mux2()
   m0.io.sel := io.sel(0) 
@@ -570,10 +560,8 @@ object tutorial {
   def main(args: Array[String]) = {
     chiselMainTest(args ++ Array("--gen-harness"), 
                    () => new Mux2())(
-      c => Scanner("%x %x %x", 
-                   c.io.sel, c.io.in0, c.io.in1),
-      c => Printer("%= %= %= %=", 
-                   c.io.sel, c.io.in0, c.io.in1, c.io.out))
+      c => Scanner("%x %x %x", c.io.sel, c.io.in0, c.io.in1),
+      c => Printer("%x %x %x %x", c.io.sel, c.io.in0, c.io.in1, c.io.out))
   }
 }
 \end{scala}
@@ -631,7 +619,7 @@ Reg(in)
 \end{scala}
 
 \begin{scala}
-def risingedge(x: Bool) = x && !Reg(x)
+def risingEdge(x: Bool) = x && !Reg(x)
 \end{scala}
 
 \end{frame}
@@ -639,12 +627,12 @@ def risingedge(x: Bool) = x && !Reg(x)
 \begin{frame}[fragile]{Counter}
 
 \begin{scala}
-def wraparound(n: UFix, max: UFix) =
+def wrapAround(n: UFix, max: UFix) =
   Mux(n > max, UFix(0), n)
 
 def counter(max: UFix) = {
   val x = Reg(resetVal = UFix(0, max.getWidth))
-  x := wraparound(x + UFix(1), max)
+  x := wrapAround(x + UFix(1), max)
   x
 }
 \end{scala}
@@ -725,9 +713,9 @@ when (c2) { r := Bits(2) }
 
 \begin{frame}[fragile]{Conditional Update Synthesized Hardware}
 
-{\centering
+\begin{center}
 \includegraphics[height=2in]{figs/condupdates.pdf}
-}
+\end{center}
 
 \begin{itemize}
 \item Each \kode{when} statement adds another level of data mux and ORs
@@ -829,7 +817,7 @@ class Parity extends Component {
   val state  = Reg(resetVal = s_even)
   when (s.in) {
     when (state === s_even) { state := s_odd  }
-    when (state === s_odd)  { state := s_even }
+    .otherwise              { state := s_even }
   }
   io.out := (state === s_odd)
 }
@@ -840,15 +828,15 @@ class Parity extends Component {
 \begin{frame}[fragile]{Memories}
 
 \begin{scala}
-def object Rom {
-  def apply[T <: Data](inits: Seq[T])(type: => T): Rom
+def object ROM {
+  def apply[T <: Data](inits: Seq[T])(type: => T): ROM
 }
 
-def object Ram {
-  def apply[T <: Data](n: Int, resetVal: T = null)(type: => T): Ram
+def object RAM {
+  def apply[T <: Data](n: Int, resetVal: T = null)(type: => T): RAM
 }
 
-class Ram[T <: Data]
+class RAM[T <: Data]
     (val n: Int, val resetVal: T, val inits: Seq[T], type: () => T) 
       extends Updateable {
   def apply(addr: UFix): T
@@ -861,16 +849,16 @@ class Ram[T <: Data]
 
 \begin{scala}
 val i = Array(UFix(1), UFix(2), UFix(4), UFix(8))
-val m = Rom(i){ UFix(width = 32) }
+val m = ROM(i){ UFix(width = 32) }
 val r = m(counter(UFix(3)))
 
 def sinTable (amp: Double, n: Int) = {
   val ts = Range(0, n, 1).map(i => (i*2*Pi)/(n.toDouble-1) - Pi) 
-  Rom(ts.map(t => Fix(round(amp * sin(t))))){ Fix(width = 32) }
+  ROM(ts.map(t => Fix(round(amp * sin(t))))){ Fix(width = 32) }
 }
 
 def sinWave (amp: Double, n: Int) = 
-  sinTable(amp, n).read(counter(UFix(n))
+  sinTable(amp, n)(counter(UFix(n))
 \end{scala}
 
 \end{frame}
@@ -878,11 +866,11 @@ def sinWave (amp: Double, n: Int) =
 \begin{frame}[fragile]{Ram}
 
 \begin{scala}
-def audioRecorder(n: Int) = { 
+def audioRecorder(n: Int, button: Bool) = { 
   val addr   = counter(UFix(n))
-  val ram    = Ram(n)
-  ram(addr) := button()
-  ram(Mux(button(), UFix(0), addr))
+  val ram    = RAM(n)
+  ram(addr) := button
+  ram(Mux(button, UFix(0), addr))
 } 
 \end{scala}
 
@@ -891,9 +879,9 @@ def audioRecorder(n: Int) = {
 \begin{frame}[fragile]{Register File}
 
 \begin{scala}
-val regs = Ram(32)
+val regs = RAM(32)
 when (wr_en) {
- regs(wr_addr) := wr_data
+  regs(wr_addr) := wr_data
 }
 val idat = regs(iaddr)
 val mdat = regs(maddr)
@@ -904,7 +892,7 @@ val mdat = regs(maddr)
 \begin{frame}[fragile]{Realistic Register File}
 
 \begin{scala}
-val regfile = Ram(64){ Bits(width = 32) }
+val regfile = RAM(64){ Bits(width = 32) }
 // w_mask = bit_mask
 when (wen) {
   regfile(addr_in) := data_in1
@@ -918,8 +906,8 @@ val read_data = Reg(regfile(addr_in))
 
 \begin{scala}
 class SimpleLink extends Bundle { 
-  val data = Bits(width = 16, dir = OUTPUT) 
-  val rdy  = Bool(dir = OUTPUT)
+  val data = Bits(16, OUTPUT) 
+  val rdy  = Bool(OUTPUT)
 }
 \end{scala}
 
@@ -929,7 +917,7 @@ bundle inheritance:
 
 \begin{scala}
 class PLink extends SimpleLink { 
-  val parity = Bits(width = 5, dir = OUTPUT) 
+  val parity = Bits(5, OUTPUT) 
 }
 \end{scala}
 
@@ -973,7 +961,7 @@ where the \verb+io+ field contains \verb+FilterIO+.
 \begin{scala}
 class CrossbarIo(n: Int) extends Bundle {
   val in  = Vec(n){ new PLink().flip() }
-  val sel = UFix(width = log2up(n), dir = INPUT)
+  val sel = UFix(sizeof(n), INPUT)
   val out = Vec(n){ new PLink() }
 }
 \end{scala}
@@ -1013,9 +1001,9 @@ Chisel warns users if ports have other than exactly one connection to them.
 \begin{frame}[fragile]{Port Views}
 \begin{scala}
 class RomIo extends Bundle {
-  val isVal = Bool(dir = INPUT)
-  val raddr = UFix(width = 32, dir = INPUT)
-  val rdata = Bits(width = 32, dir = OUTPUT)
+  val isVal = Bool(INPUT)
+  val raddr = UFix(32, INPUT)
+  val rdata = Bits(32, OUTPUT)
 }
 
 class CpathIo extends Bundle() {
@@ -1061,17 +1049,11 @@ y[t] = \sum_j w_j * x_j[t-j]
 \begin{scala}
 def innerProductFIR[T <: Num] (w: Seq[Int], x: T) = {
   val delays = Range(0, w.length).map(i => Num(w(i)) * delay(x, i))
-  foldR(delays, _ + _)
+  delays.foldRight(_ + _)
 }
 
 def delay[T <: Bits](x: T, n: Int): T =
   if (n == 0) x else Reg(delay(x, n - 1))
-
-def foldR[T <: Bits] (x: Seq[T], f: (T, T) => T): T =
-  if (x.length == 1)
-    x(0) 
-  else 
-    f(x(0), foldR(x.slice(1, x.length), f))
 \end{scala}
 
 \end{frame}
