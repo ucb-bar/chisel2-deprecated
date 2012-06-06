@@ -12,15 +12,13 @@ class Memo extends Component {
     val in      = UFix(8, INPUT)
     val out     = UFix(8, OUTPUT)
   }
-  // val mem = Mem(sizeof(w)){ UFix(width = 8) }
-  // io.out := UFix(0)
-  // when (io.isWrite) {
-  //   mem(io.addr) := io.in
-  // } .otherwise {
-  //   io.out := mem(io.addr)
-  // }
-  val mem = Mem(sizeof(w), io.isWrite, io.addr, io.in)
-  io.out := mem(io.addr)
+  val mem = Mem(sizeof(w)){ UFix(width = 8) }
+  io.out := UFix(0)
+  when (io.isWrite) {
+    mem(io.addr) := io.in
+  } .otherwise {
+    io.out := mem(io.addr)
+  }
 
   defTests(io) {
     var allGood = true

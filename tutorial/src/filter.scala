@@ -31,9 +31,8 @@ class Filter extends Component {
       val in             = rnd.nextInt(maxInt)
       vars(io.in.ready)  = Bool(true)
       vars(io.in.data)   = UFix(in)
-      val isOdd          = (in&1)!=0
-      vars(io.out.ready) = Bool(isOdd)
-      vars(io.out.data)  = UFix(if (isOdd) in else 0)
+      vars(io.out.ready) = Bool(true)
+      vars(io.out.data)  = UFix(in)
       allGood            = test(vars) && allGood
     }
     allGood
