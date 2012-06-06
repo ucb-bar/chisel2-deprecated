@@ -15,6 +15,8 @@ object Tutorial {
         chiselMain(tut_args, () => new Functional())
       case "mux2" => 
         chiselMain(tut_args, () => new Mux2())
+      case "sequential" => 
+        chiselMain(tut_args, () => new Sequential())
       case "parity" => 
         chiselMain(tut_args, () => new Parity())
       case "memo" => 
