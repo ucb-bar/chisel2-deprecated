@@ -1679,21 +1679,20 @@ where $x$ is the input and $w$ is a vector of weights.
 In Chisel this can be defined as:
 
 \begin{scala}
-def innerProductFIR[T <: Num] (w: Array[Int], x: T) = 
-  foldR(Range(0, w.length).map(i => Num(w(i)) * delay(x, i)), _ + _)
+def innerProductFIR[T <: Num] (w: Array[Int], x: T) = {
+  val delays = Range(0, w.length).map(i => Num(w(i)) * delay(x, i))
+  delays.foldRight(_ + _)
+}
 
 def delay[T <: Bits](x: T, n: Int): T =
   if (n == 0) x else Reg(delay(x, n - 1))
-
-def foldR[T <: Bits] (x: Seq[T], f: (T, T) => T): T =
-  if (x.length == 1) x(0) else f(x(0), foldR(x.slice(1, x.length), f))
 \end{scala}
  
 \noindent
 where 
 \code{delay} creates a \code{n} cycle delayed copy of its input and
-\code{foldR} (for fold right) constructs a reduction circuit given a binary combiner function \code{f}.  
-In this case, \code{foldR} creates a summation circuit.
+\code{foldRight} constructs a reduction circuit given a binary combiner function \code{f}.  
+In this case, \code{foldRight} creates a summation circuit.
 Finally, the \code{innerProductFIR} function is constrained to work on inputs of type \code{Num} where Chisel multiplication and addition are defined.
 
 \subsection{Parameterized Classes}
