@@ -1,4 +1,3 @@
-// author: jonathan bachrach
 package Chisel {
 
 import scala.collection.mutable.ArrayBuffer
@@ -97,6 +96,8 @@ abstract class Node extends nameable{
   var genError = false;
   var stack: Array[StackTraceElement] = null;
   var line: Array[StackTraceElement] = Thread.currentThread().getStackTrace
+  var memSource: MemAccess = null
+  def isMemOutput = false
   
   def isByValue: Boolean = true;
   def width: Int = width_;

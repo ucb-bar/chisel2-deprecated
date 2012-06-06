@@ -1,4 +1,3 @@
-// author: jonathan bachrach
 package Chisel {
 
 import Node._;
@@ -83,8 +82,14 @@ class Reg extends Delay with proc {
       enable = enable || cond;
     }
     updates.enqueue((cond, src));
+    if (src.memSource != null)
+      src.memSource.setOutputReg(this)
   }
-  override def genMuxes(default: Node) = {
+  override def genMuxes(default: Node): Unit = {
+    if(isMemOutput) {
+      inputs(0) = updates(0)._2
+      return
+    }
     if(isEnable){
       inputs += enable;
       enableIndex = inputs.length - 1;
@@ -113,15 +118,18 @@ class Reg extends Delay with proc {
       assigned = true; super.assign(src)
     }
   }
+  override def isMemOutput = Component.isEmittingComponents && updates.length == 1 && updates(0)._2.memSource != null
   override def emitInitC: String = {
     "  " + emitRef + " = random_initialization ? dat_t<" + width + ">::rand() : LIT<" + width + ">(0);\n"
   }
   override def emitRefC: String = 
     if(isHiC) emitRefV + "_shadow_out" else emitRefV
-  override def emitRefV: String = if (name == "") "R" + emitIndex else name;
+  override def emitRefV: String = if (isMemOutput) updateVal.emitRef else if (name == "") "R" + emitIndex else name;
   override def emitDef: String = "";
   override def emitReg: String = {
-    if(isEnable && (enableSignal.litOf == null || enableSignal.litOf.value != 1)){
+    if(isMemOutput)
+      ""
+    else if(isEnable && (enableSignal.litOf == null || enableSignal.litOf.value != 1)){
       if(isReset){
 	"    if(reset) begin\n" + 
 	"      " + emitRef + " <= " + resetVal.emitRef + ";\n" +
@@ -140,7 +148,7 @@ class Reg extends Delay with proc {
     }
   }
   override def emitDec: String = 
-    "  reg[" + (width-1) + ":0] " + emitRef + ";\n";
+    if (!isMemOutput) "  reg[" + (width-1) + ":0] " + emitRef + ";\n" else "";
 
   override def emitDefLoC: String = {
     val updateLogic = 

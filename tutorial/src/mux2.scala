@@ -24,7 +24,7 @@ class Mux2 extends Component {
       vars(io.in1) = k(1) 
       vars(io.in0) = k(2) 
       vars(io.out) = Mux(k(0), k(1), k(2)) 
-      allGood &&= test(vars)
+      allGood = test(vars) && allGood
     }
     allGood
   }
