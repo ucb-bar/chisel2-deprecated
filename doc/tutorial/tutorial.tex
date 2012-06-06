@@ -1087,7 +1087,7 @@ class Parity extends Component {
     val out = Bool(dir = OUTPUT) }
   val s_even :: s_odd :: Nil = Enum(2){ UFix() }
   val state  = Reg(resetVal = s_even)
-  when (s.in) {
+  when (io.in) {
     when (state === s_even) { state := s_odd  }
     when (state === s_odd)  { state := s_even }
   }
