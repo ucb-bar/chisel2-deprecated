@@ -1,4 +1,3 @@
-// authors: jonathan bachrach, andrew waterman
 package Chisel
 
 import ChiselError._
