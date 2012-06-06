@@ -6,12 +6,12 @@ import Node._
 import scala.collection.mutable.ArrayBuffer
 
 object ROM {
-  def apply[T <: Data](data: Array[T])(gen: => T): ROM[T] = {
+  def apply[T <: Data](data: Seq[T])(gen: => T): ROM[T] = {
     new ROM(data, () => gen)
   }
 }
 
-class ROM[T <: Data](datai: Array[T], gen: () => T) extends AccessTracker {
+class ROM[T <: Data](datai: Seq[T], gen: () => T) extends AccessTracker {
   def writeAccesses = ArrayBuffer[MemAccess]()
   def readAccesses = reads.map((x: MemAccess) => x)
   val reads = ArrayBuffer[ROMRead[T]]()
@@ -50,7 +50,7 @@ class ROM[T <: Data](datai: Array[T], gen: () => T) extends AccessTracker {
 
   override def emitInitC: String = {
     lits.zipWithIndex.map { case (lit, i) =>
-      "  " + emitRef + "[" + i + "] = " + lit.emitRef + ";\n"
+      "  " + emitRef + ".put(" + i + ", " + lit.emitRef + ");\n"
     }.reduceLeft(_ + _)
   }
 }
