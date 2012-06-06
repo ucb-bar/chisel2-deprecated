@@ -28,7 +28,7 @@
 \setlength{\fboxsep}{8pt}\fbox{\TheSbox}}
 
 % \newenvironment{sample}{\VerbatimEnvironment\begin{footnotesize}\begin{Verbatim}}{\end{Verbatim}\end{footnotesize}}
-\newcommand{\kode}[1]{\begin{footnotesize}{\tt #1}\end{footnotesize}}
+\newcommand{\code}[1]{\begin{footnotesize}{\tt #1}\end{footnotesize}}
 \newcommand{\comment}[1]{{\color{Green}\it\smaller #1}}
 
 \title{Chisel Bootcamp}
@@ -133,7 +133,7 @@ object ChiselBuild extends Build {
 % \end{FramedVerb}
 \end{frame}
 
-\begin{frame}[fragile, shrink]{bootcamp.scala}
+\begin{frame}[fragile, shrink]{tutorial.scala}
 \begin{scala}
 package Tutorial {
 
@@ -391,9 +391,9 @@ val lte = a <= b
 \end{center}
 \end{frame}
 
-\begin{frame}[fragile]{Combinational Scala}
+\begin{frame}[fragile]{Combinational -- \tt tutorial/src/combinational.scala}
 \begin{scala}
-package Bootcamp {
+package Tutorial {
 
 import Chisel._
 
@@ -410,6 +410,154 @@ class Combinational extends Component {
 \end{scala}
 \end{frame}
 
+\begin{frame}[fragile]{Tutorial Main -- \tt tutorial/src/tutorial.scala}
+
+\begin{scala}
+package Tutorial {
+
+import Chisel._
+
+object Tutorial {
+  def main(args: Array[String]) = {
+    val tut_opts = Array("--target-dir", "../emulator", "--gen-harness")
+    val tut_args = args.slice(1, args.length) ++ tut_opts
+    args(0) match {
+      case "combinational" => 
+        chiselMain(tut_args, () => new Combinational())
+      ...
+    }
+  }
+}
+
+}
+\end{scala}
+\end{frame}
+
+
+\begin{frame}[fragile]{Emitting C++ and Compiling}
+
+{\lstset{basicstyle={\tiny\ttfamily}}
+\begin{scala}
+def main(args: Array[String]) = {
+  val tut_opts = Array("--target-dir", "../emulator", "--gen-harness")
+  val tut_args = args.slice(1, args.length) ++ tut_opts
+  args(0) match {
+    case "combinational" => chiselMain(tut_args, () => new Combinational())
+} }
+\end{scala}
+
+get into sbt directory:
+
+\begin{scala}
+cd $CHISEL/tutorial/sbt
+\end{scala}
+
+emit C++ and compile \code{tutorial/emulator/Combination-*} to
+produce combinational circuit app named \code{tutorial/emulator/Combination}:
+
+\begin{scala}
+sbt
+sbt> project tutorial
+sbt> compile
+sbt> run combinational --compile
+sbt> exit
+\end{scala}
+
+or on one line
+
+\begin{scala}
+sbt "project tutorial" "run combinational --compile"
+\end{scala}
+}
+\end{frame}
+
+\begin{frame}[fragile]{Defining Tests}
+
+\begin{columns}
+\column{0.45\textwidth}
+{\lstset{basicstyle={\tiny\ttfamily}}
+\begin{scala}
+package Tutorial {
+
+import Chisel._
+import scala.collection.mutable.HashMap
+import scala.util.Random
+
+class Combinational extends Component {
+  val io = new Bundle {
+    val x = UFix(16, INPUT)
+    val y = UFix(16, INPUT)
+    val z = UFix(16, OUTPUT)
+  }
+  io.z := io.x + io.y
+
+  defTests(io) {
+    var allGood = true
+    val vars    = new HashMap[Node, Node]()
+    val rnd     = new Random()
+    val maxInt  = 1 << 16
+    for (i <- 0 until 10) {
+      vars.clear()
+      val x      = rnd.nextInt(maxInt)
+      val y      = rnd.nextInt(maxInt)
+      vars(io.x) = UFix(x)
+      vars(io.y) = UFix(y)
+      vars(io.z) = UFix((x + y)&(maxInt-1))
+      allGood    = test(vars) && allGood
+    }
+    allGood
+  }
+} }
+\end{scala}
+}
+\column{0.45\textwidth}
+{\lstset{basicstyle={\tiny\ttfamily}}
+\begin{scala}
+def defTests(testNodes: Node*)(body: => Boolean)
+\end{scala}
+\begin{scala}
+def test(vars: HashMap[Node, Node]): Boolean
+\end{scala}
+}
+
+\begin{tiny}
+\begin{itemize}
+\item \code{testNodes} flattened left to right and top to bottom
+\item \code{vars} is mapping from \code{testNodes} to literals
+\item \code{test} runs test with given bindings
+\item var values for input ports are sent to CUT
+\item CUT computes next outputs
+\item CUT sends next outputs to Chisel
+\item \code{test} compares received values against var values for
+  output ports
+\end{itemize}
+\end{tiny}
+
+\begin{center}
+\includegraphics[width=0.9\textwidth]{CUT.pdf}
+\end{center}
+
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Running Tests Examples}
+
+\begin{scala}
+sbt "project tutorial" "run combinational --compile --test"
+...
+PASSED
+\end{scala}
+
+or through makefile
+
+\begin{scala}
+make combinational test
+...
+PASSED
+\end{scala}
+
+\end{frame}
+
 \begin{frame}[fragile]{Functional Abstraction}
 \begin{scala}
 def clb(a: Bits, b: Bits, c: Bits, d: Bits) = 
@@ -419,12 +567,8 @@ val out = clb(a,b,c,d)
 \end{scala}
 \end{frame}
 
-\begin{frame}[fragile, shrink]{Functional Scala}
+\begin{frame}[fragile]{Functional Scala}
 \begin{scala}
-package Bootcamp {
-
-import Chisel._
-
 class Functional extends Component {
   def clb(a: Bits, b: Bits, c: Bits, d: Bits) = 
     (a & b) | (~c & d)
@@ -435,17 +579,15 @@ class Functional extends Component {
   }
   io.z := clb(io.x, io.y, io.x, io.y)
 }
-
-}
 \end{scala}
 \end{frame}
 
 \begin{frame}[fragile]{Bundles}
 \begin{scala}
-class MyFloat extends Bundle{
+class MyFloat extends Bundle {
   val sign        = Bool()
-  val exponent    = UFix(width=8)
-  val significand = UFix(width=23)
+  val exponent    = UFix(width = 8)
+  val significand = UFix(width = 23)
 }
 
 val x  = new MyFloat()
@@ -699,12 +841,12 @@ when (c2) { r := Bits(2) }
 \begin{center}
 \begin{tabular}{|c|c|c|l|}
 \hline
-\kode{c1} & \kode{c2}  &  \kode{r} & \\
+\code{c1} & \code{c2}  &  \code{r} & \\
 \hline
-0 &  0 & r &  \kode{r} unchanged \\
+0 &  0 & r &  \code{r} unchanged \\
 0 &  1 & 2 & \\
 1 &  0 & 1 & \\
-1 &  1 & 2& \kode{c2} takes precedence over \kode{c1} \\
+1 &  1 & 2& \code{c2} takes precedence over \code{c1} \\
 \hline
 \end{tabular}
 \end{center}
@@ -718,7 +860,7 @@ when (c2) { r := Bits(2) }
 \end{center}
 
 \begin{itemize}
-\item Each \kode{when} statement adds another level of data mux and ORs
+\item Each \code{when} statement adds another level of data mux and ORs
   the predicate into the enable chain and
 \item the compiler effectively adds
   the termination values to the end of the chain automatically.
@@ -735,18 +877,18 @@ when (c1) { r := Fix(1); s := Fix(1) }
 when (c2) { r := Fix(2) }
 \end{scala}
 
-leads to \kode{r} and \kode{s} being updated according to the
+leads to \code{r} and \code{s} being updated according to the
 following truth table:
 
 {\footnotesize
 \begin{center}
 \begin{tabular}{|c|c|c|c|l|}
 \hline
-\kode{c1} & \kode{c2}  & \kode{r} & \kode{s} & \\
+\code{c1} & \code{c2}  & \code{r} & \code{s} & \\
 \hline 
 0 &  0 & 3 & 3 & \\
 0 &  1 & 2 & 3 & \\ 
-1 &  0 & 1 & 1 & \kode{r} updated in \kode{c2} block, \kode{s} updated using default \\
+1 &  0 & 1 & 1 & \code{r} updated in \code{c2} block, \code{s} updated using default \\
 1 &  1 & 2 & 1 & \\
 \hline
 \end{tabular}
@@ -801,7 +943,7 @@ which is the same as:
 
 \begin{scala}
 when (idx === v1) { u1 }
-.elsewhen (idx === v2) { u2 }
+when (idx === v2) { u2 }
 \end{scala}
 
 \end{frame}
@@ -815,7 +957,7 @@ class Parity extends Component {
     val out = Bool(dir = OUTPUT) }
   val s_even :: s_odd :: Nil = Enum(2){ UFix() }
   val state  = Reg(resetVal = s_even)
-  when (s.in) {
+  when (io.in) {
     when (state === s_even) { state := s_odd  }
     .otherwise              { state := s_even }
   }
@@ -851,7 +993,9 @@ class RAM[T <: Data]
 val i = Array(UFix(1), UFix(2), UFix(4), UFix(8))
 val m = ROM(i){ UFix(width = 32) }
 val r = m(counter(UFix(3)))
+\end{scala}
 
+\begin{scala}
 def sinTable (amp: Double, n: Int) = {
   val ts = Range(0, n, 1).map(i => (i*2*Pi)/(n.toDouble-1) - Pi) 
   ROM(ts.map(t => Fix(round(amp * sin(t))))){ Fix(width = 32) }
@@ -863,13 +1007,36 @@ def sinWave (amp: Double, n: Int) =
 
 \end{frame}
 
+\begin{frame}[fragile]{RAM}
+\begin{scala}
+class Mem extends Component {
+  val w  = 8
+  val io = new Bundle {
+    val isWrite = Bool(INPUT)
+    val addr    = UFix(8, INPUT)
+    val in      = UFix(8, INPUT)
+    val out     = UFix(8, OUTPUT)
+  }
+  val mem = RAM(sizeof(w)){ UFix(width = 8) }
+  io.out := UFix(0)
+  when (io.isWrite) {
+    mem(io.addr) := io.in
+  } .otherwise {
+    io.out := mem(addr)
+  }
+}
+\end{scala}
+\end{frame}
+
 \begin{frame}[fragile]{Ram}
 
 \begin{scala}
-def audioRecorder(n: Int, button: Bool) = { 
-  val addr   = counter(UFix(n))
-  val ram    = RAM(n)
-  ram(addr) := button
+def audioRecorder(n: Int, in: UFix, UFix, button: Bool) = { 
+  val addr = counter(UFix(n))
+  val ram  = RAM(n){ UFix(width = 16) }
+  when (button) {  
+    ram(addr) := in
+  }
   ram(Mux(button, UFix(0), addr))
 } 
 \end{scala}
@@ -879,7 +1046,7 @@ def audioRecorder(n: Int, button: Bool) = {
 \begin{frame}[fragile]{Register File}
 
 \begin{scala}
-val regs = RAM(32)
+val regs = RAM(32){ Bits(width = 32) }
 when (wr_en) {
   regs(wr_addr) := wr_data
 }
@@ -905,9 +1072,9 @@ val read_data = Reg(regfile(addr_in))
 \begin{frame}[fragile]{Port Classes, Subclasses, and Nesting}
 
 \begin{scala}
-class SimpleLink extends Bundle { 
-  val data = Bits(16, OUTPUT) 
-  val rdy  = Bool(OUTPUT)
+class LinkIO extends Bundle { 
+  val data  = Bits(16, OUTPUT) 
+  val ready = Bool(OUTPUT)
 }
 \end{scala}
 
@@ -916,7 +1083,7 @@ We can then extend \verb+SimpleLink+ by adding parity bits using
 bundle inheritance:
 
 \begin{scala}
-class PLink extends SimpleLink { 
+class PLinkIO extends LinkIO { 
   val parity = Bits(5, OUTPUT) 
 }
 \end{scala}
@@ -929,12 +1096,12 @@ In general, users can organize their interfaces into hierarchies using inheritan
 \begin{frame}[fragile,shrink]{Filter Example}
 
 From there we can define a filter interface by nesting two
-\verb+PLink+s into a new \verb+FilterIO+ bundle:
+\verb+LinkIO+s into a new \verb+FilterIO+ bundle:
 
 \begin{scala}
 class FilterIO extends Bundle { 
-  val x = new PLink().flip
-  val y = new PLink()
+  val in  = new LinkIO().flip
+  val out = new LinkIO()
 }
 \end{scala}
 
@@ -946,8 +1113,10 @@ We can now define a filter by defining a filter class extending component:
 
 \begin{scala}
 class Filter extends Component { 
-  val io = new FilterIO()
-  ...
+  val io  = new FilterIO()
+  
+  io.out.ready := io.in.ready
+  io.out.data  := io.in.data
 }
 \end{scala}
 
@@ -956,13 +1125,66 @@ where the \verb+io+ field contains \verb+FilterIO+.
 
 \end{frame}
 
+\begin{frame}[fragile]{Filter Example}
+\begin{itemize}
+\item write filter that filters out even numbers
+\end{itemize}
+{\lstset{basicstyle={\tiny\ttfamily}}
+\begin{scala}
+class Filter extends Component { 
+  val io  = new FilterIO()
+  ...
+  defTests(io) {
+    var allGood = true
+    val vars    = new HashMap[Node, Node]()
+    val rnd     = new Random()
+    val maxInt  = 1 << 16
+    for (i <- 0 until 10) {
+      vars.clear()
+      val in             = rnd.nextInt(maxInt)
+      vars(io.in.ready)  = Bool(true)
+      vars(io.in.data)   = UFix(x)
+      val isOdd          = (x&1)!=0
+      vars(io.out.ready) = Bool(isOdd)
+      vars(io.out.data)  = UFix(if (isOdd) x else 0)
+      allGood            = test(vars) && allGood
+    }
+    allGood
+  }  
+}
+\end{scala}
+}
+\end{frame}
+
 \begin{frame}[fragile]{Bundle Vectors}
 
 \begin{scala}
-class CrossbarIo(n: Int) extends Bundle {
-  val in  = Vec(n){ new PLink().flip() }
+class FanoutIO(n: Int) extends Bundle {
+  val in  = new LinkIO().flip()
+  val sel = UFix(sizeof(n), INPUT)
+  val out = Vec(n){ new LinkIO() }
+  def clone = new FanoutIO(n)
+}
+\end{scala}
+
+\noindent
+where \verb+Vec+ takes a size as the first argument and a block
+returning a port as the second argument and \code{clone} 
+
+\end{frame}
+
+\begin{frame}[fragile]{Fanout Example}
+
+\begin{scala}
+class FanoutIO(n: Int) extends Bundle {
+  val in  = new PLink().flip()
   val sel = UFix(sizeof(n), INPUT)
   val out = Vec(n){ new PLink() }
+  ...
+}
+class Fanout extends Component {
+  val io = new FanoutIO(n)
+  
 }
 \end{scala}
 
@@ -1037,7 +1259,8 @@ Mux(c, UFix(10), UFix(11))
 \end{scala}
 
 \noindent
-yields a \kode{UFix} wire because the \kode{con} and \kode{alt} arguments are each of type \kode{UFix}.
+yields a \code{UFix} wire because the \code{con} and \code{alt}
+arguments are each of type \code{UFix}.
 \end{frame}
 
 \begin{frame}[fragile]{Bundle Vectors}
