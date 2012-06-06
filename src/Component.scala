@@ -1353,7 +1353,7 @@ abstract class Component(resetSignal: Bool = null) {
     } finally {
       if (p != null) endTest(p)
     }
-    println("TESTING = " + res)
+    println(if (res) "PASSED" else "FAILED")
     res
   }
   var tests: () => Boolean = () => { println("DEFAULT TESTS"); true }
