@@ -158,7 +158,7 @@ textarea {
 body {
   margin: 0;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 13px;
+  font-size: 16px;
   line-height: 18px;
   color: #333333;
   background-color: #ffffff;
@@ -511,9 +511,9 @@ h6 {
 }
 
 .page-header {
-  padding-bottom: 17px;
+  padding-bottom: 4px;
   margin: 18px 0;
-  border-bottom: 1px solid #eeeeee;
+  border-bottom: 2px solid #eeeeee;
 }
 
 .page-header h1 {
