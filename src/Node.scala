@@ -117,6 +117,10 @@ abstract class Node extends nameable{
     else
       null
   }
+  def litValue(default: BigInt = BigInt(-1)): BigInt = {
+    val lit = litOf
+    if (lit == null) default else lit.value
+  }
   def value = BigInt(-1);
   def signed: this.type = { 
     val res = Fix()
