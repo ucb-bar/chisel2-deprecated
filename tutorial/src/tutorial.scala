@@ -25,6 +25,8 @@ object Tutorial {
         chiselMain(tut_args, () => new Filter())
       case "tbl" => 
         chiselMain(tut_args, () => new Tbl())
+      case "life" => 
+        chiselMain(tut_args, () => new Life(3))
     }
   }
 }
