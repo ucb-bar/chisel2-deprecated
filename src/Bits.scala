@@ -61,19 +61,20 @@ class Bits extends Data with proc {
   // internal, non user exposed connectors
   var assigned = false;
 
+
+  override def assign(src: Node) = {
+    if(assigned || inputs.length > 0) {
+      ChiselErrors += ChiselError({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src}, Thread.currentThread().getStackTrace);
+    } else {
+      assigned = true; super.assign(src)
+    }
+  }
+
   def procAssign(src: Node) = {
     if (assigned) {
       ChiselErrors += ChiselError("reassignment to Node", Thread.currentThread().getStackTrace);
     } else {
       updates.enqueue((genCond(), src));
-    }
-  }
-
-  override def assign(src: Node) = {
-    if(assigned || inputs.length > 0) {
-      ChiselErrors += ChiselError("reassignment to Wire", Thread.currentThread().getStackTrace);
-    } else { 
-      assigned = true; super.assign(src)
     }
   }
 
@@ -153,12 +154,14 @@ class Bits extends Data with proc {
       src match { 
       case other: Bits => 
 	if (other.dir == OUTPUT) { // input - output connections
-          if(this.staticComp == other.staticComp && !isTypeNode) //passthrough
+          if(this.staticComp == other.staticComp && !isTypeNode) {//passthrough
 	    other assign this
-          else if (this.staticComp.parent == other.staticComp.parent || isTypeNode) //producer - consumer
-            this assign other
-          else
+          } else if (this.staticComp.parent == other.staticComp.parent || isTypeNode) { //producer - consumer
+            if(other.inputs.length > 0 || other.updates.length > 0 ) 
+              this assign other // only do assignment if output has stuff connected to it
+          } else {
             ChiselErrors += ChiselError({"Undefined connections between " + this + " and " + other}, Thread.currentThread().getStackTrace)
+          }
         } else if (other.dir == INPUT) { // input <> input conections
 	  if(this.staticComp == other.staticComp.parent) // parent <> child
 	    other assign this
@@ -181,25 +184,30 @@ class Bits extends Data with proc {
       src match { 
         case other: Bits  => 
 	  if (other.dir == INPUT) { // input - output connections
-            if (this.staticComp == other.staticComp && !isTypeNode) //passthrough
+            if (this.staticComp == other.staticComp && !isTypeNode) { //passthrough
 	      this assign other;
-	    else if (this.staticComp.parent == other.staticComp.parent || isTypeNode) //producer - consumer
-              other assign this;
-            else
+	    } else if (this.staticComp.parent == other.staticComp.parent || isTypeNode) { //producer - consumer
+              if(this.inputs.length > 0 || this.updates.length > 0) 
+                other assign this; // only do connection if I have stuff connected to me
+            } else {
               ChiselErrors += ChiselError({"Undefined connection between " + this + " and " + other}, Thread.currentThread().getStackTrace)
+            }
           } else if (other.dir == OUTPUT) { // output <> output connections
-	    if(this.staticComp == other.staticComp.parent) // parent <> child
-	      this assign other
-	    else if (this.staticComp.parent == other.staticComp) // child <> parent
-	      other assign this
-	    else if (this.isTypeNode && other.isTypeNode) //connecting two type nodes together
+	    if(this.staticComp == other.staticComp.parent) { // parent <> child
+              if(other.inputs.length > 0 || other.updates.length > 0)
+	        this assign other // only do connection if child is assigning to that output
+	    } else if (this.staticComp.parent == other.staticComp) { // child <> parent
+              if(this.inputs.length > 0 || this.updates.length > 0)
+	        other assign this // only do connection if child (me) is assinging that output
+	    } else if (this.isTypeNode && other.isTypeNode) { //connecting two type nodes together
 	      ChiselErrors += ChiselError("Ambiguous Connection of Two Nodes", Thread.currentThread().getStackTrace)
-	    else if (this.isTypeNode){ // type <> output
-	      other assign this; }
-	    else if (other.isTypeNode){ // output <> type
-	      this assign other; }
-	    else
+	    } else if (this.isTypeNode){ // type <> output
+	      other assign this;
+	    } else if (other.isTypeNode){ // output <> type
+	      this assign other;
+	    } else {
 	      ChiselErrors += ChiselError({"Connecting Output " + this + " to Output " + other}, Thread.currentThread().getStackTrace)
+            }
 	  } else { // io <> wire
             if(this.staticComp == other.staticComp) //output <> wire
               this assign other

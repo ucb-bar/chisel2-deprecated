@@ -1,4 +1,3 @@
-// author: jonathan bachrach
 package Chisel {
 
 import scala.collection.mutable.ArrayBuffer
@@ -15,14 +14,6 @@ object Enum {
   def apply(l: Symbol *) = (l.toList zip (Range(0, l.length, 1).map(x => UFix(x, sizeof(l.length-1))))).toMap;
   def apply[T <: Bits](n: Int)(gen: => T) = (Range(0, n, 1).map(x => (Lit(x, sizeof(n-1))(gen)))).toList;
 }
-
-object fromNode {
-  def apply[T <: Data: Manifest](data: Node): T = {
-    val resT = Fab[T]();
-    resT.fromNode(data);
-  }
-}
-
 
 object when {
   def execWhen(cond: Bool)(block: => Unit) = {

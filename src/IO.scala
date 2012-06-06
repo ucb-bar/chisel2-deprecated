@@ -1,4 +1,3 @@
-// author: jonathan bachrach
 package Chisel {
 
 trait IODirection;

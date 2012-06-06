@@ -1,5 +1,3 @@
-// author: jonathan bachrach
-
 package Chisel {
 
 import scala.collection.mutable.HashMap;

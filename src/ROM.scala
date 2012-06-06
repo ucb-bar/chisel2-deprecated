@@ -1,35 +1,23 @@
-// authors: jonathan bachrach, andrew waterman
 package Chisel
 
 import ChiselError._
 import Node._
 import scala.collection.mutable.ArrayBuffer
 
-object ROM {
-  def apply[T <: Data](data: Array[T])(gen: => T): ROM[T] = {
-    new ROM(data, () => gen)
-  }
-}
-
-class ROM[T <: Data](datai: Array[T], gen: () => T) extends AccessTracker {
-  def writeAccesses = ArrayBuffer[MemAccess]()
-  def readAccesses = reads.map((x: MemAccess) => x)
-  val reads = ArrayBuffer[ROMRead[T]]()
-  val lits = datai.map(_.litOf)
+class ROM[T <: Data](lits: Seq[Literal], gen: () => T) extends Vec[T](gen) {
   val data = gen().toNode
-
-  if (lits.contains(null))
-    ChiselErrors += ChiselError("ROM data is not constant", Thread.currentThread().getStackTrace)
-
   inferWidth = fixWidth(gen().getWidth)
 
-  def apply(addr: Bits): T = {
+  override def read(addr: UFix): T = {
     var port = new ROMRead(this, addr)
-    reads += port
     val data = gen().asOutput
     data.setIsTypeNode
     data assign port
     data
+  }
+
+  override def write(addr: UFix, data: T) = {
+    ChiselErrors += ChiselError("Can't write to ROM", Thread.currentThread().getStackTrace)
   }
 
   override def emitDec: String =
@@ -50,13 +38,18 @@ class ROM[T <: Data](datai: Array[T], gen: () => T) extends AccessTracker {
 
   override def emitInitC: String = {
     lits.zipWithIndex.map { case (lit, i) =>
-      "  " + emitRef + "[" + i + "] = " + lit.emitRef + ";\n"
+      "  " + emitRef + ".put(" + i + ", " + lit.emitRef + ");\n"
     }.reduceLeft(_ + _)
   }
+
+  override def isReg = true
 }
 
-class ROMRead[T <: Data](val rom: ROM[T], addri: Bits) extends MemAccess(Bool(true), addri) {
+class ROMRead[T <: Data](rom: ROM[T], addri: Bits) extends Node {
+  def addr = inputs(0)
+  inputs += addri
   inputs += rom
+
   inferWidth = fixWidth(rom.data.getWidth)
 
   override def toString: String = rom + "[" + addr + "]"
@@ -64,6 +57,4 @@ class ROMRead[T <: Data](val rom: ROM[T], addri: Bits) extends MemAccess(Bool(tr
     "  " + emitTmp + " = " + rom.emitRef + ".get(" + addr.emitRef + ");\n"
   override def emitDef: String =
     "  assign " + emitTmp + " = " + rom.emitRef + "[" + addr.emitRef + "];\n"
-  override def emitPortDef(idx: Int): String = ""
-  override def getPortType: String = "read"
 }

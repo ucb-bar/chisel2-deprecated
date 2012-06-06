@@ -1,4 +1,3 @@
-// author: jonathan bachrach
 package Chisel {
 
 import scala.collection.mutable.ArrayBuffer
@@ -152,7 +151,6 @@ abstract class Node extends nameable{
   def isIo = false;
   def isReg = false;
   var isRegOut = false;
-  def isProbe = false;
   def isUsedByRam: Boolean = {
     for (c <- consumers) 
       if (c.isRamWriteInput(this))
@@ -199,8 +197,8 @@ abstract class Node extends nameable{
   def isInObject = 
     (isIo && (isIoDebug || component == topComponent)) || 
     (topComponent.debugs.contains(this) && named) || 
-    isReg || isUsedByRam || isProbe || isDebug;
-  def isInVCD = (isIo && isInObject) || isReg || isProbe || (isDebug && named);
+    isReg || isUsedByRam || isDebug;
+  def isInVCD = (isIo && isInObject) || isReg || (isDebug && named);
   def emitTmp: String = 
     if (backendName == "c") {
       if (isInObject)
