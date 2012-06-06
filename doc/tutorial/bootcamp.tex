@@ -42,125 +42,44 @@
 \titlepage
 \end{frame}
 
-\begin{frame}[fragile]{git}
-\begin{FramedVerb}
-cd ${HOME}
-git clone git@github.com:ucb-bar/chisel.git
-export CHISEL=${HOME}/chisel
-git pull
-git status 
-git log
-git add filename
-git commit -m "comment"
-git push
-\end{FramedVerb}
-\end{frame}
-
-\begin{frame}[fragile]{sbt}
-\begin{FramedVerb}
-cd ${CHISEL}/tutorial/sbt
-sbt
-project tutorial
-compile
-run
-console
-\end{FramedVerb}
-\end{frame}
-
-\begin{frame}[fragile]{repo}
+\begin{frame}[fragile]{chisel repo}
 \begin{FramedSemiVerb}
-src                     \comment{\# source code}
-sbt                     \comment{\# sbt files}
-sbt/project/build.scala \comment{\# project file}
+src                     \comment{\# chisel scala source code}
+emulator                \comment{\# chisel emulator source code}
 doc                     \comment{\# documentation}
+www                     \comment{\# web sources}
 tutorial                \comment{\# tutorial project}
+tutorial/src            \comment{\# tutorial source code}
+tutorial/sbt            \comment{\# tutorial sbt files}
+tutorial/emulator       \comment{\# tutorial emulator files}
+tutorial/runall.sh      \comment{\# runs tutorial tests}
 \end{FramedSemiVerb}
 \end{frame}
 
-\begin{frame}[fragile]{project directory structure}
-\begin{footnotesize}
-\begin{FramedSemiVerb}
-chisel/           \comment{\# install chisel at same level as your project}
-  tutorial/
-  src/
-gpu/
-  chisel -> ../chisel
-  sbt/
-    project/
-      build.scala \comment{\# edit this as shown below}
-    chisel -> ../chisel/sbt/chisel/
-    gpu/
-      src/
-        main/
-          scala -> ../../../../src
-  src/ 
-    gpu.scala     \comment{\# your source files go here}
-  emulator/       \comment{\# your C++ target can go here}
-\end{FramedSemiVerb}
-\end{footnotesize}
-
-\end{frame}
-
-\begin{frame}[fragile, shrink]{Project File}
-% \begin{FramedVerb}
-\begin{scala}
-import sbt._
-import Keys._
-
-object BuildSettings {
-  val buildOrganization = "edu.berkeley.cs"
-  val buildVersion = "1.1"
-  val buildScalaVersion = "2.9.2"
-
-  val buildSettings = Defaults.defaultSettings ++ Seq (
-    organization := buildOrganization,
-    version      := buildVersion,
-    scalaVersion := buildScalaVersion
-  )
-}
-
-object ChiselBuild extends Build {
-  import BuildSettings._
-
-  lazy val chisel = 
-    Project("chisel", file("chisel"), 
-      settings = buildSettings)
-  lazy val gpu =
-    Project("gpu", file("gpu"), settings = buildSettings) 
-      dependsOn(chisel)
-}
-\end{scala}
-% \end{FramedVerb}
-\end{frame}
-
-\begin{frame}[fragile, shrink]{tutorial.scala}
-\begin{scala}
-package Tutorial {
-
-import Chisel._
-
-object Tutorial {
-  def main(args: Array[String]): Unit = { 
-    val tut_args = args.slice(1, args.length) ++ 
-      Array("--target-dir", "../emulator", "--gen-harness")
-    args(0) match {
-      case "gcd" => 
-        chiselMain(tut_args, () => new GCD())
-      ...
-    }
-  }
-}
-
-}
-\end{scala}
-\end{frame}
+% \begin{frame}[fragile, shrink]{tutorial.scala}
+% \begin{scala}
+% package Tutorial {
+% 
+% import Chisel._
+% 
+% object Tutorial {
+%   def main(args: Array[String]): Unit = { 
+%     val tut_args = args.slice(1, args.length) ++ 
+%       Array("--target-dir", "../emulator", "--gen-harness")
+%     args(0) match {
+%       case "gcd" => 
+%         chiselMain(tut_args, () => new GCD())
+%       ...
+%     }
+%   }
+% }
+% 
+% }
+% \end{scala}
+% \end{frame}
 
 \begin{frame}[fragile, shrink]{gcd.scala}
 \begin{scala}
-package Tutorial {
-
-import Chisel._
-
 class GCD extends Component {
   val io = new Bundle {
     val a     = UFix(16, INPUT)
@@ -177,8 +96,6 @@ class GCD extends Component {
   }
   io.z     := x
   io.valid := y === UFix(0)
-}
-
 }
 \end{scala}
 \end{frame}
@@ -439,10 +356,10 @@ object Tutorial {
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
 def main(args: Array[String]) = {
-  val tut_opts = Array("--target-dir", "../emulator", "--gen-harness")
-  val tut_args = args.slice(1, args.length) ++ tut_opts
+  val tutOpts = Array("--target-dir", "../emulator", "--gen-harness")
+  val tutArgs = args.slice(1, args.length) ++ tutOpts
   args(0) match {
-    case "combinational" => chiselMain(tut_args, () => new Combinational())
+    case "combinational" => chiselMain(tutArgs, () => new Combinational())
 } }
 \end{scala}
 
@@ -543,6 +460,7 @@ def test(vars: HashMap[Node, Node]): Boolean
 \begin{frame}[fragile]{Running Tests Examples}
 
 \begin{scala}
+cd $CHISEL/tutorial/sbt
 sbt "project tutorial" "run combinational --compile --test"
 ...
 PASSED
@@ -551,7 +469,8 @@ PASSED
 or through makefile
 
 \begin{scala}
-make combinational test
+cd $CHISEL/tutorial
+runone.sh combinational
 ...
 PASSED
 \end{scala}
@@ -685,63 +604,17 @@ class Mux4 extends Component {
 \end{scala}
 \end{frame}
 
-\begin{frame}[fragile]{Running Examples}
-\begin{scala}
-object tutorial {
-  def main(args: Array[String]) = {
-    chiselMain(args, () => new Mux2())
-  }
-}
-\end{scala}
-\end{frame}
-
-\begin{frame}[fragile, shrink]{Testing Examples}
+\begin{frame}[fragile]{Running Examples By Hand}
 
 \begin{scala}
-object tutorial {
-  def main(args: Array[String]) = {
-    chiselMainTest(args ++ Array("--gen-harness"), 
-                   () => new Mux2())(
-      c => Scanner("%x %x %x", c.io.sel, c.io.in0, c.io.in1),
-      c => Printer("%x %x %x %x", c.io.sel, c.io.in0, c.io.in1, c.io.out))
-  }
-}
-\end{scala}
-
-compile
-
-\begin{scala}
-sbt> run
-sbt> exit
+cd $CHISEL/tutorial/sbt 
+sbt "project tutorial" "run"
 cd ../emulator
 make -f Mux2-makefile
 \end{scala}
 
 \end{frame}
 
-\begin{frame}[fragile, shrink]{Testing Examples Continued}
-
-test.out
-
-\begin{scala}
-0 0 0 0
-0 0 1 0
-0 1 0 1
-0 1 1 1
-1 0 0 0
-1 0 1 1
-1 1 0 0
-1 1 1 1
-\end{scala}
-
-testing
-
-\begin{scala}
-cut -f 1,2,3 -d " " < test | Mux2 > test.out
-diff test.out test
-\end{scala}
-
-\end{frame}
 
 \begin{frame}[fragile]{ChiselMain Command Line Arguments}
 \begin{tabular}{lll}
@@ -751,6 +624,37 @@ diff test.out test
 \verb+--vcd+ & enable vcd dumping \\
 \verb+--debug+ & put all wires in class file \\
 \end{tabular}
+\end{frame}
+
+\begin{frame}[fragile]{Creating Verilog}
+
+\begin{scala}
+cd $CHISEL/tutorial/sbt
+sbt "project tutorial" "run --v"
+\end{scala}
+
+{\lstset{basicstyle={\tiny\ttfamily}}
+\begin{scala}
+module Mux2(
+    input  io_sel,
+    input  io_in0,
+    input  io_in1,
+    output io_out);
+
+  wire T0;
+  wire T1;
+  wire T2;
+  wire T3;
+
+  assign io_out = T0;
+  assign T0 = T3 | T1;
+  assign T1 = T2 & io_in0;
+  assign T2 = ~ io_sel;
+  assign T3 = io_sel & io_in1;
+endmodule
+\end{scala}
+}
+
 \end{frame}
 
 
@@ -785,8 +689,7 @@ def counter(max: UFix) = {
 
 \begin{scala}
 // Produce pulse every n cycles.
-def pulse(n: UFix) = 
-  counter(n - UFix(1)) === UFix(0)
+def pulse(n: UFix) = counter(n - UFix(1)) === UFix(0)
 \end{scala}
 
 \begin{scala}
@@ -796,10 +699,11 @@ def toggle(p: Bool) = {
   x := Mux(p, !x, x)
   x
 }
+\end{scala}
 
+\begin{scala}
 // Square wave where each half cycle has given period.
-def squareWave(period: UFix) = 
-  toggle(pulse(period))
+def squareWave(period: UFix) = toggle(pulse(period))
 \end{scala}
 
 \end{frame}
@@ -967,38 +871,23 @@ class Parity extends Component {
 \end{frame}
 
 
-\begin{frame}[fragile]{Memories}
+\begin{frame}[fragile]{ROM}
 
 \begin{scala}
-def object ROM {
-  def apply[T <: Data](inits: Seq[T])(type: => T): ROM
-}
-
-def object RAM {
-  def apply[T <: Data](n: Int, resetVal: T = null)(type: => T): RAM
-}
-
-class RAM[T <: Data]
-    (val n: Int, val resetVal: T, val inits: Seq[T], type: () => T) 
-      extends Updateable {
-  def apply(addr: UFix): T
-}
+def Vec[T <: Data](elts: Seq[T])(data: => T): Vec[T]
+def Vec[T <: Data](elts: T*)(data: => T): Vec[T]
 \end{scala}
-
-\end{frame}
-
-\begin{frame}[fragile]{Rom}
 
 \begin{scala}
 val i = Array(UFix(1), UFix(2), UFix(4), UFix(8))
-val m = ROM(i){ UFix(width = 32) }
+val m = Vec(i){ UFix(width = 32) }
 val r = m(counter(UFix(3)))
 \end{scala}
 
 \begin{scala}
 def sinTable (amp: Double, n: Int) = {
   val ts = Range(0, n, 1).map(i => (i*2*Pi)/(n.toDouble-1) - Pi) 
-  ROM(ts.map(t => Fix(round(amp * sin(t))))){ Fix(width = 32) }
+  Vec(ts.map(t => Fix(round(amp * sin(t))))){ Fix(width = 32) }
 }
 
 def sinWave (amp: Double, n: Int) = 
@@ -1007,9 +896,25 @@ def sinWave (amp: Double, n: Int) =
 
 \end{frame}
 
-\begin{frame}[fragile]{RAM}
+\begin{frame}[fragile]{Memories}
+
 \begin{scala}
-class Mem extends Component {
+def object Mem {
+  def apply[T <: Data](n: Int, resetVal: T = null)(type: => T): Mem
+}
+
+class Mem[T <: Data]
+    (val n: Int, val resetVal: T, val inits: Seq[T], type: () => T) 
+      extends Updateable {
+  def apply(addr: UFix): T
+}
+\end{scala}
+
+\end{frame}
+
+\begin{frame}[fragile]{Mem}
+\begin{scala}
+class Memo extends Component {
   val w  = 8
   val io = new Bundle {
     val isWrite = Bool(INPUT)
@@ -1017,7 +922,7 @@ class Mem extends Component {
     val in      = UFix(8, INPUT)
     val out     = UFix(8, OUTPUT)
   }
-  val mem = RAM(sizeof(w)){ UFix(width = 8) }
+  val mem = Mem(sizeof(w)){ UFix(width = 8) }
   io.out := UFix(0)
   when (io.isWrite) {
     mem(io.addr) := io.in
@@ -1028,12 +933,12 @@ class Mem extends Component {
 \end{scala}
 \end{frame}
 
-\begin{frame}[fragile]{Ram}
+\begin{frame}[fragile]{Audio Recorder}
 
 \begin{scala}
 def audioRecorder(n: Int, in: UFix, UFix, button: Bool) = { 
   val addr = counter(UFix(n))
-  val ram  = RAM(n){ UFix(width = 16) }
+  val ram  = Mem(n){ UFix(width = 16) }
   when (button) {  
     ram(addr) := in
   }
@@ -1046,7 +951,7 @@ def audioRecorder(n: Int, in: UFix, UFix, button: Bool) = {
 \begin{frame}[fragile]{Register File}
 
 \begin{scala}
-val regs = RAM(32){ Bits(width = 32) }
+val regs = Mem(32){ Bits(width = 32) }
 when (wr_en) {
   regs(wr_addr) := wr_data
 }
@@ -1056,18 +961,18 @@ val mdat = regs(maddr)
 
 \end{frame}
 
-\begin{frame}[fragile]{Realistic Register File}
-
-\begin{scala}
-val regfile = RAM(64){ Bits(width = 32) }
-// w_mask = bit_mask
-when (wen) {
-  regfile(addr_in) := data_in1
-}
-val read_data = Reg(regfile(addr_in))
-\end{scala}
-
-\end{frame}
+% \begin{frame}[fragile]{Realistic Register File}
+% 
+% \begin{scala}
+% val regfile = Mem(64){ Bits(width = 32) }
+% // w_mask = bit_mask
+% when (wen) {
+%   regfile(addr_in) := data_in1
+% }
+% val read_data = Reg(regfile(addr_in))
+% \end{scala}
+% 
+% \end{frame}
 
 \begin{frame}[fragile]{Port Classes, Subclasses, and Nesting}
 
@@ -1125,7 +1030,7 @@ where the \verb+io+ field contains \verb+FilterIO+.
 
 \end{frame}
 
-\begin{frame}[fragile]{Filter Example}
+\begin{frame}[fragile]{Real Filter Assignment}
 \begin{itemize}
 \item write filter that filters out even numbers
 \end{itemize}
@@ -1144,9 +1049,8 @@ class Filter extends Component {
       val in             = rnd.nextInt(maxInt)
       vars(io.in.ready)  = Bool(true)
       vars(io.in.data)   = UFix(x)
-      val isOdd          = (x&1)!=0
-      vars(io.out.ready) = Bool(isOdd)
-      vars(io.out.data)  = UFix(if (isOdd) x else 0)
+      vars(io.out.ready) = Bool(true)
+      vars(io.out.data)  = UFix(x)
       allGood            = test(vars) && allGood
     }
     allGood
@@ -1163,13 +1067,14 @@ class FanoutIO(n: Int) extends Bundle {
   val in  = new LinkIO().flip()
   val sel = UFix(sizeof(n), INPUT)
   val out = Vec(n){ new LinkIO() }
-  def clone = new FanoutIO(n)
+  override def clone() = (new FanoutIO(n)).asInstanceOf[this.type]
 }
 \end{scala}
 
 \noindent
 where \verb+Vec+ takes a size as the first argument and a block
-returning a port as the second argument and \code{clone} 
+returning a port as the second argument and \code{clone} binds the
+construction argument \code{n} to cloning.
 
 \end{frame}
 
@@ -1251,7 +1156,7 @@ class Cpu extends Component {
 
 \lstset{basicstyle={\footnotesize\ttfamily}}
 
-\begin{frame}[fragile]{Bundle Vectors}
+\begin{frame}[fragile]{Parameterized Functions}
 \begin{scala}
 def Mux[T <: Bits](c: Bool, con: T, alt: T): T
 
@@ -1263,7 +1168,7 @@ yields a \code{UFix} wire because the \code{con} and \code{alt}
 arguments are each of type \code{UFix}.
 \end{frame}
 
-\begin{frame}[fragile]{Bundle Vectors}
+\begin{frame}[fragile]{Parameterized Signal Processing}
 
 \begin{equation}
 y[t] = \sum_j w_j * x_j[t-j]
@@ -1283,13 +1188,13 @@ def delay[T <: Bits](x: T, n: Int): T =
 
 \begin{frame}[fragile]{Parameterized Classes}
 \begin{scala}
-class FilterIO[T <: Data]()(type: => T) extends Bundle { 
-  val x = type.asInput.flip
-  val y = type.asOutput
+class FilterIO[T <: Data]()(data: => T) extends Bundle { 
+  val in  = data.asInput.flip
+  val out = data.asOutput
 }
 
-class Filter[T <: Data]()(type: => T) extends Component { 
-  val io = (new FilterIO()){ type }
+class Filter[T <: Data]()(data: => T) extends Component { 
+  val io = (new FilterIO()){ data }
   ...
 }
 \end{scala}
@@ -1297,18 +1202,141 @@ class Filter[T <: Data]()(type: => T) extends Component {
 
 \begin{frame}[fragile]{Parameterized Classes Continued}
 \begin{scala}
-class ioDecoupled[T <: Data]()(data: => T) extends Bundle {
+class FIFOIO[T <: Data]()(data: => T) extends Bundle {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
   val bits  = data.asOutput
 }
-
-class FifoIO[T <: Data]()(type: => T) extends Bundle  {
-  val enq = new ioDecoupled()( type ).flip()
-  val deq = new ioDecoupled()( type )
-}
 \end{scala}
 \end{frame}
 
+\begin{frame}[fragile]{git}
+\begin{FramedVerb}
+cd ${HOME}
+git clone git@github.com:ucb-bar/chisel.git
+export CHISEL=${HOME}/chisel
+git pull
+git status 
+git log
+git add filename
+git commit -m "comment"
+git push
+\end{FramedVerb}
+\end{frame}
+
+\begin{frame}[fragile]{sbt}
+\begin{FramedVerb}
+cd ${CHISEL}/tutorial/sbt
+sbt
+project tutorial
+compile
+run
+console
+\end{FramedVerb}
+\end{frame}
+
+\begin{frame}[fragile]{project directory structure}
+\begin{footnotesize}
+\begin{FramedSemiVerb}
+chisel/           \comment{\# install chisel at same level as your project}
+  tutorial/
+  src/
+gpu/
+  chisel -> ../chisel
+  sbt/
+    project/
+      build.scala \comment{\# edit this as shown below}
+    chisel -> ../chisel/sbt/chisel/
+    gpu/
+      src/
+        main/
+          scala -> ../../../../src
+  src/ 
+    gpu.scala     \comment{\# your source files go here}
+  emulator/       \comment{\# your C++ target can go here}
+\end{FramedSemiVerb}
+\end{footnotesize}
+
+\end{frame}
+
+\begin{frame}[fragile, shrink]{Project File}
+% \begin{FramedVerb}
+\begin{scala}
+import sbt._
+import Keys._
+
+object BuildSettings {
+  val buildOrganization = "edu.berkeley.cs"
+  val buildVersion = "1.1"
+  val buildScalaVersion = "2.9.2"
+
+  val buildSettings = Defaults.defaultSettings ++ Seq (
+    organization := buildOrganization,
+    version      := buildVersion,
+    scalaVersion := buildScalaVersion
+  )
+}
+
+object ChiselBuild extends Build {
+  import BuildSettings._
+
+  lazy val chisel = 
+    Project("chisel", file("chisel"), 
+      settings = buildSettings)
+  lazy val gpu =
+    Project("gpu", file("gpu"), settings = buildSettings) 
+      dependsOn(chisel)
+}
+\end{scala}
+% \end{FramedVerb}
+\end{frame}
+
+\begin{frame}[fragile, shrink]{Testing Examples}
+
+\begin{scala}
+object tutorial {
+  def main(args: Array[String]) = {
+    chiselMainDebug(args ++ Array("--gen-harness"), 
+                   () => new Mux2())(
+      c => Scanner("%x %x %x", c.io.sel, c.io.in0, c.io.in1),
+      c => Printer("%x %x %x %x", c.io.sel, c.io.in0, c.io.in1, c.io.out))
+  }
+}
+\end{scala}
+
+compile
+
+\begin{scala}
+sbt> run
+sbt> exit
+cd ../emulator
+make -f Mux2-makefile
+\end{scala}
+
+\end{frame}
+
+\begin{frame}[fragile, shrink]{Testing Examples Continued}
+
+test.out
+
+\begin{scala}
+0 0 0 0
+0 0 1 0
+0 1 0 1
+0 1 1 1
+1 0 0 0
+1 0 1 1
+1 1 0 0
+1 1 1 1
+\end{scala}
+
+testing
+
+\begin{scala}
+cut -f 1,2,3 -d " " < test | Mux2 > test.out
+diff test.out test
+\end{scala}
+
+\end{frame}
 
 \end{document}
