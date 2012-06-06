@@ -88,6 +88,22 @@ object Vec {
     res.eltWidth = res(0).getWidth
     res
   }
+
+  def apply[T <: Data](elts: Seq[T])(gen: => T): Vec[T] = {
+    if (elts.forall(_.litOf != null)) {
+      val res = new ROM(elts.map(_.litOf), () => gen)
+      res.eltWidth = gen.getWidth
+      res
+    } else {
+      val res = new Vec[T](() => gen)
+      elts.foreach(res += _)
+      res.eltWidth = gen.getWidth
+      res
+    }
+  }
+
+  def apply[T <: Data](elt0: T, elts: T*)(gen: => T): Vec[T] =
+    apply(elt0 +: elts.toSeq)(gen)
   
   def getEnable(onehot: Bits, i: Int): Bool = {
     var enable: Bool = null
