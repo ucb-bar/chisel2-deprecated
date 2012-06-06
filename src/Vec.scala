@@ -7,12 +7,7 @@ import scala.collection.mutable.BufferProxy;
 import scala.math._;
 import Vec._
 
-object log2up
-{
-  def apply(in: Int) = if (in == 1) 1 else ceil(log(in)/log(2)).toInt
-}
-
-object UFixToOH
+object VecUFixToOH
 {
   def apply(in: UFix, width: Int): Bits =
   {
@@ -27,37 +22,19 @@ object UFixToOH
   }
 }
 
-class Mux1H_(n: Int, w: Int) extends Component
-{
-  val io = new Bundle {
-    val sel = Vec(n) { Bool(dir = INPUT) }
-    val in = Vec(n) { Bits(width = w, dir = INPUT) }
-    val out = Bits(width = w, dir = OUTPUT)
-  }
-
-  if (n > 1) {
-    var out = io.in(0) & Fill(w, io.sel(0))
-    for (i <- 1 to n-1)
-      out = out | (io.in(i) & Fill(w, io.sel(i)))
-    io.out := out
-  } else {
-    io.out := io.in(0)
-  }
-}
-
-object MuxN {
+object VecMuxN {
   def apply(sel: Seq[Bits], in: Seq[Bits]): Bits = {
     if (in.size == 0)
       null
     else if (in.size == 1)
       in(0)
     else
-      Mux(sel(log2up(in.size)-1), apply(sel, in.slice((1 << log2up(in.size))/2, in.size)), apply(sel, in.slice(0, (1 << log2up(in.size))/2)))
+      Mux(sel(log2Up(in.size)-1), apply(sel, in.slice((1 << log2Up(in.size))/2, in.size)), apply(sel, in.slice(0, (1 << log2Up(in.size))/2)))
   }
-  def apply(sel: Bits, in: Seq[Bits]): Bits = apply((0 until log2up(in.size)).map(sel(_)), in)
+  def apply(sel: Bits, in: Seq[Bits]): Bits = apply((0 until log2Up(in.size)).map(sel(_)), in)
 }
 
-object Mux1H {
+object VecMux1H {
   def apply(w: Int = -1, pairs: Seq[(Bool, Bits)]): Bits = {
     val inferredWidth = (w +: pairs.map{case(bool, bits) => bits.getWidth}).max
     assert(inferredWidth > 0, {println("UNABLE TO INFER WIDTH ON MUX1H")})
@@ -84,7 +61,7 @@ object Mux1H {
       val p = new ArrayBuffer[(Bool, Bits)]
       for((b, d) <- bools zip data)
         p += (b -> d.toBits)
-      i.inputs(0) = Mux1H(-1, p)
+      i.inputs(0) = VecMux1H(-1, p)
     }
 
     res
@@ -131,7 +108,7 @@ class VecProc extends proc {
   override def genMuxes(default: Node) = {}
 
   def procAssign(src: Node) = {
-    val onehot = UFixToOH(addr, elms.length)
+    val onehot = VecUFixToOH(addr, elms.length)
     searchAndMap = true
     for(i <- 0 until elms.length){
       when (getEnable(onehot, i)) {
@@ -184,7 +161,7 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
   def write(addr: UFix, data: T) = {
     if(data.isInstanceOf[Node]){
 
-      val onehot = UFixToOH(addr, length)
+      val onehot = VecUFixToOH(addr, length)
       searchAndMap = true
       for(i <- 0 until length){
         when (getEnable(onehot, i)) {
@@ -208,12 +185,12 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
     res.setIsTypeNode
     for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
       val w = io.getWidth
-      val onehot = UFixToOH(addr, length)
+      val onehot = VecUFixToOH(addr, length)
       val pairs = new ArrayBuffer[(Bool, Bits)]
       for(i <- 0 until length){
         pairs += (getEnable(onehot, i) -> sortedElm(i))
       }
-      val io_res = Mux1H(w, pairs)
+      val io_res = VecMux1H(w, pairs)
       io assign io_res
 
       // setup the comp for writes
