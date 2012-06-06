@@ -15,14 +15,6 @@ object Enum {
   def apply[T <: Bits](n: Int)(gen: => T) = (Range(0, n, 1).map(x => (Lit(x, sizeof(n-1))(gen)))).toList;
 }
 
-object fromNode {
-  def apply[T <: Data: Manifest](data: Node): T = {
-    val resT = Fab[T]();
-    resT.fromNode(data);
-  }
-}
-
-
 object when {
   def execWhen(cond: Bool)(block: => Unit) = {
     conds.push(conds.top && cond);

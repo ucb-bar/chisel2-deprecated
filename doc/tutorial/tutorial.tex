@@ -1173,11 +1173,11 @@ read/write memories.
 
 \subsection{ROM}
 
-Users can define read only memories with:
+Users can define read only memories with a \code{Vec}:
 
-%%  TODO: FIX Rom to take Seq
 \begin{scala}
-ROM(inits: Seq[Data]) (type: => T)
+Vec(inits: Seq[T]) (type: => T)
+Vec(inits: T*) (type: => T)
 \end{scala}
 
 \noindent
@@ -1189,7 +1189,7 @@ loop through all values using a counter as an address generator as follows:
 
 \begin{scala}
 val i = Array(UFix(1), UFix(2), UFix(4), UFix(8))
-val m = ROM(i){ UFix(width = 32) }
+val m = Vec(i){ UFix(width = 32) }
 val r = m(counter(UFix(i.length)))
 \end{scala}
 
@@ -1202,7 +1202,7 @@ def sinTable (amp: Double, n: Int) = {
     Range(0, n, 1).map(i => (i*2*Pi)/(n.toDouble-1) - Pi)
   val inits = 
     times.map(t => Fix(round(amp * sin(t))))
-  Rom(inits){ Fix(width = 32) }
+  Vec(inits){ Fix(width = 32) }
 }
 def sinWave (amp: Double, n: Int) = 
   sinTable(amp, n)(counter(UFix(n))
@@ -1211,7 +1211,7 @@ def sinWave (amp: Double, n: Int) =
 \noindent
 where \verb+amp+ is used to scale the fixpoint values stored in the ROM.
 
-\subsection{RAM}
+\subsection{Mem}
 
 
 Memories are given special treatment in Chisel since hardware
@@ -1224,7 +1224,7 @@ the simplest form, Chisel allows memory to be defined with a single
 write port and multiple read ports as follows:
 
 \begin{scala}
-  RAM(depth: Int)
+  Mem(depth: Int)
 \end{scala}
 
 \noindent
@@ -1237,7 +1237,7 @@ audio recorder could be defined as follows:
 \begin{scala}
   def audioRecorder(n: Int, button: Bool) = { 
     val addr   = counter(UFix(n))
-    val ram    = RAM(n)
+    val ram    = Mem(n)
     ram(addr) := button
     ram(Mux(button(), UFix(0), addr))
   } 
@@ -1251,7 +1251,7 @@ We can use simple memory to create register files.
 For example we can make a one write port, two read port register file with 32 registers as follows:
 
 \begin{scala}
-  val regs = RAM(32)
+  val regs = Mem(32)
   when (wr_en) {
     regs(wr_addr) := wr_data
   }
@@ -1268,7 +1268,7 @@ following is an example of a memory that is first defined with no
 memory ports, after which read, write, or read/write ports are added:
 
 \begin{scala}
-  val regfile = RAM(64){ Bits(width = 32) }
+  val regfile = Mem(64){ Bits(width = 32) }
   when (wen) {
     regfile.write(addr_in, data_in1, w_mask = bit_mask)
   }
@@ -1283,7 +1283,7 @@ memory ports, after which read, write, or read/write ports are added:
 % This example can be written more compactly as:
 % 
 % \begin{scala}
-% val regfile = RAM(64, io.wen, io.addr_in, io.data_in1, w_mask = io.bit_mask,
+% val regfile = Mem(64, io.wen, io.addr_in, io.data_in1, w_mask = io.bit_mask,
 %  readLatency = 1, hexInitFile = "hex_init_values.txt")
 % val read_data = regfile(io.addr_in, io.data_in1, oe = !io.wen, cs = Bool(true))
 % \end{scala}
@@ -1418,7 +1418,7 @@ Chisel warns users if ports have other than exactly one connection to them.
 Consider a simple CPU consisting of control path and data path subcomponents and host and memory interfaces shown in Figure~\ref{fig:cpu}.
 In this CPU we can see that the control path and data path each connect only to a part of the instruction and data memory interfaces. 
 Chisel allows users to do this with partial fulfillment of interfaces.
-A user first defines the complete interface to a ROM and RAM as follows:
+A user first defines the complete interface to a ROM and Mem as follows:
 
 \begin{scala}
 class RomIo extends Bundle {
@@ -1768,7 +1768,7 @@ class Fifo[T <: Data] (n: Int)(type: => T)
   enq_ptr := Mux(do_enq, enq_ptr_inc, enq_ptr)
   deq_ptr := Mux(do_deq, deq_ptr_inc, deq_ptr)
   is_full := is_full_next
-  val ram = RAM(n)
+  val ram = Mem(n)
   when (do_enq) {
     ram(enq_ptr) := io.enq_dat
   }

@@ -461,6 +461,8 @@ Vecs create an indexable vector of elements:
 \begin{scala}
 object Vec {
   def apply[T <: Data](n: Int)(type: => T): Vec[T]
+  def apply[T <: Data](elts: Seq[T])(type: => T): Vec[T]
+  def apply[T <: Data](elts: T*)(type: => T): Vec[T]
 }
 
 class Vec[T <: Data](n: Int, val type: () => T) 
@@ -677,22 +679,22 @@ Chisel provides facilities for creating both read only and
 read/write memories.  
 
 \begin{scala}
-object RAM {
-  def apply[T <: Data](depth: Int)(type: => T): RAM
+object Mem {
+  def apply[T <: Data](depth: Int)(type: => T): Mem
 }
 
-class RAM[T <: Data](n: Int, type: () => T) 
+class Mem[T <: Data](n: Int, type: () => T) 
     extends Updateable {
   def apply(idx: UFix): T
 }
 
-class RAMRead[T <: Data]
-      (val ram: RAM, val idx: UFix) extends Node {
+class MemRead[T <: Data]
+      (val ram: Mem, val idx: UFix) extends Node {
   override def := (data: T): T
 }
 
-class RAMWrite[T <: Data]
-      (val ram: RAM, val idx: UFix, val kind: T) 
+class MemWrite[T <: Data]
+      (val ram: Mem, val idx: UFix, val kind: T) 
     extends Node
 \end{scala}
 
@@ -702,7 +704,7 @@ memory writes:
 
 \begin{scala}
 // memory construction
-val m = RAM(n){ UFix(width = 32) }
+val m = Mem(n){ UFix(width = 32) }
 // memory read
 val d = m(addr)
 // memory write
