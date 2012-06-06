@@ -669,7 +669,6 @@ abstract class Component(resetSignal: Bool = null) {
       m match {
         case io: Bits          => if (io.dir == OUTPUT) { if (io.consumers.length == 0) roots += m; }
         case d: Delay        => roots += m;
-	case mr: MemRef[ _ ] => if(mr.isReg) roots += m;
         case any             =>
       }
     }
@@ -694,7 +693,6 @@ abstract class Component(resetSignal: Bool = null) {
           for (i <- node.inputs) {
             if (i != null) {
               i match {
-                case m: MemRef[ _ ] => if(!m.isReg) stack.push((newDepth+1, i));
                 case d: Delay       => ;
                 case o              => stack.push((newDepth+1, o)); 
               }
@@ -972,8 +970,7 @@ abstract class Component(resetSignal: Bool = null) {
       p match {
         case b: Bits  => if(b.updates.length > 0) b.genMuxes(b.default);
         case r: Reg  => r.genMuxes(r);
-        case m: Mem[_] => m.genMuxes(m);
-        case mr: MemRef[_] =>
+        case mw: MemWrite[_] =>
         case e: Extract =>
         case v: VecProc =>
       }
@@ -1517,7 +1514,7 @@ abstract class Component(resetSignal: Bool = null) {
       res.reverse
     }
     out_c.write("void " + name + "_t::print ( FILE* f ) {\n");
-    if (testNodes.length > 0) {
+    if (testNodes != null) {
       scanArgs.clear();  scanArgs  ++= testInputNodes;    scanFormat  = ""
       printArgs.clear(); printArgs ++= testNonInputNodes; printFormat = ""
     } 

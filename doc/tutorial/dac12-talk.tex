@@ -9,7 +9,13 @@
 
 \lstset{basicstyle={\footnotesize\ttfamily}}
 
-\usetheme[height=10mm]{Rochester}
+\usetheme[height=9mm]{Rochester}
+\setbeamersize{text margin left=3mm} 
+\setbeamersize{text margin right=3mm} 
+\setbeamertemplate{navigation symbols}{}
+
+% \usepackage[orientation=landscape,size=custom,width=200,height=120,scale=1.9]{beamerposter}
+% \usepackage[orientation=landscape,size=a0,scale=1.4,debug]{beamerposter}
 
 % \usetheme[height=0mm]{Rochester}
 % \usecolortheme{dolphin}
@@ -48,19 +54,93 @@ John Wawrzynek, Krste Asanovic}
 \end{frame}
 
 \begin{frame}[fragile]
-\frametitle{Motivation}
+\frametitle{21st Century Architecture Design}
+{\Large\textbf{Harder to get hardware / software efficiency gains}}
+\vskip5mm
 \begin{itemize}
-\item Harder to get hardware / software efficiency gains
 \item Need massive design-space exploration
-\item Traditional hardware description languages are inadequate
 \begin{itemize}
-\item Low level
-\item Poor for writing generators
+\item Hardware and software codesign and cotuning
+\end{itemize}
+\item Need meaningful results
+\begin{itemize}
+\item Cycle counts
+\item Cycle time, power and area
+\item Real chips
+\end{itemize}
+\item Traditional architectural simulators, hardware-description
+  languages, and tools are inadequate
+\begin{itemize}
+\item Slow
+\item Inaccurate
+\item Error prone
+\item Difficult to modify and parameterize
 \end{itemize}
 \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]{The Scala Programming Language}
+\begin{frame}[fragile]
+\frametitle{Bottom Line -- Shorten Design Loop}
+{\LARGE\textbf{If you make it}}
+\vskip2mm
+\begin{itemize}
+\item Easier to make design changes
+\begin{itemize}
+\item Fewer lines of design code ( \textbf{>> 3x} )
+\item More reusable code
+\item Parameterize designs
+\end{itemize}
+\item Faster to test results ( \textbf{>> 8x} )
+\begin{itemize}
+\item Fast compilation
+\item Fast simulation
+\item Easy testing
+\item Easy verification
+\end{itemize}
+\end{itemize}
+\vskip0.8cm
+{\LARGE\textbf{Then you can}}
+\begin{itemize}
+\item Explore more design space
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Chisel is ...}
+
+\begin{columns}[c]
+
+\column{0.55\textwidth}
+
+\begin{itemize}
+\item Best of hardware and software design ideas
+\item Embedded within Scala language to leverage mindshare and language design
+\item Algebraic construction and wiring
+\item Hierarchical, object oriented, and functional construction
+\item Abstract data types and interfaces
+\item Bulk connections
+\item Multiple targets
+\begin{itemize}
+\item Simulation and synthesis
+\item Memory IP is target-specific
+\end{itemize}
+\end{itemize}
+
+\column{0.40\textwidth}
+
+\begin{center}
+single source \\
+\includegraphics[width=0.99\textwidth]{../manual/figs/targets.pdf} \\
+multiple targets \\
+\end{center}
+
+\end{columns}
+
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{The Scala Programming Language}
 
 \begin{columns}[c]
 
@@ -98,40 +178,8 @@ John Wawrzynek, Krste Asanovic}
 \end{center}
 
 \end{columns}
-
 \end{frame}
 
-\begin{frame}[fragile]{Chisel is ...}
-
-\begin{columns}[c]
-
-\column{0.6\textwidth}
-
-\begin{itemize}
-\item Best of hardware and software
-\item Embedded within Scala language to leverage mindshare and language design
-\item Algebraic construction and wiring
-\item Hierarchical and object oriented construction
-\item Abstract data types and interfaces
-\item Bulk connections
-\item Multiple targets
-\begin{itemize}
-\item Simulation and synthesis
-\item Memory IP is target-specific
-\end{itemize}
-\end{itemize}
-
-\column{0.4\textwidth}
-
-\begin{center}
-single source \\
-\includegraphics[width=0.9\textwidth]{../manual/figs/targets.pdf} \\
-multiple targets \\
-\end{center}
-
-\end{columns}
-
-\end{frame}
 
 \begin{frame}[fragile]{Primitive Datatypes}
 \begin{itemize}
@@ -190,15 +238,20 @@ val myVec = Vec(5){ Fix(width=23) }
 
 \end{frame}
 
-\begin{frame}[fragile]{Example}
+\begin{frame}[fragile]
+\frametitle{Example}
+\begin{columns}
+
+\column{0.45\textwidth}
+
 \begin{footnotesize}
 \begin{scala}
 class GCD extends Component {
   val io = new Bundle {
-    val a   = UFix(16, INPUT)
-    val b   = UFix(16, INPUT)
-    val z   = UFix(16, OUTPUT)
-    val rdy = Bool(OUTPUT) }
+    val a     = UFix(16, INPUT)
+    val b     = UFix(16, INPUT)
+    val z     = UFix(16, OUTPUT)
+    val valid = Bool(OUTPUT) }
   val x = Reg(resetVal = io.a)
   val y = Reg(resetVal = io.b)
   when (x > y) {
@@ -206,11 +259,19 @@ class GCD extends Component {
   } .otherwise {
     y := y - x
   }
-  io.z   := x
-  io.rdy := y === UFix(0)
+  io.z     := x
+  io.valid := y === UFix(0)
 }
 \end{scala}
 \end{footnotesize}
+
+\column{0.45\textwidth}
+
+\begin{center}
+\includegraphics[width=0.9\textwidth]{gcd.pdf} 
+\end{center}
+
+\end{columns}
 \end{frame}
 
 \begin{frame}[fragile]{Polymorphism and Parameterization}
@@ -264,6 +325,44 @@ val c = a + b
 
 \end{frame}
 
+\begin{frame}[fragile, shrink]
+\frametitle{Functional Composition}
+
+% \begin{itemize}
+% \item natural
+% \item reusable
+% \item composable
+% \end{itemize}
+% \vskip1cm
+
+\begin{Large}
+\begin{columns}
+
+\column{0.45\textwidth}
+\verb+Map(ins, x => x * y)+ \\
+\begin{center}
+\includegraphics[height=0.6\textheight]{map.pdf} \\[2cm]
+\end{center}
+
+\column{0.45\textwidth}
+\vskip2mm
+\verb+Chain(n, in, x => f(x))+ \\
+\begin{center}
+\includegraphics[width=0.9\textwidth]{chain.pdf} \\
+\end{center}
+
+\verb+Reduce(data, Max)+ \\
+\begin{center}
+\includegraphics[width=0.9\textwidth]{reduce.pdf} \\
+\end{center}
+
+
+\end{columns}
+
+\end{Large}
+
+\end{frame}
+
 \begin{frame}[fragile]{Generator}
 \begin{footnotesize}
 \begin{scala}
@@ -289,6 +388,42 @@ class Cache(cache_type:    Int = DIR_MAPPED,
 
 \end{frame}
 
+\begin{frame}[fragile]
+\frametitle{Chisel Line Count Breakdown}
+
+\begin{columns}
+
+\column{0.3\textwidth}
+
+\begin{itemize}
+\item \verb+~+5200 lines total
+\item Embeds into Scala well
+\end{itemize}
+
+\column{0.7\textwidth}
+
+\begin{center}
+\includegraphics[width=0.9\textwidth]{linecount.png}
+\end{center}
+
+\end{columns}
+
+\end{frame}
+
+\begin{frame}
+\frametitle {Chisel versus Hand-Coded Verilog}
+
+\begin{itemize}
+\item 3-stage RISCV CPU hand-coded in Verilog
+\item Translated to Chisel
+\item Resulted in 3x reduction in lines of code
+\item Most savings in wiring
+\item Lots more savings to go ...
+% \item Chisel-generated Verilog gives comparable synthesis quality of results
+\end{itemize}
+
+\end{frame}
+
 \begin{frame}{Related Work}
 
 \begin{itemize}
@@ -300,11 +435,11 @@ class Cache(cache_type:    Int = DIR_MAPPED,
 \begin{itemize}
 \item Elegant but focus on spatial layout
 \end{itemize}
-\item Domain specific (bluespec + esterel + autoesl)
+\item Domain-specific (Bluespec + Esterel + AutoESL)
 \begin{itemize}
 \item Powerful but needs to match task at hand	
 \end{itemize}
-\item Generator language (Genesis2 + spiralFFT)
+\item Generator language (Genesis2 + SpiralFFT)
 \begin{itemize}
 \item Either inherit poor abstraction qualities of underlying HDL or
 \item Do not provide complete solution
@@ -313,12 +448,36 @@ class Cache(cache_type:    Int = DIR_MAPPED,
 
 \end{frame}
 
-\begin{frame}[fragile]{Fast Cycle-Accurate Simulation}
+\begin{frame}[fragile]
+\frametitle{Rocket Microarchitecture}
+\begin{itemize}
+\item 6-stage RISC decoupled integer datapath + 5-stage IEEE FPU + MMU
+  and non-blocking caches
+\item Completely written in Chisel
+\end{itemize}
+\includegraphics[width=\textwidth]{rocket-microarchitecture.pdf}
+
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Single Source / Multiple Targets}
+
+\begin{center}
+single source \\
+\includegraphics[width=0.95\textwidth]{../manual/figs/targets.pdf} \\
+multiple targets \
+\end{center}
+
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Fast Cycle-Accurate Simulation in C++}
 
 \begin{itemize}
-\item Compiles to single class with \verb+clock_lo+ and \verb+clock_hi+ methods
+\item Compiles to single class 
 \begin{itemize}
 \item Keep state and top level io in class fields
+\item \verb+clock_lo+ and \verb+clock_hi+ methods
 \end{itemize}
 \item Generates calls to fast multiword library using C++ templates 
 \begin{itemize}
@@ -329,55 +488,53 @@ class Cache(cache_type:    Int = DIR_MAPPED,
 
 \end{frame}
 
-\begin{frame}{Comparison with Hand-Coded Verilog}
+\begin{frame}[fragile]
+\frametitle{Simulator Comparison}
 
-\begin{itemize}
-\item 3x reduction in lines of code for 3-stage RISC CPU
-\item Chisel-generated Verilog gives comparable synthesis quality of results
-\end{itemize}
-
-\end{frame}
-
-\begin{frame}[fragile]{Rocket Microarchitecture}
-
-\begin{itemize}
-\item 6-stage RISC integer datapath + 5-stage Vector IEEE FPU + MMU and non-blocking caches
-\end{itemize}
-\includegraphics[width=\textwidth]{rocket-microarchitecture.pdf}
-
-\end{frame}
-
-\begin{frame}[fragile]{Processor Performance}
-
-\textbf{Comparison of sim time when booting Tessellation OS}
+\textbf{Comparison of simulation time when booting Tessellation OS}
 \vskip0.5cm
 
-\begin{tiny}
+\begin{footnotesize}
 \begin{tabular}{lrrrrrr}
 \textbf{Simulator} & \textbf{Compile}  & \textbf{Compile} & \textbf{Run}  & \textbf{Run} & \textbf{Total} & \textbf{Total} \\
 & \textbf{Time (s)}  & \textbf{Speedup} & \textbf{Time (s)}  & \textbf{Speedup} & \textbf{Time (s)} & \textbf{Speedup} \\
 \hline
-VCS RTL simulator             &   22 & 1.000 & 5368 & 1.00 & 5390 & 1.00 \\ 
-Chisel C++ RTL simulator & 119 & 0.184 & 575 & 9.33 & 694 & 7.77\\
-Virtex-6 FPGA & 3660 & 0.006 & 76 & 70.60 & 3736 & 1.44\\
+VCS             &   22 & 1.000 & 5368 & 1.00 & 5390 & 1.00 \\ 
+Chisel C++  & 119 & 0.184 & 575 & 9.33 & 694 & 7.77\\
+Virtex-6 & 3660 & 0.006 & 76 & 70.60 & 3736 & 1.44\\
 \end{tabular}
-\end{tiny}
+\end{footnotesize}
 
-\vskip1cm
-
-\begin{tabular}{ll}
-\textbf{Name} & \textbf{Worth it if simulating more than ...} \\
-\hline
-Chisel C++ simulation & millions of cycles \\
-FGPA emulation & billions of cycles \\
-\end{tabular}
 
 \end{frame}
 
-\begin{frame}[fragile]{Data Parallel Processor Tape Out Results}
+\begin{frame}
+\frametitle{Simulation Crossover Points}
+
+% \begin{columns}
+% \begin{tabular}{ll}
+% \textbf{Simulation} & \textbf{Worth it if ...} \\
+% \hline
+% Chisel C++ & millions of cycles \\
+% FPGA & billions of cycles \\
+% \end{tabular}
+% 
+% \column{0.55\textwidth}
 
 \begin{center}
-\includegraphics[height=0.75\textheight]{ibm45.png}
+\includegraphics[height=0.8\textheight]{perf.pdf}
+\end{center}
+
+% \end{columns}
+
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Data Parallel Processor Tape Out Results}
+
+\begin{center}
+Completely written in Chisel
+\includegraphics[height=0.7\textheight]{ibm45.png}
 
 \begin{footnotesize}
 The data-parallel processor layout results using IBM 45nm SOI 10-metal layer process using memory compiler generated 6T and 8T SRAM blocks.
@@ -392,6 +549,7 @@ The data-parallel processor layout results using IBM 45nm SOI 10-metal layer pro
 \item Open source with BSD license
 \begin{itemize}
 \item \verb+chisel.eecs.berkeley.edu+
+\item complete set of documentation
 \item public alpha now
 \end{itemize}
 \item Library of components
@@ -406,15 +564,17 @@ The data-parallel processor layout results using IBM 45nm SOI 10-metal layer pro
 
 \end{frame}
 
-\begin{frame}[fragile]{Future}
+\begin{frame}[fragile]
+\frametitle{Future}
 
 \begin{itemize}
 \item Automated design space exploration
-\item Insertion of Activity counters for power monitors
+\item Insertion of activity counters for power monitors
 \item Automatic fault insertion
-\item Faster simulation
+\item Faster and more scalable simulation
 \item More generators
-\item Little languages
+\item More little languages
+\item Compilation to UCLID
 \end{itemize}
 
 \end{frame}
