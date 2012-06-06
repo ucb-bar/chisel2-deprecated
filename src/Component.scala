@@ -10,9 +10,14 @@ import scala.collection.mutable.HashMap
 import scala.collection.mutable.BitSet
 import java.lang.reflect.Modifier._;
 import java.io.File;
+import java.io.InputStream
+import java.io.OutputStream
+import java.io.PrintStream
+import scala.sys.process._
 
 import scala.math.max;
 import Node._;
+import Literal._;
 import Component._;
 import Bundle._;
 import ChiselError._;
@@ -30,15 +35,14 @@ object Component {
   var isClockGatingUpdates = false;
   var isClockGatingUpdatesInline = false;
   var isVCD = false;
-  var isFolding = false;
+  var isFolding = true;
   var isGenHarness = false;
   var isReportDims = false;
   var scanFormat = "";
-  var scanArgs: Seq[Node] = null;
+  var scanArgs: ArrayBuffer[Node] = null;
   var printFormat = "";
   var printArgs: ArrayBuffer[Node] = null;
-  var testArgs: ArrayBuffer[Node] = null;
-  var testVecs: Array[Array[BigInt]] = null;
+  var testNodes: Array[Node] = null;
   var includeArgs: List[String] = Nil;
   var targetDir: String = null
   var configStr: String = null;
@@ -46,6 +50,8 @@ object Component {
   val compIndices = HashMap.empty[String,Int];
   val compDefs = new HashMap[StringBuilder, String];
   var isEmittingComponents = false;
+  var isCompilingEmittedC = false;
+  var isTestingC = false;
   var backendName = "c";
   var topComponent: Component = null;
   val components = ArrayBuffer[Component]();
@@ -91,14 +97,13 @@ object Component {
     isIoDebug = true;
     isClockGatingUpdates = false;
     isClockGatingUpdatesInline = false;
-    isFolding = false;
+    isFolding = true;
     isReportDims = false;
     scanFormat = "";
-    scanArgs = new Array[Node](0);
+    scanArgs = new ArrayBuffer[Node]();
     printFormat = "";
     printArgs = new ArrayBuffer[Node]();
-    testArgs = new ArrayBuffer[Node]();
-    testVecs = null;
+    testNodes = null;
     isCoercingArgs = true;
     targetDir = "."
     configStr = "";
@@ -119,6 +124,8 @@ object Component {
     searchAndMap = false
     ioCount = 0;
     isEmittingComponents = false;
+    isCompilingEmittedC = false;
+    isTestingC = false;
     backendName = "c";
     topComponent = null;
 
@@ -238,6 +245,7 @@ object Component {
     }
   }
 }
+
 
 abstract class Component(resetSignal: Bool = null) {
   var ioVal: Data = null;
@@ -784,7 +792,7 @@ abstract class Component(resetSignal: Bool = null) {
       val name = m.getName();
       // println("LOOKING FOR " + name);
       val types = m.getParameterTypes();
-      if (types.length == 0) {
+      if (types.length == 0 && name != "test") {
         val o = m.invoke(this);
         o match { 
 	  //case comp: Component => { comp.component = this;}
@@ -983,7 +991,7 @@ abstract class Component(resetSignal: Bool = null) {
     if (args.length == 0) {
       (Array[Node](), Array[Node]())
     } else {
-      val testNodes = testArgs.map(maybeFlatten).reduceLeft(_ ++ _).map(x => x.getNode);
+      val testNodes = args.map(maybeFlatten).reduceLeft(_ ++ _).map(x => x.getNode);
       (keepInputs(testNodes), removeInputs(testNodes))
     }
   }
@@ -998,55 +1006,22 @@ abstract class Component(resetSignal: Bool = null) {
     makefile.write("\tg++ -c ${CPPFLAGS} " + name + "-emulator.cpp\n\n");
     makefile.close();
     val harness  = new java.io.FileWriter(base_name + name + "-emulator.cpp");
-    val (testInputNodes, testNonInputNodes) = splitFlattenNodes(testArgs)
-    val isTester = testArgs.length > 0;
     harness.write("#include \"" + name + ".h\"\n");
-    if (isTester) {
-      harness.write("#include <vector>\n")
-      harness.write("std::string tests[] = {\n")
-      for (tv <- testVecs) {
-        harness.write("  ")
-        for (e <- tv) 
-          harness.write("\"" + e.toString(16) + "\", ")
-        harness.write("\n")
-      }
-      harness.write("};\n")
-    }
     harness.write("int main (int argc, char* argv[]) {\n");
     harness.write("  " + name + "_t* c = new " + name + "_t();\n");
     harness.write("  int lim = (argc > 1) ? atoi(argv[1]) : -1;\n");
     harness.write("  c->init();\n");
     if (isVCD)
       harness.write("  FILE *f = fopen(\"" + name + ".vcd\", \"w\");\n");
-    if (isTester) {
-      harness.write("  bool is_error = false;\n");
-      harness.write("  std::string *vecptr = tests;\n");
-      harness.write("  for (int t = 0; t < " + testVecs.length + "; t++) {\n");
-    } else 
-      harness.write("  for (int t = 0; lim < 0 || t < lim; t++) {\n");
+    harness.write("  for (int t = 0; lim < 0 || t < lim; t++) {\n");
     harness.write("    dat_t<1> reset = LIT<1>(t == 0);\n");
-    for (i <- 0 until testInputNodes.length) 
-      harness.write("    str_to_dat(*vecptr++, c->" + testInputNodes(i).emitRefC + ");\n")
     harness.write("    if (!c->scan(stdin)) break;\n");
     harness.write("    c->clock_lo(reset);\n");
     harness.write("    c->print(stdout);\n");
-    if (isTester) {
-      for (i <- 0 until testNonInputNodes.length) {
-        val node = testNonInputNodes(i)
-        harness.write("  " + node.emitDecC)
-        harness.write("    str_to_dat(*vecptr++, " + node.emitRefC + ");\n")
-        harness.write("    if ((" + node.emitRefC + " != c->" + node.emitRefC + ").to_bool()) {\n")
-        harness.write("      fprintf(stderr, \"MISMATCH ON OUT TEST %d OUT %d\\n\", t, " + i + ");\n")
-        harness.write("      is_error = true;\n")
-        harness.write("    }\n")
-      }
-    }
     harness.write("    c->clock_hi(reset);\n");
     if (isVCD)
       harness.write("    c->dump(f, t);\n");
     harness.write("  }\n");
-    if (isTester) 
-      harness.write("  exit(is_error);\n")
     harness.write("}\n");
     harness.close();
   }
@@ -1289,6 +1264,106 @@ abstract class Component(resetSignal: Bool = null) {
       }
     }
   }
+  def gcc(flags: String = "-O2"): Unit = {
+    val allFlags = flags + " -I../ -I${CHISEL}/csrc"
+    val dir = targetDir + "/"
+    def run(cmd: String) = {
+      val c = Process(cmd).!
+      println(cmd + " RET " + c)
+    }
+    def link(name: String) = {
+      val ac = "g++ -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o"
+      run(ac)
+    }
+    def cc(name: String) = {
+      val cmd = "g++ -c -o " + dir + name + ".o " + allFlags + " " + dir + name + ".cpp"
+      run(cmd)
+    }
+    cc(name + "-emulator")
+    cc(name)
+    link(name)
+  }
+  var testIn: InputStream = null
+  var testOut: OutputStream = null
+  var testInputNodes: Array[Node] = null
+  var testNonInputNodes: Array[Node] = null 
+  def test(vars: HashMap[Node, Node]): Boolean = {
+    // println("TESTONE " + testInputNodes.length + " INPUTS " + testNonInputNodes.length + " OUTPUTS")
+    for (n <- testInputNodes) {
+      val v = vars.getOrElse(n, null)
+      val i = if (v == null) BigInt(-1) else v.litValue() // TODO: WARN
+      val s = i.toString(16)
+      println(n + " = " + i)
+      testOut.write(' ')
+      for (c <- s)
+        testOut.write(c)
+      testOut.write('\n')
+      testOut.flush
+    }
+    var isSame = true
+    var c = testIn.read
+    val sb = new StringBuilder()
+    for (o <- testNonInputNodes) {
+      sb.clear()
+      def isSpace(c: Int) = c == 0x20 || c == 0x9 || c == 0xD || c == 0xA
+      while (isSpace(c)) {
+        // println("SKIPPING CHAR '" + c.toChar + "'")
+        c = testIn.read
+      }
+      while (!isSpace(c)) {
+        // println("READ CHAR '" + c.toChar + "'")
+        sb += c.toChar
+        c   = testIn.read
+      }
+      val s = sb.toString
+      val rv = toLitVal(s)
+      println("READ " + o + " = " + rv)
+      if (!vars.contains(o)) {
+        vars(o) = Literal(rv)
+      } else {
+        val tv = vars(o).litValue()
+        println(o + " = " + tv)
+        if (tv != rv) {
+          isSame = false
+          println("FAILURE")
+        }
+      }
+    }
+    isSame
+  }
+  def startTest: Process = {
+    val cmd = targetDir + "/" + name
+    val process = Process(cmd)
+    val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => err.close())
+    val p = process.run(pio) 
+    println("STARTING " + cmd)
+    p
+  }
+  def endTest(p: Process) = {
+    testOut.close()
+    testIn.close()
+    p.destroy()
+  }
+  def withTesting(body: => Boolean): Boolean = {
+    var res = false
+    var p: Process = null
+    try {
+      p = startTest
+      res = body
+    } finally {
+      if (p != null) endTest(p)
+    }
+    println("TESTING = " + res)
+    res
+  }
+  var tests: () => Boolean = () => { println("DEFAULT TESTS"); true }
+  var testVars: Array[Node] = null
+  def defTests(nodes: Node*)(body: => Boolean) = {
+    testNodes = nodes.toArray
+    val (ins, outs) = splitFlattenNodes(testNodes)
+    testInputNodes = ins.toArray; testNonInputNodes = outs.toArray
+    tests = () => withTesting { body }
+  }
   def compileC(): Unit = {
     components.foreach(_.elaborate(0));
     for (c <- components)
@@ -1442,9 +1517,13 @@ abstract class Component(resetSignal: Bool = null) {
       res.reverse
     }
     out_c.write("void " + name + "_t::print ( FILE* f ) {\n");
+    if (testNodes.length > 0) {
+      scanArgs.clear();  scanArgs  ++= testInputNodes;    scanFormat  = ""
+      printArgs.clear(); printArgs ++= testNonInputNodes; printFormat = ""
+    } 
     if (printArgs.length > 0) {
       val format =
-        if (printFormat == "") printArgs.map(a => "%=").reduceLeft((y,z) => z + " " + y) 
+        if (printFormat == "") printArgs.map(a => "%x").reduceLeft((y,z) => z + " " + y) 
         else printFormat;
       val toks = splitFormat(format);
       var i = 0;
@@ -1460,6 +1539,7 @@ abstract class Component(resetSignal: Bool = null) {
         }
       }
       out_c.write("  fprintf(f, \"\\n\");\n");
+      out_c.write("  fflush(f);\n");
     }
     out_c.write("}\n");
     def constantArgSplit(arg: String) = arg.split('=');
@@ -1467,7 +1547,7 @@ abstract class Component(resetSignal: Bool = null) {
     out_c.write("bool " + name + "_t::scan ( FILE* f ) {\n");
     if (scanArgs.length > 0) {
       val format =
-        if (scanFormat == "") scanArgs.map(a => "%=").reduceLeft((y,z) => z + " " + y) 
+        if (scanFormat == "") scanArgs.map(a => "%x").reduceLeft((y,z) => z + y) 
         else scanFormat;
       val toks = splitFormat(format);
       var i = 0;
@@ -1481,7 +1561,7 @@ abstract class Component(resetSignal: Bool = null) {
           out_c.write("  fscanf(f, \"%s\", \"" + tok + "\");\n");
         }
       }
-      out_c.write("  getc(f);\n");
+      // out_c.write("  getc(f);\n");
     }
     out_c.write("  return(!feof(f));\n");
     out_c.write("}\n");

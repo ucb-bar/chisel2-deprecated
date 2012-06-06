@@ -83,12 +83,6 @@ object Printer {
     new TestIO(format, args.toList);
 }
 
-class Tester(val vecs: Array[Array[BigInt]], val args: Seq[Data])
-object Tester {
-  def apply (vecs: Array[Array[BigInt]], args: Data*): Tester =
-    new Tester(vecs, args)
-}
-
 object chiselMain {
   def readArgs(args: Array[String]) = {
     var i = 0;
@@ -113,6 +107,8 @@ object chiselMain {
         case "--folding" => isFolding = true; 
         case "--vcd" => isVCD = true;
         case "--v" => backendName = "v"; isEmittingComponents = true; isCoercingArgs = false;
+        case "--compile" => isCompilingEmittedC = true;
+        case "--test" => isTestingC = true;
         case "--target-dir" => targetDir = args(i+1); i += 1;
 	case "--include" => includeArgs = splitArg(args(i+1)); i += 1;
         case any => println("UNKNOWN ARG");
@@ -123,38 +119,35 @@ object chiselMain {
 
   def apply[T <: Component]
       (args: Array[String], gen: () => T, 
-       scanner: T => TestIO = null, printer: T => TestIO = null, tester: T => Tester = null): T = {
+       scanner: T => TestIO = null, printer: T => TestIO = null, ioArgs: T => Seq[Data] = null): T = {
     initChisel();
     readArgs(args)
 
     val c = gen();
     if (scanner != null) {
       val s = scanner(c);
-      scanArgs   = s.args;
-      scanFormat = s.format;
+      scanArgs  ++= s.args;
+      scanFormat  = s.format;
     }
     if (printer != null) {
       val p = printer(c);
       printArgs   ++= p.args;
-      printFormat = p.format;
-    }
-    if (tester != null) {
-      val t = tester(c);
-      testArgs  ++= t.args;
-      testVecs    = t.vecs;
+      printFormat   = p.format;
     }
     backendName match {
     case "v" => c.compileV();
-    case "c" => c.compileC();
+    case "c" => 
+      c.compileC(); 
+      if (isCompilingEmittedC && isGenHarness) c.gcc()
+      if (isTestingC) c.tests()
     }
     c
   }
 }
 
 object chiselMainTest {
-  def apply[T <: Component]
-      (args: Array[String], gen: () => T)(scanner: T => TestIO, printer: T => TestIO): T = 
-    chiselMain(args, gen, scanner, printer);
+  def apply[T <: Component](args: Array[String], gen: () => T): T = 
+    chiselMain(args, gen, null, null)
 }
 
 trait proc extends Node {

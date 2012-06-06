@@ -51,6 +51,13 @@ class Bits extends Data with proc {
   }
   def default: Node = if (inputs.length < 1 || inputs(0) == null) null else inputs(0);
 
+  override def litOf: Literal = {
+    if(inputs.length == 1)
+      inputs(0).litOf
+    else
+      null
+  }
+
   // internal, non user exposed connectors
   var assigned = false;
 
