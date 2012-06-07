@@ -15,6 +15,9 @@ tutorials = \
 
 tut_out = $(addsuffix .out, $(tutorials))
 
+$(tutorials):
+	cd $(basedir)/sbt; $(SBT) "project tutorial" "run $@ --compile --test"
+
 $(tut_out): %.out: ${CHISEL}/src/*.scala ../src/%.scala
 	cd $(basedir)/sbt; $(SBT) "project tutorial" "run $* --compile --test" > $(basedir)/emulator/$@
 
