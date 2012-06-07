@@ -1,6 +1,7 @@
 package Tutorial {
 
 import Chisel._
+import Node._
 import scala.collection.mutable.HashMap
 
 class Risc extends Component {
@@ -38,7 +39,7 @@ class Risc extends Component {
     pc := UFix(0)
   } .otherwise {
     switch(op) {
-      // is(add_op) { rc := ra + rb }
+      is(add_op) { rc := ra + rb }
       is(sub_op) { rc := ra - rb }
     }
     io.out := rc

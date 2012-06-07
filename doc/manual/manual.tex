@@ -194,8 +194,8 @@ abstract class Data extends Node {
   def toUFix: UFix
   def toBool: Bool
   def toBits: Bits
-  // data leaves if aggregate
-  def leaves: Array[(String, Data)]
+  // flatten out to leaves of tree
+  def flatten: Array[(String, Data)]
   // port direction if leaf
   def dir: PortDir
   // change dir to OUTPUT
@@ -436,9 +436,9 @@ class Bundle extends Data {
 
 \noindent
 The name and type of each element in a Bundle can be obtained with the
-\code{elements} method, and recursively using the \code{leaves}
-method.  Users can define their own by subclassing \code{Bundle} as
-follows:
+\code{elements} method, and the \code{flatten} method returns the
+elements at the leaves for nested aggregates.  Users can define new
+bundles by subclassing \code{Bundle} as follows:
 
 \begin{scala}
 class MyFloat extends Bundle {
@@ -447,17 +447,17 @@ class MyFloat extends Bundle {
   val significand = Bits(width = 23)
 }
 \end{scala}
-
 \noindent
-and access their elements using Scala field access:
+Elements are accessed using Scala field access:
 
 \begin{scala}
 val x  = new MyFloat()
 val xs = x.sign
 \end{scala}
 
-Bundles elements get their emitted names from their bundle field names
-which are obtained using Scala introspection.
+The names given to a bundle's elements when they are emitted by a C++
+or Verilog backend are obtained from their bundle field names, using
+Scala introspection.
 
 \subsection{Vecs}
 
@@ -493,7 +493,7 @@ v(a) := d
 
 \subsection{Bit Width Inference}
 
-Users are required to set bitwidths of ports and registers, but otherwise,
+Users are required to set bit widths of ports and registers, but otherwise,
 bit widths on nodes are automatically inferred unless set manually by
 the user (using \code{Extract} or \code{Cat}).
 The bit-width inference engine starts from the graph's input ports and 
@@ -528,17 +528,23 @@ the user either explicitly or from the bitwidth of the reset value.
 From these two requirements, we can show that the bit-width inference
 process will converge to a fixpoint.
 
+\begin{example}
+Shouldn't & return bitwidth that is min() of inputs?
+\end{example}
+
+
 \section{Updateables}
 
 \label{sec:wires}
 
-When describing the operation of wire and state
-nodes, it is often useful to instead specify when updates to the
-wires and state will occur and to specify these updates spread across
-several separate statements.  
-For example, Data nodes can be used immediately, but their input set later.
-\code{Updateable} represents a conditionally updateable node which
-collects accesses and code generates a mux input for the node:
+When describing the operation of wire and state nodes, it is often
+useful to give the specification as a series of conditional updates to
+the output value and to spread out these updates across several
+separate statements.  For example, the output of a Data node can be
+referenced immediately, but its input can be set later.
+\code{Updateable} represents a conditionally updateable node, which
+accumulates accesses to the node and which can later generate muxes to
+combine these accesses in the circuit.
 
 \begin{scala}
 abstract class Updateable extends Node {
@@ -552,9 +558,9 @@ abstract class Updateable extends Node {
 }
 \end{scala}
 
-Chisel provides conditional update rules
-in the form of the \code{when} construct to support this style of
-sequential logic description:
+Chisel provides conditional update rules in the form of the
+\code{when} construct to support this style of sequential logic
+description:
  
 \begin{scala}
 object when {
@@ -618,19 +624,19 @@ def is(v: Bits)(block: => Unit)
 
 \section{Forward Declarations}
 
-Purely combinational circuits cannot have cycles between nodes, and
-Chisel will report an error if such a cycle is detected.  Because they
-do not have cycles, combinational circuits can always be constructed
-in a feed-forward manner, by adding new nodes whose inputs are derived
-from nodes that have already been defined.  Sequential circuits
-naturally have feedback between nodes, and so it is sometimes
-necessary to reference an output wire before the producing node has
-been defined.  Because Scala evaluates program statements
-sequentially, we have allow data nodes to serve as a wire providing
-a declaration of a node that can be used immediately, but whose
-input will be set later.  
-For example, in a simple CPU, we need to define the \verb!pcPlus4!
-and \verb!brTarget! wires so they can be referenced before defined:
+Purely combinational circuits are not allowed to have cycles between
+nodes, and Chisel will report an error if such a cycle is detected.
+Because they do not have cycles, legal combinational circuits can
+always be constructed in a feed-forward manner, by adding new nodes
+whose inputs are derived from nodes that have already been defined.
+Sequential circuits naturally have feedback between nodes, and so it
+is sometimes necessary to reference an output wire before the
+producing node has been defined.  Because Scala evaluates program
+statements sequentially, we have allowed data nodes to serve as a wire
+providing a declaration of a node that can be used immediately, but
+whose input will be set later.  For example, in a simple CPU, we need
+to define the \verb!pcPlus4!  and \verb!brTarget! wires so they can be
+referenced before definition:
 \begin{scala}
 val pcPlus4  = UFix()
 val brTarget = UFix()
