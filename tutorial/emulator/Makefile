@@ -13,6 +13,9 @@ tutorials = \
 	filter \
 	tbl \
 	life \
+	mul \
+	echo \
+	risc \
 
 tut_out = $(addsuffix .out, $(tutorials))
 
