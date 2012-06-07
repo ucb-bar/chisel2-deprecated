@@ -110,7 +110,7 @@ object chiselMain {
 
   def apply[T <: Component]
       (args: Array[String], gen: () => T, 
-       scanner: T => TestIO = null, printer: T => TestIO = null, ioArgs: T => Seq[Data] = null): T = {
+       scanner: T => TestIO = null, printer: T => TestIO = null, ftester: T => Tester[T] = null): T = {
     initChisel();
     readArgs(args)
 
@@ -125,21 +125,24 @@ object chiselMain {
       printArgs   ++= p.args;
       printFormat   = p.format;
     }
+    if (ftester != null) {
+      tester = ftester(c)
+    }
     backendName match {
     case "v" => c.compileV();
     case "c" => 
       c.compileC(); 
       // c.name = "Combinational"
       if (isCompilingEmittedC && isGenHarness) c.gcc()
-      if (isTestingC) c.tests()
+      if (isTestingC) tester.tests()
     }
     c
   }
 }
 
 object chiselMainTest {
-  def apply[T <: Component](args: Array[String], gen: () => T): T = 
-    chiselMain(args, gen, null, null)
+  def apply[T <: Component](args: Array[String], gen: () => T)(tester: T => Tester[T]): T = 
+    chiselMain(args, gen, null, null, tester)
 }
 
 trait proc extends Node {
