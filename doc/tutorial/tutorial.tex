@@ -713,7 +713,7 @@ object tutorial {
 
 \begin{figure}
 \begin{center}
-\includegraphics[width=0.45\textwidth]{figs/CUT.pdf}
+\includegraphics[width=0.45\textwidth]{../tutorial/figs/CUT.pdf}
 \end{center}
 \caption{CUT run under Scala with stdin and stdout connected}
 \label{fig:cut}
@@ -730,7 +730,8 @@ class Tester[T <: Component]
 \end{scala}
 
 \noindent
-where users write a \code{defTests} function:
+which binds a tester to a component, and where specify nodes to test,
+and finally where users write a \code{defTests} function.
 The definition for \code{defTests} is:
 
 \begin{scala}
@@ -800,6 +801,7 @@ chiselMainTest(args + "--test", () => new Mux2()){
   c => new Mux2Tests(c) 
 }
 \end{scala}
+
 
 Other command arguments are as follows:
 \begin{tabular}{lll}

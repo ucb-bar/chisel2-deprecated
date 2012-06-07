@@ -544,7 +544,7 @@ sbt "project tutorial" "run combinational --compile"
 \end{frame}
 \setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
-\begin{frame}[fragile]{Defining Tests}
+\begin{frame}[fragile]{Defining a Tester}
 
 \begin{columns}
 \column{0.45\textwidth}
@@ -588,24 +588,23 @@ class CombinationalTests(c: Combinational)
 \begin{scala}
 class Tester[T <: Component]
   (val c: T, val testNodes: Array[Node])
-\end{scala}
-\begin{scala}
-def defTests(testNodes: Node*)(body: => Boolean)
-\end{scala}
-\begin{scala}
+
+def defTests(body: => Boolean)
+
 def step(vars: HashMap[Node, Node]): Boolean
 \end{scala}
 }
 \begin{tiny}
 \begin{itemize}
-\item user subclasses \code{Tester}, where
-\code{testNodes} flattened left to right and top to bottom
-\item \code{vars} is mapping from \code{testNodes} to literals
+\item user subclasses \code{Tester} defining CUT and
+\code{testNodes} and tests in \code{defTests} body
+\item \code{vars} is mapping from \code{testNodes} to literals, called bindings
 \item \code{step} runs test with given bindings, where
 var values for input ports are sent to CUT,
 CUT computes next outputs, and
 CUT sends next outputs to Chisel
-\item \code{step} compares received values against var values for
+\item finally \code{step} compares received values against var values
+  for and returns false if any comparisons fail
   output ports
 \end{itemize}
 \end{tiny}
@@ -615,6 +614,25 @@ CUT sends next outputs to Chisel
 \end{center}
 
 \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Binding Tester to Component}
+
+\begin{scala}
+object chiselMainTest {
+  def apply[T <: Component]
+    (args: Array[String], comp: () => T)(tester: T => Tester[T]): T
+}
+\end{scala}
+
+\noindent and used as follows:
+
+\begin{scala}
+chiselMainTest(args + "--test", () => new Combinational()){ 
+  c => new CombinationalTests(c) 
+}
+\end{scala}
+
 \end{frame}
 
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}

@@ -175,8 +175,8 @@ multiple targets \\
 \column{0.25\textwidth}
 
 \begin{center}
-\includegraphics[height=0.4\textheight]{programming-scala.pdf} \\
-\includegraphics[height=0.4\textheight]{programming-in-scala.pdf}
+\includegraphics[height=0.4\textheight]{figs/programming-scala.pdf} \\
+\includegraphics[height=0.4\textheight]{figs/programming-in-scala.pdf}
 \end{center}
 
 \end{columns}
@@ -270,7 +270,7 @@ class GCD extends Component {
 \column{0.45\textwidth}
 
 \begin{center}
-\includegraphics[width=0.9\textwidth]{gcd.pdf} 
+\includegraphics[width=0.9\textwidth]{figs/gcd.pdf} 
 \end{center}
 
 \end{columns}
@@ -343,19 +343,19 @@ val c = a + b
 \column{0.45\textwidth}
 \verb+Map(ins, x => x * y)+ \\
 \begin{center}
-\includegraphics[height=0.6\textheight]{map.pdf} \\[2cm]
+\includegraphics[height=0.6\textheight]{figs/map.pdf} \\[2cm]
 \end{center}
 
 \column{0.45\textwidth}
 \vskip2mm
 \verb+Chain(n, in, x => f(x))+ \\
 \begin{center}
-\includegraphics[width=0.9\textwidth]{chain.pdf} \\
+\includegraphics[width=0.9\textwidth]{figs/chain.pdf} \\
 \end{center}
 
 \verb+Reduce(data, Max)+ \\
 \begin{center}
-\includegraphics[width=0.9\textwidth]{reduce.pdf} \\
+\includegraphics[width=0.9\textwidth]{figs/reduce.pdf} \\
 \end{center}
 
 
@@ -390,6 +390,77 @@ class Cache(cache_type:    Int = DIR_MAPPED,
 
 \end{frame}
 
+\begin{frame}[fragile]{Testing}
+
+\begin{columns}
+\column{0.45\textwidth}
+{\lstset{basicstyle={\tiny\ttfamily}}
+\begin{scala}
+package Tutorial {
+import Chisel._
+import scala.collection.mutable.HashMap
+import scala.util.Random
+
+class Combinational extends Component {
+  val io = new Bundle {
+    val x = UFix(16, INPUT)
+    val y = UFix(16, INPUT)
+    val z = UFix(16, OUTPUT) }
+  io.z := io.x + io.y
+}
+
+class CombinationalTests(c: Combinational) 
+    extends Tester(c, Array(c.io)) {
+  defTests {
+    var allGood = true
+    val vars    = new HashMap[Node, Node]()
+    val rnd     = new Random()
+    val maxInt  = 1 << 16
+    for (i <- 0 until 10) {
+      vars.clear()
+      val x        = rnd.nextInt(maxInt)
+      val y        = rnd.nextInt(maxInt)
+      vars(c.io.x) = UFix(x)
+      vars(c.io.y) = UFix(y)
+      vars(c.io.z) = UFix((x + y)&(maxInt-1))
+      allGood      = step(vars) && allGood
+    }
+    allGood
+  } } }
+\end{scala}
+}
+\column{0.45\textwidth}
+{\lstset{basicstyle={\tiny\ttfamily}}
+\begin{scala}
+class Tester[T <: Component]
+  (val c: T, val testNodes: Array[Node])
+
+def defTests(body: => Boolean)
+
+def step(vars: HashMap[Node, Node]): Boolean
+\end{scala}
+}
+\begin{tiny}
+\begin{itemize}
+\item user subclasses \kode{Tester} defining CUT and
+\kode{testNodes} and tests in \kode{defTests} body
+\item \kode{vars} is mapping from \kode{testNodes} to literals, called bindings
+\item \kode{step} runs test with given bindings, where
+var values for input ports are sent to CUT,
+CUT computes next outputs, and
+CUT sends next outputs to Chisel
+\item finally \kode{step} compares received values against var values
+ for output ports and returns false if any comparisons fail
+\end{itemize}
+\end{tiny}
+
+\begin{center}
+\includegraphics[width=0.9\textwidth]{figs/CUT.pdf}
+\end{center}
+
+\end{columns}
+\end{frame}
+
 \begin{frame}[fragile]
 \frametitle{Chisel Line Count Breakdown}
 
@@ -405,7 +476,7 @@ class Cache(cache_type:    Int = DIR_MAPPED,
 \column{0.7\textwidth}
 
 \begin{center}
-\includegraphics[width=0.9\textwidth]{linecount.png}
+\includegraphics[width=0.9\textwidth]{figs/linecount.png}
 \end{center}
 
 \end{columns}
@@ -457,7 +528,7 @@ class Cache(cache_type:    Int = DIR_MAPPED,
   and non-blocking caches
 \item Completely written in Chisel
 \end{itemize}
-\includegraphics[width=\textwidth]{rocket-microarchitecture.pdf}
+\includegraphics[width=\textwidth]{figs/rocket-microarchitecture.pdf}
 
 \end{frame}
 
@@ -527,7 +598,7 @@ Virtex-6 & 3660 & 0.006 & 76 & 70.60 & 3736 & 1.44\\
 % \column{0.55\textwidth}
 
 \begin{center}
-\includegraphics[height=0.8\textheight]{perf.pdf}
+\includegraphics[height=0.8\textheight]{figs/perf.pdf}
 \end{center}
 
 % \end{columns}
@@ -540,7 +611,7 @@ Virtex-6 & 3660 & 0.006 & 76 & 70.60 & 3736 & 1.44\\
 
 \begin{center}
 Completely written in Chisel
-\includegraphics[height=0.7\textheight]{ibm45.png}
+\includegraphics[height=0.7\textheight]{figs/ibm45.png}
 
 \begin{footnotesize}
 The data-parallel processor layout results using IBM 45nm SOI 10-metal layer process using memory compiler generated 6T and 8T SRAM blocks.
@@ -591,15 +662,16 @@ The data-parallel processor layout results using IBM 45nm SOI 10-metal layer pro
 \begin{frame}[fragile]{Come to Poster}
 
 \begin{itemize}
-\item Demos
-\begin{itemize}
-\item Chisel Workflow
-\item C++ Simulator with educational processors
-\item Multicore RISCV on FPGA
-\end{itemize}
+\item Open source plans
+\item Manual, tutorial, and bootcamp
+\item Chisel workflow
+\item More on testing
+\item Educational processors
 \end{itemize}
 
 \end{frame}
 \fi
+
+
 
 \end{document}
