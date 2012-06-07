@@ -60,6 +60,14 @@ class Mem[T <: Data](val n: Int, gen: () => T) extends AccessTracker {
   private def getPathName = component.getPathName + "_" + emitRef
 
   override def emitDef: String = {
+    reads.filter(r => r.used && r.getPortType == "read").foreach { r =>
+      val pairedWrite = writes.find(w => w.used && w.isPossibleRW(r))
+      if (!pairedWrite.isEmpty) {
+        pairedWrite.get.setRW(r)
+        ports -= r
+      }
+    }
+
     val usedports = ports.filter(_.used)
     val portdefs = usedports.zipWithIndex.map { case (p, i) => p.emitPortDef(i) }
 
@@ -127,6 +135,26 @@ class MemWrite[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits, datai: T, w
     inputs += wmaski
   }
 
+  var pairedRead: MemRead[T] = null
+  private def emitRWEnable(r: MemRead[T]) = {
+    def getProducts(x: Node): List[Node] = {
+      if (x.isInstanceOf[Op]) {
+        val op = x.asInstanceOf[Op]
+        if (op.op == "&&")
+          return getProducts(op.inputs(0)) ++ getProducts(op.inputs(1))
+      }
+      List(x)
+    }
+    def isNegOf(x: Node, y: Node) = x.isInstanceOf[Op] && x.asInstanceOf[Op].op == "!" && x.inputs(0) == y
+
+    val wp = getProducts(cond)
+    val rp = getProducts(r.cond)
+    wp.find(wc => rp.exists(rc => isNegOf(rc, wc) || isNegOf(wc, rc)))
+  }
+  def isPossibleRW(r: MemRead[T]) = Component.isEmittingComponents && !emitRWEnable(r).isEmpty && !isRW
+  def isRW = pairedRead != null
+  def setRW(r: MemRead[T]) = pairedRead = r
+
   def data = inputs(2)
   def wmask = inputs(3)
   override def procAssign(src: Node) = {
@@ -148,13 +176,28 @@ class MemWrite[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits, datai: T, w
     res
   }
   override def emitPortDef(idx: Int): String = {
-    "    .A" + idx + "(" + addr.emitRef + "),\n" +
-    "    .CS" + idx + "(" + cond.emitRef + "),\n" +
-    "    .WE" + idx + "(" + cond.emitRef + "),\n" +
-    (if (inputs.length > 3) "    .WBM" + idx + "(" + wmask.emitRef + "),\n" else "") +
+    var we = "1'b1"
+    var a = addr.emitRef
+    var cs = cond.emitRef
+    var res = ""
+
+    if (isRW) {
+      we = emitRWEnable(pairedRead).get.emitRef
+      cs = cs + " || " + pairedRead.cond.emitRef
+      if (addr != pairedRead.addr)
+        a = we + " ? " + a + " : " + pairedRead.addr.emitRef
+      res += "    .O" + idx + "(" + pairedRead.emitTmp + "),\n"
+    }
+    if (inputs.length > 3)
+      res += "    .WBM" + idx + "(" + wmask.emitRef + "),\n"
+
+    res +
+    "    .A" + idx + "(" + a + "),\n" +
+    "    .WE" + idx + "(" + we + "),\n" +
+    "    .CS" + idx + "(" + cs + "),\n" +
     "    .I" + idx + "(" + data.emitRef + ")"
   }
-  override def getPortType: String = if (inputs.length > 3) "mwrite" else "write"
+  override def getPortType: String = (if (inputs.length > 3) "m" else "") + (if (isRW) "rw" else "write")
   override def used = super.used && inputs.length > 2
   override def isRamWriteInput(n: Node) = inputs.contains(n)
 }
