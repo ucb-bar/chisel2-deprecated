@@ -4,29 +4,31 @@ import Chisel._
 
 object Tutorial {
   def main(args: Array[String]): Unit = { 
-    val tut_args = args.slice(1, args.length) ++ Array("--target-dir", "../emulator", "--gen-harness");
+    val userArgs = args.slice(1, args.length) 
+    val dir = if (userArgs.contains("--v")) "../verilog" else "../emulator"
+    val tutArgs = userArgs ++ Array("--target-dir", dir, "--gen-harness");
     val res = 
     args(0) match {
       case "gcd" => 
-        chiselMain(tut_args, () => new GCD())
+        chiselMain(tutArgs, () => new GCD())
       case "combinational" => 
-        chiselMain(tut_args, () => new Combinational())
+        chiselMain(tutArgs, () => new Combinational())
       case "functional" => 
-        chiselMain(tut_args, () => new Functional())
+        chiselMain(tutArgs, () => new Functional())
       case "mux2" => 
-        chiselMain(tut_args, () => new Mux2())
+        chiselMain(tutArgs, () => new Mux2())
       case "sequential" => 
-        chiselMain(tut_args, () => new Sequential())
+        chiselMain(tutArgs, () => new Sequential())
       case "parity" => 
-        chiselMain(tut_args, () => new Parity())
+        chiselMain(tutArgs, () => new Parity())
       case "memo" => 
-        chiselMain(tut_args, () => new Memo())
+        chiselMain(tutArgs, () => new Memo())
       case "filter" => 
-        chiselMain(tut_args, () => new Filter())
+        chiselMain(tutArgs, () => new Filter())
       case "tbl" => 
-        chiselMain(tut_args, () => new Tbl())
+        chiselMain(tutArgs, () => new Tbl())
       case "life" => 
-        chiselMain(tut_args, () => new Life(3))
+        chiselMain(tutArgs, () => new Life(3))
     }
   }
 }

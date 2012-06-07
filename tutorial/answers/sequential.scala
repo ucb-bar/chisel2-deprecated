@@ -9,9 +9,11 @@ class Sequential extends Component {
     val in  = Bool(INPUT)
     val out = UFix(8, OUTPUT)
   }
-  // COUNT INCOMING TRUES 
-  // FILL IN HERE ...
-  io.out := UFix(0)
+  val c = Reg(resetVal = UFix(0, 8))
+  when (io.in) {
+    c := c + UFix(1)
+  }
+  io.out := c
 
   defTests(io) {
     var allGood = true

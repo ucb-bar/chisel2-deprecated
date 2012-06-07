@@ -1284,13 +1284,13 @@ abstract class Component(resetSignal: Bool = null) {
   var testOut: OutputStream = null
   var testInputNodes: Array[Node] = null
   var testNonInputNodes: Array[Node] = null 
-  def test(vars: HashMap[Node, Node]): Boolean = {
-    // println("TESTONE " + testInputNodes.length + " INPUTS " + testNonInputNodes.length + " OUTPUTS")
+  def test(svars: HashMap[Node, Node], ovarsI: HashMap[Node, Node] = null, isTrace: Boolean = true): Boolean = {
+    val ovars = if (ovarsI == null) ovarsI else svars;
     for (n <- testInputNodes) {
-      val v = vars.getOrElse(n, null)
+      val v = svars.getOrElse(n, null)
       val i = if (v == null) BigInt(-1) else v.litValue() // TODO: WARN
       val s = i.toString(16)
-      println(n + " = " + i)
+      if (isTrace) println(n + " = " + i)
       testOut.write(' ')
       for (c <- s)
         testOut.write(c)
@@ -1304,25 +1304,23 @@ abstract class Component(resetSignal: Bool = null) {
       sb.clear()
       def isSpace(c: Int) = c == 0x20 || c == 0x9 || c == 0xD || c == 0xA
       while (isSpace(c)) {
-        // println("SKIPPING CHAR '" + c.toChar + "'")
         c = testIn.read
       }
       while (!isSpace(c)) {
-        // println("READ CHAR '" + c.toChar + "'")
         sb += c.toChar
         c   = testIn.read
       }
       val s = sb.toString
       val rv = toLitVal(s)
-      println("READ " + o + " = " + rv)
-      if (!vars.contains(o)) {
-        vars(o) = Literal(rv)
+      if (isTrace) println("READ " + o + " = " + rv)
+      if (!svars.contains(o)) {
+        ovars(o) = Literal(rv)
       } else {
-        val tv = vars(o).litValue()
-        println(o + " = " + tv)
+        val tv = svars(o).litValue()
+        if (isTrace) println(o + " = " + tv)
         if (tv != rv) {
           isSame = false
-          println("FAILURE")
+          if (isTrace) println("FAILURE")
         }
       }
     }

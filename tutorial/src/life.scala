@@ -63,6 +63,7 @@ class Life(n: Int) extends Component {
         println()
       }
     }
+    // TODO: WRITE REAL TEST SUITE
     allGood
   }
 }
