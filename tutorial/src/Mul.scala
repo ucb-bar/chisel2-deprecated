@@ -13,9 +13,13 @@ class Mul extends Component {
   }
   val muls = new ArrayBuffer[UFix]()
 
-  // fill in to form 4x4 bit multiplication lookup table
+  // -------------------------------- \\
+  // Calculate io.z = io.x * io.y by
+  // building filling out muls
+  // -------------------------------- \\
 
-  io.z := UFix(0)
+
+  // -------------------------------- \\
 }
 
 class MulTests(c: Mul) extends Tester(c, Array(c.io)) {
