@@ -701,7 +701,7 @@ the \code{Mux4} interface.
 
 \section{Running and Testing Examples}
 
-Now that we have defined components, we will discuss how we actually run and test a circuit.  Chisel translates into either \verb@C++@ or Verilog.   In order to build a circuit we need to call \code{chisel\_main}:
+Now that we have defined components, we will discuss how we actually run and test a circuit.  Chisel translates into either \verb@C++@ or Verilog.   In order to build a circuit we need to call \code{chiselMain}:
 
 \begin{scala}
 object tutorial {
@@ -711,56 +711,66 @@ object tutorial {
 }
 \end{scala}
 
-Testing is a crucial part of circuit design.
-Testing can be challenging and thus in Chisel we provide a mechanism for
-testing circuits by providing test inputs and printing out results:
+\begin{figure}
+\begin{center}
+\includegraphics[width=0.45\textwidth]{figs/CUT.pdf}
+\end{center}
+\caption{CUT run under Scala with stdin and stdout connected}
+\label{fig:cut}
+\end{figure}
+ 
+Testing is a crucial part of circuit design, 
+and thus in Chisel we provide a mechanism for
+testing circuits by providing test vectors within Scala using
+the \code{defTests} function defined in the top level component
+definition.
+When \code{--test} is given as an argument to \code{chiselMain}, 
+the Circuit Under Test (CUT) is run as a process under scala with stdin and stdout
+connected so that inputs can be sent to the CUT and outputs can
+received from the CUT as shown in Figure~\ref{fig:cut}.  
+The definition for \code{defTests} is:
+
 \begin{scala}
-object tutorial {
-  def main(args: Array[String]) = {
-    chiselMainTest(args ++ Array("--gen-harness"), 
-                   () => new Mux2())(
-      c => Scanner("%x %x %x", 
-                   c.io.sel, c.io.in0, c.io.in1),
-      c => Printer("%= %= %= %=", 
-                   c.io.sel, c.io.in0, c.io.in1, 
-                   c.io.out))
+def defTests(testNodes: Node*)(body: => Boolean)
+\end{scala}
+
+\noindent
+where \code{testNodes} are the graph nodes that will be input to and
+output from the CUT, and where
+in the body users write calls to \code{test}:
+
+\begin{scala}
+def test(vars: HashMap[Node, Node]): Boolean
+\end{scala}
+
+\noindent
+where \code{vars} is a mapping of test nodes to literals, 
+with assignments to input nodes being sent to the CUT and assignments to
+non-input nodes being interpreted as expected values.
+\code{test} first sends inputs specifed in vars, steps the CUT and then either
+compares expected values from vars or sets vars for test nodes without
+entries in \code{vars}.
+The following is an example for defining tests for \code{Mux2}:
+
+\begin{scala}
+class Mux2 extends Component {
+  ...
+  defTests(io) {
+    var allGood = true
+    val n = pow(2, 3).toInt
+    val vars = new HashMap[Node, Node]()
+    for (s <- 0 until 2) {
+    for (i0 <- 0 until 2) {
+    for (i1 <- 0 until 2) {
+      vars(io.sel) = Bits(s)
+      vars(io.in1) = Bits(i1)
+      vars(io.in0) = Bits(i0)
+      vars(io.out) = Bits(if (s == 1) i1 else i0)
+      allGood = test(vars) && allGood
+    } } }
+    allGood
   }
 }
-\end{scala}
-
-\noindent
-where the first three hex numbers from each line are read in from
-standard input are bound to the \verb+sel+, \verb+in0+,  and
-\verb+in1+ inputs of the multiplexer circuit, and the multiplexer
-inputs and \verb+out+ are printed out in hex format.  
-\begin{commentary}
-Currently, the only supported print format is \verb!"%="!,
-which corresponds to the entire multiword argument in hex format
-(regardless of its size).
-The scanner has no format string argument restrictions, 
-but is currently limited to reading only the low word (e.g., 64 bits
-on 64 bit i86 architecture) of each multiword.
-Currently, scanners and printers are only support with the C++ backend.
-\end{commentary}
-A user can test the multiplexer by creating a test file containing:
-\begin{scala}
-0 0 0 0
-0 0 1 0
-0 1 0 1
-0 1 1 1
-1 0 0 0
-1 0 1 1
-1 1 0 0
-1 1 1 1
-\end{scala}
-
-%TODO: FIX THIS TO REALLY WORK
-\noindent
-and can be compared using a script as follows
-
-\begin{scala}
-cut -f 1,2,3 -d " " < test | mux > test.out
-diff test.out test
 \end{scala}
 
 Other command arguments are as follows:
@@ -1410,7 +1420,7 @@ Chisel warns users if ports have other than exactly one connection to them.
 \subsection{Interface Views}
 
 \begin{figure}
-\centerline{\includegraphics[width=3in]{cpu.png}}
+\centerline{\includegraphics[width=3in]{figs/cpu.png}}
 \caption{Simple CPU involving control and data path subcomponents and host and memory interfaces.}
 \label{fig:cpu}
 \end{figure}
