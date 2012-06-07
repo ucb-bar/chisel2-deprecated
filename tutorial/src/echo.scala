@@ -7,7 +7,7 @@ import java.io.ByteArrayInputStream
 import javax.sound.sampled._
 import scala.collection.mutable.HashMap
 
-class Echo(infile: String, outfile: String) extends Component {
+class Echo(val infile: String, val outfile: String) extends Component {
   val io = new Bundle {
     val in = Bits(8, INPUT)
     val out = Bits(8, OUTPUT)
@@ -29,27 +29,29 @@ class Echo(infile: String, outfile: String) extends Component {
 
   val outUnsigned = out + UFix(128) // convert back to excess-128 format
   io.out := outUnsigned
+}
 
-  defTests(io) {
+class EchoTests(c: Echo) extends Tester(c, Array(c.io)) {  
+  defTests {
     val svars = new HashMap[Node, Node]()
     val ovars = new HashMap[Node, Node]()
 
-    val ais = AudioSystem.getAudioInputStream(new File(infile))
+    val ais = AudioSystem.getAudioInputStream(new File(c.infile))
     if (ais.getFormat.getChannels != 1 || ais.getFormat.getSampleSizeInBits != 8) {
-      println(infile + " must be 8-bit monoaural")
+      println(c.infile + " must be 8-bit monoaural")
       System.exit(-1)
     }
     val out = new EchoOutput(ais.getFormat)
 
     var sample = ais.read
     while (sample != -1) {
-      svars(io.in) = Fix(sample)
-      test(svars, ovars, isTrace = false)
-      out += ovars(io.out).litValue().toByte
+      svars(c.io.in) = Fix(sample)
+      step(svars, ovars, isTrace = false)
+      out += ovars(c.io.out).litValue().toByte
       sample = ais.read
     }
 
-    AudioSystem.write(out, AudioFileFormat.Type.WAVE, new File(outfile));
+    AudioSystem.write(out, AudioFileFormat.Type.WAVE, new File(c.outfile));
     true
   }
 }

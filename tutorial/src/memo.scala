@@ -17,22 +17,25 @@ class Memo extends Component {
 
   // fill in table logic
 
-  defTests(io) {
+}
+
+class MemoTests(c: Memo) extends Tester(c, Array(c.io)) {
+  defTests {
     var allGood = true
     val vars    = new HashMap[Node, Node]()
     def rd(addr: UFix, data: UFix) = {
       vars.clear()
-      vars(io.isRd)   = Bool(true)
-      vars(io.rdAddr) = addr
-      vars(io.rdData) = data
-      test(vars)
+      vars(c.io.isRd)   = Bool(true)
+      vars(c.io.rdAddr) = addr
+      vars(c.io.rdData) = data
+      step(vars)
     }
     def wr(addr: UFix, data: UFix)  = {
       vars.clear()
-      vars(io.isWr)   = Bool(true)
-      vars(io.wrAddr) = addr
-      vars(io.wrData) = data
-      test(vars)
+      vars(c.io.isWr)   = Bool(true)
+      vars(c.io.wrAddr) = addr
+      vars(c.io.wrData) = data
+      step(vars)
     }
     allGood = wr(UFix(0), UFix(1))  && allGood
     allGood = rd(UFix(0), UFix(1))  && allGood

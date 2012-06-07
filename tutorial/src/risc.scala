@@ -49,44 +49,46 @@ class Risc extends Component {
     }
     pc := pc + UFix(1)
   }
-  
-  defTests(io, pc) {
+}
+
+class RiscTests(c: Risc) extends Tester(c, Array(c.io, c.pc)) {  
+  defTests {
     var allGood = true
     val svars = new HashMap[Node, Node]()
     val ovars = new HashMap[Node, Node]()
     def wr(addr: UFix, data: UFix)  = {
       svars.clear()
-      svars(io.isWr)   = Bool(true)
-      svars(io.wrAddr) = addr
-      svars(io.wrData) = data
-      test(svars, ovars)
+      svars(c.io.isWr)   = Bool(true)
+      svars(c.io.wrAddr) = addr
+      svars(c.io.wrData) = data
+      step(svars, ovars)
     }
     def boot()  = {
       svars.clear()
-      svars(io.boot)   = Bool(true)
-      test(svars, ovars)
+      svars(c.io.boot)   = Bool(true)
+      step(svars, ovars)
     }
-    def step()  = {
+    def tick()  = {
       svars.clear()
-      svars(io.boot)   = Bool(false)
-      test(svars, ovars)
+      svars(c.io.boot)   = Bool(false)
+      step(svars, ovars)
     }
     def I (op: Bits, rc: Int, ra: Int, rb: Int) = 
       Cat(op, Bits(rc, 8), Bits(ra, 8), Bits(rb, 8))
-    val app  = Array(I(add_op, 1, 0, 0),
-                     I(add_op, 1, 1, 0),
-                     I(add_op, 2, 0, 0),
-                     I(add_op, 2, 2, 1),
-                     I(add_op, 2, 2, 1),
-                     I(add_op, 0, 2, 0))
+    val app  = Array(I(c.add_op, 1, 0, 0),
+                     I(c.add_op, 1, 1, 0),
+                     I(c.add_op, 2, 0, 0),
+                     I(c.add_op, 2, 2, 1),
+                     I(c.add_op, 2, 2, 1),
+                     I(c.add_op, 0, 2, 0))
     wr(UFix(0), Bits(0)) // skip reset
     for (addr <- 0 until app.length) 
       wr(UFix(addr), app(addr))
     boot()
     do {
-      step()
-    } while (ovars(io.valid).litValue() == 0)
-    allGood = ovars(io.out).litValue() == 2 && allGood
+      tick()
+    } while (ovars(c.io.valid).litValue() == 0)
+    allGood = ovars(c.io.out).litValue() == 2 && allGood
     allGood
   }
 }

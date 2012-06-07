@@ -17,22 +17,6 @@ class Mul extends Component {
       muls += UFix(i * j)
   val tbl = Vec(muls){ UFix(width = 8) }
   io.z := tbl((io.x << UFix(4)) | io.y)
-
-  defTests(io) {
-    var allGood = true
-    val vars    = new HashMap[Node, Node]()
-    val rnd     = new Random()
-    val maxInt  = 1 << 4
-    for (i <- 0 until 10) {
-      val x = rnd.nextInt(maxInt)
-      val y = rnd.nextInt(maxInt)
-      vars(io.x) = UFix(x)
-      vars(io.y) = UFix(y)
-      vars(io.z) = UFix(x * y)
-      allGood = test(vars) && allGood
-    }
-    allGood
-  }
 }
 
 }

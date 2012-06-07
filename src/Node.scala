@@ -443,6 +443,17 @@ abstract class Node extends nameable{
     }
     res.reverse
   }
+  def maybeFlatten: Seq[Node] = {
+    this match {
+      case b: Bundle => 
+        val buf = ArrayBuffer[Node]();
+        for ((n, e) <- b.flatten) buf += e.getNode;
+        buf
+      case o        => 
+        Array[Node](getNode);
+    }
+  }
+
 
 }
 

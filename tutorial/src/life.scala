@@ -23,7 +23,7 @@ class Cell(isBorn: Boolean) extends Component {
   io.out := isAlive
 }
 
-class Life(n: Int) extends Component {
+class Life(val n: Int) extends Component {
   val tot = n*n
   val io = new Bundle {
     val state = Vec(tot){ Bool(OUTPUT) }
@@ -48,17 +48,19 @@ class Life(n: Int) extends Component {
       }
     }
   }
+}
 
-  defTests(io) {
+class LifeTests(c: Life) extends Tester(c, Array(c.io)) {
+  defTests {
     var allGood = true
     val vars    = new HashMap[Node, Node]()
     var tot     = 0
     for (t <- 0 until 16) {
       vars.clear()
-      test(vars)
-      for (j <- 0 until n) {
-        for (i <- 0 until n) {
-          print(vars(io.state(idx(i, j))).litValue())
+      step(vars)
+      for (j <- 0 until c.n) {
+        for (i <- 0 until c.n) {
+          print(vars(c.io.state(c.idx(i, j))).litValue())
         }
         println()
       }

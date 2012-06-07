@@ -16,8 +16,10 @@ class Mul extends Component {
   // fill in to form 4x4 bit multiplication lookup table
 
   io.z := UFix(0)
+}
 
-  defTests(io) {
+class MulTests(c: Mul) extends Tester(c, Array(c.io)) {
+  defTests {
     var allGood = true
     val vars    = new HashMap[Node, Node]()
     val rnd     = new Random()
@@ -25,10 +27,10 @@ class Mul extends Component {
     for (i <- 0 until 10) {
       val x = rnd.nextInt(maxInt)
       val y = rnd.nextInt(maxInt)
-      vars(io.x) = UFix(x)
-      vars(io.y) = UFix(y)
-      vars(io.z) = UFix(x * y)
-      allGood = test(vars) && allGood
+      vars(c.io.x) = UFix(x)
+      vars(c.io.y) = UFix(y)
+      vars(c.io.z) = UFix(x * y)
+      allGood = step(vars) && allGood
     }
     allGood
   }

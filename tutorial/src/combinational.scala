@@ -11,20 +11,22 @@ class Combinational extends Component {
     val z   = UFix(16, OUTPUT)
   }
   io.z := io.x + io.y
+}
 
-  defTests(io) {
+class CombinationalTests(c: Combinational) extends Tester(c, Array(c.io)) {
+  defTests {
     var allGood = true
-    val vars   = new HashMap[Node, Node]()
-    val rnd    = new Random()
-    val maxInt = 1 << 16
+    val vars    = new HashMap[Node, Node]()
+    val rnd     = new Random()
+    val maxInt  = 1 << 16
     for (i <- 0 until 10) {
       vars.clear()
       val x = rnd.nextInt(maxInt)
       val y = rnd.nextInt(maxInt)
-      vars(io.x) = UFix(x)
-      vars(io.y) = UFix(y)
-      vars(io.z) = UFix((x + y)&(maxInt-1))
-      allGood = test(vars) && allGood
+      vars(c.io.x) = UFix(x)
+      vars(c.io.y) = UFix(y)
+      vars(c.io.z) = UFix((x + y)&(maxInt-1))
+      allGood = step(vars) && allGood
     }
     allGood
   }
