@@ -35,6 +35,8 @@ object Tutorial {
         chiselMain(tutArgs, () => new Mul())
       case "echo" => 
         chiselMain(tutArgs, () => new Echo("../src/in.wav", "../out.wav"))
+      case "risc" => 
+        chiselMain(tutArgs, () => new Risc())
     }
   }
 }

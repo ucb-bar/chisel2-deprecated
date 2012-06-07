@@ -24,7 +24,7 @@ class Mux4 extends Component {
   // The first mux is already done for you
   io.out := io.in0 & io.in1 & io.in2 & io.in3 & io.sel
 
-  // ----------------------------------------------------------------------- \\
+  //-------------------------------------------------------------------------\\
 
   defTests(io) {
     var allGood = true

@@ -12,10 +12,11 @@ class Mul extends Component {
     val z   = UFix(8, OUTPUT)
   }
   val muls = new ArrayBuffer[UFix]()
-
-  // fill in to form 4x4 bit multiplication lookup table
-
-  io.z := UFix(0)
+  for (i <- 0 until 16)
+    for (j <- 0 until 16)
+      muls += UFix(i * j)
+  val tbl = Vec(muls){ UFix(width = 8) }
+  io.z := tbl((io.x << UFix(4)) | io.y)
 
   defTests(io) {
     var allGood = true
