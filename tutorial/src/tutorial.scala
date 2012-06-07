@@ -29,6 +29,10 @@ object Tutorial {
         chiselMain(tutArgs, () => new Tbl())
       case "life" => 
         chiselMain(tutArgs, () => new Life(3))
+      case "mul" => 
+        chiselMain(tutArgs, () => new Mul())
+      case "echo" => 
+        chiselMain(tutArgs, () => new Echo("../src/in.wav", "../out.wav"))
     }
   }
 }
