@@ -89,28 +89,6 @@ tutorial/verilog/Makefile  \comment{\# Makefile for verilog products}
 % \end{scala}
 % \end{frame}
 
-\begin{frame}[fragile]{gcd.scala}
-\begin{scala}
-class GCD extends Component {
-  val io = new Bundle {
-    val a     = UFix(16, INPUT)
-    val b     = UFix(16, INPUT)
-    val z     = UFix(16, OUTPUT)
-    val valid = Bool(OUTPUT)
-  }
-  val x  = Reg(resetVal = io.a)
-  val y  = Reg(resetVal = io.b)
-  when (x > y) { 
-    x := x - y 
-  } .otherwise { 
-    y := y - x 
-  }
-  io.z     := x
-  io.valid := y === UFix(0)
-}
-\end{scala}
-\end{frame}
-
 \begin{frame}[fragile]{Scala Functional}
 
 \begin{scala}
