@@ -17,14 +17,16 @@ class Mux2 extends Component {
     var allGood = true
     val n = pow(2, 3).toInt
     val vars = new HashMap[Node, Node]()
-    for (i <- 0 until n) {
-      vars.clear()
-      val k  = Bits(i, width = log2up(n)) 
-      vars(io.sel) = k(0) 
-      vars(io.in1) = k(1) 
-      vars(io.in0) = k(2) 
-      vars(io.out) = Mux(k(0), k(1), k(2)) 
-      allGood = test(vars) && allGood
+    for (s <- 0 until 2) {
+      for (i0 <- 0 until 2) {
+        for (i1 <- 0 until 2) {
+          vars(io.sel) = Bits(s)
+          vars(io.in1) = Bits(i1)
+          vars(io.in0) = Bits(i0)
+          vars(io.out) = Bits(if (s == 1) i1 else i0)
+          allGood = test(vars) && allGood
+        }
+      }
     }
     allGood
   }

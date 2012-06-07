@@ -992,15 +992,15 @@ abstract class Component(resetSignal: Bool = null) {
     }
   }
   def genHarness(base_name: String, name: String) = {
-    val makefile = new java.io.FileWriter(base_name + name + "-makefile");
-    makefile.write("CPPFLAGS = -O2 -I../ -I${CHISEL}/csrc\n\n");
-    makefile.write(name + ": " + name + ".o" + " " + name + "-emulator.o\n");
-    makefile.write("\tg++ -o " + name + " " + name + ".o " + name + "-emulator.o\n\n");
-    makefile.write(name + ".o: " + name + ".cpp " + name + ".h\n");
-    makefile.write("\tg++ -c ${CPPFLAGS} " + name + ".cpp\n\n");
-    makefile.write(name + "emulator.o: " + name + "-emulator.cpp " + name + ".h\n");
-    makefile.write("\tg++ -c ${CPPFLAGS} " + name + "-emulator.cpp\n\n");
-    makefile.close();
+    // val makefile = new java.io.FileWriter(base_name + name + "-makefile");
+    // makefile.write("CPPFLAGS = -O2 -I../ -I${CHISEL}/csrc\n\n");
+    // makefile.write(name + ": " + name + ".o" + " " + name + "-emulator.o\n");
+    // makefile.write("\tg++ -o " + name + " " + name + ".o " + name + "-emulator.o\n\n");
+    // makefile.write(name + ".o: " + name + ".cpp " + name + ".h\n");
+    // makefile.write("\tg++ -c ${CPPFLAGS} " + name + ".cpp\n\n");
+    // makefile.write(name + "emulator.o: " + name + "-emulator.cpp " + name + ".h\n");
+    // makefile.write("\tg++ -c ${CPPFLAGS} " + name + "-emulator.cpp\n\n");
+    // makefile.close();
     val harness  = new java.io.FileWriter(base_name + name + "-emulator.cpp");
     harness.write("#include \"" + name + ".h\"\n");
     harness.write("int main (int argc, char* argv[]) {\n");
@@ -1261,7 +1261,8 @@ abstract class Component(resetSignal: Bool = null) {
     }
   }
   def gcc(flags: String = "-O2"): Unit = {
-    val allFlags = flags + " -I../ -I${CHISEL}/csrc"
+    val chiselENV = java.lang.System.getenv("CHISEL")
+    val allFlags = flags + " -I../ -I" + chiselENV + "/csrc/"
     val dir = targetDir + "/"
     def run(cmd: String) = {
       val c = Process(cmd).!
@@ -1283,13 +1284,13 @@ abstract class Component(resetSignal: Bool = null) {
   var testOut: OutputStream = null
   var testInputNodes: Array[Node] = null
   var testNonInputNodes: Array[Node] = null 
-  def test(vars: HashMap[Node, Node]): Boolean = {
-    // println("TESTONE " + testInputNodes.length + " INPUTS " + testNonInputNodes.length + " OUTPUTS")
+  def test(svars: HashMap[Node, Node], ovarsI: HashMap[Node, Node] = null, isTrace: Boolean = true): Boolean = {
+    val ovars = if (ovarsI == null) svars else ovarsI;
     for (n <- testInputNodes) {
-      val v = vars.getOrElse(n, null)
-      val i = if (v == null) BigInt(-1) else v.litValue() // TODO: WARN
+      val v = svars.getOrElse(n, null)
+      val i = if (v == null) BigInt(0) else v.litValue() // TODO: WARN
       val s = i.toString(16)
-      println(n + " = " + i)
+      if (isTrace) println(n + " = " + i)
       testOut.write(' ')
       for (c <- s)
         testOut.write(c)
@@ -1303,25 +1304,23 @@ abstract class Component(resetSignal: Bool = null) {
       sb.clear()
       def isSpace(c: Int) = c == 0x20 || c == 0x9 || c == 0xD || c == 0xA
       while (isSpace(c)) {
-        // println("SKIPPING CHAR '" + c.toChar + "'")
         c = testIn.read
       }
       while (!isSpace(c)) {
-        // println("READ CHAR '" + c.toChar + "'")
         sb += c.toChar
         c   = testIn.read
       }
       val s = sb.toString
       val rv = toLitVal(s)
-      println("READ " + o + " = " + rv)
-      if (!vars.contains(o)) {
-        vars(o) = Literal(rv)
+      if (isTrace) println("READ " + o + " = " + rv)
+      if (!svars.contains(o)) {
+        ovars(o) = Literal(rv)
       } else {
-        val tv = vars(o).litValue()
-        println(o + " = " + tv)
+        val tv = svars(o).litValue()
+        if (isTrace) println(o + " = " + tv)
         if (tv != rv) {
           isSame = false
-          println("FAILURE")
+          if (isTrace) println("FAILURE")
         }
       }
     }
@@ -1513,7 +1512,7 @@ abstract class Component(resetSignal: Bool = null) {
       res.reverse
     }
     out_c.write("void " + name + "_t::print ( FILE* f ) {\n");
-    if (testNodes != null) {
+    if (isTestingC && testNodes != null) {
       scanArgs.clear();  scanArgs  ++= testInputNodes;    scanFormat  = ""
       printArgs.clear(); printArgs ++= testNonInputNodes; printFormat = ""
     } 

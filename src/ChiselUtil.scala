@@ -141,13 +141,13 @@ object OHToUFix
 }
 
 
-class ioPipe[+T <: Data]()(data: => T) extends Bundle
+class PipeIO[+T <: Data]()(data: => T) extends Bundle
 {
   val valid = Bool(OUTPUT)
   val bits = data.asOutput
 }
 
-class ioDecoupled[+T <: Data]()(data: => T) extends Bundle
+class FIFOIO[+T <: Data]()(data: => T) extends Bundle
 {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
@@ -156,8 +156,8 @@ class ioDecoupled[+T <: Data]()(data: => T) extends Bundle
 
 
 class ioArbiter[T <: Data](n: Int)(data: => T) extends Bundle {
-  val in  = Vec(n) { (new ioDecoupled()) { data } }.flip
-  val out = (new ioDecoupled()) { data }
+  val in  = Vec(n) { (new FIFOIO()) { data } }.flip
+  val out = (new FIFOIO()) { data }
   val chosen = Bits(log2Up(n), OUTPUT)
 }
 

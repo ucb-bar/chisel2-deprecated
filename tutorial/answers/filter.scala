@@ -7,7 +7,7 @@ import scala.util.Random
 
 class LinkIO extends Bundle { 
   val data  = Bits(16, OUTPUT) 
-  val ready = Bool(OUTPUT)
+  val valid = Bool(OUTPUT)
 }
 
 class FilterIO extends Bundle { 
@@ -18,8 +18,8 @@ class FilterIO extends Bundle {
 class Filter extends Component { 
   val io  = new FilterIO()
 
-  io.out.ready := io.in.ready
   io.out.data  := io.in.data
+  io.out.valid := io.in.valid & (io.in.data&Bits(1))
 
   defTests(io) {
     var allGood = true

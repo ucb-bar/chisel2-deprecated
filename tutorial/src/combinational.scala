@@ -14,8 +14,8 @@ class Combinational extends Component {
 
   defTests(io) {
     var allGood = true
-    val vars = new HashMap[Node, Node]()
-    val rnd = new Random()
+    val vars   = new HashMap[Node, Node]()
+    val rnd    = new Random()
     val maxInt = 1 << 16
     for (i <- 0 until 10) {
       vars.clear()

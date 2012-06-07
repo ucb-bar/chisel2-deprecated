@@ -60,21 +60,25 @@ EECS Department, UC Berkeley\\
 
 \section{Introduction}
 
-This document is a manual for {\em Chisel} (Constructing
-Hardware In a Scala Embedded Language).  Chisel is a hardware
-construction language embedded in the high-level programming language
-Scala.  Chisel is really only a set of special class
-definitions, predefined objects, and usage conventions within Scala,
-so when you write a Chisel program you are actually writing a Scala
-program.  For this manual we presume that you
-understand the basics of Scala.  
-We recommend you consult one of the excellent
-Scala books (\cite{programming-scala}, \cite{programming-in-scala}) before reading this manual.
+This document is a manual for {\em Chisel} (Constructing Hardware In a
+Scala Embedded Language).  Chisel is a hardware construction language
+embedded in the high-level programming language Scala.  A separate
+Chisel tutorial document provides a gentle introduction to using
+Chisel, and should be read first.  This manual provides a
+comprehensive overview and specification of the Chisel language, which
+is really only a set of special class definitions, predefined objects,
+and usage conventions within Scala.  When you write a Chisel program
+you are actually writing a Scala program.  In this manual, we presume
+that you already understand the basics of Scala.  If you are
+unfamiliar with Scala, we recommend you consult one of the excellent
+Scala books (\cite{programming-scala}, \cite{programming-in-scala}).
 
 \section{Nodes}
 
-Chisel user code creates a graph of nodes which Chisel then translates
-into Verilog or C++ code.  Nodes are defined as follows:
+Any hardware design in Chisel is ultimately represented by a graph of
+node objects.  User code in Chisel generate this graph of nodes, which
+is then passed to the Chisel backends to be translated into Verilog or
+C++ code.  Nodes are defined as follows:
 
 \begin{scala}
 class Node {
@@ -100,7 +104,7 @@ class Node {
 \end{scala}
 
 
-The topmost node class hierarchy is shown in
+The uppermost levels of the node class hierarchy are shown in
 Figure~\ref{fig:node-hierarchy}.  The basic categories are:
 
 \begin{description}
@@ -132,7 +136,7 @@ class Lit extends Node {
 
 \noindent
 Raw literals contain a collection of bits.  
-Users do not create raw lits directly, but instead use type
+Users do not create raw literals directly, but instead use type
 constructors defined in Section~\ref{sec:types}.
 
 % Constant or literal values are expressed using Scala integers or strings passed to constructors for the types:
@@ -156,27 +160,30 @@ Ops compute a combinational function of their inputs.
 \section{Types}
 \label{sec:types}
 
-A Chisel graph contains raw and type nodes.  Type nodes are
-interspersed between raw nodes and allow Chisel code to
-check and respond to Chisel types.  Type nodes are erased before
-emission to C++ and Verilog.  \code{Data} is the top most type node
-and Figure~\ref{fig:type-hierarchy} shows the built in type hierarchy.
+A Chisel graph representing a hardware design contains {\em raw} and
+{\em type} nodes.  The Chisel type system is maintained separately
+from the underlying Scala type system, and so type nodes are
+interspersed between raw nodes to allow Chisel to check and respond to
+Chisel types.  Chisel type nodes are erased before the hardware design
+is translated into C++ or Verilog.  The \code{getRawNode} operator
+defined in the base Node class, skips type nodes and returns the first
+raw node found.  Figure~\ref{fig:type-hierarchy} shows the built-in
+Chisel type hierarchy, with \code{Data} as the topmost node.
 
 \begin{figure}[h]
 \centering
 \includegraphics[height=2.5in]{figs/type-hierarchy.pdf}
-\caption{Type hierarchy.}
+\caption{Chisel type hierarchy.}
 \label{fig:type-hierarchy}
 \end{figure}
 
 \noindent
-Builtin scalar types include \code{Bits}, \code{Bool}, \code{Fix}, and
-\code{UFix} and builtin aggregate types \code{Bundle} and \code{Vec}
-are classes that allow the user to expand
-the set of Chisel datatypes with collections of other types.
+Built-in scalar types include \code{Bits}, \code{Bool}, \code{Fix},
+and \code{UFix} and built-in aggregate types \code{Bundle} and
+\code{Vec} allow the user to expand the set of Chisel datatypes with
+collections of other types.
 
 \code{Data} itself is a node:
-
 \begin{scala}
 abstract class Data extends Node {
   override def clone(): this.type =
@@ -203,13 +210,12 @@ abstract class Data extends Node {
   def <>(t: Data)
 }
 \end{scala}
-
 \noindent
-with methods for converting between types and 
-delegating port methods to its single input.   
-We will discuss ports in Section~\ref{sec:ports}.
-Finally, users can override the \code{clone} method in their own type nodes (e.g., bundles) in
-order to reflect construction parameters that are necessary for cloning.
+The Data class has methods for converting between types and for
+delegating port methods to its single input.  We will discuss ports in
+Section~\ref{sec:ports}.  Finally, users can override the \code{clone}
+method in their own type nodes (e.g., bundles) in order to reflect
+construction parameters that are necessary for cloning.
 
 Data nodes can be used for four purposes:
 
@@ -218,8 +224,9 @@ Data nodes can be used for four purposes:
   specifying at minimum bitwidth (described in this section), 
 \item {\bf wires} -- \kode{UFix(width = 8)} -- serve as forward declarations of data allowing future
   conditional updates (described in Section~\ref{sec:wires}), 
-\item {\bf ports} -- \kode{UFix(width = 8, dir = OUTPUT)} -- are specialized wires defining component interfaces
-  additionally specifying direction (described in
+\item {\bf ports} -- \kode{UFix(width = 8, dir = OUTPUT)} -- are
+  specialized wires defining component interfaces, and
+  additionally specify direction (described in
   Section~\ref{sec:ports}), and
 \item{\bf literals} -- \kode{UFix(1)} or \kode{UFix(1, 8)} -- can be constructed using type object
 constructors specifying their value and optional width.
@@ -227,7 +234,8 @@ constructors specifying their value and optional width.
 
 \subsection{Bits}
 
-In Chisel, a raw collection of bits is represented by the \code{Bits} type defined as follows:
+In Chisel, a raw collection of bits is represented by the \code{Bits}
+type defined as follows:
 
 \begin{scala}
 object Bits {
@@ -281,10 +289,10 @@ def Cat[T <: Data](elt: T, elts: T*): Bits
 \end{scala}
 
 \noindent
-with methods for simple bit operations.  
-N.B., that \code{\#\#} is binary
-concatenation, \code{Cat} is an nary concatentation,
-and in order to not collide with Scala's builtin \code{==},
+Bits has methods for simple bit operations.  
+Note that \code{\#\#} is binary
+concatenation, while \code{Cat} is an n-ary concatentation.
+To avoid colliding with Scala's builtin \code{==},
 Chisel's bitwise comparison is named \code{===}.
 
 A field of width \code{n} can be created from a single bit using \code{Fill}:
@@ -314,8 +322,8 @@ Bits("b1010") // binary 4-bit lit from string.
 producing a \code{Lit} as shown in the
 leftmost subfigure of Figure~\ref{fig:bits-expressions}.
 
-Operations produce an actual operator node and a type node combining the input type nodes.
-See Figure~\ref{fig:bits-expressions} for
+Operations return an actual operator node with a type node combining
+the input type nodes.  See Figure~\ref{fig:bits-expressions} for
 successively more complicated examples.
 
 \begin{figure*}
@@ -333,9 +341,6 @@ successively more complicated examples.
 \label{fig:bits-expressions}
 \end{figure*}
 
-\noindent
-The \code{getRawNode} operator skips type nodes returning the first
-found raw node.
 
 \subsection{Bools}
 
@@ -430,10 +435,10 @@ class Bundle extends Data {
 \end{scala}
 
 \noindent
-A user can get the name and type corresponding to each element in a
-Bundle with the \code{elements} method and recursively using the
-\code{leaves} method. 
-Users can define their own by subclassing \code{Bundle} as follows:
+The name and type of each element in a Bundle can be obtained with the
+\code{elements} method, and recursively using the \code{leaves}
+method.  Users can define their own by subclassing \code{Bundle} as
+follows:
 
 \begin{scala}
 class MyFloat extends Bundle {
