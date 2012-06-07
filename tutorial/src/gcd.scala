@@ -16,19 +16,21 @@ class GCD extends Component {
   unless (x > y) { y := y - x }
   io.z := x
   io.v := y === UFix(0)
+}
 
-  defTests(io) {
+class GCDTests(c: GCD) extends Tester(c, Array(c.io)) {
+  defTests {
     val (a, b, z) = (64, 48, 16)
     val vars = new HashMap[Node, Node]()
     var t = 0
     do {
       vars.clear()
-      vars(io.a) = UFix(a)
-      vars(io.b) = UFix(b)
-      test(vars)
+      vars(c.io.a) = UFix(a)
+      vars(c.io.b) = UFix(b)
+      step(vars)
       t += 1
-    } while (t <= 1 || vars(io.v).litValue() == 0)
-    vars(io.z).litValue() == z
+    } while (t <= 1 || vars(c.io.v).litValue() == 0)
+    vars(c.io.z).litValue() == z
   }
 }
 

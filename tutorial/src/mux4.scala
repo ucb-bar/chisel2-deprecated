@@ -25,8 +25,10 @@ class Mux4 extends Component {
   io.out := io.in0 & io.in1 & io.in2 & io.in3 & io.sel
 
   //-------------------------------------------------------------------------\\
+}
 
-  defTests(io) {
+class Mux4Tests(c: Mux4) extends Tester(c, Array(c.io)) {  
+  defTests {
     var allGood = true
     val vars = new HashMap[Node, Node]()
     
@@ -37,19 +39,19 @@ class Mux4 extends Component {
             for(i2 <- 0 until 2) {
               for(i3 <- 0 until 2) {
                 vars.clear()
-                vars(io.sel) = Bits(s1 << 1 | s0)
-                vars(io.in0) = Bits(i0)
-                vars(io.in1) = Bits(i1)
-                vars(io.in2) = Bits(i2)
-                vars(io.in3) = Bits(i3)
+                vars(c.io.sel) = Bits(s1 << 1 | s0)
+                vars(c.io.in0) = Bits(i0)
+                vars(c.io.in1) = Bits(i1)
+                vars(c.io.in2) = Bits(i2)
+                vars(c.io.in3) = Bits(i3)
                 
-                vars(io.out) = 
+                vars(c.io.out) = 
                   if(s1 == 1) { 
                     if (s0 == 1) Bits(i3) else Bits(i2) 
                   } else { 
                     if (s0 == 1) Bits(i1) else Bits(i0) 
                   }
-                allGood = test(vars) && allGood
+                allGood = step(vars) && allGood
               }
             }
           }

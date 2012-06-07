@@ -12,19 +12,21 @@ class Mux2 extends Component {
     val out = Bits(width = 1, dir = OUTPUT)
   }
   io.out := (io.sel & io.in1) | (~io.sel & io.in0)
-  
-  defTests(io) {
+}
+
+class Mux2Tests(c: Mux2) extends Tester(c, Array(c.io)) {  
+  defTests {
     var allGood = true
     val n = pow(2, 3).toInt
     val vars = new HashMap[Node, Node]()
     for (s <- 0 until 2) {
       for (i0 <- 0 until 2) {
         for (i1 <- 0 until 2) {
-          vars(io.sel) = Bits(s)
-          vars(io.in1) = Bits(i1)
-          vars(io.in0) = Bits(i0)
-          vars(io.out) = Bits(if (s == 1) i1 else i0)
-          allGood = test(vars) && allGood
+          vars(c.io.sel) = Bits(s)
+          vars(c.io.in1) = Bits(i1)
+          vars(c.io.in0) = Bits(i0)
+          vars(c.io.out) = Bits(if (s == 1) i1 else i0)
+          allGood = step(vars) && allGood
         }
       }
     }

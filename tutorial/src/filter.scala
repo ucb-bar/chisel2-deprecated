@@ -20,22 +20,24 @@ class Filter extends Component {
 
   io.out.ready := io.in.ready
   io.out.data  := io.in.data
+}
 
-  defTests(io) {
+class FilterTests(c: Filter) extends Tester(c, Array(c.io)) {
+  defTests {
     var allGood = true
     val vars    = new HashMap[Node, Node]()
     val rnd     = new Random()
     val maxInt  = 1 << 16
     for (i <- 0 until 10) {
       vars.clear()
-      val in              = rnd.nextInt(maxInt)
-      vars(io.in.ready)   = Bool(true)
-      vars(io.in.data)    = UFix(in)
-      val isOdd           = (in&1)!=0
-      vars(io.out.ready)  = Bool(isOdd)
+      val in                = rnd.nextInt(maxInt)
+      vars(c.io.in.ready)   = Bool(true)
+      vars(c.io.in.data)    = UFix(in)
+      val isOdd             = (in&1)!=0
+      vars(c.io.out.ready)  = Bool(isOdd)
       if (isOdd)
-        vars(io.out.data) = UFix(in)
-      allGood             = test(vars) && allGood
+        vars(c.io.out.data) = UFix(in)
+      allGood               = step(vars) && allGood
     }
     allGood
   }  

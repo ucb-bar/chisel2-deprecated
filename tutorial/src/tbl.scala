@@ -11,17 +11,19 @@ class Tbl extends Component {
   }
   val r = Vec(Range(0, 256).map(UFix(_))){ UFix(width = 8) }
   io.out := r(io.addr)
+}
 
-  defTests(io) {
+class TblTests(c: Tbl) extends Tester(c, Array(c.io)) {  
+  defTests {
     var allGood = true
     val vars    = new HashMap[Node, Node]()
     val rnd     = new Random()
     for (t <- 0 until 16) {
       vars.clear()
-      val addr      = rnd.nextInt(256)
-      vars(io.addr) = UFix(addr)
-      vars(io.out)  = UFix(addr)
-      allGood       = test(vars) && allGood
+      val addr        = rnd.nextInt(256)
+      vars(c.io.addr) = UFix(addr)
+      vars(c.io.out)  = UFix(addr)
+      allGood         = step(vars) && allGood
     }
     allGood
   }

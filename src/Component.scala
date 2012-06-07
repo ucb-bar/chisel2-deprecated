@@ -41,7 +41,7 @@ object Component {
   var scanArgs: ArrayBuffer[Node] = null;
   var printFormat = "";
   var printArgs: ArrayBuffer[Node] = null;
-  var testNodes: Array[Node] = null;
+  var tester: Tester[Component] = null;
   var includeArgs: List[String] = Nil;
   var targetDir: String = null
   var configStr: String = null;
@@ -83,6 +83,8 @@ object Component {
   // TODO: MAYBE CHANGE NAME TO INITCOMPONENT??
   // TODO: ADD INIT OF TOP LEVEL NODE STATE
   // TODO: BETTER YET MOVE ALL TOP LEVEL STATE FROM NODE TO COMPONENT
+  def defTests(nodes: Node*)(body: => Boolean) = {
+  }
   def initChisel () = {
     saveWidthWarnings = false
     saveConnectionWarnings = false
@@ -102,7 +104,7 @@ object Component {
     scanArgs = new ArrayBuffer[Node]();
     printFormat = "";
     printArgs = new ArrayBuffer[Node]();
-    testNodes = null;
+    tester = null;
     isCoercingArgs = true;
     targetDir = "."
     configStr = "";
@@ -983,14 +985,6 @@ abstract class Component(resetSignal: Bool = null) {
   }
   def elaborate(fake: Int = 0) = {}
   def postMarkNet(fake: Int = 0) = {}
-  def splitFlattenNodes(args: Seq[Node]): (Seq[Node], Seq[Node]) = {
-    if (args.length == 0) {
-      (Array[Node](), Array[Node]())
-    } else {
-      val testNodes = args.map(maybeFlatten).reduceLeft(_ ++ _).map(x => x.getNode);
-      (keepInputs(testNodes), removeInputs(testNodes))
-    }
-  }
   def genHarness(base_name: String, name: String) = {
     // val makefile = new java.io.FileWriter(base_name + name + "-makefile");
     // makefile.write("CPPFLAGS = -O2 -I../ -I${CHISEL}/csrc\n\n");
@@ -1172,22 +1166,6 @@ abstract class Component(resetSignal: Bool = null) {
     if(containsCombPath) throw new Exception("CIRCUIT CONTAINS COMBINATIONAL PATH")
     println("NO COMBINATIONAL LOOP FOUND")
   }
-  def maybeFlatten(node: Node): Seq[Node] = {
-    node match {
-      case b:Bundle => 
-        val buf = ArrayBuffer[Node]();
-        for ((n, e) <- b.flatten) buf += e.getNode;
-        buf
-      case o        => 
-        Array[Node](node.getNode);
-    }
-  }
-  def isInput(node: Node) = 
-    node match { case b:Bits => b.dir == INPUT; case o => false }
-  def keepInputs(nodes: Seq[Node]): Seq[Node] = 
-    nodes.filter(isInput)
-  def removeInputs(nodes: Seq[Node]): Seq[Node] = 
-    nodes.filter(n => !isInput(n))
   def findCombinationalBlock(reg: Reg): AbstractFunction = {
     val traced = new HashSet[Node];
     val outsTraced = new HashMap[Node, BitSet];
@@ -1260,6 +1238,12 @@ abstract class Component(resetSignal: Bool = null) {
       }
     }
   }
+  def isInput(node: Node) = 
+    node match { case b:Bits => b.dir == INPUT; case o => false }
+  def keepInputs(nodes: Seq[Node]): Seq[Node] = 
+    nodes.filter(isInput)
+  def removeInputs(nodes: Seq[Node]): Seq[Node] = 
+    nodes.filter(n => !isInput(n))
   def gcc(flags: String = "-O2"): Unit = {
     val chiselENV = java.lang.System.getenv("CHISEL")
     val allFlags = flags + " -I../ -I" + chiselENV + "/csrc/"
@@ -1279,85 +1263,6 @@ abstract class Component(resetSignal: Bool = null) {
     cc(name + "-emulator")
     cc(name)
     link(name)
-  }
-  var testIn: InputStream = null
-  var testOut: OutputStream = null
-  var testInputNodes: Array[Node] = null
-  var testNonInputNodes: Array[Node] = null 
-  def test(svars: HashMap[Node, Node], ovarsI: HashMap[Node, Node] = null, isTrace: Boolean = true): Boolean = {
-    val ovars = if (ovarsI == null) svars else ovarsI;
-    for (n <- testInputNodes) {
-      val v = svars.getOrElse(n, null)
-      val i = if (v == null) BigInt(0) else v.litValue() // TODO: WARN
-      val s = i.toString(16)
-      if (isTrace) println(n + " = " + i)
-      testOut.write(' ')
-      for (c <- s)
-        testOut.write(c)
-      testOut.write('\n')
-      testOut.flush
-    }
-    var isSame = true
-    var c = testIn.read
-    val sb = new StringBuilder()
-    for (o <- testNonInputNodes) {
-      sb.clear()
-      def isSpace(c: Int) = c == 0x20 || c == 0x9 || c == 0xD || c == 0xA
-      while (isSpace(c)) {
-        c = testIn.read
-      }
-      while (!isSpace(c)) {
-        sb += c.toChar
-        c   = testIn.read
-      }
-      val s = sb.toString
-      val rv = toLitVal(s)
-      if (isTrace) println("READ " + o + " = " + rv)
-      if (!svars.contains(o)) {
-        ovars(o) = Literal(rv)
-      } else {
-        val tv = svars(o).litValue()
-        if (isTrace) println(o + " = " + tv)
-        if (tv != rv) {
-          isSame = false
-          if (isTrace) println("FAILURE")
-        }
-      }
-    }
-    isSame
-  }
-  def startTest: Process = {
-    val cmd = targetDir + "/" + name
-    val process = Process(cmd)
-    val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => err.close())
-    val p = process.run(pio) 
-    println("STARTING " + cmd)
-    p
-  }
-  def endTest(p: Process) = {
-    testOut.close()
-    testIn.close()
-    p.destroy()
-  }
-  def withTesting(body: => Boolean): Boolean = {
-    var res = false
-    var p: Process = null
-    try {
-      p = startTest
-      res = body
-    } finally {
-      if (p != null) endTest(p)
-    }
-    println(if (res) "PASSED" else "FAILED")
-    res
-  }
-  var tests: () => Boolean = () => { println("DEFAULT TESTS"); true }
-  var testVars: Array[Node] = null
-  def defTests(nodes: Node*)(body: => Boolean) = {
-    testNodes = nodes.toArray
-    val (ins, outs) = splitFlattenNodes(testNodes)
-    testInputNodes = ins.toArray; testNonInputNodes = outs.toArray
-    tests = () => withTesting { body }
   }
   def compileC(): Unit = {
     components.foreach(_.elaborate(0));
@@ -1512,9 +1417,9 @@ abstract class Component(resetSignal: Bool = null) {
       res.reverse
     }
     out_c.write("void " + name + "_t::print ( FILE* f ) {\n");
-    if (isTestingC && testNodes != null) {
-      scanArgs.clear();  scanArgs  ++= testInputNodes;    scanFormat  = ""
-      printArgs.clear(); printArgs ++= testNonInputNodes; printFormat = ""
+    if (isTestingC && tester != null) {
+      scanArgs.clear();  scanArgs  ++= tester.testInputNodes;    scanFormat  = ""
+      printArgs.clear(); printArgs ++= tester.testNonInputNodes; printFormat = ""
     } 
     if (printArgs.length > 0) {
       val format =
@@ -1524,7 +1429,7 @@ abstract class Component(resetSignal: Bool = null) {
       var i = 0;
       for (tok <- toks) {
         if (tok(0) == '%') {
-          val nodes = maybeFlatten(printArgs(i))
+          val nodes = printArgs(i).maybeFlatten
           for (j <- 0 until nodes.length) 
             out_c.write("  fprintf(f, \"" + (if (j > 0) " " else "") + 
                         "%s\", TO_CSTR(" + nodes(j).emitRef + "));\n");
@@ -1548,7 +1453,7 @@ abstract class Component(resetSignal: Bool = null) {
       var i = 0;
       for (tok <- toks) {
         if (tok(0) == '%') {
-          val nodes = keepInputs(maybeFlatten(scanArgs(i)))
+          val nodes = keepInputs(scanArgs(i).maybeFlatten)
           for (j <- 0 until nodes.length) 
             out_c.write("  str_to_dat(read_tok(f), " + nodes(j).emitRef + ");\n");
           i += 1;
