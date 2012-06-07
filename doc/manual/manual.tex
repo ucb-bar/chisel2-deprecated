@@ -847,132 +847,150 @@ which when run creates a C++ files named
 the directory specified with
 \code{--target-dir {\it dir\_name}} argument.
 
+% \begin{scala}
+% class TestIO
+%   (val format: String, val args: Seq[Data] = null)
+% 
+% class Scanner extends TestIO
+% 
+% class Printer extends TestIO
+% 
+% object chiselMainDebug {
+%   def apply[T <: Component]
+%     (args: Array[String], comp: () => T)(
+%      scanner: T => TestIO, 
+%      printer: T => TestIO)
+% }
+% \end{scala}
+% 
+% \noindent
+% 
+% We can use the \code{chiselMainDebug} call and \code{TestIO} objects as follows:
+% 
+% \begin{scala}
+% object tutorial {
+%   def main(args: Array[String]) = {
+%     val dargs = args ++ Array("--gen-harness")
+%     chiselMainDebug(dargs, () => new Mux2())(
+%       c => Scanner("%x %x %x",
+%                    c.io.sel, c.io.in0, c.io.in1),
+%       c => Printer("%x %x %x %x", 
+%                    c.io.sel, c.io.in0, c.io.in1, 
+%                    c.io.out))
+%   }
+% }
+% \end{scala}
+% 
+% \noindent
+% where the first three hex numbers from each line are read in from
+% standard input and bound to the \code{sel}, \code{in0},  and
+% \code{in1} inputs of the multiplexer circuit, and the multiplexer
+% inputs and \code{out} are printed out in hex format.  
+% 
+% Alternatively, a user can specify the scanned inputs and printed
+% outputs using aggregate data and one format directive per aggregate.  
+% For example, the following accomplishes the same scanning / printing
+% as above:
+% 
+% \begin{scala}
+% object tutorial {
+%   def main(args: Array[String]) = {
+%     val dargs = args ++ Array("--gen-harness")
+%     chiselMainDebug(dargs, () => new Mux2())(
+%       c => Scanner("%x", c.io),
+%       c => Printer("%x", c.io)
+%   }
+% }
+% \end{scala}
+%  
+% Using \code{--generate-harness} for \code{Mux2}
+% creates a \code{Mux2-emulator.cpp}  and \code{Mux2-makefile} in directory
+% specified by \code{--target-dir}.  The user can then compile it using:
+% 
+% \begin{scala}
+% make -f Mux2-makefile
+% \end{scala}
+% 
+% \noindent
+% 
+% A user can test the multiplexer by creating a test file called
+% \code{test.out} containing:
+% \begin{scala}
+% 0 0 0 0
+% 0 0 1 0
+% 0 1 0 1
+% 0 1 1 1
+% 1 0 0 0
+% 1 0 1 1
+% 1 1 0 0
+% 1 1 1 1
+% \end{scala}
+% 
+% \noindent
+% and can be compared using a script as follows
+% 
+% \begin{scala}
+% cut -f 1,2,3 -d " " < test | Mux2 > test.out
+% diff test.out test
+% \end{scala}
+ 
+\begin{figure}
+\begin{center}
+\includegraphics[width=0.45\textwidth]{../tutorial/CUT.pdf}
+\end{center}
+\caption{CUT run under Scala with stdin and stdout connected}
+\label{fig:cut}
+\end{figure}
+ 
 Testing is a crucial part of circuit design, 
 and thus in Chisel we provide a mechanism for
-testing circuits by providing test inputs and printing out results
-in order to specify Input / Output on a constructed circuit as follows:
+testing circuits by providing test vectors within Scala using
+the \code{defTests} function defined in the top level component
+definition.
+When \code{--test} is given as an argument to \code{chiselMain}, 
+the Circuit Under Test (CUT) is run as a process under scala with stdin and stdout
+connected so that inputs can be sent to the CUT and outputs can
+received from the CUT as shown in Figure~\ref{fig:cut}.  
+The definition for \code{defTests} is:
 
 \begin{scala}
-class TestIO
-  (val format: String, val args: Seq[Data] = null)
-
-class Scanner extends TestIO
-
-class Printer extends TestIO
-
-object chiselMainDebug {
-  def apply[T <: Component]
-    (args: Array[String], comp: () => T)(
-     scanner: T => TestIO, 
-     printer: T => TestIO)
-}
+def defTests(testNodes: Node*)(body: => Boolean)
 \end{scala}
 
 \noindent
-
-We can use the \code{chiselMainDebug} call and \code{TestIO} objects as follows:
+where \code{testNodes} are the graph nodes that will be input to and
+output from the CUT, and where
+in the body users write calls to \code{test}:
 
 \begin{scala}
-object tutorial {
-  def main(args: Array[String]) = {
-    val dargs = args ++ Array("--gen-harness")
-    chiselMainDebug(dargs, () => new Mux2())(
-      c => Scanner("%x %x %x",
-                   c.io.sel, c.io.in0, c.io.in1),
-      c => Printer("%x %x %x %x", 
-                   c.io.sel, c.io.in0, c.io.in1, 
-                   c.io.out))
-  }
-}
+def test(vars: HashMap[Node, Node]): Boolean
 \end{scala}
 
 \noindent
-where the first three hex numbers from each line are read in from
-standard input and bound to the \code{sel}, \code{in0},  and
-\code{in1} inputs of the multiplexer circuit, and the multiplexer
-inputs and \code{out} are printed out in hex format.  
+where \code{vars} is a mapping of test nodes to literals, 
+with assignments to input nodes being sent to the CUT and assignments to
+non-input nodes being interpreted as expected values.
+\code{test} first sends inputs specifed in vars, steps the CUT and then either
+compares expected values from vars or sets vars for test nodes without
+entries in \code{vars}.
+The following is an example for defining tests for \code{Mux2}:
 
-Alternatively, a user can specify the scanned inputs and printed
-outputs using aggregate data and one format directive per aggregate.  
-For example, the following accomplishes the same scanning / printing
-as above:
-
-\begin{scala}
-object tutorial {
-  def main(args: Array[String]) = {
-    val dargs = args ++ Array("--gen-harness")
-    chiselMainDebug(dargs, () => new Mux2())(
-      c => Scanner("%x", c.io),
-      c => Printer("%x", c.io)
-  }
-}
-\end{scala}
- 
-Using \code{--generate-harness} for \code{Mux2}
-creates a \code{Mux2-emulator.cpp}  and \code{Mux2-makefile} in directory
-specified by \code{--target-dir}.  The user can then compile it using:
-
-\begin{scala}
-make -f Mux2-makefile
-\end{scala}
-
-\noindent
-
-A user can test the multiplexer by creating a test file called
-\code{test.out} containing:
-\begin{scala}
-0 0 0 0
-0 0 1 0
-0 1 0 1
-0 1 1 1
-1 0 0 0
-1 0 1 1
-1 1 0 0
-1 1 1 1
-\end{scala}
-
-\noindent
-and can be compared using a script as follows
-
-\begin{scala}
-cut -f 1,2,3 -d " " < test | Mux2 > test.out
-diff test.out test
-\end{scala}
- 
-Yet another way to test circuits is with the \code{chiselMainTest}
-function by directly supplying test vectors in a Chisel program:
-
-\begin{scala}
-object chiselMainTest {
-  def apply[T <: Component]
-    (args: Array[String], comp: () => T)
-}
-\end{scala}
-
-\noindent
-where the test vector bindings are the component's interface.
-\code{chiselMainTest} generates code that scans test vectors one at a
-time, binding interface inputs,  running the circuit, and printing the outputs.
-Users write tests using \code{defTests} by creating test
-vectors by creating a bundle and assigning literal inputs and expected
-outputs to it as follows:
 \begin{scala}
 class Mux2 extends Component {
- ...
-
- defTests(io) {  
+  ...
+  defTests(io) {
     var allGood = true
     val n = pow(2, 3).toInt
-    val vars = new Map[Node, Data]()
-    for (i <- 0 until n) {
-      vars.clear()
-      val k  = Bits(i, width = sizeof(n)) 
-      vars(io.sel) = k(0) 
-      vars(io.in0) = k(1) 
-      vars(io.in1) = k(2) 
-      vars(io.out) = Mux(k(0), k(1), k(2)) 
+    val vars = new HashMap[Node, Node]()
+    for (s <- 0 until 2) {
+    for (i0 <- 0 until 2) {
+    for (i1 <- 0 until 2) {
+      vars(io.sel) = Bits(s)
+      vars(io.in1) = Bits(i1)
+      vars(io.in0) = Bits(i0)
+      vars(io.out) = Bits(if (s == 1) i1 else i0)
       allGood = test(vars) && allGood
-    }
+    } } }
     allGood
   }
 }
@@ -1007,9 +1025,11 @@ Finally, command arguments for \code{chiselMain*} are as follows: \\
 \begin{tabular}{lll}
 \code{--target-dir} & target pathname prefix \\
 \code{--gen-harness} & generate harness file for C++ \\
+\code{--debug} & put all wires in C++ class file \\
+\code{--compile} & compiles generated C++ \\
+\code{--test} & runs tests using C++ app \\
 \code{--v} & generate verilog \\
 \code{--vcd} & enable vcd dumping \\
-\code{--debug} & put all wires in class file \\
 \end{tabular}
 
 
