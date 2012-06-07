@@ -10,19 +10,11 @@ class Accumulator extends Component {
     val in  = Bool(INPUT)
     val out = UFix(width = 8, dir = OUTPUT)
   }
-
-  // ----------------------------------------------- \\
-  // Count incoming trues
-  // Shouldn't need more than 3 lines of code
-  // ----------------------------------------------- \\
-
-
-
-
-
-  // ----------------------------------------------- \\
-
-
+  // COUNT INCOMING TRUES 
+  // FILL IN HERE ...
+  val accumulator = Reg(resetVal = UFix(0, 8))
+  accumulator := accumulator + io.in
+  io.out := accumulator
 }
 
 class AccumulatorTests(c: Accumulator) extends Tester(c, Array(c.io)) {  

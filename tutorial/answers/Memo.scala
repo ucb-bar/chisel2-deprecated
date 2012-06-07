@@ -21,6 +21,12 @@ class Memo extends Component {
   // reading the mem at rdAddr
   // --------------------------------------------------- \\
 
+  // write
+  when (io.wen) { mem(io.wrAddr) := io.wrData }
+  
+  // read
+  io.rdData := UFix(0)
+  when (io.ren) { io.rdData := mem(io.rdAddr) }
 
   // --------------------------------------------------- \\
 
