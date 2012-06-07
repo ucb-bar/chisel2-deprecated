@@ -551,7 +551,6 @@ sbt "project tutorial" "run combinational --compile"
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
 package Tutorial {
-
 import Chisel._
 import scala.collection.mutable.HashMap
 import scala.util.Random
@@ -560,48 +559,53 @@ class Combinational extends Component {
   val io = new Bundle {
     val x = UFix(16, INPUT)
     val y = UFix(16, INPUT)
-    val z = UFix(16, OUTPUT)
-  }
+    val z = UFix(16, OUTPUT) }
   io.z := io.x + io.y
+}
 
-  defTests(io) {
+class CombinationalTests(c: Combinational) 
+    extends Tester(c, Array(c.io)) {
+  defTests {
     var allGood = true
     val vars    = new HashMap[Node, Node]()
     val rnd     = new Random()
     val maxInt  = 1 << 16
     for (i <- 0 until 10) {
       vars.clear()
-      val x      = rnd.nextInt(maxInt)
-      val y      = rnd.nextInt(maxInt)
-      vars(io.x) = UFix(x)
-      vars(io.y) = UFix(y)
-      vars(io.z) = UFix((x + y)&(maxInt-1))
-      allGood    = test(vars) && allGood
+      val x        = rnd.nextInt(maxInt)
+      val y        = rnd.nextInt(maxInt)
+      vars(c.io.x) = UFix(x)
+      vars(c.io.y) = UFix(y)
+      vars(c.io.z) = UFix((x + y)&(maxInt-1))
+      allGood      = step(vars) && allGood
     }
     allGood
-  }
-} }
+  } } }
 \end{scala}
 }
 \column{0.45\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
+class Tester[T <: Component]
+  (val c: T, val testNodes: Array[Node])
+\end{scala}
+\begin{scala}
 def defTests(testNodes: Node*)(body: => Boolean)
 \end{scala}
 \begin{scala}
-def test(vars: HashMap[Node, Node]): Boolean
+def step(vars: HashMap[Node, Node]): Boolean
 \end{scala}
 }
-
 \begin{tiny}
 \begin{itemize}
-\item \code{testNodes} flattened left to right and top to bottom
+\item user subclasses \code{Tester}, where
+\code{testNodes} flattened left to right and top to bottom
 \item \code{vars} is mapping from \code{testNodes} to literals
-\item \code{test} runs test with given bindings
-\item var values for input ports are sent to CUT
-\item CUT computes next outputs
-\item CUT sends next outputs to Chisel
-\item \code{test} compares received values against var values for
+\item \code{step} runs test with given bindings, where
+var values for input ports are sent to CUT,
+CUT computes next outputs, and
+CUT sends next outputs to Chisel
+\item \code{step} compares received values against var values for
   output ports
 \end{itemize}
 \end{tiny}
