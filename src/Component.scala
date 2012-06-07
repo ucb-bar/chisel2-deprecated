@@ -1512,7 +1512,7 @@ abstract class Component(resetSignal: Bool = null) {
       res.reverse
     }
     out_c.write("void " + name + "_t::print ( FILE* f ) {\n");
-    if (testNodes != null) {
+    if (isTestingC && testNodes != null) {
       scanArgs.clear();  scanArgs  ++= testInputNodes;    scanFormat  = ""
       printArgs.clear(); printArgs ++= testNonInputNodes; printFormat = ""
     } 
