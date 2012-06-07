@@ -44,19 +44,21 @@
 
 \begin{frame}[fragile]{chisel repo}
 \begin{FramedSemiVerb}
-src                     \comment{\# chisel scala source code}
-emulator                \comment{\# chisel emulator source code}
-doc                     \comment{\# documentation}
-www                     \comment{\# web sources}
-tutorial                \comment{\# tutorial project}
-tutorial/src            \comment{\# tutorial source code}
-tutorial/sbt            \comment{\# tutorial sbt files}
-tutorial/emulator       \comment{\# tutorial emulator files}
-tutorial/runall.sh      \comment{\# runs tutorial tests}
+src                        \comment{\# chisel scala source code}
+csrc                       \comment{\# chisel emulator source code}
+doc                        \comment{\# documentation}
+www                        \comment{\# web sources}
+tutorial                   \comment{\# tutorial project}
+tutorial/src               \comment{\# tutorial source code}
+tutorial/sbt               \comment{\# tutorial sbt files}
+tutorial/emulator          \comment{\# tutorial emulator build products}
+tutorial/emulator/Makefile \comment{\# Makefile for emulator products} 
+tutorial/verilog           \comment{\# tutorial verilog build products} 
+tutorial/verilog/Makefile  \comment{\# Makefile for verilog products} 
 \end{FramedSemiVerb}
 \end{frame}
 
-% \begin{frame}[fragile, shrink]{tutorial.scala}
+% \begin{frame}[fragile]{tutorial.scala}
 % \begin{scala}
 % package Tutorial {
 % 
@@ -78,7 +80,7 @@ tutorial/runall.sh      \comment{\# runs tutorial tests}
 % \end{scala}
 % \end{frame}
 
-\begin{frame}[fragile, shrink]{gcd.scala}
+\begin{frame}[fragile]{gcd.scala}
 \begin{scala}
 class GCD extends Component {
   val io = new Bundle {
@@ -109,7 +111,7 @@ def g (xs: List[Int]) =  xs.map(f)
 \end{scala}
 \end{frame}
 
-\begin{frame}[fragile, shrink]{Scala Object Oriented}
+\begin{frame}[fragile]{Scala Object Oriented}
 
 \begin{scala}
 object Blimp {
@@ -336,11 +338,11 @@ import Chisel._
 
 object Tutorial {
   def main(args: Array[String]) = {
-    val tut_opts = Array("--target-dir", "../emulator", "--gen-harness")
-    val tut_args = args.slice(1, args.length) ++ tut_opts
+    val tutOpts = Array("--target-dir", "../emulator", "--gen-harness")
+    val tutArgs = args.slice(1, args.length) ++ tutOpts
     args(0) match {
       case "combinational" => 
-        chiselMain(tut_args, () => new Combinational())
+        chiselMain(tutArgs, () => new Combinational())
       ...
     }
   }
@@ -469,8 +471,8 @@ PASSED
 or through makefile
 
 \begin{scala}
-cd $CHISEL/tutorial
-runone.sh combinational
+cd $CHISEL/tutorial/emulator
+make combinational
 ...
 PASSED
 \end{scala}
@@ -554,7 +556,7 @@ class ScaleIO extends Bundle {
 \end{scala}
 \end{frame}
 
-\begin{frame}[fragile, shrink]{Component}
+\begin{frame}[fragile]{Component}
 
 \begin{itemize}
 \item inherits from \verb+Component+,
@@ -576,62 +578,42 @@ class Mux2 extends Component {
 
 \end{frame}
 
-\begin{frame}[fragile, shrink]{Component Hierarchy}
+\begin{frame}[fragile]{chiselMain Command Line Arguments}
 \begin{scala}
-class Mux4 extends Component {
-  val io = new Bundle {
-    val in0 = Bits(1, INPUT)
-    val in1 = Bits(1, INPUT)
-    val in2 = Bits(1, INPUT)
-    val in3 = Bits(1, INPUT)
-    val sel = Bits(2, INPUT)
-    val out = Bits(1, OUTPUT)
-  }
-  val m0 = new Mux2()
-  m0.io.sel := io.sel(0) 
-  m0.io.in0 := io.in0; m0.io.in1 := io.in1
-
-  val m1 = new Mux2()
-  m1.io.sel := io.sel(0)
-  m1.io.in0 := io.in2; m1.io.in1 := io.in3
-
-  val m3 = new Mux2()
-  m3.io.sel := io.sel(1)
-  m3.io.in0 := m0.io.out; m3.io.in1 := m1.io.out
-
-  io.out := m3.io.out;
-}
-\end{scala}
-\end{frame}
-
-\begin{frame}[fragile]{Running Examples By Hand}
-
-\begin{scala}
-cd $CHISEL/tutorial/sbt 
-sbt "project tutorial" "run"
-cd ../emulator
-make -f Mux2-makefile
+sbt 
+sbt> project tutorial
+sbt> compile                     // compiles chisel scala code
+sbt> run combinational           // produces C++ files
+sbt> run combinational --compile // produces C++ files and compiles
+sbt> exit
 \end{scala}
 
-\end{frame}
+with a complete set of command line arguments being:\\[2mm]
 
-
-\begin{frame}[fragile]{ChiselMain Command Line Arguments}
 \begin{tabular}{lll}
 \verb+--target-dir+ & target pathname prefix \\
 \verb+--gen-harness+ & generate harness file for C++ \\
+\verb+--debug+ & put all wires in C++ class file \\
+\verb+--compile+ & compiles generated C++ \\
+\verb+--test+ & runs tests using C++ app \\
 \verb+--v+ & generate verilog \\
 \verb+--vcd+ & enable vcd dumping \\
-\verb+--debug+ & put all wires in class file \\
 \end{tabular}
 \end{frame}
 
 \begin{frame}[fragile]{Creating Verilog}
 
 \begin{scala}
-cd $CHISEL/tutorial/sbt
-sbt "project tutorial" "run --v"
+cd $CHISEL/tutorial/sbt; sbt "project tutorial" "run mux2 --v"
 \end{scala}
+
+or through makefile:
+
+\begin{scala}
+cd $CHISEL/tutorial/verilog; make mux2
+\end{scala}
+
+producing \code{Mux2.v}:
 
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
@@ -657,6 +639,41 @@ endmodule
 
 \end{frame}
 
+\begin{frame}[fragile]{Component Hierarchy Problem -- \tt mux4.scala}
+\begin{itemize}
+\item child components stored in fields of parent
+\item now write 4-to-1 mux out of 3 2-to-1 mux's
+\end{itemize}
+\begin{scala}
+class Mux4 extends Component {
+  val io = new Bundle {
+    val in0 = Bits(1, INPUT)
+    val in1 = Bits(1, INPUT)
+    val in2 = Bits(1, INPUT)
+    val in3 = Bits(1, INPUT)
+    val sel = Bits(2, INPUT)
+    val out = Bits(1, OUTPUT)
+  }
+  val m0 = new Mux2()
+  m0.io.sel := io.sel(0); m0.io.in0 := io.in0; m0.io.in1 := io.in1
+
+  // flush this out ...
+
+  io.out := io.in0 & io.in1 & io.in2 & io.in3 & io.sel 
+}
+\end{scala}
+\end{frame}
+
+% \begin{frame}[fragile]{Running Examples By Hand}
+% 
+% \begin{scala}
+% cd $CHISEL/tutorial/sbt 
+% sbt "project tutorial" "run"
+% cd ../emulator
+% make -f Mux2-makefile
+% \end{scala}
+% 
+% \end{frame}
 
 \begin{frame}[fragile]{State Elements}
 
@@ -706,6 +723,24 @@ def toggle(p: Bool) = {
 def squareWave(period: UFix) = toggle(pulse(period))
 \end{scala}
 
+\end{frame}
+
+\begin{frame}[fragile]{Sequential Circuit Problem -- \tt sequential.scala}
+\begin{itemize}
+\item write sequential circuit that counts trues 
+\end{itemize}
+\begin{scala}
+class Sequential extends Component {
+  val io = new Bundle {
+    val in  = Bool(INPUT)
+    val out = UFix(8, OUTPUT)
+  }
+
+  // flush this out ...
+
+  io.out := UFix(0)
+}
+\end{scala}
 \end{frame}
 
 \begin{frame}[fragile]{Forward Declarations}
@@ -884,14 +919,35 @@ val m = Vec(i){ UFix(width = 32) }
 val r = m(counter(UFix(3)))
 \end{scala}
 
-\begin{scala}
-def sinTable (amp: Double, n: Int) = {
-  val ts = Range(0, n, 1).map(i => (i*2*Pi)/(n.toDouble-1) - Pi) 
-  Vec(ts.map(t => Fix(round(amp * sin(t))))){ Fix(width = 32) }
-}
+% \begin{scala}
+% def sinTable (amp: Double, n: Int) = {
+%   val ts = Range(0, n, 1).map(i => (i*2*Pi)/(n.toDouble-1) - Pi) 
+%   Vec(ts.map(t => Fix(round(amp * sin(t))))){ Fix(width = 32) }
+% }
+% 
+% def sinWave (amp: Double, n: Int) = 
+%   sinTable(amp, n)(counter(UFix(n))
+% \end{scala}
 
-def sinWave (amp: Double, n: Int) = 
-  sinTable(amp, n)(counter(UFix(n))
+\end{frame}
+
+\begin{frame}[fragile]{Multiplication Lookup Table Problem -- \tt mul.scala}
+\begin{itemize}
+\item write 16x16 multiplication table using \code{Vec}
+\end{itemize}
+\begin{scala}
+class Mul extends Component {
+  val io = new Bundle {
+    val x   = UFix(4, INPUT)
+    val y   = UFix(4, INPUT)
+    val z   = UFix(8, OUTPUT)
+  }
+  val muls = new ArrayBuffer[UFix]()
+
+  // flush this out ...
+
+  io.z := UFix(0)
+}
 \end{scala}
 
 \end{frame}
@@ -908,42 +964,6 @@ class Mem[T <: Data]
       extends Updateable {
   def apply(addr: UFix): T
 }
-\end{scala}
-
-\end{frame}
-
-\begin{frame}[fragile]{Mem}
-\begin{scala}
-class Memo extends Component {
-  val w  = 8
-  val io = new Bundle {
-    val isWrite = Bool(INPUT)
-    val addr    = UFix(8, INPUT)
-    val in      = UFix(8, INPUT)
-    val out     = UFix(8, OUTPUT)
-  }
-  val mem = Mem(sizeof(w)){ UFix(width = 8) }
-  io.out := UFix(0)
-  when (io.isWrite) {
-    mem(io.addr) := io.in
-  } .otherwise {
-    io.out := mem(addr)
-  }
-}
-\end{scala}
-\end{frame}
-
-\begin{frame}[fragile]{Audio Recorder}
-
-\begin{scala}
-def audioRecorder(n: Int, in: UFix, UFix, button: Bool) = { 
-  val addr = counter(UFix(n))
-  val ram  = Mem(n){ UFix(width = 16) }
-  when (button) {  
-    ram(addr) := in
-  }
-  ram(Mux(button, UFix(0), addr))
-} 
 \end{scala}
 
 \end{frame}
@@ -974,12 +994,50 @@ val mdat = regs(maddr)
 % 
 % \end{frame}
 
+\begin{frame}[fragile]{Table Problem -- \tt memo.scala}
+\begin{itemize}
+\item write read/write table using \code{Mem}
+\end{itemize}
+\begin{scala}
+class Memo extends Component {
+  val io = new Bundle {
+    val isWr    = Bool(INPUT)
+    val wrAddr  = UFix(8, INPUT)
+    val wrData  = UFix(8, INPUT)
+    val isRd    = Bool(INPUT)
+    val rdAddr  = UFix(8, INPUT)
+    val rdData  = UFix(8, OUTPUT)
+  }
+  val mem = Mem(256){ UFix(width = 8) }
+
+  // flush this out ...
+
+  io.rdData := UFix(0)
+}
+\end{scala}
+\end{frame}
+
+% \begin{frame}[fragile]{Audio Recorder}
+% 
+% \begin{scala}
+% def audioRecorder(n: Int, in: UFix, UFix, button: Bool) = { 
+%   val addr = counter(UFix(n))
+%   val ram  = Mem(n){ UFix(width = 16) }
+%   when (button) {  
+%     ram(addr) := in
+%   }
+%   ram(Mux(button, UFix(0), addr))
+% } 
+% \end{scala}
+% 
+% \end{frame}
+
 \begin{frame}[fragile]{Port Classes, Subclasses, and Nesting}
 
 \begin{scala}
 class LinkIO extends Bundle { 
   val data  = Bits(16, OUTPUT) 
-  val ready = Bool(OUTPUT)
+  val valid = Bool(OUTPUT)
 }
 \end{scala}
 
@@ -998,7 +1056,7 @@ In general, users can organize their interfaces into hierarchies using inheritan
 
 \end{frame}
 
-\begin{frame}[fragile,shrink]{Filter Example}
+\begin{frame}[fragile]{Filter Example}
 
 From there we can define a filter interface by nesting two
 \verb+LinkIO+s into a new \verb+FilterIO+ bundle:
@@ -1019,8 +1077,7 @@ We can now define a filter by defining a filter class extending component:
 \begin{scala}
 class Filter extends Component { 
   val io  = new FilterIO()
-  
-  io.out.ready := io.in.ready
+  io.out.valid := io.in.valid
   io.out.data  := io.in.data
 }
 \end{scala}
@@ -1030,71 +1087,52 @@ where the \verb+io+ field contains \verb+FilterIO+.
 
 \end{frame}
 
-\begin{frame}[fragile]{Real Filter Assignment}
+\begin{frame}[fragile]{Even Filter Problem -- \tt filter.scala}
 \begin{itemize}
 \item write filter that filters out even numbers
 \end{itemize}
-{\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
 class Filter extends Component { 
   val io  = new FilterIO()
-  ...
-  defTests(io) {
-    var allGood = true
-    val vars    = new HashMap[Node, Node]()
-    val rnd     = new Random()
-    val maxInt  = 1 << 16
-    for (i <- 0 until 10) {
-      vars.clear()
-      val in             = rnd.nextInt(maxInt)
-      vars(io.in.ready)  = Bool(true)
-      vars(io.in.data)   = UFix(x)
-      vars(io.out.ready) = Bool(true)
-      vars(io.out.data)  = UFix(x)
-      allGood            = test(vars) && allGood
-    }
-    allGood
-  }  
+
+  // flush this out ...
+
+  io.out.valid := Bool(true)
+  io.out.data  := Bits(0)
 }
 \end{scala}
-}
 \end{frame}
 
 \begin{frame}[fragile]{Bundle Vectors}
 
 \begin{scala}
-class FanoutIO(n: Int) extends Bundle {
-  val in  = new LinkIO().flip()
-  val sel = UFix(sizeof(n), INPUT)
-  val out = Vec(n){ new LinkIO() }
-  override def clone() = (new FanoutIO(n)).asInstanceOf[this.type]
+class CrossbarIO extends Bundle {
+  val in  = Vec(2){ new LinkIO() }
+  val sel = UFix(2, INPUT)
+  val out = Vec(2){ new LinkIO() }
 }
 \end{scala}
 
 \noindent
 where \verb+Vec+ takes a size as the first argument and a block
-returning a port as the second argument and \code{clone} binds the
-construction argument \code{n} to cloning.
+returning a port as the second argument.
+% and \code{clone} binds the construction argument \code{n} to cloning.
 
 \end{frame}
 
-\begin{frame}[fragile]{Fanout Example}
+\begin{frame}[fragile]{Bundle Vectors Cloning}
 
 \begin{scala}
-class FanoutIO(n: Int) extends Bundle {
-  val in  = new PLink().flip()
-  val sel = UFix(sizeof(n), INPUT)
-  val out = Vec(n){ new PLink() }
-  ...
-}
-class Fanout extends Component {
-  val io = new FanoutIO(n)
-  
+class CrossbarIO(n: Int) extends Bundle {
+  val in  = Vec(n){ new LinkIO() }
+  val sel = UFix(log2Up(n), INPUT)
+  val out = Vec(n){ new LinkIO() }
+  override def clone() = (new CrossbarIO(n)).asInstanceOf[this.type]
 }
 \end{scala}
 
 \noindent
-where \verb+Vec+ takes a size as the first argument and a block returning a port as the second argument.
+where \code{clone} binds the construction argument \code{n} to cloning.
 
 \end{frame}
 
@@ -1107,9 +1145,9 @@ class Block extends Component {
   val f1 = new Filter()
   val f2 = new Filter()
 
-  f1.io.x <> io.x
-  f1.io.y <> f2.io.x
-  f2.io.y <> io.y
+  f1.io.in  <> io.in
+  f1.io.out <> f2.io.in
+  f2.io.out <> io.out
 }
 \end{scala}
 
@@ -1122,39 +1160,6 @@ Chisel warns users if ports have other than exactly one connection to them.
 \end{itemize}
 
 \end{frame}
-
-\lstset{basicstyle={\tiny\ttfamily}}
-
-\begin{frame}[fragile]{Port Views}
-\begin{scala}
-class RomIo extends Bundle {
-  val isVal = Bool(INPUT)
-  val raddr = UFix(32, INPUT)
-  val rdata = Bits(32, OUTPUT)
-}
-
-class CpathIo extends Bundle() {
-  val imem = RomIo().flip()
-  val dmem = RamIo().flip()
-  ...
-}
-
-class Cpu extends Component {
-  val io = new CpuIo()
-  val c  = new CtlPath()
-  val d  = new DatPath()
-  c.io.ctl  <> d.io.ctl
-  c.io.dat  <> d.io.dat
-  c.io.imem <> io.imem
-  d.io.imem <> io.imem
-  c.io.dmem <> io.dmem
-  d.io.dmem <> io.dmem
-  d.io.host <> io.host
-}
-\end{scala}
-\end{frame}
-
-\lstset{basicstyle={\footnotesize\ttfamily}}
 
 \begin{frame}[fragile]{Parameterized Functions}
 \begin{scala}
@@ -1175,8 +1180,8 @@ y[t] = \sum_j w_j * x_j[t-j]
 \end{equation}
 
 \begin{scala}
-def innerProductFIR[T <: Num] (w: Seq[Int], x: T) = {
-  val delays = Range(0, w.length).map(i => Num(w(i)) * delay(x, i))
+def innerProductFIR[T <: Num] (w: Seq[T], x: T) = {
+  val delays = Range(0, w.length).map(i => w(i) * delay(x, i))
   delays.foldRight(_ + _)
 }
 
@@ -1206,6 +1211,77 @@ class FIFOIO[T <: Data]()(data: => T) extends Bundle {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
   val bits  = data.asOutput
+}
+
+class EnqIO[T <: Data]()(data: => T) extends FIFOIO(data) {
+  def enq(dat: T): T = { valid := Bool(true); data := dat; dat }
+  valid := Bool(false);
+  data.fromBits(Bits(0))
+  // for (io <- data.flatten.map(x => x._2))
+  //   io := UFix(0, io.getWidth());
+}
+
+class DeqIO[T <: Data]()(data: => T) extends FIFOIO(data) {
+  flip()
+  ready := Bool(false);
+  def deq(b: Boolean = false): T = { ready := Bool(true); data }
+}
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{Enq/Deq Example}
+\begin{scala}
+class Filter[T <: Data]()(data: => T) extends Component {
+  val io = new Bundle {
+    val in  = (new DeqIO()){ data }
+    val out = (new EnqIO()){ data }
+  }
+  when (io.in.valid && io.out.ready) {
+    io.out.enq(io.in.deq())
+  }
+}
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{Router Interface}
+
+{\lstset{basicstyle={\scriptsize\ttfamily}}
+\begin{scala}
+class ReadCmd extends Bundle {
+  val addr = UFix(width = 32)
+}
+
+class WriteCmd extends ReadCmd {
+  val data = UFix(width = 32)
+}
+
+class Packet extends Bundle {
+  val header = UFix(width = 8)
+  val body   = Bits(width = 64)
+}
+
+class RouterIO(n: Int) extends Bundle {
+  override def clone = new RouterIO(n).asInstanceOf[this.type]
+  val reads   = (new DeqIO()){ new ReadCmd() }
+  val replies = (new EnqIO()){ UFix(width = 8) }
+  val writes  = (new DeqIO()){ new WriteCmd() }
+  val in      = (new DeqIO()){ new Packet() }
+  val outs    = Vec(n){ (new EnqIO()){ new Packet() } }
+}
+\end{scala}
+}
+
+\end{frame}
+
+\begin{frame}[fragile]{Router Problem -- \tt router.scala}
+\begin{scala}
+class Router extends Component {
+  val depth = 32;
+  val n     = 4;
+  val io    = new RouterIO(n);
+  val tbl   = Mem(depth){ UFix(width = sizeof(n)) };
+  
+  // flush it out ...
 }
 \end{scala}
 \end{frame}
@@ -1259,8 +1335,9 @@ gpu/
 
 \end{frame}
 
-\begin{frame}[fragile, shrink]{Project File}
-% \begin{FramedVerb}
+\begin{frame}[fragile]{Project File}
+
+{\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
 import sbt._
 import Keys._
@@ -1288,7 +1365,41 @@ object ChiselBuild extends Build {
       dependsOn(chisel)
 }
 \end{scala}
-% \end{FramedVerb}
+}
+
+\end{frame}
+
+\begin{frame}[fragile]{Port Views}
+
+{\lstset{basicstyle={\tiny\ttfamily}}
+\begin{scala}
+class RomIo extends Bundle {
+  val isVal = Bool(INPUT)
+  val raddr = UFix(32, INPUT)
+  val rdata = Bits(32, OUTPUT)
+}
+
+class CpathIo extends Bundle() {
+  val imem = RomIo().flip()
+  val dmem = RamIo().flip()
+  ...
+}
+
+class Cpu extends Component {
+  val io = new CpuIo()
+  val c  = new CtlPath()
+  val d  = new DatPath()
+  c.io.ctl  <> d.io.ctl
+  c.io.dat  <> d.io.dat
+  c.io.imem <> io.imem
+  d.io.imem <> io.imem
+  c.io.dmem <> io.dmem
+  d.io.dmem <> io.dmem
+  d.io.host <> io.host
+}
+\end{scala}
+}
+
 \end{frame}
 
 \begin{frame}[fragile, shrink]{Testing Examples}
@@ -1338,5 +1449,6 @@ diff test.out test
 \end{scala}
 
 \end{frame}
+
 
 \end{document}
