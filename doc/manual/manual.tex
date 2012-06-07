@@ -160,13 +160,15 @@ Ops compute a combinational function of their inputs.
 \section{Types}
 \label{sec:types}
 
-A Chisel graph contains {\em raw} and {\em type} nodes.  Type nodes
-are interspersed between raw nodes and allow Chisel code to check and
-respond to Chisel types.  The Chisel type system is maintained
-separately from the underlying Scala type system.  Chisel type nodes
-are erased before emission to C++ and Verilog.
-Figure~\ref{fig:type-hierarchy} shows the built-in Chisel type
-hierarchy, with \code{Data} as the topmost node.
+A Chisel graph representing a hardware design contains {\em raw} and
+{\em type} nodes.  The Chisel type system is maintained separately
+from the underlying Scala type system, and so type nodes are
+interspersed between raw nodes to allow Chisel to check and respond to
+Chisel types.  Chisel type nodes are erased before the hardware design
+is translated into C++ or Verilog.  The \code{getRawNode} operator
+defined in the base Node class, skips type nodes and returns the first
+raw node found.  Figure~\ref{fig:type-hierarchy} shows the built-in
+Chisel type hierarchy, with \code{Data} as the topmost node.
 
 \begin{figure}[h]
 \centering
@@ -339,9 +341,6 @@ successively more complicated examples.
 \label{fig:bits-expressions}
 \end{figure*}
 
-\noindent
-The \code{getRawNode} operator skips type nodes returning the first
-found raw node.
 
 \subsection{Bools}
 
@@ -436,10 +435,10 @@ class Bundle extends Data {
 \end{scala}
 
 \noindent
-A user can get the name and type corresponding to each element in a
-Bundle with the \code{elements} method and recursively using the
-\code{leaves} method. 
-Users can define their own by subclassing \code{Bundle} as follows:
+The name and type of each element in a Bundle can be obtained with the
+\code{elements} method, and recursively using the \code{leaves}
+method.  Users can define their own by subclassing \code{Bundle} as
+follows:
 
 \begin{scala}
 class MyFloat extends Bundle {
