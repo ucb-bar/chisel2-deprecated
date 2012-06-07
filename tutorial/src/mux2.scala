@@ -19,7 +19,7 @@ class Mux2 extends Component {
     val vars = new HashMap[Node, Node]()
     for (i <- 0 until n) {
       vars.clear()
-      val k  = Bits(i, width = log2up(n)) 
+      val k  = Bits(i, width = log2Up(n)) 
       vars(io.sel) = k(0) 
       vars(io.in1) = k(1) 
       vars(io.in0) = k(2) 

@@ -1,0 +1,5 @@
+*-makefile
+*.o
+*.cpp
+*.h
+*.out

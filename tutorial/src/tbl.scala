@@ -9,7 +9,7 @@ class Tbl extends Component {
     val addr = UFix(8, INPUT)
     val out  = UFix(8, OUTPUT)
   }
-  val r = ROM(Range(0, 256).map(UFix(_))){ UFix(width = 8) }
+  val r = Vec(Range(0, 256).map(UFix(_))){ UFix(width = 8) }
   io.out := r(io.addr)
 
   defTests(io) {

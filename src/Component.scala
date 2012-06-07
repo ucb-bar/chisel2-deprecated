@@ -992,15 +992,15 @@ abstract class Component(resetSignal: Bool = null) {
     }
   }
   def genHarness(base_name: String, name: String) = {
-    val makefile = new java.io.FileWriter(base_name + name + "-makefile");
-    makefile.write("CPPFLAGS = -O2 -I../ -I${CHISEL}/csrc\n\n");
-    makefile.write(name + ": " + name + ".o" + " " + name + "-emulator.o\n");
-    makefile.write("\tg++ -o " + name + " " + name + ".o " + name + "-emulator.o\n\n");
-    makefile.write(name + ".o: " + name + ".cpp " + name + ".h\n");
-    makefile.write("\tg++ -c ${CPPFLAGS} " + name + ".cpp\n\n");
-    makefile.write(name + "emulator.o: " + name + "-emulator.cpp " + name + ".h\n");
-    makefile.write("\tg++ -c ${CPPFLAGS} " + name + "-emulator.cpp\n\n");
-    makefile.close();
+    // val makefile = new java.io.FileWriter(base_name + name + "-makefile");
+    // makefile.write("CPPFLAGS = -O2 -I../ -I${CHISEL}/csrc\n\n");
+    // makefile.write(name + ": " + name + ".o" + " " + name + "-emulator.o\n");
+    // makefile.write("\tg++ -o " + name + " " + name + ".o " + name + "-emulator.o\n\n");
+    // makefile.write(name + ".o: " + name + ".cpp " + name + ".h\n");
+    // makefile.write("\tg++ -c ${CPPFLAGS} " + name + ".cpp\n\n");
+    // makefile.write(name + "emulator.o: " + name + "-emulator.cpp " + name + ".h\n");
+    // makefile.write("\tg++ -c ${CPPFLAGS} " + name + "-emulator.cpp\n\n");
+    // makefile.close();
     val harness  = new java.io.FileWriter(base_name + name + "-emulator.cpp");
     harness.write("#include \"" + name + ".h\"\n");
     harness.write("int main (int argc, char* argv[]) {\n");
@@ -1261,7 +1261,8 @@ abstract class Component(resetSignal: Bool = null) {
     }
   }
   def gcc(flags: String = "-O2"): Unit = {
-    val allFlags = flags + " -I../ -I${CHISEL}/csrc"
+    val chiselENV = java.lang.System.getenv("CHISEL")
+    val allFlags = flags + " -I../ -I" + chiselENV + "/csrc/"
     val dir = targetDir + "/"
     def run(cmd: String) = {
       val c = Process(cmd).!
