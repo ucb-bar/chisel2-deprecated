@@ -945,25 +945,44 @@ the directory specified with
 Testing is a crucial part of circuit design, 
 and thus in Chisel we provide a mechanism for
 testing circuits by providing test vectors within Scala using
-the \code{defTests} function defined in the top level component
-definition.
-When \code{--test} is given as an argument to \code{chiselMain}, 
-the Circuit Under Test (CUT) is run as a process under scala with stdin and stdout
-connected so that inputs can be sent to the CUT and outputs can
-received from the CUT as shown in Figure~\ref{fig:cut}.  
+subclasses of the \code{Tester} class:
+
+\begin{scala}
+class Tester[T <: Component]
+  (val c: T, val testNodes: Array[Node])
+\end{scala}
+
+\noindent
+where users write a \code{defTests} function:
 The definition for \code{defTests} is:
 
 \begin{scala}
-def defTests(testNodes: Node*)(body: => Boolean)
+def defTests(body: => Boolean)
 \end{scala}
 
 \noindent
 where \code{testNodes} are the graph nodes that will be input to and
 output from the CUT, and where
-in the body users write calls to \code{test}:
+users write calls to \code{step} in the body.  Users connect tester
+instances to components using:
 
 \begin{scala}
-def test(vars: HashMap[Node, Node]): Boolean
+object chiselMainTest {
+  def apply[T <: Component]
+    (args: Array[String], comp: () => T)(
+     tester: T => Tester[T]): T
+}
+\end{scala}
+
+\noindent
+When \code{--test} is given as an argument to \code{chiselMain}, 
+a tester instance runs the Circuit Under Test (CUT) is as a process
+with stdin and stdout connected so that inputs can be sent to the CUT and outputs can
+received from the CUT as shown in Figure~\ref{fig:cut}.  
+\noindent
+
+\begin{scala}
+def step(vars: HashMap[Node, Node]): Boolean
 \end{scala}
 
 \noindent
@@ -976,23 +995,32 @@ entries in \code{vars}.
 The following is an example for defining tests for \code{Mux2}:
 
 \begin{scala}
-class Mux2 extends Component {
-  ...
-  defTests(io) {
+class Mux2Tests(c: Mux2) 
+    extends Tester(c, Array(c.io)) {  
+  defTests {
     var allGood = true
     val n = pow(2, 3).toInt
     val vars = new HashMap[Node, Node]()
     for (s <- 0 until 2) {
     for (i0 <- 0 until 2) {
     for (i1 <- 0 until 2) {
-      vars(io.sel) = Bits(s)
-      vars(io.in1) = Bits(i1)
-      vars(io.in0) = Bits(i0)
-      vars(io.out) = Bits(if (s == 1) i1 else i0)
-      allGood = test(vars) && allGood
-    } } }
+      vars(c.io.sel) = Bits(s)
+      vars(c.io.in1) = Bits(i1)
+      vars(c.io.in0) = Bits(i0)
+      vars(c.io.out) = Bits(if (s == 1) i1 else i0)
+      allGood = step(vars) && allGood
+    } } } 
     allGood
   }
+}
+\end{scala}
+
+\noindent
+and the following shows how it is invoked:
+
+\begin{scala}
+chiselMainTest(args + "--test", () => new Mux2()){ 
+  c => new Mux2Tests(c) 
 }
 \end{scala}
 
