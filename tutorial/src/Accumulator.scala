@@ -1,20 +1,21 @@
 package Tutorial {
 
 import Chisel._
+import Node._
 import scala.collection.mutable.HashMap
 import util.Random
 
-class Sequential extends Component {
+class Accumulator extends Component {
   val io = new Bundle {
     val in  = Bool(INPUT)
-    val out = UFix(8, OUTPUT)
+    val out = UFix(width = 8, dir = OUTPUT)
   }
   // COUNT INCOMING TRUES 
   // FILL IN HERE ...
-  io.out := UFix(0)
+  io.out := io.in.toUFix
 }
 
-class SequentialTests(c: Sequential) extends Tester(c, Array(c.io)) {  
+class AccumulatorTests(c: Accumulator) extends Tester(c, Array(c.io)) {  
   defTests {
     var allGood = true
     val vars    = new HashMap[Node, Node]()
