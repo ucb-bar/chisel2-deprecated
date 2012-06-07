@@ -6,13 +6,22 @@
 \usepackage[procnames]{listings}
 
 \input{../style/scala.tex}
-
 \lstset{basicstyle={\footnotesize\ttfamily}}
 
-\usetheme[height=9mm]{Rochester}
+\usetheme[height=8mm]{Rochester}
 \setbeamersize{text margin left=3mm} 
 \setbeamersize{text margin right=3mm} 
 \setbeamertemplate{navigation symbols}{}
+
+\definecolor{Cobalt}{rgb}{0.25,0.125,0.70}
+\definecolor{RedOrange}{rgb}{0.8,0.25,0.0}
+% \definecolor{RedOrange}{rgb}{0.8,0.775,0.25}
+
+
+\def\frametitledefaultcolor{Cobalt}
+\def\frametitleproblemcolor{RedOrange}
+
+\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
 \newenvironment{sample}{\VerbatimEnvironment\begin{footnotesize}\begin{semiverbatim}}{\end{semiverbatim}\end{footnotesize}}
 
@@ -353,6 +362,7 @@ object Tutorial {
 \end{frame}
 
 
+\setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Emitting C++ and Compiling}
 
 {\lstset{basicstyle={\tiny\ttfamily}}
@@ -389,6 +399,7 @@ sbt "project tutorial" "run combinational --compile"
 \end{scala}
 }
 \end{frame}
+\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
 \begin{frame}[fragile]{Defining Tests}
 
@@ -453,12 +464,13 @@ def test(vars: HashMap[Node, Node]): Boolean
 \end{tiny}
 
 \begin{center}
-\includegraphics[width=0.9\textwidth]{CUT.pdf}
+\includegraphics[width=0.9\textwidth]{figs/CUT.pdf}
 \end{center}
 
 \end{columns}
 \end{frame}
 
+\setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Running Tests Examples}
 
 \begin{scala}
@@ -478,6 +490,7 @@ PASSED
 \end{scala}
 
 \end{frame}
+\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
 \begin{frame}[fragile]{Functional Abstraction}
 \begin{scala}
@@ -585,6 +598,7 @@ sbt> project tutorial
 sbt> compile                     // compiles chisel scala code
 sbt> run combinational           // produces C++ files
 sbt> run combinational --compile // produces C++ files and compiles
+sbt> run combinational --test    // produces C++ files, compiles, tests
 sbt> exit
 \end{scala}
 
@@ -639,6 +653,7 @@ endmodule
 
 \end{frame}
 
+\setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Component Hierarchy Problem -- \tt mux4.scala}
 \begin{itemize}
 \item child components stored in fields of parent
@@ -663,7 +678,7 @@ class Mux4 extends Component {
 }
 \end{scala}
 \end{frame}
-
+\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 % \begin{frame}[fragile]{Running Examples By Hand}
 % 
 % \begin{scala}
@@ -725,6 +740,7 @@ def squareWave(period: UFix) = toggle(pulse(period))
 
 \end{frame}
 
+\setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Sequential Circuit Problem -- \tt sequential.scala}
 \begin{itemize}
 \item write sequential circuit that counts trues 
@@ -742,6 +758,7 @@ class Sequential extends Component {
 }
 \end{scala}
 \end{frame}
+\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
 \begin{frame}[fragile]{Forward Declarations}
 
@@ -931,6 +948,7 @@ val r = m(counter(UFix(3)))
 
 \end{frame}
 
+\setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Multiplication Lookup Table Problem -- \tt mul.scala}
 \begin{itemize}
 \item write 16x16 multiplication table using \code{Vec}
@@ -951,6 +969,7 @@ class Mul extends Component {
 \end{scala}
 
 \end{frame}
+\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
 \begin{frame}[fragile]{Memories}
 
@@ -994,6 +1013,7 @@ val mdat = regs(maddr)
 % 
 % \end{frame}
 
+\setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Table Problem -- \tt memo.scala}
 \begin{itemize}
 \item write read/write table using \code{Mem}
@@ -1016,6 +1036,7 @@ class Memo extends Component {
 }
 \end{scala}
 \end{frame}
+\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
 % \begin{frame}[fragile]{Audio Recorder}
 % 
@@ -1087,6 +1108,7 @@ where the \verb+io+ field contains \verb+FilterIO+.
 
 \end{frame}
 
+\setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Even Filter Problem -- \tt filter.scala}
 \begin{itemize}
 \item write filter that filters out even numbers
@@ -1102,6 +1124,7 @@ class Filter extends Component {
 }
 \end{scala}
 \end{frame}
+\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
 \begin{frame}[fragile]{Bundle Vectors}
 
@@ -1273,6 +1296,7 @@ class RouterIO(n: Int) extends Bundle {
 
 \end{frame}
 
+\setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Router Problem -- \tt router.scala}
 \begin{scala}
 class Router extends Component {
@@ -1285,6 +1309,7 @@ class Router extends Component {
 }
 \end{scala}
 \end{frame}
+\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
 \begin{frame}[fragile]{git}
 \begin{FramedVerb}
@@ -1312,26 +1337,22 @@ console
 \end{frame}
 
 \begin{frame}[fragile]{project directory structure}
-\begin{footnotesize}
+% \begin{footnotesize}
 \begin{FramedSemiVerb}
-chisel/           \comment{\# install chisel at same level as your project}
+chisel/
   tutorial/
   src/
 gpu/
   chisel -> ../chisel
   sbt/
-    project/
-      build.scala \comment{\# edit this as shown below}
-    chisel -> ../chisel/sbt/chisel/
-    gpu/
-      src/
-        main/
-          scala -> ../../../../src
-  src/ 
-    gpu.scala     \comment{\# your source files go here}
-  emulator/       \comment{\# your C++ target can go here}
+    project/build.scala \comment{\# edit this as shown below}
+    chisel/src/main/scala -> ${CHISEL}/src
+    gpu/src/main/scala -> ../../../../src
+  src/                  \comment{\# your source files go here}
+    gpu.scala           
+  emulator/             \comment{\# your C++ target can go here}
 \end{FramedSemiVerb}
-\end{footnotesize}
+% \end{footnotesize}
 
 \end{frame}
 
@@ -1369,6 +1390,41 @@ object ChiselBuild extends Build {
 
 \end{frame}
 
+\begin{frame}[fragile]{Installation}
+on mac install:
+\begin{itemize}
+\item XCODE console tools
+\item http://www.macports.org
+\end{itemize}
+
+everywhere install:
+\begin{itemize}
+\item git
+\item g++
+\item java
+\item export \$CHISEL=...
+\item git clone https://github.com/ucb-bar/chisel.git
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Projects Ideas}
+
+\begin{itemize}
+\item audio processing
+\item image processing
+\item risc processor
+\item game of life
+\item router
+\item network
+\item fft
+\item cryptography
+\item serial multiplier
+\item pong
+\end{itemize}
+
+\end{frame}
+
 \begin{frame}[fragile]{Port Views}
 
 {\lstset{basicstyle={\tiny\ttfamily}}
@@ -1402,53 +1458,52 @@ class Cpu extends Component {
 
 \end{frame}
 
-\begin{frame}[fragile, shrink]{Testing Examples}
-
-\begin{scala}
-object tutorial {
-  def main(args: Array[String]) = {
-    chiselMainDebug(args ++ Array("--gen-harness"), 
-                   () => new Mux2())(
-      c => Scanner("%x %x %x", c.io.sel, c.io.in0, c.io.in1),
-      c => Printer("%x %x %x %x", c.io.sel, c.io.in0, c.io.in1, c.io.out))
-  }
-}
-\end{scala}
-
-compile
-
-\begin{scala}
-sbt> run
-sbt> exit
-cd ../emulator
-make -f Mux2-makefile
-\end{scala}
-
-\end{frame}
-
-\begin{frame}[fragile, shrink]{Testing Examples Continued}
-
-test.out
-
-\begin{scala}
-0 0 0 0
-0 0 1 0
-0 1 0 1
-0 1 1 1
-1 0 0 0
-1 0 1 1
-1 1 0 0
-1 1 1 1
-\end{scala}
-
-testing
-
-\begin{scala}
-cut -f 1,2,3 -d " " < test | Mux2 > test.out
-diff test.out test
-\end{scala}
-
-\end{frame}
-
+% \begin{frame}[fragile, shrink]{Testing Examples}
+% 
+% \begin{scala}
+% object tutorial {
+%   def main(args: Array[String]) = {
+%     chiselMainDebug(args ++ Array("--gen-harness"), 
+%                    () => new Mux2())(
+%       c => Scanner("%x %x %x", c.io.sel, c.io.in0, c.io.in1),
+%       c => Printer("%x %x %x %x", c.io.sel, c.io.in0, c.io.in1, c.io.out))
+%   }
+% }
+% \end{scala}
+% 
+% compile
+% 
+% \begin{scala}
+% sbt> run
+% sbt> exit
+% cd ../emulator
+% make -f Mux2-makefile
+% \end{scala}
+% 
+% \end{frame}
+% 
+% \begin{frame}[fragile, shrink]{Testing Examples Continued}
+% 
+% test.out
+% 
+% \begin{scala}
+% 0 0 0 0
+% 0 0 1 0
+% 0 1 0 1
+% 0 1 1 1
+% 1 0 0 0
+% 1 0 1 1
+% 1 1 0 0
+% 1 1 1 1
+% \end{scala}
+% 
+% testing
+% 
+% \begin{scala}
+% cut -f 1,2,3 -d " " < test | Mux2 > test.out
+% diff test.out test
+% \end{scala}
+% 
+% \end{frame}
 
 \end{document}
