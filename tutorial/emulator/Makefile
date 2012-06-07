@@ -6,6 +6,7 @@ tutorials = \
 	combinational \
 	functional \
 	mux2 \
+	mux4 \
 	sequential \
 	parity \
 	memo \

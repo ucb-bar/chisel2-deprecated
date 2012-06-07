@@ -13,18 +13,19 @@ class Mux4 extends Component {
     val sel = Bits(width = 2, dir = INPUT)
     val out = Bits(width = 1, dir = OUTPUT)
   }
-
   val m0 = new Mux2()
   m0.io.sel := io.sel(0) 
   m0.io.in0 := io.in0; m0.io.in1 := io.in1
 
-  //-------------------------------------------------------------------------\\
-  
-  // Modify this section to build a 4-to-1 mux out of 3 2-to-1 mux
-  // The first mux is already done for you
-  io.out := io.in0 & io.in1 & io.in2 & io.in3 & io.sel
+  val m1 = new Mux2()
+  m1.io.sel := io.sel(0)
+  m1.io.in0 := io.in2; m1.io.in1 := io.in3
 
-  // ----------------------------------------------------------------------- \\
+  val m3 = new Mux2()
+  m3.io.sel := io.sel(1)
+  m3.io.in0 := m0.io.out; m3.io.in1 := m1.io.out
+
+  io.out := m3.io.out;
 
   defTests(io) {
     var allGood = true
