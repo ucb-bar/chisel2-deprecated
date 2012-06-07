@@ -1288,7 +1288,7 @@ abstract class Component(resetSignal: Bool = null) {
     val ovars = if (ovarsI == null) svars else ovarsI;
     for (n <- testInputNodes) {
       val v = svars.getOrElse(n, null)
-      val i = if (v == null) BigInt(-1) else v.litValue() // TODO: WARN
+      val i = if (v == null) BigInt(0) else v.litValue() // TODO: WARN
       val s = i.toString(16)
       if (isTrace) println(n + " = " + i)
       testOut.write(' ')
