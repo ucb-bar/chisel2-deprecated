@@ -1285,7 +1285,7 @@ abstract class Component(resetSignal: Bool = null) {
   var testInputNodes: Array[Node] = null
   var testNonInputNodes: Array[Node] = null 
   def test(svars: HashMap[Node, Node], ovarsI: HashMap[Node, Node] = null, isTrace: Boolean = true): Boolean = {
-    val ovars = if (ovarsI == null) ovarsI else svars;
+    val ovars = if (ovarsI == null) svars else ovarsI;
     for (n <- testInputNodes) {
       val v = svars.getOrElse(n, null)
       val i = if (v == null) BigInt(-1) else v.litValue() // TODO: WARN

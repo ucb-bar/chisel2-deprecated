@@ -31,7 +31,8 @@ class Echo(infile: String, outfile: String) extends Component {
   io.out := outUnsigned
 
   defTests(io) {
-    val vars = new HashMap[Node, Node]()
+    val svars = new HashMap[Node, Node]()
+    val ovars = new HashMap[Node, Node]()
 
     val ais = AudioSystem.getAudioInputStream(new File(infile))
     if (ais.getFormat.getChannels != 1 || ais.getFormat.getSampleSizeInBits != 8) {
@@ -42,10 +43,9 @@ class Echo(infile: String, outfile: String) extends Component {
 
     var sample = ais.read
     while (sample != -1) {
-      vars.clear()
-      vars(io.in) = Fix(sample)
-      test(vars)
-      out += vars(io.out).litValue().toByte
+      svars(io.in) = Fix(sample)
+      test(svars, ovars, isTrace = false)
+      out += ovars(io.out).litValue().toByte
       sample = ais.read
     }
 
