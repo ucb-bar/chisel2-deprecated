@@ -153,6 +153,159 @@ f(4)
 \end{scala}
 \end{frame}
 
+\begin{frame}[fragile]
+\frametitle{Algebraic Graph Construction}
+
+\begin{columns}
+\column{0.35\textwidth}
+{\lstset{basicstyle={\Large\ttfamily}}
+\begin{scala}
+Mux(x > y, x, y)
+\end{scala}
+}
+
+\column{0.6\textwidth}
+
+\begin{center}
+\includegraphics[width=0.9\textwidth]{figs/max2.pdf} 
+\end{center}
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Creating Component}
+
+\begin{columns}
+\column{0.45\textwidth}
+
+{\lstset{basicstyle={\scriptsize\ttfamily}}
+\begin{scala}
+class Max2 extends Component {
+  val io = new Bundle {
+    val x = UFix(width = 8).asInput
+    val y = UFix(width = 8).asInput
+    val z = UFix(width = 8).asOutput }
+  io.z := Mux(io.x > io.y, io.x, io.y)
+}
+\end{scala}
+}
+
+\column{0.45\textwidth}
+\begin{center}
+\includegraphics[width=0.95\textwidth]{figs/Max2c.pdf} \\
+\end{center}
+\end{columns}
+
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Connecting Components}
+
+\begin{columns}
+\column{0.25\textwidth}
+\begin{scala}
+val m1 = new Max2()
+m1.io.x := a
+m1.io.y := b
+val m2 = new Max2()
+m2.io.x := c
+m2.io.y := d
+val m3 = new Max2()
+m3.io.x := m1.io.z
+m3.io.y := m2.io.z
+\end{scala}
+
+\column{0.7\textwidth}
+
+\begin{center}
+\includegraphics[width=0.99\textwidth]{figs/Max4.pdf} \\
+\end{center}
+\end{columns}
+
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{Defining Construction Functions}
+
+\begin{columns}
+
+\column{0.45\textwidth}
+
+\begin{scala}
+def Max2 = Mux(x > y, x, y)
+\end{scala}
+\begin{scala}
+Max2(x, y)
+\end{scala}
+
+\column{0.5\textwidth}
+
+\begin{center}
+\includegraphics[width=0.95\textwidth]{figs/Max2.pdf} \\[1cm]
+\end{center}
+
+\end{columns}
+
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Functional Construction}
+
+\begin{columns}
+
+\column{0.45\textwidth}
+
+\begin{scala}
+Reduce(Array(a, b, c, d), Max2)
+\end{scala}
+
+\column{0.5\textwidth}
+
+\begin{center}
+\includegraphics[width=0.99\textwidth]{figs/reduceMax.pdf} \\
+\end{center}
+
+\end{columns}
+
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Example}
+\begin{columns}
+
+\column{0.45\textwidth}
+
+\begin{footnotesize}
+\begin{scala}
+class GCD extends Component {
+  val io = new Bundle {
+    val a     = UFix(16, INPUT)
+    val b     = UFix(16, INPUT)
+    val z     = UFix(16, OUTPUT)
+    val valid = Bool(OUTPUT) }
+  val x = Reg(resetVal = io.a)
+  val y = Reg(resetVal = io.b)
+  when (x > y) {
+    x := x - y
+  } .otherwise {
+    y := y - x
+  }
+  io.z     := x
+  io.valid := y === UFix(0)
+}
+\end{scala}
+\end{footnotesize}
+
+\column{0.45\textwidth}
+
+\begin{center}
+\includegraphics[width=0.9\textwidth]{figs/gcd.pdf} 
+\end{center}
+
+\end{columns}
+\end{frame}
+
 % \begin{frame}[fragile]{Scala Console}
 % \begin{FramedVerb}
 % \end{FramedVerb}
@@ -195,6 +348,18 @@ UFix(5, 8)          // unsigned decimal 8-bit literal of type UFix.
 val sel = a | b
 val out = (sel & in1) | (~sel & in0)
 \end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{Building Graphs}
+\begin{center}
+\begin{tabular}{ccc}
+\includegraphics[height=0.94in]{../manual/figs/bits-1.pdf} &
+\includegraphics[height=1.96in]{../manual/figs/bits-and.pdf} &
+\includegraphics[height=3.0in]{../manual/figs/bits-or-and.pdf} \\
+\code{Bits(1)} & \code{Bits(1) \& Bits(2)} &
+\code{(Bits(1) \& Bits(2)) | Bits(3)} \\
+\end{tabular}
+\end{center}
 \end{frame}
 
 \begin{frame}[fragile]{Bitwise operators}
@@ -1311,6 +1476,18 @@ class Router extends Component {
 \end{frame}
 \setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
+\begin{frame}[fragile]{Advanced Topics}
+
+\begin{itemize}
+\item git
+\item sbt
+\item project directory structure
+\item project file
+\item installation
+\end{itemize}
+
+\end{frame}
+
 \begin{frame}[fragile]{git}
 \begin{FramedVerb}
 cd ${HOME}
@@ -1336,7 +1513,7 @@ console
 \end{FramedVerb}
 \end{frame}
 
-\begin{frame}[fragile]{project directory structure}
+\begin{frame}[fragile]{Project Directory Structure}
 % \begin{footnotesize}
 \begin{FramedSemiVerb}
 chisel/
@@ -1391,19 +1568,27 @@ object ChiselBuild extends Build {
 \end{frame}
 
 \begin{frame}[fragile]{Installation}
-on mac install:
+\begin{itemize}
+\item on mac install:
 \begin{itemize}
 \item XCODE console tools
 \item http://www.macports.org
 \end{itemize}
-
-everywhere install:
+\item on windows install:
+\begin{itemize}
+\item cygwin
+\end{itemize}
+\item everywhere install:
 \begin{itemize}
 \item git
 \item g++
 \item java
+\end{itemize}
+\item everywhere
+\begin{itemize}
 \item export \$CHISEL=...
 \item git clone https://github.com/ucb-bar/chisel.git
+\end{itemize}
 \end{itemize}
 
 \end{frame}
