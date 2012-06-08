@@ -64,7 +64,7 @@ class RouterTests(c: Router) extends Tester(c, Array(c.io)) {
     }
     def isAnyValidOuts(vars: HashMap[Node, Node]): Boolean = {
       for (out <- c.io.outs)
-        if (vars(out).litValue() == 1)
+        if (vars(out.valid).litValue() == 1)
           return true
       false
     }

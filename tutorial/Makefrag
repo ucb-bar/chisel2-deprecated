@@ -17,4 +17,5 @@ tutorials = \
 	Echo \
 	Darken \
 	Risc \
-        Counter
+        Counter \
+        Router
