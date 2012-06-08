@@ -4,10 +4,10 @@ SBTARGS = --backend v --targetDir ../verilog --genHarness
 
 tut_v = $(addsuffix .v, $(tutorials))
 
+all: $(tut_v)
+
 $(tut_v): %.v: ${CHISEL}/src/*.scala ../src/%.scala
 	cd $(basedir)/sbt; $(SBT) "project tutorial" "run $* $(SBTARGS)" > $(basedir)/verilog/$@
-
-all: $(tut_v)
 
 clean: 
 	rm -f *.out *.o $(tutorials) $(addsuffix .v, $(tutorials))
