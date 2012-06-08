@@ -34,6 +34,7 @@ object Component {
   var isClockGatingUpdates = false;
   var isClockGatingUpdatesInline = false;
   var isVCD = false;
+  var isInlineMem = true;
   var isFolding = true;
   var isGenHarness = false;
   var isReportDims = false;
