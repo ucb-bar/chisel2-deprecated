@@ -1,4 +1,4 @@
-package Tutorial {
+package Tutorial
 
 import Chisel._
 
@@ -55,14 +55,16 @@ object Tutorial {
       case "VendingMachine" =>
         chiselMainTest(tutArgs, () => new VendingMachine()){
           c => new VendingMachineTests(c)}
-      case "WavOp" => 
-        chiselMainTest(tutArgs, () => new WavOp()){
-          c => new WavOpTests(c, "../src/in.wav", "../out.wav")}
-      case "PicOp" => 
-        chiselMainTest(tutArgs, () => new PicOp()){
-          c => new PicOpTests(c, "../src/tst.im24", "../src/out.im24")}
+      case "Router" => 
+        chiselMainTest(tutArgs, () => new Router()){
+          c => new RouterTests(c)}
+      case "Echo" => 
+        chiselMainTest(tutArgs, () => new Echo()){
+          c => new EchoTests(c, "../src/in.wav", "../out.wav")}
+      case "Darken" => 
+        chiselMainTest(tutArgs, () => new Darken()){
+          c => new DarkenTests(c, "../src/tst.im24", "../src/out.im24")}
     }
   }
 }
 
-}

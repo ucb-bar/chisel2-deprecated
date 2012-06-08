@@ -1,4 +1,4 @@
-package Tutorial {
+package Tutorial 
 
 import Chisel._
 import Node._
@@ -41,6 +41,4 @@ class AccumulatorTests(c: Accumulator) extends Tester(c, Array(c.io)) {
     }
     allGood
   }
-}
-
 }

@@ -1,4 +1,4 @@
-package Tutorial {
+package Tutorial
 
 import Chisel._
 import scala.collection.mutable.HashMap
@@ -32,4 +32,3 @@ class CombinationalTests(c: Combinational) extends Tester(c, Array(c.io)) {
   }
 }
 
-}

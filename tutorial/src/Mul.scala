@@ -1,4 +1,4 @@
-package Tutorial {
+package Tutorial
 
 import Chisel._
 import scala.collection.mutable.HashMap
@@ -38,6 +38,4 @@ class MulTests(c: Mul) extends Tester(c, Array(c.io)) {
     }
     allGood
   }
-}
-
 }

@@ -1,4 +1,4 @@
-package Tutorial {
+package Tutorial 
 
 import Chisel._
 import Node._
@@ -68,4 +68,3 @@ class CounterTest(c: Counter) extends Tester(c, Array(c.io)) {
   }
 }
 
-}

@@ -1,4 +1,4 @@
-package Tutorial {
+package Tutorial
 
 import Chisel._
 import scala.math._
@@ -32,6 +32,4 @@ class Mux2Tests(c: Mux2) extends Tester(c, Array(c.io)) {
     }
     allGood
   }
-}
-
 }

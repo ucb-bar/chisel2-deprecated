@@ -1,4 +1,4 @@
-package Tutorial {
+package Tutorial
 
 import Chisel._
 import Node._
@@ -90,6 +90,4 @@ class RiscTests(c: Risc) extends Tester(c, Array(c.io, c.pc)) {
     allGood = ovars(c.io.out).litValue() == 4 && allGood
     allGood
   }
-}
-
 }

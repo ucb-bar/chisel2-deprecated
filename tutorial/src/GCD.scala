@@ -1,4 +1,4 @@
-package Tutorial {
+package Tutorial
 
 import Chisel._
 import scala.collection.mutable.HashMap
@@ -32,6 +32,4 @@ class GCDTests(c: GCD) extends Tester(c, Array(c.io)) {
     } while (t <= 1 || vars(c.io.v).litValue() == 0)
     vars(c.io.z).litValue() == z
   }
-}
-
 }
