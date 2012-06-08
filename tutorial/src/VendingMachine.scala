@@ -13,7 +13,7 @@ class VendingMachine extends Component {
     Enum(5){ UFix() }
   val state = Reg(resetVal = sIdle)
 
-  // flush out here ...
+  // flush it out ...
 
   io.valid := (state === sOk)
 }

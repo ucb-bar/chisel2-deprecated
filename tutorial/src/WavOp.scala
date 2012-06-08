@@ -7,7 +7,7 @@ import java.io.ByteArrayInputStream
 import javax.sound.sampled._
 import scala.collection.mutable.HashMap
 
-class Echo extends Component {
+class WavOp extends Component {
   val io = new Bundle {
     val in = Bits(8, INPUT)
     val out = Bits(8, OUTPUT)
@@ -31,7 +31,7 @@ class Echo extends Component {
   io.out := outUnsigned
 }
 
-class EchoTests(c: Echo, val infile: String, val outfile: String) extends Tester(c, Array(c.io)) {  
+class WavOpTests(c: WavOp, val infile: String, val outfile: String) extends Tester(c, Array(c.io)) {  
   defTests {
     val svars = new HashMap[Node, Node]()
     val ovars = new HashMap[Node, Node]()
@@ -41,7 +41,7 @@ class EchoTests(c: Echo, val infile: String, val outfile: String) extends Tester
       println(infile + " must be 8-bit monoaural")
       System.exit(-1)
     }
-    val out = new EchoOutput(ais.getFormat)
+    val out = new WavOpOutput(ais.getFormat)
 
     var sample = ais.read
     while (sample != -1) {
@@ -56,7 +56,7 @@ class EchoTests(c: Echo, val infile: String, val outfile: String) extends Tester
   }
 }
 
-class EchoOutput(f: AudioFormat) extends AudioInputStream(new ByteArrayInputStream(Array[Byte]()), f, AudioSystem.NOT_SPECIFIED) {
+class WavOpOutput(f: AudioFormat) extends AudioInputStream(new ByteArrayInputStream(Array[Byte]()), f, AudioSystem.NOT_SPECIFIED) {
   val buf = collection.mutable.ArrayBuffer[Byte]()
   var pos = 0
   def += (s: Byte) = buf += s

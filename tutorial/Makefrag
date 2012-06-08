@@ -14,7 +14,8 @@ tutorials = \
 	Tbl \
 	Life \
 	Mul \
-	Echo \
+	WavOp \
+	PicOp \
 	Risc \
         Counter
 

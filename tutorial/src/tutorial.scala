@@ -46,9 +46,6 @@ object Tutorial {
       case "Mul" => 
         chiselMainTest(tutArgs, () => new Mul()){
           c => new MulTests(c)}
-      case "Echo" => 
-        chiselMainTest(tutArgs, () => new Echo()){
-          c => new EchoTests(c, "../src/in.wav", "../out.wav")}
       case "Risc" => 
         chiselMainTest(tutArgs, () => new Risc()){
           c => new RiscTests(c)}
@@ -58,6 +55,12 @@ object Tutorial {
       case "VendingMachine" =>
         chiselMainTest(tutArgs, () => new VendingMachine()){
           c => new VendingMachineTests(c)}
+      case "WavOp" => 
+        chiselMainTest(tutArgs, () => new WavOp()){
+          c => new WavOpTests(c, "../src/in.wav", "../out.wav")}
+      case "PicOp" => 
+        chiselMainTest(tutArgs, () => new PicOp()){
+          c => new PicOpTests(c, "../src/tst.im24", "../src/out.im24")}
     }
   }
 }
