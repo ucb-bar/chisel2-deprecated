@@ -1,0 +1,18 @@
+SBT := java -Xmx1024M -Xss8M -jar sbt-launch.jar
+
+tutorials = \
+	GCD \
+	Combinational \
+	Functional \
+	Mux2 \
+	Mux4 \
+	Accumulator \
+	Parity \
+	Memo \
+	Filter \
+	Tbl \
+	Life \
+	Mul \
+	Echo \
+	Risc \
+          

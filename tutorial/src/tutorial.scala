@@ -4,9 +4,7 @@ import Chisel._
 
 object Tutorial {
   def main(args: Array[String]): Unit = { 
-    val userArgs = args.slice(1, args.length) 
-    val dir = if (userArgs.contains("--v")) "../verilog" else "../emulator"
-    val tutArgs = userArgs ++ Array("--target-dir", dir, "--gen-harness");
+    val tutArgs = args.slice(1, args.length) 
     val res = 
     args(0) match {
       case "GCD" => 
