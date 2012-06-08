@@ -73,6 +73,7 @@
 % \end{scala}
 % \end{frame}
 
+\setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Logging into EC2}
 
 \begin{scala}
@@ -81,21 +82,25 @@ password: bootcamp
 \end{scala}
 
 \end{frame}
+\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
+\setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Using Screen}
 
-in order prevent lossage of state if disconnected ... when you first log in
+to prevent lossage of state if disconnected ... when you first log in, type
 \begin{scala}
 screen
 \end{scala}
 
-when you log back into the instance
+when you log back into the instance, type
 \begin{scala}
 screen -r
 \end{scala}
 
 \end{frame}
+\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
+\setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Getting the Latest}
 
 \begin{scala}
@@ -103,6 +108,48 @@ cd chisel
 git pull
 \end{scala}
 
+\end{frame}
+\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
+
+\begin{frame}[fragile]
+\frametitle{The Scala Programming Language}
+
+\begin{columns}[c]
+
+\column{0.75\textwidth}
+
+\begin{itemize}
+\item Compiled to JVM
+\begin{itemize}
+\item Good performance
+\item Great Java interoperability
+\item Mature debugging, execution environments
+\end{itemize}
+\item Object Oriented
+\begin{itemize}
+\item Factory Objects, Classes
+\item Traits, overloading etc
+\end{itemize}
+\item Functional
+\begin{itemize}
+\item Higher order functions
+\item Anonymous functions
+\item Currying etc
+\end{itemize}
+\item Extensible
+\begin{itemize}
+\item Domain Specific Languages (DSLs)
+\end{itemize}
+\end{itemize}
+
+\column{0.25\textwidth}
+
+\begin{center}
+\includegraphics[height=0.4\textheight]{figs/programming-scala.pdf} \\
+\includegraphics[height=0.4\textheight]{figs/programming-in-scala.pdf}
+\end{center}
+
+\end{columns}
 \end{frame}
 
 \begin{frame}[fragile]{Scala Functional}
