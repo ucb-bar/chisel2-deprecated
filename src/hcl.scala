@@ -98,6 +98,8 @@ object chiselMain {
         case "--folding" => isFolding = true; 
         case "--vcd" => isVCD = true;
         case "--v" => backendName = "v"; isEmittingComponents = true; isCoercingArgs = false;
+        case "--inlineMem" => isInlineMem = true;
+        case "--noInlineMem" => isInlineMem = false;
         case "--backend" => {
           backendName = args(i+1)
           assert(backendName == "v" || backendName == "c")
@@ -107,7 +109,7 @@ object chiselMain {
         case "--compile" => isCompilingEmittedC = true;
         case "--test" => isTestingC = true;
         case "--targetDir" => targetDir = args(i+1); i += 1;
-	case "--include" => includeArgs = splitArg(args(i+1)); i += 1;
+        case "--include" => includeArgs = splitArg(args(i+1)); i += 1;
         case any => println("UNKNOWN ARG");
       }
       i += 1;

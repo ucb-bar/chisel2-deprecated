@@ -118,7 +118,7 @@ class Reg extends Delay with proc {
       assigned = true; super.assign(src)
     }
   }
-  override def isMemOutput = Component.isEmittingComponents && updates.length == 1 && updates(0)._2.memSource != null
+  override def isMemOutput = updates.length == 1 && updates(0)._2.memSource != null
   override def emitInitC: String = {
     "  " + emitRef + " = random_initialization ? dat_t<" + width + ">::rand() : LIT<" + width + ">(0);\n"
   }

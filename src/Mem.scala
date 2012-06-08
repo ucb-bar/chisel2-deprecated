@@ -50,7 +50,8 @@ class Mem[T <: Data](val n: Int, gen: () => T) extends AccessTracker {
 
   def apply(addr: Bits) = {
     val (rdata, rport) = doRead(addr, conds.top)
-    rdata.memSource = rport
+    if (Component.isEmittingComponents && !Component.isInlineMem)
+      rdata.memSource = rport
     rdata.comp = doWrite(addr, conds.top, null.asInstanceOf[T], null.asInstanceOf[Bits])
     rdata
   }
@@ -60,6 +61,9 @@ class Mem[T <: Data](val n: Int, gen: () => T) extends AccessTracker {
   private def getPathName = component.getPathName + "_" + emitRef
 
   override def emitDef: String = {
+    if (Component.isInlineMem)
+      return ""
+
     reads.filter(r => r.used && r.getPortType == "read").foreach { r =>
       val pairedWrite = writes.find(w => w.used && w.isPossibleRW(r))
       if (!pairedWrite.isEmpty) {
@@ -84,7 +88,12 @@ class Mem[T <: Data](val n: Int, gen: () => T) extends AccessTracker {
     "  );\n"
   }
 
-  override def emitDec: String = ""
+  override def emitDec: String = {
+    if (Component.isInlineMem)
+      "  reg [" + (width-1) + ":0] " + emitRef + " [" + (n-1) + ":0];\n"
+    else
+      ""
+  }
 
   override def emitDecC: String = 
     "  mem_t<" + width + "," + n + "> " + emitRef + ";\n"
@@ -119,6 +128,12 @@ class MemRead[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits) extends MemA
   override def toString: String = mem + "[" + addr + "]"
   override def emitDefLoC: String = 
     "  " + emitTmp + " = " + mem.emitRef + ".get(" + addr.emitRef + ");\n"
+  override def emitDef: String = {
+    if (Component.isInlineMem)
+      "  assign " + emitTmp + " = " + mem.emitRef + "[" + addr.emitRef + "];\n"
+    else
+      ""
+  }
   override def emitPortDef(idx: Int): String = {
     "    .A" + idx + "(" + addr.emitRef + "),\n" +
     "    .CS" + idx + "(" + cond.emitRef + "),\n" +
@@ -157,6 +172,7 @@ class MemWrite[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits, datai: T, w
 
   def data = inputs(2)
   def wmask = inputs(3)
+  def isMasked = inputs.length > 3
   override def procAssign(src: Node) = {
     require(inputs.length == 2)
     inputs += src
@@ -167,13 +183,32 @@ class MemWrite[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits, datai: T, w
       return ""
     isHiC = true
     var res = "  if (" + cond.emitRef + ".to_bool()) {\n"
-    if (inputs.length > 3)
+    if (isMasked)
       res += "    " + mem.emitRef + ".put(" + addr.emitRef + ", (" + data.emitRef + " & " + wmask.emitRef + ") | (" + mem.emitRef + ".get(" + addr.emitRef + ") & ~" + wmask.emitRef + "));\n"
     else
       res += "    " + mem.emitRef + ".put(" + addr.emitRef + ", " + data.emitRef + ");\n"
     res += "  }\n"
     isHiC = false
     res
+  }
+  override def emitDef: String = {
+    if (!used || !Component.isInlineMem)
+      return ""
+
+    val i = "i" + emitTmp
+    if (isMasked)
+      "  generate\n" +
+      "    genvar " + i + ";\n" +
+      "    for (" + i + " = 0; " + i + " < " + mem.width + "; " + i + " = " + i + " + 1) begin: f" + emitTmp + "\n" +
+      "      always @(posedge clk)\n" +
+      "        if (" + cond.emitRef + " && " + wmask.emitRef + "[" + i + "])\n" +
+      "          " + mem.emitRef + "[" + addr.emitRef + "][" + i + "] <= " + data.emitRef + "[" + i + "];\n" +
+      "    end\n" +
+      "  endgenerate\n"
+    else
+      "  always @(posedge clk)\n" +
+      "    if (" + cond.emitRef + ")\n" +
+      "      " + mem.emitRef + "[" + addr.emitRef + "] <= " + data.emitRef + ";\n"
   }
   override def emitPortDef(idx: Int): String = {
     var we = "1'b1"
@@ -188,7 +223,7 @@ class MemWrite[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits, datai: T, w
         a = we + " ? " + a + " : " + pairedRead.addr.emitRef
       res += "    .O" + idx + "(" + pairedRead.emitTmp + "),\n"
     }
-    if (inputs.length > 3)
+    if (isMasked)
       res += "    .WBM" + idx + "(" + wmask.emitRef + "),\n"
 
     res +
@@ -197,7 +232,7 @@ class MemWrite[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits, datai: T, w
     "    .CS" + idx + "(" + cs + "),\n" +
     "    .I" + idx + "(" + data.emitRef + ")"
   }
-  override def getPortType: String = (if (inputs.length > 3) "m" else "") + (if (isRW) "rw" else "write")
+  override def getPortType: String = (if (isMasked) "m" else "") + (if (isRW) "rw" else "write")
   override def used = super.used && inputs.length > 2
   override def isRamWriteInput(n: Node) = inputs.contains(n)
 }
