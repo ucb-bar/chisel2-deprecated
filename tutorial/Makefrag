@@ -16,5 +16,4 @@ tutorials = \
 	Mul \
 	Echo \
 	Risc \
-        Counter \ 
-          
+        Counter
