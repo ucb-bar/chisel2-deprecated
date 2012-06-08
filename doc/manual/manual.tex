@@ -489,6 +489,13 @@ users can wire to the result of a read as follows:
 v(a) := d
 \end{scala}
 
+Read-only memories can be expressed as Vecs of literals:
+
+\begin{scala}
+val rom = Vec(UFix(3), UFix(7), UFix(4), UFix(0)) { UFix(width=3) }
+val dout = rom(addr)
+\end{scala}
+
 % TODO: conditionally assigning to elements
 
 \subsection{Bit Width Inference}
