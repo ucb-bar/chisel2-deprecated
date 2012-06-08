@@ -76,7 +76,7 @@ tutorial/verilog/Makefile  \comment{\# Makefile for verilog products}
 % object Tutorial {
 %   def main(args: Array[String]): Unit = { 
 %     val tut_args = args.slice(1, args.length) ++ 
-%       Array("--target-dir", "../emulator", "--gen-harness")
+%       Array("--targetDir", "../emulator", "--genHarness")
 %     args(0) match {
 %       case "gcd" => 
 %         chiselMain(tut_args, () => new GCD())
@@ -372,7 +372,7 @@ val parity = xorR(x)
 // Equality
 val equ = x === y 
 // Inequality 
-val neq = x = y   
+val neq = x != y   
 \end{scala}
 \end{frame}
 
@@ -490,11 +490,10 @@ import Chisel._
 
 object Tutorial {
   def main(args: Array[String]) = {
-    val tutOpts = Array("--target-dir", "../emulator", "--gen-harness")
-    val tutArgs = args.slice(1, args.length) ++ tutOpts
+    val args = args.slice(1, args.length)
     args(0) match {
       case "combinational" => 
-        chiselMain(tutArgs, () => new Combinational())
+        chiselMain(args, () => new Combinational())
       ...
     }
   }
@@ -511,10 +510,9 @@ object Tutorial {
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
 def main(args: Array[String]) = {
-  val tutOpts = Array("--target-dir", "../emulator", "--gen-harness")
-  val tutArgs = args.slice(1, args.length) ++ tutOpts
+ val args = args.slice(1, args.length)
   args(0) match {
-    case "combinational" => chiselMain(tutArgs, () => new Combinational())
+    case "combinational" => chiselMain(args, () => new Combinational())
 } }
 \end{scala}
 
@@ -531,18 +529,24 @@ produce combinational circuit app named \code{tutorial/emulator/Combination}:
 sbt
 sbt> project tutorial
 sbt> compile
-sbt> run combinational --compile
+sbt> run Combinational --backend c --targetDir ../emulator --compile --genHarness
 sbt> exit
 \end{scala}
 
 or on one line
 
 \begin{scala}
-sbt "project tutorial" "run combinational --compile"
+sbt "project tutorial" "run Combinational --backend c --targetDir ../emulator --compile --genHarness"
 \end{scala}
 }
 \end{frame}
 \setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
+
+\begin{frame}{Chisel Workflow}
+\begin{center}
+\includegraphics[height=0.9\textheight]{figs/chisel-workflow.pdf}
+\end{center}
+\end{frame}
 
 \begin{frame}[fragile]{Defining a Tester}
 
@@ -596,13 +600,13 @@ def step(vars: HashMap[Node, Node]): Boolean
 }
 \begin{tiny}
 \begin{itemize}
-\item user subclasses \code{Tester} defining CUT and
+\item user subclasses \code{Tester} defining DUT and
 \code{testNodes} and tests in \code{defTests} body
 \item \code{vars} is mapping from \code{testNodes} to literals, called bindings
 \item \code{step} runs test with given bindings, where
-var values for input ports are sent to CUT,
-CUT computes next outputs, and
-CUT sends next outputs to Chisel
+var values for input ports are sent to DUT,
+DUT computes next outputs, and
+DUT sends next outputs to Chisel
 \item finally \code{step} compares received values against var values
   for and returns false if any comparisons fail
   output ports
@@ -610,7 +614,7 @@ CUT sends next outputs to Chisel
 \end{tiny}
 
 \begin{center}
-\includegraphics[width=0.9\textwidth]{figs/CUT.pdf}
+\includegraphics[width=0.9\textwidth]{figs/DUT.pdf}
 \end{center}
 
 \end{columns}
@@ -640,7 +644,7 @@ chiselMainTest(args + "--test", () => new Combinational()){
 
 \begin{scala}
 cd $CHISEL/tutorial/sbt
-sbt "project tutorial" "run combinational --compile --test"
+sbt "project tutorial" "run Combinational ... --compile --test"
 ...
 PASSED
 \end{scala}
@@ -760,22 +764,23 @@ class Mux2 extends Component {
 \begin{scala}
 sbt 
 sbt> project tutorial
-sbt> compile                     // compiles chisel scala code
-sbt> run combinational           // produces C++ files
-sbt> run combinational --compile // produces C++ files and compiles
-sbt> run combinational --test    // produces C++ files, compiles, tests
+sbt> compile                     // compiles Chisel Scala code
+sbt> run Combinational           // produces C++ files
+sbt> run Combinational --compile // produces C++ files and compiles
+sbt> run Combinational --test    // produces C++ files, compiles, tests
 sbt> exit
 \end{scala}
 
 with a complete set of command line arguments being:\\[2mm]
 
 \begin{tabular}{lll}
-\verb+--target-dir+ & target pathname prefix \\
-\verb+--gen-harness+ & generate harness file for C++ \\
+\verb+--targetDir+ & target pathname prefix \\
+\verb+--genHarness+ & generate harness file for C++ \\
 \verb+--debug+ & put all wires in C++ class file \\
 \verb+--compile+ & compiles generated C++ \\
 \verb+--test+ & runs tests using C++ app \\
-\verb+--v+ & generate verilog \\
+\verb+--backend v+ & generate verilog \\
+\verb+--backend c+ & generate C++ (default)\\
 \verb+--vcd+ & enable vcd dumping \\
 \end{tabular}
 \end{frame}
@@ -783,13 +788,13 @@ with a complete set of command line arguments being:\\[2mm]
 \begin{frame}[fragile]{Creating Verilog}
 
 \begin{scala}
-cd $CHISEL/tutorial/sbt; sbt "project tutorial" "run mux2 --v"
+cd $CHISEL/tutorial/sbt; sbt "project tutorial" "run Mux2 --backend v ..."
 \end{scala}
 
 or through makefile:
 
 \begin{scala}
-cd $CHISEL/tutorial/verilog; make mux2
+cd $CHISEL/tutorial/verilog; make Mux2
 \end{scala}
 
 producing \code{Mux2.v}:
@@ -818,8 +823,24 @@ endmodule
 
 \end{frame}
 
+\begin{frame}[fragile]{Producing VCD}
+
+\begin{scala}
+cd $CHISEL/tutorial/sbt
+sbt "project tutorial" "run Mux2 --backend c ... --vcd --compile --test"
+\end{scala}
+
+which then produces
+
+\begin{scala}
+$CHISEL/tutorial/emulator/Mux2.vcd
+\end{scala}
+
+which you can view with a vcd viewer
+\end{frame}
+
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
-\begin{frame}[fragile]{Component Hierarchy Problem -- \tt mux4.scala}
+\begin{frame}[fragile]{Component Hierarchy Problem -- \tt Mux4.scala}
 \begin{itemize}
 \item child components stored in fields of parent
 \item now write 4-to-1 mux out of 3 2-to-1 mux's
@@ -842,6 +863,7 @@ class Mux4 extends Component {
   io.out := io.in0 & io.in1 & io.in2 & io.in3 & io.sel 
 }
 \end{scala}
+
 \end{frame}
 \setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 % \begin{frame}[fragile]{Running Examples By Hand}
@@ -1087,6 +1109,27 @@ class Parity extends Component {
 \end{scala}
 \end{frame}
 
+\setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
+\begin{frame}[fragile]{FSM Problem -- \tt VendingMachine.scala}
+\begin{itemize}
+\item write vending machine which needs accepts 20 cents or more before raising valid high
+\end{itemize}
+\begin{scala}
+class VendingMachine extends Component {
+  val io = new Bundle {
+    val nickel = Bool(dir = INPUT)
+    val dime   = Bool(dir = INPUT)
+    val valid  = Bool(dir = OUTPUT) }
+  val sIdle :: s5 :: s10 :: s15 :: sOk :: Nil = Enum(5){ UFix() }
+  val state = Reg(resetVal = sIdle)
+
+  // flush this out ...
+
+  io.valid := (state === sOk)
+}
+\end{scala}
+\end{frame}
+\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
 \begin{frame}[fragile]{ROM}
 
@@ -1320,7 +1363,7 @@ class CrossbarIO(n: Int) extends Bundle {
 \end{scala}
 
 \noindent
-where \code{clone} binds the construction argument \code{n} to cloning.
+where \code{clone} definition fixes cloning, by incorporating the crossbar construction argument \code{n} in cloning.
 
 \end{frame}
 
@@ -1401,15 +1444,14 @@ class FIFOIO[T <: Data]()(data: => T) extends Bundle {
   val bits  = data.asOutput
 }
 
-class EnqIO[T <: Data]()(data: => T) extends FIFOIO(data) {
+class EnqIO[T <: Data]()(data: => T) extends FIFOIO()(data) {
   def enq(dat: T): T = { valid := Bool(true); data := dat; dat }
   valid := Bool(false);
-  data.fromBits(Bits(0))
-  // for (io <- data.flatten.map(x => x._2))
-  //   io := UFix(0, io.getWidth());
+  for (io <- data.flatten.map(x => x._2))
+    io := UFix(0, io.getWidth());
 }
 
-class DeqIO[T <: Data]()(data: => T) extends FIFOIO(data) {
+class DeqIO[T <: Data]()(data: => T) extends FIFOIO()(data) {
   flip()
   ready := Bool(false);
   def deq(b: Boolean = false): T = { ready := Bool(true); data }
@@ -1610,6 +1652,16 @@ object ChiselBuild extends Build {
 
 \end{frame}
 
+\begin{frame}[fragile]{Keep in Touch}
+\begin{center}
+\begin{tabular}{rl}
+\textbf{website} & \url{chisel.eecs.berkeley.edu} \\
+\textbf{mailing list} & \url{groups.google.com/group/chisel-users} \\
+\textbf{github} & \url{https://github.com/ucb-bar/chisel/} \\
+\end{tabular}
+\end{center}
+\end{frame}
+
 \begin{frame}[fragile]{Port Views}
 
 {\lstset{basicstyle={\tiny\ttfamily}}
@@ -1648,7 +1700,7 @@ class Cpu extends Component {
 % \begin{scala}
 % object tutorial {
 %   def main(args: Array[String]) = {
-%     chiselMainDebug(args ++ Array("--gen-harness"), 
+%     chiselMainDebug(args ++ Array("--genHarness"), 
 %                    () => new Mux2())(
 %       c => Scanner("%x %x %x", c.io.sel, c.io.in0, c.io.in1),
 %       c => Printer("%x %x %x %x", c.io.sel, c.io.in0, c.io.in1, c.io.out))

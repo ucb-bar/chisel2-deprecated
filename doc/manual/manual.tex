@@ -852,7 +852,7 @@ object chiselMain {
 which when run creates C++ files named
 \code{{\it component\_name}.cpp} and \code{{\it component\_name}.h} in
 the directory specified with
-\code{--target-dir {\it dir\_name}} argument.
+\code{--targetDir {\it dir\_name}} argument.
 
 % \begin{scala}
 % class TestIO
@@ -877,7 +877,7 @@ the directory specified with
 % \begin{scala}
 % object tutorial {
 %   def main(args: Array[String]) = {
-%     val dargs = args ++ Array("--gen-harness")
+%     val dargs = args ++ Array("--genHarness")
 %     chiselMainDebug(dargs, () => new Mux2())(
 %       c => Scanner("%x %x %x",
 %                    c.io.sel, c.io.in0, c.io.in1),
@@ -902,7 +902,7 @@ the directory specified with
 % \begin{scala}
 % object tutorial {
 %   def main(args: Array[String]) = {
-%     val dargs = args ++ Array("--gen-harness")
+%     val dargs = args ++ Array("--genHarness")
 %     chiselMainDebug(dargs, () => new Mux2())(
 %       c => Scanner("%x", c.io),
 %       c => Printer("%x", c.io)
@@ -912,7 +912,7 @@ the directory specified with
 %  
 % Using \code{--generate-harness} for \code{Mux2}
 % creates a \code{Mux2-emulator.cpp}  and \code{Mux2-makefile} in directory
-% specified by \code{--target-dir}.  The user can then compile it using:
+% specified by \code{--targetDir}.  The user can then compile it using:
 % 
 % \begin{scala}
 % make -f Mux2-makefile
@@ -943,10 +943,10 @@ the directory specified with
  
 \begin{figure}
 \begin{center}
-\includegraphics[width=0.45\textwidth]{../tutorial/figs/CUT.pdf}
+\includegraphics[width=0.45\textwidth]{../tutorial/figs/DUT.pdf}
 \end{center}
-\caption{CUT run under Scala with stdin and stdout connected}
-\label{fig:cut}
+\caption{DUT run using a Tester object in Scala with stdin and stdout connected}
+\label{fig:dut}
 \end{figure}
  
 Testing is a crucial part of circuit design, 
@@ -970,7 +970,7 @@ def defTests(body: => Boolean)
 
 \noindent
 where \code{testNodes} are the graph nodes that will be input to and
-output from the CUT, and where
+output from the DUT, and where
 users write calls to \code{step} in the body.  Users connect tester
 instances to components using:
 
@@ -984,10 +984,10 @@ object chiselMainTest {
 
 \noindent
 When \code{--test} is given as an argument to \code{chiselMain}, a
-tester instance runs the Circuit Under Test (CUT) in a separate
+tester instance runs the Design Under Test (DUT) in a separate
 process with stdin and stdout connected so that inputs can be sent to
-the CUT and outputs can received from the CUT as shown in
-Figure~\ref{fig:cut}.
+the DUT and outputs can received from the DUT as shown in
+Figure~\ref{fig:dut}.
 \noindent
 
 \begin{scala}
@@ -996,9 +996,9 @@ def step(vars: HashMap[Node, Node]): Boolean
 
 \noindent
 where \code{vars} is a mapping of test nodes to literals, 
-with assignments to input nodes being sent to the CUT and assignments to
+with assignments to input nodes being sent to the DUT and assignments to
 non-input nodes being interpreted as expected values.
-\code{test} first sends inputs specifed in vars, steps the CUT and then either
+\code{test} first sends inputs specifed in vars, steps the DUT and then either
 compares expected values from vars or sets vars for test nodes without
 entries in \code{vars}.
 The following is an example for defining tests for \code{Mux2}:
@@ -1048,7 +1048,7 @@ chiselMainTest(args + "--test", () => new Mux2()){
 %            Array(1, 1, 0, 0),
 %            Array(1, 1, 1, 1))
 %   def main(args: Array[String]) = {
-%     val targs = args ++ Array("--gen-harness") 
+%     val targs = args ++ Array("--genHarness") 
 %     chiselMainTest(targs, () => new Mux2())(
 %       c => Printer("%x", c.io),
 %       c => Tester(tsts, c.io)
@@ -1060,12 +1060,13 @@ chiselMainTest(args + "--test", () => new Mux2()){
 Finally, command arguments for \code{chiselMain*} are as follows: \\
 
 \begin{tabular}{lll}
-\code{--target-dir} & target pathname prefix \\
-\code{--gen-harness} & generate harness file for C++ \\
+\code{--targetDir} & target pathname prefix \\
+\code{--genHarness} & generate harness file for C++ \\
 \code{--debug} & put all wires in C++ class file \\
 \code{--compile} & compiles generated C++ \\
 \code{--test} & runs tests using C++ app \\
-\code{--v} & generate verilog \\
+\verb+--backend v+ & generate verilog \\ 
+\verb+--backend c+ & generate C++ (default)\\
 \code{--vcd} & enable vcd dumping \\
 \end{tabular}
 
