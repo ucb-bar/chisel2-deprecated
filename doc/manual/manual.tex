@@ -100,6 +100,8 @@ class Node {
   def fromBits(x: Bits): this.type
   // return lit value if inferrable else null
   def litOf: Lit
+  // return value of lit if litOf is non null
+  def litValue(default: BigInt = BigInt(-1)): BigInt
 }
 \end{scala}
 

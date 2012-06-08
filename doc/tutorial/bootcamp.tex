@@ -51,22 +51,6 @@
 \titlepage
 \end{frame}
 
-\begin{frame}[fragile]{chisel repo}
-\begin{FramedSemiVerb}
-src                        \comment{\# chisel scala source code}
-csrc                       \comment{\# chisel emulator source code}
-doc                        \comment{\# documentation}
-www                        \comment{\# web sources}
-tutorial                   \comment{\# tutorial project}
-tutorial/src               \comment{\# tutorial source code}
-tutorial/sbt               \comment{\# tutorial sbt files}
-tutorial/emulator          \comment{\# tutorial emulator build products}
-tutorial/emulator/Makefile \comment{\# Makefile for emulator products} 
-tutorial/verilog           \comment{\# tutorial verilog build products} 
-tutorial/verilog/Makefile  \comment{\# Makefile for verilog products} 
-\end{FramedSemiVerb}
-\end{frame}
-
 % \begin{frame}[fragile]{tutorial.scala}
 % \begin{scala}
 % package Tutorial {
@@ -334,8 +318,8 @@ val out = (sel & in1) | (~sel & in0)
 \includegraphics[height=0.94in]{../manual/figs/bits-1.pdf} &
 \includegraphics[height=1.96in]{../manual/figs/bits-and.pdf} &
 \includegraphics[height=3.0in]{../manual/figs/bits-or-and.pdf} \\
-\code{Bits(1)} & \code{Bits(1) \& Bits(2)} &
-\code{(Bits(1) \& Bits(2)) | Bits(3)} \\
+\code{a = Bits(1)} & \code{b = a \& Bits(2)} &
+\code{b | Bits(3)} \\
 \end{tabular}
 \end{center}
 \end{frame}
@@ -462,9 +446,25 @@ val lte = a <= b
 \end{center}
 \end{frame}
 
+\begin{frame}[fragile]{chisel repo}
+\begin{FramedSemiVerb}
+src                        \comment{\# chisel scala source code}
+csrc                       \comment{\# chisel emulator source code}
+doc                        \comment{\# documentation}
+www                        \comment{\# web sources}
+tutorial                   \comment{\# tutorial project}
+tutorial/src               \comment{\# tutorial source code}
+tutorial/sbt               \comment{\# tutorial sbt files}
+tutorial/emulator          \comment{\# tutorial emulator build products}
+tutorial/emulator/Makefile \comment{\# Makefile for emulator products} 
+tutorial/verilog           \comment{\# tutorial verilog build products} 
+tutorial/verilog/Makefile  \comment{\# Makefile for verilog products} 
+\end{FramedSemiVerb}
+\end{frame}
+
 \begin{frame}[fragile]{Combinational -- \tt tutorial/src/combinational.scala}
 \begin{scala}
-package Tutorial {
+package Tutorial
 
 import Chisel._
 
@@ -476,15 +476,13 @@ class Combinational extends Component {
   }
   io.z := io.x + io.y
 }
-
-}
 \end{scala}
 \end{frame}
 
 \begin{frame}[fragile]{Tutorial Main -- \tt tutorial/src/tutorial.scala}
 
 \begin{scala}
-package Tutorial {
+package Tutorial
 
 import Chisel._
 
@@ -497,8 +495,6 @@ object Tutorial {
       ...
     }
   }
-}
-
 }
 \end{scala}
 \end{frame}
@@ -554,7 +550,7 @@ sbt "project tutorial" "run Combinational --backend c --targetDir ../emulator --
 \column{0.45\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-package Tutorial {
+package Tutorial
 import Chisel._
 import scala.collection.mutable.HashMap
 import scala.util.Random
@@ -584,7 +580,7 @@ class CombinationalTests(c: Combinational)
       allGood      = step(vars) && allGood
     }
     allGood
-  } } }
+} }
 \end{scala}
 }
 \column{0.45\textwidth}
@@ -928,12 +924,12 @@ def squareWave(period: UFix) = toggle(pulse(period))
 \end{frame}
 
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
-\begin{frame}[fragile]{Sequential Circuit Problem -- \tt sequential.scala}
+\begin{frame}[fragile]{Sequential Circuit Problem -- \tt Accumulator.scala}
 \begin{itemize}
 \item write sequential circuit that counts trues 
 \end{itemize}
 \begin{scala}
-class Sequential extends Component {
+class Accumulator extends Component {
   val io = new Bundle {
     val in  = Bool(INPUT)
     val out = UFix(8, OUTPUT)
@@ -1157,7 +1153,7 @@ val r = m(counter(UFix(3)))
 \end{frame}
 
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
-\begin{frame}[fragile]{Multiplication Lookup Table Problem -- \tt mul.scala}
+\begin{frame}[fragile]{Multiplication Lookup Table Problem -- \tt Mul.scala}
 \begin{itemize}
 \item write 16x16 multiplication table using \code{Vec}
 \end{itemize}
@@ -1222,7 +1218,7 @@ val mdat = regs(maddr)
 % \end{frame}
 
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
-\begin{frame}[fragile]{Table Problem -- \tt memo.scala}
+\begin{frame}[fragile]{Table Problem -- \tt Memo.scala}
 \begin{itemize}
 \item write read/write table using \code{Mem}
 \end{itemize}
@@ -1317,7 +1313,7 @@ where the \verb+io+ field contains \verb+FilterIO+.
 \end{frame}
 
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
-\begin{frame}[fragile]{Even Filter Problem -- \tt filter.scala}
+\begin{frame}[fragile]{Even Filter Problem -- \tt Filter.scala}
 \begin{itemize}
 \item write filter that filters out even numbers
 \end{itemize}
@@ -1333,6 +1329,28 @@ class Filter extends Component {
 \end{scala}
 \end{frame}
 \setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
+
+\begin{frame}[fragile]{Testing Decoupled Circuits}
+
+\begin{scala}
+class GCDTests(c: GCD) extends Tester(c, Array(c.io)) {
+  defTests {
+    val (a, b, z) = (64, 48, 16)
+    val svars = new HashMap[Node, Node]()
+    val ovars = new HashMap[Node, Node]()
+    var t = 0
+    do {
+      svars(c.io.a) = UFix(a)
+      svars(c.io.b) = UFix(b)
+      step(svars, ovars)
+      t += 1
+    } while (t <= 1 || ovars(c.io.v).litValue() == 0)
+    ovars(c.io.z).litValue() == z
+  }
+}
+\end{scala}
+
+\end{frame}
 
 \begin{frame}[fragile]{Bundle Vectors}
 
@@ -1444,6 +1462,40 @@ class FIFOIO[T <: Data]()(data: => T) extends Bundle {
   val bits  = data.asOutput
 }
 
+class PipeIO[+T <: Data]()(data: => T) extends Bundle {
+  val valid = Bool(OUTPUT)
+  val bits  = data.asOutput
+}
+\end{scala}
+\end{frame}
+
+\setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
+\begin{frame}[fragile]{Decoupled GCD Problem -- \tt RealGCD.scala}
+
+\begin{scala}
+class RealGCDInput extends Bundle {
+  val a = Bits(width = 16)
+  val b = Bits(width = 16)
+}
+
+class RealGCD extends Component {
+  val io  = new Bundle {
+    val in  = new FIFOIO()( new RealGCDInput() ).flip()
+    val out = new PipeIO()( Bits(width = 16) )
+  }
+
+  // flush this out ...
+}
+\end{scala}
+
+\end{frame}
+\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
+
+
+\begin{frame}[fragile]{Object Oriented FIFOIO}
+
+{\lstset{basicstyle={\scriptsize\ttfamily}}
+\begin{scala}
 class EnqIO[T <: Data]()(data: => T) extends FIFOIO()(data) {
   def enq(dat: T): T = { valid := Bool(true); data := dat; dat }
   valid := Bool(false);
@@ -1456,11 +1508,7 @@ class DeqIO[T <: Data]()(data: => T) extends FIFOIO()(data) {
   ready := Bool(false);
   def deq(b: Boolean = false): T = { ready := Bool(true); data }
 }
-\end{scala}
-\end{frame}
 
-\begin{frame}[fragile]{Enq/Deq Example}
-\begin{scala}
 class Filter[T <: Data]()(data: => T) extends Component {
   val io = new Bundle {
     val in  = (new DeqIO()){ data }
@@ -1471,6 +1519,8 @@ class Filter[T <: Data]()(data: => T) extends Component {
   }
 }
 \end{scala}
+}
+
 \end{frame}
 
 \begin{frame}[fragile]{Router Interface}
@@ -1504,7 +1554,7 @@ class RouterIO(n: Int) extends Bundle {
 \end{frame}
 
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
-\begin{frame}[fragile]{Router Problem -- \tt router.scala}
+\begin{frame}[fragile]{Router Problem -- \tt Router.scala}
 \begin{scala}
 class Router extends Component {
   val depth = 32;
@@ -1515,6 +1565,9 @@ class Router extends Component {
   // flush it out ...
 }
 \end{scala}
+\begin{center}
+\includegraphics[height=0.45\textheight]{figs/trouter.pdf} 
+\end{center}
 \end{frame}
 \setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
@@ -1637,18 +1690,20 @@ object ChiselBuild extends Build {
 
 \begin{frame}[fragile]{Projects Ideas}
 
-\begin{itemize}
-\item audio processing
-\item image processing
-\item risc processor
-\item game of life
-\item router
-\item network
-\item fft
-\item cryptography
-\item serial multiplier
-\item pong
-\end{itemize}
+\begin{center}
+\begin{tabular}{rl}
+\textbf{audio processing} & \code{Echo.scala} \\
+\textbf{image processing} & \code{Darken.scala} \\
+\textbf{risc processor} & \code{Risc.scala} \\
+\textbf{game of life} & \code{Life.scala} \\
+\textbf{router} & \code{Router.scala} \\
+\textbf{network} & \\
+\textbf{fft} & \\
+\textbf{cryptography} & \\
+\textbf{serial multiplier} & \\
+\textbf{pong} & \\
+\end{tabular}
+\end{center}
 
 \end{frame}
 
@@ -1658,43 +1713,44 @@ object ChiselBuild extends Build {
 \textbf{website} & \url{chisel.eecs.berkeley.edu} \\
 \textbf{mailing list} & \url{groups.google.com/group/chisel-users} \\
 \textbf{github} & \url{https://github.com/ucb-bar/chisel/} \\
+\textbf{me} & \url{jrb@pobox.com} \\
 \end{tabular}
 \end{center}
 \end{frame}
 
-\begin{frame}[fragile]{Port Views}
-
-{\lstset{basicstyle={\tiny\ttfamily}}
-\begin{scala}
-class RomIo extends Bundle {
-  val isVal = Bool(INPUT)
-  val raddr = UFix(32, INPUT)
-  val rdata = Bits(32, OUTPUT)
-}
-
-class CpathIo extends Bundle() {
-  val imem = RomIo().flip()
-  val dmem = RamIo().flip()
-  ...
-}
-
-class Cpu extends Component {
-  val io = new CpuIo()
-  val c  = new CtlPath()
-  val d  = new DatPath()
-  c.io.ctl  <> d.io.ctl
-  c.io.dat  <> d.io.dat
-  c.io.imem <> io.imem
-  d.io.imem <> io.imem
-  c.io.dmem <> io.dmem
-  d.io.dmem <> io.dmem
-  d.io.host <> io.host
-}
-\end{scala}
-}
-
-\end{frame}
-
+% \begin{frame}[fragile]{Port Views}
+% 
+% {\lstset{basicstyle={\tiny\ttfamily}}
+% \begin{scala}
+% class RomIo extends Bundle {
+%   val isVal = Bool(INPUT)
+%   val raddr = UFix(32, INPUT)
+%   val rdata = Bits(32, OUTPUT)
+% }
+% 
+% class CpathIo extends Bundle() {
+%   val imem = RomIo().flip()
+%   val dmem = RamIo().flip()
+%   ...
+% }
+% 
+% class Cpu extends Component {
+%   val io = new CpuIo()
+%   val c  = new CtlPath()
+%   val d  = new DatPath()
+%   c.io.ctl  <> d.io.ctl
+%   c.io.dat  <> d.io.dat
+%   c.io.imem <> io.imem
+%   d.io.imem <> io.imem
+%   c.io.dmem <> io.dmem
+%   d.io.dmem <> io.dmem
+%   d.io.host <> io.host
+% }
+% \end{scala}
+% }
+% 
+% \end{frame}
+% 
 % \begin{frame}[fragile, shrink]{Testing Examples}
 % 
 % \begin{scala}
