@@ -2,7 +2,7 @@ SBT := java -Xmx1024M -Xss8M -jar sbt-launch.jar
 
 tutorials = \
 	GCD \
-        RealGCD \
+	RealGCD \
 	Combinational \
 	Functional \
 	Mux2 \
@@ -16,5 +16,4 @@ tutorials = \
 	Mul \
 	Echo \
 	Risc \
-        Counter \ 
-          
+	Counter \
