@@ -1033,7 +1033,7 @@ class Mux2Tests(c: Mux2)
       vars(c.io.in1) = Bits(i1)
       vars(c.io.in0) = Bits(i0)
       vars(c.io.out) = Bits(if (s == 1) i1 else i0)
-      allGood = step(vars) && allGood
+      allGood &&= step(vars)
     } } } 
     allGood
   }
