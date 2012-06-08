@@ -489,6 +489,13 @@ users can wire to the result of a read as follows:
 v(a) := d
 \end{scala}
 
+Read-only memories can be expressed as Vecs of literals:
+
+\begin{scala}
+val rom = Vec(UFix(3), UFix(7), UFix(4), UFix(0)) { UFix(width=3) }
+val dout = rom(addr)
+\end{scala}
+
 % TODO: conditionally assigning to elements
 
 \subsection{Bit Width Inference}
@@ -686,52 +693,68 @@ where \code{resetVal} is the value a reg takes on when implicit
 
 \section{Mems}
 
-Chisel provides facilities for creating both read only and
-read/write memories.  
+Chisel supports random-access memories via the Mem construct.  Writes to Mems
+are positive-edge-triggered and reads are either combinational or
+positive-edge-triggered.  
 
 \begin{scala}
 object Mem {
-  def apply[T <: Data](depth: Int)(type: => T): Mem
+  def apply[T <: Data](depth: Int,
+          seqRead: Boolean = false)
+        (type: => T): Mem
 }
 
-class Mem[T <: Data](n: Int, type: () => T) 
+class Mem[T <: Data](depth: Int,
+      seqRead: Booolean,
+      type: () => T) 
     extends Updateable {
   def apply(idx: UFix): T
 }
-
-class MemRead[T <: Data]
-      (val ram: Mem, val idx: UFix) extends Node {
-  override def := (data: T): T
-}
-
-class MemWrite[T <: Data]
-      (val ram: Mem, val idx: UFix, val kind: T) 
-    extends Node
 \end{scala}
 
-\noindent
-where a \code{:=} method on \code{MemRead} permits the nice syntax for
-memory writes:
+Ports into Mems are created by applying a \code{UFix} index.  A 32-entry
+register file with one write port and two combinational read ports might be
+expressed as follows:
 
 \begin{scala}
-// memory construction
-val m = Mem(n){ UFix(width = 32) }
-// memory read
-val d = m(addr)
-// memory write
-m(addr) := x + UFix(1)
-// conditional memory write
-when (en) {
-  m(addr) := x - UFix(1)
-}
+val rf = Mem(32) { UFix(width = 64) }
+when (wen) { rf(waddr) := wdata }
+val dout1 = rf(waddr1)
+val dout2 = rf(waddr2)
 \end{scala}
 
-\begin{example}
-todo: rules for 
-o determining number of ports
-o setting read latency
-o inferring write mask
-\end{example}
+If the optional parameter seqRead is set, Chisel will attempt to infer
+sequential read ports when a Reg is assigned the output of a Mem.  A one-read,
+one-write SRAM might be described as follows:
+
+\begin{scala}
+val ram1r1w = Mem(1024, seqRead = true) { Bits(width = 32) }
+val dout = Reg() { Bits() }
+when (wen) { ram1r1w(waddr) := wdata }
+when (ren) { dout := ram1r1w(raddr) }
+\end{scala}
+
+Single-ported SRAMs can be inferred when the read and write conditions are
+mutually exclusive in the same \code{when} chain:
+
+\begin{scala}
+val ram1p = Mem(1024, seqRead = true) { Bits(width = 32) }
+val dout = Reg() { Bits() }
+when (wen) { ram1p(waddr) := wdata }
+.elsewhen (ren) { dout := ram1p(raddr) }
+\end{scala}
+
+If the same Mem address is both written and sequentially read on the same clock
+edge, or if a sequential read enable is cleared, then the read data is
+implementation-defined.
+
+Mem also supports write masks for subword writes.  A given bit is written if
+the corresponding mask bit is set.
+
+\begin{scala}
+val ram = Mem(256) { Bits(width = 32) }
+when (wen) { ram.write(waddr, wdata, wmask) }
+\end{scala}
 
 \section{Ports}
 \label{sec:ports}
@@ -1017,7 +1040,7 @@ class Mux2Tests(c: Mux2)
       vars(c.io.in1) = Bits(i1)
       vars(c.io.in0) = Bits(i0)
       vars(c.io.out) = Bits(if (s == 1) i1 else i0)
-      allGood = step(vars) && allGood
+      allGood &&= step(vars)
     } } } 
     allGood
   }

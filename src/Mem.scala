@@ -5,8 +5,8 @@ import Node._
 import scala.collection.mutable.ArrayBuffer
 
 object Mem {
-  def apply[T <: Data](n: Int)(gen: => T): Mem[T] = 
-    new Mem(n, () => gen)
+  def apply[T <: Data](n: Int, seqRead: Boolean = false)(gen: => T): Mem[T] = 
+    new Mem(n, seqRead, () => gen)
 }
 
 abstract class AccessTracker extends Delay {
@@ -14,13 +14,14 @@ abstract class AccessTracker extends Delay {
   def readAccesses: ArrayBuffer[MemAccess]
 }
 
-class Mem[T <: Data](val n: Int, gen: () => T) extends AccessTracker {
+class Mem[T <: Data](val n: Int, seqRead: Boolean, gen: () => T) extends AccessTracker {
   def writeAccesses = writes.map((x: MemAccess) => x)
   def readAccesses = reads.map((x: MemAccess) => x)
   val ports = ArrayBuffer[MemAccess]()
   val writes = ArrayBuffer[MemWrite[T]]()
   val reads = ArrayBuffer[MemRead[T]]()
   val data = gen().toNode
+  val inferSeqRead = seqRead && Component.isEmittingComponents
 
   inferWidth = fixWidth(data.getWidth)
 
@@ -50,7 +51,7 @@ class Mem[T <: Data](val n: Int, gen: () => T) extends AccessTracker {
 
   def apply(addr: Bits) = {
     val (rdata, rport) = doRead(addr, conds.top)
-    if (Component.isEmittingComponents && !Component.isInlineMem)
+    if (inferSeqRead && !Component.isInlineMem)
       rdata.memSource = rport
     rdata.comp = doWrite(addr, conds.top, null.asInstanceOf[T], null.asInstanceOf[Bits])
     rdata
@@ -166,7 +167,7 @@ class MemWrite[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits, datai: T, w
     val rp = getProducts(r.cond)
     wp.find(wc => rp.exists(rc => isNegOf(rc, wc) || isNegOf(wc, rc)))
   }
-  def isPossibleRW(r: MemRead[T]) = Component.isEmittingComponents && !emitRWEnable(r).isEmpty && !isRW
+  def isPossibleRW(r: MemRead[T]) = mem.inferSeqRead && !emitRWEnable(r).isEmpty && !isRW
   def isRW = pairedRead != null
   def setRW(r: MemRead[T]) = pairedRead = r
 
