@@ -55,6 +55,9 @@ object Tutorial {
       case "VendingMachine" =>
         chiselMainTest(tutArgs, () => new VendingMachine()){
           c => new VendingMachineTests(c)}
+      case "Router" => 
+        chiselMainTest(tutArgs, () => new Router()){
+          c => new RouterTests(c)}
       case "Echo" => 
         chiselMainTest(tutArgs, () => new Echo()){
           c => new EchoTests(c, "../src/in.wav", "../out.wav")}

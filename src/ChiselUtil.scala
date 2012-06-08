@@ -160,6 +160,7 @@ class EnqIO[T <: Data]()(data: => T) extends FIFOIO()(data)
   valid := Bool(false);
   for (io <- data.flatten.map(x => x._2))
     io := UFix(0, io.getWidth());
+  override def clone = { new EnqIO()(data).asInstanceOf[this.type]; }
 }
 
 class DeqIO[T <: Data]()(data: => T) extends FIFOIO()(data) 
