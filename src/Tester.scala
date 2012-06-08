@@ -28,17 +28,22 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
            ovarsI: HashMap[Node, Node] = null, 
            isTrace: Boolean = true): Boolean = {
     val ovars = if (ovarsI == null) svars else ovarsI;
+    if (isTrace) {
+        println("TEST CASE")
+        println("SETTING INPUTS")
+    }
     for (n <- testInputNodes) {
       val v = svars.getOrElse(n, null)
       val i = if (v == null) BigInt(0) else v.litValue() // TODO: WARN
       val s = i.toString(16)
-      if (isTrace) println(n + " = " + i)
+      if (isTrace) println("\t" + n + " = " + i)
       testOut.write(' ')
       for (c <- s)
         testOut.write(c)
       testOut.write('\n')
       testOut.flush
     }
+    if (isTrace) println("\nREADING OUTPUTS")
     var isSame = true
     var c = testIn.read
     val sb = new StringBuilder()
@@ -54,18 +59,21 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
       }
       val s = sb.toString
       val rv = toLitVal(s)
-      if (isTrace) println("READ " + o + " = " + rv)
+      if (isTrace) println("\tREAD " + o + " = " + rv)
       if (!svars.contains(o)) {
         ovars(o) = Literal(rv)
       } else {
         val tv = svars(o).litValue()
-        if (isTrace) println(o + " = " + tv)
+        if (isTrace) println("\tEXPCTED: " + o + " = " + tv)
         if (tv != rv) {
           isSame = false
-          if (isTrace) println("FAILURE")
+          if (isTrace) println("\tFAILURE")
+        } else {
+          if (isTrace) println("\tSUCCESS")
         }
       }
     }
+    if (isTrace) println("\n")
     isSame
   }
   def startTest: Process = {
