@@ -22,7 +22,7 @@ class Mux4 extends Component {
   
   // Modify this section to build a 4-to-1 mux out of 3 2-to-1 mux
   // The first mux is already done for you
-  io.out := io.in0 & io.in1 & io.in2 & io.in3 & io.sel
+
 
   //-------------------------------------------------------------------------\\
 }

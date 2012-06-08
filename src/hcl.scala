@@ -89,7 +89,7 @@ object chiselMain {
         case "--Wconnection" => saveConnectionWarnings = true
         case "--Wcomponent" => saveComponentTrace = true
         case "--noCombLoop" => dontFindCombLoop = true
-        case "--gen-harness" => isGenHarness = true; 
+        case "--genHarness" => isGenHarness = true; 
         case "--debug" => isDebug = true; 
         case "--ioDebug" => isIoDebug = true; 
         case "--noIoDebug" => isIoDebug = false; 
@@ -98,10 +98,18 @@ object chiselMain {
         case "--folding" => isFolding = true; 
         case "--vcd" => isVCD = true;
         case "--v" => backendName = "v"; isEmittingComponents = true; isCoercingArgs = false;
+        case "--inlineMem" => isInlineMem = true;
+        case "--noInlineMem" => isInlineMem = false;
+        case "--backend" => {
+          backendName = args(i+1)
+          assert(backendName == "v" || backendName == "c")
+          if(backendName == "v") { isEmittingComponents = true; isCoercingArgs = false }
+          i += 1
+        }
         case "--compile" => isCompilingEmittedC = true;
         case "--test" => isTestingC = true;
-        case "--target-dir" => targetDir = args(i+1); i += 1;
-	case "--include" => includeArgs = splitArg(args(i+1)); i += 1;
+        case "--targetDir" => targetDir = args(i+1); i += 1;
+        case "--include" => includeArgs = splitArg(args(i+1)); i += 1;
         case any => println("UNKNOWN ARG");
       }
       i += 1;

@@ -34,6 +34,7 @@ object Component {
   var isClockGatingUpdates = false;
   var isClockGatingUpdatesInline = false;
   var isVCD = false;
+  var isInlineMem = true;
   var isFolding = true;
   var isGenHarness = false;
   var isReportDims = false;
@@ -1341,6 +1342,13 @@ abstract class Component(resetSignal: Bool = null) {
       funNodes ++= fun.nodes;
     renameNodesC(funNodes);
     // renameNodesC(funs);
+    if (isTestingC && tester != null) {
+      scanArgs.clear();  scanArgs  ++= tester.testInputNodes;    scanFormat  = ""
+      printArgs.clear(); printArgs ++= tester.testNonInputNodes; printFormat = ""
+
+      for (n <- scanArgs ++ printArgs)
+        if(!omods.contains(n)) omods += n
+    } 
     for (m <- (omods ++ funNodes)) {
       if(m.name != "reset" || !(m.component == this)) {
         if (m.isInObject)
@@ -1417,10 +1425,6 @@ abstract class Component(resetSignal: Bool = null) {
       res.reverse
     }
     out_c.write("void " + name + "_t::print ( FILE* f ) {\n");
-    if (isTestingC && tester != null) {
-      scanArgs.clear();  scanArgs  ++= tester.testInputNodes;    scanFormat  = ""
-      printArgs.clear(); printArgs ++= tester.testNonInputNodes; printFormat = ""
-    } 
     if (printArgs.length > 0) {
       val format =
         if (printFormat == "") printArgs.map(a => "%x").reduceLeft((y,z) => z + " " + y) 

@@ -4,14 +4,15 @@ import Chisel._
 
 object Tutorial {
   def main(args: Array[String]): Unit = { 
-    val userArgs = args.slice(1, args.length) 
-    val dir = if (userArgs.contains("--v")) "../verilog" else "../emulator"
-    val tutArgs = userArgs ++ Array("--target-dir", dir, "--gen-harness");
+    val tutArgs = args.slice(1, args.length) 
     val res = 
     args(0) match {
       case "GCD" => 
         chiselMainTest(tutArgs, () => new GCD()){
           c => new GCDTests(c)}
+      case "RealGCD" => 
+        chiselMainTest(tutArgs, () => new RealGCD()){
+          c => new RealGCDTests(c)}
       case "Combinational" => 
         chiselMainTest(tutArgs, () => new Combinational()){
           c => new CombinationalTests(c)}
@@ -46,11 +47,17 @@ object Tutorial {
         chiselMainTest(tutArgs, () => new Mul()){
           c => new MulTests(c)}
       case "Echo" => 
-        chiselMainTest(tutArgs, () => new Echo("../src/in.wav", "../out.wav")){
-          c => new EchoTests(c)}
+        chiselMainTest(tutArgs, () => new Echo()){
+          c => new EchoTests(c, "../src/in.wav", "../out.wav")}
       case "Risc" => 
         chiselMainTest(tutArgs, () => new Risc()){
           c => new RiscTests(c)}
+      case "Counter" =>
+        chiselMainTest(tutArgs, () => new Counter()){
+          c => new CounterTest(c)}
+      case "VendingMachine" =>
+        chiselMainTest(tutArgs, () => new VendingMachine()){
+          c => new VendingMachineTests(c)}
     }
   }
 }

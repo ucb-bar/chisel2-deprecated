@@ -801,12 +801,13 @@ The \code{<>} operator bulk connects interfaces of opposite gender between
 sibling components or interfaces of same gender between parent/child components. 
 Bulk connections connect leaf ports using pathname matching.
 Connections are only made if one of the ports is non-null,
-allowing users to repeatedly bulk connect partially filled interfaces.
+allowing users to repeatedly bulk-connect partially filled interfaces.
 After all connections are made and the circuit is being elaborated,
 Chisel warns users if ports have other than exactly one connection to them.
 
-Nodes and subcomponents stored in component fields get their emitted
-names from their field names which are obtained using Scala introspection.
+The names given to the nodes and subcomponents stored in a component
+when they are emitted by a C++ or Verilog backend are obtained from
+their component field names, using Scala introspection.
 
 % TODO: what is same name -- is it a pathname?
 
@@ -848,7 +849,7 @@ object chiselMain {
 \end{scala}
 
 \noindent
-which when run creates a C++ files named
+which when run creates C++ files named
 \code{{\it component\_name}.cpp} and \code{{\it component\_name}.h} in
 the directory specified with
 \code{--targetDir {\it dir\_name}} argument.
@@ -959,8 +960,8 @@ class Tester[T <: Component]
 \end{scala}
 
 \noindent
-which binds a tester to a component, and where specify nodes to test,
-and finally where users write a \code{defTests} function.
+which binds a tester to a component, and specifies the nodes to test,
+and finally allows users to write a \code{defTests} function.
 The definition for \code{defTests} is:
 
 \begin{scala}
@@ -982,10 +983,11 @@ object chiselMainTest {
 \end{scala}
 
 \noindent
-When \code{--test} is given as an argument to \code{chiselMain}, 
-a tester instance runs the Design Under Test (DUT) is as a process
-with stdin and stdout connected so that inputs can be sent to the DUT and outputs can
-received from the DUT as shown in Figure~\ref{fig:dut}.  
+When \code{--test} is given as an argument to \code{chiselMain}, a
+tester instance runs the Design Under Test (DUT) in a separate
+process with stdin and stdout connected so that inputs can be sent to
+the DUT and outputs can received from the DUT as shown in
+Figure~\ref{fig:cut}.
 \noindent
 
 \begin{scala}
