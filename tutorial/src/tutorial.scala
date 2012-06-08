@@ -10,6 +10,9 @@ object Tutorial {
       case "GCD" => 
         chiselMainTest(tutArgs, () => new GCD()){
           c => new GCDTests(c)}
+      case "RealGCD" => 
+        chiselMainTest(tutArgs, () => new RealGCD()){
+          c => new RealGCDTests(c)}
       case "Combinational" => 
         chiselMainTest(tutArgs, () => new Combinational()){
           c => new CombinationalTests(c)}
@@ -49,6 +52,9 @@ object Tutorial {
       case "Risc" => 
         chiselMainTest(tutArgs, () => new Risc()){
           c => new RiscTests(c)}
+      case "Counter" =>
+        chiselMainTest(tutArgs, () => new Counter()){
+          c => new CounterTest(c)}
     }
   }
 }
