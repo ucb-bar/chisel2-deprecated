@@ -156,10 +156,10 @@ class FIFOIO[T <: Data]()(data: => T) extends Bundle
 
 class EnqIO[T <: Data]()(data: => T) extends FIFOIO()(data) 
 {
-  def enq(dat: T): T = { valid := Bool(true); data := dat; dat }
+  def enq(dat: T): T = { valid := Bool(true); bits := dat; dat }
   valid := Bool(false);
-  for (io <- data.flatten.map(x => x._2))
-    io := UFix(0, io.getWidth());
+  for (io <- bits.flatten.map(x => x._2))
+    io := UFix(0)
   override def clone = { new EnqIO()(data).asInstanceOf[this.type]; }
 }
 
@@ -167,7 +167,7 @@ class DeqIO[T <: Data]()(data: => T) extends FIFOIO()(data)
 {
   flip()
   ready := Bool(false);
-  def deq(b: Boolean = false): T = { ready := Bool(true); data }
+  def deq(b: Boolean = false): T = { ready := Bool(true); bits }
 }
 
 
