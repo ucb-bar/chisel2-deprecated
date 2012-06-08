@@ -372,7 +372,7 @@ val parity = xorR(x)
 // Equality
 val equ = x === y 
 // Inequality 
-val neq = x = y   
+val neq = x != y   
 \end{scala}
 \end{frame}
 
@@ -1363,7 +1363,7 @@ class CrossbarIO(n: Int) extends Bundle {
 \end{scala}
 
 \noindent
-where \code{clone} binds the construction argument \code{n} to cloning.
+where \code{clone} definition fixes cloning, by incorporating the crossbar construction argument \code{n} in cloning.
 
 \end{frame}
 
