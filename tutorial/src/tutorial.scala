@@ -47,14 +47,17 @@ object Tutorial {
         chiselMainTest(tutArgs, () => new Mul()){
           c => new MulTests(c)}
       case "Echo" => 
-        chiselMainTest(tutArgs, () => new Echo("../src/in.wav", "../out.wav")){
-          c => new EchoTests(c)}
+        chiselMainTest(tutArgs, () => new Echo()){
+          c => new EchoTests(c, "../src/in.wav", "../out.wav")}
       case "Risc" => 
         chiselMainTest(tutArgs, () => new Risc()){
           c => new RiscTests(c)}
       case "Counter" =>
         chiselMainTest(tutArgs, () => new Counter()){
           c => new CounterTest(c)}
+      case "VendingMachine" =>
+        chiselMainTest(tutArgs, () => new VendingMachine()){
+          c => new VendingMachineTests(c)}
     }
   }
 }

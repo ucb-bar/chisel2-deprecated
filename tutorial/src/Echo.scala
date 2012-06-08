@@ -7,7 +7,7 @@ import java.io.ByteArrayInputStream
 import javax.sound.sampled._
 import scala.collection.mutable.HashMap
 
-class Echo(val infile: String, val outfile: String) extends Component {
+class Echo extends Component {
   val io = new Bundle {
     val in = Bits(8, INPUT)
     val out = Bits(8, OUTPUT)
@@ -31,14 +31,14 @@ class Echo(val infile: String, val outfile: String) extends Component {
   io.out := outUnsigned
 }
 
-class EchoTests(c: Echo) extends Tester(c, Array(c.io)) {  
+class EchoTests(c: Echo, val infile: String, val outfile: String) extends Tester(c, Array(c.io)) {  
   defTests {
     val svars = new HashMap[Node, Node]()
     val ovars = new HashMap[Node, Node]()
 
-    val ais = AudioSystem.getAudioInputStream(new File(c.infile))
+    val ais = AudioSystem.getAudioInputStream(new File(infile))
     if (ais.getFormat.getChannels != 1 || ais.getFormat.getSampleSizeInBits != 8) {
-      println(c.infile + " must be 8-bit monoaural")
+      println(infile + " must be 8-bit monoaural")
       System.exit(-1)
     }
     val out = new EchoOutput(ais.getFormat)
@@ -51,7 +51,7 @@ class EchoTests(c: Echo) extends Tester(c, Array(c.io)) {
       sample = ais.read
     }
 
-    AudioSystem.write(out, AudioFileFormat.Type.WAVE, new File(c.outfile));
+    AudioSystem.write(out, AudioFileFormat.Type.WAVE, new File(outfile));
     true
   }
 }

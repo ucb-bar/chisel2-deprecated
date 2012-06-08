@@ -147,7 +147,30 @@ class PipeIO[+T <: Data]()(data: => T) extends Bundle
   val bits = data.asOutput
 }
 
-class FIFOIO[+T <: Data]()(data: => T) extends Bundle
+class FIFOIO[T <: Data]()(data: => T) extends Bundle
+{
+  val ready = Bool(INPUT)
+  val valid = Bool(OUTPUT)
+  val bits  = data.asOutput
+}
+
+class EnqIO[T <: Data]()(data: => T) extends FIFOIO()(data) 
+{
+  def enq(dat: T): T = { valid := Bool(true); data := dat; dat }
+  valid := Bool(false);
+  for (io <- data.flatten.map(x => x._2))
+    io := UFix(0, io.getWidth());
+}
+
+class DeqIO[T <: Data]()(data: => T) extends FIFOIO()(data) 
+{
+  flip()
+  ready := Bool(false);
+  def deq(b: Boolean = false): T = { ready := Bool(true); data }
+}
+
+
+class FIFOIOC[+T <: Data]()(data: => T) extends Bundle
 {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
