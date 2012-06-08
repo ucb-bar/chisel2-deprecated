@@ -60,7 +60,7 @@ object Tutorial {
           c => new RouterTests(c)}
       case "Echo" => 
         chiselMainTest(tutArgs, () => new Echo()){
-          c => new EchoTests(c, "../src/in.wav", "../out.wav")}
+          c => new EchoTests(c, "../src/in.wav", "../emulator/out.wav")}
       case "Darken" => 
         chiselMainTest(tutArgs, () => new Darken()){
           c => new DarkenTests(c, "../src/tst.im24", "../src/out.im24")}
