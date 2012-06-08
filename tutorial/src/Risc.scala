@@ -17,7 +17,7 @@ class Risc extends Component {
   val code = Mem(256){ Bits(width = 32) }
   val pc   = Reg(resetVal = UFix(0, 8))
   
-  val add_op :: sub_op :: Nil = Enum(2){ Bits() }
+  val add_op :: imm_op :: Nil = Enum(2){ Bits() }
 
   val inst = code(pc)
   val op   = inst(31,24)
@@ -40,10 +40,10 @@ class Risc extends Component {
   } .otherwise {
     switch(op) {
       is(add_op) { rc := ra + rb }
-      is(sub_op) { rc := ra - rb }
+      is(imm_op) { rc := (rai << UFix(8)) | rbi }
     }
     io.out := rc
-    when (rci === UFix(0)) {
+    when (rci === UFix(255)) {
       io.valid := Bool(true)
     } .otherwise {
       file(rci) := rc
@@ -76,12 +76,10 @@ class RiscTests(c: Risc) extends Tester(c, Array(c.io, c.pc)) {
     }
     def I (op: Bits, rc: Int, ra: Int, rb: Int) = 
       Cat(op, Bits(rc, 8), Bits(ra, 8), Bits(rb, 8))
-    val app  = Array(I(c.add_op, 1, 0, 0),
-                     I(c.add_op, 1, 1, 0),
-                     I(c.add_op, 2, 0, 0),
-                     I(c.add_op, 2, 2, 1),
-                     I(c.add_op, 2, 2, 1),
-                     I(c.add_op, 0, 2, 0))
+    val app  = Array(I(c.imm_op,   1, 0, 1), // r1 <- 1
+                     I(c.add_op,   1, 1, 1), // r1 <- r1 + r1
+                     I(c.add_op,   1, 1, 1), // r1 <- r1 + r1
+                     I(c.add_op, 255, 1, 0)) // rh <- r1
     wr(UFix(0), Bits(0)) // skip reset
     for (addr <- 0 until app.length) 
       wr(UFix(addr), app(addr))
@@ -89,7 +87,7 @@ class RiscTests(c: Risc) extends Tester(c, Array(c.io, c.pc)) {
     do {
       tick()
     } while (ovars(c.io.valid).litValue() == 0)
-    allGood = ovars(c.io.out).litValue() == 2 && allGood
+    allGood = ovars(c.io.out).litValue() == 4 && allGood
     allGood
   }
 }

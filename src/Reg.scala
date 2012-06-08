@@ -98,6 +98,8 @@ class Reg extends Delay with proc {
   }
   def nameOpt: String = if (name.length > 0) name else "REG"
   override def toString: String = {
+    "REG(" + nameOpt + ")"
+    /*
     if (component == null) return "nullcompreg";
     if (component.isWalking.contains(this)) 
       nameOpt
@@ -110,6 +112,7 @@ class Reg extends Delay with proc {
       component.isWalking -= this;
       res;
     }
+    */
   }
   override def assign(src: Node) = {
     if(assigned || inputs(0) != null) {
