@@ -1,4 +1,4 @@
-package Tutorial {
+package Tutorial
 
 import Chisel._
 import Node._
@@ -50,6 +50,4 @@ class MemoTests(c: Memo) extends Tester(c, Array(c.io)) {
     allGood = rd(UFix(9), UFix(11)) && allGood
     allGood
   }
-}
-
 }

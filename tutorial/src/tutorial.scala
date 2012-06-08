@@ -1,4 +1,4 @@
-package Tutorial {
+package Tutorial
 
 import Chisel._
 
@@ -65,4 +65,3 @@ object Tutorial {
   }
 }
 
-}

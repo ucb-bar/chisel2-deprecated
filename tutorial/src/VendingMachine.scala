@@ -1,4 +1,4 @@
-package Tutorial {
+package Tutorial
 
 import Chisel._
 import scala.collection.mutable.HashMap
@@ -39,7 +39,4 @@ class VendingMachineTests(c: VendingMachine) extends Tester(c, Array(c.io)) {
     }
     allGood
   }
-  
-}
-
 }

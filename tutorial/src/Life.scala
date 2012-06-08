@@ -1,4 +1,4 @@
-package Tutorial {
+package Tutorial
 
 import Chisel._
 import scala.collection.mutable.HashMap
@@ -68,6 +68,4 @@ class LifeTests(c: Life) extends Tester(c, Array(c.io)) {
     // TODO: WRITE REAL TEST SUITE
     allGood
   }
-}
-
 }

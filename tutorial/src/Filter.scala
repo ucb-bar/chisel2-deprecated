@@ -1,4 +1,4 @@
-package Tutorial {
+package Tutorial
 
 import Chisel._
 import Node._
@@ -49,4 +49,3 @@ class FilterTests(c: Filter) extends Tester(c, Array(c.io)) {
   }  
 }
 
-}

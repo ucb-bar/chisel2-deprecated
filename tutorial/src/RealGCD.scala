@@ -1,4 +1,4 @@
-package Tutorial {
+package Tutorial
 
 import Chisel._
 import Node._
@@ -77,6 +77,4 @@ class RealGCDTests(c: RealGCD) extends Tester(c, Array(c.io)) {
     }
     allPassed
   }
-}
-
 }

@@ -50,20 +50,3 @@ class EchoTests(c: Echo, val infilename: String, val outfilename: String) extend
     true
   }
 }
-
-/*
-class EchoOutput(f: AudioFormat) extends AudioInputStream(new ByteArrayInputStream(Array[Byte]()), f, AudioSystem.NOT_SPECIFIED) {
-  val buf = collection.mutable.ArrayBuffer[Byte]()
-  var pos = 0
-  def += (s: Byte) = buf += s
-
-  override def available: Int = buf.length - pos
-  override def read(out: Array[Byte], offs: Int, len: Int): Int = {
-    val bytes = math.min(available, len)
-    for (i <- 0 until bytes)
-      out(offs + i) = buf(pos + i)
-    pos += bytes
-    bytes
-  }
-}
-*/
