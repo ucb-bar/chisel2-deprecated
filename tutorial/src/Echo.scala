@@ -3,11 +3,9 @@ package Tutorial
 import Chisel._
 import Node._
 import java.io.File
-import java.io.ByteArrayInputStream
-import javax.sound.sampled._
 import scala.collection.mutable.HashMap
 
-class WavOp extends Component {
+class Echo extends Component {
   val io = new Bundle {
     val in = Bits(8, INPUT)
     val out = Bits(8, OUTPUT)
@@ -31,32 +29,30 @@ class WavOp extends Component {
   io.out := outUnsigned
 }
 
-class WavOpTests(c: WavOp, val infile: String, val outfile: String) extends Tester(c, Array(c.io)) {  
+class EchoTests(c: Echo, val infilename: String, val outfilename: String) extends Tester(c, Array(c.io)) {  
   defTests {
     val svars = new HashMap[Node, Node]()
     val ovars = new HashMap[Node, Node]()
 
-    val ais = AudioSystem.getAudioInputStream(new File(infile))
-    if (ais.getFormat.getChannels != 1 || ais.getFormat.getSampleSizeInBits != 8) {
-      println(infile + " must be 8-bit monoaural")
-      System.exit(-1)
-    }
-    val out = new WavOpOutput(ais.getFormat)
+    val in  = WavIn(infilename)
+    val out = WavOut(outfilename, in.getFormat)
 
-    var sample = ais.read
+    var sample = in.read
     while (sample != -1) {
       svars(c.io.in) = Fix(sample)
       step(svars, ovars, isTrace = false)
       out += ovars(c.io.out).litValue().toByte
-      sample = ais.read
+      sample = in.read
     }
 
-    AudioSystem.write(out, AudioFileFormat.Type.WAVE, new File(outfile));
+    out.flush
+    out.close
     true
   }
 }
 
-class WavOpOutput(f: AudioFormat) extends AudioInputStream(new ByteArrayInputStream(Array[Byte]()), f, AudioSystem.NOT_SPECIFIED) {
+/*
+class EchoOutput(f: AudioFormat) extends AudioInputStream(new ByteArrayInputStream(Array[Byte]()), f, AudioSystem.NOT_SPECIFIED) {
   val buf = collection.mutable.ArrayBuffer[Byte]()
   var pos = 0
   def += (s: Byte) = buf += s
@@ -70,3 +66,4 @@ class WavOpOutput(f: AudioFormat) extends AudioInputStream(new ByteArrayInputStr
     bytes
   }
 }
+*/

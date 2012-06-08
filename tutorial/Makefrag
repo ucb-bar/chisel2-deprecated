@@ -14,8 +14,8 @@ tutorials = \
 	Tbl \
 	Life \
 	Mul \
-	WavOp \
-	PicOp \
+	Echo \
+	Darken \
 	Risc \
         Counter
 
