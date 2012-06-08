@@ -73,6 +73,38 @@
 % \end{scala}
 % \end{frame}
 
+\begin{frame}[fragile]{Logging into EC2}
+
+\begin{scala}
+ssh xxx@yyy
+password: bootcamp
+\end{scala}
+
+\end{frame}
+
+\begin{frame}[fragile]{Using Screen}
+
+in order prevent lossage of state if disconnected ... when you first log in
+\begin{scala}
+screen
+\end{scala}
+
+when you log back into the instance
+\begin{scala}
+screen -r
+\end{scala}
+
+\end{frame}
+
+\begin{frame}[fragile]{Getting the Latest}
+
+\begin{scala}
+cd chisel
+git pull
+\end{scala}
+
+\end{frame}
+
 \begin{frame}[fragile]{Scala Functional}
 
 \begin{scala}
@@ -302,6 +334,14 @@ UFix(5, 8)          // unsigned decimal 8-bit literal of type UFix.
 \end{scala}
 \end{frame}
 
+\begin{frame}[fragile]{Type Hierarchy}
+
+\begin{center}
+\includegraphics[height=0.9\textheight]{../manual/figs/type-hierarchy.pdf}
+\end{center}
+
+\end{frame}
+
 \begin{frame}[fragile]{Combinational Circuits}
 \begin{scala}
 (a & b) | (~c & d)
@@ -444,6 +484,14 @@ val lte = a <= b
 % \verb+z = x < y+ & \verb+<= > >= && || != ===+ & \verb+wz = 1+ \\
 \end{tabular}
 \end{center}
+\end{frame}
+
+\begin{frame}[fragile]{Node Class Hierarchy}
+
+\begin{center}
+\includegraphics[height=0.9\textheight]{../manual/figs/node-hierarchy.pdf}
+\end{center}
+
 \end{frame}
 
 \begin{frame}[fragile]{chisel repo}
@@ -1697,6 +1745,7 @@ object ChiselBuild extends Build {
 \textbf{risc processor} & \code{Risc.scala} \\
 \textbf{game of life} & \code{Life.scala} \\
 \textbf{router} & \code{Router.scala} \\
+\textbf{map/reduce} & \textit{see next slide}\\
 \textbf{network} & \\
 \textbf{fft} & \\
 \textbf{cryptography} & \\
@@ -1705,6 +1754,31 @@ object ChiselBuild extends Build {
 \end{tabular}
 \end{center}
 
+\end{frame}
+
+\begin{frame}[fragile]{Functional Composition}
+\begin{columns}
+
+\column{0.45\textwidth}
+\verb+Map(ins, x => x * y)+ \\
+\begin{center}
+\includegraphics[height=0.6\textheight]{figs/map.pdf} \\[2cm]
+\end{center}
+
+\column{0.45\textwidth}
+\vskip2mm
+\verb+Chain(n, in, x => f(x))+ \\
+\begin{center}
+\includegraphics[width=0.9\textwidth]{figs/chain.pdf} \\
+\end{center}
+
+\verb+Reduce(data, Max)+ \\
+\begin{center}
+\includegraphics[width=0.9\textwidth]{figs/reduce.pdf} \\
+\end{center}
+
+
+\end{columns}
 \end{frame}
 
 \begin{frame}[fragile]{Keep in Touch}
@@ -1716,6 +1790,16 @@ object ChiselBuild extends Build {
 \textbf{me} & \url{jrb@pobox.com} \\
 \end{tabular}
 \end{center}
+\end{frame}
+
+\begin{frame}{Thanks}
+\begin{itemize}
+\item \textbf{Arrangements} -- Roxana and Tammy
+\item \textbf{EC2 configuration} -- Henry Cook and Michael Armbrust 
+\item \textbf{Bootcamp Materials} -- Huy Vo and Andrew Waterman
+\item \textbf{Dry Runs} -- Danny, Quan, and Albert
+\item \textbf{Funding} -- Department of Energy
+\end{itemize}
 \end{frame}
 
 % \begin{frame}[fragile]{Port Views}
