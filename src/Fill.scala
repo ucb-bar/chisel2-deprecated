@@ -1,9 +1,8 @@
-package Chisel {
-
-import Component._;
-import Fill._;
-import Component._;
-import Lit._;
+package Chisel
+import Component._
+import Fill._
+import Component._
+import Lit._
 
 object Fill {
   def fillWidthOf(i: Int, n: Node) = { (m: Node) => (m.inputs(i).width * n.maxNum.toInt) }
@@ -56,5 +55,3 @@ class Fill extends Node {
     else
       "  " + emitTmp + " = " + inputs(0).emitRef + ".fill<" + width + ">(" + inputs(1).emitRef + ");\n";
 }}
-
-}

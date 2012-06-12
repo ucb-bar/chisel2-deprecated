@@ -1,6 +1,6 @@
-package Chisel {
-import Component._;
-import Node._;
+package Chisel
+import Component._
+import Node._
 
 object Cat {
   def apply[T <: Data](mod: T, mods: T*): Bits = {
@@ -53,6 +53,4 @@ class Cat extends Node {
     res += "};\n";
     res
   }
-}
-
 }

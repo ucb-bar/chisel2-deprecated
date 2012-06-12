@@ -1,5 +1,4 @@
-package Chisel {
-
+package Chisel
 import scala.math._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Queue
@@ -7,19 +6,18 @@ import scala.collection.mutable.Stack
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.BitSet
-import java.lang.reflect.Modifier._;
+import java.lang.reflect.Modifier._
 import java.io.File;
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.PrintStream
 import scala.sys.process._
-
 import scala.math.max;
-import Node._;
-import Literal._;
-import Component._;
-import Bundle._;
-import ChiselError._;
+import Node._
+import Literal._
+import Component._
+import Bundle._
+import ChiselError._
 
 object Component {
   var saveWidthWarnings = false
@@ -1549,7 +1547,5 @@ abstract class Component(resetSignal: Bool = null) {
       out_d.close();
     }
   }
-
-};
 
 }

@@ -1,8 +1,7 @@
-package Chisel {
-
-import scala.math.max;
-import Node._;
-import Component._;
+package Chisel
+import scala.math.max
+import Node._
+import Component._
 
 abstract class Cell extends nameable{
   val io: Data;
@@ -303,6 +302,4 @@ class Op extends Node {
     else 
       emitOpRef(0) + " " + op + " " + emitOpRef(1)
   }
-}
-
 }

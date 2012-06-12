@@ -1,9 +1,8 @@
-package Chisel {
-
+package Chisel
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashMap
-import Component._;
+import Component._
 
 object Function {
   def apply(reg: Reg, out: Node, enable: Node, nodes: HashSet[Node]) = {
@@ -120,7 +119,4 @@ class FunctionInline(val default: Node, val out: Node) extends AbstractFunction 
     res += "  }\n";
     res
   }
-}
-
-
 }

@@ -1,5 +1,4 @@
 package Chisel
-
 import Node._
 import scala.math._
 

@@ -1,12 +1,11 @@
-package Chisel {
-
-import scala.math.log;
-import scala.math.abs;
-import scala.math.ceil;
-import scala.math.max;
-import scala.math.min;
-import Literal._;
-import ChiselError._;
+package Chisel
+import scala.math.log
+import scala.math.abs
+import scala.math.ceil
+import scala.math.max
+import scala.math.min
+import Literal._
+import ChiselError._
 
 object Lit {
   def apply[T <: Bits](n: String, width: Int = -1)(gen: => T): T = {
@@ -252,6 +251,4 @@ class Literal extends Node {
     else "") + "/* " + inputVal + "*/";
   def d (x: BigInt): Literal = Literal(x, value.toInt)
   //def ~(x: String): Lit = Lit(value, x(0), x.substring(1, x.length));
-}
-
 }

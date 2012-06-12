@@ -1,7 +1,6 @@
-package Chisel {
-
-import Node._;
-import ChiselError._;
+package Chisel
+import Node._
+import ChiselError._
 
 object Bool {
   def apply(x: Boolean) = Lit(x);
@@ -80,5 +79,3 @@ class Bool extends Bits {
     }
   }
 }
-}
-

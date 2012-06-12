@@ -1,6 +1,5 @@
-package Chisel {
-
-import Node._;
+package Chisel
+import Node._
 import ChiselError._
 
 abstract class Num extends Bits {
@@ -24,5 +23,3 @@ abstract class Num extends Bits {
   def &(b: Num): Num = {ChiselErrors += ChiselError("& not defined on " + this.getClass.toString + " " + b.getClass.toString, Thread.currentThread().getStackTrace); this}
   def |(b: Num): Num = {ChiselErrors += ChiselError("| not defined on " + this.getClass.toString + " " + b.getClass.toString, Thread.currentThread().getStackTrace); this}
 }
-}
-

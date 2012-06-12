@@ -1,13 +1,11 @@
-package Chisel {
-
+package Chisel
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 import scala.collection.mutable.Queue
-
-import Component._;
-import Literal._;
-import Node._;
-import ChiselError._;
+import Component._
+import Literal._
+import Node._
+import ChiselError._
   
 object Enum {
   def apply(l: List[Symbol]) = (l zip (Range(0, l.length, 1).map(x => UFix(x, sizeof(l.length-1))))).toMap;
@@ -261,6 +259,3 @@ class Log2 extends Node {
   override def emitDefLoC: String =
     " " + emitTmp + " = " + inputs(0).emitRef + ".log2<" + width + ">();\n";
 }
-
-}
-

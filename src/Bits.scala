@@ -1,7 +1,6 @@
-package Chisel {
-
-import Node._;
-import Bits._;
+package Chisel
+import Node._
+import Bits._
 import ChiselError._
 import Component._
 
@@ -341,6 +340,4 @@ class Bits extends Data with proc {
   def && (b: Bool): Bool = conv(this) && b;
   def || (b: Bool): Bool = conv(this) || b;
   
-}
-
 }

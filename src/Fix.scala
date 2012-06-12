@@ -1,7 +1,6 @@
-package Chisel {
-
-import Node._;
-import ChiselError._;
+package Chisel
+import Node._
+import ChiselError._
 
 object Fix {
 
@@ -97,5 +96,4 @@ class Fix extends Num {
   def <   (b: UFix): Bool = this < Cat(Bits(1, 1), b).toFix;
   def >=  (b: UFix): Bool = this >= Cat(Bits(1, 1), b).toFix;
   def <=  (b: UFix): Bool = this <= Cat(Bits(1, 1), b).toFix;
-}
 }

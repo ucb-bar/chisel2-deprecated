@@ -1,10 +1,9 @@
-package Chisel {
-
+package Chisel
 import Component._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
-import scala.collection.mutable.BufferProxy;
-import scala.math._;
+import scala.collection.mutable.BufferProxy
+import scala.math._
 import Vec._
 
 object VecUFixToOH
@@ -347,6 +346,4 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
     val reversed = this.reverse
     Cat(reversed.head, reversed.tail: _*)
   }
-}
-
 }

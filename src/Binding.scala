@@ -1,7 +1,6 @@
-package Chisel {
-
-import Component._;
-import Node._;
+package Chisel
+import Component._
+import Node._
 
 // used for component to component connections
 object Binding {
@@ -35,5 +34,4 @@ class Binding extends Node {
   override def emitDefHiC: String = ""
   override def emitRefC: String = 
     if (isEmittingComponents) emitRefV; else inputs(0).emitRefC;
-}
 }

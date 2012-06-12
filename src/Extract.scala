@@ -1,8 +1,7 @@
-package Chisel {
-
-import Node._;
-import Component._;
-import Lit._;
+package Chisel
+import Node._
+import Component._
+import Lit._
 
 object NodeExtract {
   
@@ -127,6 +126,4 @@ class Extract extends Node {
     val lit = x.litOf
     assert(lit == null || lit.value >= 0 && lit.value < inputs(0).getWidth)
   }
-}
-
 }

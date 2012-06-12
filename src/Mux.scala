@@ -1,7 +1,6 @@
-package Chisel {
-
-import Node._;
-import Component._;
+package Chisel
+import Node._
+import Component._
 import scala.math._
 
 object MuxLookup {
@@ -66,7 +65,4 @@ class Mux extends Op {
   override def emitDefLoC: String = 
     "  " + emitTmp + " = mux<" + width + ">(" + inputs(0).emitRef + ", " + inputs(1).emitRef + ", " + inputs(2).emitRef + ");\n"
   def ::(a: Node): Mux = { inputs(2) = a; this }
-}
-
-
 }

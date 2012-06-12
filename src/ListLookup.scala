@@ -1,5 +1,4 @@
-package Chisel {
-
+package Chisel
 import Node._
 import scala.collection.mutable.ArrayBuffer
 
@@ -141,6 +140,4 @@ class MapNode extends Node {
   override def emitDecC: String = ""
   def addr = inputs(0)
   def data = inputs.slice(1, inputs.length)
-}
-
 }

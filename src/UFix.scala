@@ -1,7 +1,6 @@
-package Chisel {
-
-import Node._;
-import ChiselError._;
+package Chisel
+import Node._
+import ChiselError._
 
 object UFix {
   // def apply(x: BigInt): UFix = Lit(x){UFix()};
@@ -84,6 +83,4 @@ class Eyum extends UFix { };
 object Eyum {
   def apply[T <: Eyum](x: Int, w: Int)(gen: => T): T = { Lit(x, w){ gen } }
   def apply[T <: Eyum](w: Int)(gen: => T): Int => T = { (x: Int) => Lit(x, w){ gen } }
-}
-
 }

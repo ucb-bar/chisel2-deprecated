@@ -1,5 +1,4 @@
 package Chisel
-
 import ChiselError._
 import Node._
 import scala.collection.mutable.ArrayBuffer

@@ -1,8 +1,7 @@
-package Chisel {
-
-import Node._;
-import Literal._;
-import scala.collection.mutable.ArrayBuffer;
+package Chisel
+import Node._
+import Literal._
+import scala.collection.mutable.ArrayBuffer
 
 object Lookup {
   def apply[T <: Data](addr: Bits, default: T, mapping: Seq[(Bits, T)]): T = {
@@ -60,6 +59,4 @@ class Lookup extends Node {
   }
   override def emitDec: String = 
     "  reg[" + (width-1) + ":0] " + emitRef + ";\n";
-}
-
 }

@@ -1,9 +1,7 @@
-package Chisel {
-
+package Chisel
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
-import java.lang.reflect.Modifier._;
-
+import java.lang.reflect.Modifier._
 import Node._;
 import Component._;
 import ChiselError._
@@ -289,5 +287,4 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     for ((n, i) <- elements)
       i.setIsTypeNode
   }
-}
 }

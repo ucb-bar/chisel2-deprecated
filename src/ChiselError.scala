@@ -1,6 +1,5 @@
-package Chisel {
-
-import scala.collection.mutable.ArrayBuffer;
+package Chisel
+import scala.collection.mutable.ArrayBuffer
 import ChiselError._
 
 object ChiselError {
@@ -39,6 +38,4 @@ class ChiselError(val msgFun: () => String, val stack: Array[StackTraceElement])
             " in class " + ste.getClassName + 
             " in file " + ste.getFileName)
   }
-}
-
 }

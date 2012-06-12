@@ -1,5 +1,4 @@
-package Chisel {
-
+package Chisel
 import Chisel._
 import scala.math._
 import scala.collection.mutable.ArrayBuffer
@@ -107,6 +106,4 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
     testInputNodes = ins.toArray; testNonInputNodes = outs.toArray
     tests = () => withTesting { body }
   }
-}
-
 }

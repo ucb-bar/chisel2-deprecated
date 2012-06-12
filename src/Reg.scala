@@ -1,8 +1,7 @@
-package Chisel {
-
-import Node._;
-import Reg._;
-import ChiselError._;
+package Chisel
+import Node._
+import Reg._
+import ChiselError._
 
 object Reg {
   def regWidth(w: Int) = {
@@ -170,6 +169,4 @@ class Reg extends Delay with proc {
     "  dat_t<" + width + "> " + emitRef + ";\n" +
     "  dat_t<" + width + "> " + emitRef + "_shadow;\n";
   }
-}
-
 }
