@@ -49,7 +49,7 @@ object Component {
   val compDefs = new HashMap[StringBuilder, String];
   var isEmittingComponents = false;
   var isCompilingEmittedC = false;
-  var isTestingC = false;
+  var isTesting = false;
   var backendName = "c";
   var topComponent: Component = null;
   val components = ArrayBuffer[Component]();
@@ -125,7 +125,7 @@ object Component {
     ioCount = 0;
     isEmittingComponents = false;
     isCompilingEmittedC = false;
-    isTestingC = false;
+    isTesting = false;
     backendName = "c";
     topComponent = null;
 
@@ -859,6 +859,42 @@ abstract class Component(resetSignal: Bool = null) {
     }
   }
 
+  def genHarnessV(base_name: String, name: String) = {
+    val harness  = new java.io.FileWriter(base_name + name + "-harness.v");
+    val printFormat = printArgs.map(a => "%x").fold("")((y,z) => z + " " + y) 
+    val scanFormat = scanArgs.map(a => "%x").fold("")((y,z) => z + " " + y) 
+    val printNodes = for (arg <- printArgs; node <- arg.maybeFlatten) yield arg
+    val scanNodes = for (arg <- scanArgs; node <- keepInputs(arg.maybeFlatten)) yield arg
+    harness.write("module test;\n")
+    for (node <- scanNodes)
+      harness.write("    reg  [" + (node.width-1) + ":0] " + node.emitRef + ";\n")
+    for (node <- printNodes)
+      harness.write("    wire [" + (node.width-1) + ":0] " + node.emitRef + ";\n")
+    
+    harness.write("    " + moduleName + "\n")
+    harness.write("      " + moduleName + "(\n")
+    for (node <- (scanNodes ++ printNodes))
+      harness.write("        ." + node.emitRef + "(" + node.emitRef + "),\n")
+    harness.write("        );\n")
+
+    harness.write("  integer count;\n")
+    harness.write("  always begin;\n")
+    harness.write("    count = $fscanf('h80000000, \"" + scanFormat + "\"")
+    for (node <- scanNodes)
+      harness.write(", " + node.emitRef)
+    harness.write(");\n")
+    harness.write("    if (count < " + scanNodes.length + ") $finish(0);\n")
+    harness.write("    #1;\n")
+    harness.write("    $display(\"" + printFormat + "\"")
+    for (node <- printNodes)
+      harness.write(", " + node.emitRef)
+    harness.write(");\n")
+    harness.write("    #1;\n")
+    harness.write("  end\n")
+    harness.write("endmodule\n")
+    harness.close();
+  }
+
   def doCompileV(out: java.io.FileWriter, depth: Int): Unit = {
     // println("COMPILING COMP " + name);
     println("// " + depthString(depth) + "COMPILING " + this + " " + children.length + " CHILDREN");
@@ -957,6 +993,12 @@ abstract class Component(resetSignal: Bool = null) {
     }
     if(saveComponentTrace)
       printStack
+    if (isTesting && tester != null) {
+      scanArgs.clear();  scanArgs  ++= tester.testInputNodes;    scanFormat  = ""
+      printArgs.clear(); printArgs ++= tester.testNonInputNodes; printFormat = ""
+    }
+    if (isGenHarness)
+      genHarnessV(base_name, name);
     compDefs.clear;
   }
 
@@ -984,7 +1026,7 @@ abstract class Component(resetSignal: Bool = null) {
   }
   def elaborate(fake: Int = 0) = {}
   def postMarkNet(fake: Int = 0) = {}
-  def genHarness(base_name: String, name: String) = {
+  def genHarnessC(base_name: String, name: String) = {
     // val makefile = new java.io.FileWriter(base_name + name + "-makefile");
     // makefile.write("CPPFLAGS = -O2 -I../ -I${CHISEL}/csrc\n\n");
     // makefile.write(name + ": " + name + ".o" + " " + name + "-emulator.o\n");
@@ -1331,7 +1373,7 @@ abstract class Component(resetSignal: Bool = null) {
     
 
     if (isGenHarness)
-      genHarness(base_name, name);
+      genHarnessC(base_name, name);
     out_h.write("#include \"emulator.h\"\n\n");
     out_h.write("class " + name + "_t : public mod_t {\n");
     out_h.write(" public:\n");
@@ -1340,7 +1382,7 @@ abstract class Component(resetSignal: Bool = null) {
       funNodes ++= fun.nodes;
     renameNodesC(funNodes);
     // renameNodesC(funs);
-    if (isTestingC && tester != null) {
+    if (isTesting && tester != null) {
       scanArgs.clear();  scanArgs  ++= tester.testInputNodes;    scanFormat  = ""
       printArgs.clear(); printArgs ++= tester.testNonInputNodes; printFormat = ""
 

@@ -105,7 +105,7 @@ object chiselMain {
           i += 1
         }
         case "--compile" => isCompilingEmittedC = true;
-        case "--test" => isTestingC = true;
+        case "--test" => isTesting = true;
         case "--targetDir" => targetDir = args(i+1); i += 1;
         case "--include" => includeArgs = splitArg(args(i+1)); i += 1;
         case any => println("UNKNOWN ARG");
@@ -140,7 +140,7 @@ object chiselMain {
       c.compileC(); 
       // c.name = "Combinational"
       if (isCompilingEmittedC && isGenHarness) c.gcc()
-      if (isTestingC) tester.tests()
+      if (isTesting) tester.tests()
     }
     c
   }
