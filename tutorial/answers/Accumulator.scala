@@ -7,7 +7,7 @@ import util.Random
 
 class Accumulator extends Component {
   val io = new Bundle {
-    val in  = Bool(INPUT)
+    val in  = UFix(width = 1, dir = INPUT)
     val out = UFix(width = 8, dir = OUTPUT)
   }
   // COUNT INCOMING TRUES 

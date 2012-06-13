@@ -21,6 +21,11 @@
 \def\frametitledefaultcolor{Cobalt}
 \def\frametitleproblemcolor{RedOrange}
 
+\setbeamertemplate{frametitle}
+{
+\vskip-7mm
+\textbf{\insertframetitle}\hfill\insertframenumber
+}
 \setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
 \newenvironment{sample}{\VerbatimEnvironment\begin{footnotesize}\begin{semiverbatim}}{\end{semiverbatim}\end{footnotesize}}
@@ -50,6 +55,8 @@
 \begin{frame}
 \titlepage
 \end{frame}
+
+\addtocounter{framenumber}{-1}
 
 % \begin{frame}[fragile]{tutorial.scala}
 % \begin{scala}
@@ -183,6 +190,43 @@ class Blimp(r: Double) {
 class Zep(r: Double) extends Blimp(r)
 \end{scala}
 
+\end{frame}
+
+\begin{frame}[fragile]{Scala Collections}
+\begin{scala}
+// Array's
+val tbl = new Array[Int](256)
+tbl(0) = 32
+val y = tbl(0)
+val n = tbl.length
+
+// ArrayBuffer's
+val buf = new ArrayBuffer[Int]()
+buf += 12
+val z = buf(0)
+val l = buf.length
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{Scala Iteration}
+\begin{scala}
+val tbl = new Array[Int](256)
+
+// loop over all indices
+for (i <- 0 until tbl.length)
+  tbl(i) = i
+
+// loop of each sequence element
+for (e <- tbl)
+  tbl(i) += e
+
+// nested loop
+for (i <- 0 until 16; j <- 0 until 16)
+  tbl(j*16 + i) = i
+
+// create second table with doubled elements
+val tbl2 = for (i <- 0 until 16) yield tbl(i)*2
+\end{scala}
 \end{frame}
 
 \begin{frame}[fragile]{Scala Console}
@@ -557,7 +601,7 @@ tutorial/verilog/Makefile  \comment{\# Makefile for verilog products}
 \end{FramedSemiVerb}
 \end{frame}
 
-\begin{frame}[fragile]{Combinational -- \tt tutorial/src/combinational.scala}
+\begin{frame}[fragile]{Combinational -- \tt\small tutorial/src/combinational.scala}
 \begin{scala}
 package Tutorial
 
@@ -617,7 +661,7 @@ emit C++ and compile \code{tutorial/emulator/Combination-*} to
 produce combinational circuit app named \code{tutorial/emulator/Combination}:
 
 \begin{scala}
-sbt
+bash> sbt
 sbt> project tutorial
 sbt> compile
 sbt> run Combinational --backend c --targetDir ../emulator --compile --genHarness
@@ -957,6 +1001,26 @@ class Mux4 extends Component {
 
 \end{frame}
 \setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
+
+\setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
+\begin{frame}[fragile]{Doing Mux4 Problem -- \tt Mux4.scala}
+\begin{itemize}
+\item loop
+\begin{itemize}
+\item edit and flush out Mux4.scala 
+\item make Mux4
+\end{itemize}
+\item until PASSES
+\end{itemize}
+\begin{scala}
+cd $CHISEL/tutorial/emulator
+make Mux4
+...
+PASSED
+\end{scala}
+\end{frame}
+\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
+
 % \begin{frame}[fragile]{Running Examples By Hand}
 % 
 % \begin{scala}
@@ -1021,12 +1085,12 @@ def squareWave(period: UFix) = toggle(pulse(period))
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Sequential Circuit Problem -- \tt Accumulator.scala}
 \begin{itemize}
-\item write sequential circuit that counts trues 
+\item write sequential circuit that sums \code{in} values
 \end{itemize}
 \begin{scala}
 class Accumulator extends Component {
   val io = new Bundle {
-    val in  = Bool(INPUT)
+    val in  = UFix(1, INPUT)
     val out = UFix(8, OUTPUT)
   }
 
@@ -1248,7 +1312,7 @@ val r = m(counter(UFix(3)))
 \end{frame}
 
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
-\begin{frame}[fragile]{Multiplication Lookup Table Problem -- \tt Mul.scala}
+\begin{frame}[fragile]{Mul Lookup Table Problem -- \tt Mul.scala}
 \begin{itemize}
 \item write 16x16 multiplication table using \code{Vec}
 \end{itemize}
@@ -1259,7 +1323,7 @@ class Mul extends Component {
     val y   = UFix(4, INPUT)
     val z   = UFix(8, OUTPUT)
   }
-  val muls = new ArrayBuffer[UFix]()
+  val muls = new Array[UFix](256)
 
   // flush this out ...
 
@@ -1471,7 +1535,7 @@ class CrossbarIO(n: Int) extends Bundle {
   val in  = Vec(n){ new LinkIO() }
   val sel = UFix(log2Up(n), INPUT)
   val out = Vec(n){ new LinkIO() }
-  override def clone() = (new CrossbarIO(n)).asInstanceOf[this.type]
+  override def clone() = new CrossbarIO(n).asInstanceOf[this.type]
 }
 \end{scala}
 
@@ -1543,7 +1607,7 @@ class FilterIO[T <: Data]()(data: => T) extends Bundle {
 }
 
 class Filter[T <: Data]()(data: => T) extends Component { 
-  val io = (new FilterIO()){ data }
+  val io = new FilterIO(){ data }
   ...
 }
 \end{scala}
@@ -1575,8 +1639,8 @@ class RealGCDInput extends Bundle {
 
 class RealGCD extends Component {
   val io  = new Bundle {
-    val in  = new FIFOIO()( new RealGCDInput() ).flip()
-    val out = new PipeIO()( Bits(width = 16) )
+    val in  = new FIFOIO(){ new RealGCDInput() }.flip()
+    val out = new PipeIO(){ Bits(width = 16) }
   }
 
   // flush this out ...
@@ -1606,8 +1670,8 @@ class DeqIO[T <: Data]()(data: => T) extends FIFOIO()(data) {
 
 class Filter[T <: Data]()(data: => T) extends Component {
   val io = new Bundle {
-    val in  = (new DeqIO()){ data }
-    val out = (new EnqIO()){ data }
+    val in  = new DeqIO(){ data }
+    val out = new EnqIO(){ data }
   }
   when (io.in.valid && io.out.ready) {
     io.out.enq(io.in.deq())
@@ -1637,11 +1701,11 @@ class Packet extends Bundle {
 
 class RouterIO(n: Int) extends Bundle {
   override def clone = new RouterIO(n).asInstanceOf[this.type]
-  val reads   = (new DeqIO()){ new ReadCmd() }
-  val replies = (new EnqIO()){ UFix(width = 8) }
-  val writes  = (new DeqIO()){ new WriteCmd() }
-  val in      = (new DeqIO()){ new Packet() }
-  val outs    = Vec(n){ (new EnqIO()){ new Packet() } }
+  val reads   = new DeqIO(){ new ReadCmd() }
+  val replies = new EnqIO(){ UFix(width = 8) }
+  val writes  = new DeqIO(){ new WriteCmd() }
+  val in      = new DeqIO(){ new Packet() }
+  val outs    = Vec(n){ new EnqIO(){ new Packet() } }
 }
 \end{scala}
 }

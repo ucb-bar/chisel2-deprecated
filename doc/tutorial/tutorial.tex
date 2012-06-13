@@ -1754,7 +1754,7 @@ We can now define \verb+Filter+ by defining a component class that also takes a 
 
 \begin{scala}
 class Filter[T <: Data]()(type: => T) extends Component { 
-  val io = (new FilterIO()){ type }
+  val io = new FilterIO(){ type }
   ...
 }
 \end{scala}
@@ -1762,7 +1762,7 @@ class Filter[T <: Data]()(type: => T) extends Component {
 \noindent
 We can now define a \verb+PLink+ based \verb+Filter+ as follows:
 \begin{scala}
-val f = (new Filter()){ new PLink() }
+val f = new Filter(){ new PLink() }
 \end{scala}
 
 \noindent
@@ -1778,7 +1778,7 @@ class DataBundle extends Bundle {
 }
 
 object FifoDemo {
-  def apply () = (new Fifo(32)){ new DataBundle }
+  def apply () = new Fifo(32){ new DataBundle }
 }
 \end{scala}
 
