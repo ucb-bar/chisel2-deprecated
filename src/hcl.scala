@@ -104,7 +104,7 @@ object chiselMain {
           if(backendName == "v") { isEmittingComponents = true; isCoercingArgs = false }
           i += 1
         }
-        case "--compile" => isCompilingEmittedC = true;
+        case "--compile" => isCompiling = true
         case "--test" => isTesting = true;
         case "--targetDir" => targetDir = args(i+1); i += 1;
         case "--include" => includeArgs = splitArg(args(i+1)); i += 1;
@@ -135,12 +135,16 @@ object chiselMain {
       tester = ftester(c)
     }
     backendName match {
-    case "v" => c.compileV();
-    case "c" => 
-      c.compileC(); 
-      // c.name = "Combinational"
-      if (isCompilingEmittedC && isGenHarness) c.gcc()
-      if (isTesting) tester.tests()
+      case "v" => { 
+        c.compileV();
+        println(isCompiling + " " + isGenHarness)
+        if (isCompiling && isGenHarness) c.vcs()
+      }
+      case "c" =>  {
+        c.compileC(); 
+        if (isCompiling && isGenHarness) c.gcc()
+        if (isTesting) tester.tests()
+      }
     }
     c
   }
