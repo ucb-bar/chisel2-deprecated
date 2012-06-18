@@ -48,7 +48,7 @@ object Component {
   val compIndices = HashMap.empty[String,Int];
   val compDefs = new HashMap[StringBuilder, String];
   var isEmittingComponents = false;
-  var isCompilingEmittedC = false;
+  var isCompiling = false;
   var isTesting = false;
   var backendName = "c";
   var topComponent: Component = null;
@@ -124,7 +124,7 @@ object Component {
     searchAndMap = false
     ioCount = 0;
     isEmittingComponents = false;
-    isCompilingEmittedC = false;
+    isCompiling = false;
     isTesting = false;
     backendName = "c";
     topComponent = null;
@@ -873,8 +873,14 @@ abstract class Component(resetSignal: Bool = null) {
     
     harness.write("    " + moduleName + "\n")
     harness.write("      " + moduleName + "(\n")
-    for (node <- (scanNodes ++ printNodes))
-      harness.write("        ." + node.emitRef + "(" + node.emitRef + "),\n")
+    var first = true
+    for (node <- (scanNodes ++ printNodes)) 
+      if (first) {
+        harness.write("        ." + node.emitRef + "(" + node.emitRef + ")")
+        first = false
+      } else
+        harness.write(",\n        ." + node.emitRef + "(" + node.emitRef + ")")
+    harness.write("\n")
     harness.write("        );\n")
 
     harness.write("  integer count;\n")
@@ -948,6 +954,21 @@ abstract class Component(resetSignal: Bool = null) {
       out.append(res);
     }
   }
+
+
+  def vcs(): Unit = {
+
+    def run(cmd: String) = {
+      val c = Process(cmd).!
+      println(cmd + " RET " + c)
+    }
+    val dir = targetDir + "/"
+    val src = dir + name + "-harness.v " + dir + name +".v"
+    val cmd = "vcs +vc +v2k -timescale=10ns/10ps " + src + " -o " + dir + name
+    run(cmd)
+
+  }
+
   def compileV(): Unit = {
     topComponent = this;
     components.foreach(_.elaborate(0));
@@ -1285,6 +1306,7 @@ abstract class Component(resetSignal: Bool = null) {
     nodes.filter(isInput)
   def removeInputs(nodes: Seq[Node]): Seq[Node] = 
     nodes.filter(n => !isInput(n))
+
   def gcc(flags: String = "-O2"): Unit = {
     val chiselENV = java.lang.System.getenv("CHISEL")
     val allFlags = flags + " -I../ -I" + chiselENV + "/csrc/"
@@ -1305,6 +1327,7 @@ abstract class Component(resetSignal: Bool = null) {
     cc(name)
     link(name)
   }
+
   def compileC(): Unit = {
     components.foreach(_.elaborate(0));
     for (c <- components)
