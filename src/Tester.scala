@@ -15,6 +15,7 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
   var testOut: OutputStream = null
   var testInputNodes: Array[Node] = null
   var testNonInputNodes: Array[Node] = null 
+  var first = true
   def splitFlattenNodes(args: Seq[Node]): (Seq[Node], Seq[Node]) = {
     if (args.length == 0) {
       (Array[Node](), Array[Node]())
@@ -36,12 +37,14 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
       val i = if (v == null) BigInt(0) else v.litValue() // TODO: WARN
       val s = i.toString(16)
       if (isTrace) println("  " + n + " = " + i)
-      testOut.write(' ')
-      for (c <- s)
+      for (c <- s) {
         testOut.write(c)
-      testOut.write('\n')
-      testOut.flush
+      }
+      testOut.write(' ')
     }
+    //testOut.write('\n')
+    testOut.write('\n')
+    testOut.flush()
     if (isTrace) println("OUTPUTS")
     var isSame = true
     var c = testIn.read
@@ -57,7 +60,8 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
         c   = testIn.read
       }
       val s = sb.toString
-      val rv = toLitVal(s)
+      println(s)
+      val rv = toLitVal("0x" + s)
       if (isTrace) println("  READ " + o + " = " + rv)
       if (!svars.contains(o)) {
         ovars(o) = Literal(rv)
@@ -75,7 +79,7 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
     isSame
   }
   def startTest: Process = {
-    val cmd = targetDir + "/" + c.name
+    val cmd = targetDir + "/" + c.name + " -q"
     val process = Process(cmd)
     val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => err.close())
     val p = process.run(pio) 
@@ -91,6 +95,8 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
     var res = false
     var p: Process = null
     try {
+      while(testIn == null)
+
       p = startTest
       res = body
     } finally {

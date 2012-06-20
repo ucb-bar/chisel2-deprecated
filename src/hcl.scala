@@ -139,6 +139,7 @@ object chiselMain {
         c.compileV();
         println(isCompiling + " " + isGenHarness)
         if (isCompiling && isGenHarness) c.vcs()
+        if (isTesting) tester.tests()
       }
       case "c" =>  {
         c.compileC(); 
