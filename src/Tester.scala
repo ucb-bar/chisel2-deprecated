@@ -42,7 +42,6 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
       }
       testOut.write(' ')
     }
-    //testOut.write('\n')
     testOut.write('\n')
     testOut.flush()
     if (isTrace) println("OUTPUTS")
@@ -60,8 +59,7 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
         c   = testIn.read
       }
       val s = sb.toString
-      println(s)
-      val rv = toLitVal("0x" + s)
+      val rv = toLitVal(s)
       if (isTrace) println("  READ " + o + " = " + rv)
       if (!svars.contains(o)) {
         ovars(o) = Literal(rv)
@@ -79,7 +77,7 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
     isSame
   }
   def startTest: Process = {
-    val cmd = targetDir + "/" + c.name + " -q"
+    val cmd = targetDir + "/" + c.name + (if(backendName == "v") " -q" else "")
     val process = Process(cmd)
     val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => err.close())
     val p = process.run(pio) 
