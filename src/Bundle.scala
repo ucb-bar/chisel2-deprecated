@@ -201,7 +201,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     return false;
   }
 
-  override def :=[T <: Data](src: T) = {
+  override def :=[T <: Data](src: T): Unit = {
     src match {
       case other: Bundle => {
         this := other
@@ -210,29 +210,24 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     }
   }
 
-  def procAssign(src: Node) = {}
+  def :=(src: Bundle): Unit = {
 
-  def :=(src: Bundle) = {
-    src match {
-      case other: Bundle => {
+    for((n, i) <- elements) {
+      i match {
 
-	if (this.comp != null) {
-	  this.comp procAssign other.toNode;
-	} else {
-	  for ((n, i) <- elements) {
-	    if(other.contains(n)){
-	      i := other(n)
-	    }
-	    else {
-	      println("// UNABLE TO FIND " + n + " IN " + other.component);
-	    }
-	  }
-	}
-	
+        case bundle: Bundle => {
+          if (src.contains(n)) bundle := src(n).asInstanceOf[Bundle]
+        }
+        case bits: Bits => {
+          if (src.contains(n)) bits := src(n).asInstanceOf[Bits]
+        }
+        case vec: Vec[ Data ] => {
+          if (src.contains(n)) vec := src(n).asInstanceOf[Vec[ Data ]]
+        }
+        
       }
-      case default =>
-	println("// TRYING TO := BUNDLE TO NON BUNDLE " + default);
     }
+
   }
 
   override def flatten: Array[(String, Bits)] = {
