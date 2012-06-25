@@ -63,10 +63,10 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
         ovars(o) = Literal(rv)
       } else {
         val tv = svars(o).litValue()
-        if (isTrace) println("  EXPCTED: " + o + " = " + tv)
+        if (isTrace) println("  EXPECTED: " + o + " = " + tv)
         if (tv != rv) {
           isSame = false
-          if (isTrace) println("  FAILURE")
+          if (isTrace) println("  *** FAILURE ***")
         } else {
           if (isTrace) println("  SUCCESS")
         }
@@ -96,7 +96,7 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
     } finally {
       if (p != null) endTest(p)
     }
-    println(if (res) "PASSED" else "FAILED")
+    println(if (res) "PASSED" else "*** FAILED ***")
     res
   }
   var tests: () => Boolean = () => { println("DEFAULT TESTS"); true }
