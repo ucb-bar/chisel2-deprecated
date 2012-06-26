@@ -7,16 +7,17 @@ object BuildSettings
   val buildVersion = "1.1"
   val buildScalaVersion = "2.9.2"
 
-  val buildSettings = Defaults.defaultSettings ++ Seq (
-    organization := buildOrganization,
-    version      := buildVersion,
-    scalaVersion := buildScalaVersion
-  )
+  def apply(projectdir: String) = {
+    Defaults.defaultSettings ++ Seq (
+        organization := buildOrganization,
+        version      := buildVersion,
+        scalaVersion := buildScalaVersion,
+        scalaSource in Compile := Path.absolute(file(projectdir + "/src"))
+      )
+  }
 }
 
 object ChiselBuild extends Build
 {
-  import BuildSettings._
-
-  lazy val chisel = Project("chisel", file("chisel"), settings = buildSettings)
+  lazy val chisel = Project("chisel", file("chisel"), settings = BuildSettings(".."))
 }
