@@ -6,41 +6,9 @@
 \usepackage[procnames]{listings}
 
 \input{../style/scala.tex}
+\input{../style/talk.tex}
 
 % \def\poster{1}
-
-\lstset{basicstyle={\footnotesize\ttfamily}}
-
-\usetheme[height=9mm]{Rochester}
-\setbeamersize{text margin left=3mm} 
-\setbeamersize{text margin right=3mm} 
-\setbeamertemplate{navigation symbols}{}
-
-% \usepackage[orientation=landscape,size=custom,width=200,height=120,scale=1.9]{beamerposter}
-% \usepackage[orientation=landscape,size=a0,scale=1.4,debug]{beamerposter}
-
-% \usetheme[height=0mm]{Rochester}
-% \usecolortheme{dolphin}
-% \useinnertheme{rectangles}
-% \useoutertheme[footline=empty, subsection=true]{miniframes}
-% \setbeamercolor{frametitle}{bg=}
-
-\newenvironment{sample}{\VerbatimEnvironment\begin{footnotesize}\begin{semiverbatim}}{\end{semiverbatim}\end{footnotesize}}
-
-\newenvironment{FramedSemiVerb}%
-{\begin{Sbox}\begin{minipage}{0.95\textwidth}\begin{semiverbatim}}%
-{\end{semiverbatim}\end{minipage}\end{Sbox}
-\setlength{\fboxsep}{8pt}\fbox{\TheSbox}}
-
-\newenvironment{FramedVerb}%
-{\VerbatimEnvironment
-\begin{Sbox}\begin{minipage}{0.95\textwidth}\begin{Verbatim}}%
-{\end{Verbatim}\end{minipage}\end{Sbox}
-\setlength{\fboxsep}{8pt}\fbox{\TheSbox}}
-
-% \newenvironment{sample}{\VerbatimEnvironment\begin{footnotesize}\begin{Verbatim}}{\end{Verbatim}\end{footnotesize}}
-\newcommand{\kode}[1]{\begin{footnotesize}{\tt #1}\end{footnotesize}}
-\newcommand{\comment}[1]{{\color{Red}\it\smaller #1}}
 
 \title{Chisel: Constructing Hardware In a Scala Embedded Language}
 \author[Jonathan Bachrach et al]{Jonathan Bachrach, Huy Vo, Brian Richards, \\
@@ -442,20 +410,20 @@ def step(vars: HashMap[Node, Node]): Boolean
 }
 \begin{tiny}
 \begin{itemize}
-\item user subclasses \kode{Tester} defining CUT and
-\kode{testNodes} and tests in \kode{defTests} body
-\item \kode{vars} is mapping from \kode{testNodes} to literals, called bindings
-\item \kode{step} runs test with given bindings, where
-var values for input ports are sent to CUT,
-CUT computes next outputs, and
-CUT sends next outputs to Chisel
-\item finally \kode{step} compares received values against var values
+\item user subclasses \code{Tester} defining DUT and
+\code{testNodes} and tests in \code{defTests} body
+\item \code{vars} is mapping from \code{testNodes} to literals, called bindings
+\item \code{step} runs test with given bindings, where
+var values for input ports are sent to DUT,
+DUT computes next outputs, and
+DUT sends next outputs to Chisel
+\item finally \code{step} compares received values against var values
  for output ports and returns false if any comparisons fail
 \end{itemize}
 \end{tiny}
 
 \begin{center}
-\includegraphics[width=0.9\textwidth]{figs/CUT.pdf}
+\includegraphics[width=0.9\textwidth]{figs/DUT.pdf}
 \end{center}
 
 \end{columns}

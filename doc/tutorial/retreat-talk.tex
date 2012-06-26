@@ -7,52 +7,7 @@
 \usepackage{array}
 
 \input{../style/scala.tex}
-
-\lstset{basicstyle={\footnotesize\ttfamily}}
-
-\usetheme[height=9mm]{Rochester}
-\setbeamersize{text margin left=3mm} 
-\setbeamersize{text margin right=3mm} 
-\setbeamertemplate{navigation symbols}{}
-
-% % \usetheme[height=20mm]{Rochester}
-% % \usetheme{Rochester}
-% \setbeamertemplate{navigation symbols}{}
-% \setbeamertemplate{headline}[default]
-% \setbeamertemplate{frametitle}
-% {
-% \begin{flushleft}
-% \color{blue}
-% \vskip-6mm
-% \textbf{\LARGE\insertframetitle}
-% \end{flushleft}
-% }
-% 
-% % \setbeamertemplate{headline}{\scriptsize{\vspace*{0.3cm}\hspace*{0.3cm}\insertframenumber}} 
-% \useoutertheme{infolines}
-
-% \usetheme[height=0mm]{Rochester}
-% \usecolortheme{dolphin}
-% \useinnertheme{rectangles}
-% \useoutertheme[footline=empty, subsection=true]{miniframes}
-% \setbeamercolor{frametitle}{bg=}
-
-\newenvironment{sample}{\VerbatimEnvironment\begin{footnotesize}\begin{semiverbatim}}{\end{semiverbatim}\end{footnotesize}}
-
-\newenvironment{FramedSemiVerb}%
-{\begin{Sbox}\begin{minipage}{0.95\textwidth}\begin{semiverbatim}}%
-{\end{semiverbatim}\end{minipage}\end{Sbox}
-\setlength{\fboxsep}{8pt}\fbox{\TheSbox}}
-
-\newenvironment{FramedVerb}%
-{\VerbatimEnvironment
-\begin{Sbox}\begin{minipage}{0.95\textwidth}\begin{Verbatim}}%
-{\end{Verbatim}\end{minipage}\end{Sbox}
-\setlength{\fboxsep}{8pt}\fbox{\TheSbox}}
-
-% \newenvironment{sample}{\VerbatimEnvironment\begin{footnotesize}\begin{Verbatim}}{\end{Verbatim}\end{footnotesize}}
-\newcommand{\kode}[1]{\begin{footnotesize}{\tt #1}\end{footnotesize}}
-\newcommand{\comment}[1]{{\color{Red}\it\smaller #1}}
+\input{../style/talk.tex}
 
 \title[Chisel]{Chisel: Constructing Hardware In a Scala Embedded Language}
 \author[Bachrach et al]{Jonathan Bachrach, Huy Vo, Brian Richards, \\

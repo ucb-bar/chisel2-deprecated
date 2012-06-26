@@ -48,7 +48,7 @@ object Component {
   val compIndices = HashMap.empty[String,Int];
   val compDefs = new HashMap[StringBuilder, String];
   var isEmittingComponents = false;
-  var isCompilingEmittedC = false;
+  var isCompiling = false;
   var isTesting = false;
   var backendName = "c";
   var topComponent: Component = null;
@@ -124,7 +124,7 @@ object Component {
     searchAndMap = false
     ioCount = 0;
     isEmittingComponents = false;
-    isCompilingEmittedC = false;
+    isCompiling = false;
     isTesting = false;
     backendName = "c";
     topComponent = null;
@@ -861,7 +861,7 @@ abstract class Component(resetSignal: Bool = null) {
 
   def genHarnessV(base_name: String, name: String) = {
     val harness  = new java.io.FileWriter(base_name + name + "-harness.v");
-    val printFormat = printArgs.map(a => "%x").fold("")((y,z) => z + " " + y) 
+    val printFormat = printArgs.map(a => "0x%x").fold("")((y,z) => z + " " + y) 
     val scanFormat = scanArgs.map(a => "%x").fold("")((y,z) => z + " " + y) 
     val printNodes = for (arg <- printArgs; node <- arg.maybeFlatten) yield arg
     val scanNodes = for (arg <- scanArgs; node <- keepInputs(arg.maybeFlatten)) yield arg
@@ -870,26 +870,50 @@ abstract class Component(resetSignal: Bool = null) {
       harness.write("    reg  [" + (node.width-1) + ":0] " + node.emitRef + ";\n")
     for (node <- printNodes)
       harness.write("    wire [" + (node.width-1) + ":0] " + node.emitRef + ";\n")
+
+    harness.write("  reg clk = 0;\n")
+    harness.write("  reg reset = 1;\n\n")
+    harness.write("  initial begin\n")
+    harness.write("    reset = 1;\n")
+    harness.write("    #250 reset = 0;\n")
+    harness.write("  end\n\n")
+
+    harness.write("  always #100 clk = ~clk;\n")
     
     harness.write("    " + moduleName + "\n")
     harness.write("      " + moduleName + "(\n")
-    for (node <- (scanNodes ++ printNodes))
-      harness.write("        ." + node.emitRef + "(" + node.emitRef + "),\n")
+
+    if(containsReg || childrenContainsReg) {
+      harness.write("        .clk(clk),\n")
+      harness.write("        .reset(reset),\n")
+    }
+
+    var first = true
+    for (node <- (scanNodes ++ printNodes)) 
+      if (first) {
+        harness.write("        ." + node.emitRef + "(" + node.emitRef + ")")
+        first = false
+      } else
+        harness.write(",\n        ." + node.emitRef + "(" + node.emitRef + ")")
+    harness.write("\n")
     harness.write("        );\n")
 
     harness.write("  integer count;\n")
-    harness.write("  always begin;\n")
-    harness.write("    count = $fscanf('h80000000, \"" + scanFormat + "\"")
+    harness.write("  always @(negedge clk) begin;\n")
+    harness.write("  #50;\n")
+    harness.write("    if (!reset) ")
+    harness.write("count = $fscanf('h80000000, \"" + scanFormat.slice(0,scanFormat.length-1) + "\"")
     for (node <- scanNodes)
       harness.write(", " + node.emitRef)
     harness.write(");\n")
-    harness.write("    if (count < " + scanNodes.length + ") $finish(0);\n")
-    harness.write("    #1;\n")
-    harness.write("    $display(\"" + printFormat + "\"")
+    harness.write("      if (count == -1) $finish(1);\n")
+    harness.write("  end\n")
+    harness.write("  always @(posedge clk) begin\n")
+    harness.write("    if (!reset) ")
+    harness.write("$display(\"" + printFormat.slice(0,printFormat.length-1) + "\"")
     for (node <- printNodes)
       harness.write(", " + node.emitRef)
     harness.write(");\n")
-    harness.write("    #1;\n")
     harness.write("  end\n")
     harness.write("endmodule\n")
     harness.close();
@@ -948,6 +972,21 @@ abstract class Component(resetSignal: Bool = null) {
       out.append(res);
     }
   }
+
+
+  def vcs(): Unit = {
+
+    def run(cmd: String) = {
+      val c = Process(cmd).!
+      println(cmd + " RET " + c)
+    }
+    val dir = targetDir + "/"
+    val src = dir + name + "-harness.v " + dir + name +".v"
+    val cmd = "vcs +vc +v2k -timescale=10ns/10ps " + src + " -o " + dir + name
+    run(cmd)
+
+  }
+
   def compileV(): Unit = {
     topComponent = this;
     components.foreach(_.elaborate(0));
@@ -1044,8 +1083,13 @@ abstract class Component(resetSignal: Bool = null) {
     harness.write("  c->init();\n");
     if (isVCD)
       harness.write("  FILE *f = fopen(\"" + name + ".vcd\", \"w\");\n");
+    harness.write("  for(int i = 0; i < 5; i++) {\n")
+    harness.write("    dat_t<1> reset = LIT<1>(1);\n")
+    harness.write("    c->clock_lo(reset);\n")
+    harness.write("    c->clock_hi(reset);\n")
+    harness.write("  }\n")
     harness.write("  for (int t = 0; lim < 0 || t < lim; t++) {\n");
-    harness.write("    dat_t<1> reset = LIT<1>(t == 0);\n");
+    harness.write("    dat_t<1> reset = LIT<1>(0);\n");
     harness.write("    if (!c->scan(stdin)) break;\n");
     harness.write("    c->clock_lo(reset);\n");
     harness.write("    c->print(stdout);\n");
@@ -1285,6 +1329,7 @@ abstract class Component(resetSignal: Bool = null) {
     nodes.filter(isInput)
   def removeInputs(nodes: Seq[Node]): Seq[Node] = 
     nodes.filter(n => !isInput(n))
+
   def gcc(flags: String = "-O2"): Unit = {
     val chiselENV = java.lang.System.getenv("CHISEL")
     val allFlags = flags + " -I../ -I" + chiselENV + "/csrc/"
@@ -1305,6 +1350,7 @@ abstract class Component(resetSignal: Bool = null) {
     cc(name)
     link(name)
   }
+
   def compileC(): Unit = {
     components.foreach(_.elaborate(0));
     for (c <- components)

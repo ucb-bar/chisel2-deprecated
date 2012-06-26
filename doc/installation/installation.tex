@@ -102,37 +102,91 @@ Scala.
 
 \subsection{Install}
 
-To install Chisel, download and run the \verb|install| script 
-provided on the website. Note: python must be installed for 
-this script to work. The script does the following:
+\subsubsection{MacOSX}
+
 \begin{enumerate}
-  \item installs \verb|g++| if necessary
-  \item installs Java runtime and compiler if necessary
-  \item installs \verb+git+ if necessary
-  \item prompts for a location to install Chisel (needs an absolute path)\label{step:chiseldir}
-  \item clones Chisel into the location provided by Step~\ref{step:chiseldir}
+\item Install XCODE including console tools.
+\item Install MacPorts from \url{http://www.macports.org}
 \end{enumerate}
 
-After running the installation script, you need to set the CHISEL
-environment variable in your bashrc file to point to where you
-installed Chisel in Step~\ref{step:chiseldir}.
+\noindent
+From there install the following MacPorts packages:
 
-\subsection{Verify}
-To verify that everything has been configured correctly, download 
-run the \verb|verify| script provided on teh website. The
-script will run the compiler on simple use case. If everything
-goes correctly, you should find the following files in 
-\$CHISEL/emulator:
-\begin{itemize}
-  \item GCD-emulator.cpp
-  \item GCD-makefile
-  \item GCD.h
-  \item GCD.cpp
-\end{itemize}
+\begin{enumerate}
+\item \verb+git+
+\item \verb+openjdk6+
+\end{enumerate}
+
+\noindent
+using
+
+\begin{bash}
+sudo port install
+\end{bash}
+
+\subsubsection{Linux}
+
+To install Chisel on Linux, install the following packages:
+
+\begin{enumerate}
+\item \verb+git+
+\item \verb|g++|
+\item \verb+openjdk-7-jre+
+\item \verb+openjdk-7-jdk+
+\end{enumerate}
+
+\noindent
+using
+
+\begin{bash}
+sudo apt-get install
+\end{bash}
+
+% To install Chisel on Linux, download and run the \verb|install| script 
+% provided on the website. Note: python must be installed for 
+% this script to work. The script does the following:
+% \begin{enumerate}
+%   \item installs \verb|g++| if necessary
+%   \item installs Java runtime and compiler if necessary
+%   \item installs \verb+git+ if necessary
+%   \item prompts for a location to install Chisel (needs an absolute path)\label{step:chiseldir}
+%   \item clones Chisel into the location provided by Step~\ref{step:chiseldir}
+% \end{enumerate}
+% 
+% After running the installation script, you need to set the CHISEL
+% environment variable in your bashrc file to point to where you
+% installed Chisel in Step~\ref{step:chiseldir}.
+% 
+% \subsection{Verify}
+% To verify that everything has been configured correctly, download 
+% run the \verb|verify| script provided on teh website. The
+% script will run the compiler on simple use case. If everything
+% goes correctly, you should find the following files in 
+% $CHISEL/emulator:
+% \begin{itemize}
+%   \item GCD-emulator.cpp
+%   \item GCD-makefile
+%   \item GCD.h
+%   \item GCD.cpp
+% \end{itemize}
 
 \section{Github}
 
-The following is the Chisel directory structure:
+\verb+cd+ above directory = \verb+$DIR+ you've chosen to place Chisel and type:
+
+\begin{bash}
+cd $DIR
+git clone https://github.com/ucb-bar/chisel.git
+\end{bash}
+
+\noindent
+Your copy of the Chisel repository will then be in \verb+$DIR/chisel+.  Define this as a variable in your bash environment:
+
+\begin{bash}
+export CHISEL = $DIR/chisel
+\end{bash}
+
+The following is the Chisel directory structure you will find in \verb+$CHISEL+:
 
 \begin{bash}
 chisel/      # install chisel at same level as your project
@@ -147,29 +201,23 @@ chisel/      # install chisel at same level as your project
 
 \section{Setting Up Chisel}
 
-\begin{bash}
-export CHISEL_EMULATOR_INCLUDE = $CHISEL/csrc
-\end{bash}
-
 \section{Getting Started with Tutorial}
 
 Test your configuration as follows:
 
 \begin{bash}
-cd $CHISEL/tutorial/sbt
-sbt
-project tutorial
-run gcd
-\end{bash}
-
-\noindent
-Then test that C++ was generated correctly as follows:
-
-\begin{bash}
 cd $CHISEL/tutorial/emulator
-make -f GCD-Makefile
-GCD
+make gcd
 \end{bash}
+
+% \noindent
+% Then test that C++ was generated correctly as follows:
+% 
+% \begin{bash}
+% cd $CHISEL/tutorial/emulator
+% make -f GCD-Makefile
+% GCD
+% \end{bash}
 
 \section{Creating Your Own Projects}
 
