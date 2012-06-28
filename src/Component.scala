@@ -1432,6 +1432,12 @@ abstract class Component(resetSignal: Bool = null) {
       scanArgs.clear();  scanArgs  ++= tester.testInputNodes;    scanFormat  = ""
       printArgs.clear(); printArgs ++= tester.testNonInputNodes; printFormat = ""
 
+      for (n <- scanArgs)
+        n.isScanArg = true
+
+      for (n <- printArgs)
+        n.isPrintArg = true
+
       for (n <- scanArgs ++ printArgs)
         if(!omods.contains(n)) omods += n
     } 

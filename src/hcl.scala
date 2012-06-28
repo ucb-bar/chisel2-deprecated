@@ -124,11 +124,13 @@ object chiselMain {
     if (scanner != null) {
       val s = scanner(c);
       scanArgs  ++= s.args;
+      for (a <- s.args) a.isScanArg = true
       scanFormat  = s.format;
     }
     if (printer != null) {
       val p = printer(c);
       printArgs   ++= p.args;
+      for(a <- p.args) a.isPrintArg = true
       printFormat   = p.format;
     }
     if (ftester != null) {

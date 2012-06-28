@@ -96,6 +96,8 @@ abstract class Node extends nameable{
   var stack: Array[StackTraceElement] = null;
   var line: Array[StackTraceElement] = Thread.currentThread().getStackTrace
   var memSource: MemAccess = null
+  var isScanArg = false
+  var isPrintArg = false
   def isMemOutput = false
   
   def isByValue: Boolean = true;
@@ -196,7 +198,7 @@ abstract class Node extends nameable{
   def isInObject = 
     (isIo && (isIoDebug || component == topComponent)) || 
     (topComponent.debugs.contains(this) && named) || 
-    isReg || isUsedByRam || isDebug;
+    isReg || isUsedByRam || isDebug || isPrintArg || isScanArg;
   def isInVCD = (isIo && isInObject) || isReg || (isDebug && named);
   def emitTmp: String = 
     if (backendName == "c") {
