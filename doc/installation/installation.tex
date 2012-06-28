@@ -201,13 +201,22 @@ chisel/      # install chisel at same level as your project
 
 \section{Setting Up Chisel}
 
+Make sure to set your chisel environment variable in bash or your favorite shell:
+
+\begin{bash}
+export CHISEL = $CHISEL
+\end{bash}
+
+\noindent
+and put this into your \verb+.bashrc+ file or similar shell initialization file.
+
 \section{Getting Started with Tutorial}
 
 Test your configuration as follows:
 
 \begin{bash}
 cd $CHISEL/tutorial/emulator
-make gcd
+make GCD
 \end{bash}
 
 % \noindent
@@ -230,22 +239,15 @@ chisel/           # install chisel at same level as your project
   tutorial/
   src/
 gpu/
-  chisel -> ../chisel
   sbt/
     project/
       build.scala # edit this as shown below
-    chisel -> ../chisel/sbt/chisel/
-    gpu/
-      src/
-        main/
-          scala -> ../../../../src
   src/ 
     gpu.scala # your source files go here
   emulator/   # your C++ target can go here
 \end{bash}
 
-Alternatively, you can use \verb+chisel/tutorial+ as a template making
-sure to get the symbolic links correct.
+Alternatively, you can use \verb+chisel/tutorial+.
 The following is the \verb+build.scala+ template:
 
 \begin{scala}
@@ -257,22 +259,25 @@ object BuildSettings {
   val buildVersion = "1.1"
   val buildScalaVersion = "2.9.2"
 
-  val buildSettings = Defaults.defaultSettings ++ Seq (
-    organization := buildOrganization,
-    version      := buildVersion,
-    scalaVersion := buildScalaVersion
-  )
+  def apply(projectdir: String) = {
+    Defaults.defaultSettings ++ Seq (
+      organization := buildOrganization,
+      version      := buildVersion,
+      scalaVersion := buildScalaVersion,
+      scalaSource in Compile := Path.absolute(file(projectdir + "/src"))
+    )
+  }
 }
 
 object ChiselBuild extends Build {
   import BuildSettings._
-
+  val chiselDir = System.getProperty(``CHISEL'')
   lazy val chisel = 
     Project("chisel", file("chisel"), 
-            settings = buildSettings)
+            settings = BuildSettings(chiselDir))
   lazy val gpu =
     Project("gpu", file("gpu"), 
-            settings = buildSettings) 
+            settings = BuildSettings("..")) 
       dependsOn(chisel)
 }
 \end{scala}

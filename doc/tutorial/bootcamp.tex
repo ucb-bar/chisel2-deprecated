@@ -1741,11 +1741,8 @@ chisel/
   tutorial/
   src/
 gpu/
-  chisel -> ../chisel
   sbt/
     project/build.scala \comment{\# edit this as shown below}
-    chisel/src/main/scala -> ${CHISEL}/src
-    gpu/src/main/scala -> ../../../../src
   src/                  \comment{\# your source files go here}
     gpu.scala           
   emulator/             \comment{\# your C++ target can go here}
@@ -1766,21 +1763,25 @@ object BuildSettings {
   val buildVersion = "1.1"
   val buildScalaVersion = "2.9.2"
 
-  val buildSettings = Defaults.defaultSettings ++ Seq (
-    organization := buildOrganization,
-    version      := buildVersion,
-    scalaVersion := buildScalaVersion
-  )
+  def apply(projectdir: String) = {
+    Defaults.defaultSettings ++ Seq (
+      organization := buildOrganization,
+      version      := buildVersion,
+      scalaVersion := buildScalaVersion,
+      scalaSource in Compile := Path.absolute(file(projectdir + "/src"))
+    )
+  }
 }
 
 object ChiselBuild extends Build {
   import BuildSettings._
-
+  val chiselDir = System.getProperty(``CHISEL'')
   lazy val chisel = 
     Project("chisel", file("chisel"), 
-      settings = buildSettings)
+            settings = BuildSettings(chiselDir))
   lazy val gpu =
-    Project("gpu", file("gpu"), settings = buildSettings) 
+    Project("gpu", file("gpu"), 
+            settings = BuildSettings("..")) 
       dependsOn(chisel)
 }
 \end{scala}
