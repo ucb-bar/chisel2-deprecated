@@ -213,33 +213,31 @@ class Literal extends Node {
   override def isLit = true;
   override def toString: String = name;
   override def emitDecC: String = "";
-  override def emitRefC: String = 
-    (if (isBinary) { 
+  override def emitRefC: String = {
+    val bits_per_lit = 64
+    if (isZ) {
+      require(isBinary)
       var (bits, mask, swidth) = parseLit(name);
       var bwidth = if(base == 'b') width else swidth;
-      if (isZ) {
-        ("LITZ<" + bwidth + ">(0x" + toHex(bits) + ", 0x" + toHex(mask) + ")")
-      } else
-        ("LIT<" + bwidth + ">(0x" + toHex(bits) + ")")
-    } else if(base == 'd' || base == 'x'){
-      ("LIT<" + width + ">(" + name + "L)")
-    } else
-      ("LIT<" + width + ">(0x" + name + "L)")
-   ) + "/*" + inputVal + "*/";
+      if (bwidth > bits_per_lit)
+        ChiselErrors += ChiselError("Z-Literal " + name + " of width " + bwidth + " is too wide (max " + bits_per_lit + ")", Thread.currentThread().getStackTrace);
+      ("LITZ<" + bwidth + ">(0x" + toHex(bits) + ", 0x" + toHex(mask) + ")")
+    } else {
+      var hex = value.toString(16)
+      var res = "LIT<" + width + ">(0x" + hex.takeRight(bits_per_lit/4) + "L)"
+      hex = hex.dropRight(bits_per_lit/4)
 
-  override def emitRefVCD: String = 
-    (if (isBinary) { 
-      var (bits, mask, swidth) = parseLit(name);
-      var bwidth = if(base == 'b') width else swidth;
-      if (isZ) {
-        ("LITZ<" + bwidth + ">(0x" + toHex(bits) + ", 0x" + toHex(mask) + ")")
-      } else
-        ("LIT<" + bwidth + ">(0x" + toHex(bits) + ")")
-    } else if(base == 'd' || base == 'x'){
-      ("LIT<" + width + ">(" + name + "L)")
-    } else
-      ("LIT<" + width + ">(0x" + name + "L)")
-   );
+      var shift = bits_per_lit
+      while (hex.length > 0) {
+        res = "(LIT<" + width + ">(0x" + hex.takeRight(bits_per_lit/4) + "L) << " + shift + " | " + res + ")"
+        hex = hex.dropRight(bits_per_lit/4)
+        shift += bits_per_lit
+      }
+      res
+    }
+  }
+
+  override def emitRefVCD: String = emitRefC
 
   override def emitDec: String = "";
   override def emitRefV: String = 
