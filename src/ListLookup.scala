@@ -45,53 +45,6 @@ class ListLookup[T <: Bits] extends Node {
   override def toString: String = "LISTLOOKUP(" + inputs(0) + ")";
 
   override def isByValue: Boolean = false;
-  override def emitDef: String = {
-    val res = new StringBuilder()
-    res.append("  always @(*) begin\n" +
-               //"    " + emitRef + " = " + inputs(1).emitRef + ";\n" +
-               "    casez (" + inputs(0).emitRef + ")" + "\n");
-    
-    for ((addr, data) <- map) {
-      res.append("      " + addr.emitRef + " : begin\n");
-      for ((w, e) <- wires zip data) 
-	if(w.component != null)
-          res.append("        " + w.emitRef + " = " + e.emitRef + ";\n");
-      res.append("      end\n")
-    }
-    res.append("      default: begin\n")
-    for ((w, e) <- wires zip defaultWires) {
-      if(w.component != null)
-	res.append("        " + w.emitRef + " = " + e.emitRef + ";\n");
-    }
-    res.append("      end\n");
-    res.append( 
-      "    endcase\n" +
-      "  end\n");
-    res.toString
-  }
-
-  override def emitDefLoC: String = {
-    var res = "";
-    var isFirst = true;
-    for (w <- wires)
-      if(w.component != null) // TODO: WHY IS COMPONENT EVER NULL?
-        res = res + "  dat_t<" + w.width + "> " + w.emitRef + ";\n";
-    for ((addr, data) <- map) {
-      res = res + "  " + (if (isFirst) { isFirst = false; "" } else "else ");
-      res = res + "if ((" + addr.emitRef + " == " + inputs(0).emitRef + ").to_bool()) {\n";
-      for ((w, e) <- wires zip data)
-	if(w.component != null)
-          res = res + "    " + w.emitRef + " = " + e.emitRef + ";\n";
-      res = res + "  }\n";
-    }
-    res = res + "  else {\n";
-    for ((w, e) <- wires zip defaultWires)
-      if(w.component != null)
-        res = res + "    " + w.emitRef + " = " + e.emitRef + ";\n";
-    res = res + "  }\n";
-    res
-  }
-
 }
 
 object ListLookupRef {
@@ -104,10 +57,6 @@ object ListLookupRef {
 
 class ListLookupRef[T <: Bits]() extends Node {
   override def toString: String = name
-  override def emitDef = "";
-  override def emitDefLoC = "";
-  override def emitDec: String = 
-    "  reg[" + (width-1) + ":0] " + emitRef + ";\n";
 }
 
 object ListNode {
@@ -119,10 +68,6 @@ object ListNode {
 }
 
 class ListNode extends Node {
-  override def emitDefLoC: String = ""
-  override def emitDef: String = ""
-  override def emitDec: String = ""
-  override def emitDecC: String = ""
 }
 
 object MapNode {
@@ -134,10 +79,6 @@ object MapNode {
 }
 
 class MapNode extends Node {
-  override def emitDefLoC: String = ""
-  override def emitDef: String = ""
-  override def emitDec: String = ""
-  override def emitDecC: String = ""
   def addr = inputs(0)
   def data = inputs.slice(1, inputs.length)
 }

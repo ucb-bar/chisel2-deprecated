@@ -136,14 +136,16 @@ object chiselMain {
     }
     backendName match {
       case "v" => { 
-        c.compileV();
+        val be = new VerilogBackend()
+        be.compile(c);
         println(isCompiling + " " + isGenHarness)
-        if (isCompiling && isGenHarness) c.vcs()
+        if (isCompiling && isGenHarness) be.vcs(c)
         if (isTesting) tester.tests()
       }
       case "c" =>  {
-        c.compileC(); 
-        if (isCompiling && isGenHarness) c.gcc()
+        val be = new CppBackend()
+        be.compile(c); 
+        if (isCompiling && isGenHarness) be.gcc(c)
         if (isTesting) tester.tests()
       }
     }
@@ -219,9 +221,6 @@ trait nameable {
 abstract class BlackBox extends Component {
   parent.blackboxes += this;
   var moduleNameSet = false;
-  override def doCompileV(out: java.io.FileWriter, depth: Int): Unit = {
-    traceNodes();
-  }
 
   def setVerilogParameters(string: String) = 
     this.asInstanceOf[Component].verilog_parameters = string;
@@ -261,6 +260,4 @@ object Log2 {
 
 class Log2 extends Node {
   override def toString: String = "LOG2(" + inputs(0) + ")";
-  override def emitDefLoC: String =
-    " " + emitTmp + " = " + inputs(0).emitRef + ".log2<" + width + ">();\n";
 }

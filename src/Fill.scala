@@ -47,11 +47,4 @@ object NodeFill {
 class Fill extends Node {
   var n: Node = if(inputs.length >= 2) inputs(1) else null;
   override def toString: String = "FILL(" + inputs(0) + ", " + n + ")";
-  override def emitDef: String = 
-    "  assign " + emitTmp + " = {" + inputs(1).emitRef + "{" + inputs(0).emitRef + "}};\n";
-  override def emitDefLoC: String = {
-    if (inputs(1).isLit)
-      "  " + emitTmp + " = " + inputs(0).emitRef + ".fill<" + width + "," + inputs(1).value + ">();\n";
-    else
-      "  " + emitTmp + " = " + inputs(0).emitRef + ".fill<" + width + ">(" + inputs(1).emitRef + ");\n";
-}}
+}

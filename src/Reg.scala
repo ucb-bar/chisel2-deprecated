@@ -1,6 +1,7 @@
 package Chisel
 import Node._
 import Reg._
+import Component._
 import ChiselError._
 
 object Reg {
@@ -77,7 +78,7 @@ class Reg extends Delay with proc {
       ChiselErrors += ChiselError("reassignment to Reg", Thread.currentThread().getStackTrace);
     val cond = genCond();
     if (conds.length >= 1) {
-      isEnable = Component.isEmittingComponents
+      isEnable = backendName == "v"
       enable = enable || cond;
     }
     updates.enqueue((cond, src));
@@ -121,52 +122,4 @@ class Reg extends Delay with proc {
     }
   }
   override def isMemOutput = updates.length == 1 && updates(0)._2.memSource != null
-  override def emitInitC: String = {
-    "  " + emitRef + " = random_initialization ? dat_t<" + width + ">::rand() : LIT<" + width + ">(0);\n"
-  }
-  override def emitRefC: String = 
-    if(isHiC) emitRefV + "_shadow_out" else emitRefV
-  override def emitRefV: String = if (isMemOutput) updateVal.emitRef else if (name == "") "R" + emitIndex else name;
-  override def emitDef: String = "";
-  override def emitReg: String = {
-    if(isMemOutput)
-      ""
-    else if(isEnable && (enableSignal.litOf == null || enableSignal.litOf.value != 1)){
-      if(isReset){
-	"    if(reset) begin\n" + 
-	"      " + emitRef + " <= " + resetVal.emitRef + ";\n" +
-	"    end else if(" + enableSignal.emitRef + ") begin\n" + 
-	"      " + emitRef + " <= " + updateVal.emitRef + ";\n" +
-	"    end\n"
-      } else {
-	"    if(" + enableSignal.emitRef + ") begin\n" +
-	"      " + emitRef + " <= " + updateVal.emitRef + ";\n" +
-	"    end\n"
-      }
-    } else {
-      "    " + emitRef + " <= " + 
-      (if (isReset) "reset ? " + resetVal.emitRef + " : " else "" ) + 
-      updateVal.emitRef + ";\n"
-    }
-  }
-  override def emitDec: String = 
-    if (!isMemOutput) "  reg[" + (width-1) + ":0] " + emitRef + ";\n" else "";
-
-  override def emitDefLoC: String = {
-    val updateLogic = 
-      (if (isReset) "mux<" + width + ">(" + inputs.last.emitRef + ", " + resetVal.emitRef + ", " else "") + 
-    updateVal.emitRef + (if (isReset) ");\n" else ";\n");
-
-    "  " + emitRef + "_shadow = " +  updateLogic;
-  }
-  override def emitDefHiC: String = {
-    "  " + emitRef + " = " + emitRef + "_shadow;\n";
-  }
-  override def emitInitHiC: String = {
-    "  dat_t<" + width + "> " + emitRef + "_shadow_out = " + emitRef + ";\n";
-  }
-  override def emitDecC: String = {
-    "  dat_t<" + width + "> " + emitRef + ";\n" +
-    "  dat_t<" + width + "> " + emitRef + "_shadow;\n";
-  }
 }

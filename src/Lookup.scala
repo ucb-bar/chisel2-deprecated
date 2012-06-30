@@ -21,11 +21,6 @@ object LookupMap {
 }
 
 class LookupMap extends Node {
-  override def emitDefLoC: String = ""
-  override def emitDef: String = ""
-  override def emitDec: String = ""
-  override def emitDecC: String = ""
-
   def addr = inputs(0)
   def data = inputs(1)
 }
@@ -36,27 +31,4 @@ class Lookup extends Node {
   def map = inputs.slice(2, inputs.length).map(x => x.asInstanceOf[LookupMap])
 
   override def toString: String = "LOOKUP(" + inputs(0) + ")";
-  override def emitDef: String = {
-    var res = 
-      "  always @(*) begin\n" +
-      "    " + emitRef + " = " + inputs(1).emitRef + ";\n" +
-      "    casez (" + inputs(0).emitRef + ")" + "\n";
-    
-    for (node <- map) 
-      res = res +
-        "      " + node.addr.emitRef + " : " + emitRef + " = " + node.data.emitRef + ";\n";
-    res = res + 
-      "    endcase\n" +
-      "  end\n";
-    res
-  }
-  override def emitDefLoC: String = {
-    var res = "";
-    for (node <- map) 
-      res = res +
-        "  if ((" + node.addr.emitRef + " == " + inputs(0).emitRef + ").to_bool()) " + emitRef + " = " + node.data.emitRef + ";\n";
-    res
-  }
-  override def emitDec: String = 
-    "  reg[" + (width-1) + ":0] " + emitRef + ";\n";
 }

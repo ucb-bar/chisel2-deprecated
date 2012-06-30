@@ -192,48 +192,12 @@ abstract class Node extends nameable{
       return false;
     }
   }
-  def emitIndex: Int = { if (index == -1) index = componentOf.nextIndex; index }
   def isInObject = 
     (isIo && (isIoDebug || component == topComponent)) || 
     (topComponent.debugs.contains(this) && named) || 
     isReg || isUsedByRam || isDebug;
   def isInVCD = (isIo && isInObject) || isReg || (isDebug && named);
-  def emitTmp: String = 
-    if (backendName == "c") {
-      if (isInObject)
-        emitRef
-      else
-        "dat_t<" + width + "> " + emitRef
-    } else
-      emitRef
-  def emitRefVCD: String = emitRef;
-  def emitRef: String = if (backendName == "c") emitRefC else emitRefV;
-  def emitRefV = if(name == "" || !named) "T" + emitIndex else if(!named) name + "_" + emitIndex else name
   def dotName = { val name = this.getClass.getName; name.substring(7, name.size) };
-  def emitRefDot: String = emitRef;
-  def emitDef: String = ""
-  def emitReg: String = ""
-  def emitWidth: String = if(width == 1) "" else "[" + (width-1) + ":0]"
-  def emitDec: String = "  wire" + (if (isSigned) " signed " else "") + emitWidth + " " + emitRef + ";\n";
-  // C backend
-  def emitDecVCD: String = if (isVCD && !isLit) "  dat_t<" + width + "> " +emitRef + "__prev" + ";\n" else "";
-  def emitDecC: String = "  dat_t<" + width + "> " + emitRef + ";\n";
-  def emitDefLoC: String = ""
-  def emitInitC: String = ""
-  def emitDefHiC: String = ""
-  def emitInitHiC: String = ""
-  def emitDefVCD(vcdname: String) = {
-    "  if (t == 0 || (" + emitRef + " != " + emitRef + "__prev).to_bool())\n" +
-    "    dat_dump(f, " + emitRef + ", \"" + vcdname + "\");\n" +
-    "  " + emitRef + "__prev = " + emitRef + ";\n"
-  }
-  def emitRefC: String = emitRefV;
-  def depthString(depth: Int): String = {
-    var res = "";
-    for (i <- 0 until depth)
-      res += "  ";
-    res
-  }
 
   def printTree(depth: Int = 4, indent: String = ""): Unit = {
     if (depth < 1) return;
@@ -452,4 +416,10 @@ abstract class Node extends nameable{
         Array[Node](getNode);
     }
   }
+  def emitIndex(): Int = { 
+    if (index == -1) 
+      index = componentOf.nextIndex; 
+    index 
+  }
+
 }

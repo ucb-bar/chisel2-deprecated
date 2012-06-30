@@ -21,7 +21,7 @@ object Cat {
       } else {
         // initialize
         val res = 
-          if(isEmittingComponents){
+          if(backendName == "v"){
             val res = new Cat();
             res.initOf("", sumWidth _, mod.toNode :: mods.toList.map(x => x.toNode))
           } else {
@@ -33,10 +33,12 @@ object Cat {
   }
 }
 
+class Cat extends Node {
+}
 
 object Concatenate {
   def apply (mod: Node, mods: Node*): Node = 
-    if(isEmittingComponents) {
+    if(backendName == "v") {
       val res = new Cat();
       res.initOf("", sumWidth _, mod :: mods.toList);
       res
@@ -44,13 +46,3 @@ object Concatenate {
       mods.foldLeft(mod){(a, b) => a ## b};
 }
 
-class Cat extends Node {
-  override def emitDef: String = {
-    var res = "  assign " + emitTmp + " = {";
-    var first = true;
-    for(node <- inputs)
-      res += (if(first) {first = false; ""} else ", ") + node.emitRef;
-    res += "};\n";
-    res
-  }
-}

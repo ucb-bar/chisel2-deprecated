@@ -212,43 +212,10 @@ class Literal extends Node {
   override def minNum = value;
   override def isLit = true;
   override def toString: String = name;
-  override def emitDecC: String = "";
-  override def emitRefC: String = 
-    (if (isBinary) { 
-      var (bits, mask, swidth) = parseLit(name);
-      var bwidth = if(base == 'b') width else swidth;
-      if (isZ) {
-        ("LITZ<" + bwidth + ">(0x" + toHex(bits) + ", 0x" + toHex(mask) + ")")
-      } else
-        ("LIT<" + bwidth + ">(0x" + toHex(bits) + ")")
-    } else if(base == 'd' || base == 'x'){
-      ("LIT<" + width + ">(" + name + "L)")
-    } else
-      ("LIT<" + width + ">(0x" + name + "L)")
-   ) + "/*" + inputVal + "*/";
 
-  override def emitRefVCD: String = 
-    (if (isBinary) { 
-      var (bits, mask, swidth) = parseLit(name);
-      var bwidth = if(base == 'b') width else swidth;
-      if (isZ) {
-        ("LITZ<" + bwidth + ">(0x" + toHex(bits) + ", 0x" + toHex(mask) + ")")
-      } else
-        ("LIT<" + bwidth + ">(0x" + toHex(bits) + ")")
-    } else if(base == 'd' || base == 'x'){
-      ("LIT<" + width + ">(" + name + "L)")
-    } else
-      ("LIT<" + width + ">(0x" + name + "L)")
-   );
-
-  override def emitDec: String = "";
-  override def emitRefV: String = 
-    (if (width == -1) name 
-    else if(isBinary) ("" + width + "'b" + name)
-    else if(base == 'x') ("" + width + "'h" + name.substring(2, name.length))
-    else if(base == 'd') ("" + width + "'d" + name)
-    else if(base == 'h') ("" + width + "'h" + name)
-    else "") + "/* " + inputVal + "*/";
   def d (x: BigInt): Literal = Literal(x, value.toInt)
   //def ~(x: String): Lit = Lit(value, x(0), x.substring(1, x.length));
+}
+
+class Lit extends Node {
 }

@@ -99,29 +99,6 @@ class Extract extends Node {
       "BITS(" + inputs(0) + ", " + lo + ")";
     else
       "BITS(" + inputs(0) + ", " + hi + ", " + lo + ")";
-  override def emitDef: String = {
-    inputs.tail.foreach(validateIndex)
-    if (inputs.length < 3) {
-      if(inputs(0).width > 1) {
-        "  assign " + emitTmp + " = " + inputs(0).emitRef + "[" + inputs(1).emitRef + "];\n"
-      } else {
-        "  assign " + emitTmp + " = " + inputs(0).emitRef + ";\n"
-      }
-    } else {
-      if(inputs(0).width > 1) {
-        "  assign " + emitTmp + " = " + inputs(0).emitRef + "[" + inputs(1).emitRef + ":" + inputs(2).emitRef + "];\n"
-      } else {
-        "  assign " + emitTmp + " = " + inputs(0).emitRef + ";\n"
-      }
-    }
-  }
-  override def emitDefLoC: String = {
-    inputs.tail.foreach(validateIndex)
-    if (inputs.length < 3 )
-      "  " + emitTmp + " = " + inputs(0).emitRef + ".bit(" + inputs(1).emitRef + ");\n"
-    else{
-      "  " + emitTmp + " = " + inputs(0).emitRef + ".extract<" + width + ">(" + inputs(1).emitRef + "," + inputs(2).emitRef + ");\n"}
-  }
   def validateIndex(x: Node) = {
     val lit = x.litOf
     assert(lit == null || lit.value >= 0 && lit.value < inputs(0).getWidth)

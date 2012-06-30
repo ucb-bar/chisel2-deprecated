@@ -78,41 +78,6 @@ class Bits extends Data with proc {
   }
 
   //code generation stuff
-  override def emitRefC: String = if (!isInObject && inputs.length == 1) inputs(0).emitRefC else super.emitRefC
-
-  override def emitDefLoC: String = 
-    if (isInObject && inputs.length == 1)
-      "  " + emitTmp + " = " + inputs(0).emitRef + ";\n"
-    else if (inputs.length == 0 && !isInObject) {
-      "  " + emitTmp + ";\n"
-    } else
-      ""
-
-  override def emitDef: String = {
-    if (dir == INPUT)
-      ""
-    else {
-      if (inputs.length == 0) {
-        println("// UNCONNECTED " + this + " IN " + component); ""
-      } else if (inputs(0) == null) {
-        println("// UNCONNECTED WIRE " + this + " IN " + component); ""
-      } else
-        "  assign " + emitTmp + " = " + inputs(0).emitRef + ";\n" 
-    }
-  }
-
-  override def emitDec: String = 
-    if(dir == null)
-      super.emitDec
-    else
-      ""
-
-  override def emitDecC: String = 
-    if(dir == null) {
-      super.emitDecC
-    } else {
-      if (isEmittingComponents) ""; else super.emitDecC
-    }
 
   override def apply(name: String): Data = this
 
@@ -244,14 +209,6 @@ class Bits extends Data with proc {
       }
     }
   }
-
-  override def emitRefV = 
-    if(!isInObject || name == "") 
-      super.emitRefV 
-    else if(!named) 
-      name + "_" + emitIndex 
-    else 
-      name
 
   override def setIsTypeNode = isTypeNode = true;
 

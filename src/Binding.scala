@@ -26,12 +26,5 @@ object Binding {
   }
 }
 class Binding extends Node {
-  override def emitDef: String = "";
   override def toString: String = "BINDING(" + inputs(0) + ")";
-  override def emitDecC: String = 
-    if (isEmittingComponents) "  Data " + emitRef + ";\n"; else "";
-  override def emitDefLoC: String = ""
-  override def emitDefHiC: String = ""
-  override def emitRefC: String = 
-    if (isEmittingComponents) emitRefV; else inputs(0).emitRefC;
 }
