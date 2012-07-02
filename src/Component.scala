@@ -890,11 +890,14 @@ abstract class Component(resetSignal: Bool = null) {
 
     var first = true
     for (node <- (scanNodes ++ printNodes)) 
-      if (first) {
-        harness.write("        ." + node.emitRef + "(" + node.emitRef + ")")
-        first = false
-      } else
-        harness.write(",\n        ." + node.emitRef + "(" + node.emitRef + ")")
+      if(node.isIo && node.component == this) {
+        if (first) {
+          harness.write("        ." + node.emitRef + "(" + node.emitRef + ")")
+          first = false
+        } else
+          harness.write(",\n        ." + node.emitRef + "(" + node.emitRef + ")")
+      } 
+
     harness.write("\n")
     harness.write("        );\n")
 
@@ -911,8 +914,22 @@ abstract class Component(resetSignal: Bool = null) {
     harness.write("  always @(posedge clk) begin\n")
     harness.write("    if (!reset) ")
     harness.write("$display(\"" + printFormat.slice(0,printFormat.length-1) + "\"")
-    for (node <- printNodes)
-      harness.write(", " + node.emitRef)
+
+    for (node <- printNodes) {
+
+      if(node.isIo && node.component == this) {
+        harness.write(", " + node.emitRef)
+      } else {
+        var nextComp = node.component
+        var path = "."
+        while(nextComp != this) {
+          path = "." + nextComp.instanceName + path
+        }
+        path = this.name + path + node.emitRef
+        harness.write(", " + path)
+      }
+
+    }
     harness.write(");\n")
     harness.write("  end\n")
     harness.write("endmodule\n")
