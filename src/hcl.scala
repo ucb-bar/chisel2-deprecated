@@ -108,7 +108,7 @@ object chiselMain {
         case "--test" => isTesting = true;
         case "--targetDir" => targetDir = args(i+1); i += 1;
         case "--include" => includeArgs = splitArg(args(i+1)); i += 1;
-        case any => println("UNKNOWN ARG");
+        case any => println("UNKNOWN CONSOLE ARG");
       }
       i += 1;
     }
