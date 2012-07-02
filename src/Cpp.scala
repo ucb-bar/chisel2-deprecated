@@ -22,9 +22,6 @@ class CppBackend extends Backend {
 
   override def emitRef(node: Node): String = {
     node match {
-      case x: Bits => 
-        if (!node.isInObject && node.inputs.length == 1) emitRef(node.inputs(0)) else super.emitRef(node) 
-
       case l: Literal =>
         (if (l.isBinary) { 
           var (bits, mask, swidth) = parseLit(l.name);
@@ -44,6 +41,9 @@ class CppBackend extends Backend {
 
       case x: Binding =>
         emitRef(x.inputs(0))
+
+      case x: Bits => 
+        if (!node.isInObject && node.inputs.length == 1) emitRef(node.inputs(0)) else super.emitRef(node) 
 
       case _ =>
         super.emitRef(node)
@@ -159,7 +159,7 @@ class CppBackend extends Backend {
             res = res + "  dat_t<" + w.width + "> " + emitRef(w) + ";\n";
         for ((addr, data) <- ll.map) {
           res = res + "  " + (if (isFirst) { isFirst = false; "" } else "else ");
-          res = res + "if ((" + emitRef(ll.addr) + " == " + emitRef(ll.inputs(0)) + ").to_bool()) {\n";
+          res = res + "if ((" + emitRef(addr) + " == " + emitRef(ll.inputs(0)) + ").to_bool()) {\n";
           for ((w, e) <- ll.wires zip data)
             if(w.component != null)
               res = res + "    " + emitRef(w) + " = " + emitRef(e) + ";\n";
@@ -179,24 +179,13 @@ class CppBackend extends Backend {
             "  if ((" + emitRef(node.addr) + " == " + emitRef(l.inputs(0)) + ").to_bool()) " + emitRef(l) + " = " + emitRef(node.data) + ";\n";
         res
         
-      case x: Literal =>
-        ""
-      case x: Binding =>
-        ""
-      case x: ListLookupRef[_] =>
-        ""
-      case x: ListNode =>
-        ""
-      case x: MapNode =>
-        ""
-      case x: LookupMap =>
-        ""
-
-      case reg: Reg =>
-        val updateLogic = 
-          (if (reg.isReset) "mux<" + reg.width + ">(" + emitRef(reg.inputs.last) + ", " + emitRef(reg.resetVal) + ", " else "") + 
-        emitRef(reg.updateVal) + (if (reg.isReset) ");\n" else ";\n");
-        "  " + emitRef(reg) + "_shadow = " +  updateLogic;
+      case x: Bits =>
+        if (node.isInObject && node.inputs.length == 1)
+          "  " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ";\n"
+        else if (node.inputs.length == 0 && !node.isInObject) {
+          "  " + emitTmp(node) + ";\n"
+        } else
+          ""
 
       case m: MemRead[_] =>
         "  " + emitTmp(m) + " = " + emitRef(m.mem) + ".get(" + emitRef(m.addr) + ");\n"
@@ -204,17 +193,17 @@ class CppBackend extends Backend {
       case r: ROMRead[_] =>
         "  " + emitTmp(r) + " = " + emitRef(r.rom) + ".get(" + emitRef(r.addr) + ");\n"
 
+      case reg: Reg =>
+        val updateLogic = 
+          (if (reg.isReset) "mux<" + reg.width + ">(" + emitRef(reg.inputs.last) + ", " + emitRef(reg.resetVal) + ", " else "") + 
+        emitRef(reg.updateVal) + (if (reg.isReset) ");\n" else ";\n");
+        "  " + emitRef(reg) + "_shadow = " +  updateLogic;
+
       case x: Log2 =>
         " " + emitTmp(x) + " = " + emitRef(x.inputs(0)) + ".log2<" + x.width + ">();\n";
 
       case _ =>
-
-        if (node.isInObject && node.inputs.length == 1)
-          "  " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ";\n"
-        else if (node.inputs.length == 0 && !node.isInObject) {
-          "  " + emitTmp(node) + ";\n"
-        } else
-          ""
+        ""
     }
   }
 
@@ -350,14 +339,14 @@ class CppBackend extends Backend {
     res
   }
 
-  def renameNodes(nodes: Seq[Node]) = {
+  def renameNodes(c: Component, nodes: Seq[Node]) = {
     for (m <- nodes) {
       m match {
         case l: Literal => ;
         case any        => 
           if (m.name != "" && !(m == m.component.reset) && !(m.component == null)) {
 	    // only modify name if it is not the reset signal or not in top component
-	    if(m.name != "reset" || !(m.component == this)) 
+	    if(m.name != "reset" || !(m.component == c)) 
 	      m.name = m.component.getPathName + "__" + m.name;
 	  }
       }
@@ -412,7 +401,7 @@ class CppBackend extends Backend {
     }
     c.collectNodes(c);
     c.findOrdering(); // search from roots  -- create omods
-    renameNodes(c.omods);
+    renameNodes(c, c.omods);
     if (isReportDims) {
       val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
       println("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
