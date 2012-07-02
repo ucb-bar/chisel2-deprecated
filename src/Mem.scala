@@ -4,8 +4,18 @@ import Node._
 import scala.collection.mutable.ArrayBuffer
 
 object Mem {
-  def apply[T <: Data](n: Int, seqRead: Boolean = false)(gen: => T): Mem[T] = 
+  def apply[T <: Data](n: Int, seqRead: Boolean = false)(gen: => T): Mem[T] = {
+
+    // check valid gen
+    val testGen = gen
+    for((n, i) <- gen.flatten) {
+      if (i.inputs.length > 0 || i.updates.length > 0) {
+        throwException("Invalid Type Specifier for Reg")
+      }
+    }
+
     new Mem(n, seqRead, () => gen)
+  }
 }
 
 abstract class AccessTracker extends Delay {

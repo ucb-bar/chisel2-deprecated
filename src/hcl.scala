@@ -139,7 +139,6 @@ object chiselMain {
     backendName match {
       case "v" => { 
         c.compileV();
-        println(isCompiling + " " + isGenHarness)
         if (isCompiling && isGenHarness) c.vcs()
         if (isTesting) tester.tests()
       }
@@ -150,6 +149,17 @@ object chiselMain {
       }
     }
     c
+  }
+}
+
+object throwException {
+  def apply(s: String) = {
+    val xcpt = new Exception(s)
+    val st = xcpt.getStackTrace
+    val usrStart = findFirstUserInd(st)
+    val usrEnd = if(usrStart == 0) st.length else usrStart + 1
+    xcpt.setStackTrace(st.slice(usrStart, usrEnd))
+    throw xcpt    
   }
 }
 

@@ -1,5 +1,7 @@
 package Chisel
 
+import ChiselError._
+
 abstract class Data extends Node {
   var comp: proc = null;
   def toFix(): Fix = chiselCast(this){Fix()};
@@ -20,8 +22,15 @@ abstract class Data extends Node {
     comp procAssign data.toNode;
   }
   override def clone(): this.type = {
-    val res = this.getClass.newInstance.asInstanceOf[this.type];
-    res
+    try {
+      val res = this.getClass.newInstance.asInstanceOf[this.type];
+      res
+    } catch {
+      case e: java.lang.Exception => {
+        throwException("Parameterized Bundle " + this.getClass + " needs clone method")
+        this
+      }
+    }
   }
   override def name_it(path: String, setNamed: Boolean = false) = {
     if (isTypeNode && comp != null) 
