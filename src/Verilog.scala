@@ -18,6 +18,14 @@ class VerilogBackend extends Backend {
 
   override def emitRef(node: Node): String = {
     node match {
+      case x: Literal =>
+        (if (x.width == -1) x.name 
+        else if(x.isBinary) ("" + x.width + "'b" + x.name)
+        else if(x.base == 'x') ("" + x.width + "'h" + x.name.substring(2, x.name.length))
+        else if(x.base == 'd') ("" + x.width + "'d" + x.name)
+        else if(x.base == 'h') ("" + x.width + "'h" + x.name)
+        else "") + "/* " + x.inputVal + "*/";
+
       case x: Bits =>
         if(!node.isInObject || node.name == "") 
           super.emitRef(node) 
@@ -25,8 +33,10 @@ class VerilogBackend extends Backend {
           node.name + "_" + node.emitIndex
         else 
           node.name
+
       case reg: Reg =>
         if (reg.isMemOutput) emitRef(reg.updateVal) else if (reg.name == "") "R" + reg.emitIndex else reg.name;
+
       case _ =>
         super.emitRef(node)
     }
@@ -38,6 +48,7 @@ class VerilogBackend extends Backend {
         "    .A" + idx + "(" + emitRef(r.addr) + "),\n" +
         "    .CS" + idx + "(" + emitRef(r.cond) + "),\n" +
         "    .O" + idx + "(" + emitTmp(r) + ")"
+
       case w: MemWrite[_] =>
         var we = "1'b1"
         var a = emitRef(w.addr)
@@ -75,7 +86,7 @@ class VerilogBackend extends Backend {
         res += nl + "       ." + n + "( ";
         //if(w.isInstanceOf[IO]) println("WALKED TO " + w + ": " + w.walked);
         //if(w.isInstanceOf[IO])
-        //println("COMP WALKED " + w + " is " + this.isWalked.contains(w));
+        //println("COMP WALKED " + w + " is " + c.isWalked.contains(w));
         w match {
           case io: Bits  => 
             if (io.dir == INPUT) {
@@ -87,7 +98,7 @@ class VerilogBackend extends Backend {
                     connWriter.write("// " + io + " CONNECTED TOO MUCH " + io.inputs.length + "\n"); 
               } else if (!c.isWalked.contains(w)){ 
                   if(saveConnectionWarnings)
-                    connWriter.write("// UNUSED INPUT " +io+ " OF " + this + " IS REMOVED" + "\n");
+                    connWriter.write("// UNUSED INPUT " +io+ " OF " + c + " IS REMOVED" + "\n");
               } else {
                 res += emitRef(io.inputs(0));
               }
@@ -204,25 +215,6 @@ class VerilogBackend extends Backend {
           "  end\n");
         res.toString
 
-      case x: Literal =>
-        (if (x.width == -1) x.name 
-        else if(x.isBinary) ("" + x.width + "'b" + x.name)
-        else if(x.base == 'x') ("" + x.width + "'h" + x.name.substring(2, x.name.length))
-        else if(x.base == 'd') ("" + x.width + "'d" + x.name)
-        else if(x.base == 'h') ("" + x.width + "'h" + x.name)
-        else "") + "/* " + x.inputVal + "*/";
-
-      case x: ListLookupRef[_] =>
-        ""
-      case x: ListNode =>
-        ""
-      case x: MapNode =>
-        ""
-      case x: LookupMap =>
-        ""
-      case x: Reg =>
-        ""
-
       case l: Lookup =>
         var res = 
           "  always @(*) begin\n" +
@@ -238,7 +230,6 @@ class VerilogBackend extends Backend {
         res
 
       case m: Mem[_] =>
-
         if (Component.isInlineMem)
           return ""
 
@@ -271,9 +262,13 @@ class VerilogBackend extends Backend {
           "  assign " + emitTmp(node) + " = " + emitRef(m.mem) + "[" + emitRef(m.addr) + "];\n"
         else
           ""
+
       case m: MemWrite[_] =>
-        if (!m.used || !Component.isInlineMem)
+        println("EMIT MEM WRITE")
+        if (!m.used || !Component.isInlineMem) {
+          println("  RETURN: USED? " + m.used + " INLINE? " + Component.isInlineMem)
           return ""
+        }
 
         val i = "i" + emitTmp(m)
         if (m.isMasked)
@@ -302,9 +297,8 @@ class VerilogBackend extends Backend {
       case r: ROMRead[_] =>
         "  assign " + emitTmp(r) + " = " + emitRef(r.rom) + "[" + emitRef(r.addr) + "];\n"
         
-      case x: Binding =>
+      case _ =>
         ""
-        
     }
   }
 
@@ -345,6 +339,10 @@ class VerilogBackend extends Backend {
 
       case r: ROM[_] =>
         "  reg [" + (r.width-1) + ":0] " + emitRef(r) + " [" + (r.lits.length-1) + ":0];\n"
+
+      case x: MemAccess =>
+        x.referenced = true
+        emitDecBase(node)
 
       case _ =>
         emitDecBase(node)
@@ -474,7 +472,7 @@ class VerilogBackend extends Backend {
     }
 
     // println("COMPILING COMP " + name);
-    println("// " + depthString(depth) + "COMPILING " + this + " " + c.children.length + " CHILDREN");
+    println("// " + depthString(depth) + "COMPILING " + c + " " + c.children.length + " CHILDREN");
     for (top <- c.children)
       doCompile(top, out, depth+1);
     c.findConsumers();
