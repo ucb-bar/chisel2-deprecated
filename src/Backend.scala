@@ -17,12 +17,17 @@ abstract class Backend {
  def emitTmp(node: Node): String
 
   def emitRef(node: Node): String = {
-    if(node.name == "" || !node.named) 
-      "T" + node.emitIndex 
-    else if(!node.named)
-      node.name + "_" + node.emitIndex
-    else 
-      node.name
+    node match {
+      case r: Reg => 
+        if(r.isMemOutput) emitRef(r.updateVal) else if(r.name == "") "R" + r.emitIndex else r.name
+      case _ => 
+        if(node.name == "" || !node.named) 
+          "T" + node.emitIndex 
+        else if(!node.named)
+          node.name + "_" + node.emitIndex
+        else 
+          node.name
+    }
   }
 
   def emitRef(c: Component): String =

@@ -344,7 +344,7 @@ class CppBackend extends Backend {
       m match {
         case l: Literal => ;
         case any        => 
-          if (m.name != "" && !(m == m.component.reset) && !(m.component == null)) {
+          if (m.name != "" && !(m == c.reset) && !(m.component == null)) {
 	    // only modify name if it is not the reset signal or not in top component
 	    if(m.name != "reset" || !(m.component == c)) 
 	      m.name = m.component.getPathName + "__" + m.name;
@@ -420,7 +420,8 @@ class CppBackend extends Backend {
         if(!c.omods.contains(n)) c.omods += n
     } 
     for (m <- c.omods) {
-      if(m.name != "reset") /* && !(m.component == c) */{
+      //if(m.name != "reset" && !(m.component == c)) {
+      if(m.name != "reset") {
         if (m.isInObject)
           out_h.write(emitDec(m));
         if (m.isInVCD)
