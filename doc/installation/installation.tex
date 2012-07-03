@@ -232,23 +232,20 @@ make GCD
 
 SBT has a particular directory structure that we adhere to and
 somewhat improve.  Assuming that we have a project named {\em gpu},
-then the following would be the template:
+then the following would be the directory structure template:
 
 \begin{bash}
-chisel/           # install chisel at same level as your project
-  tutorial/
-  src/
 gpu/
   sbt/
     project/
       build.scala # edit this as shown below
   src/ 
-    gpu.scala # your source files go here
-  emulator/   # your C++ target can go here
+    gpu.scala     # your source files go here
+  emulator/       # your C++ target can go here
 \end{bash}
 
-Alternatively, you can use \verb+chisel/tutorial+.
-The following is the \verb+build.scala+ template:
+\noindent
+and the following is the \verb+build.scala+ template:
 
 \begin{scala}
 import sbt._
@@ -264,14 +261,15 @@ object BuildSettings {
       organization := buildOrganization,
       version      := buildVersion,
       scalaVersion := buildScalaVersion,
-      scalaSource in Compile := Path.absolute(file(projectdir + "/src"))
+      scalaSource in Compile := 
+        Path.absolute(file(projectdir + "/src"))
     )
   }
 }
 
 object ChiselBuild extends Build {
   import BuildSettings._
-  val chiselDir = System.getProperty(``CHISEL'')
+  val chiselDir = System.getProperty("CHISEL")
   lazy val chisel = 
     Project("chisel", file("chisel"), 
             settings = BuildSettings(chiselDir))
