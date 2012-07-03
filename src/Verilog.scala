@@ -198,7 +198,7 @@ class VerilogBackend extends Backend {
                    "    casez (" + emitRef(node.inputs(0)) + ")" + "\n");
 
         for ((addr, data) <- ll.map) {
-          res.append("      " + emitRef(ll.addr) + " : begin\n");
+          res.append("      " + emitRef(addr) + " : begin\n");
           for ((w, e) <- ll.wires zip data) 
             if(w.component != null)
               res.append("        " + emitRef(w) + " = " + emitRef(e) + ";\n");
