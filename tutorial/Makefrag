@@ -1,4 +1,4 @@
-SBT := java -Xmx1024M -Xss8M -jar sbt-launch.jar
+SBT := java -Xmx1024M -Xss8M -XX:MaxPermSize=2G -jar sbt-launch.jar
 
 tutorials = \
 	GCD \
