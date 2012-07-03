@@ -269,7 +269,7 @@ object BuildSettings {
 
 object ChiselBuild extends Build {
   import BuildSettings._
-  val chiselDir = System.getProperty("CHISEL")
+  val chiselDir = java.lang.System.getenv("CHISEL")
   lazy val chisel = 
     Project("chisel", file("chisel"), 
             settings = BuildSettings(chiselDir))
