@@ -26,7 +26,7 @@ class VcdBackend extends Backend {
            ("LIT<" + x.width + ">(0x" + x.name + "L)")
         )
       case _ =>
-        ""
+        super.emitRef(node)
     }
   }
 
@@ -42,12 +42,12 @@ class VcdBackend extends Backend {
   def dumpVCDScope(c: Component, file: java.io.FileWriter, top: Component, names: HashMap[Node, String]): Unit = {
     file.write("    fprintf(f, \"" + "$scope module " + c.name + " $end" + "\\n\");\n");
     for (mod <- top.omods) {
-      if (mod.component == this && mod.isInVCD) {
+      if (mod.component == c && mod.isInVCD) {
         file.write("    fprintf(f, \"$var wire " + mod.width + " " + names(mod) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\");\n");
       
       }
     }
-    for (child <- top.children) {
+    for (child <- c.children) {
       dumpVCDScope(child, file, top, names);
     }
     file.write("    fprintf(f, \"$upscope $end\\n\");\n");
@@ -73,7 +73,7 @@ class VcdBackend extends Backend {
       file.write("  }\n");
       file.write("  fprintf(f, \"#%d\\n\", t);\n");
       for (mod <- c.omods) {
-        if (mod.isInVCD && !(mod.name == "reset" && mod.component == c))
+        if (mod.isInVCD && mod.name != "reset")
           file.write(emitDef(mod, names(mod)));
       }
     }

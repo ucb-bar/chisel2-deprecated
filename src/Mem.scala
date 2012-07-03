@@ -56,6 +56,8 @@ class Mem[T <: Data](val n: Int, seqRead: Boolean, gen: () => T) extends AccessT
     rdata
   }
 
+  override def isInVCD = false
+
   override def toString: String = "TMEM(" + ")"
 }
 
