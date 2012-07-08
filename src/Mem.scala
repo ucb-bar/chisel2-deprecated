@@ -38,9 +38,9 @@ class Mem[T <: Data](val n: Int, seqRead: Boolean, gen: () => T) extends AccessT
     val rd = new MemRead(this, cond, addr)
     ports += rd
     reads += rd
-    val data = gen().asOutput
+    val data = gen().fromNode(rd).asInstanceOf[T]
     data.setIsTypeNode
-    data assign rd
+    //data assign rd
     (data, rd)
   }
 
