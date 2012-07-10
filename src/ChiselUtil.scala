@@ -147,6 +147,7 @@ class PipeIO[+T <: Data]()(data: => T) extends Bundle
 {
   val valid = Bool(OUTPUT)
   val bits = data.asOutput
+  override def clone = new PipeIO()(data).asInstanceOf[this.type]
 }
 
 class FIFOIO[T <: Data]()(data: => T) extends Bundle
@@ -154,6 +155,7 @@ class FIFOIO[T <: Data]()(data: => T) extends Bundle
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
   val bits  = data.asOutput
+  override def clone = new FIFOIO()(data).asInstanceOf[this.type]
 }
 
 class EnqIO[T <: Data]()(data: => T) extends FIFOIO()(data) 
@@ -170,6 +172,7 @@ class DeqIO[T <: Data]()(data: => T) extends FIFOIO()(data)
   flip()
   ready := Bool(false);
   def deq(b: Boolean = false): T = { ready := Bool(true); bits }
+  override def clone = { new DeqIO()(data).asInstanceOf[this.type]; }
 }
 
 
