@@ -171,13 +171,12 @@ object Literal {
   def apply(x: BigInt, width: Int = -1, signed: Boolean = false): Literal = { 
     val res = new Literal(); 
     val xWidth = max(x.bitLength, 1) + (if(signed) 1 else 0)
-    val xString = x.toString(16)
-
     val w = if(width == -1) xWidth else width
+    val xString = (if (x >= 0) x else (BigInt(1) << w) + x).toString(16)
+
     if(xWidth > width && width != -1)
       ChiselErrors += ChiselError({"width " + width + " is too small for literal " + x + ". Smallest allowed width is " + xWidth}, Thread.currentThread().getStackTrace);
-    val numString = if(x >= 0) xString else xString.substring(1, xString.length)
-    res.init("0x" + numString, w); 
+    res.init("0x" + xString, w);
     res.inputVal = x;
     res 
   }
