@@ -102,9 +102,12 @@ object ShiftRegister
 
 object UFixToOH
 {
-  def apply(in: UFix, width: Int): Bits =
+  def apply(in: UFix, width: Int = -1): Bits =
   {
-    (UFix(1) << in(log2Up(width)-1,0))
+    if (width == -1)
+      UFix(1) << in
+    else
+      UFix(1) << in(log2Up(width)-1,0)
   }
 }
 
