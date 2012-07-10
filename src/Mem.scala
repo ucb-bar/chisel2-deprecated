@@ -59,6 +59,8 @@ class Mem[T <: Data](val n: Int, seqRead: Boolean, gen: () => T) extends AccessT
   override def isInVCD = false
 
   override def toString: String = "TMEM(" + ")"
+
+  override def clone = new Mem(n, seqRead, gen)
 }
 
 abstract class MemAccess(val condi: Bool, val addri: Bits) extends Node {
@@ -96,7 +98,7 @@ class MemWrite[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits, datai: T, w
       if (x.isInstanceOf[Op]) {
         val op = x.asInstanceOf[Op]
         if (op.op == "&&")
-          return getProducts(op.inputs(0)) ++ getProducts(op.inputs(1))
+          return List(x) ++ getProducts(op.inputs(0)) ++ getProducts(op.inputs(1))
       }
       List(x)
     }
