@@ -212,6 +212,7 @@ class Literal extends Node {
   override def isLit = true;
   override def toString: String = name;
 
+
   def d (x: BigInt): Literal = Literal(x, value.toInt)
   //def ~(x: String): Lit = Lit(value, x(0), x.substring(1, x.length));
 }

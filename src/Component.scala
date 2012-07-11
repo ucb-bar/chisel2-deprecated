@@ -756,7 +756,6 @@ abstract class Component(resetSignal: Bool = null) {
     }
   }
 
-
   def nameAllIO(): Unit = {
     io.name_it("");
     for (child <- children) 
@@ -899,6 +898,5 @@ abstract class Component(resetSignal: Bool = null) {
     nodes.filter(isInput)
   def removeInputs(nodes: Seq[Node]): Seq[Node] = 
     nodes.filter(n => !isInput(n))
-
 
 }

@@ -14,6 +14,6 @@ $(tut_out): %.out: ${CHISEL}/src/*.scala ../src/%.scala
 	cd $(basedir)/sbt; $(SBT) "project tutorial" "run $* $(SBTARGS)" > $(basedir)/emulator/$@
 
 clean: 
-	rm -f *.out *.o $(tutorials) $(addsuffix .h, $(tutorials)) $(addsuffix .cpp, $(tutorials))
+	rm -f *.out *.o $(tutorials) $(addsuffix .h, $(tutorials)) $(addsuffix .cpp, $(tutorials)) *~
 
-.PHONY: all clean
+.PHONY: all clean $(tutorials)

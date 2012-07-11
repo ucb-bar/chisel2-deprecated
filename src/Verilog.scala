@@ -351,15 +351,15 @@ class VerilogBackend extends Backend {
 
   def genHarness(c: Component, base_name: String, name: String) = {
     val harness  = new java.io.FileWriter(base_name + name + "-harness.v");
-    val printFormat = printArgs.map(a => "0x%x").fold("")((y,z) => z + " " + y) 
-    val scanFormat = scanArgs.map(a => "%x").fold("")((y,z) => z + " " + y) 
+    val printFormat = printArgs.map(a => "0x%x").fold("")((y,z) => z + " " + y)
+    val scanFormat = scanArgs.map(a => "%x").fold("")((y,z) => z + " " + y)
     val printNodes = for (arg <- printArgs; node <- arg.maybeFlatten) yield arg
     val scanNodes = for (arg <- scanArgs; node <- c.keepInputs(arg.maybeFlatten)) yield arg
     harness.write("module test;\n")
     for (node <- scanNodes)
-      harness.write("    reg  [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
+      harness.write("    reg [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
     for (node <- printNodes)
-      harness.write("    wire [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
+      harness.write("     wire [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
 
     harness.write("  reg clk = 0;\n")
     harness.write("  reg reset = 1;\n\n")
@@ -379,14 +379,16 @@ class VerilogBackend extends Backend {
     }
 
     var first = true
-    for (node <- (scanNodes ++ printNodes)) 
-      if (first) {
-        harness.write("        ." + emitRef(node) + "(" + emitRef(node) + ")")
-        first = false
-      } else
-        harness.write(",\n        ." + emitRef(node) + "(" + emitRef(node) + ")")
+    for (node <- (scanNodes ++ printNodes))
+      if(node.isIo && node.component == c) {
+        if (first) {
+          harness.write("        ." + emitRef(node) + "(" + emitRef(node) + ")")
+          first = false
+        } else
+          harness.write(",\n        ." + emitRef(node) + "(" + emitRef(node) + ")")
+      }
     harness.write("\n")
-    harness.write("        );\n")
+    harness.write(" );\n")
 
     harness.write("  integer count;\n")
     harness.write("  always @(negedge clk) begin;\n")
@@ -401,8 +403,22 @@ class VerilogBackend extends Backend {
     harness.write("  always @(posedge clk) begin\n")
     harness.write("    if (!reset) ")
     harness.write("$display(\"" + printFormat.slice(0,printFormat.length-1) + "\"")
-    for (node <- printNodes)
-      harness.write(", " + emitRef(node))
+
+    for (node <- printNodes) {
+
+      if(node.isIo && node.component == c) {
+        harness.write(", " + emitRef(node))
+      } else {
+        var nextComp = node.component
+        var path = "."
+        while(nextComp != c) {
+          path = "." + nextComp.instanceName + path
+        }
+        path = c.name + path + emitRef(node)
+        harness.write(", " + path)
+      }
+
+    }
     harness.write(");\n")
     harness.write("  end\n")
     harness.write("endmodule\n")

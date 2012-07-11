@@ -36,9 +36,12 @@ class RealGCDTests(c: RealGCD) extends Tester(c, Array(c.io)) {
     var j = 0
     var t = 0
 
+    var anyPassed = false
     var allPassed = true
 
-    while(t < 20 && (i < 3 || j < 3)) {
+    while(t< 100 && (i < 3 || j < 3)) {
+      t += 1
+      
       if (i < 3) {
         svars(c.io.in.bits.a) = Bits(inputs(i)._1)
         svars(c.io.in.bits.b) = Bits(inputs(i)._2)
@@ -53,11 +56,11 @@ class RealGCDTests(c: RealGCD) extends Tester(c, Array(c.io)) {
       // bump counters and check outputs after advancing clock
       if (ovars(c.io.in.ready).litValue() == 1) i += 1
       if (ovars(c.io.out.valid).litValue() == 1) {
+        anyPassed = true
         allPassed = allPassed && ovars(c.io.out.bits).litValue() == outputs(j)
         j += 1
       }
-      t += 1
     }
-    allPassed && t < 20
+    anyPassed && allPassed
   }
 }

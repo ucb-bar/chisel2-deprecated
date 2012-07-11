@@ -29,6 +29,19 @@ object ChiselError {
     println("COULDN'T FIND LINE NUMBER")
     return stack(0)
   }
+
+  def findFirstUserInd(stack: Array[StackTraceElement]): Int = {
+    for(i <- 1 until stack.length) {
+      val ste = stack(i)
+      val classname = ste.getClassName
+      val dotPos = classname.lastIndexOf('.')
+      val pkg = classname.subSequence(0, dotPos)
+      if (pkg != "Chisel" && !classname.contains("scala"))
+        return i
+    }
+    println("COULDN'T FIND LINE NUMBER")
+    return 0
+  }
 }
 
 class ChiselError(val msgFun: () => String, val stack: Array[StackTraceElement]) {

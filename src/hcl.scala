@@ -124,11 +124,13 @@ object chiselMain {
     if (scanner != null) {
       val s = scanner(c);
       scanArgs  ++= s.args;
+      for (a <- s.args) a.isScanArg = true
       scanFormat  = s.format;
     }
     if (printer != null) {
       val p = printer(c);
       printArgs   ++= p.args;
+      for(a <- p.args) a.isPrintArg = true
       printFormat   = p.format;
     }
     if (ftester != null) {
@@ -150,6 +152,17 @@ object chiselMain {
       }
     }
     c
+  }
+}
+
+object throwException {
+  def apply(s: String) = {
+    val xcpt = new Exception(s)
+    val st = xcpt.getStackTrace
+    val usrStart = findFirstUserInd(st)
+    val usrEnd = if(usrStart == 0) st.length else usrStart + 1
+    xcpt.setStackTrace(st.slice(usrStart, usrEnd))
+    throw xcpt    
   }
 }
 

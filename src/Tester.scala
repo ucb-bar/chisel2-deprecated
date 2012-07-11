@@ -25,9 +25,8 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
     }
   }
   def step(svars: HashMap[Node, Node], 
-           ovarsI: HashMap[Node, Node] = null, 
+           ovars: HashMap[Node, Node] = new HashMap[Node, Node], 
            isTrace: Boolean = true): Boolean = {
-    val ovars = if (ovarsI == null) svars else ovarsI;
     if (isTrace) {
         println("---")
         println("INPUTS")
