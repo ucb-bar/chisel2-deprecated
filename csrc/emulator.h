@@ -25,6 +25,9 @@ typedef uint32_t half_val_t;
 
 #define MASK(v, c) ((v) & -(val_t)(c))
 #define TERNARY(c, t, f) ((f) ^ (((f) ^ (t)) & -(c)))
+#define MIN(a, b) TERNARY((a) < (b), (a), (b))
+#define MAX(a, b) TERNARY((a) > (b), (a), (b))
+#define CLAMP(a, min, max) MAX(MIN(a, max), min)
 
 template<uint32_t x, uint32_t shifted=0, bool sticky=false> struct CeilLog {
     static uint32_t const v = CeilLog< x >> 1, shifted + 1, sticky | (x & 1)>::v;
@@ -1531,8 +1534,6 @@ static int  char_to_hex[] = {
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1 };
-
-#define MIN(x, y) ((x)<(y) ? (x) : (y))
 
 #define TO_CSTR(d) (d.to_str().c_str())
 
