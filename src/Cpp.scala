@@ -169,59 +169,48 @@ class CppBackend extends Backend {
             block(makeArray("__d", o) ++ toArray("__x", o.inputs(0)) ++ toArray("__y", o.inputs(1)) ++ List(cmd) ++ fromArray("__d", o))
           }
         } else if (o.op == "<<") {
-          if (o.width > 256) {
-            val cmd = "lsh_n(__d, __x, " + emitLoWordRef(o.inputs(1)) + ", " + words(o) + ", " + words(o.inputs(0)) + ")"
-            block(makeArray("__d", o) ++ toArray("__x", o.inputs(0)) ++ List(cmd) ++ fromArray("__d", o))
+          if (o.width <= bpw) {
+            "  " + emitLoWordRef(o) + " = " + emitLoWordRef(o.inputs(0)) + " << " + emitLoWordRef(o.inputs(1)) + ";\n"
           } else {
             var shb = emitLoWordRef(o.inputs(1))
-            var carry = ""
             val res = ArrayBuffer[String]()
-            if (o.width > bpw) {
-              res += "val_t __c = 0"
-              res += "val_t __s = " + shb + " % " + bpw
-              res += "val_t __r = " + bpw + " - __s"
-              shb = "__s"
-              carry = " | __c"
-            }
-            for (i <- 0 until words(o)-1) {
-              res += "val_t __w" + i + " = " + emitLoWordRef(o.inputs(1)) + " < " + ((i+1)*bpw)
-              res += "val_t __v" + i + " = " + (0 to i).map(j => "__w" + j + ", " + emitWordRef(o.inputs(0), i-j)).foldRight("0L")("TERNARY(" + _ + ", " + _ + ")")
-              res += emitWordRef(o, i) + " = __v" + i + " << __s | __c"
+            res ++= toArray("__x", o.inputs(0))
+            res += "val_t __c = 0"
+            res += "val_t __w = " + emitLoWordRef(o.inputs(1)) + " / " + bpw
+            res += "val_t __s = " + emitLoWordRef(o.inputs(1)) + " % " + bpw
+            res += "val_t __r = " + bpw + " - __s"
+            for (i <- 0 until words(o)) {
+              res += "val_t __v"+i+" = MASK(__x[CLAMP("+i+"-__w,0,"+(words(o.inputs(0))-1)+")],"+i+">=__w&&"+i+"<__w+"+words(o.inputs(0))+")"
+              res += emitWordRef(o, i) + " = __v"+i+" << __s | __c"
               res += "__c = MASK(__v" + i + " >> __r, __s != 0)"
             }
-            res += "val_t __v" + (words(o)-1) + " = " + (0 until words(o)-1).map(j => "__w" + j + ", " + emitWordRef(o.inputs(0), words(o)-1-j)).foldRight(emitLoWordRef(o.inputs(0)))("TERNARY(" + _ + ", " + _ + ")")
-            res += emitWordRef(o, words(o)-1) + " = __v" + (words(o)-1) + " << " + shb + carry
-            block(res)
+            block(res) + trunc(o)
           }
         } else if (o.op == ">>") {
-          if (o.width > 256) {
-            val cmd = "rsh" + (if (o.isSigned) "a" else "") + "_n(__d, __x, " + emitLoWordRef(o.inputs(1)) + ", " + words(o) + (if (o.isSigned) ", " + o.width else "") + ")"
-            block(makeArray("__d", o) ++ toArray("__x", o.inputs(0)) ++ List(cmd) ++ fromArray("__d", o))
+          if (o.inputs(0).width <= bpw) {
+            if (o.isSigned)
+              "  " + emitLoWordRef(o) + " = (sval_t)(" + emitLoWordRef(o.inputs(0)) + " << " + (bpw - o.inputs(0).width) +") >> (" + (bpw - o.inputs(0).width) + " + " +emitLoWordRef(o.inputs(1)) + ");\n" + trunc(o)
+            else
+              "  " + emitLoWordRef(o) + " = " + emitLoWordRef(o.inputs(0)) + " >> " + emitLoWordRef(o.inputs(1)) + ";\n"
           } else {
             var shb = emitLoWordRef(o.inputs(1))
-            var carry = ""
             val res = ArrayBuffer[String]()
-            if (o.width > bpw) {
-              res += "val_t __c = 0"
-              res += "val_t __s = " + shb + " % " + bpw
-              res += "val_t __r = " + bpw + " - __s"
-              shb = "__s"
-              carry = " | __c"
-            }
+            res ++= toArray("__x", o.inputs(0))
+            res += "val_t __c = 0"
+            res += "val_t __w = " + emitLoWordRef(o.inputs(1)) + " / " + bpw
+            res += "val_t __s = " + emitLoWordRef(o.inputs(1)) + " % " + bpw
+            res += "val_t __r = " + bpw + " - __s"
             if (o.isSigned)
               res += "val_t __msb = (sval_t)" + emitWordRef(o.inputs(0), words(o)-1) + (if (o.width % bpw != 0) " << " + (bpw-o.width%bpw) else "") + " >> " + (bpw-1)
-            for (i <- words(o)-1 to 1 by -1) {
-              res += "val_t __w" + i + " = " + emitLoWordRef(o.inputs(1)) + " < " + ((words(o)-i)*bpw)
-              res += "val_t __v" + i + " = " + (words(o)-1 to i by -1).map(j => "__w" + j + ", " + emitWordRef(o.inputs(0), words(o)-1+i-j)).foldRight("0L")("TERNARY(" + _ + ", " + _ + ")")
-              res += emitWordRef(o, i) + " = __v" + i + " >> __s | __c"
+            for (i <- words(o)-1 to 0 by -1) {
+              res += "val_t __v"+i+" = MASK(__x[CLAMP("+i+"+__w,0,"+(words(o.inputs(0))-1)+")],__w+"+i+"<"+words(o.inputs(0))+")"
+              res += emitWordRef(o, i) + " = __v"+i+" >> __s | __c"
+              res += "__c = MASK(__v" + i + " << __r, __s != 0)"
               if (o.isSigned) {
                 res += emitWordRef(o, i) + " |= MASK(__msb << ((" + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ") % " + bpw + "), " + ((i+1)*bpw) + " > " + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ")"
                 res += emitWordRef(o, i) + " |= MASK(__msb, " + (i*bpw) + " >= " + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ")"
               }
-              res += "__c = MASK(__v" + i + " << __r, __s != 0)"
             }
-            res += "val_t __v0 = " + (words(o)-1 to 1 by -1).map(j => "__w" + j + ", " + emitWordRef(o.inputs(0), words(o)-1-j)).foldRight(emitWordRef(o.inputs(0), words(o)-1))("TERNARY(" + _ + ", " + _ + ")")
-            res += emitLoWordRef(o) + " = __v0 >> " + shb + carry
             if (o.isSigned)
               res += emitLoWordRef(o) + " |= MASK(__msb << ((" + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ") % " + bpw + "), " + bpw + " > " + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ")"
             block(res) + (if (o.isSigned) trunc(o) else "")
@@ -336,7 +325,7 @@ class CppBackend extends Backend {
 
       case r: ROM[_] =>
         r.lits.zipWithIndex.map { case (lit, i) =>
-          "  " + emitRef(r) + ".put(" + i + ", " + emitRef(lit) + ");\n"
+          block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(lit, j) + ")"))
         }.reduceLeft(_ + _)
 
       case _ =>
