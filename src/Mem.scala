@@ -111,6 +111,12 @@ class MemWrite[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits, datai: T, w
     inputs += wrap(wmaski)
   }
 
+  override def forceMatchingWidths = {
+    val w = mem.width
+    if(inputs.length >= 3 && inputs(2).width != w) inputs(2) = inputs(2).matchWidth(w)
+    if(inputs.length >= 4 && inputs(3).width != w) inputs(3) = inputs(3).matchWidth(w)
+  }
+
   var pairedRead: MemRead[T] = null
   def emitRWEnable(r: MemRead[T]) = {
     def getProducts(x: Node): List[Node] = {

@@ -61,4 +61,9 @@ class Mux extends Op {
   override def toString: String =
     inputs(0) + " ? " + inputs(1) + " : " + inputs(2)
   def ::(a: Node): Mux = { inputs(2) = a; this }
+
+  override def forceMatchingWidths = {
+    if (inputs(1).width != width) inputs(1) = inputs(1).matchWidth(width)
+    if (inputs(2).width != width) inputs(2) = inputs(2).matchWidth(width)
+  }
 }

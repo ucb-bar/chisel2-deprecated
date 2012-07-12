@@ -453,16 +453,16 @@ class CppBackend extends Backend {
     println("// COMPILING " + c + "(" + c.children.length + ")");
     topComponent = c;
     assignResets()
+    c.inferAll();
+    if(saveWidthWarnings)
+      widthWriter = new java.io.FileWriter(base_name + c.name + ".width.warnings")
+    c.forceMatchingWidths;
     c.removeTypeNodes()
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors)	err.printError;
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
       return
     }
-    c.inferAll();
-    if(saveWidthWarnings)
-      widthWriter = new java.io.FileWriter(base_name + c.name + ".width.warnings")
-    c.forceMatchingWidths;
     c.traceNodes();
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors)	err.printError;

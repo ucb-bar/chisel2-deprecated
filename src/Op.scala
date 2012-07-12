@@ -246,6 +246,7 @@ object Op {
     res
   }
 }
+
 class Op extends Node {
   var op: String = "";
   var nGrow: Int = 0;
@@ -255,4 +256,18 @@ class Op extends Node {
       op + inputs(0)
     else
       inputs(0) + op + inputs(1)
+
+  override def forceMatchingWidths = {
+    if (inputs.length == 2) {
+      if (List("|", "&", "^", "+", "-").contains(op)) {
+        if (inputs(0).width != width) inputs(0) = inputs(0).matchWidth(width)
+        if (inputs(1).width != width) inputs(1) = inputs(1).matchWidth(width)
+      } else if (List("==", "!=", ">", ">=", "<", "<=").contains(op)) {
+        val w = max(inputs(0).width, inputs(1).width)
+        if (inputs(0).width != w) inputs(0) = inputs(0).matchWidth(w)
+        if (inputs(1).width != w) inputs(1) = inputs(1).matchWidth(w)
+      }
+    }
+  }  
+
 }

@@ -312,6 +312,21 @@ abstract class Node extends nameable{
     }
   }
 
+  def forceMatchingWidths = { }
+
+  def matchWidth(w: Int): Node = {
+    if (w > this.width) {
+      val fill = NodeFill(w - this.width, Literal(0,1)); fill.infer
+      val res = Concatenate(fill, this); res.infer
+      res
+    } else if (w < this.width) {
+      val res = NodeExtract(this, w-1,0); res.infer
+      res
+    } else {
+      this
+    }
+  }
+
   def fixName() = {
     if(nameHolder != null && !named && !isInstanceOf[Literal]){
       name = nameHolder.name;

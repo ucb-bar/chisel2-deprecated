@@ -548,16 +548,16 @@ class VerilogBackend extends Backend {
     c.genAllMuxes;
     components.foreach(_.postMarkNet(0));
     assignResets()
-    c.removeTypeNodes()
-    if(!ChiselErrors.isEmpty){
-      for(err <- ChiselErrors) err.printError;
-      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
-    }
     c.inferAll();
     val base_name = ensure_dir(targetDir)
     if(saveWidthWarnings)
       widthWriter = new java.io.FileWriter(base_name + c.name + ".width.warnings")
     c.forceMatchingWidths;
+    c.removeTypeNodes()
+    if(!ChiselErrors.isEmpty){
+      for(err <- ChiselErrors) err.printError;
+      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
+    }
     nameChildren(topComponent)
     c.traceNodes();
     if(!ChiselErrors.isEmpty){

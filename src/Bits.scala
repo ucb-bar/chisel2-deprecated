@@ -234,6 +234,10 @@ class Bits extends Data with proc {
       super.maxNum
   }
 
+  override def forceMatchingWidths = {
+    if(inputs.length == 1 && inputs(0).width != width) inputs(0) = inputs(0).matchWidth(width)
+  }
+
   def generateError(src: Bits) = {
     val myClass = this.getClass;
     val srcClass = src.getClass;
