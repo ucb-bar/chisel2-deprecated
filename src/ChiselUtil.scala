@@ -125,8 +125,8 @@ object Mux1H
     }
   }
 
-  def apply [T <: Data](sel: Bits, in: Seq[T]): T = buildMux(sel, in, 0, sel.getWidth)
-  def apply [T <: Data](sel: Seq[Bool], in: Seq[T]): T = buildMux(Cat(Bits(0),sel.reverse:_*), in, 0, sel.size)
+  def apply [T <: Data](sel: Bits, in: Seq[T]): T = buildMux(sel, in, 0, in.size)
+  def apply [T <: Data](sel: Seq[Bool], in: Seq[T]): T = buildMux(Cat(Bits(0),sel.reverse:_*), in, 0, in.size)
 }
 
 

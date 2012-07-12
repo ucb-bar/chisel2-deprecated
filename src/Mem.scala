@@ -95,11 +95,20 @@ class MemRead[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits) extends MemA
 }
 
 class MemWrite[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits, datai: T, wmaski: Bits) extends MemAccess(condi, addri) with proc {
+  def wrap(x: Bits) = {
+    if (Component.backendName == "v") {
+      // prevent verilog syntax error when indexing a literal (e.g. 8'hff[1])
+      val b = Bits()
+      b.inputs += x
+      b
+    } else
+      x
+  }
   if (datai != null)
-    inputs += datai
+    inputs += wrap(datai.toBits)
   if (wmaski != null) {
     require(datai != null)
-    inputs += wmaski
+    inputs += wrap(wmaski)
   }
 
   var pairedRead: MemRead[T] = null
@@ -126,7 +135,7 @@ class MemWrite[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits, datai: T, w
   def isMasked = inputs.length > 3
   override def procAssign(src: Node) = {
     require(inputs.length == 2)
-    inputs += src
+    inputs += wrap(src.asInstanceOf[Data].toBits)
   }
   override def toString: String = mem + "[" + addr + "] = " + data + " COND " + cond
   override def getPortType: String = (if (isMasked) "m" else "") + (if (isRW) "rw" else "write")
