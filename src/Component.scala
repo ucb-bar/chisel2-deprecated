@@ -50,7 +50,7 @@ object Component {
   var isEmittingComponents = false;
   var isCompiling = false;
   var isTesting = false;
-  var backendName = "c";
+  var backend: Backend = null
   var topComponent: Component = null;
   val components = ArrayBuffer[Component]();
   val procs = ArrayBuffer[proc]();
@@ -126,7 +126,7 @@ object Component {
     isEmittingComponents = false;
     isCompiling = false;
     isTesting = false;
-    backendName = "c";
+    backend = new CppBackend
     topComponent = null;
 
     conds.clear()

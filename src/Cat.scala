@@ -21,7 +21,7 @@ object Cat {
       } else {
         // initialize
         val res = 
-          if(backendName == "v"){
+          if(backend.isInstanceOf[VerilogBackend]){
             val res = new Cat();
             res.initOf("", sumWidth _, mod.toNode :: mods.toList.map(x => x.toNode))
           } else {
@@ -38,7 +38,7 @@ class Cat extends Node {
 
 object Concatenate {
   def apply (mod: Node, mods: Node*): Node = 
-    if(backendName == "v") {
+    if(backend.isInstanceOf[VerilogBackend]) {
       val res = new Cat();
       res.initOf("", sumWidth _, mod :: mods.toList);
       res

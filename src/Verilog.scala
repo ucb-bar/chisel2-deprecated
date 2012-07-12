@@ -10,6 +10,9 @@ import ChiselError._
 import Component._
 
 class VerilogBackend extends Backend {
+  isEmittingComponents = true
+  isCoercingArgs = false
+
   def emitWidth(node: Node): String = 
     if (node.width == 1) "" else "[" + (node.width-1) + ":0]"
 
@@ -540,7 +543,7 @@ class VerilogBackend extends Backend {
     }
   }
 
-  override def compile(c: Component): Unit = {
+  override def elaborate(c: Component): Unit = {
     topComponent = c;
     components.foreach(_.elaborate(0));
     for (c <- components)
@@ -594,7 +597,7 @@ class VerilogBackend extends Backend {
     compDefs.clear;
   }
 
-  def vcs(c: Component): Unit = {
+  override def compile(c: Component, flags: String): Unit = {
 
     def run(cmd: String) = {
       val c = Process(cmd).!

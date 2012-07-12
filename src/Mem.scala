@@ -96,7 +96,7 @@ class MemRead[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits) extends MemA
 
 class MemWrite[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits, datai: T, wmaski: Bits) extends MemAccess(condi, addri) with proc {
   def wrap(x: Bits) = {
-    if (Component.backendName == "v") {
+    if (Component.backend.isInstanceOf[VerilogBackend]) {
       // prevent verilog syntax error when indexing a literal (e.g. 8'hff[1])
       val b = Bits()
       b.inputs += x

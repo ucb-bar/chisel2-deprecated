@@ -95,13 +95,16 @@ object chiselMain {
         case "--clockGatingUpdatesInline" => isClockGatingUpdatesInline = true; 
         case "--folding" => isFolding = true; 
         case "--vcd" => isVCD = true;
-        case "--v" => backendName = "v"; isEmittingComponents = true; isCoercingArgs = false;
+        case "--v" => backend = new VerilogBackend
         case "--inlineMem" => isInlineMem = true;
         case "--noInlineMem" => isInlineMem = false;
         case "--backend" => {
-          backendName = args(i+1)
-          assert(backendName == "v" || backendName == "c")
-          if(backendName == "v") { isEmittingComponents = true; isCoercingArgs = false }
+          if (args(i+1) == "v")
+            backend = new VerilogBackend
+          else if (args(i+1) == "c")
+            backend = new CppBackend
+          else
+            assert(false)
           i += 1
         }
         case "--compile" => isCompiling = true
@@ -136,21 +139,9 @@ object chiselMain {
     if (ftester != null) {
       tester = ftester(c)
     }
-    backendName match {
-      case "v" => { 
-        val be = new VerilogBackend()
-        be.compile(c);
-        println(isCompiling + " " + isGenHarness)
-        if (isCompiling && isGenHarness) be.vcs(c)
-        if (isTesting) tester.tests()
-      }
-      case "c" =>  {
-        val be = new CppBackend()
-        be.compile(c); 
-        if (isCompiling && isGenHarness) be.gcc(c)
-        if (isTesting) tester.tests()
-      }
-    }
+    backend.elaborate(c)
+    if (isCompiling && isGenHarness) backend.compile(c)
+    if (isTesting) tester.tests()
     c
   }
 }
@@ -255,17 +246,17 @@ class Delay extends Node {
 
 object Log2 {
   def apply (mod: UFix, n: Int): UFix = {
-    backendName match {
-      case "v" => {
+    backend match {
+      case x: CppBackend => {
+        val log2 = new Log2()
+        log2.init("", fixWidth(sizeof(n)), mod)
+        log2.setTypeNode(UFix())
+      }
+      case _ => {
         var res = UFix(0);
         for (i <- 1 to n)
           res = Mux(mod(i), UFix(i, sizeof(n)), res);
         res
-      }
-      case "c" => {
-        val log2 = new Log2()
-        log2.init("", fixWidth(sizeof(n)), mod)
-        log2.setTypeNode(UFix())
       }
     }
   }

@@ -21,7 +21,7 @@ class DotBackend extends Backend {
     }
   }
 
-  def compile(c: Component, base_name: String): Unit = {
+  def elaborate(c: Component, base_name: String): Unit = {
     var gn = -1;
     val out_cd = new java.io.FileWriter(base_name + c.name + "_c.dot");
     out_cd.write("digraph TopTop {\n");

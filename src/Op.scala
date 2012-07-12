@@ -183,7 +183,7 @@ object Op {
       } 
     }
     }
-    if (backendName == "c") {
+    if (backend.isInstanceOf[CppBackend]) {
       name match {
         case ">" | "<" | ">=" | "<=" =>
           if (a.isInstanceOf[Fix] && b.isInstanceOf[Fix]) {

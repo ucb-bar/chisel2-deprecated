@@ -45,7 +45,9 @@ abstract class Backend {
 
   def emitDef(node: Node): String = ""
 
-  def compile(c: Component): Unit = { }
+  def elaborate(c: Component): Unit = { }
+
+  def compile(c: Component, flags: String = null): Unit = { }
 }
 
 
