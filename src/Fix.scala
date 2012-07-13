@@ -7,7 +7,7 @@ object Fix {
   def apply(x: Int): Fix = Lit(x){Fix()};
   def apply(x: Int, width: Int): Fix = Lit(x, width){Fix()};
   
-  def apply(width: Int = -1, dir: IODirection = null): Fix = {
+  def apply(dir: IODirection = null, width: Int = -1): Fix = {
     val res = new Fix();
     res.dir = dir;
     if(width > 0)
@@ -16,11 +16,6 @@ object Fix {
       res.init("", widthOf(0))
     res
   }
-  
-  def apply(dir: IODirection): Fix = Fix(-1, dir) 
-  
-  def apply(): Fix = Fix(-1, null);
-
 }
 
 class Fix extends Num {

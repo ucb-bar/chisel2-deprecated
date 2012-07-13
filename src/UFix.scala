@@ -8,7 +8,7 @@ object UFix {
   def apply(x: Int): UFix = Lit(x){UFix()};
   def apply(x: Int, width: Int): UFix = Lit(x, width){UFix()};
   
-  def apply(width: Int = -1, dir: IODirection = null): UFix = {
+  def apply(dir: IODirection = null, width: Int = -1): UFix = {
     val res = new UFix();
     res.dir = dir;
     if(width > 0)
@@ -17,10 +17,6 @@ object UFix {
       res.init("", widthOf(0))
     res
   }
-  
-  def apply(dir: IODirection): UFix = UFix(-1, dir) 
-  
-  def apply(): UFix = UFix(-1, null);
 }
 
 class UFix extends Num {

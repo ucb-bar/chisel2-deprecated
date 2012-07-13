@@ -201,7 +201,7 @@ class FIFOIOC[+T <: Data]()(data: => T) extends Bundle
 class ioArbiter[T <: Data](n: Int)(data: => T) extends Bundle {
   val in  = Vec(n) { (new FIFOIO()) { data } }.flip
   val out = (new FIFOIO()) { data }
-  val chosen = Bits(log2Up(n), OUTPUT)
+  val chosen = Bits(OUTPUT, log2Up(n))
 }
 
 object foldR

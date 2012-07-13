@@ -63,7 +63,7 @@ object Node {
   }
   def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).getWidth - n.minNum.toInt }
 
-  var clk: Node = Bits(1, INPUT)
+  var clk: Node = Bits(INPUT, 1)
   clk.setName("clk")
 
   var stop = true;
