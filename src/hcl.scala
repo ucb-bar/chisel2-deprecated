@@ -103,6 +103,8 @@ object chiselMain {
             backend = new VerilogBackend
           else if (args(i+1) == "c")
             backend = new CppBackend
+          else if (args(i+1) == "fpga")
+            backend = new FPGABackend
           else
             assert(false)
           i += 1

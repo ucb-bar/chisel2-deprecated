@@ -131,4 +131,5 @@ class Reg extends Delay with proc {
     }
   }
   override def isMemOutput = updates.length == 1 && updates(0)._2.memSource != null
+  def memOf = updates(0)._2.memSource
 }

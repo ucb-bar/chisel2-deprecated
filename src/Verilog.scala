@@ -38,7 +38,7 @@ class VerilogBackend extends Backend {
           node.name
 
       case reg: Reg =>
-        if (reg.isMemOutput) emitRef(reg.updateVal) else if (reg.name == "") "R" + reg.emitIndex else reg.name;
+        if (reg.isMemOutput && !isInlineMem) emitRef(reg.updateVal) else if (reg.name == "") "R" + reg.emitIndex else reg.name;
 
       case _ =>
         super.emitRef(node)
@@ -261,17 +261,14 @@ class VerilogBackend extends Backend {
 
         
       case m: MemRead[_] =>
-        if (Component.isInlineMem)
+        if (Component.isInlineMem && !m.isSequential)
           "  assign " + emitTmp(node) + " = " + emitRef(m.mem) + "[" + emitRef(m.addr) + "];\n"
         else
           ""
 
       case m: MemWrite[_] =>
-        println("EMIT MEM WRITE")
-        if (!m.used || !Component.isInlineMem) {
-          println("  RETURN: USED? " + m.used + " INLINE? " + Component.isInlineMem)
+        if (!m.used || !Component.isInlineMem)
           return ""
-        }
 
         val i = "i" + emitTmp(m)
         if (m.isMasked)
@@ -332,7 +329,7 @@ class VerilogBackend extends Backend {
         ""
 
       case x: Reg =>
-        if (!node.isMemOutput) "  reg[" + (node.width-1) + ":0] " + emitRef(node) + ";\n" else "";
+        if (!node.isMemOutput || isInlineMem) "  reg[" + (node.width-1) + ":0] " + emitRef(node) + ";\n" else "";
 
       case m: Mem[_] =>
         if (Component.isInlineMem)
@@ -452,9 +449,15 @@ class VerilogBackend extends Backend {
   def emitReg(node: Node): String = {
     node match {
       case reg: Reg =>
-        if(reg.isMemOutput)
-          ""
-        else if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1)){
+        if(reg.isMemOutput) {
+          if (!isInlineMem)
+            ""
+          else if (reg.memOf.cond.isLit && reg.memOf.cond.litOf.value != 0)
+            "    " + emitRef(reg) + " <= " + emitRef(reg.memOf.mem) + "[" + emitRef(reg.memOf.addr) + "];\n"
+          else
+            "    if(" + emitRef(reg.memOf.cond) + ")\n" +
+            "      " + emitRef(reg) + " <= " + emitRef(reg.memOf.mem) + "[" + emitRef(reg.memOf.addr) + "];\n"
+        } else if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1)){
           if(reg.isReset){
             "    if(reset) begin\n" + 
             "      " + emitRef(reg) + " <= " + emitRef(reg.resetVal) + ";\n" +
