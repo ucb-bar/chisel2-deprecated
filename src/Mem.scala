@@ -23,7 +23,7 @@ abstract class AccessTracker extends Delay {
   def readAccesses: ArrayBuffer[MemAccess]
 }
 
-class Mem[T <: Data](val n: Int, seqRead: Boolean, gen: () => T) extends AccessTracker {
+class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends AccessTracker {
   def writeAccesses = writes.map((x: MemAccess) => x)
   def readAccesses = reads.map((x: MemAccess) => x)
   val ports = ArrayBuffer[MemAccess]()
