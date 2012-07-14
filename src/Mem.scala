@@ -97,7 +97,7 @@ class MemRead[T <: Data](mem: Mem[T], condi: Bool, addri: Bits) extends MemAcces
 }
 
 class MemWrite[T <: Data](mem: Mem[T], condi: Bool, addri: Bits, datai: T, wmaski: Bits) extends MemAccess(mem, condi, addri) with proc {
-  def wrap(x: Bits) = {
+  def wrap(x: Node) = {
     if (Component.backend.isInstanceOf[VerilogBackend]) {
       // prevent verilog syntax error when indexing a literal (e.g. 8'hff[1])
       val b = Bits()
@@ -144,7 +144,7 @@ class MemWrite[T <: Data](mem: Mem[T], condi: Bool, addri: Bits, datai: T, wmask
   def isMasked = inputs.length > 3
   override def procAssign(src: Node) = {
     require(inputs.length == 2)
-    inputs += wrap(src.asInstanceOf[Data].toBits)
+    inputs += wrap(src)
   }
   override def toString: String = mem + "[" + addr + "] = " + data + " COND " + cond
   override def getPortType: String = (if (isMasked) "m" else "") + (if (isRW) "rw" else "write")
