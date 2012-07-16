@@ -1,6 +1,7 @@
 package Chisel
 import scala.math.max
 import Node._
+import Literal._
 import Component._
 
 abstract class Cell extends nameable{
@@ -164,7 +165,7 @@ object Op {
       name match {
         case "&&" => return if (av == 0) Literal(0) else b;
         case "||" => return if (bv == 0) a else Literal(1);
-        case "===" => return Literal(if (av == bv) 1 else 0)
+        case "==" => return Literal(if (av == bv) 1 else 0)
         case "!=" => return Literal(if (av != bv) 1 else 0);
         case "<"  => return Literal(if (av <  bv) 1 else 0);
         case ">"  => return Literal(if (av >  bv) 1 else 0);
@@ -181,6 +182,46 @@ object Op {
         case _ => ;
       } 
     }
+    }
+    if (backend.isInstanceOf[CppBackend]) {
+      name match {
+        case ">" | "<" | ">=" | "<=" =>
+          if (a.isInstanceOf[Fix] && b.isInstanceOf[Fix]) {
+            if (name != "<" || b.litOf == null || b.litOf.value != 0) {
+              val fixA = a.asInstanceOf[Fix]
+              val fixB = b.asInstanceOf[Fix]
+              val msbA = fixA < Fix(0)
+              val msbB = fixB < Fix(0)
+              val ucond = LogicalOp(fixA.toUFix, fixB, name){UFix()}
+              return Mux(msbA === msbB, ucond, (if (name(0) == '>') msbB else msbA).asInstanceOf[Bool])
+            }
+          }
+        case "==" =>
+          if (b.litOf != null && b.litOf.isZ) {
+            val (bits, mask, swidth) = parseLit(b.litOf.name)
+            return Op(name, nGrow, widthInfer, Op("&", 2, maxWidth _, a, Literal(BigInt(mask, 2))), Literal(BigInt(bits, 2)))
+          }
+          if (a.litOf != null && a.litOf.isZ)
+            return Op(name, nGrow, widthInfer, b, a)
+        case "s*s" =>
+          val fixA = a.asInstanceOf[Fix]
+          val signA = fixA < Fix(0)
+          val absA = Mux(signA, -fixA, fixA)
+          val fixB = b.asInstanceOf[Fix]
+          val signB = fixB < Fix(0)
+          val absB = Mux(signB, -fixB, fixB)
+          val prod = absA.toUFix * absB.toUFix
+          return Mux(signA ^ signB, -prod, prod)
+        case "s*u" =>
+          val fixA = a.asInstanceOf[Fix]
+          val signA = fixA < Fix(0)
+          val absA = Mux(signA, -fixA, fixA)
+          val prod = absA.toUFix * b.asInstanceOf[UFix]
+          return Mux(signA, -prod, prod)
+        case "u*s" =>
+          return Op("s*u", nGrow, widthInfer, b, a)
+        case _ =>
+      }
     }
     val res = new Op();
     res.init("", widthInfer, a, b);
@@ -205,6 +246,7 @@ object Op {
     res
   }
 }
+
 class Op extends Node {
   var op: String = "";
   var nGrow: Int = 0;
@@ -214,4 +256,18 @@ class Op extends Node {
       op + inputs(0)
     else
       inputs(0) + op + inputs(1)
+
+  override def forceMatchingWidths = {
+    if (inputs.length == 2) {
+      if (List("|", "&", "^", "+", "-").contains(op)) {
+        if (inputs(0).width != width) inputs(0) = inputs(0).matchWidth(width)
+        if (inputs(1).width != width) inputs(1) = inputs(1).matchWidth(width)
+      } else if (List("==", "!=", ">", ">=", "<", "<=").contains(op)) {
+        val w = max(inputs(0).width, inputs(1).width)
+        if (inputs(0).width != w) inputs(0) = inputs(0).matchWidth(w)
+        if (inputs(1).width != w) inputs(1) = inputs(1).matchWidth(w)
+      }
+    }
+  }  
+
 }

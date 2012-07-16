@@ -25,9 +25,8 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
     }
   }
   def step(svars: HashMap[Node, Node], 
-           ovarsI: HashMap[Node, Node] = null, 
+           ovars: HashMap[Node, Node] = new HashMap[Node, Node], 
            isTrace: Boolean = true): Boolean = {
-    val ovars = if (ovarsI == null) svars else ovarsI;
     if (isTrace) {
         println("---")
         println("INPUTS")
@@ -77,7 +76,7 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
     isSame
   }
   def startTest: Process = {
-    val cmd = targetDir + "/" + c.name + (if(backendName == "v") " -q" else "")
+    val cmd = targetDir + "/" + c.name + (if(backend.isInstanceOf[VerilogBackend]) " -q" else "")
     val process = Process(cmd)
     val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => err.close())
     val p = process.run(pio) 

@@ -102,9 +102,12 @@ object ShiftRegister
 
 object UFixToOH
 {
-  def apply(in: UFix, width: Int): Bits =
+  def apply(in: UFix, width: Int = -1): Bits =
   {
-    (UFix(1) << in(log2Up(width)-1,0))
+    if (width == -1)
+      UFix(1) << in
+    else
+      UFix(1) << in(log2Up(width)-1,0)
   }
 }
 
@@ -122,8 +125,8 @@ object Mux1H
     }
   }
 
-  def apply [T <: Data](sel: Bits, in: Seq[T]): T = buildMux(sel, in, 0, sel.getWidth)
-  def apply [T <: Data](sel: Seq[Bool], in: Seq[T]): T = buildMux(Cat(Bits(0),sel.reverse:_*), in, 0, sel.size)
+  def apply [T <: Data](sel: Bits, in: Seq[T]): T = buildMux(sel, in, 0, in.size)
+  def apply [T <: Data](sel: Seq[Bool], in: Seq[T]): T = buildMux(Cat(Bits(0),sel.reverse:_*), in, 0, in.size)
 }
 
 
@@ -144,6 +147,14 @@ class PipeIO[+T <: Data]()(data: => T) extends Bundle
 {
   val valid = Bool(OUTPUT)
   val bits = data.asOutput
+  override def clone =
+    try {
+      super.clone()
+    } catch {
+      case e: java.lang.Exception => {
+        new PipeIO()(data).asInstanceOf[this.type]
+      }
+    }
 }
 
 class FIFOIO[T <: Data]()(data: => T) extends Bundle
@@ -151,6 +162,14 @@ class FIFOIO[T <: Data]()(data: => T) extends Bundle
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
   val bits  = data.asOutput
+  override def clone =
+    try {
+      super.clone()
+    } catch {
+      case e: java.lang.Exception => {
+        new FIFOIO()(data).asInstanceOf[this.type]
+      }
+    }
 }
 
 class EnqIO[T <: Data]()(data: => T) extends FIFOIO()(data) 
@@ -167,6 +186,7 @@ class DeqIO[T <: Data]()(data: => T) extends FIFOIO()(data)
   flip()
   ready := Bool(false);
   def deq(b: Boolean = false): T = { ready := Bool(true); bits }
+  override def clone = { new DeqIO()(data).asInstanceOf[this.type]; }
 }
 
 
@@ -181,7 +201,7 @@ class FIFOIOC[+T <: Data]()(data: => T) extends Bundle
 class ioArbiter[T <: Data](n: Int)(data: => T) extends Bundle {
   val in  = Vec(n) { (new FIFOIO()) { data } }.flip
   val out = (new FIFOIO()) { data }
-  val chosen = Bits(log2Up(n), OUTPUT)
+  val chosen = Bits(OUTPUT, log2Up(n))
 }
 
 object foldR

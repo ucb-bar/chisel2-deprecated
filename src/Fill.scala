@@ -16,6 +16,17 @@ object Fill {
       for (i <- 0 until n-1) 
         res = (res << w)|bits_lit.value;
       Lit(res, n * w){ Bits() };
+    } else if (backend.isInstanceOf[CppBackend] && mod.width != 1) {
+      var out: Bits = null
+      var i = 0
+      var cur = mod
+      while ((1 << i) <= n) {
+        if ((n & (1 << i)) != 0)
+          out = Cat(cur, out)
+        cur = Cat(cur, cur)
+        i = i+1
+      }
+      out
     } else {
       val fill = new Fill()
       val fillConst = UFix(n)

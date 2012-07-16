@@ -10,6 +10,9 @@ import ChiselError._
 import Component._
 
 class VerilogBackend extends Backend {
+  isEmittingComponents = true
+  isCoercingArgs = false
+
   def emitWidth(node: Node): String = 
     if (node.width == 1) "" else "[" + (node.width-1) + ":0]"
 
@@ -18,6 +21,14 @@ class VerilogBackend extends Backend {
 
   override def emitRef(node: Node): String = {
     node match {
+      case x: Literal =>
+        (if (x.width == -1) x.name 
+        else if(x.isBinary) ("" + x.width + "'b" + x.name)
+        else if(x.base == 'x') ("" + x.width + "'h" + x.name.substring(2, x.name.length))
+        else if(x.base == 'd') ("" + x.width + "'d" + x.name)
+        else if(x.base == 'h') ("" + x.width + "'h" + x.name)
+        else "") + "/* " + x.inputVal + "*/";
+
       case x: Bits =>
         if(!node.isInObject || node.name == "") 
           super.emitRef(node) 
@@ -25,8 +36,10 @@ class VerilogBackend extends Backend {
           node.name + "_" + node.emitIndex
         else 
           node.name
+
       case reg: Reg =>
-        if (reg.isMemOutput) emitRef(reg.updateVal) else if (reg.name == "") "R" + reg.emitIndex else reg.name;
+        if (reg.isMemOutput && !isInlineMem) emitRef(reg.updateVal) else if (reg.name == "") "R" + reg.emitIndex else reg.name;
+
       case _ =>
         super.emitRef(node)
     }
@@ -38,6 +51,7 @@ class VerilogBackend extends Backend {
         "    .A" + idx + "(" + emitRef(r.addr) + "),\n" +
         "    .CS" + idx + "(" + emitRef(r.cond) + "),\n" +
         "    .O" + idx + "(" + emitTmp(r) + ")"
+
       case w: MemWrite[_] =>
         var we = "1'b1"
         var a = emitRef(w.addr)
@@ -75,7 +89,7 @@ class VerilogBackend extends Backend {
         res += nl + "       ." + n + "( ";
         //if(w.isInstanceOf[IO]) println("WALKED TO " + w + ": " + w.walked);
         //if(w.isInstanceOf[IO])
-        //println("COMP WALKED " + w + " is " + this.isWalked.contains(w));
+        //println("COMP WALKED " + w + " is " + c.isWalked.contains(w));
         w match {
           case io: Bits  => 
             if (io.dir == INPUT) {
@@ -87,7 +101,7 @@ class VerilogBackend extends Backend {
                     connWriter.write("// " + io + " CONNECTED TOO MUCH " + io.inputs.length + "\n"); 
               } else if (!c.isWalked.contains(w)){ 
                   if(saveConnectionWarnings)
-                    connWriter.write("// UNUSED INPUT " +io+ " OF " + this + " IS REMOVED" + "\n");
+                    connWriter.write("// UNUSED INPUT " +io+ " OF " + c + " IS REMOVED" + "\n");
               } else {
                 res += emitRef(io.inputs(0));
               }
@@ -187,7 +201,7 @@ class VerilogBackend extends Backend {
                    "    casez (" + emitRef(node.inputs(0)) + ")" + "\n");
 
         for ((addr, data) <- ll.map) {
-          res.append("      " + emitRef(ll.addr) + " : begin\n");
+          res.append("      " + emitRef(addr) + " : begin\n");
           for ((w, e) <- ll.wires zip data) 
             if(w.component != null)
               res.append("        " + emitRef(w) + " = " + emitRef(e) + ";\n");
@@ -204,25 +218,6 @@ class VerilogBackend extends Backend {
           "  end\n");
         res.toString
 
-      case x: Literal =>
-        (if (x.width == -1) x.name 
-        else if(x.isBinary) ("" + x.width + "'b" + x.name)
-        else if(x.base == 'x') ("" + x.width + "'h" + x.name.substring(2, x.name.length))
-        else if(x.base == 'd') ("" + x.width + "'d" + x.name)
-        else if(x.base == 'h') ("" + x.width + "'h" + x.name)
-        else "") + "/* " + x.inputVal + "*/";
-
-      case x: ListLookupRef[_] =>
-        ""
-      case x: ListNode =>
-        ""
-      case x: MapNode =>
-        ""
-      case x: LookupMap =>
-        ""
-      case x: Reg =>
-        ""
-
       case l: Lookup =>
         var res = 
           "  always @(*) begin\n" +
@@ -238,7 +233,6 @@ class VerilogBackend extends Backend {
         res
 
       case m: Mem[_] =>
-
         if (Component.isInlineMem)
           return ""
 
@@ -267,10 +261,11 @@ class VerilogBackend extends Backend {
 
         
       case m: MemRead[_] =>
-        if (Component.isInlineMem)
+        if (Component.isInlineMem && !m.isSequential)
           "  assign " + emitTmp(node) + " = " + emitRef(m.mem) + "[" + emitRef(m.addr) + "];\n"
         else
           ""
+
       case m: MemWrite[_] =>
         if (!m.used || !Component.isInlineMem)
           return ""
@@ -302,9 +297,8 @@ class VerilogBackend extends Backend {
       case r: ROMRead[_] =>
         "  assign " + emitTmp(r) + " = " + emitRef(r.rom) + "[" + emitRef(r.addr) + "];\n"
         
-      case x: Binding =>
+      case _ =>
         ""
-        
     }
   }
 
@@ -335,7 +329,7 @@ class VerilogBackend extends Backend {
         ""
 
       case x: Reg =>
-        if (!node.isMemOutput) "  reg[" + (node.width-1) + ":0] " + emitRef(node) + ";\n" else "";
+        if (!node.isMemOutput || isInlineMem) "  reg[" + (node.width-1) + ":0] " + emitRef(node) + ";\n" else "";
 
       case m: Mem[_] =>
         if (Component.isInlineMem)
@@ -346,6 +340,10 @@ class VerilogBackend extends Backend {
       case r: ROM[_] =>
         "  reg [" + (r.width-1) + ":0] " + emitRef(r) + " [" + (r.lits.length-1) + ":0];\n"
 
+      case x: MemAccess =>
+        x.referenced = true
+        emitDecBase(node)
+
       case _ =>
         emitDecBase(node)
     }
@@ -353,15 +351,15 @@ class VerilogBackend extends Backend {
 
   def genHarness(c: Component, base_name: String, name: String) = {
     val harness  = new java.io.FileWriter(base_name + name + "-harness.v");
-    val printFormat = printArgs.map(a => "0x%x").fold("")((y,z) => z + " " + y) 
-    val scanFormat = scanArgs.map(a => "%x").fold("")((y,z) => z + " " + y) 
+    val printFormat = printArgs.map(a => "0x%x").fold("")((y,z) => z + " " + y)
+    val scanFormat = scanArgs.map(a => "%x").fold("")((y,z) => z + " " + y)
     val printNodes = for (arg <- printArgs; node <- arg.maybeFlatten) yield arg
     val scanNodes = for (arg <- scanArgs; node <- c.keepInputs(arg.maybeFlatten)) yield arg
     harness.write("module test;\n")
     for (node <- scanNodes)
-      harness.write("    reg  [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
+      harness.write("    reg [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
     for (node <- printNodes)
-      harness.write("    wire [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
+      harness.write("     wire [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
 
     harness.write("  reg clk = 0;\n")
     harness.write("  reg reset = 1;\n\n")
@@ -381,14 +379,16 @@ class VerilogBackend extends Backend {
     }
 
     var first = true
-    for (node <- (scanNodes ++ printNodes)) 
-      if (first) {
-        harness.write("        ." + emitRef(node) + "(" + emitRef(node) + ")")
-        first = false
-      } else
-        harness.write(",\n        ." + emitRef(node) + "(" + emitRef(node) + ")")
+    for (node <- (scanNodes ++ printNodes))
+      if(node.isIo && node.component == c) {
+        if (first) {
+          harness.write("        ." + emitRef(node) + "(" + emitRef(node) + ")")
+          first = false
+        } else
+          harness.write(",\n        ." + emitRef(node) + "(" + emitRef(node) + ")")
+      }
     harness.write("\n")
-    harness.write("        );\n")
+    harness.write(" );\n")
 
     harness.write("  integer count;\n")
     harness.write("  always @(negedge clk) begin;\n")
@@ -403,8 +403,22 @@ class VerilogBackend extends Backend {
     harness.write("  always @(posedge clk) begin\n")
     harness.write("    if (!reset) ")
     harness.write("$display(\"" + printFormat.slice(0,printFormat.length-1) + "\"")
-    for (node <- printNodes)
-      harness.write(", " + emitRef(node))
+
+    for (node <- printNodes) {
+
+      if(node.isIo && node.component == c) {
+        harness.write(", " + emitRef(node))
+      } else {
+        var nextComp = node.component
+        var path = "."
+        while(nextComp != c) {
+          path = "." + nextComp.instanceName + path
+        }
+        path = c.name + path + emitRef(node)
+        harness.write(", " + path)
+      }
+
+    }
     harness.write(");\n")
     harness.write("  end\n")
     harness.write("endmodule\n")
@@ -435,9 +449,15 @@ class VerilogBackend extends Backend {
   def emitReg(node: Node): String = {
     node match {
       case reg: Reg =>
-        if(reg.isMemOutput)
-          ""
-        else if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1)){
+        if(reg.isMemOutput) {
+          if (!isInlineMem)
+            ""
+          else if (reg.memOf.cond.isLit && reg.memOf.cond.litOf.value != 0)
+            "    " + emitRef(reg) + " <= " + emitRef(reg.memOf.mem) + "[" + emitRef(reg.memOf.addr) + "];\n"
+          else
+            "    if(" + emitRef(reg.memOf.cond) + ")\n" +
+            "      " + emitRef(reg) + " <= " + emitRef(reg.memOf.mem) + "[" + emitRef(reg.memOf.addr) + "];\n"
+        } else if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1)){
           if(reg.isReset){
             "    if(reset) begin\n" + 
             "      " + emitRef(reg) + " <= " + emitRef(reg.resetVal) + ";\n" +
@@ -474,7 +494,7 @@ class VerilogBackend extends Backend {
     }
 
     // println("COMPILING COMP " + name);
-    println("// " + depthString(depth) + "COMPILING " + this + " " + c.children.length + " CHILDREN");
+    println("// " + depthString(depth) + "COMPILING " + c + " " + c.children.length + " CHILDREN");
     for (top <- c.children)
       doCompile(top, out, depth+1);
     c.findConsumers();
@@ -526,7 +546,7 @@ class VerilogBackend extends Backend {
     }
   }
 
-  override def compile(c: Component): Unit = {
+  override def elaborate(c: Component): Unit = {
     topComponent = c;
     components.foreach(_.elaborate(0));
     for (c <- components)
@@ -534,16 +554,16 @@ class VerilogBackend extends Backend {
     c.genAllMuxes;
     components.foreach(_.postMarkNet(0));
     assignResets()
-    c.removeTypeNodes()
-    if(!ChiselErrors.isEmpty){
-      for(err <- ChiselErrors) err.printError;
-      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
-    }
     c.inferAll();
     val base_name = ensure_dir(targetDir)
     if(saveWidthWarnings)
       widthWriter = new java.io.FileWriter(base_name + c.name + ".width.warnings")
     c.forceMatchingWidths;
+    c.removeTypeNodes()
+    if(!ChiselErrors.isEmpty){
+      for(err <- ChiselErrors) err.printError;
+      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
+    }
     nameChildren(topComponent)
     c.traceNodes();
     if(!ChiselErrors.isEmpty){
@@ -580,7 +600,7 @@ class VerilogBackend extends Backend {
     compDefs.clear;
   }
 
-  def vcs(c: Component): Unit = {
+  override def compile(c: Component, flags: String): Unit = {
 
     def run(cmd: String) = {
       val c = Process(cmd).!

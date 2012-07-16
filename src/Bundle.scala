@@ -212,6 +212,11 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
 
   def :=(src: Bundle): Unit = {
 
+    if(this.isTypeNode && comp != null) {
+      this.comp.procAssign(src.toNode)
+      return
+    }
+
     for((n, i) <- elements) {
       i match {
 

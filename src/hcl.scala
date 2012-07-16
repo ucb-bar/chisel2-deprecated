@@ -95,20 +95,25 @@ object chiselMain {
         case "--clockGatingUpdatesInline" => isClockGatingUpdatesInline = true; 
         case "--folding" => isFolding = true; 
         case "--vcd" => isVCD = true;
-        case "--v" => backendName = "v"; isEmittingComponents = true; isCoercingArgs = false;
+        case "--v" => backend = new VerilogBackend
         case "--inlineMem" => isInlineMem = true;
         case "--noInlineMem" => isInlineMem = false;
         case "--backend" => {
-          backendName = args(i+1)
-          assert(backendName == "v" || backendName == "c")
-          if(backendName == "v") { isEmittingComponents = true; isCoercingArgs = false }
+          if (args(i+1) == "v")
+            backend = new VerilogBackend
+          else if (args(i+1) == "c")
+            backend = new CppBackend
+          else if (args(i+1) == "fpga")
+            backend = new FPGABackend
+          else
+            assert(false)
           i += 1
         }
         case "--compile" => isCompiling = true
         case "--test" => isTesting = true;
         case "--targetDir" => targetDir = args(i+1); i += 1;
         case "--include" => includeArgs = splitArg(args(i+1)); i += 1;
-        case any => println("UNKNOWN ARG");
+        case any => println("UNKNOWN CONSOLE ARG");
       }
       i += 1;
     }
@@ -124,32 +129,33 @@ object chiselMain {
     if (scanner != null) {
       val s = scanner(c);
       scanArgs  ++= s.args;
+      for (a <- s.args) a.isScanArg = true
       scanFormat  = s.format;
     }
     if (printer != null) {
       val p = printer(c);
       printArgs   ++= p.args;
+      for(a <- p.args) a.isPrintArg = true
       printFormat   = p.format;
     }
     if (ftester != null) {
       tester = ftester(c)
     }
-    backendName match {
-      case "v" => { 
-        val be = new VerilogBackend()
-        be.compile(c);
-        println(isCompiling + " " + isGenHarness)
-        if (isCompiling && isGenHarness) be.vcs(c)
-        if (isTesting) tester.tests()
-      }
-      case "c" =>  {
-        val be = new CppBackend()
-        be.compile(c); 
-        if (isCompiling && isGenHarness) be.gcc(c)
-        if (isTesting) tester.tests()
-      }
-    }
+    backend.elaborate(c)
+    if (isCompiling && isGenHarness) backend.compile(c)
+    if (isTesting) tester.tests()
     c
+  }
+}
+
+object throwException {
+  def apply(s: String) = {
+    val xcpt = new Exception(s)
+    val st = xcpt.getStackTrace
+    val usrStart = findFirstUserInd(st)
+    val usrEnd = if(usrStart == 0) st.length else usrStart + 1
+    xcpt.setStackTrace(st.slice(usrStart, usrEnd))
+    throw xcpt    
   }
 }
 
@@ -242,17 +248,17 @@ class Delay extends Node {
 
 object Log2 {
   def apply (mod: UFix, n: Int): UFix = {
-    backendName match {
-      case "v" => {
+    backend match {
+      case x: CppBackend => {
+        val log2 = new Log2()
+        log2.init("", fixWidth(sizeof(n)), mod)
+        log2.setTypeNode(UFix())
+      }
+      case _ => {
         var res = UFix(0);
         for (i <- 1 to n)
           res = Mux(mod(i), UFix(i, sizeof(n)), res);
         res
-      }
-      case "c" => {
-        val log2 = new Log2()
-        log2.init("", fixWidth(sizeof(n)), mod)
-        log2.setTypeNode(UFix())
       }
     }
   }

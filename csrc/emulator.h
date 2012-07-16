@@ -23,6 +23,12 @@ typedef uint32_t half_val_t;
 // typedef uint32_t val_t;
 // typedef uint8_t val_t;
 
+#define MASK(v, c) ((v) & -(val_t)(c))
+#define TERNARY(c, t, f) ((f) ^ (((f) ^ (t)) & -(c)))
+#define MIN(a, b) TERNARY((a) < (b), (a), (b))
+#define MAX(a, b) TERNARY((a) > (b), (a), (b))
+#define CLAMP(a, min, max) MAX(MIN(a, max), min)
+
 template<uint32_t x, uint32_t shifted=0, bool sticky=false> struct CeilLog {
     static uint32_t const v = CeilLog< x >> 1, shifted + 1, sticky | (x & 1)>::v;
 };
@@ -43,14 +49,15 @@ inline val_t val_all_ones_or_zeroes( val_t bit ) {
   return (val_t) ((sval_t) ((sval_t) bit << (val_n_bits() - 1)) >> (val_n_bits() -1));
   }
 inline val_t val_top_bit( val_t v ) { return (v >> (val_n_bits()-1)); }
-#define val_n_words(n_bits) (((n_bits) + 8*sizeof(val_t) - 1)/(8*sizeof(val_t)))
+#define val_n_words(n_bits) (1+((n_bits)-1)/(8*sizeof(val_t)))
+#define val_n_half_words(n_bits) (1+((n_bits)-1)/(8*sizeof(half_val_t)))
 inline val_t val_n_full_words( val_t n_bits ) { return n_bits / val_n_bits(); }
 inline val_t val_n_word_bits( val_t n_bits ) { return n_bits % val_n_bits(); }
-inline val_t val_n_half_bits( void ) { return val_n_bits()>>1; }
+inline val_t val_n_half_bits( void ) { return sizeof(half_val_t)*8; }
 inline val_t val_n_nibs( void ) { return val_n_bits()>>2; }
 inline val_t val_half_mask( void ) { return (((val_t)1)<<(val_n_half_bits()))-1; }
 inline val_t val_lo_half( val_t n_bits ) { return n_bits & val_half_mask(); }
-inline val_t val_hi_half( val_t n_bits ) { return (n_bits >> val_n_half_bits()) & val_half_mask(); }
+inline val_t val_hi_half( val_t n_bits ) { return n_bits >> val_n_half_bits(); }
 inline val_t val_n_rem_word_bits( val_t n_bits ) { return val_n_bits() - val_n_word_bits(n_bits); }
 //inline val_t dub_val_lo_half( dub_val_t bits ) { return (val_t)bits; }
 //inline val_t dub_val_hi_half( dub_val_t bits ) { return (val_t)(bits >> val_n_bits()); }
@@ -64,7 +71,7 @@ inline void  val_to_half_vals ( val_t *fvals, half_val_t *hvals, int nf ) {
 }
 inline void  half_val_to_vals ( half_val_t *hvals, val_t *vals, int nf ) {
   for (int i = 0; i < nf; i++) 
-    vals[i] = (hvals[i*2+1] << val_n_half_bits()) | hvals[i*2];
+    vals[i] = ((val_t)hvals[i*2+1] << val_n_half_bits()) | hvals[i*2];
 }
 
 template <int w> class dat_t;
@@ -107,45 +114,27 @@ static void sub_n (val_t d[], val_t s0[], val_t s1[], int nw, int nb) {
   }
 }
 
-static void mul_n (val_t d[], val_t s0[], val_t s1[], int nw, int nb) {
-  /*
-  for (int i = 0; i < nw; i++) 
+static void mul_n (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
+// Adapted from Hacker's Delight, from Knuth
+#if BYTE_ORDER != LITTLE_ENDIAN
+# error mul_n assumes a little-endian architecture
+#endif
+  for (int i = 0; i < val_n_words(nb0+nb1); i++)
     d[i] = 0;
-  val_t carry = 0;
-  for (int i0 = 0; i0 < nw; i0++) {
-    val_t carry = 0;
-    for (int i1 = 0; i1 < nw; i1++) {
-      int j         = i0 + i1;
-      dub_val_t dig = (((dub_val_t)s0[i0]) * ((dub_val_t)s1[i1]));
-      dub_val_t m0  = ((dub_val_t)d[j])   + ((dub_val_t)dub_val_lo_half(dig)) + carry;
-      dub_val_t m1  = ((dub_val_t)d[j+1]) + ((dub_val_t)dub_val_hi_half(dig)) + ((dub_val_t)dub_val_hi_half(m0));
-      d[j]          = dub_val_lo_half(m0);
-      d[j+1]        = dub_val_lo_half(m1);
-      carry         = dub_val_hi_half(m1);
+
+  half_val_t* w = reinterpret_cast<half_val_t*>(d);
+  half_val_t* u = reinterpret_cast<half_val_t*>(s0);
+  half_val_t* v = reinterpret_cast<half_val_t*>(s1);
+  int m = val_n_half_words(nb0), n = val_n_half_words(nb1);
+
+  for (int j = 0; j < n; j++) {
+    val_t k = 0;
+    for (int i = 0; i < m; i++) {
+      val_t t = (val_t)u[i]*v[j] + w[i+j] + k;
+      w[i+j] = t;
+      k = t >> val_n_half_bits();
     }
-    d[i0+nw] += carry;
-  }
-  */
-  int n_half_words = nw*2;
-  half_val_t *hsum = (half_val_t*)d;
-  half_val_t *val0 = (half_val_t*)s0;
-  half_val_t *val1 = (half_val_t*)s1;
-  val_t carry = 0;
-  for (int i = 0; i < n_half_words*2; i++) 
-    hsum[i] = 0;
-  for (int i0 = 0; i0 < n_half_words; i0++) {
-    val_t carry = 0;
-    for (int i1 = 0; i1 < n_half_words; i1++) {
-      int j     = i0 + i1;
-      val_t dig = (((val_t)val0[i0]) * ((val_t)val1[i1]));
-      val_t m0  = ((val_t)hsum[j])   + ((val_t)val_lo_half(dig)); // + carry;
-      val_t m1  = ((val_t)hsum[j+1]) + ((val_t)val_hi_half(dig)) + ((val_t)val_hi_half(m0)) + carry;
-      // printf("M1: %08llx %08llx %016llx %09llx %09llx %08x %08x %x\n", (val_t)val0[i0], (val_t)val1[i1], dig, m1, m0, hsum[j+1], hsum[j], carry);
-      hsum[j]   = val_lo_half(m0);
-      hsum[j+1] = val_lo_half(m1);
-      carry     = val_hi_half(m1);
-    }
-    hsum[i0+n_half_words] += carry;
+    w[j+m] = k;
   }
 }
 
@@ -209,7 +198,7 @@ static void rsh_n (val_t d[], val_t s0[], int amount, int nw) {
   // printf("\n");
 }
 
-static void lsh_n (val_t d[], val_t s0[], int amount, int nw) {
+static void lsh_n (val_t d[], val_t s0[], int amount, int nwd, int nws) {
   val_t carry          = 0;
   int n_shift_bits     = amount % val_n_bits();
   int n_shift_words    = amount / val_n_bits();
@@ -217,11 +206,13 @@ static void lsh_n (val_t d[], val_t s0[], int amount, int nw) {
   int is_zero_carry    = n_shift_bits == 0;
   for (int i = 0; i < n_shift_words; i++) 
     d[i] = 0;
-  for (int i = 0; i < (nw-n_shift_words); i++) {
+  for (int i = 0; i < (nws-n_shift_words); i++) {
     val_t val = s0[i];
     d[i+n_shift_words] = val << n_shift_bits | carry;
     carry              = is_zero_carry ? 0 : val >> n_rev_shift_bits;
   }
+  for (int i = nws-n_shift_words; i < nwd; i++) 
+    d[i] = 0;
 }
 
 static inline val_t mask_val(int n) {
@@ -273,6 +264,7 @@ static inline val_t log2_1 (val_t v) {
   return r;
 }
 
+#define ispow2(x) (((x) & ((x)-1)) == 0)
 static inline val_t nextpow2_1(val_t x) {
   x--;
   x |= x >> 1;
@@ -379,8 +371,8 @@ struct bit_word_funs {
   static void sub (val_t d[], val_t s0[], val_t s1[], int nb) {
     sub_n(d, s0, s1, nw, nb);
   }
-  static void mul (val_t d[], val_t s0[], val_t s1[], int nb) {
-    mul_n(d, s0, s1, nw, nb);
+  static void mul (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
+    mul_n(d, s0, s1, nb0, nb1);
   }
   static void bit_xor (val_t d[], val_t s0[], val_t s1[]) {
     for (int i = 0; i < nw; i++) 
@@ -489,7 +481,7 @@ struct bit_word_funs {
     rsh_n(d, s0, amount, nw);
   }
   static void lsh (val_t d[], val_t s0[], int amount) {
-    lsh_n(d, s0, amount, nw);
+    lsh_n(d, s0, amount, nw, nw);
   }
   static void extract (val_t d[], val_t s0[], int e, int s, int nb) {
     // TODO: FINISH THIS
@@ -521,8 +513,8 @@ struct bit_word_funs {
     val_t msk_lsh[nw];
     val_t s0_lsh[nw];
     mask_n(msk, nw, bw);
-    lsh_n(msk_lsh, msk, s, nw);
-    lsh_n(s0_lsh, s0, s, nw);
+    lsh_n(msk_lsh, msk, s, nw, nw);
+    lsh_n(s0_lsh, s0, s, nw, nw);
     for (int i = 0; i < nw; i++) {
       d[i] = (d[i] & ~msk_lsh[i]) | (s0_lsh[i] & msk_lsh[i]);
     }
@@ -560,11 +552,11 @@ struct bit_word_funs<1> {
   static void neg (val_t d[], val_t s0[], int nb) {
     d[0] = (- s0[0]) & mask_val(nb);
   }
-  static void mul (val_t d[], val_t s0[], val_t s1[], int nb) {
-    if (nb < val_n_bits())
-      d[0] = (s0[0] * s1[0]) & mask_val(nb);
+  static void mul (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
+    if (nb0+nb1 <= val_n_bits())
+      d[0] = s0[0] * s1[0];
     else
-      mul_n(d, s0, s1, 1, nb);
+      mul_n(d, s0, s1, nb0, nb1);
   }
   static void ltu (val_t d[], val_t s0[], val_t s1[]) {
     d[0] = (s0[0] < s1[0]);
@@ -682,8 +674,8 @@ struct bit_word_funs<2> {
     d[1] = -s0[1] - (s0[0] != 0);
     d[0] = d0;
   }
-  static void mul (val_t d[], val_t s0[], val_t s1[], int nb) {
-    mul_n(d, s0, s1, 2, nb);
+  static void mul (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
+    mul_n(d, s0, s1, nb0, nb1);
   }
   static void ltu (val_t d[], val_t s0[], val_t s1[]) {
     d[0] = (s0[1] < s1[1] | (s0[1] == s1[1] & s0[0] < s1[0]));
@@ -768,8 +760,8 @@ struct bit_word_funs<2> {
     val_t msk_lsh[2];
     val_t s0_lsh[2];
     mask_n(msk, 2, bw);
-    lsh_n(msk_lsh, msk, s, 2);
-    lsh_n(s0_lsh, s0, s, 2);
+    lsh_n(msk_lsh, msk, s, 2, 2);
+    lsh_n(s0_lsh, s0, s, 2, 2);
     d[0] = (d[0] & ~msk_lsh[0]) | (s0_lsh[0] & msk_lsh[0]);
     d[1] = (d[1] & ~msk_lsh[1]) | (s0_lsh[1] & msk_lsh[1]);
   }
@@ -860,8 +852,8 @@ struct bit_word_funs<3> {
   static void neg (val_t d[], val_t s0[], int nb) {
     neg_n(d, s0, 3, nb);
   }
-  static void mul (val_t d[], val_t s0[], val_t s1[], int nb) {
-    mul_n(d, s0, s1, 3, nb);
+  static void mul (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
+    mul_n(d, s0, s1, nb0, nb1);
   }
   static void ltu (val_t d[], val_t s0[], val_t s1[]) {
     d[0] = (s0[2] < s1[2] | (s0[2] == s1[2] & (s0[1] < s1[1] | (s0[1] == s1[1] & s0[0] < s1[0]))));
@@ -951,8 +943,8 @@ struct bit_word_funs<3> {
     val_t msk_lsh[3];
     val_t s0_lsh[3];
     mask_n(msk, 3, bw);
-    lsh_n(msk_lsh, msk, s, 3);
-    lsh_n(s0_lsh, s0, s, 3);
+    lsh_n(msk_lsh, msk, s, 3, 3);
+    lsh_n(s0_lsh, s0, s, 3, 3);
     d[0] = (d[0] & ~msk_lsh[0]) | (s0_lsh[0] & msk_lsh[0]);
     d[1] = (d[1] & ~msk_lsh[1]) | (s0_lsh[1] & msk_lsh[1]);
     d[2] = (d[2] & ~msk_lsh[2]) | (s0_lsh[2] & msk_lsh[2]);
@@ -965,7 +957,7 @@ struct bit_word_funs<3> {
     rsh_n(d, s0, amount, 3);
   }
   static void lsh (val_t d[], val_t s0[], int amount) {
-    lsh_n(d, s0, amount, 3);
+    lsh_n(d, s0, amount, 3, 3);
   }
   static void log2 (val_t d[], val_t s0[]) {
     d[0] = log2_n(s0, 3);
@@ -976,6 +968,14 @@ struct bit_word_funs<3> {
     d[2] = s0[2];
   }
 };
+
+static val_t rand_val()
+{
+  val_t x = 0;
+  for (int i = 0; i < sizeof(val_t)/sizeof(int); i++)
+    x |= (val_t)(unsigned)rand() << (i*CHAR_BIT*sizeof(int));
+  return x;
+}
 
 template <int w>
 class dat_t {
@@ -1008,12 +1008,9 @@ class dat_t {
   static dat_t<w> rand() {
     dat_t<w> r;
     for (int i = 0; i < n_words; i++)
-    {
-      r.values[i] = 0;
-      for (int j = 0; j < sizeof(val_t)/sizeof(int); j++)
-        r.values[i] |= val_t(::rand()) << (j*CHAR_BIT*sizeof(int));
-    }
-    r.values[n_words-1] &= mask_val(val_n_word_bits(w));
+      r.values[i] = rand_val();
+    if (val_n_word_bits(w))
+      r.values[n_words-1] &= mask_val(val_n_word_bits(w));
     return r;
   }
   inline dat_t<w> () { 
@@ -1090,7 +1087,7 @@ class dat_t {
       return DAT<w+w>(res & mask_val(w+w));
     } else {
       dat_t<w+w> res;
-      bit_word_funs<n_words>::mul(res.values, values, o.values, w+w);
+      bit_word_funs<n_words>::mul(res.values, values, o.values, w, w);
       return res;
     }
   }
@@ -1105,7 +1102,7 @@ class dat_t {
       val_t sgn_b = o.msb();
       dat_t<w> abs_b = sgn_b ? -o : o;
       dat_t<w+w> res;
-      bit_word_funs<n_words>::mul(res.values, abs_a.values, abs_b.values, w+w);
+      bit_word_funs<n_words>::mul(res.values, abs_a.values, abs_b.values, w, w);
       return (sgn_a ^ sgn_b) ? -res : res;
     }
   }
@@ -1119,7 +1116,7 @@ class dat_t {
       val_t sgn_b = o.msb();
       dat_t<w> abs_b = sgn_b ? -o : o;
       dat_t<w+w> res;
-      bit_word_funs<n_words>::mul(res.values, abs_a.values, abs_b.values, w+w);
+      bit_word_funs<n_words>::mul(res.values, abs_a.values, abs_b.values, w, w);
       return sgn_b ? -res : res;
     }
   }
@@ -1133,7 +1130,7 @@ class dat_t {
       dat_t<w> abs_a = sgn_a ? -(*this) : (*this);
       dat_t<w> abs_b = o;
       dat_t<w+w> res;
-      bit_word_funs<n_words>::mul(res.values, abs_a.values, abs_b.values, w+w);
+      bit_word_funs<n_words>::mul(res.values, abs_a.values, abs_b.values, w, w);
       return sgn_a ? -res : res;
     }
   }
@@ -1460,18 +1457,26 @@ class mem_t {
     return get(idx.lo_word() & (nextpow2_1(d)-1));
   }
   dat_t<w> get (val_t idx) {
-    if (idx >= d)
+    if (!ispow2(d) && idx >= d)
       return dat_t<w>::rand();
     return contents[idx];
   }
-  template <int iw>
-  dat_t<w> put (dat_t<iw> idx, dat_t<w> val) {
-    return put(idx.lo_word() & (nextpow2_1(d)-1), val);
+  val_t get (val_t idx, int word) {
+    if (!ispow2(d) && idx >= d)
+      return rand_val() & (word == val_n_words(w) && val_n_word_bits(w) ? mask_val(w) : -1L);
+    return contents[idx].values[word];
   }
-  dat_t<w> put (val_t idx, dat_t<w> val) {
-    if (idx < d)
+  template <int iw>
+  void put (dat_t<iw> idx, dat_t<w> val) {
+    put(idx.lo_word(), val);
+  }
+  void put (val_t idx, dat_t<w> val) {
+    if (ispow2(d) || idx <= d)
       contents[idx] = val;
-    return val;
+  }
+  val_t put (val_t idx, int word, val_t val) {
+    if (ispow2(d) || idx <= d)
+      contents[idx].values[word] = val;
   }
   void print ( void ) {
     for (int j = 0; j < d/4; j++) {
@@ -1528,8 +1533,6 @@ static int  char_to_hex[] = {
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1 };
-
-#define MIN(x, y) ((x)<(y) ? (x) : (y))
 
 #define TO_CSTR(d) (d.to_str().c_str())
 

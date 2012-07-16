@@ -37,7 +37,7 @@ class AccumulatorTests(c: Accumulator) extends Tester(c, Array(c.io)) {
       vars(c.io.in)  = Bool(in)
       vars(c.io.out) = UFix(tot)
       allGood        = step(vars) && allGood
-      if (t > 0 && in) tot += 1
+      if (in) tot += 1
     }
     allGood
   }
