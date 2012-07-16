@@ -36,12 +36,11 @@ class RealGCDTests(c: RealGCD) extends Tester(c, Array(c.io)) {
     var j = 0
     var t = 0
 
-    var anyPassed = false
     var allPassed = true
+    var anyPassed = false
 
-    while(t< 100 && (i < 3 || j < 3)) {
+    while(t < 100 && (i < 3 || j < 3)) {
       t += 1
-      
       if (i < 3) {
         svars(c.io.in.bits.a) = Bits(inputs(i)._1)
         svars(c.io.in.bits.b) = Bits(inputs(i)._2)
