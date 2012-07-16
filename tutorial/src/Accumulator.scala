@@ -7,8 +7,8 @@ import util.Random
 
 class Accumulator extends Component {
   val io = new Bundle {
-    val in  = UFix(width = 1, dir = INPUT)
-    val out = UFix(width = 8, dir = OUTPUT)
+    val in  = UFix(INPUT,  1)
+    val out = UFix(OUTPUT, 8)
   }
 
   // ----------------------------------------------- \\
