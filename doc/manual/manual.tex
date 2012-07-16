@@ -226,7 +226,7 @@ Data nodes can be used for four purposes:
   specifying at minimum bitwidth (described in this section), 
 \item {\bf wires} -- \kode{UFix(width = 8)} -- serve as forward declarations of data allowing future
   conditional updates (described in Section~\ref{sec:wires}), 
-\item {\bf ports} -- \kode{UFix(width = 8, dir = OUTPUT)} -- are
+\item {\bf ports} -- \kode{UFix(dir = OUTPUT, width = 8)} -- are
   specialized wires defining component interfaces, and
   additionally specify direction (described in
   Section~\ref{sec:ports}), and
@@ -241,8 +241,8 @@ type defined as follows:
 
 \begin{scala}
 object Bits {
-  def apply(width: Int = -1, 
-            dir: PortDir = null): Bits
+  def apply(dir: PortDir = null,
+            width: Int = -1): Bits
   // create literal from BigInt or Int
   def apply(value: BigInt, width: Int = -1): Bits
   // create literal from String using 
@@ -396,8 +396,8 @@ types \code{Fix} and \code{UFix} respectively:
 
 \begin{scala}
 object Fix {
-  def apply (width: Int = -1, 
-             dir: PortDir = null): Fix
+  def apply (dir: PortDir = null, 
+             width: Int = -1): Fix
   // create literal
   def apply (value: BigInt, width: Int = -1): Fix
   def apply (value: String, width: Int = -1): Fix
@@ -406,8 +406,8 @@ object Fix {
 class Fix extends Num 
 
 object UFix {
-  def apply(width: Int = -1, 
-            dir: PortDir = null): UFix
+  def apply(dir: PortDir = null,
+            width: Int = -1): UFix
   // create literal
   def apply(value: BigInt, width: Int = -1): UFix
   def apply(value: String, width: Int = -1): UFix
@@ -807,10 +807,10 @@ input mux, we would define a component as follows:
 \begin{scala}
 class Mux2 extends Component {
   val io = new Bundle{
-    val sel = Bits(1, INPUT)
-    val in0 = Bits(1, INPUT)
-    val in1 = Bits(1, INPUT)
-    val out = Bits(1, OUTPUT)
+    val sel = Bits(INPUT,  1)
+    val in0 = Bits(INPUT,  1)
+    val in1 = Bits(INPUT,  1)
+    val out = Bits(OUTPUT, 1)
   }
   io.out := (io.sel & io.in1) | (~io.sel & io.in0)
 }
@@ -852,8 +852,8 @@ For example, one could define a simple ROM blackbox as:
 \begin{scala}
 class RomIo extends Bundle {
   val isVal = Bool(INPUT)
-  val raddr = UFix(32, INPUT)
-  val rdata = Bits(32, OUTPUT)
+  val raddr = UFix(INPUT,  32)
+  val rdata = Bits(OUTPUT, 32)
 }
 
 class Rom extends BlackBox {

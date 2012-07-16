@@ -578,7 +578,7 @@ An example port declaration is as follows:
 \begin{scala}
 class FIFOIO extends Bundle {
   val ready = Bool(OUTPUT)
-  val data  = Bits(32, INPUT)
+  val data  = Bits(INPUT, 32)
   val valid = Bool(INPUT)
 }
 \end{scala}
@@ -605,10 +605,10 @@ By folding directions into the object declarations, Chisel is able to
 provide powerful wiring constructs described later.
 %% \begin{scala}
 %% class MuxBundle extends Bundle {
-%%   val sel = Bits(1, INPUT)
-%%   val in0 = Bits(1, INPUT)
-%%   val in1 = Bits(1, INPUT)
-%%   val out = Bits(1, OUTPUT)
+%%   val sel = Bits(INPUT,  1)
+%%   val in0 = Bits(INPUT,  1)
+%%   val in1 = Bits(INPUT,  1)
+%%   val out = Bits(OUTPUT, 1)
 %% }
 
 %% class Mux2 extends Component {
@@ -640,10 +640,10 @@ component:
 \begin{scala}
 class Mux2 extends Component {
   val io = new Bundle{
-    val sel = Bits(1, INPUT)
-    val in0 = Bits(1, INPUT)
-    val in1 = Bits(1, INPUT)
-    val out = Bits(1, OUTPUT)
+    val sel = Bits(INPUT, 1)
+    val in0 = Bits(INPUT, 1)
+    val in1 = Bits(INPUT, 1)
+    val out = Bits(OUTPUT, 1)
   }
   io.out := (io.sel & io.in1) | (~io.sel & io.in0)
 }
@@ -669,12 +669,12 @@ together three 2-input multiplexers:
 \begin{scala}
 class Mux4 extends Component {
   val io = new Bundle {
-    val in0 = Bits(1, INPUT)
-    val in1 = Bits(1, INPUT)
-    val in2 = Bits(1, INPUT)
-    val in3 = Bits(1, INPUT)
-    val sel = Bits(2, INPUT)
-    val out = Bits(1, OUTPUT)
+    val in0 = Bits(INPUT, 1)
+    val in1 = Bits(INPUT, 1)
+    val in2 = Bits(INPUT, 1)
+    val in3 = Bits(INPUT, 1)
+    val sel = Bits(INPUT, 2)
+    val out = Bits(OUTPUT, 1)
   }
   val m0 = new Mux2()
   m0.io.sel := io.sel(0) 
@@ -1409,7 +1409,7 @@ we utilize the \verb+Vec+ constructor:
 \begin{scala}
 class CrossbarIo(n: Int) extends Bundle {
   val in  = Vec(n){ new PLink().flip() }
-  val sel = UFix(sizeof(n), INPUT)
+  val sel = UFix(INPUT, sizeof(n))
   val out = Vec(n){ new PLink() }
 }
 \end{scala}
@@ -1464,13 +1464,13 @@ A user first defines the complete interface to a ROM and Mem as follows:
 \begin{scala}
 class RomIo extends Bundle {
   val isVal = Bool(INPUT)
-  val raddr = UFix(32, INPUT)
-  val rdata = Bits(32, OUTPUT)
+  val raddr = UFix(INPUT, 32)
+  val rdata = Bits(OUTPUT, 32)
 }
 
 class RamIo extends RomIo {
   val isWr  = Bool(INPUT)
-  val wdata = Bits(32, INPUT)
+  val wdata = Bits(INPUT, 32)
 }
 \end{scala}
 
@@ -1586,12 +1586,12 @@ significantly simpler.
 \begin{scala}
 class Mux4 extends Component {
   val io = new Bundle {
-    val in0 = Bits(1, INPUT)
-    val in1 = Bits(1, INPUT)
-    val in2 = Bits(1, INPUT)
-    val in3 = Bits(1, INPUT)
-    val sel = Bits(2, INPUT)
-    val out = Bits(1, OUTPUT)
+    val in0 = Bits(INPUT, 1)
+    val in1 = Bits(INPUT, 1)
+    val in2 = Bits(INPUT, 1)
+    val in3 = Bits(INPUT, 1)
+    val sel = Bits(INPUT, 2)
+    val out = Bits(OUTPUT, 1)
   }
   io.out := Mux2(io.sel(1),
                  Mux2(io.sel(0), io.in0, io.in1),
@@ -1650,10 +1650,10 @@ Note that the cases (eg. c1, c2) must be in parentheses.
 %
 % \begin{scala}
 % val io = new Bundle{
-%   val sel = Bits(1, INPUT)
-%   val in0 = Bits(1, INPUT)
-%   val in1 = Bits(1, INPUT)
-%   val out = Bits(1, OUTPUT)
+%   val sel = Bits(INPUT, 1)
+%   val in0 = Bits(INPUT, 1)
+%   val in1 = Bits(INPUT, 1)
+%   val out = Bits(OUTPUT, 1)
 % }
 % def Mux2(sel: Bits, in0: Bits, in0: Bits): Bits = {
 %   val m = new Mux2()

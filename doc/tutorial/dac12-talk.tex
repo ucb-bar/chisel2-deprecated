@@ -218,9 +218,9 @@ val myVec = Vec(5){ Fix(width=23) }
 \begin{scala}
 class GCD extends Component {
   val io = new Bundle {
-    val a     = UFix(16, INPUT)
-    val b     = UFix(16, INPUT)
-    val z     = UFix(16, OUTPUT)
+    val a     = UFix(INPUT, 16)
+    val b     = UFix(INPUT, 16)
+    val z     = UFix(OUTPUT, 16)
     val valid = Bool(OUTPUT) }
   val x = Reg(resetVal = io.a)
   val y = Reg(resetVal = io.b)
@@ -371,9 +371,9 @@ import scala.util.Random
 
 class Combinational extends Component {
   val io = new Bundle {
-    val x = UFix(16, INPUT)
-    val y = UFix(16, INPUT)
-    val z = UFix(16, OUTPUT) }
+    val x = UFix(INPUT, 16)
+    val y = UFix(INPUT, 16)
+    val z = UFix(OUTPUT, 16) }
   io.z := io.x + io.y
 }
 

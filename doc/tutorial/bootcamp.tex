@@ -332,9 +332,9 @@ Reduce(Array(a, b, c, d), Max2)
 \begin{scala}
 class GCD extends Component {
   val io = new Bundle {
-    val a     = UFix(16, INPUT)
-    val b     = UFix(16, INPUT)
-    val z     = UFix(16, OUTPUT)
+    val a     = UFix(INPUT, 16)
+    val b     = UFix(INPUT, 16)
+    val z     = UFix(OUTPUT, 16)
     val valid = Bool(OUTPUT) }
   val x = Reg(resetVal = io.a)
   val y = Reg(resetVal = io.b)
@@ -576,9 +576,9 @@ import Chisel._
 
 class Combinational extends Component {
   val io = new Bundle {
-    val x = UFix(16, INPUT)
-    val y = UFix(16, INPUT)
-    val z = UFix(16, OUTPUT)
+    val x = UFix(INPUT, 16)
+    val y = UFix(INPUT, 16)
+    val z = UFix(OUTPUT, 16)
   }
   io.z := io.x + io.y
 }
@@ -663,9 +663,9 @@ import scala.util.Random
 
 class Combinational extends Component {
   val io = new Bundle {
-    val x = UFix(16, INPUT)
-    val y = UFix(16, INPUT)
-    val z = UFix(16, OUTPUT) }
+    val x = UFix(INPUT, 16)
+    val y = UFix(INPUT, 16)
+    val z = UFix(OUTPUT, 16) }
   io.z := io.x + io.y
 }
 
@@ -824,7 +824,7 @@ myVec(addr2) := data2
 \begin{scala}
 class FIFOInput extends Bundle {
   val ready = Bool(OUTPUT)
-  val bits  = Bits(32, INPUT)
+  val bits  = Bits(INPUT, 32)
   val valid = Bool(INPUT)
 }
 \end{scala}
@@ -851,10 +851,10 @@ class ScaleIO extends Bundle {
 \begin{scala}
 class Mux2 extends Component {
   val io = new Bundle{
-    val sel = Bits(1, INPUT)
-    val in0 = Bits(1, INPUT)
-    val in1 = Bits(1, INPUT)
-    val out = Bits(1, OUTPUT)
+    val sel = Bits(INPUT, 1)
+    val in0 = Bits(INPUT, 1)
+    val in1 = Bits(INPUT, 1)
+    val out = Bits(OUTPUT, 1)
   }
   io.out := (io.sel & io.in1) | (~io.sel & io.in0)
 }
@@ -950,12 +950,12 @@ which you can view with a vcd viewer
 \begin{scala}
 class Mux4 extends Component {
   val io = new Bundle {
-    val in0 = Bits(1, INPUT)
-    val in1 = Bits(1, INPUT)
-    val in2 = Bits(1, INPUT)
-    val in3 = Bits(1, INPUT)
-    val sel = Bits(2, INPUT)
-    val out = Bits(1, OUTPUT)
+    val in0 = Bits(INPUT, 1)
+    val in1 = Bits(INPUT, 1)
+    val in2 = Bits(INPUT, 1)
+    val in3 = Bits(INPUT, 1)
+    val sel = Bits(INPUT, 2)
+    val out = Bits(OUTPUT, 1)
   }
   val m0 = new Mux2()
   m0.io.sel := io.sel(0); m0.io.in0 := io.in0; m0.io.in1 := io.in1
@@ -1057,8 +1057,8 @@ def squareWave(period: UFix) = toggle(pulse(period))
 \begin{scala}
 class Accumulator extends Component {
   val io = new Bundle {
-    val in  = UFix(1, INPUT)
-    val out = UFix(8, OUTPUT)
+    val in  = UFix(INPUT, 1)
+    val out = UFix(OUTPUT, 8)
   }
 
   // flush this out ...
@@ -1286,9 +1286,9 @@ val r = m(counter(UFix(3)))
 \begin{scala}
 class Mul extends Component {
   val io = new Bundle {
-    val x   = UFix(4, INPUT)
-    val y   = UFix(4, INPUT)
-    val z   = UFix(8, OUTPUT)
+    val x   = UFix(INPUT, 4)
+    val y   = UFix(INPUT, 4)
+    val z   = UFix(OUTPUT, 8)
   }
   val muls = new Array[UFix](256)
 
@@ -1352,11 +1352,11 @@ val mdat = regs(maddr)
 class Memo extends Component {
   val io = new Bundle {
     val isWr    = Bool(INPUT)
-    val wrAddr  = UFix(8, INPUT)
-    val wrData  = UFix(8, INPUT)
+    val wrAddr  = UFix(INPUT, 8)
+    val wrData  = UFix(INPUT, 8)
     val isRd    = Bool(INPUT)
-    val rdAddr  = UFix(8, INPUT)
-    val rdData  = UFix(8, OUTPUT)
+    val rdAddr  = UFix(INPUT, 8)
+    val rdData  = UFix(OUTPUT, 8)
   }
   val mem = Mem(256){ UFix(width = 8) }
 
@@ -1483,7 +1483,7 @@ class GCDTests(c: GCD) extends Tester(c, Array(c.io)) {
 \begin{scala}
 class CrossbarIO extends Bundle {
   val in  = Vec(2){ new LinkIO() }
-  val sel = UFix(2, INPUT)
+  val sel = UFix(INPUT, 2)
   val out = Vec(2){ new LinkIO() }
 }
 \end{scala}
@@ -1500,7 +1500,7 @@ returning a port as the second argument.
 \begin{scala}
 class CrossbarIO(n: Int) extends Bundle {
   val in  = Vec(n){ new LinkIO() }
-  val sel = UFix(log2Up(n), INPUT)
+  val sel = UFix(INPUT, log2Up(n))
   val out = Vec(n){ new LinkIO() }
   override def clone() = new CrossbarIO(n).asInstanceOf[this.type]
 }
@@ -1887,8 +1887,8 @@ object ChiselBuild extends Build {
 % \begin{scala}
 % class RomIo extends Bundle {
 %   val isVal = Bool(INPUT)
-%   val raddr = UFix(32, INPUT)
-%   val rdata = Bits(32, OUTPUT)
+%   val raddr = UFix(INPUT, 32)
+%   val rdata = Bits(OUTPUT, 32)
 % }
 % 
 % class CpathIo extends Bundle() {

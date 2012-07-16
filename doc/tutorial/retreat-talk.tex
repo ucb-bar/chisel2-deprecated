@@ -280,9 +280,9 @@ Reduce(Array(a, b, c, d), Max2)
 \begin{scala}
 class GCD extends Component {
   val io = new Bundle {
-    val a     = UFix(16, INPUT)
-    val b     = UFix(16, INPUT)
-    val z     = UFix(16, OUTPUT)
+    val a     = UFix(INPUT, 16)
+    val b     = UFix(INPUT, 16)
+    val z     = UFix(OUTPUT, 16)
     val valid = Bool(OUTPUT) }
   val x = Reg(resetVal = io.a)
   val y = Reg(resetVal = io.b)
@@ -853,9 +853,9 @@ to ensure that state updates are updated only when process execute.
 class Multiply extends Component {
   val io = new Bundle{ 
     val start  = Bool(INPUT);
-    val x      = UFix(width = 32, dir = INPUT)
-    val y      = UFix(width = 32, dir = INPUT)
-    val z      = UFix(width = 32, dir = OUTPUT)
+    val x      = UFix(dir = INPUT, width = 32)
+    val y      = UFix(dir = INPUT, width = 32)
+    val z      = UFix(dir = OUTPUT, width = 32)
     val finish = Bool(OUTPUT) }
   val a   = Reg(){ UFix(0, 32) }
   val b   = Reg(){ UFix(0, 32) }
