@@ -4,8 +4,18 @@ import Node._
 import scala.collection.mutable.ArrayBuffer
 
 object Mem {
-  def apply[T <: Data](n: Int, seqRead: Boolean = false)(gen: => T): Mem[T] = 
+  def apply[T <: Data](n: Int, seqRead: Boolean = false)(gen: => T): Mem[T] = {
+
+    // check valid gen
+    val testGen = gen
+    for((n, i) <- gen.flatten) {
+      if (i.inputs.length > 0 || i.updates.length > 0) {
+        throwException("Invalid Type Specifier for Reg")
+      }
+    }
+
     new Mem(n, seqRead, () => gen)
+  }
 }
 
 abstract class AccessTracker extends Delay {
@@ -13,7 +23,7 @@ abstract class AccessTracker extends Delay {
   def readAccesses: ArrayBuffer[MemAccess]
 }
 
-class Mem[T <: Data](val n: Int, seqRead: Boolean, gen: () => T) extends AccessTracker {
+class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends AccessTracker {
   def writeAccesses = writes.map((x: MemAccess) => x)
   def readAccesses = reads.map((x: MemAccess) => x)
   val ports = ArrayBuffer[MemAccess]()
@@ -28,9 +38,8 @@ class Mem[T <: Data](val n: Int, seqRead: Boolean, gen: () => T) extends AccessT
     val rd = new MemRead(this, cond, addr)
     ports += rd
     reads += rd
-    val data = gen().asOutput
+    val data = gen().fromNode(rd).asInstanceOf[T]
     data.setIsTypeNode
-    data assign rd
     (data, rd)
   }
 
@@ -50,7 +59,7 @@ class Mem[T <: Data](val n: Int, seqRead: Boolean, gen: () => T) extends AccessT
 
   def apply(addr: Bits) = {
     val (rdata, rport) = doRead(addr, conds.top)
-    if (inferSeqRead && !Component.isInlineMem)
+    if (inferSeqRead)
       rdata.memSource = rport
     rdata.comp = doWrite(addr, conds.top, null.asInstanceOf[T], null.asInstanceOf[Bits])
     rdata
@@ -63,7 +72,7 @@ class Mem[T <: Data](val n: Int, seqRead: Boolean, gen: () => T) extends AccessT
   override def clone = new Mem(n, seqRead, gen)
 }
 
-abstract class MemAccess(val condi: Bool, val addri: Bits) extends Node {
+abstract class MemAccess(val mem: Mem[_], val condi: Bool, val addri: Bits) extends Node {
   def cond = inputs(0)
   def addr = inputs(1)
   inputs ++= Array(condi, addri)
@@ -73,23 +82,42 @@ abstract class MemAccess(val condi: Bool, val addri: Bits) extends Node {
   var outputReg = null.asInstanceOf[Reg]
   def setOutputReg(x: Reg) = outputReg = x
   def getPortType: String
+
+  override def forceMatchingWidths =
+    if (addr.width != log2Up(mem.n)) inputs(1) = addr.matchWidth(log2Up(mem.n))
 }
 
-class MemRead[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits) extends MemAccess(condi, addri) {
+class MemRead[T <: Data](mem: Mem[T], condi: Bool, addri: Bits) extends MemAccess(mem, condi, addri) {
   inputs += mem
   inferWidth = fixWidth(mem.data.getWidth)
-  var reader = null.asInstanceOf[Node]
 
   override def toString: String = mem + "[" + addr + "]"
-  override def getPortType: String = if (outputReg != null && outputReg.isMemOutput) "read" else "cread"
+  def isSequential = outputReg != null && outputReg.isMemOutput
+  override def getPortType: String = if (isSequential) "read" else "cread"
 }
 
-class MemWrite[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits, datai: T, wmaski: Bits) extends MemAccess(condi, addri) with proc {
+class MemWrite[T <: Data](mem: Mem[T], condi: Bool, addri: Bits, datai: T, wmaski: Bits) extends MemAccess(mem, condi, addri) with proc {
+  def wrap(x: Node) = {
+    if (Component.backend.isInstanceOf[VerilogBackend]) {
+      // prevent verilog syntax error when indexing a literal (e.g. 8'hff[1])
+      val b = Bits()
+      b.inputs += x
+      b
+    } else
+      x
+  }
   if (datai != null)
-    inputs += datai
+    inputs += wrap(datai.toBits)
   if (wmaski != null) {
     require(datai != null)
-    inputs += wmaski
+    inputs += wrap(wmaski)
+  }
+
+  override def forceMatchingWidths = {
+    val w = mem.width
+    super.forceMatchingWidths
+    if(inputs.length >= 3 && inputs(2).width != w) inputs(2) = inputs(2).matchWidth(w)
+    if(inputs.length >= 4 && inputs(3).width != w) inputs(3) = inputs(3).matchWidth(w)
   }
 
   var pairedRead: MemRead[T] = null
@@ -108,7 +136,7 @@ class MemWrite[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits, datai: T, w
     val rp = getProducts(r.cond)
     wp.find(wc => rp.exists(rc => isNegOf(rc, wc) || isNegOf(wc, rc)))
   }
-  def isPossibleRW(r: MemRead[T]) = mem.inferSeqRead && !emitRWEnable(r).isEmpty && !isRW
+  def isPossibleRW(r: MemRead[T]) = Component.isInlineMem && mem.inferSeqRead && !emitRWEnable(r).isEmpty && !isRW
   def isRW = pairedRead != null
   def setRW(r: MemRead[T]) = pairedRead = r
   def data = inputs(2)
@@ -116,10 +144,10 @@ class MemWrite[T <: Data](val mem: Mem[T], condi: Bool, addri: Bits, datai: T, w
   def isMasked = inputs.length > 3
   override def procAssign(src: Node) = {
     require(inputs.length == 2)
-    inputs += src
+    inputs += wrap(src)
   }
   override def toString: String = mem + "[" + addr + "] = " + data + " COND " + cond
   override def getPortType: String = (if (isMasked) "m" else "") + (if (isRW) "rw" else "write")
-  override def used = super.used && inputs.length > 2
+  override def used = inputs.length > 2
   override def isRamWriteInput(n: Node) = inputs.contains(n)
 }

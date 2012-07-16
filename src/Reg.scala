@@ -13,6 +13,15 @@ object Reg {
   }
   val noInit = Lit(0){Fix()};
   def apply[T <: Data](data: T, width: Int, resetVal: T)(gen: => T): T = {
+
+    // check valid gen
+    val testGen = gen
+    for((n, i) <- gen.flatten) {
+      if (i.inputs.length > 0 || i.updates.length > 0) {
+        throwException("Invalid Type Specifier for Reg")
+      }
+    }
+
     val d: Array[(String, Bits)] = 
       if(data == null) 
         gen.flatten.map{case(x, y) => (x -> null)}
@@ -78,7 +87,7 @@ class Reg extends Delay with proc {
       ChiselErrors += ChiselError("reassignment to Reg", Thread.currentThread().getStackTrace);
     val cond = genCond();
     if (conds.length >= 1) {
-      isEnable = backendName == "v"
+      isEnable = backend.isInstanceOf[VerilogBackend]
       enable = enable || cond;
     }
     updates.enqueue((cond, src));
@@ -122,4 +131,5 @@ class Reg extends Delay with proc {
     }
   }
   override def isMemOutput = updates.length == 1 && updates(0)._2.memSource != null
+  def memOf = updates(0)._2.memSource
 }

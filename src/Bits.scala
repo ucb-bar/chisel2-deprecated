@@ -18,7 +18,7 @@ object Bits {
   def apply(x: String): Bits = Lit(x){Bits()};
   def apply(x: String, width: Int): Bits = Lit(x, width){Bits()};
   
-  def apply(width: Int = -1, dir: IODirection = null): Bits = {
+  def apply(dir: IODirection = null, width: Int = -1): Bits = {
     val res = new Bits();
     res.dir = dir;
     if(width > 0)
@@ -27,10 +27,6 @@ object Bits {
       res.init("", widthOf(0))
     res
   }
-  
-  def apply(dir: IODirection): Bits = Bits(-1, dir) 
-  
-  def apply(): Bits = Bits(-1, null);
 }
 
 class Bits extends Data with proc {
@@ -232,6 +228,10 @@ class Bits extends Data with proc {
       inputs(0).maxNum
     else
       super.maxNum
+  }
+
+  override def forceMatchingWidths = {
+    if(inputs.length == 1 && inputs(0).width != width) inputs(0) = inputs(0).matchWidth(width)
   }
 
   def generateError(src: Bits) = {

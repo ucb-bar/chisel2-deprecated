@@ -379,7 +379,9 @@ class CppBackend extends Backend {
     harness.close();
   }
 
-  def gcc(c: Component, flags: String = "-O2"): Unit = {
+  override def compile(c: Component, flagsIn: String): Unit = {
+    val flags = if (flagsIn == null) "-O2" else flagsIn
+
     val chiselENV = java.lang.System.getenv("CHISEL")
     val allFlags = flags + " -I../ -I" + chiselENV + "/csrc/"
     val dir = targetDir + "/"
@@ -439,7 +441,7 @@ class CppBackend extends Backend {
     }
   }
 
-  override def compile(c: Component): Unit = {
+  override def elaborate(c: Component): Unit = {
     val vcd = new VcdBackend()
     val dot = new DotBackend()
     components.foreach(_.elaborate(0));
@@ -453,16 +455,16 @@ class CppBackend extends Backend {
     println("// COMPILING " + c + "(" + c.children.length + ")");
     topComponent = c;
     assignResets()
+    c.inferAll();
+    if(saveWidthWarnings)
+      widthWriter = new java.io.FileWriter(base_name + c.name + ".width.warnings")
+    c.forceMatchingWidths;
     c.removeTypeNodes()
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors)	err.printError;
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
       return
     }
-    c.inferAll();
-    if(saveWidthWarnings)
-      widthWriter = new java.io.FileWriter(base_name + c.name + ".width.warnings")
-    c.forceMatchingWidths;
     c.traceNodes();
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors)	err.printError;

@@ -264,6 +264,7 @@ static inline val_t log2_1 (val_t v) {
   return r;
 }
 
+#define ispow2(x) (((x) & ((x)-1)) == 0)
 static inline val_t nextpow2_1(val_t x) {
   x--;
   x |= x >> 1;
@@ -1456,28 +1457,26 @@ class mem_t {
     return get(idx.lo_word() & (nextpow2_1(d)-1));
   }
   dat_t<w> get (val_t idx) {
-    if (idx >= d)
+    if (!ispow2(d) && idx >= d)
       return dat_t<w>::rand();
     return contents[idx];
   }
   val_t get (val_t idx, int word) {
-    if (idx >= d)
+    if (!ispow2(d) && idx >= d)
       return rand_val() & (word == val_n_words(w) && val_n_word_bits(w) ? mask_val(w) : -1L);
     return contents[idx].values[word];
   }
   template <int iw>
-  dat_t<w> put (dat_t<iw> idx, dat_t<w> val) {
-    return put(idx.lo_word() & (nextpow2_1(d)-1), val);
+  void put (dat_t<iw> idx, dat_t<w> val) {
+    put(idx.lo_word(), val);
   }
-  dat_t<w> put (val_t idx, dat_t<w> val) {
-    if (idx < d)
+  void put (val_t idx, dat_t<w> val) {
+    if (ispow2(d) || idx <= d)
       contents[idx] = val;
-    return val;
   }
   val_t put (val_t idx, int word, val_t val) {
-    if (idx < d)
+    if (ispow2(d) || idx <= d)
       contents[idx].values[word] = val;
-    return val;
   }
   void print ( void ) {
     for (int j = 0; j < d/4; j++) {

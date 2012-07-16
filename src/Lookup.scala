@@ -5,7 +5,7 @@ import scala.collection.mutable.ArrayBuffer
 
 object Lookup {
   def apply[T <: Data](addr: Bits, default: T, mapping: Seq[(Bits, T)]): T = {
-    if (Component.backendName == "c")
+    if (Component.backend.isInstanceOf[CppBackend])
       return CListLookup(addr, List(default), mapping.map(m => (m._1, List(m._2))).toArray).head
     val lookup = new Lookup()
     val mappingNode = mapping.map(x => LookupMap(x))

@@ -16,7 +16,7 @@ object Fill {
       for (i <- 0 until n-1) 
         res = (res << w)|bits_lit.value;
       Lit(res, n * w){ Bits() };
-    } else if (backendName == "c" && mod.width != 1) {
+    } else if (backend.isInstanceOf[CppBackend] && mod.width != 1) {
       var out: Bits = null
       var i = 0
       var cur = mod

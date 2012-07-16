@@ -50,7 +50,7 @@ object Component {
   var isEmittingComponents = false;
   var isCompiling = false;
   var isTesting = false;
-  var backendName = "c";
+  var backend: Backend = null
   var topComponent: Component = null;
   val components = ArrayBuffer[Component]();
   val procs = ArrayBuffer[proc]();
@@ -126,7 +126,7 @@ object Component {
     isEmittingComponents = false;
     isCompiling = false;
     isTesting = false;
-    backendName = "c";
+    backend = new CppBackend
     topComponent = null;
 
     conds.clear()
@@ -520,33 +520,8 @@ abstract class Component(resetSignal: Bool = null) {
         }
     }
 
-
-    for(node <- nodesList) {
-
-      if(node.inputs.length == 1 && node.isInstanceOf[Bits]) {
-
-	if (node.width > node.inputs(0).width){
-
-	  if(node.inputs(0).isInstanceOf[Fix]){
-	    val topBit = NodeExtract(node.inputs(0), node.inputs(0).width-1); topBit.infer
-	    val fill = NodeFill(node.width - node.inputs(0).width, topBit); fill.infer
-	    val res = Concatenate(fill, node.inputs(0)); res.infer
-	    node.inputs(0) = res
-	  } else {
-	    val topBit = Literal(0,1)
-	    val fill = NodeFill(node.width - node.inputs(0).width, topBit); fill.infer
-	    val res = Concatenate(fill, node.inputs(0)); res.infer
-	    node.inputs(0) = res
-	  }
-
-	} else if (node.width < node.inputs(0).width) {
-	  val res = NodeExtract(node.inputs(0), node.width-1, 0); res.infer
-	  node.inputs(0) = res
-	}
-
-      }
-
-    }
+    for (node <- nodesList)
+      node.forceMatchingWidths
 
     println("finished width checking")
   }
@@ -756,7 +731,6 @@ abstract class Component(resetSignal: Bool = null) {
     }
   }
 
-
   def nameAllIO(): Unit = {
     io.name_it("");
     for (child <- children) 
@@ -899,6 +873,5 @@ abstract class Component(resetSignal: Bool = null) {
     nodes.filter(isInput)
   def removeInputs(nodes: Seq[Node]): Seq[Node] = 
     nodes.filter(n => !isInput(n))
-
 
 }

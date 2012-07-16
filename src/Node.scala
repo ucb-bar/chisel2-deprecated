@@ -63,7 +63,7 @@ object Node {
   }
   def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).getWidth - n.minNum.toInt }
 
-  var clk: Node = Bits(1, INPUT)
+  var clk: Node = Bits(INPUT, 1)
   clk.setName("clk")
 
   var stop = true;
@@ -96,6 +96,8 @@ abstract class Node extends nameable{
   var stack: Array[StackTraceElement] = null;
   var line: Array[StackTraceElement] = Thread.currentThread().getStackTrace
   var memSource: MemAccess = null
+  var isScanArg = false
+  var isPrintArg = false
   def isMemOutput = false
   
   def isByValue: Boolean = true;
@@ -195,7 +197,7 @@ abstract class Node extends nameable{
   def isInObject = 
     (isIo && (isIoDebug || component == topComponent)) || 
     (topComponent.debugs.contains(this) && named) || 
-    isReg || isUsedByRam || isDebug;
+    isReg || isUsedByRam || isDebug || isPrintArg || isScanArg;
   def isInVCD = (isIo && isInObject) || isReg || (isDebug && named);
   def dotName = { val name = this.getClass.getName; name.substring(7, name.size) };
 
@@ -307,6 +309,21 @@ abstract class Node extends nameable{
         i += 1;
       }
       comp.mods += this;
+    }
+  }
+
+  def forceMatchingWidths = { }
+
+  def matchWidth(w: Int): Node = {
+    if (w > this.width) {
+      val fill = NodeFill(w - this.width, Literal(0,1)); fill.infer
+      val res = Concatenate(fill, this); res.infer
+      res
+    } else if (w < this.width) {
+      val res = NodeExtract(this, w-1,0); res.infer
+      res
+    } else {
+      this
     }
   }
 
