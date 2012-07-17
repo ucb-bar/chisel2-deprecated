@@ -100,6 +100,8 @@ abstract class Node extends nameable{
   var isPrintArg = false
   def isMemOutput = false
   
+  nodes += this
+  
   def isByValue: Boolean = true;
   def width: Int = width_;
   def width_=(w: Int) = { isFixedWidth = true; width_ = width; inferWidth = fixWidth(w); }

@@ -56,6 +56,7 @@ object Component {
   val procs = ArrayBuffer[proc]();
   val resetList = ArrayBuffer[Node]();
   val muxes = ArrayBuffer[Node]();
+  val nodes = ArrayBuffer[Node]()
   var ioMap = new HashMap[Node, Int];
   var chiselOneHotMap = new HashMap[(UFix, Int), Bits]
   var chiselOneHotBitMap = new HashMap[(Bits, Int), Bool]

@@ -136,7 +136,7 @@ class MemWrite[T <: Data](mem: Mem[T], condi: Bool, addri: Bits, datai: T, wmask
     val rp = getProducts(r.cond)
     wp.find(wc => rp.exists(rc => isNegOf(rc, wc) || isNegOf(wc, rc)))
   }
-  def isPossibleRW(r: MemRead[T]) = Component.isInlineMem && mem.inferSeqRead && !emitRWEnable(r).isEmpty && !isRW
+  def isPossibleRW(r: MemRead[T]) = mem.inferSeqRead && !emitRWEnable(r).isEmpty && !isRW
   def isRW = pairedRead != null
   def setRW(r: MemRead[T]) = pairedRead = r
   def data = inputs(2)

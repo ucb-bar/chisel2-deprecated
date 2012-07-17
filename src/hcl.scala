@@ -106,7 +106,7 @@ object chiselMain {
           else if (args(i+1) == "fpga")
             backend = new FPGABackend
           else
-            assert(false)
+            backend = Class.forName(args(i+1)).newInstance.asInstanceOf[Backend]
           i += 1
         }
         case "--compile" => isCompiling = true
@@ -141,6 +141,7 @@ object chiselMain {
     if (ftester != null) {
       tester = ftester(c)
     }
+    backend.transform(c)
     backend.elaborate(c)
     if (isCompiling && isGenHarness) backend.compile(c)
     if (isTesting) tester.tests()

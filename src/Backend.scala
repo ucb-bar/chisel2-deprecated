@@ -2,6 +2,7 @@ package Chisel
 import Node._
 import Reg._
 import ChiselError._
+import Component._
 
 object Backend {
 }
@@ -41,6 +42,13 @@ abstract class Backend {
       case _ =>
         ""
     }
+  }
+
+  val transforms = collection.mutable.ArrayBuffer[(Component) => Unit]()
+
+  def transform(c: Component): Unit = {
+    for (t <- transforms)
+      t(c)
   }
 
   def emitDef(node: Node): String = ""
