@@ -554,6 +554,10 @@ class VerilogBackend extends Backend {
     c.genAllMuxes;
     components.foreach(_.postMarkNet(0));
     assignResets()
+    if(!ChiselErrors.isEmpty){
+      for(err <- ChiselErrors) err.printError;
+      throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
+    }
     c.inferAll();
     val base_name = ensure_dir(targetDir)
     if(saveWidthWarnings)

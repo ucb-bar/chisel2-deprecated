@@ -47,11 +47,41 @@ object Multiplex{
   }
 }
 
+object isLessThan {
+
+  def distFromData(x: java.lang.Class[ _ ]) = {
+    var xClass = x
+    var xCnt = 0
+    while(xClass.toString != "class Chisel.Data") {
+      xClass = xClass.getSuperclass
+      xCnt += 1
+    }
+    xCnt
+  }
+
+  def checkCommonSuperclass(x: java.lang.Class[ _ ], y: java.lang.Class[ _ ]) = {
+    
+  }
+
+  def apply(x: java.lang.Class[ _ ], y: java.lang.Class[ _ ]) = {
+    checkCommonSuperclass(x, y)
+    distFromData(x) > distFromData(y)
+  }
+}
 
 object Mux {
   def apply[T <: Data](t: Bits, c: T, a: T): T = {
     val res = Multiplex(t, c.toNode, a.toNode)
-    res.setTypeNodeNoAssign(c.fromNode(res).asInstanceOf[T])
+    if (c.isInstanceOf[Bits]) {
+      assert(a.isInstanceOf[Bits])
+      if (c.getClass == a.getClass)
+        res.setTypeNodeNoAssign(c.fromNode(res).asInstanceOf[T])
+      else {
+        res.setTypeNode(Bits(OUTPUT)).asInstanceOf[T]
+      }
+    } else {
+      res.setTypeNodeNoAssign(c.fromNode(res).asInstanceOf[T])
+    }
   }
 }
 class Mux extends Op {
