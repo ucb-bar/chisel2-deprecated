@@ -266,25 +266,6 @@ class VerilogBackend extends Backend {
         else
           ""
 
-      case m: MemWrite[_] =>
-        if (!m.used || !Component.isInlineMem)
-          return ""
-
-        val i = "i" + emitTmp(m)
-        if (m.isMasked)
-          "  generate\n" +
-          "    genvar " + i + ";\n" +
-          "    for (" + i + " = 0; " + i + " < " + m.mem.width + "; " + i + " = " + i + " + 1) begin: f" + emitTmp(m) + "\n" +
-          "      always @(posedge clk)\n" +
-          "        if (" + emitRef(m.cond) + " && " + emitRef(m.wmask) + "[" + i + "])\n" +
-          "          " + emitRef(m.mem) + "[" + emitRef(m.addr) + "][" + i + "] <= " + emitRef(m.data) + "[" + i + "];\n" +
-          "    end\n" +
-          "  endgenerate\n"
-        else
-          "  always @(posedge clk)\n" +
-          "    if (" + emitRef(m.cond) + ")\n" +
-          "      " + emitRef(m.mem) + "[" + emitRef(m.addr) + "] <= " + emitRef(m.data) + ";\n"
-
       case r: ROM[_] =>
         val inits = r.lits.zipWithIndex.map { case (lit, i) =>
           "    " + emitRef(r) + "[" + i + "] = " + emitRef(lit) + ";\n"
@@ -474,6 +455,21 @@ class VerilogBackend extends Backend {
           (if (reg.isReset) "reset ? " + emitRef(reg.resetVal) + " : " else "" ) + 
           emitRef(reg.updateVal) + ";\n"
         }
+
+      case m: MemWrite[_] =>
+        if (!m.used || !Component.isInlineMem)
+          return ""
+
+        val i = "i" + emitTmp(m)
+        if (m.isMasked)
+          (0 until m.mem.width).map(i =>
+            "    if (" + emitRef(m.cond) + " && " + emitRef(m.wmask) + "[" + i + "])\n" +
+            "      " + emitRef(m.mem) + "[" + emitRef(m.addr) + "][" + i + "] <= " + emitRef(m.data) + "[" + i + "];\n"
+          ).reduceLeft(_+_)
+        else
+          "    if (" + emitRef(m.cond) + ")\n" +
+          "      " + emitRef(m.mem) + "[" + emitRef(m.addr) + "] <= " + emitRef(m.data) + ";\n"
+
       case _ =>
         ""
     }
@@ -527,7 +523,7 @@ class VerilogBackend extends Backend {
     res.append(emitDecs(c));
     res.append("\n");
     res.append(emitDefs(c));
-    if (c.regs.size > 0) {
+    if (c.containsReg) {
       res.append("\n");
       res.append(emitRegs(c));
     }
