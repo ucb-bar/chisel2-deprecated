@@ -531,11 +531,7 @@ class VerilogBackend extends Backend {
     if(compDefs contains res){
       c.moduleName = compDefs(res);
     }else{
-      if(compDefs.values.toList contains c.name) {
-	c.moduleName = genCompName(c.name);
-      } else {
-	c.moduleName = c.name;
-      }
+      c.moduleName = genCompName(c.name);
       compDefs += (res -> c.moduleName);
       res.insert(0, "module " + c.moduleName + "(");
       out.append(res);

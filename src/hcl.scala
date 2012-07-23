@@ -96,6 +96,7 @@ object chiselMain {
         case "--folding" => isFolding = true; 
         case "--vcd" => isVCD = true;
         case "--v" => backend = new VerilogBackend
+        case "--moduleNamePrefix" => moduleNamePrefix = args(i+1); i += 1
         case "--inlineMem" => isInlineMem = true;
         case "--noInlineMem" => isInlineMem = false;
         case "--backend" => {

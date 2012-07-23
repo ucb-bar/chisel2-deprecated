@@ -36,6 +36,7 @@ object Component {
   var isFolding = true;
   var isGenHarness = false;
   var isReportDims = false;
+  var moduleNamePrefix = ""
   var scanFormat = "";
   var scanArgs: ArrayBuffer[Node] = null;
   var printFormat = "";
@@ -68,14 +69,14 @@ object Component {
   var printStackStruct = ArrayBuffer[(Int, Component)]();
   var firstComp = true;
   def genCompName(name: String): String = {
-    if (compIndices contains name) {
+    moduleNamePrefix + (if (compIndices contains name) {
       val count = (compIndices(name) + 1)
       compIndices += (name -> count)
       name + "_" + count
     } else {
-      compIndices += (name -> 1)
-      name + "_" + 1
-    }
+      compIndices += (name -> 0)
+      name
+    })
   }
   def nextCompIndex : Int = { compIndex = compIndex + 1; compIndex }
   def splitArg (s: String) = s.split(' ').toList;
@@ -100,6 +101,7 @@ object Component {
     isClockGatingUpdatesInline = false;
     isFolding = true;
     isReportDims = false;
+    moduleNamePrefix = ""
     scanFormat = "";
     scanArgs = new ArrayBuffer[Node]();
     printFormat = "";
