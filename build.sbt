@@ -6,8 +6,6 @@ name := "chisel"
 
 scalaVersion := "2.9.1"
 
-organization := "edu.berkeley.cs"
-
 publishMavenStyle := true
 
 publishArtifact in Test := false
