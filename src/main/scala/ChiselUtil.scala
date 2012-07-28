@@ -30,41 +30,18 @@ object LFSR16
   }
 }
 
-// http://aggregate.ee.engr.uky.edu/MAGIC/#Population%20Count%20%28Ones%20Count%29
-// http://bits.stephan-brumme.com/countBits.html
 object PopCount
 {
-  def apply(in: Bits) =
-  {
-    require(in.width <= 32)
-    val w = log2Up(in.width+1)
-    var x = in
-    if(in.width == 2) { 
-      x = x - ((x >> UFix(1)) & Bits("h_5555_5555"))
-    } else if(in.width <= 4) {
-      x = x - ((x >> UFix(1)) & Bits("h_5555_5555"))
-      x = (((x >> UFix(2)) & Bits("h_3333_3333")) + (x & Bits("h_3333_3333")))
-    } else if(in.width <= 8) {
-      x = x - ((x >> UFix(1)) & Bits("h_5555_5555"))
-      x = (((x >> UFix(2)) & Bits("h_3333_3333")) + (x & Bits("h_3333_3333")))
-      x = ((x >> UFix(4)) + x) 
-    } else {
-      // count bits of each 2-bit chunk
-      x = x - ((x >> UFix(1)) & Bits("h_5555_5555"))
-      // count bits of each 4-bit chunk
-      x = (((x >> UFix(2)) & Bits("h_3333_3333")) + (x & Bits("h_3333_3333")))
-      // count bits of each 8-bit chunk
-      x = ((x >> UFix(4)) + x) 
-      // mask junk in upper bits
-      x = x & Bits("h_0f0f_0f0f")
-      // add all four 8-bit chunks
-      x = x + (x >> UFix(8))
-      x = x + (x >> UFix(16))
-    }
-    x(w-1,0)
+  def apply(in: Seq[Bool]): UFix = {
+    if (in.size == 0)
+      UFix(0)
+    else if (in.size == 1)
+      in(0)
+    else
+      apply(in.slice(0, in.size/2)) + Cat(Bits(0), apply(in.slice(in.size/2, in.size)))
   }
+  def apply(in: Bits): UFix = apply((0 until in.getWidth).map(in(_).toBool))
 }
-
 
 object Reverse
 {
