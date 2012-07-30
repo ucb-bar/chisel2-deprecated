@@ -248,14 +248,14 @@ class VerilogBackend extends Backend {
         val portdefs = usedports.zipWithIndex.map { case (p, i) => emitPortDef(p, i) }
 
         Component.configStr +=
-          "name " + getPathName(m) +
+          "name " + moduleNamePrefix+getPathName(m) +
           " depth " + m.n +
           " width " + m.width +
           " ports " + usedports.map(_.getPortType).reduceLeft(_ + "," + _) +
           "\n"
 
         val clkrst = Array("    .CLK(clk)", "    .RST(reset)")
-        "  " + getPathName(m) + " " + emitRef(m) + " (\n" +
+        "  " + moduleNamePrefix+getPathName(m) + " " + emitRef(m) + " (\n" +
         (clkrst ++ portdefs).reduceLeft(_ + ",\n" + _) + "\n" +
         "  );\n"
 
