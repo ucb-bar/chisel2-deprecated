@@ -567,7 +567,7 @@ class VerilogBackend extends Backend {
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
     }
     if(!dontFindCombLoop) c.findCombLoop();
-    val out = new java.io.FileWriter(base_name + c.name + ".v");
+    val out = new java.io.FileWriter(base_name + moduleNamePrefix + c.name + ".v");
     if(saveConnectionWarnings)
       connWriter = new java.io.FileWriter(base_name + c.name + ".connection.warnings")
     doCompile(c, out, 0);
@@ -581,7 +581,7 @@ class VerilogBackend extends Backend {
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
     }
     if (configStr.length > 0) {
-      val out_conf = new java.io.FileWriter(base_name+Component.topComponent.name+".conf");
+      val out_conf = new java.io.FileWriter(base_name+moduleNamePrefix+Component.topComponent.name+".conf");
       out_conf.write(configStr);
       out_conf.close();
     }
