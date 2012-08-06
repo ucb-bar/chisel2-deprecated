@@ -20,6 +20,7 @@ import Bundle._
 import ChiselError._
 
 object Component {
+  var previousImul: StringBuilder = null
   var saveWidthWarnings = false
   var saveConnectionWarnings = false
   var saveComponentTrace = false
@@ -264,6 +265,7 @@ abstract class Component(resetSignal: Bool = null) {
   val blackboxes = ArrayBuffer[BlackBox]();
   val debugs = HashSet[Node]();
   
+  val nodes = new HashSet[Node]()
   val mods  = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
   // val gmods = new ArrayBuffer[Node];

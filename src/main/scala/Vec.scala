@@ -228,6 +228,14 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
     res.toArray
   }
 
+  // override def getWidth(): Int = {
+  //   var w = 0
+  //   for ((name, io) <- this.flatten)
+  //     w += io.getWidth
+  //   println(w)
+  //   w
+  // }
+
   override def <>(src: Node) = {
     src match {
       case other: Vec[T] => {

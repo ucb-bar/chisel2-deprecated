@@ -465,6 +465,8 @@ class CppBackend extends Backend {
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
       return
     }
+    resolveNodesComponent(c)
+    transform(c, postResolvedTransforms)
     c.traceNodes();
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors)	err.printError;

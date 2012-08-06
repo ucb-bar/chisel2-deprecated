@@ -142,7 +142,7 @@ object chiselMain {
     if (ftester != null) {
       tester = ftester(c)
     }
-    backend.transform(c)
+    backend.transform(c, backend.transforms)
     backend.elaborate(c)
     if (isCompiling && isGenHarness) backend.compile(c)
     if (isTesting) tester.tests()

@@ -76,6 +76,7 @@ abstract class Node extends nameable{
   var walked = false;
   var staticComp: Component = getComponent();
   var component: Component = null;
+  var resolvedComp: Component = null
   var flattened = false;
   var isTypeNode = false;
   var depth = 0;
