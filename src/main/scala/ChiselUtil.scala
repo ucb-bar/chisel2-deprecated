@@ -124,6 +124,7 @@ class PipeIO[+T <: Data]()(data: => T) extends Bundle
 {
   val valid = Bool(OUTPUT)
   val bits = data.asOutput
+  def fire(dummy: Int = 0) = valid
   override def clone =
     try {
       super.clone()
@@ -139,6 +140,7 @@ class FIFOIO[T <: Data]()(data: => T) extends Bundle
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
   val bits  = data.asOutput
+  def fire(dummy: Int = 0) = ready && valid
   override def clone =
     try {
       super.clone()
