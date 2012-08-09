@@ -285,6 +285,7 @@ class Bits extends Data with proc {
   def unary_~(): Bits = UnaryOp(this, "~"){Bits()};
   def andR(): Bool    = ReductionOp(this, "&"){Bits()};
   def orR():  Bool    = ReductionOp(this, "|"){Bits()};
+  def xorR():  Bool   = ReductionOp(this, "^"){Bits()};
   def ===(b: Bits): Bool = LogicalOp(this, b, "==="){Bits()};
   def != (b: Bits): Bool = LogicalOp(this, b, "!="){Bits()};
   def << (b: UFix): Bits = BinaryOp(this, b.toBits, "<<"){Bits()};
