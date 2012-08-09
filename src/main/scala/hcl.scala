@@ -72,6 +72,18 @@ object Printer {
     new TestIO(format, args.toList);
 }
 
+object withFame1 {
+  def apply()(f: => Component) = {
+    val x = isFame1; 
+    isFame1 = true; 
+    val c = f; 
+    c.io.elements
+    c.io.elementsCache += (("is_fire", c.isFire))
+    isFame1 = x; 
+    c
+  }
+}
+ 
 object chiselMain {
   def readArgs(args: Array[String]) = {
     var i = 0;
@@ -169,7 +181,11 @@ object chiselMainTest {
 trait proc extends Node {
   var isDefaultNeeded = true;
   var updates = new Queue[(Bool, Node)];
-  def genCond() = conds.top;
+  def genCond() = conds.top
+  def genDelayCond() = {
+    val c = conds.top
+    if (isFame1) fame1fire && c else c;
+  }
   def genMuxes(default: Node) = {
     if (updates.length == 0) {
       if (inputs.length == 0 || inputs(0) == null){

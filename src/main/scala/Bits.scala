@@ -128,7 +128,7 @@ class Bits extends Data with proc {
 	  else if(this.staticComp.parent == other.staticComp) //child <> parent
 	    this assign other
 	  else
-	    ChiselErrors += ChiselError({"Can't connect Input " + this + " Input " + other}, Thread.currentThread().getStackTrace)
+	    ChiselErrors += ChiselError({"1 Can't connect Input " + this + " Input " + other}, Thread.currentThread().getStackTrace)
 	} else { // io <> wire
           if(this.staticComp == other.staticComp) //internal wire
             other assign this
@@ -166,7 +166,7 @@ class Bits extends Data with proc {
 	    } else if (other.isTypeNode){ // output <> type
 	      this assign other;
 	    } else {
-	      ChiselErrors += ChiselError({"Connecting Output " + this + " to Output " + other}, Thread.currentThread().getStackTrace)
+	      ChiselErrors += ChiselError({"2 Connecting Output " + this + " to Output " + other}, Thread.currentThread().getStackTrace)
             }
 	  } else { // io <> wire
             if(this.staticComp == other.staticComp) //output <> wire

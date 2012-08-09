@@ -123,7 +123,7 @@ object Literal {
     var res = BigInt(0);
     for(c <- x)
       if(c != '_'){
-	if(!(hexNibbles + "?").contains(c.toLowerCase)) ChiselErrors += ChiselError({"Literal: " + x + " contains illegal character: " + c}, Thread.currentThread().getStackTrace);
+	if(!(hexNibbles + "?").contains(c.toLower)) ChiselErrors += ChiselError({"Literal: " + x + " contains illegal character: " + c}, Thread.currentThread().getStackTrace);
 	res = res * shamt + c.asDigit;
       }
     res
