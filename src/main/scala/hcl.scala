@@ -73,12 +73,20 @@ object Printer {
 }
 
 object withFame1 {
+  def fireChildren(isTop: Boolean, c: Component): Unit = {
+    println("ADDING IS-FIRE\n")
+    if (!isTop)
+      c.isFire := c.parent.isFire
+    c.io.elements
+    c.io.elementsCache += (("is_fire", c.isFire))
+    for (e <- c.children)
+      fireChildren(false, e)
+  }
   def apply()(f: => Component) = {
     val x = isFame1; 
     isFame1 = true; 
     val c = f; 
-    c.io.elements
-    c.io.elementsCache += (("is_fire", c.isFire))
+    fireChildren(true, c)
     isFame1 = x; 
     c
   }
