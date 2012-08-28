@@ -13,7 +13,8 @@ object BuildSettings
       organization := buildOrganization,
       version      := buildVersion,
       scalaVersion := buildScalaVersion,
-      scalaSource in Compile := Path.absolute(file(projectdir + "/src"))
+      scalaSource in Compile := Path.absolute(file(projectdir + "/src/main/scala")),
+      resourceDirectory in Compile := Path.absolute(file(projectdir + "/src/main/resources/"))
     )
   }
 }
