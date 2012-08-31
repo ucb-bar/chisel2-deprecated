@@ -452,6 +452,14 @@ class CppBackend extends Backend {
     val base_name = ensure_dir(targetDir)
     val out_h = new java.io.FileWriter(base_name + c.name + ".h");
     val out_c = new java.io.FileWriter(base_name + c.name + ".cpp");
+    if(resourceStream != null) {
+      val classFile = new java.io.FileWriter(base_name + "emulator.h")
+      while(resourceStream.available > 0) {
+        classFile.write(resourceStream.read())
+      }
+      classFile.close()
+      resourceStream.close()
+    }
     println("// COMPILING " + c + "(" + c.children.length + ")");
     topComponent = c;
     assignResets()

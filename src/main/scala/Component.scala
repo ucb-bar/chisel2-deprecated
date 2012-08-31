@@ -20,6 +20,7 @@ import Bundle._
 import ChiselError._
 
 object Component {
+  var resourceStream = getClass().getResourceAsStream("/emulator.h")
   var saveWidthWarnings = false
   var saveConnectionWarnings = false
   var saveComponentTrace = false
