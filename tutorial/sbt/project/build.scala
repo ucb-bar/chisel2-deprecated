@@ -14,7 +14,9 @@ object BuildSettings
       version      := buildVersion,
       scalaVersion := buildScalaVersion,
       scalaSource in Compile := Path.absolute(file(projectdir + "/src/main/scala")),
-      resourceDirectory in Compile := Path.absolute(file(projectdir + "/src/main/resources/"))
+      resourceDirectory in Compile := Path.absolute(file(projectdir + "/src/main/resources/")),
+      resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
+      libraryDependencies += "edu.berkeley.cs" %% "chisel" % "1.0"
     )
   }
 }
@@ -23,6 +25,5 @@ object ChiselBuild extends Build
 {
   import BuildSettings._
 
-  lazy val chisel = Project("chisel", file("chisel"), settings = BuildSettings(java.lang.System.getenv("CHISEL")))
-  lazy val tutorial = Project("tutorial", file("tutorial"), settings = BuildSettings("..")) dependsOn(chisel)
+  lazy val tutorial = Project("tutorial", file("tutorial"), settings = BuildSettings(".."))
 }
