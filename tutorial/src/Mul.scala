@@ -39,3 +39,4 @@ class MulTests(c: Mul) extends Tester(c, Array(c.io)) {
     allGood
   }
 }
+

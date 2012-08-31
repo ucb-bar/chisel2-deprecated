@@ -542,9 +542,9 @@ abstract class Component(resetSignal: Bool = null) {
       roots += b.io;
     for (m <- mods) {
       m match {
-        case io: Bits          => if (io.dir == OUTPUT) { if (io.consumers.length == 0) roots += m; }
-        case d: Delay        => roots += m;
-        case any             =>
+        case io: Bits => if (io.dir == OUTPUT) { if (io.consumers.length == 0) roots += m; }
+        case d: Delay => roots += m;
+        case any      =>
       }
     }
     roots

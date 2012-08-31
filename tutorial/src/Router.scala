@@ -20,11 +20,11 @@ class Packet extends Bundle {
 
 class RouterIO(n: Int) extends Bundle {
   override def clone = new RouterIO(n).asInstanceOf[this.type]
-  val reads   = (new DeqIO()){ new ReadCmd() }
-  val replies = (new EnqIO()){ UFix(width = 8) }
-  val writes  = (new DeqIO()){ new WriteCmd() }
-  val in      = (new DeqIO()){ new Packet() }
-  val outs    = Vec(n){ (new EnqIO()){ new Packet() } }
+  val reads   = new DeqIO(){ new ReadCmd() }
+  val replies = new EnqIO(){ UFix(width = 8) }
+  val writes  = new DeqIO(){ new WriteCmd() }
+  val in      = new DeqIO(){ new Packet() }
+  val outs    = Vec(n){ new EnqIO(){ new Packet() } }
 }
 
 class Router extends Component {
