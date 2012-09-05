@@ -72,7 +72,7 @@ class Fix extends Num {
 
   override def andR(): Bool    = ReductionOp(this, "&"){Fix()};
   override def orR():  Bool    = ReductionOp(this, "|"){Fix()};
-  def xorR(): Bool   = ReductionOp(this, "^"){Fix()};
+  override def xorR(): Bool   = ReductionOp(this, "^"){Fix()};
   override def unary_-(): Fix = UnaryOp(this, "-"){Fix()};
   override def unary_~(): Fix = UnaryOp(this, "~"){Fix()};
   def unary_!(): Fix = UnaryOp(this, "!"){Fix()};

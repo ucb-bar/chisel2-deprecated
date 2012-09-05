@@ -54,6 +54,7 @@ class UFix extends Num {
   override def unary_~(): UFix = UnaryOp(this, "~"){UFix()};
   override def andR(): Bool    = ReductionOp(this, "&"){UFix()};
   override def orR():  Bool    = ReductionOp(this, "|"){UFix()};
+  override def xorR():  Bool   = ReductionOp(this, "^"){Bits()};
   override def << (b: UFix): UFix = BinaryOp(this, b, "<<"){UFix()};
   override def >> (b: UFix): UFix = BinaryOp(this, b, ">>"){UFix()};
   def +  (b: UFix): UFix = BinaryOp(this, b, "+"){UFix()};

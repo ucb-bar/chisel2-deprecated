@@ -17,6 +17,11 @@ abstract class Data extends Node {
   def asOutput(): this.type = this;
   def toNode: Node = this;
   def fromNode(n: Node): this.type = this;
+  def fromBits(b: Bits): this.type = {
+    val n = fromNode(b)
+    n.setIsTypeNode
+    n
+  }
   def :=[T <: Data](data: T) = {
     if(this.getClass != data.getClass) println("Mismatched types: " + this.getClass + " " + data.getClass);
     comp procAssign data.toNode;
