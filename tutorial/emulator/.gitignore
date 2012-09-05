@@ -2,5 +2,5 @@
 *.o
 *.cpp
 *.h
-!emulator.h
+emulator.h
 *.out

@@ -26,4 +26,5 @@ object ChiselBuild extends Build
   import BuildSettings._
 
   lazy val tutorial = Project("tutorial", file("tutorial"), settings = BuildSettings(".."))
+  lazy val answers = Project("answers", file("answers"), settings = BuildSettings("../answers"))
 }
