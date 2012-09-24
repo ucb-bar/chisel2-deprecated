@@ -25,7 +25,7 @@ object Lit {
   }
 
   def apply(value: Boolean): Bool = 
-    makeBool((if(value) Literal(1) else Literal(0)))
+    makeBool((if(value) Literal(1,1) else Literal(0,1)))
 
   def makeLit[T <: Bits](x: Literal)(gen: => T): T = 
     x.setTypeNode(gen.asOutput)
@@ -177,6 +177,7 @@ object Literal {
     if(xWidth > width && width != -1)
       ChiselErrors += ChiselError({"width " + width + " is too small for literal " + x + ". Smallest allowed width is " + xWidth}, Thread.currentThread().getStackTrace);
     res.init("0x" + xString, w);
+    res.hasInferredWidth = width == -1
     res.inputVal = x;
     res 
   }
@@ -202,6 +203,7 @@ object Literal {
 }
 class Literal extends Node {
   //implicit def intToLit (x: Int) = Lit(x);
+  var hasInferredWidth = false
   var isZ = false;
   var isBinary = false;
   var base = 'x';

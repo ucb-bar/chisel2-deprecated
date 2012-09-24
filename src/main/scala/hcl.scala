@@ -82,6 +82,7 @@ object chiselMain {
           saveWidthWarnings = true
           saveConnectionWarnings = true
           saveComponentTrace = true
+          isCheckingPorts = true
         }
         case "--Wwidth" => saveWidthWarnings = true
         case "--Wconnection" => saveConnectionWarnings = true
@@ -114,6 +115,7 @@ object chiselMain {
         case "--test" => isTesting = true;
         case "--targetDir" => targetDir = args(i+1); i += 1;
         case "--include" => includeArgs = splitArg(args(i+1)); i += 1;
+        case "--checkPorts" => isCheckingPorts = true
         case any => println("UNKNOWN CONSOLE ARG");
       }
       i += 1;
@@ -142,8 +144,8 @@ object chiselMain {
     if (ftester != null) {
       tester = ftester(c)
     }
-    backend.transform(c, backend.transforms)
     backend.elaborate(c)
+    if (isCheckingPorts) backend.checkPorts
     if (isCompiling && isGenHarness) backend.compile(c)
     if (isTesting) tester.tests()
     c

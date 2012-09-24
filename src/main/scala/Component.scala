@@ -51,6 +51,7 @@ object Component {
   val compDefs = new HashMap[StringBuilder, String];
   var isEmittingComponents = false;
   var isCompiling = false;
+  var isCheckingPorts = false
   var isTesting = false;
   var backend: Backend = null
   var topComponent: Component = null;
@@ -129,6 +130,7 @@ object Component {
     ioCount = 0;
     isEmittingComponents = false;
     isCompiling = false;
+    isCheckingPorts = false
     isTesting = false;
     backend = new CppBackend
     topComponent = null;
@@ -320,6 +322,7 @@ abstract class Component(resetSignal: Bool = null) {
     val wires = io.flatten;
     for ((n, w) <- wires) {
       // println(">>> " + w + " IN " + this);
+      scala.Predef.assert(this == w.staticComp, {println("Statically resolved component differs from dynamically resolved component of IO: " + w + " crashing compiler")})
       w.component = this;
     }
   }
@@ -425,6 +428,17 @@ abstract class Component(resetSignal: Bool = null) {
     val walked = new HashSet[Node]
     val bfsQueue = initializeBFS
 
+    def verify = {
+      var hasError = false
+      for (elm <- nodesList) {
+        if (elm.infer || elm.width == -1) {
+          println("Error: Could not infer the width on: " + elm)
+          hasError = true
+        }
+      }
+      if (hasError) throw new Exception("Could not elaborate code due to uninferred width(s)")
+    }
+
     // conduct bfs to find all reachable nodes
     while(!bfsQueue.isEmpty){
       val top = bfsQueue.dequeue
@@ -453,16 +467,13 @@ abstract class Component(resetSignal: Bool = null) {
       count += 1
 
       if(done){
-  	for(elm <- nodesList)
-  	  if (elm.infer || elm.width == -1) println("Error");
+        verify
   	println(count)
         println("finished inference")
   	return;
       }
     }
-    for(elm <- nodesList)
-      if (elm.infer || elm.width == -1) println("Error");
-
+    verify
     println(count)
     println("finished inference")
   }
@@ -861,7 +872,7 @@ abstract class Component(resetSignal: Bool = null) {
         containsCombPath = true
         println("FOUND COMBINATIONAL PATH!")
         for((node, ind) <- nodelist zip nodelist.indices) {
-          val ste = findFirstUserLine(node.line)
+          val ste = node.line
           println("  (" + ind +  ") on line " + ste.getLineNumber + 
                                   " in class " + ste.getClassName +
                                   " in file " + ste.getFileName + 

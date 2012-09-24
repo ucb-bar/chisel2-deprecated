@@ -206,8 +206,6 @@ class Bits extends Data with proc {
     }
   }
 
-  override def setIsTypeNode = isTypeNode = true;
-
   override def setIsClkInput = {isClkInput = true; this assign clk;}
 
   override def clone = {

@@ -562,8 +562,8 @@ class VerilogBackend extends Backend {
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
     }
     nameChildren(topComponent)
-    resolveNodesComponent(c)
-    transform(c, postResolvedTransforms)
+    collectNodesIntoComp(c)
+    transform(c, transforms)
     c.traceNodes();
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors) err.printError;

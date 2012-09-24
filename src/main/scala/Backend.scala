@@ -48,10 +48,9 @@ abstract class Backend {
   }
 
   val transforms = ArrayBuffer[(Component) => Unit]()
-  val postResolvedTransforms = ArrayBuffer[(Component) => Unit]()
 
-  // DFS walk of graph to collect members of every component
-  def resolveNodesComponent(c: Component) = {
+  // DFS walk of graph to collect nodes of every component
+  def collectNodesIntoComp(c: Component) = {
     val dfsStack = new Stack[(Node, Component)]()
     val walked = new HashSet[Node]()
 
@@ -81,7 +80,7 @@ abstract class Backend {
           for (input <- node.inputs) {
             if(!walked.contains(input)) {
               nextComp.nodes += input
-              input.resolvedComp = nextComp
+              if(input.component == null) input.component = nextComp
               dfsStack.push((input, nextComp))
             }
           }
@@ -97,7 +96,7 @@ abstract class Backend {
       assert(io.isInstanceOf[Bits])
       if(io.asInstanceOf[Bits].dir == OUTPUT) {
         c.nodes += io
-        io.resolvedComp = c
+        io.component = c
         dfsStack.push((io, c))
       }
     }
@@ -118,6 +117,28 @@ abstract class Backend {
   def elaborate(c: Component): Unit = { }
 
   def compile(c: Component, flags: String = null): Unit = { }
+
+  def checkPorts = {
+
+    def prettyPrint(n: Node, c: Component) = {
+      val dir = if (n.asInstanceOf[Bits].dir == INPUT) "Input" else "Output"
+      val portName = n.name
+      val compName = c.name
+      val compInstName = c.instanceName
+      println("Warning: " + dir + " port " + portName + " is unconnected in module " + 
+              compInstName + " " + compName)
+    }
+
+    for (c <- components) {
+      for ((n,i) <- c.io.flatten) {
+        if (i.inputs.length == 0) {
+          prettyPrint(i, c)
+        }
+      }
+    }
+
+  }
+
 }
 
 

@@ -1,5 +1,6 @@
 package Chisel
 
+import Node._
 import ChiselError._
 
 abstract class Data extends Node {
@@ -8,7 +9,7 @@ abstract class Data extends Node {
   def toUFix(): UFix = chiselCast(this){UFix()};
   def toBits(): Bits = chiselCast(this){Bits()};
   def toBool(): Bool = chiselCast(this){Bool()};
-  def setIsTypeNode = isTypeNode = true;
+  def setIsTypeNode = {isTypeNode = true; inferWidth = widthOf(0)}
   def apply(name: String): Data = null
   def flatten = Array[(String, Bits)]();
   def terminate(): Unit = { }

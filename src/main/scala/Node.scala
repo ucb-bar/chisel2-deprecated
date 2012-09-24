@@ -26,42 +26,51 @@ object Node {
   var conds = new Stack[Bool]();
   conds.push(Bool(true));
   var keys  = new Stack[Bits]();
+
+  var isInGetWidth = false
+
   def fixWidth(w: Int) = { (m: Node) => {m.isFixedWidth = true; w} };
+
   def widthOf(i: Int) = { (m: Node) => { 
     try { 
-      m.inputs(i).getWidth 
+      m.inputs(i).width
     } catch { 
         case e: java.lang.IndexOutOfBoundsException => {
           val error = ChiselError({m + " in " + m.component + " is unconnected. Ensure that is assigned."}, m)
-          if (!ChiselErrors.contains(error))
+          if (!ChiselErrors.contains(error) && !isInGetWidth)
             ChiselErrors += error
           -1
         }
     }}}
+
   def maxWidth(m: Node): Int = {
     var res = 0;
     for (i <- m.inputs)
       if(!(i == null) && !(i == m)){
-	res = max(res, i.getWidth);
+	res = max(res, i.width);
       }
     res
   }
+
   def maxWidthPlusOne(m: Node): Int = maxWidth(m) + 1;
+
   def sumWidth(m: Node): Int = {
     var res = 0;
     for (i <- m.inputs)
-      res = res + i.getWidth;
+      res = res + i.width;
     res
   }
+
   def lshWidthOf(i: Int, n: Node) = { 
     (m: Node) => {
-      val mwidth = m.inputs(i).getWidth;
+      val mwidth = m.inputs(i).width;
       val nMax = n.maxNum;
-      val res = m.inputs(i).getWidth + n.maxNum.toInt;
+      val res = m.inputs(i).width + n.maxNum.toInt;
       res
     } 
   }
-  def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).getWidth - n.minNum.toInt }
+
+  def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).width - n.minNum.toInt }
 
   var clk: Node = Bits(INPUT, 1)
   clk.setName("clk")
@@ -76,7 +85,6 @@ abstract class Node extends nameable{
   var walked = false;
   var staticComp: Component = getComponent();
   var component: Component = null;
-  var resolvedComp: Component = null
   var flattened = false;
   var isTypeNode = false;
   var depth = 0;
@@ -95,7 +103,7 @@ abstract class Node extends nameable{
   var inferCount = 0;
   var genError = false;
   var stack: Array[StackTraceElement] = null;
-  var line: Array[StackTraceElement] = Thread.currentThread().getStackTrace
+  var line: StackTraceElement = findFirstUserLine(Thread.currentThread().getStackTrace)
   var memSource: MemAccess = null
   var isScanArg = false
   var isPrintArg = false
@@ -104,7 +112,7 @@ abstract class Node extends nameable{
   nodes += this
   
   def isByValue: Boolean = true;
-  def width: Int = width_;
+  def width: Int = if(isInGetWidth) inferWidth(this) else width_;
   def width_=(w: Int) = { isFixedWidth = true; width_ = width; inferWidth = fixWidth(w); }
   def name_it (path: String, setNamed: Boolean = true) = { name = path; named = setNamed}
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
@@ -348,17 +356,10 @@ abstract class Node extends nameable{
   var isWidthWalked = false;
 
   def getWidth(): Int = {
-    if(width > 0)
-      width
-    else if(isTypeNode) {
-      if(inputs.length == 0) -1 else inputs(0).getWidth
-    } else if(isInstanceOf[Reg] && !isWidthWalked){
-      isWidthWalked = true;
-      inferWidth(this)
-    }else if(inputs.length >= 1 && !isInstanceOf[Reg])
-      inferWidth(this)
-    else
-      -1
+    isInGetWidth = true
+    val w = width
+    isInGetWidth = false
+    return w
   }
   
   def setTypeNodeNoAssign[T <: Data](typeNode: T): T = {
