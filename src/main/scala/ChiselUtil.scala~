@@ -151,11 +151,6 @@ class FIFOIO[T <: Data]()(data: => T) extends Bundle
     }
 }
 
-class REGIO[T <: Data]()(data: => T) extends Bundle
-{
-	val bits = data.asOutput
-}
-
 class EnqIO[T <: Data]()(data: => T) extends FIFOIO()(data) 
 {
   def enq(dat: T): T = { valid := Bool(true); bits := dat; dat }
