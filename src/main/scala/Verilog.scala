@@ -533,7 +533,8 @@ class VerilogBackend extends Backend {
     }else{
       c.moduleName = genCompName(c.name);
       compDefs += (res -> c.moduleName);
-      res.insert(0, "module " + c.moduleName + "(");
+      //res.insert(0, "module " + c.moduleName + "(");
+      out.append("module " + c.moduleName + "(")
       out.append(res);
     }
   }
@@ -561,6 +562,8 @@ class VerilogBackend extends Backend {
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
     }
     nameChildren(topComponent)
+    collectNodesIntoComp(c)
+    transform(c, transforms)
     c.traceNodes();
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors) err.printError;

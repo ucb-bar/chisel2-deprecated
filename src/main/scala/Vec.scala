@@ -5,6 +5,7 @@ import scala.collection.mutable.HashMap
 import scala.collection.mutable.BufferProxy
 import scala.math._
 import Vec._
+import Node._
 
 object VecUFixToOH
 {
@@ -84,19 +85,16 @@ object Vec {
       res    += t;
       t.name += i;
     }
-    res.eltWidth = res(0).getWidth
     res
   }
 
   def apply[T <: Data](elts: Seq[T])(gen: => T): Vec[T] = {
     if (elts.forall(_.litOf != null)) {
       val res = new ROM(elts.map(_.litOf), () => gen)
-      res.eltWidth = gen.getWidth
       res
     } else {
       val res = new Vec[T](() => gen)
       elts.foreach(res += _)
-      res.eltWidth = gen.getWidth
       res
     }
   }
@@ -138,7 +136,6 @@ class VecProc extends proc {
 }
 
 class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferProxy[T] { 
-  var eltWidth = 0
   val self = new ArrayBuffer[T]
   val readPortCache = new HashMap[UFix, T]
   var sortedElementsCache: ArrayBuffer[ArrayBuffer[Bits]] = null
@@ -227,6 +224,14 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
       }
     res.toArray
   }
+
+  // override def getWidth(): Int = {
+  //   var w = 0
+  //   for ((name, io) <- this.flatten)
+  //     w += io.getWidth
+  //   println(w)
+  //   w
+  // }
 
   override def <>(src: Node) = {
     src match {

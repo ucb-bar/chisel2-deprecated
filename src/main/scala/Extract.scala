@@ -101,6 +101,12 @@ class Extract extends Node {
       "BITS(" + inputs(0) + ", " + hi + ", " + lo + ")";
   def validateIndex(x: Node) = {
     val lit = x.litOf
-    assert(lit == null || lit.value >= 0 && lit.value < inputs(0).getWidth)
+    assert(lit == null || lit.value >= 0 && lit.value < inputs(0).width, 
+           {println("Invalid Extract of " + inputs(0) + 
+                    " on line " + line.getLineNumber +
+                    " in class " + line.getClassName + 
+                    " in file " + line.getFileName)
+          }
+         )
   }
 }

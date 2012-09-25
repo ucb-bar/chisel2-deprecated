@@ -12,10 +12,10 @@ object ChiselError {
     new ChiselError(() => mf, n.line)
 
   def apply(m: String, stack: Array[StackTraceElement]): ChiselError =
-    new ChiselError(() => m, stack)
+    new ChiselError(() => m, findFirstUserLine(stack))
 
   def apply(mf: => String, stack: Array[StackTraceElement]): ChiselError =
-    new ChiselError(() => mf, stack)
+    new ChiselError(() => mf, findFirstUserLine(stack))
 
   def findFirstUserLine(stack: Array[StackTraceElement]): StackTraceElement = {
     for(i <- 1 until stack.length) {
@@ -44,11 +44,10 @@ object ChiselError {
   }
 }
 
-class ChiselError(val msgFun: () => String, val stack: Array[StackTraceElement]) {
+class ChiselError(val msgFun: () => String, val line: StackTraceElement) {
   def printError = {
-    val ste = findFirstUserLine(stack)
-    println(msgFun() + " on line " + ste.getLineNumber + 
-            " in class " + ste.getClassName + 
-            " in file " + ste.getFileName)
+    println(msgFun() + " on line " + line.getLineNumber + 
+            " in class " + line.getClassName + 
+            " in file " + line.getFileName)
   }
 }

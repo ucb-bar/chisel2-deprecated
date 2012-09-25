@@ -5,12 +5,30 @@ import Component._
 import ChiselError._
 
 object Reg {
+
+  def regMaxWidth(m: Node) =
+    if (isInGetWidth)
+      throw new Exception("getWidth was called on a Register or on an object connected in some way to a Register that has a statically uninferrable width")
+    else
+      maxWidth(m)
+
+  // Rule: If no width is specified, use max width. Otherwise, use the specified width.
   def regWidth(w: Int) = {
     if(w <= 0)
-      maxWidth _;
+      regMaxWidth _ ;
     else 
       fixWidth(w)
   }
+
+  // Rule: if r is using an inferred width, then don't enforce a width. If it is using a user inferred
+  // width, set the the width
+  def regWidth(r: Node) = {
+    if (r.litOf.hasInferredWidth)
+      regMaxWidth _
+    else
+      fixWidth(r.getWidth)
+  }
+
   val noInit = Lit(0){Fix()};
   def apply[T <: Data](data: T, width: Int, resetVal: T)(gen: => T): T = {
 
@@ -29,14 +47,13 @@ object Reg {
         data.flatten
 
     val res = gen.asOutput
-    res.setIsTypeNode
 
     if(resetVal != null) {
       for((((res_n, res_i), (data_n, data_i)), (rval_n, rval_i)) <- res.flatten zip d zip resetVal.flatten) {
-        val w = rval_i.getWidth
-        assert(w > 0, {println("Negative width to wire " + res_i)})
+
+        assert(rval_i.getWidth > 0, {println("Negative width to wire " + res_i)})
         val reg = new Reg()
-        reg.init("", regWidth(w), data_i, rval_i)
+        reg.init("", regWidth(rval_i), data_i, rval_i)
 
         // make output
         reg.isReset = true
@@ -55,6 +72,7 @@ object Reg {
       }
     }
 
+    res.setIsTypeNode
     res
   }
 
