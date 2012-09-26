@@ -368,7 +368,7 @@ abstract class Component(resetSignal: Bool = null) {
   def assert(cond: Bool, message: String) = 
     asserts += Assert(cond, message);
   def debug(x: Node) = 
-    debugs += x;
+    debugs += x.getNode
   def <>(src: Component) = io <> src.io;
   def apply(name: String): Data = io(name);
   // COMPILATION OF REFERENCE
