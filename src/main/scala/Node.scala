@@ -1,7 +1,5 @@
 package Chisel
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.Queue
-import scala.collection.mutable.Queue._
 import scala.collection.mutable.Stack
 
 import scala.math.max;

@@ -1,7 +1,7 @@
 package Chisel
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
-import scala.collection.mutable.Queue
+import scala.collection.mutable.{Queue=>ScalaQueue}
 import Component._
 import Literal._
 import Node._
@@ -170,7 +170,7 @@ object chiselMainTest {
 
 trait proc extends Node {
   var isDefaultNeeded = true;
-  var updates = new Queue[(Bool, Node)];
+  var updates = new ScalaQueue[(Bool, Node)];
   def genCond() = conds.top;
   def genMuxes(default: Node) = {
     if (updates.length == 0) {
