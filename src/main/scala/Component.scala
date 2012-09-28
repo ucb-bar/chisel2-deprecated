@@ -1,7 +1,7 @@
 package Chisel
 import scala.math._
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.Queue
+import scala.collection.mutable.{Queue=>ScalaQueue}
 import scala.collection.mutable.Stack
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashMap
@@ -177,7 +177,7 @@ object Component {
     val walked = new HashSet[Component] // this is overkill, but just to be safe
     
     //initialize bfs queue of Components
-    val bfsQueue = new Queue[Component]()
+    val bfsQueue = new ScalaQueue[Component]()
     bfsQueue.enqueue(root)
 
     // if it popped off the queue, then it already has an instance name
@@ -272,7 +272,7 @@ abstract class Component(resetSignal: Bool = null) {
   val omods = new ArrayBuffer[Node];
   // val gmods = new ArrayBuffer[Node];
   val regs  = new ArrayBuffer[Reg];
-  val nexts = new Queue[Node];
+  val nexts = new ScalaQueue[Node];
   var nindex = -1;
   var defaultWidth = 32;
   var moduleName: String = "";
@@ -368,7 +368,7 @@ abstract class Component(resetSignal: Bool = null) {
   def assert(cond: Bool, message: String) = 
     asserts += Assert(cond, message);
   def debug(x: Node) = 
-    debugs += x;
+    debugs += x.getNode
   def <>(src: Component) = io <> src.io;
   def apply(name: String): Data = io(name);
   // COMPILATION OF REFERENCE
@@ -404,8 +404,8 @@ abstract class Component(resetSignal: Bool = null) {
     */
   }
 
-  def initializeBFS: Queue[Node] = {
-    val res = new Queue[Node]
+  def initializeBFS: ScalaQueue[Node] = {
+    val res = new ScalaQueue[Node]
 
     // initialize bfsQueue
     for((n, elm) <- io.flatten) 
