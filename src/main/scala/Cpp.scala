@@ -507,6 +507,8 @@ class CppBackend extends Backend {
 
     if (isGenHarness)
       genHarness(c, base_name, c.name);
+    out_h.write("#ifndef __" + c.name + "__\n");
+    out_h.write("#define __" + c.name + "__\n\n");
     out_h.write("#include \"emulator.h\"\n\n");
     out_h.write("class " + c.name + "_t : public mod_t {\n");
     out_h.write(" public:\n");
@@ -533,7 +535,8 @@ class CppBackend extends Backend {
     out_h.write("  void print ( FILE* f );\n");
     out_h.write("  bool scan ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
-    out_h.write("};\n");
+    out_h.write("};\n\n");
+    out_h.write("#endif\n");
     out_h.close();
 
     out_c.write("#include \"" + c.name + ".h\"\n");
