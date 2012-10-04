@@ -23,7 +23,7 @@ abstract class Backend {
   def emitRef(node: Node): String = {
     node match {
       case r: Reg => 
-        if(r.isMemOutput) emitRef(r.updateVal) else if(r.name == "") "R" + r.emitIndex else r.name
+        if(r.isMemOutput) emitRef(r.memOf.outputVal) else if(r.name == "") "R" + r.emitIndex else r.name
       case _ => 
         if(node.name == "" || !node.named) 
           "T" + node.emitIndex 

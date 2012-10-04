@@ -29,17 +29,6 @@ class VerilogBackend extends Backend {
         else if(x.base == 'h') ("" + x.width + "'h" + x.name)
         else "") + "/* " + x.inputVal + "*/";
 
-      case x: Bits =>
-        if(!node.isInObject || node.name == "") 
-          super.emitRef(node) 
-        else if(!node.named) 
-          node.name + "_" + node.emitIndex
-        else 
-          node.name
-
-      case reg: Reg =>
-        if (reg.isMemOutput && !isInlineMem) emitRef(reg.updateVal) else if (reg.name == "") "R" + reg.emitIndex else reg.name;
-
       case _ =>
         super.emitRef(node)
     }
@@ -233,7 +222,7 @@ class VerilogBackend extends Backend {
         res
 
       case m: Mem[_] =>
-        if (Component.isInlineMem)
+        if (isInlineMem)
           return ""
 
         m.reads.filter(r => r.used && r.getPortType == "read").foreach { r =>
@@ -261,7 +250,7 @@ class VerilogBackend extends Backend {
 
         
       case m: MemRead[_] =>
-        if (Component.isInlineMem && !m.isSequential)
+        if (isInlineMem)
           "  assign " + emitTmp(node) + " = " + emitRef(m.mem) + "[" + emitRef(m.addr) + "];\n"
         else
           ""
@@ -310,10 +299,13 @@ class VerilogBackend extends Backend {
         ""
 
       case x: Reg =>
-        if (!node.isMemOutput || isInlineMem) "  reg[" + (node.width-1) + ":0] " + emitRef(node) + ";\n" else "";
+        if (node.isMemOutput)
+          ""
+        else
+          "  reg[" + (node.width-1) + ":0] " + emitRef(node) + ";\n"
 
       case m: Mem[_] =>
-        if (Component.isInlineMem)
+        if (isInlineMem)
           "  reg [" + (m.width-1) + ":0] " + emitRef(m) + " [" + (m.n-1) + ":0];\n"
         else
           ""
@@ -430,15 +422,9 @@ class VerilogBackend extends Backend {
   def emitReg(node: Node): String = {
     node match {
       case reg: Reg =>
-        if(reg.isMemOutput) {
-          if (!isInlineMem)
+        if(reg.isMemOutput)
             ""
-          else if (reg.memOf.cond.isLit && reg.memOf.cond.litOf.value != 0)
-            "    " + emitRef(reg) + " <= " + emitRef(reg.memOf.mem) + "[" + emitRef(reg.memOf.addr) + "];\n"
-          else
-            "    if(" + emitRef(reg.memOf.cond) + ")\n" +
-            "      " + emitRef(reg) + " <= " + emitRef(reg.memOf.mem) + "[" + emitRef(reg.memOf.addr) + "];\n"
-        } else if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1)){
+        else if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1)){
           if(reg.isReset){
             "    if(reset) begin\n" + 
             "      " + emitRef(reg) + " <= " + emitRef(reg.resetVal) + ";\n" +
@@ -457,7 +443,7 @@ class VerilogBackend extends Backend {
         }
 
       case m: MemWrite[_] =>
-        if (!m.used || !Component.isInlineMem)
+        if (!m.used || !isInlineMem)
           return ""
 
         val i = "i" + emitTmp(m)

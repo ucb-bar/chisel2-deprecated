@@ -101,7 +101,7 @@ abstract class Node extends nameable{
   var genError = false;
   var stack: Array[StackTraceElement] = null;
   var line: StackTraceElement = findFirstUserLine(Thread.currentThread().getStackTrace)
-  var memSource: MemAccess = null
+  var memSource: MemRead[_] = null
   var isScanArg = false
   var isPrintArg = false
   def isMemOutput = false
@@ -159,7 +159,6 @@ abstract class Node extends nameable{
   def getLit = this.asInstanceOf[Literal]
   def isIo = false;
   def isReg = false;
-  var isRegOut = false;
   def isUsedByRam: Boolean = {
     for (c <- consumers) 
       if (c.isRamWriteInput(this))
@@ -242,7 +241,7 @@ abstract class Node extends nameable{
   def traceNode(c: Component, stack: Stack[() => Any]): Any = {
     if(this.isTypeNode) println("found")
     // determine whether or not the component needs a clock input
-    if ((isReg || isRegOut || isClkInput) && !(component == null))
+    if ((isReg || isClkInput) && !(component == null))
         component.containsReg = true
 
     // pushes and pops components as necessary in order to later mark the parent of nodes

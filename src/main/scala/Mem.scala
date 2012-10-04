@@ -16,6 +16,15 @@ object Mem {
 
     new Mem(n, seqRead, () => gen)
   }
+
+  val sequentialReads = collection.mutable.HashSet[Node]()
+  Component.backend.transforms += { c =>
+    if (Component.isInlineMem && !sequentialReads.isEmpty)
+      for (n <- Component.nodes)
+        for (i <- 0 until n.inputs.length)
+          if (sequentialReads.contains(n.inputs(i)))
+            n.inputs(i) = n.inputs(i).asInstanceOf[MemRead[_]].outputVal
+  }
 }
 
 abstract class AccessTracker extends Delay {
@@ -30,7 +39,6 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
   val writes = ArrayBuffer[MemWrite[T]]()
   val reads = ArrayBuffer[MemRead[T]]()
   val data = gen().toNode
-  val inferSeqRead = seqRead && Component.isEmittingComponents
 
   inferWidth = fixWidth(data.getWidth)
 
@@ -59,7 +67,7 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
 
   def apply(addr: Bits) = {
     val (rdata, rport) = doRead(addr, conds.top)
-    if (inferSeqRead)
+    if (Component.isEmittingComponents && seqRead)
       rdata.memSource = rport
     rdata.comp = doWrite(addr, conds.top, null.asInstanceOf[T], null.asInstanceOf[Bits])
     rdata
@@ -79,8 +87,6 @@ abstract class MemAccess(val mem: Mem[_], val condi: Bool, val addri: Bits) exte
 
   var referenced = false
   def used = referenced
-  var outputReg = null.asInstanceOf[Reg]
-  def setOutputReg(x: Reg) = outputReg = x
   def getPortType: String
 
   override def forceMatchingWidths =
@@ -91,8 +97,20 @@ class MemRead[T <: Data](mem: Mem[T], condi: Bool, addri: Bits) extends MemAcces
   inputs += mem
   inferWidth = fixWidth(mem.data.getWidth)
 
-  override def toString: String = mem + "[" + addr + "]"
+  var outputReg: Reg = null
+  def outputVal = if (Component.isInlineMem && isSequential) inputs.last else this
+  def setOutputReg(x: Reg) = {
+    if (Component.isInlineMem) {
+      Mem.sequentialReads += this
+      // retime the read across the output register
+      val r = Reg() { Bits() }
+      r := addr.asInstanceOf[Bits]
+      inputs += mem.read(r)
+    }
+    outputReg = x
+  }
   def isSequential = outputReg != null && outputReg.isMemOutput
+  override def toString: String = mem + "[" + addr + "]"
   override def getPortType: String = if (isSequential) "read" else "cread"
 }
 
@@ -136,7 +154,7 @@ class MemWrite[T <: Data](mem: Mem[T], condi: Bool, addri: Bits, datai: T, wmask
     val rp = getProducts(r.cond)
     wp.find(wc => rp.exists(rc => isNegOf(rc, wc) || isNegOf(wc, rc)))
   }
-  def isPossibleRW(r: MemRead[T]) = mem.inferSeqRead && !emitRWEnable(r).isEmpty && !isRW
+  def isPossibleRW(r: MemRead[T]) = mem.seqRead && !emitRWEnable(r).isEmpty && !isRW
   def isRW = pairedRead != null
   def setRW(r: MemRead[T]) = pairedRead = r
   def data = inputs(2)

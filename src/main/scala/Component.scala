@@ -654,7 +654,7 @@ abstract class Component(resetSignal: Bool = null) {
         o match { 
 	  //case comp: Component => { comp.component = this;}
           case node: Node => { if ((node.isTypeNode || (node.name == "" && !node.named) || node.name == null || name != "")) node.name_it(name, true);
-			       if (node.isReg || node.isRegOut || node.isClkInput) containsReg = true;
+			       if (node.isReg || node.isClkInput) containsReg = true;
 			      nameSpace += name;
 			    }
 	  case buf: ArrayBuffer[Node] => {
@@ -663,7 +663,7 @@ abstract class Component(resetSignal: Bool = null) {
 	      for(elm <- buf){
 		if ((elm.isTypeNode || (elm.name == "" && !elm.named) || elm.name == null)) 
 		  elm.name_it(name + "_" + i, true);
-		if (elm.isReg || elm.isRegOut || elm.isClkInput) 
+		if (elm.isReg || elm.isClkInput) 
 		  containsReg = true;
 		nameSpace += name + "_" + i;
 		i += 1;
@@ -681,7 +681,7 @@ abstract class Component(resetSignal: Bool = null) {
 		  case node: Node => {
 		    if ((node.isTypeNode || (node.name == "" && !node.named) || node.name == null)) 
 		      node.name_it(name + "_" + i + "_" + j, true);
-		    if (node.isReg || node.isRegOut || node.isClkInput) 
+		    if (node.isReg || node.isClkInput) 
 		      containsReg = true;
 		    nameSpace += name + "_" + i + "_" + j;
 		    j += 1;
