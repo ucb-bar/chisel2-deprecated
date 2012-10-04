@@ -422,11 +422,30 @@ abstract class Component(resetSignal: Bool = null) {
     res
   }
 
-  def inferAll(): Unit = {
-    println("started inference")
-    var nodesList = ArrayBuffer[Node]()
+  def bfs(visit: Node => Unit): Unit = {
     val walked = new HashSet[Node]
     val bfsQueue = initializeBFS
+
+    // conduct bfs to find all reachable nodes
+    while(!bfsQueue.isEmpty){
+      val top = bfsQueue.dequeue
+      walked += top
+      visit(top)
+      for(i <- top.inputs) {
+        if(!(i == null)) {
+          if(!walked.contains(i)) {
+            bfsQueue.enqueue(i) 
+            walked += i
+          }
+        }
+      }
+    }
+  }
+
+  def inferAll(): Unit = {
+    println("started inference")
+    val nodesList = ArrayBuffer[Node]()
+    bfs { nodesList += _ }
 
     def verify = {
       var hasError = false
@@ -439,21 +458,7 @@ abstract class Component(resetSignal: Bool = null) {
       if (hasError) throw new Exception("Could not elaborate code due to uninferred width(s)")
     }
 
-    // conduct bfs to find all reachable nodes
-    while(!bfsQueue.isEmpty){
-      val top = bfsQueue.dequeue
-      walked += top
-      nodesList += top
-      for(i <- top.inputs) 
-        if(!(i == null)) {
-  	  if(!walked.contains(i)) {
-  	    bfsQueue.enqueue(i) 
-            walked += i
-  	  }
-        }
-    }
     var count = 0
-
     // bellman-ford to infer all widths
     for(i <- 0 until nodesList.length) {
 
@@ -480,8 +485,6 @@ abstract class Component(resetSignal: Bool = null) {
 
   def removeTypeNodes() {
     println("started flattenning")
-    val walked = new HashSet[Node]
-    val bfsQueue = initializeBFS
 
     def getNode(x: Node): Node = {
       var res = x
@@ -492,23 +495,12 @@ abstract class Component(resetSignal: Bool = null) {
     }
 
     var count = 0
-
-    while(!bfsQueue.isEmpty) {
-      val top = bfsQueue.dequeue
-      top.fixName()
-      walked += top
+    bfs {x =>
+      x.fixName
       count += 1
-
-      for(i <- 0 until top.inputs.length) {
-        if(!(top.inputs(i) == null)) {
-          if(top.inputs(i).isTypeNode) top.inputs(i) = getNode(top.inputs(i))
-          if(!walked.contains(top.inputs(i))) {
-            bfsQueue.enqueue(top.inputs(i))
-            walked += top.inputs(i)
-          }
-        }
-      }
-
+      for (i <- 0 until x.inputs.length)
+        if (x.inputs(i) != null && x.inputs(i).isTypeNode)
+          x.inputs(i) = getNode(x.inputs(i))
     }
     
     println(count)
@@ -517,28 +509,7 @@ abstract class Component(resetSignal: Bool = null) {
 
   def forceMatchingWidths = {
     println("start width checking")
-
-    var nodesList = ArrayBuffer[Node]()
-    val walked = new HashSet[Node]
-    val bfsQueue = initializeBFS
-
-    // conduct bfs to find all reachable nodes
-    while(!bfsQueue.isEmpty){
-      val top = bfsQueue.dequeue
-      walked += top
-      nodesList += top
-      for(i <- top.inputs) 
-        if(!(i == null)) {
-  	  if(!walked.contains(i)) {
-  	    bfsQueue.enqueue(i) 
-            walked += i
-  	  }
-        }
-    }
-
-    for (node <- nodesList)
-      node.forceMatchingWidths
-
+    bfs(_.forceMatchingWidths)
     println("finished width checking")
   }
 
@@ -797,30 +768,6 @@ abstract class Component(resetSignal: Bool = null) {
   def findCombLoop() = {
     println("BEGINNING COMBINATIONAL LOOP CHECKING")
 
-    var nodesList = ArrayBuffer[Node]()
-    val walked = new HashSet[Node]
-    val bfsQueue = initializeBFS
-
-    // initialize bfsQueue
-    // search for all reachable nodes, then pass this graph into tarjanSCC
-
-    while(!bfsQueue.isEmpty){
-      val top = bfsQueue.dequeue
-      walked += top
-      nodesList += top
-
-      for(i <- 0 until top.inputs.length) {
-        if(!(top.inputs(i) == null)) {
-          
-          if(!walked.contains(top.inputs(i))) {
-            bfsQueue.enqueue(top.inputs(i))
-            walked += top.inputs(i)
-          }
-          
-        }
-      }
-    }
-
     // Tarjan's strongly connected components algorithm to find loops
     println("BEGINNING SEARCHING CIRCUIT FOR COMBINATIONAL LOOP")
     var sccIndex = 0
@@ -858,7 +805,7 @@ abstract class Component(resetSignal: Bool = null) {
       }
     }
 
-    for (node <- nodesList) {
+    bfs { node =>
       if(node.sccIndex == -1 && !node.isInstanceOf[Delay] && !(node.isReg))
         tarjanSCC(node)
     }
