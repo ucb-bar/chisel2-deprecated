@@ -270,7 +270,7 @@ class CppBackend extends Backend {
         if (x.isInObject && x.inputs.length == 1)
           emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i) + " = " + emitWordRef(x.inputs(0), i)))
         else if (x.inputs.length == 0 && !x.isInObject)
-          emitTmpDec(x)
+          emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i) + " = rand_val()")) + trunc(x)
         else
           ""
 
@@ -306,7 +306,7 @@ class CppBackend extends Backend {
   def emitInit(node: Node): String = {
     node match {
       case x: Reg =>
-        block((0 until words(x)).map(i => emitWordRef(x, i) + " = rand_init ? rand_val()" + (if (i == words(x)-1 && x.width % bpw != 0) " & " + ((1L << (x.width % bpw))-1) else "") + " : 0"))
+        "  if (rand_init) " + emitRef(node) + ".randomize();\n"
 
       case x: Mem[_] =>
         "  if (rand_init) " + emitRef(node) + ".randomize();\n"
