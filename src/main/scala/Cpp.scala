@@ -32,9 +32,6 @@ class CppBackend extends Backend {
 
   override def emitRef(node: Node): String = {
     node match {
-      case x: Reg =>
-        if(isHiC) super.emitRef(node) + "_shadow_out" else super.emitRef(node)
-
       case x: Binding =>
         emitRef(x.inputs(0))
 
@@ -299,15 +296,6 @@ class CppBackend extends Backend {
 
   def emitDefHi(node: Node): String = {
     node match {
-      case m: MemWrite[_] =>
-        if (m.inputs.length == 2)
-          return ""
-        def wmask(w: Int) = "(-" + emitLoWordRef(m.cond) + (if (m.isMasked) " & " + emitWordRef(m.wmask, w) else "") + ")"
-        isHiC = true
-        val res = block((0 until words(m)).map(i => emitRef(m.mem) + ".put(" + emitLoWordRef(m.addr) + ", " + i + ", (" + emitWordRef(m.data, i) + " & " + wmask(i) + ") | (" + emitRef(m.mem) + ".get(" + emitLoWordRef(m.addr) + ", " + i + ") & ~" + wmask(i) + "))"))
-        isHiC = false
-        res
-
       case reg: Reg =>
         "  " + emitRef(reg) + " = " + emitRef(reg) + "_shadow;\n"
       case _ =>
@@ -335,8 +323,12 @@ class CppBackend extends Backend {
 
   def emitInitHi(node: Node): String = {
     node match {
-      case x: Reg =>
-        "  dat_t<" + node.width + "> " + emitRef(node) + "_shadow_out = " + emitRef(node) + ";\n"
+      case m: MemWrite[_] =>
+        // schedule before Reg updates in case a MemWrite input is a Reg
+        if (m.inputs.length == 2)
+          return ""
+        def wmask(w: Int) = "(-" + emitLoWordRef(m.cond) + (if (m.isMasked) " & " + emitWordRef(m.wmask, w) else "") + ")"
+        block((0 until words(m)).map(i => emitRef(m.mem) + ".put(" + emitLoWordRef(m.addr) + ", " + i + ", (" + emitWordRef(m.data, i) + " & " + wmask(i) + ") | (" + emitRef(m.mem) + ".get(" + emitLoWordRef(m.addr) + ", " + i + ") & ~" + wmask(i) + "))"))
 
       case _ =>
         ""

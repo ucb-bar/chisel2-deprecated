@@ -19,7 +19,6 @@ object Node {
 
   implicit def convBitsToUFix(x: Bits): UFix = x.toUFix;
 
-  var isHiC = false;
   var isCoercingArgs = true;
   var conds = new Stack[Bool]();
   conds.push(Bool(true));
