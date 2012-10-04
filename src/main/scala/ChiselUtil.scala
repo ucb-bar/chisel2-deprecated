@@ -90,20 +90,13 @@ object UFixToOH
 
 object Mux1H 
 {
-  def buildMux[T <: Data](sel: Bits, in: Seq[T], i: Int, n: Int): T = {
-    if (n == 1)
-      in(i)
+  def apply [T <: Data](sel: Seq[Bits], in: Seq[T]): T = {
+    if (in.size == 1)
+      in(0)
     else
-    {
-      val half_n = (1 << log2Up(n))/2
-      val left = buildMux(sel, in, i, half_n)
-      val right = buildMux(sel, in, i + half_n, n - half_n)
-      Mux(sel(i+n-1,i+half_n).orR, right, left)
-    }
+      in(0).fromBits(sel.zip(in).map { case(s,x) => s.toFix & x.toBits }.reduce(_|_))
   }
-
-  def apply [T <: Data](sel: Bits, in: Seq[T]): T = buildMux(sel, in, 0, in.size)
-  def apply [T <: Data](sel: Seq[Bool], in: Seq[T]): T = buildMux(Cat(Bits(0),sel.reverse:_*), in, 0, in.size)
+  def apply [T <: Data](sel: Bits, in: Seq[T]): T = apply((0 until in.size).map(sel(_)), in)
 }
 
 
