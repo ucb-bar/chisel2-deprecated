@@ -260,7 +260,7 @@ object Log2 {
       }
       case _ => {
         var res = UFix(0);
-        for (i <- 1 to n)
+        for (i <- 1 until n)
           res = Mux(mod(i), UFix(i, sizeof(n)), res);
         res
       }
