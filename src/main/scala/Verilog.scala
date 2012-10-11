@@ -8,6 +8,26 @@ import scala.sys.process._
 import Reg._
 import ChiselError._
 import Component._
+import scala.collection.mutable.HashSet
+
+object VerilogBackend {
+
+  val keywords = new HashSet[String]()
+  keywords ++= List("always", "and", "assign", "attribute", "begin", "buf", "bufif0", "bufif1", "case",
+                    "casex", "casez", "cmos", "deassign", "default", "defparam", "disable", "edge",
+                    "else", "end", "endattribute", "endcase", "endfunction", "endmodule", "endprimitive",
+                    "endspecify", "endtable", "endtask", "event", "for", "force", "forever", "fork",
+                    "function", "highz0", "highz1", "if", "ifnone", "initial", "inout", "input", 
+                    "integer", "join", "medium", "module", "large", "macromodule", "nand", "negedge",
+                    "nmos", "nor", "not", "notif0", "notif1", "or", "output", "parameter", "pmos", 
+                    "posedge", "primitive", "pull0", "pull1", "pulldown", "pullup", "rcmos", "real",
+                    "realtime", "reg", "release", "repeat", "rnmos", "rpmos", "rtran", "rtranif0",
+                    "rtranif1", "scalared", "signed", "small", "specify", "specparam", "strength",
+                    "strong0", "strong1", "supply0", "supply1", "table", "task", "time", "tran",
+                    "tranif0", "tranif1", "tri", "tri0", "tri1", "triand", "trior", "trireg", "unsigned",
+                    "vectored", "wait", "wand", "weak0", "weak1", "while", "wire", "wor", "xnor", "xor"
+                 )
+}
 
 class VerilogBackend extends Backend {
   isEmittingComponents = true
@@ -276,6 +296,8 @@ class VerilogBackend extends Backend {
     "  wire" + (if (node.isSigned) " signed " else "") + emitWidth(node) + " " + emitRef(node) + ";\n"
 
   override def emitDec(node: Node): String = {
+    if (node.isInstanceOf[Bundle]) println("found")
+
     node match {
       case x: Bits =>
         if(x.dir == null)
@@ -461,6 +483,16 @@ class VerilogBackend extends Backend {
     }
   }
 
+  // this function checks that there is no collision with verilog keywords, mangling the names if there
+  // is a collision
+  def checkNames(c: Component) = {
+    for (m <- c.mods) {
+      if (VerilogBackend.keywords.contains(m.name)) {
+        m.name = m.name + "_"
+      }
+    }
+  }
+
   def emitDecs(c: Component): StringBuilder = {
     val res = new StringBuilder();
     for (m <- c.mods) {
@@ -503,6 +535,7 @@ class VerilogBackend extends Backend {
       };
     }
     res.append(");\n\n");
+    checkNames(c)
     // TODO: NOT SURE EXACTLY WHY I NEED TO PRECOMPUTE TMPS HERE
     for (m <- c.mods)
       emitTmp(m);

@@ -1,8 +1,10 @@
 package Chisel
 import Component._
+import ChiselError._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.BufferProxy
+import scala.collection.mutable.Stack
 import scala.math._
 import Vec._
 import Node._
@@ -260,8 +262,22 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
       b <> e;
   }
 
-  // TODO: CHECK FOR ALL OUT
-  def :=[T <: Data](src: Vec[T]) = {
+  def :=[T <: Data](src: Iterable[T]) = {
+
+    // Check matching size
+    assert(this.size == src.size, 
+           {printError(() => "\n[ERROR] Can't wire together Vecs of mismatched lengths", 
+                       findFirstUserLine(Thread.currentThread().getStackTrace)
+                     )
+          })
+
+    // Check LHS for all outputs
+    this.flatten.map(x => {assert(x._2.dir == null || x._2.dir == OUTPUT, 
+                                  {printError(() => "\n[ERROR] Left hand side of := must be output",
+                                              findFirstUserLine(Thread.currentThread().getStackTrace)) }
+                                  )}
+                     )
+
     for((me, other) <- this zip src){
       if(other.isInstanceOf[Bundle])
         me.asInstanceOf[Bundle] := other.asInstanceOf[Bundle]
@@ -275,11 +291,17 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
       this(i) := src(i)
   }
 
-  override def traceableNodes = self.toArray
-
   override def removeTypeNodes() = {
     for(bundle <- self)
       bundle.removeTypeNodes
+  }
+
+  override def traceableNodes = self.toArray
+
+  override def traceNode(c: Component, stack: Stack[() => Any]) = {
+    for(i <- this) {
+      stack.push(() => i.traceNode(c, stack))
+    }
   }
 
   override def flip(): this.type = {

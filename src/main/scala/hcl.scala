@@ -145,7 +145,7 @@ object chiselMain {
       tester = ftester(c)
     }
     backend.elaborate(c)
-    if (isCheckingPorts) backend.checkPorts
+    if (isCheckingPorts) backend.checkPorts(c)
     if (isCompiling && isGenHarness) backend.compile(c)
     if (isTesting) tester.tests()
     c

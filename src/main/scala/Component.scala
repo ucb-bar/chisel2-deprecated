@@ -317,21 +317,25 @@ abstract class Component(resetSignal: Bool = null) {
       res += "  ";
     res
   }
+
+  // This function sets the IO's component.
   def ownIo() = {
-    // println("COMPONENT " + name + " IO " + io);
     val wires = io.flatten;
     for ((n, w) <- wires) {
-      // println(">>> " + w + " IN " + this);
+      // This assert is a sanity check to make sure static resolution of IOs didn't fail
       scala.Predef.assert(this == w.staticComp, {println("Statically resolved component differs from dynamically resolved component of IO: " + w + " crashing compiler")})
       w.component = this;
     }
   }
+
+  // This function names components with the classname. Multiple instances of the same component is
+  // unquified by appending _N to the classname where N is an increasing integer.
   def name_it() = {
     val cname  = getClass().getName(); 
     val dotPos = cname.lastIndexOf('.');
     name = if (dotPos >= 0) cname.substring(dotPos+1) else cname;
     className = name;
-    if(!isEmittingComponents) {
+    if(!backend.isInstanceOf[VerilogBackend]) {
       if (compIndices contains name) {
         val compIndex = (compIndices(name) + 1);
         compIndices += (name -> compIndex);
@@ -341,6 +345,7 @@ abstract class Component(resetSignal: Bool = null) {
       }
     }
   }
+
   def findBinding(m: Node): Binding = {
     // println("FINDING BINDING " + m + " OUT OF " + bindings.length + " IN " + this);
     for (b <- bindings) {
@@ -639,20 +644,21 @@ abstract class Component(resetSignal: Bool = null) {
     }
     res
   }
+
+  // 1) name the component
+  // 2) name the IO
+  // 3) name and set the component of all statically declared nodes through introspection
   def markComponent() = {
     name_it();
     ownIo();
     io.name_it("io", true);
-    // println("COMPONENT " + name);
     val c = getClass();
     for (m <- c.getDeclaredMethods) {
       val name = m.getName();
-      // println("LOOKING FOR " + name);
       val types = m.getParameterTypes();
       if (types.length == 0 && name != "test") {
         val o = m.invoke(this);
         o match { 
-	  //case comp: Component => { comp.component = this;}
           case node: Node => { if ((node.isTypeNode || (node.name == "" && !node.named) || node.name == null || name != "")) node.name_it(name, true);
 			       if (node.isReg || node.isClkInput) containsReg = true;
 			      nameSpace += name;
@@ -700,8 +706,6 @@ abstract class Component(resetSignal: Bool = null) {
 	  case bb: BlackBox => {
             if(!bb.named) {bb.instanceName = name; bb.named = true};
             bb.pathParent = this;
-            //bb.name = name;
-            //bb.named = true;
             for((n, elm) <- io.flatten) {
               if (elm.isClkInput) containsReg = true
             }
