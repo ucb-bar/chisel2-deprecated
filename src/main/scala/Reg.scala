@@ -29,7 +29,6 @@ object Reg {
       fixWidth(r.getWidth)
   }
 
-  val noInit = Lit(0){Fix()};
   def apply[T <: Data](data: T, width: Int, resetVal: T)(gen: => T): T = {
 
     // check valid gen

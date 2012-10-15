@@ -196,7 +196,6 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
 
     val res = this(0).clone
     //val res = gen()
-    res.setIsTypeNode
     for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
       val w = io.getWidth
       val onehot = VecUFixToOH(addr, length)
@@ -214,6 +213,7 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
         io.comp = io_comp
     }
     readPortCache += (addr -> res)
+    res.setIsTypeNode
     return res
   }
 
@@ -265,14 +265,14 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
   def :=[T <: Data](src: Iterable[T]) = {
 
     // Check matching size
-    assert(this.size == src.size, 
-           {printError(() => "\n[ERROR] Can't wire together Vecs of mismatched lengths", 
+    assert(this.size == src.size,
+           {printError(() => "\n[ERROR] Can't wire together Vecs of mismatched lengths",
                        findFirstUserLine(Thread.currentThread().getStackTrace)
                      )
           })
 
     // Check LHS for all outputs
-    this.flatten.map(x => {assert(x._2.dir == null || x._2.dir == OUTPUT, 
+    this.flatten.map(x => {assert(x._2.dir == null || x._2.dir == OUTPUT,
                                   {printError(() => "\n[ERROR] Left hand side of := must be output",
                                               findFirstUserLine(Thread.currentThread().getStackTrace)) }
                                   )}

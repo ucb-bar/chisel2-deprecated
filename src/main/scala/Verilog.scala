@@ -17,9 +17,9 @@ object VerilogBackend {
                     "casex", "casez", "cmos", "deassign", "default", "defparam", "disable", "edge",
                     "else", "end", "endattribute", "endcase", "endfunction", "endmodule", "endprimitive",
                     "endspecify", "endtable", "endtask", "event", "for", "force", "forever", "fork",
-                    "function", "highz0", "highz1", "if", "ifnone", "initial", "inout", "input", 
+                    "function", "highz0", "highz1", "if", "ifnone", "initial", "inout", "input",
                     "integer", "join", "medium", "module", "large", "macromodule", "nand", "negedge",
-                    "nmos", "nor", "not", "notif0", "notif1", "or", "output", "parameter", "pmos", 
+                    "nmos", "nor", "not", "notif0", "notif1", "or", "output", "parameter", "pmos",
                     "posedge", "primitive", "pull0", "pull1", "pulldown", "pullup", "rcmos", "real",
                     "realtime", "reg", "release", "repeat", "rnmos", "rpmos", "rtran", "rtranif0",
                     "rtranif1", "scalared", "signed", "small", "specify", "specparam", "strength",
@@ -292,8 +292,10 @@ class VerilogBackend extends Backend {
     }
   }
 
+  def emitSigned(n: Node) = if(n.isSigned) " signed " else ""
+
   def emitDecBase(node: Node): String = 
-    "  wire" + (if (node.isSigned) " signed " else "") + emitWidth(node) + " " + emitRef(node) + ";\n"
+    "  wire" + emitSigned(node) + emitWidth(node) + " " + emitRef(node) + ";\n"
 
   override def emitDec(node: Node): String = {
     if (node.isInstanceOf[Bundle]) println("found")
@@ -306,10 +308,10 @@ class VerilogBackend extends Backend {
           ""
 
       case x: ListLookupRef[_] =>
-        "  reg[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
+        "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
 
       case x: Lookup =>
-        "  reg[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
+        "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
 
       case x: ListNode =>
         ""
@@ -324,7 +326,7 @@ class VerilogBackend extends Backend {
         if (node.isMemOutput)
           ""
         else
-          "  reg[" + (node.width-1) + ":0] " + emitRef(node) + ";\n"
+          "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n"
 
       case m: Mem[_] =>
         if (isInlineMem)
@@ -527,9 +529,9 @@ class VerilogBackend extends Backend {
       w match {
         case io: Bits => {
           if (io.dir == INPUT) {
-	    res.append(nl + "    input " + emitWidth(io) + " " + emitRef(io));
+	    res.append(nl + "    input " + emitSigned(io) + emitWidth(io) + " " + emitRef(io));
           } else if(io.dir == OUTPUT) {
-	    res.append(nl + "    output" + emitWidth(io) + " " + emitRef(io));
+	    res.append(nl + "    output" + emitSigned(io) + emitWidth(io) + " " + emitRef(io));
           }
         }
       };

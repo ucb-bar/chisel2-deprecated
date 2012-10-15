@@ -108,6 +108,7 @@ abstract class Node extends nameable{
   
   nodes += this
   
+  def setIsSigned = isSigned = true
   def isByValue: Boolean = true;
   def width: Int = if(isInGetWidth) inferWidth(this) else width_;
   def width_=(w: Int) = { isFixedWidth = true; width_ = width; inferWidth = fixWidth(w); }
@@ -324,7 +325,9 @@ abstract class Node extends nameable{
 
   def matchWidth(w: Int): Node = {
     if (w > this.width) {
-      val fill = NodeFill(w - this.width, Literal(0,1)); fill.infer
+      val topBit = if (isSigned) NodeExtract(this, this.width-1) else Literal(0,1)
+      topBit.infer
+      val fill = NodeFill(w - this.width, topBit); fill.infer
       val res = Concatenate(fill, this); res.infer
       res
     } else if (w < this.width) {
@@ -365,8 +368,8 @@ abstract class Node extends nameable{
     typeNode
   }
   def setTypeNode[T <: Data](typeNode: T): T = {
-    setTypeNodeNoAssign(typeNode)
     typeNode assign this
+    setTypeNodeNoAssign(typeNode)
     typeNode
   }
 

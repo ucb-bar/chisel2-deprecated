@@ -20,9 +20,9 @@ object ListLookup {
 	case bits: Bits => Bits(OUTPUT);
 	case any => Bits(OUTPUT);
       }
-      res.setIsTypeNode;
-      xRef.nameHolder = res;
+      xRef.nameHolder = res
       res.inputs += xRef
+      res.setIsTypeNode
       res.asInstanceOf[T]
     }}
     

@@ -19,6 +19,10 @@ object Fix {
 }
 
 class Fix extends Num {
+  setIsSigned
+
+  override def setIsTypeNode = {inputs(0).setIsSigned; super.setIsTypeNode}
+
   type T = Fix;
   override def fromNode(n: Node) = {
     val res = Fix(OUTPUT).asInstanceOf[this.type]; 
