@@ -118,6 +118,7 @@ abstract class Node extends nameable{
   def minNum: BigInt = BigInt(0);
   // TODO: SHOULD BE GENERALIZED TO DIG FOR LIT AS litOf DOES
   def isLit = false;
+  def clearlyEquals(x: Node): Boolean = this == x
   // TODO: SHOULD AGREE WITH isLit
   def litOf: Literal = {
     if(inputs.length == 0)

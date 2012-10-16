@@ -169,55 +169,27 @@ object chiselMainTest {
 }
 
 trait proc extends Node {
-  var isDefaultNeeded = true;
-  var updates = new ScalaQueue[(Bool, Node)];
+  var updates = new collection.mutable.ListBuffer[(Bool, Node)];
   def genCond() = conds.top;
-  def genMuxes(default: Node) = {
+  def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
+    val update = others.foldLeft(default)((v, u) => Multiplex(u._1, u._2, v))
+    if (inputs.isEmpty) inputs += update else inputs(0) = update
+  }
+  def genMuxes(default: Node): Unit = {
     if (updates.length == 0) {
-      if (inputs.length == 0 || inputs(0) == null){
-
-	ChiselErrors += ChiselError({"NO UPDATES ON " + this}, this); 
-      }
-    } else {
-      val (lastCond, lastValue) = updates.front;
-      if (isDefaultNeeded && default == null && !lastCond.isTrue) {
-        ChiselErrors += ChiselError({"NO DEFAULT SPECIFIED FOR WIRE: " + this}, this)
-      }
-      val (start, firstValue) = 
-        if (default != null) 
-          (0, default)
-        else 
-          (1, lastValue)
-      if(inputs.length > 0)
-	inputs(0) = firstValue;
-      else
-	inputs   += firstValue;
-
-      var startCond: Bool = null
-      def isEquals(x: Node, y: Node): Boolean = {
-        if(x.litOf != null && y.litOf != null)
-          x.litOf.value == y.litOf.value
-        else
-          x.equals(y)
-      }
-
-      for (i <- start until updates.size) {
-        val (cond, value) = updates(i);
-        if(i == updates.size-1 || !isEquals(updates(i+1)._2, value)) {
-          if(startCond == null) {
-            inputs(0) = Multiplex(cond, value, inputs(0));
-          } else {
-            inputs(0) = Multiplex(startCond || cond, value, inputs(0))
-            startCond = null
-          }
-        } else {
-          if(startCond == null)
-            startCond = cond
-          else
-            startCond = startCond || cond
-        }
-      }
+      if (inputs.length == 0 || inputs(0) == null)
+        ChiselErrors += ChiselError({"NO UPDATES ON " + this}, this)
+      return
     }
+    val (lastCond, lastValue) = updates.head
+    if (default == null && !lastCond.isTrue) {
+      ChiselErrors += ChiselError({"NO DEFAULT SPECIFIED FOR WIRE: " + this}, this)
+      return
+    }
+    if (default != null)
+      genMuxes(default, updates)
+    else
+      genMuxes(lastValue, updates.toList.tail)
   }
   def procAssign(src: Node);
   procs += this;

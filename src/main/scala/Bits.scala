@@ -69,7 +69,7 @@ class Bits extends Data with proc {
     if (assigned) {
       ChiselErrors += ChiselError("reassignment to Node", Thread.currentThread().getStackTrace);
     } else {
-      updates.enqueue((genCond(), src));
+      updates += ((genCond(), src))
     }
   }
 

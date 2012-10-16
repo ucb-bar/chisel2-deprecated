@@ -42,6 +42,8 @@ object Multiplex{
           return cat
         }
       }
+      if (a.isInstanceOf[Mux] && c.clearlyEquals(a.inputs(1)))
+        Multiplex(t.asInstanceOf[Bits] || a.inputs(0).asInstanceOf[Bits], c, a.inputs(2))
     }
     new Mux().init("", maxWidth _, t, c, a);
   }
