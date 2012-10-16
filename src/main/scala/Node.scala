@@ -241,7 +241,7 @@ abstract class Node extends nameable{
   }
 
   def traceNode(c: Component, stack: Stack[() => Any]): Any = {
-    if(this.isTypeNode) println("found")
+    if(this.isTypeNode) println("found " + this)
     // determine whether or not the component needs a clock input
     if ((isReg || isClkInput) && !(component == null))
         component.containsReg = true
@@ -278,7 +278,8 @@ abstract class Node extends nameable{
            //tmp fix, what happens if multiple componenets reference static nodes?
           if (node.component == null || !components.contains(node.component))
             node.component = nextComp;
-          stack.push(() => node.traceNode(nextComp, stack));
+          if (!backend.isInstanceOf[VerilogBackend] || !node.isIo)
+            stack.push(() => node.traceNode(nextComp, stack));
           val j = i;
           val n = node;
           stack.push(() => {

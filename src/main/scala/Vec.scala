@@ -218,12 +218,9 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
   }
 
   override def flatten: Array[(String, Bits)] = {
-    val res = new ArrayBuffer[(String, Bits)];
+    val res = new ArrayBuffer[(String, Bits)]
     for (elm <- self)
-      elm match {
-	case bundle: Bundle => res ++= bundle.flatten;
-	case io: Bits         => res += ((io.name, io));
-      }
+      res ++= elm.flatten
     res.toArray
   }
 
@@ -299,7 +296,7 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
   override def traceableNodes = self.toArray
 
   override def traceNode(c: Component, stack: Stack[() => Any]) = {
-    for(i <- this) {
+    for((n, i) <- flatten) {
       stack.push(() => i.traceNode(c, stack))
     }
   }

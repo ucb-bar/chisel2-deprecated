@@ -9,6 +9,7 @@ import Reg._
 import ChiselError._
 import Component._
 import scala.collection.mutable.HashSet
+import scala.collection.mutable.HashMap
 
 object VerilogBackend {
 
@@ -27,11 +28,15 @@ object VerilogBackend {
                     "tranif0", "tranif1", "tri", "tri0", "tri1", "triand", "trior", "trireg", "unsigned",
                     "vectored", "wait", "wand", "weak0", "weak1", "while", "wire", "wor", "xnor", "xor"
                  )
+
 }
 
 class VerilogBackend extends Backend {
   isEmittingComponents = true
   isCoercingArgs = false
+
+  val memConfigs = new HashSet[String]()
+  val memPaths = new HashMap[String, HashMap[String, Int]]()
 
   def emitWidth(node: Node): String = 
     if (node.width == 1) "" else "[" + (node.width-1) + ":0]"
@@ -137,7 +142,36 @@ class VerilogBackend extends Backend {
   }
 
   override def emitDef(node: Node): String = {
-    def getPathName[T <: Data](m: Mem[T]) = m.component.getPathName + "_" + emitRef(m)
+    def getPathName[T <: Data](m: Mem[T], configStr: String): String = {
+      var c = m.component
+      var res = ""
+      while (c != null) {
+        res = c.name + "_" + res
+        c = c.parent
+      }
+      return uniquify(res + "_" + emitRef(m), configStr)
+    }
+
+    def uniquify(path: String, configStr: String): String = {
+      if (memPaths.contains(path)) {
+        val configs = memPaths(path)
+        if (configs.contains(configStr)) {
+          val count = configs(configStr)
+          if (count == 0) return path else return path + "_" + count
+        } else {
+          val count = configs.size
+          configs += (configStr -> count)
+          scala.Predef.assert(count != 0)
+          return path + "_" + count
+        }
+      } else {
+        val configs = new HashMap[String, Int]
+        configs += (configStr -> 0)
+        memPaths += (path -> configs)
+        return path
+      }
+    }
+
     node match {
       case x: Bits =>
         if (x.dir == INPUT)
@@ -256,15 +290,21 @@ class VerilogBackend extends Backend {
         val usedports = m.ports.filter(_.used)
         val portdefs = usedports.zipWithIndex.map { case (p, i) => emitPortDef(p, i) }
 
-        Component.configStr +=
-          "name " + moduleNamePrefix+getPathName(m) +
+        var configStr =
           " depth " + m.n +
           " width " + m.width +
           " ports " + usedports.map(_.getPortType).reduceLeft(_ + "," + _) +
           "\n"
 
+        val fullConfigStr = "name " + moduleNamePrefix+getPathName(m, configStr) + configStr
+
+        if (!memConfigs.contains(fullConfigStr)) {
+          Component.configStr += fullConfigStr
+          memConfigs += fullConfigStr
+        }
+
         val clkrst = Array("    .CLK(clk)", "    .RST(reset)")
-        "  " + moduleNamePrefix+getPathName(m) + " " + emitRef(m) + " (\n" +
+        "  " + moduleNamePrefix+getPathName(m, configStr) + " " + emitRef(m) + " (\n" +
         (clkrst ++ portdefs).reduceLeft(_ + ",\n" + _) + "\n" +
         "  );\n"
 

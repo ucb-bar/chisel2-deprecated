@@ -412,14 +412,13 @@ abstract class Component(resetSignal: Bool = null) {
   def initializeBFS: ScalaQueue[Node] = {
     val res = new ScalaQueue[Node]
 
-    // initialize bfsQueue
-    for((n, elm) <- io.flatten) 
-      if(elm.isInstanceOf[Bits] && elm.asInstanceOf[Bits].dir == OUTPUT)
-  	res.enqueue(elm)
     for(a <- asserts) 
       res.enqueue(a)
     for(b <- blackboxes) 
       res.enqueue(b.io)
+    for(c <- components)
+      for((n, io) <- c.io.flatten)
+        res.enqueue(io)
     
     for(r <- resetList)
       res.enqueue(r)
@@ -501,6 +500,7 @@ abstract class Component(resetSignal: Bool = null) {
 
     var count = 0
     bfs {x =>
+      scala.Predef.assert(!x.isTypeNode)
       x.fixName
       count += 1
       for (i <- 0 until x.inputs.length)
@@ -758,7 +758,15 @@ abstract class Component(resetSignal: Bool = null) {
 
   def traceNodes() = {
     val queue = Stack[() => Any]();
-    queue.push(() => io.traceNode(this, queue));
+
+    if (!backend.isInstanceOf[VerilogBackend]) {
+      queue.push(() => io.traceNode(this, queue));
+    } else {
+      for (c <- components) {
+        queue.push(() => c.reset.traceNode(c, queue))
+        queue.push(() => c.io.traceNode(c, queue))
+      }
+    }
     for (a <- asserts)
       queue.push(() => a.traceNode(this, queue));
     for (b <- blackboxes)

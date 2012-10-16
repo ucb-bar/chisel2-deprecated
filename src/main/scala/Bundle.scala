@@ -35,7 +35,6 @@ object sort {
     }
     a
   }
-
 }
 
 class Bundle(view_arg: Seq[String] = null) extends Data{
@@ -145,7 +144,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
   override def traceableNodes = elements.map(tup => tup._2).toArray;
   
   override def traceNode(c: Component, stack: Stack[() => Any]) = {
-    for((n, i) <- elements) {
+    for((n, i) <- flatten) {
       stack.push(() => i.traceNode(c, stack))
     }
   }
