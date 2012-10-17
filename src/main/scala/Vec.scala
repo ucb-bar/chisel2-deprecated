@@ -259,7 +259,7 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
       b <> e;
   }
 
-  def :=[T <: Data](src: Iterable[T]) = {
+  def :=[T <: Data](src: Iterable[T]): Unit = {
 
     // Check matching size
     assert(this.size == src.size,
@@ -268,18 +268,34 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
                      )
           })
 
-    // Check LHS for all outputs
-    this.flatten.map(x => {assert(x._2.dir == null || x._2.dir == OUTPUT,
-                                  {printError(() => "\n[ERROR] Left hand side of := must be output",
+    // Check LHS to make sure unidirection
+    val dirLHS = this.flatten(0)._2.dir
+    this.flatten.map(x => {assert(x._2.dir == dirLHS,
+                                  {printError(() => "\n[ERROR] Cannot mix directions on left hand side of :=",
                                               findFirstUserLine(Thread.currentThread().getStackTrace)) }
                                   )}
                      )
 
+    // Check RHS to make sure unidirection
+    val dirRHS = src.head.flatten(0)._2.dir
+    for (elm <- src) {
+      elm.flatten.map(x => {assert(x._2.dir == dirRHS,
+                                    {printError(() => "\n[ERROR] Cannot mix directions on right hand side of :=",
+                                                findFirstUserLine(Thread.currentThread().getStackTrace)) }
+                                    )}
+                     )
+    }
+
+
     for((me, other) <- this zip src){
-      if(other.isInstanceOf[Bundle])
-        me.asInstanceOf[Bundle] := other.asInstanceOf[Bundle]
-      else
-        me := other
+      me match {
+        case bundle: Bundle =>
+          bundle := other.asInstanceOf[Bundle]
+        case v: Vec[_] =>
+          v := other.asInstanceOf[Vec[Data]]
+        case _ =>
+          me := other
+      }
     }
   }
 

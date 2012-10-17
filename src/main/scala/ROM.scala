@@ -10,8 +10,8 @@ class ROM[T <: Data](val lits: Seq[Literal], gen: () => T) extends Vec[T](gen) {
   override def read(addr: UFix): T = {
     var port = new ROMRead(this, addr)
     val data = gen().asOutput
-    data.setIsTypeNode
     data assign port
+    data.setIsTypeNode
     data
   }
 
