@@ -8,10 +8,35 @@ import scala.sys.process._
 import Reg._
 import ChiselError._
 import Component._
+import scala.collection.mutable.HashSet
+import scala.collection.mutable.HashMap
+
+object VerilogBackend {
+
+  val keywords = new HashSet[String]()
+  keywords ++= List("always", "and", "assign", "attribute", "begin", "buf", "bufif0", "bufif1", "case",
+                    "casex", "casez", "cmos", "deassign", "default", "defparam", "disable", "edge",
+                    "else", "end", "endattribute", "endcase", "endfunction", "endmodule", "endprimitive",
+                    "endspecify", "endtable", "endtask", "event", "for", "force", "forever", "fork",
+                    "function", "highz0", "highz1", "if", "ifnone", "initial", "inout", "input",
+                    "integer", "join", "medium", "module", "large", "macromodule", "nand", "negedge",
+                    "nmos", "nor", "not", "notif0", "notif1", "or", "output", "parameter", "pmos",
+                    "posedge", "primitive", "pull0", "pull1", "pulldown", "pullup", "rcmos", "real",
+                    "realtime", "reg", "release", "repeat", "rnmos", "rpmos", "rtran", "rtranif0",
+                    "rtranif1", "scalared", "signed", "small", "specify", "specparam", "strength",
+                    "strong0", "strong1", "supply0", "supply1", "table", "task", "time", "tran",
+                    "tranif0", "tranif1", "tri", "tri0", "tri1", "triand", "trior", "trireg", "unsigned",
+                    "vectored", "wait", "wand", "weak0", "weak1", "while", "wire", "wor", "xnor", "xor"
+                 )
+
+}
 
 class VerilogBackend extends Backend {
   isEmittingComponents = true
   isCoercingArgs = false
+
+  val memConfigs = new HashSet[String]()
+  val memPaths = new HashMap[String, HashMap[String, Int]]()
 
   def emitWidth(node: Node): String = 
     if (node.width == 1) "" else "[" + (node.width-1) + ":0]"
@@ -28,17 +53,6 @@ class VerilogBackend extends Backend {
         else if(x.base == 'd') ("" + x.width + "'d" + x.name)
         else if(x.base == 'h') ("" + x.width + "'h" + x.name)
         else "") + "/* " + x.inputVal + "*/";
-
-      case x: Bits =>
-        if(!node.isInObject || node.name == "") 
-          super.emitRef(node) 
-        else if(!node.named) 
-          node.name + "_" + node.emitIndex
-        else 
-          node.name
-
-      case reg: Reg =>
-        if (reg.isMemOutput && !isInlineMem) emitRef(reg.updateVal) else if (reg.name == "") "R" + reg.emitIndex else reg.name;
 
       case _ =>
         super.emitRef(node)
@@ -128,7 +142,36 @@ class VerilogBackend extends Backend {
   }
 
   override def emitDef(node: Node): String = {
-    def getPathName[T <: Data](m: Mem[T]) = m.component.getPathName + "_" + emitRef(m)
+    def getPathName[T <: Data](m: Mem[T], configStr: String): String = {
+      var c = m.component
+      var res = ""
+      while (c != null) {
+        res = c.name + "_" + res
+        c = c.parent
+      }
+      return uniquify(res + "_" + emitRef(m), configStr)
+    }
+
+    def uniquify(path: String, configStr: String): String = {
+      if (memPaths.contains(path)) {
+        val configs = memPaths(path)
+        if (configs.contains(configStr)) {
+          val count = configs(configStr)
+          if (count == 0) return path else return path + "_" + count
+        } else {
+          val count = configs.size
+          configs += (configStr -> count)
+          scala.Predef.assert(count != 0)
+          return path + "_" + count
+        }
+      } else {
+        val configs = new HashMap[String, Int]
+        configs += (configStr -> 0)
+        memPaths += (path -> configs)
+        return path
+      }
+    }
+
     node match {
       case x: Bits =>
         if (x.dir == INPUT)
@@ -233,7 +276,7 @@ class VerilogBackend extends Backend {
         res
 
       case m: Mem[_] =>
-        if (Component.isInlineMem)
+        if (isInlineMem)
           return ""
 
         m.reads.filter(r => r.used && r.getPortType == "read").foreach { r =>
@@ -247,21 +290,27 @@ class VerilogBackend extends Backend {
         val usedports = m.ports.filter(_.used)
         val portdefs = usedports.zipWithIndex.map { case (p, i) => emitPortDef(p, i) }
 
-        Component.configStr +=
-          "name " + moduleNamePrefix+getPathName(m) +
+        var configStr =
           " depth " + m.n +
           " width " + m.width +
           " ports " + usedports.map(_.getPortType).reduceLeft(_ + "," + _) +
           "\n"
 
+        val fullConfigStr = "name " + moduleNamePrefix+getPathName(m, configStr) + configStr
+
+        if (!memConfigs.contains(fullConfigStr)) {
+          Component.configStr += fullConfigStr
+          memConfigs += fullConfigStr
+        }
+
         val clkrst = Array("    .CLK(clk)", "    .RST(reset)")
-        "  " + moduleNamePrefix+getPathName(m) + " " + emitRef(m) + " (\n" +
+        "  " + moduleNamePrefix+getPathName(m, configStr) + " " + emitRef(m) + " (\n" +
         (clkrst ++ portdefs).reduceLeft(_ + ",\n" + _) + "\n" +
         "  );\n"
 
         
       case m: MemRead[_] =>
-        if (Component.isInlineMem && !m.isSequential)
+        if (isInlineMem)
           "  assign " + emitTmp(node) + " = " + emitRef(m.mem) + "[" + emitRef(m.addr) + "];\n"
         else
           ""
@@ -283,10 +332,14 @@ class VerilogBackend extends Backend {
     }
   }
 
+  def emitSigned(n: Node) = if(n.isSigned) " signed " else ""
+
   def emitDecBase(node: Node): String = 
-    "  wire" + (if (node.isSigned) " signed " else "") + emitWidth(node) + " " + emitRef(node) + ";\n"
+    "  wire" + emitSigned(node) + emitWidth(node) + " " + emitRef(node) + ";\n"
 
   override def emitDec(node: Node): String = {
+    if (node.isInstanceOf[Bundle]) println("found")
+
     node match {
       case x: Bits =>
         if(x.dir == null)
@@ -295,10 +348,10 @@ class VerilogBackend extends Backend {
           ""
 
       case x: ListLookupRef[_] =>
-        "  reg[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
+        "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
 
       case x: Lookup =>
-        "  reg[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
+        "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
 
       case x: ListNode =>
         ""
@@ -310,10 +363,13 @@ class VerilogBackend extends Backend {
         ""
 
       case x: Reg =>
-        if (!node.isMemOutput || isInlineMem) "  reg[" + (node.width-1) + ":0] " + emitRef(node) + ";\n" else "";
+        if (node.isMemOutput)
+          ""
+        else
+          "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n"
 
       case m: Mem[_] =>
-        if (Component.isInlineMem)
+        if (isInlineMem)
           "  reg [" + (m.width-1) + ":0] " + emitRef(m) + " [" + (m.n-1) + ":0];\n"
         else
           ""
@@ -430,15 +486,9 @@ class VerilogBackend extends Backend {
   def emitReg(node: Node): String = {
     node match {
       case reg: Reg =>
-        if(reg.isMemOutput) {
-          if (!isInlineMem)
+        if(reg.isMemOutput)
             ""
-          else if (reg.memOf.cond.isLit && reg.memOf.cond.litOf.value != 0)
-            "    " + emitRef(reg) + " <= " + emitRef(reg.memOf.mem) + "[" + emitRef(reg.memOf.addr) + "];\n"
-          else
-            "    if(" + emitRef(reg.memOf.cond) + ")\n" +
-            "      " + emitRef(reg) + " <= " + emitRef(reg.memOf.mem) + "[" + emitRef(reg.memOf.addr) + "];\n"
-        } else if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1)){
+        else if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1)){
           if(reg.isReset){
             "    if(reset) begin\n" + 
             "      " + emitRef(reg) + " <= " + emitRef(reg.resetVal) + ";\n" +
@@ -457,7 +507,7 @@ class VerilogBackend extends Backend {
         }
 
       case m: MemWrite[_] =>
-        if (!m.used || !Component.isInlineMem)
+        if (!m.used || !isInlineMem)
           return ""
 
         val i = "i" + emitTmp(m)
@@ -472,6 +522,16 @@ class VerilogBackend extends Backend {
 
       case _ =>
         ""
+    }
+  }
+
+  // this function checks that there is no collision with verilog keywords, mangling the names if there
+  // is a collision
+  def checkNames(c: Component) = {
+    for (m <- c.mods) {
+      if (VerilogBackend.keywords.contains(m.name)) {
+        m.name = m.name + "_"
+      }
     }
   }
 
@@ -509,14 +569,15 @@ class VerilogBackend extends Backend {
       w match {
         case io: Bits => {
           if (io.dir == INPUT) {
-	    res.append(nl + "    input " + emitWidth(io) + " " + emitRef(io));
+	    res.append(nl + "    input " + emitSigned(io) + emitWidth(io) + " " + emitRef(io));
           } else if(io.dir == OUTPUT) {
-	    res.append(nl + "    output" + emitWidth(io) + " " + emitRef(io));
+	    res.append(nl + "    output" + emitSigned(io) + emitWidth(io) + " " + emitRef(io));
           }
         }
       };
     }
     res.append(");\n\n");
+    checkNames(c)
     // TODO: NOT SURE EXACTLY WHY I NEED TO PRECOMPUTE TMPS HERE
     for (m <- c.mods)
       emitTmp(m);

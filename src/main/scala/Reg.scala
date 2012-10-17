@@ -29,7 +29,6 @@ object Reg {
       fixWidth(r.getWidth)
   }
 
-  val noInit = Lit(0){Fix()};
   def apply[T <: Data](data: T, width: Int, resetVal: T)(gen: => T): T = {
 
     // check valid gen
@@ -108,7 +107,7 @@ class Reg extends Delay with proc {
       isEnable = backend.isInstanceOf[VerilogBackend]
       enable = enable || cond;
     }
-    updates.enqueue((cond, src));
+    updates += ((cond, src))
     if (src.memSource != null)
       src.memSource.setOutputReg(this)
   }
@@ -118,10 +117,14 @@ class Reg extends Delay with proc {
       return
     }
     if(isEnable){
+      // hack to force the muxes to match the Reg's width:
+      // the intent is u = updates.head._2
+      val u = new Mux().init("", maxWidth _, Bool(true), updates.head._2, this)
+      genMuxes(u, updates.toList.tail)
       inputs += enable;
       enableIndex = inputs.length - 1;
-    }
-    super.genMuxes(default);
+    } else
+      super.genMuxes(default)
   }
   def nameOpt: String = if (name.length > 0) name else "REG"
   override def toString: String = {

@@ -317,21 +317,25 @@ abstract class Component(resetSignal: Bool = null) {
       res += "  ";
     res
   }
+
+  // This function sets the IO's component.
   def ownIo() = {
-    // println("COMPONENT " + name + " IO " + io);
     val wires = io.flatten;
     for ((n, w) <- wires) {
-      // println(">>> " + w + " IN " + this);
+      // This assert is a sanity check to make sure static resolution of IOs didn't fail
       scala.Predef.assert(this == w.staticComp, {println("Statically resolved component differs from dynamically resolved component of IO: " + w + " crashing compiler")})
       w.component = this;
     }
   }
+
+  // This function names components with the classname. Multiple instances of the same component is
+  // unquified by appending _N to the classname where N is an increasing integer.
   def name_it() = {
     val cname  = getClass().getName(); 
     val dotPos = cname.lastIndexOf('.');
     name = if (dotPos >= 0) cname.substring(dotPos+1) else cname;
     className = name;
-    if(!isEmittingComponents) {
+    if(!backend.isInstanceOf[VerilogBackend]) {
       if (compIndices contains name) {
         val compIndex = (compIndices(name) + 1);
         compIndices += (name -> compIndex);
@@ -341,6 +345,7 @@ abstract class Component(resetSignal: Bool = null) {
       }
     }
   }
+
   def findBinding(m: Node): Binding = {
     // println("FINDING BINDING " + m + " OUT OF " + bindings.length + " IN " + this);
     for (b <- bindings) {
@@ -407,14 +412,13 @@ abstract class Component(resetSignal: Bool = null) {
   def initializeBFS: ScalaQueue[Node] = {
     val res = new ScalaQueue[Node]
 
-    // initialize bfsQueue
-    for((n, elm) <- io.flatten) 
-      if(elm.isInstanceOf[Bits] && elm.asInstanceOf[Bits].dir == OUTPUT)
-  	res.enqueue(elm)
     for(a <- asserts) 
       res.enqueue(a)
     for(b <- blackboxes) 
       res.enqueue(b.io)
+    for(c <- components)
+      for((n, io) <- c.io.flatten)
+        res.enqueue(io)
     
     for(r <- resetList)
       res.enqueue(r)
@@ -422,11 +426,30 @@ abstract class Component(resetSignal: Bool = null) {
     res
   }
 
-  def inferAll(): Unit = {
-    println("started inference")
-    var nodesList = ArrayBuffer[Node]()
+  def bfs(visit: Node => Unit): Unit = {
     val walked = new HashSet[Node]
     val bfsQueue = initializeBFS
+
+    // conduct bfs to find all reachable nodes
+    while(!bfsQueue.isEmpty){
+      val top = bfsQueue.dequeue
+      walked += top
+      visit(top)
+      for(i <- top.inputs) {
+        if(!(i == null)) {
+          if(!walked.contains(i)) {
+            bfsQueue.enqueue(i) 
+            walked += i
+          }
+        }
+      }
+    }
+  }
+
+  def inferAll(): Unit = {
+    println("started inference")
+    val nodesList = ArrayBuffer[Node]()
+    bfs { nodesList += _ }
 
     def verify = {
       var hasError = false
@@ -439,21 +462,7 @@ abstract class Component(resetSignal: Bool = null) {
       if (hasError) throw new Exception("Could not elaborate code due to uninferred width(s)")
     }
 
-    // conduct bfs to find all reachable nodes
-    while(!bfsQueue.isEmpty){
-      val top = bfsQueue.dequeue
-      walked += top
-      nodesList += top
-      for(i <- top.inputs) 
-        if(!(i == null)) {
-  	  if(!walked.contains(i)) {
-  	    bfsQueue.enqueue(i) 
-            walked += i
-  	  }
-        }
-    }
     var count = 0
-
     // bellman-ford to infer all widths
     for(i <- 0 until nodesList.length) {
 
@@ -480,8 +489,6 @@ abstract class Component(resetSignal: Bool = null) {
 
   def removeTypeNodes() {
     println("started flattenning")
-    val walked = new HashSet[Node]
-    val bfsQueue = initializeBFS
 
     def getNode(x: Node): Node = {
       var res = x
@@ -492,23 +499,13 @@ abstract class Component(resetSignal: Bool = null) {
     }
 
     var count = 0
-
-    while(!bfsQueue.isEmpty) {
-      val top = bfsQueue.dequeue
-      top.fixName()
-      walked += top
+    bfs {x =>
+      scala.Predef.assert(!x.isTypeNode)
+      x.fixName
       count += 1
-
-      for(i <- 0 until top.inputs.length) {
-        if(!(top.inputs(i) == null)) {
-          if(top.inputs(i).isTypeNode) top.inputs(i) = getNode(top.inputs(i))
-          if(!walked.contains(top.inputs(i))) {
-            bfsQueue.enqueue(top.inputs(i))
-            walked += top.inputs(i)
-          }
-        }
-      }
-
+      for (i <- 0 until x.inputs.length)
+        if (x.inputs(i) != null && x.inputs(i).isTypeNode)
+          x.inputs(i) = getNode(x.inputs(i))
     }
     
     println(count)
@@ -517,28 +514,7 @@ abstract class Component(resetSignal: Bool = null) {
 
   def forceMatchingWidths = {
     println("start width checking")
-
-    var nodesList = ArrayBuffer[Node]()
-    val walked = new HashSet[Node]
-    val bfsQueue = initializeBFS
-
-    // conduct bfs to find all reachable nodes
-    while(!bfsQueue.isEmpty){
-      val top = bfsQueue.dequeue
-      walked += top
-      nodesList += top
-      for(i <- top.inputs) 
-        if(!(i == null)) {
-  	  if(!walked.contains(i)) {
-  	    bfsQueue.enqueue(i) 
-            walked += i
-  	  }
-        }
-    }
-
-    for (node <- nodesList)
-      node.forceMatchingWidths
-
+    bfs(_.forceMatchingWidths)
     println("finished width checking")
   }
 
@@ -668,22 +644,23 @@ abstract class Component(resetSignal: Bool = null) {
     }
     res
   }
+
+  // 1) name the component
+  // 2) name the IO
+  // 3) name and set the component of all statically declared nodes through introspection
   def markComponent() = {
     name_it();
     ownIo();
     io.name_it("io", true);
-    // println("COMPONENT " + name);
     val c = getClass();
     for (m <- c.getDeclaredMethods) {
       val name = m.getName();
-      // println("LOOKING FOR " + name);
       val types = m.getParameterTypes();
       if (types.length == 0 && name != "test") {
         val o = m.invoke(this);
         o match { 
-	  //case comp: Component => { comp.component = this;}
           case node: Node => { if ((node.isTypeNode || (node.name == "" && !node.named) || node.name == null || name != "")) node.name_it(name, true);
-			       if (node.isReg || node.isRegOut || node.isClkInput) containsReg = true;
+			       if (node.isReg || node.isClkInput) containsReg = true;
 			      nameSpace += name;
 			    }
 	  case buf: ArrayBuffer[Node] => {
@@ -692,7 +669,7 @@ abstract class Component(resetSignal: Bool = null) {
 	      for(elm <- buf){
 		if ((elm.isTypeNode || (elm.name == "" && !elm.named) || elm.name == null)) 
 		  elm.name_it(name + "_" + i, true);
-		if (elm.isReg || elm.isRegOut || elm.isClkInput) 
+		if (elm.isReg || elm.isClkInput) 
 		  containsReg = true;
 		nameSpace += name + "_" + i;
 		i += 1;
@@ -710,7 +687,7 @@ abstract class Component(resetSignal: Bool = null) {
 		  case node: Node => {
 		    if ((node.isTypeNode || (node.name == "" && !node.named) || node.name == null)) 
 		      node.name_it(name + "_" + i + "_" + j, true);
-		    if (node.isReg || node.isRegOut || node.isClkInput) 
+		    if (node.isReg || node.isClkInput) 
 		      containsReg = true;
 		    nameSpace += name + "_" + i + "_" + j;
 		    j += 1;
@@ -729,8 +706,6 @@ abstract class Component(resetSignal: Bool = null) {
 	  case bb: BlackBox => {
             if(!bb.named) {bb.instanceName = name; bb.named = true};
             bb.pathParent = this;
-            //bb.name = name;
-            //bb.named = true;
             for((n, elm) <- io.flatten) {
               if (elm.isClkInput) containsReg = true
             }
@@ -783,7 +758,15 @@ abstract class Component(resetSignal: Bool = null) {
 
   def traceNodes() = {
     val queue = Stack[() => Any]();
-    queue.push(() => io.traceNode(this, queue));
+
+    if (!backend.isInstanceOf[VerilogBackend]) {
+      queue.push(() => io.traceNode(this, queue));
+    } else {
+      for (c <- components) {
+        queue.push(() => c.reset.traceNode(c, queue))
+        queue.push(() => c.io.traceNode(c, queue))
+      }
+    }
     for (a <- asserts)
       queue.push(() => a.traceNode(this, queue));
     for (b <- blackboxes)
@@ -796,30 +779,6 @@ abstract class Component(resetSignal: Bool = null) {
 
   def findCombLoop() = {
     println("BEGINNING COMBINATIONAL LOOP CHECKING")
-
-    var nodesList = ArrayBuffer[Node]()
-    val walked = new HashSet[Node]
-    val bfsQueue = initializeBFS
-
-    // initialize bfsQueue
-    // search for all reachable nodes, then pass this graph into tarjanSCC
-
-    while(!bfsQueue.isEmpty){
-      val top = bfsQueue.dequeue
-      walked += top
-      nodesList += top
-
-      for(i <- 0 until top.inputs.length) {
-        if(!(top.inputs(i) == null)) {
-          
-          if(!walked.contains(top.inputs(i))) {
-            bfsQueue.enqueue(top.inputs(i))
-            walked += top.inputs(i)
-          }
-          
-        }
-      }
-    }
 
     // Tarjan's strongly connected components algorithm to find loops
     println("BEGINNING SEARCHING CIRCUIT FOR COMBINATIONAL LOOP")
@@ -858,7 +817,7 @@ abstract class Component(resetSignal: Bool = null) {
       }
     }
 
-    for (node <- nodesList) {
+    bfs { node =>
       if(node.sccIndex == -1 && !node.isInstanceOf[Delay] && !(node.isReg))
         tarjanSCC(node)
     }

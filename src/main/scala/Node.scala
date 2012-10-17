@@ -19,7 +19,6 @@ object Node {
 
   implicit def convBitsToUFix(x: Bits): UFix = x.toUFix;
 
-  var isHiC = false;
   var isCoercingArgs = true;
   var conds = new Stack[Bool]();
   conds.push(Bool(true));
@@ -102,13 +101,14 @@ abstract class Node extends nameable{
   var genError = false;
   var stack: Array[StackTraceElement] = null;
   var line: StackTraceElement = findFirstUserLine(Thread.currentThread().getStackTrace)
-  var memSource: MemAccess = null
+  var memSource: MemRead[_] = null
   var isScanArg = false
   var isPrintArg = false
   def isMemOutput = false
   
   nodes += this
   
+  def setIsSigned = isSigned = true
   def isByValue: Boolean = true;
   def width: Int = if(isInGetWidth) inferWidth(this) else width_;
   def width_=(w: Int) = { isFixedWidth = true; width_ = width; inferWidth = fixWidth(w); }
@@ -119,6 +119,7 @@ abstract class Node extends nameable{
   def minNum: BigInt = BigInt(0);
   // TODO: SHOULD BE GENERALIZED TO DIG FOR LIT AS litOf DOES
   def isLit = false;
+  def clearlyEquals(x: Node): Boolean = this == x
   // TODO: SHOULD AGREE WITH isLit
   def litOf: Literal = {
     if(inputs.length == 0)
@@ -160,7 +161,6 @@ abstract class Node extends nameable{
   def getLit = this.asInstanceOf[Literal]
   def isIo = false;
   def isReg = false;
-  var isRegOut = false;
   def isUsedByRam: Boolean = {
     for (c <- consumers) 
       if (c.isRamWriteInput(this))
@@ -241,9 +241,9 @@ abstract class Node extends nameable{
   }
 
   def traceNode(c: Component, stack: Stack[() => Any]): Any = {
-    if(this.isTypeNode) println("found")
+    if(this.isTypeNode) println("found " + this)
     // determine whether or not the component needs a clock input
-    if ((isReg || isRegOut || isClkInput) && !(component == null))
+    if ((isReg || isClkInput) && !(component == null))
         component.containsReg = true
 
     // pushes and pops components as necessary in order to later mark the parent of nodes
@@ -278,7 +278,8 @@ abstract class Node extends nameable{
            //tmp fix, what happens if multiple componenets reference static nodes?
           if (node.component == null || !components.contains(node.component))
             node.component = nextComp;
-          stack.push(() => node.traceNode(nextComp, stack));
+          if (!backend.isInstanceOf[VerilogBackend] || !node.isIo)
+            stack.push(() => node.traceNode(nextComp, stack));
           val j = i;
           val n = node;
           stack.push(() => {
@@ -325,7 +326,9 @@ abstract class Node extends nameable{
 
   def matchWidth(w: Int): Node = {
     if (w > this.width) {
-      val fill = NodeFill(w - this.width, Literal(0,1)); fill.infer
+      val topBit = if (isSigned) NodeExtract(this, this.width-1) else Literal(0,1)
+      topBit.infer
+      val fill = NodeFill(w - this.width, topBit); fill.infer
       val res = Concatenate(fill, this); res.infer
       res
     } else if (w < this.width) {
@@ -366,8 +369,8 @@ abstract class Node extends nameable{
     typeNode
   }
   def setTypeNode[T <: Data](typeNode: T): T = {
-    setTypeNodeNoAssign(typeNode)
     typeNode assign this
+    setTypeNodeNoAssign(typeNode)
     typeNode
   }
 

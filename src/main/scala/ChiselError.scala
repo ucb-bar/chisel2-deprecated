@@ -42,12 +42,15 @@ object ChiselError {
     println("COULDN'T FIND LINE NUMBER")
     return 0
   }
-}
 
-class ChiselError(val msgFun: () => String, val line: StackTraceElement) {
-  def printError = {
+  def printError(msgFun: () => String, line: StackTraceElement) = {
     println(msgFun() + " on line " + line.getLineNumber + 
             " in class " + line.getClassName + 
             " in file " + line.getFileName)
   }
+}
+
+class ChiselError(val msgFun: () => String, val line: StackTraceElement) {
+  def printError: Unit = ChiselError.printError(msgFun, line)
+
 }

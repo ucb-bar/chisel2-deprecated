@@ -8,6 +8,7 @@
 #include <vector>
 #include <stdarg.h>
 #include <string.h>
+#include <time.h>
 #include <string>
 #include <map>
 #include <stdlib.h>
@@ -969,11 +970,11 @@ struct bit_word_funs<3> {
   }
 };
 
+static val_t rand_val_seed = time(NULL) | 1;
 static val_t rand_val()
 {
-  val_t x = 0;
-  for (int i = 0; i < sizeof(val_t)/sizeof(int); i++)
-    x |= (val_t)(unsigned)rand() << (i*CHAR_BIT*sizeof(int));
+  val_t x = rand_val_seed;
+  rand_val_seed = x>>1 | (x>>0^x>>60^x>>61^x>>63)<<63;
   return x;
 }
 
@@ -1005,12 +1006,15 @@ class dat_t {
       res.push_back(rres[rres.size()-i-1]);
     return res;
   }
+  void randomize() {
+    for (int i = 0; i < n_words; i++)
+      values[i] = rand_val();
+    if (val_n_word_bits(w))
+      values[n_words-1] &= mask_val(val_n_word_bits(w));
+  }
   static dat_t<w> rand() {
     dat_t<w> r;
-    for (int i = 0; i < n_words; i++)
-      r.values[i] = rand_val();
-    if (val_n_word_bits(w))
-      r.values[n_words-1] &= mask_val(val_n_word_bits(w));
+    r.randomize();
     return r;
   }
   inline dat_t<w> () { 
@@ -1493,7 +1497,7 @@ class mem_t {
   }
   void randomize() {
     for (int i = 0; i < d; i++)
-      contents[i] = dat_t<w>::rand();
+      contents[i].randomize();
   }
   size_t read_hex(const char *hexFileName) {
     ifstream ifp(hexFileName);

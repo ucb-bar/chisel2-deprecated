@@ -23,7 +23,7 @@ abstract class Backend {
   def emitRef(node: Node): String = {
     node match {
       case r: Reg => 
-        if(r.isMemOutput) emitRef(r.updateVal) else if(r.name == "") "R" + r.emitIndex else r.name
+        if(r.isMemOutput) emitRef(r.memOf.outputVal) else if(r.name == "") "R" + r.emitIndex else r.name
       case _ => 
         if(node.name == "" || !node.named) 
           "T" + node.emitIndex 
@@ -118,7 +118,7 @@ abstract class Backend {
 
   def compile(c: Component, flags: String = null): Unit = { }
 
-  def checkPorts = {
+  def checkPorts(topC: Component) = {
 
     def prettyPrint(n: Node, c: Component) = {
       val dir = if (n.asInstanceOf[Bits].dir == INPUT) "Input" else "Output"
@@ -130,9 +130,11 @@ abstract class Backend {
     }
 
     for (c <- components) {
-      for ((n,i) <- c.io.flatten) {
-        if (i.inputs.length == 0) {
-          prettyPrint(i, c)
+      if (c != topC) {
+        for ((n,i) <- c.io.flatten) {
+          if (i.inputs.length == 0) {
+            prettyPrint(i, c)
+          }
         }
       }
     }

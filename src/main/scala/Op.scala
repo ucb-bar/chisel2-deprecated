@@ -13,9 +13,9 @@ abstract class Cell extends nameable{
 object chiselCast {
   def apply[S <: Data, T <: Bits](x: S)(gen: => T): T = {
     val res = gen.asOutput
-    res.setIsTypeNode
     x.nameHolder = res
     res.inputs += x.toNode
+    res.setIsTypeNode
     res
   }
 }
@@ -227,7 +227,7 @@ object Op {
     res.init("", widthInfer, a, b);
     res.op = name;
     res.nGrow = nGrow;
-    res.isSigned = a.isInstanceOf[Fix] && b.isInstanceOf[Fix]
+    if(a.isSigned && b.isSigned) res.setIsSigned
     res
   }
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node): Node = {
