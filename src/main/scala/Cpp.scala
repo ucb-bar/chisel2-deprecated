@@ -265,7 +265,7 @@ class CppBackend extends Backend {
         })
 
       case x: Fill =>
-        require(node.inputs(1).isLit)
+        // require(node.inputs(1).isLit)
         require(node.inputs(0).width == 1)
         emitTmpDec(node) + block((0 until words(node)).map(i => emitWordRef(node, i) + " = " + (if (node.inputs(0).isLit) 0L - node.inputs(0).value.toInt else "-" + emitLoWordRef(node.inputs(0))))) + trunc(node)
         
