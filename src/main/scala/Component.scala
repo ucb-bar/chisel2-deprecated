@@ -331,7 +331,7 @@ abstract class Component(resetSignal: Bool = null) {
   // This function names components with the classname. Multiple instances of the same component is
   // unquified by appending _N to the classname where N is an increasing integer.
   def name_it() = {
-    val cname  = getClass().getName(); 
+    val cname  = getClass().getName().replace("$", "_")
     val dotPos = cname.lastIndexOf('.');
     name = if (dotPos >= 0) cname.substring(dotPos+1) else cname;
     className = name;
