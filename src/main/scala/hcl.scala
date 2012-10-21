@@ -122,6 +122,8 @@ object chiselMain {
     }
   }
 
+  def run[T <: Component] (args: Array[String], gen: () => T): T = apply(args, gen) // hack to avoid supplying default parameters manually for invocation in sbt
+
   def apply[T <: Component]
       (args: Array[String], gen: () => T, 
        scanner: T => TestIO = null, printer: T => TestIO = null, ftester: T => Tester[T] = null): T = {
