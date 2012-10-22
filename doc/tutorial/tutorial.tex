@@ -569,10 +569,10 @@ any \code{Data} object that has directions assigned to its members.
 
 Chisel provides port constructors to allow a direction to be added
 (input or output) to an object at construct time.  Primitive port
-constructors take the number of bits as the first argument (except
-booleans which are always one bit) and direction as the second
-argument, where the direction is \code{INPUT} or
-\code{OUTPUT}.
+constructors take the direction as the first
+argument (where the direction is \code{INPUT} or
+\code{OUTPUT}) and the number of bits as the second argument (except
+booleans which are always one bit).
 
 An example port declaration is as follows:
 \begin{scala}
@@ -720,7 +720,7 @@ object tutorial {
 \end{figure}
  
 Testing is a crucial part of circuit design, 
-and thus in Chisel we provide a mechanism for
+and thus in Chisel we include a mechanism for
 testing circuits by providing test vectors within Scala using
 subclasses of the \code{Tester} class:
 
@@ -845,24 +845,20 @@ Counters are an important sequential circuit.  To construct an
 up-counter that counts up to a maximum value, \verb+max+, then wraps
 around back to zero (i.e., modulo \verb!max+1!), we write:
 \begin{scala}
-def wraparound(n: UFix, max: UFix) =
-  Mux(n > max, UFix(0), n)
-
 def counter(max: UFix) = {
   val x = Reg(resetVal = UFix(0, max.getWidth))
-  x := wraparound(x + UFix(1), max)
+  x := Mux(x == max, UFix(0), x + UFix(1))
   x
 }
 \end{scala}
 
 \noindent
-The \verb!wraparound! function represents the combinational circuit
-that calculates the next value of the count.  The counter register is
-created in the \verb!counter! function with a reset value of \verb!0! (with width large enough to hold \verb+max+),
+The counter register is created in the \verb!counter! function 
+with a reset value of \verb!0! (with width large enough to hold \verb+max+),
 to which the register will be initialized when the global reset for the circuit is asserted.
-The \verb!:=! assignment to \verb!x! in \verb!counter! wires the
-output of the wraparound circuit to the input of the register
-\verb!x!.  Note that when \verb!x! appears on the right-hand side of
+The \verb!:=! assignment to \verb!x! in \verb!counter! wires an update combinational circuit 
+which increments the counter value unless it hits the \verb+max+ at which point it wraps back to zero.
+Note that when \verb!x! appears on the right-hand side of
 an assigment, its output is referenced, whereas when on the right-hand
 side, its input is referenced.
 
@@ -899,7 +895,7 @@ from nodes that have already been defined.  Sequential circuits
 naturally have feedback between nodes, and so it is sometimes
 necessary to reference an output wire before the producing node has
 been defined.  Because Scala evaluates program statements
-sequentially, we have allow data nodes to serve as a wire providing
+sequentially, we allow data nodes to serve as a wire providing
 a declaration of a node that can be used immediately, but whose
 input will be set later.  
 For example, in a simple CPU, we need to define the \verb!pcPlus4!
@@ -1254,87 +1250,95 @@ where \verb+amp+ is used to scale the fixpoint values stored in the ROM.
 
 \subsection{Mem}
 
-
 Memories are given special treatment in Chisel since hardware
 implementations of memory have many variations, e.g., FPGA memories
 are instantiated quite differently from ASIC memories.  Chisel defines
 a memory abstraction that can map to either simple Verilog behavioral
 descriptions, or to instances of memory modules that are available
-from external memory generators provided by foundry or IP vendors.  In
-the simplest form, Chisel allows memory to be defined with a single
-write port and multiple read ports as follows:
+from external memory generators provided by foundry or IP vendors.  
+
+Chisel supports random-access memories via the \code{Mem} construct.
+Writes to Mems are positive-edge-triggered and reads are either
+combinational or positive-edge-triggered.
 
 \begin{scala}
-  Mem(depth: Int)
+object Mem {
+  def apply[T <: Data](depth: Int,
+          seqRead: Boolean = false)
+        (type: => T): Mem
+}
+
+class Mem[T <: Data](depth: Int, 
+      seqRead: Boolean = false,
+      type: () => T) 
+    extends Updateable {
+  def apply(idx: UFix): T
+}
 \end{scala}
 
-\noindent
-where \verb+depth+ is the number of memory locations.
-%, \verb+target+ is the type of memory used.
-A memory object can then
-be read from using the \verb+apply(rdAddress)+ method.  For example, an
-audio recorder could be defined as follows:
+Ports into Mems are created by applying a \code{UFix} index.  A 32-entry
+register file with one write port and two combinational read ports might be
+expressed as follows:
 
 \begin{scala}
-  def audioRecorder(n: Int, button: Bool) = { 
-    val addr   = counter(UFix(n))
-    val ram    = Mem(n)
-    ram(addr) := button
-    ram(Mux(button(), UFix(0), addr))
-  } 
+val rf = Mem(32) { UFix(width = 64) }
+when (wen) { rf(waddr) := wdata }
+val dout1 = rf(waddr1)
+val dout2 = rf(waddr2)
 \end{scala}
 
-\noindent
-where a counter is used as an address generator into a memory.  
-The device records while \verb+button+ is \verb+true+, or plays back when \verb+false+.
-
-We can use simple memory to create register files.
-For example we can make a one write port, two read port register file with 32 registers as follows:
+If the optional parameter \code{seqRead} is set, Chisel will attempt to infer
+sequential read ports when a Reg is assigned the output of a Mem.  A one-read,
+one-write SRAM might be described as follows:
 
 \begin{scala}
-  val regs = Mem(32)
-  when (wr_en) {
-    regs(wr_addr) := wr_data
-  }
-  val idat = regs(iaddr)
-  val mdat = regs(maddr)
+val ram1r1w =
+  Mem(1024, seqRead = true) { Bits(width = 32) }
+val dout = Reg() { Bits() }
+when (wen) { ram1r1w(waddr) := wdata }
+when (ren) { dout := ram1r1w(raddr) }
 \end{scala}
 
-\noindent
-where a new read port is created for each call to \code{apply}.
-
-Additional parameters are available to mimic common memory behaviors,
-to aid with the process of mapping to real-world hardware.  The
-following is an example of a memory that is first defined with no
-memory ports, after which read, write, or read/write ports are added:
+Single-ported SRAMs can be inferred when the read and write conditions are
+mutually exclusive in the same \code{when} chain:
 
 \begin{scala}
-  val regfile = Mem(64){ Bits(width = 32) }
-  when (wen) {
-    regfile.write(addr_in, data_in1, w_mask = bit_mask)
-  }
-  val read_data = regfile(addr_in)
+val ram1p = 
+  Mem(1024, seqRead = true) { Bits(width = 32) }
+val dout = Reg() { Bits() }
+when (wen) { ram1p(waddr) := wdata }
+.elsewhen (ren) { dout := ram1p(raddr) }
 \end{scala}
 
-%                 // Default: 0 (Combinational)
-%           // A memory with no ports, with data width derived from
-%           another signal.
-%  // Data formatted for Verilog readmemh
+If the same Mem address is both written and sequentially read on the same clock
+edge, or if a sequential read enable is cleared, then the read data is
+implementation-defined.
 
-% This example can be written more compactly as:
+Mem also supports write masks for subword writes.  A given bit is written if
+the corresponding mask bit is set.
+
+\begin{scala}
+val ram = Mem(256) { Bits(width = 32) }
+when (wen) { ram.write(waddr, wdata, wmask) }
+\end{scala}
+
+
+% For example, an
+% audio recorder could be defined as follows:
 % 
 % \begin{scala}
-% val regfile = Mem(64, io.wen, io.addr_in, io.data_in1, w_mask = io.bit_mask,
-%  readLatency = 1, hexInitFile = "hex_init_values.txt")
-% val read_data = regfile(io.addr_in, io.data_in1, oe = !io.wen, cs = Bool(true))
+%   def audioRecorder(n: Int, button: Bool) = { 
+%     val addr   = counter(UFix(n))
+%     val ram    = Mem(n)
+%     ram(addr) := button
+%     ram(Mux(button(), UFix(0), addr))
+%   } 
 % \end{scala}
 % 
-By default, this memory will be compiled to Verilog RTL.  To produce a
-reference to a Verilog instance of a memory module, one adds
-\verb+target = 'inst+ to the constructor call.  When Chisel compiles
-to Verilog, a second file will be generated, e.g., \verb+design.conf+,
-which can be used by the synthesis design flow to construct the
-requested memory objects.
+% \noindent
+% where a counter is used as an address generator into a memory.  
+% The device records while \verb+button+ is \verb+true+, or plays back when \verb+false+.
+
 
 \section{Interfaces and Bulk Connections}
 \label{sec:interfaces}
@@ -1722,7 +1726,7 @@ In Chisel this can be defined as:
 \begin{scala}
 def innerProductFIR[T <: Num] (w: Array[Int], x: T) = {
   val delays = Range(0, w.length).map(i => Num(w(i)) * delay(x, i))
-  delays.foldRight(_ + _)
+  delays.reduceRight(_ + _)
 }
 
 def delay[T <: Bits](x: T, n: Int): T =
@@ -1825,12 +1829,12 @@ class Fifo[T <: Data] (n: Int)(type: => T)
 It is also possible to define a generic decoupled interface:
 
 \begin{scala}
-  class FIFOIO[T <: Data]()(data: => T) 
-      extends Bundle {
-    val ready = Bool(INPUT)
-    val valid = Bool(OUTPUT)
-    val bits  = data.asOutput
-  }
+class FIFOIO[T <: Data]()(data: => T) 
+    extends Bundle {
+  val ready = Bool(INPUT)
+  val valid = Bool(OUTPUT)
+  val bits  = data.asOutput
+}
 \end{scala}
 
 \noindent
@@ -1838,8 +1842,8 @@ This template can then be used to add a handshaking protocol to any
 set of signals:
 
 \begin{scala}
-  class DecoupledDemo 
-    extends FIFOIO()( new DataBundle )
+class DecoupledDemo 
+  extends FIFOIO()( new DataBundle )
 \end{scala}
 
 \noindent
@@ -1847,14 +1851,14 @@ The FIFO interface in Figure~\ref{fig:fifo} can be now be simplified as
 follows: 
 
 \begin{scala}
-  class Fifo[T <: Data] (n: Int)(data: => T) 
-      extends Component {
-    val io = new Bundle {
-      val enq = new FIFOIO()( data ).flip()
-      val deq = new FIFOIO()( data )
-    }
-    ...
+class Fifo[T <: Data] (n: Int)(data: => T) 
+    extends Component {
+  val io = new Bundle {
+    val enq = new FIFOIO()( data ).flip()
+    val deq = new FIFOIO()( data )
   }
+  ...
+}
 \end{scala}
 
 
