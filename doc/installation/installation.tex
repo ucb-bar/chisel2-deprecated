@@ -170,6 +170,51 @@ sudo apt-get install
 %   \item GCD.cpp
 % \end{itemize}
 
+\subsubsection{Windows}
+
+\begin{itemize}
+\item \textbf{Install Cygwin} --
+Go to \url{http://cygwin.com/install.html} and run \verb+Setup.exe+.
+Make sure that you are installing at least the following packages.  Basic packages like editors are also required if you want to use Chisel.):
+\begin{itemize}
+\item git
+\item g++
+\item make
+\end{itemize}
+\item \textbf{Pull Chisel from repository} -- run
+\begin{bash}
+git clone git://github.com/ucb-bar/chisel/
+\end{bash}
+\item \textbf{Some fixes in Cygwin Environment variables} --
+set CHISEL environment variable to chisel directory
+like: 
+\begin{bash}
+export CHISEL=~/chisel
+\end{bash}
+Add sbt file with the following contexts to \verb+$CHISEL/tutorial/sbt+ directory (you will have an sbt file inside that directory). Make sure that you \verb!chmod +x! the sbt file
+
+\begin{bash}
+java -Xmx512M -jar sbt-launch.jar “$@”
+\end{bash}
+
+In the same directory (\verb+$CHISEL/tutorial/sbt+) make sure that sbt-launch.jar is a hard link not a symbolic link. You can make it a hard link by
+\begin{bash}
+rm sbt-launch.jar; ln ../../sbt/sbt-launch.jar sbt-launch.jar
+\end{bash}
+
+\item \textbf{Fix the Cygwin heap size if necessary}
+
+
+On windows command line run:
+
+\begin{bash}
+regtool -i set /HKLM/Software/Cygwin/heap_chunk_in_mb 1024
+\end{bash}
+
+\item {\bf Put the \verb+cygwin\bin+ directory into the windows path variable:}
+(In my case I added \verb+C:\cygwin\bin+ to windows path) this will enable the java to find the g++.exe
+\end{itemize}
+
 \section{Github}
 
 \verb+cd+ above directory = \verb+$DIR+ you've chosen to place Chisel and type:
@@ -233,6 +278,76 @@ make GCD
 SBT has a particular directory structure that we adhere to and
 somewhat improve.  Assuming that we have a project named {\em gpu},
 then the following would be the directory structure template:
+
+\begin{bash}
+gpu/
+  sbt/
+    project/
+      build.scala # edit this as shown below
+  src/ 
+    gpu.scala     # your source files go here
+  emulator/       # your C++ target can go here
+\end{bash}
+
+\noindent
+and the following is the \verb+build.scala+ template:
+
+\begin{scala}
+import sbt._
+import Keys._
+
+object BuildSettings
+{
+  val buildOrganization = "edu.berkeley.cs"
+  val buildVersion = "1.1"
+  val buildScalaVersion = "2.9.2"
+
+  def apply() = {
+    Defaults.defaultSettings ++ Seq (
+      organization := buildOrganization,
+      version      := buildVersion,
+      scalaVersion := buildScalaVersion,
+      scalaSource in Compile := Path.absolute(file("../src")),
+      libraryDependencies += "edu.berkeley.cs" %% "chisel" % "1.0"
+    )
+  }
+}
+
+object ChiselBuild extends Build
+{
+  import BuildSettings._
+
+  lazy val gpu = Project("gpu", file("gpu"), settings = BuildSettings()) 
+}
+
+object BuildSettings {
+  val buildOrganization = "edu.berkeley.cs"
+  val buildVersion = "1.1"
+  val buildScalaVersion = "2.9.2"
+
+  def apply(projectdir: String) = {
+    Defaults.defaultSettings ++ Seq (
+      organization := buildOrganization,
+      version      := buildVersion,
+      scalaVersion := buildScalaVersion,
+      scalaSource in Compile := 
+        Path.absolute(file(projectdir + "/src"))
+    )
+  }
+}
+
+object ChiselBuild extends Build {
+  import BuildSettings._
+  val chiselDir = java.lang.System.getenv("CHISEL")
+  lazy val chisel = 
+    Project("chisel", file("chisel"), 
+            settings = BuildSettings(chiselDir))
+  lazy val gpu =
+    Project("gpu", file("gpu"), 
+            settings = BuildSettings("..")) 
+      dependsOn(chisel)
+}
+\end{scala}
 
 \begin{bash}
 gpu/
