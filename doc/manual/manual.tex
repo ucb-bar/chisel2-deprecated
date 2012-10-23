@@ -31,9 +31,9 @@
 }
 
 \title{Chisel Manual}
-\author{Jonathan Bachrach, Krste Asanovi\'{c} \\
+\author{Jonathan Bachrach, Krste Asanovi\'{c}, Huy Vo \\
 EECS Department, UC Berkeley\\
-{\tt  \{jrb|krste\}@eecs.berkeley.edu}
+{\tt  \{jrb|krste|huytbvo\}@eecs.berkeley.edu}
 }
 \date{\today}
 
@@ -1317,9 +1317,13 @@ def Enum[T <: Bits]
 \subsection{Math}
 
 \begin{scala}
-// Returns the log base 2 of the input Scala 
-// Integer rounded up
+// Returns the log base 2 of the input 
+// Scala Integer rounded up
 def log2Up(in: Int): Int
+
+// Returns the log base 2 of the input
+// Scala Integer rounded down
+def log2Down(in: Int): Int
 
 // Returns true if the input Scala Integer 
 // is a power of 2
@@ -1332,42 +1336,18 @@ def LFSR16(increment: Bool = Bool(true)): Bits
 \subsection{Sequential}
 
 \begin{scala}
-// Returns a Bool that is asserted only 
-// when x transistions from low to high
-def PosEdge(x: Bool): Bool = 
-  x && !Reg(x)
-
 // Returns the n-cycle delayed version 
 // of the input signal
 def ShiftRegister[T <: Data](n: Int, in: T): T
 
-def overflow(n: UFix, max: UFix) =
-  Mux(n > max, UFix(0), n)
-
-def Counter (max: UFix): UFix = {
-  val x = Reg(resetVal = UFix(0, max.getWidth))
-  x := overflow(x + UFix(1), max)
-  x
+def Counter(cond: Bool, n: Int) = {
+  val c = Reg(resetVal = UFix(0, log2Up(n)))
+  val wrap = c === UFix(n-1)
+  when (cond) {
+    c := Mux(Bool(!isPow2(n)) && wrap, UFix(0), c + UFix(1))
+  }
+  (c, wrap && cond)
 }
-
-def Pulse (n: UFix) =
-  counter(n - UFix(1)) === UFix(0)
-
-def Toggle(p: Bool) = {
-  val x = Reg(resetVal = Bool(false))
-  x := Mux(p, !x, x)
-  x
-}
-
-def SquareWave(period: UFix) =
-  toggle(pulse(period))
-\end{scala}
-
-\subsection{Functional}
-
-
-\begin{scala}
-def foldR[T <: Bits](x: Seq[T])(f: (T, T) => T): T
 \end{scala}
 
 \subsection{Bits}
@@ -1389,23 +1369,33 @@ def UFixToOH(in: UFix, width: Int): Bits
 def OHToUFix(in: Bits): UFix
 def OHToUFix(in: Seq[Bool]): UFix
 
-// Builds a Mux tree out of the input signal 
-// vector using a one hot encoded select signal.
-// Returns the output of the Mux tree
-def MuxOH[T <: Data](sel: Bits, in: Vec[T]): T
-def MuxOH[T <: Data](sel: Vec[Bool], in: Vec[T]): T
+// Builds a Mux tree out of the input 
+// signal vector using a one hot encoded 
+// select signal. Returns the output of 
+// the Mux tree
+def Mux1H[T <: Data](sel: Bits, in: Vec[T]): T
+def Mux1H[T <: Data](sel: Vec[Bool], in: Vec[T]): T
 
-// Returns the bit position of the trailing 1 in 
-// the input vector with the assumption that 
-// multiple bits of the input bit vector can be 
-// set
+// Builds a Mux tree under the
+// assumption that multiple
+// select signals can be enabled.
+// Priority is given to the first 
+// select signal. Returns the output 
+// of the Mux tree.
+def PriorityMux[T <: Data](sel: Bits, in: Seq[T]): T
+def PriorityMux[T <: Data](sel: Seq[Bits], in: Seq[T]): T
+
+// Returns the bit position of the
+// trailing 1 in the input vector with
+// the assumption that multiple bits of
+// the input bit vector can be set
 def PriorityEncoder(in: Bits): UFix
-
 def PriorityEncoder(in: Seq[Bool]): UFix
 
-// Returns the bit position of the trailing 1 in 
-// the input vector with the assumption that only 
-// one bit in the input vector can be set
+// Returns the bit position of the
+// trailing 1 in the input vector with
+// the assumption that only one bit in 
+// the input vector can be set
 def PriorityEncoderOH(in: Bits): UFix
 def PriorityEncoderOH(in: Seq[Boo]): UFix
 \end{scala}
@@ -1413,28 +1403,32 @@ def PriorityEncoderOH(in: Seq[Boo]): UFix
 \subsection{Decoupled}
 
 \begin{scala}
-// Adds a ready-valid handshaking protocol to any 
-// interface. The standard used is that the 
-// consumer uses the flipped interface.
-class ioDecoupled[+T <: Data]()(data: => T) 
+// Adds a ready-valid handshaking
+// protocol to any interface. The 
+// standard used is that the
+// consumer uses the flipped
+// interface.
+class FIFOIO[+T <: Data]()(data: => T) 
     extends Bundle {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
   val bits  = data.asOutput
 }
 
-// Adds a valid protocol to any interface. The
-// standard used is that the consumer uses the
+// Adds a valid protocol to any
+// interface. The standard used is
+// that the consumer uses the
 // fliped interface.
-class ioPipe[+T <: Data]()(data: => T) 
+class PipeIO[+T <: Data]()(data: => T) 
     extends Bundle {
   val valid = Bool(OUTPUT)
   val bits = data.asOutput
 }
 
-// Hardware module that is used to sequence 
-// n producers into 1 consumer. Priority is
-// given to lower producer
+// Hardware module that is used to 
+// sequence n producers into 1 consumer. 
+// Priority is given to lower
+// producer
 // Example usage:
 //    val arb = new Arbiter(2){ Bits() }
 //    arb.io.in(0) <> producer0.io.out
@@ -1442,9 +1436,10 @@ class ioPipe[+T <: Data]()(data: => T)
 //    consumer.io.in <> arb.io.out
 class Arbiter[T <: Data](n: Int)(data: => T) extends Component 
 
-// Hardware module that is used to sequence 
-// n producers into 1 consumer. Producers are
-// chosen in round robin order
+// Hardware module that is used to 
+// sequence n producers into 1 consumer.
+// Producers are chosen in round robin 
+// order
 // Example usage:
 //    val arb = new RRArbiter(2){ Bits() }
 //    arb.io.in(0) <> producer0.io.out
@@ -1452,22 +1447,36 @@ class Arbiter[T <: Data](n: Int)(data: => T) extends Component
 //    consumer.io.in <> arb.io.out
 class RRArbiter[T <: Data](n: Int)(data: => T) extends Component 
 
-// Generic hardware queue. Required parameter
-// entries parameter controls the depth of the 
-// queues. The width of the queue is 
-// determined from the inputs. Optional
-// parameters pipe and flushable determines
-// if the queue is flowthrough and if the 
-// contents can be flushed respectively.
+// Generic hardware queue. Required
+// parameter entries controls the
+// depth of the queues. The width of
+// the queue is determined from the 
+// inputs.
 // Example usage:
-//    val q = new queue(16){ Bits() }
+//    val q = new Queue(16){ Bits() }
 //    q.io.enq <> producer.io.out
 //    consumer.io.in <> q.io.deq
-class queue[T <: Data]
-    (entries: Int, 
-     pipe: Boolean = false, 
+class Queue[T <: Data]
+    (entries: Int,
+     pipe: Boolean = false,
+     flow: Boolean = false
      flushable: Boolean = false)
     (data: => T) extends Component  
+
+// A hardware module that delays data 
+// coming down the pipeline by the 
+// number of cycles set by the 
+// latency parameter. Functionality
+// is similar to ShiftRegister but
+// this exposes a Pipe interface.
+// Example usage:
+//    val pipe = new Pipe(){ Bits() }
+//    pipe.io.enq <> produce.io.out
+//    consumer.io.in <> pipe.io.deq
+class Pipe[T <: Data]
+    (latency: Int = 1)
+    (data: => T) extends Component
+
 \end{scala}
 
 % henry
