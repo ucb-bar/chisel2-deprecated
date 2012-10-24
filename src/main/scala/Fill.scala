@@ -35,6 +35,11 @@ object Fill {
     }
   }
   def apply(mod: Bits, n: Int): Bits = apply(n, mod)
+  def apply(n: Bits, mod: Bits): Bits = {
+    val fill = new Fill()
+    fill.init("", fillWidthOf(0, mod), n, mod)
+    fill.setTypeNode(Bits(OUTPUT))
+  }
 }
 
 object NodeFill {
