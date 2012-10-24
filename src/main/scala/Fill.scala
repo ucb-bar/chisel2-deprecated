@@ -36,9 +36,7 @@ object Fill {
   }
   def apply(mod: Bits, n: Int): Bits = apply(n, mod)
   def apply(n: Bits, mod: Bits): Bits = {
-    val fill = new Fill()
-    fill.init("", fillWidthOf(0, mod), mod, n)
-    fill.setTypeNode(Bits(OUTPUT))
+    (mod << n).toUFix - UFix(1)
   }
 }
 
