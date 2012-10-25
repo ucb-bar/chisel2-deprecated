@@ -778,9 +778,9 @@ class Functional extends Component {
   def clb(a: Bits, b: Bits, c: Bits, d: Bits) = 
     (a & b) | (~c & d)
   val io = new Bundle {
-    val x = Bits(16, INPUT)
-    val y = Bits(16, INPUT)
-    val z = Bits(16, OUTPUT)
+    val x = Bits(INPUT, 16)
+    val y = Bits(INPUT, 16)
+    val z = Bits(OUTPUT, 16)
   }
   io.z := clb(io.x, io.y, io.x, io.y)
 }
@@ -1218,8 +1218,8 @@ when (idx === v2) { u2 }
 \begin{scala}
 class Parity extends Component {
   val io = new Bundle {
-    val in  = Bool(dir = INPUT)
-    val out = Bool(dir = OUTPUT) }
+    val in  = Bool(INPUT)
+    val out = Bool(OUTPUT) }
   val s_even :: s_odd :: Nil = Enum(2){ UFix() }
   val state  = Reg(resetVal = s_even)
   when (io.in) {
@@ -1239,9 +1239,9 @@ class Parity extends Component {
 \begin{scala}
 class VendingMachine extends Component {
   val io = new Bundle {
-    val nickel = Bool(dir = INPUT)
-    val dime   = Bool(dir = INPUT)
-    val valid  = Bool(dir = OUTPUT) }
+    val nickel = Bool(INPUT)
+    val dime   = Bool(INPUT)
+    val valid  = Bool(OUTPUT) }
   val sIdle :: s5 :: s10 :: s15 :: sOk :: Nil = Enum(5){ UFix() }
   val state = Reg(resetVal = sIdle)
 
