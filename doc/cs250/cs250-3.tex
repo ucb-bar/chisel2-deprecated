@@ -1,0 +1,523 @@
+% NOTES:
+% enum slide
+% difference between := and =
+% link and plink pic
+% filter pic
+% examples of running chisel
+
+\documentclass[xcolor=pdflatex,dvipsnames,table]{beamer}
+\usepackage{epsfig,graphicx}
+\usepackage{palatino}
+\usepackage{fancybox}
+\usepackage{relsize}
+\usepackage[procnames]{listings}
+
+\input{../style/scala.tex}
+\input{../style/talk.tex}
+
+\title{Chisel @ CS250 -- Part III -- Lecture 11}
+\author{Jonathan Bachrach}
+\date{\today}
+\institute[UC Berkeley]{EECS UC Berkeley}
+
+\begin{document}
+
+\begin{frame}
+\titlepage
+\end{frame}
+\addtocounter{framenumber}{-1}
+
+% \begin{frame}[fragile]{Forward Declarations using Wires}
+% 
+% \begin{scala}
+% val pcPlus4      = UFix() 
+% val branchTarget = UFix()
+% val pcNext       = Mux(pcSel, branchTarget, pcPlus4)
+% val pcReg        = Reg(data = pcNext, resetVal = UFix(0, 32)) 
+% pcPlus4         := pcReg + UFix(4) 
+% ... 
+% branchTarget    := addOut
+% \end{scala}
+% 
+% \begin{center}
+% \includegraphics[height=0.5\textheight]{figs/forward.pdf} 
+% \end{center}
+% 
+% \end{frame}
+
+\begin{frame}{Options for Testing Chisel Designs}
+\begin{itemize}
+\item testing Verilog using VCS
+\item testing from within Scala
+\begin{itemize}
+\item test C++ executable
+\item test Verilog using VCS
+\end{itemize}
+\item testing inside C++ simulator
+\begin{itemize}
+\item VCD debugging
+\item manual testing from within C++
+\end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Simulation Options}
+\begin{center}
+\includegraphics[height=0.9\textheight]{figs/perf.pdf}
+\end{center}
+\end{frame}
+
+\begin{frame}{Chisel Workflow}
+\begin{center}
+\includegraphics[height=0.9\textheight]{../bootcamp/figs/chisel-workflow.pdf}
+\end{center}
+\end{frame}
+
+\begin{frame}{Verilog Debugging}
+% \begin{columns}
+% \column{0.35\textwidth}
+\begin{itemize}
+\item produce Verilog from Chisel
+\item write tests in Verilog harness
+\item use waveform debugger
+\end{itemize}
+% \column{0.55\textwidth}
+% \begin{center}
+% \includegraphics[height=0.7\textheight]{figs/modelsim.png}
+% \end{center}
+% \end{columns}
+\end{frame}
+
+\begin{frame}{Chisel Based Testing Overview}
+\begin{columns}
+\column{0.55\textwidth}
+\begin{itemize}
+\item tests written in Chisel
+\item Chisel
+\begin{itemize}
+\item compiles, 
+\item runs, and 
+\item talks to DUT using pipes
+\end{itemize}
+\item User
+\begin{itemize}
+\item sets inputs + get outputs using
+\begin{itemize}
+\item Chisel data to get nodes and
+\item tables from nodes to values
+\end{itemize}
+\item specifies nodes to trace
+\end{itemize}
+\end{itemize}
+
+\column{0.35\textwidth}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{figs/chisel-testing.pdf}
+\end{center}
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Chisel Based Testing Details}
+
+\begin{columns}
+\column{0.4\textwidth}
+{\lstset{basicstyle={\tiny\ttfamily}}
+\begin{scala}
+package Tutorial
+import Chisel._
+import scala.collection.mutable.HashMap
+import scala.util.Random
+
+class Combinational extends Component {
+  val io = new Bundle {
+    val x = UFix(INPUT, 16)
+    val y = UFix(INPUT, 16)
+    val z = UFix(OUTPUT, 16) }
+  io.z := io.x + io.y
+}
+
+class CombinationalTests(c: Combinational) 
+    extends Tester(c, Array(c.io)) {
+  defTests {
+    var allGood = true
+    val vars    = new HashMap[Node, Node]()
+    val rnd     = new Random()
+    val maxInt  = 1 << 16
+    for (i <- 0 until 10) {
+      vars.clear()
+      val x        = rnd.nextInt(maxInt)
+      val y        = rnd.nextInt(maxInt)
+      vars(c.io.x) = UFix(x)
+      vars(c.io.y) = UFix(y)
+      vars(c.io.z) = UFix((x + y)&(maxInt-1))
+      allGood      = step(vars) && allGood
+    }
+    allGood
+} }
+\end{scala}
+}
+\column{0.5\textwidth}
+{\lstset{basicstyle={\tiny\ttfamily}}
+\begin{scala}
+class Tester[T <: Component]
+  (val c: T, val testNodes: Array[Node])
+
+def defTests(body: => Boolean)
+
+def step(vars: HashMap[Node, Node]): Boolean
+\end{scala}
+}
+\begin{scriptsize}
+\begin{itemize}
+\item user subclasses {\tt Tester} defining DUT and
+{\tt testNodes} and tests in {\tt defTests} body
+\item {\tt vars} is mapping from {\tt testNodes} to literals, called bindings
+\item {\tt step} runs test with given bindings, where
+var values for input ports are sent to DUT,
+DUT computes next outputs, and
+DUT sends next outputs to Chisel
+\item finally {\tt step} compares received values against var values
+  and returns false if any comparisons fail
+\end{itemize}
+\end{scriptsize}
+
+\begin{center}
+\includegraphics[width=0.8\textwidth]{../tutorial/figs/DUT.pdf}
+\end{center}
+
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Binding Tester to Component}
+
+\begin{scala}
+object chiselMainTest {
+  def apply[T <: Component]
+    (args: Array[String], comp: () => T)(tester: T => Tester[T]): T
+}
+\end{scala}
+
+\noindent and used as follows:
+
+\begin{scala}
+chiselMainTest(args ++ Array("--compile", "--test",  "--genHarness"), 
+               () => new Combinational()){ 
+  c => new CombinationalTests(c) 
+}
+\end{scala}
+
+\end{frame}
+
+\begin{frame}{\code{ChiselMain*} Arguments}
+ 
+\begin{tabular}{ll}
+\code{--targetDir} & target pathname prefix \\
+\code{--genHarness} & generate harness file for C++ \\
+\code{--backend v} & generate verilog \\ 
+\code{--backend c} & generate C++ (default)\\
+\code{--compile} & compiles generated C++ \\
+\code{--test} & generates C++ with test plumbing  \\
+\code{--vcd} & enable vcd dumping \\
+\code{--debug} & put all wires in C++ class file \\
+\end{tabular}
+
+\end{frame}
+
+\begin{frame}[fragile]{Running Tests Examples}
+
+\begin{scala}
+sbt "project tutorial" "run Combinational ... --compile --test --genHarness"
+...
+PASSED
+\end{scala}
+
+or through makefile
+
+\begin{scala}
+cd CHISEL/tutorial/emulator
+make combinational
+...
+PASSED
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{Testing Decoupled Circuits}
+\begin{scala}
+class GCDTests(c: GCD) extends Tester(c, Array(c.io)) {
+  defTests {
+    val (a, b, z) = (64, 48, 16)
+    val svars = new HashMap[Node, Node]()
+    val ovars = new HashMap[Node, Node]()
+    var t = 0
+    do {
+      svars(c.io.a) = UFix(a)
+      svars(c.io.b) = UFix(b)
+      step(svars, ovars)
+      t += 1
+    } while (t <= 1 || ovars(c.io.v).litValue() == 0)
+    ovars(c.io.z).litValue() == z
+  }
+}
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{C++ Simulator}
+\begin{itemize}
+\item cycle accurate simulator
+\begin{itemize}
+\item easy way to debug designs
+\end{itemize}
+\item compile chisel to one C++ class
+\begin{itemize}
+\item topologically sorts nodes based on dependencies
+\end{itemize}
+\item simulates using two phases
+\begin{itemize}
+\item \code{clock\_lo} for combinational
+\item \code{clock\_hi} for state updates
+\end{itemize}
+\item using fast multiword c++ template library
+\begin{itemize}
+\item now though expand in chisel backend
+\item use same representation 
+\end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Creating C++ Output}
+
+In order to construct a circuit, 
+the user calls \code{chiselMain} from their top level \code{main} function:
+
+\begin{scala}
+object chiselMain {
+  def apply[T <: Component]
+    (args: Array[String], comp: () => T): T
+}
+\end{scala}
+
+\noindent
+which when run creates C++ files named
+\code{{\it component\_name}.cpp} and \code{{\it component\_name}.h} in
+the directory specified with
+\code{--targetDir {\it dir\_name}} argument.
+
+\begin{scala}
+chiselMain(Array("--backend", "c", "--targetDir", "../emulator"), 
+           () => new GCD())
+\end{scala}
+
+\end{frame}
+
+\begin{frame}[fragile]{{\tt dat\_t}}
+\begin{scala}
+template <int w>
+class dat_t {
+ public:
+  const static int n_words = ((w - 1) / 64) + 1;
+  val_t values[n_words];
+  inline val_t lo_word ( void ) { return values[0]; }
+  ...
+}
+
+template <int w> dat_t<w> DAT(val_t value);
+template <int w> dat_t<w> LIT(val_t value);
+
+template <int w> std::string dat_to_str (dat_t<w> val);
+
+std::string read_tok(FILE* f);
+
+template <int w> void str_to_dat(std::string str, dat_t<w>& res);
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{{\tt mod\_t}}
+\begin{scala}
+class mod_t {
+ public:
+  std::vector< mod_t* > children;
+  virtual void init ( void ) { };
+  virtual void clock_lo ( dat_t<1> reset ) { };
+  virtual void clock_hi ( dat_t<1> reset ) { };
+  virtual void print ( FILE* f ) { };
+  virtual bool scan ( FILE* f ) { return true; };
+  virtual void dump ( FILE* f, int t ) { };
+};
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{C++ Simulator Outputs}
+\begin{itemize}
+\item \code{GCD.h} -- the header for the single class
+\item \code{GCD.cpp} -- the implementation of the single class
+\item \code{GCD-emulator.cpp} -- the harness which cycles the design
+\item \code{GCD.vcd} -- produced when running design with vcd output
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{GCD.h}
+\begin{scala}
+#include "emulator.h"
+
+class GCD_t : public mod_t {
+ public:
+  dat_t<1> GCD__io_v;
+  dat_t<16> GCD__io_b;
+  dat_t<1> GCD__io_e;
+  dat_t<16> GCD__y;
+  dat_t<16> GCD__y_shadow;
+  dat_t<16> GCD__io_a;
+  dat_t<16> GCD__x;
+  dat_t<16> GCD__x_shadow;
+  dat_t<16> GCD__io_z;
+
+  void init ( bool rand_init = false );
+  void clock_lo ( dat_t<1> reset );
+  void clock_hi ( dat_t<1> reset );
+  void print ( FILE* f );
+  bool scan ( FILE* f );
+  void dump ( FILE* f, int t );
+};
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{Name Mangling Scheme}
+\begin{itemize}
+\item chisel object names are mangled to 
+\begin{itemize}
+\item maintain uniqueness and avoid name conflicts
+\item maintain hierarchical membership
+\item avoid problems with C++ naming convention
+\end{itemize}
+\item basic scheme is pathname consisting of
+\begin{itemize}
+\item Component name first followed by \code{\_\_}
+\item hierarchy elements separated with \code{\_}'s in order with
+\begin{itemize}
+\item numbers for vector elements
+\item names for bundle fields
+\end{itemize}
+\item actual object name last
+\end{itemize}
+\item examples
+\begin{itemize}
+\item \code{val io = Bundle\{ val x = Bits(width = 32) \}} produces
+\begin{itemize}
+\item \code{A\_\_io\_x}
+\end{itemize}
+\item \code{... Vec(2)\{ FIFOIO()\{ Bool() \} \}} produces
+\begin{itemize}
+\item \code{B\_\_io\_ports\_0\_ready}
+\end{itemize}
+\end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{GCD.cpp}
+
+{\lstset{basicstyle={\tiny\ttfamily}}
+\begin{scala}
+#include "GCD.h"
+
+void GCD_t::init ( bool rand_init ) {
+  { GCD__y.values[0] = rand_init ? rand_val() & 65535 : 0; }
+  { GCD__x.values[0] = rand_init ? rand_val() & 65535 : 0; }
+}
+void GCD_t::clock_lo ( dat_t<1> reset ) {
+  val_t T0__w0;
+  ...
+};
+void GCD_t::clock_hi ( dat_t<1> reset ) {
+  GCD__y = GCD__y_shadow;
+  GCD__x = GCD__x_shadow;
+}
+void GCD_t::print ( FILE* f ) {
+  fprintf(f, "%s", TO_CSTR(GCD__io_z));
+  fprintf(f, "%s", " ");
+  fprintf(f, "%s", TO_CSTR(GCD__io_v));
+  fprintf(f, "\n");
+  fflush(f);
+}
+bool GCD_t::scan ( FILE* f ) {
+  str_to_dat(read_tok(f), GCD__io_a);
+  str_to_dat(read_tok(f), GCD__io_b);
+  str_to_dat(read_tok(f), GCD__io_e);
+  return(!feof(f));
+}
+void GCD_t::dump(FILE *f, int t) {
+}
+\end{scala}
+}
+\end{frame}
+
+\begin{frame}[fragile]{GCD-emulator.cpp}
+\begin{scala}
+#include "GCD.h"
+int main (int argc, char* argv[]) {
+  GCD_t* c = new GCD_t();
+  int lim = (argc > 1) ? atoi(argv[1]) : -1;
+  c->init();
+  for (int i = 0; i < 5; i++) {
+    dat_t<1> reset = LIT<1>(1);
+    c->clock_lo(reset);
+    c->clock_hi(reset);
+  }
+  for (int t = 0; lim < 0 || t < lim; t++) {
+    dat_t<1> reset = LIT<1>(0);
+    if (!c->scan(stdin)) break;
+    c->clock_lo(reset);
+    c->print(stdout);
+    c->clock_hi(reset);
+  }
+}
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{VCD Debugging}
+\begin{itemize}
+\item use \code{--vcd} arg to have simulation produce VCD output
+\item run your compiled C++ emulation app for a number of cycles
+\begin{itemize}
+\item specifying the number of cycles as a first argument
+\end{itemize}
+\item can view waveforms with
+\begin{itemize}
+\item \code{vcs} -- commercial
+\item GTKWave -- open source
+\end{itemize}
+\item can hierarchically focus on particular signals
+\item can view in a variety of formats
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Manual C++ Testing}
+\begin{itemize}
+\item test Chisel code by manually 
+\begin{itemize}
+\item setting circuit inputs directly in your C++ code
+\item inserting \code{printf}'s in your C++ code
+\end{itemize}
+\item in your c++ harness insert calls to
+\begin{itemize}
+\item \code{str\_to\_dat(read\_tok(f), GCD\_\_io\_a)} to set values
+\item \code{TO\_CSTR(GCD\_\_io\_z)} to create string for printing
+\end{itemize}
+\item in your chisel code
+\begin{itemize}
+\item wrap nodes with \code{debug} as in \code{debug(io.z)}
+\end{itemize}
+\item in your \code{chiselMain} 
+\begin{itemize}
+\item you can add \code{---debug} arg to get everything available in object
+\end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Onwards}
+\begin{itemize}
+\item for simple tests can write test vector files
+\item check out Chisel tutorial code
+\end{itemize}
+\end{frame}
+
+\end{document}
