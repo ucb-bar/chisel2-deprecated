@@ -3,8 +3,8 @@ import Component._
 import Node._
 
 object Cat {
-  def apply[T <: Data](mod: T, mods: T*): Bits = {
-    val modsList = (mod :: mods.toList).filter(_ != null).map(_.toNode)
+  private def doit[T <: Data](mods: List[T]): Bits = {
+    val modsList = mods.filter(_ != null).map(_.toNode)
     val isLit = isFolding && modsList.forall(_.litOf != null)
     val res = if (!isLit && backend.isInstanceOf[VerilogBackend]) {
       val res = new Cat();
@@ -13,6 +13,9 @@ object Cat {
       modsList.reduceLeft((a, b) => a ## b)
     res.setTypeNode(Bits(OUTPUT))
   }
+
+  def apply[T <: Data](mod: T, mods: T*): Bits = doit(mod :: mods.toList)
+  def apply(mod: UFix, mods: UFix*): UFix = doit(mod :: mods.toList).toUFix
 }
 
 class Cat extends Node {
