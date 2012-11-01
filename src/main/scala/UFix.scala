@@ -27,20 +27,20 @@ class UFix extends Num {
     res
   }
 
-  private def colonEqual(src: Bits) =
-    (if (comp == null) this else comp) procAssign src.toNode
-
-  override def :=(src: UFix) = colonEqual(src)
+  override def :=(src: UFix) = {
+    if(comp != null)
+      comp procAssign src.toNode;
+    else
+      this procAssign src.toNode;
+  }
 
   override def :=[T <: Data](src: T): Unit = {
     src match {
-      case ufix: UFix =>
-        colonEqual(ufix)
-      case any =>
-        if (any.getClass == classOf[Bits])
-          colonEqual(any.asInstanceOf[Bits])
-        else
-          ChiselErrors += ChiselError(":= not defined on " + this.getClass + " and " + src.getClass, Thread.currentThread().getStackTrace)
+      case ufix: UFix => {
+	this := ufix;
+      }
+      case any => 
+	ChiselErrors += ChiselError(":= not defined on " + this.getClass + " and " + src.getClass, Thread.currentThread().getStackTrace)
     }
   }
   
