@@ -372,28 +372,24 @@ class Pipe[T <: Data](latency: Int = 1)(data: => T) extends Component
     val deq = new PipeIO()(data)
   }
 
-  var bits: T = io.enq.bits
-  var valid: Bool = io.enq.valid
-
-  for (i <- 0 until latency) {
-    val reg_bits = Reg() { io.enq.bits.clone }
-    val reg_valid = Reg(valid, resetVal = Bool(false))
-    when (valid) { reg_bits := bits }
-    valid = reg_valid
-    bits = reg_bits
-  }
-
-  io.deq.valid := valid
-  io.deq.bits := bits
+  io.deq <> Pipe(io.enq, latency)
 }
 
 object Pipe
 {
   def apply[T <: Data](enqValid: Bool, enqBits: T, latency: Int): PipeIO[T] = {
-    val q = (new Pipe(latency)) { enqBits.clone }
-    q.io.enq.valid := enqValid
-    q.io.enq.bits := enqBits
-    q.io.deq
+    if (latency == 0) {
+      val out = new PipeIO()(enqBits.clone)
+      out.valid <> enqValid
+      out.bits <> enqBits
+      out.setIsTypeNode
+      out
+    } else {
+      val v = Reg(enqValid, resetVal = Bool(false))
+      val b = Reg() { enqBits.clone }
+      when (enqValid) { b := enqBits }
+      apply(v, b, latency-1)
+    }
   }
   def apply[T <: Data](enqValid: Bool, enqBits: T): PipeIO[T] = apply(enqValid, enqBits, 1)
   def apply[T <: Data](enq: PipeIO[T], latency: Int = 1): PipeIO[T] = apply(enq.valid, enq.bits, latency)
@@ -401,12 +397,13 @@ object Pipe
 
 object PriorityMux
 {
-  def apply[T <: Data](sel: Seq[Bits], in: Seq[T]): T = {
+  def apply[T <: Data](in: Seq[(Bits, T)]): T = {
     if (in.size == 1)
-      in.head
+      in.head._2
     else
-      Mux(sel.head, in.head, apply(sel.tail, in.tail))
+      Mux(in.head._1, in.head._2, apply(in.tail))
   }
+  def apply[T <: Data](sel: Seq[Bits], in: Seq[T]): T = apply(sel zip in)
   def apply[T <: Data](sel: Bits, in: Seq[T]): T = apply((0 until in.size).map(sel(_)), in)
 }
 
