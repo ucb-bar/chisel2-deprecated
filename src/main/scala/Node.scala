@@ -94,6 +94,7 @@ abstract class Node extends nameable{
   var inputs = new ArrayBuffer[Node];
   def traceableNodes = Array[Node]();
   var outputs = new ArrayBuffer[Node];
+  val subnodes = new ArrayBuffer[Node];
   var inferWidth: (Node) => Int = maxWidth;
   var nameHolder: nameable = null;
   var isClkInput = false;
@@ -143,6 +144,24 @@ abstract class Node extends nameable{
   def bitSet(off: UFix, dat: Bits): Bits = { 
     val bit = Bits(1, 1) << off;
     (this.asInstanceOf[Bits] & ~bit) | (dat << off);
+  }
+  def getSubNode(which: Int): Node = {
+    val sn = getSubNodes
+    if (which >= sn.length) {
+      // println("ADDING SUB NODE " + this + " " + which)
+      for (i <- sn.length until (which+1))
+        sn += Literal(0)
+    }
+    sn(which)
+  }
+  def getSubNodes = {
+    if (subnodes.isEmpty)
+      genSubNodes
+    subnodes
+  }
+  def genSubNodes: Unit = {
+    println(this)
+    require(false)
   }
   // TODO: MOVE TO WIRE
   def assign(src: Node) = { 

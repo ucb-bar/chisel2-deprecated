@@ -296,4 +296,21 @@ class Bits extends Data with proc {
   def && (b: Bool): Bool = conv(this) && b;
   def || (b: Bool): Bool = conv(this) || b;
   
+  override def genSubNodes = {
+    assert(inputs.length <= 1)
+    // println("BITS0 " + this)
+    for (i <- 0 until backend.words(this)) {
+      val subnode = new Bits()
+      subnode.dir = dir
+      subnode.name = name
+      subnode.unnamed = unnamed
+      if (inputs.length == 0)
+        subnode.init("", backend.thisWordBits(this, i))
+      else
+        subnode.init("", backend.thisWordBits(this, i), inputs(0).getSubNode(i))
+      if (subnode.width < 0) println("NEG BITS WIDTH " + subnode)
+      subnodes += subnode
+    }
+    // println("BITS0 " + this)
+  }
 }

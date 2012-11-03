@@ -106,6 +106,7 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
   var testVars: Array[Node] = null
   def defTests(body: => Boolean) = {
     val (ins, outs) = splitFlattenNodes(testNodes)
+    for (out <- outs) c.debug(out)
     testInputNodes = ins.toArray; testNonInputNodes = outs.toArray
     tests = () => withTesting { body }
   }

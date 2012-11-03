@@ -6,6 +6,7 @@ import scala.math.max
 import scala.math.min
 import Literal._
 import ChiselError._
+import Component._
 
 object Lit {
   def apply[T <: Bits](n: String, width: Int = -1)(gen: => T): T = {
@@ -123,7 +124,9 @@ object Literal {
     var res = BigInt(0);
     for(c <- x)
       if(c != '_'){
-	if(!(hexNibbles + "?").contains(c.toLowerCase)) ChiselErrors += ChiselError({"Literal: " + x + " contains illegal character: " + c}, Thread.currentThread().getStackTrace);
+	if(!(hexNibbles + "?").contains(c.toLower)) 
+	// if(!(hexNibbles + "?").contains(c.toLowerCase)) 
+          ChiselErrors += ChiselError({"Literal: " + x + " contains illegal character: " + c}, Thread.currentThread().getStackTrace);
 	res = res * shamt + c.asDigit;
       }
     res
@@ -218,6 +221,12 @@ class Literal extends Node {
 
   def d (x: BigInt): Literal = Literal(x, value.toInt)
   //def ~(x: String): Lit = Lit(value, x(0), x.substring(1, x.length));
+
+  override def genSubNodes = {
+    require(!isZ)
+    for (i <- 0 until backend.words(this))
+      subnodes += Literal(value >> i*backend.wordBits, backend.thisWordBits(this, i))
+  }
 }
 
 class Lit extends Node {

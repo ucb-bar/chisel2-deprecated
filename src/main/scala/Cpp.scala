@@ -22,6 +22,7 @@ object CListLookup {
 }
 
 class CppBackend extends Backend {
+  var isSubNodes = true
   override def emitTmp(node: Node): String = {
     require(false)
     if (node.isInObject)
@@ -91,8 +92,7 @@ class CppBackend extends Backend {
   }
 
   val bpw = 64
-  def words(node: Node) = (node.width-1)/bpw+1
-  def fullWords(node: Node) = node.width/bpw
+  override def wordBits = bpw
   def emitLoWordRef(node: Node) = emitWordRef(node, 0)
   def emitTmpDec(node: Node) = {
     if (!node.isInObject)
@@ -425,10 +425,18 @@ class CppBackend extends Backend {
         case l: Literal => ;
         case any        => 
           if (m.name != "" && !(m == c.reset) && !(m.component == null)) {
-	    // only modify name if it is not the reset signal or not in top component
-	    if(m.name != "reset" || !(m.component == c)) 
-	      m.name = m.component.getPathName + "__" + m.name;
-	  }
+            // only modify name if it is not the reset signal or not in top component
+            if(m.name != "reset" || !(m.component == c)) 
+              m.name = m.component.getPathName + "__" + m.name;
+          } 
+          if (isSubNodes) {
+            m.getSubNodes
+            // println("RENAME " + m + " NAME " + m.name + " SUBNODES " + m.subnodes.length)
+            for (i <- 0 until m.subnodes.length) {
+              m.subnodes(i).setName(nodeName(m) + "__s" + i)
+              // println("  SUBNODE NAME "+ m.subnodes(i).name)
+            }
+          }
       }
     }
   }
@@ -490,8 +498,17 @@ class CppBackend extends Backend {
       return
     }
     c.collectNodes(c);
-    c.findOrdering(); // search from roots  -- create omods
-    renameNodes(c, c.omods);
+    if (isSubNodes) {
+      renameNodes(c, c.mods);
+      c.findSubNodeOrdering(); // search from roots  -- create omods
+    } else {
+      c.findOrdering(); // search from roots  -- create omods
+      renameNodes(c, c.omods);
+    }
+    // val smods = new ArrayBuffer[Node]
+    // for (m <- c.omods) 
+    //   smods ++= m.subnodes
+    val smods = c.omods
     if (isReportDims) {
       val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
       println("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
@@ -509,9 +526,9 @@ class CppBackend extends Backend {
       printArgs.clear(); printArgs ++= tester.testNonInputNodes; printFormat = ""
 
       for (n <- scanArgs ++ printArgs)
-        if(!c.omods.contains(n)) c.omods += n
+        if(!smods.contains(n)) smods += n
     } 
-    for (m <- c.omods) {
+    for (m <- smods) {
       //if(m.name != "reset" && !(m.component == c)) {
       if(m.name != "reset") {
         if (m.isInObject)
@@ -535,13 +552,13 @@ class CppBackend extends Backend {
     for(str <- includeArgs) out_c.write("#include \"" + str + "\"\n"); 
     out_c.write("\n");
     out_c.write("void " + c.name + "_t::init ( bool rand_init ) {\n");
-    for (m <- c.omods) {
+    for (m <- smods) {
       out_c.write(emitInit(m));
     }
     out_c.write("}\n");
 
     out_c.write("void " + c.name + "_t::clock_lo ( dat_t<1> reset ) {\n");
-    for (m <- c.omods) {
+    for (m <- smods) {
       out_c.write(emitDefLo(m));
     }
     for (a <- c.asserts) {
@@ -549,9 +566,10 @@ class CppBackend extends Backend {
     }
     out_c.write("}\n");
     out_c.write("void " + c.name + "_t::clock_hi ( dat_t<1> reset ) {\n");
-    for (r <- c.omods) 
+    for (r <- smods) {
       out_c.write(emitInitHi(r));
-    for (m <- c.omods) 
+    }
+    for (m <- smods) 
       out_c.write(emitDefHi(m));
     out_c.write("}\n");
     def splitFormat(s: String) = {
@@ -624,5 +642,4 @@ class CppBackend extends Backend {
     if(saveComponentTrace)
       printStack
   }
-
 }

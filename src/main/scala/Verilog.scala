@@ -672,7 +672,5 @@ class VerilogBackend extends Backend {
     run(cmd)
 
   }
-
-
 }
 

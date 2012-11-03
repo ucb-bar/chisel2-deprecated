@@ -2,6 +2,7 @@ package Chisel
 import ChiselError._
 import Node._
 import scala.collection.mutable.ArrayBuffer
+import Component._
 
 object Mem {
   def apply[T <: Data](n: Int, seqRead: Boolean = false)(gen: => T): Mem[T] = {
@@ -78,6 +79,16 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
   override def toString: String = "TMEM(" + ")"
 
   override def clone = new Mem(n, seqRead, gen)
+
+  override def genSubNodes: Unit = {
+    for (i <- 0 until backend.words(this)) {
+      val w = backend.thisWordBits(this, i)
+      val m = new Mem(n, seqRead, () => Bits(width = w))
+      m.width_ = w
+      // println("MEM WIDTH = " + m.width)
+      subnodes += m
+    }
+  }
 }
 
 abstract class MemAccess(val mem: Mem[_], val condi: Bool, val addri: Bits) extends Node {
@@ -91,6 +102,20 @@ abstract class MemAccess(val mem: Mem[_], val condi: Bool, val addri: Bits) exte
 
   override def forceMatchingWidths =
     if (addr.width != log2Up(mem.n)) inputs(1) = addr.matchWidth(log2Up(mem.n))
+}
+
+object RawMemRead {
+  def apply(mem: Node, condi: Node, addri: Node) = {
+    val m  = mem.asInstanceOf[Mem[Bits]]
+    val bc = Bool();
+    val ba = Bits();
+    val (d, mr) = m.doRead(ba, bc)
+    mr.width_   = m.width
+    // println("MEM READ " + mr + " WIDTH = " + mr.width)
+    mr.inputs(0) = condi
+    mr.inputs(1) = addri
+    mr
+  }
 }
 
 class MemRead[T <: Data](mem: Mem[T], condi: Bool, addri: Bits) extends MemAccess(mem, condi, addri) {
@@ -112,6 +137,38 @@ class MemRead[T <: Data](mem: Mem[T], condi: Bool, addri: Bits) extends MemAcces
   def isSequential = outputReg != null && outputReg.isMemOutput
   override def toString: String = mem + "[" + addr + "]"
   override def getPortType: String = if (isSequential) "read" else "cread"
+
+  override def genSubNodes: Unit = {
+    for (i <- 0 until backend.words(this)) {
+      val c = if (condi == null) condi else condi.getSubNode(0)
+      val m = mem.getSubNode(i)
+      val r = RawMemRead(m, c, addri.getSubNode(0)) // TODO: FILL OUT
+      subnodes += r
+      // println("MEM READ " + mem.name + " MEM-WIDTH " + m.width + " MEM-READ-WIDTH " + r.width + " " + i)
+    }
+  }
+}
+
+object RawMemWrite {
+  def apply(mem: Node, condi: Node, addri: Node, datai: Node, wmaski: Node) = {
+    // FAKE OUT MemWrite WITH DUMMY INPUTS
+    val m  = mem.asInstanceOf[Mem[Bits]]
+    val bc = Bool()
+    val ba = Bits()
+    val bd = Bits()
+    val bm = if (wmaski == null) null else Bits()
+    val mw = m.doWrite(ba, bc, bd, bm)
+    // REPLACE WITH REAL INPUTS
+    mw.inputs(0) = condi
+    mw.inputs(1) = addri
+    mw.inputs(2) = datai
+    if (wmaski != null)
+      mw.inputs(3) = wmaski
+    condi.consumers += mw
+    addri.consumers += mw
+    datai.consumers += mw
+    mw
+  }
 }
 
 class MemWrite[T <: Data](mem: Mem[T], condi: Bool, addri: Bits, datai: T, wmaski: Bits) extends MemAccess(mem, condi, addri) with proc {
@@ -164,8 +221,19 @@ class MemWrite[T <: Data](mem: Mem[T], condi: Bool, addri: Bits, datai: T, wmask
     require(inputs.length == 2)
     inputs += wrap(src)
   }
-  override def toString: String = mem + "[" + addr + "] = " + data + " COND " + cond
+  override def toString: String = mem + "[" + addr + "] = " + (if (inputs.length > 2) data + " COND " + cond else "")
   override def getPortType: String = (if (isMasked) "m" else "") + (if (isRW) "rw" else "write")
   override def used = inputs.length > 2
   override def isRamWriteInput(n: Node) = inputs.contains(n)
+
+  override def genSubNodes: Unit = {
+    if (inputs.length > 2) {
+      for (i <- 0 until backend.words(this)) {
+        val c = if (cond == null) cond else cond.getSubNode(i)
+        val w = if (inputs.length == 4) wmask.getSubNode(i) else null
+        // println("MEM WRITE " + mem.name + " " + i)
+        subnodes += RawMemWrite(mem.getSubNode(i), c, addr.getSubNode(0), data.getSubNode(i), w) // TODO: FILL OUT
+      }
+    }
+  }
 }

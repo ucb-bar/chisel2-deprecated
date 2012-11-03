@@ -61,4 +61,10 @@ object NodeFill {
 class Fill extends Node {
   var n: Node = if(inputs.length >= 2) inputs(1) else null;
   override def toString: String = "FILL(" + inputs(0) + ", " + n + ")";
+  override def genSubNodes = {
+    val bpw = backend.wordBits;
+    for (i <- 0 until backend.words(this)) 
+      subnodes += (if (inputs(0).isLit) Literal(0L - inputs(0).value.toInt) else Op("-", bpw, inputs(0).getSubNode(0)))
+    Trunc(this)
+  }
 }

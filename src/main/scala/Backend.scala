@@ -18,19 +18,24 @@ abstract class Backend {
     res
   }
 
- def emitTmp(node: Node): String
+  def emitTmp(node: Node): String
+
+  def nodeName(node: Node): String = {
+    if(node.name == "" || !node.named) 
+      "T" + node.emitIndex 
+    else if(!node.named) {
+      // node.named = true
+      node.name + "_" + node.emitIndex
+    } else
+      node.name
+  }
 
   def emitRef(node: Node): String = {
     node match {
       case r: Reg => 
         if(r.isMemOutput) emitRef(r.memOf.outputVal) else if(r.name == "") "R" + r.emitIndex else r.name
-      case _ => 
-        if(node.name == "" || !node.named) 
-          "T" + node.emitIndex 
-        else if(!node.named)
-          node.name + "_" + node.emitIndex
-        else 
-          node.name
+      case _ =>
+        nodeName(node)
     }
   }
 
@@ -141,6 +146,13 @@ abstract class Backend {
 
   }
 
+  def wordBits = -1
+  def words(node: Node) = (node.width-1)/wordBits+1
+  def fullWords(node: Node) = node.width/wordBits
+  def thisWordBits(node: Node, word: Int) = {
+    if (word == words(node)-1 && words(node) != fullWords(node))
+      node.width % wordBits
+    else
+      wordBits
+  }
 }
-
-

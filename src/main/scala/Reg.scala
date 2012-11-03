@@ -153,4 +153,11 @@ class Reg extends Delay with proc {
   }
   override def isMemOutput = updates.length == 1 && updates(0)._2.memSource != null
   def memOf = updates(0)._2.memSource
+  
+  override def genSubNodes = {
+    for (i <- 0 until backend.words(this))
+      subnodes += new Reg().init("", backend.thisWordBits(this, i), null)
+    for (i <- 0 until backend.words(this))
+      subnodes(i).inputs(0) = if (isReset) new Mux().init("", backend.thisWordBits(this, i), inputs.last.getSubNode(i), resetVal.getSubNode(i), updateVal.getSubNode(i)) else updateVal.getSubNode(i)
+  }
 }

@@ -13,27 +13,28 @@ import Component._
 import Literal._
 
 class FloBackend extends Backend {
+  var isSubNodes = true
   override def emitDec(node: Node): String = 
-    emitRef(node) + " = "
+    nodeName(node) + " = "
 
   override def emitTmp(node: Node): String = 
     emitRef(node)
 
   override def emitRef(node: Node): String = {
     if (node.litOf == null) {
-    node match {
-      case x: Lit =>
-        "" + x.value
+      node match {
+        case x: Lit =>
+          "" + x.value
 
-      case x: Binding =>
-        emitRef(x.inputs(0))
+        case x: Binding =>
+          emitRef(x.inputs(0))
 
-      case x: Bits => 
-        if (!node.isInObject && node.inputs.length == 1) emitRef(node.inputs(0)) else super.emitRef(node) 
+        case x: Bits => 
+          if (!node.isInObject && node.inputs.length == 1) emitRef(node.inputs(0)) else super.emitRef(node) 
 
-      case _ =>
-        super.emitRef(node)
-    }
+        case _ =>
+          super.emitRef(node)
+      }
     } else 
       "" + node.litOf.value
   }
@@ -75,6 +76,7 @@ class FloBackend extends Backend {
          }) + "\n"
 
       case x: Extract =>
+        if (node.width < 0) println("RSH -1 NODE " + node)
         emitDec(node) + "rsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1)) + "\n"
 
       case x: Fill =>
@@ -118,6 +120,14 @@ class FloBackend extends Backend {
 	    if(m.name != "reset" || !(m.component == c)) 
 	      m.name = m.component.getPathName + "__" + m.name;
 	  }
+          if (isSubNodes) {
+            m.getSubNodes
+            // println("RENAME " + m + " NAME " + m.name + " SUBNODES " + m.subnodes.length)
+            for (i <- 0 until m.subnodes.length) {
+              m.subnodes(i).setName(nodeName(m) + (if (m.subnodes.length > 1) ("__s" + i) else ""))
+              // println("  SUBNODE NAME "+ m.subnodes(i).name)
+            }
+          }
       }
     }
   }
@@ -167,8 +177,13 @@ class FloBackend extends Backend {
       return
     }
     c.collectNodes(c);
-    c.findOrdering(); // search from roots  -- create omods
-    renameNodes(c, c.omods);
+    if (isSubNodes) {
+      renameNodes(c, c.mods);
+      c.findSubNodeOrdering(); // search from roots  -- create omods
+    } else {
+      c.findOrdering(); // search from roots  -- create omods
+      renameNodes(c, c.omods);
+    }
     if (isReportDims) {
       val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
       println("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
@@ -181,4 +196,5 @@ class FloBackend extends Backend {
       printStack
   }
 
+  override def wordBits = 32
 }

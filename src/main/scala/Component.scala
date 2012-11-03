@@ -567,6 +567,13 @@ abstract class Component(resetSignal: Bool = null) {
     }
   }
   def findOrdering() = visitNodes(findRoots().toArray);
+  def subNodesOf(nodes: Seq[Node]): Seq[Node] = {
+    val subnodes = new ArrayBuffer[Node]
+    for (m <- nodes) 
+      subnodes ++= m.subnodes
+    subnodes
+  }
+  def findSubNodeOrdering() = visitNodes(subNodesOf(findRoots()).toArray);
 
   def findGraphDims(): (Int, Int, Int) = {
     var maxDepth = 0;

@@ -9,6 +9,11 @@ import sort._
 
 object Bundle {
   def nullbundle_t = Bundle(ArrayBuffer[(String, Data)]());
+  def apply (elts: Array[(String, Data)]): Bundle = {
+    val res = ArrayBuffer[(String, Data)]();
+    for (e <- elts) res += e
+    apply(res)
+  }
   def apply (elts: ArrayBuffer[(String, Data)]): Bundle = {
     val res = new Bundle();
     res.elementsCache = elts; // TODO: REMOVE REDUNDANT CREATION

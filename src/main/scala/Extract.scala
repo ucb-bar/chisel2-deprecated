@@ -75,7 +75,7 @@ object Extract {
     val (bits_lit, hi_lit, lo_lit) = (mod.litOf, hi.litOf, lo.litOf);
     if (isFolding && bits_lit != null && hi_lit != null && lo_lit != null) {
       val dw = if (w == -1) (hi_lit.value - lo_lit.value + 1).toInt else w;
-      makeLit(Literal((bits_lit.value >> lo_lit.value.toInt)&((BigInt(1)<<dw) - BigInt(1)), dw)){ gen };
+      makeLit(Literal((bits_lit.value >> lo_lit.value.toInt)&((BigInt(1)<< dw) - BigInt(1)), dw)){ gen };
     } else {
       val extract = new Extract()
       extract.init("", if(w == -1) widthOf(0) else fixWidth(w), mod.toNode, hi, lo)
@@ -90,15 +90,27 @@ object Extract {
   }
 }
 
+object RawExtract {
+  def apply(mod: Node, hi: Node, lo: Node, w: Int = -1): Extract = {
+    val extract = new Extract()
+    extract.init("", if (w == -1) mod.width else w, mod, hi, lo)
+    extract.hi = hi
+    extract.lo = lo
+    extract
+  }
+  def apply(mod: Node, hi: Int, lo: Int): Extract = 
+    apply(mod, Literal(hi), Literal(lo), hi-lo+1)
+}
+
 class Extract extends Node {
   var lo: Node = null;
   var hi: Node = null;
 
   override def toString: String =
     if (hi == lo)
-      "BITS(" + inputs(0) + ", " + lo + ")";
+      "EXTRACT(" + inputs(0) + ", " + lo + ")";
     else
-      "BITS(" + inputs(0) + ", " + hi + ", " + lo + ")";
+      "EXTRACT(" + inputs(0) + ", " + hi + ", " + lo + ")";
   def validateIndex(x: Node) = {
     val lit = x.litOf
     assert(lit == null || lit.value >= 0 && lit.value < inputs(0).width, 
@@ -110,5 +122,39 @@ class Extract extends Node {
                     " in file " + line.getFileName)
           }
          )
+  }
+
+  override def genSubNodes = {
+    val bpw = backend.wordBits;
+    if (hi == lo) {
+      if (lo.litOf != null) {
+        val word = lo.litOf.value.toInt / backend.wordBits
+        val bit  = lo.litOf.value.toInt % backend.wordBits
+        subnodes += RawExtract(inputs(0).getSubNode(word), Literal(bit), Literal(bit))
+      } else {
+        var word: Node  = inputs(0).getSubNode(0)
+        val nShiftWords = Op(">>", bpw, inputs(1).getSubNode(0), Literal(log2Up(bpw))) 
+        val nShiftBits  = RawExtract(inputs(1).getSubNode(0), log2Up(bpw)-1, 0)
+        for (off <- 1 until backend.words(inputs(0)))
+          word = Multiplex(Op("==", 1, nShiftWords, Literal(off)), inputs(0).getSubNode(off), word)
+        subnodes += RawExtract(word, nShiftBits, nShiftBits)
+      }
+    } else {
+      val rsh = inputs(2).value.toInt
+      if (rsh % bpw == 0) {
+        for (i <- 0 until backend.words(this))
+          subnodes += inputs(0).getSubNode(i + rsh/bpw)
+        Trunc(this)
+      } else {
+        for (i <- 0 until backend.words(this)) {
+          val lh = Op(">>", bpw, inputs(0).getSubNode(i + rsh/bpw), Literal(rsh%bpw))
+          if (i + rsh/bpw + 1 < backend.words(inputs(0)))
+            subnodes += Op("|", bpw, lh, Op("<<", bpw, inputs(0).getSubNode(i + rsh/bpw + 1), Literal(bpw - rsh%bpw)))
+          else
+            subnodes += lh
+        }
+        Trunc(this)
+      }
+    }
   }
 }

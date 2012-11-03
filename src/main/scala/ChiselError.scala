@@ -26,7 +26,7 @@ object ChiselError {
       if (pkg != "Chisel" && !classname.contains("scala"))
         return ste
     }
-    println("COULDN'T FIND LINE NUMBER")
+    // println("COULDN'T FIND LINE NUMBER")
     return stack(0)
   }
 
@@ -39,7 +39,7 @@ object ChiselError {
       if (pkg != "Chisel" && !classname.contains("scala"))
         return i
     }
-    println("COULDN'T FIND LINE NUMBER")
+    // println("COULDN'T FIND LINE NUMBER")
     return 0
   }
 
