@@ -37,6 +37,8 @@ object Component {
   var isFolding = true;
   var isGenHarness = false;
   var isReportDims = false;
+  var isFame1 = false;
+  var fame1fire: Bool = null;
   var moduleNamePrefix = ""
   var scanFormat = "";
   var scanArgs: ArrayBuffer[Node] = null;
@@ -99,6 +101,8 @@ object Component {
     isGenHarness = false;
     isDebug = false;
     isIoDebug = true;
+    isFame1 = false;
+    fame1fire = null;
     isClockGatingUpdates = false;
     isClockGatingUpdatesInline = false;
     isFolding = true;
@@ -254,7 +258,6 @@ object Component {
 
 
 abstract class Component(resetSignal: Bool = null) {
-  var ioVal: Data = null;
   var name: String = "";
   val bindings = new ArrayBuffer[Binding];
   var wiresCache: Array[(String, Bits)] = null;
@@ -356,8 +359,7 @@ abstract class Component(resetSignal: Bool = null) {
     // println("UNABLE TO FIND BINDING FOR " + m);
     return null
   }
-  //def io: Data = ioVal;
-  def io: Data
+  def io: Bundle
   def nextIndex : Int = { nindex = nindex + 1; nindex }
   val nameSpace = new HashSet[String];
   def genName (name: String): String = 
@@ -390,6 +392,10 @@ abstract class Component(resetSignal: Bool = null) {
   reset.component = this
   reset.setName("reset")
   if(!(resetSignal == null)) reset := resetSignal
+
+  val isFire = Bool(INPUT)
+  isFire.component = this
+  fame1fire = isFire
 
   // COMPILATION OF BODY
   def isInferenceTerminal(m: Node): Boolean = {

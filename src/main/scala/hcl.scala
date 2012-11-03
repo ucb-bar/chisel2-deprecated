@@ -72,6 +72,26 @@ object Printer {
     new TestIO(format, args.toList);
 }
 
+object withFame1 {
+  def fireChildren(isTop: Boolean, c: Component): Unit = {
+    println("ADDING IS-FIRE\n")
+    if (!isTop)
+      c.isFire := c.parent.isFire
+    c.io.elements
+    c.io.elementsCache += (("is_fire", c.isFire))
+    for (e <- c.children)
+      fireChildren(false, e)
+  }
+  def apply()(f: => Component) = {
+    val x = isFame1; 
+    isFame1 = true; 
+    val c = f; 
+    fireChildren(true, c)
+    isFame1 = x; 
+    c
+  }
+}
+ 
 object chiselMain {
   def readArgs(args: Array[String]) = {
     var i = 0;
@@ -173,13 +193,14 @@ object chiselMainTest {
 }
 
 trait proc extends Node {
-  var updates = new collection.mutable.ListBuffer[(Bool, Node)];
-  def genCond() = conds.top;
-  def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
-    val update = others.foldLeft(default)((v, u) => Multiplex(u._1, u._2, v))
-    if (inputs.isEmpty) inputs += update else inputs(0) = update
+  var isDefaultNeeded = true;
+  var updates = new Queue[(Bool, Node)];
+  def genCond() = conds.top
+  def genDelayCond() = {
+    val c = conds.top
+    if (isFame1) fame1fire && c else c;
   }
-  def genMuxes(default: Node): Unit = {
+  def genMuxes(default: Node) = {
     if (updates.length == 0) {
       if (inputs.length == 0 || inputs(0) == null)
         ChiselErrors += ChiselError({"NO UPDATES ON " + this}, this)

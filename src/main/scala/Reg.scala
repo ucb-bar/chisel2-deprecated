@@ -102,7 +102,8 @@ class Reg extends Delay with proc {
   def procAssign(src: Node) = {
     if (assigned)
       ChiselErrors += ChiselError("reassignment to Reg", Thread.currentThread().getStackTrace);
-    val cond = genCond();
+    val cond = genDelayCond();
+
     if (conds.length >= 1) {
       isEnable = backend.isInstanceOf[VerilogBackend]
       enable = enable || cond;
