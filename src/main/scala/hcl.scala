@@ -194,13 +194,17 @@ object chiselMainTest {
 
 trait proc extends Node {
   var isDefaultNeeded = true;
-  var updates = new Queue[(Bool, Node)];
+  var updates = new ScalaQueue[(Bool, Node)];
   def genCond() = conds.top
   def genDelayCond() = {
     val c = conds.top
     if (isFame1) fame1fire && c else c;
   }
-  def genMuxes(default: Node) = {
+  def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
+    val update = others.foldLeft(default)((v, u) => Multiplex(u._1, u._2, v))
+    if (inputs.isEmpty) inputs += update else inputs(0) = update
+  }
+  def genMuxes(default: Node): Unit = {
     if (updates.length == 0) {
       if (inputs.length == 0 || inputs(0) == null)
         ChiselErrors += ChiselError({"NO UPDATES ON " + this}, this)
