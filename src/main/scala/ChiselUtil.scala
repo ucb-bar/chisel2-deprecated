@@ -294,17 +294,16 @@ object Counter
   }
 }
 
-class ioQueue[T <: Data](entries: Int, flushable: Boolean)(data: => T) extends Bundle
+class ioQueue[T <: Data](entries: Int)(data: => T) extends Bundle
 {
-  val flush = if (flushable) Bool(INPUT) else null
   val enq   = new FIFOIO()(data).flip
   val deq   = new FIFOIO()(data)
   val count = UFix(OUTPUT, log2Up(entries+1))
 }
 
-class Queue[T <: Data](val entries: Int, pipe: Boolean = false, flow: Boolean = false, flushable: Boolean = false)(data: => T) extends Component
+class Queue[T <: Data](val entries: Int, pipe: Boolean = false, flow: Boolean = false, resetSignal: Bool = null)(data: => T) extends Component(resetSignal)
 {
-  val io = new ioQueue(entries, flushable)(data)
+  val io = new ioQueue(entries)(data)
 
   val do_flow = Bool()
   val do_enq = io.enq.ready && io.enq.valid && !do_flow
@@ -313,26 +312,14 @@ class Queue[T <: Data](val entries: Int, pipe: Boolean = false, flow: Boolean = 
   var enq_ptr = UFix(0)
   var deq_ptr = UFix(0)
 
-  if (entries > 1)
-  {
+  if (entries > 1) {
     enq_ptr = Counter(do_enq, entries)._1
     deq_ptr = Counter(do_deq, entries)._1
-    if (flushable) {
-      when (io.flush) {
-        deq_ptr := UFix(0)
-        enq_ptr := UFix(0)
-      }
-    }
   }
 
   val maybe_full = Reg(resetVal = Bool(false))
   when (do_enq != do_deq) {
     maybe_full := do_enq
-  }
-  if (flushable) {
-    when (io.flush) {
-      maybe_full := Bool(false)
-    }
   }
 
   val ram = Mem(entries) { data }
