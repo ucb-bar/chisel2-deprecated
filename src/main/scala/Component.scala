@@ -36,7 +36,7 @@ object Component {
   var isInlineMem = true;
   var isFolding = true;
   var isGenHarness = false;
-  var isReportDims = false;
+  var isReportDims = true;
   var isFame1 = false;
   var fame1fire: Bool = null;
   var moduleNamePrefix = ""
@@ -106,7 +106,7 @@ object Component {
     isClockGatingUpdates = false;
     isClockGatingUpdatesInline = false;
     isFolding = true;
-    isReportDims = false;
+    isReportDims = true;
     moduleNamePrefix = ""
     scanFormat = "";
     scanArgs = new ArrayBuffer[Node]();
@@ -587,7 +587,8 @@ abstract class Component(resetSignal: Bool = null) {
     for (m <- mods) {
       m match {
         case l: Literal =>
-        case i      => imods += m;
+        case l: Bits    =>
+        case i          => imods += m;
       }
     }
     val whist = new HashMap[Int, Int]();
@@ -597,6 +598,14 @@ abstract class Component(resetSignal: Bool = null) {
         whist(w) = whist(w) + 1;
       else
         whist(w) = 1;
+    }
+    val fhist = new HashMap[Int, Int]();
+    for (m <- imods) {
+      val f = m.consumers.length;
+      if (fhist.contains(f))
+        fhist(f) = fhist(f) + 1;
+      else
+        fhist(f) = 1;
     }
     val hist = new HashMap[String, Int]();
     for (m <- imods) {
@@ -612,14 +621,7 @@ abstract class Component(resetSignal: Bool = null) {
         hist(name) = 1;
     }
     for (m <- imods) 
-      maxDepth = max(m.depth, maxDepth);
-    // for ((n, c) <- hist) 
-    println("%6s: %s".format("name", "count"));
-    for (n <- hist.keys.toList.sortWith((a, b) => a < b)) 
-      println("%6s: %4d".format(n, hist(n)));
-    println("%6s: %s".format("width", "count"));
-    for (w <- whist.keys.toList.sortWith((a, b) => a < b)) 
-      println("%3d: %4d".format(w, whist(w)));
+      maxDepth = Math.max(m.depth, maxDepth);
     var widths = new Array[Int](maxDepth+1);
     for (i <- 0 until maxDepth+1)
       widths(i) = 0;
@@ -630,9 +632,20 @@ abstract class Component(resetSignal: Bool = null) {
       numNodes += 1;
     var maxWidth = 0;
     for (i <- 0 until maxDepth+1)
-      maxWidth = max(maxWidth, widths(i));
+      maxWidth = Math.max(maxWidth, widths(i));
+    // for ((n, c) <- hist) 
+    println("%8s: %5s %5s".format("name", "count", "%"));
+    for ((o, n) <- hist.toList.sortBy{_._2}.reverse)
+      println("%8s: %5d %5.2f".format(o, n, (100.0 * n)/numNodes));
+    println("%3s: %5s %5s".format("w", "count", "%"));
+    for ((w, n) <- whist.toList.sortBy{_._2}.reverse)
+      println("%3d: %5d %5.2f".format(w, n, (100.0 * n)/numNodes));
+    println("%3s: %5s %5s".format("f", "count", "%"));
+    for ((f, n) <- fhist.toList.sortBy{_._2}.reverse)
+      println("%3d: %5d %5.2f".format(f, n, (100.0 * n)/numNodes));
     (numNodes, maxWidth, maxDepth)
   }
+
   def collectNodes(c: Component) = {
     for (m <- c.mods) {
       // println("M " + m.name);

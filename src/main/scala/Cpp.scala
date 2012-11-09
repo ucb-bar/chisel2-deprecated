@@ -22,7 +22,7 @@ object CListLookup {
 }
 
 class CppBackend extends Backend {
-  var isSubNodes = true
+  var isSubNodes = false
   override def emitTmp(node: Node): String = {
     require(false)
     if (node.isInObject)
@@ -44,15 +44,24 @@ class CppBackend extends Backend {
     }
   }
   def wordMangle(x: Node, w: Int) = {
-    if (w >= words(x))
+    if (w >= words(x)) {
       "0L"
-    else if (x.isInstanceOf[Literal]) {
-      var hex = x.asInstanceOf[Literal].value.toString(16)
-      if (hex.length > bpw/4*w) "0x" + hex.slice(hex.length-bpw/4*(w+1), hex.length-bpw/4*w) + "L" else "0L"
-    } else if (x.isInObject)
-      emitRef(x) + ".values[" + w + "]"
-    else
-      emitRef(x) + "__w" + w
+    } else {
+      x match {
+        case l: Literal => {
+          var hex = x.asInstanceOf[Literal].value.toString(16)
+          if (hex.length > bpw/4*w) "0x" + hex.slice(hex.length-bpw/4*(w+1), hex.length-bpw/4*w) + "L" else "0L"
+        }
+        case l: FloLiteral => 
+          "fromFloat(" + l.floValue + ")"
+        case _ => {
+          if (x.isInObject)
+            emitRef(x) + ".values[" + w + "]"
+          else
+            emitRef(x) + "__w" + w
+        }
+      }
+    }
   }
   def emitWordRef(node: Node, w: Int): String = {
     node match {
@@ -72,6 +81,8 @@ class CppBackend extends Backend {
       case x: Literal =>
         ""
       case x: Lit =>
+        ""
+      case x: FloLiteral =>
         ""
       case x: ListNode =>
         ""
@@ -141,6 +152,10 @@ class CppBackend extends Backend {
             block((0 until words(o)).map(i => emitWordRef(o, i) + " = -" + emitWordRef(o.inputs(0), i) + (if (i > 0) " - __borrow" else if (words(o) > 1) "; val_t __borrow" else "") + (if (i < words(o)-1) "; __borrow = " + emitWordRef(o.inputs(0), i) + " || " + emitWordRef(o, i) else ""))) + trunc(o)
           else if (o.op == "!")
             "  " + emitLoWordRef(o) + " = !" + emitLoWordRef(o.inputs(0)) + ";\n"
+          else if (o.op == "f-")
+            "  " + emitLoWordRef(o) + " = fromFloat(-(toFloat(" + emitLoWordRef(o.inputs(0)) + "));\n"
+          else if (o.op == "fsin")
+            "  " + emitLoWordRef(o) + " = fromFloat(sin(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
           else {
             assert(false)
             ""
@@ -236,6 +251,24 @@ class CppBackend extends Backend {
           val initial = (a: String, b: String) => a + " != " + b
           val subsequent = (i: String, a: String, b: String) => "(" + i + ") | (" + a + " != " + b + ")"
           "  " + emitLoWordRef(o) + " = " + opFoldLeft(o, initial, subsequent) + ";\n"
+        } else if (o.op == "f-") {
+            "  " + emitLoWordRef(o) + " = fromFloat(toFloat(" + emitLoWordRef(o.inputs(0)) + ") - toFloat(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "f+") {
+            "  " + emitLoWordRef(o) + " = fromFloat(toFloat(" + emitLoWordRef(o.inputs(0)) + ") + toFloat(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "f*") {
+            "  " + emitLoWordRef(o) + " = fromFloat(toFloat(" + emitLoWordRef(o.inputs(0)) + ") * toFloat(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "f/") {
+            "  " + emitLoWordRef(o) + " = fromFloat(toFloat(" + emitLoWordRef(o.inputs(0)) + ") / toFloat(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "f==") {
+            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") == toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "f!=") {
+            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") != toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "f>") {
+            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") > toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "f<=") {
+            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") <= toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "f>=") {
+            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") >= toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else {
           require(false)
           ""
@@ -423,6 +456,7 @@ class CppBackend extends Backend {
     for (m <- nodes) {
       m match {
         case l: Literal => ;
+        case l: FloLiteral => ;
         case any        => 
           if (m.name != "" && !(m == c.reset) && !(m.component == null)) {
             // only modify name if it is not the reset signal or not in top component

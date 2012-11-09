@@ -25,9 +25,11 @@ object chiselCast {
 object UnaryOp {
   def apply[T <: Data](x: T, op: String)(gen: => T): T = {
     val node = op match {
-    case "-" => Op("-",  1, widthOf(0), x);
-    case "~" => Op("~",  1, widthOf(0), x);
-    case "!" => Op("!",  1, fixWidth(1), x);
+    case "-"  => Op("-",  1, widthOf(0), x);
+    case "~"  => Op("~",  1, widthOf(0), x);
+    case "!"  => Op("!",  1, fixWidth(1), x);
+    case "f-" => Op("f-", 1, fixWidth(32), x);
+    case "fsin" => Op("fsin", 1, fixWidth(32), x);
     case any => null;
     }
     node.setTypeNode(gen.asOutput)
@@ -50,6 +52,10 @@ object BinaryOp {
       case "##"  => Op("##", 2, sumWidth _,  x, y );
       case "&"   => Op("&",  2, maxWidth _, x, y );
       case "|"   => Op("|",  2, maxWidth _, x, y );
+      case "f+"  => Op("f+", 2, fixWidth(32), x, y );
+      case "f-"  => Op("f-", 2, fixWidth(32), x, y );
+      case "f*"  => Op("f*", 0, fixWidth(32), x, y );
+      case "f/"  => Op("f/", 0, fixWidth(32), x, y );
       case any   => null;
     }
     node.setTypeNode(gen.asOutput)
@@ -70,6 +76,12 @@ object LogicalOp {
         case ">="  => Op(">=", 2, fixWidth(1), x, y );
         case "&&"  => Op("&&", 2, fixWidth(1), x, y );
         case "||"  => Op("||", 2, fixWidth(1), x, y );
+        case "f==" => Op("f==", 2, fixWidth(1), x, y );
+        case "f!=" => Op("f!=", 2, fixWidth(1), x, y );
+        case "f>"  => Op("f>",  2, fixWidth(1), x, y );
+        case "f<"  => Op("f<",  2, fixWidth(1), x, y );
+        case "f<=" => Op("f<=", 2, fixWidth(1), x, y );
+        case "f>=" => Op("f>=", 2, fixWidth(1), x, y );
         case any   => null;
       }
 

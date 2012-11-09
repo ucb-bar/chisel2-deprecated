@@ -111,7 +111,7 @@ object RawMemRead {
     val ba = Bits();
     val (d, mr) = m.doRead(ba, bc)
     mr.width_   = m.width
-    // println("MEM READ " + mr + " WIDTH = " + mr.width)
+    // println("MEM READ " + mr + " CONDI = " + condi)
     mr.inputs(0) = condi
     mr.inputs(1) = addri
     mr

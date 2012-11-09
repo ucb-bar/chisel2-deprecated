@@ -83,24 +83,24 @@ class FloBackend extends Backend {
         emitDec(x) + "fill/" + node.width + " " + emitRef(node.inputs(0)) + "\n"
         
       case x: Bits =>
-        if (x.inputs.length == 1)
+        if (x.inputs.length == 1) {
           emitDec(x) + "mov " + emitRef(x.inputs(0)) + "\n"
-        else
+        } else
           emitDec(x) + "rnd/" + x.width + "\n"
 
       case m: Mem[_] =>
         emitDec(m) + "mem " + m.n + "\n"
 
       case m: MemRead[_] =>
-        emitDec(m) + "ld " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n" // emitRef(m.mem) 
+        emitDec(m) + "rd " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n" // emitRef(m.mem) 
 
       case m: MemWrite[_] =>
         if (m.inputs.length == 2)
           return ""
-        emitDec(m) + "st " + emitRef(m.mem) + " " + emitRef(m.addr) + " " + emitRef(m.data) + "\n"
+        emitDec(m) + "wr " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + " " + emitRef(m.data) + "\n"
 
       case x: Reg => // TODO: need resetVal treatment
-        emitDec(x) + "reg " + emitRef(x.updateVal) + "\n"
+        emitDec(x) + "reg " + (if (x.isEnable) emitRef(x.enableSignal) else "1") + " " + emitRef(x.updateVal) + "\n"
 
       case x: Log2 => // TODO: log2 instruction?
         emitDec(x) + "log2/" + x.width + " " + emitRef(x.inputs(0)) + "\n"
