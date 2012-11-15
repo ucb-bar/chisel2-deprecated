@@ -59,6 +59,8 @@ class UFix extends Num {
   override def >> (b: UFix): UFix = BinaryOp(this, b, ">>"){UFix()};
   def +  (b: UFix): UFix = BinaryOp(this, b, "+"){UFix()};
   def *  (b: UFix): UFix = BinaryOp(this, b, "*"){UFix()};
+  def /  (b: UFix): UFix = BinaryOp(this, b, "/"){UFix()};
+  def %  (b: UFix): UFix = BinaryOp(this, b, "%"){UFix()};
   def ^  (b: UFix): UFix = BinaryOp(this, b, "^"){UFix()};
   def ?  (b: UFix): UFix = BinaryOp(this, b, "?"){UFix()};
   def -  (b: UFix): UFix = BinaryOp(this, b, "-"){UFix()};
@@ -74,6 +76,8 @@ class UFix extends Num {
 
   //UFix op Fix arithmetic
   def *   (b: Fix): Fix = BinaryOp(this, b, "u*s"){Fix()}.toFix;
+  def %   (b: Fix): Fix = BinaryOp(this, b, "u/s"){Fix()}.toFix;
+  def /   (b: Fix): Fix = BinaryOp(this, b, "u%s"){Fix()}.toFix;
 }
 
 class Eyum extends UFix { };

@@ -91,6 +91,8 @@ class Fix extends Num {
   //Fix to Fix arithmetic
   def +  (b: Fix): Fix = BinaryOp(this, b, "+"){Fix()};
   def *  (b: Fix): Fix = BinaryOp(this, b, "s*s"){Fix()};
+  def /  (b: Fix): Fix = BinaryOp(this, b, "s/s"){Fix()};
+  def %  (b: Fix): Fix = BinaryOp(this, b, "s%s"){Fix()};
   def ===(b: Fix): Bool = LogicalOp(this, b, "==="){Fix()};
   def -  (b: Fix): Fix = BinaryOp(this, b, "-"){Fix()};
   def != (b: Fix): Bool = LogicalOp(this, b, "!="){Fix()};
@@ -102,6 +104,8 @@ class Fix extends Num {
   //Fix to UFix arithmetic
   def +   (b: UFix): Fix = this + Cat(Bits(0, 1), b).toFix;
   def *   (b: UFix): Fix = BinaryOp(this, b, "s*u"){Fix()}.toFix;
+  def /   (b: UFix): Fix = BinaryOp(this, b, "s/u"){Fix()}.toFix;
+  def %   (b: UFix): Fix = BinaryOp(this, b, "s%u"){Fix()}.toFix;
   def -   (b: UFix): Fix = this - Cat(Bits(0, 1), b).toFix;
   def === (b: UFix): Bool = this === Cat(Bits(0, 1), b).toFix;
   def !=  (b: UFix): Bool = this != Cat(Bits(0, 1), b).toFix;

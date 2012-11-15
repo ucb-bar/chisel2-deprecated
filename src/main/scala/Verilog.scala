@@ -195,12 +195,12 @@ class VerilogBackend extends Backend {
             "{" + emitRef(node.inputs(0)) + ", " + emitRef(node.inputs(1)) + "}"
            else if (node.inputs.length == 1)
              o.op + " " + emitRef(node.inputs(0))
-           else if (o.op == "s*s")
-             "$signed(" + emitRef(node.inputs(0)) + ") * $signed(" + emitRef(node.inputs(1)) + ")"
-           else if (o.op == "s*u")
-             "$signed(" + emitRef(node.inputs(0)) + ") * " + emitRef(node.inputs(1))
-           else if (o.op == "u*s")
-             emitRef(node.inputs(0)) + " * $signed(" + emitRef(node.inputs(1)) + ")"
+           else if (o.op == "s*s" || o.op == "s%s" || o.op == "s/s")
+             "$signed(" + emitRef(node.inputs(0)) + ") " + o.op(1) + " $signed(" + emitRef(node.inputs(1)) + ")"
+           else if (o.op == "s*u" || o.op == "s%u" || o.op == "s/u")
+             "$signed(" + emitRef(node.inputs(0)) + ") " + o.op(1) + " " + emitRef(node.inputs(1))
+           else if (o.op == "u*s" || o.op == "u%s" || o.op == "u/s")
+             emitRef(node.inputs(0)) + " " + o.op(1) + " $signed(" + emitRef(node.inputs(1)) + ")"
            else if(node.isSigned) {
              if (o.op == ">>")
                "$signed(" + emitRef(node.inputs(0)) +") " + ">>>" + " " + emitRef(node.inputs(1))

@@ -2,7 +2,6 @@ package Chisel
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 
-import scala.math.max;
 import Node._;
 import Component._;
 import ChiselError._;
@@ -41,13 +40,14 @@ object Node {
     }}}
 
   def maxWidth(m: Node): Int = {
-    var res = 0;
+    var w = 0
     for (i <- m.inputs)
-      if(!(i == null) && !(i == m)){
-	res = max(res, i.width);
-      }
-    res
+      if (!(i == null || i == m))
+        w = w.max(i.width)
+    w
   }
+
+  def minWidth(m: Node): Int = m.inputs.map(_.width).min
 
   def maxWidthPlusOne(m: Node): Int = maxWidth(m) + 1;
 

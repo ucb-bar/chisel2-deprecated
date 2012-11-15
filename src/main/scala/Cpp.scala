@@ -158,6 +158,9 @@ class CppBackend extends Backend {
             res += emitWordRef(o, i) + " = " + emitWordRef(o.inputs(0), i) + o.op + emitWordRef(o.inputs(1), i) + o.op + "__c"
           }
           block(res) + trunc(o)
+        } else if (o.op == "/") {
+          val cmd = "div_n(__d, __x, __y, " + o.inputs(0).width + ", " + o.inputs(1).width + ")"
+          block(makeArray("__d", o) ++ toArray("__x", o.inputs(0)) ++ toArray("__y", o.inputs(1)) ++ List(cmd) ++ fromArray("__d", o))
         } else if (o.op == "*") {
           if (o.width <= bpw)
             "  " + emitLoWordRef(o) + " = " + emitLoWordRef(o.inputs(0)) + " * " + emitLoWordRef(o.inputs(1)) + ";\n"
