@@ -224,7 +224,8 @@ class CppBackend extends Backend {
           block((0 until words(o)).map(i => emitWordRef(o, i) + " = " + emitWordRef(o.inputs(0), i) + o.op + emitWordRef(o.inputs(1), i)))
         } else if (o.op == "<" && o.isSigned) {
             require(o.inputs(1).litOf.value == 0)
-            "  " + emitLoWordRef(o) + " = (" + emitWordRef(o.inputs(0), words(o.inputs(0))-1) + " >> " + (o.inputs(0).width%bpw-1) + ") & 1;\n"
+            val shamt = (o.inputs(0).width-1) % bpw
+            "  " + emitLoWordRef(o) + " = (" + emitWordRef(o.inputs(0), words(o.inputs(0))-1) + " >> " + shamt + ") & 1;\n"
         } else if (o.op == "<" || o.op == ">" || o.op == "<=" || o.op == ">=") {
           require(!o.isSigned)
           val initial = (a: String, b: String) => a + o.op + b
