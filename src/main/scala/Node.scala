@@ -25,7 +25,8 @@ object Node {
 
   var isInGetWidth = false
 
-  def fixWidth(w: Int) = { (m: Node) => {m.isFixedWidth = true; w} };
+  def fixWidth(w: Int) = { Predef.assert(w != -1, {println("invalid width for fixWidth object")});
+                          (m: Node) => {m.isFixedWidth = true; w} };
 
   def widthOf(i: Int) = { (m: Node) => { 
     try { 
@@ -243,8 +244,9 @@ abstract class Node extends nameable{
   def traceNode(c: Component, stack: Stack[() => Any]): Any = {
     if(this.isTypeNode) println("found " + this)
     // determine whether or not the component needs a clock input
-    if ((isReg || isClkInput) && !(component == null))
-        component.containsReg = true
+    if ((isReg || isClkInput) && !(component == null)) {
+      component.containsReg = true
+    }
 
     // pushes and pops components as necessary in order to later mark the parent of nodes
     val (comp, nextComp) = 

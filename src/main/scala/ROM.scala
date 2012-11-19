@@ -2,6 +2,7 @@ package Chisel
 import ChiselError._
 import Node._
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.Stack
 
 class ROM[T <: Data](val lits: Seq[Literal], gen: () => T) extends Vec[T](gen) {
   val data = gen().toNode
@@ -19,7 +20,16 @@ class ROM[T <: Data](val lits: Seq[Literal], gen: () => T) extends Vec[T](gen) {
     ChiselErrors += ChiselError("Can't write to ROM", Thread.currentThread().getStackTrace)
   }
 
+  override def equals(x: Any): Boolean = {
+    if (x.isInstanceOf[ROM[_]]) {
+      this.eq(x.asInstanceOf[AnyRef])
+    } else {
+      super.equals(x)
+    }
+  }
+
   override def isReg = true
+
 }
 
 class ROMRead[T <: Data](val rom: ROM[T], addri: Bits) extends Node {
