@@ -61,9 +61,7 @@ object Node {
 
   def lshWidthOf(i: Int, n: Node) = { 
     (m: Node) => {
-      val mwidth = m.inputs(i).width;
-      val nMax = n.maxNum;
-      val res = m.inputs(i).width + n.maxNum.toInt;
+      val res = m.inputs(0).width + n.maxNum.toInt;
       res
     } 
   }
@@ -116,7 +114,7 @@ abstract class Node extends nameable{
   def name_it (path: String, setNamed: Boolean = true) = { name = path; named = setNamed}
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
   def ##(b: Node): Node  = Op("##", 2, sumWidth _,  this, b ); 
-  def maxNum: BigInt = (1 << (if(width < 0) inferWidth(this) else width))-1;
+  def maxNum: BigInt = if(litOf != null) litOf.value else ((1 << (if(width < 0) inferWidth(this) else width))-1);
   def minNum: BigInt = BigInt(0);
   // TODO: SHOULD BE GENERALIZED TO DIG FOR LIT AS litOf DOES
   def isLit = false;
@@ -125,7 +123,7 @@ abstract class Node extends nameable{
   def litOf: Literal = {
     if(inputs.length == 0)
       if (isLit) this.asInstanceOf[Literal] else null
-    else if(inputs.length == 1 && isTypeNode)
+    else if(inputs.length == 1 && isInstanceOf[Bits] && inputs(0) != null)
       inputs(0).litOf
     else
       null

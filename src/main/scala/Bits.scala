@@ -47,7 +47,7 @@ class Bits extends Data with proc {
   def default: Node = if (inputs.length < 1 || inputs(0) == null) null else inputs(0);
 
   override def litOf: Literal = {
-    if(inputs.length == 1)
+    if(inputs.length == 1 && inputs(0) != null)
       inputs(0).litOf
     else
       null
@@ -218,11 +218,13 @@ class Bits extends Data with proc {
   }
 
   override def maxNum = {
-    if(inputs.length == 0) 
+    if (inputs.length == 0) 
       width;
-    else if(inputs(0).isLit)
+    else if (inputs(0).isLit)
       inputs(0).value
-    else if (inputs.length == 1 && isTypeNode)
+    else if (inputs(0).litOf != null)
+      inputs(0).litOf.value
+    else if (inputs.length == 1 && inputs(0) != null)
       inputs(0).maxNum
     else
       super.maxNum

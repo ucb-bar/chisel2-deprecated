@@ -12,10 +12,8 @@ abstract class Cell extends nameable{
 
 object chiselCast {
   def apply[S <: Data, T <: Bits](x: S)(gen: => T): T = {
-    val res = gen.asOutput
-    x.nameHolder = res
+    val res = gen
     res.inputs += x.toNode
-    res.setIsTypeNode
     res
   }
 }
@@ -287,9 +285,9 @@ class Op extends Node {
   override def dotName = if (op == "") "?" else op;
   override def toString: String =
     if (inputs.length == 1)
-      op + inputs(0)
+      op + "(" + inputs(0) + ")"
     else
-      inputs(0) + op + inputs(1)
+      "[ " + inputs(0) + "\n]\n  " + op + "\n" + "[  " + inputs(1) + "\n]"
 
   override def forceMatchingWidths = {
     if (inputs.length == 2) {
