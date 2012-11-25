@@ -115,6 +115,7 @@ object chiselMain {
         case "--clockGatingUpdates" => isClockGatingUpdates = true; 
         case "--clockGatingUpdatesInline" => isClockGatingUpdatesInline = true; 
         case "--folding" => isFolding = true; 
+        case "--noFolding" => isFolding = false; 
         case "--vcd" => isVCD = true;
         case "--v" => backend = new VerilogBackend
         case "--moduleNamePrefix" => moduleNamePrefix = args(i+1); i += 1

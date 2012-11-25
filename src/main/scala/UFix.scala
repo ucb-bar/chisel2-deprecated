@@ -7,6 +7,8 @@ object UFix {
   // def apply(x: BigInt, width: Int): UFix = Lit(x, width){UFix()};
   def apply(x: Int): UFix = Lit(x){UFix()};
   def apply(x: Int, width: Int): UFix = Lit(x, width){UFix()};
+  def apply(x: String): UFix = Lit(x){UFix()};
+  def apply(x: String, width: Int): UFix = Lit(x, width){UFix()};
   
   def apply(dir: IODirection = null, width: Int = -1): UFix = {
     val res = new UFix();

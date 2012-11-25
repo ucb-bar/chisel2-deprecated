@@ -6,6 +6,8 @@ object Fix {
 
   def apply(x: Int): Fix = Lit(x){Fix()};
   def apply(x: Int, width: Int): Fix = Lit(x, width){Fix()};
+  def apply(x: String): Fix = Lit(x){Fix()};
+  def apply(x: String, width: Int): Fix = Lit(x, width){Fix()};
   
   def apply(dir: IODirection = null, width: Int = -1): Fix = {
     val res = new Fix();
