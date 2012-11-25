@@ -2,7 +2,6 @@ package Chisel
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 
-import scala.math.max;
 import Node._;
 import Component._;
 import ChiselError._;
@@ -26,7 +25,8 @@ object Node {
 
   var isInGetWidth = false
 
-  def fixWidth(w: Int) = { (m: Node) => {m.isFixedWidth = true; w} };
+  def fixWidth(w: Int) = { Predef.assert(w != -1, {println("invalid width for fixWidth object")});
+                          (m: Node) => {m.isFixedWidth = true; w} };
 
   def widthOf(i: Int) = { (m: Node) => { 
     try { 
@@ -41,13 +41,14 @@ object Node {
     }}}
 
   def maxWidth(m: Node): Int = {
-    var res = 0;
+    var w = 0
     for (i <- m.inputs)
-      if(!(i == null) && !(i == m)){
-	res = max(res, i.width);
-      }
-    res
+      if (!(i == null || i == m))
+        w = w.max(i.width)
+    w
   }
+
+  def minWidth(m: Node): Int = m.inputs.map(_.width).min
 
   def maxWidthPlusOne(m: Node): Int = maxWidth(m) + 1;
 
@@ -60,9 +61,7 @@ object Node {
 
   def lshWidthOf(i: Int, n: Node) = { 
     (m: Node) => {
-      val mwidth = m.inputs(i).width;
-      val nMax = n.maxNum;
-      val res = m.inputs(i).width + n.maxNum.toInt;
+      val res = m.inputs(0).width + n.maxNum.toInt;
       res
     } 
   }
@@ -116,7 +115,7 @@ abstract class Node extends nameable{
   def name_it (path: String, setNamed: Boolean = true) = { name = path; named = setNamed}
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
   def ##(b: Node): Node  = Op("##", 2, sumWidth _,  this, b ); 
-  def maxNum: BigInt = (1 << (if(width < 0) inferWidth(this) else width))-1;
+  def maxNum: BigInt = if(litOf != null) litOf.value else ((1 << (if(width < 0) inferWidth(this) else width))-1);
   def minNum: BigInt = BigInt(0);
   // TODO: SHOULD BE GENERALIZED TO DIG FOR LIT AS litOf DOES
   def isLit = false;
@@ -125,7 +124,7 @@ abstract class Node extends nameable{
   def litOf: Literal = {
     if(inputs.length == 0)
       if (isLit) this.asInstanceOf[Literal] else null
-    else if(inputs.length == 1 && isTypeNode)
+    else if(inputs.length == 1 && isInstanceOf[Bits] && inputs(0) != null)
       inputs(0).litOf
     else
       null
@@ -262,8 +261,9 @@ abstract class Node extends nameable{
   def traceNode(c: Component, stack: Stack[() => Any]): Any = {
     if(this.isTypeNode) println("found " + this)
     // determine whether or not the component needs a clock input
-    if ((isReg || isClkInput) && !(component == null))
-        component.containsReg = true
+    if ((isReg || isClkInput) && !(component == null)) {
+      component.containsReg = true
+    }
 
     // pushes and pops components as necessary in order to later mark the parent of nodes
     val (comp, nextComp) = 

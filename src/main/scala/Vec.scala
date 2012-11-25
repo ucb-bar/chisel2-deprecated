@@ -315,6 +315,7 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
     for((n, i) <- flatten) {
       stack.push(() => i.traceNode(c, stack))
     }
+    stack.push(() => super.traceNode(c, stack))
   }
 
   override def flip(): this.type = {

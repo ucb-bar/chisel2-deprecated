@@ -14,10 +14,8 @@ abstract class Cell extends nameable{
 
 object chiselCast {
   def apply[S <: Data, T <: Bits](x: S)(gen: => T): T = {
-    val res = gen.asOutput
-    x.nameHolder = res
+    val res = gen
     res.inputs += x.toNode
-    res.setIsTypeNode
     res
   }
 }
@@ -46,6 +44,14 @@ object BinaryOp {
       case "s*s" => Op("s*s",  0, sumWidth _,  x, y );
       case "s*u" => Op("s*u",  0, sumWidth _,  x, y );
       case "u*s" => Op("u*s",  0, sumWidth _,  x, y );
+      case "/"   => Op("/",  0, widthOf(0),  x, y );
+      case "s/s" => Op("s/s",  0, widthOf(0),  x, y );
+      case "s/u" => Op("s/u",  0, widthOf(0),  x, y );
+      case "u/s" => Op("u/s",  0, widthOf(0),  x, y );
+      case "%"   => Op("%",  0, minWidth _,  x, y );
+      case "s%s" => Op("s%s",  0, minWidth _,  x, y );
+      case "s%u" => Op("s%u",  0, minWidth _,  x, y );
+      case "u%s" => Op("u%s",  0, minWidth _,  x, y );
       case "^"   => Op("^",  2, maxWidth _,  x, y );
       case "?"   => Multiplex(x, y, null);
       case "-"   => Op("-",  2, maxWidth _,  x, y );
@@ -198,6 +204,11 @@ object Op {
     }
     }
     if (backend.isInstanceOf[CppBackend]) {
+      def signAbs(x: Node) = {
+        val f = x.asInstanceOf[Fix]
+        val s = f < Fix(0)
+        (s, Mux(s, -f, f).toUFix)
+      }
       name match {
         case ">" | "<" | ">=" | "<=" =>
           if (a.isInstanceOf[Fix] && b.isInstanceOf[Fix]) {
@@ -218,22 +229,43 @@ object Op {
           if (a.litOf != null && a.litOf.isZ)
             return Op(name, nGrow, widthInfer, b, a)
         case "s*s" =>
-          val fixA = a.asInstanceOf[Fix]
-          val signA = fixA < Fix(0)
-          val absA = Mux(signA, -fixA, fixA)
-          val fixB = b.asInstanceOf[Fix]
-          val signB = fixB < Fix(0)
-          val absB = Mux(signB, -fixB, fixB)
-          val prod = absA.toUFix * absB.toUFix
+          val (signA, absA) = signAbs(a)
+          val (signB, absB) = signAbs(b)
+          val prod = absA * absB
           return Mux(signA ^ signB, -prod, prod)
         case "s*u" =>
-          val fixA = a.asInstanceOf[Fix]
-          val signA = fixA < Fix(0)
-          val absA = Mux(signA, -fixA, fixA)
-          val prod = absA.toUFix * b.asInstanceOf[UFix]
+          val (signA, absA) = signAbs(a)
+          val prod = absA * b.asInstanceOf[UFix]
           return Mux(signA, -prod, prod)
         case "u*s" =>
           return Op("s*u", nGrow, widthInfer, b, a)
+        case "s/s" =>
+          val (signA, absA) = signAbs(a)
+          val (signB, absB) = signAbs(b)
+          val quo = absA / absB
+          return Mux(signA != signB, -quo, quo)
+        case "s/u" =>
+          val (signA, absA) = signAbs(a)
+          val quo = absA / b.asInstanceOf[UFix]
+          return Mux(signA, -quo, quo)
+        case "u/s" =>
+          val (signB, absB) = signAbs(b)
+          val quo = a.asInstanceOf[UFix] / absB
+          return Mux(signB, -quo, quo)
+        case "s%s" =>
+          val (signA, absA) = signAbs(a)
+          val (signB, absB) = signAbs(b)
+          val rem = absA % absB
+          return Mux(signA, -rem, rem)
+        case "u%s" =>
+          return a.asInstanceOf[UFix] / signAbs(b)._2
+        case "s%u" =>
+          val (signA, absA) = signAbs(a)
+          val rem = absA % b.asInstanceOf[UFix]
+          return Mux(signA, -rem, rem)
+        case "%" =>
+          val (au, bu) = (a.asInstanceOf[UFix], b.asInstanceOf[UFix])
+          return Op("-", nGrow, widthInfer, au, au/bu*bu)
         case _ =>
       }
     }
@@ -292,9 +324,9 @@ class Op extends Node {
   override def dotName = if (op == "") "?" else op;
   override def toString: String =
     if (inputs.length == 1)
-      op + inputs(0)
+      op + "(" + inputs(0) + ")"
     else
-      inputs(0) + op + inputs(1)
+      "[ " + inputs(0) + "\n]\n  " + op + "\n" + "[  " + inputs(1) + "\n]"
 
   override def forceMatchingWidths = {
     if (inputs.length == 2) {

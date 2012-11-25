@@ -78,4 +78,6 @@ class Bool extends Bits {
       case any        => false;
     }
   }
+
+  override def clone = Bool(dir).asInstanceOf[this.type]
 }

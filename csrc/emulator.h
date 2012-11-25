@@ -1,6 +1,7 @@
 #ifndef __IS_EMULATOR__
 #define __IS_EMULATOR__
 
+#include <assert.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <limits.h>
@@ -223,6 +224,11 @@ static inline val_t mask_val(int n) {
   val_t res = val_all_ones() >> (val_n_bits()-n);
   // printf("RES %d %llx\n", n, res);
   return res;
+}
+
+static void div_n (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
+  assert(nb0 <= val_n_bits() && nb1 <= val_n_bits()); // TODO: generalize
+  d[0] = s1[0] == 0 ? mask_val(nb0) : s0[0] / s1[0];
 }
 
 static inline void mask_n (val_t d[], int nw, int nb) {
