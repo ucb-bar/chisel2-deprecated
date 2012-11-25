@@ -91,14 +91,11 @@ object Vec {
   }
 
   def apply[T <: Data](elts: Seq[T])(gen: => T): Vec[T] = {
-    if (elts.forall(_.litOf != null)) {
-      val res = new ROM(elts.map(_.litOf), () => gen)
-      res
-    } else {
-      val res = new Vec[T](() => gen)
-      elts.foreach(res += _)
-      res
-    }
+    val res =
+      if (elts.forall(_.litOf != null)) new ROM(elts.map(_.litOf), () => gen)
+      else new Vec[T](() => gen)
+    elts.foreach(res += _)
+    res
   }
 
   def apply[T <: Data](elt0: T, elts: T*)(gen: => T): Vec[T] =
@@ -387,4 +384,13 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
     val reversed = this.reverse
     Cat(reversed.head, reversed.tail: _*)
   }
+
+  def forall(p: T => Bool): Bool = (this map p).fold(Bool(true))(_&&_)
+  def exists(p: T => Bool): Bool = (this map p).fold(Bool(false))(_||_)
+  def contains(x: T): Bool = this.exists(_.toBits === x.toBits)
+  def count(p: T => Bool): UFix = PopCount(this map p)
+
+  private def indexWhereHelper(p: T => Bool) = this map p zip (0 until size).map(i => UFix(i))
+  def indexWhere(p: T => Bool): UFix = PriorityMux(indexWhereHelper(p))
+  def lastIndexWhere(p: T => Bool): UFix = PriorityMux(indexWhereHelper(p).reverse)
 }
