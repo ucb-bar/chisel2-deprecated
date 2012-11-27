@@ -1481,11 +1481,11 @@ class mem_t {
     put(idx.lo_word(), val);
   }
   void put (val_t idx, dat_t<w> val) {
-    if (ispow2(d) || idx <= d)
+    if (ispow2(d) || idx < d)
       contents[idx] = val;
   }
   val_t put (val_t idx, int word, val_t val) {
-    if (ispow2(d) || idx <= d)
+    if (ispow2(d) || idx < d)
       contents[idx].values[word] = val;
   }
   void print ( void ) {
