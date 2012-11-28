@@ -326,7 +326,8 @@ class Op extends Node {
     if (inputs.length == 1)
       op + "(" + inputs(0) + ")"
     else
-      "[ " + inputs(0) + "\n]\n  " + op + "\n" + "[  " + inputs(1) + "\n]"
+      inputs(0) + " " + op + " " + inputs(1)
+      // "[ " + inputs(0) + "\n]\n  " + op + "\n" + "[  " + inputs(1) + "\n]"
 
   override def forceMatchingWidths = {
     if (inputs.length == 2) {
@@ -433,6 +434,7 @@ class Op extends Node {
                          Multiplex(Op("==", 1, nShiftWords, Literal(del)), inputs(0).getSubNode(i-del), lookup)
             lookups += lookup
           }
+          lookups += Literal(0)
           for (i <- 0 until nWords) {
             val x     = Op(">>", bpw, lookups(i), nShiftBits)
             val c     = Multiplex(isZeroCarry, Literal(0), Op("<<", bpw, lookups(i+1), nRevShiftBits)) // TODO: NEED MASK
@@ -460,7 +462,8 @@ class Op extends Node {
           subnodes += Op(op, backend.thisWordBits(this, i), inputs(0).getSubNode(i), inputs(1).getSubNode(i));
       } else if (op == "<" || op == ">" || op == "<=" || op == ">=") {
         var res = Op(op, backend.thisWordBits(inputs(0), 0), inputs(0).getSubNode(0), inputs(1).getSubNode(0))
-        for (i <- 0 until backend.words(this)) {
+        println("*** THIS " + this + " WIDTH " + this.width + " WORDS " + backend.words(this))
+        for (i <- 1 until backend.words(inputs(0))) {
           val a = inputs(0).getSubNode(i);
           val b = inputs(1).getSubNode(i);
           val w = backend.thisWordBits(inputs(0), i);

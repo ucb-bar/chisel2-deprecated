@@ -59,7 +59,7 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
       }
       val s = sb.toString
       val rv = toLitVal(s)
-      if (isTrace) println("  READ " + o + " = " + rv)
+      if (isTrace) println("  READ " + o + " = " + rv + " ( " + o.line + " )")
       if (!svars.contains(o)) {
         ovars(o) = Literal(rv)
       } else {
