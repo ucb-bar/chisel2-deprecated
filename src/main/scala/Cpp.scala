@@ -28,7 +28,7 @@ class CppBackend extends Backend {
     if (node.isInObject)
       emitRef(node)
     else
-      "dat_t<" + node.width + "> " + emitRef(node)
+      "val_t " + emitRef(node)
   }
 
   override def emitRef(node: Node): String = {
@@ -43,15 +43,12 @@ class CppBackend extends Backend {
         if (isSubNodes)
           (if (l.isBinary) { 
             var (bits, mask, swidth) = parseLit(l.name);
-             var bwidth = if(l.base == 'b') l.width else swidth;
-             if (l.isZ) {
-               ("LITZ<" + bwidth + ">(0x" + toHex(bits) + ", 0x" + toHex(mask) + ")")
-             } else
-               ("LIT<" + bwidth + ">(0x" + toHex(bits) + ")")
+            var bwidth = if(l.base == 'b') l.width else swidth;
+            "0x" + toHex(bits)
            } else if (l.base == 'd' || l.base == 'x'){
-             ("LIT<" + l.width + ">(" + l.name + "L)")
+             l.name + "L"
            } else
-             ("LIT<" + l.width + ">(0x" + l.name + "L)")
+             "0x" + l.name + "L"
           ) // + "/*" + l.inputVal + "*/";
       else
         super.emitRef(node)
@@ -92,21 +89,15 @@ class CppBackend extends Backend {
   }
 
   override def emitDec(node: Node): String = {
+    if (isSubNodes && node.isSubNode) return emitDec1(node); //  && !node.isInObjectSubNode
     node match {
-      case x: Binding =>
-        ""
-      case x: Literal =>
-        ""
-      case x: Lit =>
-        ""
-      case x: FloLiteral =>
-        ""
-      case x: ListNode =>
-        ""
-      case x: MapNode =>
-        ""
-      case x: LookupMap =>
-        ""
+      case x: Binding => ""
+      case x: Literal => ""
+      case x: Lit => ""
+      case x: FloLiteral => ""
+      case x: ListNode => ""
+      case x: MapNode => ""
+      case x: LookupMap => ""
       case x: Reg =>
         "  dat_t<" + node.width + "> " + emitRef(node) + ";\n" +
         "  dat_t<" + node.width + "> " + emitRef(node) + "_shadow;\n";
@@ -143,6 +134,27 @@ class CppBackend extends Backend {
     (1 until words(o.inputs(0))).foldLeft(initial(emitLoWordRef(o.inputs(0)), emitLoWordRef(o.inputs(1))))((c, i) => subsequent(c, emitWordRef(o.inputs(0), i), emitWordRef(o.inputs(1), i)))
 
   /// OLD SINGLE WORD BACKEND START
+  def emitDec1(node: Node): String = {
+    node match {
+      case x: Binding => ""
+      case x: Literal => ""
+      case x: Lit => ""
+      case x: FloLiteral => ""
+      case x: ListNode => ""
+      case x: MapNode => ""
+      case x: LookupMap => ""
+      case x: Reg =>
+        "  val_t " + emitRef(node) + ";\n" +
+        "  val_t " + emitRef(node) + "_shadow;\n";
+      case m: Mem[_] =>
+        "  mem_val_t<" + m.n + "> " + emitRef(m) + ";\n"
+      case r: ROM[_] =>
+        "  mem_val_t<" + r.lits.length + "> " + emitRef(r) + ";\n"
+      case _ =>
+        "  val_t " + emitRef(node) + ";\n"
+    }
+  }
+
   def emitOpRef (o: Op, k: Int): String = {
     if (o.op == "<<") {
       if (k == 0 && o.inputs(k).width < o.width)
@@ -686,7 +698,8 @@ class CppBackend extends Backend {
             m.getSubNodes
             // println("RENAME " + m + " NAME " + m.name + " SUBNODES " + m.subnodes.length)
             for (i <- 0 until m.subnodes.length) {
-              m.subnodes(i).setName(nodeName(m) + "__s" + i)
+              val node = m.subnodes(i)
+              node.setName(nodeName(m) + (if (node.isInObjectSubNode) (".values[" + i + "]") else ("__w" + i)))
               // println("  SUBNODE NAME "+ m.subnodes(i).name)
             }
           }
@@ -751,9 +764,25 @@ class CppBackend extends Backend {
       return
     }
     c.collectNodes(c);
+    val cmods = ArrayBuffer[Node]();
     if (isSubNodes) {
+      c.findOrdering(); // search from roots  -- create omods
+      cmods ++= c.omods
+      for (cmod <- cmods) {
+        println("WALKING " + cmod)
+        if (cmod.isInObject) {
+          println("  in object ")
+          for (s <- cmod.getSubNodes) {
+            s.isInObjectSubNode = true
+            println("MARKING " + s)
+          }
+        }
+      }
       renameNodes(c, c.mods);
+      c.omods.clear
       c.findSubNodeOrdering(); // search from roots  -- create omods
+      for (omod <- c.omods)
+        omod.isSubNode = true
     } else {
       c.findOrdering(); // search from roots  -- create omods
       renameNodes(c, c.omods);
@@ -778,10 +807,16 @@ class CppBackend extends Backend {
       scanArgs.clear();  scanArgs  ++= tester.testInputNodes;    scanFormat  = ""
       printArgs.clear(); printArgs ++= tester.testNonInputNodes; printFormat = ""
 
-      for (n <- scanArgs ++ printArgs)
-        if(!smods.contains(n)) smods += n
+      for (n <- scanArgs ++ printArgs) {
+        if (isSubNodes) {
+          if(!cmods.contains(n)) cmods += n
+        } else {
+          if(!smods.contains(n)) smods += n
+        }
+      }
     } 
-    for (m <- smods) {
+    val dmods = (if (isSubNodes) cmods else smods);
+    for (m <- dmods) {
       //if(m.name != "reset" && !(m.component == c)) {
       if(m.name != "reset") {
         if (m.isInObject)

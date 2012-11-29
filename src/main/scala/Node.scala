@@ -104,6 +104,8 @@ abstract class Node extends nameable{
   var memSource: MemRead[_] = null
   var isScanArg = false
   var isPrintArg = false
+  var isInObjectSubNode = false
+  var isSubNode = false
   def isMemOutput = false
   
   nodes += this
