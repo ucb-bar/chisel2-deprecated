@@ -694,14 +694,11 @@ class CppBackend extends Backend {
             if(m.name != "reset" || !(m.component == c)) 
               m.name = m.component.getPathName + "__" + m.name;
           } 
-          if (isSubNodes) {
-            m.getSubNodes
-            // println("RENAME " + m + " NAME " + m.name + " SUBNODES " + m.subnodes.length)
-            for (i <- 0 until m.subnodes.length) {
-              val node = m.subnodes(i)
-              node.setName(nodeName(m) + (if (node.isInObjectSubNode) (".values[" + i + "]") else ("__w" + i)))
-              // println("  SUBNODE NAME "+ m.subnodes(i).name)
-            }
+          // println("RENAME " + m + " NAME " + m.name + " SUBNODES " + m.subnodes.length)
+          for (i <- 0 until m.subnodes.length) {
+            val node = m.subnodes(i)
+            node.setName(nodeName(m) + (if (node.isInObjectSubNode) (".values[" + i + "]") else ("__w" + i)))
+            // println("  SUBNODE NAME "+ m.subnodes(i).name)
           }
       }
     }
@@ -769,12 +766,9 @@ class CppBackend extends Backend {
       c.findOrdering(); // search from roots  -- create omods
       cmods ++= c.omods
       for (cmod <- cmods) {
-        println("WALKING " + cmod)
         if (cmod.isInObject) {
-          println("  in object ")
           for (s <- cmod.getSubNodes) {
             s.isInObjectSubNode = true
-            println("MARKING " + s)
           }
         }
       }
