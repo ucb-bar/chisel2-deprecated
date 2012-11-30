@@ -22,10 +22,10 @@ object CListLookup {
 }
 
 class CppBackend extends Backend {
-  var isSubNodes = true
+  var isSubNodes = false
   override def emitTmp(node: Node): String = {
     // require(false)
-    if (node.isInObject)
+    if (node.isInObject || node.isInObjectSubNode)
       emitRef(node)
     else
       "val_t " + emitRef(node)
@@ -40,18 +40,19 @@ class CppBackend extends Backend {
         if (!node.isInObject && node.inputs.length == 1) emitRef(node.inputs(0)) else super.emitRef(node) 
 
       case l: Literal =>
-        if (isSubNodes)
+        if (isSubNodes) {
           (if (l.isBinary) { 
             var (bits, mask, swidth) = parseLit(l.name);
             var bwidth = if(l.base == 'b') l.width else swidth;
             "0x" + toHex(bits)
            } else if (l.base == 'd' || l.base == 'x'){
              l.name + "L"
-           } else
+           } else {
              "0x" + l.name + "L"
+           }
           ) // + "/*" + l.inputVal + "*/";
-      else
-        super.emitRef(node)
+        } else
+          super.emitRef(node)
 
       case _ =>
         super.emitRef(node)
@@ -156,63 +157,20 @@ class CppBackend extends Backend {
   }
 
   def emitOpRef (o: Op, k: Int): String = {
-    if (o.op == "<<") {
-      if (k == 0 && o.inputs(k).width < o.width)
-        "DAT<" + o.width + ">(" + emitRef(o.inputs(k)) + ")"
-      else
-        emitRef(o.inputs(k))
-    } else if (o.op == "##" || o.op == ">>" || o.op == "*" ||
-             o.op == "s*s" || o.op == "u*s" || o.op == "s*u") {
-      emitRef(o.inputs(k))
-    } else {
-      var w = 0;
-      for (i <- 0 until o.nGrow)
-        w = max(w, o.inputs(i).width);
-      if (isCoercingArgs && o.nGrow > 0 && k < o.nGrow && w > o.inputs(k).width)
-        "DAT<" + w + ">(" + emitRef(o.inputs(k)) + ")"
-      else
-        emitRef(o.inputs(k))
-    }
+    emitRef(o.inputs(k))
   }
 
   def emitDefLo1(node: Node): String = {
-    node match {
+    val res =
+    (node match {
       case x: Mux =>
-        "  " + emitTmp(x) + " = mux<" + x.width + ">(" + emitRef(x.inputs(0)) + ", " + emitRef(x.inputs(1)) + ", " + emitRef(x.inputs(2)) + ");\n"
+        "  " + emitTmp(x) + " = TERNARY(" + emitRef(x.inputs(0)) + ", " + emitRef(x.inputs(1)) + ", " + emitRef(x.inputs(2)) + ");\n"
 
       case o: Op => {
         "  " + emitTmp(node) + " = " +
-          (if (o.op == "##") 
-            "cat<" + node.width + ">(" + emitOpRef(o, 0) + ", " + emitOpRef(o, 1) + ")"
-           else if (o.op == "s*s")
-             emitRef(o.inputs(0)) + ".fix_times_fix(" + emitRef(o.inputs(1)) + ")"
-           else if (o.op == "s*u")
-             emitRef(o.inputs(0)) + ".fix_times_ufix(" + emitRef(o.inputs(1)) + ")"
-           else if (o.op == "u*s")
-             emitRef(o.inputs(0)) + ".ufix_times_fix(" + emitRef(o.inputs(1)) + ")"
-           else if (o.inputs.length == 1)
-             if (o.op == "|")
-               "reduction_or(" + emitRef(o.inputs(0)) + ")"
-             else if (o.op == "&")
-               "reduction_and(" + emitRef(o.inputs(0)) + ")"
-             else if (o.op == "^")
-               "reduction_xor(" + emitRef(o.inputs(0)) + ")"
-             else
-               o.op + emitRef(o.inputs(0))
-           else if(o.isSigned) {
-             if(o.op == ">>")
-               emitOpRef(o, 0) + ".rsha(" + emitOpRef(o, 1) + ")"
-             else if(o.op == ">")
-               emitOpRef(o, 0) + ".gt(" + emitOpRef(o, 1) + ")"
-             else if(o.op == ">=")
-               emitOpRef(o, 0) + ".gte(" + emitOpRef(o, 1) + ")"
-             else if(o.op == "<")
-               emitOpRef(o, 0) + ".lt(" + emitOpRef(o, 1) + ")"
-             else if(o.op == "<=")
-               emitOpRef(o, 0) + ".lt(" + emitOpRef(o, 1) + ")"
-             else 
-               emitOpRef(o, 0) + " " + o.op + " " + emitOpRef(o, 1)
-           } else
+          (if (o.inputs.length == 1)
+             o.op + emitRef(o.inputs(0))
+           else
              emitOpRef(o, 0) + " " + o.op + " " + emitOpRef(o, 1)) + 
         ";\n"
       }
@@ -220,60 +178,25 @@ class CppBackend extends Backend {
       case x: Extract =>
         x.inputs.tail.foreach(e => x.validateIndex(e))
         if (node.inputs.length < 3 )
-          "  " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ".bit(" + emitRef(node.inputs(1)) + ");\n"
+          // "  " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ".bit(" + emitRef(node.inputs(1)) + ");\n"
+          "  " + emitTmp(node) + " = BIT(" + emitRef(node.inputs(0)) + ", " + emitRef(node.inputs(1)) + ");\n"
         else{
-          "  " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ".extract<" + node.width + ">(" + emitRef(node.inputs(1)) + "," + emitRef(node.inputs(2)) + ");\n"}
+          // "  " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ".extract<" + node.width + ">(" + emitRef(node.inputs(1)) + "," + emitRef(node.inputs(2)) + ");\n"}
+          "  " + emitTmp(node) + " = EXTRACT(" + emitRef(node.inputs(0)) + ", " + node.width + ", " + emitRef(node.inputs(2)) + ");\n"}
 
       case x: Fill =>
-        if (node.inputs(1).isLit)
-          "  " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ".fill<" + node.width + "," + node.inputs(1).value + ">();\n";
-        else
-          "  " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ".fill<" + node.width + ">(" + emitRef(node.inputs(1)) + ");\n";
+        "  " + emitTmp(node) + " = FILL(" + emitRef(node.inputs(0)) + ", " + node.width + ", " + node.inputs(1).value + ");\n";
 
-      case ll: ListLookup[_] =>
-        var res = "";
-        var isFirst = true;
-        for (w <- ll.wires)
-          if(w.component != null) // TODO: WHY IS COMPONENT EVER NULL?
-            res = res + "  dat_t<" + w.width + "> " + emitRef(w) + ";\n";
-        for ((addr, data) <- ll.map) {
-          res = res + "  " + (if (isFirst) { isFirst = false; "" } else "else ");
-          res = res + "if ((" + emitRef(ll.addr) + " == " + emitRef(ll.inputs(0)) + ").to_bool()) {\n";
-          for ((w, e) <- ll.wires zip data)
-            if(w.component != null)
-              res = res + "    " + emitRef(w) + " = " + emitRef(e) + ";\n";
-          res = res + "  }\n";
-        }
-        res = res + "  else {\n";
-        for ((w, e) <- ll.wires zip ll.defaultWires)
-          if(w.component != null)
-            res = res + "    " + emitRef(w) + " = " + emitRef(e) + ";\n";
-        res = res + "  }\n";
-        res
-
-      case l: Lookup =>
-        var res = "";
-        for (node <- l.map) 
-          res = res +
-            "  if ((" + emitRef(node.addr) + " == " + emitRef(l.inputs(0)) + ").to_bool()) " + emitRef(l) + " = " + emitRef(node.data) + ";\n";
-        res
-        
-      case x: Literal =>
-        ""
-      case x: Binding =>
-        ""
-      case x: ListLookupRef[_] =>
-        ""
-      case x: ListNode =>
-        ""
-      case x: MapNode =>
-        ""
-      case x: LookupMap =>
-        ""
+      case x: Literal => ""
+      case x: Binding => ""
+      case x: ListLookupRef[_] => ""
+      case x: ListNode => ""
+      case x: MapNode => ""
+      case x: LookupMap => ""
 
       case reg: Reg =>
         val updateLogic = 
-          (if (reg.isReset) "mux<" + reg.width + ">(" + emitRef(reg.inputs.last) + ", " + emitRef(reg.resetVal) + ", " else "") + 
+          (if (reg.isReset) "TERNARY(" + emitRef(reg.inputs.last) + ", " + emitRef(reg.resetVal) + ", " else "") + 
         emitRef(reg.updateVal) + (if (reg.isReset) ");\n" else ";\n");
         "  " + emitRef(reg) + "_shadow = " +  updateLogic;
 
@@ -284,7 +207,7 @@ class CppBackend extends Backend {
         "  " + emitTmp(r) + " = " + emitRef(r.rom) + ".get(" + emitRef(r.addr) + ");\n"
 
       case x: Log2 =>
-        " " + emitTmp(x) + " = " + emitRef(x.inputs(0)) + ".log2<" + x.width + ">();\n";
+        " " + emitTmp(x) + " = " + "log2_1(" + emitRef(x.inputs(0)) + ");\n";
 
       case _ =>
 
@@ -294,7 +217,10 @@ class CppBackend extends Backend {
           "  " + emitTmp(node) + ";\n"
         } else
           ""
-    }
+    })
+    // println("EMIT " + node + " GN " + node.getNode + " RES " + res)
+    res
+
   }
 
   /*
@@ -697,8 +623,13 @@ class CppBackend extends Backend {
           // println("RENAME " + m + " NAME " + m.name + " SUBNODES " + m.subnodes.length)
           for (i <- 0 until m.subnodes.length) {
             val node = m.subnodes(i)
-            node.setName(nodeName(m) + (if (node.isInObjectSubNode) (".values[" + i + "]") else ("__w" + i)))
+            node match {
+              case l: Literal => ;
+              case l: FloLiteral => ;
+              case any =>
+                node.setName(nodeName(m) + (if (node.isInObjectSubNode) (".values[" + i + "]") else ("__w" + i)))
             // println("  SUBNODE NAME "+ m.subnodes(i).name)
+            }
           }
       }
     }

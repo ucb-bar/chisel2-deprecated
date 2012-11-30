@@ -383,33 +383,38 @@ class Op extends Node {
         super.genSubNodes
     } else if (inputs.length == 2) {
       if (op == "==") {
-        subnodes += (0 until backend.words(this)).map(i => Op("==", 1, inputs(0).getSubNode(i), inputs(1).getSubNode(i))).reduceLeft(Op("&&", 1, _, _))
+        subnodes += (0 until backend.words(inputs(0))).map(i => Op("==", 1, inputs(0).getSubNode(i), inputs(1).getSubNode(i))).reduceLeft(Op("&&", 1, _, _))
       } else if (op == "!=") {
-        subnodes += (0 until backend.words(this)).map(i => Op("==", 1, inputs(0).getSubNode(i), inputs(1).getSubNode(i))).reduceLeft(Op("||", 1, _, _))
+        subnodes += (0 until backend.words(inputs(0))).map(i => Op("==", 1, inputs(0).getSubNode(i), inputs(1).getSubNode(i))).reduceLeft(Op("||", 1, _, _))
       } else if (op == "<<") { // TODO: 
         if (width <= bpw)
           subnodes += Op("<<", width, inputs(0).getSubNode(0), inputs(1).getSubNode(0))
         else {
+          val amount         = inputs(1).getSubNode(0)
           var carry          = Literal(0)
-          val nShiftBits     = RawExtract(inputs(1).getSubNode(0), log2Up(bpw)-1, 0)
-          val nShiftWords    = Op(">>", bpw, inputs(1).getSubNode(0), Literal(bpw)) 
-          val nRevShiftBits  = Op("-",  bpw, inputs(1).getSubNode(0), nShiftBits)
-          val isZeroCarry    = Op("==", 1,   nShiftBits,              Literal(0))
+          val nShiftBits     = RawExtract(amount, log2Up(bpw)-1, 0); // nShiftBits.setName("nsb");
+          val nShiftWords    = Op(">>", bpw, amount, Literal(log2Up(bpw))); // nShiftWords.setName("nsw");  // println("NSW " + nShiftWords)
+          val nRevShiftBits  = Op("-",  bpw, bpw, nShiftBits); // nRevShiftBits.setName("nrsb");
+          val isZeroCarry    = Op("==", 1, nShiftBits, Literal(0)); // isZeroCarry.setName("izc");
           val nWords         = backend.words(this)
           val lookups        = new ArrayBuffer[Node]()
           for (i <- 0 until nWords) {
-            var lookup: Node  = inputs(0).getSubNode(i) 
-            for (del <- 1 until i)
-              lookup = Multiplex(Op("==", 1, nShiftWords, Literal(del)), inputs(0).getSubNode(i+del), lookup)
+            var lookup: Node = inputs(0).getSubNode(i) 
+            println("LOOKUP" + i + " " + lookup)
+            for (del <- 1 until nWords) {
+              // println("  DEL " + del + " I-DEL " + (i-del) + " VAL " + inputs(0).getSubNode(i-del))
+              val res = if ((i-del) < 0) Literal(0) else inputs(0).getSubNode(i-del)
+              lookup  = Multiplex(Op("==", 1, nShiftWords, Literal(del)), res, lookup)
+            }
             lookups += lookup
           }
           for (i <- 0 until nWords) {
             val x     = Op("<<", bpw, lookups(i), nShiftBits)
-            val c     = if (i > (nWords-2))
+            val c     = if (i == 0)
                           Literal(0)
                         else {
                           // println("NWORDS " + nWords + " LOOKUPS LENGTH " + lookups.length + " I+1 " + (i+1))
-                          Multiplex(isZeroCarry, Literal(0), Op(">>", bpw, lookups(i+1), nRevShiftBits)) // TODO: NEED MASK
+                          Multiplex(isZeroCarry, Literal(0), Op(">>", bpw, lookups(i-1), nRevShiftBits)) // TODO: NEED MASK
                         }
             subnodes += Op("|", bpw, x, c)
           }
@@ -418,20 +423,20 @@ class Op extends Node {
         if (width <= bpw)
           subnodes += Op(">>", width, inputs(0).getSubNode(0), inputs(1).getSubNode(0))
         else {
+          val amount         = inputs(1).getSubNode(0)
           var carry          = Literal(0)
-          val nShiftBits     = RawExtract(inputs(1).getSubNode(0), log2Up(bpw)-1, 0)
-          val nShiftWords    = Op(">>", bpw, inputs(1).getSubNode(0), Literal(bpw)) 
-          val nRevShiftBits  = Op("-",  bpw, inputs(1).getSubNode(0), nShiftBits)
-          val isZeroCarry    = Op("==", 1,   nShiftBits,              Literal(0))
+          val nShiftBits     = RawExtract(amount, log2Up(bpw)-1, 0)
+          val nShiftWords    = Op(">>", bpw, amount, Literal(log2Up(bpw))) 
+          val nRevShiftBits  = Op("-",  bpw, bpw, nShiftBits)
+          val isZeroCarry    = Op("==", 1,   nShiftBits, Literal(0))
           val nWords         = backend.words(this)
           val lookups        = new ArrayBuffer[Node]()
           for (i <- 0 until nWords) {
             var lookup: Node  = inputs(0).getSubNode(i) 
-            for (del <- 1 until nWords-i) // TODO: CHECK
-              lookup = if ((i-del) < 0)
-                         Literal(0)
-                       else
-                         Multiplex(Op("==", 1, nShiftWords, Literal(del)), inputs(0).getSubNode(i-del), lookup)
+            for (del <- 1 until nWords) {
+              val res = if (del >= (nWords-i)) Literal(0) else inputs(0).getSubNode(i+del)
+              lookup = Multiplex(Op("==", 1, nShiftWords, Literal(del)), res, lookup)
+            }
             lookups += lookup
           }
           lookups += Literal(0)
@@ -443,8 +448,14 @@ class Op extends Node {
         }
       } else if (op == "##") { // TODO: check 
         val lsh = inputs(1).width
-        subnodes ++= (0 until backend.words(inputs(1))).map(inputs(1).getSubNode(_))
+        subnodes ++= (0 until backend.fullWords(inputs(1))).map(inputs(1).getSubNode(_))
+        println("EXPANDING ## " + lsh + " FULLWORDS " + backend.fullWords(inputs(1)))
+        if (lsh%bpw != 0) {
+          println("LSH%BPW != 0 " + inputs(1).getSubNode(backend.fullWords(inputs(1))))
+          subnodes += Op("|", bpw, inputs(1).getSubNode(backend.fullWords(inputs(1))),  Op("<<", bpw, inputs(0).getSubNode(0), Literal(lsh % bpw)));
+        }
         for (i <- backend.words(inputs(1)) until backend.words(this)) {
+          println("LOOPING")
           val sni = (bpw*i-lsh)/bpw
           val a   = inputs(0).getSubNode(sni)
           val aw  = backend.thisWordBits(inputs(0), sni)
@@ -460,7 +471,12 @@ class Op extends Node {
       } else if (op == "&" || op == "|" || op == "^" || op == "||" || op == "&&") {
         for (i <- 0 until backend.words(this)) 
           subnodes += Op(op, backend.thisWordBits(this, i), inputs(0).getSubNode(i), inputs(1).getSubNode(i));
+      } else if (op == "<" && isSigned) {
+        require(!isFolding || inputs(1).litOf.value == 0)
+        val shamt = (inputs(0).width-1) % bpw
+        subnodes += Op("&", 1, Op(">>", bpw, inputs(0).getSubNode(backend.words(inputs(0))-1), Literal(shamt)), Literal(1))
       } else if (op == "<" || op == ">" || op == "<=" || op == ">=") {
+        require(!isSigned)
         var res = Op(op, backend.thisWordBits(inputs(0), 0), inputs(0).getSubNode(0), inputs(1).getSubNode(0))
         println("*** THIS " + this + " WIDTH " + this.width + " WORDS " + backend.words(this))
         for (i <- 1 until backend.words(inputs(0))) {
@@ -500,6 +516,33 @@ class Op extends Node {
           subnodes     += prevWithCarry
         }
         Trunc(this)
+      } else if (op == "*") {
+        val bph = bpw/2
+        val m = backend.halfWords(inputs(0));
+        val n = backend.halfWords(inputs(1));
+        val u = new Array[Node](m);
+        val v = new Array[Node](n);
+        for (i <- 0 until m/2) { 
+          u(2*i)   = RawExtract(inputs(0).getSubNode(i), bph-1, 0);
+          u(2*i+1) = RawExtract(inputs(0).getSubNode(i), bpw-1, bph);
+        }
+        for (i <- 0 until n/2) { 
+          v(2*i)   = RawExtract(inputs(1).getSubNode(i), bph-1, 0);
+          v(2*i+1) = RawExtract(inputs(1).getSubNode(i), bpw-1, bph);
+        }
+        val w = new Array[Node](n*m);
+        for (i <- 0 until n*m) w(i) = Literal(0);
+        for (j <- 0 until n) {
+          var k: Node = Literal(0);
+          for (i <- 0 until m) {
+            val t = Op("+", bpw, w(i*j), Op("+", bpw, Op("*", bpw, u(i), v(j)), k))
+            w(i+j) = t;
+            k = Op(">>", bpw, t, bph);
+          }
+          w(j+m) = k
+        }
+        for (i <- 0 until (n*m))
+          subnodes += RawCat(RawExtract(w(2*i), bph-1, 0), RawExtract(w(2*i+1), bph-1, 0))
       } else 
         super.genSubNodes
     } else

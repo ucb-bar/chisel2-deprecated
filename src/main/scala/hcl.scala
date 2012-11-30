@@ -270,6 +270,19 @@ object Log2 {
   }
 }
 
+object Log2Node {
+  def apply (mod: Node): Node = {
+    val log2 = new Log2()
+    val n = mod.width;
+    log2.init("", sizeof(n-1), mod)
+    log2
+  }
+}
 class Log2 extends Node {
   override def toString: String = "LOG2(" + inputs(0) + ")";
+  override def genSubNodes = {
+    val zero_log2s = (backend.words(inputs(0))-1 to 1 by -1).
+      map(i => (Op("!=", 1, inputs(0).getSubNode(i), Literal(0)), Log2Node(inputs(0).getSubNode(i))))
+    subnodes += zero_log2s.foldRight(Log2Node(inputs(0).getSubNode(0)))((zl, r) => Multiplex(zl._1, zl._2, r));
+  }
 }

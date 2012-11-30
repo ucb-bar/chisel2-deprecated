@@ -224,8 +224,11 @@ class Literal extends Node {
 
   override def genSubNodes = {
     require(!isZ)
-    for (i <- 0 until backend.words(this))
-      subnodes += Literal(value >> i*backend.wordBits, backend.thisWordBits(this, i))
+    val mask = ((BigInt(1) << backend.wordBits)-BigInt(1))
+    for (i <- 0 until backend.words(this)) {
+      val v = (value >> i*backend.wordBits)&mask
+      subnodes += Literal(v, backend.thisWordBits(this, i))
+    }
   }
 }
 

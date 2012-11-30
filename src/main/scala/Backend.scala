@@ -147,7 +147,9 @@ abstract class Backend {
   }
 
   def wordBits = -1
+  def halfBits = wordBits/2;
   def words(node: Node) = (node.width-1)/wordBits+1
+  def halfWords(node: Node) = (node.width-1)/halfBits+1
   def fullWords(node: Node) = node.width/wordBits
   def thisWordBits(node: Node, word: Int) = {
     if (word == words(node)-1 && words(node) != fullWords(node))

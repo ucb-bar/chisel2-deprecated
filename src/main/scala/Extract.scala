@@ -112,6 +112,7 @@ class Extract extends Node {
     else
       "EXTRACT(" + inputs(0) + ", " + hi + ", " + lo + ")";
   def validateIndex(x: Node) = {
+    /*
     val lit = x.litOf
     assert(lit == null || lit.value >= 0 && lit.value < inputs(0).width, 
            {println("Extract(" + lit.value + ")" +
@@ -122,6 +123,7 @@ class Extract extends Node {
                     " in file " + line.getFileName)
           }
          )
+         */
   }
 
   override def genSubNodes = {

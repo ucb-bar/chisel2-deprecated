@@ -31,3 +31,11 @@ object Concatenate {
       mods.foldLeft(mod){(a, b) => a ## b};
 }
 
+object RawCat {
+  def apply (mod1: Node, mod2: Node): Node = {
+    val res = new Cat();
+    res.init("", mod1.width + mod2.width, mod1, mod2)
+    res
+  }
+}
+

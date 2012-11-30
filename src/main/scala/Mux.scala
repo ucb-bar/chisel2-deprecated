@@ -49,6 +49,10 @@ object Multiplex{
   }
 }
 
+object Mask{
+  def apply (t: Node, c: Node): Node = Multiplex(t, c, Literal(0))
+}
+
 object isLessThan {
 
   def distFromData(x: java.lang.Class[ _ ]) = {
