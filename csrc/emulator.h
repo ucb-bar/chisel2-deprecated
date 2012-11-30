@@ -26,6 +26,8 @@ typedef uint32_t half_val_t;
 // typedef uint8_t val_t;
 
 #define MASK(v, c) ((v) & -(val_t)(c))
+#define EXTRACT(v, w, s) (((v)>>(s))&mask_val(w))
+#define BIT(v, s) (((v)>>(s))&1L)
 #define TERNARY(c, t, f) ((f) ^ (((f) ^ (t)) & -(c)))
 #define MIN(a, b) TERNARY((a) < (b), (a), (b))
 #define MAX(a, b) TERNARY((a) > (b), (a), (b))
