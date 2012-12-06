@@ -171,12 +171,16 @@ object Op {
       name match {
         case "&&" => return if (a_lit.value == 0) Literal(0) else b;
         case "||" => return if (a_lit.value == 0) b else Literal(1);
+        case "&" => if (a_lit.value == 0) return Literal(0);
+        case "|" => if (a_lit.value == 0) return b;
         case _ => ;
       }
     } else if (a_lit == null && b_lit != null) {
       name match {
         case "&&" => return if (b_lit.value == 0) Literal(0) else a;
         case "||" => return if (b_lit.value == 0) a else Literal(1);
+        case "&" => if (b_lit.value == 0) return Literal(0);
+        case "|" => if (b_lit.value == 0) return a;
         case _ => ;
       }
     } else if (a_lit != null && b_lit != null) {
@@ -292,16 +296,13 @@ object Op {
     res
   }
   def apply (op: String, width: Int, a: Node): Node = {
-    val res = new Op
-    res.init(op, width, a)
-    res.op = op
+    val res = Op(op, 0, fixWidth(width), a)
+    res.width = width
     res
   }
   def apply (op: String, width: Int, a: Node, b: Node): Node = {
-    val res = new Op
-    // if (op == ">>") println("RSH WIDTH " + width + " ON " + op + " A " + a + " B " + b)
-    res.init(op, width, a, b)
-    res.op = op
+    val res = Op(op, 0, fixWidth(width), a, b)
+    res.width = width
     res
   }
 }
@@ -392,10 +393,10 @@ class Op extends Node {
         else {
           val amount         = inputs(1).getSubNode(0)
           var carry          = Literal(0)
-          val nShiftBits     = RawExtract(amount, log2Up(bpw)-1, 0); // nShiftBits.setName("nsb");
-          val nShiftWords    = Op(">>", bpw, amount, Literal(log2Up(bpw))); // nShiftWords.setName("nsw");  // println("NSW " + nShiftWords)
-          val nRevShiftBits  = Op("-",  bpw, bpw, nShiftBits); // nRevShiftBits.setName("nrsb");
-          val isZeroCarry    = Op("==", 1, nShiftBits, Literal(0)); // isZeroCarry.setName("izc");
+          val nShiftBits     = RawExtract(amount, log2Up(bpw)-1, 0); 
+          val nShiftWords    = Op(">>", bpw, amount, Literal(log2Up(bpw))); 
+          val nRevShiftBits  = Op("-",  bpw, bpw, nShiftBits); 
+          val isZeroCarry    = Op("==", 1, nShiftBits, Literal(0)); 
           val nWords         = backend.words(this)
           val lookups        = new ArrayBuffer[Node]()
           for (i <- 0 until nWords) {
@@ -414,15 +415,21 @@ class Op extends Node {
                           Literal(0)
                         else {
                           // println("NWORDS " + nWords + " LOOKUPS LENGTH " + lookups.length + " I+1 " + (i+1))
-                          Multiplex(isZeroCarry, Literal(0), Op(">>", bpw, lookups(i-1), nRevShiftBits)) // TODO: NEED MASK
+                          Multiplex(isZeroCarry, Literal(0), Op(">>", bpw, lookups(i-1), nRevShiftBits)) 
                         }
             subnodes += Op("|", bpw, x, c)
           }
         }
       } else if (op == ">>") { 
-        if (width <= bpw)
-          subnodes += Op(">>", width, inputs(0).getSubNode(0), inputs(1).getSubNode(0))
-        else {
+        if (width <= bpw) {
+          if (isSigned) {
+            val x = Op("<<", bpw, inputs(0).getSubNode(0), Literal(bpw - inputs(0).width));  x.isSigned = true;
+            subnodes += Op(">>", bpw, x, Op("+", bpw, Literal(bpw - inputs(0).width), inputs(1).getSubNode(0)));
+            Trunc(this)
+          } else 
+            subnodes += Op(">>", width, inputs(0).getSubNode(0), inputs(1).getSubNode(0))
+        } else {
+          println(">> IS SIGNED " + isSigned)
           val amount         = inputs(1).getSubNode(0)
           var carry          = Literal(0)
           val nShiftBits     = RawExtract(amount, log2Up(bpw)-1, 0)
@@ -440,11 +447,26 @@ class Op extends Node {
             lookups += lookup
           }
           lookups += Literal(0)
+          val msw  = inputs(0).getSubNode(backend.words(this)-1); msw.isSigned = true; // most significant word
+          val msb  = (if (width % bpw != 0) 
+                        Op("<<", bpw, msw, Literal(bpw-width%bpw)) // move bits to top of word
+                      else 
+                        Op(">>", bpw, msw, Literal(bpw-1)));       // move bits all the way to single bit
+          val fill = Op("<<", bpw, msb, RawExtract(Op("-", bpw, Literal(width-1), amount), log2Up(bpw)-1, 0)); // fill amount % bpw
           for (i <- 0 until nWords) {
             val x     = Op(">>", bpw, lookups(i), nShiftBits)
-            val c     = Multiplex(isZeroCarry, Literal(0), Op("<<", bpw, lookups(i+1), nRevShiftBits)) // TODO: NEED MASK
+            val c     = Multiplex(isZeroCarry, Literal(0), Op("<<", bpw, lookups(i+1), nRevShiftBits)) 
             subnodes += Op("|", bpw, x, c)
+            if (isSigned) {
+              println("SIGNED")
+              subnodes(i) = Op("|", bpw, subnodes(i),
+                               Op("|", bpw, Mask(Op(">", 1, Literal((i+1)*bpw), Op("-", bpw, Literal(width-1), amount)), fill),
+                                  Mask(Op(">=", 1, Literal(i*bpw), Op("-", bpw, Literal(width-1), amount)), msb)))
+            }
           }
+          if (isSigned)
+            subnodes(nWords-1) = Op("|", bpw, subnodes(nWords-1),
+                                    Mask(Op(">", 1, Literal(bpw), Op("-", bpw, Literal(width-1), amount)), fill))
         }
       } else if (op == "##") { // TODO: check 
         val lsh = inputs(1).width

@@ -64,6 +64,7 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
         ovars(o) = Literal(rv)
       } else {
         val tv = svars(o).litValue()
+        // println("TV " + tv + " IS-SIGNED " + tv.signed)
         if (isTrace) println("  EXPECTED: " + o + " = " + tv)
         if (tv != rv) {
           isSame = false

@@ -90,15 +90,22 @@ object Extract {
   }
 }
 
+// TODO: MERGE WITH ABOVE
 object RawExtract {
-  def apply(mod: Node, hi: Node, lo: Node, w: Int = -1): Extract = {
-    val extract = new Extract()
-    extract.init("", if (w == -1) mod.width else w, mod, hi, lo)
-    extract.hi = hi
-    extract.lo = lo
-    extract
+  def apply(mod: Node, hi: Node, lo: Node, w: Int = -1): Node = {
+    val (bits_lit, hi_lit, lo_lit) = (mod.litOf, hi.litOf, lo.litOf);
+    if (isFolding && bits_lit != null && hi_lit != null && lo_lit != null) {
+      val dw = if (w == -1) (hi_lit.value - lo_lit.value + 1).toInt else w;
+      Literal((bits_lit.value >> lo_lit.value.toInt)&((BigInt(1)<< dw) - BigInt(1)), dw)
+    } else {
+      val extract = new Extract()
+      extract.init("", if (w == -1) mod.width else w, mod, hi, lo)
+      extract.hi = hi
+      extract.lo = lo
+      extract
+    }
   }
-  def apply(mod: Node, hi: Int, lo: Int): Extract = 
+  def apply(mod: Node, hi: Int, lo: Int): Node = 
     apply(mod, Literal(hi), Literal(lo), hi-lo+1)
 }
 

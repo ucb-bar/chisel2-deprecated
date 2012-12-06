@@ -22,7 +22,7 @@ object CListLookup {
 }
 
 class CppBackend extends Backend {
-  var isSubNodes = false
+  var isSubNodes = true
   override def emitTmp(node: Node): String = {
     // require(false)
     if (node.isInObject || node.isInObjectSubNode)
@@ -170,8 +170,11 @@ class CppBackend extends Backend {
         "  " + emitTmp(node) + " = " +
           (if (o.inputs.length == 1)
              o.op + emitRef(o.inputs(0))
+           else if (o.op == ">>" && o.inputs(0).isSigned)
+             "(sval_t)(" + emitRef(o.inputs(0)) + ") " + o.op + " " + emitRef(o.inputs(1))
            else
-             emitOpRef(o, 0) + " " + o.op + " " + emitOpRef(o, 1)) + 
+             emitRef(o.inputs(0)) + " " + o.op + " " + emitRef(o.inputs(1))
+         ) + 
         ";\n"
       }
 
