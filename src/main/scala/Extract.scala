@@ -139,7 +139,8 @@ class Extract extends Node {
       if (lo.litOf != null) {
         val word = lo.litOf.value.toInt / backend.wordBits
         val bit  = lo.litOf.value.toInt % backend.wordBits
-        subnodes += RawExtract(inputs(0).getSubNode(word), Literal(bit), Literal(bit))
+        println("BIT " + bit)
+        subnodes += RawExtract(inputs(0).getSubNode(word), bit, bit)
       } else {
         var word: Node  = inputs(0).getSubNode(0)
         val nShiftWords = Op(">>", bpw, inputs(1).getSubNode(0), Literal(log2Up(bpw))) 

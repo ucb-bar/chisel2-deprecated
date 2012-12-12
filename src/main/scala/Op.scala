@@ -430,14 +430,15 @@ class Op extends Node {
             subnodes += Op(">>", width, inputs(0).getSubNode(0), inputs(1).getSubNode(0))
         } else {
           println(">> IS SIGNED " + isSigned)
-          val amount         = inputs(1).getSubNode(0)
-          var carry          = Literal(0)
-          val nShiftBits     = RawExtract(amount, log2Up(bpw)-1, 0)
-          val nShiftWords    = Op(">>", bpw, amount, Literal(log2Up(bpw))) 
-          val nRevShiftBits  = Op("-",  bpw, bpw, nShiftBits)
-          val isZeroCarry    = Op("==", 1,   nShiftBits, Literal(0))
-          val nWords         = backend.words(this)
-          val lookups        = new ArrayBuffer[Node]()
+          val amount        = inputs(1).getSubNode(0)
+          val revAmount     = Op("-", bpw, Literal(width-1), amount)
+          var carry         = Literal(0)
+          val nShiftBits    = RawExtract(amount, log2Up(bpw)-1, 0)
+          val nShiftWords   = Op(">>", bpw, amount, Literal(log2Up(bpw))) 
+          val nRevShiftBits = Op("-",  bpw, bpw, nShiftBits)
+          val isZeroCarry   = Op("==", 1,   nShiftBits, Literal(0))
+          val nWords        = backend.words(this)
+          val lookups       = new ArrayBuffer[Node]()
           for (i <- 0 until nWords) {
             var lookup: Node  = inputs(0).getSubNode(i) 
             for (del <- 1 until nWords) {
@@ -447,12 +448,10 @@ class Op extends Node {
             lookups += lookup
           }
           lookups += Literal(0)
-          val msw  = inputs(0).getSubNode(backend.words(this)-1); msw.isSigned = true; // most significant word
-          val msb  = (if (width % bpw != 0) 
-                        Op("<<", bpw, msw, Literal(bpw-width%bpw)) // move bits to top of word
-                      else 
-                        Op(">>", bpw, msw, Literal(bpw-1)));       // move bits all the way to single bit
-          val fill = Op("<<", bpw, msb, RawExtract(Op("-", bpw, Literal(width-1), amount), log2Up(bpw)-1, 0)); // fill amount % bpw
+          val msw  = inputs(0).getSubNode(backend.words(this)-1); // most significant word
+          val tb   = (if (width % bpw != 0) Op("<<", bpw, msw, Literal(bpw-width%bpw)) else msw);  tb.isSigned = true;  // top bit
+          val msb  = Op(">>", bpw, tb, Literal(bpw-1));           // move msb all the way to fill entire word using rsha
+          val fill = Op("<<", bpw, msb, RawExtract(revAmount, log2Up(bpw)-1, 0)); // fill top bits -- revAmount % bpw
           for (i <- 0 until nWords) {
             val x     = Op(">>", bpw, lookups(i), nShiftBits)
             val c     = Multiplex(isZeroCarry, Literal(0), Op("<<", bpw, lookups(i+1), nRevShiftBits)) 
@@ -460,13 +459,14 @@ class Op extends Node {
             if (isSigned) {
               println("SIGNED")
               subnodes(i) = Op("|", bpw, subnodes(i),
-                               Op("|", bpw, Mask(Op(">", 1, Literal((i+1)*bpw), Op("-", bpw, Literal(width-1), amount)), fill),
-                                  Mask(Op(">=", 1, Literal(i*bpw), Op("-", bpw, Literal(width-1), amount)), msb)))
+                               Op("|", bpw, Mask(Op(">", 1, Literal((i+1)*bpw), revAmount), fill), // last word?
+                                  Mask(Op(">=", 1, Literal(i*bpw), revAmount), msb)))              // mid words
             }
           }
-          if (isSigned)
-            subnodes(nWords-1) = Op("|", bpw, subnodes(nWords-1),
-                                    Mask(Op(">", 1, Literal(bpw), Op("-", bpw, Literal(width-1), amount)), fill))
+          if (isSigned) {
+            subnodes(nWords-1) = Op("|", bpw, subnodes(nWords-1), Mask(Op(">", 1, Literal(bpw), revAmount), fill))
+            Trunc(this)
+          }
         }
       } else if (op == "##") { // TODO: check 
         val lsh = inputs(1).width
