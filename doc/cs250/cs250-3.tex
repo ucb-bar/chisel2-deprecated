@@ -1,10 +1,3 @@
-% NOTES:
-% enum slide
-% difference between := and =
-% link and plink pic
-% filter pic
-% examples of running chisel
-
 \documentclass[xcolor=pdflatex,dvipsnames,table]{beamer}
 \usepackage{epsfig,graphicx}
 \usepackage{palatino}
@@ -26,24 +19,6 @@
 \titlepage
 \end{frame}
 \addtocounter{framenumber}{-1}
-
-% \begin{frame}[fragile]{Forward Declarations using Wires}
-% 
-% \begin{scala}
-% val pcPlus4      = UFix() 
-% val branchTarget = UFix()
-% val pcNext       = Mux(pcSel, branchTarget, pcPlus4)
-% val pcReg        = Reg(data = pcNext, resetVal = UFix(0, 32)) 
-% pcPlus4         := pcReg + UFix(4) 
-% ... 
-% branchTarget    := addOut
-% \end{scala}
-% 
-% \begin{center}
-% \includegraphics[height=0.5\textheight]{figs/forward.pdf} 
-% \end{center}
-% 
-% \end{frame}
 
 \begin{frame}{Options for Testing Chisel Designs}
 \begin{itemize}

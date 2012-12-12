@@ -1299,6 +1299,14 @@ def MuxLookup[S <: Bits, T <: Data]
 // create n enum values of given type
 def Enum[T <: Bits]
   (n: Int)(type: => T): List[T]
+
+// create enum values of given type and names
+def Enum[T <: Bits]
+  (l: Symbol *)(type: => T): Map[Symbol, T]
+
+// create enum values of given type and names
+def Enum[T <: Bits]
+  (l: List[Symbol])(type: => T): Map[Symbol, T]
 \end{scala}
 
 % \section{Name Mangling}
