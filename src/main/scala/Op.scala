@@ -102,6 +102,7 @@ object LogicalOp {
 
 object ReductionOp {
   def apply[T <: Data](x: T, op: String)(gen: => T): Bool = {
+    println("REDUCTION OP " + op)
     val node = op match {
       case "&" => Op("&",  1, fixWidth(1), x);
       case "|" => Op("|",  1, fixWidth(1), x);
@@ -171,12 +172,16 @@ object Op {
       name match {
         case "&&" => return if (a_lit.value == 0) Literal(0) else b;
         case "||" => return if (a_lit.value == 0) b else Literal(1);
+        case "&" => if (a_lit.value == 0) return Literal(0);
+        case "|" => if (a_lit.value == 0) return b;
         case _ => ;
       }
     } else if (a_lit == null && b_lit != null) {
       name match {
         case "&&" => return if (b_lit.value == 0) Literal(0) else a;
         case "||" => return if (b_lit.value == 0) a else Literal(1);
+        case "&" => if (b_lit.value == 0) return Literal(0);
+        case "|" => if (b_lit.value == 0) return a;
         case _ => ;
       }
     } else if (a_lit != null && b_lit != null) {
@@ -292,16 +297,13 @@ object Op {
     res
   }
   def apply (op: String, width: Int, a: Node): Node = {
-    val res = new Op
-    res.init(op, width, a)
-    res.op = op
+    val res = Op(op, 0, fixWidth(width), a)
+    res.width = width
     res
   }
   def apply (op: String, width: Int, a: Node, b: Node): Node = {
-    val res = new Op
-    // if (op == ">>") println("RSH WIDTH " + width + " ON " + op + " A " + a + " B " + b)
-    res.init(op, width, a, b)
-    res.op = op
+    val res = Op(op, 0, fixWidth(width), a, b)
+    res.width = width
     res
   }
 }
@@ -344,24 +346,30 @@ class Op extends Node {
 
   def maskVal(x: Node, i: Int) = {
     val bpw = backend.wordBits;
-    if (inputs(0).width - i*bpw < bpw) 
-      Literal((1L << (inputs(0).width - i*bpw)-1))
-    else
-      Literal(-1)
+    if ((x.width - i*bpw) < bpw) {
+      println("MASK VAL(" + i + ") " + (x.width - i*bpw))
+      Literal((1L << (x.width - i*bpw))-1)
+    } else {
+      println("FULL MASK VAL " + i)
+      Literal(-1, bpw)
+    }
   }
     
   override def genSubNodes: Unit = {
     val bpw = backend.wordBits;
+    println("EXPAND SUBWORDS " + this + " |INPUTS|= " + inputs.length)
     if (inputs.length == 1) {
       val maxWordWidth = 
       if (op == "!") {
         subnodes += Op("!", 1, inputs(0).getSubNode(0))
       } else if (op == "|") {
-        subnodes += (0 until backend.words(this)).map(inputs(0).getSubNode(_)).reduceLeft(Op("|", backend.thisWordBits(inputs(0), 0), _, _))
+        println("EXPANDING orR " + backend.words(inputs(0)))
+        subnodes += Op("!=", 1, Literal(0), (0 until backend.words(inputs(0))).map(inputs(0).getSubNode(_)).reduceLeft(Op("|", backend.thisWordBits(inputs(0), 0), _, _)))
+        println("  SUBNODE " + subnodes(0))
       } else if (op == "&") { 
-        subnodes += (0 until backend.words(this)).map(i => Op("==", 1, inputs(0).getSubNode(i), maskVal(inputs(0), i))).reduceLeft(Op("&", backend.thisWordBits(inputs(0), 0),_, _))
+        subnodes += (0 until backend.words(inputs(0))).map(i => Op("==", 1, inputs(0).getSubNode(i), maskVal(inputs(0), i))).reduceLeft(Op("&", 1, _, _))
       } else if (op == "^") { 
-        var x = (0 until backend.words(this)).map(inputs(0).getSubNode(_)).reduceLeft(Op("^", backend.thisWordBits(inputs(0), 0), _, _))
+        var x = (0 until backend.words(inputs(0))).map(inputs(0).getSubNode(_)).reduceLeft(Op("^", backend.thisWordBits(inputs(0), 0), _, _))
         for (i <- log2Up(min(bpw, inputs(0).width))-1 to 0 by -1)
           x = Op("^", bpw, Op(">>", bpw, x, Literal(1L << i)), x)
         subnodes += Op("&", 1, x, Literal(1))
@@ -392,10 +400,10 @@ class Op extends Node {
         else {
           val amount         = inputs(1).getSubNode(0)
           var carry          = Literal(0)
-          val nShiftBits     = RawExtract(amount, log2Up(bpw)-1, 0); // nShiftBits.setName("nsb");
-          val nShiftWords    = Op(">>", bpw, amount, Literal(log2Up(bpw))); // nShiftWords.setName("nsw");  // println("NSW " + nShiftWords)
-          val nRevShiftBits  = Op("-",  bpw, bpw, nShiftBits); // nRevShiftBits.setName("nrsb");
-          val isZeroCarry    = Op("==", 1, nShiftBits, Literal(0)); // isZeroCarry.setName("izc");
+          val nShiftBits     = RawExtract(amount, log2Up(bpw)-1, 0); 
+          val nShiftWords    = Op(">>", bpw, amount, Literal(log2Up(bpw))); 
+          val nRevShiftBits  = Op("-",  bpw, bpw, nShiftBits); 
+          val isZeroCarry    = Op("==", 1, nShiftBits, Literal(0)); 
           val nWords         = backend.words(this)
           val lookups        = new ArrayBuffer[Node]()
           for (i <- 0 until nWords) {
@@ -414,23 +422,30 @@ class Op extends Node {
                           Literal(0)
                         else {
                           // println("NWORDS " + nWords + " LOOKUPS LENGTH " + lookups.length + " I+1 " + (i+1))
-                          Multiplex(isZeroCarry, Literal(0), Op(">>", bpw, lookups(i-1), nRevShiftBits)) // TODO: NEED MASK
+                          Multiplex(isZeroCarry, Literal(0), Op(">>", bpw, lookups(i-1), nRevShiftBits)) 
                         }
             subnodes += Op("|", bpw, x, c)
           }
         }
       } else if (op == ">>") { 
-        if (width <= bpw)
-          subnodes += Op(">>", width, inputs(0).getSubNode(0), inputs(1).getSubNode(0))
-        else {
-          val amount         = inputs(1).getSubNode(0)
-          var carry          = Literal(0)
-          val nShiftBits     = RawExtract(amount, log2Up(bpw)-1, 0)
-          val nShiftWords    = Op(">>", bpw, amount, Literal(log2Up(bpw))) 
-          val nRevShiftBits  = Op("-",  bpw, bpw, nShiftBits)
-          val isZeroCarry    = Op("==", 1,   nShiftBits, Literal(0))
-          val nWords         = backend.words(this)
-          val lookups        = new ArrayBuffer[Node]()
+        if (width <= bpw) {
+          if (isSigned) {
+            val x = Op("<<", bpw, inputs(0).getSubNode(0), Literal(bpw - inputs(0).width));  x.isSigned = true;
+            subnodes += Op(">>", bpw, x, Op("+", bpw, Literal(bpw - inputs(0).width), inputs(1).getSubNode(0)));
+            Trunc(this)
+          } else 
+            subnodes += Op(">>", width, inputs(0).getSubNode(0), inputs(1).getSubNode(0))
+        } else {
+          println(">> IS SIGNED " + isSigned)
+          val amount        = inputs(1).getSubNode(0)
+          val revAmount     = Op("-", bpw, Literal(width-1), amount)
+          var carry         = Literal(0)
+          val nShiftBits    = RawExtract(amount, log2Up(bpw)-1, 0)
+          val nShiftWords   = Op(">>", bpw, amount, Literal(log2Up(bpw))) 
+          val nRevShiftBits = Op("-",  bpw, bpw, nShiftBits)
+          val isZeroCarry   = Op("==", 1,   nShiftBits, Literal(0))
+          val nWords        = backend.words(this)
+          val lookups       = new ArrayBuffer[Node]()
           for (i <- 0 until nWords) {
             var lookup: Node  = inputs(0).getSubNode(i) 
             for (del <- 1 until nWords) {
@@ -440,10 +455,24 @@ class Op extends Node {
             lookups += lookup
           }
           lookups += Literal(0)
+          val msw  = inputs(0).getSubNode(backend.words(this)-1); // most significant word
+          val tb   = (if (width % bpw != 0) Op("<<", bpw, msw, Literal(bpw-width%bpw)) else msw);  tb.isSigned = true;  // top bit
+          val msb  = Op(">>", bpw, tb, Literal(bpw-1));           // move msb all the way to fill entire word using rsha
+          val fill = Op("<<", bpw, msb, RawExtract(revAmount, log2Up(bpw)-1, 0)); // fill top bits -- revAmount % bpw
           for (i <- 0 until nWords) {
             val x     = Op(">>", bpw, lookups(i), nShiftBits)
-            val c     = Multiplex(isZeroCarry, Literal(0), Op("<<", bpw, lookups(i+1), nRevShiftBits)) // TODO: NEED MASK
+            val c     = Multiplex(isZeroCarry, Literal(0), Op("<<", bpw, lookups(i+1), nRevShiftBits)) 
             subnodes += Op("|", bpw, x, c)
+            if (isSigned) {
+              println("SIGNED")
+              subnodes(i) = Op("|", bpw, subnodes(i),
+                               Op("|", bpw, Mask(Op(">", 1, Literal((i+1)*bpw), revAmount), fill), // last word?
+                                  Mask(Op(">=", 1, Literal(i*bpw), revAmount), msb)))              // mid words
+            }
+          }
+          if (isSigned) {
+            subnodes(nWords-1) = Op("|", bpw, subnodes(nWords-1), Mask(Op(">", 1, Literal(bpw), revAmount), fill))
+            Trunc(this)
           }
         }
       } else if (op == "##") { // TODO: check 
