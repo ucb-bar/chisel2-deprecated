@@ -52,7 +52,10 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
     (data, rd)
   }
 
-  def doWrite(addr: Bits, cond: Bool, data: T, wmask: Bits) = {
+  def doWrite(addr: Bits, condIn: Bool, data: T, wmask: Bits) = {
+    val cond = // add bounds check if depth is not a power of 2
+      if (isPow2(n)) condIn
+      else condIn && addr(log2Up(n)-1,0) < UFix(n)
     val wr = new MemWrite(this, cond, addr, data, wmask)
     ports += wr
     writes += wr

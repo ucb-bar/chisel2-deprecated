@@ -34,7 +34,7 @@ typedef uint32_t half_val_t;
 #define CLAMP(a, min, max) MAX(MIN(a, max), min)
 
 template<uint32_t x, uint32_t shifted=0, bool sticky=false> struct CeilLog {
-    static uint32_t const v = CeilLog< x >> 1, shifted + 1, sticky | (x & 1)>::v;
+    static uint32_t const v = CeilLog<(x >> 1), shifted + 1, sticky | (x & 1)>::v;
 };
 
 template<uint32_t shifted, bool sticky> struct CeilLog<0, shifted, sticky> {
@@ -1483,11 +1483,11 @@ class mem_t {
     put(idx.lo_word(), val);
   }
   void put (val_t idx, dat_t<w> val) {
-    if (ispow2(d) || idx <= d)
+    if (ispow2(d) || idx < d)
       contents[idx] = val;
   }
   val_t put (val_t idx, int word, val_t val) {
-    if (ispow2(d) || idx <= d)
+    if (ispow2(d) || idx < d)
       contents[idx].values[word] = val;
   }
   void print ( void ) {

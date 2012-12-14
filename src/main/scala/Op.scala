@@ -400,7 +400,7 @@ class Op extends Node {
           val lookups        = new ArrayBuffer[Node]()
           for (i <- 0 until nWords) {
             var lookup: Node = inputs(0).getSubNode(i) 
-            println("LOOKUP" + i + " " + lookup)
+            // println("LOOKUP" + i + " " + lookup)
             for (del <- 1 until nWords) {
               // println("  DEL " + del + " I-DEL " + (i-del) + " VAL " + inputs(0).getSubNode(i-del))
               val res = if ((i-del) < 0) Literal(0) else inputs(0).getSubNode(i-del)
@@ -449,13 +449,10 @@ class Op extends Node {
       } else if (op == "##") { // TODO: check 
         val lsh = inputs(1).width
         subnodes ++= (0 until backend.fullWords(inputs(1))).map(inputs(1).getSubNode(_))
-        println("EXPANDING ## " + lsh + " FULLWORDS " + backend.fullWords(inputs(1)))
         if (lsh%bpw != 0) {
-          println("LSH%BPW != 0 " + inputs(1).getSubNode(backend.fullWords(inputs(1))))
           subnodes += Op("|", bpw, inputs(1).getSubNode(backend.fullWords(inputs(1))),  Op("<<", bpw, inputs(0).getSubNode(0), Literal(lsh % bpw)));
         }
         for (i <- backend.words(inputs(1)) until backend.words(this)) {
-          println("LOOPING")
           val sni = (bpw*i-lsh)/bpw
           val a   = inputs(0).getSubNode(sni)
           val aw  = backend.thisWordBits(inputs(0), sni)
@@ -478,7 +475,7 @@ class Op extends Node {
       } else if (op == "<" || op == ">" || op == "<=" || op == ">=") {
         require(!isSigned)
         var res = Op(op, backend.thisWordBits(inputs(0), 0), inputs(0).getSubNode(0), inputs(1).getSubNode(0))
-        println("*** THIS " + this + " WIDTH " + this.width + " WORDS " + backend.words(this))
+        // println("*** THIS " + this + " WIDTH " + this.width + " WORDS " + backend.words(this))
         for (i <- 1 until backend.words(inputs(0))) {
           val a = inputs(0).getSubNode(i);
           val b = inputs(1).getSubNode(i);
@@ -517,9 +514,10 @@ class Op extends Node {
         }
         Trunc(this)
       } else if (op == "*") {
+        // TODO: CHECK THIS OUT
         val bph = bpw/2
-        val m = backend.halfWords(inputs(0));
-        val n = backend.halfWords(inputs(1));
+        val m = backend.words(inputs(0))*2;
+        val n = backend.words(inputs(1))*2;
         val u = new Array[Node](m);
         val v = new Array[Node](n);
         for (i <- 0 until m/2) { 
@@ -530,7 +528,8 @@ class Op extends Node {
           v(2*i)   = RawExtract(inputs(1).getSubNode(i), bph-1, 0);
           v(2*i+1) = RawExtract(inputs(1).getSubNode(i), bpw-1, bph);
         }
-        val w = new Array[Node](n*m);
+        val w = new Array[Node](n*m+1);
+        println("W SIZE " + w.length)
         for (i <- 0 until n*m) w(i) = Literal(0);
         for (j <- 0 until n) {
           var k: Node = Literal(0);
@@ -539,9 +538,10 @@ class Op extends Node {
             w(i+j) = t;
             k = Op(">>", bpw, t, bph);
           }
+          println("J " + j + " M " + m)
           w(j+m) = k
         }
-        for (i <- 0 until (n*m))
+        for (i <- 0 until (n*m)/2)
           subnodes += RawCat(RawExtract(w(2*i), bph-1, 0), RawExtract(w(2*i+1), bph-1, 0))
       } else 
         super.genSubNodes

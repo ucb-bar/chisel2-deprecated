@@ -43,7 +43,8 @@ object Multiplex{
         }
       }
       if (a.isInstanceOf[Mux] && c.clearlyEquals(a.inputs(1)))
-        Multiplex(t.asInstanceOf[Bits] || a.inputs(0).asInstanceOf[Bits], c, a.inputs(2))
+        // Multiplex(t.asInstanceOf[Bits] || a.inputs(0).asInstanceOf[Bits], c, a.inputs(2))
+        Multiplex(Op("||", 1, t, a.inputs(0)), c, a.inputs(2))
     }
     new Mux().init("", maxWidth _, t, c, a);
   }

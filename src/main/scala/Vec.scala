@@ -24,49 +24,17 @@ object VecUFixToOH
   }
 }
 
-object VecMuxN {
-  def apply(sel: Seq[Bits], in: Seq[Bits]): Bits = {
-    if (in.size == 0)
-      null
-    else if (in.size == 1)
-      in(0)
-    else
-      Mux(sel(log2Up(in.size)-1), apply(sel, in.slice((1 << log2Up(in.size))/2, in.size)), apply(sel, in.slice(0, (1 << log2Up(in.size))/2)))
-  }
-  def apply(sel: Bits, in: Seq[Bits]): Bits = apply((0 until log2Up(in.size)).map(sel(_)), in)
-}
-
-object VecMux1H {
-  def apply(w: Int = -1, pairs: Seq[(Bool, Bits)]): Bits = {
-    val inferredWidth = (w +: pairs.map{case(bool, bits) => bits.getWidth}).max
-    assert(inferredWidth > 0, {println("UNABLE TO INFER WIDTH ON MUX1H")})
-    
-    pairs.map{case(bool, bits) => bits & Fill(inferredWidth, bool)}.reduceLeft(_ | _)
-  }
-
-  
-  def apply[T <: Data](pairs: Seq[(Bool, T)], gen: () => T): T = {
-    val res = gen().asOutput
-    res.setIsTypeNode
-    
-    val inferredWidth = (pairs.map{case(bool, data) => data.getWidth}).max
-    assert(inferredWidth > 0, {println("UNABLE TO INFER WIDTH ON MUX1H")})
-
-    var filter: List[List[Bits]] = pairs(0)._2.flatten.map(x => List()).toList
-    for((bool, data) <- pairs) {
-      filter = (filter zip data.flatten).map{case(a, (b, c)) => a :+ c}
+object VecMux {
+  def apply(addr: UFix, elts: Seq[Bits]): Bits = {
+    def doit(elts: Seq[Bits], pos: Int): Bits = {
+      if (elts.length == 1)
+        elts(0)
+      else {
+        val newElts = (0 until elts.length/2).map(i => Mux(addr(pos), elts(2*i+1), elts(2*i)))
+        doit(newElts ++ elts.slice(elts.length/2*2, elts.length), pos+1)
+      }
     }
-
-    val bools = pairs.map{case(bool, data) => bool}
-
-    for(((n, i), data) <- res.flatten zip filter) {
-      val p = new ArrayBuffer[(Bool, Bits)]
-      for((b, d) <- bools zip data)
-        p += (b -> d.toBits)
-      i.inputs(0) = VecMux1H(-1, p)
-    }
-
-    res
+    doit(elts, 0)
   }
 }
 
@@ -91,14 +59,11 @@ object Vec {
   }
 
   def apply[T <: Data](elts: Seq[T])(gen: => T): Vec[T] = {
-    if (elts.forall(_.litOf != null)) {
-      val res = new ROM(elts.map(_.litOf), () => gen)
-      res
-    } else {
-      val res = new Vec[T](() => gen)
-      elts.foreach(res += _)
-      res
-    }
+    val res =
+      if (elts.forall(_.litOf != null)) new ROM(elts.map(_.litOf), () => gen)
+      else new Vec[T](() => gen)
+    elts.foreach(res += _)
+    res
   }
 
   def apply[T <: Data](elt0: T, elts: T*)(gen: => T): Vec[T] =
@@ -197,20 +162,13 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
     val res = this(0).clone
     //val res = gen()
     for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
-      val w = io.getWidth
-      val onehot = VecUFixToOH(addr, length)
-      val pairs = new ArrayBuffer[(Bool, Bits)]
-      for(i <- 0 until length){
-        pairs += (getEnable(onehot, i) -> sortedElm(i))
-      }
-      val io_res = VecMux1H(w, pairs)
-      io assign io_res
+      io assign VecMux(addr, sortedElm)
 
       // setup the comp for writes
-        val io_comp = new VecProc()
-        io_comp.addr = addr
-        io_comp.elms = sortedElm
-        io.comp = io_comp
+      val io_comp = new VecProc()
+      io_comp.addr = addr
+      io_comp.elms = sortedElm
+      io.comp = io_comp
     }
     readPortCache += (addr -> res)
     res.setIsTypeNode
@@ -387,4 +345,13 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
     val reversed = this.reverse
     Cat(reversed.head, reversed.tail: _*)
   }
+
+  def forall(p: T => Bool): Bool = (this map p).fold(Bool(true))(_&&_)
+  def exists(p: T => Bool): Bool = (this map p).fold(Bool(false))(_||_)
+  def contains(x: T): Bool = this.exists(_.toBits === x.toBits)
+  def count(p: T => Bool): UFix = PopCount(this map p)
+
+  private def indexWhereHelper(p: T => Bool) = this map p zip (0 until size).map(i => UFix(i))
+  def indexWhere(p: T => Bool): UFix = PriorityMux(indexWhereHelper(p))
+  def lastIndexWhere(p: T => Bool): UFix = PriorityMux(indexWhereHelper(p).reverse)
 }

@@ -132,14 +132,15 @@ class Extract extends Node {
       if (lo.litOf != null) {
         val word = lo.litOf.value.toInt / backend.wordBits
         val bit  = lo.litOf.value.toInt % backend.wordBits
-        subnodes += RawExtract(inputs(0).getSubNode(word), Literal(bit), Literal(bit))
+        subnodes += RawExtract(inputs(0).getSubNode(word), bit, bit)
       } else {
         var word: Node  = inputs(0).getSubNode(0)
         val nShiftWords = Op(">>", bpw, inputs(1).getSubNode(0), Literal(log2Up(bpw))) 
         val nShiftBits  = RawExtract(inputs(1).getSubNode(0), log2Up(bpw)-1, 0)
         for (off <- 1 until backend.words(inputs(0)))
           word = Multiplex(Op("==", 1, nShiftWords, Literal(off)), inputs(0).getSubNode(off), word)
-        subnodes += RawExtract(word, nShiftBits, nShiftBits)
+        // TODO: IS THIS RIGHT? A ONE BIT EXTRACT?
+        subnodes += RawExtract(word, nShiftBits, nShiftBits, 1)
       }
     } else {
       val rsh = inputs(2).value.toInt

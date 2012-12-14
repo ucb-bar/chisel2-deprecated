@@ -5,9 +5,6 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 
 class ROM[T <: Data](val lits: Seq[Literal], gen: () => T) extends Vec[T](gen) {
-  val data = gen().toNode
-  inferWidth = fixWidth(gen().getWidth)
-
   override def read(addr: UFix): T = {
     var port = new ROMRead(this, addr)
     val data = gen().asOutput
@@ -36,8 +33,6 @@ class ROMRead[T <: Data](val rom: ROM[T], addri: Bits) extends Node {
   def addr = inputs(0)
   inputs += addri
   inputs += rom
-
-  inferWidth = fixWidth(rom.data.getWidth)
 
   override def toString: String = rom + "[" + addr + "]"
 }

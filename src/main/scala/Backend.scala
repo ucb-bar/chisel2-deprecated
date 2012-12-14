@@ -22,7 +22,7 @@ abstract class Backend {
 
   def nodeName(node: Node): String = {
     if(node.name == "" || !node.named) 
-      "T" + node.emitIndex 
+      (if (node.isInstanceOf[Reg]) "R" else "T") + node.emitIndex 
     else if(!node.named) {
       // node.named = true
       node.name + "_" + node.emitIndex

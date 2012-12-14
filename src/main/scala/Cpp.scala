@@ -22,7 +22,7 @@ object CListLookup {
 }
 
 class CppBackend extends Backend {
-  var isSubNodes = false
+  var isSubNodes = true
   override def emitTmp(node: Node): String = {
     // require(false)
     if (node.isInObject || node.isInObjectSubNode)
@@ -134,6 +134,47 @@ class CppBackend extends Backend {
   def opFoldLeft(o: Op, initial: (String, String) => String, subsequent: (String, String, String) => String) =
     (1 until words(o.inputs(0))).foldLeft(initial(emitLoWordRef(o.inputs(0)), emitLoWordRef(o.inputs(1))))((c, i) => subsequent(c, emitWordRef(o.inputs(0), i), emitWordRef(o.inputs(1), i)))
 
+  def emitShadowRef(node: Node): String = {
+    val ref   = emitRef(node);
+    val parts = ref.split("""\.""");
+    if (parts.length > 1)
+      parts(0) + "_shadow." + parts(1)
+    else
+      ref + "_shadow";
+  }
+
+  def emitMemGet(mem: Mem[_], addr: Node): String = {
+    val ref   = emitRef(mem);
+    val parts = ref.split("""\.""");
+    val get   = ".get(" + emitRef(addr) + ")";
+    if (parts.length > 1)
+      parts(0) + get + "." + parts(1)
+    else
+      ref + get
+    // "  " + emitTmp(m) + " = " + emitRef(m.mem) + ".get(" + emitRef(m.addr) + ");\n"
+  }
+
+  def emitRomGet(mem: ROM[_], addr: Node): String = {
+    val ref   = emitRef(mem);
+    val parts = ref.split("""\.""");
+    val get   = ".get(" + emitRef(addr) + ")";
+    if (parts.length > 1)
+      parts(0) + get + "." + parts(1)
+    else
+      ref + get
+  }
+
+  def emitMemPut(mem: Mem[_], addr: Node, data: Node): String = {
+    val ref   = emitRef(mem);
+    val parts = ref.split("""\.""");
+    val get   = ".get(" + emitRef(addr) + ")";
+    if (parts.length > 1)
+      parts(0) + get + "." + parts(1)
+    else
+      ref + get
+    // "  " + emitTmp(m) + " = " + emitRef(m.mem) + ".get(" + emitRef(m.addr) + ");\n"
+  }
+
   /// OLD SINGLE WORD BACKEND START
   def emitDec1(node: Node): String = {
     node match {
@@ -146,7 +187,7 @@ class CppBackend extends Backend {
       case x: LookupMap => ""
       case x: Reg =>
         "  val_t " + emitRef(node) + ";\n" +
-        "  val_t " + emitRef(node) + "_shadow;\n";
+        "  val_t " + emitShadowRef(node) + "\n";
       case m: Mem[_] =>
         "  mem_val_t<" + m.n + "> " + emitRef(m) + ";\n"
       case r: ROM[_] =>
@@ -198,13 +239,14 @@ class CppBackend extends Backend {
         val updateLogic = 
           (if (reg.isReset) "TERNARY(" + emitRef(reg.inputs.last) + ", " + emitRef(reg.resetVal) + ", " else "") + 
         emitRef(reg.updateVal) + (if (reg.isReset) ");\n" else ";\n");
-        "  " + emitRef(reg) + "_shadow = " +  updateLogic;
+        "  " + emitShadowRef(reg) + " = " +  updateLogic;
 
       case m: MemRead[_] =>
-        "  " + emitTmp(m) + " = " + emitRef(m.mem) + ".get(" + emitRef(m.addr) + ");\n"
+        "  " + emitTmp(m) + " = " + emitMemGet(m.mem, m.addr) + ";\n"
+        // "  " + emitTmp(m) + " = " + emitRef(m.mem) + ".get(" + emitRef(m.addr) + ");\n"
 
       case r: ROMRead[_] =>
-        "  " + emitTmp(r) + " = " + emitRef(r.rom) + ".get(" + emitRef(r.addr) + ");\n"
+        "  " + emitTmp(r) + " = " + emitRomGet(r.rom, r.addr) + ";\n"
 
       case x: Log2 =>
         " " + emitTmp(x) + " = " + "log2_1(" + emitRef(x.inputs(0)) + ");\n";
@@ -487,7 +529,7 @@ class CppBackend extends Backend {
   def emitDefHi(node: Node): String = {
     node match {
       case reg: Reg =>
-        "  " + emitRef(reg) + " = " + emitRef(reg) + "_shadow;\n"
+        "  " + emitRef(reg) + " = " + emitShadowRef(reg) + "\n"
       case _ =>
         ""
     }
@@ -765,7 +807,7 @@ class CppBackend extends Backend {
     for(str <- includeArgs) out_c.write("#include \"" + str + "\"\n"); 
     out_c.write("\n");
     out_c.write("void " + c.name + "_t::init ( bool rand_init ) {\n");
-    for (m <- smods) {
+    for (m <- dmods) {
       out_c.write(emitInit(m));
     }
     out_c.write("}\n");
