@@ -102,6 +102,7 @@ object LogicalOp {
 
 object ReductionOp {
   def apply[T <: Data](x: T, op: String)(gen: => T): Bool = {
+    println("REDUCTION OP " + op)
     val node = op match {
       case "&" => Op("&",  1, fixWidth(1), x);
       case "|" => Op("|",  1, fixWidth(1), x);
@@ -345,24 +346,30 @@ class Op extends Node {
 
   def maskVal(x: Node, i: Int) = {
     val bpw = backend.wordBits;
-    if (inputs(0).width - i*bpw < bpw) 
-      Literal((1L << (inputs(0).width - i*bpw)-1))
-    else
-      Literal(-1)
+    if ((x.width - i*bpw) < bpw) {
+      println("MASK VAL(" + i + ") " + (x.width - i*bpw))
+      Literal((1L << (x.width - i*bpw))-1)
+    } else {
+      println("FULL MASK VAL " + i)
+      Literal(-1, bpw)
+    }
   }
     
   override def genSubNodes: Unit = {
     val bpw = backend.wordBits;
+    println("EXPAND SUBWORDS " + this + " |INPUTS|= " + inputs.length)
     if (inputs.length == 1) {
       val maxWordWidth = 
       if (op == "!") {
         subnodes += Op("!", 1, inputs(0).getSubNode(0))
       } else if (op == "|") {
-        subnodes += (0 until backend.words(this)).map(inputs(0).getSubNode(_)).reduceLeft(Op("|", backend.thisWordBits(inputs(0), 0), _, _))
+        println("EXPANDING orR " + backend.words(inputs(0)))
+        subnodes += Op("!=", 1, Literal(0), (0 until backend.words(inputs(0))).map(inputs(0).getSubNode(_)).reduceLeft(Op("|", backend.thisWordBits(inputs(0), 0), _, _)))
+        println("  SUBNODE " + subnodes(0))
       } else if (op == "&") { 
-        subnodes += (0 until backend.words(this)).map(i => Op("==", 1, inputs(0).getSubNode(i), maskVal(inputs(0), i))).reduceLeft(Op("&", backend.thisWordBits(inputs(0), 0),_, _))
+        subnodes += (0 until backend.words(inputs(0))).map(i => Op("==", 1, inputs(0).getSubNode(i), maskVal(inputs(0), i))).reduceLeft(Op("&", 1, _, _))
       } else if (op == "^") { 
-        var x = (0 until backend.words(this)).map(inputs(0).getSubNode(_)).reduceLeft(Op("^", backend.thisWordBits(inputs(0), 0), _, _))
+        var x = (0 until backend.words(inputs(0))).map(inputs(0).getSubNode(_)).reduceLeft(Op("^", backend.thisWordBits(inputs(0), 0), _, _))
         for (i <- log2Up(min(bpw, inputs(0).width))-1 to 0 by -1)
           x = Op("^", bpw, Op(">>", bpw, x, Literal(1L << i)), x)
         subnodes += Op("&", 1, x, Literal(1))
@@ -471,13 +478,12 @@ class Op extends Node {
       } else if (op == "##") { // TODO: check 
         val lsh = inputs(1).width
         subnodes ++= (0 until backend.fullWords(inputs(1))).map(inputs(1).getSubNode(_))
-        println("EXPANDING ## " + lsh + " FULLWORDS " + backend.fullWords(inputs(1)))
+        // println("EXPANDING ## " + lsh + " FULLWORDS " + backend.fullWords(inputs(1)))
         if (lsh%bpw != 0) {
-          println("LSH%BPW != 0 " + inputs(1).getSubNode(backend.fullWords(inputs(1))))
+          // println("LSH%BPW != 0 " + inputs(1).getSubNode(backend.fullWords(inputs(1))))
           subnodes += Op("|", bpw, inputs(1).getSubNode(backend.fullWords(inputs(1))),  Op("<<", bpw, inputs(0).getSubNode(0), Literal(lsh % bpw)));
         }
         for (i <- backend.words(inputs(1)) until backend.words(this)) {
-          println("LOOPING")
           val sni = (bpw*i-lsh)/bpw
           val a   = inputs(0).getSubNode(sni)
           val aw  = backend.thisWordBits(inputs(0), sni)
