@@ -34,6 +34,7 @@ object VerilogBackend {
 class VerilogBackend extends Backend {
   isEmittingComponents = true
   isCoercingArgs = false
+  transforms += Mem.retime
 
   val memConfigs = new HashSet[String]()
   val memPaths = new HashMap[String, HashMap[String, Int]]()

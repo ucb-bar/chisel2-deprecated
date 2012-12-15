@@ -19,7 +19,7 @@ object Mem {
   }
 
   val sequentialReads = collection.mutable.HashSet[Node]()
-  Component.backend.transforms += { c =>
+  def retime(c: Component) = {
     if (Component.isInlineMem && !sequentialReads.isEmpty)
       for (n <- Component.nodes)
         for (i <- 0 until n.inputs.length)
