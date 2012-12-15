@@ -143,11 +143,11 @@ class MemRead[T <: Data](mem: Mem[T], condi: Bool, addri: Bits) extends MemAcces
 
   override def genSubNodes: Unit = {
     for (i <- 0 until backend.words(this)) {
-      val c = if (condi == null) condi else condi.getSubNode(0)
+      val c = if (cond == null) condi else cond.getSubNode(0)
       val m = mem.getSubNode(i)
-      val r = RawMemRead(m, c, addri.getSubNode(0)) // TODO: FILL OUT
+      val r = RawMemRead(m, c, addr.getSubNode(0)) // TODO: FILL OUT
       subnodes += r
-      // println("MEM READ " + mem.name + " MEM-WIDTH " + m.width + " MEM-READ-WIDTH " + r.width + " " + i)
+      // println("MEM READ " + mem.name + " MEM-WIDTH " + m.width + " MEM-READ-WIDTH " + r.width + " " + i + " ADDR " + addr + " IS TYPE " + addr.isTypeNode)
     }
   }
 }

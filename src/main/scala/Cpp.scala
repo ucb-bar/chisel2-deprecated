@@ -26,7 +26,7 @@ class CppBackend extends Backend {
   override def emitTmp(node: Node): String = {
     // require(false)
     if (node.isInObject || node.isInObjectSubNode)
-      emitRef(node)
+      emitRef(node) + "/* " + node.isInObject + "," + node.isInObjectSubNode + " */"
     else
       "val_t " + emitRef(node)
   }
@@ -145,34 +145,20 @@ class CppBackend extends Backend {
 
   def emitMemGet(mem: Mem[_], addr: Node): String = {
     val ref   = emitRef(mem);
-    val parts = ref.split("""\.""");
-    val get   = ".get(" + emitRef(addr) + ")";
-    if (parts.length > 1)
-      parts(0) + get + "." + parts(1)
-    else
-      ref + get
-    // "  " + emitTmp(m) + " = " + emitRef(m.mem) + ".get(" + emitRef(m.addr) + ");\n"
-  }
-
-  def emitRomGet(mem: ROM[_], addr: Node): String = {
-    val ref   = emitRef(mem);
-    val parts = ref.split("""\.""");
-    val get   = ".get(" + emitRef(addr) + ")";
-    if (parts.length > 1)
-      parts(0) + get + "." + parts(1)
-    else
-      ref + get
+    val parts = ref.split(":");
+    parts(0) + ".get(" + emitRef(addr) + ", " + parts(1) + ")";
   }
 
   def emitMemPut(mem: Mem[_], addr: Node, data: Node): String = {
     val ref   = emitRef(mem);
-    val parts = ref.split("""\.""");
-    val get   = ".get(" + emitRef(addr) + ")";
-    if (parts.length > 1)
-      parts(0) + get + "." + parts(1)
-    else
-      ref + get
-    // "  " + emitTmp(m) + " = " + emitRef(m.mem) + ".get(" + emitRef(m.addr) + ");\n"
+    val parts = ref.split(":");
+    parts(0) + ".put(" + emitRef(addr) + ", " + parts(1) + ", " + emitRef(data) + ")";
+  }
+
+  def emitRomGet(mem: ROM[_], addr: Node): String = {
+    val ref   = emitRef(mem);
+    val parts = ref.split(":");
+    parts(0) + ".get(" + emitRef(addr) + ", " + parts(1) + ")";
   }
 
   /// OLD SINGLE WORD BACKEND START
@@ -251,6 +237,9 @@ class CppBackend extends Backend {
       case r: ROMRead[_] =>
         "  " + emitTmp(r) + " = " + emitRomGet(r.rom, r.addr) + ";\n"
 
+      case m: Mem[_] =>
+        ""
+
       case x: Log2 =>
         " " + emitTmp(x) + " = " + "log2_1(" + emitRef(x.inputs(0)) + ");\n";
 
@@ -268,29 +257,25 @@ class CppBackend extends Backend {
 
   }
 
-  /*
-  def emitDefHi1(node: Node): String = {
+  def emitInitHi1(node: Node): String = {
     node match {
       case m: MemWrite[_] =>
         if (m.inputs.length == 2)
           return ""
-        isHiC = true
-        var res = "  if (" + emitRef(m.cond) + ".to_bool()) {\n"
+        var res = "  if (" + emitRef(m.cond) + ") {\n"
         if (m.isMasked)
-          res += "    " + emitRef(m.mem) + ".put(" + emitRef(m.addr) + ", (" + emitRef(m.data) + " & " + emitRef(m.wmask) + ") | (" + emitRef(m.mem) + ".get(" + emitRef(m.addr) + ") & ~" + emitRef(m.wmask) + "));\n"
+          res += "    " + emitMemPut(m.mem, m.addr, m.data) + " & " + emitRef(m.wmask) + ") | (" + emitMemGet(m.mem, m.addr) + ") & ~" + emitRef(m.wmask) + "));\n"
         else
-          res += "    " + emitRef(m.mem) + ".put(" + emitRef(m.addr) + ", " + emitRef(m.data) + ");\n"
+          res += "    " + emitMemPut(m.mem, m.addr, m.data) + ";\n"
         res += "  }\n"
-        isHiC = false
         res
 
-      case reg: Reg =>
-        "  " + emitRef(reg) + " = " + emitRef(reg) + "_shadow;\n"
       case _ =>
         ""
     }
   }
 
+  /*
   def emitInit1(node: Node): String = {
     node match {
       case x: Reg =>
@@ -532,7 +517,7 @@ class CppBackend extends Backend {
   def emitDefHi(node: Node): String = {
     node match {
       case reg: Reg =>
-        "  " + emitRef(reg) + " = " + emitShadowRef(reg) + "\n"
+        "  " + emitRef(reg) + " = " + emitShadowRef(reg) + ";\n"
       case _ =>
         ""
     }
@@ -557,6 +542,7 @@ class CppBackend extends Backend {
   }
 
   def emitInitHi(node: Node): String = {
+    if (isSubNodes) return emitInitHi1(node);
     node match {
       case m: MemWrite[_] =>
         // schedule before Reg updates in case a MemWrite input is a Reg
@@ -671,6 +657,10 @@ class CppBackend extends Backend {
             node match {
               case l: Literal => ;
               case l: FloLiteral => ;
+              case r: ROM[_] =>
+                node.setName(nodeName(m) + ":" + i)
+              case r: Mem[_] =>
+                node.setName(nodeName(m) + ":" + i)
               case any =>
                 node.setName(nodeName(m) + (if (node.isInObjectSubNode) (".values[" + i + "]") else ("__w" + i)))
             // println("  SUBNODE NAME "+ m.subnodes(i).name)
@@ -742,13 +732,14 @@ class CppBackend extends Backend {
       c.findOrdering(); // search from roots  -- create omods
       cmods ++= c.omods
       for (cmod <- cmods) {
+        cmod.getSubNodes
         if (cmod.isInObject) {
           for (s <- cmod.getSubNodes) {
             s.isInObjectSubNode = true
           }
         }
       }
-      renameNodes(c, c.mods);
+      renameNodes(c, c.omods);
       c.omods.clear
       c.findSubNodeOrdering(); // search from roots  -- create omods
       for (omod <- c.omods)
