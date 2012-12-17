@@ -354,4 +354,5 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
   private def indexWhereHelper(p: T => Bool) = this map p zip (0 until size).map(i => UFix(i))
   def indexWhere(p: T => Bool): UFix = PriorityMux(indexWhereHelper(p))
   def lastIndexWhere(p: T => Bool): UFix = PriorityMux(indexWhereHelper(p).reverse)
+
 }

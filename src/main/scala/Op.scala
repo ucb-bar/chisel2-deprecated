@@ -357,7 +357,7 @@ class Op extends Node {
     
   override def genSubNodes: Unit = {
     val bpw = backend.wordBits;
-    println("EXPAND SUBWORDS " + this + " |INPUTS|= " + inputs.length)
+    // println("EXPAND SUBWORDS " + this + " |INPUTS|= " + inputs.length)
     if (inputs.length == 1) {
       val maxWordWidth = 
       if (op == "!") {
@@ -393,7 +393,7 @@ class Op extends Node {
       if (op == "==") {
         subnodes += (0 until backend.words(inputs(0))).map(i => Op("==", 1, inputs(0).getSubNode(i), inputs(1).getSubNode(i))).reduceLeft(Op("&&", 1, _, _))
       } else if (op == "!=") {
-        subnodes += (0 until backend.words(inputs(0))).map(i => Op("==", 1, inputs(0).getSubNode(i), inputs(1).getSubNode(i))).reduceLeft(Op("||", 1, _, _))
+        subnodes += (0 until backend.words(inputs(0))).map(i => Op("!=", 1, inputs(0).getSubNode(i), inputs(1).getSubNode(i))).reduceLeft(Op("||", 1, _, _))
       } else if (op == "<<") { // TODO: 
         if (width <= bpw)
           subnodes += Op("<<", width, inputs(0).getSubNode(0), inputs(1).getSubNode(0))
@@ -479,7 +479,10 @@ class Op extends Node {
         val lsh = inputs(1).width
         subnodes ++= (0 until backend.fullWords(inputs(1))).map(inputs(1).getSubNode(_))
         if (lsh%bpw != 0) {
-          subnodes += Op("|", bpw, inputs(1).getSubNode(backend.fullWords(inputs(1))),  Op("<<", bpw, inputs(0).getSubNode(0), Literal(lsh % bpw)));
+          // subnodes += Op("|", bpw, Op("<<", bpw, inputs(0).getSubNode(0), Literal(lsh % bpw)), inputs(1).getSubNode(backend.fullWords(inputs(1))));
+          val i1 = inputs(1).getSubNode(backend.fullWords(inputs(1)));
+          i1.width_ = lsh % bpw;
+          subnodes += Op("##", bpw, inputs(0).getSubNode(0), i1);
         }
         for (i <- backend.words(inputs(1)) until backend.words(this)) {
           val sni = (bpw*i-lsh)/bpw
@@ -494,6 +497,7 @@ class Op extends Node {
           } else
             subnodes += a
         }
+        // println("  EXPANDED INTO " + subnodes.length + " SUBNODES " + subnodes(0) + " NAME " + subnodes(0).name)
       } else if (op == "&" || op == "|" || op == "^" || op == "||" || op == "&&") {
         for (i <- 0 until backend.words(this)) 
           subnodes += Op(op, backend.thisWordBits(this, i), inputs(0).getSubNode(i), inputs(1).getSubNode(i));

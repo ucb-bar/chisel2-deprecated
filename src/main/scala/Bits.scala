@@ -300,16 +300,15 @@ class Bits extends Data with proc {
   
   override def genSubNodes = {
     assert(inputs.length <= 1)
-    // println("BITS0 " + this)
     for (i <- 0 until backend.words(this)) {
       val subnode = new Bits()
-      subnode.dir = dir
-      subnode.name = name
-      subnode.unnamed = unnamed
       if (inputs.length == 0)
         subnode.init("", backend.thisWordBits(this, i))
       else
         subnode.init("", backend.thisWordBits(this, i), inputs(0).getSubNode(i))
+      subnode.dir = dir
+      subnode.setName(name)
+      subnode.unnamed = unnamed
       if (subnode.width < 0) println("NEG BITS WIDTH " + subnode)
       subnodes += subnode
     }

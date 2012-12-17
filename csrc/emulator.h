@@ -1434,6 +1434,10 @@ inline dat_t<w> cat(dat_t<w1> d1, dat_t<w2> d2) {
   return DAT<w>((DAT<w>(d1) << w2) | DAT<w>(d2));
 }
 
+inline val_t cat2(val_t d1, val_t d2, int w2) { 
+  return ((d1 << w2) | d2);
+}
+
 template < int w1 >
 inline dat_t<1> reduction_and(dat_t<w1> d) {
   return DAT<1>(d == ~DAT<w1>(0));

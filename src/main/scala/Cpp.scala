@@ -26,7 +26,7 @@ class CppBackend extends Backend {
   override def emitTmp(node: Node): String = {
     // require(false)
     if (node.isInObject || node.isInObjectSubNode)
-      emitRef(node) + "/* " + node.isInObject + "," + node.isInObjectSubNode + " */"
+      emitRef(node)
     else
       "val_t " + emitRef(node)
   }
@@ -197,6 +197,8 @@ class CppBackend extends Backend {
         "  " + emitTmp(node) + " = " +
           (if (o.inputs.length == 1)
              o.op + emitRef(o.inputs(0))
+           else if (o.op == "##")
+             "cat2(" + emitRef(o.inputs(0)) + ", " + emitRef(o.inputs(1)) + ", " + o.inputs(1).width + ")"
            else if (o.op == ">>" && o.inputs(0).isSigned)
              "(sval_t)(" + emitRef(o.inputs(0)) + ") " + o.op + " " + emitRef(o.inputs(1))
            else
@@ -663,7 +665,7 @@ class CppBackend extends Backend {
                 node.setName(nodeName(m) + ":" + i)
               case any =>
                 node.setName(nodeName(m) + (if (node.isInObjectSubNode) (".values[" + i + "]") else ("__w" + i)))
-            // println("  SUBNODE NAME "+ m.subnodes(i).name)
+            // println("  SUBNODE NAME "+ m.subnodes(i).name + " ISINOBJECTSUBNODE " + node.isInObjectSubNode)
             }
           }
       }
@@ -732,6 +734,7 @@ class CppBackend extends Backend {
       c.findOrdering(); // search from roots  -- create omods
       cmods ++= c.omods
       for (cmod <- cmods) {
+        // println("CMOD " + cmod + " ISINOBJECT " + cmod.isInObject)
         cmod.getSubNodes
         if (cmod.isInObject) {
           for (s <- cmod.getSubNodes) {
@@ -742,8 +745,10 @@ class CppBackend extends Backend {
       renameNodes(c, c.omods);
       c.omods.clear
       c.findSubNodeOrdering(); // search from roots  -- create omods
-      for (omod <- c.omods)
+      for (omod <- c.omods) {
+        // println("OMOD " + omod)
         omod.isSubNode = true
+      }
     } else {
       c.findOrdering(); // search from roots  -- create omods
       renameNodes(c, c.omods);
