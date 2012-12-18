@@ -227,7 +227,7 @@ class Literal extends Node {
     val mask = ((BigInt(1) << backend.wordBits)-BigInt(1))
     for (i <- 0 until backend.words(this)) {
       val v = (value >> i*backend.wordBits)&mask
-      subnodes += Literal(v, backend.thisWordBits(this, i))
+      setSubNode(i, Literal(v, backend.thisWordBits(this, i)))
     }
   }
 }

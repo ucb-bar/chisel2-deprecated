@@ -165,6 +165,7 @@ object xorR {
 }
 
 object Op {
+  var sn_depth = 0;
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
     val (a_lit, b_lit) = (a.litOf, b.litOf);
     if (isFolding) {
@@ -320,6 +321,8 @@ object Trunc {
   }
 }    
 
+import Op._
+
 class Op extends Node {
   var op: String = "";
   var nGrow: Int = 0;
@@ -347,43 +350,40 @@ class Op extends Node {
   def maskVal(x: Node, i: Int) = {
     val bpw = backend.wordBits;
     if ((x.width - i*bpw) < bpw) {
-      println("MASK VAL(" + i + ") " + (x.width - i*bpw))
       Literal((1L << (x.width - i*bpw))-1)
     } else {
-      println("FULL MASK VAL " + i)
       Literal(-1, bpw)
     }
   }
     
   override def genSubNodes: Unit = {
     val bpw = backend.wordBits;
-    // println("EXPAND SUBWORDS " + this + " |INPUTS|= " + inputs.length)
+    sn_depth += 1;
+    for (i <- 0 until sn_depth) print("  ")
+    println("EXPAND SUBWORDS " + this + " EXISTING SUBWORDS " + subnodes.length)
     if (inputs.length == 1) {
       val maxWordWidth = 
       if (op == "!") {
-        subnodes += Op("!", 1, inputs(0).getSubNode(0))
+        setSubNode(0, Op("!", 1, inputs(0).getSubNode(0)))
       } else if (op == "|") {
-        println("EXPANDING orR " + backend.words(inputs(0)))
-        subnodes += Op("!=", 1, Literal(0), (0 until backend.words(inputs(0))).map(inputs(0).getSubNode(_)).reduceLeft(Op("|", backend.thisWordBits(inputs(0), 0), _, _)))
-        println("  SUBNODE " + subnodes(0))
+        setSubNode(0, Op("!=", 1, Literal(0), (0 until backend.words(inputs(0))).map(inputs(0).getSubNode(_)).reduceLeft(Op("|", backend.thisWordBits(inputs(0), 0), _, _))))
       } else if (op == "&") { 
-        subnodes += (0 until backend.words(inputs(0))).map(i => Op("==", 1, inputs(0).getSubNode(i), maskVal(inputs(0), i))).reduceLeft(Op("&", 1, _, _))
+        setSubNode(0, (0 until backend.words(inputs(0))).map(i => Op("==", 1, inputs(0).getSubNode(i), maskVal(inputs(0), i))).reduceLeft(Op("&", 1, _, _)))
       } else if (op == "^") { 
         var x = (0 until backend.words(inputs(0))).map(inputs(0).getSubNode(_)).reduceLeft(Op("^", backend.thisWordBits(inputs(0), 0), _, _))
         for (i <- log2Up(min(bpw, inputs(0).width))-1 to 0 by -1)
           x = Op("^", bpw, Op(">>", bpw, x, Literal(1L << i)), x)
-        subnodes += Op("&", 1, x, Literal(1))
+        setSubNode(0, Op("&", 1, x, Literal(1)))
       } else if (op == "~") { 
-        subnodes ++= (0 until backend.words(this)).map(i => Op("~", backend.thisWordBits(inputs(0), i), inputs(0).getSubNode(i)))
+        for (i <- 0 until backend.words(this))
+          setSubNode(i, Op("~", backend.thisWordBits(inputs(0), i), inputs(0).getSubNode(i)))
         Trunc(this)
       } else if (op == "-") { 
-        val first = Op("-", backend.thisWordBits(this, 0), inputs(0).getSubNode(0))
-        subnodes += first
-
+        setSubNode(0, Op("-", backend.thisWordBits(this, 0), inputs(0).getSubNode(0)))
         var borrow: Node = Literal(0);
         for (i <- 1 until backend.words(this)) {
           val neg   = Op("-", backend.thisWordBits(this, 0), inputs(0).getSubNode(i))
-          subnodes += Op("-", backend.thisWordBits(this, i-1), neg, borrow)
+          setSubNode(i, Op("-", backend.thisWordBits(this, i-1), neg, borrow))
           borrow    = Op("||", 1, inputs(0).getSubNode(i), this.getSubNode(i))
         } 
         Trunc(this)
@@ -391,12 +391,12 @@ class Op extends Node {
         super.genSubNodes
     } else if (inputs.length == 2) {
       if (op == "==") {
-        subnodes += (0 until backend.words(inputs(0))).map(i => Op("==", 1, inputs(0).getSubNode(i), inputs(1).getSubNode(i))).reduceLeft(Op("&&", 1, _, _))
+        setSubNode(0, (0 until backend.words(inputs(0))).map(i => Op("==", 1, inputs(0).getSubNode(i), inputs(1).getSubNode(i))).reduceLeft(Op("&&", 1, _, _)))
       } else if (op == "!=") {
-        subnodes += (0 until backend.words(inputs(0))).map(i => Op("!=", 1, inputs(0).getSubNode(i), inputs(1).getSubNode(i))).reduceLeft(Op("||", 1, _, _))
+        setSubNode(0, (0 until backend.words(inputs(0))).map(i => Op("!=", 1, inputs(0).getSubNode(i), inputs(1).getSubNode(i))).reduceLeft(Op("||", 1, _, _)))
       } else if (op == "<<") { // TODO: 
         if (width <= bpw)
-          subnodes += Op("<<", width, inputs(0).getSubNode(0), inputs(1).getSubNode(0))
+          setSubNode(0, Op("<<", width, inputs(0).getSubNode(0), inputs(1).getSubNode(0)))
         else {
           val amount         = inputs(1).getSubNode(0)
           var carry          = Literal(0)
@@ -424,17 +424,17 @@ class Op extends Node {
                           // println("NWORDS " + nWords + " LOOKUPS LENGTH " + lookups.length + " I+1 " + (i+1))
                           Multiplex(isZeroCarry, Literal(0), Op(">>", bpw, lookups(i-1), nRevShiftBits)) 
                         }
-            subnodes += Op("|", bpw, x, c)
+            setSubNode(i, Op("|", bpw, x, c))
           }
         }
       } else if (op == ">>") { 
         if (width <= bpw) {
           if (isSigned) {
             val x = Op("<<", bpw, inputs(0).getSubNode(0), Literal(bpw - inputs(0).width));  x.isSigned = true;
-            subnodes += Op(">>", bpw, x, Op("+", bpw, Literal(bpw - inputs(0).width), inputs(1).getSubNode(0)));
+            setSubNode(0, Op(">>", bpw, x, Op("+", bpw, Literal(bpw - inputs(0).width), inputs(1).getSubNode(0))))
             Trunc(this)
           } else 
-            subnodes += Op(">>", width, inputs(0).getSubNode(0), inputs(1).getSubNode(0))
+            setSubNode(0, Op(">>", width, inputs(0).getSubNode(0), inputs(1).getSubNode(0)))
         } else {
           println(">> IS SIGNED " + isSigned)
           val amount        = inputs(1).getSubNode(0)
@@ -462,7 +462,7 @@ class Op extends Node {
           for (i <- 0 until nWords) {
             val x     = Op(">>", bpw, lookups(i), nShiftBits)
             val c     = Multiplex(isZeroCarry, Literal(0), Op("<<", bpw, lookups(i+1), nRevShiftBits)) 
-            subnodes += Op("|", bpw, x, c)
+            setSubNode(i, Op("|", bpw, x, c))
             if (isSigned) {
               println("SIGNED")
               subnodes(i) = Op("|", bpw, subnodes(i),
@@ -477,12 +477,16 @@ class Op extends Node {
         }
       } else if (op == "##") { // TODO: check 
         val lsh = inputs(1).width
-        subnodes ++= (0 until backend.fullWords(inputs(1))).map(inputs(1).getSubNode(_))
+        for (i <- 0 until backend.fullWords(inputs(1)))
+          setSubNode(i, inputs(1).getSubNode(i))
         if (lsh%bpw != 0) {
-          // subnodes += Op("|", bpw, Op("<<", bpw, inputs(0).getSubNode(0), Literal(lsh % bpw)), inputs(1).getSubNode(backend.fullWords(inputs(1))));
-          val i1 = inputs(1).getSubNode(backend.fullWords(inputs(1)));
-          i1.width_ = lsh % bpw;
-          subnodes += Op("##", bpw, inputs(0).getSubNode(0), i1);
+          val idx = backend.fullWords(inputs(1));
+          if (isInObject) {
+            val i1 = inputs(1).getSubNode(idx);
+            i1.width_ = lsh % bpw;
+            setSubNode(idx, Op("##", bpw, inputs(0).getSubNode(0), i1))
+          } else
+            setSubNode(idx, Op("|", bpw, Op("<<", bpw, inputs(0).getSubNode(0), Literal(lsh % bpw)), inputs(1).getSubNode(idx)));
         }
         for (i <- backend.words(inputs(1)) until backend.words(this)) {
           val sni = (bpw*i-lsh)/bpw
@@ -491,20 +495,20 @@ class Op extends Node {
           if (lsh % bpw != 0) {
             val rsh = Op(">>", aw, a, bpw - lsh % bpw)
             if  ((bpw*i-lsh)/bpw+1 < backend.words(inputs(0))) {
-              subnodes += Op("<<", backend.wordBits, Op("|", aw, rsh, inputs(0).getSubNode(sni)), (lsh%bpw))
+              setSubNode(i, Op("<<", backend.wordBits, Op("|", aw, rsh, inputs(0).getSubNode(sni)), (lsh%bpw)))
             } else
-              subnodes += rsh
+              setSubNode(i, rsh)
           } else
-            subnodes += a
+            setSubNode(i, a)
         }
         // println("  EXPANDED INTO " + subnodes.length + " SUBNODES " + subnodes(0) + " NAME " + subnodes(0).name)
       } else if (op == "&" || op == "|" || op == "^" || op == "||" || op == "&&") {
         for (i <- 0 until backend.words(this)) 
-          subnodes += Op(op, backend.thisWordBits(this, i), inputs(0).getSubNode(i), inputs(1).getSubNode(i));
+          setSubNode(i, Op(op, backend.thisWordBits(this, i), inputs(0).getSubNode(i), inputs(1).getSubNode(i)))
       } else if (op == "<" && isSigned) {
         require(!isFolding || inputs(1).litOf.value == 0)
         val shamt = (inputs(0).width-1) % bpw
-        subnodes += Op("&", 1, Op(">>", bpw, inputs(0).getSubNode(backend.words(inputs(0))-1), Literal(shamt)), Literal(1))
+        setSubNode(0, Op("&", 1, Op(">>", bpw, inputs(0).getSubNode(backend.words(inputs(0))-1), Literal(shamt)), Literal(1)))
       } else if (op == "<" || op == ">" || op == "<=" || op == ">=") {
         require(!isSigned)
         var res = Op(op, backend.thisWordBits(inputs(0), 0), inputs(0).getSubNode(0), inputs(1).getSubNode(0))
@@ -515,10 +519,10 @@ class Op extends Node {
           val w = backend.thisWordBits(inputs(0), i);
           res = Op("&&", 1, res, Op("||", 1, Op("==", w, a, b), Op(op, w, a, b)))
         }
-        subnodes += res
+        setSubNode(0, res)
       } else if (op == "-") { // TODO: MERGE WITH BELOW
         var prev   = Op(op, backend.thisWordBits(this, 0), inputs(0).getSubNode(0), inputs(1).getSubNode(0))
-        subnodes += prev
+        setSubNode(0, prev)
         var prevWithCarry: Node = null
         for (i <- 1 until backend.words(this)) {
           var carry = Op(">", backend.thisWordBits(this, i-1), prev, inputs(0).getSubNode(i-1))
@@ -528,12 +532,12 @@ class Op extends Node {
           }
           prev          = Op(op, backend.thisWordBits(this, i), inputs(0).getSubNode(i), inputs(1).getSubNode(i))
           prevWithCarry = Op(op, backend.thisWordBits(this, i), prev, carry)
-          subnodes     += prevWithCarry
+          setSubNode(i, prevWithCarry)
         }
         Trunc(this)
       } else if (op == "+") { 
         var prev = Op(op, backend.thisWordBits(this, 0), inputs(0).getSubNode(0), inputs(1).getSubNode(0))
-        subnodes += prev
+        setSubNode(0, prev)
         var prevWithCarry: Node = null
         for (i <- 1 until backend.words(this)) {
           var carry = Op("<", backend.thisWordBits(this, i-1), prev, inputs(0).getSubNode(i-1))
@@ -543,7 +547,7 @@ class Op extends Node {
           }
           prev          = Op(op, backend.thisWordBits(this, i), inputs(0).getSubNode(i), inputs(1).getSubNode(i))
           prevWithCarry = Op(op, backend.thisWordBits(this, i), prev, carry)
-          subnodes     += prevWithCarry
+          setSubNode(i, prevWithCarry)
         }
         Trunc(this)
       } else if (op == "*") {
@@ -575,10 +579,13 @@ class Op extends Node {
           w(j+m) = k
         }
         for (i <- 0 until (n*m)/2)
-          subnodes += RawCat(RawExtract(w(2*i), bph-1, 0), RawExtract(w(2*i+1), bph-1, 0))
+          setSubNode(i, RawCat(RawExtract(w(2*i), bph-1, 0), RawExtract(w(2*i+1), bph-1, 0)))
       } else 
         super.genSubNodes
     } else
       super.genSubNodes
+    for (i <- 0 until sn_depth) print("  ")
+    println("-> " + subnodes.length + " SUBNODES " + this)
+    sn_depth -= 1;
   }
 }

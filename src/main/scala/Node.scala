@@ -155,6 +155,13 @@ abstract class Node extends nameable{
     }
     sn(which)
   }
+
+  def setSubNode(i: Int, sub: Node): Unit = {
+    for (j <- subnodes.length to i) subnodes += null;
+    if (subnodes(i) == null)
+      subnodes(i) = sub
+  }
+
   def getSubNodes = {
     if (subnodes.isEmpty)
       genSubNodes

@@ -307,10 +307,10 @@ class Bits extends Data with proc {
       else
         subnode.init("", backend.thisWordBits(this, i), inputs(0).getSubNode(i))
       subnode.dir = dir
-      subnode.setName(name)
-      subnode.unnamed = unnamed
+      // subnode.setName(name)
+      // subnode.unnamed = unnamed
       if (subnode.width < 0) println("NEG BITS WIDTH " + subnode)
-      subnodes += subnode
+      setSubNode(i, subnode)
     }
     // println("BITS0 " + this)
   }

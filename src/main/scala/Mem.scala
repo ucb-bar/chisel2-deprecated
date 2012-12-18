@@ -88,8 +88,8 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
       val w = backend.thisWordBits(this, i)
       val m = new Mem(n, seqRead, () => Bits(width = w))
       m.width_ = w
-      // println("MEM WIDTH = " + m.width)
-      subnodes += m
+      println("MEM SUBNODE " + i + " " + m + " WIDTH = " + m.width)
+      setSubNode(i, m)
     }
   }
 }
@@ -146,7 +146,7 @@ class MemRead[T <: Data](mem: Mem[T], condi: Bool, addri: Bits) extends MemAcces
       val c = if (cond == null) condi else cond.getSubNode(0)
       val m = mem.getSubNode(i)
       val r = RawMemRead(m, c, addr.getSubNode(0)) // TODO: FILL OUT
-      subnodes += r
+      setSubNode(i, r)
       // println("MEM READ " + mem.name + " MEM-WIDTH " + m.width + " MEM-READ-WIDTH " + r.width + " " + i + " ADDR " + addr + " IS TYPE " + addr.isTypeNode)
     }
   }
@@ -234,8 +234,8 @@ class MemWrite[T <: Data](mem: Mem[T], condi: Bool, addri: Bits, datai: T, wmask
       for (i <- 0 until backend.words(this)) {
         val c = if (cond == null) cond else cond.getSubNode(i)
         val w = if (inputs.length == 4) wmask.getSubNode(i) else null
-        // println("MEM WRITE " + mem.name + " " + i)
-        subnodes += RawMemWrite(mem.getSubNode(i), c, addr.getSubNode(0), data.getSubNode(i), w) // TODO: FILL OUT
+        println("MEM WRITE SUBNODE " + mem.name + " " + i)
+        setSubNode(i, RawMemWrite(mem.getSubNode(i), c, addr.getSubNode(0), data.getSubNode(i), w)) // TODO: FILL OUT
       }
     }
   }

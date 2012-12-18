@@ -653,7 +653,7 @@ class CppBackend extends Backend {
             if(m.name != "reset" || !(m.component == c)) 
               m.name = m.component.getPathName + "__" + m.name;
           } 
-          // println("RENAME " + m + " NAME " + m.name + " SUBNODES " + m.subnodes.length)
+          // println("RENAME " + m + " NAME " + m.name + " SUBNODES " + m.subnodes.length + " ID " + m.hashCode)
           for (i <- 0 until m.subnodes.length) {
             val node = m.subnodes(i)
             node match {
@@ -664,8 +664,9 @@ class CppBackend extends Backend {
               case r: Mem[_] =>
                 node.setName(nodeName(m) + ":" + i)
               case any =>
-                node.setName(nodeName(m) + (if (node.isInObjectSubNode) (".values[" + i + "]") else ("__w" + i)))
-            // println("  SUBNODE NAME "+ m.subnodes(i).name + " ISINOBJECTSUBNODE " + node.isInObjectSubNode)
+                if (!node.named)
+                  node.setName(nodeName(m) + (if (node.isInObjectSubNode) (".values[" + i + "]") else ("__w" + i)))
+            // println("  SUBNODE NAME "+ m.subnodes(i).name + " ISINOBJECTSUBNODE " + node.isInObjectSubNode + " ID " + node.hashCode)
             }
           }
       }
@@ -734,14 +735,35 @@ class CppBackend extends Backend {
       c.findOrdering(); // search from roots  -- create omods
       cmods ++= c.omods
       for (cmod <- cmods) {
-        // println("CMOD " + cmod + " ISINOBJECT " + cmod.isInObject)
         cmod.getSubNodes
+        // println("CMOD " + cmod + " NAME " + cmod.name + " ISINOBJECT " + cmod.isInObject + " SUBNODES " + cmod.getSubNodes.length + " ID " + cmod.hashCode)
         if (cmod.isInObject) {
           for (s <- cmod.getSubNodes) {
+            // println("  ISINOBJECTSUBNODE TRUE " + s + " ID " + s.hashCode)
             s.isInObjectSubNode = true
           }
         }
       }
+      /*
+       * TODO: TRYING TO FIND PROBLEM WITH MISMATCH OF ISINOBJECT BETWEEN SUBNODE AND NODE
+      for (cmod <- cmods) {
+        if (!cmod.isInObject) {
+          var found = false;
+          println("CHECKING CMOD " + cmod + " NAME " + cmod.name + " ISINOBJECT " + cmod.isInObject + " SUBNODES " + cmod.getSubNodes.length)
+          for (s <- cmod.getSubNodes) {
+            println("  ISINOBJECTSUBNODE " + s.isInObjectSubNode + " " + s + " ID " + s.hashCode)
+            if (s.isInObjectSubNode)
+              found = true;
+          }
+          if (found) {
+            println("DEBUG " + cmod)
+            c.debug(cmod) // cmod.isInObject = true;
+            for (s <- cmod.getSubNodes) 
+              s.isInObjectSubNode = true;
+          }
+        }
+      }
+      */
       renameNodes(c, c.omods);
       c.omods.clear
       c.findSubNodeOrdering(); // search from roots  -- create omods

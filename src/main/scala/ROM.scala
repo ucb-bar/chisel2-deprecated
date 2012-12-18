@@ -36,7 +36,7 @@ class ROM[T <: Data](val lits: Seq[Literal], gen: () => T) extends Vec[T](gen) {
       val m = new ROM(sublits, () => Bits(width = w))
       // m.width_ = w // TODO: GET REAL WIDTH
       m.width_ = backend.wordBits
-      subnodes += m
+      setSubNode(i, m)
       println("  SUBROM WIDTH " + w)
     }
   }
@@ -65,7 +65,7 @@ class ROMRead[T <: Data](val rom: ROM[T], addri: Bits) extends Node {
     for (i <- 0 until backend.words(this)) {
       val m = rom.getSubNode(i)
       val r = RawROMRead(m, addr.getSubNode(0))
-      subnodes += r
+      setSubNode(i, r)
     }
     println("ROMREAD SUBNODE " + subnodes(0))
   }

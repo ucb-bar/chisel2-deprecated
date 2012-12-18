@@ -9,7 +9,7 @@ object FloLit {
 }
 class FloLiteral(val floValue: Float) extends Node {
   override val value: BigInt = floValue.toInt
-  override def genSubNodes = subnodes += new FloLiteral(floValue)
+  override def genSubNodes = setSubNode(0, new FloLiteral(floValue))
 }
 
 object Flo {

@@ -108,7 +108,7 @@ class Mux extends Op {
     // println("MUX0 " + this + " " + subnodes.length + " -> " + backend.words(this))
     val (t, c, a) = (inputs(0), inputs(1), inputs(2))
     for (i <- 0 until backend.words(this)) 
-      subnodes += new Mux()
+      setSubNode(i, new Mux())
     for (i <- 0 until backend.words(this)) 
       subnodes(i).init("", backend.thisWordBits(this, i), t.getSubNode(0), c.getSubNode(i), a.getSubNode(i))
     // println("MUX1 " + this + " " + subnodes.length)

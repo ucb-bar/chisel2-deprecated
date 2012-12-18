@@ -64,7 +64,7 @@ class Fill extends Node {
   override def genSubNodes = {
     val bpw = backend.wordBits;
     for (i <- 0 until backend.words(this)) {
-      subnodes += (if (inputs(0).isLit) Literal(0L - inputs(0).value.toInt) else Op("-", bpw, inputs(0).getSubNode(0)))
+      setSubNode(i, (if (inputs(0).isLit) Literal(0L - inputs(0).value.toInt) else Op("-", bpw, inputs(0).getSubNode(0))))
     }
     Trunc(this)
   }
