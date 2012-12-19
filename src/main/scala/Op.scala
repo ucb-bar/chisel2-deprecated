@@ -102,7 +102,7 @@ object LogicalOp {
 
 object ReductionOp {
   def apply[T <: Data](x: T, op: String)(gen: => T): Bool = {
-    println("REDUCTION OP " + op)
+    // println("REDUCTION OP " + op)
     val node = op match {
       case "&" => Op("&",  1, fixWidth(1), x);
       case "|" => Op("|",  1, fixWidth(1), x);
@@ -359,8 +359,8 @@ class Op extends Node {
   override def genSubNodes: Unit = {
     val bpw = backend.wordBits;
     sn_depth += 1;
-    for (i <- 0 until sn_depth) print("  ")
-    println("EXPAND SUBWORDS " + this + " EXISTING SUBWORDS " + subnodes.length)
+    // for (i <- 0 until sn_depth) print("  ")
+    // println("EXPAND SUBWORDS " + this + " EXISTING SUBWORDS " + subnodes.length)
     if (inputs.length == 1) {
       val maxWordWidth = 
       if (op == "!") {
@@ -584,8 +584,8 @@ class Op extends Node {
         super.genSubNodes
     } else
       super.genSubNodes
-    for (i <- 0 until sn_depth) print("  ")
-    println("-> " + subnodes.length + " SUBNODES " + this)
+    // for (i <- 0 until sn_depth) print("  ")
+    // println("-> " + subnodes.length + " SUBNODES " + this)
     sn_depth -= 1;
   }
 }

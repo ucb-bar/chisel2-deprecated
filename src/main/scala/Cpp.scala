@@ -25,7 +25,8 @@ class CppBackend extends Backend {
   var isSubNodes = true
   override def emitTmp(node: Node): String = {
     // require(false)
-    if (node.isInObject || node.isInObjectSubNode)
+    // exclude putting subnodes in object if not parent in object
+    if ((node.isInObject || node.isInObjectSubNode) && !(node.isSubNode && node.isInObject && !node.isInObjectSubNode))
       emitRef(node)
     else
       "val_t " + emitRef(node)
@@ -149,10 +150,10 @@ class CppBackend extends Backend {
     parts(0) + ".get(" + emitRef(addr) + ", " + parts(1) + ")";
   }
 
-  def emitMemPut(mem: Mem[_], addr: Node, data: Node): String = {
+  def emitMemPut(mem: Mem[_], addr: Node, data: String): String = {
     val ref   = emitRef(mem);
     val parts = ref.split(":");
-    parts(0) + ".put(" + emitRef(addr) + ", " + parts(1) + ", " + emitRef(data) + ")";
+    parts(0) + ".put(" + emitRef(addr) + ", " + parts(1) + ", " + data + ")";
   }
 
   def emitRomGet(mem: ROM[_], addr: Node): String = {
@@ -266,9 +267,9 @@ class CppBackend extends Backend {
           return ""
         var res = "  if (" + emitRef(m.cond) + ") {\n"
         if (m.isMasked)
-          res += "    " + emitMemPut(m.mem, m.addr, m.data) + " & " + emitRef(m.wmask) + ") | (" + emitMemGet(m.mem, m.addr) + ") & ~" + emitRef(m.wmask) + "));\n"
+          res += "    " + emitMemPut(m.mem, m.addr, ("((" + emitRef(m.data) + " & " + emitRef(m.wmask) + ") | (" + emitMemGet(m.mem, m.addr) + " & ~" + emitRef(m.wmask) + "))")) + ";\n"
         else
-          res += "    " + emitMemPut(m.mem, m.addr, m.data) + ";\n"
+          res += "    " + emitMemPut(m.mem, m.addr, emitRef(m.data)) + ";\n"
         res += "  }\n"
         res
 
@@ -666,7 +667,7 @@ class CppBackend extends Backend {
               case any =>
                 if (!node.named)
                   node.setName(nodeName(m) + (if (node.isInObjectSubNode) (".values[" + i + "]") else ("__w" + i)))
-            // println("  SUBNODE NAME "+ m.subnodes(i).name + " ISINOBJECTSUBNODE " + node.isInObjectSubNode + " ID " + node.hashCode)
+            // println("  SUBNODE NAME "+ node.name + " ISINOBJECTSUBNODE " + node.isInObjectSubNode + " ID " + node.hashCode)
             }
           }
       }

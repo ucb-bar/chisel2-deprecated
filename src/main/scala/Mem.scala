@@ -88,7 +88,7 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
       val w = backend.thisWordBits(this, i)
       val m = new Mem(n, seqRead, () => Bits(width = w))
       m.width_ = w
-      println("MEM SUBNODE " + i + " " + m + " WIDTH = " + m.width)
+      // println("MEM SUBNODE " + i + " " + m + " WIDTH = " + m.width)
       setSubNode(i, m)
     }
   }
@@ -142,7 +142,7 @@ class MemRead[T <: Data](mem: Mem[T], condi: Bool, addri: Bits) extends MemAcces
   override def getPortType: String = if (isSequential) "read" else "cread"
 
   override def genSubNodes: Unit = {
-    for (i <- 0 until backend.words(this)) {
+    for (i <- 0 until backend.words(mem)) {
       val c = if (cond == null) condi else cond.getSubNode(0)
       val m = mem.getSubNode(i)
       val r = RawMemRead(m, c, addr.getSubNode(0)) // TODO: FILL OUT
@@ -231,10 +231,10 @@ class MemWrite[T <: Data](mem: Mem[T], condi: Bool, addri: Bits, datai: T, wmask
 
   override def genSubNodes: Unit = {
     if (inputs.length > 2) {
-      for (i <- 0 until backend.words(this)) {
+      for (i <- 0 until backend.words(mem)) {
         val c = if (cond == null) cond else cond.getSubNode(i)
         val w = if (inputs.length == 4) wmask.getSubNode(i) else null
-        println("MEM WRITE SUBNODE " + mem.name + " " + i)
+        // println("MEM WRITE SUBNODE " + mem.name + " " + i)
         setSubNode(i, RawMemWrite(mem.getSubNode(i), c, addr.getSubNode(0), data.getSubNode(i), w)) // TODO: FILL OUT
       }
     }
