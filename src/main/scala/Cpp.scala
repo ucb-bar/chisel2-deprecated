@@ -654,7 +654,7 @@ class CppBackend extends Backend {
             if(m.name != "reset" || !(m.component == c)) 
               m.name = m.component.getPathName + "__" + m.name;
           } 
-          println("RENAME " + m + " NAME " + m.name + " SUBNODES " + m.subnodes.length + " ID " + m.hashCode)
+          // println("RENAME " + m + " NAME " + m.name + " SUBNODES " + m.subnodes.length + " ID " + m.hashCode)
           for (i <- 0 until m.subnodes.length) {
             val node = m.subnodes(i)
             node match {
@@ -667,7 +667,7 @@ class CppBackend extends Backend {
               case any =>
                 // println("  SUBNODE " + node + " SUBNODE-NAME " + node.name + " NODE " + m.name + " SUBNODE-NODE " + node.subnodeNode)
                 node.setName(nodeName(node.subnodeNode) + (if (node.isInObjectSubNode) (".values[" + i + "]") else ("__w" + i)))
-            println("  SUBNODE NAME "+ node.name + " ISINOBJECTSUBNODE " + node.isInObjectSubNode + " ID " + node.hashCode)
+            // println("  SUBNODE NAME "+ node.name + " ISINOBJECTSUBNODE " + node.isInObjectSubNode + " ID " + node.hashCode)
             }
           }
       }
@@ -737,7 +737,7 @@ class CppBackend extends Backend {
       cmods ++= c.omods
       for (cmod <- c.omods) {
         cmod.getSubNodes
-        println("CMOD " + cmod + " NAME " + cmod.name + " ISINOBJECT " + cmod.isInObject + " SUBNODES " + cmod.getSubNodes.length + " ID " + cmod.hashCode)
+        // println("CMOD " + cmod + " NAME " + cmod.name + " ISINOBJECT " + cmod.isInObject + " SUBNODES " + cmod.getSubNodes.length + " ID " + cmod.hashCode)
         if (cmod.isInObject) {
           for (s <- cmod.getSubNodes) {
             // println("  ISINOBJECTSUBNODE TRUE " + s + " ID " + s.hashCode)
