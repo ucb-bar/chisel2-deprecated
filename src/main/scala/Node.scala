@@ -106,6 +106,7 @@ abstract class Node extends nameable{
   var isPrintArg = false
   var isInObjectSubNode = false
   var isSubNode = false
+  var subnodeNode: Node = null
   def isMemOutput = false
   
   nodes += this
@@ -156,15 +157,37 @@ abstract class Node extends nameable{
     sn(which)
   }
 
+  def isSubNodeLeaf: Boolean =
+    isInstanceOf[Bits] || isInstanceOf[Reg]
+
   def setSubNode(i: Int, sub: Node): Unit = {
     for (j <- subnodes.length to i) subnodes += null;
     if (subnodes(i) == null)
       subnodes(i) = sub
+    val subnode = subnodes(i)
+    // if (isInstanceOf[Extract])
+    //   println("SET-SUB-NODE-" + i + " NODE " + this + " SUB-NODE-NODE " + subnode.subnodeNode + " ID " + hashCode)
+    if (subnode.subnodeNode == null && isSubNodeLeaf == subnode.isSubNodeLeaf)
+      subnodes(i).subnodeNode = this
+    // else
+      // if (isInstanceOf[Extract])
+      //   println("    FAIL SUB-NODE-" + i + " " + subnode + " SUB-NODE-NODE " + subnode.subnodeNode + " IS-SUB-NODE-LEAF " + isSubNodeLeaf + " SUB-NODE-IS_SUB-NODE-LEAF " + subnode.isSubNodeLeaf + " ID " + hashCode)
+      
   }
 
   def getSubNodes = {
+    // if (isInstanceOf[Extract]) 
+    //   println("  GET-SUB-NODES EXTRACT " + this + " " + subnodes.length + " ID " + hashCode)
     if (subnodes.isEmpty)
       genSubNodes
+    /*
+    if (isInstanceOf[Extract]) {
+      println("    " + subnodes.length + " [")
+      for (i <- 0 until subnodes.length) 
+        println("    SUB-NODE-" + i + " " + subnodes(i) + " SUBNODE-NODE " + subnodes(i).subnodeNode + " ID " + subnodes(i).hashCode)
+      println("    ]")
+    }
+    */
     subnodes
   }
   def genSubNodes: Unit = {
@@ -232,7 +255,8 @@ abstract class Node extends nameable{
   }
   def isInObject = 
     (isIo && (isIoDebug || component == topComponent)) || 
-    (topComponent.debugs.contains(this) && named) || 
+    (topComponent.debugs.contains(this)) || 
+    // (topComponent.debugs.contains(this) && named) || 
     isReg || isUsedByRam || isDebug || isPrintArg || isScanArg;
   def isInVCD = (isIo && isInObject) || isReg || (isDebug && named);
   def dotName = { val name = this.getClass.getName; name.substring(7, name.size) };

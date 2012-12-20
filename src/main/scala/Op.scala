@@ -316,7 +316,7 @@ object Trunc {
     val nfw = backend.fullWords(x)
     if (nw != nfw) {
       val w = (x.width-bpw*nfw)
-      x.subnodes(nw-1) = Op("&", w, x.getSubNode(nw-1), Literal((1L << w)-1, w))
+      x.setSubNode(nw-1, Op("&", w, x.getSubNode(nw-1), Literal((1L << w)-1, w)))
     }
   }
 }    
@@ -465,13 +465,13 @@ class Op extends Node {
             setSubNode(i, Op("|", bpw, x, c))
             if (isSigned) {
               println("SIGNED")
-              subnodes(i) = Op("|", bpw, subnodes(i),
-                               Op("|", bpw, Mask(Op(">", 1, Literal((i+1)*bpw), revAmount), fill), // last word?
-                                  Mask(Op(">=", 1, Literal(i*bpw), revAmount), msb)))              // mid words
+              setSubNode(i, Op("|", bpw, subnodes(i),
+                              Op("|", bpw, Mask(Op(">", 1, Literal((i+1)*bpw), revAmount), fill), // last word?
+                                 Mask(Op(">=", 1, Literal(i*bpw), revAmount), msb))))             // mid words
             }
           }
           if (isSigned) {
-            subnodes(nWords-1) = Op("|", bpw, subnodes(nWords-1), Mask(Op(">", 1, Literal(bpw), revAmount), fill))
+            setSubNode(nWords-1, Op("|", bpw, subnodes(nWords-1), Mask(Op(">", 1, Literal(bpw), revAmount), fill)))
             Trunc(this)
           }
         }
