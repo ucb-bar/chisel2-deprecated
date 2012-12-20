@@ -299,12 +299,12 @@ object Op {
   }
   def apply (op: String, width: Int, a: Node): Node = {
     val res = Op(op, 0, fixWidth(width), a)
-    res.width = width
+    res.width_ = width
     res
   }
   def apply (op: String, width: Int, a: Node, b: Node): Node = {
     val res = Op(op, 0, fixWidth(width), a, b)
-    res.width = width
+    res.width_ = width
     res
   }
 }
@@ -431,12 +431,12 @@ class Op extends Node {
         if (width <= bpw) {
           if (isSigned) {
             val x = Op("<<", bpw, inputs(0).getSubNode(0), Literal(bpw - inputs(0).width));  x.isSigned = true;
-            setSubNode(0, Op(">>", bpw, x, Op("+", bpw, Literal(bpw - inputs(0).width), inputs(1).getSubNode(0))))
+            setSubNode(0, Op(">>", width, x, Op("+", bpw, Literal(bpw - inputs(0).width), inputs(1).getSubNode(0))))
             Trunc(this)
           } else 
             setSubNode(0, Op(">>", width, inputs(0).getSubNode(0), inputs(1).getSubNode(0)))
         } else {
-          println(">> IS SIGNED " + isSigned)
+          // println(">> IS SIGNED " + isSigned)
           val amount        = inputs(1).getSubNode(0)
           val revAmount     = Op("-", bpw, Literal(width-1), amount)
           var carry         = Literal(0)
@@ -464,7 +464,7 @@ class Op extends Node {
             val c     = Multiplex(isZeroCarry, Literal(0), Op("<<", bpw, lookups(i+1), nRevShiftBits)) 
             setSubNode(i, Op("|", bpw, x, c))
             if (isSigned) {
-              println("SIGNED")
+              // println("SIGNED")
               setSubNode(i, Op("|", bpw, subnodes(i),
                               Op("|", bpw, Mask(Op(">", 1, Literal((i+1)*bpw), revAmount), fill), // last word?
                                  Mask(Op(">=", 1, Literal(i*bpw), revAmount), msb))))             // mid words
@@ -566,7 +566,7 @@ class Op extends Node {
           v(2*i+1) = RawExtract(inputs(1).getSubNode(i), bpw-1, bph);
         }
         val w = new Array[Node](n*m+1);
-        println("W SIZE " + w.length)
+        // println("W SIZE " + w.length)
         for (i <- 0 until n*m) w(i) = Literal(0);
         for (j <- 0 until n) {
           var k: Node = Literal(0);
@@ -575,7 +575,7 @@ class Op extends Node {
             w(i+j) = t;
             k = Op(">>", bpw, t, bph);
           }
-          println("J " + j + " M " + m)
+          // println("J " + j + " M " + m)
           w(j+m) = k
         }
         for (i <- 0 until (n*m)/2)

@@ -150,17 +150,18 @@ class Extract extends Node {
         setSubNode(0, RawExtract(word, nShiftBits, nShiftBits, 1))
       }
     } else {
-      val rsh = inputs(2).value.toInt
+      val rsh = lo.litOf.value.toInt
       if (rsh % bpw == 0) {
         for (i <- 0 until backend.words(this))
           setSubNode(i, inputs(0).getSubNode(i + rsh/bpw))
         Trunc(this)
       } else {
         for (i <- 0 until backend.words(this)) {
-          val lh = Op(">>", bpw, inputs(0).getSubNode(i + rsh/bpw), Literal(rsh%bpw))
-          if (i + rsh/bpw + 1 < backend.words(inputs(0)))
-            setSubNode(i, Op("|", bpw, lh, Op("<<", bpw, inputs(0).getSubNode(i + rsh/bpw + 1), Literal(bpw - rsh%bpw))))
-          else
+          val rshi = rsh%bpw
+          val lh = Op(">>", bpw-rshi, inputs(0).getSubNode(i + rsh/bpw), Literal(rshi))
+          if (i + rsh/bpw + 1 < backend.words(inputs(0))) {
+            setSubNode(i, Op("|", bpw, lh, Op("<<", bpw, inputs(0).getSubNode(i + rsh/bpw + 1), Literal(bpw - rshi))))
+          } else
             setSubNode(i, lh)
         }
         Trunc(this)

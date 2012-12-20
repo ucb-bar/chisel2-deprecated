@@ -162,7 +162,7 @@ abstract class Node extends nameable{
 
   def setSubNode(i: Int, sub: Node): Unit = {
     for (j <- subnodes.length to i) subnodes += null;
-    if (subnodes(i) == null)
+    // if (isForce || subnodes(i) == null)
       subnodes(i) = sub
     val subnode = subnodes(i)
     // if (isInstanceOf[Extract])

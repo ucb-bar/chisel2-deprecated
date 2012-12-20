@@ -50,6 +50,6 @@ abstract class Data extends Node {
     else
       super.name_it(path, setNamed);
   }
-  def setWidth(w: Int) = this.width = w;
+  def setWidth(w: Int) = this.width_ = w;
 }
 
