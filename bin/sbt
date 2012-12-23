@@ -1,3 +1,3 @@
-#!/bin/bash
+#!/bin/sh
 
 java -XX:MaxGCPauseMillis=100 -XX:+UseConcMarkSweepGC -noverify -XX:ReservedCodeCacheSize=64M -noverify -Xss2M -Xmx4G -XX:MaxPermSize=3G -jar `dirname $0`/sbt-launch-0.12.0-RC1.jar "$@"
