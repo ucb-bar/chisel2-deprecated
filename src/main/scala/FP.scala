@@ -2,6 +2,8 @@ package Chisel
 import Node._
 import ChiselError._
 
+/// FLO
+
 object FloLit {
   def apply(x: Float) = {
     (new FloLiteral(x)).setTypeNode(new Flo())
@@ -69,6 +71,76 @@ class Flo extends Num {
   def >= (b: Flo): Bool = LogicalOp(this, b, "f>="){Flo()};
 }
 
+/// DBL
+
+object DblLit {
+  def apply(x: Double) = {
+    (new DblLiteral(x)).setTypeNode(new Dbl())
+  }
+}
+class DblLiteral(val dblValue: Double) extends Node {
+  override val value: BigInt = dblValue.toInt
+  override def genSubNodes = setSubNode(0, new DblLiteral(dblValue))
+}
+
+object Dbl {
+
+  def apply(x: Float): Dbl = DblLit(x.toDouble);
+  def apply(x: Double): Dbl = DblLit(x);
+  
+  def apply(dir: IODirection = null): Dbl = {
+    val res = new Dbl();
+    res.dir = dir;
+    res.init("", fixWidth(64))
+    res
+  }
+}
+
+class Dbl extends Num {
+  setIsSigned
+
+  override def setIsTypeNode = {inputs(0).setIsSigned; super.setIsTypeNode}
+
+  type T = Dbl;
+  override def fromNode(n: Node) = {
+    val res = Dbl(OUTPUT).asInstanceOf[this.type]; 
+    res assign n; 
+    res};
+
+  private def colonEqual(src: Dbl) = {
+    if(comp != null)
+      comp procAssign src.toNode;
+    else
+      this procAssign src.toNode;
+  }
+
+  override def :=[T <: Data](src: T): Unit = {
+    src match {
+      case dbl: Dbl => 
+        this := dbl;
+      case any => 
+	ChiselErrors += ChiselError(":= not defined on " + this.getClass + " and " + src.getClass, Thread.currentThread().getStackTrace)
+    }
+  }
+
+  def :=(src: Dbl)  = colonEqual(src);
+
+  def gen[T <: Num](): T = Dbl().asInstanceOf[T];
+
+  override def unary_-(): Dbl = UnaryOp(this, "d-"){Dbl()};
+  def +  (b: Dbl): Dbl = BinaryOp(this, b, "d+"){Dbl()};
+  def -  (b: Dbl): Dbl = BinaryOp(this, b, "d-"){Dbl()};
+  def *  (b: Dbl): Dbl = { println("B " + b); BinaryOp(this, b, "d*"){Dbl()}; }
+  def /  (b: Dbl): Dbl = BinaryOp(this, b, "d/"){Dbl()};
+  def ===(b: Dbl): Bool = LogicalOp(this, b, "d=="){Dbl()};
+  def != (b: Dbl): Bool = LogicalOp(this, b, "d!="){Dbl()};
+  def >  (b: Dbl): Bool = LogicalOp(this, b, "d>"){Dbl()};
+  def <  (b: Dbl): Bool = LogicalOp(this, b, "d<"){Dbl()};
+  def <= (b: Dbl): Bool = LogicalOp(this, b, "d<="){Dbl()};
+  def >= (b: Dbl): Bool = LogicalOp(this, b, "d>="){Dbl()};
+}
+
 object Sin {
   def apply (x: Flo) = UnaryOp(x, "fsin"){Flo()};
+  def apply (x: Dbl) = UnaryOp(x, "dsin"){Dbl()};
 }

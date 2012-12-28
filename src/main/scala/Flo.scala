@@ -49,8 +49,8 @@ class FloBackend extends Backend {
         (if (o.inputs.length == 1) {
           o.op match {
             case "~" => "not " + emitRef(node.inputs(0))
-            case "-" => "neg " + emitRef(node.inputs(0))
             case "!" => "not " + emitRef(node.inputs(0))
+            case "-" => "neg " + emitRef(node.inputs(0))
           }
          } else {
            o.op match {
@@ -124,7 +124,7 @@ class FloBackend extends Backend {
             m.getSubNodes
             // println("RENAME " + m + " NAME " + m.name + " SUBNODES " + m.subnodes.length)
             for (i <- 0 until m.subnodes.length) {
-              m.subnodes(i).setName(nodeName(m) + (if (m.subnodes.length > 1) ("__s" + i) else ""))
+              m.subnodes(i).setName(nodeName(m.subnodes(i).subnodeNode) + (if (m.subnodes.length > 1) ("__s" + i) else ""))
               // println("  SUBNODE NAME "+ m.subnodes(i).name)
             }
           }

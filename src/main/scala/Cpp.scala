@@ -22,7 +22,7 @@ object CListLookup {
 }
 
 class CppBackend extends Backend {
-  var isSubNodes = true
+  var isSubNodes = false
   override def emitTmp(node: Node): String = {
     // require(false)
     // exclude putting subnodes in object if not parent in object
@@ -70,6 +70,8 @@ class CppBackend extends Backend {
         }
         case l: FloLiteral => 
           "fromFloat(" + l.floValue + ")"
+        case l: DblLiteral => 
+          "fromDouble(" + l.dblValue + ")"
         case _ => {
           if (x.isInObject)
             emitRef(x) + ".values[" + w + "]"
@@ -97,6 +99,7 @@ class CppBackend extends Backend {
       case x: Literal => ""
       case x: Lit => ""
       case x: FloLiteral => ""
+      case x: DblLiteral => ""
       case x: ListNode => ""
       case x: MapNode => ""
       case x: LookupMap => ""
@@ -169,6 +172,7 @@ class CppBackend extends Backend {
       case x: Literal => ""
       case x: Lit => ""
       case x: FloLiteral => ""
+      case x: DblLiteral => ""
       case x: ListNode => ""
       case x: MapNode => ""
       case x: LookupMap => ""
@@ -342,6 +346,10 @@ class CppBackend extends Backend {
             "  " + emitLoWordRef(o) + " = fromFloat(-(toFloat(" + emitLoWordRef(o.inputs(0)) + "));\n"
           else if (o.op == "fsin")
             "  " + emitLoWordRef(o) + " = fromFloat(sin(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "d-")
+            "  " + emitLoWordRef(o) + " = fromDouble(-(toDouble(" + emitLoWordRef(o.inputs(0)) + "));\n"
+          else if (o.op == "dsin")
+            "  " + emitLoWordRef(o) + " = fromDouble(sin(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
           else {
             assert(false)
             ""
@@ -442,23 +450,41 @@ class CppBackend extends Backend {
           val subsequent = (i: String, a: String, b: String) => "(" + i + ") | (" + a + " != " + b + ")"
           "  " + emitLoWordRef(o) + " = " + opFoldLeft(o, initial, subsequent) + ";\n"
         } else if (o.op == "f-") {
-            "  " + emitLoWordRef(o) + " = fromFloat(toFloat(" + emitLoWordRef(o.inputs(0)) + ") - toFloat(" + emitLoWordRef(o.inputs(1)) + "));\n"
+            "  " + emitLoWordRef(o) + " = fromDouble(toDouble(" + emitLoWordRef(o.inputs(0)) + ") - toDouble(" + emitLoWordRef(o.inputs(1)) + "));\n"
         } else if (o.op == "f+") {
-            "  " + emitLoWordRef(o) + " = fromFloat(toFloat(" + emitLoWordRef(o.inputs(0)) + ") + toFloat(" + emitLoWordRef(o.inputs(1)) + "));\n"
+            "  " + emitLoWordRef(o) + " = fromDouble(toDouble(" + emitLoWordRef(o.inputs(0)) + ") + toDouble(" + emitLoWordRef(o.inputs(1)) + "));\n"
         } else if (o.op == "f*") {
-            "  " + emitLoWordRef(o) + " = fromFloat(toFloat(" + emitLoWordRef(o.inputs(0)) + ") * toFloat(" + emitLoWordRef(o.inputs(1)) + "));\n"
+            "  " + emitLoWordRef(o) + " = fromDouble(toDouble(" + emitLoWordRef(o.inputs(0)) + ") * toDouble(" + emitLoWordRef(o.inputs(1)) + "));\n"
         } else if (o.op == "f/") {
-            "  " + emitLoWordRef(o) + " = fromFloat(toFloat(" + emitLoWordRef(o.inputs(0)) + ") / toFloat(" + emitLoWordRef(o.inputs(1)) + "));\n"
+            "  " + emitLoWordRef(o) + " = fromDouble(toDouble(" + emitLoWordRef(o.inputs(0)) + ") / toDouble(" + emitLoWordRef(o.inputs(1)) + "));\n"
         } else if (o.op == "f==") {
-            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") == toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") == toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "f!=") {
-            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") != toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") != toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "f>") {
-            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") > toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") > toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "f<=") {
-            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") <= toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") <= toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "f>=") {
-            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") >= toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") >= toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d-") {
+            "  " + emitLoWordRef(o) + " = fromDouble(toDouble(" + emitLoWordRef(o.inputs(0)) + ") - toDouble(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "d+") {
+            "  " + emitLoWordRef(o) + " = fromDouble(toDouble(" + emitLoWordRef(o.inputs(0)) + ") + toDouble(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "d*") {
+            "  " + emitLoWordRef(o) + " = fromDouble(toDouble(" + emitLoWordRef(o.inputs(0)) + ") * toDouble(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "d/") {
+            "  " + emitLoWordRef(o) + " = fromDouble(toDouble(" + emitLoWordRef(o.inputs(0)) + ") / toDouble(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "d==") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") == toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d!=") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") != toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d>") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") > toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d<=") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") <= toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d>=") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") >= toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else {
           require(false)
           ""
@@ -648,6 +674,7 @@ class CppBackend extends Backend {
       m match {
         case l: Literal => ;
         case l: FloLiteral => ;
+        case l: DblLiteral => ;
         case any        => 
           if (m.name != "" && !(m == c.reset) && !(m.component == null)) {
             // only modify name if it is not the reset signal or not in top component
@@ -660,6 +687,7 @@ class CppBackend extends Backend {
             node match {
               case l: Literal => ;
               case l: FloLiteral => ;
+              case l: DblLiteral => ;
               case r: ROM[_] =>
                 node.setName(nodeName(m) + ":" + i)
               case r: Mem[_] =>
@@ -748,15 +776,16 @@ class CppBackend extends Backend {
       // TODO: TRYING TO FIND PROBLEM WITH MISMATCH OF ISINOBJECT BETWEEN SUBNODE AND NODE
       for (cmod <- cmods) {
         if (!cmod.isInObject) {
-          var found = false;
+          var found: Node = null;
           // println("CHECKING CMOD " + cmod + " NAME " + cmod.name + " ISINOBJECT " + cmod.isInObject + " SUBNODES " + cmod.getSubNodes.length)
           for (s <- cmod.getSubNodes) {
             // println("  ISINOBJECTSUBNODE " + s.isInObjectSubNode + " " + s + " ID " + s.hashCode)
-            if (s.isInObjectSubNode)
-              found = true;
+            // if (s.isInObjectSubNode && !s.isSubNodeLeaf)
+            if (s.isInObjectSubNode && !s.subnodeNode.isInObject)
+              found = s;
           }
-          if (found) {
-            println("DEBUG " + cmod)
+          if (found != null) {
+            println("DEBUG " + cmod + " SUBNODE " + found + " SUBNODE-NODE " + found.subnodeNode)
             c.debug(cmod) // cmod.isInObject = true;
             for (s <- cmod.getSubNodes) 
               s.isInObjectSubNode = true;
