@@ -28,8 +28,12 @@ object UnaryOp {
     case "!"  => Op("!",  1, fixWidth(1), x);
     case "f-" => Op("f-", 1, fixWidth(32), x);
     case "fsin" => Op("fsin", 1, fixWidth(32), x);
+    case "fcos" => Op("fcos", 1, fixWidth(32), x);
+    case "flog" => Op("flog", 1, fixWidth(32), x);
     case "d-" => Op("d-", 1, fixWidth(64), x);
     case "dsin" => Op("dsin", 1, fixWidth(64), x);
+    case "dcos" => Op("dcos", 1, fixWidth(64), x);
+    case "dlog" => Op("dlog", 1, fixWidth(64), x);
     case any => null;
     }
     node.setTypeNode(gen.asOutput)
@@ -64,10 +68,12 @@ object BinaryOp {
       case "f-"  => Op("f-", 2, fixWidth(32), x, y );
       case "f*"  => Op("f*", 0, fixWidth(32), x, y );
       case "f/"  => Op("f/", 0, fixWidth(32), x, y );
+      case "fpow"  => Op("fpow", 0, fixWidth(64), x, y );
       case "d+"  => Op("d+", 2, fixWidth(64), x, y );
       case "d-"  => Op("d-", 2, fixWidth(64), x, y );
       case "d*"  => Op("d*", 0, fixWidth(64), x, y );
       case "d/"  => Op("d/", 0, fixWidth(64), x, y );
+      case "dpow"  => Op("dpow", 0, fixWidth(64), x, y );
       case any   => null;
     }
     node.setTypeNode(gen.asOutput)

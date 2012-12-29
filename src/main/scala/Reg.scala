@@ -23,7 +23,7 @@ object Reg {
   // Rule: if r is using an inferred width, then don't enforce a width. If it is using a user inferred
   // width, set the the width
   def regWidth(r: Node) = {
-    if (r.litOf.hasInferredWidth)
+    if (r.litOf != null && r.litOf.hasInferredWidth)
       regMaxWidth _
     else
       fixWidth(r.getWidth)

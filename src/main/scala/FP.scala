@@ -12,6 +12,7 @@ object FloLit {
 class FloLiteral(val floValue: Float) extends Node {
   override val value: BigInt = floValue.toInt
   override def genSubNodes = setSubNode(0, new FloLiteral(floValue))
+  inferWidth = fixWidth(32)
 }
 
 object Flo {
@@ -81,6 +82,7 @@ object DblLit {
 class DblLiteral(val dblValue: Double) extends Node {
   override val value: BigInt = dblValue.toInt
   override def genSubNodes = setSubNode(0, new DblLiteral(dblValue))
+  inferWidth = fixWidth(64)
 }
 
 object Dbl {
@@ -143,4 +145,14 @@ class Dbl extends Num {
 object Sin {
   def apply (x: Flo) = UnaryOp(x, "fsin"){Flo()};
   def apply (x: Dbl) = UnaryOp(x, "dsin"){Dbl()};
+}
+
+object Log {
+  def apply (x: Flo) = UnaryOp(x, "flog"){Flo()};
+  def apply (x: Dbl) = UnaryOp(x, "dlog"){Dbl()};
+}
+
+object Pow {
+  def apply (x: Flo, y: Flo) = BinaryOp(x, y, "fpow"){Flo()};
+  def apply (x: Dbl, y: Dbl) = BinaryOp(x, y, "dpow"){Dbl()};
 }
