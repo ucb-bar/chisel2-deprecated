@@ -100,6 +100,12 @@ object LogicalOp {
         case "f<"  => Op("f<",  2, fixWidth(1), x, y );
         case "f<=" => Op("f<=", 2, fixWidth(1), x, y );
         case "f>=" => Op("f>=", 2, fixWidth(1), x, y );
+        case "d==" => Op("d==", 2, fixWidth(1), x, y );
+        case "d!=" => Op("d!=", 2, fixWidth(1), x, y );
+        case "d>"  => Op("d>",  2, fixWidth(1), x, y );
+        case "d<"  => Op("d<",  2, fixWidth(1), x, y );
+        case "d<=" => Op("d<=", 2, fixWidth(1), x, y );
+        case "d>=" => Op("d>=", 2, fixWidth(1), x, y );
         case any   => null;
       }
 
