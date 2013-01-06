@@ -23,10 +23,15 @@ class FPGABackend extends VerilogBackend
     }
   }
 
+  override def emitReg(node: Node): String = node match {
+    case m: MemWrite[_] => ""
+    case _ => super.emitReg(node)
+  }
+
   override def emitDef(node: Node): String = {
     node match {
       case m: MemRead[_] =>
-        if (Component.isInlineMem && !m.isSequential)
+        if (!m.isSequential)
           "  assign " + emitTmp(node) + " = " + writeMap(m.mem).map(_ + "[" + emitRef(m.addr) + "]").reduceLeft(_+" ^ "+_) + ";\n"
         else
           ""
