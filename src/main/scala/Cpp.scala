@@ -434,7 +434,7 @@ class CppBackend extends Backend {
           }
         } else if (o.op == "##") {
           val lsh = o.inputs(1).width
-          println("LSH " + lsh + " INPUTS1 " + o.inputs(1))
+          // println("LSH " + lsh + " INPUTS1 " + o.inputs(1))
           block((0 until fullWords(o.inputs(1))).map(i => emitWordRef(o, i) + " = " + emitWordRef(o.inputs(1), i)) ++
                 (if (lsh % bpw != 0) List(emitWordRef(o, fullWords(o.inputs(1))) + " = " + emitWordRef(o.inputs(1), fullWords(o.inputs(1))) + " | " + emitLoWordRef(o.inputs(0)) + " << " + (lsh % bpw)) else List()) ++
                 (words(o.inputs(1)) until words(o)).map(i => emitWordRef(o, i) + " = " + emitWordRef(o.inputs(0), (bpw*i-lsh)/bpw) + (if (lsh % bpw != 0) " >> " + (bpw - lsh % bpw) + (if ((bpw*i-lsh)/bpw+1 < words(o.inputs(0))) " | " + emitWordRef(o.inputs(0), (bpw*i-lsh)/bpw+1) + " << " + (lsh%bpw) else "") else "")))
@@ -467,7 +467,7 @@ class CppBackend extends Backend {
         } else if (o.op == "f/") {
             "  " + emitLoWordRef(o) + " = fromFloat(toFloat(" + emitLoWordRef(o.inputs(0)) + ") / toFloat(" + emitLoWordRef(o.inputs(1)) + "));\n"
         } else if (o.op == "fpow") {
-            "  " + emitLoWordRef(o) + " = fromFloat(pow(toFloat(" + emitLoWordRef(o.inputs(0)) + "), toFloat(" + emitLoWordRef(o.inputs(1)) + ")));\n"
+            "  " + emitLoWordRef(o) + " = fromFloat(pow(toFloat(" + emitLoWordRef(o.inputs(1)) + "), toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
         } else if (o.op == "f==") {
             "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") == toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "f!=") {
@@ -487,7 +487,7 @@ class CppBackend extends Backend {
         } else if (o.op == "d/") {
             "  " + emitLoWordRef(o) + " = fromDouble(toDouble(" + emitLoWordRef(o.inputs(0)) + ") / toDouble(" + emitLoWordRef(o.inputs(1)) + "));\n"
         } else if (o.op == "dpow") {
-            "  " + emitLoWordRef(o) + " = fromDouble(pow(toDouble(" + emitLoWordRef(o.inputs(0)) + "), toDouble(" + emitLoWordRef(o.inputs(1)) + ")));\n"
+            "  " + emitLoWordRef(o) + " = fromDouble(pow(toDouble(" + emitLoWordRef(o.inputs(1)) + "), toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
         } else if (o.op == "d==") {
             "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") == toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "d!=") {

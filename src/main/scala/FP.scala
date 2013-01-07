@@ -132,7 +132,7 @@ class Dbl extends Num {
   override def unary_-(): Dbl = UnaryOp(this, "d-"){Dbl()};
   def +  (b: Dbl): Dbl = BinaryOp(this, b, "d+"){Dbl()};
   def -  (b: Dbl): Dbl = BinaryOp(this, b, "d-"){Dbl()};
-  def *  (b: Dbl): Dbl = { println("B " + b); BinaryOp(this, b, "d*"){Dbl()}; }
+  def *  (b: Dbl): Dbl = { BinaryOp(this, b, "d*"){Dbl()}; }
   def /  (b: Dbl): Dbl = BinaryOp(this, b, "d/"){Dbl()};
   def ===(b: Dbl): Bool = LogicalOp(this, b, "d=="){Dbl()};
   def != (b: Dbl): Bool = LogicalOp(this, b, "d!="){Dbl()};
@@ -148,8 +148,10 @@ object Sin {
 }
 
 object Log {
-  def apply (x: Flo) = UnaryOp(x, "flog"){Flo()};
-  def apply (x: Dbl) = UnaryOp(x, "dlog"){Dbl()};
+  def apply (x: Flo): Flo = UnaryOp(x, "flog"){Flo()};
+  def apply (x: Dbl): Dbl  = UnaryOp(x, "dlog"){Dbl()};
+  def apply (x: Flo, p: Flo): Flo = Log(x)/Log(p)
+  def apply (x: Dbl, p: Dbl): Dbl = Log(x)/Log(p)
 }
 
 object Pow {
