@@ -59,10 +59,15 @@ object Vec {
   }
 
   def apply[T <: Data](elts: Seq[T])(gen: => T): Vec[T] = {
-    val res =
-      if (elts.forall(_.litOf != null)) new ROM(elts.map(_.litOf), () => gen)
-      else new Vec[T](() => gen)
-    elts.foreach(res += _)
+    val res = if (elts.forall(_.litOf != null)) {
+      new ROM(elts.map(_.litOf), () => gen)
+    } else {
+      new Vec[T](() => gen)
+    }
+    elts.zipWithIndex.foreach{ case (e,i) => 
+      e.name += i
+      res += e
+    }
     res
   }
 
