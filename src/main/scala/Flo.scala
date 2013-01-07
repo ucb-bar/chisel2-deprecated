@@ -84,9 +84,13 @@ class FloBackend extends Backend {
         
       case x: Bits =>
         if (x.inputs.length == 1) {
-          emitDec(x) + "mov " + emitRef(x.inputs(0)) + "\n"
+          // println("NAME " + x.name + " DIR " + x.dir + " COMP " + x.componentOf + " TOP-COMP " + topComponent)
+          if (x.dir == OUTPUT && x.componentOf == topComponent)
+            emitDec(x) + "out/" + x.width + " " + emitRef(x.inputs(0)) + "\n"
+          else
+            emitDec(x) + "mov " + emitRef(x.inputs(0)) + "\n"
         } else
-          emitDec(x) + "rnd/" + x.width + "\n"
+          emitDec(x) + "in/" + x.width + "\n"
 
       case m: Mem[_] =>
         emitDec(m) + "mem " + m.n + "\n"
