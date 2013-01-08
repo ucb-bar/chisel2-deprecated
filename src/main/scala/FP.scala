@@ -16,7 +16,6 @@ class FloLiteral(val floValue: Float) extends Node {
 }
 
 object Flo {
-
   def apply(x: Float): Flo = FloLit(x);
   def apply(x: Double): Flo = FloLit(x.toFloat);
   
@@ -54,6 +53,17 @@ class Flo extends Num {
 	ChiselErrors += ChiselError(":= not defined on " + this.getClass + " and " + src.getClass, Thread.currentThread().getStackTrace)
     }
   }
+
+  def floLitOf: FloLiteral = 
+    if (inputs.length == 1) {
+      if (inputs(0).isInstanceOf[FloLiteral])
+        inputs(0).asInstanceOf[FloLiteral] 
+      else if (inputs(0).isInstanceOf[Flo])
+        inputs(0).asInstanceOf[Flo].floLitOf
+      else 
+        null;
+    } else 
+      null;
 
   def :=(src: Flo)  = colonEqual(src);
 
@@ -109,6 +119,17 @@ class Dbl extends Num {
     res assign n; 
     res};
 
+  def dblLitOf: DblLiteral =
+    if (inputs.length == 1) {
+      if (inputs(0).isInstanceOf[DblLiteral])
+        inputs(0).asInstanceOf[DblLiteral] 
+      else if (inputs(0).isInstanceOf[Dbl])
+        inputs(0).asInstanceOf[Dbl].dblLitOf
+      else 
+        null;
+    } else 
+      null;
+
   private def colonEqual(src: Dbl) = {
     if(comp != null)
       comp procAssign src.toNode;
@@ -132,7 +153,7 @@ class Dbl extends Num {
   override def unary_-(): Dbl = UnaryOp(this, "d-"){Dbl()};
   def +  (b: Dbl): Dbl = BinaryOp(this, b, "d+"){Dbl()};
   def -  (b: Dbl): Dbl = BinaryOp(this, b, "d-"){Dbl()};
-  def *  (b: Dbl): Dbl = { BinaryOp(this, b, "d*"){Dbl()}; }
+  def *  (b: Dbl): Dbl = BinaryOp(this, b, "d*"){Dbl()};
   def /  (b: Dbl): Dbl = BinaryOp(this, b, "d/"){Dbl()};
   def ===(b: Dbl): Bool = LogicalOp(this, b, "d=="){Dbl()};
   def != (b: Dbl): Bool = LogicalOp(this, b, "d!="){Dbl()};
