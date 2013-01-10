@@ -80,6 +80,8 @@ class Flo extends Num {
   def <  (b: Flo): Bool = LogicalOp(this, b, "f<"){Flo()};
   def <= (b: Flo): Bool = LogicalOp(this, b, "f<="){Flo()};
   def >= (b: Flo): Bool = LogicalOp(this, b, "f>="){Flo()};
+  override def toFix (): Fix = Op("fToFix", 1, fixWidth(32), this).setTypeNode(Fix().asOutput);;
+  override def toUFix (): UFix = Op("fToFix", 1, fixWidth(32), this).setTypeNode(UFix().asOutput);;
 }
 
 /// DBL
@@ -161,11 +163,28 @@ class Dbl extends Num {
   def <  (b: Dbl): Bool = LogicalOp(this, b, "d<"){Dbl()};
   def <= (b: Dbl): Bool = LogicalOp(this, b, "d<="){Dbl()};
   def >= (b: Dbl): Bool = LogicalOp(this, b, "d>="){Dbl()};
+  override def toFix (): Fix = Op("dToFix", 1, fixWidth(64), this).setTypeNode(Fix().asOutput);;
+  override def toUFix (): UFix = Op("dToFix", 1, fixWidth(64), this).setTypeNode(UFix().asOutput);;
 }
 
 object Sin {
   def apply (x: Flo) = UnaryOp(x, "fsin"){Flo()};
   def apply (x: Dbl) = UnaryOp(x, "dsin"){Dbl()};
+}
+
+object Floor {
+  def apply (x: Flo) = UnaryOp(x, "ffloor"){Flo()};
+  def apply (x: Dbl) = UnaryOp(x, "dfloor"){Dbl()};
+}
+
+object Ceil {
+  def apply (x: Flo) = UnaryOp(x, "fceil"){Flo()};
+  def apply (x: Dbl) = UnaryOp(x, "dceil"){Dbl()};
+}
+
+object Round {
+  def apply (x: Flo) = UnaryOp(x, "fround"){Flo()};
+  def apply (x: Dbl) = UnaryOp(x, "dround"){Dbl()};
 }
 
 object Log {

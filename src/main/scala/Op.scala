@@ -30,10 +30,16 @@ object UnaryOp {
     case "fsin" => Op("fsin", 1, fixWidth(32), x);
     case "fcos" => Op("fcos", 1, fixWidth(32), x);
     case "flog" => Op("flog", 1, fixWidth(32), x);
+    case "ffloor" => Op("ffloor", 1, fixWidth(32), x);
+    case "fceil" => Op("fceil", 1, fixWidth(32), x);
+    case "fround" => Op("fround", 1, fixWidth(32), x);
     case "d-" => Op("d-", 1, fixWidth(64), x);
     case "dsin" => Op("dsin", 1, fixWidth(64), x);
     case "dcos" => Op("dcos", 1, fixWidth(64), x);
     case "dlog" => Op("dlog", 1, fixWidth(64), x);
+    case "dfloor" => Op("dfloor", 1, fixWidth(64), x);
+    case "dceil" => Op("dceil", 1, fixWidth(64), x);
+    case "dround" => Op("dround", 1, fixWidth(64), x);
     case any => null;
     }
     node.setTypeNode(gen.asOutput)
@@ -68,7 +74,7 @@ object BinaryOp {
       case "f-"  => Op("f-", 2, fixWidth(32), x, y );
       case "f*"  => Op("f*", 0, fixWidth(32), x, y );
       case "f/"  => Op("f/", 0, fixWidth(32), x, y );
-      case "fpow"  => Op("fpow", 0, fixWidth(64), x, y );
+      case "fpow"  => Op("fpow", 0, fixWidth(32), x, y );
       case "d+"  => Op("d+", 2, fixWidth(64), x, y );
       case "d-"  => Op("d-", 2, fixWidth(64), x, y );
       case "d*"  => Op("d*", 0, fixWidth(64), x, y );
@@ -428,6 +434,10 @@ object Op {
       name match {
         case "dsin" => return DblLit(Math.sin(fa_val));
         case "dlog" => return DblLit(Math.log(fa_val));
+        case "dfloor" => return DblLit(Math.floor(fa_val));
+        case "dceil" => return DblLit(Math.ceil(fa_val));
+        case "dround" => return DblLit(Math.round(fa_val));
+        case "dToFix" => return Literal(fa_val.toInt);
         case _ => ;
       }
       }
@@ -439,6 +449,10 @@ object Op {
       name match {
         case "fsin" => return FloLit(Math.sin(fa_val).toFloat);
         case "flog" => return FloLit(Math.log(fa_val).toFloat);
+        case "ffloor" => return DblLit(Math.floor(fa_val).toFloat);
+        case "fceil" => return DblLit(Math.ceil(fa_val).toFloat);
+        case "fround" => return DblLit(Math.round(fa_val).toFloat);
+        case "fToFix" => return Literal(fa_val.toLong);
         case _ => ;
       }
       }
