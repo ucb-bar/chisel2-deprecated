@@ -74,6 +74,7 @@ class Flo extends Num {
   def -  (b: Flo): Flo = BinaryOp(this, b, "f-"){Flo()};
   def *  (b: Flo): Flo = BinaryOp(this, b, "f*"){Flo()};
   def /  (b: Flo): Flo = BinaryOp(this, b, "f/"){Flo()};
+  def %  (b: Flo): Flo = BinaryOp(this, b, "f%"){Flo()};
   def ===(b: Flo): Bool = LogicalOp(this, b, "f=="){Flo()};
   def != (b: Flo): Bool = LogicalOp(this, b, "f!="){Flo()};
   def >  (b: Flo): Bool = LogicalOp(this, b, "f>"){Flo()};
@@ -157,6 +158,7 @@ class Dbl extends Num {
   def -  (b: Dbl): Dbl = BinaryOp(this, b, "d-"){Dbl()};
   def *  (b: Dbl): Dbl = BinaryOp(this, b, "d*"){Dbl()};
   def /  (b: Dbl): Dbl = BinaryOp(this, b, "d/"){Dbl()};
+  def %  (b: Dbl): Dbl = BinaryOp(this, b, "d%"){Dbl()};
   def ===(b: Dbl): Bool = LogicalOp(this, b, "d=="){Dbl()};
   def != (b: Dbl): Bool = LogicalOp(this, b, "d!="){Dbl()};
   def >  (b: Dbl): Bool = LogicalOp(this, b, "d>"){Dbl()};

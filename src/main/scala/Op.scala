@@ -74,11 +74,13 @@ object BinaryOp {
       case "f-"  => Op("f-", 2, fixWidth(32), x, y );
       case "f*"  => Op("f*", 0, fixWidth(32), x, y );
       case "f/"  => Op("f/", 0, fixWidth(32), x, y );
+      case "f%"  => Op("f%", 0, fixWidth(32), x, y );
       case "fpow"  => Op("fpow", 0, fixWidth(32), x, y );
       case "d+"  => Op("d+", 2, fixWidth(64), x, y );
       case "d-"  => Op("d-", 2, fixWidth(64), x, y );
       case "d*"  => Op("d*", 0, fixWidth(64), x, y );
       case "d/"  => Op("d/", 0, fixWidth(64), x, y );
+      case "d%"  => Op("d%", 0, fixWidth(64), x, y );
       case "dpow"  => Op("dpow", 0, fixWidth(64), x, y );
       case any   => null;
     }
@@ -241,6 +243,7 @@ object Op {
         case "f-" => return FloLit(fa_val - fb_val);
         case "f*" => return FloLit(fa_val * fb_val);
         case "f/" => return FloLit(fa_val / fb_val);
+        case "f%" => return FloLit(fa_val % fb_val);
         case "f==" => return Bool(fa_val == fb_val);
         case "f!=" => return Bool(fa_val != fb_val);
         case "f>" => return Bool(fa_val > fb_val);
@@ -270,13 +273,13 @@ object Op {
           name match {
             case "f+" => return a;
             case "f*" => return FloLit(0.0.toFloat);
-            case "f/" => return FloLit(0.0.toFloat);
             case _ => ;
           }
         } else if (fb_val == 1.0) {
           name match {
             case "f*" => return a;
             case "f/" => return a;
+            case "f%" => return a;
             case _ => ;
           }
         }        
@@ -294,6 +297,7 @@ object Op {
         case "d-" => return DblLit(fa_val - fb_val);
         case "d*" => return DblLit(fa_val * fb_val);
         case "d/" => return DblLit(fa_val / fb_val);
+        case "d%" => return DblLit(fa_val % fb_val);
         case "d==" => return Bool(fa_val == fb_val);
         case "d!=" => return Bool(fa_val != fb_val);
         case "d>" => return Bool(fa_val > fb_val);
@@ -308,15 +312,16 @@ object Op {
       if (fa_val == 0.0) {
         // println("FOLDING " + name);
         name match {
-          case "f+" => return b;
-          case "f*" => return DblLit(0.0);
-          case "f/" => return DblLit(0.0);
+          case "d+" => return b;
+          case "d*" => return DblLit(0.0);
+          case "d/" => return DblLit(0.0);
+          case "d%" => return DblLit(0.0);
           case _ => ;
         }
       } else if (fa_val == 1.0) {
         // println("FOLDING " + name);
         name match {
-          case "f*" => return b;
+          case "d*" => return b;
           case _ => ;
         }
       }        
@@ -326,16 +331,16 @@ object Op {
       if (fb_val == 0.0) {
         // println("FOLDING " + name);
         name match {
-          case "f+" => return a;
-          case "f*" => return DblLit(0.0);
-          case "f/" => return DblLit(0.0);
+          case "d+" => return a;
+          case "d*" => return DblLit(0.0);
           case _ => ;
         }
       } else if (fb_val == 1.0) {
         // println("FOLDING " + name);
         name match {
-          case "f*" => return a;
-          case "f/" => return a;
+          case "d*" => return a;
+          case "d/" => return a;
+          case "d%" => return a;
           case _ => ;
         }
       }        
