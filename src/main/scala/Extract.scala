@@ -4,89 +4,86 @@ import Component._
 import Lit._
 
 object NodeExtract {
-  
   // extract one bit
-  def apply (mod: Node, bit: Node): Node = {
-    val (bits_lit, off_lit) = (mod.litOf, bit.litOf);
-    if (isFolding && bits_lit != null && off_lit != null) {
-      Literal((bits_lit.value >> off_lit.value.toInt)&1, 1)
-    } else {
-      val res = new Extract();
-      res.init("", fixWidth(1), mod, bit);
-      res.hi = bit; 
-      res.lo = bit;
-      res
-    }
-  }
+  def apply(mod: Node, bit: Int): Node = apply(mod, bit, bit)
 
-  def apply (mod: Node, bit: Int): Node = 
-    apply(mod, Literal(bit));
+  // extract one bit
+  def apply(mod: Node, bit: Node): Node = {
+    val bitLit = bit.litOf
+    if (bitLit != null)
+      apply(mod, bitLit.value.toInt)
+    else if (mod.litOf == null)
+      makeExtract(mod, bit)
+    else // don't use Extract on literals
+      Op(">>", 0, fixWidth(1), mod, bit)
+  }
 
   // extract bit range
-  def apply (mod: Node, hi: Node, lo: Node): Node = {
-    val (bits_lit, hi_lit, lo_lit) = (mod.litOf, hi.litOf, lo.litOf);
-    if (isFolding && bits_lit != null && hi_lit != null && lo_lit != null) {
-      val w = (hi_lit.value - lo_lit.value + 1).toInt
-      Literal((bits_lit.value >> lo_lit.value.toInt) & ((BigInt(1) << w) - BigInt(1)), w)
-    } else {
-      val res = new Extract();
-      res.init("", widthOf(0), mod, hi, lo);
-      res.hi = hi;
-      res.lo = lo;
-      res
+  def apply(mod: Node, hi: Int, lo: Int): Node = apply(mod, hi, lo, -1)
+  def apply(mod: Node, hi: Int, lo: Int, width: Int): Node = {
+    val w = if (width == -1) hi - lo + 1 else width
+    val bits_lit = mod.litOf
+    if (bits_lit != null)
+      Literal((bits_lit.value >> lo) & ((BigInt(1) << w) - BigInt(1)), w)
+    else
+      makeExtract(mod, Literal(hi), Literal(lo), fixWidth(w))
+  }
+
+  // extract bit range
+  def apply(mod: Node, hi: Node, lo: Node, width: Int = -1): Node = {
+    val hiLit = hi.litOf
+    val loLit = lo.litOf
+    val widthInfer = if (width == -1) widthOf(0) else fixWidth(width)
+    if (hiLit != null && loLit != null)
+      apply(mod, hiLit.value.toInt, loLit.value.toInt, width)
+    else if (mod.litOf == null)
+      makeExtract(mod, hi, lo, widthInfer)
+    else { // don't use Extract on literals
+      val rsh = Op(">>", 0, widthInfer, mod, lo)
+      val hiMinusLoPlus1 = Op("+", 2, maxWidth _, Op("-", 2, maxWidth _, hi, lo), UFix(1))
+      val mask = Op("-", 2, widthInfer, Op("<<", 0, widthInfer, UFix(1), hiMinusLoPlus1), UFix(1))
+      Op("&", 2, widthInfer, rsh, mask)
     }
   }
 
-  def apply (mod: Node, hi: Int, lo: Int): Node = {
-    val bits_lit = mod.litOf
-    if (isFolding && bits_lit != null){
-      val w = hi - lo + 1
-      Literal((bits_lit.value >> lo) & ((BigInt(1) << w) - BigInt(1)), w)
-    } else {
-      val res = new Extract();
-      res.hi = Literal(hi);
-      res.lo = Literal(lo);
-      res.init("", fixWidth(hi-lo+1), mod, res.hi, res.lo);
-      res
-    }
+  private def makeExtract(mod: Node, bit: Node) = {
+    val res = new Extract
+    res.init("", fixWidth(1), mod, bit)
+    res.hi = bit
+    res.lo = bit
+    res
+  }
+
+  private def makeExtract(mod: Node, hi: Node, lo: Node, width: (Node) => Int) = {
+    val res = new Extract
+    res.init("", width, mod, hi, lo)
+    res.hi = hi
+    res.lo = lo
+    res
   }
 }
 
 object Extract {
   //extract 1 bit
   def apply[T <: Bits](mod: T, bit: UFix)(gen: => T): T = {
-    val (bits_lit, off_lit) = (mod.litOf, bit.litOf);
-    if (isFolding && bits_lit != null && off_lit != null) {
-      makeLit(Literal((bits_lit.value >> off_lit.value.toInt)&1, 1)){ gen };
-    } else {
-      val extract = new Extract()
-      extract.init("", fixWidth(1), mod.toNode, bit)
-      extract.hi = bit
-      extract.lo = bit
-      extract.setTypeNodeNoAssign(gen.fromNode(extract))
-    }
+    val x = NodeExtract(mod, bit)
+    x.setTypeNodeNoAssign(gen.fromNode(x))
   }
 
-  def apply[T <: Bits](mod: T, bit: Int)(gen: => T): T = 
-     apply(mod, UFix(bit))(gen);
+  def apply[T <: Bits](mod: T, bit: Int)(gen: => T): T = {
+    val x = NodeExtract(mod, bit)
+    x.setTypeNodeNoAssign(gen.fromNode(x))
+  }
 
   // extract bit range
   def apply[T <: Bits](mod: T, hi: UFix, lo: UFix, w: Int = -1)(gen: => T): T = {
-    val (bits_lit, hi_lit, lo_lit) = (mod.litOf, hi.litOf, lo.litOf);
-    if (isFolding && bits_lit != null && hi_lit != null && lo_lit != null) {
-      val dw = if (w == -1) (hi_lit.value - lo_lit.value + 1).toInt else w;
-      makeLit(Literal((bits_lit.value >> lo_lit.value.toInt)&((BigInt(1)<<dw) - BigInt(1)), dw)){ gen };
-    } else {
-      val extract = new Extract()
-      extract.init("", if(w == -1) widthOf(0) else fixWidth(w), mod.toNode, hi, lo)
-      extract.hi = hi
-      extract.lo = lo
-      extract.setTypeNodeNoAssign(gen.fromNode(extract))
-    }
+    val x = NodeExtract(mod, hi, lo, w)
+    x.setTypeNodeNoAssign(gen.fromNode(x))
   }
 
   def apply[T <: Bits](mod: T, hi: Int, lo: Int)(gen: => T): T ={
-    apply(mod, UFix(hi), UFix(lo), hi-lo+1)(gen);
+    val x = NodeExtract(mod, hi, lo)
+    x.setTypeNodeNoAssign(gen.fromNode(x))
   }
 }
 
