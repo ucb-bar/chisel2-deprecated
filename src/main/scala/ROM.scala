@@ -6,8 +6,8 @@ import scala.collection.mutable.Stack
 
 class ROM[T <: Data](val lits: Seq[Literal], gen: () => T) extends Vec[T](gen) {
   override def read(addr: UFix): T = {
-    var port = new ROMRead(this, addr)
     val data = gen().asOutput
+    var port = new ROMRead().init("", fixWidth(gen().getWidth), addr, this)
     data assign port
     data.setIsTypeNode
     data
@@ -29,10 +29,11 @@ class ROM[T <: Data](val lits: Seq[Literal], gen: () => T) extends Vec[T](gen) {
 
 }
 
-class ROMRead[T <: Data](val rom: ROM[T], addri: Bits) extends Node {
+class ROMRead[T <: Data]() extends Node {
   def addr = inputs(0)
-  inputs += addri
-  inputs += rom
+  def rom = inputs(1)
+  // inputs += addri
+  // inputs += rom
 
-  override def toString: String = rom + "[" + addr + "]"
+  override def toString: String = inputs(1) + "[" + inputs(0) + "]"
 }

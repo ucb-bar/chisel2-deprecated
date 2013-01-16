@@ -23,7 +23,8 @@ object Reg {
   // Rule: if r is using an inferred width, then don't enforce a width. If it is using a user inferred
   // width, set the the width
   def regWidth(r: Node) = {
-    if (r.litOf.hasInferredWidth)
+    val rLit = r.litOf
+    if (rLit != null && rLit.hasInferredWidth)
       regMaxWidth _
     else
       fixWidth(r.getWidth)
@@ -52,6 +53,7 @@ object Reg {
 
         assert(rval_i.getWidth > 0, {println("Negative width to wire " + res_i)})
         val reg = new Reg()
+
         reg.init("", regWidth(rval_i), data_i, rval_i)
 
         // make output

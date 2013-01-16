@@ -165,13 +165,14 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
       return readPortCache(addr)
 
     val res = this(0).clone
-    //val res = gen()
+    val iaddr = Bits(width=log2Up(length))
+    iaddr.inputs += addr
     for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
-      io assign VecMux(addr, sortedElm)
+      io assign VecMux(iaddr, sortedElm)
 
       // setup the comp for writes
       val io_comp = new VecProc()
-      io_comp.addr = addr
+      io_comp.addr = iaddr
       io_comp.elms = sortedElm
       io.comp = io_comp
     }
