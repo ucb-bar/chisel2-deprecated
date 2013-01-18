@@ -6,6 +6,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.io.PrintStream
 import scala.sys.process._
+import sys.process.stringSeqToProcess
 import Node._
 import Reg._
 import ChiselError._
@@ -382,7 +383,8 @@ class CppBackend extends Backend {
     val allFlags = flags + " -I../ -I" + chiselENV + "/csrc/"
     val dir = targetDir + "/"
     def run(cmd: String) = {
-      val c = Process(cmd).!
+      val bashCmd = Seq("bash", "-c", cmd)
+      val c = bashCmd.!
       println(cmd + " RET " + c)
     }
     def link(name: String) = {
