@@ -170,7 +170,7 @@ object Literal {
 
   def apply(x: BigInt, width: Int = -1, signed: Boolean = false): Literal = { 
     val res = new Literal(); 
-    val xWidth = max(x.bitLength, 1) + (if(signed) 1 else 0)
+    val xWidth = if (signed) x.bitLength+1 else max(x.bitLength, 1)
     val w = if(width == -1) xWidth else width
     val xString = (if (x >= 0) x else (BigInt(1) << w) + x).toString(16)
 
