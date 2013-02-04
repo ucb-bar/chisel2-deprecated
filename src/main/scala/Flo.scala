@@ -14,6 +14,7 @@ import Literal._
 
 class FloBackend extends Backend {
   var isSubNodes = true
+  var isRnd = true
   override def emitDec(node: Node): String = 
     nodeName(node) + " = "
 
@@ -39,7 +40,21 @@ class FloBackend extends Backend {
       "" + node.litOf.value
   }
 
+  def trueAll(dstName: String, refs: Seq[Node]): String = {
+    def trueRef (k: Int): String = {
+      val n = refs.length - k
+      if (n == 0) "1" else if (n == 1) emitRef(refs(k)) else (dstName + "__" + k)
+    }
+    def doTrueAll (k: Int): String = {
+      if ((refs.length - k) <= 1)
+        ""
+      else 
+        doTrueAll(k + 1) + trueRef(k) + " = or " + emitRef(refs(k)) + " " + trueRef(k+1) + "\n"
+    }
+    doTrueAll(0) + dstName + " = or 1 " + trueRef(0) + "\n"
+  }
   def emit(node: Node): String = {
+    println("NODE " + node)
     node match {
       case x: Mux =>
         emitDec(x) + "mux " + emitRef(x.inputs(0)) + " " + emitRef(x.inputs(1)) + " " + emitRef(x.inputs(2)) + "\n"
@@ -48,9 +63,9 @@ class FloBackend extends Backend {
         emitDec(o) +
         (if (o.inputs.length == 1) {
           o.op match {
-            case "~" => "not " + emitRef(node.inputs(0))
-            case "!" => "not " + emitRef(node.inputs(0))
-            case "-" => "neg " + emitRef(node.inputs(0))
+            case "~" => "not/" + node.inputs(0).width + " " + emitRef(node.inputs(0))
+            case "!" => "not/" + node.inputs(0).width + " " + emitRef(node.inputs(0))
+            case "-" => "neg/" + node.inputs(0).width + " " + emitRef(node.inputs(0))
           }
          } else {
            o.op match {
@@ -77,31 +92,53 @@ class FloBackend extends Backend {
 
       case x: Extract =>
         if (node.width < 0) println("RSH -1 NODE " + node)
+        println("EXTRACT " + node + " W " + node.width)
         emitDec(node) + "rsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1)) + "\n"
 
       case x: Fill =>
         emitDec(x) + "fill/" + node.width + " " + emitRef(node.inputs(0)) + "\n"
         
+      case x: Binding =>
+        println("FOUND BINDING")
+        ""
+
       case x: Bits =>
         if (x.inputs.length == 1) {
           // println("NAME " + x.name + " DIR " + x.dir + " COMP " + x.componentOf + " TOP-COMP " + topComponent)
           if (x.dir == OUTPUT && x.componentOf == topComponent)
-            emitDec(x) + "out/" + x.width + " " + emitRef(x.inputs(0)) + "\n"
-          else
-            emitDec(x) + "mov " + emitRef(x.inputs(0)) + "\n"
+            emitDec(x) + (if (isRnd) "eat" else ("out/" + x.width))  + " " + emitRef(x.inputs(0)) + "\n"
+          else {
+            if (x.consumers.length > 0 && !(!node.isInObject && node.inputs.length == 1)) 
+              emitDec(x) + "mov " + emitRef(x.inputs(0)) + "\n"
+            else
+              ""
+          }
         } else
-          emitDec(x) + "in/" + x.width + "\n"
+          emitDec(x) + (if (isRnd) "rnd/" else "in/") + x.width + "\n"
 
       case m: Mem[_] =>
-        emitDec(m) + "mem " + m.n + "\n"
+        for (r <- m.reads)
+          println(">> READ " + r)
+        emitDec(m) + "mem " + m.n + "\n" + trueAll(emitRef(m) + "__is_all_read", m.reads)
 
-      case m: MemRead[_] =>
-        emitDec(m) + "rd " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n" // emitRef(m.mem) 
+      case r: MemRead[_] =>
+        val w = r.mem.writes(0);
+        // var rw: MemWrite[_] = null
+        println("NUM WRITES " + r.mem.writes.length)
+        // for (i <- 0 until r.mem.writes.length)
+        //   if (r.mem.writes(i).isReal)
+        //     rw = r.mem.writes(i)
+        // println("  REAL-WRITE " + rw)
+        emitRef(r) + "__is_read = and " + emitRef(w) + "__write " + emitRef(r.cond) + "\n" +
+        emitDec(r) + "rd " + emitRef(r) + "__is_read" + " " + emitRef(r.mem) + " " + emitRef(r.addr) + "\n" // emitRef(m.mem) 
 
-      case m: MemWrite[_] =>
-        if (m.inputs.length == 2)
+      case w: MemWrite[_] =>
+        if (w.inputs.length == 2)
           return ""
-        emitDec(m) + "wr " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + " " + emitRef(m.data) + "\n"
+        emitRef(w) + "__is_wr" + " = and " + emitRef(w.mem) + "__is_all_read" + " " + emitRef(w.cond) + "\n" + 
+        emitDec(w) + "wr " + emitRef(w) + "__is_wr" + " " + emitRef(w.mem) + " " + emitRef(w.addr) + " " + emitRef(w.data) + "\n" +
+        emitRef(w) + "__write0 = reg 1 " + emitRef(w) + "\n" +
+        emitRef(w) + "__write = or 1 " + emitRef(w) + "__write0" + "\n"       
 
       case x: Reg => // TODO: need resetVal treatment
         emitDec(x) + "reg " + (if (x.isEnable) emitRef(x.enableSignal) else "1") + " " + emitRef(x.updateVal) + "\n"
@@ -181,11 +218,29 @@ class FloBackend extends Backend {
       return
     }
     c.collectNodes(c);
+    def updateMems() = {
+      println("SEARCHING FOR MEM")
+      for (mod <- c.omods) {
+        mod match {
+          case m: Mem[_] => m.writes.clear(); m.reads.clear(); 
+          case _ =>;
+        }
+      }
+      for (mod <- c.omods) {
+        mod match {
+          case w: MemWrite[_] => w.addWrite
+          case r: MemRead[_]  => r.addRead
+          case _ =>;
+        }
+      }
+    }
     if (isSubNodes) {
       renameNodes(c, c.mods);
       c.findSubNodeOrdering(); // search from roots  -- create omods
+      updateMems()
     } else {
       c.findOrdering(); // search from roots  -- create omods
+      updateMems()
       renameNodes(c, c.omods);
     }
     if (isReportDims) {

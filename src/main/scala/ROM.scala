@@ -59,6 +59,8 @@ class ROMRead[T <: Data](val rom: ROM[T], addri: Bits) extends Node {
   inputs += addri
   inputs += rom
 
+  inferWidth = fixWidth(rom.lits.foldRight(0){ (l, w) => Math.max(l.getWidth, w) });
+
   override def toString: String = rom + "[" + addr + "]"
 
   override def genSubNodes: Unit = {

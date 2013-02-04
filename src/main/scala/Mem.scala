@@ -102,6 +102,7 @@ abstract class MemAccess(val mem: Mem[_], val condi: Bool, val addri: Bits) exte
   var referenced = false
   def used = referenced
   def getPortType: String
+  var isReal = false
 
   override def forceMatchingWidths =
     if (addr.width != log2Up(mem.n)) inputs(1) = addr.matchWidth(log2Up(mem.n))
@@ -126,6 +127,7 @@ class MemRead[T <: Data](mem: Mem[T], condi: Bool, addri: Bits) extends MemAcces
   inferWidth = fixWidth(mem.data.getWidth)
 
   var outputReg: Reg = null
+  def addRead = mem.reads += this
   def outputVal = if (Component.isInlineMem && isSequential) inputs.last else this
   def setOutputReg(x: Reg) = {
     if (Component.isInlineMem) {
@@ -191,6 +193,7 @@ class MemWrite[T <: Data](mem: Mem[T], condi: Bool, addri: Bits, datai: T, wmask
     inputs += wrap(wmaski)
   }
 
+  def addWrite = mem.writes += this
   override def forceMatchingWidths = {
     val w = mem.width
     super.forceMatchingWidths
@@ -223,6 +226,7 @@ class MemWrite[T <: Data](mem: Mem[T], condi: Bool, addri: Bits, datai: T, wmask
   override def procAssign(src: Node) = {
     require(inputs.length == 2)
     inputs += wrap(src)
+    isReal = true
   }
   override def toString: String = mem + "[" + addr + "] = " + (if (inputs.length > 2) data + " COND " + cond else "")
   override def getPortType: String = (if (isMasked) "m" else "") + (if (isRW) "rw" else "write")
