@@ -30,15 +30,14 @@ object Reg {
       fixWidth(r.getWidth)
   }
 
-  def apply[T <: Data](data: T, width: Int, resetVal: T)(gen: => T): T = {
-
-    // check valid gen
-    val testGen = gen
-    for((n, i) <- gen.flatten) {
-      if (i.inputs.length > 0 || i.updates.length > 0) {
+  def validateGen[T <: Data](gen: => T) = {
+    for ((n, i) <- gen.flatten)
+      if (!i.inputs.isEmpty || !i.updates.isEmpty)
         throwException("Invalid Type Specifier for Reg")
-      }
-    }
+  }
+
+  def apply[T <: Data](data: T, width: Int, resetVal: T)(gen: => T): T = {
+    validateGen(gen)
 
     val d: Array[(String, Bits)] = 
       if(data == null) 
@@ -110,8 +109,6 @@ class Reg extends Delay with proc {
       enable = enable || cond;
     }
     updates += ((cond, src))
-    if (src.memSource != null)
-      src.memSource.setOutputReg(this)
   }
   override def genMuxes(default: Node): Unit = {
     if(isMemOutput) {
@@ -153,6 +150,4 @@ class Reg extends Delay with proc {
       assigned = true; super.assign(src)
     }
   }
-  override def isMemOutput = updates.length == 1 && updates(0)._2.memSource != null
-  def memOf = updates(0)._2.memSource
 }

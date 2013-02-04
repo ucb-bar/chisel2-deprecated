@@ -45,7 +45,6 @@ object Component {
   var tester: Tester[Component] = null;
   var includeArgs: List[String] = Nil;
   var targetDir: String = null
-  var configStr: String = null;
   var compIndex = -1;
   val compIndices = HashMap.empty[String,Int];
   val compDefs = new HashMap[StringBuilder, String];
@@ -111,7 +110,6 @@ object Component {
     tester = null;
     isCoercingArgs = true;
     targetDir = "."
-    configStr = "";
     compIndex = -1;
     compIndices.clear();
     components.clear();
@@ -732,7 +730,8 @@ abstract class Component(resetSignal: Bool = null) {
       p match {
         case b: Bits  => if(b.updates.length > 0) b.genMuxes(b.default);
         case r: Reg  => r.genMuxes(r);
-        case mw: MemWrite[_] =>
+        case mw: MemWrite =>
+        case mw: PutativeMemWrite =>
         case e: Extract =>
         case v: VecProc =>
       }

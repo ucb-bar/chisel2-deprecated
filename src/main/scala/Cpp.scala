@@ -279,7 +279,7 @@ class CppBackend extends Backend {
         else
           ""
 
-      case m: MemRead[_] =>
+      case m: MemRead =>
         emitTmpDec(m) + block((0 until words(m)).map(i => emitWordRef(m, i) + " = " + emitRef(m.mem) + ".get(" + emitLoWordRef(m.addr) + ", " + i + ")"))
 
       case r: ROMRead[_] =>
@@ -328,7 +328,7 @@ class CppBackend extends Backend {
 
   def emitInitHi(node: Node): String = {
     node match {
-      case m: MemWrite[_] =>
+      case m: MemWrite =>
         // schedule before Reg updates in case a MemWrite input is a Reg
         if (m.inputs.length == 2)
           return ""

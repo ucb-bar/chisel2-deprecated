@@ -23,7 +23,7 @@ abstract class Backend {
   def emitRef(node: Node): String = {
     node match {
       case r: Reg => 
-        if(r.isMemOutput) emitRef(r.memOf.outputVal) else if(r.name == "") "R" + r.emitIndex else r.name
+        if (r.name == "") "R" + r.emitIndex else r.name
       case _ => 
         if(node.name == "" || !node.named) 
           "T" + node.emitIndex 
@@ -37,15 +37,7 @@ abstract class Backend {
   def emitRef(c: Component): String =
     c.name
 
-  def emitDec(node: Node): String = {
-    node match {
-      case m: MemAccess =>
-        m.referenced = true
-        ""
-      case _ =>
-        ""
-    }
-  }
+  def emitDec(node: Node): String = ""
 
   val transforms = ArrayBuffer[(Component) => Unit]()
 

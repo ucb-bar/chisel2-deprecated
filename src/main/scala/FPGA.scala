@@ -2,12 +2,11 @@ package Chisel
 
 class FPGABackend extends VerilogBackend
 {
-  def isMultiWrite(m: Mem[_]) = m.writes.count((w: MemWrite[_]) => w.used) > 1 && !m.seqRead
-  def nwrite(m: Mem[_]) = if (isMultiWrite(m)) m.writes.count((w: MemWrite[_]) => w.used) else 1
-  def writen(m: MemWrite[_]) = if (isMultiWrite(m.mem)) m.mem.writes.filter((w: MemWrite[_]) => w.used).indexOf(m) else 0
+  def isMultiWrite(m: Mem[_]) = m.writes.size > 1
+  def writen(m: MemWrite) = if (isMultiWrite(m.mem)) m.mem.writes.indexOf(m) else 0
   def writeMap(m: Mem[_], exclude: Int = -1) = {
     if (isMultiWrite(m))
-      (0 until nwrite(m)).filterNot(_ == exclude).map(emitRef(m) + "_" + _)
+      (0 until m.writes.size).filterNot(_ == exclude).map(emitRef(m) + "_" + _)
     else
       Seq(emitRef(m))
   }
@@ -15,7 +14,7 @@ class FPGABackend extends VerilogBackend
   override def emitDec(node: Node): String = {
     node match {
       case m: Mem[_] =>
-        assert(Component.isInlineMem)
+        assert(m.isInline)
         "  reg [" + (m.width-1) + ":0] " + writeMap(m).map(_ + " [" + (m.n-1) + ":0]").reduceLeft(_+", "+_) + ";\n"
 
       case _ =>
@@ -24,22 +23,16 @@ class FPGABackend extends VerilogBackend
   }
 
   override def emitReg(node: Node): String = node match {
-    case m: MemWrite[_] => ""
+    case m: MemWrite => ""
     case _ => super.emitReg(node)
   }
 
   override def emitDef(node: Node): String = {
     node match {
-      case m: MemRead[_] =>
-        if (!m.isSequential)
-          "  assign " + emitTmp(node) + " = " + writeMap(m.mem).map(_ + "[" + emitRef(m.addr) + "]").reduceLeft(_+" ^ "+_) + ";\n"
-        else
-          ""
+      case m: MemRead =>
+        "  assign " + emitTmp(node) + " = " + writeMap(m.mem).map(_ + "[" + emitRef(m.addr) + "]").reduceLeft(_+" ^ "+_) + ";\n"
 
-      case m: MemWrite[_] =>
-        if (!m.used)
-          return ""
-
+      case m: MemWrite =>
         // check if byte-wide write enable can be used
         def litOK(x: Node) = x.isLit && (0 until x.width).forall(i => x.litOf.value.testBit(i) == x.litOf.value.testBit(i/8*8))
         def extractOK(x: Node) = x.isInstanceOf[Extract] && x.inputs.length == 3 && x.inputs(2).isLit && x.inputs(2).litOf.value % 8 == 0 && x.inputs(1).isLit && (x.inputs(1).litOf.value+1) % 8 == 0 && useByteMask(x.inputs(0))
@@ -53,7 +46,7 @@ class FPGABackend extends VerilogBackend
         val i = "i" + emitTmp(m)
         (if (mw) "  wire [" + (m.mem.width-1) + ":0] " + emitRef(m.mem) + "_w" + me + " = " + writeMap(m.mem, me).map(_ + "[" + emitRef(m.addr) + "]").reduceLeft(_+" ^ "+_) + ";\n" else "") +
         (if (m.isMasked) {
-          val bm = useByteMask(m.wmask)
+          val bm = m.mem.width % 8 == 0 && useByteMask(m.wmask)
           val max = if (bm) m.mem.width/8 else m.mem.width
           val maskIdx = if(bm) i+"*8" else i
           val dataIdx = if (bm) i+"*8+7:"+i+"*8" else i

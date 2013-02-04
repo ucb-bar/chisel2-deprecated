@@ -89,10 +89,10 @@ class FloBackend extends Backend {
       case m: Mem[_] =>
         emitDec(m) + "mem " + m.n + "\n"
 
-      case m: MemRead[_] =>
+      case m: MemRead =>
         emitDec(m) + "ld " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n" // emitRef(m.mem) 
 
-      case m: MemWrite[_] =>
+      case m: MemWrite =>
         if (m.inputs.length == 2)
           return ""
         emitDec(m) + "st " + emitRef(m.mem) + " " + emitRef(m.addr) + " " + emitRef(m.data) + "\n"

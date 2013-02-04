@@ -35,8 +35,16 @@ class VerilogBackend extends Backend {
   isEmittingComponents = true
   isCoercingArgs = false
 
-  val memConfigs = new HashSet[String]()
-  val memPaths = new HashMap[String, HashMap[String, Int]]()
+  val memConfs = HashMap[String, String]()
+  def getMemConfString =
+    memConfs.map { case (conf, name) => "name " + name + " " + conf } reduceLeft(_+_)
+  def getMemName(mem: Mem[_], configStr: String): String = {
+    if (!memConfs.contains(configStr)) {
+      val compName = if (mem.component != null) mem.component.name+"_" else ""
+      memConfs += (configStr -> genCompName(compName + emitRef(mem)))
+    }
+    memConfs(configStr)
+  }
 
   def emitWidth(node: Node): String = 
     if (node.width == 1) "" else "[" + (node.width-1) + ":0]"
@@ -61,32 +69,31 @@ class VerilogBackend extends Backend {
 
   def emitPortDef(m: MemAccess, idx: Int): String = {
     m match {
-      case r: MemRead[_] =>
-        "    .A" + idx + "(" + emitRef(r.addr) + "),\n" +
-        "    .CS" + idx + "(" + emitRef(r.cond) + "),\n" +
-        "    .O" + idx + "(" + emitTmp(r) + ")"
+      case r: MemSeqRead =>
+        "    .R" + idx + "A(" + emitRef(r.addr) + "),\n" +
+        "    .R" + idx + "E(" + emitRef(r.cond) + "),\n" +
+        "    .R" + idx + "O(" + emitTmp(r) + ")"
 
-      case w: MemWrite[_] =>
-        var we = "1'b1"
-        var a = emitRef(w.addr)
-        var cs = emitRef(w.cond)
-        var res = ""
+      case w: MemWrite =>
+        val mask = if (w.isMasked) emitRef(w.wmask) else "{"+w.mem.width+"{1'b1}}"
 
-        if (w.isRW) {
-          we = emitRef(w.emitRWEnable(w.pairedRead).get)
-          cs = cs + " || " + emitRef(w.pairedRead.cond)
-          if (w.addr != w.pairedRead.addr)
-            a = we + " ? " + a + " : " + emitRef(w.pairedRead.addr)
-          res += "    .O" + idx + "(" + emitTmp(w.pairedRead) + "),\n"
-        }
-        if (w.isMasked)
-          res += "    .WBM" + idx + "(" + emitRef(w.wmask) + "),\n"
+        "    .W" + idx + "A(" + emitRef(w.addr) + "),\n" +
+        "    .W" + idx + "E(" + emitRef(w.cond) + "),\n" +
+        "    .W" + idx + "M(" + mask + "),\n" +
+        "    .W" + idx + "I(" + emitRef(w.data) + ")"
 
-        res +
-        "    .A" + idx + "(" + a + "),\n" +
-        "    .WE" + idx + "(" + we + "),\n" +
-        "    .CS" + idx + "(" + cs + "),\n" +
-        "    .I" + idx + "(" + emitRef(w.data) + ")"
+      case rw: MemReadWrite =>
+        val (r, w) = (rw.read, rw.write)
+        val en = emitRef(r.cond) + " || " + emitRef(w.cond)
+        val addr = emitRef(w.cond) + " ? " + emitRef(w.addr) + " : " + emitRef(r.addr)
+        val mask = if (w.isMasked) emitRef(w.wmask) else "{"+rw.mem.width+"{1'b1}}"
+
+        "    .RW" + idx + "A(" + addr + "),\n" +
+        "    .RW" + idx + "E(" + en + "),\n" +
+        "    .RW" + idx + "W(" + emitRef(w.cond) + "),\n" +
+        "    .RW" + idx + "M(" + mask + "),\n" +
+        "    .RW" + idx + "I(" + emitRef(w.data) + "),\n" +
+        "    .RW" + idx + "O(" + emitTmp(r) + ")"
     }
   }
 
@@ -142,35 +149,6 @@ class VerilogBackend extends Backend {
   }
 
   override def emitDef(node: Node): String = {
-    def getPathName[T <: Data](m: Mem[T], configStr: String): String = {
-      var c = m.component
-      var res = ""
-      while (c != null) {
-        res = c.name + "_" + res
-        c = c.parent
-      }
-      return uniquify(res + "_" + emitRef(m), configStr)
-    }
-
-    def uniquify(path: String, configStr: String): String = {
-      if (memPaths.contains(path)) {
-        val configs = memPaths(path)
-        if (configs.contains(configStr)) {
-          val count = configs(configStr)
-          if (count == 0) return path else return path + "_" + count
-        } else {
-          val count = configs.size
-          configs += (configStr -> count)
-          scala.Predef.assert(count != 0)
-          return path + "_" + count
-        }
-      } else {
-        val configs = new HashMap[String, Int]
-        configs += (configStr -> 0)
-        memPaths += (path -> configs)
-        return path
-      }
-    }
 
     node match {
       case x: Bits =>
@@ -276,41 +254,27 @@ class VerilogBackend extends Backend {
         res
 
       case m: Mem[_] =>
-        if (isInlineMem)
+        if (m.isInline)
           return ""
 
-        m.reads.filter(r => r.used && r.getPortType == "read").foreach { r =>
-          val pairedWrite = m.writes.find(w => w.used && w.isPossibleRW(r))
-          if (!pairedWrite.isEmpty) {
-            pairedWrite.get.setRW(r)
-            m.ports -= r
-          }
-        }
-
-        val usedports = m.ports.filter(_.used)
-        val portdefs = usedports.zipWithIndex.map { case (p, i) => emitPortDef(p, i) }
-
-        var configStr =
+        val configStr =
           " depth " + m.n +
           " width " + m.width +
-          " ports " + usedports.map(_.getPortType).reduceLeft(_ + "," + _) +
+          " ports " + m.ports.map(_.getPortType).reduceLeft(_ + "," + _) +
           "\n"
-
-        val fullConfigStr = "name " + moduleNamePrefix+getPathName(m, configStr) + configStr
-
-        if (!memConfigs.contains(fullConfigStr)) {
-          Component.configStr += fullConfigStr
-          memConfigs += fullConfigStr
-        }
+        val name = moduleNamePrefix + getMemName(m, configStr)
+        println("MEM " + name)
 
         val clkrst = Array("    .CLK(clk)", "    .RST(reset)")
-        "  " + moduleNamePrefix+getPathName(m, configStr) + " " + emitRef(m) + " (\n" +
+        val portdefs = for (i <- 0 until m.ports.size)
+          yield emitPortDef(m.ports(i), i)
+        "  " + name + " " + emitRef(m) + " (\n" +
         (clkrst ++ portdefs).reduceLeft(_ + ",\n" + _) + "\n" +
         "  );\n"
 
         
-      case m: MemRead[_] =>
-        if (isInlineMem)
+      case m: MemRead =>
+        if (m.mem.isInline)
           "  assign " + emitTmp(node) + " = " + emitRef(m.mem) + "[" + emitRef(m.addr) + "];\n"
         else
           ""
@@ -369,7 +333,7 @@ class VerilogBackend extends Backend {
           "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n"
 
       case m: Mem[_] =>
-        if (isInlineMem)
+        if (m.isInline)
           "  reg [" + (m.width-1) + ":0] " + emitRef(m) + " [" + (m.n-1) + ":0];\n"
         else
           ""
@@ -506,8 +470,8 @@ class VerilogBackend extends Backend {
           emitRef(reg.updateVal) + ";\n"
         }
 
-      case m: MemWrite[_] =>
-        if (!m.used || !isInlineMem)
+      case m: MemWrite =>
+        if (!m.mem.isInline)
           return ""
 
         val i = "i" + emitTmp(m)
@@ -644,9 +608,9 @@ class VerilogBackend extends Backend {
       for(err <- ChiselErrors)	err.printError;
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length +" ERRORS");
     }
-    if (configStr.length > 0) {
+    if (!memConfs.isEmpty) {
       val out_conf = new java.io.FileWriter(base_name+moduleNamePrefix+Component.topComponent.name+".conf");
-      out_conf.write(configStr);
+      out_conf.write(getMemConfString);
       out_conf.close();
     }
     if(saveComponentTrace)
