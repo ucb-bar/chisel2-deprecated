@@ -727,15 +727,16 @@ val dout2 = rf(waddr2)
 \end{scala}
 
 If the optional parameter seqRead is set, Chisel will attempt to infer
-sequential read ports when a Reg is assigned the output of a Mem.  A one-read,
+sequential read ports when the read address is a Reg.  A one-read,
 one-write SRAM might be described as follows:
 
 \begin{scala}
 val ram1r1w =
   Mem(1024, seqRead = true) { Bits(width = 32) }
-val dout = Reg() { Bits() }
+val reg_raddr = Reg() { UFix() }
 when (wen) { ram1r1w(waddr) := wdata }
-when (ren) { dout := ram1r1w(raddr) }
+when (ren) { reg_raddr := raddr }
+val rdata = ram1r1w(reg_raddr)
 \end{scala}
 
 Single-ported SRAMs can be inferred when the read and write conditions are
@@ -744,14 +745,15 @@ mutually exclusive in the same \code{when} chain:
 \begin{scala}
 val ram1p = 
   Mem(1024, seqRead = true) { Bits(width = 32) }
-val dout = Reg() { Bits() }
+val reg_raddr = Reg() { UFix() }
 when (wen) { ram1p(waddr) := wdata }
-.elsewhen (ren) { dout := ram1p(raddr) }
+.elsewhen (ren) { reg_raddr := raddr }
+val rdata = ram1p(reg_raddr)
 \end{scala}
 
 If the same Mem address is both written and sequentially read on the same clock
 edge, or if a sequential read enable is cleared, then the read data is
-implementation-defined.
+undefined.
 
 Mem also supports write masks for subword writes.  A given bit is written if
 the corresponding mask bit is set.
