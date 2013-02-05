@@ -349,7 +349,8 @@ object Op {
     }
       
     }
-    if (backend.isInstanceOf[CppBackend]) {
+    if (backend.isInstanceOf[CppBackend] || 
+        backend.isInstanceOf[FloBackend]) {
       def signAbs(x: Node) = {
         val f = x.asInstanceOf[Fix]
         val s = f < Fix(0)

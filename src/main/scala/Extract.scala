@@ -119,7 +119,7 @@ class Extract extends Node {
     else
       "EXTRACT(" + inputs(0) + ", " + hi + ", " + lo + ")";
   def validateIndex(x: Node) = {
-    /*
+    /* TODO: PUT THIS BACK IN
     val lit = x.litOf
     assert(lit == null || lit.value >= 0 && lit.value < inputs(0).width, 
            {println("Extract(" + lit.value + ")" +
@@ -149,6 +149,8 @@ class Extract extends Node {
         // TODO: IS THIS RIGHT? A ONE BIT EXTRACT?
         setSubNode(0, RawExtract(word, nShiftBits, nShiftBits, 1))
       }
+    } else if (backend.words(inputs(0)) == 1 && lo.litOf != null && hi.litOf != null) {
+      setSubNode(0, RawExtract(inputs(0).getSubNode(0), hi.litOf.value.toInt, lo.litOf.value.toInt))
     } else {
       val rsh = lo.litOf.value.toInt
       if (rsh % bpw == 0) {

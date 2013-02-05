@@ -14,7 +14,7 @@ import Literal._
 
 class FloBackend extends Backend {
   var isSubNodes = true
-  var isRnd = true
+  var isRnd = false
   override def emitDec(node: Node): String = 
     nodeName(node) + " = "
 
@@ -54,7 +54,7 @@ class FloBackend extends Backend {
     doTrueAll(0) + dstName + " = or 1 " + trueRef(0) + "\n"
   }
   def emit(node: Node): String = {
-    println("NODE " + node)
+    // println("NODE " + node)
     node match {
       case x: Mux =>
         emitDec(x) + "mux " + emitRef(x.inputs(0)) + " " + emitRef(x.inputs(1)) + " " + emitRef(x.inputs(2)) + "\n"
@@ -92,7 +92,7 @@ class FloBackend extends Backend {
 
       case x: Extract =>
         if (node.width < 0) println("RSH -1 NODE " + node)
-        println("EXTRACT " + node + " W " + node.width)
+        // println("EXTRACT " + node + " W " + node.width)
         emitDec(node) + "rsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1)) + "\n"
 
       case x: Fill =>
@@ -113,18 +113,19 @@ class FloBackend extends Backend {
             else
               ""
           }
-        } else
-          emitDec(x) + (if (isRnd) "rnd/" else "in/") + x.width + "\n"
+        } else {
+          emitDec(x) + (if (x.name == "reset") "rst" else ((if (isRnd) "rnd/" else "in/")) + x.width) + "\n"
+        }
 
       case m: Mem[_] =>
-        for (r <- m.reads)
-          println(">> READ " + r)
+        // for (r <- m.reads)
+        //   println(">> READ " + r)
         emitDec(m) + "mem " + m.n + "\n" + trueAll(emitRef(m) + "__is_all_read", m.reads)
 
       case r: MemRead[_] =>
         val w = r.mem.writes(0);
         // var rw: MemWrite[_] = null
-        println("NUM WRITES " + r.mem.writes.length)
+        // println("NUM WRITES " + r.mem.writes.length)
         // for (i <- 0 until r.mem.writes.length)
         //   if (r.mem.writes(i).isReal)
         //     rw = r.mem.writes(i)
@@ -141,7 +142,11 @@ class FloBackend extends Backend {
         emitRef(w) + "__write = or 1 " + emitRef(w) + "__write0" + "\n"       
 
       case x: Reg => // TODO: need resetVal treatment
-        emitDec(x) + "reg " + (if (x.isEnable) emitRef(x.enableSignal) else "1") + " " + emitRef(x.updateVal) + "\n"
+        (if (x.isReset) 
+          (emitRef(x) + "__update = mux " + emitRef(x.inputs.last) + " " + emitRef(x.resetVal) + " " + emitRef(x.updateVal)) 
+         else "") +
+        emitDec(x) + "reg " + (if (x.isEnable) emitRef(x.enableSignal) else "1") + " " + 
+          (if (x.isReset) (emitRef(x) + "__update") else emitRef(x.updateVal)) + "\n"
 
       case x: Log2 => // TODO: log2 instruction?
         emitDec(x) + "log2/" + x.width + " " + emitRef(x.inputs(0)) + "\n"
