@@ -107,6 +107,7 @@ abstract class Node extends nameable{
   var isInObjectSubNode = false
   var isSubNode = false
   var subnodeNode: Node = null
+  var isSetComponentName = false
   def isMemOutput = false
   
   nodes += this

@@ -14,7 +14,7 @@ import Literal._
 
 class FloBackend extends Backend {
   var isSubNodes = true
-  var isRnd = false
+  var isRnd = true
   override def emitDec(node: Node): String = 
     nodeName(node) + " = "
 
@@ -32,6 +32,7 @@ class FloBackend extends Backend {
 
         case x: Bits => 
           if (!node.isInObject && node.inputs.length == 1) emitRef(node.inputs(0)) else super.emitRef(node) 
+          // super.emitRef(node) 
 
         case _ =>
           super.emitRef(node)
@@ -110,8 +111,10 @@ class FloBackend extends Backend {
           else {
             if (x.consumers.length > 0 && !(!node.isInObject && node.inputs.length == 1)) 
               emitDec(x) + "mov " + emitRef(x.inputs(0)) + "\n"
-            else
+            else {
+              println("--> NO CONSUMERS " + x);
               ""
+            }
           }
         } else {
           emitDec(x) + (if (x.name == "reset") "rst" else ((if (isRnd) "rnd/" else "in/")) + x.width) + "\n"
@@ -163,15 +166,21 @@ class FloBackend extends Backend {
         case any        => 
           if (m.name != "" && !(m == c.reset) && !(m.component == null)) {
 	    // only modify name if it is not the reset signal or not in top component
-	    if(m.name != "reset" || !(m.component == c)) 
+	    if(!m.isSetComponentName && (m.name != "reset" || !(m.component == c))) {
+              // print("NODE(" + m.hashCode + ") " + m.name + " NAMING USING " + m.component.getPathName);
 	      m.name = m.component.getPathName + "__" + m.name;
+              m.isSetComponentName = true
+              // println(" -> " + m.name)
+            }
 	  }
           if (isSubNodes) {
             m.getSubNodes
-            // println("RENAME " + m + " NAME " + m.name + " SUBNODES " + m.subnodes.length)
+            // println("RENAME(" + m.hashCode + ") " + m + " NAME " + m.name + " SUBNODES " + m.subnodes.length)
             for (i <- 0 until m.subnodes.length) {
-              m.subnodes(i).setName(nodeName(m.subnodes(i).subnodeNode) + (if (m.subnodes.length > 1) ("__s" + i) else ""))
-              // println("  SUBNODE NAME "+ m.subnodes(i).name)
+              val snn = m.subnodes(i).subnodeNode;
+              // print("  SNN(" + snn.hashCode + ") " + snn.name);
+              m.subnodes(i).setName(nodeName(snn) + (if (m.subnodes.length > 1) ("__s" + i) else ""))
+              // println(" SUBNODE(" + m.subnodes(i).hashCode + ") NAME "+ m.subnodes(i).name)
             }
           }
       }
@@ -242,6 +251,8 @@ class FloBackend extends Backend {
     if (isSubNodes) {
       renameNodes(c, c.mods);
       c.findSubNodeOrdering(); // search from roots  -- create omods
+      for (m <- c.omods)
+        m.addConsumers
       updateMems()
     } else {
       c.findOrdering(); // search from roots  -- create omods
@@ -254,7 +265,7 @@ class FloBackend extends Backend {
     }
 
     for (m <- c.omods) 
-      out.write(emit(m));
+      out.write(emit(m))
     out.close();
     if(saveComponentTrace)
       printStack
