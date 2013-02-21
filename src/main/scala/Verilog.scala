@@ -68,32 +68,34 @@ class VerilogBackend extends Backend {
   }
 
   def emitPortDef(m: MemAccess, idx: Int): String = {
+    def str(prefix: String, ports: (String, String)*) =
+      ports.toList.filter(_._2 != null)
+        .map(p => "    ." + prefix + idx + p._1 + "(" + p._2 + ")")
+        .reduceLeft(_ + ",\n" + _)
+
     m match {
       case r: MemSeqRead =>
-        "    .R" + idx + "A(" + emitRef(r.addr) + "),\n" +
-        "    .R" + idx + "E(" + emitRef(r.cond) + "),\n" +
-        "    .R" + idx + "O(" + emitTmp(r) + ")"
+        val addr = ("A", emitRef(r.addr))
+        val en = ("E", emitRef(r.cond))
+        val out = ("O", emitTmp(r))
+        str("R", addr, en, out)
 
       case w: MemWrite =>
-        val mask = if (w.isMasked) emitRef(w.wmask) else "{"+w.mem.width+"{1'b1}}"
-
-        "    .W" + idx + "A(" + emitRef(w.addr) + "),\n" +
-        "    .W" + idx + "E(" + emitRef(w.cond) + "),\n" +
-        "    .W" + idx + "M(" + mask + "),\n" +
-        "    .W" + idx + "I(" + emitRef(w.data) + ")"
+        val addr = ("A", emitRef(w.addr))
+        val en = ("E", emitRef(w.cond))
+        val data = ("I", emitRef(w.data))
+        val mask = ("M", if (w.isMasked) emitRef(w.mask) else null)
+        str("W", addr, en, data, mask)
 
       case rw: MemReadWrite =>
         val (r, w) = (rw.read, rw.write)
-        val en = emitRef(r.cond) + " || " + emitRef(w.cond)
-        val addr = emitRef(w.cond) + " ? " + emitRef(w.addr) + " : " + emitRef(r.addr)
-        val mask = if (w.isMasked) emitRef(w.wmask) else "{"+rw.mem.width+"{1'b1}}"
-
-        "    .RW" + idx + "A(" + addr + "),\n" +
-        "    .RW" + idx + "E(" + en + "),\n" +
-        "    .RW" + idx + "W(" + emitRef(w.cond) + "),\n" +
-        "    .RW" + idx + "M(" + mask + "),\n" +
-        "    .RW" + idx + "I(" + emitRef(w.data) + "),\n" +
-        "    .RW" + idx + "O(" + emitTmp(r) + ")"
+        val addr = ("A", emitRef(w.cond) + " ? " + emitRef(w.addr) + " : " + emitRef(r.addr))
+        val en = ("E", emitRef(r.cond) + " || " + emitRef(w.cond))
+        val write = ("W", emitRef(w.cond))
+        val data = ("I", emitRef(w.data))
+        val mask = ("M", if (w.isMasked) emitRef(w.mask) else null)
+        val out = ("O", emitTmp(r))
+        str("RW", addr, en, write, data, mask, out)
     }
   }
 
@@ -477,7 +479,7 @@ class VerilogBackend extends Backend {
         val i = "i" + emitTmp(m)
         if (m.isMasked)
           (0 until m.mem.width).map(i =>
-            "    if (" + emitRef(m.cond) + " && " + emitRef(m.wmask) + "[" + i + "])\n" +
+            "    if (" + emitRef(m.cond) + " && " + emitRef(m.mask) + "[" + i + "])\n" +
             "      " + emitRef(m.mem) + "[" + emitRef(m.addr) + "][" + i + "] <= " + emitRef(m.data) + "[" + i + "];\n"
           ).reduceLeft(_+_)
         else

@@ -46,7 +46,7 @@ class FPGABackend extends VerilogBackend
         val i = "i" + emitTmp(m)
         (if (mw) "  wire [" + (m.mem.width-1) + ":0] " + emitRef(m.mem) + "_w" + me + " = " + writeMap(m.mem, me).map(_ + "[" + emitRef(m.addr) + "]").reduceLeft(_+" ^ "+_) + ";\n" else "") +
         (if (m.isMasked) {
-          val bm = m.mem.width % 8 == 0 && useByteMask(m.wmask)
+          val bm = m.mem.width % 8 == 0 && useByteMask(m.mask)
           val max = if (bm) m.mem.width/8 else m.mem.width
           val maskIdx = if(bm) i+"*8" else i
           val dataIdx = if (bm) i+"*8+7:"+i+"*8" else i
@@ -54,7 +54,7 @@ class FPGABackend extends VerilogBackend
           "    genvar " + i + ";\n" +
           "    for (" + i + " = 0; " + i + " < " + max + "; " + i + " = " + i + " + 1) begin: f" + emitTmp(m) + "\n" +
           "      always @(posedge clk)\n" +
-          "        if (" + emitRef(m.cond) + " && " + emitRef(m.wmask) + "["+maskIdx+"])\n" +
+          "        if (" + emitRef(m.cond) + " && " + emitRef(m.mask) + "["+maskIdx+"])\n" +
           "          " + meStr + "["+emitRef(m.addr)+"]["+dataIdx+"] <= " + emitRef(m.data) + "["+dataIdx+"]" + (if (mw) " ^ " + emitRef(m.mem) + "_w" + me + "["+dataIdx+"]" else "") + ";\n" +
           "    end\n" +
           "  endgenerate\n"

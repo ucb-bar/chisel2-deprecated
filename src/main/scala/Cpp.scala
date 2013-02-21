@@ -332,8 +332,8 @@ class CppBackend extends Backend {
         // schedule before Reg updates in case a MemWrite input is a Reg
         if (m.inputs.length == 2)
           return ""
-        def wmask(w: Int) = "(-" + emitLoWordRef(m.cond) + (if (m.isMasked) " & " + emitWordRef(m.wmask, w) else "") + ")"
-        block((0 until words(m)).map(i => emitRef(m.mem) + ".put(" + emitLoWordRef(m.addr) + ", " + i + ", (" + emitWordRef(m.data, i) + " & " + wmask(i) + ") | (" + emitRef(m.mem) + ".get(" + emitLoWordRef(m.addr) + ", " + i + ") & ~" + wmask(i) + "))"))
+        def mask(w: Int) = "(-" + emitLoWordRef(m.cond) + (if (m.isMasked) " & " + emitWordRef(m.mask, w) else "") + ")"
+        block((0 until words(m)).map(i => emitRef(m.mem) + ".put(" + emitLoWordRef(m.addr) + ", " + i + ", (" + emitWordRef(m.data, i) + " & " + mask(i) + ") | (" + emitRef(m.mem) + ".get(" + emitLoWordRef(m.addr) + ", " + i + ") & ~" + mask(i) + "))"))
 
       case _ =>
         ""

@@ -166,10 +166,10 @@ class PutativeMemWrite(mem: Mem[_], addri: Bits) extends Node with proc {
 class MemReadWrite(val read: MemSeqRead, val write: MemWrite) extends MemAccess(read.mem, null)
 {
   override def cond = throw new Exception("")
-  override def getPortType = "rw"
+  override def getPortType = if (write.isMasked) "mrw" else "rw"
 }
 
-class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, wmaski: Node) extends MemAccess(mem, addri) {
+class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) extends MemAccess(mem, addri) {
   inputs += condi
   override def cond = inputs(1)
 
@@ -180,8 +180,8 @@ class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, wmaski: Node)
       b
     }
     inputs += wrap(datai)
-    if (wmaski != null)
-      inputs += wrap(wmaski)
+    if (maski != null)
+      inputs += wrap(maski)
   }
 
   override def forceMatchingWidths = {
@@ -206,9 +206,9 @@ class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, wmaski: Node)
     wp.find(wc => rp.exists(rc => isNegOf(rc, wc) || isNegOf(wc, rc)))
   }
   def data = inputs(2)
-  def wmask = inputs(3)
+  def mask = inputs(3)
   def isMasked = inputs.length > 3
   override def toString: String = mem + "[" + addr + "] = " + data + " COND " + cond
-  override def getPortType: String = "write"
+  override def getPortType: String = if (isMasked) "mwrite" else "write"
   override def isRamWriteInput(n: Node) = inputs.contains(n)
 }
