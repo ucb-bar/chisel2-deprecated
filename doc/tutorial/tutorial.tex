@@ -847,7 +847,7 @@ around back to zero (i.e., modulo \verb!max+1!), we write:
 \begin{scala}
 def counter(max: UFix) = {
   val x = Reg(resetVal = UFix(0, max.getWidth))
-  x := Mux(x == max, UFix(0), x + UFix(1))
+  x := Mux(x === max, UFix(0), x + UFix(1))
   x
 }
 \end{scala}
