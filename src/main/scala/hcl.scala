@@ -51,11 +51,12 @@ object switch {
   }
 }
 object is {
-  def apply(v: Bits)(block: => Unit) = {
+  def apply(v: Bits, vs: Bits*)(block: => Unit) = {
     if (keys.length == 0) 
       println("NO KEY SPECIFIED");
     else {
-      val c = keys(0) === v;
+      val ts = vs.map(keys(0) === _)
+      val c = ts.foldLeft(keys(0) === v){ _ || _ };
       when (c) { block; }
     }
   }

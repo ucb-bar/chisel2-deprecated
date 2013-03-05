@@ -19,6 +19,8 @@ object Cat {
 }
 
 class Cat extends Node {
+  override def toString: String =
+    inputs(0) + " ## " + inputs(1)
 }
 
 object Concatenate {

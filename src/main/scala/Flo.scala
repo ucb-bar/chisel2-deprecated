@@ -1,5 +1,6 @@
 package Chisel
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.HashSet
 import scala.math._
 import java.io.File;
 import java.io.InputStream
@@ -66,7 +67,9 @@ class FloBackend extends Backend {
           o.op match {
             case "~" => "not/" + node.inputs(0).width + " " + emitRef(node.inputs(0))
             case "!" => "not/" + node.inputs(0).width + " " + emitRef(node.inputs(0))
-            case "-" => "neg/" + node.inputs(0).width + " " + emitRef(node.inputs(0))
+            case "-" => {
+              "neg/" + node.inputs(0).width + " " + emitRef(node.inputs(0))
+            }
           }
          } else {
            o.op match {
@@ -94,7 +97,7 @@ class FloBackend extends Backend {
       case x: Extract =>
         if (node.width < 0) println("RSH -1 NODE " + node)
         // println("EXTRACT " + node + " W " + node.width)
-        emitDec(node) + "rsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1)) + "\n"
+        emitDec(node) + "rsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(2)) + "\n"
 
       case x: Fill =>
         emitDec(x) + "fill/" + node.width + " " + emitRef(node.inputs(0)) + "\n"
@@ -154,9 +157,25 @@ class FloBackend extends Backend {
       case x: Log2 => // TODO: log2 instruction?
         emitDec(x) + "log2/" + x.width + " " + emitRef(x.inputs(0)) + "\n"
 
+      case c: Cat =>
+        emitDec(c) + "cat/" + c.inputs(1).width + " " + emitRef(c.inputs(0)) + " " + emitRef(c.inputs(1)) + "\n"
+        
+      case l: Literal =>
+        ""
       case _ =>
+        println("NO EMITTER FOR " + node)
         ""
     }
+  }
+
+  def genSubNodes(c: Component, nodes: Seq[Node]) = {
+    val walked = new HashSet[Node]
+    for (n <- nodes) {
+      n.getSubNodes
+      for (sn <- n.subnodes)
+        walked += sn
+    }
+    walked
   }
 
   def renameNodes(c: Component, nodes: Seq[Node]) = {
@@ -174,12 +193,14 @@ class FloBackend extends Backend {
             }
 	  }
           if (isSubNodes) {
-            m.getSubNodes
             // println("RENAME(" + m.hashCode + ") " + m + " NAME " + m.name + " SUBNODES " + m.subnodes.length)
             for (i <- 0 until m.subnodes.length) {
               val snn = m.subnodes(i).subnodeNode;
+              if (snn != null && m.subnodes(i).name == "") {
+                m.subnodes(i).setName(nodeName(snn) + (if (m.subnodes.length > 1) ("__s" + i) else ""))
+              } // else
+                // println("M " + m + " I " + i + " SN " + m.subnodes(i) + " SNN " + snn);
               // print("  SNN(" + snn.hashCode + ") " + snn.name);
-              m.subnodes(i).setName(nodeName(snn) + (if (m.subnodes.length > 1) ("__s" + i) else ""))
               // println(" SUBNODE(" + m.subnodes(i).hashCode + ") NAME "+ m.subnodes(i).name)
             }
           }
@@ -249,6 +270,7 @@ class FloBackend extends Backend {
       }
     }
     if (isSubNodes) {
+      val walked = genSubNodes(c, c.mods);
       renameNodes(c, c.mods);
       c.findSubNodeOrdering(); // search from roots  -- create omods
       for (m <- c.omods)
