@@ -43,3 +43,9 @@ publishTo <<= version { v: String =>
 }
 
 org.scalastyle.sbt.ScalastylePlugin.Settings
+
+libraryDependencies += "com.novocode" % "junit-interface" % "0.10-M1" % "test"
+
+libraryDependencies += "org.scalatest" %% "scalatest" % "1.9.1" % "test"
+
+seq(ScctPlugin.instrumentSettings : _*)
