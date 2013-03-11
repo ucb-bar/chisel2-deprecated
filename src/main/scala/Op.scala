@@ -201,6 +201,7 @@ object Op {
         case "||" => return if (a_lit.value == 0) b else Literal(1);
         case "&" => if (a_lit.value == 0) return Literal(0);
         case "|" => if (a_lit.value == 0) return b;
+        case "+" => if (a_lit.value == 0) return b;
         case _ => ;
       }
     } else if (a_lit == null && b_lit != null) {
@@ -209,6 +210,7 @@ object Op {
         case "||" => return if (b_lit.value == 0) a else Literal(1);
         case "&" => if (b_lit.value == 0) return Literal(0);
         case "|" => if (b_lit.value == 0) return a;
+        case "+" => if (b_lit.value == 0) return a;
         case _ => ;
       }
     } else if (a_lit != null && b_lit != null) {
@@ -649,30 +651,34 @@ class Op extends Node {
           }
         }
       } else if (op == "##") { // TODO: check 
-        val lsh = inputs(1).width
-        for (i <- 0 until backend.fullWords(inputs(1)))
-          setSubNode(i, inputs(1).getSubNode(i))
-        if (lsh%bpw != 0) {
-          val idx = backend.fullWords(inputs(1));
-          if (isInObject) {
-            val i1 = inputs(1).getSubNode(idx);
-            i1.width_ = lsh % bpw;
-            setSubNode(idx, Op("##", bpw, inputs(0).getSubNode(0), i1))
-          } else
-            setSubNode(idx, Op("|", bpw, Op("<<", bpw, inputs(0).getSubNode(0), Literal(lsh % bpw)), inputs(1).getSubNode(idx)));
-        }
-        for (i <- backend.words(inputs(1)) until backend.words(this)) {
-          val sni = (bpw*i-lsh)/bpw
-          val a   = inputs(0).getSubNode(sni)
-          val aw  = backend.thisWordBits(inputs(0), sni)
-          if (lsh % bpw != 0) {
-            val rsh = Op(">>", aw, a, bpw - lsh % bpw)
-            if  ((bpw*i-lsh)/bpw+1 < backend.words(inputs(0))) {
-              setSubNode(i, Op("<<", backend.wordBits, Op("|", aw, rsh, inputs(0).getSubNode(sni)), (lsh%bpw)))
+        if (width <= bpw) {
+          setSubNode(0, Op("##", width, inputs(0).getSubNode(0), inputs(1).getSubNode(0)))
+        } else {
+          val lsh = inputs(1).width
+          for (i <- 0 until backend.fullWords(inputs(1)))
+            setSubNode(i, inputs(1).getSubNode(i))
+          if (lsh%bpw != 0) {
+            val idx = backend.fullWords(inputs(1));
+            if (isInObject) {
+              val i1 = inputs(1).getSubNode(idx);
+              i1.width_ = lsh % bpw;
+              setSubNode(idx, Op("##", bpw, inputs(0).getSubNode(0), i1))
             } else
-              setSubNode(i, rsh)
-          } else
-            setSubNode(i, a)
+              setSubNode(idx, Op("|", bpw, Op("<<", bpw, inputs(0).getSubNode(0), Literal(lsh % bpw)), inputs(1).getSubNode(idx)));
+          }
+          for (i <- backend.words(inputs(1)) until backend.words(this)) {
+            val sni = (bpw*i-lsh)/bpw
+            val a   = inputs(0).getSubNode(sni)
+            val aw  = backend.thisWordBits(inputs(0), sni)
+            if (lsh % bpw != 0) {
+              val rsh = Op(">>", aw, a, bpw - lsh % bpw)
+              if  ((bpw*i-lsh)/bpw+1 < backend.words(inputs(0))) {
+                setSubNode(i, Op("<<", backend.wordBits, Op("|", aw, rsh, inputs(0).getSubNode(sni)), (lsh%bpw)))
+              } else
+                setSubNode(i, rsh)
+            } else
+              setSubNode(i, a)
+          }
         }
         // println("  EXPANDED INTO " + subnodes.length + " SUBNODES " + subnodes(0) + " NAME " + subnodes(0).name)
       } else if (op == "&" || op == "|" || op == "^" || op == "||" || op == "&&") {

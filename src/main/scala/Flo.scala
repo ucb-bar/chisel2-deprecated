@@ -109,16 +109,15 @@ class FloBackend extends Backend {
       case x: Bits =>
         if (x.inputs.length == 1) {
           // println("NAME " + x.name + " DIR " + x.dir + " COMP " + x.componentOf + " TOP-COMP " + topComponent)
-          if (x.dir == OUTPUT && x.componentOf == topComponent)
+          if (x.dir == OUTPUT && x.componentOf == topComponent && x.consumers.length == 0)
             emitDec(x) + (if (isRnd) "eat" else ("out/" + x.width))  + " " + emitRef(x.inputs(0)) + "\n"
-          else {
-            if (x.consumers.length > 0 && !(!node.isInObject && node.inputs.length == 1)) 
-              emitDec(x) + "mov " + emitRef(x.inputs(0)) + "\n"
-            else {
-              println("--> NO CONSUMERS " + x);
-              ""
-            }
-          }
+          else if (node.isInObject) {
+            println("IN OBJECT NAME " + x.name)
+            emitDec(x) + "mov " + emitRef(x.inputs(0)) + "\n"
+          } else
+            ""
+          // println("--> NO CONSUMERS " + x + " = " + x.consumers.length);
+          // ""
         } else {
           emitDec(x) + (if (x.name == "reset") "rst" else ((if (isRnd) "rnd/" else "in/")) + x.width) + "\n"
         }
