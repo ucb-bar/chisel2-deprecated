@@ -486,12 +486,15 @@ object Op {
 
 object Trunc {
   def apply(x: Node) = {
-    val bpw = backend.wordBits;
-    val nw  = backend.words(x)
-    val nfw = backend.fullWords(x)
-    if (nw != nfw) {
-      val w = (x.width-bpw*nfw)
-      x.setSubNode(nw-1, Op("&", w, x.getSubNode(nw-1), Literal((1L << w)-1, w)))
+    if (!backend.isInstanceOf[FloBackend]) {
+      val bpw = backend.wordBits;
+      val nw  = backend.words(x)
+      val nfw = backend.fullWords(x)
+      if (nw != nfw) {
+        val w = (x.width-bpw*nfw)
+        // TODO: EXTRACT INSTEAD
+        x.setSubNode(nw-1, Op("&", w, x.getSubNode(nw-1), Literal((1L << w)-1, w)))
+      }
     }
   }
 }    
@@ -659,7 +662,7 @@ class Op extends Node {
             setSubNode(i, inputs(1).getSubNode(i))
           if (lsh%bpw != 0) {
             val idx = backend.fullWords(inputs(1));
-            if (isInObject) {
+            if (isInObject || backend.isInstanceOf[FloBackend]) { // TODO: WHY IS THIS NECESSARY?
               val i1 = inputs(1).getSubNode(idx);
               i1.width_ = lsh % bpw;
               setSubNode(idx, Op("##", bpw, inputs(0).getSubNode(0), i1))

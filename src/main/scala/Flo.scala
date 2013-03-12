@@ -38,8 +38,9 @@ class FloBackend extends Backend {
         case _ =>
           super.emitRef(node)
       }
-    } else 
+    } else {
       "" + node.litOf.value
+    }
   }
 
   def trueAll(dstName: String, refs: Seq[Node]): String = {
@@ -111,8 +112,9 @@ class FloBackend extends Backend {
           // println("NAME " + x.name + " DIR " + x.dir + " COMP " + x.componentOf + " TOP-COMP " + topComponent)
           if (x.dir == OUTPUT && x.componentOf == topComponent && x.consumers.length == 0)
             emitDec(x) + (if (isRnd) "eat" else ("out/" + x.width))  + " " + emitRef(x.inputs(0)) + "\n"
-          else if (node.isInObject) {
-            println("IN OBJECT NAME " + x.name)
+          else if (node.isInObject && node.litOf == null) {
+            if (x.inputs(0).isInstanceOf[Literal])
+              println("LIT IN OBJECT NAME " + x.name + " " + x.consumers.length + " CONSUMERS " + x.consumers(0))
             emitDec(x) + "mov " + emitRef(x.inputs(0)) + "\n"
           } else
             ""
