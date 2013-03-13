@@ -22,9 +22,11 @@ object ChiselError {
       val ste = stack(i)
       val classname = ste.getClassName
       val dotPos = classname.lastIndexOf('.')
-      val pkg = classname.subSequence(0, dotPos)
-      if (pkg != "Chisel" && !classname.contains("scala"))
-        return ste
+      if( dotPos > 0 ) {
+        val pkg = classname.subSequence(0, dotPos)
+        if (pkg != "Chisel" && !classname.contains("scala"))
+          return ste
+      }
     }
     println("COULDN'T FIND LINE NUMBER")
     return stack(0)
