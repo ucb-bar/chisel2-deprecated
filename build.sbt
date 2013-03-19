@@ -4,7 +4,7 @@ version := "1.1-SNAPSHOT"
 
 name := "chisel"
 
-scalaVersion := "2.9.1"
+scalaVersion := "2.9.2"
 
 publishMavenStyle := true
 
@@ -41,3 +41,11 @@ publishTo <<= version { v: String =>
   else                             
     Some("releases" at nexus + "service/local/staging/deploy/maven2")
 }
+
+org.scalastyle.sbt.ScalastylePlugin.Settings
+
+libraryDependencies += "com.novocode" % "junit-interface" % "0.10-M1" % "test"
+
+libraryDependencies += "org.scalatest" %% "scalatest" % "1.9.1" % "test"
+
+seq(ScctPlugin.instrumentSettings : _*)
