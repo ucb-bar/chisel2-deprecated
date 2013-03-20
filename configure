@@ -7,7 +7,13 @@
 srcTop=`dirname $0`
 buildTop=`pwd`
 
-if [ "$(stat -L -f '%d:%i' $srcTop)" == "$(stat -L -f '%d:%i' $buildTop)" ]
+if [ $(uname) == "Linux" ] ; then
+    statFormat="--format='%d:%i'"
+else
+    statFormat="-f '%d:%i'"
+fi
+
+if [ "$(stat -L $statFormat $srcTop)" == "$(stat -L $statFormat $buildTop)" ]
 then
     echo "You are running 'configure' in the directory it resides."
     echo "Nothing to be done, just run sbt directory."
