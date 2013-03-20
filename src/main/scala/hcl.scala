@@ -1,3 +1,33 @@
+/*
+ Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ California (Regents). All Rights Reserved.  Redistribution and use in
+ source and binary forms, with or without modification, are permitted
+ provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer.
+    * Redistributions in binary form must reproduce the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer in the documentation and/or other materials
+      provided with the distribution.
+    * Neither the name of the Regents nor the names of its contributors
+      may be used to endorse or promote products derived from this
+      software without specific prior written permission.
+
+ IN NO EVENT SHALL REGENTS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
+ SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS,
+ ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+ REGENTS HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ REGENTS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE. THE SOFTWARE AND ACCOMPANYING DOCUMENTATION, IF
+ ANY, PROVIDED HEREUNDER IS PROVIDED "AS IS". REGENTS HAS NO OBLIGATION
+ TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
+ MODIFICATIONS.
+*/
+
 package Chisel
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
@@ -6,7 +36,7 @@ import Component._
 import Literal._
 import Node._
 import ChiselError._
-  
+
 object Enum {
   def apply(l: List[Symbol]) = (l zip (Range(0, l.length, 1).map(x => UFix(x, sizeof(l.length-1))))).toMap;
   def apply(l: Symbol *) = (l.toList zip (Range(0, l.length, 1).map(x => UFix(x, sizeof(l.length-1))))).toMap;
@@ -17,7 +47,7 @@ object when {
   def execWhen(cond: Bool)(block: => Unit) = {
     conds.push(conds.top && cond);
     block;
-    conds.pop(); 
+    conds.pop();
   }
   def apply(cond: Bool)(block: => Unit) = {
     execWhen(cond){ block }
@@ -35,26 +65,26 @@ class when (prevCond: Bool) {
 }
 
 object unless {
-  def apply(c: Bool)(block: => Unit) = 
+  def apply(c: Bool)(block: => Unit) =
     when (!c) { block }
 }
 
 object otherwise {
-  def apply(block: => Unit) = 
+  def apply(block: => Unit) =
     when (Bool(true)) { block }
 }
 object switch {
   def apply(c: Bits)(block: => Unit) = {
-    keys.push(c); 
-    block; 
+    keys.push(c);
+    block;
     keys.pop();
   }
 }
 object is {
   def apply(v: Bits)(block: => Unit) = {
-    if (keys.length == 0) 
+    if (keys.length == 0) {
       println("NO KEY SPECIFIED");
-    else {
+    } else {
       val c = keys(0) === v;
       when (c) { block; }
     }
@@ -64,11 +94,11 @@ object is {
 class TestIO(val format: String, val args: Seq[Data] = null)
 
 object Scanner {
-  def apply (format: String, args: Data*) = 
+  def apply (format: String, args: Data*) =
     new TestIO(format, args.toList);
 }
 object Printer {
-  def apply (format: String, args: Data*) = 
+  def apply (format: String, args: Data*) =
     new TestIO(format, args.toList);
 }
 
@@ -88,35 +118,36 @@ object chiselMain {
         case "--Wconnection" => saveConnectionWarnings = true
         case "--Wcomponent" => saveComponentTrace = true
         case "--noCombLoop" => dontFindCombLoop = true
-        case "--genHarness" => isGenHarness = true; 
-        case "--debug" => isDebug = true; 
-        case "--ioDebug" => isIoDebug = true; 
-        case "--noIoDebug" => isIoDebug = false; 
-        case "--clockGatingUpdates" => isClockGatingUpdates = true; 
-        case "--clockGatingUpdatesInline" => isClockGatingUpdatesInline = true; 
-        case "--folding" => isFolding = true; 
+        case "--genHarness" => isGenHarness = true;
+        case "--debug" => isDebug = true;
+        case "--ioDebug" => isIoDebug = true;
+        case "--noIoDebug" => isIoDebug = false;
+        case "--clockGatingUpdates" => isClockGatingUpdates = true;
+        case "--clockGatingUpdatesInline" => isClockGatingUpdatesInline = true;
+        case "--folding" => isFolding = true;
         case "--vcd" => isVCD = true;
         case "--v" => backend = new VerilogBackend
-        case "--moduleNamePrefix" => moduleNamePrefix = args(i+1); i += 1
+        case "--moduleNamePrefix" => moduleNamePrefix = args(i + 1); i += 1
         case "--inlineMem" => isInlineMem = true;
         case "--noInlineMem" => isInlineMem = false;
         case "--backend" => {
-          if (args(i+1) == "v")
+          if (args(i + 1) == "v") {
             backend = new VerilogBackend
-          else if (args(i+1) == "c")
+          } else if (args(i + 1) == "c") {
             backend = new CppBackend
-          else if (args(i+1) == "flo")
+          } else if (args(i + 1) == "flo") {
             backend = new FloBackend
-          else if (args(i+1) == "fpga")
+          } else if (args(i + 1) == "fpga") {
             backend = new FPGABackend
-          else
-            backend = Class.forName(args(i+1)).newInstance.asInstanceOf[Backend]
+          } else {
+            backend = Class.forName(args(i + 1)).newInstance.asInstanceOf[Backend]
+          }
           i += 1
         }
         case "--compile" => isCompiling = true
         case "--test" => isTesting = true;
-        case "--targetDir" => targetDir = args(i+1); i += 1;
-        case "--include" => includeArgs = splitArg(args(i+1)); i += 1;
+        case "--targetDir" => targetDir = args(i + 1); i += 1;
+        case "--include" => includeArgs = splitArg(args(i + 1)); i += 1;
         case "--checkPorts" => isCheckingPorts = true
         case any => println("UNKNOWN CONSOLE ARG");
       }
@@ -127,7 +158,7 @@ object chiselMain {
   def run[T <: Component] (args: Array[String], gen: () => T): T = apply(args, gen) // hack to avoid supplying default parameters manually for invocation in sbt
 
   def apply[T <: Component]
-      (args: Array[String], gen: () => T, 
+      (args: Array[String], gen: () => T,
        scanner: T => TestIO = null, printer: T => TestIO = null, ftester: T => Tester[T] = null): T = {
     initChisel();
     readArgs(args)
@@ -163,12 +194,12 @@ object throwException {
     val usrStart = findFirstUserInd(st)
     val usrEnd = if(usrStart == 0) st.length else usrStart + 1
     xcpt.setStackTrace(st.slice(usrStart, usrEnd))
-    throw xcpt    
+    throw xcpt
   }
 }
 
 object chiselMainTest {
-  def apply[T <: Component](args: Array[String], gen: () => T)(tester: T => Tester[T]): T = 
+  def apply[T <: Component](args: Array[String], gen: () => T)(tester: T => Tester[T]): T =
     chiselMain(args, gen, null, null, tester)
 }
 
@@ -181,8 +212,9 @@ trait proc extends Node {
   }
   def genMuxes(default: Node): Unit = {
     if (updates.length == 0) {
-      if (inputs.length == 0 || inputs(0) == null)
+      if (inputs.length == 0 || inputs(0) == null) {
         ChiselErrors += ChiselError({"NO UPDATES ON " + this}, this)
+      }
       return
     }
     val (lastCond, lastValue) = updates.head
@@ -190,10 +222,11 @@ trait proc extends Node {
       ChiselErrors += ChiselError({"NO DEFAULT SPECIFIED FOR WIRE: " + this}, this)
       return
     }
-    if (default != null)
+    if (default != null) {
       genMuxes(default, updates)
-    else
+    } else {
       genMuxes(lastValue, updates.toList.tail)
+    }
   }
   def procAssign(src: Node);
   procs += this;
@@ -208,14 +241,14 @@ abstract class BlackBox extends Component {
   parent.blackboxes += this;
   var moduleNameSet = false;
 
-  def setVerilogParameters(string: String) = 
+  def setVerilogParameters(string: String) =
     this.asInstanceOf[Component].verilog_parameters = string;
 
-  override def name_it() = {
+  override def nameIt() = {
     if(!moduleNameSet) {
       val cname = getClass().getName();
       val dotPos = cname.lastIndexOf('.');
-      moduleName = if (dotPos >= 0) cname.substring(dotPos+1) else cname;
+      moduleName = if (dotPos >= 0) cname.substring(dotPos + 1) else cname;
     }
   }
   def setName(name: String) = {moduleName = name; moduleNameSet = true}

@@ -1,3 +1,33 @@
+/*
+ Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ California (Regents). All Rights Reserved.  Redistribution and use in
+ source and binary forms, with or without modification, are permitted
+ provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer.
+    * Redistributions in binary form must reproduce the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer in the documentation and/or other materials
+      provided with the distribution.
+    * Neither the name of the Regents nor the names of its contributors
+      may be used to endorse or promote products derived from this
+      software without specific prior written permission.
+
+ IN NO EVENT SHALL REGENTS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
+ SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS,
+ ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+ REGENTS HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ REGENTS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE. THE SOFTWARE AND ACCOMPANYING DOCUMENTATION, IF
+ ANY, PROVIDED HEREUNDER IS PROVIDED "AS IS". REGENTS HAS NO OBLIGATION
+ TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
+ MODIFICATIONS.
+*/
+
 package Chisel
 import ChiselError._
 import Node._
@@ -11,12 +41,14 @@ object Mem {
 
   Component.backend.transforms.prepend { c =>
     c.bfs { n =>
-      if (n.isInstanceOf[MemAccess])
+      if (n.isInstanceOf[MemAccess]) {
         n.asInstanceOf[MemAccess].referenced = true
+      }
     }
     c.bfs { n =>
-      if (n.isInstanceOf[Mem[_]])
+      if (n.isInstanceOf[Mem[_]]) {
         n.asInstanceOf[Mem[_]].computePorts
+      }
     }
   }
 }
@@ -40,15 +72,16 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
 
   private val readPortCache = HashMap[Bits, T]()
   def doRead(addr: Bits): T = {
-    if (readPortCache.contains(addr))
+    if (readPortCache.contains(addr)) {
       return readPortCache(addr)
+    }
 
     val addrIsReg = addr.isInstanceOf[Bits] && addr.inputs.length == 1 && addr.inputs(0).isInstanceOf[Reg]
-    val rd = if (seqRead && !Component.isInlineMem && addrIsReg)
+    val rd = if (seqRead && !Component.isInlineMem && addrIsReg) {
       (seqreads += new MemSeqRead(this, addr.inputs(0))).last
-    else
+    } else {
       (reads += new MemRead(this, addr)).last
-
+    }
     val data = gen().fromNode(rd).asInstanceOf[T]
     data.setIsTypeNode
     readPortCache += (addr -> data)
@@ -57,8 +90,11 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
 
   def doWrite(addr: Bits, condIn: Bool, wdata: Node, wmask: Bits) = {
     val cond = // add bounds check if depth is not a power of 2
-      if (isPow2(n)) condIn
-      else condIn && addr(log2Up(n)-1,0) < UFix(n)
+      if (isPow2(n)) {
+        condIn
+      } else {
+        condIn && addr(log2Up(n)-1,0) < UFix(n)
+      }
 
     def doit(addr: Bits, cond: Bool, wdata: Node, wmask: Bits) = {
       val wr = new MemWrite(this, cond, addr, wdata, wmask)
@@ -77,8 +113,9 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
       doit(Reg(addr), Reg(cond), reg_data, reg_wmask)
       doit(addr, cond, gen().fromBits(random_data), wmask)
       reg_data.comp
-    } else
+    } else {
       doit(addr, cond, wdata, wmask)
+    }
   }
 
   def read(addr: Bits): T = doRead(addr)
@@ -106,8 +143,9 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
 
     // try to extract RW ports
     for (w <- writes; r <- seqreads)
-      if (!w.emitRWEnable(r).isEmpty && !readwrites.contains((rw: MemReadWrite) => rw.read == r || rw.write == w))
+      if (!w.emitRWEnable(r).isEmpty && !readwrites.contains((rw: MemReadWrite) => rw.read == r || rw.write == w)) {
         readwrites += new MemReadWrite(r, w)
+      }
     writes --= readwrites.map(_.write)
     seqreads --= readwrites.map(_.read)
   }
@@ -180,8 +218,9 @@ class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) 
       b
     }
     inputs += wrap(datai)
-    if (maski != null)
+    if (maski != null) {
       inputs += wrap(maski)
+    }
   }
 
   override def forceMatchingWidths = {
@@ -194,10 +233,11 @@ class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) 
   var pairedRead: MemSeqRead = null
   def emitRWEnable(r: MemSeqRead) = {
     def getProducts(x: Node): List[Node] = {
-      if (x.isInstanceOf[Op] && x.asInstanceOf[Op].op == "&&")
+      if (x.isInstanceOf[Op] && x.asInstanceOf[Op].op == "&&") {
         List(x) ++ getProducts(x.inputs(0)) ++ getProducts(x.inputs(1))
-      else
+      } else {
         List(x)
+      }
     }
     def isNegOf(x: Node, y: Node) = x.isInstanceOf[Op] && x.asInstanceOf[Op].op == "!" && x.inputs(0) == y
 

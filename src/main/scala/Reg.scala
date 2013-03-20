@@ -1,3 +1,33 @@
+/*
+ Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ California (Regents). All Rights Reserved.  Redistribution and use in
+ source and binary forms, with or without modification, are permitted
+ provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer.
+    * Redistributions in binary form must reproduce the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer in the documentation and/or other materials
+      provided with the distribution.
+    * Neither the name of the Regents nor the names of its contributors
+      may be used to endorse or promote products derived from this
+      software without specific prior written permission.
+
+ IN NO EVENT SHALL REGENTS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
+ SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS,
+ ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+ REGENTS HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ REGENTS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE. THE SOFTWARE AND ACCOMPANYING DOCUMENTATION, IF
+ ANY, PROVIDED HEREUNDER IS PROVIDED "AS IS". REGENTS HAS NO OBLIGATION
+ TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
+ MODIFICATIONS.
+*/
+
 package Chisel
 import Node._
 import Reg._
@@ -7,43 +37,47 @@ import ChiselError._
 object Reg {
 
   def regMaxWidth(m: Node) =
-    if (isInGetWidth)
+    if (isInGetWidth) {
       throw new Exception("getWidth was called on a Register or on an object connected in some way to a Register that has a statically uninferrable width")
-    else
+    } else {
       maxWidth(m)
+    }
 
   // Rule: If no width is specified, use max width. Otherwise, use the specified width.
-  def regWidth(w: Int) = {
-    if(w <= 0)
+  def regWidth(w: Int) =
+    if(w <= 0) {
       regMaxWidth _ ;
-    else 
+    } else {
       fixWidth(w)
-  }
+    }
 
   // Rule: if r is using an inferred width, then don't enforce a width. If it is using a user inferred
   // width, set the the width
   def regWidth(r: Node) = {
     val rLit = r.litOf
-    if (rLit != null && rLit.hasInferredWidth)
+    if (rLit != null && rLit.hasInferredWidth) {
       regMaxWidth _
-    else
+    } else {
       fixWidth(r.getWidth)
+    }
   }
 
   def validateGen[T <: Data](gen: => T) = {
     for ((n, i) <- gen.flatten)
-      if (!i.inputs.isEmpty || !i.updates.isEmpty)
+      if (!i.inputs.isEmpty || !i.updates.isEmpty) {
         throwException("Invalid Type Specifier for Reg")
+      }
   }
 
   def apply[T <: Data](data: T, width: Int, resetVal: T)(gen: => T): T = {
     validateGen(gen)
 
-    val d: Array[(String, Bits)] = 
-      if(data == null) 
+    val d: Array[(String, Bits)] =
+      if(data == null) {
         gen.flatten.map{case(x, y) => (x -> null)}
-      else 
+      } else {
         data.flatten
+      }
 
     val res = gen.asOutput
 
@@ -101,8 +135,9 @@ class Reg extends Delay with proc {
   var assigned = false;
   var enable = Bool(false);
   def procAssign(src: Node) = {
-    if (assigned)
+    if (assigned) {
       ChiselErrors += ChiselError("reassignment to Reg", Thread.currentThread().getStackTrace);
+    }
     val cond = genCond();
     if (conds.length >= 1) {
       isEnable = backend.isInstanceOf[VerilogBackend]
@@ -122,15 +157,16 @@ class Reg extends Delay with proc {
       genMuxes(u, updates.toList.tail)
       inputs += enable;
       enableIndex = inputs.length - 1;
-    } else
+    } else {
       super.genMuxes(default)
+    }
   }
   def nameOpt: String = if (name.length > 0) name else "REG"
   override def toString: String = {
     "REG(" + nameOpt + ")"
     /*
     if (component == null) return "nullcompreg";
-    if (component.isWalking.contains(this)) 
+    if (component.isWalking.contains(this))
       nameOpt
     else {
       component.isWalking += this;
@@ -146,7 +182,7 @@ class Reg extends Delay with proc {
   override def assign(src: Node) = {
     if(assigned || inputs(0) != null) {
       ChiselErrors += ChiselError("reassignment to Reg", Thread.currentThread().getStackTrace);
-    } else { 
+    } else {
       assigned = true; super.assign(src)
     }
   }

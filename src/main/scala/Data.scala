@@ -1,3 +1,33 @@
+/*
+ Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ California (Regents). All Rights Reserved.  Redistribution and use in
+ source and binary forms, with or without modification, are permitted
+ provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer.
+    * Redistributions in binary form must reproduce the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer in the documentation and/or other materials
+      provided with the distribution.
+    * Neither the name of the Regents nor the names of its contributors
+      may be used to endorse or promote products derived from this
+      software without specific prior written permission.
+
+ IN NO EVENT SHALL REGENTS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
+ SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS,
+ ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+ REGENTS HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ REGENTS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE. THE SOFTWARE AND ACCOMPANYING DOCUMENTATION, IF
+ ANY, PROVIDED HEREUNDER IS PROVIDED "AS IS". REGENTS HAS NO OBLIGATION
+ TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
+ MODIFICATIONS.
+*/
+
 package Chisel
 
 import Node._
@@ -21,7 +51,13 @@ abstract class Data extends Node {
   def terminate(): Unit = { }
   def flip(): this.type = this;
   def asInput(): this.type = this;
-  def asOutput(): this.type = this;
+
+  /** Sets the direction (*dir*) of instances derived from Bits to OUTPUT
+    or recursively sets members of Bundle/Vec to OUTPUT.
+    Returns this instance with its exact type.
+    */
+  def asOutput(): this.type
+
   def toNode: Node = this;
   def fromNode(n: Node): this.type = this;
   def fromBits(b: Bits): this.type = {
@@ -44,11 +80,12 @@ abstract class Data extends Node {
       }
     }
   }
-  override def name_it(path: String, setNamed: Boolean = false) = {
-    if (isTypeNode && comp != null) 
-      comp.name_it(path, setNamed)
-    else
-      super.name_it(path, setNamed);
+  override def nameIt(path: String, setNamed: Boolean = false) = {
+    if (isTypeNode && comp != null) {
+      comp.nameIt(path, setNamed)
+    } else {
+      super.nameIt(path, setNamed);
+    }
   }
   def setWidth(w: Int) = this.width = w;
 }

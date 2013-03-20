@@ -1,3 +1,33 @@
+/*
+ Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ California (Regents). All Rights Reserved.  Redistribution and use in
+ source and binary forms, with or without modification, are permitted
+ provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer.
+    * Redistributions in binary form must reproduce the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer in the documentation and/or other materials
+      provided with the distribution.
+    * Neither the name of the Regents nor the names of its contributors
+      may be used to endorse or promote products derived from this
+      software without specific prior written permission.
+
+ IN NO EVENT SHALL REGENTS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
+ SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS,
+ ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+ REGENTS HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ REGENTS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE. THE SOFTWARE AND ACCOMPANYING DOCUMENTATION, IF
+ ANY, PROVIDED HEREUNDER IS PROVIDED "AS IS". REGENTS HAS NO OBLIGATION
+ TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
+ MODIFICATIONS.
+*/
+
 package Chisel
 import Node._
 import Component._
@@ -26,12 +56,14 @@ object MuxCase {
 object Multiplex{
   def apply (t: Node, c: Node, a: Node): Node = {
     if (isFolding) {
-      if (t.litOf != null) 
+      if (t.litOf != null) {
         return if (t.litOf.value == 0) a else c
+      }
       if (c.litOf != null && a.litOf != null) {
-        if (c.litOf.value == a.litOf.value)
+        if (c.litOf.value == a.litOf.value) {
           return c
-        if (c.litOf.value == 1 && a.litOf.value == 0){
+        }
+        if (c.litOf.value == 1 && a.litOf.value == 0) {
           if(c.litOf.width == 1 && a.litOf.width == 1) return t
           val fill = NodeFill(max(c.litOf.width-1, a.litOf.width-1), Literal(0,1))
           fill.infer
@@ -42,8 +74,9 @@ object Multiplex{
           return cat
         }
       }
-      if (a.isInstanceOf[Mux] && c.clearlyEquals(a.inputs(1)))
+      if (a.isInstanceOf[Mux] && c.clearlyEquals(a.inputs(1))) {
         Multiplex(t.asInstanceOf[Bits] || a.inputs(0).asInstanceOf[Bits], c, a.inputs(2))
+      }
     }
     new Mux().init("", maxWidth _, t, c, a);
   }
@@ -51,7 +84,7 @@ object Multiplex{
 
 object isLessThan {
 
-  def distFromData(x: java.lang.Class[ _ ]) = {
+  def distFromData(x: java.lang.Class[_]): Int = {
     var xClass = x
     var xCnt = 0
     while(xClass.toString != "class Chisel.Data") {
@@ -61,11 +94,10 @@ object isLessThan {
     xCnt
   }
 
-  def checkCommonSuperclass(x: java.lang.Class[ _ ], y: java.lang.Class[ _ ]) = {
-    
+  def checkCommonSuperclass(x: java.lang.Class[_], y: java.lang.Class[_]) {
   }
 
-  def apply(x: java.lang.Class[ _ ], y: java.lang.Class[ _ ]) = {
+  def apply(x: java.lang.Class[_], y: java.lang.Class[_]) = {
     checkCommonSuperclass(x, y)
     distFromData(x) > distFromData(y)
   }
@@ -76,9 +108,9 @@ object Mux {
     val res = Multiplex(t, c.toNode, a.toNode)
     if (c.isInstanceOf[Bits]) {
       assert(a.isInstanceOf[Bits])
-      if (c.getClass == a.getClass)
+      if (c.getClass == a.getClass) {
         res.setTypeNodeNoAssign(c.fromNode(res).asInstanceOf[T])
-      else {
+      } else {
         res.setTypeNode(Bits(OUTPUT)).asInstanceOf[T]
       }
     } else {

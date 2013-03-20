@@ -1,3 +1,33 @@
+/*
+ Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ California (Regents). All Rights Reserved.  Redistribution and use in
+ source and binary forms, with or without modification, are permitted
+ provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer.
+    * Redistributions in binary form must reproduce the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer in the documentation and/or other materials
+      provided with the distribution.
+    * Neither the name of the Regents nor the names of its contributors
+      may be used to endorse or promote products derived from this
+      software without specific prior written permission.
+
+ IN NO EVENT SHALL REGENTS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
+ SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS,
+ ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+ REGENTS HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ REGENTS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE. THE SOFTWARE AND ACCOMPANYING DOCUMENTATION, IF
+ ANY, PROVIDED HEREUNDER IS PROVIDED "AS IS". REGENTS HAS NO OBLIGATION
+ TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
+ MODIFICATIONS.
+*/
+
 package Chisel
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
@@ -12,7 +42,7 @@ object Bundle {
   def apply (elts: ArrayBuffer[(String, Data)]): Bundle = {
     val res = new Bundle();
     res.elementsCache = elts; // TODO: REMOVE REDUNDANT CREATION
-    for ((n, i) <- elts) 
+    for ((n, i) <- elts)
       i.name = n;
     res
   }
@@ -37,6 +67,9 @@ object sort {
   }
 }
 
+/** Defines a collection of datum of different types into a single coherent
+  whole.
+  */
 class Bundle(view_arg: Seq[String] = null) extends Data{
   var dir = "";
   var view = view_arg;
@@ -62,23 +95,25 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
             isFound = true; isInterface = true;
           } else if (c == null || c == Class.forName("java.lang.Object")) {
             isFound = true; isInterface = false;
-          } else 
+          } else {
             c = c.getSuperclass();
+          }
         } while (!isFound);
         // TODO: SPLIT THIS OUT TO TOP LEVEL LIST
         if (types.length == 0 && !isStatic(modifiers) && isInterface &&
             name != "elements" && name != "flip" && name != "toString" && name != "flatten" && name != "binding" && name != "asInput" && name != "asOutput" && name != "unary_$tilde" && name != "unary_$bang" && name != "unary_$minus" && name != "clone" && name != "toUFix" && name != "toBits" && name != "toBool" && name != "toFix" &&
             (view == null || view.contains(name)) && !seen.contains(m.invoke(this))) {
           val o = m.invoke(this);
-          o match { 
-	    case bv: Vec[Data] => elts += ((name + bv.name, bv))
-            case i: Data => elts += ((name, i)); i.name = name; 
+          o match {
+            case bv: Vec[Data] => elts += ((name + bv.name, bv))
+            case i: Data => elts += ((name, i)); i.name = name;
             case any =>
           }
           seen += o;
         }
-      } else if (name == "elementsCache") 
+      } else if (name == "elementsCache") {
         isCollecting = true;
+      }
     }
     elts
   }
@@ -99,30 +134,30 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     res
   }
   override def terminate(): Unit = {
-    for ((n, i) <- elements) 
+    for ((n, i) <- elements)
       i.terminate();
   }
-  def view (elts: ArrayBuffer[(String, Data)]): Bundle = { 
-    elementsCache = elts; this 
+  def view (elts: ArrayBuffer[(String, Data)]): Bundle = {
+    elementsCache = elts; this
   }
 
-  override def name_it (path: String, named: Boolean = true) = {
+  override def nameIt (path: String, named: Boolean = true) = {
     if(!this.named) {
       if(path.length > 0) {
         name = path
         this.named = named
       }
       for ((n, i) <- elements) {
-        i.name_it( (if (path.length > 0) path + "_" else "") + n, named )
+        i.nameIt( (if (path.length > 0) path + "_" else "") + n, named )
       }
     }
   }
 
   def +(other: Bundle): Bundle = {
     var elts = ArrayBuffer[(String, Data)]();
-    for ((n, i) <- elements) 
+    for ((n, i) <- elements)
       elts += ((n, i));
-    for ((n, i) <- other.elements) 
+    for ((n, i) <- other.elements)
       elts += ((n, i));
     Bundle(elts)
   }
@@ -142,48 +177,48 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
       elt.removeTypeNodes
   }
   override def traceableNodes = elements.map(tup => tup._2).toArray;
-  
+
   override def traceNode(c: Component, stack: Stack[() => Any]) = {
     for((n, i) <- flatten) {
       stack.push(() => i.traceNode(c, stack))
     }
   }
-  
+
   override def apply(name: String): Data = {
     for((n,i) <- elements)
       if(name == n) return i;
     throw new NoSuchElementException();
     return null;
   }
-  override def <>(src: Node) = { 
-    if(comp == null || (dir == "output" && 
-			src.isInstanceOf[Bundle] && 
-			src.asInstanceOf[Bundle].dir == "output")){
+  override def <>(src: Node) = {
+    if(comp == null || (dir == "output" &&
+      src.isInstanceOf[Bundle] &&
+      src.asInstanceOf[Bundle].dir == "output")){
       src match {
-	case other: Bundle => {
+        case other: Bundle => {
           for ((n, i) <- elements) {
             if (other.contains(n)){
               i <> other(n);
-	    }
+            }
             else{
               println("// UNABLE TO FIND " + n + " IN " + other.component);
-	    }
+            }
           }
-	}
-	case default =>
+        }
+        case default =>
           println("// TRYING TO CONNECT BUNDLE TO NON BUNDLE " + default);
       }
     } else {
-      src match { 
-	case other: Bundle => {
-	  comp assign other.toNode
-	}
-	case default =>
-	  println("CONNECTING INCORRECT TYPES INTO WIRE OR REG")
+      src match {
+        case other: Bundle => {
+          comp assign other.toNode
+        }
+        case default =>
+          println("CONNECTING INCORRECT TYPES INTO WIRE OR REG")
       }
     }
   }
-  override def ^^(src: Node) = { 
+  override def ^^(src: Node) = {
     src match {
       case other: Bundle =>
         for ((n, i) <- elements) {
@@ -225,10 +260,9 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
         case bits: Bits => {
           if (src.contains(n)) bits := src(n).asInstanceOf[Bits]
         }
-        case vec: Vec[ Data ] => {
-          if (src.contains(n)) vec := src(n).asInstanceOf[Vec[ Data ]]
+        case vec: Vec[Data] => {
+          if (src.contains(n)) vec := src(n).asInstanceOf[Vec[Data]]
         }
-        
       }
     }
 
@@ -256,7 +290,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     }
     bundledElm
   }
-  
+
   override def fromNode(n: Node): this.type = {
     val res = this.clone()
     var ind = 0;
