@@ -216,9 +216,7 @@ class CppBackend extends Backend {
             res += "val_t __s = " + emitLoWordRef(o.inputs(1)) + " % " + bpw
             res += "val_t __r = " + bpw + " - __s"
             for (i <- 0 until words(o)) {
-              res += "val_t __v" + i + " = MASK(__x[CLAMP(" + i + "-__w,0,"
-              + (words(o.inputs(0)) - 1) + ")]," + i + ">=__w&&"
-              + i + "<__w+" + words(o.inputs(0)) + ")"
+              res += "val_t __v" + i + " = MASK(__x[CLAMP(" + i + "-__w,0," + (words(o.inputs(0)) - 1) + ")]," + i + ">=__w&&" + i + "<__w+" + words(o.inputs(0)) + ")"
               res += emitWordRef(o, i) + " = __v" + i + " << __s | __c"
               res += "__c = MASK(__v" + i + " >> __r, __s != 0)"
             }
