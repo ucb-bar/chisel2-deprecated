@@ -4,7 +4,7 @@ import scala.collection.mutable.ArrayBuffer
 
 object ListLookup {
   def apply[T <: Bits](addr: Bits, default: List[T], mapping: Array[(Bits, List[T])]): List[T] = {
-    if (Component.backend.isInstanceOf[CppBackend])
+    if (Component.backend.isInstanceOf[CppBackend] || Component.backend.isInstanceOf[FloBackend])
       return CListLookup(addr, default, mapping)
     val defaultNode = ListNode(default)
     val mappingNode = mapping.map(x => MapNode(x))
