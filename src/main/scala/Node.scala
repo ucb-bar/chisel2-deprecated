@@ -107,6 +107,7 @@ abstract class Node extends nameable{
   var isInObjectSubNode = false
   var isSubNode = false
   var subnodeNode: Node = null
+  var subnodeIndex = -1
   var isSetComponentName = false
   def isMemOutput = false
   
@@ -168,11 +169,13 @@ abstract class Node extends nameable{
     val subnode = subnodes(i)
     // if (isInstanceOf[Extract])
     //   println("SET-SUB-NODE-" + i + " NODE " + this + " SUB-NODE-NODE " + subnode.subnodeNode + " ID " + hashCode)
-    if (subnode.subnodeNode == null && isSubNodeLeaf == subnode.isSubNodeLeaf)
+    if (subnode.subnodeNode == null && isSubNodeLeaf == subnode.isSubNodeLeaf) {
       subnodes(i).subnodeNode = this
-    // else
+      subnodes(i).subnodeIndex = i
+      // else
       // if (isInstanceOf[Extract])
       //   println("    FAIL SUB-NODE-" + i + " " + subnode + " SUB-NODE-NODE " + subnode.subnodeNode + " IS-SUB-NODE-LEAF " + isSubNodeLeaf + " SUB-NODE-IS_SUB-NODE-LEAF " + subnode.isSubNodeLeaf + " ID " + hashCode)
+    }
       
   }
 
@@ -192,7 +195,7 @@ abstract class Node extends nameable{
     subnodes
   }
   def genSubNodes: Unit = {
-    println(this)
+    println("GEN-SUB-NODES " + this + " " + getClass)
     require(false)
   }
   // TODO: MOVE TO WIRE
@@ -492,8 +495,11 @@ abstract class Node extends nameable{
     }
   }
   def emitIndex(): Int = { 
-    if (index == -1) 
+    if (index == -1) {
       index = componentOf.nextIndex; 
+      if (index == 181)
+        println("INDEX = " + index + " NODE " + this)
+    }
     index 
   }
 

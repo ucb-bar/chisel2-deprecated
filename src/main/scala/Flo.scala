@@ -56,8 +56,16 @@ class FloBackend extends Backend {
     }
     doTrueAll(0) + dstName + " = or 1 " + trueRef(0) + "\n"
   }
+
   def emit(node: Node): String = {
     // println("NODE " + node)
+    val nn = node.name
+    /*
+    if (node.name == "T181") {
+      println("NODE " + node + " NAME " + nn + " HC " + node.hashCode + " LAST " + lastT181 + " = " + (node == lastT181))
+      lastT181 = node
+    }
+    */
     node match {
       case x: Mux =>
         emitDec(x) + "mux " + emitRef(x.inputs(0)) + " " + emitRef(x.inputs(1)) + " " + emitRef(x.inputs(2)) + "\n"
@@ -120,9 +128,8 @@ class FloBackend extends Backend {
             ""
           // println("--> NO CONSUMERS " + x + " = " + x.consumers.length);
           // ""
-        } else {
+        } else
           emitDec(x) + (if (x.name == "reset") "rst" else ((if (isRnd) "rnd/" else "in/")) + x.width) + "\n"
-        }
 
       case m: Mem[_] =>
         // for (r <- m.reads)
@@ -137,6 +144,7 @@ class FloBackend extends Backend {
         //   if (r.mem.writes(i).isReal)
         //     rw = r.mem.writes(i)
         // println("  REAL-WRITE " + rw)
+        // println("  READ " + r + " HASH " + r.hashCode + " NAME " + r.name + " subnodeNode " + r.subnodeNode + " HASH " + r.subnodeNode.hashCode)
         emitRef(r) + "__is_read = and " + emitRef(w) + "__write " + emitRef(r.cond) + "\n" +
         emitDec(r) + "rd " + emitRef(r) + "__is_read" + " " + emitRef(r.mem) + " " + emitRef(r.addr) + "\n" // emitRef(m.mem) 
 
@@ -179,31 +187,66 @@ class FloBackend extends Backend {
     walked
   }
 
+  def nameNode(c: Component, m: Node) = {
+    if (m.name != "" && !(m == c.reset) && !(m.component == null)) {
+      // only modify name if it is not the reset signal or not in top component
+      if(!m.isSetComponentName && (m.name != "reset" || !(m.component == c))) {
+        // print("NODE(" + m.hashCode + ") " + m.name + " NAMING USING " + m.component.getPathName);
+	m.name = m.component.getPathName + "__" + m.name;
+        m.isSetComponentName = true
+        // println(" -> " + m.name)
+      }
+    }
+  }
+  def renameSubnode(c: Component, node: Node) = {
+  }
+
+  /*
   def renameNodes(c: Component, nodes: Seq[Node]) = {
     for (m <- nodes) {
       m match {
         case l: Literal => ;
         case any        => 
-          if (m.name != "" && !(m == c.reset) && !(m.component == null)) {
-	    // only modify name if it is not the reset signal or not in top component
-	    if(!m.isSetComponentName && (m.name != "reset" || !(m.component == c))) {
-              // print("NODE(" + m.hashCode + ") " + m.name + " NAMING USING " + m.component.getPathName);
-	      m.name = m.component.getPathName + "__" + m.name;
-              m.isSetComponentName = true
-              // println(" -> " + m.name)
-            }
-	  }
           if (isSubNodes) {
-            // println("RENAME(" + m.hashCode + ") " + m + " NAME " + m.name + " SUBNODES " + m.subnodes.length)
+            if (m.isInstanceOf[MemRead[_]])
+              println("BEG RENAME(" + m.hashCode + ") " + m + " NAME " + m.name + " SUBNODES " + m.subnodes.length)
             for (i <- 0 until m.subnodes.length) {
               val snn = m.subnodes(i).subnodeNode;
+              if (snn != null)
+                nameNode(c, snn)
+              if (m.isInstanceOf[MemRead[_]])
+                println("  SNN " + snn + " NAME " + snn.name + " SN-NAME " + m.subnodes(i).name)
               if (snn != null && m.subnodes(i).name == "") {
                 m.subnodes(i).setName(nodeName(snn) + (if (m.subnodes.length > 1) ("__s" + i) else ""))
+                if (snn.isInstanceOf[MemRead[_]])
+                  println("  RENAME NODE(" + m.hashCode + ") " + m + " SNN(" + snn.hashCode + ") " + snn + " NAME " + snn.name + " SUBNODES " + snn.subnodes.length)
               } // else
                 // println("M " + m + " I " + i + " SN " + m.subnodes(i) + " SNN " + snn);
               // print("  SNN(" + snn.hashCode + ") " + snn.name);
               // println(" SUBNODE(" + m.subnodes(i).hashCode + ") NAME "+ m.subnodes(i).name)
             }
+          } else {
+            nameNode(c, m)
+          }
+        if (m.isInstanceOf[MemRead[_]])
+          println("END RENAME(" + m.hashCode + ") " + m + " NAME " + m.name + " SUBNODES " + m.subnodes.length)
+      }
+    }
+  }
+  */
+
+  def renameNodes(c: Component, nodes: Seq[Node]) = {
+    for (m <- nodes) {
+      m match {
+        case l: Literal => ;
+        case any        => 
+          val snn = m.subnodeNode;
+          if (snn != null)
+            nameNode(c, snn)
+          // else
+          //   println("SNN NOT FOUND " + m)
+          if (snn != null && m.name == "") {
+            m.setName(nodeName(snn) + (if (snn.subnodes.length > 1) ("__s" + m.subnodeIndex) else ""))
           }
       }
     }
@@ -254,8 +297,9 @@ class FloBackend extends Backend {
       return
     }
     c.collectNodes(c);
-    def updateMems() = {
+    def updateMems(): ArrayBuffer[Node] = {
       println("SEARCHING FOR MEM")
+      val res = new ArrayBuffer[Node]();
       for (mod <- c.omods) {
         mod match {
           case m: Mem[_] => m.writes.clear(); m.reads.clear(); 
@@ -264,19 +308,24 @@ class FloBackend extends Backend {
       }
       for (mod <- c.omods) {
         mod match {
-          case w: MemWrite[_] => w.addWrite
-          case r: MemRead[_]  => r.addRead
+          case w: MemWrite[_] => w.addWrite; res += w.subnodeNode; // println("ADDING WRITE " + w);
+          case r: MemRead[_]  => r.addRead;  res += r.subnodeNode; // println("ADDING READ " + r);
           case _ =>;
         }
       }
+      res
     }
     if (isSubNodes) {
       val walked = genSubNodes(c, c.mods);
-      renameNodes(c, c.mods);
+      // renameNodes(c, c.mods);
+      println("FINDING SUBNODES")
       c.findSubNodeOrdering(); // search from roots  -- create omods
       for (m <- c.omods)
         m.addConsumers
-      updateMems()
+      println("RENAMING SUBNODES")
+      // renameNodes(c, c.omods);
+      val mem_mods = updateMems()
+      // renameNodes(c, mem_mods)
     } else {
       c.findOrdering(); // search from roots  -- create omods
       updateMems()
