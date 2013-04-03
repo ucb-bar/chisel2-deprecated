@@ -144,6 +144,10 @@ class FIFOIO[T <: Data]()(data: => T) extends Bundle
     }
 }
 
+object FIFOIO {
+  def apply[T <: Data]()(data: => T) = {(new FIFOIO())(data)}
+}
+
 class EnqIO[T <: Data]()(data: => T) extends FIFOIO()(data) 
 {
   def enq(dat: T): T = { valid := Bool(true); bits := dat; dat }
