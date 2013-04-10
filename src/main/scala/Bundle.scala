@@ -281,6 +281,11 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     this.dir = "output"
     this
   }
+
+  override def isDirectionless: Boolean = {
+    (dir == "") && elements.map{case (n,i) => i.isDirectionless}.reduce(_&&_)
+  }
+
   override def setIsTypeNode() = {
     isTypeNode = true;
     for ((n, i) <- elements)

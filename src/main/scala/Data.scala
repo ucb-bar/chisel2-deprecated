@@ -22,6 +22,7 @@ abstract class Data extends Node {
   def flip(): this.type = this;
   def asInput(): this.type = this;
   def asOutput(): this.type = this;
+  def isDirectionless: Boolean = true;
   def toNode: Node = this;
   def fromNode(n: Node): this.type = this;
   def fromBits(b: Bits): this.type = {

@@ -109,6 +109,10 @@ class Bits extends Data with proc {
     this
   }
 
+  override def isDirectionless: Boolean = {
+    return dir == null
+  }
+
   override def <>(src: Node) = { 
     if (dir == INPUT) {
       src match { 
