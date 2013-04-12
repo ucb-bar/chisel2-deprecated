@@ -1,6 +1,8 @@
 package Chisel
 import Node._
+import Component._
 import scala.math._
+import scala.collection.mutable.ArrayBuffer
 
 object log2Up
 {
@@ -190,7 +192,10 @@ object foldR
 object ArbiterCtrl
 {
   def apply(request: Seq[Bool]) = {
-    Bool(true) +: (1 until request.length).map(i => !request.slice(0, i).foldLeft(Bool(false))(_ || _))
+    val grant = collection.mutable.ArrayBuffer(Bool(true))
+    for (i <- 1 until request.length)
+      grant += grant.last && !request(i-1)
+    grant
   }
 }
 
@@ -198,7 +203,9 @@ class Arbiter[T <: Data](n: Int)(data: => T) extends Component {
   val io = new ioArbiter(n)(data)
 
   val grant = ArbiterCtrl(io.in.map(_.valid))
-  (0 until n).map(i => io.in(i).ready := grant(i) && io.out.ready)
+  for (i <- 0 until n)
+    io.in(i).ready := (grant(i) && io.out.ready)
+  // (0 until n).map(i => io.in(i).ready := (grant(i) && io.out.ready))
 
   var dout = io.in(n-1).bits
   var choose = Bits(n-1)
@@ -218,7 +225,7 @@ class RRArbiter[T <: Data](n: Int)(data: => T) extends Component {
   val last_grant = Reg(resetVal = Bits(0, log2Up(n)))
   val g = ArbiterCtrl((0 until n).map(i => io.in(i).valid && UFix(i) > last_grant) ++ io.in.map(_.valid))
   val grant = (0 until n).map(i => g(i) && UFix(i) > last_grant || g(i+n))
-  (0 until n).map(i => io.in(i).ready := grant(i) && io.out.ready)
+  (0 until n).map(i => io.in(i).ready := (grant(i) && io.out.ready))
 
   var choose = Bits(n-1)
   for (i <- n-2 to 0 by -1)
@@ -231,6 +238,9 @@ class RRArbiter[T <: Data](n: Int)(data: => T) extends Component {
 
   val dvec = Vec(n) { data } 
   (0 until n).map(i => dvec(i) := io.in(i).bits )
+
+  // for (i <- 0 until n)
+  //   io.in(i).ready := ((choose === Bits(i)) && io.out.ready)
 
   io.out.valid := io.in.map(_.valid).foldLeft(Bool(false))( _ || _)
   io.out.bits := dvec(choose)
@@ -389,6 +399,26 @@ object Pipe
 
 object PriorityMux
 {
+  /*
+  def balanced[T <: Data](in: Seq[(Bits, T)]): T = {
+    val prev = new ArrayBuffer[(Bits, T)]();
+    prev ++= in
+    val next = new ArrayBuffer[(Bits, T)]();
+    do {
+      for (i <- 0 until prev.length/2) {
+        val j = i*2;
+        if (j == (prev.length-1)) {
+          next += prev(j)
+        } else {
+          next ++= Array((Op("||", 1, prev(j)._1, prev(j+1)._1), Multiplex(prev(j)._1, prev(j)._2, prev(j+1)._2)))
+        }
+      }
+      prev.clear()
+      prev ++= next
+    } while (prev.length > 1);
+    prev(0)._2
+  }
+  */
   def apply[T <: Data](in: Seq[(Bits, T)]): T = {
     if (in.size == 1)
       in.head._2
@@ -407,7 +437,6 @@ object PriorityEncoder
 
 object PriorityEncoderOH
 {
-  def apply(in: Bits): Bits = Vec(apply((0 until in.getWidth).map(in(_)))){Bool()}.toBits
   def apply(in: Seq[Bits]): Seq[Bool] = {
     var none_hot = Bool(true)
     val out = collection.mutable.ArrayBuffer[Bool]()
@@ -417,6 +446,26 @@ object PriorityEncoderOH
     }
     out
   }
+  def apply(in: Bits): Bits = Vec(apply((0 until in.getWidth).map(in(_)))){Bool()}.toBits
+  /*
+  def apply(in: Bits): Bits = apply((0 until in.getWidth).map(in(_))).toBits
+  def apply(in: Seq[Bits]): Vec[Bool] = {
+    val res = new PriorityEncoderOH(in.size);
+    for (i <- 0 until in.size)
+      res.io.in(i) := in(i)
+    res.io.out
+  }
+  */
 }
 
-
+/*
+class PriorityEncoderOH(n: Int) extends Component {
+  val io = new Bundle { val in = Vec(n){ Bool(INPUT) }; val out = Vec(n){ Bool(OUTPUT) } }
+  var none_hot = Bool(true)
+  val out = collection.mutable.ArrayBuffer[Bool]()
+  for (i <- 0 until n) {
+    io.out(i) = none_hot && io.in(i)
+    none_hot  = none_hot && !io.in(i)
+  }
+}
+*/

@@ -35,8 +35,16 @@ class FloBackend extends Backend {
           if (!node.isInObject && node.inputs.length == 1) emitRef(node.inputs(0)) else super.emitRef(node) 
           // super.emitRef(node) 
 
+        case r: Reg => 
+          if(r.isMemOutput) 
+            emitRef(r.memOf.outputVal) 
+          else if (r.name == "")
+            nodeComponentName(r) + "R" + r.emitIndex 
+          else
+            r.name
+
         case _ =>
-          super.emitRef(node)
+          nodeName(node)
       }
     } else {
       "" + node.litOf.value
@@ -106,7 +114,10 @@ class FloBackend extends Backend {
       case x: Extract =>
         if (node.width < 0) println("RSH -1 NODE " + node)
         // println("EXTRACT " + node + " W " + node.width)
-        emitDec(node) + "rsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(2)) + "\n"
+        if (node.inputs.length == 2)
+          emitDec(node) + "rsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1)) + "\n"     
+        else
+          emitDec(node) + "rsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(2)) + "\n"
 
       case x: Fill =>
         emitDec(x) + "fill/" + node.width + " " + emitRef(node.inputs(0)) + "\n"
@@ -164,7 +175,7 @@ class FloBackend extends Backend {
           (if (x.isReset) (emitRef(x) + "__update") else emitRef(x.updateVal)) + "\n"
 
       case x: Log2 => // TODO: log2 instruction?
-        emitDec(x) + "log2/" + x.width + " " + emitRef(x.inputs(0)) + "\n"
+        emitDec(x) + "log2 " + emitRef(x.inputs(0)) + "\n"
 
       case c: Cat =>
         emitDec(c) + "cat/" + c.inputs(1).width + " " + emitRef(c.inputs(0)) + " " + emitRef(c.inputs(1)) + "\n"
@@ -187,13 +198,32 @@ class FloBackend extends Backend {
     walked
   }
 
-  def nameNode(c: Component, m: Node) = {
-    if (m.name != "" && !(m == c.reset) && !(m.component == null)) {
+  def nodeComponentName(node: Node): String = {
+    val snn = node.subnodeNode;
+    val comp = if (snn == null || snn.component == null) null else snn.component;
+    if (comp == null) "" else (comp.getPathName + "__");
+  }
+
+  override def nodeName(node: Node): String = {
+    val prefix = nodeComponentName(node)
+    if(node.name == "" || !node.named) {
+      val res = (if (node.isInstanceOf[Reg]) "R" else "T") + node.emitIndex 
+      prefix + res
+    } else if(!node.named) {
+      node.named = true
+      prefix + node.name + "_" + node.emitIndex
+    } else
+      node.name
+  }
+
+  def nameNode(c: Component, n: Node) = {
+    val m = n.subnodeNode;
+    if (!(m == null) || m.name != "" && !(m == c.reset) && !(m.component == null)) {
       // only modify name if it is not the reset signal or not in top component
       if(!m.isSetComponentName && (m.name != "reset" || !(m.component == c))) {
         // print("NODE(" + m.hashCode + ") " + m.name + " NAMING USING " + m.component.getPathName);
-	m.name = m.component.getPathName + "__" + m.name;
-        m.isSetComponentName = true
+	n.name = m.component.getPathName + "__" + n.name;
+        n.isSetComponentName = true
         // println(" -> " + m.name)
       }
     }
@@ -241,6 +271,7 @@ class FloBackend extends Backend {
         case l: Literal => ;
         case any        => 
           val snn = m.subnodeNode;
+          nameNode(c, m)
           if (snn != null)
             nameNode(c, snn)
           // else

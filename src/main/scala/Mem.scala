@@ -49,6 +49,7 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
     reads += rd
     val data = gen().fromNode(rd).asInstanceOf[T]
     data.setIsTypeNode
+    if (isEventCounters) inputs += rd.counter;
     (data, rd)
   }
 
@@ -60,6 +61,7 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
     ports += wr
     writes += wr
     inputs += wr
+    if (isEventCounters) inputs += wr.counter;
     wr
   }
 
@@ -103,6 +105,14 @@ abstract class MemAccess(val mem: Mem[_], val condi: Bool, val addri: Bits) exte
   def used = referenced
   def getPortType: String
   var isReal = false
+  var counter: UFix = 
+    if (isEventCounters) { 
+      val c = Reg(resetVal = UFix(0, 32)); 
+      getComponent.debug(c)
+      when (condi) { c := c + UFix(1)} 
+      c
+    } else 
+      null; 
 
   override def forceMatchingWidths =
     if (addr.width != log2Up(mem.n)) inputs(1) = addr.matchWidth(log2Up(mem.n))

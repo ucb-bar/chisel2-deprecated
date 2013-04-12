@@ -110,6 +110,7 @@ object chiselMain {
         case "--Wcomponent" => saveComponentTrace = true
         case "--noCombLoop" => dontFindCombLoop = true
         case "--genHarness" => isGenHarness = true; 
+        case "--eventCounters" => isEventCounters = true; 
         case "--debug" => isDebug = true; 
         case "--ioDebug" => isIoDebug = true; 
         case "--noIoDebug" => isIoDebug = false; 
@@ -202,8 +203,31 @@ trait proc extends Node {
     val c = conds.top
     if (isFame1) fame1fire && c else c;
   }
+  def genBalancedPriorityMux(in: Seq[(Node, Node)]): Node = {
+    val prev = new ArrayBuffer[(Node, Node)]();
+    prev ++= in
+    val next = new ArrayBuffer[(Node, Node)]();
+    while (prev.length > 1) {
+      for (j <- 0 until prev.length by 2) {
+        if (j == (prev.length-1)) {
+          next += prev(j)
+        } else {
+          next ++= Array((Op("||", 1, prev(j)._1, prev(j+1)._1), 
+                          Multiplex(prev(j)._1, prev(j)._2, prev(j+1)._2)))
+        }
+      }
+      prev.clear()
+      prev ++= next
+      next.clear()
+    }
+    prev(0)._2
+  }
   def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
-    val update = others.foldLeft(default)((v, u) => Multiplex(u._1, u._2, v))
+    val update = 
+      if (others.length > 4 && backend.isInstanceOf[FloBackend]) 
+        genBalancedPriorityMux(others ++ Array((Bool(true), default)))
+      else
+        others.foldLeft(default)((v, u) => Multiplex(u._1, u._2, v))
     if (inputs.isEmpty) inputs += update else inputs(0) = update
   }
   def genMuxes(default: Node): Unit = {
@@ -255,12 +279,14 @@ class Delay extends Node {
 
 object Log2 {
   def apply (mod: UFix, n: Int): UFix = {
+    def fab(mod: UFix, n: Int): UFix = {
+      val log2 = new Log2()
+      log2.init("", fixWidth(sizeof(n-1)), mod)
+      log2.setTypeNode(UFix())
+    }
     backend match {
-      case x: CppBackend => {
-        val log2 = new Log2()
-        log2.init("", fixWidth(sizeof(n-1)), mod)
-        log2.setTypeNode(UFix())
-      }
+      case x: CppBackend => fab(mod, n)
+      case x: FloBackend => fab(mod, n)
       case _ => {
         var res = UFix(0);
         for (i <- 1 until n)

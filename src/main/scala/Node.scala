@@ -182,8 +182,11 @@ abstract class Node extends nameable{
   def getSubNodes = {
     // if (isInstanceOf[Extract]) 
     //   println("  GET-SUB-NODES EXTRACT " + this + " " + subnodes.length + " ID " + hashCode)
-    if (subnodes.isEmpty)
+    if (subnodes.isEmpty) {
+      compStack.push(component);
       genSubNodes
+      compStack.pop();
+    }
     /*
     if (isInstanceOf[Extract]) {
       println("    " + subnodes.length + " [")
@@ -497,8 +500,6 @@ abstract class Node extends nameable{
   def emitIndex(): Int = { 
     if (index == -1) {
       index = componentOf.nextIndex; 
-      if (index == 181)
-        println("INDEX = " + index + " NODE " + this)
     }
     index 
   }

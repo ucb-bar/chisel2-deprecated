@@ -24,6 +24,7 @@ object Component {
   var saveWidthWarnings = false
   var saveConnectionWarnings = false
   var saveComponentTrace = false
+  var isEventCounters = false
   var saveDot = false
   var dontFindCombLoop = false
   var widthWriter: java.io.FileWriter = null
@@ -91,6 +92,7 @@ object Component {
   def defTests(nodes: Node*)(body: => Boolean) = {
   }
   def initChisel () = {
+    isEventCounters = false
     saveWidthWarnings = false
     saveConnectionWarnings = false
     saveComponentTrace = false
@@ -242,7 +244,6 @@ object Component {
 
   def getComponent(): Component = if(compStack.length != 0) compStack.top else { 
     // val st = Thread.currentThread.getStackTrace;
-    // println("UNKNOWN COMPONENT "); 
     // for(frame <- st)
     //   println("  " + frame);
     null 
@@ -506,6 +507,8 @@ abstract class Component(resetSignal: Bool = null) {
 
     var count = 0
     bfs {x =>
+      if (x.isTypeNode)
+        println("FOUND TYPE-NODE " + x + " NODE " + x.getNode())
       scala.Predef.assert(!x.isTypeNode)
       x.fixName
       count += 1
@@ -576,7 +579,7 @@ abstract class Component(resetSignal: Bool = null) {
   def subNodesOf(nodes: Seq[Node]): Seq[Node] = {
     val subnodes = new ArrayBuffer[Node]
     for (m <- nodes) 
-      subnodes ++= m.subnodes
+      subnodes ++= m.getSubNodes
     subnodes
   }
   def findSubNodeOrdering() = visitNodes(subNodesOf(findRoots()).toArray);
@@ -593,7 +596,8 @@ abstract class Component(resetSignal: Bool = null) {
     }
     val whist = new HashMap[Int, Int]();
     for (m <- imods) {
-      val w = m.width;
+      // val w = m.width;
+      val w = m.inputs.foldLeft(0){ (x, y) => max(x, y.width) }
       if (whist.contains(w))
         whist(w) = whist(w) + 1;
       else
@@ -607,7 +611,10 @@ abstract class Component(resetSignal: Bool = null) {
       else
         fhist(f) = 1;
     }
-    val hist = new HashMap[String, Int]();
+    val hist   = new HashMap[String, Int]();
+    val hist1  = new HashMap[String, Int]();
+    val hist1c = new HashMap[Component, Int]();
+    var numOneBits = 0;
     for (m <- imods) {
       var name = m.getClass().getName();
       m match {
@@ -619,6 +626,17 @@ abstract class Component(resetSignal: Bool = null) {
         hist(name) = hist(name) + 1;
       else
         hist(name) = 1;
+      if (m.width == 1 && m.inputs.forall(_.width == 1)) {
+        numOneBits += 1;
+      if (hist1.contains(name))
+        hist1(name) = hist1(name) + 1;
+      else
+        hist1(name) = 1;
+      if (hist1c.contains(m.component))
+        hist1c(m.component) = hist1c(m.component) + 1;
+      else
+        hist1c(m.component) = 1;
+      }
     }
     for (m <- imods) 
       maxDepth = Math.max(m.depth, maxDepth);
@@ -634,15 +652,37 @@ abstract class Component(resetSignal: Bool = null) {
     for (i <- 0 until maxDepth+1)
       maxWidth = Math.max(maxWidth, widths(i));
     // for ((n, c) <- hist) 
-    println("%8s: %5s %5s".format("name", "count", "%"));
-    for ((o, n) <- hist.toList.sortBy{_._2}.reverse)
-      println("%8s: %5d %5.2f".format(o, n, (100.0 * n)/numNodes));
-    println("%3s: %5s %5s".format("w", "count", "%"));
-    for ((w, n) <- whist.toList.sortBy{_._2}.reverse)
-      println("%3d: %5d %5.2f".format(w, n, (100.0 * n)/numNodes));
-    println("%3s: %5s %5s".format("f", "count", "%"));
-    for ((f, n) <- fhist.toList.sortBy{_._2}.reverse)
-      println("%3d: %5d %5.2f".format(f, n, (100.0 * n)/numNodes));
+    println("%8s: %5s %5s".format("name", "count", "%", "cum%"));
+    var tot = 0;
+    for ((o, n) <- hist.toList.sortBy{_._2}.reverse) {
+      tot += n
+      println("%8s: %5d %5.2f %5.2f".format(o, n, (100.0 * n)/numNodes, (100.0 * tot)/numNodes));
+    }
+    println("%8s: %5s %5.2f".format("oneBits", numOneBits, (100.0 * numOneBits)/numNodes));
+    println("%8s: %5s %5s".format("name1", "count", "%", "cum%"));
+    tot = 0;
+    for ((o, n) <- hist1.toList.sortBy{_._2}.reverse) {
+      tot += n
+      println("%8s: %5d %5.2f %5.2f".format(o, n, (100.0 * n)/numOneBits, (100.0 * tot)/numOneBits));
+    }
+    println("%32s: %5s %5s".format("name1c", "count", "%", "cum%"));
+    tot = 0;
+    for ((o, n) <- hist1c.toList.sortBy{_._2}.reverse) {
+      tot += n
+      println("%32s: %5d %5.2f %5.2f".format(if (o == null) "" else o.name, n, (100.0 * n)/numOneBits, (100.0 * tot)/numOneBits));
+    }
+    println("%3s: %5s %5s".format("w", "count", "%", "cum%"));
+    tot = 0;
+    for ((w, n) <- whist.toList.sortBy{_._2}.reverse) {
+      tot += n
+      println("%3d: %5d %5.2f %5.2f".format(w, n, (100.0 * n)/numNodes, (100.0 * tot)/numNodes));
+    }
+    println("%3s: %5s %5s".format("f", "count", "%", "cum%"));
+    tot = 0;
+    for ((f, n) <- fhist.toList.sortBy{_._2}.reverse) {
+      tot += n
+      println("%3d: %5d %5.2f %5.2f".format(f, n, (100.0 * n)/numNodes, (100.0 * tot)/numNodes));
+    }
     (numNodes, maxWidth, maxDepth)
   }
 

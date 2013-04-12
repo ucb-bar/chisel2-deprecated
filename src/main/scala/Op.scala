@@ -202,6 +202,8 @@ object Op {
         case "&" => if (a_lit.value == 0) return Literal(0);
         case "|" => if (a_lit.value == 0) return b;
         case "+" => if (a_lit.value == 0) return b;
+        case "##" => if (a_lit.value == 0 && (b.getWidth > -1) && 
+                         (a_lit.width + b.getWidth) <= backend.wordBits) return b;
         case _ => ;
       }
     } else if (a_lit == null && b_lit != null) {
