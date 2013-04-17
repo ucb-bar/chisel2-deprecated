@@ -319,9 +319,7 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
   }
 
   override def nameIt (path: String) {
-    if( (!named
-      /* XXX hardcoded to minimize diff with previous implementation. */
-      || name.startsWith("ptw"))
+    if( !named
       && (name.isEmpty
         || (!path.isEmpty && name != path)) ) {
       val prevPrefix = if (name.length > 0) name + "_" else ""
@@ -338,7 +336,6 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
         }
         elm.nameIt(prefix + i + suffix)
       }
-      named = true
     } else {
       /* We are trying to rename a Vec that has a fixed name. */
     }

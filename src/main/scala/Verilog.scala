@@ -637,8 +637,7 @@ class VerilogBackend extends Backend {
     for( (className, modules) <- defs ) {
       var index = 0
       for ( (text, comps) <- modules) {
-        /* XXX (index > 0) minimizes diff with previous implementation. */
-        val moduleName = if( modules.size > 1 && index > 0 ) {
+        val moduleName = if( modules.size > 1 ) {
           className + "_" + index.toString;
         } else {
           className;

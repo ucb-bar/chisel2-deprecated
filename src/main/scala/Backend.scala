@@ -47,8 +47,6 @@ abstract class Backend {
   /* Set of keywords which cannot be used as node and component names. */
   val keywords: HashSet[String];
 
-  val cppComps = HashMap.empty[String,Int];
-
   def depthString(depth: Int): String = {
     var res = "";
     for (i <- 0 until depth)
@@ -153,12 +151,7 @@ abstract class Backend {
     for( (className, comps) <- byNames ) {
         if( comps.length > 1 ) {
           for( (c, index) <- comps.zipWithIndex ) {
-            /* XXX (index > 0) minimizes diff with previous implementation. */
-            c.name = if( index > 0 ) {
-              className + "_" + index.toString
-            } else {
-              className
-            }
+            c.name = className + "_" + index.toString
           }
         } else {
           comps(0).name = className;

@@ -246,6 +246,8 @@ trait proc extends Node {
 
 trait nameable {
   var name: String = "";
+  /** _named_ is used to indicates name was set explicitely
+   and should not be overriden by a _nameIt_ generator. */
   var named = false;
 }
 

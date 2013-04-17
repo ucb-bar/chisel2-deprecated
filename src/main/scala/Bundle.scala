@@ -162,9 +162,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data {
   }
 
   override def nameIt (path: String) {
-    if( (!named
-      /* XXX hardcoded to minimize diff with previous implementation. */
-      || name.startsWith("ptw"))
+    if( !named
       && (name.isEmpty
         || (!path.isEmpty && name != path)) ) {
       name = path
@@ -172,7 +170,6 @@ class Bundle(view_arg: Seq[String] = null) extends Data {
       for ((n, i) <- elements) {
         i.nameIt(prefix + n)
       }
-      named = true
     } else {
       /* We are trying to rename a Bundle that has a fixed name. */
     }
