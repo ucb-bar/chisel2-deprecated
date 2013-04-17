@@ -4,7 +4,9 @@ version := "1.1-SNAPSHOT"
 
 name := "chisel"
 
-scalaVersion := "2.9.2"
+scalaVersion := "2.10.1"
+
+//sourceDirectory := new File("@srcTop@")
 
 publishMavenStyle := true
 
@@ -31,14 +33,18 @@ pomExtra := (
       <name>Jonathan Bachrach</name>
       <url>http://people.csail.mit.edu/jrb/</url>
     </developer>
+    <developer>
+      <id>huytbvo</id>
+      <name>Huy Vo</name>
+    </developer>
   </developers>
 )
 
 publishTo <<= version { v: String =>
   val nexus = "https://oss.sonatype.org/"
-  if (v.trim.endsWith("SNAPSHOT")) 
+  if (v.trim.endsWith("SNAPSHOT"))
     Some("snapshots" at nexus + "content/repositories/snapshots")
-  else                             
+  else
     Some("releases" at nexus + "service/local/staging/deploy/maven2")
 }
 

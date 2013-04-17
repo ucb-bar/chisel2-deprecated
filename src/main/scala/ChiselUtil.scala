@@ -1,3 +1,33 @@
+/*
+ Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ California (Regents). All Rights Reserved.  Redistribution and use in
+ source and binary forms, with or without modification, are permitted
+ provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer.
+    * Redistributions in binary form must reproduce the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer in the documentation and/or other materials
+      provided with the distribution.
+    * Neither the name of the Regents nor the names of its contributors
+      may be used to endorse or promote products derived from this
+      software without specific prior written permission.
+
+ IN NO EVENT SHALL REGENTS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
+ SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS,
+ ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+ REGENTS HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ REGENTS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE. THE SOFTWARE AND ACCOMPANYING DOCUMENTATION, IF
+ ANY, PROVIDED HEREUNDER IS PROVIDED "AS IS". REGENTS HAS NO OBLIGATION
+ TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
+ MODIFICATIONS.
+*/
+
 package Chisel
 import Node._
 import scala.math._
@@ -33,12 +63,13 @@ object LFSR16
 object PopCount
 {
   def apply(in: Seq[Bool]): UFix = {
-    if (in.size == 0)
+    if (in.size == 0) {
       UFix(0)
-    else if (in.size == 1)
+    } else if (in.size == 1) {
       in(0)
-    else
+    } else {
       apply(in.slice(0, in.size/2)) + Cat(Bits(0), apply(in.slice(in.size/2, in.size)))
+    }
   }
   def apply(in: Bits): UFix = apply((0 until in.getWidth).map(in(_).toBool))
 }
@@ -48,10 +79,11 @@ object Reverse
   def doit(in: Bits, base: Int, length: Int): Bits =
   {
     val half = (1 << log2Up(length))/2
-    if (length == 1)
+    if (length == 1) {
       in(base)
-    else
-      Cat(doit(in, base, half), doit(in, base+half, length-half))
+    } else {
+      Cat(doit(in, base, half), doit(in, base + half, length - half))
+    }
   }
   def apply(in: Bits) = doit(in, 0, in.getWidth)
 }
@@ -59,7 +91,7 @@ object Reverse
 
 object ShiftRegister
 {
-  def apply [T <: Data](n: Int, in: T, en: Bool = Bool(true)): T =
+  def apply[T <: Data](n: Int, in: T, en: Bool = Bool(true)): T =
   {
     if (n == 1)
     {
@@ -81,22 +113,24 @@ object UFixToOH
 {
   def apply(in: UFix, width: Int = -1): Bits =
   {
-    if (width == -1)
+    if (width == -1) {
       UFix(1) << in
-    else
+    } else {
       UFix(1) << in(log2Up(width)-1,0)
+    }
   }
 }
 
-object Mux1H 
+object Mux1H
 {
-  def apply [T <: Data](sel: Seq[Bits], in: Seq[T]): T = {
-    if (in.size == 1)
+  def apply[T <: Data](sel: Seq[Bits], in: Seq[T]): T = {
+    if (in.size == 1) {
       in(0)
-    else
+    } else {
       in(0).fromBits(sel.zip(in).map { case(s,x) => s.toFix & x.toBits }.reduce(_|_))
+    }
   }
-  def apply [T <: Data](sel: Bits, in: Seq[T]): T = apply((0 until in.size).map(sel(_)), in)
+  def apply[T <: Data](sel: Bits, in: Seq[T]): T = apply((0 until in.size).map(sel(_)), in)
 }
 
 
@@ -148,7 +182,7 @@ object FIFOIO {
   def apply[T <: Data]()(data: => T) = {(new FIFOIO())(data)}
 }
 
-class EnqIO[T <: Data]()(data: => T) extends FIFOIO()(data) 
+class EnqIO[T <: Data]()(data: => T) extends FIFOIO()(data)
 {
   def enq(dat: T): T = { valid := Bool(true); bits := dat; dat }
   valid := Bool(false);
@@ -157,7 +191,7 @@ class EnqIO[T <: Data]()(data: => T) extends FIFOIO()(data)
   override def clone = { new EnqIO()(data).asInstanceOf[this.type]; }
 }
 
-class DeqIO[T <: Data]()(data: => T) extends FIFOIO()(data) 
+class DeqIO[T <: Data]()(data: => T) extends FIFOIO()(data)
 {
   flip()
   ready := Bool(false);
@@ -216,7 +250,7 @@ class RRArbiter[T <: Data](n: Int)(data: => T) extends Component {
 
   val last_grant = Reg(resetVal = Bits(0, log2Up(n)))
   val g = ArbiterCtrl((0 until n).map(i => io.in(i).valid && UFix(i) > last_grant) ++ io.in.map(_.valid))
-  val grant = (0 until n).map(i => g(i) && UFix(i) > last_grant || g(i+n))
+  val grant = (0 until n).map(i => g(i) && UFix(i) > last_grant || g(i + n))
   (0 until n).map(i => io.in(i).ready := grant(i) && io.out.ready)
 
   var choose = Bits(n-1)
@@ -228,7 +262,7 @@ class RRArbiter[T <: Data](n: Int)(data: => T) extends Component {
     last_grant := choose
   }
 
-  val dvec = Vec(n) { data } 
+  val dvec = Vec(n) { data }
   (0 until n).map(i => dvec(i) := io.in(i).bits )
 
   io.out.valid := io.in.map(_.valid).foldLeft(Bool(false))( _ || _)
@@ -246,8 +280,8 @@ class LockingArbiter[T <: Data](n: Int)(data: => T) extends Component {
   val io = new ioLockingArbiter(n)(data)
   val locked = Vec(n) { Reg(resetVal = Bool(false)) }
   val any_lock_held = (locked.toBits & io.lock.toBits).orR
-  val valid_arr = Vec(n) { Bool() } 
-  val bits_arr = Vec(n) { data } 
+  val valid_arr = Vec(n) { Bool() }
+  val bits_arr = Vec(n) { data }
   for(i <- 0 until n) {
     valid_arr(i) := io.in(i).valid
     bits_arr(i) := io.in(i).bits
@@ -256,7 +290,7 @@ class LockingArbiter[T <: Data](n: Int)(data: => T) extends Component {
   io.in(0).ready := Mux(any_lock_held, io.out.ready && locked(0), io.out.ready)
   locked(0) := Mux(any_lock_held, locked(0), io.in(0).ready && io.lock(0))
   for (i <- 1 until n) {
-    io.in(i).ready := Mux(any_lock_held, io.out.ready && locked(i), 
+    io.in(i).ready := Mux(any_lock_held, io.out.ready && locked(i),
                           !io.in(i-1).valid && io.in(i-1).ready)
     locked(i) := Mux(any_lock_held, locked(i), io.in(i).ready && io.lock(i))
   }
@@ -302,7 +336,7 @@ class ioQueue[T <: Data](entries: Int)(data: => T) extends Bundle
 {
   val enq   = new FIFOIO()(data).flip
   val deq   = new FIFOIO()(data)
-  val count = UFix(OUTPUT, log2Up(entries+1))
+  val count = UFix(OUTPUT, log2Up(entries + 1))
 }
 
 class Queue[T <: Data](val entries: Int, pipe: Boolean = false, flow: Boolean = false, resetSignal: Bool = null)(data: => T) extends Component(resetSignal)
@@ -339,10 +373,11 @@ class Queue[T <: Data](val entries: Int, pipe: Boolean = false, flow: Boolean = 
   io.deq.bits := Mux(maybe_flow, io.enq.bits, ram(deq_ptr))
 
   val ptr_diff = enq_ptr - deq_ptr
-  if (isPow2(entries))
+  if (isPow2(entries)) {
     io.count := Cat(maybe_full && ptr_match, ptr_diff).toUFix
-  else
+  } else {
     io.count := Mux(ptr_match, Mux(maybe_full, UFix(entries), UFix(0)), Mux(deq_ptr > enq_ptr, UFix(entries) + ptr_diff, ptr_diff))
+  }
 }
 
 object Queue
@@ -389,10 +424,11 @@ object Pipe
 object PriorityMux
 {
   def apply[T <: Data](in: Seq[(Bits, T)]): T = {
-    if (in.size == 1)
+    if (in.size == 1) {
       in.head._2
-    else
+    } else {
       Mux(in.head._1, in.head._2, apply(in.tail))
+    }
   }
   def apply[T <: Data](sel: Seq[Bits], in: Seq[T]): T = apply(sel zip in)
   def apply[T <: Data](sel: Bits, in: Seq[T]): T = apply((0 until in.size).map(sel(_)), in)

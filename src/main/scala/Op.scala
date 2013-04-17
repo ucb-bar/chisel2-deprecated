@@ -1,3 +1,33 @@
+/*
+ Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ California (Regents). All Rights Reserved.  Redistribution and use in
+ source and binary forms, with or without modification, are permitted
+ provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer.
+    * Redistributions in binary form must reproduce the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer in the documentation and/or other materials
+      provided with the distribution.
+    * Neither the name of the Regents nor the names of its contributors
+      may be used to endorse or promote products derived from this
+      software without specific prior written permission.
+
+ IN NO EVENT SHALL REGENTS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
+ SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS,
+ ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+ REGENTS HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ REGENTS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE. THE SOFTWARE AND ACCOMPANYING DOCUMENTATION, IF
+ ANY, PROVIDED HEREUNDER IS PROVIDED "AS IS". REGENTS HAS NO OBLIGATION
+ TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
+ MODIFICATIONS.
+*/
+
 package Chisel
 import scala.math.max
 import Node._
@@ -79,11 +109,12 @@ object LogicalOp {
 
       // make output
       val output = Bool(OUTPUT)
-      if(searchAndMap && op == "&&" && !chiselAndMap.contains((x, y))) 
+      if(searchAndMap && op == "&&" && !chiselAndMap.contains((x, y))) {
         chiselAndMap += ((x, y) -> output)
+      }
       node.setTypeNode(output)
     }
-  } 
+  }
 }
 
 object ReductionOp {
@@ -130,8 +161,9 @@ object BinaryBoolOp {
         case any   => null;
       }
       val output = Bool(OUTPUT)
-      if(searchAndMap && op == "&&" && !chiselAndMap.contains((x, y))) 
+      if(searchAndMap && op == "&&" && !chiselAndMap.contains((x, y))) {
         chiselAndMap += ((x, y) -> output)
+      }
       node.setTypeNode(output)
     }
   }
@@ -178,15 +210,15 @@ object Op {
         case "<=" => return Literal(if (av <= bv) 1 else 0);
         case ">=" => return Literal(if (av >= bv) 1 else 0);
         case "##" => return Literal(av << bw | bv, aw + bw);
-        case "+"  => return Literal(av + bv, max(aw, bw)+1);
-        case "-"  => return Literal(av - bv, max(aw, bw)+1);
+        case "+"  => return Literal(av + bv, max(aw, bw) + 1);
+        case "-"  => return Literal(av - bv, max(aw, bw) + 1);
         case "|"  => return Literal(av | bv, max(aw, bw));
         case "&"  => return Literal(av & bv, max(aw, bw));
         case "^"  => return Literal(av ^ bv, max(aw, bw));
         case "<<" => return Literal(av << bv.toInt, aw + bv.toInt);
         case ">>" => return Literal(av >> bv.toInt, aw - bv.toInt);
         case _ => ;
-      } 
+      }
     }
     }
     if (backend.isInstanceOf[CppBackend]) {
@@ -212,8 +244,9 @@ object Op {
             val (bits, mask, swidth) = parseLit(b.litOf.name)
             return Op(name, nGrow, widthInfer, Op("&", 2, maxWidth _, a, Literal(BigInt(mask, 2))), Literal(BigInt(bits, 2)))
           }
-          if (a.litOf != null && a.litOf.isZ)
+          if (a.litOf != null && a.litOf.isZ) {
             return Op(name, nGrow, widthInfer, b, a)
+          }
         case "s*s" =>
           val (signA, absA) = signAbs(a)
           val (signB, absB) = signAbs(b)
@@ -269,7 +302,7 @@ object Op {
         case "-" => return Literal(-a.litOf.value, a.litOf.width);
         case "~" => return Literal((-a.litOf.value-1)&((BigInt(1) << a.litOf.width)-1), a.litOf.width);
         case _ => ;
-      } 
+      }
     }
     val res = new Op();
     res.init("", widthInfer, a);
@@ -284,10 +317,11 @@ class Op extends Node {
   var nGrow: Int = 0;
   override def dotName = if (op == "") "?" else op;
   override def toString: String =
-    if (inputs.length == 1)
+    if (inputs.length == 1) {
       op + "(" + inputs(0) + ")"
-    else
+    } else {
       "[ " + inputs(0) + "\n]\n  " + op + "\n" + "[  " + inputs(1) + "\n]"
+    }
 
   override def forceMatchingWidths = {
     if (inputs.length == 2) {
@@ -300,6 +334,6 @@ class Op extends Node {
         if (inputs(1).width != w) inputs(1) = inputs(1).matchWidth(w)
       }
     }
-  }  
+  }
 
 }
