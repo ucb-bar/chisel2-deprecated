@@ -102,6 +102,18 @@ object Printer {
     new TestIO(format, args.toList);
 }
 
+/**
+  _chiselMain_ behaves as if it constructs an execution tree from
+  the constructor of a sub class of Component which is passed as a parameter.
+  That execution tree is simplified by aggregating all calls which are not
+  constructors of a Component instance into the parent which is.
+  The simplified tree (encoded through _Component.children_) forms the basis
+  of the generated verilog. Each node in the simplified execution tree is
+  a _Component_ instance from which a verilog module is textually derived.
+  As an optimization, _Backend_ classes output modules which are
+  textually equivalent only once and update a _Component_ instance's
+  _moduleName_ accordingly.
+*/
 object chiselMain {
   def readArgs(args: Array[String]) = {
     var i = 0;
@@ -127,7 +139,7 @@ object chiselMain {
         case "--folding" => isFolding = true;
         case "--vcd" => isVCD = true;
         case "--v" => backend = new VerilogBackend
-        case "--moduleNamePrefix" => moduleNamePrefix = args(i + 1); i += 1
+        case "--moduleNamePrefix" => Backend.moduleNamePrefix = args(i + 1); i += 1
         case "--inlineMem" => isInlineMem = true;
         case "--noInlineMem" => isInlineMem = false;
         case "--backend" => {
@@ -239,19 +251,13 @@ trait nameable {
 
 abstract class BlackBox extends Component {
   parent.blackboxes += this;
-  var moduleNameSet = false;
 
   def setVerilogParameters(string: String) =
     this.asInstanceOf[Component].verilog_parameters = string;
 
-  override def nameIt() = {
-    if(!moduleNameSet) {
-      val cname = getClass().getName();
-      val dotPos = cname.lastIndexOf('.');
-      moduleName = if (dotPos >= 0) cname.substring(dotPos + 1) else cname;
-    }
+  def setName(name: String) = {
+    moduleName = name;
   }
-  def setName(name: String) = {moduleName = name; moduleNameSet = true}
 }
 
 

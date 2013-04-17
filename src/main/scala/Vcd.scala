@@ -35,8 +35,11 @@ import Literal._
 import Component._
 import ChiselError._
 import scala.collection.mutable.HashMap
+import scala.collection.mutable.HashSet
 
 class VcdBackend extends Backend {
+  val keywords = new HashSet[String]();
+
   override def emitTmp(node: Node): String =
     emitRef(node)
 

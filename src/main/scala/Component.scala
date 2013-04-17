@@ -67,7 +67,6 @@ object Component {
   var isFolding = true;
   var isGenHarness = false;
   var isReportDims = false;
-  var moduleNamePrefix = ""
   var scanFormat = "";
   var scanArgs: ArrayBuffer[Node] = null;
   var printFormat = "";
@@ -75,9 +74,6 @@ object Component {
   var tester: Tester[Component] = null;
   var includeArgs: List[String] = Nil;
   var targetDir: String = null;
-  var compIndex = -1;
-  val compIndices = HashMap.empty[String,Int];
-  val compDefs = new HashMap[StringBuilder, String];
   var isEmittingComponents = false;
   var isCompiling = false;
   var isCheckingPorts = false
@@ -99,17 +95,7 @@ object Component {
   var stackIndent = 0;
   var printStackStruct = ArrayBuffer[(Int, Component)]();
   var firstComp = true;
-  def genCompName(name: String): String = {
-    moduleNamePrefix + (if (compIndices contains name) {
-      val count = (compIndices(name) + 1)
-      compIndices += (name -> count)
-      name + "_" + count
-    } else {
-      compIndices += (name -> 0)
-      name
-    })
-  }
-  def nextCompIndex : Int = { compIndex = compIndex + 1; compIndex }
+
   def splitArg (s: String) : List[String] = s.split(' ').toList;
 
   // TODO: MAYBE CHANGE NAME TO INITCOMPONENT??
@@ -132,7 +118,6 @@ object Component {
     isClockGatingUpdatesInline = false;
     isFolding = true;
     isReportDims = false;
-    moduleNamePrefix = ""
     scanFormat = "";
     scanArgs = new ArrayBuffer[Node]();
     printFormat = "";
@@ -140,8 +125,6 @@ object Component {
     tester = null;
     isCoercingArgs = true;
     targetDir = "."
-    compIndex = -1;
-    compIndices.clear();
     components.clear();
     compStack.clear();
     stackIndent = 0;
@@ -189,31 +172,13 @@ object Component {
   def printStack = {
     var res = ""
     for((i, c) <- printStackStruct){
-      val dispName = if(c.moduleName == "") c.className else c.moduleName
-      res += (genIndent(i) + dispName + " " + c.instanceName + "\n")
+      res += (genIndent(i) + c.moduleName + " " + c.name + "\n")
     }
     println(res)
   }
 
   def genIndent(x: Int): String = {
     if(x == 0) "" else "    " + genIndent(x-1);
-  }
-
-  def nameChildren(root: Component) = {
-    val walked = new HashSet[Component] // this is overkill, but just to be safe
-    //initialize bfs queue of Components
-    val bfsQueue = new ScalaQueue[Component]()
-    bfsQueue.enqueue(root)
-
-    // if it popped off the queue, then it already has an instance name
-    while(!bfsQueue.isEmpty) {
-      val top = bfsQueue.dequeue
-      walked += top
-      for(child <- top.children){
-        top.nameChild(child)
-        if(!walked.contains(child)) bfsQueue.enqueue(child)
-      }
-    }
   }
 
   def push(c: Component){
@@ -258,8 +223,12 @@ object Component {
   }
 
   def pop(){
-    compStack.pop;
+    val node = compStack.pop;
     stackIndent -= 1;
+    node.level = 0;
+    for(child <- node.children) {
+      node.level = math.max(node.level, child.level + 1);
+    }
   }
 
   def getComponent(): Component = if(compStack.length != 0) compStack.top else {
@@ -273,6 +242,7 @@ object Component {
   def assignResets() {
     for(c <- components) {
       if(c.reset.inputs.length == 0 && c.parent != null) {
+        // XXX Why += when length == 0? why inputs += reset and not reset=reset?
         c.reset.inputs += c.parent.reset
       }
     }
@@ -281,8 +251,21 @@ object Component {
 
 
 abstract class Component(resetSignal: Bool = null) {
+  /** A backend(Backend.scala) might generate multiple module source code
+    from one Component, based on the parameters to instanciate the component
+    instance. Since we do not want to blindly generate one module per instance
+    the backend will keep a cache of each module's implementation source code
+    and discard textual duplicates. By walking the nodes from level zero
+    (leafs) to level N (root), we are guarenteed to generate all
+    Component/modules source text before their first instantiation. */
+  var level = 0;
+  var traversal = 0;
   var ioVal: Data = null;
+  /** Name of the instance. */
   var name: String = "";
+  /** Name of the module this component generates (defaults to class name). */
+  var moduleName: String = "";
+  var named = false;
   val bindings = new ArrayBuffer[Binding];
   var wiresCache: Array[(String, Bits)] = null;
   var parent: Component = null;
@@ -302,31 +285,11 @@ abstract class Component(resetSignal: Bool = null) {
   val nexts = new ScalaQueue[Node];
   var nindex = -1;
   var defaultWidth = 32;
-  var moduleName: String = "";
-  var className:  String = "";
-  var instanceName: String = "";
-  var pathName: String = "";
   var pathParent: Component = null;
-  val childNames = new HashMap[String, Int];
-  var named = false;
   var verilog_parameters = "";
+
   components += this;
-
   push(this);
-
-  def nameChild(child: Component) = {
-    if(!child.named){
-      Predef.assert(child.className != "")
-      if(childNames contains child.className){
-        childNames(child.className)+=1;
-        child.instanceName = child.className + "_" + childNames(child.className);
-      } else {
-        childNames += (child.className -> 0);
-        child.instanceName = child.className;
-      }
-      child.named = true;
-    }
-  }
 
   //true if this is a subclass of x
   def isSubclassOf(x: java.lang.Class[_]): Boolean = {
@@ -356,23 +319,6 @@ abstract class Component(resetSignal: Bool = null) {
     }
   }
 
-  // This function names components with the classname. Multiple instances of the same component is
-  // unquified by appending _N to the classname where N is an increasing integer.
-  def nameIt() = {
-    val cname  = getClass().getName().replace("$", "_")
-    val dotPos = cname.lastIndexOf('.');
-    name = if (dotPos >= 0) cname.substring(dotPos + 1) else cname;
-    className = name;
-    if(!backend.isInstanceOf[VerilogBackend]) {
-      if (compIndices contains name) {
-        val compIndex = (compIndices(name) + 1);
-        compIndices += (name -> compIndex);
-        name = name + "_" + compIndex;
-      } else {
-        compIndices += (name -> 0);
-      }
-    }
-  }
 
   def findBinding(m: Node): Binding = {
     // println("FINDING BINDING " + m + " OUT OF " + bindings.length + " IN " + this);
@@ -388,9 +334,7 @@ abstract class Component(resetSignal: Bool = null) {
   //def io: Data = ioVal;
   def io: Data
   def nextIndex : Int = { nindex = nindex + 1; nindex }
-  val nameSpace = new HashSet[String];
-  def genName (name: String): String =
-    if (name == null || name.length() == 0) "" else this.instanceName + "_" + name;
+
   var isWalking = new HashSet[Node];
   var isWalked = new HashSet[Node];
   override def toString: String = name
@@ -493,7 +437,8 @@ abstract class Component(resetSignal: Bool = null) {
     }
 
     var count = 0
-    // bellman-ford to infer all widths
+    // Infer all node widths by propagating known widths
+    // in a bellman-ford fashion.
     for(i <- 0 until nodesList.length) {
 
       var done = true;
@@ -517,6 +462,8 @@ abstract class Component(resetSignal: Bool = null) {
     println("finished inference")
   }
 
+  /** All classes inherited from Data are used to add type information
+   and do not represent logic itself. */
   def removeTypeNodes() {
     println("started flattenning")
 
@@ -531,7 +478,6 @@ abstract class Component(resetSignal: Bool = null) {
     var count = 0
     bfs {x =>
       scala.Predef.assert(!x.isTypeNode)
-      x.fixName
       count += 1
       for (i <- 0 until x.inputs.length)
         if (x.inputs(i) != null && x.inputs(i).isTypeNode) {
@@ -683,88 +629,66 @@ abstract class Component(resetSignal: Bool = null) {
   // 2) name the IO
   // 3) name and set the component of all statically declared nodes through introspection
   def markComponent() = {
-    nameIt();
     ownIo();
-    io.nameIt("io", true);
-    val c = getClass();
-    for (m <- c.getDeclaredMethods) {
-      val name = m.getName();
-      val types = m.getParameterTypes();
-      if (types.length == 0 && name != "test") {
-        val o = m.invoke(this);
-        o match {
-          case node: Node => { if ((node.isTypeNode || (node.name == "" && !node.named) || node.name == null || name != "")) node.nameIt(name, true);
-            if (node.isReg || node.isClkInput) containsReg = true;
-            nameSpace += name;
-          }
-          case buf: ArrayBuffer[Node] => {
-            var i = 0;
-            if(!buf.isEmpty && buf(0).isInstanceOf[Node]){
-              for(elm <- buf){
-                if ((elm.isTypeNode || (elm.name == "" && !elm.named) || elm.name == null)) {
-                  elm.nameIt(name + "_" + i, true);
-                }
-                if (elm.isReg || elm.isClkInput) {
-                  containsReg = true;
-                }
-                nameSpace += name + "_" + i;
-                i += 1;
-              }
-            }
-          }
-          // TODO: THIS CASE MAY NEVER MATCH
-          case bufbuf: ArrayBuffer[ArrayBuffer[_]] => {
-            var i = 0;
-            println(name);
-            for(buf <- bufbuf){
-              var j = 0;
-              for(elm <- buf){
-                elm match {
-                  case node: Node => {
-                    if ((node.isTypeNode || (node.name == "" && !node.named) || node.name == null)) {
-                      node.nameIt(name + "_" + i + "_" + j, true);
-                    }
-                    if (node.isReg || node.isClkInput) {
-                      containsReg = true;
-                    }
-                    nameSpace += name + "_" + i + "_" + j;
-                    j += 1;
-                  }
-                  case any =>
-                }
-              }
-              i += 1;
-            }
-          }
-          case cell: Cell => { cell.name = name;
-            cell.named = true;
-            if(cell.isReg) containsReg = true;
-            nameSpace += name;
-          }
-          case bb: BlackBox => {
-            if(!bb.named) {bb.instanceName = name; bb.named = true};
-            bb.pathParent = this;
-            for((n, elm) <- io.flatten) {
-              if (elm.isClkInput) containsReg = true
-            }
-            nameSpace += name;
-          }
-          case comp: Component => {
-            if(!comp.named) {comp.instanceName = name; comp.named = true};
-            comp.pathParent = this;
-            nameSpace += name;
-          }
-          case any =>
-        }
-      }
-    }
+     // We are going through all declarations, which can return Nodes,
+     // ArrayBuffer[Node], Cell, BlackBox and Components.
+     for (m <- getClass().getDeclaredMethods) {
+       val name = m.getName();
+       val types = m.getParameterTypes();
+       if (types.length == 0 && name != "test") {
+         val o = m.invoke(this);
+         o match {
+         case node: Node => {
+           if (node.isReg || node.isClkInput) containsReg = true;
+         }
+         case buf: ArrayBuffer[Node] => {
+           if(!buf.isEmpty && buf(0).isInstanceOf[Node]){
+             for(elm <- buf){
+               if (elm.isReg || elm.isClkInput) {
+                 containsReg = true;
+               }
+             }
+           }
+         }
+         // TODO: THIS CASE MAY NEVER MATCH
+         case bufbuf: ArrayBuffer[ArrayBuffer[_]] => {
+           var i = 0;
+           println(name);
+           for(buf <- bufbuf){
+             var j = 0;
+             for(elm <- buf){
+               elm match {
+                 case node: Node => {
+                   if (node.isReg || node.isClkInput) {
+                     containsReg = true;
+                   }
+                   j += 1;
+                 }
+                 case any =>
+               }
+             }
+             i += 1;
+           }
+         }
+         case cell: Cell => {
+           if(cell.isReg) containsReg = true;
+         }
+         case bb: BlackBox => {
+           bb.pathParent = this;
+           for((n, elm) <- io.flatten) {
+             if (elm.isClkInput) containsReg = true
+           }
+         }
+         case comp: Component => {
+           comp.pathParent = this;
+         }
+         case any =>
+       }
+     }
+     }
   }
 
-  def nameAllIO(): Unit = {
-    io.nameIt("");
-    for (child <- children)
-      child.nameAllIO();
-  }
+
   def genAllMuxes = {
     for (p <- procs) {
       p match {
@@ -784,24 +708,33 @@ abstract class Component(resetSignal: Bool = null) {
       }
     }
   }
+  /* XXX Not sure what the two following do.
+   They never get overridden yet it is called
+   for each component (See Backend implementations). */
   def elaborate(fake: Int = 0) = {}
   def postMarkNet(fake: Int = 0) = {}
   def stripComponent(s: String) = s.split("__").last
 
+    /** Returns the absolute path to a component instance from toplevel. */
   def getPathName: String = {
-    val res = (if(instanceName != "") instanceName else name);
-    if(parent == null) {
-      return res;
-    } else {
-      parent.getPathName + "_" + res;
-    }
+    if ( parent == null ) name else parent.getPathName + "_" + name;
   }
 
-  def traceNodes() = {
+  def traceNodes() {
     val queue = Stack[() => Any]();
 
+    /* XXX Why do we do something different here? */
     if (!backend.isInstanceOf[VerilogBackend]) {
       queue.push(() => io.traceNode(this, queue));
+      /* This is ugly and most likely unnecessary but as long as we are not
+       sure of the subtle consequences of tracing through blackboxes, let's
+       have the code here (instead of Verilog.doCompile). */
+      for (c <- components) {
+        c match {
+          case x: BlackBox => c.traceNodes();
+          case _ =>
+        }
+      }
     } else {
       for (c <- components) {
         queue.push(() => c.reset.traceNode(c, queue))

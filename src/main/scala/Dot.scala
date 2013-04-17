@@ -33,8 +33,11 @@ import Node._
 import Reg._
 import Component._
 import ChiselError._
+import scala.collection.mutable.HashSet
 
 class DotBackend extends Backend {
+  val keywords = new HashSet[String]();
+
   override def emitTmp(node: Node): String =
     emitRef(node)
 

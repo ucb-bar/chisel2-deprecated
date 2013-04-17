@@ -31,6 +31,7 @@
 package Chisel
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
+import java.io.PrintStream
 
 import Node._;
 import Component._;
@@ -144,7 +145,15 @@ abstract class Node extends nameable {
   def isByValue: Boolean = true;
   def width: Int = if(isInGetWidth) inferWidth(this) else width_;
   def width_=(w: Int) = { isFixedWidth = true; width_ = width; inferWidth = fixWidth(w); }
-  def nameIt (path: String, setNamed: Boolean = true) = { name = path; named = setNamed}
+
+  def nameIt (path: String) {
+    if( !named ) {
+      /* If the name was set explicitely through *setName*,
+       we don't override it. */
+      name = path;
+    }
+  }
+
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
   def ##(b: Node): Node  = Op("##", 2, sumWidth _,  this, b );
   def maxNum: BigInt = if(litOf != null) litOf.value else ((1 << (if(width < 0) inferWidth(this) else width))-1);
@@ -242,37 +251,62 @@ abstract class Node extends nameable {
   }
   def isInObject =
     (isIo && (isIoDebug || component == topComponent)) ||
-    (topComponent.debugs.contains(this) && named) ||
+    (topComponent.debugs.contains(this) && !name.isEmpty) ||
     isReg || isUsedByRam || isDebug || isPrintArg || isScanArg;
-  def isInVCD = (isIo && isInObject) || isReg || (isDebug && named);
+  def isInVCD = (isIo && isInObject) || isReg || (isDebug && !name.isEmpty);
   def dotName = { val name = this.getClass.getName; name.substring(7, name.size) };
 
-  def printTree(depth: Int = 4, indent: String = ""): Unit = {
+  /** Prints all members of a node and recursively its inputs up to a certain
+    depth level. This method is purely used for debugging. */
+  def printTree(writer: PrintStream, depth: Int = 4, indent: String = ""): Unit = {
     if (depth < 1) return;
-    println(indent + getClass + " width=" + getWidth + " #inputs=" + inputs.length);
+    writer.println(indent + getClass + " width=" + getWidth + " #inputs=" + inputs.length);
     this match {
       case fix: Fix => {
         if (!(fix.comp == null)) {
-          println(indent + "  (has comp " + fix.comp + " of type " + fix.comp.getClass + ")");
+          writer.println(indent + "  (has comp " + fix.comp + " of type " + fix.comp.getClass + ")");
         }
       }
       case ufix: UFix => {
         if (!(ufix.comp == null)) {
-          println(indent + "(has comp " + ufix.comp + ")");
+          writer.println(indent + "(has comp " + ufix.comp + ")");
         }
       }
       case bits: Bits => {
         if (!(bits.comp == null)) {
-          println(indent + "(has comp " + bits.comp + ")");
+          writer.println(indent + "(has comp " + bits.comp + ")");
         }
       }
       case any =>
     }
+    writer.println("sccIndex: " + sccIndex)
+    writer.println("sccLowlink: " + sccLowlink)
+    writer.println("walked: " + walked)
+    writer.println("component: " + component)
+    writer.println("flattened: " + flattened)
+    writer.println("isTypeNode: " + isTypeNode)
+    writer.println("depth: " + depth)
+    writer.println("isSigned: " + isSigned)
+    writer.println("width_: " + width_)
+    writer.println("index: " + index)
+    writer.println("isFixedWidth: " + isFixedWidth)
+    writer.println("consumers.length: " + consumers.length)
+    writer.println("outputs.length: " + outputs.length)
+    writer.println("nameHolder: " + nameHolder)
+    writer.println("nameHolder: " + nameHolder)
+    writer.println("isClkInput: " + isClkInput)
+    writer.println("inferCount: " + inferCount)
+    writer.println("genError: " + genError)
+    writer.println("stack.length: " + (if(stack != null) { stack.length } else { 0 }))
+    writer.println("line: " + line)
+    writer.println("isScanArg: " + isScanArg)
+    writer.println("isPrintArg: " + isPrintArg)
+    writer.println("isMemOutput: " + isMemOutput)
     for (in <- inputs) {
       if (in == null) {
-        println("null");
+        writer.println("null");
       } else {
-        in.printTree(depth-1, indent + "  ");
+        in.printTree(writer, depth-1, indent + "  ");
       }
     }
   }
@@ -377,14 +411,6 @@ abstract class Node extends nameable {
       res
     } else {
       this
-    }
-  }
-
-  def fixName() = {
-    if(nameHolder != null && !named && !isInstanceOf[Literal]){
-      name = nameHolder.name;
-      nameHolder.name = "";
-      named = nameHolder.named;
     }
   }
 

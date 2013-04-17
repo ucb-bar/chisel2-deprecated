@@ -38,40 +38,68 @@ import scala.sys.process._
 import Reg._
 import ChiselError._
 import Component._
+import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashMap
+import scala.collection.mutable.LinkedHashMap
 
 object VerilogBackend {
 
-  val keywords = new HashSet[String]()
-  keywords ++= List("always", "and", "assign", "attribute", "begin", "buf", "bufif0", "bufif1", "case",
-                    "casex", "casez", "cmos", "deassign", "default", "defparam", "disable", "edge",
-                    "else", "end", "endattribute", "endcase", "endfunction", "endmodule", "endprimitive",
-                    "endspecify", "endtable", "endtask", "event", "for", "force", "forever", "fork",
-                    "function", "highz0", "highz1", "if", "ifnone", "initial", "inout", "input",
-                    "integer", "join", "medium", "module", "large", "macromodule", "nand", "negedge",
-                    "nmos", "nor", "not", "notif0", "notif1", "or", "output", "parameter", "pmos",
-                    "posedge", "primitive", "pull0", "pull1", "pulldown", "pullup", "rcmos", "real",
-                    "realtime", "reg", "release", "repeat", "rnmos", "rpmos", "rtran", "rtranif0",
-                    "rtranif1", "scalared", "signed", "small", "specify", "specparam", "strength",
-                    "strong0", "strong1", "supply0", "supply1", "table", "task", "time", "tran",
-                    "tranif0", "tranif1", "tri", "tri0", "tri1", "triand", "trior", "trireg", "unsigned",
-                    "vectored", "wait", "wand", "weak0", "weak1", "while", "wire", "wor", "xnor", "xor"
-                 )
+  val keywords = HashSet[String](
+    "always", "and", "assign", "attribute", "begin", "buf", "bufif0", "bufif1",
+    "case", "casex", "casez", "cmos", "deassign", "default", "defparam",
+    "disable", "edge", "else", "end", "endattribute", "endcase", "endfunction",
+    "endmodule", "endprimitive", "endspecify", "endtable", "endtask", "event",
+    "for", "force", "forever", "fork", "function", "highz0", "highz1", "if",
+    "ifnone", "initial", "inout", "input", "integer", "join", "medium",
+    "module", "large", "macromodule", "nand", "negedge", "nmos", "nor", "not",
+    "notif0", "notif1", "or", "output", "parameter", "pmos", "posedge",
+    "primitive", "pull0", "pull1", "pulldown", "pullup", "rcmos", "real",
+    "realtime", "reg", "release", "repeat", "rnmos", "rpmos", "rtran",
+    "rtranif0", "rtranif1", "scalared", "signed", "small", "specify",
+    "specparam", "strength", "strong0", "strong1", "supply0", "supply1",
+    "table", "task", "time", "tran", "tranif0", "tranif1", "tri", "tri0",
+    "tri1", "triand", "trior", "trireg", "unsigned", "vectored", "wait",
+    "wand", "weak0", "weak1", "while", "wire", "wor", "xnor", "xor")
 
+  var traversalIndex = 0
 }
 
 class VerilogBackend extends Backend {
   isEmittingComponents = true
   isCoercingArgs = false
+  val keywords = VerilogBackend.keywords
+
+  val flushedTexts = HashSet[String]()
 
   val memConfs = HashMap[String, String]()
+  val compIndices = HashMap.empty[String,Int];
+
   def getMemConfString =
     memConfs.map { case (conf, name) => "name " + name + " " + conf } reduceLeft(_ + _)
+
   def getMemName(mem: Mem[_], configStr: String): String = {
     if (!memConfs.contains(configStr)) {
-      val compName = if (mem.component != null) mem.component.name + "_" else ""
-      memConfs += (configStr -> genCompName(compName + emitRef(mem)))
+      /* Generates memory that are different in (depth, width, ports).
+       All others, we return the previously generated name. */
+      val compName = if (mem.component != null) {
+        if( !mem.component.moduleName.isEmpty ) {
+          mem.component.moduleName
+        } else {
+          extractClassName(mem.component)
+        } + "_"
+      } else ""
+      // Generate a unique name for the memory module.
+      val candidateName = Backend.moduleNamePrefix + compName + emitRef(mem)
+      val memModuleName = if( compIndices contains candidateName ) {
+        val count = (compIndices(candidateName) + 1)
+        compIndices += (candidateName -> count)
+        candidateName + "_" + count
+      } else {
+        compIndices += (candidateName -> 0)
+        candidateName
+      }
+      memConfs += (configStr -> memModuleName)
     }
     memConfs(configStr)
   }
@@ -138,7 +166,7 @@ class VerilogBackend extends Backend {
 
   def emitDef(c: Component): String = {
     val spacing = (if(c.verilog_parameters != "") " " else "");
-    var res = "  " + c.moduleName + " " + c.verilog_parameters + spacing + c.instanceName + "(";
+    var res = "  " + c.moduleName + " " + c.verilog_parameters + spacing + c.name + "(";
     val hasReg = c.containsReg || c.childrenContainsReg;
     res = res + (if(hasReg) ".clk(clk), .reset(" + (if(c.reset.inputs.length==0) "reset" else emitRef(c.reset.inputs(0))) + ")" else "");
     var isFirst = true;
@@ -311,7 +339,7 @@ class VerilogBackend extends Backend {
           " width " + m.width +
           " ports " + m.ports.map(_.getPortType).reduceLeft(_ + "," + _) +
           "\n"
-        val name = moduleNamePrefix + getMemName(m, configStr)
+        val name = getMemName(m, configStr)
         println("MEM " + name)
 
         val clkrst = Array("    .CLK(clk)", "    .RST(reset)")
@@ -463,7 +491,9 @@ class VerilogBackend extends Backend {
         var nextComp = node.component
         var path = "."
         while(nextComp != c) {
-          path = "." + nextComp.instanceName + path
+          /* XXX This code is most likely never executed otherwise
+                 it would end in an infinite loop. */
+          path = "." + nextComp.name + path
         }
         path = c.name + path + emitRef(node)
         harness.write(", " + path)
@@ -542,16 +572,6 @@ class VerilogBackend extends Backend {
     }
   }
 
-  // this function checks that there is no collision with verilog keywords, mangling the names if there
-  // is a collision
-  def checkNames(c: Component) = {
-    for (m <- c.mods) {
-      if (VerilogBackend.keywords.contains(m.name)) {
-        m.name = m.name + "_"
-      }
-    }
-  }
-
   def emitDecs(c: Component): StringBuilder = {
     val res = new StringBuilder();
     for (m <- c.mods) {
@@ -560,27 +580,30 @@ class VerilogBackend extends Backend {
     res
   }
 
-  def doCompile(c: Component, out: java.io.FileWriter, depth: Int): Unit = {
-    c match {
-      case x: BlackBox => c.traceNodes(); return
-      case _ =>
+  def levelChildren(root: Component) {
+    root.level = 0;
+    root.traversal = VerilogBackend.traversalIndex;
+    VerilogBackend.traversalIndex = VerilogBackend.traversalIndex + 1;
+    for(child <- root.children) {
+      levelChildren(child)
+      root.level = math.max(root.level, child.level + 1);
     }
+  }
 
-    // println("COMPILING COMP " + name);
-    println("// " + depthString(depth) + "COMPILING " + c + " " + c.children.length + " CHILDREN");
-    for (top <- c.children)
-      doCompile(top, out, depth + 1);
-    c.findConsumers();
-    if(!ChiselErrors.isEmpty){
-      for(err <- ChiselErrors) err.printError;
-      throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
-    }
-    c.collectNodes(c);
-    val hasReg = c.containsReg || c.childrenContainsReg;
+  def gatherChildren(root: Component): ArrayBuffer[Component] = {
+    var result = new ArrayBuffer[Component]();
+    for (child <- root.children)
+      result = result ++ gatherChildren(child);
+    result ++ ArrayBuffer[Component](root);
+  }
+
+
+  def emitModuleText(c: Component): String = {
     val res = new StringBuilder()
-    res.append((if (hasReg) "input clk, input reset" else ""));
+    val hasReg = c.containsReg || c.childrenContainsReg;
     var first = true;
     var nl = "";
+    res.append((if (hasReg) "input clk, input reset" else ""));
     for ((n, w) <- c.wires) {
       if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
       w match {
@@ -594,7 +617,6 @@ class VerilogBackend extends Backend {
       };
     }
     res.append(");\n\n");
-    checkNames(c)
     // TODO: NOT SURE EXACTLY WHY I NEED TO PRECOMPUTE TMPS HERE
     for (m <- c.mods)
       emitTmp(m);
@@ -606,15 +628,102 @@ class VerilogBackend extends Backend {
       res.append(emitRegs(c));
     }
     res.append("endmodule\n\n");
-    if(compDefs contains res){
-      c.moduleName = compDefs(res);
-    }else{
-      c.moduleName = genCompName(c.name);
-      compDefs += (res -> c.moduleName);
-      //res.insert(0, "module " + c.moduleName + "(");
-      out.append("module " + c.moduleName + "(")
-      out.append(res);
+    res.result();
+  }
+
+  def flushModules( out: java.io.FileWriter,
+    defs: HashMap[String, LinkedHashMap[String, ArrayBuffer[Component] ]],
+    level: Int ) {
+    for( (className, modules) <- defs ) {
+      var index = 0
+      for ( (text, comps) <- modules) {
+        /* XXX (index > 0) minimizes diff with previous implementation. */
+        val moduleName = if( modules.size > 1 && index > 0 ) {
+          className + "_" + index.toString;
+        } else {
+          className;
+        }
+        index = index + 1
+        var textLevel = 0;
+        for( flushComp <- comps ) {
+          textLevel = flushComp.level;
+          if( flushComp.level == level ) {
+            flushComp.moduleName = moduleName
+          }
+        }
+        if( textLevel == level ) {
+          /* XXX We write the module source text in *emitChildren* instead
+                 of here so as to generate a minimal "diff -u" with the previous
+                 implementation. */
+        }
+      }
     }
+  }
+
+
+  def emitChildren(top: Component,
+    defs: HashMap[String, LinkedHashMap[String, ArrayBuffer[Component] ]],
+    out: java.io.FileWriter, depth: Int) {
+    for (child <- top.children) {
+      emitChildren(child, defs, out, depth + 1);
+    }
+    val className = extractClassName(top);
+    for( (text, comps) <- defs(className)) {
+      if( comps contains top ) {
+        if( !(flushedTexts contains text) ) {
+          out.append("module " + top.moduleName + "(")
+          out.append(text);
+          flushedTexts += text
+        }
+        return;
+      }
+    }
+  }
+
+  def doCompile(top: Component, out: java.io.FileWriter, depth: Int): Unit = {
+    levelChildren(top)
+    val sortedComps = gatherChildren(top).sortWith(
+      (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)));
+    /* *defs* maps Component classes to Component instances through
+       the generated text of their module.
+       We use a LinkedHashMap such that later iteration is predictable. */
+    val defs = new HashMap[String, LinkedHashMap[String, ArrayBuffer[Component] ]];
+    var level = 0;
+    for( c <- sortedComps ) {
+      println("// " + depthString(depth) + "COMPILING " + c + " " + c.children.length + " CHILDREN"
+      + " (" + c.level + "," + c.traversal + ")");
+      c.findConsumers();
+      if(!ChiselErrors.isEmpty){
+        for(err <- ChiselErrors) err.printError;
+        throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
+      }
+      c.collectNodes(c);
+      if( c.level > level ) {
+        /* When a component instance instantiates different sets
+         of sub-components based on its constructor parameters, the same
+         Component class might appear with different level in the tree.
+         We thus wait until the very end to generate module names.
+         If that were not the case, we could flush modules as soon as
+         the source text for all components at a certain level in the tree
+         has been generated. */
+        flushModules(out, defs, level);
+        level = c.level
+      }
+      val res = emitModuleText(c);
+      val className = extractClassName(c);
+      if( !(defs contains className) ) {
+        defs += (className -> LinkedHashMap[String, ArrayBuffer[Component] ]());
+      }
+      if( defs(className) contains res ) {
+        /* We have already outputed the exact same source text */
+        defs(className)(res) += c;
+        println("\t" + defs(className)(res).length + " components");
+      } else {
+        defs(className) += (res -> ArrayBuffer[Component](c));
+      }
+    }
+    flushModules(out, defs, level);
+    emitChildren(top, defs, out, depth);
   }
 
   override def elaborate(c: Component): Unit = {
@@ -640,10 +749,13 @@ class VerilogBackend extends Backend {
       for(err <- ChiselErrors) err.printError;
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
     }
-    nameChildren(topComponent)
     collectNodesIntoComp(c)
+    /* *transforms* might add memory pins with specific names. */
     transform(c, transforms)
     c.traceNodes();
+    /* We execute nameAll after traceNodes because bindings would not have been
+       created yet otherwise. */
+    nameAll(topComponent)
     if(!ChiselErrors.isEmpty){
       for(err <- ChiselErrors) err.printError;
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
@@ -651,7 +763,7 @@ class VerilogBackend extends Backend {
     if(!dontFindCombLoop) {
       c.findCombLoop();
     }
-    val out = new java.io.FileWriter(base_name + moduleNamePrefix + c.name + ".v");
+    val out = new java.io.FileWriter(base_name + Backend.moduleNamePrefix + c.name + ".v");
     if(saveConnectionWarnings) {
       connWriter = new java.io.FileWriter(base_name + c.name + ".connection.warnings")
     }
@@ -667,7 +779,7 @@ class VerilogBackend extends Backend {
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
     }
     if (!memConfs.isEmpty) {
-      val out_conf = new java.io.FileWriter(base_name + moduleNamePrefix + Component.topComponent.name + ".conf");
+      val out_conf = new java.io.FileWriter(base_name + Backend.moduleNamePrefix + Component.topComponent.name + ".conf");
       out_conf.write(getMemConfString);
       out_conf.close();
     }
@@ -681,7 +793,6 @@ class VerilogBackend extends Backend {
     if (isGenHarness) {
       genHarness(c, base_name, c.name);
     }
-    compDefs.clear;
   }
 
   override def compile(c: Component, flags: String): Unit = {

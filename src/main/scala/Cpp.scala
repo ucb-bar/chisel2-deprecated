@@ -42,6 +42,7 @@ import Reg._
 import ChiselError._
 import Component._
 import Literal._
+import scala.collection.mutable.HashSet
 
 object CListLookup {
   def apply[T <: Data](addr: Bits, default: List[T], mapping: Array[(Bits, List[T])]): List[T] = {
@@ -53,6 +54,8 @@ object CListLookup {
 }
 
 class CppBackend extends Backend {
+  val keywords = new HashSet[String]();
+
   override def emitTmp(node: Node): String = {
     require(false)
     if (node.isInObject) {
@@ -445,6 +448,7 @@ class CppBackend extends Backend {
     harness.write("  for (int t = 0; lim < 0 || t < lim; t++) {\n");
     harness.write("    dat_t<1> reset = LIT<1>(0);\n");
     harness.write("    if (!c->scan(stdin)) break;\n");
+    // XXX Why print is after clock_lo and dump after clock_hi?
     harness.write("    c->clock_lo(reset);\n");
     harness.write("    c->print(stdout);\n");
     harness.write("    c->clock_hi(reset);\n");
@@ -507,6 +511,7 @@ class CppBackend extends Backend {
     res
   }
 
+  /* flatten the component hierarchy such that each node has a unique name. */
   def renameNodes(c: Component, nodes: Seq[Node]) = {
     for (m <- nodes) {
       m match {
@@ -524,15 +529,13 @@ class CppBackend extends Backend {
 
   override def elaborate(c: Component): Unit = {
     val vcd = new VcdBackend()
-    val dot = new DotBackend()
+    val dot = new DotBackend()  // XXX Not used?
     components.foreach(_.elaborate(0));
     for (c <- components)
       c.markComponent();
     c.genAllMuxes;
     components.foreach(_.postMarkNet(0));
     val base_name = ensureDir(targetDir)
-    val out_h = new java.io.FileWriter(base_name + c.name + ".h");
-    val out_c = new java.io.FileWriter(base_name + c.name + ".cpp");
     if(resourceStream != null) {
       val classFile = new java.io.FileWriter(base_name + "emulator.h")
       while(resourceStream.available > 0) {
@@ -546,7 +549,7 @@ class CppBackend extends Backend {
     assignResets()
     c.inferAll();
     if(saveWidthWarnings) {
-      widthWriter = new java.io.FileWriter(base_name + c.name + ".width.warnings")
+      widthWriter = new java.io.FileWriter(base_name + extractClassName(c) + ".width.warnings")
     }
     c.forceMatchingWidths;
     c.removeTypeNodes()
@@ -563,7 +566,10 @@ class CppBackend extends Backend {
       throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
       return
     }
+    // Moved right after traceNodes to match Verilog.scala
+    nameAll(c);
     if(!dontFindCombLoop) c.findCombLoop();
+    /* XXX Why now? */
     for (cc <- components) {
       if (!(cc == c)) {
         c.mods       ++= cc.mods;
@@ -590,6 +596,8 @@ class CppBackend extends Backend {
     if (isGenHarness) {
       genHarness(c, base_name, c.name);
     }
+    val out_h = new java.io.FileWriter(base_name + c.name + ".h");
+    val out_c = new java.io.FileWriter(base_name + c.name + ".cpp");
     out_h.write("#ifndef __" + c.name + "__\n");
     out_h.write("#define __" + c.name + "__\n\n");
     out_h.write("#include \"emulator.h\"\n\n");
@@ -603,7 +611,6 @@ class CppBackend extends Backend {
         if(!c.omods.contains(n)) c.omods += n
     }
     for (m <- c.omods) {
-      //if(m.name != "reset" && !(m.component == c)) {
       if(m.name != "reset") {
         if (m.isInObject) {
           out_h.write(emitDec(m));

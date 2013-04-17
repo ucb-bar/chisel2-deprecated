@@ -41,8 +41,11 @@ import Reg._
 import ChiselError._
 import Component._
 import Literal._
+import scala.collection.mutable.HashSet
 
 class FloBackend extends Backend {
+  val keywords = new HashSet[String]();
+
   override def emitDec(node: Node): String =
     emitRef(node) + " = "
 

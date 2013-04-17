@@ -29,6 +29,7 @@
 */
 
 package Chisel
+import scala.collection.immutable.HashSet
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 import java.lang.reflect.Modifier._
@@ -38,12 +39,20 @@ import ChiselError._
 import sort._
 
 object Bundle {
+  val keywords = HashSet[String]("elements", "flip", "toString",
+    "flatten", "binding", "asInput", "asOutput", "unary_$tilde",
+    "unary_$bang", "unary_$minus", "clone", "toUFix", "toBits",
+    "toBool", "toFix")
+
   def nullbundle_t = Bundle(ArrayBuffer[(String, Data)]());
   def apply (elts: ArrayBuffer[(String, Data)]): Bundle = {
     val res = new Bundle();
     res.elementsCache = elts; // TODO: REMOVE REDUNDANT CREATION
-    for ((n, i) <- elts)
+/* XXX Removed this code!
+    for ((n, i) <- elts) {
       i.name = n;
+    }
+ */
     res
   }
 
@@ -70,86 +79,102 @@ object sort {
 /** Defines a collection of datum of different types into a single coherent
   whole.
   */
-class Bundle(view_arg: Seq[String] = null) extends Data{
+class Bundle(view_arg: Seq[String] = null) extends Data {
   var dir = "";
   var view = view_arg;
-  var elementsCache: ArrayBuffer[(String, Data)] = null;
+  private var elementsCache: ArrayBuffer[(String, Data)] = null;
   var bundledElm: Node = null;
-  def calcElements(view: Seq[String]): ArrayBuffer[(String, Data)] = {
+
+  /** Populates the cache of elements declared in the Bundle. */
+  private def calcElements(view: Seq[String]): ArrayBuffer[(String, Data)] = {
     val c      = getClass();
     var elts   = ArrayBuffer[(String, Data)]();
     val seen   = ArrayBuffer[Object]();
-    var isCollecting = true;
     for (m <- c.getMethods) {
       val name = m.getName();
-      if (isCollecting) {
-        val modifiers = m.getModifiers();
-        val types = m.getParameterTypes();
-        val rtype = m.getReturnType();
-        var isFound = false;
-        var isInterface = false;
-        var c = rtype;
-        val sc = Class.forName("Chisel.Data");
-        do {
-          if (c == sc) {
-            isFound = true; isInterface = true;
-          } else if (c == null || c == Class.forName("java.lang.Object")) {
-            isFound = true; isInterface = false;
-          } else {
-            c = c.getSuperclass();
-          }
-        } while (!isFound);
-        // TODO: SPLIT THIS OUT TO TOP LEVEL LIST
-        if (types.length == 0 && !isStatic(modifiers) && isInterface &&
-            name != "elements" && name != "flip" && name != "toString" && name != "flatten" && name != "binding" && name != "asInput" && name != "asOutput" && name != "unary_$tilde" && name != "unary_$bang" && name != "unary_$minus" && name != "clone" && name != "toUFix" && name != "toBits" && name != "toBool" && name != "toFix" &&
-            (view == null || view.contains(name)) && !seen.contains(m.invoke(this))) {
-          val o = m.invoke(this);
+      val modifiers = m.getModifiers();
+      val types = m.getParameterTypes();
+      val rtype = m.getReturnType();
+      var isFound = false;
+      var isInterface = false;
+      var c = rtype;
+      val sc = Class.forName("Chisel.Data");
+      do {
+        if (c == sc) {
+          isFound = true; isInterface = true;
+        } else if (c == null || c == Class.forName("java.lang.Object")) {
+          isFound = true; isInterface = false;
+        } else {
+          c = c.getSuperclass();
+        }
+      } while (!isFound);
+      // TODO: SPLIT THIS OUT TO TOP LEVEL LIST
+      if( types.length == 0 && !isStatic(modifiers) && isInterface
+        && !(Bundle.keywords contains name)
+        && (view == null || view.contains(name)) ) {
+        val o = m.invoke(this);
+        if( !seen.contains(o)) {
           o match {
-            case bv: Vec[Data] => elts += ((name + bv.name, bv))
-            case i: Data => elts += ((name, i)); i.name = name;
+            case bv: Vec[_] => {
+              /* We would prefer to match for Vec[Data] but that's impossible
+               because of JVM constraints which lead to type erasure.*/
+              val datavec = bv.asInstanceOf[Vec[Data]];
+              elts += ((name + datavec.name, datavec))
+            }
+            case i: Data => {
+              elts += ((name, i));
+            }
             case any =>
           }
           seen += o;
         }
-      } else if (name == "elementsCache") {
-        isCollecting = true;
       }
     }
     elts
   }
+
+  /* XXX This method is not private since it is used in Dot.scala. */
   def elements: ArrayBuffer[(String, Data)] = {
     if (elementsCache == null) {
       elementsCache = calcElements(view);
     }
     elementsCache
   }
+
   override def toString: String = {
-    val init = "BUNDLE(";
-    var res = init;
+    var res = "BUNDLE(";
+    var sep = "";
     for ((n, i) <- elements) {
-      if (res.length() > init.length()) res += ", ";
-      res += n + " => " + i;
+      res += sep + n + " => " + i;
+      sep = ", ";
     }
     res += ")";
     res
   }
+
   override def terminate(): Unit = {
     for ((n, i) <- elements)
       i.terminate();
   }
+
   def view (elts: ArrayBuffer[(String, Data)]): Bundle = {
     elementsCache = elts; this
   }
 
-  override def nameIt (path: String, named: Boolean = true) = {
-    if(!this.named) {
-      if(path.length > 0) {
-        name = path
-        this.named = named
-      }
+  override def nameIt (path: String) {
+    if( (!named
+      /* XXX hardcoded to minimize diff with previous implementation. */
+      || name.startsWith("ptw"))
+      && (name.isEmpty
+        || (!path.isEmpty && name != path)) ) {
+      name = path
+      val prefix = if (name.length > 0) name + "_" else ""
       for ((n, i) <- elements) {
-        i.nameIt( (if (path.length > 0) path + "_" else "") + n, named )
+        i.nameIt(prefix + n)
       }
+      named = true
+    } else {
+      /* We are trying to rename a Bundle that has a fixed name. */
     }
   }
 
@@ -161,21 +186,25 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
       elts += ((n, i));
     Bundle(elts)
   }
+
   def +=[T <: Data](other: T) = {
     elements;
     elementsCache += ((other.name, other));
     if(isTypeNode) other.setIsTypeNode;
   }
+
   override def flip(): this.type = {
     for ((n, i) <- elements) {
       i.flip()
     }
     this
   }
+
   override def removeTypeNodes() = {
     for ((n, elt) <- elements)
       elt.removeTypeNodes
   }
+
   override def traceableNodes = elements.map(tup => tup._2).toArray;
 
   override def traceNode(c: Component, stack: Stack[() => Any]) = {
@@ -190,6 +219,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     throw new NoSuchElementException();
     return null;
   }
+
   override def <>(src: Node) = {
     if(comp == null || (dir == "output" &&
       src.isInstanceOf[Bundle] &&
@@ -218,6 +248,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
       }
     }
   }
+
   override def ^^(src: Node) = {
     src match {
       case other: Bundle =>
@@ -245,15 +276,12 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
   }
 
   def :=(src: Bundle): Unit = {
-
     if(this.isTypeNode && comp != null) {
       this.comp.procAssign(src.toNode)
       return
     }
-
     for((n, i) <- elements) {
       i match {
-
         case bundle: Bundle => {
           if (src.contains(n)) bundle := src(n).asInstanceOf[Bundle]
         }
@@ -261,11 +289,14 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
           if (src.contains(n)) bits := src(n).asInstanceOf[Bits]
         }
         case vec: Vec[Data] => {
+           /* We would prefer to match for Vec[Data] but that's impossible
+            because of JVM constraints which lead to type erasure.
+            XXX The warning is still there since casting *vec* might have
+            unintended consequences on the assignment to *vec*. */
           if (src.contains(n)) vec := src(n).asInstanceOf[Vec[Data]]
         }
       }
     }
-
   }
 
   override def flatten: Array[(String, Bits)] = {
@@ -315,6 +346,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data{
     this.dir = "output"
     this
   }
+
   override def setIsTypeNode() = {
     isTypeNode = true;
     for ((n, i) <- elements)

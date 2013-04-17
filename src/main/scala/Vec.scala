@@ -83,7 +83,6 @@ object Vec {
     for(i <- 0 until n){
       val t   = gen;
       res    += t;
-      t.name += i;
     }
     res
   }
@@ -95,7 +94,6 @@ object Vec {
       new Vec[T](() => gen)
     }
     elts.zipWithIndex.foreach{ case (e,i) =>
-      e.name += i
       res += e
     }
     res
@@ -320,13 +318,29 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
     this
   }
 
-  override def nameIt (path: String, named: Boolean = true) = {
-    if(!this.named) {
-      if(path.length > 0) name = path
-      this.named = named
-      for (i <- self) {
-        i.nameIt( (if (path.length > 0) path + "_" else "") + i.name, named )
+  override def nameIt (path: String) {
+    if( (!named
+      /* XXX hardcoded to minimize diff with previous implementation. */
+      || name.startsWith("ptw"))
+      && (name.isEmpty
+        || (!path.isEmpty && name != path)) ) {
+      val prevPrefix = if (name.length > 0) name + "_" else ""
+      name = path
+      val prefix = if (name.length > 0) name + "_" else ""
+      for( (elm, i) <- self.zipWithIndex ) {
+        val prevElmPrefix = prevPrefix + i
+        val suffix = if( elm.name.startsWith(prevElmPrefix) ) {
+          /* XXX Cludgy! We remove the previous prefix and regenerate
+          the _elm_ name with a new prefix. */
+          elm.name.substring(prevElmPrefix.length)
+        } else {
+          elm.name
+        }
+        elm.nameIt(prefix + i + suffix)
       }
+      named = true
+    } else {
+      /* We are trying to rename a Vec that has a fixed name. */
     }
   }
 

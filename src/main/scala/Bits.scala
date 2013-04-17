@@ -256,7 +256,6 @@ class Bits extends Data with proc {
     res.inferWidth = this.inferWidth
     res.width_ = this.width_;
     res.dir = this.dir;
-    res.name = this.name;
     res
   }
 
