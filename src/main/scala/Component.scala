@@ -94,7 +94,6 @@ object Component {
   val compStack = new Stack[Component]();
   var stackIndent = 0;
   var printStackStruct = ArrayBuffer[(Int, Component)]();
-  var firstComp = true;
 
   def splitArg (s: String) : List[String] = s.split(' ').toList;
 
@@ -124,12 +123,10 @@ object Component {
     printFormat = "";
     printArgs = new ArrayBuffer[Node]();
     tester = null;
-    isCoercingArgs = true;
     targetDir = "."
     components.clear();
     compStack.clear();
     stackIndent = 0;
-    firstComp = true;
     printStackStruct.clear();
     procs.clear();
     resetList.clear()
@@ -147,8 +144,12 @@ object Component {
     backend = new CppBackend
     topComponent = null;
 
+    /* Re-initialize global variables defined in object Node {} */
+    isCoercingArgs = true
+    isInGetWidth = false
     conds.clear()
     conds.push(Bool(true))
+    keys.clear()
   }
 
   def ensureDir(dir: String) = {
@@ -183,9 +184,8 @@ object Component {
   }
 
   def push(c: Component){
-    if(firstComp){
+    if(compStack.isEmpty){
       compStack.push(c);
-      firstComp = false;
       printStackStruct += ((stackIndent, c));
     } else {
       val st = Thread.currentThread.getStackTrace;
