@@ -104,6 +104,7 @@ object Component {
   def defTests(nodes: Node*)(body: => Boolean) = {
   }
   def initChisel () = {
+    ChiselError.ChiselErrors.clear();
     saveWidthWarnings = false
     saveConnectionWarnings = false
     saveComponentTrace = false
@@ -429,7 +430,7 @@ abstract class Component(resetSignal: Bool = null) {
       var hasError = false
       for (elm <- nodesList) {
         if (elm.infer || elm.width == -1) {
-          println("Error: Could not infer the width on: " + elm)
+          println("chisel: error: Could not infer the width on: " + elm)
           hasError = true
         }
       }

@@ -41,48 +41,42 @@ object ChiselError {
   def apply(mf: => String, n: Node): ChiselError =
     new ChiselError(() => mf, n.line)
 
-  def apply(m: String, stack: Array[StackTraceElement]): ChiselError =
+  def apply(m: String, stack: Array[StackTraceElement]): ChiselError = {
     new ChiselError(() => m, findFirstUserLine(stack))
+  }
 
   def apply(mf: => String, stack: Array[StackTraceElement]): ChiselError =
     new ChiselError(() => mf, findFirstUserLine(stack))
 
   def findFirstUserLine(stack: Array[StackTraceElement]): StackTraceElement = {
-    for(i <- 1 until stack.length) {
-      val ste = stack(i)
-      val classname = ste.getClassName
-      val dotPos = classname.lastIndexOf('.')
-      if( dotPos > 0 ) {
-        val pkg = classname.subSequence(0, dotPos)
-        if (pkg != "Chisel" && !classname.contains("scala")) {
-          return ste
-        }
-      }
-    }
-    println("COULDN'T FIND LINE NUMBER")
-    return stack(0)
+    val index = findFirstUserInd(stack)
+    if( index > 0 ) stack(index) else stack(0)
   }
 
   def findFirstUserInd(stack: Array[StackTraceElement]): Int = {
+    /* Starts at one because item 0 is java.lang.Thread.getStackTrace */
     for(i <- 1 until stack.length) {
       val ste = stack(i)
-      val classname = ste.getClassName
-      val dotPos = classname.lastIndexOf('.')
-      if( dotPos > 0 ) {
-        val pkg = classname.subSequence(0, dotPos)
-        if (pkg != "Chisel" && !classname.contains("scala")) {
+      val className = ste.getClassName()
+      try {
+        val cls = Class.forName(className)
+        val supercls = cls.getSuperclass()
+        if( supercls == classOf[Component] ) {
           return i
         }
+      } catch {
+        case e: java.lang.ClassNotFoundException => {}
       }
     }
-    println("COULDN'T FIND LINE NUMBER")
+    println("COULDN'T FIND LINE NUMBER (" + stack(1) + ")")
     return 0
   }
 
   def printError(msgFun: () => String, line: StackTraceElement) {
-    println(msgFun() + " on line " + line.getLineNumber +
-            " in class " + line.getClassName +
-            " in file " + line.getFileName)
+    /* Following conventions for error formatting */
+    println(line.getFileName + ":" + line.getLineNumber
+      + ": error: " + msgFun() +
+      " in class " + line.getClassName)
   }
 }
 
