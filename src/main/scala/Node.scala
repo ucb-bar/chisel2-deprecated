@@ -52,9 +52,9 @@ object Node {
   implicit def convBitsToUFix(x: Bits): UFix = x.toUFix;
 
   var isCoercingArgs = true;
-  var conds = new Stack[Bool]();
+  val conds = new Stack[Bool]();
   conds.push(Bool(true));
-  var keys  = new Stack[Bits]();
+  val keys  = new Stack[Bits]();
 
   var isInGetWidth = false
 
@@ -106,15 +106,13 @@ object Node {
   var clk: Node = Bits(INPUT, 1)
   clk.setName("clk")
 
-  var stop = true;
-
 }
 
 abstract class Node extends nameable {
   var sccIndex = -1
   var sccLowlink = -1
   var walked = false;
-  var staticComp: Component = getComponent();
+  val staticComp: Component = getComponent();
   var component: Component = null;
   var flattened = false;
   var isTypeNode = false;
