@@ -68,6 +68,21 @@ object ChiselError {
         case e: java.lang.ClassNotFoundException => {}
       }
     }
+    /* XXX Do it the old way until we figure if it is safe
+           to remove from Node.scala
+       var line: StackTraceElement = findFirstUserLine(Thread.currentThread().getStackTrace)
+     */
+    for(i <- 1 until stack.length) {
+      val ste = stack(i)
+      val classname = ste.getClassName
+      val dotPos = classname.lastIndexOf('.')
+      if( dotPos > 0 ) {
+        val pkg = classname.subSequence(0, dotPos)
+        if (pkg != "Chisel" && !classname.contains("scala")) {
+          return i
+        }
+      }
+    }
     println("COULDN'T FIND LINE NUMBER (" + stack(1) + ")")
     return 0
   }
