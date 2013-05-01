@@ -59,3 +59,5 @@ seq(ScctPlugin.instrumentSettings : _*)
 // Execute tests in the current project serially.
 // Tests from other projects may still run concurrently.
 parallelExecution in Test := false
+
+parallelExecution in ScctTest := false
