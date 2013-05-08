@@ -44,7 +44,7 @@ class ROM[T <: Data](val lits: Seq[Literal], gen: () => T) extends Vec[T](gen) {
   }
 
   override def write(addr: UFix, data: T) = {
-    ChiselErrors += ChiselError("Can't write to ROM", Thread.currentThread().getStackTrace)
+    ChiselError.error("Can't write to ROM")
   }
 
   override def equals(x: Any): Boolean = {

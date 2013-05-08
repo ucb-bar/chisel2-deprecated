@@ -175,27 +175,31 @@ object chiselMain {
     initChisel();
     readArgs(args)
 
-    val c = gen();
-    if (scanner != null) {
-      val s = scanner(c);
-      scanArgs  ++= s.args;
-      for (a <- s.args) a.isScanArg = true
-      scanFormat  = s.format;
+    try {
+      val c = gen();
+      if (scanner != null) {
+        val s = scanner(c);
+        scanArgs  ++= s.args;
+        for (a <- s.args) a.isScanArg = true
+        scanFormat  = s.format;
+      }
+      if (printer != null) {
+        val p = printer(c);
+        printArgs   ++= p.args;
+        for(a <- p.args) a.isPrintArg = true
+        printFormat   = p.format;
+      }
+      if (ftester != null) {
+        tester = ftester(c)
+      }
+      backend.elaborate(c)
+      if (isCheckingPorts) backend.checkPorts(c)
+      if (isCompiling && isGenHarness) backend.compile(c)
+      if (isTesting) tester.tests()
+      c
+    } finally {
+      ChiselError.report()
     }
-    if (printer != null) {
-      val p = printer(c);
-      printArgs   ++= p.args;
-      for(a <- p.args) a.isPrintArg = true
-      printFormat   = p.format;
-    }
-    if (ftester != null) {
-      tester = ftester(c)
-    }
-    backend.elaborate(c)
-    if (isCheckingPorts) backend.checkPorts(c)
-    if (isCompiling && isGenHarness) backend.compile(c)
-    if (isTesting) tester.tests()
-    c
   }
 }
 
@@ -225,13 +229,13 @@ trait proc extends Node {
   def genMuxes(default: Node): Unit = {
     if (updates.length == 0) {
       if (inputs.length == 0 || inputs(0) == null) {
-        ChiselErrors += ChiselError({"NO UPDATES ON " + this}, this)
+        ChiselError.error({"NO UPDATES ON " + this}, this.line)
       }
       return
     }
     val (lastCond, lastValue) = updates.head
     if (default == null && !lastCond.isTrue) {
-      ChiselErrors += ChiselError({"NO DEFAULT SPECIFIED FOR WIRE: " + this}, this)
+      ChiselError.error({"NO DEFAULT SPECIFIED FOR WIRE: " + this}, this.line)
       return
     }
     if (default != null) {

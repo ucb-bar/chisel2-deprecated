@@ -62,7 +62,7 @@ object Reg {
     }
   }
 
-  def validateGen[T <: Data](gen: => T) = {
+  def validateGen[T <: Data](gen: => T) {
     for ((n, i) <- gen.flatten)
       if (!i.inputs.isEmpty || !i.updates.isEmpty) {
         throwException("Invalid Type Specifier for Reg")
@@ -136,7 +136,7 @@ class Reg extends Delay with proc {
   var enable = Bool(false);
   def procAssign(src: Node) = {
     if (assigned) {
-      ChiselErrors += ChiselError("reassignment to Reg", Thread.currentThread().getStackTrace);
+      ChiselError.error("reassignment to Reg");
     }
     val cond = genCond();
     if (conds.length >= 1) {
@@ -181,7 +181,7 @@ class Reg extends Delay with proc {
   }
   override def assign(src: Node) = {
     if(assigned || inputs(0) != null) {
-      ChiselErrors += ChiselError("reassignment to Reg", Thread.currentThread().getStackTrace);
+      ChiselError.error("reassignment to Reg");
     } else {
       assigned = true; super.assign(src)
     }

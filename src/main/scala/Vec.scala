@@ -118,7 +118,7 @@ class VecProc extends proc {
   var addr: UFix = null
   var elms: ArrayBuffer[Bits] = null
 
-  override def genMuxes(default: Node) = {}
+  override def genMuxes(default: Node) {}
 
   def procAssign(src: Node) = {
     val onehot = VecUFixToOH(addr, elms.length)
@@ -171,7 +171,7 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
   def apply(ind: Bits): T =
     read(ind)
 
-  def write(addr: UFix, data: T) = {
+  def write(addr: UFix, data: T) {
     if(data.isInstanceOf[Node]){
 
       val onehot = VecUFixToOH(addr, length)
@@ -185,7 +185,7 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
     }
   }
 
-  def write(addr: Bits, data: T): Unit = {
+  def write(addr: Bits, data: T) {
     write(addr.toUFix, data)
   }
 
@@ -208,7 +208,7 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
     }
     readPortCache += (addr -> res)
     res.setIsTypeNode
-    return res
+    res
   }
 
   override def flatten: Array[(String, Bits)] = {
@@ -256,30 +256,25 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
   def :=[T <: Data](src: Iterable[T]): Unit = {
 
     // Check matching size
-    assert(this.size == src.size,
-           {printError(() => "\n[ERROR] Can't wire together Vecs of mismatched lengths",
-                       findFirstUserLine(Thread.currentThread().getStackTrace)
-                     )
-          })
+    assert(this.size == src.size, {
+      ChiselError.error("Can't wire together Vecs of mismatched lengths")
+    })
 
     // Check LHS to make sure unidirection
     val dirLHS = this.flatten(0)._2.dir
-    this.flatten.map(x => {assert(x._2.dir == dirLHS,
-                                  {printError(() => "\n[ERROR] Cannot mix directions on left hand side of :=",
-                                              findFirstUserLine(Thread.currentThread().getStackTrace)) }
-                                  )}
-                     )
+    this.flatten.map(x => {assert(x._2.dir == dirLHS, {
+      ChiselError.error("Cannot mix directions on left hand side of :=")
+    })
+    })
 
     // Check RHS to make sure unidirection
     val dirRHS = src.head.flatten(0)._2.dir
     for (elm <- src) {
-      elm.flatten.map(x => {assert(x._2.dir == dirRHS,
-                                    {printError(() => "\n[ERROR] Cannot mix directions on right hand side of :=",
-                                                findFirstUserLine(Thread.currentThread().getStackTrace)) }
-                                    )}
-                     )
+      elm.flatten.map(x => {assert(x._2.dir == dirRHS, {
+        ChiselError.error("Cannot mix directions on right hand side of :=")
+      })
+      })
     }
-
 
     for((me, other) <- this zip src){
       me match {
@@ -298,14 +293,14 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
       this(i) := src(i)
   }
 
-  override def removeTypeNodes() = {
+  override def removeTypeNodes() {
     for(bundle <- self)
       bundle.removeTypeNodes
   }
 
   override def traceableNodes = self.toArray
 
-  override def traceNode(c: Component, stack: Stack[() => Any]) = {
+  override def traceNode(c: Component, stack: Stack[() => Any]) {
     for((n, i) <- flatten) {
       stack.push(() => i.traceNode(c, stack))
     }
@@ -381,7 +376,7 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
     this
   }
 
-  override def setIsTypeNode() = {
+  override def setIsTypeNode() {
     isTypeNode = true;
     for(elm <- self)
       elm.setIsTypeNode

@@ -41,7 +41,7 @@ class DotBackend extends Backend {
   override def emitTmp(node: Node): String =
     emitRef(node)
 
-  def isDottable (m: Node) = {
+  def isDottable (m: Node): Boolean = {
     if (m == m.component.reset) {
       false
     } else {
@@ -54,12 +54,14 @@ class DotBackend extends Backend {
     }
   }
 
-  def elaborate(c: Component, base_name: String): Unit = {
+  override def elaborate(c: Component): Unit = {
+    super.elaborate(c)
+
     var gn = -1;
-    val out_cd = new java.io.FileWriter(base_name + c.name + "_c.dot");
+    val out_cd = createOutputFile(c.name + "_c.dot");
     out_cd.write("digraph TopTop {\n");
     out_cd.write("rankdir = LR;\n");
-    def genNum = { gn += 1; gn };
+    def genNum: Int = { gn += 1; gn };
     def dumpComponent (c: Component): Unit = {
       out_cd.write("subgraph cluster" + c.name + "{\n");
       out_cd.write("label = \"" + c.name + "\";\n");
@@ -88,7 +90,8 @@ class DotBackend extends Backend {
     dumpComponent(c);
     out_cd.write("}");
     out_cd.close();
-    val out_d = new java.io.FileWriter(base_name + c.name + ".dot");
+
+    val out_d = createOutputFile(c.name + ".dot");
     out_d.write("digraph " + c.name + "{\n");
     out_d.write("rankdir = LR;\n");
     for (m <- c.mods) {

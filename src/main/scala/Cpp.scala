@@ -31,7 +31,6 @@
 package Chisel
 import scala.collection.mutable.ArrayBuffer
 import scala.math._
-import java.io.File;
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.PrintStream
@@ -77,7 +76,7 @@ class CppBackend extends Backend {
         super.emitRef(node)
     }
   }
-  def wordMangle(x: Node, w: Int) = {
+  def wordMangle(x: Node, w: Int): String = {
     if (w >= words(x)) {
       "0L"
     } else if (x.isInstanceOf[Literal]) {
@@ -127,22 +126,22 @@ class CppBackend extends Backend {
   }
 
   val bpw = 64
-  def words(node: Node) = (node.width - 1) / bpw + 1
-  def fullWords(node: Node) = node.width/bpw
-  def emitLoWordRef(node: Node) = emitWordRef(node, 0)
-  def emitTmpDec(node: Node) = {
+  def words(node: Node): Int = (node.width - 1) / bpw + 1
+  def fullWords(node: Node): Int = node.width/bpw
+  def emitLoWordRef(node: Node): String = emitWordRef(node, 0)
+  def emitTmpDec(node: Node): String = {
     if (!node.isInObject) {
       "  val_t " + (0 until words(node)).map(emitRef(node) + "__w" + _).reduceLeft(_ + ", " + _) + ";\n"
     } else {
       ""
     }
   }
-  def block(s: Seq[String]) = "  {" + s.map(" " + _ + ";").reduceLeft(_ + _) + " }\n"
-  def makeArray(s: String, x: Node) = List("val_t " + s + "[" + words(x) + "]")
-  def toArray(s: String, x: Node) = makeArray(s, x) ++ (0 until words(x)).map(i => s + "[" + i + "] = " + emitWordRef(x, i))
+  def block(s: Seq[String]): String = "  {" + s.map(" " + _ + ";").reduceLeft(_ + _) + " }\n"
+  def makeArray(s: String, x: Node): List[String] = List("val_t " + s + "[" + words(x) + "]")
+  def toArray(s: String, x: Node): List[String] = makeArray(s, x) ++ (0 until words(x)).map(i => s + "[" + i + "] = " + emitWordRef(x, i))
   def fromArray(s: String, x: Node) =
     (0 until words(x)).map(i => emitWordRef(x, i) + " = " + s + "[" + i + "]")
-  def trunc(x: Node) = {
+  def trunc(x: Node): String = {
     if (words(x) != fullWords(x)) {
       "  " + emitWordRef(x, words(x)-1) + " = " + emitWordRef(x, words(x)-1) + " & " + ((1L << (x.width-bpw*fullWords(x)))-1) + ";\n"
     } else {
@@ -421,7 +420,7 @@ class CppBackend extends Backend {
     }
   }
 
-  def genHarness(c: Component, base_name: String, name: String) = {
+  def genHarness(c: Component, name: String) = {
     // val makefile = new java.io.FileWriter(base_name + name + "-makefile");
     // makefile.write("CPPFLAGS = -O2 -I../ -I${CHISEL}/csrc\n\n");
     // makefile.write(name + ": " + name + ".o" + " " + name + "-emulator.o\n");
@@ -431,7 +430,7 @@ class CppBackend extends Backend {
     // makefile.write(name + "emulator.o: " + name + "-emulator.cpp " + name + ".h\n");
     // makefile.write("\tg++ -c ${CPPFLAGS} " + name + "-emulator.cpp\n\n");
     // makefile.close();
-    val harness  = new java.io.FileWriter(base_name + name + "-emulator.cpp");
+    val harness  = createOutputFile(name + "-emulator.cpp");
     harness.write("#include \"" + name + ".h\"\n");
     harness.write("int main (int argc, char* argv[]) {\n");
     harness.write("  " + name + "_t* c = new " + name + "_t();\n");
@@ -460,7 +459,7 @@ class CppBackend extends Backend {
     harness.close();
   }
 
-  override def compile(c: Component, flagsIn: String): Unit = {
+  override def compile(c: Component, flagsIn: String) {
     val flags = if (flagsIn == null) "-O2" else flagsIn
 
     val chiselENV = java.lang.System.getenv("CHISEL")
@@ -528,47 +527,8 @@ class CppBackend extends Backend {
   }
 
   override def elaborate(c: Component): Unit = {
-    val vcd = new VcdBackend()
-    val dot = new DotBackend()  // XXX Not used?
-    components.foreach(_.elaborate(0));
-    for (c <- components)
-      c.markComponent();
-    c.genAllMuxes;
-    components.foreach(_.postMarkNet(0));
-    val base_name = ensureDir(targetDir)
-    if(resourceStream != null) {
-      val classFile = new java.io.FileWriter(base_name + "emulator.h")
-      while(resourceStream.available > 0) {
-        classFile.write(resourceStream.read())
-      }
-      classFile.close()
-      resourceStream.close()
-    }
-    println("// COMPILING " + c + "(" + c.children.length + ")");
-    topComponent = c;
-    assignResets()
-    c.inferAll();
-    if(saveWidthWarnings) {
-      widthWriter = new java.io.FileWriter(base_name + extractClassName(c) + ".width.warnings")
-    }
-    c.forceMatchingWidths;
-    c.removeTypeNodes()
-    if(!ChiselErrors.isEmpty){
-      for(err <- ChiselErrors)  err.printError;
-      throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
-      return
-    }
-    collectNodesIntoComp(c)
-    transform(c, transforms)
-    c.traceNodes();
-    if(!ChiselErrors.isEmpty){
-      for(err <- ChiselErrors)  err.printError;
-      throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
-      return
-    }
-    // Moved right after traceNodes to match Verilog.scala
-    nameAll(c);
-    if(!dontFindCombLoop) c.findCombLoop();
+    super.elaborate(c)
+
     /* XXX Why now? */
     for (cc <- components) {
       if (!(cc == c)) {
@@ -580,11 +540,8 @@ class CppBackend extends Backend {
     }
     c.findConsumers();
     c.verifyAllMuxes;
-    if(!ChiselErrors.isEmpty){
-      for(err <- ChiselErrors) err.printError;
-      throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
-      return
-    }
+    ChiselError.checkpoint()
+
     c.collectNodes(c);
     c.findOrdering(); // search from roots  -- create omods
     renameNodes(c, c.omods);
@@ -594,10 +551,10 @@ class CppBackend extends Backend {
     }
 
     if (isGenHarness) {
-      genHarness(c, base_name, c.name);
+      genHarness(c, c.name);
     }
-    val out_h = new java.io.FileWriter(base_name + c.name + ".h");
-    val out_c = new java.io.FileWriter(base_name + c.name + ".cpp");
+    val out_h = createOutputFile(c.name + ".h");
+    val out_c = createOutputFile(c.name + ".cpp");
     out_h.write("#ifndef __" + c.name + "__\n");
     out_h.write("#define __" + c.name + "__\n\n");
     out_h.write("#include \"emulator.h\"\n\n");
@@ -610,6 +567,7 @@ class CppBackend extends Backend {
       for (n <- scanArgs ++ printArgs)
         if(!c.omods.contains(n)) c.omods += n
     }
+    val vcd = new VcdBackend()
     for (m <- c.omods) {
       if(m.name != "reset") {
         if (m.isInObject) {
@@ -701,8 +659,8 @@ class CppBackend extends Backend {
       out_c.write("  fflush(f);\n");
     }
     out_c.write("}\n");
-    def constantArgSplit(arg: String) = arg.split('=');
-    def isConstantArg(arg: String) = constantArgSplit(arg).length == 2;
+    def constantArgSplit(arg: String): Array[String] = arg.split('=');
+    def isConstantArg(arg: String): Boolean = constantArgSplit(arg).length == 2;
     out_c.write("bool " + c.name + "_t::scan ( FILE* f ) {\n");
     if (scanArgs.length > 0) {
       val format =
@@ -731,6 +689,16 @@ class CppBackend extends Backend {
     out_c.close();
     if(saveComponentTrace) {
       printStack
+    }
+    /* Copy the emulator.h file into the targetDirectory. */
+    val resourceStream = getClass().getResourceAsStream("/emulator.h")
+    if( resourceStream != null ) {
+      val classFile = createOutputFile("emulator.h")
+      while(resourceStream.available > 0) {
+        classFile.write(resourceStream.read())
+      }
+      classFile.close()
+      resourceStream.close()
     }
   }
 

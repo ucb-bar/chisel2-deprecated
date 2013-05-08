@@ -159,35 +159,8 @@ class FloBackend extends Backend {
   }
 
   override def elaborate(c: Component): Unit = {
-    components.foreach(_.elaborate(0));
-    for (c <- components)
-      c.markComponent();
-    c.genAllMuxes;
-    components.foreach(_.postMarkNet(0));
-    val base_name = ensureDir(targetDir)
-    val out = new java.io.FileWriter(base_name + c.name + ".flo");
-    topComponent = c;
-    assignResets()
-    c.inferAll();
-    if(saveWidthWarnings) {
-      widthWriter = new java.io.FileWriter(base_name + c.name + ".width.warnings")
-    }
-    c.forceMatchingWidths;
-    c.removeTypeNodes()
-    if(!ChiselErrors.isEmpty) {
-      for(err <- ChiselErrors)  err.printError;
-      throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
-      return
-    }
-    collectNodesIntoComp(c)
-    transform(c, transforms)
-    c.traceNodes();
-    if(!ChiselErrors.isEmpty){
-      for(err <- ChiselErrors)  err.printError;
-      throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
-      return
-    }
-    if(!dontFindCombLoop) c.findCombLoop();
+    super.elaborate(c)
+
     for (cc <- components) {
       if (!(cc == c)) {
         c.mods       ++= cc.mods;
@@ -198,11 +171,8 @@ class FloBackend extends Backend {
     }
     c.findConsumers();
     c.verifyAllMuxes;
-    if(!ChiselErrors.isEmpty){
-      for(err <- ChiselErrors)  err.printError;
-      throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
-      return
-    }
+    ChiselError.checkpoint()
+
     c.collectNodes(c);
     c.findOrdering(); // search from roots  -- create omods
     renameNodes(c, c.omods);
@@ -211,6 +181,8 @@ class FloBackend extends Backend {
       println("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
 
+    // Write the generated code to the output file
+    val out = createOutputFile(c.name + ".flo");
     for (m <- c.omods)
       out.write(emit(m));
     out.close();

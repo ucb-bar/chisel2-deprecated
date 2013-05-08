@@ -36,10 +36,9 @@ abstract class Num extends Bits {
   type T <: Num;
 
   def undefinedError(opName: String, b: Num) = {
-    ChiselErrors += ChiselError(
+    ChiselError.error(
       opName + " not defined on "
-        + this.getClass.toString + " " + b.getClass.toString,
-      Thread.currentThread().getStackTrace);
+        + this.getClass.toString + " " + b.getClass.toString);
   }
 
   def <<(b: Num): Num = { undefinedError("<<", b); this }

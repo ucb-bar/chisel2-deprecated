@@ -44,7 +44,6 @@ object Bundle {
     "unary_$bang", "unary_$minus", "clone", "toUFix", "toBits",
     "toBool", "toFix")
 
-  def nullbundle_t = Bundle(ArrayBuffer[(String, Data)]());
   def apply (elts: ArrayBuffer[(String, Data)]): Bundle = {
     val res = new Bundle();
     res.elementsCache = elts; // TODO: REMOVE REDUNDANT CREATION
@@ -197,14 +196,14 @@ class Bundle(view_arg: Seq[String] = null) extends Data {
     this
   }
 
-  override def removeTypeNodes() = {
+  override def removeTypeNodes() {
     for ((n, elt) <- elements)
       elt.removeTypeNodes
   }
 
   override def traceableNodes = elements.map(tup => tup._2).toArray;
 
-  override def traceNode(c: Component, stack: Stack[() => Any]) = {
+  override def traceNode(c: Component, stack: Stack[() => Any]) {
     for((n, i) <- flatten) {
       stack.push(() => i.traceNode(c, stack))
     }
@@ -348,7 +347,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data {
     (dir == "") && elements.map{case (n,i) => i.isDirectionless}.reduce(_&&_)
   }
 
-  override def setIsTypeNode() = {
+  override def setIsTypeNode() {
     isTypeNode = true;
     for ((n, i) <- elements)
       i.setIsTypeNode

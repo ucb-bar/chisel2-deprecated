@@ -94,7 +94,7 @@ class NameSuite extends AssertionsForJUnit {
       io.sigs_valid := valid.toBool
     }
 
-    chiselMain(Array[String]("--v", "--c",
+    chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => new ListLookupsComp())
     assertFile(tmpdir.getRoot() + "/NameSuite_ListLookupsComp_1.v",
