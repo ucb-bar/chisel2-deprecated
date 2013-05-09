@@ -641,12 +641,10 @@ abstract class Component(resetSignal: Bool = null) {
     ownIo();
      // We are going through all declarations, which can return Nodes,
      // ArrayBuffer[Node], Cell, BlackBox and Components.
-    println("XXX [markComponent] " + this.getClass.getName)
      for (m <- getClass().getDeclaredMethods) {
        val name = m.getName();
        val types = m.getParameterTypes();
        if (types.length == 0 && name != "test") {
-         println("XXX\t" + name)
          val o = m.invoke(this);
          o match {
          case node: Node => {
