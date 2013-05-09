@@ -94,6 +94,7 @@ object Component {
   val compStack = new Stack[Component]();
   var stackIndent = 0;
   var printStackStruct = ArrayBuffer[(Int, Component)]();
+  val printfs = ArrayBuffer[Printf]()
 
   def splitArg (s: String) : List[String] = s.split(' ').toList;
 
@@ -349,6 +350,13 @@ abstract class Component(resetSignal: Bool = null) {
   def debug(x: Node): Unit = {
     x.getNode.component = this
     debugs += x.getNode
+  }
+  def printf(message: String, args: Node*): Unit = {
+    val p = new Printf(conds.top && !reset, message, args)
+    printfs += p
+    debug(p)
+    p.inputs.foreach(debug _)
+  }
   def <>(src: Component) = io <> src.io;
   def apply(name: String): Data = io(name);
   // COMPILATION OF REFERENCE

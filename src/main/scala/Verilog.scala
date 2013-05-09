@@ -574,6 +574,14 @@ class VerilogBackend extends Backend {
         "      $finish;\n" +
         "    end\n" +
         "`endif\n"
+      case p: Printf =>
+        "`ifndef SYNTHESIS\n" +
+        "`ifdef PRINTF_COND\n" +
+        "    if (`PRINTF_COND)\n" +
+        "`endif\n" +
+        "      if (" + emitRef(p.cond) + ")\n" +
+        "        $fwrite(32'h80000002, " + p.args.map(emitRef _).foldLeft(CString(p.message))(_+", "+_) + ");\n" +
+        "`endif"
       case _ =>
         ""
     }

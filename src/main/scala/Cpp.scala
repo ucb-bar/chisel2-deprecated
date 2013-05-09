@@ -692,6 +692,8 @@ class CppBackend extends Backend {
       res.reverse
     }
     out_c.write("void " + c.name + "_t::print ( FILE* f ) {\n");
+    for (p <- Component.printfs)
+      out_c write "  if (" + emitLoWordRef(p.cond) + ") dat_fprintf(f, " + p.args.map(emitRef _).foldLeft(CString(p.message))(_+", "+_) + ");\n"
     if (printArgs.length > 0) {
       val format =
         if (printFormat == "") {

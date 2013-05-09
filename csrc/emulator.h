@@ -1116,6 +1116,14 @@ class dat_t {
       return (sgn_a ^ sgn_b) ? -res : res;
     }
   }
+  dat_t<w+w> operator / ( dat_t<w> o ) {
+    dat_t<w+w> res;
+    div_n(res.values, values, o.values, w, w);
+    return res;
+  }
+  dat_t<w+w> operator % ( dat_t<w> o ) {
+    return *this - *this / o * o;
+  }
   dat_t<w+w> ufix_times_fix( dat_t<w> o ) {
     // TODO: CLEANUP AND ADD DIFFERENT WIDTHS FOR EACH OPERAND
     if (n_words == 1 && ((w + w) <= val_n_bits())) {
@@ -1390,6 +1398,99 @@ class dat_t {
     return bit(b.lo_word());
   }
 };
+
+template <int w>
+std::string dat_to_str(dat_t<w> x, int base = 16, char pad = '0') {
+  int n_digs = (int)ceil(log(2)/log(base)*w);
+  std::string res(n_digs, pad);
+
+  for (int j = n_digs-1; j >= 0; j--) {
+    int digit = (x % base).lo_word();
+    x = x / base;
+    res[j] = (digit > 10 ? 'a'-10 : '0') + digit;
+    if ((x == 0).to_bool()) break;
+  }
+
+  return res;
+}
+
+static std::string dat_to_str(val_t x, int base = 16, char pad = '0') {
+  return dat_to_str(dat_t<sizeof(val_t)*8>(x), base, pad);
+}
+
+template <int w>
+std::string fix_to_str(dat_t<w> x, int base = 16, char pad = '0') {
+  bool neg = x.bit(w-1).to_bool();
+  std::string res = pad + dat_to_str(neg ? -x : x, base, pad);
+  if (neg)
+    res[res.rfind(pad)] = '-';
+  return res;
+}
+
+static std::string fix_to_str(val_t x, int base = 16, char pad = '0') {
+  return fix_to_str(dat_t<sizeof(val_t)*8>(x), base, pad);
+}
+
+template <int w>
+std::string dat_as_str(const dat_t<w>& x) {
+  std::string res((w+7)/8, ' ');
+  for (int i = 0; i < w; i += 8) {
+    char ch = x.values[i/val_n_bits()] >> (i % val_n_bits());
+    if (ch == 0) break;
+    res[i/8] = ch;
+  }
+  return res;
+}
+
+static std::string dat_as_str(val_t x) {
+  return dat_as_str(dat_t<sizeof(val_t)*8>(x));
+}
+
+#if __cplusplus >= 201103L
+static std::string dat_sprintf(const char* s)
+{
+  std::string res;
+  for ( ; s[0]; s++) {
+    if (s[0] == '%') {
+      if (s[1] != '%')
+        abort();
+      s++;
+    }
+    res += s;
+  }
+  return res;
+}
+
+template <typename T, typename... Args>
+static std::string dat_sprintf(const char* s, T value, Args... args)
+{
+  std::string res;
+  for ( ; s[0]; s++) {
+    if (s[0] == '%') {
+      if (s[1] == '%') {
+        s++;
+      } else {
+        switch(s[1]) {
+          case 'h': res += dat_to_str(value, 16, '0'); break;
+          case 'b': res += dat_to_str(value, 2, '0'); break;
+          case 'd': res += dat_to_str(value, 10, ' '); break;
+          case 's': res += dat_as_str(value); break;
+          default: abort();
+        }
+        return res + dat_sprintf(s+2, args...);
+      }
+    }
+    res += s[0];
+  }
+  abort();
+}
+
+template <typename... Args>
+static int dat_fprintf(FILE* f, const char* s, Args... args)
+{
+  return fputs(dat_sprintf(s, args...).c_str(), f);
+}
+#endif /* C++11 */
                                             
 template <int w, int sw> inline dat_t<w> DAT(dat_t<sw> dat) { 
   dat_t<w> res(dat);
@@ -1545,23 +1646,6 @@ static int  char_to_hex[] = {
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1 };
 
 #define TO_CSTR(d) (d.to_str().c_str())
-
-template <int w>
-std::string dat_to_str (dat_t<w> val, int n_bits = 4, bool for_vcd = false) {
-  std::string rev_res, res;
-  int bits_left = w;
-  for (int j = 0; j < val.n_words; j++) {
-    for (int i = 0; i < MIN(bits_left, val_n_bits()); i += n_bits) {
-      rev_res.push_back(hex_to_char[(val.values[j] >> i) & ((1<<n_bits)-1)]);
-    }
-    bits_left -= val_n_bits();
-  }
-  for (int j = rev_res.size()-1; j >= 0; j--) {
-    if (!for_vcd && (j+1) % 8 == 0) res.push_back('_');
-    res.push_back(rev_res[j]);
-  }
-  return res;
-}
 
 template <int w>
 void str_to_dat(std::string str, dat_t<w>& res) {
