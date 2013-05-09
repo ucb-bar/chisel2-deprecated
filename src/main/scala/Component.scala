@@ -274,7 +274,6 @@ abstract class Component(resetSignal: Bool = null) {
   val children = new ArrayBuffer[Component];
   var inputs = new ArrayBuffer[Node];
   var outputs = new ArrayBuffer[Node];
-  val asserts = ArrayBuffer[Assert]();
   val blackboxes = ArrayBuffer[BlackBox]();
   val debugs = HashSet[Node]();
 
@@ -345,9 +344,10 @@ abstract class Component(resetSignal: Bool = null) {
     }
     wiresCache
   }
-  def assert(cond: Bool, message: String) =
-    asserts += Assert(cond, message);
-  def debug(x: Node) =
+  def assert(cond: Bool, message: String): Unit =
+    debug(new Assert(cond || reset, message))
+  def debug(x: Node): Unit = {
+    x.getNode.component = this
     debugs += x.getNode
   def <>(src: Component) = io <> src.io;
   def apply(name: String): Data = io(name);
@@ -387,7 +387,7 @@ abstract class Component(resetSignal: Bool = null) {
   def initializeBFS: ScalaQueue[Node] = {
     val res = new ScalaQueue[Node]
 
-    for(a <- asserts)
+    for (c <- components; a <- c.debugs)
       res.enqueue(a)
     for(b <- blackboxes)
       res.enqueue(b.io)
@@ -468,21 +468,13 @@ abstract class Component(resetSignal: Bool = null) {
   def removeTypeNodes() {
     println("started flattenning")
 
-    def getNode(x: Node): Node = {
-      var res = x
-      while(res.isTypeNode && res.inputs.length != 0){
-        res = res.inputs(0)
-      }
-      res
-    }
-
     var count = 0
     bfs {x =>
       scala.Predef.assert(!x.isTypeNode)
       count += 1
       for (i <- 0 until x.inputs.length)
         if (x.inputs(i) != null && x.inputs(i).isTypeNode) {
-          x.inputs(i) = getNode(x.inputs(i))
+          x.inputs(i) = x.inputs(i).getNode
         }
     }
 
@@ -503,8 +495,8 @@ abstract class Component(resetSignal: Bool = null) {
   }
   def findRoots(): ArrayBuffer[Node] = {
     val roots = new ArrayBuffer[Node];
-    for (a <- asserts)
-      roots += a.cond;
+    for (c <- components)
+      roots ++= c.debugs
     for (b <- blackboxes)
       roots += b.io;
     for (m <- mods) {
@@ -742,8 +734,8 @@ abstract class Component(resetSignal: Bool = null) {
         queue.push(() => c.io.traceNode(c, queue))
       }
     }
-    for (a <- asserts)
-      queue.push(() => a.traceNode(this, queue));
+    for (c <- components; d <- c.debugs)
+      queue.push(() => d.traceNode(c, queue))
     for (b <- blackboxes)
       queue.push(() => b.io.traceNode(this, queue));
     while (queue.length > 0) {

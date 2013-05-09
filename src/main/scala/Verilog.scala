@@ -567,6 +567,13 @@ class VerilogBackend extends Backend {
           "    if (" + emitRef(m.cond) + ")\n" +
           "      " + emitRef(m.mem) + "[" + emitRef(m.addr) + "] <= " + emitRef(m.data) + ";\n"
         }
+      case a: Assert =>
+        "`ifndef SYNTHESIS\n" +
+        "    if(!" + emitRef(a.cond) + ") begin\n" +
+        "      $fwrite(32'h80000002, " + CString("ASSERTION FAILED: %s\n") + ", " + CString(a.message) + ");\n" +
+        "      $finish;\n" +
+        "    end\n" +
+        "`endif\n"
       case _ =>
         ""
     }

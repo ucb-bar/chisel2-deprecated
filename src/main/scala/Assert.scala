@@ -34,12 +34,6 @@ import scala.collection.mutable.ListBuffer
 import Node._
 import ChiselError._
 
-object Assert {
-  def apply(cond: Bool, message: String) : Assert =
-    new Assert(cond, message)
-}
-
-
 class Assert(condArg: Bool, val message: String) extends Node {
   inputs += condArg;
   def cond: Node = inputs(0);

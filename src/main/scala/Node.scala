@@ -249,7 +249,7 @@ abstract class Node extends nameable {
   }
   def isInObject =
     (isIo && (isIoDebug || component == topComponent)) ||
-    (topComponent.debugs.contains(this) && !name.isEmpty) ||
+    topComponent.debugs.contains(this) ||
     isReg || isUsedByRam || isDebug || isPrintArg || isScanArg;
   def isInVCD = (isIo && isInObject) || isReg || (isDebug && !name.isEmpty);
   def dotName = { val name = this.getClass.getName; name.substring(7, name.size) };

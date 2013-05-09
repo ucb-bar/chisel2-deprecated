@@ -2,16 +2,6 @@
 #include <string.h>
 #include "emulator.h"
 
-char char_to_hex[256];
-static void init_char_to_hex ( void ) {
-  for (int i = 0; i < 10; i++)
-    char_to_hex['0' + i] = i;
-  for (int i = 0; i < 6; i++)
-    char_to_hex['a' + i] = 10 + i;
-  for (int i = 0; i < 6; i++)
-    char_to_hex['A' + i] = 10 + i;
-}
-
 template <int w>
 
 dat_t<w> str_to_dat (const char* s) {
@@ -76,7 +66,6 @@ void test (const char* name, dat_t<w> tst, dat_t<w> val) {
 }
 
 int main (int argc, char* argv[]) {
-  init_char_to_hex();
   // test("stdb-1-0",    str_to_dat<4>("0b1010"), LIT<4>(0xa));
   // test("stdx-1-0",    str_to_dat<32>("0x12345678"), LIT<32>(0x12345678));
   // test("stdx-1-0",    str_to_dat<32>("0x12345678"), LIT<32>(0x12345678));

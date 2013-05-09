@@ -1690,4 +1690,11 @@ class mod_t {
   virtual void dump ( FILE* f, int t ) { };
 };
 
+#define ASSERT(cond, msg) { \
+  if (!(cond)) { \
+    printf("Assertion failed: %s\n", (msg)); \
+    abort(); \
+  } \
+}
+
 #endif

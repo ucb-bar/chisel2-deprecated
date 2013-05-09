@@ -44,6 +44,21 @@ import Component._
 import Literal._
 import scala.collection.mutable.HashSet
 
+object CString {
+  def apply(s: String): String = {
+    val cs = new StringBuilder("\"")
+    for (c <- s) {
+      if (c == '\n')
+        cs ++= "\\n"
+      else if (c == '\\' || c == '"')
+        cs ++= "\\" + c
+      else
+        cs += c
+    }
+    cs + "\""
+  }
+}
+
 object CListLookup {
   def apply[T <: Data](addr: Bits, default: List[T], mapping: Array[(Bits, List[T])]): List[T] = {
     val map = mapping.map(m => (addr === m._1, m._2))
@@ -369,6 +384,9 @@ class CppBackend extends Backend {
       case x: Log2 =>
         emitTmpDec(x) + "  " + emitLoWordRef(x) + " = " + (words(x.inputs(0))-1 to 1 by -1).map(i => emitWordRef(x.inputs(0), i) + " != 0, " + (i*bpw) + " + log2_1(" + emitWordRef(x.inputs(0), i) + ")").foldRight("log2_1(" + emitLoWordRef(x.inputs(0)) + ")")("TERNARY(" + _ + ", " + _ + ")") + ";\n"
 
+      case a: Assert =>
+        "  ASSERT(" + emitLoWordRef(a.cond) + ", " + CString(a.message) + ");\n"
+
       case _ =>
         ""
     }
@@ -531,6 +549,8 @@ class CppBackend extends Backend {
     val vcd = new VcdBackend()
     val dot = new DotBackend()  // XXX Not used?
     components.foreach(_.elaborate(0));
+    for (cc <- components)
+      c.debugs ++= cc.debugs
     for (c <- components)
       c.markComponent();
     c.genAllMuxes;
@@ -573,9 +593,7 @@ class CppBackend extends Backend {
     for (cc <- components) {
       if (!(cc == c)) {
         c.mods       ++= cc.mods;
-        c.asserts    ++= cc.asserts;
         c.blackboxes ++= cc.blackboxes;
-        c.debugs     ++= cc.debugs;
       }
     }
     c.findConsumers();
@@ -643,9 +661,6 @@ class CppBackend extends Backend {
     out_c.write("void " + c.name + "_t::clock_lo ( dat_t<1> reset ) {\n");
     for (m <- c.omods) {
       out_c.write(emitDefLo(m));
-    }
-    for (a <- c.asserts) {
-      out_c.write("  ASSERT(" + emitRef(a.cond) + ", \"" + a.message + "\");\n");
     }
     out_c.write("}\n");
     out_c.write("void " + c.name + "_t::clock_hi ( dat_t<1> reset ) {\n");
