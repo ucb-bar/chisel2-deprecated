@@ -34,13 +34,40 @@ import scala.collection.mutable.ListBuffer
 import Node._
 import ChiselError._
 
-object Assert {
-  def apply(cond: Bool, message: String) : Assert =
-    new Assert(cond, message)
-}
-
-
 class Assert(condArg: Bool, val message: String) extends Node {
   inputs += condArg;
   def cond: Node = inputs(0);
+}
+
+class Printf(condIn: Bool, msgIn: String, argsIn: Seq[Node]) extends Node {
+  inputs += condIn
+  inputs ++= argsIn
+
+  def cond = inputs.head
+  def args = inputs.tail
+
+  val message = {
+    def bad(c: String) =
+      ChiselError.error("Bad printf format: \"%" + c + "\"")
+    var msg = ""
+    var n = 0
+    var percent = false
+    for (c <- msgIn) {
+      if (percent) {
+        if (!List('b', 'd', 's', 'x', '%').contains(c))
+          bad(c.toString)
+        msg += (if (c == 'x') 'h' else c)
+        n = n+1
+        percent = false
+      } else {
+        msg += c
+        percent = c == '%'
+      }
+    }
+    if (percent)
+      bad("")
+    if (n != argsIn.size)
+      ChiselError.error("Wrong number of printf arguments (found " + argsIn.size + ", expected " + n + ")")
+    msg
+  }
 }
