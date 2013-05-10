@@ -47,6 +47,11 @@ abstract class Backend {
   /* Set of keywords which cannot be used as node and component names. */
   val keywords: HashSet[String];
 
+  def createOutputFile(name: String): java.io.FileWriter = {
+    val baseDir = ensureDir(targetDir)
+    new java.io.FileWriter(baseDir + name)
+  }
+
   def depthString(depth: Int): String = {
     var res = "";
     for (i <- 0 until depth)
@@ -172,7 +177,7 @@ abstract class Backend {
     if (keywords.contains(name)) name + "_" else name;
   }
 
-  def nameAll(root: Component) = {
+  def nameAll(root: Component) {
     root.name = extractClassName(root);
     nameChildren(root);
     for( node <- nodes ) {
@@ -185,7 +190,24 @@ abstract class Backend {
     }
   }
 
- def emitTmp(node: Node): String
+  def fullyQualifiedName( m: Node ): String = {
+    m match {
+      case l: Literal => return l.toString;
+      case any       =>
+        if (m.name != ""
+          && m != topComponent.reset && m.component != null) {
+          /* Only modify name if it is not the reset signal
+           or not in top component */
+          if(m.name != "reset" && m.component != topComponent) {
+            return m.component.getPathName + "__" + m.name;
+          }
+        }
+    }
+    m.name
+  }
+
+ def emitTmp(node: Node): String =
+    emitRef(node)
 
   def emitRef(node: Node): String = {
     node match {
@@ -208,7 +230,7 @@ abstract class Backend {
   val transforms = ArrayBuffer[(Component) => Unit]()
 
   // DFS walk of graph to collect nodes of every component
-  def collectNodesIntoComp(c: Component) = {
+  def collectNodesIntoComp(c: Component) {
     val dfsStack = new Stack[(Node, Component)]()
     val walked = new HashSet[Node]()
 
@@ -273,13 +295,40 @@ abstract class Backend {
 
   def emitDef(node: Node): String = ""
 
-  def elaborate(c: Component): Unit = {}
+  def elaborate(c: Component): Unit = {
+    topComponent = c;
+    components.foreach(_.elaborate(0));
+    for (c <- components)
+      c.markComponent();
+    c.genAllMuxes;
+    components.foreach(_.postMarkNet(0));
+    println("// COMPILING " + c + "(" + c.children.length + ")");
+    assignResets()
+    c.inferAll();
+    c.forceMatchingWidths;
+    c.removeTypeNodes()
+    ChiselError.checkpoint()
+
+    collectNodesIntoComp(c)
+    transform(c, transforms)
+    c.traceNodes();
+    ChiselError.checkpoint()
+
+    /* We execute nameAll after traceNodes because bindings would not have been
+       created yet otherwise. */
+    nameAll(c)
+    ChiselError.checkpoint()
+
+    if(!dontFindCombLoop) {
+      c.findCombLoop();
+    }
+  }
 
   def compile(c: Component, flags: String = null): Unit = { }
 
-  def checkPorts(topC: Component) = {
+  def checkPorts(topC: Component) {
 
-    def prettyPrint(n: Node, c: Component) = {
+    def prettyPrint(n: Node, c: Component) {
       val dir = if (n.asInstanceOf[Bits].dir == INPUT) "Input" else "Output"
       val portName = n.name
       val compName = c.name

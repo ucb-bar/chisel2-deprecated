@@ -48,7 +48,7 @@ class Printf(condIn: Bool, msgIn: String, argsIn: Seq[Node]) extends Node {
 
   val message = {
     def bad(c: String) =
-      ChiselErrors += ChiselError("Bad printf format: \"%" + c + "\"", Thread.currentThread().getStackTrace)
+      ChiselError.error("Bad printf format: \"%" + c + "\"")
     var msg = ""
     var n = 0
     var percent = false
@@ -67,7 +67,7 @@ class Printf(condIn: Bool, msgIn: String, argsIn: Seq[Node]) extends Node {
     if (percent)
       bad("")
     if (n != argsIn.size)
-      ChiselErrors += ChiselError("Wrong number of printf arguments (found " + argsIn.size + ", expected " + n + ")", Thread.currentThread().getStackTrace)
+      ChiselError.error("Wrong number of printf arguments (found " + argsIn.size + ", expected " + n + ")")
     msg
   }
 }

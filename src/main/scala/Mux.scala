@@ -97,7 +97,7 @@ object isLessThan {
   def checkCommonSuperclass(x: java.lang.Class[_], y: java.lang.Class[_]) {
   }
 
-  def apply(x: java.lang.Class[_], y: java.lang.Class[_]) = {
+  def apply(x: java.lang.Class[_], y: java.lang.Class[_]): Boolean = {
     checkCommonSuperclass(x, y)
     distFromData(x) > distFromData(y)
   }
@@ -126,7 +126,7 @@ class Mux extends Op {
     inputs(0) + " ? " + inputs(1) + " : " + inputs(2)
   def ::(a: Node): Mux = { inputs(2) = a; this }
 
-  override def forceMatchingWidths = {
+  override def forceMatchingWidths {
     if (inputs(1).width != width) inputs(1) = inputs(1).matchWidth(width)
     if (inputs(2).width != width) inputs(2) = inputs(2).matchWidth(width)
   }

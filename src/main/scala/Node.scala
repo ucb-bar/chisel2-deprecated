@@ -66,7 +66,7 @@ object Node {
       m.inputs(i).width
     } catch {
         case e: java.lang.IndexOutOfBoundsException => {
-          val error = ChiselError({m + " in " + m.component + " is unconnected. Ensure that is assigned."}, m)
+          val error = new ChiselError(() => {m + " in " + m.component + " is unconnected. Ensure that is assigned."}, m.line)
           if (!ChiselErrors.contains(error) && !isInGetWidth) {
             ChiselErrors += error
           }
@@ -229,7 +229,7 @@ abstract class Node extends nameable {
     val res = inferWidth(this);
     if(inferCount > 1000000) {
       if(genError) {
-        val error = ChiselError({"Unable to infer width of " + this}, this);
+        val error = new ChiselError(() => {"Unable to infer width of " + this}, this.line);
         if (!ChiselErrors.contains(error)) {
           ChiselErrors += error
         }
@@ -252,8 +252,7 @@ abstract class Node extends nameable {
     topComponent.debugs.contains(this) ||
     isReg || isUsedByRam || isDebug || isPrintArg || isScanArg;
   def isInVCD = (isIo && isInObject) || isReg || (isDebug && !name.isEmpty);
-  def dotName = { val name = this.getClass.getName; name.substring(7, name.size) };
-
+  
   /** Prints all members of a node and recursively its inputs up to a certain
     depth level. This method is purely used for debugging. */
   def printTree(writer: PrintStream, depth: Int = 4, indent: String = ""): Unit = {
@@ -395,7 +394,7 @@ abstract class Node extends nameable {
     }
   }
 
-  def forceMatchingWidths = { }
+  def forceMatchingWidths { }
 
   def matchWidth(w: Int): Node = {
     if (w > this.width) {
@@ -412,12 +411,12 @@ abstract class Node extends nameable {
     }
   }
 
-  def setName(n: String) = {
+  def setName(n: String) {
     name = n
     named = true;
   }
 
-  def setIsClkInput = {};
+  def setIsClkInput {};
 
   var isWidthWalked = false;
 
@@ -425,7 +424,7 @@ abstract class Node extends nameable {
     isInGetWidth = true
     val w = width
     isInGetWidth = false
-    return w
+    w
   }
 
   def setTypeNodeNoAssign[T <: Data](typeNode: T): T = {
@@ -442,7 +441,7 @@ abstract class Node extends nameable {
   def removeTypeNodes() {
     for(i <- 0 until inputs.length) {
       if(inputs(i) == null){
-        val error = ChiselError({"NULL Input for " + this.getClass + " " + this + " in Component " + component}, this);
+        val error = new ChiselError(() => {"NULL Input for " + this.getClass + " " + this + " in Component " + component}, this.line);
         if (!ChiselErrors.contains(error)) {
           ChiselErrors += error
         }

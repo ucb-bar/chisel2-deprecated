@@ -52,7 +52,10 @@ object Fix {
 class Fix extends Num {
   setIsSigned
 
-  override def setIsTypeNode = {inputs(0).setIsSigned; super.setIsTypeNode}
+  override def setIsTypeNode {
+    inputs(0).setIsSigned;
+    super.setIsTypeNode
+  }
 
   type T = Fix;
   override def fromNode(n: Node) = {
@@ -91,7 +94,7 @@ class Fix extends Num {
         this := fix;
       }
       case any =>
-        ChiselErrors += ChiselError(":= not defined on " + this.getClass + " and " + src.getClass, Thread.currentThread().getStackTrace)
+        ChiselError.error(":= not defined on " + this.getClass + " and " + src.getClass)
     }
   }
 

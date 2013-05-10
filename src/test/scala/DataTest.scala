@@ -49,11 +49,30 @@ import scala.collection.mutable.ListBuffer
 import org.junit.Assert._
 import org.junit.Test
 import org.junit.Before
+import org.junit.After
+import org.junit.rules.TemporaryFolder;
 
 import Chisel._
 
 
 class DataSuite extends AssertionsForJUnit {
+
+  val tmpdir = new TemporaryFolder();
+
+  @Before def initialize() {
+    tmpdir.create()
+  }
+
+  @After def done() {
+    tmpdir.delete()
+  }
+
+  def assertFile( filename: String, content: String ) {
+    val source = scala.io.Source.fromFile(filename, "utf-8")
+    val lines = source.mkString
+    source.close()
+    assert(lines === content)
+  }
 
   @Test def testBoolFromValue() {
     val tested = Bool(true);
@@ -105,6 +124,27 @@ class DataSuite extends AssertionsForJUnit {
     assertFalse( fixFromWidthDir.assigned );
     assertFalse( fixFromWidthDir.named );
   }
+
+
+  @Test def testBypassData() {
+    class BypassData(num_bypass_ports:Int) extends Bundle() {
+      val data = Bits(INPUT, width=num_bypass_ports)
+      val valid = Vec(num_bypass_ports){ new Bool() } // XXX Component.findRoots
+        // does not support a Vec as Root.
+      def get_num_ports: Int = num_bypass_ports
+    }
+
+    class BypassDataComp extends Component {
+      val io = new BypassData(3)
+
+      io.valid := io.data
+    }
+
+    chiselMain(Array[String]("--c",
+      "--targetDir", tmpdir.getRoot().toString()),
+      () => new BypassDataComp)
+  }
+
 
 }
 

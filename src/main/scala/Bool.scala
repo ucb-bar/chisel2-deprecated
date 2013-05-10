@@ -80,12 +80,12 @@ class Bool extends Bits {
         this := bits;
       }
       case any =>
-        ChiselErrors += ChiselError(":= not defined on " + this.getClass + " and " + src.getClass, Thread.currentThread().getStackTrace)
+        ChiselError.error(":= not defined on " + this.getClass + " and " + src.getClass)
     }
   }
 
   def generateError = {
-    ChiselErrors += ChiselError("Cannot perform extraction on a Bool", Thread.currentThread().getStackTrace);
+    ChiselError.error("Cannot perform extraction on a Bool");
   }
 
   override def apply(bit: Int): Bool = { generateError; this};
