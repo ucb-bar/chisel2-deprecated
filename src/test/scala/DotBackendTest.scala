@@ -65,6 +65,15 @@ class DotBackendSuite extends AssertionsForJUnit {
   /** Checks generation of simple dataflow graph */
   @Test def testSimple() {
 
+    class DAGSubComp extends Component {
+      val io = new Bundle {
+        val ready = Bool(INPUT)
+        val valid = Bool(OUTPUT)
+      }
+      val stored = Reg(io.ready)
+      io.valid := stored
+    }
+
     class DAGComp extends Component {
       val io = new Bundle {
         val data0 = Bool(INPUT)
@@ -74,7 +83,9 @@ class DotBackendSuite extends AssertionsForJUnit {
         // not c++. This is an interaction between Component.findRoots
         // and class Bool { def apply(): Bool = Bool(null); }
       }
-      io.result := io.data0 & io.data1
+      val sub = new DAGSubComp()
+      sub.io.ready := io.data0 & io.data1
+      io.result := sub.io.valid
     }
 
     chiselMain(Array[String](
@@ -84,11 +95,20 @@ class DotBackendSuite extends AssertionsForJUnit {
     assertFile(tmpdir.getRoot() + "/DotBackendSuite_DAGComp_1.dot",
 """digraph DotBackendSuite_DAGComp_1{
 rankdir = LR;
-io_result[label="Bool"];
-T0[label="&"];
-io_data1[label="Bool"];
-io_data0[label="Bool"];
-  T0 -> io_result[label="1"];
+  subgraph clustersub{
+    label = "sub"
+    DotBackendSuite_DAGComp_1_sub__io_valid[label="io_valid:Bool"];
+    DotBackendSuite_DAGComp_1_sub__stored[shape=square,label="stored:Reg"];
+    DotBackendSuite_DAGComp_1_sub__io_ready[label="io_ready:Bool"];
+    DotBackendSuite_DAGComp_1_sub__stored -> DotBackendSuite_DAGComp_1_sub__io_valid[label="1"];
+    DotBackendSuite_DAGComp_1_sub__io_ready -> DotBackendSuite_DAGComp_1_sub__stored[label="1"];
+  }
+  T0 -> DotBackendSuite_DAGComp_1_sub__io_ready[label="1"];
+  io_result[label="io_result:Bool"];
+  T0[label="&"];
+  io_data1[label="io_data1:Bool"];
+  io_data0[label="io_data0:Bool"];
+  DotBackendSuite_DAGComp_1_sub__io_valid -> io_result[label="1"];
   io_data0 -> T0[label="1"];
   io_data1 -> T0[label="1"];
 }""")
