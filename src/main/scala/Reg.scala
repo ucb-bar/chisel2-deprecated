@@ -84,7 +84,8 @@ object Reg {
     if(resetVal != null) {
       for((((res_n, res_i), (data_n, data_i)), (rval_n, rval_i)) <- res.flatten zip d zip resetVal.flatten) {
 
-        assert(rval_i.getWidth > 0, {println("Negative width to wire " + res_i)})
+        assert(rval_i.getWidth > 0,
+          {ChiselError.error("Negative width to wire " + res_i)})
         val reg = new Reg()
 
         reg.init("", regWidth(rval_i), data_i, rval_i)

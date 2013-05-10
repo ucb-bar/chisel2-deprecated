@@ -528,7 +528,9 @@ class CppBackend extends Backend {
     res
   }
 
-  /* flatten the component hierarchy such that each node has a unique name. */
+  /** Insures each node such that it has a unique name accross the whole
+    hierarchy by prefixing its name by a component path (except for "reset"
+    and all nodes in *c*). */
   def renameNodes(c: Component, nodes: Seq[Node]) = {
     for (m <- nodes) {
       m match {

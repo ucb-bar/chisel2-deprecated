@@ -121,6 +121,7 @@ object Component {
     components.clear();
     compStack.clear();
     stackIndent = 0;
+    printfs.clear();
     printStackStruct.clear();
     procs.clear();
     resetList.clear()

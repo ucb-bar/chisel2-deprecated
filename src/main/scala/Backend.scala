@@ -190,7 +190,24 @@ abstract class Backend {
     }
   }
 
- def emitTmp(node: Node): String
+  def fullyQualifiedName( m: Node ): String = {
+    m match {
+      case l: Literal => return l.toString;
+      case any       =>
+        if (m.name != ""
+          && m != topComponent.reset && m.component != null) {
+          /* Only modify name if it is not the reset signal
+           or not in top component */
+          if(m.name != "reset" && m.component != topComponent) {
+            return m.component.getPathName + "__" + m.name;
+          }
+        }
+    }
+    m.name
+  }
+
+ def emitTmp(node: Node): String =
+    emitRef(node)
 
   def emitRef(node: Node): String = {
     node match {

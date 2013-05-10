@@ -252,8 +252,7 @@ abstract class Node extends nameable {
     topComponent.debugs.contains(this) ||
     isReg || isUsedByRam || isDebug || isPrintArg || isScanArg;
   def isInVCD = (isIo && isInObject) || isReg || (isDebug && !name.isEmpty);
-  def dotName = { val name = this.getClass.getName; name.substring(7, name.size) };
-
+  
   /** Prints all members of a node and recursively its inputs up to a certain
     depth level. This method is purely used for debugging. */
   def printTree(writer: PrintStream, depth: Int = 4, indent: String = ""): Unit = {
