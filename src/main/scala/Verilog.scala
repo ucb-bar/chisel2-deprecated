@@ -88,7 +88,9 @@ class VerilogBackend extends Backend {
         } else {
           extractClassName(mem.component)
         } + "_"
-      } else ""
+      } else {
+        ""
+      }
       // Generate a unique name for the memory module.
       val candidateName = Backend.moduleNamePrefix + compName + emitRef(mem)
       val memModuleName = if( compIndices contains candidateName ) {
@@ -183,15 +185,15 @@ class VerilogBackend extends Backend {
             if (io.dir == INPUT) {
               if (io.inputs.length == 0) {
                   if(saveConnectionWarnings) {
-                    connWriter.write("// " + io + " UNCONNECTED IN " + io.component + "\n");
+                    ChiselError.warning("" + io + " UNCONNECTED IN " + io.component);
                   }
               } else if (io.inputs.length > 1) {
                   if(saveConnectionWarnings) {
-                    connWriter.write("// " + io + " CONNECTED TOO MUCH " + io.inputs.length + "\n");
+                    ChiselError.warning("" + io + " CONNECTED TOO MUCH " + io.inputs.length);
                   }
               } else if (!c.isWalked.contains(w)){
                   if(saveConnectionWarnings) {
-                    connWriter.write("// UNUSED INPUT " + io + " OF " + c + " IS REMOVED" + "\n");
+                    ChiselError.warning(" UNUSED INPUT " + io + " OF " + c + " IS REMOVED");
                   }
               } else {
                 res += emitRef(io.inputs(0));
@@ -199,13 +201,13 @@ class VerilogBackend extends Backend {
             } else if(io.dir == OUTPUT) {
               if (io.consumers.length == 0) {
                   if(saveConnectionWarnings) {
-                    connWriter.write("// " + io + " UNCONNECTED IN " + io.component + " BINDING " + c.findBinding(io) + "\n");
+                    ChiselError.warning("" + io + " UNCONNECTED IN " + io.component + " BINDING " + c.findBinding(io));
                   }
               } else {
                 var consumer: Node = c.parent.findBinding(io);
                 if (consumer == null) {
                   if(saveConnectionWarnings) {
-                    connWriter.write("// " + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + io.consumers.length + ") IN " + c.parent + "\n");
+                    ChiselError.warning("" + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + io.consumers.length + ") IN " + c.parent);
                   }
                 } else {
                   res += emitRef(consumer); // TODO: FIX THIS?
@@ -372,7 +374,7 @@ class VerilogBackend extends Backend {
     }
   }
 
-  def emitSigned(n: Node) = if(n.isSigned) " signed " else ""
+  def emitSigned(n: Node): String = if(n.isSigned) " signed " else ""
 
   def emitDecBase(node: Node): String =
     "  wire" + emitSigned(node) + emitWidth(node) + " " + emitRef(node) + ";\n"
@@ -427,8 +429,8 @@ class VerilogBackend extends Backend {
     }
   }
 
-  def genHarness(c: Component, base_name: String, name: String) = {
-    val harness  = new java.io.FileWriter(base_name + name + "-harness.v");
+  def genHarness(c: Component, name: String) = {
+    val harness  = createOutputFile(name + "-harness.v");
     val printFormat = printArgs.map(a => "0x%x").fold("")((y,z) => z + " " + y)
     val scanFormat = scanArgs.map(a => "%x").fold("")((y,z) => z + " " + y)
     val printNodes = for (arg <- printArgs; node <- arg.maybeFlatten) yield arg
@@ -707,10 +709,8 @@ class VerilogBackend extends Backend {
       println("// " + depthString(depth) + "COMPILING " + c + " " + c.children.length + " CHILDREN"
       + " (" + c.level + "," + c.traversal + ")");
       c.findConsumers();
-      if(!ChiselErrors.isEmpty){
-        for(err <- ChiselErrors) err.printError;
-        throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
-      }
+      ChiselError.checkpoint()
+
       c.collectNodes(c);
       if( c.level > level ) {
         /* When a component instance instantiates different sets
@@ -740,60 +740,17 @@ class VerilogBackend extends Backend {
     emitChildren(top, defs, out, depth);
   }
 
-  override def elaborate(c: Component): Unit = {
-    topComponent = c;
-    components.foreach(_.elaborate(0));
-    for (c <- components)
-      c.markComponent();
-    c.genAllMuxes;
-    components.foreach(_.postMarkNet(0));
-    assignResets()
-    if(!ChiselErrors.isEmpty){
-      for(err <- ChiselErrors) err.printError;
-      throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
-    }
-    c.inferAll();
-    val base_name = ensureDir(targetDir)
-    if(saveWidthWarnings) {
-      widthWriter = new java.io.FileWriter(base_name + c.name + ".width.warnings")
-    }
-    c.forceMatchingWidths;
-    c.removeTypeNodes()
-    if(!ChiselErrors.isEmpty){
-      for(err <- ChiselErrors) err.printError;
-      throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
-    }
-    collectNodesIntoComp(c)
-    /* *transforms* might add memory pins with specific names. */
-    transform(c, transforms)
-    c.traceNodes();
-    /* We execute nameAll after traceNodes because bindings would not have been
-       created yet otherwise. */
-    nameAll(topComponent)
-    if(!ChiselErrors.isEmpty){
-      for(err <- ChiselErrors) err.printError;
-      throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
-    }
-    if(!dontFindCombLoop) {
-      c.findCombLoop();
-    }
-    val out = new java.io.FileWriter(base_name + Backend.moduleNamePrefix + c.name + ".v");
-    if(saveConnectionWarnings) {
-      connWriter = new java.io.FileWriter(base_name + c.name + ".connection.warnings")
-    }
+  override def elaborate(c: Component) {
+    super.elaborate(c)
+
+    val out = createOutputFile(Backend.moduleNamePrefix + c.name + ".v");
     doCompile(c, out, 0);
     c.verifyAllMuxes;
-    if(saveConnectionWarnings) {
-      connWriter.close()
-    }
-    if(ChiselErrors isEmpty) {
-      out.close();
-    } else {
-      for(err <- ChiselErrors)  err.printError;
-      throw new IllegalStateException("CODE HAS " + ChiselErrors.length + " ERRORS");
-    }
+    ChiselError.checkpoint()
+    out.close();
+
     if (!memConfs.isEmpty) {
-      val out_conf = new java.io.FileWriter(base_name + Backend.moduleNamePrefix + Component.topComponent.name + ".conf");
+      val out_conf = createOutputFile(Backend.moduleNamePrefix + Component.topComponent.name + ".conf");
       out_conf.write(getMemConfString);
       out_conf.close();
     }
@@ -805,13 +762,13 @@ class VerilogBackend extends Backend {
       printArgs.clear(); printArgs ++= tester.testNonInputNodes; printFormat = ""
     }
     if (isGenHarness) {
-      genHarness(c, base_name, c.name);
+      genHarness(c, c.name);
     }
   }
 
-  override def compile(c: Component, flags: String): Unit = {
+  override def compile(c: Component, flags: String) {
 
-    def run(cmd: String) = {
+    def run(cmd: String) {
       val c = Process(cmd).!
       println(cmd + " RET " + c)
     }

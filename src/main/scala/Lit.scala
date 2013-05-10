@@ -67,7 +67,7 @@ object Lit {
 
 object Literal {
   implicit def intToLit (x: Int) = Literal(x);
-  def bigMax(x: BigInt, y: BigInt) = if (x > y) x else y;
+  def bigMax(x: BigInt, y: BigInt): BigInt = if (x > y) x else y;
   def sizeof(x: BigInt): Int = {
     val y = bigMax(BigInt(1), x.abs).toDouble;
     val res = max(1, (ceil(log(y + 1)/log(2.0))).toInt);
@@ -102,7 +102,7 @@ object Literal {
       });
     if(width != -1) {
       if(width < resWidth) {
-        ChiselErrors += ChiselError({"width " + width + " is too small for literal " + x}, Thread.currentThread().getStackTrace);
+        ChiselError.error({"width " + width + " is too small for literal " + x});
       } else if(width > resWidth && x < 0) {
         while(width > resWidth){
           resWidth += 1;
@@ -169,7 +169,7 @@ object Literal {
     var res = BigInt(0);
     for(c <- x)
       if(c != '_'){
-        if(!(hexNibbles + "?").contains(c.toLower)) ChiselErrors += ChiselError({"Literal: " + x + " contains illegal character: " + c}, Thread.currentThread().getStackTrace);
+        if(!(hexNibbles + "?").contains(c.toLower)) ChiselError.error({"Literal: " + x + " contains illegal character: " + c});
         res = res * shamt + c.asDigit;
       }
     res
@@ -191,7 +191,7 @@ object Literal {
     var width = 0;
     for (d <- x) {
       if (d != '_') {
-        if(!"01?".contains(d)) ChiselErrors += ChiselError({"Literal: " + x + " contains illegal character: " + d}, Thread.currentThread().getStackTrace);
+        if(!"01?".contains(d)) ChiselError.error({"Literal: " + x + " contains illegal character: " + d});
         width += 1;
         mask   = mask + (if (d == '?') "0" else "1");
         bits   = bits + (if (d == '?') "0" else d.toString);
@@ -222,8 +222,7 @@ object Literal {
     val xString = (if (x >= 0) x else (BigInt(1) << w) + x).toString(16)
 
     if(xWidth > width && width != -1) {
-      ChiselErrors += ChiselError({"width " + width + " is too small for literal " + x + ". Smallest allowed width is " + xWidth},
-        Thread.currentThread().getStackTrace);
+      ChiselError.error({"width " + width + " is too small for literal " + x + ". Smallest allowed width is " + xWidth});
     }
     res.init("0x" + xString, w);
     res.hasInferredWidth = width == -1
@@ -236,7 +235,7 @@ object Literal {
 
   def apply(width: Int, base: Char, literal: String): Literal = {
     if (!"dhbo".contains(base)) {
-      ChiselErrors += ChiselError("no base specified", Thread.currentThread().getStackTrace);
+      ChiselError.error("no base specified");
     }
     val res = new Literal();
     if(width == -1) {
@@ -244,7 +243,7 @@ object Literal {
     } else {
       res.init(removeUnderscore(literal), width);
       if(width < sizeof(base, literal)) {
-        ChiselErrors += ChiselError({"width " + width + " is too small for literal: " + res + " with min width " + sizeof(base, literal)}, Thread.currentThread().getStackTrace)
+        ChiselError.error({"width " + width + " is too small for literal: " + res + " with min width " + sizeof(base, literal)})
       }
     }
     res.base = base;

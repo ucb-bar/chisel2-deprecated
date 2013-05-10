@@ -315,7 +315,7 @@ object Op {
 class Op extends Node {
   var op: String = "";
   var nGrow: Int = 0;
-  override def dotName = if (op == "") "?" else op;
+
   override def toString: String =
     if (inputs.length == 1) {
       op + "(" + inputs(0) + ")"

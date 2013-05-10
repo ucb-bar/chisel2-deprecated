@@ -40,7 +40,7 @@ abstract class Data extends Node {
   def toBits(): Bits = chiselCast(this){Bits()};
   def toBool(): Bool = chiselCast(this){Bool()};
 
-  def setIsTypeNode = {
+  def setIsTypeNode {
     assert(inputs.length > 0, {println("Type Node must have an input") })
     isTypeNode = true
     inferWidth = widthOf(0)
@@ -70,6 +70,7 @@ abstract class Data extends Node {
     if(this.getClass != data.getClass) println("Mismatched types: " + this.getClass + " " + data.getClass);
     comp procAssign data.toNode;
   }
+
   override def clone(): this.type = {
     try {
       val res = this.getClass.newInstance.asInstanceOf[this.type];
@@ -81,13 +82,17 @@ abstract class Data extends Node {
       }
     }
   }
-  override def nameIt(path: String) = {
+
+  override def nameIt(path: String) {
     if (isTypeNode && comp != null) {
       comp.nameIt(path)
     } else {
       super.nameIt(path)
     }
   }
-  def setWidth(w: Int) = this.width = w;
+
+  def setWidth(w: Int) {
+    this.width = w;
+  }
 }
 

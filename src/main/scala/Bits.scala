@@ -92,7 +92,7 @@ class Bits extends Data with proc {
 
   override def assign(src: Node) = {
     if(assigned || inputs.length > 0) {
-      ChiselErrors += ChiselError({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src}, Thread.currentThread().getStackTrace);
+      ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
     } else {
       assigned = true; super.assign(src)
     }
@@ -100,7 +100,7 @@ class Bits extends Data with proc {
 
   def procAssign(src: Node) = {
     if (assigned) {
-      ChiselErrors += ChiselError("reassignment to Node", Thread.currentThread().getStackTrace);
+      ChiselError.error("reassignment to Node");
     } else {
       updates += ((genCond(), src))
     }
@@ -159,7 +159,7 @@ class Bits extends Data with proc {
               this assign other // only do assignment if output has stuff connected to it
             }
           } else {
-            ChiselErrors += ChiselError({"Undefined connections between " + this + " and " + other}, Thread.currentThread().getStackTrace)
+            ChiselError.error({"Undefined connections between " + this + " and " + other})
           }
         } else if (other.dir == INPUT) { // input <> input conections
             if(this.staticComp == other.staticComp.parent) { // parent <> child
@@ -167,7 +167,7 @@ class Bits extends Data with proc {
             } else if(this.staticComp.parent == other.staticComp) { //child <> parent
               this assign other
             } else {
-              ChiselErrors += ChiselError({"Can't connect Input " + this + " Input " + other}, Thread.currentThread().getStackTrace)
+              ChiselError.error({"Can't connect Input " + this + " Input " + other})
             }
           } else { // io <> wire
             if(this.staticComp == other.staticComp) { //internal wire
@@ -175,11 +175,11 @@ class Bits extends Data with proc {
             } else if(this.staticComp.parent == other.staticComp) { //external wire
               this assign other
             } else {
-            ChiselErrors += ChiselError({"Connecting Input " + this + " to " + other}, Thread.currentThread().getStackTrace)
+            ChiselError.error({"Connecting Input " + this + " to " + other})
             }
         }
       case default =>
-        ChiselErrors += ChiselError({"Connecting Input " + this + " to IO without direction " + default}, Thread.currentThread().getStackTrace)
+        ChiselError.error({"Connecting Input " + this + " to IO without direction " + default})
       }
     } else if (dir == OUTPUT) {
       src match {
@@ -192,7 +192,7 @@ class Bits extends Data with proc {
                 other assign this; // only do connection if I have stuff connected to me
               }
             } else {
-              ChiselErrors += ChiselError({"Undefined connection between " + this + " and " + other}, Thread.currentThread().getStackTrace)
+              ChiselError.error({"Undefined connection between " + this + " and " + other})
             }
           } else if (other.dir == OUTPUT) { // output <> output connections
             if(this.staticComp == other.staticComp.parent) { // parent <> child
@@ -204,25 +204,25 @@ class Bits extends Data with proc {
                 other assign this // only do connection if child (me) is assinging that output
               }
             } else if (this.isTypeNode && other.isTypeNode) { //connecting two type nodes together
-              ChiselErrors += ChiselError("Ambiguous Connection of Two Nodes", Thread.currentThread().getStackTrace)
+              ChiselError.error("Ambiguous Connection of Two Nodes")
             } else if (this.isTypeNode){ // type <> output
               other assign this;
             } else if (other.isTypeNode){ // output <> type
               this assign other;
             } else {
-              ChiselErrors += ChiselError({"Connecting Output " + this + " to Output " + other}, Thread.currentThread().getStackTrace)
+              ChiselError.error({"Connecting Output " + this + " to Output " + other})
             }
           } else { // io <> wire
             if(this.staticComp == other.staticComp) { //output <> wire
               this assign other
             } else if(this.staticComp.parent == other.staticComp) {
-              ChiselErrors += ChiselError({"Connecting Ouptut " + this + " to an external wire " + other}, Thread.currentThread().getStackTrace)
+              ChiselError.error({"Connecting Ouptut " + this + " to an external wire " + other})
             } else {
-              ChiselErrors += ChiselError({"Connecting Output " + this + " to IO without direction " + other}, Thread.currentThread().getStackTrace)
+              ChiselError.error({"Connecting Output " + this + " to IO without direction " + other})
             }
           }
         case default =>
-          ChiselErrors += ChiselError({"Connecting Output " + this + " to an IO withouth direction " + default}, Thread.currentThread().getStackTrace)
+          ChiselError.error({"Connecting Output " + this + " to an IO withouth direction " + default})
       }
     }
     else {
@@ -234,7 +234,7 @@ class Bits extends Data with proc {
             } else if(this.staticComp == other.staticComp.parent) {
               other assign this
             } else {
-              ChiselErrors += ChiselError({"Undefined connection between wire " + this + " and input " + other}, Thread.currentThread().getStackTrace)
+              ChiselError.error({"Undefined connection between wire " + this + " and input " + other})
             }
           } else if (other.dir == OUTPUT) { //wire <> output
             if(this.staticComp == other.staticComp) { // internal wire
@@ -242,13 +242,13 @@ class Bits extends Data with proc {
             } else if(this.staticComp == other.staticComp.parent) { // external wire
               this assign other
             } else {
-              ChiselErrors += ChiselError({"Undefined connection between wire " + this + " and output " + other}, Thread.currentThread().getStackTrace)
+              ChiselError.error({"Undefined connection between wire " + this + " and output " + other})
             }
           } else {
             this assign other
           }
         case default =>
-          ChiselErrors += ChiselError({"Undefined connection between " + this + " and " + default}, Thread.currentThread().getStackTrace)
+          ChiselError.error({"Undefined connection between " + this + " and " + default})
       }
     }
   }
@@ -263,7 +263,7 @@ class Bits extends Data with proc {
     res
   }
 
-  override def maxNum = {
+  override def maxNum: BigInt = {
     if (inputs.length == 0) {
       width;
     } else if (inputs(0).isLit) {
@@ -277,19 +277,19 @@ class Bits extends Data with proc {
     }
   }
 
-  override def forceMatchingWidths = {
+  override def forceMatchingWidths {
     if(inputs.length == 1 && inputs(0).width != width) {
       inputs(0) = inputs(0).matchWidth(width)
     }
   }
 
-  def generateError(src: Bits) = {
+  def generateError(src: Bits) {
     val myClass = this.getClass;
     val srcClass = src.getClass;
     if(myClass != classOf[Bits] && myClass == srcClass) {
-      ChiselErrors += ChiselError(":= not defined on " + myClass.toString + " " + classOf[Bits].toString, Thread.currentThread().getStackTrace)
+      ChiselError.error(":= not defined on " + myClass.toString + " " + classOf[Bits].toString)
     } else if(myClass != classOf[Bits]) {
-      ChiselErrors += ChiselError(":= not defined on " + myClass.toString + " " + srcClass.toString, Thread.currentThread().getStackTrace)
+      ChiselError.error(":= not defined on " + myClass.toString + " " + srcClass.toString)
     }
   }
 
@@ -321,7 +321,7 @@ class Bits extends Data with proc {
         this colonEqual(bits);
       }
       case any =>
-        ChiselErrors += ChiselError(":= not defined on " + this.getClass + " and " + src.getClass, Thread.currentThread().getStackTrace);
+        ChiselError.error(":= not defined on " + this.getClass + " and " + src.getClass);
     }
   }
 
