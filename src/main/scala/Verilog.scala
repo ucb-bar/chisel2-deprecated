@@ -84,15 +84,15 @@ class VerilogBackend extends Backend {
        All others, we return the previously generated name. */
       val compName = if (mem.component != null) {
         if( !mem.component.moduleName.isEmpty ) {
-          mem.component.moduleName
+          Backend.moduleNamePrefix + mem.component.moduleName
         } else {
           extractClassName(mem.component)
         } + "_"
       } else {
-        ""
+        Backend.moduleNamePrefix
       }
       // Generate a unique name for the memory module.
-      val candidateName = Backend.moduleNamePrefix + compName + emitRef(mem)
+      val candidateName = compName + emitRef(mem)
       val memModuleName = if( compIndices contains candidateName ) {
         val count = (compIndices(candidateName) + 1)
         compIndices += (candidateName -> count)
@@ -743,14 +743,14 @@ class VerilogBackend extends Backend {
   override def elaborate(c: Component) {
     super.elaborate(c)
 
-    val out = createOutputFile(Backend.moduleNamePrefix + c.name + ".v");
+    val out = createOutputFile(c.name + ".v");
     doCompile(c, out, 0);
     c.verifyAllMuxes;
     ChiselError.checkpoint()
     out.close();
 
     if (!memConfs.isEmpty) {
-      val out_conf = createOutputFile(Backend.moduleNamePrefix + Component.topComponent.name + ".conf");
+      val out_conf = createOutputFile(Component.topComponent.name + ".conf");
       out_conf.write(getMemConfString);
       out_conf.close();
     }
