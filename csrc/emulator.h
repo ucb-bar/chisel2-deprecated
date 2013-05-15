@@ -1407,7 +1407,7 @@ std::string dat_to_str(dat_t<w> x, int base = 16, char pad = '0') {
   for (int j = n_digs-1; j >= 0; j--) {
     int digit = (x % base).lo_word();
     x = x / base;
-    res[j] = (digit > 10 ? 'a'-10 : '0') + digit;
+    res[j] = (digit >= 10 ? 'a'-10 : '0') + digit;
     if ((x == 0).to_bool()) break;
   }
 
