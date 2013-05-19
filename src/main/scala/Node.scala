@@ -251,7 +251,7 @@ abstract class Node extends nameable {
     (isIo && (isIoDebug || component == topComponent)) ||
     topComponent.debugs.contains(this) ||
     isReg || isUsedByRam || isDebug || isPrintArg || isScanArg;
-  def isInVCD = (isIo && isInObject) || isReg || (isDebug && !name.isEmpty);
+  def isInVCD = !isLit && ((isIo && isInObject) || isReg || (isDebug && !name.isEmpty));
   
   /** Prints all members of a node and recursively its inputs up to a certain
     depth level. This method is purely used for debugging. */
