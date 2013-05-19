@@ -88,7 +88,7 @@ object Vec {
   }
 
   def apply[T <: Data](elts: Seq[T])(gen: => T): Vec[T] = {
-    val res = if (elts.forall(_.litOf != null)) {
+    val res = if (elts.forall(_.litOf != null) && gen.getWidth > 0) {
       new ROM(elts.map(_.litOf), () => gen)
     } else {
       new Vec[T](() => gen)
