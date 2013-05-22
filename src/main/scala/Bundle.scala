@@ -42,7 +42,7 @@ object Bundle {
   val keywords = HashSet[String]("elements", "flip", "toString",
     "flatten", "binding", "asInput", "asOutput", "unary_$tilde",
     "unary_$bang", "unary_$minus", "clone", "toUFix", "toBits",
-    "toBool", "toFix")
+    "toBool", "toFix", "asDirectionless")
 
   def apply (elts: ArrayBuffer[(String, Data)]): Bundle = {
     val res = new Bundle();
@@ -329,16 +329,20 @@ class Bundle(view_arg: Seq[String] = null) extends Data {
     res
   }
 
+  override def asDirectionless(): this.type = {
+    elements.foreach(_._2.asDirectionless)
+    this.dir = ""
+    this
+  }
+
   override def asInput(): this.type = {
-    for ((n, i) <- elements)
-      i.asInput();
-    this.dir = "input";
+    elements.foreach(_._2.asInput)
+    this.dir = "input"
     this
   }
 
   override def asOutput(): this.type = {
-    for ((n, i) <- elements)
-      i.asOutput();
+    elements.foreach(_._2.asOutput)
     this.dir = "output"
     this
   }
