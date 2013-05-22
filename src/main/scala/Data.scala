@@ -57,6 +57,7 @@ abstract class Data extends Node {
     Returns this instance with its exact type.
     */
   def asOutput(): this.type
+  def asDirectionless(): this.type
   def isDirectionless: Boolean = true;
 
   def toNode: Node = this;

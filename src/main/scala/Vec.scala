@@ -364,15 +364,18 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
     res
   }
 
+  override def asDirectionless(): this.type = {
+    self.foreach(_.asDirectionless)
+    this
+  }
+
   override def asOutput(): this.type = {
-    for(elm <- self)
-      elm.asOutput;
+    self.foreach(_.asOutput)
     this
   }
 
   override def asInput(): this.type = {
-    for(elm <- self)
-      elm.asInput
+    self.foreach(_.asInput)
     this
   }
 

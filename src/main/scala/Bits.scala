@@ -133,6 +133,11 @@ class Bits extends Data with proc {
     this
   }
 
+  override def asDirectionless(): this.type = {
+    dir = null
+    this
+  }
+
   override def asInput(): this.type = {
     dir = INPUT
     this
