@@ -68,16 +68,16 @@ object BinaryOp {
       case "+"   => Op("+",  2, maxWidth _,  x, y );
       case "*"   => Op("*",  0, sumWidth _,  x, y );
       case "s*s" => Op("s*s",  0, sumWidth _,  x, y );
-      case "s*u" => Op("s*u",  0, sumWidth _,  x, y );
-      case "u*s" => Op("u*s",  0, sumWidth _,  x, y );
+      case "s*u" => Op("s*s",  0, mulSUWidth _,  x, Cat(Bits(0,1), y).toFix );
+      case "u*s" => BinaryOp(y, x, "s*u")(gen)
       case "/"   => Op("/",  0, widthOf(0),  x, y );
       case "s/s" => Op("s/s",  0, widthOf(0),  x, y );
-      case "s/u" => Op("s/u",  0, widthOf(0),  x, y );
-      case "u/s" => Op("u/s",  0, widthOf(0),  x, y );
+      case "s/u" => Op("s/s",  0, widthOf(0),  x, Cat(Bits(0,1), y).toFix );
+      case "u/s" => Op("s/s",  0, divUSWidth _, Cat(Bits(0,1), x).toFix, y );
       case "%"   => Op("%",  0, minWidth _,  x, y );
       case "s%s" => Op("s%s",  0, minWidth _,  x, y );
-      case "s%u" => Op("s%u",  0, minWidth _,  x, y );
-      case "u%s" => Op("u%s",  0, minWidth _,  x, y );
+      case "s%u" => Op("s%u",  0, modSUWidth _,  x, Cat(Bits(0,1), y).toFix );
+      case "u%s" => Op("u%s",  0, modUSWidth _, Cat(Bits(0,1), x).toFix, y );
       case "^"   => Op("^",  2, maxWidth _,  x, y );
       case "?"   => Multiplex(x, y, null);
       case "-"   => Op("-",  2, maxWidth _,  x, y );
@@ -88,6 +88,12 @@ object BinaryOp {
     }
     node.setTypeNode(gen.asOutput)
   }
+
+  // width inference functions for signed-unsigned operations
+  private def mulSUWidth(x: Node) = sumWidth(x) - 1
+  private def divUSWidth(x: Node) = widthOf(0)(x) - 1
+  private def modUSWidth(x: Node) = x.inputs(1).width.min(x.inputs(0).width - 1)
+  private def modSUWidth(x: Node) = x.inputs(0).width.min(x.inputs(1).width - 1)
 }
 
 object LogicalOp {
@@ -253,35 +259,15 @@ object Op {
           val (signB, absB) = signAbs(b)
           val prod = absA * absB
           return Mux(signA ^ signB, -prod, prod)
-        case "s*u" =>
-          val (signA, absA) = signAbs(a)
-          val prod = absA * b.asInstanceOf[UFix]
-          return Mux(signA, -prod, prod)
-        case "u*s" =>
-          return Op("s*u", nGrow, widthInfer, b, a)
         case "s/s" =>
           val (signA, absA) = signAbs(a)
           val (signB, absB) = signAbs(b)
           val quo = absA / absB
           return Mux(signA != signB, -quo, quo)
-        case "s/u" =>
-          val (signA, absA) = signAbs(a)
-          val quo = absA / b.asInstanceOf[UFix]
-          return Mux(signA, -quo, quo)
-        case "u/s" =>
-          val (signB, absB) = signAbs(b)
-          val quo = a.asInstanceOf[UFix] / absB
-          return Mux(signB, -quo, quo)
         case "s%s" =>
           val (signA, absA) = signAbs(a)
           val (signB, absB) = signAbs(b)
           val rem = absA % absB
-          return Mux(signA, -rem, rem)
-        case "u%s" =>
-          return a.asInstanceOf[UFix] / signAbs(b)._2
-        case "s%u" =>
-          val (signA, absA) = signAbs(a)
-          val rem = absA % b.asInstanceOf[UFix]
           return Mux(signA, -rem, rem)
         case "%" =>
           val (au, bu) = (a.asInstanceOf[UFix], b.asInstanceOf[UFix])
