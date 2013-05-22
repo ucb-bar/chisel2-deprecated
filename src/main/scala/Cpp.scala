@@ -212,13 +212,13 @@ class CppBackend extends Backend {
           }
           block(res) + trunc(o)
         } else if (o.op == "/") {
-          val cmd = "div_n(__d, __x, __y, " + o.inputs(0).width + ", " + o.inputs(1).width + ")"
+          val cmd = "div_n(__d, __x, __y, " + o.width + ", " + o.inputs(0).width + ", " + o.inputs(1).width + ")"
           block(makeArray("__d", o) ++ toArray("__x", o.inputs(0)) ++ toArray("__y", o.inputs(1)) ++ List(cmd) ++ fromArray("__d", o))
         } else if (o.op == "*") {
           if (o.width <= bpw) {
             "  " + emitLoWordRef(o) + " = " + emitLoWordRef(o.inputs(0)) + " * " + emitLoWordRef(o.inputs(1)) + ";\n"
           } else {
-            val cmd = "mul_n(__d, __x, __y, " + o.inputs(0).width + ", " + o.inputs(1).width + ")"
+            val cmd = "mul_n(__d, __x, __y, " + o.width + ", " + o.inputs(0).width + ", " + o.inputs(1).width + ")"
             block(makeArray("__d", o) ++ toArray("__x", o.inputs(0)) ++ toArray("__y", o.inputs(1)) ++ List(cmd) ++ fromArray("__d", o))
           }
         } else if (o.op == "<<") {
