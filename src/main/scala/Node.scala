@@ -132,7 +132,7 @@ abstract class Node extends nameable {
   var inferCount = 0;
   var genError = false;
   var stack: Array[StackTraceElement] = null;
-  var line: StackTraceElement = findFirstUserLine(Thread.currentThread().getStackTrace)
+  var line: StackTraceElement = findFirstUserLine(Thread.currentThread().getStackTrace) getOrElse Thread.currentThread().getStackTrace()(0)
   var isScanArg = false
   var isPrintArg = false
   def isMemOutput = false

@@ -206,10 +206,7 @@ object chiselMain {
 object throwException {
   def apply(s: String) = {
     val xcpt = new Exception(s)
-    val st = xcpt.getStackTrace
-    val usrStart = findFirstUserInd(st)
-    val usrEnd = if(usrStart == 0) st.length else usrStart + 1
-    xcpt.setStackTrace(st.slice(usrStart, usrEnd))
+    findFirstUserLine(xcpt.getStackTrace) map { u => xcpt.setStackTrace(Array(u)) }
     throw xcpt
   }
 }
