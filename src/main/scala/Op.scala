@@ -184,7 +184,8 @@ object xorR {
 object Op {
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
     val (a_lit, b_lit) = (a.litOf, b.litOf);
-    if (isFolding) {
+    val isSigned = a.isSigned && b.isSigned
+    if (isFolding && !isSigned) {
     if (a_lit != null && b_lit == null) {
       name match {
         case "&&" => return if (a_lit.value == 0) Literal(0) else b;
@@ -292,7 +293,7 @@ object Op {
     res.init("", widthInfer, a, b);
     res.op = name;
     res.nGrow = nGrow;
-    if(a.isSigned && b.isSigned) res.setIsSigned
+    if (isSigned) res.setIsSigned
     res
   }
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node): Node = {
