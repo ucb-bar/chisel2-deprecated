@@ -49,44 +49,42 @@ object chiselCast {
 }
 
 object UnaryOp {
-  def apply[T <: Data](x: T, op: String)(gen: => T): T = {
-    val node = op match {
-    case "-" => Op("-",  1, widthOf(0), x);
-    case "~" => Op("~",  1, widthOf(0), x);
-    case "!" => Op("!",  1, fixWidth(1), x);
-    case any => null;
+  def apply[T <: Bits](x: T, op: String): Node = {
+    op match {
+      case "-" => Op("-",  1, widthOf(0), x);
+      case "~" => Op("~",  1, widthOf(0), x);
+      case "!" => Op("!",  1, fixWidth(1), x);
+      case any => throw new Exception("Unrecognized operator " + op);
     }
-    node.setTypeNode(gen.asOutput)
   }
 }
 
 object BinaryOp {
-  def apply[T <: Data](x: T, y: T, op: String)(gen: => T): T = {
-    val node = op match {
+  def apply[T <: Bits](x: T, y: T, op: String): Node = {
+    op match {
       case "<<"  => Op("<<", 0, lshWidthOf(0, y),  x, y );
       case ">>"  => Op(">>", 0, rshWidthOf(0, y),  x, y );
       case "+"   => Op("+",  2, maxWidth _,  x, y );
       case "*"   => Op("*",  0, sumWidth _,  x, y );
       case "s*s" => Op("s*s",  0, sumWidth _,  x, y );
-      case "s*u" => Op("s*s",  0, mulSUWidth _,  x, Cat(Bits(0,1), y).toFix );
-      case "u*s" => BinaryOp(y, x, "s*u")(gen)
+      case "s*u" => Op("s*s",  0, mulSUWidth _,  x, y );
+      case "u*s" => Op("s*s",  0, mulSUWidth _,  y, x );
       case "/"   => Op("/",  0, widthOf(0),  x, y );
       case "s/s" => Op("s/s",  0, widthOf(0),  x, y );
-      case "s/u" => Op("s/s",  0, widthOf(0),  x, Cat(Bits(0,1), y).toFix );
-      case "u/s" => Op("s/s",  0, divUSWidth _, Cat(Bits(0,1), x).toFix, y );
+      case "s/u" => Op("s/s",  0, widthOf(0),  x, y );
+      case "u/s" => Op("s/s",  0, divUSWidth _, x, y );
       case "%"   => Op("%",  0, minWidth _,  x, y );
       case "s%s" => Op("s%s",  0, minWidth _,  x, y );
-      case "s%u" => Op("s%u",  0, modSUWidth _,  x, Cat(Bits(0,1), y).toFix );
-      case "u%s" => Op("u%s",  0, modUSWidth _, Cat(Bits(0,1), x).toFix, y );
+      case "s%u" => Op("s%u",  0, modSUWidth _,  x, y );
+      case "u%s" => Op("u%s",  0, modUSWidth _, x, y );
       case "^"   => Op("^",  2, maxWidth _,  x, y );
       case "?"   => Multiplex(x, y, null);
       case "-"   => Op("-",  2, maxWidth _,  x, y );
       case "##"  => Op("##", 2, sumWidth _,  x, y );
       case "&"   => Op("&",  2, maxWidth _, x, y );
       case "|"   => Op("|",  2, maxWidth _, x, y );
-      case any   => null;
+      case any   => throw new Exception("Unrecognized operator " + op);
     }
-    node.setTypeNode(gen.asOutput)
   }
 
   // width inference functions for signed-unsigned operations
@@ -96,8 +94,9 @@ object BinaryOp {
   private def modSUWidth(x: Node) = x.inputs(0).width.min(x.inputs(1).width - 1)
 }
 
+
 object LogicalOp {
-  def apply[T <: Data](x: T, y: T, op: String)(gen: => T): Bool = {
+  def apply[T <: Bits](x: T, y: T, op: String): Bool = {
     if(searchAndMap && op == "&&" && chiselAndMap.contains((x, y))) {
       chiselAndMap((x, y))
     } else {
@@ -110,40 +109,27 @@ object LogicalOp {
         case ">="  => Op(">=", 2, fixWidth(1), x, y );
         case "&&"  => Op("&&", 2, fixWidth(1), x, y );
         case "||"  => Op("||", 2, fixWidth(1), x, y );
-        case any   => null;
+        case any   => throw new Exception("Unrecognized operator " + op);
       }
 
       // make output
-      val output = Bool(OUTPUT)
+      val output = Bool(OUTPUT).fromNode(node)
       if(searchAndMap && op == "&&" && !chiselAndMap.contains((x, y))) {
         chiselAndMap += ((x, y) -> output)
       }
-      node.setTypeNode(output)
+      output
     }
   }
 }
 
 object ReductionOp {
-  def apply[T <: Data](x: T, op: String)(gen: => T): Bool = {
-    val node = op match {
+  def apply[T <: Bits](x: T, op: String): Node = {
+    op match {
       case "&" => Op("&",  1, fixWidth(1), x);
       case "|" => Op("|",  1, fixWidth(1), x);
       case "^" => Op("^",  1, fixWidth(1), x);
-      case any => null;
+      case any => throw new Exception("Unrecognized operator " + op);
     }
-    node.setTypeNode(Bool(OUTPUT))
-  }
-}
-
-object UnaryBoolOp {
-  def apply(x: Bool, op: String): Bool = {
-    val node = op match {
-    case "-" => Op("-",  1, widthOf(0), x);
-    case "~" => Op("~",  1, widthOf(0), x);
-    case "!" => Op("!",  1, fixWidth(1), x);
-    case any => null;
-    }
-    node.setTypeNode(Bool(OUTPUT))
   }
 }
 
@@ -153,39 +139,19 @@ object BinaryBoolOp {
       chiselAndMap((x, y))
     } else {
       val node = op match {
-        case "^"   => Op("^",  2, maxWidth _,  x, y );
-        case "===" => Op("==", 2, fixWidth(1), x, y );
-        case "!="  => Op("!=", 2, fixWidth(1), x, y );
-        case ">"   => Op(">",  2, fixWidth(1), x, y );
-        case "<"   => Op("<",  2, fixWidth(1), x, y );
-        case "<="  => Op("<=", 2, fixWidth(1), x, y );
-        case ">="  => Op(">=", 2, fixWidth(1), x, y );
         case "&&"  => Op("&&", 2, fixWidth(1), x, y );
         case "||"  => Op("||", 2, fixWidth(1), x, y );
-        case "&"   => Op("&",  2, maxWidth _, x, y );
-        case "|"   => Op("|",  2, maxWidth _, x, y );
-        case any   => null;
+        case any   => throw new Exception("Unrecognized operator " + op);
       }
-      val output = Bool(OUTPUT)
+      val output = Bool(OUTPUT).fromNode(node)
       if(searchAndMap && op == "&&" && !chiselAndMap.contains((x, y))) {
         chiselAndMap += ((x, y) -> output)
       }
-      node.setTypeNode(output)
+      output
     }
   }
 }
 
-object andR {
-    def apply(x: Bits): Bool = ReductionOp(x, "&"){Bits()}
-}
-
-object orR {
-    def apply(x: Bits): Bool = ReductionOp(x, "|"){Bits()}
-}
-
-object xorR {
-    def apply(x: Bits): Bool = ReductionOp(x, "^"){Bits()}
-}
 
 object Op {
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
@@ -242,8 +208,9 @@ object Op {
               val fixB = b.asInstanceOf[Fix]
               val msbA = fixA < Fix(0)
               val msbB = fixB < Fix(0)
-              val ucond = LogicalOp(fixA.toUFix, fixB, name){UFix()}
-              return Mux(msbA === msbB, ucond, (if (name(0) == '>') msbB else msbA).asInstanceOf[Bool])
+              val ucond = Bool(OUTPUT).fromNode(
+                LogicalOp(fixA.toUFix, fixB, name))
+              return Mux(msbA === msbB, ucond, (if (name(0) == '>') msbB else msbA))
             }
           }
         case "==" =>

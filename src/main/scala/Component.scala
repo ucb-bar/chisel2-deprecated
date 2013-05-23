@@ -82,7 +82,7 @@ object Component {
   val muxes = ArrayBuffer[Node]();
   val nodes = ArrayBuffer[Node]()
   var ioMap = new HashMap[Node, Int];
-  var chiselOneHotMap = new HashMap[(UFix, Int), Bits]
+  var chiselOneHotMap = new HashMap[(UFix, Int), UFix]
   var chiselOneHotBitMap = new HashMap[(Bits, Int), Bool]
   var chiselAndMap = new HashMap[(Node, Node), Bool]
   var searchAndMap = true
@@ -651,33 +651,18 @@ abstract class Component(resetSignal: Bool = null) {
          case node: Node => {
            if (node.isReg || node.isClkInput) containsReg = true;
          }
-         case buf: ArrayBuffer[Node] => {
-           if(!buf.isEmpty && buf(0).isInstanceOf[Node]){
-             for(elm <- buf){
+         case buf: ArrayBuffer[_] => {
+           /* We would prefer to match for ArrayBuffer[Node] but that's
+            impossible because of JVM constraints which lead to type erasure.
+            XXX Using Seq instead of ArrayBuffer will pick up members defined
+            in Component that are solely there for implementation purposes. */
+           if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
+             val nodebuf = buf.asInstanceOf[Seq[Node]];
+             for(elm <- nodebuf){
                if (elm.isReg || elm.isClkInput) {
                  containsReg = true;
                }
              }
-           }
-         }
-         // TODO: THIS CASE MAY NEVER MATCH
-         case bufbuf: ArrayBuffer[ArrayBuffer[_]] => {
-           var i = 0;
-           println(name);
-           for(buf <- bufbuf){
-             var j = 0;
-             for(elm <- buf){
-               elm match {
-                 case node: Node => {
-                   if (node.isReg || node.isClkInput) {
-                     containsReg = true;
-                   }
-                   j += 1;
-                 }
-                 case any =>
-               }
-             }
-             i += 1;
            }
          }
          case cell: Cell => {

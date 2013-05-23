@@ -37,6 +37,7 @@ import scala.math.min
 import Literal._
 import ChiselError._
 
+/* Factory for literal values to be used by Bits and Fix factories. */
 object Lit {
   def apply[T <: Bits](n: String, width: Int = -1)(gen: => T): T = {
     makeLit(Literal(n, width))(gen)
@@ -54,20 +55,17 @@ object Lit {
     makeLit(Literal(width, base, literal))(gen)
   }
 
-  def apply(value: Boolean): Bool =
-    makeBool((if(value) Literal(1,1) else Literal(0,1)))
-
   def makeLit[T <: Bits](x: Literal)(gen: => T): T = {
-    x.setTypeNode(gen.asOutput)
+    gen.fromNode(x)
   }
-
-  def makeBool(x: Literal): Bool =
-    x.setTypeNode(Bool(OUTPUT))
 }
 
 object Literal {
+/*XXX
+  @deprecated("Not used?")
   implicit def intToLit (x: Int) = Literal(x);
-  def bigMax(x: BigInt, y: BigInt): BigInt = if (x > y) x else y;
+ */
+  private def bigMax(x: BigInt, y: BigInt): BigInt = if (x > y) x else y;
   def sizeof(x: BigInt): Int = {
     val y = bigMax(BigInt(1), x.abs).toDouble;
     val res = max(1, (ceil(log(y + 1)/log(2.0))).toInt);
@@ -75,6 +73,7 @@ object Literal {
      res
    }
 
+  @deprecated("This part of the implementation is not used anymore")
   def signedsizeof(x: BigInt, width: Int = -1, signed: Boolean = false): (Int, String) = {
     var count = 0;
     var n = x;
@@ -115,7 +114,7 @@ object Literal {
     ((resWidth, resNum.toString(16)))
   }
 
-  def sizeof(base: Char, x: String): Int = {
+  private def sizeof(base: Char, x: String): Int = {
     var res = 0;
     var first = true;
     val size =
@@ -215,6 +214,8 @@ object Literal {
     }
   }
 
+  /** Creates a *Literal* instance from a scala integer.
+    */
   def apply(x: BigInt, width: Int = -1, signed: Boolean = false): Literal = {
     val res = new Literal();
     val xWidth = if (signed) x.bitLength + 1 else max(x.bitLength, 1)
@@ -230,6 +231,9 @@ object Literal {
     res
   }
 
+  /** Creates a *Literal* instance from a scala string. The first character
+    of the string indicates the base for the suffix characters.
+    */
   def apply(n: String, width: Int): Literal =
     apply(width, n(0), n.substring(1, n.length));
 
@@ -250,8 +254,11 @@ object Literal {
     if (base == 'b') {res.isZ = literal.contains('?'); res.isBinary = true;}
     res
   }
-
 }
+
+/** Stores the actual value of a scala literal as a string.
+  This class should not end-up being instantiated directly in user code.
+  */
 class Literal extends Node {
   //implicit def intToLit (x: Int) = Lit(x);
   var hasInferredWidth = false
@@ -268,8 +275,5 @@ class Literal extends Node {
   override def isInVCD = false
 
   def d (x: BigInt): Literal = Literal(x, value.toInt)
-  //def ~(x: String): Lit = Lit(value, x(0), x.substring(1, x.length));
 }
 
-class Lit extends Node {
-}

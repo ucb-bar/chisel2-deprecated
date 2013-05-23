@@ -268,24 +268,3 @@ class Delay extends Node {
   override def isReg = true;
 }
 
-object Log2 {
-  def apply (mod: UFix, n: Int): UFix = {
-    backend match {
-      case x: CppBackend => {
-        val log2 = new Log2()
-        log2.init("", fixWidth(sizeof(n-1)), mod)
-        log2.setTypeNode(UFix())
-      }
-      case _ => {
-        var res = UFix(0);
-        for (i <- 1 until n)
-          res = Mux(mod(i), UFix(i, sizeof(n-1)), res);
-        res
-      }
-    }
-  }
-}
-
-class Log2 extends Node {
-  override def toString: String = "LOG2(" + inputs(0) + ")";
-}

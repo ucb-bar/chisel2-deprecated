@@ -70,13 +70,13 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
 
   inferWidth = fixWidth(data.getWidth)
 
-  private val readPortCache = HashMap[Bits, T]()
-  def doRead(addr: Bits): T = {
+  private val readPortCache = HashMap[UFix, T]()
+  def doRead(addr: UFix): T = {
     if (readPortCache.contains(addr)) {
       return readPortCache(addr)
     }
 
-    val addrIsReg = addr.isInstanceOf[Bits] && addr.inputs.length == 1 && addr.inputs(0).isInstanceOf[Reg]
+    val addrIsReg = addr.isInstanceOf[UFix] && addr.inputs.length == 1 && addr.inputs(0).isInstanceOf[Reg]
     val rd = if (seqRead && !Component.isInlineMem && addrIsReg) {
       (seqreads += new MemSeqRead(this, addr.inputs(0))).last
     } else {
@@ -88,7 +88,7 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
     data
   }
 
-  def doWrite(addr: Bits, condIn: Bool, wdata: Node, wmaskIn: Bits) = {
+  def doWrite(addr: UFix, condIn: Bool, wdata: Node, wmaskIn: UFix) = {
     val cond = // add bounds check if depth is not a power of 2
       if (isPow2(n))
         condIn
@@ -100,7 +100,7 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
       else
         wmaskIn
 
-    def doit(addr: Bits, cond: Bool, wdata: Node, wmask: Bits) = {
+    def doit(addr: UFix, cond: Bool, wdata: Node, wmask: UFix) = {
       val wr = new MemWrite(this, cond, addr, wdata, wmask)
       writes += wr
       inputs += wr
@@ -115,20 +115,20 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
       val random16 = LFSR16()
       val random_data = Cat(random16, Array.fill((width-1)/16){random16}:_*)
       doit(Reg(addr), Reg(cond), reg_data, reg_wmask)
-      doit(addr, cond, gen().fromBits(random_data), wmask)
+      doit(addr, cond, gen().fromNode(random_data), wmask)
       reg_data.comp
     } else {
       doit(addr, cond, wdata, wmask)
     }
   }
 
-  def read(addr: Bits): T = doRead(addr)
+  def read(addr: UFix): T = doRead(addr)
 
-  def write(addr: Bits, data: T) = doWrite(addr, conds.top, data.toBits, null.asInstanceOf[Bits])
+  def write(addr: UFix, data: T) = doWrite(addr, conds.top, data, null.asInstanceOf[UFix])
 
-  def write(addr: Bits, data: T, wmask: Bits) = doWrite(addr, conds.top, data.toBits, wmask)
+  def write(addr: UFix, data: T, wmask: UFix) = doWrite(addr, conds.top, data, wmask)
 
-  def apply(addr: Bits) = {
+  def apply(addr: UFix) = {
     val rdata = doRead(addr)
     rdata.comp = new PutativeMemWrite(this, addr)
     rdata
@@ -200,9 +200,9 @@ class MemSeqRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
   override def isRamWriteInput(n: Node) = addrReg.isEnable && addrReg.enableSignal == n || addr == n
 }
 
-class PutativeMemWrite(mem: Mem[_], addri: Bits) extends Node with proc {
+class PutativeMemWrite(mem: Mem[_], addri: UFix) extends Node with proc {
   override def procAssign(src: Node) =
-    mem.doWrite(addri, conds.top, src, null.asInstanceOf[Bits])
+    mem.doWrite(addri, conds.top, src, null.asInstanceOf[UFix])
 }
 
 class MemReadWrite(val read: MemSeqRead, val write: MemWrite) extends MemAccess(read.mem, null)
@@ -217,7 +217,7 @@ class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) 
 
   if (datai != null) {
     def wrap(x: Node) = { // prevent Verilog syntax errors when indexing constants
-      val b = Bits()
+      val b = UFix()
       b.inputs += x
       b
     }

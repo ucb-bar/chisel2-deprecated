@@ -36,7 +36,7 @@ import Lit._
 
 object Fill {
   def fillWidthOf(i: Int, n: Node) = { (m: Node) => (m.inputs(i).width * n.maxNum.toInt) }
-  def apply(n: Int, mod: Bits): Bits = {
+  def apply(n: Int, mod: UFix): UFix = {
     val (bits_lit) = (mod.litOf);
     if (n == 1) {
       mod
@@ -45,9 +45,9 @@ object Fill {
       val w   = mod.getWidth();
       for (i <- 0 until n-1)
         res = (res << w)|bits_lit.value;
-      Lit(res, n * w){ Bits() };
+      Lit(res, n * w){ UFix() };
     } else if (backend.isInstanceOf[CppBackend] && mod.width != 1) {
-      var out: Bits = null
+      var out: UFix = null
       var i = 0
       var cur = mod
       while ((1 << i) <= n) {
@@ -62,12 +62,12 @@ object Fill {
       val fill = new Fill()
       val fillConst = UFix(n)
       fill.init("", fillWidthOf(0, fillConst), mod, fillConst)
-      fill.setTypeNode(Bits(OUTPUT))
+      UFix(OUTPUT).fromNode(fill)
     }
   }
-  def apply(mod: Bits, n: Int): Bits = apply(n, mod)
-  def apply(n: Bits, mod: Bits): Bits = {
-    (mod << n).toUFix - UFix(1)
+  def apply(mod: UFix, n: Int): UFix = apply(n, mod)
+  def apply(n: UFix, mod: UFix): UFix = {
+    (mod << n) - UFix(1)
   }
 }
 

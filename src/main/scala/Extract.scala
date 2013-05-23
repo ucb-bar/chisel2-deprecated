@@ -97,25 +97,25 @@ object NodeExtract {
 
 object Extract {
   //extract 1 bit
-  def apply[T <: Bits](mod: T, bit: UFix)(gen: => T): T = {
+  def apply[T <: Bits](mod: T, bit: UFix)(gen: => Bool): Bool = {
     val x = NodeExtract(mod, bit)
-    x.setTypeNodeNoAssign(gen.fromNode(x))
+    gen.fromNode(x)
   }
 
-  def apply[T <: Bits](mod: T, bit: Int)(gen: => T): T = {
+  def apply[T <: Bits](mod: T, bit: Int)(gen: => Bool): Bool = {
     val x = NodeExtract(mod, bit)
-    x.setTypeNodeNoAssign(gen.fromNode(x))
+    gen.fromNode(x)
   }
 
   // extract bit range
-  def apply[T <: Bits](mod: T, hi: UFix, lo: UFix, w: Int = -1)(gen: => T): T = {
+  def apply[T <: Bits, R <: Bits](mod: T, hi: UFix, lo: UFix, w: Int = -1)(gen: => R): R = {
     val x = NodeExtract(mod, hi, lo, w)
-    x.setTypeNodeNoAssign(gen.fromNode(x))
+    gen.fromNode(x)
   }
 
-  def apply[T <: Bits](mod: T, hi: Int, lo: Int)(gen: => T): T ={
+  def apply[T <: Bits, R <: Bits](mod: T, hi: Int, lo: Int)(gen: => R): R = {
     val x = NodeExtract(mod, hi, lo)
-    x.setTypeNodeNoAssign(gen.fromNode(x))
+    gen.fromNode(x)
   }
 }
 

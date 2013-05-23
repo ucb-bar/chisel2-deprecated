@@ -39,17 +39,12 @@ object Fix {
 
   def apply(dir: IODirection = null, width: Int = -1): Fix = {
     val res = new Fix();
-    res.dir = dir;
-    if(width > 0) {
-      res.init("", width);
-    } else {
-      res.init("", widthOf(0))
-    }
+    res.create(dir, width)
     res
   }
 }
 
-class Fix extends Num {
+class Fix extends Bits {
   setIsSigned
 
   override def setIsTypeNode {
@@ -58,10 +53,16 @@ class Fix extends Num {
   }
 
   type T = Fix;
+
+  /** Factory method to create and assign a *Fix* type to a Node *n*.
+    */
   override def fromNode(n: Node) = {
-    val res = Fix(OUTPUT).asInstanceOf[this.type];
-    res assign n;
-    res};
+    Fix(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
+  }
+
+  override def fromInt(x: Int) = {
+    Fix(x).asInstanceOf[this.type]
+  }
 
   override def matchWidth(w: Int): Node = {
     if (w > this.width) {
@@ -77,75 +78,48 @@ class Fix extends Num {
     }
   }
 
-  private def colonEqual(src: Num) = {
-    if(comp != null) {
-      comp procAssign src.toNode;
-    } else {
-      this procAssign src.toNode;
+  /** casting from UFix followed by assignment. */
+  def :=(src: UFix): Unit = this := src.zext;
+
+  def gen[T <: Bits](): T = Fix().asInstanceOf[T];
+
+  // arithmetic operators
+  def unary_-(): Fix = newUnaryOp("-");
+  def unary_!(): Fix = newUnaryOp("!");
+  def << (b: UFix): Fix = newBinaryOp(b, "<<");
+  def >> (b: UFix): Fix = newBinaryOp(b, ">>");
+  def ?  (b: Fix): Fix = newBinaryOp(b, "?");
+
+  // order operators
+  def >  (b: Fix): Bool = newLogicalOp(b, ">");
+  def <  (b: Fix): Bool = newLogicalOp(b, "<");
+  def <= (b: Fix): Bool = newLogicalOp(b, "<=");
+  def >= (b: Fix): Bool = newLogicalOp(b, ">=");
+  def !=  (b: UFix): Bool = this != b.zext;
+  def >   (b: UFix): Bool = this > Cat(UFix(1, 1), b).toFix;
+  def <   (b: UFix): Bool = this < Cat(UFix(1, 1), b).toFix;
+  def >=  (b: UFix): Bool = this >= Cat(UFix(1, 1), b).toFix;
+  def <=  (b: UFix): Bool = this <= Cat(UFix(1, 1), b).toFix;
+
+  override def ===[T <: Data](right: T): Bool = {
+    right match {
+      case b: UFix => this === b.zext;
+      case _ =>
+        this.asInstanceOf[Bits] === right
     }
   }
-
-  override def :=[T <: Data](src: T): Unit = {
-    src match {
-      case ufix: UFix => {
-        this := ufix;
-      }
-      case fix: Fix => {
-        this := fix;
-      }
-      case any =>
-        ChiselError.error(":= not defined on " + this.getClass + " and " + src.getClass)
-    }
-  }
-
-  override def :=(src: Fix)  = colonEqual(src);
-  override def :=(src: UFix) = colonEqual(Cat(Bits(0), src).toUFix);
-
-  def gen[T <: Num](): T = Fix().asInstanceOf[T];
-
-  override def apply(bit: Int): Fix = { Extract(this, bit){Fix()}};
-  override def apply(hi: Int, lo: Int): Fix = {Extract(this, hi, lo){Fix()}};
-  override def apply(bit: UFix): Fix = {Extract(this, bit){Fix()}};
-  override def apply(hi: UFix, lo: UFix): Fix = {Extract(this, hi, lo, -1){Fix()}};
-  override def apply(range: (Int, Int)): Fix = this(range._1, range._2);
-
-  override def andR(): Bool    = ReductionOp(this, "&"){Fix()};
-  override def orR():  Bool    = ReductionOp(this, "|"){Fix()};
-  override def xorR(): Bool   = ReductionOp(this, "^"){Fix()};
-  override def unary_-(): Fix = UnaryOp(this, "-"){Fix()};
-  override def unary_~(): Fix = UnaryOp(this, "~"){Fix()};
-  def unary_!(): Fix = UnaryOp(this, "!"){Fix()};
-  override def << (b: UFix): Fix = BinaryOp(this, b.toFix, "<<"){Fix()};
-  override def >> (b: UFix): Fix = BinaryOp(this, b.toFix, ">>"){Fix()};
-  def ^  (b: Fix): Fix = BinaryOp(this, b, "^"){Fix()};
-  def ?  (b: Fix): Fix = BinaryOp(this, b, "?"){Fix()};
-  def ## (b: Fix): Fix = BinaryOp(this, b, "##"){Fix()};
-  def &  (b: Fix): Fix = BinaryOp(this, b, "&"){Fix()};
-  def |  (b: Fix): Fix = BinaryOp(this, b, "|"){Fix()};
 
   //Fix to Fix arithmetic
-  def +  (b: Fix): Fix = BinaryOp(this, b, "+"){Fix()};
-  def *  (b: Fix): Fix = BinaryOp(this, b, "s*s"){Fix()};
-  def /  (b: Fix): Fix = BinaryOp(this, b, "s/s"){Fix()};
-  def %  (b: Fix): Fix = BinaryOp(this, b, "s%s"){Fix()};
-  def ===(b: Fix): Bool = LogicalOp(this, b, "==="){Fix()};
-  def -  (b: Fix): Fix = BinaryOp(this, b, "-"){Fix()};
-  def != (b: Fix): Bool = LogicalOp(this, b, "!="){Fix()};
-  def >  (b: Fix): Bool = LogicalOp(this, b, ">"){Fix()};
-  def <  (b: Fix): Bool = LogicalOp(this, b, "<"){Fix()};
-  def <= (b: Fix): Bool = LogicalOp(this, b, "<="){Fix()};
-  def >= (b: Fix): Bool = LogicalOp(this, b, ">="){Fix()};
+  def +  (b: Fix): Fix = newBinaryOp(b, "+");
+  def *  (b: Fix): Fix = newBinaryOp(b, "s*s");
+  def /  (b: Fix): Fix = newBinaryOp(b, "s/s");
+  def %  (b: Fix): Fix = newBinaryOp(b, "s%s");
+  def -  (b: Fix): Fix = newBinaryOp(b, "-");
 
   //Fix to UFix arithmetic
-  def +   (b: UFix): Fix = this + Cat(Bits(0, 1), b).toFix;
-  def *   (b: UFix): Fix = BinaryOp(this, b, "s*u"){Fix()}.toFix;
-  def /   (b: UFix): Fix = BinaryOp(this, b, "s/u"){Fix()}.toFix;
-  def %   (b: UFix): Fix = BinaryOp(this, b, "s%u"){Fix()}.toFix;
-  def -   (b: UFix): Fix = this - Cat(Bits(0, 1), b).toFix;
-  def === (b: UFix): Bool = this === Cat(Bits(0, 1), b).toFix;
-  def !=  (b: UFix): Bool = this != Cat(Bits(0, 1), b).toFix;
-  def >   (b: UFix): Bool = this > Cat(Bits(1, 1), b).toFix;
-  def <   (b: UFix): Bool = this < Cat(Bits(1, 1), b).toFix;
-  def >=  (b: UFix): Bool = this >= Cat(Bits(1, 1), b).toFix;
-  def <=  (b: UFix): Bool = this <= Cat(Bits(1, 1), b).toFix;
+  def +   (b: UFix): Fix = this + b.zext;
+  def *   (b: UFix): Fix = newBinaryOp(b.zext, "s*u");
+  def /   (b: UFix): Fix = newBinaryOp(b.zext, "s/u");
+  def %   (b: UFix): Fix = newBinaryOp(b.zext, "s%u");
+  def -   (b: UFix): Fix = this - b.zext;
 }

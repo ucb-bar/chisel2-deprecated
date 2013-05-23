@@ -65,9 +65,10 @@ class VcdBackend extends Backend {
   }
 
   def emitDef(node: Node, vcdname: String): String = { // vcdname: String
-    "  if (t == 0 || (" + emitRef(node) + " != " + emitRef(node) + "__prev).to_bool())\n" +
+    ("  if (t == 0 || ("
+      + emitRef(node) + " != " + emitRef(node) + "__prev).to_bool())\n" +
     "    dat_dump(f, " + emitRef(node) + ", \"" + vcdname + "\");\n" +
-    "  " + emitRef(node) + "__prev = " + emitRef(node) + ";\n"
+    "  " + emitRef(node) + "__prev = " + emitRef(node) + ";\n")
   }
 
   override def emitDec(node: Node): String =

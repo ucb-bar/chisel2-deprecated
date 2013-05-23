@@ -33,87 +33,58 @@ import Node._
 import ChiselError._
 
 object UFix {
-  // def apply(x: BigInt): UFix = Lit(x){UFix()};
-  // def apply(x: BigInt, width: Int): UFix = Lit(x, width){UFix()};
+  /* Implementation Note: scalac does not allow multiple overloaded
+   method with default parameters so we define the following four
+   methods to create UFix from litterals (with implicit and explicit
+   widths) and reserve the default parameters for the "direction" method.
+   */
   def apply(x: Int): UFix = Lit(x){UFix()};
   def apply(x: Int, width: Int): UFix = Lit(x, width){UFix()};
+  def apply(x: String): UFix = Lit(x, -1){UFix()};
+  def apply(x: String, width: Int): UFix = Lit(x, width){UFix()};
 
   def apply(dir: IODirection = null, width: Int = -1): UFix = {
     val res = new UFix();
-    res.dir = dir;
-    if(width > 0) {
-      res.init("", width);
-    } else {
-      res.init("", widthOf(0))
-    }
+    res.create(dir, width)
     res
   }
 }
 
-class UFix extends Num {
+
+class UFix extends Bits {
   type T = UFix;
+
+  /** Factory method to create and assign a *UFix* type to a Node *n*.
+    */
   override def fromNode(n: Node) = {
-    val res = UFix(OUTPUT).asInstanceOf[this.type];
-    res assign n;
-    res
+    UFix(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
   }
 
-  override def :=(src: UFix) = {
-    if(comp != null) {
-      comp procAssign src.toNode;
-    } else {
-      this procAssign src.toNode;
-    }
+  override def fromInt(x: Int) = {
+    UFix(x).asInstanceOf[this.type]
   }
 
-  override def :=[T <: Data](src: T): Unit = {
-    src match {
-      case ufix: UFix => {
-        this := ufix;
-      }
-      case any =>
-        ChiselError.error(":= not defined on " + this.getClass + " and " + src.getClass)
-    }
-  }
+  // arithmetic operators
+  def zext(): Fix = Cat(UFix(0,1), this).toFix
+  def unary_-(): UFix = newUnaryOp("-");
+  def unary_!(): Bool = Bool(OUTPUT).fromNode(UnaryOp(this, "!"));
+  def << (b: UFix): UFix = newBinaryOp(b, "<<");
+  def >> (b: UFix): UFix = newBinaryOp(b, ">>");
+  def +  (b: UFix): UFix = newBinaryOp(b, "+");
+  def *  (b: UFix): UFix = newBinaryOp(b, "*");
+  def /  (b: UFix): UFix = newBinaryOp(b, "/");
+  def %  (b: UFix): UFix = newBinaryOp(b, "%");
+  def ?  (b: UFix): UFix = newBinaryOp(b, "?");
+  def -  (b: UFix): UFix = newBinaryOp(b, "-");
 
-  override def apply(bit: Int): UFix = { Extract(this, bit){UFix()}};
-  override def apply(hi: Int, lo: Int): UFix = {Extract(this, hi, lo){UFix()}};
-  override def apply(bit: UFix): UFix = {Extract(this, bit){UFix()}};
-  override def apply(hi: UFix, lo: UFix): UFix = {Extract(this, hi, lo, -1){UFix()}};
-  override def apply(range: (Int, Int)): UFix = this(range._1, range._2);
-
-  override def unary_-(): UFix = UnaryOp(this, "-"){UFix()};
-  override def unary_~(): UFix = UnaryOp(this, "~"){UFix()};
-  override def andR(): Bool    = ReductionOp(this, "&"){UFix()};
-  override def orR():  Bool    = ReductionOp(this, "|"){UFix()};
-  override def xorR():  Bool   = ReductionOp(this, "^"){Bits()};
-  override def << (b: UFix): UFix = BinaryOp(this, b, "<<"){UFix()};
-  override def >> (b: UFix): UFix = BinaryOp(this, b, ">>"){UFix()};
-  def +  (b: UFix): UFix = BinaryOp(this, b, "+"){UFix()};
-  def *  (b: UFix): UFix = BinaryOp(this, b, "*"){UFix()};
-  def /  (b: UFix): UFix = BinaryOp(this, b, "/"){UFix()};
-  def %  (b: UFix): UFix = BinaryOp(this, b, "%"){UFix()};
-  def ^  (b: UFix): UFix = BinaryOp(this, b, "^"){UFix()};
-  def ?  (b: UFix): UFix = BinaryOp(this, b, "?"){UFix()};
-  def -  (b: UFix): UFix = BinaryOp(this, b, "-"){UFix()};
-  def ## (b: UFix): UFix = BinaryOp(this, b, "##"){UFix()};
-  def ===(b: UFix): Bool = LogicalOp(this, b, "==="){UFix()};
-  def != (b: UFix): Bool = LogicalOp(this, b, "!="){UFix()};
-  def >  (b: UFix): Bool = LogicalOp(this, b, ">"){UFix()};
-  def <  (b: UFix): Bool = LogicalOp(this, b, "<"){UFix()};
-  def <= (b: UFix): Bool = LogicalOp(this, b, "<="){UFix()};
-  def >= (b: UFix): Bool = LogicalOp(this, b, ">="){UFix()};
-  def &  (b: UFix): UFix = BinaryOp(this, b, "&"){UFix()};
-  def |  (b: UFix): UFix = BinaryOp(this, b, "|"){UFix()};
+  // order operators
+  def >  (b: UFix): Bool = newLogicalOp(b, ">");
+  def <  (b: UFix): Bool = newLogicalOp(b, "<");
+  def <= (b: UFix): Bool = newLogicalOp(b, "<=");
+  def >= (b: UFix): Bool = newLogicalOp(b, ">=");
 
   //UFix op Fix arithmetic
-  def *   (b: Fix): Fix = BinaryOp(this, b, "u*s"){Fix()}.toFix;
-  def %   (b: Fix): Fix = BinaryOp(this, b, "u%s"){Fix()}.toFix;
-  def /   (b: Fix): Fix = BinaryOp(this, b, "u/s"){Fix()}.toFix;
-}
-
-class Eyum extends UFix { };
-object Eyum {
-  def apply[T <: Eyum](x: Int, w: Int)(gen: => T): T = { Lit(x, w){ gen } }
-  def apply[T <: Eyum](w: Int)(gen: => T): Int => T = { (x: Int) => Lit(x, w){ gen } }
+  def *   (b: Fix): Fix = Fix(OUTPUT).fromNode(BinaryOp(this.zext, b, "u*s"));
+  def %   (b: Fix): Fix = Fix(OUTPUT).fromNode(BinaryOp(this.zext, b, "u%s"));
+  def /   (b: Fix): Fix = Fix(OUTPUT).fromNode(BinaryOp(this.zext, b, "u/s"));
 }

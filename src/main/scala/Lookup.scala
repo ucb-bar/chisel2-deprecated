@@ -34,19 +34,19 @@ import Literal._
 import scala.collection.mutable.ArrayBuffer
 
 object Lookup {
-  def apply[T <: Data](addr: Bits, default: T, mapping: Seq[(Bits, T)]): T = {
+  def apply[T <: Bits](addr: UFix, default: T, mapping: Seq[(UFix, T)]): T = {
     if (Component.backend.isInstanceOf[CppBackend]) {
       return CListLookup(addr, List(default), mapping.map(m => (m._1, List(m._2))).toArray).head
     }
     val lookup = new Lookup()
     val mappingNode = mapping.map(x => LookupMap(x))
     lookup.initOf("", widthOf(1), List(addr, default) ++ mappingNode)
-    lookup.setTypeNodeNoAssign(default.fromNode(lookup).asInstanceOf[T])
+    default.fromNode(lookup)
   }
 }
 
 object LookupMap {
-  def apply[T <: Data](map: (Bits, T)): LookupMap = {
+  def apply[T <: Data](map: (UFix, T)): LookupMap = {
     val res = new LookupMap()
     res.init("", widthOf(0), map._1, map._2)
     res

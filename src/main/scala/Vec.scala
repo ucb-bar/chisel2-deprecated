@@ -41,12 +41,12 @@ import Node._
 
 object VecUFixToOH
 {
-  def apply(in: UFix, width: Int): Bits =
+  def apply(in: UFix, width: Int): UFix =
   {
     if(chiselOneHotMap.contains((in, width))) {
       chiselOneHotMap((in, width))
     } else {
-      val out = Bits(1, width)
+      val out = UFix(1, width)
       val res = (out << in)(width-1,0)
       chiselOneHotMap += ((in, width) -> res)
       res
@@ -55,8 +55,8 @@ object VecUFixToOH
 }
 
 object VecMux {
-  def apply(addr: UFix, elts: Seq[Bits]): Bits = {
-    def doit(elts: Seq[Bits], pos: Int): Bits = {
+  def apply(addr: UFix, elts: Seq[Data]): Data = {
+    def doit(elts: Seq[Data], pos: Int): Data = {
       if (elts.length == 1) {
         elts(0)
       } else {
@@ -102,12 +102,12 @@ object Vec {
   def apply[T <: Data](elt0: T, elts: T*)(gen: => T): Vec[T] =
     apply(elt0 +: elts.toSeq)(gen)
 
-  def getEnable(onehot: Bits, i: Int): Bool = {
+  def getEnable(onehot: UFix, i: Int): Bool = {
     var enable: Bool = null
       if(chiselOneHotBitMap.contains(onehot, i)){
         enable = chiselOneHotBitMap(onehot, i)
       } else {
-        enable = onehot(i).toBool
+        enable = onehot(i)
         chiselOneHotBitMap += ((onehot, i) -> enable)
       }
     enable
@@ -136,29 +136,29 @@ class VecProc extends proc {
   }
 }
 
-class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferProxy[T] {
+class Vec[T <: Data](val gen: () => T) extends CompositeData with Cloneable with BufferProxy[T] {
   val self = new ArrayBuffer[T]
   val readPortCache = new HashMap[UFix, T]
-  var sortedElementsCache: ArrayBuffer[ArrayBuffer[Bits]] = null
+  var sortedElementsCache: ArrayBuffer[ArrayBuffer[Data]] = null
   var flattenedVec: Node = null
   override def apply(idx: Int): T = {
     super.apply(idx)
   };
 
-  def sortedElements: ArrayBuffer[ArrayBuffer[Bits]] = {
+  def sortedElements: ArrayBuffer[ArrayBuffer[Data]] = {
     if (sortedElementsCache == null) {
-      sortedElementsCache = new ArrayBuffer[ArrayBuffer[Bits]]
+      sortedElementsCache = new ArrayBuffer[ArrayBuffer[Data]]
 
       // create buckets for each elm in data type
       for(i <- 0 until this(0).flatten.length)
-        sortedElementsCache += new ArrayBuffer[Bits]
+        sortedElementsCache += new ArrayBuffer[Data]
 
       // fill out buckets
       for(elm <- this) {
         for(((n, io), i) <- elm.flatten zip elm.flatten.indices) {
           //val bits = io.toBits
           //bits.comp = io.comp
-          sortedElementsCache(i) += io.asInstanceOf[Bits]
+          sortedElementsCache(i) += io.asInstanceOf[Data]
         }
       }
     }
@@ -166,9 +166,6 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
   }
 
   def apply(ind: UFix): T =
-    read(ind)
-
-  def apply(ind: Bits): T =
     read(ind)
 
   def write(addr: UFix, data: T) {
@@ -185,17 +182,13 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
     }
   }
 
-  def write(addr: Bits, data: T) {
-    write(addr.toUFix, data)
-  }
-
   def read(addr: UFix): T = {
     if(readPortCache.contains(addr)) {
       return readPortCache(addr)
     }
 
     val res = this(0).clone
-    val iaddr = Bits(width=log2Up(length))
+    val iaddr = UFix(width=log2Up(length))
     iaddr.inputs += addr
     for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
       io assign VecMux(iaddr, sortedElm)
@@ -203,7 +196,7 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
       // setup the comp for writes
       val io_comp = new VecProc()
       io_comp.addr = iaddr
-      io_comp.elms = sortedElm
+      io_comp.elms = sortedElm.asInstanceOf[ArrayBuffer[Bits]] // XXX ?
       io.comp = io_comp
     }
     readPortCache += (addr -> res)
@@ -288,7 +281,7 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
     }
   }
 
-  def := (src: Bits) = {
+  def := (src: UFix) = {
     for(i <- 0 until length)
       this(i) := src(i)
   }
@@ -385,18 +378,14 @@ class Vec[T <: Data](val gen: () => T) extends Data with Cloneable with BufferPr
       elm.setIsTypeNode
   }
 
-  override def toBits(): Bits = {
-    // var res: Bits = null
-    // for(i <- 0 until length)
-    //   res = Cat(this(i), res)
-    // res
-    val reversed = this.reverse
+  override def toBits(): UFix = {
+    val reversed = this.reverse.map(_.toBits)
     Cat(reversed.head, reversed.tail: _*)
   }
 
   def forall(p: T => Bool): Bool = (this map p).fold(Bool(true))(_&&_)
   def exists(p: T => Bool): Bool = (this map p).fold(Bool(false))(_||_)
-  def contains(x: T): Bool = this.exists(_.toBits === x.toBits)
+  def contains[T <: Bits](x: T): Bool = this.exists(_ === x)
   def count(p: T => Bool): UFix = PopCount(this map p)
 
   private def indexWhereHelper(p: T => Bool) = this map p zip (0 until size).map(i => UFix(i))

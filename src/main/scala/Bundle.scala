@@ -47,11 +47,6 @@ object Bundle {
   def apply (elts: ArrayBuffer[(String, Data)]): Bundle = {
     val res = new Bundle();
     res.elementsCache = elts; // TODO: REMOVE REDUNDANT CREATION
-/* XXX Removed this code!
-    for ((n, i) <- elts) {
-      i.name = n;
-    }
- */
     res
   }
 
@@ -78,7 +73,7 @@ object sort {
 /** Defines a collection of datum of different types into a single coherent
   whole.
   */
-class Bundle(view_arg: Seq[String] = null) extends Data {
+class Bundle(view_arg: Seq[String] = null) extends CompositeData {
   var dir = "";
   var view = view_arg;
   private var elementsCache: ArrayBuffer[(String, Data)] = null;
@@ -237,7 +232,7 @@ class Bundle(view_arg: Seq[String] = null) extends Data {
     } else {
       src match {
         case other: Bundle => {
-          comp assign other.toNode
+          comp assign other
         }
         case default =>
           println("CONNECTING INCORRECT TYPES INTO WIRE OR REG")
@@ -267,7 +262,8 @@ class Bundle(view_arg: Seq[String] = null) extends Data {
       case other: Bundle => {
         this := other
       }
-      case default =>
+      case any =>
+        this.asInstanceOf[Data] := src
     }
   }
 
@@ -284,12 +280,11 @@ class Bundle(view_arg: Seq[String] = null) extends Data {
         case bits: Bits => {
           if (src.contains(n)) bits := src(n).asInstanceOf[Bits]
         }
-        case vec: Vec[Data] => {
+        case vec: Vec[_] => {
            /* We would prefer to match for Vec[Data] but that's impossible
-            because of JVM constraints which lead to type erasure.
-            XXX The warning is still there since casting *vec* might have
-            unintended consequences on the assignment to *vec*. */
-          if (src.contains(n)) vec := src(n).asInstanceOf[Vec[Data]]
+            because of JVM constraints which lead to type erasure. */
+          val vecdata = vec.asInstanceOf[Vec[Data]]
+          if (src.contains(n)) vecdata := src(n).asInstanceOf[Vec[Data]]
         }
       }
     }

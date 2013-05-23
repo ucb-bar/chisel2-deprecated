@@ -38,22 +38,10 @@ import Component._;
 import ChiselError._;
 
 object Node {
-  //implicits
-  implicit def convBitsToBool(x: Bits): Bool = {
-    if(x.getWidth > 1) {
-      throw new Exception("multi bit signal " + x + " converted to Bool");
-    }
-    if(x.getWidth == -1) {
-      throw new Exception("unable to automatically convert " + x + " to Bool, convert manually instead");
-    }
-    x.toBool
-  }
-
-  implicit def convBitsToUFix(x: Bits): UFix = x.toUFix;
-
   var isCoercingArgs = true;
   val conds = new Stack[Bool]();
   conds.push(Bool(true));
+  // XXX ??
   val keys  = new Stack[Bits]();
 
   var isInGetWidth = false
@@ -103,11 +91,18 @@ object Node {
 
   def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).width - n.minNum.toInt }
 
-  var clk: Node = Bits(INPUT, 1)
+  var clk: Node = UFix(INPUT, 1)
   clk.setName("clk")
 
 }
 
+/** *Node* defines the root class of the class hierarchy for
+  a [Composite Pattern](http://en.wikipedia.org/wiki/Composite_pattern).
+
+  A digital logic graph is encoded as adjacency graph where instances
+  of *Node* describe vertices and *inputs*, *consumers* member fields
+  are used to traverse the directed graph respectively backward and forward.
+  */
 abstract class Node extends nameable {
   var sccIndex = -1
   var sccLowlink = -1
@@ -163,7 +158,8 @@ abstract class Node extends nameable {
   def litOf: Literal = {
     if(inputs.length == 0) {
       if (isLit) this.asInstanceOf[Literal] else null
-    } else if(inputs.length == 1 && isInstanceOf[Bits] && inputs(0) != null) {
+    } else if(inputs.length == 1
+      && isInstanceOf[Bits] && inputs(0) != null) {
       inputs(0).litOf
     } else {
       null
@@ -180,9 +176,9 @@ abstract class Node extends nameable {
     res.isSigned = true;
     res.asInstanceOf[this.type]
   }
-  def bitSet(off: UFix, dat: Bits): Bits = {
-    val bit = Bits(1, 1) << off;
-    (this.asInstanceOf[Bits] & ~bit) | (dat << off);
+  def bitSet(off: UFix, dat: UFix): UFix = {
+    val bit = UFix(1, 1) << off;
+    (this.asInstanceOf[UFix] & ~bit) | (dat << off);
   }
   // TODO: MOVE TO WIRE
   def assign(src: Node) = {
@@ -264,12 +260,7 @@ abstract class Node extends nameable {
           writer.println(indent + "  (has comp " + fix.comp + " of type " + fix.comp.getClass + ")");
         }
       }
-      case ufix: UFix => {
-        if (!(ufix.comp == null)) {
-          writer.println(indent + "(has comp " + ufix.comp + ")");
-        }
-      }
-      case bits: Bits => {
+      case bits: UFix => {
         if (!(bits.comp == null)) {
           writer.println(indent + "(has comp " + bits.comp + ")");
         }
@@ -355,15 +346,18 @@ abstract class Node extends nameable {
           val j = i;
           val n = node;
           stack.push(() => {
-            // This code finds an output binding for a node. We search for a binding only if the io is an output
-            // and the logic's grandfather component is not the same as the io's component and
-            // the logic's component is not same as output's component unless the logic is an input
+            /* This code finds an output binding for a node.
+             We search for a binding only if the io is an output
+             and the logic's grandfather component is not the same
+             as the io's component and the logic's component is not
+             same as output's component unless the logic is an input */
             n match {
               case io: Bits =>
                 if (io.dir == OUTPUT && !io.isTypeNode &&
                     (!(component.parent == io.component) &&
                      !(component == io.component &&
-                       !(this.isInstanceOf[Bits] && this.asInstanceOf[Bits].dir == INPUT)))) {
+                       !(this.isInstanceOf[Bits]
+                         && this.asInstanceOf[Bits].dir == INPUT)))) {
                   val c = n.component.parent;
                   val b = Binding(n, c, io.component);
                   inputs(j) = b;
@@ -372,17 +366,20 @@ abstract class Node extends nameable {
                   }
                   // In this case, we are trying to use the input of a submodule
                   // as part of the logic outside of the submodule.
-                  // If the logic is outside the submodule, we do not use the input
-                  // name. Instead, we use whatever is driving the input. In other
-                  // words, we do not use the Input name, if the component of the
-                  // logic is the part of Input's component.
-                  // We also do the same when assigning to the output if the output
-                  // is the parent of the subcomponent;
+                  // If the logic is outside the submodule, we do not use
+                  // the input name. Instead, we use whatever is driving
+                  // the input. In other words, we do not use the Input name,
+                  // if the component of the logic is the part of Input's
+                  // component. We also do the same when assigning
+                  // to the output if the output is the parent
+                  // of the subcomponent.
                 } else if (io.dir == INPUT &&
-                           ((!this.isIo && this.component == io.component.parent) ||
-                            (this.isInstanceOf[Bits] && this.asInstanceOf[Bits].dir == OUTPUT &&
-                             this.component == io.component.parent))) {
-                   if (io.inputs.length > 0) inputs(j) = io.inputs(0);
+                           ((!this.isIo
+                             && this.component == io.component.parent)
+                             || (this.isInstanceOf[Bits]
+                               && this.asInstanceOf[Bits].dir == OUTPUT &&
+                               this.component == io.component.parent))) {
+                  if (io.inputs.length > 0) inputs(j) = io.inputs(0);
                 }
               case any =>
             };
@@ -427,17 +424,6 @@ abstract class Node extends nameable {
     w
   }
 
-  def setTypeNodeNoAssign[T <: Data](typeNode: T): T = {
-    typeNode.setIsTypeNode
-    if(!isInstanceOf[Literal]) nameHolder = typeNode
-    typeNode
-  }
-  def setTypeNode[T <: Data](typeNode: T): T = {
-    typeNode assign this
-    setTypeNodeNoAssign(typeNode)
-    typeNode
-  }
-
   def removeTypeNodes() {
     for(i <- 0 until inputs.length) {
       if(inputs(i) == null){
@@ -474,11 +460,11 @@ abstract class Node extends nameable {
     true;
   }
 
-  def extract (widths: Array[Int]): List[Fix] = {
-    var res: List[Fix] = Nil;
+  def extract (widths: Array[Int]): List[UFix] = {
+    var res: List[UFix] = Nil;
     var off = 0;
     for (w <- widths) {
-      res  = this.asInstanceOf[Fix](off + w - 1, off) :: res;
+      res  = this.asInstanceOf[UFix](off + w - 1, off) :: res;
       off += w;
     }
     res.reverse

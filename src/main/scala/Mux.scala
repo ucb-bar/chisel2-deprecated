@@ -34,7 +34,7 @@ import Component._
 import scala.math._
 
 object MuxLookup {
-  def apply[S <: Bits, T <: Data] (key: S, default: T, mapping: Seq[(S, T)]): T = {
+  def apply[S <: UFix, T <: Bits] (key: S, default: T, mapping: Seq[(S, T)]): T = {
     var res = default;
     for ((k, v) <- mapping.reverse)
       res = Mux(key === k, v, res);
@@ -44,7 +44,7 @@ object MuxLookup {
 }
 
 object MuxCase {
-  def apply[T <: Data] (default: T, mapping: Seq[(Bool, T)]): T = {
+  def apply[T <: Bits] (default: T, mapping: Seq[(Bool, T)]): T = {
     var res = default;
     for ((t, v) <- mapping.reverse){
       res = Mux(t, v, res);
@@ -75,7 +75,7 @@ object Multiplex{
         }
       }
       if (a.isInstanceOf[Mux] && c.clearlyEquals(a.inputs(1))) {
-        Multiplex(t.asInstanceOf[Bits] || a.inputs(0).asInstanceOf[Bits], c, a.inputs(2))
+        Multiplex(t.asInstanceOf[Bool] || a.inputs(0).asInstanceOf[Bool], c, a.inputs(2))
       }
     }
     new Mux().init("", maxWidth _, t, c, a);
@@ -104,20 +104,21 @@ object isLessThan {
 }
 
 object Mux {
-  def apply[T <: Data](t: Bits, c: T, a: T): T = {
+  def apply[T <: Data](t: Bool, c: T, a: T): T = {
     val res = Multiplex(t, c.toNode, a.toNode)
-    if (c.isInstanceOf[Bits]) {
-      assert(a.isInstanceOf[Bits])
+    if (c.isInstanceOf[UFix]) {
+      assert(a.isInstanceOf[UFix])
       if (c.getClass == a.getClass) {
-        res.setTypeNodeNoAssign(c.fromNode(res).asInstanceOf[T])
+        c.fromNode(res)
       } else {
-        res.setTypeNode(Bits(OUTPUT)).asInstanceOf[T]
+        UFix(OUTPUT).fromNode(res).asInstanceOf[T]
       }
     } else {
-      res.setTypeNodeNoAssign(c.fromNode(res).asInstanceOf[T])
+      c.fromNode(res)
     }
   }
 }
+
 class Mux extends Op {
   muxes += this;
   stack = Thread.currentThread.getStackTrace;

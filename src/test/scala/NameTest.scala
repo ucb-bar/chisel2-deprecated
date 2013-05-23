@@ -43,7 +43,7 @@ import Chisel._
  Bundle class NodeSuite$Status$1 needs clone method" when Status is declared
  inside testBindComp3 instead of here at the top level. */
 class Status extends Bundle {
-  val im = Bits(width = 8)
+  val im = UFix(width = 8)
 }
 
 
@@ -74,15 +74,15 @@ class NameSuite extends AssertionsForJUnit {
    of ListLookups. */
   @Test def testListLookups() {
     trait Constants {
-      val VXCPTHOLD  = Bits("b00000_00000_00000_0001001110_1111011", 32)
+      val VXCPTHOLD  = UFix("b00000_00000_00000_0001001110_1111011", 32)
       val VCMD_X = UFix(0, 3)
       val VIMM_X = UFix(0, 1)
-      val N = Bits(0, 1);
+      val N = UFix(0, 1);
     }
 
     class ListLookupsComp extends Component with Constants {
       val io = new Bundle {
-        val inst = Bits(INPUT, 32)
+        val inst = UFix(INPUT, 32)
         val sigs_valid = Bool(OUTPUT)
       }
       val veccs =
@@ -369,7 +369,7 @@ endmodule
     class BindFourthComp extends Component {
       val io = new CompIO()
 
-      var norms = ArrayBuffer[Bits]();
+      var norms = ArrayBuffer[UFix]();
       norms += io.in;
       io.out := norms.last
     }
@@ -431,7 +431,7 @@ endmodule
       io.resp := ptw(0)
     }
 
-    chiselMain(Array[String]("--v", "--c",
+    chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => new BindFithComp)
     assertFile(tmpdir.getRoot() + "/NameSuite_BindFithComp_1.v",
@@ -449,62 +449,26 @@ endmodule
   wire[31:0] T3;
   wire[31:0] T4;
   wire[31:0] T5;
-  reg[31:0] tag_ram_1;
+  reg[31:0] tag_ram_0;
   wire[31:0] T6;
   wire[31:0] T7;
-  wire signed  T8;
-  wire[31:0] T9;
-  wire[31:0] T10;
-  reg[31:0] tag_ram_0;
-  wire[31:0] T11;
-  wire[31:0] T12;
-  wire signed  T13;
-  wire[31:0] T14;
-  wire[31:0] T15;
-  wire[31:0] T16;
-  wire[31:0] T17;
-  wire signed  T18;
-  wire[31:0] T19;
-  wire[31:0] T20;
-  wire[31:0] T21;
-  wire signed  T22;
-  wire[31:0] T23;
-  wire T24;
+  wire T8;
 
   assign io_mine_1 = T0;
   assign T0 = {31'h0/* 0*/, T1};
   assign T1 = T2[1'h1/* 1*/:1'h1/* 1*/];
-  assign T2 = io_valid ? T14 : T3;
-  assign T3 = T9 | T4;
-  assign T4 = T7 & T5;
-  assign T5 = tag_ram_1;
-  assign T6 = 1'h1/* 1*/ ? io_sub_resp_bits_ppn : tag_ram_1;
+  assign T2 = io_valid ? T4 : T3;
+  assign T3 = {31'h0/* 0*/, 1'h0/* 0*/};
+  assign T4 = tag_ram_0 | T5;
+  assign T5 = {31'h0/* 0*/, 1'h0/* 0*/};
+  assign T6 = 1'h1/* 1*/ ? io_sub_resp_bits_ppn : tag_ram_0;
+  assign io_mine_0 = T7;
   assign T7 = {31'h0/* 0*/, T8};
-  assign T8 = 1'h0/* 0*/;
-  assign T9 = T12 & T10;
-  assign T10 = tag_ram_0;
-  assign T11 = 1'h1/* 1*/ ? io_sub_resp_bits_ppn : tag_ram_0;
-  assign T12 = {31'h0/* 0*/, T13};
-  assign T13 = 1'h0/* 0*/;
-  assign T14 = T19 | T15;
-  assign T15 = T17 & T16;
-  assign T16 = tag_ram_1;
-  assign T17 = {31'h0/* 0*/, T18};
-  assign T18 = 1'h0/* 0*/;
-  assign T19 = T21 & T20;
-  assign T20 = tag_ram_0;
-  assign T21 = {31'h7fffffff/* 2147483647*/, T22};
-  assign T22 = 1'h1/* 1*/;
-  assign io_mine_0 = T23;
-  assign T23 = {31'h0/* 0*/, T24};
-  assign T24 = T2[1'h0/* 0*/:1'h0/* 0*/];
+  assign T8 = T2[1'h0/* 0*/:1'h0/* 0*/];
 
   always @(posedge clk) begin
-    if(1'h0/* 0*/) begin
-      tag_ram_1 <= T6;
-    end
     if(io_valid) begin
-      tag_ram_0 <= T11;
+      tag_ram_0 <= T6;
     end
   end
 endmodule
@@ -542,17 +506,17 @@ endmodule
   @Test def testVec() {
     class VecComp extends Component {
       val io = new Bundle {
-        val pcr_req_data = Bits(width = 64)
+        val pcr_req_data = UFix(width = 64)
 
         val r_en   = Bool(INPUT)
         val r_addr = UFix(INPUT, log2Up(32))
-        val w_data = Bits(INPUT, 64)
+        val w_data = UFix(INPUT, 64)
 
         val status = new Status().asOutput
       }
 
       val reg_status = Reg{new Status}
-      val rdata = Bits();
+      val rdata = UFix();
 
       val host_pcr_bits_data = Reg{io.pcr_req_data.clone}
       when (io.r_en) {
@@ -563,13 +527,13 @@ endmodule
 
       io.status := reg_status
 
-      val elts = List[Bits](reg_status.toBits)
+      val elts = List[UFix](reg_status.toBits)
       rdata := Vec(elts) { elts.head.clone }(UFix(0))
 
       reg_status := new Status().fromBits(wdata)
     }
 
-    chiselMain(Array[String]("--v", "--c",
+    chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => new VecComp())
     assertFile(tmpdir.getRoot() + "/NameSuite_VecComp_1.v",
@@ -772,15 +736,15 @@ endmodule
 
     class RegfileIO extends Bundle {
       val ren    = Bool(INPUT)
-      val raddr  = Bits(INPUT, SZ_BREGLEN)
-      val rdata = Bits(OUTPUT, SZ_DATA)
+      val raddr  = UFix(INPUT, SZ_BREGLEN)
+      val rdata = UFix(OUTPUT, SZ_DATA)
     }
 
     class MemComp extends Component {
       val io = new RegfileIO()
 
-      val rfile = Mem(256, seqRead = true) { Bits(width = SZ_DATA) }
-      val raddr = Reg() { Bits() }
+      val rfile = Mem(256, seqRead = true) { UFix(width = SZ_DATA) }
+      val raddr = Reg() { UFix() }
       when (io.ren) { raddr := io.raddr }
       io.rdata := rfile(raddr)
     }

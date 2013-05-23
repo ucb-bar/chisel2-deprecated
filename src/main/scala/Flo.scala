@@ -55,7 +55,7 @@ class FloBackend extends Backend {
   override def emitRef(node: Node): String = {
     if (node.litOf == null) {
       node match {
-        case x: Lit =>
+        case x: Literal =>
           "" + x.value
 
         case x: Binding =>

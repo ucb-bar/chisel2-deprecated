@@ -53,6 +53,13 @@ class StdlibSuite extends AssertionsForJUnit {
     tmpdir.delete()
   }
 
+  def assertFile( filename: String, content: String ) {
+    val source = scala.io.Source.fromFile(filename, "utf-8")
+    val lines = source.mkString
+    source.close()
+    assert(lines === content)
+  }
+
   /** test of simple operators */
   @Test def testOperators() {
 
@@ -63,11 +70,10 @@ class StdlibSuite extends AssertionsForJUnit {
         val ys = Fix(INPUT, 8)
         val z = UFix(OUTPUT)
         val zb = Bool(OUTPUT)
-        val zs = Fix(OUTPUT)
       }
 
-      // apply(bit: Int): UFix
-      val a = io.x(0)
+      // apply(bit: Int): Bool
+      val a = io.x(0).toBits
 
       // apply(hi: Int, lo: Int): UFix
       val b = io.x(4, 3)
@@ -75,8 +81,9 @@ class StdlibSuite extends AssertionsForJUnit {
       val d = io.x(3, 3)
       val e = io.x(9, -1)
 
-      // apply(bit: UFix): UFix
-      val a1 = io.x(UFix(0))
+      // apply(bit: UFix): Bool
+      val a1 = io.x(UFix(0)).toBits
+
       // apply(hi: UFix, lo: UFix): UFix
       val b1 = io.x(UFix(4), UFix(3))
       val c1 = io.x(UFix(3), UFix(4))
@@ -93,13 +100,13 @@ class StdlibSuite extends AssertionsForJUnit {
       val h = ~io.x
 
       // andR(): Bool
-      val i = io.x.andR
+      val i = io.x.andR.toBits
 
       // orR():  Bool
-      val j = io.x.orR
+      val j = io.x.orR.toBits
 
       // xorR():  Bool
-      val k = io.x.xorR
+      val k = io.x.xorR.toBits
 
       // << (b: UFix): UFix
       val l = io.x << a
@@ -112,12 +119,6 @@ class StdlibSuite extends AssertionsForJUnit {
 
       // *  (b: UFix): UFix
       val o = io.x * io.y
-
-      // /  (b: UFix): UFix
-      val p = io.x / io.y
-
-      // %  (b: UFix): UFix
-      val q = io.x % io.y
 
       // ^  (b: UFix): UFix
       val r = io.x ^ io.y
@@ -140,11 +141,11 @@ class StdlibSuite extends AssertionsForJUnit {
       io.z := (a | b | c | d
         | a1 | b1 | c1 | d1
         | f | g | h | i | j | k
-        | l | m | n | o | p | q
+        | l | m | n | o
         | r | u | ab | ac
         /* XXX Computing any of those signals throws an exception */
         /* | e | t | e1 | s */
-      ).toUFix
+      ).toBits
 
       // -- result type is Bool --
 
@@ -167,24 +168,203 @@ class StdlibSuite extends AssertionsForJUnit {
       val aa = io.x >= io.y
 
       io.zb := (v | w | x | y | z | aa)
-
-      // -- result type is Fix --
-
-      // *   (b: Fix): Fix
-      val ad = io.x * io.ys
-
-      // %   (b: Fix): Fix
-      val ae = io.x % io.ys
-
-      // /   (b: Fix): Fix
-      val af = io.x / io.ys
-
-      io.zs := (ad | ae | af)
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => new OperatorComp())
+  }
+
+  /** Multiply an unsigned number by signed number */
+  @Test def testMulUS() {
+    class MulUS extends Component {
+      val io = new Bundle {
+        val x = UFix(INPUT, 32)
+        val y = Fix(INPUT, 32)
+        val z = Fix(OUTPUT)
+      }
+      io.z := io.x * io.y
+    }
+    chiselMain(Array[String]("--v",
+      "--targetDir", tmpdir.getRoot().toString()),
+      () => new MulUS())
+    assertFile(tmpdir.getRoot() + "/StdlibSuite_MulUS_1.v",
+"""module StdlibSuite_MulUS_1(
+    input [31:0] io_x,
+    input  signed [31:0] io_y,
+    output signed [63:0] io_z);
+
+  wire signed [63:0] T0;
+  wire signed [32:0] T1;
+  wire[32:0] T2;
+
+  assign io_z = T0;
+  assign T0 = $signed(io_y) * $signed(T1);
+  assign T1 = T2;
+  assign T2 = {1'h0/* 0*/, io_x};
+endmodule
+
+""")
+  }
+
+  /** Divide an unsigned number by signed number */
+  @Test def testDivUS() {
+    class DivUS extends Component {
+      val io = new Bundle {
+        val x = UFix(INPUT, 32)
+        val y = Fix(INPUT, 32)
+        val z = Fix(OUTPUT)
+      }
+      io.z := io.x / io.y
+    }
+    chiselMain(Array[String]("--v",
+      "--targetDir", tmpdir.getRoot().toString()),
+      () => new DivUS())
+    assertFile(tmpdir.getRoot() + "/StdlibSuite_DivUS_1.v",
+"""module StdlibSuite_DivUS_1(
+    input [31:0] io_x,
+    input  signed [31:0] io_y,
+    output signed [31:0] io_z);
+
+  wire signed [31:0] T0;
+  wire signed [32:0] T1;
+  wire[32:0] T2;
+
+  assign io_z = T0;
+  assign T0 = $signed(T1) / $signed(io_y);
+  assign T1 = T2;
+  assign T2 = {1'h0/* 0*/, io_x};
+endmodule
+
+""")
+  }
+
+  /** Remainer of an unsigned number by signed number */
+  @Test def testRemUS() {
+    class RemUS extends Component {
+      val io = new Bundle {
+        val x = UFix(INPUT, 32)
+        val y = Fix(INPUT, 32)
+        val z = Fix(OUTPUT)
+      }
+      io.z := io.x % io.y
+    }
+    chiselMain(Array[String]("--v",
+      "--targetDir", tmpdir.getRoot().toString()),
+      () => new RemUS())
+    assertFile(tmpdir.getRoot() + "/StdlibSuite_RemUS_1.v",
+"""module StdlibSuite_RemUS_1(
+    input [31:0] io_x,
+    input  signed [31:0] io_y,
+    output signed [31:0] io_z);
+
+  wire signed [31:0] T0;
+  wire signed [32:0] T1;
+  wire[32:0] T2;
+
+  assign io_z = T0;
+  assign T0 = $signed(T1) u%s $signed(io_y);
+  assign T1 = T2;
+  assign T2 = {1'h0/* 0*/, io_x};
+endmodule
+
+""")
+  }
+
+  /** Multiply an signed number by an unsigned number */
+  @Test def testMulSU() {
+    class MulSU extends Component {
+      val io = new Bundle {
+        val x = Fix(INPUT, 32)
+        val y = UFix(INPUT, 32)
+        val z = Fix(OUTPUT)
+      }
+      io.z := io.x * io.y
+    }
+    chiselMain(Array[String]("--v",
+      "--targetDir", tmpdir.getRoot().toString()),
+      () => new MulSU())
+    assertFile(tmpdir.getRoot() + "/StdlibSuite_MulSU_1.v",
+"""module StdlibSuite_MulSU_1(
+    input  signed [31:0] io_x,
+    input [31:0] io_y,
+    output signed [63:0] io_z);
+
+  wire signed [63:0] T0;
+  wire signed [32:0] T1;
+  wire[32:0] T2;
+
+  assign io_z = T0;
+  assign T0 = $signed(io_x) * $signed(T1);
+  assign T1 = T2;
+  assign T2 = {1'h0/* 0*/, io_y};
+endmodule
+
+""")
+  }
+
+  /** Divide a signed number by an unsigned number */
+  @Test def testDivSU() {
+    class DivSU extends Component {
+      val io = new Bundle {
+        val x = Fix(INPUT, 32)
+        val y = UFix(INPUT, 32)
+        val z = Fix(OUTPUT)
+      }
+      io.z := io.x / io.y
+    }
+    chiselMain(Array[String]("--v",
+      "--targetDir", tmpdir.getRoot().toString()),
+      () => new DivSU())
+    assertFile(tmpdir.getRoot() + "/StdlibSuite_DivSU_1.v",
+"""module StdlibSuite_DivSU_1(
+    input  signed [31:0] io_x,
+    input [31:0] io_y,
+    output signed [31:0] io_z);
+
+  wire signed [31:0] T0;
+  wire signed [32:0] T1;
+  wire[32:0] T2;
+
+  assign io_z = T0;
+  assign T0 = $signed(io_x) / $signed(T1);
+  assign T1 = T2;
+  assign T2 = {1'h0/* 0*/, io_y};
+endmodule
+
+""")
+  }
+
+  /** Remainer of a signed number by an unsigned number */
+  @Test def testRemSU() {
+    class RemSU extends Component {
+      val io = new Bundle {
+        val x = Fix(INPUT, 32)
+        val y = UFix(INPUT, 32)
+        val z = Fix(OUTPUT)
+      }
+      io.z := io.x % io.y
+    }
+    chiselMain(Array[String]("--v",
+      "--targetDir", tmpdir.getRoot().toString()),
+      () => new RemSU())
+    assertFile(tmpdir.getRoot() + "/StdlibSuite_RemSU_1.v",
+"""module StdlibSuite_RemSU_1(
+    input  signed [31:0] io_x,
+    input [31:0] io_y,
+    output signed [31:0] io_z);
+
+  wire signed [31:0] T0;
+  wire signed [32:0] T1;
+  wire[32:0] T2;
+
+  assign io_z = T0;
+  assign T0 = $signed(io_x) s%u $signed(T1);
+  assign T1 = T2;
+  assign T2 = {1'h0/* 0*/, io_y};
+endmodule
+
+""")
   }
 
   /** Concatenate two nodes X and Y in a node Z such that
@@ -373,8 +553,8 @@ class StdlibSuite extends AssertionsForJUnit {
 
     class PriorityMuxComp extends Component {
       val io = new Bundle {
-        val in0 = Bits(INPUT, 1)
-        val in1 = Bits(INPUT, 1)
+        val in0 = Bool(INPUT)
+        val in1 = Bool(INPUT)
         val data0 = Bits(INPUT, 16)
         val data1 = Bits(INPUT, 16)
         val out0 = Bits(OUTPUT)
@@ -384,7 +564,7 @@ class StdlibSuite extends AssertionsForJUnit {
       io.out0 := PriorityMux((io.in0, io.data0) :: (io.in1, io.data1) :: Nil)
       io.out1 := PriorityMux(io.in0 :: io.in1 :: Nil,
         io.data0 :: io.data1 :: Nil)
-      io.out2 := PriorityMux(io.in0, io.data0 :: io.data1 :: Nil)
+      io.out2 := PriorityMux(io.in0.toBits, io.data0 :: io.data1 :: Nil)
     }
 
     chiselMain(Array[String]("--v",

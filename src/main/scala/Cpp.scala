@@ -59,7 +59,7 @@ object CString {
 }
 
 object CListLookup {
-  def apply[T <: Data](addr: Bits, default: List[T], mapping: Array[(Bits, List[T])]): List[T] = {
+  def apply[T <: Bits](addr: UFix, default: List[T], mapping: Array[(UFix, List[T])]): List[T] = {
     val map = mapping.map(m => (addr === m._1, m._2))
     default.zipWithIndex map { case (d, i) =>
       map.foldRight(d)((m, n) => Mux(m._1, m._2(i), n))
@@ -119,8 +119,6 @@ class CppBackend extends Backend {
       case x: Binding =>
         ""
       case x: Literal =>
-        ""
-      case x: Lit =>
         ""
       case x: ListNode =>
         ""

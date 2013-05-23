@@ -30,18 +30,22 @@
 
 
 /*
+Node Hierarchy:
 
 nameable                (src/main/hcl.scala)
   Node                  (src/main/Node.scala)
+    Delay               (src/main/hcl.scala)
+      Reg               (src/main/Reg.scala)
+      AccessTracker     (src/main/Mem.scala)
+        Mem             (src/main/Mem.scala)
     Data                (src/main/Data.scala)
       Bits with proc    (src/main/Bits.scala, src/main/scala/hcl.scala)
-        Bool            (src/main/Bool.scala)
-        Num             (src/main/Num.scala)
-          Fix           (src/main/Fix.scala)
-          UFix          (src/main/UFix.scala)
-            Eyum        (src/main/UFix.scala)
-      Vec               (src/main/Vec.scala)
-      Bundle            (src/main/Bundle.scala)
+        Fix             (src/main/Fix.scala)
+        UFix            (src/main/UFix.scala)
+          Bool          (src/main/Bool.scala)
+      CompositeData     (src/main/Data.scala)
+        Vec             (src/main/Vec.scala)
+        Bundle          (src/main/Bundle.scala)
 */
 
 import org.scalatest.junit.AssertionsForJUnit
@@ -125,10 +129,47 @@ class DataSuite extends AssertionsForJUnit {
     assertFalse( fixFromWidthDir.named );
   }
 
+  // Testing the UFix factory methods
+
+  @Test def testUFixVal() {
+    val dat = UFix(5)
+    assertTrue( dat.width == -1 ); // XXX ??
+    assertTrue( dat.dir == OUTPUT );
+    assertFalse( dat.isSigned );
+    assertTrue( dat.assigned );
+    assertFalse( dat.named );
+  }
+
+  @Test def testUFixValWidth() {
+    val dat = UFix(5, 4)
+    assertTrue( dat.width == -1 ); // XXX ??
+    assertTrue( dat.dir == OUTPUT );
+    assertFalse( dat.isSigned );
+    assertTrue( dat.assigned );
+    assertFalse( dat.named );
+  }
+
+  @Test def testUFixStringWidth() {
+    val dat = UFix("101", 4)
+    assertTrue( dat.width == -1 ); // XXX ??
+    assertTrue( dat.dir == OUTPUT );
+    assertFalse( dat.isSigned );
+    assertTrue( dat.assigned );
+    assertFalse( dat.named );
+  }
+
+  @Test def testUFixDirWidth() {
+    val dat = UFix(INPUT, 4)
+    assertTrue( dat.width == 4 );
+    assertTrue( dat.dir == INPUT );
+    assertFalse( dat.isSigned );
+    assertFalse( dat.assigned );
+    assertFalse( dat.named );
+  }
 
   @Test def testBypassData() {
     class BypassData(num_bypass_ports:Int) extends Bundle() {
-      val data = Bits(INPUT, width=num_bypass_ports)
+      val data = UFix(INPUT, width=num_bypass_ports)
       val valid = Vec(num_bypass_ports){ new Bool() } // XXX Component.findRoots
         // does not support a Vec as Root.
       def get_num_ports: Int = num_bypass_ports

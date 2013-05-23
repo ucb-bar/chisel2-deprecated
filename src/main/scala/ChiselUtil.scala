@@ -30,7 +30,9 @@
 
 package Chisel
 import Node._
+import Component._
 import scala.math._
+import Literal._
 
 object log2Up
 {
@@ -61,11 +63,13 @@ object LFSR16
   {
     val width = 16
     val lfsr = Reg(resetVal = UFix(1, width))
-    when (increment) { lfsr := Cat(lfsr(0)^lfsr(2)^lfsr(3)^lfsr(5), lfsr(width-1,1)).toUFix }
+    when (increment) { lfsr := Cat(lfsr(0)^lfsr(2)^lfsr(3)^lfsr(5), lfsr(width-1,1)) }
     lfsr
   }
 }
 
+/** Counts the number of 1s in a sequence of *Bool*.
+*/
 object PopCount
 {
   def apply(in: Seq[Bool]): UFix = {
@@ -74,15 +78,17 @@ object PopCount
     } else if (in.size == 1) {
       in(0)
     } else {
-      apply(in.slice(0, in.size/2)) + Cat(Bits(0), apply(in.slice(in.size/2, in.size)))
+      apply(in.slice(0, in.size/2)) + Cat(UFix(0), apply(in.slice(in.size/2, in.size)))
     }
   }
-  def apply(in: Bits): UFix = apply((0 until in.getWidth).map(in(_).toBool))
+  def apply(in: Bits): UFix = apply((0 until in.getWidth).map(in(_)))
 }
 
+/** Litte/big bit endian convertion: reverse the order of the bits in a UFix.
+*/
 object Reverse
 {
-  def doit(in: Bits, base: Int, length: Int): Bits =
+  def doit(in: UFix, base: Int, length: Int): UFix =
   {
     val half = (1 << log2Up(length))/2
     if (length == 1) {
@@ -91,7 +97,7 @@ object Reverse
       Cat(doit(in, base, half), doit(in, base + half, length - half))
     }
   }
-  def apply(in: Bits) = doit(in, 0, in.getWidth)
+  def apply(in: UFix) = doit(in, 0, in.getWidth)
 }
 
 
@@ -117,7 +123,7 @@ object ShiftRegister
 
 object UFixToOH
 {
-  def apply(in: UFix, width: Int = -1): Bits =
+  def apply(in: UFix, width: Int = -1): UFix =
   {
     if (width == -1) {
       UFix(1) << in
@@ -129,25 +135,27 @@ object UFixToOH
 
 object Mux1H
 {
-  def apply[T <: Data](sel: Seq[Bits], in: Seq[T]): T = {
+  def apply[T<: Bits](sel: Seq[Bool], in: Seq[T]): T = {
     if (in.size == 1) {
       in(0)
     } else {
-      in(0).fromBits(sel.zip(in).map { case(s,x) => s.toFix & x.toBits }.reduce(_|_))
+      val zero: T = in(0).fromInt(0)
+      sel.zip(in).map { case(s,x) => Mux(s, x, zero) }.reduce(_|_)
     }
   }
-  def apply[T <: Data](sel: Bits, in: Seq[T]): T = apply((0 until in.size).map(sel(_)), in)
+  def apply[T <: Bits](sel: Bits, in: Seq[T]): T = apply((0 until in.size).map(sel(_)), in)
 }
 
 
 object OHToUFix
 {
-  def apply(in: Seq[Bits]): UFix = {
+  def apply(in: Seq[Bool]): UFix = {
     if (in.size <= 1) return UFix(0)
     if (in.size == 2) return in(1)
     val hi = in.slice(in.size/2, in.size)
     val lo = in.slice(0, in.size/2)
-    Cat(hi.reduceLeft(_||_), apply(hi zip lo map { case (x, y) => x || y }))
+    Cat(hi.reduceLeft((s1, s2) => {s1 || s2}),
+      apply(hi zip lo map { case (x, y) => (x || y) }))
   }
   def apply(in: Bits): UFix = apply((0 until in.getWidth).map(in(_)))
 }
@@ -217,7 +225,7 @@ class FIFOIOC[+T <: Data]()(data: => T) extends Bundle
 class ioArbiter[T <: Data](n: Int)(data: => T) extends Bundle {
   val in  = Vec(n) { (new FIFOIO()) { data } }.flip
   val out = (new FIFOIO()) { data }
-  val chosen = Bits(OUTPUT, log2Up(n))
+  val chosen = UFix(OUTPUT, log2Up(n))
 }
 
 object ArbiterCtrl
@@ -233,7 +241,7 @@ abstract class LockingArbiterLike[T <: Data](n: Int, count: Int, needsLock: Opti
   val locked  = if(count > 1) Reg(resetVal = Bool(false)) else Bool(false)
   val lockIdx = if(count > 1) Reg(resetVal = UFix(n-1)) else UFix(n-1)
   val grant = List.fill(n)(Bool())
-  val chosen = Bits(width = log2Up(n))
+  val chosen = UFix(width = log2Up(n))
 
   (0 until n).map(i => io.in(i).ready := Mux(locked, lockIdx === UFix(i), grant(i)) && io.out.ready)
   io.out.valid := io.in(chosen).valid
@@ -258,39 +266,40 @@ abstract class LockingArbiterLike[T <: Data](n: Int, count: Int, needsLock: Opti
   }
 }
 
-class LockingRRArbiter[T <: Data](n: Int, count: Int, needsLock: Option[T => Bool] = None)(data: => T) extends LockingArbiterLike[T](n, count, needsLock)(data) {
-  val last_grant = Reg(resetVal = Bits(0, log2Up(n)))
+class LockingRRArbiter[T <: Bits](n: Int, count: Int, needsLock: Option[T => Bool] = None)(data: => T) extends LockingArbiterLike[T](n, count, needsLock)(data) {
+  val last_grant = Reg(resetVal = UFix(0, log2Up(n)))
   val ctrl = ArbiterCtrl((0 until n).map(i => io.in(i).valid && UFix(i) > last_grant) ++ io.in.map(_.valid))
   (0 until n).map(i => grant(i) := ctrl(i) && UFix(i) > last_grant || ctrl(i + n))
 
-  var choose = Bits(n-1)
+  var choose = UFix(n-1)
   for (i <- n-2 to 0 by -1)
-    choose = Mux(io.in(i).valid, Bits(i), choose)
+    choose = Mux(io.in(i).valid, UFix(i), choose)
   for (i <- n-1 to 1 by -1)
-    choose = Mux(io.in(i).valid && UFix(i) > last_grant, Bits(i), choose)
+    choose = Mux(io.in(i).valid && UFix(i) > last_grant, UFix(i), choose)
   chosen := Mux(locked, lockIdx, choose)
 
   when (io.out.fire()) { last_grant := chosen }
 }
 
-class LockingArbiter[T <: Data](n: Int, count: Int, needsLock: Option[T => Bool] = None)(data: => T) extends LockingArbiterLike[T](n, count, needsLock)(data) {
+class LockingArbiter[T <: Bits](n: Int, count: Int, needsLock: Option[T => Bool] = None)(data: => T) extends LockingArbiterLike[T](n, count, needsLock)(data) {
   val ctrl = ArbiterCtrl(io.in.map(_.valid))
   grant zip ctrl map { case(g, c) => g := c }
 
-  var choose = Bits(n-1)
+  var choose = UFix(n-1)
   for (i <- n-2 to 0 by -1) {
-    choose = Mux(io.in(i).valid, Bits(i), choose)
+    choose = Mux(io.in(i).valid, UFix(i), choose)
   }
   chosen := Mux(locked, lockIdx, choose)
 }
 
-class RRArbiter[T <: Data](n: Int)(data: => T) extends LockingRRArbiter[T](n, 1)(data)
+class RRArbiter[T <: Bits](n: Int)(data: => T) extends LockingRRArbiter[T](n, 1)(data)
 
-class Arbiter[T <: Data](n: Int)(data: => T) extends LockingArbiter[T](n, 1)(data)
+class Arbiter[T <: Bits](n: Int)(data: => T) extends LockingArbiter[T](n, 1)(data)
+
 
 object FillInterleaved
 {
-  def apply(n: Int, in: Bits) =
+  def apply(n: Int, in: Bits): UFix =
   {
     var out = Fill(n, in(0))
     for (i <- 1 until in.getWidth)
@@ -312,14 +321,14 @@ object Counter
   }
 }
 
-class ioQueue[T <: Data](entries: Int)(data: => T) extends Bundle
+class ioQueue[T <: Bits](entries: Int)(data: => T) extends Bundle
 {
   val enq   = new FIFOIO()(data).flip
   val deq   = new FIFOIO()(data)
   val count = UFix(OUTPUT, log2Up(entries + 1))
 }
 
-class Queue[T <: Data](val entries: Int, pipe: Boolean = false, flow: Boolean = false, resetSignal: Bool = null)(data: => T) extends Component(resetSignal)
+class Queue[T <: Bits](val entries: Int, pipe: Boolean = false, flow: Boolean = false, resetSignal: Bool = null)(data: => T) extends Component(resetSignal)
 {
   val io = new ioQueue(entries)(data)
 
@@ -354,7 +363,7 @@ class Queue[T <: Data](val entries: Int, pipe: Boolean = false, flow: Boolean = 
 
   val ptr_diff = enq_ptr - deq_ptr
   if (isPow2(entries)) {
-    io.count := Cat(maybe_full && ptr_match, ptr_diff).toUFix
+    io.count := Cat(maybe_full && ptr_match, ptr_diff)
   } else {
     io.count := Mux(ptr_match, Mux(maybe_full, UFix(entries), UFix(0)), Mux(deq_ptr > enq_ptr, UFix(entries) + ptr_diff, ptr_diff))
   }
@@ -362,7 +371,7 @@ class Queue[T <: Data](val entries: Int, pipe: Boolean = false, flow: Boolean = 
 
 object Queue
 {
-  def apply[T <: Data](enq: FIFOIO[T], entries: Int = 2, pipe: Boolean = false) = {
+  def apply[T <: Bits](enq: FIFOIO[T], entries: Int = 2, pipe: Boolean = false) = {
     val q = (new Queue(entries, pipe)) { enq.bits.clone }
     q.io.enq.valid := enq.valid // not using <> so that override is allowed
     q.io.enq.bits := enq.bits
@@ -371,7 +380,29 @@ object Queue
   }
 }
 
-class Pipe[T <: Data](latency: Int = 1)(data: => T) extends Component
+object Log2 {
+  def apply (mod: Bits, n: Int): UFix = {
+    backend match {
+      case x: CppBackend => {
+        val log2 = new Log2()
+        log2.init("", fixWidth(sizeof(n-1)), mod)
+        UFix().fromNode(log2)
+      }
+      case _ => {
+        var res = UFix(0);
+        for (i <- 1 until n)
+          res = Mux(mod(i), UFix(i, sizeof(n-1)), res);
+        res
+      }
+    }
+  }
+}
+
+class Log2 extends Node {
+  override def toString: String = "LOG2(" + inputs(0) + ")";
+}
+
+class Pipe[T <: Bits](latency: Int = 1)(data: => T) extends Component
 {
   val io = new Bundle {
     val enq = new PipeIO()(data).flip
@@ -383,7 +414,7 @@ class Pipe[T <: Data](latency: Int = 1)(data: => T) extends Component
 
 object Pipe
 {
-  def apply[T <: Data](enqValid: Bool, enqBits: T, latency: Int): PipeIO[T] = {
+  def apply[T <: Bits](enqValid: Bool, enqBits: T, latency: Int): PipeIO[T] = {
     if (latency == 0) {
       val out = new PipeIO()(enqBits.clone)
       out.valid <> enqValid
@@ -397,37 +428,37 @@ object Pipe
       apply(v, b, latency-1)
     }
   }
-  def apply[T <: Data](enqValid: Bool, enqBits: T): PipeIO[T] = apply(enqValid, enqBits, 1)
-  def apply[T <: Data](enq: PipeIO[T], latency: Int = 1): PipeIO[T] = apply(enq.valid, enq.bits, latency)
+  def apply[T <: Bits](enqValid: Bool, enqBits: T): PipeIO[T] = apply(enqValid, enqBits, 1)
+  def apply[T <: Bits](enq: PipeIO[T], latency: Int = 1): PipeIO[T] = apply(enq.valid, enq.bits, latency)
 }
 
 object PriorityMux
 {
-  def apply[T <: Data](in: Seq[(Bits, T)]): T = {
+  def apply[T <: Bits](in: Seq[(Bool, T)]): T = {
     if (in.size == 1) {
       in.head._2
     } else {
       Mux(in.head._1, in.head._2, apply(in.tail))
     }
   }
-  def apply[T <: Data](sel: Seq[Bits], in: Seq[T]): T = apply(sel zip in)
-  def apply[T <: Data](sel: Bits, in: Seq[T]): T = apply((0 until in.size).map(sel(_)), in)
+  def apply[T <: Bits](sel: Seq[Bool], in: Seq[T]): T = apply(sel zip in)
+  def apply[T <: Bits](sel: Bits, in: Seq[T]): T = apply((0 until in.size).map(sel(_)), in)
 }
 
 object PriorityEncoder
 {
-  def apply(in: Seq[Bits]): UFix = PriorityMux(in, (0 until in.size).map(UFix(_)))
+  def apply(in: Seq[Bool]): UFix = PriorityMux(in, (0 until in.size).map(UFix(_)))
   def apply(in: Bits): UFix = apply((0 until in.getWidth).map(in(_)))
 }
 
 object PriorityEncoderOH
 {
-  def apply(in: Bits): Bits = Vec(apply((0 until in.getWidth).map(in(_)))){Bool()}.toBits
-  def apply(in: Seq[Bits]): Seq[Bool] = {
+  def apply(in: Bits): UFix = Vec(apply((0 until in.getWidth).map(in(_)))){UFix()}.toBits
+  def apply(in: Seq[Bool]): Seq[UFix] = {
     var none_hot = Bool(true)
-    val out = collection.mutable.ArrayBuffer[Bool]()
+    val out = collection.mutable.ArrayBuffer[UFix]()
     for (i <- 0 until in.size) {
-      out += none_hot && in(i)
+      out += (none_hot && in(i))
       none_hot = none_hot && !in(i)
     }
     out

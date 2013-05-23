@@ -33,12 +33,30 @@ package Chisel
 import Node._
 import ChiselError._
 
+/** *Data* is part of the *Node* Composite Pattern class hierarchy.
+  It is the root of the type system which includes composites (Bundle, Vec)
+  and atomic types (UFix, Fix, etc.).
+
+  Instances of Data are meant to help with construction and correctness
+  of a logic graph. They will trimmed out of the graph before a *Backend*
+  generates target code.
+  */
 abstract class Data extends Node {
   var comp: proc = null;
-  def toFix(): Fix = chiselCast(this){Fix()};
-  def toUFix(): UFix = chiselCast(this){UFix()};
-  def toBits(): Bits = chiselCast(this){Bits()};
-  def toBool(): Bool = chiselCast(this){Bool()};
+
+  // Interface required by Vec:
+  def ===[T <: Data](right: T): Bool = {
+    throw new Exception("=== not defined on " + this.getClass
+      + " and " + right.getClass)
+  }
+
+  def toBits(): UFix = chiselCast(this){UFix()};
+
+  // Interface required by Cat:
+  def ##[T <: Data](right: T): this.type = {
+    throw new Exception("## not defined on " + this.getClass + " and " + right.getClass)
+  }
+
 
   def setIsTypeNode {
     assert(inputs.length > 0, {println("Type Node must have an input") })
@@ -61,15 +79,22 @@ abstract class Data extends Node {
   def isDirectionless: Boolean = true;
 
   def toNode: Node = this;
-  def fromNode(n: Node): this.type = this;
+
+  /** Factory method to create and assign a leaf-type instance out of a subclass
+    of *Node* instance which we have lost the concrete type. */
+  def fromNode(n: Node): this.type;
   def fromBits(b: Bits): this.type = {
     val n = fromNode(b)
     n.setIsTypeNode
     n
   }
-  def :=[T <: Data](data: T) = {
-    if(this.getClass != data.getClass) println("Mismatched types: " + this.getClass + " " + data.getClass);
-    comp procAssign data.toNode;
+
+  def :=[T <: Data](data: T): Unit = {
+    if(this.getClass != data.getClass) {
+      ChiselError.error(":= not defined on " + this.getClass
+        + " and " + data.getClass);
+    }
+    comp procAssign data;
   }
 
   override def clone(): this.type = {
@@ -97,3 +122,5 @@ abstract class Data extends Node {
   }
 }
 
+abstract class CompositeData extends Data {
+}
