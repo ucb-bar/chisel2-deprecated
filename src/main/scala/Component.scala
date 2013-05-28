@@ -50,6 +50,10 @@ import Bundle._
 import ChiselError._
 
 object Component {
+  /* We have to keep a list of public methods which happen to be public,
+   have no arguments yet should not be used to generate C++ or Verilog code. */
+  val keywords = HashSet[String]("test")
+
   var saveWidthWarnings = false
   var saveConnectionWarnings = false
   var saveComponentTrace = false
@@ -392,7 +396,7 @@ abstract class Component(resetSignal: Bool = null) {
     */
   }
 
-  def initializeBFS: ScalaQueue[Node] = {
+  private def initializeBFS: ScalaQueue[Node] = {
     val res = new ScalaQueue[Node]
 
     for (c <- components; a <- c.debugs)
@@ -640,12 +644,16 @@ abstract class Component(resetSignal: Bool = null) {
   // 3) name and set the component of all statically declared nodes through introspection
   def markComponent() {
     ownIo();
-     // We are going through all declarations, which can return Nodes,
-     // ArrayBuffer[Node], Cell, BlackBox and Components.
-     for (m <- getClass().getDeclaredMethods) {
-       val name = m.getName();
-       val types = m.getParameterTypes();
-       if (types.length == 0 && name != "test") {
+    /* We are going through all declarations, which can return Nodes,
+     ArrayBuffer[Node], Cell, BlackBox and Components.
+     Since we call invoke() to get a proper instance of the correct type,
+     we have to insure the method is accessible, thus all fields
+     that will generate C++ or Verilog code must be made public. */
+    for (m <- getClass().getDeclaredMethods) {
+      val name = m.getName();
+      val types = m.getParameterTypes();
+      if (types.length == 0
+         && isPublic(m.getModifiers()) && !(Component.keywords contains name)) {
          val o = m.invoke(this);
          o match {
          case node: Node => {

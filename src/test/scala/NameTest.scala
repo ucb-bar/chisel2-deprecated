@@ -860,13 +860,19 @@ endmodule
 class NameSuite_DebugComp_1_t : public mod_t {
  public:
   dat_t<1> NameSuite_DebugComp_1_dpath__reset;
+  dat_t<1> NameSuite_DebugComp_1_dpath__reset__prev;
   dat_t<1> NameSuite_DebugComp_1__io_ctrl_wb_wen;
+  dat_t<1> NameSuite_DebugComp_1__io_ctrl_wb_wen__prev;
   dat_t<1> NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen;
+  dat_t<1> NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen__prev;
   dat_t<1> NameSuite_DebugComp_1_dpath__wb_wen;
   dat_t<1> NameSuite_DebugComp_1_dpath__wb_reg_ll_wb;
   dat_t<1> NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow;
+  dat_t<1> NameSuite_DebugComp_1_dpath__wb_reg_ll_wb__prev;
   dat_t<1> NameSuite_DebugComp_1_dpath__io_ctrl_out;
+  dat_t<1> NameSuite_DebugComp_1_dpath__io_ctrl_out__prev;
   dat_t<1> NameSuite_DebugComp_1__io_ctrl_out;
+  dat_t<1> NameSuite_DebugComp_1__io_ctrl_out__prev;
 
   void init ( bool rand_init = false );
   void clock_lo ( dat_t<1> reset );
