@@ -37,6 +37,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashMap
+import java.lang.reflect.Modifier._
 
 object Backend {
   var moduleNamePrefix = ""
@@ -69,13 +70,17 @@ abstract class Backend {
   def nameChildren(root: Component) {
     // Name all nodes at this level
     root.io.nameIt("io");
-    // We are going through all declarations, which can return Nodes,
-    // ArrayBuffer[Node], Cell, BlackBox and Components.
     val nameSpace = new HashSet[String];
+    /* We are going through all declarations, which can return Nodes,
+     ArrayBuffer[Node], Cell, BlackBox and Components.
+     Since we call invoke() to get a proper instance of the correct type,
+     we have to insure the method is accessible, thus all fields
+     that will generate C++ or Verilog code must be made public. */
     for (m <- root.getClass().getDeclaredMethods) {
       val name = m.getName();
       val types = m.getParameterTypes();
-      if (types.length == 0 && name != "test") {
+      if (types.length == 0
+        && isPublic(m.getModifiers()) && !(Component.keywords contains name)) {
         val o = m.invoke(root);
         o match {
          case node: Node => {
