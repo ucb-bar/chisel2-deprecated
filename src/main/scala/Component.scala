@@ -529,7 +529,7 @@ abstract class Component(resetSignal: Bool = null) {
     isWalked.clear();
     while (stack.length > 0) {
       val (newDepth, node) = stack.pop();
-      val comp = node.componentOf;
+      val comp = node.component;
       if (newDepth == -1) {
         comp.omods += node;
       } else {
@@ -734,6 +734,7 @@ abstract class Component(resetSignal: Bool = null) {
   def traceNodes() {
     val queue = Stack[() => Any]();
 
+    /*
     /* XXX Why do we do something different here? */
     if (!backend.isInstanceOf[VerilogBackend]) {
       queue.push(() => io.traceNode(this, queue));
@@ -751,6 +752,11 @@ abstract class Component(resetSignal: Bool = null) {
         queue.push(() => c.reset.traceNode(c, queue))
         queue.push(() => c.io.traceNode(c, queue))
       }
+    }
+    * */
+    for (c <- components) {
+      queue.push(() => c.reset.traceNode(c, queue))
+      queue.push(() => c.io.traceNode(c, queue))
     }
     for (c <- components; d <- c.debugs)
       queue.push(() => d.traceNode(c, queue))

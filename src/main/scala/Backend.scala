@@ -37,15 +37,18 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashMap
+import scala.collection.mutable.LinkedHashMap
 
 object Backend {
   var moduleNamePrefix = ""
+  var traversalIndex = 0
 }
 
 abstract class Backend {
 
   /* Set of keywords which cannot be used as node and component names. */
   val keywords: HashSet[String];
+  val flushedTexts = HashSet[String]()
 
   def createOutputFile(name: String): java.io.FileWriter = {
     val baseDir = ensureDir(targetDir)
@@ -240,6 +243,12 @@ abstract class Backend {
       while(!dfsStack.isEmpty) {
         val (node, curComp) = dfsStack.pop
 
+        // collect inputs into component
+        if (node.component == null) {
+          node.component = curComp
+        }
+        node.component.nodes += node
+
         if(!walked.contains(node)) {
           walked += node
           // push and pop components as necessary
@@ -257,12 +266,9 @@ abstract class Backend {
               nextComp = curComp
           }
 
-          // collect inputs into component
-          for (input <- node.inputs) {
-            if(!walked.contains(input)) {
-              nextComp.nodes += input
-              if(input.component == null) input.component = nextComp
-              dfsStack.push((input, nextComp))
+          for (i <- node.inputs) {
+            if(!walked.contains(i)) {
+              dfsStack.push((i, nextComp))
             }
           }
         }
@@ -281,7 +287,6 @@ abstract class Backend {
         dfsStack.push((io, c))
       }
     }
-
     walk;
     assert(dfsStack.isEmpty)
     println("finished resolving")
@@ -325,6 +330,105 @@ abstract class Backend {
   }
 
   def compile(c: Component, flags: String = null): Unit = { }
+  
+  def emitModuleText(c: Component): String = {
+    "" 
+  }
+
+  def emitChildren(top: Component,
+    defs: HashMap[String, LinkedHashMap[String, ArrayBuffer[Component] ]],
+    outs: ArrayBuffer[java.io.FileWriter], depth: Int) {
+
+  }
+
+  def flushModules( 
+    defs: HashMap[String, LinkedHashMap[String, ArrayBuffer[Component] ]],
+    level: Int ) {
+    for( (className, modules) <- defs ) {
+      var index = 0
+      for ( (text, comps) <- modules) {
+        val moduleName = if( modules.size > 1 ) {
+          className + "_" + index.toString;
+        } else {
+          className;
+        }
+        index = index + 1
+        var textLevel = 0;
+        for( flushComp <- comps ) {
+          textLevel = flushComp.level;
+          if( flushComp.level == level ) {
+            flushComp.moduleName = moduleName
+          }
+        }
+        if( textLevel == level ) {
+          /* XXX We write the module source text in *emitChildren* instead
+                 of here so as to generate a minimal "diff -u" with the previous
+                 implementation. */
+        }
+      }
+    }
+  }
+
+  def doCompile(top: Component, outs: ArrayBuffer[java.io.FileWriter], depth: Int): Unit = {
+    levelChildren(top)
+    val sortedComps = gatherChildren(top).sortWith(
+      (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)));
+    /* *defs* maps Component classes to Component instances through
+       the generated text of their module.
+       We use a LinkedHashMap such that later iteration is predictable. */
+    val defs = new HashMap[String, LinkedHashMap[String, ArrayBuffer[Component] ]];
+    var level = 0;
+    for( c <- sortedComps ) {
+      println("// " + depthString(depth) + "COMPILING " + c + " " + c.children.length + " CHILDREN"
+      + " (" + c.level + "," + c.traversal + ")");
+      c.findConsumers();
+      ChiselError.checkpoint()
+
+      c.collectNodes(c);
+      if( c.level > level ) {
+        /* When a component instance instantiates different sets
+         of sub-components based on its constructor parameters, the same
+         Component class might appear with different level in the tree.
+         We thus wait until the very end to generate module names.
+         If that were not the case, we could flush modules as soon as
+         the source text for all components at a certain level in the tree
+         has been generated. */
+        flushModules(defs, level);
+        level = c.level
+      }
+      val res = emitModuleText(c);
+      val className = extractClassName(c);
+      if( !(defs contains className) ) {
+        defs += (className -> LinkedHashMap[String, ArrayBuffer[Component] ]());
+      }
+      if( defs(className) contains res ) {
+        /* We have already outputed the exact same source text */
+        defs(className)(res) += c;
+        println("\t" + defs(className)(res).length + " components");
+      } else {
+        defs(className) += (res -> ArrayBuffer[Component](c));
+      }
+    }
+    flushModules(defs, level);
+    emitChildren(top, defs, outs, depth);
+  }
+
+  def levelChildren(root: Component) {
+    root.level = 0;
+    root.traversal = Backend.traversalIndex;
+    Backend.traversalIndex = Backend.traversalIndex + 1;
+    for(child <- root.children) {
+      levelChildren(child)
+      root.level = math.max(root.level, child.level + 1);
+    }
+  }
+
+  def gatherChildren(root: Component): ArrayBuffer[Component] = {
+    var result = new ArrayBuffer[Component]();
+    for (child <- root.children)
+      result = result ++ gatherChildren(child);
+    result ++ ArrayBuffer[Component](root);
+  }
 
   def checkPorts(topC: Component) {
 

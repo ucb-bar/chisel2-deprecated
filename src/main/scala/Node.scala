@@ -111,6 +111,8 @@ object Node {
 abstract class Node extends nameable {
   var sccIndex = -1
   var sccLowlink = -1
+  var incomingEdges = 0
+  var topVisit = false
   var walked = false;
   val staticComp: Component = getComponent();
   var component: Component = null;
@@ -349,7 +351,7 @@ abstract class Node extends nameable {
           if (node.component == null || !components.contains(node.component)) {
             node.component = nextComp;
           }
-          if (!backend.isInstanceOf[VerilogBackend] || !node.isIo) {
+          if (!node.isIo) {
             stack.push(() => node.traceNode(nextComp, stack));
           }
           val j = i;
@@ -507,7 +509,7 @@ abstract class Node extends nameable {
   }
   def emitIndex(): Int = {
     if (index == -1) {
-      index = componentOf.nextIndex;
+      index = component.nextIndex;
     }
     index
   }

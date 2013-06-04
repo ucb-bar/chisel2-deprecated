@@ -42,6 +42,9 @@ import ChiselError._
 import Component._
 import Literal._
 import scala.collection.mutable.HashSet
+import scala.collection.mutable.HashMap
+import scala.collection.mutable.Stack
+import scala.collection.mutable.LinkedHashMap
 
 object CString {
   def apply(s: String): String = {
@@ -69,6 +72,11 @@ object CListLookup {
 
 class CppBackend extends Backend {
   val keywords = new HashSet[String]();
+  var current: Component = null
+  val beginH = "$$BEGINH$$"
+  val endH = "$$ENDH$$"
+  val beginC = "$$BEGINC$$"
+  val endC = "$$ENDC$$"
 
   override def emitTmp(node: Node): String = {
     require(false)
@@ -92,16 +100,22 @@ class CppBackend extends Backend {
     }
   }
   def wordMangle(x: Node, w: Int): String = {
-    if (w >= words(x)) {
-      "0L"
-    } else if (x.isInstanceOf[Literal]) {
-      var hex = x.asInstanceOf[Literal].value.toString(16)
-      if (hex.length > bpw/4*w) "0x" + hex.slice(hex.length-bpw/4*(w + 1), hex.length-bpw/4*w) + "L" else "0L"
-    } else if (x.isInObject) {
-      emitRef(x) + ".values[" + w + "]"
-    } else {
-      emitRef(x) + "__w" + w
-    }
+    val res = 
+      if (w >= words(x)) {
+        "0L"
+      } else if (x.isInstanceOf[Literal]) {
+        var hex = x.asInstanceOf[Literal].value.toString(16)
+        if (hex.length > bpw/4*w) "0x" + hex.slice(hex.length-bpw/4*(w + 1), hex.length-bpw/4*w) + "L" else "0L"
+      } else if (x.isInObject) {
+        emitRef(x) + ".values[" + w + "]"
+      } else {
+        emitRef(x) + "__w" + w
+      }
+    if (x.component == null) println(res) // TODO: Get red of this...should never happen
+    if (current != x.component && x.component != null && !x.isInstanceOf[Literal])
+      x.component.name + "." + res
+    else
+      res
   }
   def emitWordRef(node: Node, w: Int): String = {
     node match {
@@ -354,12 +368,16 @@ class CppBackend extends Backend {
             }))) + trunc(node)
 
       case x: Bits =>
-        if (x.isInObject && x.inputs.length == 1) {
+        if (current == x.component && x.dir == INPUT) {
+          ""
+        } else if (current != x.component && x.dir == OUTPUT) {
+          "  " + x.component.name + ".clock_lo_" + emitRef(x) + "( );\n"
+        } else if (x.isInObject && x.inputs.length == 1) {
           emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
-            + " = " + emitWordRef(x.inputs(0), i)))
+                                                       + " = " + emitWordRef(x.inputs(0), i)))
         } else if (x.inputs.length == 0 && !x.isInObject) {
           emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
-            + " = rand_val()")) + trunc(x)
+                                                       + " = rand_val()")) + trunc(x)
         } else {
           ""
         }
@@ -389,6 +407,12 @@ class CppBackend extends Backend {
       case _ =>
         ""
     }
+  }
+
+  def emitDefLo(parent: Component, child: Component): String = {
+    val moduleName = child.moduleName
+    val instanceName = child.name
+    "  " + moduleName + " " + instanceName + ";\n"
   }
 
   def emitDefHi(node: Node): String = {
@@ -546,40 +570,312 @@ class CppBackend extends Backend {
     }
   }
 
+  def ioDependency(c: Component): HashMap[Node, ArrayBuffer[Node]] = {
+    val inputs = new ArrayBuffer[Node]
+    val outputs = new ArrayBuffer[Node]
+    val res = new HashMap[Node, ArrayBuffer[Node]]
+
+    for ((n, io) <- c.io.flatten) {
+      if (io.dir == INPUT) {
+        inputs += io
+      } else if (io.dir == OUTPUT) {
+        outputs += io
+        res += (io -> new ArrayBuffer[Node])
+      } else {
+        assert(false, {println("found io without direction")})
+      }
+    }
+
+    for (i <- inputs) {
+      val work = new Stack[Node]
+      val walked = new ArrayBuffer[Node]
+      work.push(i)
+      walked += i
+      while (!work.isEmpty) {
+        val n = work.pop()
+        for (consumer <- n.consumers) {
+          if (outputs.contains(consumer)) {
+            // we reached c's output node from input node i, don't continue search from this node
+            if(!res(consumer).contains(i)) res(consumer) += i
+          } else if (!consumer.isInstanceOf[Delay] && !walked.contains(consumer)) {
+            // enqueue a consumer if its not a register/mem and have not walked it yet
+            work.push(consumer)
+            walked += consumer
+          }
+        }
+      }
+    }
+    
+    res
+  }
+
+  // def topologicalSort(c: Component): Unit = {
+
+  //   for (m <- c.mods)
+  //     if (!m.isInstanceOf[Delay])
+  //       m.incomingEdges = m.inputs.length
+
+  //   for (child <- c.children)
+  //     c.mods ++= child.io.flatten.map(_._2)
+    
+  //   val roots = new ArrayBuffer[Node]
+  //   roots ++= c.mods.filter((m) -> (m.isInstanceOf[Delay] || m.isInstanceOf[Literal]))
+  //   roots ++= c.io.flatten.map(._2).filter(_.dir == INPUT)
+
+  //   val ioMap = ioDependency(c)
+  //   for (k <- ioMap.keys)
+  //     k.incomingEdges = ioMap(k).size
+
+  //   val res = new ArrayBuffer[Node]
+    
+  //   while (!roots.isEmpty) {
+  //     val m = roots.remove(0)
+  //     res += m
+  //     val consumers = if (ioMap.contains(m)) {
+  //       ioMap(m)
+  //     } else {
+  //       m.consumers
+  //     }
+  //     for ( consumer <- m.consumers) {
+  //       if (!consumer.isInstanceOf[Delay]) {
+  //         consumer.incomingEdges -= 1
+  //         if (consumer.incomingEdges == 0)
+  //           roots += m
+  //       }
+  //     }
+  //   }
+    
+  //   res
+  // }
+
+  def topologicalSort(c: Component): (HashMap[Node, ArrayBuffer[Node]], ArrayBuffer[Node]) = {
+
+    val mods = new ArrayBuffer[Node]
+    mods ++= c.mods
+    for (child <- c.children)
+      mods ++= child.io.flatten.map(_._2)
+    
+    val res = new HashMap[Node, ArrayBuffer[Node]]
+    for ((n, io) <- c.io.flatten)
+      if (io.dir == OUTPUT)
+        res += (io -> new ArrayBuffer[Node])
+
+    val ioMap = new HashMap[Node, ArrayBuffer[Node]]
+    for (child <- c.children)
+      ioMap ++= ioDependency(child)
+
+    def walk(roots: ArrayBuffer[Node], result: ArrayBuffer[Node], terminal: Node => Boolean) {
+      val work = new Stack[(Boolean, Node)]
+      val walked = new ArrayBuffer[Node]
+
+      for (root <- roots) {
+        work.push((false -> root))
+        walked  += root
+      }
+
+      while (!work.isEmpty) {
+        val (done, n) = work.pop()
+        assert(n.component == c || n.isIo || n.isLit, {println(n.getClass + " " + n.component.getClass + " " + c.getClass)})
+        if (done) {
+          result += n
+        } else {
+          work.push((true -> n))
+          val nexts = if (ioMap.contains(n)) {
+            ioMap(n)
+          } else if (terminal(n)) {
+            new ArrayBuffer[Node]
+          } else {
+            n.inputs
+          }
+          for (i <- nexts) {
+            if (!i.isInstanceOf[Delay] && !walked.contains(i)) {
+              // don't walk registers
+              work.push((false -> i))
+              walked += i
+            }
+          }
+        }
+      }
+    }
+
+    for (k <- res.keys) { // TODO: Deterministic?
+      val root = new ArrayBuffer[Node]
+      root += k
+      walk(root, res(k), (n: Node) => 
+                         (n.isIo && n.asInstanceOf[Bits].dir == INPUT && n.component == c))
+    }
+    
+    val remainder = new ArrayBuffer[Node]
+    val roots = new ArrayBuffer[Node]
+    roots ++= mods.filter(_.isInstanceOf[Delay])
+    for (child <- c.children) {
+      roots ++= child.io.flatten.map(_._2).filter(_.dir == INPUT)
+      roots += child.reset
+    }
+
+    walk(roots, remainder, (n: Node) => 
+                           (n.isIo && n.asInstanceOf[Bits].dir == INPUT && n.component == c))
+
+    ((res, remainder))
+  }
+
+  override def emitModuleText(c: Component): String = {
+    val res = new StringBuilder()
+    current = c
+    c.findOrdering()
+    // generate .h first
+    val ((ios, remainder)) = topologicalSort(c)
+
+    res.append(beginH)
+    res.append("#ifndef __$$MODULENAME$$__\n");
+    res.append("#define __$$MODULENAME$$__\n\n");
+    res.append("#include \"emulator.h\"\n\n");
+    res.append("class $$MODULENAME$$_t : public mod_t {\n");
+    res.append(" public:\n");
+
+    // val vcd = new VcdBackend()
+    for (m <- c.mods) {
+      if (m.isInObject) {
+        res.append(emitDec(m));
+      }
+      // if (m.isInVCD) {
+      //   out_h.write(vcd.emitDec(m));
+      // }
+    }
+    for (child <- c.children)
+      res.append("  " + child.moduleName + "_t " + child.name + ";\n")
+
+    res.append("\n");
+    res.append("  void init ( bool rand_init = false );\n");
+    for ((n, io) <- c.io.flatten) {
+      if (io.dir == OUTPUT) {
+        res.append("  void clock_lo_" + emitRef(io) + " ();\n");
+      }
+    }
+    res.append("  void clock_lo ( );\n")
+    res.append("  void clock_lo_remainder ( );\n");
+    res.append("  void clock_hi ( );\n");
+    // res.append("  void print ( FILE* f );\n");
+    // res.append("  bool scan ( FILE* f );\n");
+    // res.append("  void dump ( FILE* f, int t );\n");
+    res.append("};\n\n");
+    res.append("#endif\n");
+    res.append(endH)
+
+    // generate .cpp second
+    res.append(beginC)
+    for(str <- includeArgs) res.append("#include \"" + str + "\"\n");
+    res.append("\n");
+    res.append("void $$MODULENAME$$_t::init ( bool rand_init ) {\n");
+    for (m <- c.omods) {
+      res.append(emitInit(m));
+    }
+    for (child <- c.children) {
+      res.append("  " + child.name + ".init ( rand_init );\n")
+    }
+    res.append("}\n");
+
+    for ((n, io) <- c.io.flatten) {
+      if (io.dir == OUTPUT) {
+        res.append("void $$MODULENAME$$_t::clock_lo_" + emitRef(io) + " ( ) {\n");
+        val topList = ios(io)
+        for (m <- topList) {
+          res.append(emitDefLo(m));
+        }
+        res.append("}\n");
+      }
+    }
+    if (c == topComponent) {
+      res.append("void $$MODULENAME$$_t::clock_lo ( ) {\n");
+      for ((n, io) <- c.io.flatten) {
+        if (io.dir == OUTPUT)
+          res.append("  clock_lo_" + emitRef(io) + " ( );\n")
+      }
+      res.append("  clock_lo_remainder ( );\n")
+      res.append("}\n")
+    }
+
+    res.append("void $$MODULENAME$$_t::clock_lo_remainder ( ) {\n")
+    for (m <- remainder) {
+      res.append(emitDefLo(m));
+    }
+    for (child <- c.children) {
+      res.append("  " + child.name + ".clock_lo_remainder( );\n")
+    }
+    res.append("}\n")
+    
+    res.append("void $$MODULENAME$$_t::clock_hi ( ) {\n");
+    for (r <- c.omods)
+      res.append(emitInitHi(r));
+    for (m <- c.omods)
+      res.append(emitDefHi(m));
+    for (child <- c.children)
+      res.append("  " + child.name + ".clock_hi( );\n")
+    res.append("}\n");
+    res.append(endC)
+
+    res.result()
+    // vcd.dumpVCD(c, out_c);
+
+  }
+
+
+  override def emitChildren(top: Component,
+    defs: HashMap[String, LinkedHashMap[String, ArrayBuffer[Component] ]],
+    outs: ArrayBuffer[java.io.FileWriter], depth: Int) {
+    for (child <- top.children) {
+      emitChildren(child, defs, outs, depth + 1);
+    }
+    val out_h = outs(0)
+    val out_c = outs(1)
+    val className = extractClassName(top);
+    for( (text, comps) <- defs(className)) {
+      if( comps contains top ) {
+        if( !(flushedTexts contains text) ) {
+          val hText = text.substring(text.indexOf(beginH) + beginH.length, text.indexOf(endH))
+          val cText = text.substring(text.indexOf(beginC) + beginC.length, text.indexOf(endC))
+          out_h.append(hText.replace("$$MODULENAME$$", top.moduleName))
+          out_c.append(cText.replace("$$MODULENAME$$", top.moduleName))
+          flushedTexts += text
+        }
+        return;
+      }
+    }
+  }
+
+
   override def elaborate(c: Component): Unit = {
     for (cc <- components)
       c.debugs ++= cc.debugs
     super.elaborate(c)
 
     /* XXX Why now? */
-    for (cc <- components) {
-      if (!(cc == c)) {
-        c.mods       ++= cc.mods;
-        c.blackboxes ++= cc.blackboxes;
-      }
-    }
-    c.findConsumers();
+    // for (cc <- components) {
+    //   if (!(cc == c)) {
+    //     c.mods       ++= cc.mods;
+    //     c.blackboxes ++= cc.blackboxes;
+    //   }
+    // }
+
+    // renameNodes(c, c.omods);
+
+    // if (isReportDims) {
+    //   val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
+    //   println("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
+    // }
+
+    // if (isGenHarness) {
+    //   genHarness(c, c.name);
+    // }
+    val outs = new ArrayBuffer[java.io.FileWriter]
+    outs += createOutputFile(c.name + ".h");
+    outs += createOutputFile(c.name + ".cpp");
+    outs(1).write("#include \"" + c.name + ".h\"\n");
+
+    doCompile(c, outs, 0)
     c.verifyAllMuxes;
     ChiselError.checkpoint()
 
-    c.collectNodes(c);
-    c.findOrdering(); // search from roots  -- create omods
-    renameNodes(c, c.omods);
-    if (isReportDims) {
-      val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
-      println("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
-    }
-
-    if (isGenHarness) {
-      genHarness(c, c.name);
-    }
-    val out_h = createOutputFile(c.name + ".h");
-    val out_c = createOutputFile(c.name + ".cpp");
-    out_h.write("#ifndef __" + c.name + "__\n");
-    out_h.write("#define __" + c.name + "__\n\n");
-    out_h.write("#include \"emulator.h\"\n\n");
-    out_h.write("class " + c.name + "_t : public mod_t {\n");
-    out_h.write(" public:\n");
     if (isTesting && tester != null) {
       scanArgs.clear();  scanArgs  ++= tester.testInputNodes;    scanFormat  = ""
       printArgs.clear(); printArgs ++= tester.testNonInputNodes; printFormat = ""
@@ -587,48 +883,8 @@ class CppBackend extends Backend {
       for (n <- scanArgs ++ printArgs)
         if(!c.omods.contains(n)) c.omods += n
     }
-    val vcd = new VcdBackend()
-    for (m <- c.omods) {
-      if(m.name != "reset") {
-        if (m.isInObject) {
-          out_h.write(emitDec(m));
-        }
-        if (m.isInVCD) {
-          out_h.write(vcd.emitDec(m));
-        }
-      }
-    }
-    out_h.write("\n");
-    out_h.write("  void init ( bool rand_init = false );\n");
-    out_h.write("  void clock_lo ( dat_t<1> reset );\n");
-    out_h.write("  void clock_hi ( dat_t<1> reset );\n");
-    out_h.write("  void print ( FILE* f );\n");
-    out_h.write("  bool scan ( FILE* f );\n");
-    out_h.write("  void dump ( FILE* f, int t );\n");
-    out_h.write("};\n\n");
-    out_h.write("#endif\n");
-    out_h.close();
 
-    out_c.write("#include \"" + c.name + ".h\"\n");
-    for(str <- includeArgs) out_c.write("#include \"" + str + "\"\n");
-    out_c.write("\n");
-    out_c.write("void " + c.name + "_t::init ( bool rand_init ) {\n");
-    for (m <- c.omods) {
-      out_c.write(emitInit(m));
-    }
-    out_c.write("}\n");
 
-    out_c.write("void " + c.name + "_t::clock_lo ( dat_t<1> reset ) {\n");
-    for (m <- c.omods) {
-      out_c.write(emitDefLo(m));
-    }
-    out_c.write("}\n");
-    out_c.write("void " + c.name + "_t::clock_hi ( dat_t<1> reset ) {\n");
-    for (r <- c.omods)
-      out_c.write(emitInitHi(r));
-    for (m <- c.omods)
-      out_c.write(emitDefHi(m));
-    out_c.write("}\n");
     def splitFormat(s: String) = {
       var off = 0;
       var res: List[String] = Nil;
@@ -651,36 +907,38 @@ class CppBackend extends Backend {
       }
       res.reverse
     }
-    out_c.write("void " + c.name + "_t::print ( FILE* f ) {\n");
-    for (p <- Component.printfs)
-      out_c write "  if (" + emitLoWordRef(p.cond) + ") dat_fprintf(f, " + p.args.map(emitRef _).foldLeft(CString(p.message))(_+", "+_) + ");\n"
-    if (printArgs.length > 0) {
-      val format =
-        if (printFormat == "") {
-          printArgs.map(a => "%x").reduceLeft((y,z) => z + " " + y)
-        } else {
-          printFormat;
-        }
-      val toks = splitFormat(format);
-      var i = 0;
-      for (tok <- toks) {
-        if (tok(0) == '%') {
-          val nodes = printArgs(i).maybeFlatten
-          for (j <- 0 until nodes.length)
-            out_c.write("  fprintf(f, \"" + (if (j > 0) " " else "") +
-                        "%s\", TO_CSTR(" + emitRef(nodes(j)) + "));\n");
-          i += 1;
-        } else {
-          out_c.write("  fprintf(f, \"%s\", \"" + tok + "\");\n");
-        }
-      }
-      out_c.write("  fprintf(f, \"\\n\");\n");
-      out_c.write("  fflush(f);\n");
-    }
-    out_c.write("}\n");
+    // out_c.write("void " + c.name + "_t::print ( FILE* f ) {\n");
+    // for (p <- Component.printfs)
+    //   out_c write "  if (" + emitLoWordRef(p.cond) + ") dat_fprintf(f, " + p.args.map(emitRef _).foldLeft(CString(p.message))(_+", "+_) + ");\n"
+    // if (printArgs.length > 0) {
+    //   val format =
+    //     if (printFormat == "") {
+    //       printArgs.map(a => "%x").reduceLeft((y,z) => z + " " + y)
+    //     } else {
+    //       printFormat;
+    //     }
+    //   val toks = splitFormat(format);
+    //   var i = 0;
+    //   for (tok <- toks) {
+    //     if (tok(0) == '%') {
+    //       val nodes = printArgs(i).maybeFlatten
+    //       for (j <- 0 until nodes.length)
+    //         out_c.write("  fprintf(f, \"" + (if (j > 0) " " else "") +
+    //                     "%s\", TO_CSTR(" + emitRef(nodes(j)) + "));\n");
+    //       i += 1;
+    //     } else {
+    //       out_c.write("  fprintf(f, \"%s\", \"" + tok + "\");\n");
+    //     }
+    //   }
+    //   out_c.write("  fprintf(f, \"\\n\");\n");
+    //   out_c.write("  fflush(f);\n");
+    // }
+    // out_c.write("}\n");
     def constantArgSplit(arg: String): Array[String] = arg.split('=');
     def isConstantArg(arg: String): Boolean = constantArgSplit(arg).length == 2;
-    out_c.write("bool " + c.name + "_t::scan ( FILE* f ) {\n");
+    // out_c.write("bool " + c.name + "_t::scan ( FILE* f ) {\n");
+
+    /*
     if (scanArgs.length > 0) {
       val format =
         if (scanFormat == "") {
@@ -694,21 +952,21 @@ class CppBackend extends Backend {
         if (tok(0) == '%') {
           val nodes = c.keepInputs(scanArgs(i).maybeFlatten)
           for (j <- 0 until nodes.length)
-            out_c.write("  str_to_dat(read_tok(f), " + emitRef(nodes(j)) + ");\n");
+            res.append("  str_to_dat(read_tok(f), " + emitRef(nodes(j)) + ");\n");
           i += 1;
         } else {
-          out_c.write("  fscanf(f, \"%s\", \"" + tok + "\");\n");
+          res.append("  fscanf(f, \"%s\", \"" + tok + "\");\n");
         }
       }
       // out_c.write("  getc(f);\n");
     }
-    out_c.write("  return(!feof(f));\n");
-    out_c.write("}\n");
-    vcd.dumpVCD(c, out_c);
-    out_c.close();
+    // out_c.write("  return(!feof(f));\n");
+    // out_c.write("}\n");
     if(saveComponentTrace) {
       printStack
     }
+    *
+  * */
     /* Copy the emulator.h file into the targetDirectory. */
     val resourceStream = getClass().getResourceAsStream("/emulator.h")
     if( resourceStream != null ) {
@@ -719,6 +977,9 @@ class CppBackend extends Backend {
       classFile.close()
       resourceStream.close()
     }
+    
+    for (out <- outs)
+      out.close()
   }
 
 }

@@ -36,7 +36,7 @@ import Node._
 object Binding {
 
   def apply(m: Node, c: Component, ioComp: Component): Node = {
-    if (isEmittingComponents) {
+    if (isEmittingComponents || true) { // TODO: REMOVE THIS!!!
       val res = c.findBinding(m);
       if (res == null) {
         val res = new Binding(m, ioComp);

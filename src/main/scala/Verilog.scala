@@ -62,15 +62,12 @@ object VerilogBackend {
     "tri1", "triand", "trior", "trireg", "unsigned", "vectored", "wait",
     "wand", "weak0", "weak1", "while", "wire", "wor", "xnor", "xor")
 
-  var traversalIndex = 0
 }
 
 class VerilogBackend extends Backend {
   isEmittingComponents = true
   isCoercingArgs = false
   val keywords = VerilogBackend.keywords
-
-  val flushedTexts = HashSet[String]()
 
   val memConfs = HashMap[String, String]()
   val compIndices = HashMap.empty[String,Int];
@@ -593,25 +590,7 @@ class VerilogBackend extends Backend {
     res
   }
 
-  def levelChildren(root: Component) {
-    root.level = 0;
-    root.traversal = VerilogBackend.traversalIndex;
-    VerilogBackend.traversalIndex = VerilogBackend.traversalIndex + 1;
-    for(child <- root.children) {
-      levelChildren(child)
-      root.level = math.max(root.level, child.level + 1);
-    }
-  }
-
-  def gatherChildren(root: Component): ArrayBuffer[Component] = {
-    var result = new ArrayBuffer[Component]();
-    for (child <- root.children)
-      result = result ++ gatherChildren(child);
-    result ++ ArrayBuffer[Component](root);
-  }
-
-
-  def emitModuleText(c: Component): String = {
+  override def emitModuleText(c: Component): String = {
     val res = new StringBuilder()
     val hasReg = c.containsReg || c.childrenContainsReg;
     var first = true;
@@ -644,41 +623,13 @@ class VerilogBackend extends Backend {
     res.result();
   }
 
-  def flushModules( out: java.io.FileWriter,
+  override def emitChildren(top: Component,
     defs: HashMap[String, LinkedHashMap[String, ArrayBuffer[Component] ]],
-    level: Int ) {
-    for( (className, modules) <- defs ) {
-      var index = 0
-      for ( (text, comps) <- modules) {
-        val moduleName = if( modules.size > 1 ) {
-          className + "_" + index.toString;
-        } else {
-          className;
-        }
-        index = index + 1
-        var textLevel = 0;
-        for( flushComp <- comps ) {
-          textLevel = flushComp.level;
-          if( flushComp.level == level ) {
-            flushComp.moduleName = moduleName
-          }
-        }
-        if( textLevel == level ) {
-          /* XXX We write the module source text in *emitChildren* instead
-                 of here so as to generate a minimal "diff -u" with the previous
-                 implementation. */
-        }
-      }
-    }
-  }
-
-
-  def emitChildren(top: Component,
-    defs: HashMap[String, LinkedHashMap[String, ArrayBuffer[Component] ]],
-    out: java.io.FileWriter, depth: Int) {
+    outs: ArrayBuffer[java.io.FileWriter], depth: Int) {
     for (child <- top.children) {
-      emitChildren(child, defs, out, depth + 1);
+      emitChildren(child, defs, outs, depth + 1);
     }
+    val out = outs(0)
     val className = extractClassName(top);
     for( (text, comps) <- defs(className)) {
       if( comps contains top ) {
@@ -692,58 +643,16 @@ class VerilogBackend extends Backend {
     }
   }
 
-  def doCompile(top: Component, out: java.io.FileWriter, depth: Int): Unit = {
-    levelChildren(top)
-    val sortedComps = gatherChildren(top).sortWith(
-      (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)));
-    /* *defs* maps Component classes to Component instances through
-       the generated text of their module.
-       We use a LinkedHashMap such that later iteration is predictable. */
-    val defs = new HashMap[String, LinkedHashMap[String, ArrayBuffer[Component] ]];
-    var level = 0;
-    for( c <- sortedComps ) {
-      println("// " + depthString(depth) + "COMPILING " + c + " " + c.children.length + " CHILDREN"
-      + " (" + c.level + "," + c.traversal + ")");
-      c.findConsumers();
-      ChiselError.checkpoint()
-
-      c.collectNodes(c);
-      if( c.level > level ) {
-        /* When a component instance instantiates different sets
-         of sub-components based on its constructor parameters, the same
-         Component class might appear with different level in the tree.
-         We thus wait until the very end to generate module names.
-         If that were not the case, we could flush modules as soon as
-         the source text for all components at a certain level in the tree
-         has been generated. */
-        flushModules(out, defs, level);
-        level = c.level
-      }
-      val res = emitModuleText(c);
-      val className = extractClassName(c);
-      if( !(defs contains className) ) {
-        defs += (className -> LinkedHashMap[String, ArrayBuffer[Component] ]());
-      }
-      if( defs(className) contains res ) {
-        /* We have already outputed the exact same source text */
-        defs(className)(res) += c;
-        println("\t" + defs(className)(res).length + " components");
-      } else {
-        defs(className) += (res -> ArrayBuffer[Component](c));
-      }
-    }
-    flushModules(out, defs, level);
-    emitChildren(top, defs, out, depth);
-  }
-
   override def elaborate(c: Component) {
     super.elaborate(c)
 
-    val out = createOutputFile(Backend.moduleNamePrefix + c.name + ".v");
-    doCompile(c, out, 0);
+    val outs = new ArrayBuffer[java.io.FileWriter]
+    outs += createOutputFile(Backend.moduleNamePrefix + c.name + ".v");
+    doCompile(c, outs, 0);
     c.verifyAllMuxes;
     ChiselError.checkpoint()
-    out.close();
+    for (out <- outs)
+      out.close();
 
     if (!memConfs.isEmpty) {
       val out_conf = createOutputFile(Backend.moduleNamePrefix + Component.topComponent.name + ".conf");
