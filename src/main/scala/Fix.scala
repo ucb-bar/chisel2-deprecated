@@ -122,4 +122,5 @@ class Fix extends Bits {
   def /   (b: UFix): Fix = newBinaryOp(b.zext, "s/u");
   def %   (b: UFix): Fix = newBinaryOp(b.zext, "s%u");
   def -   (b: UFix): Fix = this - b.zext;
+  def abs: UFix = Mux(this < Fix(0), (-this).toUFix, this.toUFix)
 }
