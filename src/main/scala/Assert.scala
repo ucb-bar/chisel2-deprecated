@@ -30,7 +30,6 @@
 
 package Chisel
 import scala.collection.mutable.HashMap
-import scala.collection.mutable.ListBuffer
 import Node._
 import ChiselError._
 
@@ -39,25 +38,35 @@ class Assert(condArg: Bool, val message: String) extends Node {
   def cond: Node = inputs(0);
 }
 
-class Printf(condIn: Bool, msgIn: String, argsIn: Seq[Node]) extends Node {
-  inputs += condIn
-  inputs ++= argsIn
+class BitsInObject(x: Node) extends Bits {
+  inputs += x
+  override def isInObject = true
+}
 
-  def cond = inputs.head
-  def args = inputs.tail
+class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
+  inputs ++= argsIn.map(a => new BitsInObject(a))
+  def args = inputs
+  override def isInObject = true
 
-  val message = {
-    def bad(c: String) =
-      ChiselError.error("Bad printf format: \"%" + c + "\"")
+  private var formats = ""
+  private val lengths = new HashMap[Char, (Int => Int)]
+  lengths += ('b' -> ((x: Int) => x))
+  lengths += ('d' -> ((x: Int) => math.ceil(math.log(2)/math.log(10)*x).toInt))
+  lengths += ('x' -> ((x: Int) => (x+3)/4))
+  lengths += ('s' -> ((x: Int) => (x+7)/8))
+  lengths += ('%' -> ((x: Int) => 1))
+  
+  private def remap(c: Char) = if (c == 'x') 'h' else c
+
+  val format = {
     var msg = ""
-    var n = 0
     var percent = false
-    for (c <- msgIn) {
+    for (c <- formatIn) {
       if (percent) {
-        if (!List('b', 'd', 's', 'x', '%').contains(c))
-          bad(c.toString)
-        msg += (if (c == 'x') 'h' else c)
-        n = n+1
+        if (!lengths.contains(c))
+          ChiselError.error("Bad sprintf format: \"%" + c + "\"")
+        formats += c
+        msg += remap(c)
         percent = false
       } else {
         msg += c
@@ -65,9 +74,24 @@ class Printf(condIn: Bool, msgIn: String, argsIn: Seq[Node]) extends Node {
       }
     }
     if (percent)
-      bad("")
-    if (n != argsIn.size)
-      ChiselError.error("Wrong number of printf arguments (found " + argsIn.size + ", expected " + n + ")")
+      ChiselError.error("Bad sprintf format: trailing %")
+    if (formats.length != argsIn.size)
+      ChiselError.error("Wrong number of sprintf arguments (found " + argsIn.size + ", expected " + formats.length + ")")
+
     msg
   }
+
+  inferWidth = (x: Node) => {
+    val argLength = formats.zip(inputs).map{case (a,b) => lengths(a)(b.width)}.sum
+    formats.zip(inputs).foreach{case (a,b) => println(lengths(a)(b.width))}
+    8*(format.length - 2*formats.length + argLength)
+  }
+}
+
+class Sprintf(formatIn: String, argsIn: Seq[Node]) extends PrintfBase(formatIn, argsIn)
+
+class Printf(condIn: Bool, formatIn: String, argsIn: Seq[Node]) extends PrintfBase(formatIn, argsIn) {
+  inputs += condIn
+  override def args = inputs.init
+  def cond = inputs.last
 }

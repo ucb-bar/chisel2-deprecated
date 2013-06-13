@@ -1395,95 +1395,120 @@ class dat_t {
 };
 
 template <int w>
-std::string dat_to_str(dat_t<w> x, int base = 16, char pad = '0') {
+std::string dat_to_str(const dat_t<w>& x) {
+  char s[w];
+  s[dat_to_str(s, x)] = 0;
+  return s;
+}
+
+template <int w>
+int dat_to_str(char* s, dat_t<w> x, int base = 16, char pad = '0') {
   int n_digs = (int)ceil(log(2)/log(base)*w);
-  std::string res(n_digs, pad);
+  int j = n_digs-1, digit;
 
-  for (int j = n_digs-1; j >= 0; j--) {
-    int digit = (x % base).lo_word();
-    x = x / base;
-    res[j] = (digit >= 10 ? 'a'-10 : '0') + digit;
-    if ((x == 0).to_bool()) break;
-  }
+  do {
+    if (ispow2(base)) {
+      digit = x.lo_word() & (base-1);
+      x = x >> log2_1(base);
+    } else {
+      digit = (x % base).lo_word();
+      x = x / base;
+    }
+    s[j] = (digit >= 10 ? 'a'-10 : '0') + digit;
+  } while (--j >= 0 && (x != 0).to_bool());
 
-  return res;
+  for ( ; j >= 0; j--)
+    s[j] = pad;
+
+  return n_digs;
 }
 
-static std::string dat_to_str(val_t x, int base = 16, char pad = '0') {
-  return dat_to_str(dat_t<sizeof(val_t)*8>(x), base, pad);
+static int dat_to_str(char* s, val_t x, int base = 16, char pad = '0') {
+  return dat_to_str<sizeof(val_t)*8>(s, dat_t<sizeof(val_t)*8>(x), base, pad);
 }
 
 template <int w>
-std::string fix_to_str(dat_t<w> x, int base = 16, char pad = '0') {
+int fix_to_str(char* s, dat_t<w> x, int base = 16, char pad = '0') {
   bool neg = x.bit(w-1).to_bool();
-  std::string res = pad + dat_to_str(neg ? -x : x, base, pad);
-  if (neg)
-    res[res.rfind(pad)] = '-';
-  return res;
+  s[0] = neg;
+  int len = dat_to_str<w>(s+1, neg ? -x : x, base, pad);
+  return len+1;
 }
 
-static std::string fix_to_str(val_t x, int base = 16, char pad = '0') {
-  return fix_to_str(dat_t<sizeof(val_t)*8>(x), base, pad);
+static int fix_to_str(char* s, val_t x, int base = 16, char pad = '0') {
+  return fix_to_str(s, dat_t<sizeof(val_t)*8>(x), base, pad);
 }
 
 template <int w>
-std::string dat_as_str(const dat_t<w>& x) {
-  std::string res((w+7)/8, ' ');
-  for (int i = 0; i < w; i += 8) {
-    char ch = x.values[i/val_n_bits()] >> (i % val_n_bits());
+int dat_as_str(char* s, const dat_t<w>& x) {
+  int i, j;
+  for (i = 0, j = (w/8-1)*8; i < w/8; i++, j -= 8) {
+    char ch = x.values[j/val_n_bits()] >> (j % val_n_bits());
     if (ch == 0) break;
-    res[i/8] = ch;
+    s[i] = ch;
   }
-  return res;
+  for ( ; i < w/8; i++)
+    s[i] = ' ';
+  return w/8;
 }
 
-static std::string dat_as_str(val_t x) {
-  return dat_as_str(dat_t<sizeof(val_t)*8>(x));
+static int dat_as_str(char* s, val_t x) {
+  return dat_as_str(s, dat_t<sizeof(val_t)*8>(x));
 }
 
 #if __cplusplus >= 201103L
-static std::string dat_sprintf(const char* s)
+static void dat_format(char* s, const char* fmt)
 {
-  std::string res;
-  for ( ; s[0]; s++) {
-    if (s[0] == '%') {
-      if (s[1] != '%')
-        abort();
-      s++;
-    }
-    res += s;
+  for (char c; (c = *fmt); fmt++) {
+    if (c == '%' && *++fmt != '%')
+      abort();
+    *s++ = c;
   }
-  return res;
 }
 
 template <typename T, typename... Args>
-static std::string dat_sprintf(const char* s, T value, Args... args)
+static void dat_format(char* s, const char* fmt, T value, Args... args)
 {
-  std::string res;
-  for ( ; s[0]; s++) {
-    if (s[0] == '%') {
-      if (s[1] == '%') {
-        s++;
-      } else {
-        switch(s[1]) {
-          case 'h': res += dat_to_str(value, 16, '0'); break;
-          case 'b': res += dat_to_str(value, 2, '0'); break;
-          case 'd': res += dat_to_str(value, 10, ' '); break;
-          case 's': res += dat_as_str(value); break;
-          default: abort();
-        }
-        return res + dat_sprintf(s+2, args...);
+  while (*fmt) {
+    if (*fmt == '%') {
+      switch(fmt[1]) {
+        case 'h': s += dat_to_str(s, value, 16, '0'); break;
+        case 'b': s += dat_to_str(s, value, 2, '0'); break;
+        case 'd': s += dat_to_str(s, value, 10, ' '); break;
+        case 's': s += dat_as_str(s, value); break;
+        case '%': *s++ = '%'; break;
+        default: abort();
       }
+      return dat_format(s, fmt + 2, args...);
+    } else {
+      *s++ = *fmt++;
     }
-    res += s[0];
   }
   abort();
 }
 
-template <typename... Args>
-static int dat_fprintf(FILE* f, const char* s, Args... args)
+template <int w, typename... Args>
+static dat_t<w> dat_format(const char* fmt, Args... args)
 {
-  return fputs(dat_sprintf(s, args...).c_str(), f);
+#if BYTE_ORDER != LITTLE_ENDIAN
+# error dat_format assumes a little-endian architecture
+#endif
+  char str[w/8+1];
+  dat_format(str, fmt, args...);
+
+  dat_t<w> res;
+  res.values[res.n_words-1] = 0;
+  for (int i = 0; i < w/8; i++)
+    ((char*)res.values)[w/8-1-i] = str[i];
+  return res;
+}
+
+template <int w, typename... Args>
+static ssize_t dat_fprintf(FILE* f, const char* fmt, Args... args)
+{
+  char str[w/8+1];
+  dat_format(str, fmt, args...);
+  return fwrite(str, 1, w/8, f);
 }
 #endif /* C++11 */
                                             

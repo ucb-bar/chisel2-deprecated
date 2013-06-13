@@ -38,6 +38,12 @@ import Component._;
 import ChiselError._;
 
 object Node {
+  def sprintf(message: String, args: Node*): Bits = {
+    val s = Bits().fromNode(new Sprintf(message, args))
+    s.setIsTypeNode
+    s
+  }
+
   //implicits
   implicit def convBitsToBool(x: Bits): Bool = {
     if(x.getWidth > 1) {
