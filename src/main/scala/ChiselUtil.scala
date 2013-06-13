@@ -364,6 +364,7 @@ object Queue
 {
   def apply[T <: Data](enq: FIFOIO[T], entries: Int = 2, pipe: Boolean = false) = {
     val q = (new Queue(entries, pipe)) { enq.bits.clone }
+    q.io.view(q.io.elements.filter(j => j._1 != "count")) // count io is not being used if called functionally
     q.io.enq.valid := enq.valid // not using <> so that override is allowed
     q.io.enq.bits := enq.bits
     enq.ready := q.io.enq.ready
