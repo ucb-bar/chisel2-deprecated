@@ -122,6 +122,7 @@ class Fix extends Num {
   def ## (b: Fix): Fix = BinaryOp(this, b, "##"){Fix()};
   def &  (b: Fix): Fix = BinaryOp(this, b, "&"){Fix()};
   def |  (b: Fix): Fix = BinaryOp(this, b, "|"){Fix()};
+  def abs: UFix = Mux(this < Fix(0), (-this).toUFix, this.toUFix)
 
   //Fix to Fix arithmetic
   def +  (b: Fix): Fix = BinaryOp(this, b, "+"){Fix()};
