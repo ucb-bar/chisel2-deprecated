@@ -38,6 +38,12 @@ import Component._;
 import ChiselError._;
 
 object Node {
+  def sprintf(message: String, args: Node*): Bits = {
+    val s = Bits().fromNode(new Sprintf(message, args))
+    s.setIsTypeNode
+    s
+  }
+
   var isCoercingArgs = true;
   val conds = new Stack[Bool]();
   conds.push(Bool(true));

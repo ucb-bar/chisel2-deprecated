@@ -365,6 +365,9 @@ class VerilogBackend extends Backend {
       case r: ROMRead[_] =>
         "  assign " + emitTmp(r) + " = " + emitRef(r.rom) + "[" + emitRef(r.addr) + "];\n"
 
+      case s: Sprintf =>
+        "  always @(*) $sformat(" + emitTmp(s) + ", " + s.args.map(emitRef _).foldLeft(CString(s.format))(_+", "+_) + ");\n"
+
       case _ =>
         ""
     }
@@ -389,6 +392,9 @@ class VerilogBackend extends Backend {
         "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
 
       case x: Lookup =>
+        "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
+
+      case x: Sprintf =>
         "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
 
       case x: ListNode =>
@@ -578,7 +584,7 @@ class VerilogBackend extends Backend {
         "    if (`PRINTF_COND)\n" +
         "`endif\n" +
         "      if (" + emitRef(p.cond) + ")\n" +
-        "        $fwrite(32'h80000002, " + p.args.map(emitRef _).foldLeft(CString(p.message))(_+", "+_) + ");\n" +
+        "        $fwrite(32'h80000002, " + p.args.map(emitRef _).foldLeft(CString(p.format))(_+", "+_) + ");\n" +
         "`endif"
       case _ =>
         ""
