@@ -202,6 +202,8 @@ object Op {
       name match {
         case "&&" => return if (b_lit.value == 0) Literal(0) else a;
         case "||" => return if (b_lit.value == 0) a else Literal(1);
+        case "/"  => return BinaryOp(a.asInstanceOf[Bits], UFix((b_lit.value-1).bitLength), ">>"){Bits()}
+        case "%"  => return NodeExtract(a, (b_lit.value-1).bitLength-1, 0)
         case _ => ;
       }
     } else if (a_lit != null && b_lit != null) {
