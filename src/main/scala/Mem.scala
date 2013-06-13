@@ -107,7 +107,7 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
       wr
     }
 
-    if (seqRead && Component.backend.isInstanceOf[CppBackend]) {
+    if (seqRead && Component.backend.isInstanceOf[CppBackend] && gen().isInstanceOf[Bits]) {
       // generate bogus data when reading & writing same address on same cycle
       val reg_data = Reg{gen()}
       reg_data.comp procAssign wdata
