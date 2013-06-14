@@ -38,7 +38,7 @@ class Assert(condArg: Bool, val message: String) extends Node {
   def cond: Node = inputs(0);
 }
 
-class BitsInObject(x: Node) extends Bits {
+class BitsInObject(x: Node) extends UFix {
   inputs += x
   override def isInObject = true
 }
