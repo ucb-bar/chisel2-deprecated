@@ -33,11 +33,13 @@ import ChiselError._
 import Node._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
+import scala.reflect.ClassTag
 
-class ROM[T <: Data](val lits: Seq[Literal], gen: () => T) extends Vec[T](gen) {
+class ROM[T <: Data: ClassTag](val lits: Seq[Literal], gen: (Int) => T) extends Vec[T](gen) {
   override def read(addr: UFix): T = {
-    val data = gen().asOutput
-    var port = new ROMRead().init("", fixWidth(gen().getWidth), addr, this)
+    val cln = gen(0)
+    val data = cln.asOutput
+    var port = new ROMRead().init("", fixWidth(cln.getWidth), addr, this)
     data assign port
     data.setIsTypeNode
     data

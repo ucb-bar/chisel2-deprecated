@@ -31,10 +31,12 @@
 package Chisel
 import ChiselError._
 import Node._
+import scala.reflect._
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 
 object Mem {
-  def apply[T <: Data](n: Int, seqRead: Boolean = false)(gen: => T): Mem[T] = {
+  def apply[T <: Data](n: Int, out: T, seqRead: Boolean = false): Mem[T] = {
+    val gen = out.clone
     Reg.validateGen(gen)
     new Mem(n, seqRead, () => gen)
   }
@@ -109,7 +111,7 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
 
     if (seqRead && Component.backend.isInstanceOf[CppBackend] && gen().isInstanceOf[Bits]) {
       // generate bogus data when reading & writing same address on same cycle
-      val reg_data = Reg{gen()}
+      val reg_data = Reg(gen())
       reg_data.comp procAssign wdata
       val reg_wmask = if (wmask == null) null else Reg(wmask)
       val random16 = LFSR16()
@@ -184,7 +186,7 @@ class MemSeqRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
   val addrReg = addri.asInstanceOf[Reg]
   override def cond = if (addrReg.isEnable) addrReg.enableSignal else Bool(true)
   override def isReg = true
-  override def addr = inputs(2)
+  override def addr = if(inputs.length > 2) inputs(2) else null
 
   override def forceMatchingWidths = {
     val forced = addrReg.updateVal.matchWidth(log2Up(mem.n))

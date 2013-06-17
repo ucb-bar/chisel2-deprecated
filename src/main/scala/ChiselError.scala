@@ -38,19 +38,7 @@ import scala.collection.mutable.ArrayBuffer
 object ChiselError {
   var hasErrors: Boolean = false;
   val ChiselErrors = new ArrayBuffer[ChiselError];
-/*
-  def apply(m: String, n: Node): ChiselError =
-    new ChiselError(() => m, n.line)
 
-  def apply(mf: => String, n: Node): ChiselError =
-    new ChiselError(() => mf, n.line)
-
-  def apply(m: String, stack: Array[StackTraceElement]): ChiselError =
-    new ChiselError(() => m, findFirstUserLine(stack) getOrElse stack(0))
-
-  def apply(mf: => String, stack: Array[StackTraceElement]): ChiselError =
-    new ChiselError(() => mf, findFirstUserLine(stack))
- */
   def clear() {
     ChiselErrors.clear()
     hasErrors = false
@@ -89,7 +77,7 @@ object ChiselError {
            var line: StackTraceElement = findFirstUserLine(Thread.currentThread().getStackTrace)
          */
           val dotPos = className.lastIndexOf('.')
-          if( dotPos > 0 ) 
+          if( dotPos > 0 )
             (className.subSequence(0, dotPos) != "Chisel") && !className.contains("scala")
           else false
         }
@@ -97,7 +85,7 @@ object ChiselError {
         case e: java.lang.ClassNotFoundException => false
       }
     }
-    val idx = stack.indexWhere(isUserCode) 
+    val idx = stack.indexWhere(isUserCode)
     if(idx < 0) {
       println("COULDN'T FIND LINE NUMBER (" + stack(1) + ")")
       None

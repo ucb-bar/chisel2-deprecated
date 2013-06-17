@@ -46,7 +46,7 @@ class ConnectSuite extends AssertionsForJUnit {
         val b_in = UFix(INPUT, 1)
         val b_out = UFix(OUTPUT, 1)
       }
-      val aComp = new A()
+      val aComp = module(new A())
       aComp.io.a_in := io.b_in
       io.b_out := aComp.io.a_out
     }
@@ -55,13 +55,13 @@ class ConnectSuite extends AssertionsForJUnit {
         val c_in = UFix(INPUT, 1)
         val c_out = UFix(OUTPUT, 1)
       }
-      val aComp = new B()
+      val aComp = module(new B())
       aComp.io.b_in := io.c_in
       io.c_out := aComp.io.b_out
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new NoClassRelation())
+      () => module(new NoClassRelation()))
     assertFile(tmpdir.getRoot() + "/ConnectSuite_NoClassRelation_1.v",
 """module ConnectSuite_A_1(
     input  io_a_in,
@@ -114,17 +114,17 @@ endmodule
         val b_in = UFix(INPUT, 1)
         val b_out = UFix(OUTPUT, 1)
       }
-      val a1 = new A()
+      val a1 = module(new A())
       val x = Reg(UFix(1))
       x := io.b_in
-      val a2 = new A()
+      val a2 = module(new A())
       a1.io.a_in := io.b_in
       a2.io.a_in := io.b_in
       io.b_out := a1.io.a_out | a2.io.a_out | x
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new LogicBtwInstances())
+      () => module(new LogicBtwInstances()))
     assertFile(tmpdir.getRoot() + "/ConnectSuite_LogicBtwInstances_1.v",
 """module ConnectSuite_A_2(
     input  io_a_in,
@@ -182,17 +182,17 @@ endmodule
         val b_in = UFix(INPUT, 1)
         val b_out = UFix(OUTPUT, 1)
       }
-      val aInBComp = new A()
+      val aInBComp = module(new A())
       aInBComp.io.a_in := io.b_in
     }
     class Instance2Level extends B {
-      val aInCComp = new A()
+      val aInCComp = module(new A())
       aInCComp.io.a_in := io.b_in
       io.b_out := aInCComp.io.a_out | aInBComp.io.a_out
     }
     chiselMain(Array[String]("--v"),
 //      "--targetDir", tmpdir.getRoot().toString()),
-      () => new Instance2Level())
+      () => module(new Instance2Level()))
      */
   }
 
@@ -207,12 +207,12 @@ endmodule
       io.a_out := io.a_in
     }
     class InstanceSuperclass extends A {
-      val aInBComp = new A()
+      val aInBComp = module(new A())
       aInBComp.io.a_in := io.a_in
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new InstanceSuperclass())
+      () => module(new InstanceSuperclass()))
     assertFile(tmpdir.getRoot() + "/ConnectSuite_InstanceSuperclass_1.v",
 """module ConnectSuite_A_3(
     input  io_a_in,

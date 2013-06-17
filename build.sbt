@@ -4,7 +4,7 @@ version := "1.1-SNAPSHOT"
 
 name := "chisel"
 
-scalaVersion := "2.10.1"
+scalaVersion := "2.10.2"
 
 //sourceDirectory := new File("@srcTop@")
 

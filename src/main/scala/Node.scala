@@ -97,8 +97,8 @@ object Node {
 
   def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).width - n.minNum.toInt }
 
-  var clk: Node = UFix(INPUT, 1)
-  clk.setName("clk")
+  /* clk is initialized in Component.initChisel */
+  var clk: Node = null
 
 }
 

@@ -62,7 +62,7 @@ object LFSR16
   def apply(increment: Bool = Bool(true)) =
   {
     val width = 16
-    val lfsr = Reg(resetVal = UFix(1, width))
+    val lfsr = RegReset(UFix(1, width))
     when (increment) { lfsr := Cat(lfsr(0)^lfsr(2)^lfsr(3)^lfsr(5), lfsr(width-1,1)) }
     lfsr
   }
@@ -107,7 +107,7 @@ object ShiftRegister
   {
     if (n == 1)
     {
-      val res = Reg() { in.clone }
+      val res = Reg(in)
       when (en)
       {
         res := in
@@ -116,7 +116,7 @@ object ShiftRegister
     }
     else
     {
-      Reg(apply(n-1, in, en))
+      RegUpdate(apply(n-1, in, en))
     }
   }
 }
@@ -161,70 +161,70 @@ object OHToUFix
 }
 
 
-class PipeIO[+T <: Data]()(data: => T) extends Bundle
+class PipeIO[+T <: Data](gen: T) extends Bundle
 {
   val valid = Bool(OUTPUT)
-  val bits = data.asOutput
+  val bits = gen.clone.asOutput
   def fire(dummy: Int = 0) = valid
   override def clone =
     try {
       super.clone()
     } catch {
       case e: java.lang.Exception => {
-        new PipeIO()(data).asInstanceOf[this.type]
+        new PipeIO(gen).asInstanceOf[this.type]
       }
     }
 }
 
-class FIFOIO[T <: Data]()(data: => T) extends Bundle
+class FIFOIO[T <: Data](gen: T) extends Bundle
 {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
-  val bits  = data.asOutput
+  val bits  = gen.clone.asOutput
   def fire(dummy: Int = 0) = ready && valid
   override def clone =
     try {
       super.clone()
     } catch {
       case e: java.lang.Exception => {
-        new FIFOIO()(data).asInstanceOf[this.type]
+        new FIFOIO(gen).asInstanceOf[this.type]
       }
     }
 }
 
 object FIFOIO {
-  def apply[T <: Data]()(data: => T) = {(new FIFOIO())(data)}
+  def apply[T <: Data](gen: T) = {new FIFOIO(gen)}
 }
 
-class EnqIO[T <: Data]()(data: => T) extends FIFOIO()(data)
+class EnqIO[T <: Data](gen: T) extends FIFOIO(gen)
 {
   def enq(dat: T): T = { valid := Bool(true); bits := dat; dat }
   valid := Bool(false);
   for (io <- bits.flatten.map(x => x._2))
     io := UFix(0)
-  override def clone = { new EnqIO()(data).asInstanceOf[this.type]; }
+  override def clone = { new EnqIO(gen).asInstanceOf[this.type]; }
 }
 
-class DeqIO[T <: Data]()(data: => T) extends FIFOIO()(data)
+class DeqIO[T <: Data](gen: T) extends FIFOIO(gen)
 {
   flip()
   ready := Bool(false);
   def deq(b: Boolean = false): T = { ready := Bool(true); bits }
-  override def clone = { new DeqIO()(data).asInstanceOf[this.type]; }
+  override def clone = { new DeqIO(gen).asInstanceOf[this.type]; }
 }
 
 
-class FIFOIOC[+T <: Data]()(data: => T) extends Bundle
+class FIFOIOC[+T <: Data](gen: T) extends Bundle
 {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
-  val bits  = data.asOutput
+  val bits  = gen.clone.asOutput
 }
 
 
-class ioArbiter[T <: Data](n: Int)(data: => T) extends Bundle {
-  val in  = Vec(n) { (new FIFOIO()) { data } }.flip
-  val out = (new FIFOIO()) { data }
+class ioArbiter[T <: Data](gen: T, n: Int) extends Bundle {
+  val in  = Vec.fill(n){ new FIFOIO(gen) }.flip
+  val out = new FIFOIO(gen)
   val chosen = UFix(OUTPUT, log2Up(n))
 }
 
@@ -235,11 +235,11 @@ object ArbiterCtrl
   }
 }
 
-abstract class LockingArbiterLike[T <: Data](n: Int, count: Int, needsLock: Option[T => Bool] = None)(data: => T) extends Component {
+abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends Component {
   require(isPow2(count))
-  val io = new ioArbiter(n)(data)
-  val locked  = if(count > 1) Reg(resetVal = Bool(false)) else Bool(false)
-  val lockIdx = if(count > 1) Reg(resetVal = UFix(n-1)) else UFix(n-1)
+  val io = new ioArbiter(gen, n)
+  val locked  = if(count > 1) RegReset(Bool(false)) else Bool(false)
+  val lockIdx = if(count > 1) RegReset(UFix(n-1)) else UFix(n-1)
   val grant = List.fill(n)(Bool())
   val chosen = UFix(width = log2Up(n))
 
@@ -249,14 +249,14 @@ abstract class LockingArbiterLike[T <: Data](n: Int, count: Int, needsLock: Opti
   io.chosen := chosen
 
   if(count > 1){
-    val cnt = Reg(resetVal = UFix(0, width = log2Up(count)))
+    val cnt = RegReset(UFix(0, width = log2Up(count)))
     val cnt_next = cnt + UFix(1)
     when(io.out.fire()) {
       when(needsLock.map(_(io.out.bits)).getOrElse(Bool(true))) {
         cnt := cnt_next
         when(!locked) {
           locked := Bool(true)
-          lockIdx := Vec(io.in.map{ in => in.fire()}){Bool()}.indexWhere{i: Bool => i} 
+          lockIdx := Vec(io.in.map{ in => in.fire()}).indexWhere{i: Bool => i}
         }
       }
       when(cnt_next === UFix(0)) {
@@ -266,8 +266,8 @@ abstract class LockingArbiterLike[T <: Data](n: Int, count: Int, needsLock: Opti
   }
 }
 
-class LockingRRArbiter[T <: Bits](n: Int, count: Int, needsLock: Option[T => Bool] = None)(data: => T) extends LockingArbiterLike[T](n, count, needsLock)(data) {
-  val last_grant = Reg(resetVal = UFix(0, log2Up(n)))
+class LockingRRArbiter[T <: Bits](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
+  val last_grant = RegReset(UFix(0, log2Up(n)))
   val ctrl = ArbiterCtrl((0 until n).map(i => io.in(i).valid && UFix(i) > last_grant) ++ io.in.map(_.valid))
   (0 until n).map(i => grant(i) := ctrl(i) && UFix(i) > last_grant || ctrl(i + n))
 
@@ -281,7 +281,7 @@ class LockingRRArbiter[T <: Bits](n: Int, count: Int, needsLock: Option[T => Boo
   when (io.out.fire()) { last_grant := chosen }
 }
 
-class LockingArbiter[T <: Bits](n: Int, count: Int, needsLock: Option[T => Bool] = None)(data: => T) extends LockingArbiterLike[T](n, count, needsLock)(data) {
+class LockingArbiter[T <: Bits](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
   val ctrl = ArbiterCtrl(io.in.map(_.valid))
   grant zip ctrl map { case(g, c) => g := c }
 
@@ -292,9 +292,9 @@ class LockingArbiter[T <: Bits](n: Int, count: Int, needsLock: Option[T => Bool]
   chosen := Mux(locked, lockIdx, choose)
 }
 
-class RRArbiter[T <: Bits](n: Int)(data: => T) extends LockingRRArbiter[T](n, 1)(data)
+class RRArbiter[T <: Bits](gen:T, n: Int) extends LockingRRArbiter[T](gen, n, 1)
 
-class Arbiter[T <: Bits](n: Int)(data: => T) extends LockingArbiter[T](n, 1)(data)
+class Arbiter[T <: Bits](gen: T, n: Int) extends LockingArbiter[T](gen, n, 1)
 
 
 object FillInterleaved
@@ -312,7 +312,7 @@ object FillInterleaved
 object Counter
 {
   def apply(cond: Bool, n: Int) = {
-    val c = Reg(resetVal = UFix(0, log2Up(n)))
+    val c = RegReset(UFix(0, log2Up(n)))
     val wrap = c === UFix(n-1)
     when (cond) {
       c := Mux(Bool(!isPow2(n)) && wrap, UFix(0), c + UFix(1))
@@ -321,16 +321,16 @@ object Counter
   }
 }
 
-class ioQueue[T <: Bits](entries: Int)(data: => T) extends Bundle
+class ioQueue[T <: Bits](gen: T, entries: Int) extends Bundle
 {
-  val enq   = new FIFOIO()(data).flip
-  val deq   = new FIFOIO()(data)
+  val enq   = new FIFOIO(gen.clone).flip
+  val deq   = new FIFOIO(gen.clone)
   val count = UFix(OUTPUT, log2Up(entries + 1))
 }
 
-class Queue[T <: Bits](val entries: Int, pipe: Boolean = false, flow: Boolean = false, resetSignal: Bool = null)(data: => T) extends Component(resetSignal)
+class Queue[T <: Bits](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, resetSignal: Bool = null) extends Component(resetSignal)
 {
-  val io = new ioQueue(entries)(data)
+  val io = new ioQueue(gen, entries)
 
   val do_flow = Bool()
   val do_enq = io.enq.ready && io.enq.valid && !do_flow
@@ -344,12 +344,12 @@ class Queue[T <: Bits](val entries: Int, pipe: Boolean = false, flow: Boolean = 
     deq_ptr = Counter(do_deq, entries)._1
   }
 
-  val maybe_full = Reg(resetVal = Bool(false))
+  val maybe_full = RegReset(Bool(false))
   when (do_enq != do_deq) {
     maybe_full := do_enq
   }
 
-  val ram = Mem(entries) { data }
+  val ram = Mem(entries, gen)
   when (do_enq) { ram(enq_ptr) := io.enq.bits }
 
   val ptr_match = enq_ptr === deq_ptr
@@ -372,7 +372,7 @@ class Queue[T <: Bits](val entries: Int, pipe: Boolean = false, flow: Boolean = 
 object Queue
 {
   def apply[T <: Bits](enq: FIFOIO[T], entries: Int = 2, pipe: Boolean = false) = {
-    val q = (new Queue(entries, pipe)) { enq.bits.clone }
+    val q = new Queue(enq.bits.clone, entries, pipe)
     q.io.enq.valid := enq.valid // not using <> so that override is allowed
     q.io.enq.bits := enq.bits
     enq.ready := q.io.enq.ready
@@ -402,11 +402,11 @@ class Log2 extends Node {
   override def toString: String = "LOG2(" + inputs(0) + ")";
 }
 
-class Pipe[T <: Bits](latency: Int = 1)(data: => T) extends Component
+class Pipe[T <: Bits](gen: T, latency: Int = 1) extends Component
 {
   val io = new Bundle {
-    val enq = new PipeIO()(data).flip
-    val deq = new PipeIO()(data)
+    val enq = new PipeIO(gen).flip
+    val deq = new PipeIO(gen)
   }
 
   io.deq <> Pipe(io.enq, latency)
@@ -416,14 +416,14 @@ object Pipe
 {
   def apply[T <: Bits](enqValid: Bool, enqBits: T, latency: Int): PipeIO[T] = {
     if (latency == 0) {
-      val out = new PipeIO()(enqBits.clone)
+      val out = new PipeIO(enqBits.clone)
       out.valid <> enqValid
       out.bits <> enqBits
       out.setIsTypeNode
       out
     } else {
-      val v = Reg(enqValid, resetVal = Bool(false))
-      val b = Reg() { enqBits.clone }
+      val v = Reg(Bool(), updateVal=enqValid, resetVal=Bool(false))
+      val b = Reg(enqBits)
       when (enqValid) { b := enqBits }
       apply(v, b, latency-1)
     }
@@ -453,7 +453,7 @@ object PriorityEncoder
 
 object PriorityEncoderOH
 {
-  def apply(in: Bits): UFix = Vec(apply((0 until in.getWidth).map(in(_)))){UFix()}.toBits
+  def apply(in: Bits): UFix = Vec(apply((0 until in.getWidth).map(in(_)))).toBits
   def apply(in: Seq[Bool]): Seq[UFix] = {
     var none_hot = Bool(true)
     val out = collection.mutable.ArrayBuffer[UFix]()

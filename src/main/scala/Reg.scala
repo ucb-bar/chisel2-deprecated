@@ -33,6 +33,7 @@ import Node._
 import Reg._
 import Component._
 import ChiselError._
+import scala.reflect._
 
 object Reg {
 
@@ -69,16 +70,22 @@ object Reg {
       }
   }
 
-  def apply[T <: Data](data: T, width: Int, resetVal: T)(gen: => T): T = {
+  /** *out* defines the data type of the register when it is read.
+    *updateVal* and *resetVal* define the update and reset values
+    respectively.
+    */
+  def apply[T <: Data](out: T, updateVal: T, resetVal: T): T = {
+    val gen = out.clone
     validateGen(gen)
 
     val d: Array[(String, Bits)] =
-      if(data == null) {
+      if(updateVal == null) {
         gen.flatten.map{case(x, y) => (x -> null)}
       } else {
-        data.flatten
+        updateVal.flatten
       }
 
+    // asOutput flip the direction and returns this.
     val res = gen.asOutput
 
     if(resetVal != null) {
@@ -106,20 +113,26 @@ object Reg {
         res_i.comp = reg
       }
     }
-
     res.setIsTypeNode
     res
   }
 
-  def apply[T <: Data](data: T): T = {
-    Reg[T](data, -1, null.asInstanceOf[T]){data.clone}
+
+  def apply[T <: Data](gen: T): T = {
+    Reg[T](gen, null.asInstanceOf[T], null.asInstanceOf[T])
   }
+}
 
-  def apply[T <: Data](data: T, resetVal: T): T = Reg[T](data, -1, resetVal){data.clone}
+object RegUpdate {
 
-  def apply[T <: Data](width: Int = -1, resetVal: T): T = Reg[T](null.asInstanceOf[T], width, resetVal){resetVal.clone}
+  def apply[T <: Data](updateVal: T): T = Reg[T](updateVal, updateVal, null.asInstanceOf[T])
 
-  def apply[T <: Data]()(gen: => T): T = Reg[T](null.asInstanceOf[T], gen.width, null.asInstanceOf[T])(gen)
+}
+
+
+object RegReset {
+
+  def apply[T <: Data](resetVal: T): T = Reg[T](resetVal, null.asInstanceOf[T], resetVal)
 
 }
 

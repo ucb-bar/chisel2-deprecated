@@ -125,15 +125,16 @@ abstract class Bits extends Data with proc {
   override def flatten = Array((name, this));
 
   override def toString: String = {
-    if (dir == INPUT) {
-      "INPUT(" + name + (if (component == null) "" else ("." + component)) + ")";
-    } else if (dir == OUTPUT) {
-      "OUTPUT(" + name + (if (component == null) "" else ("." + component)) + ")";
-    } else {
-      "BITS(" + name + ", " + super.toString + ")"
-    }
+    // XXX We cannot print the width here as it would computed the infered
+    // width, hence change the computations. It might be possible to print
+    // width_ but it seems to also have some underlying computations associated
+    // to it.
+    (getClass.getName + "("
+      + (if (dir == INPUT) "INPUT" else if (dir == OUTPUT) "OUTPUT" else "?")
+      + (if (name != null) (", " + name) else "")
+      + (if (component != null) (" in " + component) else "")
+      + ")")
   }
-
 
   override def flip(): this.type = {
     assert(dir != null, println("Can't flip something that doesn't have a direction"))

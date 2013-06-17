@@ -172,7 +172,7 @@ class StdlibSuite extends AssertionsForJUnit {
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new OperatorComp())
+      () => module(new OperatorComp()))
   }
 
   /** Multiply an unsigned number by signed number */
@@ -187,7 +187,7 @@ class StdlibSuite extends AssertionsForJUnit {
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new MulUS())
+      () => module(new MulUS()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_MulUS_1.v",
 """module StdlibSuite_MulUS_1(
     input [31:0] io_x,
@@ -219,7 +219,7 @@ endmodule
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new DivUS())
+      () => module(new DivUS()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_DivUS_1.v",
 """module StdlibSuite_DivUS_1(
     input [31:0] io_x,
@@ -251,7 +251,7 @@ endmodule
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new RemUS())
+      () => module(new RemUS()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_RemUS_1.v",
 """module StdlibSuite_RemUS_1(
     input [31:0] io_x,
@@ -283,7 +283,7 @@ endmodule
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new MulSU())
+      () => module(new MulSU()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_MulSU_1.v",
 """module StdlibSuite_MulSU_1(
     input  signed [31:0] io_x,
@@ -315,7 +315,7 @@ endmodule
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new DivSU())
+      () => module(new DivSU()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_DivSU_1.v",
 """module StdlibSuite_DivSU_1(
     input  signed [31:0] io_x,
@@ -347,7 +347,7 @@ endmodule
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new RemSU())
+      () => module(new RemSU()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_RemSU_1.v",
 """module StdlibSuite_RemSU_1(
     input  signed [31:0] io_x,
@@ -362,6 +362,37 @@ endmodule
   assign T0 = $signed(io_x) s%u $signed(T1);
   assign T1 = T2;
   assign T2 = {1'h0/* 0*/, io_y};
+endmodule
+
+""")
+  }
+
+  /** Assign a Bundle */
+  @Test def assignBundle() {
+    class AssignBundle extends Bundle {
+        val v = Vec.fill(2){UFix(INPUT, 2)}
+    }
+    class AssignBundleComp extends Component {
+      val io = new Bundle {
+        val in = new AssignBundle()
+        val out = new AssignBundle().flip
+      }
+
+      io.out := io.in
+    }
+    chiselMain(Array[String]("--v",
+      "--targetDir", tmpdir.getRoot().toString()),
+      () => module(new AssignBundleComp()))
+    assertFile(tmpdir.getRoot() + "/StdlibSuite_AssignBundleComp_1.v",
+"""module StdlibSuite_AssignBundleComp_1(
+    input [1:0] io_in_v_0,
+    input [1:0] io_in_v_1,
+    output[1:0] io_out_v_0,
+    output[1:0] io_out_v_1);
+
+
+  assign io_out_v_1 = io_in_v_1;
+  assign io_out_v_0 = io_in_v_0;
 endmodule
 
 """)
@@ -382,7 +413,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new CatComp())
+      () => module(new CatComp()))
   }
 
   /** Generate a lookup into an array.
@@ -401,7 +432,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new LookupComp())
+      () => module(new LookupComp()))
   }
 
   /** Generate a PopCount
@@ -418,7 +449,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new PopCountComp())
+      () => module(new PopCountComp()))
   }
 
   /** Generate a Reverse
@@ -435,7 +466,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new ReverseComp())
+      () => module(new ReverseComp()))
   }
 
   /** Generate a ShiftRegister
@@ -452,7 +483,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new ShiftRegisterComp())
+      () => module(new ShiftRegisterComp()))
   }
 
   /** Generate a UFixToOH
@@ -471,7 +502,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new UFixToOHComp())
+      () => module(new UFixToOHComp()))
   }
 
   /** Generate a foldR
@@ -489,7 +520,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new foldRComp())
+      () => module(new foldRComp()))
   }
 
   /** Generate a ArbiterCtrl
@@ -507,7 +538,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new ArbiterCtrlComp())
+      () => module(new ArbiterCtrlComp()))
   }
 
   /** Generate a FillInterleaved
@@ -524,7 +555,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new FillInterleavedComp())
+      () => module(new FillInterleavedComp()))
   }
 
   /** Generate a Counter
@@ -544,7 +575,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new CounterComp())
+      () => module(new CounterComp()))
   }
 
   /** Generate a PriorityMux
@@ -569,7 +600,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new PriorityMuxComp())
+      () => module(new PriorityMuxComp()))
   }
 
   /** Generate a PriorityEncoder
@@ -586,7 +617,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new PriorityEncoderComp())
+      () => module(new PriorityEncoderComp()))
   }
 
   /** Generate a PriorityEncoderOH
@@ -603,7 +634,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new PriorityEncoderOHComp())
+      () => module(new PriorityEncoderOHComp()))
   }
 
   /** Generate a Fill
@@ -620,7 +651,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new FillComp())
+      () => module(new FillComp()))
   }
 
   /** Generate a Log2
@@ -637,7 +668,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new Log2Comp())
+      () => module(new Log2Comp()))
   }
 
   /** Generate a MuxLookup
@@ -660,7 +691,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new MuxLookupComp())
+      () => module(new MuxLookupComp()))
   }
 
   /** Generate a MuxCase
@@ -680,7 +711,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new MuxCaseComp())
+      () => module(new MuxCaseComp()))
   }
 
   /** Generate a Multiplex
@@ -700,7 +731,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new MultiplexComp())
+      () => module(new MultiplexComp()))
   }
 
   /** Generate a Mux
@@ -719,7 +750,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new MuxComp())
+      () => module(new MuxComp()))
   }
 
 }

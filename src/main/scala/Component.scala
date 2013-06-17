@@ -50,6 +50,10 @@ import Bundle._
 import ChiselError._
 
 object Component {
+  /* We have to keep a list of public methods which happen to be public,
+   have no arguments yet should not be used to generate C++ or Verilog code. */
+  val keywords = HashSet[String]("test")
+
   var saveWidthWarnings = false
   var saveConnectionWarnings = false
   var saveComponentTrace = false
@@ -140,6 +144,10 @@ object Component {
     topComponent = null;
 
     /* Re-initialize global variables defined in object Node {} */
+    nodes.clear()
+    clk = UFix(INPUT, 1)
+    clk.setName("clk")
+
     isCoercingArgs = true
     isInGetWidth = false
     conds.clear()
@@ -178,52 +186,28 @@ object Component {
     if(x == 0) "" else "    " + genIndent(x-1);
   }
 
-  def push(c: Component){
-    if(compStack.isEmpty){
-      compStack.push(c);
-      printStackStruct += ((stackIndent, c));
-    } else {
-      val st = Thread.currentThread.getStackTrace;
-      //for(elm <- st)
-      //println(elm.getClassName + " " + elm.getMethodName + " " + elm.getLineNumber);
-      var skip = 3;
-      for(elm <- st){
-        if(skip > 0) {
-          skip -= 1;
-        } else {
-          if(elm.getMethodName == "<init>") {
-
-            val className = elm.getClassName;
-
-            if(isSubclassOfComponent(Class.forName(className)) && !c.isSubclassOf(Class.forName(className))) {
-              if(saveComponentTrace) {
-                println("marking " + className + " as parent of " + c.getClass);
-              }
-              while(compStack.top.getClass != Class.forName(className)){
-                pop;
-              }
-
-              val dad = compStack.top;
-              c.parent = dad;
-              dad.children += c;
-
-              compStack.push(c);
-              stackIndent += 1;
-              printStackStruct += ((stackIndent, c));
-              return;
-            }
-          }
-        }
-      }
+  private def push(c: Component) {
+    if( !module.trigger ) {
+      ChiselError.error(
+        c.getClass.getName + " was not properly wrapped into a module() call.")
     }
+    module.trigger = false
+    compStack.push(c);
+    printStackStruct += ((stackIndent, c));
+    stackIndent += 1;
   }
 
   def pop(){
-    val node = compStack.pop;
+    val c = compStack.pop;
+    if( !compStack.isEmpty ) {
+      val dad = compStack.top;
+      c.parent = dad;
+      dad.children += c;
+    }
     stackIndent -= 1;
-    node.level = 0;
-    for(child <- node.children) {
-      node.level = math.max(node.level, child.level + 1);
+    c.level = 0;
+    for(child <- c.children) {
+      c.level = math.max(c.level, child.level + 1);
     }
   }
 
@@ -640,12 +624,16 @@ abstract class Component(resetSignal: Bool = null) {
   // 3) name and set the component of all statically declared nodes through introspection
   def markComponent() {
     ownIo();
-     // We are going through all declarations, which can return Nodes,
-     // ArrayBuffer[Node], Cell, BlackBox and Components.
+    /* We are going through all declarations, which can return Nodes,
+     ArrayBuffer[Node], Cell, BlackBox and Components.
+     Since we call invoke() to get a proper instance of the correct type,
+     we have to insure the method is accessible, thus all fields
+     that will generate C++ or Verilog code must be made public. */
      for (m <- getClass().getDeclaredMethods) {
        val name = m.getName();
        val types = m.getParameterTypes();
-       if (types.length == 0 && name != "test") {
+       if (types.length == 0
+        && isPublic(m.getModifiers()) && !(Component.keywords contains name)) {
          val o = m.invoke(this);
          o match {
          case node: Node => {
@@ -818,5 +806,24 @@ abstract class Component(resetSignal: Bool = null) {
     nodes.filter(isInput)
   def removeInputs(nodes: Seq[Node]): Seq[Node] =
     nodes.filter(n => !isInput(n))
+
+}
+
+
+object module {
+
+  /* Any call to a *Component* constructor without a proper wrapping
+   into a module.apply() call will be detected when trigger is false. */
+  var trigger: Boolean = false
+
+  def apply[T <: Component](c: => T): T = {
+    trigger = true
+    /* *push* is done in the Component constructor because we don't have
+     a *this* pointer before then, yet we need to store it before the subclass
+     constructors are built. */
+    val res = c
+    pop()
+    res
+  }
 
 }

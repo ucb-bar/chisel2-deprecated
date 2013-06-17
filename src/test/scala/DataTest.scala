@@ -167,25 +167,50 @@ class DataSuite extends AssertionsForJUnit {
     assertFalse( dat.named );
   }
 
+  /** The statement new Bool bypasses the width initialization resulting
+    in incorrect code dat_t<0> which leads to incorrect VCD output.
+
+    XXX Chisel should generate an error message!
+    */
   @Test def testBypassData() {
     class BypassData(num_bypass_ports:Int) extends Bundle() {
       val data = UFix(INPUT, width=num_bypass_ports)
-      val valid = Vec(num_bypass_ports){ new Bool() } // XXX Component.findRoots
-        // does not support a Vec as Root.
+      val valid = Vec.fill(num_bypass_ports){Bool()}
+        // XXX Component.findRoots does not support Vec as a graph root.
       def get_num_ports: Int = num_bypass_ports
     }
 
     class BypassDataComp extends Component {
       val io = new BypassData(3)
 
-      io.valid := io.data
+      io.valid := io.data | UFix(1)
+      debug(io.valid)
     }
 
     chiselMain(Array[String]("--c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => new BypassDataComp)
-  }
+      () => module(new BypassDataComp))
+    assertFile(tmpdir.getRoot() + "/DataSuite_BypassDataComp_1.h",
+"""#ifndef __DataSuite_BypassDataComp_1__
+#define __DataSuite_BypassDataComp_1__
 
+#include "emulator.h"
+
+class DataSuite_BypassDataComp_1_t : public mod_t {
+ public:
+  dat_t<0> DataSuite_BypassDataComp_1__io_valid;
+
+  void init ( bool rand_init = false );
+  void clock_lo ( dat_t<1> reset );
+  void clock_hi ( dat_t<1> reset );
+  void print ( FILE* f );
+  bool scan ( FILE* f );
+  void dump ( FILE* f, int t );
+};
+
+#endif
+""")
+  }
 
 }
 
