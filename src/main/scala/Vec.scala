@@ -38,7 +38,6 @@ import scala.collection.mutable.Stack
 import scala.math._
 import Vec._
 import Node._
-import scala.reflect.ClassTag
 
 object VecUFixToOH
 {
@@ -93,7 +92,7 @@ object Vec {
   }
  */
 
-  def apply[T <: Data: ClassTag](elts: Seq[T]): Vec[T] = {
+  def apply[T <: Data](elts: Seq[T]): Vec[T] = {
     val res = if (elts.forall(_.litOf != null) && elts.head.getWidth > 0) {
       new ROM(elts.map(_.litOf), i => elts.head.clone)
     } else {
@@ -103,7 +102,7 @@ object Vec {
     res
   }
 
-  def apply[T <: Data: ClassTag](elt0: T, elts: T*): Vec[T] =
+  def apply[T <: Data](elt0: T, elts: T*): Vec[T] =
     apply(elt0 +: elts.toSeq)
 
   /** Returns an array that contains the results of some element computation
@@ -111,7 +110,7 @@ object Vec {
 
     Note that this means that elem is computed a total of n times.
     */
-  def fill[T <: Data: ClassTag](n: Int)(gen: => T): Vec[T] = {
+  def fill[T <: Data](n: Int)(gen: => T): Vec[T] = {
     Vec.tabulate(n){ i => gen }
   }
 
@@ -129,7 +128,7 @@ object Vec {
   /** Returns an array containing values of a given function over
     a range of integer values starting from 0.
     */
-  def tabulate[T <: Data: ClassTag](n: Int)(gen: (Int) => T): Vec[T] = {
+  def tabulate[T <: Data](n: Int)(gen: (Int) => T): Vec[T] = {
     val res = new Vec[T](gen);
     var i = 0
     while (i < n) {
@@ -163,7 +162,7 @@ class VecProc extends proc {
   }
 }
 
-class Vec[T <: Data: ClassTag](val gen: (Int) => T) extends CompositeData with Cloneable with BufferProxy[T] {
+class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable with BufferProxy[T] {
   val self = new ArrayBuffer[T]
   val readPortCache = new HashMap[UFix, T]
   var sortedElementsCache: ArrayBuffer[ArrayBuffer[Data]] = null
