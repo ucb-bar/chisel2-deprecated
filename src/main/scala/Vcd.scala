@@ -32,7 +32,6 @@ package Chisel
 import Node._
 import Reg._
 import Literal._
-import Component._
 import ChiselError._
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.HashSet
@@ -72,9 +71,9 @@ class VcdBackend extends Backend {
   }
 
   override def emitDec(node: Node): String =
-    if (isVCD && !node.isLit) "  dat_t<" + node.width + "> " + emitRef(node) + "__prev" + ";\n" else ""
+    if (Mod.isVCD && !node.isLit) "  dat_t<" + node.width + "> " + emitRef(node) + "__prev" + ";\n" else ""
 
-  def dumpVCDScope(c: Component, file: java.io.FileWriter, top: Component, names: HashMap[Node, String]): Unit = {
+  def dumpVCDScope(c: Mod, file: java.io.FileWriter, top: Mod, names: HashMap[Node, String]): Unit = {
     file.write("    fprintf(f, \"" + "$scope module " + c.name + " $end" + "\\n\");\n");
     for (mod <- top.omods) {
       if (mod.component == c && mod.isInVCD) {
@@ -87,7 +86,7 @@ class VcdBackend extends Backend {
     file.write("    fprintf(f, \"$upscope $end\\n\");\n");
   }
 
-  def dumpVCD(c: Component, file: java.io.FileWriter): Unit = {
+  def dumpVCD(c: Mod, file: java.io.FileWriter): Unit = {
     var num = 0;
     val names = new HashMap[Node, String];
     for (mod <- c.omods) {
@@ -97,7 +96,7 @@ class VcdBackend extends Backend {
       }
     }
     file.write("void " + c.name + "_t::dump(FILE *f, int t) {\n");
-    if (isVCD) {
+    if (Mod.isVCD) {
       file.write("  if (t == 0) {\n");
       file.write("    fprintf(f, \"$timescale 1ps $end\\n\");\n");
       dumpVCDScope(c, file, c, names);

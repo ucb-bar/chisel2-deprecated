@@ -34,7 +34,6 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 import java.lang.reflect.Modifier._
 import Node._;
-import Component._;
 import ChiselError._
 import sort._
 
@@ -57,10 +56,10 @@ object sort {
     var i = 0
     for (j <- 1 until a.length) {
       val keyElm = a(j);
-      val key = ioMap(keyElm._2)
+      val key = Mod.ioMap(keyElm._2)
       i = j - 1
 
-      while (i >= 0 && ioMap(a(i)._2) > key) {
+      while (i >= 0 && Mod.ioMap(a(i)._2) > key) {
         a(i + 1) = a(i)
         i = i - 1
       }
@@ -198,7 +197,7 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
 
   override def traceableNodes = elements.map(tup => tup._2).toArray;
 
-  override def traceNode(c: Component, stack: Stack[() => Any]) {
+  override def traceNode(c: Mod, stack: Stack[() => Any]) {
     for((n, i) <- flatten) {
       stack.push(() => i.traceNode(c, stack))
     }

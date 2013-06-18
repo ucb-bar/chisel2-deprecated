@@ -31,7 +31,6 @@
 package Chisel
 import Node._
 import ChiselError._
-import Component._
 
 /* backward compatibility */
 @deprecated("Use UFix instead of Bits.")
@@ -47,8 +46,8 @@ object Bits {
 
 /** Base class for built-in Chisel types Bits and Fix. */
 abstract class Bits extends Data with proc {
-  ioMap += ((this, ioCount));
-  ioCount += 1;
+  Mod.ioMap += ((this, Mod.ioCount));
+  Mod.ioCount += 1;
 
   var dir: IODirection = null;
 

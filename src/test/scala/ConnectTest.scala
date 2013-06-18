@@ -34,14 +34,14 @@ class ConnectSuite extends AssertionsForJUnit {
     no relationship. */
   @Test def testNoClassRelation() {
     println("\n### testNoClassRelation ###")
-    class A extends Component {
+    class A extends Mod {
       val io = new Bundle {
         val a_in = UFix(INPUT, 1)
         val a_out = UFix(OUTPUT, 1)
       }
       io.a_out := io.a_in
     }
-    class B extends Component {
+    class B extends Mod {
       val io = new Bundle {
         val b_in = UFix(INPUT, 1)
         val b_out = UFix(OUTPUT, 1)
@@ -50,7 +50,7 @@ class ConnectSuite extends AssertionsForJUnit {
       aComp.io.a_in := io.b_in
       io.b_out := aComp.io.a_out
     }
-    class NoClassRelation extends Component {
+    class NoClassRelation extends Mod {
       val io = new Bundle {
         val c_in = UFix(INPUT, 1)
         val c_out = UFix(OUTPUT, 1)
@@ -102,14 +102,14 @@ endmodule
     with logic in-between. */
   @Test def testLogicBtwInstances() {
     println("\n### testLogicBtwInstances ###")
-    class A extends Component {
+    class A extends Mod {
       val io = new Bundle {
         val a_in = UFix(INPUT, 1)
         val a_out = UFix(OUTPUT, 1)
       }
       io.a_out := io.a_in
     }
-    class LogicBtwInstances extends Component {
+    class LogicBtwInstances extends Mod {
       val io = new Bundle {
         val b_in = UFix(INPUT, 1)
         val b_out = UFix(OUTPUT, 1)
@@ -169,15 +169,15 @@ endmodule
   @Test def test2Instance2Level() {
     println("\n### test2Instance2Level ###")
     /* XXX This test will fail to pick up the correct pop sequence
-     on the Component stack. 
-    class A extends Component {
+     on the Mod stack. 
+    class A extends Mod {
       val io = new Bundle {
         val a_in = UFix(INPUT, 1)
         val a_out = UFix(OUTPUT, 1)
       }
       io.a_out := io.a_in
     }
-    class B extends Component {
+    class B extends Mod {
       val io = new Bundle {
         val b_in = UFix(INPUT, 1)
         val b_out = UFix(OUTPUT, 1)
@@ -199,7 +199,7 @@ endmodule
   /** Instantiate a component superclass inside a component */
   @Test def testInstanceSuperclass() {
     println("\n### testInstanceSuperclass ###")
-    class A extends Component {
+    class A extends Mod {
       val io = new Bundle {
         val a_in = UFix(INPUT, 1)
         val a_out = UFix(OUTPUT, 1)

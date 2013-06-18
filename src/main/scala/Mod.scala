@@ -37,19 +37,15 @@ import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.BitSet
 import java.lang.reflect.Modifier._
-import java.io.File;
-import java.io.InputStream
-import java.io.OutputStream
-import java.io.PrintStream
 import scala.sys.process._
 import scala.math.max;
 import Node._
 import Literal._
-import Component._
 import Bundle._
 import ChiselError._
+import Mod._
 
-object Component {
+object Mod {
   /* We have to keep a list of public methods which happen to be public,
    have no arguments yet should not be used to generate C++ or Verilog code. */
   val keywords = HashSet[String]("test")
@@ -71,7 +67,7 @@ object Component {
   var scanArgs: ArrayBuffer[Node] = null;
   var printFormat = "";
   var printArgs: ArrayBuffer[Node] = null;
-  var tester: Tester[Component] = null;
+  var tester: Tester[Mod] = null;
   var includeArgs: List[String] = Nil;
   var targetDir: String = null;
   var isEmittingComponents = false;
@@ -79,8 +75,8 @@ object Component {
   var isCheckingPorts = false
   var isTesting = false;
   var backend: Backend = null;
-  var topComponent: Component = null;
-  val components = ArrayBuffer[Component]();
+  var topComponent: Mod = null;
+  val components = ArrayBuffer[Mod]();
   val procs = ArrayBuffer[proc]();
   val resetList = ArrayBuffer[Node]();
   val muxes = ArrayBuffer[Node]();
@@ -91,10 +87,24 @@ object Component {
   var chiselAndMap = new HashMap[(Node, Node), Bool]
   var searchAndMap = true
   var ioCount = 0;
-  val compStack = new Stack[Component]();
+  val compStack = new Stack[Mod]();
   var stackIndent = 0;
-  var printStackStruct = ArrayBuffer[(Int, Component)]();
+  var printStackStruct = ArrayBuffer[(Int, Mod)]();
   val printfs = ArrayBuffer[Printf]()
+
+  /* Any call to a *Mod* constructor without a proper wrapping
+   into a Mod.apply() call will be detected when trigger is false. */
+  var trigger: Boolean = false
+
+  def apply[T <: Mod](c: => T): T = {
+    trigger = true
+    /* *push* is done in the Mod constructor because we don't have
+     a *this* pointer before then, yet we need to store it before the subclass
+     constructors are built. */
+    val res = c
+    pop()
+    res
+  }
 
   def splitArg (s: String) : List[String] = s.split(' ').toList;
 
@@ -155,22 +165,16 @@ object Component {
     keys.clear()
   }
 
-  def ensureDir(dir: String): String = {
-    val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/")
-    new File(d).mkdirs()
-    d
-  }
-
   //component stack handling stuff
 
-  def isSubclassOfComponent(x: java.lang.Class[_]): Boolean = {
+  def isSubclassOfMod(x: java.lang.Class[_]): Boolean = {
     val classString = x.toString;
     if(classString == "class java.lang.Object") {
       false
-    } else if(classString == "class Chisel.Component") {
+    } else if(classString == "class Chisel.Mod") {
       true
     } else {
-      isSubclassOfComponent(x.getSuperclass)
+      isSubclassOfMod(x.getSuperclass)
     }
   }
 
@@ -186,7 +190,7 @@ object Component {
     if(x == 0) "" else "    " + genIndent(x-1);
   }
 
-  private def push(c: Component) {
+  private def push(c: Mod) {
     if( !Mod.trigger ) {
       ChiselError.error(
         c.getClass.getName + " was not properly wrapped into a module() call.")
@@ -211,7 +215,7 @@ object Component {
     }
   }
 
-  def getComponent(): Component = if(compStack.length != 0) compStack.top else {
+  def getComponent(): Mod = if(compStack.length != 0) compStack.top else {
     // val st = Thread.currentThread.getStackTrace;
     // println("UNKNOWN COMPONENT ");
     // for(frame <- st)
@@ -230,14 +234,14 @@ object Component {
 }
 
 
-abstract class Component(resetSignal: Bool = null) {
+abstract class Mod(resetSignal: Bool = null) {
   /** A backend(Backend.scala) might generate multiple module source code
-    from one Component, based on the parameters to instanciate the component
+    from one Mod, based on the parameters to instanciate the component
     instance. Since we do not want to blindly generate one module per instance
     the backend will keep a cache of each module's implementation source code
     and discard textual duplicates. By walking the nodes from level zero
     (leafs) to level N (root), we are guarenteed to generate all
-    Component/modules source text before their first instantiation. */
+    Mod/modules source text before their first instantiation. */
   var level = 0;
   var traversal = 0;
   var ioVal: Data = null;
@@ -248,9 +252,9 @@ abstract class Component(resetSignal: Bool = null) {
   var named = false;
   val bindings = new ArrayBuffer[Binding];
   var wiresCache: Array[(String, Bits)] = null;
-  var parent: Component = null;
+  var parent: Mod = null;
   var containsReg = false;
-  val children = new ArrayBuffer[Component];
+  val children = new ArrayBuffer[Mod];
   var inputs = new ArrayBuffer[Node];
   var outputs = new ArrayBuffer[Node];
   val blackboxes = ArrayBuffer[BlackBox]();
@@ -264,7 +268,7 @@ abstract class Component(resetSignal: Bool = null) {
   val nexts = new ScalaQueue[Node];
   var nindex = -1;
   var defaultWidth = 32;
-  var pathParent: Component = null;
+  var pathParent: Mod = null;
   var verilog_parameters = "";
 
   components += this;
@@ -274,7 +278,7 @@ abstract class Component(resetSignal: Bool = null) {
   def isSubclassOf(x: java.lang.Class[_]): Boolean = {
     var className: java.lang.Class[_] = this.getClass;
     while(className.toString != x.toString){
-      if(className.toString == "class Chisel.Component") return false;
+      if(className.toString == "class Chisel.Mod") return false;
       className = className.getSuperclass;
     }
     return true;
@@ -340,7 +344,7 @@ abstract class Component(resetSignal: Bool = null) {
     debug(p)
     p.inputs.foreach(debug _)
   }
-  def <>(src: Component) = io <> src.io;
+  def <>(src: Mod) = io <> src.io;
 
   def apply(name: String): Data = io(name);
   // COMPILATION OF REFERENCE
@@ -379,15 +383,15 @@ abstract class Component(resetSignal: Bool = null) {
   def initializeBFS: ScalaQueue[Node] = {
     val res = new ScalaQueue[Node]
 
-    for (c <- components; a <- c.debugs)
+    for (c <- Mod.components; a <- c.debugs)
       res.enqueue(a)
     for(b <- blackboxes)
       res.enqueue(b.io)
-    for(c <- components)
+    for(c <- Mod.components)
       for((n, io) <- c.io.flatten)
         res.enqueue(io)
 
-    for(r <- resetList)
+    for(r <- Mod.resetList)
       res.enqueue(r)
 
     res
@@ -488,7 +492,7 @@ abstract class Component(resetSignal: Bool = null) {
 
   def findRoots(): ArrayBuffer[Node] = {
     val roots = new ArrayBuffer[Node];
-    for (c <- components)
+    for (c <- Mod.components)
       roots ++= c.debugs
     for (b <- blackboxes)
       roots += b.io;
@@ -592,7 +596,7 @@ abstract class Component(resetSignal: Bool = null) {
     (numNodes, maxWidth, maxDepth)
   }
 
-  def collectNodes(c: Component) {
+  def collectNodes(c: Mod) {
     for (m <- c.mods) {
       // println("M " + m.name);
       m match {
@@ -625,7 +629,7 @@ abstract class Component(resetSignal: Bool = null) {
   def markComponent() {
     ownIo();
     /* We are going through all declarations, which can return Nodes,
-     ArrayBuffer[Node], Cell, BlackBox and Components.
+     ArrayBuffer[Node], Cell, BlackBox and Mods.
      Since we call invoke() to get a proper instance of the correct type,
      we have to insure the method is accessible, thus all fields
      that will generate C++ or Verilog code must be made public. */
@@ -633,7 +637,7 @@ abstract class Component(resetSignal: Bool = null) {
        val name = m.getName();
        val types = m.getParameterTypes();
        if (types.length == 0
-        && isPublic(m.getModifiers()) && !(Component.keywords contains name)) {
+        && isPublic(m.getModifiers()) && !(Mod.keywords contains name)) {
          val o = m.invoke(this);
          o match {
          case node: Node => {
@@ -643,7 +647,7 @@ abstract class Component(resetSignal: Bool = null) {
            /* We would prefer to match for ArrayBuffer[Node] but that's
             impossible because of JVM constraints which lead to type erasure.
             XXX Using Seq instead of ArrayBuffer will pick up members defined
-            in Component that are solely there for implementation purposes. */
+            in Mod that are solely there for implementation purposes. */
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
              val nodebuf = buf.asInstanceOf[Seq[Node]];
              for(elm <- nodebuf){
@@ -662,7 +666,7 @@ abstract class Component(resetSignal: Bool = null) {
              if (elm.isClkInput) containsReg = true
            }
          }
-         case comp: Component => {
+         case comp: Mod => {
            comp.pathParent = this;
          }
          case any =>
@@ -686,8 +690,8 @@ abstract class Component(resetSignal: Bool = null) {
   }
 
   def verifyAllMuxes {
-    for(m <- muxes) {
-      if(m.inputs(0).width != 1 && m.component != null && (!isEmittingComponents || !m.component.isInstanceOf[BlackBox])) {
+    for(m <- Mod.muxes) {
+      if(m.inputs(0).width != 1 && m.component != null && (!Mod.isEmittingComponents || !m.component.isInstanceOf[BlackBox])) {
         ChiselError.error({"Mux " + m.name + " has " + m.inputs(0).width + "-bit selector " + m.inputs(0).name}, m.line);
       }
     }
@@ -708,24 +712,24 @@ abstract class Component(resetSignal: Bool = null) {
     val queue = Stack[() => Any]();
 
     /* XXX Why do we do something different here? */
-    if (!backend.isInstanceOf[VerilogBackend]) {
+    if (!Mod.backend.isInstanceOf[VerilogBackend]) {
       queue.push(() => io.traceNode(this, queue));
       /* This is ugly and most likely unnecessary but as long as we are not
        sure of the subtle consequences of tracing through blackboxes, let's
        have the code here (instead of Verilog.doCompile). */
-      for (c <- components) {
+      for (c <- Mod.components) {
         c match {
           case x: BlackBox => c.traceNodes();
           case _ =>
         }
       }
     } else {
-      for (c <- components) {
+      for (c <- Mod.components) {
         queue.push(() => c.reset.traceNode(c, queue))
         queue.push(() => c.io.traceNode(c, queue))
       }
     }
-    for (c <- components; d <- c.debugs)
+    for (c <- Mod.components; d <- c.debugs)
       queue.push(() => d.traceNode(c, queue))
     for (b <- blackboxes)
       queue.push(() => b.io.traceNode(this, queue));
@@ -809,21 +813,3 @@ abstract class Component(resetSignal: Bool = null) {
 
 }
 
-
-object Mod {
-
-  /* Any call to a *Component* constructor without a proper wrapping
-   into a Mod.apply() call will be detected when trigger is false. */
-  var trigger: Boolean = false
-
-  def apply[T <: Component](c: => T): T = {
-    trigger = true
-    /* *push* is done in the Component constructor because we don't have
-     a *this* pointer before then, yet we need to store it before the subclass
-     constructors are built. */
-    val res = c
-    pop()
-    res
-  }
-
-}

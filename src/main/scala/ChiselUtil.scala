@@ -30,7 +30,6 @@
 
 package Chisel
 import Node._
-import Component._
 import scala.math._
 import Literal._
 
@@ -235,7 +234,7 @@ object ArbiterCtrl
   }
 }
 
-abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends Component {
+abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends Mod {
   require(isPow2(count))
   val io = new ioArbiter(gen, n)
   val locked  = if(count > 1) RegReset(Bool(false)) else Bool(false)
@@ -328,7 +327,7 @@ class ioQueue[T <: Bits](gen: T, entries: Int) extends Bundle
   val count = UFix(OUTPUT, log2Up(entries + 1))
 }
 
-class Queue[T <: Bits](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, resetSignal: Bool = null) extends Component(resetSignal)
+class Queue[T <: Bits](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, resetSignal: Bool = null) extends Mod(resetSignal)
 {
   val io = new ioQueue(gen, entries)
 
@@ -382,7 +381,7 @@ object Queue
 
 object Log2 {
   def apply (mod: Bits, n: Int): UFix = {
-    backend match {
+    Mod.backend match {
       case x: CppBackend => {
         val log2 = new Log2()
         log2.init("", fixWidth(sizeof(n-1)), mod)
@@ -402,7 +401,7 @@ class Log2 extends Node {
   override def toString: String = "LOG2(" + inputs(0) + ")";
 }
 
-class Pipe[T <: Bits](gen: T, latency: Int = 1) extends Component
+class Pipe[T <: Bits](gen: T, latency: Int = 1) extends Mod
 {
   val io = new Bundle {
     val enq = new PipeIO(gen).flip

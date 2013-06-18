@@ -30,7 +30,6 @@
 
 package Chisel
 import Node._
-import Component._
 import Lit._
 
 object NodeExtract {

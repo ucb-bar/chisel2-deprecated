@@ -63,7 +63,7 @@ class StdlibSuite extends AssertionsForJUnit {
   /** test of simple operators */
   @Test def testOperators() {
 
-    class OperatorComp extends Component {
+    class OperatorComp extends Mod {
       val io = new Bundle {
         val x = UFix(INPUT, 8)
         val y = UFix(INPUT, 8)
@@ -177,7 +177,7 @@ class StdlibSuite extends AssertionsForJUnit {
 
   /** Multiply an unsigned number by signed number */
   @Test def testMulUS() {
-    class MulUS extends Component {
+    class MulUS extends Mod {
       val io = new Bundle {
         val x = UFix(INPUT, 32)
         val y = Fix(INPUT, 32)
@@ -209,7 +209,7 @@ endmodule
 
   /** Divide an unsigned number by signed number */
   @Test def testDivUS() {
-    class DivUS extends Component {
+    class DivUS extends Mod {
       val io = new Bundle {
         val x = UFix(INPUT, 32)
         val y = Fix(INPUT, 32)
@@ -241,7 +241,7 @@ endmodule
 
   /** Remainer of an unsigned number by signed number */
   @Test def testRemUS() {
-    class RemUS extends Component {
+    class RemUS extends Mod {
       val io = new Bundle {
         val x = UFix(INPUT, 32)
         val y = Fix(INPUT, 32)
@@ -273,7 +273,7 @@ endmodule
 
   /** Multiply an signed number by an unsigned number */
   @Test def testMulSU() {
-    class MulSU extends Component {
+    class MulSU extends Mod {
       val io = new Bundle {
         val x = Fix(INPUT, 32)
         val y = UFix(INPUT, 32)
@@ -305,7 +305,7 @@ endmodule
 
   /** Divide a signed number by an unsigned number */
   @Test def testDivSU() {
-    class DivSU extends Component {
+    class DivSU extends Mod {
       val io = new Bundle {
         val x = Fix(INPUT, 32)
         val y = UFix(INPUT, 32)
@@ -337,7 +337,7 @@ endmodule
 
   /** Remainer of a signed number by an unsigned number */
   @Test def testRemSU() {
-    class RemSU extends Component {
+    class RemSU extends Mod {
       val io = new Bundle {
         val x = Fix(INPUT, 32)
         val y = UFix(INPUT, 32)
@@ -372,7 +372,7 @@ endmodule
     class AssignBundle extends Bundle {
         val v = Vec.fill(2){UFix(INPUT, 2)}
     }
-    class AssignBundleComp extends Component {
+    class AssignBundleComp extends Mod {
       val io = new Bundle {
         val in = new AssignBundle()
         val out = new AssignBundle().flip
@@ -402,7 +402,7 @@ endmodule
     Z[0..wx+wy] = X[0..wx] :: Y[0..wy]. */
   @Test def testCat() {
 
-    class CatComp extends Component {
+    class CatComp extends Mod {
       val io = new Bundle {
         val x = UFix(INPUT, 8)
         val y = UFix(INPUT, 8)
@@ -420,7 +420,7 @@ endmodule
     XXX Lookup.scala, use different code based on instance of CppBackend. */
   @Test def testLookup() {
 
-    class LookupComp extends Component {
+    class LookupComp extends Mod {
       val io = new Bundle {
         val addr = Bits(INPUT, 8)
         val data = UFix(OUTPUT)
@@ -439,7 +439,7 @@ endmodule
     */
   @Test def testPopCount() {
 
-    class PopCountComp extends Component {
+    class PopCountComp extends Mod {
       val io = new Bundle {
         val in = Bits(INPUT, 8)
         val out = UFix(OUTPUT)
@@ -456,7 +456,7 @@ endmodule
     */
   @Test def testReverse() {
 
-    class ReverseComp extends Component {
+    class ReverseComp extends Mod {
       val io = new Bundle {
         val in = Bits(INPUT, 8)
         val out = Bits(OUTPUT)
@@ -473,7 +473,7 @@ endmodule
     */
   @Test def testShiftRegister() {
 
-    class ShiftRegisterComp extends Component {
+    class ShiftRegisterComp extends Mod {
       val io = new Bundle {
         val in = Bits(INPUT, 8)
         val out = Bits(OUTPUT)
@@ -490,7 +490,7 @@ endmodule
     */
   @Test def testUFixToOH() {
 
-    class UFixToOHComp extends Component {
+    class UFixToOHComp extends Mod {
       val io = new Bundle {
         val in = Bits(INPUT, 8)
         val out0 = UFix(OUTPUT)
@@ -509,7 +509,7 @@ endmodule
     */
   @Test def testfoldR() {
 
-    class foldRComp extends Component {
+    class foldRComp extends Mod {
       val io = new Bundle {
         val in0 = UFix(INPUT, 8)
         val in1 = UFix(INPUT, 8)
@@ -527,7 +527,7 @@ endmodule
     */
   @Test def testArbiterCtrl() {
 
-    class ArbiterCtrlComp extends Component {
+    class ArbiterCtrlComp extends Mod {
       val io = new Bundle {
         val in0 = Bool(INPUT)
         val in1 = Bool(INPUT)
@@ -545,7 +545,7 @@ endmodule
     */
   @Test def testFillInterleaved() {
 
-    class FillInterleavedComp extends Component {
+    class FillInterleavedComp extends Mod {
       val io = new Bundle {
         val in = Bits(INPUT, 8)
         val out = Bits(OUTPUT)
@@ -562,7 +562,7 @@ endmodule
     */
   @Test def testCounter() {
 
-    class CounterComp extends Component {
+    class CounterComp extends Mod {
       val io = new Bundle {
         val in = Bool(INPUT)
         val out = UFix(OUTPUT)
@@ -582,7 +582,7 @@ endmodule
     */
   @Test def testPriorityMux() {
 
-    class PriorityMuxComp extends Component {
+    class PriorityMuxComp extends Mod {
       val io = new Bundle {
         val in0 = Bool(INPUT)
         val in1 = Bool(INPUT)
@@ -607,7 +607,7 @@ endmodule
     */
   @Test def testPriorityEncoder() {
 
-    class PriorityEncoderComp extends Component {
+    class PriorityEncoderComp extends Mod {
       val io = new Bundle {
         val in = Bits(INPUT, 8)
         val out = UFix(OUTPUT)
@@ -624,7 +624,7 @@ endmodule
     */
   @Test def testPriorityEncoderOH() {
 
-    class PriorityEncoderOHComp extends Component {
+    class PriorityEncoderOHComp extends Mod {
       val io = new Bundle {
         val in = Bits(INPUT, 8)
         val out = Bits(OUTPUT)
@@ -641,7 +641,7 @@ endmodule
     */
   @Test def testFill() {
 
-    class FillComp extends Component {
+    class FillComp extends Mod {
       val io = new Bundle {
         val in = Bits(INPUT, 8)
         val out = Bits(OUTPUT)
@@ -658,7 +658,7 @@ endmodule
     */
   @Test def testLog2() {
 
-    class Log2Comp extends Component {
+    class Log2Comp extends Mod {
       val io = new Bundle {
         val in = UFix(INPUT, 8)
         val out = UFix(OUTPUT)
@@ -675,7 +675,7 @@ endmodule
     */
   @Test def testMuxLookup() {
 
-    class MuxLookupComp extends Component {
+    class MuxLookupComp extends Mod {
       val io = new Bundle {
         val key = Bits(INPUT, 8)
         val in0 = Bits(INPUT, 8)
@@ -698,7 +698,7 @@ endmodule
     */
   @Test def testMuxCase() {
 
-    class MuxCaseComp extends Component {
+    class MuxCaseComp extends Mod {
       val io = new Bundle {
         val default = Bits(INPUT, 8)
         val in0 = Bits(INPUT, 8)
@@ -718,7 +718,7 @@ endmodule
     */
   @Test def testMultiplex() {
 
-    class MultiplexComp extends Component {
+    class MultiplexComp extends Mod {
       val io = new Bundle {
         val t = Bits(INPUT, 1)
         val c = Bits(INPUT, 8)
@@ -738,7 +738,7 @@ endmodule
     */
   @Test def testMux() {
 
-    class MuxComp extends Component {
+    class MuxComp extends Mod {
       val io = new Bundle {
         val t = Bool(INPUT)
         val c = Bits(INPUT, 8)

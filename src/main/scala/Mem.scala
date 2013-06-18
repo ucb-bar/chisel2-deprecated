@@ -41,7 +41,7 @@ object Mem {
     new Mem(n, seqRead, () => gen)
   }
 
-  Component.backend.transforms.prepend { c =>
+  Mod.backend.transforms.prepend { c =>
     c.bfs { n =>
       if (n.isInstanceOf[MemAccess]) {
         n.asInstanceOf[MemAccess].referenced = true
@@ -79,7 +79,7 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
     }
 
     val addrIsReg = addr.isInstanceOf[UFix] && addr.inputs.length == 1 && addr.inputs(0).isInstanceOf[Reg]
-    val rd = if (seqRead && !Component.isInlineMem && addrIsReg) {
+    val rd = if (seqRead && !Mod.isInlineMem && addrIsReg) {
       (seqreads += new MemSeqRead(this, addr.inputs(0))).last
     } else {
       (reads += new MemRead(this, addr)).last
@@ -109,7 +109,7 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
       wr
     }
 
-    if (seqRead && Component.backend.isInstanceOf[CppBackend] && gen().isInstanceOf[Bits]) {
+    if (seqRead && Mod.backend.isInstanceOf[CppBackend] && gen().isInstanceOf[Bits]) {
       // generate bogus data when reading & writing same address on same cycle
       val reg_data = Reg(gen())
       reg_data.comp procAssign wdata
@@ -156,7 +156,7 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
     seqreads --= readwrites.map(_.read)
   }
 
-  def isInline = Component.isInlineMem || !reads.isEmpty
+  def isInline = Mod.isInlineMem || !reads.isEmpty
 }
 
 abstract class MemAccess(val mem: Mem[_], addri: Node) extends Node {

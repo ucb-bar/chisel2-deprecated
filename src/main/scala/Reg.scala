@@ -31,7 +31,6 @@
 package Chisel
 import Node._
 import Reg._
-import Component._
 import ChiselError._
 import scala.reflect._
 
@@ -154,7 +153,7 @@ class Reg extends Delay with proc {
     }
     val cond = genCond();
     if (conds.length >= 1) {
-      isEnable = backend.isInstanceOf[VerilogBackend]
+      isEnable = Mod.backend.isInstanceOf[VerilogBackend]
       enable = enable || cond;
     }
     updates += ((cond, src))

@@ -35,7 +35,7 @@ import scala.collection.mutable.ArrayBuffer
 
 object Lookup {
   def apply[T <: Bits](addr: UFix, default: T, mapping: Seq[(UFix, T)]): T = {
-    if (Component.backend.isInstanceOf[CppBackend]) {
+    if (Mod.backend.isInstanceOf[CppBackend]) {
       return CListLookup(addr, List(default), mapping.map(m => (m._1, List(m._2))).toArray).head
     }
     val lookup = new Lookup()

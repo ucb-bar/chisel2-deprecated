@@ -32,7 +32,6 @@ package Chisel
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 import scala.collection.mutable.{Queue=>ScalaQueue}
-import Component._
 import Literal._
 import Node._
 import ChiselError._
@@ -104,14 +103,14 @@ object Printer {
 
 /**
   _chiselMain_ behaves as if it constructs an execution tree from
-  the constructor of a sub class of Component which is passed as a parameter.
+  the constructor of a sub class of Mod which is passed as a parameter.
   That execution tree is simplified by aggregating all calls which are not
-  constructors of a Component instance into the parent which is.
-  The simplified tree (encoded through _Component.children_) forms the basis
+  constructors of a Mod instance into the parent which is.
+  The simplified tree (encoded through _Mod.children_) forms the basis
   of the generated verilog. Each node in the simplified execution tree is
-  a _Component_ instance from which a verilog module is textually derived.
+  a _Mod_ instance from which a verilog module is textually derived.
   As an optimization, _Backend_ classes output modules which are
-  textually equivalent only once and update a _Component_ instance's
+  textually equivalent only once and update a _Mod_ instance's
   _moduleName_ accordingly.
 */
 object chiselMain {
@@ -121,81 +120,81 @@ object chiselMain {
       val arg = args(i);
       arg match {
         case "--Wall" => {
-          saveWidthWarnings = true
-          saveConnectionWarnings = true
-          saveComponentTrace = true
-          isCheckingPorts = true
+          Mod.saveWidthWarnings = true
+          Mod.saveConnectionWarnings = true
+          Mod.saveComponentTrace = true
+          Mod.isCheckingPorts = true
         }
-        case "--Wwidth" => saveWidthWarnings = true
-        case "--Wconnection" => saveConnectionWarnings = true
-        case "--Wcomponent" => saveComponentTrace = true
-        case "--noCombLoop" => dontFindCombLoop = true
-        case "--genHarness" => isGenHarness = true;
-        case "--debug" => isDebug = true;
-        case "--ioDebug" => isIoDebug = true;
-        case "--noIoDebug" => isIoDebug = false;
-        case "--clockGatingUpdates" => isClockGatingUpdates = true;
-        case "--clockGatingUpdatesInline" => isClockGatingUpdatesInline = true;
-        case "--folding" => isFolding = true;
-        case "--vcd" => isVCD = true;
-        case "--v" => backend = new VerilogBackend
+        case "--Wwidth" => Mod.saveWidthWarnings = true
+        case "--Wconnection" => Mod.saveConnectionWarnings = true
+        case "--Wcomponent" => Mod.saveComponentTrace = true
+        case "--noCombLoop" => Mod.dontFindCombLoop = true
+        case "--genHarness" => Mod.isGenHarness = true;
+        case "--debug" => Mod.isDebug = true;
+        case "--ioDebug" => Mod.isIoDebug = true;
+        case "--noIoDebug" => Mod.isIoDebug = false;
+        case "--clockGatingUpdates" => Mod.isClockGatingUpdates = true;
+        case "--clockGatingUpdatesInline" => Mod.isClockGatingUpdatesInline = true;
+        case "--folding" => Mod.isFolding = true;
+        case "--vcd" => Mod.isVCD = true;
+        case "--v" => Mod.backend = new VerilogBackend
         case "--moduleNamePrefix" => Backend.moduleNamePrefix = args(i + 1); i += 1
-        case "--inlineMem" => isInlineMem = true;
-        case "--noInlineMem" => isInlineMem = false;
+        case "--inlineMem" => Mod.isInlineMem = true;
+        case "--noInlineMem" => Mod.isInlineMem = false;
         case "--backend" => {
           if (args(i + 1) == "v") {
-            backend = new VerilogBackend
+            Mod.backend = new VerilogBackend
           } else if (args(i + 1) == "c") {
-            backend = new CppBackend
+            Mod.backend = new CppBackend
           } else if (args(i + 1) == "flo") {
-            backend = new FloBackend
+            Mod.backend = new FloBackend
           } else if (args(i + 1) == "fpga") {
-            backend = new FPGABackend
+            Mod.backend = new FPGABackend
           } else {
-            backend = Class.forName(args(i + 1)).newInstance.asInstanceOf[Backend]
+            Mod.backend = Class.forName(args(i + 1)).newInstance.asInstanceOf[Backend]
           }
           i += 1
         }
-        case "--compile" => isCompiling = true
-        case "--test" => isTesting = true;
-        case "--targetDir" => targetDir = args(i + 1); i += 1;
-        case "--include" => includeArgs = splitArg(args(i + 1)); i += 1;
-        case "--checkPorts" => isCheckingPorts = true
+        case "--compile" => Mod.isCompiling = true
+        case "--test" => Mod.isTesting = true;
+        case "--targetDir" => Mod.targetDir = args(i + 1); i += 1;
+        case "--include" => Mod.includeArgs = Mod.splitArg(args(i + 1)); i += 1;
+        case "--checkPorts" => Mod.isCheckingPorts = true
         case any => println("UNKNOWN CONSOLE ARG");
       }
       i += 1;
     }
   }
 
-  def run[T <: Component] (args: Array[String], gen: () => T): T = apply(args, gen) // hack to avoid supplying default parameters manually for invocation in sbt
+  def run[T <: Mod] (args: Array[String], gen: () => T): T = apply(args, gen) // hack to avoid supplying default parameters manually for invocation in sbt
 
-  def apply[T <: Component]
+  def apply[T <: Mod]
       (args: Array[String], gen: () => T,
        scanner: T => TestIO = null, printer: T => TestIO = null, ftester: T => Tester[T] = null): T = {
-    initChisel();
+    Mod.initChisel();
     readArgs(args)
 
     try {
       val c = gen();
       if (scanner != null) {
         val s = scanner(c);
-        scanArgs  ++= s.args;
+        Mod.scanArgs  ++= s.args;
         for (a <- s.args) a.isScanArg = true
-        scanFormat  = s.format;
+        Mod.scanFormat  = s.format;
       }
       if (printer != null) {
         val p = printer(c);
-        printArgs   ++= p.args;
+        Mod.printArgs   ++= p.args;
         for(a <- p.args) a.isPrintArg = true
-        printFormat   = p.format;
+        Mod.printFormat   = p.format;
       }
       if (ftester != null) {
-        tester = ftester(c)
+        Mod.tester = ftester(c)
       }
-      backend.elaborate(c)
-      if (isCheckingPorts) backend.checkPorts(c)
-      if (isCompiling && isGenHarness) backend.compile(c)
-      if (isTesting) tester.tests()
+      Mod.backend.elaborate(c)
+      if (Mod.isCheckingPorts) Mod.backend.checkPorts(c)
+      if (Mod.isCompiling && Mod.isGenHarness) Mod.backend.compile(c)
+      if (Mod.isTesting) Mod.tester.tests()
       c
     } finally {
       ChiselError.report()
@@ -212,7 +211,7 @@ object throwException {
 }
 
 object chiselMainTest {
-  def apply[T <: Component](args: Array[String], gen: () => T)(tester: T => Tester[T]): T =
+  def apply[T <: Mod](args: Array[String], gen: () => T)(tester: T => Tester[T]): T =
     chiselMain(args, gen, null, null, tester)
 }
 
@@ -242,7 +241,7 @@ trait proc extends Node {
     }
   }
   def procAssign(src: Node);
-  procs += this;
+  Mod.procs += this;
 }
 
 trait nameable {
@@ -252,11 +251,11 @@ trait nameable {
   var named = false;
 }
 
-abstract class BlackBox extends Component {
+abstract class BlackBox extends Mod {
   parent.blackboxes += this;
 
   def setVerilogParameters(string: String) =
-    this.asInstanceOf[Component].verilog_parameters = string;
+    this.asInstanceOf[Mod].verilog_parameters = string;
 
   def setName(name: String) = {
     moduleName = name;

@@ -80,7 +80,7 @@ class NameSuite extends AssertionsForJUnit {
       val N = UFix(0, 1);
     }
 
-    class ListLookupsComp extends Component with Constants {
+    class ListLookupsComp extends Mod with Constants {
       val io = new Bundle {
         val inst = UFix(INPUT, 32)
         val sigs_valid = Bool(OUTPUT)
@@ -136,7 +136,7 @@ endmodule
       val enq_ximm1q = Bool()
     }
 
-    class BlockDecoder extends Component {
+    class BlockDecoder extends Mod {
       val io = new Bundle {
         val valid = Bool(INPUT)
         val replay = Bool(OUTPUT)
@@ -146,7 +146,7 @@ endmodule
       io.replay := io.valid;
     }
 
-    class BindFirstComp extends Component {
+    class BindFirstComp extends Mod {
       val io = new BlockIO
       val dec = Mod(new BlockDecoder());
 
@@ -205,17 +205,17 @@ endmodule
 """)
    }
 
-  /** Since *vec* is declared within a if() block and not as a Component
+  /** Since *vec* is declared within a if() block and not as a Mod
     member, we do not extract the actual name of the module instance
     (i.e. *vec*) which means that if we do not set an arbitrary name on
     that component instance, it will remain empty.
     This would result in bindings starting with a "_" prefix (target
-    Component name is empty).
+    Mod name is empty).
 
     We thus generate a name for the component instance based on its class name.
     */
   @Test def testBindSecond() {
-    class Block extends Component {
+    class Block extends Mod {
       val io = new Bundle() {
         val irq = Bool(INPUT)
         val irq_cause = UFix(OUTPUT, 5)
@@ -223,7 +223,7 @@ endmodule
       io.irq_cause := UFix(2);
     }
 
-    class BindSecondComp(conf: Boolean) extends Component {
+    class BindSecondComp(conf: Boolean) extends Mod {
       val io = new Bundle() {
         val irq = Bool(INPUT)
         val irq_cause = UFix(OUTPUT, 6)
@@ -283,12 +283,12 @@ endmodule
     }
 
 
-    class Comp extends Component {
+    class Comp extends Mod {
       val io = new CompIO()
       io.out.ren := io.in.ren
     }
 
-    class BindThirdComp extends Component {
+    class BindThirdComp extends Mod {
       val io = new Bundle() {
         val in = new BankToBankIO()
         val result = Bool(OUTPUT)
@@ -366,7 +366,7 @@ endmodule
       val out = UFix(OUTPUT, 5)
     }
 
-    class BindFourthComp extends Component {
+    class BindFourthComp extends Mod {
       val io = new CompIO()
 
       var norms = ArrayBuffer[UFix]();
@@ -410,7 +410,7 @@ endmodule
       override def clone = new BlockIO().asInstanceOf[this.type]
     }
 
-    class Block extends Component {
+    class Block extends Mod {
       val io = new Bundle {
         val valid = Bool(INPUT)
         val mine = Vec.fill(2){UFix(width = 32)}.asOutput
@@ -423,7 +423,7 @@ endmodule
       io.mine := Mux(io.valid, Mux1H(UFix(1), tag_ram), Mux1H(UFix(0), tag_ram))
     }
 
-    class BindFithComp extends Component {
+    class BindFithComp extends Mod {
       val io = new Bundle {
         val imem_ptw = new BlockIO()
         val dmem_ptw = new BlockIO()
@@ -512,7 +512,7 @@ endmodule
     without setting *named* to true.
     */
   @Test def testVec() {
-    class VecComp extends Component {
+    class VecComp extends Mod {
       val io = new Bundle {
         val pcr_req_data = UFix(width = 64)
 
@@ -597,7 +597,7 @@ endmodule
       val req = new FIFOIO(new BlockReq)
     }
 
-    class VecSecondComp extends Component {
+    class VecSecondComp extends Mod {
       val io = new Bundle {
         val requestor = Vec.fill(4) { new BlockIO() }.flip
         val mem = Bool(OUTPUT)
@@ -660,14 +660,14 @@ endmodule
 
 
   /** This test checks names are correctly generated in the presence
-    of multiple instantiation of the same Component. */
+    of multiple instantiation of the same Mod. */
   @Test def testVariation() {
     class BlockIO extends Bundle {
       val valid = Bool(INPUT)
       val replay = Bool(OUTPUT)
     }
 
-    class CompBlock(width: Int) extends Component {
+    class CompBlock(width: Int) extends Mod {
       val io = new BlockIO();
 
       if( width > 8) {
@@ -677,7 +677,7 @@ endmodule
       }
     }
 
-    class VariationComp extends Component {
+    class VariationComp extends Mod {
       val io = new BlockIO();
       val block_0 = Mod(new CompBlock(8));
       val block_1 = Mod(new CompBlock(8));
@@ -748,7 +748,7 @@ endmodule
       val rdata = UFix(OUTPUT, SZ_DATA)
     }
 
-    class MemComp extends Component {
+    class MemComp extends Mod {
       val io = new RegfileIO()
 
       val rfile = Mem(256, UFix(width = SZ_DATA), seqRead = true)
@@ -793,7 +793,7 @@ endmodule
   /* Add signals which are not registers to the toplevel C++ class declaration.
    */
   @Test def testDebug() {
-    class Block extends Component {
+    class Block extends Mod {
       val io = new Bundle {
         val ctrl_wb_wen = Bool(INPUT);
         val ctrl_out = Bool(OUTPUT);
@@ -809,7 +809,7 @@ endmodule
       debug(wb_wen)
     }
 
-    class DebugComp extends Component {
+    class DebugComp extends Mod {
       val io = new Bundle {
         val ctrl_wb_wen = Bool(INPUT);
         val ctrl_out = Bool(OUTPUT);

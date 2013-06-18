@@ -29,14 +29,13 @@
 */
 
 package Chisel
-import Component._
 import Node._
 
 // used for component to component connections
 object Binding {
 
-  def apply(m: Node, c: Component, ioComp: Component): Node = {
-    if (isEmittingComponents) {
+  def apply(m: Node, c: Mod, ioComp: Mod): Node = {
+    if (Mod.isEmittingComponents) {
       val res = c.findBinding(m);
       if (res == null) {
         val res = new Binding(m, ioComp);
@@ -54,10 +53,10 @@ object Binding {
   }
 }
 
-class Binding(tn: Node, tc: Component) extends Node {
+class Binding(tn: Node, tc: Mod) extends Node {
 
   val targetNode: Node = tn;
-  val targetComponent: Component = tc;
+  val targetComponent: Mod = tc;
 
   override def toString: String = "BINDING(" + inputs(0) + ")";
 }

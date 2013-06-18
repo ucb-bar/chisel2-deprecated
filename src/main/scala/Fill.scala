@@ -29,9 +29,7 @@
 */
 
 package Chisel
-import Component._
 import Fill._
-import Component._
 import Lit._
 
 object Fill {
@@ -40,13 +38,13 @@ object Fill {
     val (bits_lit) = (mod.litOf);
     if (n == 1) {
       mod
-    } else if (isFolding && bits_lit != null) {
+    } else if (Mod.isFolding && bits_lit != null) {
       var res = bits_lit.value;
       val w   = mod.getWidth();
       for (i <- 0 until n-1)
         res = (res << w)|bits_lit.value;
       Lit(res, n * w){ UFix() };
-    } else if (backend.isInstanceOf[CppBackend] && mod.width != 1) {
+    } else if (Mod.backend.isInstanceOf[CppBackend] && mod.width != 1) {
       var out: UFix = null
       var i = 0
       var cur = mod
@@ -73,7 +71,7 @@ object Fill {
 
 object NodeFill {
   def apply(n: Int, mod: Node): Node = {
-    if (isFolding && mod.litOf != null) {
+    if (Mod.isFolding && mod.litOf != null) {
       var c = BigInt(0)
       val w = mod.litOf.width
       val a = mod.litOf.value

@@ -39,7 +39,6 @@ import sys.process.stringSeqToProcess
 import Node._
 import Reg._
 import ChiselError._
-import Component._
 import Literal._
 import scala.collection.mutable.HashSet
 
@@ -439,7 +438,7 @@ class CppBackend extends Backend {
     }
   }
 
-  def genHarness(c: Component, name: String) = {
+  def genHarness(c: Mod, name: String) = {
     // val makefile = new java.io.FileWriter(base_name + name + "-makefile");
     // makefile.write("CPPFLAGS = -O2 -I../ -I${CHISEL}/csrc\n\n");
     // makefile.write(name + ": " + name + ".o" + " " + name + "-emulator.o\n");
@@ -455,7 +454,7 @@ class CppBackend extends Backend {
     harness.write("  " + name + "_t* c = new " + name + "_t();\n");
     harness.write("  int lim = (argc > 1) ? atoi(argv[1]) : -1;\n");
     harness.write("  c->init();\n");
-    if (isVCD) {
+    if (Mod.isVCD) {
       harness.write("  FILE *f = fopen(\"" + name + ".vcd\", \"w\");\n");
     }
     harness.write("  for(int i = 0; i < 5; i++) {\n")
@@ -470,7 +469,7 @@ class CppBackend extends Backend {
     harness.write("    c->clock_lo(reset);\n");
     harness.write("    c->print(stdout);\n");
     harness.write("    c->clock_hi(reset);\n");
-    if (isVCD) {
+    if (Mod.isVCD) {
       harness.write("    c->dump(f, t);\n");
     }
     harness.write("  }\n");
@@ -478,12 +477,12 @@ class CppBackend extends Backend {
     harness.close();
   }
 
-  override def compile(c: Component, flagsIn: String) {
+  override def compile(c: Mod, flagsIn: String) {
     val flags = if (flagsIn == null) "-O2" else flagsIn
 
     val chiselENV = java.lang.System.getenv("CHISEL")
     val allFlags = flags + " -I../ -I" + chiselENV + "/csrc/"
-    val dir = targetDir + "/"
+    val dir = Mod.targetDir + "/"
     def run(cmd: String) = {
       val bashCmd = Seq("bash", "-c", cmd)
       val c = bashCmd.!
@@ -502,7 +501,7 @@ class CppBackend extends Backend {
     link(c.name)
   }
 
-  def emitDefLos(c: Component): String = {
+  def emitDefLos(c: Mod): String = {
     var res = "";
     for ((n, w) <- c.wires) {
       w match {
@@ -524,7 +523,7 @@ class CppBackend extends Backend {
     res
   }
 
-  def emitDefHis(c: Component): String = {
+  def emitDefHis(c: Mod): String = {
     var res = emitRef(c) + "->clock_hi(reset);\n";
     res
   }
@@ -532,7 +531,7 @@ class CppBackend extends Backend {
   /** Insures each node such that it has a unique name accross the whole
     hierarchy by prefixing its name by a component path (except for "reset"
     and all nodes in *c*). */
-  def renameNodes(c: Component, nodes: Seq[Node]) = {
+  def renameNodes(c: Mod, nodes: Seq[Node]) = {
     for (m <- nodes) {
       m match {
         case l: Literal => ;
@@ -547,13 +546,13 @@ class CppBackend extends Backend {
     }
   }
 
-  override def elaborate(c: Component): Unit = {
-    for (cc <- components)
+  override def elaborate(c: Mod): Unit = {
+    for (cc <- Mod.components)
       c.debugs ++= cc.debugs
     super.elaborate(c)
 
     /* XXX Why now? */
-    for (cc <- components) {
+    for (cc <- Mod.components) {
       if (!(cc == c)) {
         c.mods       ++= cc.mods;
         c.blackboxes ++= cc.blackboxes;
@@ -566,12 +565,12 @@ class CppBackend extends Backend {
     c.collectNodes(c);
     c.findOrdering(); // search from roots  -- create omods
     renameNodes(c, c.omods);
-    if (isReportDims) {
+    if (Mod.isReportDims) {
       val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
       println("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
 
-    if (isGenHarness) {
+    if (Mod.isGenHarness) {
       genHarness(c, c.name);
     }
     val out_h = createOutputFile(c.name + ".h");
@@ -581,11 +580,11 @@ class CppBackend extends Backend {
     out_h.write("#include \"emulator.h\"\n\n");
     out_h.write("class " + c.name + "_t : public mod_t {\n");
     out_h.write(" public:\n");
-    if (isTesting && tester != null) {
-      scanArgs.clear();  scanArgs  ++= tester.testInputNodes;    scanFormat  = ""
-      printArgs.clear(); printArgs ++= tester.testNonInputNodes; printFormat = ""
+    if (Mod.isTesting && Mod.tester != null) {
+      Mod.scanArgs.clear();  Mod.scanArgs  ++= Mod.tester.testInputNodes;    Mod.scanFormat  = ""
+      Mod.printArgs.clear(); Mod.printArgs ++= Mod.tester.testNonInputNodes; Mod.printFormat = ""
 
-      for (n <- scanArgs ++ printArgs)
+      for (n <- Mod.scanArgs ++ Mod.printArgs)
         if(!c.omods.contains(n)) c.omods += n
     }
     val vcd = new VcdBackend()
@@ -611,7 +610,7 @@ class CppBackend extends Backend {
     out_h.close();
 
     out_c.write("#include \"" + c.name + ".h\"\n");
-    for(str <- includeArgs) out_c.write("#include \"" + str + "\"\n");
+    for(str <- Mod.includeArgs) out_c.write("#include \"" + str + "\"\n");
     out_c.write("\n");
     out_c.write("void " + c.name + "_t::init ( bool rand_init ) {\n");
     for (m <- c.omods) {
@@ -653,20 +652,20 @@ class CppBackend extends Backend {
       res.reverse
     }
     out_c.write("void " + c.name + "_t::print ( FILE* f ) {\n");
-    for (p <- Component.printfs)
+    for (p <- Mod.printfs)
       out_c write "  if (" + emitLoWordRef(p.cond) + ") dat_fprintf<" + p.width + ">(f, " + p.args.map(emitRef _).foldLeft(CString(p.format))(_+", "+_) + ");\n"
-    if (printArgs.length > 0) {
+    if (Mod.printArgs.length > 0) {
       val format =
-        if (printFormat == "") {
-          printArgs.map(a => "%x").reduceLeft((y,z) => z + " " + y)
+        if (Mod.printFormat == "") {
+          Mod.printArgs.map(a => "%x").reduceLeft((y,z) => z + " " + y)
         } else {
-          printFormat;
+          Mod.printFormat;
         }
       val toks = splitFormat(format);
       var i = 0;
       for (tok <- toks) {
         if (tok(0) == '%') {
-          val nodes = printArgs(i).maybeFlatten
+          val nodes = Mod.printArgs(i).maybeFlatten
           for (j <- 0 until nodes.length)
             out_c.write("  fprintf(f, \"" + (if (j > 0) " " else "") +
                         "%s\", TO_CSTR(" + emitRef(nodes(j)) + "));\n");
@@ -682,18 +681,18 @@ class CppBackend extends Backend {
     def constantArgSplit(arg: String): Array[String] = arg.split('=');
     def isConstantArg(arg: String): Boolean = constantArgSplit(arg).length == 2;
     out_c.write("bool " + c.name + "_t::scan ( FILE* f ) {\n");
-    if (scanArgs.length > 0) {
+    if (Mod.scanArgs.length > 0) {
       val format =
-        if (scanFormat == "") {
-          scanArgs.map(a => "%x").reduceLeft((y,z) => z + y)
+        if (Mod.scanFormat == "") {
+          Mod.scanArgs.map(a => "%x").reduceLeft((y,z) => z + y)
         } else {
-          scanFormat;
+          Mod.scanFormat;
         }
       val toks = splitFormat(format);
       var i = 0;
       for (tok <- toks) {
         if (tok(0) == '%') {
-          val nodes = c.keepInputs(scanArgs(i).maybeFlatten)
+          val nodes = c.keepInputs(Mod.scanArgs(i).maybeFlatten)
           for (j <- 0 until nodes.length)
             out_c.write("  str_to_dat(read_tok(f), " + emitRef(nodes(j)) + ");\n");
           i += 1;
@@ -707,8 +706,8 @@ class CppBackend extends Backend {
     out_c.write("}\n");
     vcd.dumpVCD(c, out_c);
     out_c.close();
-    if(saveComponentTrace) {
-      printStack
+    if(Mod.saveComponentTrace) {
+      Mod.printStack
     }
     /* Copy the emulator.h file into the targetDirectory. */
     val resourceStream = getClass().getResourceAsStream("/emulator.h")

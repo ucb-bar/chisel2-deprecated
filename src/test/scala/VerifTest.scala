@@ -61,7 +61,7 @@ class VerifSuite extends AssertionsForJUnit {
 
   @Test def testAssertCpp() {
 
-    class CppAssertComp extends Component {
+    class CppAssertComp extends Mod {
       val io = new Bundle {
         val x = UFix(INPUT, 8)
         val y = UFix(INPUT, 8)
@@ -99,7 +99,7 @@ void VerifSuite_CppAssertComp_1_t::dump(FILE *f, int t) {
 
   @Test def testAssertVerilog() {
 
-    class VerilogAssertComp extends Component {
+    class VerilogAssertComp extends Mod {
       val io = new Bundle {
         val x = UFix(INPUT, 8)
         val y = UFix(INPUT, 8)
@@ -116,7 +116,7 @@ void VerifSuite_CppAssertComp_1_t::dump(FILE *f, int t) {
 
   @Test def testPrintfCpp() {
 
-    class CppPrintfComp extends Component {
+    class CppPrintfComp extends Mod {
       val io = new Bundle {
         val x = UFix(INPUT, 8)
         val y = UFix(INPUT, 8)
@@ -157,7 +157,7 @@ void VerifSuite_CppPrintfComp_1_t::dump(FILE *f, int t) {
 
   @Test def testPrintfVerilog() {
 
-    class VerilogPrintfComp extends Component {
+    class VerilogPrintfComp extends Mod {
       val io = new Bundle {
         val x = UFix(INPUT, 8)
         val y = UFix(INPUT, 8)

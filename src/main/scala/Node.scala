@@ -34,7 +34,6 @@ import scala.collection.mutable.Stack
 import java.io.PrintStream
 
 import Node._;
-import Component._;
 import ChiselError._;
 
 object Node {
@@ -97,7 +96,7 @@ object Node {
 
   def rshWidthOf(i: Int, n: Node) = { (m: Node) => m.inputs(i).width - n.minNum.toInt }
 
-  /* clk is initialized in Component.initChisel */
+  /* clk is initialized in Mod.initChisel */
   var clk: Node = null
 
 }
@@ -113,12 +112,12 @@ abstract class Node extends nameable {
   var sccIndex = -1
   var sccLowlink = -1
   var walked = false;
-  val staticComp: Component = getComponent();
-  var component: Component = null;
+  val staticComp: Mod = Mod.getComponent();
+  var component: Mod = null;
   var flattened = false;
   var isTypeNode = false;
   var depth = 0;
-  def componentOf: Component = if (isEmittingComponents && component != null) component else topComponent
+  def componentOf: Mod = if (Mod.isEmittingComponents && component != null) component else Mod.topComponent
   var isSigned = false;
   var width_ = -1;
   var index = -1;
@@ -138,7 +137,7 @@ abstract class Node extends nameable {
   var isPrintArg = false
   def isMemOutput = false
 
-  nodes += this
+  Mod.nodes += this
 
   def setIsSigned = isSigned = true
   def isByValue: Boolean = true;
@@ -250,10 +249,10 @@ abstract class Node extends nameable {
     }
   }
   def isInObject =
-    (isIo && (isIoDebug || component == topComponent)) ||
-    topComponent.debugs.contains(this) ||
-    isReg || isUsedByRam || isDebug || isPrintArg || isScanArg;
-  def isInVCD = (isIo && isInObject) || isReg || (isDebug && !name.isEmpty);
+    (isIo && (Mod.isIoDebug || component == Mod.topComponent)) ||
+    Mod.topComponent.debugs.contains(this) ||
+    isReg || isUsedByRam || Mod.isDebug || isPrintArg || isScanArg;
+  def isInVCD = (isIo && isInObject) || isReg || (Mod.isDebug && !name.isEmpty);
   
   /** Prints all members of a node and recursively its inputs up to a certain
     depth level. This method is purely used for debugging. */
@@ -305,7 +304,7 @@ abstract class Node extends nameable {
     }
   }
 
-  def traceNode(c: Component, stack: Stack[() => Any]): Any = {
+  def traceNode(c: Mod, stack: Stack[() => Any]): Any = {
     if(this.isTypeNode) println("found " + this)
     // determine whether or not the component needs a clock input
     if ((isReg || isClkInput) && !(component == null)) {
@@ -343,10 +342,10 @@ abstract class Node extends nameable {
       for (node <- inputs) {
         if (node != null) {
            //tmp fix, what happens if multiple componenets reference static nodes?
-          if (node.component == null || !components.contains(node.component)) {
+          if (node.component == null || !Mod.components.contains(node.component)) {
             node.component = nextComp;
           }
-          if (!backend.isInstanceOf[VerilogBackend] || !node.isIo) {
+          if (!Mod.backend.isInstanceOf[VerilogBackend] || !node.isIo) {
             stack.push(() => node.traceNode(nextComp, stack));
           }
           val j = i;
@@ -433,7 +432,7 @@ abstract class Node extends nameable {
   def removeTypeNodes() {
     for(i <- 0 until inputs.length) {
       if(inputs(i) == null){
-        val error = new ChiselError(() => {"NULL Input for " + this.getClass + " " + this + " in Component " + component}, this.line);
+        val error = new ChiselError(() => {"NULL Input for " + this.getClass + " " + this + " in Mod " + component}, this.line);
         if (!ChiselErrors.contains(error)) {
           ChiselErrors += error
         }

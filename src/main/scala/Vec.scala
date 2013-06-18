@@ -29,7 +29,7 @@
 */
 
 package Chisel
-import Component._
+
 import ChiselError._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
@@ -43,12 +43,12 @@ object VecUFixToOH
 {
   def apply(in: UFix, width: Int): UFix =
   {
-    if(chiselOneHotMap.contains((in, width))) {
-      chiselOneHotMap((in, width))
+    if(Mod.chiselOneHotMap.contains((in, width))) {
+      Mod.chiselOneHotMap((in, width))
     } else {
       val out = UFix(1, width)
       val res = (out << in)(width-1,0)
-      chiselOneHotMap += ((in, width) -> res)
+      Mod.chiselOneHotMap += ((in, width) -> res)
       res
     }
   }
@@ -116,11 +116,11 @@ object Vec {
 
   def getEnable(onehot: UFix, i: Int): Bool = {
     var enable: Bool = null
-      if(chiselOneHotBitMap.contains(onehot, i)){
-        enable = chiselOneHotBitMap(onehot, i)
+      if(Mod.chiselOneHotBitMap.contains(onehot, i)){
+        enable = Mod.chiselOneHotBitMap(onehot, i)
       } else {
         enable = onehot(i)
-        chiselOneHotBitMap += ((onehot, i) -> enable)
+        Mod.chiselOneHotBitMap += ((onehot, i) -> enable)
       }
     enable
   }
@@ -148,7 +148,7 @@ class VecProc extends proc {
 
   def procAssign(src: Node) = {
     val onehot = VecUFixToOH(addr, elms.length)
-    searchAndMap = true
+    Mod.searchAndMap = true
     for(i <- 0 until elms.length){
       when (getEnable(onehot, i)) {
         if(elms(i).comp != null) {
@@ -158,7 +158,7 @@ class VecProc extends proc {
         }
       }
     }
-    searchAndMap = false
+    Mod.searchAndMap = false
   }
 }
 
@@ -198,13 +198,13 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable w
     if(data.isInstanceOf[Node]){
 
       val onehot = VecUFixToOH(addr, length)
-      searchAndMap = true
+      Mod.searchAndMap = true
       for(i <- 0 until length){
         when (getEnable(onehot, i)) {
           this(i).comp procAssign data.toNode
         }
       }
-      searchAndMap = false
+      Mod.searchAndMap = false
     }
   }
 
@@ -319,7 +319,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable w
 
   override def traceableNodes = self.toArray
 
-  override def traceNode(c: Component, stack: Stack[() => Any]) {
+  override def traceNode(c: Mod, stack: Stack[() => Any]) {
     for((n, i) <- flatten) {
       stack.push(() => i.traceNode(c, stack))
     }
