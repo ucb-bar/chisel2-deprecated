@@ -83,7 +83,7 @@ class DotBackendSuite extends AssertionsForJUnit {
         // not c++. This is an interaction between Component.findRoots
         // and class Bool { def apply(): Bool = Bool(null); }
       }
-      val sub = module(new DAGSubComp())
+      val sub = Mod(new DAGSubComp())
       sub.io.ready := io.data0 & io.data1
       io.result := sub.io.valid
     }
@@ -91,7 +91,7 @@ class DotBackendSuite extends AssertionsForJUnit {
     chiselMain(Array[String](
       "--backend", "Chisel.DotBackend",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new DAGComp()))
+      () => Mod(new DAGComp()))
     assertFile(tmpdir.getRoot() + "/DotBackendSuite_DAGComp_1.dot",
 """digraph DotBackendSuite_DAGComp_1{
 rankdir = LR;

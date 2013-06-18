@@ -73,7 +73,7 @@ class VerifSuite extends AssertionsForJUnit {
 
     chiselMain(Array[String]("--c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new CppAssertComp()))
+      () => Mod(new CppAssertComp()))
     assertFile(tmpdir.getRoot() + "/VerifSuite_CppAssertComp_1.cpp",
 """#include "VerifSuite_CppAssertComp_1.h"
 
@@ -111,7 +111,7 @@ void VerifSuite_CppAssertComp_1_t::dump(FILE *f, int t) {
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new VerilogAssertComp()))
+      () => Mod(new VerilogAssertComp()))
   }
 
   @Test def testPrintfCpp() {
@@ -129,7 +129,7 @@ void VerifSuite_CppAssertComp_1_t::dump(FILE *f, int t) {
       because the emulator resource is closed. 
     chiselMain(Array[String]("--c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new CppPrintfComp()))
+      () => Mod(new CppPrintfComp()))
     assertFile(tmpdir.getRoot() + "/VerifSuite_CppPrintfComp_1.cpp",
 """#include "VerifSuite_CppPrintfComp_1.h"
 
@@ -169,6 +169,6 @@ void VerifSuite_CppPrintfComp_1_t::dump(FILE *f, int t) {
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new VerilogPrintfComp()))
+      () => Mod(new VerilogPrintfComp()))
   }
 }

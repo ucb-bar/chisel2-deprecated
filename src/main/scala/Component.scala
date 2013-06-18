@@ -187,11 +187,11 @@ object Component {
   }
 
   private def push(c: Component) {
-    if( !module.trigger ) {
+    if( !Mod.trigger ) {
       ChiselError.error(
         c.getClass.getName + " was not properly wrapped into a module() call.")
     }
-    module.trigger = false
+    Mod.trigger = false
     compStack.push(c);
     printStackStruct += ((stackIndent, c));
     stackIndent += 1;
@@ -810,10 +810,10 @@ abstract class Component(resetSignal: Bool = null) {
 }
 
 
-object module {
+object Mod {
 
   /* Any call to a *Component* constructor without a proper wrapping
-   into a module.apply() call will be detected when trigger is false. */
+   into a Mod.apply() call will be detected when trigger is false. */
   var trigger: Boolean = false
 
   def apply[T <: Component](c: => T): T = {

@@ -96,7 +96,7 @@ class NameSuite extends AssertionsForJUnit {
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new ListLookupsComp()))
+      () => Mod(new ListLookupsComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_ListLookupsComp_1.v",
 """module NameSuite_ListLookupsComp_1(
     input [31:0] io_inst,
@@ -148,7 +148,7 @@ endmodule
 
     class BindFirstComp extends Component {
       val io = new BlockIO
-      val dec = module(new BlockDecoder());
+      val dec = Mod(new BlockDecoder());
 
       val valid_common = io.valid;
 
@@ -163,7 +163,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new BindFirstComp()))
+      () => Mod(new BindFirstComp()))
    assertFile(tmpdir.getRoot() + "/NameSuite_BindFirstComp_1.v",
 """module NameSuite_BlockDecoder_1(
     input  io_valid,
@@ -230,7 +230,7 @@ endmodule
       }
 
       if( conf ) {
-        val vec = module(new Block());
+        val vec = Mod(new Block());
         vec.io.irq := io.irq;
         io.irq_cause := UFix(1) ## vec.io.irq_cause;
       }
@@ -238,7 +238,7 @@ endmodule
 
     chiselMain(Array[String]("--v", "--c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new BindSecondComp(true)))
+      () => Mod(new BindSecondComp(true)))
    assertFile(tmpdir.getRoot() + "/NameSuite_BindSecondComp_1.v",
 """module NameSuite_Block_1(
     input  io_irq,
@@ -298,7 +298,7 @@ endmodule
 
       var first = true
       for (i <- 0 until 4) {
-        val bank = module(new Comp())
+        val bank = Mod(new Comp())
         if (first) {
           bank.io.in <> io.in
           first = false
@@ -312,7 +312,7 @@ endmodule
 
     chiselMain(Array[String]("--v", "--c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new BindThirdComp()))
+      () => Mod(new BindThirdComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_BindThirdComp_1.v",
 """module NameSuite_Comp_1(
     input  io_in_ren,
@@ -376,7 +376,7 @@ endmodule
 
     chiselMain(Array[String]("--v", "--c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new BindFourthComp()))
+      () => Mod(new BindFourthComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_BindFourthComp_1.v",
 """module NameSuite_BindFourthComp_1(
     input [4:0] io_in,
@@ -432,7 +432,7 @@ endmodule
 
       val ptw = collection.mutable.ArrayBuffer(io.imem_ptw, io.dmem_ptw)
       if( true ) {
-        val vdtlb = module(new Block())
+        val vdtlb = Mod(new Block())
         ptw += vdtlb.io.sub
         vdtlb.io <> io.imem_ptw
       }
@@ -441,7 +441,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new BindFithComp))
+      () => Mod(new BindFithComp))
     assertFile(tmpdir.getRoot() + "/NameSuite_BindFithComp_1.v",
 """module NameSuite_Block_2(input clk, input reset,
     input  io_valid,
@@ -543,7 +543,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new VecComp()))
+      () => Mod(new VecComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_VecComp_1.v",
 """module NameSuite_VecComp_1(input clk, input reset,
     input  io_r_en,
@@ -615,7 +615,7 @@ endmodule
 
     chiselMain(Array[String]("--v", "--c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new VecSecondComp()))
+      () => Mod(new VecSecondComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_VecSecondComp_1.v",
 """module NameSuite_VecSecondComp_1(input clk, input reset,
     output io_requestor_0_req_ready,
@@ -679,9 +679,9 @@ endmodule
 
     class VariationComp extends Component {
       val io = new BlockIO();
-      val block_0 = module(new CompBlock(8));
-      val block_1 = module(new CompBlock(8));
-      val block_2 = module(new CompBlock(16));
+      val block_0 = Mod(new CompBlock(8));
+      val block_1 = Mod(new CompBlock(8));
+      val block_2 = Mod(new CompBlock(16));
 
       block_0.io.valid := io.valid;
       block_1.io.valid := io.valid;
@@ -691,7 +691,7 @@ endmodule
 
     chiselMain(Array[String]("--v", "--c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new VariationComp()))
+      () => Mod(new VariationComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_VariationComp_1.v",
 """module NameSuite_CompBlock_1_0(
     input  io_valid,
@@ -759,7 +759,7 @@ endmodule
 
     chiselMain(Array[String]("--v", "--noInlineMem",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new MemComp()))
+      () => Mod(new MemComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_MemComp_1.v",
 """module NameSuite_MemComp_1(input clk, input reset,
     input  io_ren,
@@ -815,14 +815,14 @@ endmodule
         val ctrl_out = Bool(OUTPUT);
       }
 
-      val dpath = module(new Block)
+      val dpath = Mod(new Block)
       dpath.io.ctrl_wb_wen := io.ctrl_wb_wen
       io.ctrl_out := dpath.io.ctrl_out
     }
 
     chiselMain(Array[String]("--c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new DebugComp))
+      () => Mod(new DebugComp))
     assertFile(tmpdir.getRoot() + "/NameSuite_DebugComp_1.h",
 """#ifndef __NameSuite_DebugComp_1__
 #define __NameSuite_DebugComp_1__
