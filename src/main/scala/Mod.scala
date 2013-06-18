@@ -124,6 +124,7 @@ object Mod {
     isIoDebug = true;
     isClockGatingUpdates = false;
     isClockGatingUpdatesInline = false;
+    isVCD = false;
     isFolding = true;
     isReportDims = false;
     scanFormat = "";

@@ -280,7 +280,7 @@ class LockingRRArbiter[T <: Bits](gen: T, n: Int, count: Int, needsLock: Option[
   when (io.out.fire()) { last_grant := chosen }
 }
 
-class LockingArbiter[T <: Bits](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
+class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
   val ctrl = ArbiterCtrl(io.in.map(_.valid))
   grant zip ctrl map { case(g, c) => g := c }
 
@@ -293,7 +293,7 @@ class LockingArbiter[T <: Bits](gen: T, n: Int, count: Int, needsLock: Option[T 
 
 class RRArbiter[T <: Bits](gen:T, n: Int) extends LockingRRArbiter[T](gen, n, 1)
 
-class Arbiter[T <: Bits](gen: T, n: Int) extends LockingArbiter[T](gen, n, 1)
+class Arbiter[T <: Data](gen: T, n: Int) extends LockingArbiter[T](gen, n, 1)
 
 
 object FillInterleaved
@@ -320,14 +320,14 @@ object Counter
   }
 }
 
-class ioQueue[T <: Bits](gen: T, entries: Int) extends Bundle
+class ioQueue[T <: Data](gen: T, entries: Int) extends Bundle
 {
   val enq   = new FIFOIO(gen.clone).flip
   val deq   = new FIFOIO(gen.clone)
   val count = UFix(OUTPUT, log2Up(entries + 1))
 }
 
-class Queue[T <: Bits](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, resetSignal: Bool = null) extends Mod(resetSignal)
+class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, resetSignal: Bool = null) extends Mod(resetSignal)
 {
   val io = new ioQueue(gen, entries)
 
@@ -370,8 +370,8 @@ class Queue[T <: Bits](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
 
 object Queue
 {
-  def apply[T <: Bits](enq: FIFOIO[T], entries: Int = 2, pipe: Boolean = false) = {
-    val q = new Queue(enq.bits.clone, entries, pipe)
+  def apply[T <: Data](enq: FIFOIO[T], entries: Int = 2, pipe: Boolean = false) = {
+    val q = Mod(new Queue(enq.bits.clone, entries, pipe))
     q.io.enq.valid := enq.valid // not using <> so that override is allowed
     q.io.enq.bits := enq.bits
     enq.ready := q.io.enq.ready

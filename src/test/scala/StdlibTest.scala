@@ -523,22 +523,380 @@ endmodule
       () => Mod(new foldRComp()))
   }
 
-  /** Generate a ArbiterCtrl
-    */
-  @Test def testArbiterCtrl() {
+  /** Generate an Arbiter such that first valid wins.
 
-    class ArbiterCtrlComp extends Mod {
-      val io = new Bundle {
-        val in0 = Bool(INPUT)
-        val in1 = Bool(INPUT)
-        val out = Bool(OUTPUT)
-      }
-      val x = ArbiterCtrl(io.in0 :: io.in1 :: Nil)
+      Arbiter[T <: Bits](gen: T,
+           n: Int) extends LockingArbiter[T](gen, n, 1)
+      LockingArbiter[T <: Bits](gen: T,
+           n: Int, count: Int, needsLock: Option[T => Bool] = None)
+      LockingArbiterLike[T <: Data](gen: T,
+           n: Int, count: Int, needsLock: Option[T => Bool] = None)
+    */
+  @Test def testArbiter() {
+    class ArbiterTest extends Arbiter(Fix(width=8), 4) {
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new ArbiterCtrlComp()))
+      () => Mod(new ArbiterTest()))
+    assertFile(tmpdir.getRoot() + "/StdlibSuite_ArbiterTest_1.v",
+"""module StdlibSuite_ArbiterTest_1(
+    output io_in_0_ready,
+    input  io_in_0_valid,
+    input  signed [7:0] io_in_0_bits,
+    output io_in_1_ready,
+    input  io_in_1_valid,
+    input  signed [7:0] io_in_1_bits,
+    output io_in_2_ready,
+    input  io_in_2_valid,
+    input  signed [7:0] io_in_2_bits,
+    output io_in_3_ready,
+    input  io_in_3_valid,
+    input  signed [7:0] io_in_3_bits,
+    input  io_out_ready,
+    output io_out_valid,
+    output signed [7:0] io_out_bits,
+    output[1:0] io_chosen);
+
+  wire[1:0] T0;
+  wire[1:0] T1;
+  wire[1:0] T2;
+  wire[1:0] T3;
+  wire[1:0] T4;
+  wire[1:0] T5;
+  wire signed [7:0] T6;
+  wire signed [7:0] T7;
+  wire T8;
+  wire[1:0] T9;
+  wire signed [7:0] T10;
+  wire T11;
+  wire T12;
+  wire T13;
+  wire T14;
+  wire T15;
+  wire T16;
+  wire T17;
+  wire T18;
+  wire T19;
+  wire T20;
+  wire T21;
+  wire T22;
+  wire T23;
+  wire T24;
+  wire T25;
+  wire T26;
+  wire T27;
+  wire T28;
+  wire T29;
+  wire T30;
+  wire T31;
+  wire T32;
+
+  assign io_chosen = T0;
+  assign T0 = T1;
+  assign T1 = io_in_0_valid ? T5 : T2;
+  assign T2 = io_in_1_valid ? T4 : T3;
+  assign T3 = io_in_2_valid ? 2'h2/* 2*/ : 2'h3/* 3*/;
+  assign T4 = {1'h0/* 0*/, 1'h1/* 1*/};
+  assign T5 = {1'h0/* 0*/, 1'h0/* 0*/};
+  assign io_out_bits = T6;
+  assign T6 = T12 ? T10 : T7;
+  assign T7 = T8 ? io_in_1_bits : io_in_0_bits;
+  assign T8 = T9[1'h0/* 0*/:1'h0/* 0*/];
+  assign T9 = T0;
+  assign T10 = T11 ? io_in_3_bits : io_in_2_bits;
+  assign T11 = T9[1'h0/* 0*/:1'h0/* 0*/];
+  assign T12 = T9[1'h1/* 1*/:1'h1/* 1*/];
+  assign io_out_valid = T13;
+  assign T13 = T18 ? T16 : T14;
+  assign T14 = T15 ? io_in_1_valid : io_in_0_valid;
+  assign T15 = T9[1'h0/* 0*/:1'h0/* 0*/];
+  assign T16 = T17 ? io_in_3_valid : io_in_2_valid;
+  assign T17 = T9[1'h0/* 0*/:1'h0/* 0*/];
+  assign T18 = T9[1'h1/* 1*/:1'h1/* 1*/];
+  assign io_in_3_ready = T19;
+  assign T19 = T20 && io_out_ready;
+  assign T20 = T21;
+  assign T21 = ! T22;
+  assign T22 = T23 || io_in_2_valid;
+  assign T23 = io_in_0_valid || io_in_1_valid;
+  assign io_in_2_ready = T24;
+  assign T24 = T25 && io_out_ready;
+  assign T25 = T26;
+  assign T26 = ! T27;
+  assign T27 = io_in_0_valid || io_in_1_valid;
+  assign io_in_1_ready = T28;
+  assign T28 = T29 && io_out_ready;
+  assign T29 = T30;
+  assign T30 = ! io_in_0_valid;
+  assign io_in_0_ready = T31;
+  assign T31 = T32 && io_out_ready;
+  assign T32 = 1'h1/* 1*/;
+endmodule
+
+""")
+  }
+
+  /** XXX Generate an Arbiter that needs locking.
+
+      Arbiter[T <: Bits](gen: T,
+           n: Int) extends LockingArbiter[T](gen, n, 1)
+      LockingArbiter[T <: Bits](gen: T,
+           n: Int, count: Int, needsLock: Option[T => Bool] = None)
+      LockingArbiterLike[T <: Data](gen: T,
+           n: Int, count: Int, needsLock: Option[T => Bool] = None)
+
+  @Test def testArbiterNeedsLock() {
+    class ArbiterNeedsLock extends Arbiter(Fix(width=8), 4,
+      needsLock=Some()) {
+    }
+
+    chiselMain(Array[String]("--v",
+    "--targetDir", tmpdir.getRoot().toString()),
+      () => Mod(new ArbiterNeedsLock()))
+    assertFile(tmpdir.getRoot() + "/NeedsLock.v",
+"""
+""")
+  }
+    */
+
+  /** Generate a Round-Robin arbiter.
+
+      RRArbiter[T <: Bits](gen: T,
+           n: Int) extends LockingRRArbiter[T](gen, n, 1)
+      LockingRRArbiter[T <: Bits](gen: T,
+           n: Int, count: Int, needsLock: Option[T => Bool] = None)
+      LockingArbiterLike[T <: Data](gen: T,
+           n: Int, count: Int, needsLock: Option[T => Bool] = None)
+    */
+  @Test def testRRArbiter() {
+    class RRArbiterTest extends RRArbiter(Fix(width=8), 4) {
+    }
+
+    chiselMain(Array[String]("--v",
+      "--targetDir", tmpdir.getRoot().toString()),
+      () => Mod(new RRArbiterTest()))
+    assertFile(tmpdir.getRoot() + "/StdlibSuite_RRArbiterTest_1.v",
+"""module StdlibSuite_RRArbiterTest_1(input clk, input reset,
+    output io_in_0_ready,
+    input  io_in_0_valid,
+    input  signed [7:0] io_in_0_bits,
+    output io_in_1_ready,
+    input  io_in_1_valid,
+    input  signed [7:0] io_in_1_bits,
+    output io_in_2_ready,
+    input  io_in_2_valid,
+    input  signed [7:0] io_in_2_bits,
+    output io_in_3_ready,
+    input  io_in_3_valid,
+    input  signed [7:0] io_in_3_bits,
+    input  io_out_ready,
+    output io_out_valid,
+    output signed [7:0] io_out_bits,
+    output[1:0] io_chosen);
+
+  wire[1:0] T0;
+  wire[1:0] T1;
+  wire[1:0] T2;
+  wire[1:0] T3;
+  wire[1:0] T4;
+  wire[1:0] T5;
+  wire[1:0] T6;
+  wire[1:0] T7;
+  wire[1:0] T8;
+  wire T9;
+  wire T10;
+  reg[1:0] R11;
+  wire T12;
+  wire[1:0] T13;
+  wire T14;
+  wire T15;
+  wire[1:0] T16;
+  wire T17;
+  wire T18;
+  wire[1:0] T19;
+  wire signed [7:0] T20;
+  wire signed [7:0] T21;
+  wire T22;
+  wire[1:0] T23;
+  wire signed [7:0] T24;
+  wire T25;
+  wire T26;
+  wire T27;
+  wire T28;
+  wire T29;
+  wire T30;
+  wire T31;
+  wire T32;
+  wire T33;
+  wire T34;
+  wire T35;
+  wire T36;
+  wire T37;
+  wire T38;
+  wire T39;
+  wire T40;
+  wire T41;
+  wire T42;
+  wire T43;
+  wire T44;
+  wire T45;
+  wire T46;
+  wire T47;
+  wire T48;
+  wire[1:0] T49;
+  wire T50;
+  wire T51;
+  wire[1:0] T52;
+  wire T53;
+  wire T54;
+  wire T55;
+  wire T56;
+  wire T57;
+  wire T58;
+  wire T59;
+  wire T60;
+  wire T61;
+  wire T62;
+  wire T63;
+  wire T64;
+  wire T65;
+  wire T66;
+  wire T67;
+  wire T68;
+  wire T69;
+  wire T70;
+  wire T71;
+  wire T72;
+  wire T73;
+  wire T74;
+  wire T75;
+  wire T76;
+  wire T77;
+  wire T78;
+  wire T79;
+  wire T80;
+  wire[1:0] T81;
+  wire T82;
+  wire T83;
+  wire T84;
+  wire T85;
+  wire T86;
+  wire T87;
+  wire T88;
+  wire T89;
+  wire T90;
+  wire[1:0] T91;
+
+  assign io_chosen = T0;
+  assign T0 = T1;
+  assign T1 = T17 ? T16 : T2;
+  assign T2 = T14 ? 2'h2/* 2*/ : T3;
+  assign T3 = T9 ? 2'h3/* 3*/ : T4;
+  assign T4 = io_in_0_valid ? T8 : T5;
+  assign T5 = io_in_1_valid ? T7 : T6;
+  assign T6 = io_in_2_valid ? 2'h2/* 2*/ : 2'h3/* 3*/;
+  assign T7 = {1'h0/* 0*/, 1'h1/* 1*/};
+  assign T8 = {1'h0/* 0*/, 1'h0/* 0*/};
+  assign T9 = io_in_3_valid && T10;
+  assign T10 = 2'h3/* 3*/ > R11;
+  assign T12 = io_out_ready && io_out_valid;
+  assign T13 = 1'h1/* 1*/ ? T0 : R11;
+  assign T14 = io_in_2_valid && T15;
+  assign T15 = 2'h2/* 2*/ > R11;
+  assign T16 = {1'h0/* 0*/, 1'h1/* 1*/};
+  assign T17 = io_in_1_valid && T18;
+  assign T18 = T19 > R11;
+  assign T19 = {1'h0/* 0*/, 1'h1/* 1*/};
+  assign io_out_bits = T20;
+  assign T20 = T26 ? T24 : T21;
+  assign T21 = T22 ? io_in_1_bits : io_in_0_bits;
+  assign T22 = T23[1'h0/* 0*/:1'h0/* 0*/];
+  assign T23 = T0;
+  assign T24 = T25 ? io_in_3_bits : io_in_2_bits;
+  assign T25 = T23[1'h0/* 0*/:1'h0/* 0*/];
+  assign T26 = T23[1'h1/* 1*/:1'h1/* 1*/];
+  assign io_out_valid = T27;
+  assign T27 = T32 ? T30 : T28;
+  assign T28 = T29 ? io_in_1_valid : io_in_0_valid;
+  assign T29 = T23[1'h0/* 0*/:1'h0/* 0*/];
+  assign T30 = T31 ? io_in_3_valid : io_in_2_valid;
+  assign T31 = T23[1'h0/* 0*/:1'h0/* 0*/];
+  assign T32 = T23[1'h1/* 1*/:1'h1/* 1*/];
+  assign io_in_3_ready = T33;
+  assign T33 = T34 && io_out_ready;
+  assign T34 = T35;
+  assign T35 = T53 || T36;
+  assign T36 = ! T37;
+  assign T37 = T38 || io_in_2_valid;
+  assign T38 = T39 || io_in_1_valid;
+  assign T39 = T40 || io_in_0_valid;
+  assign T40 = T43 || T41;
+  assign T41 = io_in_3_valid && T42;
+  assign T42 = 2'h3/* 3*/ > R11;
+  assign T43 = T46 || T44;
+  assign T44 = io_in_2_valid && T45;
+  assign T45 = 2'h2/* 2*/ > R11;
+  assign T46 = T50 || T47;
+  assign T47 = io_in_1_valid && T48;
+  assign T48 = T49 > R11;
+  assign T49 = {1'h0/* 0*/, 1'h1/* 1*/};
+  assign T50 = io_in_0_valid && T51;
+  assign T51 = T52 > R11;
+  assign T52 = {1'h0/* 0*/, 1'h0/* 0*/};
+  assign T53 = T55 && T54;
+  assign T54 = 2'h3/* 3*/ > R11;
+  assign T55 = ! T56;
+  assign T56 = T57 || T44;
+  assign T57 = T50 || T47;
+  assign io_in_2_ready = T58;
+  assign T58 = T59 && io_out_ready;
+  assign T59 = T60;
+  assign T60 = T67 || T61;
+  assign T61 = ! T62;
+  assign T62 = T63 || io_in_1_valid;
+  assign T63 = T64 || io_in_0_valid;
+  assign T64 = T65 || T41;
+  assign T65 = T66 || T44;
+  assign T66 = T50 || T47;
+  assign T67 = T69 && T68;
+  assign T68 = 2'h2/* 2*/ > R11;
+  assign T69 = ! T70;
+  assign T70 = T50 || T47;
+  assign io_in_1_ready = T71;
+  assign T71 = T72 && io_out_ready;
+  assign T72 = T73;
+  assign T73 = T79 || T74;
+  assign T74 = ! T75;
+  assign T75 = T76 || io_in_0_valid;
+  assign T76 = T77 || T41;
+  assign T77 = T78 || T44;
+  assign T78 = T50 || T47;
+  assign T79 = T82 && T80;
+  assign T80 = T81 > R11;
+  assign T81 = {1'h0/* 0*/, 1'h1/* 1*/};
+  assign T82 = ! T50;
+  assign io_in_0_ready = T83;
+  assign T83 = T84 && io_out_ready;
+  assign T84 = T85;
+  assign T85 = T90 || T86;
+  assign T86 = ! T87;
+  assign T87 = T88 || T41;
+  assign T88 = T89 || T44;
+  assign T89 = T50 || T47;
+  assign T90 = T91 > R11;
+  assign T91 = {1'h0/* 0*/, 1'h0/* 0*/};
+
+  always @(posedge clk) begin
+    if(reset) begin
+      R11 <= 2'h0/* 0*/;
+    end else if(T12) begin
+      R11 <= T13;
+    end
+  end
+endmodule
+
+""")
   }
 
   /** Generate a FillInterleaved
@@ -576,6 +934,79 @@ endmodule
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Mod(new CounterComp()))
+  }
+
+  /* XXX. */
+  @Test def testOHToUFix() {
+    println("\ntestOHToUFix ...")
+    class OHToUFixComp extends Mod {
+      val io = new Bundle {
+        val in = Bool(INPUT)
+        val out = UFix(OUTPUT)
+      }
+      io.out := OHToUFix(Bool(true) :: io.in :: Bool(false) :: io.in :: Nil)
+    }
+
+    chiselMain(Array[String]("--v",
+      "--targetDir", tmpdir.getRoot().toString()),
+      () => Mod(new OHToUFixComp()))
+    assertFile(tmpdir.getRoot() + "/StdlibSuite_OHToUFixComp_1.v",
+"""module StdlibSuite_OHToUFixComp_1(
+    input  io_in,
+    output[1:0] io_out);
+
+  wire[1:0] T0;
+  wire T1;
+
+  assign io_out = T0;
+  assign T0 = {io_in, T1};
+  assign T1 = io_in || io_in;
+endmodule
+
+""")
+  }
+
+  /* Delays an element by a fixed latency. */
+  @Test def testPipe() {
+    println("\ntestPipe ...")
+    class PipeComp extends Pipe(UFix(width=8), 2) {
+    }
+
+    chiselMain(Array[String]("--v",
+      "--targetDir", tmpdir.getRoot().toString()),
+      () => Mod(new PipeComp()))
+    assertFile(tmpdir.getRoot() + "/StdlibSuite_PipeComp_1.v",
+"""module StdlibSuite_PipeComp_1(input clk, input reset,
+    input  io_enq_valid,
+    input [7:0] io_enq_bits,
+    output io_deq_valid,
+    output[7:0] io_deq_bits);
+
+  reg[7:0] R0;
+  reg[0:0] R1;
+  wire[7:0] T2;
+  reg[7:0] R3;
+  wire[7:0] T4;
+  reg[0:0] R5;
+
+  assign io_deq_bits = R0;
+  assign T2 = 1'h1/* 1*/ ? R3 : R0;
+  assign T4 = 1'h1/* 1*/ ? io_enq_bits : R3;
+  assign io_deq_valid = R5;
+
+  always @(posedge clk) begin
+    if(R1) begin
+      R0 <= T2;
+    end
+    R1 <= reset ? 1'h0/* 0*/ : io_enq_valid;
+    if(io_enq_valid) begin
+      R3 <= T4;
+    end
+    R5 <= reset ? 1'h0/* 0*/ : R1;
+  end
+endmodule
+
+""")
   }
 
   /** Generate a PriorityMux
@@ -635,6 +1066,138 @@ endmodule
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Mod(new PriorityEncoderOHComp()))
+  }
+
+  /* Implements a queue of elements (first-in, first-out). */
+  @Test def testQueue() {
+    println("\ntestQueue ...")
+    class QueueComp extends Mod {
+      val io = new Bundle {
+        val req = new FIFOIO(UFix(width=8)).flip
+        val resp = new FIFOIO(UFix(width=8))
+      }
+      io.resp <> Queue(io.req)
+    }
+
+    chiselMain(Array[String]("--v",
+      "--targetDir", tmpdir.getRoot().toString()),
+      () => Mod(new QueueComp()))
+    assertFile(tmpdir.getRoot() + "/StdlibSuite_QueueComp_1.v",
+"""module Queue(input clk, input reset,
+    output io_enq_ready,
+    input  io_enq_valid,
+    input [7:0] io_enq_bits,
+    input  io_deq_ready,
+    output io_deq_valid,
+    output[7:0] io_deq_bits,
+    output[1:0] io_count);
+
+  wire[1:0] T0;
+  wire ptr_diff;
+  reg[0:0] deq_ptr;
+  wire do_deq;
+  wire T1;
+  wire do_flow;
+  wire T2;
+  wire T3;
+  wire T4;
+  reg[0:0] enq_ptr;
+  wire do_enq;
+  wire T5;
+  wire T6;
+  wire T7;
+  wire T8;
+  wire T9;
+  wire T10;
+  reg[0:0] maybe_full;
+  wire T11;
+  wire T12;
+  wire[7:0] T13;
+  reg [7:0] ram [1:0];
+  wire[7:0] T14;
+  wire[7:0] T15;
+  wire T16;
+  wire empty;
+  wire T17;
+  wire T18;
+  wire full;
+
+  assign io_count = T0;
+  assign T0 = {T9, ptr_diff};
+  assign ptr_diff = enq_ptr - deq_ptr;
+  assign do_deq = T2 && T1;
+  assign T1 = ! do_flow;
+  assign do_flow = 1'h0/* 0*/;
+  assign T2 = io_deq_ready && io_deq_valid;
+  assign T3 = 1'h1/* 1*/ ? T4 : deq_ptr;
+  assign T4 = deq_ptr + 1'h1/* 1*/;
+  assign do_enq = T6 && T5;
+  assign T5 = ! do_flow;
+  assign T6 = io_enq_ready && io_enq_valid;
+  assign T7 = 1'h1/* 1*/ ? T8 : enq_ptr;
+  assign T8 = enq_ptr + 1'h1/* 1*/;
+  assign T9 = maybe_full && T10;
+  assign T10 = enq_ptr == deq_ptr;
+  assign T11 = do_enq != do_deq;
+  assign T12 = 1'h1/* 1*/ ? do_enq : maybe_full;
+  assign io_deq_bits = T13;
+  assign T13 = ram[deq_ptr];
+  assign T15 = io_enq_bits;
+  assign io_deq_valid = T16;
+  assign T16 = ! empty;
+  assign empty = T10 && T17;
+  assign T17 = ! maybe_full;
+  assign io_enq_ready = T18;
+  assign T18 = ! full;
+  assign full = T10 && maybe_full;
+
+  always @(posedge clk) begin
+    if(reset) begin
+      deq_ptr <= 1'h0/* 0*/;
+    end else if(do_deq) begin
+      deq_ptr <= T3;
+    end
+    if(reset) begin
+      enq_ptr <= 1'h0/* 0*/;
+    end else if(do_enq) begin
+      enq_ptr <= T7;
+    end
+    if(reset) begin
+      maybe_full <= 1'h0/* 0*/;
+    end else if(T11) begin
+      maybe_full <= T12;
+    end
+    if (do_enq)
+      ram[enq_ptr] <= T15;
+  end
+endmodule
+
+module StdlibSuite_QueueComp_1(input clk, input reset,
+    output io_req_ready,
+    input  io_req_valid,
+    input [7:0] io_req_bits,
+    input  io_resp_ready,
+    output io_resp_valid,
+    output[7:0] io_resp_bits);
+
+  wire[7:0] Queue_io_deq_bits;
+  wire Queue_io_deq_valid;
+  wire Queue_io_enq_ready;
+
+  assign io_resp_bits = Queue_io_deq_bits;
+  assign io_resp_valid = Queue_io_deq_valid;
+  assign io_req_ready = Queue_io_enq_ready;
+  Queue Queue(.clk(clk), .reset(reset),
+       .io_enq_ready( Queue_io_enq_ready ),
+       .io_enq_valid( io_req_valid ),
+       .io_enq_bits( io_req_bits ),
+       .io_deq_ready( io_resp_ready ),
+       .io_deq_valid( Queue_io_deq_valid ),
+       .io_deq_bits( Queue_io_deq_bits ),
+       .io_count(  ));
+endmodule
+
+""")
   }
 
   /** Generate a Fill
