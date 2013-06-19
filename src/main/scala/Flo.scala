@@ -39,7 +39,6 @@ import scala.sys.process._
 import Node._
 import Reg._
 import ChiselError._
-import Component._
 import Literal._
 import scala.collection.mutable.HashSet
 
@@ -143,7 +142,7 @@ class FloBackend extends Backend {
     }
   }
 
-  def renameNodes(c: Component, nodes: Seq[Node]) = {
+  def renameNodes(c: Mod, nodes: Seq[Node]) = {
     for (m <- nodes) {
       m match {
         case l: Literal => ;
@@ -158,10 +157,10 @@ class FloBackend extends Backend {
     }
   }
 
-  override def elaborate(c: Component): Unit = {
+  override def elaborate(c: Mod): Unit = {
     super.elaborate(c)
 
-    for (cc <- components) {
+    for (cc <- Mod.components) {
       if (!(cc == c)) {
         c.mods       ++= cc.mods;
         c.blackboxes ++= cc.blackboxes;
@@ -175,9 +174,9 @@ class FloBackend extends Backend {
     c.collectNodes(c);
     c.findOrdering(); // search from roots  -- create omods
     renameNodes(c, c.omods);
-    if (isReportDims) {
+    if (Mod.isReportDims) {
       val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
-      println("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
+      ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
 
     // Write the generated code to the output file
@@ -185,9 +184,6 @@ class FloBackend extends Backend {
     for (m <- c.omods)
       out.write(emit(m));
     out.close();
-    if(saveComponentTrace) {
-      printStack
-    }
   }
 
 }

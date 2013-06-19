@@ -29,7 +29,7 @@
 */
 
 package Chisel
-import Component._
+
 import ChiselError._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
@@ -38,18 +38,17 @@ import scala.collection.mutable.Stack
 import scala.math._
 import Vec._
 import Node._
-import scala.reflect.ClassTag
 
 object VecUFixToOH
 {
   def apply(in: UFix, width: Int): UFix =
   {
-    if(chiselOneHotMap.contains((in, width))) {
-      chiselOneHotMap((in, width))
+    if(Mod.chiselOneHotMap.contains((in, width))) {
+      Mod.chiselOneHotMap((in, width))
     } else {
       val out = UFix(1, width)
       val res = (out << in)(width-1,0)
-      chiselOneHotMap += ((in, width) -> res)
+      Mod.chiselOneHotMap += ((in, width) -> res)
       res
     }
   }
@@ -80,20 +79,9 @@ object VecBuf{
 
 object Vec {
 
-/* XXX deprecated
-  def apply[T <: Data](gen: T, n: Int): Vec[T] = {
-    println("XXX [Vec.apply] " + gen)
-    val res = new Vec[T](gen);
-    for(i <- 0 until n){
-      val t   = gen.clone;
-      res    += t;
-    }
-    println("XXX [Vec.apply] done: " + res)
-    res
-  }
- */
-
-  def apply[T <: Data: ClassTag](elts: Seq[T]): Vec[T] = {
+  /** Returns a new *Vec* from a sequence of *Data* nodes.
+    */
+  def apply[T <: Data](elts: Seq[T]): Vec[T] = {
     val res = if (elts.forall(_.litOf != null) && elts.head.getWidth > 0) {
       new ROM(elts.map(_.litOf), i => elts.head.clone)
     } else {
@@ -103,7 +91,10 @@ object Vec {
     res
   }
 
-  def apply[T <: Data: ClassTag](elt0: T, elts: T*): Vec[T] =
+  /** Returns a new *Vec* from the contatenation of a *Data* node
+    and a sequence of *Data* nodes.
+    */
+  def apply[T <: Data](elt0: T, elts: T*): Vec[T] =
     apply(elt0 +: elts.toSeq)
 
   /** Returns an array that contains the results of some element computation
@@ -111,17 +102,17 @@ object Vec {
 
     Note that this means that elem is computed a total of n times.
     */
-  def fill[T <: Data: ClassTag](n: Int)(gen: => T): Vec[T] = {
+  def fill[T <: Data](n: Int)(gen: => T): Vec[T] = {
     Vec.tabulate(n){ i => gen }
   }
 
   def getEnable(onehot: UFix, i: Int): Bool = {
     var enable: Bool = null
-      if(chiselOneHotBitMap.contains(onehot, i)){
-        enable = chiselOneHotBitMap(onehot, i)
+      if(Mod.chiselOneHotBitMap.contains(onehot, i)){
+        enable = Mod.chiselOneHotBitMap(onehot, i)
       } else {
         enable = onehot(i)
-        chiselOneHotBitMap += ((onehot, i) -> enable)
+        Mod.chiselOneHotBitMap += ((onehot, i) -> enable)
       }
     enable
   }
@@ -129,7 +120,7 @@ object Vec {
   /** Returns an array containing values of a given function over
     a range of integer values starting from 0.
     */
-  def tabulate[T <: Data: ClassTag](n: Int)(gen: (Int) => T): Vec[T] = {
+  def tabulate[T <: Data](n: Int)(gen: (Int) => T): Vec[T] = {
     val res = new Vec[T](gen);
     var i = 0
     while (i < n) {
@@ -139,6 +130,9 @@ object Vec {
     res
   }
 
+  def tabulate[T <: Data](n1: Int, n2: Int)(f: (Int, Int) => T): Vec[Vec[T]] =
+    tabulate(n1)(i1 => tabulate(n2)(f(i1, _)))
+
 }
 
 class VecProc extends proc {
@@ -147,9 +141,9 @@ class VecProc extends proc {
 
   override def genMuxes(default: Node) {}
 
-  def procAssign(src: Node) = {
+  def procAssign(src: Node) {
     val onehot = VecUFixToOH(addr, elms.length)
-    searchAndMap = true
+    Mod.searchAndMap = true
     for(i <- 0 until elms.length){
       when (getEnable(onehot, i)) {
         if(elms(i).comp != null) {
@@ -159,11 +153,11 @@ class VecProc extends proc {
         }
       }
     }
-    searchAndMap = false
+    Mod.searchAndMap = false
   }
 }
 
-class Vec[T <: Data: ClassTag](val gen: (Int) => T) extends CompositeData with Cloneable with BufferProxy[T] {
+class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable with BufferProxy[T] {
   val self = new ArrayBuffer[T]
   val readPortCache = new HashMap[UFix, T]
   var sortedElementsCache: ArrayBuffer[ArrayBuffer[Data]] = null
@@ -199,13 +193,13 @@ class Vec[T <: Data: ClassTag](val gen: (Int) => T) extends CompositeData with C
     if(data.isInstanceOf[Node]){
 
       val onehot = VecUFixToOH(addr, length)
-      searchAndMap = true
+      Mod.searchAndMap = true
       for(i <- 0 until length){
         when (getEnable(onehot, i)) {
           this(i).comp procAssign data.toNode
         }
       }
-      searchAndMap = false
+      Mod.searchAndMap = false
     }
   }
 
@@ -238,15 +232,7 @@ class Vec[T <: Data: ClassTag](val gen: (Int) => T) extends CompositeData with C
     res.toArray
   }
 
-  // override def getWidth(): Int = {
-  //   var w = 0
-  //   for ((name, io) <- this.flatten)
-  //     w += io.getWidth
-  //   println(w)
-  //   w
-  // }
-
-  override def <>(src: Node) = {
+  override def <>(src: Node) {
     src match {
       case other: Vec[T] => {
         for((b, o) <- self zip other.self)
@@ -263,12 +249,12 @@ class Vec[T <: Data: ClassTag](val gen: (Int) => T) extends CompositeData with C
     }
   }
 
-  def <>(src: Vec[T]) = {
+  def <>(src: Vec[T]) {
     for((b, e) <- self zip src)
       b <> e;
   }
 
-  def <>(src: Iterable[T]) = {
+  def <>(src: Iterable[T]) {
     for((b, e) <- self zip src)
       b <> e;
   }
@@ -308,7 +294,7 @@ class Vec[T <: Data: ClassTag](val gen: (Int) => T) extends CompositeData with C
     }
   }
 
-  def := (src: UFix) = {
+  def := (src: UFix) {
     for(i <- 0 until length)
       this(i) := src(i)
   }
@@ -318,9 +304,9 @@ class Vec[T <: Data: ClassTag](val gen: (Int) => T) extends CompositeData with C
       bundle.removeTypeNodes
   }
 
-  override def traceableNodes = self.toArray
+  override def traceableNodes: Array[Node] = self.toArray
 
-  override def traceNode(c: Component, stack: Stack[() => Any]) {
+  override def traceNode(c: Mod, stack: Stack[() => Any]) {
     for((n, i) <- flatten) {
       stack.push(() => i.traceNode(c, stack))
     }

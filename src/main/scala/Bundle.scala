@@ -34,7 +34,6 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 import java.lang.reflect.Modifier._
 import Node._;
-import Component._;
 import ChiselError._
 import sort._
 
@@ -57,10 +56,10 @@ object sort {
     var i = 0
     for (j <- 1 until a.length) {
       val keyElm = a(j);
-      val key = ioMap(keyElm._2)
+      val key = Mod.ioMap(keyElm._2)
       i = j - 1
 
-      while (i >= 0 && ioMap(a(i)._2) > key) {
+      while (i >= 0 && Mod.ioMap(a(i)._2) > key) {
         a(i + 1) = a(i)
         i = i - 1
       }
@@ -178,7 +177,7 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
     Bundle(elts)
   }
 
-  def +=[T <: Data](other: T) = {
+  def +=[T <: Data](other: T) {
     elements;
     elementsCache += ((other.name, other));
     if(isTypeNode) other.setIsTypeNode;
@@ -196,9 +195,9 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
       elt.removeTypeNodes
   }
 
-  override def traceableNodes = elements.map(tup => tup._2).toArray;
+  override def traceableNodes: Array[Node] = elements.map(tup => tup._2).toArray;
 
-  override def traceNode(c: Component, stack: Stack[() => Any]) {
+  override def traceNode(c: Mod, stack: Stack[() => Any]) {
     for((n, i) <- flatten) {
       stack.push(() => i.traceNode(c, stack))
     }
@@ -211,7 +210,7 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
     return null;
   }
 
-  override def <>(src: Node) = {
+  override def <>(src: Node) {
     if(comp == null || (dir == "output" &&
       src.isInstanceOf[Bundle] &&
       src.asInstanceOf[Bundle].dir == "output")){
@@ -222,12 +221,12 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
               i <> other(n);
             }
             else{
-              println("// UNABLE TO FIND " + n + " IN " + other.component);
+              ChiselError.warning("UNABLE TO FIND " + n + " IN " + other.component);
             }
           }
         }
         case default =>
-          println("// TRYING TO CONNECT BUNDLE TO NON BUNDLE " + default);
+          ChiselError.warning("TRYING TO CONNECT BUNDLE TO NON BUNDLE " + default);
       }
     } else {
       src match {
@@ -235,12 +234,12 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
           comp assign other
         }
         case default =>
-          println("CONNECTING INCORRECT TYPES INTO WIRE OR REG")
+          ChiselError.warning("CONNECTING INCORRECT TYPES INTO WIRE OR REG")
       }
     }
   }
 
-  override def ^^(src: Node) = {
+  override def ^^(src: Node) {
     src match {
       case other: Bundle =>
         for ((n, i) <- elements) {

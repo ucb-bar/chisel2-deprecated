@@ -38,9 +38,8 @@ import java.io.OutputStream
 import java.io.PrintStream
 import scala.sys.process._
 import Literal._
-import Component._
 
-class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
+class Tester[+T <: Mod](val c: T, val testNodes: Array[Node]) {
   var testIn: InputStream = null
   var testOut: OutputStream = null
   var testInputNodes: Array[Node] = null
@@ -106,7 +105,7 @@ class Tester[+T <: Component](val c: T, val testNodes: Array[Node]) {
     isSame
   }
   def startTest: Process = {
-    val cmd = targetDir + "/" + c.name + (if(backend.isInstanceOf[VerilogBackend]) " -q" else "")
+    val cmd = Mod.targetDir + "/" + c.name + (if(Mod.backend.isInstanceOf[VerilogBackend]) " -q" else "")
     val process = Process(cmd)
     val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => err.close())
     val p = process.run(pio)

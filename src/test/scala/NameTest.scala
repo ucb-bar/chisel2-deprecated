@@ -80,7 +80,7 @@ class NameSuite extends AssertionsForJUnit {
       val N = UFix(0, 1);
     }
 
-    class ListLookupsComp extends Component with Constants {
+    class ListLookupsComp extends Mod with Constants {
       val io = new Bundle {
         val inst = UFix(INPUT, 32)
         val sigs_valid = Bool(OUTPUT)
@@ -96,7 +96,7 @@ class NameSuite extends AssertionsForJUnit {
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new ListLookupsComp()))
+      () => Mod(new ListLookupsComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_ListLookupsComp_1.v",
 """module NameSuite_ListLookupsComp_1(
     input [31:0] io_inst,
@@ -136,7 +136,7 @@ endmodule
       val enq_ximm1q = Bool()
     }
 
-    class BlockDecoder extends Component {
+    class BlockDecoder extends Mod {
       val io = new Bundle {
         val valid = Bool(INPUT)
         val replay = Bool(OUTPUT)
@@ -146,9 +146,9 @@ endmodule
       io.replay := io.valid;
     }
 
-    class BindFirstComp extends Component {
+    class BindFirstComp extends Mod {
       val io = new BlockIO
-      val dec = module(new BlockDecoder());
+      val dec = Mod(new BlockDecoder());
 
       val valid_common = io.valid;
 
@@ -163,7 +163,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new BindFirstComp()))
+      () => Mod(new BindFirstComp()))
    assertFile(tmpdir.getRoot() + "/NameSuite_BindFirstComp_1.v",
 """module NameSuite_BlockDecoder_1(
     input  io_valid,
@@ -205,17 +205,17 @@ endmodule
 """)
    }
 
-  /** Since *vec* is declared within a if() block and not as a Component
+  /** Since *vec* is declared within a if() block and not as a Mod
     member, we do not extract the actual name of the module instance
     (i.e. *vec*) which means that if we do not set an arbitrary name on
     that component instance, it will remain empty.
     This would result in bindings starting with a "_" prefix (target
-    Component name is empty).
+    Mod name is empty).
 
     We thus generate a name for the component instance based on its class name.
     */
   @Test def testBindSecond() {
-    class Block extends Component {
+    class Block extends Mod {
       val io = new Bundle() {
         val irq = Bool(INPUT)
         val irq_cause = UFix(OUTPUT, 5)
@@ -223,14 +223,14 @@ endmodule
       io.irq_cause := UFix(2);
     }
 
-    class BindSecondComp(conf: Boolean) extends Component {
+    class BindSecondComp(conf: Boolean) extends Mod {
       val io = new Bundle() {
         val irq = Bool(INPUT)
         val irq_cause = UFix(OUTPUT, 6)
       }
 
       if( conf ) {
-        val vec = module(new Block());
+        val vec = Mod(new Block());
         vec.io.irq := io.irq;
         io.irq_cause := UFix(1) ## vec.io.irq_cause;
       }
@@ -238,7 +238,7 @@ endmodule
 
     chiselMain(Array[String]("--v", "--c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new BindSecondComp(true)))
+      () => Mod(new BindSecondComp(true)))
    assertFile(tmpdir.getRoot() + "/NameSuite_BindSecondComp_1.v",
 """module NameSuite_Block_1(
     input  io_irq,
@@ -283,12 +283,12 @@ endmodule
     }
 
 
-    class Comp extends Component {
+    class Comp extends Mod {
       val io = new CompIO()
       io.out.ren := io.in.ren
     }
 
-    class BindThirdComp extends Component {
+    class BindThirdComp extends Mod {
       val io = new Bundle() {
         val in = new BankToBankIO()
         val result = Bool(OUTPUT)
@@ -298,7 +298,7 @@ endmodule
 
       var first = true
       for (i <- 0 until 4) {
-        val bank = module(new Comp())
+        val bank = Mod(new Comp())
         if (first) {
           bank.io.in <> io.in
           first = false
@@ -312,7 +312,7 @@ endmodule
 
     chiselMain(Array[String]("--v", "--c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new BindThirdComp()))
+      () => Mod(new BindThirdComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_BindThirdComp_1.v",
 """module NameSuite_Comp_1(
     input  io_in_ren,
@@ -366,7 +366,7 @@ endmodule
       val out = UFix(OUTPUT, 5)
     }
 
-    class BindFourthComp extends Component {
+    class BindFourthComp extends Mod {
       val io = new CompIO()
 
       var norms = ArrayBuffer[UFix]();
@@ -376,7 +376,7 @@ endmodule
 
     chiselMain(Array[String]("--v", "--c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new BindFourthComp()))
+      () => Mod(new BindFourthComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_BindFourthComp_1.v",
 """module NameSuite_BindFourthComp_1(
     input [4:0] io_in,
@@ -410,7 +410,7 @@ endmodule
       override def clone = new BlockIO().asInstanceOf[this.type]
     }
 
-    class Block extends Component {
+    class Block extends Mod {
       val io = new Bundle {
         val valid = Bool(INPUT)
         val mine = Vec.fill(2){UFix(width = 32)}.asOutput
@@ -423,7 +423,7 @@ endmodule
       io.mine := Mux(io.valid, Mux1H(UFix(1), tag_ram), Mux1H(UFix(0), tag_ram))
     }
 
-    class BindFithComp extends Component {
+    class BindFithComp extends Mod {
       val io = new Bundle {
         val imem_ptw = new BlockIO()
         val dmem_ptw = new BlockIO()
@@ -432,7 +432,7 @@ endmodule
 
       val ptw = collection.mutable.ArrayBuffer(io.imem_ptw, io.dmem_ptw)
       if( true ) {
-        val vdtlb = module(new Block())
+        val vdtlb = Mod(new Block())
         ptw += vdtlb.io.sub
         vdtlb.io <> io.imem_ptw
       }
@@ -441,7 +441,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new BindFithComp))
+      () => Mod(new BindFithComp))
     assertFile(tmpdir.getRoot() + "/NameSuite_BindFithComp_1.v",
 """module NameSuite_Block_2(input clk, input reset,
     input  io_valid,
@@ -512,7 +512,7 @@ endmodule
     without setting *named* to true.
     */
   @Test def testVec() {
-    class VecComp extends Component {
+    class VecComp extends Mod {
       val io = new Bundle {
         val pcr_req_data = UFix(width = 64)
 
@@ -543,7 +543,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new VecComp()))
+      () => Mod(new VecComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_VecComp_1.v",
 """module NameSuite_VecComp_1(input clk, input reset,
     input  io_r_en,
@@ -597,7 +597,7 @@ endmodule
       val req = new FIFOIO(new BlockReq)
     }
 
-    class VecSecondComp extends Component {
+    class VecSecondComp extends Mod {
       val io = new Bundle {
         val requestor = Vec.fill(4) { new BlockIO() }.flip
         val mem = Bool(OUTPUT)
@@ -615,7 +615,7 @@ endmodule
 
     chiselMain(Array[String]("--v", "--c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new VecSecondComp()))
+      () => Mod(new VecSecondComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_VecSecondComp_1.v",
 """module NameSuite_VecSecondComp_1(input clk, input reset,
     output io_requestor_0_req_ready,
@@ -660,14 +660,14 @@ endmodule
 
 
   /** This test checks names are correctly generated in the presence
-    of multiple instantiation of the same Component. */
+    of multiple instantiation of the same Mod. */
   @Test def testVariation() {
     class BlockIO extends Bundle {
       val valid = Bool(INPUT)
       val replay = Bool(OUTPUT)
     }
 
-    class CompBlock(width: Int) extends Component {
+    class CompBlock(width: Int) extends Mod {
       val io = new BlockIO();
 
       if( width > 8) {
@@ -677,11 +677,11 @@ endmodule
       }
     }
 
-    class VariationComp extends Component {
+    class VariationComp extends Mod {
       val io = new BlockIO();
-      val block_0 = module(new CompBlock(8));
-      val block_1 = module(new CompBlock(8));
-      val block_2 = module(new CompBlock(16));
+      val block_0 = Mod(new CompBlock(8));
+      val block_1 = Mod(new CompBlock(8));
+      val block_2 = Mod(new CompBlock(16));
 
       block_0.io.valid := io.valid;
       block_1.io.valid := io.valid;
@@ -691,7 +691,7 @@ endmodule
 
     chiselMain(Array[String]("--v", "--c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new VariationComp()))
+      () => Mod(new VariationComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_VariationComp_1.v",
 """module NameSuite_CompBlock_1_0(
     input  io_valid,
@@ -748,7 +748,7 @@ endmodule
       val rdata = UFix(OUTPUT, SZ_DATA)
     }
 
-    class MemComp extends Component {
+    class MemComp extends Mod {
       val io = new RegfileIO()
 
       val rfile = Mem(256, UFix(width = SZ_DATA), seqRead = true)
@@ -759,7 +759,7 @@ endmodule
 
     chiselMain(Array[String]("--v", "--noInlineMem",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new MemComp()))
+      () => Mod(new MemComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_MemComp_1.v",
 """module NameSuite_MemComp_1(input clk, input reset,
     input  io_ren,
@@ -793,7 +793,7 @@ endmodule
   /* Add signals which are not registers to the toplevel C++ class declaration.
    */
   @Test def testDebug() {
-    class Block extends Component {
+    class Block extends Mod {
       val io = new Bundle {
         val ctrl_wb_wen = Bool(INPUT);
         val ctrl_out = Bool(OUTPUT);
@@ -809,20 +809,20 @@ endmodule
       debug(wb_wen)
     }
 
-    class DebugComp extends Component {
+    class DebugComp extends Mod {
       val io = new Bundle {
         val ctrl_wb_wen = Bool(INPUT);
         val ctrl_out = Bool(OUTPUT);
       }
 
-      val dpath = module(new Block)
+      val dpath = Mod(new Block)
       dpath.io.ctrl_wb_wen := io.ctrl_wb_wen
       io.ctrl_out := dpath.io.ctrl_out
     }
 
-    chiselMain(Array[String]("--c",
+    chiselMain(Array[String]("--c", "--vcd",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new DebugComp))
+      () => Mod(new DebugComp))
     assertFile(tmpdir.getRoot() + "/NameSuite_DebugComp_1.h",
 """#ifndef __NameSuite_DebugComp_1__
 #define __NameSuite_DebugComp_1__
@@ -832,13 +832,19 @@ endmodule
 class NameSuite_DebugComp_1_t : public mod_t {
  public:
   dat_t<1> NameSuite_DebugComp_1_dpath__reset;
+  dat_t<1> NameSuite_DebugComp_1_dpath__reset__prev;
   dat_t<1> NameSuite_DebugComp_1__io_ctrl_wb_wen;
+  dat_t<1> NameSuite_DebugComp_1__io_ctrl_wb_wen__prev;
   dat_t<1> NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen;
+  dat_t<1> NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen__prev;
   dat_t<1> NameSuite_DebugComp_1_dpath__wb_wen;
   dat_t<1> NameSuite_DebugComp_1_dpath__wb_reg_ll_wb;
   dat_t<1> NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow;
+  dat_t<1> NameSuite_DebugComp_1_dpath__wb_reg_ll_wb__prev;
   dat_t<1> NameSuite_DebugComp_1_dpath__io_ctrl_out;
+  dat_t<1> NameSuite_DebugComp_1_dpath__io_ctrl_out__prev;
   dat_t<1> NameSuite_DebugComp_1__io_ctrl_out;
+  dat_t<1> NameSuite_DebugComp_1__io_ctrl_out__prev;
 
   void init ( bool rand_init = false );
   void clock_lo ( dat_t<1> reset );
@@ -875,6 +881,42 @@ bool NameSuite_DebugComp_1_t::scan ( FILE* f ) {
   return(!feof(f));
 }
 void NameSuite_DebugComp_1_t::dump(FILE *f, int t) {
+  if (t == 0) {
+    fprintf(f, "$timescale 1ps $end\n");
+    fprintf(f, "$scope module NameSuite_DebugComp_1 $end\n");
+    fprintf(f, "$var wire 1 N0 reset $end\n");
+    fprintf(f, "$var wire 1 N2 io_ctrl_wb_wen $end\n");
+    fprintf(f, "$var wire 1 N6 io_ctrl_out $end\n");
+    fprintf(f, "$scope module dpath $end\n");
+    fprintf(f, "$var wire 1 N1 reset $end\n");
+    fprintf(f, "$var wire 1 N3 io_ctrl_wb_wen $end\n");
+    fprintf(f, "$var wire 1 N4 wb_reg_ll_wb $end\n");
+    fprintf(f, "$var wire 1 N5 io_ctrl_out $end\n");
+    fprintf(f, "$upscope $end\n");
+    fprintf(f, "$upscope $end\n");
+    fprintf(f, "$enddefinitions $end\n");
+    fprintf(f, "$dumpvars\n");
+    fprintf(f, "$end\n");
+  }
+  fprintf(f, "#%d\n", t);
+  if (t == 0 || (NameSuite_DebugComp_1_dpath__reset != NameSuite_DebugComp_1_dpath__reset__prev).to_bool())
+    dat_dump(f, NameSuite_DebugComp_1_dpath__reset, "N1");
+  NameSuite_DebugComp_1_dpath__reset__prev = NameSuite_DebugComp_1_dpath__reset;
+  if (t == 0 || (NameSuite_DebugComp_1__io_ctrl_wb_wen != NameSuite_DebugComp_1__io_ctrl_wb_wen__prev).to_bool())
+    dat_dump(f, NameSuite_DebugComp_1__io_ctrl_wb_wen, "N2");
+  NameSuite_DebugComp_1__io_ctrl_wb_wen__prev = NameSuite_DebugComp_1__io_ctrl_wb_wen;
+  if (t == 0 || (NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen != NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen__prev).to_bool())
+    dat_dump(f, NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen, "N3");
+  NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen__prev = NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen;
+  if (t == 0 || (NameSuite_DebugComp_1_dpath__wb_reg_ll_wb != NameSuite_DebugComp_1_dpath__wb_reg_ll_wb__prev).to_bool())
+    dat_dump(f, NameSuite_DebugComp_1_dpath__wb_reg_ll_wb, "N4");
+  NameSuite_DebugComp_1_dpath__wb_reg_ll_wb__prev = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb;
+  if (t == 0 || (NameSuite_DebugComp_1_dpath__io_ctrl_out != NameSuite_DebugComp_1_dpath__io_ctrl_out__prev).to_bool())
+    dat_dump(f, NameSuite_DebugComp_1_dpath__io_ctrl_out, "N5");
+  NameSuite_DebugComp_1_dpath__io_ctrl_out__prev = NameSuite_DebugComp_1_dpath__io_ctrl_out;
+  if (t == 0 || (NameSuite_DebugComp_1__io_ctrl_out != NameSuite_DebugComp_1__io_ctrl_out__prev).to_bool())
+    dat_dump(f, NameSuite_DebugComp_1__io_ctrl_out, "N6");
+  NameSuite_DebugComp_1__io_ctrl_out__prev = NameSuite_DebugComp_1__io_ctrl_out;
 }
 """)
   }

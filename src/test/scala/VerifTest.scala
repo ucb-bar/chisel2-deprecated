@@ -61,7 +61,7 @@ class VerifSuite extends AssertionsForJUnit {
 
   @Test def testAssertCpp() {
 
-    class CppAssertComp extends Component {
+    class CppAssertComp extends Mod {
       val io = new Bundle {
         val x = UFix(INPUT, 8)
         val y = UFix(INPUT, 8)
@@ -73,7 +73,7 @@ class VerifSuite extends AssertionsForJUnit {
 
     chiselMain(Array[String]("--c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new CppAssertComp()))
+      () => Mod(new CppAssertComp()))
     assertFile(tmpdir.getRoot() + "/VerifSuite_CppAssertComp_1.cpp",
 """#include "VerifSuite_CppAssertComp_1.h"
 
@@ -99,7 +99,7 @@ void VerifSuite_CppAssertComp_1_t::dump(FILE *f, int t) {
 
   @Test def testAssertVerilog() {
 
-    class VerilogAssertComp extends Component {
+    class VerilogAssertComp extends Mod {
       val io = new Bundle {
         val x = UFix(INPUT, 8)
         val y = UFix(INPUT, 8)
@@ -111,12 +111,12 @@ void VerifSuite_CppAssertComp_1_t::dump(FILE *f, int t) {
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new VerilogAssertComp()))
+      () => Mod(new VerilogAssertComp()))
   }
 
   @Test def testPrintfCpp() {
 
-    class CppPrintfComp extends Component {
+    class CppPrintfComp extends Mod {
       val io = new Bundle {
         val x = UFix(INPUT, 8)
         val y = UFix(INPUT, 8)
@@ -129,7 +129,7 @@ void VerifSuite_CppAssertComp_1_t::dump(FILE *f, int t) {
       because the emulator resource is closed. 
     chiselMain(Array[String]("--c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new CppPrintfComp()))
+      () => Mod(new CppPrintfComp()))
     assertFile(tmpdir.getRoot() + "/VerifSuite_CppPrintfComp_1.cpp",
 """#include "VerifSuite_CppPrintfComp_1.h"
 
@@ -157,7 +157,7 @@ void VerifSuite_CppPrintfComp_1_t::dump(FILE *f, int t) {
 
   @Test def testPrintfVerilog() {
 
-    class VerilogPrintfComp extends Component {
+    class VerilogPrintfComp extends Mod {
       val io = new Bundle {
         val x = UFix(INPUT, 8)
         val y = UFix(INPUT, 8)
@@ -169,6 +169,6 @@ void VerifSuite_CppPrintfComp_1_t::dump(FILE *f, int t) {
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new VerilogPrintfComp()))
+      () => Mod(new VerilogPrintfComp()))
   }
 }

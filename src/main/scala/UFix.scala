@@ -51,16 +51,16 @@ object UFix {
 }
 
 
-class UFix extends Bits {
+class UFix extends Bits /* with Numeric[UFix] */ {
   type T = UFix;
 
   /** Factory method to create and assign a *UFix* type to a Node *n*.
     */
-  override def fromNode(n: Node) = {
+  override def fromNode(n: Node): this.type = {
     UFix(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
   }
 
-  override def fromInt(x: Int) = {
+  override def fromInt(x: Int): this.type = {
     UFix(x).asInstanceOf[this.type]
   }
 

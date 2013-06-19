@@ -32,12 +32,15 @@ package Chisel
 import Node._
 import Reg._
 import ChiselError._
-import Component._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashMap
 import java.lang.reflect.Modifier._
+import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
+import java.io.PrintStream
 
 object Backend {
   var moduleNamePrefix = ""
@@ -49,7 +52,7 @@ abstract class Backend {
   val keywords: HashSet[String];
 
   def createOutputFile(name: String): java.io.FileWriter = {
-    val baseDir = ensureDir(targetDir)
+    val baseDir = ensureDir(Mod.targetDir)
     new java.io.FileWriter(baseDir + name)
   }
 
@@ -60,19 +63,30 @@ abstract class Backend {
     res
   }
 
-  def extractClassName(comp: Component): String = {
+  /** Ensures a directory *dir* exists on the filesystem. */
+  def ensureDir(dir: String): String = {
+    val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/")
+    new File(d).mkdirs()
+    d
+  }
+
+  def extractClassName(comp: Mod): String = {
     val cname  = comp.getClass().getName().replace("$", "_")
     val dotPos = cname.lastIndexOf('.');
     Backend.moduleNamePrefix + (
       if (dotPos >= 0) cname.substring(dotPos + 1) else cname);
   }
 
-  def nameChildren(root: Component) {
+  protected def genIndent(x: Int): String = {
+    if(x == 0) "" else "    " + genIndent(x-1);
+  }
+
+  def nameChildren(root: Mod) {
     // Name all nodes at this level
     root.io.nameIt("io");
     val nameSpace = new HashSet[String];
     /* We are going through all declarations, which can return Nodes,
-     ArrayBuffer[Node], Cell, BlackBox and Components.
+     ArrayBuffer[Node], Cell, BlackBox and Mods.
      Since we call invoke() to get a proper instance of the correct type,
      we have to insure the method is accessible, thus all fields
      that will generate C++ or Verilog code must be made public. */
@@ -80,7 +94,7 @@ abstract class Backend {
       val name = m.getName();
       val types = m.getParameterTypes();
       if (types.length == 0
-        && isPublic(m.getModifiers()) && !(Component.keywords contains name)) {
+        && isPublic(m.getModifiers()) && !(Mod.keywords contains name)) {
         val o = m.invoke(root);
         o match {
          case node: Node => {
@@ -95,7 +109,7 @@ abstract class Backend {
            /* We would prefer to match for ArrayBuffer[Node] but that's
             impossible because of JVM constraints which lead to type erasure.
             XXX Using Seq instead of ArrayBuffer will pick up members defined
-            in Component that are solely there for implementation purposes. */
+            in Mod that are solely there for implementation purposes. */
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
              val nodebuf = buf.asInstanceOf[Seq[Node]];
              var i = 0;
@@ -126,7 +140,7 @@ abstract class Backend {
            };
            nameSpace += bb.name;
          }
-         case comp: Component => {
+         case comp: Mod => {
            if(!comp.named) {
              comp.name = asValidName(name);
              comp.named = true
@@ -144,7 +158,7 @@ abstract class Backend {
      This code must be executed between the root-level naming and the naming
      of bindings otherwise some identifiers will leak into the input/output
      of a module. */
-    val byNames = new HashMap[String, ArrayBuffer[Component] ];
+    val byNames = new HashMap[String, ArrayBuffer[Mod] ];
     for (c <- root.children) {
       nameChildren(c);
       if( c.name.isEmpty ) {
@@ -154,7 +168,7 @@ abstract class Backend {
         if( byNames contains className ) {
           byNames(className).append(c);
         } else {
-          byNames += (className -> ArrayBuffer[Component](c));
+          byNames += (className -> ArrayBuffer[Mod](c));
         }
       }
     }
@@ -183,10 +197,10 @@ abstract class Backend {
     if (keywords.contains(name)) name + "_" else name;
   }
 
-  def nameAll(root: Component) {
+  def nameAll(root: Mod) {
     root.name = extractClassName(root);
     nameChildren(root);
-    for( node <- nodes ) {
+    for( node <- Mod.nodes ) {
       if( (node.nameHolder != null && !node.nameHolder.name.isEmpty)
         && !node.named && !node.isInstanceOf[Literal] ){
         node.name = node.nameHolder.name; // Not using nameIt to avoid override
@@ -198,18 +212,21 @@ abstract class Backend {
 
   def fullyQualifiedName( m: Node ): String = {
     m match {
-      case l: Literal => return l.toString;
+      case l: Literal => l.toString;
       case any       =>
         if (m.name != ""
-          && m != topComponent.reset && m.component != null) {
+          && m != Mod.topComponent.reset && m.component != null) {
           /* Only modify name if it is not the reset signal
            or not in top component */
-          if(m.name != "reset" && m.component != topComponent) {
-            return m.component.getPathName + "__" + m.name;
+          if(m.name != "reset" && m.component != Mod.topComponent) {
+            m.component.getPathName + "__" + m.name;
+          } else {
+            m.name
           }
+        } else {
+          m.name
         }
     }
-    m.name
   }
 
  def emitTmp(node: Node): String =
@@ -228,19 +245,19 @@ abstract class Backend {
     }
   }
 
-  def emitRef(c: Component): String =
+  def emitRef(c: Mod): String =
     c.name
 
   def emitDec(node: Node): String = ""
 
-  val transforms = ArrayBuffer[(Component) => Unit]()
+  val transforms = ArrayBuffer[(Mod) => Unit]()
 
   // DFS walk of graph to collect nodes of every component
-  def collectNodesIntoComp(c: Component) {
-    val dfsStack = new Stack[(Node, Component)]()
+  def collectNodesIntoComp(c: Mod) {
+    val dfsStack = new Stack[(Node, Mod)]()
     val walked = new HashSet[Node]()
 
-    def walk = {
+    def walk {
       var nextComp = c
 
       while(!dfsStack.isEmpty) {
@@ -276,7 +293,7 @@ abstract class Backend {
 
     }
 
-    println("resolving nodes to the components")
+    ChiselError.info("resolving nodes to the components")
     // start DFS from top level inputs
     // dequeing from dfsStack => walked
     for ((name, io) <- c.io.flatten) {
@@ -290,10 +307,10 @@ abstract class Backend {
 
     walk;
     assert(dfsStack.isEmpty)
-    println("finished resolving")
+    ChiselError.info("finished resolving")
   }
 
-  def transform(c: Component, transforms: ArrayBuffer[(Component) => Unit]): Unit = {
+  def transform(c: Mod, transforms: ArrayBuffer[(Mod) => Unit]): Unit = {
     for (t <- transforms)
       t(c)
   }
@@ -301,22 +318,28 @@ abstract class Backend {
 
   def emitDef(node: Node): String = ""
 
-  def elaborate(c: Component): Unit = {
-    topComponent = c;
-    components.foreach(_.elaborate(0));
+  def elaborate(c: Mod): Unit = {
+    Mod.topComponent = c;
+    Mod.components.foreach(_.elaborate(0));
 
     /* XXX We should name all signals before error messages are generated
      so as to give a clue where problems are showing up but that interfers
      with the *bindings* (see later comment). */
-    for (c <- components)
+    for (c <- Mod.components)
       c.markComponent();
     c.genAllMuxes;
-    components.foreach(_.postMarkNet(0));
-    println("// COMPILING " + c + "(" + c.children.length + ")");
-    assignResets()
-    c.inferAll();
+    Mod.components.foreach(_.postMarkNet(0));
+    ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
+    Mod.assignResets()
+    ChiselError.info("started inference")
+    val nbOuterLoops = c.inferAll();
+    ChiselError.info("finished inference (" + nbOuterLoops + ")")
+    ChiselError.info("start width checking")
     c.forceMatchingWidths;
-    c.removeTypeNodes()
+    ChiselError.info("finished width checking")
+    ChiselError.info("started flattenning")
+    val nbNodes = c.removeTypeNodes()
+    ChiselError.info("finished flattening (" + nbNodes + ")")
     ChiselError.checkpoint()
 
     collectNodesIntoComp(c)
@@ -329,25 +352,31 @@ abstract class Backend {
     nameAll(c)
     ChiselError.checkpoint()
 
-    if(!dontFindCombLoop) {
+    if(!Mod.dontFindCombLoop) {
+      ChiselError.info("checking for combinational loops")
       c.findCombLoop();
+      ChiselError.checkpoint()
+      ChiselError.info("NO COMBINATIONAL LOOP FOUND")
+    }
+    if(Mod.saveComponentTrace) {
+      printStack
     }
   }
 
-  def compile(c: Component, flags: String = null): Unit = { }
+  def compile(c: Mod, flags: String = null): Unit = { }
 
-  def checkPorts(topC: Component) {
+  def checkPorts(topC: Mod) {
 
-    def prettyPrint(n: Node, c: Component) {
+    def prettyPrint(n: Node, c: Mod) {
       val dir = if (n.asInstanceOf[Bits].dir == INPUT) "Input" else "Output"
       val portName = n.name
       val compName = c.name
       val compInstName = c.moduleName
-      println("Warning: " + dir + " port " + portName
+      ChiselError.warning(dir + " port " + portName
         + " is unconnected in module " + compInstName + " " + compName)
     }
 
-    for (c <- components) {
+    for (c <- Mod.components) {
       if (c != topC) {
         for ((n,i) <- c.io.flatten) {
           if (i.inputs.length == 0) {
@@ -357,6 +386,15 @@ abstract class Backend {
       }
     }
 
+  }
+
+  /** Prints the call stack of Component as seen by the push/pop runtime. */
+  protected def printStack {
+    var res = ""
+    for((i, c) <- Mod.printStackStruct){
+      res += (genIndent(i) + c.moduleName + " " + c.name + "\n")
+    }
+    ChiselError.info(res)
   }
 
 }
