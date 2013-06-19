@@ -30,7 +30,6 @@
 
 package Chisel
 import Node._
-import Component._
 import scala.math._
 
 object MuxLookup {
@@ -55,7 +54,7 @@ object MuxCase {
 
 object Multiplex{
   def apply (t: Node, c: Node, a: Node): Node = {
-    if (isFolding) {
+    if (Mod.isFolding) {
       if (t.litOf != null) {
         return if (t.litOf.value == 0) a else c
       }
@@ -120,7 +119,7 @@ object Mux {
 }
 
 class Mux extends Op {
-  muxes += this;
+  Mod.muxes += this;
   stack = Thread.currentThread.getStackTrace;
   op = "Mux";
   override def toString: String =

@@ -33,9 +33,8 @@ import ChiselError._
 import Node._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
-import scala.reflect.ClassTag
 
-class ROM[T <: Data: ClassTag](val lits: Seq[Literal], gen: (Int) => T) extends Vec[T](gen) {
+class ROM[T <: Data](val lits: Seq[Literal], gen: (Int) => T) extends Vec[T](gen) {
   override def read(addr: UFix): T = {
     val cln = gen(0)
     val data = cln.asOutput
@@ -45,7 +44,7 @@ class ROM[T <: Data: ClassTag](val lits: Seq[Literal], gen: (Int) => T) extends 
     data
   }
 
-  override def write(addr: UFix, data: T) = {
+  override def write(addr: UFix, data: T) {
     ChiselError.error("Can't write to ROM")
   }
 
@@ -57,13 +56,13 @@ class ROM[T <: Data: ClassTag](val lits: Seq[Literal], gen: (Int) => T) extends 
     }
   }
 
-  override def isReg = true
+  override def isReg: Boolean = true
 
 }
 
 class ROMRead[T <: Data]() extends Node {
-  def addr = inputs(0)
-  def rom = inputs(1)
+  def addr: Node = inputs(0)
+  def rom: Node = inputs(1)
   // inputs += addri
   // inputs += rom
 

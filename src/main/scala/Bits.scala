@@ -31,10 +31,9 @@
 package Chisel
 import Node._
 import ChiselError._
-import Component._
 
 /* backward compatibility */
-@deprecated("Use UFix instead of Bits.")
+@deprecated("Use UFix instead of Bits.", "2.0")
 object Bits {
   def apply(x: Int): UFix = UFix(x);
   def apply(x: Int, width: Int): UFix = UFix(x, width);
@@ -47,8 +46,8 @@ object Bits {
 
 /** Base class for built-in Chisel types Bits and Fix. */
 abstract class Bits extends Data with proc {
-  ioMap += ((this, ioCount));
-  ioCount += 1;
+  Mod.ioMap += ((this, Mod.ioCount));
+  Mod.ioCount += 1;
 
   var dir: IODirection = null;
 
@@ -86,7 +85,7 @@ abstract class Bits extends Data with proc {
 
   def toUFix(): UFix = chiselCast(this){UFix()};
 
-  override def isIo = dir != null;
+  override def isIo: Boolean = dir != null;
 
   def default: Node = if (inputs.length < 1 || inputs(0) == null) null else inputs(0);
 
@@ -102,7 +101,7 @@ abstract class Bits extends Data with proc {
   var assigned = false;
 
 
-  override def assign(src: Node) = {
+  override def assign(src: Node) {
     if(assigned || inputs.length > 0) {
       ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
     } else {
@@ -110,7 +109,7 @@ abstract class Bits extends Data with proc {
     }
   }
 
-  def procAssign(src: Node) = {
+  def procAssign(src: Node) {
     if (assigned) {
       ChiselError.error("reassignment to Node");
     } else {
@@ -122,7 +121,7 @@ abstract class Bits extends Data with proc {
 
   override def apply(name: String): Data = this
 
-  override def flatten = Array((name, this));
+  override def flatten: Array[(String, Bits)] = Array((name, this));
 
   override def toString: String = {
     // XXX We cannot print the width here as it would computed the infered
@@ -137,7 +136,8 @@ abstract class Bits extends Data with proc {
   }
 
   override def flip(): this.type = {
-    assert(dir != null, println("Can't flip something that doesn't have a direction"))
+    assert(dir != null,
+      ChiselError.error("Can't flip something that doesn't have a direction"))
     if (dir == INPUT) {
       dir = OUTPUT
     } else if(dir == OUTPUT) {
@@ -165,7 +165,7 @@ abstract class Bits extends Data with proc {
     return dir == null
   }
 
-  override def <>(src: Node) = {
+  override def <>(src: Node) {
     if (dir == INPUT) {
       src match {
       case other: Bits =>
@@ -271,9 +271,12 @@ abstract class Bits extends Data with proc {
     }
   }
 
-  override def setIsClkInput = {isClkInput = true; this assign clk;}
+  override def setIsClkInput {
+    isClkInput = true
+    this assign clk
+  }
 
-  override def clone = {
+  override def clone: this.type = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
     res.inferWidth = this.inferWidth
     res.width_ = this.width_;

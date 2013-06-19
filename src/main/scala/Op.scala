@@ -32,7 +32,6 @@ package Chisel
 import scala.math.max
 import Node._
 import Literal._
-import Component._
 
 abstract class Cell extends nameable{
   val io: Data;
@@ -97,8 +96,8 @@ object BinaryOp {
 
 object LogicalOp {
   def apply[T <: Bits](x: T, y: T, op: String): Bool = {
-    if(searchAndMap && op == "&&" && chiselAndMap.contains((x, y))) {
-      chiselAndMap((x, y))
+    if(Mod.searchAndMap && op == "&&" && Mod.chiselAndMap.contains((x, y))) {
+      Mod.chiselAndMap((x, y))
     } else {
       val node = op match {
         case "===" => Op("==", 2, fixWidth(1), x, y );
@@ -114,8 +113,8 @@ object LogicalOp {
 
       // make output
       val output = Bool(OUTPUT).fromNode(node)
-      if(searchAndMap && op == "&&" && !chiselAndMap.contains((x, y))) {
-        chiselAndMap += ((x, y) -> output)
+      if(Mod.searchAndMap && op == "&&" && !Mod.chiselAndMap.contains((x, y))) {
+        Mod.chiselAndMap += ((x, y) -> output)
       }
       output
     }
@@ -135,8 +134,8 @@ object ReductionOp {
 
 object BinaryBoolOp {
   def apply(x: Bool, y: Bool, op: String): Bool = {
-    if(searchAndMap && op == "&&" && chiselAndMap.contains((x, y))) {
-      chiselAndMap((x, y))
+    if(Mod.searchAndMap && op == "&&" && Mod.chiselAndMap.contains((x, y))) {
+      Mod.chiselAndMap((x, y))
     } else {
       val node = op match {
         case "&&"  => Op("&&", 2, fixWidth(1), x, y );
@@ -144,8 +143,8 @@ object BinaryBoolOp {
         case any   => throw new Exception("Unrecognized operator " + op);
       }
       val output = Bool(OUTPUT).fromNode(node)
-      if(searchAndMap && op == "&&" && !chiselAndMap.contains((x, y))) {
-        chiselAndMap += ((x, y) -> output)
+      if(Mod.searchAndMap && op == "&&" && !Mod.chiselAndMap.contains((x, y))) {
+        Mod.chiselAndMap += ((x, y) -> output)
       }
       output
     }
@@ -157,7 +156,7 @@ object Op {
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
     val (a_lit, b_lit) = (a.litOf, b.litOf);
     val isSigned = a.isSigned && b.isSigned
-    if (isFolding && !isSigned) {
+    if (Mod.isFolding && !isSigned) {
     if (a_lit != null && b_lit == null) {
       name match {
         case "&&" => return if (a_lit.value == 0) Literal(0) else b;
@@ -194,8 +193,8 @@ object Op {
       }
     }
     }
-    if (backend.isInstanceOf[CppBackend]) {
-      def signAbs(x: Node) = {
+    if (Mod.backend.isInstanceOf[CppBackend]) {
+      def signAbs(x: Node): (Bool, UFix) = {
         val f = x.asInstanceOf[Fix]
         val s = f < Fix(0)
         (s, Mux(s, -f, f).toUFix)
@@ -250,7 +249,7 @@ object Op {
     res
   }
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node): Node = {
-    if (isFolding && a.litOf != null) {
+    if (Mod.isFolding && a.litOf != null) {
       name match {
         case "!" => return if (a.litOf.value == 0) Literal(1) else Literal(0);
         case "-" => return Literal(-a.litOf.value, a.litOf.width);
@@ -277,7 +276,7 @@ class Op extends Node {
       "[ " + inputs(0) + "\n]\n  " + op + "\n" + "[  " + inputs(1) + "\n]"
     }
 
-  override def forceMatchingWidths = {
+  override def forceMatchingWidths {
     if (inputs.length == 2) {
       if (List("|", "&", "^", "+", "-").contains(op)) {
         if (inputs(0).width != width) inputs(0) = inputs(0).matchWidth(width)

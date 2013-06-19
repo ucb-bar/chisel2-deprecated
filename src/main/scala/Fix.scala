@@ -56,11 +56,11 @@ class Fix extends Bits {
 
   /** Factory method to create and assign a *Fix* type to a Node *n*.
     */
-  override def fromNode(n: Node) = {
+  override def fromNode(n: Node): this.type = {
     Fix(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
   }
 
-  override def fromInt(x: Int) = {
+  override def fromInt(x: Int): this.type = {
     Fix(x).asInstanceOf[this.type]
   }
 

@@ -29,24 +29,22 @@
 */
 
 package Chisel
-import Component._
 import Fill._
-import Component._
 import Lit._
 
 object Fill {
-  def fillWidthOf(i: Int, n: Node) = { (m: Node) => (m.inputs(i).width * n.maxNum.toInt) }
+  def fillWidthOf(i: Int, n: Node): (Node) => (Int) = { (m: Node) => (m.inputs(i).width * n.maxNum.toInt) }
   def apply(n: Int, mod: UFix): UFix = {
     val (bits_lit) = (mod.litOf);
     if (n == 1) {
       mod
-    } else if (isFolding && bits_lit != null) {
+    } else if (Mod.isFolding && bits_lit != null) {
       var res = bits_lit.value;
       val w   = mod.getWidth();
       for (i <- 0 until n-1)
         res = (res << w)|bits_lit.value;
       Lit(res, n * w){ UFix() };
-    } else if (backend.isInstanceOf[CppBackend] && mod.width != 1) {
+    } else if (Mod.backend.isInstanceOf[CppBackend] && mod.width != 1) {
       var out: UFix = null
       var i = 0
       var cur = mod
@@ -72,20 +70,22 @@ object Fill {
 }
 
 object NodeFill {
+
   def apply(n: Int, mod: Node): Node = {
-    if (isFolding && mod.litOf != null) {
+    if (Mod.isFolding && mod.litOf != null) {
       var c = BigInt(0)
       val w = mod.litOf.width
       val a = mod.litOf.value
       for (i <- 0 until n)
         c = (c << w) | a
-      return Literal(c,n*w)
+      Literal(c,n*w)
+    } else {
+      val res = new Fill()
+      res.init("", (m: Node) => {m.inputs(0).width * n}, mod, Literal(n))
+      res
     }
-
-    val res = new Fill()
-    res.init("", (m: Node) => {m.inputs(0).width * n}, mod, Literal(n))
-    res
   }
+
   def apply(mod: Node, n: Int): Node = apply(n, mod)
 }
 

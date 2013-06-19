@@ -29,14 +29,13 @@
 */
 
 package Chisel
-import Component._
 import Node._
 
 object Cat {
   private def doit[T <: Bits](mods: List[T]): T = {
     val modsList = mods.filter(_ != null)
-    val isLit = isFolding && modsList.forall(_.litOf != null)
-    val res = if (!isLit && backend.isInstanceOf[VerilogBackend]) {
+    val isLit = Mod.isFolding && modsList.forall(_.litOf != null)
+    val res = if (!isLit && Mod.backend.isInstanceOf[VerilogBackend]) {
       val res = new Cat();
       res.initOf("", sumWidth _, modsList)
     } else {
@@ -53,7 +52,7 @@ class Cat extends Node {
 
 object Concatenate {
   def apply (mod: Node, mods: Node*): Node =
-    if(backend.isInstanceOf[VerilogBackend]) {
+    if(Mod.backend.isInstanceOf[VerilogBackend]) {
       val res = new Cat();
       res.initOf("", sumWidth _, mod :: mods.toList);
       res

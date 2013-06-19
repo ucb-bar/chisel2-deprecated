@@ -65,7 +65,7 @@ class DotBackendSuite extends AssertionsForJUnit {
   /** Checks generation of simple dataflow graph */
   @Test def testSimple() {
 
-    class DAGSubComp extends Component {
+    class DAGSubComp extends Mod {
       val io = new Bundle {
         val ready = Bool(INPUT)
         val valid = Bool(OUTPUT)
@@ -74,16 +74,16 @@ class DotBackendSuite extends AssertionsForJUnit {
       io.valid := stored
     }
 
-    class DAGComp extends Component {
+    class DAGComp extends Mod {
       val io = new Bundle {
         val data0 = Bool(INPUT)
         val data1 = Bool(INPUT)
         val result = Bool(OUTPUT) // XXX If we don't explicitely specify
         // OUTPUT here, dot and verilog is generated correctly but
-        // not c++. This is an interaction between Component.findRoots
+        // not c++. This is an interaction between Mod.findRoots
         // and class Bool { def apply(): Bool = Bool(null); }
       }
-      val sub = module(new DAGSubComp())
+      val sub = Mod(new DAGSubComp())
       sub.io.ready := io.data0 & io.data1
       io.result := sub.io.valid
     }
@@ -91,7 +91,7 @@ class DotBackendSuite extends AssertionsForJUnit {
     chiselMain(Array[String](
       "--backend", "Chisel.DotBackend",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new DAGComp()))
+      () => Mod(new DAGComp()))
     assertFile(tmpdir.getRoot() + "/DotBackendSuite_DAGComp_1.dot",
 """digraph DotBackendSuite_DAGComp_1{
 rankdir = LR;

@@ -29,7 +29,9 @@
 */
 
 package Chisel
+
 import scala.collection.mutable.HashMap
+import scala.collection.mutable.ArrayBuffer
 import Node._
 import ChiselError._
 
@@ -40,22 +42,22 @@ class Assert(condArg: Bool, val message: String) extends Node {
 
 class BitsInObject(x: Node) extends UFix {
   inputs += x
-  override def isInObject = true
+  override def isInObject: Boolean = true
 }
 
 class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
   inputs ++= argsIn.map(a => new BitsInObject(a))
-  def args = inputs
-  override def isInObject = true
+  def args: ArrayBuffer[Node] = inputs
+  override def isInObject: Boolean = true
 
   private var formats = ""
   private val lengths = new HashMap[Char, (Int => Int)]
   lengths += ('b' -> ((x: Int) => x))
   lengths += ('d' -> ((x: Int) => math.ceil(math.log(2)/math.log(10)*x).toInt))
-  lengths += ('x' -> ((x: Int) => (x+3)/4))
-  lengths += ('s' -> ((x: Int) => (x+7)/8))
+  lengths += ('x' -> ((x: Int) => (x + 3)/4))
+  lengths += ('s' -> ((x: Int) => (x + 7)/8))
   lengths += ('%' -> ((x: Int) => 1))
-  
+
   private def remap(c: Char) = if (c == 'x') 'h' else c
 
   val format = {
@@ -63,8 +65,9 @@ class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
     var percent = false
     for (c <- formatIn) {
       if (percent) {
-        if (!lengths.contains(c))
+        if (!lengths.contains(c)) {
           ChiselError.error("Bad sprintf format: \"%" + c + "\"")
+        }
         formats += c
         msg += remap(c)
         percent = false
@@ -73,11 +76,12 @@ class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
         percent = c == '%'
       }
     }
-    if (percent)
+    if (percent) {
       ChiselError.error("Bad sprintf format: trailing %")
-    if (formats.length != argsIn.size)
+    }
+    if (formats.length != argsIn.size) {
       ChiselError.error("Wrong number of sprintf arguments (found " + argsIn.size + ", expected " + formats.length + ")")
-
+    }
     msg
   }
 
@@ -91,6 +95,6 @@ class Sprintf(formatIn: String, argsIn: Seq[Node]) extends PrintfBase(formatIn, 
 
 class Printf(condIn: Bool, formatIn: String, argsIn: Seq[Node]) extends PrintfBase(formatIn, argsIn) {
   inputs += condIn
-  override def args = inputs.init
-  def cond = inputs.last
+  override def args: ArrayBuffer[Node] = inputs.init
+  def cond: Node = inputs.last
 }

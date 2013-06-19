@@ -31,7 +31,6 @@
 package Chisel
 import Node._
 import Reg._
-import Component._
 import ChiselError._
 import scala.collection.mutable.HashSet
 
@@ -77,7 +76,7 @@ class DotBackend extends Backend {
   }
 
 
-  private def emitModuleText(top: Component, depth: Int ): (String, String) = {
+  private def emitModuleText(top: Mod, depth: Int ): (String, String) = {
     val res = new StringBuilder()
     val crossings = new StringBuilder()
     val indent = "  " * (depth + 1)
@@ -146,7 +145,7 @@ class DotBackend extends Backend {
   }
 
 
-  override def elaborate(c: Component): Unit = {
+  override def elaborate(c: Mod): Unit = {
     super.elaborate(c)
 
     var gn = -1;
@@ -154,7 +153,7 @@ class DotBackend extends Backend {
     out_cd.write("digraph TopTop {\n");
     out_cd.write("rankdir = LR;\n");
     def genNum: Int = { gn += 1; gn };
-    def dumpComponent (c: Component): Unit = {
+    def dumpComponent (c: Mod): Unit = {
       out_cd.write("subgraph cluster" + c.name + "{\n");
       out_cd.write("label = \"" + c.name + "\";\n");
       def dumpIo (n: String, d: Data): Unit = {

@@ -34,7 +34,7 @@ import scala.collection.mutable.ArrayBuffer
 
 object ListLookup {
   def apply[T <: Bits](addr: UFix, default: List[T], mapping: Array[(UFix, List[T])]): List[T] = {
-    if (Component.backend.isInstanceOf[CppBackend]) {
+    if (Mod.backend.isInstanceOf[CppBackend]) {
       return CListLookup(addr, default, mapping)
     }
     val defaultNode = ListNode(default)
@@ -59,11 +59,11 @@ object ListLookup {
 class ListLookup[T <: Bits] extends Node {
   var wires: List[ListLookupRef[T]] = null
 
-  def addr = inputs(0)
+  def addr: Node = inputs(0)
 
   def defaultWires = inputs(1).inputs
 
-  def map = {
+  def map: ArrayBuffer[(Node, ArrayBuffer[Node])] = {
     val mapArray = inputs.slice(2, inputs.length)
     val res = ArrayBuffer[(Node, ArrayBuffer[Node])]()
     for(elm <- mapArray)
@@ -108,6 +108,6 @@ object MapNode {
 }
 
 class MapNode extends Node {
-  def addr = inputs(0)
+  def addr: Node = inputs(0)
   def data = inputs.slice(1, inputs.length)
 }

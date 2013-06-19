@@ -176,11 +176,11 @@ class DataSuite extends AssertionsForJUnit {
     class BypassData(num_bypass_ports:Int) extends Bundle() {
       val data = UFix(INPUT, width=num_bypass_ports)
       val valid = Vec.fill(num_bypass_ports){Bool()}
-        // XXX Component.findRoots does not support Vec as a graph root.
+        // XXX Mod.findRoots does not support Vec as a graph root.
       def get_num_ports: Int = num_bypass_ports
     }
 
-    class BypassDataComp extends Component {
+    class BypassDataComp extends Mod {
       val io = new BypassData(3)
 
       io.valid := io.data | UFix(1)
@@ -189,7 +189,7 @@ class DataSuite extends AssertionsForJUnit {
 
     chiselMain(Array[String]("--c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => module(new BypassDataComp))
+      () => Mod(new BypassDataComp))
     assertFile(tmpdir.getRoot() + "/DataSuite_BypassDataComp_1.h",
 """#ifndef __DataSuite_BypassDataComp_1__
 #define __DataSuite_BypassDataComp_1__

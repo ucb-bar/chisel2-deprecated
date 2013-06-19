@@ -30,7 +30,6 @@
 
 package Chisel
 import Node._
-import Component._
 import Lit._
 
 object NodeExtract {
@@ -133,13 +132,11 @@ class Extract extends Node {
   def validateIndex(x: Node) {
     val lit = x.litOf
     assert(lit == null || lit.value >= 0 && lit.value < inputs(0).width,
-           {println("Extract(" + lit.value + ")" +
+           ChiselError.error("Extract(" + lit.value + ")" +
                     " out of range [0," + (inputs(0).width-1) + "]" +
                     " of " + inputs(0) +
                     " on line " + line.getLineNumber +
                     " in class " + line.getClassName +
-                    " in file " + line.getFileName)
-          }
-         )
+                    " in file " + line.getFileName))
   }
 }

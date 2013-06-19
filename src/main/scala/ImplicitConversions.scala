@@ -29,34 +29,14 @@
 */
 
 package Chisel
-import Node._
 
-// used for component to component connections
-object Binding {
+object ImplicitConversions {
 
-  def apply(m: Node, c: Mod, ioComp: Mod): Node = {
-    if (Mod.isEmittingComponents) {
-      val res = c.findBinding(m);
-      if (res == null) {
-        val res = new Binding(m, ioComp);
-        res.component = c;
-        res.init("", widthOf(0), m);
-        res.infer;
-        c.bindings += res;
-        res
-      } else {
-        res;
-      }
-    } else {
-      m
-    }
-  }
-}
+  implicit def intToUFix(x: Int): UFix = UFix(x)
+  implicit def booleanToBool(x: Boolean): Bool = Bool(x)
 
-class Binding(tn: Node, tc: Mod) extends Node {
+  // These ones for the lazy programmer.
+  implicit def intToBoolean(x: Int): Boolean = if (x != 0) true else false
+  implicit def booleanToInt(x: Boolean): Int = if (x) 1 else 0
 
-  val targetNode: Node = tn;
-  val targetComponent: Mod = tc;
-
-  override def toString: String = "BINDING(" + inputs(0) + ")";
 }
