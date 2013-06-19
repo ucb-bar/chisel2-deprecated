@@ -61,19 +61,15 @@ object Lit {
 }
 
 object Literal {
-/*XXX
-  @deprecated("Not used?")
-  implicit def intToLit (x: Int) = Literal(x);
- */
+
   private def bigMax(x: BigInt, y: BigInt): BigInt = if (x > y) x else y;
   def sizeof(x: BigInt): Int = {
     val y = bigMax(BigInt(1), x.abs).toDouble;
     val res = max(1, (ceil(log(y + 1)/log(2.0))).toInt);
-    // println("SIZEOF " + y + " LOG2 " + (log(y)/log(2.0)) + " IS " + res);
-     res
+    res
    }
 
-  @deprecated("This part of the implementation is not used anymore")
+  @deprecated("This part of the implementation is not used anymore?", "2.0")
   def signedsizeof(x: BigInt, width: Int = -1, signed: Boolean = false): (Int, String) = {
     var count = 0;
     var n = x;
@@ -139,7 +135,6 @@ object Literal {
   val hexNibbles = "0123456789abcdef";
   def toHexNibble(x: String, off: Int): Char = {
     var res = 0;
-    // println("OFF = " + off);
     for (i <- 0 until 4) {
       val idx = off + i;
       val c   = if (idx < 0) '0' else x(idx);
@@ -260,19 +255,18 @@ object Literal {
   This class should not end-up being instantiated directly in user code.
   */
 class Literal extends Node {
-  //implicit def intToLit (x: Int) = Lit(x);
   var hasInferredWidth = false
   var isZ = false;
   var isBinary = false;
   var base = 'x';
   var inputVal = BigInt(0);
   override def value: BigInt = stringToVal(base, name);
-  override def maxNum = value;
-  override def minNum = value;
-  override def isLit = true;
+  override def maxNum: BigInt = value;
+  override def minNum: BigInt = value;
+  override def isLit: Boolean = true;
   override def clearlyEquals(x: Node) = x.isLit && value == x.litOf.value
   override def toString: String = name;
-  override def isInVCD = false
+  override def isInVCD: Boolean = false
 
   def d (x: BigInt): Literal = Literal(x, value.toInt)
 }

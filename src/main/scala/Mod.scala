@@ -108,12 +108,7 @@ object Mod {
 
   def splitArg (s: String) : List[String] = s.split(' ').toList;
 
-  // TODO: MAYBE CHANGE NAME TO INITCOMPONENT??
-  // TODO: ADD INIT OF TOP LEVEL NODE STATE
-  // TODO: BETTER YET MOVE ALL TOP LEVEL STATE FROM NODE TO COMPONENT
-  def defTests(nodes: Node*)(body: => Boolean) = {
-  }
-  def initChisel () = {
+  def initChisel () {
     ChiselError.clear();
     saveWidthWarnings = false
     saveConnectionWarnings = false
@@ -179,18 +174,6 @@ object Mod {
     }
   }
 
-  def printStack {
-    var res = ""
-    for((i, c) <- printStackStruct){
-      res += (genIndent(i) + c.moduleName + " " + c.name + "\n")
-    }
-    println(res)
-  }
-
-  def genIndent(x: Int): String = {
-    if(x == 0) "" else "    " + genIndent(x-1);
-  }
-
   private def push(c: Mod) {
     if( !Mod.trigger ) {
       ChiselError.error(
@@ -216,13 +199,7 @@ object Mod {
     }
   }
 
-  def getComponent(): Mod = if(compStack.length != 0) compStack.top else {
-    // val st = Thread.currentThread.getStackTrace;
-    // println("UNKNOWN COMPONENT ");
-    // for(frame <- st)
-    //   println("  " + frame);
-    null
-  };
+  def getComponent(): Mod = if(compStack.length != 0) compStack.top else null
 
   def assignResets() {
     for(c <- components) {
@@ -297,22 +274,19 @@ abstract class Mod(resetSignal: Bool = null) {
     val wires = io.flatten;
     for ((n, w) <- wires) {
       // This assert is a sanity check to make sure static resolution of IOs didn't fail
-      scala.Predef.assert(this == w.staticComp, {
-        println("Statically resolved component differs from dynamically resolved component of IO: " + w + " crashing compiler")})
+      scala.Predef.assert(this == w.staticComp,
+        ChiselError.error("Statically resolved component differs from dynamically resolved component of IO: " + w + " crashing compiler"))
       w.component = this;
     }
   }
 
 
   def findBinding(m: Node): Binding = {
-    // println("FINDING BINDING " + m + " OUT OF " + bindings.length + " IN " + this);
     for (b <- bindings) {
-      // println("LOOKING AT " + b + " INPUT " + b.inputs(0));
       if (b.inputs(0) == m) {
         return b
       }
     }
-    // println("UNABLE TO FIND BINDING FOR " + m);
     null
   }
 
@@ -339,13 +313,17 @@ abstract class Mod(resetSignal: Bool = null) {
     x.getNode.component = this
     debugs += x.getNode
   }
+
   def printf(message: String, args: Node*): Unit = {
     val p = new Printf(conds.top && !reset, message, args)
     printfs += p
     debug(p)
     p.inputs.foreach(debug _)
   }
-  def <>(src: Mod) = io <> src.io;
+
+  def <>(src: Mod) {
+    io <> src.io
+  }
 
   def apply(name: String): Data = io(name);
   // COMPILATION OF REFERENCE
@@ -418,8 +396,7 @@ abstract class Mod(resetSignal: Bool = null) {
     }
   }
 
-  def inferAll(): Unit = {
-    println("started inference")
+  def inferAll(): Int = {
     val nodesList = ArrayBuffer[Node]()
     bfs { nodesList += _ }
 
@@ -427,7 +404,7 @@ abstract class Mod(resetSignal: Bool = null) {
       var hasError = false
       for (elm <- nodesList) {
         if (elm.infer || elm.width == -1) {
-          println("chisel: error: Could not infer the width on: " + elm)
+          ChiselError.error("Could not infer the width on: " + elm)
           hasError = true
         }
       }
@@ -450,21 +427,16 @@ abstract class Mod(resetSignal: Bool = null) {
 
       if(done){
         verify
-        println(count)
-        println("finished inference")
-        return;
+        return count;
       }
     }
     verify
-    println(count)
-    println("finished inference")
+    count
   }
 
   /** All classes inherited from Data are used to add type information
    and do not represent logic itself. */
-  def removeTypeNodes() {
-    println("started flattenning")
-
+  def removeTypeNodes(): Int = {
     var count = 0
     bfs {x =>
       scala.Predef.assert(!x.isTypeNode)
@@ -474,15 +446,11 @@ abstract class Mod(resetSignal: Bool = null) {
           x.inputs(i) = x.inputs(i).getNode
         }
     }
-
-    println(count)
-    println("finished flattening")
+    count
   }
 
   def forceMatchingWidths {
-    println("start width checking")
     bfs(_.forceMatchingWidths)
-    println("finished width checking")
   }
 
   def findConsumers() {
@@ -577,12 +545,12 @@ abstract class Mod(resetSignal: Bool = null) {
     for (m <- imods)
       maxDepth = max(m.depth, maxDepth);
     // for ((n, c) <- hist)
-    println("%6s: %s".format("name", "count"));
+    ChiselError.info("%6s: %s".format("name", "count"));
     for (n <- hist.keys.toList.sortWith((a, b) => a < b))
-      println("%6s: %4d".format(n, hist(n)));
-    println("%6s: %s".format("width", "count"));
+      ChiselError.info("%6s: %4d".format(n, hist(n)));
+    ChiselError.info("%6s: %s".format("width", "count"));
     for (w <- whist.keys.toList.sortWith((a, b) => a < b))
-      println("%3d: %4d".format(w, whist(w)));
+      ChiselError.info("%3d: %4d".format(w, whist(w)));
     var widths = new Array[Int](maxDepth + 1);
     for (i <- 0 until maxDepth + 1)
       widths(i) = 0;
@@ -599,7 +567,6 @@ abstract class Mod(resetSignal: Bool = null) {
 
   def collectNodes(c: Mod) {
     for (m <- c.mods) {
-      // println("M " + m.name);
       m match {
         case io: Bits  =>
           if (io.dir == INPUT) {
@@ -613,7 +580,7 @@ abstract class Mod(resetSignal: Bool = null) {
     }
   }
 
-  def traceableNodes = io.traceableNodes;
+  def traceableNodes: Array[Node] = io.traceableNodes;
   def childrenContainsReg: Boolean = {
     var res = containsReg;
     if(children.isEmpty) return res;
@@ -741,10 +708,7 @@ abstract class Mod(resetSignal: Bool = null) {
   }
 
   def findCombLoop() {
-    println("BEGINNING COMBINATIONAL LOOP CHECKING")
-
     // Tarjan's strongly connected components algorithm to find loops
-    println("BEGINNING SEARCHING CIRCUIT FOR COMBINATIONAL LOOP")
     var sccIndex = 0
     val stack = new Stack[Node]
     val sccList = new ArrayBuffer[ArrayBuffer[Node]]
@@ -787,25 +751,23 @@ abstract class Mod(resetSignal: Bool = null) {
     }
 
     // check for combinational loops
-    println("FINISHED ANALYZING CIRCUIT")
     var containsCombPath = false
     for (nodelist <- sccList) {
       if(nodelist.length > 1) {
         containsCombPath = true
-        println("FOUND COMBINATIONAL PATH!")
+        ChiselError.error("FOUND COMBINATIONAL PATH!")
         for((node, ind) <- nodelist zip nodelist.indices) {
           val ste = node.line
-          println("  (" + ind +  ") on line " + ste.getLineNumber +
+          ChiselError.error("  (" + ind +  ") on line " + ste.getLineNumber +
                                   " in class " + ste.getClassName +
                                   " in file " + ste.getFileName +
                                   ", " + node.name)
         }
       }
     }
-    if(containsCombPath) throw new Exception("CIRCUIT CONTAINS COMBINATIONAL PATH")
-    println("NO COMBINATIONAL LOOP FOUND")
   }
-  def isInput(node: Node) =
+
+  def isInput(node: Node): Boolean =
     node match { case b:Bits => b.dir == INPUT; case o => false }
   def keepInputs(nodes: Seq[Node]): Seq[Node] =
     nodes.filter(isInput)

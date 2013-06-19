@@ -36,12 +36,13 @@ import scala.collection.mutable.ArrayBuffer
 object Lookup {
   def apply[T <: Bits](addr: UFix, default: T, mapping: Seq[(UFix, T)]): T = {
     if (Mod.backend.isInstanceOf[CppBackend]) {
-      return CListLookup(addr, List(default), mapping.map(m => (m._1, List(m._2))).toArray).head
+      CListLookup(addr, List(default), mapping.map(m => (m._1, List(m._2))).toArray).head
+    } else {
+      val lookup = new Lookup()
+      val mappingNode = mapping.map(x => LookupMap(x))
+      lookup.initOf("", widthOf(1), List(addr, default) ++ mappingNode)
+      default.fromNode(lookup)
     }
-    val lookup = new Lookup()
-    val mappingNode = mapping.map(x => LookupMap(x))
-    lookup.initOf("", widthOf(1), List(addr, default) ++ mappingNode)
-    default.fromNode(lookup)
   }
 }
 
@@ -54,14 +55,14 @@ object LookupMap {
 }
 
 class LookupMap extends Node {
-  def addr = inputs(0)
-  def data = inputs(1)
+  def addr: Node = inputs(0)
+  def data: Node = inputs(1)
 }
 
 class Lookup extends Node {
-  override def isInObject = true;
+  override def isInObject: Boolean = true;
 
-  def map = inputs.slice(2, inputs.length).map(x => x.asInstanceOf[LookupMap])
+  def map: Seq[LookupMap] = inputs.slice(2, inputs.length).map(x => x.asInstanceOf[LookupMap])
 
   override def toString: String = "LOOKUP(" + inputs(0) + ")";
 }

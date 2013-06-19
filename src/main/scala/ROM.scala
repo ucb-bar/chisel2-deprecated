@@ -44,7 +44,7 @@ class ROM[T <: Data](val lits: Seq[Literal], gen: (Int) => T) extends Vec[T](gen
     data
   }
 
-  override def write(addr: UFix, data: T) = {
+  override def write(addr: UFix, data: T) {
     ChiselError.error("Can't write to ROM")
   }
 
@@ -56,13 +56,13 @@ class ROM[T <: Data](val lits: Seq[Literal], gen: (Int) => T) extends Vec[T](gen
     }
   }
 
-  override def isReg = true
+  override def isReg: Boolean = true
 
 }
 
 class ROMRead[T <: Data]() extends Node {
-  def addr = inputs(0)
-  def rom = inputs(1)
+  def addr: Node = inputs(0)
+  def rom: Node = inputs(1)
   // inputs += addri
   // inputs += rom
 

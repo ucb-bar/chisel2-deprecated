@@ -194,7 +194,7 @@ object Op {
     }
     }
     if (Mod.backend.isInstanceOf[CppBackend]) {
-      def signAbs(x: Node) = {
+      def signAbs(x: Node): (Bool, UFix) = {
         val f = x.asInstanceOf[Fix]
         val s = f < Fix(0)
         (s, Mux(s, -f, f).toUFix)
@@ -276,7 +276,7 @@ class Op extends Node {
       "[ " + inputs(0) + "\n]\n  " + op + "\n" + "[  " + inputs(1) + "\n]"
     }
 
-  override def forceMatchingWidths = {
+  override def forceMatchingWidths {
     if (inputs.length == 2) {
       if (List("|", "&", "^", "+", "-").contains(op)) {
         if (inputs(0).width != width) inputs(0) = inputs(0).matchWidth(width)

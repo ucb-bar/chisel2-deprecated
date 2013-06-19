@@ -51,8 +51,12 @@ object Reg {
       fixWidth(w)
     }
 
-  // Rule: if r is using an inferred width, then don't enforce a width. If it is using a user inferred
-  // width, set the the width
+  /** Rule: if r is using an inferred width, then don't enforce a width. If it is using a user inferred
+    width, set the the width
+
+    XXX Can't specify return type. There is a conflict. It is either
+    (Node) => (Int) or Int depending which execution path you believe.
+    */
   def regWidth(r: Node) = {
     val rLit = r.litOf
     if (rLit != null && rLit.hasInferredWidth) {
@@ -136,18 +140,19 @@ object RegReset {
 }
 
 class Reg extends Delay with proc {
-  def updateVal = inputs(0);
-  def resetVal  = inputs(1);
-  def enableSignal = inputs(enableIndex);
+  def updateVal: Node = inputs(0);
+  def resetVal: Node  = inputs(1);
+  def enableSignal: Node = inputs(enableIndex);
   var enableIndex = 0;
   var hasResetSignal = false
   var isReset = false
   var isEnable = false;
-  def isUpdate = !(updateVal == null);
-  def update (x: Node) = { inputs(0) = x };
+  def isUpdate: Boolean = !(updateVal == null);
+  def update (x: Node) { inputs(0) = x };
   var assigned = false;
   var enable = Bool(false);
-  def procAssign(src: Node) = {
+
+  def procAssign(src: Node) {
     if (assigned) {
       ChiselError.error("reassignment to Reg");
     }
@@ -177,22 +182,9 @@ class Reg extends Delay with proc {
   def nameOpt: String = if (name.length > 0) name else "REG"
   override def toString: String = {
     "REG(" + nameOpt + ")"
-    /*
-    if (component == null) return "nullcompreg";
-    if (component.isWalking.contains(this))
-      nameOpt
-    else {
-      component.isWalking += this;
-      var res = nameOpt + "(";
-      if (isUpdate) res = res + " " + updateVal;
-      if (isReset)  res = res + " " + resetVal;
-      res += ")";
-      component.isWalking -= this;
-      res;
-    }
-    */
   }
-  override def assign(src: Node) = {
+
+  override def assign(src: Node) {
     if(assigned || inputs(0) != null) {
       ChiselError.error("reassignment to Reg");
     } else {

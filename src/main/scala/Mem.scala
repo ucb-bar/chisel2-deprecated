@@ -61,9 +61,9 @@ abstract class AccessTracker extends Delay {
 }
 
 class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends AccessTracker {
-  def writeAccesses = writes ++ readwrites.map(_.write)
-  def readAccesses = reads ++ seqreads ++ readwrites.map(_.read)
-  def ports = writes ++ reads ++ seqreads ++ readwrites
+  def writeAccesses: ArrayBuffer[MemWrite] = writes ++ readwrites.map(_.write)
+  def readAccesses: ArrayBuffer[_ <: MemAccess] = reads ++ seqreads ++ readwrites.map(_.read)
+  def ports: ArrayBuffer[_ <: MemAccess] = writes ++ reads ++ seqreads ++ readwrites
   val writes = ArrayBuffer[MemWrite]()
   val seqreads = ArrayBuffer[MemSeqRead]()
   val reads = ArrayBuffer[MemRead]()
@@ -90,17 +90,21 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
     data
   }
 
+  /** XXX Cannot specify return type as it can either be proc or MemWrite
+    depending on the execution path you believe. */
   def doWrite(addr: UFix, condIn: Bool, wdata: Node, wmaskIn: UFix) = {
     val cond = // add bounds check if depth is not a power of 2
-      if (isPow2(n))
+      if (isPow2(n)) {
         condIn
-      else
+      } else {
         condIn && addr(log2Up(n)-1,0) < UFix(n)
+      }
     val wmask = // remove constant-1 write masks
-      if (!(wmaskIn == null) && wmaskIn.litOf != null && wmaskIn.litOf.value == (BigInt(1) << data.getWidth)-1)
+      if (!(wmaskIn == null) && wmaskIn.litOf != null && wmaskIn.litOf.value == (BigInt(1) << data.getWidth)-1) {
         null
-      else
+      } else {
         wmaskIn
+      }
 
     def doit(addr: UFix, cond: Bool, wdata: Node, wmask: UFix) = {
       val wr = new MemWrite(this, cond, addr, wdata, wmask)

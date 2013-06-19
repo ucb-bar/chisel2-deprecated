@@ -45,11 +45,11 @@ class Bool extends UFix {
 
   /** Factory method to create and assign a *Bool* type to a Node *n*.
     */
-  override def fromNode(n: Node) = {
+  override def fromNode(n: Node): this.type = {
     Bool(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
   }
 
-  override def fromInt(x: Int) = {
+  override def fromInt(x: Int): this.type = {
     Bool(x > 0).asInstanceOf[this.type]
   }
 
@@ -75,12 +75,15 @@ class Bool extends UFix {
   def || (b: Bool): Bool = BinaryBoolOp(this, b, "||");
 
   def isTrue: Boolean = {
-    if(inputs.length == 0) return false
-    inputs(0) match {
-      case l: Literal => {l.isLit && l.value == 1};
-      case any        => false;
+    if(inputs.length == 0) {
+      false
+    } else {
+      inputs(0) match {
+        case l: Literal => {l.isLit && l.value == 1};
+        case any        => false;
+      }
     }
   }
 
-  override def clone = Bool(dir).asInstanceOf[this.type]
+  override def clone: this.type = Bool(dir).asInstanceOf[this.type]
 }

@@ -61,3 +61,5 @@ seq(ScctPlugin.instrumentSettings : _*)
 parallelExecution in Test := false
 
 parallelExecution in ScctTest := false
+
+scalacOptions ++= Seq("-deprecation", "-feature", "-language:reflectiveCalls", "-language:implicitConversions", "-language:existentials")

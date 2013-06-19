@@ -59,13 +59,13 @@ abstract class Data extends Node {
 
 
   def setIsTypeNode {
-    assert(inputs.length > 0, {println("Type Node must have an input") })
+    assert(inputs.length > 0, ChiselError.error("Type Node must have an input"))
     isTypeNode = true
     inferWidth = widthOf(0)
   }
 
   def apply(name: String): Data = null
-  def flatten = Array[(String, Bits)]();
+  def flatten: Array[(String, Bits)] = Array[(String, Bits)]();
   def terminate(): Unit = { }
   def flip(): this.type = this;
   def asInput(): this.type = this;

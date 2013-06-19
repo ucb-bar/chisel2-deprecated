@@ -35,19 +35,19 @@ import Literal._
 
 object log2Up
 {
-  def apply(in: Int) = if(in == 1) 1 else ceil(log(in)/log(2)).toInt
+  def apply(in: Int): Int = if(in == 1) 1 else ceil(log(in)/log(2)).toInt
 }
 
 
 object log2Down
 {
-  def apply(x : Int) = if (x == 1) 1 else floor(log(x)/log(2.0)).toInt
+  def apply(x : Int): Int = if (x == 1) 1 else floor(log(x)/log(2.0)).toInt
 }
 
 
 object isPow2
 {
-  def apply(in: Int) = in > 0 && ((in & (in-1)) == 0)
+  def apply(in: Int): Boolean = in > 0 && ((in & (in-1)) == 0)
 }
 
 object foldR
@@ -58,7 +58,7 @@ object foldR
 
 object LFSR16
 {
-  def apply(increment: Bool = Bool(true)) =
+  def apply(increment: Bool = Bool(true)): UFix =
   {
     val width = 16
     val lfsr = RegReset(UFix(1, width))
@@ -96,7 +96,7 @@ object Reverse
       Cat(doit(in, base, half), doit(in, base + half, length - half))
     }
   }
-  def apply(in: UFix) = doit(in, 0, in.getWidth)
+  def apply(in: UFix): UFix = doit(in, 0, in.getWidth)
 }
 
 
@@ -164,8 +164,8 @@ class PipeIO[+T <: Data](gen: T) extends Bundle
 {
   val valid = Bool(OUTPUT)
   val bits = gen.clone.asOutput
-  def fire(dummy: Int = 0) = valid
-  override def clone =
+  def fire(dummy: Int = 0): Bool = valid
+  override def clone: this.type =
     try {
       super.clone()
     } catch {
@@ -180,8 +180,8 @@ class FIFOIO[T <: Data](gen: T) extends Bundle
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
   val bits  = gen.clone.asOutput
-  def fire(dummy: Int = 0) = ready && valid
-  override def clone =
+  def fire(dummy: Int = 0): Bool = ready && valid
+  override def clone: this.type =
     try {
       super.clone()
     } catch {
@@ -192,7 +192,7 @@ class FIFOIO[T <: Data](gen: T) extends Bundle
 }
 
 object FIFOIO {
-  def apply[T <: Data](gen: T) = {new FIFOIO(gen)}
+  def apply[T <: Data](gen: T): FIFOIO[T]  = {new FIFOIO(gen)}
 }
 
 class EnqIO[T <: Data](gen: T) extends FIFOIO(gen)
@@ -201,7 +201,7 @@ class EnqIO[T <: Data](gen: T) extends FIFOIO(gen)
   valid := Bool(false);
   for (io <- bits.flatten.map(x => x._2))
     io := UFix(0)
-  override def clone = { new EnqIO(gen).asInstanceOf[this.type]; }
+  override def clone: this.type = { new EnqIO(gen).asInstanceOf[this.type]; }
 }
 
 class DeqIO[T <: Data](gen: T) extends FIFOIO(gen)
@@ -209,7 +209,7 @@ class DeqIO[T <: Data](gen: T) extends FIFOIO(gen)
   flip()
   ready := Bool(false);
   def deq(b: Boolean = false): T = { ready := Bool(true); bits }
-  override def clone = { new DeqIO(gen).asInstanceOf[this.type]; }
+  override def clone: this.type = { new DeqIO(gen).asInstanceOf[this.type]; }
 }
 
 
@@ -229,7 +229,7 @@ class ioArbiter[T <: Data](gen: T, n: Int) extends Bundle {
 
 object ArbiterCtrl
 {
-  def apply(request: Seq[Bool]) = {
+  def apply(request: Seq[Bool]): Seq[Bool] = {
     Bool(true) +: (1 until request.length).map(i => !request.slice(0, i).foldLeft(Bool(false))(_ || _))
   }
 }
@@ -310,7 +310,7 @@ object FillInterleaved
 
 object Counter
 {
-  def apply(cond: Bool, n: Int) = {
+  def apply(cond: Bool, n: Int): (UFix, Bool) = {
     val c = RegReset(UFix(0, log2Up(n)))
     val wrap = c === UFix(n-1)
     when (cond) {
@@ -370,7 +370,7 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
 
 object Queue
 {
-  def apply[T <: Data](enq: FIFOIO[T], entries: Int = 2, pipe: Boolean = false) = {
+  def apply[T <: Data](enq: FIFOIO[T], entries: Int = 2, pipe: Boolean = false): FIFOIO[T]  = {
     val q = Mod(new Queue(enq.bits.clone, entries, pipe))
     q.io.enq.valid := enq.valid // not using <> so that override is allowed
     q.io.enq.bits := enq.bits

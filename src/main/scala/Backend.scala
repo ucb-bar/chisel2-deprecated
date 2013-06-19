@@ -77,6 +77,10 @@ abstract class Backend {
       if (dotPos >= 0) cname.substring(dotPos + 1) else cname);
   }
 
+  protected def genIndent(x: Int): String = {
+    if(x == 0) "" else "    " + genIndent(x-1);
+  }
+
   def nameChildren(root: Mod) {
     // Name all nodes at this level
     root.io.nameIt("io");
@@ -208,18 +212,21 @@ abstract class Backend {
 
   def fullyQualifiedName( m: Node ): String = {
     m match {
-      case l: Literal => return l.toString;
+      case l: Literal => l.toString;
       case any       =>
         if (m.name != ""
           && m != Mod.topComponent.reset && m.component != null) {
           /* Only modify name if it is not the reset signal
            or not in top component */
           if(m.name != "reset" && m.component != Mod.topComponent) {
-            return m.component.getPathName + "__" + m.name;
+            m.component.getPathName + "__" + m.name;
+          } else {
+            m.name
           }
+        } else {
+          m.name
         }
     }
-    m.name
   }
 
  def emitTmp(node: Node): String =
@@ -250,7 +257,7 @@ abstract class Backend {
     val dfsStack = new Stack[(Node, Mod)]()
     val walked = new HashSet[Node]()
 
-    def walk = {
+    def walk {
       var nextComp = c
 
       while(!dfsStack.isEmpty) {
@@ -286,7 +293,7 @@ abstract class Backend {
 
     }
 
-    println("resolving nodes to the components")
+    ChiselError.info("resolving nodes to the components")
     // start DFS from top level inputs
     // dequeing from dfsStack => walked
     for ((name, io) <- c.io.flatten) {
@@ -300,7 +307,7 @@ abstract class Backend {
 
     walk;
     assert(dfsStack.isEmpty)
-    println("finished resolving")
+    ChiselError.info("finished resolving")
   }
 
   def transform(c: Mod, transforms: ArrayBuffer[(Mod) => Unit]): Unit = {
@@ -322,11 +329,17 @@ abstract class Backend {
       c.markComponent();
     c.genAllMuxes;
     Mod.components.foreach(_.postMarkNet(0));
-    println("// COMPILING " + c + "(" + c.children.length + ")");
+    ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
     Mod.assignResets()
-    c.inferAll();
+    ChiselError.info("started inference")
+    val nbOuterLoops = c.inferAll();
+    ChiselError.info("finished inference (" + nbOuterLoops + ")")
+    ChiselError.info("start width checking")
     c.forceMatchingWidths;
-    c.removeTypeNodes()
+    ChiselError.info("finished width checking")
+    ChiselError.info("started flattenning")
+    val nbNodes = c.removeTypeNodes()
+    ChiselError.info("finished flattening (" + nbNodes + ")")
     ChiselError.checkpoint()
 
     collectNodesIntoComp(c)
@@ -340,7 +353,13 @@ abstract class Backend {
     ChiselError.checkpoint()
 
     if(!Mod.dontFindCombLoop) {
+      ChiselError.info("checking for combinational loops")
       c.findCombLoop();
+      ChiselError.checkpoint()
+      ChiselError.info("NO COMBINATIONAL LOOP FOUND")
+    }
+    if(Mod.saveComponentTrace) {
+      printStack
     }
   }
 
@@ -353,7 +372,7 @@ abstract class Backend {
       val portName = n.name
       val compName = c.name
       val compInstName = c.moduleName
-      println("Warning: " + dir + " port " + portName
+      ChiselError.warning(dir + " port " + portName
         + " is unconnected in module " + compInstName + " " + compName)
     }
 
@@ -367,6 +386,15 @@ abstract class Backend {
       }
     }
 
+  }
+
+  /** Prints the call stack of Component as seen by the push/pop runtime. */
+  protected def printStack {
+    var res = ""
+    for((i, c) <- Mod.printStackStruct){
+      res += (genIndent(i) + c.moduleName + " " + c.name + "\n")
+    }
+    ChiselError.info(res)
   }
 
 }

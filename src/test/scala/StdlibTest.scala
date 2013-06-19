@@ -422,12 +422,12 @@ endmodule
 
     class LookupComp extends Mod {
       val io = new Bundle {
-        val addr = Bits(INPUT, 8)
+        val addr = UFix(INPUT, 8)
         val data = UFix(OUTPUT)
       }
       io.data := Lookup(io.addr, UFix(0), Array(
-        (Bits(0), UFix(10)),
-        (Bits(1), UFix(11))))
+        (UFix(0), UFix(10)),
+        (UFix(1), UFix(11))))
     }
 
     chiselMain(Array[String]("--v",
@@ -441,7 +441,7 @@ endmodule
 
     class PopCountComp extends Mod {
       val io = new Bundle {
-        val in = Bits(INPUT, 8)
+        val in = UFix(INPUT, 8)
         val out = UFix(OUTPUT)
       }
       io.out := PopCount(Array(Bool(true), Bool(false)))
@@ -458,8 +458,8 @@ endmodule
 
     class ReverseComp extends Mod {
       val io = new Bundle {
-        val in = Bits(INPUT, 8)
-        val out = Bits(OUTPUT)
+        val in = UFix(INPUT, 8)
+        val out = UFix(OUTPUT)
       }
       io.out := Reverse(io.in)
     }
@@ -475,8 +475,8 @@ endmodule
 
     class ShiftRegisterComp extends Mod {
       val io = new Bundle {
-        val in = Bits(INPUT, 8)
-        val out = Bits(OUTPUT)
+        val in = UFix(INPUT, 8)
+        val out = UFix(OUTPUT)
       }
       io.out := ShiftRegister(2, io.in)
     }
@@ -492,7 +492,7 @@ endmodule
 
     class UFixToOHComp extends Mod {
       val io = new Bundle {
-        val in = Bits(INPUT, 8)
+        val in = UFix(INPUT, 8)
         val out0 = UFix(OUTPUT)
         val out1 = UFix(OUTPUT)
       }
@@ -525,9 +525,9 @@ endmodule
 
   /** Generate an Arbiter such that first valid wins.
 
-      Arbiter[T <: Bits](gen: T,
+      Arbiter[T <: Data](gen: T,
            n: Int) extends LockingArbiter[T](gen, n, 1)
-      LockingArbiter[T <: Bits](gen: T,
+      LockingArbiter[T <: Data](gen: T,
            n: Int, count: Int, needsLock: Option[T => Bool] = None)
       LockingArbiterLike[T <: Data](gen: T,
            n: Int, count: Int, needsLock: Option[T => Bool] = None)
@@ -639,9 +639,9 @@ endmodule
 
   /** XXX Generate an Arbiter that needs locking.
 
-      Arbiter[T <: Bits](gen: T,
+      Arbiter[T <: Data](gen: T,
            n: Int) extends LockingArbiter[T](gen, n, 1)
-      LockingArbiter[T <: Bits](gen: T,
+      LockingArbiter[T <: Data](gen: T,
            n: Int, count: Int, needsLock: Option[T => Bool] = None)
       LockingArbiterLike[T <: Data](gen: T,
            n: Int, count: Int, needsLock: Option[T => Bool] = None)
@@ -662,9 +662,9 @@ endmodule
 
   /** Generate a Round-Robin arbiter.
 
-      RRArbiter[T <: Bits](gen: T,
+      RRArbiter[T <: Data](gen: T,
            n: Int) extends LockingRRArbiter[T](gen, n, 1)
-      LockingRRArbiter[T <: Bits](gen: T,
+      LockingRRArbiter[T <: Data](gen: T,
            n: Int, count: Int, needsLock: Option[T => Bool] = None)
       LockingArbiterLike[T <: Data](gen: T,
            n: Int, count: Int, needsLock: Option[T => Bool] = None)
@@ -905,8 +905,8 @@ endmodule
 
     class FillInterleavedComp extends Mod {
       val io = new Bundle {
-        val in = Bits(INPUT, 8)
-        val out = Bits(OUTPUT)
+        val in = UFix(INPUT, 8)
+        val out = UFix(OUTPUT)
       }
       io.out := FillInterleaved(4, io.in)
     }
@@ -1017,11 +1017,11 @@ endmodule
       val io = new Bundle {
         val in0 = Bool(INPUT)
         val in1 = Bool(INPUT)
-        val data0 = Bits(INPUT, 16)
-        val data1 = Bits(INPUT, 16)
-        val out0 = Bits(OUTPUT)
-        val out1 = Bits(OUTPUT)
-        val out2 = Bits(OUTPUT)
+        val data0 = UFix(INPUT, 16)
+        val data1 = UFix(INPUT, 16)
+        val out0 = UFix(OUTPUT)
+        val out1 = UFix(OUTPUT)
+        val out2 = UFix(OUTPUT)
       }
       io.out0 := PriorityMux((io.in0, io.data0) :: (io.in1, io.data1) :: Nil)
       io.out1 := PriorityMux(io.in0 :: io.in1 :: Nil,
@@ -1040,7 +1040,7 @@ endmodule
 
     class PriorityEncoderComp extends Mod {
       val io = new Bundle {
-        val in = Bits(INPUT, 8)
+        val in = UFix(INPUT, 8)
         val out = UFix(OUTPUT)
       }
       io.out := PriorityEncoder(io.in)
@@ -1057,8 +1057,8 @@ endmodule
 
     class PriorityEncoderOHComp extends Mod {
       val io = new Bundle {
-        val in = Bits(INPUT, 8)
-        val out = Bits(OUTPUT)
+        val in = UFix(INPUT, 8)
+        val out = UFix(OUTPUT)
       }
       io.out := PriorityEncoderOH(io.in)
     }
@@ -1206,8 +1206,8 @@ endmodule
 
     class FillComp extends Mod {
       val io = new Bundle {
-        val in = Bits(INPUT, 8)
-        val out = Bits(OUTPUT)
+        val in = UFix(INPUT, 8)
+        val out = UFix(OUTPUT)
       }
       io.out := Fill(4, io.in)
     }
@@ -1240,13 +1240,13 @@ endmodule
 
     class MuxLookupComp extends Mod {
       val io = new Bundle {
-        val key = Bits(INPUT, 8)
-        val in0 = Bits(INPUT, 8)
-        val in1 = Bits(INPUT, 8)
-        val default = Bits(INPUT, 16)
-        val data0 = Bits(INPUT, 16)
-        val data1 = Bits(INPUT, 16)
-        val out = Bits(OUTPUT)
+        val key = UFix(INPUT, 8)
+        val in0 = UFix(INPUT, 8)
+        val in1 = UFix(INPUT, 8)
+        val default = UFix(INPUT, 16)
+        val data0 = UFix(INPUT, 16)
+        val data1 = UFix(INPUT, 16)
+        val out = UFix(OUTPUT)
       }
       io.out := MuxLookup(io.key, io.default,
         (io.in0, io.data0) :: (io.in1, io.data1) :: Nil)
@@ -1263,10 +1263,10 @@ endmodule
 
     class MuxCaseComp extends Mod {
       val io = new Bundle {
-        val default = Bits(INPUT, 8)
-        val in0 = Bits(INPUT, 8)
-        val in1 = Bits(INPUT, 8)
-        val out = Bits(OUTPUT)
+        val default = UFix(INPUT, 8)
+        val in0 = UFix(INPUT, 8)
+        val in1 = UFix(INPUT, 8)
+        val out = UFix(OUTPUT)
       }
       io.out := MuxCase(io.default,
         (Bool(true), io.in0) :: (Bool(false), io.in1) :: Nil)
@@ -1283,10 +1283,10 @@ endmodule
 
     class MultiplexComp extends Mod {
       val io = new Bundle {
-        val t = Bits(INPUT, 1)
-        val c = Bits(INPUT, 8)
-        val a = Bits(INPUT, 8)
-        val out = Bits(OUTPUT, 8)
+        val t = UFix(INPUT, 1)
+        val c = UFix(INPUT, 8)
+        val a = UFix(INPUT, 8)
+        val out = UFix(OUTPUT, 8)
       }
       // XXX Cannot figure out which code to write. Multiplex returns a Node.
       // val x = Multiplex(io.t, io.c, io.a)
@@ -1304,9 +1304,9 @@ endmodule
     class MuxComp extends Mod {
       val io = new Bundle {
         val t = Bool(INPUT)
-        val c = Bits(INPUT, 8)
-        val a = Bits(INPUT, 8)
-        val out = Bits(OUTPUT)
+        val c = UFix(INPUT, 8)
+        val a = UFix(INPUT, 8)
+        val out = UFix(OUTPUT)
       }
       io.out := Mux(io.t, io.c, io.a)
     }

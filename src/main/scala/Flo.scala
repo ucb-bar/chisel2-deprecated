@@ -176,7 +176,7 @@ class FloBackend extends Backend {
     renameNodes(c, c.omods);
     if (Mod.isReportDims) {
       val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
-      println("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
+      ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
 
     // Write the generated code to the output file
@@ -184,9 +184,6 @@ class FloBackend extends Backend {
     for (m <- c.omods)
       out.write(emit(m));
     out.close();
-    if(Mod.saveComponentTrace) {
-      Mod.printStack
-    }
   }
 
 }

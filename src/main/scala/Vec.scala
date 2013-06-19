@@ -79,19 +79,8 @@ object VecBuf{
 
 object Vec {
 
-/* XXX deprecated
-  def apply[T <: Data](gen: T, n: Int): Vec[T] = {
-    println("XXX [Vec.apply] " + gen)
-    val res = new Vec[T](gen);
-    for(i <- 0 until n){
-      val t   = gen.clone;
-      res    += t;
-    }
-    println("XXX [Vec.apply] done: " + res)
-    res
-  }
- */
-
+  /** Returns a new *Vec* from a sequence of *Data* nodes.
+    */
   def apply[T <: Data](elts: Seq[T]): Vec[T] = {
     val res = if (elts.forall(_.litOf != null) && elts.head.getWidth > 0) {
       new ROM(elts.map(_.litOf), i => elts.head.clone)
@@ -102,6 +91,9 @@ object Vec {
     res
   }
 
+  /** Returns a new *Vec* from the contatenation of a *Data* node
+    and a sequence of *Data* nodes.
+    */
   def apply[T <: Data](elt0: T, elts: T*): Vec[T] =
     apply(elt0 +: elts.toSeq)
 
@@ -146,7 +138,7 @@ class VecProc extends proc {
 
   override def genMuxes(default: Node) {}
 
-  def procAssign(src: Node) = {
+  def procAssign(src: Node) {
     val onehot = VecUFixToOH(addr, elms.length)
     Mod.searchAndMap = true
     for(i <- 0 until elms.length){
@@ -237,15 +229,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable w
     res.toArray
   }
 
-  // override def getWidth(): Int = {
-  //   var w = 0
-  //   for ((name, io) <- this.flatten)
-  //     w += io.getWidth
-  //   println(w)
-  //   w
-  // }
-
-  override def <>(src: Node) = {
+  override def <>(src: Node) {
     src match {
       case other: Vec[T] => {
         for((b, o) <- self zip other.self)
@@ -262,12 +246,12 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable w
     }
   }
 
-  def <>(src: Vec[T]) = {
+  def <>(src: Vec[T]) {
     for((b, e) <- self zip src)
       b <> e;
   }
 
-  def <>(src: Iterable[T]) = {
+  def <>(src: Iterable[T]) {
     for((b, e) <- self zip src)
       b <> e;
   }
@@ -307,7 +291,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable w
     }
   }
 
-  def := (src: UFix) = {
+  def := (src: UFix) {
     for(i <- 0 until length)
       this(i) := src(i)
   }
@@ -317,7 +301,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable w
       bundle.removeTypeNodes
   }
 
-  override def traceableNodes = self.toArray
+  override def traceableNodes: Array[Node] = self.toArray
 
   override def traceNode(c: Mod, stack: Stack[() => Any]) {
     for((n, i) <- flatten) {

@@ -43,46 +43,49 @@ object Enum {
 }
 
 object when {
-  def execWhen(cond: Bool)(block: => Unit) = {
+  def execWhen(cond: Bool)(block: => Unit) {
     conds.push(conds.top && cond);
     block;
     conds.pop();
   }
-  def apply(cond: Bool)(block: => Unit) = {
+  def apply(cond: Bool)(block: => Unit): when = {
     execWhen(cond){ block }
     new when(cond);
   }
 }
+
 class when (prevCond: Bool) {
-  def elsewhen (cond: Bool)(block: => Unit) = {
+  def elsewhen (cond: Bool)(block: => Unit): when = {
     when.execWhen(!prevCond && cond){ block }
     new when(prevCond || cond);
   }
-  def otherwise (block: => Unit) = {
+  def otherwise (block: => Unit) {
     when.execWhen(!prevCond){ block }
   }
 }
 
 object unless {
-  def apply(c: Bool)(block: => Unit) =
+  def apply(c: Bool)(block: => Unit) {
     when (!c) { block }
+  }
 }
 
 object otherwise {
-  def apply(block: => Unit) =
+  def apply(block: => Unit) {
     when (Bool(true)) { block }
+  }
 }
 object switch {
-  def apply(c: Bits)(block: => Unit) = {
+  def apply(c: Bits)(block: => Unit) {
     keys.push(c);
     block;
     keys.pop();
   }
 }
 object is {
-  def apply(v: Bits)(block: => Unit) = {
+  def apply(v: Bits)(block: => Unit) {
     if (keys.length == 0) {
-      println("NO KEY SPECIFIED");
+      ChiselError.error("NO KEY SPECIFIED");
     } else {
       val c = keys(0) === v;
       when (c) { block; }
@@ -93,11 +96,11 @@ object is {
 class TestIO(val format: String, val args: Seq[Data] = null)
 
 object Scanner {
-  def apply (format: String, args: Data*) =
+  def apply (format: String, args: Data*): TestIO =
     new TestIO(format, args.toList);
 }
 object Printer {
-  def apply (format: String, args: Data*) =
+  def apply (format: String, args: Data*): TestIO =
     new TestIO(format, args.toList);
 }
 
@@ -114,7 +117,7 @@ object Printer {
   _moduleName_ accordingly.
 */
 object chiselMain {
-  def readArgs(args: Array[String]) = {
+  def readArgs(args: Array[String]) {
     var i = 0;
     while (i < args.length) {
       val arg = args(i);
@@ -160,7 +163,7 @@ object chiselMain {
         case "--targetDir" => Mod.targetDir = args(i + 1); i += 1;
         case "--include" => Mod.includeArgs = Mod.splitArg(args(i + 1)); i += 1;
         case "--checkPorts" => Mod.isCheckingPorts = true
-        case any => println("UNKNOWN CONSOLE ARG");
+        case any => ChiselError.warning("UNKNOWN CONSOLE ARG");
       }
       i += 1;
     }
@@ -203,7 +206,7 @@ object chiselMain {
 }
 
 object throwException {
-  def apply(s: String) = {
+  def apply(s: String) {
     val xcpt = new Exception(s)
     findFirstUserLine(xcpt.getStackTrace) map { u => xcpt.setStackTrace(Array(u)) }
     throw xcpt
@@ -217,7 +220,7 @@ object chiselMainTest {
 
 trait proc extends Node {
   var updates = new collection.mutable.ListBuffer[(Bool, Node)];
-  def genCond() = conds.top;
+  def genCond(): Bool = conds.top;
   def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
     val update = others.foldLeft(default)((v, u) => Multiplex(u._1, u._2, v))
     if (inputs.isEmpty) inputs += update else inputs(0) = update
@@ -240,7 +243,7 @@ trait proc extends Node {
       genMuxes(lastValue, updates.toList.tail)
     }
   }
-  def procAssign(src: Node);
+  def procAssign(src: Node): Unit
   Mod.procs += this;
 }
 
@@ -254,16 +257,17 @@ trait nameable {
 abstract class BlackBox extends Mod {
   parent.blackboxes += this;
 
-  def setVerilogParameters(string: String) =
+  def setVerilogParameters(string: String) {
     this.asInstanceOf[Mod].verilog_parameters = string;
+  }
 
-  def setName(name: String) = {
+  def setName(name: String) {
     moduleName = name;
   }
 }
 
 
 class Delay extends Node {
-  override def isReg = true;
+  override def isReg: Boolean = true;
 }
 

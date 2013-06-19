@@ -46,12 +46,13 @@ object CString {
   def apply(s: String): String = {
     val cs = new StringBuilder("\"")
     for (c <- s) {
-      if (c == '\n')
+      if (c == '\n') {
         cs ++= "\\n"
-      else if (c == '\\' || c == '"')
+      } else if (c == '\\' || c == '"') {
         cs ++= "\\" + c
-      else
+      } else {
         cs += c
+      }
     }
     cs + "\""
   }
@@ -239,9 +240,15 @@ class CppBackend extends Backend {
         } else if (o.op == ">>") {
           if (o.inputs(0).width <= bpw) {
             if (o.isSigned) {
-              "  " + emitLoWordRef(o) + " = (sval_t)(" + emitLoWordRef(o.inputs(0)) + " << " + (bpw - o.inputs(0).width) +") >> (" + (bpw - o.inputs(0).width) + " + " + emitLoWordRef(o.inputs(1)) + ");\n" + trunc(o)
+              ("  " + emitLoWordRef(o) + " = (sval_t)("
+                + emitLoWordRef(o.inputs(0)) + " << "
+                + (bpw - o.inputs(0).width) + ") >> ("
+                + (bpw - o.inputs(0).width) + " + "
+                + emitLoWordRef(o.inputs(1)) + ");\n" + trunc(o))
             } else {
-              "  " + emitLoWordRef(o) + " = " + emitLoWordRef(o.inputs(0)) + " >> " + emitLoWordRef(o.inputs(1)) + ";\n"
+              ("  " + emitLoWordRef(o) + " = "
+                + emitLoWordRef(o.inputs(0)) + " >> "
+                + emitLoWordRef(o.inputs(1)) + ";\n")
             }
           } else {
             var shb = emitLoWordRef(o.inputs(1))
@@ -372,19 +379,27 @@ class CppBackend extends Backend {
           + i + ")"))
 
       case reg: Reg =>
-        def updateVal(w: Int) = if (reg.isReset) "TERNARY(" + emitLoWordRef(reg.inputs.last) + ", " + emitWordRef(reg.resetVal, w) + ", " + emitWordRef(reg.updateVal, w) + ")" else emitWordRef(reg.updateVal, w)
+        def updateVal(w: Int): String = if (reg.isReset) "TERNARY(" + emitLoWordRef(reg.inputs.last) + ", " + emitWordRef(reg.resetVal, w) + ", " + emitWordRef(reg.updateVal, w) + ")" else emitWordRef(reg.updateVal, w)
 
-        def shadow(w: Int) = emitRef(reg) + "_shadow.values[" + w + "]"
+        def shadow(w: Int): String = emitRef(reg) + "_shadow.values[" + w + "]"
         block((0 until words(reg)).map(i => shadow(i) + " = " + updateVal(i)))
 
       case x: Log2 =>
-        emitTmpDec(x) + "  " + emitLoWordRef(x) + " = " + (words(x.inputs(0))-1 to 1 by -1).map(i => emitWordRef(x.inputs(0), i) + " != 0, " + (i*bpw) + " + log2_1(" + emitWordRef(x.inputs(0), i) + ")").foldRight("log2_1(" + emitLoWordRef(x.inputs(0)) + ")")("TERNARY(" + _ + ", " + _ + ")") + ";\n"
+        (emitTmpDec(x) + "  " + emitLoWordRef(x) + " = "
+          + (words(x.inputs(0))-1 to 1 by -1).map(
+            i => emitWordRef(x.inputs(0), i) + " != 0, "
+              + (i*bpw) + " + log2_1("
+              + emitWordRef(x.inputs(0), i) + ")").foldRight("log2_1("
+                + emitLoWordRef(x.inputs(0)) + ")")(
+            "TERNARY(" + _ + ", " + _ + ")") + ";\n")
 
       case a: Assert =>
         "  ASSERT(" + emitLoWordRef(a.cond) + ", " + CString(a.message) + ");\n"
 
       case s: Sprintf =>
-        "  " + emitRef(s) + " = dat_format<" + s.width + ">(" + s.args.map(emitRef _).foldLeft(CString(s.format))(_+", "+_) + ");\n"
+        ("  " + emitRef(s) + " = dat_format<" + s.width + ">("
+          + s.args.map(emitRef _).foldLeft(CString(s.format))(_ + ", " + _)
+          + ");\n")
 
       case _ =>
         ""
@@ -425,7 +440,7 @@ class CppBackend extends Backend {
         if (m.inputs.length == 2) {
           return ""
         }
-        def mask(w: Int) = "(-" + emitLoWordRef(m.cond) + (if (m.isMasked) " & " + emitWordRef(m.mask, w) else "") + ")"
+        def mask(w: Int): String = "(-" + emitLoWordRef(m.cond) + (if (m.isMasked) " & " + emitWordRef(m.mask, w) else "") + ")"
 
         block((0 until words(m)).map(i => emitRef(m.mem)
           + ".put(" + emitLoWordRef(m.addr) + ", " + i
@@ -438,16 +453,7 @@ class CppBackend extends Backend {
     }
   }
 
-  def genHarness(c: Mod, name: String) = {
-    // val makefile = new java.io.FileWriter(base_name + name + "-makefile");
-    // makefile.write("CPPFLAGS = -O2 -I../ -I${CHISEL}/csrc\n\n");
-    // makefile.write(name + ": " + name + ".o" + " " + name + "-emulator.o\n");
-    // makefile.write("\tg++ -o " + name + " " + name + ".o " + name + "-emulator.o\n\n");
-    // makefile.write(name + ".o: " + name + ".cpp " + name + ".h\n");
-    // makefile.write("\tg++ -c ${CPPFLAGS} " + name + ".cpp\n\n");
-    // makefile.write(name + "emulator.o: " + name + "-emulator.cpp " + name + ".h\n");
-    // makefile.write("\tg++ -c ${CPPFLAGS} " + name + "-emulator.cpp\n\n");
-    // makefile.close();
+  def genHarness(c: Mod, name: String) {
     val harness  = createOutputFile(name + "-emulator.cpp");
     harness.write("#include \"" + name + ".h\"\n");
     harness.write("int main (int argc, char* argv[]) {\n");
@@ -483,16 +489,16 @@ class CppBackend extends Backend {
     val chiselENV = java.lang.System.getenv("CHISEL")
     val allFlags = flags + " -I../ -I" + chiselENV + "/csrc/"
     val dir = Mod.targetDir + "/"
-    def run(cmd: String) = {
+    def run(cmd: String) {
       val bashCmd = Seq("bash", "-c", cmd)
       val c = bashCmd.!
-      println(cmd + " RET " + c)
+      ChiselError.info(cmd + " RET " + c)
     }
-    def link(name: String) = {
+    def link(name: String) {
       val ac = "g++ -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o"
       run(ac)
     }
-    def cc(name: String) = {
+    def cc(name: String) {
       val cmd = "g++ -c -o " + dir + name + ".o " + allFlags + " " + dir + name + ".cpp"
       run(cmd)
     }
@@ -531,7 +537,7 @@ class CppBackend extends Backend {
   /** Insures each node such that it has a unique name accross the whole
     hierarchy by prefixing its name by a component path (except for "reset"
     and all nodes in *c*). */
-  def renameNodes(c: Mod, nodes: Seq[Node]) = {
+  def renameNodes(c: Mod, nodes: Seq[Node]) {
     for (m <- nodes) {
       m match {
         case l: Literal => ;
@@ -567,7 +573,7 @@ class CppBackend extends Backend {
     renameNodes(c, c.omods);
     if (Mod.isReportDims) {
       val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
-      println("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
+      ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
 
     if (Mod.isGenHarness) {
@@ -629,7 +635,7 @@ class CppBackend extends Backend {
     for (m <- c.omods)
       out_c.write(emitDefHi(m));
     out_c.write("}\n");
-    def splitFormat(s: String) = {
+    def splitFormat(s: String): Seq[String] = {
       var off = 0;
       var res: List[String] = Nil;
       for (i <- 0 until s.length) {
@@ -639,9 +645,9 @@ class CppBackend extends Backend {
           }
           res = "%" :: res;
           if (i == (s.length-1)) {
-            println("Badly formed format argument kind: %");
+            ChiselError.error("Badly formed format argument kind: %");
           } else if (s(i + 1) != 'x') {
-            println("Unsupported format argument kind: %" + s(i + 1));
+            ChiselError.error("Unsupported format argument kind: %" + s(i + 1));
           }
           off = i + 2;
         }
@@ -653,7 +659,10 @@ class CppBackend extends Backend {
     }
     out_c.write("void " + c.name + "_t::print ( FILE* f ) {\n");
     for (p <- Mod.printfs)
-      out_c write "  if (" + emitLoWordRef(p.cond) + ") dat_fprintf<" + p.width + ">(f, " + p.args.map(emitRef _).foldLeft(CString(p.format))(_+", "+_) + ");\n"
+      out_c.write("  if (" + emitLoWordRef(p.cond)
+        + ") dat_fprintf<" + p.width + ">(f, "
+        + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
+        + ");\n")
     if (Mod.printArgs.length > 0) {
       val format =
         if (Mod.printFormat == "") {
@@ -706,9 +715,7 @@ class CppBackend extends Backend {
     out_c.write("}\n");
     vcd.dumpVCD(c, out_c);
     out_c.close();
-    if(Mod.saveComponentTrace) {
-      Mod.printStack
-    }
+
     /* Copy the emulator.h file into the targetDirectory. */
     val resourceStream = getClass().getResourceAsStream("/emulator.h")
     if( resourceStream != null ) {
