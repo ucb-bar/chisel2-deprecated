@@ -130,6 +130,9 @@ object Vec {
     res
   }
 
+  def tabulate[T <: Data](n1: Int, n2: Int)(f: (Int, Int) => T): Vec[Vec[T]] =
+    tabulate(n1)(i1 => tabulate(n2)(f(i1, _)))
+
 }
 
 class VecProc extends proc {
