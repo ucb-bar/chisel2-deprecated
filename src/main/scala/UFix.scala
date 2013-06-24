@@ -66,6 +66,16 @@ class UFix extends Bits /* with Numeric[UFix] */ {
     UFix(x).asInstanceOf[this.type]
   }
 
+  // to support implicit convestions
+  def ===(b: UFix): Bool = LogicalOp(this, b, "==="){UFix()};
+  def :=(src: UFix) {
+    if(comp != null) {
+      comp procAssign src.toNode;
+    } else {
+      this procAssign src.toNode;
+    }
+  }
+
   // arithmetic operators
   def zext(): Fix = Cat(UFix(0,1), this).toFix
   def unary_-(): UFix = newUnaryOp("-");
