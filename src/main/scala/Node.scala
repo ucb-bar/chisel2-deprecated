@@ -29,6 +29,8 @@
 */
 
 package Chisel
+
+import scala.collection.immutable.Vector
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 import java.io.PrintStream
@@ -52,7 +54,7 @@ object Node {
   var isInGetWidth = false
 
   def fixWidth(w: Int) = {
-    Predef.assert(w != -1, ChiselError.error("invalid width for fixWidth object"));
+    assert(w != -1, ChiselError.error("invalid width for fixWidth object"));
     (m: Node) => {m.isFixedWidth = true; w}
   }
 
@@ -108,7 +110,8 @@ object Node {
 
   A digital logic graph is encoded as adjacency graph where instances
   of *Node* describe vertices and *inputs*, *consumers* member fields
-  are used to traverse the directed graph respectively backward and forward.
+  are used to traverse the directed graph respectively backward (from
+  output to input) and forward (from input to output).
   */
 abstract class Node extends nameable {
   var sccIndex = -1
@@ -124,10 +127,9 @@ abstract class Node extends nameable {
   var width_ = -1;
   var index = -1;
   var isFixedWidth = false;
-  var consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
-  var inputs = new ArrayBuffer[Node];
+  val consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
+  val inputs = new ArrayBuffer[Node];
   def traceableNodes: Array[Node] = Array[Node]();
-  var outputs = new ArrayBuffer[Node];
   var inferWidth: (Node) => Int = maxWidth;
   var nameHolder: nameable = null;
   var isClkInput = false;
@@ -295,8 +297,6 @@ abstract class Node extends nameable {
     writer.println("index: " + index)
     writer.println("isFixedWidth: " + isFixedWidth)
     writer.println("consumers.length: " + consumers.length)
-    writer.println("outputs.length: " + outputs.length)
-    writer.println("nameHolder: " + nameHolder)
     writer.println("nameHolder: " + nameHolder)
     writer.println("isClkInput: " + isClkInput)
     writer.println("inferCount: " + inferCount)
@@ -460,19 +460,15 @@ abstract class Node extends nameable {
     }
   }
 
-  def addConsumers(): Boolean = {
-    var off = 0;
-    for (i <- inputs) {
-      if (i == null) {
-        ChiselError.warning(this + " " + inputs + " HAS NULL INPUT " + off + "/" + inputs.length + " IN " + component);
-        inputs = ArrayBuffer(inputs(0));
-        return false;
-      } else if(!i.consumers.contains(this)) {
+  def addConsumers() {
+    for ((i, off) <- inputs.zipWithIndex) {
+      /* By construction we should not end-up with null inputs. */
+      assert(i != null, ChiselError.error("input " + off
+        + " of " + inputs.length + " for node " + this + " is null"))
+      if(!i.consumers.contains(this)) {
         i.consumers += this;
       }
-      off += 1;
     }
-    true;
   }
 
   def extract (widths: Array[Int]): List[UFix] = {
