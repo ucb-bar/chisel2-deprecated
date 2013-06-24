@@ -43,16 +43,16 @@ object Lit {
     makeLit(Literal(n, width))(gen)
   }
 
+  def apply[T <: Bits](n: String, base: Char, width: Int = -1)(gen: => T): T = {
+    makeLit(Literal(width, base, n))(gen)
+  }
+
   def apply[T <: Bits](n: BigInt)(gen: => T): T = {
     makeLit(Literal(n, signed = gen.isInstanceOf[Fix]))(gen)
   }
 
   def apply[T <: Bits](n: BigInt, width: Int)(gen: => T): T = {
     makeLit(Literal(n, width, signed = gen.isInstanceOf[Fix]))(gen)
-  }
-
-  def apply[T <: Bits](width: Int, base: Char, literal: String)(gen: => T): T = {
-    makeLit(Literal(width, base, literal))(gen)
   }
 
   def makeLit[T <: Bits](x: Literal)(gen: => T): T = {

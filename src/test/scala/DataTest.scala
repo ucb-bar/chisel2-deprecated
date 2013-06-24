@@ -132,6 +132,7 @@ class DataSuite extends AssertionsForJUnit {
   // Testing the UFix factory methods
 
   @Test def testUFixVal() {
+    // apply(x: Int): UFix
     val dat = UFix(5)
     assertTrue( dat.width == -1 ); // XXX ??
     assertTrue( dat.dir == OUTPUT );
@@ -141,6 +142,7 @@ class DataSuite extends AssertionsForJUnit {
   }
 
   @Test def testUFixValWidth() {
+    // def apply(x: Int, width: Int): UFix
     val dat = UFix(5, 4)
     assertTrue( dat.width == -1 ); // XXX ??
     assertTrue( dat.dir == OUTPUT );
@@ -149,7 +151,20 @@ class DataSuite extends AssertionsForJUnit {
     assertFalse( dat.named );
   }
 
+  /* XXX This test interfers with others declared in NameTest.scala
+  @Test def testUFixString() {
+    // def apply(x: String): UFix
+    val dat = UFix("1010")
+    assertTrue( dat.width == -1 ); // XXX
+    assertTrue( dat.dir == OUTPUT );
+    assertFalse( dat.isSigned );
+    assertTrue( dat.assigned );
+    assertFalse( dat.named );
+  }
+   */
+
   @Test def testUFixStringWidth() {
+    // def apply(x: String, width: Int): UFix
     val dat = UFix("101", 4)
     assertTrue( dat.width == -1 ); // XXX ??
     assertTrue( dat.dir == OUTPUT );
@@ -158,7 +173,50 @@ class DataSuite extends AssertionsForJUnit {
     assertFalse( dat.named );
   }
 
+  @Test def testUFixStringBaseBinary() {
+    // def apply(x: String, base: Char): UFix
+    val dat = UFix("1010", 'b')
+    assertTrue( dat.width == -1 );
+    assertTrue( dat.dir == OUTPUT );
+    assertFalse( dat.isSigned );
+    assertTrue( dat.assigned );
+    assertFalse( dat.named );
+  }
+
+  @Test def testUFixStringBaseOctal() {
+    // def apply(x: String, base: Char): UFix
+    val dat = UFix("644", 'o')
+    assertTrue( dat.width == -1 );
+    assertTrue( dat.dir == OUTPUT );
+    assertFalse( dat.isSigned );
+    assertTrue( dat.assigned );
+    assertFalse( dat.named );
+  }
+
+  /* XXX This test interfers with others declared in NameTest.scala
+  @Test def testUFixStringBaseDec() {
+    // def apply(x: String, base: Char): UFix
+    val dat = UFix("199", 'd')
+    assertTrue( dat.width == -1 );
+    assertTrue( dat.dir == OUTPUT );
+    assertFalse( dat.isSigned );
+    assertTrue( dat.assigned );
+    assertFalse( dat.named );
+  }
+   */
+
+  @Test def testUFixStringBaseHex() {
+    // def apply(x: String, base: Char): UFix
+    val dat = UFix("abc", 'h')
+    assertTrue( dat.width == -1 );
+    assertTrue( dat.dir == OUTPUT );
+    assertFalse( dat.isSigned );
+    assertTrue( dat.assigned );
+    assertFalse( dat.named );
+  }
+
   @Test def testUFixDirWidth() {
+    // def apply(dir: IODirection = null, width: Int = -1): UFix
     val dat = UFix(INPUT, 4)
     assertTrue( dat.width == 4 );
     assertTrue( dat.dir == INPUT );
