@@ -256,6 +256,7 @@ abstract class Component(resetSignal: Bool = null) {
     Component/modules source text before their first instantiation. */
   var level = 0;
   var traversal = 0;
+  var hasMemoize = false;
   var ioVal: Data = null;
   /** Name of the instance. */
   var name: String = "";

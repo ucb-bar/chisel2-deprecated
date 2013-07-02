@@ -129,7 +129,7 @@ class CppBackend extends Backend {
   }
 
   override def emitDec(node: Node): String = {
-    node match {
+    var res = node match {
       case x: Binding =>
         ""
       case x: Literal =>
@@ -152,6 +152,10 @@ class CppBackend extends Backend {
       case _ =>
         "  dat_t<" + node.width + "> " + emitRef(node) + ";\n"
     }
+    if (node.memoize) {
+      res = res + "  bool " + emitRef(node) + "_memoize;\n"
+    }
+    res
   }
 
   val bpw = 64
@@ -409,6 +413,10 @@ class CppBackend extends Backend {
     }
   }
 
+  def emitDefLoMemoize(n: Node): String = {
+    "  clock_lo_" + emitRef(n) + "( );\n"
+  }
+
   def emitDefLo(parent: Component, child: Component): String = {
     val moduleName = child.moduleName
     val instanceName = child.name
@@ -425,7 +433,7 @@ class CppBackend extends Backend {
   }
 
   def emitInit(node: Node): String = {
-    node match {
+    var res = node match {
       case x: Reg =>
         "  if (rand_init) " + emitRef(node) + ".randomize();\n"
 
@@ -440,6 +448,10 @@ class CppBackend extends Backend {
       case _ =>
         ""
     }
+    if (node.memoize) {
+      res = res + "  " + emitRef(node) + "_memoize = false;\n"
+    }
+    res
   }
 
   def emitInitHi(node: Node): String = {
@@ -664,22 +676,31 @@ class CppBackend extends Backend {
     for (child <- c.children)
       ioMap ++= ioDependency(child)
 
+    val visitedFromPrevIO = new ArrayBuffer[Node]
+
     def walk(roots: ArrayBuffer[Node], result: ArrayBuffer[Node], terminal: Node => Boolean) {
-      val work = new Stack[(Boolean, Node)]
+      val work = new Stack[(Boolean, Boolean, Node)]
       val walked = new ArrayBuffer[Node]
+      val memoizedResult = new Stack[(Node, ArrayBuffer[Node])]
 
       for (root <- roots) {
-        work.push((false -> root))
+        work.push(((false, false, root)))
         walked  += root
       }
 
       while (!work.isEmpty) {
-        val (done, n) = work.pop()
+        val (done, isInPrevIO, n) = work.pop()
         assert(n.component == c || n.isIo || n.isLit, {println(n.getClass + " " + n.component.getClass + " " + c.getClass)})
         if (done) {
+          if (isInPrevIO) {
+            memoizedResult.top._2 += n
+            if(memoizedResult.top._1 == n) {
+              res += (n -> memoizedResult.pop._2) // todo: Check that n isn't already an io
+            }
+          }
           result += n
         } else {
-          work.push((true -> n))
+          work.push(((true, isInPrevIO, n)))
           val nexts = if (ioMap.contains(n)) {
             ioMap(n)
           } else if (terminal(n)) {
@@ -690,8 +711,20 @@ class CppBackend extends Backend {
           for (i <- nexts) {
             if (!i.isInstanceOf[Delay] && !walked.contains(i)) {
               // don't walk registers
-              work.push((false -> i))
               walked += i
+              if (visitedFromPrevIO.contains(i)) {
+                work.push(((i.memoize, true, i)))
+                if (!isInPrevIO) {
+                  // only memoize if consumer is not used in a previous IO
+                  memoizedResult.push((i, new ArrayBuffer[Node]))
+                  i.memoize = true
+                } else {
+                  i.memoizedNode = memoizedResult.top._1
+                }
+              } else {
+                work.push(((false, false, i)))
+                visitedFromPrevIO += i
+              }
             }
           }
         }
@@ -737,6 +770,10 @@ class CppBackend extends Backend {
     for (m <- c.mods) {
       if (m.isInObject) {
         res.append(emitDec(m));
+        if (m.memoize) {
+          c.hasMemoize = true
+          println("HUY: " + emitRef(m) + " consumers: " + m.consumers.length + " " + c.hasMemoize)
+        }
       }
       // if (m.isInVCD) {
       //   out_h.write(vcd.emitDec(m));
@@ -751,6 +788,14 @@ class CppBackend extends Backend {
       if (io.dir == OUTPUT) {
         res.append("  void clock_lo_" + emitRef(io) + " ();\n");
       }
+    }
+    for (k <- ios.keys) {
+      if (k.memoize) {
+        res.append("  void clock_lo_" + emitRef(k) + " ();\n");
+      }
+    }
+    if (c.hasMemoize) {
+      res.append("  void unmemoize ( );\n")
     }
     res.append("  void clock_lo ( );\n")
     res.append("  void clock_lo_remainder ( );\n");
@@ -779,12 +824,50 @@ class CppBackend extends Backend {
       if (io.dir == OUTPUT) {
         res.append("void $$MODULENAME$$_t::clock_lo_" + emitRef(io) + " ( ) {\n");
         val topList = ios(io)
+        assert(!io.memoize)
         for (m <- topList) {
-          res.append(emitDefLo(m));
+          if (m.memoize) {
+            res.append(emitDefLoMemoize(m))
+          } else if (m.memoizedNode == null)
+            res.append(emitDefLo(m));
         }
         res.append("}\n");
       }
     }
+
+    for (k <- ios.keys) {
+      if (k.memoize) {
+        res.append("void $$MODULENAME$$_t::clock_lo_" + emitRef(k) + " ( ) {\n");
+        res.append("  if ( !" + emitRef(k) + "_memoize ) {\n")
+        val topList = ios(k)
+        println("HUY: " + emitRef(k) + ": " + topList.length)
+        for (m <- topList) {
+          if (m.memoize && m != k) {
+            res.append("  " + emitDefLoMemoize(m))
+          } else if (m.memoizedNode == k || m == k) {
+            res.append("  " + emitDefLo(m))
+          }
+        }
+        res.append("    " + emitRef(k) + "_memoize = true;\n")
+        res.append("  }\n")
+        res.append("}\n")
+      }
+    }
+
+    if (c.hasMemoize) {
+      res.append("void $$MODULENAME$$_t::unmemoize( ) {\n")
+      for (m <- c.mods) {
+        if (m.memoize) {
+          res.append("  " + emitRef(m) + "_memoize = false;\n")
+        }
+      }
+      for (child <- c.children) {
+        if (child.hasMemoize)
+          res.append("  " + child.name + ".unmemoize( );\n")
+      }
+      res.append("}\n")
+    }
+
     if (c == topComponent) {
       res.append("void $$MODULENAME$$_t::clock_lo ( ) {\n");
       for ((n, io) <- c.io.flatten) {
@@ -792,12 +875,19 @@ class CppBackend extends Backend {
           res.append("  clock_lo_" + emitRef(io) + " ( );\n")
       }
       res.append("  clock_lo_remainder ( );\n")
+      for (child <- c.children) {
+        if (child.hasMemoize)
+          res.append("  " + child.name + ".unmemoize( );\n")
+      }
       res.append("}\n")
     }
 
     res.append("void $$MODULENAME$$_t::clock_lo_remainder ( ) {\n")
     for (m <- remainder) {
-      res.append(emitDefLo(m));
+      if (m.memoize)
+        res.append(emitDefLoMemoize(m))
+      else if (m.memoizedNode == null)
+        res.append(emitDefLo(m));
     }
     for (child <- c.children) {
       res.append("  " + child.name + ".clock_lo_remainder( );\n")

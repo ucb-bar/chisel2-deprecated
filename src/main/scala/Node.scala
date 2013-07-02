@@ -114,6 +114,8 @@ abstract class Node extends nameable {
   var incomingEdges = 0
   var topVisit = false
   var walked = false;
+  var memoizedNode: Node = null;
+  var memoize = false
   val staticComp: Component = getComponent();
   var component: Component = null;
   var flattened = false;
@@ -252,7 +254,8 @@ abstract class Node extends nameable {
   def isInObject =
     (isIo && (isIoDebug || component == topComponent)) ||
     topComponent.debugs.contains(this) ||
-    isReg || isUsedByRam || isDebug || isPrintArg || isScanArg;
+    isReg || isUsedByRam || isDebug || isPrintArg || isScanArg ||
+    memoize;
   def isInVCD = (isIo && isInObject) || isReg || (isDebug && !name.isEmpty);
   
   /** Prints all members of a node and recursively its inputs up to a certain
