@@ -123,11 +123,8 @@ class Extract extends Node {
   var hi: Node = null;
 
   override def toString: String =
-    if (hi == lo) {
-      "BITS(" + inputs(0) + ", " + lo + ")";
-    } else {
-      "BITS(" + inputs(0) + ", " + hi + ", " + lo + ")";
-    }
+    ("/*" + (if (name != null && !name.isEmpty) name else "?") + "*/ Extract("
+      + inputs(0) + (if (hi == lo) "" else (", " + hi)) + ", " + lo + ")")
 
   def validateIndex(x: Node) {
     val lit = x.litOf

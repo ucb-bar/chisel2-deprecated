@@ -229,6 +229,7 @@ class DataSuite extends AssertionsForJUnit {
     in incorrect code dat_t<0> which leads to incorrect VCD output.
 
     XXX Chisel should generate an error message!
+    XXX Incorrect until we compute debug roots correctly.
     */
   @Test def testBypassData() {
     class BypassData(num_bypass_ports:Int) extends Bundle() {

@@ -117,8 +117,8 @@ abstract class Node extends nameable {
   var sccIndex = -1
   var sccLowlink = -1
   var walked = false;
-  val staticComp: Mod = Mod.getComponent();
-  var component: Mod = null;
+  /* Assigned in Binding and Mod.reset */
+  var component: Mod = Mod.getComponent();
   var flattened = false;
   var isTypeNode = false;
   var depth = 0;
@@ -341,6 +341,7 @@ abstract class Node extends nameable {
       reg.hasResetSignal = true
     }
 
+    assert( comp != null );
     if (comp != null && !comp.isWalked.contains(this)) {
       comp.isWalked += this;
       for (node <- traceableNodes) {
@@ -353,7 +354,13 @@ abstract class Node extends nameable {
         if (node != null) {
            //tmp fix, what happens if multiple componenets reference static nodes?
           if (node.component == null || !Mod.components.contains(node.component)) {
-            node.component = nextComp;
+            /* If Backend.collectNodesIntoComp does not resolve the component
+             field for all components, we will most likely end-up here. */
+            assert( node.component == nextComp,
+              ChiselError.error((if(node.name != null && !node.name.isEmpty)
+                node.name else "?") + " has no match between component "
+                + (if( node.component == null ) "(null)" else node.component)
+                + " and '" + nextComp + "'"))
           }
           if (!Mod.backend.isInstanceOf[VerilogBackend] || !node.isIo) {
             stack.push(() => node.traceNode(nextComp, stack));

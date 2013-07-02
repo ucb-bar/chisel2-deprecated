@@ -254,38 +254,23 @@ abstract class Backend {
 
   // DFS walk of graph to collect nodes of every component
   def collectNodesIntoComp(c: Mod) {
-    val dfsStack = new Stack[(Node, Mod)]()
+    val dfsStack = c.initializeDFS
     val walked = new HashSet[Node]()
 
     def walk {
       var nextComp = c
 
       while(!dfsStack.isEmpty) {
-        val (node, curComp) = dfsStack.pop
+        val node = dfsStack.pop
 
         if(!walked.contains(node)) {
           walked += node
-          // push and pop components as necessary
-          node match {
-            case io: Bits => {
-              if (io.dir == OUTPUT) { // push
-                nextComp = io.component
-              } else if (io.dir == INPUT) { // pop
-                nextComp = io.component.parent
-              } else { // do nothing
-                nextComp = curComp
-              }
-            }
-            case any => // do nothing
-              nextComp = curComp
-          }
-
-          // collect inputs into component
+          // collect unassigned nodes into component
           for (input <- node.inputs) {
             if(!walked.contains(input)) {
               nextComp.nodes += input
-              if(input.component == null) input.component = nextComp
-              dfsStack.push((input, nextComp))
+              if( input.component == null ) input.component = node.component
+              dfsStack.push(input)
             }
           }
         }
@@ -296,12 +281,12 @@ abstract class Backend {
     ChiselError.info("resolving nodes to the components")
     // start DFS from top level inputs
     // dequeing from dfsStack => walked
-    for ((name, io) <- c.io.flatten) {
+    for (io <- dfsStack) {
+      // XXX Not needed anymore?
       assert(io.isInstanceOf[Bits])
       if(io.asInstanceOf[Bits].dir == OUTPUT) {
         c.nodes += io
-        io.component = c
-        dfsStack.push((io, c))
+        assert( io.component == c )
       }
     }
 
@@ -320,6 +305,10 @@ abstract class Backend {
 
   def elaborate(c: Mod): Unit = {
     Mod.topComponent = c;
+    /* XXX If we call nameAll here and again further down, we end-up with
+     duplicate names in the generated C++.
+     nameAll(c) */
+
     Mod.components.foreach(_.elaborate(0));
 
     /* XXX We should name all signals before error messages are generated
@@ -327,10 +316,15 @@ abstract class Backend {
      with the *bindings* (see later comment). */
     for (c <- Mod.components)
       c.markComponent();
+    // XXX This will create nodes after the tree is traversed!
     c.genAllMuxes;
     Mod.components.foreach(_.postMarkNet(0));
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
     Mod.assignResets()
+
+    /* XXX Temporary debugging info. */
+//XXX    c.findConsumers();
+
     ChiselError.info("started inference")
     val nbOuterLoops = c.inferAll();
     ChiselError.info("finished inference (" + nbOuterLoops + ")")
@@ -342,7 +336,13 @@ abstract class Backend {
     ChiselError.info("finished flattening (" + nbNodes + ")")
     ChiselError.checkpoint()
 
+    /* The code in this function seems wrong. Yet we still need to call
+     it to associate components to nodes that were created after the call
+     tree has been executed (ie. in genMuxes). More nodes are created
+     in transforms. I don't know why collect with be executed before then.
+     */
     collectNodesIntoComp(c)
+    // two transforms added in Mem.scala (referenced and computePorts)
     transform(c, transforms)
     c.traceNodes();
     ChiselError.checkpoint()

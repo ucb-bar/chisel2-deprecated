@@ -67,7 +67,8 @@ class UFix extends Bits /* with Numeric[UFix] */ {
   }
 
   // to support implicit convestions
-  def ===(b: UFix): Bool = LogicalOp(this, b, "==="){UFix()};
+  def ===(b: UFix): Bool = LogicalOp(this, b, "===")
+
   def :=(src: UFix) {
     if(comp != null) {
       comp procAssign src.toNode;

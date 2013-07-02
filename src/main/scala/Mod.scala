@@ -274,10 +274,10 @@ abstract class Mod(resetSignal: Bool = null) {
   def ownIo() {
     val wires = io.flatten;
     for ((n, w) <- wires) {
-      // This assert is a sanity check to make sure static resolution of IOs didn't fail
-      scala.Predef.assert(this == w.staticComp,
+      // This assert is a sanity check to make sure static resolution
+      // of IOs didn't fail
+      scala.Predef.assert(this == w.component,
         ChiselError.error("Statically resolved component differs from dynamically resolved component of IO: " + w + " crashing compiler"))
-      w.component = this;
     }
   }
 
@@ -310,6 +310,7 @@ abstract class Mod(resetSignal: Bool = null) {
   /** Insures a backend does not remove a signal because it is unreachable
     from the outputs. */
   def debug(x: Node): Unit = {
+    // XXX Because We cannot guarentee x is flatten later on in collectComp.
     x.getNode.component = this
     debugs += x.getNode
   }
@@ -376,6 +377,23 @@ abstract class Mod(resetSignal: Bool = null) {
     res
   }
 
+  def initializeDFS: Stack[Node] = {
+    val res = new Stack[Node]
+
+    /* XXX This fails the assertion in Backend collectComp because debugs
+     might not be flatten structures.
+     XXX Make sure roots are consistent between initializeBFS, initializeDFS
+     and findRoots.
+    for(a <- this.debugs) {
+      res.push(a)
+    }
+     */
+    for((n, flat) <- this.io.flatten) {
+      res.push(flat)
+    }
+    res
+  }
+
   def bfs(visit: Node => Unit): Unit = {
     val walked = new HashSet[Node]
     val bfsQueue = initializeBFS
@@ -415,12 +433,12 @@ abstract class Mod(resetSignal: Bool = null) {
     // Infer all node widths by propagating known widths
     // in a bellman-ford fashion.
     for(i <- 0 until nodesList.length) {
-
+      var nbUpdates = 0
       var done = true;
       for(elm <- nodesList){
         val updated = elm.infer
+        if( updated ) { nbUpdates = nbUpdates + 1  }
         done = done && !updated
-        //done = done && !(elm.infer) TODO: why is this line not the same as previous two?
       }
 
       count += 1
