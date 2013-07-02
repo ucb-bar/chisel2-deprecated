@@ -128,11 +128,23 @@ abstract class Bits extends Data with proc {
     // width, hence change the computations. It might be possible to print
     // width_ but it seems to also have some underlying computations associated
     // to it.
-    (getClass.getName + "("
-      + (if (dir == INPUT) "INPUT" else if (dir == OUTPUT) "OUTPUT" else "?")
-      + (if (name != null) (", " + name) else "")
-      + (if (component != null) (" in " + component) else "")
-      + ")")
+    var str = (
+      "/*" + (if (name != null && !name.isEmpty) name else "?")
+        + (if (component != null) (" in " + component) else "") + "*/ "
+        + getClass.getName + "("
+        + (if (dir == INPUT) "INPUT, "
+        else if (dir == OUTPUT) "OUTPUT, " else "")
+        + "width=" + width_
+        + ", connect to " + inputs.length + " inputs: (")
+    var sep = ""
+    for( i <- inputs ) {
+      str = (str + sep + (if (i.name != null) i.name else "?")
+        + "[" + i.getClass.getName + "]"
+        + " in " + (if (i.component != null) i.component.getClass.getName else "?"))
+      sep = ", "
+    }
+    str = str + "))"
+    str
   }
 
   override def flip(): this.type = {
@@ -170,9 +182,9 @@ abstract class Bits extends Data with proc {
       src match {
       case other: Bits =>
           if (other.dir == OUTPUT) { // input - output connections
-          if(this.staticComp == other.staticComp && !isTypeNode) {//passthrough
+          if(this.component == other.component && !isTypeNode) {//passthrough
             other assign this
-          } else if (this.staticComp.parent == other.staticComp.parent || isTypeNode) { //producer - consumer
+          } else if (this.component.parent == other.component.parent || isTypeNode) { //producer - consumer
             if(other.inputs.length > 0 || other.updates.length > 0 ) {
               this assign other // only do assignment if output has stuff connected to it
             }
@@ -180,17 +192,17 @@ abstract class Bits extends Data with proc {
             ChiselError.error({"Undefined connections between " + this + " and " + other})
           }
         } else if (other.dir == INPUT) { // input <> input conections
-            if(this.staticComp == other.staticComp.parent) { // parent <> child
+            if(this.component == other.component.parent) { // parent <> child
               other assign this
-            } else if(this.staticComp.parent == other.staticComp) { //child <> parent
+            } else if(this.component.parent == other.component) { //child <> parent
               this assign other
             } else {
               ChiselError.error({"Can't connect Input " + this + " Input " + other})
             }
           } else { // io <> wire
-            if(this.staticComp == other.staticComp) { //internal wire
+            if(this.component == other.component) { //internal wire
               other assign this
-            } else if(this.staticComp.parent == other.staticComp) { //external wire
+            } else if(this.component.parent == other.component) { //external wire
               this assign other
             } else {
             ChiselError.error({"Connecting Input " + this + " to " + other})
@@ -203,9 +215,9 @@ abstract class Bits extends Data with proc {
       src match {
         case other: Bits  =>
           if (other.dir == INPUT) { // input - output connections
-            if (this.staticComp == other.staticComp && !isTypeNode) { //passthrough
+            if (this.component == other.component && !isTypeNode) { //passthrough
               this assign other;
-            } else if (this.staticComp.parent == other.staticComp.parent || isTypeNode) { //producer - consumer
+            } else if (this.component.parent == other.component.parent || isTypeNode) { //producer - consumer
               if(this.inputs.length > 0 || this.updates.length > 0) {
                 other assign this; // only do connection if I have stuff connected to me
               }
@@ -213,11 +225,11 @@ abstract class Bits extends Data with proc {
               ChiselError.error({"Undefined connection between " + this + " and " + other})
             }
           } else if (other.dir == OUTPUT) { // output <> output connections
-            if(this.staticComp == other.staticComp.parent) { // parent <> child
+            if(this.component == other.component.parent) { // parent <> child
               if(other.inputs.length > 0 || other.updates.length > 0) {
                 this assign other // only do connection if child is assigning to that output
               }
-            } else if (this.staticComp.parent == other.staticComp) { // child <> parent
+            } else if (this.component.parent == other.component) { // child <> parent
               if(this.inputs.length > 0 || this.updates.length > 0) {
                 other assign this // only do connection if child (me) is assinging that output
               }
@@ -231,9 +243,9 @@ abstract class Bits extends Data with proc {
               ChiselError.error({"Connecting Output " + this + " to Output " + other})
             }
           } else { // io <> wire
-            if(this.staticComp == other.staticComp) { //output <> wire
+            if(this.component == other.component) { //output <> wire
               this assign other
-            } else if(this.staticComp.parent == other.staticComp) {
+            } else if(this.component.parent == other.component) {
               ChiselError.error({"Connecting Ouptut " + this + " to an external wire " + other})
             } else {
               ChiselError.error({"Connecting Output " + this + " to IO without direction " + other})
@@ -247,17 +259,17 @@ abstract class Bits extends Data with proc {
       src match {
         case other: Bits =>
           if (other.dir == INPUT) { // wire <> input
-            if(this.staticComp == other.staticComp) {
+            if(this.component == other.component) {
               this assign other
-            } else if(this.staticComp == other.staticComp.parent) {
+            } else if(this.component == other.component.parent) {
               other assign this
             } else {
               ChiselError.error({"Undefined connection between wire " + this + " and input " + other})
             }
           } else if (other.dir == OUTPUT) { //wire <> output
-            if(this.staticComp == other.staticComp) { // internal wire
+            if(this.component == other.component) { // internal wire
               other assign this
-            } else if(this.staticComp == other.staticComp.parent) { // external wire
+            } else if(this.component == other.component.parent) { // external wire
               this assign other
             } else {
               ChiselError.error({"Undefined connection between wire " + this + " and output " + other})

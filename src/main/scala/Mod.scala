@@ -233,15 +233,16 @@ abstract class Mod(resetSignal: Bool = null) {
   var parent: Mod = null;
   var containsReg = false;
   val children = new ArrayBuffer[Mod];
-  var inputs = new ArrayBuffer[Node];
-  var outputs = new ArrayBuffer[Node];
+  /* XXX deprecated? */
+//  var inputs = new ArrayBuffer[Node];
+//  var outputs = new ArrayBuffer[Node];
   val blackboxes = ArrayBuffer[BlackBox]();
   val debugs = HashSet[Node]();
 
   val nodes = new HashSet[Node]()
   val mods  = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
-  // val gmods = new ArrayBuffer[Node];
+
   val regs  = new ArrayBuffer[Reg];
   val nexts = new ScalaQueue[Node];
   var nindex = -1;
@@ -273,13 +274,12 @@ abstract class Mod(resetSignal: Bool = null) {
   def ownIo() {
     val wires = io.flatten;
     for ((n, w) <- wires) {
-      // This assert is a sanity check to make sure static resolution of IOs didn't fail
-      scala.Predef.assert(this == w.staticComp,
+      // This assert is a sanity check to make sure static resolution
+      // of IOs didn't fail
+      scala.Predef.assert(this == w.component,
         ChiselError.error("Statically resolved component differs from dynamically resolved component of IO: " + w + " crashing compiler"))
-      w.component = this;
     }
   }
-
 
   def findBinding(m: Node): Binding = {
     for (b <- bindings) {
@@ -310,6 +310,7 @@ abstract class Mod(resetSignal: Bool = null) {
   /** Insures a backend does not remove a signal because it is unreachable
     from the outputs. */
   def debug(x: Node): Unit = {
+    // XXX Because We cannot guarentee x is flatten later on in collectComp.
     x.getNode.component = this
     debugs += x.getNode
   }
@@ -376,6 +377,23 @@ abstract class Mod(resetSignal: Bool = null) {
     res
   }
 
+  def initializeDFS: Stack[Node] = {
+    val res = new Stack[Node]
+
+    /* XXX This fails the assertion in Backend collectComp because debugs
+     might not be flatten structures.
+     XXX Make sure roots are consistent between initializeBFS, initializeDFS
+     and findRoots.
+    for(a <- this.debugs) {
+      res.push(a)
+    }
+     */
+    for((n, flat) <- this.io.flatten) {
+      res.push(flat)
+    }
+    res
+  }
+
   def bfs(visit: Node => Unit): Unit = {
     val walked = new HashSet[Node]
     val bfsQueue = initializeBFS
@@ -415,12 +433,12 @@ abstract class Mod(resetSignal: Bool = null) {
     // Infer all node widths by propagating known widths
     // in a bellman-ford fashion.
     for(i <- 0 until nodesList.length) {
-
+      var nbUpdates = 0
       var done = true;
       for(elm <- nodesList){
         val updated = elm.infer
+        if( updated ) { nbUpdates = nbUpdates + 1  }
         done = done && !updated
-        //done = done && !(elm.infer) TODO: why is this line not the same as previous two?
       }
 
       count += 1
@@ -459,6 +477,9 @@ abstract class Mod(resetSignal: Bool = null) {
     }
   }
 
+  /** Since we are relying on the out-degree of nodes (i.e. consumers.length),
+    this method should only be called after the forward edges have been
+    constructed. */
   def findRoots(): ArrayBuffer[Node] = {
     val roots = new ArrayBuffer[Node];
     for (c <- Mod.components)
@@ -568,12 +589,14 @@ abstract class Mod(resetSignal: Bool = null) {
   def collectNodes(c: Mod) {
     for (m <- c.mods) {
       m match {
+/* XXX deprecated?
         case io: Bits  =>
           if (io.dir == INPUT) {
             inputs += m;
           } else if (io.dir == OUTPUT) {
             outputs += m;
           }
+ */
         case r: Reg    => regs += r;
         case other     =>
       }
@@ -581,19 +604,24 @@ abstract class Mod(resetSignal: Bool = null) {
   }
 
   def traceableNodes: Array[Node] = io.traceableNodes;
-  def childrenContainsReg: Boolean = {
-    var res = containsReg;
-    if(children.isEmpty) return res;
-    for(child <- children){
-      res = res || child.containsReg || child.childrenContainsReg;
-      if(res) return res;
+
+  /** Returns true if this module or any of its children contains
+    at least one register. */
+  def containsRegInTree: Boolean = {
+    if( containsReg ) {
+      true
+    } else {
+      for(child <- children){
+        if( child.containsRegInTree ) return true
+      }
+      false
     }
-    res
   }
 
   // 1) name the component
   // 2) name the IO
   // 3) name and set the component of all statically declared nodes through introspection
+  /* XXX deprecated. make sure containsReg and isClk are set properly. */
   def markComponent() {
     ownIo();
     /* We are going through all declarations, which can return Nodes,

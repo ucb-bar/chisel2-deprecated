@@ -85,5 +85,4 @@ class Bool extends UFix {
     }
   }
 
-  override def clone: this.type = Bool(dir).asInstanceOf[this.type]
 }

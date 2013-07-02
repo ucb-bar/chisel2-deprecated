@@ -127,7 +127,7 @@ class DotBackend extends Backend {
         for (in <- m.inputs) {
           if (isDottable(m) && isDottable(in)) {
             val edge = (emitRef(in) + " -> " + emitRef(m)
-              + "[label=\"" + in.getWidth + "\"];\n")
+              + "[label=\"" + in.width_ + "\"];\n")
             /* If the both ends of an edge are on either side of a component
              boundary, we must add it at the upper level otherwise graphviz
              will incorrectly draw the input node into the cluster. */
@@ -169,7 +169,7 @@ class DotBackend extends Backend {
             out_cd.write(emitRef(d) + "[label=\"" + n + "\"];\n");
             for (in <- d.inputs)
               if (isDottable(in)) {
-                out_cd.write(emitRef(in) + " -> " + emitRef(d) + "[label=\"" + in.getWidth + "\"];\n");
+                out_cd.write(emitRef(in) + " -> " + emitRef(d) + "[label=\"" + in.width_ + "\"];\n");
               }
         }
       }
