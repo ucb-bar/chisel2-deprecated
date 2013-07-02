@@ -168,7 +168,7 @@ class VerilogBackend extends Backend {
   def emitDef(c: Mod): String = {
     val spacing = (if(c.verilog_parameters != "") " " else "");
     var res = "  " + c.moduleName + " " + c.verilog_parameters + spacing + c.name + "(";
-    val hasReg = c.containsReg || c.childrenContainsReg;
+    val hasReg = c.containsRegInTree
     res = res + (if(hasReg) ".clk(clk), .reset(" + (if(c.reset.inputs.length==0) "reset" else emitRef(c.reset.inputs(0))) + ")" else "");
     var isFirst = true;
     var nl = ""
@@ -449,7 +449,7 @@ class VerilogBackend extends Backend {
     harness.write("    " + c.moduleName + "\n")
     harness.write("      " + c.moduleName + "(\n")
 
-    if(c.containsReg || c.childrenContainsReg) {
+    if(c.containsRegInTree) {
       harness.write("        .clk(clk),\n")
       harness.write("        .reset(reset),\n")
     }
@@ -614,7 +614,7 @@ class VerilogBackend extends Backend {
 
   def emitModuleText(c: Mod): String = {
     val res = new StringBuilder()
-    val hasReg = c.containsReg || c.childrenContainsReg;
+    val hasReg = c.containsRegInTree
     var first = true;
     var nl = "";
     res.append((if (hasReg) "input clk, input reset" else ""));

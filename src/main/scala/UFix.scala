@@ -42,6 +42,8 @@ object UFix {
   def apply(x: Int, width: Int): UFix = Lit(x, width){UFix()};
   def apply(x: String): UFix = Lit(x, -1){UFix()};
   def apply(x: String, width: Int): UFix = Lit(x, width){UFix()};
+  def apply(x: String, base: Char): UFix = Lit(x, base, -1){UFix()};
+  def apply(x: String, base: Char, width: Int): UFix = Lit(x, base, width){UFix()};
 
   def apply(dir: IODirection = null, width: Int = -1): UFix = {
     val res = new UFix();
@@ -62,6 +64,17 @@ class UFix extends Bits /* with Numeric[UFix] */ {
 
   override def fromInt(x: Int): this.type = {
     UFix(x).asInstanceOf[this.type]
+  }
+
+  // to support implicit convestions
+  def ===(b: UFix): Bool = LogicalOp(this, b, "===")
+
+  def :=(src: UFix) {
+    if(comp != null) {
+      comp procAssign src.toNode;
+    } else {
+      this procAssign src.toNode;
+    }
   }
 
   // arithmetic operators
