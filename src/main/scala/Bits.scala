@@ -370,6 +370,107 @@ abstract class Bits extends Data with proc {
   def & (b: Bits): this.type = newBinaryOp(b, "&");
   def | (b: Bits): this.type = newBinaryOp(b, "|");
   def ^ (b: Bits): this.type = newBinaryOp(b, "^");
+  
+  def error(b: Bits): Bits = {
+    throw new Exception("+ not defined on " + this.getClass + " and " + b.getClass)
+    this
+  }
+
+  def + (b: Bits): Bits = {
+    this match {
+      case u0: UFix => {
+        b match {
+          case u1: UFix => u0 + u1
+          case f1: Fix => u0 + f1
+          case _ => error(b)
+        }
+      }
+      case f0: Fix => {
+        b match {
+          case u1: UFix => f0 + u1
+          case f1: Fix => f0 + f1
+          case _ => error(b)
+        }
+      }
+      case _ => error(b)
+    }
+  }
+  def - (b: Bits): Bits = {
+    this match {
+      case u0: UFix => {
+        b match {
+          case u1: UFix => u0 - u1
+          case f1: Fix => u0 - f1
+          case _ => error(b)
+        }
+      }
+      case f0: Fix => {
+        b match {
+          case u1: UFix => f0 - u1
+          case f1: Fix => f0 - f1
+          case _ => error(b)
+        }
+      }
+      case _ => error(b)
+    }
+  }
+  def * (b: Bits): Bits = {
+    this match {
+      case u0: UFix => {
+        b match {
+          case u1: UFix => u0 * u1
+          case f1: Fix => u0 * f1
+          case _ => error(b)
+        }
+      }
+      case f0: Fix => {
+        b match {
+          case u1: UFix => f0 * u1
+          case f1: Fix => f0 * f1
+          case _ => error(b)
+        }
+      }
+      case _ => error(b)
+    }
+  }
+  def % (b: Bits): Bits = {
+    this match {
+      case u0: UFix => {
+        b match {
+          case u1: UFix => u0 % u1
+          case f1: Fix => u0 % f1
+          case _ => error(b)
+        }
+      }
+      case f0: Fix => {
+        b match {
+          case u1: UFix => f0 % u1
+          case f1: Fix => f0 % f1
+          case _ => error(b)
+        }
+      }
+      case _ => error(b)
+    }
+  }
+  def / (b: Bits): Bits = {
+    this match {
+      case u0: UFix => {
+        b match {
+          case u1: UFix => u0 / u1
+          case f1: Fix => u0 / f1
+          case _ => error(b)
+        }
+      }
+      case f0: Fix => {
+        b match {
+          case u1: UFix => f0 / u1
+          case f1: Fix => f0 / f1
+          case _ => error(b)
+        }
+      }
+      case _ => error(b)
+    }
+  }
 
   override def ===[T <: Data](right: T): Bool = {
     right match {
