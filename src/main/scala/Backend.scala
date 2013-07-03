@@ -252,25 +252,39 @@ abstract class Backend {
 
   val transforms = ArrayBuffer[(Mod) => Unit]()
 
-  // DFS walk of graph to collect nodes of every component
+  /** Nodes which are created outside the execution trace from the toplevel
+    component constructor (i.e. through the () => Mod(new Top()) ChiselMain
+    argument) will have a component field set to null. For example, genMuxes,
+    forceMatchWidths and transforms (all called from Backend.elaborate) create
+    such nodes.
+
+    This method walks all nodes from a component roots (outputs, debugs).
+    and reassociates the component to the node both ways (i.e. in Mod.nodes
+    and Node.component).
+
+    We assume here that all nodes at the components boundaries (io) have
+    a non-null and correct node/component association. We use this assumption
+    to stop the search.
+    */
   def collectNodesIntoComp(c: Mod) {
     val dfsStack = c.initializeDFS
     val walked = new HashSet[Node]()
 
     def walk {
-      var nextComp = c
-
       while(!dfsStack.isEmpty) {
         val node = dfsStack.pop
+        assert( node.component == c )
 
         if(!walked.contains(node)) {
           walked += node
           // collect unassigned nodes into component
           for (input <- node.inputs) {
             if(!walked.contains(input)) {
-              nextComp.nodes += input
               if( input.component == null ) input.component = node.component
-              dfsStack.push(input)
+              if( input.component == c ) {
+                c.nodes += input
+                dfsStack.push(input)
+              }
             }
           }
         }
@@ -278,7 +292,6 @@ abstract class Backend {
 
     }
 
-    ChiselError.info("resolving nodes to the components")
     // start DFS from top level inputs
     // dequeing from dfsStack => walked
     for (io <- dfsStack) {
@@ -292,7 +305,6 @@ abstract class Backend {
 
     walk;
     assert(dfsStack.isEmpty)
-    ChiselError.info("finished resolving")
   }
 
   def transform(c: Mod, transforms: ArrayBuffer[(Mod) => Unit]): Unit = {
@@ -322,9 +334,6 @@ abstract class Backend {
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
     Mod.assignResets()
 
-    /* XXX Temporary debugging info. */
-//XXX    c.findConsumers();
-
     ChiselError.info("started inference")
     val nbOuterLoops = c.inferAll();
     ChiselError.info("finished inference (" + nbOuterLoops + ")")
@@ -338,12 +347,20 @@ abstract class Backend {
 
     /* The code in this function seems wrong. Yet we still need to call
      it to associate components to nodes that were created after the call
-     tree has been executed (ie. in genMuxes). More nodes are created
-     in transforms. I don't know why collect with be executed before then.
+     tree has been executed (ie. in genMuxes and forceMatchWidths). More
+     nodes are created in transforms. I don't know why collect with be
+     executed before then.
      */
-    collectNodesIntoComp(c)
+    ChiselError.info("resolving nodes to the components")
+    for( comp <- Mod.components ) {
+      collectNodesIntoComp(comp)
+    }
+    ChiselError.info("finished resolving")
+
     // two transforms added in Mem.scala (referenced and computePorts)
+    ChiselError.info("started transforms")
     transform(c, transforms)
+    ChiselError.info("finished transforms")
     c.traceNodes();
     ChiselError.checkpoint()
 
