@@ -123,8 +123,9 @@ class StdlibSuite extends AssertionsForJUnit {
       // ^  (b: UFix): UFix
       val r = io.x ^ io.y
 
-      // ?  (b: UFix): UFix
-      val s = io.x ? io.y
+      // XXX disabled seems left over from previous attempts at implementing
+      // Mux: ?  (b: UFix): UFix
+      //val s = io.x ? io.y
 
       // -  (b: UFix): UFix
       val t = io.x - io.y
