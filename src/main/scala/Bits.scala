@@ -49,6 +49,7 @@ abstract class Bits extends Data with proc {
   Mod.ioMap += ((this, Mod.ioCount));
   Mod.ioCount += 1;
 
+  var canBeUsedAsDefault = false
   var dir: IODirection = null;
 
   def create(dir: IODirection, width: Int) {

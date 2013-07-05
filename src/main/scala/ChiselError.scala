@@ -68,8 +68,9 @@ object ChiselError {
       findFirstUserLine(stack) getOrElse stack(0), 1)
   }
 
-  def findFirstUserLine(stack: Array[StackTraceElement]): Option[StackTraceElement] =
+  def findFirstUserLine(stack: Array[StackTraceElement]): Option[StackTraceElement] = {
     findFirstUserInd(stack) map { stack(_) }
+  }
 
   def findFirstUserInd(stack: Array[StackTraceElement]): Option[Int] = {
     def isUserCode(ste: StackTraceElement): Boolean = {
@@ -85,7 +86,8 @@ object ChiselError {
          */
           val dotPos = className.lastIndexOf('.')
           if( dotPos > 0 ) {
-            (className.subSequence(0, dotPos) != "Chisel") && !className.contains("scala")
+            (className.subSequence(0, dotPos) != "Chisel") && !className.contains("scala") &&
+            !className.contains("java") && !className.contains("$$")
           } else {
             false
           }

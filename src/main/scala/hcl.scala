@@ -60,7 +60,9 @@ class when (prevCond: Bool) {
     new when(prevCond || cond);
   }
   def otherwise (block: => Unit) {
-    when.execWhen(!prevCond){ block }
+    val cond = !prevCond
+    if (conds.length == 1) cond.canBeUsedAsDefault = true
+    when.execWhen(cond){ block }
   }
 }
 
@@ -232,15 +234,21 @@ trait proc extends Node {
       }
       return
     }
-    val (lastCond, lastValue) = updates.head
-    if (default == null && !lastCond.isTrue) {
-      ChiselError.error({"NO DEFAULT SPECIFIED FOR WIRE: " + this}, this.line)
+    val (topCond, topValue) = updates.head
+    val (lastCond, lastValue) = updates.last
+    if (default == null && !topCond.isTrue && !lastCond.canBeUsedAsDefault) {
+      ChiselError.error(
+        {"NO DEFAULT SPECIFIED FOR WIRE: " + this + " in component " + this.component.getClass}, 
+        this.line)
       return
     }
     if (default != null) {
       genMuxes(default, updates)
     } else {
-      genMuxes(lastValue, updates.toList.tail)
+      if (topCond.isTrue)
+        genMuxes(topValue, updates.toList.tail)
+      else if (lastCond.canBeUsedAsDefault)
+        genMuxes(lastValue, updates)
     }
   }
   def procAssign(src: Node): Unit
