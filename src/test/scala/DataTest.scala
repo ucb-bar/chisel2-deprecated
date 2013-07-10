@@ -246,7 +246,7 @@ class DataSuite extends AssertionsForJUnit {
       debug(io.valid)
     }
 
-    chiselMain(Array[String]("--c",
+    chiselMain(Array[String]("--backend", "c",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Mod(new BypassDataComp))
     assertFile(tmpdir.getRoot() + "/DataSuite_BypassDataComp_1.h",
