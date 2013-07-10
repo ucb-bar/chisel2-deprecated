@@ -71,7 +71,7 @@ class Bool extends UFix {
     this := src(0) // We only have one bit in *src*.
   }
 
-  def && (b: Bool): Bool = if (b.isTrue) this else BinaryBoolOp(this, b, "&&");
+  def && (b: Bool): Bool = if (b.isTrue) this else if (this.isTrue) b else BinaryBoolOp(this, b, "&&");
   def || (b: Bool): Bool = BinaryBoolOp(this, b, "||");
 
   def isTrue: Boolean = {

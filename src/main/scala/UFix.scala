@@ -97,6 +97,8 @@ class UFix extends Bits /* with Numeric[UFix] */ {
   def >= (b: UFix): Bool = newLogicalOp(b, ">=");
 
   //UFix op Fix arithmetic
+  def +   (b: Fix): Fix = Fix(OUTPUT).fromNode(BinaryOp(this.zext, b, "+"));
+  def -   (b: Fix): Fix = Fix(OUTPUT).fromNode(BinaryOp(this.zext, b, "-"));
   def *   (b: Fix): Fix = Fix(OUTPUT).fromNode(BinaryOp(this.zext, b, "u*s"));
   def %   (b: Fix): Fix = Fix(OUTPUT).fromNode(BinaryOp(this.zext, b, "u%s"));
   def /   (b: Fix): Fix = Fix(OUTPUT).fromNode(BinaryOp(this.zext, b, "u/s"));
