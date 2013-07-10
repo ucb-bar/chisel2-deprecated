@@ -252,58 +252,62 @@ abstract class Backend {
 
   val transforms = ArrayBuffer[(Mod) => Unit]()
 
+  def initializeDFS: Stack[Node] = {
+    val res = new Stack[Node]
+
+    /* XXX Make sure roots are consistent between initializeBFS, initializeDFS
+     and findRoots.
+     */
+    for( c <- Mod.components ) {
+      for( a <- c.debugs ) {
+        res.push(a)
+      }
+      for((n, flat) <- c.io.flatten) {
+        res.push(flat)
+      }
+    }
+    res
+  }
+
   /** Nodes which are created outside the execution trace from the toplevel
     component constructor (i.e. through the () => Mod(new Top()) ChiselMain
     argument) will have a component field set to null. For example, genMuxes,
     forceMatchWidths and transforms (all called from Backend.elaborate) create
     such nodes.
 
-    This method walks all nodes from a component roots (outputs, debugs).
+    This method walks all nodes from all component roots (outputs, debugs).
     and reassociates the component to the node both ways (i.e. in Mod.nodes
     and Node.component).
 
     We assume here that all nodes at the components boundaries (io) have
-    a non-null and correct node/component association. We use this assumption
-    to stop the search.
+    a non-null and correct node/component association. We further assume
+    that nodes generated in elaborate are inputs to a node whose component
+    field is set.
+
+    Implementation Node:
+    At first we did implement *collectNodesIntoComp* to handle a single
+    component at a time but that did not catch the cases where Regs are
+    passed as input to sub-module without being tied to an output
+    of *this.component*.
     */
-  def collectNodesIntoComp(c: Mod) {
-    val dfsStack = c.initializeDFS
+  def collectNodesIntoComp(dfsStack: Stack[Node]) {
     val walked = new HashSet[Node]()
 
-    def walk {
-      while(!dfsStack.isEmpty) {
-        val node = dfsStack.pop
-        assert( node.component == c )
+    while(!dfsStack.isEmpty) {
+      val node = dfsStack.pop
 
-        if(!walked.contains(node)) {
-          walked += node
-          // collect unassigned nodes into component
-          for (input <- node.inputs) {
-            if(!walked.contains(input)) {
-              if( input.component == null ) input.component = node.component
-              if( input.component == c ) {
-                c.nodes += input
-                dfsStack.push(input)
-              }
-            }
+      if(!walked.contains(node)) {
+        walked += node
+        // collect unassigned nodes into component
+        for (input <- node.inputs) {
+          if(!walked.contains(input)) {
+            if( input.component == null ) input.component = node.component
+            dfsStack.push(input)
           }
         }
       }
-
     }
 
-    // start DFS from top level inputs
-    // dequeing from dfsStack => walked
-    for (io <- dfsStack) {
-      // XXX Not needed anymore?
-      assert(io.isInstanceOf[Bits])
-      if(io.asInstanceOf[Bits].dir == OUTPUT) {
-        c.nodes += io
-        assert( io.component == c )
-      }
-    }
-
-    walk;
     assert(dfsStack.isEmpty)
   }
 
@@ -319,7 +323,7 @@ abstract class Backend {
     Mod.topComponent = c;
     /* XXX If we call nameAll here and again further down, we end-up with
      duplicate names in the generated C++.
-     nameAll(c) */
+    nameAll(c) */
 
     Mod.components.foreach(_.elaborate(0));
 
@@ -352,9 +356,7 @@ abstract class Backend {
      executed before then.
      */
     ChiselError.info("resolving nodes to the components")
-    for( comp <- Mod.components ) {
-      collectNodesIntoComp(comp)
-    }
+    collectNodesIntoComp(initializeDFS)
     ChiselError.info("finished resolving")
 
     // two transforms added in Mem.scala (referenced and computePorts)

@@ -71,7 +71,7 @@ class VerifSuite extends AssertionsForJUnit {
       io.z := Cat(io.x, io.y)
     }
 
-    chiselMain(Array[String]("--c",
+    chiselMain(Array[String]("--backend", "c",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Mod(new CppAssertComp()))
     assertFile(tmpdir.getRoot() + "/VerifSuite_CppAssertComp_1.cpp",
@@ -127,7 +127,7 @@ void VerifSuite_CppAssertComp_1_t::dump(FILE *f, int t) {
     }
     /** XXX Can't run CppBackend back-to-back in the same process
       because the emulator resource is closed. 
-    chiselMain(Array[String]("--c",
+    chiselMain(Array[String]("--backend", "c",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Mod(new CppPrintfComp()))
     assertFile(tmpdir.getRoot() + "/VerifSuite_CppPrintfComp_1.cpp",
@@ -163,7 +163,11 @@ void VerifSuite_CppPrintfComp_1_t::dump(FILE *f, int t) {
         val y = UFix(INPUT, 8)
         val z = UFix(OUTPUT)
       }
-      printf("display %x %x", io.x, io.y)
+
+      val tsc_reg = RegReset(UFix(0, width=32))
+      tsc_reg := tsc_reg + UFix(1/*, width=32*/)
+
+      printf("Cyc= %d io: %x %x", tsc_reg(31,0), io.x, io.y)
       io.z := Cat(io.x, io.y)
     }
 
