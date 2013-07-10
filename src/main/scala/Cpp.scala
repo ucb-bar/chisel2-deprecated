@@ -553,13 +553,15 @@ class CppBackend extends Backend {
   }
 
   override def elaborate(c: Mod): Unit = {
-    for (cc <- Mod.components)
-      c.debugs ++= cc.debugs
     super.elaborate(c)
 
-    /* XXX Why now? */
+    /* We flatten all signals in the toplevel component after we had
+     a change to associate node and components correctly first
+     otherwise we are bound for assertions popping up left and right
+     in the Backend.elaborate method. */
     for (cc <- Mod.components) {
       if (!(cc == c)) {
+        c.debugs ++= cc.debugs
         c.mods       ++= cc.mods;
         c.blackboxes ++= cc.blackboxes;
       }

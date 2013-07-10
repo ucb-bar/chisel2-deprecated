@@ -233,13 +233,9 @@ abstract class Mod(resetSignal: Bool = null) {
   var parent: Mod = null;
   var containsReg = false;
   val children = new ArrayBuffer[Mod];
-  /* XXX deprecated? */
-//  var inputs = new ArrayBuffer[Node];
-//  var outputs = new ArrayBuffer[Node];
   val blackboxes = ArrayBuffer[BlackBox]();
   val debugs = HashSet[Node]();
 
-  val nodes = new HashSet[Node]()
   val mods  = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
 
@@ -380,14 +376,12 @@ abstract class Mod(resetSignal: Bool = null) {
   def initializeDFS: Stack[Node] = {
     val res = new Stack[Node]
 
-    /* XXX This fails the assertion in Backend collectComp because debugs
-     might not be flatten structures.
-     XXX Make sure roots are consistent between initializeBFS, initializeDFS
+    /* XXX Make sure roots are consistent between initializeBFS, initializeDFS
      and findRoots.
-    for(a <- this.debugs) {
+     */
+    for( a <- this.debugs ) {
       res.push(a)
     }
-     */
     for((n, flat) <- this.io.flatten) {
       res.push(flat)
     }
