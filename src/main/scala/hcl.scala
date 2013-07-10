@@ -165,7 +165,7 @@ object chiselMain {
         case "--targetDir" => Mod.targetDir = args(i + 1); i += 1;
         case "--include" => Mod.includeArgs = Mod.splitArg(args(i + 1)); i += 1;
         case "--checkPorts" => Mod.isCheckingPorts = true
-        case any => ChiselError.warning("UNKNOWN CONSOLE ARG");
+        case any => ChiselError.warning("'" + arg + "' is an unkown argument.");
       }
       i += 1;
     }

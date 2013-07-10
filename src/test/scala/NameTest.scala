@@ -244,7 +244,7 @@ endmodule
       }
     }
 
-    chiselMain(Array[String]("--v", "--c",
+    chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Mod(new BindSecondComp(true)))
    assertFile(tmpdir.getRoot() + "/NameSuite_BindSecondComp_1.v",
@@ -318,7 +318,7 @@ endmodule
       io.result := conn(0).ren | conn(1).ren | conn(2).ren | conn(3).ren
     }
 
-    chiselMain(Array[String]("--v", "--c",
+    chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Mod(new BindThirdComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_BindThirdComp_1.v",
@@ -382,7 +382,7 @@ endmodule
       io.out := norms.last
     }
 
-    chiselMain(Array[String]("--v", "--c",
+    chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Mod(new BindFourthComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_BindFourthComp_1.v",
@@ -620,7 +620,7 @@ endmodule
       }
     }
 
-    chiselMain(Array[String]("--v", "--c",
+    chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Mod(new VecSecondComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_VecSecondComp_1.v",
@@ -696,7 +696,7 @@ endmodule
       io.replay := block_0.io.replay & block_1.io.replay & block_2.io.replay;
     }
 
-    chiselMain(Array[String]("--v", "--c",
+    chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Mod(new VariationComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_VariationComp_1.v",
@@ -827,7 +827,7 @@ endmodule
       io.ctrl_out := dpath.io.ctrl_out
     }
 
-    chiselMain(Array[String]("--c", "--vcd",
+    chiselMain(Array[String]("--backend", "c", "--vcd",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Mod(new DebugComp))
     assertFile(tmpdir.getRoot() + "/NameSuite_DebugComp_1.h",
