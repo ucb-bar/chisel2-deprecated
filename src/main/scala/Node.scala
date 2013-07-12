@@ -140,6 +140,7 @@ abstract class Node extends nameable {
   var isScanArg = false
   var isPrintArg = false
   def isMemOutput: Boolean = false
+  var prune = false
 
   Module.nodes += this
 

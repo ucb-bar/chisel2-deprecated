@@ -183,6 +183,16 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
     if(isTypeNode) other.setIsTypeNode;
   }
 
+  def -=[T <: Data](other: T) {
+    elements;
+    var i = 0
+    for (((name, io), ind) <- elementsCache.zipWithIndex) {
+      if (io == other)
+        i = ind
+    }
+    elementsCache.remove(i)
+  }
+
   override def flip(): this.type = {
     for ((n, i) <- elements) {
       i.flip()

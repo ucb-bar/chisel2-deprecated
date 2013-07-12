@@ -33,6 +33,7 @@ import Node._
 import Reg._
 import ChiselError._
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.{Queue=>ScalaQueue}
 import scala.collection.mutable.Stack
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashMap
@@ -316,8 +317,79 @@ abstract class Backend {
       t(c)
   }
 
+  def pruneUnconnectedIOs(m: Module) {
+    val inputs = m.io.flatten.filter(_._2.dir == INPUT)
+    val outputs = m.io.flatten.filter(_._2.dir == OUTPUT)
+
+    for ((name, i) <- inputs) {
+      if (i.inputs.length == 0 && m != Module.topComponent)
+        if (i.consumers.length > 0) {
+          ChiselError.warning({"UNCONNECTED INPUT " + emitRef(i) + " in COMPONENT " + i.component +
+                               " has consumers"})
+          Module.randInitIOs += i
+        } else {
+          m.io.asInstanceOf[Bundle] -= i
+        }
+    }
+
+    for ((name, o) <- outputs) {
+      if (o.inputs.length == 0) {
+        if (o.consumers.length > 0) {
+          ChiselError.warning({"UNCONNETED OUTPUT " + emitRef(o) + " in component " + o.component + 
+                             " has consumers on line " + o.consumers(0).line})
+          Module.randInitIOs += o
+        } else {
+          m.io.asInstanceOf[Bundle] -= o
+          m.nodes -= o
+          m.mods -= o
+        }
+      }
+    }
+  }
+
+  def pruneNodes {
+    val walked = new HashSet[Node]
+    val bfsQueue = new ScalaQueue[Node]
+    for (node <- Module.randInitIOs) bfsQueue.enqueue(node)
+    var pruneCount = 0
+
+    // conduct bfs to find all reachable nodes
+    while(!bfsQueue.isEmpty){
+      val top = bfsQueue.dequeue
+      walked += top
+      pruneCount+=1
+      top.prune = true
+      for(i <- top.consumers) {
+        if(!(i == null)) {
+          if(!walked.contains(i)) {
+            bfsQueue.enqueue(i)
+            walked += i
+          }
+        }
+      }
+    }
+    ChiselError.warning("Pruned " + pruneCount + " nodes due to unconnected inputs")
+  }
 
   def emitDef(node: Node): String = ""
+
+  def levelChildren(root: Module) {
+    root.level = 0;
+    root.traversal = VerilogBackend.traversalIndex;
+    VerilogBackend.traversalIndex = VerilogBackend.traversalIndex + 1;
+    for(child <- root.children) {
+      levelChildren(child)
+      root.level = math.max(root.level, child.level + 1);
+    }
+  }
+
+  def gatherChildren(root: Module): ArrayBuffer[Module] = {
+    var result = new ArrayBuffer[Module]();
+    for (child <- root.children)
+      result = result ++ gatherChildren(child);
+    result ++ ArrayBuffer[Module](root);
+  }
+
 
   def elaborate(c: Module): Unit = {
     Module.topComponent = c;
@@ -359,6 +431,10 @@ abstract class Backend {
     collectNodesIntoComp(initializeDFS)
     ChiselError.info("finished resolving")
 
+    levelChildren(c)
+    Module.sortedComps = gatherChildren(c).sortWith(
+      (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)));
+
     // two transforms added in Mem.scala (referenced and computePorts)
     ChiselError.info("started transforms")
     transform(c, transforms)
@@ -366,9 +442,18 @@ abstract class Backend {
     c.traceNodes();
     ChiselError.checkpoint()
 
+    Module.sortedComps.map(_.nodes.map(_.addConsumers))
     /* We execute nameAll after traceNodes because bindings would not have been
        created yet otherwise. */
     nameAll(c)
+
+    for (comp <- Module.sortedComps ) {
+      // remove unconnected outputs
+      pruneUnconnectedIOs(comp)
+    }
+    if (Module.isPruning)
+      pruneNodes
+
     ChiselError.checkpoint()
 
     if(!Module.dontFindCombLoop) {

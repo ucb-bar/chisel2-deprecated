@@ -165,6 +165,7 @@ object chiselMain {
         case "--targetDir" => Module.targetDir = args(i + 1); i += 1;
         case "--include" => Module.includeArgs = Module.splitArg(args(i + 1)); i += 1;
         case "--checkPorts" => Module.isCheckingPorts = true
+        case "--prune" => Module.isPruning = true
         case any => ChiselError.warning("'" + arg + "' is an unkown argument.");
       }
       i += 1;

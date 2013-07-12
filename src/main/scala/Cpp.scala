@@ -427,7 +427,11 @@ class CppBackend extends Backend {
         r.lits.zipWithIndex.map { case (lit, i) =>
           block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(lit, j) + ")"))
         }.reduceLeft(_ + _)
-
+      case u: UFix => 
+        if (Mod.randInitIOs.contains(u))
+          "  if (rand_init) " + emitRef(node) + ".randomize();\n"
+        else
+          ""
       case _ =>
         ""
     }
