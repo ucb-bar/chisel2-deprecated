@@ -117,8 +117,9 @@ abstract class Node extends nameable {
   var sccIndex = -1
   var sccLowlink = -1
   var walked = false;
-  /* Assigned in Binding and Module.reset */
+  /* Assigned in Binding and Mod.reset */
   var component: Module = Module.getComponent();
+  if (component != null) component.nodes += this
   var flattened = false;
   var isTypeNode = false;
   var depth = 0;

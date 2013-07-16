@@ -293,18 +293,29 @@ abstract class Backend {
     */
   def collectNodesIntoComp(dfsStack: Stack[Node]) {
     val walked = new HashSet[Node]()
-
+    walked ++= dfsStack
+    // invariant is everything in the stack is walked and has a non-null component
     while(!dfsStack.isEmpty) {
       val node = dfsStack.pop
-
-      if(!walked.contains(node)) {
-        walked += node
-        // collect unassigned nodes into component
-        for (input <- node.inputs) {
-          if(!walked.contains(input)) {
-            if( input.component == null ) input.component = node.component
-            dfsStack.push(input)
+      /*
+      we're tracing from outputs -> inputs, so if node is an input, then its
+      inputs belong to the outside component. Otherwise, its inputs are the same
+      as node's inputs.
+      */
+      val curComp = 
+        if ( node.isIo && node.asInstanceOf[Bits].dir == INPUT ) {
+          node.component.parent
+        } else {
+          node.component
+        }
+      for (input <- node.inputs) {
+        if(!walked.contains(input)) {
+          if( input.component == null ) {
+            input.component = curComp
+            curComp.nodes += input
           }
+          walked += input
+          dfsStack.push(input)
         }
       }
     }
@@ -421,6 +432,7 @@ abstract class Backend {
     ChiselError.info("finished flattening (" + nbNodes + ")")
     ChiselError.checkpoint()
 
+    nameAll(c)
     /* The code in this function seems wrong. Yet we still need to call
      it to associate components to nodes that were created after the call
      tree has been executed (ie. in genMuxes and forceMatchWidths). More

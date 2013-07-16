@@ -239,6 +239,7 @@ abstract class Module(resetSignal: Bool = null) {
   val blackboxes = ArrayBuffer[BlackBox]();
   val debugs = HashSet[Node]();
 
+  val nodes = new ArrayBuffer[Node]
   val mods  = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
 
