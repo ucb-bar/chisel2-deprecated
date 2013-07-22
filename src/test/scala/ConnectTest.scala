@@ -9,8 +9,8 @@ import org.junit.rules.TemporaryFolder;
 import Chisel._
 
 class RegStatus extends Bundle {
-  val im = UFix(width = 8)
-  val zero = UFix(width = 7)
+  val im = UInt(width = 8)
+  val zero = UInt(width = 7)
   val vm = Bool()
   val s64 = Bool()
   val u64 = Bool()
@@ -49,34 +49,34 @@ class ConnectSuite extends AssertionsForJUnit {
     no relationship. */
   @Test def testNoClassRelation() {
     println("\n### testNoClassRelation ###")
-    class A extends Mod {
+    class A extends Module {
       val io = new Bundle {
-        val a_in = UFix(INPUT, 1)
-        val a_out = UFix(OUTPUT, 1)
+        val a_in = UInt(INPUT, 1)
+        val a_out = UInt(OUTPUT, 1)
       }
       io.a_out := io.a_in
     }
-    class B extends Mod {
+    class B extends Module {
       val io = new Bundle {
-        val b_in = UFix(INPUT, 1)
-        val b_out = UFix(OUTPUT, 1)
+        val b_in = UInt(INPUT, 1)
+        val b_out = UInt(OUTPUT, 1)
       }
-      val aComp = Mod(new A())
+      val aComp = Module(new A())
       aComp.io.a_in := io.b_in
       io.b_out := aComp.io.a_out
     }
-    class NoClassRelation extends Mod {
+    class NoClassRelation extends Module {
       val io = new Bundle {
-        val c_in = UFix(INPUT, 1)
-        val c_out = UFix(OUTPUT, 1)
+        val c_in = UInt(INPUT, 1)
+        val c_out = UInt(OUTPUT, 1)
       }
-      val aComp = Mod(new B())
+      val aComp = Module(new B())
       aComp.io.b_in := io.c_in
       io.c_out := aComp.io.b_out
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new NoClassRelation()))
+      () => Module(new NoClassRelation()))
     assertFile(tmpdir.getRoot() + "/ConnectSuite_NoClassRelation_1.v",
 """module ConnectSuite_A_1(
     input  io_a_in,
@@ -117,29 +117,29 @@ endmodule
     with logic in-between. */
   @Test def testLogicBtwInstances() {
     println("\n### testLogicBtwInstances ###")
-    class A extends Mod {
+    class A extends Module {
       val io = new Bundle {
-        val a_in = UFix(INPUT, 1)
-        val a_out = UFix(OUTPUT, 1)
+        val a_in = UInt(INPUT, 1)
+        val a_out = UInt(OUTPUT, 1)
       }
       io.a_out := io.a_in
     }
-    class LogicBtwInstances extends Mod {
+    class LogicBtwInstances extends Module {
       val io = new Bundle {
-        val b_in = UFix(INPUT, 1)
-        val b_out = UFix(OUTPUT, 1)
+        val b_in = UInt(INPUT, 1)
+        val b_out = UInt(OUTPUT, 1)
       }
-      val a1 = Mod(new A())
-      val x = Reg(UFix(1))
+      val a1 = Module(new A())
+      val x = Reg(UInt(1))
       x := io.b_in
-      val a2 = Mod(new A())
+      val a2 = Module(new A())
       a1.io.a_in := io.b_in
       a2.io.a_in := io.b_in
       io.b_out := a1.io.a_out | a2.io.a_out | x
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new LogicBtwInstances()))
+      () => Module(new LogicBtwInstances()))
     assertFile(tmpdir.getRoot() + "/ConnectSuite_LogicBtwInstances_1.v",
 """module ConnectSuite_A_2(
     input  io_a_in,
@@ -184,50 +184,50 @@ endmodule
   @Test def test2Instance2Level() {
     println("\n### test2Instance2Level ###")
     /* XXX This test will fail to pick up the correct pop sequence
-     on the Mod stack.
-    class A extends Mod {
+     on the Module stack.
+    class A extends Module {
       val io = new Bundle {
-        val a_in = UFix(INPUT, 1)
-        val a_out = UFix(OUTPUT, 1)
+        val a_in = UInt(INPUT, 1)
+        val a_out = UInt(OUTPUT, 1)
       }
       io.a_out := io.a_in
     }
-    class B extends Mod {
+    class B extends Module {
       val io = new Bundle {
-        val b_in = UFix(INPUT, 1)
-        val b_out = UFix(OUTPUT, 1)
+        val b_in = UInt(INPUT, 1)
+        val b_out = UInt(OUTPUT, 1)
       }
-      val aInBComp = Mod(new A())
+      val aInBComp = Module(new A())
       aInBComp.io.a_in := io.b_in
     }
     class Instance2Level extends B {
-      val aInCComp = Mod(new A())
+      val aInCComp = Module(new A())
       aInCComp.io.a_in := io.b_in
       io.b_out := aInCComp.io.a_out | aInBComp.io.a_out
     }
     chiselMain(Array[String]("--v"),
 //      "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new Instance2Level()))
+      () => Module(new Instance2Level()))
      */
   }
 
   /** Instantiate a component superclass inside a component */
   @Test def testInstanceSuperclass() {
     println("\n### testInstanceSuperclass ###")
-    class A extends Mod {
+    class A extends Module {
       val io = new Bundle {
-        val a_in = UFix(INPUT, 1)
-        val a_out = UFix(OUTPUT, 1)
+        val a_in = UInt(INPUT, 1)
+        val a_out = UInt(OUTPUT, 1)
       }
       io.a_out := io.a_in
     }
     class InstanceSuperclass extends A {
-      val aInBComp = Mod(new A())
+      val aInBComp = Module(new A())
       aInBComp.io.a_in := io.a_in
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new InstanceSuperclass()))
+      () => Module(new InstanceSuperclass()))
     assertFile(tmpdir.getRoot() + "/ConnectSuite_InstanceSuperclass_1.v",
 """module ConnectSuite_A_3(
     input  io_a_in,
@@ -254,11 +254,11 @@ endmodule
   /** Test hooking-up Registers. */
   @Test def testRegisterHook() {
     println("\n### Hooking-up Registers ###")
-    class A extends Mod {
+    class A extends Module {
       val io = new Bundle {
         val status = new RegStatus().asOutput
         val wen   = Bool(INPUT)
-        val wdata = UFix(INPUT, 32)
+        val wdata = UInt(INPUT, 32)
       }
 
       val reg_status = Reg(new RegStatus) // reset down below
@@ -270,7 +270,7 @@ endmodule
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new A()))
+      () => Module(new A()))
     assertFile(tmpdir.getRoot() + "/ConnectSuite_A_4.v",
     """module ConnectSuite_A_4(input clk, input reset,
     output[7:0] io_status_im,

@@ -71,8 +71,8 @@ object NodeExtract {
       makeExtract(mod, hi, lo, widthInfer)
     } else { // don't use Extract on literals
       val rsh = Op(">>", 0, widthInfer, mod, lo)
-      val hiMinusLoPlus1 = Op("+", 2, maxWidth _, Op("-", 2, maxWidth _, hi, lo), UFix(1))
-      val mask = Op("-", 2, widthInfer, Op("<<", 0, widthInfer, UFix(1), hiMinusLoPlus1), UFix(1))
+      val hiMinusLoPlus1 = Op("+", 2, maxWidth _, Op("-", 2, maxWidth _, hi, lo), UInt(1))
+      val mask = Op("-", 2, widthInfer, Op("<<", 0, widthInfer, UInt(1), hiMinusLoPlus1), UInt(1))
       Op("&", 2, widthInfer, rsh, mask)
     }
   }
@@ -96,7 +96,7 @@ object NodeExtract {
 
 object Extract {
   //extract 1 bit
-  def apply[T <: Bits](mod: T, bit: UFix)(gen: => Bool): Bool = {
+  def apply[T <: Bits](mod: T, bit: UInt)(gen: => Bool): Bool = {
     val x = NodeExtract(mod, bit)
     gen.fromNode(x)
   }
@@ -107,7 +107,7 @@ object Extract {
   }
 
   // extract bit range
-  def apply[T <: Bits, R <: Bits](mod: T, hi: UFix, lo: UFix, w: Int = -1)(gen: => R): R = {
+  def apply[T <: Bits, R <: Bits](mod: T, hi: UInt, lo: UInt, w: Int = -1)(gen: => R): R = {
     val x = NodeExtract(mod, hi, lo, w)
     gen.fromNode(x)
   }

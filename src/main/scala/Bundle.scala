@@ -40,8 +40,8 @@ import sort._
 object Bundle {
   val keywords = HashSet[String]("elements", "flip", "toString",
     "flatten", "binding", "asInput", "asOutput", "unary_$tilde",
-    "unary_$bang", "unary_$minus", "clone", "toUFix", "toBits",
-    "toBool", "toFix", "asDirectionless")
+    "unary_$bang", "unary_$minus", "clone", "toUInt", "toBits",
+    "toBool", "toSInt", "asDirectionless")
 
   def apply (elts: ArrayBuffer[(String, Data)]): Bundle = {
     val res = new Bundle();
@@ -56,10 +56,10 @@ object sort {
     var i = 0
     for (j <- 1 until a.length) {
       val keyElm = a(j);
-      val key = Mod.ioMap(keyElm._2)
+      val key = Module.ioMap(keyElm._2)
       i = j - 1
 
-      while (i >= 0 && Mod.ioMap(a(i)._2) > key) {
+      while (i >= 0 && Module.ioMap(a(i)._2) > key) {
         a(i + 1) = a(i)
         i = i - 1
       }
@@ -197,7 +197,7 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
 
   override def traceableNodes: Array[Node] = elements.map(tup => tup._2).toArray;
 
-  override def traceNode(c: Mod, stack: Stack[() => Any]) {
+  override def traceNode(c: Module, stack: Stack[() => Any]) {
     for((n, i) <- flatten) {
       stack.push(() => i.traceNode(c, stack))
     }

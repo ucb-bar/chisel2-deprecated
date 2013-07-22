@@ -100,7 +100,7 @@ object Node {
 
   def rshWidthOf(i: Int, n: Node): (Node) => (Int) = { (m: Node) => m.inputs(i).width - n.minNum.toInt }
 
-  /* clk is initialized in Mod.initChisel */
+  /* clk is initialized in Module.initChisel */
   var clk: Node = null
 
 }
@@ -117,12 +117,12 @@ abstract class Node extends nameable {
   var sccIndex = -1
   var sccLowlink = -1
   var walked = false;
-  /* Assigned in Binding and Mod.reset */
-  var component: Mod = Mod.getComponent();
+  /* Assigned in Binding and Module.reset */
+  var component: Module = Module.getComponent();
   var flattened = false;
   var isTypeNode = false;
   var depth = 0;
-  def componentOf: Mod = if (Mod.isEmittingComponents && component != null) component else Mod.topComponent
+  def componentOf: Module = if (Module.isEmittingComponents && component != null) component else Module.topComponent
   var isSigned = false;
   var width_ = -1;
   var index = -1;
@@ -141,7 +141,7 @@ abstract class Node extends nameable {
   var isPrintArg = false
   def isMemOutput: Boolean = false
 
-  Mod.nodes += this
+  Module.nodes += this
 
   def setIsSigned {
     isSigned = true
@@ -189,14 +189,14 @@ abstract class Node extends nameable {
   }
   def value: BigInt = BigInt(-1);
   def signed: this.type = {
-    val res = Fix()
-    res := this.asInstanceOf[Fix];
+    val res = SInt()
+    res := this.asInstanceOf[SInt];
     res.isSigned = true;
     res.asInstanceOf[this.type]
   }
-  def bitSet(off: UFix, dat: UFix): UFix = {
-    val bit = UFix(1, 1) << off;
-    (this.asInstanceOf[UFix] & ~bit) | (dat << off);
+  def bitSet(off: UInt, dat: UInt): UInt = {
+    val bit = UInt(1, 1) << off;
+    (this.asInstanceOf[UInt] & ~bit) | (dat << off);
   }
   // TODO: MOVE TO WIRE
   def assign(src: Node) {
@@ -261,11 +261,11 @@ abstract class Node extends nameable {
     }
   }
   def isInObject: Boolean =
-    (isIo && (Mod.isIoDebug || component == Mod.topComponent)) ||
-    Mod.topComponent.debugs.contains(this) ||
-    isReg || isUsedByRam || Mod.isDebug || isPrintArg || isScanArg;
+    (isIo && (Module.isIoDebug || component == Module.topComponent)) ||
+    Module.topComponent.debugs.contains(this) ||
+    isReg || isUsedByRam || Module.isDebug || isPrintArg || isScanArg;
 
-  def isInVCD: Boolean = (isIo && isInObject) || isReg || (Mod.isDebug && !name.isEmpty);
+  def isInVCD: Boolean = (isIo && isInObject) || isReg || (Module.isDebug && !name.isEmpty);
 
   /** Prints all members of a node and recursively its inputs up to a certain
     depth level. This method is purely used for debugging. */
@@ -273,12 +273,12 @@ abstract class Node extends nameable {
     if (depth < 1) return;
     writer.println(indent + getClass + " width=" + getWidth + " #inputs=" + inputs.length);
     this match {
-      case fix: Fix => {
+      case fix: SInt => {
         if (!(fix.comp == null)) {
           writer.println(indent + "  (has comp " + fix.comp + " of type " + fix.comp.getClass + ")");
         }
       }
-      case bits: UFix => {
+      case bits: UInt => {
         if (!(bits.comp == null)) {
           writer.println(indent + "(has comp " + bits.comp + ")");
         }
@@ -315,7 +315,7 @@ abstract class Node extends nameable {
     }
   }
 
-  def traceNode(c: Mod, stack: Stack[() => Any]): Any = {
+  def traceNode(c: Module, stack: Stack[() => Any]): Any = {
     // determine whether or not the component needs a clock input
     if ((isReg || isClkInput) && !(component == null)) {
       component.containsReg = true
@@ -353,7 +353,7 @@ abstract class Node extends nameable {
       for (node <- inputs) {
         if (node != null) {
            //tmp fix, what happens if multiple componenets reference static nodes?
-          if (node.component == null || !Mod.components.contains(node.component)) {
+          if (node.component == null || !Module.components.contains(node.component)) {
             /* If Backend.collectNodesIntoComp does not resolve the component
              field for all components, we will most likely end-up here. */
             assert( node.component == nextComp,
@@ -366,7 +366,7 @@ abstract class Node extends nameable {
                 + (if(this.name != null && !this.name.isEmpty)
                 this.name else "?")))
           }
-          if (!Mod.backend.isInstanceOf[VerilogBackend] || !node.isIo) {
+          if (!Module.backend.isInstanceOf[VerilogBackend] || !node.isIo) {
             stack.push(() => node.traceNode(nextComp, stack));
           }
           val j = i;
@@ -453,7 +453,7 @@ abstract class Node extends nameable {
   def removeTypeNodes() {
     for(i <- 0 until inputs.length) {
       if(inputs(i) == null){
-        val error = new ChiselError(() => {"NULL Input for " + this.getClass + " " + this + " in Mod " + component}, this.line);
+        val error = new ChiselError(() => {"NULL Input for " + this.getClass + " " + this + " in Module " + component}, this.line);
         if (!ChiselErrors.contains(error)) {
           ChiselErrors += error
         }
@@ -482,11 +482,11 @@ abstract class Node extends nameable {
     }
   }
 
-  def extract (widths: Array[Int]): List[UFix] = {
-    var res: List[UFix] = Nil;
+  def extract (widths: Array[Int]): List[UInt] = {
+    var res: List[UInt] = Nil;
     var off = 0;
     for (w <- widths) {
-      res  = this.asInstanceOf[UFix](off + w - 1, off) :: res;
+      res  = this.asInstanceOf[UInt](off + w - 1, off) :: res;
       off += w;
     }
     res.reverse

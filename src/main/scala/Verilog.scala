@@ -65,7 +65,7 @@ object VerilogBackend {
 }
 
 class VerilogBackend extends Backend {
-  Mod.isEmittingComponents = true
+  Module.isEmittingComponents = true
   isCoercingArgs = false
   val keywords = VerilogBackend.keywords
 
@@ -165,7 +165,7 @@ class VerilogBackend extends Backend {
     }
   }
 
-  def emitDef(c: Mod): String = {
+  def emitDef(c: Module): String = {
     val spacing = (if(c.verilog_parameters != "") " " else "");
     var res = "  " + c.moduleName + " " + c.verilog_parameters + spacing + c.name + "(";
     val hasReg = c.containsRegInTree
@@ -180,15 +180,15 @@ class VerilogBackend extends Backend {
           case io: Bits  =>
             if (io.dir == INPUT) {
               if (io.inputs.length == 0) {
-                  if(Mod.saveConnectionWarnings) {
+                  if(Module.saveConnectionWarnings) {
                     ChiselError.warning("" + io + " UNCONNECTED IN " + io.component);
                   }
               } else if (io.inputs.length > 1) {
-                  if(Mod.saveConnectionWarnings) {
+                  if(Module.saveConnectionWarnings) {
                     ChiselError.warning("" + io + " CONNECTED TOO MUCH " + io.inputs.length);
                   }
               } else if (!c.isWalked.contains(w)){
-                  if(Mod.saveConnectionWarnings) {
+                  if(Module.saveConnectionWarnings) {
                     ChiselError.warning(" UNUSED INPUT " + io + " OF " + c + " IS REMOVED");
                   }
               } else {
@@ -196,13 +196,13 @@ class VerilogBackend extends Backend {
               }
             } else if(io.dir == OUTPUT) {
               if (io.consumers.length == 0) {
-                  if(Mod.saveConnectionWarnings) {
+                  if(Module.saveConnectionWarnings) {
                     ChiselError.warning("" + io + " UNCONNECTED IN " + io.component + " BINDING " + c.findBinding(io));
                   }
               } else {
                 var consumer: Node = c.parent.findBinding(io);
                 if (consumer == null) {
-                  if(Mod.saveConnectionWarnings) {
+                  if(Module.saveConnectionWarnings) {
                     ChiselError.warning("" + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + io.consumers.length + ") IN " + c.parent);
                   }
                 } else {
@@ -425,12 +425,12 @@ class VerilogBackend extends Backend {
     }
   }
 
-  def genHarness(c: Mod, name: String) {
+  def genHarness(c: Module, name: String) {
     val harness  = createOutputFile(name + "-harness.v");
-    val printFormat = Mod.printArgs.map(a => "0x%x").fold("")((y,z) => z + " " + y)
-    val scanFormat = Mod.scanArgs.map(a => "%x").fold("")((y,z) => z + " " + y)
-    val printNodes = for (arg <- Mod.printArgs; node <- arg.maybeFlatten) yield arg
-    val scanNodes = for (arg <- Mod.scanArgs; node <- c.keepInputs(arg.maybeFlatten)) yield arg
+    val printFormat = Module.printArgs.map(a => "0x%x").fold("")((y,z) => z + " " + y)
+    val scanFormat = Module.scanArgs.map(a => "%x").fold("")((y,z) => z + " " + y)
+    val printNodes = for (arg <- Module.printArgs; node <- arg.maybeFlatten) yield arg
+    val scanNodes = for (arg <- Module.scanArgs; node <- c.keepInputs(arg.maybeFlatten)) yield arg
     harness.write("module test;\n")
     for (node <- scanNodes)
       harness.write("    reg [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
@@ -504,7 +504,7 @@ class VerilogBackend extends Backend {
     harness.close();
   }
 
-  def emitDefs(c: Mod): StringBuilder = {
+  def emitDefs(c: Module): StringBuilder = {
     val res = new StringBuilder()
     for (m <- c.mods) {
       res.append(emitDef(m))
@@ -515,7 +515,7 @@ class VerilogBackend extends Backend {
     res
   }
 
-  def emitRegs(c: Mod): StringBuilder = {
+  def emitRegs(c: Module): StringBuilder = {
     val res = new StringBuilder();
     res.append("  always @(posedge clk) begin\n");
     for (m <- c.mods) {
@@ -586,7 +586,7 @@ class VerilogBackend extends Backend {
     }
   }
 
-  def emitDecs(c: Mod): StringBuilder = {
+  def emitDecs(c: Module): StringBuilder = {
     val res = new StringBuilder();
     for (m <- c.mods) {
       res.append(emitDec(m))
@@ -594,7 +594,7 @@ class VerilogBackend extends Backend {
     res
   }
 
-  def levelChildren(root: Mod) {
+  def levelChildren(root: Module) {
     root.level = 0;
     root.traversal = VerilogBackend.traversalIndex;
     VerilogBackend.traversalIndex = VerilogBackend.traversalIndex + 1;
@@ -604,15 +604,15 @@ class VerilogBackend extends Backend {
     }
   }
 
-  def gatherChildren(root: Mod): ArrayBuffer[Mod] = {
-    var result = new ArrayBuffer[Mod]();
+  def gatherChildren(root: Module): ArrayBuffer[Module] = {
+    var result = new ArrayBuffer[Module]();
     for (child <- root.children)
       result = result ++ gatherChildren(child);
-    result ++ ArrayBuffer[Mod](root);
+    result ++ ArrayBuffer[Module](root);
   }
 
 
-  def emitModuleText(c: Mod): String = {
+  def emitModuleText(c: Module): String = {
     val res = new StringBuilder()
     val hasReg = c.containsRegInTree
     var first = true;
@@ -646,7 +646,7 @@ class VerilogBackend extends Backend {
   }
 
   def flushModules( out: java.io.FileWriter,
-    defs: HashMap[String, LinkedHashMap[String, ArrayBuffer[Mod] ]],
+    defs: HashMap[String, LinkedHashMap[String, ArrayBuffer[Module] ]],
     level: Int ) {
     for( (className, modules) <- defs ) {
       var index = 0
@@ -674,8 +674,8 @@ class VerilogBackend extends Backend {
   }
 
 
-  def emitChildren(top: Mod,
-    defs: HashMap[String, LinkedHashMap[String, ArrayBuffer[Mod] ]],
+  def emitChildren(top: Module,
+    defs: HashMap[String, LinkedHashMap[String, ArrayBuffer[Module] ]],
     out: java.io.FileWriter, depth: Int) {
     for (child <- top.children) {
       emitChildren(child, defs, out, depth + 1);
@@ -693,14 +693,14 @@ class VerilogBackend extends Backend {
     }
   }
 
-  def doCompile(top: Mod, out: java.io.FileWriter, depth: Int): Unit = {
+  def doCompile(top: Module, out: java.io.FileWriter, depth: Int): Unit = {
     levelChildren(top)
     val sortedComps = gatherChildren(top).sortWith(
       (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)));
-    /* *defs* maps Mod classes to Mod instances through
+    /* *defs* maps Module classes to Module instances through
        the generated text of their module.
        We use a LinkedHashMap such that later iteration is predictable. */
-    val defs = new HashMap[String, LinkedHashMap[String, ArrayBuffer[Mod] ]];
+    val defs = new HashMap[String, LinkedHashMap[String, ArrayBuffer[Module] ]];
     var level = 0;
     for( c <- sortedComps ) {
       ChiselError.info(depthString(depth) + "COMPILING " + c
@@ -713,7 +713,7 @@ class VerilogBackend extends Backend {
       if( c.level > level ) {
         /* When a component instance instantiates different sets
          of sub-components based on its constructor parameters, the same
-         Mod class might appear with different level in the tree.
+         Module class might appear with different level in the tree.
          We thus wait until the very end to generate module names.
          If that were not the case, we could flush modules as soon as
          the source text for all components at a certain level in the tree
@@ -724,21 +724,21 @@ class VerilogBackend extends Backend {
       val res = emitModuleText(c);
       val className = extractClassName(c);
       if( !(defs contains className) ) {
-        defs += (className -> LinkedHashMap[String, ArrayBuffer[Mod] ]());
+        defs += (className -> LinkedHashMap[String, ArrayBuffer[Module] ]());
       }
       if( defs(className) contains res ) {
         /* We have already outputed the exact same source text */
         defs(className)(res) += c;
         ChiselError.info("\t" + defs(className)(res).length + " components");
       } else {
-        defs(className) += (res -> ArrayBuffer[Mod](c));
+        defs(className) += (res -> ArrayBuffer[Module](c));
       }
     }
     flushModules(out, defs, level);
     emitChildren(top, defs, out, depth);
   }
 
-  override def elaborate(c: Mod) {
+  override def elaborate(c: Module) {
     super.elaborate(c)
 
     val out = createOutputFile(c.name + ".v");
@@ -748,26 +748,26 @@ class VerilogBackend extends Backend {
     out.close();
 
     if (!memConfs.isEmpty) {
-      val out_conf = createOutputFile(Mod.topComponent.name + ".conf");
+      val out_conf = createOutputFile(Module.topComponent.name + ".conf");
       out_conf.write(getMemConfString);
       out_conf.close();
     }
-    if (Mod.isTesting && Mod.tester != null) {
-      Mod.scanArgs.clear();  Mod.scanArgs  ++= Mod.tester.testInputNodes;    Mod.scanFormat  = ""
-      Mod.printArgs.clear(); Mod.printArgs ++= Mod.tester.testNonInputNodes; Mod.printFormat = ""
+    if (Module.isTesting && Module.tester != null) {
+      Module.scanArgs.clear();  Module.scanArgs  ++= Module.tester.testInputNodes;    Module.scanFormat  = ""
+      Module.printArgs.clear(); Module.printArgs ++= Module.tester.testNonInputNodes; Module.printFormat = ""
     }
-    if (Mod.isGenHarness) {
+    if (Module.isGenHarness) {
       genHarness(c, c.name);
     }
   }
 
-  override def compile(c: Mod, flags: String) {
+  override def compile(c: Module, flags: String) {
 
     def run(cmd: String) {
       val c = Process(cmd).!
       ChiselError.info(cmd + " RET " + c)
     }
-    val dir = Mod.targetDir + "/"
+    val dir = Module.targetDir + "/"
     val src = dir + c.name + "-harness.v " + dir + c.name + ".v"
     val cmd = "vcs +vc +v2k -timescale=10ns/10ps " + src + " -o " + dir + c.name
     run(cmd)

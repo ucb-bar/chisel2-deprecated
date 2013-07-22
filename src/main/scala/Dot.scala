@@ -76,7 +76,7 @@ class DotBackend extends Backend {
   }
 
 
-  private def emitModuleText(top: Mod, depth: Int ): (String, String) = {
+  private def emitModuleText(top: Module, depth: Int ): (String, String) = {
     val res = new StringBuilder()
     val crossings = new StringBuilder()
     val indent = "  " * (depth + 1)
@@ -145,7 +145,7 @@ class DotBackend extends Backend {
   }
 
 
-  override def elaborate(c: Mod): Unit = {
+  override def elaborate(c: Module): Unit = {
     super.elaborate(c)
 
     var gn = -1;
@@ -153,7 +153,7 @@ class DotBackend extends Backend {
     out_cd.write("digraph TopTop {\n");
     out_cd.write("rankdir = LR;\n");
     def genNum: Int = { gn += 1; gn };
-    def dumpComponent (c: Mod): Unit = {
+    def dumpComponent (c: Module): Unit = {
       out_cd.write("subgraph cluster" + c.name + "{\n");
       out_cd.write("label = \"" + c.name + "\";\n");
       def dumpIo (n: String, d: Data): Unit = {

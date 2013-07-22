@@ -32,19 +32,19 @@ package Chisel
 import Node._
 import ChiselError._
 
-object Fix {
+object SInt {
 
-  def apply(x: Int): Fix = Lit(x){Fix()};
-  def apply(x: Int, width: Int): Fix = Lit(x, width){Fix()};
+  def apply(x: Int): SInt = Lit(x){SInt()};
+  def apply(x: Int, width: Int): SInt = Lit(x, width){SInt()};
 
-  def apply(dir: IODirection = null, width: Int = -1): Fix = {
-    val res = new Fix();
+  def apply(dir: IODirection = null, width: Int = -1): SInt = {
+    val res = new SInt();
     res.create(dir, width)
     res
   }
 }
 
-class Fix extends Bits {
+class SInt extends Bits {
   setIsSigned
 
   override def setIsTypeNode {
@@ -52,16 +52,16 @@ class Fix extends Bits {
     super.setIsTypeNode
   }
 
-  type T = Fix;
+  type T = SInt;
 
-  /** Factory method to create and assign a *Fix* type to a Node *n*.
+  /** Factory method to create and assign a *SInt* type to a Node *n*.
     */
   override def fromNode(n: Node): this.type = {
-    Fix(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
+    SInt(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
   }
 
   override def fromInt(x: Int): this.type = {
-    Fix(x).asInstanceOf[this.type]
+    SInt(x).asInstanceOf[this.type]
   }
 
   override def matchWidth(w: Int): Node = {
@@ -78,49 +78,49 @@ class Fix extends Bits {
     }
   }
 
-  /** casting from UFix followed by assignment. */
-  def :=(src: UFix): Unit = this := src.zext;
+  /** casting from UInt followed by assignment. */
+  def :=(src: UInt): Unit = this := src.zext;
 
-  def gen[T <: Bits](): T = Fix().asInstanceOf[T];
+  def gen[T <: Bits](): T = SInt().asInstanceOf[T];
 
   // arithmetic operators
-  def unary_-(): Fix = newUnaryOp("-");
-  def unary_!(): Fix = newUnaryOp("!");
-  def << (b: UFix): Fix = newBinaryOp(b, "<<");
-  def >> (b: UFix): Fix = newBinaryOp(b, ">>");
-  def ?  (b: Fix): Fix = newBinaryOp(b, "?");
+  def unary_-(): SInt = newUnaryOp("-");
+  def unary_!(): SInt = newUnaryOp("!");
+  def << (b: UInt): SInt = newBinaryOp(b, "<<");
+  def >> (b: UInt): SInt = newBinaryOp(b, ">>");
+  def ?  (b: SInt): SInt = newBinaryOp(b, "?");
 
   // order operators
-  def >  (b: Fix): Bool = newLogicalOp(b, ">");
-  def <  (b: Fix): Bool = newLogicalOp(b, "<");
-  def <= (b: Fix): Bool = newLogicalOp(b, "<=");
-  def >= (b: Fix): Bool = newLogicalOp(b, ">=");
-  def !=  (b: UFix): Bool = this != b.zext;
-  def >   (b: UFix): Bool = this > Cat(UFix(1, 1), b).toFix;
-  def <   (b: UFix): Bool = this < Cat(UFix(1, 1), b).toFix;
-  def >=  (b: UFix): Bool = this >= Cat(UFix(1, 1), b).toFix;
-  def <=  (b: UFix): Bool = this <= Cat(UFix(1, 1), b).toFix;
+  def >  (b: SInt): Bool = newLogicalOp(b, ">");
+  def <  (b: SInt): Bool = newLogicalOp(b, "<");
+  def <= (b: SInt): Bool = newLogicalOp(b, "<=");
+  def >= (b: SInt): Bool = newLogicalOp(b, ">=");
+  def !=  (b: UInt): Bool = this != b.zext;
+  def >   (b: UInt): Bool = this > Cat(UInt(1, 1), b).toSInt;
+  def <   (b: UInt): Bool = this < Cat(UInt(1, 1), b).toSInt;
+  def >=  (b: UInt): Bool = this >= Cat(UInt(1, 1), b).toSInt;
+  def <=  (b: UInt): Bool = this <= Cat(UInt(1, 1), b).toSInt;
 
   override def ===[T <: Data](right: T): Bool = {
     right match {
-      case b: UFix => this === b.zext;
+      case b: UInt => this === b.zext;
       case _ =>
         this.asInstanceOf[Bits] === right
     }
   }
 
-  //Fix to Fix arithmetic
-  def +  (b: Fix): Fix = newBinaryOp(b, "+");
-  def *  (b: Fix): Fix = newBinaryOp(b, "s*s");
-  def /  (b: Fix): Fix = newBinaryOp(b, "s/s");
-  def %  (b: Fix): Fix = newBinaryOp(b, "s%s");
-  def -  (b: Fix): Fix = newBinaryOp(b, "-");
+  //SInt to SInt arithmetic
+  def +  (b: SInt): SInt = newBinaryOp(b, "+");
+  def *  (b: SInt): SInt = newBinaryOp(b, "s*s");
+  def /  (b: SInt): SInt = newBinaryOp(b, "s/s");
+  def %  (b: SInt): SInt = newBinaryOp(b, "s%s");
+  def -  (b: SInt): SInt = newBinaryOp(b, "-");
 
-  //Fix to UFix arithmetic
-  def +   (b: UFix): Fix = this + b.zext;
-  def -   (b: UFix): Fix = this - b.zext;
-  def *   (b: UFix): Fix = newBinaryOp(b.zext, "s*u");
-  def /   (b: UFix): Fix = newBinaryOp(b.zext, "s/u");
-  def %   (b: UFix): Fix = newBinaryOp(b.zext, "s%u");
-  def abs: UFix = Mux(this < Fix(0), (-this).toUFix, this.toUFix)
+  //SInt to UInt arithmetic
+  def +   (b: UInt): SInt = this + b.zext;
+  def -   (b: UInt): SInt = this - b.zext;
+  def *   (b: UInt): SInt = newBinaryOp(b.zext, "s*u");
+  def /   (b: UInt): SInt = newBinaryOp(b.zext, "s/u");
+  def %   (b: UInt): SInt = newBinaryOp(b.zext, "s%u");
+  def abs: UInt = Mux(this < SInt(0), (-this).toUInt, this.toUInt)
 }

@@ -32,7 +32,7 @@ package Chisel
 
 object ImplicitConversions {
 
-  implicit def intToUFix(x: Int): UFix = UFix(x)
+  implicit def intToUInt(x: Int): UInt = UInt(x)
   implicit def booleanToBool(x: Boolean): Bool = Bool(x)
 
   // These ones for the lazy programmer.

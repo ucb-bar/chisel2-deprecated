@@ -158,7 +158,7 @@ class Reg extends Delay with proc {
     }
     val cond = genCond();
     if (conds.length >= 1) {
-      isEnable = Mod.backend.isInstanceOf[VerilogBackend]
+      isEnable = Module.backend.isInstanceOf[VerilogBackend]
       enable = enable || cond;
     }
     updates += ((cond, src))

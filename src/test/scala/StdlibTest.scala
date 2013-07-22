@@ -63,40 +63,40 @@ class StdlibSuite extends AssertionsForJUnit {
   /** test of simple operators */
   @Test def testOperators() {
 
-    class OperatorComp extends Mod {
+    class OperatorComp extends Module {
       val io = new Bundle {
-        val x = UFix(INPUT, 8)
-        val y = UFix(INPUT, 8)
-        val ys = Fix(INPUT, 8)
-        val z = UFix(OUTPUT)
+        val x = UInt(INPUT, 8)
+        val y = UInt(INPUT, 8)
+        val ys = SInt(INPUT, 8)
+        val z = UInt(OUTPUT)
         val zb = Bool(OUTPUT)
       }
 
       // apply(bit: Int): Bool
       val a = io.x(0).toBits
 
-      // apply(hi: Int, lo: Int): UFix
+      // apply(hi: Int, lo: Int): UInt
       val b = io.x(4, 3)
       val c = io.x(3, 4)
       val d = io.x(3, 3)
       val e = io.x(9, -1)
 
-      // apply(bit: UFix): Bool
-      val a1 = io.x(UFix(0)).toBits
+      // apply(bit: UInt): Bool
+      val a1 = io.x(UInt(0)).toBits
 
-      // apply(hi: UFix, lo: UFix): UFix
-      val b1 = io.x(UFix(4), UFix(3))
-      val c1 = io.x(UFix(3), UFix(4))
-      val d1 = io.x(UFix(3), UFix(3))
-      val e1 = io.x(UFix(9), UFix(-1))
+      // apply(hi: UInt, lo: UInt): UInt
+      val b1 = io.x(UInt(4), UInt(3))
+      val c1 = io.x(UInt(3), UInt(4))
+      val d1 = io.x(UInt(3), UInt(3))
+      val e1 = io.x(UInt(9), UInt(-1))
 
-      // apply(range: (Int, Int)): UFix
+      // apply(range: (Int, Int)): UInt
       val f = io.x((5, 3))
 
-      // unary_-(): UFix
+      // unary_-(): UInt
       val g = - io.x
 
-      // unary_~(): UFix
+      // unary_~(): UInt
       val h = ~io.x
 
       // andR(): Bool
@@ -108,35 +108,35 @@ class StdlibSuite extends AssertionsForJUnit {
       // xorR():  Bool
       val k = io.x.xorR.toBits
 
-      // << (b: UFix): UFix
+      // << (b: UInt): UInt
       val l = io.x << a
 
-      // >> (b: UFix): UFix
+      // >> (b: UInt): UInt
       val m = io.x >> a
 
-      // +  (b: UFix): UFix
+      // +  (b: UInt): UInt
       val n = io.x + io.y
 
-      // *  (b: UFix): UFix
+      // *  (b: UInt): UInt
       val o = io.x * io.y
 
-      // ^  (b: UFix): UFix
+      // ^  (b: UInt): UInt
       val r = io.x ^ io.y
 
       // XXX disabled seems left over from previous attempts at implementing
-      // Mux: ?  (b: UFix): UFix
+      // Mux: ?  (b: UInt): UInt
       //val s = io.x ? io.y
 
-      // -  (b: UFix): UFix
+      // -  (b: UInt): UInt
       val t = io.x - io.y
 
-      // ## (b: UFix): UFix
+      // ## (b: UInt): UInt
       val u = io.x ## io.y
 
-      // &  (b: UFix): UFix
+      // &  (b: UInt): UInt
       val ab = io.x & io.y
 
-      // |  (b: UFix): UFix
+      // |  (b: UInt): UInt
       val ac = io.x | io.y
 
       io.z := (a | b | c | d
@@ -150,22 +150,22 @@ class StdlibSuite extends AssertionsForJUnit {
 
       // -- result type is Bool --
 
-      // ===(b: UFix): Bool
+      // ===(b: UInt): Bool
       val v = io.x === io.y
 
-      // != (b: UFix): Bool
+      // != (b: UInt): Bool
       val w = io.x != io.y
 
-      // >  (b: UFix): Bool
+      // >  (b: UInt): Bool
       val x = io.x > io.y
 
-      // <  (b: UFix): Bool
+      // <  (b: UInt): Bool
       val y = io.x < io.y
 
-      // <= (b: UFix): Bool
+      // <= (b: UInt): Bool
       val z = io.x <= io.y
 
-      // >= (b: UFix): Bool
+      // >= (b: UInt): Bool
       val aa = io.x >= io.y
 
       io.zb := (v | w | x | y | z | aa)
@@ -173,22 +173,22 @@ class StdlibSuite extends AssertionsForJUnit {
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new OperatorComp()))
+      () => Module(new OperatorComp()))
   }
 
   /** Multiply an unsigned number by signed number */
   @Test def testMulUS() {
-    class MulUS extends Mod {
+    class MulUS extends Module {
       val io = new Bundle {
-        val x = UFix(INPUT, 32)
-        val y = Fix(INPUT, 32)
-        val z = Fix(OUTPUT)
+        val x = UInt(INPUT, 32)
+        val y = SInt(INPUT, 32)
+        val z = SInt(OUTPUT)
       }
       io.z := io.x * io.y
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new MulUS()))
+      () => Module(new MulUS()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_MulUS_1.v",
 """module StdlibSuite_MulUS_1(
     input [31:0] io_x,
@@ -210,17 +210,17 @@ endmodule
 
   /** Divide an unsigned number by signed number */
   @Test def testDivUS() {
-    class DivUS extends Mod {
+    class DivUS extends Module {
       val io = new Bundle {
-        val x = UFix(INPUT, 32)
-        val y = Fix(INPUT, 32)
-        val z = Fix(OUTPUT)
+        val x = UInt(INPUT, 32)
+        val y = SInt(INPUT, 32)
+        val z = SInt(OUTPUT)
       }
       io.z := io.x / io.y
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new DivUS()))
+      () => Module(new DivUS()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_DivUS_1.v",
 """module StdlibSuite_DivUS_1(
     input [31:0] io_x,
@@ -242,17 +242,17 @@ endmodule
 
   /** Remainer of an unsigned number by signed number */
   @Test def testRemUS() {
-    class RemUS extends Mod {
+    class RemUS extends Module {
       val io = new Bundle {
-        val x = UFix(INPUT, 32)
-        val y = Fix(INPUT, 32)
-        val z = Fix(OUTPUT)
+        val x = UInt(INPUT, 32)
+        val y = SInt(INPUT, 32)
+        val z = SInt(OUTPUT)
       }
       io.z := io.x % io.y
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new RemUS()))
+      () => Module(new RemUS()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_RemUS_1.v",
 """module StdlibSuite_RemUS_1(
     input [31:0] io_x,
@@ -274,17 +274,17 @@ endmodule
 
   /** Multiply an signed number by an unsigned number */
   @Test def testMulSU() {
-    class MulSU extends Mod {
+    class MulSU extends Module {
       val io = new Bundle {
-        val x = Fix(INPUT, 32)
-        val y = UFix(INPUT, 32)
-        val z = Fix(OUTPUT)
+        val x = SInt(INPUT, 32)
+        val y = UInt(INPUT, 32)
+        val z = SInt(OUTPUT)
       }
       io.z := io.x * io.y
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new MulSU()))
+      () => Module(new MulSU()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_MulSU_1.v",
 """module StdlibSuite_MulSU_1(
     input  signed [31:0] io_x,
@@ -306,17 +306,17 @@ endmodule
 
   /** Divide a signed number by an unsigned number */
   @Test def testDivSU() {
-    class DivSU extends Mod {
+    class DivSU extends Module {
       val io = new Bundle {
-        val x = Fix(INPUT, 32)
-        val y = UFix(INPUT, 32)
-        val z = Fix(OUTPUT)
+        val x = SInt(INPUT, 32)
+        val y = UInt(INPUT, 32)
+        val z = SInt(OUTPUT)
       }
       io.z := io.x / io.y
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new DivSU()))
+      () => Module(new DivSU()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_DivSU_1.v",
 """module StdlibSuite_DivSU_1(
     input  signed [31:0] io_x,
@@ -338,17 +338,17 @@ endmodule
 
   /** Remainer of a signed number by an unsigned number */
   @Test def testRemSU() {
-    class RemSU extends Mod {
+    class RemSU extends Module {
       val io = new Bundle {
-        val x = Fix(INPUT, 32)
-        val y = UFix(INPUT, 32)
-        val z = Fix(OUTPUT)
+        val x = SInt(INPUT, 32)
+        val y = UInt(INPUT, 32)
+        val z = SInt(OUTPUT)
       }
       io.z := io.x % io.y
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new RemSU()))
+      () => Module(new RemSU()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_RemSU_1.v",
 """module StdlibSuite_RemSU_1(
     input  signed [31:0] io_x,
@@ -371,9 +371,9 @@ endmodule
   /** Assign a Bundle */
   @Test def assignBundle() {
     class AssignBundle extends Bundle {
-        val v = Vec.fill(2){UFix(INPUT, 2)}
+        val v = Vec.fill(2){UInt(INPUT, 2)}
     }
-    class AssignBundleComp extends Mod {
+    class AssignBundleComp extends Module {
       val io = new Bundle {
         val in = new AssignBundle()
         val out = new AssignBundle().flip
@@ -383,7 +383,7 @@ endmodule
     }
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new AssignBundleComp()))
+      () => Module(new AssignBundleComp()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_AssignBundleComp_1.v",
 """module StdlibSuite_AssignBundleComp_1(
     input [1:0] io_in_v_0,
@@ -403,125 +403,125 @@ endmodule
     Z[0..wx+wy] = X[0..wx] :: Y[0..wy]. */
   @Test def testCat() {
 
-    class CatComp extends Mod {
+    class CatComp extends Module {
       val io = new Bundle {
-        val x = UFix(INPUT, 8)
-        val y = UFix(INPUT, 8)
-        val z = UFix(OUTPUT)
+        val x = UInt(INPUT, 8)
+        val y = UInt(INPUT, 8)
+        val z = UInt(OUTPUT)
       }
       io.z := Cat(io.x, io.y)
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new CatComp()))
+      () => Module(new CatComp()))
   }
 
   /** Generate a lookup into an array.
     XXX Lookup.scala, use different code based on instance of CppBackend. */
   @Test def testLookup() {
 
-    class LookupComp extends Mod {
+    class LookupComp extends Module {
       val io = new Bundle {
-        val addr = UFix(INPUT, 8)
-        val data = UFix(OUTPUT)
+        val addr = UInt(INPUT, 8)
+        val data = UInt(OUTPUT)
       }
-      io.data := Lookup(io.addr, UFix(0), Array(
-        (UFix(0), UFix(10)),
-        (UFix(1), UFix(11))))
+      io.data := Lookup(io.addr, UInt(0), Array(
+        (UInt(0), UInt(10)),
+        (UInt(1), UInt(11))))
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new LookupComp()))
+      () => Module(new LookupComp()))
   }
 
   /** Generate a PopCount
     */
   @Test def testPopCount() {
 
-    class PopCountComp extends Mod {
+    class PopCountComp extends Module {
       val io = new Bundle {
-        val in = UFix(INPUT, 8)
-        val out = UFix(OUTPUT)
+        val in = UInt(INPUT, 8)
+        val out = UInt(OUTPUT)
       }
       io.out := PopCount(Array(Bool(true), Bool(false)))
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new PopCountComp()))
+      () => Module(new PopCountComp()))
   }
 
   /** Generate a Reverse
     */
   @Test def testReverse() {
 
-    class ReverseComp extends Mod {
+    class ReverseComp extends Module {
       val io = new Bundle {
-        val in = UFix(INPUT, 8)
-        val out = UFix(OUTPUT)
+        val in = UInt(INPUT, 8)
+        val out = UInt(OUTPUT)
       }
       io.out := Reverse(io.in)
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new ReverseComp()))
+      () => Module(new ReverseComp()))
   }
 
   /** Generate a ShiftRegister
     */
   @Test def testShiftRegister() {
 
-    class ShiftRegisterComp extends Mod {
+    class ShiftRegisterComp extends Module {
       val io = new Bundle {
-        val in = UFix(INPUT, 8)
-        val out = UFix(OUTPUT)
+        val in = UInt(INPUT, 8)
+        val out = UInt(OUTPUT)
       }
       io.out := ShiftRegister(2, io.in)
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new ShiftRegisterComp()))
+      () => Module(new ShiftRegisterComp()))
   }
 
-  /** Generate a UFixToOH
+  /** Generate a UIntToOH
     */
-  @Test def testUFixToOH() {
+  @Test def testUIntToOH() {
 
-    class UFixToOHComp extends Mod {
+    class UIntToOHComp extends Module {
       val io = new Bundle {
-        val in = UFix(INPUT, 8)
-        val out0 = UFix(OUTPUT)
-        val out1 = UFix(OUTPUT)
+        val in = UInt(INPUT, 8)
+        val out0 = UInt(OUTPUT)
+        val out1 = UInt(OUTPUT)
       }
-      io.out0 := UFixToOH(io.in)
-      io.out1 := UFixToOH(io.in, 4)
+      io.out0 := UIntToOH(io.in)
+      io.out1 := UIntToOH(io.in, 4)
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new UFixToOHComp()))
+      () => Module(new UIntToOHComp()))
   }
 
   /** Generate a foldR
     */
   @Test def testfoldR() {
 
-    class foldRComp extends Mod {
+    class foldRComp extends Module {
       val io = new Bundle {
-        val in0 = UFix(INPUT, 8)
-        val in1 = UFix(INPUT, 8)
-        val out = UFix(OUTPUT)
+        val in0 = UInt(INPUT, 8)
+        val in1 = UInt(INPUT, 8)
+        val out = UInt(OUTPUT)
       }
       io.out := foldR(io.in0 :: io.in1 :: Nil){ _ + _ }
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new foldRComp()))
+      () => Module(new foldRComp()))
   }
 
   /** Generate an Arbiter such that first valid wins.
@@ -534,12 +534,12 @@ endmodule
            n: Int, count: Int, needsLock: Option[T => Bool] = None)
     */
   @Test def testArbiter() {
-    class ArbiterTest extends Arbiter(Fix(width=8), 4) {
+    class ArbiterTest extends Arbiter(SInt(width=8), 4) {
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new ArbiterTest()))
+      () => Module(new ArbiterTest()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_ArbiterTest_1.v",
 """module StdlibSuite_ArbiterTest_1(
     output io_in_0_ready,
@@ -648,13 +648,13 @@ endmodule
            n: Int, count: Int, needsLock: Option[T => Bool] = None)
 
   @Test def testArbiterNeedsLock() {
-    class ArbiterNeedsLock extends Arbiter(Fix(width=8), 4,
+    class ArbiterNeedsLock extends Arbiter(SInt(width=8), 4,
       needsLock=Some()) {
     }
 
     chiselMain(Array[String]("--v",
     "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new ArbiterNeedsLock()))
+      () => Module(new ArbiterNeedsLock()))
     assertFile(tmpdir.getRoot() + "/NeedsLock.v",
 """
 """)
@@ -671,12 +671,12 @@ endmodule
            n: Int, count: Int, needsLock: Option[T => Bool] = None)
     */
   @Test def testRRArbiter() {
-    class RRArbiterTest extends RRArbiter(Fix(width=8), 4) {
+    class RRArbiterTest extends RRArbiter(SInt(width=8), 4) {
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new RRArbiterTest()))
+      () => Module(new RRArbiterTest()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_RRArbiterTest_1.v",
 """module StdlibSuite_RRArbiterTest_1(input clk, input reset,
     output io_in_0_ready,
@@ -904,27 +904,27 @@ endmodule
     */
   @Test def testFillInterleaved() {
 
-    class FillInterleavedComp extends Mod {
+    class FillInterleavedComp extends Module {
       val io = new Bundle {
-        val in = UFix(INPUT, 8)
-        val out = UFix(OUTPUT)
+        val in = UInt(INPUT, 8)
+        val out = UInt(OUTPUT)
       }
       io.out := FillInterleaved(4, io.in)
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new FillInterleavedComp()))
+      () => Module(new FillInterleavedComp()))
   }
 
   /** Generate a Counter
     */
   @Test def testCounter() {
 
-    class CounterComp extends Mod {
+    class CounterComp extends Module {
       val io = new Bundle {
         val in = Bool(INPUT)
-        val out = UFix(OUTPUT)
+        val out = UInt(OUTPUT)
         val wrap = Bool(OUTPUT)
       }
       val (count, wrap) = Counter(io.in, 5)
@@ -934,25 +934,25 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new CounterComp()))
+      () => Module(new CounterComp()))
   }
 
   /* XXX. */
-  @Test def testOHToUFix() {
-    println("\ntestOHToUFix ...")
-    class OHToUFixComp extends Mod {
+  @Test def testOHToUInt() {
+    println("\ntestOHToUInt ...")
+    class OHToUIntComp extends Module {
       val io = new Bundle {
         val in = Bool(INPUT)
-        val out = UFix(OUTPUT)
+        val out = UInt(OUTPUT)
       }
-      io.out := OHToUFix(Bool(true) :: io.in :: Bool(false) :: io.in :: Nil)
+      io.out := OHToUInt(Bool(true) :: io.in :: Bool(false) :: io.in :: Nil)
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new OHToUFixComp()))
-    assertFile(tmpdir.getRoot() + "/StdlibSuite_OHToUFixComp_1.v",
-"""module StdlibSuite_OHToUFixComp_1(
+      () => Module(new OHToUIntComp()))
+    assertFile(tmpdir.getRoot() + "/StdlibSuite_OHToUIntComp_1.v",
+"""module StdlibSuite_OHToUIntComp_1(
     input  io_in,
     output[1:0] io_out);
 
@@ -970,12 +970,12 @@ endmodule
   /* Delays an element by a fixed latency. */
   @Test def testPipe() {
     println("\ntestPipe ...")
-    class PipeComp extends Pipe(UFix(width=8), 2) {
+    class PipeComp extends Pipe(UInt(width=8), 2) {
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new PipeComp()))
+      () => Module(new PipeComp()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_PipeComp_1.v",
 """module StdlibSuite_PipeComp_1(input clk, input reset,
     input  io_enq_valid,
@@ -1014,15 +1014,15 @@ endmodule
     */
   @Test def testPriorityMux() {
 
-    class PriorityMuxComp extends Mod {
+    class PriorityMuxComp extends Module {
       val io = new Bundle {
         val in0 = Bool(INPUT)
         val in1 = Bool(INPUT)
-        val data0 = UFix(INPUT, 16)
-        val data1 = UFix(INPUT, 16)
-        val out0 = UFix(OUTPUT)
-        val out1 = UFix(OUTPUT)
-        val out2 = UFix(OUTPUT)
+        val data0 = UInt(INPUT, 16)
+        val data1 = UInt(INPUT, 16)
+        val out0 = UInt(OUTPUT)
+        val out1 = UInt(OUTPUT)
+        val out2 = UInt(OUTPUT)
       }
       io.out0 := PriorityMux((io.in0, io.data0) :: (io.in1, io.data1) :: Nil)
       io.out1 := PriorityMux(io.in0 :: io.in1 :: Nil,
@@ -1032,57 +1032,57 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new PriorityMuxComp()))
+      () => Module(new PriorityMuxComp()))
   }
 
   /** Generate a PriorityEncoder
     */
   @Test def testPriorityEncoder() {
 
-    class PriorityEncoderComp extends Mod {
+    class PriorityEncoderComp extends Module {
       val io = new Bundle {
-        val in = UFix(INPUT, 8)
-        val out = UFix(OUTPUT)
+        val in = UInt(INPUT, 8)
+        val out = UInt(OUTPUT)
       }
       io.out := PriorityEncoder(io.in)
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new PriorityEncoderComp()))
+      () => Module(new PriorityEncoderComp()))
   }
 
   /** Generate a PriorityEncoderOH
     */
   @Test def testPriorityEncoderOH() {
 
-    class PriorityEncoderOHComp extends Mod {
+    class PriorityEncoderOHComp extends Module {
       val io = new Bundle {
-        val in = UFix(INPUT, 8)
-        val out = UFix(OUTPUT)
+        val in = UInt(INPUT, 8)
+        val out = UInt(OUTPUT)
       }
       io.out := PriorityEncoderOH(io.in)
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new PriorityEncoderOHComp()))
+      () => Module(new PriorityEncoderOHComp()))
   }
 
   /* Implements a queue of elements (first-in, first-out). */
   @Test def testQueue() {
     println("\ntestQueue ...")
-    class QueueComp extends Mod {
+    class QueueComp extends Module {
       val io = new Bundle {
-        val req = new FIFOIO(UFix(width=8)).flip
-        val resp = new FIFOIO(UFix(width=8))
+        val req = new FIFOIO(UInt(width=8)).flip
+        val resp = new FIFOIO(UInt(width=8))
       }
       io.resp <> Queue(io.req)
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new QueueComp()))
+      () => Module(new QueueComp()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_QueueComp_1.v",
 """module Queue(input clk, input reset,
     output io_enq_ready,
@@ -1196,49 +1196,49 @@ endmodule
     */
   @Test def testFill() {
 
-    class FillComp extends Mod {
+    class FillComp extends Module {
       val io = new Bundle {
-        val in = UFix(INPUT, 8)
-        val out = UFix(OUTPUT)
+        val in = UInt(INPUT, 8)
+        val out = UInt(OUTPUT)
       }
       io.out := Fill(4, io.in)
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new FillComp()))
+      () => Module(new FillComp()))
   }
 
   /** Generate a Log2
     */
   @Test def testLog2() {
 
-    class Log2Comp extends Mod {
+    class Log2Comp extends Module {
       val io = new Bundle {
-        val in = UFix(INPUT, 8)
-        val out = UFix(OUTPUT)
+        val in = UInt(INPUT, 8)
+        val out = UInt(OUTPUT)
       }
       io.out := Log2(io.in, 2)
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new Log2Comp()))
+      () => Module(new Log2Comp()))
   }
 
   /** Generate a MuxLookup
     */
   @Test def testMuxLookup() {
 
-    class MuxLookupComp extends Mod {
+    class MuxLookupComp extends Module {
       val io = new Bundle {
-        val key = UFix(INPUT, 8)
-        val in0 = UFix(INPUT, 8)
-        val in1 = UFix(INPUT, 8)
-        val default = UFix(INPUT, 16)
-        val data0 = UFix(INPUT, 16)
-        val data1 = UFix(INPUT, 16)
-        val out = UFix(OUTPUT)
+        val key = UInt(INPUT, 8)
+        val in0 = UInt(INPUT, 8)
+        val in1 = UInt(INPUT, 8)
+        val default = UInt(INPUT, 16)
+        val data0 = UInt(INPUT, 16)
+        val data1 = UInt(INPUT, 16)
+        val out = UInt(OUTPUT)
       }
       io.out := MuxLookup(io.key, io.default,
         (io.in0, io.data0) :: (io.in1, io.data1) :: Nil)
@@ -1246,19 +1246,19 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new MuxLookupComp()))
+      () => Module(new MuxLookupComp()))
   }
 
   /** Generate a MuxCase
     */
   @Test def testMuxCase() {
 
-    class MuxCaseComp extends Mod {
+    class MuxCaseComp extends Module {
       val io = new Bundle {
-        val default = UFix(INPUT, 8)
-        val in0 = UFix(INPUT, 8)
-        val in1 = UFix(INPUT, 8)
-        val out = UFix(OUTPUT)
+        val default = UInt(INPUT, 8)
+        val in0 = UInt(INPUT, 8)
+        val in1 = UInt(INPUT, 8)
+        val out = UInt(OUTPUT)
       }
       io.out := MuxCase(io.default,
         (Bool(true), io.in0) :: (Bool(false), io.in1) :: Nil)
@@ -1266,19 +1266,19 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new MuxCaseComp()))
+      () => Module(new MuxCaseComp()))
   }
 
   /** Generate a Multiplex
     */
   @Test def testMultiplex() {
 
-    class MultiplexComp extends Mod {
+    class MultiplexComp extends Module {
       val io = new Bundle {
-        val t = UFix(INPUT, 1)
-        val c = UFix(INPUT, 8)
-        val a = UFix(INPUT, 8)
-        val out = UFix(OUTPUT, 8)
+        val t = UInt(INPUT, 1)
+        val c = UInt(INPUT, 8)
+        val a = UInt(INPUT, 8)
+        val out = UInt(OUTPUT, 8)
       }
       // XXX Cannot figure out which code to write. Multiplex returns a Node.
       // val x = Multiplex(io.t, io.c, io.a)
@@ -1286,26 +1286,26 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new MultiplexComp()))
+      () => Module(new MultiplexComp()))
   }
 
   /** Generate a Mux
     */
   @Test def testMux() {
 
-    class MuxComp extends Mod {
+    class MuxComp extends Module {
       val io = new Bundle {
         val t = Bool(INPUT)
-        val c = UFix(INPUT, 8)
-        val a = UFix(INPUT, 8)
-        val out = UFix(OUTPUT)
+        val c = UInt(INPUT, 8)
+        val a = UInt(INPUT, 8)
+        val out = UInt(OUTPUT)
       }
       io.out := Mux(io.t, io.c, io.a)
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new MuxComp()))
+      () => Module(new MuxComp()))
   }
 
 }
