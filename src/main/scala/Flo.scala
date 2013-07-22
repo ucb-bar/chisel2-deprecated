@@ -142,7 +142,7 @@ class FloBackend extends Backend {
     }
   }
 
-  def renameNodes(c: Mod, nodes: Seq[Node]) = {
+  def renameNodes(c: Module, nodes: Seq[Node]) = {
     for (m <- nodes) {
       m match {
         case l: Literal => ;
@@ -157,10 +157,10 @@ class FloBackend extends Backend {
     }
   }
 
-  override def elaborate(c: Mod): Unit = {
+  override def elaborate(c: Module): Unit = {
     super.elaborate(c)
 
-    for (cc <- Mod.components) {
+    for (cc <- Module.components) {
       if (!(cc == c)) {
         c.mods       ++= cc.mods;
         c.blackboxes ++= cc.blackboxes;
@@ -174,7 +174,7 @@ class FloBackend extends Backend {
     c.collectNodes(c);
     c.findOrdering(); // search from roots  -- create omods
     renameNodes(c, c.omods);
-    if (Mod.isReportDims) {
+    if (Module.isReportDims) {
       val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
       ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }

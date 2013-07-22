@@ -39,23 +39,23 @@ import scala.math._
 import Vec._
 import Node._
 
-object VecUFixToOH
+object VecUIntToOH
 {
-  def apply(in: UFix, width: Int): UFix =
+  def apply(in: UInt, width: Int): UInt =
   {
-    if(Mod.chiselOneHotMap.contains((in, width))) {
-      Mod.chiselOneHotMap((in, width))
+    if(Module.chiselOneHotMap.contains((in, width))) {
+      Module.chiselOneHotMap((in, width))
     } else {
-      val out = UFix(1, width)
+      val out = UInt(1, width)
       val res = (out << in)(width-1,0)
-      Mod.chiselOneHotMap += ((in, width) -> res)
+      Module.chiselOneHotMap += ((in, width) -> res)
       res
     }
   }
 }
 
 object VecMux {
-  def apply(addr: UFix, elts: Seq[Data]): Data = {
+  def apply(addr: UInt, elts: Seq[Data]): Data = {
     def doit(elts: Seq[Data], pos: Int): Data = {
       if (elts.length == 1) {
         elts(0)
@@ -106,13 +106,13 @@ object Vec {
     Vec.tabulate(n){ i => gen }
   }
 
-  def getEnable(onehot: UFix, i: Int): Bool = {
+  def getEnable(onehot: UInt, i: Int): Bool = {
     var enable: Bool = null
-      if(Mod.chiselOneHotBitMap.contains(onehot, i)){
-        enable = Mod.chiselOneHotBitMap(onehot, i)
+      if(Module.chiselOneHotBitMap.contains(onehot, i)){
+        enable = Module.chiselOneHotBitMap(onehot, i)
       } else {
         enable = onehot(i)
-        Mod.chiselOneHotBitMap += ((onehot, i) -> enable)
+        Module.chiselOneHotBitMap += ((onehot, i) -> enable)
       }
     enable
   }
@@ -136,14 +136,14 @@ object Vec {
 }
 
 class VecProc extends proc {
-  var addr: UFix = null
+  var addr: UInt = null
   var elms: ArrayBuffer[Bits] = null
 
   override def genMuxes(default: Node) {}
 
   def procAssign(src: Node) {
-    val onehot = VecUFixToOH(addr, elms.length)
-    Mod.searchAndMap = true
+    val onehot = VecUIntToOH(addr, elms.length)
+    Module.searchAndMap = true
     for(i <- 0 until elms.length){
       when (getEnable(onehot, i)) {
         if(elms(i).comp != null) {
@@ -153,13 +153,13 @@ class VecProc extends proc {
         }
       }
     }
-    Mod.searchAndMap = false
+    Module.searchAndMap = false
   }
 }
 
 class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable with BufferProxy[T] {
   val self = new ArrayBuffer[T]
-  val readPortCache = new HashMap[UFix, T]
+  val readPortCache = new HashMap[UInt, T]
   var sortedElementsCache: ArrayBuffer[ArrayBuffer[Data]] = null
   var flattenedVec: Node = null
   override def apply(idx: Int): T = {
@@ -186,30 +186,30 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable w
     sortedElementsCache
   }
 
-  def apply(ind: UFix): T =
+  def apply(ind: UInt): T =
     read(ind)
 
-  def write(addr: UFix, data: T) {
+  def write(addr: UInt, data: T) {
     if(data.isInstanceOf[Node]){
 
-      val onehot = VecUFixToOH(addr, length)
-      Mod.searchAndMap = true
+      val onehot = VecUIntToOH(addr, length)
+      Module.searchAndMap = true
       for(i <- 0 until length){
         when (getEnable(onehot, i)) {
           this(i).comp procAssign data.toNode
         }
       }
-      Mod.searchAndMap = false
+      Module.searchAndMap = false
     }
   }
 
-  def read(addr: UFix): T = {
+  def read(addr: UInt): T = {
     if(readPortCache.contains(addr)) {
       return readPortCache(addr)
     }
 
     val res = this(0).clone
-    val iaddr = UFix(width=log2Up(length))
+    val iaddr = UInt(width=log2Up(length))
     iaddr.inputs += addr
     for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
       io assign VecMux(iaddr, sortedElm)
@@ -294,7 +294,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable w
     }
   }
 
-  def := (src: UFix) {
+  def := (src: UInt) {
     for(i <- 0 until length)
       this(i) := src(i)
   }
@@ -306,7 +306,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable w
 
   override def traceableNodes: Array[Node] = self.toArray
 
-  override def traceNode(c: Mod, stack: Stack[() => Any]) {
+  override def traceNode(c: Module, stack: Stack[() => Any]) {
     for((n, i) <- flatten) {
       stack.push(() => i.traceNode(c, stack))
     }
@@ -391,7 +391,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable w
       elm.setIsTypeNode
   }
 
-  override def toBits(): UFix = {
+  override def toBits(): UInt = {
     val reversed = this.reverse.map(_.toBits)
     Cat(reversed.head, reversed.tail: _*)
   }
@@ -399,9 +399,9 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable w
   def forall(p: T => Bool): Bool = (this map p).fold(Bool(true))(_&&_)
   def exists(p: T => Bool): Bool = (this map p).fold(Bool(false))(_||_)
   def contains[T <: Bits](x: T): Bool = this.exists(_ === x)
-  def count(p: T => Bool): UFix = PopCount(this map p)
+  def count(p: T => Bool): UInt = PopCount(this map p)
 
-  private def indexWhereHelper(p: T => Bool) = this map p zip (0 until size).map(i => UFix(i))
-  def indexWhere(p: T => Bool): UFix = PriorityMux(indexWhereHelper(p))
-  def lastIndexWhere(p: T => Bool): UFix = PriorityMux(indexWhereHelper(p).reverse)
+  private def indexWhereHelper(p: T => Bool) = this map p zip (0 until size).map(i => UInt(i))
+  def indexWhere(p: T => Bool): UInt = PriorityMux(indexWhereHelper(p))
+  def lastIndexWhere(p: T => Bool): UInt = PriorityMux(indexWhereHelper(p).reverse)
 }

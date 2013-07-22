@@ -40,8 +40,8 @@ nameable                (src/main/hcl.scala)
         Mem             (src/main/Mem.scala)
     Data                (src/main/Data.scala)
       Bits with proc    (src/main/Bits.scala, src/main/scala/hcl.scala)
-        Fix             (src/main/Fix.scala)
-        UFix            (src/main/UFix.scala)
+        SInt             (src/main/SInt.scala)
+        UInt            (src/main/UInt.scala)
           Bool          (src/main/Bool.scala)
       CompositeData     (src/main/Data.scala)
         Vec             (src/main/Vec.scala)
@@ -94,14 +94,14 @@ class DataSuite extends AssertionsForJUnit {
 
   @Test def testBoolFromDefault() {
     val tested = Bool();
-    /* XXX In the same situation Fix direction shows up as INPUT */
+    /* XXX In the same situation SInt direction shows up as INPUT */
     assertTrue( tested.dir == null );
     assertFalse( tested.assigned );
     assertFalse( tested.named );
   }
 
-  @Test def testFixFromLit() {
-    val fixFromLit = Fix(42);
+  @Test def testSIntFromLit() {
+    val fixFromLit = SInt(42);
 
     assertTrue( fixFromLit.dir == OUTPUT );
     assertTrue( fixFromLit.isSigned ); /* XXX why defined in Node? */
@@ -109,8 +109,8 @@ class DataSuite extends AssertionsForJUnit {
     assertFalse( fixFromLit.named );
   }
 
-  @Test def testFixFromLitWithWidth() {
-    val fixFromLitWithWidth = Fix(42, width = 16);
+  @Test def testSIntFromLitWithWidth() {
+    val fixFromLitWithWidth = SInt(42, width = 16);
     assertTrue( fixFromLitWithWidth.dir == OUTPUT );
     assertTrue( fixFromLitWithWidth.isSigned );
     assertTrue( fixFromLitWithWidth.assigned );
@@ -120,8 +120,8 @@ class DataSuite extends AssertionsForJUnit {
      */
   }
 
-  @Test def testFixFromWidthDir() {
-    val fixFromWidthDir = Fix(width = 8, dir = INPUT);
+  @Test def testSIntFromWidthDir() {
+    val fixFromWidthDir = SInt(width = 8, dir = INPUT);
     assertTrue( fixFromWidthDir.width == 8 );
     assertTrue( fixFromWidthDir.dir == INPUT );
     assertTrue( fixFromWidthDir.isSigned );
@@ -129,11 +129,11 @@ class DataSuite extends AssertionsForJUnit {
     assertFalse( fixFromWidthDir.named );
   }
 
-  // Testing the UFix factory methods
+  // Testing the UInt factory methods
 
-  @Test def testUFixVal() {
-    // apply(x: Int): UFix
-    val dat = UFix(5)
+  @Test def testUIntVal() {
+    // apply(x: Int): UInt
+    val dat = UInt(5)
     assertTrue( dat.width == -1 ); // XXX ??
     assertTrue( dat.dir == OUTPUT );
     assertFalse( dat.isSigned );
@@ -141,9 +141,9 @@ class DataSuite extends AssertionsForJUnit {
     assertFalse( dat.named );
   }
 
-  @Test def testUFixValWidth() {
-    // def apply(x: Int, width: Int): UFix
-    val dat = UFix(5, 4)
+  @Test def testUIntValWidth() {
+    // def apply(x: Int, width: Int): UInt
+    val dat = UInt(5, 4)
     assertTrue( dat.width == -1 ); // XXX ??
     assertTrue( dat.dir == OUTPUT );
     assertFalse( dat.isSigned );
@@ -152,9 +152,9 @@ class DataSuite extends AssertionsForJUnit {
   }
 
   /* XXX This test interfers with others declared in NameTest.scala
-  @Test def testUFixString() {
-    // def apply(x: String): UFix
-    val dat = UFix("1010")
+  @Test def testUIntString() {
+    // def apply(x: String): UInt
+    val dat = UInt("1010")
     assertTrue( dat.width == -1 ); // XXX
     assertTrue( dat.dir == OUTPUT );
     assertFalse( dat.isSigned );
@@ -163,9 +163,9 @@ class DataSuite extends AssertionsForJUnit {
   }
    */
 
-  @Test def testUFixStringWidth() {
-    // def apply(x: String, width: Int): UFix
-    val dat = UFix("101", 4)
+  @Test def testUIntStringWidth() {
+    // def apply(x: String, width: Int): UInt
+    val dat = UInt("101", 4)
     assertTrue( dat.width == -1 ); // XXX ??
     assertTrue( dat.dir == OUTPUT );
     assertFalse( dat.isSigned );
@@ -173,9 +173,9 @@ class DataSuite extends AssertionsForJUnit {
     assertFalse( dat.named );
   }
 
-  @Test def testUFixStringBaseBinary() {
-    // def apply(x: String, base: Char): UFix
-    val dat = UFix("1010", 'b')
+  @Test def testUIntStringBaseBinary() {
+    // def apply(x: String, base: Char): UInt
+    val dat = UInt("1010", 'b')
     assertTrue( dat.width == -1 );
     assertTrue( dat.dir == OUTPUT );
     assertFalse( dat.isSigned );
@@ -183,9 +183,9 @@ class DataSuite extends AssertionsForJUnit {
     assertFalse( dat.named );
   }
 
-  @Test def testUFixStringBaseOctal() {
-    // def apply(x: String, base: Char): UFix
-    val dat = UFix("644", 'o')
+  @Test def testUIntStringBaseOctal() {
+    // def apply(x: String, base: Char): UInt
+    val dat = UInt("644", 'o')
     assertTrue( dat.width == -1 );
     assertTrue( dat.dir == OUTPUT );
     assertFalse( dat.isSigned );
@@ -194,9 +194,9 @@ class DataSuite extends AssertionsForJUnit {
   }
 
   /* XXX This test interfers with others declared in NameTest.scala
-  @Test def testUFixStringBaseDec() {
-    // def apply(x: String, base: Char): UFix
-    val dat = UFix("199", 'd')
+  @Test def testUIntStringBaseDec() {
+    // def apply(x: String, base: Char): UInt
+    val dat = UInt("199", 'd')
     assertTrue( dat.width == -1 );
     assertTrue( dat.dir == OUTPUT );
     assertFalse( dat.isSigned );
@@ -205,9 +205,9 @@ class DataSuite extends AssertionsForJUnit {
   }
    */
 
-  @Test def testUFixStringBaseHex() {
-    // def apply(x: String, base: Char): UFix
-    val dat = UFix("abc", 'h')
+  @Test def testUIntStringBaseHex() {
+    // def apply(x: String, base: Char): UInt
+    val dat = UInt("abc", 'h')
     assertTrue( dat.width == -1 );
     assertTrue( dat.dir == OUTPUT );
     assertFalse( dat.isSigned );
@@ -215,9 +215,9 @@ class DataSuite extends AssertionsForJUnit {
     assertFalse( dat.named );
   }
 
-  @Test def testUFixDirWidth() {
-    // def apply(dir: IODirection = null, width: Int = -1): UFix
-    val dat = UFix(INPUT, 4)
+  @Test def testUIntDirWidth() {
+    // def apply(dir: IODirection = null, width: Int = -1): UInt
+    val dat = UInt(INPUT, 4)
     assertTrue( dat.width == 4 );
     assertTrue( dat.dir == INPUT );
     assertFalse( dat.isSigned );
@@ -233,22 +233,22 @@ class DataSuite extends AssertionsForJUnit {
     */
   @Test def testBypassData() {
     class BypassData(num_bypass_ports:Int) extends Bundle() {
-      val data = UFix(INPUT, width=num_bypass_ports)
+      val data = UInt(INPUT, width=num_bypass_ports)
       val valid = Vec.fill(num_bypass_ports){Bool()}
-        // XXX Mod.findRoots does not support Vec as a graph root.
+        // XXX Module.findRoots does not support Vec as a graph root.
       def get_num_ports: Int = num_bypass_ports
     }
 
-    class BypassDataComp extends Mod {
+    class BypassDataComp extends Module {
       val io = new BypassData(3)
 
-      io.valid := io.data | UFix(1)
+      io.valid := io.data | UInt(1)
       debug(io.valid)
     }
 
     chiselMain(Array[String]("--backend", "c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new BypassDataComp))
+      () => Module(new BypassDataComp))
     assertFile(tmpdir.getRoot() + "/DataSuite_BypassDataComp_1.h",
 """#ifndef __DataSuite_BypassDataComp_1__
 #define __DataSuite_BypassDataComp_1__

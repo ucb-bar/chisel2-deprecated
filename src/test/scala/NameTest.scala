@@ -43,7 +43,7 @@ import Chisel._
  Bundle class NodeSuite$Status$1 needs clone method" when Status is declared
  inside testBindComp3 instead of here at the top level. */
 class Status extends Bundle {
-  val im = UFix(width = 8)
+  val im = UInt(width = 8)
 }
 
 
@@ -74,15 +74,15 @@ class NameSuite extends AssertionsForJUnit {
    of ListLookups. */
   @Test def testListLookups() {
     trait Constants {
-      val VXCPTHOLD  = UFix("b00000_00000_00000_0001001110_1111011", 32)
-      val VCMD_X = UFix(0, 3)
-      val VIMM_X = UFix(0, 1)
-      val N = UFix(0, 1);
+      val VXCPTHOLD  = UInt("b00000_00000_00000_0001001110_1111011", 32)
+      val VCMD_X = UInt(0, 3)
+      val VIMM_X = UInt(0, 1)
+      val N = UInt(0, 1);
     }
 
-    class ListLookupsComp extends Mod with Constants {
+    class ListLookupsComp extends Module with Constants {
       val io = new Bundle {
-        val inst = UFix(INPUT, 32)
+        val inst = UInt(INPUT, 32)
         val sigs_valid = Bool(OUTPUT)
       }
       val veccs =
@@ -96,7 +96,7 @@ class NameSuite extends AssertionsForJUnit {
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new ListLookupsComp()))
+      () => Module(new ListLookupsComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_ListLookupsComp_1.v",
 """module NameSuite_ListLookupsComp_1(
     input [31:0] io_inst,
@@ -144,7 +144,7 @@ endmodule
       val enq_ximm1q = Bool()
     }
 
-    class BlockDecoder extends Mod {
+    class BlockDecoder extends Module {
       val io = new Bundle {
         val valid = Bool(INPUT)
         val replay = Bool(OUTPUT)
@@ -154,9 +154,9 @@ endmodule
       io.replay := io.valid;
     }
 
-    class BindFirstComp extends Mod {
+    class BindFirstComp extends Module {
       val io = new BlockIO
-      val dec = Mod(new BlockDecoder());
+      val dec = Module(new BlockDecoder());
 
       val valid_common = io.valid;
 
@@ -171,7 +171,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new BindFirstComp()))
+      () => Module(new BindFirstComp()))
    assertFile(tmpdir.getRoot() + "/NameSuite_BindFirstComp_1.v",
 """module NameSuite_BlockDecoder_1(
     input  io_valid,
@@ -213,40 +213,40 @@ endmodule
 """)
    }
 
-  /** Since *vec* is declared within a if() block and not as a Mod
+  /** Since *vec* is declared within a if() block and not as a Module
     member, we do not extract the actual name of the module instance
     (i.e. *vec*) which means that if we do not set an arbitrary name on
     that component instance, it will remain empty.
     This would result in bindings starting with a "_" prefix (target
-    Mod name is empty).
+    Module name is empty).
 
     We thus generate a name for the component instance based on its class name.
     */
   @Test def testBindSecond() {
-    class Block extends Mod {
+    class Block extends Module {
       val io = new Bundle() {
         val irq = Bool(INPUT)
-        val irq_cause = UFix(OUTPUT, 5)
+        val irq_cause = UInt(OUTPUT, 5)
       }
-      io.irq_cause := UFix(2);
+      io.irq_cause := UInt(2);
     }
 
-    class BindSecondComp(conf: Boolean) extends Mod {
+    class BindSecondComp(conf: Boolean) extends Module {
       val io = new Bundle() {
         val irq = Bool(INPUT)
-        val irq_cause = UFix(OUTPUT, 6)
+        val irq_cause = UInt(OUTPUT, 6)
       }
 
       if( conf ) {
-        val vec = Mod(new Block());
+        val vec = Module(new Block());
         vec.io.irq := io.irq;
-        io.irq_cause := UFix(1) ## vec.io.irq_cause;
+        io.irq_cause := UInt(1) ## vec.io.irq_cause;
       }
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new BindSecondComp(true)))
+      () => Module(new BindSecondComp(true)))
    assertFile(tmpdir.getRoot() + "/NameSuite_BindSecondComp_1.v",
 """module NameSuite_Block_1(
     input  io_irq,
@@ -291,12 +291,12 @@ endmodule
     }
 
 
-    class Comp extends Mod {
+    class Comp extends Module {
       val io = new CompIO()
       io.out.ren := io.in.ren
     }
 
-    class BindThirdComp extends Mod {
+    class BindThirdComp extends Module {
       val io = new Bundle() {
         val in = new BankToBankIO()
         val result = Bool(OUTPUT)
@@ -306,7 +306,7 @@ endmodule
 
       var first = true
       for (i <- 0 until 4) {
-        val bank = Mod(new Comp())
+        val bank = Module(new Comp())
         if (first) {
           bank.io.in <> io.in
           first = false
@@ -320,7 +320,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new BindThirdComp()))
+      () => Module(new BindThirdComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_BindThirdComp_1.v",
 """module NameSuite_Comp_1(
     input  io_in_ren,
@@ -370,21 +370,21 @@ endmodule
     */
   @Test def testBindFourth() {
     class CompIO extends Bundle {
-      val in = UFix(INPUT, 5)
-      val out = UFix(OUTPUT, 5)
+      val in = UInt(INPUT, 5)
+      val out = UInt(OUTPUT, 5)
     }
 
-    class BindFourthComp extends Mod {
+    class BindFourthComp extends Module {
       val io = new CompIO()
 
-      var norms = ArrayBuffer[UFix]();
+      var norms = ArrayBuffer[UInt]();
       norms += io.in;
       io.out := norms.last
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new BindFourthComp()))
+      () => Module(new BindFourthComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_BindFourthComp_1.v",
 """module NameSuite_BindFourthComp_1(
     input [4:0] io_in,
@@ -407,7 +407,7 @@ endmodule
 
     class UnamedBundle extends Bundle {
       val error = Bool()
-      val ppn = UFix(width = 32)
+      val ppn = UInt(width = 32)
 
       override def clone = new UnamedBundle().asInstanceOf[this.type]
     }
@@ -416,20 +416,20 @@ endmodule
       val resp = new PipeIO(new UnamedBundle()).flip
     }
 
-    class Block extends Mod {
+    class Block extends Module {
       val io = new Bundle {
         val valid = Bool(INPUT)
-        val mine = Vec.fill(2){UFix(width = 32)}.asOutput
+        val mine = Vec.fill(2){UInt(width = 32)}.asOutput
         val sub = new BlockIO()
       }
       val tag_ram = Vec.fill(2){ Reg(io.sub.resp.bits.ppn) }
       when (io.valid) {
-        tag_ram(UFix(0)) := io.sub.resp.bits.ppn
+        tag_ram(UInt(0)) := io.sub.resp.bits.ppn
       }
-      io.mine := Mux(io.valid, Mux1H(UFix(1), tag_ram), Mux1H(UFix(0), tag_ram))
+      io.mine := Mux(io.valid, Mux1H(UInt(1), tag_ram), Mux1H(UInt(0), tag_ram))
     }
 
-    class BindFithComp extends Mod {
+    class BindFithComp extends Module {
       val io = new Bundle {
         val imem_ptw = new BlockIO()
         val dmem_ptw = new BlockIO()
@@ -438,7 +438,7 @@ endmodule
 
       val ptw = collection.mutable.ArrayBuffer(io.imem_ptw, io.dmem_ptw)
       if( true ) {
-        val vdtlb = Mod(new Block())
+        val vdtlb = Module(new Block())
         ptw += vdtlb.io.sub
         vdtlb.io <> io.imem_ptw
       }
@@ -447,7 +447,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new BindFithComp))
+      () => Module(new BindFithComp))
     assertFile(tmpdir.getRoot() + "/NameSuite_BindFithComp_1.v",
 """module NameSuite_Block_2(input clk, input reset,
     input  io_valid,
@@ -519,19 +519,19 @@ endmodule
     */
   @Test def testVec() {
     println("\nRunning testVec:")
-    class VecComp extends Mod {
+    class VecComp extends Module {
       val io = new Bundle {
-        val pcr_req_data = UFix(width = 64)
+        val pcr_req_data = UInt(width = 64)
 
         val r_en   = Bool(INPUT)
-        val r_addr = UFix(INPUT, log2Up(32))
-        val w_data = UFix(INPUT, 64)
+        val r_addr = UInt(INPUT, log2Up(32))
+        val w_data = UInt(INPUT, 64)
 
         val status = new Status().asOutput
       }
 
       val reg_status = Reg(new Status)
-      val rdata = UFix();
+      val rdata = UInt();
 
       val host_pcr_bits_data = Reg(io.pcr_req_data)
       when (io.r_en) {
@@ -542,15 +542,15 @@ endmodule
 
       io.status := reg_status
 
-      val elts = Vec(List[UFix](reg_status.toBits))
-      rdata := elts(UFix(0))
+      val elts = Vec(List[UInt](reg_status.toBits))
+      rdata := elts(UInt(0))
 
       reg_status := new Status().fromBits(wdata)
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new VecComp()))
+      () => Module(new VecComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_VecComp_1.v",
 """module NameSuite_VecComp_1(input clk, input reset,
     input  io_r_en,
@@ -604,7 +604,7 @@ endmodule
       val req = new FIFOIO(new BlockReq)
     }
 
-    class VecSecondComp extends Mod {
+    class VecSecondComp extends Module {
       val io = new Bundle {
         val requestor = Vec.fill(4) { new BlockIO() }.flip
         val mem = Bool(OUTPUT)
@@ -622,7 +622,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new VecSecondComp()))
+      () => Module(new VecSecondComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_VecSecondComp_1.v",
 """module NameSuite_VecSecondComp_1(input clk, input reset,
     output io_requestor_0_req_ready,
@@ -667,14 +667,14 @@ endmodule
 
 
   /** This test checks names are correctly generated in the presence
-    of multiple instantiation of the same Mod. */
+    of multiple instantiation of the same Module. */
   @Test def testVariation() {
     class BlockIO extends Bundle {
       val valid = Bool(INPUT)
       val replay = Bool(OUTPUT)
     }
 
-    class CompBlock(width: Int) extends Mod {
+    class CompBlock(width: Int) extends Module {
       val io = new BlockIO();
 
       if( width > 8) {
@@ -684,11 +684,11 @@ endmodule
       }
     }
 
-    class VariationComp extends Mod {
+    class VariationComp extends Module {
       val io = new BlockIO();
-      val block_0 = Mod(new CompBlock(8));
-      val block_1 = Mod(new CompBlock(8));
-      val block_2 = Mod(new CompBlock(16));
+      val block_0 = Module(new CompBlock(8));
+      val block_1 = Module(new CompBlock(8));
+      val block_2 = Module(new CompBlock(16));
 
       block_0.io.valid := io.valid;
       block_1.io.valid := io.valid;
@@ -698,7 +698,7 @@ endmodule
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new VariationComp()))
+      () => Module(new VariationComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_VariationComp_1.v",
 """module NameSuite_CompBlock_1_0(
     input  io_valid,
@@ -751,22 +751,22 @@ endmodule
 
     class RegfileIO extends Bundle {
       val ren    = Bool(INPUT)
-      val raddr  = UFix(INPUT, SZ_BREGLEN)
-      val rdata = UFix(OUTPUT, SZ_DATA)
+      val raddr  = UInt(INPUT, SZ_BREGLEN)
+      val rdata = UInt(OUTPUT, SZ_DATA)
     }
 
-    class MemComp extends Mod {
+    class MemComp extends Module {
       val io = new RegfileIO()
 
-      val rfile = Mem(256, UFix(width = SZ_DATA), seqRead = true)
-      val raddr = Reg(UFix())
+      val rfile = Mem(256, UInt(width = SZ_DATA), seqRead = true)
+      val raddr = Reg(UInt())
       when (io.ren) { raddr := io.raddr }
       io.rdata := rfile(raddr)
     }
 
     chiselMain(Array[String]("--v", "--noInlineMem",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new MemComp()))
+      () => Module(new MemComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_MemComp_1.v",
 """module NameSuite_MemComp_1(input clk, input reset,
     input  io_ren,
@@ -800,7 +800,7 @@ endmodule
   /* Add signals which are not registers to the toplevel C++ class declaration.
    */
   @Test def testDebug() {
-    class Block extends Mod {
+    class Block extends Module {
       val io = new Bundle {
         val ctrl_wb_wen = Bool(INPUT);
         val ctrl_out = Bool(OUTPUT);
@@ -816,20 +816,20 @@ endmodule
       debug(wb_wen)
     }
 
-    class DebugComp extends Mod {
+    class DebugComp extends Module {
       val io = new Bundle {
         val ctrl_wb_wen = Bool(INPUT);
         val ctrl_out = Bool(OUTPUT);
       }
 
-      val dpath = Mod(new Block)
+      val dpath = Module(new Block)
       dpath.io.ctrl_wb_wen := io.ctrl_wb_wen
       io.ctrl_out := dpath.io.ctrl_out
     }
 
     chiselMain(Array[String]("--backend", "c", "--vcd",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new DebugComp))
+      () => Module(new DebugComp))
     assertFile(tmpdir.getRoot() + "/NameSuite_DebugComp_1.h",
 """#ifndef __NameSuite_DebugComp_1__
 #define __NameSuite_DebugComp_1__

@@ -34,8 +34,8 @@ import Node._
 object Cat {
   private def doit[T <: Bits](mods: List[T]): T = {
     val modsList = mods.filter(_ != null)
-    val isLit = Mod.isFolding && modsList.forall(_.litOf != null)
-    val res = if (!isLit && Mod.backend.isInstanceOf[VerilogBackend]) {
+    val isLit = Module.isFolding && modsList.forall(_.litOf != null)
+    val res = if (!isLit && Module.backend.isInstanceOf[VerilogBackend]) {
       val res = new Cat();
       res.initOf("", sumWidth _, modsList)
     } else {
@@ -52,7 +52,7 @@ class Cat extends Node {
 
 object Concatenate {
   def apply (mod: Node, mods: Node*): Node =
-    if(Mod.backend.isInstanceOf[VerilogBackend]) {
+    if(Module.backend.isInstanceOf[VerilogBackend]) {
       val res = new Cat();
       res.initOf("", sumWidth _, mod :: mods.toList);
       res

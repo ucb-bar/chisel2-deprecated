@@ -33,7 +33,7 @@ import Node._
 import scala.math._
 
 object MuxLookup {
-  def apply[S <: UFix, T <: Bits] (key: S, default: T, mapping: Seq[(S, T)]): T = {
+  def apply[S <: UInt, T <: Bits] (key: S, default: T, mapping: Seq[(S, T)]): T = {
     var res = default;
     for ((k, v) <- mapping.reverse)
       res = Mux(key === k, v, res);
@@ -54,7 +54,7 @@ object MuxCase {
 
 object Multiplex{
   def apply (t: Node, c: Node, a: Node): Node = {
-    if (Mod.isFolding) {
+    if (Module.isFolding) {
       if (t.litOf != null) {
         return if (t.litOf.value == 0) a else c
       }
@@ -105,12 +105,12 @@ object isLessThan {
 object Mux {
   def apply[T <: Data](t: Bool, c: T, a: T): T = {
     val res = Multiplex(t, c.toNode, a.toNode)
-    if (c.isInstanceOf[UFix]) {
-      assert(a.isInstanceOf[UFix])
+    if (c.isInstanceOf[UInt]) {
+      assert(a.isInstanceOf[UInt])
       if (c.getClass == a.getClass) {
         c.fromNode(res)
       } else {
-        UFix(OUTPUT).fromNode(res).asInstanceOf[T]
+        UInt(OUTPUT).fromNode(res).asInstanceOf[T]
       }
     } else {
       c.fromNode(res)
@@ -119,7 +119,7 @@ object Mux {
 }
 
 class Mux extends Op {
-  Mod.muxes += this;
+  Module.muxes += this;
   stack = Thread.currentThread.getStackTrace;
   op = "Mux";
   override def toString: String =

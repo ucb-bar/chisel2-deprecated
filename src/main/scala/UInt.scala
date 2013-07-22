@@ -32,44 +32,44 @@ package Chisel
 import Node._
 import ChiselError._
 
-object UFix {
+object UInt {
   /* Implementation Note: scalac does not allow multiple overloaded
    method with default parameters so we define the following four
-   methods to create UFix from litterals (with implicit and explicit
+   methods to create UInt from litterals (with implicit and explicit
    widths) and reserve the default parameters for the "direction" method.
    */
-  def apply(x: Int): UFix = Lit(x){UFix()};
-  def apply(x: Int, width: Int): UFix = Lit(x, width){UFix()};
-  def apply(x: String): UFix = Lit(x, -1){UFix()};
-  def apply(x: String, width: Int): UFix = Lit(x, width){UFix()};
-  def apply(x: String, base: Char): UFix = Lit(x, base, -1){UFix()};
-  def apply(x: String, base: Char, width: Int): UFix = Lit(x, base, width){UFix()};
+  def apply(x: Int): UInt = Lit(x){UInt()};
+  def apply(x: Int, width: Int): UInt = Lit(x, width){UInt()};
+  def apply(x: String): UInt = Lit(x, -1){UInt()};
+  def apply(x: String, width: Int): UInt = Lit(x, width){UInt()};
+  def apply(x: String, base: Char): UInt = Lit(x, base, -1){UInt()};
+  def apply(x: String, base: Char, width: Int): UInt = Lit(x, base, width){UInt()};
 
-  def apply(dir: IODirection = null, width: Int = -1): UFix = {
-    val res = new UFix();
+  def apply(dir: IODirection = null, width: Int = -1): UInt = {
+    val res = new UInt();
     res.create(dir, width)
     res
   }
 }
 
 
-class UFix extends Bits /* with Numeric[UFix] */ {
-  type T = UFix;
+class UInt extends Bits /* with Numeric[UInt] */ {
+  type T = UInt;
 
-  /** Factory method to create and assign a *UFix* type to a Node *n*.
+  /** Factory method to create and assign a *UInt* type to a Node *n*.
     */
   override def fromNode(n: Node): this.type = {
-    UFix(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
+    UInt(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
   }
 
   override def fromInt(x: Int): this.type = {
-    UFix(x).asInstanceOf[this.type]
+    UInt(x).asInstanceOf[this.type]
   }
 
   // to support implicit convestions
-  def ===(b: UFix): Bool = LogicalOp(this, b, "===")
+  def ===(b: UInt): Bool = LogicalOp(this, b, "===")
 
-  def :=(src: UFix) {
+  def :=(src: UInt) {
     if(comp != null) {
       comp procAssign src.toNode;
     } else {
@@ -78,28 +78,28 @@ class UFix extends Bits /* with Numeric[UFix] */ {
   }
 
   // arithmetic operators
-  def zext(): Fix = Cat(UFix(0,1), this).toFix
-  def unary_-(): UFix = newUnaryOp("-");
+  def zext(): SInt = Cat(UInt(0,1), this).toSInt
+  def unary_-(): UInt = newUnaryOp("-");
   def unary_!(): Bool = Bool(OUTPUT).fromNode(UnaryOp(this, "!"));
-  def << (b: UFix): UFix = newBinaryOp(b, "<<");
-  def >> (b: UFix): UFix = newBinaryOp(b, ">>");
-  def +  (b: UFix): UFix = newBinaryOp(b, "+");
-  def *  (b: UFix): UFix = newBinaryOp(b, "*");
-  def /  (b: UFix): UFix = newBinaryOp(b, "/");
-  def %  (b: UFix): UFix = newBinaryOp(b, "%");
-  def ?  (b: UFix): UFix = newBinaryOp(b, "?");
-  def -  (b: UFix): UFix = newBinaryOp(b, "-");
+  def << (b: UInt): UInt = newBinaryOp(b, "<<");
+  def >> (b: UInt): UInt = newBinaryOp(b, ">>");
+  def +  (b: UInt): UInt = newBinaryOp(b, "+");
+  def *  (b: UInt): UInt = newBinaryOp(b, "*");
+  def /  (b: UInt): UInt = newBinaryOp(b, "/");
+  def %  (b: UInt): UInt = newBinaryOp(b, "%");
+  def ?  (b: UInt): UInt = newBinaryOp(b, "?");
+  def -  (b: UInt): UInt = newBinaryOp(b, "-");
 
   // order operators
-  def >  (b: UFix): Bool = newLogicalOp(b, ">");
-  def <  (b: UFix): Bool = newLogicalOp(b, "<");
-  def <= (b: UFix): Bool = newLogicalOp(b, "<=");
-  def >= (b: UFix): Bool = newLogicalOp(b, ">=");
+  def >  (b: UInt): Bool = newLogicalOp(b, ">");
+  def <  (b: UInt): Bool = newLogicalOp(b, "<");
+  def <= (b: UInt): Bool = newLogicalOp(b, "<=");
+  def >= (b: UInt): Bool = newLogicalOp(b, ">=");
 
-  //UFix op Fix arithmetic
-  def +   (b: Fix): Fix = Fix(OUTPUT).fromNode(BinaryOp(this.zext, b, "+"));
-  def -   (b: Fix): Fix = Fix(OUTPUT).fromNode(BinaryOp(this.zext, b, "-"));
-  def *   (b: Fix): Fix = Fix(OUTPUT).fromNode(BinaryOp(this.zext, b, "u*s"));
-  def %   (b: Fix): Fix = Fix(OUTPUT).fromNode(BinaryOp(this.zext, b, "u%s"));
-  def /   (b: Fix): Fix = Fix(OUTPUT).fromNode(BinaryOp(this.zext, b, "u/s"));
+  //UInt op SInt arithmetic
+  def +   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "+"));
+  def -   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "-"));
+  def *   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "u*s"));
+  def %   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "u%s"));
+  def /   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "u/s"));
 }

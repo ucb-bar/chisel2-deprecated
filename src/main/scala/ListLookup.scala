@@ -33,8 +33,8 @@ import Node._
 import scala.collection.mutable.ArrayBuffer
 
 object ListLookup {
-  def apply[T <: Bits](addr: UFix, default: List[T], mapping: Array[(UFix, List[T])]): List[T] = {
-    if (Mod.backend.isInstanceOf[CppBackend]) {
+  def apply[T <: Bits](addr: UInt, default: List[T], mapping: Array[(UInt, List[T])]): List[T] = {
+    if (Module.backend.isInstanceOf[CppBackend]) {
       return CListLookup(addr, default, mapping)
     }
     val defaultNode = ListNode(default)
@@ -45,8 +45,8 @@ object ListLookup {
     // TODO: GENERALIZE AND SHARE THIS
     (default zip ll.wires).map{case(x, xRef) => {
       val res = x match {
-        case fix: Fix => Fix(OUTPUT);
-        case any => UFix(OUTPUT);
+        case fix: SInt => SInt(OUTPUT);
+        case any => UInt(OUTPUT);
       }
       xRef.nameHolder = res
       res.inputs += xRef
@@ -100,7 +100,7 @@ class ListNode extends Node {
 }
 
 object MapNode {
-  def apply[T <: Bits](map: (UFix, List[T])): MapNode = {
+  def apply[T <: Bits](map: (UInt, List[T])): MapNode = {
     val res = new MapNode()
     res.initOf("", widthOf(0), List(map._1) ++ map._2)
     res

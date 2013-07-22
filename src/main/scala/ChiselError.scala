@@ -77,7 +77,7 @@ object ChiselError {
       val className = ste.getClassName()
       try {
         val cls = Class.forName(className)
-        if( cls.getSuperclass() == classOf[Mod] ) {
+        if( cls.getSuperclass() == classOf[Module] ) {
           true
         } else {
         /* XXX Do it the old way until we figure if it is safe

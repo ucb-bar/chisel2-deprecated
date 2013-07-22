@@ -34,18 +34,18 @@ import Lit._
 
 object Fill {
   def fillWidthOf(i: Int, n: Node): (Node) => (Int) = { (m: Node) => (m.inputs(i).width * n.maxNum.toInt) }
-  def apply(n: Int, mod: UFix): UFix = {
+  def apply(n: Int, mod: UInt): UInt = {
     val (bits_lit) = (mod.litOf);
     if (n == 1) {
       mod
-    } else if (Mod.isFolding && bits_lit != null) {
+    } else if (Module.isFolding && bits_lit != null) {
       var res = bits_lit.value;
       val w   = mod.getWidth();
       for (i <- 0 until n-1)
         res = (res << w)|bits_lit.value;
-      Lit(res, n * w){ UFix() };
-    } else if (Mod.backend.isInstanceOf[CppBackend] && mod.width != 1) {
-      var out: UFix = null
+      Lit(res, n * w){ UInt() };
+    } else if (Module.backend.isInstanceOf[CppBackend] && mod.width != 1) {
+      var out: UInt = null
       var i = 0
       var cur = mod
       while ((1 << i) <= n) {
@@ -58,21 +58,21 @@ object Fill {
       out
     } else {
       val fill = new Fill()
-      val fillConst = UFix(n)
+      val fillConst = UInt(n)
       fill.init("", fillWidthOf(0, fillConst), mod, fillConst)
-      UFix(OUTPUT).fromNode(fill)
+      UInt(OUTPUT).fromNode(fill)
     }
   }
-  def apply(mod: UFix, n: Int): UFix = apply(n, mod)
-  def apply(n: UFix, mod: UFix): UFix = {
-    (mod << n) - UFix(1)
+  def apply(mod: UInt, n: Int): UInt = apply(n, mod)
+  def apply(n: UInt, mod: UInt): UInt = {
+    (mod << n) - UInt(1)
   }
 }
 
 object NodeFill {
 
   def apply(n: Int, mod: Node): Node = {
-    if (Mod.isFolding && mod.litOf != null) {
+    if (Module.isFolding && mod.litOf != null) {
       var c = BigInt(0)
       val w = mod.litOf.width
       val a = mod.litOf.value
