@@ -41,7 +41,7 @@ object Bool {
   }
 }
 
-class Bool extends UFix {
+class Bool extends UInt {
 
   /** Factory method to create and assign a *Bool* type to a Node *n*.
     */

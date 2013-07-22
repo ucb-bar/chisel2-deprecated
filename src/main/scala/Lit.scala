@@ -37,7 +37,7 @@ import scala.math.min
 import Literal._
 import ChiselError._
 
-/* Factory for literal values to be used by Bits and Fix factories. */
+/* Factory for literal values to be used by Bits and SInt factories. */
 object Lit {
   def apply[T <: Bits](n: String, width: Int = -1)(gen: => T): T = {
     makeLit(Literal(n, width))(gen)
@@ -48,11 +48,11 @@ object Lit {
   }
 
   def apply[T <: Bits](n: BigInt)(gen: => T): T = {
-    makeLit(Literal(n, signed = gen.isInstanceOf[Fix]))(gen)
+    makeLit(Literal(n, signed = gen.isInstanceOf[SInt]))(gen)
   }
 
   def apply[T <: Bits](n: BigInt, width: Int)(gen: => T): T = {
-    makeLit(Literal(n, width, signed = gen.isInstanceOf[Fix]))(gen)
+    makeLit(Literal(n, width, signed = gen.isInstanceOf[SInt]))(gen)
   }
 
   def makeLit[T <: Bits](x: Literal)(gen: => T): T = {

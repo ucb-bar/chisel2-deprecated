@@ -15,3 +15,12 @@ for synthesis and place and route.
 
 Visit the [community website](http://chisel.eecs.berkeley.edu/) for more
 information.
+
+Examples commands
+=================
+
+## running unit tests with code coverage
+$ sbt scct:test
+
+## publishing jar to local system
+$ sbt publish-local

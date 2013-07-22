@@ -41,7 +41,7 @@ object Mem {
     new Mem(n, seqRead, () => gen)
   }
 
-  Mod.backend.transforms.prepend { c =>
+  Module.backend.transforms.prepend { c =>
     c.bfs { n =>
       if (n.isInstanceOf[MemAccess]) {
         n.asInstanceOf[MemAccess].referenced = true
@@ -72,14 +72,14 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
 
   inferWidth = fixWidth(data.getWidth)
 
-  private val readPortCache = HashMap[UFix, T]()
-  def doRead(addr: UFix): T = {
+  private val readPortCache = HashMap[UInt, T]()
+  def doRead(addr: UInt): T = {
     if (readPortCache.contains(addr)) {
       return readPortCache(addr)
     }
 
-    val addrIsReg = addr.isInstanceOf[UFix] && addr.inputs.length == 1 && addr.inputs(0).isInstanceOf[Reg]
-    val rd = if (seqRead && !Mod.isInlineMem && addrIsReg) {
+    val addrIsReg = addr.isInstanceOf[UInt] && addr.inputs.length == 1 && addr.inputs(0).isInstanceOf[Reg]
+    val rd = if (seqRead && !Module.isInlineMem && addrIsReg) {
       (seqreads += new MemSeqRead(this, addr.inputs(0))).last
     } else {
       (reads += new MemRead(this, addr)).last
@@ -92,12 +92,12 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
 
   /** XXX Cannot specify return type as it can either be proc or MemWrite
     depending on the execution path you believe. */
-  def doWrite(addr: UFix, condIn: Bool, wdata: Node, wmaskIn: UFix) = {
+  def doWrite(addr: UInt, condIn: Bool, wdata: Node, wmaskIn: UInt) = {
     val cond = // add bounds check if depth is not a power of 2
       if (isPow2(n)) {
         condIn
       } else {
-        condIn && addr(log2Up(n)-1,0) < UFix(n)
+        condIn && addr(log2Up(n)-1,0) < UInt(n)
       }
     val wmask = // remove constant-1 write masks
       if (!(wmaskIn == null) && wmaskIn.litOf != null && wmaskIn.litOf.value == (BigInt(1) << data.getWidth)-1) {
@@ -106,14 +106,14 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
         wmaskIn
       }
 
-    def doit(addr: UFix, cond: Bool, wdata: Node, wmask: UFix) = {
+    def doit(addr: UInt, cond: Bool, wdata: Node, wmask: UInt) = {
       val wr = new MemWrite(this, cond, addr, wdata, wmask)
       writes += wr
       inputs += wr
       wr
     }
 
-    if (seqRead && Mod.backend.isInstanceOf[CppBackend] && gen().isInstanceOf[Bits]) {
+    if (seqRead && Module.backend.isInstanceOf[CppBackend] && gen().isInstanceOf[Bits]) {
       // generate bogus data when reading & writing same address on same cycle
       val reg_data = Reg(gen())
       reg_data.comp procAssign wdata
@@ -128,13 +128,13 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
     }
   }
 
-  def read(addr: UFix): T = doRead(addr)
+  def read(addr: UInt): T = doRead(addr)
 
-  def write(addr: UFix, data: T) = doWrite(addr, conds.top, data, null.asInstanceOf[UFix])
+  def write(addr: UInt, data: T) = doWrite(addr, conds.top, data, null.asInstanceOf[UInt])
 
-  def write(addr: UFix, data: T, wmask: UFix) = doWrite(addr, conds.top, data, wmask)
+  def write(addr: UInt, data: T, wmask: UInt) = doWrite(addr, conds.top, data, wmask)
 
-  def apply(addr: UFix) = {
+  def apply(addr: UInt) = {
     val rdata = doRead(addr)
     rdata.comp = new PutativeMemWrite(this, addr)
     rdata
@@ -160,7 +160,7 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
     seqreads --= readwrites.map(_.read)
   }
 
-  def isInline = Mod.isInlineMem || !reads.isEmpty
+  def isInline = Module.isInlineMem || !reads.isEmpty
 }
 
 abstract class MemAccess(val mem: Mem[_], addri: Node) extends Node {
@@ -206,9 +206,9 @@ class MemSeqRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
   override def isRamWriteInput(n: Node) = addrReg.isEnable && addrReg.enableSignal == n || addr == n
 }
 
-class PutativeMemWrite(mem: Mem[_], addri: UFix) extends Node with proc {
+class PutativeMemWrite(mem: Mem[_], addri: UInt) extends Node with proc {
   override def procAssign(src: Node) =
-    mem.doWrite(addri, conds.top, src, null.asInstanceOf[UFix])
+    mem.doWrite(addri, conds.top, src, null.asInstanceOf[UInt])
 }
 
 class MemReadWrite(val read: MemSeqRead, val write: MemWrite) extends MemAccess(read.mem, null)
@@ -223,7 +223,7 @@ class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) 
 
   if (datai != null) {
     def wrap(x: Node) = { // prevent Verilog syntax errors when indexing constants
-      val b = UFix()
+      val b = UInt()
       b.inputs += x
       b
     }

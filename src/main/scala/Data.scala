@@ -35,7 +35,7 @@ import ChiselError._
 
 /** *Data* is part of the *Node* Composite Pattern class hierarchy.
   It is the root of the type system which includes composites (Bundle, Vec)
-  and atomic types (UFix, Fix, etc.).
+  and atomic types (UInt, SInt, etc.).
 
   Instances of Data are meant to help with construction and correctness
   of a logic graph. They will trimmed out of the graph before a *Backend*
@@ -50,7 +50,7 @@ abstract class Data extends Node {
       + " and " + right.getClass)
   }
 
-  def toBits(): UFix = chiselCast(this){UFix()};
+  def toBits(): UInt = chiselCast(this){UInt()};
 
   // Interface required by Cat:
   def ##[T <: Data](right: T): this.type = {

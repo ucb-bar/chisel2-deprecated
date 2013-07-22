@@ -35,7 +35,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 
 class ROM[T <: Data](val lits: Seq[Literal], gen: (Int) => T) extends Vec[T](gen) {
-  override def read(addr: UFix): T = {
+  override def read(addr: UInt): T = {
     val cln = gen(0)
     val data = cln.asOutput
     var port = new ROMRead().init("", fixWidth(lits.head.getWidth), addr, this)
@@ -44,7 +44,7 @@ class ROM[T <: Data](val lits: Seq[Literal], gen: (Int) => T) extends Vec[T](gen
     data
   }
 
-  override def write(addr: UFix, data: T) {
+  override def write(addr: UInt, data: T) {
     ChiselError.error("Can't write to ROM")
   }
 

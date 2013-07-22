@@ -96,8 +96,8 @@ object BinaryOp {
 
 object LogicalOp {
   def apply[T <: Bits](x: T, y: T, op: String): Bool = {
-    if(Mod.searchAndMap && op == "&&" && Mod.chiselAndMap.contains((x, y))) {
-      Mod.chiselAndMap((x, y))
+    if(Module.searchAndMap && op == "&&" && Module.chiselAndMap.contains((x, y))) {
+      Module.chiselAndMap((x, y))
     } else {
       val node = op match {
         case "===" => Op("==", 2, fixWidth(1), x, y );
@@ -113,8 +113,8 @@ object LogicalOp {
 
       // make output
       val output = Bool(OUTPUT).fromNode(node)
-      if(Mod.searchAndMap && op == "&&" && !Mod.chiselAndMap.contains((x, y))) {
-        Mod.chiselAndMap += ((x, y) -> output)
+      if(Module.searchAndMap && op == "&&" && !Module.chiselAndMap.contains((x, y))) {
+        Module.chiselAndMap += ((x, y) -> output)
       }
       output
     }
@@ -134,8 +134,8 @@ object ReductionOp {
 
 object BinaryBoolOp {
   def apply(x: Bool, y: Bool, op: String): Bool = {
-    if(Mod.searchAndMap && op == "&&" && Mod.chiselAndMap.contains((x, y))) {
-      Mod.chiselAndMap((x, y))
+    if(Module.searchAndMap && op == "&&" && Module.chiselAndMap.contains((x, y))) {
+      Module.chiselAndMap((x, y))
     } else {
       val node = op match {
         case "&&"  => Op("&&", 2, fixWidth(1), x, y );
@@ -143,8 +143,8 @@ object BinaryBoolOp {
         case any   => throw new Exception("Unrecognized operator " + op);
       }
       val output = Bool(OUTPUT).fromNode(node)
-      if(Mod.searchAndMap && op == "&&" && !Mod.chiselAndMap.contains((x, y))) {
-        Mod.chiselAndMap += ((x, y) -> output)
+      if(Module.searchAndMap && op == "&&" && !Module.chiselAndMap.contains((x, y))) {
+        Module.chiselAndMap += ((x, y) -> output)
       }
       output
     }
@@ -156,7 +156,7 @@ object Op {
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
     val (a_lit, b_lit) = (a.litOf, b.litOf);
     val isSigned = a.isSigned && b.isSigned
-    if (Mod.isFolding && !isSigned) {
+    if (Module.isFolding && !isSigned) {
     if (a_lit != null && b_lit == null) {
       name match {
         case "&&" => return if (a_lit.value == 0) Literal(0) else b;
@@ -193,22 +193,22 @@ object Op {
       }
     }
     }
-    if (Mod.backend.isInstanceOf[CppBackend]) {
-      def signAbs(x: Node): (Bool, UFix) = {
-        val f = x.asInstanceOf[Fix]
-        val s = f < Fix(0)
-        (s, Mux(s, -f, f).toUFix)
+    if (Module.backend.isInstanceOf[CppBackend]) {
+      def signAbs(x: Node): (Bool, UInt) = {
+        val f = x.asInstanceOf[SInt]
+        val s = f < SInt(0)
+        (s, Mux(s, -f, f).toUInt)
       }
       name match {
         case ">" | "<" | ">=" | "<=" =>
-          if (a.isInstanceOf[Fix] && b.isInstanceOf[Fix]) {
+          if (a.isInstanceOf[SInt] && b.isInstanceOf[SInt]) {
             if (name != "<" || b.litOf == null || b.litOf.value != 0) {
-              val fixA = a.asInstanceOf[Fix]
-              val fixB = b.asInstanceOf[Fix]
-              val msbA = fixA < Fix(0)
-              val msbB = fixB < Fix(0)
+              val fixA = a.asInstanceOf[SInt]
+              val fixB = b.asInstanceOf[SInt]
+              val msbA = fixA < SInt(0)
+              val msbB = fixB < SInt(0)
               val ucond = Bool(OUTPUT).fromNode(
-                LogicalOp(fixA.toUFix, fixB, name))
+                LogicalOp(fixA.toUInt, fixB, name))
               return Mux(msbA === msbB, ucond, (if (name(0) == '>') msbB else msbA))
             }
           }
@@ -236,7 +236,7 @@ object Op {
           val rem = absA % absB
           return Mux(signA, -rem, rem)
         case "%" =>
-          val (au, bu) = (a.asInstanceOf[UFix], b.asInstanceOf[UFix])
+          val (au, bu) = (a.asInstanceOf[UInt], b.asInstanceOf[UInt])
           return Op("-", nGrow, widthInfer, au, au/bu*bu)
         case _ =>
       }
@@ -249,7 +249,7 @@ object Op {
     res
   }
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node): Node = {
-    if (Mod.isFolding && a.litOf != null) {
+    if (Module.isFolding && a.litOf != null) {
       name match {
         case "!" => return if (a.litOf.value == 0) Literal(1) else Literal(0);
         case "-" => return Literal(-a.litOf.value, a.litOf.width);

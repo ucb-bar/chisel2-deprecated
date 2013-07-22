@@ -33,21 +33,21 @@ import Node._
 import ChiselError._
 
 /* backward compatibility */
-@deprecated("Use UFix instead of Bits.", "2.0")
+@deprecated("Use UInt instead of Bits.", "2.0")
 object Bits {
-  def apply(x: Int): UFix = UFix(x);
-  def apply(x: Int, width: Int): UFix = UFix(x, width);
-  def apply(x: String): UFix = UFix(x);
-  def apply(x: String, width: Int): UFix = UFix(x, width);
+  def apply(x: Int): UInt = UInt(x);
+  def apply(x: Int, width: Int): UInt = UInt(x, width);
+  def apply(x: String): UInt = UInt(x);
+  def apply(x: String, width: Int): UInt = UInt(x, width);
 
-  def apply(dir: IODirection = null, width: Int = -1): UFix = UFix(dir, width);
+  def apply(dir: IODirection = null, width: Int = -1): UInt = UInt(dir, width);
 }
 
 
-/** Base class for built-in Chisel types Bits and Fix. */
+/** Base class for built-in Chisel types Bits and SInt. */
 abstract class Bits extends Data with proc {
-  Mod.ioMap += ((this, Mod.ioCount));
-  Mod.ioCount += 1;
+  Module.ioMap += ((this, Module.ioCount));
+  Module.ioCount += 1;
 
   var canBeUsedAsDefault = false
   var dir: IODirection = null;
@@ -82,9 +82,9 @@ abstract class Bits extends Data with proc {
     chiselCast(this){Bool()};
   }
 
-  def toFix(): Fix = chiselCast(this){Fix()};
+  def toSInt(): SInt = chiselCast(this){SInt()};
 
-  def toUFix(): UFix = chiselCast(this){UFix()};
+  def toUInt(): UInt = chiselCast(this){UInt()};
 
   override def isIo: Boolean = dir != null;
 
@@ -356,12 +356,12 @@ abstract class Bits extends Data with proc {
   /** Extract a single Bool at index *bit*.
     */
   final def apply(bit: Int): Bool = { Extract(this, bit){Bool()}};
-  final def apply(bit: UFix): Bool = {Extract(this, bit){Bool()}};
+  final def apply(bit: UInt): Bool = {Extract(this, bit){Bool()}};
 
   /** Extract a range of bits */
-  final def apply(hi: Int, lo: Int): UFix = {Extract(this, hi, lo){UFix()}};
-  final def apply(hi: UFix, lo: UFix): UFix = {Extract(this, hi, lo, -1){UFix()}};
-  final def apply(range: (Int, Int)): UFix = this(range._1, range._2);
+  final def apply(hi: Int, lo: Int): UInt = {Extract(this, hi, lo){UInt()}};
+  final def apply(hi: UInt, lo: UInt): UInt = {Extract(this, hi, lo, -1){UInt()}};
+  final def apply(range: (Int, Int)): UInt = this(range._1, range._2);
 
   def unary_~(): this.type   = newUnaryOp("~");
   def andR(): Bool           = newReductionOp("&");
@@ -379,17 +379,17 @@ abstract class Bits extends Data with proc {
 
   def + (b: Bits): Bits = {
     this match {
-      case u0: UFix => {
+      case u0: UInt => {
         b match {
-          case u1: UFix => u0 + u1
-          case f1: Fix => u0 + f1
+          case u1: UInt => u0 + u1
+          case f1: SInt => u0 + f1
           case _ => error(b)
         }
       }
-      case f0: Fix => {
+      case f0: SInt => {
         b match {
-          case u1: UFix => f0 + u1
-          case f1: Fix => f0 + f1
+          case u1: UInt => f0 + u1
+          case f1: SInt => f0 + f1
           case _ => error(b)
         }
       }
@@ -398,17 +398,17 @@ abstract class Bits extends Data with proc {
   }
   def - (b: Bits): Bits = {
     this match {
-      case u0: UFix => {
+      case u0: UInt => {
         b match {
-          case u1: UFix => u0 - u1
-          case f1: Fix => u0 - f1
+          case u1: UInt => u0 - u1
+          case f1: SInt => u0 - f1
           case _ => error(b)
         }
       }
-      case f0: Fix => {
+      case f0: SInt => {
         b match {
-          case u1: UFix => f0 - u1
-          case f1: Fix => f0 - f1
+          case u1: UInt => f0 - u1
+          case f1: SInt => f0 - f1
           case _ => error(b)
         }
       }
@@ -417,17 +417,17 @@ abstract class Bits extends Data with proc {
   }
   def * (b: Bits): Bits = {
     this match {
-      case u0: UFix => {
+      case u0: UInt => {
         b match {
-          case u1: UFix => u0 * u1
-          case f1: Fix => u0 * f1
+          case u1: UInt => u0 * u1
+          case f1: SInt => u0 * f1
           case _ => error(b)
         }
       }
-      case f0: Fix => {
+      case f0: SInt => {
         b match {
-          case u1: UFix => f0 * u1
-          case f1: Fix => f0 * f1
+          case u1: UInt => f0 * u1
+          case f1: SInt => f0 * f1
           case _ => error(b)
         }
       }
@@ -436,17 +436,17 @@ abstract class Bits extends Data with proc {
   }
   def % (b: Bits): Bits = {
     this match {
-      case u0: UFix => {
+      case u0: UInt => {
         b match {
-          case u1: UFix => u0 % u1
-          case f1: Fix => u0 % f1
+          case u1: UInt => u0 % u1
+          case f1: SInt => u0 % f1
           case _ => error(b)
         }
       }
-      case f0: Fix => {
+      case f0: SInt => {
         b match {
-          case u1: UFix => f0 % u1
-          case f1: Fix => f0 % f1
+          case u1: UInt => f0 % u1
+          case f1: SInt => f0 % f1
           case _ => error(b)
         }
       }
@@ -455,17 +455,17 @@ abstract class Bits extends Data with proc {
   }
   def / (b: Bits): Bits = {
     this match {
-      case u0: UFix => {
+      case u0: UInt => {
         b match {
-          case u1: UFix => u0 / u1
-          case f1: Fix => u0 / f1
+          case u1: UInt => u0 / u1
+          case f1: SInt => u0 / f1
           case _ => error(b)
         }
       }
-      case f0: Fix => {
+      case f0: SInt => {
         b match {
-          case u1: UFix => f0 / u1
-          case f1: Fix => f0 / f1
+          case u1: UInt => f0 / u1
+          case f1: SInt => f0 / f1
           case _ => error(b)
         }
       }

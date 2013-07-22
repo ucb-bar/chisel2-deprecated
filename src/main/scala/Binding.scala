@@ -34,8 +34,8 @@ import Node._
 // used for component to component connections
 object Binding {
 
-  def apply(m: Node, c: Mod, ioComp: Mod): Node = {
-    if (Mod.isEmittingComponents) {
+  def apply(m: Node, c: Module, ioComp: Module): Node = {
+    if (Module.isEmittingComponents) {
       val res = c.findBinding(m);
       if (res == null) {
         val res = new Binding(m, ioComp);
@@ -53,10 +53,10 @@ object Binding {
   }
 }
 
-class Binding(tn: Node, tc: Mod) extends Node {
+class Binding(tn: Node, tc: Module) extends Node {
 
   val targetNode: Node = tn;
-  val targetComponent: Mod = tc;
+  val targetComponent: Module = tc;
 
   override def toString: String = "BINDING(" + inputs(0) + ")";
 }

@@ -61,11 +61,11 @@ class VerifSuite extends AssertionsForJUnit {
 
   @Test def testAssertCpp() {
 
-    class CppAssertComp extends Mod {
+    class CppAssertComp extends Module {
       val io = new Bundle {
-        val x = UFix(INPUT, 8)
-        val y = UFix(INPUT, 8)
-        val z = UFix(OUTPUT)
+        val x = UInt(INPUT, 8)
+        val y = UInt(INPUT, 8)
+        val z = UInt(OUTPUT)
       }
       assert(Bool(io.x == io.y), "failure")
       io.z := Cat(io.x, io.y)
@@ -73,7 +73,7 @@ class VerifSuite extends AssertionsForJUnit {
 
     chiselMain(Array[String]("--backend", "c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new CppAssertComp()))
+      () => Module(new CppAssertComp()))
     assertFile(tmpdir.getRoot() + "/VerifSuite_CppAssertComp_1.cpp",
 """#include "VerifSuite_CppAssertComp_1.h"
 
@@ -99,11 +99,11 @@ void VerifSuite_CppAssertComp_1_t::dump(FILE *f, int t) {
 
   @Test def testAssertVerilog() {
 
-    class VerilogAssertComp extends Mod {
+    class VerilogAssertComp extends Module {
       val io = new Bundle {
-        val x = UFix(INPUT, 8)
-        val y = UFix(INPUT, 8)
-        val z = UFix(OUTPUT)
+        val x = UInt(INPUT, 8)
+        val y = UInt(INPUT, 8)
+        val z = UInt(OUTPUT)
       }
       assert(Bool(io.x == io.y), "failure")
       io.z := Cat(io.x, io.y)
@@ -111,16 +111,16 @@ void VerifSuite_CppAssertComp_1_t::dump(FILE *f, int t) {
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new VerilogAssertComp()))
+      () => Module(new VerilogAssertComp()))
   }
 
   @Test def testPrintfCpp() {
 
-    class CppPrintfComp extends Mod {
+    class CppPrintfComp extends Module {
       val io = new Bundle {
-        val x = UFix(INPUT, 8)
-        val y = UFix(INPUT, 8)
-        val z = UFix(OUTPUT)
+        val x = UInt(INPUT, 8)
+        val y = UInt(INPUT, 8)
+        val z = UInt(OUTPUT)
       }
       printf("display %x %x", io.x, io.y)
       io.z := Cat(io.x, io.y)
@@ -129,7 +129,7 @@ void VerifSuite_CppAssertComp_1_t::dump(FILE *f, int t) {
       because the emulator resource is closed. 
     chiselMain(Array[String]("--backend", "c",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new CppPrintfComp()))
+      () => Module(new CppPrintfComp()))
     assertFile(tmpdir.getRoot() + "/VerifSuite_CppPrintfComp_1.cpp",
 """#include "VerifSuite_CppPrintfComp_1.h"
 
@@ -157,15 +157,15 @@ void VerifSuite_CppPrintfComp_1_t::dump(FILE *f, int t) {
 
   @Test def testPrintfVerilog() {
 
-    class VerilogPrintfComp extends Mod {
+    class VerilogPrintfComp extends Module {
       val io = new Bundle {
-        val x = UFix(INPUT, 8)
-        val y = UFix(INPUT, 8)
-        val z = UFix(OUTPUT)
+        val x = UInt(INPUT, 8)
+        val y = UInt(INPUT, 8)
+        val z = UInt(OUTPUT)
       }
 
-      val tsc_reg = RegReset(UFix(0, width=32))
-      tsc_reg := tsc_reg + UFix(1/*, width=32*/)
+      val tsc_reg = RegReset(UInt(0, width=32))
+      tsc_reg := tsc_reg + UInt(1/*, width=32*/)
 
       printf("Cyc= %d io: %x %x", tsc_reg(31,0), io.x, io.y)
       io.z := Cat(io.x, io.y)
@@ -173,6 +173,6 @@ void VerifSuite_CppPrintfComp_1_t::dump(FILE *f, int t) {
 
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
-      () => Mod(new VerilogPrintfComp()))
+      () => Module(new VerilogPrintfComp()))
   }
 }
