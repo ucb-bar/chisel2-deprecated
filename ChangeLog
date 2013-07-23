@@ -9,6 +9,7 @@
         as a first step. Other changes will generate a compilation error.
         * Replace Reg(resetVal=x) by RegReset(x)
         * Replace Reg(){x} by Reg(x)
+        * Replace Mem(n){x} by Mem(n, x)
         * Replace Vec(n){x} by Vec.fill(n){x}
           to follow Scala standard libraryconventions
         * Replace new FIFOIO {x} by  new FIFOIO(x)
