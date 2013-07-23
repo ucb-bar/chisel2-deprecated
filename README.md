@@ -16,11 +16,70 @@ for synthesis and place and route.
 Visit the [community website](http://chisel.eecs.berkeley.edu/) for more
 information.
 
-Examples commands
-=================
+Getting started
+===============
 
-## running unit tests with code coverage
-$ sbt scct:test
+Chisel Users
+------------
 
-## publishing jar to local system
-$ sbt publish-local
+To start working on a circuit with Chisel, first create a project
+directory with a standard Scala/SBT layout.
+
+    $ mkdir -p chisel-hello/src/main/scala
+    $ cd chisel-hello
+
+Insure that your build.sbt contains a reference to Scala version greater
+or equal to 2.10 and add a dependency on the Chisel library.
+
+    $ diff -u prev build.sbt
+    +scalaVersion := "2.10.2"
+    +libraryDependencies += "edu.berkeley.cs" %% "chisel" % "2.0-SNAPSHOT"
+
+Edit the source files for your circuit
+
+    $ cat src/main/scala/Hello.scala
+    import Chisel._
+
+    class HelloModule extends Module {
+
+        val io = new Bundle {}
+
+        printf("Hello World!")
+    }
+
+
+    object hello {
+        def main(args: Array[String]): Unit = {
+            chiselMain(Array[String]("--backend", "c"),
+            () => Module(new HelloModule()))
+        }
+    }
+
+Execute sbt run to generate the C++ simulation source for your circuit
+
+    $ sbt run
+
+Compile the resulting C++ output to generate a simulation executable
+
+    $ g++ -std=c++11 -o HelloModule HelloModule.cpp emulator.o
+
+Execute the simulation executable to generate a simulation trace
+
+    $ ./HelloModule
+    Hello World!
+
+
+Chisel developpers
+------------------
+
+Checking coding style compliance
+
+    $ sbt scalastyle
+
+Running unit tests with code coverage
+
+    $ sbt scct:test
+
+Publishing jar to local system
+
+    $ sbt publish-local
