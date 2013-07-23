@@ -339,7 +339,8 @@ abstract class Backend {
                                " has consumers"})
           Module.randInitIOs += i
         } else {
-          m.io.asInstanceOf[Bundle] -= i
+          Mod.randInitIOs += i
+          i.prune = true
         }
     }
 
@@ -350,9 +351,8 @@ abstract class Backend {
                              " has consumers on line " + o.consumers(0).line})
           Module.randInitIOs += o
         } else {
-          m.io.asInstanceOf[Bundle] -= o
-          m.nodes -= o
-          m.mods -= o
+          Mod.randInitIOs += o
+          o.prune = true
         }
       }
     }
@@ -368,8 +368,9 @@ abstract class Backend {
     while(!bfsQueue.isEmpty){
       val top = bfsQueue.dequeue
       walked += top
-      pruneCount+=1
-      top.prune = true
+      val prune = top.inputs.map(_.prune).foldLeft(true)(_ && _)
+      pruneCount+= (if (prune) 1 else 0)
+      top.prune = prune
       for(i <- top.consumers) {
         if(!(i == null)) {
           if(!walked.contains(i)) {
@@ -399,6 +400,24 @@ abstract class Backend {
     for (child <- root.children)
       result = result ++ gatherChildren(child);
     result ++ ArrayBuffer[Module](root);
+  }
+
+  def assignClkDomain(root: Node) = {
+    val walked = new ArrayBuffer[Node]
+    val dfsStack = new Stack[Node]
+    walked += root; dfsStack.push(root)
+    val clock = root.clock
+    while(!dfsStack.isEmpty) {
+      val node = dfsStack.pop
+      for (consumer <- node.consumers) {
+        if (!consumer.isInstanceOf[Delay] && !walked.contains(consumer)) {
+          assert(consumer.clock == null || consumer.clock == clock)
+          consumer.clock = clock
+          walked += consumer
+          dfsStack.push(consumer)
+        }
+      }
+    }
   }
 
 
@@ -458,6 +477,19 @@ abstract class Backend {
     /* We execute nameAll after traceNodes because bindings would not have been
        created yet otherwise. */
     nameAll(c)
+
+    for (comp <- Module.sortedComps) {
+      for (node <- comp.nodes) {
+        if (node.isInstanceOf[Reg]) {
+          if (node.clock == null && comp.clock != null) {
+            node.clock = comp.clock
+            assignClkDomain(node)
+          } else if (node.clock != null) {
+            assignClkDomain(node)
+          }
+        }
+      }
+    }
 
     for (comp <- Module.sortedComps ) {
       // remove unconnected outputs

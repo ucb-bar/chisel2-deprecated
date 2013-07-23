@@ -41,6 +41,7 @@ import Reg._
 import ChiselError._
 import Literal._
 import scala.collection.mutable.HashSet
+import scala.collection.mutable.HashMap
 
 object CString {
   def apply(s: String): String = {
@@ -107,6 +108,8 @@ class CppBackend extends Backend {
     node match {
       case x: Binding =>
         emitWordRef(x.inputs(0), w)
+      case c: Clock =>
+        emitRef(c) + "_cnt == 0"
       case x: Bits =>
         if (!node.isInObject && node.inputs.length == 1) emitWordRef(node.inputs(0), w) else wordMangle(node, w)
       case _ =>
@@ -133,6 +136,11 @@ class CppBackend extends Backend {
         "  mem_t<" + m.width + "," + m.n + "> " + emitRef(m) + ";\n"
       case r: ROM[_] =>
         "  mem_t<" + r.width + "," + r.lits.length + "> " + emitRef(r) + ";\n"
+      case c: Clock =>
+        "  int " + emitRef(node) + ";\n" +
+        "  int " + emitRef(node) + "_cnt;\n";
+      // case f: AsyncFIFO =>
+      //   "  async_fifo_t<" + f.width + ",32> " + emitRef(f) + ";\n"
       case _ =>
         "  dat_t<" + node.width + "> " + emitRef(node) + ";\n"
     }
@@ -357,6 +365,9 @@ class CppBackend extends Backend {
               "-" + emitLoWordRef(node.inputs(0))
             }))) + trunc(node)
 
+      case x: Clock =>
+        ""
+
       case x: Bits =>
         if (x.isInObject && x.inputs.length == 1) {
           emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
@@ -410,8 +421,7 @@ class CppBackend extends Backend {
     node match {
       case reg: Reg =>
         "  " + emitRef(reg) + " = " + emitRef(reg) + "_shadow;\n"
-      case _ =>
-        ""
+      case _ => ""
     }
   }
 
@@ -582,6 +592,17 @@ class CppBackend extends Backend {
       ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
 
+    val nullClk = new Clock
+    val clkDomains = new HashMap[Clock, (StringBuilder, StringBuilder)]
+    for (clock <- Module.clocks) {
+      val clkName = if (clock == nullClk) "" else "_" + emitRef(clock)
+      val clock_lo = new StringBuilder
+      val clock_hi = new StringBuilder
+      clkDomains += (clock -> ((clock_lo, clock_hi)))
+      clock_lo.append("void " + c.name + "_t::clock_lo" + clkName + " ( dat_t<1> reset ) {\n")
+      clock_hi.append("void " + c.name + "_t::clock_hi" + clkName + " ( dat_t<1> reset ) {\n")
+    }
+
     if (Module.isGenHarness) {
       genHarness(c, c.name);
     }
@@ -610,10 +631,14 @@ class CppBackend extends Backend {
         }
       }
     }
+
     out_h.write("\n");
     out_h.write("  void init ( bool rand_init = false );\n");
-    out_h.write("  void clock_lo ( dat_t<1> reset );\n");
-    out_h.write("  void clock_hi ( dat_t<1> reset );\n");
+    for ( clock <- Module.clocks) {
+      val clkName = if (clock == nullClk) "" else "_" + emitRef(clock)
+      out_h.write("  void clock_lo" + clkName + " ( dat_t<1> reset);\n")
+      out_h.write("  void clock_hi" + clkName + " ( dat_t<1> reset);\n")
+    }
     out_h.write("  void print ( FILE* f );\n");
     out_h.write("  bool scan ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
@@ -628,19 +653,45 @@ class CppBackend extends Backend {
     for (m <- c.omods) {
       out_c.write(emitInit(m));
     }
+    // for ( clock <- Mod.clocks) {
+    //   out_c.write("  " + emitRef(clock) + "_cnt = " + emitRef(clock) + " - 1;\n")
+    // }
     out_c.write("}\n");
 
-    out_c.write("void " + c.name + "_t::clock_lo ( dat_t<1> reset ) {\n");
     for (m <- c.omods) {
-      out_c.write(emitDefLo(m));
+      val clock = if (m.clock == null) nullClk else m.clock
+      clkDomains(clock)._1.append(emitDefLo(m))
     }
-    out_c.write("}\n");
-    out_c.write("void " + c.name + "_t::clock_hi ( dat_t<1> reset ) {\n");
-    for (r <- c.omods)
-      out_c.write(emitInitHi(r));
-    for (m <- c.omods)
-      out_c.write(emitDefHi(m));
-    out_c.write("}\n");
+
+    for (m <- c.omods) {
+      val clock = if (m.clock == null) nullClk else m.clock
+      clkDomains(clock)._2.append(emitInitHi(m))
+    }
+
+    for (m <- c.omods) {
+      val clock = if (m.clock == null) nullClk else m.clock
+      clkDomains(clock)._2.append(emitDefHi(m))
+    }
+
+    for (clk <- clkDomains.keys) {
+      clkDomains(clk)._1.append("}\n")
+      clkDomains(clk)._2.append("}\n")
+      out_c.write(clkDomains(clk)._1.result)
+      out_c.write(clkDomains(clk)._2.result)
+    }
+
+    // for (clock <- Mod.clocks) {
+    //   out_c.write("  if ( " + emitRef(clock) + "_cnt == 0 ) {\n")
+    //   for (m <- clock.stateElms) {
+    //     if (m.isInstanceOf[Reg])
+    //       out_c.write("  " + emitDefHi(m))
+    //   }
+    //   out_c.write("    " + emitRef(clock) + "_cnt = " + emitRef(clock) + " - 1;\n")
+    //   out_c.write("  } else {\n")
+    //   out_c.write("    " + emitRef(clock) + "_cnt--;\n")
+    //   out_c.write("  }\n")
+    // }
+
     def splitFormat(s: String): Seq[String] = {
       var off = 0;
       var res: List[String] = Nil;

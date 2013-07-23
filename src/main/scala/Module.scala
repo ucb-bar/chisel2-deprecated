@@ -94,6 +94,7 @@ object Module {
   var printStackStruct = ArrayBuffer[(Int, Module)]();
   val printfs = ArrayBuffer[Printf]()
   val randInitIOs = new ArrayBuffer[Node]()
+  val clocks = new ArrayBuffer[Clock]()
 
   /* Any call to a *Module* constructor without a proper wrapping
    into a Module.apply() call will be detected when trigger is false. */
@@ -249,9 +250,15 @@ abstract class Module(resetSignal: Bool = null) {
   var defaultWidth = 32;
   var pathParent: Module = null;
   var verilog_parameters = "";
+  var clock: Clock = null
 
   components += this;
   push(this);
+
+  def withClock (clk: Clock): this.type = {
+    clock = clk
+    return this
+  }
 
   override def toString = this.getClass.toString
 

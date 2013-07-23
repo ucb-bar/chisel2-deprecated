@@ -621,11 +621,13 @@ class VerilogBackend extends Backend {
       if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
       w match {
         case io: Bits => {
+          val prune = if (io.prune && c != Mod.topComponent) "//" else ""
           if (io.dir == INPUT) {
-            res.append(nl + "    input " + emitSigned(io) + emitWidth(io) + " " + emitRef(io));
+            res.append(nl + "    " + prune + "input " + 
+                       emitSigned(io) + emitWidth(io) + " " + emitRef(io));
           } else if(io.dir == OUTPUT) {
-            res.append(nl + "    " + (if(io.prune && c != Mod.topComponent) "//" else "") + 
-                       "output" + emitSigned(io) + emitWidth(io) + " " + emitRef(io));
+            res.append(nl + "    " + prune + "output" + 
+                       emitSigned(io) + emitWidth(io) + " " + emitRef(io));
           }
         }
       };
