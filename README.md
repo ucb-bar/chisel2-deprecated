@@ -44,14 +44,19 @@ Edit the source files for your circuit
 
         val io = new Bundle {}
 
-        printf("Hello World!")
+        printf("Hello World!\n")
     }
 
+    class HelloModuleTests(c: HelloModule) extends Tester(c, Array(c.io)) {
+        defTests {
+            true
+        }
+    }
 
     object hello {
         def main(args: Array[String]): Unit = {
-            chiselMain(Array[String]("--backend", "c"),
-            () => Module(new HelloModule()))
+            chiselMainTest(Array[String]("--backend", "c", "--genHarness"),
+                () => Module(new HelloModule())){c => new HelloModuleTests(c)}
         }
     }
 
@@ -61,11 +66,11 @@ Execute sbt run to generate the C++ simulation source for your circuit
 
 Compile the resulting C++ output to generate a simulation executable
 
-    $ g++ -std=c++11 -o HelloModule HelloModule.cpp emulator.o
+    $ g++ -std=c++11 -o HelloModule HelloModule.cpp HelloModule-emulator.cpp
 
-Execute the simulation executable to generate a simulation trace
+Run the simulation executable for one clock cycle to generate a simulation trace
 
-    $ ./HelloModule
+    $ ./HelloModule 1
     Hello World!
 
 
