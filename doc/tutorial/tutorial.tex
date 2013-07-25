@@ -207,7 +207,7 @@ representations for values allow clearer specifications and help the
 tools generate more optimal circuits.  In Chisel, a raw collection of
 bits is represented by the \code{Bits} type.  Signed and unsigned integers
 are considered subsets of fixed-point numbers and are represented by
-types \code{Fix} and \code{UFix} respectively. Signed fixed-point
+types \code{SInt} and \code{UInt} respectively. Signed fixed-point
 numbers, including integers, are represented using two's-complement
 format.  Boolean values are represented as type \code{Bool}.  Note
 that these types are distinct from Scala's builtin types such as
@@ -219,14 +219,14 @@ values.  Bundles and Vecs will be covered later.
 Constant or literal values are expressed using Scala integers or
 strings passed to constructors for the types:
 \begin{scala}
-Bits(1)       // decimal 1-bit lit from Scala Int.
-Bits("ha")    // hexadecimal 4-bit lit from string.
-Bits("o12")   // octal 4-bit lit from string.
-Bits("b1010") // binary 4-bit lit from string.
+UInt(1)       // decimal 1-bit lit from Scala Int.
+UInt("ha")    // hexadecimal 4-bit lit from string.
+UInt("o12")   // octal 4-bit lit from string.
+UInt("b1010") // binary 4-bit lit from string.
 
-Fix(5)     // signed decimal 4-bit lit from Scala Int.
-Fix(-8)    // negative decimal 4-bit lit from Scala Int.
-UFix(5)    // unsigned decimal 3-bit lit from Scala Int.
+SInt(5)    // signed decimal 4-bit lit from Scala Int.
+SInt(-8)   // negative decimal 4-bit lit from Scala Int.
+UInt(5)    // unsigned decimal 3-bit lit from Scala Int.
 
 Bool(true) // Bool lits from Scala lits.
 Bool(false)
@@ -235,7 +235,7 @@ Bool(false)
 Underscores can be used as separators in long string literals to aid
 readability, but are ignored when creating the value, e.g.:
 \begin{scala}
-Bits("h_dead_beef")   // 32-bit lit of type Bits
+UInt("h_dead_beef")   // 32-bit lit of type UInt
 \end{scala}
 
 By default, the Chisel compiler will size each constant to the minimum
@@ -243,18 +243,18 @@ number of bits required to hold the constant, including a sign bit for
 signed types.  Bit widths can also be specified explicitly on
 literals, as shown below:
 \begin{scala}
-Bits("ha", 8)     // hexadecimal 8-bit lit of type Bits
-Bits("o12", 6)    // octal 6-bit lit of type Bits
-Bits("b1010", 12) // binary 12-bit lit of type Bits
+UInt("ha", 8)     // hexadecimal 8-bit lit of type UInt
+UInt("o12", 6)    // octal 6-bit lit of type UInt
+UInt("b1010", 12) // binary 12-bit lit of type UInt
 
-Fix(5, 7)  // signed decimal 7-bit lit of type Fix
-UFix(5, 8) // unsigned decimal 8-bit lit of type UFix
+SInt(5, 7) // signed decimal 7-bit lit of type SInt
+UInt(5, 8) // unsigned decimal 8-bit lit of type UInt
 \end{scala}
 
 \noindent
-For literals of type \code{Bits} and \code{UFix}, the value is
+For literals of type \code{UInt}, the value is
 zero-extended to the desired bit width.  For literals of type
-\code{Fix}, the value is sign-extended to fill the desired bit width.
+\code{SInt}, the value is sign-extended to fill the desired bit width.
 If the given bit width is too small to hold the argument value, then a
 Chisel error is generated.
 
@@ -268,7 +268,7 @@ We have also considered allowing Scala literals to be automatically
 converted to Chisel types, but this can cause type ambiguity and
 requires an additional import.
 
-The Fix and UFix types will also later support an optional exponent
+The SInt and UInt types will also later support an optional exponent
 field to allow Chisel to automatically produce optimized fixed-point
 arithmetic circuits.
 \end{commentary}
@@ -327,17 +327,17 @@ in Table~\ref{tbl:chisel-operators}.
 Example & Explanation \\
 \hline
 \hline
-\multicolumn{2}{|l|}{Bitwise operators.  Valid on Bits, Fix, UFix, Bool.} \\
+\multicolumn{2}{|l|}{Bitwise operators.  Valid on SInt, UInt, Bool.} \\
 \hline
 \hline
 \verb!val invertedX = ~x!                    &   Bitwise-NOT  \\
-\verb!val hiBits = x & Bits("h_ffff_0000") ! &   Bitwise-AND  \\
+\verb!val hiBits = x & UInt("h_ffff_0000") ! &   Bitwise-AND  \\
 \verb!val flagsOut = flagsIn | overflow !    &   Bitwise-OR   \\
 \verb!val flagsOut = flagsIn ^ toggle !      &   Bitwise-XOR  \\
 \hline
 \hline
-\multicolumn{2}{|l|}{Bitwise reductions.  Valid on Bits, Fix, and
-  UFix.  Returns Bool. } \\
+\multicolumn{2}{|l|}{Bitwise reductions.  Valid on SInt and
+  UInt.  Returns Bool. } \\
 \hline
 \hline
 \verb!val allSet = andR(x) ! & AND-reduction  \\
@@ -345,30 +345,30 @@ Example & Explanation \\
 \verb!val parity = xorR(x) !  & XOR-reduction  \\
 \hline
 \hline
-\multicolumn{2}{|l|}{Equality comparison. Valid on Bits,
-Fix, UFix, and Bool. Returns Bool.} \\
+\multicolumn{2}{|l|}{Equality comparison. Valid on SInt, 
+UInt, and Bool. Returns Bool.} \\
 \hline
 \hline
 \verb@val equ = x === y@ & Equality \\
 \verb@val neq = x != y@ & Inequality \\
 \hline
 \hline
-\multicolumn{2}{|l|}{Shifts. Valid on Bits, Fix, and UFix.} \\
+\multicolumn{2}{|l|}{Shifts. Valid on SInt and UInt.} \\
 \hline
 \hline
-\verb@val twoToTheX = Fix(1) << x@  & Logical left shift. \\
-\verb@val hiBits = x >> UFix(16)@          & Right shift (logical on Bits \&
-UFix, arithmetic on Fix). \\
+\verb@val twoToTheX = SInt(1) << x@  & Logical left shift. \\
+\verb@val hiBits = x >> UInt(16)@          & Right shift (logical on UInt and\&
+arithmetic on SInt). \\
 % \verb@val scaledX = x >>> 3@  & Arithmetic right shift, copies in sign bits. \\
 \hline
 \hline
-\multicolumn{2}{|l|}{Bitfield manipulation.  Valid on Bits, Fix, UFix, and Bool. } \\
+\multicolumn{2}{|l|}{Bitfield manipulation.  Valid on SInt, UInt, and Bool. } \\
 \hline
 \hline
 \verb@val xLSB = x(0)@  & Extract single bit, LSB has index 0. \\
 \verb@val xTopNibble = x(15,12)@  & Extract bit field  from end to start
 bit position. \\
-\verb@val usDebt = Fill(3, Bits("hA"))@ & Replicate a bit string multiple times. \\
+\verb@val usDebt = Fill(3, UInt("hA"))@ & Replicate a bit string multiple times. \\
 \verb@val float = Cat(sign,exponent,mantissa)@ & Concatenates bit fields, with first argument on left.\\
 \hline
 \hline
@@ -380,7 +380,7 @@ bit position. \\
 \verb@val out = Mux(sel, inTrue, inFalse)@  & Two-input mux where sel is a Bool. \\ % {\bf Why?} \\
 \hline
 \hline
-\multicolumn{2}{|l|}{Arithmetic operations.  Valid on Nums: Fix and UFix. } \\
+\multicolumn{2}{|l|}{Arithmetic operations.  Valid on Nums: SInt and UInt. } \\
 \hline
 \verb@val sum = a + b@  & Addition. \\
 \verb@val diff = a - b @  & Subtraction. \\
@@ -389,8 +389,8 @@ bit position. \\
 \verb@val mod = a % b @  & Modulus \\
 \hline
 \hline
-\multicolumn{2}{|l|}{Arithmetic comparisons.  Valid on Nums: Fix and
-  UFix. Returns Bool.} \\
+\multicolumn{2}{|l|}{Arithmetic comparisons.  Valid on Nums: SInt and
+  UInt. Returns Bool.} \\
 \hline
 \verb@val gt = a > b@  & Greater than. \\
 \verb@val gte = a >= b@  & Greater than or equal. \\
@@ -454,7 +454,7 @@ we later reuse multiple times in a design.  For example, we can wrap
 up our earlier example of a simple combinational logic block as
 follows:
 \begin{scala}
-def clb(a: Bits, b: Bits, c: Bits, d: Bits) = 
+def clb(a: UInt, b: UInt, c: UInt, d: UInt) = 
   (a & b) | (~c & d)
 \end{scala}
 
@@ -481,7 +481,7 @@ val out = clb(a,b,c,d)
 %% def clb(a, b, c, d) = (a & b) | (~c & d) // No types needed.
 
 %% def bigblock(a: Bool, b: Bool, c: Bool, d: Bool,
-%%              f: UFix, g: UFix, h: UFix, i: UFix): Bool =
+%%              f: UInt, g: UInt, h: UInt, i: UInt): Bool =
 %%                  clb(a, b, c, clb(f,g,h,i)!=0) 
 
 %% \end{scala}
@@ -508,8 +508,8 @@ define their own bundles by defining a class as a subclass of
 \begin{scala}
 class MyFloat extends Bundle {
   val sign        = Bool()
-  val exponent    = Bits(width = 8)
-  val significand = Bits(width = 23)
+  val exponent    = UInt(width = 8)
+  val significand = UInt(width = 23)
 }
 
 val x  = new MyFloat()
@@ -519,14 +519,14 @@ val xs = x.sign
 \noindent
 A Scala convention is to capitalize the name of new classes and we
 suggest you follow that convention in Chisel too.  The \code{width}
-named parameter to the \code{Bits} constructor specificies the number
+named parameter to the \code{UInt} constructor specificies the number
 of bits in the type.
 
 Vecs create an indexable vector of elements, and are constructed as
 follows:
 \begin{scala}
 // Vector of 5 23-bit signed integers.
-val myVec = Vec(5) { Fix(width = 23) } 
+val myVec = Vec(5) { SInt(width = 23) } 
 
 // Connect to one element of vector. 
 val reg3  = myVec(3) 
@@ -535,10 +535,10 @@ val reg3  = myVec(3)
 \noindent
 (Note that we have to specify the type of the \code{Vec} elements
 inside the trailing curly brackets, as we have to pass the bitwidth
-parameter into the \code{Fix} constructor.)
+parameter into the \code{SInt} constructor.)
 
 The set of primitive classes
-(\code{Bits},\code{Fix},\code{UFix},\code{Bool}) plus the aggregate
+(\code{SInt},\code{UInt},\code{Bool}) plus the aggregate
 classes (\code{Bundles} and \code{Vec}s) all inherit from a common
 superclass, \code{Data}.  Every object that ultimately inherits from
 \code{Data} can be represented as a bit vector in a hardware design.
@@ -548,7 +548,7 @@ structures:
 \begin{scala}
 class BigBundle extends Bundle {
  // Vector of 5 23-bit signed integers.
- val myVec = Vec(5) { Fix(width = 23) } 
+ val myVec = Vec(5) { SInt(width = 23) } 
  val flag  = Bool()
  // Previously defined bundle.
  val f     = new MyFloat()              
@@ -578,7 +578,7 @@ An example port declaration is as follows:
 \begin{scala}
 class FIFOIO extends Bundle {
   val ready = Bool(OUTPUT)
-  val data  = Bits(INPUT, 32)
+  val data  = UInt(INPUT, 32)
   val valid = Bool(INPUT)
 }
 \end{scala}
@@ -605,20 +605,20 @@ By folding directions into the object declarations, Chisel is able to
 provide powerful wiring constructs described later.
 %% \begin{scala}
 %% class MuxBundle extends Bundle {
-%%   val sel = Bits(INPUT,  1)
-%%   val in0 = Bits(INPUT,  1)
-%%   val in1 = Bits(INPUT,  1)
-%%   val out = Bits(OUTPUT, 1)
+%%   val sel = UInt(INPUT,  1)
+%%   val in0 = UInt(INPUT,  1)
+%%   val in1 = UInt(INPUT,  1)
+%%   val out = UInt(OUTPUT, 1)
 %% }
 
-%% class Mux2 extends Component {
+%% class Mux2 extends Module {
 %%   val io = new MuxBundle()
 %%   io.out := (io.sel & io.in1) | (~io.sel & io.in0)
 %% }
 %% \end{scala}
 
 
-\section{Components}
+\section{Modules}
 
 In Chisel, {\em components} are very similar to {\em modules} in
 Verilog, defining a hierarchical structure in the generated circuit.
@@ -631,19 +631,19 @@ The hierarchical component namespace is accessible in downstream tools
 to aid in debugging and physical layout.  A user-defined component is
 defined as a {\em class} which:
 \begin{itemize}
-\item inherits from \code{Component},
+\item inherits from \code{Module},
 \item contains an interface stored in a port field named \code{io}, and
 \item wires together subcircuits in its constructor.
 \end{itemize}
 As an example, consider defining your own two-input multiplexer as a
 component:
 \begin{scala}
-class Mux2 extends Component {
+class Mux2 extends Module {
   val io = new Bundle{
-    val sel = Bits(INPUT, 1)
-    val in0 = Bits(INPUT, 1)
-    val in1 = Bits(INPUT, 1)
-    val out = Bits(OUTPUT, 1)
+    val sel = UInt(INPUT, 1)
+    val in0 = UInt(INPUT, 1)
+    val in1 = UInt(INPUT, 1)
+    val out = UInt(OUTPUT, 1)
   }
   io.out := (io.sel & io.in1) | (~io.sel & io.in0)
 }
@@ -659,7 +659,7 @@ The \code{:=} assignment operator, used here in the body of the
 definition, is a special operator in Chisel that wires the input of
 left-hand side to the output of the right-hand side.
 
-\subsection{Component Hierarchy}
+\subsection{Module Hierarchy}
 
 We can now construct circuit hierarchies, where we build larger components out
 of smaller sub-components.  For example, we can build a 4-input
@@ -667,14 +667,14 @@ multiplexer component in terms of the \code{Mux2} component by wiring
 together three 2-input multiplexers:
 
 \begin{scala}
-class Mux4 extends Component {
+class Mux4 extends Module {
   val io = new Bundle {
-    val in0 = Bits(INPUT, 1)
-    val in1 = Bits(INPUT, 1)
-    val in2 = Bits(INPUT, 1)
-    val in3 = Bits(INPUT, 1)
-    val sel = Bits(INPUT, 2)
-    val out = Bits(OUTPUT, 1)
+    val in0 = UInt(INPUT, 1)
+    val in1 = UInt(INPUT, 1)
+    val in2 = UInt(INPUT, 1)
+    val in3 = UInt(INPUT, 1)
+    val sel = UInt(INPUT, 2)
+    val out = UInt(OUTPUT, 1)
   }
   val m0 = new Mux2()
   m0.io.sel := io.sel(0) 
@@ -725,7 +725,7 @@ testing circuits by providing test vectors within Scala using
 subclasses of the \code{Tester} class:
 
 \begin{scala}
-class Tester[T <: Component]
+class Tester[T <: Module]
   (val c: T, val testNodes: Array[Node])
 \end{scala}
 
@@ -746,7 +746,7 @@ instances to components using:
 
 \begin{scala}
 object chiselMainTest {
-  def apply[T <: Component]
+  def apply[T <: Module]
     (args: Array[String], comp: () => T)(
      tester: T => Tester[T]): T
 }
@@ -782,10 +782,10 @@ class Mux2Tests(c: Mux2)
     for (s <- 0 until 2) {
     for (i0 <- 0 until 2) {
     for (i1 <- 0 until 2) {
-      vars(c.io.sel) = Bits(s)
-      vars(c.io.in1) = Bits(i1)
-      vars(c.io.in0) = Bits(i0)
-      vars(c.io.out) = Bits(if (s == 1) i1 else i0)
+      vars(c.io.sel) = UInt(s)
+      vars(c.io.in1) = UInt(i1)
+      vars(c.io.in0) = UInt(i0)
+      vars(c.io.out) = UInt(if (s == 1) i1 else i0)
       allGood = step(vars) && allGood
     } } } 
     allGood
@@ -845,9 +845,9 @@ Counters are an important sequential circuit.  To construct an
 up-counter that counts up to a maximum value, \verb+max+, then wraps
 around back to zero (i.e., modulo \verb!max+1!), we write:
 \begin{scala}
-def counter(max: UFix) = {
-  val x = Reg(resetVal = UFix(0, max.getWidth))
-  x := Mux(x == max, UFix(0), x + UFix(1))
+def counter(max: UInt) = {
+  val x = RegReset(UInt(0, max.getWidth))
+  x := Mux(x == max, UInt(0), x + UInt(1))
   x
 }
 \end{scala}
@@ -867,7 +867,7 @@ For example, we can build a pulse generator by outputting true when
 a counter reaches zero:
 \begin{scala}
 // Produce pulse every n cycles.
-def pulse(n: UFix) = counter(n - UFix(1)) === UFix(0)
+def pulse(n: UInt) = counter(n - UInt(1)) === UInt(0)
 \end{scala}
 
 \noindent
@@ -876,13 +876,13 @@ toggling between true and false on each pulse:
 \begin{scala}
 // Flip internal state when input true.
 def toggle(p: Bool) = {
-  val x = Reg(resetVal = Bool(false))
+  val x = RegReset(Bool(false))
   x := Mux(p, !x, x)
   x
 }
 
 // Square wave where each half cycle has given period.
-def squareWave(period: UFix) = toggle(pulse(period))
+def squareWave(period: UInt) = toggle(pulse(period))
 \end{scala}
 
 \subsection{Forward Declarations}
@@ -901,11 +901,11 @@ input will be set later.
 For example, in a simple CPU, we need to define the \verb!pcPlus4!
 and \verb!brTarget! wires so they can be referenced before defined:
 \begin{scala}
-val pcPlus4  = UFix()
-val brTarget = UFix()
-val pcNext   = Mux(io.ctl.pcSel, brTarget, pcPlus4)
-val pcReg    = Reg(data = pcNext, resetVal = UFix(0, 32))
-pcPlus4     := pcReg + UFix(4)
+val pcPlus4  = UInt()
+val brTarget = UInt()
+val pcNext   = Mux(io.ctrl.pcSel, brTarget, pcPlus4)
+val pcReg    = RegUpdate(pcNext, resetVal = UInt(0, 32))
+pcPlus4     := pcReg + UInt(4)
 ...
 brTarget    := addOut
 \end{scala}
@@ -925,9 +925,9 @@ several separate statements.  Chisel provides conditional update rules
 in the form of the \code{when} construct to support this style of
 sequential logic description. For example,
 \begin{scala}
-val r = Reg() { UFix(16) }
-when (c === UFix(0) ) {
-  r := r + UFix(1)
+val r = Reg() { UInt(16) }
+when (c === UInt(0) ) {
+  r := r + UInt(1)
 }
 \end{scala}
 
@@ -942,8 +942,8 @@ defined with \code{val}.
 In a sequence of conditional updates, the last conditional update
 whose condition is true takes priority.  For example,
 \begin{scala}
-when (c1) { r := Bits(1) }
-when (c2) { r := Bits(2) }
+when (c1) { r := UInt(1) }
+when (c2) { r := UInt(2) }
 \end{scala}
 
 \noindent
@@ -1011,9 +1011,9 @@ different overlapping subsets of registers present in different update
 blocks.  Each register is only affected by conditions in which it
 appears.  For example:
 \begin{scala}
-r := Fix(3); s := Fix(3)
-when (c1)   { r := Fix(1); s := Fix(1) }
-when (c2)   { r := Fix(2) }
+r := SInt(3); s := SInt(3)
+when (c1)   { r := SInt(1); s := SInt(1) }
+when (c2)   { r := SInt(2) }
 \end{scala}
 
 \noindent
@@ -1104,12 +1104,12 @@ State Machine (FSM).  An example of a simple FSM is a parity
 generator:
 
 % \begin{scala}
-% class Parity extends Component {
+% class Parity extends Module {
 %   val io = new Bundle {
 %     val in  = Bool(INPUT)
 %     val out = Bool(OUTPUT) }
-%   val s_even :: s_odd :: Nil = Enum(2){ UFix() }
-%   val state  = Reg(resetVal = s_even)
+%   val s_even :: s_odd :: Nil = Enum(2){ UInt() }
+%   val state  = RegReset(s_even)
 %   switch(state, Array(
 %     (s_even, () => { when (io.in) { state := s_odd } }),
 %     (s_odd,  () => { when (io.in) { state := s_even } }) ))
@@ -1118,12 +1118,12 @@ generator:
 % \end{scala}
 
 \begin{scala}
-class Parity extends Component {
+class Parity extends Module {
   val io = new Bundle {
     val in  = Bool(dir = INPUT)
     val out = Bool(dir = OUTPUT) }
-  val s_even :: s_odd :: Nil = Enum(2){ UFix() }
-  val state  = Reg(resetVal = s_even)
+  val s_even :: s_odd :: Nil = Enum(2){ UInt() }
+  val state  = RegReset(s_even)
   when (io.in) {
     when (state === s_even) { state := s_odd  }
     when (state === s_odd)  { state := s_even }
@@ -1133,7 +1133,7 @@ class Parity extends Component {
 \end{scala}
 
 \noindent
-where \verb+Enum(2){ UFix() }+ generates two \verb+UFix+ literals and
+where \verb+Enum(2){ UInt() }+ generates two \verb+UInt+ literals and
 where the states are updated when \verb+in+ is true.  It is worth
 noting that all of the mechanisms for FSMs are built upon registers,
 wires, and conditional updates.
@@ -1141,14 +1141,14 @@ wires, and conditional updates.
 Below is a more complicated FSM example which is a circuit for
 accepting money for a vending machine:
 \begin{scala}
-class VendingMachine extends Component {
+class VendingMachine extends Module {
   val io = new Bundle {
     val nickel = Bool(dir = INPUT)
     val dime   = Bool(dir = INPUT)
     val rdy    = Bool(dir = OUTPUT) }
   val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = 
-    Enum(5){ UFix() }
-  val state = Reg(resetVal = s_idle)
+    Enum(5){ UInt() }
+  val state = RegReset(s_idle)
   when (state === s_idle) {
     when (io.nickel) { state := s_5 }
     when (io.dime)   { state := s_10 }
@@ -1175,13 +1175,13 @@ class VendingMachine extends Component {
 \noindent
 Here is the vending machine FSM defined with \code{switch} statement:
 \begin{scala}
-class VendingMachine extends Component {
+class VendingMachine extends Module {
   val io = new Bundle {
     val nickel = Bool(dir = INPUT)
     val dime   = Bool(dir = INPUT)
     val rdy    = Bool(dir = OUTPUT) }
   val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = Enum(5){ UFIx() }
-  val state = Reg(resetVal = s_idle)
+  val state = RegReset(s_idle)
   switch (state) {
       is (s_idle) {
       when (io.nickel) { state := s_5 }
@@ -1213,21 +1213,20 @@ read/write memories.
 Users can define read only memories with a \code{Vec}:
 
 \begin{scala}
-Vec(inits: Seq[T]) (type: => T)
-Vec(inits: T*) (type: => T)
+Vec(inits: Seq[T])
+Vec(elt0: T, elts: T*)
 \end{scala}
 
 \noindent
 where \verb+inits+ is a sequence of initial \verb+Data+ literals that
-initialize the ROM and define the element type.
+initialize the ROM.
 For example,  users can
 create a small ROM initialized to \verb+1, 2, 4, 8+ and 
 loop through all values using a counter as an address generator as follows:
 
 \begin{scala}
-val i = Array(UFix(1), UFix(2), UFix(4), UFix(8))
-val m = Vec(i){ UFix(width = 32) }
-val r = m(counter(UFix(i.length)))
+val m = Vec(Array(UInt(1), UInt(2), UInt(4), UInt(8)))
+val r = m(counter(UInt(m.length)))
 \end{scala}
 
 \noindent
@@ -1238,11 +1237,11 @@ def sinTable (amp: Double, n: Int) = {
   val times = 
     Range(0, n, 1).map(i => (i*2*Pi)/(n.toDouble-1) - Pi)
   val inits = 
-    times.map(t => Fix(round(amp * sin(t))))
-  Vec(inits){ Fix(width = 32) }
+    times.map(t => SInt(round(amp * sin(t)), width = 32))
+  Vec(inits)
 }
 def sinWave (amp: Double, n: Int) = 
-  sinTable(amp, n)(counter(UFix(n))
+  sinTable(amp, n)(counter(UInt(n))
 \end{scala}
 
 \noindent
@@ -1263,25 +1262,24 @@ combinational or positive-edge-triggered.
 
 \begin{scala}
 object Mem {
-  def apply[T <: Data](depth: Int,
-          seqRead: Boolean = false)
-        (type: => T): Mem
+  def apply[T <: Data](depth: Int, type: T,
+          seqRead: Boolean = false): Mem
 }
 
 class Mem[T <: Data](depth: Int, 
-      seqRead: Boolean = false,
-      type: () => T) 
+      type: T,
+      seqRead: Boolean = false)
     extends Updateable {
-  def apply(idx: UFix): T
+  def apply(idx: UInt): T
 }
 \end{scala}
 
-Ports into Mems are created by applying a \code{UFix} index.  A 32-entry
+Ports into Mems are created by applying a \code{UInt} index.  A 32-entry
 register file with one write port and two combinational read ports might be
 expressed as follows:
 
 \begin{scala}
-val rf = Mem(32) { UFix(width = 64) }
+val rf = Mem(32, UInt(width = 64))
 when (wen) { rf(waddr) := wdata }
 val dout1 = rf(waddr1)
 val dout2 = rf(waddr2)
@@ -1293,8 +1291,8 @@ one-write SRAM might be described as follows:
 
 \begin{scala}
 val ram1r1w =
-  Mem(1024, seqRead = true) { Bits(width = 32) }
-val dout = Reg() { Bits() }
+  Mem(1024, UInt(width = 32), seqRead = true)
+val dout = Reg() { UInt() }
 when (wen) { ram1r1w(waddr) := wdata }
 when (ren) { dout := ram1r1w(raddr) }
 \end{scala}
@@ -1304,8 +1302,8 @@ mutually exclusive in the same \code{when} chain:
 
 \begin{scala}
 val ram1p = 
-  Mem(1024, seqRead = true) { Bits(width = 32) }
-val dout = Reg() { Bits() }
+  Mem(1024, UInt(width = 32), seqRead = true)
+val dout = Reg() { UInt() }
 when (wen) { ram1p(waddr) := wdata }
 .elsewhen (ren) { dout := ram1p(raddr) }
 \end{scala}
@@ -1318,7 +1316,7 @@ Mem also supports write masks for subword writes.  A given bit is written if
 the corresponding mask bit is set.
 
 \begin{scala}
-val ram = Mem(256) { Bits(width = 32) }
+val ram = Mem(256, UInt(width = 32))
 when (wen) { ram.write(waddr, wdata, wmask) }
 \end{scala}
 
@@ -1328,10 +1326,10 @@ when (wen) { ram.write(waddr, wdata, wmask) }
 % 
 % \begin{scala}
 %   def audioRecorder(n: Int, button: Bool) = { 
-%     val addr   = counter(UFix(n))
+%     val addr   = counter(UInt(n))
 %     val ram    = Mem(n)
 %     ram(addr) := button
-%     ram(Mux(button(), UFix(0), addr))
+%     ram(Mux(button(), UInt(0), addr))
 %   } 
 % \end{scala}
 % 
@@ -1360,7 +1358,7 @@ For example, a user could define a simple link for handshaking data as follows:
 
 \begin{scala}
 class SimpleLink extends Bundle { 
-  val data = Bits(16, OUTPUT) 
+  val data = UInt(16, OUTPUT) 
   val rdy  = Bool(OUTPUT)
 }
 \end{scala}
@@ -1371,7 +1369,7 @@ bundle inheritance:
 
 \begin{scala}
 class PLink extends SimpleLink { 
-  val parity = Bits(5, OUTPUT) 
+  val parity = UInt(5, OUTPUT) 
 }
 \end{scala}
 
@@ -1395,7 +1393,7 @@ changing input to output and output to input.
 We can now define a filter by defining a filter class extending component:
 
 \begin{scala}
-class Filter extends Component { 
+class Filter extends Module { 
   val io = new FilterIO()
   ...
 }
@@ -1407,22 +1405,22 @@ where the \verb+io+ field contains \verb+FilterIO+.
 \subsection{Bundle Vectors}
 
 Beyond single elements, vectors of elements form richer hierarchical interfaces.  
-For example, in order to create a crossbar with a vector of inputs, producing a vector of outputs, and selected by a UFix input, 
+For example, in order to create a crossbar with a vector of inputs, producing a vector of outputs, and selected by a UInt input, 
 we utilize the \verb+Vec+ constructor:
 
 \begin{scala}
 class CrossbarIo(n: Int) extends Bundle {
-  val in  = Vec(n){ new PLink().flip() }
-  val sel = UFix(INPUT, sizeof(n))
-  val out = Vec(n){ new PLink() }
+  val in  = Vec.fill(n){ new PLink().flip() }
+  val sel = UInt(INPUT, sizeof(n))
+  val out = Vec.fill(n){ new PLink() }
 }
 \end{scala}
 
 % \begin{scala}
 % class CrossbarIo(n: Int) extends Bundle {
-%   val in  = Vec(n){ Bits(w, INPUT) }
-%   val sel = Vec(n){ UFix(sizeof(n),  INPUT) }
-%   val out = Vec(n){ Bits(w, OUTPUT) }
+%   val in  = Vec.fill(n){ UInt(w, INPUT) }
+%   val sel = Vec.fill(n){ UInt(sizeof(n),  INPUT) }
+%   val out = Vec.fill(n){ UInt(w, OUTPUT) }
 % }
 % \end{scala}
 
@@ -1434,7 +1432,7 @@ where \verb+Vec+ takes a size as the first argument and a block returning a port
 We can now compose two filters into a filter block as follows:
 
 \begin{scala}
-class Block extends Component { 
+class Block extends Module { 
   val io = new FilterIO()
   val f1 = new Filter()
   val f2 = new Filter()
@@ -1468,13 +1466,13 @@ A user first defines the complete interface to a ROM and Mem as follows:
 \begin{scala}
 class RomIo extends Bundle {
   val isVal = Bool(INPUT)
-  val raddr = UFix(INPUT, 32)
-  val rdata = Bits(OUTPUT, 32)
+  val raddr = UInt(INPUT, 32)
+  val rdata = UInt(OUTPUT, 32)
 }
 
 class RamIo extends RomIo {
   val isWr  = Bool(INPUT)
-  val wdata = Bits(INPUT, 32)
+  val wdata = UInt(INPUT, 32)
 }
 \end{scala}
 
@@ -1494,7 +1492,7 @@ and the control and data path components can be built by partially assigning to
 this interfaces as follows:
 
 \begin{scala}
-class Cpath extends Component {
+class Cpath extends Module {
   val io = new CpathIo();
   ...
   io.imem.isVal := ...;
@@ -1503,7 +1501,7 @@ class Cpath extends Component {
   ...
 }
 
-class Dpath extends Component {
+class Dpath extends Module {
   val io = new DpathIo();
   ...
   io.imem.raddr := ...;
@@ -1517,7 +1515,7 @@ class Dpath extends Component {
 We can now wire up the CPU using bulk connects as we would with other bundles:
 
 \begin{scala}
-class Cpu extends Component {
+class Cpu extends Module {
   val io = new CpuIo()
   val c  = new CtlPath()
   val d  = new DatPath()
@@ -1535,8 +1533,8 @@ class Cpu extends Component {
 Repeated bulk connections of partially assigned control and data path interfaces
 completely connect up the CPU interface.
 
-% A Bool can be automatically treated as a single bit UFix (with values
-% 0 or 1), but an Int or UFix cannot be used as a Bool without an
+% A Bool can be automatically treated as a single bit UInt (with values
+% 0 or 1), but an Int or UInt cannot be used as a Bool without an
 % explicit cast.
 %
 %   Lit(5) // means a constant node with decimal value 5. Bit width will
@@ -1547,20 +1545,20 @@ completely connect up the CPU interface.
 % constant generator.
 %
 % \begin{scala}
-% Lit(10, 4) // means a constant node of type Bits that is 4 bits
+% Lit(10, 4) // means a constant node of type UInt that is 4 bits
 %            // wide with decimal 10.
 % Lit(10)
 % LitInt(10, 4)
-% LitUFix(10, 4)
+% LitUInt(10, 4)
 % Lit(-1,4)
 % \end{scala}
 %
 % can more concisely write:
 %
-% Component correspond to Verilog modules
+% Module correspond to Verilog modules
 % Cell is a sub-module, Chisel Module
 
-\section{Functional Creation of Components}
+\section{Functional Creation of Modules}
 \label{sec:funconstructor}
 
 It is also useful to be able to make a functional interface for
@@ -1570,7 +1568,7 @@ multiplexer output:
 
 \begin{scala}
 object Mux2 {
-  def apply (sel: Bits, in0: Bits, in1: Bits) = {
+  def apply (sel: UInt, in0: UInt, in1: UInt) = {
     val m = new Mux2()
     m.io.in0 := in0
     m.io.in1 := in1
@@ -1588,14 +1586,14 @@ With this \code{Mux2} creation function, the specification of \code{Mux4} now is
 significantly simpler.
 
 \begin{scala}
-class Mux4 extends Component {
+class Mux4 extends Module {
   val io = new Bundle {
-    val in0 = Bits(INPUT, 1)
-    val in1 = Bits(INPUT, 1)
-    val in2 = Bits(INPUT, 1)
-    val in3 = Bits(INPUT, 1)
-    val sel = Bits(INPUT, 2)
-    val out = Bits(OUTPUT, 1)
+    val in0 = UInt(INPUT, 1)
+    val in1 = UInt(INPUT, 1)
+    val in2 = UInt(INPUT, 1)
+    val in3 = UInt(INPUT, 1)
+    val sel = UInt(INPUT, 2)
+    val out = UInt(OUTPUT, 1)
   }
   io.out := Mux2(io.sel(1),
                  Mux2(io.sel(0), io.in0, io.in1),
@@ -1628,7 +1626,7 @@ Chisel also provides \code{MuxLookup} which is an n-way indexed multiplexer:
 
 \begin{scala}
 MuxLookup(idx, default, 
-          Array(UFix(0) -> a, UFix(1) -> b, ...))
+          Array(UInt(0) -> a, UInt(1) -> b, ...))
 \end{scala}
 
 \noindent
@@ -1636,8 +1634,8 @@ which can be rewritten in terms of:\verb+MuxCase+ as follows:
 
 \begin{scala}
 MuxCase(default, 
-        Array((idx === UFix(0)) -> a, 
-              (idx === UFix(1)) -> b, ...))
+        Array((idx === UInt(0)) -> a, 
+              (idx === UInt(1)) -> b, ...))
 \end{scala}
 
 \noindent
@@ -1654,12 +1652,12 @@ Note that the cases (eg. c1, c2) must be in parentheses.
 %
 % \begin{scala}
 % val io = new Bundle{
-%   val sel = Bits(INPUT, 1)
-%   val in0 = Bits(INPUT, 1)
-%   val in1 = Bits(INPUT, 1)
-%   val out = Bits(OUTPUT, 1)
+%   val sel = UInt(INPUT, 1)
+%   val in0 = UInt(INPUT, 1)
+%   val in1 = UInt(INPUT, 1)
+%   val out = UInt(OUTPUT, 1)
 % }
-% def Mux2(sel: Bits, in0: Bits, in0: Bits): Bits = {
+% def Mux2(sel: UInt, in0: UInt, in0: UInt): UInt = {
 %   val m = new Mux2()
 %   m.io.wire(Array("sel" => sel, "in0" => in0, "in1" => in1), "out")
 % }
@@ -1695,22 +1693,22 @@ otherwise it causes a Scala compilation type error.
 For example,
 
 \begin{scala}
-Mux(c, UFix(10), UFix(11))
+Mux(c, UInt(10), UInt(11))
 \end{scala}
 
 \noindent
-yields a \code{UFix} wire because the \code{con} and \code{alt} arguments are each of type \code{UFix}.
+yields a \code{UInt} wire because the \code{con} and \code{alt} arguments are each of type \code{UInt}.
 
 % Earlier we defined \code{Mux2} on \code{Bool}, but now we show how we can define a generic \code{Mux}.  
 % We define a function that takes a condition and two functions of no arguments (called thunks) for the {\it then} and {\it else} cases:
 % 
 % \begin{scala}
-% def Mux[T <: Bits](c: Bool, con: T, alt: T): T
-% def Mux[T <: Bits](c: Bool)(con: => T)(alt: => T): T
+% def Mux[T <: UInt](c: Bool, con: T, alt: T): T
+% def Mux[T <: UInt](c: Bool)(con: => T)(alt: => T): T
 % \end{scala}
 % 
 % \noindent
-% where the two thunk return types are parameterized to be a type \code{T} that is a subclass of \code{Bits}.
+% where the two thunk return types are parameterized to be a type \code{T} that is a subclass of \code{UInt}.
 % Scala ensures that it finds a common superclass of the two thunks' return types.
 
 We now present a more advanced example of parameterized functions for defining an inner product FIR digital filter generically over Chisel \code{Num}'s.
@@ -1729,7 +1727,7 @@ def innerProductFIR[T <: Num] (w: Array[Int], x: T) = {
   delays.reduceRight(_ + _)
 }
 
-def delay[T <: Bits](x: T, n: Int): T =
+def delay[T <: UInt](x: T, n: Int): T =
   if (n == 0) x else Reg(delay(x, n - 1))
 \end{scala}
  
@@ -1757,7 +1755,7 @@ class FilterIO[T <: Data]()(type: => T) extends Bundle {
 We can now define \verb+Filter+ by defining a component class that also takes a link type constructor argument and passes it through to the \verb+FilterIO+ interface constructor:
 
 \begin{scala}
-class Filter[T <: Data]()(type: => T) extends Component { 
+class Filter[T <: Data]()(type: => T) extends Module { 
   val io = new FilterIO(){ type }
   ...
 }
@@ -1777,19 +1775,19 @@ used as follows:
 
 \begin{scala}
 class DataBundle extends Bundle {
-  val A = UFix(width = 32)
-  val B = UFix(width = 32)
+  val A = UInt(width = 32)
+  val B = UInt(width = 32)
 }
 
 object FifoDemo {
-  def apply () = new Fifo(32){ new DataBundle }
+  def apply () = new Fifo(32, new DataBundle)
 }
 \end{scala}
 
 \begin{figure}[ht]
 \begin{scala}
-class Fifo[T <: Data] (n: Int)(type: => T) 
-    extends Component {
+class Fifo[T <: Data] (n: Int, type: T) 
+    extends Module {
   val io = new Bundle {
     val enq_val = Bool(INPUT)
     val enq_rdy = Bool(OUTPUT)
@@ -1798,14 +1796,14 @@ class Fifo[T <: Data] (n: Int)(type: => T)
     val enq_dat = type.asInput
     val deq_dat = type.asOutput
   }
-  val enq_ptr      = Reg(resetVal = UFix(0, sizeof(n)))
-  val deq_ptr      = Reg(resetVal = UFix(0, sizeof(n)))
-  val is_full      = Reg(resetVal = Bool(false))
+  val enq_ptr      = RegReset(UInt(0, sizeof(n)))
+  val deq_ptr      = RegReset(UInt(0, sizeof(n)))
+  val is_full      = RegReset(Bool(false))
   val do_enq       = io.enq_rdy && io.enq_val
   val do_deq       = io.deq_rdy && io.deq_val
   val is_empty     = !is_full && (enq_ptr === deq_ptr)
-  val deq_ptr_inc  = deq_ptr + UFix(1)
-  val enq_ptr_inc  = enq_ptr + UFix(1)
+  val deq_ptr_inc  = deq_ptr + UInt(1)
+  val enq_ptr_inc  = enq_ptr + UInt(1)
   val is_full_next = 
     Mux(do_enq && ~do_deq && (enq_ptr_inc === deq_ptr), 
         Bool(true),
@@ -1852,7 +1850,7 @@ follows:
 
 \begin{scala}
 class Fifo[T <: Data] (n: Int)(data: => T) 
-    extends Component {
+    extends Module {
   val io = new Bundle {
     val enq = new FIFOIO()( data ).flip()
     val deq = new FIFOIO()( data )
