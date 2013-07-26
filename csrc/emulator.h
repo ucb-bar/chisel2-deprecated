@@ -116,27 +116,28 @@ static void sub_n (val_t d[], val_t s0[], val_t s1[], int nw, int nb) {
   }
 }
 
-static void mul_n (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
+static void mul_n (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
 // Adapted from Hacker's Delight, from Knuth
 #if BYTE_ORDER != LITTLE_ENDIAN
 # error mul_n assumes a little-endian architecture
 #endif
-  for (int i = 0; i < val_n_words(nb0+nb1); i++)
+  for (int i = 0; i < val_n_words(nbd); i++)
     d[i] = 0;
 
   half_val_t* w = reinterpret_cast<half_val_t*>(d);
   half_val_t* u = reinterpret_cast<half_val_t*>(s0);
   half_val_t* v = reinterpret_cast<half_val_t*>(s1);
-  int m = val_n_half_words(nb0), n = val_n_half_words(nb1);
+  int m = val_n_half_words(nb0), n = val_n_half_words(nb1), p = val_n_half_words(nbd);
 
   for (int j = 0; j < n; j++) {
     val_t k = 0;
-    for (int i = 0; i < m; i++) {
+    for (int i = 0; i < MIN(m, p-j); i++) {
       val_t t = (val_t)u[i]*v[j] + w[i+j] + k;
       w[i+j] = t;
       k = t >> val_n_half_bits();
     }
-    w[j+m] = k;
+    if (j+m < p)
+      w[j+m] = k;
   }
 }
 
@@ -226,8 +227,8 @@ static inline val_t mask_val(int n) {
   return res;
 }
 
-static void div_n (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
-  assert(nb0 <= val_n_bits() && nb1 <= val_n_bits()); // TODO: generalize
+static void div_n (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
+  assert(MAX(nbd, MAX(nb0, nb1)) <= val_n_bits()); // TODO: generalize
   d[0] = s1[0] == 0 ? mask_val(nb0) : s0[0] / s1[0];
 }
 
@@ -378,8 +379,8 @@ struct bit_word_funs {
   static void sub (val_t d[], val_t s0[], val_t s1[], int nb) {
     sub_n(d, s0, s1, nw, nb);
   }
-  static void mul (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
-    mul_n(d, s0, s1, nb0, nb1);
+  static void mul (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
+    mul_n(d, s0, s1, nbd, nb0, nb1);
   }
   static void bit_xor (val_t d[], val_t s0[], val_t s1[]) {
     for (int i = 0; i < nw; i++) 
@@ -559,11 +560,11 @@ struct bit_word_funs<1> {
   static void neg (val_t d[], val_t s0[], int nb) {
     d[0] = (- s0[0]) & mask_val(nb);
   }
-  static void mul (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
-    if (nb0+nb1 <= val_n_bits())
-      d[0] = s0[0] * s1[0];
+  static void mul (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
+    if (nbd <= val_n_bits())
+      d[0] = (s0[0] * s1[0]) & mask_val(nbd);
     else
-      mul_n(d, s0, s1, nb0, nb1);
+      mul_n(d, s0, s1, nbd, nb0, nb1);
   }
   static void ltu (val_t d[], val_t s0[], val_t s1[]) {
     d[0] = (s0[0] < s1[0]);
@@ -681,8 +682,8 @@ struct bit_word_funs<2> {
     d[1] = -s0[1] - (s0[0] != 0);
     d[0] = d0;
   }
-  static void mul (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
-    mul_n(d, s0, s1, nb0, nb1);
+  static void mul (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
+    mul_n(d, s0, s1, nbd, nb0, nb1);
   }
   static void ltu (val_t d[], val_t s0[], val_t s1[]) {
     d[0] = (s0[1] < s1[1] | (s0[1] == s1[1] & s0[0] < s1[0]));
@@ -859,8 +860,8 @@ struct bit_word_funs<3> {
   static void neg (val_t d[], val_t s0[], int nb) {
     neg_n(d, s0, 3, nb);
   }
-  static void mul (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
-    mul_n(d, s0, s1, nb0, nb1);
+  static void mul (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
+    mul_n(d, s0, s1, nbd, nb0, nb1);
   }
   static void ltu (val_t d[], val_t s0[], val_t s1[]) {
     d[0] = (s0[2] < s1[2] | (s0[2] == s1[2] & (s0[1] < s1[1] | (s0[1] == s1[1] & s0[0] < s1[0]))));
@@ -1091,15 +1092,9 @@ class dat_t {
     return ~(*this) + DAT<w>(1);
   }
   dat_t<w+w> operator * ( dat_t<w> o ) {
-    // TODO: CLEANUP AND ADD DIFFERENT WIDTHS FOR EACH OPERAND
-    if (n_words == 1 && ((w + w) <= val_n_bits())) {
-      val_t res = values[0] * o.values[0];
-      return DAT<w+w>(res & mask_val(w+w));
-    } else {
-      dat_t<w+w> res;
-      bit_word_funs<n_words>::mul(res.values, values, o.values, w, w);
-      return res;
-    }
+    dat_t<w+w> res;
+    bit_word_funs<n_words>::mul(res.values, values, o.values, w+w, w, w);
+    return res;
   }
   dat_t<w+w> fix_times_fix( dat_t<w> o ) {
     // TODO: CLEANUP AND ADD DIFFERENT WIDTHS FOR EACH OPERAND
@@ -1112,9 +1107,17 @@ class dat_t {
       val_t sgn_b = o.msb();
       dat_t<w> abs_b = sgn_b ? -o : o;
       dat_t<w+w> res;
-      bit_word_funs<n_words>::mul(res.values, abs_a.values, abs_b.values, w, w);
+      bit_word_funs<n_words>::mul(res.values, abs_a.values, abs_b.values, w+w, w, w);
       return (sgn_a ^ sgn_b) ? -res : res;
     }
+  }
+  dat_t<w> operator / ( dat_t<w> o ) {
+    dat_t<w> res;
+    div_n(res.values, values, o.values, w, w, w);
+    return res;
+  }
+  dat_t<w> operator % ( dat_t<w> o ) {
+    return *this - *this / o * o;
   }
   dat_t<w+w> ufix_times_fix( dat_t<w> o ) {
     // TODO: CLEANUP AND ADD DIFFERENT WIDTHS FOR EACH OPERAND
@@ -1126,7 +1129,7 @@ class dat_t {
       val_t sgn_b = o.msb();
       dat_t<w> abs_b = sgn_b ? -o : o;
       dat_t<w+w> res;
-      bit_word_funs<n_words>::mul(res.values, abs_a.values, abs_b.values, w, w);
+      bit_word_funs<n_words>::mul(res.values, abs_a.values, abs_b.values, w+w, w, w);
       return sgn_b ? -res : res;
     }
   }
@@ -1140,7 +1143,7 @@ class dat_t {
       dat_t<w> abs_a = sgn_a ? -(*this) : (*this);
       dat_t<w> abs_b = o;
       dat_t<w+w> res;
-      bit_word_funs<n_words>::mul(res.values, abs_a.values, abs_b.values, w, w);
+      bit_word_funs<n_words>::mul(res.values, abs_a.values, abs_b.values, w+w, w, w);
       return sgn_a ? -res : res;
     }
   }
@@ -1390,6 +1393,124 @@ class dat_t {
     return bit(b.lo_word());
   }
 };
+
+template <int w>
+std::string dat_to_str(const dat_t<w>& x) {
+  char s[w];
+  s[dat_to_str(s, x)] = 0;
+  return s;
+}
+
+template <int w>
+int dat_to_str(char* s, dat_t<w> x, int base = 16, char pad = '0') {
+  int n_digs = (int)ceil(log(2)/log(base)*w);
+  int j = n_digs-1, digit;
+
+  do {
+    if (ispow2(base)) {
+      digit = x.lo_word() & (base-1);
+      x = x >> log2_1(base);
+    } else {
+      digit = (x % base).lo_word();
+      x = x / base;
+    }
+    s[j] = (digit >= 10 ? 'a'-10 : '0') + digit;
+  } while (--j >= 0 && (x != 0).to_bool());
+
+  for ( ; j >= 0; j--)
+    s[j] = pad;
+
+  return n_digs;
+}
+
+static int dat_to_str(char* s, val_t x, int base = 16, char pad = '0') {
+  return dat_to_str<sizeof(val_t)*8>(s, dat_t<sizeof(val_t)*8>(x), base, pad);
+}
+
+template <int w>
+int fix_to_str(char* s, dat_t<w> x, int base = 16, char pad = '0') {
+  bool neg = x.bit(w-1).to_bool();
+  s[0] = neg;
+  int len = dat_to_str<w>(s+1, neg ? -x : x, base, pad);
+  return len+1;
+}
+
+static int fix_to_str(char* s, val_t x, int base = 16, char pad = '0') {
+  return fix_to_str(s, dat_t<sizeof(val_t)*8>(x), base, pad);
+}
+
+template <int w>
+int dat_as_str(char* s, const dat_t<w>& x) {
+  int i, j;
+  for (i = 0, j = (w/8-1)*8; i < w/8; i++, j -= 8) {
+    char ch = x.values[j/val_n_bits()] >> (j % val_n_bits());
+    if (ch == 0) break;
+    s[i] = ch;
+  }
+  for ( ; i < w/8; i++)
+    s[i] = ' ';
+  return w/8;
+}
+
+static int dat_as_str(char* s, val_t x) {
+  return dat_as_str(s, dat_t<sizeof(val_t)*8>(x));
+}
+
+#if __cplusplus >= 201103L
+static void dat_format(char* s, const char* fmt)
+{
+  for (char c; (c = *fmt); fmt++) {
+    if (c == '%' && *++fmt != '%')
+      abort();
+    *s++ = c;
+  }
+}
+
+template <typename T, typename... Args>
+static void dat_format(char* s, const char* fmt, T value, Args... args)
+{
+  while (*fmt) {
+    if (*fmt == '%') {
+      switch(fmt[1]) {
+        case 'h': s += dat_to_str(s, value, 16, '0'); break;
+        case 'b': s += dat_to_str(s, value, 2, '0'); break;
+        case 'd': s += dat_to_str(s, value, 10, ' '); break;
+        case 's': s += dat_as_str(s, value); break;
+        case '%': *s++ = '%'; break;
+        default: abort();
+      }
+      return dat_format(s, fmt + 2, args...);
+    } else {
+      *s++ = *fmt++;
+    }
+  }
+  abort();
+}
+
+template <int w, typename... Args>
+static dat_t<w> dat_format(const char* fmt, Args... args)
+{
+#if BYTE_ORDER != LITTLE_ENDIAN
+# error dat_format assumes a little-endian architecture
+#endif
+  char str[w/8+1];
+  dat_format(str, fmt, args...);
+
+  dat_t<w> res;
+  res.values[res.n_words-1] = 0;
+  for (int i = 0; i < w/8; i++)
+    ((char*)res.values)[w/8-1-i] = str[i];
+  return res;
+}
+
+template <int w, typename... Args>
+static ssize_t dat_fprintf(FILE* f, const char* fmt, Args... args)
+{
+  char str[w/8+1];
+  dat_format(str, fmt, args...);
+  return fwrite(str, 1, w/8, f);
+}
+#endif /* C++11 */
                                             
 template <int w, int sw> inline dat_t<w> DAT(dat_t<sw> dat) { 
   dat_t<w> res(dat);
@@ -1547,23 +1668,6 @@ static int  char_to_hex[] = {
 #define TO_CSTR(d) (d.to_str().c_str())
 
 template <int w>
-std::string dat_to_str (dat_t<w> val, int n_bits = 4, bool for_vcd = false) {
-  std::string rev_res, res;
-  int bits_left = w;
-  for (int j = 0; j < val.n_words; j++) {
-    for (int i = 0; i < MIN(bits_left, val_n_bits()); i += n_bits) {
-      rev_res.push_back(hex_to_char[(val.values[j] >> i) & ((1<<n_bits)-1)]);
-    }
-    bits_left -= val_n_bits();
-  }
-  for (int j = rev_res.size()-1; j >= 0; j--) {
-    if (!for_vcd && (j+1) % 8 == 0) res.push_back('_');
-    res.push_back(rev_res[j]);
-  }
-  return res;
-}
-
-template <int w>
 void str_to_dat(std::string str, dat_t<w>& res) {
   val_t word_accum = 0;
   int digit_val, digit, w_index, bit;
@@ -1689,5 +1793,12 @@ class mod_t {
   virtual bool scan ( FILE* f ) { return true; };
   virtual void dump ( FILE* f, int t ) { };
 };
+
+#define ASSERT(cond, msg) { \
+  if (!(cond)) { \
+    printf("Assertion failed: %s\n", (msg)); \
+    abort(); \
+  } \
+}
 
 #endif

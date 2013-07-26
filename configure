@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+# This script will copy the appropriate project/ directories from the source
+# tree and modify build.sbt such that we build the chisel jar in a build tree
+# independent of the filesystem on which sources reside.
+
+srcTop=`dirname $0`
+buildTop=`pwd`
+
+if [ $(uname) == "Linux" ] ; then
+    statFormat="--format='%d:%i'"
+else
+    statFormat="-f '%d:%i'"
+fi
+
+if [ "$(stat -L $statFormat $srcTop)" == "$(stat -L $statFormat $buildTop)" ]
+then
+    echo "You are running 'configure' in the directory it resides."
+    echo "Nothing to be done, just run sbt directory."
+    exit 1
+fi
+
+sed -e "s,//sourceDirectory := new File(\"@srcTop@\"),sourceDirectory := new File(\"${srcTop}\")," $srcTop/build.sbt > build.sbt
+cp -rf $srcTop/project .
+echo "Done."
+echo "Ready to run sbt commands from the build directory."

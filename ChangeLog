@@ -1,0 +1,24 @@
+2013-07-23 Sebastien Mirolo <smirolo@eecs.berkeley.edu>
+
+        Porting from Chisel 1.1 to Chisel 2.0
+        * Replace Reg(x) by RegUpdate(x)
+          Semantic of Reg(x) changed from Reg(updateVal=x) to Reg(){x.clone}.
+        That's important to note because code will compile correctly
+        and you might chase bugs for a while on this one. I recommend
+        to do a search/replace of Reg(x) pattern by RegUpdate(x)
+        as a first step. Other changes will generate a compilation error.
+        * Replace Reg(resetVal=x) by RegReset(x)
+        * Replace Reg(){x} by Reg(x)
+        * Replace Mem(n){x} by Mem(n, x)
+        * Replace Vec(n){x} by Vec.fill(n){x}
+          to follow Scala standard libraryconventions
+        * Replace new FIFOIO {x} by  new FIFOIO(x)
+        * Replace new Arbiter(n) {x} by new Arbiter(x, n)
+        * Replace Component by Module
+        * Replace UFix by UInt
+        * Replace Fix by SInt
+        * Wrap module instantiation into a Module() call,
+          as in replace new C() by Module(new C())
+        * Update Scala compiler to 2.10
+          If you get Scala runtime version mismatch errors, call
+          ChiselMain directly instead of through the type reflection API.
