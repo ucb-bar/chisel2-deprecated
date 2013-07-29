@@ -121,9 +121,9 @@ object Reg {
   }
 
 
-  def apply[T <: Data](gen: T): T = {
-    Reg[T](gen, null.asInstanceOf[T], null.asInstanceOf[T])
-  }
+  def apply[T <: Data](updateVal: T, resetVal: T): T = Reg[T](updateVal, updateVal, resetVal)
+
+  def apply[T <: Data](out: T): T = Reg[T](out, null.asInstanceOf[T], null.asInstanceOf[T])
 }
 
 object RegUpdate {
