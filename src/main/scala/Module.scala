@@ -50,6 +50,8 @@ object Module {
    have no arguments yet should not be used to generate C++ or Verilog code. */
   val keywords = HashSet[String]("test")
 
+  var warnInputs = false
+  var warnOutputs = false
   var saveWidthWarnings = false
   var saveConnectionWarnings = false
   var saveComponentTrace = false
@@ -118,6 +120,8 @@ object Module {
 
   def initChisel () {
     ChiselError.clear();
+    warnInputs = false
+    warnOutputs = false
     saveWidthWarnings = false
     saveConnectionWarnings = false
     saveComponentTrace = false

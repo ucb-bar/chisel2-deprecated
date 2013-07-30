@@ -130,6 +130,9 @@ object chiselMain {
           Module.saveComponentTrace = true
           Module.isCheckingPorts = true
         }
+        case "--wi" => Module.warnInputs = true
+        case "--wo" => Module.warnOutputs = true
+        case "--wio" => {Module.warnInputs = true; Module.warnOutputs = true}
         case "--Wwidth" => Module.saveWidthWarnings = true
         case "--Wconnection" => Module.saveConnectionWarnings = true
         case "--Wcomponent" => Module.saveComponentTrace = true

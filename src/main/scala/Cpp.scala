@@ -108,8 +108,6 @@ class CppBackend extends Backend {
     node match {
       case x: Binding =>
         emitWordRef(x.inputs(0), w)
-      case c: Clock =>
-        emitRef(c) + "_cnt == 0"
       case x: Bits =>
         if (!node.isInObject && node.inputs.length == 1) emitWordRef(node.inputs(0), w) else wordMangle(node, w)
       case _ =>
@@ -437,8 +435,8 @@ class CppBackend extends Backend {
         r.lits.zipWithIndex.map { case (lit, i) =>
           block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(lit, j) + ")"))
         }.reduceLeft(_ + _)
-      case u: UInt => 
-        if (Module.randInitIOs.contains(u))
+      case u: Bits => 
+        if (u.driveRand)
           "  if (rand_init) " + emitRef(node) + ".randomize();\n"
         else
           ""
@@ -592,14 +590,15 @@ class CppBackend extends Backend {
       ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
 
+    def clkName (clock: Clock): String = 
+      (if (clock == Module.implicitClock) "" else "_" + emitRef(clock))
     val clkDomains = new HashMap[Clock, (StringBuilder, StringBuilder)]
     for (clock <- Module.clocks) {
-      val clkName = if (clock == Module.implicitClock) "" else "_" + emitRef(clock)
       val clock_lo = new StringBuilder
       val clock_hi = new StringBuilder
       clkDomains += (clock -> ((clock_lo, clock_hi)))
-      clock_lo.append("void " + c.name + "_t::clock_lo" + clkName + " ( dat_t<1> reset ) {\n")
-      clock_hi.append("void " + c.name + "_t::clock_hi" + clkName + " ( dat_t<1> reset ) {\n")
+      clock_lo.append("void " + c.name + "_t::clock_lo" + clkName(clock) + " ( dat_t<1> reset ) {\n")
+      clock_hi.append("void " + c.name + "_t::clock_hi" + clkName(clock) + " ( dat_t<1> reset ) {\n")
     }
 
     if (Module.isGenHarness) {
@@ -630,14 +629,16 @@ class CppBackend extends Backend {
         }
       }
     }
+    for (clock <- Module.clocks)
+      out_h.write(emitDec(clock))
 
     out_h.write("\n");
     out_h.write("  void init ( bool rand_init = false );\n");
     for ( clock <- Module.clocks) {
-      val clkName = if (clock == Module.implicitClock) "" else "_" + emitRef(clock)
-      out_h.write("  void clock_lo" + clkName + " ( dat_t<1> reset);\n")
-      out_h.write("  void clock_hi" + clkName + " ( dat_t<1> reset);\n")
+      out_h.write("  void clock_lo" + clkName(clock) + " ( dat_t<1> reset);\n")
+      out_h.write("  void clock_hi" + clkName(clock) + " ( dat_t<1> reset);\n")
     }
+    out_h.write("  int clock ( dat_t<1> reset );\n")
     out_h.write("  void print ( FILE* f );\n");
     out_h.write("  bool scan ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
@@ -652,9 +653,6 @@ class CppBackend extends Backend {
     for (m <- c.omods) {
       out_c.write(emitInit(m));
     }
-    // for ( clock <- Mod.clocks) {
-    //   out_c.write("  " + emitRef(clock) + "_cnt = " + emitRef(clock) + " - 1;\n")
-    // }
     out_c.write("}\n");
 
     for (m <- c.omods) {
@@ -679,17 +677,26 @@ class CppBackend extends Backend {
       out_c.write(clkDomains(clk)._2.result)
     }
 
-    // for (clock <- Mod.clocks) {
-    //   out_c.write("  if ( " + emitRef(clock) + "_cnt == 0 ) {\n")
-    //   for (m <- clock.stateElms) {
-    //     if (m.isInstanceOf[Reg])
-    //       out_c.write("  " + emitDefHi(m))
-    //   }
-    //   out_c.write("    " + emitRef(clock) + "_cnt = " + emitRef(clock) + " - 1;\n")
-    //   out_c.write("  } else {\n")
-    //   out_c.write("    " + emitRef(clock) + "_cnt--;\n")
-    //   out_c.write("  }\n")
-    // }
+    out_c.write("int " + c.name + "_t::clock ( dat_t <1> reset ) {\n")
+    out_c.write("  uint32_t min = (1<<31)-1;\n")
+    for (clock <- Module.clocks) {
+      out_c.write("  if (" + emitRef(clock) + "_cnt < min) min = " + emitRef(clock) +"_cnt;\n")
+    }
+    for (clock <- Module.clocks) {
+      out_c.write("  " + emitRef(clock) + "_cnt-=min;\n")
+    }
+    for (clock <- Module.clocks) {
+      out_c.write("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
+    }
+    for (clock <- Module.clocks) {
+      out_c.write("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
+    }
+    for (clock <- Module.clocks) {
+      out_c.write("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " + 
+                  emitRef(clock) + "-1;\n")
+    }
+    out_c.write("  return min;\n")
+    out_c.write("}\n")
 
     def splitFormat(s: String): Seq[String] = {
       var off = 0;

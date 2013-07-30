@@ -229,6 +229,15 @@ class VerilogBackend extends Backend {
     if (hasReg) res += ",\n" else res += "\n"
     res += portDecs.map(_.result).reduceLeft(_ + "\n" + _)
     res += "\n  );\n";
+    if (c.wires.map(_._2.driveRand).reduceLeft(_ || _)) {
+      res += "  `ifdef SYNTHESIS\n"
+      for ((n, w) <- c.wires) {
+        if (w.driveRand) {
+          res += "    " + c.name + "." + n + " = $random();\n"
+        }
+      }
+      res += "  end\n"
+    }
     res
   }
 
@@ -628,21 +637,26 @@ class VerilogBackend extends Backend {
     var nl = "";
     if (c.clocks.length > 0)
       res.append((c.clocks ++ c.resets.keys.toList).map(x => "input " + emitRef(x)).reduceLeft(_ + ", " + _))
+    val ports = new ArrayBuffer[StringBuilder]
     for ((n, w) <- c.wires) {
-      if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
+      // if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
       w match {
         case io: Bits => {
           val prune = if (io.prune && c != Module.topComponent) "//" else ""
           if (io.dir == INPUT) {
-            res.append(nl + "    " + prune + "input " + 
-                       emitSigned(io) + emitWidth(io) + " " + emitRef(io));
+            ports += new StringBuilder(nl + "    " + prune + "input " + 
+                                       emitSigned(io) + emitWidth(io) + " " + emitRef(io));
           } else if(io.dir == OUTPUT) {
-            res.append(nl + "    " + prune + "output" + 
-                       emitSigned(io) + emitWidth(io) + " " + emitRef(io));
+            ports += new StringBuilder(nl + "    " + prune + "output" + 
+                                       emitSigned(io) + emitWidth(io) + " " + emitRef(io));
           }
         }
       };
     }
+    val uncommentedPorts = ports.filter(!_.result.contains("//"))
+    uncommentedPorts.slice(0, uncommentedPorts.length-1).map(_.append(","))
+    if (hasReg) res.append(",\n") else res.append("\n")
+    res.append(ports.map(_.result).reduceLeft(_ + "\n" + _))
     res.append("\n);\n\n");
     // TODO: NOT SURE EXACTLY WHY I NEED TO PRECOMPUTE TMPS HERE
     for (m <- c.mods)

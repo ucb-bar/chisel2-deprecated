@@ -380,6 +380,59 @@ object Queue
   }
 }
 
+class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) extends Module {
+  val io = new ioQueue(gen, entries)
+  val asize = log2Up(entries)
+
+  val s1_rptr_gray = RegReset(UInt(0, asize+1)).withClock(enq_clk)
+  val s2_rptr_gray = RegReset(UInt(0, asize+1)).withClock(enq_clk)
+  val s1_rst_deq = RegReset(Bool(false)).withClock(enq_clk)
+  val s2_rst_deq = RegReset(Bool(false)).withClock(enq_clk)
+
+  val s1_wptr_gray = RegReset(UInt(0, asize+1)).withClock(deq_clk)
+  val s2_wptr_gray = RegReset(UInt(0, asize+1)).withClock(deq_clk)
+  val s1_rst_enq = RegReset(Bool(false)).withClock(deq_clk)
+  val s2_rst_enq = RegReset(Bool(false)).withClock(deq_clk)
+
+  val wptr_bin = RegReset(UInt(0, asize+1)).withClock(enq_clk)
+  val wptr_gray = RegReset(UInt(0, asize+1)).withClock(enq_clk)
+  val not_full = RegReset(Bool(false)).withClock(enq_clk)
+
+  val wptr_bin_next = wptr_bin + (io.enq.valid & not_full)
+  val wptr_gray_next = (wptr_bin_next >> UInt(1)) ^ wptr_bin_next
+  val not_full_next = !(wptr_gray_next === Cat(~s2_rptr_gray(asize,asize-1), s2_rptr_gray(asize-2,0)))
+
+  val rptr_bin = RegReset(UInt(0, asize+1)).withClock(deq_clk)
+  val rptr_gray = RegReset(UInt(0, asize+1)).withClock(deq_clk)
+  val not_empty = RegReset(Bool(false)).withClock(deq_clk)
+
+  val rptr_bin_next = rptr_bin + (io.deq.ready & not_empty)
+  val rptr_gray_next = (rptr_bin_next >> UInt(1)) ^ rptr_bin_next
+  val not_empty_next = !(rptr_gray_next === s2_wptr_gray)
+
+  s2_rptr_gray := s1_rptr_gray; s1_rptr_gray := rptr_gray
+  s2_rst_deq := s1_rst_deq; s1_rst_deq := enq_clk.getReset
+  s2_wptr_gray := s1_wptr_gray; s1_wptr_gray := wptr_gray
+  s2_rst_enq := s1_rst_enq; s1_rst_enq := deq_clk.getReset
+
+  wptr_bin := wptr_bin_next
+  wptr_gray := wptr_gray_next
+  not_full := not_full_next && !s2_rst_deq
+
+  rptr_bin := rptr_bin_next
+  rptr_gray := rptr_gray_next
+  not_empty := not_empty_next && !s2_rst_enq
+
+  io.enq.ready := not_full
+  io.deq.valid := not_empty
+
+  val mem = Mem(entries, gen).withClock(enq_clk)
+  when (io.enq.valid && io.enq.ready) {
+    mem(wptr_bin(asize-1,0)) := io.enq.bits
+  }
+  io.deq.bits := mem(rptr_bin(asize-1,0))
+}
+
 object Log2 {
   def apply (mod: Bits, n: Int): UInt = {
     Module.backend match {

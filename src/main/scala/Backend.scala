@@ -335,11 +335,13 @@ abstract class Backend {
     for ((name, i) <- inputs) {
       if (i.inputs.length == 0 && m != Module.topComponent)
         if (i.consumers.length > 0) {
-          ChiselError.warning({"UNCONNECTED INPUT " + emitRef(i) + " in COMPONENT " + i.component +
-                               " has consumers"})
-          Module.randInitIOs += i
+          if (Module.warnInputs)
+            ChiselError.warning({"UNCONNECTED INPUT " + emitRef(i) + " in COMPONENT " + i.component +
+                                 " has consumers"})
+          i.driveRand = true
         } else {
-          Module.randInitIOs += i
+          if (Module.warnInputs)
+            ChiselError.warning({"FLOATING INPUT " + emitRef(i) + " in COMPONENT " + i.component})
           i.prune = true
         }
     }
@@ -347,11 +349,13 @@ abstract class Backend {
     for ((name, o) <- outputs) {
       if (o.inputs.length == 0) {
         if (o.consumers.length > 0) {
-          ChiselError.warning({"UNCONNETED OUTPUT " + emitRef(o) + " in component " + o.component + 
-                             " has consumers on line " + o.consumers(0).line})
-          Module.randInitIOs += o
+          if (Module.warnOutputs)
+            ChiselError.warning({"UNCONNETED OUTPUT " + emitRef(o) + " in component " + o.component + 
+                                 " has consumers on line " + o.consumers(0).line})
+          o.driveRand = true
         } else {
-          Module.randInitIOs += o
+          if (Module.warnOutputs)
+            ChiselError.warning({"FLOATING OUTPUT " + emitRef(o) + " in component " + o.component})
           o.prune = true
         }
       }
@@ -536,8 +540,6 @@ abstract class Backend {
       // remove unconnected outputs
       pruneUnconnectedIOs(comp)
     }
-    if (Module.isPruning)
-      pruneNodes
 
     ChiselError.checkpoint()
 
