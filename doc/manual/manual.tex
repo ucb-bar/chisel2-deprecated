@@ -53,7 +53,7 @@ EECS Department, UC Berkeley\\
 \maketitle{}
 
 % TODO: default
-% TODO: enum yields Bits
+% TODO: enum yields UInt
 % TODO: why hardware construction languages
 
 
@@ -180,8 +180,8 @@ Chisel type hierarchy, with \code{Data} as the topmost node.
 \end{figure}
 
 \noindent
-Built-in scalar types include \code{Bits}, \code{Bool}, \code{Fix},
-and \code{UFix} and built-in aggregate types \code{Bundle} and
+Built-in scalar types include \code{Bool}, \code{SInt},
+and \code{UInt} and built-in aggregate types \code{Bundle} and
 \code{Vec} allow the user to expand the set of Chisel datatypes with
 collections of other types.
 
@@ -192,8 +192,8 @@ abstract class Data extends Node {
     this.getClass.newInstance.
       asInstanceOf[this.type]
   // simple conversions
-  def toFix: Fix
-  def toUFix: UFix
+  def toSInt: SInt
+  def toUInt: UInt
   def toBool: Bool
   def toBits: Bits
   // flatten out to leaves of tree
@@ -222,15 +222,15 @@ construction parameters that are necessary for cloning.
 Data nodes can be used for four purposes:
 
 \begin{itemize}
-\item {\bf types} -- \kode{UFix(width = 8)} -- record intermediate types in the graph
+\item {\bf types} -- \kode{UInt(width = 8)} -- record intermediate types in the graph
   specifying at minimum bitwidth (described in this section), 
-\item {\bf wires} -- \kode{UFix(width = 8)} -- serve as forward declarations of data allowing future
+\item {\bf wires} -- \kode{UInt(width = 8)} -- serve as forward declarations of data allowing future
   conditional updates (described in Section~\ref{sec:wires}), 
-\item {\bf ports} -- \kode{UFix(dir = OUTPUT, width = 8)} -- are
-  specialized wires defining component interfaces, and
+\item {\bf ports} -- \kode{UInt(dir = OUTPUT, width = 8)} -- are
+  specialized wires defining module interfaces, and
   additionally specify direction (described in
   Section~\ref{sec:ports}), and
-\item{\bf literals} -- \kode{UFix(1)} or \kode{UFix(1, 8)} -- can be constructed using type object
+\item{\bf literals} -- \kode{UInt(1)} or \kode{UInt(1, 8)} -- can be constructed using type object
 constructors specifying their value and optional width.
 \end{itemize}
 
@@ -276,9 +276,9 @@ class Bits extends Data with Updateable {
   // inequality
   def != (b: Bits): Bool
   // logical left shift
-  def << (b: UFix): Bits
+  def << (b: UInt): Bits
   // logical right shift
-  def >> (b: UFix): Bits
+  def >> (b: UInt): Bits
   // concatenate
   def ## (b: Bits): Bits
   // extract single bit, LSB is 0
@@ -314,10 +314,10 @@ def Mux[T <: Data](sel: Bits, cons: T, alt: T): T
 Constant or literal values are expressed using Scala integers or
 strings passed to constructors for the types:
 \begin{scala}
-Bits(1)       // decimal 1-bit lit from Scala Int.
-Bits("ha")    // hex 4-bit lit from string.
-Bits("o12")   // octal 4-bit lit from string.
-Bits("b1010") // binary 4-bit lit from string.
+UInt(1)       // decimal 1-bit lit from Scala Int.
+UInt("ha")    // hex 4-bit lit from string.
+UInt("o12")   // octal 4-bit lit from string.
+UInt("b1010") // binary 4-bit lit from string.
 \end{scala}
 
 \noindent
@@ -334,8 +334,8 @@ successively more complicated examples.
 \includegraphics[height=0.94in]{figs/bits-1.pdf} &
 \includegraphics[height=1.96in]{figs/bits-and.pdf} &
 \includegraphics[height=3.0in]{figs/bits-or-and.pdf} \\
-\kode{a = Bits(1)} & \kode{b = a \& Bits(2)} &
-\kode{b | Bits(3)} \\
+\kode{a = UInt(1)} & \kode{b = a \& UInt(2)} &
+\kode{b | UInt(3)} \\
 \end{tabular}
 \end{center}
 \caption{Chisel Op/Lit graphs constructed with algebraic expressions
@@ -355,11 +355,11 @@ object Bool {
   def apply(value: Boolean): Bool
 }
 
-class Bool extends Bits
+class Bool extends UInt
 \end{scala}
 
 \noindent
-\code{Bool} is equivalent to \code{Bits(width = 1)}.
+\code{Bool} is equivalent to \code{UInt(width = 1)}.
 
 \subsection{Nums}
 
@@ -393,30 +393,30 @@ class Num extends Bits {
 
 Signed and unsigned integers
 are considered subsets of fixed-point numbers and are represented by
-types \code{Fix} and \code{UFix} respectively:
+types \code{SInt} and \code{UInt} respectively:
 
 \begin{scala}
-object Fix {
+object SInt {
   def apply (dir: PortDir = null, 
-             width: Int = -1): Fix
+             width: Int = -1): SInt
   // create literal
-  def apply (value: BigInt, width: Int = -1): Fix
-  def apply (value: String, width: Int = -1): Fix
+  def apply (value: BigInt, width: Int = -1): SInt
+  def apply (value: String, width: Int = -1): SInt
 }
 
-class Fix extends Num 
+class SInt extends Num 
 
-object UFix {
+object UInt {
   def apply(dir: PortDir = null,
-            width: Int = -1): UFix
+            width: Int = -1): UInt
   // create literal
-  def apply(value: BigInt, width: Int = -1): UFix
-  def apply(value: String, width: Int = -1): UFix
+  def apply(value: BigInt, width: Int = -1): UInt
+  def apply(value: String, width: Int = -1): UInt
 }
 
-class UFix extends Num {
+class UInt extends Num {
   // arithmetic right shift
-  override def >> (b: UFix): Fix
+  override def >> (b: UInt): SInt
 }
 \end{scala}
 
@@ -446,8 +446,8 @@ bundles by subclassing \code{Bundle} as follows:
 \begin{scala}
 class MyFloat extends Bundle {
   val sign        = Bool()
-  val exponent    = Bits(width = 8)
-  val significand = Bits(width = 23)
+  val exponent    = UInt(width = 8)
+  val significand = UInt(width = 23)
 }
 \end{scala}
 \noindent
@@ -468,22 +468,32 @@ Vecs create an indexable vector of elements:
 
 \begin{scala}
 object Vec {
-  def apply[T <: Data](n: Int)(type: => T): Vec[T]
-  def apply[T <: Data](elts: Seq[T])(type: => T): Vec[T]
-  def apply[T <: Data](elts: T*)(type: => T): Vec[T]
+  def apply[T <: Data](elts: Seq[T]): Vec[T]
+  def apply[T <: Data](elt0: T, elts: T*): Vec[T]
+  def fill[T <: Data](n: Int)(type: => T): Vec[T]
+  def tabulate[T <: Data](n: Int)
+        (type: (Int) => T): Vec[T]
+  def tabulate[T <: Data](n1: Int, n2: Int)
+        (type: (Int, Int) => T): Vec[Vec[T]]
 }
 
 class Vec[T <: Data](n: Int, val type: () => T) 
     extends Data {
-  def apply(idx: UFix): T
+  def apply(idx: UInt): T
   def apply(idx: Int): T
+  def forall(p: T => Bool): Bool
+  def exists(p: T => Bool): Bool
+  def contains[T <: Bits](x: T): Bool
+  def count(p: T => Bool): UInt
+  def indexWhere(p: T => Bool): UInt
+  def lastIndexWhere(p: T => Bool): UInt
 }
 \end{scala}
 
 \noindent
 with \code{n} elements of type defined with the \code{gen} thunk.
 Users can access elements statically with an \code{Int} index or
-dynamically using a \code{UFix} index, 
+dynamically using a \code{UInt} index, 
 where dynamic access creates a virtual type node (representing a read
 ``port'') that records the read using the given address.  In either case,
 users can wire to the result of a read as follows:
@@ -495,7 +505,7 @@ v(a) := d
 Read-only memories can be expressed as Vecs of literals:
 
 \begin{scala}
-val rom = Vec(UFix(3), UFix(7), UFix(4), UFix(0)) { UFix(width=3) }
+val rom = Vec(UInt(3), UInt(7), UInt(4), UInt(0)) { UInt(width=3) }
 val dout = rom(addr)
 \end{scala}
 
@@ -559,9 +569,9 @@ combine these accesses in the circuit.
 \begin{scala}
 abstract class Updateable extends Node {
   // conditional reads
-  def reads: Queue[(Bool, UFix)]
+  def reads: Queue[(Bool, UInt)]
   // conditional writes
-  def writes: Queue[(Bool, UFix, Node)]
+  def writes: Queue[(Bool, UInt, Node)]
   // gen mux integrating all conditional writes
   def genMuxes(default: Node)
   override def := (x: Node): this.type
@@ -627,9 +637,9 @@ We introduce the \code{switch} statement for conditional updates
 involving a series of comparisons against a common key:
 
 \begin{scala}
-def switch(c: Bits)(block: => Unit): Unit
+def switch(c: UInt)(block: => Unit): Unit
 
-def is(v: Bits)(block: => Unit)
+def is(v: Bool)(block: => Unit)
 \end{scala}
 
 \section{Forward Declarations}
@@ -648,11 +658,11 @@ whose input will be set later.  For example, in a simple CPU, we need
 to define the \verb!pcPlus4!  and \verb!brTarget! wires so they can be
 referenced before definition:
 \begin{scala}
-val pcPlus4  = UFix()
-val brTarget = UFix()
+val pcPlus4  = UInt()
+val brTarget = UInt()
 val pcNext   = Mux(pcSel, brTarget, pcPlus4)
-val pcReg    = Reg(pcNext)
-pcPlus4     := pcReg + UFix(4)
+val pcReg    = RegUpdate(pcNext)
+pcPlus4     := pcReg + UInt(4)
 ...
 brTarget    := addOut
 \end{scala}
@@ -672,11 +682,17 @@ positive-edge-triggered register defined as follows:
 \begin{scala}
 object Reg {
   def apply[T <: Data]
-        (data: T, resetVal: T = null): T
-  def apply[T <: Data] (resetVal: T): T
-  def apply[T <: Data] ()(type: => T): T
+    (type: T, updateVal: T = null, resetVal: T = null): T
 }
  
+object RegUpdate {
+  def apply[T <: Data] (updateVal: T, resetVal: T = null): T
+}
+
+object RegReset {
+  def apply[T <: Data] (resetVal: T): T
+}
+
 class Reg extends Updateable
 \end{scala}
 
@@ -684,10 +700,10 @@ class Reg extends Updateable
 where it can be constructed as follows:
 
 \begin{scala}
-val r1 = Reg(io.in)
-val r2 = Reg(resetVal = UFix(1, 8))
-val r3 = Reg(data = io.in, resetVal = UFix(1))
-val r4 = Reg(){ UFix(width = 8) }
+val r1 = RegUpdate(io.in)
+val r2 = RegReset(UInt(1, 8))
+val r3 = RegUpdate(io.in, UInt(1))
+val r4 = Reg(UInt(width = 8))
 \end{scala}
 
 \noindent
@@ -702,25 +718,23 @@ positive-edge-triggered.
 
 \begin{scala}
 object Mem {
-  def apply[T <: Data](depth: Int,
-          seqRead: Boolean = false)
-        (type: => T): Mem
+  def apply[T <: Data](depth: Int, type: T,
+          seqRead: Boolean = false): Mem
 }
 
-class Mem[T <: Data](depth: Int, 
-      seqRead: Boolean = false,
-      type: () => T) 
+class Mem[T <: Data](depth: Int, type: T,
+      seqRead: Boolean = false)
     extends Updateable {
-  def apply(idx: UFix): T
+  def apply(idx: UInt): T
 }
 \end{scala}
 
-Ports into Mems are created by applying a \code{UFix} index.  A 32-entry
+Ports into Mems are created by applying a \code{UInt} index.  A 32-entry
 register file with one write port and two combinational read ports might be
 expressed as follows:
 
 \begin{scala}
-val rf = Mem(32) { UFix(width = 64) }
+val rf = Mem(32, UInt(width = 64))
 when (wen) { rf(waddr) := wdata }
 val dout1 = rf(waddr1)
 val dout2 = rf(waddr2)
@@ -732,8 +746,9 @@ one-write SRAM might be described as follows:
 
 \begin{scala}
 val ram1r1w =
+  Mem(1024, UInt(width = 32), seqRead = true)
   Mem(1024, seqRead = true) { Bits(width = 32) }
-val reg_raddr = Reg() { UFix() }
+val reg_raddr = Reg(UInt())
 when (wen) { ram1r1w(waddr) := wdata }
 when (ren) { reg_raddr := raddr }
 val rdata = ram1r1w(reg_raddr)
@@ -744,8 +759,8 @@ mutually exclusive in the same \code{when} chain:
 
 \begin{scala}
 val ram1p = 
-  Mem(1024, seqRead = true) { Bits(width = 32) }
-val reg_raddr = Reg() { UFix() }
+  Mem(1024, UInt(width = 32), seqRead = true)
+val reg_raddr = Reg(UInt())
 when (wen) { ram1p(waddr) := wdata }
 .elsewhen (ren) { reg_raddr := raddr }
 val rdata = ram1p(reg_raddr)
@@ -759,7 +774,7 @@ Mem also supports write masks for subword writes.  A given bit is written if
 the corresponding mask bit is set.
 
 \begin{scala}
-val ram = Mem(256) { Bits(width = 32) }
+val ram = Mem(256, UInt(width = 32))
 when (wen) { ram.write(waddr, wdata, wmask) }
 \end{scala}
 
@@ -767,7 +782,7 @@ when (wen) { ram.write(waddr, wdata, wmask) }
 \label{sec:ports}
 
 Ports are \code{Data} derived nodes used as interfaces to hardware
-components.   A port is a directional version of a primitive
+modules.   A port is a directional version of a primitive
 \code{Data} object.  Port directions are defined as follows:
 
 \begin{scala}
@@ -780,24 +795,24 @@ object OUTPUT extends PortDir
 Aggregate ports can be recursively constructed using either a vec or
 bundle with instances of \code{Port}s as leaves.  
 
-\section{Components}
+\section{Modules}
 
-In Chisel, {\em components} are very similar to {\em modules} in
+In Chisel, {\em modules} are very similar to {\em modules} in
 Verilog, defining a hierarchical structure in the generated circuit.
-The hierarchical component namespace is accessible in downstream tools
-to aid in debugging and physical layout.  A user-defined component is
+The hierarchical module namespace is accessible in downstream tools
+to aid in debugging and physical layout.  A user-defined module is
 defined as a {\em class} which:
 \begin{itemize}
-\item inherits from \code{Component},
+\item inherits from \code{Module},
 \item contains an interface Bundle stored in a field named \code{io}, and
 \item wires together subcircuits in its constructor.
 \end{itemize}
 
-Users write their own components by subclassing Component which is
+Users write their own modules by subclassing Module which is
 defined as follows:
 
 \begin{scala}
-abstract class Component {
+abstract class Module {
   val io: Bundle
   var name: String = ""
   def compileV: Unit
@@ -807,15 +822,15 @@ abstract class Component {
 
 \noindent
 and defining their own \code{io} field.  For example, to define a two
-input mux, we would define a component as follows:
+input mux, we would define a module as follows:
 
 \begin{scala}
-class Mux2 extends Component {
+class Mux2 extends Module {
   val io = new Bundle{
-    val sel = Bits(INPUT,  1)
-    val in0 = Bits(INPUT,  1)
-    val in1 = Bits(INPUT,  1)
-    val out = Bits(OUTPUT, 1)
+    val sel = Bool(INPUT)
+    val in0 = Bool(INPUT)
+    val in1 = Bool(INPUT)
+    val out = Bool(OUTPUT)
   }
   io.out := (io.sel & io.in1) | (~io.sel & io.in0)
 }
@@ -823,21 +838,21 @@ class Mux2 extends Component {
 
 \noindent
 The \code{:=} assignment operator, used in the body of a
-component definition, is a special operator in Chisel that wires the input of
+module definition, is a special operator in Chisel that wires the input of
 left-hand side to the output of the right-hand side.  It is typically
 used to connect an output port to its definition.
 
 The \code{<>} operator bulk connects interfaces of opposite gender between
-sibling components or interfaces of same gender between parent/child components. 
+sibling modules or interfaces of same gender between parent/child modules. 
 Bulk connections connect leaf ports using pathname matching.
 Connections are only made if one of the ports is non-null,
 allowing users to repeatedly bulk-connect partially filled interfaces.
 After all connections are made and the circuit is being elaborated,
 Chisel warns users if ports have other than exactly one connection to them.
 
-The names given to the nodes and subcomponents stored in a component
+The names given to the nodes and submodules stored in a module
 when they are emitted by a C++ or Verilog backend are obtained from
-their component field names, using Scala introspection.
+their module field names, using Scala introspection.
 
 % TODO: what is same name -- is it a pathname?
 
@@ -847,7 +862,7 @@ Black boxes allow users to define interfaces to circuits defined
 outside of Chisel.  The user defines:
 
 \begin{itemize}
-\item a component as a subclass of \code{BlackBox} and
+\item a module as a subclass of \code{BlackBox} and
 \item an \code{io} field with the interface.
 \end{itemize}
 
@@ -857,8 +872,8 @@ For example, one could define a simple ROM blackbox as:
 \begin{scala}
 class RomIo extends Bundle {
   val isVal = Bool(INPUT)
-  val raddr = UFix(INPUT,  32)
-  val rdata = Bits(OUTPUT, 32)
+  val raddr = UInt(INPUT,  32)
+  val rdata = UInt(OUTPUT, 32)
 }
 
 class Rom extends BlackBox {
@@ -873,14 +888,14 @@ the user calls \code{chiselMain} from their top level \code{main} function:
 
 \begin{scala}
 object chiselMain {
-  def apply[T <: Component]
+  def apply[T <: Module]
     (args: Array[String], comp: () => T): T
 }
 \end{scala}
 
 \noindent
 which when run creates C++ files named
-\code{{\it component\_name}.cpp} and \code{{\it component\_name}.h} in
+\code{{\it module\_name}.cpp} and \code{{\it module\_name}.h} in
 the directory specified with
 \code{--targetDir {\it dir\_name}} argument.
 
@@ -893,7 +908,7 @@ the directory specified with
 % class Printer extends TestIO
 % 
 % object chiselMainDebug {
-%   def apply[T <: Component]
+%   def apply[T <: Module]
 %     (args: Array[String], comp: () => T)(
 %      scanner: T => TestIO, 
 %      printer: T => TestIO)
@@ -985,12 +1000,12 @@ testing circuits by providing test vectors within Scala using
 subclasses of the \code{Tester} class:
 
 \begin{scala}
-class Tester[T <: Component]
+class Tester[T <: Module]
   (val c: T, val testNodes: Array[Node])
 \end{scala}
 
 \noindent
-which binds a tester to a component, and specifies the nodes to test,
+which binds a tester to a module, and specifies the nodes to test,
 and finally allows users to write a \code{defTests} function.
 The definition for \code{defTests} is:
 
@@ -1002,11 +1017,11 @@ def defTests(body: => Boolean)
 where \code{testNodes} are the graph nodes that will be input to and
 output from the DUT, and where
 users write calls to \code{step} in the body.  Users connect tester
-instances to components using:
+instances to modules using:
 
 \begin{scala}
 object chiselMainTest {
-  def apply[T <: Component]
+  def apply[T <: Module]
     (args: Array[String], comp: () => T)(
      tester: T => Tester[T]): T
 }
@@ -1043,10 +1058,10 @@ class Mux2Tests(c: Mux2)
     for (s <- 0 until 2) {
     for (i0 <- 0 until 2) {
     for (i1 <- 0 until 2) {
-      vars(c.io.sel) = Bits(s)
-      vars(c.io.in1) = Bits(i1)
-      vars(c.io.in0) = Bits(i0)
-      vars(c.io.out) = Bits(if (s == 1) i1 else i0)
+      vars(c.io.sel) = UInt(s)
+      vars(c.io.in1) = UInt(i1)
+      vars(c.io.in0) = UInt(i0)
+      vars(c.io.out) = UInt(if (s == 1) i1 else i0)
       allGood &&= step(vars)
     } } } 
     allGood
@@ -1212,13 +1227,13 @@ template <int w> dat_t<w>
 \noindent
 where \code{w} is the bit width parameter.
 
-The Chisel compiler compiles top level components into a single flattened \code{mod\_t}
+The Chisel compiler compiles top level modules into a single flattened \code{mod\_t}
 class that can be created and executed:
 
 \begin{cpp}
 class mod_t {
  public:
-  // initialize component
+  // initialize module
   virtual void init (void) { };
   // compute all combinational logic
   virtual void clock_lo (dat_t<1> reset) { };
@@ -1235,7 +1250,7 @@ class mod_t {
 
 Either the Chisel compiler can create a harness or the user can write
 a harness themselves.  The following is an example of a harness for a
-CPU component:
+CPU module:
 
 \begin{cpp}
 #include "cpu.h"
@@ -1264,10 +1279,10 @@ run --v
 \end{scala}
 
 \noindent
-would produce a single Verilog file named \code{{\it component-name}.v} in
+would produce a single Verilog file named \code{{\it module-name}.v} in
 the target directory.
-The file will contain one module per component defined as subcomponents of
-the top level component created in \code{chiselMain}.  Modules with
+The file will contain one module per module defined as submodules of
+the top level module created in \code{chiselMain}.  Modules with
 the same interface and body are cached and reused.
 
 \section{Extra Stuff}
@@ -1276,19 +1291,19 @@ the same interface and body are cached and reused.
 
 \begin{scala}
 def ListLookup[T <: Bits]
-  (addr: Bits, default: List[T], 
-   mapping: Array[(Bits, List[T])]): List[T]
+  (addr: UInt, default: List[T], 
+   mapping: Array[(UInt, List[T])]): List[T]
 
 def Lookup[T <: Data]
-  (addr: Bits, default: T, 
-   mapping: Seq[(Bits, T)]): T
+  (addr: UInt, default: T, 
+   mapping: Seq[(UInt, T)]): T
 
 // n-way multiplexor
 def MuxCase[T <: Data] 
   (default: T, mapping: Seq[(Bool, T)]): T
 
 // n-way indexed multiplexer:
-def MuxLookup[S <: Bits, T <: Data] 
+def MuxLookup[S <: UInt, T <: Data] 
   (key: S, default: T, mapping: Seq[(S, T)]): T
 \end{scala}
 
@@ -1299,15 +1314,15 @@ def MuxLookup[S <: Bits, T <: Data]
 
 \begin{scala}
 // create n enum values of given type
-def Enum[T <: Bits]
+def Enum[T <: UInt]
   (n: Int)(type: => T): List[T]
 
 // create enum values of given type and names
-def Enum[T <: Bits]
+def Enum[T <: UInt]
   (l: Symbol *)(type: => T): Map[Symbol, T]
 
 // create enum values of given type and names
-def Enum[T <: Bits]
+def Enum[T <: UInt]
   (l: List[Symbol])(type: => T): Map[Symbol, T]
 \end{scala}
 
@@ -1315,7 +1330,7 @@ def Enum[T <: Bits]
 % 
 % \begin{itemize}
 % \item separate and escape sequence
-% \item component prefix
+% \item module prefix
 % \item vec element suffixes
 % \item naming from fields
 % \item bundle field paths
@@ -1340,7 +1355,7 @@ def log2Down(in: Int): Int
 def isPow2(in: Int): Boolean
 
 // linear feedback shift register
-def LFSR16(increment: Bool = Bool(true)): Bits
+def LFSR16(increment: Bool = Bool(true)): UInt
 \end{scala}
 
 \subsection{Sequential}
@@ -1351,40 +1366,43 @@ def LFSR16(increment: Bool = Bool(true)): Bits
 def ShiftRegister[T <: Data](n: Int, in: T): T
 
 def Counter(cond: Bool, n: Int) = {
-  val c = Reg(resetVal = UFix(0, log2Up(n)))
-  val wrap = c === UFix(n-1)
+  val c = RegReset(UInt(0, log2Up(n)))
+  val wrap = c === UInt(n-1)
   when (cond) {
-    c := Mux(Bool(!isPow2(n)) && wrap, UFix(0), c + UFix(1))
+    c := Mux(Bool(!isPow2(n)) && wrap, UInt(0), 
+             c + UInt(1))
   }
   (c, wrap && cond)
 }
 \end{scala}
 
-\subsection{Bits}
+\subsection{UInt}
 
 \begin{scala}
 // Returns the number of bits set in the 
 // input signal. Causes an exception if 
 // the input is wider than 32 bits.
-def PopCount(in: Bits): Bits
+def PopCount(in: UInt): UInt
 
 // Returns the reverse the input signal
-def Reverse(in: Bits): Bits
+def Reverse(in: UInt): UInt
 
 // returns the one hot encoding of
-// the input UFix
-def UFixToOH(in: UFix, width: Int): Bits
+// the input UInt
+def UIntToOH(in: UInt, width: Int): UInt
 
-// does the inverse of UFixToOH
-def OHToUFix(in: Bits): UFix
-def OHToUFix(in: Seq[Bool]): UFix
+// does the inverse of UIntToOH
+def OHToUInt(in: UInt): UInt
+def OHToUInt(in: Seq[Bool]): UInt
 
 // Builds a Mux tree out of the input 
 // signal vector using a one hot encoded 
 // select signal. Returns the output of 
 // the Mux tree
-def Mux1H[T <: Data](sel: Bits, in: Vec[T]): T
-def Mux1H[T <: Data](sel: Vec[Bool], in: Vec[T]): T
+def Mux1H[T <: Data]
+      (sel: UInt, in: Vec[T]): T
+def Mux1H[T <: Data]
+      (sel: Vec[Bool], in: Vec[T]): T
 
 // Builds a Mux tree under the
 // assumption that multiple
@@ -1392,22 +1410,24 @@ def Mux1H[T <: Data](sel: Vec[Bool], in: Vec[T]): T
 // Priority is given to the first 
 // select signal. Returns the output 
 // of the Mux tree.
-def PriorityMux[T <: Data](sel: Bits, in: Seq[T]): T
-def PriorityMux[T <: Data](sel: Seq[Bits], in: Seq[T]): T
+def PriorityMux[T <: Data]
+      (sel: UInt, in: Seq[T]): T
+def PriorityMux[T <: Data]
+      (sel: Seq[UInt], in: Seq[T]): T
 
 // Returns the bit position of the
 // trailing 1 in the input vector with
 // the assumption that multiple bits of
 // the input bit vector can be set
-def PriorityEncoder(in: Bits): UFix
-def PriorityEncoder(in: Seq[Bool]): UFix
+def PriorityEncoder(in: UInt): UInt
+def PriorityEncoder(in: Seq[Bool]): UInt
 
 // Returns the bit position of the
 // trailing 1 in the input vector with
 // the assumption that only one bit in 
 // the input vector can be set
-def PriorityEncoderOH(in: Bits): UFix
-def PriorityEncoderOH(in: Seq[Boo]): UFix
+def PriorityEncoderOH(in: UInt): UInt
+def PriorityEncoderOH(in: Seq[Boo]): UInt
 \end{scala}
 
 \subsection{Decoupled}
@@ -1418,7 +1438,7 @@ def PriorityEncoderOH(in: Seq[Boo]): UFix
 // standard used is that the
 // consumer uses the flipped
 // interface.
-class FIFOIO[+T <: Data]()(data: => T) 
+class Decoupled[+T <: Data](type: T) 
     extends Bundle {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
@@ -1429,7 +1449,7 @@ class FIFOIO[+T <: Data]()(data: => T)
 // interface. The standard used is
 // that the consumer uses the
 // fliped interface.
-class PipeIO[+T <: Data]()(data: => T) 
+class PipeIO[+T <: Data](type: T) 
     extends Bundle {
   val valid = Bool(OUTPUT)
   val bits = data.asOutput
@@ -1440,22 +1460,24 @@ class PipeIO[+T <: Data]()(data: => T)
 // Priority is given to lower
 // producer
 // Example usage:
-//    val arb = new Arbiter(2){ Bits() }
+//    val arb = new Arbiter(2, UInt())
 //    arb.io.in(0) <> producer0.io.out
 //    arb.io.in(1) <> producer1.io.out
 //    consumer.io.in <> arb.io.out
-class Arbiter[T <: Data](n: Int)(data: => T) extends Component 
+class Arbiter[T <: Data](n: Int, type: T) 
+  extends Module 
 
 // Hardware module that is used to 
 // sequence n producers into 1 consumer.
 // Producers are chosen in round robin 
 // order
 // Example usage:
-//    val arb = new RRArbiter(2){ Bits() }
+//    val arb = new RRArbiter(2, UInt())
 //    arb.io.in(0) <> producer0.io.out
 //    arb.io.in(1) <> producer1.io.out
 //    consumer.io.in <> arb.io.out
-class RRArbiter[T <: Data](n: Int)(data: => T) extends Component 
+class RRArbiter[T <: Data](n: Int, type: T) 
+  extends Module 
 
 // Generic hardware queue. Required
 // parameter entries controls the
@@ -1463,15 +1485,15 @@ class RRArbiter[T <: Data](n: Int)(data: => T) extends Component
 // the queue is determined from the 
 // inputs.
 // Example usage:
-//    val q = new Queue(16){ Bits() }
+//    val q = new Queue(16, UInt())
 //    q.io.enq <> producer.io.out
 //    consumer.io.in <> q.io.deq
 class Queue[T <: Data]
-    (entries: Int,
+    (entries: Int, type: T,
      pipe: Boolean = false,
      flow: Boolean = false
      flushable: Boolean = false)
-    (data: => T) extends Component  
+    extends Module  
 
 // A hardware module that delays data 
 // coming down the pipeline by the 
@@ -1480,12 +1502,11 @@ class Queue[T <: Data]
 // is similar to ShiftRegister but
 // this exposes a Pipe interface.
 // Example usage:
-//    val pipe = new Pipe(){ Bits() }
+//    val pipe = new Pipe(UInt())
 //    pipe.io.enq <> produce.io.out
 //    consumer.io.in <> pipe.io.deq
 class Pipe[T <: Data]
-    (latency: Int = 1)
-    (data: => T) extends Component
+    (type: T, latency: Int = 1) extends Module
 
 \end{scala}
 
