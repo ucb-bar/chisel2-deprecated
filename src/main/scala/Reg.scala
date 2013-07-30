@@ -146,7 +146,6 @@ class Reg extends Delay with proc {
   def resetVal: Node  = inputs(1);
   def enableSignal: Node = inputs(enableIndex);
   var enableIndex = 0;
-  var hasResetSignal = false
   var isReset = false
   var isEnable = false;
   def isUpdate: Boolean = !(updateVal == null);

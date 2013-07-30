@@ -169,7 +169,8 @@ class VerilogBackend extends Backend {
     val spacing = (if(c.verilog_parameters != "") " " else "");
     var res = "  " + c.moduleName + " " + c.verilog_parameters + spacing + c.name + "(";
     val hasReg = c.containsRegInTree
-    res = res + (if(hasReg) ".clk(clk), .reset(" + (if(c.reset.inputs.length==0) "reset" else emitRef(c.reset.inputs(0))) + ")" else "");
+    if (c.clocks.length > 0)
+      res = res + (c.clocks ++ c.resets.keys.toList).map(x => "." + emitRef(x) + "(" + emitRef(x) + ")").reduceLeft(_ + ", " + _)
     var isFirst = true;
     val portDecs = new ArrayBuffer[StringBuilder]
     for ((n, w) <- c.wires) {
@@ -533,11 +534,20 @@ class VerilogBackend extends Backend {
 
   def emitRegs(c: Module): StringBuilder = {
     val res = new StringBuilder();
-    res.append("  always @(posedge clk) begin\n");
-    for (m <- c.mods) {
-      res.append(emitReg(m))
+    val clkDomains = new HashMap[Clock, StringBuilder]
+    for (clock <- c.clocks) {
+      val sb = new StringBuilder
+      sb.append("  always @(posedge " + emitRef(clock) + ") begin\n")
+      clkDomains += (clock -> sb)
     }
-    res.append("  end\n");
+    for (m <- c.mods) {
+      if (m.clock != null)
+        clkDomains(m.clock).append(emitReg(m))
+    }
+    for (clock <- c.clocks) {
+      clkDomains(clock).append("  end\n")
+      res.append(clkDomains(clock).result())
+    }
     res
   }
 
@@ -548,7 +558,7 @@ class VerilogBackend extends Backend {
             ""
         } else if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1)){
           if(reg.isReset){
-            "    if(reset) begin\n" +
+            "    if(" + emitRef(reg.inputs.last) + ") begin\n" +
             "      " + emitRef(reg) + " <= " + emitRef(reg.resetVal) + ";\n" +
             "    end else if(" + emitRef(reg.enableSignal) + ") begin\n" +
             "      " + emitRef(reg) + " <= " + emitRef(reg.updateVal) + ";\n" +
@@ -561,7 +571,7 @@ class VerilogBackend extends Backend {
         } else {
           "    " + emitRef(reg) + " <= " +
           (if (reg.isReset) {
-            "reset ? " + emitRef(reg.resetVal) + " : "
+            emitRef(reg.inputs.last) + " ? " + emitRef(reg.resetVal) + " : "
           } else {
             ""
           }) + emitRef(reg.updateVal) + ";\n"
@@ -616,12 +626,13 @@ class VerilogBackend extends Backend {
     val hasReg = c.containsRegInTree
     var first = true;
     var nl = "";
-    res.append((if (hasReg) "input clk, input reset" else ""));
+    if (c.clocks.length > 0)
+      res.append((c.clocks ++ c.resets.keys.toList).map(x => "input " + emitRef(x)).reduceLeft(_ + ", " + _))
     for ((n, w) <- c.wires) {
       if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
       w match {
         case io: Bits => {
-          val prune = if (io.prune && c != Mod.topComponent) "//" else ""
+          val prune = if (io.prune && c != Module.topComponent) "//" else ""
           if (io.dir == INPUT) {
             res.append(nl + "    " + prune + "input " + 
                        emitSigned(io) + emitWidth(io) + " " + emitRef(io));
@@ -702,7 +713,7 @@ class VerilogBackend extends Backend {
        We use a LinkedHashMap such that later iteration is predictable. */
     val defs = new HashMap[String, LinkedHashMap[String, ArrayBuffer[Module] ]];
     var level = 0;
-    for( c <- Mod.sortedComps ) {
+    for( c <- Module.sortedComps ) {
       ChiselError.info(depthString(depth) + "COMPILING " + c
         + " " + c.children.length + " CHILDREN"
         + " (" + c.level + "," + c.traversal + ")");

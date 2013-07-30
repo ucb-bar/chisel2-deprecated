@@ -437,8 +437,8 @@ class CppBackend extends Backend {
         r.lits.zipWithIndex.map { case (lit, i) =>
           block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(lit, j) + ")"))
         }.reduceLeft(_ + _)
-      case u: UFix => 
-        if (Mod.randInitIOs.contains(u))
+      case u: UInt => 
+        if (Module.randInitIOs.contains(u))
           "  if (rand_init) " + emitRef(node) + ".randomize();\n"
         else
           ""
@@ -592,10 +592,9 @@ class CppBackend extends Backend {
       ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
 
-    val nullClk = new Clock
     val clkDomains = new HashMap[Clock, (StringBuilder, StringBuilder)]
     for (clock <- Module.clocks) {
-      val clkName = if (clock == nullClk) "" else "_" + emitRef(clock)
+      val clkName = if (clock == Module.implicitClock) "" else "_" + emitRef(clock)
       val clock_lo = new StringBuilder
       val clock_hi = new StringBuilder
       clkDomains += (clock -> ((clock_lo, clock_hi)))
@@ -635,7 +634,7 @@ class CppBackend extends Backend {
     out_h.write("\n");
     out_h.write("  void init ( bool rand_init = false );\n");
     for ( clock <- Module.clocks) {
-      val clkName = if (clock == nullClk) "" else "_" + emitRef(clock)
+      val clkName = if (clock == Module.implicitClock) "" else "_" + emitRef(clock)
       out_h.write("  void clock_lo" + clkName + " ( dat_t<1> reset);\n")
       out_h.write("  void clock_hi" + clkName + " ( dat_t<1> reset);\n")
     }
@@ -659,17 +658,17 @@ class CppBackend extends Backend {
     out_c.write("}\n");
 
     for (m <- c.omods) {
-      val clock = if (m.clock == null) nullClk else m.clock
+      val clock = if (m.clock == null) Module.implicitClock else m.clock
       clkDomains(clock)._1.append(emitDefLo(m))
     }
 
     for (m <- c.omods) {
-      val clock = if (m.clock == null) nullClk else m.clock
+      val clock = if (m.clock == null) Module.implicitClock else m.clock
       clkDomains(clock)._2.append(emitInitHi(m))
     }
 
     for (m <- c.omods) {
-      val clock = if (m.clock == null) nullClk else m.clock
+      val clock = if (m.clock == null) Module.implicitClock else m.clock
       clkDomains(clock)._2.append(emitDefHi(m))
     }
 

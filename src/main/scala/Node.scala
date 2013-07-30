@@ -338,11 +338,11 @@ abstract class Node extends nameable {
       }
 
     // give the components reset signal to the current node
-    if(this.isInstanceOf[Reg]) {
-      val reg = this.asInstanceOf[Reg]
-      if(reg.isReset) reg.inputs += reg.component.reset
-      reg.hasResetSignal = true
-    }
+    // if(this.isInstanceOf[Reg]) {
+    //   val reg = this.asInstanceOf[Reg]
+    //   if(reg.isReset) reg.inputs += reg.component.reset
+    //   reg.hasResetSignal = true
+    // } obsolete now...
 
     assert( comp != null );
     if (comp != null && !comp.isWalked.contains(this)) {
@@ -370,6 +370,7 @@ abstract class Node extends nameable {
                 this.name else "?")))
           }
           if (!Module.backend.isInstanceOf[VerilogBackend] || !node.isIo) {
+            assert (nextComp != null)
             stack.push(() => node.traceNode(nextComp, stack));
           }
           val j = i;

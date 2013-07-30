@@ -95,6 +95,10 @@ object Module {
   val printfs = ArrayBuffer[Printf]()
   val randInitIOs = new ArrayBuffer[Node]()
   val clocks = new ArrayBuffer[Clock]()
+  val implicitReset = Bool(INPUT)
+  implicitReset.setName("reset")
+  val implicitClock = new Clock()
+  implicitClock.setName("clk")
 
   /* Any call to a *Module* constructor without a proper wrapping
    into a Module.apply() call will be detected when trigger is false. */
@@ -251,6 +255,8 @@ abstract class Module(resetSignal: Bool = null) {
   var pathParent: Module = null;
   var verilog_parameters = "";
   var clock: Clock = null
+  val clocks = new ArrayBuffer[Clock]
+  val resets = new HashMap[Bool, Bool]
 
   components += this;
   push(this);
@@ -477,6 +483,41 @@ abstract class Module(resetSignal: Bool = null) {
 
   def forceMatchingWidths {
     bfs(_.forceMatchingWidths)
+  }
+
+  def getReset(clock: Clock): Bool = {
+    if (clock.component == this) {
+      clock.getReset
+    } else {
+      if (!this.resets.contains(clock.getReset)) {
+        val pin = Bool(INPUT); pin.setName(clock.getReset.name); pin.component = this; this.nodes += pin
+        this.resets += (clock.getReset -> pin)
+      }
+      this.resets(clock.getReset)
+    }
+  }
+
+  // associate every delay element w/ clock, add reset signal to every reg
+  def assignClks {
+    bfs {x => 
+      {
+        if (x.isInstanceOf[Delay]) {
+          if (x.clock == null) {
+            if (x.component.clock == null) {
+              x.clock = Module.implicitClock
+            } else {
+              x.clock = x.component.clock
+            }
+          }
+        }
+        if (x.isInstanceOf[Reg]) {
+          val reg = x.asInstanceOf[Reg]
+          if (reg.isReset) {
+            reg.inputs += this.getReset(reg.clock)
+          }
+        }
+      }
+    }
   }
 
   def findConsumers() {
