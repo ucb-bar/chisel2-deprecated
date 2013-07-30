@@ -413,7 +413,7 @@ endmodule
     }
 
     class BlockIO extends Bundle {
-      val resp = new PipeIO(new UnamedBundle()).flip
+      val resp = new Valid(new UnamedBundle()).flip
     }
 
     class Block extends Module {
@@ -601,7 +601,7 @@ endmodule
     }
 
     class BlockIO extends Bundle {
-      val req = new FIFOIO(new BlockReq)
+      val req = new Decoupled(new BlockReq)
     }
 
     class VecSecondComp extends Module {

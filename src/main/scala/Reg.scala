@@ -130,6 +130,8 @@ object RegUpdate {
 
   def apply[T <: Data](updateVal: T): T = Reg[T](updateVal, updateVal, null.asInstanceOf[T])
 
+  def apply[T <: Data](updateVal: T, resetVal: T): T = Reg[T](updateVal, updateVal, resetVal)
+
 }
 
 
