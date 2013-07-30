@@ -472,6 +472,10 @@ abstract class Backend {
 
   def elaborate(c: Module): Unit = {
     Module.topComponent = c;
+    Module.implicitReset.component = Module.topComponent
+    Module.topComponent.nodes += Module.implicitReset
+    Module.implicitClock.component = Module.topComponent
+    Module.topComponent.nodes += Module.implicitClock
     /* XXX If we call nameAll here and again further down, we end-up with
      duplicate names in the generated C++.
     nameAll(c) */

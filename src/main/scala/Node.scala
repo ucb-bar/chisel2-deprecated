@@ -371,7 +371,6 @@ abstract class Node extends nameable {
                 this.name else "?")))
           }
           if (!Module.backend.isInstanceOf[VerilogBackend] || !node.isIo) {
-            assert (nextComp != null)
             stack.push(() => node.traceNode(nextComp, stack));
           }
           val j = i;
