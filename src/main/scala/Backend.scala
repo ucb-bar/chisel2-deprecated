@@ -424,7 +424,7 @@ abstract class Backend {
         var curComp = comp
         while (curComp != clock.component) {
           if (!curComp.resets.contains(clock.getReset)) {
-            val pin = Bool(INPUT); pin.setName(clock.getReset.name); pin.component = curComp; curComp.nodes += pin
+            val pin = Bool(INPUT); pin.component = curComp; curComp.nodes += pin
             curComp.resets += (clock.getReset -> pin)
           }
           curComp = curComp.parent
@@ -435,12 +435,13 @@ abstract class Backend {
     // connect reset pins
     for (comp <- Module.sortedComps) {
       for (rst <- comp.resets.keys) {
-        if (comp.resets(rst).inputs == 0) {
+        if (comp.resets(rst).inputs.length == 0) {
           if (comp.parent.resets.contains(rst)) {
             comp.resets(rst).inputs += comp.parent.resets(rst)
           } else {
             comp.resets(rst).inputs += rst
           }
+          comp.resets(rst).setName(rst.name)
         }
       }
     }
@@ -518,11 +519,15 @@ abstract class Backend {
     ChiselError.info("started transforms")
     transform(c, transforms)
     ChiselError.info("finished transforms")
-    c.traceNodes();
-    println("finished trace nodes")
-    ChiselError.checkpoint()
 
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
+    c.traceNodes();
+    for (comp <- Module.sortedComps)
+      for (node <- comp.nodes)
+        if (node.isInstanceOf[Reg])
+            createClkDomain(node)
+    ChiselError.checkpoint()
+
     /* We execute nameAll after traceNodes because bindings would not have been
        created yet otherwise. */
     nameAll(c)

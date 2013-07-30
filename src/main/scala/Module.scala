@@ -490,7 +490,7 @@ abstract class Module(resetSignal: Bool = null) {
       clock.getReset
     } else {
       if (!this.resets.contains(clock.getReset)) {
-        val pin = Bool(INPUT); pin.setName(clock.getReset.name); pin.component = this; this.nodes += pin
+        val pin = Bool(INPUT); pin.component = this; this.nodes += pin
         this.resets += (clock.getReset -> pin)
       }
       this.resets(clock.getReset)
