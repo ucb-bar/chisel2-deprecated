@@ -7,14 +7,14 @@
 	<key>ApplicationVersion</key>
 	<array>
 		<string>com.omnigroup.OmniGrafflePro</string>
-		<string>139.7.0.167456</string>
+		<string>139.18.0.187838</string>
 	</array>
 	<key>AutoAdjust</key>
 	<true/>
 	<key>BackgroundGraphic</key>
 	<dict>
 		<key>Bounds</key>
-		<string>{{0, 0}, {577, 534}}</string>
+		<string>{{0, 0}, {577, 533}}</string>
 		<key>Class</key>
 		<string>SolidGraphic</string>
 		<key>ID</key>
@@ -38,13 +38,13 @@
 	<key>CanvasOrigin</key>
 	<string>{0, 0}</string>
 	<key>CanvasSize</key>
-	<string>{577, 534}</string>
+	<string>{577, 533}</string>
 	<key>ColumnAlign</key>
 	<integer>1</integer>
 	<key>ColumnSpacing</key>
 	<real>36</real>
 	<key>CreationDate</key>
-	<string>2012-05-15 17:15:06 -0700</string>
+	<string>2012-05-16 00:15:06 +0000</string>
 	<key>Creator</key>
 	<string>Jonathan Bachrach</string>
 	<key>DisplayScale</key>
@@ -57,7 +57,7 @@
 	<array>
 		<dict>
 			<key>Bounds</key>
-			<string>{{252, 384.992}, {72, 45}}</string>
+			<string>{{252, 384.99200000000002}, {72, 45}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FontInfo</key>
@@ -96,8 +96,8 @@
 			<key>Text</key>
 			<dict>
 				<key>Text</key>
-				<string>{\rtf1\ansi\ansicpg1252\cocoartf1038\cocoasubrtf360
-{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+				<string>{\rtf1\ansi\ansicpg1252\cocoartf1187\cocoasubrtf390
+\cocoascreenfonts1{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
 {\colortbl;\red255\green255\blue255;}
 \pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\qc
 
@@ -109,7 +109,7 @@ Lit(1)}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{252, 302.992}, {72, 45}}</string>
+			<string>{{252, 302.99200000000002}, {72, 45}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FontInfo</key>
@@ -148,13 +148,13 @@ Lit(1)}</string>
 			<key>Text</key>
 			<dict>
 				<key>Text</key>
-				<string>{\rtf1\ansi\ansicpg1252\cocoartf1038\cocoasubrtf360
-{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+				<string>{\rtf1\ansi\ansicpg1252\cocoartf1187\cocoasubrtf390
+\cocoascreenfonts1{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
 {\colortbl;\red255\green255\blue255;}
 \pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\qc
 
 \f0\fs24 \cf0 \expnd0\expndtw0\kerning0
-Bits}</string>
+UInt}</string>
 				<key>VerticalPad</key>
 				<integer>0</integer>
 			</dict>
@@ -171,8 +171,8 @@ Bits}</string>
 			<integer>1169</integer>
 			<key>Points</key>
 			<array>
-				<string>{288, 348.492}</string>
-				<string>{288, 384.492}</string>
+				<string>{288, 348.49200000000002}</string>
+				<string>{288, 384.49200000000002}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -244,7 +244,7 @@ Bits}</string>
 	<key>MasterSheets</key>
 	<array/>
 	<key>ModificationDate</key>
-	<string>2012-06-08 04:30:29 -0700</string>
+	<string>2013-07-30 21:15:05 +0000</string>
 	<key>Modifier</key>
 	<string>Jonathan Bachrach</string>
 	<key>NotesVisible</key>
@@ -264,20 +264,25 @@ Bits}</string>
 			<string>float</string>
 			<string>41</string>
 		</array>
+		<key>NSHorizonalPagination</key>
+		<array>
+			<string>coded</string>
+			<string>BAtzdHJlYW10eXBlZIHoA4QBQISEhAhOU051bWJlcgCEhAdOU1ZhbHVlAISECE5TT2JqZWN0AIWEASqEhAFxlwCG</string>
+		</array>
 		<key>NSLeftMargin</key>
 		<array>
 			<string>float</string>
 			<string>18</string>
 		</array>
-		<key>NSPaperName</key>
-		<array>
-			<string>string</string>
-			<string>US Letter</string>
-		</array>
 		<key>NSPaperSize</key>
 		<array>
 			<string>size</string>
-			<string>{612, 792}</string>
+			<string>{611.99999713897705, 792}</string>
+		</array>
+		<key>NSPrintReverseOrientation</key>
+		<array>
+			<string>int</string>
+			<string>0</string>
 		</array>
 		<key>NSRightMargin</key>
 		<array>
@@ -319,7 +324,7 @@ Bits}</string>
 		<key>FitInWindow</key>
 		<true/>
 		<key>Frame</key>
-		<string>{{181, 952}, {717, 626}}</string>
+		<string>{{301, 627}, {717, 626}}</string>
 		<key>ListView</key>
 		<false/>
 		<key>OutlineWidth</key>
@@ -331,7 +336,7 @@ Bits}</string>
 		<key>SidebarWidth</key>
 		<integer>138</integer>
 		<key>VisibleRegion</key>
-		<string>{{1, 1}, {575, 533}}</string>
+		<string>{{1, 1}, {575, 532}}</string>
 		<key>Zoom</key>
 		<real>1</real>
 		<key>ZoomValues</key>

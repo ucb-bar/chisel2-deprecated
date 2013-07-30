@@ -30,7 +30,7 @@
   \end{quotation}
 }
 
-\title{Chisel Manual}
+\title{Chisel 2.0 Manual}
 \author{Jonathan Bachrach, Krste Asanovi\'{c}, Huy Vo \\
 EECS Department, UC Berkeley\\
 {\tt  \{jrb|krste|huytbvo\}@eecs.berkeley.edu}
@@ -250,7 +250,7 @@ object Bits {
   def apply(value: String, width: Int = -1): Bits
 }
 
-class Bits extends Data with Updateable {
+abstract class Bits extends Data {
   // bitwise-not
   def unary_~(): Bits
   // bitwise-and
@@ -1314,8 +1314,7 @@ def MuxLookup[S <: UInt, T <: Data]
 
 \begin{scala}
 // create n enum values of given type
-def Enum[T <: UInt]
-  (n: Int)(type: => T): List[T]
+def Enum[T <: UInt](n: Int, type: T): List[T]
 
 // create enum values of given type and names
 def Enum[T <: UInt]
@@ -1323,7 +1322,7 @@ def Enum[T <: UInt]
 
 // create enum values of given type and names
 def Enum[T <: UInt]
-  (l: List[Symbol])(type: => T): Map[Symbol, T]
+  (l: List[Symbol], type: => T): Map[Symbol, T]
 \end{scala}
 
 % \section{Name Mangling}
@@ -1448,8 +1447,8 @@ class Decoupled[+T <: Data](type: T)
 // Adds a valid protocol to any
 // interface. The standard used is
 // that the consumer uses the
-// fliped interface.
-class PipeIO[+T <: Data](type: T) 
+// flipped interface.
+class Valid[+T <: Data](type: T) 
     extends Bundle {
   val valid = Bool(OUTPUT)
   val bits = data.asOutput

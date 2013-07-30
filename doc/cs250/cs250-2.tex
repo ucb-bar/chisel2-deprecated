@@ -65,7 +65,6 @@
 \end{frame}
 
 \begin{frame}[fragile]{Conditional Updates}
-
 When describing state operations, we could simply wire register inputs to combinational logic blocks, but it is often more convenient:
 \begin{itemize}
 \item to specify when updates to registers will occur and
@@ -75,7 +74,7 @@ When describing state operations, we could simply wire register inputs to combin
 \begin{columns}
 \column{0.45\textwidth}
 \begin{scala}
-val r = Reg() { UFix(16) }
+val r = Reg( UFix(16) )
 when (c === UFix(0) ) {
   r := r + UFix(1)
 }
@@ -93,8 +92,8 @@ when (c === UFix(0) ) {
 \begin{frame}[fragile]{Conditional Updates Priority}
 
 \begin{scala}
-when (c1) { r := Bits(1) }
-when (c2) { r := Bits(2) }
+when (c1) { r := UInt(1) }
+when (c2) { r := UInt(2) }
 \end{scala}
 
 \textbf{Conditional Update Order:}
@@ -132,8 +131,8 @@ when (c2) { r := Bits(2) }
 \begin{frame}[fragile]{Targetting Multiple Registers}
 
 \begin{scala}
-r := Reg(){ Fix(3) }
-s := Reg(){ Fix(3) }
+r := Reg( Fix(3) )
+s := Reg( Fix(3) )
 when (c1) { r := Fix(1); s := Fix(1) }
 when (c2) { r := Fix(2) }
 \end{scala}
@@ -225,20 +224,20 @@ Conditional updates also work for
 For wires, we can do conditional updates as follows:
 
 \begin{scala}
-val w = Bits(width = 32)
-w := Bits(0)                       // default value 
-when (c1)         { w := Bits(1) }
-when (c2)         { w := Bits(2) }
+val w = UInt(width = 32)
+w := UInt(0)                       // default value 
+when (c1)         { w := UInt(1) }
+when (c2)         { w := UInt(2) }
 \end{scala}
 
 \noindent
 which is the same as
 
 \begin{scala}
-val w = Bits(width = 32)
-when (Bool(true)) { w := Bits(0) } // default value
-when (c1)         { w := Bits(1) }
-when (c2)         { w := Bits(2) }
+val w = UInt(width = 32)
+when (Bool(true)) { w := UInt(0) } // default value
+when (c1)         { w := UInt(1) }
+when (c2)         { w := UInt(2) }
 \end{scala}
 
 \end{frame}
@@ -251,12 +250,12 @@ when (c2)         { w := Bits(2) }
 Finite state machines can now be readily defined as follows:
 
 \begin{scala}
-class Parity extends Component {
+class Parity extends Module {
   val io = new Bundle {
     val in  = Bool(INPUT)
     val out = Bool(OUTPUT) }
   val s_even :: s_odd :: Nil = Enum(2){ UFix() }
-  val state  = Reg(resetVal = s_even)
+  val state  = RegReset(s_even)
   when (io.in) {
     when (state === s_even) { state := s_odd  }
     .otherwise              { state := s_even }
@@ -280,7 +279,7 @@ where \verb+Enum(2){ UFix() }+ creates a list of two \code{UFix()} literals.
 
 \begin{scala}
 val d = Array(UFix(1), UFix(2), UFix(4), UFix(8))
-val m = ROM(d){ UFix(width = 32) }
+val m = ROM(d, UFix(width = 32) )
 val r = m(counter(UFix(3)))
 \end{scala}
 
@@ -295,7 +294,7 @@ val r = m(counter(UFix(3)))
 \column{0.52\textwidth}
 
 \begin{scala}
-class Mul extends Component {
+class Mul extends Module {
   val io = new Bundle {
     val x   = UFix(INPUT, 4)
     val y   = UFix(INPUT, 4)
@@ -321,11 +320,10 @@ class Mul extends Component {
 \end{frame}
 
 \begin{frame}[fragile]{RAM}
-
 RAM is supported using the \code{Mem} construct
 
 \begin{scala}
-val m = Mem(32){ Bits(width = 32) }
+val m = Mem(32){ UInt(width = 32) }
 \end{scala}
 
 \noindent
@@ -340,7 +338,7 @@ where
 \begin{frame}[fragile]{32-entry Register File}
 
 \begin{scala}
-val regs = Mem(32){ Bits(width = 32) }
+val regs = Mem(32, UInt(width = 32) )
 when (wrEn) {
   regs(wrAddr) := wrData
 }
@@ -355,7 +353,6 @@ val mDat = regs(mAddr)
 \end{frame}
 
 \begin{frame}[fragile]{Sequential Read Ports}
-
 Sequential read ports are inferred when:
 \begin{itemize}
 \item optional parameter \code{seqRead} is set and
@@ -363,8 +360,8 @@ Sequential read ports are inferred when:
 \end{itemize}
 
 \begin{scala}
-val ram1r1w = Mem(1024, seqRead = true) { Bits(width = 32) }
-val dOut    = Reg() { Bits() }
+val ram1r1w = Mem(1024, UInt(width = 32), seqRead = true)
+val dOut    = Reg( UInt() )
 when (wrEn) { ram1r1w(wrAddr) := wrData }
 when (rdEn) { dOut := ram1r1w(rdAddr) }
 \end{scala}
@@ -376,13 +373,12 @@ when (rdEn) { dOut := ram1r1w(rdAddr) }
 \end{frame}
 
 \begin{frame}[fragile]{Single-ported SRAM}
-
 Single-ported SRAMs can be inferred when the read and write conditions are
 mutually exclusive in the same \code{when} chain
 
 \begin{scala}
-val ram1p = Mem(1024, seqRead = true) { Bits(width = 32) }
-val dOut  = Reg() { Bits() }
+val ram1p = Mem(1024, UInt(width = 32), seqRead = true )
+val dOut  = Reg( UInt() )
 when (wrEn) { ram1p(wrAddr) := wrData }
 .elsewhen (rdEn) { dOut := ram1p(rdAddr) }
 \end{scala}
@@ -393,8 +389,7 @@ when (wrEn) { ram1p(wrAddr) := wrData }
 
 \end{frame}
 
-\begin{frame}[fragile]{Components and Interfaces}
-
+\begin{frame}[fragile]{Modules and Interfaces}
 Suppose we want to break computation into a series of filters (ala Unix):
 
 \begin{center}
@@ -407,14 +402,13 @@ where data is fed though with an additional \code{valid} signal to say whether d
 \end{frame}
 
 \begin{frame}[fragile]{Pass Through Filter}
-
 We can define a pass through filter component by defining a filter class extending component:
 
 \begin{columns}
 \column{0.45\textwidth}
 
 \begin{scala}
-class Filter extends Component { 
+class Filter extends Module { 
   val io  = new FilterIO()
   io.out.data  := io.in.data
   io.out.valid := io.in.valid
@@ -433,17 +427,15 @@ where the \verb+io+ field contains \verb+FilterIO+.
 \end{frame}
 
 \begin{frame}[fragile]{Small and Odd Filters}
-
 Suppose we want to write a small and odd filter.  We could write these out by hand:
-
 \begin{scala}
-class SmallFilter extends Component { 
+class SmallFilter extends Module { 
   val io  = new FilterIO()
   io.out.data  := io.in.data
   io.out.valid := io.in.valid && (io.in.data < 10)
 }
 
-class OddFilter extends Component { 
+class OddFilter extends Module { 
   val io  = new FilterIO()
   io.out.data  := io.in.data
   io.out.valid := io.in.valid && (io.in.data & 1)
@@ -458,8 +450,8 @@ class OddFilter extends Component {
 \column{0.55\textwidth}
 
 \begin{scala}
-class PipeIO extends Bundle { 
-  val data  = UFix(OUTPUT, 16) 
+class ValidUInt extends Bundle { 
+  val data  = UInt(OUTPUT, 16) 
   val valid = Bool(OUTPUT)
 }
 \end{scala}
@@ -483,8 +475,8 @@ From there we can define a filter interface by nesting two
 
 \begin{scala}
 class FilterIO extends Bundle { 
-  val in  = new PipeIO().flip
-  val out = new PipeIO()
+  val in  = new ValidUInt().flip
+  val out = new ValidUInt()
 }
 \end{scala}
 
@@ -509,10 +501,10 @@ We can now compose two filters into a filter block as follows:
 
 {\lstset{basicstyle={\scriptsize\ttfamily}}
 \begin{scala}
-class SmallOdds extends Component { 
+class SmallOdds extends Module { 
   val io     = new FilterIO()
-  val smalls = new SmallFilter()
-  val odds   = new OddFilter()
+  val smalls = Module(new SmallFilter())
+  val odds   = Module(new OddFilter())
 
   smalls.io.in  <> io.in
   smalls.io.out <> odds.io.in
@@ -559,7 +551,6 @@ You can write RTL, define components (even with recursive data types), and wire 
 
 
 \begin{frame}[fragile]{Parameterized Filter}
-
 Instead of writing a \code{SmallFilter} and \code{OddFilter}, a better Filter solution would be to create a single reusable Filter class that allows the user to specify the filter function.  We can do this by
 \begin{itemize}
 \item specifying a filter function as a Filter constructor argument:
@@ -571,15 +562,15 @@ Instead of writing a \code{SmallFilter} and \code{OddFilter}, a better Filter so
 {\lstset{basicstyle={\scriptsize\ttfamily}}
 \begin{scala}
 class Filter (isOk: (UFix) => Bool) 
-    extends Component { 
-  val io  = new FilterIO()
+    extends Module { 
+  val io  = new ValidUFix()
   io.out.data  := io.in.data
   io.out.valid := 
     io.in.valid && isOk(io.in.data)
 }
 
-val odds   = new Filter((x) => x & UFix(1))
-val smalls = new Filter((x) => x < UFix(10))
+val odds   = Module(new Filter((x) => x & UFix(1)))
+val smalls = Module(new Filter((x) => x < UFix(10)))
 \end{scala}
 }
 
@@ -600,10 +591,10 @@ We can now compose two parameterized filters into a filter block as follows:
 
 {\lstset{basicstyle={\scriptsize\ttfamily}}
 \begin{scala}
-class SmallOdds extends Component { 
+class SmallOdds extends Module { 
   val io     = new FilterIO()
-  val smalls = new Filter(_ < 10)
-  val odds   = new Filter(_ & 1)
+  val smalls = Module(new Filter(_ < 10))
+  val odds   = Module(new Filter(_ & 1))
 
   smalls.io.in  <> io.in
   smalls.io.out <> odds.io.in
@@ -637,11 +628,11 @@ We can do this:
 
 {\lstset{basicstyle={\scriptsize\ttfamily}}
 \begin{scala}
-class SmallOdds extends Component { 
+class SmallOdds extends Module { 
   val io     = new FilterIO()
-  val smalls = new Filter(_ < 10)
+  val smalls = Module(new Filter(_ < 10))
   val q      = new Queue()
-  val odds   = new Filter(_ & 1)
+  val odds   = Module(new Filter(_ & 1))
 
   smalls.io.in  <> io.in
   smalls.io.out <> q.io.in
@@ -662,7 +653,6 @@ class SmallOdds extends Component {
 \end{frame}
 
 \begin{frame}[fragile]{Decoupled Filter}
-
 Now filtering must consider back pressure:
 
 \begin{columns}
@@ -671,7 +661,7 @@ Now filtering must consider back pressure:
 {\lstset{basicstyle={\scriptsize\ttfamily}}
 \begin{scala}
 class Filter (isOk: (UFix) => Bool) 
-    extends Component { 
+    extends Module { 
   val io  = new FilterIO()
   io.out.data  := io.in.data
   io.out.ready := Bool(true)
@@ -708,7 +698,7 @@ where
 We can define a decoupled interface by extending \verb+PipeIO+ with a ready signal:
 
 \begin{scala}
-class FIFOIO extends PipeIO { 
+class DecoupledUFix extends ValidUFix { 
   val ready = Bool(INPUT)
 }
 \end{scala}
@@ -732,12 +722,12 @@ In general, users can organize their interfaces into hierarchies using inheritan
 \column{0.55\textwidth}
 
 From there we can define a filter interface by nesting two
-\verb+FIFOIO+s into a new \verb+FilterIO+ bundle:
+\verb+ValidUFix+s into a new \verb+FilterIO+ bundle:
 
 \begin{scala}
 class FilterIO extends Bundle { 
-  val in  = new FIFOIO().flip
-  val out = new FIFOIO()
+  val in  = new ValidUFix().flip
+  val out = new ValidUFix()
 }
 \end{scala}
 
@@ -751,7 +741,6 @@ class FilterIO extends Bundle {
 \end{frame}
 
 \begin{frame}[fragile]{Parameterized Decoupled Interfaces}
-
 Unfortunately, as defined, decoupled interfaces are defined only for 16 bit \verb+UFix+s.  
 Obviously, we want to generalize this to allow for arbitrary Chisel data types.  
 We can do this by using:
@@ -762,13 +751,13 @@ We can do this by using:
 
 We want to be able to write
 \begin{scala}
-val ufix32s = new FIFOIO(){ UFix(width = 32) }
+val ufix32s = new Valid( UFix(width = 32) )
 
 class Packet extends Bundle {
   val header = UFix(width = 8)
-  val body   = Bits(width = 64)
+  val body   = UInt(width = 64)
 }
-val pkts    = new FIFOIO(){ new Packet() }
+val pkts    = new Decoupled( new Packet() )
 \end{scala}
 
 \noindent
@@ -776,18 +765,17 @@ but how do we define this parameterized \code{FIFOIO}?
 \end{frame}
 
 \begin{frame}[fragile]{Parameterized Types in Scala}
-
 First we need to learn about parameterized types in Scala.
 We can define a generic \code{Mux} function as taking a boolean condition and \code{con} and \code{alt} arguments (corresponding to then and else expressions) of type \code{T} as follows:
 
 \begin{scala}
-def Mux[T <: Bits](c: Bool, con: T, alt: T): T { ... }
+def Mux[T <: UInt](c: Bool, con: T, alt: T): T { ... }
 \end{scala}
 
 \noindent
 where 
 \begin{itemize}
-\item \code{T} is required to be a subclass of \code{Bits} and 
+\item \code{T} is required to be a subclass of \code{UInt} and 
 \item the type of \code{con} and \code{alt} are required to match.
 \end{itemize}
 
@@ -796,41 +784,20 @@ You can think of the type parameter as a way of just constraining the types of t
 
 \end{frame}
 
-\begin{frame}[fragile]{Curried Arguments}
-
-In Chisel we use special syntax for passing in a type constructor for parameterized types (such as Reg, Mem, and ROM).  For example, for we can construct a reg using the following syntax:
-\begin{scala}
-val r = Reg(){ Bits(width = 32) }
-\end{scala}
-
-You can write your own functions to allow this syntax and behavior as follows:
-
-\begin{scala}
-def myReg[T <: Data]()(type: => T) { ... }
-
-myReg(){ Bits(width = 16) }
-\end{scala}
-
-\noindent
-where the second parameter list has a single zero argument function parameter (aka thunk) that when called with no arguments produces a chisel type.
-
-\end{frame}
-
 \begin{frame}[fragile]{Implementing Parameterized Interfaces}
-
-Now we can define \code{FIFOIO} and \code{FilterIO} using parameterized types and a curried argument as follows:
+Now we can define \code{Decoupled} and \code{FilterIO} using parameterized types as follows:
 
 {\lstset{basicstyle={\scriptsize\ttfamily}}
 \begin{scala}
-class FIFOIO[T <: Data]()(type: => T) extends Bundle {
+class Decoupled[T <: Data](type: T) extends Bundle {
   val data  = type.asOutput
   val valid = Bool(OUTPUT)
   val ready = Bool(INPUT)
 }
 
-class FilterIO[T <: Data]()(type: => T) extends Bundle { 
-  val in  = new FIFOIO(){ type }.flip
-  val out = new FIFOIO(){ type }
+class FilterIO[T <: Data]()(type: T) extends Bundle { 
+  val in  = new Decoupled( type ).flip
+  val out = new Decoupled( type )
 }
 \end{scala}
 
@@ -838,19 +805,18 @@ class FilterIO[T <: Data]()(type: => T) extends Bundle {
 We can now define \code{FIFOIO} on arbitrary data types:
 
 \begin{scala}
-val ufix32s = new FIFOIO(){ UFix(width = 32) }
-val pkts    = new FIFOIO(){ new Packet() }
+val ufix32s = new Decoupled( UFix(width = 32) )
+val pkts    = new Decoupled( new Packet() )
 \end{scala}
 }
 \end{frame}
 
 \begin{frame}[fragile]{Fully Parameterized Filters}
-
 Now we can redo our definition of the \code{Filter} and \code{SmallOdds} components:
 
 {\lstset{basicstyle={\scriptsize\ttfamily}}
 \begin{scala}
-class Filter[T <: Data] (isOk: (T) => Bool) (type: => T) extends Component { 
+class Filter[T <: Data] (isOk: (T) => Bool, type: T) extends Module { 
   val io = new FilterIO(){ type }
 
   io.out.data  := io.in.data
@@ -858,11 +824,11 @@ class Filter[T <: Data] (isOk: (T) => Bool) (type: => T) extends Component {
   io.out.valid := io.out.ready && io.in.valid && isOk(io.in.data)
 }
 
-class SmallOdds[T <: Data]()(type: => T) extends Component { 
+class SmallOdds[T <: Data](type: T) extends Module { 
   val io     = new FilterIO()
-  val smalls = new Filter(_ < UFix(10)){ type }
+  val smalls = Module(new Filter(_ < UFix(10), type ))
   val q      = new Queue(){ type }
-  val odds   = new Filter(_ & UFix(1)){ type }
+  val odds   = Module(new Filter(_ & UFix(1), type ))
 
   smalls.io.in  <> io.in
   smalls.io.out <> q.io.in
@@ -870,7 +836,7 @@ class SmallOdds[T <: Data]()(type: => T) extends Component {
   odds.io.out   <> io.out
 }
 
-val block = new SmallOdds(){ UFix(width = 32) }
+val block = new SmallOdds( UFix(width = 32) )
 \end{scala}
 }
 \end{frame}
@@ -880,10 +846,10 @@ val block = new SmallOdds(){ UFix(width = 32) }
 \column{0.40\textwidth}
 
 \begin{scala}
-class Cpu extends Component {
+class Cpu extends Module {
   val io = new CpuIo()
-  val c  = new CtlPath()
-  val d  = new DatPath()
+  val c  = Module(new CtlPath())
+  val d  = Module(new DatPath())
   c.io.ctl  <> d.io.ctl
   c.io.dat  <> d.io.dat
   c.io.imem <> io.imem
@@ -911,12 +877,12 @@ class Cpu extends Component {
 class RomIo extends Bundle {
   val isVal = Bool(INPUT)
   val raddr = UFix(INPUT, 32)
-  val rdata = Bits(OUTPUT, 32) 
+  val rdata = UInt(OUTPUT, 32) 
 }
 
 class RamIo extends RomIo {
   val isWr  = Bool(INPUT)
-  val wdata = Bits(INPUT, 32) 
+  val wdata = UInt(INPUT, 32) 
 }
 
 class CpathIo extends Bundle {
@@ -944,7 +910,7 @@ class DpathIo extends Bundle {
 \column{0.40\textwidth}
 
 \begin{scala}
-class Cpath extends Component {
+class Cpath extends Module {
   val io = new CpathIo();
   ...
   io.imem.isVal := ...;
@@ -953,7 +919,7 @@ class Cpath extends Component {
   ...
 }
 
-class Dpath extends Component {
+class Dpath extends Module {
   val io = new DpathIo();
   ...
   io.imem.raddr := ...;
@@ -977,10 +943,10 @@ class Dpath extends Component {
 \column{0.40\textwidth}
 
 \begin{scala}
-class Cpu extends Component {
+class Cpu extends Module {
   val io = new CpuIo()
-  val c  = new CtlPath()
-  val d  = new DatPath()
+  val c  = Module(new CtlPath())
+  val d  = Module(new DatPath())
   c.io.ctl  <> d.io.ctl
   c.io.dat  <> d.io.dat
   c.io.imem <> io.imem
@@ -1069,11 +1035,11 @@ class Cpu extends Component {
 
 \begin{frame}[fragile]{Object-Oriented Parameterized Interfaces}
 \begin{scala}
-class Router extends Component {
+class Router extends Module {
   val depth = 32
   val n     = 4
   val io    = new RouterIO(n)
-  val tbl   = Mem(depth){ UFix(width = sizeof(n)) }
+  val tbl   = Mem(depth, UFix(width = sizeof(n)) )x
   
   ...
 }
@@ -1087,11 +1053,11 @@ class Router extends Component {
 \begin{scala}
 class RouterIO(n: Int) extends Bundle {
   override def clone = new RouterIO(n).asInstanceOf[this.type]
-  val reads   = new DeqIO(){ new ReadCmd() }
-  val replies = new EnqIO(){ UFix(width = 8) }
-  val writes  = new DeqIO(){ new WriteCmd() }
-  val in      = new DeqIO(){ new Packet() }
-  val outs    = Vec(n){ new EnqIO(){ new Packet() } }
+  val reads   = new DeqIO( new ReadCmd() )
+  val replies = new EnqIO( UFix(width = 8) )
+  val writes  = new DeqIO( new WriteCmd() )
+  val in      = new DeqIO( new Packet() )
+  val outs    = Vec.fill(n){ new EnqIO( new Packet() ) }
 }
 \end{scala}
 \begin{center}
@@ -1113,16 +1079,16 @@ class WriteCmd extends ReadCmd {
 
 class Packet extends Bundle {
   val header = UFix(width = 8)
-  val body   = Bits(width = 64)
+  val body   = UInt(width = 64)
 }
 
 class RouterIO(n: Int) extends Bundle {
   override def clone = new RouterIO(n).asInstanceOf[this.type]
-  val reads   = new DeqIO(){ new ReadCmd() }
-  val replies = new EnqIO(){ UFix(width = 8) }
-  val writes  = new DeqIO(){ new WriteCmd() }
-  val in      = new DeqIO(){ new Packet() }
-  val outs    = Vec(n){ new EnqIO(){ new Packet() } }
+  val reads   = new DeqIO( new ReadCmd() )
+  val replies = new EnqIO( UFix(width = 8) )
+  val writes  = new DeqIO( new WriteCmd() )
+  val in      = new DeqIO( new Packet() )
+  val outs    = Vec.fill(n){ new EnqIO( new Packet() ) }
 }
 \end{scala}
 }
@@ -1134,18 +1100,18 @@ class RouterIO(n: Int) extends Bundle {
 \begin{scala}
 class RouterIO(n: Int) extends Bundle {
   override def clone = new RouterIO(n).asInstanceOf[this.type]
-  val reads   = new DeqIO(){ new ReadCmd() }
-  val replies = new EnqIO(){ UFix(width = 8) }
-  val writes  = new DeqIO(){ new WriteCmd() }
-  val in      = new DeqIO(){ new Packet() }
-  val outs    = Vec(n){ new EnqIO(){ new Packet() } }
+  val reads   = new DeqIO( new ReadCmd() )
+  val replies = new EnqIO( UFix(width = 8) )
+  val writes  = new DeqIO( new WriteCmd() )
+  val in      = new DeqIO( new Packet() )
+  val outs    = Vec.fill(n){ new EnqIO( new Packet() ) }
 }
 
-class Router extends Component {
+class Router extends Module {
   val depth = 32
   val n     = 4
   val io    = new RouterIO(n)
-  val tbl   = Mem(depth){ UFix(width = sizeof(n)) }
+  val tbl   = Mem(depth, UFix(width = sizeof(n)) )
   
   when(io.reads.valid && io.replies.ready) { 
     val cmd = io.reads.deq();  io.replies.enq(tbl(cmd.addr))  
@@ -1163,23 +1129,23 @@ class Router extends Component {
 
 {\lstset{basicstyle={\scriptsize\ttfamily}}
 \begin{scala}
-class EnqIO[T <: Data]()(data: => T) extends FIFOIO()(data) {
+class EnqIO[T <: Data]( data: T ) extends Decoupled(data) {
   def enq(dat: T): T = { valid := Bool(true); data := dat; dat }
   valid := Bool(false)
   for (io <- data.flatten.map(x => x._2))
     io := UFix(0, io.getWidth())
 }
 
-class DeqIO[T <: Data]()(data: => T) extends FIFOIO()(data) {
+class DeqIO[T <: Data](data: T) extends Decoupled(data) {
   flip()
   ready := Bool(false)
   def deq(b: Boolean = false): T = { ready := Bool(true); data }
 }
 
-class Filter[T <: Data]()(data: => T) extends Component {
+class Filter[T <: Data](data: T) extends Module {
   val io = new Bundle {
-    val in  = new DeqIO(){ data }
-    val out = new EnqIO(){ data }
+    val in  = new DeqIO( data )
+    val out = new EnqIO( data )
   }
   when (io.in.valid && io.out.ready) {
     io.out.enq(io.in.deq())

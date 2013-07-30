@@ -65,7 +65,7 @@
 %  %\vspace*{-0.1in}
 %  }
 
-\title{Chisel Tutorial}
+\title{Chisel 2.0 Tutorial}
 \author{Jonathan Bachrach, Krste Asanovi\'{c}, John Wawrzynek \\
 EECS Department, UC Berkeley\\
 {\tt  \{jrb|krste|johnw\}@eecs.berkeley.edu}
@@ -576,7 +576,7 @@ booleans which are always one bit).
 
 An example port declaration is as follows:
 \begin{scala}
-class FIFOIO extends Bundle {
+class Decoupled extends Bundle {
   val ready = Bool(OUTPUT)
   val data  = UInt(INPUT, 32)
   val valid = Bool(INPUT)
@@ -676,15 +676,15 @@ class Mux4 extends Module {
     val sel = UInt(INPUT, 2)
     val out = UInt(OUTPUT, 1)
   }
-  val m0 = new Mux2()
+  val m0 = Module(new Mux2())
   m0.io.sel := io.sel(0) 
   m0.io.in0 := io.in0; m0.io.in1 := io.in1
 
-  val m1 = new Mux2()
+  val m1 = Module(new Mux2())
   m1.io.sel := io.sel(0) 
   m1.io.in0 := io.in2; m1.io.in1 := io.in3
 
-  val m3 = new Mux2()
+  val m3 = Module(new Mux2())
   m3.io.sel := io.sel(1) 
   m3.io.in0 := m0.io.out; m3.io.in1 := m1.io.out
 
@@ -822,7 +822,7 @@ The simplest form of state element supported by Chisel is a
 positive-edge-triggered register, which can be instantiated
 functionally as:
 \begin{scala}
-Reg(in)
+RegUpdate(in)
 \end{scala}
 
 \noindent
@@ -838,7 +838,7 @@ constructs.  For example, a rising-edge detector that takes a boolean
 signal in and outputs true when the current value is true and the
 previous value is false is given by:
 \begin{scala}
-def risingedge(x: Bool) = x && !Reg(x)
+def risingedge(x: Bool) = x && !RegUpdate(x)
 \end{scala}
 
 Counters are an important sequential circuit.  To construct an
@@ -925,7 +925,7 @@ several separate statements.  Chisel provides conditional update rules
 in the form of the \code{when} construct to support this style of
 sequential logic description. For example,
 \begin{scala}
-val r = Reg() { UInt(16) }
+val r = Reg(UInt(16))
 when (c === UInt(0) ) {
   r := r + UInt(1)
 }
@@ -1108,7 +1108,7 @@ generator:
 %   val io = new Bundle {
 %     val in  = Bool(INPUT)
 %     val out = Bool(OUTPUT) }
-%   val s_even :: s_odd :: Nil = Enum(2){ UInt() }
+%   val s_even :: s_odd :: Nil = Enum(2, UInt())
 %   val state  = RegReset(s_even)
 %   switch(state, Array(
 %     (s_even, () => { when (io.in) { state := s_odd } }),
@@ -1122,7 +1122,7 @@ class Parity extends Module {
   val io = new Bundle {
     val in  = Bool(dir = INPUT)
     val out = Bool(dir = OUTPUT) }
-  val s_even :: s_odd :: Nil = Enum(2){ UInt() }
+  val s_even :: s_odd :: Nil = Enum(2, UInt())
   val state  = RegReset(s_even)
   when (io.in) {
     when (state === s_even) { state := s_odd  }
@@ -1133,7 +1133,7 @@ class Parity extends Module {
 \end{scala}
 
 \noindent
-where \verb+Enum(2){ UInt() }+ generates two \verb+UInt+ literals and
+where \verb+Enum(2, UInt())+ generates two \verb+UInt+ literals and
 where the states are updated when \verb+in+ is true.  It is worth
 noting that all of the mechanisms for FSMs are built upon registers,
 wires, and conditional updates.
@@ -1147,7 +1147,7 @@ class VendingMachine extends Module {
     val dime   = Bool(dir = INPUT)
     val rdy    = Bool(dir = OUTPUT) }
   val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = 
-    Enum(5){ UInt() }
+    Enum(5, UInt())
   val state = RegReset(s_idle)
   when (state === s_idle) {
     when (io.nickel) { state := s_5 }
@@ -1180,7 +1180,7 @@ class VendingMachine extends Module {
     val nickel = Bool(dir = INPUT)
     val dime   = Bool(dir = INPUT)
     val rdy    = Bool(dir = OUTPUT) }
-  val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = Enum(5){ UFIx() }
+  val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = Enum(5, UFIx())
   val state = RegReset(s_idle)
   switch (state) {
       is (s_idle) {
@@ -1436,8 +1436,8 @@ We can now compose two filters into a filter block as follows:
 \begin{scala}
 class Block extends Module { 
   val io = new FilterIO()
-  val f1 = new Filter()
-  val f2 = new Filter()
+  val f1 = Module(new Filter())
+  val f2 = Module(new Filter())
 
   f1.io.x <> io.x
   f1.io.y <> f2.io.x
@@ -1519,8 +1519,8 @@ We can now wire up the CPU using bulk connects as we would with other bundles:
 \begin{scala}
 class Cpu extends Module {
   val io = new CpuIo()
-  val c  = new CtlPath()
-  val d  = new DatPath()
+  val c  = Module(new CtlPath())
+  val d  = Module(new DatPath())
   c.io.ctl  <> d.io.ctl
   c.io.dat  <> d.io.dat
   c.io.imem <> io.imem
@@ -1724,20 +1724,19 @@ where $x$ is the input and $w$ is a vector of weights.
 In Chisel this can be defined as:
 
 \begin{scala}
-def innerProductFIR[T <: Num] (w: Array[Int], x: T) = {
-  val delays = Range(0, w.length).map(i => Num(w(i)) * delay(x, i))
-  delays.reduceRight(_ + _)
-}
+def delays[T <: Data](x: T, n: Int): List[T] = 
+  if (n <= 1) List(x) else x :: taps(RegUpdate(x), n-1)
 
-def delay[T <: UInt](x: T, n: Int): T =
-  if (n == 0) x else Reg(delay(x, n - 1))
+def innerProductFIR[T <: Num](ws: Seq[T], x: T): T = 
+  (ws, delays(x, ws.length)).zipped.
+    map( _ * _ ).reduceRight( _ + _ )
 \end{scala}
  
 \noindent
 where 
-\code{delay} creates a \code{n} cycle delayed copy of its input and
-\code{foldRight} constructs a reduction circuit given a binary combiner function \code{f}.  
-In this case, \code{foldRight} creates a summation circuit.
+\code{delays} creates a list of incrementally increasing delays of its input and
+\code{reduceRight} constructs a reduction circuit given a binary combiner function \code{f}.  
+In this case, \code{reduceRight} creates a summation circuit.
 Finally, the \code{innerProductFIR} function is constrained to work on inputs of type \code{Num} where Chisel multiplication and addition are defined.
 
 \subsection{Parameterized Classes}
@@ -1747,7 +1746,7 @@ For instance, we can generalize the Filter class to use any kind of link.
 We do so by parameterizing the \verb+FilterIO+ class and defining the constructor to take a zero argument type constructor function as follow:
 
 \begin{scala}
-class FilterIO[T <: Data]()(type: => T) extends Bundle { 
+class FilterIO[T <: Data](type: T) extends Bundle { 
   val x = type.asInput.flip
   val y = type.asOutput
 }
@@ -1757,8 +1756,8 @@ class FilterIO[T <: Data]()(type: => T) extends Bundle {
 We can now define \verb+Filter+ by defining a component class that also takes a link type constructor argument and passes it through to the \verb+FilterIO+ interface constructor:
 
 \begin{scala}
-class Filter[T <: Data]()(type: => T) extends Module { 
-  val io = new FilterIO(){ type }
+class Filter[T <: Data](type: T) extends Module { 
+  val io = new FilterIO(type)
   ...
 }
 \end{scala}
@@ -1766,7 +1765,7 @@ class Filter[T <: Data]()(type: => T) extends Module {
 \noindent
 We can now define a \verb+PLink+ based \verb+Filter+ as follows:
 \begin{scala}
-val f = new Filter(){ new PLink() }
+val f = Module(new Filter(new PLink()))
 \end{scala}
 
 \noindent
@@ -1829,7 +1828,7 @@ class Fifo[T <: Data] (n: Int, type: T)
 It is also possible to define a generic decoupled interface:
 
 \begin{scala}
-class FIFOIO[T <: Data]()(data: => T) 
+class Decoupled[T <: Data](data: T) 
     extends Bundle {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
@@ -1843,7 +1842,7 @@ set of signals:
 
 \begin{scala}
 class DecoupledDemo 
-  extends FIFOIO()( new DataBundle )
+  extends Decoupled()( new DataBundle )
 \end{scala}
 
 \noindent
@@ -1854,8 +1853,8 @@ follows:
 class Fifo[T <: Data] (n: Int)(data: => T) 
     extends Module {
   val io = new Bundle {
-    val enq = new FIFOIO()( data ).flip()
-    val deq = new FIFOIO()( data )
+    val enq = new Decoupled( data ).flip()
+    val deq = new Decoupled( data )
   }
   ...
 }

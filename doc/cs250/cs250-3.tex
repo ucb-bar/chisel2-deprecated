@@ -103,11 +103,11 @@ import Chisel._
 import scala.collection.mutable.HashMap
 import scala.util.Random
 
-class Combinational extends Component {
+class Combinational extends Module {
   val io = new Bundle {
-    val x = UFix(INPUT, 16)
-    val y = UFix(INPUT, 16)
-    val z = UFix(OUTPUT, 16) }
+    val x = UInt(INPUT, 16)
+    val y = UInt(INPUT, 16)
+    val z = UInt(OUTPUT, 16) }
   io.z := io.x + io.y
 }
 
@@ -122,9 +122,9 @@ class CombinationalTests(c: Combinational)
       vars.clear()
       val x        = rnd.nextInt(maxInt)
       val y        = rnd.nextInt(maxInt)
-      vars(c.io.x) = UFix(x)
-      vars(c.io.y) = UFix(y)
-      vars(c.io.z) = UFix((x + y)&(maxInt-1))
+      vars(c.io.x) = UInt(x)
+      vars(c.io.y) = UInt(y)
+      vars(c.io.z) = UInt((x + y)&(maxInt-1))
       allGood      = step(vars) && allGood
     }
     allGood
@@ -134,7 +134,7 @@ class CombinationalTests(c: Combinational)
 \column{0.5\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-class Tester[T <: Component]
+class Tester[T <: Module]
   (val c: T, val testNodes: Array[Node])
 
 def defTests(body: => Boolean)
@@ -163,11 +163,11 @@ DUT sends next outputs to Chisel
 \end{columns}
 \end{frame}
 
-\begin{frame}[fragile]{Binding Tester to Component}
+\begin{frame}[fragile]{Binding Tester to Module}
 
 \begin{scala}
 object chiselMainTest {
-  def apply[T <: Component]
+  def apply[T <: Module]
     (args: Array[String], comp: () => T)(tester: T => Tester[T]): T
 }
 \end{scala}
@@ -225,8 +225,8 @@ class GCDTests(c: GCD) extends Tester(c, Array(c.io)) {
     val ovars = new HashMap[Node, Node]()
     var t = 0
     do {
-      svars(c.io.a) = UFix(a)
-      svars(c.io.b) = UFix(b)
+      svars(c.io.a) = UInt(a)
+      svars(c.io.b) = UInt(b)
       step(svars, ovars)
       t += 1
     } while (t <= 1 || ovars(c.io.v).litValue() == 0)
@@ -260,20 +260,19 @@ class GCDTests(c: GCD) extends Tester(c, Array(c.io)) {
 \end{frame}
 
 \begin{frame}[fragile]{Creating C++ Output}
-
 In order to construct a circuit, 
 the user calls \code{chiselMain} from their top level \code{main} function:
 
 \begin{scala}
 object chiselMain {
-  def apply[T <: Component]
+  def apply[T <: Module]
     (args: Array[String], comp: () => T): T
 }
 \end{scala}
 
 \noindent
 which when run creates C++ files named
-\code{{\it component\_name}.cpp} and \code{{\it component\_name}.h} in
+\code{{\it module\_name}.cpp} and \code{{\it module\_name}.h} in
 the directory specified with
 \code{--targetDir {\it dir\_name}} argument.
 
@@ -366,7 +365,7 @@ class GCD_t : public mod_t {
 \end{itemize}
 \item basic scheme is pathname consisting of
 \begin{itemize}
-\item Component name first followed by \code{\_\_}
+\item Module name first followed by \code{\_\_}
 \item hierarchy elements separated with \code{\_}'s in order with
 \begin{itemize}
 \item numbers for vector elements
@@ -376,7 +375,7 @@ class GCD_t : public mod_t {
 \end{itemize}
 \item examples
 \begin{itemize}
-\item \code{val io = Bundle\{ val x = Bits(width = 32) \}} produces
+\item \code{val io = Bundle\{ val x = UInt(width = 32) \}} produces
 \begin{itemize}
 \item \code{A\_\_io\_x}
 \end{itemize}
