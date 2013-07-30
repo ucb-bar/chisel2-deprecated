@@ -22,22 +22,18 @@ Getting started
 Chisel Users
 ------------
 
-To start working on a circuit with Chisel, first create a project
-directory with a standard Scala/SBT layout.
+To start working on a circuit with Chisel, create a project directory
+with a standard Scala/SBT layout. You want your build.sbt file to
+contain a reference to Scala version greater or equal to 2.10 and
+add a dependency on the Chisel library.
 
-    $ mkdir -p chisel-hello/src/main/scala
-    $ cd chisel-hello
-
-Insure that your build.sbt contains a reference to Scala version greater
-or equal to 2.10 and add a dependency on the Chisel library.
-
-    $ diff -u prev build.sbt
-    +scalaVersion := "2.10.2"
-    +libraryDependencies += "edu.berkeley.cs" %% "chisel" % "2.0-SNAPSHOT"
+    $ cat build.sbt
+    scalaVersion := "2.10.2"
+    libraryDependencies += "edu.berkeley.cs" %% "chisel" % "2.0-SNAPSHOT"
 
 Edit the source files for your circuit
 
-    $ cat src/main/scala/Hello.scala
+    $ cat Hello.scala
     import Chisel._
 
     class HelloModule extends Module {
@@ -88,3 +84,7 @@ Running unit tests with code coverage
 Publishing jar to local system
 
     $ sbt publish-local
+
+Publishing to public Maven repo
+
+    $ sbt publish-signed

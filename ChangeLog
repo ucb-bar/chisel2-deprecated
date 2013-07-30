@@ -12,8 +12,9 @@
         * Replace Mem(n){x} by Mem(n, x)
         * Replace Vec(n){x} by Vec.fill(n){x}
           to follow Scala standard libraryconventions
-        * Replace new FIFOIO {x} by  new FIFOIO(x)
+        * Replace new FIFOIO {x} by  new Decoupled(x)
         * Replace new Arbiter(n) {x} by new Arbiter(x, n)
+        * Replace PIPEIO by Valid
         * Replace Component by Module
         * Replace UFix by UInt
         * Replace Fix by SInt
