@@ -169,57 +169,80 @@ class VerilogBackend extends Backend {
     val spacing = (if(c.verilog_parameters != "") " " else "");
     var res = "  " + c.moduleName + " " + c.verilog_parameters + spacing + c.name + "(";
     val hasReg = c.containsRegInTree
-    res = res + (if(hasReg) ".clk(clk), .reset(" + (if(c.reset.inputs.length==0) "reset" else emitRef(c.reset.inputs(0))) + ")" else "");
+    if (c.clocks.length > 0)
+      res = res + (c.clocks ++ c.resets.keys.toList).map(x => "." + emitRef(x) + "(" + emitRef(x) + ")").reduceLeft(_ + ", " + _)
     var isFirst = true;
-    var nl = ""
+    val portDecs = new ArrayBuffer[StringBuilder]
     for ((n, w) <- c.wires) {
       if(n != "reset") {
-        if (isFirst && !hasReg) { isFirst = false; nl = "\n" } else nl = ",\n";
-        res += nl + "       ." + n + "( ";
+        var portDec = "." + n + "( ";
         w match {
           case io: Bits  =>
-            if (io.dir == INPUT) {
+            if (io.dir == INPUT) { // if reached, then input has consumers
               if (io.inputs.length == 0) {
-                  if(Module.saveConnectionWarnings) {
-                    ChiselError.warning("" + io + " UNCONNECTED IN " + io.component);
-                  }
+                  // if(Module.saveConnectionWarnings) {
+                  //   ChiselError.warning("" + io + " UNCONNECTED IN " + io.component);
+                  // } removed this warning because pruneUnconnectedIOs should have picked it up
+                portDec = "//" + portDec
               } else if (io.inputs.length > 1) {
                   if(Module.saveConnectionWarnings) {
                     ChiselError.warning("" + io + " CONNECTED TOO MUCH " + io.inputs.length);
                   }
+                portDec = "//" + portDec
               } else if (!c.isWalked.contains(w)){
                   if(Module.saveConnectionWarnings) {
                     ChiselError.warning(" UNUSED INPUT " + io + " OF " + c + " IS REMOVED");
                   }
+                portDec = "//" + portDec
               } else {
-                res += emitRef(io.inputs(0));
+                portDec += emitRef(io.inputs(0));
               }
             } else if(io.dir == OUTPUT) {
               if (io.consumers.length == 0) {
-                  if(Module.saveConnectionWarnings) {
-                    ChiselError.warning("" + io + " UNCONNECTED IN " + io.component + " BINDING " + c.findBinding(io));
-                  }
+                  // if(Module.saveConnectionWarnings) {
+                  //   ChiselError.warning("" + io + " UNCONNECTED IN " + io.component + " BINDING " + c.findBinding(io));
+                  // } removed this warning because pruneUnconnectedsIOs should have picked it up
+                portDec = "//" + portDec
               } else {
                 var consumer: Node = c.parent.findBinding(io);
                 if (consumer == null) {
                   if(Module.saveConnectionWarnings) {
                     ChiselError.warning("" + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + io.consumers.length + ") IN " + c.parent);
                   }
+                  portDec = "//" + portDec
                 } else {
-                  res += emitRef(consumer); // TODO: FIX THIS?
+                  if (io.prune)
+                    portDec = "//" + portDec + emitRef(consumer)
+                  else
+                    portDec += emitRef(consumer); // TODO: FIX THIS?
                 }
               }
             }
-        };
-        res += " )";
+        }
+        portDec += " )"
+        portDecs += new StringBuilder(portDec)
       }
     }
-    res += ");\n";
+    val uncommentedPorts = portDecs.filter(!_.result.contains("//"))
+    uncommentedPorts.slice(0, uncommentedPorts.length-1).map(_.append(","))
+    portDecs.map(_.insert(0, "        "))
+    if (hasReg) res += ",\n" else res += "\n"
+    res += portDecs.map(_.result).reduceLeft(_ + "\n" + _)
+    res += "\n  );\n";
+    if (c.wires.map(_._2.driveRand).reduceLeft(_ || _)) {
+      res += "  `ifdef SYNTHESIS\n"
+      for ((n, w) <- c.wires) {
+        if (w.driveRand) {
+          res += "    " + c.name + "." + n + " = $random();\n"
+        }
+      }
+      res += "  end\n"
+    }
     res
   }
 
   override def emitDef(node: Node): String = {
-
+    val res = 
     node match {
       case x: Bits =>
         if (x.dir == INPUT) {
@@ -367,6 +390,7 @@ class VerilogBackend extends Backend {
       case _ =>
         ""
     }
+    (if (node.prune && res != "") "//" else "") + res    
   }
 
   def emitSigned(n: Node): String = if(n.isSigned) " signed " else ""
@@ -375,6 +399,7 @@ class VerilogBackend extends Backend {
     "  wire" + emitSigned(node) + emitWidth(node) + " " + emitRef(node) + ";\n"
 
   override def emitDec(node: Node): String = {
+    val res = 
     node match {
       case x: Bits =>
         if(x.dir == null) {
@@ -423,6 +448,7 @@ class VerilogBackend extends Backend {
       case _ =>
         emitDecBase(node)
     }
+    (if (node.prune && res != "") "//" else "") + res
   }
 
   def genHarness(c: Module, name: String) {
@@ -517,11 +543,20 @@ class VerilogBackend extends Backend {
 
   def emitRegs(c: Module): StringBuilder = {
     val res = new StringBuilder();
-    res.append("  always @(posedge clk) begin\n");
-    for (m <- c.mods) {
-      res.append(emitReg(m))
+    val clkDomains = new HashMap[Clock, StringBuilder]
+    for (clock <- c.clocks) {
+      val sb = new StringBuilder
+      sb.append("  always @(posedge " + emitRef(clock) + ") begin\n")
+      clkDomains += (clock -> sb)
     }
-    res.append("  end\n");
+    for (m <- c.mods) {
+      if (m.clock != null)
+        clkDomains(m.clock).append(emitReg(m))
+    }
+    for (clock <- c.clocks) {
+      clkDomains(clock).append("  end\n")
+      res.append(clkDomains(clock).result())
+    }
     res
   }
 
@@ -532,7 +567,7 @@ class VerilogBackend extends Backend {
             ""
         } else if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1)){
           if(reg.isReset){
-            "    if(reset) begin\n" +
+            "    if(" + emitRef(reg.inputs.last) + ") begin\n" +
             "      " + emitRef(reg) + " <= " + emitRef(reg.resetVal) + ";\n" +
             "    end else if(" + emitRef(reg.enableSignal) + ") begin\n" +
             "      " + emitRef(reg) + " <= " + emitRef(reg.updateVal) + ";\n" +
@@ -545,7 +580,7 @@ class VerilogBackend extends Backend {
         } else {
           "    " + emitRef(reg) + " <= " +
           (if (reg.isReset) {
-            "reset ? " + emitRef(reg.resetVal) + " : "
+            emitRef(reg.inputs.last) + " ? " + emitRef(reg.resetVal) + " : "
           } else {
             ""
           }) + emitRef(reg.updateVal) + ";\n"
@@ -594,43 +629,35 @@ class VerilogBackend extends Backend {
     res
   }
 
-  def levelChildren(root: Module) {
-    root.level = 0;
-    root.traversal = VerilogBackend.traversalIndex;
-    VerilogBackend.traversalIndex = VerilogBackend.traversalIndex + 1;
-    for(child <- root.children) {
-      levelChildren(child)
-      root.level = math.max(root.level, child.level + 1);
-    }
-  }
-
-  def gatherChildren(root: Module): ArrayBuffer[Module] = {
-    var result = new ArrayBuffer[Module]();
-    for (child <- root.children)
-      result = result ++ gatherChildren(child);
-    result ++ ArrayBuffer[Module](root);
-  }
-
 
   def emitModuleText(c: Module): String = {
     val res = new StringBuilder()
     val hasReg = c.containsRegInTree
     var first = true;
     var nl = "";
-    res.append((if (hasReg) "input clk, input reset" else ""));
+    if (c.clocks.length > 0)
+      res.append((c.clocks ++ c.resets.keys.toList).map(x => "input " + emitRef(x)).reduceLeft(_ + ", " + _))
+    val ports = new ArrayBuffer[StringBuilder]
     for ((n, w) <- c.wires) {
-      if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
+      // if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
       w match {
         case io: Bits => {
+          val prune = if (io.prune && c != Module.topComponent) "//" else ""
           if (io.dir == INPUT) {
-            res.append(nl + "    input " + emitSigned(io) + emitWidth(io) + " " + emitRef(io));
+            ports += new StringBuilder(nl + "    " + prune + "input " + 
+                                       emitSigned(io) + emitWidth(io) + " " + emitRef(io));
           } else if(io.dir == OUTPUT) {
-            res.append(nl + "    output" + emitSigned(io) + emitWidth(io) + " " + emitRef(io));
+            ports += new StringBuilder(nl + "    " + prune + "output" + 
+                                       emitSigned(io) + emitWidth(io) + " " + emitRef(io));
           }
         }
       };
     }
-    res.append(");\n\n");
+    val uncommentedPorts = ports.filter(!_.result.contains("//"))
+    uncommentedPorts.slice(0, uncommentedPorts.length-1).map(_.append(","))
+    if (hasReg) res.append(",\n") else res.append("\n")
+    res.append(ports.map(_.result).reduceLeft(_ + "\n" + _))
+    res.append("\n);\n\n");
     // TODO: NOT SURE EXACTLY WHY I NEED TO PRECOMPUTE TMPS HERE
     for (m <- c.mods)
       emitTmp(m);
@@ -693,16 +720,14 @@ class VerilogBackend extends Backend {
     }
   }
 
+
   def doCompile(top: Module, out: java.io.FileWriter, depth: Int): Unit = {
-    levelChildren(top)
-    val sortedComps = gatherChildren(top).sortWith(
-      (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)));
-    /* *defs* maps Module classes to Module instances through
+    /* *defs* maps Mod classes to Mod instances through
        the generated text of their module.
        We use a LinkedHashMap such that later iteration is predictable. */
     val defs = new HashMap[String, LinkedHashMap[String, ArrayBuffer[Module] ]];
     var level = 0;
-    for( c <- sortedComps ) {
+    for( c <- Module.sortedComps ) {
       ChiselError.info(depthString(depth) + "COMPILING " + c
         + " " + c.children.length + " CHILDREN"
         + " (" + c.level + "," + c.traversal + ")");

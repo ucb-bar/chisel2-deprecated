@@ -130,6 +130,8 @@ object RegUpdate {
 
   def apply[T <: Data](updateVal: T): T = Reg[T](updateVal, updateVal, null.asInstanceOf[T])
 
+  def apply[T <: Data](updateVal: T, resetVal: T): T = Reg[T](updateVal, updateVal, resetVal)
+
 }
 
 
@@ -144,7 +146,6 @@ class Reg extends Delay with proc {
   def resetVal: Node  = inputs(1);
   def enableSignal: Node = inputs(enableIndex);
   var enableIndex = 0;
-  var hasResetSignal = false
   var isReset = false
   var isEnable = false;
   def isUpdate: Boolean = !(updateVal == null);

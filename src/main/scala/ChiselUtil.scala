@@ -160,7 +160,7 @@ object OHToUInt
 }
 
 
-class PipeIO[+T <: Data](gen: T) extends Bundle
+class Valid[+T <: Data](gen: T) extends Bundle
 {
   val valid = Bool(OUTPUT)
   val bits = gen.clone.asOutput
@@ -170,12 +170,12 @@ class PipeIO[+T <: Data](gen: T) extends Bundle
       super.clone()
     } catch {
       case e: java.lang.Exception => {
-        new PipeIO(gen).asInstanceOf[this.type]
+        new Valid(gen).asInstanceOf[this.type]
       }
     }
 }
 
-class FIFOIO[T <: Data](gen: T) extends Bundle
+class Decoupled[T <: Data](gen: T) extends Bundle
 {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
@@ -186,16 +186,16 @@ class FIFOIO[T <: Data](gen: T) extends Bundle
       super.clone()
     } catch {
       case e: java.lang.Exception => {
-        new FIFOIO(gen).asInstanceOf[this.type]
+        new Decoupled(gen).asInstanceOf[this.type]
       }
     }
 }
 
-object FIFOIO {
-  def apply[T <: Data](gen: T): FIFOIO[T]  = {new FIFOIO(gen)}
+object Decoupled {
+  def apply[T <: Data](gen: T): Decoupled[T]  = {new Decoupled(gen)}
 }
 
-class EnqIO[T <: Data](gen: T) extends FIFOIO(gen)
+class EnqIO[T <: Data](gen: T) extends Decoupled(gen)
 {
   def enq(dat: T): T = { valid := Bool(true); bits := dat; dat }
   valid := Bool(false);
@@ -204,7 +204,7 @@ class EnqIO[T <: Data](gen: T) extends FIFOIO(gen)
   override def clone: this.type = { new EnqIO(gen).asInstanceOf[this.type]; }
 }
 
-class DeqIO[T <: Data](gen: T) extends FIFOIO(gen)
+class DeqIO[T <: Data](gen: T) extends Decoupled(gen)
 {
   flip()
   ready := Bool(false);
@@ -213,7 +213,7 @@ class DeqIO[T <: Data](gen: T) extends FIFOIO(gen)
 }
 
 
-class FIFOIOC[+T <: Data](gen: T) extends Bundle
+class DecoupledC[+T <: Data](gen: T) extends Bundle
 {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
@@ -222,8 +222,8 @@ class FIFOIOC[+T <: Data](gen: T) extends Bundle
 
 
 class ioArbiter[T <: Data](gen: T, n: Int) extends Bundle {
-  val in  = Vec.fill(n){ new FIFOIO(gen) }.flip
-  val out = new FIFOIO(gen)
+  val in  = Vec.fill(n){ new Decoupled(gen) }.flip
+  val out = new Decoupled(gen)
   val chosen = UInt(OUTPUT, log2Up(n))
 }
 
@@ -322,8 +322,8 @@ object Counter
 
 class ioQueue[T <: Data](gen: T, entries: Int) extends Bundle
 {
-  val enq   = new FIFOIO(gen.clone).flip
-  val deq   = new FIFOIO(gen.clone)
+  val enq   = new Decoupled(gen.clone).flip
+  val deq   = new Decoupled(gen.clone)
   val count = UInt(OUTPUT, log2Up(entries + 1))
 }
 
@@ -370,7 +370,7 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
 
 object Queue
 {
-  def apply[T <: Data](enq: FIFOIO[T], entries: Int = 2, pipe: Boolean = false): FIFOIO[T]  = {
+  def apply[T <: Data](enq: Decoupled[T], entries: Int = 2, pipe: Boolean = false): Decoupled[T]  = {
     val q = Module(new Queue(enq.bits.clone, entries, pipe))
     q.io.view(q.io.elements.filter(j => j._1 != "count")) // count io is not being used if called functionally
     q.io.enq.valid := enq.valid // not using <> so that override is allowed
@@ -378,6 +378,59 @@ object Queue
     enq.ready := q.io.enq.ready
     q.io.deq
   }
+}
+
+class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) extends Module {
+  val io = new ioQueue(gen, entries)
+  val asize = log2Up(entries)
+
+  val s1_rptr_gray = RegReset(UInt(0, asize+1)).withClock(enq_clk)
+  val s2_rptr_gray = RegReset(UInt(0, asize+1)).withClock(enq_clk)
+  val s1_rst_deq = RegReset(Bool(false)).withClock(enq_clk)
+  val s2_rst_deq = RegReset(Bool(false)).withClock(enq_clk)
+
+  val s1_wptr_gray = RegReset(UInt(0, asize+1)).withClock(deq_clk)
+  val s2_wptr_gray = RegReset(UInt(0, asize+1)).withClock(deq_clk)
+  val s1_rst_enq = RegReset(Bool(false)).withClock(deq_clk)
+  val s2_rst_enq = RegReset(Bool(false)).withClock(deq_clk)
+
+  val wptr_bin = RegReset(UInt(0, asize+1)).withClock(enq_clk)
+  val wptr_gray = RegReset(UInt(0, asize+1)).withClock(enq_clk)
+  val not_full = RegReset(Bool(false)).withClock(enq_clk)
+
+  val wptr_bin_next = wptr_bin + (io.enq.valid & not_full)
+  val wptr_gray_next = (wptr_bin_next >> UInt(1)) ^ wptr_bin_next
+  val not_full_next = !(wptr_gray_next === Cat(~s2_rptr_gray(asize,asize-1), s2_rptr_gray(asize-2,0)))
+
+  val rptr_bin = RegReset(UInt(0, asize+1)).withClock(deq_clk)
+  val rptr_gray = RegReset(UInt(0, asize+1)).withClock(deq_clk)
+  val not_empty = RegReset(Bool(false)).withClock(deq_clk)
+
+  val rptr_bin_next = rptr_bin + (io.deq.ready & not_empty)
+  val rptr_gray_next = (rptr_bin_next >> UInt(1)) ^ rptr_bin_next
+  val not_empty_next = !(rptr_gray_next === s2_wptr_gray)
+
+  s2_rptr_gray := s1_rptr_gray; s1_rptr_gray := rptr_gray
+  s2_rst_deq := s1_rst_deq; s1_rst_deq := enq_clk.getReset
+  s2_wptr_gray := s1_wptr_gray; s1_wptr_gray := wptr_gray
+  s2_rst_enq := s1_rst_enq; s1_rst_enq := deq_clk.getReset
+
+  wptr_bin := wptr_bin_next
+  wptr_gray := wptr_gray_next
+  not_full := not_full_next && !s2_rst_deq
+
+  rptr_bin := rptr_bin_next
+  rptr_gray := rptr_gray_next
+  not_empty := not_empty_next && !s2_rst_enq
+
+  io.enq.ready := not_full
+  io.deq.valid := not_empty
+
+  val mem = Mem(entries, gen).withClock(enq_clk)
+  when (io.enq.valid && io.enq.ready) {
+    mem(wptr_bin(asize-1,0)) := io.enq.bits
+  }
+  io.deq.bits := mem(rptr_bin(asize-1,0))
 }
 
 object Log2 {
@@ -405,8 +458,8 @@ class Log2 extends Node {
 class Pipe[T <: Bits](gen: T, latency: Int = 1) extends Module
 {
   val io = new Bundle {
-    val enq = new PipeIO(gen).flip
-    val deq = new PipeIO(gen)
+    val enq = new Valid(gen).flip
+    val deq = new Valid(gen)
   }
 
   io.deq <> Pipe(io.enq, latency)
@@ -414,9 +467,9 @@ class Pipe[T <: Bits](gen: T, latency: Int = 1) extends Module
 
 object Pipe
 {
-  def apply[T <: Bits](enqValid: Bool, enqBits: T, latency: Int): PipeIO[T] = {
+  def apply[T <: Bits](enqValid: Bool, enqBits: T, latency: Int): Valid[T] = {
     if (latency == 0) {
-      val out = new PipeIO(enqBits.clone)
+      val out = new Valid(enqBits.clone)
       out.valid <> enqValid
       out.bits <> enqBits
       out.setIsTypeNode
@@ -428,8 +481,8 @@ object Pipe
       apply(v, b, latency-1)
     }
   }
-  def apply[T <: Bits](enqValid: Bool, enqBits: T): PipeIO[T] = apply(enqValid, enqBits, 1)
-  def apply[T <: Bits](enq: PipeIO[T], latency: Int = 1): PipeIO[T] = apply(enq.valid, enq.bits, latency)
+  def apply[T <: Bits](enqValid: Bool, enqBits: T): Valid[T] = apply(enqValid, enqBits, 1)
+  def apply[T <: Bits](enq: Valid[T], latency: Int = 1): Valid[T] = apply(enq.valid, enq.bits, latency)
 }
 
 object PriorityMux

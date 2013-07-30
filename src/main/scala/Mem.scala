@@ -128,6 +128,11 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
     }
   }
 
+  def withClock(c: Clock): this.type = {
+    this.clock = c
+    this
+  }
+
   def read(addr: UInt): T = doRead(addr)
 
   def write(addr: UInt, data: T) = doWrite(addr, conds.top, data, null.asInstanceOf[UInt])
@@ -220,6 +225,7 @@ class MemReadWrite(val read: MemSeqRead, val write: MemWrite) extends MemAccess(
 class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) extends MemAccess(mem, addri) {
   inputs += condi
   override def cond = inputs(1)
+  this.clock = mem.clock
 
   if (datai != null) {
     def wrap(x: Node) = { // prevent Verilog syntax errors when indexing constants

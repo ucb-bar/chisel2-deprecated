@@ -117,8 +117,9 @@ abstract class Node extends nameable {
   var sccIndex = -1
   var sccLowlink = -1
   var walked = false;
-  /* Assigned in Binding and Module.reset */
+  /* Assigned in Binding and Mod.reset */
   var component: Module = Module.getComponent();
+  if (component != null) component.nodes += this
   var flattened = false;
   var isTypeNode = false;
   var depth = 0;
@@ -140,6 +141,9 @@ abstract class Node extends nameable {
   var isScanArg = false
   var isPrintArg = false
   def isMemOutput: Boolean = false
+  var prune = false
+  var driveRand = false
+  var clock: Clock = null
 
   Module.nodes += this
 
@@ -335,11 +339,11 @@ abstract class Node extends nameable {
       }
 
     // give the components reset signal to the current node
-    if(this.isInstanceOf[Reg]) {
-      val reg = this.asInstanceOf[Reg]
-      if(reg.isReset) reg.inputs += reg.component.reset
-      reg.hasResetSignal = true
-    }
+    // if(this.isInstanceOf[Reg]) {
+    //   val reg = this.asInstanceOf[Reg]
+    //   if(reg.isReset) reg.inputs += reg.component.reset
+    //   reg.hasResetSignal = true
+    // } obsolete now...
 
     assert( comp != null );
     if (comp != null && !comp.isWalked.contains(this)) {

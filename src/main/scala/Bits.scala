@@ -174,6 +174,14 @@ abstract class Bits extends Data with proc {
     this
   }
 
+  def withClock(c: Clock): this.type = {
+    if (comp != null)
+      comp.clock = c
+    else
+      this.clock = c
+    this
+  }
+
   override def isDirectionless: Boolean = {
     return dir == null
   }

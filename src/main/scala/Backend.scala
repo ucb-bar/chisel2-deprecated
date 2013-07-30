@@ -33,6 +33,7 @@ import Node._
 import Reg._
 import ChiselError._
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.{Queue=>ScalaQueue}
 import scala.collection.mutable.Stack
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashMap
@@ -292,18 +293,29 @@ abstract class Backend {
     */
   def collectNodesIntoComp(dfsStack: Stack[Node]) {
     val walked = new HashSet[Node]()
-
+    walked ++= dfsStack
+    // invariant is everything in the stack is walked and has a non-null component
     while(!dfsStack.isEmpty) {
       val node = dfsStack.pop
-
-      if(!walked.contains(node)) {
-        walked += node
-        // collect unassigned nodes into component
-        for (input <- node.inputs) {
-          if(!walked.contains(input)) {
-            if( input.component == null ) input.component = node.component
-            dfsStack.push(input)
+      /*
+      we're tracing from outputs -> inputs, so if node is an input, then its
+      inputs belong to the outside component. Otherwise, its inputs are the same
+      as node's inputs.
+      */
+      val curComp = 
+        if ( node.isIo && node.asInstanceOf[Bits].dir == INPUT ) {
+          node.component.parent
+        } else {
+          node.component
+        }
+      for (input <- node.inputs) {
+        if(!walked.contains(input)) {
+          if( input.component == null ) {
+            input.component = curComp
+            curComp.nodes += input
           }
+          walked += input
+          dfsStack.push(input)
         }
       }
     }
@@ -316,11 +328,154 @@ abstract class Backend {
       t(c)
   }
 
+  def pruneUnconnectedIOs(m: Module) {
+    val inputs = m.io.flatten.filter(_._2.dir == INPUT)
+    val outputs = m.io.flatten.filter(_._2.dir == OUTPUT)
+
+    for ((name, i) <- inputs) {
+      if (i.inputs.length == 0 && m != Module.topComponent)
+        if (i.consumers.length > 0) {
+          if (Module.warnInputs)
+            ChiselError.warning({"UNCONNECTED INPUT " + emitRef(i) + " in COMPONENT " + i.component +
+                                 " has consumers"})
+          i.driveRand = true
+        } else {
+          if (Module.warnInputs)
+            ChiselError.warning({"FLOATING INPUT " + emitRef(i) + " in COMPONENT " + i.component})
+          i.prune = true
+        }
+    }
+
+    for ((name, o) <- outputs) {
+      if (o.inputs.length == 0) {
+        if (o.consumers.length > 0) {
+          if (Module.warnOutputs)
+            ChiselError.warning({"UNCONNETED OUTPUT " + emitRef(o) + " in component " + o.component + 
+                                 " has consumers on line " + o.consumers(0).line})
+          o.driveRand = true
+        } else {
+          if (Module.warnOutputs)
+            ChiselError.warning({"FLOATING OUTPUT " + emitRef(o) + " in component " + o.component})
+          o.prune = true
+        }
+      }
+    }
+  }
+
+  def pruneNodes {
+    val walked = new HashSet[Node]
+    val bfsQueue = new ScalaQueue[Node]
+    for (node <- Module.randInitIOs) bfsQueue.enqueue(node)
+    var pruneCount = 0
+
+    // conduct bfs to find all reachable nodes
+    while(!bfsQueue.isEmpty){
+      val top = bfsQueue.dequeue
+      walked += top
+      val prune = top.inputs.map(_.prune).foldLeft(true)(_ && _)
+      pruneCount+= (if (prune) 1 else 0)
+      top.prune = prune
+      for(i <- top.consumers) {
+        if(!(i == null)) {
+          if(!walked.contains(i)) {
+            bfsQueue.enqueue(i)
+            walked += i
+          }
+        }
+      }
+    }
+    ChiselError.warning("Pruned " + pruneCount + " nodes due to unconnected inputs")
+  }
 
   def emitDef(node: Node): String = ""
 
+  def levelChildren(root: Module) {
+    root.level = 0;
+    root.traversal = VerilogBackend.traversalIndex;
+    VerilogBackend.traversalIndex = VerilogBackend.traversalIndex + 1;
+    for(child <- root.children) {
+      levelChildren(child)
+      root.level = math.max(root.level, child.level + 1);
+    }
+  }
+
+  def gatherChildren(root: Module): ArrayBuffer[Module] = {
+    var result = new ArrayBuffer[Module]();
+    for (child <- root.children)
+      result = result ++ gatherChildren(child);
+    result ++ ArrayBuffer[Module](root);
+  }
+
+  def assignClksToComps {
+    for (comp <- Module.sortedComps) {
+      for (node <- comp.nodes) {
+        if (node.isInstanceOf[Delay]) {
+          var curComp = comp
+          while (curComp != null) {
+            if (!curComp.clocks.contains(node.clock))
+              curComp.clocks += node.clock
+            curComp = curComp.parent
+          }
+        }
+      }
+    }
+  }
+
+  def assignRstsToComps {
+    // create the input reset pin
+    for (comp <- Module.sortedComps) {
+      for (clock <- comp.clocks) {
+        var curComp = comp
+        while (curComp != clock.component) {
+          if (!curComp.resets.contains(clock.getReset)) {
+            val pin = Bool(INPUT); pin.component = curComp; curComp.nodes += pin
+            curComp.resets += (clock.getReset -> pin)
+          }
+          curComp = curComp.parent
+        }
+      }
+    }
+
+    // connect reset pins
+    for (comp <- Module.sortedComps) {
+      for (rst <- comp.resets.keys) {
+        if (comp.resets(rst).inputs.length == 0) {
+          if (comp.parent.resets.contains(rst)) {
+            comp.resets(rst).inputs += comp.parent.resets(rst)
+          } else {
+            comp.resets(rst).inputs += rst
+          }
+          comp.resets(rst).setName(rst.name)
+        }
+      }
+    }
+  }
+
+  // walk forward from root register assigning consumer clk = root.clock
+  def createClkDomain(root: Node) = {
+    val walked = new ArrayBuffer[Node]
+    val dfsStack = new Stack[Node]
+    walked += root; dfsStack.push(root)
+    val clock = root.clock
+    while(!dfsStack.isEmpty) {
+      val node = dfsStack.pop
+      for (consumer <- node.consumers) {
+        if (!consumer.isInstanceOf[Delay] && !walked.contains(consumer)) {
+          assert(consumer.clock == null || consumer.clock == clock)
+          consumer.clock = clock
+          walked += consumer
+          dfsStack.push(consumer)
+        }
+      }
+    }
+  }
+
   def elaborate(c: Module): Unit = {
     Module.topComponent = c;
+    Module.implicitReset.component = Module.topComponent
+    Module.topComponent.nodes += Module.implicitReset
+    Module.implicitClock.component = Module.topComponent
+    Module.topComponent.nodes += Module.implicitClock
     /* XXX If we call nameAll here and again further down, we end-up with
      duplicate names in the generated C++.
     nameAll(c) */
@@ -349,6 +504,7 @@ abstract class Backend {
     ChiselError.info("finished flattening (" + nbNodes + ")")
     ChiselError.checkpoint()
 
+    nameAll(c)
     /* The code in this function seems wrong. Yet we still need to call
      it to associate components to nodes that were created after the call
      tree has been executed (ie. in genMuxes and forceMatchWidths). More
@@ -359,16 +515,36 @@ abstract class Backend {
     collectNodesIntoComp(initializeDFS)
     ChiselError.info("finished resolving")
 
+    levelChildren(c)
+    Module.sortedComps = gatherChildren(c).sortWith(
+      (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)));
+
+    c.assignClks
+    assignClksToComps
+    assignRstsToComps
+
     // two transforms added in Mem.scala (referenced and computePorts)
     ChiselError.info("started transforms")
     transform(c, transforms)
     ChiselError.info("finished transforms")
+
+    Module.sortedComps.map(_.nodes.map(_.addConsumers))
     c.traceNodes();
+    for (comp <- Module.sortedComps)
+      for (node <- comp.nodes)
+        if (node.isInstanceOf[Reg])
+            createClkDomain(node)
     ChiselError.checkpoint()
 
     /* We execute nameAll after traceNodes because bindings would not have been
        created yet otherwise. */
     nameAll(c)
+
+    for (comp <- Module.sortedComps ) {
+      // remove unconnected outputs
+      pruneUnconnectedIOs(comp)
+    }
+
     ChiselError.checkpoint()
 
     if(!Module.dontFindCombLoop) {

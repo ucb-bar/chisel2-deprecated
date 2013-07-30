@@ -130,6 +130,9 @@ object chiselMain {
           Module.saveComponentTrace = true
           Module.isCheckingPorts = true
         }
+        case "--wi" => Module.warnInputs = true
+        case "--wo" => Module.warnOutputs = true
+        case "--wio" => {Module.warnInputs = true; Module.warnOutputs = true}
         case "--Wwidth" => Module.saveWidthWarnings = true
         case "--Wconnection" => Module.saveConnectionWarnings = true
         case "--Wcomponent" => Module.saveComponentTrace = true
@@ -165,6 +168,7 @@ object chiselMain {
         case "--targetDir" => Module.targetDir = args(i + 1); i += 1;
         case "--include" => Module.includeArgs = Module.splitArg(args(i + 1)); i += 1;
         case "--checkPorts" => Module.isCheckingPorts = true
+        case "--prune" => Module.isPruning = true
         case any => ChiselError.warning("'" + arg + "' is an unkown argument.");
       }
       i += 1;
