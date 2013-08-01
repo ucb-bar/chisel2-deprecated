@@ -225,7 +225,7 @@ class VerilogBackend extends Backend {
     }
     val uncommentedPorts = portDecs.filter(!_.result.contains("//"))
     uncommentedPorts.slice(0, uncommentedPorts.length-1).map(_.append(","))
-    portDecs.map(_.insert(0, "        "))
+    portDecs.map(_.insert(0, "       "))
     if (hasReg) res += ",\n" else res += "\n"
     res += portDecs.map(_.result).reduceLeft(_ + "\n" + _)
     res += "\n  );\n";

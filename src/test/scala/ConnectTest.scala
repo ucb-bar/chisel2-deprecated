@@ -80,7 +80,8 @@ class ConnectSuite extends AssertionsForJUnit {
     assertFile(tmpdir.getRoot() + "/ConnectSuite_NoClassRelation_1.v",
 """module ConnectSuite_A_1(
     input  io_a_in,
-    output io_a_out);
+    output io_a_out)
+;
 
 
   assign io_a_out = io_a_in;
@@ -95,7 +96,8 @@ module ConnectSuite_B_1(
   assign io_b_out = aComp_io_a_out;
   ConnectSuite_A_1 aComp(
        .io_a_in( io_b_in ),
-       .io_a_out( aComp_io_a_out ));
+       .io_a_out( aComp_io_a_out )
+  );
 endmodule
 
 module ConnectSuite_NoClassRelation_1(
@@ -107,7 +109,8 @@ module ConnectSuite_NoClassRelation_1(
   assign io_c_out = aComp_io_b_out;
   ConnectSuite_B_1 aComp(
        .io_b_in( io_c_in ),
-       .io_b_out( aComp_io_b_out ));
+       .io_b_out( aComp_io_b_out )
+  );
 endmodule
 
 """)
@@ -143,7 +146,8 @@ endmodule
     assertFile(tmpdir.getRoot() + "/ConnectSuite_LogicBtwInstances_1.v",
 """module ConnectSuite_A_2(
     input  io_a_in,
-    output io_a_out);
+    output io_a_out
+);
 
 
   assign io_a_out = io_a_in;
@@ -166,10 +170,12 @@ module ConnectSuite_LogicBtwInstances_1(input clk, input reset,
   assign T2 = a1_io_a_out | a2_io_a_out;
   ConnectSuite_A_2 a1(
        .io_a_in( io_b_in ),
-       .io_a_out( a1_io_a_out ));
+       .io_a_out( a1_io_a_out )
+  );
   ConnectSuite_A_2 a2(
        .io_a_in( io_b_in ),
-       .io_a_out( a2_io_a_out ));
+       .io_a_out( a2_io_a_out )
+  );
 
   always @(posedge clk) begin
     x <= T1;
@@ -231,7 +237,8 @@ endmodule
     assertFile(tmpdir.getRoot() + "/ConnectSuite_InstanceSuperclass_1.v",
 """module ConnectSuite_A_3(
     input  io_a_in,
-    output io_a_out);
+    output io_a_out
+);
 
 
   assign io_a_out = io_a_in;
@@ -239,13 +246,15 @@ endmodule
 
 module ConnectSuite_InstanceSuperclass_1(
     input  io_a_in,
-    output io_a_out);
+    output io_a_out
+);
 
 
   assign io_a_out = io_a_in;
   ConnectSuite_A_3 aInBComp(
-       .io_a_in( io_a_in ),
-       .io_a_out(  ));
+       .io_a_in( io_a_in )
+       //.io_a_out(  )
+  );
 endmodule
 
 """)
@@ -285,7 +294,8 @@ endmodule
     output io_status_ef,
     output io_status_et,
     input  io_wen,
-    input [31:0] io_wdata);
+    input [31:0] io_wdata
+);
 
   reg[0:0] reg_status_et;
   wire T0;

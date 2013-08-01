@@ -421,25 +421,36 @@ abstract class Backend {
     }
   }
 
+  def createPin(module: Module): Bool = {
+    val pin = Bool(INPUT)
+    pin.component = module
+    module.nodes += pin
+    pin
+  }
+
   def assignRstsToComps {
-    // create the input reset pin
+    // special case for top level implicit reset
+    if (Module.sortedComps.map(_.clocks.map(_.getReset)).reduceLeft(_ ++ _).contains(Module.implicitReset)) {
+      Module.topComponent.resets += (Module.implicitReset -> Module.implicitReset)
+    }
+
+    // create the input reset pin for every module between reset source and consumer
     for (comp <- Module.sortedComps) {
       for (clock <- comp.clocks) {
         var curComp = comp
         while (curComp != clock.component) {
           if (!curComp.resets.contains(clock.getReset)) {
-            val pin = Bool(INPUT); pin.component = curComp; curComp.nodes += pin
-            curComp.resets += (clock.getReset -> pin)
+            curComp.resets += (clock.getReset -> createPin(curComp))
           }
           curComp = curComp.parent
         }
       }
     }
 
-    // connect reset pins
+    // connect module's reset pin to parent's reset pin
     for (comp <- Module.sortedComps) {
       for (rst <- comp.resets.keys) {
-        if (comp.resets(rst).inputs.length == 0) {
+        if (comp.resets(rst).inputs.length == 0 && comp.resets(rst) != Module.implicitReset) {
           if (comp.parent.resets.contains(rst)) {
             comp.resets(rst).inputs += comp.parent.resets(rst)
           } else {

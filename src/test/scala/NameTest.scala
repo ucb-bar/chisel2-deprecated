@@ -100,7 +100,8 @@ class NameSuite extends AssertionsForJUnit {
     assertFile(tmpdir.getRoot() + "/NameSuite_ListLookupsComp_1.v",
 """module NameSuite_ListLookupsComp_1(
     input [31:0] io_inst,
-    output io_sigs_valid);
+    output io_sigs_valid
+);
 
   wire T0;
   reg[0:0] valid;
@@ -177,7 +178,8 @@ endmodule
     input  io_valid,
     output io_replay,
     output io_sigs_enq_cmdq,
-    output io_sigs_enq_ximm1q);
+    output io_sigs_enq_ximm1q
+);
 
 
   assign io_replay = io_valid;
@@ -185,7 +187,8 @@ endmodule
 
 module NameSuite_BindFirstComp_1(
     input  valid_common,
-    output io_replay);
+    output io_replay
+);
 
   wire T0;
   wire T1;
@@ -207,7 +210,8 @@ module NameSuite_BindFirstComp_1(
        .io_valid(  ),
        .io_replay(  ),
        .io_sigs_enq_cmdq( dec_io_sigs_enq_cmdq ),
-       .io_sigs_enq_ximm1q( dec_io_sigs_enq_ximm1q ));
+       .io_sigs_enq_ximm1q( dec_io_sigs_enq_ximm1q )
+  );
 endmodule
 
 """)
@@ -250,7 +254,8 @@ endmodule
    assertFile(tmpdir.getRoot() + "/NameSuite_BindSecondComp_1.v",
 """module NameSuite_Block_1(
     input  io_irq,
-    output[4:0] io_irq_cause);
+    output[4:0] io_irq_cause
+);
 
   wire[4:0] T0;
 
@@ -260,7 +265,8 @@ endmodule
 
 module NameSuite_BindSecondComp_1(
     input  io_irq,
-    output[5:0] io_irq_cause);
+    output[5:0] io_irq_cause
+);
 
   wire[5:0] T0;
   wire[4:0] NameSuite_Block_1_io_irq_cause;
@@ -269,7 +275,8 @@ module NameSuite_BindSecondComp_1(
   assign T0 = {1'h1/* 1*/, NameSuite_Block_1_io_irq_cause};
   NameSuite_Block_1 NameSuite_Block_1(
        .io_irq( io_irq ),
-       .io_irq_cause( NameSuite_Block_1_io_irq_cause ));
+       .io_irq_cause( NameSuite_Block_1_io_irq_cause )
+);
 endmodule
 
 """)
@@ -324,7 +331,8 @@ endmodule
     assertFile(tmpdir.getRoot() + "/NameSuite_BindThirdComp_1.v",
 """module NameSuite_Comp_1(
     input  io_in_ren,
-    output io_out_ren);
+    output io_out_ren
+);
 
 
   assign io_out_ren = io_in_ren;
@@ -332,7 +340,8 @@ endmodule
 
 module NameSuite_BindThirdComp_1(
     input  io_in_ren,
-    output io_result);
+    output io_result
+);
 
   wire NameSuite_Comp_1_2_io_out_ren;
   wire NameSuite_Comp_1_1_io_out_ren;
@@ -348,16 +357,20 @@ module NameSuite_BindThirdComp_1(
   assign T2 = NameSuite_Comp_1_0_io_out_ren | NameSuite_Comp_1_1_io_out_ren;
   NameSuite_Comp_1 NameSuite_Comp_1_0(
        .io_in_ren( io_in_ren ),
-       .io_out_ren( NameSuite_Comp_1_0_io_out_ren ));
+       .io_out_ren( NameSuite_Comp_1_0_io_out_ren )
+  );
   NameSuite_Comp_1 NameSuite_Comp_1_1(
        .io_in_ren( NameSuite_Comp_1_0_io_out_ren ),
-       .io_out_ren( NameSuite_Comp_1_1_io_out_ren ));
+       .io_out_ren( NameSuite_Comp_1_1_io_out_ren )
+  );
   NameSuite_Comp_1 NameSuite_Comp_1_2(
        .io_in_ren( NameSuite_Comp_1_1_io_out_ren ),
-       .io_out_ren( NameSuite_Comp_1_2_io_out_ren ));
+       .io_out_ren( NameSuite_Comp_1_2_io_out_ren )
+  );
   NameSuite_Comp_1 NameSuite_Comp_1_3(
        .io_in_ren( NameSuite_Comp_1_2_io_out_ren ),
-       .io_out_ren( NameSuite_Comp_1_3_io_out_ren ));
+       .io_out_ren( NameSuite_Comp_1_3_io_out_ren )
+  );
 endmodule
 
 """)
@@ -388,7 +401,8 @@ endmodule
     assertFile(tmpdir.getRoot() + "/NameSuite_BindFourthComp_1.v",
 """module NameSuite_BindFourthComp_1(
     input [4:0] io_in,
-    output[4:0] io_out);
+    output[4:0] io_out
+);
 
 
   assign io_out = io_in;
@@ -455,7 +469,8 @@ endmodule
     output[31:0] io_mine_1,
     input  io_sub_resp_valid,
     input  io_sub_resp_bits_error,
-    input [31:0] io_sub_resp_bits_ppn);
+    input [31:0] io_sub_resp_bits_ppn
+);
 
   wire[31:0] T0;
   wire T1;
@@ -496,7 +511,8 @@ module NameSuite_BindFithComp_1(input clk, input reset,
     input [31:0] io_dmem_ptw_resp_bits_ppn,
     output io_resp_resp_valid,
     output io_resp_resp_bits_error,
-    output[31:0] io_resp_resp_bits_ppn);
+    output[31:0] io_resp_resp_bits_ppn
+);
 
 
   assign io_resp_resp_bits_ppn = io_imem_ptw_resp_bits_ppn;
@@ -508,7 +524,8 @@ module NameSuite_BindFithComp_1(input clk, input reset,
        .io_mine_1(  ),
        .io_sub_resp_valid(  ),
        .io_sub_resp_bits_error(  ),
-       .io_sub_resp_bits_ppn(  ));
+       .io_sub_resp_bits_ppn(  )
+);
 endmodule
 
 """)
@@ -556,7 +573,8 @@ endmodule
     input  io_r_en,
     input [4:0] io_r_addr,
     input [63:0] io_w_data,
-    output[7:0] io_status_im);
+    output[7:0] io_status_im
+);
 
   reg[7:0] reg_status_im;
   wire[7:0] T0;
@@ -637,7 +655,8 @@ endmodule
     output io_requestor_3_req_ready,
     input  io_requestor_3_req_valid,
     input  io_requestor_3_req_bits_ready,
-    output io_mem);
+    output io_mem
+);
 
   wire T0;
   wire T1;
@@ -702,7 +721,8 @@ endmodule
     assertFile(tmpdir.getRoot() + "/NameSuite_VariationComp_1.v",
 """module NameSuite_CompBlock_1_0(
     input  io_valid,
-    output io_replay);
+    output io_replay
+);
 
 
   assign io_replay = 1'h0/* 0*/;
@@ -710,7 +730,8 @@ endmodule
 
 module NameSuite_CompBlock_1_1(
     input  io_valid,
-    output io_replay);
+    output io_replay
+);
 
 
   assign io_replay = io_valid;
@@ -718,7 +739,8 @@ endmodule
 
 module NameSuite_VariationComp_1(
     input  io_valid,
-    output io_replay);
+    output io_replay
+);
 
   wire T0;
   wire block_2_io_replay;
@@ -731,13 +753,16 @@ module NameSuite_VariationComp_1(
   assign T1 = block_0_io_replay & block_1_io_replay;
   NameSuite_CompBlock_1_0 block_0(
        .io_valid( io_valid ),
-       .io_replay( block_0_io_replay ));
+       .io_replay( block_0_io_replay )
+);
   NameSuite_CompBlock_1_0 block_1(
        .io_valid( io_valid ),
-       .io_replay( block_1_io_replay ));
+       .io_replay( block_1_io_replay )
+);
   NameSuite_CompBlock_1_1 block_2(
        .io_valid( io_valid ),
-       .io_replay( block_2_io_replay ));
+       .io_replay( block_2_io_replay )
+);
 endmodule
 
 """)
@@ -771,7 +796,8 @@ endmodule
 """module NameSuite_MemComp_1(input clk, input reset,
     input  io_ren,
     input [7:0] io_raddr,
-    output[64:0] io_rdata);
+    output[64:0] io_rdata
+);
 
   wire[64:0] T0;
   wire[7:0] T1;
@@ -856,6 +882,7 @@ class NameSuite_DebugComp_1_t : public mod_t {
   void init ( bool rand_init = false );
   void clock_lo ( dat_t<1> reset );
   void clock_hi ( dat_t<1> reset );
+  void clock ( dat_t<1> reset );
   void print ( FILE* f );
   bool scan ( FILE* f );
   void dump ( FILE* f, int t );
@@ -881,6 +908,15 @@ void NameSuite_DebugComp_1_t::clock_lo ( dat_t<1> reset ) {
 }
 void NameSuite_DebugComp_1_t::clock_hi ( dat_t<1> reset ) {
   NameSuite_DebugComp_1_dpath__wb_reg_ll_wb = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow;
+}
+int NameSuite_DebugComp_1_t::clock ( dat_t<1> reset) {
+  uint32_t min = (1<<31)-1;
+  if (clk_cnt < min) min = clk_cnt;
+  clk_cnt-=min;
+  if (clk_cnt == 0) clock_lo( reset );
+  if (clk_cnt == 0) clock_hi( reset );
+  if (clk_cnt == 0) clk_cnt = clk-1;
+  return min;
 }
 void NameSuite_DebugComp_1_t::print ( FILE* f ) {
 }
