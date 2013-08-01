@@ -80,8 +80,8 @@ class ConnectSuite extends AssertionsForJUnit {
     assertFile(tmpdir.getRoot() + "/ConnectSuite_NoClassRelation_1.v",
 """module ConnectSuite_A_1(
     input  io_a_in,
-    output io_a_out)
-;
+    output io_a_out
+);
 
 
   assign io_a_out = io_a_in;
@@ -89,7 +89,8 @@ endmodule
 
 module ConnectSuite_B_1(
     input  io_b_in,
-    output io_b_out);
+    output io_b_out
+);
 
   wire aComp_io_a_out;
 
@@ -102,7 +103,8 @@ endmodule
 
 module ConnectSuite_NoClassRelation_1(
     input  io_c_in,
-    output io_c_out);
+    output io_c_out
+);
 
   wire aComp_io_b_out;
 
@@ -155,7 +157,8 @@ endmodule
 
 module ConnectSuite_LogicBtwInstances_1(input clk, input reset,
     input  io_b_in,
-    output io_b_out);
+    output io_b_out
+);
 
   wire T0;
   reg[0:0] x;

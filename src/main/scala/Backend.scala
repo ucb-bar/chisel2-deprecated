@@ -409,7 +409,7 @@ abstract class Backend {
   def assignClksToComps {
     for (comp <- Module.sortedComps) {
       for (node <- comp.nodes) {
-        if (node.isInstanceOf[Delay]) {
+        if (node.isInstanceOf[Delay] && node.clock != null) { // null clock due to unreachable reg
           var curComp = comp
           while (curComp != null) {
             if (!curComp.clocks.contains(node.clock))
@@ -456,6 +456,15 @@ abstract class Backend {
           } else {
             comp.resets(rst).inputs += rst
           }
+        }
+      }
+    }
+  }
+
+  def nameRsts {
+    for (comp <- Module.sortedComps) {
+      for (rst <- comp.resets.keys) {
+        if (comp.resets(rst) != Module.implicitReset) {
           comp.resets(rst).setName(rst.name)
         }
       }
@@ -515,7 +524,6 @@ abstract class Backend {
     ChiselError.info("finished flattening (" + nbNodes + ")")
     ChiselError.checkpoint()
 
-    nameAll(c)
     /* The code in this function seems wrong. Yet we still need to call
      it to associate components to nodes that were created after the call
      tree has been executed (ie. in genMuxes and forceMatchWidths). More
@@ -550,6 +558,7 @@ abstract class Backend {
     /* We execute nameAll after traceNodes because bindings would not have been
        created yet otherwise. */
     nameAll(c)
+    nameRsts
 
     for (comp <- Module.sortedComps ) {
       // remove unconnected outputs

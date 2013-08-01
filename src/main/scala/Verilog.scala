@@ -233,10 +233,10 @@ class VerilogBackend extends Backend {
       res += "  `ifdef SYNTHESIS\n"
       for ((n, w) <- c.wires) {
         if (w.driveRand) {
-          res += "    " + c.name + "." + n + " = $random();\n"
+          res += "    assign " + c.name + "." + n + " = $random();\n"
         }
       }
-      res += "  end\n"
+      res += "  `endif\n"
     }
     res
   }

@@ -635,8 +635,8 @@ class CppBackend extends Backend {
     out_h.write("\n");
     out_h.write("  void init ( bool rand_init = false );\n");
     for ( clock <- Module.clocks) {
-      out_h.write("  void clock_lo" + clkName(clock) + " ( dat_t<1> reset);\n")
-      out_h.write("  void clock_hi" + clkName(clock) + " ( dat_t<1> reset);\n")
+      out_h.write("  void clock_lo" + clkName(clock) + " ( dat_t<1> reset );\n")
+      out_h.write("  void clock_hi" + clkName(clock) + " ( dat_t<1> reset );\n")
     }
     out_h.write("  int clock ( dat_t<1> reset );\n")
     out_h.write("  void print ( FILE* f );\n");
@@ -677,7 +677,7 @@ class CppBackend extends Backend {
       out_c.write(clkDomains(clk)._2.result)
     }
 
-    out_c.write("int " + c.name + "_t::clock ( dat_t <1> reset ) {\n")
+    out_c.write("int " + c.name + "_t::clock ( dat_t<1> reset ) {\n")
     out_c.write("  uint32_t min = (1<<31)-1;\n")
     for (clock <- Module.clocks) {
       out_c.write("  if (" + emitRef(clock) + "_cnt < min) min = " + emitRef(clock) +"_cnt;\n")
