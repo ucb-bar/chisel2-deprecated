@@ -87,6 +87,15 @@ void VerifSuite_CppAssertComp_1_t::clock_lo ( dat_t<1> reset ) {
 }
 void VerifSuite_CppAssertComp_1_t::clock_hi ( dat_t<1> reset ) {
 }
+int VerifSuite_CppAssertComp_1_t::clock ( dat_t<1> reset ) {
+  uint32_t min = (1<<31)-1;
+  if (clk_cnt < min) min = clk_cnt;
+  clk_cnt-=min;
+  if (clk_cnt == 0) clock_lo( reset );
+  if (clk_cnt == 0) clock_hi( reset );
+  if (clk_cnt == 0) clk_cnt = clk-1;
+  return min;
+}
 void VerifSuite_CppAssertComp_1_t::print ( FILE* f ) {
 }
 bool VerifSuite_CppAssertComp_1_t::scan ( FILE* f ) {

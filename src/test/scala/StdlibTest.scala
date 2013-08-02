@@ -193,7 +193,8 @@ class StdlibSuite extends AssertionsForJUnit {
 """module StdlibSuite_MulUS_1(
     input [31:0] io_x,
     input  signed [31:0] io_y,
-    output signed [63:0] io_z);
+    output signed [63:0] io_z
+);
 
   wire signed [63:0] T0;
   wire signed [32:0] T1;
@@ -225,7 +226,8 @@ endmodule
 """module StdlibSuite_DivUS_1(
     input [31:0] io_x,
     input  signed [31:0] io_y,
-    output signed [31:0] io_z);
+    output signed [31:0] io_z
+);
 
   wire signed [31:0] T0;
   wire signed [32:0] T1;
@@ -257,7 +259,8 @@ endmodule
 """module StdlibSuite_RemUS_1(
     input [31:0] io_x,
     input  signed [31:0] io_y,
-    output signed [31:0] io_z);
+    output signed [31:0] io_z
+);
 
   wire signed [31:0] T0;
   wire signed [32:0] T1;
@@ -289,7 +292,8 @@ endmodule
 """module StdlibSuite_MulSU_1(
     input  signed [31:0] io_x,
     input [31:0] io_y,
-    output signed [63:0] io_z);
+    output signed [63:0] io_z
+);
 
   wire signed [63:0] T0;
   wire signed [32:0] T1;
@@ -321,7 +325,8 @@ endmodule
 """module StdlibSuite_DivSU_1(
     input  signed [31:0] io_x,
     input [31:0] io_y,
-    output signed [31:0] io_z);
+    output signed [31:0] io_z
+);
 
   wire signed [31:0] T0;
   wire signed [32:0] T1;
@@ -353,7 +358,8 @@ endmodule
 """module StdlibSuite_RemSU_1(
     input  signed [31:0] io_x,
     input [31:0] io_y,
-    output signed [31:0] io_z);
+    output signed [31:0] io_z
+);
 
   wire signed [31:0] T0;
   wire signed [32:0] T1;
@@ -389,7 +395,8 @@ endmodule
     input [1:0] io_in_v_0,
     input [1:0] io_in_v_1,
     output[1:0] io_out_v_0,
-    output[1:0] io_out_v_1);
+    output[1:0] io_out_v_1
+);
 
 
   assign io_out_v_1 = io_in_v_1;
@@ -557,7 +564,8 @@ endmodule
     input  io_out_ready,
     output io_out_valid,
     output signed [7:0] io_out_bits,
-    output[1:0] io_chosen);
+    output[1:0] io_chosen
+);
 
   wire[1:0] T0;
   wire[1:0] T1;
@@ -694,7 +702,8 @@ endmodule
     input  io_out_ready,
     output io_out_valid,
     output signed [7:0] io_out_bits,
-    output[1:0] io_chosen);
+    output[1:0] io_chosen
+);
 
   wire[1:0] T0;
   wire[1:0] T1;
@@ -954,7 +963,8 @@ endmodule
     assertFile(tmpdir.getRoot() + "/StdlibSuite_OHToUIntComp_1.v",
 """module StdlibSuite_OHToUIntComp_1(
     input  io_in,
-    output[1:0] io_out);
+    output[1:0] io_out
+);
 
   wire[1:0] T0;
   wire T1;
@@ -981,7 +991,8 @@ endmodule
     input  io_enq_valid,
     input [7:0] io_enq_bits,
     output io_deq_valid,
-    output[7:0] io_deq_bits);
+    output[7:0] io_deq_bits
+);
 
   reg[7:0] R0;
   reg[0:0] R1;
@@ -1090,7 +1101,8 @@ endmodule
     input [7:0] io_enq_bits,
     input  io_deq_ready,
     output io_deq_valid,
-    output[7:0] io_deq_bits);
+    output[7:0] io_deq_bits
+);
 
   wire[7:0] T0;
   reg [7:0] ram [1:0];
@@ -1171,7 +1183,8 @@ module StdlibSuite_QueueComp_1(input clk, input reset,
     input [7:0] io_req_bits,
     input  io_resp_ready,
     output io_resp_valid,
-    output[7:0] io_resp_bits);
+    output[7:0] io_resp_bits
+);
 
   wire[7:0] Queue_io_deq_bits;
   wire Queue_io_deq_valid;
@@ -1186,7 +1199,8 @@ module StdlibSuite_QueueComp_1(input clk, input reset,
        .io_enq_bits( io_req_bits ),
        .io_deq_ready( io_resp_ready ),
        .io_deq_valid( Queue_io_deq_valid ),
-       .io_deq_bits( Queue_io_deq_bits ));
+       .io_deq_bits( Queue_io_deq_bits )
+  );
 endmodule
 
 """)

@@ -225,7 +225,7 @@ class VerilogBackend extends Backend {
     }
     val uncommentedPorts = portDecs.filter(!_.result.contains("//"))
     uncommentedPorts.slice(0, uncommentedPorts.length-1).map(_.append(","))
-    portDecs.map(_.insert(0, "        "))
+    portDecs.map(_.insert(0, "       "))
     if (hasReg) res += ",\n" else res += "\n"
     res += portDecs.map(_.result).reduceLeft(_ + "\n" + _)
     res += "\n  );\n";
@@ -233,10 +233,10 @@ class VerilogBackend extends Backend {
       res += "  `ifdef SYNTHESIS\n"
       for ((n, w) <- c.wires) {
         if (w.driveRand) {
-          res += "    " + c.name + "." + n + " = $random();\n"
+          res += "    assign " + c.name + "." + n + " = $random();\n"
         }
       }
-      res += "  end\n"
+      res += "  `endif\n"
     }
     res
   }

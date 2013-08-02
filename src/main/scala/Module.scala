@@ -489,15 +489,15 @@ abstract class Module(resetSignal: Bool = null) {
     bfs(_.forceMatchingWidths)
   }
 
-  def getReset(clock: Clock): Bool = {
-    if (clock.component == this) {
+  def getReset(n: Node, clock: Clock): Bool = {
+    if (clock.component == n.component) {
       clock.getReset
     } else {
-      if (!this.resets.contains(clock.getReset)) {
-        val pin = Bool(INPUT); pin.component = this; this.nodes += pin
-        this.resets += (clock.getReset -> pin)
+      if (!n.component.resets.contains(clock.getReset)) {
+        val pin = Bool(INPUT); pin.component = n.component; n.component.nodes += pin
+        n.component.resets += (clock.getReset -> pin)
       }
-      this.resets(clock.getReset)
+      n.component.resets(clock.getReset)
     }
   }
 
@@ -517,7 +517,7 @@ abstract class Module(resetSignal: Bool = null) {
         if (x.isInstanceOf[Reg]) {
           val reg = x.asInstanceOf[Reg]
           if (reg.isReset) {
-            reg.inputs += this.getReset(reg.clock)
+            reg.inputs += this.getReset(reg, reg.clock)
           }
         }
       }
