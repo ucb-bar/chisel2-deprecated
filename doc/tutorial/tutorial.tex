@@ -160,33 +160,33 @@ domain-specific languages.
 
 \section{Hardware expressible in Chisel}
 
-The initial version of Chisel only supports the expression of
-synchronous RTL (Register-Transfer Level) designs, with a single
-common clock.  Synchronous RTL circuits can be expressed as a
-hierarchical composition of modules containing combinational logic and
-clocked state elements.  Although Chisel assumes a single global
-clock, local clock gating logic is automatically generated for every
-state element in the design to save power.
-\begin{commentary}
-Modern hardware designs often include multiple islands of logic, where
-each island uses a different clock and where islands must correctly
-communicate across clock island boundaries.  Although clock-crossing
-synchronization circuits are notoriously difficult to design, there
-are known good solutions for most scenarios, which can be packaged as
-library elements for use by designers.  As a result, most effort in
-new designs is spent in developing and verifying the functionality
-within each synchronous island rather than on passing values between
-islands.
-
-In its current form, Chisel can be used to describe each of the
-synchronous islands individually. Existing tool frameworks can tie
-together these islands into a complete design.  For example, a
-separate outer simulation framework can be used to model the assembly
-of islands running together.  It should be noted that exhaustive
-dynamic verification of asynchronous communications is usually
-impossible and that more formal static approaches are usually
-necessary.
-\end{commentary}
+% The initial version of Chisel only supports the expression of
+% synchronous RTL (Register-Transfer Level) designs, with a single
+% common clock.  Synchronous RTL circuits can be expressed as a
+% hierarchical composition of modules containing combinational logic and
+% clocked state elements.  Although Chisel assumes a single global
+% clock, local clock gating logic is automatically generated for every
+% state element in the design to save power.
+% \begin{commentary}
+% Modern hardware designs often include multiple islands of logic, where
+% each island uses a different clock and where islands must correctly
+% communicate across clock island boundaries.  Although clock-crossing
+% synchronization circuits are notoriously difficult to design, there
+% are known good solutions for most scenarios, which can be packaged as
+% library elements for use by designers.  As a result, most effort in
+% new designs is spent in developing and verifying the functionality
+% within each synchronous island rather than on passing values between
+% islands.
+% 
+% In its current form, Chisel can be used to describe each of the
+% synchronous islands individually. Existing tool frameworks can tie
+% together these islands into a complete design.  For example, a
+% separate outer simulation framework can be used to model the assembly
+% of islands running together.  It should be noted that exhaustive
+% dynamic verification of asynchronous communications is usually
+% impossible and that more formal static approaches are usually
+% necessary.
+% \end{commentary}
 
 This version of Chisel also only supports binary logic, and does not
 support tri-state signals.
@@ -526,7 +526,7 @@ Vecs create an indexable vector of elements, and are constructed as
 follows:
 \begin{scala}
 // Vector of 5 23-bit signed integers.
-val myVec = Vec(5) { SInt(width = 23) } 
+val myVec = Vec.fill(5){ SInt(width = 23) } 
 
 // Connect to one element of vector. 
 val reg3  = myVec(3) 
@@ -548,7 +548,7 @@ structures:
 \begin{scala}
 class BigBundle extends Bundle {
  // Vector of 5 23-bit signed integers.
- val myVec = Vec(5) { SInt(width = 23) } 
+ val myVec = Vec.fill(5) { SInt(width = 23) } 
  val flag  = Bool()
  // Previously defined bundle.
  val f     = new MyFloat()              
@@ -822,7 +822,7 @@ The simplest form of state element supported by Chisel is a
 positive-edge-triggered register, which can be instantiated
 functionally as:
 \begin{scala}
-RegUpdate(in)
+Reg(data = in)
 \end{scala}
 
 \noindent
@@ -838,7 +838,7 @@ constructs.  For example, a rising-edge detector that takes a boolean
 signal in and outputs true when the current value is true and the
 previous value is false is given by:
 \begin{scala}
-def risingedge(x: Bool) = x && !RegUpdate(x)
+def risingedge(x: Bool) = x && !Reg(data = x)
 \end{scala}
 
 Counters are an important sequential circuit.  To construct an
@@ -846,7 +846,7 @@ up-counter that counts up to a maximum value, \verb+max+, then wraps
 around back to zero (i.e., modulo \verb!max+1!), we write:
 \begin{scala}
 def counter(max: UInt) = {
-  val x = RegReset(UInt(0, max.getWidth))
+  val x = Reg(reset = UInt(0, max.getWidth))
   x := Mux(x == max, UInt(0), x + UInt(1))
   x
 }
@@ -876,7 +876,7 @@ toggling between true and false on each pulse:
 \begin{scala}
 // Flip internal state when input true.
 def toggle(p: Bool) = {
-  val x = RegReset(Bool(false))
+  val x = Reg(reset = Bool(false))
   x := Mux(p, !x, x)
   x
 }
@@ -904,7 +904,7 @@ and \verb!brTarget! wires so they can be referenced before defined:
 val pcPlus4  = UInt()
 val brTarget = UInt()
 val pcNext   = Mux(io.ctrl.pcSel, brTarget, pcPlus4)
-val pcReg    = RegUpdate(pcNext, resetVal = UInt(0, 32))
+val pcReg    = Reg(data = pcNext, reset = UInt(0, 32))
 pcPlus4     := pcReg + UInt(4)
 ...
 brTarget    := addOut
@@ -1109,7 +1109,7 @@ generator:
 %     val in  = Bool(INPUT)
 %     val out = Bool(OUTPUT) }
 %   val s_even :: s_odd :: Nil = Enum(2, UInt())
-%   val state  = RegReset(s_even)
+%   val state  = Reg(reset = s_even)
 %   switch(state, Array(
 %     (s_even, () => { when (io.in) { state := s_odd } }),
 %     (s_odd,  () => { when (io.in) { state := s_even } }) ))
@@ -1123,7 +1123,7 @@ class Parity extends Module {
     val in  = Bool(dir = INPUT)
     val out = Bool(dir = OUTPUT) }
   val s_even :: s_odd :: Nil = Enum(2, UInt())
-  val state  = RegReset(s_even)
+  val state  = Reg(reset = s_even)
   when (io.in) {
     when (state === s_even) { state := s_odd  }
     when (state === s_odd)  { state := s_even }
@@ -1148,7 +1148,7 @@ class VendingMachine extends Module {
     val rdy    = Bool(dir = OUTPUT) }
   val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = 
     Enum(5, UInt())
-  val state = RegReset(s_idle)
+  val state = Reg(reset = s_idle)
   when (state === s_idle) {
     when (io.nickel) { state := s_5 }
     when (io.dime)   { state := s_10 }
@@ -1181,7 +1181,7 @@ class VendingMachine extends Module {
     val dime   = Bool(dir = INPUT)
     val rdy    = Bool(dir = OUTPUT) }
   val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = Enum(5, UFIx())
-  val state = RegReset(s_idle)
+  val state = Reg(reset = s_idle)
   switch (state) {
       is (s_idle) {
       when (io.nickel) { state := s_5 }
@@ -1725,7 +1725,7 @@ In Chisel this can be defined as:
 
 \begin{scala}
 def delays[T <: Data](x: T, n: Int): List[T] = 
-  if (n <= 1) List(x) else x :: taps(RegUpdate(x), n-1)
+  if (n <= 1) List(x) else x :: taps(Reg(data = x), n-1)
 
 def innerProductFIR[T <: Num](ws: Seq[T], x: T): T = 
   (ws, delays(x, ws.length)).zipped.
@@ -1797,9 +1797,9 @@ class Fifo[T <: Data] (n: Int, type: T)
     val enq_dat = type.asInput
     val deq_dat = type.asOutput
   }
-  val enq_ptr      = RegReset(UInt(0, sizeof(n)))
-  val deq_ptr      = RegReset(UInt(0, sizeof(n)))
-  val is_full      = RegReset(Bool(false))
+  val enq_ptr      = Reg(reset = UInt(0, sizeof(n)))
+  val deq_ptr      = Reg(reset = UInt(0, sizeof(n)))
+  val is_full      = Reg(reset = Bool(false))
   val do_enq       = io.enq_rdy && io.enq_val
   val do_deq       = io.deq_rdy && io.deq_val
   val is_empty     = !is_full && (enq_ptr === deq_ptr)

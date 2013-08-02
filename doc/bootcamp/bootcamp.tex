@@ -55,7 +55,6 @@ password: bootcamp
 
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Using Screen}
-
 to prevent lossage of state if disconnected ... when you first log in, type
 \begin{scala}
 screen
@@ -225,18 +224,18 @@ Mux(x > y, x, y)
 \end{frame}
 
 \begin{frame}[fragile]
-\frametitle{Creating Component}
+\frametitle{Creating Module}
 
 \begin{columns}
 \column{0.45\textwidth}
 
 {\lstset{basicstyle={\scriptsize\ttfamily}}
 \begin{scala}
-class Max2 extends Component {
+class Max2 extends Module {
   val io = new Bundle {
-    val x = UFix(width = 8).asInput
-    val y = UFix(width = 8).asInput
-    val z = UFix(width = 8).asOutput }
+    val x = UInt(width = 8).asInput
+    val y = UInt(width = 8).asInput
+    val z = UInt(width = 8).asOutput }
   io.z := Mux(io.x > io.y, io.x, io.y)
 }
 \end{scala}
@@ -251,18 +250,18 @@ class Max2 extends Component {
 \end{frame}
 
 \begin{frame}[fragile]
-\frametitle{Connecting Components}
+\frametitle{Connecting Modules}
 
 \begin{columns}
 \column{0.25\textwidth}
 \begin{scala}
-val m1 = new Max2()
+val m1 = Module(new Max2())
 m1.io.x := a
 m1.io.y := b
-val m2 = new Max2()
+val m2 = Module(new Max2())
 m2.io.x := c
 m2.io.y := d
-val m3 = new Max2()
+val m3 = Module(new Max2())
 m3.io.x := m1.io.z
 m3.io.y := m2.io.z
 \end{scala}
@@ -330,21 +329,21 @@ Reduce(Array(a, b, c, d), Max2)
 
 \begin{footnotesize}
 \begin{scala}
-class GCD extends Component {
+class GCD extends Module {
   val io = new Bundle {
-    val a     = UFix(INPUT, 16)
-    val b     = UFix(INPUT, 16)
-    val z     = UFix(OUTPUT, 16)
+    val a     = UInt(INPUT, 16)
+    val b     = UInt(INPUT, 16)
+    val z     = UInt(OUTPUT, 16)
     val valid = Bool(OUTPUT) }
-  val x = Reg(resetVal = io.a)
-  val y = Reg(resetVal = io.b)
+  val x = Reg(reset = io.a)
+  val y = Reg(reset = io.b)
   when (x > y) {
     x := x - y
   } .otherwise {
     y := y - x
   }
   io.z     := x
-  io.valid := y === UFix(0)
+  io.valid := y === UInt(0)
 }
 \end{scala}
 \end{footnotesize}
@@ -365,14 +364,14 @@ class GCD extends Component {
 
 \begin{frame}[fragile]{Literals}
 \begin{scala}
-Bits(1)       // decimal 1-bit literal from Scala Int. 
-Bits("ha")    // hexadecimal 4-bit literal from string.
-Bits("o12")   // octal 4-bit literal from string. 
-Bits("b1010") // binary 4-bit literal from string.
+UInt(1)       // decimal 1-bit literal from Scala Int. 
+UInt("ha")    // hexadecimal 4-bit literal from string.
+UInt("o12")   // octal 4-bit literal from string. 
+UInt("b1010") // binary 4-bit literal from string.
 
-Fix(5)        // signed decimal 4-bit literal from Scala Int.
-Fix(-8)       // negative decimal 4-bit literal from Scala Int.
-UFix(5)       // unsigned decimal 3-bit literal from Scala Int.
+SInt(5)       // signed decimal 4-bit literal from Scala Int.
+SInt(-8)      // negative decimal 4-bit literal from Scala Int.
+UInt(5)       // unsigned decimal 3-bit literal from Scala Int.
 
 Bool(true)    // Bool literals from Scala literals.
 Bool(false)
@@ -381,14 +380,14 @@ Bool(false)
  
 \begin{frame}[fragile]{Literals}
 \begin{scala}
-Bits("h_dead_beef") // 32-bit literal of type Bits.
-Bits(1)             // decimal 1-bit literal from Scala Int.
-Bits("ha", 8)       // hexadecimal 8-bit literal of type Bits.
-Bits("o12", 6)      // octal 6-bit literal of type Bits.
-Bits("b1010", 12)   // binary 12-bit literal of type Bits.
+UInt("h_dead_beef") // 32-bit literal of type UInt.
+UInt(1)             // decimal 1-bit literal from Scala Int.
+UInt("ha", 8)       // hexadecimal 8-bit literal of type UInt.
+UInt("o12", 6)      // octal 6-bit literal of type UInt.
+UInt("b1010", 12)   // binary 12-bit literal of type UInt.
 
-Fix(5, 7)           // signed decimal 7-bit literal of type Fix.
-UFix(5, 8)          // unsigned decimal 8-bit literal of type UFix.
+SInt(5, 7)          // signed decimal 7-bit literal of type SInt.
+UInt(5, 8)          // unsigned decimal 8-bit literal of type UInt.
 \end{scala}
 \end{frame}
 
@@ -416,19 +415,19 @@ val out = (sel & in1) | (~sel & in0)
 \includegraphics[height=0.94in]{../manual/figs/bits-1.pdf} &
 \includegraphics[height=1.96in]{../manual/figs/bits-and.pdf} &
 \includegraphics[height=3.0in]{../manual/figs/bits-or-and.pdf} \\
-\code{a = Bits(1)} & \code{b = a \& Bits(2)} &
-\code{b | Bits(3)} \\
+\code{a = UInt(1)} & \code{b = a \& UInt(2)} &
+\code{b | UInt(3)} \\
 \end{tabular}
 \end{center}
 \end{frame}
 
 \begin{frame}[fragile]{Bitwise operators}
-\textbf{Valid on Bits, Fix, UFix, Bool.}
+\textbf{Valid on UInt, SInt, Bool.}
 \begin{scala}
 // Bitwise-NOT
 val invertedX = ~x                      
 // Bitwise-AND 
-val hiBits    = x & Bits("h_ffff_0000") 
+val hiBits    = x & UInt("h_ffff_0000") 
 // Bitwise-OR
 val flagsOut  = flagsIn | overflow      
 // Bitwise-XOR
@@ -437,7 +436,7 @@ val flagsOut  = flagsIn ^ toggle
 \end{frame}
 
 \begin{frame}[fragile]{Bitwise reductions}
-\textbf{Valid on Bits, Fix, and UFix.  Returns Bool.}
+\textbf{Valid on SInt and UInt.  Returns Bool.}
 \begin{scala}
 // AND-reduction 
 val allSet = andR(x)  
@@ -449,7 +448,7 @@ val parity = xorR(x)
 \end{frame}
 
 \begin{frame}[fragile]{Equality comparison}
-\textbf{Valid on Bits, Fix, UFix, and Bool. Returns Bool.}
+\textbf{Valid on SInt, UInt, and Bool. Returns Bool.}
 \begin{scala}
 // Equality
 val equ = x === y 
@@ -459,24 +458,24 @@ val neq = x != y
 \end{frame}
 
 \begin{frame}[fragile]{Shifts}
-\textbf{Valid on Bits, Fix, and UFix.}
+\textbf{Valid on SInt, and UInt.}
 \begin{scala}
 // Logical left shift.
-val twoToTheX = Fix(1) << x   
-// Right shift (logical on Bits & UFix, arithmetic on Fix).
-val hiBits    = x >> UFix(16) 
+val twoToTheX = SInt(1) << x   
+// Right shift (logical on UInt & UInt, arithmetic on SInt).
+val hiBits    = x >> UInt(16) 
 \end{scala}
 \end{frame}
 
 \begin{frame}[fragile]{Bitfield manipulation}
-\textbf{Valid on Bits, Fix, UFix, and Bool.}
+\textbf{Valid on SInt, UInt, and Bool.}
 \begin{scala}
 // Extract single bit, LSB has index 0.
 val xLSB       = x(0)                
 // Extract bit field  from end to start bit pos. 
 val xTopNibble = x(15,12)            
 // Replicate a bit string multiple times.
-val usDebt     = Fill(3, Bits("hA")) 
+val usDebt     = Fill(3, UInt("hA")) 
 // Concatenates bit fields, w/ first arg on left
 val float      = Cat(sgn,exp,man)    
 \end{scala}
@@ -497,7 +496,7 @@ val out   = Mux(sel, inTrue, inFalse)
 \end{frame}
 
 \begin{frame}[fragile]{Arithmetic operations}
-\textbf{Valid on Nums: Fix and UFix. }
+\textbf{Valid on Nums: SInt and UInt. }
 \begin{scala}
 // Addition. 
 val sum  = a + b  
@@ -513,7 +512,7 @@ val mod  = a % b
 \end{frame}
 
 \begin{frame}[fragile]{Arithmetic comparisons}
-\textbf{Valid on Nums: Fix and UFix. Returns Bool.}
+\textbf{Valid on Nums: SInt and UInt. Returns Bool.}
 \begin{scala}
 // Greater than.
 val gt  = a > b   
@@ -574,11 +573,11 @@ package Tutorial
 
 import Chisel._
 
-class Combinational extends Component {
+class Combinational extends Module {
   val io = new Bundle {
-    val x = UFix(INPUT, 16)
-    val y = UFix(INPUT, 16)
-    val z = UFix(OUTPUT, 16)
+    val x = UInt(INPUT, 16)
+    val y = UInt(INPUT, 16)
+    val z = UInt(OUTPUT, 16)
   }
   io.z := io.x + io.y
 }
@@ -661,11 +660,11 @@ import Chisel._
 import scala.collection.mutable.HashMap
 import scala.util.Random
 
-class Combinational extends Component {
+class Combinational extends Module {
   val io = new Bundle {
-    val x = UFix(INPUT, 16)
-    val y = UFix(INPUT, 16)
-    val z = UFix(OUTPUT, 16) }
+    val x = UInt(INPUT, 16)
+    val y = UInt(INPUT, 16)
+    val z = UInt(OUTPUT, 16) }
   io.z := io.x + io.y
 }
 
@@ -680,9 +679,9 @@ class CombinationalTests(c: Combinational)
       vars.clear()
       val x        = rnd.nextInt(maxInt)
       val y        = rnd.nextInt(maxInt)
-      vars(c.io.x) = UFix(x)
-      vars(c.io.y) = UFix(y)
-      vars(c.io.z) = UFix((x + y)&(maxInt-1))
+      vars(c.io.x) = UInt(x)
+      vars(c.io.y) = UInt(y)
+      vars(c.io.z) = UInt((x + y)&(maxInt-1))
       allGood      = step(vars) && allGood
     }
     allGood
@@ -692,7 +691,7 @@ class CombinationalTests(c: Combinational)
 \column{0.45\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-class Tester[T <: Component]
+class Tester[T <: Module]
   (val c: T, val testNodes: Array[Node])
 
 def defTests(body: => Boolean)
@@ -722,11 +721,11 @@ DUT sends next outputs to Chisel
 \end{columns}
 \end{frame}
 
-\begin{frame}[fragile]{Binding Tester to Component}
+\begin{frame}[fragile]{Binding Tester to Module}
 
 \begin{scala}
 object chiselMainTest {
-  def apply[T <: Component]
+  def apply[T <: Module]
     (args: Array[String], comp: () => T)(tester: T => Tester[T]): T
 }
 \end{scala}
@@ -765,7 +764,7 @@ PASSED
 
 \begin{frame}[fragile]{Functional Abstraction}
 \begin{scala}
-def clb(a: Bits, b: Bits, c: Bits, d: Bits) = 
+def clb(a: UInt, b: UInt, c: UInt, d: UInt) = 
   (a & b) | (~c & d)
 
 val out = clb(a,b,c,d)
@@ -774,13 +773,13 @@ val out = clb(a,b,c,d)
 
 \begin{frame}[fragile]{Functional Scala}
 \begin{scala}
-class Functional extends Component {
-  def clb(a: Bits, b: Bits, c: Bits, d: Bits) = 
+class Functional extends Module {
+  def clb(a: UInt, b: UInt, c: UInt, d: UInt) = 
     (a & b) | (~c & d)
   val io = new Bundle {
-    val x = Bits(INPUT, 16)
-    val y = Bits(INPUT, 16)
-    val z = Bits(OUTPUT, 16)
+    val x = UInt(INPUT, 16)
+    val y = UInt(INPUT, 16)
+    val z = UInt(OUTPUT, 16)
   }
   io.z := clb(io.x, io.y, io.x, io.y)
 }
@@ -791,8 +790,8 @@ class Functional extends Component {
 \begin{scala}
 class MyFloat extends Bundle {
   val sign        = Bool()
-  val exponent    = UFix(width = 8)
-  val significand = UFix(width = 23)
+  val exponent    = UInt(width = 8)
+  val significand = UInt(width = 23)
 }
 
 val x  = new MyFloat()
@@ -803,7 +802,7 @@ val xs = x.sign
 \begin{frame}[fragile]{Vecs}
 \begin{scala}
 // Vector of 5 23-bit signed integers.
-val myVec = Vec(5) { Fix(width = 23) } 
+val myVec = Vec.fill(5) { SInt(width = 23) } 
 
 // Connect to one static element of vector.
 val reg3  = myVec(3)                   
@@ -824,7 +823,7 @@ myVec(addr2) := data2
 \begin{scala}
 class FIFOInput extends Bundle {
   val ready = Bool(OUTPUT)
-  val bits  = Bits(INPUT, 32)
+  val bits  = UInt(INPUT, 32)
   val valid = Bool(INPUT)
 }
 \end{scala}
@@ -840,21 +839,21 @@ class ScaleIO extends Bundle {
 \end{scala}
 \end{frame}
 
-\begin{frame}[fragile]{Component}
+\begin{frame}[fragile]{Module}
 
 \begin{itemize}
-\item inherits from \verb+Component+,
+\item inherits from \verb+Module+,
 \item contains an interface stored in a port field named \verb+io+, and
 \item wires together subcircuits in its constructor.
 \end{itemize}
 
 \begin{scala}
-class Mux2 extends Component {
+class Mux2 extends Module {
   val io = new Bundle{
-    val sel = Bits(INPUT, 1)
-    val in0 = Bits(INPUT, 1)
-    val in1 = Bits(INPUT, 1)
-    val out = Bits(OUTPUT, 1)
+    val sel = UInt(INPUT, 1)
+    val in0 = UInt(INPUT, 1)
+    val in1 = UInt(INPUT, 1)
+    val out = UInt(OUTPUT, 1)
   }
   io.out := (io.sel & io.in1) | (~io.sel & io.in0)
 }
@@ -942,20 +941,20 @@ which you can view with a vcd viewer
 \end{frame}
 
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
-\begin{frame}[fragile]{Component Hierarchy Problem -- \tt Mux4.scala}
+\begin{frame}[fragile]{Module Hierarchy Problem -- \tt Mux4.scala}
 \begin{itemize}
-\item child components stored in fields of parent
+\item child modules stored in fields of parent
 \item now write 4-to-1 mux out of 3 2-to-1 mux's
 \end{itemize}
 \begin{scala}
-class Mux4 extends Component {
+class Mux4 extends Module {
   val io = new Bundle {
-    val in0 = Bits(INPUT, 1)
-    val in1 = Bits(INPUT, 1)
-    val in2 = Bits(INPUT, 1)
-    val in3 = Bits(INPUT, 1)
-    val sel = Bits(INPUT, 2)
-    val out = Bits(OUTPUT, 1)
+    val in0 = UInt(INPUT, 1)
+    val in1 = UInt(INPUT, 1)
+    val in2 = UInt(INPUT, 1)
+    val in3 = UInt(INPUT, 1)
+    val sel = UInt(INPUT, 2)
+    val out = UInt(OUTPUT, 1)
   }
   val m0 = new Mux2()
   m0.io.sel := io.sel(0); m0.io.in0 := io.in0; m0.io.in1 := io.in1
@@ -1002,11 +1001,11 @@ PASSED
 \begin{frame}[fragile]{State Elements}
 
 \begin{scala}
-Reg(in)
+Reg(data = in)
 \end{scala}
 
 \begin{scala}
-def risingEdge(x: Bool) = x && !Reg(x)
+def risingEdge(x: Bool) = x && !Reg(data = x)
 \end{scala}
 
 \end{frame}
@@ -1014,12 +1013,12 @@ def risingEdge(x: Bool) = x && !Reg(x)
 \begin{frame}[fragile]{Counter}
 
 \begin{scala}
-def wrapAround(n: UFix, max: UFix) =
-  Mux(n > max, UFix(0), n)
+def wrapAround(n: UInt, max: UInt) =
+  Mux(n > max, UInt(0), n)
 
-def counter(max: UFix) = {
-  val x = Reg(resetVal = UFix(0, max.getWidth))
-  x := wrapAround(x + UFix(1), max)
+def counter(max: UInt) = {
+  val x = Reg(reset = UInt(0, max.getWidth))
+  x := wrapAround(x + UInt(1), max)
   x
 }
 \end{scala}
@@ -1030,13 +1029,13 @@ def counter(max: UFix) = {
 
 \begin{scala}
 // Produce pulse every n cycles.
-def pulse(n: UFix) = counter(n - UFix(1)) === UFix(0)
+def pulse(n: UInt) = counter(n - UInt(1)) === UInt(0)
 \end{scala}
 
 \begin{scala}
 // Flip internal state when input true.
 def toggle(p: Bool) = {
-  val x = Reg(resetVal = Bool(false))
+  val x = Reg(reset = Bool(false))
   x := Mux(p, !x, x)
   x
 }
@@ -1044,7 +1043,7 @@ def toggle(p: Bool) = {
 
 \begin{scala}
 // Square wave where each half cycle has given period.
-def squareWave(period: UFix) = toggle(pulse(period))
+def squareWave(period: UInt) = toggle(pulse(period))
 \end{scala}
 
 \end{frame}
@@ -1055,15 +1054,15 @@ def squareWave(period: UFix) = toggle(pulse(period))
 \item write sequential circuit that sums \code{in} values
 \end{itemize}
 \begin{scala}
-class Accumulator extends Component {
+class Accumulator extends Module {
   val io = new Bundle {
-    val in  = UFix(INPUT, 1)
-    val out = UFix(OUTPUT, 8)
+    val in  = UInt(INPUT, 1)
+    val out = UInt(OUTPUT, 8)
   }
 
   // flush this out ...
 
-  io.out := UFix(0)
+  io.out := UInt(0)
 }
 \end{scala}
 \end{frame}
@@ -1072,11 +1071,11 @@ class Accumulator extends Component {
 \begin{frame}[fragile]{Forward Declarations}
 
 \begin{scala}
-val pcPlus4      = UFix() 
-val branchTarget = UFix()
+val pcPlus4      = UInt() 
+val branchTarget = UInt()
 val pcNext       = Mux(io.ctl.pcSel, branchTarget, pcPlus4)
-val pcReg        = Reg(data = pcNext, resetVal = UFix(0, 32)) 
-pcPlus4         := pcReg + UFix(4) 
+val pcReg        = Reg(data = pcNext, reset = UInt(0, 32)) 
+pcPlus4         := pcReg + UInt(4) 
 ... 
 branchTarget    := addOut
 \end{scala}
@@ -1086,9 +1085,9 @@ branchTarget    := addOut
 \begin{frame}[fragile]{Conditional Updates}
 
 \begin{scala}
-val r = Reg() { UFix(16) }
-when (c === UFix(0) ) {
-  r := r + UFix(1)
+val r = Reg( UInt(16) )
+when (c === UInt(0) ) {
+  r := r + UInt(1)
 }
 \end{scala}
 
@@ -1097,8 +1096,8 @@ when (c === UFix(0) ) {
 \begin{frame}[fragile]{Conditional Updates Priority}
 
 \begin{scala}
-when (c1) { r := Bits(1) }
-when (c2) { r := Bits(2) }
+when (c1) { r := UInt(1) }
+when (c2) { r := UInt(2) }
 \end{scala}
 
 \textbf{Conditional Update Order:}
@@ -1136,10 +1135,10 @@ when (c2) { r := Bits(2) }
 \begin{frame}[fragile]{Targetting Multiple Registers}
 
 \begin{scala}
-r := Fix(3) 
-s := Fix(3)
-when (c1) { r := Fix(1); s := Fix(1) }
-when (c2) { r := Fix(2) }
+r := SInt(3) 
+s := SInt(3)
+when (c1) { r := SInt(1); s := SInt(1) }
+when (c2) { r := SInt(2) }
 \end{scala}
 
 leads to \code{r} and \code{s} being updated according to the
@@ -1216,12 +1215,12 @@ when (idx === v2) { u2 }
 \begin{frame}[fragile]{Finite State Machines}
 
 \begin{scala}
-class Parity extends Component {
+class Parity extends Module {
   val io = new Bundle {
     val in  = Bool(INPUT)
     val out = Bool(OUTPUT) }
-  val s_even :: s_odd :: Nil = Enum(2){ UFix() }
-  val state  = Reg(resetVal = s_even)
+  val s_even :: s_odd :: Nil = Enum(2){ UInt() }
+  val state  = Reg(reset = s_even)
   when (io.in) {
     when (state === s_even) { state := s_odd  }
     .otherwise              { state := s_even }
@@ -1237,13 +1236,13 @@ class Parity extends Component {
 \item write vending machine which needs accepts 20 cents or more before raising valid high
 \end{itemize}
 \begin{scala}
-class VendingMachine extends Component {
+class VendingMachine extends Module {
   val io = new Bundle {
     val nickel = Bool(INPUT)
     val dime   = Bool(INPUT)
     val valid  = Bool(OUTPUT) }
-  val sIdle :: s5 :: s10 :: s15 :: sOk :: Nil = Enum(5){ UFix() }
-  val state = Reg(resetVal = sIdle)
+  val sIdle :: s5 :: s10 :: s15 :: sOk :: Nil = Enum(5){ UInt() }
+  val state = Reg(reset = sIdle)
 
   // flush this out ...
 
@@ -1261,19 +1260,19 @@ def Vec[T <: Data](elts: T*)(data: => T): Vec[T]
 \end{scala}
 
 \begin{scala}
-val i = Array(UFix(1), UFix(2), UFix(4), UFix(8))
-val m = Vec(i){ UFix(width = 32) }
-val r = m(counter(UFix(3)))
+val i = Array(UInt(1), UInt(2), UInt(4), UInt(8))
+val m = Vec.fill(i){ UInt(width = 32) }
+val r = m(counter(UInt(3)))
 \end{scala}
 
 % \begin{scala}
 % def sinTable (amp: Double, n: Int) = {
 %   val ts = Range(0, n, 1).map(i => (i*2*Pi)/(n.toDouble-1) - Pi) 
-%   Vec(ts.map(t => Fix(round(amp * sin(t))))){ Fix(width = 32) }
+%   Vec(ts.map(t => SInt(round(amp * sin(t))))){ SInt(width = 32) }
 % }
 % 
 % def sinWave (amp: Double, n: Int) = 
-%   sinTable(amp, n)(counter(UFix(n))
+%   sinTable(amp, n)(counter(UInt(n))
 % \end{scala}
 
 \end{frame}
@@ -1284,17 +1283,17 @@ val r = m(counter(UFix(3)))
 \item write 16x16 multiplication table using \code{Vec}
 \end{itemize}
 \begin{scala}
-class Mul extends Component {
+class Mul extends Module {
   val io = new Bundle {
-    val x   = UFix(INPUT, 4)
-    val y   = UFix(INPUT, 4)
-    val z   = UFix(OUTPUT, 8)
+    val x   = UInt(INPUT, 4)
+    val y   = UInt(INPUT, 4)
+    val z   = UInt(OUTPUT, 8)
   }
-  val muls = new Array[UFix](256)
+  val muls = new Array[UInt](256)
 
   // flush this out ...
 
-  io.z := UFix(0)
+  io.z := UInt(0)
 }
 \end{scala}
 
@@ -1305,13 +1304,13 @@ class Mul extends Component {
 
 \begin{scala}
 def object Mem {
-  def apply[T <: Data](n: Int, resetVal: T = null)(type: => T): Mem
+  def apply[T <: Data](n: Int, reset: T = null)(type: => T): Mem
 }
 
 class Mem[T <: Data]
-    (val n: Int, val resetVal: T, val inits: Seq[T], type: () => T) 
+    (val n: Int, val reset: T, val inits: Seq[T], type: () => T) 
       extends Updateable {
-  def apply(addr: UFix): T
+  def apply(addr: UInt): T
 }
 \end{scala}
 
@@ -1320,7 +1319,7 @@ class Mem[T <: Data]
 \begin{frame}[fragile]{Register File}
 
 \begin{scala}
-val regs = Mem(32){ Bits(width = 32) }
+val regs = Mem(32, UInt(width = 32) )
 when (wr_en) {
   regs(wr_addr) := wr_data
 }
@@ -1333,12 +1332,12 @@ val mdat = regs(maddr)
 % \begin{frame}[fragile]{Realistic Register File}
 % 
 % \begin{scala}
-% val regfile = Mem(64){ Bits(width = 32) }
+% val regfile = Mem(64, UInt(width = 32) )
 % // w_mask = bit_mask
 % when (wen) {
 %   regfile(addr_in) := data_in1
 % }
-% val read_data = Reg(regfile(addr_in))
+% val read_data = Reg(data = regfile(addr_in))
 % \end{scala}
 % 
 % \end{frame}
@@ -1349,20 +1348,20 @@ val mdat = regs(maddr)
 \item write read/write table using \code{Mem}
 \end{itemize}
 \begin{scala}
-class Memo extends Component {
+class Memo extends Module {
   val io = new Bundle {
     val isWr    = Bool(INPUT)
-    val wrAddr  = UFix(INPUT, 8)
-    val wrData  = UFix(INPUT, 8)
+    val wrAddr  = UInt(INPUT, 8)
+    val wrData  = UInt(INPUT, 8)
     val isRd    = Bool(INPUT)
-    val rdAddr  = UFix(INPUT, 8)
-    val rdData  = UFix(OUTPUT, 8)
+    val rdAddr  = UInt(INPUT, 8)
+    val rdData  = UInt(OUTPUT, 8)
   }
-  val mem = Mem(256){ UFix(width = 8) }
+  val mem = Mem(256, UInt(width = 8) )
 
   // flush this out ...
 
-  io.rdData := UFix(0)
+  io.rdData := UInt(0)
 }
 \end{scala}
 \end{frame}
@@ -1371,13 +1370,13 @@ class Memo extends Component {
 % \begin{frame}[fragile]{Audio Recorder}
 % 
 % \begin{scala}
-% def audioRecorder(n: Int, in: UFix, UFix, button: Bool) = { 
-%   val addr = counter(UFix(n))
-%   val ram  = Mem(n){ UFix(width = 16) }
+% def audioRecorder(n: Int, in: UInt, UInt, button: Bool) = { 
+%   val addr = counter(UInt(n))
+%   val ram  = Mem(n, UInt(width = 16) )
 %   when (button) {  
 %     ram(addr) := in
 %   }
-%   ram(Mux(button, UFix(0), addr))
+%   ram(Mux(button, UInt(0), addr))
 % } 
 % \end{scala}
 % 
@@ -1387,7 +1386,7 @@ class Memo extends Component {
 
 \begin{scala}
 class LinkIO extends Bundle { 
-  val data  = Bits(16, OUTPUT) 
+  val data  = UInt(16, OUTPUT) 
   val valid = Bool(OUTPUT)
 }
 \end{scala}
@@ -1398,7 +1397,7 @@ bundle inheritance:
 
 \begin{scala}
 class PLinkIO extends LinkIO { 
-  val parity = Bits(5, OUTPUT) 
+  val parity = UInt(5, OUTPUT) 
 }
 \end{scala}
 
@@ -1408,7 +1407,6 @@ In general, users can organize their interfaces into hierarchies using inheritan
 \end{frame}
 
 \begin{frame}[fragile]{Filter Example}
-
 From there we can define a filter interface by nesting two
 \verb+LinkIO+s into a new \verb+FilterIO+ bundle:
 
@@ -1423,10 +1421,10 @@ class FilterIO extends Bundle {
 where \verb+flip+ recursively changes the ``gender'' of a bundle,
 changing input to output and output to input.
 
-We can now define a filter by defining a filter class extending component:
+We can now define a filter by defining a filter class extending module:
 
 \begin{scala}
-class Filter extends Component { 
+class Filter extends Module { 
   val io  = new FilterIO()
   io.out.valid := io.in.valid
   io.out.data  := io.in.data
@@ -1444,13 +1442,13 @@ where the \verb+io+ field contains \verb+FilterIO+.
 \item write filter that filters out even numbers
 \end{itemize}
 \begin{scala}
-class Filter extends Component { 
+class Filter extends Module { 
   val io  = new FilterIO()
 
   // flush this out ...
 
   io.out.valid := Bool(true)
-  io.out.data  := Bits(0)
+  io.out.data  := UInt(0)
 }
 \end{scala}
 \end{frame}
@@ -1466,8 +1464,8 @@ class GCDTests(c: GCD) extends Tester(c, Array(c.io)) {
     val ovars = new HashMap[Node, Node]()
     var t = 0
     do {
-      svars(c.io.a) = UFix(a)
-      svars(c.io.b) = UFix(b)
+      svars(c.io.a) = UInt(a)
+      svars(c.io.b) = UInt(b)
       step(svars, ovars)
       t += 1
     } while (t <= 1 || ovars(c.io.v).litValue() == 0)
@@ -1482,9 +1480,9 @@ class GCDTests(c: GCD) extends Tester(c, Array(c.io)) {
 
 \begin{scala}
 class CrossbarIO extends Bundle {
-  val in  = Vec(2){ new LinkIO() }
-  val sel = UFix(INPUT, 2)
-  val out = Vec(2){ new LinkIO() }
+  val in  = Vec.fill(2){ new LinkIO() }
+  val sel = UInt(INPUT, 2)
+  val out = Vec.fill(2){ new LinkIO() }
 }
 \end{scala}
 
@@ -1499,9 +1497,9 @@ returning a port as the second argument.
 
 \begin{scala}
 class CrossbarIO(n: Int) extends Bundle {
-  val in  = Vec(n){ new LinkIO() }
-  val sel = UFix(INPUT, log2Up(n))
-  val out = Vec(n){ new LinkIO() }
+  val in  = Vec.fill(n){ new LinkIO() }
+  val sel = UInt(INPUT, log2Up(n))
+  val out = Vec.fill(n){ new LinkIO() }
   override def clone() = new CrossbarIO(n).asInstanceOf[this.type]
 }
 \end{scala}
@@ -1515,10 +1513,10 @@ where \code{clone} definition fixes cloning, by incorporating the crossbar const
 We can now compose two filters into a filter block as follows:
 
 \begin{scala}
-class Block extends Component { 
+class Block extends Module { 
   val io = new FilterIO()
-  val f1 = new Filter()
-  val f2 = new Filter()
+  val f1 = Module(new Filter())
+  val f2 = Module(new Filter())
 
   f1.io.in  <> io.in
   f1.io.out <> f2.io.in
@@ -1538,14 +1536,14 @@ Chisel warns users if ports have other than exactly one connection to them.
 
 \begin{frame}[fragile]{Parameterized Functions}
 \begin{scala}
-def Mux[T <: Bits](c: Bool, con: T, alt: T): T
+def Mux[T <: UInt](c: Bool, con: T, alt: T): T
 
-Mux(c, UFix(10), UFix(11))
+Mux(c, UInt(10), UInt(11))
 \end{scala}
 
 \noindent
-yields a \code{UFix} wire because the \code{con} and \code{alt}
-arguments are each of type \code{UFix}.
+yields a \code{UInt} wire because the \code{con} and \code{alt}
+arguments are each of type \code{UInt}.
 \end{frame}
 
 \begin{frame}[fragile]{Parameterized Signal Processing}
@@ -1560,8 +1558,8 @@ def innerProductFIR[T <: Num] (w: Seq[T], x: T) = {
   delays.foldRight(_ + _)
 }
 
-def delay[T <: Bits](x: T, n: Int): T =
-  if (n == 0) x else Reg(delay(x, n - 1))
+def delay[T <: UInt](x: T, n: Int): T =
+  if (n == 0) x else Reg(data = delay(x, n - 1))
 \end{scala}
 
 \end{frame}
@@ -1573,7 +1571,7 @@ class FilterIO[T <: Data]()(data: => T) extends Bundle {
   val out = data.asOutput
 }
 
-class Filter[T <: Data]()(data: => T) extends Component { 
+class Filter[T <: Data]()(data: => T) extends Module { 
   val io = new FilterIO(){ data }
   ...
 }
@@ -1582,15 +1580,15 @@ class Filter[T <: Data]()(data: => T) extends Component {
 
 \begin{frame}[fragile]{Parameterized Classes Continued}
 \begin{scala}
-class FIFOIO[T <: Data]()(data: => T) extends Bundle {
+class Decoupled[T <: Data](type: T) extends Bundle {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
-  val bits  = data.asOutput
+  val bits  = type.asOutput
 }
 
-class PipeIO[+T <: Data]()(data: => T) extends Bundle {
+class Valid[+T <: Data](type: T) extends Bundle {
   val valid = Bool(OUTPUT)
-  val bits  = data.asOutput
+  val bits  = type.asOutput
 }
 \end{scala}
 \end{frame}
@@ -1600,14 +1598,14 @@ class PipeIO[+T <: Data]()(data: => T) extends Bundle {
 
 \begin{scala}
 class RealGCDInput extends Bundle {
-  val a = Bits(width = 16)
-  val b = Bits(width = 16)
+  val a = UInt(width = 16)
+  val b = UInt(width = 16)
 }
 
-class RealGCD extends Component {
+class RealGCD extends Module {
   val io  = new Bundle {
-    val in  = new FIFOIO(){ new RealGCDInput() }.flip()
-    val out = new PipeIO(){ Bits(width = 16) }
+    val in  = new Decoupled( new RealGCDInput() ).flip()
+    val out = new Valid( UInt(width = 16) )
   }
 
   // flush this out ...
@@ -1622,23 +1620,23 @@ class RealGCD extends Component {
 
 {\lstset{basicstyle={\scriptsize\ttfamily}}
 \begin{scala}
-class EnqIO[T <: Data]()(data: => T) extends FIFOIO()(data) {
+class EnqIO[T <: Data]()(data: T) extends FIFOIO()(data) {
   def enq(dat: T): T = { valid := Bool(true); data := dat; dat }
   valid := Bool(false);
   for (io <- data.flatten.map(x => x._2))
-    io := UFix(0, io.getWidth());
+    io := UInt(0, io.getWidth());
 }
 
-class DeqIO[T <: Data]()(data: => T) extends FIFOIO()(data) {
+class DeqIO[T <: Data](type: T) extends FIFOIO()(data) {
   flip()
   ready := Bool(false);
   def deq(b: Boolean = false): T = { ready := Bool(true); data }
 }
 
-class Filter[T <: Data]()(data: => T) extends Component {
+class Filter[T <: Data](type: T) extends Module {
   val io = new Bundle {
-    val in  = new DeqIO(){ data }
-    val out = new EnqIO(){ data }
+    val in  = new DeqIO( data )
+    val out = new EnqIO( data )
   }
   when (io.in.valid && io.out.ready) {
     io.out.enq(io.in.deq())
@@ -1654,25 +1652,25 @@ class Filter[T <: Data]()(data: => T) extends Component {
 {\lstset{basicstyle={\scriptsize\ttfamily}}
 \begin{scala}
 class ReadCmd extends Bundle {
-  val addr = UFix(width = 32)
+  val addr = UInt(width = 32)
 }
 
 class WriteCmd extends ReadCmd {
-  val data = UFix(width = 32)
+  val data = UInt(width = 32)
 }
 
 class Packet extends Bundle {
-  val header = UFix(width = 8)
-  val body   = Bits(width = 64)
+  val header = UInt(width = 8)
+  val body   = UInt(width = 64)
 }
 
 class RouterIO(n: Int) extends Bundle {
   override def clone = new RouterIO(n).asInstanceOf[this.type]
-  val reads   = new DeqIO(){ new ReadCmd() }
-  val replies = new EnqIO(){ UFix(width = 8) }
-  val writes  = new DeqIO(){ new WriteCmd() }
-  val in      = new DeqIO(){ new Packet() }
-  val outs    = Vec(n){ new EnqIO(){ new Packet() } }
+  val reads   = new DeqIO( new ReadCmd() )
+  val replies = new EnqIO( UInt(width = 8) )
+  val writes  = new DeqIO( new WriteCmd() )
+  val in      = new DeqIO( new Packet() )
+  val outs    = Vec.fill(n){ new EnqIO(){ new Packet() } }
 }
 \end{scala}
 }
@@ -1682,11 +1680,11 @@ class RouterIO(n: Int) extends Bundle {
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Router Problem -- \tt Router.scala}
 \begin{scala}
-class Router extends Component {
+class Router extends Module {
   val depth = 32;
   val n     = 4;
   val io    = new RouterIO(n);
-  val tbl   = Mem(depth){ UFix(width = sizeof(n)) };
+  val tbl   = Mem(depth, UInt(width = sizeof(n)) );
   
   // flush it out ...
 }
@@ -1887,8 +1885,8 @@ object ChiselBuild extends Build {
 % \begin{scala}
 % class RomIo extends Bundle {
 %   val isVal = Bool(INPUT)
-%   val raddr = UFix(INPUT, 32)
-%   val rdata = Bits(OUTPUT, 32)
+%   val raddr = UInt(INPUT, 32)
+%   val rdata = UInt(OUTPUT, 32)
 % }
 % 
 % class CpathIo extends Bundle() {
@@ -1897,10 +1895,10 @@ object ChiselBuild extends Build {
 %   ...
 % }
 % 
-% class Cpu extends Component {
+% class Cpu extends Module {
 %   val io = new CpuIo()
-%   val c  = new CtlPath()
-%   val d  = new DatPath()
+%   val c  = Module(new CtlPath())
+%   val d  = Module(new DatPath())
 %   c.io.ctl  <> d.io.ctl
 %   c.io.dat  <> d.io.dat
 %   c.io.imem <> io.imem

@@ -661,7 +661,7 @@ referenced before definition:
 val pcPlus4  = UInt()
 val brTarget = UInt()
 val pcNext   = Mux(pcSel, brTarget, pcPlus4)
-val pcReg    = RegUpdate(pcNext)
+val pcReg    = Reg(data = pcNext)
 pcPlus4     := pcReg + UInt(4)
 ...
 brTarget    := addOut
@@ -682,15 +682,8 @@ positive-edge-triggered register defined as follows:
 \begin{scala}
 object Reg {
   def apply[T <: Data]
-    (type: T, updateVal: T = null, resetVal: T = null): T
-}
- 
-object RegUpdate {
-  def apply[T <: Data] (updateVal: T, resetVal: T = null): T
-}
-
-object RegReset {
-  def apply[T <: Data] (resetVal: T): T
+    (type: T = null, 
+     data: T = null, reset: T = null): T
 }
 
 class Reg extends Updateable
@@ -700,9 +693,9 @@ class Reg extends Updateable
 where it can be constructed as follows:
 
 \begin{scala}
-val r1 = RegUpdate(io.in)
-val r2 = RegReset(UInt(1, 8))
-val r3 = RegUpdate(io.in, UInt(1))
+val r1 = Reg(data = io.in)
+val r2 = Reg(reset = UInt(1, 8))
+val r3 = Reg(data = io.in, reset = UInt(1))
 val r4 = Reg(UInt(width = 8))
 \end{scala}
 
@@ -1105,14 +1098,14 @@ chiselMainTest(args + "--test", () => new Mux2()){
 Finally, command arguments for \code{chiselMain*} are as follows: \\
 
 \begin{tabular}{lll}
-\code{--targetDir} & target pathname prefix \\
-\code{--genHarness} & generate harness file for C++ \\
-\code{--debug} & put all wires in C++ class file \\
-\code{--compile} & compiles generated C++ \\
-\code{--test} & runs tests using C++ app \\
+\verb+--targetDir+ & target pathname prefix \\
+\verb+--genHarness+ & generate harness file for C++ \\
+\verb+--debug+ & put all wires in C++ class file \\
+\verb+--compile+ & compiles generated C++ \\
+\verb+--test+ & runs tests using C++ app \\
 \verb+--backend v+ & generate verilog \\ 
 \verb+--backend c+ & generate C++ (default)\\
-\code{--vcd} & enable vcd dumping \\
+\verb+--vcd+ & enable vcd dumping \\
 \end{tabular}
 
 
@@ -1365,7 +1358,7 @@ def LFSR16(increment: Bool = Bool(true)): UInt
 def ShiftRegister[T <: Data](n: Int, in: T): T
 
 def Counter(cond: Bool, n: Int) = {
-  val c = RegReset(UInt(0, log2Up(n)))
+  val c = Reg(reset = UInt(0, log2Up(n)))
   val wrap = c === UInt(n-1)
   when (cond) {
     c := Mux(Bool(!isPow2(n)) && wrap, UInt(0), 

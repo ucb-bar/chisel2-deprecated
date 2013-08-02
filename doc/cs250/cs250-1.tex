@@ -307,8 +307,8 @@ scala> f(4)
 %     val b     = UInt(INPUT, 16)
 %     val z     = UInt(OUTPUT, 16)
 %     val valid = Bool(OUTPUT) }
-%   val x = RegReset(io.a)
-%   val y = RegReset(io.b)
+%   val x = Reg(reset = io.a)
+%   val y = Reg(reset = io.b)
 %   when (x > y) {
 %     x := x - y
 %   } .otherwise {
@@ -639,7 +639,7 @@ val xs = x.sign
 
 \begin{scala}
 // Vector of 3 23-bit signed integers.
-val myVec = Vec(3) { SInt(width = 23) } 
+val myVec = Vec.fill(3) { SInt(width = 23) } 
 \end{scala}
 
 \begin{itemize}
@@ -658,7 +658,7 @@ val myVec = Vec(3) { SInt(width = 23) }
 
 \begin{frame}[fragile]{Static Vec Element Access}
 \begin{scala}
-val myVec = Vec(3) { SInt(width = 23) } 
+val myVec = Vec.fill(3) { SInt(width = 23) } 
 
 // Connect to one vector element chosen at elaboration time.
 val fix0  = myVec(0)
@@ -674,7 +674,7 @@ myVec(2) := data2
 
 \begin{frame}[fragile]{Dynamic Vec Element Access}
 \begin{scala}
-val myVec = Vec(3) { SInt(width = 23) } 
+val myVec = Vec.fill(3) { SInt(width = 23) } 
 
 // Connect to one vector element chosen at runtime.
 val out0      = myVec(addr0)
@@ -767,7 +767,7 @@ class Mux2 extends Module {
 \begin{frame}[fragile]{State Elements}
 
 \begin{scala}
-RegUpdate(in)
+Reg(data = in)
 \end{scala}
 
 \begin{center}
@@ -779,7 +779,7 @@ RegUpdate(in)
 \begin{frame}[fragile]{Rising Edge}
 
 \begin{scala}
-def risingEdge(x: Bool) = x && !RegUpdate(x)
+def risingEdge(x: Bool) = x && !Reg(data = x)
 \end{scala}
 
 \begin{center}
@@ -795,7 +795,7 @@ def risingEdge(x: Bool) = x && !RegUpdate(x)
 
 \begin{scala}
 def counter(max: UInt) = {
-  val x = RegReset(UInt(0, max.getWidth))
+  val x = Reg(reset = UInt(0, max.getWidth))
   x := Mux(x == max, UInt(0), x + UInt(1))
   x
 }
@@ -821,7 +821,7 @@ def pulse(n: UInt) = counter(n - UInt(1)) === UInt(0)
 \begin{scala}
 // Flip internal state when input true.
 def toggle(p: Bool) = {
-  val x = RegReset(Bool(false))
+  val x = Reg(reset = Bool(false))
   x := Mux(p, !x, x)
   x
 }

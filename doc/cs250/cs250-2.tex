@@ -33,7 +33,7 @@
 % val pcPlus4      = UFix() 
 % val branchTarget = UFix()
 % val pcNext       = Mux(pcSel, branchTarget, pcPlus4)
-% val pcReg        = Reg(data = pcNext, resetVal = UFix(0, 32)) 
+% val pcReg        = Reg(data = pcNext, reset = UFix(0, 32)) 
 % pcPlus4         := pcReg + UFix(4) 
 % ... 
 % branchTarget    := addOut
@@ -255,7 +255,7 @@ class Parity extends Module {
     val in  = Bool(INPUT)
     val out = Bool(OUTPUT) }
   val s_even :: s_odd :: Nil = Enum(2){ UFix() }
-  val state  = RegReset(s_even)
+  val state  = Reg(reset = s_even)
   when (io.in) {
     when (state === s_even) { state := s_odd  }
     .otherwise              { state := s_even }
