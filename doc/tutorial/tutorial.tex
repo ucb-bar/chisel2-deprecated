@@ -415,7 +415,7 @@ calculates node output bit widths from their respective input bit widths accordi
 {\bf operation} & {\bf bit width} \\ 
 \verb|z = x + y| & \verb|wz = max(wx, wy)| \\
 \verb+z = x - y+ & \verb|wz = max(wx, wy)|\\
-\verb+z = x & y+ & \verb+wz = max(wx, wy)+ \\
+\verb+z = x & y+ & \verb+wz = min(wx, wy)+ \\
 \verb+z = Mux(c, x, y)+ & \verb+wz = max(wx, wy)+ \\
 \verb+z = w * y+ & \verb!wz = wx + wy! \\
 \verb+z = x << n+ & \verb!wz = wx + maxNum(n)! \\
@@ -568,7 +568,7 @@ Ports are used as interfaces to hardware components.  A port is simply
 any \code{Data} object that has directions assigned to its members.
 
 Chisel provides port constructors to allow a direction to be added
-(input or output) to an object at construct time.  Primitive port
+(input or output) to an object at construction time.  Primitive port
 constructors take the direction as the first
 argument (where the direction is \code{INPUT} or
 \code{OUTPUT}) and the number of bits as the second argument (except
@@ -695,7 +695,8 @@ class Mux4 extends Module {
 \noindent
 We again define the component interface as \code{io} and wire up the
 inputs and outputs.  In this case, we create three \code{Mux2}
-children components, using the Scala \code{new} keyword to create a
+children components, using the \code{Module} constructor function and 
+the Scala \code{new} keyword to create a
 new object.  We then wire them up to one another and to the ports of
 the \code{Mux4} interface.
 
@@ -1266,8 +1267,7 @@ object Mem {
           seqRead: Boolean = false): Mem
 }
 
-class Mem[T <: Data](depth: Int, 
-      type: T,
+class Mem[T <: Data](depth: Int, type: T,
       seqRead: Boolean = false)
     extends Updateable {
   def apply(idx: UInt): T
@@ -1360,8 +1360,8 @@ For example, a user could define a simple link for handshaking data as follows:
 
 \begin{scala}
 class SimpleLink extends Bundle { 
-  val data = UInt(16, OUTPUT) 
-  val rdy  = Bool(OUTPUT)
+  val data  = UInt(16, OUTPUT) 
+  val valid = Bool(OUTPUT)
 }
 \end{scala}
 
@@ -1725,7 +1725,7 @@ In Chisel this can be defined as:
 
 \begin{scala}
 def delays[T <: Data](x: T, n: Int): List[T] = 
-  if (n <= 1) List(x) else x :: taps(Reg(data = x), n-1)
+  if (n <= 1) List(x) else x :: delays(Reg(data = x), n-1)
 
 def innerProductFIR[T <: Num](ws: Seq[T], x: T): T = 
   (ws, delays(x, ws.length)).zipped.

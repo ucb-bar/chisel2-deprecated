@@ -255,13 +255,16 @@ class Max2 extends Module {
 \begin{columns}
 \column{0.25\textwidth}
 \begin{scala}
-val m1 = Module(new Max2())
+val m1 = 
+  Module(new Max2())
 m1.io.x := a
 m1.io.y := b
-val m2 = Module(new Max2())
+val m2 = 
+  Module(new Max2())
 m2.io.x := c
 m2.io.y := d
-val m3 = Module(new Max2())
+val m3 = 
+  Module(new Max2())
 m3.io.x := m1.io.z
 m3.io.y := m2.io.z
 \end{scala}
@@ -821,7 +824,7 @@ myVec(addr2) := data2
 \textbf{Data object with directions assigned to its members}
 
 \begin{scala}
-class FIFOInput extends Bundle {
+class Decoupled extends Bundle {
   val ready = Bool(OUTPUT)
   val bits  = UInt(INPUT, 32)
   val valid = Bool(INPUT)
@@ -1219,7 +1222,7 @@ class Parity extends Module {
   val io = new Bundle {
     val in  = Bool(INPUT)
     val out = Bool(OUTPUT) }
-  val s_even :: s_odd :: Nil = Enum(2){ UInt() }
+  val s_even :: s_odd :: Nil = Enum(2, UInt())
   val state  = Reg(reset = s_even)
   when (io.in) {
     when (state === s_even) { state := s_odd  }
@@ -1241,7 +1244,7 @@ class VendingMachine extends Module {
     val nickel = Bool(INPUT)
     val dime   = Bool(INPUT)
     val valid  = Bool(OUTPUT) }
-  val sIdle :: s5 :: s10 :: s15 :: sOk :: Nil = Enum(5){ UInt() }
+  val sIdle :: s5 :: s10 :: s15 :: sOk :: Nil = Enum(5, UInt())
   val state = Reg(reset = sIdle)
 
   // flush this out ...
@@ -1525,7 +1528,7 @@ class Block extends Module {
 \end{scala}
 
 \noindent
-where \verb+<>+ bulk connects interfaces.
+where \verb+Module+ is the module constructor function and \verb+<>+ bulk connects interfaces:
 \begin{itemize}
 \item Bulk connections connect leaf ports of the same name to each other.
 \item After all connections are made and the circuit is being elaborated,
@@ -1553,13 +1556,11 @@ y[t] = \sum_j w_j * x_j[t-j]
 \end{equation}
 
 \begin{scala}
-def innerProductFIR[T <: Num] (w: Seq[T], x: T) = {
-  val delays = Range(0, w.length).map(i => w(i) * delay(x, i))
-  delays.foldRight(_ + _)
-}
+def delays[T <: Data](x: T, n: Int): List[T] = 
+  if (n <= 1) List(x) else x :: delays(Reg(data = x), n-1)
 
-def delay[T <: UInt](x: T, n: Int): T =
-  if (n == 0) x else Reg(data = delay(x, n - 1))
+def FIR[T <: Num](w: Seq[T], x: T): T = 
+  (w, delays(x, hs.length)).zipped.map( _ * _ ).reduceRight( _ + _ )
 \end{scala}
 
 \end{frame}

@@ -183,17 +183,17 @@ chiselMainTest(args ++ Array("--compile", "--test",  "--genHarness"),
 
 \end{frame}
 
-\begin{frame}{\code{ChiselMain*} Arguments}
+\begin{frame}[fragile]{\code{ChiselMain*} Arguments}
  
 \begin{tabular}{ll}
-\code{--targetDir} & target pathname prefix \\
-\code{--genHarness} & generate harness file for C++ \\
-\code{--backend v} & generate verilog \\ 
-\code{--backend c} & generate C++ (default)\\
-\code{--compile} & compiles generated C++ \\
-\code{--test} & generates C++ with test plumbing  \\
-\code{--vcd} & enable vcd dumping \\
-\code{--debug} & put all wires in C++ class file \\
+\verb+--targetDir+ & target pathname prefix \\
+\verb+--genHarness+ & generate harness file for C++ \\
+\verb+--backend v+ & generate verilog \\ 
+\verb+--backend c+ & generate C++ (default)\\
+\verb+--compile+ & compiles generated C++ \\
+\verb+--test+ & generates C++ with test plumbing  \\
+\verb+--vcd+ & enable vcd dumping \\
+\verb+--debug+ & put all wires in C++ class file \\
 \end{tabular}
 
 \end{frame}

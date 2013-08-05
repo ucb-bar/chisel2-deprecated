@@ -209,7 +209,7 @@ when (idx === v2) { u2 }
 
 % \begin{frame}[fragile]{Enums}
 % \begin{scala}
-% val s_even :: s_odd :: Nil = Enum(2){ UFix() }
+% val s_even :: s_odd :: Nil = Enum(2, UFix())
 % \end{scala}
 % \end{frame}
 
@@ -254,7 +254,7 @@ class Parity extends Module {
   val io = new Bundle {
     val in  = Bool(INPUT)
     val out = Bool(OUTPUT) }
-  val s_even :: s_odd :: Nil = Enum(2){ UFix() }
+  val s_even :: s_odd :: Nil = Enum(2, UFix())
   val state  = Reg(reset = s_even)
   when (io.in) {
     when (state === s_even) { state := s_odd  }
@@ -265,7 +265,7 @@ class Parity extends Module {
 \end{scala}
 
 \noindent
-where \verb+Enum(2){ UFix() }+ creates a list of two \code{UFix()} literals.
+where \verb+Enum(2, UFix())+ creates a list of two \code{UFix()} literals.
 \column{0.25\textwidth}
 
 \begin{center}
@@ -323,7 +323,7 @@ class Mul extends Module {
 RAM is supported using the \code{Mem} construct
 
 \begin{scala}
-val m = Mem(32){ UInt(width = 32) }
+val m = Mem(32, UInt(width = 32) )
 \end{scala}
 
 \noindent
@@ -503,8 +503,10 @@ We can now compose two filters into a filter block as follows:
 \begin{scala}
 class SmallOdds extends Module { 
   val io     = new FilterIO()
-  val smalls = Module(new SmallFilter())
-  val odds   = Module(new OddFilter())
+  val smalls =
+    Module(new SmallFilter())
+  val odds   = 
+    Module(new OddFilter())
 
   smalls.io.in  <> io.in
   smalls.io.out <> odds.io.in
@@ -569,8 +571,10 @@ class Filter (isOk: (UFix) => Bool)
     io.in.valid && isOk(io.in.data)
 }
 
-val odds   = Module(new Filter((x) => x & UFix(1)))
-val smalls = Module(new Filter((x) => x < UFix(10)))
+val odds   = 
+  Module(new Filter((x) => x & UFix(1)))
+val smalls = 
+  Module(new Filter((x) => x < UFix(10)))
 \end{scala}
 }
 
@@ -593,8 +597,10 @@ We can now compose two parameterized filters into a filter block as follows:
 \begin{scala}
 class SmallOdds extends Module { 
   val io     = new FilterIO()
-  val smalls = Module(new Filter(_ < 10))
-  val odds   = Module(new Filter(_ & 1))
+  val smalls = 
+    Module(new Filter(_ < 10))
+  val odds   = 
+    Module(new Filter(_ & 1))
 
   smalls.io.in  <> io.in
   smalls.io.out <> odds.io.in
@@ -761,7 +767,7 @@ val pkts    = new Decoupled( new Packet() )
 \end{scala}
 
 \noindent
-but how do we define this parameterized \code{FIFOIO}?
+but how do we define this parameterized \code{Decoupled}?
 \end{frame}
 
 \begin{frame}[fragile]{Parameterized Types in Scala}
@@ -827,7 +833,7 @@ class Filter[T <: Data] (isOk: (T) => Bool, type: T) extends Module {
 class SmallOdds[T <: Data](type: T) extends Module { 
   val io     = new FilterIO()
   val smalls = Module(new Filter(_ < UFix(10), type ))
-  val q      = new Queue(){ type }
+  val q      = Module(new Queue(type))
   val odds   = Module(new Filter(_ & UFix(1), type ))
 
   smalls.io.in  <> io.in
@@ -843,7 +849,7 @@ val block = new SmallOdds( UFix(width = 32) )
 
 \begin{frame}[fragile]{Interface Views}
 \begin{columns}
-\column{0.40\textwidth}
+\column{0.45\textwidth}
 
 \begin{scala}
 class Cpu extends Module {
@@ -860,7 +866,7 @@ class Cpu extends Module {
 }
 \end{scala}
 
-\column{0.50\textwidth}
+\column{0.45\textwidth}
 
 \begin{center}
 \includegraphics[width=0.9\textwidth]{../tutorial/figs/cpu.png} 
@@ -940,7 +946,7 @@ class Dpath extends Module {
 
 \begin{frame}[fragile]{Multiple Partial Bulk Connections}
 \begin{columns}
-\column{0.40\textwidth}
+\column{0.45\textwidth}
 
 \begin{scala}
 class Cpu extends Module {
@@ -957,7 +963,7 @@ class Cpu extends Module {
 }
 \end{scala}
 
-\column{0.50\textwidth}
+\column{0.45\textwidth}
 
 \begin{center}
 \includegraphics[width=0.9\textwidth]{../tutorial/figs/cpu.png} 
@@ -1039,7 +1045,7 @@ class Router extends Module {
   val depth = 32
   val n     = 4
   val io    = new RouterIO(n)
-  val tbl   = Mem(depth, UFix(width = sizeof(n)) )x
+  val tbl   = Mem(depth, UFix(width = sizeof(n)) )
   
   ...
 }

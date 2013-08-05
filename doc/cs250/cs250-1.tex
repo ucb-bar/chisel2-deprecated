@@ -695,7 +695,7 @@ myVec(addr2) := data2
 \textbf{Data object with directions assigned to its members}
 
 \begin{scala}
-class FIFOIO extends Bundle {
+class Decoupled extends Bundle {
   val data  = UInt(INPUT, 32)
   val valid = Bool(OUTPUT)
   val ready = Bool(INPUT)

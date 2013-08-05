@@ -101,7 +101,8 @@ class Node {
   // return lit value if inferrable else null
   def litOf: Lit
   // return value of lit if litOf is non null
-  def litValue(default: BigInt = BigInt(-1)): BigInt
+  def litValue
+    (default: BigInt = BigInt(-1)): BigInt
 }
 \end{scala}
 
@@ -180,8 +181,8 @@ Chisel type hierarchy, with \code{Data} as the topmost node.
 \end{figure}
 
 \noindent
-Built-in scalar types include \code{Bool}, \code{SInt},
-and \code{UInt} and built-in aggregate types \code{Bundle} and
+Built-in scalar types include \code{SInt},
+\code{UInt}, and \code{Bool}, and built-in aggregate types \code{Bundle} and
 \code{Vec} allow the user to expand the set of Chisel datatypes with
 collections of other types.
 
@@ -344,23 +345,6 @@ successively more complicated examples.
 \end{figure*}
 
 
-\subsection{Bools}
-
-Boolean values are represented as \code{Bool}s:
-
-\begin{scala}
-object Bool {
-  def apply(dir: PortDir = null): Bool
-  // create literal
-  def apply(value: Boolean): Bool
-}
-
-class Bool extends UInt
-\end{scala}
-
-\noindent
-\code{Bool} is equivalent to \code{UInt(width = 1)}.
-
 \subsection{Nums}
 
 \code{Num} is a type node which defines arithmetic operations:
@@ -424,6 +408,23 @@ class UInt extends Num {
 Signed fixed-point
 numbers, including integers, are represented using two's-complement
 format.  
+
+\subsection{Bools}
+
+Boolean values are represented as \code{Bool}s:
+
+\begin{scala}
+object Bool {
+  def apply(dir: PortDir = null): Bool
+  // create literal
+  def apply(value: Boolean): Bool
+}
+
+class Bool extends UInt
+\end{scala}
+
+\noindent
+\code{Bool} is equivalent to \code{UInt(width = 1)}.
 
 \subsection{Bundles}
 
@@ -524,7 +525,7 @@ calculates node output bit widths from their respective input bit widths accordi
 {\bf operation} & {\bf bit width} \\ 
 \verb|z = x + y| & \verb+wz = max(wx, wy)+ \\
 \verb+z = x - y+ & \verb+wz = max(wx, wy)+\\
-\verb+z = x & y+ & \verb+wz = max(wx, wy)+ \\
+\verb+z = x & y+ & \verb+wz = min(wx, wy)+ \\
 \verb+z = Mux(c, x, y)+ & \verb+wz = max(wx, wy)+ \\
 \verb+z = w * y+ & \verb!wz = wx + wy! \\
 \verb+z = x << n+ & \verb!wz = wx + maxNum(n)! \\
@@ -547,11 +548,6 @@ the same.  Furthermore, the width of a register must be specified by
 the user either explicitly or from the bitwidth of the reset value.
 From these two requirements, we can show that the bit-width inference
 process will converge to a fixpoint.
-
-\begin{example}
-Shouldn't & return bitwidth that is min() of inputs?
-\end{example}
-
 
 \section{Updateables}
 
@@ -683,7 +679,8 @@ positive-edge-triggered register defined as follows:
 object Reg {
   def apply[T <: Data]
     (type: T = null, 
-     data: T = null, reset: T = null): T
+     data: T = null, 
+     reset: T = null): T
 }
 
 class Reg extends Updateable
