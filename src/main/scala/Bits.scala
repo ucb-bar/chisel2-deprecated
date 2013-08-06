@@ -33,7 +33,6 @@ import Node._
 import ChiselError._
 
 /* backward compatibility */
-@deprecated("Use UInt instead of Bits.", "2.0")
 object Bits {
   def apply(x: Int): UInt = UInt(x);
   def apply(x: Int, width: Int): UInt = UInt(x, width);

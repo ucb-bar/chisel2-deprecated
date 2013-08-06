@@ -627,7 +627,7 @@ endmodule
     }
 
     class BlockIO extends Bundle {
-      val req = new Decoupled(new BlockReq)
+      val req = Decoupled(new BlockReq)
     }
 
     class VecSecondComp extends Module {
@@ -791,7 +791,7 @@ endmodule
     class MemComp extends Module {
       val io = new RegfileIO()
 
-      val rfile = Mem(256, UInt(width = SZ_DATA), seqRead = true)
+      val rfile = Mem(UInt(width = SZ_DATA), 256, seqRead = true)
       val raddr = Reg(UInt())
       when (io.ren) { raddr := io.raddr }
       io.rdata := rfile(raddr)

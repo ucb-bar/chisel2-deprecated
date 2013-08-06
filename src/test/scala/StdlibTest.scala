@@ -1085,8 +1085,8 @@ endmodule
     println("\ntestQueue ...")
     class QueueComp extends Module {
       val io = new Bundle {
-        val req = new Decoupled(UInt(width=8)).flip
-        val resp = new Decoupled(UInt(width=8))
+        val req = Decoupled(UInt(width=8)).flip
+        val resp = Decoupled(UInt(width=8))
       }
       io.resp <> Queue(io.req)
     }

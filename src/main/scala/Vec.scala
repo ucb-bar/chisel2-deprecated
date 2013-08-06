@@ -69,7 +69,7 @@ object VecMux {
 }
 
 object VecBuf{
-  def apply[T <: Data](n: Int, gen: Vec[T]): ArrayBuffer[Vec[T]] = {
+  def apply[T <: Data](gen: Vec[T], n: Int): ArrayBuffer[Vec[T]] = {
     val res = new ArrayBuffer[Vec[T]]
     for(i <- 0 until n)
       res += gen.clone

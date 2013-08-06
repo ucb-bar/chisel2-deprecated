@@ -77,20 +77,19 @@ object Reg {
     *update* and *reset* define the update and reset values
     respectively.
     */
-  def apply[T <: Data](type_out: T = null,
-    update: T = null, reset: T = null): T = {
-    var out = type_out
-    if(out == null) {
-      out = update
+  def apply[T <: Data](out: T = null, update: T = null, reset: T = null): T = {
+    var type_out = out
+    if(type_out == null) {
+      type_out = update
     }
-    if(out == null) {
-      out = reset
+    if(type_out == null) {
+      type_out = reset
     }
-    if(out == null) {
+    if(type_out == null) {
       throw new Exception("cannot infer type of Reg.")
     }
 
-    val gen = out.clone
+    val gen = type_out.clone
     validateGen(gen)
 
     val d: Array[(String, Bits)] =
