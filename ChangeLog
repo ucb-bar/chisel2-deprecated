@@ -1,13 +1,13 @@
-2013-07-23 Sebastien Mirolo <smirolo@eecs.berkeley.edu>
+2013-08-05 Sebastien Mirolo <smirolo@eecs.berkeley.edu>
 
         Porting from Chisel 1.1 to Chisel 2.0
-        * Replace Reg(x) by RegUpdate(x)
+        * Replace Reg(x) by Reg(update=x)
           Semantic of Reg(x) changed from Reg(updateVal=x) to Reg(){x.clone}.
         That's important to note because code will compile correctly
         and you might chase bugs for a while on this one. I recommend
-        to do a search/replace of Reg(x) pattern by RegUpdate(x)
+        to do a search/replace of Reg(x) pattern by Reg(update=x)
         as a first step. Other changes will generate a compilation error.
-        * Replace Reg(resetVal=x) by RegReset(x)
+        * Replace Reg(resetVal=x) by Reg(reset=x)
         * Replace Reg(){x} by Reg(x)
         * Replace Mem(n){x} by Mem(n, x)
         * Replace Vec(n){x} by Vec.fill(n){x}

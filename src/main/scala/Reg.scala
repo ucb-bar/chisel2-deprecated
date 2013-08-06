@@ -73,26 +73,38 @@ object Reg {
       }
   }
 
-  /** *out* defines the data type of the register when it is read.
-    *updateVal* and *resetVal* define the update and reset values
+  /** *type_out* defines the data type of the register when it is read.
+    *update* and *reset* define the update and reset values
     respectively.
     */
-  def apply[T <: Data](out: T, updateVal: T, resetVal: T): T = {
+  def apply[T <: Data](type_out: T = null,
+    update: T = null, reset: T = null): T = {
+    var out = type_out
+    if(out == null) {
+      out = update
+    }
+    if(out == null) {
+      out = reset
+    }
+    if(out == null) {
+      throw new Exception("cannot infer type of Reg.")
+    }
+
     val gen = out.clone
     validateGen(gen)
 
     val d: Array[(String, Bits)] =
-      if(updateVal == null) {
+      if(update == null) {
         gen.flatten.map{case(x, y) => (x -> null)}
       } else {
-        updateVal.flatten
+        update.flatten
       }
 
     // asOutput flip the direction and returns this.
     val res = gen.asOutput
 
-    if(resetVal != null) {
-      for((((res_n, res_i), (data_n, data_i)), (rval_n, rval_i)) <- res.flatten zip d zip resetVal.flatten) {
+    if(reset != null) {
+      for((((res_n, res_i), (data_n, data_i)), (rval_n, rval_i)) <- res.flatten zip d zip reset.flatten) {
 
         assert(rval_i.getWidth > 0,
           {ChiselError.error("Negative width to wire " + res_i)})
@@ -120,10 +132,10 @@ object Reg {
     res
   }
 
-
-  def apply[T <: Data](updateVal: T, resetVal: T): T = Reg[T](updateVal, updateVal, resetVal)
-
-  def apply[T <: Data](out: T): T = Reg[T](out, null.asInstanceOf[T], null.asInstanceOf[T])
+  /* Without this method, the scala compiler is not happy
+   when we declare registers as Reg(signal). */
+  def apply[T <: Data](out: T): T = Reg[T](
+    out, null.asInstanceOf[T], null.asInstanceOf[T])
 }
 
 object RegUpdate {
