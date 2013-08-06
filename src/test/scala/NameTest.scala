@@ -637,7 +637,7 @@ endmodule
       }
 
       io.mem := io.requestor(0).req.ready
-      val r_valid = io.requestor.map(r => RegUpdate(r.req.ready))
+      val r_valid = io.requestor.map(r => Reg(update=r.req.ready))
 
       for(i <- 0 to 3) {
         when (r_valid(i)) {
@@ -840,7 +840,7 @@ endmodule
         val ctrl_out = Bool(OUTPUT);
       }
       // writeback definitions
-      val wb_reg_ll_wb          = RegReset(Bool(false));
+      val wb_reg_ll_wb          = Reg(reset=Bool(false));
       val wb_wen = io.ctrl_wb_wen || wb_reg_ll_wb
 
       when (wb_wen) { wb_reg_ll_wb := io.ctrl_wb_wen }

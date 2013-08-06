@@ -173,7 +173,7 @@ void VerifSuite_CppPrintfComp_1_t::dump(FILE *f, int t) {
         val z = UInt(OUTPUT)
       }
 
-      val tsc_reg = RegReset(UInt(0, width=32))
+      val tsc_reg = Reg(reset=UInt(0, width=32))
       tsc_reg := tsc_reg + UInt(1/*, width=32*/)
 
       printf("Cyc= %d io: %x %x", tsc_reg(31,0), io.x, io.y)
