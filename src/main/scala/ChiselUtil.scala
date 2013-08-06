@@ -175,7 +175,7 @@ class Valid[+T <: Data](gen: T) extends Bundle
     }
 }
 
-class Decoupled[T <: Data](gen: T) extends Bundle
+class DecoupledIO[T <: Data](gen: T) extends Bundle
 {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
@@ -186,16 +186,16 @@ class Decoupled[T <: Data](gen: T) extends Bundle
       super.clone()
     } catch {
       case e: java.lang.Exception => {
-        new Decoupled(gen).asInstanceOf[this.type]
+        new DecoupledIO(gen).asInstanceOf[this.type]
       }
     }
 }
 
 object Decoupled {
-  def apply[T <: Data](gen: T): Decoupled[T]  = {new Decoupled(gen)}
+  def apply[T <: Data](gen: T): DecoupledIO[T]  = {new DecoupledIO(gen)}
 }
 
-class EnqIO[T <: Data](gen: T) extends Decoupled(gen)
+class EnqIO[T <: Data](gen: T) extends DecoupledIO(gen)
 {
   def enq(dat: T): T = { valid := Bool(true); bits := dat; dat }
   valid := Bool(false);
@@ -204,7 +204,7 @@ class EnqIO[T <: Data](gen: T) extends Decoupled(gen)
   override def clone: this.type = { new EnqIO(gen).asInstanceOf[this.type]; }
 }
 
-class DeqIO[T <: Data](gen: T) extends Decoupled(gen)
+class DeqIO[T <: Data](gen: T) extends DecoupledIO(gen)
 {
   flip()
   ready := Bool(false);
@@ -213,7 +213,7 @@ class DeqIO[T <: Data](gen: T) extends Decoupled(gen)
 }
 
 
-class DecoupledC[+T <: Data](gen: T) extends Bundle
+class DecoupledIOC[+T <: Data](gen: T) extends Bundle
 {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
@@ -221,9 +221,9 @@ class DecoupledC[+T <: Data](gen: T) extends Bundle
 }
 
 
-class ioArbiter[T <: Data](gen: T, n: Int) extends Bundle {
-  val in  = Vec.fill(n){ new Decoupled(gen) }.flip
-  val out = new Decoupled(gen)
+class ArbiterIO[T <: Data](gen: T, n: Int) extends Bundle {
+  val in  = Vec.fill(n){ new DecoupledIO(gen) }.flip
+  val out = new DecoupledIO(gen)
   val chosen = UInt(OUTPUT, log2Up(n))
 }
 
@@ -236,7 +236,7 @@ object ArbiterCtrl
 
 abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends Module {
   require(isPow2(count))
-  val io = new ioArbiter(gen, n)
+  val io = new ArbiterIO(gen, n)
   val locked  = if(count > 1) RegReset(Bool(false)) else Bool(false)
   val lockIdx = if(count > 1) RegReset(UInt(n-1)) else UInt(n-1)
   val grant = List.fill(n)(Bool())
@@ -320,16 +320,16 @@ object Counter
   }
 }
 
-class ioQueue[T <: Data](gen: T, entries: Int) extends Bundle
+class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
 {
-  val enq   = new Decoupled(gen.clone).flip
-  val deq   = new Decoupled(gen.clone)
+  val enq   = new DecoupledIO(gen.clone).flip
+  val deq   = new DecoupledIO(gen.clone)
   val count = UInt(OUTPUT, log2Up(entries + 1))
 }
 
 class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, resetSignal: Bool = null) extends Module(resetSignal)
 {
-  val io = new ioQueue(gen, entries)
+  val io = new QueueIO(gen, entries)
 
   val do_flow = Bool()
   val do_enq = io.enq.ready && io.enq.valid && !do_flow
@@ -348,7 +348,7 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
     maybe_full := do_enq
   }
 
-  val ram = Mem(entries, gen)
+  val ram = Mem(gen, entries)
   when (do_enq) { ram(enq_ptr) := io.enq.bits }
 
   val ptr_match = enq_ptr === deq_ptr
@@ -370,7 +370,7 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
 
 object Queue
 {
-  def apply[T <: Data](enq: Decoupled[T], entries: Int = 2, pipe: Boolean = false): Decoupled[T]  = {
+  def apply[T <: Data](enq: DecoupledIO[T], entries: Int = 2, pipe: Boolean = false): DecoupledIO[T]  = {
     val q = Module(new Queue(enq.bits.clone, entries, pipe))
     q.io.view(q.io.elements.filter(j => j._1 != "count")) // count io is not being used if called functionally
     q.io.enq.valid := enq.valid // not using <> so that override is allowed
@@ -381,7 +381,7 @@ object Queue
 }
 
 class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) extends Module {
-  val io = new ioQueue(gen, entries)
+  val io = new QueueIO(gen, entries)
   val asize = log2Up(entries)
 
   val s1_rptr_gray = RegReset(UInt(0, asize+1)).withClock(enq_clk)
@@ -426,7 +426,7 @@ class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) e
   io.enq.ready := not_full
   io.deq.valid := not_empty
 
-  val mem = Mem(entries, gen).withClock(enq_clk)
+  val mem = Mem(gen, entries).withClock(enq_clk)
   when (io.enq.valid && io.enq.ready) {
     mem(wptr_bin(asize-1,0)) := io.enq.bits
   }

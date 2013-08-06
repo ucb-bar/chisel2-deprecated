@@ -35,10 +35,10 @@ import scala.reflect._
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 
 object Mem {
-  def apply[T <: Data](n: Int, out: T, seqRead: Boolean = false): Mem[T] = {
+  def apply[T <: Data](out: T, n: Int, seqRead: Boolean = false): Mem[T] = {
     val gen = out.clone
     Reg.validateGen(gen)
-    new Mem(n, seqRead, () => gen)
+    new Mem(() => gen, n, seqRead)
   }
 
   Module.backend.transforms.prepend { c =>
@@ -60,7 +60,7 @@ abstract class AccessTracker extends Delay {
   def readAccesses: ArrayBuffer[_ <: MemAccess]
 }
 
-class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends AccessTracker {
+class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean) extends AccessTracker {
   def writeAccesses: ArrayBuffer[MemWrite] = writes ++ readwrites.map(_.write)
   def readAccesses: ArrayBuffer[_ <: MemAccess] = reads ++ seqreads ++ readwrites.map(_.read)
   def ports: ArrayBuffer[_ <: MemAccess] = writes ++ reads ++ seqreads ++ readwrites
@@ -149,7 +149,7 @@ class Mem[T <: Data](val n: Int, val seqRead: Boolean, gen: () => T) extends Acc
 
   override def toString: String = "TMEM(" + ")"
 
-  override def clone = new Mem(n, seqRead, gen)
+  override def clone = new Mem(gen, n, seqRead)
 
   def computePorts = {
     reads --= reads.filterNot(_.used)
