@@ -308,11 +308,11 @@ abstract class Backend {
         } else {
           node.component
         }
+      node.component.nodes += node
       for (input <- node.inputs) {
         if(!walked.contains(input)) {
           if( input.component == null ) {
             input.component = curComp
-            curComp.nodes += input
           }
           walked += input
           dfsStack.push(input)
@@ -547,6 +547,7 @@ abstract class Backend {
     transform(c, transforms)
     ChiselError.info("finished transforms")
 
+    Module.sortedComps.map(x => println(x + " " + x.nodes.length))
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
     c.traceNodes();
     for (comp <- Module.sortedComps)

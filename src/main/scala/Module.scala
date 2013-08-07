@@ -555,8 +555,9 @@ abstract class Module(resetSignal: Bool = null) {
 
   def visitNodes(roots: Array[Node]) {
     val stack = new Stack[(Int, Node)]();
-    for (root <- roots)
+    for (root <- roots) {
       stack.push((0, root));
+    }
     isWalked.clear();
     while (stack.length > 0) {
       val (newDepth, node) = stack.pop();

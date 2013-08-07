@@ -471,10 +471,10 @@ endmodule
 """module NameSuite_Block_2(input clk, input reset,
     input  io_valid,
     output[31:0] io_mine_0,
-    output[31:0] io_mine_1
+    output[31:0] io_mine_1,
     //input  io_sub_resp_valid
     //input  io_sub_resp_bits_error
-    //input [31:0] io_sub_resp_bits_ppn
+    input [31:0] io_sub_resp_bits_ppn
 );
 
   wire[31:0] T0;
@@ -533,6 +533,7 @@ module NameSuite_BindFithComp_1(input clk, input reset,
   );
   `ifdef SYNTHESIS
     assign NameSuite_Block_2.io_valid = $random();
+    assign NameSuite_Block_2.io_sub_resp_bits_ppn = $random();
   `endif
 endmodule
 
