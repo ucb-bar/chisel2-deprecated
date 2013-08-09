@@ -122,7 +122,7 @@ object ShiftRegister
 
 object UIntToOH
 {
-  def apply(in: UInt, width: Int = -1): UInt =
+  def apply(in: UInt, width: Int = -1): Bits =
   {
     if (width == -1) {
       UInt(1) << in
@@ -134,17 +134,15 @@ object UIntToOH
 
 object Mux1H
 {
-  def apply[T<: Bits](sel: Seq[Bool], in: Seq[T]): T = {
-    if (in.size == 1) {
-      in(0)
-    } else {
-      val zero: T = in(0).fromInt(0)
-      sel.zip(in).map { case(s,x) => Mux(s, x, zero) }.reduce(_|_)
-    }
+  def apply[T <: Data](sel: Vec[Bool], in: Vec[T]): T = {
+    if (in.size == 1) in(0)
+    else in(sel.indexWhere((i: Bool) => i))
   }
-  def apply[T <: Bits](sel: Bits, in: Seq[T]): T = apply((0 until in.size).map(sel(_)), in)
+  def apply[T <: Data](sel: Vec[Bool], in: Seq[T]): T = apply(sel, Vec(in))
+  def apply[T <: Data](sel: Seq[Bool], in: Vec[T]): T = apply(Vec(sel), in)
+  def apply[T <: Data](sel: Bits, in: Seq[T]): T = apply(Vec((0 until in.size).map(sel(_))), Vec(in))
+  def apply[T <: Data](sel: Bits, in: Vec[T]): T = apply(Vec((0 until in.size).map(sel(_))), in)
 }
-
 
 object OHToUInt
 {
@@ -265,7 +263,7 @@ abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLo
   }
 }
 
-class LockingRRArbiter[T <: Bits](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
+class LockingRRArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
   val last_grant = RegReset(UInt(0, log2Up(n)))
   val ctrl = ArbiterCtrl((0 until n).map(i => io.in(i).valid && UInt(i) > last_grant) ++ io.in.map(_.valid))
   (0 until n).map(i => grant(i) := ctrl(i) && UInt(i) > last_grant || ctrl(i + n))
@@ -291,7 +289,7 @@ class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T 
   chosen := Mux(locked, lockIdx, choose)
 }
 
-class RRArbiter[T <: Bits](gen:T, n: Int) extends LockingRRArbiter[T](gen, n, 1)
+class RRArbiter[T <: Data](gen:T, n: Int) extends LockingRRArbiter[T](gen, n, 1)
 
 class Arbiter[T <: Data](gen: T, n: Int) extends LockingArbiter[T](gen, n, 1)
 
@@ -455,7 +453,7 @@ class Log2 extends Node {
   override def toString: String = "LOG2(" + inputs(0) + ")";
 }
 
-class Pipe[T <: Bits](gen: T, latency: Int = 1) extends Module
+class Pipe[T <: Data](gen: T, latency: Int = 1) extends Module
 {
   val io = new Bundle {
     val enq = new Valid(gen).flip
@@ -467,7 +465,7 @@ class Pipe[T <: Bits](gen: T, latency: Int = 1) extends Module
 
 object Pipe
 {
-  def apply[T <: Bits](enqValid: Bool, enqBits: T, latency: Int): Valid[T] = {
+  def apply[T <: Data](enqValid: Bool, enqBits: T, latency: Int): Valid[T] = {
     if (latency == 0) {
       val out = new Valid(enqBits.clone)
       out.valid <> enqValid
@@ -481,8 +479,8 @@ object Pipe
       apply(v, b, latency-1)
     }
   }
-  def apply[T <: Bits](enqValid: Bool, enqBits: T): Valid[T] = apply(enqValid, enqBits, 1)
-  def apply[T <: Bits](enq: Valid[T], latency: Int = 1): Valid[T] = apply(enq.valid, enq.bits, latency)
+  def apply[T <: Data](enqValid: Bool, enqBits: T): Valid[T] = apply(enqValid, enqBits, 1)
+  def apply[T <: Data](enq: Valid[T], latency: Int = 1): Valid[T] = apply(enq.valid, enq.bits, latency)
 }
 
 object PriorityMux
