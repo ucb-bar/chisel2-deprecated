@@ -183,9 +183,9 @@ class Reg extends Delay with proc {
     if(isEnable){
       // hack to force the muxes to match the Reg's width:
       // the intent is u = updates.head._2
-      val u = new Mux().init("", maxWidth _, Bool(true), updates.head._2, this)
-      u.component = this.component
-      genMuxes(u, updates.toList.tail)
+      // val u = new Mux().init("", maxWidth _, Bool(true), updates.head._2, this)
+      // u.component = this.component
+      genMuxes(updates.head._2, updates.toList.tail)
       inputs += enable;
       enableIndex = inputs.length - 1;
     } else {
@@ -202,6 +202,12 @@ class Reg extends Delay with proc {
       ChiselError.error("reassignment to Reg");
     } else {
       assigned = true; super.assign(src)
+    }
+  }
+
+  override def forceMatchingWidths {
+    if (inputs(0).width != width) {
+      inputs(0) = inputs(0).matchWidth(width)
     }
   }
 }

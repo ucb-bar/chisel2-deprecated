@@ -7,12 +7,10 @@ class Clock(reset: Bool = Module.implicitReset) extends Node {
   Module.clocks += this
   init("", 1)
 
+  // returns a reset pin connected to reset for the component in scope
   def getReset: Bool = {
     if (Module.compStack.length != 0) {
-      val curComp = Module.compStack.top
-      if (!curComp.resets.contains(reset))
-        curComp.resets += (reset -> Bool(INPUT))
-      curComp.resets(reset)
+      Module.compStack.top.getResetPin(reset)
     } else {
       reset
     }

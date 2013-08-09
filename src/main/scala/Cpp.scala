@@ -554,7 +554,7 @@ class CppBackend extends Backend {
       m match {
         case l: Literal => ;
         case any        =>
-          if (m.name != "" && !(m == c.reset) && !(m.component == null)) {
+          if (m.name != "" && !(m == c.defaultResetPin) && !(m.component == null)) {
             // only modify name if it is not the reset signal or not in top component
             if(m.name != "reset" || !(m.component == c)) {
               m.name = m.component.getPathName + "__" + m.name;
@@ -678,7 +678,7 @@ class CppBackend extends Backend {
     }
 
     out_c.write("int " + c.name + "_t::clock ( dat_t<1> reset ) {\n")
-    out_c.write("  uint32_t min = (1<<31)-1;\n")
+    out_c.write("  uint32_t min = ((uint32_t)1<<31)-1;\n")
     for (clock <- Module.clocks) {
       out_c.write("  if (" + emitRef(clock) + "_cnt < min) min = " + emitRef(clock) +"_cnt;\n")
     }

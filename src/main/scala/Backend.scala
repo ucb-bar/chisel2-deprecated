@@ -216,7 +216,7 @@ abstract class Backend {
       case l: Literal => l.toString;
       case any       =>
         if (m.name != ""
-          && m != Module.topComponent.reset && m.component != null) {
+          && m != Module.topComponent.defaultResetPin && m.component != null) {
           /* Only modify name if it is not the reset signal
            or not in top component */
           if(m.name != "reset" && m.component != Module.topComponent) {
@@ -406,56 +406,54 @@ abstract class Backend {
     result ++ ArrayBuffer[Module](root);
   }
 
-  def assignClksToComps {
-    for (comp <- Module.sortedComps) {
-      for (node <- comp.nodes) {
-        if (node.isInstanceOf[Delay] && node.clock != null) { // null clock due to unreachable reg
-          var curComp = comp
-          while (curComp != null) {
-            if (!curComp.clocks.contains(node.clock))
-              curComp.clocks += node.clock
-            curComp = curComp.parent
-          }
+  // go through every Module and set its clock and reset field
+  def assignClockAndResetToModules {
+    for (module <- Module.sortedComps.reverse) {
+      if (module.mClock == null) {
+        module.mClock = module.parent.mClock
+      }
+      if (module.mReset == null) {
+        module.mReset = module.parent.mReset
+        if (module.defaultResetPin != null) {
+          module.resets += (module.mReset -> module.defaultResetPin)
+        }
+      }
+      assert(module.mClock != null)
+      assert(module.mReset != null)
+    }
+  }
+
+  // go through every Module, add all clocks+resets used in it's tree to it's list of clocks+resets
+  def gatherClocksAndResets {
+    for (parent <- Module.sortedComps) {
+      for (child <- parent.children) {
+        for (clock <- child.clocks) {
+          parent.addClock(clock)
+        }
+        for (reset <- child.resets.keys) {
+          // create a reset pin in parent if reset does not originate in parent and 
+          // if reset is not an output from one of parent's children
+          if (reset.component != parent && !parent.children.contains(reset.component))
+            parent.addResetPin(reset)
+
+          // special case for implicitReset
+          if (reset == Module.implicitReset && parent == Module.topComponent)
+            if(!parent.resets.contains(reset))
+              parent.resets += (reset -> reset)
         }
       }
     }
   }
 
-  def createPin(module: Module): Bool = {
-    val pin = Bool(INPUT)
-    pin.component = module
-    module.nodes += pin
-    pin
-  }
 
-  def assignRstsToComps {
-    // special case for top level implicit reset
-    if (Module.sortedComps.map(_.clocks.map(_.getReset)).reduceLeft(_ ++ _).contains(Module.implicitReset)) {
-      Module.topComponent.resets += (Module.implicitReset -> Module.implicitReset)
-    }
-
-    // create the input reset pin for every module between reset source and consumer
-    for (comp <- Module.sortedComps) {
-      for (clock <- comp.clocks) {
-        var curComp = comp
-        while (curComp != clock.component) {
-          if (!curComp.resets.contains(clock.getReset)) {
-            curComp.resets += (clock.getReset -> createPin(curComp))
-          }
-          curComp = curComp.parent
-        }
-      }
-    }
-
-    // connect module's reset pin to parent's reset pin
-    for (comp <- Module.sortedComps) {
-      for (rst <- comp.resets.keys) {
-        if (comp.resets(rst).inputs.length == 0 && comp.resets(rst) != Module.implicitReset) {
-          if (comp.parent.resets.contains(rst)) {
-            comp.resets(rst).inputs += comp.parent.resets(rst)
-          } else {
-            comp.resets(rst).inputs += rst
-          }
+  def connectResets {
+    for (parent <- Module.sortedComps) {
+      for (child <- parent.children) {
+        for (reset <- child.resets.keys) {
+          if (parent.resets.contains(reset))
+            child.resets(reset).inputs += parent.resets(reset)
+          else 
+            child.resets(reset).inputs += reset
         }
       }
     }
@@ -463,9 +461,12 @@ abstract class Backend {
 
   def nameRsts {
     for (comp <- Module.sortedComps) {
+      if (comp.resets.contains(comp.mReset))
+          comp.resets(comp.mReset).setName("reset")
       for (rst <- comp.resets.keys) {
         if (comp.resets(rst) != Module.implicitReset) {
-          comp.resets(rst).setName(rst.name)
+          if (!comp.resets(rst).named)
+            comp.resets(rst).setName(rst.name)
         }
       }
     }
@@ -493,9 +494,12 @@ abstract class Backend {
   def elaborate(c: Module): Unit = {
     Module.topComponent = c;
     Module.implicitReset.component = Module.topComponent
-    Module.topComponent.nodes += Module.implicitReset
     Module.implicitClock.component = Module.topComponent
-    Module.topComponent.nodes += Module.implicitClock
+    Module.topComponent.mReset = Module.implicitReset
+    Module.topComponent.mClock = Module.implicitClock
+    if (Module.topComponent.defaultResetPin != null)
+      Module.topComponent.defaultResetPin.setName("reset")
+
     /* XXX If we call nameAll here and again further down, we end-up with
      duplicate names in the generated C++.
     nameAll(c) */
@@ -511,7 +515,7 @@ abstract class Backend {
     c.genAllMuxes;
     Module.components.foreach(_.postMarkNet(0));
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
-    Module.assignResets()
+    // Module.assignResets()
 
     ChiselError.info("started inference")
     val nbOuterLoops = c.inferAll();
@@ -538,9 +542,10 @@ abstract class Backend {
     Module.sortedComps = gatherChildren(c).sortWith(
       (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)));
 
-    c.assignClks
-    assignClksToComps
-    assignRstsToComps
+    assignClockAndResetToModules
+    c.addClockAndReset
+    gatherClocksAndResets
+    connectResets
 
     // two transforms added in Mem.scala (referenced and computePorts)
     ChiselError.info("started transforms")

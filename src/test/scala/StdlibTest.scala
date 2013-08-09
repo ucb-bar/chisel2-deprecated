@@ -718,18 +718,18 @@ endmodule
   wire T10;
   reg[1:0] R11;
   wire T12;
-  wire[1:0] T13;
+  wire T13;
   wire T14;
-  wire T15;
-  wire[1:0] T16;
+  wire[1:0] T15;
+  wire T16;
   wire T17;
-  wire T18;
-  wire[1:0] T19;
+  wire[1:0] T18;
+  wire signed [7:0] T19;
   wire signed [7:0] T20;
-  wire signed [7:0] T21;
-  wire T22;
-  wire[1:0] T23;
-  wire signed [7:0] T24;
+  wire T21;
+  wire[1:0] T22;
+  wire signed [7:0] T23;
+  wire T24;
   wire T25;
   wire T26;
   wire T27;
@@ -753,11 +753,11 @@ endmodule
   wire T45;
   wire T46;
   wire T47;
-  wire T48;
-  wire[1:0] T49;
+  wire[1:0] T48;
+  wire T49;
   wire T50;
-  wire T51;
-  wire[1:0] T52;
+  wire[1:0] T51;
+  wire T52;
   wire T53;
   wire T54;
   wire T55;
@@ -785,8 +785,8 @@ endmodule
   wire T77;
   wire T78;
   wire T79;
-  wire T80;
-  wire[1:0] T81;
+  wire[1:0] T80;
+  wire T81;
   wire T82;
   wire T83;
   wire T84;
@@ -795,13 +795,12 @@ endmodule
   wire T87;
   wire T88;
   wire T89;
-  wire T90;
-  wire[1:0] T91;
+  wire[1:0] T90;
 
   assign io_chosen = T0;
   assign T0 = T1;
-  assign T1 = T17 ? T16 : T2;
-  assign T2 = T14 ? 2'h2/* 2*/ : T3;
+  assign T1 = T16 ? T15 : T2;
+  assign T2 = T13 ? 2'h2/* 2*/ : T3;
   assign T3 = T9 ? 2'h3/* 3*/ : T4;
   assign T4 = io_in_0_valid ? T8 : T5;
   assign T5 = io_in_1_valid ? T7 : T6;
@@ -811,97 +810,96 @@ endmodule
   assign T9 = io_in_3_valid && T10;
   assign T10 = 2'h3/* 3*/ > R11;
   assign T12 = io_out_ready && io_out_valid;
-  assign T13 = 1'h1/* 1*/ ? T0 : R11;
-  assign T14 = io_in_2_valid && T15;
-  assign T15 = 2'h2/* 2*/ > R11;
-  assign T16 = {1'h0/* 0*/, 1'h1/* 1*/};
-  assign T17 = io_in_1_valid && T18;
-  assign T18 = T19 > R11;
-  assign T19 = {1'h0/* 0*/, 1'h1/* 1*/};
-  assign io_out_bits = T20;
-  assign T20 = T26 ? T24 : T21;
-  assign T21 = T22 ? io_in_1_bits : io_in_0_bits;
-  assign T22 = T23[1'h0/* 0*/:1'h0/* 0*/];
-  assign T23 = T0;
-  assign T24 = T25 ? io_in_3_bits : io_in_2_bits;
-  assign T25 = T23[1'h0/* 0*/:1'h0/* 0*/];
-  assign T26 = T23[1'h1/* 1*/:1'h1/* 1*/];
-  assign io_out_valid = T27;
-  assign T27 = T32 ? T30 : T28;
-  assign T28 = T29 ? io_in_1_valid : io_in_0_valid;
-  assign T29 = T23[1'h0/* 0*/:1'h0/* 0*/];
-  assign T30 = T31 ? io_in_3_valid : io_in_2_valid;
-  assign T31 = T23[1'h0/* 0*/:1'h0/* 0*/];
-  assign T32 = T23[1'h1/* 1*/:1'h1/* 1*/];
-  assign io_in_3_ready = T33;
-  assign T33 = T34 && io_out_ready;
-  assign T34 = T35;
-  assign T35 = T53 || T36;
-  assign T36 = ! T37;
-  assign T37 = T38 || io_in_2_valid;
-  assign T38 = T39 || io_in_1_valid;
-  assign T39 = T40 || io_in_0_valid;
-  assign T40 = T43 || T41;
-  assign T41 = io_in_3_valid && T42;
-  assign T42 = 2'h3/* 3*/ > R11;
-  assign T43 = T46 || T44;
-  assign T44 = io_in_2_valid && T45;
-  assign T45 = 2'h2/* 2*/ > R11;
-  assign T46 = T50 || T47;
-  assign T47 = io_in_1_valid && T48;
-  assign T48 = T49 > R11;
-  assign T49 = {1'h0/* 0*/, 1'h1/* 1*/};
-  assign T50 = io_in_0_valid && T51;
-  assign T51 = T52 > R11;
-  assign T52 = {1'h0/* 0*/, 1'h0/* 0*/};
-  assign T53 = T55 && T54;
-  assign T54 = 2'h3/* 3*/ > R11;
-  assign T55 = ! T56;
-  assign T56 = T57 || T44;
-  assign T57 = T50 || T47;
-  assign io_in_2_ready = T58;
-  assign T58 = T59 && io_out_ready;
-  assign T59 = T60;
-  assign T60 = T67 || T61;
-  assign T61 = ! T62;
-  assign T62 = T63 || io_in_1_valid;
-  assign T63 = T64 || io_in_0_valid;
-  assign T64 = T65 || T41;
-  assign T65 = T66 || T44;
-  assign T66 = T50 || T47;
-  assign T67 = T69 && T68;
-  assign T68 = 2'h2/* 2*/ > R11;
-  assign T69 = ! T70;
-  assign T70 = T50 || T47;
-  assign io_in_1_ready = T71;
-  assign T71 = T72 && io_out_ready;
-  assign T72 = T73;
-  assign T73 = T79 || T74;
-  assign T74 = ! T75;
-  assign T75 = T76 || io_in_0_valid;
-  assign T76 = T77 || T41;
-  assign T77 = T78 || T44;
-  assign T78 = T50 || T47;
-  assign T79 = T82 && T80;
-  assign T80 = T81 > R11;
-  assign T81 = {1'h0/* 0*/, 1'h1/* 1*/};
-  assign T82 = ! T50;
-  assign io_in_0_ready = T83;
-  assign T83 = T84 && io_out_ready;
-  assign T84 = T85;
-  assign T85 = T90 || T86;
-  assign T86 = ! T87;
-  assign T87 = T88 || T41;
-  assign T88 = T89 || T44;
-  assign T89 = T50 || T47;
-  assign T90 = T91 > R11;
-  assign T91 = {1'h0/* 0*/, 1'h0/* 0*/};
+  assign T13 = io_in_2_valid && T14;
+  assign T14 = 2'h2/* 2*/ > R11;
+  assign T15 = {1'h0/* 0*/, 1'h1/* 1*/};
+  assign T16 = io_in_1_valid && T17;
+  assign T17 = T18 > R11;
+  assign T18 = {1'h0/* 0*/, 1'h1/* 1*/};
+  assign io_out_bits = T19;
+  assign T19 = T25 ? T23 : T20;
+  assign T20 = T21 ? io_in_1_bits : io_in_0_bits;
+  assign T21 = T22[1'h0/* 0*/:1'h0/* 0*/];
+  assign T22 = T0;
+  assign T23 = T24 ? io_in_3_bits : io_in_2_bits;
+  assign T24 = T22[1'h0/* 0*/:1'h0/* 0*/];
+  assign T25 = T22[1'h1/* 1*/:1'h1/* 1*/];
+  assign io_out_valid = T26;
+  assign T26 = T31 ? T29 : T27;
+  assign T27 = T28 ? io_in_1_valid : io_in_0_valid;
+  assign T28 = T22[1'h0/* 0*/:1'h0/* 0*/];
+  assign T29 = T30 ? io_in_3_valid : io_in_2_valid;
+  assign T30 = T22[1'h0/* 0*/:1'h0/* 0*/];
+  assign T31 = T22[1'h1/* 1*/:1'h1/* 1*/];
+  assign io_in_3_ready = T32;
+  assign T32 = T33 && io_out_ready;
+  assign T33 = T34;
+  assign T34 = T52 || T35;
+  assign T35 = ! T36;
+  assign T36 = T37 || io_in_2_valid;
+  assign T37 = T38 || io_in_1_valid;
+  assign T38 = T39 || io_in_0_valid;
+  assign T39 = T42 || T40;
+  assign T40 = io_in_3_valid && T41;
+  assign T41 = 2'h3/* 3*/ > R11;
+  assign T42 = T45 || T43;
+  assign T43 = io_in_2_valid && T44;
+  assign T44 = 2'h2/* 2*/ > R11;
+  assign T45 = T49 || T46;
+  assign T46 = io_in_1_valid && T47;
+  assign T47 = T48 > R11;
+  assign T48 = {1'h0/* 0*/, 1'h1/* 1*/};
+  assign T49 = io_in_0_valid && T50;
+  assign T50 = T51 > R11;
+  assign T51 = {1'h0/* 0*/, 1'h0/* 0*/};
+  assign T52 = T54 && T53;
+  assign T53 = 2'h3/* 3*/ > R11;
+  assign T54 = ! T55;
+  assign T55 = T56 || T43;
+  assign T56 = T49 || T46;
+  assign io_in_2_ready = T57;
+  assign T57 = T58 && io_out_ready;
+  assign T58 = T59;
+  assign T59 = T66 || T60;
+  assign T60 = ! T61;
+  assign T61 = T62 || io_in_1_valid;
+  assign T62 = T63 || io_in_0_valid;
+  assign T63 = T64 || T40;
+  assign T64 = T65 || T43;
+  assign T65 = T49 || T46;
+  assign T66 = T68 && T67;
+  assign T67 = 2'h2/* 2*/ > R11;
+  assign T68 = ! T69;
+  assign T69 = T49 || T46;
+  assign io_in_1_ready = T70;
+  assign T70 = T71 && io_out_ready;
+  assign T71 = T72;
+  assign T72 = T78 || T73;
+  assign T73 = ! T74;
+  assign T74 = T75 || io_in_0_valid;
+  assign T75 = T76 || T40;
+  assign T76 = T77 || T43;
+  assign T77 = T49 || T46;
+  assign T78 = T81 && T79;
+  assign T79 = T80 > R11;
+  assign T80 = {1'h0/* 0*/, 1'h1/* 1*/};
+  assign T81 = ! T49;
+  assign io_in_0_ready = T82;
+  assign T82 = T83 && io_out_ready;
+  assign T83 = T84;
+  assign T84 = T89 || T85;
+  assign T85 = ! T86;
+  assign T86 = T87 || T40;
+  assign T87 = T88 || T43;
+  assign T88 = T49 || T46;
+  assign T89 = T90 > R11;
+  assign T90 = {1'h0/* 0*/, 1'h0/* 0*/};
 
   always @(posedge clk) begin
     if(reset) begin
       R11 <= 2'h0/* 0*/;
     end else if(T12) begin
-      R11 <= T13;
+      R11 <= T0;
     end
   end
 endmodule
@@ -996,25 +994,21 @@ endmodule
 
   reg[7:0] R0;
   reg[0:0] R1;
-  wire[7:0] T2;
-  reg[7:0] R3;
-  wire[7:0] T4;
-  reg[0:0] R5;
+  reg[7:0] R2;
+  reg[0:0] R3;
 
   assign io_deq_bits = R0;
-  assign T2 = 1'h1/* 1*/ ? R3 : R0;
-  assign T4 = 1'h1/* 1*/ ? io_enq_bits : R3;
-  assign io_deq_valid = R5;
+  assign io_deq_valid = R3;
 
   always @(posedge clk) begin
     if(R1) begin
-      R0 <= T2;
+      R0 <= R2;
     end
     R1 <= reset ? 1'h0/* 0*/ : io_enq_valid;
     if(io_enq_valid) begin
-      R3 <= T4;
+      R2 <= io_enq_bits;
     end
-    R5 <= reset ? 1'h0/* 0*/ : R1;
+    R3 <= reset ? 1'h0/* 0*/ : R1;
   end
 endmodule
 
@@ -1114,21 +1108,18 @@ endmodule
   wire T4;
   reg[0:0] enq_ptr;
   wire T5;
-  wire T6;
   reg[0:0] deq_ptr;
   wire do_deq;
+  wire T6;
   wire T7;
   wire T8;
   wire T9;
-  wire T10;
-  wire T11;
   wire empty;
-  wire T12;
+  wire T10;
   reg[0:0] maybe_full;
-  wire T13;
-  wire T14;
+  wire T11;
   wire ptr_match;
-  wire T15;
+  wire T12;
   wire full;
 
   assign io_deq_bits = T0;
@@ -1138,22 +1129,19 @@ endmodule
   assign T3 = ! do_flow;
   assign do_flow = 1'h0/* 0*/;
   assign T4 = io_enq_ready && io_enq_valid;
-  assign T5 = 1'h1/* 1*/ ? T6 : enq_ptr;
-  assign T6 = enq_ptr + 1'h1/* 1*/;
-  assign do_deq = T8 && T7;
-  assign T7 = ! do_flow;
-  assign T8 = io_deq_ready && io_deq_valid;
-  assign T9 = 1'h1/* 1*/ ? T10 : deq_ptr;
-  assign T10 = deq_ptr + 1'h1/* 1*/;
-  assign io_deq_valid = T11;
-  assign T11 = ! empty;
-  assign empty = ptr_match && T12;
-  assign T12 = ! maybe_full;
-  assign T13 = do_enq != do_deq;
-  assign T14 = 1'h1/* 1*/ ? do_enq : maybe_full;
+  assign T5 = enq_ptr + 1'h1/* 1*/;
+  assign do_deq = T7 && T6;
+  assign T6 = ! do_flow;
+  assign T7 = io_deq_ready && io_deq_valid;
+  assign T8 = deq_ptr + 1'h1/* 1*/;
+  assign io_deq_valid = T9;
+  assign T9 = ! empty;
+  assign empty = ptr_match && T10;
+  assign T10 = ! maybe_full;
+  assign T11 = do_enq != do_deq;
   assign ptr_match = enq_ptr == deq_ptr;
-  assign io_enq_ready = T15;
-  assign T15 = ! full;
+  assign io_enq_ready = T12;
+  assign T12 = ! full;
   assign full = ptr_match && maybe_full;
 
   always @(posedge clk) begin
@@ -1167,12 +1155,12 @@ endmodule
     if(reset) begin
       deq_ptr <= 1'h0/* 0*/;
     end else if(do_deq) begin
-      deq_ptr <= T9;
+      deq_ptr <= T8;
     end
     if(reset) begin
       maybe_full <= 1'h0/* 0*/;
-    end else if(T13) begin
-      maybe_full <= T14;
+    end else if(T11) begin
+      maybe_full <= do_enq;
     end
   end
 endmodule

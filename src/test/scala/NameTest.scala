@@ -468,7 +468,7 @@ endmodule
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new BindFithComp))
     assertFile(tmpdir.getRoot() + "/NameSuite_BindFithComp_1.v",
-"""module NameSuite_Block_2(input clk, input reset,
+"""module NameSuite_Block_2(input clk,
     input  io_valid,
     output[31:0] io_mine_0,
     output[31:0] io_mine_1,
@@ -485,8 +485,7 @@ endmodule
   wire[31:0] T5;
   reg[31:0] tag_ram_0;
   wire[31:0] T6;
-  wire[31:0] T7;
-  wire T8;
+  wire T7;
 
   assign io_mine_1 = T0;
   assign T0 = {31'h0/* 0*/, T1};
@@ -495,19 +494,18 @@ endmodule
   assign T3 = {31'h0/* 0*/, 1'h0/* 0*/};
   assign T4 = tag_ram_0 | T5;
   assign T5 = {31'h0/* 0*/, 1'h0/* 0*/};
-  assign T6 = 1'h1/* 1*/ ? io_sub_resp_bits_ppn : tag_ram_0;
-  assign io_mine_0 = T7;
-  assign T7 = {31'h0/* 0*/, T8};
-  assign T8 = T2[1'h0/* 0*/:1'h0/* 0*/];
+  assign io_mine_0 = T6;
+  assign T6 = {31'h0/* 0*/, T7};
+  assign T7 = T2[1'h0/* 0*/:1'h0/* 0*/];
 
   always @(posedge clk) begin
     if(io_valid) begin
-      tag_ram_0 <= T6;
+      tag_ram_0 <= io_sub_resp_bits_ppn;
     end
   end
 endmodule
 
-module NameSuite_BindFithComp_1(input clk, input reset,
+module NameSuite_BindFithComp_1(input clk,
     input  io_imem_ptw_resp_valid,
     input  io_imem_ptw_resp_bits_error,
     input [31:0] io_imem_ptw_resp_bits_ppn,
@@ -523,7 +521,7 @@ module NameSuite_BindFithComp_1(input clk, input reset,
   assign io_resp_resp_bits_ppn = io_imem_ptw_resp_bits_ppn;
   assign io_resp_resp_bits_error = io_imem_ptw_resp_bits_error;
   assign io_resp_resp_valid = io_imem_ptw_resp_valid;
-  NameSuite_Block_2 NameSuite_Block_2(.clk(clk), .reset(reset),
+  NameSuite_Block_2 NameSuite_Block_2(.clk(clk),
        //.io_valid(  )
        //.io_mine_0(  )
        //.io_mine_1(  )
@@ -578,7 +576,7 @@ endmodule
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new VecComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_VecComp_1.v",
-"""module NameSuite_VecComp_1(input clk, input reset,
+"""module NameSuite_VecComp_1(input clk,
     input  io_r_en,
     input [4:0] io_r_addr,
     input [63:0] io_w_data,
@@ -587,30 +585,26 @@ endmodule
 
   reg[7:0] reg_status_im;
   wire[7:0] T0;
-  wire[7:0] T1;
   wire[63:0] wdata;
   reg[63:0] host_pcr_bits_data;
-  wire[63:0] T2;
-  wire[63:0] T3;
+  wire[63:0] T1;
   wire[7:0] rdata;
   wire[7:0] elts_0;
-  wire[7:0] T4;
+  wire[7:0] T2;
   wire[63:0] io_pcr_req_data;
 
   assign io_status_im = reg_status_im;
-  assign T0 = 1'h1/* 1*/ ? T1 : reg_status_im;
-  assign T1 = wdata[3'h7/* 7*/:1'h0/* 0*/];
+  assign T0 = wdata[3'h7/* 7*/:1'h0/* 0*/];
   assign wdata = io_r_en ? io_w_data : host_pcr_bits_data;
-  assign T2 = 1'h1/* 1*/ ? T3 : host_pcr_bits_data;
-  assign T3 = {56'h0/* 0*/, rdata};
+  assign T1 = {56'h0/* 0*/, rdata};
   assign rdata = elts_0;
-  assign elts_0 = T4;
-  assign T4 = {reg_status_im};
+  assign elts_0 = T2;
+  assign T2 = {reg_status_im};
 
   always @(posedge clk) begin
     reg_status_im <= T0;
     if(io_r_en) begin
-      host_pcr_bits_data <= T2;
+      host_pcr_bits_data <= T1;
     end
   end
 endmodule
@@ -651,7 +645,7 @@ endmodule
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new VecSecondComp()))
     assertFile(tmpdir.getRoot() + "/NameSuite_VecSecondComp_1.v",
-"""module NameSuite_VecSecondComp_1(input clk, input reset,
+"""module NameSuite_VecSecondComp_1(input clk,
     output io_requestor_0_req_ready,
     input  io_requestor_0_req_valid,
     input  io_requestor_0_req_bits_ready,
@@ -809,22 +803,20 @@ endmodule
 );
 
   wire[64:0] T0;
-  wire[7:0] T1;
   reg[7:0] raddr;
 
   assign io_rdata = T0;
-  assign T1 = 1'h1/* 1*/ ? io_raddr : raddr;
   NameSuite_MemComp_1_rfile rfile (
     .CLK(clk),
     .RST(reset),
-    .R0A(T1),
+    .R0A(io_raddr),
     .R0E(io_ren),
     .R0O(T0)
   );
 
   always @(posedge clk) begin
     if(io_ren) begin
-      raddr <= T1;
+      raddr <= io_raddr;
     end
   end
 endmodule
@@ -921,7 +913,7 @@ void NameSuite_DebugComp_1_t::clock_hi ( dat_t<1> reset ) {
   NameSuite_DebugComp_1_dpath__wb_reg_ll_wb = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow;
 }
 int NameSuite_DebugComp_1_t::clock ( dat_t<1> reset ) {
-  uint32_t min = (1<<31)-1;
+  uint32_t min = ((uint32_t)1<<31)-1;
   if (clk_cnt < min) min = clk_cnt;
   clk_cnt-=min;
   if (clk_cnt == 0) clock_lo( reset );

@@ -52,7 +52,7 @@ class DotBackend extends Backend {
   }
 
   private def isDottable (m: Node): Boolean = {
-    if (m == m.component.reset) {
+    if (m == m.component.defaultResetPin) {
       false
     } else {
       m match {

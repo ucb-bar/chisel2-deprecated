@@ -327,7 +327,7 @@ class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
   val count = UInt(OUTPUT, log2Up(entries + 1))
 }
 
-class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, resetSignal: Bool = null) extends Module(resetSignal)
+class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, resetSignal: Bool = null) extends Module(reset=resetSignal)
 {
   val io = new QueueIO(gen, entries)
 

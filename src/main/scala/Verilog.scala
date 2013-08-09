@@ -357,7 +357,7 @@ class VerilogBackend extends Backend {
           val name = getMemName(m, configStr)
           ChiselError.info("MEM " + name)
 
-          val clkrst = Array("    .CLK(clk)", "    .RST(reset)")
+          val clkrst = Array("    .CLK(clk)", "    .RST(" + emitRef(m.inputs.last) + ")")
           val portdefs = for (i <- 0 until m.ports.size)
           yield emitPortDef(m.ports(i), i)
           "  " + name + " " + emitRef(m) + " (\n" +
