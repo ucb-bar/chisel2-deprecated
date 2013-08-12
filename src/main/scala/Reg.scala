@@ -178,13 +178,9 @@ class Reg extends Delay with proc {
   override def genMuxes(default: Node): Unit = {
     if(isMemOutput) {
       inputs(0) = updates(0)._2
-      return
-    }
-    if(isEnable){
+    } else if(isEnable) {
       // hack to force the muxes to match the Reg's width:
       // the intent is u = updates.head._2
-      // val u = new Mux().init("", maxWidth _, Bool(true), updates.head._2, this)
-      // u.component = this.component
       genMuxes(updates.head._2, updates.toList.tail)
       inputs += enable;
       enableIndex = inputs.length - 1;
