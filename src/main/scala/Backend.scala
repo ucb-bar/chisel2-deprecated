@@ -409,17 +409,12 @@ abstract class Backend {
   // go through every Module and set its clock and reset field
   def assignClockAndResetToModules {
     for (module <- Module.sortedComps.reverse) {
-      if (module.mClock == null) {
-        module.mClock = module.parent.mClock
-      }
-      if (module.mReset == null) {
-        module.mReset = module.parent.mReset
-        if (module.defaultResetPin != null) {
-          module.resets += (module.mReset -> module.defaultResetPin)
-        }
-      }
-      assert(module.mClock != null)
-      assert(module.mReset != null)
+      if (module.clock == null)
+        module.clock = module.parent.clock
+      if (!module.hasExplicitReset)
+        module.reset = module.parent.reset
+      assert(module.clock != null)
+      assert(module.reset != null)
     }
   }
 
@@ -435,11 +430,6 @@ abstract class Backend {
           // if reset is not an output from one of parent's children
           if (reset.component != parent && !parent.children.contains(reset.component))
             parent.addResetPin(reset)
-
-          // special case for implicitReset
-          if (reset == Module.implicitReset && parent == Module.topComponent)
-            if(!parent.resets.contains(reset))
-              parent.resets += (reset -> reset)
         }
       }
     }
@@ -461,13 +451,9 @@ abstract class Backend {
 
   def nameRsts {
     for (comp <- Module.sortedComps) {
-      if (comp.resets.contains(comp.mReset))
-          comp.resets(comp.mReset).setName("reset")
       for (rst <- comp.resets.keys) {
-        if (comp.resets(rst) != Module.implicitReset) {
-          if (!comp.resets(rst).named)
+        if (!comp.resets(rst).named)
             comp.resets(rst).setName(rst.name)
-        }
       }
     }
   }
@@ -482,7 +468,9 @@ abstract class Backend {
       val node = dfsStack.pop
       for (consumer <- node.consumers) {
         if (!consumer.isInstanceOf[Delay] && !walked.contains(consumer)) {
-          assert(consumer.clock == null || consumer.clock == clock)
+          if(!(consumer.clock == null || consumer.clock == clock))
+            ChiselError.warning({emitDef(consumer) + " resolves to clock domain " + 
+                                 emitRef(consumer.clock) + " and " + emitRef(clock)})
           consumer.clock = clock
           walked += consumer
           dfsStack.push(consumer)
@@ -492,13 +480,7 @@ abstract class Backend {
   }
 
   def elaborate(c: Module): Unit = {
-    Module.topComponent = c;
-    Module.implicitReset.component = Module.topComponent
-    Module.implicitClock.component = Module.topComponent
-    Module.topComponent.mReset = Module.implicitReset
-    Module.topComponent.mClock = Module.implicitClock
-    if (Module.topComponent.defaultResetPin != null)
-      Module.topComponent.defaultResetPin.setName("reset")
+    Module.setAsTopComponent(c)
 
     /* XXX If we call nameAll here and again further down, we end-up with
      duplicate names in the generated C++.
