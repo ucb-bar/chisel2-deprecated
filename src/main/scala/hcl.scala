@@ -175,7 +175,7 @@ object chiselMain {
     }
   }
 
-  def run[T <: Module] (args: Array[String], gen: () => T): T = apply(args, gen) // hack to avoid supplying default parameters manually for invocation in sbt
+  def run[T <: Module] (args: Array[String], gen: () => T): T = apply(args, () => Module(gen())) // hack to avoid supplying default parameters and invoke Module.apply manually for invocation in sbt
 
   def apply[T <: Module]
       (args: Array[String], gen: () => T,
