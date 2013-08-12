@@ -105,7 +105,7 @@ class SInt extends Bits {
     right match {
       case b: UInt => this === b.zext;
       case _ =>
-        this.asInstanceOf[Bits] === right
+        super.===(right)
     }
   }
 
