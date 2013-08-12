@@ -158,7 +158,7 @@ object OHToUInt
 }
 
 
-class Valid[+T <: Data](gen: T) extends Bundle
+class ValidIO[+T <: Data](gen: T) extends Bundle
 {
   val valid = Bool(OUTPUT)
   val bits = gen.clone.asOutput
@@ -168,9 +168,13 @@ class Valid[+T <: Data](gen: T) extends Bundle
       super.clone()
     } catch {
       case e: java.lang.Exception => {
-        new Valid(gen).asInstanceOf[this.type]
+        new ValidIO(gen).asInstanceOf[this.type]
       }
     }
+}
+
+object Valid {
+  def apply[T <: Data](gen: T): ValidIO[T] = new ValidIO(gen)
 }
 
 class DecoupledIO[T <: Data](gen: T) extends Bundle
@@ -190,7 +194,7 @@ class DecoupledIO[T <: Data](gen: T) extends Bundle
 }
 
 object Decoupled {
-  def apply[T <: Data](gen: T): DecoupledIO[T]  = {new DecoupledIO(gen)}
+  def apply[T <: Data](gen: T): DecoupledIO[T] = new DecoupledIO(gen)
 }
 
 class EnqIO[T <: Data](gen: T) extends DecoupledIO(gen)
@@ -220,8 +224,8 @@ class DecoupledIOC[+T <: Data](gen: T) extends Bundle
 
 
 class ArbiterIO[T <: Data](gen: T, n: Int) extends Bundle {
-  val in  = Vec.fill(n){ new DecoupledIO(gen) }.flip
-  val out = new DecoupledIO(gen)
+  val in  = Vec.fill(n){ Decoupled(gen) }.flip
+  val out = Decoupled(gen)
   val chosen = UInt(OUTPUT, log2Up(n))
 }
 
@@ -320,8 +324,8 @@ object Counter
 
 class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
 {
-  val enq   = new DecoupledIO(gen.clone).flip
-  val deq   = new DecoupledIO(gen.clone)
+  val enq   = Decoupled(gen.clone).flip
+  val deq   = Decoupled(gen.clone)
   val count = UInt(OUTPUT, log2Up(entries + 1))
 }
 
@@ -456,8 +460,8 @@ class Log2 extends Node {
 class Pipe[T <: Data](gen: T, latency: Int = 1) extends Module
 {
   val io = new Bundle {
-    val enq = new Valid(gen).flip
-    val deq = new Valid(gen)
+    val enq = Valid(gen).flip
+    val deq = Valid(gen)
   }
 
   io.deq <> Pipe(io.enq, latency)
@@ -465,9 +469,9 @@ class Pipe[T <: Data](gen: T, latency: Int = 1) extends Module
 
 object Pipe
 {
-  def apply[T <: Data](enqValid: Bool, enqBits: T, latency: Int): Valid[T] = {
+  def apply[T <: Data](enqValid: Bool, enqBits: T, latency: Int): ValidIO[T] = {
     if (latency == 0) {
-      val out = new Valid(enqBits.clone)
+      val out = Valid(enqBits)
       out.valid <> enqValid
       out.bits <> enqBits
       out.setIsTypeNode
@@ -479,8 +483,8 @@ object Pipe
       apply(v, b, latency-1)
     }
   }
-  def apply[T <: Data](enqValid: Bool, enqBits: T): Valid[T] = apply(enqValid, enqBits, 1)
-  def apply[T <: Data](enq: Valid[T], latency: Int = 1): Valid[T] = apply(enq.valid, enq.bits, latency)
+  def apply[T <: Data](enqValid: Bool, enqBits: T): ValidIO[T] = apply(enqValid, enqBits, 1)
+  def apply[T <: Data](enq: ValidIO[T], latency: Int = 1): ValidIO[T] = apply(enq.valid, enq.bits, latency)
 }
 
 object PriorityMux
