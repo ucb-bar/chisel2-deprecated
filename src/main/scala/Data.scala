@@ -99,13 +99,14 @@ abstract class Data extends Node {
 
   override def clone(): this.type = {
     try {
-      val res = this.getClass.newInstance.asInstanceOf[this.type];
-      res
+      val constructor = this.getClass.getConstructors.head
+      val res = constructor.newInstance(Array.fill(constructor.getParameterTypes.size)(null):_*)
+      res.asInstanceOf[this.type]
     } catch {
-      case e: java.lang.Exception => {
-        throwException("Parameterized Bundle " + this.getClass + " needs clone method")
-        this
-      }
+      case npe: java.lang.reflect.InvocationTargetException if npe.getCause.isInstanceOf[java.lang.NullPointerException] =>
+        throwException("Parameterized Bundle " + this.getClass + " needs clone method. You are probably using an anonymous Bundle object that captures external state and hence is un-cloneable", npe)
+      case e: java.lang.Exception =>
+        throwException("Parameterized Bundle " + this.getClass + " needs clone method", e)
     }
   }
 
