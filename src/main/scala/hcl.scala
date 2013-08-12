@@ -211,10 +211,13 @@ object chiselMain {
   }
 }
 
+
+class ChiselException(message: String, cause: Throwable) extends Exception(message, cause)
+
 object throwException {
-  def apply(s: String) {
-    val xcpt = new Exception(s)
-    findFirstUserLine(xcpt.getStackTrace) map { u => xcpt.setStackTrace(Array(u)) }
+  def apply(s: String, t: Throwable = null) = {
+    val xcpt = new ChiselException(s, t)
+    findFirstUserLine(xcpt.getStackTrace) foreach { u => xcpt.setStackTrace(Array(u)) }
     throw xcpt
   }
 }
