@@ -432,7 +432,7 @@ endmodule
     }
 
     class BlockIO extends Bundle {
-      val resp = new Valid(new UnamedBundle()).flip
+      val resp = Valid(new UnamedBundle()).flip
     }
 
     class Block extends Module {
