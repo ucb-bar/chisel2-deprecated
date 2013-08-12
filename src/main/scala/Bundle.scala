@@ -268,11 +268,8 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
 
   override def :=[T <: Data](src: T): Unit = {
     src match {
-      case other: Bundle => {
-        this := other
-      }
-      case any =>
-        this.asInstanceOf[Data] := src
+      case bun: Bundle => this := bun
+      case any => super.:=(any)
     }
   }
 
