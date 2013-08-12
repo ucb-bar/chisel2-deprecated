@@ -32,23 +32,22 @@ package Chisel
 import Node._
 
 object Cat {
-  private def doit[T <: Bits](mods: List[T]): T = {
-    val modsList = mods.filter(_ != null)
+  private def doit[T <: Data](mods: Seq[T]): UInt = {
+    val modsList = mods.filter(_ != null).toList
     val isLit = Module.isFolding && modsList.forall(_.litOf != null)
-    val res = if (!isLit && Module.backend.isInstanceOf[VerilogBackend]) {
-      val res = new Cat();
-      res.initOf("", sumWidth _, modsList)
+    val res = if(!isLit && Module.backend.isInstanceOf[VerilogBackend]) {
+      (new Cat()).initOf("", sumWidth _, modsList)
     } else {
       modsList.reduceLeft((a, b) => a ## b)
     }
-    mods.head.fromNode(res)
+    UInt(OUTPUT).fromNode(res)
   }
 
-  def apply[T <: Bits](mod: T, mods: T*): T = doit(mod :: mods.toList)
+  def apply[T <: Data](mod: T, mods: T*): UInt = doit(mod :: mods.toList)
+  def apply[T <: Data](mods: Seq[T]): UInt = doit(mods)
 }
 
-class Cat extends Node {
-}
+class Cat extends Node
 
 object Concatenate {
   def apply (mod: Node, mods: Node*): Node =
