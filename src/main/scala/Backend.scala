@@ -412,7 +412,7 @@ abstract class Backend {
       if (module.clock == null)
         module.clock = module.parent.clock
       if (!module.hasExplicitReset)
-        module.reset = module.parent.reset
+        module.reset_= 
       assert(module.clock != null)
       assert(module.reset != null)
     }
@@ -430,6 +430,11 @@ abstract class Backend {
           // if reset is not an output from one of parent's children
           if (reset.component != parent && !parent.children.contains(reset.component))
             parent.addResetPin(reset)
+
+          // special case for implicit reset
+          if (reset == Module.implicitReset && parent == Module.topComponent)
+            if (!parent.resets.contains(reset))
+              parent.resets += (reset -> reset)
         }
       }
     }

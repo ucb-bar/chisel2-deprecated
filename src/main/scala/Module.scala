@@ -98,7 +98,7 @@ object Module {
   val randInitIOs = new ArrayBuffer[Node]()
   val clocks = new ArrayBuffer[Clock]()
   val implicitReset = Bool(INPUT)
-  implicitReset.setName("implicitReset")
+  implicitReset.setName("reset")
   val implicitClock = new Clock()
   implicitClock.setName("clk")
 
@@ -296,6 +296,9 @@ abstract class Module(private var _clock: Clock = null, private var _reset: Bool
   }
   def reset_=(r: Bool) {
     _reset = r
+  }
+  def reset_=() {
+    _reset = parent._reset
   }
 
   def withClock (clk: Clock): this.type = {
@@ -560,14 +563,14 @@ abstract class Module(private var _clock: Clock = null, private var _reset: Bool
               x.isInstanceOf[Mem[ _ ]] && !Module.isInlineMem) { // assign resets to regs
             val reset = 
               if (x.component.hasExplicitReset)
-                x.component.reset
+                x.component._reset
               else if (x.clock != null)
-                x.component.getResetPin(x.clock.getReset)
+                x.clock.getReset
               else if (x.component.hasExplicitClock)
-                x.component.getResetPin(x.component.clock.getReset)
+                x.component.clock.getReset
               else
-                x.component.reset
-            x.inputs += reset
+                x.component._reset
+            x.inputs += x.component.getResetPin(reset)
           }
           x.clock = clock
           x.component.addClock(clock)
@@ -828,8 +831,8 @@ abstract class Module(private var _clock: Clock = null, private var _reset: Bool
       }
     } else {
       for (c <- Module.components) {
-        if (!(c.defaultResetPin == null))
-          queue.push(() => c.defaultResetPin.traceNode(c, queue))
+        // if (!(c.defaultResetPin == null))
+        //   queue.push(() => c.defaultResetPin.traceNode(c, queue))
         queue.push(() => c.io.traceNode(c, queue))
       }
     }

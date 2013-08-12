@@ -833,7 +833,7 @@ endmodule
         val ctrl_out = Bool(OUTPUT);
       }
       // writeback definitions
-      val wb_reg_ll_wb          = Reg(reset=Bool(false));
+      val wb_reg_ll_wb          = Reg(resetVal=Bool(false));
       val wb_wen = io.ctrl_wb_wen || wb_reg_ll_wb
 
       when (wb_wen) { wb_reg_ll_wb := io.ctrl_wb_wen }

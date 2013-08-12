@@ -475,7 +475,7 @@ object Pipe
       out.setIsTypeNode
       out
     } else {
-      val v = Reg(Bool(), update=enqValid, reset=Bool(false))
+      val v = Reg(Bool(), update=enqValid, resetVal=Bool(false))
       val b = Reg(enqBits)
       when (enqValid) { b := enqBits }
       apply(v, b, latency-1)

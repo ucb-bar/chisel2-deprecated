@@ -77,13 +77,13 @@ object Reg {
     *update* and *reset* define the update and reset values
     respectively.
     */
-  def apply[T <: Data](out: T = null, update: T = null, reset: T = null): T = {
+  def apply[T <: Data](out: T = null, update: T = null, resetVal: T = null): T = {
     var type_out = out
     if(type_out == null) {
       type_out = update
     }
     if(type_out == null) {
-      type_out = reset
+      type_out = resetVal
     }
     if(type_out == null) {
       throw new Exception("cannot infer type of Reg.")
@@ -102,8 +102,8 @@ object Reg {
     // asOutput flip the direction and returns this.
     val res = gen.asOutput
 
-    if(reset != null) {
-      for((((res_n, res_i), (data_n, data_i)), (rval_n, rval_i)) <- res.flatten zip d zip reset.flatten) {
+    if(resetVal != null) {
+      for((((res_n, res_i), (data_n, data_i)), (rval_n, rval_i)) <- res.flatten zip d zip resetVal.flatten) {
 
         assert(rval_i.getWidth > 0,
           {ChiselError.error("Negative width to wire " + res_i)})
