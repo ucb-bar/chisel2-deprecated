@@ -33,7 +33,7 @@ import Node._
 import scala.collection.mutable.ArrayBuffer
 
 object ListLookup {
-  def apply[T <: Bits](addr: UInt, default: List[T], mapping: Array[(UInt, List[T])]): List[T] = {
+  def apply[T <: Data](addr: UInt, default: List[T], mapping: Array[(UInt, List[T])]): List[T] = {
     if (Module.backend.isInstanceOf[CppBackend]) {
       return CListLookup(addr, default, mapping)
     }
@@ -56,7 +56,7 @@ object ListLookup {
   }
 }
 
-class ListLookup[T <: Bits] extends Node {
+class ListLookup[T <: Data] extends Node {
   var wires: List[ListLookupRef[T]] = null
 
   def addr: Node = inputs(0)
@@ -77,14 +77,14 @@ class ListLookup[T <: Bits] extends Node {
 }
 
 object ListLookupRef {
-  def apply[T <: Bits](x: T, ll: ListLookup[T]): ListLookupRef[T] = {
+  def apply[T <: Data](x: T, ll: ListLookup[T]): ListLookupRef[T] = {
     val res = new ListLookupRef[T]()
     res.init("", widthOf(1), ll, x)
     res
   }
 }
 
-class ListLookupRef[T <: Bits]() extends Node {
+class ListLookupRef[T <: Data]() extends Node {
   override def toString: String = name
 }
 
@@ -100,7 +100,7 @@ class ListNode extends Node {
 }
 
 object MapNode {
-  def apply[T <: Bits](map: (UInt, List[T])): MapNode = {
+  def apply[T <: Data](map: (UInt, List[T])): MapNode = {
     val res = new MapNode()
     res.initOf("", widthOf(0), List(map._1) ++ map._2)
     res
