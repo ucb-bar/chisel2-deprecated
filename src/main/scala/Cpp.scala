@@ -406,9 +406,11 @@ class CppBackend extends Backend {
         "  ASSERT(" + emitLoWordRef(a.cond) + ", " + CString(a.message) + ");\n"
 
       case s: Sprintf =>
-        ("  " + emitRef(s) + " = dat_format<" + s.width + ">("
+        ("#if __cplusplus >= 201103L\n"
+          + "  " + emitRef(s) + " = dat_format<" + s.width + ">("
           + s.args.map(emitRef _).foldLeft(CString(s.format))(_ + ", " + _)
-          + ");\n")
+          + ");\n"
+          + "#endif\n")
 
       case _ =>
         ""
@@ -722,10 +724,12 @@ class CppBackend extends Backend {
     }
     out_c.write("void " + c.name + "_t::print ( FILE* f ) {\n");
     for (p <- Module.printfs)
-      out_c.write("  if (" + emitLoWordRef(p.cond)
+      out_c.write("#if __cplusplus >= 201103L\n"
+        + "  if (" + emitLoWordRef(p.cond)
         + ") dat_fprintf<" + p.width + ">(f, "
         + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
-        + ");\n")
+        + ");\n"
+        + "#endif\n")
     if (Module.printArgs.length > 0) {
       val format =
         if (Module.printFormat == "") {
