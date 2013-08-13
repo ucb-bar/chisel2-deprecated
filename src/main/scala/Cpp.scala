@@ -436,7 +436,7 @@ class CppBackend extends Backend {
           block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(lit, j) + ")"))
         }.reduceLeft(_ + _)
       case u: Bits => 
-        if (u.driveRand)
+        if (u.driveRand && u.isInObject)
           "  if (rand_init) " + emitRef(node) + ".randomize();\n"
         else
           ""
