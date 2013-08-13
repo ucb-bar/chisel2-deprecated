@@ -60,7 +60,7 @@ object CString {
 }
 
 object CListLookup {
-  def apply[T <: Bits](addr: UInt, default: List[T], mapping: Array[(UInt, List[T])]): List[T] = {
+  def apply[T <: Data](addr: UInt, default: List[T], mapping: Array[(UInt, List[T])]): List[T] = {
     val map = mapping.map(m => (addr === m._1, m._2))
     default.zipWithIndex map { case (d, i) =>
       map.foldRight(d)((m, n) => Mux(m._1, m._2(i), n))

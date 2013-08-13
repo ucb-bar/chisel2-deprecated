@@ -100,23 +100,26 @@ object Reverse
 }
 
 
+object RegEn
+{
+  def apply[T <: Data](data: T, en: Bool) = {
+    val r = Reg(data)
+    when (en) { r := data }
+    r
+  }
+  def apply[T <: Data](data: T, en: Bool, resetVal: T) = {
+    val r = RegReset(resetVal)
+    when (en) { r := data }
+    r
+  }
+}
+
 object ShiftRegister
 {
   def apply[T <: Data](n: Int, in: T, en: Bool = Bool(true)): T =
   {
-    if (n == 1)
-    {
-      val res = Reg(in)
-      when (en)
-      {
-        res := in
-      }
-      res
-    }
-    else
-    {
-      RegUpdate(apply(n-1, in, en))
-    }
+    if (n == 1) RegEn(in, en)
+    else RegUpdate(apply(n-1, in, en))
   }
 }
 
@@ -478,8 +481,7 @@ object Pipe
       out
     } else {
       val v = Reg(Bool(), update=enqValid, resetVal=Bool(false))
-      val b = Reg(enqBits)
-      when (enqValid) { b := enqBits }
+      val b = RegEn(enqBits, enqValid)
       apply(v, b, latency-1)
     }
   }

@@ -52,6 +52,16 @@ abstract class Data extends Node {
 
   def toBits(): UInt = chiselCast(this){UInt()};
 
+  def toBool(): Bool = {
+    if(this.getWidth > 1) {
+      throw new Exception("multi bit signal " + this + " converted to Bool");
+    }
+    if(this.getWidth == -1) {
+      throw new Exception("unable to automatically convert " + this + " to Bool, convert manually instead")
+    }
+    chiselCast(this){Bool()};
+  }
+
   // Interface required by Cat:
   def ##[T <: Data](right: T): this.type = {
     throw new Exception("## not defined on " + this.getClass + " and " + right.getClass)

@@ -71,16 +71,6 @@ abstract class Bits extends Data with proc {
 
   def fromInt(x: Int): this.type;
 
-  def toBool(): Bool = {
-    if(this.getWidth > 1) {
-      throw new Exception("multi bit signal " + this + " converted to Bool");
-    }
-    if(this.getWidth == -1) {
-      throw new Exception("unable to automatically convert " + this + " to Bool, convert manually instead")
-    }
-    chiselCast(this){Bool()};
-  }
-
   def toSInt(): SInt = chiselCast(this){SInt()};
 
   def toUInt(): UInt = chiselCast(this){UInt()};
