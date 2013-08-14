@@ -18,6 +18,7 @@
 \usepackage{palatino}
 \usepackage{fancybox}
 \usepackage[procnames]{listings}
+\usepackage{hyperref}
 
 \newenvironment{commentary}
 { \vspace{-0.1in}
@@ -31,9 +32,9 @@
 }
 
 \title{Chisel 2.0 Manual}
-\author{Jonathan Bachrach, Krste Asanovi\'{c}, Huy Vo \\
+\author{Jonathan Bachrach, Huy Vo, Krste Asanovi\'{c} \\
 EECS Department, UC Berkeley\\
-{\tt  \{jrb|krste|huytbvo\}@eecs.berkeley.edu}
+{\tt  \{jrb|huytbvo|krste\}@eecs.berkeley.edu}
 }
 \date{\today}
 
@@ -680,7 +681,7 @@ object Reg {
   def apply[T <: Data]
     (type: T = null, 
      data: T = null, 
-     reset: T = null): T
+     init: T = null): T
 }
 
 class Reg extends Updateable
@@ -691,13 +692,13 @@ where it can be constructed as follows:
 
 \begin{scala}
 val r1 = Reg(data = io.in)
-val r2 = Reg(reset = UInt(1, 8))
+val r2 = Reg(init = UInt(1, 8))
 val r3 = Reg(data = io.in, reset = UInt(1))
 val r4 = Reg(UInt(width = 8))
 \end{scala}
 
 \noindent
-where \code{resetVal} is the value a reg takes on when implicit
+where \code{init} is the value a reg takes on when implicit
 \code{reset} is \code{Bool(true)}.
 
 \section{Mems}
@@ -708,11 +709,11 @@ positive-edge-triggered.
 
 \begin{scala}
 object Mem {
-  def apply[T <: Data](depth: Int, type: T,
+  def apply[T <: Data](type: T, depth: Int, 
           seqRead: Boolean = false): Mem
 }
 
-class Mem[T <: Data](depth: Int, type: T,
+class Mem[T <: Data](type: T, depth: Int,
       seqRead: Boolean = false)
     extends Updateable {
   def apply(idx: UInt): T
@@ -724,7 +725,7 @@ register file with one write port and two combinational read ports might be
 expressed as follows:
 
 \begin{scala}
-val rf = Mem(32, UInt(width = 64))
+val rf = Mem(UInt(width = 64), 32)
 when (wen) { rf(waddr) := wdata }
 val dout1 = rf(waddr1)
 val dout2 = rf(waddr2)
@@ -736,8 +737,7 @@ one-write SRAM might be described as follows:
 
 \begin{scala}
 val ram1r1w =
-  Mem(1024, UInt(width = 32), seqRead = true)
-  Mem(1024, seqRead = true) { Bits(width = 32) }
+  Mem(UInt(width = 32), 1024, seqRead = true)
 val reg_raddr = Reg(UInt())
 when (wen) { ram1r1w(waddr) := wdata }
 when (ren) { reg_raddr := raddr }
@@ -749,7 +749,7 @@ mutually exclusive in the same \code{when} chain:
 
 \begin{scala}
 val ram1p = 
-  Mem(1024, UInt(width = 32), seqRead = true)
+  Mem(UInt(width = 32), 1024, seqRead = true)
 val reg_raddr = Reg(UInt())
 when (wen) { ram1p(waddr) := wdata }
 .elsewhen (ren) { reg_raddr := raddr }
@@ -764,7 +764,7 @@ Mem also supports write masks for subword writes.  A given bit is written if
 the corresponding mask bit is set.
 
 \begin{scala}
-val ram = Mem(256, UInt(width = 32))
+val ram = Mem(UInt(width = 32), 256)
 when (wen) { ram.write(waddr, wdata, wmask) }
 \end{scala}
 
@@ -905,7 +905,7 @@ an error is printed and simulation terminates.  For example, the following
 will terminate simulation after ten clock cycles:
 
 \begin{scala}
-val x = Reg(reset = UInt(0, 4))
+val x = Reg(init = UInt(0, 4))
 x := x + UInt(1)
 assert(x < UInt(10))
 \end{scala}
@@ -1314,6 +1314,157 @@ The file will contain one module per module defined as submodules of
 the top level module created in \code{chiselMain}.  Modules with
 the same interface and body are cached and reused.
 
+\section{Multiple Clock Domains}
+
+Chisel 2.0 introduces support of multiple clock domains.  
+
+\subsection{Creating Clock domains}
+
+In order to use multiple clock domains, users must create multiple clocks.  
+In Chisel, clocks are first class nodes created with a reset signal parameter and defined as follows:
+
+\begin{scala}
+class Clock (reset: Bool) extends Node {
+  def reset: Bool // returns reset pin
+}
+\end{scala}
+
+\noindent
+% Having reset in clock makes it easier to pass around.
+In Chisel there is a builtin implicit clock that state elements use by default:
+
+\begin{scala}
+var implicitClock = new Clock( implicitReset )
+\end{scala}
+
+The clock for state elements and modules can be defined using an additional named parameter called clock:
+
+\begin{scala}
+Reg(... clock: Clock = implicitClock)
+Mem(... clock: Clock = implicitClock)
+Module(... clock: Clock = implicitClock)
+\end{scala}
+
+\subsection{Crossing Clock Domains}
+
+There are two ways that circuits can be defined to send data between clock domains.
+The first and most primitive way is by using a synchronizer circuit comprised of two registers as follows:
+
+\begin{scala}
+// signalA is in clock domain clockA, 
+// want a version in clockB as signalB
+val s1 = Reg(init = UInt(0), clock = clockB)
+val s2 = Reg(init = UInt(0), clock = clockB)
+s1      := signalA
+s2      := s1; 
+signalB := s2
+\end{scala}
+
+\noindent
+Due to metastability issues, this technique is limited to communicating one bit data between domains.
+
+The second and more general way to send data between domains is by using an asynchronous queue:
+
+\begin{scala}
+class AsyncQueue[T<:Data](gen: T, depth: Int, enq_clk: Clock, deq_clock: Clock)
+  extends Module
+\end{scala}
+
+\noindent
+We can then get a version of signalA from clock domains clockA to clockB by specifying the standard queue parameters and the two clocks and then using the standard decoupled ready/valid signals:
+
+\begin{scala}
+val queue = new AsyncQueue(Uint(width = 32), 2, clockA, clockB)
+fifo.enq.bits := signalA
+signalB       := fifo.deq.bits
+fifo.valid    := condA
+fifo.ready    := condB
+...
+\end{scala}
+
+\subsection{Backend Specific Multiple Clock Domains}
+
+Each Chisel backend requires the user to setup up and control multiple clocks in a backend specific manner.  For the purposes of showing how to drive a multi clock design, consider the example of hardware with two modules communicating using an AsyncQueue with each module on separate clocks: \verb+fastClock+ and \verb+slowClock+.  
+
+\subsubsection{C++}
+
+In the C++ backend, for every clock \verb+i+ there is a
+\begin{itemize}
+\item \verb+uint64_t clk_i+ field representing the clock \verb+i+'s period,
+\item \verb+uint63_t clk_i_cnt+ field representing the clock \verb+i+'s current count,
+\item \verb+clock_lo_i+ and \verb+clock_hi_i+, 
+\item \verb+int reset()+ function which ensures that all \verb+clock_lo+ and \verb+clock_hi+ functions are called at least once, and
+\item \verb+int clock(reset)+ function which computes min delta, invokes appropriate \verb+clock_lo+ and \verb+clock_hi+'s and returns min delta used.
+\end{itemize}
+
+\noindent
+In order to set up a C++ simulation, the user 
+\begin{itemize}
+\item initializes all period fields to desired period
+\item initializes all count fields to desired phase, 
+\item calls \verb+reset+ and then
+\item repeated calls clock to step the simulation.
+\end{itemize}
+
+\noindent
+The following is a C++ example of a main function for the \verb+slowClock+ / \verb+fastClock+ example:
+
+\begin{scala}
+int main(int argc, char** argv) {
+  ClkDomainTest_t dut;
+  dut.init(1);
+  dut.clk = 2;
+  dut.clk_cnt = 1;
+  dut.fastClock = 4;
+  dut.fastClock_cnt = 0;
+  dut.slowClock = 6;
+  dut.slowClock_cnt = 0;
+  for (int i = 0; i < 12; i ++) 
+    dut.reset();
+  for (int i = 0; i < 96; i ++) 
+    dut.clock(LIT<1>(0));
+}
+\end{scala}
+
+\subsubsection{Verilog}
+
+In Verilog, 
+
+\begin{itemize}
+\item Chisel creates a new port for each clock / reset,
+\item Chisel wires all the clocks to the top module, and
+\item the user must create an \verb+always+ block clock driver for every clock \verb+i+.
+\end{itemize}
+
+\noindent
+The following is a Verilog example of a top level harness to drive the  \verb+slowClock+ / \verb+fastClock+ example circuit:
+
+\begin{scala}
+module emulator;
+  reg fastClock = 0, slowClock = 0, 
+      resetFast = 1, resetSlow = 1;
+  wire [31:0] add, mul, test;
+  always #2 fastClock = ~fastClock;
+  always #4 slowClock = ~slowClock;
+  initial begin
+     #8 
+     resetFast = 0;
+     resetSlow = 0;
+     #400
+     $finish;
+  end
+  ClkDomainTest dut (
+     .fastClock(fastClock),
+     .slowClock(slowClock),
+     .io_resetFast(resetFast),
+     .io_resetSlow(resetSlow),
+     .io_add(add), .io_mul(mul), .io_test(test));
+endmodule
+\end{scala}
+
+\noindent
+See \url{http://www.asic-world.com/verilog/verifaq2.html} for more information about simulating clocks in Verilog.
+
 \section{Extra Stuff}
 
 \lstset{language=scala}
@@ -1394,7 +1545,7 @@ def LFSR16(increment: Bool = Bool(true)): UInt
 def ShiftRegister[T <: Data](n: Int, in: T): T
 
 def Counter(cond: Bool, n: Int) = {
-  val c = Reg(reset = UInt(0, log2Up(n)))
+  val c = Reg(init = UInt(0, log2Up(n)))
   val wrap = c === UInt(n-1)
   when (cond) {
     c := Mux(Bool(!isPow2(n)) && wrap, UInt(0), 
@@ -1458,7 +1609,7 @@ def PriorityEncoderOH(in: UInt): UInt
 def PriorityEncoderOH(in: Seq[Boo]): UInt
 \end{scala}
 
-\subsection{Decoupled}
+\subsection{DecoupledIO}
 
 \begin{scala}
 // Adds a ready-valid handshaking
@@ -1466,21 +1617,24 @@ def PriorityEncoderOH(in: Seq[Boo]): UInt
 // standard used is that the
 // consumer uses the flipped
 // interface.
-class Decoupled[+T <: Data](type: T) 
+class DecoupledIO[+T <: Data](type: T) 
     extends Bundle {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
-  val bits  = data.asOutput
+  val bits  = type.asOutput
+}
+object Decoupled {
+  def apply (type: T) = new DecoupledIo(type)
 }
 
 // Adds a valid protocol to any
 // interface. The standard used is
 // that the consumer uses the
 // flipped interface.
-class Valid[+T <: Data](type: T) 
+class ValidIO[+T <: Data](type: T) 
     extends Bundle {
   val valid = Bool(OUTPUT)
-  val bits = data.asOutput
+  val bits  = type.asOutput
 }
 
 // Hardware module that is used to 
@@ -1513,11 +1667,11 @@ class RRArbiter[T <: Data](n: Int, type: T)
 // the queue is determined from the 
 // inputs.
 // Example usage:
-//    val q = new Queue(16, UInt())
+//    val q = new Queue(UInt(), 16)
 //    q.io.enq <> producer.io.out
 //    consumer.io.in <> q.io.deq
 class Queue[T <: Data]
-    (entries: Int, type: T,
+    (type: T, entries: Int, 
      pipe: Boolean = false,
      flow: Boolean = false
      flushable: Boolean = false)

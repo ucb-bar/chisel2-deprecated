@@ -847,7 +847,7 @@ up-counter that counts up to a maximum value, \verb+max+, then wraps
 around back to zero (i.e., modulo \verb!max+1!), we write:
 \begin{scala}
 def counter(max: UInt) = {
-  val x = Reg(reset = UInt(0, max.getWidth))
+  val x = Reg(init = UInt(0, max.getWidth))
   x := Mux(x == max, UInt(0), x + UInt(1))
   x
 }
@@ -877,7 +877,7 @@ toggling between true and false on each pulse:
 \begin{scala}
 // Flip internal state when input true.
 def toggle(p: Bool) = {
-  val x = Reg(reset = Bool(false))
+  val x = Reg(init = Bool(false))
   x := Mux(p, !x, x)
   x
 }
@@ -905,7 +905,7 @@ and \verb!brTarget! wires so they can be referenced before defined:
 val pcPlus4  = UInt()
 val brTarget = UInt()
 val pcNext   = Mux(io.ctrl.pcSel, brTarget, pcPlus4)
-val pcReg    = Reg(data = pcNext, reset = UInt(0, 32))
+val pcReg    = Reg(data = pcNext, init = UInt(0, 32))
 pcPlus4     := pcReg + UInt(4)
 ...
 brTarget    := addOut
@@ -1110,7 +1110,7 @@ generator:
 %     val in  = Bool(INPUT)
 %     val out = Bool(OUTPUT) }
 %   val s_even :: s_odd :: Nil = Enum(2, UInt())
-%   val state  = Reg(reset = s_even)
+%   val state  = Reg(init = s_even)
 %   switch(state, Array(
 %     (s_even, () => { when (io.in) { state := s_odd } }),
 %     (s_odd,  () => { when (io.in) { state := s_even } }) ))
@@ -1124,7 +1124,7 @@ class Parity extends Module {
     val in  = Bool(dir = INPUT)
     val out = Bool(dir = OUTPUT) }
   val s_even :: s_odd :: Nil = Enum(2, UInt())
-  val state  = Reg(reset = s_even)
+  val state  = Reg(init = s_even)
   when (io.in) {
     when (state === s_even) { state := s_odd  }
     when (state === s_odd)  { state := s_even }
@@ -1149,7 +1149,7 @@ class VendingMachine extends Module {
     val rdy    = Bool(dir = OUTPUT) }
   val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = 
     Enum(5, UInt())
-  val state = Reg(reset = s_idle)
+  val state = Reg(init = s_idle)
   when (state === s_idle) {
     when (io.nickel) { state := s_5 }
     when (io.dime)   { state := s_10 }
@@ -1182,7 +1182,7 @@ class VendingMachine extends Module {
     val dime   = Bool(dir = INPUT)
     val rdy    = Bool(dir = OUTPUT) }
   val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = Enum(5, UFIx())
-  val state = Reg(reset = s_idle)
+  val state = Reg(init = s_idle)
   switch (state) {
       is (s_idle) {
       when (io.nickel) { state := s_5 }
@@ -1263,11 +1263,11 @@ combinational or positive-edge-triggered.
 
 \begin{scala}
 object Mem {
-  def apply[T <: Data](depth: Int, type: T,
+  def apply[T <: Data](type: T, depth: Int, 
           seqRead: Boolean = false): Mem
 }
 
-class Mem[T <: Data](depth: Int, type: T,
+class Mem[T <: Data](type: T, depth: Int,
       seqRead: Boolean = false)
     extends Updateable {
   def apply(idx: UInt): T
@@ -1279,7 +1279,7 @@ register file with one write port and two combinational read ports might be
 expressed as follows:
 
 \begin{scala}
-val rf = Mem(32, UInt(width = 64))
+val rf = Mem(UInt(width = 64), 32)
 when (wen) { rf(waddr) := wdata }
 val dout1 = rf(waddr1)
 val dout2 = rf(waddr2)
@@ -1291,7 +1291,7 @@ one-write SRAM might be described as follows:
 
 \begin{scala}
 val ram1r1w =
-  Mem(1024, UInt(width = 32), seqRead = true)
+  Mem(UInt(width = 32), 1024, seqRead = true)
 val reg_raddr = Reg(UInt())
 when (wen) { ram1r1w(waddr) := wdata }
 when (ren) { reg_raddr := raddr }
@@ -1303,7 +1303,7 @@ mutually exclusive in the same \code{when} chain:
 
 \begin{scala}
 val ram1p = 
-  Mem(1024, UInt(width = 32), seqRead = true)
+  Mem(UInt(width = 32), 1024, seqRead = true)
 val reg_raddr = Reg(UInt())
 when (wen) { ram1p(waddr) := wdata }
 .elsewhen (ren) { reg_raddr := raddr }
@@ -1318,7 +1318,7 @@ Mem also supports write masks for subword writes.  A given bit is written if
 the corresponding mask bit is set.
 
 \begin{scala}
-val ram = Mem(256, UInt(width = 32))
+val ram = Mem(UInt(width = 32), 256)
 when (wen) { ram.write(waddr, wdata, wmask) }
 \end{scala}
 
@@ -1781,13 +1781,13 @@ class DataBundle extends Bundle {
 }
 
 object FifoDemo {
-  def apply () = new Fifo(32, new DataBundle)
+  def apply () = new Fifo(new DataBundle, 32)
 }
 \end{scala}
 
 \begin{figure}[ht]
 \begin{scala}
-class Fifo[T <: Data] (n: Int, type: T) 
+class Fifo[T <: Data] (type: T, n: Int) 
     extends Module {
   val io = new Bundle {
     val enq_val = Bool(INPUT)
@@ -1797,9 +1797,9 @@ class Fifo[T <: Data] (n: Int, type: T)
     val enq_dat = type.asInput
     val deq_dat = type.asOutput
   }
-  val enq_ptr      = Reg(reset = UInt(0, sizeof(n)))
-  val deq_ptr      = Reg(reset = UInt(0, sizeof(n)))
-  val is_full      = Reg(reset = Bool(false))
+  val enq_ptr      = Reg(init = UInt(0, sizeof(n)))
+  val deq_ptr      = Reg(init = UInt(0, sizeof(n)))
+  val is_full      = Reg(init = Bool(false))
   val do_enq       = io.enq_rdy && io.enq_val
   val do_deq       = io.deq_rdy && io.deq_val
   val is_empty     = !is_full && (enq_ptr === deq_ptr)
@@ -1828,7 +1828,7 @@ class Fifo[T <: Data] (n: Int, type: T)
 It is also possible to define a generic decoupled interface:
 
 \begin{scala}
-class Decoupled[T <: Data](data: T) 
+class DecoupledIO[T <: Data](data: T) 
     extends Bundle {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
@@ -1842,7 +1842,7 @@ set of signals:
 
 \begin{scala}
 class DecoupledDemo 
-  extends Decoupled()( new DataBundle )
+  extends DecoupledIO()( new DataBundle )
 \end{scala}
 
 \noindent
@@ -1850,11 +1850,11 @@ The FIFO interface in Figure~\ref{fig:fifo} can be now be simplified as
 follows: 
 
 \begin{scala}
-class Fifo[T <: Data] (n: Int)(data: => T) 
+class Fifo[T <: Data] (data: T, n: Int) 
     extends Module {
   val io = new Bundle {
-    val enq = new Decoupled( data ).flip()
-    val deq = new Decoupled( data )
+    val enq = new DecoupledIO( data ).flip()
+    val deq = new DecoupledIO( data )
   }
   ...
 }

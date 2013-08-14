@@ -307,8 +307,8 @@ scala> f(4)
 %     val b     = UInt(INPUT, 16)
 %     val z     = UInt(OUTPUT, 16)
 %     val valid = Bool(OUTPUT) }
-%   val x = Reg(reset = io.a)
-%   val y = Reg(reset = io.b)
+%   val x = Reg(init = io.a)
+%   val y = Reg(init = io.b)
 %   when (x > y) {
 %     x := x - y
 %   } .otherwise {
@@ -795,7 +795,7 @@ def risingEdge(x: Bool) = x && !Reg(data = x)
 
 \begin{scala}
 def counter(max: UInt) = {
-  val x = Reg(reset = UInt(0, max.getWidth))
+  val x = Reg(init = UInt(0, max.getWidth))
   x := Mux(x == max, UInt(0), x + UInt(1))
   x
 }
@@ -821,7 +821,7 @@ def pulse(n: UInt) = counter(n - UInt(1)) === UInt(0)
 \begin{scala}
 // Flip internal state when input true.
 def toggle(p: Bool) = {
-  val x = Reg(reset = Bool(false))
+  val x = Reg(init = Bool(false))
   x := Mux(p, !x, x)
   x
 }
