@@ -767,8 +767,9 @@ def step(vars: HashMap[Node, Node]): Boolean
 \noindent
 where \code{vars} is a mapping of test nodes to literals, 
 with assignments to input nodes being sent to the DUT and assignments to
-non-input nodes being interpreted as expected values.
-\code{test} first sends inputs specifed in vars, steps the DUT and then either
+non-input nodes being interpreted as expected values.\footnote{Note that
+only output nodes are accessible, not internal nodes of a component.}
+\code{test} first sends inputs specified in vars, steps the DUT and then either
 compares expected values from vars or sets vars for test nodes without
 entries in \code{vars}.
 The following is an example for defining tests for \code{Mux2}:

@@ -68,15 +68,6 @@ object VecMux {
   }
 }
 
-object VecBuf{
-  def apply[T <: Data](gen: Vec[T], n: Int): ArrayBuffer[Vec[T]] = {
-    val res = new ArrayBuffer[Vec[T]]
-    for(i <- 0 until n)
-      res += gen.clone
-    res
-  }
-}
-
 object Vec {
 
   /** Returns a new *Vec* from a sequence of *Data* nodes.

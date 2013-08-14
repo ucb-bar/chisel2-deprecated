@@ -60,7 +60,7 @@ object CString {
 }
 
 object CListLookup {
-  def apply[T <: Bits](addr: UInt, default: List[T], mapping: Array[(UInt, List[T])]): List[T] = {
+  def apply[T <: Data](addr: UInt, default: List[T], mapping: Array[(UInt, List[T])]): List[T] = {
     val map = mapping.map(m => (addr === m._1, m._2))
     default.zipWithIndex map { case (d, i) =>
       map.foldRight(d)((m, n) => Mux(m._1, m._2(i), n))
@@ -388,10 +388,10 @@ class CppBackend extends Backend {
           + i + ")"))
 
       case reg: Reg =>
-        def updateVal(w: Int): String = if (reg.isReset) "TERNARY(" + emitLoWordRef(reg.inputs.last) + ", " + emitWordRef(reg.resetVal, w) + ", " + emitWordRef(reg.updateVal, w) + ")" else emitWordRef(reg.updateVal, w)
+        def updateData(w: Int): String = if (reg.isReset) "TERNARY(" + emitLoWordRef(reg.inputs.last) + ", " + emitWordRef(reg.resetData, w) + ", " + emitWordRef(reg.updateData, w) + ")" else emitWordRef(reg.updateData, w)
 
         def shadow(w: Int): String = emitRef(reg) + "_shadow.values[" + w + "]"
-        block((0 until words(reg)).map(i => shadow(i) + " = " + updateVal(i)))
+        block((0 until words(reg)).map(i => shadow(i) + " = " + updateData(i)))
 
       case x: Log2 =>
         (emitTmpDec(x) + "  " + emitLoWordRef(x) + " = "
@@ -406,9 +406,11 @@ class CppBackend extends Backend {
         "  ASSERT(" + emitLoWordRef(a.cond) + ", " + CString(a.message) + ");\n"
 
       case s: Sprintf =>
-        ("  " + emitRef(s) + " = dat_format<" + s.width + ">("
+        ("#if __cplusplus >= 201103L\n"
+          + "  " + emitRef(s) + " = dat_format<" + s.width + ">("
           + s.args.map(emitRef _).foldLeft(CString(s.format))(_ + ", " + _)
-          + ");\n")
+          + ");\n"
+          + "#endif\n")
 
       case _ =>
         ""
@@ -722,10 +724,12 @@ class CppBackend extends Backend {
     }
     out_c.write("void " + c.name + "_t::print ( FILE* f ) {\n");
     for (p <- Module.printfs)
-      out_c.write("  if (" + emitLoWordRef(p.cond)
+      out_c.write("#if __cplusplus >= 201103L\n"
+        + "  if (" + emitLoWordRef(p.cond)
         + ") dat_fprintf<" + p.width + ">(f, "
         + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
-        + ");\n")
+        + ");\n"
+        + "#endif\n")
     if (Module.printArgs.length > 0) {
       val format =
         if (Module.printFormat == "") {

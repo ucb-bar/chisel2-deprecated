@@ -568,22 +568,22 @@ class VerilogBackend extends Backend {
         } else if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1)){
           if(reg.isReset){
             "    if(" + emitRef(reg.inputs.last) + ") begin\n" +
-            "      " + emitRef(reg) + " <= " + emitRef(reg.resetVal) + ";\n" +
+            "      " + emitRef(reg) + " <= " + emitRef(reg.resetData) + ";\n" +
             "    end else if(" + emitRef(reg.enableSignal) + ") begin\n" +
-            "      " + emitRef(reg) + " <= " + emitRef(reg.updateVal) + ";\n" +
+            "      " + emitRef(reg) + " <= " + emitRef(reg.updateData) + ";\n" +
             "    end\n"
           } else {
             "    if(" + emitRef(reg.enableSignal) + ") begin\n" +
-            "      " + emitRef(reg) + " <= " + emitRef(reg.updateVal) + ";\n" +
+            "      " + emitRef(reg) + " <= " + emitRef(reg.updateData) + ";\n" +
             "    end\n"
           }
         } else {
           "    " + emitRef(reg) + " <= " +
           (if (reg.isReset) {
-            emitRef(reg.inputs.last) + " ? " + emitRef(reg.resetVal) + " : "
+            emitRef(reg.inputs.last) + " ? " + emitRef(reg.resetData) + " : "
           } else {
             ""
-          }) + emitRef(reg.updateVal) + ";\n"
+          }) + emitRef(reg.updateData) + ";\n"
         }
 
       case m: MemWrite =>

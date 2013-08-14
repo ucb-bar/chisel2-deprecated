@@ -100,29 +100,32 @@ object Reverse
 }
 
 
+object RegEnable
+{
+  def apply[T <: Data](updateData: T, enable: Bool) = {
+    val r = Reg(updateData)
+    when (enable) { r := updateData }
+    r
+  }
+  def apply[T <: Data](updateData: T, resetData: T, enable: Bool) = {
+    val r = RegReset(resetData)
+    when (enable) { r := updateData }
+    r
+  }
+}
+
 object ShiftRegister
 {
-  def apply[T <: Data](n: Int, in: T, en: Bool = Bool(true)): T =
+  def apply[T <: Data](in: T, n: Int, en: Bool = Bool(true)): T =
   {
-    if (n == 1)
-    {
-      val res = Reg(in)
-      when (en)
-      {
-        res := in
-      }
-      res
-    }
-    else
-    {
-      RegUpdate(apply(n-1, in, en))
-    }
+    if (n == 1) RegEnable(in, en)
+    else RegUpdate(apply(in, n-1, en))
   }
 }
 
 object UIntToOH
 {
-  def apply(in: UInt, width: Int = -1): UInt =
+  def apply(in: UInt, width: Int = -1): Bits =
   {
     if (width == -1) {
       UInt(1) << in
@@ -134,17 +137,15 @@ object UIntToOH
 
 object Mux1H
 {
-  def apply[T<: Bits](sel: Seq[Bool], in: Seq[T]): T = {
-    if (in.size == 1) {
-      in(0)
-    } else {
-      val zero: T = in(0).fromInt(0)
-      sel.zip(in).map { case(s,x) => Mux(s, x, zero) }.reduce(_|_)
-    }
+  def apply[T <: Data](sel: Vec[Bool], in: Vec[T]): T = {
+    if (in.size == 1) in(0)
+    else in(sel.indexWhere((i: Bool) => i))
   }
-  def apply[T <: Bits](sel: Bits, in: Seq[T]): T = apply((0 until in.size).map(sel(_)), in)
+  def apply[T <: Data](sel: Vec[Bool], in: Seq[T]): T = apply(sel, Vec(in))
+  def apply[T <: Data](sel: Seq[Bool], in: Vec[T]): T = apply(Vec(sel), in)
+  def apply[T <: Data](sel: Bits, in: Seq[T]): T = apply(Vec((0 until in.size).map(sel(_))), Vec(in))
+  def apply[T <: Data](sel: Bits, in: Vec[T]): T = apply(Vec((0 until in.size).map(sel(_))), in)
 }
-
 
 object OHToUInt
 {
@@ -160,7 +161,7 @@ object OHToUInt
 }
 
 
-class Valid[+T <: Data](gen: T) extends Bundle
+class ValidIO[+T <: Data](gen: T) extends Bundle
 {
   val valid = Bool(OUTPUT)
   val bits = gen.clone.asOutput
@@ -170,9 +171,13 @@ class Valid[+T <: Data](gen: T) extends Bundle
       super.clone()
     } catch {
       case e: java.lang.Exception => {
-        new Valid(gen).asInstanceOf[this.type]
+        new ValidIO(gen).asInstanceOf[this.type]
       }
     }
+}
+
+object Valid {
+  def apply[T <: Data](gen: T): ValidIO[T] = new ValidIO(gen)
 }
 
 class DecoupledIO[T <: Data](gen: T) extends Bundle
@@ -192,7 +197,7 @@ class DecoupledIO[T <: Data](gen: T) extends Bundle
 }
 
 object Decoupled {
-  def apply[T <: Data](gen: T): DecoupledIO[T]  = {new DecoupledIO(gen)}
+  def apply[T <: Data](gen: T): DecoupledIO[T] = new DecoupledIO(gen)
 }
 
 class EnqIO[T <: Data](gen: T) extends DecoupledIO(gen)
@@ -222,8 +227,8 @@ class DecoupledIOC[+T <: Data](gen: T) extends Bundle
 
 
 class ArbiterIO[T <: Data](gen: T, n: Int) extends Bundle {
-  val in  = Vec.fill(n){ new DecoupledIO(gen) }.flip
-  val out = new DecoupledIO(gen)
+  val in  = Vec.fill(n){ Decoupled(gen) }.flip
+  val out = Decoupled(gen)
   val chosen = UInt(OUTPUT, log2Up(n))
 }
 
@@ -265,7 +270,7 @@ abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLo
   }
 }
 
-class LockingRRArbiter[T <: Bits](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
+class LockingRRArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
   val last_grant = RegReset(UInt(0, log2Up(n)))
   val ctrl = ArbiterCtrl((0 until n).map(i => io.in(i).valid && UInt(i) > last_grant) ++ io.in.map(_.valid))
   (0 until n).map(i => grant(i) := ctrl(i) && UInt(i) > last_grant || ctrl(i + n))
@@ -291,7 +296,7 @@ class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T 
   chosen := Mux(locked, lockIdx, choose)
 }
 
-class RRArbiter[T <: Bits](gen:T, n: Int) extends LockingRRArbiter[T](gen, n, 1)
+class RRArbiter[T <: Data](gen:T, n: Int) extends LockingRRArbiter[T](gen, n, 1)
 
 class Arbiter[T <: Data](gen: T, n: Int) extends LockingArbiter[T](gen, n, 1)
 
@@ -322,12 +327,12 @@ object Counter
 
 class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
 {
-  val enq   = new DecoupledIO(gen.clone).flip
-  val deq   = new DecoupledIO(gen.clone)
+  val enq   = Decoupled(gen.clone).flip
+  val deq   = Decoupled(gen.clone)
   val count = UInt(OUTPUT, log2Up(entries + 1))
 }
 
-class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, resetSignal: Bool = null) extends Module(_reset=resetSignal)
+class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Bool = null) extends Module(_reset=_reset)
 {
   val io = new QueueIO(gen, entries)
 
@@ -455,11 +460,11 @@ class Log2 extends Node {
   override def toString: String = "LOG2(" + inputs(0) + ")";
 }
 
-class Pipe[T <: Bits](gen: T, latency: Int = 1) extends Module
+class Pipe[T <: Data](gen: T, latency: Int = 1) extends Module
 {
   val io = new Bundle {
-    val enq = new Valid(gen).flip
-    val deq = new Valid(gen)
+    val enq = Valid(gen).flip
+    val deq = Valid(gen)
   }
 
   io.deq <> Pipe(io.enq, latency)
@@ -467,22 +472,21 @@ class Pipe[T <: Bits](gen: T, latency: Int = 1) extends Module
 
 object Pipe
 {
-  def apply[T <: Bits](enqValid: Bool, enqBits: T, latency: Int): Valid[T] = {
+  def apply[T <: Data](enqValid: Bool, enqBits: T, latency: Int): ValidIO[T] = {
     if (latency == 0) {
-      val out = new Valid(enqBits.clone)
+      val out = Valid(enqBits)
       out.valid <> enqValid
       out.bits <> enqBits
       out.setIsTypeNode
       out
     } else {
-      val v = Reg(Bool(), update=enqValid, resetVal=Bool(false))
-      val b = Reg(enqBits)
-      when (enqValid) { b := enqBits }
+      val v = Reg(Bool(), updateData=enqValid, resetData=Bool(false))
+      val b = RegEnable(enqBits, enqValid)
       apply(v, b, latency-1)
     }
   }
-  def apply[T <: Bits](enqValid: Bool, enqBits: T): Valid[T] = apply(enqValid, enqBits, 1)
-  def apply[T <: Bits](enq: Valid[T], latency: Int = 1): Valid[T] = apply(enq.valid, enq.bits, latency)
+  def apply[T <: Data](enqValid: Bool, enqBits: T): ValidIO[T] = apply(enqValid, enqBits, 1)
+  def apply[T <: Data](enq: ValidIO[T], latency: Int = 1): ValidIO[T] = apply(enq.valid, enq.bits, latency)
 }
 
 object PriorityMux

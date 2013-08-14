@@ -175,7 +175,7 @@ object chiselMain {
     }
   }
 
-  def run[T <: Module] (args: Array[String], gen: () => T): T = apply(args, gen) // hack to avoid supplying default parameters manually for invocation in sbt
+  def run[T <: Module] (args: Array[String], gen: () => T): T = apply(args, () => Module(gen())) // hack to avoid supplying default parameters and invoke Module.apply manually for invocation in sbt
 
   def apply[T <: Module]
       (args: Array[String], gen: () => T,
@@ -211,10 +211,13 @@ object chiselMain {
   }
 }
 
+
+class ChiselException(message: String, cause: Throwable) extends Exception(message, cause)
+
 object throwException {
-  def apply(s: String) {
-    val xcpt = new Exception(s)
-    findFirstUserLine(xcpt.getStackTrace) map { u => xcpt.setStackTrace(Array(u)) }
+  def apply(s: String, t: Throwable = null) = {
+    val xcpt = new ChiselException(s, t)
+    findFirstUserLine(xcpt.getStackTrace) foreach { u => xcpt.setStackTrace(Array(u)) }
     throw xcpt
   }
 }
