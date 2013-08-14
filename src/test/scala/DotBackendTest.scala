@@ -70,7 +70,7 @@ class DotBackendSuite extends AssertionsForJUnit {
         val ready = Bool(INPUT)
         val valid = Bool(OUTPUT)
       }
-      val stored = Reg(update=io.ready)
+      val stored = Reg(updateData=io.ready)
       io.valid := stored
     }
 

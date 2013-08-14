@@ -388,10 +388,10 @@ class CppBackend extends Backend {
           + i + ")"))
 
       case reg: Reg =>
-        def updateVal(w: Int): String = if (reg.isReset) "TERNARY(" + emitLoWordRef(reg.inputs.last) + ", " + emitWordRef(reg.resetVal, w) + ", " + emitWordRef(reg.updateVal, w) + ")" else emitWordRef(reg.updateVal, w)
+        def updateData(w: Int): String = if (reg.isReset) "TERNARY(" + emitLoWordRef(reg.inputs.last) + ", " + emitWordRef(reg.resetData, w) + ", " + emitWordRef(reg.updateData, w) + ")" else emitWordRef(reg.updateData, w)
 
         def shadow(w: Int): String = emitRef(reg) + "_shadow.values[" + w + "]"
-        block((0 until words(reg)).map(i => shadow(i) + " = " + updateVal(i)))
+        block((0 until words(reg)).map(i => shadow(i) + " = " + updateData(i)))
 
       case x: Log2 =>
         (emitTmpDec(x) + "  " + emitLoWordRef(x) + " = "

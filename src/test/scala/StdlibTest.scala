@@ -486,7 +486,7 @@ endmodule
         val in = UInt(INPUT, 8)
         val out = UInt(OUTPUT)
       }
-      io.out := ShiftRegister(2, io.in)
+      io.out := ShiftRegister(io.in, 2)
     }
 
     chiselMain(Array[String]("--v",

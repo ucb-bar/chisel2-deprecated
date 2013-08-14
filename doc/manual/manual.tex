@@ -678,9 +678,9 @@ positive-edge-triggered register defined as follows:
 \begin{scala}
 object Reg {
   def apply[T <: Data]
-    (type: T = null, 
-     data: T = null, 
-     reset: T = null): T
+    (outType: T = null, 
+     updateData: T = null, 
+     resetData: T = null): T
 }
 
 class Reg extends Updateable
@@ -690,14 +690,14 @@ class Reg extends Updateable
 where it can be constructed as follows:
 
 \begin{scala}
-val r1 = Reg(data = io.in)
-val r2 = Reg(reset = UInt(1, 8))
-val r3 = Reg(data = io.in, reset = UInt(1))
+val r1 = Reg(updateData = io.in)
+val r2 = Reg(resetData = UInt(1, 8))
+val r3 = Reg(updateData = io.in, resetData = UInt(1,8))
 val r4 = Reg(UInt(width = 8))
 \end{scala}
 
 \noindent
-where \code{resetVal} is the value a reg takes on when implicit
+where \code{resetData} is the value a reg takes on when implicit
 \code{reset} is \code{Bool(true)}.
 
 \section{Mems}
@@ -708,11 +708,11 @@ positive-edge-triggered.
 
 \begin{scala}
 object Mem {
-  def apply[T <: Data](depth: Int, type: T,
+  def apply[T <: Data](type: T, depth: Int,
           seqRead: Boolean = false): Mem
 }
 
-class Mem[T <: Data](depth: Int, type: T,
+class Mem[T <: Data](type: T, depth: Int,
       seqRead: Boolean = false)
     extends Updateable {
   def apply(idx: UInt): T
@@ -724,7 +724,7 @@ register file with one write port and two combinational read ports might be
 expressed as follows:
 
 \begin{scala}
-val rf = Mem(32, UInt(width = 64))
+val rf = Mem(UInt(width = 64), 32)
 when (wen) { rf(waddr) := wdata }
 val dout1 = rf(waddr1)
 val dout2 = rf(waddr2)
@@ -736,8 +736,7 @@ one-write SRAM might be described as follows:
 
 \begin{scala}
 val ram1r1w =
-  Mem(1024, UInt(width = 32), seqRead = true)
-  Mem(1024, seqRead = true) { Bits(width = 32) }
+  Mem(UInt(width = 32), 1024, seqRead = true)
 val reg_raddr = Reg(UInt())
 when (wen) { ram1r1w(waddr) := wdata }
 when (ren) { reg_raddr := raddr }
@@ -749,7 +748,7 @@ mutually exclusive in the same \code{when} chain:
 
 \begin{scala}
 val ram1p = 
-  Mem(1024, UInt(width = 32), seqRead = true)
+  Mem(UInt(width = 32), 1024, seqRead = true)
 val reg_raddr = Reg(UInt())
 when (wen) { ram1p(waddr) := wdata }
 .elsewhen (ren) { reg_raddr := raddr }
@@ -764,7 +763,7 @@ Mem also supports write masks for subword writes.  A given bit is written if
 the corresponding mask bit is set.
 
 \begin{scala}
-val ram = Mem(256, UInt(width = 32))
+val ram = Mem(UInt(width = 32), 256)
 when (wen) { ram.write(waddr, wdata, wmask) }
 \end{scala}
 
@@ -1391,7 +1390,7 @@ def LFSR16(increment: Bool = Bool(true)): UInt
 \begin{scala}
 // Returns the n-cycle delayed version 
 // of the input signal
-def ShiftRegister[T <: Data](n: Int, in: T): T
+def ShiftRegister[T <: Data](in: T, n: Int): T
 
 def Counter(cond: Bool, n: Int) = {
   val c = Reg(reset = UInt(0, log2Up(n)))

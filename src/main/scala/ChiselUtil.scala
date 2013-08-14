@@ -100,26 +100,26 @@ object Reverse
 }
 
 
-object RegEn
+object RegEnable
 {
-  def apply[T <: Data](data: T, en: Bool) = {
-    val r = Reg(data)
-    when (en) { r := data }
+  def apply[T <: Data](updateData: T, enable: Bool) = {
+    val r = Reg(updateData)
+    when (enable) { r := updateData }
     r
   }
-  def apply[T <: Data](data: T, en: Bool, resetVal: T) = {
-    val r = RegReset(resetVal)
-    when (en) { r := data }
+  def apply[T <: Data](updateData: T, resetData: T, enable: Bool) = {
+    val r = RegReset(resetData)
+    when (enable) { r := updateData }
     r
   }
 }
 
 object ShiftRegister
 {
-  def apply[T <: Data](n: Int, in: T, en: Bool = Bool(true)): T =
+  def apply[T <: Data](in: T, n: Int, en: Bool = Bool(true)): T =
   {
-    if (n == 1) RegEn(in, en)
-    else RegUpdate(apply(n-1, in, en))
+    if (n == 1) RegEnable(in, en)
+    else RegUpdate(apply(in, n-1, en))
   }
 }
 
@@ -332,7 +332,7 @@ class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
   val count = UInt(OUTPUT, log2Up(entries + 1))
 }
 
-class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, resetSignal: Bool = null) extends Module(_reset=resetSignal)
+class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Bool = null) extends Module(_reset=_reset)
 {
   val io = new QueueIO(gen, entries)
 
@@ -480,8 +480,8 @@ object Pipe
       out.setIsTypeNode
       out
     } else {
-      val v = Reg(Bool(), update=enqValid, resetVal=Bool(false))
-      val b = RegEn(enqBits, enqValid)
+      val v = Reg(Bool(), updateData=enqValid, resetData=Bool(false))
+      val b = RegEnable(enqBits, enqValid)
       apply(v, b, latency-1)
     }
   }
