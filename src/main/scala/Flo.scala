@@ -132,7 +132,7 @@ class FloBackend extends Backend {
         emitDec(m) + "st " + emitRef(m.mem) + " " + emitRef(m.addr) + " " + emitRef(m.data) + "\n"
 
       case x: Reg => // TODO: need resetData treatment
-        emitDec(x) + "reg " + emitRef(x.updateData) + "\n"
+        emitDec(x) + "reg " + emitRef(x.next) + "\n"
 
       case x: Log2 => // TODO: log2 instruction?
         emitDec(x) + "log2/" + x.width + " " + emitRef(x.inputs(0)) + "\n"
