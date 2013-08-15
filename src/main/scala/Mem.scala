@@ -117,10 +117,10 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean) extends Acc
       // generate bogus data when reading & writing same address on same cycle
       val reg_data = Reg(gen())
       reg_data.comp procAssign wdata
-      val reg_wmask = if (wmask == null) null else Reg(updateData=wmask)
+      val reg_wmask = if (wmask == null) null else Reg(next=wmask)
       val random16 = LFSR16()
       val random_data = Cat(random16, Array.fill((width-1)/16){random16}:_*)
-      doit(Reg(updateData=addr), Reg(updateData=cond), reg_data, reg_wmask)
+      doit(Reg(next=addr), Reg(next=cond), reg_data, reg_wmask)
       doit(addr, cond, gen().fromNode(random_data), wmask)
       reg_data.comp
     } else {
@@ -198,7 +198,7 @@ class MemSeqRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
   override def addr = if(inputs.length > 2) inputs(2) else null
 
   override def forceMatchingWidths = {
-    val forced = addrReg.updateData.matchWidth(log2Up(mem.n))
+    val forced = addrReg.next.matchWidth(log2Up(mem.n))
     inputs += forced
     assert(addr == forced)
   }

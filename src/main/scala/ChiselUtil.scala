@@ -61,7 +61,7 @@ object LFSR16
   def apply(increment: Bool = Bool(true)): UInt =
   {
     val width = 16
-    val lfsr = RegReset(UInt(1, width))
+    val lfsr = Reg(init=UInt(1, width))
     when (increment) { lfsr := Cat(lfsr(0)^lfsr(2)^lfsr(3)^lfsr(5), lfsr(width-1,1)) }
     lfsr
   }
@@ -108,7 +108,7 @@ object RegEnable
     r
   }
   def apply[T <: Data](updateData: T, resetData: T, enable: Bool) = {
-    val r = RegReset(resetData)
+    val r = RegInit(resetData)
     when (enable) { r := updateData }
     r
   }
@@ -119,7 +119,7 @@ object ShiftRegister
   def apply[T <: Data](in: T, n: Int, en: Bool = Bool(true)): T =
   {
     if (n == 1) RegEnable(in, en)
-    else RegUpdate(apply(in, n-1, en))
+    else RegNext(apply(in, n-1, en))
   }
 }
 
@@ -242,8 +242,8 @@ object ArbiterCtrl
 abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends Module {
   require(isPow2(count))
   val io = new ArbiterIO(gen, n)
-  val locked  = if(count > 1) RegReset(Bool(false)) else Bool(false)
-  val lockIdx = if(count > 1) RegReset(UInt(n-1)) else UInt(n-1)
+  val locked  = if(count > 1) Reg(init=Bool(false)) else Bool(false)
+  val lockIdx = if(count > 1) Reg(init=UInt(n-1)) else UInt(n-1)
   val grant = List.fill(n)(Bool())
   val chosen = UInt(width = log2Up(n))
 
@@ -253,7 +253,7 @@ abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLo
   io.chosen := chosen
 
   if(count > 1){
-    val cnt = RegReset(UInt(0, width = log2Up(count)))
+    val cnt = Reg(init=UInt(0, width = log2Up(count)))
     val cnt_next = cnt + UInt(1)
     when(io.out.fire()) {
       when(needsLock.map(_(io.out.bits)).getOrElse(Bool(true))) {
@@ -271,7 +271,7 @@ abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLo
 }
 
 class LockingRRArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
-  val last_grant = RegReset(UInt(0, log2Up(n)))
+  val last_grant = Reg(init=UInt(0, log2Up(n)))
   val ctrl = ArbiterCtrl((0 until n).map(i => io.in(i).valid && UInt(i) > last_grant) ++ io.in.map(_.valid))
   (0 until n).map(i => grant(i) := ctrl(i) && UInt(i) > last_grant || ctrl(i + n))
 
@@ -316,7 +316,7 @@ object FillInterleaved
 object Counter
 {
   def apply(cond: Bool, n: Int): (UInt, Bool) = {
-    val c = RegReset(UInt(0, log2Up(n)))
+    val c = Reg(init=UInt(0, log2Up(n)))
     val wrap = c === UInt(n-1)
     when (cond) {
       c := Mux(Bool(!isPow2(n)) && wrap, UInt(0), c + UInt(1))
@@ -348,7 +348,7 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
     deq_ptr = Counter(do_deq, entries)._1
   }
 
-  val maybe_full = RegReset(Bool(false))
+  val maybe_full = Reg(init=Bool(false))
   when (do_enq != do_deq) {
     maybe_full := do_enq
   }
@@ -389,27 +389,27 @@ class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) e
   val io = new QueueIO(gen, entries)
   val asize = log2Up(entries)
 
-  val s1_rptr_gray = RegReset(UInt(0, asize+1)).withClock(enq_clk)
-  val s2_rptr_gray = RegReset(UInt(0, asize+1)).withClock(enq_clk)
-  val s1_rst_deq = RegReset(Bool(false)).withClock(enq_clk)
-  val s2_rst_deq = RegReset(Bool(false)).withClock(enq_clk)
+  val s1_rptr_gray = Reg(init=UInt(0, asize+1)).withClock(enq_clk)
+  val s2_rptr_gray = Reg(init=UInt(0, asize+1)).withClock(enq_clk)
+  val s1_rst_deq = Reg(init=Bool(false)).withClock(enq_clk)
+  val s2_rst_deq = Reg(init=Bool(false)).withClock(enq_clk)
 
-  val s1_wptr_gray = RegReset(UInt(0, asize+1)).withClock(deq_clk)
-  val s2_wptr_gray = RegReset(UInt(0, asize+1)).withClock(deq_clk)
-  val s1_rst_enq = RegReset(Bool(false)).withClock(deq_clk)
-  val s2_rst_enq = RegReset(Bool(false)).withClock(deq_clk)
+  val s1_wptr_gray = Reg(init=UInt(0, asize+1)).withClock(deq_clk)
+  val s2_wptr_gray = Reg(init=UInt(0, asize+1)).withClock(deq_clk)
+  val s1_rst_enq = Reg(init=Bool(false)).withClock(deq_clk)
+  val s2_rst_enq = Reg(init=Bool(false)).withClock(deq_clk)
 
-  val wptr_bin = RegReset(UInt(0, asize+1)).withClock(enq_clk)
-  val wptr_gray = RegReset(UInt(0, asize+1)).withClock(enq_clk)
-  val not_full = RegReset(Bool(false)).withClock(enq_clk)
+  val wptr_bin = Reg(init=UInt(0, asize+1)).withClock(enq_clk)
+  val wptr_gray = Reg(init=UInt(0, asize+1)).withClock(enq_clk)
+  val not_full = Reg(init=Bool(false)).withClock(enq_clk)
 
   val wptr_bin_next = wptr_bin + (io.enq.valid & not_full)
   val wptr_gray_next = (wptr_bin_next >> UInt(1)) ^ wptr_bin_next
   val not_full_next = !(wptr_gray_next === Cat(~s2_rptr_gray(asize,asize-1), s2_rptr_gray(asize-2,0)))
 
-  val rptr_bin = RegReset(UInt(0, asize+1)).withClock(deq_clk)
-  val rptr_gray = RegReset(UInt(0, asize+1)).withClock(deq_clk)
-  val not_empty = RegReset(Bool(false)).withClock(deq_clk)
+  val rptr_bin = Reg(init=UInt(0, asize+1)).withClock(deq_clk)
+  val rptr_gray = Reg(init=UInt(0, asize+1)).withClock(deq_clk)
+  val not_empty = Reg(init=Bool(false)).withClock(deq_clk)
 
   val rptr_bin_next = rptr_bin + (io.deq.ready & not_empty)
   val rptr_gray_next = (rptr_bin_next >> UInt(1)) ^ rptr_bin_next
@@ -480,7 +480,7 @@ object Pipe
       out.setIsTypeNode
       out
     } else {
-      val v = Reg(Bool(), updateData=enqValid, resetData=Bool(false))
+      val v = Reg(Bool(), next=enqValid, init=Bool(false))
       val b = RegEnable(enqBits, enqValid)
       apply(v, b, latency-1)
     }
