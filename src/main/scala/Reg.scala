@@ -77,13 +77,13 @@ object Reg {
     *update* and *reset* define the update and reset values
     respectively.
     */
-  def apply[T <: Data](outType: T = null, updateData: T = null, resetData: T = null): T = {
+  def apply[T <: Data](outType: T = null, next: T = null, init: T = null): T = {
     var mType = outType
     if(mType == null) {
-      mType = updateData
+      mType = next
     }
     if(mType == null) {
-      mType = resetData
+      mType = init
     }
     if(mType == null) {
       throw new Exception("cannot infer type of Reg.")
@@ -93,17 +93,17 @@ object Reg {
     validateGen(gen)
 
     val d: Array[(String, Bits)] =
-      if(updateData == null) {
+      if(next == null) {
         gen.flatten.map{case(x, y) => (x -> null)}
       } else {
-        updateData.flatten
+        next.flatten
       }
 
     // asOutput flip the direction and returns this.
     val res = gen.asOutput
 
-    if(resetData != null) {
-      for((((res_n, res_i), (data_n, data_i)), (rval_n, rval_i)) <- res.flatten zip d zip resetData.flatten) {
+    if(init != null) {
+      for((((res_n, res_i), (data_n, data_i)), (rval_n, rval_i)) <- res.flatten zip d zip init.flatten) {
 
         assert(rval_i.getWidth > 0,
           {ChiselError.error("Negative width to wire " + res_i)})
@@ -136,28 +136,30 @@ object Reg {
   def apply[T <: Data](outType: T): T = Reg[T](outType, null.asInstanceOf[T], null.asInstanceOf[T])
 }
 
-object RegUpdate {
 
-  def apply[T <: Data](updateData: T): T = Reg[T](updateData, updateData, null.asInstanceOf[T])
+object RegNext {
 
-  def apply[T <: Data](updateData: T, resetData: T): T = Reg[T](updateData, updateData, resetData)
+  def apply[T <: Data](next: T): T = Reg[T](next, next, null.asInstanceOf[T])
+
+  def apply[T <: Data](next: T, init: T): T = Reg[T](next, next, init)
+
+}
+
+object RegInit {
+
+  def apply[T <: Data](init: T): T = Reg[T](init, null.asInstanceOf[T], init)
 
 }
 
-object RegReset {
-
-  def apply[T <: Data](resetData: T): T = Reg[T](resetData, null.asInstanceOf[T], resetData)
-
-}
 
 class Reg extends Delay with proc {
-  def updateData: Node = inputs(0);
-  def resetData: Node  = inputs(1);
+  def next: Node = inputs(0);
+  def init: Node  = inputs(1);
   def enableSignal: Node = inputs(enableIndex);
   var enableIndex = 0;
   var isReset = false
   var isEnable = false;
-  def isUpdate: Boolean = !(updateData == null);
+  def isUpdate: Boolean = !(next == null);
   def update (x: Node) { inputs(0) = x };
   var assigned = false;
   var enable = Bool(false);
