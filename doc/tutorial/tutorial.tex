@@ -824,7 +824,7 @@ The simplest form of state element supported by Chisel is a
 positive-edge-triggered register, which can be instantiated
 functionally as:
 \begin{scala}
-Reg(data = in)
+Reg(next = in)
 \end{scala}
 
 \noindent
@@ -840,7 +840,7 @@ constructs.  For example, a rising-edge detector that takes a boolean
 signal in and outputs true when the current value is true and the
 previous value is false is given by:
 \begin{scala}
-def risingedge(x: Bool) = x && !Reg(data = x)
+def risingedge(x: Bool) = x && !Reg(next = x)
 \end{scala}
 
 Counters are an important sequential circuit.  To construct an
@@ -906,7 +906,7 @@ and \verb!brTarget! wires so they can be referenced before defined:
 val pcPlus4  = UInt()
 val brTarget = UInt()
 val pcNext   = Mux(io.ctrl.pcSel, brTarget, pcPlus4)
-val pcReg    = Reg(data = pcNext, init = UInt(0, 32))
+val pcReg    = Reg(next = pcNext, init = UInt(0, 32))
 pcPlus4     := pcReg + UInt(4)
 ...
 brTarget    := addOut
@@ -1726,7 +1726,7 @@ In Chisel this can be defined as:
 
 \begin{scala}
 def delays[T <: Data](x: T, n: Int): List[T] = 
-  if (n <= 1) List(x) else x :: delays(Reg(data = x), n-1)
+  if (n <= 1) List(x) else x :: delays(Reg(next = x), n-1)
 
 def innerProductFIR[T <: Num](ws: Seq[T], x: T): T = 
   (ws, delays(x, ws.length)).zipped.

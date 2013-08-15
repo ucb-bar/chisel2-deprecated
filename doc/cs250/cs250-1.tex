@@ -767,7 +767,7 @@ class Mux2 extends Module {
 \begin{frame}[fragile]{State Elements}
 
 \begin{scala}
-Reg(data = in)
+Reg(next = in)
 \end{scala}
 
 \begin{center}
@@ -779,7 +779,7 @@ Reg(data = in)
 \begin{frame}[fragile]{Rising Edge}
 
 \begin{scala}
-def risingEdge(x: Bool) = x && !Reg(data = x)
+def risingEdge(x: Bool) = x && !Reg(next = x)
 \end{scala}
 
 \begin{center}

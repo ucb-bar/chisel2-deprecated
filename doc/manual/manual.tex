@@ -658,7 +658,7 @@ referenced before definition:
 val pcPlus4  = UInt()
 val brTarget = UInt()
 val pcNext   = Mux(pcSel, brTarget, pcPlus4)
-val pcReg    = Reg(data = pcNext)
+val pcReg    = Reg(next = pcNext)
 pcPlus4     := pcReg + UInt(4)
 ...
 brTarget    := addOut
@@ -679,8 +679,8 @@ positive-edge-triggered register defined as follows:
 \begin{scala}
 object Reg {
   def apply[T <: Data]
-    (type: T = null, 
-     data: T = null, 
+    (outType: T = null, 
+     next: T = null, 
      init: T = null): T
 }
 
@@ -691,9 +691,9 @@ class Reg extends Updateable
 where it can be constructed as follows:
 
 \begin{scala}
-val r1 = Reg(data = io.in)
+val r1 = Reg(next = io.in)
 val r2 = Reg(init = UInt(1, 8))
-val r3 = Reg(data = io.in, reset = UInt(1))
+val r3 = Reg(next = io.in, init = UInt(1))
 val r4 = Reg(UInt(width = 8))
 \end{scala}
 
@@ -1337,7 +1337,7 @@ In Chisel there is a builtin implicit clock that state elements use by default:
 var implicitClock = new Clock( implicitReset )
 \end{scala}
 
-The clock for state elements and modules can be defined using an additional named parameter called clock:
+The clock for state elements and modules can be specified using an additional named parameter called clock:
 
 \begin{scala}
 Reg(... clock: Clock = implicitClock)
@@ -1347,7 +1347,7 @@ Module(... clock: Clock = implicitClock)
 
 \subsection{Crossing Clock Domains}
 
-There are two ways that circuits can be defined to send data between clock domains.
+There are two ways that circuits can be defined to move data between clock domains.
 The first and most primitive way is by using a synchronizer circuit comprised of two registers as follows:
 
 \begin{scala}
@@ -1363,7 +1363,7 @@ signalB := s2
 \noindent
 Due to metastability issues, this technique is limited to communicating one bit data between domains.
 
-The second and more general way to send data between domains is by using an asynchronous queue:
+The second and more general technique to send data between domains (that can be constructed using the primitive one bit scheme) is an asynchronous queue:
 
 \begin{scala}
 class AsyncQueue[T<:Data](gen: T, depth: Int, enq_clk: Clock, deq_clock: Clock)
@@ -1371,7 +1371,7 @@ class AsyncQueue[T<:Data](gen: T, depth: Int, enq_clk: Clock, deq_clock: Clock)
 \end{scala}
 
 \noindent
-We can then get a version of signalA from clock domains clockA to clockB by specifying the standard queue parameters and the two clocks and then using the standard decoupled ready/valid signals:
+Using these queues, we can then move a signalA from clock domains clockA to signalB in clockB by specifying the standard queue parameters and the two clocks and then by using the standard decoupled ready/valid signals:
 
 \begin{scala}
 val queue = new AsyncQueue(Uint(width = 32), 2, clockA, clockB)
@@ -1382,19 +1382,24 @@ fifo.ready    := condB
 ...
 \end{scala}
 
-\subsection{Backend Specific Multiple Clock Domains}
+\subsection{Backend Specifics}
 
 Each Chisel backend requires the user to setup up and control multiple clocks in a backend specific manner.  For the purposes of showing how to drive a multi clock design, consider the example of hardware with two modules communicating using an AsyncQueue with each module on separate clocks: \verb+fastClock+ and \verb+slowClock+.  
 
 \subsubsection{C++}
 
-In the C++ backend, for every clock \verb+i+ there is a
+In the C++ backend, for every clock \verb+i+ Chisel produces
 \begin{itemize}
-\item \verb+uint64_t clk_i+ field representing the clock \verb+i+'s period,
-\item \verb+uint63_t clk_i_cnt+ field representing the clock \verb+i+'s current count,
-\item \verb+clock_lo_i+ and \verb+clock_hi_i+, 
-\item \verb+int reset()+ function which ensures that all \verb+clock_lo+ and \verb+clock_hi+ functions are called at least once, and
-\item \verb+int clock(reset)+ function which computes min delta, invokes appropriate \verb+clock_lo+ and \verb+clock_hi+'s and returns min delta used.
+\item a \verb+uint64_t clk_i+ field representing the clock \verb+i+'s period,
+\item a \verb+uint63_t clk_i_cnt+ field representing the clock \verb+i+'s current count, and
+\item \verb+clock_lo_i+ and \verb+clock_hi_i+ methods
+\end{itemize}
+
+\noindent
+Next for each application, Chisel produces
+\begin{itemize}
+\item an \verb+int reset()+ function which ensures that all \verb+clock_lo+ and \verb+clock_hi+ functions are called at least once, and
+\item an \verb+int clock(reset)+ function which computes min delta, invokes appropriate \verb+clock_lo+ and \verb+clock_hi+'s and returns min delta used.
 \end{itemize}
 
 \noindent
@@ -1428,15 +1433,15 @@ int main(int argc, char** argv) {
 
 \subsubsection{Verilog}
 
-In Verilog, 
+In Verilog, Chisel 
 
 \begin{itemize}
-\item Chisel creates a new port for each clock / reset,
-\item Chisel wires all the clocks to the top module, and
-\item the user must create an \verb+always+ block clock driver for every clock \verb+i+.
+\item produces a new port for each clock / reset, and
+\item wires all the clocks to the top module.
 \end{itemize}
 
 \noindent
+A user must then create an \verb+always+ block clock driver for every clock \verb+i+.
 The following is a Verilog example of a top level harness to drive the  \verb+slowClock+ / \verb+fastClock+ example circuit:
 
 \begin{scala}
@@ -1494,15 +1499,15 @@ def MuxLookup[S <: UInt, T <: Data]
 
 \begin{scala}
 // create n enum values of given type
-def Enum[T <: UInt](n: Int, type: T): List[T]
+def Enum[T <: UInt](type: T, n: Int): List[T]
 
 // create enum values of given type and names
 def Enum[T <: UInt]
-  (l: Symbol *)(type: => T): Map[Symbol, T]
+  (type: T, l: Symbol *): Map[Symbol, T]
 
 // create enum values of given type and names
 def Enum[T <: UInt]
-  (l: List[Symbol], type: => T): Map[Symbol, T]
+  (type: T, l: List[Symbol]): Map[Symbol, T]
 \end{scala}
 
 % \section{Name Mangling}
