@@ -831,8 +831,8 @@ abstract class Module(private var _clock: Clock = null, private var _reset: Bool
       }
     } else {
       for (c <- Module.components) {
-        // if (!(c.defaultResetPin == null))
-        //   queue.push(() => c.defaultResetPin.traceNode(c, queue))
+        if (!(c.defaultResetPin == null)) // must manually add reset pin cuz it isn't part of io
+          queue.push(() => c.defaultResetPin.traceNode(c, queue))
         queue.push(() => c.io.traceNode(c, queue))
       }
     }

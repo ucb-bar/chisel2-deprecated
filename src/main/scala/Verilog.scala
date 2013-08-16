@@ -169,8 +169,11 @@ class VerilogBackend extends Backend {
     val spacing = (if(c.verilog_parameters != "") " " else "");
     var res = "  " + c.moduleName + " " + c.verilog_parameters + spacing + c.name + "(";
     val hasReg = c.containsRegInTree
-    if (c.clocks.length > 0)
-      res = res + (c.clocks ++ c.resets.keys.toList).map(x => "." + emitRef(x) + "(" + emitRef(x) + ")").reduceLeft(_ + ", " + _)
+    if (c.clocks.length > 0) {
+      res = res + (c.clocks).map(x => "." + emitRef(x) + "(" + emitRef(x) + ")").reduceLeft(_ + ", " + _)
+      if (c.resets.size > 0 )
+        res = res + ", " + (c.resets.values.toList).map(x => "." + emitRef(x) + "(" + emitRef(x.inputs(0)) + ")").reduceLeft(_ + ", " + _)
+    }
     var isFirst = true;
     val portDecs = new ArrayBuffer[StringBuilder]
     for ((n, w) <- c.wires) {
@@ -636,7 +639,7 @@ class VerilogBackend extends Backend {
     var first = true;
     var nl = "";
     if (c.clocks.length > 0)
-      res.append((c.clocks ++ c.resets.keys.toList).map(x => "input " + emitRef(x)).reduceLeft(_ + ", " + _))
+      res.append((c.clocks ++ c.resets.values.toList).map(x => "input " + emitRef(x)).reduceLeft(_ + ", " + _))
     val ports = new ArrayBuffer[StringBuilder]
     for ((n, w) <- c.wires) {
       // if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
