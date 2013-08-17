@@ -85,7 +85,6 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean) extends Acc
       (reads += new MemRead(this, addr)).last
     }
     val data = gen().fromNode(rd).asInstanceOf[T]
-    data.setIsTypeNode
     readPortCache += (addr -> data)
     data
   }
@@ -225,7 +224,7 @@ class MemReadWrite(val read: MemSeqRead, val write: MemWrite) extends MemAccess(
 class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) extends MemAccess(mem, addri) {
   inputs += condi
   override def cond = inputs(1)
-  this.clock = mem.clock
+  clock = mem.clock
 
   if (datai != null) {
     def wrap(x: Node) = { // prevent Verilog syntax errors when indexing constants

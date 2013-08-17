@@ -573,6 +573,9 @@ abstract class Module(private var _clock: Clock = null, private var _reset: Bool
             x.inputs += x.component.getResetPin(reset)
           }
           x.clock = clock
+          if (x.isInstanceOf[Mem[ _ ]])
+            for (i <- x.inputs)
+              if (i.isInstanceOf[MemWrite]) i.clock = clock
           x.component.addClock(clock)
         }
       }

@@ -327,6 +327,7 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
       if(io.width > 1) io assign NodeExtract(n, ind + io.width-1, ind) else io assign NodeExtract(n, ind);
       ind += io.width;
     }
+    res.setIsTypeNode
     res
   }
 
