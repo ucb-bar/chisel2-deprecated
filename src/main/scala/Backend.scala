@@ -515,11 +515,16 @@ abstract class Backend {
     ChiselError.info("finished flattening (" + nbNodes + ")")
     ChiselError.checkpoint()
 
-    /* The code in this function seems wrong. Yet we still need to call
-     it to associate components to nodes that were created after the call
-     tree has been executed (ie. in genMuxes and forceMatchWidths). More
-     nodes are created in transforms. I don't know why collect with be
-     executed before then.
+    /* *collectNodesIntoComp* associates components to nodes that were
+     created after the call tree has been executed (ie. in genMuxes
+     and forceMatchWidths).
+
+     The purpose of *collectNodesIntoComp* is to insure user-defined
+     transforms will be able to query a component for all its nodes
+     and a node for its component.
+
+     Technically all user-defined transforms are responsible to update
+     nodes and component correctly or call collectNodesIntoComp on return.
      */
     ChiselError.info("resolving nodes to the components")
     collectNodesIntoComp(initializeDFS)
