@@ -106,6 +106,10 @@ class NameSuite extends AssertionsForJUnit {
   wire T0;
   reg[0:0] valid;
   wire T1;
+  reg[2:0] T4;
+  reg[0:0] T5;
+  reg[0:0] T6;
+  reg[0:0] T7;
 
   assign io_sigs_valid = T0;
   assign T0 = valid;
