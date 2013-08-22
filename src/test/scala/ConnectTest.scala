@@ -45,6 +45,195 @@ class ConnectSuite extends AssertionsForJUnit {
     assert(lines === content)
   }
 
+  @Test def testShimConnections() {
+    println("\n### testShimConnections ###")
+    class UsesShim extends Module {
+      val io = new Bundle {
+        val in = Decoupled(UInt(width = 1)).flip
+        val out = Decoupled(UInt(width = 1))
+      }
+
+      def makeShim(in: DecoupledIO[UInt]): DecoupledIO[UInt] = {
+        val out = Decoupled(UInt())
+        out.bits := in.bits + UInt(1)
+        out.valid := in.valid
+        in.ready := out.ready
+        out
+      }
+
+      val s = makeShim(io.in)
+      io.out.bits := s.bits
+      io.out.valid := s.valid
+      s.ready := io.out.ready
+    }
+    class UsesShimParent extends Module {
+      val io = new Bundle {
+        val in = Decoupled(UInt(width = 1)).flip
+        val out = Decoupled(UInt(width = 1))
+      }
+      val us = Module(new UsesShim)
+      us.io.in <> io.in
+      io.out <> us.io.out
+    } 
+    chiselMain(Array[String]("--v",
+      "--targetDir", tmpdir.getRoot().toString()),
+      () => Module(new UsesShimParent))
+    println(scala.io.Source.fromFile(tmpdir.getRoot() + "/ConnectSuite_UsesShimParent_1.v", "utf-8").mkString)
+    assertFile(tmpdir.getRoot() + "/ConnectSuite_UsesShimParent_1.v",
+"""module ConnectSuite_UsesShim_1(
+    output io_in_ready,
+    input  io_in_valid,
+    input  io_in_bits,
+    input  io_out_ready,
+    output io_out_valid,
+    output io_out_bits
+);
+
+  wire s_bits;
+  wire T0;
+  wire s_valid;
+  wire s_ready;
+
+  assign io_out_bits = s_bits;
+  assign s_bits = T0;
+  assign T0 = io_in_bits + 1'h1/* 1*/;
+  assign io_out_valid = s_valid;
+  assign s_valid = io_in_valid;
+  assign io_in_ready = s_ready;
+  assign s_ready = io_out_ready;
+endmodule
+
+module ConnectSuite_UsesShimParent_1(
+    output io_in_ready,
+    input  io_in_valid,
+    input  io_in_bits,
+    input  io_out_ready,
+    output io_out_valid,
+    output io_out_bits
+);
+
+  wire us_io_out_bits;
+  wire us_io_out_valid;
+  wire us_io_in_ready;
+
+  assign io_out_bits = us_io_out_bits;
+  assign io_out_valid = us_io_out_valid;
+  assign io_in_ready = us_io_in_ready;
+  ConnectSuite_UsesShim_1 us(
+       .io_in_ready( us_io_in_ready ),
+       .io_in_valid( io_in_valid ),
+       .io_in_bits( io_in_bits ),
+       .io_out_ready( io_out_ready ),
+       .io_out_valid( us_io_out_valid ),
+       .io_out_bits( us_io_out_bits )
+  );
+endmodule
+
+""")
+  }
+
+  @Test def testResetConnections() {
+    println("\n### testResetConnections ###")
+    class UsesReset(resetSignal: Bool = null) extends Module(_reset = resetSignal) { 
+      val io = new Bundle {
+        val in = Bool(INPUT)
+        val out = Bool(OUTPUT)
+      }
+      io.out := io.in || reset
+    }
+    class SuppliesResets extends Module {
+      val io = new Bundle {
+        val in = Bool(INPUT)
+        val out = Bool(OUTPUT)
+      }
+      val delayed = Reg(next=this.reset)
+      val a0 = Module(new UsesReset(this.reset))
+      val a1 = Module(new UsesReset(delayed))
+      val a2 = Module(new UsesReset(Reg(next=this.reset)))
+      a0.io.in := io.in
+      a1.io.in := io.in
+      a2.io.in := io.in
+      io.out := a0.io.out || a1.io.out || a2.io.out || delayed
+    }
+    class SuppliesResetsParent extends Module {
+      val io = new Bundle {
+        val in = Bool(INPUT)
+        val out = Bool(OUTPUT)
+      }
+      val srs = Module(new SuppliesResets)
+      srs.io.in := io.in
+      io.out := srs.io.out
+    }
+    chiselMain(Array[String]("--v",
+      "--targetDir", tmpdir.getRoot().toString()),
+      () => Module(new SuppliesResetsParent))
+    println(scala.io.Source.fromFile(tmpdir.getRoot() + "/ConnectSuite_SuppliesResetsParent_1.v", "utf-8").mkString)
+    assertFile(tmpdir.getRoot() + "/ConnectSuite_SuppliesResetsParent_1.v",
+"""module ConnectSuite_UsesReset_2(input reset,
+    input  io_in,
+    output io_out
+);
+
+  wire T0;
+
+  assign io_out = T0;
+  assign T0 = io_in || reset;
+endmodule
+
+module ConnectSuite_SuppliesResets_1(input clk, input reset,
+    input  io_in,
+    output io_out
+);
+
+  reg[0:0] R0;
+  wire T0;
+  reg[0:0] delayed;
+  wire T1;
+  wire a2_io_out;
+  wire T2;
+  wire a1_io_out;
+  wire a0_io_out;
+
+  assign io_out = T0;
+  assign T0 = T1 || delayed;
+  assign T1 = T2 || a2_io_out;
+  assign T2 = a0_io_out || a1_io_out;
+  ConnectSuite_UsesReset_2 a0(.reset(reset),
+       .io_in( io_in ),
+       .io_out( a0_io_out )
+  );
+  ConnectSuite_UsesReset_2 a1(.reset(delayed),
+       .io_in( io_in ),
+       .io_out( a1_io_out )
+  );
+  ConnectSuite_UsesReset_2 a2(.reset(R0),
+       .io_in( io_in ),
+       .io_out( a2_io_out )
+  );
+
+  always @(posedge clk) begin
+    R0 <= reset;
+    delayed <= reset;
+  end
+endmodule
+
+module ConnectSuite_SuppliesResetsParent_1(input clk, input reset,
+    input  io_in,
+    output io_out
+);
+
+  wire srs_io_out;
+
+  assign io_out = srs_io_out;
+  ConnectSuite_SuppliesResets_1 srs(.clk(clk), .reset(reset),
+       .io_in( io_in ),
+       .io_out( srs_io_out )
+  );
+endmodule
+
+""")
+  }
+
   /** Instantiate a component tree where all component classes have
     no relationship. */
   @Test def testNoClassRelation() {
