@@ -81,7 +81,9 @@ def main(args):
            'values': sorted(coverage, key=lambda test: test[0]) } ],
         indent=2, sort_keys=True)
 
-    env = Environment(loader=FileSystemLoader(os.path.dirname(sys.argv[0])))
+    env = Environment(loader=FileSystemLoader(
+            os.path.join(os.path.dirname(os.path.dirname(sys.argv[0])),
+                         'doc', 'templates')))
     template = env.get_template('unit_tests_trends.html')
     print template.render(compile_data=json_compile_data,
                           runtime_data=json_runtime_data)
