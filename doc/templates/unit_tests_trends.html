@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block localheader %}
+<link href="./assets/css/nv.d3.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="span12">
+<h1>Build Metrics for Chisel</h1>
+<p>code repository at <a href="http://github.com/ucb-bar/chisel">http://github.com/ucb-bar/chisel</a></p>
+<h2>Static Style Checker</h2>
+<pre class="code">
+$ sbt scalastyle
+</pre>
+<pre id="static-chart">
+  <svg style="height: 600px;">
+  </svg>
+</pre>
+<h2>Runtime Analysis</h2>
+<pre class="code">
+$ sbt scct:test
+</pre>
+<pre id="dynamic-chart">
+  <svg style="height: 600px;">
+  </svg>
+</pre>
+{% endblock %}
+
+{% block bodyscripts %}
+<script src="./assets/js/d3.v3.min.js"></script>
+<script src="./assets/js/nv.d3.min.js"></script>
+<script type="text/javascript">
+function update_chart(compile_data, runtime_data) {
+  nv.addGraph(function() {
+      var width = 1000, height = 600;//Chart size////
+
+      /* Insures we have actual Date object and not String representations. */
+      var values = compile_data[0].values
+      for( j=0 ; j < compile_data.length ; ++j ){
+          for( i = 0; i < values.length; ++i ) {
+              values = compile_data[j].values;
+              // http://stackoverflow.com/questions/17165456/invalid-value-for-circle-attribute-cx-nan-using-nvd3-js
+              values[i][0] = (new Date(values[i][0])).getTime();
+          }
+      }
+      // get max and min dates - this assumes data is sorted
+      var maxDate = values[0][0],
+          minDate = values[values.length-2][0];
+
+      var chart = nv.models.lineChart()
+          .x(function(d) { return d[0]; })
+          .y(function(d) { return d[1]; })
+          .clipEdge(true)
+          //.showControls(false)
+          .forceY([0])
+          .width(width).height(height)//Change chart size////;
+
+      chart.xAxis.axisLabel('Date')
+           .tickFormat(function(d) {
+               return d3.time.format('%x')(new Date(d)); });
+      chart.yAxis.showMaxMin(false)
+                 .tickFormat(d3.format('f'));
+
+      d3.select('#static-chart svg').datum(compile_data)
+         .transition().duration(500)
+         .call(chart);
+
+      nv.utils.windowResize(chart.update);
+
+      return chart;
+    });
+
+  nv.addGraph(function() {
+      var width = 1000, height = 600;//Chart size////
+
+      /* Insures we have actual Date object and not String representations. */
+      var values = runtime_data[0].values
+      for( j=0 ; j < runtime_data.length ; ++j ){
+          for( i = 0; i < values.length; ++i ) {
+              values = runtime_data[j].values;
+              // http://stackoverflow.com/questions/17165456/invalid-value-for-circle-attribute-cx-nan-using-nvd3-js
+              values[i][0] = (new Date(values[i][0])).getTime();
+          }
+      }
+      // get max and min dates - this assumes data is sorted
+      var maxDate = values[0][0],
+          minDate = values[values.length-2][0];
+
+      var chart = nv.models.lineChart()
+          .x(function(d) { return d[0]; })
+          .y(function(d) { return d[1]; })
+          .clipEdge(true)
+          .forceY([1])
+          //.showControls(false)
+          .width(width).height(height)//Change chart size////;
+
+      chart.xAxis.axisLabel('Date')
+           .tickFormat(function(d) {
+               return d3.time.format('%x')(new Date(d)); });
+      chart.yAxis.showMaxMin(false)
+                 .tickFormat(d3.format('.2f'));
+
+      d3.select('#dynamic-chart svg').datum(runtime_data)
+         .transition().duration(500)
+         .call(chart);
+
+      nv.utils.windowResize(chart.update);
+
+      return chart;
+    });
+}
+
+(function() {
+     update_chart({{compile_data}}, {{runtime_data}})
+})();
+    </script>
+{% endblock %}
+
