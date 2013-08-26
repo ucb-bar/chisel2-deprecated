@@ -1,47 +1,160 @@
 {% extends "base.html" %}
 
 {% block content %}
-      <!-- Main hero unit for a primary marketing message or call to action -->
-      <div class="hero-unit">
-        <h1>Chisel</h1>
-        <p>Constructing Hardware in a Scala Embedded Language</p>
-        <a href="https://github.com/ucb-bar/chisel/" class="btn btn-primary btn-large" >View project on GitHub</a>
+<!-- Main hero unit for a primary marketing message or call to action -->
+<div class="hero-unit">
+      <h1>Chisel</h1>
+      <p>Constructing Hardware in a Scala Embedded Language</p>
+      <a href="https://github.com/ucb-bar/chisel/" class="btn btn-primary btn-large" >View project on GitHub</a>
+</div>
+
+<div class="row">
+      <div class="span8">
+            <section id="about">
+                  <div class="page-header"><h1>About Chisel</h1></div>
+                  <p>
+Chisel is an open-source hardware construction language
+developed at UC Berkeley that supports
+advanced hardware design using highly parameterized generators
+and layered domain-specific hardware languages.
+                  </p>
+                  <div class="row">
+                        <div class="span4">
+                              <ul>
+                                    <li>Algebraic construction and wiring</li>
+                                    <li>Abstract data types and interfaces</li>
+                                    <li>Bulk connections</li>
+                              </ul>
+                        </div>
+                        <div class="span4">
+                              <ul>
+                                    <li>Embedded in the Scala programming language</li>
+                                    <li>Generate a high-speed C++-based cycle-accurate software simulator</li>
+                                    <li>Generate low-level Verilog designed to pass on to standard ASIC or FPGA tools</li>
+                              </ul>
+                        </div>
+                  </div>
+            </section>
       </div>
+            <section id="news">
+                  <div class="span4">
+<a class="twitter-timeline" href="https://twitter.com/ucbbar_chisel" data-widget-id="372101811877851136">Tweets by @ucbbar_chisel</a>
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+"://platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
+                  </div>
+            </section>
+</div> <!-- /.row -->
 
-      <section id="about">
-      <div class="page-header"><h1>About Chisel</h1></div>
-      <p> Chisel is a new open-source hardware construction language
-        developed at UC Berkeley that supports
-        advanced hardware design using highly parameterized generators
-        and layered domain-specific hardware languages.  Chisel is
-        embedded in the Scala programming language, which raises the
-        level of hardware design abstraction by providing concepts
-        including object orientation, functional programming,
-        parameterized types, and type inference.  Chisel can generate
-        a high-speed C++-based cycle-accurate software simulator, or
-        low-level Verilog designed to pass on to standard ASIC or FPGA
-        tools for synthesis and place and route.
-</p>
-<p>
-<i>
-We are currently transitioning to Chisel 2.0 which has simplified types and
-supports multiple clock domains among other things.  Check out the updated docs
-below.  Consult <a href="https://github.com/ucb-bar/chisel/blob/master/ChangeLog">conversion document</a> for how to convert your code from 1.x to 2.0.
-We will host a full day Chisel Bootcamp at Berkeley on Monday Sep 30th.
-Stay tuned for a formal announcement of the 2.0 release and the accompanying
-bootcamp.
-</i>
-</p>
+<div class="row">
+      <section id="code">
+            <div class="span12">
+            <div class="page-header"><h1>CODE</h1></div>
+            <p>
+You can find code examples on the Berkeley EECS Berkeley Architecture Research
+(BAR) <a href="https://github.com/ucb-bar">github page</a>.
+<a href="https://github.com/ucb-bar/chisel-tutorial">Chisel-tutorial</a> is
+a set of sample circuits with supporting
+<a href="./chisel-tutorial.pdf">documentation</a>.
+<a href="https://github.com/ucb-bar/riscv-sodor">Sodor</a> is a set of
+educational processors written in Chisel by Christopher
+Celio, a PhD student at UC Berkeley. Sodor implements the RISC-V
+Instruction Set Architecture designed in the BAR group and described on
+<a href="http://riscv.org">riscv.org</a>.
+            </p>
+            <div class="tabbable">
+                  <ul class="nav nav-tabs">
+                        <li class="active">
+                              <a href="#example" data-toggle="tab">Example</a>
+                        </li>
+                        <li class="workflow">
+                              <a href="#workflow" data-toggle="tab">Workflow</a>
+                        </li>
+                  </ul>
+                  <div class="tab-content">
+                        <div class="tab-pane active" id="example">
+                              <pre class="code">
+<tt><b><font color="#000080">import</font></b> Chisel<font color="#990000">.</font><b><font color="#0000FF">_</font></b>
 
-      <section id="examples">
-      <div class="page-header"><h1>Example Chisel Projects</h1></div>
+<b><font color="#0000FF">class</font></b> <font color="#008080">GCD</font> <b><font color="#0000FF">extends</font></b> Module <font color="#FF0000">{</font>
+  <b><font color="#0000FF">val</font></b> io <b><font color="#0000FF">=</font></b> <b><font color="#0000FF">new</font></b> Bundle <font color="#FF0000">{</font>
+    <b><font color="#0000FF">val</font></b> a  <b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>INPUT<font color="#990000">,</font>  <font color="#993399">16</font><font color="#990000">)</font>
+    <b><font color="#0000FF">val</font></b> b  <b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>INPUT<font color="#990000">,</font>  <font color="#993399">16</font><font color="#990000">)</font>
+    <b><font color="#0000FF">val</font></b> e  <b><font color="#0000FF">=</font></b> <b><font color="#000000">Bool</font></b><font color="#990000">(</font>INPUT<font color="#990000">)</font>
+    <b><font color="#0000FF">val</font></b> z  <b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>OUTPUT<font color="#990000">,</font> <font color="#993399">16</font><font color="#990000">)</font>
+    <b><font color="#0000FF">val</font></b> v  <b><font color="#0000FF">=</font></b> <b><font color="#000000">Bool</font></b><font color="#990000">(</font>OUTPUT<font color="#990000">)</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">val</font></b> x  <b><font color="#0000FF">=</font></b> <b><font color="#000000">Reg(UInt</font></b><font color="#990000">())</font>
+  <b><font color="#0000FF">val</font></b> y  <b><font color="#0000FF">=</font></b> <b><font color="#000000">Reg(UInt</font></b><font color="#990000">())</font>
+  <b><font color="#000000">when</font></b>   <font color="#990000">(</font>x <font color="#990000">&gt;</font> y<font color="#990000">)</font> <font color="#FF0000">{</font> x <b><font color="#0000FF">:=</font></b> x <font color="#990000">-</font> y <font color="#FF0000">}</font>
+  <b><font color="#000000">unless</font></b> <font color="#990000">(</font>x <font color="#990000">&gt;</font> y<font color="#990000">)</font> <font color="#FF0000">{</font> y <b><font color="#0000FF">:=</font></b> y <font color="#990000">-</font> x <font color="#FF0000">}</font>
+  <b><font color="#000000">when</font></b> <font color="#990000">(</font>io<font color="#990000">.</font>e<font color="#990000">)</font> <font color="#FF0000">{</font> x <b><font color="#0000FF">:=</font></b> io<font color="#990000">.</font>a<font color="#990000">;</font> y <b><font color="#0000FF">:=</font></b> io<font color="#990000">.</font>b <font color="#FF0000">}</font>
+  io<font color="#990000">.</font>z <b><font color="#0000FF">:=</font></b> x
+  io<font color="#990000">.</font>v <b><font color="#0000FF">:=</font></b> y <b><font color="#0000FF">===</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font><font color="#993399">0</font><font color="#990000">)</font>
+<font color="#FF0000">}</font>
 
-      <p> Sodor, a set of educational processors written in Chisel is available as a <a href="https://github.com/ucb-bar/riscv-sodor">github repository</a>. Sodor implements the RISC-V Instruction Set Architecture designed in the Berkeley EECS Berkeley Architecture Research (BAR) group and described on <a href="http://riscv.org">riscv.org</a>. Sodor is made available under
-      a <a href="./BSD_licence.html">modified BSD Licence</a>.  Follow instructions in the README file.  Sodor was created by Christopher Celio, a PhD student at UC Berkeley.</p>
-
-      <section id="contact">
-      <div class="page-header"><h1>Contacting the Authors</h1></div>
-      <p> We have created
-      a <a href="http://groups.google.com/group/chisel-users">Chisel
-      users Google group</a>.</p>
+<b><font color="#0000FF">object</font></b> Example <font color="#FF0000">{</font>
+  <b><font color="#0000FF">def</font></b> <b><font color="#000000">main</font></b><font color="#990000">(</font>args<b><font color="#0000FF">:</font></b> Array<font color="#990000">[</font>String<font color="#990000">])</font><b><font color="#0000FF">:</font></b> Unit <b><font color="#0000FF">=</font></b> <font color="#FF0000">{</font>
+    <b><font color="#000000">chiselMain(args,</font></b> <font color="#990000">()</font> <b><font color="#0000FF">=&gt;</font></b> <b><font color="#000000">Module</font></b><font color="#990000">(</font><b><font color="#0000FF">new</font></b> <b><font color="#000000">GCD</font></b><font color="#990000">()))</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+</tt>
+                              </pre>
+                        </div>
+                        <div class="tab-pane" id="workflow">
+                              <img src="./workflow.svg" width="724" height="496">
+                        </div>
+                  </div>
+            </div>
+            </div>
+      </section>
+</div>
+<div class="row">
+      <section id="getstarted">
+            <div class="span12">
+            <div class="page-header"><h1>GET STARTED</h1></div>
+            <p>
+Getting started with Chisel is easy. Boilerplate verilog often directly maps
+to Chisel one-liners. Everything you learn to write Scala code is directly
+applicable. Follow the <a href="./chisel-tutorial.pdf">Chisel Tutorial</a>.
+When you gave a question that the documentation doesn't answer, check
+<a href="http://stackoverflow.com/questions/tagged/chisel">Stack Overflow</a>
+or ask on the <a href="http://groups.google.com/group/chisel-users">Chisel users mailing list</a>.
+            </p>
+            </div>
+            <div class="span4">
+            <div class="page-header"><h2>GET CHISEL</h2></div>
+            <p>
+Chisel is released as a JAR file through the official Maven repo.
+Just add this line to your build.sbt
+            </p>
+            <pre class="code">
+libraryDependencies += "edu.berkeley.cs" %% "chisel" % "2.0"
+            </pre>
+            <p>
+and start coding!
+            </p>
+      </div>
+      <div class="span4">
+            <div class="page-header"><h2>LEARN</h2></div>
+            <ul>
+                  <li><a href="./chisel-dac2012.pdf">DAC2012 Introduction Paper</a></li>
+                  <li><a href="./chisel-tutorial.pdf">Chisel Tutorial</a></li>
+                  <li><a href="http://github.com/ucb-bar/riscv-sodor">The RISC-V sodor processors in Chisel</a></li>
+            </ul>
+            <p>
+Also see: <a href="./chisel-bootcamp.pdf">slides</a> from the second Chisel
+bootcamp and slides from CS250 <a href="./chisel-cs250-1.pdf">part 1</a>,
+<a href="./chisel-cs250-2.pdf">part 2</a>,
+and  <a href="./chisel-cs250-3.pdf">part 3</a> taught fall 2012 at UC Berkeley.
+            </p>
+      </div>
+      <div class="span4">
+            <div class="page-header"><h2>JOIN IN</h2></div>
+            <ul>
+                  <li><a href="http://groups.google.com/group/chisel-users">Chisel users Google group</a></li>
+                  <li><a href="http://stackoverflow.com/questions/tagged/chisel">Get answers at Stack Overflow</a></li>
+                  <li><a href="http://github.com/ucb-bar/chisel/issues">File feature requests and bugs</a></li>
+            </ul>
+      </div>
+      </section>
+</div>
 {% endblock %}
