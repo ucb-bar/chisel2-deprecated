@@ -3,8 +3,21 @@
 {% block content %}
 <section id="documentation">
   <div class="page-header">
-    <h1>Support</h1>
+    <h1>Frequently Asked Questions</h1>
   </div>
+
+  <h2>Does Chisel convert Scala to Verilog?</h2>
+  <p>No Chisel is a hardware construction language for writing Scala programs
+    that generate hardware</p>
+
+  <h2>What's the overhead for Chisel?</h2>
+  <p>None. Chisel allows designers to write circuits structurally as they do
+    in Verilog with no extra overhead.</p>
+
+  <h2>How can I make a vector of modules?</h2>
+  <pre class="code">
+Vec.fill{ (new CPU()).io }
+  </pre>
 
   <h2>How do I get in touch with the Chisel community?</h2>
   <p>
