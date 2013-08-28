@@ -234,7 +234,7 @@ object Module {
          ( + ) sets the default reset signal
          ( + ) overriden if Delay specifies its own clock w/ reset != implicitReset
 */
-abstract class Module(private var _clock: Clock = null, private var _reset: Bool = null) {
+abstract class Module(var clock: Clock = null, private var _reset: Bool = null) {
   /** A backend(Backend.scala) might generate multiple module source code
     from one Module, based on the parameters to instanciate the component
     instance. Since we do not want to blindly generate one module per instance
@@ -277,13 +277,8 @@ abstract class Module(private var _clock: Clock = null, private var _reset: Bool
   components += this;
   push(this);
 
-  var hasExplicitClock = !(_clock == null)
+  var hasExplicitClock = !(clock == null)
   var hasExplicitReset = !(_reset == null)
-
-  def clock = _clock
-  def clock_=(c: Clock) {
-    _clock = c
-  }
 
   var defaultResetPin: Bool = null
   def reset = {
@@ -299,12 +294,6 @@ abstract class Module(private var _clock: Clock = null, private var _reset: Bool
   }
   def reset_=() {
     _reset = parent._reset
-  }
-
-  def withClock (clk: Clock): this.type = {
-    this.clock = clk
-    hasExplicitClock = true
-    return this
   }
 
   override def toString = this.getClass.toString
