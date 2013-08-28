@@ -1684,8 +1684,14 @@ void str_to_dat(std::string str, dat_t<w>& res) {
       }
     }
   }
-  if (bit != 0) 
+  if (bit != 0) {
     res.values[w_index] = word_accum;
+    ++w_index;
+  }
+  for( ; w_index < res.n_words; ++w_index ) {
+      res.values[w_index] = 0;
+  }
+  assert( res.n_words == w_index );
 }
 
 // dat_from_hex: Read a hex value from a std::string into a given dat_t variable.
