@@ -585,7 +585,7 @@ class Decoupled extends Bundle {
 
 \noindent
 After defining \code{FIFOInput}, it becomes a new type that can be
-used as needed for component interfaces or for named collections of
+used as needed for module interfaces or for named collections of
 wires.
 
 The direction of an object can also be assigned at instantation time:
@@ -598,7 +598,7 @@ class ScaleIO extends Bundle {
 \end{scala}
 
 \noindent
-The methods \code{asInput} and \code{asOutput} force all components of
+The methods \code{asInput} and \code{asOutput} force all modules of
 the data object to the requested direction.
 
 By folding directions into the object declarations, Chisel is able to
@@ -620,15 +620,15 @@ provide powerful wiring constructs described later.
 
 \section{Modules}
 
-In Chisel, {\em components} are very similar to {\em modules} in
-Verilog, defining a hierarchical structure in the generated circuit.
+Chisel {\em modules} are very similar to Verilog {\em modules} in
+defining a hierarchical structure in the generated circuit.
 %Like functional generators, we can also parameterize the construction of
-%circuits by turning them into object-oriented components.  Unlike
-%functional generators, components also provide a coarse hierarchy on a
+%circuits by turning them into object-oriented modules.  Unlike
+%functional generators, modules also provide a coarse hierarchy on a
 %circuit and permit a level of generator abstraction that is often
 %useful.
-The hierarchical component namespace is accessible in downstream tools
-to aid in debugging and physical layout.  A user-defined component is
+The hierarchical module namespace is accessible in downstream tools
+to aid in debugging and physical layout.  A user-defined module is
 defined as a {\em class} which:
 \begin{itemize}
 \item inherits from \code{Module},
@@ -636,7 +636,7 @@ defined as a {\em class} which:
 \item wires together subcircuits in its constructor.
 \end{itemize}
 As an example, consider defining your own two-input multiplexer as a
-component:
+module:
 \begin{scala}
 class Mux2 extends Module {
   val io = new Bundle{
@@ -650,8 +650,8 @@ class Mux2 extends Module {
 \end{scala}
 
 \noindent
-The wiring interface to a component is a collection of ports in the
-form of a \code{Bundle}.  The interface to the component is defined
+The wiring interface to a module is a collection of ports in the
+form of a \code{Bundle}.  The interface to the module is defined
 through a field named \code{io}.  For \code{Mux2}, \code{io} is
 defined as a bundle with four fields, one for each multiplexer port.
 
@@ -661,9 +661,9 @@ left-hand side to the output of the right-hand side.
 
 \subsection{Module Hierarchy}
 
-We can now construct circuit hierarchies, where we build larger components out
-of smaller sub-components.  For example, we can build a 4-input
-multiplexer component in terms of the \code{Mux2} component by wiring
+We can now construct circuit hierarchies, where we build larger modules out
+of smaller sub-modules.  For example, we can build a 4-input
+multiplexer module in terms of the \code{Mux2} module by wiring
 together three 2-input multiplexers:
 
 \begin{scala}
@@ -693,16 +693,16 @@ class Mux4 extends Module {
 \end{scala}
 
 \noindent
-We again define the component interface as \code{io} and wire up the
+We again define the module interface as \code{io} and wire up the
 inputs and outputs.  In this case, we create three \code{Mux2}
-children components, using the \code{Module} constructor function and 
+children modules, using the \code{Module} constructor function and 
 the Scala \code{new} keyword to create a
 new object.  We then wire them up to one another and to the ports of
 the \code{Mux4} interface.
 
 \section{Running and Testing Examples}
 
-Now that we have defined components, we will discuss how we actually run and test a circuit.  Chisel translates into either \verb@C++@ or Verilog.   In order to build a circuit we need to call \code{chiselMain}:
+Now that we have defined modules, we will discuss how we actually run and test a circuit.  Chisel translates into either \verb@C++@ or Verilog.   In order to build a circuit we need to call \code{chiselMain}:
 
 \begin{scala}
 object tutorial {
@@ -731,7 +731,7 @@ class Tester[T <: Module]
 \end{scala}
 
 \noindent
-which binds a tester to a component, and where specify nodes to test,
+which binds a tester to a module, and where specify nodes to test,
 and finally where users write a \code{defTests} function.
 The definition for \code{defTests} is:
 
@@ -743,7 +743,7 @@ def defTests(body: => Boolean)
 where \code{testNodes} are the graph nodes that will be input to and
 output from the DUT, and where
 users write calls to \code{step} in the body.  Users connect tester
-instances to components using:
+instances to modules using:
 
 \begin{scala}
 object chiselMainTest {
@@ -768,7 +768,7 @@ def step(vars: HashMap[Node, Node]): Boolean
 where \code{vars} is a mapping of test nodes to literals, 
 with assignments to input nodes being sent to the DUT and assignments to
 non-input nodes being interpreted as expected values.\footnote{Note that
-only output nodes are accessible, not internal nodes of a component.}
+only output nodes are accessible, not internal nodes of a module.}
 \code{test} first sends inputs specified in vars, steps the DUT and then either
 compares expected values from vars or sets vars for test nodes without
 entries in \code{vars}.
@@ -1344,12 +1344,12 @@ when (wen) { ram.write(waddr, wdata, wmask) }
 \section{Interfaces and Bulk Connections}
 \label{sec:interfaces}
 
-For more sophisticated components it is often useful to define and
-instantiate interface classes while defining component IO.  First and
+For more sophisticated modules it is often useful to define and
+instantiate interface classes while defining module IO.  First and
 foremost, interface classes promote reuse allowing users to capture
 once and for all common interfaces in a useful form.  Secondly,
 interfaces allow users to dramatically reduce wiring by supporting
-{\em bulk connections} between producer and consumer components.  Finally,
+{\em bulk connections} between producer and consumer modules.  Finally,
 users can make changes in large interfaces in one place reducing the
 number of updates required when adding or removing pieces of the
 interface.
@@ -1393,7 +1393,7 @@ class FilterIO extends Bundle {
 where \verb+flip+ recursively changes the ``gender'' of a bundle,
 changing input to output and output to input.
 
-We can now define a filter by defining a filter class extending component:
+We can now define a filter by defining a filter class extending module:
 
 \begin{scala}
 class Filter extends Module { 
@@ -1448,7 +1448,7 @@ class Block extends Module {
 
 \noindent
 where \verb+<>+ bulk connects interfaces of opposite gender between
-sibling components or interfaces of same gender between parent/child components. 
+sibling modules or interfaces of same gender between parent/child modules. 
 Bulk connections connect leaf ports of the same name to each other.
 After all connections are made and the circuit is being elaborated,
 Chisel warns users if ports have other than exactly one connection to them.
@@ -1457,11 +1457,11 @@ Chisel warns users if ports have other than exactly one connection to them.
 
 \begin{figure}
 \centerline{\includegraphics[width=3in]{figs/cpu.png}}
-\caption{Simple CPU involving control and data path subcomponents and host and memory interfaces.}
+\caption{Simple CPU involving control and data path submodules and host and memory interfaces.}
 \label{fig:cpu}
 \end{figure}
 
-Consider a simple CPU consisting of control path and data path subcomponents and host and memory interfaces shown in Figure~\ref{fig:cpu}.
+Consider a simple CPU consisting of control path and data path submodules and host and memory interfaces shown in Figure~\ref{fig:cpu}.
 In this CPU we can see that the control path and data path each connect only to a part of the instruction and data memory interfaces. 
 Chisel allows users to do this with partial fulfillment of interfaces.
 A user first defines the complete interface to a ROM and Mem as follows:
@@ -1491,7 +1491,7 @@ class CpathIo extends Bundle {
 \end{scala}
 
 \noindent
-and the control and data path components can be built by partially assigning to
+and the control and data path modules can be built by partially assigning to
 this interfaces as follows:
 
 \begin{scala}
@@ -1565,7 +1565,7 @@ completely connect up the CPU interface.
 \label{sec:funconstructor}
 
 It is also useful to be able to make a functional interface for
-component construction.  For instance, we could build a constructor
+module construction.  For instance, we could build a constructor
 that takes multiplexer inputs as parameters and returns the
 multiplexer output:
 
@@ -1583,7 +1583,7 @@ object Mux2 {
 
 \noindent
 where \code{object Mux2} creates a Scala singleton object on the \code{Mux2}
-component class, and \code{apply} defines a method for creation of a \code{Mux2} instance.
+module class, and \code{apply} defines a method for creation of a \code{Mux2} instance.
 %
 With this \code{Mux2} creation function, the specification of \code{Mux4} now is
 significantly simpler.
@@ -1754,7 +1754,7 @@ class FilterIO[T <: Data](type: T) extends Bundle {
 \end{scala}
 
 \noindent
-We can now define \verb+Filter+ by defining a component class that also takes a link type constructor argument and passes it through to the \verb+FilterIO+ interface constructor:
+We can now define \verb+Filter+ by defining a module class that also takes a link type constructor argument and passes it through to the \verb+FilterIO+ interface constructor:
 
 \begin{scala}
 class Filter[T <: Data](type: T) extends Module { 
