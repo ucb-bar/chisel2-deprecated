@@ -35,10 +35,10 @@ import scala.reflect._
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 
 object Mem {
-  def apply[T <: Data](out: T, n: Int, seqRead: Boolean = false): Mem[T] = {
+  def apply[T <: Data](out: T, n: Int, seqRead: Boolean = false, clock: Clock = Module.implicitClock): Mem[T] = {
     val gen = out.clone
     Reg.validateGen(gen)
-    new Mem(() => gen, n, seqRead)
+    new Mem(() => gen, n, seqRead, clock)
   }
 
   Module.backend.transforms.prepend { c =>
@@ -60,7 +60,8 @@ abstract class AccessTracker extends Delay {
   def readAccesses: ArrayBuffer[_ <: MemAccess]
 }
 
-class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean) extends AccessTracker {
+class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean,
+    clock: Clock = Module.implicitClock) extends AccessTracker {
   def writeAccesses: ArrayBuffer[MemWrite] = writes ++ readwrites.map(_.write)
   def readAccesses: ArrayBuffer[_ <: MemAccess] = reads ++ seqreads ++ readwrites.map(_.read)
   def ports: ArrayBuffer[_ <: MemAccess] = writes ++ reads ++ seqreads ++ readwrites
@@ -125,11 +126,6 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean) extends Acc
     } else {
       doit(addr, cond, wdata, wmask)
     }
-  }
-
-  def withClock(c: Clock): this.type = {
-    this.clock = c
-    this
   }
 
   def read(addr: UInt): T = doRead(addr)

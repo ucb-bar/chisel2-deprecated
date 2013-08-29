@@ -77,7 +77,8 @@ object Reg {
     *update* and *reset* define the update and reset values
     respectively.
     */
-  def apply[T <: Data](outType: T = null, next: T = null, init: T = null): T = {
+  def apply[T <: Data](outType: T = null, next: T = null, init: T = null,
+    clock: Clock = Module.implicitClock): T = {
     var mType = outType
     if(mType == null) {
       mType = next
@@ -128,6 +129,13 @@ object Reg {
       }
     }
     res.setIsTypeNode
+
+    // set clock
+    if (res.comp != null)
+      res.comp.clock = clock
+    else
+      res.clock = clock
+
     res
   }
 
