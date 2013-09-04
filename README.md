@@ -26,9 +26,6 @@ Chisel Users
 To start working on a circuit with Chisel, create simple build.sbt
 and scala source file containing your Chisel code as follow.
 
-(You want your build.sbt file to contain a reference to Scala version greater
-or equal to 2.10 and a dependency on the Chisel library.)
-
     $ cat build.sbt
     scalaVersion := "2.10.2"
 
@@ -37,6 +34,9 @@ or equal to 2.10 and a dependency on the Chisel library.)
     )
 
     libraryDependencies += "edu.berkeley.cs" %% "chisel" % "2.0"
+
+(You want your build.sbt file to contain a reference to Scala version greater
+or equal to 2.10 and a dependency on the Chisel library.)
 
 Edit the source files for your circuit
 
@@ -80,7 +80,7 @@ Run the simulation executable for one clock cycle to generate a simulation trace
     Hello World!
 
 Going further, you should read on the [sbt directory structure](http://www.scala-sbt.org/release/docs/Getting-Started/Directories.html)
-to organize your files for bigger project. SBT is the &quot;official&quot;
+to organize your files for bigger projects. SBT is the &quot;official&quot;
 build system for Scala but you can use any other Java build system you
 like (Maven, etc).
 
