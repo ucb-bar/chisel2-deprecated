@@ -5,9 +5,10 @@ Chisel is a new open-source hardware construction language developed
 at UC Berkeley that supports advanced hardware design using highly
 parameterized generators and layered domain-specific hardware languages.
 
-Chisel is embedded in the Scala programming language, which raises the level
-of hardware design abstraction by providing concepts including object
-orientation, functional programming, parameterized types, and type inference.
+Chisel is embedded in the [Scala](http://www.scala-lang.org/) programming
+language, which raises the level of hardware design abstraction by providing
+concepts including object orientation, functional programming, parameterized
+types, and type inference.
 
 Chisel can generate a high-speed C++-based cycle-accurate software simulator,
 or low-level Verilog designed to pass on to standard ASIC or FPGA tools
@@ -22,10 +23,8 @@ Getting started
 Chisel Users
 ------------
 
-To start working on a circuit with Chisel, create a project directory
-with a standard Scala/SBT layout. You want your build.sbt file to
-contain a reference to Scala version greater or equal to 2.10 and
-add a dependency on the Chisel library.
+To start working on a circuit with Chisel, create simple build.sbt
+and scala source file containing your Chisel code as follow.
 
     $ cat build.sbt
     scalaVersion := "2.10.2"
@@ -35,6 +34,9 @@ add a dependency on the Chisel library.
     )
 
     libraryDependencies += "edu.berkeley.cs" %% "chisel" % "2.0"
+
+(You want your build.sbt file to contain a reference to Scala version greater
+or equal to 2.10 and a dependency on the Chisel library.)
 
 Edit the source files for your circuit
 
@@ -61,6 +63,9 @@ Edit the source files for your circuit
         }
     }
 
+At this point you will need to [download and install sbt](http://www.scala-sbt.org/release/docs/Getting-Started/Setup.html#installing-sbt)
+for your favorite distribution.
+
 Execute sbt run to generate the C++ simulation source for your circuit
 
     $ sbt run
@@ -74,9 +79,16 @@ Run the simulation executable for one clock cycle to generate a simulation trace
     $ ./HelloModule 1
     Hello World!
 
+Going further, you should read on the [sbt directory structure](http://www.scala-sbt.org/release/docs/Getting-Started/Directories.html)
+to organize your files for bigger projects. SBT is the &quot;official&quot;
+build system for Scala but you can use any other Java build system you
+like (Maven, etc).
 
-Chisel developpers
-------------------
+Chisel is implemented 100% in Scala!
+
+
+Chisel developers
+-----------------
 
 Checking coding style compliance
 
@@ -93,3 +105,6 @@ Publishing jar to local system
 Publishing to public Maven repo
 
     $ sbt publish-signed
+
+You can follow Chisel metrics on style compliance and code coverage
+on the [website](https://chisel.eecs.berkeley.edu/unit_test_trends.html).
