@@ -318,7 +318,7 @@ class VerilogBackend extends Backend {
         for ((addr, data) <- ll.map) {
           res.append("      " + emitRef(addr) + " : begin\n");
           for ((w, e) <- ll.wires zip data) {
-            if(w.component != null) {
+            if(w.component != null && w.component.mods.contains(w) ) {
               res.append("        " + emitRef(w) + " = " + emitRef(e) + ";\n");
             }
           }
@@ -326,7 +326,7 @@ class VerilogBackend extends Backend {
         }
         res.append("      default: begin\n")
         for ((w, e) <- ll.wires zip ll.defaultWires) {
-          if(w.component != null) {
+          if(w.component != null && w.component.mods.contains(w)) {
             res.append("        " + emitRef(w) + " = " + emitRef(e) + ";\n");
           }
         }
