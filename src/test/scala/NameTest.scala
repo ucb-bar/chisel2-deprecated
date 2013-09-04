@@ -106,10 +106,6 @@ class NameSuite extends AssertionsForJUnit {
   wire T0;
   reg[0:0] valid;
   wire T1;
-  reg[2:0] T4;
-  reg[0:0] T5;
-  reg[0:0] T6;
-  reg[0:0] T7;
 
   assign io_sigs_valid = T0;
   assign T0 = valid;
@@ -117,17 +113,9 @@ class NameSuite extends AssertionsForJUnit {
     casez (io_inst)
       32'b00000000000000000010011101111011/* 0*/ : begin
         valid = 1'h0/* 0*/;
-        T4 = 3'h0/* 0*/;
-        T5 = 1'h0/* 0*/;
-        T6 = 1'h0/* 0*/;
-        T7 = 1'h0/* 0*/;
       end
       default: begin
         valid = 1'h0/* 0*/;
-        T4 = 3'h0/* 0*/;
-        T5 = 1'h0/* 0*/;
-        T6 = 1'h0/* 0*/;
-        T7 = 1'h0/* 0*/;
       end
     endcase
   end
