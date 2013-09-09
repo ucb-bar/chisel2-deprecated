@@ -30,11 +30,11 @@
 % \begin{frame}[fragile]{Forward Declarations using Wires}
 % 
 % \begin{scala}
-% val pcPlus4      = UFix() 
-% val branchTarget = UFix()
+% val pcPlus4      = UInt() 
+% val branchTarget = UInt()
 % val pcNext       = Mux(pcSel, branchTarget, pcPlus4)
-% val pcReg        = Reg(next = pcNext, init = UFix(0, 32)) 
-% pcPlus4         := pcReg + UFix(4) 
+% val pcReg        = Reg(next = pcNext, init = UInt(0, 32)) 
+% pcPlus4         := pcReg + UInt(4) 
 % ... 
 % branchTarget    := addOut
 % \end{scala}
@@ -74,9 +74,9 @@ When describing state operations, we could simply wire register inputs to combin
 \begin{columns}
 \column{0.45\textwidth}
 \begin{scala}
-val r = Reg( UFix(16) )
-when (c === UFix(0) ) {
-  r := r + UFix(1)
+val r = Reg( UInt(16) )
+when (c === UInt(0) ) {
+  r := r + UInt(1)
 }
 \end{scala}
 
@@ -131,10 +131,10 @@ when (c2) { r := UInt(2) }
 \begin{frame}[fragile]{Targetting Multiple Registers}
 
 \begin{scala}
-r := Reg( Fix(3) )
-s := Reg( Fix(3) )
-when (c1) { r := Fix(1); s := Fix(1) }
-when (c2) { r := Fix(2) }
+r := Reg( SInt(3) )
+s := Reg( SInt(3) )
+when (c1) { r := SInt(1); s := SInt(1) }
+when (c2) { r := SInt(2) }
 \end{scala}
 
 leads to \code{r} and \code{s} being updated according to the
@@ -209,7 +209,7 @@ when (idx === v2) { u2 }
 
 % \begin{frame}[fragile]{Enums}
 % \begin{scala}
-% val s_even :: s_odd :: Nil = Enum(2, UFix())
+% val s_even :: s_odd :: Nil = Enum(UInt(), 2)
 % \end{scala}
 % \end{frame}
 
@@ -254,7 +254,7 @@ class Parity extends Module {
   val io = new Bundle {
     val in  = Bool(INPUT)
     val out = Bool(OUTPUT) }
-  val s_even :: s_odd :: Nil = Enum(2, UFix())
+  val s_even :: s_odd :: Nil = Enum(UInt(), 2)
   val state  = Reg(init = s_even)
   when (io.in) {
     when (state === s_even) { state := s_odd  }
@@ -265,7 +265,7 @@ class Parity extends Module {
 \end{scala}
 
 \noindent
-where \verb+Enum(2, UFix())+ creates a list of two \code{UFix()} literals.
+where \verb+Enum(UInt(), 2)+ creates a list of two \code{UInt()} literals.
 \column{0.25\textwidth}
 
 \begin{center}
@@ -278,9 +278,9 @@ where \verb+Enum(2, UFix())+ creates a list of two \code{UFix()} literals.
 \begin{frame}[fragile]{ROM}
 
 \begin{scala}
-val d = Array(UFix(1), UFix(2), UFix(4), UFix(8))
-val m = ROM(d, UFix(width = 32) )
-val r = m(counter(UFix(3)))
+val d = Array(UInt(1), UInt(2), UInt(4), UInt(8))
+val m = ROM(d, UInt(width = 32) )
+val r = m(counter(UInt(3)))
 \end{scala}
 
 \begin{center}
@@ -296,15 +296,15 @@ val r = m(counter(UFix(3)))
 \begin{scala}
 class Mul extends Module {
   val io = new Bundle {
-    val x   = UFix(INPUT, 4)
-    val y   = UFix(INPUT, 4)
-    val z   = UFix(OUTPUT, 8) }
+    val x   = UInt(INPUT, 4)
+    val y   = UInt(INPUT, 4)
+    val z   = UInt(OUTPUT, 8) }
 
-  val muls = new Array[UFix](256)
+  val muls = new Array[UInt](256)
   for (x <- 0 until 16; y <- 0 until 16) 
     muls((x << 4) | y) = x * y
 
-  val tbl = ROM(muls){ UFix(8) }
+  val tbl = ROM(muls){ UInt(8) }
 
   io.z := tbl((io.x << 4) | io.y)
 }
@@ -331,7 +331,7 @@ where
 \begin{itemize}
 \item writes to Mems are positive-edge-triggered
 \item reads are either combinational or positive-edge-triggered
-\item ports are created by applying a \code{UFix} index
+\item ports are created by applying a \code{UInt} index
 \end{itemize}
 \end{frame}
 
@@ -563,18 +563,18 @@ Instead of writing a \code{SmallFilter} and \code{OddFilter}, a better Filter so
 
 {\lstset{basicstyle={\scriptsize\ttfamily}}
 \begin{scala}
-class Filter (isOk: (UFix) => Bool) 
+class Filter (isOk: (UInt) => Bool) 
     extends Module { 
-  val io  = new ValidUFix()
+  val io  = new ValidUInt()
   io.out.data  := io.in.data
   io.out.valid := 
     io.in.valid && isOk(io.in.data)
 }
 
 val odds   = 
-  Module(new Filter((x) => x & UFix(1)))
+  Module(new Filter((x) => x & UInt(1)))
 val smalls = 
-  Module(new Filter((x) => x < UFix(10)))
+  Module(new Filter((x) => x < UInt(10)))
 \end{scala}
 }
 
@@ -666,7 +666,7 @@ Now filtering must consider back pressure:
 
 {\lstset{basicstyle={\scriptsize\ttfamily}}
 \begin{scala}
-class Filter (isOk: (UFix) => Bool) 
+class Filter (isOk: (UInt) => Bool) 
     extends Module { 
   val io  = new FilterIO()
   io.out.data  := io.in.data
@@ -704,7 +704,7 @@ where
 We can define a decoupled interface by extending \verb+PipeIO+ with a ready signal:
 
 \begin{scala}
-class DecoupledUFix extends ValidUFix { 
+class DecoupledUInt extends ValidUInt { 
   val ready = Bool(INPUT)
 }
 \end{scala}
@@ -728,12 +728,12 @@ In general, users can organize their interfaces into hierarchies using inheritan
 \column{0.55\textwidth}
 
 From there we can define a filter interface by nesting two
-\verb+ValidUFix+s into a new \verb+FilterIO+ bundle:
+\verb+ValidUInt+s into a new \verb+FilterIO+ bundle:
 
 \begin{scala}
 class FilterIO extends Bundle { 
-  val in  = new ValidUFix().flip
-  val out = new ValidUFix()
+  val in  = new ValidUInt().flip
+  val out = new ValidUInt()
 }
 \end{scala}
 
@@ -747,7 +747,7 @@ class FilterIO extends Bundle {
 \end{frame}
 
 \begin{frame}[fragile]{Parameterized Decoupled Interfaces}
-Unfortunately, as defined, decoupled interfaces are defined only for 16 bit \verb+UFix+s.  
+Unfortunately, as defined, decoupled interfaces are defined only for 16 bit \verb+UInt+s.  
 Obviously, we want to generalize this to allow for arbitrary Chisel data types.  
 We can do this by using:
 \begin{itemize}
@@ -757,10 +757,10 @@ We can do this by using:
 
 We want to be able to write
 \begin{scala}
-val ufix32s = new Valid( UFix(width = 32) )
+val ufix32s = new Valid( UInt(width = 32) )
 
 class Packet extends Bundle {
-  val header = UFix(width = 8)
+  val header = UInt(width = 8)
   val body   = UInt(width = 64)
 }
 val pkts    = new DecoupledIO( new Packet() )
@@ -811,7 +811,7 @@ class FilterIO[T <: Data]()(type: T) extends Bundle {
 We can now define \code{DecoupledIO} on arbitrary data types:
 
 \begin{scala}
-val ufix32s = new DecoupledIO( UFix(width = 32) )
+val ufix32s = new DecoupledIO( UInt(width = 32) )
 val pkts    = new DecoupledIO( new Packet() )
 \end{scala}
 }
@@ -832,9 +832,9 @@ class Filter[T <: Data] (isOk: (T) => Bool, type: T) extends Module {
 
 class SmallOdds[T <: Data](type: T) extends Module { 
   val io     = new FilterIO()
-  val smalls = Module(new Filter(_ < UFix(10), type ))
+  val smalls = Module(new Filter(_ < UInt(10), type ))
   val q      = Module(new Queue(type))
-  val odds   = Module(new Filter(_ & UFix(1), type ))
+  val odds   = Module(new Filter(_ & UInt(1), type ))
 
   smalls.io.in  <> io.in
   smalls.io.out <> q.io.in
@@ -842,7 +842,7 @@ class SmallOdds[T <: Data](type: T) extends Module {
   odds.io.out   <> io.out
 }
 
-val block = new SmallOdds( UFix(width = 32) )
+val block = new SmallOdds( UInt(width = 32) )
 \end{scala}
 }
 \end{frame}
@@ -882,7 +882,7 @@ class Cpu extends Module {
 \begin{scala}
 class RomIo extends Bundle {
   val isVal = Bool(INPUT)
-  val raddr = UFix(INPUT, 32)
+  val raddr = UInt(INPUT, 32)
   val rdata = UInt(OUTPUT, 32) 
 }
 
@@ -1045,7 +1045,7 @@ class Router extends Module {
   val depth = 32
   val n     = 4
   val io    = new RouterIO(n)
-  val tbl   = Mem(depth, UFix(width = sizeof(n)) )
+  val tbl   = Mem(depth, UInt(width = sizeof(n)) )
   
   ...
 }
@@ -1060,7 +1060,7 @@ class Router extends Module {
 class RouterIO(n: Int) extends Bundle {
   override def clone = new RouterIO(n).asInstanceOf[this.type]
   val reads   = new DeqIO( new ReadCmd() )
-  val replies = new EnqIO( UFix(width = 8) )
+  val replies = new EnqIO( UInt(width = 8) )
   val writes  = new DeqIO( new WriteCmd() )
   val in      = new DeqIO( new Packet() )
   val outs    = Vec.fill(n){ new EnqIO( new Packet() ) }
@@ -1076,22 +1076,22 @@ class RouterIO(n: Int) extends Bundle {
 {\lstset{basicstyle={\scriptsize\ttfamily}}
 \begin{scala}
 class ReadCmd extends Bundle {
-  val addr = UFix(width = 32)
+  val addr = UInt(width = 32)
 }
 
 class WriteCmd extends ReadCmd {
-  val data = UFix(width = 32)
+  val data = UInt(width = 32)
 }
 
 class Packet extends Bundle {
-  val header = UFix(width = 8)
+  val header = UInt(width = 8)
   val body   = UInt(width = 64)
 }
 
 class RouterIO(n: Int) extends Bundle {
   override def clone = new RouterIO(n).asInstanceOf[this.type]
   val reads   = new DeqIO( new ReadCmd() )
-  val replies = new EnqIO( UFix(width = 8) )
+  val replies = new EnqIO( UInt(width = 8) )
   val writes  = new DeqIO( new WriteCmd() )
   val in      = new DeqIO( new Packet() )
   val outs    = Vec.fill(n){ new EnqIO( new Packet() ) }
@@ -1107,7 +1107,7 @@ class RouterIO(n: Int) extends Bundle {
 class RouterIO(n: Int) extends Bundle {
   override def clone = new RouterIO(n).asInstanceOf[this.type]
   val reads   = new DeqIO( new ReadCmd() )
-  val replies = new EnqIO( UFix(width = 8) )
+  val replies = new EnqIO( UInt(width = 8) )
   val writes  = new DeqIO( new WriteCmd() )
   val in      = new DeqIO( new Packet() )
   val outs    = Vec.fill(n){ new EnqIO( new Packet() ) }
@@ -1117,7 +1117,7 @@ class Router extends Module {
   val depth = 32
   val n     = 4
   val io    = new RouterIO(n)
-  val tbl   = Mem(depth, UFix(width = sizeof(n)) )
+  val tbl   = Mem(depth, UInt(width = sizeof(n)) )
   
   when(io.reads.valid && io.replies.ready) { 
     val cmd = io.reads.deq();  io.replies.enq(tbl(cmd.addr))  
@@ -1139,7 +1139,7 @@ class EnqIO[T <: Data]( data: T ) extends DecoupledIO(data) {
   def enq(dat: T): T = { valid := Bool(true); data := dat; dat }
   valid := Bool(false)
   for (io <- data.flatten.map(x => x._2))
-    io := UFix(0, io.getWidth())
+    io := UInt(0, io.getWidth())
 }
 
 class DeqIO[T <: Data](data: T) extends DecoupledIO(data) {
