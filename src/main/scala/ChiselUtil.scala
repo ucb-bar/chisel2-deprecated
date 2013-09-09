@@ -522,4 +522,83 @@ object PriorityEncoderOH
   }
 }
 
+class RdIO[T <: Data](depth: Int)(data: => T) extends Bundle {
+  val adr = Bits( INPUT,  log2Up(depth) ); 
+  val dat = data.asOutput; 
+}
 
+class WrIO[T <: Data](depth: Int)(data: => T) extends Bundle {
+  val is  = Bool( INPUT );                        
+  val adr = Bits( INPUT, log2Up(depth) ); 
+  val dat = data.asInput;                         
+}
+
+class FunRdIO[T <: Data](depth: Int)(data: => T) extends RdIO(depth)(data) {
+  adr := Bits(0);
+  def read(nadr: Bits): T = {
+    adr := nadr
+    dat
+  }
+}
+
+class FunWrIO[T <: Data](depth: Int)(data: => T) extends WrIO(depth)(data) {
+  is  := Bool(false)
+  adr := Bits(0)
+  dat := data.fromBits(Bits(0))
+  def write(nadr: Bits, ndat: T) = {
+    is  := conds.top
+    adr := nadr
+    dat := ndat
+  }
+}
+
+class FunMemIO[T <: Data](depth: Int, numReads: Int, numWrites: Int)(data: => T) extends Bundle {
+  val reads  = Vec.fill(numReads){ new FunRdIO(depth)(data) }
+  val writes = Vec.fill(numWrites){ new FunWrIO(depth)(data) }
+}
+
+class FunStore[T <: Data](val depth: Int, numReads: Int, numWrites: Int)(data: => T) extends Module {
+  val io = new FunMemIO(depth, numReads, numWrites)( data )
+}
+
+class TransactionMem[T <: Data](depth: Int, numReads: Int, numVirtWrites: Int, numPhyWrites: Int)(data: => T) 
+    extends FunStore(depth, numReads, numVirtWrites)(data) {
+  val mem = Mem(data, depth)
+  def read(addr: UInt, idx: Int = 0): T = io.reads(idx).read(addr)
+  def write(addr: UInt, data: T, idx: Int = 0) = io.writes(idx).write(addr, data)
+  for (read <- io.reads)
+    read.dat := mem.read(read.adr)
+  var roundUp = 0
+  if(numVirtWrites%numPhyWrites > 0){
+    roundUp = 1
+  }
+  val virtPerPhys = numVirtWrites/numPhyWrites + roundUp
+  val ens = Vec.fill(numPhyWrites){Bool()}
+  val addrs = Vec.fill(numPhyWrites){Bits()}
+  val datas = Vec.fill(numPhyWrites){Bits()}
+  for(i <- 0 until numVirtWrites/virtPerPhys){
+    var en = Bool(false)
+    var addr = Bits(); addr := Bits(0)
+    var data = Bits(); data := Bits(0)
+    for(j <- 0 until virtPerPhys){
+      en = en || io.writes(i*virtPerPhys + j).is
+      when (io.writes(i*virtPerPhys + j).is){
+        addr := io.writes(i*virtPerPhys + j).adr
+        data := io.writes(i*virtPerPhys + j).dat
+      }
+    }
+    ens(i) := en
+    addrs(i) := addr
+    datas(i) := data
+  }
+  for(i <- numVirtWrites/virtPerPhys until numPhyWrites){
+    ens(i) := Bool(false)
+    addrs(i) := Bits(0)
+    datas(i) := Bits(0)
+  }
+  for(i <- 0 until numPhyWrites){
+    when(ens(i)){
+      mem.write(addrs(i), datas(i).asInstanceOf[T])
+    }
+  }
+}

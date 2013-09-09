@@ -3,3 +3,4 @@ target/
 .history
 .ensime
 .ensime_lucene/
+*~

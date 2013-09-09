@@ -30,6 +30,7 @@
 
 package Chisel
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.HashSet
 import scala.collection.mutable.Stack
 import scala.collection.mutable.{Queue=>ScalaQueue}
 import Literal._
@@ -223,12 +224,14 @@ object chiselMainTest {
 
 trait proc extends Node {
   var updates = new collection.mutable.ListBuffer[(Bool, Node)];
+  var genned = false
   def genCond(): Bool = conds.top;
   def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
     val update = others.foldLeft(default)((v, u) => Multiplex(u._1, u._2, v))
     if (inputs.isEmpty) inputs += update else inputs(0) = update
   }
   def genMuxes(default: Node): Unit = {
+    if (genned) return
     if (updates.length == 0) {
       if (inputs.length == 0 || inputs(0) == null) {
         ChiselError.error({"NO UPDATES ON " + this}, this.line)
@@ -251,9 +254,40 @@ trait proc extends Node {
       else if (lastCond.canBeUsedAsDefault)
         genMuxes(lastValue, updates)
     }
+    genned = true
   }
   def procAssign(src: Node): Unit
   Module.procs += this;
+  override def getProducers(): Seq[Node] = {
+    val producers = new collection.mutable.ListBuffer[Node];
+    for((i,j) <- updates){
+      producers += i
+      producers += j
+    }
+    for(elm <- inputs){
+      if (elm != null) producers += elm
+    }
+    producers
+  }
+  override def replaceProducer(delete: Node, add: Node) = {
+    for(i <- 0 until inputs.length){
+      if(inputs(i) == delete){
+        inputs(i) = add
+      }
+    }
+    for((i,j) <- updates){
+      if(i == delete && j == delete){
+        updates -= ((i,j))
+        updates += ((add.asInstanceOf[Bool], add))
+      } else if(i == delete) {
+        updates -= ((i,j))
+        updates += ((add.asInstanceOf[Bool], j))
+      } else if(j == delete) {
+        updates -= ((i,j))
+        updates += ((i, add)) 
+      }
+    }
+  }
 }
 
 trait nameable {
