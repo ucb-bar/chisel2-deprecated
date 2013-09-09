@@ -186,18 +186,18 @@ module ConnectSuite_SuppliesResets_1(input clk, input reset,
 );
 
   reg[0:0] R0;
-  wire T0;
   reg[0:0] delayed;
   wire T1;
-  wire a2_io_out;
   wire T2;
+  wire a2_io_out;
+  wire T3;
   wire a1_io_out;
   wire a0_io_out;
 
-  assign io_out = T0;
-  assign T0 = T1 || delayed;
-  assign T1 = T2 || a2_io_out;
-  assign T2 = a0_io_out || a1_io_out;
+  assign io_out = T1;
+  assign T1 = T2 || delayed;
+  assign T2 = T3 || a2_io_out;
+  assign T3 = a0_io_out || a1_io_out;
   ConnectSuite_UsesReset_2 a0(.reset(reset),
        .io_in( io_in ),
        .io_out( a0_io_out )

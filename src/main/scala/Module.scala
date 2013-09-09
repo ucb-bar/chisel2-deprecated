@@ -98,6 +98,7 @@ object Module {
   val randInitIOs = new ArrayBuffer[Node]()
   val clocks = new ArrayBuffer[Clock]()
   val implicitReset = Bool(INPUT)
+  implicitReset.isIo = true
   implicitReset.setName("reset")
   val implicitClock = new Clock()
   implicitClock.setName("clk")
@@ -113,6 +114,9 @@ object Module {
      constructors are built. */
     val res = c
     pop()
+    for ((n, io) <- res.wires) {
+      io.isIo = true
+    }
     res
   }
 
@@ -284,6 +288,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def reset = {
     if (defaultResetPin == null) {
       defaultResetPin = Bool(INPUT)
+      defaultResetPin.isIo = true
       defaultResetPin.component = this
       defaultResetPin.setName("reset")
     }
@@ -390,6 +395,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           this.reset
         } else {
           val res = Bool(INPUT)
+          res.isIo = true
           res.component = this
           res
         }
@@ -534,6 +540,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
   def forceMatchingWidths {
     bfs(_.forceMatchingWidths)
+  }
+
+  def addDefaultReset {
+    if (defaultResetPin != null)
+      addResetPin(_reset)
   }
 
   // for every reachable delay element

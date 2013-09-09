@@ -216,7 +216,9 @@ abstract class Node extends nameable {
     src assign this;
   }
   def getLit: Literal = this.asInstanceOf[Literal]
-  def isIo: Boolean = false;
+  private var _isIo = false
+  def isIo = _isIo
+  def isIo_=(isIo: Boolean) = _isIo = isIo
   def isReg: Boolean = false;
   def isUsedByRam: Boolean = {
     for (c <- consumers)
@@ -328,7 +330,7 @@ abstract class Node extends nameable {
     val (comp, nextComp) =
       this match {
         case io: Bits => {
-          if(io.dir == INPUT || io.dir == OUTPUT) {
+          if(io.isIo && (io.dir == INPUT || io.dir == OUTPUT)) {
             (io.component, if (io.dir == OUTPUT) io.component else io.component.parent)
           } else {
             (c, c)
@@ -382,7 +384,7 @@ abstract class Node extends nameable {
              same as output's component unless the logic is an input */
             n match {
               case io: Bits =>
-                if (io.dir == OUTPUT && !io.isTypeNode &&
+                if (io.isIo && io.dir == OUTPUT && !io.isTypeNode &&
                     (!(component.parent == io.component) &&
                      !(component == io.component &&
                        !(this.isInstanceOf[Bits]
@@ -402,7 +404,7 @@ abstract class Node extends nameable {
                   // component. We also do the same when assigning
                   // to the output if the output is the parent
                   // of the subcomponent.
-                } else if (io.dir == INPUT &&
+                } else if (io.isIo && io.dir == INPUT &&
                            ((!this.isIo
                              && this.component == io.component.parent)
                              || (this.isInstanceOf[Bits]
