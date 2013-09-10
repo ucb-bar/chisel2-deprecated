@@ -33,7 +33,7 @@ and scala source file containing your Chisel code as follow.
       "scct-github-repository" at "http://mtkopone.github.com/scct/maven-repo"
     )
 
-    libraryDependencies += "edu.berkeley.cs" %% "chisel" % "2.0"
+    libraryDependencies += "edu.berkeley.cs" %% "chisel" % "2.0.1"
 
 (You want your build.sbt file to contain a reference to Scala version greater
 or equal to 2.10 and a dependency on the Chisel library.)
