@@ -97,11 +97,8 @@ object Module {
   val printfs = ArrayBuffer[Printf]()
   val randInitIOs = new ArrayBuffer[Node]()
   val clocks = new ArrayBuffer[Clock]()
-  val implicitReset = Bool(INPUT)
-  implicitReset.isIo = true
-  implicitReset.setName("reset")
-  val implicitClock = new Clock()
-  implicitClock.setName("clk")
+  var implicitReset: Bool = null
+  var implicitClock: Clock = null
 
   /* Any call to a *Module* constructor without a proper wrapping
    into a Module.apply() call will be detected when trigger is false. */
@@ -164,6 +161,13 @@ object Module {
     isTesting = false;
     backend = new CppBackend
     topComponent = null;
+    randInitIOs.clear()
+    clocks.clear()
+    implicitReset = Bool(INPUT)
+    implicitReset.isIo = true
+    implicitReset.setName("reset")
+    implicitClock = new Clock()
+    implicitClock.setName("clk")
 
     /* Re-initialize global variables defined in object Node {} */
     nodes.clear()
