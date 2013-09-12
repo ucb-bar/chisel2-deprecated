@@ -423,6 +423,7 @@ abstract class Backend {
         for (clock <- child.clocks) {
           parent.addClock(clock)
         }
+        println("HUY: parent: " + parent + " child: " + child + " " + child.resets.size)
         for (reset <- child.resets.keys) {
           // create a reset pin in parent if reset does not originate in parent and 
           // if reset is not an output from one of parent's children
@@ -438,15 +439,15 @@ abstract class Backend {
     }
   }
 
-
   def connectResets {
     for (parent <- Module.sortedComps) {
       for (child <- parent.children) {
         for (reset <- child.resets.keys) {
-          if (parent.resets.contains(reset))
-            child.resets(reset).inputs += parent.resets(reset)
-          else 
-            child.resets(reset).inputs += reset
+          if (child.resets(reset).inputs.length == 0)
+            if (parent.resets.contains(reset))
+              child.resets(reset).inputs += parent.resets(reset)
+            else 
+              child.resets(reset).inputs += reset
         }
       }
     }
