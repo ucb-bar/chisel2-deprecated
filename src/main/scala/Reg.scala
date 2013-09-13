@@ -78,7 +78,7 @@ object Reg {
     respectively.
     */
   def apply[T <: Data](outType: T = null, next: T = null, init: T = null,
-    clock: Clock = Module.implicitClock): T = {
+    clock: Clock = null): T = {
     var mType = outType
     if(mType == null) {
       mType = next
