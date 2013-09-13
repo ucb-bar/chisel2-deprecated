@@ -1833,7 +1833,7 @@ class DecoupledIO[T <: Data](data: T)
     extends Bundle {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
-  val bits  = data.asOutput
+  val bits  = data.clone.asOutput
 }
 \end{scala}
 
