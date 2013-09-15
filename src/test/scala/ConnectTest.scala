@@ -304,6 +304,7 @@ module ConnectSuite_SuppliesResetsParent_1(input clk, input reset,
        .io_out( srs_io_out )
   );
 endmodule
+
 """)
   }
 

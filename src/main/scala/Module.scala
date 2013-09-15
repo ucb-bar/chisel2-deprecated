@@ -544,9 +544,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   def addDefaultReset {
-    if (defaultResetPin != null) {
+    if (!(defaultResetPin == null)) {
       addResetPin(_reset)
-      defaultResetPin.inputs += _reset
+      if (this != topComponent && hasExplicitReset)
+        defaultResetPin.inputs += _reset
     }
   }
 
