@@ -34,6 +34,10 @@ import Node._
 import scala.reflect._
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 
+/** *seqRead* means that if a port tries to read the same address that another
+  port is writing to in the same cycle, the read data is random garbage (from
+  a LFSR, which returns "1" on its first invocation).
+  */
 object Mem {
   def apply[T <: Data](out: T, n: Int, seqRead: Boolean = false, clock: Clock = Module.implicitClock): Mem[T] = {
     val gen = out.clone

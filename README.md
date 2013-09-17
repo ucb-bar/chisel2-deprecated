@@ -64,7 +64,10 @@ Edit the source files for your circuit
     }
 
 At this point you will need to [download and install sbt](http://www.scala-sbt.org/release/docs/Getting-Started/Setup.html#installing-sbt)
-for your favorite distribution.
+for your favorite distribution. You will need sbt version 0.12.4 or higher
+because [recent versions of sbt](http://www.scala-sbt.org/0.12.4/docs/Community/Changes.html)
+generate jars without the scala third-point version number
+(i.e. chisel_2.10-2.0.1.jar instead of chisel_2.10*.2*-2.0.1.jar).
 
 Execute sbt run to generate the C++ simulation source for your circuit
 
