@@ -57,7 +57,7 @@ class ROM[T <: Data](val lits: Seq[Literal], gen: (Int) => T) extends Vec[T](gen
   }
 
   override def isReg: Boolean = true
-
+  override def isInVCD = false
 }
 
 class ROMRead[T <: Data]() extends Node {

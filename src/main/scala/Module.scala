@@ -448,9 +448,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       for((n, io) <- c.io.flatten)
         res.enqueue(io)
 
-    for(r <- Module.resetList)
-      res.enqueue(r)
-
     res
   }
 
@@ -547,8 +544,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   def addDefaultReset {
-    if (defaultResetPin != null)
+    if (!(defaultResetPin == null)) {
       addResetPin(_reset)
+      if (this != topComponent && hasExplicitReset)
+        defaultResetPin.inputs += _reset
+    }
   }
 
   // for every reachable delay element
@@ -838,10 +838,13 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
     } else {
       for (c <- Module.components) {
-        if (!(c.defaultResetPin == null)) // must manually add reset pin cuz it isn't part of io
-          queue.push(() => c.defaultResetPin.traceNode(c, queue))
         queue.push(() => c.io.traceNode(c, queue))
       }
+    }
+    for (c <- Module.components) {
+        if (!(c.defaultResetPin == null)) { // must manually add reset pin cuz it isn't part of io
+          queue.push(() => c.defaultResetPin.traceNode(c, queue))
+        }
     }
     for (c <- Module.components; d <- c.debugs)
       queue.push(() => d.traceNode(c, queue))
