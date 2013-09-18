@@ -93,21 +93,41 @@ Chisel is implemented 100% in Scala!
 Chisel developers
 -----------------
 
-Checking coding style compliance
-
-    $ sbt scalastyle
-
-Running unit tests with code coverage
+Before you generate a pull request, run the following commands
+to insure all unit tests (with code coverage) pass
+and to check for coding style compliance respectively.
 
     $ sbt scct:test
-
-Publishing jar to local system
-
-    $ sbt publish-local
-
-Publishing to public Maven repo
-
-    $ sbt publish-signed
+    $ sbt scalastyle
 
 You can follow Chisel metrics on style compliance and code coverage
 on the [website](https://chisel.eecs.berkeley.edu/unit_test_trends.html).
+
+If you are debugging an issue in a third-party project which depends
+on the Chisel jar, first check that the chisel version in your chisel
+code base and in the third-party project library dependency match.
+After editing the chisel code base, delete the local jar cache directory
+to make sure you are not picking up incorrect jar files, then publish
+the Chisel jar locally and remake your third-party project. Example:
+
+    $ cat *srcTop*/chisel/build.sbt
+    ...
+    version := "2.1-SNAPSHOT"
+    ...
+
+    $ cat *srcTop*/riscv-sodor/project/build.scala
+    ...
+    libraryDependencies += "edu.berkeley.cs" %% "chisel" % "2.1-SNAPSHOT"
+    ...
+
+    $ rm -rf ~/.sbt ~/.ivy2
+    $ cd *srcTop*/chisel && sbt publish-local
+    $ cd *srcTop*/riscv-sodor && make run-emulator
+
+Publishing to public Maven repo:
+
+    $ diff -u build.sbt
+    -version := "2.1-SNAPSHOT"
+    +version := "2.1"
+
+    $ sbt publish-signed
