@@ -33,7 +33,7 @@ and scala source file containing your Chisel code as follow.
       "scct-github-repository" at "http://mtkopone.github.com/scct/maven-repo"
     )
 
-    libraryDependencies += "edu.berkeley.cs" %% "chisel" % "2.0.1"
+    libraryDependencies += "edu.berkeley.cs" %% "chisel" % "2.0.2"
 
 (You want your build.sbt file to contain a reference to Scala version greater
 or equal to 2.10 and a dependency on the Chisel library.)
@@ -67,7 +67,7 @@ At this point you will need to [download and install sbt](http://www.scala-sbt.o
 for your favorite distribution. You will need sbt version 0.12.4 or higher
 because [recent versions of sbt](http://www.scala-sbt.org/0.12.4/docs/Community/Changes.html)
 generate jars without the scala third-point version number
-(i.e. chisel_2.10-2.0.1.jar instead of chisel_2.10*.2*-2.0.1.jar).
+(i.e. chisel_2.10-2.0.2.jar instead of chisel_2.10*.2*-2.0.2.jar).
 
 Execute sbt run to generate the C++ simulation source for your circuit
 
