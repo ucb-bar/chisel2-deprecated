@@ -581,7 +581,6 @@ endmodule
   wire[7:0] rdata;
   wire[7:0] elts_0;
   wire[7:0] T2;
-  wire[63:0] io_pcr_req_data;
 
   assign io_status_im = reg_status_im;
   assign T0 = wdata[3'h7/* 7*/:1'h0/* 0*/];

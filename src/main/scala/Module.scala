@@ -97,10 +97,8 @@ object Module {
   val printfs = ArrayBuffer[Printf]()
   val randInitIOs = new ArrayBuffer[Node]()
   val clocks = new ArrayBuffer[Clock]()
-  val implicitReset = Bool(INPUT)
-  implicitReset.setName("reset")
-  val implicitClock = new Clock()
-  implicitClock.setName("clk")
+  var implicitReset: Bool = null
+  var implicitClock: Clock = null
 
   /* Any call to a *Module* constructor without a proper wrapping
    into a Module.apply() call will be detected when trigger is false. */
@@ -113,6 +111,9 @@ object Module {
      constructors are built. */
     val res = c
     pop()
+    for ((n, io) <- res.wires) {
+      io.isIo = true
+    }
     res
   }
 
@@ -160,6 +161,13 @@ object Module {
     isTesting = false;
     backend = new CppBackend
     topComponent = null;
+    randInitIOs.clear()
+    clocks.clear()
+    implicitReset = Bool(INPUT)
+    implicitReset.isIo = true
+    implicitReset.setName("reset")
+    implicitClock = new Clock()
+    implicitClock.setName("clk")
 
     /* Re-initialize global variables defined in object Node {} */
     nodes.clear()
@@ -284,6 +292,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def reset = {
     if (defaultResetPin == null) {
       defaultResetPin = Bool(INPUT)
+      defaultResetPin.isIo = true
       defaultResetPin.component = this
       defaultResetPin.setName("reset")
     }
@@ -390,6 +399,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           this.reset
         } else {
           val res = Bool(INPUT)
+          res.isIo = true
           res.component = this
           res
         }
@@ -437,9 +447,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     for(c <- Module.components)
       for((n, io) <- c.io.flatten)
         res.enqueue(io)
-
-    for(r <- Module.resetList)
-      res.enqueue(r)
 
     res
   }
@@ -534,6 +541,14 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
   def forceMatchingWidths {
     bfs(_.forceMatchingWidths)
+  }
+
+  def addDefaultReset {
+    if (!(defaultResetPin == null)) {
+      addResetPin(_reset)
+      if (this != topComponent && hasExplicitReset)
+        defaultResetPin.inputs += _reset
+    }
   }
 
   // for every reachable delay element
@@ -823,10 +838,13 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
     } else {
       for (c <- Module.components) {
-        if (!(c.defaultResetPin == null)) // must manually add reset pin cuz it isn't part of io
-          queue.push(() => c.defaultResetPin.traceNode(c, queue))
         queue.push(() => c.io.traceNode(c, queue))
       }
+    }
+    for (c <- Module.components) {
+        if (!(c.defaultResetPin == null)) { // must manually add reset pin cuz it isn't part of io
+          queue.push(() => c.defaultResetPin.traceNode(c, queue))
+        }
     }
     for (c <- Module.components; d <- c.debugs)
       queue.push(() => d.traceNode(c, queue))

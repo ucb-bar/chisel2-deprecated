@@ -1124,7 +1124,7 @@ class Parity extends Module {
   val io = new Bundle {
     val in  = Bool(dir = INPUT)
     val out = Bool(dir = OUTPUT) }
-  val s_even :: s_odd :: Nil = Enum(2, UInt())
+  val s_even :: s_odd :: Nil = Enum(UInt(), 2)
   val state  = Reg(init = s_even)
   when (io.in) {
     when (state === s_even) { state := s_odd  }
@@ -1135,7 +1135,7 @@ class Parity extends Module {
 \end{scala}
 
 \noindent
-where \verb+Enum(2, UInt())+ generates two \verb+UInt+ literals and
+where \verb+Enum(UInt(), 2)+ generates two \verb+UInt+ literals and
 where the states are updated when \verb+in+ is true.  It is worth
 noting that all of the mechanisms for FSMs are built upon registers,
 wires, and conditional updates.
@@ -1149,7 +1149,7 @@ class VendingMachine extends Module {
     val dime   = Bool(dir = INPUT)
     val rdy    = Bool(dir = OUTPUT) }
   val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = 
-    Enum(5, UInt())
+    Enum(UInt(), 2)
   val state = Reg(init = s_idle)
   when (state === s_idle) {
     when (io.nickel) { state := s_5 }
@@ -1182,7 +1182,7 @@ class VendingMachine extends Module {
     val nickel = Bool(dir = INPUT)
     val dime   = Bool(dir = INPUT)
     val rdy    = Bool(dir = OUTPUT) }
-  val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = Enum(5, UFIx())
+  val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = Enum(UFIx(), 5)
   val state = Reg(init = s_idle)
   switch (state) {
       is (s_idle) {
@@ -1833,7 +1833,7 @@ class DecoupledIO[T <: Data](data: T)
     extends Bundle {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
-  val bits  = data.asOutput
+  val bits  = data.clone.asOutput
 }
 \end{scala}
 

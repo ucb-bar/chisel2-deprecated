@@ -168,11 +168,12 @@ class VerilogBackend extends Backend {
   def emitDef(c: Module): String = {
     val spacing = (if(c.verilog_parameters != "") " " else "");
     var res = "  " + c.moduleName + " " + c.verilog_parameters + spacing + c.name + "(";
-    val hasReg = c.containsRegInTree
     if (c.clocks.length > 0) {
       res = res + (c.clocks).map(x => "." + emitRef(x) + "(" + emitRef(x) + ")").reduceLeft(_ + ", " + _)
-      if (c.resets.size > 0 )
-        res = res + ", " + (c.resets.values.toList).map(x => "." + emitRef(x) + "(" + emitRef(x.inputs(0)) + ")").reduceLeft(_ + ", " + _)
+    }
+    if (c.resets.size > 0 ) {    
+      if (c.clocks.length > 0) res = res + ", "
+      res = res + (c.resets.values.toList).map(x => "." + emitRef(x) + "(" + emitRef(x.inputs(0)) + ")").reduceLeft(_ + ", " + _)
     }
     var isFirst = true;
     val portDecs = new ArrayBuffer[StringBuilder]
@@ -229,7 +230,7 @@ class VerilogBackend extends Backend {
     val uncommentedPorts = portDecs.filter(!_.result.contains("//"))
     uncommentedPorts.slice(0, uncommentedPorts.length-1).map(_.append(","))
     portDecs.map(_.insert(0, "       "))
-    if (hasReg) res += ",\n" else res += "\n"
+    if (c.clocks.length > 0 || c.resets.size > 0) res += ",\n" else res += "\n"
     res += portDecs.map(_.result).reduceLeft(_ + "\n" + _)
     res += "\n  );\n";
     if (c.wires.map(_._2.driveRand).reduceLeft(_ || _)) {
@@ -248,7 +249,7 @@ class VerilogBackend extends Backend {
     val res = 
     node match {
       case x: Bits =>
-        if (x.dir == INPUT) {
+        if (x.isIo && x.dir == INPUT) {
           ""
         } else {
           if (node.inputs.length == 0) {
@@ -405,7 +406,7 @@ class VerilogBackend extends Backend {
     val res = 
     node match {
       case x: Bits =>
-        if(x.dir == null) {
+        if(!x.isIo) {
           emitDecBase(node)
         } else {
           ""
@@ -552,7 +553,10 @@ class VerilogBackend extends Backend {
       sb.append("  always @(posedge " + emitRef(clock) + ") begin\n")
       clkDomains += (clock -> sb)
     }
+    println("HUY: in emitRegs of " + c)
     for (m <- c.mods) {
+      if (m.isInstanceOf[Reg] && m.clock == null)
+        println("no clock domain??? " + emitReg(m))
       if (m.clock != null)
         clkDomains(m.clock).append(emitReg(m))
     }
@@ -635,10 +639,9 @@ class VerilogBackend extends Backend {
 
   def emitModuleText(c: Module): String = {
     val res = new StringBuilder()
-    val hasReg = c.containsRegInTree
     var first = true;
     var nl = "";
-    if (c.clocks.length > 0)
+    if (c.clocks.length > 0 || c.resets.size > 0)
       res.append((c.clocks ++ c.resets.values.toList).map(x => "input " + emitRef(x)).reduceLeft(_ + ", " + _))
     val ports = new ArrayBuffer[StringBuilder]
     for ((n, w) <- c.wires) {
@@ -658,7 +661,7 @@ class VerilogBackend extends Backend {
     }
     val uncommentedPorts = ports.filter(!_.result.contains("//"))
     uncommentedPorts.slice(0, uncommentedPorts.length-1).map(_.append(","))
-    if (hasReg) res.append(",\n") else res.append("\n")
+    if (c.clocks.length > 0 || c.resets.size > 0) res.append(",\n") else res.append("\n")
     res.append(ports.map(_.result).reduceLeft(_ + "\n" + _))
     res.append("\n);\n\n");
     // TODO: NOT SURE EXACTLY WHY I NEED TO PRECOMPUTE TMPS HERE

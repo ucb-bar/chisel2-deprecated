@@ -75,8 +75,6 @@ abstract class Bits extends Data with proc {
 
   def toUInt(): UInt = chiselCast(this){UInt()};
 
-  override def isIo: Boolean = dir != null;
-
   def default: Node = if (inputs.length < 1 || inputs(0) == null) null else inputs(0);
 
   override def litOf: Literal = {

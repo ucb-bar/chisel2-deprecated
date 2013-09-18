@@ -592,8 +592,9 @@ class CppBackend extends Backend {
       ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
 
-    def clkName (clock: Clock): String = 
+    def clkName (clock: Clock): String =
       (if (clock == Module.implicitClock) "" else "_" + emitRef(clock))
+
     val clkDomains = new HashMap[Clock, (StringBuilder, StringBuilder)]
     for (clock <- Module.clocks) {
       val clock_lo = new StringBuilder
