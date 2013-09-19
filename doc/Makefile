@@ -4,7 +4,7 @@
 #     $ port install texlive-latex-extra texlive-latex-recommended \
 #           texlive-htmlxml ImageMagick
 
-version   := 2.0.1
+version   := 2.0.2
 
 PDFLATEX  := pdflatex
 WWW_PAGES := index.html documentation.html download.html faq.html
@@ -19,6 +19,8 @@ installTop:= ../www
 vpath %.tex $(srcDir)/bootcamp $(srcDir)/cs250 $(srcDir)/installation $(srcDir)/talks/dac12 $(srcDir)/manual $(srcDir)/tutorial
 
 all: $(WWW_PAGES) $(WWW_EXTRA) $(PDFS)
+
+html: $(WWW_PAGES)
 
 extra: $(WWW_EXTRA)
 
