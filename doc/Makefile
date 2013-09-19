@@ -20,6 +20,8 @@ vpath %.tex $(srcDir)/bootcamp $(srcDir)/cs250 $(srcDir)/installation $(srcDir)/
 
 all: $(WWW_PAGES) $(WWW_EXTRA) $(PDFS)
 
+html: $(WWW_PAGES)
+
 extra: $(WWW_EXTRA)
 
 install: all
