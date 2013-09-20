@@ -117,7 +117,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean,
       wr
     }
 
-    if (seqRead && Module.backend.isInstanceOf[CppBackend] && gen().isInstanceOf[Data]) {
+    if (seqRead && Module.backend.isInstanceOf[CppBackend] && gen().isInstanceOf[Bits]) {
       // generate bogus data when reading & writing same address on same cycle
       val reg_data = new Reg().init("", widthOf(0), wdata)
       val reg_wmask = if (wmask == null) null else Reg(next=wmask)

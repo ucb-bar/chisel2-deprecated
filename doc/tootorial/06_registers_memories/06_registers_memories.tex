@@ -1,0 +1,368 @@
+\documentclass[twocolumn, 10pt]{article}
+\setlength\textwidth{6.875in}
+\setlength\textheight{8.875in}
+% set both margins to 2.5 pc
+\setlength{\oddsidemargin}{-0.1875in}% 1 - (8.5 - 6.875)/2
+\setlength{\evensidemargin}{-0.1875in}
+\setlength{\marginparwidth}{0pc}
+\setlength{\marginparsep}{0pc}%
+\setlength{\topmargin}{0in} \setlength{\headheight}{0pt}
+\setlength{\headsep}{0pt}
+\setlength{\footskip}{37pt}%
+%\setlength{\columnsep}{0.3125in}
+%\setlength{\columnwidth}{3.28125in}% (6.875 - 0.3125)/2 = 3.28125in
+\setlength{\parindent}{1pc}
+\newcommand{\myMargin}{1.00in}
+\usepackage[top=\myMargin, left=\myMargin, right=\myMargin, bottom=\myMargin, nohead]{geometry}
+\usepackage{epsfig,graphicx}
+\usepackage{palatino}
+\usepackage{fancybox}
+\usepackage{hyperref}
+\usepackage[procnames]{listings}
+
+\input{../../style/scala.tex}
+
+\lstset{basicstyle={\footnotesize\ttfamily}}
+
+\newenvironment{commentary}
+{ \vspace{-0.1in}
+  \begin{quotation}
+  \noindent
+  \small \em
+  \rule{\linewidth}{1pt}\\
+}
+{
+  \end{quotation}
+}
+
+\title{Getting Started: Tutorial 06 - Conditional Assignments and Memories}
+\author{Jonathan Bachrach, Vincent Lee \\
+EECS Department, UC Berkeley\\
+{\tt  \{jrb\}@eecs.berkeley.edu}
+}
+\date{\today}
+
+\newenvironment{example}{\VerbatimEnvironment\begin{footnotesize}\begin{Verbatim}}{\end{Verbatim}\end{footnotesize}}
+\newcommand{\kode}[1]{\begin{footnotesize}{\tt #1}\end{footnotesize}}
+
+\def\code#1{{\tt #1}}
+
+\def\note#1{\noindent{\bf [Note: #1]}}
+%\def\note#1{}
+
+\begin{document}
+\maketitle{}
+
+\section{Introduction}
+
+Ths document is intended to revisit and reintroduce structures for conditional register updating, in addition to introducing read only and read-write memories. The tutorial is broken into small sections each of which introduces a new construct.
+
+\section{Conditional Register Updates}
+
+As shown earlier in the tutorial, conditional register updates are performed with the \verb+when+ block which takes a \verb+Bool+ value or some boolean expression to evaluate.
+In this section we more fully explore how to use this \verb+when+ conditional update structure.
+
+If a \verb+when+ block is used by itself, Chisel will assume that if the condition for the \verb+when+ block doesn't evaluate to true, there is no update to the register value. However, most of the time we don't want to limit ourselves a single conditional. Thus in Chisel we use \verb+.elsewhen+ and \verb+.otherwise+ statements to select between multiple possible register updates as shown in the following sections.
+
+\subsection{The .elsewhen Clause}
+
+When specifying a conditional update, we may want to check several conditions which we want to check in some order. 
+To do this for registers updates, we use a \verb+when ... .elsewhen+ structure. This is analagous to an \verb+if... else if+ control structure in sequential programming. \footnote{Note that the if .. else if control structure in Chisel is NOT used to specify register updates} 
+As with \verb+else if+ clauses, as many \verb+.elsewhen+ statements can be chained together in a single \verb+when+ block. 
+
+The general structure thus looks like:
+
+%$when$ (<condition 1>) {<register update 1>}
+%.elsewhen (<condition 2>) {<register update 2>}
+%...
+%.elsewhen (<condition N>) {<register update 3>}
+
+\begin{scala}
+when (<condition 1>) {<register update 1>}
+.elsewhen (<condition 2>) {<register update 2>}
+...
+.elsewhen (<condition N>) {<register update N>}
+\end{scala}
+
+Where \verb+<condition 1>+ through \verb+<condition N>+ represent the trigger conditions of their respective \verb+<register update>+ segments.
+
+An example of this statement in action is shown in the following implementation of a simple stack pointer. Suppose, we need to maintain a pointer that keeps track of the address of the top of a stack. Given a signal \verb+pop+ that decrements the stack pointer address by 1 entry and a signal \verb+push+ that increments the stack pointer address by 1 entry, the implementation of just the pointer would look like the following:
+
+\begin{scala}
+class StackPointer(depth:Int) extends Module {
+  val io = new Bundle {
+    val push = Bool(INPUT)
+    val en = Bool(INPUT)
+    val pop = Bool(INPUT)
+  }
+
+  val sp = Reg(resetVal = UInt(0, width = log2Up(depth)))
+  
+  when(io.en && io.push && (sp != UInt(depth-1))) {
+    sp := sp + UInt(1)
+  } .elsewhen(io.en && io.pop && (sp > UInt(0))) {
+    sp := sp - UInt(1)
+  }
+}
+\end{scala}
+
+Notice that in this implementation, the push signal has higher priority over the pop signal as it appears earlier in the \verb+when+ block.
+
+\subsection{The .otherwise Clause}
+
+In order to specify a default register update value if all the conditions in the \verb+when+ block fail to trigger, we use a \verb+.otherwise+ clause. 
+The \verb+.otherwise+ clause is analagous to the \verb+else+ case that completes an \verb+if ... else+ block. The \verb+.otherwise+ statement must occur last in the \verb+when+ block.
+
+The general structure for the complete \verb+when+ block now looks like:
+\begin{scala}
+when (<condition 1>) {<register update 1>}
+.elsewhen (<condition 2>) {<register update 2>}
+...
+.elsewhen (<condition N>) {<register update N>}
+.otherwise {<default register update>}
+\end{scala}
+
+In the previous example, we could add a default statement which just assigns \verb+sp+ to the current value of \verb+sp+. The \verb+block+ would then look like:
+
+\begin{scala}
+  when(io.en && io.push && (sp != UInt(depth-1))) {
+    sp := sp + UInt(1)
+  } .elsewhen(io.en && io.pop && (sp > UInt(0))) {
+    sp := sp - UInt(1)
+  } .otherwise {
+    sp := sp
+  }
+\end{scala}
+
+The explicit assignment to preserve the value of \verb+sp+ is redundant in this case but it captures the point of the \verb+.otherwise+ statement.
+
+\subsection{The unless Clause}
+
+To complement the \verb+when+ statement, Chisel also supports an \verb+unless+ statement. The \verb+unless+ statement is a conditional assignment that triggers only if the condition is false. The general structure for the \verb+unless+ statement is:
+
+\begin{scala}
+unless ( <condition> ) { <assignments> }
+\end{scala}
+
+For example, suppose we want to do a simple search of the contents of memory and determine the address that contains some number. Since we don't know how long the search will take, the module will output a \verb+done+ signal when it is finished and until then, we want to continue to search memory. The Chisel code for the module would look like:
+
+\begin{scala}
+class MemorySearch extends Module {
+  val io = new Bundle {
+    val target  = UInt(INPUT,  4)
+    val address = UInt(OUTPUT, 3)
+    val en      = Bool(INPUT)
+    val done    = Bool(INPUT)
+  }
+  val done   = Bool()
+  val index  = Reg(resetVal = UInt(0, width = 3))
+  val list   = Vec(UInt(0), UInt(4), UInt(15), UInt(14), UInt(2), UInt(5), UInt(13)){ UInt(width = 4) }
+  val memVal = list(index)
+
+  done := (memVal === io.target) || (index === UInt(7))
+
+  unless (done === Bool(true)) {
+    index := index + UInt(1)
+  }
+  io.done := done
+  io.address := index
+}
+\end{scala}
+
+In this example, we limit the size of the memory to 8 entries and use a vector of literals to create a read only memory. Notice that the \verb+unless+ statement is used to terminate the iteration if it see that the \verb+done+ signal is asserted. Otherwise, it will continue to increment the index in memory until it finds the value in \verb+target+ or reaches the last index in the memory (7).
+
+\section{Combinational Conditional Assignment}
+
+You can also use the \verb+when .elsewhen .otherwise+ block to define combinational values that may take many values. For example, the following Chisel code show how to implement a basic arithmetic unit with 4 operations: add, subtract, and pass. In this example, we check the opcode to determine which operation to perform and conditionally assign the output.
+
+\begin{scala}
+class BasicALU extends Module {
+  val io = new Bundle {
+    val a      = UInt(INPUT, 4)
+    val b      = UInt(INPUT, 4)
+    val opcode = UInt(INPUT, 2)
+    val output = UInt(OUTPUT, 4)
+  }
+  io.output := UInt(0) 
+  when (io.opcode === UInt(0)) {
+    io.output := io.a + io.b   //ADD
+  } .elsewhen (io.opcode === UInt(1)) {
+    io.output := io.b - io.b   //SUB
+  } .elsewhen (io.opcode === UInt(2)) {
+    io.output := io.a  	       //PASS A
+  } .otherwise {
+    io.output := io.b          //PASS B
+  }
+}
+\end{scala}
+
+Notice that this can easily be easily expanded to check many different conditions for more complicated arithmetic units or combinational blocks.
+
+\section{Read Only Memories}
+
+To instantiate read only memories in Chisel, we use a vector of constant literals and specify literal type. For example, in order to instantiate an 4 entry read only memory with the values 0 to 3, the definition would look like the following:
+
+\begin{scala}
+val numbers = Vec(UInt(0), UInt(1), UInt(2), UInt(3)){ UInt(width = 2) }
+\end{scala}
+
+Notice that we need to specify the type of literal in the {...} braces following the literals. Accessing the values in the read only memory is the same as accessing an entry in a \verb+Vec+. For example, to access the 2nd entry of the memory we would use:
+
+\begin{scala}
+val entry2 = numbers(2)
+\end{scala}
+
+\section{Read-Write Memories}
+
+Chisel contains a primitive for memories called \verb+Mem+. Using the \verb+Mem+ class it is possible to construct multi-ported memory that can be synchronous or combinational read. \footnote{The complete definition can be found in the chisel source in  Mem.scala}
+
+\subsection{Basic Instantiation}
+
+The \verb+Mem+ construction takes a memory depth and a data type which it is composed of. The general declaration structure looks like:
+
+\begin{scala}
+val myMem = Mem(<type>, <depth>)
+\end{scala}
+
+Where \verb+<depth>+ corresponds to the number of entries of \verb+<type>+ are in the memory.
+
+For instance, if you wanted to create a 128 deep memory of 32 bit UInt types, you would use the following instantiation:
+
+\begin{scala}
+val myMem = Mem(UInt(width = 32), depth = 128)
+\end{scala}
+
+Note that when constructing a memory in Chisel, the initial value of memory contents cannot be specified. Therefore, you should never assume anything about the initial contents of your \verb+Mem+ class.
+
+\subsection{Synchronous vs. Combinational Read}
+
+It is possible to specify either combinational or synchronous read behavior during instantiation by setting the \verb+seqRead+ parameter when defining the \verb+Mem+. The \verb+seqRead+ parameter is a \verb+Bool+ that tells Chisel if you want synchronous read behavior memory or not.
+
+For instance, if we wanted a combinational read 128 entry memory of 32 bit UInt types, we would use the following definition:
+
+\begin{scala}
+val asyncMem = Mem(UInt(width = 32), depth = 128, seqRead = false)
+\end{scala}
+
+Likewise, if we wanted a synchronous read 128 entry memory of 32 bit UInt types, we would set the \verb+seqRead+ to true:
+
+\begin{scala}
+val syncMem = Mem(UInt(width = 32), depth = 128, seqRead = true)
+\end{scala}
+
+By default, Chisel will assume that the read behavior is combinational.
+
+\subsection{Adding Write Ports}
+
+To add write ports to the \verb+Mem+, we use a \verb+when+ block to allow Chisel to infer a write port. Inside the \verb+when+ block, we specify the location and data for the write transaction. In general, adding a write port requires the following definition:
+
+\begin{scala}
+when (<write condition> ) {
+  <memory name>( <write address> ) := <write data>
+}
+\end{scala}
+
+Where \verb+<write address>+ refers to the entry number in the memory to write to. Also notice that we use the reassignment operator \verb+:=+ when writing to the memory. 
+
+
+For example, suppose we have a 128 deep memory of 32 bit UInt types. If we wanted to write a 32 bit value \verb+dataIn+ to the memory at location \verb+writeAddr+ if as write enable signal \verb+we+ is true, our Chisel code would look like:
+
+\begin{scala}
+...
+val myMem = Mem(UInt(width = 32), depth = 128)
+when (wen) {
+  myMem(writeAddr) := dataIn
+}
+...
+\end{scala}
+
+<what is the behavior of multiple write ports?>
+
+\subsection{Adding Read Ports}
+
+Depending on the type of read behaviour specified, the syntax for adding read ports to \verb+Mem+ in Chisel is slightly different for combinational read and synchornous read memories.
+
+\subsubsection{Combinational Read Ports}
+
+For combinational read memories, adding read port to the memory simply amounts to placing an assignment inside a \verb+when+ block with some trigger condition. If you want Chisel to infer multiple read ports, simply add more assignments in the \verb+when+ definition. The general definition for read ports is thus:
+
+\begin{scala}
+when (<read condition>) {
+  <read data 1> := <memory name>( <read address 1> )
+  ...
+  <read data N> := <memory name>( <read address N>)
+}
+\end{scala}
+
+For instance, if you wanted a 128 entry memory of 32 bit UInt values with two combinational read ports, with some read enable \verb+re+ and reads from addresses \verb+raddr1+ and \verb+raddr2+, we would use the following \verb+when+ block definition:
+
+\begin{scala}
+...
+val myMem = Mem(UInt(width = 32), depth = 128, seqRead = false)
+val read_port1 = UInt(width = 32)
+val read_port2 = UInt(width = 32)
+when (re) {
+  read_port1 := myMem(raddr1)
+  read_port2 := myMem(raddr2)
+}
+...
+\end{scala}
+
+Note that the type and width of the \verb+read_port1+ and \verb+read_port2+ should match the type and width of the entries in the \verb+Mem+.
+
+\subsubsection{Synchronous Read Ports}
+
+In order to add synchronous read ports to the Chisel \verb+Mem+ class, Chisel requires that the output from the memory be assigned to a \verb+Reg+ type. Like the combinational read port, a synchronous read assignment must occur in a \verb+when+ block. The general structure for the definition of a synchronous read port is as follows:
+
+\begin{scala}
+...
+val myMem = Mem(UInt(width = 32), depth = 128, seqRead = true)
+val read_port = Reg(UInt(width = 32))
+when (re) {
+  read_port := myMem(raddr)
+}
+...
+\end{scala}
+
+\subsection{Example of Mem in Action}
+
+We introduced a basic stack pointer bookkeeping example earlier in the tutorial. In this section we show how the complete stack implementation would look like.
+
+Suppose we would like to implement a stack that takes two signals \verb+push+ and \verb+pop+ where \verb+push+ tells the stack to push an input \verb+dataIn+ to the top of the stack, and \verb+pop+ tells the stack to pop off the top value from the stack. Furthermore, an enable signal \verb+en+ disables pushing or popping if not asserted. Finally, the stack should always output the top value of the stack.
+
+\begin{scala}
+class Stack(depth: Int) extends Module {
+  val io = new Bundle {
+    val dataIn  = UInt(INPUT,  32)
+    val dataOut = UInt(OUTPUT, 32)
+    val push    = Bool(INPUT)
+    val pop     = Bool(INPUT)
+    val en      = Bool(INPUT)
+  }
+  
+  //declare the memory for the stack
+  val stack_mem = Mem(UInt(width = 32), depth, seqRead = false)
+  val sp = Reg(init = UInt(0, width = log2Up(depth)))
+  val dataOut = Reg(init = UInt(0, width = 32))
+  
+  //Push condition - make sure stack isn't full
+  when(io.en && io.push && (sp != UInt(depth-1))) {
+    stack_mem(sp + UInt(1)) := io.dataIn
+    sp := sp + UInt(1)
+  } 
+  //Pop condition - make sure the stack isn't empty
+  .elsewhen(io.en && io.pop && (sp > UInt(0))) {
+    sp := sp - UInt(1)
+  }
+  
+  when(io.en) {
+    dataOut := stack_mem(sp)
+  }
+
+  io.dataOut := dataOut
+}
+\end{scala}
+
+Since the module is parametrized to be \verb+depth+ entries deep, in order to correctly extract the minimum width of the stack pointer \verb+sp+ we take the \verb+log2Up(depth)+. This takes the base 2 logarithm of \verb+depth+ and rounds up.
+
+\end{document}
