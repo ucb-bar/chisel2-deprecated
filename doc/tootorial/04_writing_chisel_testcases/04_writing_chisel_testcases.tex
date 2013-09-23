@@ -1,0 +1,216 @@
+\documentclass[twocolumn, 10pt]{article}
+\setlength\textwidth{6.875in}
+\setlength\textheight{8.875in}
+% set both margins to 2.5 pc
+\setlength{\oddsidemargin}{-0.1875in}% 1 - (8.5 - 6.875)/2
+\setlength{\evensidemargin}{-0.1875in}
+\setlength{\marginparwidth}{0pc}
+\setlength{\marginparsep}{0pc}%
+\setlength{\topmargin}{0in} \setlength{\headheight}{0pt}
+\setlength{\headsep}{0pt}
+\setlength{\footskip}{37pt}%
+%\setlength{\columnsep}{0.3125in}
+%\setlength{\columnwidth}{3.28125in}% (6.875 - 0.3125)/2 = 3.28125in
+\setlength{\parindent}{1pc}
+\newcommand{\myMargin}{1.00in}
+\usepackage[top=\myMargin, left=\myMargin, right=\myMargin, bottom=\myMargin, nohead]{geometry}
+\usepackage{epsfig,graphicx}
+\usepackage{palatino}
+\usepackage{fancybox}
+\usepackage{hyperref}
+\usepackage[procnames]{listings}
+
+\input{../../style/scala.tex}
+
+\lstset{basicstyle={\footnotesize\ttfamily}}
+
+\newenvironment{commentary}
+{ \vspace{-0.1in}
+  \begin{quotation}
+  \noindent
+  \small \em
+  \rule{\linewidth}{1pt}\\
+}
+{
+  \end{quotation}
+}
+
+\title{Getting Started - Tutorial 04: Writing Scala Testbenches}
+\author{Jonathan Bachrach, Vincent Lee \\
+EECS Department, UC Berkeley\\
+{\tt  \{jrb\}@eecs.berkeley.edu}
+}
+\date{\today}
+
+\newenvironment{example}{\VerbatimEnvironment\begin{footnotesize}\begin{Verbatim}}{\end{Verbatim}\end{footnotesize}}
+\newcommand{\kode}[1]{\begin{footnotesize}{\tt #1}\end{footnotesize}}
+
+\def\code#1{{\tt #1}}
+
+\def\note#1{\noindent{\bf [Note: #1]}}
+%\def\note#1{}
+
+\begin{document}
+\maketitle{}
+
+\section{Introduction}
+
+There are several different way that you can test your design in Chisel. This first is through a Scala testbench setup that is part of Chisel. The second is using a C++ emulator using the generated C++ which is compiled from the Chisel source code. A third method is to generate the Verilog code from the Chisel source code and write a Verilog testharness. This document is intended to familiarize you with writing Scala testbenches in Chisel. The C++ testbench is covered in a more advanced tutorial.  This tutorial assumes that you are familiar with what was presented in the previous tutorial.
+
+\subsection{Acquiring the Tutorial Files}
+
+To get the files required for this tutorial, you will need to have Git installed on your machine. Change directory to the place you would like to place your Chisel files (let's call this \verb+$DIR+ from now on) and get the tutorial files with:
+
+\begin{bash}
+git clone https://github.com/ucb-bar/chisel-tutorial.git
+\end{bash}
+
+This will clone the Chisel tutorial files onto your machine. If you cloned the repository into \verb+$DIR+ then your copy of the Chisel Tutorial repository will then be in \verb+$DIR/chisel-tutorial+.
+
+\section{The Scala Testbench Simulation}
+
+Chisel's Scala based testbench is the first line of defense against simple bugs in your design. The Scala testbench uses several unique Chisel constructs to perform this. To see how this works, let's first explore a simple example.
+
+\subsection{Scala Testbench Example}
+
+Below is the \verb+ByteSelector.scala+ component definition from the previous tutorial and the corresponding Chisel test harness.
+
+\begin{scala}
+package TutorialProblems
+
+import Chisel._
+import Node._
+import scala.collection.mutable.HashMap
+import util.Random
+
+class ByteSelector extends Module {
+  val io = new Bundle {
+    val in     = UInt(INPUT, 32)
+    val offset = UInt(INPUT, 2)
+    val out    = UInt(OUTPUT, 8)
+  }
+  io.out := UInt(0, width = 8)
+  when (io.offset === UInt(0)) {
+    io.out := io.in(7,0)
+  } .elsewhen (io.offset === UInt(1)) {
+    io.out := io.in(15,8)
+  } .elsewhen (io.offset === UInt(2)) {
+    io.out := io.in(23,16)
+  } .otherwise {
+    io.out := io.in(31,24)
+  }    
+}
+
+class ByteSelectorTests(c: ByteSelector) extends Tester(c, Array(c.io)) {  
+  defTests {
+    var allGood = true
+    val vars = new HashMap[Node, Node]()
+    val test_in = UInt(12345678)
+    for (t <- 0 until 4) {
+      vars(c.io.in) = test_in
+      vars(c.io.offset) = UInt(t)
+      val ref_out = (test_in >> (UInt(t * 8))) & UInt(0xFF)
+      vars(c.io.out) = ref_out
+      allGood = step(vars) && allGood
+    }
+    allGood
+  }
+}
+\end{scala}
+
+In the test harness \verb+ByteSelectorTests+ we see that the test portion is written in Scala with some Chisel constructs inside of a \verb+defTests+ block. The first thing to notice is that we use a hash map \verb+vars+ to hold the input-output combination behavior for the device we are testing. The device under test is passed to us as a parameter \verb+c+ which is why we prepend \verb+c+ to the I/O names when specifying them. 
+
+In the \verb+for+ look, the assignments for each io of the \verb+ByteSelector+ is set to the appropriate values. For this particular example, we are testing the \verb+ByteSelector+ by hardcoding the input to some known value and checking if each of the 4 offsets returns the appropriate byte. To do this, on each iteration we generate appropriate inputs to the component and tell the simulation to assign this value to the input of the device we are testing \verb+c+:
+
+\begin{scala}
+ val test_in = UInt(12345678)
+for (t <- 0 until 4) {
+   vars(c.io.in) = test_in  //set in of the DUT to be some known word
+   vars(c.io.offset) = UInt(t) //set the offset of the DUT
+   ..
+}
+\end{scala}
+
+The next step is to define the expected reference output to \verb+ByteSelector+ and assign the expected output of the device under test \verb+c+. In this example, this is done in the next two lines:
+
+\begin{scala}
+val ref_out = (test_in >> (UInt(t * 8))) & UInt(0xFF)
+vars(c.io.out) = ref_out
+\end{scala}
+
+This defines the reference output expected for this particular cycle of the simulation. Since the circuit we are testing is purely combinational, we expected that output we define appears on any advancement of the simulation.
+
+We next advance the simulation by calling the \verb+step+ function. This effectively advances the simulation one clock cycle in the presence of sequential logic. In our simulation, we want to output at the end if the the simulation failed or not so we effectively accumulate the failures by:
+
+\begin{scala}
+allGood = step(vars) && allGood
+\end{scala}
+
+The \verb+step+ function will return either true or false after checking if for the inputs defined earlier, the device generates the expected reference output. Thus if the inputs defined for \verb+c.io.in+ and \verb+c.io.offset+ does not result in \verb+c.io.out+, the \verb+step+ function will return a failure. Notice that the \verb+step+ function knows about the pin assignments and reference output through the hash map \verb+vars+ that gets passed to it. We also notice that the \verb+allGood+ Bool value will end up false in the event of one or more failures and true if none of the simulation checks fail.
+
+\subsection{Simulation Debug Output}
+
+Now suppose we run the testbench for the \verb+ByteSelector+ defined previously. To do this, \verb+cd+ into the \verb+\$DIR/problems+ directory and run \verb+make ByteSelector+.
+
+When we run the testbench, we will notice that the simulation produces debug output every time the \verb+step+ function is called. Each of these calls gives the state of the inputs and outputs to the \verb+ByteSelector+ and if the check between the reference output and expected output matched as shown below:
+
+\begin{bash}
+STARTING ../emulator/problems/ByteSelector
+---
+INPUTS
+  INPUT(ByteSelector__io_in.ByteSelector) = 12345678
+  INPUT(ByteSelector__io_offset.ByteSelector) = 0
+OUTPUTS
+  READ OUTPUT(ByteSelector__io_out.ByteSelector) = 78
+  EXPECTED: OUTPUT(ByteSelector__io_out.ByteSelector) = 78
+  SUCCESS
+---
+INPUTS
+  INPUT(ByteSelector__io_in.ByteSelector) = 12345678
+  INPUT(ByteSelector__io_offset.ByteSelector) = 1
+OUTPUTS
+  READ OUTPUT(ByteSelector__io_out.ByteSelector) = 97
+  EXPECTED: OUTPUT(ByteSelector__io_out.ByteSelector) = 97
+  SUCCESS
+---
+INPUTS
+  INPUT(ByteSelector__io_in.ByteSelector) = 12345678
+  INPUT(ByteSelector__io_offset.ByteSelector) = 2
+OUTPUTS
+  READ OUTPUT(ByteSelector__io_out.ByteSelector) = 188
+  EXPECTED: OUTPUT(ByteSelector__io_out.ByteSelector) = 188
+  SUCCESS
+---
+INPUTS
+  INPUT(ByteSelector__io_in.ByteSelector) = 12345678
+  INPUT(ByteSelector__io_offset.ByteSelector) = 3
+OUTPUTS
+  READ OUTPUT(ByteSelector__io_out.ByteSelector) = 0
+  EXPECTED: OUTPUT(ByteSelector__io_out.ByteSelector) = 0
+  SUCCESS
+PASSED   //Final pass assertion
+[success] Total time: 26 s, ...
+\end{bash}
+
+Also notice that there is a final pass assertion "PASSED" at the end which corresponds to the \verb+allGood+ at the very end of the testbench. In this case, we know that the test passed since the allGood assertion resulted in a "PASSED". In the event of a failure, the assertion would result in a "FAILED" output message here.
+
+\subsection{General Testbench}
+
+In general, the scala testbench should have the following rough structure:
+
+\begin{itemize}
+\item Define hash map for I/O and any initializations
+\item Set inputs to device under test in hash map
+\item Determine expected output for simulation advance for hash map
+\item Advance simulation and track success/failure (ex. allGood)
+\item Repeat until all appropriate test cases verified
+\item Assert if test passed or failed (allGood)
+\end{itemize}
+
+For sequential components we may want to delay the output definition to the appropriate time as the \verb+step+ function implicitly advances the clock one period in the simulation. Unlike Verilog, you do not need to explicitly specify the timing advances of the simulation; Chisel will take care of these details for you.
+
+\section{Limitations of the Testbench}
+
+The Chisel testbench works well for simple tests and small numbers of simulation iterations. However, for larger test cases, the Chisel testbench quickly becomes more complicated and slower simply due to the inefficiency of the infrastructure. For these larger and more complex test cases, we recommend using the C++ emulator or Verilog test harness which runs faster and can handle more rigorous test cases.
+
+\end{document}

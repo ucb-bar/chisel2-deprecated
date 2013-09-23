@@ -553,10 +553,7 @@ class VerilogBackend extends Backend {
       sb.append("  always @(posedge " + emitRef(clock) + ") begin\n")
       clkDomains += (clock -> sb)
     }
-    println("HUY: in emitRegs of " + c)
     for (m <- c.mods) {
-      if (m.isInstanceOf[Reg] && m.clock == null)
-        println("no clock domain??? " + emitReg(m))
       if (m.clock != null)
         clkDomains(m.clock).append(emitReg(m))
     }

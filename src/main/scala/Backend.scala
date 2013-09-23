@@ -308,7 +308,8 @@ abstract class Backend {
         } else {
           node.component
         }
-      node.component.nodes += node
+      if (!node.component.nodes.contains(node))
+        node.component.nodes += node
       for (input <- node.inputs) {
         if(!walked.contains(input)) {
           if( input.component == null ) {
@@ -423,7 +424,6 @@ abstract class Backend {
         for (clock <- child.clocks) {
           parent.addClock(clock)
         }
-        println("HUY: parent: " + parent + " child: " + child + " " + child.resets.size)
         for (reset <- child.resets.keys) {
           // create a reset pin in parent if reset does not originate in parent and 
           // if reset is not an output from one of parent's children
@@ -544,7 +544,6 @@ abstract class Backend {
     transform(c, transforms)
     ChiselError.info("finished transforms")
 
-    Module.sortedComps.map(x => println(x + " " + x.nodes.length))
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
     c.traceNodes();
     for (comp <- Module.sortedComps)
