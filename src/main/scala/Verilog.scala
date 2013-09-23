@@ -498,7 +498,7 @@ class VerilogBackend extends Backend {
     harness.write(" );\n")
 
     harness.write("  integer count;\n")
-    harness.write("  always @(negedge clk) begin;\n")
+    harness.write("  always @(negedge clk) begin\n")
     harness.write("  #50;\n")
     harness.write("    if (!reset) ")
     harness.write("count = $fscanf('h80000000, \"" + scanFormat.slice(0,scanFormat.length-1) + "\"")
@@ -783,7 +783,7 @@ class VerilogBackend extends Backend {
       out_conf.write(getMemConfString);
       out_conf.close();
     }
-    if (Module.isTesting && Module.tester != null) {
+    if( Module.tester != null ) {
       Module.scanArgs.clear();  Module.scanArgs  ++= Module.tester.testInputNodes;    Module.scanFormat  = ""
       Module.printArgs.clear(); Module.printArgs ++= Module.tester.testNonInputNodes; Module.printFormat = ""
     }
