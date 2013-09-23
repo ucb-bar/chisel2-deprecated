@@ -163,6 +163,7 @@ object OHToUInt
   def apply(in: Seq[Bool]): UInt = {
     if (in.size <= 1) return UInt(0)
     if (in.size == 2) return in(1)
+    if (!isPow2(in.size)) return apply(in.padTo(1 << log2Up(in.size), Bool(false)))
     val hi = in.slice(in.size/2, in.size)
     val lo = in.slice(0, in.size/2)
     Cat(hi.reduceLeft((s1, s2) => {s1 || s2}),
