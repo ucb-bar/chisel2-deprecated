@@ -1588,13 +1588,19 @@ class mem_t {
     return get(idx.lo_word() & (nextpow2_1(d)-1));
   }
   dat_t<w> get (val_t idx) {
-    if (!ispow2(d) && idx >= d)
+    if (!ispow2(d) && idx >= d) {
+      std::cerr << "warning: reading mem_t<" << w << "," << d << "> at index "
+                << idx << std::endl;
       return dat_t<w>::rand();
+    }
     return contents[idx];
   }
   val_t get (val_t idx, int word) {
-    if (!ispow2(d) && idx >= d)
+    if (!ispow2(d) && idx >= d) {
+      std::cerr << "warning: reading mem_t<" << w << "," << d << "> at index "
+                << idx << std::endl;
       return rand_val() & (word == val_n_words(w) && val_n_word_bits(w) ? mask_val(w) : -1L);
+    }
     return contents[idx].values[word];
   }
   template <int iw>
@@ -1602,12 +1608,20 @@ class mem_t {
     put(idx.lo_word(), val);
   }
   void put (val_t idx, dat_t<w> val) {
-    if (ispow2(d) || idx < d)
+    if (ispow2(d) || idx < d) {
       contents[idx] = val;
+    } else {
+      std::cerr << "warning: writing mem_t<" << w << "," << d << "> at index "
+                << idx << std::endl;
+    }
   }
   val_t put (val_t idx, int word, val_t val) {
-    if (ispow2(d) || idx < d)
+    if (ispow2(d) || idx < d) {
       contents[idx].values[word] = val;
+    } else {
+      std::cerr << "warning: writing mem_t<" << w << "," << d << "> at index "
+                << idx << std::endl;
+    }
   }
   void print ( void ) {
     for (int j = 0; j < d/4; j++) {
