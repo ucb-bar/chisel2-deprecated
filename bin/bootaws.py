@@ -6,11 +6,16 @@
 # $ pip install -U boto Fabric
 #
 # export AWS_ACCOUNT_ID=<your_account_id_on_aws>
+# (optional)
+#   export SMTP_USER=<smtp_user>
+#   export SMTP_PASSWORD=<smtp_password>
 
-import os, sys, time
+import os, smtplib, sys, time
+from email.mime.text import MIMEText
 
 import boto, boto.ec2
 import fabric.api as fab
+import fabric.exceptions
 from fabric.decorators import task
 
 #EC2_BUNDLE_VOL    = 'euca-bundle-vol-2.7'
@@ -27,6 +32,9 @@ fab.env.update({
 key_name = os.path.basename(fab.env.get('key_filename'))
 AWS_ACCOUNT_ID = os.getenv('AWS_ACCOUNT_ID')
 x509_name = 'chisel.eecs.berkeley.edu'
+
+SMTP_USER = os.getenv('SMTP_USER')
+SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
 
 def wait_for_public_dns_name(conn, reserv):
     counter = 0
@@ -176,12 +184,12 @@ def package(public_dns_name):
 
 
 @task
-def deploy(identifiers):
+def deploy(emails, send_confirmation=False):
     """
     Start as many number of Chisel-ready EC2 instances as necessary
     and associate them one-to-one to the identifers list.
     """
-    nb_instances = len(identifiers)
+    nb_instances = len(emails)
     sys.stdout.write("deploy %d instances\n" % nb_instances)
     conn = boto.ec2.connect_to_region('us-west-2')
     # Chisel AMI
@@ -194,8 +202,54 @@ def deploy(identifiers):
     # Wait a minute or two while it boots
     reservation = wait_for_public_dns_name(conn, reservation)
 
-    for identifier, instance in zip(identifiers, reservation.instances):
-        sys.stdout.write("%s %s\n" % (identifier, instance.public_dns_name))
+    for identifier, instance in zip(emails, reservation.instances):
+        fab.env['host_string'] = instance.public_dns_name
+        counter = 0
+        while counter < 3:
+            try:
+                fab.run("echo")
+            except fabric.exceptions.NetworkError:
+                time.sleep(20)
+            counter = counter + 1
+        fab.sudo('echo "ubuntu:%s" | chpasswd' % identifier)
+        fab.sudo('cp /etc/ssh/sshd_config /etc/ssh/sshd_config~')
+        fab.sudo("sed -e 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config~ > /etc/ssh/sshd_config")
+        fab.sudo("restart ssh")
+
+    for identifier, instance in zip(emails, reservation.instances):
+        sys.stdout.write("%s %s" % (identifier, instance.public_dns_name))
+        if send_confirmation:
+            try:
+                msg = MIMEText("""
+Welcome to the [Chisel](https://chisel.eecs.berkeley.edu) bootcamp!
+
+To access the Amazon EC2 instance you will be used for the lab exercise,
+please follow these instructions:
+
+1. Login to your machine using your email when prompted for a password
+    $ ssh ubuntu@%(public_dns_name)s
+
+2. Go to the chisel-tutorial
+    $ cd chisel-tutorial
+
+3. Read through the README and wait for the lab session to start
+
+Thank you,
+- The Chisel Development Team.
+""" % {"public_dns_name": instance.public_dns_name})
+                msg['Subject'] = 'Welcome to the Chisel bootcamp!'
+                msg['From'] = 'Chisel <parlab-admin@eecs.berkeley.edu>'
+                msg['To'] = identifier
+                server = smtplib.SMTP('smtp.gmail.com', 587)
+                server.ehlo()
+                server.starttls()
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.sendmail('parlab-admin@eecs.berkeley.edu',
+                                [msg['To']], msg.as_string())
+                server.quit()
+                sys.stdout.write(" email sent OK")
+            finally:
+                sys.stdout.write("\n")
 
 
 @task
@@ -221,7 +275,7 @@ def main(args):
     elif args[1] == 'package':
         package(args[2])
     elif args[1] == 'deploy':
-        deploy(args[2:])
+        deploy(args[2:], send_confirmation=True)
     elif args[1] == 'teardown':
         teardown()
     else:
