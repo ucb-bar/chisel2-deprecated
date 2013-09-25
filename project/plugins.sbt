@@ -7,7 +7,7 @@ resolvers ++= Seq(
   "Sonatype Releases" at "http://oss.sonatype.org/content/repositories/releases"
 )
 
-addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "0.2.0")
+addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "0.3.2")
 
 resolvers += Classpaths.typesafeResolver
 
