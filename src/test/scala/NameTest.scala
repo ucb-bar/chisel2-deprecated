@@ -35,6 +35,7 @@ import org.junit.Assert._
 import org.junit.Test
 import org.junit.Before
 import org.junit.After
+import org.junit.Ignore
 import org.junit.rules.TemporaryFolder;
 
 import Chisel._
