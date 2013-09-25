@@ -35,6 +35,7 @@ import org.junit.Assert._
 import org.junit.Test
 import org.junit.Before
 import org.junit.After
+import org.junit.Ignore
 import org.junit.rules.TemporaryFolder;
 
 import Chisel._
@@ -956,4 +957,33 @@ void NameSuite_DebugComp_1_t::dump(FILE *f, int t) {
 """)
   }
 
+  /* XXX test case derived from issue #6 on github.
+   */
+  @Ignore("clean use of nameHolder") @Test def testInputPortNameChange() {
+    class InputPortNameComp extends Module {
+      val io = new Bundle {
+        val in = Bits(INPUT, 20)
+        val out = Bits(OUTPUT, 20)
+      }
+
+      val newName = io.in
+      io.out := newName
+    }
+
+    chiselMain(Array[String]("--v",
+      "--targetDir", tmpdir.getRoot().toString()),
+      () => Module(new InputPortNameComp))
+    assertFile(tmpdir.getRoot() + "/NameSuite_InputPortNameComp_1.v",
+"""module NameSuite_InputPortNameComp_1(
+    input [19:0] io_in,
+    output[19:0] io_out
+);
+
+
+  assign io_out = io_in;
+endmodule
+
+"""
+    );
+  }
 }

@@ -274,6 +274,31 @@ class DataSuite_BypassDataComp_1_t : public mod_t {
 """)
   }
 
+  /** Test case derived from issue #1 reported on github.
+    Check an out-of-range bit extract throws an exception.
+    */
+  @Test def testBuildCarryChain() {
+    try {
+    class CarryChainComp(size: Int) extends Module {
+      val io = new Bundle {
+        val r = UInt(INPUT, width=size)
+        val p = UInt(INPUT, width=size)
+        val out = UInt(OUTPUT)
+      }
+      val grant_pass1 = ~io.r + io.p;
+      val grant_pass2 = ~io.r + UInt(1, size);
+      io.out := Mux(grant_pass1(size).toBool(),
+        io.r & grant_pass2(size-1, 0), io.r & grant_pass1(size-1, 0));
+    }
+
+    chiselMain(Array[String]("--backend", "c",
+      "--targetDir", tmpdir.getRoot().toString()),
+      () => Module(new CarryChainComp(4)))
+    } catch {
+      case _ : Throwable => assertTrue(!ChiselError.ChiselErrors.isEmpty);
+    }
+  }
+
 }
 
 
