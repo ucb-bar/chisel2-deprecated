@@ -472,10 +472,13 @@ abstract class Backend {
       val node = dfsStack.pop
       for (consumer <- node.consumers) {
         if (!consumer.isInstanceOf[Delay] && !walked.contains(consumer)) {
-          if(!(consumer.clock == null || consumer.clock == clock))
-            ChiselError.warning({emitDef(consumer) + " resolves to clock domain " + 
-                                 emitRef(consumer.clock) + " and " + emitRef(clock)})
-          consumer.clock = clock
+          val c1 = consumer.clock
+          val c2 = clock
+          if(!(consumer.clock == null || consumer.clock == clock)) {
+            ChiselError.warning({consumer.getClass + " " + emitRef(consumer) + " " + emitDef(consumer) + "in module" +
+                                 consumer.component + " resolves to clock domain " + 
+                                 emitRef(c1) + " and " + emitRef(c2) + " traced from " + root.name})
+          } else { consumer.clock = clock }
           walked += consumer
           dfsStack.push(consumer)
         }

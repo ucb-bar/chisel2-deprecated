@@ -907,7 +907,7 @@ int NameSuite_DebugComp_1_t::clock ( dat_t<1> reset ) {
   clk_cnt-=min;
   if (clk_cnt == 0) clock_lo( reset );
   if (clk_cnt == 0) clock_hi( reset );
-  if (clk_cnt == 0) clk_cnt = clk-1;
+  if (clk_cnt == 0) clk_cnt = clk;
   return min;
 }
 void NameSuite_DebugComp_1_t::print ( FILE* f ) {

@@ -39,10 +39,12 @@ import scala.collection.mutable.{ArrayBuffer, HashMap}
   a LFSR, which returns "1" on its first invocation).
   */
 object Mem {
-  def apply[T <: Data](out: T, n: Int, seqRead: Boolean = false, clock: Clock = Module.implicitClock): Mem[T] = {
+  def apply[T <: Data](out: T, n: Int, seqRead: Boolean = false, clock: Clock = null): Mem[T] = {
     val gen = out.clone
     Reg.validateGen(gen)
-    new Mem(() => gen, n, seqRead, clock)
+    val res = new Mem(() => gen, n, seqRead)
+    if (!(clock == null)) res.clock = clock
+    res
   }
 
   Module.backend.transforms.prepend { c =>
@@ -64,8 +66,7 @@ abstract class AccessTracker extends Delay {
   def readAccesses: ArrayBuffer[_ <: MemAccess]
 }
 
-class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean,
-    clock: Clock = Module.implicitClock) extends AccessTracker {
+class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean) extends AccessTracker {
   def writeAccesses: ArrayBuffer[MemWrite] = writes ++ readwrites.map(_.write)
   def readAccesses: ArrayBuffer[_ <: MemAccess] = reads ++ seqreads ++ readwrites.map(_.read)
   def ports: ArrayBuffer[_ <: MemAccess] = writes ++ reads ++ seqreads ++ readwrites

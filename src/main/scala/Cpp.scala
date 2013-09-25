@@ -427,6 +427,11 @@ class CppBackend extends Backend {
 
   def emitInit(node: Node): String = {
     node match {
+      case x: Clock =>
+        if (x.srcClock != null)
+          "  " + emitRef(node) + " = " + emitRef(x.srcClock) + x.initStr
+        else
+          ""
       case x: Reg =>
         "  if (rand_init) " + emitRef(node) + ".randomize();\n"
 
@@ -455,7 +460,6 @@ class CppBackend extends Backend {
           return ""
         }
         def mask(w: Int): String = "(-" + emitLoWordRef(m.cond) + (if (m.isMasked) " & " + emitWordRef(m.mask, w) else "") + ")"
-
         block((0 until words(m)).map(i => emitRef(m.mem)
           + ".put(" + emitLoWordRef(m.addr) + ", " + i
           + ", (" + emitWordRef(m.data, i) + " & " + mask(i)
@@ -467,28 +471,52 @@ class CppBackend extends Backend {
     }
   }
 
+  def clkName (clock: Clock): String =
+    (if (clock == Module.implicitClock) "" else "_" + emitRef(clock))
+
   def genHarness(c: Module, name: String) {
     val harness  = createOutputFile(name + "-emulator.cpp");
     harness.write("#include \"" + name + ".h\"\n");
     harness.write("int main (int argc, char* argv[]) {\n");
     harness.write("  " + name + "_t* c = new " + name + "_t();\n");
     harness.write("  int lim = (argc > 1) ? atoi(argv[1]) : -1;\n");
+    harness.write("  int period;\n")
+    if (Module.clocks.length > 1) {
+      for (clock <- Module.clocks) {
+        harness.write("  period = atoi(read_tok(stdin).c_str());\n")
+        harness.write("  c->" + emitRef(clock) + " = period;\n")
+        harness.write("  c->" + emitRef(clock) + "_cnt = period;\n")
+      }
+    }
     harness.write("  c->init();\n");
     if (Module.isVCD) {
       harness.write("  FILE *f = fopen(\"" + name + ".vcd\", \"w\");\n");
     }
+    harness.write("  int delta = 0;\n")
     harness.write("  for(int i = 0; i < 5; i++) {\n")
     harness.write("    dat_t<1> reset = LIT<1>(1);\n")
-    harness.write("    c->clock_lo(reset);\n")
-    harness.write("    c->clock_hi(reset);\n")
+    if (Module.clocks.length > 1) {
+      harness.write("    delta += c->clock(reset);\n")
+    } else {
+      harness.write("    c->clock_lo(reset);\n")
+      harness.write("    c->clock_hi(reset);\n")
+    }
     harness.write("  }\n")
     harness.write("  for (int t = 0; lim < 0 || t < lim; t++) {\n");
     harness.write("    dat_t<1> reset = LIT<1>(0);\n");
     harness.write("    if (!c->scan(stdin)) break;\n");
     // XXX Why print is after clock_lo and dump after clock_hi?
-    harness.write("    c->clock_lo(reset);\n");
-    harness.write("    c->print(stdout);\n");
-    harness.write("    c->clock_hi(reset);\n");
+    if (Module.clocks.length > 1) {
+      harness.write("    delta += c->clock(reset);\n")
+      harness.write("    fprintf(stdout, \"%d\", delta);\n")
+      harness.write("    fprintf(stdout, \"%s\", \" \");\n")
+      harness.write("    c->print(stdout);\n")
+      harness.write("    delta = 0;\n")
+    } else {
+      harness.write("    c->clock_lo(reset);\n");
+      harness.write("    c->print(stdout);\n");
+      harness.write("    c->clock_hi(reset);\n");
+    }
     if (Module.isVCD) {
       harness.write("    c->dump(f, t);\n");
     }
@@ -592,9 +620,6 @@ class CppBackend extends Backend {
       ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
 
-    def clkName (clock: Clock): String =
-      (if (clock == Module.implicitClock) "" else "_" + emitRef(clock))
-
     val clkDomains = new HashMap[Clock, (StringBuilder, StringBuilder)]
     for (clock <- Module.clocks) {
       val clock_lo = new StringBuilder
@@ -696,7 +721,7 @@ class CppBackend extends Backend {
     }
     for (clock <- Module.clocks) {
       out_c.write("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " + 
-                  emitRef(clock) + "-1;\n")
+                  emitRef(clock) + ";\n")
     }
     out_c.write("  return min;\n")
     out_c.write("}\n")
