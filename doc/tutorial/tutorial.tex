@@ -754,7 +754,7 @@ object chiselMainTest {
 \end{scala}
 
 \noindent
-When \code{--test} is given as an argument to \code{chiselMain}, 
+When \code{-{-}test} is given as an argument to \code{chiselMainTest}, 
 a tester instance runs the Design Under Test (DUT) is as a process
 with stdin and stdout connected so that inputs can be sent to the DUT and outputs can
 received from the DUT as shown in Figure~\ref{fig:dut}.  
@@ -883,8 +883,9 @@ def toggle(p: Bool) = {
   x
 }
 
-// Square wave where each half cycle has given period.
-def squareWave(period: UInt) = toggle(pulse(period))
+% MS: a period contains both phases (high and low)
+// Square wave of a given period.
+def squareWave(period: UInt) = toggle(pulse(period/2))
 \end{scala}
 
 \subsection{Forward Declarations}
@@ -1011,7 +1012,9 @@ when (!c) { body }
 The update block can target multiple registers, and there can be
 different overlapping subsets of registers present in different update
 blocks.  Each register is only affected by conditions in which it
-appears.  For example:
+appears.  The same is possible for combinational circuits (update
+of a \code{Wire}). Note that all combinational
+circuits need a default value. For example:
 \begin{scala}
 r := SInt(3); s := SInt(3)
 when (c1)   { r := SInt(1); s := SInt(1) }
@@ -1724,6 +1727,7 @@ y[t] = \sum_j w_j * x_j[t-j]
 where $x$ is the input and $w$ is a vector of weights.
 In Chisel this can be defined as:
 
+% MS: just out of curiosity: does this example generate several delay lines?
 \begin{scala}
 def delays[T <: Data](x: T, n: Int): List[T] = 
   if (n <= 1) List(x) else x :: delays(Reg(next = x), n-1)
