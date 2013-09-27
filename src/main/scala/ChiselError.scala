@@ -62,7 +62,7 @@ object ChiselError {
   }
 
   /** emit a warning message */
-  def warning(m: String) {
+  def warning(m: => String) {
     val stack = Thread.currentThread().getStackTrace
     ChiselErrors += new ChiselError(() => m,
       findFirstUserLine(stack) getOrElse stack(0), 1)
