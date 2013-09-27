@@ -119,7 +119,7 @@ sudo apt-get install
 
 \section{Setting Up the Tutorial}
 
-In subsequent tutorials, you will be using the files distributed in our chisel-tutorial repository. To obtain these tutorials files, \verb+cd+ to the directory = \verb+$DIR+ where you want to place Chisel tutorial and type:
+In subsequent tutorials, you will be using the files distributed in the chisel-tutorial repository. To obtain these tutorials files, \verb+cd+ to the directory = \verb+$DIR+ where you want to place the Chisel tutorial and type:
 
 \begin{bash}
 cd $DIR
@@ -127,7 +127,7 @@ git clone https://github.com/ucb-bar/chisel-tutorial.git
 \end{bash}
 
 \noindent
-Your copy of the Chisel Tutorial repository will then be in \verb+$DIR/chisel-tutorial+.  Define this as a variable in your bash environment:
+Your copy of the Chisel Tutorial repository will then be in \verb+$DIR/chisel-tutorial+.  Define this as a variable in your bash environment named \verb+$TUT_DIR+.
 
 The following is the Chisel tutorial directory structure that you should see which is explained more in the next tutorial:
 
@@ -150,15 +150,13 @@ chisel-tutorial/
 
 \noindent 
 
-The following tutorials will explain features of Chisel by presenting a number of examples. These examples can be found in the distribution under <insert distribution path>.
-
-The repository is split into examples, problems and solutions, where the problems have some piece of the design for you to fill out and where the examples and solutions are meant to be complete designs that should pass the given tests.  In order to run either, you simply need to change directory into the appropriate subdirectory and type \verb+make+ of the particular lesson name. We will use the repository to first test out if your machine is set up to use Chisel.
+The following tutorials will explain features of Chisel by presenting source code examples.  The repository is split into examples, problems and solutions, where the problems have some piece of the design for you to fill out and where the examples and solutions are meant to be complete designs that should pass the given tests.  In order to run either, you simply need to change directory into the appropriate subdirectory and type \verb+make+ of the particular lesson name. We will use the repository to first test out if your machine is set up to use Chisel.
 
 To test your Chisel distribution and to verify that your system contains all the correct tools, run the following set of commands:
 
 \begin{bash}
-cd $DIR/examples
-make Parity
+cd $TUT_DIR/examples
+make Parity.out
 \end{bash}
 
 This will run a test build and will take a minute before it completes. If your system is set up correctly, you should see a messsage \verb+[success]+ followed by the total time of the run, and date and time of completion. If you see a success than your system has been set up correctly and you can continute to the next tutorial where we will explain more about the basics of Chisel.

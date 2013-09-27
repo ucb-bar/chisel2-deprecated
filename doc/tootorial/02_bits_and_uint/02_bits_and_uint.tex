@@ -89,11 +89,11 @@ class FullAdder extends Module {
     val sum  = UInt(OUTPUT, 1)
     val cout = UInt(OUTPUT, 1)
   }
-  //Generate the sum
+  // Generate the sum
   val a_xor_b = io.a ^ io.b
-  #reassignment to io.sum so use :=
+  // Reassignment to io.sum so use :=
   io.sum := a_xor_b ^ io.cin 
-  //Generate the carry
+  // Generate the carry
   val a_and_b = io.a & io.b
   val b_and_cin = io.b & io.cin
   val a_and_cin = io.a & io.cin
@@ -104,7 +104,7 @@ class FullAdder extends Module {
 
 In this example we make sure to use the \verb+:=+ reassignment for the \verb+io.sum+ and \verb+io.cout+ output values because we only know what they're values are later in the code and not at the time of construction of the \verb+io+ Bundle. All other values in this example use the \verb+=+ assignment operator since they need to be created. 
 
-In general, the rule of thumb is to use the reassignment operator \verb+:=+ if the value already has been assigned by the \verb+=+ operator, otherwise the \verb+=+ operator should be used. Note that if you do not use the \verb+=+ or \verb+:=+ operators correclty you will get an error when you try and compile your design.
+In general, the rule of thumb is to use the reassignment operator \verb+:=+ if the value already has been assigned by the \verb+=+ operator, otherwise the \verb+=+ operator should be used. Note that if you do not use the \verb+=+ or \verb+:=+ operators correctly you will get an error when you try and compile your design.
 
 \section{The Chisel UInt Class}
 
@@ -118,27 +118,27 @@ class BasicALU extends Module {
     val opcode = UInt(INPUT, 4)
     val output = UInt(OUTPUT, 4)
   }
-  io.output := UInt(0) //THIS SEEMS LIKE A HACK/BUG
+  io.output := UInt(0) 
   when (io.opcode === UInt(0)) {
-    io.output := io.a //pass A
+    io.output := io.a                     // pass A
   } .elsewhen (io.opcode === UInt(1)) {
-    io.output := io.b //pass B
+    io.output := io.b                     // pass B
   } .elsewhen (io.opcode === UInt(2)) {
-    io.output := io.a + UInt(1) //increment A by 1
+    io.output := io.a + UInt(1)           // inc A by 1
   } .elsewhen (io.opcode === UInt(3)) {
-    io.output := io.a - UInt(1) //increment B by 1
+    io.output := io.a - UInt(1)           // inc B by 1
   } .elsewhen (io.opcode === UInt(4)) {
-    io.output := io.a + UInt(4) //increment A by 4
+    io.output := io.a + UInt(4)           // inc A by 4
   } .elsewhen (io.opcode === UInt(5)) {
-    io.output := io.a - UInt(4) //decrement A by 4
+    io.output := io.a - UInt(4)           // dec A by 4
   } .elsewhen (io.opcode === UInt(6)) {
-    io.output := io.a + io.b //add A and B
+    io.output := io.a + io.b              // add A and B
   } .elsewhen (io.opcode === UInt(7)) {
-    io.output := io.a - io.b //subtract B from A
+    io.output := io.a - io.b              // sub B from A
   } .elsewhen (io.opcode === UInt(8)) {
-    io.output := (io.a < io.b).toUInt() //set on A less than B
+    io.output := (io.a < io.b).toUInt()   // set on A < B
   } .otherwise { 
-    io.output :=  (io.a === io.b).toUInt() //set on A equal to B
+    io.output := (io.a === io.b).toUInt() // set on A == B
   }
 }
 \end{scala}
@@ -146,7 +146,8 @@ class BasicALU extends Module {
 You will notice that there are multiple reassignments to \verb+io.output+ inside a \verb+when+ block which indicates that the value of \verb+io.output+ can take many different values depending on the \verb+io.opcode+ in this example. Also notice that in order to specify constants to add to our operands, we must also specify them as a UInt type as UInt operations on different type operands is not allowed.
 
 \begin{scala}
-io.output := io.a + UInt(1) //Specify that 1 is a UInt type
+// Specify that 1 is a UInt type
+io.output := io.a + UInt(1) 
 \end{scala}
 
 A list of commonly used UInt operations is given in the table below:
@@ -176,21 +177,21 @@ A list of commonly used UInt operations is given in the table below:
 Notice that the comparisons for the UInt type give you a Bool type back. In order to be able to assign the output of a comparison to a UInt type, we will need to cast the Bool to a UInt before the assignment. This is shown in the \verb+BasicALU+ example in the \verb+.otherwise+ block:
 
 \begin{scala}
-io.output :=  (io.a === io.b).toUInt() //set on A equal to B
+io.output :=  (io.a === io.b).toUInt() // set on A == B
 \end{scala}
 
 If we you do not cast the resulting Bool to a UInt the Chisel compiler will return an error.
 
 \subsection{Bit Extraction}
 
-The UInt class allows you to extract bits based on their index of their representation. Given an \verb+n+ bit wide value \verb+value+ we can extract the bits \verb+x+ through \verb+y+ (n > x > y) by simply doing the following:
+The UInt class allows you to extract bits based on their index of their representation. Given an \verb+n+ bit wide value \verb+value+ we can extract the bits \verb+x+ through \verb+y+ (n > x > y >= 0) by simply doing the following:
 
 \begin{scala}
 //extracts the x through y bits of value
 val x_to_y = value(x, y) 
 \end{scala}
 
-Note that the higher index is specified first in the argument list when extraction the bits. Also notice that the bits in the UInt are zero indexed so the highest bit that can be extracted from an \verb+n+ bit wide value is \verb+n\-1+.
+Note that the higher index is specified first in the argument list when extraction the bits. Also notice that the bits in the UInt are zero indexed so the highest bit that can be extracted from an \verb+n+ bit wide value is \verb+n-1+.
 
 If you just want to extract a single bit from the value, say bit \verb+x+ we simply need to specify a single index instead as follows:
 \begin{scala}
@@ -209,13 +210,13 @@ class ByteSelector extends Module {
   }
   io.out := UInt(0, width = 8)
   when (io.offset === UInt(0)) {
-    io.out := io.in(7,0) //pull out lowest byte
+    io.out := io.in(7,0) // pull out lowest byte
   } .elsewhen (io.offset === UInt(1)) {
-    io.out := io.in(15,8) //pull out second byte
+    io.out := io.in(15,8) // pull out second byte
   } .elsewhen (io.offset === UInt(2)) {
-    io.out := io.in(23,16) //pull out third byte
+    io.out := io.in(23,16) // pull out third byte
   } .otherwise {
-    io.out := io.in(31,24) //pull out highest byte
+    io.out := io.in(31,24) // pull out highest byte
   }    
 }
 \end{scala}
@@ -227,7 +228,7 @@ Chisel also allows you to easily concatenate bits together using \verb+Cat+. Sup
 \begin{scala}
 val A = UInt(width = 32)
 val B = UInt(width = 32)
-val bus = Cat(A, B) //concantenate A and B
+val bus = Cat(A, B) // concatenate A and B
 \end{scala}
 
 Again, the first argument to \verb+Cat+ will be placed in the high part while the second argument gets the low part of \verb+bus+. Thus for this example bits 0 to 31 of \verb+bus+ correspond to \verb+B+, while bits 32 to 63 correspond to \verb+A+. 
@@ -281,18 +282,18 @@ As we get to more complicate designs, it will become more clear that bit inferen
 	\begin{tabular}{| l | l | l | }
 	\hline
 	Operation & Result Bit Width \\ \hline
-	Z = X + Y & max(Width(X), Width(Y))  \\ \hline
-	Z = X - Y & max(Width(X), Width(Y)) \\ \hline
-	Z = X \& Y & max(Width(X), Width(Y)) \\ \hline
-	Z = X | Y & max(Width(X), Width(Y)) \\ \hline
-	Z = X \^\ Y & max(Width(X), Width(Y)) \\ \hline
-	Z = ~X & Width(X) \\ \hline
-	Z = Mux(C, X, Y) & max(Width(X), Width (Y)) \\ \hline
-	Z = X * Y & Width(X) + Width(Y) \\ \hline
-	Z = X << n & Width(X) + n \\ \hline
-	Z = X >> n & Width(X) - n \\ \hline
-	Z = Cat(X, Y) & Width(X) + Width(Y) \\ \hline
-	Z = Fill(n, x) & Width(X) + n \\ \hline
+	\verb!Z = X + Y! & max(Width(X), Width(Y))  \\ \hline
+        \verb+Z = X - Y+ & max(Width(X), Width(Y)) \\ \hline
+	\verb+Z = X & Y+ & max(Width(X), Width(Y)) \\ \hline
+	\verb+Z = X | Y+ & max(Width(X), Width(Y)) \\ \hline
+	\verb+Z = X ^ Y+ & max(Width(X), Width(Y)) \\ \hline
+	\verb+Z = ~X+ & Width(X) \\ \hline
+	\verb+Z = Mux(C, X, Y)+ & max(Width(X), Width (Y)) \\ \hline
+	\verb+Z = X * Y+ & Width(X) + Width(Y) \\ \hline
+	\verb+Z = X << n+ & Width(X) + n \\ \hline
+	\verb+Z = X >> n+ & Width(X) - n \\ \hline
+	\verb+Z = Cat(X, Y)+ & Width(X) + Width(Y) \\ \hline
+	\verb+Z = Fill(n, x)+ & Width(X) + n \\ \hline
 	\end{tabular}
 \end{center}
 
@@ -301,8 +302,8 @@ As we get to more complicate designs, it will become more clear that bit inferen
 The Bool class in Chisel is used to represent the result of logical expressions and takes either the values \verb+true+ or \verb+false+. These can be used in conditional statements such as \verb+when+ blocks.
 
 \begin{scala}
-val change = io.a === io.b //change gets Bool type
-when (change) { //execute if change is true
+val change = io.a === io.b // change gets Bool type
+when (change) { // execute if change is true
 	...
 } .otherwise {
 	...
@@ -340,7 +341,7 @@ The correct way to perform the intended operation is to cast the resulting Bool 
     val in  = UInt(INPUT, 2)
     val out = UInt(OUTPUT, 1)
   }
-  io.out := (in === UInt(0)).toUInt() //UInt cast
+  io.out := (in === UInt(0)).toUInt() // UInt cast
   ...
 \end{scala}
 

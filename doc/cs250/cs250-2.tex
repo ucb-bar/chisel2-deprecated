@@ -15,7 +15,7 @@
 \input{../style/scala.tex}
 \input{../style/talk.tex}
 
-\title{Chisel @ CS250 -- Part II -- Lecture 03}
+\title{Chisel @ CS250 -- Part II -- Lecture 07}
 \author{Jonathan Bachrach}
 \date{\today}
 \institute[UC Berkeley]{EECS UC Berkeley}
@@ -33,7 +33,7 @@
 % val pcPlus4      = UInt() 
 % val branchTarget = UInt()
 % val pcNext       = Mux(pcSel, branchTarget, pcPlus4)
-% val pcReg        = Reg(next = pcNext, init = UInt(0, 32)) 
+% val pcReg        = Reg(data = pcNext, resetVal = UInt(0, 32)) 
 % pcPlus4         := pcReg + UInt(4) 
 % ... 
 % branchTarget    := addOut
@@ -45,22 +45,99 @@
 % 
 % \end{frame}
 
+\begin{frame}[fragile]
+\frametitle{Accelerator Chisel Interface}
+\begin{columns}
+\column{0.45\textwidth}
+{\lstset{basicstyle={\tiny\ttfamily}}
+\begin{scala}
+def class MemReq extends Bundle {
+  val cmd     = UInt(width = 2)
+  val mtype   = UInt(width = 2)
+  val tag     = UInt(width = 9)
+  val addr    = UInt(width = 64)
+  val data    = UInt(width = 64)
+}
+
+def class MemResp extends Bundle {
+  val cmd     = UInt(width = 2)
+  val tag     = UInt(width = 9)
+  val mtype   = UInt(width = 2)
+  val data    = UInt(width = 64)
+}
+\end{scala}
+\begin{scala}
+def class OpReq extends Bundle {
+  val code = new RoccInst()
+  val a    = UInt(width = 64)
+  val b    = UInt(width = 64)
+}
+
+def class OpResp extends Bundle {
+  val idx  = UInt(width = 5)
+  val data = UInt(width = 64)
+}
+\end{scala}
+
+}
+
+\column{0.45\textwidth}
+
+{\lstset{basicstyle={\tiny\ttfamily}}
+\begin{scala}
+def class RoccIO extends Bundle {
+  val busy    = Bool(OUTPUT)
+  val isIntr  = Bool(OUTPUT)
+  val memReq  = Decoupled(new MemReq).flip
+  val memResp = Decoupled(new MemResp)
+  val opReq   = Decoupled(new OpReq)
+  val opResp  = Decoupled(new OpResp).flip
+}
+\end{scala}
+}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{figs/rocket-coprocessor.pdf}
+\end{center}
+
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Accelerator Clarifications}
+\begin{columns}
+\column{0.45\textwidth}
+\begin{itemize}
+\item tags on write commands,
+\item responses to write commands,
+\item must keep busy asserted until all reads and writes have completed, and
+\item memory system has single port with accelerator having priority
+\end{itemize}
+\column{0.45\textwidth}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{figs/rocket-coprocessor.pdf}
+\end{center}
+\end{columns}
+\end{frame}
+
 \begin{frame}[fragile]{What is Chisel?}
 \begin{itemize}
 \item Chisel is just a set of class definitions in Scala and
  when you write a Chisel program you are actually writing a Scala program,
 \item Chisel programs produce and manipulate a data structure in Scala using a convenient textural language layered on top of Scala,
-\item Chisel makes it possible to create powerful and reusable hardware components using modern programming language concepts, and
+\item Chisel makes it possible to create powerful and reusable hardware modules using modern programming language concepts, and
 \item the same Chisel description can generate different types of output
 \end{itemize}
 \end{frame}
 
 \begin{frame}[fragile]{Today}
 \begin{itemize}
-\item finish out state operations,
-\item present how to make hierarchical components, 
-\item teach you how to make reusable components,
-\item introduce you to even more powerful construction techniques.
+\item conditional updates on wires, registers, and memories,
+\item give you perspective,
+\item roms and rams,
+\item abstraction through object orientation and functional programming,
+\item present how to make hierarchical modules, 
+\item teach you how to make reusable modules,
+\item show you to even more powerful construction techniques.
+\item introduce you to the standard library
 \end{itemize}
 \end{frame}
 
@@ -74,7 +151,7 @@ When describing state operations, we could simply wire register inputs to combin
 \begin{columns}
 \column{0.45\textwidth}
 \begin{scala}
-val r = Reg( UInt(16) )
+val r = Reg( UInt(width = 16) )
 when (c === UInt(0) ) {
   r := r + UInt(1)
 }
@@ -92,8 +169,8 @@ when (c === UInt(0) ) {
 \begin{frame}[fragile]{Conditional Updates Priority}
 
 \begin{scala}
-when (c1) { r := UInt(1) }
-when (c2) { r := UInt(2) }
+when (c1) { r := Bits(1) }
+when (c2) { r := Bits(2) }
 \end{scala}
 
 \textbf{Conditional Update Order:}
@@ -131,10 +208,10 @@ when (c2) { r := UInt(2) }
 \begin{frame}[fragile]{Targetting Multiple Registers}
 
 \begin{scala}
-r := Reg( SInt(3) )
-s := Reg( SInt(3) )
-when (c1) { r := SInt(1); s := SInt(1) }
-when (c2) { r := SInt(2) }
+r := Reg( init = UInt(3) )
+s := Reg( init = UInt(3) )
+when (c1) { r := UInt(1); s := UInt(1) }
+when (c2) { r := UInt(2) }
 \end{scala}
 
 leads to \code{r} and \code{s} being updated according to the
@@ -209,7 +286,7 @@ when (idx === v2) { u2 }
 
 % \begin{frame}[fragile]{Enums}
 % \begin{scala}
-% val s_even :: s_odd :: Nil = Enum(UInt(), 2)
+% val s_even :: s_odd :: Nil = Enum(2){ UInt() }
 % \end{scala}
 % \end{frame}
 
@@ -224,20 +301,35 @@ Conditional updates also work for
 For wires, we can do conditional updates as follows:
 
 \begin{scala}
-val w = UInt(width = 32)
-w := UInt(0)                       // default value 
-when (c1)         { w := UInt(1) }
-when (c2)         { w := UInt(2) }
+val w = Bits(width = 32)
+w := Bits(0)                       // default value 
+when (c1)         { w := Bits(1) }
+when (c2)         { w := Bits(2) }
 \end{scala}
 
 \noindent
 which is the same as
 
 \begin{scala}
-val w = UInt(width = 32)
-when (Bool(true)) { w := UInt(0) } // default value
-when (c1)         { w := UInt(1) }
-when (c2)         { w := UInt(2) }
+val w = Bits(width = 32)
+when (Bool(true)) { w := Bits(0) } // default value
+when (c1)         { w := Bits(1) }
+when (c2)         { w := Bits(2) }
+\end{scala}
+
+\end{frame}
+
+\begin{frame}[fragile]{Enums}
+Enums can be defined to create a list of increasing nums.
+
+\begin{scala}
+object Enum {
+  def apply[T <: UInt](type: T, n: Int): List[T] = ...
+}
+\end{scala}
+
+\begin{scala}
+val s_even :: s_odd :: Nil = Enum(UInt(), 2)
 \end{scala}
 
 \end{frame}
@@ -255,7 +347,7 @@ class Parity extends Module {
     val in  = Bool(INPUT)
     val out = Bool(OUTPUT) }
   val s_even :: s_odd :: Nil = Enum(UInt(), 2)
-  val state  = Reg(init = s_even)
+  val state  = Reg(resetVal = s_even)
   when (io.in) {
     when (state === s_even) { state := s_odd  }
     .otherwise              { state := s_even }
@@ -264,8 +356,6 @@ class Parity extends Module {
 }
 \end{scala}
 
-\noindent
-where \verb+Enum(UInt(), 2)+ creates a list of two \code{UInt()} literals.
 \column{0.25\textwidth}
 
 \begin{center}
@@ -275,11 +365,14 @@ where \verb+Enum(UInt(), 2)+ creates a list of two \code{UInt()} literals.
 \end{columns}
 \end{frame}
 
+\input{../talks/microsoft/libs-to-langs-guts.tex}
+
+
 \begin{frame}[fragile]{ROM}
 
 \begin{scala}
 val d = Array(UInt(1), UInt(2), UInt(4), UInt(8))
-val m = ROM(d, UInt(width = 32) )
+val m = ROM(UInt(width = 32), d)
 val r = m(counter(UInt(3)))
 \end{scala}
 
@@ -302,9 +395,9 @@ class Mul extends Module {
 
   val muls = new Array[UInt](256)
   for (x <- 0 until 16; y <- 0 until 16) 
-    muls((x << 4) | y) = x * y
+    muls((x << 4) | y) = UInt(x * y)
 
-  val tbl = ROM(muls){ UInt(8) }
+  val tbl = ROM(UInt(8), muls)
 
   io.z := tbl((io.x << 4) | io.y)
 }
@@ -323,7 +416,7 @@ class Mul extends Module {
 RAM is supported using the \code{Mem} construct
 
 \begin{scala}
-val m = Mem(UInt(width = 32), 32 )
+val m = Mem(Bits(width = 32), 32)
 \end{scala}
 
 \noindent
@@ -338,7 +431,7 @@ where
 \begin{frame}[fragile]{32-entry Register File}
 
 \begin{scala}
-val regs = Mem(UInt(width = 32), 32 )
+val regs = Mem(Bits(width = 32), 32)
 when (wrEn) {
   regs(wrAddr) := wrData
 }
@@ -356,14 +449,16 @@ val mDat = regs(mAddr)
 Sequential read ports are inferred when:
 \begin{itemize}
 \item optional parameter \code{seqRead} is set and
-\item a reg is assigned to the output of a MemRead
+\item read address is a reg
 \end{itemize}
 
 \begin{scala}
-val ram1r1w = Mem( UInt(width = 32), 1024, seqRead = true)
-val dOut    = Reg( UInt() )
-when (wrEn) { ram1r1w(wrAddr) := wrData }
-when (rdEn) { dOut := ram1r1w(rdAddr) }
+al ram1r1w =
+  Mem(UInt(width = 32), 1024, seqRead = true)
+val reg_raddr = Reg(UInt())
+when (wen) { ram1r1w(waddr) := wdata }
+when (ren) { reg_raddr := raddr }
+val rdata = ram1r1w(reg_raddr)
 \end{scala}
 
 \begin{center}
@@ -377,10 +472,12 @@ Single-ported SRAMs can be inferred when the read and write conditions are
 mutually exclusive in the same \code{when} chain
 
 \begin{scala}
-val ram1p = Mem( UInt(width = 32), 1024, seqRead = true )
-val dOut  = Reg( UInt() )
-when (wrEn) { ram1p(wrAddr) := wrData }
-.elsewhen (rdEn) { dOut := ram1p(rdAddr) }
+al ram1p =
+  Mem(UInt(width = 32), 1024, seqRead = true)
+val reg_raddr = Reg(UInt())
+when (wen) { ram1p(waddr) := wdata }
+.elsewhen (ren) { reg_raddr := raddr }
+val rdata = ram1p(reg_raddr)
 \end{scala}
 
 \begin{center}
@@ -389,157 +486,26 @@ when (wrEn) { ram1p(wrAddr) := wrData }
 
 \end{frame}
 
-\begin{frame}[fragile]{Modules and Interfaces}
-Suppose we want to break computation into a series of filters (ala Unix):
-
-\begin{center}
-\includegraphics[width=0.7\textwidth]{figs/filtering.pdf} 
-\end{center}
-
-\noindent 
-where data is fed though with an additional \code{valid} signal to say whether data has \textbf{not} been filtered.
-
-\end{frame}
-
-\begin{frame}[fragile]{Pass Through Filter}
-We can define a pass through filter component by defining a filter class extending component:
-
-\begin{columns}
-\column{0.45\textwidth}
-
-\begin{scala}
-class Filter extends Module { 
-  val io  = new FilterIO()
-  io.out.data  := io.in.data
-  io.out.valid := io.in.valid
-}
-\end{scala}
-
-\column{0.45\textwidth}
-
-\begin{center}
-\includegraphics[width=0.9\textwidth]{figs/pass-through-filter.pdf} 
-\end{center}
-\end{columns}
-
-\noindent 
-where the \verb+io+ field contains \verb+FilterIO+. 
-\end{frame}
-
-\begin{frame}[fragile]{Small and Odd Filters}
-Suppose we want to write a small and odd filter.  We could write these out by hand:
-\begin{scala}
-class SmallFilter extends Module { 
-  val io  = new FilterIO()
-  io.out.data  := io.in.data
-  io.out.valid := io.in.valid && (io.in.data < 10)
-}
-
-class OddFilter extends Module { 
-  val io  = new FilterIO()
-  io.out.data  := io.in.data
-  io.out.valid := io.in.valid && (io.in.data & 1)
-}
-\end{scala}
-
-\end{frame}
-
-\begin{frame}[fragile]{Basic Filter Interface}
-
-\begin{columns}
-\column{0.55\textwidth}
-
-\begin{scala}
-class ValidUInt extends Bundle { 
-  val data  = UInt(OUTPUT, 16) 
-  val valid = Bool(OUTPUT)
-}
-\end{scala}
-
-\column{0.35\textwidth}
-
-\begin{center}
-\includegraphics[height=0.9\textheight]{figs/link-io.pdf} 
-\end{center}
-
-\end{columns}
-\end{frame}
-
-\begin{frame}[fragile]{Complete Filter Interface}
-
-\begin{columns}
-\column{0.55\textwidth}
-
-From there we can define a filter interface by nesting two
-\verb+PipeIO+s into a new \verb+FilterIO+ bundle:
-
-\begin{scala}
-class FilterIO extends Bundle { 
-  val in  = new ValidUInt().flip
-  val out = new ValidUInt()
-}
-\end{scala}
-
-\noindent
-where \verb+flip+ recursively changes the ``gender'' of a bundle,
-changing input to output and output to input.
-
-\column{0.35\textwidth}
-
-\begin{center}
-\includegraphics[height=0.9\textheight]{figs/filter-io.pdf} 
-\end{center}
-
-\end{columns}
-\end{frame}
-
-\begin{frame}[fragile]{Bulk Connections}
-We can now compose two filters into a filter block as follows:
-
-\begin{columns}
-\column{0.42\textwidth}
-
-{\lstset{basicstyle={\scriptsize\ttfamily}}
-\begin{scala}
-class SmallOdds extends Module { 
-  val io     = new FilterIO()
-  val smalls =
-    Module(new SmallFilter())
-  val odds   = 
-    Module(new OddFilter())
-
-  smalls.io.in  <> io.in
-  smalls.io.out <> odds.io.in
-  odds.io.out   <> io.out
-}
-\end{scala}
-}
-
-\column{0.48\textwidth}
-
-\begin{center}
-\includegraphics[width=0.95\textwidth]{figs/small-odds.pdf} 
-\end{center}
-
-\end{columns}
-
-\noindent
-where \verb+<>+ bulk connects interfaces.  Note that:
+\begin{frame}[fragile]{Mem Write Masks }
+Mem also supports write masks for subword writes. 
 \begin{itemize}
-\item bulk connections recursively pattern match names between left and right hand sides finally connecting leaf ports to each other, and
-\item after all connections are made and the circuit is being elaborated,
-Chisel warns users if ports have other than exactly one connection to them.
+\item A given bit is written if the corresponding mask bit is set.
 \end{itemize}
+
+\begin{scala}
+val ram = Mem(UInt(width = 32), 256)
+when (wen) { ram.write(waddr, wdata, wmask) }
+\end{scala}
+
 \end{frame}
 
 \begin{frame}{Prepare for Warp Speed and Be Happy}
-
 Congratulations, you have all that you need at this point to write Chisel programs!
-You can write RTL, define components (even with recursive data types), and wire them together.
+You can write RTL, define modules (even with recursive data types), and wire them together.
 \vspace{5mm}
 \begin{itemize}
-\item In order to attain true hardware description power though, you need to be able to write reusable RTL, components and interfaces.
-\item This will allow you to both use and write generic component libraries and more quickly explore design space.
+\item In order to attain true hardware description power though, you need to be able to write reusable RTL, modules and interfaces.
+\item This will allow you to both use and write generic module libraries and more quickly explore design space.
 \item To do this, we will use modern programming techniques such as:
 \begin{itemize}
 \item object orientation, 
@@ -551,237 +517,18 @@ You can write RTL, define components (even with recursive data types), and wire 
 
 \end{frame}
 
-
-\begin{frame}[fragile]{Parameterized Filter}
-Instead of writing a \code{SmallFilter} and \code{OddFilter}, a better Filter solution would be to create a single reusable Filter class that allows the user to specify the filter function.  We can do this by
-\begin{itemize}
-\item specifying a filter function as a Filter constructor argument:
-\end{itemize}
-
-\begin{columns}
-\column{0.55\textwidth}
-
-{\lstset{basicstyle={\scriptsize\ttfamily}}
-\begin{scala}
-class Filter (isOk: (UInt) => Bool) 
-    extends Module { 
-  val io  = new ValidUInt()
-  io.out.data  := io.in.data
-  io.out.valid := 
-    io.in.valid && isOk(io.in.data)
-}
-
-val odds   = 
-  Module(new Filter((x) => x & UInt(1)))
-val smalls = 
-  Module(new Filter((x) => x < UInt(10)))
-\end{scala}
-}
-
-\column{0.40\textwidth}
-
-\begin{center}
-\includegraphics[width=0.9\textwidth]{figs/parameterized-filter.pdf} 
-\end{center}
-\end{columns}
-
-\end{frame}
-
-\begin{frame}[fragile]{SmallOdds built out of Parameterized Filters}
-We can now compose two parameterized filters into a filter block as follows:
-
-\begin{columns}
-\column{0.42\textwidth}
-
-{\lstset{basicstyle={\scriptsize\ttfamily}}
-\begin{scala}
-class SmallOdds extends Module { 
-  val io     = new FilterIO()
-  val smalls = 
-    Module(new Filter(_ < 10))
-  val odds   = 
-    Module(new Filter(_ & 1))
-
-  smalls.io.in  <> io.in
-  smalls.io.out <> odds.io.in
-  odds.io.out   <> io.out
-}
-\end{scala}
-}
-
-\column{0.48\textwidth}
-
-\begin{center}
-\includegraphics[width=0.95\textwidth]{figs/small-odds.pdf} 
-\end{center}
-
-\end{columns}
-
-\noindent
-where \code{\_ \& 1} is a shorthand for \code{(x) => x \& 1}.
-\end{frame}
-
-\begin{frame}[fragile]{Decoupled Filters}
-Suppose we want to make a block of two filters, where the filters take differing amounts of time to compute and need to be decoupled from each other.
-We can do this:
-\begin{itemize}
-\item by using decoupled interfaces with an additional ready signal and
-\item by connecting the two filters up using a queue
-\end{itemize}
-
-\begin{columns}
-\column{0.41\textwidth}
-
-{\lstset{basicstyle={\scriptsize\ttfamily}}
-\begin{scala}
-class SmallOdds extends Module { 
-  val io     = new FilterIO()
-  val smalls = Module(new Filter(_ < 10))
-  val q      = new Queue()
-  val odds   = Module(new Filter(_ & 1))
-
-  smalls.io.in  <> io.in
-  smalls.io.out <> q.io.in
-  q.io.out      <> odds.io.in
-  odds.io.out   <> io.out
-}
-\end{scala}
-}
-
-\column{0.49\textwidth}
-
-\begin{center}
-\includegraphics[width=1.0\textwidth]{figs/decoupled-block.pdf} 
-\end{center}
-
-\end{columns}
-
-\end{frame}
-
-\begin{frame}[fragile]{Decoupled Filter}
-Now filtering must consider back pressure:
-
-\begin{columns}
-\column{0.45\textwidth}
-
-{\lstset{basicstyle={\scriptsize\ttfamily}}
-\begin{scala}
-class Filter (isOk: (UInt) => Bool) 
-    extends Module { 
-  val io  = new FilterIO()
-  io.out.data  := io.in.data
-  io.out.ready := Bool(true)
-  io.out.valid := 
-    io.out.ready && 
-    io.in.valid && 
-    isOk(io.in.data)
-}
-\end{scala}
-}
-
-\column{0.45\textwidth}
-
-\begin{center}
-\includegraphics[width=0.9\textwidth]{figs/odd-filter.pdf} 
-\end{center}
-\end{columns}
-
-\vspace{3mm}
-\noindent 
-where 
-\begin{itemize}
-\item the filter ``fires'' only when there is input data present and upstream fifos and filters are ready for output data, and
-\item in this version we are assuming that we are always ready for data.
-\end{itemize}
-
-\end{frame}
-
-\begin{frame}[fragile]{Basic Decoupled IO}
-
-\begin{columns}
-\column{0.55\textwidth}
-
-We can define a decoupled interface by extending \verb+PipeIO+ with a ready signal:
-
-\begin{scala}
-class DecoupledUInt extends ValidUInt { 
-  val ready = Bool(INPUT)
-}
-\end{scala}
-
-\noindent
-In general, users can organize their interfaces into hierarchies using inheritance in order to promote reuse.  
-
-\column{0.35\textwidth}
-
-\begin{center}
-\includegraphics[height=0.9\textheight]{figs/FIFOIO.pdf} 
-\end{center}
-
-\end{columns}
-
-\end{frame}
-
-\begin{frame}[fragile]{Complete Decoupled Filter Interface}
-
-\begin{columns}
-\column{0.55\textwidth}
-
-From there we can define a filter interface by nesting two
-\verb+ValidUInt+s into a new \verb+FilterIO+ bundle:
-
-\begin{scala}
-class FilterIO extends Bundle { 
-  val in  = new ValidUInt().flip
-  val out = new ValidUInt()
-}
-\end{scala}
-
-\column{0.35\textwidth}
-
-\begin{center}
-\includegraphics[height=0.9\textheight]{figs/decoupled-filter-io.pdf} 
-\end{center}
-
-\end{columns}
-\end{frame}
-
-\begin{frame}[fragile]{Parameterized Decoupled Interfaces}
-Unfortunately, as defined, decoupled interfaces are defined only for 16 bit \verb+UInt+s.  
-Obviously, we want to generalize this to allow for arbitrary Chisel data types.  
-We can do this by using:
-\begin{itemize}
-\item Scala parameterized types and 
-\item a curried class constructor argument
-\end{itemize}
-
-We want to be able to write
-\begin{scala}
-val ufix32s = new Valid( UInt(width = 32) )
-
-class Packet extends Bundle {
-  val header = UInt(width = 8)
-  val body   = UInt(width = 64)
-}
-val pkts    = new DecoupledIO( new Packet() )
-\end{scala}
-
-\noindent
-but how do we define this parameterized \code{Decoupled}?
-\end{frame}
-
 \begin{frame}[fragile]{Parameterized Types in Scala}
 First we need to learn about parameterized types in Scala.
 We can define a generic \code{Mux} function as taking a boolean condition and \code{con} and \code{alt} arguments (corresponding to then and else expressions) of type \code{T} as follows:
 
 \begin{scala}
-def Mux[T <: UInt](c: Bool, con: T, alt: T): T { ... }
+def Mux[T <: Data](c: Bool, con: T, alt: T): T = ...
 \end{scala}
 
 \noindent
 where 
 \begin{itemize}
-\item \code{T} is required to be a subclass of \code{UInt} and 
+\item \code{T} is required to be a subclass of \code{Data} and 
 \item the type of \code{con} and \code{alt} are required to match.
 \end{itemize}
 
@@ -790,72 +537,255 @@ You can think of the type parameter as a way of just constraining the types of t
 
 \end{frame}
 
-\begin{frame}[fragile]{Implementing Parameterized Interfaces}
-Now we can define \code{Decoupled} and \code{FilterIO} using parameterized types as follows:
+\begin{frame}[fragile]
+\frametitle{Revisiting GCD}
+\begin{columns}
 
-{\lstset{basicstyle={\scriptsize\ttfamily}}
+\column{0.45\textwidth}
+
+\begin{footnotesize}
 \begin{scala}
-class DecoupledIO[T <: Data](type: T) extends Bundle {
-  val data  = type.asOutput
-  val valid = Bool(OUTPUT)
-  val ready = Bool(INPUT)
-}
-
-class FilterIO[T <: Data]()(type: T) extends Bundle { 
-  val in  = new DecoupledIO( type ).flip
-  val out = new DecoupledIO( type )
+class GCD extends Module {
+  val io = new Bundle {
+    val a     = UInt(INPUT, 16)
+    val b     = UInt(INPUT, 16)
+    val z     = UInt(OUTPUT, 16)
+    val valid = Bool(OUTPUT) }
+  val x = Reg(init = io.a)
+  val y = Reg(init = io.b)
+  when (x > y) {
+    x := x - y
+  } .otherwise {
+    y := y - x
+  }
+  io.z     := x
+  io.valid := y === UInt(0)
 }
 \end{scala}
+\end{footnotesize}
 
-\noindent
-We can now define \code{DecoupledIO} on arbitrary data types:
+\column{0.45\textwidth}
 
-\begin{scala}
-val ufix32s = new DecoupledIO( UInt(width = 32) )
-val pkts    = new DecoupledIO( new Packet() )
-\end{scala}
-}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{../talks/retreat-1/figs/gcd.pdf} 
+\end{center}
+
+\end{columns}
+\note{defining modules is a matter of \\[1cm]
+defining its interface and then \\[1cm]
+wiring outputs to compute logic and state defined in terms of inputs. \\[1cm]
+here we're defining registers and conditional updates on them. \\[1cm]
+this module outputs valid true when an answer is ready.}
 \end{frame}
 
-\begin{frame}[fragile]{Fully Parameterized Filters}
-Now we can redo our definition of the \code{Filter} and \code{SmallOdds} components:
+\begin{frame}[fragile]
+\frametitle{Valid Wrapper}
 
-{\lstset{basicstyle={\scriptsize\ttfamily}}
+\begin{columns}
+
+\column{0.65\textwidth}
+
+\begin{footnotesize}
 \begin{scala}
-class Filter[T <: Data] (isOk: (T) => Bool, type: T) extends Module { 
-  val io = new FilterIO(){ type }
-
-  io.out.data  := io.in.data
-  io.out.ready := Bool(true)
-  io.out.valid := io.out.ready && io.in.valid && isOk(io.in.data)
+class Valid[T <: Data](dtype: T) extends Bundle {
+  val data  = dtype.clone
+  val valid = Bool()
+  override def clone = new Valid(dtype)
 }
 
-class SmallOdds[T <: Data](type: T) extends Module { 
-  val io     = new FilterIO()
-  val smalls = Module(new Filter(_ < UInt(10), type ))
-  val q      = Module(new Queue(type))
-  val odds   = Module(new Filter(_ & UInt(1), type ))
-
-  smalls.io.in  <> io.in
-  smalls.io.out <> q.io.in
-  q.io.out      <> odds.io.in
-  odds.io.out   <> io.out
+class GCD extends Module {
+  val io = new Bundle {
+    val a   = UInt(INPUT, 16)
+    val b   = UInt(INPUT, 16)
+    val out = new Valid(UInt(OUTPUT, 16))
+  } }
+  ...
+  io.out.data  := x
+  io.out.valid := y === UInt(0)
 }
 
-val block = new SmallOdds( UInt(width = 32) )
 \end{scala}
+\end{footnotesize}
+
+\column{0.3\textwidth}
+
+\begin{center}
+\includegraphics[width=0.9\textwidth]{../talks/retreat-1/figs/valid.pdf} 
+\end{center}
+
+\end{columns}
+\note{now gcd had a valid signal on its output.  \\[1cm]
+we can generalize this idea by defining a wrapper class that bundles a valid with a data signal. \\[1cm]
+now we can rewrite GCD using an interface using this valid wrapper for its output. }
+
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Function Filters}
+
+\begin{footnotesize}
+\begin{scala}
+abstract class Filter[T <: Data](dtype: T) extends Module {
+  val io = new Bundle {
+    val in  = new Valid(dtype).asInput
+    val out = new Valid(dtype).asOutput
+} }
+
+class FunctionFilter[T <: Data](f: T => T, dtype: T) extends Filter(dtype) {
+  io.out.valid := io.in.valid
+  io.out       := f(io.in)
 }
+\end{scala}
+\end{footnotesize}
+
+\begin{center}
+\includegraphics[height=0.4\textheight]{../talks/sketching13/figs/function-filter.pdf} 
+\end{center}
+
+\note{suppose we want to write hardware filters. \\[1cm]
+one way to create a reusable filter would be \\[1cm]
+to create a filter class that takes a function as argument that definines its filter operation.}
+
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Clipping Filter}
+
+\begin{footnotesize}
+\begin{scala}
+def clippingFilter[T <: Num](limit: Int, dtype: T) = 
+  new FunctionFilter(min(limit, max(-limit, _)), dtype)
+\end{scala}
+\end{footnotesize}
+
+\begin{center}
+\includegraphics[height=0.4\textheight]{../talks/retreat-1/figs/clipping-filter.pdf} 
+\end{center}
+\note{using this reusable substrate then it is easy to create an instance of a filter.}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{Shifting Filter}
+
+\begin{footnotesize}
+\begin{scala}
+def shiftingFilter[T <: Num](shift: Int, dtype: T) = 
+  new FunctionFilter(_ >> shift, dtype)
+\end{scala}
+\end{footnotesize}
+
+\begin{center}
+\includegraphics[height=0.4\textheight]{../talks/retreat-1/figs/shifting-filter.pdf} 
+\end{center}
+\note{and reuse it for shift filter}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Chained Filter}
+
+\begin{footnotesize}
+\begin{scala}
+class ChainedFilter[T <: Num](dtype: T) extends Filter(dtype) = {
+  val shift   = new ShiftFilter(2, dtype)
+  val clipper = new ClippingFilter(1 << 7, dtype)
+  io.in          <> shift.io.in
+  shift.io.out   <> clipper.io.in
+  clipper.io.out <> io.out
+}
+\end{scala}
+% \begin{scala}
+% class ChainedFilter[T <: Num](dtype: T) extends Filter(dtype) = {
+%   val fir     = new TstFIR(dtype)
+%   val shift   = new ShiftFilter(2, dtype)
+%   val clipper = new ClippingFilter(1 << 7, dtype)
+%   io.in          <> fir.io.in
+%   fir.io.out     <> shift.io.in
+%   shift.io.out   <> clipper.io.in
+%   clipper.io.out <> io.out
+% }
+% \end{scala}
+\end{footnotesize}
+
+\begin{center}
+\includegraphics[height=0.4\textheight]{../talks/sketching13/figs/chained-filter2.pdf} 
+\end{center}
+\note{and chain together...}
+\end{frame}
+
+\begin{frame}[fragile, shrink]
+\frametitle{Functional Composition}
+
+% \begin{itemize}
+% \item natural
+% \item reusable
+% \item composable
+% \end{itemize}
+% \vskip1cm
+
+\begin{Large}
+\begin{columns}
+
+\column{0.45\textwidth}
+\verb+Map(ins, x => x * y)+ \\
+\begin{center}
+\includegraphics[height=0.6\textheight]{../bootcamp/figs/map.pdf} \\[2cm]
+\end{center}
+
+\column{0.45\textwidth}
+\vskip2mm
+\verb+Chain(n, in, x => f(x))+ \\
+\begin{center}
+\includegraphics[width=0.9\textwidth]{../bootcamp/figs/chain.pdf} \\
+\end{center}
+
+\verb+Reduce(ins, Max)+ \\
+\begin{center}
+\includegraphics[width=0.9\textwidth]{../bootcamp/figs/reduce.pdf} \\
+\end{center}
+
+\end{columns}
+
+\end{Large}
+\note{the previous example showed a simple use of functional programming. \\[1cm]
+Scala provides strong support for functional programming and
+it turns out that functional programming is a powerful way to define hardware. \\[1cm]
+for example, you can create a parallel set of blocks using map and reduce to creation reduction trees and chain to create a pipeline.}
+\end{frame}
+
+\begin{frame}[fragile]{Generator}
+\begin{footnotesize}
+\begin{scala}
+def delays[T <: Data](x: T, n: Int): List[T] = 
+  if (n <= 1) List(x) else x :: taps(Reg(next = x), n-1)
+
+def FIR[T <: Num](hs: Seq[T], x: T): T = 
+  (hs, delays(x, hs.length)).zipped.map( _ * _ ).reduce( _ + _ )
+
+class TstFIR extends Module {
+  val io = new Bundle{ val x  = SInt(INPUT, 8); val y = SInt(OUTPUT, 8) }
+  val h  = Array(SInt(1), SInt(2), SInt(4))
+  io.y  := FIR(h, io.x)
+}
+\end{scala}
+\end{footnotesize}
+\begin{center}
+\includegraphics[height=0.35\textheight]{../cs294-88/lectures/advanced-chisel/figs/inner-product-fir.png} 
+\end{center}
+\note{as an advanced example, consider writing an FIR filter which is defined by the equation below. \\[1cm]
+essentially it's a sum of products of coefficients and delayed versions of input.\\[1cm]
+we can write this quite simply using map and reduce as above.}
 \end{frame}
 
 \begin{frame}[fragile]{Interface Views}
 \begin{columns}
-\column{0.45\textwidth}
+\column{0.40\textwidth}
 
 \begin{scala}
 class Cpu extends Module {
   val io = new CpuIo()
-  val c  = Module(new CtlPath())
-  val d  = Module(new DatPath())
+  val c  = new CtlPath()
+  val d  = new DatPath()
   c.io.ctl  <> d.io.ctl
   c.io.dat  <> d.io.dat
   c.io.imem <> io.imem
@@ -866,7 +796,7 @@ class Cpu extends Module {
 }
 \end{scala}
 
-\column{0.45\textwidth}
+\column{0.50\textwidth}
 
 \begin{center}
 \includegraphics[width=0.9\textwidth]{../tutorial/figs/cpu.png} 
@@ -883,12 +813,12 @@ class Cpu extends Module {
 class RomIo extends Bundle {
   val isVal = Bool(INPUT)
   val raddr = UInt(INPUT, 32)
-  val rdata = UInt(OUTPUT, 32) 
+  val rdata = Bits(OUTPUT, 32) 
 }
 
 class RamIo extends RomIo {
   val isWr  = Bool(INPUT)
-  val wdata = UInt(INPUT, 32) 
+  val wdata = Bits(INPUT, 32) 
 }
 
 class CpathIo extends Bundle {
@@ -946,13 +876,13 @@ class Dpath extends Module {
 
 \begin{frame}[fragile]{Multiple Partial Bulk Connections}
 \begin{columns}
-\column{0.45\textwidth}
+\column{0.40\textwidth}
 
 \begin{scala}
 class Cpu extends Module {
   val io = new CpuIo()
-  val c  = Module(new CtlPath())
-  val d  = Module(new DatPath())
+  val c  = new CtlPath()
+  val d  = new DatPath()
   c.io.ctl  <> d.io.ctl
   c.io.dat  <> d.io.dat
   c.io.imem <> io.imem
@@ -963,7 +893,7 @@ class Cpu extends Module {
 }
 \end{scala}
 
-\column{0.45\textwidth}
+\column{0.50\textwidth}
 
 \begin{center}
 \includegraphics[width=0.9\textwidth]{../tutorial/figs/cpu.png} 
@@ -1007,160 +937,316 @@ class Cpu extends Module {
 \end{frame}
 
 \begin{frame}
-\frametitle{Advanced Topics}
+\frametitle{Standard Library in ChiselUtil.scala}
 \begin{itemize}
-\item Functional Composition
-\item Object Oriented Interfaces
-\item Layering Domain Specific Languages on Top
+\item Basic Utils
+\item Vecs
+\item Queues
+\item Arbiters
+% \item Crossbars
+\item Structural Memory
 \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]{Functional Composition}
-\begin{columns}
+\begin{frame}[fragile]
+\frametitle{Bits Properties}
+\begin{scala}
+object log2Up {
+  def apply(in: Int): Int = if(in == 1) 1 else ceil(log(in)/log(2)).toInt
+}
 
-\column{0.45\textwidth}
-\verb+Map(ins, x => x * y)+ \\
-\begin{center}
-\includegraphics[height=0.6\textheight]{../bootcamp/figs/map.pdf} \\[2cm]
-\end{center}
+object log2Down {
+  def apply(x : Int): Int = if (x == 1) 1 else floor(log(x)/log(2.0)).toInt
+}
 
-\column{0.45\textwidth}
-\vskip2mm
-\verb+Chain(n, in, x => f(x))+ \\
-\begin{center}
-\includegraphics[width=0.9\textwidth]{../bootcamp/figs/chain.pdf} \\
-\end{center}
+object isPow2 {
+  def apply(in: Int): Boolean = in > 0 && ((in & (in-1)) == 0)
+}
 
-\verb+Reduce(data, Max)+ \\
-\begin{center}
-\includegraphics[width=0.9\textwidth]{../bootcamp/figs/reduce.pdf} \\
-\end{center}
-
-\end{columns}
+object PopCount {
+  def apply(in: Seq[Bool]): UInt = ...
+  def apply(in: Bits): UInt = ...
+}
+\end{scala}
 \end{frame}
 
-\begin{frame}[fragile]{Object-Oriented Parameterized Interfaces}
+\begin{frame}[fragile]
+\frametitle{Bits Functions}
+\begin{itemize}
+\item LFSR16 -- random number generator
+\item Reverse -- reverse order of bits
+\item FillInterleaved -- space out booleans into uint
+\end{itemize}
 \begin{scala}
-class Router extends Module {
-  val depth = 32
-  val n     = 4
-  val io    = new RouterIO(n)
-  val tbl   = Mem(depth, UInt(width = sizeof(n)) )
-  
+object LFSR16 {
+  def apply(increment: Bool = Bool(true)): UInt = ...
+}
+object Reverse {
+  def apply(in: UInt): UInt = ...
+}
+object FillInterleaved {
+  def apply(n: Int, in: Bits): UInt = ...
+}
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Stateful Functions}
+\begin{itemize}
+\item n cycle delayed version of input signal
+\end{itemize}
+\begin{scala}
+object ShiftRegister {
+  def apply[T <: Data](in: T, n: Int, en: Bool = Bool(true)): T = ...
+}
+\end{scala}
+\begin{itemize}
+\item enable driven counter with parameterized wrapping
+\end{itemize}
+\begin{scala}
+object Counter {
+  def apply(cond: Bool, n: Int): (UInt, Bool) = ...
+}
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Priority Encoding Functions}
+\begin{itemize}
+\item UIntToOH -- returns one hot encoding of input int
+\item OHToUInt -- returns int version of one hot encoding input
+\item Mux1H -- builds mux tree of input vector using a one hot encoded select signal
+\end{itemize}
+\begin{scala}
+object UIntToOH {
+  def apply(in: UInt, width: Int = -1): Bits = ...
+}
+
+object OHToUInt {
+  def apply(in: Seq[Bool]): UInt = ...
+}
+
+object Mux1H {
+  def apply[T <: Data](sel: Vec[Bool], in: Vec[T]): T = ...
+}
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Priority Mux Function}
+\begin{itemize}
+\item PriorityMux -- build mux tree allow multiple select signals with priority given to first select signal
+\end{itemize}
+\begin{scala}
+object PriorityMux {
+  def apply[T <: Bits](in: Seq[(Bool, T)]): T = ...
+  def apply[T <: Bits](sel: Seq[Bool], in: Seq[T]): T = ...
+  def apply[T <: Bits](sel: Bits, in: Seq[T]): T = ...
+}
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Priority Encoding Functions}
+\begin{itemize}
+\item PriorityEncoder -- returns the bit position of the trailing 1 in the input vector
+  with the assumption that multiple bits of the input bit vector can be set
+\item PriorityEncoderOH -- returns the bit position of the trailing 1 in the input vector
+  with the assumption that only one bit in the input vector can be set.
+\end{itemize}
+\begin{scala}
+object PriorityEncoder {
+  def apply(in: Seq[Bool]): UInt = ...
+  def apply(in: Bits): UInt = ...
+}
+
+object PriorityEncoderOH {
+  def apply(in: Bits): UInt = ...
+  def apply(in: Seq[Bool]): Seq[UInt] = ...
+}
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{Vec Construction}
+\begin{scala}
+object Vec {
+  def apply[T <: Data](elts: Seq[T]): Vec[T]
+  def apply[T <: Data](elts: Vec[T]): Vec[T]
+  def apply[T <: Data](elt0: T, elts: T*): Vec[T]
+
+  def fill[T <: Data](n: Int)(f: => T): Vec[T]
+  def tabulate[T <: Data](n: Int)(f: Int => T): Vec[T]
+  def tabulate[T <: Data](n1: Int, n2: Int)(f: (Int, Int) => T): Vec[Vec[T]] 
+}
+\end{scala}
+\begin{scala}
+Vec(A, L, M)
+Vec.fill(3){ UInt(width = 8) } ==== 
+  Vec(UInt(width = 8), UInt(width = 8), UInt(width = 8))
+Vec.tabulate(3){ UInt(_) } ==== 
+  Vec(UInt(0), UInt(1), UInt(2))
+val v = Vec.fill(0){ UInt(width = 8) }
+for ...
+  v += UInt(width = 8)
+\end{scala}
+\end{frame}
+
+
+\begin{frame}[fragile]{Functional Vec}
+\begin{scala}
+class Vec[T <: Data](val gen: () => T) 
+    extends Data with Cloneable with BufferProxy[T] { 
+  ... 
+  def forall(p: T => Bool): Bool
+  def exists(p: T => Bool): Bool
+  def contains(x: T): Bool
+  def count(p: T => Bool): UInt
+
+  def indexWhere(p: T => Bool): UInt
+  def lastIndexWhere(p: T => Bool): UInt
+}
+\end{scala}
+\begin{scala}
+Vec(K, L, M).contains(x) ==== ( x === K || x === L || x === M )
+\end{scala}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{Queues}
+\begin{itemize}
+\item Required parameter \verb+entries+ controls depth
+\item The width is determined from the inputs.
+\end{itemize}
+\begin{scala}
+class QueueIO[T <: Data](type: T, entries: Int) extends Bundle {
+  val enq   = Decoupled(data.clone).flip
+  val deq   = Decoupled(data.clone)
+  val count = UFix(OUTPUT, log2Up(entries+1))
+}
+
+class Queue[T <: Data]
+    (type: T, entries: Int, 
+     pipe: Boolean = false,
+     flow: Boolean = false
+     flushable: Boolean = false)
+    extends Module  
+\end{scala}
+\begin{scala}
+val q = new Queue(UInt(), 16)
+q.io.enq <> producer.io.out
+consumer.io.in <> q.io.deq
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Pipes}
+\begin{itemize}
+\item delays data coming down pipeline by \verb+latency+ cycles
+\item similar to \verb+ShiftRegister+ but exposes Pipe interface
+\end{itemize}
+\begin{scala}
+class PipeIO[+T <: Data](data: T) extends Bundle {
+  val valid = Bool(OUTPUT)
+  val bits  = data.clone.asOutput
+}
+
+class Pipe[T <: Data](type: T, latency: Int = 1) extends Module
+\end{scala}
+\begin{scala}
+val pipe = new Pipe(UInt())
+pipe.io.enq <> produce.io.out
+consumer.io.in <> pipe.io.deq
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Fixed Priority Arbiter}
+\begin{itemize}
+\item sequences \verb+n+ producers into 1 consumer
+\item priority is given to lower producer
+\end{itemize}
+\begin{scala}
+class ArbiterIO[T <: Data](data: T, n: Int) extends Bundle {
+  val in     = Vec.fill(n) { Decoupled(data) }.flip
+  val out    = Decoupled( data.clone )
+  val chosen = Bits(OUTPUT, log2Up(n))
+}
+
+class Arbiter[T <: Data](type: T, n: Int) extends Module 
+\end{scala}
+\begin{scala}
+val arb = new Arbiter(UInt(), 2)
+arb.io.in(0) <> producer0.io.out
+arb.io.in(1) <> producer1.io.out
+consumer.io.in <> arb.io.out
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Round Robin Arbiter}
+\begin{itemize}
+\item sequences \verb+n+ producers into 1 consumer
+\item producers are chosen in round robin order
+\end{itemize}
+\begin{scala}
+class ArbiterIO[T <: Data](data: T, n: Int) extends Bundle {
+  val in     = Vec.fill(n) { Decoupled(data) }.flip
+  val out    = Decoupled( data.clone )
+  val chosen = Bits(OUTPUT, log2Up(n))
+}
+
+class RRArbiter[T <: Data](type: T, n: Int) extends Module 
+\end{scala}
+\begin{scala}
+val arb = new RRArbiter(UInt(), 2)
+arb.io.in(0) <> producer0.io.out
+arb.io.in(1) <> producer1.io.out
+consumer.io.in <> arb.io.out
+\end{scala}
+\end{frame}
+
+% \begin{frame}[fragile]
+% \frametitle{Crossbar}
+% \begin{itemize}
+% \item Priority
+% \item Round Robin
+% \end{itemize}
+% \end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{Structural Memory}
+\begin{itemize}
+\item Defined number of ports
+\item Port specific accesses
+\end{itemize}
+\begin{scala}
+class FunMem[T <: Data]
+    (data: T, depth: Int, numReads: Int, numWrites: Int) {
+  ...
+  def read(addr: UInt, idx: Int = 0): T = ...
+  def write(addr: UInt, data: T, idx: Int = 0) = ...
   ...
 }
 \end{scala}
-\begin{center}
-\includegraphics[height=0.45\textheight]{../bootcamp/figs/trouter.pdf} 
-\end{center}
-\end{frame}
-
-\begin{frame}[fragile]{Router Interface}
 \begin{scala}
-class RouterIO(n: Int) extends Bundle {
-  override def clone = new RouterIO(n).asInstanceOf[this.type]
-  val reads   = new DeqIO( new ReadCmd() )
-  val replies = new EnqIO( UInt(width = 8) )
-  val writes  = new DeqIO( new WriteCmd() )
-  val in      = new DeqIO( new Packet() )
-  val outs    = Vec.fill(n){ new EnqIO( new Packet() ) }
+val cellDats = new FunMem(Bits(width = DATA_WIDTH), NUM_CELLS, 1, 1)
+when (isWrite0) {
+  cellDats.write(ca0, dat0, 0)
 }
+when (isWrite1) {
+  cellDats.write(ca1, dat1, 1)
+}
+... cellDats.read(ca, 0) ...
+... cellDats.read(ca, 1) ...
 \end{scala}
-\begin{center}
-\includegraphics[height=0.45\textheight]{../bootcamp/figs/trouter.pdf} 
-\end{center}
 \end{frame}
 
-\begin{frame}[fragile]{Complete Router Interface}
-
-{\lstset{basicstyle={\scriptsize\ttfamily}}
-\begin{scala}
-class ReadCmd extends Bundle {
-  val addr = UInt(width = 32)
-}
-
-class WriteCmd extends ReadCmd {
-  val data = UInt(width = 32)
-}
-
-class Packet extends Bundle {
-  val header = UInt(width = 8)
-  val body   = UInt(width = 64)
-}
-
-class RouterIO(n: Int) extends Bundle {
-  override def clone = new RouterIO(n).asInstanceOf[this.type]
-  val reads   = new DeqIO( new ReadCmd() )
-  val replies = new EnqIO( UInt(width = 8) )
-  val writes  = new DeqIO( new WriteCmd() )
-  val in      = new DeqIO( new Packet() )
-  val outs    = Vec.fill(n){ new EnqIO( new Packet() ) }
-}
-\end{scala}
-}
+\begin{frame}{Acknowledgements}
+\begin{itemize}
+\item ``What is Chisel?'' based on slides from Patrick Li
+\end{itemize}
 \end{frame}
-
-\begin{frame}[fragile]{Router Guts}
-
-{\lstset{basicstyle={\scriptsize\ttfamily}}
-\begin{scala}
-class RouterIO(n: Int) extends Bundle {
-  override def clone = new RouterIO(n).asInstanceOf[this.type]
-  val reads   = new DeqIO( new ReadCmd() )
-  val replies = new EnqIO( UInt(width = 8) )
-  val writes  = new DeqIO( new WriteCmd() )
-  val in      = new DeqIO( new Packet() )
-  val outs    = Vec.fill(n){ new EnqIO( new Packet() ) }
-}
-
-class Router extends Module {
-  val depth = 32
-  val n     = 4
-  val io    = new RouterIO(n)
-  val tbl   = Mem(depth, UInt(width = sizeof(n)) )
-  
-  when(io.reads.valid && io.replies.ready) { 
-    val cmd = io.reads.deq();  io.replies.enq(tbl(cmd.addr))  
-  } .elsewhen(io.writes.valid) { 
-    val cmd = io.writes.deq(); tbl(cmd.addr) := cmd.data
-  } .elsewhen(io.in.valid) {
-    val pkt = io.in.deq(); io.outs(tbl(pkt.header(0))).enq(pkt) 
-  } 
-}
-\end{scala}
-}
-\end{frame}
-
-\begin{frame}[fragile]{Object Oriented FIFOIO}
-
-{\lstset{basicstyle={\scriptsize\ttfamily}}
-\begin{scala}
-class EnqIO[T <: Data]( data: T ) extends DecoupledIO(data) {
-  def enq(dat: T): T = { valid := Bool(true); data := dat; dat }
-  valid := Bool(false)
-  for (io <- data.flatten.map(x => x._2))
-    io := UInt(0, io.getWidth())
-}
-
-class DeqIO[T <: Data](data: T) extends DecoupledIO(data) {
-  flip()
-  ready := Bool(false)
-  def deq(b: Boolean = false): T = { ready := Bool(true); data }
-}
-
-class Filter[T <: Data](data: T) extends Module {
-  val io = new Bundle {
-    val in  = new DeqIO( data )
-    val out = new EnqIO( data )
-  }
-  when (io.in.valid && io.out.ready) {
-    io.out.enq(io.in.deq())
-  }
-}
-\end{scala}
-}
-\end{frame}
-
-
 
 \end{document}

@@ -8,7 +8,7 @@
 \input{../style/scala.tex}
 \input{../style/talk.tex}
 
-\title{Chisel @ CS250 -- Part III -- Lecture 11}
+\title{Chisel @ CS250 -- Part III -- Lecture 8}
 \author{Jonathan Bachrach}
 \date{\today}
 \institute[UC Berkeley]{EECS UC Berkeley}
@@ -22,6 +22,7 @@
 
 \begin{frame}{Options for Testing Chisel Designs}
 \begin{itemize}
+\item testing using assert and printf in Chisel
 \item testing Verilog using VCS
 \item testing from within Scala
 \begin{itemize}
@@ -46,6 +47,47 @@
 \begin{center}
 \includegraphics[height=0.9\textheight]{../bootcamp/figs/chisel-workflow.pdf}
 \end{center}
+\end{frame}
+
+\begin{frame}[fragile]{printf / sprintf}
+\begin{itemize}
+\item during simulation
+\begin{itemize}
+\item \verb+printf+ prings the formatted string to the console on rising clock edges
+\item \verb+sprintf+ returns the formatted string as a bit vector
+\end{itemize}
+\item format specifiers are
+\begin{itemize}
+\item \verb+%b+ -- binary number
+\item \verb+%d+ -- decimal number
+\item \verb+%x+ -- hexidecimal number
+\item \verb+%s+ -- string consisting of a sequence of 8-bit extended ASCII chars
+\item \verb+%%+ -- specifies a literal %.
+\end{itemize}
+\end{itemize}
+the following prints the line \verb+"0x4142 16706 AB"+ on cycles when \verb+c+ is true:
+\begin{scala}
+val x = Bits(0x4142)
+val s1 = sprintf("%x %s", x, x);
+when (c) { printf("%d %s\n", x, s1); }
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{assert}
+\begin{itemize}
+\item simulation time assertions are provided by \verb+assert+ construct
+\item if assert arguments false on rising edge then 
+\begin{itemize}
+\item an error is printed and 
+\item simulation terminates
+\end{itemize}
+\end{itemize}
+the following will terminate after 10 clock cycles:
+\begin{scala}
+val x = Reg(init = UInt(0, 4))
+x := x + UInt(1)
+assert(x < UInt(10))
+\end{scala}
 \end{frame}
 
 \begin{frame}{Verilog Debugging}
@@ -216,7 +258,7 @@ PASSED
 \end{scala}
 \end{frame}
 
-\begin{frame}[fragile]{Testing Decoupled Circuits}
+\begin{frame}[fragile]{Simple Decoupled Circuits Testing}
 \begin{scala}
 class GCDTests(c: GCD) extends Tester(c, Array(c.io)) {
   defTests {
@@ -234,6 +276,77 @@ class GCDTests(c: GCD) extends Tester(c, Array(c.io)) {
   }
 }
 \end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{Testing Coprocessor}
+\begin{center}
+\includegraphics[width=0.8\textwidth]{figs/rocket-coprocessor.pdf}
+\end{center}
+\end{frame}
+
+\begin{frame}[fragile]{More Powerful Decoupled Circuits}
+
+{\lstset{basicstyle={\scriptsize\ttfamily}}
+\begin{scala}
+class AdvTester[+T <: Module](val dut: T, val ios: Array[Node])
+    extends Tester[T](dut, ios) {
+
+  val preprocessors = new ArrayBuffer[Processable]()
+
+  val postprocessors = new ArrayBuffer[Processable]()
+
+  // like step but does pre and post processing and work
+  def takestep(work: => Unit = {}) = ...
+
+  def until(pred: => Boolean, maxCycles: Int = ...)(work: => Unit): Boolean = ...
+
+  def do_until(pred: => Boolean, maxCycles: Int = ...)(work: => Unit): Boolean = ...
+
+  def eventually(pred: => Boolean, maxCycles: Int = ...) = 
+    until(pred, maxCycles){ }
+}
+\end{scala}
+}
+\vfill 
+{\tiny by Stephen Twigg and Eric Love}
+\end{frame}
+
+\begin{frame}[fragile]{Sources + Sinks for Testing Decoupled Circuits}
+\verb+DecoupledSource+
+\begin{itemize}
+\item queue from tester to DUT
+\item tester enqueues data onto queue
+\item handlers moving data from queue to decoupled interface
+\item can use \verb+until+ to wait until data shows up on queue
+\end{itemize}
+\verb+DecoupledSink+
+\begin{itemize}
+\item queue from DUT to tester
+\item tester sees data on queue
+\item handlers moving data from decoupled interface to queue
+\item can use \verb+until+ to wait until data shows up on queue
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Decoupled Testing Coprocessor}
+Imagine testing your coprocessor with AdvTester (instead of rocket core):
+\begin{scala}
+val commands  = new DecoupledSource(dut.io.cmd, ...)
+val responses = new DecoupledSink(dut.io.resp, ...)
+...
+defTests {
+  ...
+  commands.inputs.enqueue(TestCmd.setup(0, 1, 10))
+  until(!responses.outputs.isEmpty) { } 
+  val resp = response.outputs.dequeue()
+  assert(resp.data == ..., "test 1 failed: bad response")
+  assert(resp.rd == 10, "test 1 failed: bad rd returned")
+  ...
+}  
+\end{scala}
+\begin{itemize}
+\item memory can also be handled in tester using Scala queues and Scala memory and a process that gets stepped to handle mem requests.
+\end{itemize}
 \end{frame}
 
 \begin{frame}[fragile]{C++ Simulator}
@@ -379,7 +492,7 @@ class GCD_t : public mod_t {
 \begin{itemize}
 \item \code{A\_\_io\_x}
 \end{itemize}
-\item \code{... Vec(2)\{ FIFOIO()\{ Bool() \} \}} produces
+\item \code{... Vec.fill(2)\{ Decoupled( Bool() ) \}} produces
 \begin{itemize}
 \item \code{B\_\_io\_ports\_0\_ready}
 \end{itemize}
@@ -486,6 +599,8 @@ int main (int argc, char* argv[]) {
 \end{itemize}
 \end{itemize}
 \end{frame}
+
+
 
 \begin{frame}[fragile]{Onwards}
 \begin{itemize}

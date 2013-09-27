@@ -55,7 +55,7 @@ EECS Department, UC Berkeley\\
 
 \section{Introduction}
 
-Ths document is intended to familiarize you with component instantiation and using primitives in Chisel.  The tutorial is broken into small modules each of which will present a new feature of Chisel. This tutorial assumes that you are familiar with what was presented in the previous tutorial.
+Ths document is intended to familiarize you with module instantiation and using primitives in Chisel.  The tutorial is broken into small modules each of which will present a new feature of Chisel. This tutorial assumes that you are familiar with what was presented in the previous tutorial.
 
 \subsection{Acquiring the Tutorial Files}
 
@@ -69,7 +69,7 @@ This will clone the Chisel tutorial files onto your machine. If you cloned the r
 
 \section{Module Instantiation}
 
-Like other hardware description languages, Chisel allows fairly straightforward module instantiation to enable modularity and hierarchy. In Chisel, instantiating a Module class is the equivalent to instantiating a module in Verilog. To do this, we simply use the keyword \verb+new+ in order to indicate that we are instnatiation a new module. We want to make sure we assign this to a value so that we can reference its input and outputs which we also need to connect.
+Like other hardware description languages, Chisel allows fairly straightforward module instantiation to enable modularity and hierarchy. In Chisel, instantiating a Module class is the equivalent to instantiating a module in Verilog. To do this, we simply use a call to \verb+Module+ with module created with the Scala \verb+new+ keyword in order to indicate that we are instantiation a new module. We want to make sure we assign this to a value so that we can reference its input and outputs which we also need to connect.
 
 For example, suppose we would like to construct a 4-bit adder using multiple copies of the  \verb+FullAdder+ module. as shown in the Figure 1. The Chisel source code is shown below.
 
@@ -81,7 +81,7 @@ For example, suppose we would like to construct a 4-bit adder using multiple cop
 \end{figure}
 
 \begin{scala}
-//A 4-bit adder with carry in and carry out
+// A 4-bit adder with carry in and carry out
 class Adder4 extends Module {
   val io = new Bundle {
     val A    = UInt(INPUT, 4)
@@ -90,26 +90,26 @@ class Adder4 extends Module {
     val Sum  = UInt(OUTPUT, 4)
     val Cout = UInt(OUTPUT, 1)
   }
-  //Adder for bit 0
-  val Adder0 = new FullAdder()
+  // Adder for bit 0
+  val Adder0 = Module(new FullAdder())
   Adder0.io.a   := io.A(0)
   Adder0.io.b   := io.B(0)
   Adder0.io.cin := io.Cin
   val s0 = Adder0.io.sum
-  //Adder for bit 1
-  val Adder1 = new FullAdder()
+  // Adder for bit 1
+  val Adder1 = Module(new FullAdder())
   Adder1.io.a   := io.A(1)
   Adder1.io.b   := io.B(1)
   Adder1.io.cin := Adder0.io.cout
   val s1 = Cat(Adder1.io.sum, s0)
-  //Adder for bit 2
-  val Adder2 = new FullAdder()
+  // Adder for bit 2
+  val Adder2 = Module(new FullAdder())
   Adder2.io.a   := io.A(2)
   Adder2.io.b   := io.B(2)
   Adder2.io.cin := Adder1.io.cout
   val s2 = Cat(Adder2.io.sum, s1)
-  //Adder for bit 3
-  val Adder3 = new FullAdder()
+  // Adder for bit 3
+  val Adder3 = Module(new FullAdder())
   Adder3.io.a   := io.A(3)
   Adder3.io.b   := io.B(3)
   Adder3.io.cin := Adder2.io.cout
@@ -122,9 +122,10 @@ In this example, notice how when referencing each module I/O we must first refer
 
 \section{The Vec Class}
 
-The \verb+Vec+ class allows you to create an indexable vector in Chisel which can be filled with any primitive or module. The general syntax for a \verb+Vec+ declaration is given by:
+The \verb+Vec+ class allows you to create an indexable vector in Chisel which can be filled with any expression that returns a chisel data type. The general syntax for a \verb+Vec+ declaration is given by:
 \begin{scala}
-val myVec = Vec.fill( <number of elements> ) { <data type> }
+val myVec = 
+  Vec.fill( <number of elements> ) { <data type> }
 \end{scala}
 Where \verb+<number of elements>+ corresponds to how long the vector is and \verb+<data type>+ corresponds to what type of class the vector contains.
 
@@ -152,23 +153,24 @@ To access a particular element in the vector at some index, we specify the index
 val reg5 = reg_vec(5)
 \end{scala}
 
-The syntax for the \verb+Vec+ class is slightly different when instantiating a vector of components. When instantiating a vector of components the data type that is specified in the {} braces is slightly different than the usualy primitive types. To specify a vector of components, we use the \verb+io+ bundle when specifying the type of the vector. For example, in order to specify a \verb+Vec+ with 16 components , say \verb+FullAdder+s in this case, we would use the following declaration:
+The syntax for the \verb+Vec+ class is slightly different when instantiating a vector of modules. When instantiating a vector of modules the data type that is specified in the {} braces is slightly different than the usualy primitive types. To specify a vector of modules, we use the \verb+io+ bundle when specifying the type of the vector. For example, in order to specify a \verb+Vec+ with 16 modules , say \verb+FullAdder+s in this case, we would use the following declaration:
 
 \begin{scala}
-val FullAdders = Vec.fill(16){ new FullAdder().io }
+val FullAdders = 
+  Vec.fill(16){ Module(new FullAdder()).io }
 \end{scala}
 
-Notice we use the keyword \verb+new+ in the vector definition before the component name \verb+FullAdder+. For how to actually access the \verb+io+ on the vector components, refer to the next section.
+Notice we use the keyword \verb+new+ in the vector definition before the module name \verb+FullAdder+. For how to actually access the \verb+io+ on the vector modules, refer to the next section.
 
 \section{Parametrization}
 
-In the previous Adder example, we explicitly instantiated four different copies of a \verb+FullAdder+ and wired up the ports. But suppose we want to generalize this structure to an n-bit adder. Like Verilog, Chisel allows a you to pass parameters to specify certain aspects of your design. In order to do this, we add a field in the Module declaration to our Chisel definition.
+In the previous Adder example, we explicitly instantiated four different copies of a \verb+FullAdder+ and wired up the ports. But suppose we want to generalize this structure to an n-bit adder. Like Verilog, Chisel allows you to pass parameters to specify certain aspects of your design. In order to do this, we add a parameter in the Module declaration to our Chisel definition.
 For a carry ripple adder, we would like to parametrize the width to some integer value \verb+n+ as shown in the following example:
 
 \begin{scala}
 
-//A n-bit adder with carry in and carry out
-class Adder(n:Int) extends Module {
+// A n-bit adder with carry in and carry out
+class Adder(n: Int) extends Module {
   val io = new Bundle {
     val A    = UInt(INPUT, n)
     val B    = UInt(INPUT, n)
@@ -176,17 +178,17 @@ class Adder(n:Int) extends Module {
     val Sum  = UInt(OUTPUT, n)
     val Cout = UInt(OUTPUT, 1)
   }
-  //create a vector of FullAdders
-  val FAs = Vec(n) {new FullAdder().io}
+  // create a vector of FullAdders
+  val FAs = Vec.fill(n) { Module(new FullAdder()).io}
 
-  //define carry and sum wires
-  val carry = Vec(n+1) {UInt(width = 1)}
-  val sum   = Vec(n) {Bool()}  
+  // define carry and sum wires
+  val carry = Vec.fill(n+1){ UInt(width = 1) }
+  val sum   = Vec.fill(n){ Bool() } 
 
-  //first carry is the top level carry in
+  // first carry is the top level carry in
   carry(0) := io.Cin
 
-  //wire up the ports of the full adders
+  // wire up the ports of the full adders
   for(i <- 0 until n) {
      FAs(i).a   := io.A(i)
      FAs(i).b   := io.B(i)
@@ -204,19 +206,19 @@ Note that in this example, we keep track of the sum output in a \verb+Vec+ of \v
 
 You will notice that modules are instantiated in a Vec class which allows us to iterate through each module when assigning the ports connections to each \verb+FullAdder+. This is similar to the generate statement in Verilog. However, you will see in more advanced tutorials that Chisel can offer more powerful variations.
 
-Instantiating a parametrized module is very similar to instantiating an unparametrized module except that we must provide arguments for the parameter values. For instance, if we wanted to instantiate a 4-bit version of the \verb+Adder+ component we defined above, it would look like:
+Instantiating a parametrized module is very similar to instantiating an unparametrized module except that we must provide arguments for the parameter values. For instance, if we wanted to instantiate a 4-bit version of the \verb+Adder+ module we defined above, it would look like:
 
 \begin{scala}
-val adder4 = new Adder(4)
+val adder4 = Module(new Adder(4))
 \end{scala}
 
 We can also instantiate the \verb+Adder+ by explicitly specifying the value of it parameter \verb+n+ like the this:
 
 \begin{scala}
-val adder4 = new Adder(n = 4)
+val adder4 = Module(new Adder(n = 4))
 \end{scala}
 
-Explicitly specifying the parameter is useful when you have a module with multiple parameters. Suppose you have a parametrized FIFO module with the following component definition:
+Explicitly specifying the parameter is useful when you have a module with multiple parameters. Suppose you have a parametrized FIFO module with the following module definition:
 
 \begin{scala}
 class FIFO(width: Int, depth: Int) extends Module {...}
@@ -225,12 +227,12 @@ class FIFO(width: Int, depth: Int) extends Module {...}
 You can explicitly specify the parameter values in any order:
 
 \begin{scala}
-val FIFO1 = new FIFO(16, 32)
-val FIFO2 = new FIFO(width = 16, depth = 32)
-val FIFO3 = new FIFO(depth = 32, width = 16)
+val fifo1 = Module(new FIFO(16, 32))
+val fifo2 = Module(new FIFO(width = 16, depth = 32))
+val fifo3 = Module(new FIFO(depth = 32, width = 16))
 \end{scala}
 
-All of the above definitions pass the same parameters to the FIFO component. Notice that when you explicitly assign the parameter values, they can occur in any order you want such as the definition for FIFO3.
+All of the above definitions pass the same parameters to the FIFO module. Notice that when you explicitly assign the parameter values, they can occur in any order you want such as the definition for fifo3.
 
 \section{Built In Primitives}
 
@@ -248,15 +250,15 @@ val out = Mux(select, A, B)
 Thus if \verb+A=10+, \verb+B=14+, and \verb+select+ was \verb+true+, the value of \verb+out+ would be assigned 10. Notice how using the \verb+Mux+ primitive type abstracts away the logic structures required if we had wanted to implement the multiplexor explicitly. The instantiation would look something like this:
 
 \begin{scala}
-//where n is the width of A and m is the width of B
-val mux = new Mux(n, m)
+// where n is the width of A and m is the width of B
+val mux = Module(new Mux(n, m))
 mux.io.select := select
 mux.io.A      := A
 mux.io.B      := B
 val out = mux.io.out
 \end{scala}
 
-We see that clearly it is much cleaner to use the primitive \verb+Mux+ type instead of trying to write and implement our own general multiplexor since the \verb+Mux+ type does all the bookkeeping for you.
+We see that clearly it is much cleaner to use the primitive \verb+Mux+ type instead of trying to write and implement our own general multiplexor since the \verb+Mux+ type does all the wiring for you.
 
 
 %\section{Exercises}

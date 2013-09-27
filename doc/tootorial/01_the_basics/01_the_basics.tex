@@ -65,40 +65,31 @@ To get the files required for this tutorial, you will need to have Git installed
 git clone https://github.com/ucb-bar/chisel-tutorial.git
 \end{bash}
 
-This will clone the Chisel tutorial files onto your machine. If you cloned the repository into \verb+$DIR+ then your copy of the Chisel Tutorial repository will then be in \verb+$DIR/chisel-tutorial+.  Define this as a variable in your bash environment:
+This will clone the Chisel tutorial files onto your machine. If you cloned the repository into \verb+$DIR+ then your copy of the Chisel Tutorial repository will then be in \verb+$DIR/chisel-tutorial+.  Define this as a variable in your bash environment named \verb+$TUT_DIR+.
 
 \subsection{The Chisel Directory Structure}
 
-Once you have acquired the tutorial files you should see the following Chisel tutorial directory structure under \verb+$DIR+:
+Once you have acquired the tutorial files you should see the following Chisel tutorial directory structure under \verb+$TUT_DIR+:
 
 \begin{bash}
 chisel-tutorial/  
   Makefile
   examples/   # Contains chisel examples
     Makefile  
-    build.sbt # Contains project file
+    build.sbt # Contains project description
     Accumulator.scala ...
-    emulator/ # Contains C++ simulation build products
-    verilog/  # Contains Verilog build products
   problems/   # Contains skeletal files for tutorial problems
     Makefile
-    build.sbt # Contains project file
+    build.sbt # Contains project description
     Counter.scala ...
-    emulator/ # Contains C++ simulation build products
-    verilog/  # Contains Verilog build products
   solutions/  # Contains solutions to problems
     Makefile
-    build.sbt # Contains project file
+    build.sbt # Contains project description
     Counter.scala ...
-    emulator/ # Contains C++ simulation build products
-    verilog/  # Contains Verilog build products
 \end{bash}
 
-The \verb+src/+ directory contains all of your Chisel source files. For our tutorial it contains the files that you will be modifying under \verb+problems/+ while the \verb+solutions/+ folder contains the reference implementations for each of the problems.  Finally, \verb+examples/+ contains source to the complete examples given in this tutorial.
-
-The \verb+emulator/+ directories contain the generated C++ files required to simulate the Chisel source files. We will explain more about the simulation directories later.
-
-The \verb+verilog/+ directories contain the generated Verilog files corresponding to your Chisel sources. Recall that Chisel is a hardware constructing language so this directory is where all of the magic occurs and produces FPGA or ASIC Verilog.
+Chisel source files are distributed between \verb+examples+, \verb+problems+, and \verb+solutions+ directories.
+The tutorial contains the files that you will be modifying under \verb+problems/+ while the \verb+solutions/+ folder contains the reference implementations for each of the problems.  Finally, \verb+examples/+ contains source to the complete examples given in this tutorial.
 
 Finally, the \verb+build.sbt+ files contain the build configuration information used to specify what version of Chisel to make your project with.
 
@@ -143,8 +134,8 @@ Next we see the I/O specification for this component in the \verb+val io = new B
 The next section of code performs the actual GCD computation for the module. The register declarations for \verb+x+ and \verb+y+ tell Chisel to treat \verb+x+ and \verb+y+ as a register of type UInt(). 
 
 \begin{scala}
-val x  = Reg(UInt())  // declares x as UInt register
-val y  = Reg(UInt())  // declares y as UInt register
+val x = Reg(UInt()) // declares x as UInt register
+val y = Reg(UInt()) // declares y as UInt register
 \end{scala}
 
 The \verb+when+ statement tells Chisel to perform the operation on a positive clock edge if the condition is true, treating the left hand assignments as synchronous. This is similar to how Verilog uses \verb+always @ (posedge clk)+ to specify synchronous logic.
@@ -153,23 +144,26 @@ Finally we see the output assignments for the computation for \verb+io.z+ and \v
 
 \subsection{Running the Chisel Simulation}
 
-Now that we are familiar with the Chisel code for the \verb+GCD.scala+ file, let's try to simulate it by generating the C++ models. Change directory into the \verb+$DIR/problems/+ directory. Here you will see one lonely Makefile which we will call with:
+Now that we are familiar with the Chisel code for the \verb+GCD.scala+ file, let's try to simulate it by generating the C++ models. Change directory into the \verb+$DIR/examples/+ directory. Here you will see one lonely Makefile which we will call with:
 
 \begin{bash}
 make GCD
 \end{bash}
 
+\noindent
 This will fire off the Chisel emulator that will run the simulation for the component defined in \verb+GCD.scala+. If the simulation succeeds, you should see some debug output followed by:
+\begin{footnotesize}
 \begin{bash}
 PASSED
 [success] Total time: 2 s, completed Feb 28, 2013 8:14:37 PM
 \end{bash}
+\end{footnotesize}
 
 The debug output is generated by the test harness which composes the second half of the GCD.scala file. We will talk about this more later. In addition to the debug output, the build also creates C++ models which can be used to simulate and debug more complicated designs.
 
 \subsection{Generating the Verilog}
 
-One of the most powerful features of Chisel is its ability to generate FPGA and ASIC Verilog from the Scala sources that you construct. To do this, change directory into the \verb+$DIR/problems/verilog/+ directory and again run:
+One of the most powerful features of Chisel is its ability to generate FPGA and ASIC Verilog from the Scala sources that you construct. To do this, change directory into the \verb+$DIR/examples/verilog/+ directory and again run:
 \begin{bash}
 make GCD.v
 \end{bash}
@@ -212,17 +206,20 @@ class FullAdder extends Module {
 }
 \end{scala}
 
+\noindent
+where \verb+cout+ is defined as a combinational function of inputs \verb+a+, \verb+b+, and \verb+cin+.
+
 You will notice that in order to access the input values from the \verb+io+ bundle, you need to first reference \verb+io+ since the input and output values belong to the \verb+io+ bundle. The |, \&, and \^\ operators correspond to bitwise OR, AND, and XOR operations respectively.
 
-The corresponding wires for each of these values is shown below:
+The corresponding wires for each of these values is shown below in Figure~\ref{fig:full-adder}.  You will notice that each \verb+val+ corresponds to exactly one of the wires.
 
 \begin{figure}[ht!]
 \centering
 \includegraphics[width=80mm]{Full_Adder.jpg}
 \caption{Full Adder Circuit}
+\label{fig:full-adder}
 \end{figure}
 
-You will notice that each \verb+val+ corresponds to exactly one of the wires.
 
 \subsection{Bit Width Inference}
 
@@ -326,14 +323,14 @@ val z = Reg(next = y)
 If we only want to update if certain conditions are met we use a \verb+when+ block to indicate that the registers are only updated when the condition is satisfied:
 
 \begin{scala}
-//Clock the new register value when the condition a > b
+// Clock the new register value when the condition a > b
 val x = Reg(UInt())
 when (a > b) { x := y }
 .elsewhen ( b > a) {x := z}
 .otherwise { x := w}
 \end{scala}
 
-It is important to note that when using the conditional method that the values getting assigned to the input of the register matches the type and bitwidth of the register you declared. In the unconditional register assignment, you do not need to do this as Chisel will infer the type and width from the type and width of the input value.
+It is important to note that when using the conditional method, the values getting assigned to the input of the register match the type and bitwidth of the register you declared. In the unconditional register assignment, you do not need to do this as Chisel will infer the type and width from the type and width of the input value.
 
 The following sections show how these can be used to construct a shift register.
 
@@ -387,7 +384,7 @@ As mentioned earlier, Chisel allows you to conditionally update a register (use 
 class ShiftRegister extends Module {
   val io = new Bundle {
     val in     = UInt(INPUT, 1)
-    val enable = UInt(INPUT, 1)
+    val enable = Bool(INPUT)
     val out    = UInt(OUTPUT, 1)
   }
 
@@ -416,7 +413,7 @@ Chisel allows you to specify a synchronous reset to a certain value by specifyin
 class ShiftRegister extends Module {
   val io = new Bundle {
     val in     = UInt(INPUT, 1)
-    val enable = UInt(INPUT, 1)
+    val enable = Bool(INPUT)
     val out    = UInt(OUTPUT, 1)
   }
   // Register reset to zero
@@ -442,7 +439,7 @@ Chisel also has an implict global \verb+reset+ signal that you can use in a \ver
 class ShiftRegister extends Module {
   val io = new Bundle {
     val in     = UInt(INPUT, 1)
-    val enable = UInt(INPUT, 1)
+    val enable = Bool(INPUT)
     val out    = UInt(OUTPUT, 1)
   }
   val r0 = Reg(UInt())

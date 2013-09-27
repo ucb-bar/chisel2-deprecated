@@ -55,33 +55,31 @@ EECS Department, UC Berkeley\\
 
 \section{Introduction}
 
-Ths document is intended to show you how to create your own project in Chisel and goes over the essential components required to get your project off the ground.  The tutorial is broken into small sections each of which explain the components required for you to create your own project. This tutorial explores a 
+Ths document is intended to show you how to create your own project in Chisel and goes over the essential components required to get your project off the ground.  The tutorial is broken into small sections each of which explain the components required for you to create your own project. 
 
 \section{Creating Your Own Projects}
 
-In order to create your own projects from scratch, you will need to create the appropriate infrastructure of directories, Makefiles and Makefrags, and the build.scala configuration file. In the first part of this tutorial we cover the basic calls to SBT in order generate appropriate files. At the end of the tutorial, we will explain how the Makefile infrastructure can make the process more streamlined.
+In order to create your own projects from scratch, you will need to create a directory, a Chisel source file, and a build.sbt configuration file. In the first part of this tutorial we cover the basic calls to SBT in order generate appropriate files. At the end of the tutorial, we will explain how the Makefile infrastructure can make the process more streamlined.
 
 \subsection{Directory Structure}
 
-The simplest project file organization is using a single directory containing your Scala project file and your Chisel source file. The \verb+emulator+ and \verb+verilog+ directories are automatically generated when C++ and Verilog targets are selected. 
-
-The project directory structure would look like:
+The simplest project file organization is using a single directory containing your Scala project file and your Chisel source file.  The project directory structure would look like:
 
 \begin{bash}
 Hello/
   build.sbt   # scala configuration file
   Hello.scala # your source file
-  emulator/   # your C++ target generated here
-  verilog/    # your Verilog target generated here
 \end{bash}
 
 We will refer to the path to the \verb+Hello+ directory as \verb+$BASEDIR+ from here on.  More sophisticated directory structures can be useful in the future.  Consult the SBT documentation for more information.
 
 \subsection{The Source Directory and Chisel Main}
 
-The top directory \verb+$BASEDIR/+ contains all of the Chisel module definitions for your circuit and a main method as shown below:
+The top directory \verb+$BASEDIR/+ contains Scala source files containing all of the Chisel module definitions for your circuit and a main method.  In this simple example, we have one Scala source file as shown below:
 
 \begin{scala}
+package Hello
+
 import Chisel._
 
 class HelloModule extends Module {
@@ -97,17 +95,17 @@ class HelloModuleTests(c: HelloModule) extends Tester(c, Array(c.io)) {
 
 object hello {
   def main(args: Array[String]): Unit = {
-    chiselMainTest(Array[String]("--backend", "c", "--genHarness"),
-      () => Module(new HelloModule())){c => new HelloModuleTests(c)}
+    chiselMainTest(Array("--backend", "c", "--genHarness"),
+      () => Module(new HelloModule()) {
+        c => new HelloModuleTests(c)
+      })
   }
 }
 \end{scala}
 
-In this main method, we see that it takes the first argument and looks for a match against the components that can be instantiated. In the above example, we have a component definition in package \verb+Hello+ for a \verb+Hello+ module. If the argument that is supplied to main is "GCD", the main method will call \verb+chiselMainTest+ for a new GCD module. Note that in order for main to recognize your component definition, \verb+GCD.scala+ must also be part of the same package as \verb+myProjectMain.scala+.
+In the above example, we have a module definition in package \verb+Hello+ for a \verb+Hello+ module. The main method calls \verb+chiselMainTest+ for a new Hello module\footnote{Note that when you have multiple Scala files, in order for main to recognize your module definition, your module definition must be in the same package as the main function}. In addition to creating the module, the call to \verb+chiselMainTest+ also includes a call to execute the scala testbench defined in the routine \verb+HelloModuleTests+.
 
-In addition to creating the module, the call to \verb+chiselMainTest+ also includes a call to execute the scala testbench defined in the routine \verb+HelloModuleTests+.
-
-\subsection{The build.scala Template}
+\subsection{The build.sbt Template}
 
 The \verb+build.sbt+ configuration file is located in the top folder and contains a number of settings used by \verb+sbt+ when building and compiling the Chisel sources.  The following shows the recommended \verb+build.sbt+ template that should be used:
 
@@ -118,7 +116,8 @@ resolvers ++= Seq(
   "scct-github-repository" at "http://mtkopone.github.com/scct/maven-repo"
 )
 
-libraryDependencies += "edu.berkeley.cs" %% "chisel" % "2.0.2"
+libraryDependencies += 
+  "edu.berkeley.cs" %% "chisel" % "2.0.3"
 \end{scala}
 
 The SBT project file contains a reference to Scala version greater or equal to 2.10 and a dependency on the Chisel library.
@@ -130,28 +129,28 @@ The SBT project file contains a reference to Scala version greater or equal to 2
 In order to launch SBT to compile the Chisel code we must first be in the directory \verb+$BASEDIR/+. The following call is then made to compile and run the Hello module:
 
 \begin{bash}
-sbt run --backend c --targetDir ../emulator 
+sbt run --backend c
 \end{bash}
 
 \subsection{Running the Chisel Tests}
 
-To actually run the tests referenced in the main method of \verb+$BASEDIR/Hello.scala+, we need to tell sbt to also generate the harness and run the tests. For instance, for our Hello module introduced earlier, the Chisel main method references a test routine \verb+HelloTests+. In order to both compile the Hello component and run the tests defined in \verb+Hello+, we make the following call to sbt:
+To actually run the tests referenced in the main method of \verb+$BASEDIR/Hello.scala+, we need to tell SBT to also generate the harness and run the tests. For instance, for our Hello module introduced earlier, the Chisel main method references a test routine \verb+HelloTests+. In order to both compile the Hello component and run the tests defined in \verb+Hello+, we make the following call to sbt:
 
 \begin{bash}
-sbt run --backend c --compile --test --targetDir ../emulator --genHarness
+sbt run --backend c --compile --test --genHarness
 \end{bash}
 
-Note the addition of the 5 arguments at the end of the call to \verb+run GCD+. This will both compile the \verb+.cpp+ and \verb+.h+ files for the emulator and run the Chisel tests defined. In addition, the \verb+--targetDir ../emulator+ arguments tell sbt to put the generated files in the \verb+$BASEDIR/emulator/+ folder instead of the default which is the currecnt directory.
+Note the addition of the 5 arguments at the end of the call to \verb+run+. This will both compile the \verb+.cpp+ and \verb+.h+ files for the emulator and run the Chisel tests defined. 
 
 \subsection{Compiling Verilog}
 
-Similarly to compile the Chisel code and generate the Verilog HDL, a simlar call to sbt is made with slightly different arguments. The call looks like:
+Similarly to compile the Chisel code and generate the Verilog HDL, a similar call to SBT is made with slightly different arguments. The call looks like:
 
 \begin{bash}
-sbt run --backend v --targetDir ../verilog --genHarness"
+sbt run --backend v --genHarness"
 \end{bash}
 
-Notice the call is very similar to when generating the emulator; the key difference is the parameter to the \verb+--backend+ attribute which is now \verb+v+ which specifies to sbt that we would like to compile our Chisel component to Verilog. Again, the \verb+--targetDir+ argument is used to tell sbt to put the generated files into \verb+$BASEDIR/verilog/+.
+Notice the call is very similar to when generating C++; the key difference is the parameter to the \verb+--backend+ attribute which is now \verb+v+ which specifies to sbt that we would like to compile our Chisel component to Verilog. 
 
 \section{Putting It All Together}
 
@@ -162,6 +161,6 @@ In summary, the bare minimum project components that are necessary for your proj
 \item \verb+$BASEDIR/<Chisel source files>.scala+
 \end{enumerate}
 
-Together, these files compose a Chisel project and can be used to generate the Verilog and emulator files. It is strongly recommended that you supplement the file structure with appropriate Makefiles but not necessary (examples can be found in the Chisel tutorial project).
+Together, these files compose a Chisel project and can be used to generate the Verilog and C++ files. It is strongly recommended that you supplement the file structure with appropriate Makefiles but is not strictly necessary (examples can be found in the Chisel tutorial project).
 
 \end{document}
