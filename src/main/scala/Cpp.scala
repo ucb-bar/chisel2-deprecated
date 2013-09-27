@@ -428,9 +428,10 @@ class CppBackend extends Backend {
   def emitInit(node: Node): String = {
     node match {
       case x: Clock =>
-        if (x.srcClock != null)
-          "  " + emitRef(node) + " = " + emitRef(x.srcClock) + x.initStr
-        else
+        if (x.srcClock != null) {
+          "  " + emitRef(node) + " = " + emitRef(x.srcClock) + x.initStr +
+          "  " + emitRef(node) + "_cnt = " + emitRef(node) + ";\n"
+        } else
           ""
       case x: Reg =>
         "  if (rand_init) " + emitRef(node) + ".randomize();\n"
@@ -483,9 +484,11 @@ class CppBackend extends Backend {
     harness.write("  int period;\n")
     if (Module.clocks.length > 1) {
       for (clock <- Module.clocks) {
-        harness.write("  period = atoi(read_tok(stdin).c_str());\n")
-        harness.write("  c->" + emitRef(clock) + " = period;\n")
-        harness.write("  c->" + emitRef(clock) + "_cnt = period;\n")
+        if (clock.srcClock == null) {
+          harness.write("  period = atoi(read_tok(stdin).c_str());\n")
+          harness.write("  c->" + emitRef(clock) + " = period;\n")
+          harness.write("  c->" + emitRef(clock) + "_cnt = period;\n")
+        }
       }
     }
     harness.write("  c->init();\n");
@@ -681,6 +684,8 @@ class CppBackend extends Backend {
     for (m <- c.omods) {
       out_c.write(emitInit(m));
     }
+    for (clock <- Module.clocks)
+      out_c.write(emitInit(clock))
     out_c.write("}\n");
 
     for (m <- c.omods) {

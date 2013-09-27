@@ -58,10 +58,12 @@ class Tester[+T <: Module](val c: T, val testNodes: Array[Node]) {
   def setClocks(clocks: HashMap[Clock, Int]) {
     println("SETTING UP CLOCKS")
     for (clock <- Module.clocks) {
-      val s = BigInt(clocks(clock)).toString(16)
-      for (c <- s)
-        testOut.write(c)
-      testOut.write(' ')
+      if (clock.srcClock == null) {
+        val s = BigInt(clocks(clock)).toString(16)
+        for (c <- s)
+          testOut.write(c)
+        testOut.write(' ')
+      }
     }
     testOut.write('\n')
     testOut.flush()
