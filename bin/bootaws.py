@@ -184,12 +184,12 @@ def package(public_dns_name):
 
 
 @task
-def deploy(emails, send_confirmation=False):
+def deploy(email_passwd_list, send_confirmation=False):
     """
     Start as many number of Chisel-ready EC2 instances as necessary
     and associate them one-to-one to the identifers list.
     """
-    nb_instances = len(emails)
+    nb_instances = len(email_passwd_list)
     sys.stdout.write("deploy %d instances\n" % nb_instances)
     conn = boto.ec2.connect_to_region('us-west-2')
     # Chisel AMI
@@ -202,7 +202,7 @@ def deploy(emails, send_confirmation=False):
     # Wait a minute or two while it boots
     reservation = wait_for_public_dns_name(conn, reservation)
 
-    for identifier, instance in zip(emails, reservation.instances):
+    for identifier, instance in zip(email_passwd_list, reservation.instances):
         fab.env['host_string'] = instance.public_dns_name
         counter = 0
         while counter < 3:
@@ -211,13 +211,13 @@ def deploy(emails, send_confirmation=False):
             except fabric.exceptions.NetworkError:
                 time.sleep(20)
             counter = counter + 1
-        fab.sudo('echo "ubuntu:%s" | chpasswd' % identifier)
+        fab.sudo('echo "ubuntu:%s" | chpasswd' % identifier[1])
         fab.sudo('cp /etc/ssh/sshd_config /etc/ssh/sshd_config~')
         fab.sudo("sed -e 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config~ > /etc/ssh/sshd_config")
         fab.sudo("restart ssh")
 
-    for identifier, instance in zip(emails, reservation.instances):
-        sys.stdout.write("%s %s" % (identifier, instance.public_dns_name))
+    for identifier, instance in zip(email_passwd_list, reservation.instances):
+        sys.stdout.write("%s %s" % (identifier[0], instance.public_dns_name))
         if send_confirmation:
             try:
                 msg = MIMEText("""
@@ -239,7 +239,7 @@ Thank you,
 """ % {"public_dns_name": instance.public_dns_name})
                 msg['Subject'] = 'Welcome to the Chisel bootcamp!'
                 msg['From'] = 'Chisel <parlab-admin@eecs.berkeley.edu>'
-                msg['To'] = identifier
+                msg['To'] = identifier[0]
                 server = smtplib.SMTP('smtp.gmail.com', 587)
                 server.ehlo()
                 server.starttls()
@@ -275,7 +275,14 @@ def main(args):
     elif args[1] == 'package':
         package(args[2])
     elif args[1] == 'deploy':
-        deploy(args[2:], send_confirmation=True)
+        email_list = args[2:]
+        if os.path.exists(args[2]):
+            with open(args[2]) as email_file:
+                email_list = email_file.readlines()
+        email_passwd_list = []
+        for email_passwd in email_list:
+            email_passwd_list += [ email_passwd.strip().split(':') ]
+        deploy(email_passwd_list, send_confirmation=False)
     elif args[1] == 'teardown':
         teardown()
     else:

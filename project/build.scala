@@ -52,7 +52,7 @@ object BuildSettings extends Build {
       "scct-github-repository" at "http://mtkopone.github.com/scct/maven-repo"
     ),
 
-    libraryDependencies += "com.novocode" % "junit-interface" % "0.10-M1" % "test",
+    libraryDependencies += "com.novocode" % "junit-interface" % "0.10" % "test",
     libraryDependencies += "org.scalatest" %% "scalatest" % "1.9.2" % "test",
 
     // Execute tests in the current project serially.
