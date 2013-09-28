@@ -4,7 +4,7 @@
 #     $ port install texlive-latex-extra texlive-latex-recommended \
 #           texlive-htmlxml ImageMagick
 
-version   := 2.0.2
+version   := 2.0.4
 
 PDFLATEX  := pdflatex
 WWW_PAGES := index.html documentation.html download.html faq.html
