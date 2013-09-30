@@ -1025,6 +1025,65 @@ bit := a > b
 \end{center}
 \end{frame}
 
+\begin{frame}[fragile]{Bundles}
+
+\begin{columns}
+\column{0.55\textwidth}
+\begin{scala}
+class MyFloat extends Bundle {
+  val sign        = Bool()
+  val exponent    = UInt(width = 8)
+  val significand = UInt(width = 23)
+}
+
+val x  = new MyFloat()
+val xs = x.sign
+\end{scala}
+
+\column{0.35\textwidth}
+
+\begin{center}
+\includegraphics[height=0.9\textheight]{../cs250/figs/myfloat.pdf} 
+\end{center}
+
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Ports}
+
+\begin{columns}
+\column{0.55\textwidth}
+
+\textbf{Data object with directions assigned to its members}
+
+\begin{scala}
+class Decoupled extends Bundle {
+  val data  = UInt(INPUT, 32)
+  val valid = Bool(OUTPUT)
+  val ready = Bool(INPUT)
+}
+\end{scala}
+
+\textbf{Direction assigned at instantiation time}
+
+\begin{scala}
+class ScaleIO extends Bundle {
+  val in    = new MyFloat().asInput
+  val scale = new MyFloat().asInput
+  val out   = new MyFloat().asOutput
+}
+\end{scala}
+
+\column{0.35\textwidth}
+
+\begin{center}
+\includegraphics[height=0.9\textheight]{../cs250/figs/fifoio.pdf} 
+\end{center}
+
+\end{columns}
+
+\end{frame}
+
 \begin{frame}[fragile]{Instantiating Modules}
 
 \begin{columns}
@@ -1070,6 +1129,12 @@ class Adder4 extends Module {
 
 \includegraphics[width=0.9\textwidth]{../tootorial/03_module_instantiation/4_Bit_Adder.jpg}
 
+\begin{itemize}
+\item inherits from \verb+Module+ class,
+\item contains an interface stored in a port field named \verb+io+, and
+\item wires together subcircuits in its constructor.
+\end{itemize}
+
 \end{columns}
 
 \end{frame}
@@ -1106,6 +1171,11 @@ val reg5 = reg_vec(5)
 
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Vec Shift Reg -- problems/VecShiftRegister.scala}
+
+\begin{itemize}
+\item add loadability to shift register
+\item change interface to use vec's
+\end{itemize}
 
 {\lstset{basicstyle={\scriptsize\ttfamily}}
 \begin{scala}
@@ -1759,7 +1829,7 @@ it turns out that functional programming is a powerful way to define hardware. \
 for example, you can create a parallel set of blocks using map and reduce to creation reduction trees and chain to create a pipeline.}
 \end{frame}
 
-\begin{frame}[fragile]{Generator}
+\begin{frame}[fragile]{Map / Reduce Generator}
 \begin{footnotesize}
 \begin{scala}
 def delays[T <: Data](x: T, n: Int): List[T] = 
@@ -1838,6 +1908,32 @@ fifo.ready    := condB
 ...
 \end{scala}
 
+\end{frame}
+
+\begin{frame}[fragile]{Multiple Clocks -- \tt MultipleClockDomains.scala}
+\begin{scala}
+class MultiClockDomain extends Module {
+  val io = new Bundle {
+    val start = Bool(INPUT)
+    val sum = Decoupled(UInt(OUTPUT))
+  }
+  val fastClock = new Clock()
+  val slowClock = new Clock()
+  ...
+}
+
+class MultiClockDomainTests(c: MultiClockDomain) 
+    extends Tester(c, Array(c.io)) {
+  defTests {
+    val clocks = new HashMap[Clock, Int]
+    clocks(Module.implicitClock) = 2
+    clocks(c.fastClock) = 4
+    clocks(c.slowClock) = 6
+    setClocks(clocks)
+    ...
+  }
+}
+\end{scala}
 \end{frame}
 
 \begin{frame}[fragile]{Creating Your Own Project}
@@ -1979,26 +2075,75 @@ make a change
 
 \end{frame}
 
-\begin{frame}[fragile]{Resources}
+\begin{frame}[fragile]{Chisel Standard Library}
+\begin{itemize}
+\item Bits Properities
+\item Numeric Utilities
+\item Stateful Functions
+\item Priority Encoding FUnctions
+\item Queues and Pipes
+\item Arbiters
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Queues}
+\begin{itemize}
+\item Required parameter \verb+entries+ controls depth
+\item The width is determined from the inputs.
+\end{itemize}
+\begin{scala}
+class QueueIO[T <: Data](type: T, entries: Int) extends Bundle {
+  val enq   = Decoupled(data.clone).flip
+  val deq   = Decoupled(data.clone)
+  val count = UFix(OUTPUT, log2Up(entries+1))
+}
+
+class Queue[T <: Data]
+    (type: T, entries: Int, 
+     pipe: Boolean = false,
+     flow: Boolean = false
+     flushable: Boolean = false)
+    extends Module  
+\end{scala}
+\begin{scala}
+val q = new Queue(UInt(), 16)
+q.io.enq <> producer.io.out
+consumer.io.in <> q.io.deq
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{Chisel Resources}
 \begin{center}
-\url{https://chisel.eecs.berkeley.edu/documentation.html} \\[0.5cm]
+\url{https://chisel.eecs.berkeley.edu/documentation.html} \\[0.25cm]
 \begin{tabular}{rl}
 \textbf{manual} & \code{manual.pdf} \\
-\textbf{bootcamp2012} & \code{bootcamp-20120608.pdf} \\
+\textbf{bootcamp2012} & \code{bootcamp-20121026.pdf} \\
 \textbf{bootcamp2013} & \code{bootcamp-20130930.pdf} \\
 \textbf{tutorial classic} & \code{tutorial.pdf} \\
-\textbf{new tutorial} & \code{tooturial.pdf} \\
-\textbf{cs250 lectures} & \code{cs250-1.pdf}, \code{cs250-2.pdf}, \code{cs250-3.pdf} \\[1cm]
+\textbf{new tutorial} & \code{tooturial.pdf} to appear \\
+\textbf{cs250 lectures} & \code{cs250-1.pdf}, \code{cs250-2.pdf}, \code{cs250-3.pdf} \\[0.5cm]
 \end{tabular}
-\url{https://github.com/ucb-bar/chisel/} \\[0.5cm]
+\url{https://github.com/ucb-bar/chisel/} \\[0.25cm]
 \begin{tabular}{rl}
 \textbf{setup} & \code{readme.md} \\
+\textbf{utils} & \code{src/main/scala/ChiselUtils.scala} \\[0.5cm]
 \end{tabular}
+\url{https://github.com/ucb-bar/sodor/} 
 \end{center}
 \end{frame}
 
-\begin{frame}[fragile]{Projects Ideas}
+\begin{frame}{Scala Resources}
 
+\begin{center}
+\includegraphics[height=0.4\textheight]{../bootcamp/figs/programming-scala.pdf} \\
+\includegraphics[height=0.4\textheight]{../bootcamp/figs/programming-in-scala.pdf}
+\end{center}
+
+\end{frame}
+
+\begin{frame}[fragile]{Projects Ideas}
+ 
 \begin{center}
 \begin{tabular}{rl}
 \textbf{audio processing} & \code{Echo.scala} \\
@@ -2023,7 +2168,7 @@ make a change
 \textbf{website} & \url{chisel.eecs.berkeley.edu} \\
 \textbf{mailing list} & \url{groups.google.com/group/chisel-users} \\
 \textbf{github} & \url{https://github.com/ucb-bar/chisel/} \\
-\textbf{me} & \url{jrb@pobox.com} \\
+\textbf{me} & \url{jrb@eecs.berkeley.edu} \\
 \end{tabular}
 \end{center}
 \end{frame}
@@ -2032,8 +2177,7 @@ make a change
 \begin{itemize}
 \item \textbf{Arrangements} -- Roxana and Kostas
 \item \textbf{EC2 configuration} -- Sebastien Mirolo
-\item \textbf{Bootcamp Materials} -- Vincent Lee and Huy Vo
-\item \textbf{Dry Runs} -- Danny, Quan, and Albert
+\item \textbf{Bootcamp Materials} -- Vincent Lee, Stephen Twigg, Huy Vo
 \item \textbf{Funding} -- Department of Energy, Department of Defense
 \end{itemize}
 \end{frame}
