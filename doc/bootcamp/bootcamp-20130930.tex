@@ -407,7 +407,7 @@ The Verilog source is roughly divided into three parts:
 \end{frame}
 \setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
-\begin{frame}[fragile]{FullAdder}
+\begin{frame}[fragile]{FullAdder -- Type Inference}
 
 \begin{columns}
 \column{0.4\textwidth}
@@ -445,7 +445,7 @@ class FullAdder extends Module {
 
 \end{frame}
 
-\begin{frame}[fragile]{FullAdder Verilog}
+\begin{frame}[fragile]{FullAdder Verilog -- Width Inference 1}
 
 \begin{columns}
 \column{0.45\textwidth}
@@ -508,7 +508,7 @@ endmodule
 
 \end{frame}
 
-\begin{frame}[fragile]{FullAdder2}
+\begin{frame}[fragile]{FullAdder2 Verilog -- Width Inference 2}
 
 \begin{columns}
 \column{0.45\textwidth}
@@ -1865,6 +1865,49 @@ essentially it's a sum of products of coefficients and delayed versions of input
 we can write this quite simply using map and reduce as above.}
 \end{frame}
 
+\begin{frame}[fragile]{Chisel Standard Library -- \tt ChiselUtil.scala}
+\begin{center}
+\begin{tabular}{rl}
+{\bf Bits Properities} & \code{log2Up}, \code{log2Down}, \code{isPow2}, \code{PopCount}\\
+{\bf Numeric Utilities} & \code{LFSR16}, \code{Reverse}, \code{FillInterleaved} \\
+{\bf Stateful Functions} & \code{ShiftRegister}, \code{Counter} \\
+{\bf Priority Encoding Functions} & \code{UIntToOH}, \code{OHToUInt}, \code{Mux1H} \\
+{\bf Priority Encoders} & \code{PriorityEncoder}, \code{PriorityEncoderOH}  \\
+{\bf Vec Construction} & \code{Vec.fill}, \code{Vec.tabulate} \\
+{\bf Vec Functional} & \code{forall}, \code{exists}, \code{contains}, ... \\
+{\bf Queues and Pipes} & \code{Decoupled}, \code{Queue}, \code{Valid}, \code{Pipe} \\
+{\bf Arbiters} & \code{ArbiterIO}, \code{Arbiter}, \code{RRArbiter} \\
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Queues}
+\begin{itemize}
+\item Required parameter \verb+entries+ controls depth
+\item The width is determined from the inputs.
+\end{itemize}
+\begin{scala}
+class QueueIO[T <: Data](type: T, entries: Int) extends Bundle {
+  val enq   = Decoupled(data.clone).flip
+  val deq   = Decoupled(data.clone)
+  val count = UFix(OUTPUT, log2Up(entries+1))
+}
+
+class Queue[T <: Data]
+    (type: T, entries: Int, 
+     pipe: Boolean = false,
+     flow: Boolean = false
+     flushable: Boolean = false)
+    extends Module  
+\end{scala}
+\begin{scala}
+val q = new Queue(UInt(), 16)
+q.io.enq <> producer.io.out
+consumer.io.in <> q.io.deq
+\end{scala}
+\end{frame}
+
 \begin{frame}[fragile]{Multiple Clock Domains}
 Clocks are first class and take an optional reset signal:
 \begin{scala}
@@ -2106,44 +2149,6 @@ the following will terminate after 10 clock cycles:
 val x = Reg(init = UInt(0, 4))
 x := x + UInt(1)
 assert(x < UInt(10))
-\end{scala}
-\end{frame}
-
-\begin{frame}[fragile]{Chisel Standard Library}
-\begin{itemize}
-\item Bits Properities
-\item Numeric Utilities
-\item Stateful Functions
-\item Priority Encoding FUnctions
-\item Queues and Pipes
-\item Arbiters
-\end{itemize}
-\end{frame}
-
-\begin{frame}[fragile]
-\frametitle{Queues}
-\begin{itemize}
-\item Required parameter \verb+entries+ controls depth
-\item The width is determined from the inputs.
-\end{itemize}
-\begin{scala}
-class QueueIO[T <: Data](type: T, entries: Int) extends Bundle {
-  val enq   = Decoupled(data.clone).flip
-  val deq   = Decoupled(data.clone)
-  val count = UFix(OUTPUT, log2Up(entries+1))
-}
-
-class Queue[T <: Data]
-    (type: T, entries: Int, 
-     pipe: Boolean = false,
-     flow: Boolean = false
-     flushable: Boolean = false)
-    extends Module  
-\end{scala}
-\begin{scala}
-val q = new Queue(UInt(), 16)
-q.io.enq <> producer.io.out
-consumer.io.in <> q.io.deq
 \end{scala}
 \end{frame}
 
