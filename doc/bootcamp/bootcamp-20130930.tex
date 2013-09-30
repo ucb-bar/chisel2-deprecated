@@ -45,6 +45,7 @@
 \begin{frame}[fragile]{Goals for Bootcamp}
 
 \begin{itemize}
+\item get yout started with Chisel
 \item get a basic working knowledge of Chisel
 \item learn how to think in Chisel
 \item know where to get more information
@@ -748,6 +749,9 @@ class Accumulator extends Module {
 
 \begin{frame}[fragile]{UInt Operations and Conditional Assignment}
 
+\begin{columns}
+\column{0.5\textwidth}
+
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
 class BasicALU extends Module {
@@ -783,6 +787,14 @@ class BasicALU extends Module {
 \end{scala}
 }
 
+\column{0.4\textwidth}
+\begin{itemize}
+\item wire \code{io.output} defaulted to 0 and then
+\item conditionally reassigned to based on opcode
+\item unlike registers, wires are required to be defaulted
+\item wires also allow forward declarations
+\end{itemize}
+\end{columns}
 \end{frame}
 
 \begin{frame}[fragile]{UInt Operations}
@@ -1528,8 +1540,6 @@ class Stack(depth: Int) extends Module {
 
 \end{frame}
 
-\input{../talks/microsoft/libs-to-langs-guts.tex}
-
 \begin{frame}[fragile]{Scripting Hardware Generation}
 
 {\lstset{basicstyle={\tiny\ttfamily}}
@@ -1553,11 +1563,11 @@ class Adder(n: Int) extends Module {
 
   // wire up the ports of the full adders
   for(i <- 0 until n) {
-     FAs(i).a   := io.A(i)
-     FAs(i).b   := io.B(i)
-     FAs(i).cin := carry(i)
-     carry(i+1) := FAs(i).cout
-     sum(i)     := FAs(i).sum.toBool()
+    FAs(i).a   := io.A(i)
+    FAs(i).b   := io.B(i)
+    FAs(i).cin := carry(i)
+    carry(i+1) := FAs(i).cout
+    sum(i)     := FAs(i).sum.toBool()
   }
   io.Sum  := sum.toBits().toUInt()
   io.Cout := carry(n)
@@ -1566,6 +1576,8 @@ class Adder(n: Int) extends Module {
 }
 
 \end{frame}
+
+\input{../talks/microsoft/libs-to-langs-guts.tex}
 
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Mul Lookup Table Problem -- \tt Mul.scala}
@@ -2010,13 +2022,12 @@ sbt run --backend c --compile --test --genHarness
 
 \end{frame}
 
-\begin{frame}[fragile]{chiselMain Command Line Arguments}
+\begin{frame}[fragile]{chiselMain(Test) Command Line Arguments}
 \begin{scala}
 sbt 
-sbt> compile       // compiles Chisel Scala code
-sbt> run           // produces C++ files
-sbt> run --compile // produces C++ files and compiles
-sbt> run --test    // produces C++ files, compiles, tests
+sbt> compile         // compiles Chisel Scala code
+sbt> run             // compile and run Chisel Scala Code
+sbt> run --backend c // produces C++ files
 sbt> exit
 \end{scala}
 
@@ -2051,28 +2062,51 @@ make a change
 \end{frame}
 \setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
-\begin{frame}[fragile]{Installation}
-\begin{itemize}
-\item on mac install:
-\begin{itemize}
-\item XCODE console tools
-\end{itemize}
-\item on windows install:
-\begin{itemize}
-\item cygwin
-\end{itemize}
-\item everywhere install:
-\begin{itemize}
-\item git
-\item g++ (except on mac)
-\item java
-\end{itemize}
-\item everywhere
-\begin{itemize}
-\item git clone https://github.com/ucb-bar/chisel-tutorial.git
-\end{itemize}
-\end{itemize}
+\begin{frame}{Chisel Workflow}
+\begin{center}
+\includegraphics[height=0.9\textheight]{../bootcamp/figs/chisel-workflow.pdf}
+\end{center}
+\end{frame}
 
+\begin{frame}[fragile]{printf / sprintf}
+\begin{itemize}
+\item during simulation
+\begin{itemize}
+\item \verb+printf+ prings the formatted string to the console on rising clock edges
+\item \verb+sprintf+ returns the formatted string as a bit vector
+\end{itemize}
+\item format specifiers are
+\begin{itemize}
+\item \verb+%b+ -- binary number
+\item \verb+%d+ -- decimal number
+\item \verb+%x+ -- hexidecimal number
+\item \verb+%s+ -- string consisting of a sequence of 8-bit extended ASCII chars
+\item \verb+%%+ -- specifies a literal %.
+\end{itemize}
+\end{itemize}
+the following prints the line \verb+"0x4142 16706 AB"+ on cycles when \verb+c+ is true:
+\begin{scala}
+val x = Bits(0x4142)
+val s1 = sprintf("%x %s", x, x);
+when (c) { printf("%d %s\n", x, s1); }
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{assert}
+\begin{itemize}
+\item simulation time assertions are provided by \verb+assert+ construct
+\item if assert arguments false on rising edge then 
+\begin{itemize}
+\item an error is printed and 
+\item simulation terminates
+\end{itemize}
+\end{itemize}
+the following will terminate after 10 clock cycles:
+\begin{scala}
+val x = Reg(init = UInt(0, 4))
+x := x + UInt(1)
+assert(x < UInt(10))
+\end{scala}
 \end{frame}
 
 \begin{frame}[fragile]{Chisel Standard Library}
@@ -2111,6 +2145,30 @@ val q = new Queue(UInt(), 16)
 q.io.enq <> producer.io.out
 consumer.io.in <> q.io.deq
 \end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{Installation}
+\begin{itemize}
+\item on mac install:
+\begin{itemize}
+\item XCODE console tools
+\end{itemize}
+\item on windows install:
+\begin{itemize}
+\item cygwin
+\end{itemize}
+\item everywhere install:
+\begin{itemize}
+\item git
+\item g++ version 4.0 or later
+\item java
+\end{itemize}
+\item everywhere
+\begin{itemize}
+\item git clone https://github.com/ucb-bar/chisel-tutorial.git
+\end{itemize}
+\end{itemize}
+
 \end{frame}
 
 \begin{frame}[fragile]{Chisel Resources}
@@ -2153,7 +2211,7 @@ consumer.io.in <> q.io.deq
 \textbf{router} & \code{Router.scala} \\
 \textbf{map/reduce} & \code{FIR.scala}\\
 \textbf{network} & \\
-\textbf{fft} & \\
+\textbf{decoupled filter} & \\
 \textbf{cryptography} & \\
 \textbf{serial multiplier} & \\
 \textbf{pong} & \\
