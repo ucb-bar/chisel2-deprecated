@@ -58,10 +58,10 @@ object BuildSettings extends Build {
     // Execute tests in the current project serially.
     // Tests from other projects may still run concurrently.
     parallelExecution in Test := false,
-    parallelExecution in ScctPlugin.ScctTest := false,
+    parallelExecution in sbt.scct.ScctPlugin.ScctTest := false,
     scalacOptions ++= Seq("-deprecation", "-feature", "-language:reflectiveCalls", "-language:implicitConversions", "-language:existentials")
   ) ++ org.scalastyle.sbt.ScalastylePlugin.Settings
 
-  lazy val root = Project("chisel", file("."), settings=buildSettings) settings (ScctPlugin.instrumentSettings: _*)
+  lazy val root = Project("chisel", file("."), settings=buildSettings) settings (sbt.scct.ScctPlugin.instrumentSettings: _*)
 }
 
