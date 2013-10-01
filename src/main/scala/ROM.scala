@@ -35,6 +35,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 
 class ROM[T <: Data](val lits: Seq[Literal], gen: (Int) => T) extends Vec[T](gen) {
+  this.init("", (m: Node) => lits.map(x => x.width).reduceLeft(scala.math.max(_, _)), lits: _*)
   override def read(addr: UInt): T = {
     val cln = gen(0)
     val data = cln.asOutput
@@ -58,6 +59,13 @@ class ROM[T <: Data](val lits: Seq[Literal], gen: (Int) => T) extends Vec[T](gen
 
   override def isReg: Boolean = true
   override def isInVCD = false
+
+  override def traceableNodes: Array[Node] = lits.toArray
+
+  override def traceNode(c: Module, stack: Stack[() => Any]) {
+    for (lit <- lits)
+      stack.push(() => lit.traceNode(c, stack))
+  }
 }
 
 class ROMRead[T <: Data]() extends Node {
