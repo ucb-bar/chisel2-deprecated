@@ -62,10 +62,6 @@ class ROM[T <: Data](val lits: Seq[Literal], gen: (Int) => T) extends Vec[T](gen
 
   override def traceableNodes: Array[Node] = lits.toArray
 
-  override def traceNode(c: Module, stack: Stack[() => Any]) {
-    for (lit <- lits)
-      stack.push(() => lit.traceNode(c, stack))
-  }
 }
 
 class ROMRead[T <: Data]() extends Node {
