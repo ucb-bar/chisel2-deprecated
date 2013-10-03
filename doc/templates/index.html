@@ -5,7 +5,10 @@
 <div class="hero-unit">
       <h1>Chisel</h1>
       <p>Constructing Hardware in a Scala Embedded Language</p>
-      <p>Register for the <a href="/blog/?p=34">Chisel 2.0 Bootcamp</a> at UC Berkeley September 30th 2013!</p>
+      <p>
+Thank you to everyone who attended the Chisel 2.0 Bootcamp on site and online!
+Please, leave any feedback you might have in the <a href="https://chisel.eecs.berkeley.edu/blog/?p=34">blog comments</a>.
+      </p>
       <a href="#getstarted" class="btn btn-primary btn-large" >Get Started</a>
       <a href="https://github.com/ucb-bar/chisel/" class="btn btn-large" >View on GitHub</a>
 </div>
@@ -76,8 +79,8 @@ Instruction Set Architecture designed in the BAR group and described on
                         <li class="active">
                               <a href="#gcd" data-toggle="tab">Gcd</a>
                         </li>
-                        <li class="max4">
-                              <a href="#max4" data-toggle="tab">Max4</a>
+                        <li class="maxN">
+                              <a href="#maxN" data-toggle="tab">MaxN</a>
                         </li>
                         <li class="mul">
                               <a href="#mul" data-toggle="tab">Mul</a>
@@ -116,34 +119,31 @@ Instruction Set Architecture designed in the BAR group and described on
 </tt>
                               </pre>
                         </div>
-                        <div class="tab-pane" id="max4">
-<pre class="code"><tt><b><font color="#000080">import</font></b> Chisel<font color="#990000">.</font><b><font color="#0000FF">_</font></b>  <i><font color="#9A1900">/* importing the Chisel library. */</font></i>
+                        <div class="tab-pane" id="maxN">
+<pre class="code"><tt><b><font color="#000080">import</font></b> Chisel<font color="#990000">.</font><b><font color="#0000FF">_</font></b>  <i><font color="#9A1900">// importing the Chisel library.</font></i>
 
-<i><font color="#9A1900">/** Creating a Module that computes the maximum of four values</font></i>
+<i><font color="#9A1900">/// Creating a Module that computes the maximum of N values</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//  This generator shows how it is possible to do functional construction</font></i>
+<i><font color="#9A1900">//  of circuits.</font></i>
 
-<i><font color="#9A1900">  This generator shows how it is possible to do functional construction</font></i>
-<i><font color="#9A1900">  of circuits.</font></i>
-<i><font color="#9A1900">  */</font></i>
-<b><font color="#0000FF">class</font></b> <font color="#008080">Max4</font><font color="#990000">(</font>size<b><font color="#0000FF">:</font></b> <font color="#009900">Int</font> <i><font color="#9A1900">/* parameterized input width */</font></i><font color="#990000">)</font> <b><font color="#0000FF">extends</font></b> Module <font color="#FF0000">{</font>
+<b><font color="#0000FF">class</font></b> <font color="#008080">MaxN</font><font color="#990000">(</font>n<b><font color="#0000FF">:</font></b> <font color="#009900">Int</font><font color="#990000">,</font> w<b><font color="#0000FF">:</font></b> <font color="#009900">Int</font> <i><font color="#9A1900">/* parameterized input */</font></i><font color="#990000">)</font> <b><font color="#0000FF">extends</font></b> Module <font color="#FF0000">{</font>
 
-  <b><font color="#0000FF">private</font></b> <b><font color="#0000FF">def</font></b> <b><font color="#000000">Max2</font></b><font color="#990000">(</font>x<b><font color="#0000FF">:</font></b> UInt<font color="#990000">,</font> y<b><font color="#0000FF">:</font></b> UInt<font color="#990000">)</font> <b><font color="#0000FF">=</font></b> <b><font color="#000000">Mux</font></b><font color="#990000">(</font>x <font color="#990000">&gt;</font> y<font color="#990000">,</font> x<font color="#990000">,</font> y<font color="#990000">)</font>
+ <b><font color="#0000FF">private</font></b> <b><font color="#0000FF">def</font></b> <b><font color="#000000">Max2</font></b><font color="#990000">(</font>x<b><font color="#0000FF">:</font></b> UInt<font color="#990000">,</font> y<b><font color="#0000FF">:</font></b> UInt<font color="#990000">)</font> <b><font color="#0000FF">=</font></b> <b><font color="#000000">Mux</font></b><font color="#990000">(</font>x <font color="#990000">&gt;</font> y<font color="#990000">,</font> x<font color="#990000">,</font> y<font color="#990000">)</font>
 
-  <b><font color="#0000FF">val</font></b> io <b><font color="#0000FF">=</font></b> <b><font color="#0000FF">new</font></b> Bundle <font color="#FF0000">{</font>
-    <b><font color="#0000FF">val</font></b> a <b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>INPUT<font color="#990000">,</font> width <b><font color="#0000FF">=</font></b> size<font color="#990000">)</font>
-    <b><font color="#0000FF">val</font></b> b <b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>INPUT<font color="#990000">,</font> width <b><font color="#0000FF">=</font></b> size<font color="#990000">)</font>
-    <b><font color="#0000FF">val</font></b> c <b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>INPUT<font color="#990000">,</font> width <b><font color="#0000FF">=</font></b> size<font color="#990000">)</font>
-    <b><font color="#0000FF">val</font></b> d <b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>INPUT<font color="#990000">,</font> width <b><font color="#0000FF">=</font></b> size<font color="#990000">)</font>
-    <b><font color="#0000FF">val</font></b> z <b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>OUTPUT<font color="#990000">,</font> width <b><font color="#0000FF">=</font></b> size<font color="#990000">)</font>
-  <font color="#FF0000">}</font>
-  io<font color="#990000">.</font>z <b><font color="#0000FF">:=</font></b> <b><font color="#000000">Array</font></b><font color="#990000">(</font>io<font color="#990000">.</font>a<font color="#990000">,</font> io<font color="#990000">.</font>b<font color="#990000">,</font> io<font color="#990000">.</font>c<font color="#990000">,</font> <b><font color="#000000">io.d).reduceLeft</font></b><font color="#990000">(</font>Max2<font color="#990000">)</font>
+ <b><font color="#0000FF">val</font></b> io <b><font color="#0000FF">=</font></b> <b><font color="#0000FF">new</font></b> Bundle <font color="#FF0000">{</font>
+   <b><font color="#0000FF">val</font></b> in  <b><font color="#0000FF">=</font></b> <b><font color="#000000">Vec.fill</font></b><font color="#990000">(</font>n<font color="#990000">)</font><font color="#FF0000">{</font> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>INPUT<font color="#990000">,</font> w<font color="#990000">)</font> <font color="#FF0000">}</font>
+   <b><font color="#0000FF">val</font></b> out <b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>OUTPUT<font color="#990000">,</font> w<font color="#990000">)</font>
+ <font color="#FF0000">}</font>
+ io<font color="#990000">.</font>out <b><font color="#0000FF">:=</font></b> <b><font color="#000000">io.in.reduceLeft</font></b><font color="#990000">(</font>Max2<font color="#990000">)</font>
 <font color="#FF0000">}</font>
 
-<b><font color="#0000FF">object</font></b> Max4Example <font color="#FF0000">{</font>
-  <i><font color="#9A1900">/* Main Entry Point of the circuit generator */</font></i>
-  <b><font color="#0000FF">def</font></b> <b><font color="#000000">main</font></b><font color="#990000">(</font>args<b><font color="#0000FF">:</font></b> Array<font color="#990000">[</font>String<font color="#990000">])</font><b><font color="#0000FF">:</font></b> Unit <b><font color="#0000FF">=</font></b> <font color="#FF0000">{</font>
-    <b><font color="#000000">chiselMain(args.slice</font></b><font color="#990000">(</font><font color="#993399">1</font><font color="#990000">,</font> args<font color="#990000">.</font>length<font color="#990000">),</font>
-      <font color="#990000">()</font> <b><font color="#0000FF">=&gt;</font></b> <b><font color="#000000">Module</font></b><font color="#990000">(</font><b><font color="#0000FF">new</font></b> <b><font color="#000000">Max4</font></b><font color="#990000">(</font><font color="#993399">8</font><i><font color="#9A1900">/* instantiate with specific port width */</font></i><font color="#990000">)))</font>
-  <font color="#FF0000">}</font>
+<b><font color="#0000FF">object</font></b> MaxNExample <font color="#FF0000">{</font>
+ <i><font color="#9A1900">// Main Entry Point of the circuit generator</font></i>
+ <b><font color="#0000FF">def</font></b> <b><font color="#000000">main</font></b><font color="#990000">(</font>args<b><font color="#0000FF">:</font></b> Array<font color="#990000">[</font>String<font color="#990000">])</font><b><font color="#0000FF">:</font></b> Unit <b><font color="#0000FF">=</font></b> <font color="#FF0000">{</font>
+   <i><font color="#9A1900">// instantiate with 4 ports. Each port is 8 bits wide.</font></i>
+   <b><font color="#000000">chiselMain(args,</font></b> <font color="#990000">()</font> <b><font color="#0000FF">=&gt;</font></b> <b><font color="#000000">Module</font></b><font color="#990000">(</font><b><font color="#0000FF">new</font></b> <b><font color="#000000">MaxN</font></b><font color="#990000">(</font><font color="#993399">4</font><font color="#990000">,</font> <font color="#993399">8</font><font color="#990000">)))</font>
+ <font color="#FF0000">}</font>
 <font color="#FF0000">}</font>
 </tt></pre>
                         </div>
