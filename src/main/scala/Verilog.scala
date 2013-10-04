@@ -707,6 +707,8 @@ class VerilogBackend extends Backend {
   def emitChildren(top: Module,
     defs: HashMap[String, LinkedHashMap[String, ArrayBuffer[Module] ]],
     out: java.io.FileWriter, depth: Int) {
+    if (top.isInstanceOf[BlackBox])
+      return
     for (child <- top.children) {
       emitChildren(child, defs, out, depth + 1);
     }

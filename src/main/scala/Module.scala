@@ -828,15 +828,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     /* XXX Why do we do something different here? */
     if (!Module.backend.isInstanceOf[VerilogBackend]) {
       queue.push(() => io.traceNode(this, queue));
-      /* This is ugly and most likely unnecessary but as long as we are not
-       sure of the subtle consequences of tracing through blackboxes, let's
-       have the code here (instead of Verilog.doCompile). */
-      for (c <- Module.components) {
-        c match {
-          case x: BlackBox => c.traceNodes();
-          case _ =>
-        }
-      }
     } else {
       for (c <- Module.components) {
         queue.push(() => c.io.traceNode(c, queue))
