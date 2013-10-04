@@ -234,7 +234,7 @@ class VerilogBackend extends Backend {
     res += portDecs.map(_.result).reduceLeft(_ + "\n" + _)
     res += "\n  );\n";
     if (c.wires.map(_._2.driveRand).reduceLeft(_ || _)) {
-      res += "  `ifdef SYNTHESIS\n"
+      res += "  `ifndef SYNTHESIS\n"
       for ((n, w) <- c.wires) {
         if (w.driveRand) {
           res += "    assign " + c.name + "." + n + " = $random();\n"
