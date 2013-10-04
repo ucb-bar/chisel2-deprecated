@@ -298,7 +298,10 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable w
   override def traceableNodes: Array[Node] = self.toArray
 
   override def traceNode(c: Module, stack: Stack[() => Any]) {
-    for((n, i) <- flatten) {
+    val ins = if (this.isInstanceOf[ROM [ _ ]]) this.asInstanceOf[ROM [ _ ] ].lits.toArray
+              else this.flatten.map(_._2)
+      
+    for(i <- ins) {
       stack.push(() => i.traceNode(c, stack))
     }
     stack.push(() => super.traceNode(c, stack))

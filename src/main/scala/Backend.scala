@@ -463,8 +463,7 @@ abstract class Backend {
   }
 
   // walk forward from root register assigning consumer clk = root.clock
-  def createClkDomain(root: Node) = {
-    val walked = new ArrayBuffer[Node]
+  def createClkDomain(root: Node, walked: ArrayBuffer[Node]) = {
     val dfsStack = new Stack[Node]
     walked += root; dfsStack.push(root)
     val clock = root.clock
@@ -549,10 +548,11 @@ abstract class Backend {
 
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
     c.traceNodes();
+    val clkDomainWalkedNodes = new ArrayBuffer[Node]
     for (comp <- Module.sortedComps)
       for (node <- comp.nodes)
         if (node.isInstanceOf[Reg])
-            createClkDomain(node)
+            createClkDomain(node, clkDomainWalkedNodes)
     ChiselError.checkpoint()
 
     /* We execute nameAll after traceNodes because bindings would not have been
