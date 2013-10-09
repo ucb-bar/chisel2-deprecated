@@ -178,7 +178,7 @@ class Reg extends Delay with proc {
     }
     val cond = genCond();
     if (conds.length >= 1) {
-      isEnable = Module.backend.isInstanceOf[VerilogBackend]
+      isEnable = true
       enable = enable || cond;
     }
     updates += ((cond, src))
@@ -186,7 +186,7 @@ class Reg extends Delay with proc {
   override def genMuxes(default: Node): Unit = {
     if(isMemOutput) {
       inputs(0) = updates(0)._2
-    } else if(isEnable) {
+    } else if(isEnable && Module.backend.isInstanceOf[VerilogBackend]) {
       // hack to force the muxes to match the Reg's width:
       // the intent is u = updates.head._2
       genMuxes(updates.head._2, updates.toList.tail)
