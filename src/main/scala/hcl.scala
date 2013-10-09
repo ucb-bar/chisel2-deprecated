@@ -265,7 +265,7 @@ trait nameable {
 }
 
 abstract class BlackBox extends Module {
-  parent.blackboxes += this;
+  Module.blackboxes += this
 
   def setVerilogParameters(string: String) {
     this.asInstanceOf[Module].verilog_parameters = string;

@@ -1,69 +1,10 @@
-\documentclass[twocolumn, 10pt]{article}
-\setlength\textwidth{6.875in}
-\setlength\textheight{8.875in}
-% set both margins to 2.5 pc
-\setlength{\oddsidemargin}{-0.1875in}% 1 - (8.5 - 6.875)/2
-\setlength{\evensidemargin}{-0.1875in}
-\setlength{\marginparwidth}{0pc}
-\setlength{\marginparsep}{0pc}%
-\setlength{\topmargin}{0in} \setlength{\headheight}{0pt}
-\setlength{\headsep}{0pt}
-\setlength{\footskip}{37pt}%
-%\setlength{\columnsep}{0.3125in}
-%\setlength{\columnwidth}{3.28125in}% (6.875 - 0.3125)/2 = 3.28125in
-\setlength{\parindent}{1pc}
-\newcommand{\myMargin}{1.00in}
-\usepackage[top=\myMargin, left=\myMargin, right=\myMargin, bottom=\myMargin, nohead]{geometry}
-\usepackage{epsfig,graphicx}
-\usepackage{palatino}
-\usepackage{fancybox}
-\usepackage{hyperref}
-\usepackage[procnames]{listings}
-
-\input{../../style/scala.tex}
-
-\lstset{basicstyle={\footnotesize\ttfamily}}
-
-\newenvironment{commentary}
-{ \vspace{-0.1in}
-  \begin{quotation}
-  \noindent
-  \small \em
-  \rule{\linewidth}{1pt}\\
-}
-{
-  \end{quotation}
-}
-
-\title{Gettings Started: Tutorial 07 - Scripting Hardware Generation}
-\author{Jonathan Bachrach, Vincent Lee \\
-EECS Department, UC Berkeley\\
-{\tt  \{jrb\}@eecs.berkeley.edu}
-}
-\date{\today}
-
-\newenvironment{example}{\VerbatimEnvironment\begin{footnotesize}\begin{Verbatim}}{\end{Verbatim}\end{footnotesize}}
-\newcommand{\kode}[1]{\begin{footnotesize}{\tt #1}\end{footnotesize}}
-
-\def\code#1{{\tt #1}}
-
-\def\note#1{\noindent{\bf [Note: #1]}}
-%\def\note#1{}
-
-\begin{document}
-\maketitle{}
-
-\section{Introduction}
-
-Ths document is intended to introduce Scala structures that allow you to control and facilitate the construction of your design. The tutorial is broken into small sections each of which contains examples that demonstrate each construct.
-
 \section{Using the For loop}
 
 Often times parametrization requires instantiating multiple components which are connected in a very regular structure. A revisit to the parametrized \verb+Adder+ component definition shows the \verb+for+ loop construct in action:
 
 \begin{scala}
 // A n-bit adder with carry in and carry out
-class Adder(n:Int) extends Module {
+class Adder(n: Int) extends Module {
   val io = new Bundle {
     val A    = UInt(INPUT, n)
     val B    = UInt(INPUT, n)
@@ -72,7 +13,7 @@ class Adder(n:Int) extends Module {
     val Cout = UInt(OUTPUT, 1)
   }
   // create a vector of FullAdders
-  val FAs   = Vec.fill(n){ new FullAdder().io }
+  val FAs   = Vec.fill(n){ Module(new FullAdder()).io }
   val carry = Vec.fill(n+1){ UInt(width = 1) }
   val sum   = Vec.fill(n){ Bool() }
 
@@ -208,5 +149,3 @@ class Counter extends Module {
 In this example, we use calls to subroutines defined in the \verb+Counter+ object in order to perform the appropriate logic. 
 
 % The first call to \verb+counter+ in the \verb+Counter+ module
-
-\end{document}

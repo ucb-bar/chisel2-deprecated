@@ -1,72 +1,3 @@
-\documentclass[twocolumn, 10pt]{article}
-\setlength\textwidth{6.875in}
-\setlength\textheight{8.875in}
-% set both margins to 2.5 pc
-\setlength{\oddsidemargin}{-0.1875in}% 1 - (8.5 - 6.875)/2
-\setlength{\evensidemargin}{-0.1875in}
-\setlength{\marginparwidth}{0pc}
-\setlength{\marginparsep}{0pc}%
-\setlength{\topmargin}{0in} \setlength{\headheight}{0pt}
-\setlength{\headsep}{0pt}
-\setlength{\footskip}{37pt}%
-%\setlength{\columnsep}{0.3125in}
-%\setlength{\columnwidth}{3.28125in}% (6.875 - 0.3125)/2 = 3.28125in
-\setlength{\parindent}{1pc}
-\newcommand{\myMargin}{1.00in}
-\usepackage[top=\myMargin, left=\myMargin, right=\myMargin, bottom=\myMargin, nohead]{geometry}
-\usepackage{epsfig,graphicx}
-\usepackage{palatino}
-\usepackage{fancybox}
-\usepackage{hyperref}
-\usepackage[procnames]{listings}
-
-\input{../../style/scala.tex}
-
-\lstset{basicstyle={\footnotesize\ttfamily}}
-
-\newenvironment{commentary}
-{ \vspace{-0.1in}
-  \begin{quotation}
-  \noindent
-  \small \em
-  \rule{\linewidth}{1pt}\\
-}
-{
-  \end{quotation}
-}
-
-\title{Getting Started - Tutorial 03: Instantiating Modules}
-\author{Jonathan Bachrach, Vincent Lee \\
-EECS Department, UC Berkeley\\
-{\tt  \{jrb\}@eecs.berkeley.edu}
-}
-\date{\today}
-
-\newenvironment{example}{\VerbatimEnvironment\begin{footnotesize}\begin{Verbatim}}{\end{Verbatim}\end{footnotesize}}
-\newcommand{\kode}[1]{\begin{footnotesize}{\tt #1}\end{footnotesize}}
-
-\def\code#1{{\tt #1}}
-
-\def\note#1{\noindent{\bf [Note: #1]}}
-%\def\note#1{}
-
-\begin{document}
-\maketitle{}
-
-\section{Introduction}
-
-Ths document is intended to familiarize you with module instantiation and using primitives in Chisel.  The tutorial is broken into small modules each of which will present a new feature of Chisel. This tutorial assumes that you are familiar with what was presented in the previous tutorial.
-
-\subsection{Acquiring the Tutorial Files}
-
-To get the files required for this tutorial, you will need to have Git installed on your machine. Change directory to the place you would like to place your Chisel files (let's call this \verb+$DIR+ from now on) and get the tutorial files with:
-
-\begin{bash}
-git clone https://github.com/ucb-bar/chisel-tutorial.git
-\end{bash}
-
-This will clone the Chisel tutorial files onto your machine. If you cloned the repository into \verb+$DIR+ then your copy of the Chisel Tutorial repository will then be in \verb+$DIR/chisel-tutorial+.
-
 \section{Module Instantiation}
 
 Like other hardware description languages, Chisel allows fairly straightforward module instantiation to enable modularity and hierarchy. In Chisel, instantiating a Module class is the equivalent to instantiating a module in Verilog. To do this, we simply use a call to \verb+Module+ with module created with the Scala \verb+new+ keyword in order to indicate that we are instantiation a new module. We want to make sure we assign this to a value so that we can reference its input and outputs which we also need to connect.
@@ -75,7 +6,7 @@ For example, suppose we would like to construct a 4-bit adder using multiple cop
 
 \begin{figure}[ht!]
 \centering
-\includegraphics[width=80mm]{4_Bit_Adder.jpg}
+\includegraphics[width=80mm]{figs/4_Bit_Adder.jpg}
 \caption{Block Diagram of 4-Bit Adder}
 \label{overflow}
 \end{figure}
@@ -179,7 +110,7 @@ class Adder(n: Int) extends Module {
     val Cout = UInt(OUTPUT, 1)
   }
   // create a vector of FullAdders
-  val FAs = Vec.fill(n) { Module(new FullAdder()).io}
+  val FAs = Vec.fill(n){ Module(new FullAdder()).io }
 
   // define carry and sum wires
   val carry = Vec.fill(n+1){ UInt(width = 1) }
@@ -267,5 +198,3 @@ We see that clearly it is much cleaner to use the primitive \verb+Mux+ type inst
 %
 %Earlier in this tutorial we demonstarted how to parametrize and instantiate an n-bit ripple adder. <Finish this>
 %
-
-\end{document}

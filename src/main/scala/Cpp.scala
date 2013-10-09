@@ -608,7 +608,6 @@ class CppBackend extends Backend {
       if (!(cc == c)) {
         c.debugs ++= cc.debugs
         c.mods       ++= cc.mods;
-        c.blackboxes ++= cc.blackboxes;
       }
     }
     c.findConsumers();

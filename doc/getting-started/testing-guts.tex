@@ -1,72 +1,3 @@
-\documentclass[twocolumn, 10pt]{article}
-\setlength\textwidth{6.875in}
-\setlength\textheight{8.875in}
-% set both margins to 2.5 pc
-\setlength{\oddsidemargin}{-0.1875in}% 1 - (8.5 - 6.875)/2
-\setlength{\evensidemargin}{-0.1875in}
-\setlength{\marginparwidth}{0pc}
-\setlength{\marginparsep}{0pc}%
-\setlength{\topmargin}{0in} \setlength{\headheight}{0pt}
-\setlength{\headsep}{0pt}
-\setlength{\footskip}{37pt}%
-%\setlength{\columnsep}{0.3125in}
-%\setlength{\columnwidth}{3.28125in}% (6.875 - 0.3125)/2 = 3.28125in
-\setlength{\parindent}{1pc}
-\newcommand{\myMargin}{1.00in}
-\usepackage[top=\myMargin, left=\myMargin, right=\myMargin, bottom=\myMargin, nohead]{geometry}
-\usepackage{epsfig,graphicx}
-\usepackage{palatino}
-\usepackage{fancybox}
-\usepackage{hyperref}
-\usepackage[procnames]{listings}
-
-\input{../../style/scala.tex}
-
-\lstset{basicstyle={\footnotesize\ttfamily}}
-
-\newenvironment{commentary}
-{ \vspace{-0.1in}
-  \begin{quotation}
-  \noindent
-  \small \em
-  \rule{\linewidth}{1pt}\\
-}
-{
-  \end{quotation}
-}
-
-\title{Getting Started - Tutorial 04: Writing Scala Testbenches}
-\author{Jonathan Bachrach, Vincent Lee \\
-EECS Department, UC Berkeley\\
-{\tt  \{jrb\}@eecs.berkeley.edu}
-}
-\date{\today}
-
-\newenvironment{example}{\VerbatimEnvironment\begin{footnotesize}\begin{Verbatim}}{\end{Verbatim}\end{footnotesize}}
-\newcommand{\kode}[1]{\begin{footnotesize}{\tt #1}\end{footnotesize}}
-
-\def\code#1{{\tt #1}}
-
-\def\note#1{\noindent{\bf [Note: #1]}}
-%\def\note#1{}
-
-\begin{document}
-\maketitle{}
-
-\section{Introduction}
-
-There are several different way that you can test your design in Chisel. The first is through a Scala testbench setup that is part of Chisel. The second is using a C++ emulator using the generated C++ which is compiled from the Chisel source code. A third method is to generate the Verilog code from the Chisel source code and write a Verilog testharness. This document is intended to familiarize you with writing Scala testbenches in Chisel. The C++ testbench is covered in a more advanced tutorial.  This tutorial assumes that you are familiar with what was presented in the previous tutorial.
-
-\subsection{Acquiring the Tutorial Files}
-
-To get the files required for this tutorial, you will need to have Git installed on your machine. Change directory to the place you would like to place your Chisel files (let's call this \verb+$DIR+ from now on) and get the tutorial files with:
-
-\begin{bash}
-git clone https://github.com/ucb-bar/chisel-tutorial.git
-\end{bash}
-
-This will clone the Chisel tutorial files onto your machine. If you cloned the repository into \verb+$DIR+ then your copy of the Chisel Tutorial repository will then be in \verb+$DIR/chisel-tutorial+.
-
 \section{The Scala Testbench Simulation}
 
 Chisel's Scala based testbench is the first line of defense against simple bugs in your design. The Scala testbench uses several unique Chisel constructs to perform this. To see how this works, let's first explore a simple example.
@@ -216,4 +147,3 @@ For sequential components we may want to delay the output definition to the appr
 
 The Chisel testbench works well for simple tests and small numbers of simulation iterations. However, for larger test cases, the Chisel testbench quickly becomes more complicated and slower simply due to the inefficiency of the infrastructure. For these larger and more complex test cases, we recommend using the C++ emulator or Verilog test harnesses which run faster and can handle more rigorous test cases.
 
-\end{document}

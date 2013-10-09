@@ -57,9 +57,11 @@
 \begin{frame}[fragile]{Logging into EC2}
 
 \begin{scala}
-ssh xxx@yyy
+ssh ubuntu@xxx
 password: bootcamp
 \end{scala}
+\noindent
+where \code{xxx} corresponds to your EC2 instance written on your airbears slip
 
 \end{frame}
 \setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
@@ -97,11 +99,11 @@ chisel-tutorial/
   examples/   \comment{\# Contains chisel examples}
     Makefile  
     build.sbt \comment{\# Contains project description}
-    Accumulator.scala ...
+    FullAdder.scala ...
   problems/   \comment{\# Contains skeletal files for tutorial problems}
     Makefile
     build.sbt \comment{\# Contains project description}
-    Counter.scala ...
+    Accumulator.scala ...
   solutions/  \comment{\# Contains solutions to problems}
     Makefile
     build.sbt \comment{\# Contains project description}
@@ -288,7 +290,7 @@ m3.io.y := m2.io.z
 \column{0.45\textwidth}
 
 \begin{scala}
-def Max2 = Mux(x > y, x, y)
+def Max2(x, y) = Mux(x > y, x, y)
 \end{scala}
 \begin{scala}
 Max2(x, y)
@@ -347,8 +349,8 @@ class GCD extends Module {
     val b     = UInt(INPUT, 16)
     val z     = UInt(OUTPUT, 16)
     val valid = Bool(OUTPUT) }
-  val x = Reg(reset = io.a)
-  val y = Reg(reset = io.b)
+  val x = Reg(init = io.a)
+  val y = Reg(init = io.b)
   when (x > y) {
     x := x - y
   } .otherwise {
@@ -438,7 +440,7 @@ class FullAdder extends Module {
 \column{0.55\textwidth}
 
 \begin{center}
-\includegraphics[width=0.9\textwidth]{../tootorial/01_the_basics/Full_Adder.jpg}
+\includegraphics[width=0.9\textwidth]{../tootorial/Full_Adder.jpg}
 \end{center}
 
 \end{columns}
@@ -984,7 +986,7 @@ endmodule
 Operation & Result Bit Width \\ \hline
 \verb!Z = X + Y! & max(Width(X), Width(Y))  \\ \hline
 \verb+Z = X - Y+ & max(Width(X), Width(Y)) \\ \hline
-\verb+Z = X & Y+ & max(Width(X), Width(Y)) \\ \hline
+\verb+Z = X & Y+ & min(Width(X), Width(Y)) \\ \hline
 \verb+Z = X | Y+ & max(Width(X), Width(Y)) \\ \hline
 \verb+Z = X ^ Y+ & max(Width(X), Width(Y)) \\ \hline
 \verb+Z = ~X+ & Width(X) \\ \hline
@@ -1131,7 +1133,7 @@ class Adder4 extends Module {
   Adder3.io.a   := io.A(3)
   Adder3.io.b   := io.B(3)
   Adder3.io.cin := Adder2.io.cout
-  io.Sum  := Cat(Adder3.io.sum, s2).toUInt()
+  io.Sum  := Cat(Adder3.io.sum, s2)
   io.Cout := Adder3.io.cout
 }
 \end{scala}
@@ -1139,7 +1141,9 @@ class Adder4 extends Module {
 
 \column{0.5\textwidth}
 
-\includegraphics[width=0.9\textwidth]{../tootorial/03_module_instantiation/4_Bit_Adder.jpg}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{../tootorial/4_Bit_Adder.jpg}
+\end{center}
 
 \begin{itemize}
 \item inherits from \verb+Module+ class,
@@ -1160,13 +1164,13 @@ val myVec2 = Vec(<elt0>, <elt1>, ...)
 
 creating a vec of wires
 \begin{scala}
-val ufix5_vec10 := Vec.fill(10) { UInt(width = 5) }
+val ufix5_vec10 = Vec.fill(10) { UInt(width = 5) }
 \end{scala}
 
 
 creating a vec of regs
 \begin{scala}
-val reg_vec32 := Vec.fill(32){ Reg() }
+val reg_vec32 = Vec.fill(32){ Reg() }
 \end{scala}
 
 writing
@@ -1199,11 +1203,12 @@ class VecShiftRegister extends Module {
     val out   = UInt(OUTPUT, 1)
   }
   val delays = Vec.fill(4){ Reg(UInt()) }
+  when ( ...) {
   // fill in here ...
-  when (io.enable) {
+  } .elsewhen (io.shift) {
     ...
   }
-  io.out := delays(0)
+  io.out := delays(3)
 }
 \end{scala}
 }
@@ -1246,7 +1251,8 @@ class ByteSelectorTests(c: ByteSelector)
     for (t <- 0 until 4) {
       vars(c.io.in) = UInt(test_in)
       vars(c.io.offset) = UInt(t)
-      val ref_out = UInt((test_in >> (t * 8)) & 0xFF)
+      val ref_out = 
+        UInt((test_in >> (t * 8)) & 0xFF)
       vars(c.io.out) = ref_out
       allGood = step(vars) && allGood
     }
@@ -1359,13 +1365,17 @@ class MaxN(val n: Int, val w: Int)
     Mux(x > y, x, y)
 
   val io = new Bundle {
-    val in = Vec.fill(n){ UInt(INPUT, w) }
+    val ins = Vec.fill(n){ UInt(INPUT, w) }
     val out = UInt(OUTPUT, w)
   }
-  io.out := io.in.reduceLeft(Max2)
+  io.out := io.ins.reduceLeft(Max2)
 }
 \end{scala}
 }
+\begin{scala}
+// returns random int in 0..lim-1
+val x = rnd.nextInt(lim) 
+\end{scala}
 
 \column{0.43\textwidth}
 
@@ -1375,7 +1385,8 @@ class MaxNTests(c: MaxN)
     extends Tester(c, Array(c.io)) {
   defTests {
     var allGood = true
-    val vars = new HashMap[Node, Node]()
+    val vars = 
+       new HashMap[Node, Node]()
     val rnd  = new Random()
     for (i <- 0 until 10) {
       vars.clear()
@@ -1402,8 +1413,8 @@ class MaxNTests(c: MaxN)
 class MemorySearch extends Module {
   val io = new Bundle {
     val target  = UInt(INPUT,  4)
-    val address = UInt(OUTPUT, 3)
     val en      = Bool(INPUT)
+    val address = UInt(OUTPUT, 3)
     val done    = Bool(OUTPUT)
   }
   val index  = Reg(init = UInt(0, width = 3))
@@ -1542,6 +1553,9 @@ class Stack(depth: Int) extends Module {
 
 \begin{frame}[fragile]{Scripting Hardware Generation}
 
+\begin{columns}
+\column{0.5\textwidth}
+
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
 // A n-bit adder with carry in and carry out
@@ -1575,6 +1589,13 @@ class Adder(n: Int) extends Module {
 \end{scala}
 }
 
+\column{0.4\textwidth}
+
+\begin{center}
+\includegraphics[width=0.9\textwidth]{../tootorial/4_Bit_Adder.jpg}
+\end{center}
+\end{columns}
+
 \end{frame}
 
 \input{../talks/microsoft/libs-to-langs-guts.tex}
@@ -1597,6 +1618,12 @@ class Mul extends Module {
 
   io.z := UInt(0)
 }
+\end{scala}
+
+hint:
+\begin{scala}
+val tab = Vec(muls)
+io.z := tab(Cat(io.x, io.y))
 \end{scala}
 
 \end{frame}
@@ -1737,8 +1764,8 @@ class GCDTests(c: GCD) extends Tester(c, Array(c.io)) {
 \begin{footnotesize}
 \begin{scala}
 class ChainedFilter[T <: Num](dtype: T) extends Filter(dtype) = {
-  val shift   = new ShiftFilter(2, dtype)
-  val clipper = new ClippingFilter(1 << 7, dtype)
+  val shift   = Module(new ShiftFilter(2, dtype))
+  val clipper = Module(new ClippingFilter(1 << 7, dtype))
   io.in          <> shift.io.in
   shift.io.out   <> clipper.io.in
   clipper.io.out <> io.out
@@ -2038,9 +2065,7 @@ object Hello {
 \begin{scala}
 scalaVersion := "2.10.2"
 
-resolvers ++= Seq(
-  "scct-github-repository" at "http://mtkopone.github.com/scct/maven-repo"
-)
+addSbtPlugin("com.github.scct" % "sbt-scct" % "0.2")
 
 libraryDependencies += 
   "edu.berkeley.cs" %% "chisel" % "latest.release"
@@ -2183,8 +2208,8 @@ assert(x < UInt(10))
 \textbf{manual} & \code{manual.pdf} \\
 \textbf{bootcamp2012} & \code{bootcamp-20121026.pdf} \\
 \textbf{bootcamp2013} & \code{bootcamp-20130930.pdf} \\
-\textbf{tutorial classic} & \code{tutorial.pdf} \\
-\textbf{new tutorial} & \code{tooturial.pdf} to appear \\
+\textbf{tutorial} & \code{tutorial.pdf} \\
+\textbf{getting started} & \code{getting-started.pdf} \\
 \textbf{cs250 lectures} & \code{cs250-1.pdf}, \code{cs250-2.pdf}, \code{cs250-3.pdf} \\[0.5cm]
 \end{tabular}
 \url{https://github.com/ucb-bar/chisel/} \\[0.25cm]
@@ -2192,7 +2217,11 @@ assert(x < UInt(10))
 \textbf{setup} & \code{readme.md} \\
 \textbf{utils} & \code{src/main/scala/ChiselUtils.scala} \\[0.5cm]
 \end{tabular}
-\url{https://github.com/ucb-bar/sodor/} 
+\url{https://chisel.eecs.berkeley.edu/download.html} \\[0.25cm]
+\begin{tabular}{rl}
+\textbf{sodor} & \url{https://github.com/ucb-bar/sodor/} \\
+\textbf{virtualbox} & \url{https://chisel.eecs.berkeley.edu/chisel-riscv.box} \\
+\end{tabular}
 \end{center}
 \end{frame}
 
@@ -2231,6 +2260,9 @@ assert(x < UInt(10))
 \textbf{website} & \url{chisel.eecs.berkeley.edu} \\
 \textbf{mailing list} & \url{groups.google.com/group/chisel-users} \\
 \textbf{github} & \url{https://github.com/ucb-bar/chisel/} \\
+\textbf{features + bugs} & \url{https://github.com/ucb-bar/chisel/issues} \\
+\textbf{more questions} & \url{stackoverflow.com/quesions/tagged/chisel} \\
+\textbf{twitter} & {\tt \#chiselhdl} \\
 \textbf{me} & \url{jrb@eecs.berkeley.edu} \\
 \end{tabular}
 \end{center}
