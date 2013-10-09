@@ -635,6 +635,9 @@ class VerilogBackend extends Backend {
 
 
   def emitModuleText(c: Module): String = {
+    if (c.isInstanceOf[BlackBox])
+      return ""
+
     val res = new StringBuilder()
     var first = true;
     var nl = "";
@@ -709,6 +712,7 @@ class VerilogBackend extends Backend {
     out: java.io.FileWriter, depth: Int) {
     if (top.isInstanceOf[BlackBox])
       return
+
     for (child <- top.children) {
       emitChildren(child, defs, out, depth + 1);
     }
