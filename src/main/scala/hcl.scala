@@ -223,6 +223,7 @@ object chiselMainTest {
 
 trait proc extends Node {
   var updates = new collection.mutable.ListBuffer[(Bool, Node)];
+  var updated = false
   def genCond(): Bool = conds.top;
   def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
     val update = others.foldLeft(default)((v, u) => Multiplex(u._1, u._2, v))
@@ -264,7 +265,7 @@ trait nameable {
 }
 
 abstract class BlackBox extends Module {
-  parent.blackboxes += this;
+  Module.blackboxes += this
 
   def setVerilogParameters(string: String) {
     this.asInstanceOf[Module].verilog_parameters = string;

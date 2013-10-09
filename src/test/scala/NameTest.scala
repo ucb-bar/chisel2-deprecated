@@ -205,7 +205,7 @@ module NameSuite_BindFirstComp_1(
        .io_sigs_enq_cmdq( dec_io_sigs_enq_cmdq ),
        .io_sigs_enq_ximm1q( dec_io_sigs_enq_ximm1q )
   );
-  `ifdef SYNTHESIS
+  `ifndef SYNTHESIS
     assign dec.io_valid = $random();
     assign dec.io_sigs_enq_cmdq = $random();
     assign dec.io_sigs_enq_ximm1q = $random();
@@ -520,7 +520,7 @@ module NameSuite_BindFithComp_1(input clk,
        //.io_sub_resp_bits_error(  )
        //.io_sub_resp_bits_ppn(  )
   );
-  `ifdef SYNTHESIS
+  `ifndef SYNTHESIS
     assign NameSuite_Block_2.io_valid = $random();
     assign NameSuite_Block_2.io_sub_resp_bits_ppn = $random();
   `endif

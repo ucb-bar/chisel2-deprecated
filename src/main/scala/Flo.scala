@@ -163,7 +163,6 @@ class FloBackend extends Backend {
     for (cc <- Module.components) {
       if (!(cc == c)) {
         c.mods       ++= cc.mods;
-        c.blackboxes ++= cc.blackboxes;
         c.debugs     ++= cc.debugs;
       }
     }

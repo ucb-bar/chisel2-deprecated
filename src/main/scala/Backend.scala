@@ -251,6 +251,7 @@ abstract class Backend {
 
   def emitDec(node: Node): String = ""
 
+  val preElaborateTransforms = ArrayBuffer[(Module) => Unit]()
   val transforms = ArrayBuffer[(Module) => Unit]()
 
   def initializeDFS: Stack[Node] = {
@@ -501,6 +502,7 @@ abstract class Backend {
       c.markComponent();
     // XXX This will create nodes after the tree is traversed!
     c.genAllMuxes;
+    transform(c, preElaborateTransforms)
     Module.components.foreach(_.postMarkNet(0));
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
     // Module.assignResets()
