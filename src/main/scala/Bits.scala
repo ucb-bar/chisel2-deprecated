@@ -40,6 +40,8 @@ object Bits {
   def apply(x: Int, width: Int): UInt = UInt(x, width)
   def apply(x: String): UInt = UInt(x)
   def apply(x: String, width: Int): UInt = UInt(x, width)
+  def apply(x: BigInt): UInt = UInt(x)
+  def apply(x: BigInt, width: Int): UInt = UInt(x, width)
 
   def apply(dir: IODirection = NODIRECTION, width: Int = -1): UInt
     = UInt(dir, width);

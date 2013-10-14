@@ -35,6 +35,8 @@ object SInt {
 
   def apply(x: Int): SInt = SInt(Literal(x))
   def apply(x: Int, width: Int): SInt = SInt(Literal(x, width))
+  def apply(x: BigInt): SInt = SInt(Literal(x))
+  def apply(x: BigInt, width: Int): SInt = SInt(Literal(x, width))
 
   def apply(dir: IODirection = NODIRECTION, width: Int = -1): SInt = {
     val res = new SInt()

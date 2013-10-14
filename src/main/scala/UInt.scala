@@ -45,6 +45,8 @@ object UInt {
   def apply(x: String, base: Char): UInt = UInt(Literal(x, base, -1))
   def apply(x: String, base: Char, width: Int): UInt
     = UInt(Literal(x, base, width))
+  def apply(x: BigInt): UInt = UInt(Literal(x))
+  def apply(x: BigInt, width: Int): UInt = UInt(Literal(x, width))
 
   def apply(dir: IODirection = NODIRECTION, width: Int = -1): UInt = {
     val res = new UInt()
