@@ -40,6 +40,8 @@ object UInt {
    */
   def apply(x: Int): UInt = Lit(x){UInt()};
   def apply(x: Int, width: Int): UInt = Lit(x, width){UInt()};
+  def apply(x: BigInt): UInt = Lit(x){UInt()};
+  def apply(x: BigInt, width: Int): UInt = Lit(x, width){UInt()};
   def apply(x: String): UInt = Lit(x, -1){UInt()};
   def apply(x: String, width: Int): UInt = Lit(x, width){UInt()};
   def apply(x: String, base: Char): UInt = Lit(x, base, -1){UInt()};

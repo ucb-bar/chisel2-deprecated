@@ -36,6 +36,8 @@ object SInt {
 
   def apply(x: Int): SInt = Lit(x){SInt()};
   def apply(x: Int, width: Int): SInt = Lit(x, width){SInt()};
+  def apply(x: BigInt): SInt = Lit(x){SInt()};
+  def apply(x: BigInt, width: Int): SInt = Lit(x, width){SInt()};
 
   def apply(dir: IODirection = null, width: Int = -1): SInt = {
     val res = new SInt();
