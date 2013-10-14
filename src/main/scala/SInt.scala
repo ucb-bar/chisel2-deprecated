@@ -97,11 +97,11 @@ class SInt extends Bits {
   def <  (b: SInt): Bool = newLogicalOp(b, "<");
   def <= (b: SInt): Bool = newLogicalOp(b, "<=");
   def >= (b: SInt): Bool = newLogicalOp(b, ">=");
-  def !=  (b: UInt): Bool = this != b.zext;
-  def >   (b: UInt): Bool = this > Cat(UInt(1, 1), b).toSInt;
-  def <   (b: UInt): Bool = this < Cat(UInt(1, 1), b).toSInt;
-  def >=  (b: UInt): Bool = this >= Cat(UInt(1, 1), b).toSInt;
-  def <=  (b: UInt): Bool = this <= Cat(UInt(1, 1), b).toSInt;
+  def !=  (b: UInt): Bool = this != b.zext
+  def >   (b: UInt): Bool = this > b.zext
+  def <   (b: UInt): Bool = this < b.zext
+  def >=  (b: UInt): Bool = this >= b.zext
+  def <=  (b: UInt): Bool = this <= b.zext
 
   override def ===[T <: Data](right: T): Bool = {
     right match {
