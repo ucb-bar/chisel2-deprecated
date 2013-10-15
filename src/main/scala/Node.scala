@@ -191,12 +191,6 @@ abstract class Node extends nameable {
     if (lit == null) default else lit.value
   }
   def value: BigInt = BigInt(-1);
-  def signed: this.type = {
-    val res = SInt()
-    res := this.asInstanceOf[SInt];
-    res.isSigned = true;
-    res.asInstanceOf[this.type]
-  }
   def bitSet(off: UInt, dat: UInt): UInt = {
     val bit = UInt(1, 1) << off;
     (this.asInstanceOf[UInt] & ~bit) | (dat << off);
