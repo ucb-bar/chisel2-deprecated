@@ -47,13 +47,6 @@ object SInt {
 }
 
 class SInt extends Bits {
-  setIsSigned
-
-  override def setIsTypeNode {
-    inputs(0).setIsSigned;
-    super.setIsTypeNode
-  }
-
   type T = SInt;
 
   /** Factory method to create and assign a *SInt* type to a Node *n*.
@@ -89,14 +82,14 @@ class SInt extends Bits {
   def unary_-(): SInt = newUnaryOp("-");
   def unary_!(): SInt = newUnaryOp("!");
   def << (b: UInt): SInt = newBinaryOp(b, "<<");
-  def >> (b: UInt): SInt = newBinaryOp(b, ">>");
+  def >> (b: UInt): SInt = newBinaryOp(b, "s>>");
   def ?  (b: SInt): SInt = newBinaryOp(b, "?");
 
   // order operators
-  def >  (b: SInt): Bool = newLogicalOp(b, ">");
-  def <  (b: SInt): Bool = newLogicalOp(b, "<");
-  def <= (b: SInt): Bool = newLogicalOp(b, "<=");
-  def >= (b: SInt): Bool = newLogicalOp(b, ">=");
+  def <  (b: SInt): Bool = newLogicalOp(b, "s<");
+  def >  (b: SInt): Bool = b < this
+  def <= (b: SInt): Bool = newLogicalOp(b, "s<=");
+  def >= (b: SInt): Bool = b <= this
   def !=  (b: UInt): Bool = this != b.zext
   def >   (b: UInt): Bool = this > b.zext
   def <   (b: UInt): Bool = this < b.zext

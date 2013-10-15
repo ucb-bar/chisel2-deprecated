@@ -273,12 +273,10 @@ class VerilogBackend extends Backend {
           o.op + " " + emitRef(node.inputs(0))
         } else if (o.op == "s*s" || o.op == "s%s" || o.op == "s/s") {
           "$signed(" + emitRef(node.inputs(0)) + ") " + o.op(1) + " $signed(" + emitRef(node.inputs(1)) + ")"
-        } else if(node.isSigned) {
-          if (o.op == ">>") {
-            "$signed(" + emitRef(node.inputs(0)) + ") " + ">>>" + " " + emitRef(node.inputs(1))
-          } else {
-            "$signed(" + emitRef(node.inputs(0)) + ") " + o.op + " $signed(" + emitRef(node.inputs(1)) + ")"
-          }
+        } else if (o.op == "s<" || o.op == "s<=") {
+          "$signed(" + emitRef(node.inputs(0)) + ") " + o.op.tail + " $signed(" + emitRef(node.inputs(1)) + ")"
+        } else if (o.op == "s>>") {
+          "$signed(" + emitRef(node.inputs(0)) + ") " + ">>>" + " $signed(" + emitRef(node.inputs(1)) + ")"
         } else {
           emitRef(node.inputs(0)) + " " + o.op + " " + emitRef(node.inputs(1))
         }) + ";\n"
@@ -397,10 +395,8 @@ class VerilogBackend extends Backend {
     (if (node.prune && res != "") "//" else "") + res    
   }
 
-  def emitSigned(n: Node): String = if(n.isSigned) " signed " else ""
-
   def emitDecBase(node: Node): String =
-    "  wire" + emitSigned(node) + emitWidth(node) + " " + emitRef(node) + ";\n"
+    "  wire" + emitWidth(node) + " " + emitRef(node) + ";\n"
 
   override def emitDec(node: Node): String = {
     val res = 
@@ -412,13 +408,13 @@ class VerilogBackend extends Backend {
           ""
         }
       case x: ListLookupRef[_] =>
-        "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
+        "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
 
       case x: Lookup =>
-        "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
+        "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
 
       case x: Sprintf =>
-        "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
+        "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
 
       case x: ListNode =>
         ""
@@ -433,7 +429,7 @@ class VerilogBackend extends Backend {
         if (node.isMemOutput) {
           ""
         } else {
-          "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n"
+          "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n"
         }
 
       case m: Mem[_] =>
@@ -651,10 +647,10 @@ class VerilogBackend extends Backend {
           val prune = if (io.prune && c != Module.topComponent) "//" else ""
           if (io.dir == INPUT) {
             ports += new StringBuilder(nl + "    " + prune + "input " + 
-                                       emitSigned(io) + emitWidth(io) + " " + emitRef(io));
+                                       emitWidth(io) + " " + emitRef(io));
           } else if(io.dir == OUTPUT) {
             ports += new StringBuilder(nl + "    " + prune + "output" + 
-                                       emitSigned(io) + emitWidth(io) + " " + emitRef(io));
+                                       emitWidth(io) + " " + emitRef(io));
           }
         }
       };

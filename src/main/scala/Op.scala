@@ -63,6 +63,7 @@ object BinaryOp {
     op match {
       case "<<"  => Op("<<", 0, lshWidthOf(0, y),  x, y );
       case ">>"  => Op(">>", 0, rshWidthOf(0, y),  x, y );
+      case "s>>" => Op("s>>", 0, rshWidthOf(0, y),  x, y );
       case "+"   => Op("+",  2, maxWidth _,  x, y );
       case "*"   => Op("*",  0, sumWidth _,  x, y );
       case "s*s" => Op("s*s",  0, sumWidth _,  x, y );
@@ -106,6 +107,8 @@ object LogicalOp {
         case "<"   => Op("<",  2, fixWidth(1), x, y );
         case "<="  => Op("<=", 2, fixWidth(1), x, y );
         case ">="  => Op(">=", 2, fixWidth(1), x, y );
+        case "s<"  => Op("s<", 2, fixWidth(1), x, y );
+        case "s<=" => Op("s<=",2, fixWidth(1), x, y );
         case "&&"  => Op("&&", 2, fixWidth(1), x, y );
         case "||"  => Op("||", 2, fixWidth(1), x, y );
         case any   => throw new Exception("Unrecognized operator " + op);
@@ -155,8 +158,7 @@ object BinaryBoolOp {
 object Op {
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
     val (a_lit, b_lit) = (a.litOf, b.litOf);
-    val isSigned = a.isSigned && b.isSigned
-    if (Module.isFolding && !isSigned) {
+    if (Module.isFolding) {
     if (a_lit != null && b_lit == null) {
       name match {
         case "&&" => return if (a_lit.value == 0) Literal(0) else b;
@@ -200,17 +202,14 @@ object Op {
         (s, Mux(s, -f, f).toUInt)
       }
       name match {
-        case ">" | "<" | ">=" | "<=" =>
-          if (a.isInstanceOf[SInt] && b.isInstanceOf[SInt]) {
-            if (name != "<" || b.litOf == null || b.litOf.value != 0) {
-              val fixA = a.asInstanceOf[SInt]
-              val fixB = b.asInstanceOf[SInt]
-              val msbA = fixA < SInt(0)
-              val msbB = fixB < SInt(0)
-              val ucond = Bool(OUTPUT).fromNode(
-                LogicalOp(fixA.toUInt, fixB, name))
-              return Mux(msbA === msbB, ucond, (if (name(0) == '>') msbB else msbA))
-            }
+        case "s<" | "s<=" =>
+          if (name != "s<" || b.litOf == null || b.litOf.value != 0) {
+            val fixA = a.asInstanceOf[SInt]
+            val fixB = b.asInstanceOf[SInt]
+            val msbA = fixA < SInt(0)
+            val msbB = fixB < SInt(0)
+            val ucond = Bool(OUTPUT).fromNode(LogicalOp(fixA, fixB, name.tail))
+            return Mux(msbA === msbB, ucond, msbA)
           }
         case "==" =>
           if (b.litOf != null && b.litOf.isZ) {
@@ -245,7 +244,6 @@ object Op {
     res.init("", widthInfer, a, b);
     res.op = name;
     res.nGrow = nGrow;
-    if (isSigned) res.setIsSigned
     res
   }
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node): Node = {
