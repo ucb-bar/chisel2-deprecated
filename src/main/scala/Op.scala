@@ -103,10 +103,8 @@ object LogicalOp {
       val node = op match {
         case "===" => Op("==", 2, fixWidth(1), x, y );
         case "!="  => Op("!=", 2, fixWidth(1), x, y );
-        case ">"   => Op(">",  2, fixWidth(1), x, y );
         case "<"   => Op("<",  2, fixWidth(1), x, y );
         case "<="  => Op("<=", 2, fixWidth(1), x, y );
-        case ">="  => Op(">=", 2, fixWidth(1), x, y );
         case "s<"  => Op("s<", 2, fixWidth(1), x, y );
         case "s<=" => Op("s<=",2, fixWidth(1), x, y );
         case "&&"  => Op("&&", 2, fixWidth(1), x, y );
@@ -180,9 +178,7 @@ object Op {
         case "==" => return Literal(if (av == bv) 1 else 0)
         case "!=" => return Literal(if (av != bv) 1 else 0);
         case "<"  => return Literal(if (av <  bv) 1 else 0);
-        case ">"  => return Literal(if (av >  bv) 1 else 0);
         case "<=" => return Literal(if (av <= bv) 1 else 0);
-        case ">=" => return Literal(if (av >= bv) 1 else 0);
         case "##" => return Literal(av << bw | bv, aw + bw);
         case "+"  => return Literal(av + bv, max(aw, bw) + 1);
         case "-"  => return Literal(av - bv, max(aw, bw) + 1);
@@ -279,7 +275,7 @@ class Op extends Node {
       if (List("|", "&", "^", "+", "-").contains(op)) {
         if (inputs(0).width != width) inputs(0) = inputs(0).matchWidth(width)
         if (inputs(1).width != width) inputs(1) = inputs(1).matchWidth(width)
-      } else if (List("==", "!=", ">", ">=", "<", "<=").contains(op)) {
+      } else if (List("==", "!=", "<", "<=").contains(op)) {
         val w = max(inputs(0).width, inputs(1).width)
         if (inputs(0).width != w) inputs(0) = inputs(0).matchWidth(w)
         if (inputs(1).width != w) inputs(1) = inputs(1).matchWidth(w)

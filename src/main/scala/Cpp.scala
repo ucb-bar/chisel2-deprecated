@@ -305,7 +305,7 @@ class CppBackend extends Backend {
           require(o.inputs(1).litOf.value == 0)
           val shamt = (o.inputs(0).width-1) % bpw
           "  " + emitLoWordRef(o) + " = (" + emitWordRef(o.inputs(0), words(o.inputs(0))-1) + " >> " + shamt + ") & 1;\n"
-        } else if (o.op == "<" || o.op == ">" || o.op == "<=" || o.op == ">=") {
+        } else if (o.op == "<" || o.op == "<=") {
           val initial = (a: String, b: String) => a + o.op + b
           val subsequent = (i: String, a: String, b: String) => "(" + i + ") & " + a + " == " + b + " || " + a + o.op(0) + b
           val cond = opFoldLeft(o, initial, subsequent)

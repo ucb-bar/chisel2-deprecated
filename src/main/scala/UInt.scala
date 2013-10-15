@@ -93,10 +93,10 @@ class UInt extends Bits /* with Numeric[UInt] */ {
   def -  (b: UInt): UInt = newBinaryOp(b, "-");
 
   // order operators
-  def >  (b: UInt): Bool = newLogicalOp(b, ">");
   def <  (b: UInt): Bool = newLogicalOp(b, "<");
   def <= (b: UInt): Bool = newLogicalOp(b, "<=");
-  def >= (b: UInt): Bool = newLogicalOp(b, ">=");
+  def >  (b: UInt): Bool = b < this
+  def >= (b: UInt): Bool = b <= this
 
   //UInt op SInt arithmetic
   def +   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "+"));
