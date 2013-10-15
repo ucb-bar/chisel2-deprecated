@@ -75,8 +75,8 @@ object BinaryOp {
       case "u/s" => Op("s/s",  0, divUSWidth _, x, y );
       case "%"   => Op("%",  0, minWidth _,  x, y );
       case "s%s" => Op("s%s",  0, minWidth _,  x, y );
-      case "s%u" => Op("s%u",  0, modSUWidth _,  x, y );
-      case "u%s" => Op("u%s",  0, modUSWidth _, x, y );
+      case "s%u" => Op("s%s",  0, modSUWidth _,  x, y );
+      case "u%s" => Op("s%s",  0, modUSWidth _, x, y );
       case "^"   => Op("^",  2, maxWidth _,  x, y );
       case "?"   => Multiplex(x, y, null);
       case "-"   => Op("-",  2, maxWidth _,  x, y );

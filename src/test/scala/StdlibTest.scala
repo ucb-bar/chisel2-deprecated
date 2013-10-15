@@ -267,7 +267,7 @@ endmodule
   wire[32:0] T2;
 
   assign io_z = T0;
-  assign T0 = $signed(T1) u%s $signed(io_y);
+  assign T0 = $signed(T1) % $signed(io_y);
   assign T1 = T2;
   assign T2 = {1'h0/* 0*/, io_x};
 endmodule
