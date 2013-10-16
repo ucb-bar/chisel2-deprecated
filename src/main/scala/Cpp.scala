@@ -508,20 +508,18 @@ class CppBackend extends Backend {
     harness.write("  for (int t = 0; lim < 0 || t < lim; t++) {\n");
     harness.write("    dat_t<1> reset = LIT<1>(0);\n");
     harness.write("    if (!c->scan(stdin)) break;\n");
-    // XXX Why print is after clock_lo and dump after clock_hi?
     if (Module.clocks.length > 1) {
       harness.write("    delta += c->clock(reset);\n")
       harness.write("    fprintf(stdout, \"%d\", delta);\n")
       harness.write("    fprintf(stdout, \"%s\", \" \");\n")
       harness.write("    c->print(stdout);\n")
       harness.write("    delta = 0;\n")
+      if (Module.isVCD) { harness.write("    c->dump(f, t);\n"); }
     } else {
       harness.write("    c->clock_lo(reset);\n");
       harness.write("    c->print(stdout);\n");
+      if (Module.isVCD) { harness.write("    c->dump(f, t);\n"); }
       harness.write("    c->clock_hi(reset);\n");
-    }
-    if (Module.isVCD) {
-      harness.write("    c->dump(f, t);\n");
     }
     harness.write("  }\n");
     harness.write("}\n");
