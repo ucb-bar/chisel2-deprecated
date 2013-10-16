@@ -192,7 +192,7 @@ class MemRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
 
 class MemSeqRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
   val addrReg = addri.asInstanceOf[Reg]
-  override def cond = if (addrReg.isEnable) addrReg.enableSignal else Bool(true)
+  override def cond = addrReg.enableSignal
   override def isReg = true
   override def addr = if(inputs.length > 2) inputs(2) else null
 

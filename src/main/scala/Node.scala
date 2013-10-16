@@ -138,7 +138,6 @@ abstract class Node extends nameable {
   var line: StackTraceElement = findFirstUserLine(Thread.currentThread().getStackTrace) getOrElse Thread.currentThread().getStackTrace()(0)
   var isScanArg = false
   var isPrintArg = false
-  def isMemOutput: Boolean = false
   var prune = false
   var driveRand = false
   var clock: Clock = null
@@ -299,7 +298,6 @@ abstract class Node extends nameable {
     writer.println("line: " + line)
     writer.println("isScanArg: " + isScanArg)
     writer.println("isPrintArg: " + isPrintArg)
-    writer.println("isMemOutput: " + isMemOutput)
     for (in <- inputs) {
       if (in == null) {
         writer.println("null");
