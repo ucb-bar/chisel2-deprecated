@@ -595,7 +595,10 @@ class CppBackend extends Backend {
     }
   }
 
+  def backendElaborate(c: Module) = super.elaborate(c)
+
   override def elaborate(c: Module): Unit = {
+    println("CPP elaborate")
     super.elaborate(c)
 
     /* We flatten all signals in the toplevel component after we had
