@@ -123,7 +123,6 @@ abstract class Node extends nameable {
   var isTypeNode = false;
   var depth = 0;
   def componentOf: Module = if (Module.isEmittingComponents && component != null) component else Module.topComponent
-  var isSigned = false;
   var width_ = -1;
   var index = -1;
   var isFixedWidth = false;
@@ -139,16 +138,12 @@ abstract class Node extends nameable {
   var line: StackTraceElement = findFirstUserLine(Thread.currentThread().getStackTrace) getOrElse Thread.currentThread().getStackTrace()(0)
   var isScanArg = false
   var isPrintArg = false
-  def isMemOutput: Boolean = false
   var prune = false
   var driveRand = false
   var clock: Clock = null
+  var CppVertex: CppVertex = null
 
   Module.nodes += this
-
-  def setIsSigned {
-    isSigned = true
-  }
 
   def isByValue: Boolean = true;
   def width: Int = if(isInGetWidth) inferWidth(this) else width_;
@@ -191,12 +186,6 @@ abstract class Node extends nameable {
     if (lit == null) default else lit.value
   }
   def value: BigInt = BigInt(-1);
-  def signed: this.type = {
-    val res = SInt()
-    res := this.asInstanceOf[SInt];
-    res.isSigned = true;
-    res.asInstanceOf[this.type]
-  }
   def bitSet(off: UInt, dat: UInt): UInt = {
     val bit = UInt(1, 1) << off;
     (this.asInstanceOf[UInt] & ~bit) | (dat << off);
@@ -298,7 +287,6 @@ abstract class Node extends nameable {
     writer.println("flattened: " + flattened)
     writer.println("isTypeNode: " + isTypeNode)
     writer.println("depth: " + depth)
-    writer.println("isSigned: " + isSigned)
     writer.println("width_: " + width_)
     writer.println("index: " + index)
     writer.println("isFixedWidth: " + isFixedWidth)
@@ -311,7 +299,6 @@ abstract class Node extends nameable {
     writer.println("line: " + line)
     writer.println("isScanArg: " + isScanArg)
     writer.println("isPrintArg: " + isPrintArg)
-    writer.println("isMemOutput: " + isMemOutput)
     for (in <- inputs) {
       if (in == null) {
         writer.println("null");
@@ -427,10 +414,8 @@ abstract class Node extends nameable {
 
   def matchWidth(w: Int): Node = {
     if (w > this.width) {
-      val topBit = if (isSigned) NodeExtract(this, this.width-1) else Literal(0,1)
-      topBit.infer
-      val fill = NodeFill(w - this.width, topBit); fill.infer
-      val res = Concatenate(fill, this); res.infer
+      val zero = Literal(0, w - this.width); zero.infer
+      val res = Concatenate(zero, this); res.infer
       res
     } else if (w < this.width) {
       val res = NodeExtract(this, w-1,0); res.infer

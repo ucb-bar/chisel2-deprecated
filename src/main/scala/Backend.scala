@@ -253,6 +253,7 @@ abstract class Backend {
 
   val preElaborateTransforms = ArrayBuffer[(Module) => Unit]()
   val transforms = ArrayBuffer[(Module) => Unit]()
+  val analyses = ArrayBuffer[(Module) => Unit]()
 
   def initializeDFS: Stack[Node] = {
     val res = new Stack[Node]
@@ -325,9 +326,9 @@ abstract class Backend {
     assert(dfsStack.isEmpty)
   }
 
-  def transform(c: Module, transforms: ArrayBuffer[(Module) => Unit]): Unit = {
-    for (t <- transforms)
-      t(c)
+  def execute(c: Module, walks: ArrayBuffer[(Module) => Unit]): Unit = {
+    for (w <- walks)
+      w(c)
   }
 
   def pruneUnconnectedIOs(m: Module) {
@@ -487,6 +488,7 @@ abstract class Backend {
   }
 
   def elaborate(c: Module): Unit = {
+    println("backend elaborate")
     Module.setAsTopComponent(c)
 
     /* XXX If we call nameAll here and again further down, we end-up with
@@ -502,7 +504,7 @@ abstract class Backend {
       c.markComponent();
     // XXX This will create nodes after the tree is traversed!
     c.genAllMuxes;
-    transform(c, preElaborateTransforms)
+    execute(c, preElaborateTransforms)
     Module.components.foreach(_.postMarkNet(0));
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
     // Module.assignResets()
@@ -545,7 +547,7 @@ abstract class Backend {
 
     // two transforms added in Mem.scala (referenced and computePorts)
     ChiselError.info("started transforms")
-    transform(c, transforms)
+    execute(c, transforms)
     ChiselError.info("finished transforms")
 
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
@@ -561,6 +563,8 @@ abstract class Backend {
        created yet otherwise. */
     nameAll(c)
     nameRsts
+
+    execute(c, analyses)
 
     for (comp <- Module.sortedComps ) {
       // remove unconnected outputs

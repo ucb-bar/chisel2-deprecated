@@ -36,6 +36,8 @@ object SInt {
 
   def apply(x: Int): SInt = Lit(x){SInt()};
   def apply(x: Int, width: Int): SInt = Lit(x, width){SInt()};
+  def apply(x: BigInt): SInt = Lit(x){SInt()};
+  def apply(x: BigInt, width: Int): SInt = Lit(x, width){SInt()};
 
   def apply(dir: IODirection = null, width: Int = -1): SInt = {
     val res = new SInt();
@@ -45,13 +47,6 @@ object SInt {
 }
 
 class SInt extends Bits {
-  setIsSigned
-
-  override def setIsTypeNode {
-    inputs(0).setIsSigned;
-    super.setIsTypeNode
-  }
-
   type T = SInt;
 
   /** Factory method to create and assign a *SInt* type to a Node *n*.
@@ -87,19 +82,19 @@ class SInt extends Bits {
   def unary_-(): SInt = newUnaryOp("-");
   def unary_!(): SInt = newUnaryOp("!");
   def << (b: UInt): SInt = newBinaryOp(b, "<<");
-  def >> (b: UInt): SInt = newBinaryOp(b, ">>");
+  def >> (b: UInt): SInt = newBinaryOp(b, "s>>");
   def ?  (b: SInt): SInt = newBinaryOp(b, "?");
 
   // order operators
-  def >  (b: SInt): Bool = newLogicalOp(b, ">");
-  def <  (b: SInt): Bool = newLogicalOp(b, "<");
-  def <= (b: SInt): Bool = newLogicalOp(b, "<=");
-  def >= (b: SInt): Bool = newLogicalOp(b, ">=");
-  def !=  (b: UInt): Bool = this != b.zext;
-  def >   (b: UInt): Bool = this > Cat(UInt(1, 1), b).toSInt;
-  def <   (b: UInt): Bool = this < Cat(UInt(1, 1), b).toSInt;
-  def >=  (b: UInt): Bool = this >= Cat(UInt(1, 1), b).toSInt;
-  def <=  (b: UInt): Bool = this <= Cat(UInt(1, 1), b).toSInt;
+  def <  (b: SInt): Bool = newLogicalOp(b, "s<");
+  def >  (b: SInt): Bool = b < this
+  def <= (b: SInt): Bool = newLogicalOp(b, "s<=");
+  def >= (b: SInt): Bool = b <= this
+  def !=  (b: UInt): Bool = this != b.zext
+  def >   (b: UInt): Bool = this > b.zext
+  def <   (b: UInt): Bool = this < b.zext
+  def >=  (b: UInt): Bool = this >= b.zext
+  def <=  (b: UInt): Bool = this <= b.zext
 
   override def ===[T <: Data](right: T): Bool = {
     right match {
