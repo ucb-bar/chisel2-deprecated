@@ -49,10 +49,15 @@ object BuildSettings extends Build {
     resolvers ++= Seq(
       "Sonatype Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots",
       "Sonatype Releases" at "http://oss.sonatype.org/content/repositories/releases"
+      //"repo.codahale.com" at "http://repo.codahale.com"
+      //"spray" at "http://repo.spray.io/"
     ),
 
-    libraryDependencies += "com.novocode" % "junit-interface" % "0.10" % "test",
+    //libraryDependencies += "com.novocode" % "junit-interface" % "0.10" % "test",
+    //libraryDependencies += "io.spray" %%  "spray-json" % "1.2.5",
+    libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.1.3",
     libraryDependencies += "org.scalatest" %% "scalatest" % "1.9.2" % "test",
+    libraryDependencies += "com.codahale" % "jerkson_2.9.1" % "0.5.0",
 
     // Execute tests in the current project serially.
     // Tests from other projects may still run concurrently.
