@@ -105,12 +105,12 @@ object isLessThan {
 object Mux {
   def apply[T <: Data](t: Bool, c: T, a: T): T = {
     val res = Multiplex(t, c.toNode, a.toNode)
-    if (c.isInstanceOf[UInt]) {
-      assert(a.isInstanceOf[UInt])
+    if (c.isInstanceOf[Bits]) {
+      assert(a.isInstanceOf[Bits])
       if (c.getClass == a.getClass) {
         c.fromNode(res)
       } else {
-        UInt(OUTPUT).fromNode(res).asInstanceOf[T]
+        Bits(OUTPUT).fromNode(res).asInstanceOf[T]
       }
     } else {
       c.fromNode(res)
