@@ -79,13 +79,13 @@ abstract class Bits extends Data with proc {
 
   def default: Node = if (inputs.length < 1 || inputs(0) == null) null else inputs(0);
 
-  override def litOf: Literal = {
-    if(inputs.length == 1 && inputs(0) != null) {
-      inputs(0).litOf
-    } else {
-      null
-    }
-  }
+  override def isLit: Boolean =
+    if (inputs.length == 1 && inputs(0) != null) inputs(0).isLit
+    else super.isLit
+
+  override def litOf: Literal =
+    if (inputs.length == 1 && inputs(0) != null) inputs(0).litOf
+    else super.litOf
 
   // internal, non user exposed connectors
   var assigned = false;
