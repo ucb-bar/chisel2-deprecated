@@ -286,20 +286,6 @@ abstract class Bits extends Data with proc {
     res
   }
 
-  override def maxNum: BigInt = {
-    if (inputs.length == 0) {
-      width;
-    } else if (inputs(0).isLit) {
-      inputs(0).value
-    } else if (inputs(0).litOf != null) {
-      inputs(0).litOf.value
-    } else if (inputs.length == 1 && inputs(0) != null) {
-      inputs(0).maxNum
-    } else {
-      super.maxNum
-    }
-  }
-
   override def forceMatchingWidths {
     if(inputs.length == 1 && inputs(0).width != width) {
       inputs(0) = inputs(0).matchWidth(width)
