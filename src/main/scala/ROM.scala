@@ -57,8 +57,8 @@ class ROM[T <: Data](val lits: Seq[Literal], gen: (Int) => T) extends Vec[T](gen
     }
   }
 
-  override def isReg: Boolean = true
-  override def isInVCD = false
+  override def isInObject: Boolean = true
+  override def isInVCD: Boolean = false
 
   override def traceableNodes: Array[Node] = lits.toArray
 

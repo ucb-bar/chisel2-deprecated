@@ -375,12 +375,12 @@ class VerilogBackend extends Backend {
           ""
         }
       case r: ROM[_] =>
-        val inits = r.lits.zipWithIndex.map { case (lit, i) =>
-          "    " + emitRef(r) + "[" + i + "] = " + emitRef(lit) + ";\n"
-        }
+        val inits = new StringBuilder
+        for (i <- 0 until r.lits.length)
+          inits append "    " + emitRef(r) + "[" + i + "] = " + emitRef(r.lits(i)) + ";\n"
 
-        "  initial begin\n" +
-        inits.reduceLeft(_ + _) +
+        "  always @(*) begin\n" +
+        inits +
         "  end\n"
 
       case r: ROMRead[_] =>

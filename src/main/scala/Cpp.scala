@@ -440,9 +440,11 @@ class CppBackend extends Backend {
         "  if (rand_init) " + emitRef(node) + ".randomize();\n"
 
       case r: ROM[_] =>
-        r.lits.zipWithIndex.map { case (lit, i) =>
-          block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(lit, j) + ")"))
-        }.reduceLeft(_ + _)
+        val res = new StringBuilder
+        for (i <- 0 until r.lits.length)
+          res append block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(r.lits(i), j) + ")"))
+        res.toString
+
       case u: Bits => 
         if (u.driveRand && u.isInObject)
           "  if (rand_init) " + emitRef(node) + ".randomize();\n"
