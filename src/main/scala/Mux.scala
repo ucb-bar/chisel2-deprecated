@@ -73,9 +73,6 @@ object Multiplex{
           return cat
         }
       }
-      if (a.isInstanceOf[Mux] && c.clearlyEquals(a.inputs(1))) {
-        Multiplex(t.asInstanceOf[Bool] || a.inputs(0).asInstanceOf[Bool], c, a.inputs(2))
-      }
     }
     new Mux().init("", maxWidth _, t, c, a);
   }

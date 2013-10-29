@@ -266,7 +266,7 @@ class Literal extends Node {
   override def maxNum: BigInt = value;
   override def minNum: BigInt = value;
   override def isLit: Boolean = true;
-  override def clearlyEquals(x: Node) = x.isLit && value == x.litOf.value
+  override def litOf: Literal = this
   override def toString: String = name;
   override def isInVCD: Boolean = false
 

@@ -165,26 +165,17 @@ abstract class Node extends nameable {
 
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
   def ##(b: Node): Node  = Op("##", 2, sumWidth _,  this, b );
-  def maxNum: BigInt = if(litOf != null) litOf.value else ((1 << (if(width < 0) inferWidth(this) else width))-1);
+  def maxNum: BigInt = {
+    // XXX This makes sense for UInt, but not in general.
+    val w = if (width < 0) inferWidth(this) else width
+    litValue((BigInt(1) << w) - 1)
+  }
   def minNum: BigInt = BigInt(0);
-  // TODO: SHOULD BE GENERALIZED TO DIG FOR LIT AS litOf DOES
-  def isLit: Boolean = false;
-  def clearlyEquals(x: Node): Boolean = this == x
-  // TODO: SHOULD AGREE WITH isLit
-  def litOf: Literal = {
-    if(inputs.length == 0) {
-      if (isLit) this.asInstanceOf[Literal] else null
-    } else if(inputs.length == 1
-      && isInstanceOf[Bits] && inputs(0) != null) {
-      inputs(0).litOf
-    } else {
-      null
-    }
-  }
-  def litValue(default: BigInt = BigInt(-1)): BigInt = {
-    val lit = litOf
-    if (lit == null) default else lit.value
-  }
+  def isLit: Boolean = false
+  def litOf: Literal = null
+  def litValue(default: BigInt = BigInt(-1)): BigInt =
+    if (isLit) litOf.value
+    else default
   def value: BigInt = BigInt(-1);
   def bitSet(off: UInt, dat: UInt): UInt = {
     val bit = UInt(1, 1) << off;
