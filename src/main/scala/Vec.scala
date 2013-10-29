@@ -93,15 +93,8 @@ object Vec {
   /** Returns an array containing values of a given function over
     a range of integer values starting from 0.
     */
-  def tabulate[T <: Data](n: Int)(gen: (Int) => T): Vec[T] = {
-    val res = new Vec[T](gen);
-    var i = 0
-    while (i < n) {
-      res += gen(i)
-      i += 1
-    }
-    res
-  }
+  def tabulate[T <: Data](n: Int)(gen: (Int) => T): Vec[T] =
+    apply((0 until n).map(i => gen(i)))
 
   def tabulate[T <: Data](n1: Int, n2: Int)(f: (Int, Int) => T): Vec[Vec[T]] =
     tabulate(n1)(i1 => tabulate(n2)(f(i1, _)))

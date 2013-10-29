@@ -691,9 +691,10 @@ class CppBackend extends Backend {
         "  if (rand_init) " + emitRef(node) + ".randomize();\n"
 
       case r: ROMemDelay =>
-        r.inputs.zipWithIndex.map { case (lit, i) =>
-          block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(lit, j) + ")"))
-        }.reduceLeft(_ + _)
+        val res = new StringBuilder
+        for (i <- 0 until r.inputs.length)
+          res append block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(r.inputs(i), j) + ")"))
+        res.toString
 
       case x: MemDelay =>
         "  if (rand_init) " + emitRef(node) + ".randomize();\n"
