@@ -66,11 +66,6 @@ object unless {
   }
 }
 
-object otherwise {
-  def apply(block: => Unit) {
-    when (Bool(true)) { block }
-  }
-}
 object switch {
   def apply(c: Bits)(block: => Unit) {
     keys.push(c);
