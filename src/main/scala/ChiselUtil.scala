@@ -146,14 +146,15 @@ object UIntToOH
   */
 object Mux1H
 {
-  def apply[T <: Data](sel: Vec[Bool], in: Vec[T]): T = {
+  def apply[T <: Data](sel: Seq[Bool], in: Seq[T]): T = {
     if (in.size == 1) in(0)
-    else in(sel.indexWhere((i: Bool) => i))
+    else {
+      val masked = (sel, in).zipped map ((s, i) => Mux(s, i.toBits, Bits(0)))
+      in(0).fromBits(masked.reduceLeft(_|_))
+    }
   }
-  def apply[T <: Data](sel: Vec[Bool], in: Seq[T]): T = apply(sel, Vec(in))
-  def apply[T <: Data](sel: Seq[Bool], in: Vec[T]): T = apply(Vec(sel), in)
-  def apply[T <: Data](sel: Bits, in: Seq[T]): T = apply(Vec((0 until in.size).map(sel(_))), Vec(in))
-  def apply[T <: Data](sel: Bits, in: Vec[T]): T = apply(Vec((0 until in.size).map(sel(_))), in)
+  def apply[T <: Data](sel: Bits, in: Seq[T]): T =
+    apply((0 until in.size).map(sel(_)), in)
 }
 
 /** Does the inverse of UIntToOH.
