@@ -155,7 +155,11 @@ class CppBackend extends Backend {
       ""
     }
   }
-  def block(s: Seq[String]): String = "  {" + s.map(" " + _ + ";").reduceLeft(_ + _) + " }\n"
+  def block(s: Seq[String]): String = 
+    if (s.length == 0)
+      ""
+    else
+      "  {" + s.map(" " + _ + ";").reduceLeft(_ + _) + " }\n"
   def makeArray(s: String, x: Node): List[String] = List("val_t " + s + "[" + words(x) + "]")
   def toArray(s: String, x: Node): List[String] = makeArray(s, x) ++ (0 until words(x)).map(i => s + "[" + i + "] = " + emitWordRef(x, i))
   def fromArray(s: String, x: Node) =
