@@ -985,8 +985,19 @@ static val_t rand_val()
   return x;
 }
 
+// Abstract dat_t with a basic width-independent interface.
+class dat_base_t {
+ public:
+  // Returns the bitwidth of this data.
+  virtual int width() = 0;
+  virtual string to_str() = 0;  // TODO(ducky): define standardized interface and expected output.
+                                // Also allow different bases and representations (with defaults).
+  virtual void set_from_str(string val) = 0; // TODO(ducky): define standardized interface and input format
+                                        // allowing multiple representations (0x, 0h, 0b, ...).
+};
+
 template <int w>
-class dat_t {
+class dat_t : public dat_base_t {
  public:
   const static int n_words = ((w - 1) / 64) + 1;
   // const static int n_words = (w >> CeilLog<sizeof(val_t)*8>::v) + 1;
@@ -1012,6 +1023,10 @@ class dat_t {
     for (int i = 0; i < rres.size(); i++)
       res.push_back(rres[rres.size()-i-1]);
     return res;
+  }
+  virtual void set_from_str(string val) {
+    // TODO(ducky): unhackify, make standardized interface, allow non-hex
+    dat_from_hex(val, *this);
   }
   void randomize() {
     for (int i = 0; i < n_words; i++)
@@ -1581,10 +1596,29 @@ inline dat_t<1> reduction_xor(dat_t<w1> d) {
   return res;
 }
 
+// Abstract mem_t with a basic width- and size-independent interface.
+class mem_base_t {
+ public:
+  // Returns the bitwidth of each memory element
+  virtual int width() = 0;
+  // Returns the number of elements in this memory
+  virtual int length() = 0;
+  virtual string get_to_str(string index) = 0;  // TODO(ducky): standardize (see dat_base_t).
+  virtual void put_from_str(string index, string val) = 0;   // TODO(ducky): standardize (see dat_base_t).
+};
+
 template <int w, int d>
 class mem_t {
  public:
   dat_t<w> contents[d];
+  
+  int width() {
+    return w; 
+  }
+  int length() {
+    return d;
+  }
+  
   template <int iw>
   dat_t<w> get (dat_t<iw> idx) {
     return get(idx.lo_word() & (nextpow2_1(d)-1));
@@ -1599,6 +1633,11 @@ class mem_t {
       return rand_val() & (word == val_n_words(w) && val_n_word_bits(w) ? mask_val(w) : -1L);
     return contents[idx].values[word];
   }
+  string get_to_str(string index) {
+    dat_t<w> val = get(atoi(index.c_str()));
+    return val.to_str();
+  }
+  
   template <int iw>
   void put (dat_t<iw> idx, dat_t<w> val) {
     put(idx.lo_word(), val);
@@ -1611,6 +1650,12 @@ class mem_t {
     if (ispow2(d) || idx < d)
       contents[idx].values[word] = val;
   }
+  void put_from_str(string index, string val) {
+    dat_t<w> dat_val;
+    dat_val.set_from_str(val);
+    put(atoi(index.c_str()), dat_val);
+  }
+  
   void print ( void ) {
     for (int j = 0; j < d/4; j++) {
       for (int i = 0; i < 4; i++) {
@@ -1791,15 +1836,111 @@ void dat_dump (FILE* file, mem_t<w,d> val, std::string name) {
 
 template <int w, int d> mem_t<w,d> MEM( void );
 
+struct debug_node_t {
+    string name;
+    dat_base_t* dat_ptr;
+    
+    debug_node_t(string in_name, dat_base_t* in_ptr) :
+        name(name), dat_ptr(in_ptr) {
+    }
+};
+
+struct debug_mem_t {
+    string name;
+    mem_base_t* mem_ptr;
+    
+    debug_mem_t(string in_name, mem_base_t* in_ptr) :
+        name(name), mem_ptr(in_ptr) {
+    }
+};
+
+// Generic templatized function to return a list of names in either a
+// debug_node_t or debug_mem_t.
+template<typename T> vector<string> get_list_names(vector<T>* in_vec) {
+  vector<string> out;
+  typedef typename vector<T>::iterator iter_t;
+  for (iter_t it = in_vec->begin(); it != in_vec->end(); ++it) {
+    out.push_back(it->name);
+  }
+  return out;
+}
+
+// Generic templatized function to return an element pointer from a list
+// given a name. Returns NULL if no match is found.
+template<typename T> T* get_list_elem(vector<T>* in_vec, string name) {
+  typedef typename vector<T>::iterator iter_t;
+  for (iter_t it = in_vec->begin(); it != in_vec->end(); ++it) {
+    if (it->name == name) {
+      return &(*it);
+    }    
+  }
+  return NULL;
+}
+
 class mod_t {
  public:
   std::vector< mod_t* > children;
   virtual void init ( void ) { };
   virtual void clock_lo ( dat_t<1> reset ) { };
   virtual void clock_hi ( dat_t<1> reset ) { };
+  
   virtual void print ( FILE* f ) { };
   virtual bool scan ( FILE* f ) { return true; };
   virtual void dump ( FILE* f, int t ) { };
+  
+  virtual void init_debug_interface ( ) { };
+  
+  // Lists containing node/mem names to pointers, to be populated by init().
+  vector<debug_node_t> nodes;
+  vector<debug_mem_t> mems;
+  
+  // Returns a list of all nodes accessible by the debugging interface.
+  virtual vector<string> get_nodes() {
+    return get_list_names<debug_node_t>(&nodes);
+  }
+  // Returns a list of all memory objects accessible by the debugging interface.
+  virtual vector<string> get_mems() {
+    return get_list_names<debug_mem_t>(&mems);
+  }
+  // Reads the value on a node. Returns empty on error.
+  virtual string node_read ( string name ) {
+    debug_node_t* node = get_list_elem<debug_node_t>(&nodes, name);
+    if (node != NULL) {
+      return node->dat_ptr->to_str();
+    } else {
+      return "";
+    }
+  }
+  // Writes a value to a node. Returns true on success and false on error.
+  // Recommended to only be used on state elements.
+  virtual bool node_write ( string name, string val ) {
+    debug_node_t* node = get_list_elem<debug_node_t>(&nodes, name);
+    if (node != NULL) {
+      node->dat_ptr->set_from_str(val);
+      return true;
+    } else {
+      return false;
+    }
+  }
+  // Reads the an element from a memory.
+  virtual string mem_read ( string name, string index ) {
+    debug_mem_t* mem = get_list_elem<debug_mem_t>(&mems, name);
+    if (mem != NULL) {
+      return mem->mem_ptr->get_to_str(index);
+    } else {
+      return "";
+    }
+  }
+  // Writes an element to a memory.
+  virtual bool mem_write ( string name, string index, string val ) {
+    debug_mem_t* mem = get_list_elem<debug_mem_t>(&mems, name);
+    if (mem != NULL) {
+      mem->mem_ptr->put_from_str(index, val);
+      return true;
+    } else {
+      return false;
+    }
+  }
 };
 
 #define ASSERT(cond, msg) { \
