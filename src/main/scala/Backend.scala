@@ -542,8 +542,19 @@ abstract class Backend {
     // two transforms added in Mem.scala (referenced and computePorts)
     ChiselError.info("started transforms")
     transform(c, transforms)
+    //c.insertPipelineRegisters2()
+    c.insertPipelineRegisters()
+    c.inferAll()//is this correct?
+    c.genAllMuxes//is this correct?
+    c.colorPipelineStages()
+    c.findHazards()
+    c.generateForwardingLogic()
+    c.resolveHazards()
+    c.inferAll()
+    c.genAllMuxes
+    collectNodesIntoComp(initializeDFS)
     ChiselError.info("finished transforms")
-
+    
     Module.sortedComps.map(x => println(x + " " + x.nodes.length))
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
     c.traceNodes();
@@ -557,7 +568,10 @@ abstract class Backend {
        created yet otherwise. */
     nameAll(c)
     nameRsts
+    
+    
 
+    
     for (comp <- Module.sortedComps ) {
       // remove unconnected outputs
       pruneUnconnectedIOs(comp)

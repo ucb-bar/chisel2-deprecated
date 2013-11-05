@@ -230,6 +230,66 @@ object Module {
     topComponent.clock = Module.implicitClock
     topComponent.hasExplicitClock = true    
   }
+  
+  // automatic pipeline stuff
+  var pipeline = new HashMap[Int, ArrayBuffer[(Node, Bits)]]()
+  val chckStg = new ArrayBuffer[Bits]()
+  var pipelineComponent: Module = null
+  var pipelineReg = new HashMap[Int, ArrayBuffer[Reg]]()
+  def setNumStages(x: Int) = {
+    for (i <- 0 until x-1) {
+      pipeline += (i -> new ArrayBuffer[(Node, Bits)]())
+      pipelineReg += (i -> new ArrayBuffer[Reg]())
+    }
+    for (i <- 0 until x) {
+      stalls += (i -> new ArrayBuffer[Bool])
+      kills += (i -> new ArrayBuffer[Bool])
+      speckills += (i -> new ArrayBuffer[Bool])
+    }
+  }
+  def addPipeReg(stage: Int, n: Node, rst: Bits) = {
+    pipeline(stage) += (n -> rst)
+  }
+  val forwardedRegs = new HashSet[Reg]
+  val forwardedMemReadPoints = new HashSet[(TransactionMem[_], FunRdIO[_])]
+  val memNonForwardedWritePoints = new HashSet[FunWrIO[_]]
+  def addForwardedReg(d: Reg) = {
+    forwardedRegs += d
+  }
+  def addForwardedMemReadPoint(m: TransactionMem[_], r: FunRdIO[_]) = {
+    forwardedMemReadPoints += ((m.asInstanceOf[TransactionMem[Data]], r.asInstanceOf[FunRdIO[Data]]))
+  }
+  def addNonForwardedMemWritePoint[T <: Data] (writePoint: FunWrIO[T]) = {
+    memNonForwardedWritePoints += writePoint
+  }
+
+  val speculation = new ArrayBuffer[(Bits, Bits)]
+  def speculate(s: Bits, v: Bits) = {
+    speculation += ((s, v))
+  }
+  //new syntax stuff
+  var nodeStages = new ArrayBuffer[(Node, Int)]()
+  var conflictNodes = new ArrayBuffer[(Node, Int)]()
+  def annotateNodeStage(n: Node, s:Int) = {
+    nodeStages += ((n,s))
+  }
+  val tcomponents = new ArrayBuffer[TransactionalComponent]()
+  var stages: HashMap[Node, Int] = new HashMap[Node, Int]()
+  var cRegs: ArrayBuffer[Reg] = null
+  var cMems: ArrayBuffer[Mem[ Data ]] = null
+  var cTransactionMems: ArrayBuffer[TransactionMem[ Data ]] = null
+  def getStage(n: Node): Int = {
+    if (stages.contains(n))
+      return stages(n)
+    else
+      return -1
+  }
+  val valids = new ArrayBuffer[Bool]
+  val stalls = new HashMap[Int, ArrayBuffer[Bool]]
+  val kills = new HashMap[Int, ArrayBuffer[Bool]]
+  val speckills = new HashMap[Int, ArrayBuffer[Bool]]
+  var globalStall: Bool = null
+  val hazards = new ArrayBuffer[(Bool, Delay, Int, Int, Bool, FunRdIO[Data])]
 }
 
 
@@ -923,65 +983,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def removeInputs(nodes: Seq[Node]): Seq[Node] =
     nodes.filter(n => !isInput(n))
     
-  // automatic pipeline stuff
-  var pipeline = new HashMap[Int, ArrayBuffer[(Node, Bits)]]()
-  val chckStg = new ArrayBuffer[Bits]()
-  var pipelineComponent: Module = null
-  var pipelineReg = new HashMap[Int, ArrayBuffer[Reg]]()
-  def setNumStages(x: Int) = {
-    for (i <- 0 until x-1) {
-      pipeline += (i -> new ArrayBuffer[(Node, Bits)]())
-      pipelineReg += (i -> new ArrayBuffer[Reg]())
-    }
-    for (i <- 0 until x) {
-      stalls += (i -> new ArrayBuffer[Bool])
-      kills += (i -> new ArrayBuffer[Bool])
-      speckills += (i -> new ArrayBuffer[Bool])
-    }
-  }
-  def addPipeReg(stage: Int, n: Node, rst: Bits) = {
-    pipeline(stage) += (n -> rst)
-  }
-  val forwardedRegs = new HashSet[Reg]
-  val forwardedMemReadPoints = new HashSet[(TransactionMem[_], FunRdIO[_])]
-  val memNonForwardedWritePoints = new HashSet[FunWrIO[_]]
-  def addForwardedReg(d: Reg) = {
-    forwardedRegs += d
-  }
-  def addForwardedMemReadPoint(m: TransactionMem[_], r: FunRdIO[_]) = {
-    forwardedMemReadPoints += ((m.asInstanceOf[TransactionMem[Data]], r.asInstanceOf[FunRdIO[Data]]))
-  }
-  def addNonForwardedMemWritePoint[T <: Data] (writePoint: FunWrIO[T]) = {
-    memNonForwardedWritePoints += writePoint
-  }
-
-  val speculation = new ArrayBuffer[(Bits, Bits)]
-  def speculate(s: Bits, v: Bits) = {
-    speculation += ((s, v))
-  }
-  //new syntax stuff
-  var nodeStages = new ArrayBuffer[(Node, Int)]()
-  var conflictNodes = new ArrayBuffer[(Node, Int)]()
-  def annotateNodeStage(n: Node, s:Int) = {
-    nodeStages += ((n,s))
-  }
-  val tcomponents = new ArrayBuffer[TransactionalComponent]()
-  var stages: HashMap[Node, Int] = new HashMap[Node, Int]()
-  var cRegs: ArrayBuffer[Reg] = null
-  var cMems: ArrayBuffer[Mem[ Data ]] = null
-  var cTransactionMems: ArrayBuffer[TransactionMem[ Data ]] = null
-  def getStage(n: Node): Int = {
-    if (stages.contains(n))
-      return stages(n)
-    else
-      return -1
-  }
-  val valids = new ArrayBuffer[Bool]
-  val stalls = new HashMap[Int, ArrayBuffer[Bool]]
-  val kills = new HashMap[Int, ArrayBuffer[Bool]]
-  val speckills = new HashMap[Int, ArrayBuffer[Bool]]
-  var globalStall: Bool = null
-  val hazards = new ArrayBuffer[(Bool, Delay, Int, Int, Bool, FunRdIO[Data])]
+  //automatic pipelining stuff
 
   def getConsumers() = {
     val map = new HashMap[Node, ArrayBuffer[Node]]
@@ -1266,7 +1268,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         valid := valids(stage-1)
       else
         valid := Bool(true)
-      valid.nameIt("HuyValid_" + stage)
+      valid.setName("HuyValid_" + stage)
       for ((p, enum) <- pipeline(stage) zip pipeline(stage).indices) {
         val r = Reg(init = p._2)
         r := p._1.asInstanceOf[Bits]
@@ -1279,6 +1281,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         for (c <- consumers) {
           val ind = c.inputs.indexOf(p._1)
           if(ind > -1) c.inputs(ind) = r
+          r.consumers += c
         }
       }
     }
@@ -1482,11 +1485,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     cRegs = cRegs.filter(!specRegs.contains(_))
     for (p <- cRegs) {
       if (p.updates.length > 1 && stages.contains(p)) {
-        val enables = p.updates.map(_._1)
+        val enables = p.updates.map(_._1).filter(_.name != "reset")
         val enStgs = enables.map(getStage(_)).filter(_ > -1)
         val stage = enStgs.head
-        if (p.name == "pc_reg") println(enables.map(getStage(_)) + " " + p.updates.map(_._2).map(getStage(_)) + " RD: " + getStage(p))
-        scala.Predef.assert(enStgs.tail.map( _ == stage).foldLeft(true)(_ && _), println(p.line.getLineNumber + " " + p.line.getClassName + " " + enStgs)) // check all the stgs match
+        
+        scala.Predef.assert(enStgs.tail.map( _ == stage).foldLeft(true)(_ && _), println(p.name + " " + p.line.getLineNumber + " " + p.line.getClassName + " " + enStgs)) // check all the stgs match
         val rdStg = getStage(p)
         for (en <- enables) {
           val wrStg = getStage(en)
@@ -1513,8 +1516,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         val writeStage = getStage(writeEn)
         val writeEnables = getVersions(writeEn.asInstanceOf[Bool])
         val writeAddrs = getVersions(writeAddr.asInstanceOf[Bits])
-        Predef.assert(getStage(writeEn) == getStage(writeData), "writeEN stage: " + getStage(writeEn) + " writeData stage: " + getStage(writeData))
-        Predef.assert(getStage(writeData) == getStage(writeAddr), "writeData stage: " + getStage(writeData) + " writeAddr stage: " + getStage(writeAddr))
+        Predef.assert(getStage(writeEn) == getStage(writeData) || getStage(writeEn) == -1 || getStage(writeData) == -1, "writeEN stage" + "(" + writeEn.name + "): " + getStage(writeEn) + " writeData stage" + "(" + writeData + "): " + getStage(writeData))
+        Predef.assert(getStage(writeData) == getStage(writeAddr) || getStage(writeAddr) == -1 || getStage(writeData) == -1, "writeData stage: " + getStage(writeData) + " writeAddr stage: " + getStage(writeAddr))
         var foundHazard = false
         var readStage = -1
         for(readPoint <- m.io.reads){
