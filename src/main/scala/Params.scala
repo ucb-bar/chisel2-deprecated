@@ -68,15 +68,16 @@ object Params {
   
   def load(filename: String) = {
     buildingSpace = false
-    val json = io.Source.fromFile(filename).mkString
-    vspace = JacksonWrapper.deserialize[VSpace](json)
+    //val json = io.Source.fromFile(filename).mkString
+    //vspace = JacksonWrapper.deserialize[VSpace](json)
+    vspace = HashMap("sha3.Sha3Accel" -> HashMap("W" -> new ValueParam(64)))
     //println("Loaded: " + json + "\nfrom " + filename)
   }
 
   def dump(filename: String) = {
     val json = JacksonWrapper.serialize(space)
     val writer = new PrintWriter(new File(filename))
-    //println("Dumping to " + filename + ":\n" + json)
+    println("Dumping to " + filename + ":\n" + json)
     writer.write(json)
     writer.close()
   }
