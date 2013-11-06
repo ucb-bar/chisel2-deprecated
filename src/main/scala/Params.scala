@@ -1,3 +1,8 @@
+/* Unfinished. This is a hacked-together piece of crap, with simplified shits. I'm saving it for now.
+It uses the Spray library, and ideally I want to use this library to write and read JSON files with polymorphic types.
+It does not work.
+To Do!
+*/
 package Chisel
 
 import Node._
@@ -68,9 +73,11 @@ object Params {
   
   def load(filename: String) = {
     buildingSpace = false
-    //val json = io.Source.fromFile(filename).mkString
+    val json = io.Source.fromFile(filename).mkString
+    val list = json.split(" ")
     //vspace = JacksonWrapper.deserialize[VSpace](json)
-    vspace = HashMap("sha3.Sha3Accel" -> HashMap("W" -> new ValueParam(64)))
+    vspace = HashMap(list(0) -> HashMap(list(1) -> new ValueParam(list(2).dropRight(1).toInt)))
+    //vspace = HashMap("sha3.Sha3Accel" -> HashMap("W" -> new ValueParam(64)))
     //println("Loaded: " + json + "\nfrom " + filename)
   }
 
