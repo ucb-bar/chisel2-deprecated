@@ -142,16 +142,13 @@ abstract class Node extends nameable {
   var prune = false
   var driveRand = false
   var clock: Clock = null
-<<<<<<< HEAD
   //automatic pipelining stuff
   var pipelinedVersion: Node = null
   var unPipelinedVersion: Node = null
   //end automatci pipelining stuff
   
-=======
   var CppVertex: CppVertex = null
 
->>>>>>> 775df72ad295fd6b052889cf6fad19c45766618e
   Module.nodes += this
 
   def isByValue: Boolean = true;

@@ -187,23 +187,15 @@ class Reg extends Delay with proc {
     updates += ((cond, src))
   }
   override def genMuxes(default: Node): Unit = {
-<<<<<<< HEAD
     if (genned) return
-    if(isMemOutput) {
-      inputs(0) = updates(0)._2
-      return
-    } else if(isEnable) {
-      // hack to force the muxes to match the Reg's width:
-      // the intent is u = updates.head._2
-=======
     if(!updates.isEmpty && Module.backend.isInstanceOf[VerilogBackend]) {
       // use clock enable to keep old value, rather than muxing in old value
->>>>>>> 775df72ad295fd6b052889cf6fad19c45766618e
       genMuxes(updates.head._2, updates.toList.tail)
       inputs += enable;
       enableIndex = inputs.length - 1;
-    } else 
+    } else { 
       super.genMuxes(default)
+    }
     genned = true
   }
   def nameOpt: String = if (name.length > 0) name else "REG"

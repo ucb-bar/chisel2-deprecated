@@ -557,13 +557,12 @@ abstract class Backend {
 
     // two transforms added in Mem.scala (referenced and computePorts)
     ChiselError.info("started transforms")
-<<<<<<< HEAD
     execute(c, transforms)
     ChiselError.info("finished transforms")
 
-=======
-    transform(c, transforms)
+    //transform(c, transforms)
     //c.insertPipelineRegisters2()
+/*
     c.insertPipelineRegisters()
     c.inferAll()//is this correct?
     c.genAllMuxes//is this correct?
@@ -573,11 +572,11 @@ abstract class Backend {
     c.resolveHazards()
     c.inferAll()
     c.genAllMuxes
+*/
     collectNodesIntoComp(initializeDFS)
     ChiselError.info("finished transforms")
     
     Module.sortedComps.map(x => println(x + " " + x.nodes.length))
->>>>>>> 429e8014f32daec0aa902cae51a72eebbec65fe2
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
     c.traceNodes();
     val clkDomainWalkedNodes = new ArrayBuffer[Node]
@@ -594,12 +593,9 @@ abstract class Backend {
     
     
 
-<<<<<<< HEAD
     execute(c, analyses)
 
-=======
     
->>>>>>> 429e8014f32daec0aa902cae51a72eebbec65fe2
     for (comp <- Module.sortedComps ) {
       // remove unconnected outputs
       pruneUnconnectedIOs(comp)
