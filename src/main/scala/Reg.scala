@@ -173,7 +173,7 @@ class Reg extends Delay with proc {
   override def isReg = true
 
   var assigned = false;
-  var enable = Bool(false);
+  var enable = Bool(true)
 
   def procAssign(src: Node) {
     if (assigned) {
@@ -181,24 +181,21 @@ class Reg extends Delay with proc {
     }
     val cond = genCond();
     if (conds.length >= 1) {
-      isEnable = Module.backend.isInstanceOf[VerilogBackend]
-      enable = enable || cond;
+      enable = if (isEnable) enable || cond else cond
+      isEnable = true
     }
     updates += ((cond, src))
   }
   override def genMuxes(default: Node): Unit = {
     if (genned) return
-    if(isMemOutput) {
-      inputs(0) = updates(0)._2
-      return
-    } else if(isEnable) {
-      // hack to force the muxes to match the Reg's width:
-      // the intent is u = updates.head._2
+    if(!updates.isEmpty && Module.backend.isInstanceOf[VerilogBackend]) {
+      // use clock enable to keep old value, rather than muxing in old value
       genMuxes(updates.head._2, updates.toList.tail)
       inputs += enable;
       enableIndex = inputs.length - 1;
-    } else 
+    } else { 
       super.genMuxes(default)
+    }
     genned = true
   }
   def nameOpt: String = if (name.length > 0) name else "REG"

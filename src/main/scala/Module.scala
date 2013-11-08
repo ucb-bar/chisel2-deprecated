@@ -55,6 +55,9 @@ object Module {
   var saveWidthWarnings = false
   var saveConnectionWarnings = false
   var saveComponentTrace = false
+  var saveGraph = false       // by Donggyu
+  var annotateSignals = false // by Donggyu
+  var signalFilename = ""     // by Donggyu
   var dontFindCombLoop = false
   var isDebug = false;
   var isIoDebug = true;
@@ -85,6 +88,7 @@ object Module {
   val resetList = ArrayBuffer[Node]();
   val muxes = ArrayBuffer[Node]();
   val nodes = ArrayBuffer[Node]()
+  val blackboxes = ArrayBuffer[BlackBox]()
   var ioMap = new HashMap[Node, Int];
   var chiselOneHotMap = new HashMap[(UInt, Int), UInt]
   var chiselOneHotBitMap = new HashMap[(Bits, Int), Bool]
@@ -126,6 +130,9 @@ object Module {
     saveWidthWarnings = false
     saveConnectionWarnings = false
     saveComponentTrace = false
+    saveGraph = false       // by Donggyu
+    annotateSignals = false // by Donggyu
+    signalFilename = ""     // by Donggyu
     dontFindCombLoop = false
     isGenHarness = false;
     isDebug = false;
@@ -149,6 +156,7 @@ object Module {
     procs.clear();
     resetList.clear()
     muxes.clear();
+    blackboxes.clear();
     ioMap.clear()
     chiselOneHotMap.clear()
     chiselOneHotBitMap.clear()
@@ -323,7 +331,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   var parent: Module = null;
   var containsReg = false;
   val children = new ArrayBuffer[Module];
-  val blackboxes = ArrayBuffer[BlackBox]();
   val debugs = HashSet[Node]();
 
   val nodes = new ArrayBuffer[Node]
@@ -338,6 +345,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   var verilog_parameters = "";
   val clocks = new ArrayBuffer[Clock]
   val resets = new HashMap[Bool, Bool]
+
+  val signals = new ArrayBuffer[Node]() // by Donggyu
 
   def hasReset = !(reset == null)
   def hasClock = !(clock == null)
@@ -502,7 +511,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
     for (c <- Module.components; a <- c.debugs)
       res.enqueue(a)
-    for(b <- blackboxes)
+    for(b <- Module.blackboxes)
       res.enqueue(b.io)
     for(c <- Module.components)
       for((n, io) <- c.io.flatten)
@@ -660,7 +669,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     for (c <- Module.components) {
       roots ++= c.debugs
     }
-    for (b <- blackboxes)
+    for (b <- Module.blackboxes)
       roots += b.io;
     for (m <- mods) {
       m match {
@@ -887,15 +896,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     /* XXX Why do we do something different here? */
     if (!Module.backend.isInstanceOf[VerilogBackend]) {
       queue.push(() => io.traceNode(this, queue));
-      /* This is ugly and most likely unnecessary but as long as we are not
-       sure of the subtle consequences of tracing through blackboxes, let's
-       have the code here (instead of Verilog.doCompile). */
-      for (c <- Module.components) {
-        c match {
-          case x: BlackBox => c.traceNodes();
-          case _ =>
-        }
-      }
     } else {
       for (c <- Module.components) {
         queue.push(() => c.io.traceNode(c, queue))
@@ -908,7 +908,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
     for (c <- Module.components; d <- c.debugs)
       queue.push(() => d.traceNode(c, queue))
-    for (b <- blackboxes)
+    for (b <- Module.blackboxes)
       queue.push(() => b.io.traceNode(this, queue));
     while (queue.length > 0) {
       val work = queue.pop();
@@ -1269,15 +1269,22 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         valid := Bool(true)
       valid.setName("HuyValid_" + stage)*/
       for ((p, enum) <- pipeline(stage) zip pipeline(stage).indices) {
-        val r = Reg(init = p._2)
-        r := p._1.asInstanceOf[Bits]
+        //val r = Reg(init = p._2)
+        val r = Reg(Bits())
+        //r := p._1.asInstanceOf[Bits]
+        r.comp.asInstanceOf[Reg].clock = p._1.component.clock
+        r.comp.updates += new Tuple2(Bool(true), p._1.asInstanceOf[Bits])
+        r.comp.updates += new Tuple2(p._1.component.getResetPin(p._1.component._reset), p._2.asInstanceOf[Bits])
+        //r.comp.asInstanceOf[Reg].inputs += p._1.component.getResetPin(p._1.component._reset)
+        /*when(p._1.component._reset){
+          r := p._2
+        }*/
         //add pointer in p._1 to point to pipelined version of itself
         p._1.pipelinedVersion = r
         r.unPipelinedVersion = p._1
         r.setName("Huy_" + enum + "_" + p._1.name)
-        println("DEBUG0")
-        println(r.name)
         pipelineReg(stage) += r.comp.asInstanceOf[Reg]
+        println(p._1.consumers)
         for (c <- p._1.consumers) {
           val producer_ind = c.inputs.indexOf(p._1)
           if(producer_ind > -1) c.inputs(producer_ind) = r

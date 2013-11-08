@@ -56,6 +56,8 @@ object foldR
     if (x.length == 1) x(0) else f(x(0), foldR(x.slice(1, x.length))(f))
 }
 
+/** linear feedback shift register
+  */
 object LFSR16
 {
   def apply(increment: Bool = Bool(true)): UInt =
@@ -67,8 +69,8 @@ object LFSR16
   }
 }
 
-/** Counts the number of 1s in a sequence of *Bool*.
-*/
+/** Returns the number of bits set (i.e value is 1) in the input signal.
+  */
 object PopCount
 {
   def apply(in: Seq[Bool]): UInt = {
@@ -114,6 +116,8 @@ object RegEnable
   }
 }
 
+/** Returns the n-cycle delayed version of the input signal.
+  */
 object ShiftRegister
 {
   def apply[T <: Data](in: T, n: Int, en: Bool = Bool(true)): T =
@@ -123,6 +127,8 @@ object ShiftRegister
   }
 }
 
+/** Returns the one hot encoding of the input UInt.
+  */
 object UIntToOH
 {
   def apply(in: UInt, width: Int = -1): Bits =
@@ -135,23 +141,30 @@ object UIntToOH
   }
 }
 
+/** Builds a Mux tree out of the input signal vector using a one hot encoded
+  select signal. Returns the output of the Mux tree.
+  */
 object Mux1H
 {
-  def apply[T <: Data](sel: Vec[Bool], in: Vec[T]): T = {
+  def apply[T <: Data](sel: Seq[Bool], in: Seq[T]): T = {
     if (in.size == 1) in(0)
-    else in(sel.indexWhere((i: Bool) => i))
+    else {
+      val masked = (sel, in).zipped map ((s, i) => Mux(s, i.toBits, Bits(0)))
+      in(0).fromBits(masked.reduceLeft(_|_))
+    }
   }
-  def apply[T <: Data](sel: Vec[Bool], in: Seq[T]): T = apply(sel, Vec(in))
-  def apply[T <: Data](sel: Seq[Bool], in: Vec[T]): T = apply(Vec(sel), in)
-  def apply[T <: Data](sel: Bits, in: Seq[T]): T = apply(Vec((0 until in.size).map(sel(_))), Vec(in))
-  def apply[T <: Data](sel: Bits, in: Vec[T]): T = apply(Vec((0 until in.size).map(sel(_))), in)
+  def apply[T <: Data](sel: Bits, in: Seq[T]): T =
+    apply((0 until in.size).map(sel(_)), in)
 }
 
+/** Does the inverse of UIntToOH.
+  */
 object OHToUInt
 {
   def apply(in: Seq[Bool]): UInt = {
     if (in.size <= 1) return UInt(0)
     if (in.size == 2) return in(1)
+    if (!isPow2(in.size)) return apply(in.padTo(1 << log2Up(in.size), Bool(false)))
     val hi = in.slice(in.size/2, in.size)
     val lo = in.slice(0, in.size/2)
     Cat(hi.reduceLeft((s1, s2) => {s1 || s2}),
@@ -176,6 +189,9 @@ class ValidIO[+T <: Data](gen: T) extends Bundle
     }
 }
 
+/** Adds a valid protocol to any interface. The standard used is
+  that the consumer uses the flipped interface.
+*/
 object Valid {
   def apply[T <: Data](gen: T): ValidIO[T] = new ValidIO(gen)
 }
@@ -196,6 +212,10 @@ class DecoupledIO[T <: Data](gen: T) extends Bundle
     }
 }
 
+/** Adds a ready-valid handshaking protocol to any interface.
+  The standard used is that the consumer uses the flipped
+  interface.
+  */
 object Decoupled {
   def apply[T <: Data](gen: T): DecoupledIO[T] = new DecoupledIO(gen)
 }
@@ -296,8 +316,26 @@ class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T 
   chosen := Mux(locked, lockIdx, choose)
 }
 
+/** Hardware module that is used to sequence n producers into 1 consumer.
+  Producers are chosen in round robin order.
+
+  Example usage:
+    val arb = new RRArbiter(2, UInt())
+    arb.io.in(0) <> producer0.io.out
+    arb.io.in(1) <> producer1.io.out
+    consumer.io.in <> arb.io.out
+  */
 class RRArbiter[T <: Data](gen:T, n: Int) extends LockingRRArbiter[T](gen, n, 1)
 
+/** Hardware module that is used to sequence n producers into 1 consumer.
+ Priority is given to lower producer
+
+ Example usage:
+   val arb = Module(new Arbiter(2, UInt()))
+   arb.io.in(0) <> producer0.io.out
+   arb.io.in(1) <> producer1.io.out
+   consumer.io.in <> arb.io.out
+ */
 class Arbiter[T <: Data](gen: T, n: Int) extends LockingArbiter[T](gen, n, 1)
 
 
@@ -373,6 +411,15 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
   }
 }
 
+/** Generic hardware queue. Required parameter entries controls
+  the depth of the queues. The width of the queue is determined
+  from the inputs.
+
+  Example usage:
+    val q = new Queue(UInt(), 16)
+    q.io.enq <> producer.io.out
+    consumer.io.in <> q.io.deq
+  */
 object Queue
 {
   def apply[T <: Data](enq: DecoupledIO[T], entries: Int = 2, pipe: Boolean = false): DecoupledIO[T]  = {
@@ -470,6 +517,15 @@ class Pipe[T <: Data](gen: T, latency: Int = 1) extends Module
   io.deq <> Pipe(io.enq, latency)
 }
 
+/** A hardware module that delays data coming down the pipeline
+  by the number of cycles set by the latency parameter. Functionality
+  is similar to ShiftRegister but this exposes a Pipe interface.
+
+  Example usage:
+    val pipe = new Pipe(UInt())
+    pipe.io.enq <> produce.io.out
+    consumer.io.in <> pipe.io.deq
+  */
 object Pipe
 {
   def apply[T <: Data](enqValid: Bool, enqBits: T, latency: Int): ValidIO[T] = {
@@ -489,6 +545,11 @@ object Pipe
   def apply[T <: Data](enq: ValidIO[T], latency: Int = 1): ValidIO[T] = apply(enq.valid, enq.bits, latency)
 }
 
+/** Builds a Mux tree under the assumption that multiple select signals
+  can be enabled. Priority is given to the first select signal.
+
+  Returns the output of the Mux tree.
+  */
 object PriorityMux
 {
   def apply[T <: Bits](in: Seq[(Bool, T)]): T = {
@@ -502,24 +563,29 @@ object PriorityMux
   def apply[T <: Bits](sel: Bits, in: Seq[T]): T = apply((0 until in.size).map(sel(_)), in)
 }
 
+/** Returns the bit position of the trailing 1 in the input vector
+  with the assumption that multiple bits of the input bit vector can be set
+  */
 object PriorityEncoder
 {
   def apply(in: Seq[Bool]): UInt = PriorityMux(in, (0 until in.size).map(UInt(_)))
   def apply(in: Bits): UInt = apply((0 until in.getWidth).map(in(_)))
 }
 
+/** Returns a bit vector in which only the least-significant 1 bit in
+  the input vector, if any, is set.
+  */
 object PriorityEncoderOH
 {
-  def apply(in: Bits): UInt = Vec(apply((0 until in.getWidth).map(in(_)))).toBits
-  def apply(in: Seq[Bool]): Seq[UInt] = {
-    var none_hot = Bool(true)
-    val out = collection.mutable.ArrayBuffer[UInt]()
-    for (i <- 0 until in.size) {
-      out += (none_hot && in(i))
-      none_hot = none_hot && !in(i)
-    }
-    out
+  private def encode(in: Seq[Bool]): UInt = {
+    val outs = Vec.tabulate(in.size)(i => UInt(BigInt(1) << i, in.size))
+    PriorityMux(in :+ Bool(true), outs :+ UInt(0, in.size))
   }
+  def apply(in: Seq[Bool]): Vec[Bool] = {
+    val enc = encode(in)
+    Vec.tabulate(in.size)(enc(_))
+  }
+  def apply(in: Bits): UInt = encode((0 until in.getWidth).map(i => in(i)))
 }
 
 class RdIO[T <: Data](depth: Int)(data: => T) extends Bundle {

@@ -34,11 +34,17 @@ import Node._
 import scala.reflect._
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 
+/** *seqRead* means that if a port tries to read the same address that another
+  port is writing to in the same cycle, the read data is random garbage (from
+  a LFSR, which returns "1" on its first invocation).
+  */
 object Mem {
-  def apply[T <: Data](out: T, n: Int, seqRead: Boolean = false, clock: Clock = Module.implicitClock): Mem[T] = {
+  def apply[T <: Data](out: T, n: Int, seqRead: Boolean = false, clock: Clock = null): Mem[T] = {
     val gen = out.clone
     Reg.validateGen(gen)
-    new Mem(() => gen, n, seqRead, clock)
+    val res = new Mem(() => gen, n, seqRead)
+    if (!(clock == null)) res.clock = clock
+    res
   }
 
   Module.backend.transforms.prepend { c =>
@@ -60,8 +66,7 @@ abstract class AccessTracker extends Delay {
   def readAccesses: ArrayBuffer[_ <: MemAccess]
 }
 
-class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean,
-    clock: Clock = Module.implicitClock) extends AccessTracker {
+class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean) extends AccessTracker {
   def writeAccesses: ArrayBuffer[MemWrite] = writes ++ readwrites.map(_.write)
   def readAccesses: ArrayBuffer[_ <: MemAccess] = reads ++ seqreads ++ readwrites.map(_.read)
   def ports: ArrayBuffer[_ <: MemAccess] = writes ++ reads ++ seqreads ++ readwrites
@@ -113,16 +118,15 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean,
       wr
     }
 
-    if (seqRead && Module.backend.isInstanceOf[CppBackend] && gen().isInstanceOf[Data]) {
+    if (seqRead && Module.backend.isInstanceOf[CppBackend] && gen().isInstanceOf[Bits]) {
       // generate bogus data when reading & writing same address on same cycle
-      val reg_data = Reg(gen())
-      reg_data.comp procAssign wdata
+      val reg_data = new Reg().init("", widthOf(0), wdata)
       val reg_wmask = if (wmask == null) null else Reg(next=wmask)
       val random16 = LFSR16()
       val random_data = Cat(random16, Array.fill((width-1)/16){random16}:_*)
       doit(Reg(next=addr), Reg(next=cond), reg_data, reg_wmask)
-      doit(addr, cond, gen().fromNode(random_data), wmask)
-      reg_data.comp
+      doit(addr, cond, random_data, wmask)
+      reg_data
     } else {
       doit(addr, cond, wdata, wmask)
     }
@@ -188,7 +192,7 @@ class MemRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
 
 class MemSeqRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
   val addrReg = addri.asInstanceOf[Reg]
-  override def cond = if (addrReg.isEnable) addrReg.enableSignal else Bool(true)
+  override def cond = addrReg.enableSignal
   override def isReg = true
   override def addr = if(inputs.length > 2) inputs(2) else null
 

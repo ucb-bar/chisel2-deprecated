@@ -67,11 +67,6 @@ object unless {
   }
 }
 
-object otherwise {
-  def apply(block: => Unit) {
-    when (Bool(true)) { block }
-  }
-}
 object switch {
   def apply(c: Bits)(block: => Unit) {
     keys.push(c);
@@ -85,6 +80,14 @@ object is {
       ChiselError.error("NO KEY SPECIFIED");
     } else {
       val c = keys(0) === v;
+      when (c) { block; }
+    }
+  }
+  def apply(v: Bits, vr: Bits*)(block: => Unit) {
+    if (keys.length == 0) {
+      ChiselError.error("NO KEY SPECIFIED");
+    } else {
+      val c = vr.foldLeft(keys(0) === v)( (p: Bool, v: Bits) => keys(0) === v || p );
       when (c) { block; }
     }
   }
@@ -164,6 +167,13 @@ object chiselMain {
         case "--include" => Module.includeArgs = Module.splitArg(args(i + 1)); i += 1;
         case "--checkPorts" => Module.isCheckingPorts = true
         case "--prune" => Module.isPruning = true
+        case "--Wgraph" => Module.saveGraph = true // by Donggyu
+        // by Donggyu
+        case "--annotSig" => {
+          Module.annotateSignals = true
+          Module.signalFilename = args(i + 1)
+          i += 1
+        }
         case any => ChiselError.warning("'" + arg + "' is an unkown argument.");
       }
       i += 1;
@@ -198,6 +208,7 @@ object chiselMain {
       Module.backend.elaborate(c)
       if (Module.isCheckingPorts) Module.backend.checkPorts(c)
       if (Module.isCompiling && Module.isGenHarness) Module.backend.compile(c)
+      if (Module.annotateSignals) Module.backend.back_annotate
       if (Module.isTesting) Module.tester.tests()
       c
     } finally {
@@ -225,6 +236,7 @@ object chiselMainTest {
 trait proc extends Node {
   var updates = new collection.mutable.ListBuffer[(Bool, Node)];
   var genned = false
+  var updated = false
   def genCond(): Bool = conds.top;
   def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
     val update = others.foldLeft(default)((v, u) => Multiplex(u._1, u._2, v))
@@ -298,7 +310,7 @@ trait nameable {
 }
 
 abstract class BlackBox extends Module {
-  parent.blackboxes += this;
+  Module.blackboxes += this
 
   def setVerilogParameters(string: String) {
     this.asInstanceOf[Module].verilog_parameters = string;

@@ -192,12 +192,12 @@ class StdlibSuite extends AssertionsForJUnit {
     assertFile(tmpdir.getRoot() + "/StdlibSuite_MulUS_1.v",
 """module StdlibSuite_MulUS_1(
     input [31:0] io_x,
-    input  signed [31:0] io_y,
-    output signed [63:0] io_z
+    input [31:0] io_y,
+    output[63:0] io_z
 );
 
-  wire signed [63:0] T0;
-  wire signed [32:0] T1;
+  wire[63:0] T0;
+  wire[32:0] T1;
   wire[32:0] T2;
 
   assign io_z = T0;
@@ -225,12 +225,12 @@ endmodule
     assertFile(tmpdir.getRoot() + "/StdlibSuite_DivUS_1.v",
 """module StdlibSuite_DivUS_1(
     input [31:0] io_x,
-    input  signed [31:0] io_y,
-    output signed [31:0] io_z
+    input [31:0] io_y,
+    output[31:0] io_z
 );
 
-  wire signed [31:0] T0;
-  wire signed [32:0] T1;
+  wire[31:0] T0;
+  wire[32:0] T1;
   wire[32:0] T2;
 
   assign io_z = T0;
@@ -258,16 +258,16 @@ endmodule
     assertFile(tmpdir.getRoot() + "/StdlibSuite_RemUS_1.v",
 """module StdlibSuite_RemUS_1(
     input [31:0] io_x,
-    input  signed [31:0] io_y,
-    output signed [31:0] io_z
+    input [31:0] io_y,
+    output[31:0] io_z
 );
 
-  wire signed [31:0] T0;
-  wire signed [32:0] T1;
+  wire[31:0] T0;
+  wire[32:0] T1;
   wire[32:0] T2;
 
   assign io_z = T0;
-  assign T0 = $signed(T1) u%s $signed(io_y);
+  assign T0 = $signed(T1) % $signed(io_y);
   assign T1 = T2;
   assign T2 = {1'h0/* 0*/, io_x};
 endmodule
@@ -290,13 +290,13 @@ endmodule
       () => Module(new MulSU()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_MulSU_1.v",
 """module StdlibSuite_MulSU_1(
-    input  signed [31:0] io_x,
+    input [31:0] io_x,
     input [31:0] io_y,
-    output signed [63:0] io_z
+    output[63:0] io_z
 );
 
-  wire signed [63:0] T0;
-  wire signed [32:0] T1;
+  wire[63:0] T0;
+  wire[32:0] T1;
   wire[32:0] T2;
 
   assign io_z = T0;
@@ -323,13 +323,13 @@ endmodule
       () => Module(new DivSU()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_DivSU_1.v",
 """module StdlibSuite_DivSU_1(
-    input  signed [31:0] io_x,
+    input [31:0] io_x,
     input [31:0] io_y,
-    output signed [31:0] io_z
+    output[31:0] io_z
 );
 
-  wire signed [31:0] T0;
-  wire signed [32:0] T1;
+  wire[31:0] T0;
+  wire[32:0] T1;
   wire[32:0] T2;
 
   assign io_z = T0;
@@ -356,17 +356,17 @@ endmodule
       () => Module(new RemSU()))
     assertFile(tmpdir.getRoot() + "/StdlibSuite_RemSU_1.v",
 """module StdlibSuite_RemSU_1(
-    input  signed [31:0] io_x,
+    input [31:0] io_x,
     input [31:0] io_y,
-    output signed [31:0] io_z
+    output[31:0] io_z
 );
 
-  wire signed [31:0] T0;
-  wire signed [32:0] T1;
+  wire[31:0] T0;
+  wire[32:0] T1;
   wire[32:0] T2;
 
   assign io_z = T0;
-  assign T0 = $signed(io_x) s%u $signed(T1);
+  assign T0 = $signed(io_x) % $signed(T1);
   assign T1 = T2;
   assign T2 = {1'h0/* 0*/, io_y};
 endmodule
@@ -551,19 +551,19 @@ endmodule
 """module StdlibSuite_ArbiterTest_1(
     output io_in_0_ready,
     input  io_in_0_valid,
-    input  signed [7:0] io_in_0_bits,
+    input [7:0] io_in_0_bits,
     output io_in_1_ready,
     input  io_in_1_valid,
-    input  signed [7:0] io_in_1_bits,
+    input [7:0] io_in_1_bits,
     output io_in_2_ready,
     input  io_in_2_valid,
-    input  signed [7:0] io_in_2_bits,
+    input [7:0] io_in_2_bits,
     output io_in_3_ready,
     input  io_in_3_valid,
-    input  signed [7:0] io_in_3_bits,
+    input [7:0] io_in_3_bits,
     input  io_out_ready,
     output io_out_valid,
-    output signed [7:0] io_out_bits,
+    output[7:0] io_out_bits,
     output[1:0] io_chosen
 );
 
@@ -573,11 +573,11 @@ endmodule
   wire[1:0] T3;
   wire[1:0] T4;
   wire[1:0] T5;
-  wire signed [7:0] T6;
-  wire signed [7:0] T7;
+  wire[7:0] T6;
+  wire[7:0] T7;
   wire T8;
   wire[1:0] T9;
-  wire signed [7:0] T10;
+  wire[7:0] T10;
   wire T11;
   wire T12;
   wire T13;
@@ -689,19 +689,19 @@ endmodule
 """module StdlibSuite_RRArbiterTest_1(input clk, input reset,
     output io_in_0_ready,
     input  io_in_0_valid,
-    input  signed [7:0] io_in_0_bits,
+    input [7:0] io_in_0_bits,
     output io_in_1_ready,
     input  io_in_1_valid,
-    input  signed [7:0] io_in_1_bits,
+    input [7:0] io_in_1_bits,
     output io_in_2_ready,
     input  io_in_2_valid,
-    input  signed [7:0] io_in_2_bits,
+    input [7:0] io_in_2_bits,
     output io_in_3_ready,
     input  io_in_3_valid,
-    input  signed [7:0] io_in_3_bits,
+    input [7:0] io_in_3_bits,
     input  io_out_ready,
     output io_out_valid,
-    output signed [7:0] io_out_bits,
+    output[7:0] io_out_bits,
     output[1:0] io_chosen
 );
 
@@ -724,11 +724,11 @@ endmodule
   wire T16;
   wire T17;
   wire[1:0] T18;
-  wire signed [7:0] T19;
-  wire signed [7:0] T20;
+  wire[7:0] T19;
+  wire[7:0] T20;
   wire T21;
   wire[1:0] T22;
-  wire signed [7:0] T23;
+  wire[7:0] T23;
   wire T24;
   wire T25;
   wire T26;
@@ -808,13 +808,13 @@ endmodule
   assign T7 = {1'h0/* 0*/, 1'h1/* 1*/};
   assign T8 = {1'h0/* 0*/, 1'h0/* 0*/};
   assign T9 = io_in_3_valid && T10;
-  assign T10 = 2'h3/* 3*/ > R11;
+  assign T10 = R11 < 2'h3/* 3*/;
   assign T12 = io_out_ready && io_out_valid;
   assign T13 = io_in_2_valid && T14;
-  assign T14 = 2'h2/* 2*/ > R11;
+  assign T14 = R11 < 2'h2/* 2*/;
   assign T15 = {1'h0/* 0*/, 1'h1/* 1*/};
   assign T16 = io_in_1_valid && T17;
-  assign T17 = T18 > R11;
+  assign T17 = R11 < T18;
   assign T18 = {1'h0/* 0*/, 1'h1/* 1*/};
   assign io_out_bits = T19;
   assign T19 = T25 ? T23 : T20;
@@ -841,19 +841,19 @@ endmodule
   assign T38 = T39 || io_in_0_valid;
   assign T39 = T42 || T40;
   assign T40 = io_in_3_valid && T41;
-  assign T41 = 2'h3/* 3*/ > R11;
+  assign T41 = R11 < 2'h3/* 3*/;
   assign T42 = T45 || T43;
   assign T43 = io_in_2_valid && T44;
-  assign T44 = 2'h2/* 2*/ > R11;
+  assign T44 = R11 < 2'h2/* 2*/;
   assign T45 = T49 || T46;
   assign T46 = io_in_1_valid && T47;
-  assign T47 = T48 > R11;
+  assign T47 = R11 < T48;
   assign T48 = {1'h0/* 0*/, 1'h1/* 1*/};
   assign T49 = io_in_0_valid && T50;
-  assign T50 = T51 > R11;
+  assign T50 = R11 < T51;
   assign T51 = {1'h0/* 0*/, 1'h0/* 0*/};
   assign T52 = T54 && T53;
-  assign T53 = 2'h3/* 3*/ > R11;
+  assign T53 = R11 < 2'h3/* 3*/;
   assign T54 = ! T55;
   assign T55 = T56 || T43;
   assign T56 = T49 || T46;
@@ -868,7 +868,7 @@ endmodule
   assign T64 = T65 || T43;
   assign T65 = T49 || T46;
   assign T66 = T68 && T67;
-  assign T67 = 2'h2/* 2*/ > R11;
+  assign T67 = R11 < 2'h2/* 2*/;
   assign T68 = ! T69;
   assign T69 = T49 || T46;
   assign io_in_1_ready = T70;
@@ -881,7 +881,7 @@ endmodule
   assign T76 = T77 || T43;
   assign T77 = T49 || T46;
   assign T78 = T81 && T79;
-  assign T79 = T80 > R11;
+  assign T79 = R11 < T80;
   assign T80 = {1'h0/* 0*/, 1'h1/* 1*/};
   assign T81 = ! T49;
   assign io_in_0_ready = T82;
@@ -892,7 +892,7 @@ endmodule
   assign T86 = T87 || T40;
   assign T87 = T88 || T43;
   assign T88 = T49 || T46;
-  assign T89 = T90 > R11;
+  assign T89 = R11 < T90;
   assign T90 = {1'h0/* 0*/, 1'h0/* 0*/};
 
   always @(posedge clk) begin

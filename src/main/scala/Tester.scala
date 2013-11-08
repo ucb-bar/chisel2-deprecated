@@ -44,6 +44,7 @@ class Tester[+T <: Module](val c: T, val testNodes: Array[Node]) {
   var testOut: OutputStream = null
   var testInputNodes: Array[Node] = null
   var testNonInputNodes: Array[Node] = null
+  var delta = 0
   var first = true
   def splitFlattenNodes(args: Seq[Node]): (Seq[Node], Seq[Node]) = {
     if (args.length == 0) {
@@ -53,6 +54,21 @@ class Tester[+T <: Module](val c: T, val testNodes: Array[Node]) {
       (c.keepInputs(testNodes), c.removeInputs(testNodes))
     }
   }
+
+  def setClocks(clocks: HashMap[Clock, Int]) {
+    println("SETTING UP CLOCKS")
+    for (clock <- Module.clocks) {
+      if (clock.srcClock == null) {
+        val s = BigInt(clocks(clock)).toString(16)
+        for (c <- s)
+          testOut.write(c)
+        testOut.write(' ')
+      }
+    }
+    testOut.write('\n')
+    testOut.flush()
+  }
+
   def step(svars: HashMap[Node, Node],
            ovars: HashMap[Node, Node] = new HashMap[Node, Node],
            isTrace: Boolean = true): Boolean = {
@@ -76,9 +92,17 @@ class Tester[+T <: Module](val c: T, val testNodes: Array[Node]) {
     var isSame = true
     var c = testIn.read
     val sb = new StringBuilder()
+    def isSpace(c: Int) : Boolean = c == 0x20 || c == 0x9 || c == 0xD || c == 0xA
+    if (Module.clocks.length > 1) {
+      while (isSpace(c)) c = testIn.read
+      while (!isSpace(c)) {
+        sb += c.toChar
+        c = testIn.read
+      }
+      delta += sb.toString.toInt
+    }
     for (o <- testNonInputNodes) {
       sb.clear()
-      def isSpace(c: Int) : Boolean = c == 0x20 || c == 0x9 || c == 0xD || c == 0xA
       while (isSpace(c)) {
         c = testIn.read
       }
