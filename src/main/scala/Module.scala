@@ -1260,28 +1260,30 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
   
   def insertPipelineRegisters() = {
-    val map = getConsumers()
     for(stage <- 0 until pipeline.size) {
-      val valid = Reg(init = Bool(false))
+      /*val valid = Reg(init = Bool(false))
       valids += valid
       if (stage > 0) 
         valid := valids(stage-1)
       else
         valid := Bool(true)
-      valid.setName("HuyValid_" + stage)
+      valid.setName("HuyValid_" + stage)*/
       for ((p, enum) <- pipeline(stage) zip pipeline(stage).indices) {
         val r = Reg(init = p._2)
         r := p._1.asInstanceOf[Bits]
         //add pointer in p._1 to point to pipelined version of itself
         p._1.pipelinedVersion = r
         r.unPipelinedVersion = p._1
-        r.nameIt("Huy_" + enum + "_" + p._1.name)
+        r.setName("Huy_" + enum + "_" + p._1.name)
+        println("DEBUG0")
+        println(r.name)
         pipelineReg(stage) += r.comp.asInstanceOf[Reg]
-        val consumers = map(p._1)
-        for (c <- consumers) {
-          val ind = c.inputs.indexOf(p._1)
-          if(ind > -1) c.inputs(ind) = r
+        for (c <- p._1.consumers) {
+          val producer_ind = c.inputs.indexOf(p._1)
+          if(producer_ind > -1) c.inputs(producer_ind) = r
+          val consumer_ind = p._1.consumers.indexOf(c)
           r.consumers += c
+          p._1.consumers(consumer_ind) = r
         }
       }
     }

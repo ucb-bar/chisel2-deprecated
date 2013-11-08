@@ -488,10 +488,10 @@ class CppBackend extends Backend {
     // XXX Why print is after clock_lo and dump after clock_hi?
     harness.write("    c->clock_lo(reset);\n");
     harness.write("    c->print(stdout);\n");
-    harness.write("    c->clock_hi(reset);\n");
     if (Module.isVCD) {
       harness.write("    c->dump(f, t);\n");
     }
+    harness.write("    c->clock_hi(reset);\n");
     harness.write("  }\n");
     harness.write("}\n");
     harness.close();

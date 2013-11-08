@@ -147,6 +147,7 @@ abstract class Node extends nameable {
   //automatic pipelining stuff
   var pipelinedVersion: Node = null
   var unPipelinedVersion: Node = null
+  var elaborated = false
   //end automatci pipelining stuff
   
   Module.nodes += this

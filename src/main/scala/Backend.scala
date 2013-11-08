@@ -517,7 +517,7 @@ abstract class Backend {
     val nbOuterLoops = c.inferAll();
     ChiselError.info("finished inference (" + nbOuterLoops + ")")
     ChiselError.info("start width checking")
-    c.forceMatchingWidths;
+    c.forceMatchingWidths
     ChiselError.info("finished width checking")
     ChiselError.info("started flattenning")
     val nbNodes = c.removeTypeNodes()
@@ -542,24 +542,27 @@ abstract class Backend {
     // two transforms added in Mem.scala (referenced and computePorts)
     ChiselError.info("started transforms")
     transform(c, transforms)
+    Module.sortedComps.map(x => println(x + " " + x.nodes.length))
+    Module.sortedComps.map(_.nodes.map(_.addConsumers))
+    
     //c.insertPipelineRegisters2()
     c.insertPipelineRegisters()
-    c.inferAll()//is this correct?
-    c.genAllMuxes//is this correct?
-    c.colorPipelineStages()
+    c.genAllMuxes
+    c.inferAll()
+    c.forceMatchingWidths
+    /*c.colorPipelineStages()
     c.findHazards()
     c.generateForwardingLogic()
     c.resolveHazards()
-    c.inferAll()
     c.genAllMuxes
+    c.inferAll()
+    c.forceMatchingWidths*/
     collectNodesIntoComp(initializeDFS)
     ChiselError.info("finished transforms")
-    
-    Module.sortedComps.map(x => println(x + " " + x.nodes.length))
-    Module.sortedComps.map(_.nodes.map(_.addConsumers))
+          
     c.traceNodes();
     for (comp <- Module.sortedComps)
-      for (node <- comp.nodes)
+
         if (node.isInstanceOf[Reg])
             createClkDomain(node)
     ChiselError.checkpoint()
@@ -588,6 +591,7 @@ abstract class Backend {
     if(Module.saveComponentTrace) {
       printStack
     }
+    
   }
 
   def compile(c: Module, flags: String = null): Unit = { }
@@ -626,4 +630,4 @@ abstract class Backend {
 
 }
 
-
+      for (node <- comp.nodes)
