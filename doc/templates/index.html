@@ -5,7 +5,10 @@
 <div class="hero-unit">
       <h1>Chisel</h1>
       <p>Constructing Hardware in a Scala Embedded Language</p>
-      <p>Register for the <a href="/blog/?p=34">Chisel 2.0 Bootcamp</a> at UC Berkeley September 30th 2013!</p>
+      <p>
+For those who missed the Chisel 2.0 Bootcamp, the <a href="http://www.youtube.com/playlist?list=PLYTiwx6hV33t9-eMmf6WEgATKRTt1GeuR">videos</a> are online now.
+Please, leave any feedback you might have in the <a href="https://chisel.eecs.berkeley.edu/blog/?p=34">comments</a>.
+      </p>
       <a href="#getstarted" class="btn btn-primary btn-large" >Get Started</a>
       <a href="https://github.com/ucb-bar/chisel/" class="btn btn-large" >View on GitHub</a>
 </div>
@@ -74,14 +77,20 @@ Instruction Set Architecture designed in the BAR group and described on
             <div class="tabbable">
                   <ul class="nav nav-tabs">
                         <li class="active">
-                              <a href="#example" data-toggle="tab">Example</a>
+                              <a href="#gcd" data-toggle="tab">Gcd</a>
                         </li>
-                        <li class="workflow">
-                              <a href="#workflow" data-toggle="tab">Workflow</a>
+                        <li class="maxN">
+                              <a href="#maxN" data-toggle="tab">MaxN</a>
+                        </li>
+                        <li class="mul">
+                              <a href="#mul" data-toggle="tab">Mul</a>
+                        </li>
+                        <li class="adder">
+                              <a href="#adder" data-toggle="tab">Adder</a>
                         </li>
                   </ul>
                   <div class="tab-content">
-                        <div class="tab-pane active" id="example">
+                        <div class="tab-pane active" id="gcd">
                               <pre class="code">
 <tt><b><font color="#000080">import</font></b> Chisel<font color="#990000">.</font><b><font color="#0000FF">_</font></b>
 
@@ -110,9 +119,85 @@ Instruction Set Architecture designed in the BAR group and described on
 </tt>
                               </pre>
                         </div>
-                        <div class="tab-pane" id="workflow">
-                              <img src="./workflow.svg" width="724" height="496">
+                        <div class="tab-pane" id="maxN">
+<pre class="code"><tt><b><font color="#000080">import</font></b> Chisel<font color="#990000">.</font><b><font color="#0000FF">_</font></b>  <i><font color="#9A1900">// importing the Chisel library.</font></i>
+
+<i><font color="#9A1900">/// Creating a Module that computes the maximum of N values</font></i>
+<i><font color="#9A1900">//</font></i>
+<i><font color="#9A1900">//  This generator shows how it is possible to do functional construction</font></i>
+<i><font color="#9A1900">//  of circuits.</font></i>
+
+<b><font color="#0000FF">class</font></b> <font color="#008080">MaxN</font><font color="#990000">(</font>n<b><font color="#0000FF">:</font></b> <font color="#009900">Int</font><font color="#990000">,</font> w<b><font color="#0000FF">:</font></b> <font color="#009900">Int</font> <i><font color="#9A1900">/* parameterized input */</font></i><font color="#990000">)</font> <b><font color="#0000FF">extends</font></b> Module <font color="#FF0000">{</font>
+
+ <b><font color="#0000FF">private</font></b> <b><font color="#0000FF">def</font></b> <b><font color="#000000">Max2</font></b><font color="#990000">(</font>x<b><font color="#0000FF">:</font></b> UInt<font color="#990000">,</font> y<b><font color="#0000FF">:</font></b> UInt<font color="#990000">)</font> <b><font color="#0000FF">=</font></b> <b><font color="#000000">Mux</font></b><font color="#990000">(</font>x <font color="#990000">&gt;</font> y<font color="#990000">,</font> x<font color="#990000">,</font> y<font color="#990000">)</font>
+
+ <b><font color="#0000FF">val</font></b> io <b><font color="#0000FF">=</font></b> <b><font color="#0000FF">new</font></b> Bundle <font color="#FF0000">{</font>
+   <b><font color="#0000FF">val</font></b> in  <b><font color="#0000FF">=</font></b> <b><font color="#000000">Vec.fill</font></b><font color="#990000">(</font>n<font color="#990000">)</font><font color="#FF0000">{</font> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>INPUT<font color="#990000">,</font> w<font color="#990000">)</font> <font color="#FF0000">}</font>
+   <b><font color="#0000FF">val</font></b> out <b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>OUTPUT<font color="#990000">,</font> w<font color="#990000">)</font>
+ <font color="#FF0000">}</font>
+ io<font color="#990000">.</font>out <b><font color="#0000FF">:=</font></b> <b><font color="#000000">io.in.reduceLeft</font></b><font color="#990000">(</font>Max2<font color="#990000">)</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">object</font></b> MaxNExample <font color="#FF0000">{</font>
+ <i><font color="#9A1900">// Main Entry Point of the circuit generator</font></i>
+ <b><font color="#0000FF">def</font></b> <b><font color="#000000">main</font></b><font color="#990000">(</font>args<b><font color="#0000FF">:</font></b> Array<font color="#990000">[</font>String<font color="#990000">])</font><b><font color="#0000FF">:</font></b> Unit <b><font color="#0000FF">=</font></b> <font color="#FF0000">{</font>
+   <i><font color="#9A1900">// instantiate with 4 ports. Each port is 8 bits wide.</font></i>
+   <b><font color="#000000">chiselMain(args,</font></b> <font color="#990000">()</font> <b><font color="#0000FF">=&gt;</font></b> <b><font color="#000000">Module</font></b><font color="#990000">(</font><b><font color="#0000FF">new</font></b> <b><font color="#000000">MaxN</font></b><font color="#990000">(</font><font color="#993399">4</font><font color="#990000">,</font> <font color="#993399">8</font><font color="#990000">)))</font>
+ <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+</tt></pre>
                         </div>
+                        <div class="tab-pane" id="mul">
+<pre class="code"><tt><i><font color="#9A1900">/** Four-by-four multiply using a look-up table.</font></i>
+<i><font color="#9A1900">*/</font></i>
+<b><font color="#0000FF">class</font></b> <font color="#008080">Mul</font> <b><font color="#0000FF">extends</font></b> Module <font color="#FF0000">{</font>
+  <b><font color="#0000FF">val</font></b> io <b><font color="#0000FF">=</font></b> <b><font color="#0000FF">new</font></b> Bundle <font color="#FF0000">{</font>
+    <b><font color="#0000FF">val</font></b> x   <b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>INPUT<font color="#990000">,</font>  <font color="#993399">4</font><font color="#990000">)</font>
+    <b><font color="#0000FF">val</font></b> y   <b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>INPUT<font color="#990000">,</font>  <font color="#993399">4</font><font color="#990000">)</font>
+    <b><font color="#0000FF">val</font></b> z   <b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>OUTPUT<font color="#990000">,</font> <font color="#993399">8</font><font color="#990000">)</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">val</font></b> muls <b><font color="#0000FF">=</font></b> <b><font color="#0000FF">new</font></b> <b><font color="#000000">ArrayBuffer[UInt]</font></b><font color="#990000">()</font>
+
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font>i <b><font color="#0000FF">&lt;-</font></b> <font color="#993399">0</font> until <font color="#993399">16</font><font color="#990000">)</font>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font>j <b><font color="#0000FF">&lt;-</font></b> <font color="#993399">0</font> until <font color="#993399">16</font><font color="#990000">)</font>
+      muls <font color="#990000">+</font><b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>i <font color="#990000">*</font> j<font color="#990000">,</font> width <b><font color="#0000FF">=</font></b> <font color="#993399">8</font><font color="#990000">)</font>
+  <b><font color="#0000FF">val</font></b> tbl <b><font color="#0000FF">=</font></b> <b><font color="#000000">Vec</font></b><font color="#990000">(</font>muls<font color="#990000">)</font>
+  io<font color="#990000">.</font>z <b><font color="#0000FF">:=</font></b> <b><font color="#000000">tbl(</font></b><font color="#990000">(</font>io<font color="#990000">.</font>x <font color="#990000">&lt;&lt;</font> <b><font color="#000000">UInt</font></b><font color="#990000">(</font><font color="#993399">4</font><font color="#990000">))</font> <font color="#990000">|</font> io<font color="#990000">.</font>y<font color="#990000">)</font>
+<font color="#FF0000">}</font>
+</tt></pre>
+                        </div>
+                        <div class="tab-pane" id="adder">
+<pre class="code"><tt><i><font color="#9A1900">/** A n-bit adder with carry in and carry out</font></i>
+<i><font color="#9A1900">  */</font></i>
+<b><font color="#0000FF">class</font></b> <font color="#008080">Adder</font><font color="#990000">(</font><b><font color="#0000FF">val</font></b> n<b><font color="#0000FF">:</font></b><font color="#009900">Int</font><font color="#990000">)</font> <b><font color="#0000FF">extends</font></b> Module <font color="#FF0000">{</font>
+  <b><font color="#0000FF">val</font></b> io <b><font color="#0000FF">=</font></b> <b><font color="#0000FF">new</font></b> Bundle <font color="#FF0000">{</font>
+    <b><font color="#0000FF">val</font></b> A    <b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>INPUT<font color="#990000">,</font> n<font color="#990000">)</font>
+    <b><font color="#0000FF">val</font></b> B    <b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>INPUT<font color="#990000">,</font> n<font color="#990000">)</font>
+    <b><font color="#0000FF">val</font></b> Cin  <b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>INPUT<font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">)</font>
+    <b><font color="#0000FF">val</font></b> Sum  <b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>OUTPUT<font color="#990000">,</font> n<font color="#990000">)</font>
+    <b><font color="#0000FF">val</font></b> Cout <b><font color="#0000FF">=</font></b> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>OUTPUT<font color="#990000">,</font> <font color="#993399">1</font><font color="#990000">)</font>
+  <font color="#FF0000">}</font>
+  <i><font color="#9A1900">//create a vector of FullAdders</font></i>
+  <b><font color="#0000FF">val</font></b> FAs   <b><font color="#0000FF">=</font></b> <b><font color="#000000">Vec.fill</font></b><font color="#990000">(</font>n<font color="#990000">)</font><font color="#FF0000">{</font> <b><font color="#000000">Module</font></b><font color="#990000">(</font><b><font color="#0000FF">new</font></b> <b><font color="#000000">FullAdder</font></b><font color="#990000">()).</font>io <font color="#FF0000">}</font>
+  <b><font color="#0000FF">val</font></b> carry <b><font color="#0000FF">=</font></b> <b><font color="#000000">Vec.fill</font></b><font color="#990000">(</font>n<font color="#990000">+</font><font color="#993399">1</font><font color="#990000">)</font><font color="#FF0000">{</font> <b><font color="#000000">UInt</font></b><font color="#990000">(</font>width <b><font color="#0000FF">=</font></b> <font color="#993399">1</font><font color="#990000">)</font> <font color="#FF0000">}</font>
+  <b><font color="#0000FF">val</font></b> sum   <b><font color="#0000FF">=</font></b> <b><font color="#000000">Vec.fill</font></b><font color="#990000">(</font>n<font color="#990000">)</font><font color="#FF0000">{</font> <b><font color="#000000">Bool</font></b><font color="#990000">()</font> <font color="#FF0000">}</font>
+
+  <i><font color="#9A1900">//first carry is the top level carry in</font></i>
+  <b><font color="#000000">carry</font></b><font color="#990000">(</font><font color="#993399">0</font><font color="#990000">)</font> <b><font color="#0000FF">:=</font></b> io<font color="#990000">.</font>Cin
+
+  <i><font color="#9A1900">//wire up the ports of the full adders</font></i>
+  <b><font color="#0000FF">for</font></b> <font color="#990000">(</font>i <b><font color="#0000FF">&lt;-</font></b> <font color="#993399">0</font> until n<font color="#990000">)</font> <font color="#FF0000">{</font>
+    <b><font color="#000000">FAs</font></b><font color="#990000">(</font>i<font color="#990000">).</font>a <b><font color="#0000FF">:=</font></b> <b><font color="#000000">io.A</font></b><font color="#990000">(</font>i<font color="#990000">)</font>
+    <b><font color="#000000">FAs</font></b><font color="#990000">(</font>i<font color="#990000">).</font>b <b><font color="#0000FF">:=</font></b> <b><font color="#000000">io.B</font></b><font color="#990000">(</font>i<font color="#990000">)</font>
+    <b><font color="#000000">FAs</font></b><font color="#990000">(</font>i<font color="#990000">).</font>cin <b><font color="#0000FF">:=</font></b> <b><font color="#000000">carry</font></b><font color="#990000">(</font>i<font color="#990000">)</font>
+    <b><font color="#000000">carry</font></b><font color="#990000">(</font>i<font color="#990000">+</font><font color="#993399">1</font><font color="#990000">)</font> <b><font color="#0000FF">:=</font></b> <b><font color="#000000">FAs</font></b><font color="#990000">(</font>i<font color="#990000">).</font>cout
+    <b><font color="#000000">sum</font></b><font color="#990000">(</font>i<font color="#990000">)</font> <b><font color="#0000FF">:=</font></b> <b><font color="#000000">FAs(i).sum.toBool</font></b><font color="#990000">()</font>
+  <font color="#FF0000">}</font>
+  io<font color="#990000">.</font>Sum <b><font color="#0000FF">:=</font></b> <b><font color="#000000">sum.toBits().toUInt</font></b><font color="#990000">()</font>
+  io<font color="#990000">.</font>Cout <b><font color="#0000FF">:=</font></b> <b><font color="#000000">carry</font></b><font color="#990000">(</font>n<font color="#990000">)</font>
+<font color="#FF0000">}</font>
+</tt></pre>
+</div>
                   </div>
             </div>
             </div>
@@ -138,7 +223,7 @@ Chisel is released as a JAR file through the official Maven repo.
 Just add this line to your build.sbt
             </p>
             <pre class="code">
-libraryDependencies += "edu.berkeley.cs" %% "chisel" % "2.0.1"
+libraryDependencies += "edu.berkeley.cs" %% "chisel" % "latest.release"
             </pre>
             <p>
 If you are new to <a href="http://www.scala-lang.org/">Scala</a>
@@ -150,7 +235,7 @@ in Chisel's README.md.
             <div class="page-header"><h2>LEARN</h2></div>
             <ul>
                   <li><a href="./chisel-dac2012.pdf">DAC2012 Introduction Paper</a></li>
-                  <li><a href="./latest/chisel-tutorial.pdf">Chisel Tutorial</a></li>
+                  <li><a href="./latest/getting-started.html">Starting with Chisel</a></li>
                   <li><a href="http://github.com/ucb-bar/riscv-sodor">The RISC-V sodor processors in Chisel</a></li>
             </ul>
             <p>

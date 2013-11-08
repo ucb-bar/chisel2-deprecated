@@ -51,6 +51,8 @@ object NodeExtract {
   // extract bit range
   def apply(mod: Node, hi: Int, lo: Int): Node = apply(mod, hi, lo, -1)
   def apply(mod: Node, hi: Int, lo: Int, width: Int): Node = {
+    if (hi < lo)
+      ChiselError.error("Extract(hi = " + hi + ", lo = " + lo + ") requires hi >= lo")
     val w = if (width == -1) hi - lo + 1 else width
     val bits_lit = mod.litOf
     if (bits_lit != null) {

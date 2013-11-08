@@ -88,6 +88,7 @@ object Module {
   val resetList = ArrayBuffer[Node]();
   val muxes = ArrayBuffer[Node]();
   val nodes = ArrayBuffer[Node]()
+  val blackboxes = ArrayBuffer[BlackBox]()
   var ioMap = new HashMap[Node, Int];
   var chiselOneHotMap = new HashMap[(UInt, Int), UInt]
   var chiselOneHotBitMap = new HashMap[(Bits, Int), Bool]
@@ -155,6 +156,7 @@ object Module {
     procs.clear();
     resetList.clear()
     muxes.clear();
+    blackboxes.clear();
     ioMap.clear()
     chiselOneHotMap.clear()
     chiselOneHotBitMap.clear()
@@ -269,7 +271,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   var parent: Module = null;
   var containsReg = false;
   val children = new ArrayBuffer[Module];
-  val blackboxes = ArrayBuffer[BlackBox]();
   val debugs = HashSet[Node]();
 
   val nodes = new ArrayBuffer[Node]
@@ -450,7 +451,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
     for (c <- Module.components; a <- c.debugs)
       res.enqueue(a)
-    for(b <- blackboxes)
+    for(b <- Module.blackboxes)
       res.enqueue(b.io)
     for(c <- Module.components)
       for((n, io) <- c.io.flatten)
@@ -608,7 +609,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     for (c <- Module.components) {
       roots ++= c.debugs
     }
-    for (b <- blackboxes)
+    for (b <- Module.blackboxes)
       roots += b.io;
     for (m <- mods) {
       m match {
@@ -835,15 +836,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     /* XXX Why do we do something different here? */
     if (!Module.backend.isInstanceOf[VerilogBackend]) {
       queue.push(() => io.traceNode(this, queue));
-      /* This is ugly and most likely unnecessary but as long as we are not
-       sure of the subtle consequences of tracing through blackboxes, let's
-       have the code here (instead of Verilog.doCompile). */
-      for (c <- Module.components) {
-        c match {
-          case x: BlackBox => c.traceNodes();
-          case _ =>
-        }
-      }
     } else {
       for (c <- Module.components) {
         queue.push(() => c.io.traceNode(c, queue))
@@ -856,7 +848,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
     for (c <- Module.components; d <- c.debugs)
       queue.push(() => d.traceNode(c, queue))
-    for (b <- blackboxes)
+    for (b <- Module.blackboxes)
       queue.push(() => b.io.traceNode(this, queue));
     while (queue.length > 0) {
       val work = queue.pop();

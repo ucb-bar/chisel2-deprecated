@@ -63,6 +63,7 @@ object BinaryOp {
     op match {
       case "<<"  => Op("<<", 0, lshWidthOf(0, y),  x, y );
       case ">>"  => Op(">>", 0, rshWidthOf(0, y),  x, y );
+      case "s>>" => Op("s>>", 0, rshWidthOf(0, y),  x, y );
       case "+"   => Op("+",  2, maxWidth _,  x, y );
       case "*"   => Op("*",  0, sumWidth _,  x, y );
       case "s*s" => Op("s*s",  0, sumWidth _,  x, y );
@@ -74,8 +75,8 @@ object BinaryOp {
       case "u/s" => Op("s/s",  0, divUSWidth _, x, y );
       case "%"   => Op("%",  0, minWidth _,  x, y );
       case "s%s" => Op("s%s",  0, minWidth _,  x, y );
-      case "s%u" => Op("s%u",  0, modSUWidth _,  x, y );
-      case "u%s" => Op("u%s",  0, modUSWidth _, x, y );
+      case "s%u" => Op("s%s",  0, modSUWidth _,  x, y );
+      case "u%s" => Op("s%s",  0, modUSWidth _, x, y );
       case "^"   => Op("^",  2, maxWidth _,  x, y );
       case "?"   => Multiplex(x, y, null);
       case "-"   => Op("-",  2, maxWidth _,  x, y );
@@ -102,10 +103,10 @@ object LogicalOp {
       val node = op match {
         case "===" => Op("==", 2, fixWidth(1), x, y );
         case "!="  => Op("!=", 2, fixWidth(1), x, y );
-        case ">"   => Op(">",  2, fixWidth(1), x, y );
         case "<"   => Op("<",  2, fixWidth(1), x, y );
         case "<="  => Op("<=", 2, fixWidth(1), x, y );
-        case ">="  => Op(">=", 2, fixWidth(1), x, y );
+        case "s<"  => Op("s<", 2, fixWidth(1), x, y );
+        case "s<=" => Op("s<=",2, fixWidth(1), x, y );
         case "&&"  => Op("&&", 2, fixWidth(1), x, y );
         case "||"  => Op("||", 2, fixWidth(1), x, y );
         case any   => throw new Exception("Unrecognized operator " + op);
@@ -155,8 +156,7 @@ object BinaryBoolOp {
 object Op {
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
     val (a_lit, b_lit) = (a.litOf, b.litOf);
-    val isSigned = a.isSigned && b.isSigned
-    if (Module.isFolding && !isSigned) {
+    if (Module.isFolding) {
     if (a_lit != null && b_lit == null) {
       name match {
         case "&&" => return if (a_lit.value == 0) Literal(0) else b;
@@ -178,9 +178,7 @@ object Op {
         case "==" => return Literal(if (av == bv) 1 else 0)
         case "!=" => return Literal(if (av != bv) 1 else 0);
         case "<"  => return Literal(if (av <  bv) 1 else 0);
-        case ">"  => return Literal(if (av >  bv) 1 else 0);
         case "<=" => return Literal(if (av <= bv) 1 else 0);
-        case ">=" => return Literal(if (av >= bv) 1 else 0);
         case "##" => return Literal(av << bw | bv, aw + bw);
         case "+"  => return Literal(av + bv, max(aw, bw) + 1);
         case "-"  => return Literal(av - bv, max(aw, bw) + 1);
@@ -200,17 +198,14 @@ object Op {
         (s, Mux(s, -f, f).toUInt)
       }
       name match {
-        case ">" | "<" | ">=" | "<=" =>
-          if (a.isInstanceOf[SInt] && b.isInstanceOf[SInt]) {
-            if (name != "<" || b.litOf == null || b.litOf.value != 0) {
-              val fixA = a.asInstanceOf[SInt]
-              val fixB = b.asInstanceOf[SInt]
-              val msbA = fixA < SInt(0)
-              val msbB = fixB < SInt(0)
-              val ucond = Bool(OUTPUT).fromNode(
-                LogicalOp(fixA.toUInt, fixB, name))
-              return Mux(msbA === msbB, ucond, (if (name(0) == '>') msbB else msbA))
-            }
+        case "s<" | "s<=" =>
+          if (name != "s<" || b.litOf == null || b.litOf.value != 0) {
+            val fixA = a.asInstanceOf[SInt]
+            val fixB = b.asInstanceOf[SInt]
+            val msbA = fixA < SInt(0)
+            val msbB = fixB < SInt(0)
+            val ucond = Bool(OUTPUT).fromNode(LogicalOp(fixA, fixB, name.tail))
+            return Mux(msbA === msbB, ucond, msbA)
           }
         case "==" =>
           if (b.litOf != null && b.litOf.isZ) {
@@ -245,7 +240,6 @@ object Op {
     res.init("", widthInfer, a, b);
     res.op = name;
     res.nGrow = nGrow;
-    if (isSigned) res.setIsSigned
     res
   }
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node): Node = {
@@ -282,7 +276,7 @@ class Op extends Node {
       if (List("|", "&", "^", "+", "-").contains(op)) {
         if (inputs(0).width != width) inputs(0) = inputs(0).matchWidth(width)
         if (inputs(1).width != width) inputs(1) = inputs(1).matchWidth(width)
-      } else if (List("==", "!=", ">", ">=", "<", "<=").contains(op)) {
+      } else if (List("==", "!=", "<", "<=").contains(op)) {
         val w = max(inputs(0).width, inputs(1).width)
         if (inputs(0).width != w) inputs(0) = inputs(0).matchWidth(w)
         if (inputs(1).width != w) inputs(1) = inputs(1).matchWidth(w)

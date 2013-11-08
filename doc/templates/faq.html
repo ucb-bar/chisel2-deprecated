@@ -14,9 +14,37 @@
   <p>None. Chisel allows designers to write circuits structurally as they do
     in Verilog with no extra overhead.</p>
 
+  <h2>Why do I need SBT to compile and execute my Chisel code?</h2>
+  <p>
+    Technically you don't.
+  </p>
+  <p>
+    <a href="http://www.scala-sbt.org/">SBT</a> is
+    a builder for scala which is a cross between apt-get and make.
+    It downloads all the prerequisites (as apt-get would do) then
+    builds your chisel code (as make would do). The downloaded files
+    will be cached in ~/.sbt and ~/.ivy2.
+  </p>
+  <p>
+    Chisel is packaged as a regular JAR file published on the sonatype
+    repo. If you have your own build system, the bare minimum you need
+    is to download the <a href="http://oss.sonatype.org/content/repositories/releases/edu/berkeley/cs/chisel_2.10/2.0.4/chisel_2.10-2.0.4.jar">latest chisel jar file</a>
+    and execute the following commands (based on the example in the
+    <a href="https://github.com/ucb-bar/chisel/blob/master/README.md">README</a> file).
+  </p>
+  <pre class="code">
+# Compile and execute your Chisel code
+$ scalac-2.10 -cp chisel_2.10-2.0.4.jar Hello.scala
+$ scala-2.10 -cp chisel_2.10-2.0.4.jar:. hello
+
+# Compile and run the generated simulation
+$ g++ -std=c++11 -o HelloModule HelloModule.cpp HelloModule-emulator.cpp
+$ ./HelloModule 1
+  </pre>
+
   <h2>How can I make a vector of modules?</h2>
   <pre class="code">
-Vec.fill{ (new CPU()).io }
+Vec.fill{ Module(new CPU()).io }
   </pre>
 
   <h2>How do I get in touch with the Chisel community?</h2>

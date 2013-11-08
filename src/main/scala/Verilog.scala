@@ -235,7 +235,7 @@ class VerilogBackend extends Backend {
     res += portDecs.map(_.result).reduceLeft(_ + "\n" + _)
     res += "\n  );\n";
     if (c.wires.map(_._2.driveRand).reduceLeft(_ || _)) {
-      res += "  `ifdef SYNTHESIS\n"
+      res += "  `ifndef SYNTHESIS\n"
       for ((n, w) <- c.wires) {
         if (w.driveRand) {
           res += "    assign " + c.name + "." + n + " = $random();\n"
@@ -274,12 +274,10 @@ class VerilogBackend extends Backend {
           o.op + " " + emitRef(node.inputs(0))
         } else if (o.op == "s*s" || o.op == "s%s" || o.op == "s/s") {
           "$signed(" + emitRef(node.inputs(0)) + ") " + o.op(1) + " $signed(" + emitRef(node.inputs(1)) + ")"
-        } else if(node.isSigned) {
-          if (o.op == ">>") {
-            "$signed(" + emitRef(node.inputs(0)) + ") " + ">>>" + " " + emitRef(node.inputs(1))
-          } else {
-            "$signed(" + emitRef(node.inputs(0)) + ") " + o.op + " $signed(" + emitRef(node.inputs(1)) + ")"
-          }
+        } else if (o.op == "s<" || o.op == "s<=") {
+          "$signed(" + emitRef(node.inputs(0)) + ") " + o.op.tail + " $signed(" + emitRef(node.inputs(1)) + ")"
+        } else if (o.op == "s>>") {
+          "$signed(" + emitRef(node.inputs(0)) + ") " + ">>>" + " $signed(" + emitRef(node.inputs(1)) + ")"
         } else {
           emitRef(node.inputs(0)) + " " + o.op + " " + emitRef(node.inputs(1))
         }) + ";\n"
@@ -378,12 +376,12 @@ class VerilogBackend extends Backend {
           ""
         }
       case r: ROM[_] =>
-        val inits = r.lits.zipWithIndex.map { case (lit, i) =>
-          "    " + emitRef(r) + "[" + i + "] = " + emitRef(lit) + ";\n"
-        }
+        val inits = new StringBuilder
+        for (i <- 0 until r.lits.length)
+          inits append "    " + emitRef(r) + "[" + i + "] = " + emitRef(r.lits(i)) + ";\n"
 
-        "  initial begin\n" +
-        inits.reduceLeft(_ + _) +
+        "  always @(*) begin\n" +
+        inits +
         "  end\n"
 
       case r: ROMRead[_] =>
@@ -398,10 +396,8 @@ class VerilogBackend extends Backend {
     (if (node.prune && res != "") "//" else "") + res    
   }
 
-  def emitSigned(n: Node): String = if(n.isSigned) " signed " else ""
-
   def emitDecBase(node: Node): String =
-    "  wire" + emitSigned(node) + emitWidth(node) + " " + emitRef(node) + ";\n"
+    "  wire" + emitWidth(node) + " " + emitRef(node) + ";\n"
 
   override def emitDec(node: Node): String = {
     val res = 
@@ -413,13 +409,13 @@ class VerilogBackend extends Backend {
           ""
         }
       case x: ListLookupRef[_] =>
-        "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
+        "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
 
       case x: Lookup =>
-        "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
+        "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
 
       case x: Sprintf =>
-        "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
+        "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
 
       case x: ListNode =>
         ""
@@ -431,11 +427,7 @@ class VerilogBackend extends Backend {
         ""
 
       case x: Reg =>
-        if (node.isMemOutput) {
-          ""
-        } else {
-          "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n"
-        }
+        "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n"
 
       case m: Mem[_] =>
         if (m.isInline) {
@@ -499,7 +491,7 @@ class VerilogBackend extends Backend {
     harness.write(" );\n")
 
     harness.write("  integer count;\n")
-    harness.write("  always @(negedge clk) begin;\n")
+    harness.write("  always @(negedge clk) begin\n")
     harness.write("  #50;\n")
     harness.write("    if (!reset) ")
     harness.write("count = $fscanf('h80000000, \"" + scanFormat.slice(0,scanFormat.length-1) + "\"")
@@ -554,10 +546,7 @@ class VerilogBackend extends Backend {
       sb.append("  always @(posedge " + emitRef(clock) + ") begin\n")
       clkDomains += (clock -> sb)
     }
-    println("HUY: in emitRegs of " + c)
     for (m <- c.mods) {
-      if (m.isInstanceOf[Reg] && m.clock == null)
-        println("no clock domain??? " + emitReg(m))
       if (m.clock != null)
         clkDomains(m.clock).append(emitReg(m))
     }
@@ -571,9 +560,7 @@ class VerilogBackend extends Backend {
   def emitReg(node: Node): String = {
     node match {
       case reg: Reg =>
-        if(reg.isMemOutput) {
-            ""
-        } else if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1)){
+        if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1)){
           if(reg.isReset){
             "    if(" + emitRef(reg.inputs.last) + ") begin\n" +
             "      " + emitRef(reg) + " <= " + emitRef(reg.init) + ";\n" +
@@ -639,6 +626,9 @@ class VerilogBackend extends Backend {
 
 
   def emitModuleText(c: Module): String = {
+    if (c.isInstanceOf[BlackBox])
+      return ""
+
     val res = new StringBuilder()
     var first = true;
     var nl = "";
@@ -652,10 +642,10 @@ class VerilogBackend extends Backend {
           val prune = if (io.prune && c != Module.topComponent) "//" else ""
           if (io.dir == INPUT) {
             ports += new StringBuilder(nl + "    " + prune + "input " + 
-                                       emitSigned(io) + emitWidth(io) + " " + emitRef(io));
+                                       emitWidth(io) + " " + emitRef(io));
           } else if(io.dir == OUTPUT) {
             ports += new StringBuilder(nl + "    " + prune + "output" + 
-                                       emitSigned(io) + emitWidth(io) + " " + emitRef(io));
+                                       emitWidth(io) + " " + emitRef(io));
           }
         }
       };
@@ -711,6 +701,9 @@ class VerilogBackend extends Backend {
   def emitChildren(top: Module,
     defs: HashMap[String, LinkedHashMap[String, ArrayBuffer[Module] ]],
     out: java.io.FileWriter, depth: Int) {
+    if (top.isInstanceOf[BlackBox])
+      return
+
     for (child <- top.children) {
       emitChildren(child, defs, out, depth + 1);
     }
@@ -784,7 +777,7 @@ class VerilogBackend extends Backend {
       out_conf.write(getMemConfString);
       out_conf.close();
     }
-    if (Module.isTesting && Module.tester != null) {
+    if( Module.tester != null ) {
       Module.scanArgs.clear();  Module.scanArgs  ++= Module.tester.testInputNodes;    Module.scanFormat  = ""
       Module.printArgs.clear(); Module.printArgs ++= Module.tester.testNonInputNodes; Module.printFormat = ""
     }

@@ -36,6 +36,8 @@ import ChiselError._
 object Bits {
   def apply(x: Int): UInt = UInt(x);
   def apply(x: Int, width: Int): UInt = UInt(x, width);
+  def apply(x: BigInt): UInt = UInt(x);
+  def apply(x: BigInt, width: Int): UInt = UInt(x, width);
   def apply(x: String): UInt = UInt(x);
   def apply(x: String, width: Int): UInt = UInt(x, width);
 
@@ -77,13 +79,13 @@ abstract class Bits extends Data with proc {
 
   def default: Node = if (inputs.length < 1 || inputs(0) == null) null else inputs(0);
 
-  override def litOf: Literal = {
-    if(inputs.length == 1 && inputs(0) != null) {
-      inputs(0).litOf
-    } else {
-      null
-    }
-  }
+  override def isLit: Boolean =
+    if (inputs.length == 1 && inputs(0) != null) inputs(0).isLit
+    else super.isLit
+
+  override def litOf: Literal =
+    if (inputs.length == 1 && inputs(0) != null) inputs(0).litOf
+    else super.litOf
 
   // internal, non user exposed connectors
   var assigned = false;
@@ -283,20 +285,6 @@ abstract class Bits extends Data with proc {
     res.width_ = this.width_;
     res.dir = this.dir;
     res
-  }
-
-  override def maxNum: BigInt = {
-    if (inputs.length == 0) {
-      width;
-    } else if (inputs(0).isLit) {
-      inputs(0).value
-    } else if (inputs(0).litOf != null) {
-      inputs(0).litOf.value
-    } else if (inputs.length == 1 && inputs(0) != null) {
-      inputs(0).maxNum
-    } else {
-      super.maxNum
-    }
   }
 
   override def forceMatchingWidths {

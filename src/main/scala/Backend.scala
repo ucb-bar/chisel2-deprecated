@@ -261,7 +261,9 @@ abstract class Backend {
 
   def emitDec(node: Node): String = ""
 
+  val preElaborateTransforms = ArrayBuffer[(Module) => Unit]()
   val transforms = ArrayBuffer[(Module) => Unit]()
+  val analyses = ArrayBuffer[(Module) => Unit]()
 
   def initializeDFS: Stack[Node] = {
     val res = new Stack[Node]
@@ -318,7 +320,8 @@ abstract class Backend {
         } else {
           node.component
         }
-      node.component.nodes += node
+      if (!node.component.nodes.contains(node))
+        node.component.nodes += node
       for (input <- node.inputs) {
         if(!walked.contains(input)) {
           if( input.component == null ) {
@@ -333,9 +336,9 @@ abstract class Backend {
     assert(dfsStack.isEmpty)
   }
 
-  def transform(c: Module, transforms: ArrayBuffer[(Module) => Unit]): Unit = {
-    for (t <- transforms)
-      t(c)
+  def execute(c: Module, walks: ArrayBuffer[(Module) => Unit]): Unit = {
+    for (w <- walks)
+      w(c)
   }
 
   def pruneUnconnectedIOs(m: Module) {
@@ -433,7 +436,6 @@ abstract class Backend {
         for (clock <- child.clocks) {
           parent.addClock(clock)
         }
-        println("HUY: parent: " + parent + " child: " + child + " " + child.resets.size)
         for (reset <- child.resets.keys) {
           // create a reset pin in parent if reset does not originate in parent and 
           // if reset is not an output from one of parent's children
@@ -473,8 +475,7 @@ abstract class Backend {
   }
 
   // walk forward from root register assigning consumer clk = root.clock
-  def createClkDomain(root: Node) = {
-    val walked = new ArrayBuffer[Node]
+  def createClkDomain(root: Node, walked: ArrayBuffer[Node]) = {
     val dfsStack = new Stack[Node]
     walked += root; dfsStack.push(root)
     val clock = root.clock
@@ -482,10 +483,13 @@ abstract class Backend {
       val node = dfsStack.pop
       for (consumer <- node.consumers) {
         if (!consumer.isInstanceOf[Delay] && !walked.contains(consumer)) {
-          if(!(consumer.clock == null || consumer.clock == clock))
-            ChiselError.warning({emitDef(consumer) + " resolves to clock domain " + 
-                                 emitRef(consumer.clock) + " and " + emitRef(clock)})
-          consumer.clock = clock
+          val c1 = consumer.clock
+          val c2 = clock
+          if(!(consumer.clock == null || consumer.clock == clock)) {
+            ChiselError.warning({consumer.getClass + " " + emitRef(consumer) + " " + emitDef(consumer) + "in module" +
+                                 consumer.component + " resolves to clock domain " + 
+                                 emitRef(c1) + " and " + emitRef(c2) + " traced from " + root.name})
+          } else { consumer.clock = clock }
           walked += consumer
           dfsStack.push(consumer)
         }
@@ -494,6 +498,7 @@ abstract class Backend {
   }
 
   def elaborate(c: Module): Unit = {
+    println("backend elaborate")
     Module.setAsTopComponent(c)
 
     /* XXX If we call nameAll here and again further down, we end-up with
@@ -509,6 +514,7 @@ abstract class Backend {
       c.markComponent();
     // XXX This will create nodes after the tree is traversed!
     c.genAllMuxes;
+    execute(c, preElaborateTransforms)
     Module.components.foreach(_.postMarkNet(0));
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
     // Module.assignResets()
@@ -551,22 +557,24 @@ abstract class Backend {
 
     // two transforms added in Mem.scala (referenced and computePorts)
     ChiselError.info("started transforms")
-    transform(c, transforms)
+    execute(c, transforms)
     ChiselError.info("finished transforms")
 
-    Module.sortedComps.map(x => println(x + " " + x.nodes.length))
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
     c.traceNodes();
+    val clkDomainWalkedNodes = new ArrayBuffer[Node]
     for (comp <- Module.sortedComps)
       for (node <- comp.nodes)
         if (node.isInstanceOf[Reg])
-            createClkDomain(node)
+            createClkDomain(node, clkDomainWalkedNodes)
     ChiselError.checkpoint()
 
     /* We execute nameAll after traceNodes because bindings would not have been
        created yet otherwise. */
     nameAll(c)
     nameRsts
+
+    execute(c, analyses)
 
     for (comp <- Module.sortedComps ) {
       // remove unconnected outputs
