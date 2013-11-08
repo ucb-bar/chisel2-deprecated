@@ -273,7 +273,8 @@ class Op extends Node {
     if (inputs.length == 1) {
       op + "(" + inputs(0) + ")"
     } else {
-      "[ " + inputs(0) + "\n]\n  " + op + "\n" + "[  " + inputs(1) + "\n]"
+      // "[ " + inputs(0) + "\n]\n  " + op + "\n" + "[  " + inputs(1) + "\n]"
+      "[ " + inputs(0) + " ] " + op + " [  " + inputs(1) + " ]"
     }
 
   override def forceMatchingWidths {

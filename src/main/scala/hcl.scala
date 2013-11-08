@@ -164,6 +164,13 @@ object chiselMain {
         case "--include" => Module.includeArgs = Module.splitArg(args(i + 1)); i += 1;
         case "--checkPorts" => Module.isCheckingPorts = true
         case "--prune" => Module.isPruning = true
+        case "--Wgraph" => Module.saveGraph = true // by Donggyu
+        // by Donggyu
+        case "--annotSig" => {
+          Module.annotateSignals = true
+          Module.signalFilename = args(i + 1)
+          i += 1
+        }
         case any => ChiselError.warning("'" + arg + "' is an unkown argument.");
       }
       i += 1;
@@ -198,6 +205,7 @@ object chiselMain {
       Module.backend.elaborate(c)
       if (Module.isCheckingPorts) Module.backend.checkPorts(c)
       if (Module.isCompiling && Module.isGenHarness) Module.backend.compile(c)
+      if (Module.annotateSignals) Module.backend.back_annotate
       if (Module.isTesting) Module.tester.tests()
       c
     } finally {

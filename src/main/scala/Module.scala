@@ -55,6 +55,9 @@ object Module {
   var saveWidthWarnings = false
   var saveConnectionWarnings = false
   var saveComponentTrace = false
+  var saveGraph = false       // by Donggyu
+  var annotateSignals = false // by Donggyu
+  var signalFilename = ""     // by Donggyu
   var dontFindCombLoop = false
   var isDebug = false;
   var isIoDebug = true;
@@ -126,6 +129,9 @@ object Module {
     saveWidthWarnings = false
     saveConnectionWarnings = false
     saveComponentTrace = false
+    saveGraph = false       // by Donggyu
+    annotateSignals = false // by Donggyu
+    signalFilename = ""     // by Donggyu
     dontFindCombLoop = false
     isGenHarness = false;
     isDebug = false;
@@ -278,6 +284,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   var verilog_parameters = "";
   val clocks = new ArrayBuffer[Clock]
   val resets = new HashMap[Bool, Bool]
+
+  val signals = new ArrayBuffer[Node]() // by Donggyu
 
   def hasReset = !(reset == null)
   def hasClock = !(clock == null)
