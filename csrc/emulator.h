@@ -992,8 +992,12 @@ class dat_base_t {
   virtual int width() = 0;
   virtual string to_str() = 0;  // TODO(ducky): define standardized interface and expected output.
                                 // Also allow different bases and representations (with defaults).
-  virtual void set_from_str(string val) = 0; // TODO(ducky): define standardized interface and input format
+  virtual bool set_from_str(string val) = 0; // TODO(ducky): define standardized interface and input format
                                         // allowing multiple representations (0x, 0h, 0b, ...).
+  virtual dat_base_t* copy() = 0;   // this is an AWFUL hack to get around the awful templating
+                                    // to be able to create an object of the same width
+                                    // for fast compare operations
+  virtual bool equals(dat_base_t& other) = 0;
 };
 
 template <int w>
@@ -1007,6 +1011,18 @@ class dat_t : public dat_base_t {
   inline bool to_bool ( void ) { return lo_word() != 0; }
   inline val_t lo_word ( void ) { return values[0]; }
   inline unsigned long to_ulong ( void ) { return (unsigned long)lo_word(); }
+  dat_base_t* copy() {
+    return new dat_t<w>(*this);
+  }
+  bool equals(dat_base_t& other) {
+    dat_t<w> *other_ptr = dynamic_cast<dat_t<w>*>(&other);
+    if (other_ptr == NULL) {
+        return false;
+    }
+    dat_t<1> equals = *other_ptr == *this;
+    // cout << values[0] << " " << other_ptr->values[0] << endl;
+    return equals.values[0];
+  }
   std::string to_str () {
     std::string rres, res;
     int nn = (int)ceilf(w / 4.0);
@@ -1024,9 +1040,8 @@ class dat_t : public dat_base_t {
       res.push_back(rres[rres.size()-i-1]);
     return res;
   }
-  virtual void set_from_str(string val) {
-    // TODO(ducky): unhackify, make standardized interface, allow non-hex
-    dat_from_hex(val, *this);
+  virtual bool set_from_str(string val) {
+    return dat_from_str(val, *this);
   }
   void randomize() {
     for (int i = 0; i < n_words; i++)
@@ -1604,7 +1619,7 @@ class mem_base_t {
   // Returns the number of elements in this memory
   virtual int length() = 0;
   virtual string get_to_str(string index) = 0;  // TODO(ducky): standardize (see dat_base_t).
-  virtual void put_from_str(string index, string val) = 0;   // TODO(ducky): standardize (see dat_base_t).
+  virtual bool put_from_str(string index, string val) = 0;   // TODO(ducky): standardize (see dat_base_t).
 };
 
 template <int w, int d>
@@ -1650,7 +1665,7 @@ class mem_t {
     if (ispow2(d) || idx < d)
       contents[idx].values[word] = val;
   }
-  void put_from_str(string index, string val) {
+  bool put_from_str(string index, string val) {
     dat_t<w> dat_val;
     dat_val.set_from_str(val);
     put(atoi(index.c_str()), dat_val);
@@ -1790,6 +1805,100 @@ size_t dat_from_hex(std::string hex_line, dat_t<w>& res, size_t offset = 0) {
   return last_digit + 1;
 }
 
+/**
+ * Copy one val_t array to another.
+ * nb must be the exact number of bits the val_t represents.
+ */
+static void val_cpy(val_t* dst, val_t* src, int nb) {
+    for (int i=0; i<val_n_words(nb); i++) {
+        dst[i] = src[i];
+    }
+}
+
+/**
+ * Empty a val_t array (sets to zero).
+ * nb must be the exact number of bits the val_t represents.
+ */
+static void val_empty(val_t* dst, int nb) {
+    for (int i=0; i<val_n_words(nb); i++) {
+        dst[i] = 0;
+    }
+}
+
+/**
+ * Set a val_t array to a integer number. Obviously, the maximum integer
+ * is capped by the width of a single val_t element.
+ * nb must be the exact number of bits the val_t represents.
+ */
+static void val_set(val_t* dst, val_t nb, val_t num) {
+    val_empty(dst, nb);
+    dst[0] = num;
+}
+
+/**
+ * Creates a dat_t from a std::string, where the string radix is automatically determined
+ * from the string, or defaults to 10.
+ * Returns true on success and false on failure.
+ */
+template <int w>
+bool dat_from_str(std::string in, dat_t<w>& res, int pos = 0) {
+    int radix = 10;
+    
+    if (!in.substr(pos, 1).compare("d")) {
+        radix = 10;
+        pos++;
+    } else if (!in.substr(pos, 1).compare("h")
+               || !in.substr(pos, 1).compare("x")) {
+        radix = 16;
+        pos++;
+    } else if (!in.substr(pos, 2).compare("0h")
+               || !in.substr(pos, 2).compare("0x")) {
+        radix = 16;
+        pos += 2;
+    } else if (!in.substr(pos, 1).compare("b")) {
+        radix = 2;
+        pos++;
+    } else if (!in.substr(pos, 2).compare("0b")) {
+        radix = 2;
+        pos += 2;
+    }
+    
+    val_t radix_val = radix;
+    val_t temp_prod[val_n_words(w)];
+    val_t curr_base[val_n_words(w)];
+    val_t temp_alias[val_n_words(w)];
+    val_t *dest_val = res.values;
+    val_set(curr_base, w, 1);
+    val_empty(dest_val, w);
+    
+    for (int rpos=in.length()-1; rpos>=pos; rpos--) {
+        char c = in[rpos];
+        val_t c_val = 0;
+        if (c == '_') {
+            continue;
+        }
+        if (c >= '0' && c <= '9') {
+            c_val = c - '0';
+        } else if (c >= 'a' && c <= 'z') {
+            c_val = c - 'a' + 10;
+        } else if (c >= 'A' && c <= 'Z') {
+            c_val = c - 'A' + 10;
+        } else {
+            return false;
+        }
+        if (c_val > radix || c_val < 0) {
+            return false;
+        }
+        
+        mul_n(temp_prod, curr_base, &c_val, w, w, val_n_bits());
+        val_cpy(temp_alias, dest_val, w);   // copy to prevent aliasing on add
+        add_n(dest_val, temp_alias, temp_prod, val_n_words(w), w);
+        val_cpy(temp_alias, curr_base, w);
+        mul_n(curr_base, temp_alias, &radix_val, w, w, val_n_bits());
+    }
+    return true;
+}
+
 template <int w>
 void dat_dump (FILE* file, dat_t<w> val, const char* name) {
   int namelen = strlen(name), pos = 0;
@@ -1841,7 +1950,7 @@ struct debug_node_t {
     dat_base_t* dat_ptr;
     
     debug_node_t(string in_name, dat_base_t* in_ptr) :
-        name(name), dat_ptr(in_ptr) {
+        name(in_name), dat_ptr(in_ptr) {
     }
 };
 
@@ -1850,7 +1959,7 @@ struct debug_mem_t {
     mem_base_t* mem_ptr;
     
     debug_mem_t(string in_name, mem_base_t* in_ptr) :
-        name(name), mem_ptr(in_ptr) {
+        name(in_name), mem_ptr(in_ptr) {
     }
 };
 
@@ -1903,7 +2012,7 @@ class mod_t {
     return get_list_names<debug_mem_t>(&mems);
   }
   // Reads the value on a node. Returns empty on error.
-  virtual string node_read ( string name ) {
+  virtual string node_read(string name) {
     debug_node_t* node = get_list_elem<debug_node_t>(&nodes, name);
     if (node != NULL) {
       return node->dat_ptr->to_str();
@@ -1913,17 +2022,16 @@ class mod_t {
   }
   // Writes a value to a node. Returns true on success and false on error.
   // Recommended to only be used on state elements.
-  virtual bool node_write ( string name, string val ) {
+  virtual bool node_write(string name, string val) {
     debug_node_t* node = get_list_elem<debug_node_t>(&nodes, name);
     if (node != NULL) {
-      node->dat_ptr->set_from_str(val);
-      return true;
+      return node->dat_ptr->set_from_str(val);
     } else {
       return false;
     }
   }
   // Reads the an element from a memory.
-  virtual string mem_read ( string name, string index ) {
+  virtual string mem_read(string name, string index) {
     debug_mem_t* mem = get_list_elem<debug_mem_t>(&mems, name);
     if (mem != NULL) {
       return mem->mem_ptr->get_to_str(index);
@@ -1932,13 +2040,73 @@ class mod_t {
     }
   }
   // Writes an element to a memory.
-  virtual bool mem_write ( string name, string index, string val ) {
+  virtual bool mem_write(string name, string index, string val) {
     debug_mem_t* mem = get_list_elem<debug_mem_t>(&mems, name);
     if (mem != NULL) {
-      mem->mem_ptr->put_from_str(index, val);
-      return true;
+      return mem->mem_ptr->put_from_str(index, val);
     } else {
       return false;
+    }
+  }
+  
+  // Clocks in a reset
+  virtual void reset() {
+    clock_lo(dat_t<1>(1));
+    clock_hi(dat_t<1>(1));
+    clock_lo(dat_t<1>(1));
+  }
+  
+  // Clocks one cycle
+  virtual void cycle() {
+    clock_lo(dat_t<1>(0));
+    clock_hi(dat_t<1>(0));
+    clock_lo(dat_t<1>(0));
+  }
+  
+  // Clocks until a node is equal to the value.
+  // Returns the number of cycles executed or -1 if the maximum was exceeded
+  // or -2 if some error was encountered.
+  virtual int clock_until_node_equal(string name, string val, int max=1000000) {
+    int cycles = 0;
+    debug_node_t* node = get_list_elem<debug_node_t>(&nodes, name);
+    dat_base_t* target_dat = node->dat_ptr;
+    dat_base_t* target_val = target_dat->copy();
+    target_val->set_from_str(val);
+    
+    while (true) {
+        if (target_dat->equals(*target_val)) {
+            return cycles;
+        } else {
+            cycles++;
+            cycle();
+            if (cycles >= max) {
+                return -1;
+            }
+        }
+    }
+  }
+  
+  // Clocks until a node is equal to the value.
+  // Returns the number of cycles executed or -1 if the maximum was exceeded
+  // or -2 if some error was encountered.
+  virtual int clock_until_node_not_equal(string name, string val, int max=1000000) {
+    int cycles = 0;
+    debug_node_t* node = get_list_elem<debug_node_t>(&nodes, name);
+    int w = node->dat_ptr->width();
+    dat_base_t* target_dat = node->dat_ptr;
+    dat_base_t* target_val = target_dat->copy();
+    target_val->set_from_str(val);
+    
+    while (true) {
+        if (!target_dat->equals(*target_val)) {
+            return cycles;
+        } else {
+            cycles++;
+            cycle();
+            if (cycles >= max) {
+                return -1;
+            }
+        }
     }
   }
 };
