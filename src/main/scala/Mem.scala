@@ -226,6 +226,8 @@ class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) 
   override def cond = inputs(1)
   clock = mem.clock
 
+  inferWidth = fixWidth(mem.data.getWidth)
+
   if (datai != null) {
     def wrap(x: Node) = { // prevent Verilog syntax errors when indexing constants
       val b = UInt()

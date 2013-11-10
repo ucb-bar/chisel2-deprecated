@@ -40,10 +40,12 @@ import Node._
 import Reg._
 import ChiselError._
 import Literal._
+import Module._
 import scala.collection.mutable.HashSet
 
 class FloBackend extends Backend {
   val keywords = new HashSet[String]();
+  var isRnd = false
 
   override def emitDec(node: Node): String =
     emitRef(node) + " = "
@@ -80,14 +82,18 @@ class FloBackend extends Backend {
         emitDec(o) +
         (if (o.inputs.length == 1) {
           o.op match {
-            case "~" => "not " + emitRef(node.inputs(0))
-            case "-" => "neg " + emitRef(node.inputs(0))
-            case "!" => "not " + emitRef(node.inputs(0))
+            case "~" => "not/" + node.inputs(0).width + " " + emitRef(node.inputs(0))
+            case "!" => "not/" + node.inputs(0).width + " " + emitRef(node.inputs(0))
+            case "-" => {
+              "neg/" + node.inputs(0).width + " " + emitRef(node.inputs(0))
+            }
           }
          } else {
            o.op match {
-             case "<"  => "lt/"  + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "<=" => "gt/"  + node.inputs(0).width + " " + emitRef(node.inputs(1)) + " " + emitRef(node.inputs(0))
+             case "<"  => "lt/"   + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
+             case ">=" => "gte/"  + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
+             case "<=" => "gte/"  + node.inputs(0).width + " " + emitRef(node.inputs(1)) + " " + emitRef(node.inputs(0))
+             case ">"  => "lt/"   + node.inputs(0).width + " " + emitRef(node.inputs(1)) + " " + emitRef(node.inputs(0))
              case "+"  => "add/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "-"  => "sub/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "*"  => "mul/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
@@ -106,36 +112,66 @@ class FloBackend extends Backend {
          }) + "\n"
 
       case x: Extract =>
-        emitDec(node) + "rsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1)) + "\n"
+        if (node.inputs.length == 2)
+          emitDec(node) + "rsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1)) + "\n"     
+        else
+          emitDec(node) + "rsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(2)) + "\n"
 
       case x: Fill =>
         emitDec(x) + "fill/" + node.width + " " + emitRef(node.inputs(0)) + "\n"
 
       case x: Bits =>
-        if( x.inputs.length == 1 ) {
-          emitDec(x) + "mov " + emitRef(x.inputs(0)) + "\n"
-        } else {
-          emitDec(x) + "rnd/" + x.width + "\n"
-        }
+        if (x.inputs.length == 1) {
+          // println("NAME " + x.name + " DIR " + x.dir + " COMP " + x.componentOf + " TOP-COMP " + topComponent)
+          if (x.dir == OUTPUT && x.componentOf == topComponent && x.consumers.length == 0)
+            emitDec(x) + (if (isRnd) "eat" else ("out/" + x.width))  + " " + emitRef(x.inputs(0)) + "\n"
+          else if (node.isInObject && node.litOf == null) {
+            if (x.inputs(0).isInstanceOf[Literal])
+              println("LIT IN OBJECT NAME " + x.name + " " + x.consumers.length + " CONSUMERS " + x.consumers(0))
+            emitDec(x) + "mov " + emitRef(x.inputs(0)) + "\n"
+          } else
+            ""
+          // println("--> NO CONSUMERS " + x + " = " + x.consumers.length);
+          // ""
+        } else
+          emitDec(x) + (if (x.name == "reset") "rst" else ((if (isRnd) "rnd/" else "in/")) + x.width) + "\n"
+
       case m: Mem[_] =>
         emitDec(m) + "mem " + m.n + "\n"
+        // emitDec(m) + "mem " + m.n + "\n" + trueAll(emitRef(m) + "__is_all_read", m.reads)
 
       case m: MemRead =>
         emitDec(m) + "ld " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n" // emitRef(m.mem)
+        // val w = r.mem.writes(0);
+        // emitRef(r) + "__is_read = and " + emitRef(w) + "__write " + emitRef(r.cond) + "\n" +
+        // emitDec(r) + "rd " + emitRef(r) + "__is_read" + " " + emitRef(r.mem) + " " + emitRef(r.addr) + "\n" 
 
       case m: MemWrite =>
-        if (m.inputs.length == 2) {
+        if (m.inputs.length == 2) 
           return ""
-        }
         emitDec(m) + "st " + emitRef(m.mem) + " " + emitRef(m.addr) + " " + emitRef(m.data) + "\n"
+        // emitRef(w) + "__is_wr" + " = and " + emitRef(w.mem) + "__is_all_read" + " " + emitRef(w.cond) + "\n" + 
+        // emitDec(w) + "wr " + emitRef(w) + "__is_wr" + " " + emitRef(w.mem) + " " + emitRef(w.addr) + " " + emitRef(w.data) + "\n" +
+        // emitRef(w) + "__write0 = reg 1 " + emitRef(w) + "\n" +
+        // emitRef(w) + "__write = or 1 " + emitRef(w) + "__write0" + "\n"       
 
       case x: Reg => // TODO: need resetData treatment
-        emitDec(x) + "reg " + emitRef(x.next) + "\n"
+        (if (x.isReset) 
+          (emitRef(x) + "__update = mux " + emitRef(x.inputs.last) + " " + emitRef(x.init) + " " + emitRef(x.next) + "\n") 
+         else "") +
+        emitDec(x) + "reg " + (if (x.isEnable) emitRef(x.enableSignal) else "1") + " " + 
+          (if (x.isReset) (emitRef(x) + "__update") else emitRef(x.next)) + "\n"
 
       case x: Log2 => // TODO: log2 instruction?
         emitDec(x) + "log2/" + x.width + " " + emitRef(x.inputs(0)) + "\n"
 
+      case c: Cat =>
+        emitDec(c) + "cat/" + c.inputs(1).width + " " + emitRef(c.inputs(0)) + " " + emitRef(c.inputs(1)) + "\n"
+        
+      case l: Literal =>
+        ""
       case _ =>
+        println("NO EMITTER FOR " + node)
         ""
     }
   }
