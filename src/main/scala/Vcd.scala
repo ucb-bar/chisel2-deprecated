@@ -71,7 +71,7 @@ class VcdBackend extends Backend {
   }
 
   override def emitDec(node: Node): String =
-    if (Module.isVCD && !node.isLit) "  dat_t<" + node.width + "> " + emitRef(node) + "__prev" + ";\n" else ""
+    if (Module.isVCD && node.isInVCD) "  dat_t<" + node.width + "> " + emitRef(node) + "__prev" + ";\n" else ""
 
   def dumpVCDScope(c: Module, file: java.io.FileWriter, top: Module, names: HashMap[Node, String]): Unit = {
     file.write("    fprintf(f, \"" + "$scope module " + c.name + " $end" + "\\n\");\n");
