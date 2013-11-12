@@ -1623,7 +1623,7 @@ class mem_base_t {
 };
 
 template <int w, int d>
-class mem_t {
+class mem_t : public mem_base_t {
  public:
   dat_t<w> contents[d];
   

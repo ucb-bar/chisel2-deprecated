@@ -632,9 +632,9 @@ class CppBackend extends Backend {
       case x: Reg =>
         "  nodes.push_back(debug_node_t(\"" + name + "\", &" + emitRef(node) + "));\n"
       case m: Mem[_] =>
-        "  mems.push_back(mem_node_t(\"" + name + "\", &" + emitRef(node) + "));\n"
+        "  mems.push_back(debug_mem_t(\"" + name + "\", &" + emitRef(node) + "));\n"
       case r: ROM[_] =>
-        "  mems.push_back(mem_node_t(\"" + name + "\", &" + emitRef(node) + "));\n"
+        "  mems.push_back(debug_mem_t(\"" + name + "\", &" + emitRef(node) + "));\n"
       case c: Clock =>
         "  nodes.push_back(debug_node_t(\"" + name + "\", &" + emitRef(node) + "));\n"
       case _ =>
