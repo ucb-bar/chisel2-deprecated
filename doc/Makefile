@@ -50,8 +50,9 @@ clean:
 	-rm -f $(addprefix manual/figs/,bits-1.png bits-and.png bits-or-and.png node-hierarchy.png type-hierarchy.png)
 	-rm -f $(addprefix tutorial/,*.4ct *.4tc *.css *.dvi *.html *.idv *.lg *.tmp *.xref)
 	-rm -f $(addprefix tutorial/figs/,DUT.png DUT.svg condupdates.png)
-	-rm -f $(addprefix getting-started/,*.4ct *.4tc *.css *.dvi *.html *.idv *.lg *.tmp *.xref)
+	-rm -f $(addprefix getting-started/,*.4ct *.4tc *.css *.dvi *.html *.idv *.lg *.tmp *.xref) getting-started?.html
 	-rm -f $(addprefix cs250/,*.4ct *.4tc *.css *.dvi *.html *.idv *.lg *.tmp *.xref)
 	-rm -f $(WWW_PAGES) $(PDFS) $(WWW_EXTRA) $(addsuffix .1,$(WWW_EXTRA)) $(patsubst %.html,%.css,$(WWW_EXTRA))
 	-rm -f *~ *.aux *.log *.nav *.out *.snm *.toc *.vrb
+	-rm -f *.jpg *.png
 
