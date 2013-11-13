@@ -518,12 +518,12 @@ class CppBackend extends Backend {
       harness.write("    delta += c->clock(reset);\n")
       harness.write("    fprintf(stdout, \"%d\", delta);\n")
       harness.write("    fprintf(stdout, \"%s\", \" \");\n")
-      harness.write("    c->print(stdout);\n")
+      harness.write("    c->print(stdout, stderr);\n")
       harness.write("    delta = 0;\n")
       if (Module.isVCD) { harness.write("    c->dump(f, t);\n"); }
     } else {
       harness.write("    c->clock_lo(reset);\n");
-      harness.write("    c->print(stdout);\n");
+      harness.write("    c->print(stdout, stderr);\n");
       if (Module.isVCD) { harness.write("    c->dump(f, t);\n"); }
       harness.write("    c->clock_hi(reset);\n");
     }
@@ -536,7 +536,8 @@ class CppBackend extends Backend {
     val flags = if (flagsIn == null) "-O2" else flagsIn
 
     val chiselENV = java.lang.System.getenv("CHISEL")
-    val allFlags = flags + " -I../ -I" + chiselENV + "/csrc/"
+    val c11 = if(Module.printfs.size > 0) " -std=c++11 " else ""
+    val allFlags = flags + c11 + " -I../ -I" + chiselENV + "/csrc/"
     val dir = Module.targetDir + "/"
     def run(cmd: String) {
       val bashCmd = Seq("bash", "-c", cmd)
@@ -718,7 +719,7 @@ class CppBackend extends Backend {
       out_h.write("  void clock_hi" + clkName(clock) + " ( dat_t<1> reset );\n")
     }
     out_h.write("  int clock ( dat_t<1> reset );\n")
-    out_h.write("  void print ( FILE* f );\n");
+    out_h.write("  void print ( FILE* f, FILE* e);\n");
     out_h.write("  bool scan ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
     out_h.write("};\n\n");
@@ -811,11 +812,11 @@ class CppBackend extends Backend {
       }
       res.reverse
     }
-    out_c.write("void " + c.name + "_t::print ( FILE* f ) {\n");
+    out_c.write("void " + c.name + "_t::print ( FILE* f, FILE* e ) {\n");
     for (p <- Module.printfs)
       out_c.write("#if __cplusplus >= 201103L\n"
         + "  if (" + emitLoWordRef(p.cond)
-        + ") dat_fprintf<" + p.width + ">(f, "
+        + ") dat_fprintf<" + p.width + ">(e, "
         + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
         + ");\n"
         + "#endif\n")
@@ -841,6 +842,7 @@ class CppBackend extends Backend {
       }
       out_c.write("  fprintf(f, \"\\n\");\n");
       out_c.write("  fflush(f);\n");
+      out_c.write("  fflush(e);\n");
     }
     out_c.write("}\n");
     def constantArgSplit(arg: String): Array[String] = arg.split('=');
