@@ -42,6 +42,7 @@ import Literal._
 class Tester[+T <: Module](val c: T, val testNodes: Array[Node]) {
   var testIn: InputStream = null
   var testOut: OutputStream = null
+  var testErr: InputStream = null
   var testInputNodes: Array[Node] = null
   var testNonInputNodes: Array[Node] = null
   var delta = 0
@@ -90,6 +91,11 @@ class Tester[+T <: Module](val c: T, val testNodes: Array[Node]) {
     testOut.flush()
     if (isTrace) println("OUTPUTS")
     var isSame = true
+    //Copy stderr from the module (could be made faster)
+    while(testErr.available() > 0) {
+      System.err.print(Character.toChars(testErr.read()))
+    }
+
     var c = testIn.read
     val sb = new StringBuilder()
     def isSpace(c: Int) : Boolean = c == 0x20 || c == 0x9 || c == 0xD || c == 0xA
@@ -131,7 +137,7 @@ class Tester[+T <: Module](val c: T, val testNodes: Array[Node]) {
   def startTest: Process = {
     val cmd = Module.targetDir + "/" + c.name + (if(Module.backend.isInstanceOf[VerilogBackend]) " -q" else "")
     val process = Process(cmd)
-    val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => err.close())
+    val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => testErr = err)
     val p = process.run(pio)
     println("STARTING " + cmd)
     p
@@ -139,6 +145,7 @@ class Tester[+T <: Module](val c: T, val testNodes: Array[Node]) {
   def endTest(p: Process) {
     testOut.close()
     testIn.close()
+    testErr.close()
     p.destroy()
   }
   def withTesting(body: => Boolean): Boolean = {
