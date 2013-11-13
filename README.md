@@ -133,3 +133,8 @@ Publishing to public Maven repo:
 Making the Chisel jar file with Maven (>=3.0.4)
 
     $ mvn install
+
+Two maven profiles to skip the tests or ignore failures respectively
+
+    $ mvn install -Pskip
+    $ mvn install -Pignore
