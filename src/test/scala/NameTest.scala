@@ -876,7 +876,7 @@ class NameSuite_DebugComp_1_t : public mod_t {
   void clock_lo ( dat_t<1> reset );
   void clock_hi ( dat_t<1> reset );
   int clock ( dat_t<1> reset );
-  void print ( FILE* f );
+  void print ( FILE* f, FILE* e);
   bool scan ( FILE* f );
   void dump ( FILE* f, int t );
 };
@@ -911,7 +911,7 @@ int NameSuite_DebugComp_1_t::clock ( dat_t<1> reset ) {
   if (clk_cnt == 0) clk_cnt = clk;
   return min;
 }
-void NameSuite_DebugComp_1_t::print ( FILE* f ) {
+void NameSuite_DebugComp_1_t::print ( FILE* f, FILE* e ) {
 }
 bool NameSuite_DebugComp_1_t::scan ( FILE* f ) {
   return(!feof(f));
