@@ -155,7 +155,11 @@ class CppBackend extends Backend {
       ""
     }
   }
-  def block(s: Seq[String]): String = "  {" + s.map(" " + _ + ";").reduceLeft(_ + _) + " }\n"
+  def block(s: Seq[String]): String = 
+    if (s.length == 0)
+      ""
+    else
+      "  {" + s.map(" " + _ + ";").reduceLeft(_ + _) + " }\n"
   def makeArray(s: String, x: Node): List[String] = List("val_t " + s + "[" + words(x) + "]")
   def toArray(s: String, x: Node): List[String] = makeArray(s, x) ++ (0 until words(x)).map(i => s + "[" + i + "] = " + emitWordRef(x, i))
   def fromArray(s: String, x: Node) =
@@ -198,7 +202,7 @@ class CppBackend extends Backend {
           } else if (o.op == "!") {
             "  " + emitLoWordRef(o) + " = !" + emitLoWordRef(o.inputs(0)) + ";\n"
           } else {
-            assert(false)
+            assert(false, "operator " + o.op + " unsupported")
             ""
           })
         } else if (o.op == "+" || o.op == "-") {
@@ -243,9 +247,10 @@ class CppBackend extends Backend {
             }
             block(res) + trunc(o)
           }
-        } else if (o.op == ">>") {
+        } else if (o.op == ">>" || o.op == "s>>") {
+          val arith = o.op == "s>>"
           if (o.inputs(0).width <= bpw) {
-            if (o.isSigned) {
+            if (arith) {
               ("  " + emitLoWordRef(o) + " = (sval_t)("
                 + emitLoWordRef(o.inputs(0)) + " << "
                 + (bpw - o.inputs(0).width) + ") >> ("
@@ -264,22 +269,22 @@ class CppBackend extends Backend {
             res += "val_t __w = " + emitLoWordRef(o.inputs(1)) + " / " + bpw
             res += "val_t __s = " + emitLoWordRef(o.inputs(1)) + " % " + bpw
             res += "val_t __r = " + bpw + " - __s"
-            if (o.isSigned) {
+            if (arith) {
               res += "val_t __msb = (sval_t)" + emitWordRef(o.inputs(0), words(o)-1) + (if (o.width % bpw != 0) " << " + (bpw-o.width%bpw) else "") + " >> " + (bpw-1)
             }
             for (i <- words(o)-1 to 0 by -1) {
               res += "val_t __v" + i + " = MASK(__x[CLAMP(" + i + "+__w,0," + (words(o.inputs(0))-1) + ")],__w+" + i + "<" + words(o.inputs(0)) + ")"
               res += emitWordRef(o, i) + " = __v" + i + " >> __s | __c"
               res += "__c = MASK(__v" + i + " << __r, __s != 0)"
-              if (o.isSigned) {
+              if (arith) {
                 res += emitWordRef(o, i) + " |= MASK(__msb << ((" + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ") % " + bpw + "), " + ((i + 1) * bpw) + " > " + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ")"
                 res += emitWordRef(o, i) + " |= MASK(__msb, " + (i*bpw) + " >= " + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ")"
               }
             }
-            if (o.isSigned) {
+            if (arith) {
               res += emitLoWordRef(o) + " |= MASK(__msb << ((" + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ") % " + bpw + "), " + bpw + " > " + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ")"
             }
-            block(res) + (if (o.isSigned) trunc(o) else "")
+            block(res) + (if (arith) trunc(o) else "")
           }
         } else if (o.op == "##") {
           val lsh = o.inputs(1).width
@@ -300,12 +305,11 @@ class CppBackend extends Backend {
                     })))
         } else if (o.op == "|" || o.op == "&" || o.op == "^" || o.op == "||" || o.op == "&&") {
           block((0 until words(o)).map(i => emitWordRef(o, i) + " = " + emitWordRef(o.inputs(0), i) + o.op + emitWordRef(o.inputs(1), i)))
-        } else if (o.op == "<" && o.isSigned) {
-            require(o.inputs(1).litOf.value == 0)
-            val shamt = (o.inputs(0).width-1) % bpw
-            "  " + emitLoWordRef(o) + " = (" + emitWordRef(o.inputs(0), words(o.inputs(0))-1) + " >> " + shamt + ") & 1;\n"
-        } else if (o.op == "<" || o.op == ">" || o.op == "<=" || o.op == ">=") {
-          require(!o.isSigned)
+        } else if (o.op == "s<") {
+          require(o.inputs(1).litOf.value == 0)
+          val shamt = (o.inputs(0).width-1) % bpw
+          "  " + emitLoWordRef(o) + " = (" + emitWordRef(o.inputs(0), words(o.inputs(0))-1) + " >> " + shamt + ") & 1;\n"
+        } else if (o.op == "<" || o.op == "<=") {
           val initial = (a: String, b: String) => a + o.op + b
           val subsequent = (i: String, a: String, b: String) => "(" + i + ") & " + a + " == " + b + " || " + a + o.op(0) + b
           val cond = opFoldLeft(o, initial, subsequent)
@@ -319,7 +323,7 @@ class CppBackend extends Backend {
           val subsequent = (i: String, a: String, b: String) => "(" + i + ") | (" + a + " != " + b + ")"
           "  " + emitLoWordRef(o) + " = " + opFoldLeft(o, initial, subsequent) + ";\n"
         } else {
-          require(false)
+          assert(false, "operator " + o.op + " unsupported")
           ""
         })
       }
@@ -440,9 +444,11 @@ class CppBackend extends Backend {
         "  if (rand_init) " + emitRef(node) + ".randomize();\n"
 
       case r: ROM[_] =>
-        r.lits.zipWithIndex.map { case (lit, i) =>
-          block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(lit, j) + ")"))
-        }.reduceLeft(_ + _)
+        val res = new StringBuilder
+        for (i <- 0 until r.lits.length)
+          res append block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(r.lits(i), j) + ")"))
+        res.toString
+
       case u: Bits => 
         if (u.driveRand && u.isInObject)
           "  if (rand_init) " + emitRef(node) + ".randomize();\n"
@@ -508,20 +514,18 @@ class CppBackend extends Backend {
     harness.write("  for (int t = 0; lim < 0 || t < lim; t++) {\n");
     harness.write("    dat_t<1> reset = LIT<1>(0);\n");
     harness.write("    if (!c->scan(stdin)) break;\n");
-    // XXX Why print is after clock_lo and dump after clock_hi?
     if (Module.clocks.length > 1) {
       harness.write("    delta += c->clock(reset);\n")
       harness.write("    fprintf(stdout, \"%d\", delta);\n")
       harness.write("    fprintf(stdout, \"%s\", \" \");\n")
       harness.write("    c->print(stdout);\n")
       harness.write("    delta = 0;\n")
+      if (Module.isVCD) { harness.write("    c->dump(f, t);\n"); }
     } else {
       harness.write("    c->clock_lo(reset);\n");
       harness.write("    c->print(stdout);\n");
+      if (Module.isVCD) { harness.write("    c->dump(f, t);\n"); }
       harness.write("    c->clock_hi(reset);\n");
-    }
-    if (Module.isVCD) {
-      harness.write("    c->dump(f, t);\n");
     }
     harness.write("  }\n");
     harness.write("}\n");
@@ -597,7 +601,10 @@ class CppBackend extends Backend {
     }
   }
 
+  def backendElaborate(c: Module) = super.elaborate(c)
+
   override def elaborate(c: Module): Unit = {
+    println("CPP elaborate")
     super.elaborate(c)
 
     /* We flatten all signals in the toplevel component after we had

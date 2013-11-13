@@ -34,12 +34,15 @@ import Node._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 
-class ROM[T <: Data](val lits: Seq[Literal], gen: (Int) => T) extends Vec[T](gen) {
-  this.init("", (m: Node) => lits.map(x => x.width).reduceLeft(scala.math.max(_, _)), lits: _*)
+class ROM[T <: Data] extends Vec[T] {
+  def lits = inputs
+
   override def read(addr: UInt): T = {
-    val cln = gen(0)
-    val data = cln.asOutput
-    var port = new ROMRead().init("", fixWidth(lits.head.getWidth), addr, this)
+    inputs.clear
+    inputs ++= self
+
+    val data = this(0).clone
+    var port = new ROMRead().init("", widthOf(1), addr, this)
     data assign port
     data.setIsTypeNode
     data
@@ -57,11 +60,10 @@ class ROM[T <: Data](val lits: Seq[Literal], gen: (Int) => T) extends Vec[T](gen
     }
   }
 
-  override def isReg: Boolean = true
-  override def isInVCD = false
+  override def isInObject: Boolean = true
+  override def isInVCD: Boolean = false
 
   override def traceableNodes: Array[Node] = lits.toArray
-
 }
 
 class ROMRead[T <: Data]() extends Node {

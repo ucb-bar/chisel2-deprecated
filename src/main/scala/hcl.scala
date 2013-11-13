@@ -66,11 +66,6 @@ object unless {
   }
 }
 
-object otherwise {
-  def apply(block: => Unit) {
-    when (Bool(true)) { block }
-  }
-}
 object switch {
   def apply(c: Bits)(block: => Unit) {
     keys.push(c);
@@ -84,6 +79,14 @@ object is {
       ChiselError.error("NO KEY SPECIFIED");
     } else {
       val c = keys(0) === v;
+      when (c) { block; }
+    }
+  }
+  def apply(v: Bits, vr: Bits*)(block: => Unit) {
+    if (keys.length == 0) {
+      ChiselError.error("NO KEY SPECIFIED");
+    } else {
+      val c = vr.foldLeft(keys(0) === v)( (p: Bool, v: Bits) => keys(0) === v || p );
       when (c) { block; }
     }
   }

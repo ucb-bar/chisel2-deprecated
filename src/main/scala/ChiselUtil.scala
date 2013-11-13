@@ -146,14 +146,15 @@ object UIntToOH
   */
 object Mux1H
 {
-  def apply[T <: Data](sel: Vec[Bool], in: Vec[T]): T = {
+  def apply[T <: Data](sel: Seq[Bool], in: Seq[T]): T = {
     if (in.size == 1) in(0)
-    else in(sel.indexWhere((i: Bool) => i))
+    else {
+      val masked = (sel, in).zipped map ((s, i) => Mux(s, i.toBits, Bits(0)))
+      in(0).fromBits(masked.reduceLeft(_|_))
+    }
   }
-  def apply[T <: Data](sel: Vec[Bool], in: Seq[T]): T = apply(sel, Vec(in))
-  def apply[T <: Data](sel: Seq[Bool], in: Vec[T]): T = apply(Vec(sel), in)
-  def apply[T <: Data](sel: Bits, in: Seq[T]): T = apply(Vec((0 until in.size).map(sel(_))), Vec(in))
-  def apply[T <: Data](sel: Bits, in: Vec[T]): T = apply(Vec((0 until in.size).map(sel(_))), in)
+  def apply[T <: Data](sel: Bits, in: Seq[T]): T =
+    apply((0 until in.size).map(sel(_)), in)
 }
 
 /** Does the inverse of UIntToOH.
@@ -571,21 +572,20 @@ object PriorityEncoder
   def apply(in: Bits): UInt = apply((0 until in.getWidth).map(in(_)))
 }
 
-/** Returns the bit position of the trailing 1 in the input vector
-  with the assumption that only one bit in the input vector can be set.
+/** Returns a bit vector in which only the least-significant 1 bit in
+  the input vector, if any, is set.
   */
 object PriorityEncoderOH
 {
-  def apply(in: Bits): UInt = Vec(apply((0 until in.getWidth).map(in(_)))).toBits
-  def apply(in: Seq[Bool]): Seq[UInt] = {
-    var none_hot = Bool(true)
-    val out = collection.mutable.ArrayBuffer[UInt]()
-    for (i <- 0 until in.size) {
-      out += (none_hot && in(i))
-      none_hot = none_hot && !in(i)
-    }
-    out
+  private def encode(in: Seq[Bool]): UInt = {
+    val outs = Vec.tabulate(in.size)(i => UInt(BigInt(1) << i, in.size))
+    PriorityMux(in :+ Bool(true), outs :+ UInt(0, in.size))
   }
+  def apply(in: Seq[Bool]): Vec[Bool] = {
+    val enc = encode(in)
+    Vec.tabulate(in.size)(enc(_))
+  }
+  def apply(in: Bits): UInt = encode((0 until in.getWidth).map(i => in(i)))
 }
 
 

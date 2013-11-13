@@ -73,12 +73,10 @@ object Vec {
   /** Returns a new *Vec* from a sequence of *Data* nodes.
     */
   def apply[T <: Data](elts: Seq[T]): Vec[T] = {
-    val res = if (elts.forall(_.litOf != null) && elts.head.getWidth > 0) {
-      new ROM(elts.map(_.litOf), i => elts.head.clone)
-    } else {
-      new Vec[T](i => elts.head.clone)
-    }
-    elts.zipWithIndex.foreach{ case (e,i) => res += e }
+    val res =
+      if (!elts.isEmpty && elts.forall(_ isLit)) new ROM[T]
+      else new Vec[T]
+    res ++= elts
     res
   }
 
@@ -111,15 +109,8 @@ object Vec {
   /** Returns an array containing values of a given function over
     a range of integer values starting from 0.
     */
-  def tabulate[T <: Data](n: Int)(gen: (Int) => T): Vec[T] = {
-    val res = new Vec[T](gen);
-    var i = 0
-    while (i < n) {
-      res += gen(i)
-      i += 1
-    }
-    res
-  }
+  def tabulate[T <: Data](n: Int)(gen: (Int) => T): Vec[T] =
+    apply((0 until n).map(i => gen(i)))
 
   def tabulate[T <: Data](n1: Int, n2: Int)(f: (Int, Int) => T): Vec[Vec[T]] =
     tabulate(n1)(i1 => tabulate(n2)(f(i1, _)))
@@ -148,7 +139,7 @@ class VecProc extends proc {
   }
 }
 
-class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable with BufferProxy[T] {
+class Vec[T <: Data] extends CompositeData with Cloneable with BufferProxy[T] {
   val self = new ArrayBuffer[T]
   val readPortCache = new HashMap[UInt, T]
   var sortedElementsCache: ArrayBuffer[ArrayBuffer[Data]] = null
@@ -298,8 +289,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable w
   override def traceableNodes: Array[Node] = self.toArray
 
   override def traceNode(c: Module, stack: Stack[() => Any]) {
-    val ins = if (this.isInstanceOf[ROM [ _ ]]) this.asInstanceOf[ROM [ _ ] ].lits.toArray
-              else this.flatten.map(_._2)
+    val ins = this.flatten.map(_._2)
       
     for(i <- ins) {
       stack.push(() => i.traceNode(c, stack))
@@ -336,10 +326,8 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable w
     }
   }
 
-  override def clone(): this.type = {
-    val res = Vec.tabulate(size)(gen);
-    res.asInstanceOf[this.type]
-  }
+  override def clone(): this.type =
+    Vec(this: Seq[T]).asInstanceOf[this.type]
 
   override def toNode: Node = {
     if(flattenedVec == null){

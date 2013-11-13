@@ -123,7 +123,6 @@ abstract class Node extends nameable {
   var isTypeNode = false;
   var depth = 0;
   def componentOf: Module = if (Module.isEmittingComponents && component != null) component else Module.topComponent
-  var isSigned = false;
   var width_ = -1;
   var index = -1;
   var isFixedWidth = false;
@@ -139,16 +138,12 @@ abstract class Node extends nameable {
   var line: StackTraceElement = findFirstUserLine(Thread.currentThread().getStackTrace) getOrElse Thread.currentThread().getStackTrace()(0)
   var isScanArg = false
   var isPrintArg = false
-  def isMemOutput: Boolean = false
   var prune = false
   var driveRand = false
   var clock: Clock = null
+  var CppVertex: CppVertex = null
 
   Module.nodes += this
-
-  def setIsSigned {
-    isSigned = true
-  }
 
   def isByValue: Boolean = true;
   def width: Int = if(isInGetWidth) inferWidth(this) else width_;
@@ -170,33 +165,18 @@ abstract class Node extends nameable {
 
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
   def ##(b: Node): Node  = Op("##", 2, sumWidth _,  this, b );
-  def maxNum: BigInt = if(litOf != null) litOf.value else ((1 << (if(width < 0) inferWidth(this) else width))-1);
+  def maxNum: BigInt = {
+    // XXX This makes sense for UInt, but not in general.
+    val w = if (width < 0) inferWidth(this) else width
+    litValue((BigInt(1) << w) - 1)
+  }
   def minNum: BigInt = BigInt(0);
-  // TODO: SHOULD BE GENERALIZED TO DIG FOR LIT AS litOf DOES
-  def isLit: Boolean = false;
-  def clearlyEquals(x: Node): Boolean = this == x
-  // TODO: SHOULD AGREE WITH isLit
-  def litOf: Literal = {
-    if(inputs.length == 0) {
-      if (isLit) this.asInstanceOf[Literal] else null
-    } else if(inputs.length == 1
-      && isInstanceOf[Bits] && inputs(0) != null) {
-      inputs(0).litOf
-    } else {
-      null
-    }
-  }
-  def litValue(default: BigInt = BigInt(-1)): BigInt = {
-    val lit = litOf
-    if (lit == null) default else lit.value
-  }
+  def isLit: Boolean = false
+  def litOf: Literal = null
+  def litValue(default: BigInt = BigInt(-1)): BigInt =
+    if (isLit) litOf.value
+    else default
   def value: BigInt = BigInt(-1);
-  def signed: this.type = {
-    val res = SInt()
-    res := this.asInstanceOf[SInt];
-    res.isSigned = true;
-    res.asInstanceOf[this.type]
-  }
   def bitSet(off: UInt, dat: UInt): UInt = {
     val bit = UInt(1, 1) << off;
     (this.asInstanceOf[UInt] & ~bit) | (dat << off);
@@ -298,7 +278,6 @@ abstract class Node extends nameable {
     writer.println("flattened: " + flattened)
     writer.println("isTypeNode: " + isTypeNode)
     writer.println("depth: " + depth)
-    writer.println("isSigned: " + isSigned)
     writer.println("width_: " + width_)
     writer.println("index: " + index)
     writer.println("isFixedWidth: " + isFixedWidth)
@@ -311,7 +290,6 @@ abstract class Node extends nameable {
     writer.println("line: " + line)
     writer.println("isScanArg: " + isScanArg)
     writer.println("isPrintArg: " + isPrintArg)
-    writer.println("isMemOutput: " + isMemOutput)
     for (in <- inputs) {
       if (in == null) {
         writer.println("null");
@@ -427,10 +405,8 @@ abstract class Node extends nameable {
 
   def matchWidth(w: Int): Node = {
     if (w > this.width) {
-      val topBit = if (isSigned) NodeExtract(this, this.width-1) else Literal(0,1)
-      topBit.infer
-      val fill = NodeFill(w - this.width, topBit); fill.infer
-      val res = Concatenate(fill, this); res.infer
+      val zero = Literal(0, w - this.width); zero.infer
+      val res = Concatenate(zero, this); res.infer
       res
     } else if (w < this.width) {
       val res = NodeExtract(this, w-1,0); res.infer

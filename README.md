@@ -29,7 +29,7 @@ and scala source file containing your Chisel code as follow.
     $ cat build.sbt
     scalaVersion := "2.10.2"
 
-    addSbtPlugin("com.github.scct" % "sbt-scct" % "0.2")
+    addSbtPlugin("com.github.scct" % "sbt-scct" % "0.2.1")
 
     libraryDependencies += "edu.berkeley.cs" %% "chisel" % "latest.release"
 
@@ -129,3 +129,7 @@ Publishing to public Maven repo:
     +version := "2.1"
 
     $ sbt publish-signed
+
+Making the Chisel jar file with Maven (>=3.0.4)
+
+    $ mvn install
