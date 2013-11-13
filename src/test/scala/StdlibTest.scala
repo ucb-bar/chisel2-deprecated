@@ -77,7 +77,6 @@ class StdlibSuite extends AssertionsForJUnit {
 
       // apply(hi: Int, lo: Int): UInt
       val b = io.x(4, 3)
-      val c = io.x(3, 4)
       val d = io.x(3, 3)
       val e = io.x(9, -1)
 
@@ -86,7 +85,6 @@ class StdlibSuite extends AssertionsForJUnit {
 
       // apply(hi: UInt, lo: UInt): UInt
       val b1 = io.x(UInt(4), UInt(3))
-      val c1 = io.x(UInt(3), UInt(4))
       val d1 = io.x(UInt(3), UInt(3))
       val e1 = io.x(UInt(9), UInt(-1))
 
@@ -139,8 +137,8 @@ class StdlibSuite extends AssertionsForJUnit {
       // |  (b: UInt): UInt
       val ac = io.x | io.y
 
-      io.z := (a | b | c | d
-        | a1 | b1 | c1 | d1
+      io.z := (a | b | d
+        | a1 | b1 | d1
         | f | g | h | i | j | k
         | l | m | n | o
         | r | u | ab | ac
@@ -174,6 +172,30 @@ class StdlibSuite extends AssertionsForJUnit {
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new OperatorComp()))
+  }
+
+  /** Generates an error if hi <= lo on an extract.
+    */
+  @Test def testExtractError() {
+    class ExtractError extends Module {
+      val io = new Bundle {
+        val x = UInt(INPUT, 32)
+        val y = SInt(INPUT, 32)
+        val z = SInt(OUTPUT)
+      }
+      val c = io.x(3, 4)
+      val c1 = io.x(UInt(3), UInt(4))
+      io.z := c | c1
+    }
+
+    try {
+      chiselMain(Array[String]("--v",
+        "--targetDir", tmpdir.getRoot().toString()),
+        () => Module(new ExtractError()))
+      fail()
+    } catch {
+      case err: IllegalStateException => // Expected.
+    }
   }
 
   /** Multiply an unsigned number by signed number */
