@@ -473,23 +473,27 @@ endmodule
   wire[31:0] T0;
   wire T1;
   wire[31:0] T2;
-  reg[31:0] tag_ram_1;
-  reg[31:0] tag_ram_0;
   wire[31:0] T3;
-  wire T4;
+  wire[31:0] T4;
+  wire[31:0] T5;
+  wire[31:0] T6;
+  reg[31:0] tag_ram_0;
+  wire[31:0] T7;
+  wire T8;
 
   assign io_mine_1 = T0;
   assign T0 = {31'h0/* 0*/, T1};
   assign T1 = T2[1'h1/* 1*/:1'h1/* 1*/];
-  assign T2 = io_valid ? tag_ram_0 : tag_ram_1;
-  assign io_mine_0 = T3;
-  assign T3 = {31'h0/* 0*/, T4};
-  assign T4 = T2[1'h0/* 0*/:1'h0/* 0*/];
+  assign T2 = io_valid ? T4 : T3;
+  assign T3 = {31'h0/* 0*/, 1'h0/* 0*/};
+  assign T4 = T6 | T5;
+  assign T5 = {31'h0/* 0*/, 1'h0/* 0*/};
+  assign T6 = tag_ram_0;
+  assign io_mine_0 = T7;
+  assign T7 = {31'h0/* 0*/, T8};
+  assign T8 = T2[1'h0/* 0*/:1'h0/* 0*/];
 
   always @(posedge clk) begin
-    if(1'h0/* 0*/) begin
-      tag_ram_1 <= io_sub_resp_bits_ppn;
-    end
     if(io_valid) begin
       tag_ram_0 <= io_sub_resp_bits_ppn;
     end
@@ -876,7 +880,7 @@ class NameSuite_DebugComp_1_t : public mod_t {
   void clock_lo ( dat_t<1> reset );
   void clock_hi ( dat_t<1> reset );
   int clock ( dat_t<1> reset );
-  void print ( FILE* f );
+  void print ( FILE* f, FILE* e);
   bool scan ( FILE* f );
   void dump ( FILE* f, int t );
 };
@@ -911,7 +915,7 @@ int NameSuite_DebugComp_1_t::clock ( dat_t<1> reset ) {
   if (clk_cnt == 0) clk_cnt = clk;
   return min;
 }
-void NameSuite_DebugComp_1_t::print ( FILE* f ) {
+void NameSuite_DebugComp_1_t::print ( FILE* f, FILE* e ) {
 }
 bool NameSuite_DebugComp_1_t::scan ( FILE* f ) {
   return(!feof(f));
