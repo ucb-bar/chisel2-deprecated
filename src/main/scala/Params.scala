@@ -10,12 +10,7 @@ import Node._
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ArrayBuffer
 
-//import com.codahale.jerkson.Json._
 import java.lang.reflect.{Type, ParameterizedType}
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.`type`.TypeReference;
 
 import scala.io.Source
 import java.io._
@@ -36,8 +31,8 @@ import java.io._
 abstract class Param[+T] {
   def value: T
 
-  def register(comp: Module, pname: String) = {
-    Params.register(comp, pname, this).asInstanceOf[T]
+  def register(module: Module, pname: String) = {
+    Params.register(module, pname, this).asInstanceOf[T]
   }
 }
 
@@ -49,70 +44,106 @@ case class EnumParam(override val value: String, values: List[String]) extends P
 
 object Params {
   type Space = HashMap[String,HashMap[String,Param[Any]]]
-  type VSpace = HashMap[String,HashMap[String,ValueParam]]
 
   var space = new Space
-  var vspace = new VSpace
+  var design = new Space
 
   var buildingSpace = true
 
-  def register(comp: Module, pname: String, p: Param[Any]) = {
-    val cname = comp.getClass.getName
+  def register(module: Module, pname: String, p: Param[Any]) = {
+    val mname = module.getClass.getName
     if(buildingSpace) {
       // TODO: error on duplicate key
-      if(!space.contains(cname)) {
-        space(cname) = new HashMap[String,Param[Any]]
+      if(!space.contains(mname)) {
+        space(mname) = new HashMap[String,Param[Any]]
       }
-      space(cname)(pname) = p
+      space(mname)(pname) = p
       p.value
     } else {
       // TODO: error on key not found
-      vspace(cname)(pname).value
+      design(mname)(pname).value
     }
   }
-  
+
+  def load_file(filename: String) : Params.Space = {
+    //val file = io.Source.fromFile(filename).mkString
+    var lines = io.Source.fromFile(filename).getLines
+    var space = new Params.Space
+    while(lines.hasNext) {
+      val line = lines.next()
+      println("Loaded: " + line + "\nfrom " + filename)
+      Params.deserialize(line,space)
+    }
+    space
+  }
+   
+  def dump_file(filename: String, design: Params.Space) = {
+    val string = Params.serialize(design)
+    val writer = new PrintWriter(new File(filename))
+    println("Dumping to " + filename + ":\n" + string)
+    writer.write(string)
+    writer.close()
+  }
+
   def load(filename: String) = {
     buildingSpace = false
-    val json = io.Source.fromFile(filename).mkString
-    val list = json.split(" ")
-    //vspace = JacksonWrapper.deserialize[VSpace](json)
-    vspace = HashMap(list(0) -> HashMap(list(1) -> new ValueParam(list(2).dropRight(1).toInt)))
-    //vspace = HashMap("sha3.Sha3Accel" -> HashMap("W" -> new ValueParam(64)))
-    //println("Loaded: " + json + "\nfrom " + filename)
+    design = load_file(filename)
   }
 
   def dump(filename: String) = {
-    val json = JacksonWrapper.serialize(space)
-    val writer = new PrintWriter(new File(filename))
-    println("Dumping to " + filename + ":\n" + json)
-    writer.write(json)
-    writer.close()
+    dump_file(filename, space)
   }
-}
-
-object JacksonWrapper {
-  val mapper = new ObjectMapper()
-  mapper.registerModule(DefaultScalaModule)
-
-  def serialize(value: Any): String = {
-    val writer = new StringWriter()
-    mapper.writeValue(writer, value)
-    writer.toString
+ 
+  def serialize[T<:Param[Any]](myhashmap: HashMap[String,HashMap[String,T]]) : String = {
+    var hashmap = myhashmap
+    var string = ""
+    while(!hashmap.isEmpty){
+      var elem = hashmap.head
+      hashmap = hashmap.tail
+      var mname = elem._1
+      var mhash = elem._2
+      while(!mhash.isEmpty){
+        var elem2 = mhash.head
+        mhash = mhash.tail
+        string = string + mname + "," + elem2._1 + "," + toStringParam(elem2._2)
+        if(!mhash.isEmpty) {
+          string = string + " "
+        }
+      }
+      if(!hashmap.isEmpty) {
+        string = string + "\n"
+      }
+    }
+    string
   }
 
-  def deserialize[T: Manifest](value: String) : T =
-    mapper.readValue(value, typeReference[T])
-
-  private [this] def typeReference[T: Manifest] = new TypeReference[T] {
-    override def getType = typeFromManifest(manifest[T])
+  def deserialize(string: String, myhashmap: HashMap[String,HashMap[String,Param[Any]]]) = {
+    val args = string.split(",")
+    val mname = args(0)
+    val pname = args(1)
+    val ptype = args(2)
+    val param = ptype match {
+      case "range" => new RangeParam(args(3).toInt, args(4).toInt, args(5).toInt, args(6).toInt, args(7).toBoolean)
+      case "value" => new ValueParam(args(3).toInt)
+      case _       => new ValueParam("error")
+    }
+    if(!myhashmap.contains(mname)) {
+      myhashmap(mname) = new HashMap[String,Param[Any]]
+    }
+    myhashmap(mname)(pname) = param
   }
-
-  private [this] def typeFromManifest(m: Manifest[_]): Type = {
-    if (m.typeArguments.isEmpty) { m.runtimeClass }
-    else new ParameterizedType {
-      def getRawType = m.runtimeClass
-      def getActualTypeArguments = m.typeArguments.map(typeFromManifest).toArray
-      def getOwnerType = null
+    
+  def toStringParam(param: Param[Any]) = {
+    param match {
+      //case EnumParam(init, list) =>
+        //"(range," + init + "," + list + ")"
+      case RangeParam(init, min, max, step, log) =>
+        "range," + init + "," + min + "," + max + "," + step + "," + log
+      case ValueParam(init) =>
+        "value," + init
+      case _ =>
+        "uhoh "
     }
   }
+    
 }
