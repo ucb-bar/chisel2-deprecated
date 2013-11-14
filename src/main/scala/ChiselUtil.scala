@@ -629,6 +629,8 @@ class FunStore[T <: Data](val depth: Int, numReads: Int, numWrites: Int)(data: =
 
 class TransactionMem[T <: Data](depth: Int, numReads: Int, numVirtWrites: Int, numPhyWrites: Int)(data: => T) 
     extends FunStore(depth, numReads, numVirtWrites)(data) {
+  val readPortNum = numReads
+  val virtWritePortNum = numVirtWrites
   val mem = Mem(data, depth)
   def read(addr: UInt, idx: Int = 0): T = io.reads(idx).read(addr)
   def write(addr: UInt, data: T, idx: Int = 0) = io.writes(idx).write(addr, data)

@@ -283,9 +283,8 @@ object Module {
   }
   val tcomponents = new ArrayBuffer[TransactionalComponent]()
   var stages: HashMap[Node, Int] = new HashMap[Node, Int]()
-  var cRegs: ArrayBuffer[Reg] = null
-  var cMems: ArrayBuffer[Mem[ Data ]] = null
-  var cTransactionMems: ArrayBuffer[TransactionMem[ Data ]] = null
+  var ArchitecturalRegs: ArrayBuffer[Reg] = null
+  var TransactionMems: ArrayBuffer[TransactionMem[ Data ]] = null
   def getStage(n: Node): Int = {
     if (stages.contains(n))
       return stages(n)
@@ -1002,10 +1001,28 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     map
   }
   
+  def findArchitecturalState() = {
+    ArchitecturalRegs = new ArrayBuffer[Reg]
+    TransactionMems = new ArrayBuffer[TransactionMem[Data]]
+    for(node <- pipelineComponent.nodes){
+      if (node.isInstanceOf[Reg] && !isPipeLineReg(node)) ArchitecturalRegs += node.asInstanceOf[Reg]
+    }
+    for(component <- pipelineComponent.children){
+      if(component.isInstanceOf[TransactionMem[Data]]){
+        TransactionMems += component.asInstanceOf[TransactionMem[Data]]
+      }
+    }
+  }
+  
   def insertPipelineRegisters2() = { 
     val coloredNodes = propagateStages()
+    println("DEBUG0")
+    for(item <- coloredNodes){
+      if(item._2.length > 1){
+        println(item)
+      }
+    }
     println("inserting pipeline registers")
-    val consumerMap = getConsumers()
     var maxStage = 0
     for((node, stages) <- coloredNodes){
       if(stages.length > 0 && stages.max > maxStage){
@@ -1030,7 +1047,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       speckills += (i -> new ArrayBuffer[Bool])
     }*/
     setNumStages(maxStage + 1)
-    for(stage <- 0 until pipeline.size) {
+    /*for(stage <- 0 until pipeline.size) {
       val valid = Reg(init = Bool(false))
       valids += valid
       if (stage > 0) 
@@ -1038,7 +1055,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       else
         valid := Bool(true)
       valid.nameIt("HuyValid_" + stage)
-    }
+    }*/
     for((node,stages) <- coloredNodes){
       Predef.assert(stages.length <= 2, stages)
       if(stages.length > 1){
@@ -1046,27 +1063,255 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         Predef.assert(stageDifference > 0, stageDifference)
         var actualNode = node
         if(node.isInstanceOf[Op]){
-          actualNode = consumerMap(node)(0)
+          println("DEBUG1")
+          actualNode = insertBits(node.asInstanceOf[Op])
         }
         var currentNodeOut = actualNode
         for(i <- 0 until stageDifference){
-          val r = Reg(init = Bits(0))
+          /*val r = Reg(init = Bits(0))
           r := currentNodeOut.asInstanceOf[Bits]
           currentNodeOut.pipelinedVersion = r
           r.unPipelinedVersion = currentNodeOut
           r.nameIt("Huy_" + Math.min(stages(0),stages(1) + i) + "_" + currentNodeOut.name)
           pipelineReg(Math.min(stages(0),stages(1)) + i) += r.comp.asInstanceOf[Reg]
-          currentNodeOut = r
-        }
-        
-        for(c <- consumerMap(actualNode)){
-          val producerIndex = c.inputs.indexOf(actualNode)
-          if(producerIndex > -1) c.inputs(producerIndex) = currentNodeOut
+          currentNodeOut = r*/
+          currentNodeOut = insertRegister(currentNodeOut.asInstanceOf[Bits], Bits(0), "Stage_" + (Math.min(stages(0),stages(1)) + i) + "_" + currentNodeOut.name + "_" + "PipeReg")
+          pipelineReg(Math.min(stages(0),stages(1)) + i) += currentNodeOut.asInstanceOf[Bits].comp.asInstanceOf[Reg]
         }
       }
     }
   }
   
+  
+  def propagateStages() = {
+    val regWritePoints = new HashSet[Node] //list of all register write inputs and transactionMem write port nodes(including write addr, write data, write en)
+    val regReadPoints = new HashSet[Node] //list of all register read outputs and transactionMem read port
+    val tMemWritePoints = new HashSet[Node] //list of all transactionMem write port nodes(including write addr, write data, write en)
+    val tMemReadPoints = new HashSet[Node] //list of all transactionMem read port nodes(including read addr, read data, read en)
+    val inputNodes = new HashSet[Node] //list of all module Input Nodes
+    val outputNodes = new HashSet[Node] //list of all module Output Nodes
+    
+    val bfsQueue = new ScalaQueue[(Node, Boolean)] //the 2nd item of the tuple indicateds which direction the node should propagate its stage number to. True means propagate to outputs, false means propagate to inputs
+    val retryNodes = new ArrayBuffer[(Node, Boolean)] //list of nodes that need to retry their stage propagation because their children weren't ready
+    
+    val coloredNodes = new HashMap[Node, ArrayBuffer[Int]] //map of node to stage numbers to be returned
+    var oldColoredNodes = new HashMap[Node, ArrayBuffer[Int]] //remember old colored nodes so that we can see if the algorithm is making progress
+    
+    def requiresNoStageNum(node: Node) : Boolean = {
+      (node.litOf != null) || (node == pipelineComponent.clock) || (node == pipelineComponent._reset)
+    }
+    
+    def propagatedToChild(parentStage: Int, child: Node) : Boolean = {
+      if(!requiresNoStageNum(child)){
+        if(!coloredNodes.contains(child)){
+          return false
+        } else {
+          return coloredNodes(child).contains(parentStage)
+        }
+      }
+      return true
+    }
+    
+    def propagatedToAllChildren(node: Node, stage: Int, direction: Boolean) : Boolean = {
+      var children = node.getProducers
+      if(direction){
+        children = node.consumers
+      }
+      var result = true
+      for(child <- children){
+        result = result && propagatedToChild(stage, child)
+      }
+      result
+    }
+    
+    def propagateToProducers(node: Node) = {
+      val propagatedChildren = new ArrayBuffer[Node]
+      for(producer <- node.getProducers()){
+        if(!propagatedToChild(coloredNodes(node)(0), producer)){//case if we have not already propagated to the producer
+          if(producer.consumers.length <= 1){//case if producer only outputs to the current node
+            if(!coloredNodes.contains(producer)){
+              coloredNodes(producer) = new ArrayBuffer[Int]
+            }
+            coloredNodes(producer) += coloredNodes(node)(0)
+            propagatedChildren += producer
+          } else {
+            var childResolvedAllProducers = true
+            var lowestConsumerStage = Int.MaxValue
+            for(childConsumer <- producer.consumers){
+              if(!requiresNoStageNum(childConsumer)){
+                if(!coloredNodes.contains(childConsumer)){
+                  childResolvedAllProducers = false
+                } else if(coloredNodes(childConsumer).length == 0) {
+                  childResolvedAllProducers = false
+                } else{
+                  if(coloredNodes(childConsumer).min < lowestConsumerStage){
+                    lowestConsumerStage = coloredNodes(childConsumer).min
+                  }
+                }
+              }
+            }
+            if(childResolvedAllProducers){
+              if(!coloredNodes.contains(producer)){
+                coloredNodes(producer) = new ArrayBuffer[Int]
+              }
+              //propagate stage to child
+              if(!coloredNodes(producer).contains(lowestConsumerStage)){
+                coloredNodes(producer) += lowestConsumerStage  
+              }
+              //propagate child stage back to its producers
+              for(childConsumer <- producer.consumers){
+                if(!requiresNoStageNum(childConsumer)){
+                  if(!coloredNodes(childConsumer).contains(lowestConsumerStage)){
+                    coloredNodes(childConsumer) += lowestConsumerStage  
+                  }
+                }
+              }
+              propagatedChildren += producer
+            }
+          }
+        }
+      }
+      propagatedChildren
+    }
+    
+    def propagateToConsumers(node: Node) = {
+      val propagatedChildren = new ArrayBuffer[Node]
+      for(consumer <- node.consumers){
+        if(!propagatedToChild(coloredNodes(node)(0), consumer)){//case if we have not already propagated to the consumer
+          if(consumer.getProducers().length <= 1){//case if consumer only consumes from the current node
+            if(!coloredNodes.contains(consumer)){
+              coloredNodes(consumer) = new ArrayBuffer[Int]
+            }
+            coloredNodes(consumer) += coloredNodes(node)(0)
+            propagatedChildren += consumer
+          } else {
+            var childResolvedAllProducers = true
+            var highestProducerStage = 0
+            for(childProducer <- consumer.getProducers()){
+              if(!requiresNoStageNum(childProducer)){
+                if(!coloredNodes.contains(childProducer)){
+                  childResolvedAllProducers = false
+                } else if(coloredNodes(childProducer).length == 0) {
+                  childResolvedAllProducers = false
+                } else{
+                  if(coloredNodes(childProducer).max > highestProducerStage){
+                    highestProducerStage = coloredNodes(childProducer).max
+                  }
+                }
+              }
+            }
+            if(childResolvedAllProducers){
+              if(!coloredNodes.contains(consumer)){
+                coloredNodes(consumer) = new ArrayBuffer[Int]
+              }
+              //propagate stage to child
+              if(!coloredNodes(consumer).contains(highestProducerStage)){
+                coloredNodes(consumer) += highestProducerStage  
+              }
+              //propagate child stage back to its consumers
+              for(childProducer <- consumer.getProducers()){
+                if(!requiresNoStageNum(childProducer)){
+                  if(!coloredNodes(childProducer).contains(highestProducerStage)){
+                    coloredNodes(childProducer) += highestProducerStage  
+                  }
+                }
+              }
+              propagatedChildren += consumer
+            }
+          }
+        }
+      }
+      propagatedChildren
+    }
+    
+    //do initial pass to mark read and write points for regs
+    for(p <- procs){
+      p match {
+        case r: Reg => {
+          for(i <- r.getProducers()){
+            regWritePoints += i
+          }
+          regReadPoints += r
+        }
+        case _ =>
+      }
+    }
+    //do initial pass to mark read and write ports for transactionMems
+    for(tmem <- TransactionMems){
+      for(i <- 0 until tmem.readPortNum){
+        tMemReadPoints += tmem.io.reads(i).adr
+        tMemReadPoints += tmem.io.reads(i).dat
+      }
+      for(i <- 0 until tmem.virtWritePortNum){
+        tMemWritePoints += tmem.io.writes(i).adr
+        tMemWritePoints += tmem.io.writes(i).dat
+        tMemWritePoints += tmem.io.writes(i).is
+      }
+    }
+    //find module IO nodes
+    val inputs = pipelineComponent.io.flatten.filter(_._2.dir == INPUT)
+    val outputs = pipelineComponent.io.flatten.filter(_._2.dir == OUTPUT)
+    for(input <- inputs){
+      inputNodes += input._2
+    }
+    for(output <- outputs){
+      outputNodes += output._2
+    }
+
+    //initialize bfs queue and coloredNodes with user annotated nodes
+    for((node, stage) <- nodeStages){
+      Predef.assert(!(regReadPoints.contains(node) && regWritePoints.contains(node)), "same node marked as both read point and write point")
+      if(!regWritePoints.contains(node) && !tMemWritePoints.contains(node) && !outputNodes.contains(node)){
+        retryNodes += ((node, true))
+      }
+      if(!regReadPoints.contains(node) && !tMemReadPoints.contains(node) && !inputNodes.contains(node)){
+        retryNodes += ((node, false))
+      }
+      coloredNodes(node) = new ArrayBuffer[Int]()
+      coloredNodes(node) += stage
+    }
+    
+    //do stage propagation
+    while(!retryNodes.isEmpty && !oldColoredNodes.equals(coloredNodes)){
+      for((node, direction) <- retryNodes){
+        bfsQueue.enqueue(((node, direction)))
+      }
+      oldColoredNodes = coloredNodes.clone()
+      retryNodes.clear
+      while(!bfsQueue.isEmpty){
+        val current = bfsQueue.dequeue
+        val currentNode = current._1
+        val currentDirection = current._2
+        if(coloredNodes(currentNode).length < 2){
+          if(currentDirection){
+            val childrenPropagatedTo = propagateToConsumers(currentNode)
+            for(child <- childrenPropagatedTo){
+              if((coloredNodes(child).length < 2) && !regWritePoints.contains(child) && !tMemWritePoints.contains(child) && !outputNodes.contains(child)){
+                bfsQueue.enqueue(((child, currentDirection)))
+              }
+            }
+            if(!propagatedToAllChildren(currentNode, coloredNodes(currentNode)(0), currentDirection)){
+              retryNodes += ((currentNode, currentDirection))
+            }
+          } else {
+            val childrenPropagatedTo = propagateToProducers(currentNode)
+            for(child <- childrenPropagatedTo){
+              if((coloredNodes(child).length < 2) && !regReadPoints.contains(child) && !tMemReadPoints.contains(child) && !inputNodes.contains(child)){
+                bfsQueue.enqueue(((child, currentDirection)))
+              }
+            }
+            if(!propagatedToAllChildren(currentNode, coloredNodes(currentNode)(0), currentDirection)){
+              retryNodes += ((currentNode, currentDirection))
+            }
+          }
+        }
+      }
+    }
+    
+    coloredNodes
+  }
+  
+  /*
   def propagateStages() = {
     val consumerMap = getConsumers()
     val coloredNodes = new HashMap[Node, ArrayBuffer[Int]]
@@ -1257,7 +1502,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
     }
     coloredNodes
-  }
+  }*/
   
   def insertPipelineRegisters() = {
     for(stage <- 0 until pipeline.size) {
@@ -1269,29 +1514,25 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         valid := Bool(true)
       valid.setName("HuyValid_" + stage)*/
       for ((p, enum) <- pipeline(stage) zip pipeline(stage).indices) {
-        //val r = Reg(init = p._2)
-        val r = Reg(Bits())
-        //r := p._1.asInstanceOf[Bits]
+        /*val r = Reg(Bits())
+        r := p._1.asInstanceOf[Bits]
         r.comp.asInstanceOf[Reg].clock = p._1.component.clock
-        r.comp.updates += new Tuple2(Bool(true), p._1.asInstanceOf[Bits])
-        r.comp.updates += new Tuple2(p._1.component.getResetPin(p._1.component._reset), p._2.asInstanceOf[Bits])
-        //r.comp.asInstanceOf[Reg].inputs += p._1.component.getResetPin(p._1.component._reset)
-        /*when(p._1.component._reset){
+        when(p._1.component._reset){
           r := p._2
-        }*/
+        }
         //add pointer in p._1 to point to pipelined version of itself
         p._1.pipelinedVersion = r
         r.unPipelinedVersion = p._1
-        r.setName("Huy_" + enum + "_" + p._1.name)
-        pipelineReg(stage) += r.comp.asInstanceOf[Reg]
-        println(p._1.consumers)
-        for (c <- p._1.consumers) {
+        r.comp.setName("Huy_" + enum + "_" + p._1.name)
+        pipelineReg(stage) += r.comp.asInstanceOf[Reg]*/
+        pipelineReg(stage) += insertRegister(p._1.asInstanceOf[Bits], p._2.asInstanceOf[Bits], "Huy_" + enum + "_" + p._1.name).comp.asInstanceOf[Reg]
+        /*for (c <- p._1.consumers) {
           val producer_ind = c.inputs.indexOf(p._1)
           if(producer_ind > -1) c.inputs(producer_ind) = r
           val consumer_ind = p._1.consumers.indexOf(c)
           r.consumers += c
           p._1.consumers(consumer_ind) = r
-        }
+        }*/
       }
     }
   }
@@ -1469,30 +1710,15 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       val stall = tc.io.req.valid && (!tc.req_ready || !tc.resp_valid)
       globalStall = globalStall || stall
     }
-
-    cRegs = new ArrayBuffer[Reg]
-    cMems = new ArrayBuffer[Mem[Data]]
-    cTransactionMems = new ArrayBuffer[TransactionMem[Data]]
-    compBfs(comp, 
-            (n: Node) => {
-              if (n.isMem) cMems += n.asInstanceOf[Mem[ Data ] ]
-              if (n.isInstanceOf[Reg] && !isPipeLineReg(n)) cRegs += n.asInstanceOf[Reg]
-            }
-          )
-    for(c <- comp.children){
-      if(c.isInstanceOf[TransactionMem[Data]]){
-        cTransactionMems += c.asInstanceOf[TransactionMem[Data]]
-      }
-    }
     
     //Reg hazards
     for (b <- chckStg)
       println("HUY: " + b.name + " " + getStage(b))
 
     // raw stalls
-    val specRegs = speculation.map(_._1.comp.asInstanceOf[Reg])
-    cRegs = cRegs.filter(!specRegs.contains(_))
-    for (p <- cRegs) {
+    val speArchitecturalRegs = speculation.map(_._1.comp.asInstanceOf[Reg])
+    ArchitecturalRegs = ArchitecturalRegs.filter(!speArchitecturalRegs.contains(_))
+    for (p <- ArchitecturalRegs) {
       if (p.updates.length > 1 && stages.contains(p)) {
         val enables = p.updates.map(_._1).filter(_.name != "reset")
         val enStgs = enables.map(getStage(_)).filter(_ > -1)
@@ -1516,7 +1742,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
     }
     // FunMem hazards
-    for (m <- cTransactionMems) {
+    for (m <- TransactionMems) {
       for(i <- 0 until m.io.writes.length){
         val writePoint = m.io.writes(i)
         val writeAddr = writePoint.adr.inputs(0).inputs(1)
@@ -1543,33 +1769,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         }
       }
     }
-
-    /*for (n <- cMems) {
-      for(i <- n.writes){
-        val waddr = i.addr
-        val enable = i.inputs(1)
-        val dataIn = i.inputs(2)
-        val wrStg = getStage(enable)
-        var hazard = Bool(false)
-        var foundHazard = false
-        var rdStg = -1
-        for(j <- n.reads){
-          val raddr = j.addr
-          rdStg = getStage(raddr)
-          val enables = getVersions(enable.asInstanceOf[Bool])
-          val waddrs = getVersions(waddr.asInstanceOf[Bits])
-          if(wrStg > 0 && rdStg > 0 && wrStg > rdStg){
-            scala.Predef.assert((getStage(enables.last) - rdStg) == 1, println(enables.length))
-            scala.Predef.assert(enables.length == waddrs.length, println(enables.length + " " + waddrs.length))
-            for ((en, w) <- enables zip waddrs) {
-              hazards += (((j.cond && en.asInstanceOf[Bool] && (w.asInstanceOf[Bits] === raddr.asInstanceOf[Bits])), n, rdStg, getStage(en), en.asInstanceOf[Bool], null))
-              println("found hazard " + en.line.getLineNumber + " " + en.line.getClassName + " " + en.name + " " + n.name)
-            }
-          }
-        }
-      }
-    }*/
-    
   }
   
   def getVersions(b: Bits): ArrayBuffer[Bits] = {
@@ -1607,7 +1806,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     return res
   }
 
-  def resolveHazards() = {
+  /*def resolveHazards() = {
 
     // raw stalls
     for ((hazard, s, rdStg, wrStg, wEn, rPort) <- hazards) {
@@ -1621,11 +1820,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         stalls(stg) ++= stalls(nstg)
 
     for ((s, v) <- speculation)
-      cRegs += s.comp.asInstanceOf[Reg]
+      ArchitecturalRegs += s.comp.asInstanceOf[Reg]
 
     val wStageMap = new HashMap[Reg, Int]()
 
-    for ((r, ind) <- (cRegs zip cRegs.indices)) {
+    for ((r, ind) <- (ArchitecturalRegs zip ArchitecturalRegs.indices)) {
       if (r.updates.length > 1 && stages.contains(r)) {
         val enStg = r.updates.map(_._1).map(getStage(_)).filter(_ > -1)(0)
         wStageMap += (r -> enStg)
@@ -1681,7 +1880,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         wprt.inputs(1) = wprt.inputs(1).asInstanceOf[Bool] && (!stalls(getStage(wprt.inputs(1))).foldLeft(Bool(false))(_ || _)).asInstanceOf[Bool] && !(globalStall.asInstanceOf[Bool])
       }
     }
-  }
+  }*/
 
   def insertBubble(globalStall: Bool) = {
     for (stage <- 0 until pipelineReg.size) {
@@ -1791,62 +1990,42 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         n.replaceProducer(rp.dat.asInstanceOf[Node], bypassMux)    
       }
     }
-    /*case m: Mem[_] => {
-      println("generating forwarding logic for Mems")
-      println("annotated write points")
-      println("hazards")
-      for(h <- hazards){
-        println(h)
-      }
-      //println(memWritePoints)
-      for(readPort <- m.reads){
-        val forwardPoints = new HashMap[Int, ArrayBuffer[(Node, Node, Node)]]()
-        for (i <- stages(readPort.addr) + 1 to pipelineReg.size){
-          forwardPoints(i) = new ArrayBuffer[(Node,Node,Node)]()
-        }
-        for((writeEn, writeData, writeAddr) <- memWritePoints(m)){
-          val delayedWriteEn = getPipelinedVersion(writeEn)
-          val delayedWriteData = getPipelinedVersion(writeData)
-          val delayedWriteAddr = getPipelinedVersion(writeAddr)
-          Predef.assert(stages(delayedWriteEn) == stages(delayedWriteData))
-          Predef.assert(stages(delayedWriteEn) == stages(delayedWriteAddr))
-          val earliestForwardingStage = stages(delayedWriteEn) - Math.min(findEarliestStageAvail(delayedWriteEn), Math.min(findEarliestStageAvail(delayedWriteData), findEarliestStageAvail(delayedWriteAddr)))
-          for(i <- stages(readPort.addr) + 1 to stages(delayedWriteEn)){
-            forwardPoints(i) += ((findPastNodeVersion(delayedWriteEn, stages(delayedWriteEn) - i), findPastNodeVersion(delayedWriteData, stages(delayedWriteData) - i), findPastNodeVersion(delayedWriteAddr, stages(delayedWriteAddr) - i)))
-          }
-        }
-        println("Mem forward points")
-        println(forwardPoints)
-        val muxMapping = new ArrayBuffer[(Bool, Data)]()
-        for(i <- stages(readPort.addr) + 1 to pipelineReg.size){
-          //generate muxes
-          if(!forwardPoints(i).isEmpty){
-            println("has forwards from stage " + i)
-            for((writeEn, writeData, writeAddr) <- forwardPoints(i)){
-              val forwardCond = readPort.cond & writeEn.asInstanceOf[Bool] & writeAddr.asInstanceOf[Bits] === readPort.addr.asInstanceOf[Bits]
-              muxMapping += ((forwardCond, writeData.asInstanceOf[Data]))
-              //append forward condition to hazards list
-              for((cond, state, rStage, wStage, wEn, rPort) <- hazards){
-                //println((cond, state, rStage, wStage, rEn, wEn))
-                //if(wStage == i & rEn == readPort.cond & wEn == writeEn.asInstanceOf[Bool]){
-                if(wStage == i & rPort == readPort){
-                  hazards -= ((cond, state, rStage, wStage, wEn, rPort.asInstanceOf[FunRdIO[Data]]))
-                  println("wtf " + i)
-                  println("rPort: " + System.identityHashCode(rPort))
-                  println("readPort: " + System.identityHashCode(readPort))
-                  println("wEn: " + System.identityHashCode(wEn))
-                  println("writeEn: " + System.identityHashCode(writeEn))
-                }
-              }
-            }
-          }
-        }
-        val bypassMux = MuxCase(readPort.dataOut.asInstanceOf[Data], muxMapping)
-        for (n <- consumerMap(readPort.dataOut)){
-          n.replaceProducer(readPort.dataOut, bypassMux)    
-        }
-      }
-    }*/
+  }
+  
+  //inserts register between *input* and its consumers
+  def insertRegister(input: Bits, init_value: Bits, name: String) : Bits = {
+    val new_reg = Reg(Bits())
+    new_reg := input
+    new_reg.comp.asInstanceOf[Reg].clock = input.component.clock
+    when(input.component._reset){
+      new_reg := init_value
+    }
+    input.pipelinedVersion = new_reg
+    new_reg.unPipelinedVersion = input
+    new_reg.comp.setName(name)
+    for(i <- 0 until input.consumers.size){
+      val consumer = input.consumers(i)
+      val producer_index = consumer.inputs.indexOf(input)
+      if(producer_index > -1) consumer.inputs(producer_index) = new_reg
+      new_reg.consumers += consumer
+      input.consumers(i) = new_reg
+    }
+    new_reg
+  }
+  
+  //inserts additional bit node between *input* and its consumers(useful for automatic pipelining)
+  def insertBits(input: Op) : Bits = {
+    val new_bits = Bits()
+    new_bits.inputs += input
+    new_bits.component = input.component//hack; need to figure out way to actually initialize new bit node correctly
+    for(i <- 0 until input.consumers.size){
+      val consumer = input.consumers(i)
+      val producer_index = consumer.inputs.indexOf(input)
+      if(producer_index > -1) consumer.inputs(producer_index) = new_bits
+      new_bits.consumers += consumer
+      input.consumers(i) = new_bits
+    }
+    new_bits
   }
   
   def compBfs(comp: Module, visit: Node => Unit) : Unit = {

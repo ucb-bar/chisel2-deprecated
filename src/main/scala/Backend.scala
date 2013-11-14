@@ -561,20 +561,24 @@ abstract class Backend {
     Module.sortedComps.map(x => println(x + " " + x.nodes.length))
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
     ChiselError.info("finished transforms")
-
-    //c.insertPipelineRegisters2()
-    c.insertPipelineRegisters()
+    
+    
+    c.findArchitecturalState
+    c.insertPipelineRegisters2()
+    //c.insertPipelineRegisters()
     connectResets
     c.genAllMuxes
     c.inferAll()
     c.forceMatchingWidths
-    /*c.colorPipelineStages()
-    c.findHazards()
-    c.generateForwardingLogic()
-    c.resolveHazards()
-    c.genAllMuxes
-    c.inferAll()
-    c.forceMatchingWidths*/
+    c.removeTypeNodes()
+    //c.colorPipelineStages()
+    //c.findHazards()
+    //c.generateForwardingLogic()
+    //c.resolveHazards()
+    //c.genAllMuxes
+    //c.inferAll()
+    //c.forceMatchingWidths
+    //c.removeTypeNodes()
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
     collectNodesIntoComp(initializeDFS)
          
@@ -591,8 +595,11 @@ abstract class Backend {
        created yet otherwise. */
     nameAll(c)
     nameRsts
-
-    printGraph
+    
+    //just here so we can see names of the inserted registers
+    //c.findArchitecturalState()
+    //c.insertPipelineRegisters2()
+    //printGraph
     
     execute(c, analyses)
 
