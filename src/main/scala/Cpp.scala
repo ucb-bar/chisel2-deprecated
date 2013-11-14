@@ -740,9 +740,6 @@ class CppBackend extends Backend {
     for (m <- mappings) {
       if (m._2.name != "reset" && (m._2.isInObject || m._2.isInVCD)) {
       	out_c.write(emitMapping(m));
-      	println(m._1 + ": " + m._2.name + " " + m._2.isInObject + " " + m._2.isInVCD)
-      } else {
-        println(m._1 + ": " + m._2.name + " " + m._2.isInObject + " " + m._2.isInVCD)
       }
     }
     out_c.write("}\n");
