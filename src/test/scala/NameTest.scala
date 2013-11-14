@@ -473,23 +473,27 @@ endmodule
   wire[31:0] T0;
   wire T1;
   wire[31:0] T2;
-  reg[31:0] tag_ram_1;
-  reg[31:0] tag_ram_0;
   wire[31:0] T3;
-  wire T4;
+  wire[31:0] T4;
+  wire[31:0] T5;
+  wire[31:0] T6;
+  reg[31:0] tag_ram_0;
+  wire[31:0] T7;
+  wire T8;
 
   assign io_mine_1 = T0;
   assign T0 = {31'h0/* 0*/, T1};
   assign T1 = T2[1'h1/* 1*/:1'h1/* 1*/];
-  assign T2 = io_valid ? tag_ram_0 : tag_ram_1;
-  assign io_mine_0 = T3;
-  assign T3 = {31'h0/* 0*/, T4};
-  assign T4 = T2[1'h0/* 0*/:1'h0/* 0*/];
+  assign T2 = io_valid ? T4 : T3;
+  assign T3 = {31'h0/* 0*/, 1'h0/* 0*/};
+  assign T4 = T6 | T5;
+  assign T5 = {31'h0/* 0*/, 1'h0/* 0*/};
+  assign T6 = tag_ram_0;
+  assign io_mine_0 = T7;
+  assign T7 = {31'h0/* 0*/, T8};
+  assign T8 = T2[1'h0/* 0*/:1'h0/* 0*/];
 
   always @(posedge clk) begin
-    if(1'h0/* 0*/) begin
-      tag_ram_1 <= io_sub_resp_bits_ppn;
-    end
     if(io_valid) begin
       tag_ram_0 <= io_sub_resp_bits_ppn;
     end
