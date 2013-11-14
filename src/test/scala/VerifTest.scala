@@ -96,7 +96,7 @@ int VerifSuite_CppAssertComp_1_t::clock ( dat_t<1> reset ) {
   if (clk_cnt == 0) clk_cnt = clk;
   return min;
 }
-void VerifSuite_CppAssertComp_1_t::print ( FILE* f ) {
+void VerifSuite_CppAssertComp_1_t::print ( FILE* f, FILE* e ) {
 }
 bool VerifSuite_CppAssertComp_1_t::scan ( FILE* f ) {
   return(!feof(f));
