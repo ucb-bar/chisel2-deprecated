@@ -563,7 +563,7 @@ abstract class Backend {
     ChiselError.info("finished transforms")
     
     
-    c.findArchitecturalState
+    c.gatherSpecialComponents()
     c.insertPipelineRegisters2()
     //c.insertPipelineRegisters()
     connectResets
@@ -572,12 +572,12 @@ abstract class Backend {
     c.forceMatchingWidths
     c.removeTypeNodes()
     //c.colorPipelineStages()
-    //c.findHazards()
+    c.findHazards()
     //c.generateForwardingLogic()
     //c.resolveHazards()
     //c.genAllMuxes
     //c.inferAll()
-    //c.forceMatchingWidths
+    //c.forceMatchingWidths()
     //c.removeTypeNodes()
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
     collectNodesIntoComp(initializeDFS)
@@ -599,6 +599,7 @@ abstract class Backend {
     //just here so we can see names of the inserted registers
     //c.findArchitecturalState()
     //c.insertPipelineRegisters2()
+    //c.findHazards()
     //printGraph
     
     execute(c, analyses)

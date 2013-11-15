@@ -11,7 +11,6 @@ class TransactionalBundle extends Bundle {
 
 abstract class TransactionalComponent extends Module {
   val io: TransactionalBundle
-  tcomponents += this
 
   var acceptBackPressure = true
   val req_ready: Bool = Bool(false)
