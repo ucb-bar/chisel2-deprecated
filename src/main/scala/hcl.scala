@@ -270,17 +270,7 @@ trait proc extends Node {
   }
   def procAssign(src: Node): Unit
   Module.procs += this;
-  override def getProducers(): Seq[Node] = {
-    val producers = new collection.mutable.ListBuffer[Node];
-    for((i,j) <- updates){
-      producers += i
-      producers += j
-    }
-    for(elm <- inputs){
-      if (elm != null) producers += elm
-    }
-    producers
-  }
+
   override def replaceProducer(delete: Node, add: Node) = {
     for(i <- 0 until inputs.length){
       if(inputs(i) == delete){

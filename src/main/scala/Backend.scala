@@ -563,15 +563,17 @@ abstract class Backend {
     ChiselError.info("finished transforms")
     
     
+    nameAll(c)//for debug
+    //c.insertPipelineRegisters()
+    //c.colorPipelineStages()
     c.gatherSpecialComponents()
     c.insertPipelineRegisters2()
-    //c.insertPipelineRegisters()
     connectResets
     c.genAllMuxes
     c.inferAll()
     c.forceMatchingWidths
     c.removeTypeNodes()
-    //c.colorPipelineStages()
+    c.verifyLegalStageColoring()
     c.findHazards()
     //c.generateForwardingLogic()
     //c.resolveHazards()
@@ -595,12 +597,6 @@ abstract class Backend {
        created yet otherwise. */
     nameAll(c)
     nameRsts
-    
-    //just here so we can see names of the inserted registers
-    //c.findArchitecturalState()
-    //c.insertPipelineRegisters2()
-    //c.findHazards()
-    //printGraph
     
     execute(c, analyses)
 

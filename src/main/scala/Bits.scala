@@ -293,18 +293,6 @@ abstract class Bits extends Data with proc {
     }
   }
   
-  override def getProducers(): Seq[Node] = {
-    val producers = new collection.mutable.ListBuffer[Node];
-    for((i,j) <- updates){
-      producers += i
-      producers += j
-    }
-    for(elm <- inputs) {
-      if (elm != null) producers += elm
-    }
-    producers
-  }
-  
   // Operators
   protected final def newUnaryOp(opName: String): this.type = {
     fromNode(UnaryOp(this, opName))
