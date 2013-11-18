@@ -495,8 +495,10 @@ abstract class Node extends nameable {
         Array[Node](getNode);
     }
   }
+  
+  // edited by Donggyu
   def emitIndex(): Int = {
-    if (index == -1) {
+    if (index == -1 && !isTypeNode)  {
       index = componentOf.nextIndex;
     }
     index

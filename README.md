@@ -1,3 +1,10 @@
+'backannotate' branch
+=====================
+
+Donggyu Kim
+(dgkim@eecs.berkeley.edu)
+
+
 About Chisel
 ============
 
