@@ -142,6 +142,7 @@ abstract class Node extends nameable {
   var driveRand = false
   var clock: Clock = null
   var CppVertex: CppVertex = null
+  var delay: Double = 0.0 // for delay annotation by Donggyu
 
   Module.nodes += this
 
