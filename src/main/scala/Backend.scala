@@ -575,6 +575,12 @@ abstract class Backend {
     c.removeTypeNodes()
     c.verifyLegalStageColoring()
     c.findHazards()
+    c.generateInterlockLogic()
+    connectResets
+    c.genAllMuxes
+    c.inferAll()
+    c.forceMatchingWidths
+    c.removeTypeNodes()
     //c.generateForwardingLogic()
     //c.resolveHazards()
     //c.genAllMuxes

@@ -267,12 +267,13 @@ object Module {
   
   var pipelineLength = 0
   val stageValids = new ArrayBuffer[Bool]
+  
   val regRAWHazards = new HashMap[(Reg, Int, Int), Bool] //map of (register, updatelist num, write stage) -> RAW signal
   val tMemRAWHazards = new HashMap[(FunRdIO[Data], Int, Int), Bool] //map of (tmem readport, writeport number, write stage) -> RAW signal
   
   def setPipelineLength(length: Int) = {
     pipelineLength = length
-    for (i <- 0 until length-1) {
+    for (i <- 0 until length - 1) {
       pipelineReg += (i -> new ArrayBuffer[Reg]())
     }
     for (i <- 0 until length) {
@@ -1383,14 +1384,22 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def insertBitsOnOutputs(input: Node) : ArrayBuffer[Node] = {
     val newNodes = new ArrayBuffer[Node]()
     for(i <- 0 until input.consumers.size){
-      val new_bits = Bits()
-      newNodes += new_bits
       val consumer = input.consumers(i)
-      val producer_index = consumer.inputs.indexOf(input)
-      if(producer_index > -1) consumer.inputs(producer_index) = new_bits
-      new_bits.consumers += consumer
-      new_bits.inputs += input
-      input.consumers(i) = new_bits
+      val producer_indices = new ArrayBuffer[Int]
+      for(j <- 0 until consumer.inputs.size){
+        if(consumer.inputs(j) == input) producer_indices += j
+      }
+      for(producer_index <- producer_indices){
+        val new_bits = Bits()
+        newNodes += new_bits
+        consumer.inputs(producer_index) = new_bits
+        new_bits.consumers += consumer
+        new_bits.inputs += input
+      }
+      input.consumers -= input.consumers(i)
+      for(newNode <- newNodes){
+        input.consumers += newNode
+      }
     }
     newNodes
   }
@@ -1631,7 +1640,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             if(-(stage - writeStage)  <= prevWriteEns.length){
               currentStageWriteEnable = prevWriteEns(-(stage - writeStage) ).asInstanceOf[Bool]
             }
-            regRAWHazards(((reg, i, stage))) = stageValids(readStage) && stageValids(writeStage) && currentStageWriteEnable
+            regRAWHazards(((reg, i, stage))) = stageValids(writeStage) && currentStageWriteEnable
+            regRAWHazards(((reg, i, stage))).nameIt("hazards_" + reg.name + "_" + stage + "_" + writeEn.name)
             println("found reg RAW hazard " + writeEn.line.getLineNumber + " " + writeEn.line.getClassName)
           }
         }
@@ -1642,14 +1652,18 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     for (m <- TransactionMems) {
       for(i <- 0 until m.io.writes.length){
         val writePoint = m.io.writes(i)
-        val writeAddr = writePoint.adr.inputs(0).inputs(1)
-        val writeEn = writePoint.is.inputs(0).inputs(1)
-        val writeData = writePoint.dat.inputs(0).inputs(1)
+        /*val writeAddr = writePoint.adr.inputs(0).inputs(0).inputs(1)
+        val writeEn = writePoint.is.inputs(0).inputs(0).inputs(1)
+        val writeData = writePoint.dat.inputs(0).inputs(0).inputs(1)*/
+        val writeAddr = writePoint.actualWaddr
+        val writeEn = writePoint.actualWen
+        val writeData = writePoint.actualWdata
         val writeStage = Math.max(getStage(writeEn),Math.max(getStage(writeAddr), getStage(writeData)))
         Predef.assert(writeStage > -1)
         val writeEnables = getVersions(writeEn.asInstanceOf[Bool])
         val writeAddrs = getVersions(writeAddr.asInstanceOf[Bits])
-        for(readPoint <- m.io.reads){
+        for(j <- 0 until m.io.reads.length){
+          val readPoint = m.io.reads(j)
           val readAddr = readPoint.adr
           val readData = readPoint.dat
           val readStage = Math.max(getStage(readAddr), getStage(readData))
@@ -1657,14 +1671,15 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           if(writeStage > readStage){
             for(stage <- readStage + 1 until writeStage + 1){
               var currentStageWriteEnable = Bool(true)
-              var currentStageWriteAddr = readAddr
+              var currentStageWriteAddr:Data = readAddr
               if(-(stage - writeStage)  <= writeEnables.length){
                 currentStageWriteEnable = writeEnables(-(stage - writeStage) ).asInstanceOf[Bool]
               }
               if(-(stage - writeStage)  <= writeAddrs.length){
-                currentStageWriteAddr = writeAddrs(-(stage - writeStage) ).asInstanceOf[Bool]
+                currentStageWriteAddr = writeAddrs(-(stage - writeStage) ).asInstanceOf[Data]
               }
-              tMemRAWHazards(((readPoint, i, stage))) = stageValids(readStage) && stageValids(writeStage) && currentStageWriteEnable && (readAddr === currentStageWriteAddr)
+              tMemRAWHazards(((readPoint, i, stage))) = stageValids(writeStage) && currentStageWriteEnable && (readAddr === currentStageWriteAddr)
+              tMemRAWHazards(((readPoint, i, stage))).nameIt("hazards_" +m.name + "_readport_num" + j + "_"+ stage + "_" + writeEn.name)
               println("found hazard" + writeEn.line.getLineNumber + " " + writeEn.line.getClassName + " " + writeEn.name + " " + m.name)
             }
           }
@@ -1672,9 +1687,106 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
     }
     
-    
     println(regRAWHazards)
     println(tMemRAWHazards)
+  }
+  
+  def generateInterlockLogic() = {
+    //initialize stall signals
+    val stageStalls = new ArrayBuffer[Bool]
+    for (i <- 0 until pipelineLength - 1) {
+      val stall = Bool()
+      stageStalls += stall
+      stall.nameIt("PipeStageStall_" + i)
+    }
+    
+    //initialize registers for stageValid signals
+    val validRegs = new ArrayBuffer[Bool]
+    for (i <- 0 until pipelineLength - 1) {
+      val validReg = Reg(Bool())
+      when(pipelineComponent._reset){
+        validReg := Bool(false)
+      }
+      when(~stageStalls(i)){
+        validReg := stageValids(i)
+      }
+      validReg.comp.asInstanceOf[Reg].clock = pipelineComponent.clock
+      validRegs += validReg
+      validReg.comp.nameIt("Stage_" + i + "_valid_reg")
+    }
+    
+    //initialize temporpary valid signals
+    val tempValids = new ArrayBuffer[Bool]
+    tempValids += Bool(true)
+    for(i <- 1 until pipelineLength){
+      tempValids += validRegs(i - 1)
+    }
+    
+    //collect RAW hazards for valids and stalls for every stage
+    //reg RAW hazards
+    for ((key, value) <- regRAWHazards){
+      val reg = key._1
+      val RAWHazardSignal = value
+      val readStage = getStage(reg)
+      tempValids(readStage) = tempValids(readStage) && ~RAWHazardSignal
+      if(readStage > 0 && readStage < pipelineLength){
+        stageStalls(readStage - 1) = stageStalls(readStage - 1) || RAWHazardSignal
+      }
+    }
+    
+    //transactionMem RAW hazards
+    for ((key, value) <- tMemRAWHazards){
+      val readAddr = key._1.adr
+      val RAWHazardSignal = value
+      val readStage = getStage(readAddr)
+      tempValids(readStage) = tempValids(readStage) && ~RAWHazardSignal
+      if(readStage > 0 && readStage < pipelineLength ){
+        stageStalls(readStage - 1) = stageStalls(readStage - 1) || RAWHazardSignal
+      }
+    }
+    
+    //connect actual stage valids to the tempValids
+    for(i <- 0 until pipelineLength){
+      stageValids(i) := tempValids(i)
+    }
+    
+    //generate logic for stall signals
+    for(i <- (0 until pipelineLength - 2).reverse) {
+      stageStalls(i) = stageStalls(i) || stageStalls(i+1)
+    }
+
+    //wire stage valid and stall signals to architecural state write enables
+    //regs
+    for(reg <- ArchitecturalRegs){
+      val writeStage = reg.updates.map(_._2).map(getStage(_)).filter(_ > - 1)(0)
+      for (i <- 0 until reg.updates.length){
+        val writeEn = reg.updates(i)._1
+        reg.updates(i) = ((writeEn && ~globalStall && stageValids(writeStage) && ~stageStalls(writeStage), reg.updates(i)._2))
+      }
+      reg.genned = false
+    }
+    //transactionMems
+    for(tmem <- TransactionMems){
+      for(i <- 0 until tmem.io.writes.length){
+        val writePoint = tmem.io.writes(i)
+        val writeAddr = writePoint.actualWaddr
+        val writeEn = writePoint.actualWen
+        val writeData = writePoint.actualWdata
+        val writeStage = Math.max(getStage(writeEn),Math.max(getStage(writeAddr), getStage(writeData)))
+        val newWriteEn = writeEn.asInstanceOf[Bool] && ~globalStall && stageValids(writeStage) && (if(writeStage > pipelineLength -2) Bool(true) else ~stageStalls(writeStage))
+        //fix writeEn's consumer list
+        val writeEnMuxFillerInput = writePoint.is.inputs(0).inputs(0).inputs(0)//need a less hack way of finding this
+        val consumer_index = writeEn.consumers.indexOf(writeEnMuxFillerInput)
+        Predef.assert(consumer_index > -1)        
+        writeEn.consumers(consumer_index) = newWriteEn
+        //fix writeEnMux's inputs list
+        val producer_index = writeEnMuxFillerInput.inputs.indexOf(writeEn)
+        Predef.assert(producer_index > -1)
+        writeEnMuxFillerInput.inputs(producer_index) = newWriteEn
+        //populate newWriteEn's consumer list
+        newWriteEn.addConsumers 
+      }
+    }
   }
   
   /*def findHazards() = {
@@ -1756,7 +1868,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         } else {
           return result
         }
-        currentNode = currentNode.asInstanceOf[Reg].updates(0)._2
+        currentNode = currentNode.inputs(0).asInstanceOf[Reg].updates(0)._2
       } else {
         currentNode = currentNode.inputs(0)
       } 

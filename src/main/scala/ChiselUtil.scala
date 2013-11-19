@@ -608,13 +608,21 @@ class FunRdIO[T <: Data](depth: Int)(data: => T) extends RdIO(depth)(data) {
 }
 
 class FunWrIO[T <: Data](depth: Int)(data: => T) extends WrIO(depth)(data) {
+  var actualWen : Node = null
+  var actualWaddr : Node = null
+  var actualWdata : Node = null
+  
   is  := Bool(false)
   adr := Bits(0)
   dat := data.fromBits(Bits(0))
+  
   def write(nadr: Bits, ndat: T) = {
     is  := conds.top
     adr := nadr
     dat := ndat
+    actualWen = conds.top
+    actualWaddr = nadr
+    actualWdata = ndat
   }
 }
 
