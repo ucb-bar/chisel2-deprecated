@@ -1,8 +1,4 @@
-/* Unfinished. This is a hacked-together piece of crap, with simplified shits. I'm saving it for now.
-It uses the Spray library, and ideally I want to use this library to write and read JSON files with polymorphic types.
-It does not work.
-To Do!
-*/
+/* Unfinished. Has 3 basic parameters available */
 package Chisel
 
 import Node._
@@ -19,14 +15,6 @@ import java.io._
   //containers for parameter types. Params object is what actually stores
   //the data structures of parameters, whether they are generated from a Chisel
   //design, or read from a json file
-
-//abstract class Param[+T] {
-//  def value: T
-//
-//  def register(comp: Module, pname: String) = {
-//    Params.register(comp, pname, this).asInstanceOf[T]
-//  }
-//}
 
 abstract class Param[+T] {
   def value: T
