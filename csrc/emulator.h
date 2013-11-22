@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <iostream>
 #include <fstream>
+#include <stdexcept>
 
 using namespace std;
 
@@ -1803,10 +1804,8 @@ class mod_t {
 };
 
 #define ASSERT(cond, msg) { \
-  if (!(cond)) { \
-    printf("Assertion failed: %s\n", (msg)); \
-    abort(); \
-  } \
+  if (!(cond)) \
+    throw std::runtime_error("Assertion failed: " msg); \
 }
 
 #endif
