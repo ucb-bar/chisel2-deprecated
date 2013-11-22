@@ -39,10 +39,12 @@ import scala.collection.mutable.{ArrayBuffer, HashMap}
   a LFSR, which returns "1" on its first invocation).
   */
 object Mem {
-  def apply[T <: Data](out: T, n: Int, seqRead: Boolean = false, clock: Clock = null): Mem[T] = {
+  def apply[T <: Data](out: T, n: Int, seqRead: Boolean = false,
+                       orderedWrites: Boolean = false,
+                       clock: Clock = null): Mem[T] = {
     val gen = out.clone
     Reg.validateGen(gen)
-    val res = new Mem(() => gen, n, seqRead)
+    val res = new Mem(() => gen, n, seqRead, orderedWrites)
     if (!(clock == null)) res.clock = clock
     res
   }
@@ -66,7 +68,9 @@ abstract class AccessTracker extends Delay {
   def readAccesses: ArrayBuffer[_ <: MemAccess]
 }
 
-class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean) extends AccessTracker {
+class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val orderedWrites: Boolean) extends AccessTracker with VecLike[T] {
+  if (seqRead)
+    require(!orderedWrites) // sad reality of realizable SRAMs
   def writeAccesses: ArrayBuffer[MemWrite] = writes ++ readwrites.map(_.write)
   def readAccesses: ArrayBuffer[_ <: MemAccess] = reads ++ seqreads ++ readwrites.map(_.read)
   def ports: ArrayBuffer[_ <: MemAccess] = writes ++ reads ++ seqreads ++ readwrites
@@ -79,7 +83,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean) extends Acc
   inferWidth = fixWidth(data.getWidth)
 
   private val readPortCache = HashMap[UInt, T]()
-  def doRead(addr: UInt): T = {
+  def read(addr: UInt): T = {
     if (readPortCache.contains(addr)) {
       return readPortCache(addr)
     }
@@ -99,11 +103,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean) extends Acc
     depending on the execution path you believe. */
   def doWrite(addr: UInt, condIn: Bool, wdata: Node, wmaskIn: UInt) = {
     val cond = // add bounds check if depth is not a power of 2
-      if (isPow2(n)) {
-        condIn
-      } else {
-        condIn && addr(log2Up(n)-1,0) < UInt(n)
-      }
+      condIn && (Bool(isPow2(n)) || addr(log2Up(n)-1,0) < UInt(n))
     val wmask = // remove constant-1 write masks
       if (!(wmaskIn == null) && wmaskIn.litOf != null && wmaskIn.litOf.value == (BigInt(1) << data.getWidth)-1) {
         null
@@ -128,27 +128,35 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean) extends Acc
       doit(addr, cond, random_data, wmask)
       reg_data
     } else {
+      if (orderedWrites) // enforce priority ordering of write ports
+        for (w <- writes)
+          w.cond = w.cond.asInstanceOf[Bool] && !(cond && addr === w.addr.asInstanceOf[UInt])
       doit(addr, cond, wdata, wmask)
     }
   }
-
-  def read(addr: UInt): T = doRead(addr)
 
   def write(addr: UInt, data: T) = doWrite(addr, conds.top, data, null.asInstanceOf[UInt])
 
   def write(addr: UInt, data: T, wmask: UInt) = doWrite(addr, conds.top, data, wmask)
 
-  def apply(addr: UInt) = {
-    val rdata = doRead(addr)
+  def apply(addr: UInt): T = {
+    val rdata = read(addr)
     rdata.comp = new PutativeMemWrite(this, addr)
     rdata
   }
+
+  override def hashCode: Int = System.identityHashCode(this)
+  override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
+
+  def apply(addr: Int): T = apply(UInt(addr))
+
+  def length: Int = n
 
   override def isInVCD = false
 
   override def toString: String = "TMEM(" + ")"
 
-  override def clone = new Mem(gen, n, seqRead)
+  override def clone = new Mem(gen, n, seqRead, orderedWrites)
 
   def computePorts = {
     reads --= reads.filterNot(_.used)
@@ -224,6 +232,7 @@ class MemReadWrite(val read: MemSeqRead, val write: MemWrite) extends MemAccess(
 class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) extends MemAccess(mem, addri) {
   inputs += condi
   override def cond = inputs(1)
+  def cond_=(c: Bool) = inputs(1) = c
   clock = mem.clock
 
   inferWidth = fixWidth(mem.data.getWidth)
