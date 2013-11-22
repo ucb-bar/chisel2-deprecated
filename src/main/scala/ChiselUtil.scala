@@ -153,6 +153,10 @@ object Mux1H
       in(0).fromBits(masked.reduceLeft(_|_))
     }
   }
+  def apply[T <: Data](in: Seq[(Bool, T)]): T = {
+    val (sel, data) = in.unzip
+    apply(sel, data)
+  }
   def apply[T <: Data](sel: Bits, in: Seq[T]): T =
     apply((0 until in.size).map(sel(_)), in)
 }
