@@ -2,6 +2,7 @@
 package Chisel
 
 import Node._
+import Module._
 
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ArrayBuffer
@@ -19,8 +20,8 @@ import java.io._
 abstract class Param[+T] {
   def value: T
 
-  def register(module: Module, pname: String) = {
-    Params.register(module, pname, this).asInstanceOf[T]
+  def register(pname: String) = {
+    Params.register(getComponent(), pname, this).asInstanceOf[T]
   }
 }
 
@@ -30,16 +31,22 @@ case class RangeParam(override val value: Int, min: Int, max: Int, step: Int = 1
 
 case class EnumParam(override val value: String, values: List[String]) extends Param[String]
 
+object IntParam {
+  def apply(name: String, value: Int) = RangeParam(value, value, value).register(name)
+}
+
 object Params {
   type Space = HashMap[String,HashMap[String,Param[Any]]]
 
   var space = new Space
   var design = new Space
+  var modules = new HashMap[String, Module]
 
   var buildingSpace = true
 
   def register(module: Module, pname: String, p: Param[Any]) = {
-    val mname = module.getClass.getName
+    val mname = if (module == null) "TOP" else module.getClass.getName
+    modules(mname) = module
     if(buildingSpace) {
       // TODO: error on duplicate key
       if(!space.contains(mname)) {
@@ -82,27 +89,24 @@ object Params {
     dump_file(filename, space)
   }
  
-  def serialize[T<:Param[Any]](myhashmap: HashMap[String,HashMap[String,T]]) : String = {
-    var hashmap = myhashmap
-    var string = ""
-    while(!hashmap.isEmpty){
-      var elem = hashmap.head
-      hashmap = hashmap.tail
-      var mname = elem._1
-      var mhash = elem._2
-      while(!mhash.isEmpty){
-        var elem2 = mhash.head
-        mhash = mhash.tail
-        string = string + mname + "," + elem2._1 + "," + toStringParam(elem2._2)
-        if(!mhash.isEmpty) {
-          string = string + " "
-        }
-      }
-      if(!hashmap.isEmpty) {
-        string = string + "\n"
+  def toCxxStringParams : String = {
+    var string = new StringBuilder("")
+    for ((mname, pelts) <- space) {
+      for ((pname, pelt) <- pelts) {
+        val rmname = if (mname == "TOP") "" else modules(mname).name + "__";
+        string ++= "const int " + rmname + pname + " = " + toCxxStringParam(pelt) + ";\n"
       }
     }
-    string
+    string.toString
+  }
+
+  def serialize[T<:Param[Any]](hashmap: HashMap[String,HashMap[String,T]]) : String = {
+    var string = new StringBuilder("")
+    for ((mname, pelts) <- hashmap) {
+      for ((pname, pelt) <- pelts)
+        string ++= mname + "," + pname + "," + toStringParam(pelt) + "\n"
+    }
+    string.toString
   }
 
   def deserialize(string: String, myhashmap: HashMap[String,HashMap[String,Param[Any]]]) = {
@@ -134,4 +138,17 @@ object Params {
     }
   }
     
+  def toCxxStringParam(param: Param[Any]) = {
+    param match {
+      // case EnumParam(init, list) =>
+        //"(range," + init + "," + list + ")"
+      //   "const int " + name + " = " + init + ";\n"
+      case RangeParam(init, min, max, step, log) =>
+        init.toString
+      case ValueParam(init) =>
+        init.toString
+      case _ =>
+        "uhoh "
+    }
+  }
 }

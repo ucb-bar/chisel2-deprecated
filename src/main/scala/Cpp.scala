@@ -681,7 +681,8 @@ class CppBackend extends Backend {
     out_h.write("  bool scan ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
     out_h.write("};\n\n");
-    out_h.write("#endif\n");
+    out_h.write(Params.toCxxStringParams);
+    out_h.write("\n\n#endif\n");
     out_h.close();
 
     out_c.write("#include \"" + c.name + ".h\"\n");
