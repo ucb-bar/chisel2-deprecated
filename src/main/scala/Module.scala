@@ -818,7 +818,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def stripComponent(s: String): String = s.split("__").last
 
     /** Returns the absolute path to a component instance from toplevel. */
-  def getPathName {
+  def getPathName: String = {
     getPathName()
   }
   def getPathName(separator: String = "_"): String = {
