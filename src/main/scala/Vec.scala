@@ -76,7 +76,7 @@ object Vec {
     val res =
       if (!elts.isEmpty && elts.forall(_ isLit)) new ROM[T]
       else new Vec[T]
-    res ++= elts
+    res.self ++= elts
     res
   }
 
@@ -139,14 +139,13 @@ class VecProc extends proc {
   }
 }
 
-class Vec[T <: Data] extends CompositeData with Cloneable with BufferProxy[T] {
+class Vec[T <: Data] extends CompositeData with VecLike[T] with Cloneable {
   val self = new ArrayBuffer[T]
   val readPortCache = new HashMap[UInt, T]
   var sortedElementsCache: ArrayBuffer[ArrayBuffer[Data]] = null
   var flattenedVec: Node = null
-  override def apply(idx: Int): T = {
-    super.apply(idx)
-  };
+
+  override def apply(idx: Int): T = self(idx)
 
   def sortedElements: ArrayBuffer[ArrayBuffer[Data]] = {
     if (sortedElementsCache == null) {
@@ -378,12 +377,21 @@ class Vec[T <: Data] extends CompositeData with Cloneable with BufferProxy[T] {
     Cat(reversed.head, reversed.tail: _*)
   }
 
+  def length: Int = self.size
+}
+
+trait VecLike[T <: Data] extends collection.IndexedSeq[T] {
+  def read(idx: UInt): T
+  def write(idx: UInt, data: T): Unit
+  def apply(idx: UInt): T
+
   def forall(p: T => Bool): Bool = (this map p).fold(Bool(true))(_&&_)
   def exists(p: T => Bool): Bool = (this map p).fold(Bool(false))(_||_)
   def contains[T <: Bits](x: T): Bool = this.exists(_ === x)
-  def count(p: T => Bool): UInt = PopCount(this map p)
+  def count(p: T => Bool): UInt = PopCount((this map p).toSeq)
 
-  private def indexWhereHelper(p: T => Bool) = this map p zip (0 until size).map(i => UInt(i))
+  private def indexWhereHelper(p: T => Bool) = this map p zip (0 until length).map(i => UInt(i))
   def indexWhere(p: T => Bool): UInt = PriorityMux(indexWhereHelper(p))
   def lastIndexWhere(p: T => Bool): UInt = PriorityMux(indexWhereHelper(p).reverse)
+  def onlyIndexWhere(p: T => Bool): UInt = Mux1H(indexWhereHelper(p))
 }

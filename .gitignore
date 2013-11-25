@@ -3,3 +3,10 @@ target/
 .history
 .ensime
 .ensime_lucene/
+*.nav
+*.out
+*.snm
+*.vrb
+*.toc
+*.bak
+*.new

@@ -44,7 +44,7 @@ object Fill {
       for (i <- 0 until n-1)
         res = (res << w)|bits_lit.value;
       Lit(res, n * w){ UInt() };
-    } else if (Module.backend.isInstanceOf[CppBackend] && mod.width != 1) {
+    } else if ((Module.backend.isInstanceOf[CppBackend] || Module.backend.isInstanceOf[FloBackend]) && mod.width != 1) {
       var out: UInt = null
       var i = 0
       var cur = mod

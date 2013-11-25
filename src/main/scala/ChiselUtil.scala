@@ -153,6 +153,10 @@ object Mux1H
       in(0).fromBits(masked.reduceLeft(_|_))
     }
   }
+  def apply[T <: Data](in: Seq[(Bool, T)]): T = {
+    val (sel, data) = in.unzip
+    apply(sel, data)
+  }
   def apply[T <: Data](sel: Bits, in: Seq[T]): T =
     apply((0 until in.size).map(sel(_)), in)
 }
@@ -487,12 +491,14 @@ class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) e
 
 object Log2 {
   def apply (mod: Bits, n: Int): UInt = {
+    def log2it() = {
+      val log2 = new Log2()
+      log2.init("", fixWidth(sizeof(n-1)), mod)
+      UInt().fromNode(log2)
+    }
     Module.backend match {
-      case x: CppBackend => {
-        val log2 = new Log2()
-        log2.init("", fixWidth(sizeof(n-1)), mod)
-        UInt().fromNode(log2)
-      }
+      case x: CppBackend => log2it
+      case x: FloBackend => log2it
       case _ => {
         var res = UInt(0);
         for (i <- 1 until n)

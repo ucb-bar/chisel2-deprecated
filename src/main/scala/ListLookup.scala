@@ -34,7 +34,7 @@ import scala.collection.mutable.ArrayBuffer
 
 object ListLookup {
   def apply[T <: Data](addr: UInt, default: List[T], mapping: Array[(UInt, List[T])]): List[T] = {
-    if (Module.backend.isInstanceOf[CppBackend]) {
+    if (Module.backend.isInstanceOf[CppBackend] || Module.backend.isInstanceOf[FloBackend]) {
       return CListLookup(addr, default, mapping)
     }
     val defaultNode = ListNode(default)

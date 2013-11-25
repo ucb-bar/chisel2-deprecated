@@ -84,22 +84,23 @@ class FloBackend extends Backend {
           o.op match {
             case "~" => "not/" + node.inputs(0).width + " " + emitRef(node.inputs(0))
             case "!" => "not/" + node.inputs(0).width + " " + emitRef(node.inputs(0))
-            case "-" => {
-              "neg/" + node.inputs(0).width + " " + emitRef(node.inputs(0))
-            }
+            case "-" => "neg/" + node.inputs(0).width + " " + emitRef(node.inputs(0))
           }
          } else {
            o.op match {
              case "<"  => "lt/"   + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
+             case "s<" => "rsh/1" + emitRef(node.inputs(0)) + " " + (node.inputs(0).width-1)
              case ">=" => "gte/"  + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "<=" => "gte/"  + node.inputs(0).width + " " + emitRef(node.inputs(1)) + " " + emitRef(node.inputs(0))
              case ">"  => "lt/"   + node.inputs(0).width + " " + emitRef(node.inputs(1)) + " " + emitRef(node.inputs(0))
              case "+"  => "add/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "-"  => "sub/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "*"  => "mul/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
+             case "/"  => "div/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "!"  => "not/" + node.width + " " + emitRef(node.inputs(0))
              case "<<" => "lsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case ">>" => "rsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
+             case "s>>" => "arsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "##" => "cat/" + node.inputs(1).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "|"  => "or "  + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "||" => "or "  + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
