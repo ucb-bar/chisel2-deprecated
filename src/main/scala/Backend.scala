@@ -220,7 +220,7 @@ abstract class Backend {
           /* Only modify name if it is not the reset signal
            or not in top component */
           if(m.name != "reset" && m.component != Module.topComponent) {
-            m.component.getPathName() + "__" + m.name;
+            m.component.getPathName + "__" + m.name;
           } else {
             m.name
           }

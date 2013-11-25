@@ -595,7 +595,7 @@ class CppBackend extends Backend {
           if (m.name != "" && !(m == c.defaultResetPin) && !(m.component == null)) {
             // only modify name if it is not the reset signal or not in top component
             if(m.name != "reset" || !(m.component == c)) {
-              m.name = m.component.getPathName() + "__" + m.name;
+              m.name = m.component.getPathName + "__" + m.name;
             }
           }
       }

@@ -993,8 +993,8 @@ class dat_base_t {
   virtual int width() = 0;
   virtual string to_str() = 0;  // TODO(ducky): define standardized interface and expected output.
                                 // Also allow different bases and representations (with defaults).
-  virtual bool set_from_str(string val) = 0; // TODO(ducky): define standardized interface and input format
-                                        // allowing multiple representations (0x, 0h, 0b, ...).
+  virtual bool set_from_str(string val) = 0;    // TODO(ducky): define standardized interface and input format
+                                                // allowing multiple representations (0x, 0h, 0b, ...).
   virtual dat_base_t* copy() = 0;   // this is an AWFUL hack to get around the awful templating
                                     // to be able to create an object of the same width
                                     // for fast compare operations
@@ -2131,8 +2131,6 @@ class mod_t {
 #define ASSERT(cond, msg) { \
   if (!(cond)) \
     throw std::runtime_error("Assertion failed: " msg); \
-
-
 }
 
 #endif
