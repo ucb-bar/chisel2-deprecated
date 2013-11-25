@@ -1667,9 +1667,15 @@ class mem_t : public mem_base_t {
       contents[idx].values[word] = val;
   }
   bool put_from_str(string index, string val) {
+    int i = atoi(index.c_str());
+    if (i > length()) {
+        cout << "mem_t::put_from_str: Index " << index << " out of range (max: " << length() << ")" << endl;
+        return false;
+    }
     dat_t<w> dat_val;
     dat_val.set_from_str(val);
-    put(atoi(index.c_str()), dat_val);
+    put(i, dat_val);
+    return true;
   }
   
   void print ( void ) {
@@ -1885,9 +1891,11 @@ bool dat_from_str(std::string in, dat_t<w>& res, int pos = 0) {
         } else if (c >= 'A' && c <= 'Z') {
             c_val = c - 'A' + 10;
         } else {
+            cout << "dat_from_str: Invalid character '" << c << "'" << endl;
             return false;
         }
         if (c_val > radix || c_val < 0) {
+            cout << "dat_from_str: Invalid character '" << c << "'" << endl;
             return false;
         }
         
@@ -1990,7 +1998,7 @@ template<typename T> T* get_list_elem(vector<T>* in_vec, string name) {
 class mod_t {
  public:
   std::vector< mod_t* > children;
-  virtual void init ( void ) { };
+  virtual void init ( bool rand_init=false ) { };
   virtual void clock_lo ( dat_t<1> reset ) { };
   virtual void clock_hi ( dat_t<1> reset ) { };
   
@@ -2018,6 +2026,7 @@ class mod_t {
     if (node != NULL) {
       return node->dat_ptr->to_str();
     } else {
+      cout << "mod_t::node_read: Unable to find node '" << name << "'" << endl;
       return "";
     }
   }
@@ -2026,8 +2035,11 @@ class mod_t {
   virtual bool node_write(string name, string val) {
     debug_node_t* node = get_list_elem<debug_node_t>(&nodes, name);
     if (node != NULL) {
-      return node->dat_ptr->set_from_str(val);
+      bool success = node->dat_ptr->set_from_str(val);
+      clock_lo(dat_t<1>(0));
+      return success;
     } else {
+      cout << "mod_t::node_write: Unable to find node '" << name << "'" << endl;
       return false;
     }
   }
@@ -2037,6 +2049,7 @@ class mod_t {
     if (mem != NULL) {
       return mem->mem_ptr->get_to_str(index);
     } else {
+      cout << "mod_t::mem_read: Unable to find mem '" << name << "'" << endl;
       return "";
     }
   }
@@ -2044,8 +2057,11 @@ class mod_t {
   virtual bool mem_write(string name, string index, string val) {
     debug_mem_t* mem = get_list_elem<debug_mem_t>(&mems, name);
     if (mem != NULL) {
-      return mem->mem_ptr->put_from_str(index, val);
+      bool success = mem->mem_ptr->put_from_str(index, val);
+      clock_lo(dat_t<1>(0));
+      return success;
     } else {
+      cout << "mod_t::mem_write: Unable to find mem '" << name << "'" << endl;
       return false;
     }
   }
@@ -2115,6 +2131,8 @@ class mod_t {
 #define ASSERT(cond, msg) { \
   if (!(cond)) \
     throw std::runtime_error("Assertion failed: " msg); \
+
+
 }
 
 #endif
