@@ -609,14 +609,14 @@ class CppBackend extends Backend {
         case l: Literal => ;
         case any        =>
           if (m.name != "" && (m.name != "reset") && !(m.component == null)) {
-            val mapping = (m.component.getPathName(".") + "." + m.name, m) 
+            val mapping = (m.component.getPathName(".") + "." + m.name, m)
             mappings += mapping
           }
       }
     }
     return mappings
   }
-  
+
   def emitMapping(mapping: Tuple2[String, Node]): String = {
     val (name, node) = mapping
     node match {
@@ -642,7 +642,7 @@ class CppBackend extends Backend {
         "  nodes.push_back(debug_node_t(\"" + name + "\", &" + emitRef(node) + "));\n"
     }
   }
-  
+
   def backendElaborate(c: Module) = super.elaborate(c)
 
   override def elaborate(c: Module): Unit = {
@@ -740,7 +740,7 @@ class CppBackend extends Backend {
     out_c.write("  mems.clear();\n");
     for (m <- mappings) {
       if (m._2.name != "reset" && (m._2.isInObject || m._2.isInVCD)) {
-      	out_c.write(emitMapping(m));
+        out_c.write(emitMapping(m));
       }
     }
     out_c.write("}\n");
@@ -782,7 +782,7 @@ class CppBackend extends Backend {
       out_c.write("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
     }
     for (clock <- Module.clocks) {
-      out_c.write("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " + 
+      out_c.write("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " +
                   emitRef(clock) + ";\n")
     }
     out_c.write("  return min;\n")
