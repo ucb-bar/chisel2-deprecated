@@ -146,14 +146,18 @@ object UIntToOH
   */
 object Mux1H
 {
-  def apply[T <: Data](sel: Seq[Bool], in: Seq[T]): T = {
-    if (in.size == 1) in(0)
+  def apply[T <: Data](sel: Iterable[Bool], in: Iterable[T]): T = {
+    if (in.tail.isEmpty) in.head
     else {
       val masked = (sel, in).zipped map ((s, i) => Mux(s, i.toBits, Bits(0)))
-      in(0).fromBits(masked.reduceLeft(_|_))
+      in.head.fromBits(masked.reduceLeft(_|_))
     }
   }
-  def apply[T <: Data](sel: Bits, in: Seq[T]): T =
+  def apply[T <: Data](in: Iterable[(Bool, T)]): T = {
+    val (sel, data) = in.unzip
+    apply(sel, data)
+  }
+  def apply[T <: Data](sel: Bits, in: Iterable[T]): T =
     apply((0 until in.size).map(sel(_)), in)
 }
 
@@ -487,12 +491,14 @@ class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) e
 
 object Log2 {
   def apply (mod: Bits, n: Int): UInt = {
+    def log2it() = {
+      val log2 = new Log2()
+      log2.init("", fixWidth(sizeof(n-1)), mod)
+      UInt().fromNode(log2)
+    }
     Module.backend match {
-      case x: CppBackend => {
-        val log2 = new Log2()
-        log2.init("", fixWidth(sizeof(n-1)), mod)
-        UInt().fromNode(log2)
-      }
+      case x: CppBackend => log2it
+      case x: FloBackend => log2it
       case _ => {
         var res = UInt(0);
         for (i <- 1 until n)

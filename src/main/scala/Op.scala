@@ -191,7 +191,7 @@ object Op {
       }
     }
     }
-    if (Module.backend.isInstanceOf[CppBackend]) {
+    if (Module.backend.isInstanceOf[CppBackend] || Module.backend.isInstanceOf[FloBackend]) {
       def signAbs(x: Node): (Bool, UInt) = {
         val f = x.asInstanceOf[SInt]
         val s = f < SInt(0)
@@ -267,7 +267,8 @@ class Op extends Node {
     if (inputs.length == 1) {
       op + "(" + inputs(0) + ")"
     } else {
-      "[ " + inputs(0) + "\n]\n  " + op + "\n" + "[  " + inputs(1) + "\n]"
+      op + " [ " + inputs(0) + "]" + op + "[  " + inputs(1) + "]"
+      // "[ " + inputs(0) + "\n]\n  " + op + "\n" + "[  " + inputs(1) + "\n]"
     }
 
   override def forceMatchingWidths {
