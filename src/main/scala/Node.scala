@@ -170,7 +170,7 @@ abstract class Node extends nameable {
     val w = if (width < 0) inferWidth(this) else width
     litValue((BigInt(1) << w) - 1)
   }
-  def minNum: BigInt = BigInt(0);
+  def minNum: BigInt = litValue(0)
   def isLit: Boolean = false
   def litOf: Literal = null
   def litValue(default: BigInt = BigInt(-1)): BigInt =

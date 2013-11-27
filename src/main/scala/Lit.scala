@@ -263,8 +263,6 @@ class Literal extends Node {
   var base = 'x';
   var inputVal = BigInt(0);
   override def value: BigInt = stringToVal(base, name);
-  override def maxNum: BigInt = value;
-  override def minNum: BigInt = value;
   override def isLit: Boolean = true;
   override def litOf: Literal = this
   override def toString: String = name;

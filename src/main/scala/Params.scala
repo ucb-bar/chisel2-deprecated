@@ -100,6 +100,17 @@ object Params {
     string.toString
   }
 
+  def toDotpStringParams : String = {
+    var string = new StringBuilder("")
+    for ((mname, pelts) <- space) {
+      for ((pname, pelt) <- pelts) {
+        val rmname = if (mname == "TOP") "" else modules(mname).name + ":";
+        string ++= rmname + pname + " = " + toCxxStringParam(pelt) + "\n"
+      }
+    }
+    string.toString
+  }
+
   def serialize[T<:Param[Any]](hashmap: HashMap[String,HashMap[String,T]]) : String = {
     var string = new StringBuilder("")
     for ((mname, pelts) <- hashmap) {
