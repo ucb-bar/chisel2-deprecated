@@ -142,20 +142,12 @@ class FloBackend extends Backend {
         // emitDec(m) + "mem " + m.n + "\n" + trueAll(emitRef(m) + "__is_all_read", m.reads)
 
       case m: MemRead =>
-        emitDec(m) + "ld " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n" // emitRef(m.mem)
-        // val w = r.mem.writes(0);
-        // emitRef(r) + "__is_read = and " + emitRef(w) + "__write " + emitRef(r.cond) + "\n" +
-        // emitDec(r) + "rd " + emitRef(r) + "__is_read" + " " + emitRef(r.mem) + " " + emitRef(r.addr) + "\n" 
+        emitDec(m) + "rd " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n" 
 
       case m: MemWrite =>
         if (m.inputs.length == 2) 
           return ""
-        emitDec(m) + "st " + emitRef(m.mem) + " " + emitRef(m.addr) + " " + emitRef(m.data) + "\n"
-        // emitRef(w) + "__is_wr" + " = and " + emitRef(w.mem) + "__is_all_read" + " " + emitRef(w.cond) + "\n" + 
-        // emitDec(w) + "wr " + emitRef(w) + "__is_wr" + " " + emitRef(w.mem) + " " + emitRef(w.addr) + " " + emitRef(w.data) + "\n" +
-        // emitRef(w) + "__write0 = reg 1 " + emitRef(w) + "\n" +
-        // emitRef(w) + "__write = or 1 " + emitRef(w) + "__write0" + "\n"       
-
+        emitDec(m) + "wr " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + " " + emitRef(m.data) + "\n"
       case x: Reg => // TODO: need resetData treatment
         (if (x.isReset) 
           (emitRef(x) + "__update = mux " + emitRef(x.inputs.last) + " " + emitRef(x.init) + " " + emitRef(x.next) + "\n") 
