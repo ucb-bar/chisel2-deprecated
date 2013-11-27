@@ -644,6 +644,11 @@ class CppBackend extends Backend {
     }
     val out_h = createOutputFile(c.name + ".h");
     val out_c = createOutputFile(c.name + ".cpp");
+    if (!Params.space.isEmpty) {
+      val out_p = createOutputFile(c.name + ".p");
+      out_p.write(Params.toCxxStringParams);
+      out_p.close();
+    }
     out_h.write("#ifndef __" + c.name + "__\n");
     out_h.write("#define __" + c.name + "__\n\n");
     out_h.write("#include \"emulator.h\"\n\n");
