@@ -646,7 +646,7 @@ class CppBackend extends Backend {
     val out_c = createOutputFile(c.name + ".cpp");
     if (!Params.space.isEmpty) {
       val out_p = createOutputFile(c.name + ".p");
-      out_p.write(Params.toCxxStringParams);
+      out_p.write(Params.toDotpStringParams);
       out_p.close();
     }
     out_h.write("#ifndef __" + c.name + "__\n");
