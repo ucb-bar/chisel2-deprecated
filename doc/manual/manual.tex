@@ -878,6 +878,45 @@ class Rom extends BlackBox {
 }
 \end{scala}
 
+\section{Printf and Sprintf}
+
+Chisel provides the ability to format and print strings for debugging
+purposes.  The \code{printf} and \code{sprintf} construct are similar to their
+C namesakes: they take a format string and a variable number of arguments,
+then print or return a string, respectively.  During simulation, \code{printf}
+prints the formatted string to the console on rising clock edges.
+\code{sprintf}, on the other hand, returns the formatted string as a bit
+vector.
+
+Supported format specifiers are \code{\%b} (binary number), \code{\%d}
+(decimal number), \code{\%x} (hexadecimal number), and \code{\%s} (string
+consisting of a sequence of 8-bit extended ASCII characters).  (\code{\%\%}
+specifies a literal \code{\%}.) Unlike in C, there are no width modifiers: the
+bit width of the corresponding argument determines the width in the string
+representation.
+
+The following example prints the line \code{"0x4142 16706 AB"} on cycles when
+\code{c} is true:
+
+\begin{scala}
+val x = Bits(0x4142)
+val s1 = sprintf("%x %s", x, x);
+when (c) { printf("%d %s\n", x, s1); }
+\end{scala}
+
+\section{Assert}
+
+Runtime assertions are provided by the \code{assert} construct.  During
+simulation, if an assertion's argument is false on a rising clock edge,
+an error is printed and simulation terminates.  For example, the following
+will terminate simulation after ten clock cycles:
+
+\begin{scala}
+val x = Reg(init = UInt(0, 4))
+x := x + UInt(1)
+assert(x < UInt(10))
+\end{scala}
+
 \section{Main and Testing}
 
 In order to construct a circuit, 
