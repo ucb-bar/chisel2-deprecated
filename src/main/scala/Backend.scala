@@ -230,7 +230,7 @@ abstract class Backend {
     }
   }
 
- def emitTmp(node: Node): String =
+  def emitTmp(node: Node): String =
     emitRef(node)
 
   def emitRef(node: Node): String = {

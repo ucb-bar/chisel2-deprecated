@@ -398,7 +398,7 @@ abstract class Node extends nameable {
         }
         i += 1;
       }
-      comp.mods += this;
+      if (!isTypeNode) /* edited by Donggyu */ comp.mods += this;
     }
   }
 
@@ -497,9 +497,8 @@ abstract class Node extends nameable {
     }
   }
   
-  // edited by Donggyu
   def emitIndex(): Int = {
-    if (index == -1 && !isTypeNode)  {
+    if (index == -1) {
       index = componentOf.nextIndex;
     }
     index
