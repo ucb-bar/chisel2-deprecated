@@ -1214,14 +1214,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           }
         }
       }
-      for(child <- propagatedChildren){
-        if(child.name == "pc_reg"){
-          println("DEBUG4")
-          println(node)
-          println(node.consumers)
-          println(coloredNodes(node)(0))
-        }
-      }
       propagatedChildren
     }
     
@@ -1272,12 +1264,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
               }
             }
           }
-        }
-      }
-      for(child <- propagatedChildren){
-        if(child.name == "pc_reg"){
-          println("DEBUG3")
-          println(node)
         }
       }
       propagatedChildren
@@ -1923,16 +1909,12 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         val writeEn = reg.updates(i)._1
         val writeData = reg.updates(i)._2
         val prevWriteEns = getVersions(writeEn)
-        println("DEBUG1")
-        println(getStage(writeEn))
-        println(getStage(writeData))
-        println(readStage)
         val writeStage = Math.max(getStage(writeEn), getStage(writeData))
         Predef.assert(writeStage > -1, "both writeEn and writeData are literals")
         if (writeStage > readStage) {
           for(stage <- readStage + 1 until writeStage + 1) {
             var currentStageWriteEnable = Bool(true)
-            if(-(stage - writeStage)  <= prevWriteEns.length){
+            if(-(stage - writeStage)  < prevWriteEns.length){
               currentStageWriteEnable = prevWriteEns(-(stage - writeStage) ).asInstanceOf[Bool]
             }
             regRAWHazards(((reg, i, stage))) = stageValids(writeStage) && currentStageWriteEnable
@@ -1968,10 +1950,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             for(stage <- readStage + 1 until writeStage + 1){
               var currentStageWriteEnable = Bool(true)
               var currentStageWriteAddr:Data = readAddr
-              if(-(stage - writeStage)  <= writeEnables.length){
+              if(-(stage - writeStage)  < writeEnables.length){
                 currentStageWriteEnable = writeEnables(-(stage - writeStage) ).asInstanceOf[Bool]
               }
-              if(-(stage - writeStage)  <= writeAddrs.length){
+              if(-(stage - writeStage)  < writeAddrs.length){
                 currentStageWriteAddr = writeAddrs(-(stage - writeStage) ).asInstanceOf[Data]
               }
               tMemRAWHazards(((readPoint, i, stage))) = stageValids(writeStage) && currentStageWriteEnable && (readAddr === currentStageWriteAddr)
