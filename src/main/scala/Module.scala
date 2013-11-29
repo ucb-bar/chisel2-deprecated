@@ -30,7 +30,9 @@
 
 package Chisel
 import scala.math._
+import scala.util.Random
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.{Queue=>ScalaQueue}
 import scala.collection.mutable.Stack
 import scala.collection.mutable.HashSet
@@ -267,6 +269,7 @@ object Module {
   
   var pipelineLength = 0
   val stageValids = new ArrayBuffer[Bool]
+  val fillerNodes = new HashSet[Node]
   
   val regRAWHazards = new HashMap[(Reg, Int, Int), Bool] //map of (register, updatelist num, write stage) -> RAW signal
   val tMemRAWHazards = new HashMap[(FunRdIO[Data], Int, Int), Bool] //map of (tmem readport, writeport number, write stage) -> RAW signal
@@ -299,7 +302,11 @@ object Module {
     pipeline(stage) += (n -> rst)
   }
   def annotateNodeStage(n: Node, s:Int) = {//insert pipeline registers by annotating nodes with stages
-    annotatedStages += ((n,s))
+    if(n.isInstanceOf[Data] && n.asInstanceOf[Data].comp != null){
+      annotatedStages += ((n.asInstanceOf[Data].comp, s))
+    } else {
+      annotatedStages += ((n,s))
+    }
   }
   
   def addForwardedReg(d: Reg) = {
@@ -1056,8 +1063,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
   
   def insertPipelineRegisters2() = { 
+    println("finding valid pipeline register placement")
     val coloredNodes = propagateStages()
-    println("inserting pipeline registers")
     var maxStage = 0
     for((node, stages) <- coloredNodes){
       if(stages.length > 0 && stages.max > maxStage){
@@ -1065,22 +1072,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
     }
     setPipelineLength(maxStage + 1)
-    
-    for(stage <- 0 until pipeline.size) {
-      val valid = Reg(init = Bool(false))
-      valids += valid
-      if (stage > 0) 
-        valid := valids(stage-1)
-      else
-        valid := Bool(true)
-      valid.nameIt("HuyValid_" + stage)
-    }
-    /*for(stage <- 0 until maxStage + 1) {
-      val valid = Bool()
-      valids += valid
-      valid.nameIt("PipeStageValid_" + stage)
-    }*/
 
+    /*println("optimizing pipeline register placement")
+    optimizeRegisterPlacement(coloredNodes)
+    println("inserting pipeline registers")*/
+    
     var counter = 0//hack to get unique register names with out anything nodes being named already
     nodeToStageMap = new HashMap[Node, Int]()
     for((node,stgs) <- coloredNodes){
@@ -1098,7 +1094,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           counter = counter + 1
           pipelineReg(Math.min(stgs(0),stgs(1)) + i) += currentNodeOut.asInstanceOf[Bits].comp.asInstanceOf[Reg]
           println("DEBUG0")
-          println(currentNodeOut.name)
         }
       } else if(stgs.length == 1){
         nodeToStageMap(node) = stgs(0)
@@ -1111,7 +1106,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     val regWritePoints = new HashSet[Node] //list of all register write inputs and transactionMem write port nodes(including write addr, write data, write en)
     val regReadPoints = new HashSet[Node] //list of all register read outputs and transactionMem read port
     val tMemWritePoints = new HashSet[Node] //list of all transactionMem write port nodes(including write addr, write data, write en)
-    val tMemReadPoints = new HashSet[Node] //list of all transactionMem read port nodes(including read addr, read data, read en)
+    val tMemReadDatas = new HashSet[Node] //list of all transactionMem read port nodes(including read addr, read data, read en)
+    val tMemReadAddrs = new HashSet[Node]
     val inputNodes = new HashSet[Node] //list of all module Input Nodes
     val outputNodes = new HashSet[Node] //list of all module Output Nodes
     
@@ -1121,8 +1117,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     val coloredNodes = new HashMap[Node, ArrayBuffer[Int]] //map of node to stage numbers to be returned
     var oldColoredNodes = new HashMap[Node, ArrayBuffer[Int]] //remember old colored nodes so that we can see if the algorithm is making progress
     
-    val fillerNodes = new HashSet[Node]
-    
     def insertFillerWires() = {//place extra wire nodes between all nodes
       val bfsQueue = new ScalaQueue[Node]
       val visited = new HashSet[Node]
@@ -1130,7 +1124,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       for(node <- regReadPoints){
         bfsQueue.enqueue(node)
       }
-      for(node <- tMemReadPoints){
+      for(node <- tMemReadDatas){
         bfsQueue.enqueue(node)
       }
       for(node <- inputNodes){
@@ -1139,7 +1133,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       while(!bfsQueue.isEmpty){
         val currentNode = bfsQueue.dequeue
         for(child <- currentNode.consumers){
-          if(!visited.contains(child) && !regWritePoints.contains(child) && !tMemWritePoints.contains(child) && !outputNodes.contains(child)){
+          if(!visited.contains(child) && !regWritePoints.contains(child) && !tMemWritePoints.contains(child) && !outputNodes.contains(child) && !tMemReadAddrs.contains(child)){
             bfsQueue.enqueue(child)
           }
         }
@@ -1220,6 +1214,14 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           }
         }
       }
+      for(child <- propagatedChildren){
+        if(child.name == "pc_reg"){
+          println("DEBUG4")
+          println(node)
+          println(node.consumers)
+          println(coloredNodes(node)(0))
+        }
+      }
       propagatedChildren
     }
     
@@ -1227,7 +1229,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       val propagatedChildren = new ArrayBuffer[Node]
       for(consumer <- node.consumers){
         if(!propagatedToChild(coloredNodes(node)(0), consumer)){//case if we have not already propagated to the consumer
-          if(!(fillerNodes.contains(node) && !fillerNodes.contains(consumer) && coloredNodes.contains(consumer) && (coloredNodes(consumer).length > 0))){//don't propagate to consumer if node is a fillerNode and consumer is not andconsumer already has atleast 1 stage number
+          if(!(fillerNodes.contains(node) && !fillerNodes.contains(consumer) && coloredNodes.contains(consumer) && (coloredNodes(consumer).length > 0))){//don't propagate to consumer if node is a fillerNode and consumer is not and consumer already has atleast 1 stage number
             if(consumer.getProducers.length <= 1){//case if consumer only consumes from the current node
               if(!coloredNodes.contains(consumer)){
                 coloredNodes(consumer) = new ArrayBuffer[Int]
@@ -1272,26 +1274,28 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           }
         }
       }
+      for(child <- propagatedChildren){
+        if(child.name == "pc_reg"){
+          println("DEBUG3")
+          println(node)
+        }
+      }
       propagatedChildren
     }
     
     //do initial pass to mark read and write points for regs
-    for(p <- procs){
-      p match {
-        case r: Reg => {
-          for(i <- r.getProducers()){
-            regWritePoints += i
-          }
-          regReadPoints += r
-        }
-        case _ =>
+    for (reg <- ArchitecturalRegs) {
+      regReadPoints += reg
+      for(i <- reg.getProducers){
+        regWritePoints += i
       }
     }
+    
     //do initial pass to mark read and write ports for transactionMems
     for(tmem <- TransactionMems){
       for(i <- 0 until tmem.readPortNum){
-        tMemReadPoints += tmem.io.reads(i).adr
-        tMemReadPoints += tmem.io.reads(i).dat
+        tMemReadAddrs += tmem.io.reads(i).adr
+        tMemReadDatas += tmem.io.reads(i).dat
       }
       for(i <- 0 until tmem.virtWritePortNum){
         tMemWritePoints += tmem.io.writes(i).adr
@@ -1309,16 +1313,16 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       outputNodes += output._2
     }
     
-    //insert filler wires for easier stage propagation
+    //insert filler wires for easier stage propagation. ie make sure that there is a non-shared wire node between a combinational logic node and each of its inputs and consumers. Each filler node is gaurenteed to have only 1 producer and 1 consumer. This way we make sure that the pipeline boundary can always lie on these wire nodes, ensuring that we get a legal pipelining
     insertFillerWires()
     
     //initialize bfs queue and coloredNodes with user annotated nodes
     for((node, stage) <- annotatedStages){
       Predef.assert(!(regReadPoints.contains(node) && regWritePoints.contains(node)), "same node marked as both read point and write point")
-      if(!regWritePoints.contains(node) && !tMemWritePoints.contains(node) && !outputNodes.contains(node)){
+      if(!regWritePoints.contains(node) && !tMemWritePoints.contains(node) && !outputNodes.contains(node) && !tMemReadAddrs.contains(node)){
         retryNodes += ((node, true))
       }
-      if(!regReadPoints.contains(node) && !tMemReadPoints.contains(node) && !inputNodes.contains(node)){
+      if(!regReadPoints.contains(node) && !tMemReadDatas.contains(node) && !inputNodes.contains(node)){
         retryNodes += ((node, false))
       }
       coloredNodes(node) = new ArrayBuffer[Int]()
@@ -1344,7 +1348,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             childrenPropagatedTo = propagateToProducers(currentNode)
           }
           for(child <- childrenPropagatedTo){
-            if((coloredNodes(child).length < 2) && !regReadPoints.contains(child) && !tMemReadPoints.contains(child) && !inputNodes.contains(child)){
+            if((coloredNodes(child).length < 2) && !regReadPoints.contains(child) && !tMemReadDatas.contains(child) && !inputNodes.contains(child) && !regWritePoints.contains(child) && !tMemWritePoints.contains(child) && !outputNodes.contains(child) && !tMemReadAddrs.contains(child)){
               bfsQueue.enqueue(((child, currentDirection)))
             }
           }
@@ -1354,7 +1358,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         }
       }
     }
-
+    println(regReadPoints)
+    println(regWritePoints)
     coloredNodes
   }
     
@@ -1396,10 +1401,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         new_bits.consumers += consumer
         new_bits.inputs += input
       }
-      input.consumers -= input.consumers(i)
-      for(newNode <- newNodes){
-        input.consumers += newNode
-      }
+    }
+    input.consumers.clear()
+    for(newNode <- newNodes){
+      input.consumers += newNode
     }
     newNodes
   }
@@ -1418,6 +1423,291 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       input.inputs(i) = new_bits
     }
     newNodes
+  }
+  
+  
+  def optimizeRegisterPlacement(coloredNodes: HashMap[Node, ArrayBuffer[Int]]) = {
+    val regWritePoints = new HashSet[Node] //list of all register write inputs and transactionMem write port nodes(including write addr, write data, write en)
+    val regReadPoints = new HashSet[Node] //list of all register read outputs and transactionMem read port
+    val tMemWritePoints = new HashSet[Node] //list of all transactionMem write port nodes(including write addr, write data, write en)
+    val tMemReadPoints = new HashSet[Node] //list of all transactionMem read port nodes(including read addr, read data, read en)
+    val inputNodes = new HashSet[Node] //list of all module Input Nodes
+    val outputNodes = new HashSet[Node] //list of all module Output Nodes
+    
+    val lastMovedNodes = new ArrayBuffer[(Node, ArrayBuffer[Int])]//keep track of nodes we just moved so that we can undo the move later
+    
+    var temp = 10000.0
+    val coolRate = 0.03
+    var iterCount = 0
+    
+    def acceptProbability(currentEnergy: Double, newEnergy: Double, temp: Double): Double = {
+      if(newEnergy < currentEnergy){
+        return 1
+      } else {
+        return Math.exp((currentEnergy-newEnergy)/temp)
+      }
+    }
+    
+    def findPaths(roots: ListBuffer[Node]): ListBuffer[ListBuffer[Node]] = {
+      val result = new ListBuffer[ListBuffer[Node]]
+      val unprocessedRoots = roots.clone()
+      
+      def traverse(currentNode: Node, path: ListBuffer[Node]): Unit = {
+        currentNode match {
+          case reg: Reg => {
+            if(path.size > 0){
+              result += path.clone()
+            }
+          }
+          case node: Node => {
+            if(coloredNodes.contains(node) && coloredNodes(node).length > 1 && (coloredNodes(node)(0) != coloredNodes(node)(1))){
+              unprocessedRoots += node
+              if(path.size > 0){
+                result += path.clone()
+              }
+            } else if(!tMemReadPoints.contains(node) && !inputNodes.contains(node)){
+              for(input <- node.inputs){
+                val newPath = path.clone()
+                newPath += node
+                traverse(input, newPath)
+              }
+            } else{
+              if(path.size > 0){
+                result += path.clone()
+              }
+            }
+          }
+          case _ =>
+        }
+      }
+      
+      while(unprocessedRoots.size > 0){
+        for(input <- unprocessedRoots(0).inputs){
+          traverse(input, new ListBuffer[Node])
+        }
+        unprocessedRoots -= unprocessedRoots(0)
+      }
+      return result
+    }
+    
+    def findEnergy(coloredNodes: HashMap[Node, ArrayBuffer[Int]]): Double = {
+      val roots = new ListBuffer[Node]()
+      for(node <- regWritePoints){
+        roots += node
+      }
+      for(node <- tMemWritePoints){
+        roots += node
+      }
+      for(node <- outputNodes){
+        roots += node
+      }
+      val paths = findPaths(roots)
+      var maxLength = 0.0
+      for(path <- paths){
+        var pathLength = 0.0
+        for(node <- path){
+          Predef.assert(!node.isInstanceOf[Reg], "register found in path")
+          pathLength = pathLength + node.delay()
+        }
+        maxLength = Math.max(maxLength, pathLength)
+      }
+      return maxLength
+    }
+    
+    //randomly move a combinational node across a pipeline boundary
+    def getNewPlacement() = {
+      if(Math.random > 0.5){//move node up a stage
+        val eligibleNodes = new ArrayBuffer[Node]//list of nodes that can be legally moved up one stage. A node can be legally moved up one stage if all of its consumer nodes have a stage number greater than its stage number
+        
+        //find eligibleNodes
+        for((node, stageNums) <- coloredNodes){
+          if(!regWritePoints.contains(node) && !regReadPoints.contains(node) && !tMemWritePoints.contains(node) && !tMemReadPoints.contains(node) && !inputNodes.contains(node) && !outputNodes.contains(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) < pipelineLength - 1) {
+            val nodeStage = coloredNodes(node)(0)
+            var consumersEligible = true
+            Predef.assert(coloredNodes(node).length <= 1)
+            for(consumer <- node.consumers){
+              if(!requiresNoStageNum(consumer)){
+                if(coloredNodes.contains(consumer) && coloredNodes(consumer).length > 1){
+                  Predef.assert(coloredNodes(consumer).length <= 2)
+                  consumersEligible = consumersEligible && (Math.max(coloredNodes(consumer)(0), coloredNodes(consumer)(1)) > nodeStage)
+                } else {
+                  consumersEligible = consumersEligible && false
+                  //Predef.assert(coloredNodes(consumer)(0) == nodeStage)
+                }
+              }
+            }
+            if(consumersEligible) eligibleNodes += node
+          }
+        }
+        
+        //randomly select eligible node to move
+        //Predef.assert(eligibleNodes.length > 0)
+        if(eligibleNodes.length > 0){
+          val idx = scala.util.Random.nextInt(eligibleNodes.length)
+          val movedNode = eligibleNodes(idx)
+          lastMovedNodes += ((movedNode, coloredNodes(movedNode).clone()))
+          val movedNodeStage = coloredNodes(movedNode)(0)
+          coloredNodes(movedNode)(0) = coloredNodes(movedNode)(0) + 1
+          for(input <- movedNode.inputs){
+            if(!requiresNoStageNum(input)){
+              lastMovedNodes += ((input, coloredNodes(input).clone()))
+              if(coloredNodes(input).length == 2){
+                if(coloredNodes(input)(0) == movedNodeStage){
+                  coloredNodes(input)(0) = coloredNodes(input)(0) + 1
+                } else {
+                  coloredNodes(input)(1) = coloredNodes(input)(1) + 1
+                }
+                if(coloredNodes(input)(0) == coloredNodes(input)(1)){
+                  coloredNodes(input) -= coloredNodes(input)(1)
+                }
+              } else {
+                coloredNodes(input) += coloredNodes(input)(0) + 1
+              }
+            }
+          }
+          for(consumer <- movedNode.consumers){
+            if(!requiresNoStageNum(consumer)){
+              lastMovedNodes += ((consumer, coloredNodes(consumer).clone()))
+              if(coloredNodes(consumer).length == 2){
+                if(coloredNodes(consumer)(0) == movedNodeStage){
+                  coloredNodes(consumer)(0) = coloredNodes(consumer)(0) + 1
+                } else {
+                  coloredNodes(consumer)(1) = coloredNodes(consumer)(1) + 1
+                }
+                if(coloredNodes(consumer)(0) == coloredNodes(consumer)(1)){
+                  coloredNodes(consumer) -= coloredNodes(consumer)(1)
+                }
+              }
+            }
+          }
+          
+        }
+      } else {//move node down a stage
+        val eligibleNodes = new ArrayBuffer[Node]//list of nodes that can be legally moved up one stage. A node can be legally moved up one stage if all of its consumer nodes have a stage number less than its stage number
+        
+        //find eligible nodes
+        for((node, stageNums) <- coloredNodes){
+          
+          if(!regWritePoints.contains(node) && !regReadPoints.contains(node) && !tMemWritePoints.contains(node) && !tMemReadPoints.contains(node) && !inputNodes.contains(node) && !outputNodes.contains(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) > 0) {
+            val nodeStage = coloredNodes(node)(0)
+            var producersEligible = true
+            Predef.assert(coloredNodes(node).length <= 1)
+            for(producer <- node.inputs){
+              if(!requiresNoStageNum(producer)){
+                if(coloredNodes.contains(producer) && coloredNodes(producer).length > 1){
+                  Predef.assert(coloredNodes(producer).length <= 2)
+                  producersEligible = producersEligible && (Math.min(coloredNodes(producer)(0), coloredNodes(producer)(1)) < nodeStage)
+                } else {
+                  producersEligible = producersEligible && false
+                  //Predef.assert(coloredNodes(producer)(0) == nodeStage)
+                }
+              }
+            }
+            if(producersEligible) eligibleNodes += node
+          }
+        }
+        
+        //Predef.assert(eligibleNodes.length > 0)
+        if(eligibleNodes.length > 0){
+          val idx = scala.util.Random.nextInt(eligibleNodes.length)
+          val movedNode = eligibleNodes(idx)
+          val movedNodeStage = coloredNodes(movedNode)(0)
+          lastMovedNodes += ((movedNode, coloredNodes(movedNode).clone()))
+          coloredNodes(movedNode)(0) = coloredNodes(movedNode)(0) - 1
+          for(input <- movedNode.inputs){
+            if(!requiresNoStageNum(input)){
+              lastMovedNodes += ((input, coloredNodes(input).clone()))
+              if(coloredNodes(input).length == 2){
+                if(coloredNodes(input)(0) == movedNodeStage){
+                  coloredNodes(input)(0) = coloredNodes(input)(0) - 1
+                } else {
+                  coloredNodes(input)(1) = coloredNodes(input)(1) - 1
+                }
+                if(coloredNodes(input)(0) == coloredNodes(input)(1)){
+                  coloredNodes(input) -= coloredNodes(input)(1)
+                }
+              }
+            }
+          }
+          for(consumer <- movedNode.consumers){
+            if(!requiresNoStageNum(consumer)){
+              lastMovedNodes += ((consumer, coloredNodes(consumer).clone()))
+              if(coloredNodes(consumer).length == 2){
+                if(coloredNodes(consumer)(0) == movedNodeStage){
+                  coloredNodes(consumer)(0) = coloredNodes(consumer)(0) - 1
+                } else {
+                  coloredNodes(consumer)(1) = coloredNodes(consumer)(1) - 1
+                }
+                if(coloredNodes(consumer)(0) == coloredNodes(consumer)(1)){
+                  coloredNodes(consumer) -= coloredNodes(consumer)(1)
+                }
+              } else {
+                coloredNodes(consumer) += coloredNodes(consumer)(0) - 1
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    //reset coloredNodes to its state before the last call of getNewPlacemement()
+    def recoverOldPlacement() = {
+      for((node, stages) <- lastMovedNodes){
+        coloredNodes(node) = stages
+      }
+    }
+    
+    //do initial pass to mark read and write points for regs
+    for(p <- procs){
+      p match {
+        case r: Reg => {
+          for(i <- r.getProducers()){
+            regWritePoints += i
+          }
+          regReadPoints += r
+        }
+        case _ =>
+      }
+    }
+    //do initial pass to mark read and write ports for transactionMems
+    for(tmem <- TransactionMems){
+      for(i <- 0 until tmem.readPortNum){
+        tMemReadPoints += tmem.io.reads(i).adr
+        tMemReadPoints += tmem.io.reads(i).dat
+      }
+      for(i <- 0 until tmem.virtWritePortNum){
+        tMemWritePoints += tmem.io.writes(i).adr
+        tMemWritePoints += tmem.io.writes(i).dat
+        tMemWritePoints += tmem.io.writes(i).is
+      }
+    }
+    //find module IO nodes
+    val inputs = pipelineComponent.io.flatten.filter(_._2.dir == INPUT)
+    val outputs = pipelineComponent.io.flatten.filter(_._2.dir == OUTPUT)
+    for(input <- inputs){
+      inputNodes += input._2
+    }
+    for(output <- outputs){
+      outputNodes += output._2
+    }
+    
+    println("max path delay before optimization:")
+    println(findEnergy(coloredNodes))
+    while(temp > 0.01 && iterCount < 1000){
+      val currentEnergy = findEnergy(coloredNodes)
+      getNewPlacement()
+      val newEnergy = findEnergy(coloredNodes)
+      /*println(currentEnergy)
+      println(newEnergy)*/
+      if(acceptProbability(currentEnergy, newEnergy, temp) < Math.random()){
+        recoverOldPlacement()
+      } 
+      lastMovedNodes.clear()
+      temp = temp - temp*coolRate
+      iterCount = iterCount + 1
+    }
+    println("max path delay after optimization:")
+    println(findEnergy(coloredNodes))
   }
   
   def insertPipelineRegisters() = {
@@ -1633,6 +1923,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         val writeEn = reg.updates(i)._1
         val writeData = reg.updates(i)._2
         val prevWriteEns = getVersions(writeEn)
+        println("DEBUG1")
+        println(getStage(writeEn))
+        println(getStage(writeData))
+        println(readStage)
         val writeStage = Math.max(getStage(writeEn), getStage(writeData))
         Predef.assert(writeStage > -1, "both writeEn and writeData are literals")
         if (writeStage > readStage) {
@@ -1681,7 +1975,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
                 currentStageWriteAddr = writeAddrs(-(stage - writeStage) ).asInstanceOf[Data]
               }
               tMemRAWHazards(((readPoint, i, stage))) = stageValids(writeStage) && currentStageWriteEnable && (readAddr === currentStageWriteAddr)
-              tMemRAWHazards(((readPoint, i, stage))).nameIt("hazard_num" + "raw_counter" + "_" +m.name + "_readport_num" + j + "_"+ stage + "_" + writeEn.name)
+              tMemRAWHazards(((readPoint, i, stage))).nameIt("hazard_num" + raw_counter + "_" +m.name + "_readport_num" + j + "_"+ stage + "_" + writeEn.name)
               raw_counter = raw_counter + 1
               println("found hazard" + writeEn.line.getLineNumber + " " + writeEn.line.getClassName + " " + writeEn.name + " " + m.name)
             }
@@ -1690,7 +1984,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
     }
     
+    println("reg raw hazards")
     println(regRAWHazards)
+    println("tMem raw hazards")
     println(tMemRAWHazards)
   }
   

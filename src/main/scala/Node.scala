@@ -146,7 +146,10 @@ abstract class Node extends nameable {
   var pipelinedVersion: Node = null
   var unPipelinedVersion: Node = null
   var elaborated = false
-  //end automatci pipelining stuff
+  def delay() : Float = {
+    return 0
+  }
+  //end automatic pipelining stuff
   
   var CppVertex: CppVertex = null
 
