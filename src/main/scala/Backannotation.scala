@@ -189,6 +189,9 @@ trait DelayBackannotation extends Backend {
     tcl.append("link\n")
     tcl.append("check_design\n")
     tcl.append("create_clock clk -name ideal_clock1 -period 1\n\n")
+    // tcl.append("compile -no_design_rule")
+    // tcl.append("compile -only_design_rule")
+    tcl.append("compile -only_hold_time")
    
     var first_report = true
 
@@ -416,5 +419,14 @@ trait DelayBackannotation extends Backend {
         }
       }
     }
+  }
+
+  override def elaborate(c: Module) = {
+    super.elaborate(c)
+  
+    generateTcl(c)
+    executeDC()
+    annotateDelay(c)
+    printDelay(c)
   }
 }
