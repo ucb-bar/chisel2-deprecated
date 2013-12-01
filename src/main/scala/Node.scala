@@ -523,5 +523,17 @@ abstract class Node extends nameable {
         inputs(i) = add
       }
     }
+    var i = 0
+    val deleteOriginalConsumers = delete.consumers.clone()
+    delete.consumers.clear()
+    for(consumer <- deleteOriginalConsumers){
+      if(consumer != this){
+        delete.consumers += consumer
+      }
+    }
+    if(!delete.consumers.contains(add)){
+      delete.consumers += add
+    }  
+    add.consumers += this
   }
 }

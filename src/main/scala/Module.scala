@@ -247,12 +247,12 @@ object Module {
   var pipelineReg = new HashMap[Int, ArrayBuffer[Reg]]()
   
   val forwardedRegs = new HashSet[Reg]
-  val forwardedMemReadPoints = new HashSet[(TransactionMem[_], FunRdIO[_])]
+  val forwardedMemReadPorts = new HashSet[(TransactionMem[_], FunRdIO[_])]
   val memNonForwardedWritePoints = new HashSet[FunWrIO[_]]
   
   val speculation = new ArrayBuffer[(Bits, Bits)]
   
-  var annotatedStages = new ArrayBuffer[(Node, Int)]()
+  var annotatedStages = new HashMap[Node, Int]()
   
   var nodeToStageMap: HashMap[Node, Int] = null
   
@@ -302,18 +302,19 @@ object Module {
     pipeline(stage) += (n -> rst)
   }
   def annotateNodeStage(n: Node, s:Int) = {//insert pipeline registers by annotating nodes with stages
+    Predef.assert(!annotatedStages.contains(n), n.name + " already annotated as stage " + annotatedStages(n))
     if(n.isInstanceOf[Data] && n.asInstanceOf[Data].comp != null){
-      annotatedStages += ((n.asInstanceOf[Data].comp, s))
+      annotatedStages(n.asInstanceOf[Data].comp) = s
     } else {
-      annotatedStages += ((n,s))
+      annotatedStages(n) = s
     }
   }
   
   def addForwardedReg(d: Reg) = {
     forwardedRegs += d
   }
-  def addForwardedMemReadPoint(m: TransactionMem[_], r: FunRdIO[_]) = {
-    forwardedMemReadPoints += ((m.asInstanceOf[TransactionMem[Data]], r.asInstanceOf[FunRdIO[Data]]))
+  def addForwardedMemReadPort(m: TransactionMem[_], r: FunRdIO[_]) = {
+    forwardedMemReadPorts += ((m.asInstanceOf[TransactionMem[Data]], r.asInstanceOf[FunRdIO[Data]]))
   }
   def addNonForwardedMemWritePoint[T <: Data] (writePoint: FunWrIO[T]) = {
     memNonForwardedWritePoints += writePoint
@@ -1344,8 +1345,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         }
       }
     }
-    println(regReadPoints)
-    println(regWritePoints)
     coloredNodes
   }
     
@@ -1371,21 +1370,19 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     new_reg
   }
   
-  //inserts additional bit node between *input* and its consumers(useful for automatic pipelining)
+  //inserts additional bit nodes between *input* and its consumers(useful for automatic pipelining)
   def insertBitsOnOutputs(input: Node) : ArrayBuffer[Node] = {
     val newNodes = new ArrayBuffer[Node]()
     for(i <- 0 until input.consumers.size){
       val consumer = input.consumers(i)
-      val producer_indices = new ArrayBuffer[Int]
       for(j <- 0 until consumer.inputs.size){
-        if(consumer.inputs(j) == input) producer_indices += j
-      }
-      for(producer_index <- producer_indices){
-        val new_bits = Bits()
-        newNodes += new_bits
-        consumer.inputs(producer_index) = new_bits
-        new_bits.consumers += consumer
-        new_bits.inputs += input
+        if(consumer.inputs(j) == input){
+          val new_bits = Bits()
+          newNodes += new_bits
+          consumer.inputs(j) = new_bits
+          new_bits.consumers += consumer
+          new_bits.inputs += input
+        } 
       }
     }
     input.consumers.clear()
@@ -1395,22 +1392,23 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     newNodes
   }
   
-  //inserts additional bit node between *input* and its producers(useful for automatic pipelining)
-  def insertBitsOnInputs(input: Node) = {
-  val newNodes = new ArrayBuffer[Node]()
-    for(i <- 0 until input.inputs.size){
-      val new_bits = Bits()
-      newNodes += new_bits
-      val producer = input.inputs(i)
-      val consumer_index = producer.consumers.indexOf(input)
-      if(consumer_index > -1) producer.consumers(consumer_index) = new_bits
-      new_bits.inputs += producer
-      new_bits.consumers += input
-      input.inputs(i) = new_bits
+  //inserts additional (SINGULAR) bit node between *input* and its consumers(useful for automatic pipelining)
+  def insertBitOnOutputs(input: Node) : Node = {
+    val new_bits = Bits()
+    new_bits.inputs += input
+    for(i <- 0 until input.consumers.size){
+      val consumer = input.consumers(i)
+      for(j <- 0 until consumer.inputs.size){
+        if(consumer.inputs(j) == input){
+          consumer.inputs(j) = new_bits
+          new_bits.consumers += consumer
+        } 
+      }
     }
-    newNodes
+    input.consumers.clear()
+    input.consumers += new_bits
+    new_bits
   }
-  
   
   def optimizeRegisterPlacement(coloredNodes: HashMap[Node, ArrayBuffer[Int]]) = {
     val regWritePoints = new HashSet[Node] //list of all register write inputs and transactionMem write port nodes(including write addr, write data, write en)
@@ -1908,16 +1906,16 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       for (i <- 0 until reg.updates.length){
         val writeEn = reg.updates(i)._1
         val writeData = reg.updates(i)._2
-        val prevWriteEns = getVersions(writeEn)
         val writeStage = Math.max(getStage(writeEn), getStage(writeData))
         Predef.assert(writeStage > -1, "both writeEn and writeData are literals")
+        val prevWriteEns = getVersions(writeEn, writeStage - readStage + 1)
         if (writeStage > readStage) {
           for(stage <- readStage + 1 until writeStage + 1) {
             var currentStageWriteEnable = Bool(true)
             if(-(stage - writeStage)  < prevWriteEns.length){
               currentStageWriteEnable = prevWriteEns(-(stage - writeStage) ).asInstanceOf[Bool]
             }
-            regRAWHazards(((reg, i, stage))) = stageValids(writeStage) && currentStageWriteEnable
+            regRAWHazards(((reg, i, stage))) = (stageValids(stage) && currentStageWriteEnable)
             regRAWHazards(((reg, i, stage))).nameIt("hazard_num" + raw_counter + "_" + reg.name + "_" + stage + "_" + writeEn.name)
             raw_counter = raw_counter + 1
             println("found reg RAW hazard " + writeEn.line.getLineNumber + " " + writeEn.line.getClassName)
@@ -1930,22 +1928,19 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     for (m <- TransactionMems) {
       for(i <- 0 until m.io.writes.length){
         val writePoint = m.io.writes(i)
-        /*val writeAddr = writePoint.adr.inputs(0).inputs(0).inputs(1)
-        val writeEn = writePoint.is.inputs(0).inputs(0).inputs(1)
-        val writeData = writePoint.dat.inputs(0).inputs(0).inputs(1)*/
         val writeAddr = writePoint.actualWaddr
         val writeEn = writePoint.actualWen
         val writeData = writePoint.actualWdata
         val writeStage = Math.max(getStage(writeEn),Math.max(getStage(writeAddr), getStage(writeData)))
         Predef.assert(writeStage > -1)
-        val writeEnables = getVersions(writeEn.asInstanceOf[Bool])
-        val writeAddrs = getVersions(writeAddr.asInstanceOf[Bits])
         for(j <- 0 until m.io.reads.length){
           val readPoint = m.io.reads(j)
           val readAddr = readPoint.adr
           val readData = readPoint.dat
           val readStage = Math.max(getStage(readAddr), getStage(readData))
           Predef.assert(readStage > -1)
+          val writeEnables = getVersions(writeEn.asInstanceOf[Bool], writeStage - readStage + 1)
+          val writeAddrs = getVersions(writeAddr.asInstanceOf[Bits], writeStage - readStage + 1)
           if(writeStage > readStage){
             for(stage <- readStage + 1 until writeStage + 1){
               var currentStageWriteEnable = Bool(true)
@@ -1956,10 +1951,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
               if(-(stage - writeStage)  < writeAddrs.length){
                 currentStageWriteAddr = writeAddrs(-(stage - writeStage) ).asInstanceOf[Data]
               }
-              tMemRAWHazards(((readPoint, i, stage))) = stageValids(writeStage) && currentStageWriteEnable && (readAddr === currentStageWriteAddr)
+              tMemRAWHazards(((readPoint, i, stage))) = stageValids(stage) && currentStageWriteEnable && (readAddr === currentStageWriteAddr)
               tMemRAWHazards(((readPoint, i, stage))).nameIt("hazard_num" + raw_counter + "_" +m.name + "_readport_num" + j + "_"+ stage + "_" + writeEn.name)
               raw_counter = raw_counter + 1
-              println("found hazard" + writeEn.line.getLineNumber + " " + writeEn.line.getClassName + " " + writeEn.name + " " + m.name)
+              println("found hazard" + writeEn.line.getLineNumber + " " + writeEn.line.getClassName + " " + j + " " + stage + " " + currentStageWriteEnable.name + " " + readAddr.name + " " + currentStageWriteAddr.name + " " + m.name)
             }
           }
         }
@@ -2071,6 +2066,91 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
   }
   
+  def generateBypassLogic() = {
+    //generate bypass logic for registers
+    for(reg <- forwardedRegs){
+      val forwardPoints = new HashMap[(Int, Int), Node]// map of (write port number, write stage) -> write data
+      val readStage = getStage(reg)
+      for(i <- 0 until reg.updates.length){
+        val writeEn = reg.updates(i)._1
+        val writeData = reg.updates(i)._2
+        val writeStage = Math.max(getStage(writeEn), getStage(writeData))
+        Predef.assert(writeStage > -1)
+        val writeEns = getVersions(writeEn.asInstanceOf[Bool], writeStage - readStage + 1)
+        val writeDatas = getVersions(writeData.asInstanceOf[Bits], writeStage - readStage + 1)
+        val numStagesAvail = Math.min(writeEns.length, writeDatas.length)
+        for(j <- 0 until numStagesAvail) {
+          forwardPoints(((i, writeStage - j))) = writeDatas(j)
+        }
+      }
+
+      val muxMapping = new ArrayBuffer[(Bool, Bits)]()
+      for(j <- getStage(reg) + 1 to pipelineReg.size){
+        for(i <- 0 until reg.updates.length){
+          if(forwardPoints.contains(((i,j)))){ 
+            val forwardCond = regRAWHazards(((reg, i, j)))
+            muxMapping += ((forwardCond, forwardPoints(((i, j))).asInstanceOf[Bits]))
+            regRAWHazards -= ((reg, i, j))
+            println("added fowarding point (" + reg.name + ", write port #" + i + ", write stage: " + j +  ")")
+          }
+        }
+      }
+
+      val tempBitsNode = insertBitOnOutputs(reg).asInstanceOf[Bits]
+      val originalConsumers = tempBitsNode.consumers.clone()
+      val bypassMux = MuxCase(tempBitsNode, muxMapping)
+      bypassMux.nameIt("bypassMux_" + reg.name)
+      for (consumer <- originalConsumers){
+        consumer.replaceProducer(tempBitsNode, bypassMux)
+      }
+    }
+    
+    //generate bypass logic for tmems
+    for((tMem, readPort) <- forwardedMemReadPorts){
+      val forwardPoints = new HashMap[(Int, Int), Node]()// map of (writeport number, write stage) -> write data
+      val readAddr = readPort.adr
+      val readData = readPort.dat
+      val readStage = Math.max(getStage(readAddr), getStage(readData.asInstanceOf[Node]))
+      Predef.assert(readStage > -1)
+      for(i <- 0 until tMem.io.writes.length){
+        val writePoint = tMem.io.writes(i)
+        if(!memNonForwardedWritePoints.contains(writePoint)){
+          val writeAddr = writePoint.actualWaddr
+          val writeEn = writePoint.actualWen
+          val writeData = writePoint.actualWdata
+          val writeStage = Math.max(getStage(writeEn),Math.max(getStage(writeAddr), getStage(writeData)))
+          Predef.assert(writeStage > -1)
+          val writeEns = getVersions(writeEn.asInstanceOf[Bool], writeStage - readStage + 1)
+          val writeAddrs = getVersions(writeAddr.asInstanceOf[Bits], writeStage - readStage + 1)
+          val writeDatas = getVersions(writeData.asInstanceOf[Bits], writeStage - readStage + 1)
+          val numStagesAvail = Math.min(writeEns.length, Math.min(writeDatas.length, writeAddrs.length))
+          for(j <- 0 until numStagesAvail){
+            Predef.assert(getStage(writeEns(j)) > -1)
+            forwardPoints(((i, writeStage - j))) = writeDatas(j)
+          }
+        }
+      }
+      val muxMapping = new ArrayBuffer[(Bool, Bits)]()
+      for(j <- getStage(readPort.adr) + 1 to pipelineReg.size){
+        for(i <- 0 until tMem.io.writes.length){
+          if(forwardPoints.contains(((i, j)))){
+            val forwardCond = tMemRAWHazards(((readPort.asInstanceOf[FunRdIO[Data]], i, j)))
+            muxMapping +=((forwardCond, forwardPoints(((i, j))).asInstanceOf[Bits]))
+            tMemRAWHazards -= ((readPort.asInstanceOf[FunRdIO[Data]], i, j))
+            println("added fowarding point (" + readPort.dat.asInstanceOf[Node].name + ", write port #" + i + ", write stage: " + j +  ")")
+          }
+        }
+      }
+      
+      val bypassMux = MuxCase(readPort.dat.asInstanceOf[Bits], muxMapping)
+      bypassMux.nameIt("bypassMux_" + tMem.name + "_" + readPort.dat.asInstanceOf[Node].name)
+      val originalConsumers = readPort.dat.asInstanceOf[Bits].consumers.clone()
+      for (consumer <- originalConsumers){
+        consumer.replaceProducer(readPort.dat.asInstanceOf[Node], bypassMux)    
+      }
+    }
+  }
+  
   /*def findHazards() = {
     println("searching for hazards...")
     val comp = pipelineComponent
@@ -2118,7 +2198,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         val writeData = writePoint.dat.inputs(0).inputs(1)
         val writeStage = getStage(writeEn)
         val writeEnables = getVersions(writeEn.asInstanceOf[Bool])
-        val writeAddrs = getVersions(writeAddr.asInstanceOf[Bits])
+        val writeAddrs = getVersions(writeAddr.asInstanceOf[Bits],)
         Predef.assert(getStage(writeEn) == getStage(writeData) || getStage(writeEn) == -1 || getStage(writeData) == -1, "writeEN stage" + "(" + writeEn.name + "): " + getStage(writeEn) + " writeData stage" + "(" + writeData + "): " + getStage(writeData))
         Predef.assert(getStage(writeData) == getStage(writeAddr) || getStage(writeAddr) == -1 || getStage(writeData) == -1, "writeData stage: " + getStage(writeData) + " writeAddr stage: " + getStage(writeAddr))
         var foundHazard = false
@@ -2139,21 +2219,28 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
   }*/
   
-  def getVersions(node: Node): ArrayBuffer[Node] = {
+  def getVersions(node: Node, maxLen: Int): ArrayBuffer[Node] = {
     val result = new ArrayBuffer[Node]//stage of node decreases as the array index increases
     var currentNode = node
-    result += currentNode
-    while(currentNode.inputs.length == 1){
-      if(currentNode.inputs(0).isInstanceOf[Reg]){
-        if(!isPipeLineReg(currentNode)){
-          result += currentNode
+    if(requiresNoStageNum(currentNode)){
+      for(i <- 0 until maxLen){
+        result += currentNode
+      }
+    } else {
+      while(currentNode.inputs.length == 1){
+        if(currentNode.inputs(0).isInstanceOf[Reg]){
+          if(!isPipeLineReg(currentNode)){
+            if(result.length < maxLen) result += currentNode
+          } else {
+            if(result.length < maxLen) result += currentNode
+            return result
+          }
+          currentNode = currentNode.inputs(0).asInstanceOf[Reg].updates(0)._2
         } else {
-          return result
-        }
-        currentNode = currentNode.inputs(0).asInstanceOf[Reg].updates(0)._2
-      } else {
-        currentNode = currentNode.inputs(0)
-      } 
+          currentNode = currentNode.inputs(0)
+        } 
+      }
+      if(result.length < maxLen) result += currentNode
     }
     result
   }

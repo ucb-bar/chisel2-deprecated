@@ -271,24 +271,10 @@ trait proc extends Node {
   def procAssign(src: Node): Unit
   Module.procs += this;
 
-  override def replaceProducer(delete: Node, add: Node) = {
-    for(i <- 0 until inputs.length){
-      if(inputs(i) == delete){
-        inputs(i) = add
-      }
-    }
-    for((i,j) <- updates){
-      if(i == delete && j == delete){
-        updates -= ((i,j))
-        updates += ((add.asInstanceOf[Bool], add))
-      } else if(i == delete) {
-        updates -= ((i,j))
-        updates += ((add.asInstanceOf[Bool], j))
-      } else if(j == delete) {
-        updates -= ((i,j))
-        updates += ((i, add)) 
-      }
-    }
+  abstract override def replaceProducer(delete: Node, add: Node) = {
+    super.replaceProducer(delete, add)
+    
+    updates.clear()
   }
 }
 
