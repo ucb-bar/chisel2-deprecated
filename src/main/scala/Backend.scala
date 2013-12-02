@@ -576,6 +576,7 @@ abstract class Backend {
     c.verifyLegalStageColoring()
     c.findHazards()
     c.generateBypassLogic()
+    c.generateSpeculationLogic()
     c.generateInterlockLogic()
     connectResets
     c.genAllMuxes

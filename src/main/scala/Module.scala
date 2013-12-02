@@ -250,7 +250,8 @@ object Module {
   val forwardedMemReadPorts = new HashSet[(TransactionMem[_], FunRdIO[_])]
   val memNonForwardedWritePoints = new HashSet[FunWrIO[_]]
   
-  val speculation = new ArrayBuffer[(Bits, Bits)]
+  val speculation = new ArrayBuffer[(Bits, Bits)]//need to deprecate
+  val speculatedRegs = new ArrayBuffer[(Reg, Data)]
   
   var annotatedStages = new HashMap[Node, Int]()
   
@@ -269,6 +270,8 @@ object Module {
   
   var pipelineLength = 0
   val stageValids = new ArrayBuffer[Bool]
+  val stageStalls = new ArrayBuffer[Bool]
+  val stageKills = new ArrayBuffer[Bool]
   val fillerNodes = new HashSet[Node]
   
   val regRAWHazards = new HashMap[(Reg, Int, Int), Bool] //map of (register, updatelist num, write stage) -> RAW signal
@@ -276,13 +279,23 @@ object Module {
   
   def setPipelineLength(length: Int) = {
     pipelineLength = length
-    for (i <- 0 until length - 1) {
+    for (i <- 0 until pipelineLength - 1) {
       pipelineReg += (i -> new ArrayBuffer[Reg]())
     }
-    for (i <- 0 until length) {
+    for (i <- 0 until pipelineLength) {
       val valid = Bool()
       stageValids += valid
-      valid.nameIt("PipeStageValid_" + i)
+      valid.nameIt("PipeStage_Valid_" + i)
+    }
+    for (i <- 0 until pipelineLength) {
+      val stall = Bool()
+      stageStalls += stall
+      stall.nameIt("PipeStage_Stall_" + i)
+    }
+    for (i <- 0 until pipelineLength) {
+      val kill = Bool()
+      stageKills += kill
+      kill.nameIt("PipeStage_Kill_" + i)
     }
   }
   
@@ -320,8 +333,12 @@ object Module {
     memNonForwardedWritePoints += writePoint
   }
 
-  def speculate(s: Bits, v: Bits) = {
+  def speculate(s: Bits, v: Bits) = {//need to deprecate
     speculation += ((s, v))
+  }
+  
+  def speculate(reg: Reg, specValue: Data) = {
+    speculatedRegs += ((reg, specValue))
   }
   
   //we should not propagate stage numbers to literals, reset signals, and clock signals
@@ -1089,12 +1106,12 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         var currentNodeOut = node
         nodeToStageMap(currentNodeOut) = Math.min(stgs(0),stgs(1))
         for(i <- 0 until stageDifference){
+          println("inserted register on " + currentNodeOut.name)
           currentNodeOut = insertRegister(currentNodeOut.asInstanceOf[Bits], Bits(0), "Stage_" + (Math.min(stgs(0),stgs(1)) + i) + "_" + "PipeReg_"+ currentNodeOut.name + counter)
           nodeToStageMap(currentNodeOut) = Math.min(stgs(0),stgs(1)) + i + 1
           nodeToStageMap(currentNodeOut.asInstanceOf[Bits].comp) = Math.min(stgs(0),stgs(1)) + i + 1
           counter = counter + 1
           pipelineReg(Math.min(stgs(0),stgs(1)) + i) += currentNodeOut.asInstanceOf[Bits].comp.asInstanceOf[Reg]
-          println("DEBUG0")
         }
       } else if(stgs.length == 1){
         nodeToStageMap(node) = stgs(0)
@@ -1913,9 +1930,12 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           for(stage <- readStage + 1 until writeStage + 1) {
             var currentStageWriteEnable = Bool(true)
             if(-(stage - writeStage)  < prevWriteEns.length){
-              currentStageWriteEnable = prevWriteEns(-(stage - writeStage) ).asInstanceOf[Bool]
+              currentStageWriteEnable = Bool()
+              currentStageWriteEnable.inputs += prevWriteEns(-(stage - writeStage) )
             }
-            regRAWHazards(((reg, i, stage))) = (stageValids(stage) && currentStageWriteEnable)
+            val stageValidTemp = Bool()
+            stageValidTemp.inputs += stageValids(stage)//hack to deal with empty bool() being merged with what its &&ed with randomly
+            regRAWHazards(((reg, i, stage))) = (stageValidTemp && currentStageWriteEnable)
             regRAWHazards(((reg, i, stage))).nameIt("hazard_num" + raw_counter + "_" + reg.name + "_" + stage + "_" + writeEn.name)
             raw_counter = raw_counter + 1
             println("found reg RAW hazard " + writeEn.line.getLineNumber + " " + writeEn.line.getClassName)
@@ -1951,7 +1971,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
               if(-(stage - writeStage)  < writeAddrs.length){
                 currentStageWriteAddr = writeAddrs(-(stage - writeStage) ).asInstanceOf[Data]
               }
-              tMemRAWHazards(((readPoint, i, stage))) = stageValids(stage) && currentStageWriteEnable && (readAddr === currentStageWriteAddr)
+              val stageValidTemp = Bool()
+              stageValidTemp.inputs += stageValids(stage)//hack to deal with empty bool() being merged with what its &&ed with randomly
+              tMemRAWHazards(((readPoint, i, stage))) = stageValidTemp && currentStageWriteEnable && (readAddr === currentStageWriteAddr)
               tMemRAWHazards(((readPoint, i, stage))).nameIt("hazard_num" + raw_counter + "_" +m.name + "_readport_num" + j + "_"+ stage + "_" + writeEn.name)
               raw_counter = raw_counter + 1
               println("found hazard" + writeEn.line.getLineNumber + " " + writeEn.line.getClassName + " " + j + " " + stage + " " + currentStageWriteEnable.name + " " + readAddr.name + " " + currentStageWriteAddr.name + " " + m.name)
@@ -1965,105 +1987,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     println(regRAWHazards)
     println("tMem raw hazards")
     println(tMemRAWHazards)
-  }
-  
-  def generateInterlockLogic() = {
-    //initialize stall signals
-    val stageStalls = new ArrayBuffer[Bool]
-    for (i <- 0 until pipelineLength) {
-      val stall = Bool(false)
-      stageStalls += stall
-      stall.nameIt("PipeStageStall_" + i)
-    }
-    
-    
-    //initialize registers for stageValid signals
-    val validRegs = new ArrayBuffer[Bool]
-    for (i <- 0 until pipelineLength - 1) {
-      val validReg = Reg(Bool())
-      when(~stageStalls(i)){
-        validReg := stageValids(i)
-      }
-      when(pipelineComponent._reset){
-        validReg := Bool(false)
-      }
-      validReg.comp.asInstanceOf[Reg].clock = pipelineComponent.clock
-      validRegs += validReg
-      validReg.comp.nameIt("Stage_" + i + "_valid_reg")
-    }
-    
-    //initialize temporpary valid signals
-    val tempValids = new ArrayBuffer[Bool]
-    tempValids += Bool(true)
-    for(i <- 1 until pipelineLength){
-      tempValids += validRegs(i - 1)
-    }
-    
-    //collect RAW hazards for valids and stalls for every stage
-    //reg RAW hazards
-    for ((key, value) <- regRAWHazards){
-      val reg = key._1
-      val RAWHazardSignal = value
-      val readStage = getStage(reg)
-      tempValids(readStage) = tempValids(readStage) && ~RAWHazardSignal
-      if(readStage > 0 && readStage < pipelineLength){
-        stageStalls(readStage - 1) = stageStalls(readStage - 1) || RAWHazardSignal
-      }
-    }
-    
-    //transactionMem RAW hazards
-    for ((key, value) <- tMemRAWHazards){
-      val readAddr = key._1.adr
-      val RAWHazardSignal = value
-      val readStage = getStage(readAddr)
-      tempValids(readStage) = tempValids(readStage) && ~RAWHazardSignal
-      if(readStage > 0 && readStage < pipelineLength ){
-        stageStalls(readStage - 1) = stageStalls(readStage - 1) || RAWHazardSignal
-      }
-    }
-    
-    //connect actual stage valids to the tempValids
-    for(i <- 0 until pipelineLength){
-      stageValids(i) := tempValids(i)
-    }
-    
-    //generate logic for stall signals
-    for(i <- (0 until pipelineLength - 2).reverse) {
-      stageStalls(i) = stageStalls(i) || stageStalls(i+1)
-    }
-
-    //wire stage valid and stall signals to architecural state write enables
-    //regs
-    for(reg <- ArchitecturalRegs){
-      val writeStage = reg.updates.map(_._2).map(getStage(_)).filter(_ > - 1)(0)
-      for (i <- 0 until reg.updates.length){
-        val writeEn = reg.updates(i)._1
-        reg.updates(i) = ((writeEn && ~globalStall && stageValids(writeStage) && ~stageStalls(writeStage), reg.updates(i)._2))
-      }
-      reg.genned = false
-    }
-    //transactionMems
-    for(tmem <- TransactionMems){
-      for(i <- 0 until tmem.io.writes.length){
-        val writePoint = tmem.io.writes(i)
-        val writeAddr = writePoint.actualWaddr
-        val writeEn = writePoint.actualWen
-        val writeData = writePoint.actualWdata
-        val writeStage = Math.max(getStage(writeEn),Math.max(getStage(writeAddr), getStage(writeData)))
-        val newWriteEn = writeEn.asInstanceOf[Bool] && ~globalStall && stageValids(writeStage) && ~stageStalls(writeStage)
-        //fix writeEn's consumer list
-        val writeEnMuxFillerInput = writePoint.is.inputs(0).inputs(0).inputs(0)//need a less hack way of finding this
-        val consumer_index = writeEn.consumers.indexOf(writeEnMuxFillerInput)
-        Predef.assert(consumer_index > -1)        
-        writeEn.consumers(consumer_index) = newWriteEn
-        //fix writeEnMux's inputs list
-        val producer_index = writeEnMuxFillerInput.inputs.indexOf(writeEn)
-        Predef.assert(producer_index > -1)
-        writeEnMuxFillerInput.inputs(producer_index) = newWriteEn
-        //populate newWriteEn's consumer list
-        newWriteEn.addConsumers 
-      }
-    }
   }
   
   def generateBypassLogic() = {
@@ -2080,7 +2003,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         val writeDatas = getVersions(writeData.asInstanceOf[Bits], writeStage - readStage + 1)
         val numStagesAvail = Math.min(writeEns.length, writeDatas.length)
         for(j <- 0 until numStagesAvail) {
-          forwardPoints(((i, writeStage - j))) = writeDatas(j)
+          val writeDataBits = Bits()//needed to deal with op nodes
+          writeDataBits.inputs += writeDatas(j)
+          forwardPoints(((i, writeStage - j))) = writeDataBits
         }
       }
 
@@ -2126,7 +2051,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           val numStagesAvail = Math.min(writeEns.length, Math.min(writeDatas.length, writeAddrs.length))
           for(j <- 0 until numStagesAvail){
             Predef.assert(getStage(writeEns(j)) > -1)
-            forwardPoints(((i, writeStage - j))) = writeDatas(j)
+            val writeDataBits = Bits()//needed to deal with op nodes
+            writeDataBits.inputs += writeDatas(j)
+            forwardPoints(((i, writeStage - j))) = writeDataBits
           }
         }
       }
@@ -2150,6 +2077,185 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
     }
   }
+  
+  def generateSpeculationLogic() = {
+    val tempKills = new ArrayBuffer[Bool]
+    for(i <- 0 until pipelineLength){
+      tempKills += Bool(false)
+    }
+    
+    for((reg, specWriteData) <- speculatedRegs){
+      ArchitecturalRegs -= reg
+      val readStage = getStage(reg)
+      val writeStage = Math.max(getStage(reg.updates(0)._1), getStage(reg.updates(0)._2))
+      
+      //generate registers to hold the speculated data
+      var currentStageSpecWriteData = specWriteData
+      for(stage <- readStage until writeStage){
+        val specWriteDataReg = Reg(Bits())
+        when(~stageStalls(stage) && ~globalStall){
+          specWriteDataReg := currentStageSpecWriteData
+        }
+        when(pipelineComponent._reset){
+          specWriteDataReg := Bits(0)
+        }
+        specWriteDataReg.comp.asInstanceOf[Reg].clock = pipelineComponent.clock
+        specWriteDataReg.nameIt("spec_write_data_reg_" + reg.name + "_" + stage)
+        specWriteDataReg := currentStageSpecWriteData
+        currentStageSpecWriteData = specWriteDataReg
+      }
+      
+      //figure out when we mis-speculate
+      val actualWriteData = Bits()
+      actualWriteData.inputs += reg.inputs(0)
+      
+      val stageValidTemp = Bool()
+      stageValidTemp.inputs += stageValids(writeStage)//hack to deal with empty bool() being merged with what its &&ed with randomly
+      val kill = ~(currentStageSpecWriteData === actualWriteData) && stageValidTemp
+      kill.nameIt("spec_kill_" + reg.name)
+      for(stage <- readStage until writeStage ){
+        tempKills(stage) = tempKills(stage) || kill
+      }
+      
+      //remove reg's raw hazards from regRAWHazards
+      for (i <- 0 until reg.updates.length){
+        val writeEn = reg.updates(i)._1
+        val writeData = reg.updates(i)._2
+        val writeStage = Math.max(getStage(writeEn), getStage(writeData))
+        Predef.assert(writeStage > -1, "both writeEn and writeData are literals")
+        val prevWriteEns = getVersions(writeEn, writeStage - readStage + 1)
+        if (writeStage > readStage) {
+          for(stage <- readStage + 1 until writeStage + 1) {
+            regRAWHazards -= (((reg, i, stage)))
+          }
+        }
+      }
+      
+      //modify reg's write port
+      for(i <- 0 until reg.updates.length){
+        val en = reg.updates(i)._1
+        reg.updates(i) = ((en && kill, reg.updates(i)._2))
+      }
+      val doSpeculate = ~stageStalls(readStage) && ~globalStall && ~kill
+      doSpeculate.nameIt("do_speculate_" + reg.name)
+      reg.updates += ((doSpeculate, specWriteData))
+      reg.genned = false
+      
+      
+    }
+    
+    for(i <- 0 until pipelineLength){
+      tempKills(i).nameIt("PipeStage_Kill_" + i)
+      stageKills(i) = tempKills(i)//hack fix this(why does := work?)
+    }
+  }
+  
+  def generateInterlockLogic() = {
+    //initialize temporpary valid signals
+    val tempStalls = new ArrayBuffer[Bool]
+    for(i <- 0 until pipelineLength){
+      tempStalls += Bool(false)
+    }
+    
+    //initialize registers for stageValid signals
+    val validRegs = new ArrayBuffer[Bool]
+    for (i <- 0 until pipelineLength - 1) {
+      val validReg = Reg(Bool())
+      when(~stageStalls(i) && ~globalStall){
+        validReg := stageValids(i)
+      }
+      when(pipelineComponent._reset){
+        validReg := Bool(false)
+      }
+      validReg.comp.asInstanceOf[Reg].clock = pipelineComponent.clock
+      validRegs += validReg
+      validReg.comp.nameIt("Stage_" + i + "_valid_reg")
+    }
+    
+    //initialize temporpary valid signals
+    val tempValids = new ArrayBuffer[Bool]
+    tempValids += ~stageKills(0)
+    for(i <- 1 until pipelineLength){
+      tempValids += validRegs(i - 1) && ~stageKills(i)
+    }
+
+    //collect RAW hazards for valids and stalls for every stage
+    //reg RAW hazards
+    for ((key, value) <- regRAWHazards){
+      val reg = key._1
+      val RAWHazardSignal = value
+      val readStage = getStage(reg)
+      tempValids(readStage) = tempValids(readStage) && ~RAWHazardSignal
+      if(readStage > 0 && readStage < pipelineLength){
+        tempStalls(readStage - 1) = tempStalls(readStage - 1) || RAWHazardSignal
+      }
+    }
+    
+    //transactionMem RAW hazards
+    for ((key, value) <- tMemRAWHazards){
+      val readAddr = key._1.adr
+      val RAWHazardSignal = value
+      val readStage = getStage(readAddr)
+      tempValids(readStage) = tempValids(readStage) && ~RAWHazardSignal
+      if(readStage > 0 && readStage < pipelineLength ){
+        tempStalls(readStage - 1) = tempStalls(readStage - 1) || RAWHazardSignal
+      }
+    }
+    
+    //connect actual stage valids to the tempValids
+    for(i <- 0 until pipelineLength){
+      stageValids(i).inputs += tempValids(i)
+    }
+    
+    //generate logic for stall signals
+    for(i <- (0 until pipelineLength - 2).reverse) {
+      tempStalls(i) = tempStalls(i) || tempStalls(i+1)
+    }
+
+    //connect actual stage stalls to the tempStalls
+    for(i <- 0 until pipelineLength){
+      if(tempStalls(i).litOf != null){
+        stageStalls(i) := ~(stageValids(0) === stageValids(0))//hack to get around stage(i) := const failing to code gen properly
+      } else {
+        stageStalls(i) := tempStalls(i)
+      }
+    }
+    
+    //wire stage valid and stall signals to architecural state write enables
+    //regs
+    for(reg <- ArchitecturalRegs){
+      val writeStage = reg.updates.map(_._2).map(getStage(_)).filter(_ > - 1)(0)
+      for (i <- 0 until reg.updates.length){
+        val writeEn = reg.updates(i)._1
+        reg.updates(i) = ((writeEn && ~globalStall && stageValids(writeStage) && ~stageStalls(writeStage), reg.updates(i)._2))
+      }
+      reg.genned = false
+    }
+    //transactionMems
+    for(tmem <- TransactionMems){
+      for(i <- 0 until tmem.io.writes.length){
+        val writePoint = tmem.io.writes(i)
+        val writeAddr = writePoint.actualWaddr
+        val writeEn = writePoint.actualWen
+        val writeData = writePoint.actualWdata
+        val writeStage = Math.max(getStage(writeEn),Math.max(getStage(writeAddr), getStage(writeData)))
+        val newWriteEn = writeEn.asInstanceOf[Bool] && ~globalStall && stageValids(writeStage) && ~stageStalls(writeStage)
+        //fix writeEn's consumer list
+        val writeEnMuxFillerInput = writePoint.is.inputs(0).inputs(0).inputs(0)//need a less hack way of finding this
+        val consumer_index = writeEn.consumers.indexOf(writeEnMuxFillerInput)
+        Predef.assert(consumer_index > -1)        
+        writeEn.consumers(consumer_index) = newWriteEn
+        //fix writeEnMux's inputs list
+        val producer_index = writeEnMuxFillerInput.inputs.indexOf(writeEn)
+        Predef.assert(producer_index > -1)
+        writeEnMuxFillerInput.inputs(producer_index) = newWriteEn
+        //populate newWriteEn's consumer list
+        newWriteEn.addConsumers 
+      }
+    }
+  }
+  
+  
   
   /*def findHazards() = {
     println("searching for hazards...")
@@ -2227,7 +2333,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         result += currentNode
       }
     } else {
-      while(currentNode.inputs.length == 1){
+      while(currentNode.inputs.length == 1 && !currentNode.inputs(0).isInstanceOf[Op]){
         if(currentNode.inputs(0).isInstanceOf[Reg]){
           if(!isPipeLineReg(currentNode)){
             if(result.length < maxLen) result += currentNode
