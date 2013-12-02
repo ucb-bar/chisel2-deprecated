@@ -357,8 +357,8 @@ trait DelayBackannotation extends Backend {
             delay1 += incr.toDouble 
           }
           else { }
-          // ChiselError.info("cell : " + cell + "\tincr : " + incr.toDouble + "\tpath : " + path + "\t( " + 
-          //   delay1 + " , " + delay2 + " , " + delay3 + " )")
+          ChiselError.info("cell : " + cell + "\tincr : " + incr.toDouble + "\tpath : " + path + "\t( " + 
+             delay1 + " , " + delay2 + " , " + delay3 + " )")
         }
         case FlagRegex(cell, incr, path) => {
           if (firstflag) {
@@ -458,7 +458,7 @@ trait DelayBackannotation extends Backend {
     }
    
     report.append("\nCritical path delay: %.4f".format(calcCPDelay(m)))
-
+   
     // ChiselError.info(report)
     // Write the signals into the file
     try {
