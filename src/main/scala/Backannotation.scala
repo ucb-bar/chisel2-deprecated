@@ -358,8 +358,8 @@ trait DelayBackannotation extends Backend {
             delay1 += incr.toDouble 
           }
           else { }
-          ChiselError.info("cell : " + cell + "\tincr : " + incr.toDouble + "\tpath : " + path + "\t( " + 
-             delay1 + " , " + delay2 + " , " + delay3 + " )")
+          // ChiselError.info("cell : " + cell + "\tincr : " + incr.toDouble + "\tpath : " + path + "\t( " + 
+          //   delay1 + " , " + delay2 + " , " + delay3 + " )")
         }
         case FlagRegex(cell, incr, path) => {
           if (firstflag) {
