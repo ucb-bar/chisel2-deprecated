@@ -26,7 +26,7 @@ trait SignalBackannotation extends Backend {
   preElaborateTransforms += ((c: Module) => nameAll(c))
   preElaborateTransforms += ((c: Module) => nameNodes)
   preElaborateTransforms += ((c: Module) => annotateCrosses(c))
-  preElaborateTransforms += ((c: Module) => printCrosses(Module.crosses))
+  preElaborateTransforms += ((c: Module) => printCrosses(Module.crosses, c.name + "_crosses.rpt"))
 
   // For consistent naming
   private def nameNodes: Unit = {
@@ -38,17 +38,6 @@ trait SignalBackannotation extends Backend {
           emitTmp(node)
       }
     }
-  }
-
-  private def printParents(module: Module): String = {
-    if (module == Module.topComponent) emitRef(module)
-    else printParents(module.parent) + "." + emitRef(module)
-  }
-
-  private def printSignal(node: Node): String = {
-    if (node == null) "null"
-    else if (node.width > 1) "Bus(" + printParents(node.componentOf) + "." + emitTmp(node) + ")"
-    else "Signal(" + printParents(node.componentOf) + "." + emitTmp(node) + ")"
   }
 
   private def readCrosses(filename: String): ArrayBuffer[(Double, Array[String])] = {
@@ -124,6 +113,17 @@ trait SignalBackannotation extends Backend {
     }
   }
   
+  private def printParents(module: Module): String = {
+    if (module == Module.topComponent) emitRef(module)
+    else printParents(module.parent) + "." + emitRef(module)
+  }
+
+  private def printSignal(node: Node): String = {
+    if (node == null) "null"
+    else if (node.width > 1) "Bus(" + printParents(node.componentOf) + "." + emitTmp(node) + ")"
+    else "Signal(" + printParents(node.componentOf) + "." + emitTmp(node) + ")"
+  }
+
   private def printCrosses(crosses: ArrayBuffer[(Double, Array[Node], Array[Node])], filename: String = "crosses.rpt"): Unit = {
     val basedir = ensureDir(Module.targetDir)
     val rptdir  = ensureDir(basedir+"report")
@@ -169,7 +169,16 @@ trait DelayBackannotation extends Backend {
   analyses += ((c: Module) => printDelay(c))
 */
 
-  protected def generateTcl(m: Module, filename: String = "gentcl.tcl") {
+  private def getParents(m: Module): String = {
+    if (m == Module.topComponent) ""
+    else getParents(m.parent) + emitRef(m.parent) + "/"
+  }
+
+  private def getNodeName(n: Node): String = {
+    getParents(n.componentOf) + emitTmp(n)
+  }
+
+  private def generateTcl(m: Module, filename: String = "gentcl.tcl") {
     val basedir = ensureDir(Module.targetDir)
     val dcsyndir  = ensureDir(basedir+"dc-syn")
     val tcl = new StringBuilder();
@@ -188,10 +197,10 @@ trait DelayBackannotation extends Backend {
     tcl.append("elaborate " + m.name + "\n")
     tcl.append("link\n")
     tcl.append("check_design\n")
-    tcl.append("create_clock clk -name ideal_clock1 -period 1\n\n")
-    // tcl.append("compile -no_design_rule")
-    // tcl.append("compile -only_design_rule")
-    tcl.append("compile -only_hold_time")
+    tcl.append("create_clock clk -name ideal_clock1 -period 1\n")
+    // tcl.append("compile -no_design_rule\n\n")
+    // tcl.append("compile -only_design_rule\n\n")
+    tcl.append("compile -only_hold_time\n\n")
    
     var first_report = true
 
@@ -227,47 +236,52 @@ trait DelayBackannotation extends Backend {
     }
     */
 
-    m.bfs { node =>
-      for (i <- node.inputs) {
-        (i, node) match {
-          case (_: Chisel.Reg, r: Chisel.Reg) => {
-            tcl.append(cmdhead + "echo \"\\n" + emitTmp(i) + " ---> " + emitTmp(r) + "\"" + cmdtail)
-            tcl.append(cmdhead + "report_timing -from [get_clock] -to [get_pins " + emitTmp(r) + 
-                       "_reg*/next_state]" + cmdopts + cmdtail)
+    tcl.append(cmdhead + "echo \"\\n*** Critical Path Timing Information ***\\n\"" + cmdtail)
+    tcl.append(cmdhead + "report_timing" + cmdopts + cmdtail)
+
+    m.bfs { from =>
+      for (to <- from.consumers) {
+        (from, to) match {
+          case (_: Reg, to: Reg) => {
+            tcl.append(cmdhead + "echo \"\\n" + getNodeName(from) + " ---> " + getNodeName(to) + "\"" + cmdtail)
+            tcl.append(cmdhead + "report_timing -from [get_pins " + getNodeName(from) + "_reg*/Q] -to [get_pins " + 
+                       getNodeName(to) + "_reg*/D]" + cmdopts + cmdtail)
           }
-          case (r: Chisel.Reg, _) => {
-            (signalmap get node) match {
+          case (_: Reg, _) => {
+            (signalmap get to) match {
               case None    => {
-                tcl.append(cmdhead + "echo \"\\n" + emitTmp(r) + " ---> " + emitTmp(node) + "\"" + cmdtail)
-                tcl.append(cmdhead + "report_timing -from [get_pins " + emitTmp(r) + "_reg*/Q] -to " + 
-                           emitTmp(node) + cmdopts + cmdtail)
+                tcl.append(cmdhead + "echo \"\\n" + getNodeName(from) + " ---> " + getNodeName(to) + "\"" + cmdtail)
+                tcl.append(cmdhead + "report_timing -from [get_pins " + getNodeName(from) + "_reg*/Q] -to " + 
+                           getNodeName(to) + cmdopts + cmdtail)
               }
-              case Some(c) => { 
-                tcl.append(cmdhead + "echo \"\\n" +emitTmp(r) + " ---> " + emitTmp(c) + "\"" + cmdtail)
-                tcl.append(cmdhead + "report_timing -from [get_pins " + emitTmp(r) + "_reg*/Q] -to " + 
-                           emitTmp(c) + cmdopts + cmdtail)
+              case Some(to) => { 
+                tcl.append(cmdhead + "echo \"\\n" + getNodeName(from) + " ---> " + getNodeName(to) + "\"" + cmdtail)
+                tcl.append(cmdhead + "report_timing -from [get_pins " + getNodeName(from) + "_reg*/Q] -to " + 
+                           getNodeName(to) + cmdopts + cmdtail)
               }
             }
           }
-          case (_: Chisel.Literal, _) =>
-          case (_, r: Chisel.Reg) => {
-            (signalmap get i) match {
+          case (_: Literal, _) =>
+          case (_, _: Reg) => {
+            (signalmap get from) match {
               case None    => {
-                tcl.append(cmdhead + "echo \"\\n" + emitTmp(i) + " ---> " + emitTmp(r) + "\"" + cmdtail)
-                tcl.append(cmdhead + "report_timing -from [get_clock] -to [get_pins " + emitTmp(r) + 
-                           "_reg*/Q]" + cmdopts + cmdtail)
+                tcl.append(cmdhead + "echo \"\\n" + getNodeName(from) + " ---> " + getNodeName(to) + "\"" + cmdtail)
+                tcl.append(cmdhead + "report_timing -from " + getNodeName(from) + " -to [get_pins " + 
+                           getNodeName(to) + "_reg*/D]" + cmdopts + cmdtail)
               }
               case Some(_) =>
             }
           }
           case (_, _) => {
-            (signalmap get i, signalmap get node) match {
+            (signalmap get from, signalmap get to) match {
               case (None, None)    => 
-                tcl.append(cmdhead + "echo \"\\n" + emitTmp(i) + " ---> " + emitTmp(node) + "\"" + cmdtail)
-                tcl.append(cmdhead + "report_timing -from " + emitTmp(i) + " -to " + emitTmp(node) + cmdopts + cmdtail)
-              case (None, Some(c)) =>
-                tcl.append(cmdhead + "echo \"\\n" + emitTmp(i) + " ---> " + emitTmp(c) + "\"" + cmdtail)
-                tcl.append(cmdhead + "report_timing -from " + emitTmp(i) + " -to " + emitTmp(c) + cmdopts + cmdtail)
+                tcl.append(cmdhead + "echo \"\\n" + getNodeName(from) + " ---> " + getNodeName(to) + "\"" + cmdtail)
+                tcl.append(cmdhead + "report_timing -from " + getNodeName(from) + " -to " + 
+                           getNodeName(to) + cmdopts + cmdtail)
+              case (None, Some(to)) =>
+                tcl.append(cmdhead + "echo \"\\n" + getNodeName(from) + " ---> " + getNodeName(to) + "\"" + cmdtail)
+                tcl.append(cmdhead + "report_timing -from " + getNodeName(from) + " -to " + 
+                           getNodeName(to) + cmdopts + cmdtail)
               case (Some(_), _)    =>
             }
           }
@@ -276,7 +290,7 @@ trait DelayBackannotation extends Backend {
     }
 
     tcl.append("\nwrite -f verilog -hierarchy -output " + m.name + ".mapped.v\n\n")
-    tcl.append("exit")
+    tcl.append("exit\n")
 
     // ChiselError.info(tcl.toString) 
 
@@ -308,9 +322,9 @@ trait DelayBackannotation extends Backend {
     var start = false
     var firstflag = false
     var secondflag = false
-    var earlydelay = 0.0
-    var middledelay = 0.0
-    var lastdelay = 0.0
+    var delay1 = 0.0
+    var delay2 = 0.0
+    var delay3 = 0.0
     val hashmap = new HashMap[(String, String), (Double, Double, Double)]
 
     // for (line <- lines) { ChiselError.info(line) }
@@ -319,44 +333,44 @@ trait DelayBackannotation extends Backend {
       line match {
         case RetRegex(ret) => {
           // ChiselError.info ("RET " + ret.toString)
-          hashmap += ((nodepair, (earlydelay, middledelay, lastdelay)))
+          hashmap += ((nodepair, (delay1, delay2, delay3)))
           start = false
           firstflag = false
           secondflag = false
-          earlydelay = 0.0
-          middledelay = 0.0
-          lastdelay = 0.0
+          delay1 = 0.0
+          delay2 = 0.0
+          delay3 = 0.0
         }
-        case NodeRegex(i, node) => {
-          // ChiselError.info((i + " ---> " + node))
+        case NodeRegex(from, to) => {
+          // ChiselError.info((from + " ---> " + to))
           start = true
-          nodepair = (i, node)
+          nodepair = (from, to)
         }
         case DelayRegex(cell, incr, path) => {
           if (secondflag) { 
-            lastdelay += incr.toDouble 
+            delay3 += incr.toDouble 
           }
           else if (firstflag) { 
-            middledelay += incr.toDouble 
+            delay2 += incr.toDouble 
           }
           else if (start) {
-            earlydelay += incr.toDouble 
+            delay1 += incr.toDouble 
           }
           else { }
           // ChiselError.info("cell : " + cell + "\tincr : " + incr.toDouble + "\tpath : " + path + "\t( " + 
-          //   earlydelay + " , " + middledelay + " , " + lastdelay + " )")
+          //   delay1 + " , " + delay2 + " , " + delay3 + " )")
         }
         case FlagRegex(cell, incr, path) => {
           if (firstflag) {
             secondflag = true
-            lastdelay += incr.toDouble
+            delay2 += incr.toDouble
           } else if (start) {
             firstflag = true
-            middledelay += incr.toDouble
+            delay1 += incr.toDouble
           } else {
           }
           // ChiselError.info("cell : " + cell + " <- \tincr : " + incr + "\tpath : " + path + "\t( " + 
-          //   earlydelay + " , " + middledelay + " , " + lastdelay + " )")
+          //   delay1 + " , " + delay2 + " , " + delay3 + " )")
         }
         case _ =>
       }
@@ -365,7 +379,67 @@ trait DelayBackannotation extends Backend {
     hashmap  
   }
 
-  protected def printDelay(m: Module, filename: String = "delay.rpt"): Unit = {
+  private def annotateDelay(m: Module, filename: String = "timing.rpt") {
+    ChiselError.info("Donggyu: annotate delays")
+    val basedir = ensureDir(Module.targetDir)
+    val dcsyndir  = ensureDir(basedir+"dc-syn")
+    val delaymap = readDelay(dcsyndir+filename)
+
+    m bfs { from => 
+      val fromname = getNodeName(from)
+      for (to <- from.consumers) {
+        val toname = getNodeName(to)
+        val (delay1, delay2, delay3) =  
+            delaymap getOrElse ((fromname, toname), (0.0, 0.0, 0.0))
+        (from, to) match {
+          case (from: Bits, _) if from.dir == INPUT => {
+            if (from.outdelay < delay1) from.outdelay = delay1
+          }
+          case (_: Reg, _) => {
+            if (from.outdelay < delay1) from.outdelay = delay1
+            if (to.indelay < delay2) to.indelay = delay2
+          }
+          case (_, _: Reg) => {
+            if (from.outdelay < delay2) from.outdelay = delay2
+          }
+          case _ => {
+            if (from.outdelay < delay2) from.outdelay = delay2
+          }
+        }
+      }
+    }
+  }
+
+  private def calcCPDelay(m: Module) : Double = {
+    ChiselError.info("Donggyu: calculate critical path delays")
+
+    // Calculate early start & early finish times
+    // in the boundary of registers
+    m bfs { from =>
+      from match {
+        case _: Reg => from.earlyFinish = from.outdelay
+        case _ => from.earlyFinish = from.earlyStart + from.outdelay
+      }
+
+      for (to <- from.consumers) {
+        if (to.earlyStart < from.earlyFinish + to.indelay) {
+          to.earlyStart = from.earlyFinish + to.indelay
+        }
+      }
+    }
+
+    // Critical path delay = the latest early start time among nodes 
+    var cp_delay = 0.0
+
+    m bfs { node =>
+      if (cp_delay < node.earlyStart)
+        cp_delay = node.earlyStart
+    }
+
+    return cp_delay
+  }
+
+  private def printDelay(m: Module, filename: String = "delay.rpt"): Unit = {
     val basedir = ensureDir(Module.targetDir)
     val rptdir  = ensureDir(basedir+"report")
     val rptfile = new java.io.FileWriter(rptdir+filename) 
@@ -379,8 +453,11 @@ trait DelayBackannotation extends Backend {
     report.append("\t\t+--------------------------------+\n\n")
 
     m bfs { node =>
-      report.append(emitTmp(node) + ":" + nodeToString(node) + " ==> delay: " + node.delay.toString + "\n")
+      report.append(getNodeName(node) + ":" + nodeToString(node) + 
+                    " ==> indelay: %.4f, outdelay: %.4f\n".format(node.indelay, node.outdelay))
     }
+   
+    report.append("\nCritical path delay: %.4f".format(calcCPDelay(m)))
 
     // ChiselError.info(report)
     // Write the signals into the file
@@ -391,42 +468,12 @@ trait DelayBackannotation extends Backend {
     }
   }
 
-  protected def annotateDelay(m: Module, filename: String = "timing.rpt") {
-    ChiselError.info("Donggyu: annotate delays")
-    val basedir = ensureDir(Module.targetDir)
-    val dcsyndir  = ensureDir(basedir+"dc-syn")
-    val delaymap = readDelay(dcsyndir+filename)
-
-    m bfs { node => 
-      val nodename = emitTmp(node)
-      for (i <- node.inputs) {
-        val inputname = emitTmp(i)
-        val (earlydelay, middledelay, lastdelay) = 
-            delaymap getOrElse ((inputname, nodename), (0.0, 0.0, 0.0))
-        (i, node) match {
-          case (_: Chisel.Reg, _: Chisel.Reg) => {
-            node.delay = middledelay
-          }
-          case (_: Chisel.Reg, _) => {
-            node.delay = middledelay
-          }
-          case (_, _: Chisel.Reg) => {
-            node.delay = earlydelay
-          }
-          case _ => {
-            node.delay = middledelay
-          }
-        }
-      }
-    }
-  }
-
-  override def elaborate(c: Module) = {
+  override def elaborate(c: Module) {
     super.elaborate(c)
   
     generateTcl(c)
     executeDC()
     annotateDelay(c)
-    printDelay(c)
+    printDelay(c, c.name + "_delay.rpt")
   }
 }

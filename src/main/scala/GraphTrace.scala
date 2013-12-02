@@ -46,9 +46,9 @@ object nodeToString {
 
 trait GraphTrace extends Backend {
   // Print the graph before 'elaborate'
-  preElaborateTransforms += ((c: Module) => printGraph("preelabgraph.rpt")) 
+  // preElaborateTransforms += ((c: Module) => printGraph(c.name + "_preelabgraph.rpt")) 
   // Print the graph after 'elaborate'
-  analyses               += ((c: Module) => printGraph("postelabgraph.rpt")) 
+  // analyses               += ((c: Module) => printGraph(c.name + "_postelabgraph.rpt")) 
 
   protected def printGraph(filename: String = "graph.rpt") = {
     val walked = new HashSet[Node]
@@ -58,7 +58,8 @@ trait GraphTrace extends Backend {
     var report = new StringBuilder();
 
     def printNode(top: Node, level: Int) = {
-      report.append(genIndent(level) + nodeToString(top) + "\t(delay : " + top.delay + ")\n")
+      report.append(genIndent(level) + nodeToString(top) + 
+                    "\t(delay: %.4f, early start: %.4f)\n".format(top.indelay, top.earlyStart))
     }
    
     def dfs (top: Node, c: Module, level: Int): Unit = {
@@ -100,5 +101,11 @@ trait GraphTrace extends Backend {
     } finally {
       rptfile.close()
     }    
+  }
+
+  override def elaborate(c: Module) {
+    super.elaborate(c)
+
+    printGraph(c.name + "_graph.rpt") 
   }
 }
