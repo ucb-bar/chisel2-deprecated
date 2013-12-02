@@ -142,7 +142,14 @@ abstract class Node extends nameable {
   var driveRand = false
   var clock: Clock = null
   var CppVertex: CppVertex = null
-  var delay: Double = 0.0 // for delay annotation by Donggyu
+  // Delay annotation and Critical path calc
+  // by Donggyu
+  var indelay: Double = 0.0 
+  var outdelay: Double = 0.0
+  var earlyStart: Double = 0.0
+  var earlyFinish: Double = 0.0
+  var lateStart: Double = 0.0
+  var lateFinish: Double = 0.0 
 
   Module.nodes += this
 

@@ -58,7 +58,7 @@ trait GraphTrace extends Backend {
     var report = new StringBuilder();
 
     def printNode(top: Node, level: Int) = {
-      report.append(genIndent(level) + nodeToString(top) + "\t(delay : " + top.delay + ")\n")
+      report.append(genIndent(level) + nodeToString(top) + "\t(delay : " + (top.indelay + top.outdelay) + ")\n")
     }
    
     def dfs (top: Node, c: Module, level: Int): Unit = {
