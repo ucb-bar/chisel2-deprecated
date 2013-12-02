@@ -183,6 +183,7 @@ trait DelayBackannotation extends Backend {
     val dcsyndir  = ensureDir(basedir+"dc-syn")
     val tcl = new StringBuilder();
     val tclfile = new java.io.FileWriter(dcsyndir+filename)
+    val rpt_filename = m.name + "_timing.rpt"
 
     ChiselError.info("Donggyu: generate a tcl file")
     tcl.append("""set ucb_vlsi_home [getenv UCB_VLSI_HOME]"""+"\n")
@@ -207,9 +208,9 @@ trait DelayBackannotation extends Backend {
     def cmdhead = 
       if (first_report) { 
         first_report = false 
-        "redirect timing.rpt { " 
+        "redirect " + rpt_filename + " { " 
       } else { 
-        "redirect -append timing.rpt { " 
+        "redirect -append " + rpt_filename + " { " 
       }
 
     val cmdopts = " -input_pins -significant_digits 5 -path only"
@@ -473,7 +474,7 @@ trait DelayBackannotation extends Backend {
   
     generateTcl(c)
     executeDC()
-    annotateDelay(c)
+    annotateDelay(c, c.name + "_timing.rpt")
     printDelay(c, c.name + "_delay.rpt")
   }
 }
