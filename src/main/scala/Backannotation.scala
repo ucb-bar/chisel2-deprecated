@@ -80,10 +80,12 @@ trait SignalBackannotation extends Backend {
         if emitTmp(n) == nodeName  
       } yield n
 
+      /*
       val clks = for {
         m <- comps
         if m.clock != null && emitTmp(m.clock) == nodeName
       } yield m.clock
+      */
 
       val resets = for {
         m <- comps
@@ -178,7 +180,7 @@ trait DelayBackannotation extends Backend {
     getParents(n.componentOf) + emitTmp(n)
   }
 
-  private def generateTcl(m: Module, filename: String = "gentcl.tcl") {
+  private def generateTcl(m: Module, filename: String = "gentcl.tcl"): (HashSet[Node], HashMap[Node, Node]) = {
     val basedir = ensureDir(Module.targetDir)
     val dcsyndir  = ensureDir(basedir+"dc-syn")
     val tcl = new StringBuilder();
@@ -190,7 +192,8 @@ trait DelayBackannotation extends Backend {
     tcl.append("""set stdcells_home $ucb_vlsi_home/stdcells/synopsys-32nm/typical_rvt"""+"\n")
     tcl.append("""set search_path "$stdcells_home/db $ucb_vlsi_home/install/vclib ../" """+"\n")
     tcl.append("""set target_library "cells.db" """+"\n")
-    tcl.append("""set synthetic_library "dw_foundation.sldb" """+"\n")
+    // tcl.append("""set synthetic_library "dw_foundation.sldb" """+"\n")
+    tcl.append("""set synthetic_library "standard.sldb" """+"\n")
     tcl.append("""set link_library "* $target_library $synthetic_library" """+"\n")
     tcl.append("""set alib_library_analysis_path "alib" """+"\n\n")
 
@@ -199,6 +202,22 @@ trait DelayBackannotation extends Backend {
     tcl.append("link\n")
     tcl.append("check_design\n")
     tcl.append("create_clock clk -name ideal_clock1 -period 1\n")
+    // tcl.append("define_name_rules backannotation -dont_change_bus_members -dont_change_ports\n")
+    // tcl.append("change_names -rules backannotation\n")
+
+    // set_dont_touch for signal preserving
+    /*
+    m bfs { node => 
+      node match {
+        case _: Op => {
+          tcl.append("set_dont_touch " + getNodeName(node) + "\n")
+        }
+        case _ =>
+      }
+    }
+    */
+
+    tcl.append("set hdlin_infer_mux all\n")
     // tcl.append("compile -no_design_rule\n\n")
     // tcl.append("compile -only_design_rule\n\n")
     tcl.append("compile -only_hold_time\n\n")
@@ -219,8 +238,22 @@ trait DelayBackannotation extends Backend {
     val delset = new HashSet[Node]()
     val signalmap = new HashMap[Node, Node]()
 
+    m bfs { 
+      node => {
+        def isDel(n: Node): Boolean = {
+          n match {
+            case _: Literal => true
+            case _: Cat     => (true /: n.inputs) {_ && isDel(_)}
+            case _          => false
+          }
+        }
+   
+        if (isDel(node)) delset += node
+      }
+    }
+
     // Construct a map from deleted signals to their corresponding signals
-    m.bfs { node => 
+    m bfs { node => 
       for (c <- node.consumers) { 
         c match {
           case bits: Chisel.Bits if bits.inputs.length == 1 && bits.dir == OUTPUT => {
@@ -240,8 +273,8 @@ trait DelayBackannotation extends Backend {
     tcl.append(cmdhead + "echo \"\\n*** Critical Path Timing Information ***\\n\"" + cmdtail)
     tcl.append(cmdhead + "report_timing" + cmdopts + cmdtail)
 
-    m.bfs { from =>
-      for (to <- from.consumers) {
+    m bfs { from =>
+      for (to <- from.consumers ; if !((delset contains from) || (delset contains to))) {
         (from, to) match {
           case (_: Reg, to: Reg) => {
             tcl.append(cmdhead + "echo \"\\n" + getNodeName(from) + " ---> " + getNodeName(to) + "\"" + cmdtail)
@@ -262,7 +295,7 @@ trait DelayBackannotation extends Backend {
               }
             }
           }
-          case (_: Literal, _) =>
+          // case (_: Literal, _) =>
           case (_, _: Reg) => {
             (signalmap get from) match {
               case None    => {
@@ -300,6 +333,8 @@ trait DelayBackannotation extends Backend {
     } finally {
       tclfile.close()
     }
+
+    (delset, signalmap)
   }
  
   private def executeDC(filename: String = "gentcl.tcl") = {
@@ -380,32 +415,54 @@ trait DelayBackannotation extends Backend {
     hashmap  
   }
 
-  private def annotateDelay(m: Module, filename: String = "timing.rpt") {
+  private def annotateDelay(m: Module, filename: String = "timing.rpt", delset: HashSet[Node], signalmap: HashMap[Node, Node]) {
     ChiselError.info("Donggyu: annotate delays")
     val basedir = ensureDir(Module.targetDir)
     val dcsyndir  = ensureDir(basedir+"dc-syn")
     val delaymap = readDelay(dcsyndir+filename)
 
-    m bfs { from => 
+    def getDelay(from: Node, to: Node) = {
       val fromname = getNodeName(from)
-      for (to <- from.consumers) {
-        val toname = getNodeName(to)
-        val (delay1, delay2, delay3) =  
-            delaymap getOrElse ((fromname, toname), (0.0, 0.0, 0.0))
-        (from, to) match {
-          case (from: Bits, _) if from.dir == INPUT => {
-            if (from.outdelay < delay1) from.outdelay = delay1
+      val toname = getNodeName(to)
+      val (delay1, delay2, delay3) = delaymap getOrElse ((fromname, toname), (0.0, 0.0, 0.0))
+      // ChiselError.info("from: %s, to: %s, delay1: %.4f, delay2: %.4f, delay3: %.4f".format(fromname, toname, delay1, delay2, delay3))
+      (delay1, delay2, delay3)
+    }
+
+    def annotate(from: Node, to: Node, delays: (Double, Double, Double)) {
+      val (delay1, delay2, delay3) = delays
+
+      (from, to) match {
+        case (from: Bits, to: Bits) if from.dir == INPUT && to.dir == OUTPUT && to.inputs.length == 1 => {
+          val node = to.inputs(0)
+          if (node.indelay < delay1) node.indelay = delay1
+        }
+        case (from: Bits, _) if from.dir == INPUT => {
+          if (from.outdelay < delay1) from.outdelay = delay1
+        }
+        case (_: Reg, _) => {
+          if (from.outdelay < delay1) from.outdelay = delay1
+          if (to.indelay < delay2) to.indelay = delay2
+        }
+        case (_, _: Reg) => {
+          if (from.outdelay < delay2) from.outdelay = delay2
+        }
+        case _ => {
+          if (from.outdelay < delay2) from.outdelay = delay2
+        }
+      }      
+    }
+
+    m bfs { from => 
+      for (to <- from.consumers ; if !((delset contains from) || (delset contains to))) {
+        (signalmap get from, signalmap get to) match {
+          case (None, None) => {
+            annotate(from, to, getDelay(from, to))
           }
-          case (_: Reg, _) => {
-            if (from.outdelay < delay1) from.outdelay = delay1
-            if (to.indelay < delay2) to.indelay = delay2
+          case (None, Some(to)) => {
+            annotate(from, to, getDelay(from, to))
           }
-          case (_, _: Reg) => {
-            if (from.outdelay < delay2) from.outdelay = delay2
-          }
-          case _ => {
-            if (from.outdelay < delay2) from.outdelay = delay2
-          }
+          case _ =>
         }
       }
     }
@@ -472,9 +529,9 @@ trait DelayBackannotation extends Backend {
   override def elaborate(c: Module) {
     super.elaborate(c)
   
-    generateTcl(c)
+    val (delset, signalmap) = generateTcl(c)
     executeDC()
-    annotateDelay(c, c.name + "_timing.rpt")
+    annotateDelay(c, c.name + "_timing.rpt", delset, signalmap)
     printDelay(c, c.name + "_delay.rpt")
   }
 }
