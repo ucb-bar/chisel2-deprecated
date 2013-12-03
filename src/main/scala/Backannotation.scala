@@ -42,12 +42,12 @@ trait SignalBackannotation extends Backend {
 
   private def readCrosses(filename: String): ArrayBuffer[(Double, Array[String])] = {
     val lines: Iterator[String] = Source.fromFile(filename).getLines
-    val TermRegex = """([\w\._]+)\s+(-?\d\.\d+e[\+-]\d+)""".r
+    val TermRegex = """\s*([\w\._\:]+)\s+([\d\.\+-e]+)\s+[\d\.\+-e]+\s+[\d\.\+-e]+\s+[\d\.\+-e]+""".r
    
     (lines foldLeft (ArrayBuffer[(Double, Array[String])]())) {
       case (res: ArrayBuffer[(Double, Array[String])], TermRegex(exp, coeff)) => {
-        val vars = exp split ".__cross__."
-        ChiselError.info(coeff + ", " + (vars.head /: vars.tail) {_ + ", " + _})
+        val vars = exp split ':'
+        // ChiselError.info(coeff + ", " + (vars.head /: vars.tail) {_ + ", " + _})
         res += ((coeff.toDouble, vars))
         res
       }
@@ -65,7 +65,7 @@ trait SignalBackannotation extends Backend {
       val nodeName = variable.last
  
       def checkParents(names: Array[String], module: Module): Boolean = {
-        if (names.isEmpty) true
+        if (names.length == 1 && module.parent == Module.topComponent) true
         else if (emitRef(module) == names.last) checkParents(names.init, module.parent)
         else false
       }
@@ -80,6 +80,7 @@ trait SignalBackannotation extends Backend {
         if emitTmp(n) == nodeName  
       } yield n
 
+      // TODO: Are clocks included in the future?
       /*
       val clks = for {
         m <- comps
@@ -93,7 +94,7 @@ trait SignalBackannotation extends Backend {
       } yield m.reset
 
       if (!nodes.isEmpty) nodes.head
-      else if (!clks.isEmpty) clks.head
+      // else if (!clks.isEmpty) clks.head
       else if (!resets.isEmpty) resets.head
       else null
     }
@@ -103,7 +104,7 @@ trait SignalBackannotation extends Backend {
       val (busses, signals) = term partition (x => x != null && x.width > 1)
 
       val termToString = (printSignal(term.head) /: term.tail) { _ + " * " +  printSignal(_) }
-      ChiselError.info("term: " + coeff.toString + " * " +  termToString)
+      // ChiselError.info("term: " + coeff.toString + " * " +  termToString)
 
       (coeff, signals, busses)
     }
@@ -142,15 +143,15 @@ trait SignalBackannotation extends Backend {
     for ((coeff, signals, busses) <- crosses) {
       val signalsToString = {
         if (signals.isEmpty) ""
-        else (printSignal(signals.head) /: signals.tail) { _ + " * " + printSignal(_) }
+        else " * " + (printSignal(signals.head) /: signals.tail) { _ + " * " + printSignal(_) }
       }
 
       val bussesToString = {
         if (busses.isEmpty) ""
-        else (printSignal(busses.head) /: busses.tail) { _ + " * " + printSignal(_) }
+        else " * " + (printSignal(busses.head) /: busses.tail) { _ + " * " + printSignal(_) }
       }
 
-      report.append(coeff.toString + " * " + signalsToString + " * " + bussesToString + "\n")
+      report.append(coeff.toString +  signalsToString + bussesToString + "\n")
     }
 
     // ChiselError.info(report)
