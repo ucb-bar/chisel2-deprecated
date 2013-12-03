@@ -22,7 +22,7 @@ trait SignalBackannotation extends Backend {
   preElaborateTransforms += ((c: Module) => c.forceMatchingWidths)
   // preElaborateTransforms += ((c: Module) => c.removeTypeNodes)
   preElaborateTransforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
-  preElaborateTransforms += ((c: Module) => c.traceNodes)
+  // preElaborateTransforms += ((c: Module) => c.traceNodes)
   preElaborateTransforms += ((c: Module) => nameAll(c))
   preElaborateTransforms += ((c: Module) => nameNodes)
   preElaborateTransforms += ((c: Module) => annotateCrosses(c))
