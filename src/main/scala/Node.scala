@@ -124,7 +124,9 @@ abstract class Node extends nameable {
   var depth = 0;
   def componentOf: Module = if (Module.isEmittingComponents && component != null) component else Module.topComponent
   var width_ = -1;
-  var index = -1;
+  // var index = -1;
+  // by Donggyu
+  var index = if (Module.topComponent == null) -1 else Module.topComponent.nextIndex
   var isFixedWidth = false;
   val consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
   val inputs = new ArrayBuffer[Node];
@@ -506,7 +508,8 @@ abstract class Node extends nameable {
   
   def emitIndex(): Int = {
     if (index == -1) {
-      index = componentOf.nextIndex;
+      // index = componentOf.nextIndex;
+      index = Module.topComponent.nextIndex;
     }
     index
   }
