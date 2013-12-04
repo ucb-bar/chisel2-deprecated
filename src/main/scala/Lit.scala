@@ -39,24 +39,26 @@ import ChiselError._
 
 /* Factory for literal values to be used by Bits and SInt factories. */
 object Lit {
-  def apply[T <: Bits](n: String, width: Int = -1)(gen: => T): T = {
-    makeLit(Literal(n, width))(gen)
+  def apply[T <: Bits](n: String, width: Int = -1)(implicit m: reflect.ClassTag[T]): T = {
+    makeLit(Literal(n, width))
   }
 
-  def apply[T <: Bits](n: String, base: Char, width: Int = -1)(gen: => T): T = {
-    makeLit(Literal(width, base, n))(gen)
+  def apply[T <: Bits](n: String, base: Char, width: Int = -1)(implicit m: reflect.ClassTag[T]): T = {
+    makeLit(Literal(n, base, width))
   }
 
-  def apply[T <: Bits](n: BigInt)(gen: => T): T = {
-    makeLit(Literal(n, signed = gen.isInstanceOf[SInt]))(gen)
+  def apply[T <: Bits](n: BigInt)(implicit m: reflect.ClassTag[T]): T = {
+    makeLit(Literal(n))
   }
 
-  def apply[T <: Bits](n: BigInt, width: Int)(gen: => T): T = {
-    makeLit(Literal(n, width, signed = gen.isInstanceOf[SInt]))(gen)
+  def apply[T <: Bits](n: BigInt, width: Int)(implicit m: reflect.ClassTag[T]): T = {
+    makeLit(Literal(n, width))
   }
 
-  def makeLit[T <: Bits](x: Literal)(gen: => T): T = {
-    gen.fromNode(x)
+  def makeLit[T <: Bits](x: Literal)(implicit m: reflect.ClassTag[T]): T = {
+    val result = m.runtimeClass.newInstance.asInstanceOf[T]
+    result.node = x
+    result
   }
 }
 
@@ -125,7 +127,6 @@ object Literal {
       }
     for(c <- x)
       if (c == '_') {
-        
       } else if(first) {
         first = false;
         res += sizeof(c.asDigit);
@@ -156,8 +157,10 @@ object Literal {
   }
   def toLitVal(x: String): BigInt = {
     var res = BigInt(0);
-    for (c <- x.substring(2, x.length))
-      res = res * 16 + c.asDigit;
+    if( x.length > 2 ) {
+      for (c <- x.substring(2, x.length))
+        res = res * 16 + c.asDigit;
+    }
     res
   }
 
@@ -222,9 +225,11 @@ object Literal {
     if(xWidth > width && width != -1) {
       ChiselError.error({"width " + width + " is too small for literal " + x + ". Smallest allowed width is " + xWidth});
     }
-    res.init("0x" + xString, w);
+    res.name = "0x" + xString
+    res.width = w
     res.hasInferredWidth = width == -1
     res.inputVal = x;
+    res.inferWidth = new FixedWidth(res.width)
     res
   }
 
@@ -232,23 +237,25 @@ object Literal {
     of the string indicates the base for the suffix characters.
     */
   def apply(n: String, width: Int): Literal =
-    apply(width, n(0), n.substring(1, n.length));
+    apply(n.substring(1, n.length), n(0), width)
 
-  def apply(width: Int, base: Char, literal: String): Literal = {
+  def apply(literal: String, base: Char, width: Int): Literal = {
     if (!"dhbo".contains(base)) {
       ChiselError.error("no base specified");
     }
-    val res = new Literal();
+    val res = new Literal()
+    res.name = removeUnderscore(literal)
     if(width == -1) {
-      res.init(removeUnderscore(literal), sizeof(base, literal));
+      res.width = sizeof(base, literal)
     } else {
-      res.init(removeUnderscore(literal), width);
+      res.width = width
       if(width < sizeof(base, literal)) {
         ChiselError.error({"width " + width + " is too small for literal: " + res + " with min width " + sizeof(base, literal)})
       }
     }
     res.base = base;
     if (base == 'b') {res.isZ = literal.contains('?'); res.isBinary = true;}
+    res.inferWidth = new FixedWidth(res.width)
     res
   }
 }
@@ -257,19 +264,26 @@ object Literal {
   This class should not end-up being instantiated directly in user code.
   */
 class Literal extends Node {
+
   var hasInferredWidth = false
   var isZ = false;
   var isBinary = false;
   var base = 'x';
   var inputVal = BigInt(0);
-  override def value: BigInt = stringToVal(base, name);
-  override def maxNum: BigInt = value;
-  override def minNum: BigInt = value;
-  override def isLit: Boolean = true;
-  override def clearlyEquals(x: Node) = x.isLit && value == x.litOf.value
+  def value: BigInt = stringToVal(base, name);
+  def maxNum: BigInt = value;
+  def minNum: BigInt = value;
+  override def clearlyEquals(x: Node) = x.isInstanceOf[Literal] && value == x.asInstanceOf[Literal].value
   override def toString: String = name;
+
   override def isInVCD: Boolean = false
 
   def d (x: BigInt): Literal = Literal(x, value.toInt)
+
+  override def nameIt( path: String ): this.type = {
+    // Donot change the name of a Literal because it is the actual value.
+    this
+  }
+
 }
 

@@ -29,112 +29,82 @@
 */
 
 package Chisel
-import Node._
+
 import Reg._
 import ChiselError._
 import scala.reflect._
 
 object Reg {
 
-  def regMaxWidth(m: Node) =
-    if (isInGetWidth) {
-      throw new Exception("getWidth was called on a Register or on an object connected in some way to a Register that has a statically uninferrable width")
-    } else {
-      maxWidth(m)
-    }
-
-  // Rule: If no width is specified, use max width. Otherwise, use the specified width.
-  def regWidth(w: Int) =
-    if(w <= 0) {
-      regMaxWidth _ ;
-    } else {
-      fixWidth(w)
-    }
-
-  /** Rule: if r is using an inferred width, then don't enforce a width. If it is using a user inferred
-    width, set the the width
-
-    XXX Can't specify return type. There is a conflict. It is either
-    (Node) => (Int) or Int depending which execution path you believe.
-    */
-  def regWidth(r: Node) = {
-    val rLit = r.litOf
-    if (rLit != null && rLit.hasInferredWidth) {
-      regMaxWidth _
-    } else {
-      fixWidth(r.getWidth)
-    }
-  }
-
-  def validateGen[T <: Data](gen: => T) {
-    for ((n, i) <- gen.flatten)
-      if (!i.inputs.isEmpty || !i.updates.isEmpty) {
-        throwException("Invalid Type Specifier for Reg")
-      }
-  }
-
   /** *type_out* defines the data type of the register when it is read.
     *update* and *reset* define the update and reset values
     respectively.
     */
   def apply[T <: Data](outType: T = null, next: T = null, init: T = null,
-    clock: Clock = null): T = {
-    var mType = outType
-    if(mType == null) {
-      mType = next
+    clock: Clock = Module.scope.clock, reset: Bool = Module.scope.reset): T = {
+    val res: T = if( outType != null ) outType.clone
+    else if( next != null ) next.clone
+    else if( init != null ) init.clone
+    else null.asInstanceOf[T]
+    if( res == null ) {
+      ChiselError.error("Cannot infer type of Reg")
     }
-    if(mType == null) {
-      mType = init
-    }
-    if(mType == null) {
-      throw new Exception("cannot infer type of Reg.")
-    }
-
-    val gen = mType.clone
-    validateGen(gen)
-
-    val d: Array[(String, Bits)] =
-      if(next == null) {
-        gen.flatten.map{case(x, y) => (x -> null)}
+    if( next != null ) {
+      if( init != null ) {
+        for((((resIdx, resB), (dataIdx, nextB)), (rvalIdx, initB))
+          <- res.flatten zip next.flatten zip init.flatten) {
+          val reg = new RegDelay(
+            clock.node.asInstanceOf[Update],
+            nextB.lvalue(),
+            initB.lvalue(),
+            reset.lvalue())
+          resB.node = reg
+        }
       } else {
-        next.flatten
-      }
-
-    // asOutput flip the direction and returns this.
-    val res = gen.asOutput
-
-    if(init != null) {
-      for((((res_n, res_i), (data_n, data_i)), (rval_n, rval_i)) <- res.flatten zip d zip init.flatten) {
-
-        assert(rval_i.getWidth > 0,
-          {ChiselError.error("Negative width to wire " + res_i)})
-        val reg = new Reg()
-
-        reg.init("", regWidth(rval_i), data_i, rval_i)
-
-        // make output
-        reg.isReset = true
-        res_i.inputs += reg
-        res_i.comp = reg
+        for(((resIdx, resB), (dataIdx, nextB))
+          <- res.flatten zip next.flatten) {
+          val reg = new RegDelay(
+            clock.node.asInstanceOf[Update],
+            nextB.lvalue(),
+            null,
+            reset.lvalue())
+          resB.node = reg
+        }
       }
     } else {
-      for(((res_n, res_i), (data_n, data_i)) <- res.flatten zip d) {
-        val w = res_i.getWidth
-        val reg = new Reg()
-        reg.init("", regWidth(w), data_i)
-
-        // make output
-        res_i.inputs += reg
-        res_i.comp = reg
+      /* next is null */
+      if( init != null ) {
+        for(((resIdx, resB), (rvalIdx, initB))
+          <- res.flatten zip init.flatten) {
+          val reg = new RegDelay(
+            clock.node.asInstanceOf[Update],
+            null,
+            initB.lvalue(),
+            reset.lvalue())
+          resB.node = reg
+          resB.node.inferWidth = new WidthOf(2)
+        }
+      } else {
+        /* both next and init are null */
+        for((resIdx, resB) <- res.flatten) {
+          val reg = new RegDelay(
+            clock.node.asInstanceOf[Update],
+            null,
+            null,
+            reset.lvalue())
+          resB.node = reg
+        }
       }
     }
-    res.setIsTypeNode
 
-    // set clock
-    if (res.comp != null)
-      res.comp.clock = clock
-    else
-      res.clock = clock
+    /* override width inference if it was explicitely specified. */
+    if( outType != null ) {
+      for(((resIdx, resB), (outIdx, outN)) <- res.flatten zip outType.flatten) {
+        if( outN.node.inferWidth.isInstanceOf[FixedWidth] ) {
+          resB.node.inferWidth = outN.node.inferWidth
+        }
+      }
+    }
 
     res
   }
@@ -159,59 +129,3 @@ object RegInit {
 
 }
 
-
-class Reg extends Delay with proc {
-  def next: Node = inputs(0);
-  def init: Node  = inputs(1);
-  def enableSignal: Node = inputs(enableIndex);
-  var enableIndex = 0;
-  var isReset = false
-  var isEnable = false;
-  def isUpdate: Boolean = !(next == null);
-  def update (x: Node) { inputs(0) = x };
-  var assigned = false;
-  var enable = Bool(false);
-
-  def procAssign(src: Node) {
-    if (assigned) {
-      ChiselError.error("reassignment to Reg");
-    }
-    val cond = genCond();
-    if (conds.length >= 1) {
-      isEnable = true
-      enable = enable || cond;
-    }
-    updates += ((cond, src))
-  }
-  override def genMuxes(default: Node): Unit = {
-    if(isMemOutput) {
-      inputs(0) = updates(0)._2
-    } else if(isEnable && Module.backend.isInstanceOf[VerilogBackend]) {
-      // hack to force the muxes to match the Reg's width:
-      // the intent is u = updates.head._2
-      genMuxes(updates.head._2, updates.toList.tail)
-      inputs += enable;
-      enableIndex = inputs.length - 1;
-    } else {
-      super.genMuxes(default)
-    }
-  }
-  def nameOpt: String = if (name.length > 0) name else "REG"
-  override def toString: String = {
-    "REG(" + nameOpt + ")"
-  }
-
-  override def assign(src: Node) {
-    if(assigned || inputs(0) != null) {
-      ChiselError.error("reassignment to Reg");
-    } else {
-      assigned = true; super.assign(src)
-    }
-  }
-
-  override def forceMatchingWidths {
-    if (inputs(0).width != width) {
-      inputs(0) = inputs(0).matchWidth(width)
-    }
-  }
-}

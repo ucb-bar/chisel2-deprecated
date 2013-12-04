@@ -30,8 +30,16 @@
 
 package Chisel
 
-trait IODirection;
+/** Hook to connect with modules which were not written in Chisel.
+  */
+abstract class BlackBox extends Module {
+  Module.blackboxes += this
 
-object INPUT extends IODirection;
+  def setVerilogParameters(string: String) {
+    this.asInstanceOf[Module].verilog_parameters = string;
+  }
 
-object OUTPUT extends IODirection;
+  def setName(name: String) {
+    moduleName = name;
+  }
+}

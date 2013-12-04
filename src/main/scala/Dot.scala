@@ -29,36 +29,28 @@
 */
 
 package Chisel
-import Node._
+
 import Reg._
 import ChiselError._
 import scala.collection.mutable.HashSet
 
+
+/** Generates a graphviz .dot file from the generated Chisel Node graph.
+  */
 class DotBackend extends Backend {
   val keywords = new HashSet[String]();
 
   override def emitRef(node: Node): String = {
-    node match {
-      case r: Reg =>
-        if (r.name == "") {
-          r.name = "R" + r.emitIndex
-        }
-      case _ =>
-        if(node.name == "") {
-          node.name = "T" + node.emitIndex
-        }
-    }
+    super.emitRef(node)
     fullyQualifiedName(node)
   }
 
   private def isDottable (m: Node): Boolean = {
-    if (m == m.component.defaultResetPin) {
+    if( m == null ) {
       false
     } else {
       m match {
         case x: Literal  => false;
-        case x: MapNode  => false;
-        case x: ListNode => false;
         case _           => true;
       }
     }
@@ -67,7 +59,7 @@ class DotBackend extends Backend {
 
   private def asValidLabel( node: Node ): String = {
     node match {
-      case operator: Op => if (operator.op == "") "?" else operator.op;
+      case iob: IOBound => node.name + ":" + iob.dir
       case _             => {
         val typeName = node.getClass.getName.substring(7)
         node.name + ":" + typeName
@@ -93,9 +85,9 @@ class DotBackend extends Backend {
       res.append(indent)
       res.append(innercrossings)
     }
-    for (m <- top.mods) {
+    for (m <- top.nodes) {
       if (isDottable(m)) {
-        if( m.component == top ) {
+//        if( m.component == top ) {
           /* We have to check the node's component agrees because output
            nodes are part of a component *mods* as well as its parent *mods*! */
           res.append(indent)
@@ -107,7 +99,7 @@ class DotBackend extends Backend {
             label += "(";
             for (in <- m.inputs) {
               if (i != 0) label += ", ";
-              label += (if (in.isLit) emitRef(in) else "_");
+              label += (if (in.isInstanceOf[Literal]) emitRef(in) else "_");
               i += 1;
             }
             label += ")";
@@ -117,17 +109,17 @@ class DotBackend extends Backend {
             case reg: Delay => res.append("[shape=square," + label + "];\n")
             case _ => res.append("[" + label + "];\n")
           }
-        }
+ //       }
       }
     }
-    for (m <- top.mods) {
-      if( m.component == top ) {
+    for (m <- top.nodes) {
+ //     if( m.component == top ) {
         /* We have to check the node's component agrees because output
          nodes are part of a component *mods* as well as its parent *mods*! */
         for (in <- m.inputs) {
           if (isDottable(m) && isDottable(in)) {
             val edge = (emitRef(in) + " -> " + emitRef(m)
-              + "[label=\"" + in.width_ + "\"];\n")
+              + "[label=\"" + in.width + "\"];\n")
             /* If the both ends of an edge are on either side of a component
              boundary, we must add it at the upper level otherwise graphviz
              will incorrectly draw the input node into the cluster. */
@@ -139,7 +131,7 @@ class DotBackend extends Backend {
             }
           }
         }
-      }
+ //     }
     }
     (res.toString, crossings.toString)
   }
@@ -152,24 +144,35 @@ class DotBackend extends Backend {
     val out_cd = createOutputFile(c.name + "_c.dot");
     out_cd.write("digraph TopTop {\n");
     out_cd.write("rankdir = LR;\n");
+
     def genNum: Int = { gn += 1; gn };
+
     def dumpComponent (c: Module): Unit = {
       out_cd.write("subgraph cluster" + c.name + "{\n");
       out_cd.write("label = \"" + c.name + "\";\n");
+
       def dumpIo (n: String, d: Data): Unit = {
         d match {
           case b: Bundle =>
             out_cd.write("subgraph cluster" + n + "__" + genNum + "{\n");
             out_cd.write("node [shape=box];\n");
             out_cd.write("label = \"" + n + "\";\n");
-            for ((cn, cd) <- b.elements)
+            for ((cn, cd) <- b.items())
               dumpIo(cn, cd);
             out_cd.write("}\n");
-          case o =>
-            out_cd.write(emitRef(d) + "[label=\"" + n + "\"];\n");
-            for (in <- d.inputs)
+          case v: Vec[_] =>
+            out_cd.write("subgraph cluster" + n + "__" + genNum + "{\n");
+            out_cd.write("node [shape=box];\n");
+            out_cd.write("label = \"" + n + "\";\n");
+            for ((cn, cd) <- v.items())
+              dumpIo(cn.toString, cd);
+            out_cd.write("}\n");
+          case bits: Bits =>
+            out_cd.write(emitRef(bits.node) + "[label=\"" + n + "\"];\n");
+            for (in <- bits.node.inputs)
               if (isDottable(in)) {
-                out_cd.write(emitRef(in) + " -> " + emitRef(d) + "[label=\"" + in.width_ + "\"];\n");
+                out_cd.write(emitRef(in) + " -> "
+                  + emitRef(bits.node) + "[label=\"" + in.width + "\"];\n");
               }
         }
       }
@@ -191,5 +194,9 @@ class DotBackend extends Backend {
       {println("length:" + innercrossings.length + ", " + innercrossings)})
     out_d.write("}");
     out_d.close();
+/*XXX
+    println("XXX All Reachable Nodes:")
+    GraphWalker.depthFirst(findRoots(c), new PrintNode)
+ */
   }
 }

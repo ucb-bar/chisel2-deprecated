@@ -37,7 +37,6 @@ import scala.collection.mutable.BufferProxy
 import scala.collection.mutable.Stack
 import scala.math._
 import Vec._
-import Node._
 
 object VecUIntToOH
 {
@@ -54,30 +53,13 @@ object VecUIntToOH
   }
 }
 
-object VecMux {
-  def apply(addr: UInt, elts: Seq[Data]): Data = {
-    def doit(elts: Seq[Data], pos: Int): Data = {
-      if (elts.length == 1) {
-        elts(0)
-      } else {
-        val newElts = (0 until elts.length/2).map(i => Mux(addr(pos), elts(2*i + 1), elts(2*i)))
-        doit(newElts ++ elts.slice(elts.length/2*2, elts.length), pos + 1)
-      }
-    }
-    doit(elts, 0)
-  }
-}
 
 object Vec {
 
   /** Returns a new *Vec* from a sequence of *Data* nodes.
     */
   def apply[T <: Data](elts: Seq[T]): Vec[T] = {
-    val res = if (elts.forall(_.litOf != null) && elts.head.getWidth > 0) {
-      new ROM(elts.map(_.litOf), i => elts.head.clone)
-    } else {
-      new Vec[T](i => elts.head.clone)
-    }
+    val res = new Vec[T](i => elts.head.clone)
     elts.zipWithIndex.foreach{ case (e,i) => res += e }
     res
   }
@@ -126,94 +108,52 @@ object Vec {
 
 }
 
-class VecProc extends proc {
-  var addr: UInt = null
-  var elms: ArrayBuffer[Bits] = null
 
-  override def genMuxes(default: Node) {}
+/** Reference to a location inside a *Vec*.
+  */
+class VecReference[T <: Data](val addr: UInt, val elts: Seq[T]) extends Node {
 
-  def procAssign(src: Node) {
-    val onehot = VecUIntToOH(addr, elms.length)
-    Module.searchAndMap = true
-    for(i <- 0 until elms.length){
-      when (getEnable(onehot, i)) {
-        if(elms(i).comp != null) {
-          elms(i).comp procAssign src
-        } else {
-          elms(i) procAssign src
-        }
-      }
-    }
-    Module.searchAndMap = false
-  }
+  inferWidth = new FixedWidth(log2Up(elts.length))
+
 }
 
-class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable with BufferProxy[T] {
+
+/* XXX should be a no-argument constructor */
+class Vec[T <: Data](val gen: (Int) => T) extends AggregateData[Int]
+    with Cloneable with BufferProxy[T] {
+
   val self = new ArrayBuffer[T]
-  val readPortCache = new HashMap[UInt, T]
+
+  /* Optimization caches */
   var sortedElementsCache: ArrayBuffer[ArrayBuffer[Data]] = null
-  var flattenedVec: Node = null
-  override def apply(idx: Int): T = {
-    super.apply(idx)
-  };
+  val readPortCache = new HashMap[UInt, T]
 
-  def sortedElements: ArrayBuffer[ArrayBuffer[Data]] = {
-    if (sortedElementsCache == null) {
-      sortedElementsCache = new ArrayBuffer[ArrayBuffer[Data]]
-
-      // create buckets for each elm in data type
-      for(i <- 0 until this(0).flatten.length)
-        sortedElementsCache += new ArrayBuffer[Data]
-
-      // fill out buckets
-      for(elm <- this) {
-        for(((n, io), i) <- elm.flatten zip elm.flatten.indices) {
-          //val bits = io.toBits
-          //bits.comp = io.comp
-          sortedElementsCache(i) += io.asInstanceOf[Data]
-        }
-      }
-    }
-    sortedElementsCache
+  override def items(): Seq[(Int, Data)] = {
+    self.zipWithIndex.map(tuple => (tuple._2, tuple._1))
   }
 
-  def apply(ind: UInt): T =
-    read(ind)
 
-  def write(addr: UInt, data: T) {
-    if(data.isInstanceOf[Node]){
+  override def apply(index: Int): T = self(index)
 
-      val onehot = VecUIntToOH(addr, length)
-      Module.searchAndMap = true
-      for(i <- 0 until length){
-        when (getEnable(onehot, i)) {
-          this(i).comp procAssign data.toNode
+//  def apply(index: UInt): T = read(index)
+
+
+  def apply(addr: UInt): T = {
+    if( !readPortCache.contains(addr) ) {
+      /* XXX We can't execute the following line unless we get rid
+       of *gen* class parameters.
+       val res = m.runtimeClass.newInstance.asInstanceOf[T] */
+      val res = gen(0).clone.asOutput
+      for( ((resName, resB), resIdx) <- res.flatten.zipWithIndex ) {
+        val seq = new ArrayBuffer[Data]
+        for( elem <- self ) {
+          seq += elem.flatten(resIdx)._2
         }
+        resB.node = new VecReference(addr, seq)
       }
-      Module.searchAndMap = false
+      readPortCache += (addr -> res)
     }
-  }
-
-  def read(addr: UInt): T = {
-    if(readPortCache.contains(addr)) {
-      return readPortCache(addr)
-    }
-
-    val res = this(0).clone
-    val iaddr = UInt(width=log2Up(length))
-    iaddr.inputs += addr
-    for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
-      io assign VecMux(iaddr, sortedElm)
-
-      // setup the comp for writes
-      val io_comp = new VecProc()
-      io_comp.addr = iaddr
-      io_comp.elms = sortedElm.asInstanceOf[ArrayBuffer[Bits]] // XXX ?
-      io.comp = io_comp
-    }
-    readPortCache += (addr -> res)
-    res.setIsTypeNode
-    res
+    readPortCache(addr)
   }
 
   override def flatten: Array[(String, Bits)] = {
@@ -223,7 +163,14 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable w
     res.toArray
   }
 
-  override def <>(src: Node) {
+  override def fromBits( bits: Bits ): this.type = {
+    // XXX implement correctly
+    this
+  }
+
+  override def length: Int = self.size
+
+  override def <>(src: Data) {
     src match {
       case other: Vec[T] => {
         for((b, o) <- self zip other.self)
@@ -232,88 +179,38 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable w
     }
   }
 
-  override def ^^(src: Node) = {
-    src match {
-      case other: Vec[T] =>
-        for((b, o) <- self zip other.self)
-          b ^^ o
-    }
-  }
-
-  def <>(src: Vec[T]) {
-    for((b, e) <- self zip src)
-      b <> e;
-  }
-
   def <>(src: Iterable[T]) {
     for((b, e) <- self zip src)
       b <> e;
   }
 
   def :=[T <: Data](src: Iterable[T]): Unit = {
-
-    // Check matching size
-    assert(this.size == src.size, {
+    if( this.size != src.size ) {
       ChiselError.error("Can't wire together Vecs of mismatched lengths")
-    })
-
-    // Check LHS to make sure unidirection
-    val dirLHS = this.flatten(0)._2.dir
-    this.flatten.map(x => {assert(x._2.dir == dirLHS, {
-      ChiselError.error("Cannot mix directions on left hand side of :=")
-    })
-    })
-
-    // Check RHS to make sure unidirection
-    val dirRHS = src.head.flatten(0)._2.dir
-    for (elm <- src) {
-      elm.flatten.map(x => {assert(x._2.dir == dirRHS, {
-        ChiselError.error("Cannot mix directions on right hand side of :=")
-      })
-      })
-    }
-
-    for((me, other) <- this zip src){
-      me match {
-        case bundle: Bundle =>
-          bundle := other.asInstanceOf[Bundle]
-        case v: Vec[_] =>
-          v := other.asInstanceOf[Vec[Data]]
-        case _ =>
-          me := other
+    } else {
+      for( (me, other) <- this zip src ) {
+        me := other
       }
     }
   }
 
-  def := (src: UInt) {
-    for(i <- 0 until length)
-      this(i) := src(i)
-  }
-
-  override def removeTypeNodes() {
-    for(bundle <- self)
-      bundle.removeTypeNodes
-  }
-
-  override def traceableNodes: Array[Node] = self.toArray
-
-  override def traceNode(c: Module, stack: Stack[() => Any]) {
-    val ins = if (this.isInstanceOf[ROM [ _ ]]) this.asInstanceOf[ROM [ _ ] ].lits.toArray
-              else this.flatten.map(_._2)
-      
-    for(i <- ins) {
-      stack.push(() => i.traceNode(c, stack))
+  override def :=(src: Data): Unit = {
+    src match {
+      case uint: UInt =>
+        for(i <- 0 until length)
+          this(i) := uint(i)
+      case vec: Vec[_] => {
+        /* We would prefer to match for Vec[Data] but that's impossible
+         because of JVM constraints which lead to type erasure. */
+        val vecdata = vec.asInstanceOf[Vec[Data]]
+        this := vecdata.asInstanceOf[Iterable[Data]]
+      }
+      case _ =>
+        super.:=(src)
     }
-    stack.push(() => super.traceNode(c, stack))
   }
 
-  override def flip(): this.type = {
-    for(b <- self)
-      b.flip();
-    this
-  }
-
-  override def nameIt (path: String) {
+  override def nameIt (path: String): this.type = {
     if( !named
       && (name.isEmpty
         || (!path.isEmpty && name != path)) ) {
@@ -334,6 +231,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable w
     } else {
       /* We are trying to rename a Vec that has a fixed name. */
     }
+    this
   }
 
   override def clone(): this.type = {
@@ -341,58 +239,28 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with Cloneable w
     res.asInstanceOf[this.type]
   }
 
-  override def toNode: Node = {
-    if(flattenedVec == null){
-      val nodes = flatten.map{case(n, i) => i};
-      flattenedVec = Concatenate(nodes.head, nodes.tail.toList: _*)
-    }
-    flattenedVec
-  }
-
-  override def fromNode(n: Node): this.type = {
-    val res = this.clone();
-    var ind = 0;
-    for((name, io) <- res.flatten.toList.reverse) {
-      io.asOutput();
-      if(io.width > 1) {
-        io assign NodeExtract(n, ind + io.width-1, ind)
-      } else {
-        io assign NodeExtract(n, ind);
-      }
-      ind += io.width;
-    }
-    res
-  }
-
-  override def asDirectionless(): this.type = {
-    self.foreach(_.asDirectionless)
-    this
-  }
-
-  override def asOutput(): this.type = {
-    self.foreach(_.asOutput)
-    this
-  }
-
-  override def asInput(): this.type = {
-    self.foreach(_.asInput)
-    this
-  }
-
-  override def setIsTypeNode() {
-    isTypeNode = true;
-    for(elm <- self)
-      elm.setIsTypeNode
-  }
-
   override def toBits(): UInt = {
     val reversed = this.reverse.map(_.toBits)
     Cat(reversed.head, reversed.tail: _*)
   }
 
+
+  override def toString: String = {
+    var sep = ""
+    val str = new StringBuilder
+    str.append("[")
+    for( (key, value) <- items ) {
+      str.append(sep + value)
+      sep = ", "
+    }
+    str.append("]")
+    str.toString
+  }
+
+
   def forall(p: T => Bool): Bool = (this map p).fold(Bool(true))(_&&_)
   def exists(p: T => Bool): Bool = (this map p).fold(Bool(false))(_||_)
-  def contains[T <: Bits](x: T): Bool = this.exists(_ === x)
+  def contains(x: Bits): Bool = this.exists(_ === x)
   def count(p: T => Bool): UInt = PopCount(this map p)
 
   private def indexWhereHelper(p: T => Bool) = this map p zip (0 until size).map(i => UInt(i))

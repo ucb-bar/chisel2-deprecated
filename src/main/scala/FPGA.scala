@@ -32,9 +32,9 @@ package Chisel
 
 class FPGABackend extends VerilogBackend
 {
-  def isMultiWrite(m: Mem[_]) = m.writes.size > 1
+  def isMultiWrite(m: MemDelay) = m.writes.size > 1
   def writen(m: MemWrite) = if (isMultiWrite(m.mem)) m.mem.writes.indexOf(m) else 0
-  def writeMap(m: Mem[_], exclude: Int = -1) = {
+  def writeMap(m: MemDelay, exclude: Int = -1) = {
     if (isMultiWrite(m)) {
       (0 until m.writes.size).filterNot(_ == exclude).map(emitRef(m) + "_" + _)
     } else {
@@ -44,9 +44,9 @@ class FPGABackend extends VerilogBackend
 
   override def emitDec(node: Node): String = {
     node match {
-      case m: Mem[_] =>
+      case m: MemDelay =>
         assert(m.isInline)
-        "  reg [" + (m.width-1) + ":0] " + writeMap(m).map(_ + " [" + (m.n-1) + ":0]").reduceLeft(_ + ", " + _) + ";\n"
+        "  reg [" + (m.width-1) + ":0] " + writeMap(m).map(_ + " [" + (m.depth-1) + ":0]").reduceLeft(_ + ", " + _) + ";\n"
 
       case _ =>
         super.emitDec(node)
@@ -65,10 +65,10 @@ class FPGABackend extends VerilogBackend
 
       case m: MemWrite =>
         // check if byte-wide write enable can be used
-        def litOK(x: Node) = x.isLit && (0 until x.width).forall(i => x.litOf.value.testBit(i) == x.litOf.value.testBit(i/8*8))
-        def extractOK(x: Node) = x.isInstanceOf[Extract] && x.inputs.length == 3 && x.inputs(2).isLit && x.inputs(2).litOf.value % 8 == 0 && x.inputs(1).isLit && (x.inputs(1).litOf.value + 1) % 8 == 0 && useByteMask(x.inputs(0))
-        def fillOK(x: Node) = x.isInstanceOf[Fill] && (x.inputs(1).litOf.value % 8 == 0 && x.inputs(0).width == 1 || useByteMask(x.inputs(0)))
-        def catOK(x: Node) = x.isInstanceOf[Cat] && x.inputs.forall(i => useByteMask(i))
+        def litOK(x: Node) = x.isInstanceOf[Literal] && (0 until x.width).forall(i => x.asInstanceOf[Literal].value.testBit(i) == x.asInstanceOf[Literal].value.testBit(i/8*8))
+        def extractOK(x: Node) = x.isInstanceOf[ExtractOp] && x.inputs.length == 3 && x.inputs(2).isInstanceOf[Literal] && x.inputs(2).asInstanceOf[Literal].value % 8 == 0 && x.inputs(1).isInstanceOf[Literal] && (x.inputs(1).asInstanceOf[Literal].value + 1) % 8 == 0 && useByteMask(x.inputs(0))
+        def fillOK(x: Node) = x.isInstanceOf[FillOp] && (x.inputs(1).asInstanceOf[Literal].value % 8 == 0 && x.inputs(0).width == 1 || useByteMask(x.inputs(0)))
+        def catOK(x: Node) = x.isInstanceOf[CatOp] && x.inputs.forall(i => useByteMask(i))
         def useByteMask(x: Node): Boolean = extractOK(x) || litOK(x) || fillOK(x) || catOK(x) || x.isInstanceOf[Bits] && x.inputs.length == 1 && useByteMask(x.inputs(0))
 
         val me = writen(m)

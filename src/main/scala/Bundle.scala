@@ -33,7 +33,7 @@ import scala.collection.immutable.HashSet
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 import java.lang.reflect.Modifier._
-import Node._;
+
 import ChiselError._
 import sort._
 
@@ -72,11 +72,17 @@ object sort {
 /** Defines a collection of datum of different types into a single coherent
   whole.
   */
-class Bundle(view_arg: Seq[String] = null) extends CompositeData {
-  var dir = "";
-  var view = view_arg;
+class Bundle extends AggregateData[String] {
+
+  var view = null;
   private var elementsCache: ArrayBuffer[(String, Data)] = null;
   var bundledElm: Node = null;
+
+
+  override def items(): Seq[(String, Data)] = {
+    elements
+  }
+
 
   /** Populates the cache of elements declared in the Bundle. */
   private def calcElements(view: Seq[String]): ArrayBuffer[(String, Data)] = {
@@ -126,12 +132,22 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
     elts
   }
 
-  /* XXX This method is not private since it is used in Dot.scala. */
+  /* XXX must be public, used in Chisel.QueueIO */
   def elements: ArrayBuffer[(String, Data)] = {
     if (elementsCache == null) {
       elementsCache = calcElements(view);
     }
     elementsCache
+  }
+
+  override def fromBits( bits: Bits ): this.type = {
+    var ind = 0;
+    for( (name, elem) <- this.flatten.toList.reverse ) {
+      val width = elem.node.width
+      elem := (if( width > 1) bits(ind + width - 1, ind) else bits(ind))
+      ind += width
+    }
+    this
   }
 
   override def toString: String = {
@@ -145,16 +161,11 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
     res
   }
 
-  override def terminate(): Unit = {
-    for ((n, i) <- elements)
-      i.terminate();
-  }
-
   def view (elts: ArrayBuffer[(String, Data)]): Bundle = {
     elementsCache = elts; this
   }
 
-  override def nameIt (path: String) {
+  override def nameIt (path: String): this.type = {
     if( !named
       && (name.isEmpty
         || (!path.isEmpty && name != path)) ) {
@@ -166,6 +177,7 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
     } else {
       /* We are trying to rename a Bundle that has a fixed name. */
     }
+    this
   }
 
   def +(other: Bundle): Bundle = {
@@ -180,7 +192,6 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
   def +=[T <: Data](other: T) {
     elements;
     elementsCache += ((other.name, other));
-    if(isTypeNode) other.setIsTypeNode;
   }
 
   def -=[T <: Data](other: T) {
@@ -200,65 +211,29 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
     this
   }
 
-  override def removeTypeNodes() {
-    for ((n, elt) <- elements)
-      elt.removeTypeNodes
-  }
-
-  override def traceableNodes: Array[Node] = elements.map(tup => tup._2).toArray;
-
-  override def traceNode(c: Module, stack: Stack[() => Any]) {
-    for((n, i) <- flatten) {
-      stack.push(() => i.traceNode(c, stack))
-    }
-  }
-
-  override def apply(name: String): Data = {
+  def apply(name: String): Data = {
     for((n,i) <- elements)
       if(name == n) return i;
     throw new NoSuchElementException();
     return null;
   }
 
-  override def <>(src: Node) {
-    if(comp == null || (dir == "output" &&
-      src.isInstanceOf[Bundle] &&
-      src.asInstanceOf[Bundle].dir == "output")){
-      src match {
-        case other: Bundle => {
-          for ((n, i) <- elements) {
-            if (other.contains(n)){
-              i <> other(n);
-            }
-            else{
-              ChiselError.warning("UNABLE TO FIND " + n + " IN " + other.component);
-            }
+  override def <>(right: Data) {
+    right match {
+      case other: Bundle => {
+        for ((n, i) <- elements) {
+          if( other.contains(n) ) {
+            i <> other(n)
+          } else {
+            ChiselError.warning("UNABLE TO FIND " + n + " IN " + other.component);
           }
         }
-        case default =>
-          ChiselError.warning("TRYING TO CONNECT BUNDLE TO NON BUNDLE " + default);
       }
-    } else {
-      src match {
-        case other: Bundle => {
-          comp assign other
-        }
-        case default =>
-          ChiselError.warning("CONNECTING INCORRECT TYPES INTO WIRE OR REG")
-      }
+      case default =>
+        ChiselError.warning("TRYING TO CONNECT BUNDLE TO NON BUNDLE " + default);
     }
   }
 
-  override def ^^(src: Node) {
-    src match {
-      case other: Bundle =>
-        for ((n, i) <- elements) {
-          if(other.contains(n)) {
-            i ^^ other(n);
-          }
-        }
-    }
-  }
 
   def contains(name: String): Boolean = {
     for((n,i) <- elements)
@@ -266,35 +241,17 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
     return false;
   }
 
-  override def :=[T <: Data](src: T): Unit = {
+  override def :=(src: Data): Unit = {
     src match {
-      case bun: Bundle => this := bun
-      case any => super.:=(any)
+      case bundle: Bundle => {
+        for((n, i) <- elements) {
+          if( bundle.contains(n) ) i := bundle(n)
+        }
+      }
+      case _ => super.:=(src)
     }
   }
 
-  def :=(src: Bundle): Unit = {
-    if(this.isTypeNode && comp != null) {
-      this.comp.procAssign(src.toNode)
-      return
-    }
-    for((n, i) <- elements) {
-      i match {
-        case bundle: Bundle => {
-          if (src.contains(n)) bundle := src(n).asInstanceOf[Bundle]
-        }
-        case bits: Bits => {
-          if (src.contains(n)) bits := src(n).asInstanceOf[Bits]
-        }
-        case vec: Vec[_] => {
-           /* We would prefer to match for Vec[Data] but that's impossible
-            because of JVM constraints which lead to type erasure. */
-          val vecdata = vec.asInstanceOf[Vec[Data]]
-          if (src.contains(n)) vecdata := src(n).asInstanceOf[Vec[Data]]
-        }
-      }
-    }
-  }
 
   override def flatten: Array[(String, Bits)] = {
     var res = ArrayBuffer[(String, Bits)]();
@@ -304,58 +261,4 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
     sort(res.toArray)
   }
 
-  override def getWidth(): Int = {
-    var w = 0
-    for((name, io) <- elements)
-      w += io.getWidth
-    w
-  }
-
-  override def toNode: Node = {
-    if(bundledElm == null) {
-      val nodes = flatten.map{case (n, i) => i};
-      bundledElm = Concatenate(nodes.head, nodes.tail.toList: _*)
-    }
-    bundledElm
-  }
-
-  override def fromNode(n: Node): this.type = {
-    val res = this.clone()
-    var ind = 0;
-    for((name, io) <- res.flatten.toList.reverse) {
-      io.asOutput();
-      if(io.width > 1) io assign NodeExtract(n, ind + io.width-1, ind) else io assign NodeExtract(n, ind);
-      ind += io.width;
-    }
-    res.setIsTypeNode
-    res
-  }
-
-  override def asDirectionless(): this.type = {
-    elements.foreach(_._2.asDirectionless)
-    this.dir = ""
-    this
-  }
-
-  override def asInput(): this.type = {
-    elements.foreach(_._2.asInput)
-    this.dir = "input"
-    this
-  }
-
-  override def asOutput(): this.type = {
-    elements.foreach(_._2.asOutput)
-    this.dir = "output"
-    this
-  }
-
-  override def isDirectionless: Boolean = {
-    (dir == "") && elements.map{case (n,i) => i.isDirectionless}.reduce(_&&_)
-  }
-
-  override def setIsTypeNode() {
-    isTypeNode = true;
-    for ((n, i) <- elements)
-      i.setIsTypeNode
-  }
 }

@@ -29,7 +29,7 @@
 */
 
 package Chisel
-import Node._
+
 import java.io.File;
 import java.io.InputStream
 import java.io.OutputStream
@@ -60,13 +60,13 @@ object VerilogBackend {
     "table", "task", "time", "tran", "tranif0", "tranif1", "tri", "tri0",
     "tri1", "triand", "trior", "trireg", "unsigned", "vectored", "wait",
     "wand", "weak0", "weak1", "while", "wire", "wor", "xnor", "xor")
-
-  var traversalIndex = 0
 }
 
+
+/** This backend generates Verilog source code from a Chisel graph.
+  */
 class VerilogBackend extends Backend {
   Module.isEmittingComponents = true
-  isCoercingArgs = false
   val keywords = VerilogBackend.keywords
 
   val flushedTexts = HashSet[String]()
@@ -77,7 +77,7 @@ class VerilogBackend extends Backend {
   private def getMemConfString: String =
     memConfs.map { case (conf, name) => "name " + name + " " + conf } reduceLeft(_ + _)
 
-  private def getMemName(mem: Mem[_], configStr: String): String = {
+  private def getMemName(mem: MemDelay, configStr: String): String = {
     if (!memConfs.contains(configStr)) {
       /* Generates memory that are different in (depth, width, ports).
        All others, we return the previously generated name. */
@@ -105,8 +105,11 @@ class VerilogBackend extends Backend {
     memConfs(configStr)
   }
 
-  def emitWidth(node: Node): String =
-    if (node.width == 1) "" else "[" + (node.width-1) + ":0]"
+  /** Emit a width suffix */
+  def emitWidth(node: Node): String = {
+
+    if (node.width == 1) "" else " [" + (node.width-1) + ":0]"
+  }
 
   override def emitTmp(node: Node): String =
     emitRef(node)
@@ -133,6 +136,7 @@ class VerilogBackend extends Backend {
     }
   }
 
+  /** Emit definitions for a memory port */
   def emitPortDef(m: MemAccess, idx: Int): String = {
     def str(prefix: String, ports: (String, String)*): String =
       ports.toList.filter(_._2 != null)
@@ -155,25 +159,36 @@ class VerilogBackend extends Backend {
 
       case rw: MemReadWrite =>
         val (r, w) = (rw.read, rw.write)
-        val addr = ("A", emitRef(w.cond) + " ? " + emitRef(w.addr) + " : " + emitRef(r.addr))
+        val addr = ("A", emitRef(w.cond) + " ? " + emitRef(w.addr)
+          + " : " + emitRef(r.addr))
         val en = ("E", emitRef(r.cond) + " || " + emitRef(w.cond))
         val write = ("W", emitRef(w.cond))
         val data = ("I", emitRef(w.data))
         val mask = ("M", if (w.isMasked) emitRef(w.mask) else null)
         val out = ("O", emitTmp(r))
         str("RW", addr, en, write, data, mask, out)
+
+      case _ =>
+        ""
     }
   }
 
+  /** Emit definitions for a ``Module``. */
   def emitDef(c: Module): String = {
-    val spacing = (if(c.verilog_parameters != "") " " else "");
-    var res = "  " + c.moduleName + " " + c.verilog_parameters + spacing + c.name + "(";
+    /* module prototype */
+    var res = ("  " + c.moduleName + " " + c.verilog_parameters
+      + (if(c.verilog_parameters != "") " " else "") + c.name + "(")
+    /* generated clocks and resets */
     if (c.clocks.length > 0) {
-      res = res + (c.clocks).map(x => "." + emitRef(x) + "(" + emitRef(x) + ")").reduceLeft(_ + ", " + _)
+      res = res + (c.clocks).map(x => "." + emitRef(x)
+        + "(" + emitRef(x) + ")").reduceLeft(_ + ", " + _)
     }
-    if (c.resets.size > 0 ) {    
+    if (c.resets.size > 0 ) {
       if (c.clocks.length > 0) res = res + ", "
-      res = res + (c.resets.values.toList).map(x => "." + emitRef(x) + "(" + emitRef(x.inputs(0)) + ")").reduceLeft(_ + ", " + _)
+      /* The reset signal is an end-point that needs to be propagated
+       back the hierarchy to the top module. */
+      res = res + (c.resets.toList).map(x => "." + emitRef(x)
+        + "(" + emitRef(x) + ")").reduceLeft(_ + ", " + _)
     }
     var isFirst = true;
     val portDecs = new ArrayBuffer[StringBuilder]
@@ -181,34 +196,27 @@ class VerilogBackend extends Backend {
       if(n != "reset") {
         var portDec = "." + n + "( ";
         w match {
-          case io: Bits  =>
-            if (io.dir == INPUT) { // if reached, then input has consumers
+          case io: IOBound  =>
+            if (io.isDirected(INPUT)) { // if reached, then input has consumers
               if (io.inputs.length == 0) {
-                  // if(Module.saveConnectionWarnings) {
-                  //   ChiselError.warning("" + io + " UNCONNECTED IN " + io.component);
-                  // } removed this warning because pruneUnconnectedIOs should have picked it up
                 portDec = "//" + portDec
               } else if (io.inputs.length > 1) {
                   if(Module.saveConnectionWarnings) {
                     ChiselError.warning("" + io + " CONNECTED TOO MUCH " + io.inputs.length);
                   }
                 portDec = "//" + portDec
-              } else if (!c.isWalked.contains(w)){
-                  if(Module.saveConnectionWarnings) {
-                    ChiselError.warning(" UNUSED INPUT " + io + " OF " + c + " IS REMOVED");
-                  }
-                portDec = "//" + portDec
               } else {
                 portDec += emitRef(io.inputs(0));
               }
-            } else if(io.dir == OUTPUT) {
+            } else if(io.isDirected(OUTPUT)) {
               if (io.consumers.length == 0) {
-                  // if(Module.saveConnectionWarnings) {
-                  //   ChiselError.warning("" + io + " UNCONNECTED IN " + io.component + " BINDING " + c.findBinding(io));
-                  // } removed this warning because pruneUnconnectedsIOs should have picked it up
+                /* pruneUnconnectedsIOs should have picked it up so no need
+                 to generate a warning here. */
                 portDec = "//" + portDec
               } else {
-                var consumer: Node = c.parent.findBinding(io);
+                /* There could be multiple consumers. We need to to find
+                 the correct one. */
+                val consumer = io.consumers.filter(_.component != io.component).head
                 if (consumer == null) {
                   if(Module.saveConnectionWarnings) {
                     ChiselError.warning("" + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + io.consumers.length + ") IN " + c.parent);
@@ -245,81 +253,86 @@ class VerilogBackend extends Backend {
     res
   }
 
+  /** Emit code that computes a ``Node``. */
   override def emitDef(node: Node): String = {
-    val res = 
+    val res =
     node match {
-      case x: Bits =>
-        if (x.isIo && x.dir == INPUT) {
-          ""
+      case x: IOBound =>
+        if( x.isDirected(INPUT) ) {
+          if( node.inputs.length > 0 && node.inputs(0) != null
+            && node.component == node.inputs(0).component ) {
+            "  assign " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ";\n"
+          } else {
+            ""
+          }
         } else {
           if (node.inputs.length == 0) {
             ChiselError.warning("UNCONNECTED " + node + " IN " + node.component); ""
           } else if (node.inputs(0) == null) {
             ChiselError.warning("UNCONNECTED WIRE " + node + " IN " + node.component); ""
-          } else {
+          } else if( node.component == node.inputs(0).component ) {
             "  assign " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ";\n"
+          } else {
+            ""
           }
         }
 
-      case x: Mux =>
-        "  assign " + emitTmp(x) + " = " + emitRef(x.inputs(0)) + " ? " + emitRef(x.inputs(1)) + " : " + emitRef(x.inputs(2)) + ";\n"
-
-      case o: Op =>
-        val c = o.component;
-        "  assign " + emitTmp(o) + " = " +
-        (if (o.op == "##") {
-          "{" + emitRef(node.inputs(0)) + ", " + emitRef(node.inputs(1)) + "}"
-        } else if (node.inputs.length == 1) {
-          o.op + " " + emitRef(node.inputs(0))
-        } else if (o.op == "s*s" || o.op == "s%s" || o.op == "s/s") {
-          "$signed(" + emitRef(node.inputs(0)) + ") " + o.op(1) + " $signed(" + emitRef(node.inputs(1)) + ")"
-        } else if(node.isSigned) {
-          if (o.op == ">>") {
-            "$signed(" + emitRef(node.inputs(0)) + ") " + ">>>" + " " + emitRef(node.inputs(1))
-          } else {
-            "$signed(" + emitRef(node.inputs(0)) + ") " + o.op + " $signed(" + emitRef(node.inputs(1)) + ")"
-          }
-        } else {
-          emitRef(node.inputs(0)) + " " + o.op + " " + emitRef(node.inputs(1))
-        }) + ";\n"
-
-      case x: Cat =>
+      case x: CatOp => {
         var res = "  assign " + emitTmp(node) + " = {";
         var first = true;
-        for(e <- node.inputs)
+        for(e <- x.inputs)
           res += (if(first) {first = false; ""} else ", ") + emitRef(e);
         res += "};\n";
         res
+      }
 
-      case x: Extract =>
-        node.inputs.tail.foreach(x.validateIndex)
-        if (node.inputs.length < 3) {
-          if(node.inputs(0).width > 1) {
-            "  assign " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + "[" + emitRef(node.inputs(1)) + "];\n"
+      case x: DivSOp =>
+        ("  assign " + emitTmp(x) + " = " + "$signed(" + emitRef(x.left) + ") "
+          + "/ $signed(" + emitRef(x.right) + ");\n")
+
+      case x: DivUSOp =>
+        ("  assign " + emitTmp(x) + " = " + "$signed(" + emitRef(x.left) + ") "
+          + "/ $signed(" + emitRef(x.right) + ");\n")
+
+      case x: DivSUOp =>
+        ("  assign " + emitTmp(x) + " = " + "$signed(" + emitRef(x.left) + ") "
+          + "/ $signed(" + emitRef(x.right) + ");\n")
+
+      case x: ExtractOp =>
+        if (x.inputs.length < 3) {
+          if(x.inputs(0).width > 1) {
+            ("  assign " + emitTmp(x) + " = "
+              + emitRef(x.inputs(0)) + "[" + emitRef(x.inputs(1)) + "];\n")
           } else {
-            "  assign " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ";\n"
+            ("  assign " + emitTmp(x) + " = " + emitRef(x.inputs(0)) + ";\n")
           }
         } else {
-          if(node.inputs(0).width > 1) {
-            "  assign " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + "[" + emitRef(node.inputs(1)) + ":" + emitRef(node.inputs(2)) + "];\n"
+          if(x.inputs(0).width > 1) {
+            ("  assign " + emitTmp(x) + " = "
+              + emitRef(x.inputs(0)) + "[" + emitRef(x.inputs(1))
+              + ":" + emitRef(x.inputs(2)) + "];\n")
           } else {
-            "  assign " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ";\n"
+            "  assign " + emitTmp(x) + " = " + emitRef(x.inputs(0)) + ";\n"
           }
         }
 
-      case x: Fill =>
-        "  assign " + emitTmp(node) + " = {" + emitRef(node.inputs(1)) + "{" + emitRef(node.inputs(0)) + "}};\n";
+      case x: FillOp =>
+        ("  assign " + emitTmp(x) + " = {"
+          + emitRef(x.inputs(0)) + "{" + x.n + "}};\n");
 
-      case ll: ListLookup[_] =>
+      case ll: ListLookupRef => {
+        ""
+      }
+
+      case ll: ListLookup => {
         val res = new StringBuilder()
         res.append("  always @(*) begin\n" +
                    //"    " + emitRef + " = " + inputs(1).emitRef + ";\n" +
-                   "    casez (" + emitRef(node.inputs(0)) + ")" + "\n");
-
+                   "    casez (" + emitRef(ll.addr) + ")" + "\n");
         for ((addr, data) <- ll.map) {
           res.append("      " + emitRef(addr) + " : begin\n");
           for ((w, e) <- ll.wires zip data) {
-            if(w.component != null && w.component.mods.contains(w) ) {
+            if(w.component != null && w.component.nodes.contains(w) ) {
               res.append("        " + emitRef(w) + " = " + emitRef(e) + ";\n");
             }
           }
@@ -327,7 +340,7 @@ class VerilogBackend extends Backend {
         }
         res.append("      default: begin\n")
         for ((w, e) <- ll.wires zip ll.defaultWires) {
-          if(w.component != null && w.component.mods.contains(w)) {
+          if(w.component != null && w.component.nodes.contains(w)) {
             res.append("        " + emitRef(w) + " = " + emitRef(e) + ";\n");
           }
         }
@@ -336,121 +349,172 @@ class VerilogBackend extends Backend {
           "    endcase\n" +
           "  end\n");
         res.toString
+      }
 
-      case l: Lookup =>
+      case l: Lookup => {
         var res =
           "  always @(*) begin\n" +
           "    " + emitRef(l) + " = " + emitRef(l.inputs(1)) + ";\n" +
           "    casez (" + emitRef(l.inputs(0)) + ")" + "\n";
 
         for (node <- l.map)
-          res = res +
-            "      " + emitRef(node.addr) + " : " + emitRef(l) + " = " + emitRef(node.data) + ";\n";
+          res = res + "      " + emitRef(node._1) + " : " + emitRef(l) + " = " + emitRef(node._2) + ";\n";
         res = res +
           "    endcase\n" +
           "  end\n";
         res
+      }
 
-      case m: Mem[_] =>
-        if(!m.isInline) {
-          val configStr =
-          (" depth " + m.n +
-            " width " + m.width +
-            " ports " + m.ports.map(_.getPortType).reduceLeft(_ + "," + _) +
-            "\n")
-          val name = getMemName(m, configStr)
-          ChiselError.info("MEM " + name)
-
-          val clkrst = Array("    .CLK(clk)", "    .RST(" + emitRef(m.inputs.last) + ")")
-          val portdefs = for (i <- 0 until m.ports.size)
-          yield emitPortDef(m.ports(i), i)
-          "  " + name + " " + emitRef(m) + " (\n" +
-            (clkrst ++ portdefs).reduceLeft(_ + ",\n" + _) + "\n" +
-          "  );\n"
-        } else {
-          ""
+      case x: Log2Op => {
+        val res = new StringBuilder
+        var mux = UInt(0)
+        res.append(emitDef(mux.node))
+        for (i <- 1 until x.nbits) {
+          val cond = Extract(UInt(x.opand), UInt(i))
+          res.append(emitDef(cond.node))
+          val left = UInt(i, Literal.sizeof(x.nbits-1))
+          res.append(emitDef(left.node))
+          mux = Mux(cond, left, mux)
+          res.append(emitDef(mux.node))
         }
+        res.toString
+      }
+
+      case x: MuxOp =>
+        // XXX .otherwise might be null
+        ("  assign " + emitTmp(x) + " = "
+          + (if(x.otherwise != null)
+            (emitRef(x.cond) + " ? " + emitRef(x.thenNode)
+              + " : " + emitRef(x.otherwise)) else emitRef(x.thenNode)) + ";\n")
+
+      case x: MulSOp =>
+        ("  assign " + emitTmp(x) + " = " + "$signed(" + emitRef(x.left) + ") "
+          + "* $signed(" + emitRef(x.right) + ");\n")
+
+      case x: MulSUOp =>
+        ("  assign " + emitTmp(x) + " = " + "$signed(" + emitRef(x.left) + ") "
+          + "* $signed(" + emitRef(x.right) + ");\n")
+
+      case x: RemSOp =>
+        ("  assign " + emitTmp(x) + " = " + "$signed(" + emitRef(x.left) + ") "
+          + "% $signed(" + emitRef(x.right) + ");\n")
+
+      case x: RemUSOp =>
+        ("  assign " + emitTmp(x) + " = " + "$signed(" + emitRef(x.left) + ") "
+          + "% $signed(" + emitRef(x.right) + ");\n")
+
+      case x: RemSUOp =>
+        ("  assign " + emitTmp(x) + " = " + "$signed(" + emitRef(x.left) + ") "
+          + "% $signed(" + emitRef(x.right) + ");\n")
+
+      case x: RightShiftSOp =>
+        ("  assign " + emitTmp(x) + " = "
+          + "$signed(" + emitRef(x.left) + ") "
+          + ">>>" + " " + emitRef(x.right) + ";\n")
+
+      case r: ROMemDelay => {
+        val inits = new StringBuilder
+        for (i <- 0 until r.inputs.length)
+          inits append("    " + emitRef(r) + "[" + i + "] = "
+            + emitRef(r.inputs(i)) + ";\n")
+
+        "  always @(*) begin\n" +
+        inits +
+        "  end\n"
+      }
+
+      case m: MemDelay =>
+        if(m.isInline) {
+          ""
+        } else {
+          if( m.ports.length > 0 ) {
+            val configStr =
+              (" depth " + m.depth +
+                " width " + m.width +
+                " ports " + m.ports.map(_.getPortType).reduceLeft(_ + "," + _) +
+                "\n")
+            val name = getMemName(m, configStr)
+            ChiselError.info("MEM " + name)
+            val clkrst = Array("    .CLK(" + emitRef(m.clock) + ")", "    .RST(" + emitRef(m.reset) + ")")
+            val portdefs = for (i <- 0 until m.ports.size)
+            yield emitPortDef(m.ports(i), i)
+            "  " + name + " " + emitRef(m) + " (\n" +
+              (clkrst ++ portdefs).reduceLeft(_ + ",\n" + _) + "\n" +
+            "  );\n"
+          } else {
+            ChiselError.error("Memory " + m.name + " has no ports")
+          }
+        }
+
       case m: MemRead =>
         if (m.mem.isInline) {
-          "  assign " + emitTmp(node) + " = " + emitRef(m.mem) + "[" + emitRef(m.addr) + "];\n"
+          "  assign " + emitTmp(m) + " = " + emitRef(m.mem) + "[" + emitRef(m.addr) + "];\n"
         } else {
           ""
         }
-      case r: ROM[_] =>
-        val inits = r.lits.zipWithIndex.map { case (lit, i) =>
-          "    " + emitRef(r) + "[" + i + "] = " + emitRef(lit) + ";\n"
-        }
-
-        "  initial begin\n" +
-        inits.reduceLeft(_ + _) +
-        "  end\n"
-
-      case r: ROMRead[_] =>
-        "  assign " + emitTmp(r) + " = " + emitRef(r.rom) + "[" + emitRef(r.addr) + "];\n"
 
       case s: Sprintf =>
-        "  always @(*) $sformat(" + emitTmp(s) + ", " + s.args.map(emitRef _).foldLeft(CString(s.format))(_ + ", " + _) + ");\n"
+        ("  always @(*) $sformat(" + emitTmp(s) + ", "
+          + s.args.map(emitRef _).foldLeft(CString(s.format))(_ + ", " + _)
+          + ");\n")
+
+        /* These cannot be alphabetically sorted. They need to appear
+         after all subclasses have been matched. */
+      case x:BinaryOp =>
+       ("  assign " + emitTmp(x) + " = "
+         + emitRef(x.inputs(0)) + " "
+         + x.opInfix + " " + emitRef(x.inputs(1)) + ";\n")
+
+      case x: UnaryOp =>
+        ("  assign " + emitTmp(x) + " = "
+          + x.opPrefix + " " + emitRef(x.inputs(0)) + ";\n")
 
       case _ =>
         ""
     }
-    (if (node.prune && res != "") "//" else "") + res    
+    (if (node.prune && res != "") "//" else "") + res
   }
 
-  def emitSigned(n: Node): String = if(n.isSigned) " signed " else ""
+  def emitSigned(n: Node): String = if(n.isSigned) " signed" else ""
 
-  def emitDecBase(node: Node): String =
+  def emitDecBase(node: Node): String = {
     "  wire" + emitSigned(node) + emitWidth(node) + " " + emitRef(node) + ";\n"
+  }
 
   override def emitDec(node: Node): String = {
-    val res = 
+    val res =
     node match {
-      case x: Bits =>
-        if(!x.isIo) {
-          emitDecBase(node)
-        } else {
-          ""
-        }
-      case x: ListLookupRef[_] =>
-        "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
+      case x: ListLookupRef =>
+        "  reg" + emitSigned(x) + emitWidth(x) + " " + emitRef(x) + ";\n";
 
       case x: Lookup =>
-        "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
+        "  reg" + emitSigned(x) + emitWidth(x) + " " + emitRef(x) + ";\n";
 
       case x: Sprintf =>
-        "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
+        "  reg" + emitSigned(x) + emitWidth(x) + " " + emitRef(x) + ";\n";
 
-      case x: ListNode =>
-        ""
-      case x: MapNode =>
-        ""
-      case x: LookupMap =>
-        ""
       case x: Literal =>
         ""
 
-      case x: Reg =>
-        if (node.isMemOutput) {
-          ""
-        } else {
-          "  reg" + emitSigned(node) + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n"
-        }
+      case x: Update =>
+        ""
 
-      case m: Mem[_] =>
+      case x: RegDelay =>
+          "  reg" + emitSigned(x) + emitWidth(x) + " " + emitRef(x) + (
+            if( x.depth > 1) " [" + (x.depth-1) + ":0]" else "") + ";\n"
+
+      case m: MemDelay =>
         if (m.isInline) {
-          "  reg [" + (m.width-1) + ":0] " + emitRef(m) + " [" + (m.n-1) + ":0];\n"
+          "  reg" + emitWidth(m) + " " + emitRef(m) + " [" + (m.depth - 1) + ":0];\n"
         } else {
           ""
         }
-      case r: ROM[_] =>
-        "  reg [" + (r.width-1) + ":0] " + emitRef(r) + " [" + (r.lits.length-1) + ":0];\n"
 
       case x: MemAccess =>
-        x.referenced = true
         emitDecBase(node)
 
-      case _ =>
-        emitDecBase(node)
+      case x =>
+        if( !x.isReset ) emitDecBase(node) else ""
     }
     (if (node.prune && res != "") "//" else "") + res
   }
@@ -459,8 +523,8 @@ class VerilogBackend extends Backend {
     val harness  = createOutputFile(name + "-harness.v");
     val printFormat = Module.printArgs.map(a => "0x%x").fold("")((y,z) => z + " " + y)
     val scanFormat = Module.scanArgs.map(a => "%x").fold("")((y,z) => z + " " + y)
-    val printNodes = for (arg <- Module.printArgs; node <- arg.maybeFlatten) yield arg
-    val scanNodes = for (arg <- Module.scanArgs; node <- c.keepInputs(arg.maybeFlatten)) yield arg
+    val printNodes = for (arg <- Module.printArgs) yield arg
+    val scanNodes = for (arg <- Module.scanArgs.filter(n => c.isInput(n))) yield arg
     harness.write("module test;\n")
     for (node <- scanNodes)
       harness.write("    reg [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
@@ -536,7 +600,7 @@ class VerilogBackend extends Backend {
 
   def emitDefs(c: Module): StringBuilder = {
     val res = new StringBuilder()
-    for (m <- c.mods) {
+    for (m <- c.nodes) {
       res.append(emitDef(m))
     }
     for (c <- c.children) {
@@ -547,15 +611,20 @@ class VerilogBackend extends Backend {
 
   def emitRegs(c: Module): StringBuilder = {
     val res = new StringBuilder();
-    val clkDomains = new HashMap[Clock, StringBuilder]
+    val clkDomains = new HashMap[Update, StringBuilder]
     for (clock <- c.clocks) {
       val sb = new StringBuilder
       sb.append("  always @(posedge " + emitRef(clock) + ") begin\n")
       clkDomains += (clock -> sb)
     }
-    for (m <- c.mods) {
-      if (m.clock != null)
-        clkDomains(m.clock).append(emitReg(m))
+    for (m <- c.nodes) {
+      if( m.isInstanceOf[Delay] || m.isInstanceOf[MemWrite] ) {
+        val clock = (if( m.isInstanceOf[Delay] ) m.asInstanceOf[Delay].clock
+        else m.asInstanceOf[MemWrite].mem.clock)
+        if( clock != null ) {
+          clkDomains(clock).append(emitReg(m))
+        }
+      }
     }
     for (clock <- c.clocks) {
       clkDomains(clock).append("  end\n")
@@ -566,25 +635,24 @@ class VerilogBackend extends Backend {
 
   def emitReg(node: Node): String = {
     node match {
-      case reg: Reg =>
-        if(reg.isMemOutput) {
-            ""
-        } else if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1)){
-          if(reg.isReset){
-            "    if(" + emitRef(reg.inputs.last) + ") begin\n" +
+      case reg: RegDelay =>
+        val enable = reg.enable
+        if( enable != null ){
+          if(reg.hasReset){
+            "    if(" + emitRef(reg.reset) + ") begin\n" +
             "      " + emitRef(reg) + " <= " + emitRef(reg.init) + ";\n" +
-            "    end else if(" + emitRef(reg.enableSignal) + ") begin\n" +
+            "    end else if(" + emitRef(enable) + ") begin\n" +
             "      " + emitRef(reg) + " <= " + emitRef(reg.next) + ";\n" +
             "    end\n"
           } else {
-            "    if(" + emitRef(reg.enableSignal) + ") begin\n" +
+            "    if(" + emitRef(enable) + ") begin\n" +
             "      " + emitRef(reg) + " <= " + emitRef(reg.next) + ";\n" +
             "    end\n"
           }
         } else {
           "    " + emitRef(reg) + " <= " +
-          (if (reg.isReset) {
-            emitRef(reg.inputs.last) + " ? " + emitRef(reg.init) + " : "
+          (if (reg.hasReset) {
+            emitRef(reg.reset) + " ? " + emitRef(reg.init) + " : "
           } else {
             ""
           }) + emitRef(reg.next) + ";\n"
@@ -627,7 +695,7 @@ class VerilogBackend extends Backend {
 
   def emitDecs(c: Module): StringBuilder = {
     val res = new StringBuilder();
-    for (m <- c.mods) {
+    for (m <- c.nodes -- c.io.flatten.map(x => x._2.node)) {
       res.append(emitDec(m))
     }
     res
@@ -642,19 +710,19 @@ class VerilogBackend extends Backend {
     var first = true;
     var nl = "";
     if (c.clocks.length > 0 || c.resets.size > 0)
-      res.append((c.clocks ++ c.resets.values.toList).map(x => "input " + emitRef(x)).reduceLeft(_ + ", " + _))
+      res.append((c.clocks ++ c.resets.toList).map(x => "input " + emitRef(x)).reduceLeft(_ + ", " + _))
     val ports = new ArrayBuffer[StringBuilder]
     for ((n, w) <- c.wires) {
       // if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
       w match {
-        case io: Bits => {
+        case io: IOBound => {
           val prune = if (io.prune && c != Module.topComponent) "//" else ""
-          if (io.dir == INPUT) {
-            ports += new StringBuilder(nl + "    " + prune + "input " + 
-                                       emitSigned(io) + emitWidth(io) + " " + emitRef(io));
-          } else if(io.dir == OUTPUT) {
-            ports += new StringBuilder(nl + "    " + prune + "output" + 
-                                       emitSigned(io) + emitWidth(io) + " " + emitRef(io));
+          if (io.isDirected(INPUT)) {
+            ports += new StringBuilder(nl + "    " + prune + "input" +
+              emitSigned(io) + emitWidth(io) + " " + emitRef(io));
+          } else if(io.isDirected(OUTPUT)) {
+            ports += new StringBuilder(nl + "    " + prune + "output" +
+              emitSigned(io) + emitWidth(io) + " " + emitRef(io));
           }
         }
       };
@@ -665,7 +733,7 @@ class VerilogBackend extends Backend {
     res.append(ports.map(_.result).reduceLeft(_ + "\n" + _))
     res.append("\n);\n\n");
     // TODO: NOT SURE EXACTLY WHY I NEED TO PRECOMPUTE TMPS HERE
-    for (m <- c.mods)
+    for (m <- c.nodes)
       emitTmp(m);
     res.append(emitDecs(c));
     res.append("\n");
@@ -736,14 +804,12 @@ class VerilogBackend extends Backend {
        We use a LinkedHashMap such that later iteration is predictable. */
     val defs = new HashMap[String, LinkedHashMap[String, ArrayBuffer[Module] ]];
     var level = 0;
-    for( c <- Module.sortedComps ) {
+    for( c <- sortedComps ) {
       ChiselError.info(depthString(depth) + "COMPILING " + c
         + " " + c.children.length + " CHILDREN"
         + " (" + c.level + "," + c.traversal + ")");
-      c.findConsumers();
       ChiselError.checkpoint()
 
-      c.collectNodes(c);
       if( c.level > level ) {
         /* When a component instance instantiates different sets
          of sub-components based on its constructor parameters, the same
@@ -777,8 +843,6 @@ class VerilogBackend extends Backend {
 
     val out = createOutputFile(c.name + ".v");
     doCompile(c, out, 0);
-    c.verifyAllMuxes;
-    ChiselError.checkpoint()
     out.close();
 
     if (!memConfs.isEmpty) {
@@ -787,8 +851,13 @@ class VerilogBackend extends Backend {
       out_conf.close();
     }
     if( Module.tester != null ) {
-      Module.scanArgs.clear();  Module.scanArgs  ++= Module.tester.testInputNodes;    Module.scanFormat  = ""
-      Module.printArgs.clear(); Module.printArgs ++= Module.tester.testNonInputNodes; Module.printFormat = ""
+      Module.scanArgs.clear();
+      Module.scanArgs  ++= Module.tester.testInputNodes.map(n => n.node)
+      Module.scanFormat  = ""
+
+      Module.printArgs.clear();
+      Module.printArgs ++= Module.tester.testNonInputNodes.map(n => n.node)
+      Module.printFormat = ""
     }
     if (Module.isGenHarness) {
       genHarness(c, c.name);

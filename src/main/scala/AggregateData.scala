@@ -29,22 +29,64 @@
 */
 
 package Chisel
-import Literal._
 
-object Enum {
-  /** create n enum values of given type */
-  def apply[T <: Bits](nodeType: T, n: Int)(implicit m: reflect.ClassTag[T]): List[T] = {
-    (Range(0, n, 1).map(x => (Lit(x, sizeof(n-1))))).toList
+/** Base class for a logical set of references to ``Node``s.
+
+  Each node can be individually accessed by a key of type Key,
+  which is a String for ``Bundle``s (name) and an Int for ``Vec`` (index).
+
+  This class implements the *Composite* role
+  in a [Composite pattern](http://en.wikipedia.org/wiki/Composite_pattern).
+  */
+abstract class AggregateData[Key] extends Data {
+
+  def items(): Seq[(Key, Data)]
+
+  def nodes(): Seq[Node] = {
+    this.flatten.map(x => x._2.node)
   }
 
-  /** create enum values of given type and names */
-  def apply[T <: Bits](nodeType: T, l: Symbol *)(implicit m: reflect.ClassTag[T]): Map[Symbol, T] = {
-    (l.toList zip (Range(0, l.length, 1).map(x => Lit(x, sizeof(l.length-1))))).toMap
+  override def asDirectionless(): this.type = {
+    items().foreach(_._2.asDirectionless)
+    this
   }
 
-  /** create enum values of given type and names */
-  def apply[T <: Bits](nodeType: T, l: List[Symbol])(implicit m: reflect.ClassTag[T]): Map[Symbol, T] = {
-    (l zip (Range(0, l.length, 1).map(x => Lit(x, sizeof(l.length-1))))).toMap
+  override def asInput(): this.type = {
+    items().foreach(_._2.asInput)
+    this
+  }
+
+  override def asOutput(): this.type = {
+    items().foreach(_._2.asOutput)
+    this
+  }
+
+  override def flip(): this.type = {
+    items().foreach(_._2.flip())
+    this
+  }
+
+  def getWidth(): Int = {
+    var w = 0
+    for((key, dat) <- items())
+      w += dat.getWidth
+    w
+  }
+
+  override def toBits(): UInt = {
+    Cat(this.flatten.map(x => x._2))
+  }
+
+  override def toString: String = {
+    var sep = ""
+    val str = new StringBuilder
+    str.append("{")
+    for( (key, value) <- items ) {
+      str.append(sep + key + ":" + value)
+      sep = ", "
+    }
+    str.append("}")
+    str.toString
   }
 
 }

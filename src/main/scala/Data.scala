@@ -30,82 +30,101 @@
 
 package Chisel
 
-import Node._
 import ChiselError._
 
-/** *Data* is part of the *Node* Composite Pattern class hierarchy.
-  It is the root of the type system which includes composites (Bundle, Vec)
-  and atomic types (UInt, SInt, etc.).
+/** *Data* the *Compoment* class
+  in a [Composite pattern](http://en.wikipedia.org/wiki/Composite_pattern)
+  class hierarchy. It is the root of the type system which includes composites
+  (Bundle, Vec) and atomic types (UInt, SInt, etc.).
 
   Instances of Data are meant to help with construction and correctness
   of a logic graph. They will trimmed out of the graph before a *Backend*
   generates target code.
+
+  Instances of Data are used to transport data types (UInt, SInt, etc)
+  while executing the Scala program. These data types are used to create
+  Nodes through dynamic dispatch.
   */
-abstract class Data extends Node {
-  var comp: proc = null;
+abstract class Data extends nameable {
 
-  // Interface required by Vec:
-  def ===[T <: Data](right: T): Bool = {
-    throw new Exception("=== not defined on " + this.getClass
-      + " and " + right.getClass)
-  }
+  /** Set to the line on which the instance is declared. */
+  val line: StackTraceElement = (
+    findFirstUserLine(Thread.currentThread().getStackTrace)
+      getOrElse Thread.currentThread().getStackTrace()(0))
 
-  def toBits(): UInt = chiselCast(this){UInt()};
+  /* Component this AST Data Type belongs to. We use it
+   in the <> operator to bind nodes. */
+  val component: Module = Module.scope.topModule
 
-  def toBool(): Bool = {
-    if(this.getWidth > 1) {
-      throw new Exception("multi bit signal " + this + " converted to Bool");
+  def nameIt(name: String): this.type
+
+  /** Returns the infered width of this instance at the time the method
+    is called.
+    */
+  def getWidth(): Int
+
+  // following: Interface required by Vec:
+  def ===(right: Data): Bool = {
+    if(this.getClass != right.getClass) {
+      ChiselError.error("=== not defined on " + this.getClass
+        + " and " + right.getClass);
     }
-    if(this.getWidth == -1) {
-      throw new Exception("unable to automatically convert " + this + " to Bool, convert manually instead")
-    }
-    chiselCast(this){Bool()};
+    Bool()
   }
 
-  // Interface required by Cat:
-  def ##[T <: Data](right: T): this.type = {
-    throw new Exception("## not defined on " + this.getClass + " and " + right.getClass)
-  }
+  def toBits(): UInt
 
+  def fromBits( bits: Bits ): this.type
 
-  def setIsTypeNode {
-    assert(inputs.length > 0, ChiselError.error("Type Node must have an input"))
-    isTypeNode = true
-    inferWidth = widthOf(0)
-  }
+  def nodes(): Seq[Node]
 
-  def apply(name: String): Data = null
+  /** Returns a sequence of tuples where the first
+    element is the name of a node and the second element is
+    a boxed ``Node`` associated with the name.
+    */
   def flatten: Array[(String, Bits)] = Array[(String, Bits)]();
-  def terminate(): Unit = { }
-  def flip(): this.type = this;
-  def asInput(): this.type = this;
 
-  /** Sets the direction (*dir*) of instances derived from Bits to OUTPUT
-    or recursively sets members of Bundle/Vec to OUTPUT.
-    Returns this instance with its exact type.
+  /** Sets the direction of all ``IOBound`` nodes referenced
+    by this ``Data`` to ``NODIRECTION``.
+
+    For single node reference like ``Bits``, this means if the actual
+    node is an IOBound, that node will be modified. For aggregate node
+    references like ``Bundle`` and ``Vec``, this method applies to all
+    ``IOBound`` nodes aggregated by the reference.
+    */
+  def asDirectionless(): this.type
+
+  /** Sets the direction of all ``IOBound`` nodes referenced
+    by this ``Data`` to ``INPUT``.
+
+    For single node reference like ``Bits``, this means if the actual
+    node is an IOBound, that node will be modified. For aggregate node
+    references like ``Bundle`` and ``Vec``, this method applies to all
+    ``IOBound`` nodes aggregated by the reference.
+    */
+  def asInput(): this.type
+
+  /** Sets the direction of all ``IOBound`` nodes referenced
+    by this ``Data`` to ``OUTPUT``.
+
+    For single node reference like ``Bits``, this means if the actual
+    node is an IOBound, that node will be modified. For aggregate node
+    references like ``Bundle`` and ``Vec``, this method applies to all
+    ``IOBound`` nodes aggregated by the reference.
     */
   def asOutput(): this.type
-  def asDirectionless(): this.type
-  def isDirectionless: Boolean = true;
 
-  def toNode: Node = this;
+  /** Flips the direction of all ``IOBound`` nodes referenced
+    by this ``Data`` from ``INPUT`` to ``OUTPUT`` and ``OUTPUT``
+    to ``INPUT`` respectively. Nodes with no direction are left
+    unchanged.
 
-  /** Factory method to create and assign a leaf-type instance out of a subclass
-    of *Node* instance which we have lost the concrete type. */
-  def fromNode(n: Node): this.type;
-  def fromBits(b: Bits): this.type = {
-    val n = fromNode(b)
-    n.setIsTypeNode
-    n
-  }
-
-  def :=[T <: Data](data: T): Unit = {
-    if(this.getClass != data.getClass) {
-      ChiselError.error(":= not defined on " + this.getClass
-        + " and " + data.getClass);
-    }
-    comp procAssign data;
-  }
+    For single node reference like ``Bits``, this means if the actual
+    node is an IOBound, that node will be modified. For aggregate node
+    references like ``Bundle`` and ``Vec``, this method applies to all
+    ``IOBound`` nodes aggregated by the reference.
+    */
+  def flip(): this.type
 
   override def clone(): this.type = {
     try {
@@ -120,18 +139,23 @@ abstract class Data extends Node {
     }
   }
 
-  override def nameIt(path: String) {
-    if (isTypeNode && comp != null) {
-      comp.nameIt(path)
-    } else {
-      super.nameIt(path)
+  /** Strict Assignment
+
+    Muxes will be created as necessary to accomate
+    multiple assignments to the same ``Data`` instance.
+    */
+  def :=(src: Data): Unit = {
+    if(this.getClass != src.getClass) {
+      ChiselError.error(":= not defined on " + this.getClass
+        + " and " + src.getClass);
     }
   }
 
-  def setWidth(w: Int) {
-    this.width = w;
-  }
+  /** Intelligent Assignment
+
+    Left-to-right or right-to-left assignment is used based
+    on the context.
+    */
+  def <>(src: Data): Unit
 }
 
-abstract class CompositeData extends Data {
-}

@@ -119,6 +119,7 @@ the Chisel jar locally and remake your third-party project. Example:
     ...
 
     $ rm -rf ~/.sbt ~/.ivy2
+    $ find . -name 'target' -exec rm -rf {} +
     $ cd *srcTop*/chisel && sbt publish-local
     $ cd *srcTop*/riscv-sodor && make run-emulator
 

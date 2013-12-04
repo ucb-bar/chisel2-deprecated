@@ -29,264 +29,407 @@
 */
 
 package Chisel
-import scala.math.max
-import Node._
-import Literal._
 
-abstract class Cell extends nameable{
-  val io: Data;
-  val primitiveNode: Node;
-  var isReg = false;
+/** Base class for nodes that appear as operators in the generated graph.
+  */
+abstract class Op extends Node {
+  override def slug = "und"
+  val opInfix = "und"
 }
 
-object chiselCast {
-  def apply[S <: Data, T <: Bits](x: S)(gen: => T): T = {
-    val res = gen
-    res.inputs += x.toNode
-    res
-  }
-}
-
-object UnaryOp {
-  def apply[T <: Bits](x: T, op: String): Node = {
-    op match {
-      case "-" => Op("-",  1, widthOf(0), x);
-      case "~" => Op("~",  1, widthOf(0), x);
-      case "!" => Op("!",  1, fixWidth(1), x);
-      case any => throw new Exception("Unrecognized operator " + op);
-    }
-  }
-}
-
-object BinaryOp {
-  def apply[T <: Bits](x: T, y: T, op: String): Node = {
-    op match {
-      case "<<"  => Op("<<", 0, lshWidthOf(0, y),  x, y );
-      case ">>"  => Op(">>", 0, rshWidthOf(0, y),  x, y );
-      case "+"   => Op("+",  2, maxWidth _,  x, y );
-      case "*"   => Op("*",  0, sumWidth _,  x, y );
-      case "s*s" => Op("s*s",  0, sumWidth _,  x, y );
-      case "s*u" => Op("s*s",  0, mulSUWidth _,  x, y );
-      case "u*s" => Op("s*s",  0, mulSUWidth _,  y, x );
-      case "/"   => Op("/",  0, widthOf(0),  x, y );
-      case "s/s" => Op("s/s",  0, widthOf(0),  x, y );
-      case "s/u" => Op("s/s",  0, widthOf(0),  x, y );
-      case "u/s" => Op("s/s",  0, divUSWidth _, x, y );
-      case "%"   => Op("%",  0, minWidth _,  x, y );
-      case "s%s" => Op("s%s",  0, minWidth _,  x, y );
-      case "s%u" => Op("s%u",  0, modSUWidth _,  x, y );
-      case "u%s" => Op("u%s",  0, modUSWidth _, x, y );
-      case "^"   => Op("^",  2, maxWidth _,  x, y );
-      case "?"   => Multiplex(x, y, null);
-      case "-"   => Op("-",  2, maxWidth _,  x, y );
-      case "##"  => Op("##", 2, sumWidth _,  x, y );
-      case "&"   => Op("&",  2, maxWidth _, x, y );
-      case "|"   => Op("|",  2, maxWidth _, x, y );
-      case any   => throw new Exception("Unrecognized operator " + op);
-    }
-  }
-
-  // width inference functions for signed-unsigned operations
-  private def mulSUWidth(x: Node) = sumWidth(x) - 1
-  private def divUSWidth(x: Node) = widthOf(0)(x) - 1
-  private def modUSWidth(x: Node) = x.inputs(1).width.min(x.inputs(0).width - 1)
-  private def modSUWidth(x: Node) = x.inputs(0).width.min(x.inputs(1).width - 1)
+/** Marks operations whose inputs width need to match in sizes.
+  */
+trait SymetricOpand {
 }
 
 
-object LogicalOp {
-  def apply[T <: Bits](x: T, y: T, op: String): Bool = {
-    if(Module.searchAndMap && op == "&&" && Module.chiselAndMap.contains((x, y))) {
-      Module.chiselAndMap((x, y))
-    } else {
-      val node = op match {
-        case "===" => Op("==", 2, fixWidth(1), x, y );
-        case "!="  => Op("!=", 2, fixWidth(1), x, y );
-        case ">"   => Op(">",  2, fixWidth(1), x, y );
-        case "<"   => Op("<",  2, fixWidth(1), x, y );
-        case "<="  => Op("<=", 2, fixWidth(1), x, y );
-        case ">="  => Op(">=", 2, fixWidth(1), x, y );
-        case "&&"  => Op("&&", 2, fixWidth(1), x, y );
-        case "||"  => Op("||", 2, fixWidth(1), x, y );
-        case any   => throw new Exception("Unrecognized operator " + op);
-      }
+/** Base class for nodes that appear as unary operators in the generated graph.
+  */
+abstract class UnaryOp(opandNode: Node) extends Op {
 
-      // make output
-      val output = Bool(OUTPUT).fromNode(node)
-      if(Module.searchAndMap && op == "&&" && !Module.chiselAndMap.contains((x, y))) {
-        Module.chiselAndMap += ((x, y) -> output)
-      }
-      output
-    }
-  }
-}
+  this.inputs.append(opandNode)
 
-object ReductionOp {
-  def apply[T <: Bits](x: T, op: String): Node = {
-    op match {
-      case "&" => Op("&",  1, fixWidth(1), x);
-      case "|" => Op("|",  1, fixWidth(1), x);
-      case "^" => Op("^",  1, fixWidth(1), x);
-      case any => throw new Exception("Unrecognized operator " + op);
-    }
-  }
-}
-
-object BinaryBoolOp {
-  def apply(x: Bool, y: Bool, op: String): Bool = {
-    if(Module.searchAndMap && op == "&&" && Module.chiselAndMap.contains((x, y))) {
-      Module.chiselAndMap((x, y))
-    } else {
-      val node = op match {
-        case "&&"  => Op("&&", 2, fixWidth(1), x, y );
-        case "||"  => Op("||", 2, fixWidth(1), x, y );
-        case any   => throw new Exception("Unrecognized operator " + op);
-      }
-      val output = Bool(OUTPUT).fromNode(node)
-      if(Module.searchAndMap && op == "&&" && !Module.chiselAndMap.contains((x, y))) {
-        Module.chiselAndMap += ((x, y) -> output)
-      }
-      output
-    }
-  }
+  val opPrefix = "und"
+  def opand: Node = this.inputs(0)
 }
 
 
-object Op {
-  def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
-    val (a_lit, b_lit) = (a.litOf, b.litOf);
-    val isSigned = a.isSigned && b.isSigned
-    if (Module.isFolding && !isSigned) {
-    if (a_lit != null && b_lit == null) {
-      name match {
-        case "&&" => return if (a_lit.value == 0) Literal(0) else b;
-        case "||" => return if (a_lit.value == 0) b else Literal(1);
-        case _ => ;
-      }
-    } else if (a_lit == null && b_lit != null) {
-      name match {
-        case "&&" => return if (b_lit.value == 0) Literal(0) else a;
-        case "||" => return if (b_lit.value == 0) a else Literal(1);
-        case _ => ;
-      }
-    } else if (a_lit != null && b_lit != null) {
-      val (aw, bw) = (a_lit.width, b_lit.width);
-      val (av, bv) = (a_lit.value, b_lit.value);
-      name match {
-        case "&&" => return if (av == 0) Literal(0) else b;
-        case "||" => return if (bv == 0) a else Literal(1);
-        case "==" => return Literal(if (av == bv) 1 else 0)
-        case "!=" => return Literal(if (av != bv) 1 else 0);
-        case "<"  => return Literal(if (av <  bv) 1 else 0);
-        case ">"  => return Literal(if (av >  bv) 1 else 0);
-        case "<=" => return Literal(if (av <= bv) 1 else 0);
-        case ">=" => return Literal(if (av >= bv) 1 else 0);
-        case "##" => return Literal(av << bw | bv, aw + bw);
-        case "+"  => return Literal(av + bv, max(aw, bw) + 1);
-        case "-"  => return Literal(av - bv, max(aw, bw) + 1);
-        case "|"  => return Literal(av | bv, max(aw, bw));
-        case "&"  => return Literal(av & bv, max(aw, bw));
-        case "^"  => return Literal(av ^ bv, max(aw, bw));
-        case "<<" => return Literal(av << bv.toInt, aw + bv.toInt);
-        case ">>" => return Literal(av >> bv.toInt, aw - bv.toInt);
-        case _ => ;
-      }
-    }
-    }
-    if (Module.backend.isInstanceOf[CppBackend]) {
-      def signAbs(x: Node): (Bool, UInt) = {
-        val f = x.asInstanceOf[SInt]
-        val s = f < SInt(0)
-        (s, Mux(s, -f, f).toUInt)
-      }
-      name match {
-        case ">" | "<" | ">=" | "<=" =>
-          if (a.isInstanceOf[SInt] && b.isInstanceOf[SInt]) {
-            if (name != "<" || b.litOf == null || b.litOf.value != 0) {
-              val fixA = a.asInstanceOf[SInt]
-              val fixB = b.asInstanceOf[SInt]
-              val msbA = fixA < SInt(0)
-              val msbB = fixB < SInt(0)
-              val ucond = Bool(OUTPUT).fromNode(
-                LogicalOp(fixA.toUInt, fixB, name))
-              return Mux(msbA === msbB, ucond, (if (name(0) == '>') msbB else msbA))
-            }
-          }
-        case "==" =>
-          if (b.litOf != null && b.litOf.isZ) {
-            val (bits, mask, swidth) = parseLit(b.litOf.name)
-            return Op(name, nGrow, widthInfer, Op("&", 2, maxWidth _, a, Literal(BigInt(mask, 2))), Literal(BigInt(bits, 2)))
-          }
-          if (a.litOf != null && a.litOf.isZ) {
-            return Op(name, nGrow, widthInfer, b, a)
-          }
-        case "s*s" =>
-          val (signA, absA) = signAbs(a)
-          val (signB, absB) = signAbs(b)
-          val prod = absA * absB
-          return Mux(signA ^ signB, -prod, prod)
-        case "s/s" =>
-          val (signA, absA) = signAbs(a)
-          val (signB, absB) = signAbs(b)
-          val quo = absA / absB
-          return Mux(signA != signB, -quo, quo)
-        case "s%s" =>
-          val (signA, absA) = signAbs(a)
-          val (signB, absB) = signAbs(b)
-          val rem = absA % absB
-          return Mux(signA, -rem, rem)
-        case "%" =>
-          val (au, bu) = (a.asInstanceOf[UInt], b.asInstanceOf[UInt])
-          return Op("-", nGrow, widthInfer, au, au/bu*bu)
-        case _ =>
-      }
-    }
-    val res = new Op();
-    res.init("", widthInfer, a, b);
-    res.op = name;
-    res.nGrow = nGrow;
-    if (isSigned) res.setIsSigned
-    res
-  }
-  def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node): Node = {
-    if (Module.isFolding && a.litOf != null) {
-      name match {
-        case "!" => return if (a.litOf.value == 0) Literal(1) else Literal(0);
-        case "-" => return Literal(-a.litOf.value, a.litOf.width);
-        case "~" => return Literal((-a.litOf.value-1)&((BigInt(1) << a.litOf.width)-1), a.litOf.width);
-        case _ => ;
-      }
-    }
-    val res = new Op();
-    res.init("", widthInfer, a);
-    res.op = name;
-    res.nGrow = nGrow;
-    res
-  }
+/* XXX Prevent Verilog syntax errors when indexing constants
+ which we do on masks.
+ */
+class WrapOp(opand: Node) extends UnaryOp(opand) {
+
+  inferWidth = new WidthOf(0)
+
+  override def slug = ""
+  override val opPrefix = ""
 }
 
-class Op extends Node {
-  var op: String = "";
-  var nGrow: Int = 0;
+
+/** Bitwise reverse
+*/
+class BitwiseRevOp(opand: Node) extends UnaryOp(opand) {
+
+  inferWidth = new WidthOf(0)
+
+  override def slug = "not"
+  override val opPrefix = "~"
+}
+
+
+/** Logical Negation
+*/
+class LogicalNegOp(opand: Node) extends UnaryOp(opand) {
+
+  inferWidth = new FixedWidth(1)
+
+  override def slug = "not"
+  override val opPrefix = "!"
+}
+
+
+/** Sign reversal for integers
+*/
+class SignRevOp(opand: Node) extends UnaryOp(opand) {
+  inferWidth = new WidthOf(0)
+
+  override def slug = "neg"
+  override val opPrefix = "-"
+}
+
+
+/** Base class for binary operators
+  */
+abstract class BinaryOp(leftNode: Node, rightNode: Node) extends Op {
+
+  this.inputs.append(leftNode)
+  this.inputs.append(rightNode)
+
+  def left: Node = inputs(0)
+  def right: Node = inputs(1)
+}
+
+class LeftShiftOp(left: Node, right: Node) extends BinaryOp(left, right) {
+  inferWidth = new lshWidthOf(0, right)
+
+  override def slug = "<<"
+}
+
+
+class RightShiftOp(left: Node, right: Node) extends BinaryOp(left, right) {
+
+  inferWidth = new rshWidthOf(0, right)
+
+  override def slug = ">>"
+}
+
+
+class RightShiftSOp(left: Node, right: Node)
+    extends RightShiftOp(left, right) {
+}
+
+
+class AddOp(left: Node, right: Node) extends BinaryOp(left, right)
+    with SymetricOpand {
+
+  inferWidth = new maxWidth()
+
+  override def slug = "add"
+  override val opInfix = "+"
+}
+
+
+class AndOp(left: Node, right: Node) extends BinaryOp(left, right)
+    with SymetricOpand {
+
+  inferWidth = new maxWidth()
+
+  override def slug = "and"
+  override val opInfix = "&"
+}
+
+
+class ExtractOp(opandN: Node, hiBit: Node, loBit: Node) extends Op {
+
+  this.inputs.append(opandN)
+  this.inputs.append(hiBit)
+  this.inputs.append(loBit)
+
+  inferWidth = if( hi.isInstanceOf[Literal] && lo.isInstanceOf[Literal] ) new FixedWidth(hi.asInstanceOf[Literal].value.toInt - lo.asInstanceOf[Literal].value.toInt + 1) else new WidthOf(0)
+
+  def opand: Node = this.inputs(0)
+
+  def hi: Node = this.inputs(1)
+
+  def lo: Node = this.inputs(2)
+
+  override def slug = "extract"
 
   override def toString: String =
-    if (inputs.length == 1) {
-      op + "(" + inputs(0) + ")"
-    } else {
-      "[ " + inputs(0) + "\n]\n  " + op + "\n" + "[  " + inputs(1) + "\n]"
+    (inputs(0) + "(" + hi + (if (hi == lo) "" else (", " + hi)) + ")")
+}
+
+
+class FillOp(opand: Node, val n: Int) extends UnaryOp(opand) {
+
+  inferWidth = new WidthOf(0)
+
+  override def slug = "fill"
+
+  override def toString: String = name + "(" + inputs(0) + ", " + n + ")";
+}
+
+
+class DivOp(left: Node, right: Node) extends BinaryOp(left, right) {
+
+  inferWidth = new WidthOf(0)
+
+  override def slug = "div"
+  override val opInfix = "/"
+}
+
+
+class DivSOp(left: Node, right: Node) extends DivOp(left, right) {
+  override def slug = "divs"
+}
+
+
+class DivSUOp(left: Node, right: Node) extends DivOp(left, right) {
+  override def slug = "divsu"
+}
+
+
+class DivUSOp(left: Node, right: Node) extends DivOp(left, right) {
+  inferWidth = new WidthOf(0, -1)
+
+  override def slug = "divus"
+}
+
+
+class Log2Op(opand: Node, val nbits: Int) extends UnaryOp(opand) {
+  inferWidth = new FixedWidth(nbits)
+
+  override def slug = "log2"
+}
+
+
+class MulOp(left: Node, right: Node) extends BinaryOp(left, right) {
+  inferWidth = new SumWidth()
+
+  override def slug = "mul"
+  override val opInfix = "*"
+}
+
+
+class MulSOp(left: Node, right: Node) extends MulOp(left, right) {
+  override def slug = "muls"
+}
+
+
+class MulSUOp(left: Node, right: Node) extends MulOp(left, right) {
+  inferWidth = new SumWidth(-1)
+
+  override def slug = "mulsu"
+}
+
+/** XXX elseNode null because of regEnable */
+class MuxOp(condNode: Node, thenNodeP: Node, elseNode: Node = null ) extends Op {
+  override def slug = "mux";
+
+  inferWidth = new maxWidth()
+  inputs.append(condNode)
+  inputs.append(thenNodeP)
+  if( elseNode != null ) inputs.append(elseNode)
+
+  def cond: Node = inputs(0)
+  def thenNode: Node = inputs(1)
+  def otherwise: Node = if( inputs.length > 2 ) inputs(2) else null
+
+  def ::(a: Node): MuxOp = { inputs(2) = a; this }
+
+
+  /* Returns an enable signal for a Mux tree. */
+  def enable(): Node = {
+    val thenEnable = thenNode match {
+      case mux: MuxOp =>
+        new LogicalOrOp(cond, mux.enable)
+      case _ => cond
     }
 
-  override def forceMatchingWidths {
-    if (inputs.length == 2) {
-      if (List("|", "&", "^", "+", "-").contains(op)) {
-        if (inputs(0).width != width) inputs(0) = inputs(0).matchWidth(width)
-        if (inputs(1).width != width) inputs(1) = inputs(1).matchWidth(width)
-      } else if (List("==", "!=", ">", ">=", "<", "<=").contains(op)) {
-        val w = max(inputs(0).width, inputs(1).width)
-        if (inputs(0).width != w) inputs(0) = inputs(0).matchWidth(w)
-        if (inputs(1).width != w) inputs(1) = inputs(1).matchWidth(w)
-      }
+    otherwise match {
+      case mux: MuxOp =>
+        new LogicalOrOp(thenEnable, mux.enable)
+      case _ => thenEnable
     }
   }
 
 }
+
+
+class RemOp(left: Node, right: Node) extends BinaryOp(left, right) {
+
+  inferWidth = new minWidth()
+
+  override def slug = "rem"
+  override val opInfix = "%"
+}
+
+
+class RemSOp(left: Node, right: Node) extends RemOp(left, right) {
+  override def slug = "rems"
+}
+
+
+class RemSUOp(left: Node, right: Node) extends RemOp(left, right) {
+
+  inferWidth = new RemWidthOf(0, 1)
+
+  override def slug = "remsu"
+}
+
+
+class RemUSOp(left: Node, right: Node) extends RemOp(left, right) {
+
+  inferWidth = new RemWidthOf(1, 0)
+
+  override def slug = "remus"
+}
+
+
+class OrOp(left: Node, right: Node) extends BinaryOp(left, right)
+    with SymetricOpand {
+
+  inferWidth = new maxWidth()
+
+  override def slug = "or"
+  override val opInfix = "|"
+}
+
+
+/** Substraction operator
+  */
+class SubOp(left: Node, right: Node) extends BinaryOp(left, right)
+    with SymetricOpand {
+
+  inferWidth = new maxWidth()
+
+  override def slug = "sub"
+  override val opInfix = "-"
+}
+
+
+class XorOp(left: Node, right: Node) extends BinaryOp(left, right)
+    with SymetricOpand {
+
+  inferWidth = new maxWidth()
+
+  override def slug = "xor"
+  override val opInfix = "^"
+}
+
+
+/** Bus concatenation operator
+  */
+class CatOp(left: Node, right: Node) extends BinaryOp(left, right) {
+
+  inferWidth = new SumWidth()
+
+  override def slug = "cat"
+  override val opInfix = "##"
+}
+
+
+class LogicalOp(left: Node, right: Node) extends BinaryOp(left, right)
+    with SymetricOpand {
+
+  inferWidth = new maxToFixedWidth(1)
+}
+
+class EqlOp(left: Node, right: Node) extends LogicalOp(left, right) {
+  override def slug = "eq"
+  override val opInfix = "=="
+}
+
+
+class NeqOp(left: Node, right: Node) extends LogicalOp(left, right) {
+  override def slug = "neq"
+  override val opInfix = "!="
+}
+
+
+class GteOp(left: Node, right: Node) extends LogicalOp(left, right) {
+  override def slug = "gte"
+  override val opInfix = ">="
+}
+
+
+class GteSOp(left: Node, right: Node) extends GteOp(left, right) {
+  override def slug = "gtes"
+}
+
+
+class GtrOp(left: Node, right: Node) extends LogicalOp(left, right) {
+  override def slug = "gt"
+  override val opInfix = ">"
+}
+
+
+class GtrSOp(left: Node, right: Node) extends GtrOp(left, right) {
+  override def slug = "gts"
+}
+
+
+class LtnOp(left: Node, right: Node) extends LogicalOp(left, right) {
+  override def slug = "lt"
+  override val opInfix = "<"
+}
+
+
+class LtnSOp(left: Node, right: Node) extends LtnOp(left, right) {
+  override def slug = "lts"
+}
+
+
+class LteOp(left: Node, right: Node) extends LogicalOp(left, right) {
+  override def slug = "lte"
+  override val opInfix = "<="
+}
+
+
+class LteSOp(left: Node, right: Node) extends LteOp(left, right) {
+  override def slug = "ltes"
+}
+
+class LogicalAndOp(left: Node, right: Node) extends  LogicalOp(left, right) {
+  override def slug = "andl"
+  override val opInfix = "&&"
+}
+
+class LogicalOrOp(left: Node, right: Node) extends  LogicalOp(left, right) {
+  override def slug = "orl"
+  override val opInfix = "||"
+}
+
+
+class ReduceOp(opand: Node) extends UnaryOp(opand) {
+  inferWidth = new FixedWidth(1)
+}
+
+class ReduceAndOp(opand: Node) extends ReduceOp(opand) {
+  override def slug = "andR"
+}
+
+
+class ReduceOrOp(opand: Node) extends ReduceOp(opand) {
+  override def slug = "orR"
+}
+
+
+class ReduceXorOp(opand: Node) extends ReduceOp(opand) {
+  override def slug = "xorR"
+}
+
+
+// XXX      case "?"   => Multiplex(x, y, null);
+
+

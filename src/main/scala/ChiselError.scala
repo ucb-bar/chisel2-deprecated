@@ -36,6 +36,7 @@ import scala.collection.mutable.ArrayBuffer
   detected at runtime.
   */
 object ChiselError {
+  var level: Int = 0
   var hasErrors: Boolean = false;
   val ChiselErrors = new ArrayBuffer[ChiselError];
 
@@ -58,7 +59,7 @@ object ChiselError {
   /** Emit an informational message
     (useful to track long running passes) */
   def info(m: String) {
-    println(m)
+    if( level > 0 ) println(m)
   }
 
   /** emit a warning message */

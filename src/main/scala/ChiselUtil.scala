@@ -29,7 +29,7 @@
 */
 
 package Chisel
-import Node._
+
 import scala.math._
 import Literal._
 
@@ -369,7 +369,7 @@ class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
   val count = UInt(OUTPUT, log2Up(entries + 1))
 }
 
-class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Bool = null) extends Module(_reset=_reset)
+class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Bool = null)(implicit m: Manifest[T]) extends Module(reset=_reset)
 {
   val io = new QueueIO(gen, entries)
 
@@ -390,7 +390,7 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
     maybe_full := do_enq
   }
 
-  val ram = Mem(gen, entries)
+  val ram = Mem[T](gen, entries)
   when (do_enq) { ram(enq_ptr) := io.enq.bits }
 
   val ptr_match = enq_ptr === deq_ptr
@@ -421,7 +421,7 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
   */
 object Queue
 {
-  def apply[T <: Data](enq: DecoupledIO[T], entries: Int = 2, pipe: Boolean = false): DecoupledIO[T]  = {
+  def apply[T <: Data](enq: DecoupledIO[T], entries: Int = 2, pipe: Boolean = false)(implicit m: Manifest[T]): DecoupledIO[T]  = {
     val q = Module(new Queue(enq.bits.clone, entries, pipe))
     q.io.view(q.io.elements.filter(j => j._1 != "count")) // count io is not being used if called functionally
     q.io.enq.valid := enq.valid // not using <> so that override is allowed
@@ -431,7 +431,7 @@ object Queue
   }
 }
 
-class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) extends Module {
+class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock)(implicit m: Manifest[T]) extends Module {
   val io = new QueueIO(gen, entries)
   val asize = log2Up(entries)
 
@@ -484,27 +484,6 @@ class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) e
   io.deq.bits := mem(rptr_bin(asize-1,0))
 }
 
-object Log2 {
-  def apply (mod: Bits, n: Int): UInt = {
-    Module.backend match {
-      case x: CppBackend => {
-        val log2 = new Log2()
-        log2.init("", fixWidth(sizeof(n-1)), mod)
-        UInt().fromNode(log2)
-      }
-      case _ => {
-        var res = UInt(0);
-        for (i <- 1 until n)
-          res = Mux(mod(i), UInt(i, sizeof(n-1)), res);
-        res
-      }
-    }
-  }
-}
-
-class Log2 extends Node {
-  override def toString: String = "LOG2(" + inputs(0) + ")";
-}
 
 class Pipe[T <: Data](gen: T, latency: Int = 1) extends Module
 {
@@ -532,7 +511,6 @@ object Pipe
       val out = Valid(enqBits)
       out.valid <> enqValid
       out.bits <> enqBits
-      out.setIsTypeNode
       out
     } else {
       val v = Reg(Bool(), next=enqValid, init=Bool(false))
@@ -551,15 +529,15 @@ object Pipe
   */
 object PriorityMux
 {
-  def apply[T <: Bits](in: Seq[(Bool, T)]): T = {
+  def apply[T <: Bits](in: Seq[(Bool, T)])(implicit m: Manifest[T]): T = {
     if (in.size == 1) {
       in.head._2
     } else {
       Mux(in.head._1, in.head._2, apply(in.tail))
     }
   }
-  def apply[T <: Bits](sel: Seq[Bool], in: Seq[T]): T = apply(sel zip in)
-  def apply[T <: Bits](sel: Bits, in: Seq[T]): T = apply((0 until in.size).map(sel(_)), in)
+  def apply[T <: Bits](sel: Seq[Bool], in: Seq[T])(implicit m: Manifest[T]): T = apply(sel zip in)
+  def apply[T <: Bits](sel: Bits, in: Seq[T])(implicit m: Manifest[T]): T = apply((0 until in.size).map(sel(_)), in)
 }
 
 /** Returns the bit position of the trailing 1 in the input vector

@@ -30,45 +30,31 @@
 
 package Chisel
 import ChiselError._
-import Node._
+
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 
-class ROM[T <: Data](val lits: Seq[Literal], gen: (Int) => T) extends Vec[T](gen) {
-  this.init("", (m: Node) => lits.map(x => x.width).reduceLeft(scala.math.max(_, _)), lits: _*)
-  override def read(addr: UInt): T = {
-    val cln = gen(0)
-    val data = cln.asOutput
-    var port = new ROMRead().init("", fixWidth(lits.head.getWidth), addr, this)
-    data assign port
-    data.setIsTypeNode
-    data
+/** Create an initialized Read-Only Memory.
+  */
+object ROM {
+  def apply[T <: Data](lits: Seq[T]): ROM[T] = {
+    new ROM[T](() => lits.head,
+      lits.map(x => x.toBits.node.asInstanceOf[Literal]),
+      Module.scope.clock,
+      Module.scope.reset)
   }
+}
+
+
+class ROM[T <: Data](gen: () => T, val lits: Seq[Literal],
+  clock: Clock, reset: Bool,
+  isInline: Boolean = Module.isInlineMem) extends Mem[T](
+  gen, clock, reset, lits.length, false, isInline) {
+
+  override val node = new ROMemDelay(lits, clock.node.asInstanceOf[Update],
+    reset.node, lits.length, isInline)
 
   override def write(addr: UInt, data: T) {
     ChiselError.error("Can't write to ROM")
   }
-
-  override def equals(x: Any): Boolean = {
-    if (x.isInstanceOf[ROM[_]]) {
-      this.eq(x.asInstanceOf[AnyRef])
-    } else {
-      super.equals(x)
-    }
-  }
-
-  override def isReg: Boolean = true
-  override def isInVCD = false
-
-  override def traceableNodes: Array[Node] = lits.toArray
-
-}
-
-class ROMRead[T <: Data]() extends Node {
-  def addr: Node = inputs(0)
-  def rom: Node = inputs(1)
-  // inputs += addri
-  // inputs += rom
-
-  override def toString: String = inputs(1) + "[" + inputs(0) + "]"
 }

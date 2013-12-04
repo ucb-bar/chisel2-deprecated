@@ -29,35 +29,78 @@
 */
 
 package Chisel
-import Node._
 
-// used for component to component connections
-object Binding {
+import scala.collection.mutable.ArrayBuffer
 
-  def apply(m: Node, c: Module, ioComp: Module): Node = {
-    if (Module.isEmittingComponents) {
-      val res = c.findBinding(m);
-      if (res == null) {
-        val res = new Binding(m, ioComp);
-        res.component = c;
-        c.nodes += res
-        res.init("", widthOf(0), m);
-        res.infer;
-        c.bindings += res;
-        res
-      } else {
-        res;
-      }
-    } else {
-      m
+/* This files contains Vertex and Edge filters to be used when walking
+ a Chisel graph.
+ */
+
+/** Only traverse edges which connect to a ``MuxOp``.
+*/
+class OnlyMuxes extends EdgeFilter {
+
+  override def apply( source: Node, target: Node ): Boolean = {
+    target != null && target.isInstanceOf[MuxOp]
+  }
+
+}
+
+
+/** Edges that flow between components.
+  */
+class InnerEdges extends EdgeFilter {
+
+  override def apply(source: Node, target: Node): Boolean = {
+    target != null && source.component == target.component
+  }
+}
+
+
+/** Reachable Nodes in topological order excluding the roots
+  */
+class Reachable extends GraphVisitor {
+
+  val nodes = new ArrayBuffer[Node]
+
+  override def start( node: Node ): Unit = {
+    nodes += node
+  }
+
+}
+
+
+/** Sets the empty clause of ``MuxOp`` to *reg* while traversing a graph.
+*/
+class MuxDefault(val reg: Delay) extends GraphVisitor {
+
+  override def start( node: Node ): Unit = {
+    node match {
+      case mux: MuxOp =>
+        if( mux.inputs.length < 3 ) {
+          mux.inputs.append(reg)
+        }
+      case _ => {}
     }
   }
 }
 
-class Binding(tn: Node, tc: Module) extends Node {
 
-  val targetNode: Node = tn;
-  val targetComponent: Module = tc;
+class PrintNode extends GraphVisitor {
 
-  override def toString: String = "BINDING(" + inputs(0) + ")";
+ private def isDottable (m: Node): Boolean = {
+    if( m == null ) {
+      false
+    } else {
+      m match {
+        case x: Literal  => false;
+        case _           => true;
+      }
+    }
+  }
+
+  override def start( node: Node ): Unit = {
+    println(node + " inferWidth=" + node.inferWidth.toString)
+  }
+
 }

@@ -29,40 +29,34 @@
 */
 
 package Chisel
-import Node._
+
 import Literal._
 import scala.collection.mutable.ArrayBuffer
 
+/** Dataflow switch statement. default list and mapping list
+  must be of equal length. */
 object Lookup {
-  def apply[T <: Bits](addr: UInt, default: T, mapping: Seq[(UInt, T)]): T = {
-    if (Module.backend.isInstanceOf[CppBackend]) {
-      CListLookup(addr, List(default), mapping.map(m => (m._1, List(m._2))).toArray).head
-    } else {
-      val lookup = new Lookup()
-      val mappingNode = mapping.map(x => LookupMap(x))
-      lookup.initOf("", widthOf(1), List(addr, default) ++ mappingNode)
-      default.fromNode(lookup)
-    }
-  }
-}
 
-object LookupMap {
-  def apply[T <: Data](map: (UInt, T)): LookupMap = {
-    val res = new LookupMap()
-    res.init("", widthOf(0), map._1, map._2)
+  def apply[T <: Data](addr: UInt, default: T,
+    mapping: Seq[(UInt, T)])(implicit m: reflect.ClassTag[T]): T = {
+    val res = m.runtimeClass.newInstance.asInstanceOf[T]
+    res.fromBits(UInt(new Lookup(addr.lvalue(),
+      default.toBits.lvalue(),
+      mapping.map(x => (x._1.lvalue(), x._2.toBits.lvalue())))))
     res
   }
 }
 
-class LookupMap extends Node {
+class Lookup(addrN: Node, default: Node,
+    val map: Seq[(Node, Node)]) extends Node {
+
+  inferWidth = new WidthOf(0)
+
+  inputs.append(addrN)
+  inputs.append(default)
+  map.map(x => { inputs.append(x._1); inputs.append(x._2) })
+
   def addr: Node = inputs(0)
-  def data: Node = inputs(1)
-}
-
-class Lookup extends Node {
-  override def isInObject: Boolean = true;
-
-  def map: Seq[LookupMap] = inputs.slice(2, inputs.length).map(x => x.asInstanceOf[LookupMap])
-
-  override def toString: String = "LOOKUP(" + inputs(0) + ")";
+  def wires: List[Node] = map.map(x => x._1).toList
+  def defaultWires: List[Node] = map.map(x => x._2).toList
 }

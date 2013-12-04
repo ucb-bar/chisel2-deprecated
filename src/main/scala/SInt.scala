@@ -29,98 +29,166 @@
 */
 
 package Chisel
-import Node._
 import ChiselError._
 
 object SInt {
 
-  def apply(x: Int): SInt = Lit(x){SInt()};
-  def apply(x: Int, width: Int): SInt = Lit(x, width){SInt()};
+  def apply(x: Int): SInt = SInt(Literal(x))
+  def apply(x: Int, width: Int): SInt = SInt(Literal(x, width))
 
-  def apply(dir: IODirection = null, width: Int = -1): SInt = {
-    val res = new SInt();
-    res.create(dir, width)
+  def apply(dir: IODirection = NODIRECTION, width: Int = -1): SInt = {
+    val res = new SInt()
+    res.node = new IOBound(dir, width)
+    res
+  }
+
+  def apply(node: Node): SInt = {
+    val res = new SInt()
+    res.node = node
     res
   }
 }
 
 class SInt extends Bits {
-  setIsSigned
-
-  override def setIsTypeNode {
-    inputs(0).setIsSigned;
-    super.setIsTypeNode
-  }
 
   type T = SInt;
 
-  /** Factory method to create and assign a *SInt* type to a Node *n*.
-    */
-  override def fromNode(n: Node): this.type = {
-    SInt(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
-  }
-
-  override def fromInt(x: Int): this.type = {
-    SInt(x).asInstanceOf[this.type]
-  }
-
-  override def matchWidth(w: Int): Node = {
-    if (w > this.width) {
-      val topBit = NodeExtract(this, this.width-1); topBit.infer
-      val fill = NodeFill(w - this.width, topBit); fill.infer
-      val res = Concatenate(fill, this); res.infer
-      res
-    } else if (w < this.width) {
-      val res = NodeExtract(this, w-1,0); res.infer
-      res
-    } else {
-      this
+  /** casting from UInt followed by assignment. */
+  override def :=(src: Data): Unit = {
+    src match {
+      case uint: UInt =>
+        this procAssign uint.zext;
+      case _ =>
+        super.:=(src)
     }
   }
-
-  /** casting from UInt followed by assignment. */
-  def :=(src: UInt): Unit = this := src.zext;
 
   def gen[T <: Bits](): T = SInt().asInstanceOf[T];
 
   // arithmetic operators
-  def unary_-(): SInt = newUnaryOp("-");
-  def unary_!(): SInt = newUnaryOp("!");
-  def << (b: UInt): SInt = newBinaryOp(b, "<<");
-  def >> (b: UInt): SInt = newBinaryOp(b, ">>");
-  def ?  (b: SInt): SInt = newBinaryOp(b, "?");
+  def unary_-(): SInt = SignRev(this)
+  def unary_!(): Bool = LogicalNeg(this)
+  def << (right: UInt): SInt = LeftShift(this, right)
+  def >> (right: UInt): SInt = RightShift(this, right)
+// XXX deprecated  def ?  (b: SInt): SInt = newBinaryOp(b, "?");
 
   // order operators
-  def >  (b: SInt): Bool = newLogicalOp(b, ">");
-  def <  (b: SInt): Bool = newLogicalOp(b, "<");
-  def <= (b: SInt): Bool = newLogicalOp(b, "<=");
-  def >= (b: SInt): Bool = newLogicalOp(b, ">=");
-  def !=  (b: UInt): Bool = this != b.zext;
-  def >   (b: UInt): Bool = this > Cat(UInt(1, 1), b).toSInt;
-  def <   (b: UInt): Bool = this < Cat(UInt(1, 1), b).toSInt;
-  def >=  (b: UInt): Bool = this >= Cat(UInt(1, 1), b).toSInt;
-  def <=  (b: UInt): Bool = this <= Cat(UInt(1, 1), b).toSInt;
+  def >  (right: SInt): Bool = GtrS(this, right)
+  def <  (right: SInt): Bool = LtnS(this, right)
+  def <= (right: SInt): Bool = LteS(this, right)
+  def >= (right: SInt): Bool = GteS(this, right)
+  def !=  (right: UInt): Bool = this != right.zext;
+  def >   (right: UInt): Bool = this > SInt(right.zext.lvalue());
+  def <   (right: UInt): Bool = this < SInt(right.zext.lvalue());
+  def >=  (right: UInt): Bool = this >= SInt(right.zext.lvalue());
+  def <=  (right: UInt): Bool = this <= SInt(right.zext.lvalue());
 
-  override def ===[T <: Data](right: T): Bool = {
+  override def ===(right: Data): Bool = {
     right match {
-      case b: UInt => this === b.zext;
-      case _ =>
-        super.===(right)
+      case right: UInt => UInt(this.lvalue()) === right.zext;
+      case _ => super.===(right)
     }
   }
 
   //SInt to SInt arithmetic
-  def +  (b: SInt): SInt = newBinaryOp(b, "+");
-  def *  (b: SInt): SInt = newBinaryOp(b, "s*s");
-  def /  (b: SInt): SInt = newBinaryOp(b, "s/s");
-  def %  (b: SInt): SInt = newBinaryOp(b, "s%s");
-  def -  (b: SInt): SInt = newBinaryOp(b, "-");
+  def +  (right: SInt): SInt = Add(this, right)
+  def *  (right: SInt): SInt = MulS(this, right)
+  def /  (right: SInt): SInt = DivS(this, right)
+  def %  (right: SInt): SInt = RemS(this, right)
+  def -  (right: SInt): SInt = Sub(this, right)
 
   //SInt to UInt arithmetic
-  def +   (b: UInt): SInt = this + b.zext;
-  def -   (b: UInt): SInt = this - b.zext;
-  def *   (b: UInt): SInt = newBinaryOp(b.zext, "s*u");
-  def /   (b: UInt): SInt = newBinaryOp(b.zext, "s/u");
-  def %   (b: UInt): SInt = newBinaryOp(b.zext, "s%u");
-  def abs: UInt = Mux(this < SInt(0), (-this).toUInt, this.toUInt)
+  def +   (right: UInt): SInt = this + right.zext;
+  def -   (right: UInt): SInt = this - right.zext;
+  def *   (right: UInt): SInt = MulSU(this, right.zext)
+  def /   (right: UInt): SInt = DivSU(this, right.zext)
+  def %   (right: UInt): SInt = RemSU(this, right.zext)
+  def abs: UInt = Mux(this < SInt(0), UInt((-this).node), UInt(this.node))
+}
+
+
+object SignRev {
+  def apply(opand: Bits): SInt = {
+    SInt(
+      if( opand.isConst ) {
+        Literal(-opand.node.asInstanceOf[Literal].value, opand.node.width)
+      } else {
+        new SignRevOp(opand.lvalue())
+      })
+  }
+}
+
+object DivS {
+  def apply[T <: SInt]( left: SInt, right: SInt): SInt = {
+      SInt(new DivSOp(left.lvalue(), right.lvalue()))
+  }
+}
+
+object DivSU {
+  def apply[T <: SInt]( left: T, right: UInt)(implicit m: Manifest[T]): T = {
+    val op = new DivSUOp(left.lvalue(), right.lvalue())
+    val result = m.runtimeClass.newInstance.asInstanceOf[T]
+    result.node = op
+    result
+  }
+}
+
+object MulS {
+  def apply[T <: SInt]( left: T, right: T)(implicit m: Manifest[T]): T = {
+    val op = new MulSOp(left.lvalue(), right.lvalue())
+    val result = m.runtimeClass.newInstance.asInstanceOf[T]
+    result.node = op
+    result
+  }
+}
+
+object MulSU {
+  def apply[T <: SInt]( left: T, right: UInt)(implicit m: Manifest[T]): T = {
+    val op = new MulSUOp(left.lvalue(), right.lvalue())
+    val result = m.runtimeClass.newInstance.asInstanceOf[T]
+    result.node = op
+    result
+  }
+}
+
+object RemS {
+  def apply[T <: SInt]( left: T, right: T)(implicit m: Manifest[T]): T = {
+    val op = new RemSOp(left.lvalue(), right.lvalue())
+    val result = m.runtimeClass.newInstance.asInstanceOf[T]
+    result.node = op
+    result
+  }
+}
+
+object RemSU {
+  def apply[T <: SInt]( left: T, right: UInt)(implicit m: Manifest[T]): T = {
+    val op = new RemSUOp(left.lvalue(), right.lvalue())
+    val result = m.runtimeClass.newInstance.asInstanceOf[T]
+    result.node = op
+    result
+  }
+}
+
+object GteS {
+  def apply[T <: Bits]( left: T, right: T): Bool = {
+    Gte(left, right)
+  }
+}
+
+object GtrS {
+  def apply[T <: Bits]( left: T, right: T): Bool = {
+    Gtr(left, right)
+  }
+}
+
+object LteS {
+  def apply[T <: Bits]( left: T, right: T): Bool = {
+    Lte(left, right)
+  }
+}
+
+object LtnS {
+  def apply[T <: Bits]( left: T, right: T): Bool = {
+    Ltn(left, right)
+  }
 }

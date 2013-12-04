@@ -36,7 +36,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.io.PrintStream
 import scala.sys.process._
-import Node._
+
 import Reg._
 import ChiselError._
 import Literal._
@@ -52,75 +52,38 @@ class FloBackend extends Backend {
     emitRef(node)
 
   override def emitRef(node: Node): String = {
-    if (node.litOf == null) {
       node match {
         case x: Literal =>
           "" + x.value
 
-        case x: Binding =>
+        case x: IOBound =>
           emitRef(x.inputs(0))
-
-        case x: Bits =>
-          if (!node.isInObject && node.inputs.length == 1) emitRef(node.inputs(0)) else super.emitRef(node)
 
         case _ =>
           super.emitRef(node)
       }
-    } else {
-      "" + node.litOf.value
-    }
   }
 
   def emit(node: Node): String = {
     node match {
-      case x: Mux =>
+      case x: MuxOp =>
         emitDec(x) + "mux " + emitRef(x.inputs(0)) + " " + emitRef(x.inputs(1)) + " " + emitRef(x.inputs(2)) + "\n"
 
-      case o: Op =>
-        emitDec(o) +
-        (if (o.inputs.length == 1) {
-          o.op match {
-            case "~" => "not " + emitRef(node.inputs(0))
-            case "-" => "neg " + emitRef(node.inputs(0))
-            case "!" => "not " + emitRef(node.inputs(0))
-          }
-         } else {
-           o.op match {
-             case "<"  => "lt/"  + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "<=" => "gt/"  + node.inputs(0).width + " " + emitRef(node.inputs(1)) + " " + emitRef(node.inputs(0))
-             case ">"  => "gt/"  + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case ">=" => "lt/"  + node.inputs(0).width + " " + emitRef(node.inputs(1)) + " " + emitRef(node.inputs(0))
-             case "+"  => "add/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "-"  => "sub/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "*"  => "mul/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "!"  => "not/" + node.width + " " + emitRef(node.inputs(0))
-             case "<<" => "lsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case ">>" => "rsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "##" => "cat/" + node.inputs(1).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "|"  => "or "  + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "||" => "or "  + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "&"  => "and " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "&&" => "and " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "^"  => "xor " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "==" => "eq "  + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "!=" => "neq " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-           }
-         }) + "\n"
-
-      case x: Extract =>
+      case x: ExtractOp =>
         emitDec(node) + "rsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1)) + "\n"
 
-      case x: Fill =>
+      case x: FillOp =>
         emitDec(x) + "fill/" + node.width + " " + emitRef(node.inputs(0)) + "\n"
 
-      case x: Bits =>
+      case x: IOBound =>
         if( x.inputs.length == 1 ) {
           emitDec(x) + "mov " + emitRef(x.inputs(0)) + "\n"
         } else {
           emitDec(x) + "rnd/" + x.width + "\n"
         }
-      case m: Mem[_] =>
-        emitDec(m) + "mem " + m.n + "\n"
+
+      case m: MemDelay =>
+        emitDec(m) + "mem " + m.depth + "\n"
 
       case m: MemRead =>
         emitDec(m) + "ld " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n" // emitRef(m.mem)
@@ -131,11 +94,18 @@ class FloBackend extends Backend {
         }
         emitDec(m) + "st " + emitRef(m.mem) + " " + emitRef(m.addr) + " " + emitRef(m.data) + "\n"
 
-      case x: Reg => // TODO: need resetData treatment
+      case x: RegDelay => // TODO: need resetData treatment
         emitDec(x) + "reg " + emitRef(x.next) + "\n"
 
-      case x: Log2 => // TODO: log2 instruction?
+      case x: Log2Op => // TODO: log2 instruction?
         emitDec(x) + "log2/" + x.width + " " + emitRef(x.inputs(0)) + "\n"
+
+      case x: UnaryOp =>
+        emitDec(x) + x.slug + emitRef(node.inputs(0)) + "\n"
+
+      case x: BinaryOp =>
+          (emitDec(x) + x.slug + "/" + x.width
+            + " " + emitRef(x.left) + " " + emitRef(x.right)) + "\n"
 
       case _ =>
         ""
@@ -160,19 +130,11 @@ class FloBackend extends Backend {
   override def elaborate(c: Module): Unit = {
     super.elaborate(c)
 
-    for (cc <- Module.components) {
-      if (!(cc == c)) {
-        c.mods       ++= cc.mods;
-        c.debugs     ++= cc.debugs;
-      }
-    }
-    c.findConsumers();
-    c.verifyAllMuxes;
-    ChiselError.checkpoint()
-
-    c.collectNodes(c);
     c.findOrdering(); // search from roots  -- create omods
-    renameNodes(c, c.omods);
+    GraphWalker.depthFirst(findRoots(c), new RenameNodes(c))
+    val agg = new Reachable()
+    GraphWalker.depthFirst(findRoots(c), agg)
+
     if (Module.isReportDims) {
       val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
       ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
@@ -180,7 +142,7 @@ class FloBackend extends Backend {
 
     // Write the generated code to the output file
     val out = createOutputFile(c.name + ".flo");
-    for (m <- c.omods)
+    for (m <- agg.nodes)
       out.write(emit(m));
     out.close();
   }

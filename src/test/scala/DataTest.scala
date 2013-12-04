@@ -80,40 +80,32 @@ class DataSuite extends AssertionsForJUnit {
 
   @Test def testBoolFromValue() {
     val tested = Bool(true);
-    assertTrue( tested.dir == OUTPUT );
-    assertTrue( tested.assigned );
+    assertTrue( tested.node.isInstanceOf[Literal] );
     assertFalse( tested.named );
   }
 
   @Test def testBoolFromDir() {
     val tested = Bool(dir = INPUT);
-    assertTrue( tested.dir == INPUT );
-    assertFalse( tested.assigned );
+    assertTrue( tested.node.asInstanceOf[IOBound].dir == INPUT );
     assertFalse( tested.named );
   }
 
   @Test def testBoolFromDefault() {
     val tested = Bool();
-    /* XXX In the same situation SInt direction shows up as INPUT */
-    assertTrue( tested.dir == null );
-    assertFalse( tested.assigned );
+    assertTrue( tested.node.asInstanceOf[IOBound].dir == NODIRECTION );
     assertFalse( tested.named );
   }
 
   @Test def testSIntFromLit() {
     val fixFromLit = SInt(42);
 
-    assertTrue( fixFromLit.dir == OUTPUT );
-    assertTrue( fixFromLit.isSigned ); /* XXX why defined in Node? */
-    assertTrue( fixFromLit.assigned );
+    assertTrue( fixFromLit.node.isInstanceOf[Literal] );
     assertFalse( fixFromLit.named );
   }
 
   @Test def testSIntFromLitWithWidth() {
     val fixFromLitWithWidth = SInt(42, width = 16);
-    assertTrue( fixFromLitWithWidth.dir == OUTPUT );
-    assertTrue( fixFromLitWithWidth.isSigned );
-    assertTrue( fixFromLitWithWidth.assigned );
+    assertTrue( fixFromLitWithWidth.node.isInstanceOf[Literal] );
     assertFalse( fixFromLitWithWidth.named );
     /* XXX width is -1 here for some reason
     assertTrue( fixFromLitWithWidth.width == 16 );
@@ -122,10 +114,8 @@ class DataSuite extends AssertionsForJUnit {
 
   @Test def testSIntFromWidthDir() {
     val fixFromWidthDir = SInt(width = 8, dir = INPUT);
-    assertTrue( fixFromWidthDir.width == 8 );
-    assertTrue( fixFromWidthDir.dir == INPUT );
-    assertTrue( fixFromWidthDir.isSigned );
-    assertFalse( fixFromWidthDir.assigned );
+    assertTrue( fixFromWidthDir.node.width == 8 );
+    assertTrue( fixFromWidthDir.node.asInstanceOf[IOBound].dir == INPUT );
     assertFalse( fixFromWidthDir.named );
   }
 
@@ -134,20 +124,16 @@ class DataSuite extends AssertionsForJUnit {
   @Test def testUIntVal() {
     // apply(x: Int): UInt
     val dat = UInt(5)
-    assertTrue( dat.width == -1 ); // XXX ??
-    assertTrue( dat.dir == OUTPUT );
-    assertFalse( dat.isSigned );
-    assertTrue( dat.assigned );
+    assertTrue( dat.node.width == 3 );
+    assertTrue( dat.node.isInstanceOf[Literal] );
     assertFalse( dat.named );
   }
 
   @Test def testUIntValWidth() {
     // def apply(x: Int, width: Int): UInt
     val dat = UInt(5, 4)
-    assertTrue( dat.width == -1 ); // XXX ??
-    assertTrue( dat.dir == OUTPUT );
-    assertFalse( dat.isSigned );
-    assertTrue( dat.assigned );
+    assertTrue( dat.node.width == 4 )
+    assertTrue( dat.node.isInstanceOf[Literal] )
     assertFalse( dat.named );
   }
 
@@ -155,8 +141,8 @@ class DataSuite extends AssertionsForJUnit {
   @Test def testUIntString() {
     // def apply(x: String): UInt
     val dat = UInt("1010")
-    assertTrue( dat.width == -1 ); // XXX
-    assertTrue( dat.dir == OUTPUT );
+    assertTrue( dat.node.width == -1 ); // XXX
+    assertTrue( dat.node.asInstanceOf[IOBound].dir == OUTPUT );
     assertFalse( dat.isSigned );
     assertTrue( dat.assigned );
     assertFalse( dat.named );
@@ -166,30 +152,24 @@ class DataSuite extends AssertionsForJUnit {
   @Test def testUIntStringWidth() {
     // def apply(x: String, width: Int): UInt
     val dat = UInt("101", 4)
-    assertTrue( dat.width == -1 ); // XXX ??
-    assertTrue( dat.dir == OUTPUT );
-    assertFalse( dat.isSigned );
-    assertTrue( dat.assigned );
-    assertFalse( dat.named );
+    assertTrue( dat.node.width == 4 )
+    assertTrue( dat.node.isInstanceOf[Literal] )
+    assertFalse( dat.named )
   }
 
   @Test def testUIntStringBaseBinary() {
     // def apply(x: String, base: Char): UInt
     val dat = UInt("1010", 'b')
-    assertTrue( dat.width == -1 );
-    assertTrue( dat.dir == OUTPUT );
-    assertFalse( dat.isSigned );
-    assertTrue( dat.assigned );
-    assertFalse( dat.named );
+    assertTrue( dat.node.width == 4 )
+    assertTrue( dat.node.isInstanceOf[Literal] )
+    assertFalse( dat.named )
   }
 
   @Test def testUIntStringBaseOctal() {
     // def apply(x: String, base: Char): UInt
     val dat = UInt("644", 'o')
-    assertTrue( dat.width == -1 );
-    assertTrue( dat.dir == OUTPUT );
-    assertFalse( dat.isSigned );
-    assertTrue( dat.assigned );
+    assertTrue( dat.node.width == 9 );
+    assertTrue( dat.node.isInstanceOf[Literal] )
     assertFalse( dat.named );
   }
 
@@ -197,8 +177,8 @@ class DataSuite extends AssertionsForJUnit {
   @Test def testUIntStringBaseDec() {
     // def apply(x: String, base: Char): UInt
     val dat = UInt("199", 'd')
-    assertTrue( dat.width == -1 );
-    assertTrue( dat.dir == OUTPUT );
+    assertTrue( dat.node.width == -1 );
+    assertTrue( dat.node.asInstanceOf[IOBound].dir == OUTPUT );
     assertFalse( dat.isSigned );
     assertTrue( dat.assigned );
     assertFalse( dat.named );
@@ -208,28 +188,26 @@ class DataSuite extends AssertionsForJUnit {
   @Test def testUIntStringBaseHex() {
     // def apply(x: String, base: Char): UInt
     val dat = UInt("abc", 'h')
-    assertTrue( dat.width == -1 );
-    assertTrue( dat.dir == OUTPUT );
-    assertFalse( dat.isSigned );
-    assertTrue( dat.assigned );
-    assertFalse( dat.named );
+    assertTrue( dat.node.width == 12 )
+    assertTrue( dat.node.isInstanceOf[Literal] )
+    assertFalse( dat.named )
   }
 
   @Test def testUIntDirWidth() {
     // def apply(dir: IODirection = null, width: Int = -1): UInt
     val dat = UInt(INPUT, 4)
-    assertTrue( dat.width == 4 );
-    assertTrue( dat.dir == INPUT );
-    assertFalse( dat.isSigned );
-    assertFalse( dat.assigned );
+    assertTrue( dat.node.width == 4 );
+    assertTrue( dat.node.asInstanceOf[IOBound].dir == INPUT );
     assertFalse( dat.named );
   }
 
-  /** The statement new Bool bypasses the width initialization resulting
-    in incorrect code dat_t<0> which leads to incorrect VCD output.
+  /** The code used to bypass the width initialization resulting
+    in incorrect code dat_t<0> which lead to incorrect VCD output.
+    This is not the case anymore.
 
-    XXX Chisel should generate an error message!
-    XXX Incorrect until we compute debug roots correctly.
+    A clock_hi and clock_lo used to be generated as well but since
+    there are no registers nor memory in this circuit this seemed
+    to be an error to so. This is fixed as well.
     */
   @Test def testBypassData() {
     class BypassData(num_bypass_ports:Int) extends Bundle() {
@@ -257,13 +235,17 @@ class DataSuite extends AssertionsForJUnit {
 
 class DataSuite_BypassDataComp_1_t : public mod_t {
  public:
-  dat_t<0> DataSuite_BypassDataComp_1__io_valid;
+  dat_t<3> T0;
+  dat_t<1> DataSuite_BypassDataComp_1__io_valid_2;
+  dat_t<3> DataSuite_BypassDataComp_1__io_data;
+  dat_t<1> DataSuite_BypassDataComp_1__io_valid_1;
+  dat_t<1> DataSuite_BypassDataComp_1__io_valid_0;
   int clk;
   int clk_cnt;
 
   void init ( bool rand_init = false );
-  void clock_lo ( dat_t<1> reset );
-  void clock_hi ( dat_t<1> reset );
+  void clock_lo_clk ( dat_t<1> reset );
+  void clock_hi_clk ( dat_t<1> reset );
   int clock ( dat_t<1> reset );
   void print ( FILE* f );
   bool scan ( FILE* f );
@@ -287,7 +269,7 @@ class DataSuite_BypassDataComp_1_t : public mod_t {
       }
       val grant_pass1 = ~io.r + io.p;
       val grant_pass2 = ~io.r + UInt(1, size);
-      io.out := Mux(grant_pass1(size).toBool(),
+      io.out := Mux(grant_pass1(size),
         io.r & grant_pass2(size-1, 0), io.r & grant_pass1(size-1, 0));
     }
 

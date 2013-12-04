@@ -31,58 +31,79 @@
 package Chisel
 
 object Bool {
-  def apply(x: Boolean): Bool = Lit(if(x) 1 else 0, 1){Bool()}
+  def apply(node: Node): Bool = {
+    val res = new Bool()
+    res.node = node
+    res
+  }
 
-  def apply(dir: IODirection = null): Bool = {
-    val res = new Bool();
-    res.dir = dir;
-    res.init("", 1)
+  def apply(x: Boolean): Bool = Bool(Literal(if(x) 1 else 0, 1))
+
+  def apply(dir: IODirection = NODIRECTION): Bool = {
+    val res = new Bool()
+    res.node = new IOBound(dir, 1)
     res
   }
 }
 
+
 class Bool extends UInt {
 
-  /** Factory method to create and assign a *Bool* type to a Node *n*.
-    */
-  override def fromNode(n: Node): this.type = {
-    Bool(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
-  }
+  def && (right: Bool): Bool = LogicalAnd(this, right)
+  def || (right: Bool): Bool = LogicalOr(this, right)
 
-  override def fromInt(x: Int): this.type = {
-    Bool(x > 0).asInstanceOf[this.type]
-  }
+}
 
-  def :=(src: Bool): Unit = {
-    if(comp != null) {
-      comp procAssign src;
-    } else {
-      this procAssign src;
+
+object LogicalAnd {
+  def apply( left: Bits, right: Bits): Bool = {
+    if(Module.searchAndMap
+      && Module.chiselAndMap.contains((left, right))) {
+      Module.chiselAndMap((left, right))
     }
-  }
-
-  def := (src: Bits): Unit = {
-    if(src.getWidth > 1) {
-      throw new Exception("multi bit signal " + src + " converted to Bool");
-    }
-    if(src.getWidth == -1) {
-      throw new Exception("unable to automatically convert " + src + " to Bool, convert manually instead");
-    }
-    this := src(0) // We only have one bit in *src*.
-  }
-
-  def && (b: Bool): Bool = if (b.isTrue) this else if (this.isTrue) b else BinaryBoolOp(this, b, "&&");
-  def || (b: Bool): Bool = BinaryBoolOp(this, b, "||");
-
-  def isTrue: Boolean = {
-    if(inputs.length == 0) {
-      false
-    } else {
-      inputs(0) match {
-        case l: Literal => {l.isLit && l.value == 1};
-        case any        => false;
+    val op = {
+      if (left.isConst) {
+        if( left.node.asInstanceOf[Literal].value > 0 ) {
+          right.lvalue()
+        } else {
+          left.node // alias to false
+        }
+      } else if( right.isConst ) {
+        if( right.node.asInstanceOf[Literal].value > 0 ) {
+          left.lvalue()
+        } else {
+          right.node // alias to true
+        }
+      } else {
+        new LogicalAndOp(left.lvalue(), right.lvalue())
       }
     }
+    val result = Bool(op)
+    if(Module.searchAndMap && !Module.chiselAndMap.contains((left, right))) {
+      Module.chiselAndMap += ((left, right) -> result)
+    }
+    result
   }
+}
 
+
+object LogicalOr {
+  def apply( left: Bits, right: Bits): Bool = {
+    Bool(
+      if (left.isConst) {
+        if( left.node.asInstanceOf[Literal].value > 0 ) {
+          left.node // alias to true
+        } else {
+          right.lvalue()
+        }
+      } else if( right.isConst ) {
+        if( right.node.asInstanceOf[Literal].value > 0 ) {
+          right.node // alias to true
+        } else {
+          left.lvalue()
+        }
+      } else {
+        new LogicalOrOp(left.lvalue(), right.lvalue())
+      })
+  }
 }

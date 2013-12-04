@@ -29,34 +29,37 @@
 */
 
 package Chisel
-import Node._
+
 
 object Cat {
-  private def doit[T <: Data](mods: Seq[T]): UInt = {
-    val modsList = mods.filter(_ != null).toList
-    val isLit = Module.isFolding && modsList.forall(_.litOf != null)
-    val res = if(!isLit && Module.backend.isInstanceOf[VerilogBackend]) {
-      (new Cat()).initOf("", sumWidth _, modsList)
-    } else {
-      modsList.reduceLeft((a, b) => a ## b)
-    }
-    UInt(OUTPUT).fromNode(res)
+
+  /** With *left* a signal of L bits and *right a signal of R bits,
+    this function will return a new signal of L+R bits where
+    the high-order bits are the bits in *left* and the low-order
+    bits the bits in *right*.
+    */
+  def apply(left: Bits, right: Bits): UInt = {
+    UInt(
+      if( left.isConst && right.isConst ) {
+        Literal(left.node.asInstanceOf[Literal].value << right.node.width
+          | right.node.asInstanceOf[Literal].value,
+          left.node.width + right.node.width)
+      } else {
+        new CatOp(left.lvalue(), right.lvalue())
+      })
   }
 
-  def apply[T <: Data](mod: T, mods: T*): UInt = doit(mod :: mods.toList)
-  def apply[T <: Data](mods: Seq[T]): UInt = doit(mods)
-}
+  def apply[T <: Data](head: T, tail: T*): UInt =
+    apply(head :: tail.toList)
 
-class Cat extends Node
-
-object Concatenate {
-  def apply (mod: Node, mods: Node*): Node =
-    if(Module.backend.isInstanceOf[VerilogBackend]) {
-      val res = new Cat();
-      res.initOf("", sumWidth _, mod :: mods.toList);
-      res
+  def apply[T <: Data](seq: Seq[T]): UInt = {
+    val modsList = seq.filter(_ != null).toList
+    if( modsList.length > 1 ) {
+      modsList.tail.foldLeft(modsList.head.toBits){
+        (a, b) => a.toBits ## b.toBits }
     } else {
-      mods.foldLeft(mod){(a, b) => a ## b};
+      modsList.head.toBits
     }
+  }
 }
 

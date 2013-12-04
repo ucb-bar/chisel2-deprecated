@@ -29,11 +29,14 @@
 */
 
 package Chisel
-import Node._
+
 import scala.math._
 
+
 object MuxLookup {
-  def apply[S <: UInt, T <: Bits] (key: S, default: T, mapping: Seq[(S, T)]): T = {
+  def apply[S <: UInt, T <: Bits](key: S, default: T, mapping: Seq[(S, T)])
+    (implicit m: reflect.ClassTag[T]): T
+  = {
     var res = default;
     for ((k, v) <- mapping.reverse)
       res = Mux(key === k, v, res);
@@ -43,7 +46,8 @@ object MuxLookup {
 }
 
 object MuxCase {
-  def apply[T <: Bits] (default: T, mapping: Seq[(Bool, T)]): T = {
+  def apply[T <: Bits](default: T, mapping: Seq[(Bool, T)])
+    (implicit m: reflect.ClassTag[T]): T = {
     var res = default;
     for ((t, v) <- mapping.reverse){
       res = Mux(t, v, res);
@@ -52,82 +56,72 @@ object MuxCase {
   }
 }
 
-object Multiplex{
-  def apply (t: Node, c: Node, a: Node): Node = {
-    if (Module.isFolding) {
-      if (t.litOf != null) {
-        return if (t.litOf.value == 0) a else c
-      }
-      if (c.litOf != null && a.litOf != null) {
-        if (c.litOf.value == a.litOf.value) {
-          return c
-        }
-        if (c.litOf.value == 1 && a.litOf.value == 0) {
-          if(c.litOf.width == 1 && a.litOf.width == 1) return t
-          val fill = NodeFill(max(c.litOf.width-1, a.litOf.width-1), Literal(0,1))
-          fill.infer
-          val bit = NodeExtract(t, 0)
-          bit.infer
-          val cat = Concatenate(fill, bit)
-          cat.infer
-          return cat
-        }
-      }
-      if (a.isInstanceOf[Mux] && c.clearlyEquals(a.inputs(1))) {
-        Multiplex(t.asInstanceOf[Bool] || a.inputs(0).asInstanceOf[Bool], c, a.inputs(2))
-      }
-    }
-    new Mux().init("", maxWidth _, t, c, a);
-  }
-}
-
-object isLessThan {
-
-  def distFromData(x: java.lang.Class[_]): Int = {
-    var xClass = x
-    var xCnt = 0
-    while(xClass.toString != "class Chisel.Data") {
-      xClass = xClass.getSuperclass
-      xCnt += 1
-    }
-    xCnt
-  }
-
-  def checkCommonSuperclass(x: java.lang.Class[_], y: java.lang.Class[_]) {
-  }
-
-  def apply(x: java.lang.Class[_], y: java.lang.Class[_]): Boolean = {
-    checkCommonSuperclass(x, y)
-    distFromData(x) > distFromData(y)
-  }
-}
 
 object Mux {
-  def apply[T <: Data](t: Bool, c: T, a: T): T = {
-    val res = Multiplex(t, c.toNode, a.toNode)
-    if (c.isInstanceOf[UInt]) {
-      assert(a.isInstanceOf[UInt])
-      if (c.getClass == a.getClass) {
-        c.fromNode(res)
+  def apply[T <: Data](t: Bool, c: T, a: T)(implicit m: reflect.ClassTag[T]): T = {
+    val op =
+      if( t.node.isInstanceOf[Literal] ) {
+        if( t.node.asInstanceOf[Literal].value == 0 ) a.toBits.lvalue() else c.toBits.lvalue()
+      } else if( c.toBits.node.isInstanceOf[Literal] && a.toBits.node.isInstanceOf[Literal]) {
+        if (c.toBits.node.asInstanceOf[Literal].value
+          == a.toBits.node.asInstanceOf[Literal].value) {
+          c.toBits.node
+        } else if (c.toBits.node.asInstanceOf[Literal].value == 1
+          && a.toBits.node.asInstanceOf[Literal].value == 0) {
+          /* special case where we can use the cond itself. */
+          if(c.toBits.node.width == 1 && a.toBits.node.width == 1) {
+            t.toBits.node
+          } else {
+            new CatOp(new FillOp(Literal(0,1),
+              max(c.toBits.node.width-1, a.toBits.node.width-1)), t.node)
+          }
+        } else if (c.toBits.node.asInstanceOf[Literal].value == 0
+          && a.toBits.node.asInstanceOf[Literal].value == 1) {
+          /* special case where we can use the cond itself. */
+          if(c.toBits.node.width == 1 && a.toBits.node.width == 1) {
+            new BitwiseRevOp(t.lvalue())
+          } else {
+            new CatOp(new FillOp(Literal(0,1),
+              max(c.toBits.node.width-1, a.toBits.node.width-1)),
+              new BitwiseRevOp(t.lvalue()))
+          }
+        } else {
+          new MuxOp(t.lvalue(), c.toBits.lvalue(), a.toBits.lvalue())
+        }
+      } else if (a.toBits.node.isInstanceOf[MuxOp]
+        && c.toBits.node.clearlyEquals(a.toBits.node.inputs(1))) {
+        new MuxOp(new LogicalOrOp(
+          t.lvalue(), a.toBits.node.inputs(0)), c.toBits.node, a.toBits.node.inputs(2))
       } else {
-        UInt(OUTPUT).fromNode(res).asInstanceOf[T]
+        new MuxOp(t.lvalue(), c.toBits.lvalue(), a.toBits.lvalue())
       }
-    } else {
-      c.fromNode(res)
+    /* XXX Cannot use classTag on Bundle/Vec until we solve
+     the cloning issue. Passed that there is also the type erasure
+     issue when executing a VecMux from a VecReference.
+    val result = m.runtimeClass.newInstance.asInstanceOf[T]
+     */
+    val result = a.clone
+    result.fromBits(UInt(op))
+    result
+  }
+}
+
+
+/** Generate a mux tree that returns the item in *elts* at position *addr*.
+  */
+object VecMux {
+
+  def apply(addr: UInt, elts: Seq[Data]): Data = {
+    def doit(elts: Seq[Data], pos: Int): Data = {
+      if (elts.length == 1) {
+        elts(0)
+      } else {
+        val newElts = (0 until elts.length/2).map(i => Mux(addr(pos), elts(2*i + 1), elts(2*i)))
+        doit(newElts ++ elts.slice(elts.length/2*2, elts.length), pos + 1)
+      }
     }
+    doit(elts, 0)
   }
 }
 
-class Mux extends Op {
-  Module.muxes += this;
-  stack = Thread.currentThread.getStackTrace;
-  op = "Mux";
-  override def toString: String =
-    inputs(0) + " ? " + inputs(1) + " : " + inputs(2)
-  def ::(a: Node): Mux = { inputs(2) = a; this }
 
-  override def forceMatchingWidths {
-    if (inputs(1).width != width) inputs(1) = inputs(1).matchWidth(width)
-    if (inputs(2).width != width) inputs(2) = inputs(2).matchWidth(width)
-  }
-}

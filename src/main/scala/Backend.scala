@@ -29,9 +29,7 @@
 */
 
 package Chisel
-import Node._
-import Reg._
-import ChiselError._
+
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.{Queue=>ScalaQueue}
 import scala.collection.mutable.Stack
@@ -43,14 +41,24 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.io.PrintStream
 
+
 object Backend {
   var moduleNamePrefix = ""
 }
 
+/** Base class for C++, verilog, etc. backends.
+
+  Each ``Backend`` is responsible to emit source text that can simulate
+  the Chisel design (Graph) as specified by a top level ``Module``.
+  */
 abstract class Backend {
 
   /* Set of keywords which cannot be used as node and component names. */
   val keywords: HashSet[String];
+
+  var sortedComps: ArrayBuffer[Module] = null
+
+  var traversalIndex = 0
 
   def createOutputFile(name: String): java.io.FileWriter = {
     val baseDir = ensureDir(Module.targetDir)
@@ -63,6 +71,10 @@ abstract class Backend {
       res += "  ";
     res
   }
+
+  var nindex = 0
+  def emitIndex : Int = { val res = nindex; nindex = nindex + 1; res }
+
 
   /** Ensures a directory *dir* exists on the filesystem. */
   def ensureDir(dir: String): String = {
@@ -82,12 +94,23 @@ abstract class Backend {
     if(x == 0) "" else "    " + genIndent(x-1);
   }
 
+  def findRoots(root: Module): Seq[Node] = {
+    var res = root.outputs()
+    for (comp <- root.children) {
+      res ++= findRoots(comp)
+    }
+    res
+  }
+
+  /** Use Scala class introspection to set names of various nodes
+    in the generated graph.
+    */
   def nameChildren(root: Module) {
     // Name all nodes at this level
     root.io.nameIt("io");
     val nameSpace = new HashSet[String];
-    /* We are going through all declarations, which can return Nodes,
-     ArrayBuffer[Node], Cell, BlackBox and Modules.
+    /* We are going through all declarations, which can return Datas,
+     ArrayBuffer[Data], BlackBox and Modules.
      Since we call invoke() to get a proper instance of the correct type,
      we have to insure the method is accessible, thus all fields
      that will generate C++ or Verilog code must be made public. */
@@ -98,24 +121,22 @@ abstract class Backend {
         && isPublic(m.getModifiers()) && !(Module.keywords contains name)) {
         val o = m.invoke(root);
         o match {
-         case node: Node => {
-           /* XXX It seems to always be true. How can name be empty? */
-           if ((node.isTypeNode || name != ""
-             || node.name == null || (node.name == "" && !node.named))) {
-             node.nameIt(asValidName(name));
-           }
-           nameSpace += node.name;
-         }
-         case buf: ArrayBuffer[_] => {
-           /* We would prefer to match for ArrayBuffer[Node] but that's
+          case data: Data => {
+            nameSpace += data.nameIt(asValidName(name)).name
+          }
+          case mem: Mem[_] => {
+            nameSpace += mem.nameIt(asValidName(name)).name
+          }
+          case buf: ArrayBuffer[_] => {
+           /* We would prefer to match for ArrayBuffer[Data] but that's
             impossible because of JVM constraints which lead to type erasure.
             XXX Using Seq instead of ArrayBuffer will pick up members defined
             in Module that are solely there for implementation purposes. */
-           if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
-             val nodebuf = buf.asInstanceOf[Seq[Node]];
+           if(!buf.isEmpty && buf.head.isInstanceOf[Data]){
+             val nodebuf = buf.asInstanceOf[Seq[Data]];
              var i = 0;
              for(elm <- nodebuf){
-               if( elm.isTypeNode || elm.name == null || elm.name.isEmpty ) {
+               if( elm.name == null || elm.name.isEmpty ) {
                  /* XXX This code is sensitive to when Bundle.nameIt is called.
                   Whether it is called late (elm.name is empty) or we override
                   any previous name that could have been infered,
@@ -129,17 +150,15 @@ abstract class Backend {
              }
            }
          }
-         case cell: Cell => {
-           cell.name = asValidName(name);
-           cell.named = true;
-           nameSpace += cell.name;
-         }
          case bb: BlackBox => {
            if(!bb.named) {
              bb.name = name;
              bb.named = true
            };
            nameSpace += bb.name;
+           /* XXX It is not just naming here. We also update the path
+            to the parent (which might not be necessary anymore). */
+           bb.pathParent = root;
          }
          case comp: Module => {
            if(!comp.named) {
@@ -147,6 +166,9 @@ abstract class Backend {
              comp.named = true
            };
            nameSpace += comp.name;
+           /* XXX It is not just naming here. We also update the path
+            to the parent (which might not be necessary anymore). */
+           comp.pathParent = root;
          }
          case any => {
            /* We have no idea what to do with class members which are
@@ -184,12 +206,17 @@ abstract class Backend {
         }
     }
 
+
     for (bind <- root.bindings) {
-      var genName = if (bind.targetNode.name == null || bind.targetNode.name.length() == 0) "" else bind.targetComponent.name + "_" + bind.targetNode.name;
-      if(nameSpace.contains(genName)) genName += ("_" + bind.emitIndex);
-      bind.name = asValidName(genName); // Not using nameIt to avoid override
-      bind.named = true;
+      if( bind.target != null ) {
+        /* the IOBound is connected. */
+        var genName = if(bind.target.name.isEmpty) "" else bind.target.component.name + "_" + bind.target.name;
+        if(nameSpace.contains(genName)) genName += ("_" + emitIndex);
+        bind.name = asValidName(genName); // Not using nameIt to avoid override
+        bind.named = true;
+      }
     }
+
   }
 
   /* Returns a string derived from _name_ that can be used as a valid
@@ -199,16 +226,9 @@ abstract class Backend {
   }
 
   def nameAll(root: Module) {
+    nindex = 0
     root.name = extractClassName(root);
     nameChildren(root);
-    for( node <- Module.nodes ) {
-      if( (node.nameHolder != null && !node.nameHolder.name.isEmpty)
-        && !node.named && !node.isInstanceOf[Literal] ){
-        node.name = node.nameHolder.name; // Not using nameIt to avoid override
-        node.named = node.nameHolder.named;
-        node.nameHolder.name = "";
-      }
-    }
   }
 
   def fullyQualifiedName( m: Node ): String = {
@@ -216,7 +236,7 @@ abstract class Backend {
       case l: Literal => l.toString;
       case any       =>
         if (m.name != ""
-          && m != Module.topComponent.defaultResetPin && m.component != null) {
+          && m != Module.scope.resets.head && m.component != null) {
           /* Only modify name if it is not the reset signal
            or not in top component */
           if(m.name != "reset" && m.component != Module.topComponent) {
@@ -235,14 +255,12 @@ abstract class Backend {
 
   def emitRef(node: Node): String = {
     node match {
-      case r: Reg =>
-        if (r.name == "") "R" + r.emitIndex else r.name
+      case r: RegDelay =>
+        if (r.name == "") r.name = "R" + emitIndex
+        r.name
       case _ =>
-        if(node.name == "") {
-          "T" + node.emitIndex
-        } else {
-          node.name
-        }
+        if(node.name == "") node.name = "T" + emitIndex
+        node.name
     }
   }
 
@@ -265,65 +283,12 @@ abstract class Backend {
         res.push(a)
       }
       for((n, flat) <- c.io.flatten) {
-        res.push(flat)
+        res.push(flat.node)
       }
     }
     res
   }
 
-  /** Nodes which are created outside the execution trace from the toplevel
-    component constructor (i.e. through the () => Module(new Top()) ChiselMain
-    argument) will have a component field set to null. For example, genMuxes,
-    forceMatchWidths and transforms (all called from Backend.elaborate) create
-    such nodes.
-
-    This method walks all nodes from all component roots (outputs, debugs).
-    and reassociates the component to the node both ways (i.e. in Module.nodes
-    and Node.component).
-
-    We assume here that all nodes at the components boundaries (io) have
-    a non-null and correct node/component association. We further assume
-    that nodes generated in elaborate are inputs to a node whose component
-    field is set.
-
-    Implementation Node:
-    At first we did implement *collectNodesIntoComp* to handle a single
-    component at a time but that did not catch the cases where Regs are
-    passed as input to sub-module without being tied to an output
-    of *this.component*.
-    */
-  def collectNodesIntoComp(dfsStack: Stack[Node]) {
-    val walked = new HashSet[Node]()
-    walked ++= dfsStack
-    // invariant is everything in the stack is walked and has a non-null component
-    while(!dfsStack.isEmpty) {
-      val node = dfsStack.pop
-      /*
-      we're tracing from outputs -> inputs, so if node is an input, then its
-      inputs belong to the outside component. Otherwise, its inputs are the same
-      as node's inputs.
-      */
-      val curComp = 
-        if ( node.isIo && node.asInstanceOf[Bits].dir == INPUT ) {
-          node.component.parent
-        } else {
-          node.component
-        }
-      if (!node.component.nodes.contains(node))
-        node.component.nodes += node
-      for (input <- node.inputs) {
-        if(!walked.contains(input)) {
-          if( input.component == null ) {
-            input.component = curComp
-          }
-          walked += input
-          dfsStack.push(input)
-        }
-      }
-    }
-
-    assert(dfsStack.isEmpty)
-  }
 
   def transform(c: Module, transforms: ArrayBuffer[(Module) => Unit]): Unit = {
     for (t <- transforms)
@@ -331,35 +296,31 @@ abstract class Backend {
   }
 
   def pruneUnconnectedIOs(m: Module) {
-    val inputs = m.io.flatten.filter(_._2.dir == INPUT)
-    val outputs = m.io.flatten.filter(_._2.dir == OUTPUT)
+    val inputs = m.io.flatten.filter(x => x._2.node.isInstanceOf[IOBound] && x._2.node.asInstanceOf[IOBound].isDirected(INPUT))
+    val outputs = m.io.flatten.filter(x => x._2.node.isInstanceOf[IOBound] && x._2.node.asInstanceOf[IOBound].isDirected(OUTPUT))
 
     for ((name, i) <- inputs) {
-      if (i.inputs.length == 0 && m != Module.topComponent)
-        if (i.consumers.length > 0) {
+      val node = i.node
+      if (node.inputs.length == 0 && m != Module.topComponent) {
+        if (node.consumers.length > 0) {
           if (Module.warnInputs)
-            ChiselError.warning({"UNCONNECTED INPUT " + emitRef(i) + " in COMPONENT " + i.component +
+            ChiselError.warning({"UNCONNECTED INPUT " + emitRef(node) + " in COMPONENT " + node.component +
                                  " has consumers"})
-          i.driveRand = true
+          node.driveRand = true
         } else {
           if (Module.warnInputs)
-            ChiselError.warning({"FLOATING INPUT " + emitRef(i) + " in COMPONENT " + i.component})
-          i.prune = true
+            ChiselError.warning({"FLOATING INPUT " + emitRef(node) + " in COMPONENT " + node.component})
+          node.prune = true
         }
+      }
     }
 
     for ((name, o) <- outputs) {
-      if (o.inputs.length == 0) {
-        if (o.consumers.length > 0) {
-          if (Module.warnOutputs)
-            ChiselError.warning({"UNCONNETED OUTPUT " + emitRef(o) + " in component " + o.component + 
-                                 " has consumers on line " + o.consumers(0).line})
-          o.driveRand = true
-        } else {
-          if (Module.warnOutputs)
-            ChiselError.warning({"FLOATING OUTPUT " + emitRef(o) + " in component " + o.component})
-          o.prune = true
-        }
+      val node = o.node
+      if (node.inputs.length == 0) {
+        if (Module.warnOutputs)
+          ChiselError.warning({"UNCONNETED OUTPUT " + emitRef(node) + " in component " + node.component})
+        node.driveRand = true
       }
     }
   }
@@ -393,8 +354,8 @@ abstract class Backend {
 
   def levelChildren(root: Module) {
     root.level = 0;
-    root.traversal = VerilogBackend.traversalIndex;
-    VerilogBackend.traversalIndex = VerilogBackend.traversalIndex + 1;
+    root.traversal = traversalIndex;
+    traversalIndex = traversalIndex + 1;
     for(child <- root.children) {
       levelChildren(child)
       root.level = math.max(root.level, child.level + 1);
@@ -408,83 +369,6 @@ abstract class Backend {
     result ++ ArrayBuffer[Module](root);
   }
 
-  // go through every Module and set its clock and reset field
-  def assignClockAndResetToModules {
-    for (module <- Module.sortedComps.reverse) {
-      if (module.clock == null)
-        module.clock = module.parent.clock
-      if (!module.hasExplicitReset)
-        module.reset_=
-    }
-  }
-
-  // go through every Module, add all clocks+resets used in it's tree to it's list of clocks+resets
-  def gatherClocksAndResets {
-    for (parent <- Module.sortedComps) {
-      for (child <- parent.children) {
-        for (clock <- child.clocks) {
-          parent.addClock(clock)
-        }
-        for (reset <- child.resets.keys) {
-          // create a reset pin in parent if reset does not originate in parent and 
-          // if reset is not an output from one of parent's children
-          if (reset.component != parent && !parent.children.contains(reset.component))
-            parent.addResetPin(reset)
-
-          // special case for implicit reset
-          if (reset == Module.implicitReset && parent == Module.topComponent)
-            if (!parent.resets.contains(reset))
-              parent.resets += (reset -> reset)
-        }
-      }
-    }
-  }
-
-  def connectResets {
-    for (parent <- Module.sortedComps) {
-      for (child <- parent.children) {
-        for (reset <- child.resets.keys) {
-          if (child.resets(reset).inputs.length == 0)
-            if (parent.resets.contains(reset))
-              child.resets(reset).inputs += parent.resets(reset)
-            else 
-              child.resets(reset).inputs += reset
-        }
-      }
-    }
-  }
-
-  def nameRsts {
-    for (comp <- Module.sortedComps) {
-      for (rst <- comp.resets.keys) {
-        if (!comp.resets(rst).named)
-            comp.resets(rst).setName(rst.name)
-      }
-    }
-  }
-
-  // walk forward from root register assigning consumer clk = root.clock
-  def createClkDomain(root: Node, walked: ArrayBuffer[Node]) = {
-    val dfsStack = new Stack[Node]
-    walked += root; dfsStack.push(root)
-    val clock = root.clock
-    while(!dfsStack.isEmpty) {
-      val node = dfsStack.pop
-      for (consumer <- node.consumers) {
-        if (!consumer.isInstanceOf[Delay] && !walked.contains(consumer)) {
-          val c1 = consumer.clock
-          val c2 = clock
-          if(!(consumer.clock == null || consumer.clock == clock)) {
-            ChiselError.warning({consumer.getClass + " " + emitRef(consumer) + " " + emitDef(consumer) + "in module" +
-                                 consumer.component + " resolves to clock domain " + 
-                                 emitRef(c1) + " and " + emitRef(c2) + " traced from " + root.name})
-          } else { consumer.clock = clock }
-          walked += consumer
-          dfsStack.push(consumer)
-        }
-      }
-    }
-  }
 
   def elaborate(c: Module): Unit = {
     Module.setAsTopComponent(c)
@@ -493,80 +377,57 @@ abstract class Backend {
      duplicate names in the generated C++.
     nameAll(c) */
 
-    Module.components.foreach(_.elaborate(0));
-
     /* XXX We should name all signals before error messages are generated
      so as to give a clue where problems are showing up but that interfers
      with the *bindings* (see later comment). */
-    for (c <- Module.components)
-      c.markComponent();
-    // XXX This will create nodes after the tree is traversed!
-    c.genAllMuxes;
     transform(c, preElaborateTransforms)
-    Module.components.foreach(_.postMarkNet(0));
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
-    // Module.assignResets()
 
     levelChildren(c)
-    Module.sortedComps = gatherChildren(c).sortWith(
+    sortedComps = gatherChildren(c).sortWith(
       (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)));
 
-    assignClockAndResetToModules
-    Module.sortedComps.map(_.addDefaultReset)
-    c.addClockAndReset
-    gatherClocksAndResets
-    connectResets
+    /* compute necessary clocks and resets */
+    for (comp <- sortedComps ) {
+      val clks = new ByClassVisitor[Update]()
+      GraphWalker.depthFirst(findRoots(comp), clks)
+      comp.clocks = clks.items
+      val rsts = new ByClassVisitor[Delay]()
+      GraphWalker.depthFirst(findRoots(comp), rsts)
+      comp.resets.clear()
+      for( rst <- rsts.items.map(x => { x.reset }).filter(_ != null) ) {
+        rst.isIo = true
+        if( !comp.resets.contains(rst) ) comp.resets += rst
+      }
+    }
 
-    ChiselError.info("started inference")
-    val nbOuterLoops = c.inferAll();
-    ChiselError.info("finished inference (" + nbOuterLoops + ")")
-    ChiselError.info("start width checking")
-    c.forceMatchingWidths;
-    ChiselError.info("finished width checking")
-    ChiselError.info("started flattenning")
-    val nbNodes = c.removeTypeNodes()
-    ChiselError.info("finished flattening (" + nbNodes + ")")
+    ChiselError.info("started width inference")
+    var updated = true
+    while( updated ) {
+      val inferWF = new InferWidthForward
+      GraphWalker.tarjan(findRoots(c), inferWF)
+      updated = inferWF.updated
+    }
+    val inferBW = new InferWidthBackward
+    GraphWalker.tarjan(findRoots(c), inferBW)
+    ChiselError.info("finished width inference")
     ChiselError.checkpoint()
-
-    /* *collectNodesIntoComp* associates components to nodes that were
-     created after the call tree has been executed (ie. in genMuxes
-     and forceMatchWidths).
-
-     The purpose of *collectNodesIntoComp* is to insure user-defined
-     transforms will be able to query a component for all its nodes
-     and a node for its component.
-
-     Technically all user-defined transforms are responsible to update
-     nodes and component correctly or call collectNodesIntoComp on return.
-     */
-    ChiselError.info("resolving nodes to the components")
-    collectNodesIntoComp(initializeDFS)
-    ChiselError.info("finished resolving")
 
     // two transforms added in Mem.scala (referenced and computePorts)
     ChiselError.info("started transforms")
     transform(c, transforms)
     ChiselError.info("finished transforms")
-
-    Module.sortedComps.map(_.nodes.map(_.addConsumers))
-    c.traceNodes();
-    val clkDomainWalkedNodes = new ArrayBuffer[Node]
-    for (comp <- Module.sortedComps)
-      for (node <- comp.nodes)
-        if (node.isInstanceOf[Reg])
-            createClkDomain(node, clkDomainWalkedNodes)
     ChiselError.checkpoint()
+
+    GraphWalker.depthFirst(findRoots(c), new AddConsumersVisitor)
 
     /* We execute nameAll after traceNodes because bindings would not have been
        created yet otherwise. */
     nameAll(c)
-    nameRsts
-
-    for (comp <- Module.sortedComps ) {
+    for (comp <- sortedComps ) {
       // remove unconnected outputs
       pruneUnconnectedIOs(comp)
     }
-
     ChiselError.checkpoint()
 
     if(!Module.dontFindCombLoop) {
@@ -578,6 +439,8 @@ abstract class Backend {
     if(Module.saveComponentTrace) {
       printStack
     }
+    verifyAllMuxes(c)
+    ChiselError.checkpoint()
   }
 
   def compile(c: Module, flags: String = null): Unit = { }
@@ -585,7 +448,7 @@ abstract class Backend {
   def checkPorts(topC: Module) {
 
     def prettyPrint(n: Node, c: Module) {
-      val dir = if (n.asInstanceOf[Bits].dir == INPUT) "Input" else "Output"
+      val dir = n.asInstanceOf[IOBound].dir.toString()
       val portName = n.name
       val compName = c.name
       val compInstName = c.moduleName
@@ -596,8 +459,9 @@ abstract class Backend {
     for (c <- Module.components) {
       if (c != topC) {
         for ((n,i) <- c.io.flatten) {
-          if (i.inputs.length == 0) {
-            prettyPrint(i, c)
+          val node = i.node
+          if (node.inputs.length == 0) {
+            prettyPrint(node, c)
           }
         }
       }
@@ -608,12 +472,21 @@ abstract class Backend {
   /** Prints the call stack of Component as seen by the push/pop runtime. */
   protected def printStack {
     var res = ""
-    for((i, c) <- Module.printStackStruct){
+    for((i, c) <- Module.scope.printStackStruct){
       res += (genIndent(i) + c.moduleName + " " + c.name + "\n")
     }
     ChiselError.info(res)
   }
 
-}
+  def verifyAllMuxes(c: Module) {
+    val stateVars = new ByClassVisitor[Delay]()
+    GraphWalker.depthFirst(findRoots(c), stateVars)
+    for( state <- stateVars.items ) {
+      GraphWalker.depthFirst(state :: Nil,
+        new MuxDefault(state), new OnlyMuxes)
+    }
+    GraphWalker.depthFirst(findRoots(c), new VerifyMuxes())
+  }
 
+}
 

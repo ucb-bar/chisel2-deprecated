@@ -63,13 +63,13 @@ class MultiClockSuite extends AssertionsForJUnit {
 
   /** Test Register on a different clock */
   @Test def testRegClock() {
-
+    println("testRegClock:")
     class ClockedSubComp extends Module {
       val io = new Bundle {
         val ready = Bool(INPUT)
         val valid = Bool(OUTPUT)
       }
-      val stored = Reg(next=io.ready, clock=new Clock())
+      val stored = Reg(next=io.ready, clock=Clock())
       io.valid := stored
     }
 
@@ -89,11 +89,11 @@ class MultiClockSuite extends AssertionsForJUnit {
       () => Module(new Comp()))
     assertFile(tmpdir.getRoot() + "/MultiClockSuite_Comp_1.v",
 """module MultiClockSuite_ClockedSubComp_1(input T0,
-    input  io_ready,
+    input io_ready,
     output io_valid
 );
 
-  reg[0:0] stored;
+  reg stored;
 
   assign io_valid = stored;
 
@@ -103,18 +103,18 @@ class MultiClockSuite extends AssertionsForJUnit {
 endmodule
 
 module MultiClockSuite_Comp_1(input T0,
-    input  io_data0,
-    input  io_data1,
+    input io_data0,
+    input io_data1,
     output io_result
 );
 
-  wire T0;
   wire sub_io_valid;
+  wire T1;
 
-  assign T0 = io_data0 & io_data1;
   assign io_result = sub_io_valid;
+  assign T1 = io_data0 & io_data1;
   MultiClockSuite_ClockedSubComp_1 sub(.T0(T0),
-       .io_ready( T0 ),
+       .io_ready( T1 ),
        .io_valid( sub_io_valid )
   );
 endmodule

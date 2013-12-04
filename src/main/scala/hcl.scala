@@ -29,76 +29,13 @@
 */
 
 package Chisel
+
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 import scala.collection.mutable.{Queue=>ScalaQueue}
-import Literal._
-import Node._
+
 import ChiselError._
 
-object when {
-  def execWhen(cond: Bool)(block: => Unit) {
-    conds.push(conds.top && cond);
-    block;
-    conds.pop();
-  }
-  def apply(cond: Bool)(block: => Unit): when = {
-    execWhen(cond){ block }
-    new when(cond);
-  }
-}
-
-class when (prevCond: Bool) {
-  def elsewhen (cond: Bool)(block: => Unit): when = {
-    when.execWhen(!prevCond && cond){ block }
-    new when(prevCond || cond);
-  }
-  def otherwise (block: => Unit) {
-    val cond = !prevCond
-    if (conds.length == 1) cond.canBeUsedAsDefault = true
-    when.execWhen(cond){ block }
-  }
-}
-
-object unless {
-  def apply(c: Bool)(block: => Unit) {
-    when (!c) { block }
-  }
-}
-
-object otherwise {
-  def apply(block: => Unit) {
-    when (Bool(true)) { block }
-  }
-}
-object switch {
-  def apply(c: Bits)(block: => Unit) {
-    keys.push(c);
-    block;
-    keys.pop();
-  }
-}
-object is {
-  def apply(v: Bits)(block: => Unit) {
-    if (keys.length == 0) {
-      ChiselError.error("NO KEY SPECIFIED");
-    } else {
-      val c = keys(0) === v;
-      when (c) { block; }
-    }
-  }
-}
-
-class TestIO(val format: String, val args: Seq[Data] = null)
-
-object Scanner {
-  def apply (format: String, args: Data*): TestIO =
-    new TestIO(format, args.toList);
-}
-object Printer {
-  def apply (format: String, args: Data*): TestIO =
-    new TestIO(format, args.toList);
-}
 
 /**
   _chiselMain_ behaves as if it constructs an execution tree from
@@ -173,24 +110,12 @@ object chiselMain {
 
   def apply[T <: Module]
       (args: Array[String], gen: () => T,
-       scanner: T => TestIO = null, printer: T => TestIO = null, ftester: T => Tester[T] = null): T = {
+       ftester: T => Tester[T] = null): T = {
     Module.initChisel();
     readArgs(args)
 
     try {
       val c = gen();
-      if (scanner != null) {
-        val s = scanner(c);
-        Module.scanArgs  ++= s.args;
-        for (a <- s.args) a.isScanArg = true
-        Module.scanFormat  = s.format;
-      }
-      if (printer != null) {
-        val p = printer(c);
-        Module.printArgs   ++= p.args;
-        for(a <- p.args) a.isPrintArg = true
-        Module.printFormat   = p.format;
-      }
       if (ftester != null) {
         Module.tester = ftester(c)
       }
@@ -218,66 +143,16 @@ object throwException {
 
 object chiselMainTest {
   def apply[T <: Module](args: Array[String], gen: () => T)(tester: T => Tester[T]): T =
-    chiselMain(args, gen, null, null, tester)
-}
-
-trait proc extends Node {
-  var updates = new collection.mutable.ListBuffer[(Bool, Node)];
-  var updated = false
-  def genCond(): Bool = conds.top;
-  def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
-    val update = others.foldLeft(default)((v, u) => Multiplex(u._1, u._2, v))
-    if (inputs.isEmpty) inputs += update else inputs(0) = update
-  }
-  def genMuxes(default: Node): Unit = {
-    if (updates.length == 0) {
-      if (inputs.length == 0 || inputs(0) == null) {
-        ChiselError.error({"NO UPDATES ON " + this}, this.line)
-      }
-      return
-    }
-    val (topCond, topValue) = updates.head
-    val (lastCond, lastValue) = updates.last
-    if (default == null && !topCond.isTrue && !lastCond.canBeUsedAsDefault) {
-      ChiselError.error(
-        {"NO DEFAULT SPECIFIED FOR WIRE: " + this + " in component " + this.component.getClass}, 
-        this.line)
-      return
-    }
-    if (default != null) {
-      genMuxes(default, updates)
-    } else {
-      if (topCond.isTrue)
-        genMuxes(topValue, updates.toList.tail)
-      else if (lastCond.canBeUsedAsDefault)
-        genMuxes(lastValue, updates)
-    }
-  }
-  def procAssign(src: Node): Unit
-  Module.procs += this;
+    chiselMain(args, gen, tester)
 }
 
 trait nameable {
   var name: String = "";
+
   /** _named_ is used to indicates name was set explicitely
    and should not be overriden by a _nameIt_ generator. */
   var named = false;
 }
 
-abstract class BlackBox extends Module {
-  Module.blackboxes += this
 
-  def setVerilogParameters(string: String) {
-    this.asInstanceOf[Module].verilog_parameters = string;
-  }
-
-  def setName(name: String) {
-    moduleName = name;
-  }
-}
-
-
-class Delay extends Node {
-  override def isReg: Boolean = true;
-}
 

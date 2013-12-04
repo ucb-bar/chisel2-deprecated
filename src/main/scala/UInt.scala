@@ -29,7 +29,7 @@
 */
 
 package Chisel
-import Node._
+
 import ChiselError._
 
 object UInt {
@@ -38,68 +38,160 @@ object UInt {
    methods to create UInt from litterals (with implicit and explicit
    widths) and reserve the default parameters for the "direction" method.
    */
-  def apply(x: Int): UInt = Lit(x){UInt()};
-  def apply(x: Int, width: Int): UInt = Lit(x, width){UInt()};
-  def apply(x: String): UInt = Lit(x, -1){UInt()};
-  def apply(x: String, width: Int): UInt = Lit(x, width){UInt()};
-  def apply(x: String, base: Char): UInt = Lit(x, base, -1){UInt()};
-  def apply(x: String, base: Char, width: Int): UInt = Lit(x, base, width){UInt()};
+  def apply(x: Int): UInt = UInt(Literal(x))
+  def apply(x: Int, width: Int): UInt = UInt(Literal(x, width))
+  def apply(x: String): UInt = UInt(Literal(x, -1))
+  def apply(x: String, width: Int): UInt = UInt(Literal(x, width))
+  def apply(x: String, base: Char): UInt = UInt(Literal(x, base, -1))
+  def apply(x: String, base: Char, width: Int): UInt
+    = UInt(Literal(x, base, width))
 
-  def apply(dir: IODirection = null, width: Int = -1): UInt = {
-    val res = new UInt();
-    res.create(dir, width)
+  def apply(dir: IODirection = NODIRECTION, width: Int = -1): UInt = {
+    val res = new UInt()
+    res.node = new IOBound(dir, width)
+    res
+  }
+
+  def apply(node: Node): UInt = {
+    val res = new UInt()
+    res.node = node
     res
   }
 }
 
 
-class UInt extends Bits /* with Numeric[UInt] */ {
+class UInt extends Bits /* XXX with Numeric[UInt] */ {
   type T = UInt;
 
-  /** Factory method to create and assign a *UInt* type to a Node *n*.
-    */
-  override def fromNode(n: Node): this.type = {
-    UInt(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
+  def toBool(): Bool = {
+    Bool(this.node)
   }
 
-  override def fromInt(x: Int): this.type = {
-    UInt(x).asInstanceOf[this.type]
-  }
-
-  // to support implicit convestions
-  def ===(b: UInt): Bool = LogicalOp(this, b, "===")
-
-  def :=(src: UInt) {
-    if(comp != null) {
-      comp procAssign src.toNode;
-    } else {
-      this procAssign src.toNode;
-    }
-  }
+  // unary operators
+  def zext: UInt = UInt(0, 1) ## this
+  def unary_-(): SInt = SignRev(this.zext)
+  def unary_!(): Bool = LogicalNeg(this)
 
   // arithmetic operators
-  def zext(): SInt = Cat(UInt(0,1), this).toSInt
-  def unary_-(): UInt = newUnaryOp("-");
-  def unary_!(): Bool = Bool(OUTPUT).fromNode(UnaryOp(this, "!"));
-  def << (b: UInt): UInt = newBinaryOp(b, "<<");
-  def >> (b: UInt): UInt = newBinaryOp(b, ">>");
-  def +  (b: UInt): UInt = newBinaryOp(b, "+");
-  def *  (b: UInt): UInt = newBinaryOp(b, "*");
-  def /  (b: UInt): UInt = newBinaryOp(b, "/");
-  def %  (b: UInt): UInt = newBinaryOp(b, "%");
-  def ?  (b: UInt): UInt = newBinaryOp(b, "?");
-  def -  (b: UInt): UInt = newBinaryOp(b, "-");
+
+  def << (right: UInt): UInt = LeftShift(this, right)
+  def >> (right: UInt): UInt = RightShift(this, right)
+
+// XXX deprecated?  def ?  (b: UInt): UInt = newBinaryOp(b, "?");
+
+  def + (right: UInt): UInt = Add(this, right)
+  def -  (right: UInt): UInt = Sub(this, right)
+  def * (right: UInt): UInt = Mul(this, right)
+  def % (right: UInt): UInt = Rem(this, right)
+  def / (right: UInt): UInt = Div(this, right)
 
   // order operators
-  def >  (b: UInt): Bool = newLogicalOp(b, ">");
-  def <  (b: UInt): Bool = newLogicalOp(b, "<");
-  def <= (b: UInt): Bool = newLogicalOp(b, "<=");
-  def >= (b: UInt): Bool = newLogicalOp(b, ">=");
+  def >  (right: UInt): Bool = Gtr(this, right)
+  def <  (right: UInt): Bool = Ltn(this, right)
+  def <= (right: UInt): Bool = Lte(this, right)
+  def >= (right: UInt): Bool = Gte(this, right)
 
   //UInt op SInt arithmetic
-  def +   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "+"));
-  def -   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "-"));
-  def *   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "u*s"));
-  def %   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "u%s"));
-  def /   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "u/s"));
+  def + (right: SInt): SInt = Add(SInt(this.zext.node), right)
+  def - (right: SInt): SInt = Sub(SInt(this.zext.node), right)
+  def * (right: SInt): SInt = MulSU(right, this.zext)
+  def % (right: SInt): SInt = RemUS(this.zext, right)
+  def / (right: SInt): SInt = DivUS(this.zext, right)
 }
+
+object Div {
+  def apply( left: UInt, right: UInt): UInt = {
+    UInt(new DivOp(left.lvalue(), right.lvalue()))
+  }
+}
+
+object DivUS {
+  def apply[T <: SInt]( left: UInt, right: T)(implicit m: Manifest[T]): T = {
+    val op = new DivUSOp(left.lvalue(), right.lvalue())
+    val result = m.runtimeClass.newInstance.asInstanceOf[T]
+    result.node = op
+    result
+  }
+}
+
+object Gte {
+  def apply[T <: Bits]( left: T, right: T): Bool = {
+    Bool(
+      if( left.isConst && right.isConst ) {
+        Literal(if (left.node.asInstanceOf[Literal].value
+          >= right.node.asInstanceOf[Literal].value) 1 else 0)
+      } else {
+        new GteOp(left.lvalue(), right.lvalue())
+      })
+  }
+}
+
+object Gtr {
+  def apply[T <: Bits]( left: T, right: T): Bool = {
+    Bool(
+      if( left.isConst && right.isConst ) {
+        Literal(if (left.node.asInstanceOf[Literal].value
+          > right.node.asInstanceOf[Literal].value) 1 else 0)
+      } else {
+        new GtrOp(left.lvalue(), right.lvalue())
+    })
+  }
+}
+
+object Log2 {
+  def apply (opand: Bits, n: Int): UInt = {
+    UInt(new Log2Op(opand.lvalue(), Literal.sizeof(n-1)))
+  }
+}
+
+object Lte {
+  def apply[T <: Bits]( left: T, right: T): Bool = {
+    Bool(if( left.isConst && right.isConst ) {
+      Literal(if (left.node.asInstanceOf[Literal].value
+        <= right.node.asInstanceOf[Literal].value) 1 else 0)
+    } else {
+      new LteOp(left.lvalue(), right.lvalue())
+    })
+  }
+}
+
+object Ltn {
+  def apply[T <: Bits]( left: T, right: T): Bool = {
+    Bool(
+      if( left.isConst && right.isConst ) {
+        Literal(if (left.node.asInstanceOf[Literal].value
+          < right.node.asInstanceOf[Literal].value) 1 else 0)
+      } else {
+        new LtnOp(left.lvalue(), right.lvalue())
+      })
+  }
+}
+
+object Mul {
+  def apply[T <: UInt]( left: T, right: T)(implicit m: Manifest[T]): T = {
+    val op = new MulOp(left.lvalue(), right.lvalue())
+    val result = m.runtimeClass.newInstance.asInstanceOf[T]
+    result.node = op
+    result
+  }
+}
+
+object Rem {
+  def apply[T <: UInt]( left: T, right: T)(implicit m: Manifest[T]): T = {
+    val op = new RemOp(left.lvalue(), right.lvalue())
+    val result = m.runtimeClass.newInstance.asInstanceOf[T]
+    result.node = op
+    result
+  }
+}
+
+object RemUS {
+  def apply[T <: SInt]( left: UInt, right: T)(implicit m: Manifest[T]): T = {
+    val op = new RemUSOp(left.lvalue(), right.lvalue())
+    val result = m.runtimeClass.newInstance.asInstanceOf[T]
+    result.node = op
+    result
+  }
+}
+
+
