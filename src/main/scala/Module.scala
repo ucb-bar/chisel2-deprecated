@@ -222,6 +222,7 @@ object Module {
   }
 
   def getComponent(): Module = if(compStack.length != 0) compStack.top else null
+  def current: Module = compStack.top
 
   def setAsTopComponent(mod: Module) {
     topComponent = mod;
