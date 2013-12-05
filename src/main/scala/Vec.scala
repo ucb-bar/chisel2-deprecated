@@ -58,7 +58,7 @@ object Vec {
 
   /** Returns a new *Vec* from a sequence of *Data* nodes.
     */
-  def apply[T <: Data](elts: Seq[T]): Vec[T] = {
+  def apply[T <: Data](elts: Iterable[T]): Vec[T] = {
     val res = new Vec[T](i => elts.head.clone)
     elts.zipWithIndex.foreach{ case (e,i) => res += e }
     res
