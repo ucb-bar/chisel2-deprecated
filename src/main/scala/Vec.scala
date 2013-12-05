@@ -74,8 +74,8 @@ object Vec {
     */
   def apply[T <: Data](elts: Iterable[T]): Vec[T] = {
     val res =
-      if (!elts.isEmpty && elts.forall(_ isLit)) new ROM[T]
-      else new Vec[T]
+      //if (!elts.isEmpty && elts.forall(_ isLit)) new ROM[T]
+      /*else */new Vec[T]
     res.self ++= elts
     res
   }
