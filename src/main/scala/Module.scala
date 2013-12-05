@@ -177,6 +177,8 @@ object Module {
   def setAsTopComponent(mod: Module) {
     topComponent = mod;
   }
+
+  def current: Module = scope.compStack.top
 }
 
 
