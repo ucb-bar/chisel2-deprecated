@@ -45,6 +45,9 @@ object Bool {
     res
   }
 
+  /** Factory method to create a don't-care. */
+  def DC: Bool = Bool(Literal("b?", 1))
+
   implicit def booleanToBool(x: Boolean): Bool = Bool(x)
 }
 
