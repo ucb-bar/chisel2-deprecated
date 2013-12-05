@@ -72,7 +72,7 @@ object Vec {
 
   /** Returns a new *Vec* from a sequence of *Data* nodes.
     */
-  def apply[T <: Data](elts: Seq[T]): Vec[T] = {
+  def apply[T <: Data](elts: Iterable[T]): Vec[T] = {
     val res =
       if (!elts.isEmpty && elts.forall(_ isLit)) new ROM[T]
       else new Vec[T]
