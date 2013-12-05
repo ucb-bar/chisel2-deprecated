@@ -147,7 +147,7 @@ abstract class Node extends nameable {
   var unPipelinedVersion: Node = null
   var elaborated = false
   def delay() : Float = {
-    return 0
+    return 1
   }
   //end automatic pipelining stuff
   

@@ -174,6 +174,7 @@ object chiselMain {
           Module.signalFilename = args(i + 1)
           i += 1
         }
+        case "--autoPipe" => Module.autoPipe = true
         case any => ChiselError.warning("'" + arg + "' is an unkown argument.");
       }
       i += 1;

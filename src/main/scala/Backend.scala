@@ -564,30 +564,28 @@ abstract class Backend {
     
     
     nameAll(c)//for debug
-    //c.insertPipelineRegisters()
-    //c.colorPipelineStages()
-    c.gatherSpecialComponents()
-    c.insertPipelineRegisters2()
-    connectResets
-    c.genAllMuxes
-    c.inferAll()
-    c.forceMatchingWidths
-    c.removeTypeNodes()
-    c.verifyLegalStageColoring()
-    c.findHazards()
-    c.generateBypassLogic()
-    c.generateSpeculationLogic()
-    c.generateInterlockLogic()
-    connectResets
-    c.genAllMuxes
-    c.inferAll()
-    c.forceMatchingWidths
-    c.removeTypeNodes()
-    //c.resolveHazards()
-    //c.genAllMuxes
-    //c.inferAll()
-    //c.forceMatchingWidths()
-    //c.removeTypeNodes()
+    if(Module.autoPipe){
+      //c.insertPipelineRegisters()
+      //c.colorPipelineStages()
+      c.gatherSpecialComponents()
+      c.insertPipelineRegisters2()
+      connectResets
+      c.genAllMuxes
+      c.inferAll()
+      c.forceMatchingWidths
+      c.removeTypeNodes()
+      c.verifyLegalStageColoring()
+      c.findHazards()
+      c.generateBypassLogic()
+      c.generateSpeculationLogic()
+      c.generateInterlockLogic()
+      connectResets
+      c.genAllMuxes
+      c.inferAll()
+      c.forceMatchingWidths
+      c.removeTypeNodes()
+    }
+
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
     collectNodesIntoComp(initializeDFS)
          

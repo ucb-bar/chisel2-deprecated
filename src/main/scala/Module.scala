@@ -242,6 +242,7 @@ object Module {
   }
   
   // automatic pipeline stuff
+  var autoPipe = false
   var pipeline = new HashMap[Int, ArrayBuffer[(Node, Bits)]]() //need to be deprecated
   var pipelineComponent: Module = null
   var pipelineReg = new HashMap[Int, ArrayBuffer[Reg]]()
@@ -1091,9 +1092,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
     setPipelineLength(maxStage + 1)
 
-    /*println("optimizing pipeline register placement")
+    println("optimizing pipeline register placement")
     optimizeRegisterPlacement(coloredNodes)
-    println("inserting pipeline registers")*/
+    println("inserting pipeline registers")
     
     var counter = 0//hack to get unique register names with out anything nodes being named already
     nodeToStageMap = new HashMap[Node, Int]()
@@ -1438,7 +1439,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     val lastMovedNodes = new ArrayBuffer[(Node, ArrayBuffer[Int])]//keep track of nodes we just moved so that we can undo the move later
     
     var temp = 10000.0
-    val coolRate = 0.03
+    val coolRate = 0.002
     var iterCount = 0
     
     def acceptProbability(currentEnergy: Double, newEnergy: Double, temp: Double): Double = {
@@ -1491,6 +1492,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       return result
     }
     
+    var maxPath = new ListBuffer[Node]
     def findEnergy(coloredNodes: HashMap[Node, ArrayBuffer[Int]]): Double = {
       val roots = new ListBuffer[Node]()
       for(node <- regWritePoints){
@@ -1510,7 +1512,73 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           Predef.assert(!node.isInstanceOf[Reg], "register found in path")
           pathLength = pathLength + node.delay()
         }
+        if(pathLength > maxLength){
+          maxPath = path.clone()
+        }
         maxLength = Math.max(maxLength, pathLength)
+        
+      }
+      return maxLength
+    }
+    
+    def findUnpipelinedPaths(roots: ListBuffer[Node]): ListBuffer[ListBuffer[Node]] = {
+      val result = new ListBuffer[ListBuffer[Node]]
+      val unprocessedRoots = roots.clone()
+      
+      def traverse(currentNode: Node, path: ListBuffer[Node]): Unit = {
+        currentNode match {
+          case reg: Reg => {
+            if(path.size > 0){
+              result += path.clone()
+            }
+          }
+          case node: Node => {
+            if(!tMemReadPoints.contains(node) && !inputNodes.contains(node)){
+              for(input <- node.inputs){
+                val newPath = path.clone()
+                newPath += node
+                traverse(input, newPath)
+              }
+            } else{
+              if(path.size > 0){
+                result += path.clone()
+              }
+            }
+          }
+          case _ =>
+        }
+      }
+      
+      while(unprocessedRoots.size > 0){
+        for(input <- unprocessedRoots(0).inputs){
+          traverse(input, new ListBuffer[Node])
+        }
+        unprocessedRoots -= unprocessedRoots(0)
+      }
+      return result
+    }
+    
+    def findUnpipelinedPathLength(coloredNodes: HashMap[Node, ArrayBuffer[Int]]): Double = {
+      val roots = new ListBuffer[Node]()
+      for(node <- regWritePoints){
+        roots += node
+      }
+      for(node <- tMemWritePoints){
+        roots += node
+      }
+      for(node <- outputNodes){
+        roots += node
+      }
+      val paths = findUnpipelinedPaths(roots)
+      var maxLength = 0.0
+      for(path <- paths){
+        var pathLength = 0.0
+        for(node <- path){
+          Predef.assert(!node.isInstanceOf[Reg], "register found in path")
+          pathLength = pathLength + node.delay()
+        }
+        maxLength = Math.max(maxLength, pathLength)
+        
       }
       return maxLength
     }
@@ -1522,7 +1590,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         
         //find eligibleNodes
         for((node, stageNums) <- coloredNodes){
-          if(!regWritePoints.contains(node) && !regReadPoints.contains(node) && !tMemWritePoints.contains(node) && !tMemReadPoints.contains(node) && !inputNodes.contains(node) && !outputNodes.contains(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) < pipelineLength - 1) {
+          if(!annotatedStages.contains(node) && !regWritePoints.contains(node) && !regReadPoints.contains(node) && !tMemWritePoints.contains(node) && !tMemReadPoints.contains(node) && !inputNodes.contains(node) && !outputNodes.contains(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) < pipelineLength - 1) {
             val nodeStage = coloredNodes(node)(0)
             var consumersEligible = true
             Predef.assert(coloredNodes(node).length <= 1)
@@ -1589,7 +1657,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         //find eligible nodes
         for((node, stageNums) <- coloredNodes){
           
-          if(!regWritePoints.contains(node) && !regReadPoints.contains(node) && !tMemWritePoints.contains(node) && !tMemReadPoints.contains(node) && !inputNodes.contains(node) && !outputNodes.contains(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) > 0) {
+          if(!annotatedStages.contains(node) && !regWritePoints.contains(node) && !regReadPoints.contains(node) && !tMemWritePoints.contains(node) && !tMemReadPoints.contains(node) && !inputNodes.contains(node) && !outputNodes.contains(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) > 0) {
             val nodeStage = coloredNodes(node)(0)
             var producersEligible = true
             Predef.assert(coloredNodes(node).length <= 1)
@@ -1692,9 +1760,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       outputNodes += output._2
     }
     
+    println("max unpipelined path delay")
+    println(findUnpipelinedPathLength(coloredNodes))
     println("max path delay before optimization:")
     println(findEnergy(coloredNodes))
-    while(temp > 0.01 && iterCount < 1000){
+    while(temp > 0.001 && iterCount < 5000){
       val currentEnergy = findEnergy(coloredNodes)
       getNewPlacement()
       val newEnergy = findEnergy(coloredNodes)
@@ -1706,9 +1776,16 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       lastMovedNodes.clear()
       temp = temp - temp*coolRate
       iterCount = iterCount + 1
+      if(iterCount/1000 > 0 && iterCount%1000 == 0){
+        println(temp)
+        println(currentEnergy)
+        println(maxPath)
+      }
     }
     println("max path delay after optimization:")
     println(findEnergy(coloredNodes))
+    println(temp)
+    println(iterCount)
   }
   
   def insertPipelineRegisters() = {
@@ -1966,10 +2043,12 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
               var currentStageWriteEnable = Bool(true)
               var currentStageWriteAddr:Data = readAddr
               if(-(stage - writeStage)  < writeEnables.length){
-                currentStageWriteEnable = writeEnables(-(stage - writeStage) ).asInstanceOf[Bool]
+                currentStageWriteEnable = Bool()
+                currentStageWriteEnable.inputs += writeEnables(-(stage - writeStage) )
               }
               if(-(stage - writeStage)  < writeAddrs.length){
-                currentStageWriteAddr = writeAddrs(-(stage - writeStage) ).asInstanceOf[Data]
+                currentStageWriteAddr = Bits()
+                currentStageWriteAddr.inputs += writeAddrs(-(stage - writeStage) )
               }
               val stageValidTemp = Bool()
               stageValidTemp.inputs += stageValids(stage)//hack to deal with empty bool() being merged with what its &&ed with randomly
