@@ -561,5 +561,7 @@ abstract class Module(var clock: Clock = null, var reset: Bool = null) {
   def removeInputs(nodes: Seq[Bits]): Seq[Bits] =
     nodes.filter(n => !isInput(n.node))
 
+  override val hashCode: Int = Module.components.size
+  override def equals(that: Any) = this eq that.asInstanceOf[AnyRef]
 }
 
