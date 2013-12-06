@@ -24,11 +24,14 @@ trait SignalBackannotation extends Backend {
   preElaborateTransforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
   // preElaborateTransforms += ((c: Module) => c.traceNodes)
   preElaborateTransforms += ((c: Module) => nameAll(c))
-  preElaborateTransforms += ((c: Module) => nameNodes)
+  // preElaborateTransforms += ((c: Module) => nameNodes)
+  preElaborateTransforms += ((c: Module) => getNodeIndices(c))
   preElaborateTransforms += ((c: Module) => annotateCrosses(c))
   preElaborateTransforms += ((c: Module) => printCrosses(Module.crosses, c.name + "_crosses.rpt"))
 
   // For consistent naming
+  // TODO: we do not need this any more
+  /*
   private def nameNodes: Unit = {
     for(comp <- Module.sortedComps) {
       for(node <- comp.mods if node != null) {
@@ -39,6 +42,7 @@ trait SignalBackannotation extends Backend {
       }
     }
   }
+  */
 
   private def readCrosses(filename: String): ArrayBuffer[(Double, Array[String])] = {
     val lines: Iterator[String] = Source.fromFile(filename).getLines
@@ -76,7 +80,7 @@ trait SignalBackannotation extends Backend {
       } yield m
 
       val nodes = for {
-        m <- comps; n <- m.mods
+        m <- comps; n <- m.nodes
         if emitTmp(n) == nodeName  
       } yield n
 

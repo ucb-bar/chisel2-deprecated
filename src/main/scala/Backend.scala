@@ -209,6 +209,19 @@ abstract class Backend {
         node.nameHolder.name = "";
       }
     }
+    // by Donggyu
+    /*
+    root bfs { x =>
+      for(i <- 0 until x.inputs.length) {
+        if (x.inputs(i) != null) {
+          if (x.inputs(i).isTypeNode) 
+            emitRef(x.inputs(i).getNode)
+          else
+            emitRef(x.inputs(i))
+        }
+      }
+    }
+    */
   }
 
   def fullyQualifiedName( m: Node ): String = {
@@ -313,7 +326,8 @@ abstract class Backend {
       if (node.component == null) {
         println("NULL NODE COMPONENT " + node)
       }
-      if (!node.component.nodes.contains(node))
+      if (!node.component.nodes.contains(node) 
+          && !node.isTypeNode/* by Donggyu */)
         node.component.nodes += node
       for (input <- node.inputs) {
         if(!walked.contains(input)) {
@@ -528,6 +542,13 @@ abstract class Backend {
     ChiselError.info("start width checking")
     c.forceMatchingWidths;
     ChiselError.info("finished width checking")
+    // By Donggyu
+    ChiselError.info("resolving nodes to the components")
+    collectNodesIntoComp(initializeDFS)
+    ChiselError.info("finished resolving")
+    nameAll(c)
+    getNodeIndices(c)
+    /*************/
     ChiselError.info("started flattenning")
     val nbNodes = c.removeTypeNodes()
     ChiselError.info("finished flattening (" + nbNodes + ")")
@@ -544,9 +565,12 @@ abstract class Backend {
      Technically all user-defined transforms are responsible to update
      nodes and component correctly or call collectNodesIntoComp on return.
      */
+    // This is moved to in front of removeTypeNodes by Donggyu
+    /*
     ChiselError.info("resolving nodes to the components")
     collectNodesIntoComp(initializeDFS)
     ChiselError.info("finished resolving")
+    */
 
     // two transforms added in Mem.scala (referenced and computePorts)
     ChiselError.info("started transforms")
@@ -621,6 +645,15 @@ abstract class Backend {
     ChiselError.info(res)
   }
 
+  // by Donggyu
+  protected def getNodeIndices(m: Module) {
+    m bfs { node =>
+      if (node.isTypeNode) 
+        emitTmp(node.getNode)
+      else
+        emitTmp(node)
+    }
+  }
 }
 
 
