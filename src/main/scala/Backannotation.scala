@@ -52,7 +52,7 @@ trait SignalBackannotation extends Backend {
       case (res: ArrayBuffer[(Double, Array[String])], TermRegex(exp, coeff)) => {
         val vars = exp split ':'
         // ChiselError.info(coeff + ", " + (vars.head /: vars.tail) {_ + ", " + _})
-        res += ((coeff.toDouble, vars))
+        if (coeff.toDouble != 0.0) res += ((coeff.toDouble, vars))
         res
       }
       case (res: ArrayBuffer[(Double, Array[String])], _) => res
