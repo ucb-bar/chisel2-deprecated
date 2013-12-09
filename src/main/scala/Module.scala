@@ -287,7 +287,7 @@ object Module {
   val variableLatencyUnitOutputs = new HashSet[Node]// list of all variable latency unit output nodes
 
   val regRAWHazards = new HashMap[(Reg, Int, Int), Bool] //map of (register, updatelist num, write stage) -> RAW signal
-  val tMemRAWHazards = new HashMap[(FunRdIO[Data], Int, Int), Bool] //map of (tmem readport, writeport number, write stage) -> RAW signal
+  val tMemRAWHazards = new HashMap[(FunRdIO[Data], Int, Int), Bool] //map of (tmem readport, writeport number, write stage) -> RAW signal 
   
   def isSource(node: Node) =  {
     regReadPoints.contains(node) || tMemReadDatas.contains(node) || inputNodes.contains(node) || variableLatencyUnitOutputs.contains(node)
@@ -295,6 +295,13 @@ object Module {
 
   def isSink(node: Node) = {
     regWritePoints.contains(node) || tMemReadAddrs.contains(node) || tMemWritePoints.contains(node) || outputNodes.contains(node) || variableLatencyUnitInputs.contains(node)
+  }
+
+  def sourceNodes(): HashSet[Node] = {
+    regReadPoints | tMemReadDatas | inputNodes |  variableLatencyUnitOutputs
+  }
+  def sinkNodes(): HashSet[Node] = {
+    regWritePoints | tMemReadAddrs | tMemWritePoints | outputNodes | variableLatencyUnitInputs
   }
   def setPipelineLength(length: Int) = {
     pipelineLength = length
@@ -362,7 +369,8 @@ object Module {
   
   //we should not propagate stage numbers to literals, reset signals, and clock signals
   def requiresNoStageNum(node: Node) : Boolean = {
-    (node.litOf != null) || (node == pipelineComponent.clock) || (node == pipelineComponent._reset)
+    //(node.litOf != null) || (node == pipelineComponent.clock) || (node == pipelineComponent._reset)
+    findIfNodeNeedsStageNum(node)
   }
   
   def findIfNodeNeedsStageNum(node: Node): Boolean = {
@@ -372,7 +380,10 @@ object Module {
         if((node.litOf != null) || (node == pipelineComponent.clock) || (node == pipelineComponent._reset)){
 	  noStageNodes(node) = true
 	  return true
-	} else if(regReadPoints.contains(node) || tMemReadDatas.contains(node) || inputNodes.contains(node)) {
+	} else if(isSource(node)) {
+	  noStageNodes(node) = false
+	  return false
+	} else if(isSink(node)){
 	  noStageNodes(node) = false
 	  return false
 	} else {
@@ -1171,7 +1182,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     setPipelineLength(maxStage + 1)
 
     println("optimizing pipeline register placement")
-    optimizeRegisterPlacement(coloredNodes)
+    //optimizeRegisterPlacement(coloredNodes)
     println("inserting pipeline registers")
     
     var counter = 0//hack to get unique register names with out anything nodes being named already
@@ -1211,13 +1222,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     def insertFillerWires() = {//place extra wire nodes between all nodes
       val bfsQueue = new ScalaQueue[Node]
       val visited = new HashSet[Node]
-      for(node <- regReadPoints){
-        bfsQueue.enqueue(node)
-      }
-      for(node <- tMemReadDatas){
-        bfsQueue.enqueue(node)
-      }
-      for(node <- inputNodes){
+      for(node <- sourceNodes()){
         bfsQueue.enqueue(node)
       }
       while(!bfsQueue.isEmpty){
@@ -1398,10 +1403,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     //initialize bfs queue and coloredNodes with user annotated nodes
     for((node, stage) <- annotatedStages){
       Predef.assert(!(regReadPoints.contains(node) && regWritePoints.contains(node)), "same node marked as both read point and write point")
-      if(!regWritePoints.contains(node) && !tMemWritePoints.contains(node) && !outputNodes.contains(node) && !tMemReadAddrs.contains(node)){
+      if(!isSink(node)){
         retryNodes += ((node, true))
       }
-      if(!regReadPoints.contains(node) && !tMemReadDatas.contains(node) && !inputNodes.contains(node)){
+      if(!isSource(node)){
         retryNodes += ((node, false))
       }
       coloredNodes(node) = new ArrayBuffer[Int]()
@@ -1427,7 +1432,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             childrenPropagatedTo = propagateToProducers(currentNode)
           }
           for(child <- childrenPropagatedTo){
-            if((coloredNodes(child).length < 2) && !regReadPoints.contains(child) && !tMemReadDatas.contains(child) && !inputNodes.contains(child) && !regWritePoints.contains(child) && !tMemWritePoints.contains(child) && !outputNodes.contains(child) && !tMemReadAddrs.contains(child)){
+            if((coloredNodes(child).length < 2) && !isSource(child) && !isSink(child)){
               bfsQueue.enqueue(((child, currentDirection)))
             }
           }
@@ -1682,7 +1687,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         
         //find eligibleNodes
         for((node, stageNums) <- coloredNodes){
-          if(!annotatedStages.contains(node) && !regWritePoints.contains(node) && !regReadPoints.contains(node) && !tMemWritePoints.contains(node) && !tMemReadAddrs.contains(node) && !tMemReadDatas.contains(node) && !inputNodes.contains(node) && !outputNodes.contains(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) < pipelineLength - 1) {
+          if(!requiresNoStageNum(node) && !annotatedStages.contains(node) && !isSource(node) && !isSink(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) < pipelineLength - 1) {
             val nodeStage = coloredNodes(node)(0)
             var consumersEligible = true
             Predef.assert(coloredNodes(node).length <= 1, "" + node + " " + coloredNodes(node))
@@ -1749,7 +1754,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         //find eligible nodes
         for((node, stageNums) <- coloredNodes){
           
-          if(!annotatedStages.contains(node) && !regWritePoints.contains(node) && !regReadPoints.contains(node) && !tMemWritePoints.contains(node) && !tMemReadAddrs.contains(node) && !tMemReadDatas.contains(node) && !inputNodes.contains(node) && !outputNodes.contains(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) > 0) {
+          if(!requiresNoStageNum(node) && !annotatedStages.contains(node) && !isSource(node) && !isSink(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) > 0) {
             val nodeStage = coloredNodes(node)(0)
             var producersEligible = true
             Predef.assert(coloredNodes(node).length <= 1, "" + node + " " + coloredNodes(node))
@@ -2675,6 +2680,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }*/
   
   def verifyLegalStageColoring() = {
+    println("DEBUG1")
+    println(noStageNodes)
     this.bfs((n: Node) => {
       n match {
         case reg: Reg => {//check all architectural reg read and write ports are annotated; data and enable of each port is in same stage; all write ports are in same stage; write ports have stage >= read port stage
@@ -2696,7 +2703,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           }
         }
         case op: Op => {//check all combinational nodes have inputs coming from same stage
-          if(op.component == pipelineComponent && !op.isInstanceOf[Mux]){//hack because muxes generated for pipeline register reset values don't have stages
+          if(op.component == pipelineComponent && !op.isInstanceOf[Mux] && !(op.consumers(0).isInstanceOf[Reg] && op.consumers(0).inputs.contains(op))){//hack because muxes generated for pipeline register reset values don't have stages //also hack to deal with or node generated for register write enable in verilog backend
+	    println(op.consumers)
+	    println(op.consumers(0).inputs)
             val opStage = getStage(op)
             for(input <- op.inputs){
               val inputStage = getStage(input)
