@@ -172,7 +172,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends AggregateData[Int]
     }
   }
 
-  def <>(src: Iterable[T]) {
+  def <>[T <: Data](src: Iterable[T]) {
     for((b, e) <- self zip src)
       b <> e;
   }
@@ -202,6 +202,14 @@ class Vec[T <: Data](val gen: (Int) => T) extends AggregateData[Int]
         super.:=(src)
     }
   }
+
+  /** Resolve ambiguity of := method for Vec := Vec */
+  def :=[T <: Data](src: Vec[T]): Unit =
+    this := src.asInstanceOf[Iterable[T]]
+
+  /** Resolve ambiguity of <> method for Vec <> Vec */
+  def <>[T <: Data](src: Vec[T]): Unit =
+    this <> src.asInstanceOf[Iterable[T]]
 
   override def nameIt (path: String): this.type = {
     if( !named

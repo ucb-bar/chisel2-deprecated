@@ -111,9 +111,8 @@ abstract class Bits extends Data {
   /** Returns ``true`` when this Bits instance is bound to a ``Node``
     that generates a constant signal.
     */
-  def isConst: Boolean = {
-    node != null && node.isInstanceOf[Literal]
-  }
+  def isConst: Boolean = node != null && node.isInstanceOf[Literal]
+  def asConst: Literal = node.asInstanceOf[Literal]
 
   /** Returns the lvalue associated with the node */
   def lvalue(): Node = {
@@ -383,6 +382,11 @@ abstract class Bits extends Data {
   def ^ (right: Bits): this.type = Xor(this, right)
 
   def ##(right: Bits): UInt = Cat(this, right)
+
+  def bitSet(off: UInt, dat: Bool): this.type = {
+    val bit = UInt(1, 1) << off;
+    (this & ~bit) | (dat << off);
+  }
 }
 
 

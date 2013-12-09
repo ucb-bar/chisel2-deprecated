@@ -534,15 +534,15 @@ object Pipe
   */
 object PriorityMux
 {
-  def apply[T <: Bits](in: Seq[(Bool, T)])(implicit m: Manifest[T]): T = {
+  def apply[T <: Bits](in: Iterable[(Bool, T)]): T = {
     if (in.size == 1) {
       in.head._2
     } else {
       Mux(in.head._1, in.head._2, apply(in.tail))
     }
   }
-  def apply[T <: Bits](sel: Seq[Bool], in: Seq[T])(implicit m: Manifest[T]): T = apply(sel zip in)
-  def apply[T <: Bits](sel: Bits, in: Seq[T])(implicit m: Manifest[T]): T = apply((0 until in.size).map(sel(_)), in)
+  def apply[T <: Bits](sel: Iterable[Bool], in: Iterable[T]): T = apply(sel zip in)
+  def apply[T <: Bits](sel: Bits, in: Iterable[T]): T = apply((0 until in.size).map(sel(_)), in)
 }
 
 /** Returns the bit position of the trailing 1 in the input vector
@@ -550,7 +550,7 @@ object PriorityMux
   */
 object PriorityEncoder
 {
-  def apply(in: Seq[Bool]): UInt = PriorityMux(in, (0 until in.size).map(UInt(_)))
+  def apply(in: Iterable[Bool]): UInt = PriorityMux(in, (0 until in.size).map(UInt(_)))
   def apply(in: Bits): UInt = apply((0 until in.getWidth).map(in(_)))
 }
 

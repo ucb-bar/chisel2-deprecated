@@ -184,8 +184,8 @@ class Mem[T <: Data](gen: () => T, clock: Clock, reset: Bool, val depth: Int,
   }
 
 
-  def apply(addr: UInt)(implicit m: Manifest[T]): T = {
-    val result = m.runtimeClass.newInstance.asInstanceOf[T]
+  def apply(addr: UInt): T = {
+    val result = gen()
     result.fromBits(UInt(new MemReference(this.node, addr.node)))
     result
   }
