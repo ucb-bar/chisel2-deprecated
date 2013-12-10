@@ -354,7 +354,11 @@ abstract class Bits extends Data {
   final def apply(bit: UInt): Bool = Extract(this, bit)
 
   /** Extract a range of bits */
-  final def apply(hi: Int, lo: Int): UInt = Extract(this, UInt(hi), UInt(lo))
+  final def apply(hi: Int, lo: Int): UInt = {
+   if (hi < lo)
+      ChiselError.error("Extract(hi = " + hi + ", lo = " + lo + ") requires hi >= lo")
+    Extract(this, UInt(hi), UInt(lo))
+  }
   final def apply(hi: UInt, lo: UInt): UInt = Extract(this, hi, lo)
 
 /** can't define apply(range: (UInt, UInt)) because it gets same
