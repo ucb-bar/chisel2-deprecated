@@ -475,23 +475,21 @@ class VerilogBackend extends Backend {
     (if (node.prune && res != "") "//" else "") + res
   }
 
-  def emitSigned(n: Node): String = if(n.isSigned) " signed" else ""
-
   def emitDecBase(node: Node): String = {
-    "  wire" + emitSigned(node) + emitWidth(node) + " " + emitRef(node) + ";\n"
+    "  wire" + emitWidth(node) + " " + emitRef(node) + ";\n"
   }
 
   override def emitDec(node: Node): String = {
     val res =
     node match {
       case x: ListLookupRef =>
-        "  reg" + emitSigned(x) + emitWidth(x) + " " + emitRef(x) + ";\n";
+        "  reg" + emitWidth(x) + " " + emitRef(x) + ";\n";
 
       case x: Lookup =>
-        "  reg" + emitSigned(x) + emitWidth(x) + " " + emitRef(x) + ";\n";
+        "  reg" + emitWidth(x) + " " + emitRef(x) + ";\n";
 
       case x: Sprintf =>
-        "  reg" + emitSigned(x) + emitWidth(x) + " " + emitRef(x) + ";\n";
+        "  reg" + emitWidth(x) + " " + emitRef(x) + ";\n";
 
       case x: Literal =>
         ""
@@ -500,7 +498,7 @@ class VerilogBackend extends Backend {
         ""
 
       case x: RegDelay =>
-          "  reg" + emitSigned(x) + emitWidth(x) + " " + emitRef(x) + (
+          "  reg" + emitWidth(x) + " " + emitRef(x) + (
             if( x.depth > 1) " [" + (x.depth-1) + ":0]" else "") + ";\n"
 
       case m: MemDelay =>
@@ -719,10 +717,10 @@ class VerilogBackend extends Backend {
           val prune = if (io.prune && c != Module.topComponent) "//" else ""
           if (io.isDirected(INPUT)) {
             ports += new StringBuilder(nl + "    " + prune + "input" +
-              emitSigned(io) + emitWidth(io) + " " + emitRef(io));
+              emitWidth(io) + " " + emitRef(io));
           } else if(io.isDirected(OUTPUT)) {
             ports += new StringBuilder(nl + "    " + prune + "output" +
-              emitSigned(io) + emitWidth(io) + " " + emitRef(io));
+              emitWidth(io) + " " + emitRef(io));
           }
         }
       };

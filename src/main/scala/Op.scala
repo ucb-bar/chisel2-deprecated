@@ -126,6 +126,7 @@ class RightShiftOp(left: Node, right: Node) extends BinaryOp(left, right) {
 
 class RightShiftSOp(left: Node, right: Node)
     extends RightShiftOp(left, right) {
+  override def slug = ">>s"
 }
 
 

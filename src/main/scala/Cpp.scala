@@ -355,19 +355,13 @@ class CppBackend extends Backend {
               + emitWordRef(o.inputs(0), i) + " || " + emitWordRef(o, i)
             else ""))) + trunc(o))
 
-      case o: RightShiftOp => {
+      case o: RightShiftSOp => {
         (emitTmpDec(o) + (if (o.inputs(0).width <= bpw) {
-          if (o.isSigned) {
-            ("  " + emitLoWordRef(o) + " = (sval_t)("
-              + emitLoWordRef(o.inputs(0)) + " << "
-              + (bpw - o.inputs(0).width) + ") >> ("
-              + (bpw - o.inputs(0).width) + " + "
-              + emitLoWordRef(o.inputs(1)) + ");\n" + trunc(o))
-          } else {
-            ("  " + emitLoWordRef(o) + " = "
-              + emitLoWordRef(o.inputs(0)) + " >> "
-              + emitLoWordRef(o.inputs(1)) + ";\n")
-          }
+          ("  " + emitLoWordRef(o) + " = (sval_t)("
+            + emitLoWordRef(o.inputs(0)) + " << "
+            + (bpw - o.inputs(0).width) + ") >> ("
+            + (bpw - o.inputs(0).width) + " + "
+            + emitLoWordRef(o.inputs(1)) + ");\n" + trunc(o))
         } else {
           var shb = emitLoWordRef(o.inputs(1))
           val res = ArrayBuffer[String]()
@@ -376,22 +370,38 @@ class CppBackend extends Backend {
           res += "val_t __w = " + emitLoWordRef(o.inputs(1)) + " / " + bpw
           res += "val_t __s = " + emitLoWordRef(o.inputs(1)) + " % " + bpw
           res += "val_t __r = " + bpw + " - __s"
-          if (o.isSigned) {
-            res += "val_t __msb = (sval_t)" + emitWordRef(o.inputs(0), words(o)-1) + (if (o.width % bpw != 0) " << " + (bpw-o.width%bpw) else "") + " >> " + (bpw-1)
-          }
+          res += "val_t __msb = (sval_t)" + emitWordRef(o.inputs(0), words(o)-1) + (if (o.width % bpw != 0) " << " + (bpw-o.width%bpw) else "") + " >> " + (bpw-1)
           for (i <- words(o)-1 to 0 by -1) {
             res += "val_t __v" + i + " = MASK(__x[CLAMP(" + i + "+__w,0," + (words(o.inputs(0))-1) + ")],__w+" + i + "<" + words(o.inputs(0)) + ")"
             res += emitWordRef(o, i) + " = __v" + i + " >> __s | __c"
             res += "__c = MASK(__v" + i + " << __r, __s != 0)"
-            if (o.isSigned) {
-              res += emitWordRef(o, i) + " |= MASK(__msb << ((" + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ") % " + bpw + "), " + ((i + 1) * bpw) + " > " + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ")"
-              res += emitWordRef(o, i) + " |= MASK(__msb, " + (i*bpw) + " >= " + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ")"
-            }
+            res += emitWordRef(o, i) + " |= MASK(__msb << ((" + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ") % " + bpw + "), " + ((i + 1) * bpw) + " > " + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ")"
+            res += emitWordRef(o, i) + " |= MASK(__msb, " + (i*bpw) + " >= " + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ")"
           }
-          if (o.isSigned) {
-            res += emitLoWordRef(o) + " |= MASK(__msb << ((" + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ") % " + bpw + "), " + bpw + " > " + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ")"
+          res += emitLoWordRef(o) + " |= MASK(__msb << ((" + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ") % " + bpw + "), " + bpw + " > " + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ")"
+          block(res) + trunc(o)
+        }))
+      }
+
+      case o: RightShiftOp => {
+        (emitTmpDec(o) + (if (o.inputs(0).width <= bpw) {
+          ("  " + emitLoWordRef(o) + " = "
+            + emitLoWordRef(o.inputs(0)) + " >> "
+            + emitLoWordRef(o.inputs(1)) + ";\n")
+        } else {
+          var shb = emitLoWordRef(o.inputs(1))
+          val res = ArrayBuffer[String]()
+          res ++= toArray("__x", o.inputs(0))
+          res += "val_t __c = 0"
+          res += "val_t __w = " + emitLoWordRef(o.inputs(1)) + " / " + bpw
+          res += "val_t __s = " + emitLoWordRef(o.inputs(1)) + " % " + bpw
+          res += "val_t __r = " + bpw + " - __s"
+          for (i <- words(o)-1 to 0 by -1) {
+            res += "val_t __v" + i + " = MASK(__x[CLAMP(" + i + "+__w,0," + (words(o.inputs(0))-1) + ")],__w+" + i + "<" + words(o.inputs(0)) + ")"
+            res += emitWordRef(o, i) + " = __v" + i + " >> __s | __c"
+            res += "__c = MASK(__v" + i + " << __r, __s != 0)"
           }
-          block(res) + (if (o.isSigned) trunc(o) else "")
+          block(res)
         }))
       }
 

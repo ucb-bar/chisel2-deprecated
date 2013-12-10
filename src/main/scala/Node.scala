@@ -63,7 +63,6 @@ abstract class Node extends nameable {
   var prune = false
   var driveRand = false
   var isReset = false
-  var isSigned: Boolean = false //XXX used in Verilog code generator
   private var _isIo = false
 
   def assigned: Node = null
