@@ -190,6 +190,10 @@ abstract class Node extends nameable {
     (if( !name.isEmpty ) name else ("T" + hashCode.toString)
       + "[" + width + "]")
   }
+
+  // XXX These are only true for UInt
+  def maxNum: BigInt = (BigInt(1) << width) - 1
+  def minNum: BigInt = BigInt(0)
 }
 
 /** For backward compatibility. */

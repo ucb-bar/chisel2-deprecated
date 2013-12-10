@@ -223,9 +223,9 @@ class SumWidth(offset: Int = 0) extends Width {
 class lshWidthOf(index: Int, n: Node) extends Width {
 
   override def forward(node: Node): Boolean = {
-    val width = node.inputs(index).width + (1 << n.width)
+    val width = node.inputs(index).width + n.maxNum
     val update = (node.width != width)
-    if( update ) node.width = width
+    if( update ) node.width = width.toInt
     update
   }
 
@@ -237,9 +237,9 @@ class lshWidthOf(index: Int, n: Node) extends Width {
 class rshWidthOf(index: Int, n: Node) extends Width {
 
   override def forward(node: Node): Boolean = {
-    val width = node.inputs(index).width - (1 << n.width)
+    val width = node.inputs(index).width - n.minNum
     val update = (node.width != width)
-    if( update ) node.width = width
+    if( update ) node.width = width.toInt
     update
   }
 

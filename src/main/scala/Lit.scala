@@ -271,8 +271,8 @@ class Literal extends Node {
   var base = 'x';
   var inputVal = BigInt(0);
   def value: BigInt = stringToVal(base, name);
-  def maxNum: BigInt = value;
-  def minNum: BigInt = value;
+  override def maxNum: BigInt = value;
+  override def minNum: BigInt = value;
   override def clearlyEquals(x: Node) = x.isInstanceOf[Literal] && value == x.asInstanceOf[Literal].value
   override def toString: String = name;
 
