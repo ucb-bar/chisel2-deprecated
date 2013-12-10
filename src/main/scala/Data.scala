@@ -73,8 +73,10 @@ abstract class Data extends nameable {
   }
 
   def toBits(): UInt
+  def toUInt: UInt = toBits()
 
-  def fromBits( bits: Bits ): this.type
+  def fromBits(bits: Bits): this.type
+  def fromUInt(bits: UInt): this.type = fromBits(bits)
 
   def nodes(): Seq[Node]
 

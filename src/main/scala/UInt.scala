@@ -59,18 +59,20 @@ object UInt {
     res.node = node
     res
   }
+
+  implicit def intToUInt(x: Int): UInt = UInt(x)
+  implicit def bitsToUInt(x: Bits): UInt = x.toUInt
 }
 
 
 class UInt extends Bits /* XXX with Numeric[UInt] */ {
   type T = UInt;
 
-  def toBool(): Bool = {
-    Bool(this.node)
-  }
+  def toBool(): Bool = Bool(this.node)
+  def toSInt: SInt = SInt(this.node)
 
   // unary operators
-  def zext: UInt = UInt(0, 1) ## this
+  def zext: SInt = (UInt(0, 1) ## this).toSInt
   def unary_-(): SInt = SignRev(this.zext)
   def unary_!(): Bool = LogicalNeg(this)
 
@@ -88,17 +90,17 @@ class UInt extends Bits /* XXX with Numeric[UInt] */ {
   def / (right: UInt): UInt = Div(this, right)
 
   // order operators
-  def >  (right: UInt): Bool = Gtr(this, right)
   def <  (right: UInt): Bool = Ltn(this, right)
   def <= (right: UInt): Bool = Lte(this, right)
-  def >= (right: UInt): Bool = Gte(this, right)
+  def >  (right: UInt): Bool = right < this
+  def >= (right: UInt): Bool = right <= this
 
   //UInt op SInt arithmetic
-  def + (right: SInt): SInt = Add(SInt(this.zext.node), right)
-  def - (right: SInt): SInt = Sub(SInt(this.zext.node), right)
-  def * (right: SInt): SInt = MulSU(right, this.zext)
-  def % (right: SInt): SInt = RemUS(this.zext, right)
-  def / (right: SInt): SInt = DivUS(this.zext, right)
+  def + (right: SInt): SInt = this.zext + right
+  def - (right: SInt): SInt = this.zext - right
+  def * (right: SInt): SInt = right * this
+  def % (right: SInt): SInt = RemUS(this, right)
+  def / (right: SInt): SInt = DivUS(this, right)
 }
 
 object Div {
@@ -113,30 +115,6 @@ object DivUS {
     val result = m.runtimeClass.newInstance.asInstanceOf[T]
     result.node = op
     result
-  }
-}
-
-object Gte {
-  def apply[T <: Bits]( left: T, right: T): Bool = {
-    Bool(
-      if( left.isConst && right.isConst ) {
-        Literal(if (left.node.asInstanceOf[Literal].value
-          >= right.node.asInstanceOf[Literal].value) 1 else 0)
-      } else {
-        new GteOp(left.lvalue(), right.lvalue())
-      })
-  }
-}
-
-object Gtr {
-  def apply[T <: Bits]( left: T, right: T): Bool = {
-    Bool(
-      if( left.isConst && right.isConst ) {
-        Literal(if (left.node.asInstanceOf[Literal].value
-          > right.node.asInstanceOf[Literal].value) 1 else 0)
-      } else {
-        new GtrOp(left.lvalue(), right.lvalue())
-    })
   }
 }
 
@@ -189,7 +167,7 @@ object Rem {
 
 object RemUS {
   def apply[T <: SInt]( left: UInt, right: T)(implicit m: Manifest[T]): T = {
-    val op = new RemUSOp(left.lvalue(), right.lvalue())
+    val op = new RemUSOp(left.zext.lvalue(), right.lvalue())
     val result = m.runtimeClass.newInstance.asInstanceOf[T]
     result.node = op
     result

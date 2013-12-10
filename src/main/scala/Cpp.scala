@@ -425,28 +425,6 @@ class CppBackend extends Backend {
           + opFoldLeft(o, initial, subsequent) + ";\n")
       }
 
-      case o: GtrSOp => {
-        val left = o.inputs(0)
-        val right = o.inputs(1)
-        val (signLeft, absLeft) = signAbs(left)
-        val (signRight, absRight) = signAbs(right)
-        val ucond = new GtrOp(absLeft, absRight)
-        val result = new MuxOp(
-          new EqlOp(signLeft, signRight), ucond, signRight)
-        "XXX Generate code for gtrs"
-      }
-
-      case o: GteSOp => {
-        val left = o.inputs(0)
-        val right = o.inputs(1)
-        val (signLeft, absLeft) = signAbs(left)
-        val (signRight, absRight) = signAbs(right)
-        val ucond = new GtrOp(absLeft, absRight)
-        val result = new MuxOp(
-          new EqlOp(signLeft, signRight), ucond, signRight)
-        "XXX Generate code for gtes"
-      }
-
       case o: LteSOp => {
         val left = o.inputs(0)
         val right = o.inputs(1)
@@ -471,8 +449,6 @@ class CppBackend extends Backend {
           + emitWordRef(result, words(result)-1) + " >> " + shamt + ") & 1;\n")
       }
 
-      case o: GteOp => emitOrderOpDef(o)
-      case o: GtrOp => emitOrderOpDef(o)
       case o: LteOp => emitOrderOpDef(o)
       case o: LtnOp => emitOrderOpDef(o)
 

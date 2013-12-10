@@ -369,7 +369,7 @@ class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
   val count = UInt(OUTPUT, log2Up(entries + 1))
 }
 
-class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Bool = null)(implicit m: Manifest[T]) extends Module(reset=_reset)
+class Queue[T <: Data : Manifest](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Bool = null) extends Module(reset=_reset)
 {
   val io = new QueueIO(gen, entries)
 

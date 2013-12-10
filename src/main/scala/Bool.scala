@@ -44,6 +44,8 @@ object Bool {
     res.node = new IOBound(dir, 1)
     res
   }
+
+  implicit def booleanToBool(x: Boolean): Bool = Bool(x)
 }
 
 

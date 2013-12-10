@@ -369,7 +369,7 @@ abstract class Bits extends Data {
     }
   }
 
-  def unary_~(): UInt = BitwiseRev(this)
+  def unary_~(): this.type = BitwiseRev(this)
   def andR(): Bool = ReduceAnd(this)
   def orR(): Bool = ReduceOr(this)
   def xorR(): Bool = ReduceXor(this)
@@ -383,15 +383,17 @@ abstract class Bits extends Data {
 
 
 object BitwiseRev {
-  def apply(opand: Bits): UInt = {
-    UInt(
-      if( opand.isConst ) {
-        Literal((-opand.node.asInstanceOf[Literal].value - 1)
-          & ((BigInt(1) << opand.node.width) - 1),
-          opand.node.width)
-      } else {
-        new BitwiseRevOp(opand.lvalue())
-      })
+  def apply[T <: Bits](opand: T)(implicit m: Manifest[T]): T = {
+    val op = if( opand.isConst ) {
+      Literal((-opand.node.asInstanceOf[Literal].value - 1)
+        & ((BigInt(1) << opand.node.width) - 1),
+        opand.node.width)
+    } else {
+      new BitwiseRevOp(opand.lvalue())
+    }
+    val result = m.runtimeClass.newInstance.asInstanceOf[T]
+    result.node = op
+    result
   }
 }
 

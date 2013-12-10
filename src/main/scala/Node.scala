@@ -192,3 +192,7 @@ abstract class Node extends nameable {
       + "[" + width + "]")
   }
 }
+
+/** For backward compatibility. */
+object Node {
+}

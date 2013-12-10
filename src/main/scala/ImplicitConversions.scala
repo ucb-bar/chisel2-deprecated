@@ -31,12 +31,7 @@
 package Chisel
 
 object ImplicitConversions {
-
-  implicit def intToUInt(x: Int): UInt = UInt(x)
-  implicit def booleanToBool(x: Boolean): Bool = Bool(x)
-
   // These ones for the lazy programmer.
   implicit def intToBoolean(x: Int): Boolean = if (x != 0) true else false
   implicit def booleanToInt(x: Boolean): Int = if (x) 1 else 0
-
 }

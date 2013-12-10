@@ -135,8 +135,8 @@ class Vec[T <: Data](val gen: (Int) => T) extends AggregateData[Int]
 
   override def apply(index: Int): T = self(index)
 
-//  def apply(index: UInt): T = read(index)
-
+  /* XXX This currently allows assignment to the read port! */
+  def read(index: UInt): T = apply(index)
 
   def apply(addr: UInt): T = {
     if( !readPortCache.contains(addr) ) {
@@ -260,7 +260,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends AggregateData[Int]
 
   def forall(p: T => Bool): Bool = (this map p).fold(Bool(true))(_&&_)
   def exists(p: T => Bool): Bool = (this map p).fold(Bool(false))(_||_)
-  def contains(x: Bits): Bool = this.exists(_ === x)
+  def contains(x: T): Bool = this.exists(x === _)
   def count(p: T => Bool): UInt = PopCount(this map p)
 
   private def indexWhereHelper(p: T => Bool) = this map p zip (0 until size).map(i => UInt(i))

@@ -58,7 +58,7 @@ object MuxCase {
 
 
 object Mux {
-  def apply[T <: Data](t: Bool, c: T, a: T)(implicit m: reflect.ClassTag[T]): T = {
+  def apply[T <: Data](t: Bool, c: T, a: T): T = {
     val op =
       if( t.node.isInstanceOf[Literal] ) {
         if( t.node.asInstanceOf[Literal].value == 0 ) a.toBits.lvalue() else c.toBits.lvalue()

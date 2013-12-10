@@ -116,7 +116,7 @@ class Mem[T <: Data](gen: () => T, clock: Clock, reset: Bool, val depth: Int,
   val seqreads = ArrayBuffer[MemSeqRead]()
   val reads = ArrayBuffer[MemRead]()
   val readwrites = ArrayBuffer[MemReadWrite]()
-  val data = gen().toBits.node
+  val data = gen().toBits
 
   private val readPortCache = HashMap[UInt, T]()
 
@@ -192,9 +192,7 @@ class Mem[T <: Data](gen: () => T, clock: Clock, reset: Bool, val depth: Int,
 
   override def toString: String = "TMEM(" + ")"
 
-/* XXX Why we can't get clone to work?
-  override def clone: this.type = new Mem(gen, n, seqRead)
- */
+  override def clone: this.type = Mem(gen(), depth, seqRead).asInstanceOf[this.type]
 
   def computePorts = {
     reads --= reads.filterNot(_.used)

@@ -357,28 +357,6 @@ class NeqOp(left: Node, right: Node) extends LogicalOp(left, right) {
 }
 
 
-class GteOp(left: Node, right: Node) extends LogicalOp(left, right) {
-  override def slug = "gte"
-  override val opInfix = ">="
-}
-
-
-class GteSOp(left: Node, right: Node) extends GteOp(left, right) {
-  override def slug = "gtes"
-}
-
-
-class GtrOp(left: Node, right: Node) extends LogicalOp(left, right) {
-  override def slug = "gt"
-  override val opInfix = ">"
-}
-
-
-class GtrSOp(left: Node, right: Node) extends GtrOp(left, right) {
-  override def slug = "gts"
-}
-
-
 class LtnOp(left: Node, right: Node) extends LogicalOp(left, right) {
   override def slug = "lt"
   override val opInfix = "<"
