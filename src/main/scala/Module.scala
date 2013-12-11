@@ -2274,16 +2274,19 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
       
       //modify reg's write port
-      for(i <- 0 until reg.updates.length){
+      /*for(i <- 0 until reg.updates.length){
         val en = reg.updates(i)._1
         reg.updates(i) = ((en && kill, reg.updates(i)._2))
       }
       val doSpeculate = ~stageStalls(readStage) && ~globalStall && ~kill
       doSpeculate.nameIt("do_speculate_" + reg.name)
       reg.updates += ((doSpeculate, specWriteData))
-      reg.genned = false
-      
-      
+      reg.genned = false*/
+
+      val doSpeculate = ~stageStalls(readStage) && ~globalStall && ~kill
+      doSpeculate.nameIt("do_speculate_" + reg.name)
+      reg.inputs(0) = Multiplex(kill, reg.inputs(0), reg)
+      reg.inputs(0) = Multiplex(doSpeculate, specWriteData, reg.inputs(0))   
     }
     
     for(i <- 0 until pipelineLength){
@@ -2365,13 +2368,17 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     
     //wire stage valid and stall signals to architecural state write enables
     //regs
-    for(reg <- ArchitecturalRegs){
+    /*for(reg <- ArchitecturalRegs){
       val writeStage = reg.updates.map(_._2).map(getStage(_)).filter(_ > - 1)(0)
       for (i <- 0 until reg.updates.length){
         val writeEn = reg.updates(i)._1
         reg.updates(i) = ((writeEn && ~globalStall && stageValids(writeStage) && ~stageStalls(writeStage), reg.updates(i)._2))
       }
       reg.genned = false
+    }*/
+    for(reg <- ArchitecturalRegs){
+      val writeStage = reg.updates.map(_._2).map(getStage(_)).filter(_ > - 1)(0)
+      reg.inputs(0) = Multiplex( ~globalStall && stageValids(writeStage) && ~stageStalls(writeStage), reg.inputs(0), reg)
     }
     //transactionMems
     for(tmem <- TransactionMems){
