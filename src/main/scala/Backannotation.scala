@@ -30,7 +30,7 @@ trait Backannotation extends Backend {
   }
 
   protected def getSignalName(n: Node, delim: String = "/"): String = {
-    if (n == null) "null" else getParentNames(n.componentOf, delim) + emitTmp(n)
+    if (n == null) "null" else getParentNames(n.componentOf, delim) + emitRef(n)
   }
 }
 
@@ -76,20 +76,20 @@ trait SignalBackannotation extends Backannotation {
 
       val nodes = for {
         m <- comps; n <- m.nodes
-        if emitTmp(n) == nodeName  
+        if emitRef(n) == nodeName  
       } yield n
 
       // TODO: Are clocks included in the future?
       /*
       val clks = for {
         m <- comps
-        if m.clock != null && emitTmp(m.clock) == nodeName
+        if m.clock != null && emitRef(m.clock) == nodeName
       } yield m.clock
       */
 
       val resets = for {
         m <- comps
-        if emitTmp(m.reset) == nodeName
+        if emitRef(m.reset) == nodeName
       } yield m.reset
 
       if (!nodes.isEmpty) nodes.head
@@ -171,14 +171,6 @@ trait DelayBackannotation extends Backannotation {
       multimap(node) += list
     }
 
-    def printTimingPaths(paths: ArrayBuffer[List[Node]]) {
-      for (path <- paths) {
-        ChiselError.info(
-          (getSignalName(path.head) /: path.tail) ( _ + " -> " + getSignalName(_))
-        )
-      }
-    }
-
     val paths = new ArrayBuffer[List[Node]]() // Timing paths
     val tailpaths = new HashMap[Node, HashSet[List[Node]]]() // Multimap for tail paths
     val walked = new HashSet[Node]() // Set of walked nodes (DFS)
@@ -236,7 +228,13 @@ trait DelayBackannotation extends Backannotation {
       }
     }
 
-    // printTimingPaths(paths) // for debug
+    /*
+    for (path <- paths) {
+      ChiselError.info(
+        (getSignalName(path.head) /: path.tail) ( _ + " -> " + getSignalName(_))
+      )
+    }
+    */
     paths
   }
 
@@ -282,7 +280,6 @@ trait DelayBackannotation extends Backannotation {
     // tcl.append("compile -no_design_rule\n\n")
     // tcl.append("compile -only_design_rule\n\n")
     tcl.append("compile -only_hold_time\n\n")
-
    
     var first_report = true
 
@@ -301,14 +298,14 @@ trait DelayBackannotation extends Backannotation {
     val paths = getTimingPaths(initializeDFS)
  
     def genReports(from: String, to: String, via: List[Node]) {
-      def powerset (list: List[Node]): Set[Set[Node]] = {
+      def powerset (list: List[Node]): Array[Set[Node]] = {
         list match {
-          case Nil => Set(Set[Node]())
+          case Nil => Array(Set[Node]())
           case head::tail => (powerset(tail) map { Set(head) ++ _ }) ++ powerset(tail)
         }
       }
 
-      def reports (sets: Set[Set[Node]]) {
+      def reports (sets: Array[Set[Node]]) {
         def condcmds(via: Set[Node]) = {
           def cond(node: Node) = "[get_nets " + getSignalName(node) + " ] != \"\""
           def conds = (cond(via.head) /: via.tail) (_ + " && " + cond(_))
@@ -335,7 +332,7 @@ trait DelayBackannotation extends Backannotation {
         }
       }
   
-      val throughSets = powerset(via)
+      val throughSets = powerset(via).sortWith(_.size > _.size)
 
       /*
       for (throughs <- throughSets) {
@@ -361,8 +358,6 @@ trait DelayBackannotation extends Backannotation {
       val start = path.head
       val via = path.tail.init
       val end = path.last
-
-      // val thoughs = ("" /: via) (_ + " -through " + getSignalName(_))
       
       (start, end) match {
         case (_: Reg, _: Reg) => {
@@ -587,16 +582,6 @@ trait DelayBackannotation extends Backannotation {
     } finally {
       rptfile.close()
     }
-  }
-  */
-  /*
-  override def elaborate(c: Module) {
-    super.elaborate(c)
-  
-    generateTcl(c)
-    executeDC()
-    annotateDelay(c, c.name + "_timing.rpt")
-    calcCriticalPathDelay()
   }
   */
 }
