@@ -57,9 +57,6 @@ object Module {
   var saveWidthWarnings = false
   var saveConnectionWarnings = false
   var saveComponentTrace = false
-  var saveGraph = false       // by Donggyu
-  var annotateSignals = false // by Donggyu
-  var signalFilename = ""     // by Donggyu
   var dontFindCombLoop = false
   var isDebug = false;
   var isIoDebug = true;
@@ -107,6 +104,7 @@ object Module {
   var implicitClock: Clock = null
   var crossFilename: String = ""                                      // by Donggyu
   val crosses = new ArrayBuffer[(Double, Array[Node], Array[Node])]() // by Donggyu
+  var criticalPathDelay = 0.0                                         // by Donggyu
 
   /* Any call to a *Module* constructor without a proper wrapping
    into a Module.apply() call will be detected when trigger is false. */
@@ -134,9 +132,6 @@ object Module {
     saveWidthWarnings = false
     saveConnectionWarnings = false
     saveComponentTrace = false
-    saveGraph = false       // by Donggyu
-    annotateSignals = false // by Donggyu
-    signalFilename = ""     // by Donggyu
     dontFindCombLoop = false
     isGenHarness = false;
     isDebug = false;
@@ -458,8 +453,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   var verilog_parameters = "";
   val clocks = new ArrayBuffer[Clock]
   val resets = new HashMap[Bool, Bool]
-
-  val signals = new ArrayBuffer[Node]() // by Donggyu
 
   def hasReset = !(reset == null)
   def hasClock = !(clock == null)
@@ -1608,7 +1601,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         var pathLength = 0.0
         for(node <- path){
           Predef.assert(!node.isInstanceOf[Reg], "register found in path")
-          pathLength = pathLength + node.delay()
+          pathLength = pathLength + node.delay
         }
         if(pathLength > maxLength){
           maxPath = path.clone()
@@ -1676,7 +1669,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         var pathLength = 0.0
         for(node <- path){
           Predef.assert(!node.isInstanceOf[Reg], "register found in path")
-          pathLength = pathLength + node.delay()
+          pathLength = pathLength + node.delay
         }
         maxLength = Math.max(maxLength, pathLength)
         

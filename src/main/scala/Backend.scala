@@ -323,7 +323,8 @@ abstract class Backend {
       if (node.component == null) {
         println("NULL NODE COMPONENT " + node)
       }
-      if (!node.component.nodes.contains(node))
+      if (!node.component.nodes.contains(node) 
+          && !node.isTypeNode/* by Donggyu */)
         node.component.nodes += node
       for (input <- node.inputs) {
         if(!walked.contains(input)) {
@@ -538,6 +539,13 @@ abstract class Backend {
     ChiselError.info("start width checking")
     c.forceMatchingWidths
     ChiselError.info("finished width checking")
+    // By Donggyu
+    ChiselError.info("resolving nodes to the components")
+    collectNodesIntoComp(initializeDFS)
+    ChiselError.info("finished resolving")
+    nameAll(c)
+    getNodeIndices(c)
+    /*************/
     ChiselError.info("started flattenning")
     val nbNodes = c.removeTypeNodes()
     ChiselError.info("finished flattening (" + nbNodes + ")")
@@ -554,9 +562,12 @@ abstract class Backend {
      Technically all user-defined transforms are responsible to update
      nodes and component correctly or call collectNodesIntoComp on return.
      */
+    // This is moved to in front of removeTypeNodes by Donggyu
+    /*
     ChiselError.info("resolving nodes to the components")
     collectNodesIntoComp(initializeDFS)
     ChiselError.info("finished resolving")
+    */
 
     // two transforms added in Mem.scala (referenced and computePorts)
     ChiselError.info("started transforms")
@@ -636,17 +647,10 @@ abstract class Backend {
     if(Module.saveComponentTrace) {
       printStack
     }
-    
-    // by Donggyu
-    if(Module.saveGraph){
-      printGraph
-    }
   }
 
   def compile(c: Module, flags: String = null): Unit = { }
   
-  def back_annotate: Unit = { } // by Donggyu
-
   def checkPorts(topC: Module) {
 
     def prettyPrint(n: Node, c: Module) {
@@ -680,81 +684,12 @@ abstract class Backend {
   }
 
   // by Donggyu
-  /** Prints all graph nodes **/
-  protected def printGraph {
-    val walked = new HashSet[Node]
-   
-    def printNode (level: Int, top: Node) = {
-      ChiselError.info(genIndent(level)+top.toString)
-      /*
-      top match {
-          case bits : Chisel.Bool    => {
-            if(bits.dir == OUTPUT){ 
-              ChiselError.info(genIndent(level)+"OUTPUT("+bits.name+")") 
-            }  
-            if(bits.dir == INPUT){ 
-              ChiselError.info(genIndent(level)+"INPUT("+bits.name+")") 
-            }  
-          }
-          case bits : UInt    => {
-            if(bits.dir == OUTPUT){ 
-              ChiselError.info(genIndent(level)+"OUTPUT("+bits.name+")")
-            }  
-            if(bits.dir == INPUT){ 
-              ChiselError.info(genIndent(level)+"INPUT("+bits.name+")") 
-            }  
-          }
-          case bits : SInt    => {
-            if(bits.dir == OUTPUT){ 
-              ChiselError.info(genIndent(level)+"OUTPUT("+bits.name+")")
-            }  
-            if(bits.dir == INPUT){ 
-              ChiselError.info(genIndent(level)+"INPUT("+bits.name+")") 
-            }  
-          }
-          case bits : Bits    => {
-            if(bits.dir == OUTPUT){ 
-              ChiselError.info(genIndent(level)+"OUTPUT("+bits.name+")") 
-            }  
-            if(bits.dir == INPUT){ 
-              ChiselError.info(genIndent(level)+"INPUT("+bits.name+")") 
-            }  
-          }
-          // case reg  : Reg     => ChiselError.info(genIndent(level)+"Reg name: " + reg.name)
-          // case op   : Op      => ChiselError.info(genIndent(level)+"Op name: " + op.toString) 
-          // case lit  : Literal => ChiselError.info(genIndent(level)+"Lit value: " + lit.litValue())
-          // case node : Node    => ChiselError.info(genIndent(level)+"name: " + node.name)
-          case node : Node    => ChiselError.info(genIndent(level)+node)
-      }
-      */
-   }
-
-    def dfs (level: Int, top: Node): Unit = {
-      walked += top
-      printNode(level, top)
-      for (input <- top.inputs){
-        if(!(input == null)){
-          if(!walked.contains(input)){
-            dfs (level+1, input)
-          }
-          else if (!top.isInstanceOf[Op]){
-            printNode(level+1, input)
-          }
-        }
-      }
+  protected def getNodeIndices(m: Module) {
+    m bfs { node =>
+      if (node.isTypeNode) 
+        emitTmp(node.getNode)
+      else
+        emitTmp(node)
     }
-
-    for (c <- Module.components ){
-      ChiselError.info("Module name : " + c.name)
-      for ( debug <- c.debugs ){
-        ChiselError.info("debug name : " + debug.name)
-      }
-      for ((n, flat) <- c.io.flatten){
-        dfs(1, flat)
-      }
-    }    
   }
-
 }
-
-      

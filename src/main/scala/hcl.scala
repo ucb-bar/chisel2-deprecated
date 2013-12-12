@@ -203,7 +203,6 @@ object chiselMain {
       Module.backend.elaborate(c)
       if (Module.isCheckingPorts) Module.backend.checkPorts(c)
       if (Module.isCompiling && Module.isGenHarness) Module.backend.compile(c)
-      if (Module.annotateSignals) Module.backend.back_annotate
       if (Module.isTesting) Module.tester.tests()
       c
     } finally {

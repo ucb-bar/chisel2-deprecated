@@ -146,20 +146,13 @@ abstract class Node extends nameable {
   var pipelinedVersion: Node = null
   var unPipelinedVersion: Node = null
   var elaborated = false
-  def delay() : Float = {
-    return 1
-  }
   //end automatic pipelining stuff
   
   var CppVertex: CppVertex = null
   // Delay annotation and Critical path calc
   // by Donggyu
-  var indelay: Double = 0.0 
-  var outdelay: Double = 0.0
-  var earlyStart: Double = 0.0
-  var earlyFinish: Double = 0.0
-  var lateStart: Double = 0.0
-  var lateFinish: Double = 0.0 
+  var arrival = 0.0
+  var delay = 0.0
 
   Module.nodes += this
 
@@ -416,7 +409,7 @@ abstract class Node extends nameable {
         }
         i += 1;
       }
-      if (!isTypeNode) /* edited by Donggyu */ comp.mods += this;
+      comp.mods += this;
     }
   }
 

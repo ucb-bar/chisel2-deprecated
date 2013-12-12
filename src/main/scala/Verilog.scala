@@ -41,7 +41,6 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.LinkedHashMap
-import scala.io.Source // by Donggyu
 
 object VerilogBackend {
 
@@ -797,68 +796,6 @@ class VerilogBackend extends Backend {
     val cmd = "vcs +vc +v2k -timescale=10ns/10ps " + src + " -o " + dir + c.name
     run(cmd)
 
-  }
-
-  // by Donggyu
-  // Back-anotation function
-  override def back_annotate : Unit = {
-    def back_annotate_signals : Unit  = {
-      if (Module.annotateSignals) {
-        val it = Source.fromFile(Module.signalFilename).getLines
-        val ModuleExp = """\$scope module (\w+) \$end""".r
-        val SignalExp = """\$var [a-z]+\s+\d+ \S+\s+(\w+) \S*\s*\$end""".r
-      
-        // Read each line in the file
-        while(it.hasNext){
-          val line = it.next()
-          line match {
-            case ModuleExp(module_name) => {
-              val module = { Module.sortedComps find { c => c.name == module_name } }
-              module match {
-                case None => {}
-                case Some(c) => {
-                  var loop = true
-                  while(it.hasNext && loop){
-                    val signalLine = it.next()
-                    signalLine match {
-                      case SignalExp(signal_name) => {
-                        val signal = { c.mods find { m => m.name == signal_name } }
-                        signal match {
-                          case None => {}
-                          case Some(m) => { 
-			    c.signals += m 
-                          }
-                        }
-                      }
-                      case _ => { 
-                        loop = false 
-                      }
-                    }
-                  }
-                }
-              }     
-            }
-            case _ => {}
-          }
-        }
-      } else {
-      }
-    }
-
-    def print_signals : Unit = {
-      ChiselError.info("---------------------")
-      ChiselError.info("| Important Signals |")
-      ChiselError.info("---------------------")
-      for (c <- Module.sortedComps ) {
-        ChiselError.info("Module name : " + c.name)
-        for (signal <- c.signals) {
-          ChiselError.info("  Signal name : " + signal.name + " ==> " + signal.toString)
-        }
-      }
-    }
-
-    back_annotate_signals
-    print_signals
   }
 }
 
