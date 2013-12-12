@@ -283,5 +283,10 @@ class Op extends Node {
       }
     }
   }
-
+  
+  //automatic pipelining stuff
+  override def delay() : Float= {
+    return 5
+  }
+  //end automatic pipelining stuff
 }

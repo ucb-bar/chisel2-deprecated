@@ -118,23 +118,24 @@ abstract class Bits extends Data with proc {
     // width, hence change the computations. It might be possible to print
     // width_ but it seems to also have some underlying computations associated
     // to it.
-    var str = (
-      "/*" + (if (name != null && !name.isEmpty) name else "?")
-        + (if (component != null) (" in " + component) else "") + "*/ "
-        + getClass.getName + "("
-        + (if (dir == INPUT) "INPUT, "
-        else if (dir == OUTPUT) "OUTPUT, " else "")
-        + "width=" + width_
-        + ", connect to " + inputs.length + " inputs: (")
-    var sep = ""
-    for( i <- inputs ) {
-      str = (str + sep + (if (i.name != null) i.name else "?")
-        + "[" + i.getClass.getName + "]"
-        + " in " + (if (i.component != null) i.component.getClass.getName else "?"))
-      sep = ", "
-    }
-    str = str + "))"
-    str
+    //var str = (
+    //  "/*" + (if (name != null && !name.isEmpty) name else "?")
+    //    + (if (component != null) (" in " + component) else "") + "*/ "
+    //    + getClass.getName + "("
+    //    + (if (dir == INPUT) "INPUT, "
+    //    else if (dir == OUTPUT) "OUTPUT, " else "")
+    //    + "width=" + width_
+    //   + ", connect to " + inputs.length + " inputs: (")
+    //var sep = ""
+    //for( i <- inputs ) {
+    //  str = (str + sep + (if (i.name != null) i.name else "?")
+    //    + "[" + i.getClass.getName + "]"
+    //    + " in " + (if (i.component != null) i.component.getClass.getName else "?"))
+    //  sep = ", "
+    //}
+    //str = str + "))"
+    //str
+    { if (dir == INPUT) "INPUT(" else if (dir == OUTPUT) "OUTPUT("  else "(" } + name + ")"
   }
 
   override def flip(): this.type = {
@@ -291,7 +292,7 @@ abstract class Bits extends Data with proc {
       inputs(0) = inputs(0).matchWidth(width)
     }
   }
-
+  
   // Operators
   protected final def newUnaryOp(opName: String): this.type = {
     fromNode(UnaryOp(this, opName))

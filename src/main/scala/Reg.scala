@@ -167,8 +167,11 @@ class Reg extends Delay with proc {
   var enableIndex = 0;
   var isReset = false
   var isEnable = false;
+
   def isUpdate: Boolean = !(next == null);
   def update (x: Node) { inputs(0) = x };
+  override def isReg = true
+
   var assigned = false;
   var enable = Bool(true)
 
@@ -184,14 +187,16 @@ class Reg extends Delay with proc {
     updates += ((cond, src))
   }
   override def genMuxes(default: Node): Unit = {
+    if (genned) return
     if(!updates.isEmpty && Module.backend.isInstanceOf[VerilogBackend]) {
       // use clock enable to keep old value, rather than muxing in old value
       genMuxes(updates.head._2, updates.toList.tail)
       inputs += enable;
       enableIndex = inputs.length - 1;
-    } else {
+    } else { 
       super.genMuxes(default)
     }
+    genned = true
   }
   def nameOpt: String = if (name.length > 0) name else "REG"
   override def toString: String = {
@@ -210,5 +215,14 @@ class Reg extends Delay with proc {
     if (inputs(0).width != width) {
       inputs(0) = inputs(0).matchWidth(width)
     }
+  }
+  
+  override def getProducers(): Seq[Node] = {
+    val producers = new collection.mutable.ListBuffer[Node];
+    for((i,j) <- updates){
+      producers += i
+      producers += j
+    }
+    producers
   }
 }

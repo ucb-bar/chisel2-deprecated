@@ -30,6 +30,7 @@
 
 package Chisel
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.HashSet
 import scala.collection.mutable.Stack
 import scala.collection.mutable.{Queue=>ScalaQueue}
 import Literal._
@@ -167,6 +168,7 @@ object chiselMain {
         case "--checkPorts" => Module.isCheckingPorts = true
         case "--prune" => Module.isPruning = true
         case "--crossFile" => Module.crossFilename = args(i + 1) ; i += 1   // by Donggyu
+        case "--autoPipe" => Module.autoPipe = true
         case any => ChiselError.warning("'" + arg + "' is an unkown argument.");
       }
       i += 1;
@@ -201,6 +203,7 @@ object chiselMain {
       Module.backend.elaborate(c)
       if (Module.isCheckingPorts) Module.backend.checkPorts(c)
       if (Module.isCompiling && Module.isGenHarness) Module.backend.compile(c)
+      if (Module.annotateSignals) Module.backend.back_annotate
       if (Module.isTesting) Module.tester.tests()
       c
     } finally {
@@ -227,6 +230,7 @@ object chiselMainTest {
 
 trait proc extends Node {
   var updates = new collection.mutable.ListBuffer[(Bool, Node)];
+  var genned = false
   var updated = false
   def genCond(): Bool = conds.top;
   def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
@@ -234,6 +238,7 @@ trait proc extends Node {
     if (inputs.isEmpty) inputs += update else inputs(0) = update
   }
   def genMuxes(default: Node): Unit = {
+    if (genned) return
     if (updates.length == 0) {
       if (inputs.length == 0 || inputs(0) == null) {
         ChiselError.error({"NO UPDATES ON " + this}, this.line)
@@ -256,9 +261,16 @@ trait proc extends Node {
       else if (lastCond.canBeUsedAsDefault)
         genMuxes(lastValue, updates)
     }
+    genned = true
   }
   def procAssign(src: Node): Unit
   Module.procs += this;
+
+  abstract override def replaceProducer(delete: Node, add: Node) = {
+    super.replaceProducer(delete, add)
+    
+    updates.clear()
+  }
 }
 
 trait nameable {

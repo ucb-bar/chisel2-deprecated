@@ -527,6 +527,7 @@ class CppBackend extends Backend {
       if (Module.isVCD) { harness.write("    c->dump(f, t);\n"); }
       harness.write("    c->clock_hi(reset);\n");
     }
+    harness.write("    c->clock_hi(reset);\n");
     harness.write("  }\n");
     harness.write("}\n");
     harness.close();

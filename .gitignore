@@ -3,6 +3,7 @@ target/
 .history
 .ensime
 .ensime_lucene/
+<<<<<<< HEAD
 *.nav
 *.out
 *.snm
@@ -10,3 +11,6 @@ target/
 *.toc
 *.bak
 *.new
+=======
+*~
+>>>>>>> b69f8c610964dd19e14d60e7834320c36b17ef86

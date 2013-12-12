@@ -33,6 +33,7 @@ package Chisel
 import scala.collection.immutable.Vector
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
+import scala.collection.mutable.HashSet
 import java.io.PrintStream
 
 import Node._;
@@ -141,6 +142,15 @@ abstract class Node extends nameable {
   var prune = false
   var driveRand = false
   var clock: Clock = null
+  //automatic pipelining stuff
+  var pipelinedVersion: Node = null
+  var unPipelinedVersion: Node = null
+  var elaborated = false
+  def delay() : Float = {
+    return 1
+  }
+  //end automatic pipelining stuff
+  
   var CppVertex: CppVertex = null
   // Delay annotation and Critical path calc
   // by Donggyu
@@ -208,6 +218,7 @@ abstract class Node extends nameable {
   def isIo = _isIo
   def isIo_=(isIo: Boolean) = _isIo = isIo
   def isReg: Boolean = false;
+  def isMem: Boolean = false;
   def isUsedByRam: Boolean = {
     for (c <- consumers)
       if (c.isRamWriteInput(this)) {
@@ -510,5 +521,28 @@ abstract class Node extends nameable {
     }
     index
   }
-
+  
+  def getProducers(): Seq[Node] = {
+    inputs
+  }
+  
+  def replaceProducer(delete: Node, add: Node): Unit = {
+    for(i <- 0 until inputs.length){
+      if(inputs(i) == delete){
+        inputs(i) = add
+      }
+    }
+    var i = 0
+    val deleteOriginalConsumers = delete.consumers.clone()
+    delete.consumers.clear()
+    for(consumer <- deleteOriginalConsumers){
+      if(consumer != this){
+        delete.consumers += consumer
+      }
+    }
+    if(!delete.consumers.contains(add)){
+      delete.consumers += add
+    }  
+    add.consumers += this
+  }
 }
