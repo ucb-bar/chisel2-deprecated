@@ -209,19 +209,6 @@ abstract class Backend {
         node.nameHolder.name = "";
       }
     }
-    // by Donggyu
-    /*
-    root bfs { x =>
-      for(i <- 0 until x.inputs.length) {
-        if (x.inputs(i) != null) {
-          if (x.inputs(i).isTypeNode) 
-            emitRef(x.inputs(i).getNode)
-          else
-            emitRef(x.inputs(i))
-        }
-      }
-    }
-    */
   }
 
   def fullyQualifiedName( m: Node ): String = {

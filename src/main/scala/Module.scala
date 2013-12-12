@@ -102,6 +102,7 @@ object Module {
   var implicitClock: Clock = null
   var crossFilename: String = ""                                      // by Donggyu
   val crosses = new ArrayBuffer[(Double, Array[Node], Array[Node])]() // by Donggyu
+  var criticalPathDelay = 0.0                                         // by Donggyu
 
   /* Any call to a *Module* constructor without a proper wrapping
    into a Module.apply() call will be detected when trigger is false. */

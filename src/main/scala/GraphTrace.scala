@@ -7,6 +7,7 @@ import Backend._
 import ChiselError._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashSet
+import scala.collection.mutable.Stack
 
 object nodeToString {
   def apply(node: Node) = nodeString(node)
@@ -30,10 +31,8 @@ object nodeToString {
         if (op.inputs.length == 1) op.op + "(" + nodeString(op.inputs(0)) + ")"
         else if (op.op == "Mux") "[ " + nodeString(op.inputs(0)) + " ] ? [ " + nodeString(op.inputs(1)) + " ] : [ " + nodeString(op.inputs(2)) + " ]"
         else "[ " + nodeString(op.inputs(0)) + " ] " + op.op + " [ " + nodeString(op.inputs(1)) + " ]"
-      /*
       case cat   : Chisel.Cat       => 
-        { for ( input <- cat.inputs ) yield input.toString }
-      */
+        { "{ " + ((nodeString(cat.inputs.head) /: cat.inputs.tail) (_ + ", " + nodeString(_))) + " }" }
       case ext   : Chisel.Extract   => 
         val hi: String = nodeString(ext.hi)
         val lo: String = nodeString(ext.lo) 
@@ -59,26 +58,48 @@ trait GraphTrace extends Backend {
 
     def printNode(top: Node, level: Int) = {
       report.append(genIndent(level) + nodeToString(top) + 
-                    "\t(delay: %.4f, early start: %.4f)\n".format(top.indelay, top.earlyStart))
+                    "\t(arrival: %.4f, delay: %.4f)\n".format(top.arrival, top.delay))
     }
    
-    def dfs (top: Node, c: Module, level: Int): Unit = {
-      walked += top
-      printNode(top, level)
-      for (input <- top.inputs) { 
-        if (input.componentOf.name == c.name) {
-          if(!walked.contains(input)){
-            dfs (input, c, level+1)
-          }
-          else top match {
-            case _: Op      =>
-            case _: Binding => 
-            case _          => printNode(input, level+1)
-          }
-        }    
+    def dfs(c: Module) = {
+      // initialization
+      val stack = new Stack[(Node, Int)]
+      val walked = new HashSet[Node]()
+      
+      for (a <- c.debugs) {
+        stack push ((a, 0))
+        walked += a
       }
+      for ((n, flat) <- c.io.flatten) {
+        stack push ((flat, 0))
+        walked += flat
+      }
+
+      // do DFS
+      while(!stack.isEmpty) {
+        val (node, level) = stack.pop
+
+        node match {
+          case bits: Bits if bits.dir == INPUT =>
+          case _: Literal =>
+          case _ => {
+            printNode(node, level)
+            for (input <- node.inputs) {
+              if (walked contains input) {
+                input match {
+                  case _: Literal =>
+                  case _ => printNode(input, level+1)
+                }
+              } else {
+                walked += input
+                stack push ((input, level + 1))
+              }
+            }
+          }
+        } 
+      }    
     }
-  
+
     report.append("\t\t+---------------------------+\n")
     report.append("\t\t|       Graph Traces        |\n")
     report.append("\t\t|             by Donggyu    |\n")
@@ -86,13 +107,10 @@ trait GraphTrace extends Backend {
 
     for (c <- Module.components) {
       report.append("Module name : " + c.name + "\n")
-      for (debug <- c.debugs) {
-        report.append("  debug name : " + debug.name + "\n")
-      }
-      for ((n, flat) <- c.io.flatten){
-        dfs(flat, c, 1)
-      }
+      dfs(c)
     }
+
+    report.append("\nCritical path delay = %.5f\n".format(Module.criticalPathDelay))
 
     // ChiselError.info(report) 
     // write files into report
