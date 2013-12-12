@@ -31,7 +31,6 @@
 package Chisel
 import Node._
 import Reg._
-// import Lit._ // by Donggyu
 import ChiselError._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.{Queue=>ScalaQueue}

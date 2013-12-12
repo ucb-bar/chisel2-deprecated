@@ -177,6 +177,7 @@ object Module {
     implicitClock.setName("clk")
     crossFilename = ""  // by Donggyu
     crosses.clear()     // by Donggyu
+    criticalPathDelay = 0.0 // by Donggyu
 
     /* Re-initialize global variables defined in object Node {} */
     nodes.clear()

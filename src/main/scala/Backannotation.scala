@@ -114,6 +114,8 @@ trait SignalBackannotation extends Backannotation {
       }
     }
   }
+t
+t
 
   private def printCrosses(crosses: ArrayBuffer[(Double, Array[Node], Array[Node])], filename: String = "crosses.rpt"): Unit = {
     val basedir = ensureDir(Module.targetDir)
@@ -335,8 +337,7 @@ trait DelayBackannotation extends Backannotation {
         }
       }
   
-      val throughSets = powerset(via)
-
+      val throughSets = powerset(via).sortWith(_.size >= _.size)
       /*
       for (throughs <- throughSets) {
         if (throughs.isEmpty) {
