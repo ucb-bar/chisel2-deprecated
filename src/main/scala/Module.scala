@@ -1181,7 +1181,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     setPipelineLength(maxStage + 1)
 
     println("optimizing pipeline register placement")
-    //optimizeRegisterPlacement(coloredNodes)
+    optimizeRegisterPlacement(coloredNodes)
     println("inserting pipeline registers")
     
     var counter = 0//hack to get unique register names with out anything nodes being named already
@@ -2695,8 +2695,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }*/
   
   def verifyLegalStageColoring() = {
-    println("DEBUG1")
-    println(noStageNodes)
     this.bfs((n: Node) => {
       n match {
         case reg: Reg => {//check all architectural reg read and write ports are annotated; data and enable of each port is in same stage; all write ports are in same stage; write ports have stage >= read port stage
@@ -2719,8 +2717,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         }
         case op: Op => {//check all combinational nodes have inputs coming from same stage
           if(op.component == pipelineComponent && !op.isInstanceOf[Mux] && !(op.consumers(0).isInstanceOf[Reg] && op.consumers(0).inputs.contains(op))){//hack because muxes generated for pipeline register reset values don't have stages //also hack to deal with or node generated for register write enable in verilog backend
-	    println(op.consumers)
-	    println(op.consumers(0).inputs)
             val opStage = getStage(op)
             for(input <- op.inputs){
               val inputStage = getStage(input)
