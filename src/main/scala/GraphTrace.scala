@@ -10,7 +10,17 @@ import scala.collection.mutable.HashSet
 import scala.collection.mutable.Stack
 
 trait GraphTrace extends Backend {
-  preElaborateTransforms += ((c: Module) => printGraph(c.name + "_graph.rpt"))
+  // preElaborateTransforms += ((c: Module) => printGraph(c.name + "_graph.rpt"))
+  // analyses += ((c: Module) => printGraph(c.name + "_graph.rpt"))
+
+  protected def getParentNames(m: Module, delim: String = "/"): String = {
+    if (m == Module.topComponent) ""
+    else getParentNames(m.parent) + emitRef(m) + delim
+  }
+
+  protected def getSignalName(n: Node, delim: String = "/"): String = {
+    if (n == null) "null" else getParentNames(n.componentOf, delim) + emitRef(n)
+  }
 
   def nodeToString(node: Node): String = { 
     node match {
@@ -46,7 +56,7 @@ trait GraphTrace extends Backend {
     }      
   }
 
-  def printGraph(filename: String = "graph.rpt") = {
+  def printGraph(c: Module, filename: String = "graph.rpt") = {
     val walked = new HashSet[Node]
     val basedir = ensureDir(Module.targetDir)
     val rptdir  = ensureDir(basedir+"report")
@@ -64,11 +74,11 @@ trait GraphTrace extends Backend {
       val walked = new HashSet[Node]()
       
       for (a <- c.debugs) {
-        stack push ((a, 0))
+        stack push ((a, 1))
         walked += a
       }
       for ((n, flat) <- c.io.flatten) {
-        stack push ((flat, 0))
+        stack push ((flat, 1))
         walked += flat
       }
 
@@ -76,7 +86,7 @@ trait GraphTrace extends Backend {
       while(!stack.isEmpty) {
         val (node, level) = stack.pop
           node match {
-            case bits: Bits if bits.dir == INPUT || (bits.dir == OUTPUT && bits.componentOf != c) =>
+            // case bits: Bits if bits.dir == INPUT /* || (bits.dir == OUTPUT && bits.componentOf != c) */ =>
             case _: Literal =>
             case _ => {
               printNode(node, level)
@@ -101,10 +111,8 @@ trait GraphTrace extends Backend {
     report.append("\t\t|             by Donggyu    |\n")
     report.append("\t\t+---------------------------+\n\n")
 
-    for (c <- Module.components) {
-      report.append("Module name : " + c.name + "\n")
-      dfs(c)
-    }
+    report.append("Module name : " + c.name + "\n")
+    dfs(c)
 
     report.append("\nCritical path = " + Module.criticalPath)
     report.append("\nCritical path delay = %.5f\n".format(Module.criticalPathDelay))

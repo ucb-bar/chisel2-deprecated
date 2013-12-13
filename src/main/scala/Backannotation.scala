@@ -3,7 +3,7 @@ package Chisel
 import Chisel._
 import Module._
 import Node._
-import Backend._
+// import GraphTrace._
 import ChiselError._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashSet
@@ -12,7 +12,7 @@ import scala.collection.mutable.Stack
 import scala.io.Source
 import scala.sys.process._
 
-trait Backannotation extends Backend {
+trait Backannotation extends GraphTrace {
   preElaborateTransforms += ((c: Module) => levelChildren(c))
   preElaborateTransforms += ((c: Module) => 
     Module.sortedComps = gatherChildren(c).sortWith(
@@ -24,6 +24,7 @@ trait Backannotation extends Backend {
   preElaborateTransforms += ((c: Module) => nameAll(c))
   preElaborateTransforms += ((c: Module) => getNodeIndices(c))
 
+  /*
   protected def getParentNames(m: Module, delim: String = "/"): String = {
     if (m == Module.topComponent) ""
     else getParentNames(m.parent) + emitRef(m) + delim
@@ -32,6 +33,7 @@ trait Backannotation extends Backend {
   protected def getSignalName(n: Node, delim: String = "/"): String = {
     if (n == null) "null" else getParentNames(n.componentOf, delim) + emitRef(n)
   }
+  */
 }
 
 trait SignalBackannotation extends Backannotation {
@@ -164,6 +166,7 @@ trait DelayBackannotation extends Backannotation {
   preElaborateTransforms += ((c: Module) => executeDC())
   preElaborateTransforms += ((c: Module) => annotateDelay(c, c.name + "_timing.rpt"))
   preElaborateTransforms += ((c: Module) => calcCriticalPathDelay(c))
+  preElaborateTransforms += ((c: Module) => printGraph(c, c.name + "_graph.rpt"))
 
   private def getTimingPaths(stack: Stack[Node]): ArrayBuffer[List[Node]] = {
     def insertToMultimap(multimap: HashMap[Node, HashSet[List[Node]]], node: Node, list: List[Node]) {
@@ -183,7 +186,7 @@ trait DelayBackannotation extends Backannotation {
       node match {
         // OUTPUT PORT: the end point of a timing path
         // => initialize timing paths
-        case bits: Bits if bits.dir == OUTPUT => {
+        case bits: Bits if bits.dir == OUTPUT && node.componentOf == Module.topComponent => {
           insertToMultimap(tailpaths, node, Nil)
         }
         // REGISTER: the end point of a timing path
@@ -203,7 +206,7 @@ trait DelayBackannotation extends Backannotation {
         input match {
           // INPUT PORT: the start point of a timing path
           // => return timing paths 
-          case bits: Bits if bits.dir == INPUT =>
+          case bits: Bits if bits.dir == INPUT && input.componentOf == Module.topComponent =>
             for (tail <- tails) {
               paths += (input::node::tail)
             }
@@ -305,10 +308,23 @@ trait DelayBackannotation extends Backannotation {
     val cmdtail = " }\n"
 
     tcl.append("report_timing > %s_critical.rpt\n".format(m.name))
-
+  
     val paths = getTimingPaths(m.initializeDFS)
  
-    def genReports(from: String, to: String, via: List[Node]) {
+    def genReports(from: String, to: String, via: List[Node], end: Node) {
+      // When a node has only one input,
+      // prune its input.
+      // Otherwise, you will se a giant powerset.
+      def truncation (list: List[Node]):List[Node] = {
+        list match {
+          case Nil => Nil
+          case _::Nil => Nil
+          case input::consumer::tail =>
+            if (consumer.inputs.length > 1) input::(truncation(consumer::tail))
+            else truncation(consumer::tail)
+        }
+      }
+
       def powerset (list: List[Node]): Array[Set[Node]] = {
         list match {
           case Nil => Array(Set[Node]())
@@ -335,15 +351,17 @@ trait DelayBackannotation extends Backannotation {
           val head = sets.head
           val mid = sets.tail.init
           val last = sets.last
-          tcl.append(
-            "if " + condcmds(head) +
-            (("" /: mid) (_ + " elseif " + condcmds(_))) +
-            " else " + condcmds(last)
-          )
+          tcl.append("if " + condcmds(head))
+          for (via <- mid) {
+            tcl.append(" elseif " + condcmds(via))
+          }
+          tcl.append(" else " + condcmds(last))
         }
       }
   
-      val throughSets = powerset(via).sortWith(_.size > _.size)
+      ChiselError.info("hello!")
+      val throughSets = powerset(truncation(via:::List(end))).sortWith(_.size > _.size)
+      ChiselError.info("powerset size: " + throughSets.size.toString)
 
       /*
       for (throughs <- throughSets) {
@@ -359,12 +377,13 @@ trait DelayBackannotation extends Backannotation {
       */
 
       reports(throughSets)      
+      ChiselError.info("hello!!!")
     }
- 
+
     for (path <- paths) {
       val pathToString = (getSignalName(path.head) /: path.tail) ( _ + " -> " + getSignalName(_))
       tcl.append(cmdhead + "echo \"\\n" + pathToString + "\"" + cmdtail)
-      // ChiselError.info(pathToString)
+      ChiselError.info(pathToString)
 
       val start = path.head
       val via = path.tail.init
@@ -374,22 +393,22 @@ trait DelayBackannotation extends Backannotation {
         case (_: Delay, _: Delay) => {
           val from = " -from [get_pins " + getSignalName(start) + "_reg*/CLK]"
           val to = " -to [get_pins " + getSignalName(end) + "_reg*/D]"
-          genReports(from, to, via)
+          genReports(from, to, via, end)
         }
         case (_: Delay, bits: Bits) if bits.dir == OUTPUT => {
           val from = " -from [get_pins " + getSignalName(start) + "_reg*/CLK]"
           val to = " -to " + getSignalName(end)
-          genReports(from, to, via)
+          genReports(from, to, via, end)
         }
         case (bits: Bits, _: Delay) if bits.dir == INPUT => {
           val from = " -from " + getSignalName(start)
           val to = " -to [get_pins " + getSignalName(end) + "_reg*/D]"
-          genReports(from, to, via)
+          genReports(from, to, via, end)
         }
         case (input: Bits, output: Bits) if input.dir == INPUT && output.dir == OUTPUT => {
           val from = " -from " + getSignalName(start)
           val to = " -to " + getSignalName(end)
-          genReports(from, to, via)
+          genReports(from, to, via, end)
         }
         case (_, _) =>
       }
@@ -430,8 +449,8 @@ trait DelayBackannotation extends Backannotation {
     val NetRegex = """\s*([\w/_]+)(?:\[\d+\])* \(net\)\s+(\d+\.\d+)\s+(\d+\.\d+).*""".r
     val PortinRegex = """\s*([\w/_]+)(?:\[\d+\])* \(in\)\s+(\d+\.\d+)\s+(\d+\.\d+).*""".r
     val PortoutRegex = """\s*([\w/_]+)(?:\[\d+\])* \(out\)\s+(\d+\.\d+)\s+(\d+\.\d+).*""".r
-    val StartpointRegex = """\s*Startpoint: ([\w/_]+)(?:_reg)?(?:\[\d+\])*.*""".r
-    val EndpointRegex = """\s*Endpoint: ([\w/_]+)(?:_reg)?(?:\[\d+\])*.*""".r
+    val StartpointRegex = """\s*Startpoint: ([\w/_]+)(?:\[\d+\])*.*""".r
+    val EndpointRegex = """\s*Endpoint: ([\w/_]+)(?:\[\d+\])*.*""".r
     val arrivalmap = new HashMap[String, Double]
     val delaymap = new HashMap[String, Double]
     var points: Array[String] = null
@@ -443,8 +462,10 @@ trait DelayBackannotation extends Backannotation {
     // so guess the arrival time and delay for them
     def inferDelay(node: String, finishTime: Double) {
       var newIndex = pointIndex
+      /*
       if (newIndex >= points.length)
         return
+      */
 
       while (newIndex < points.length && points(newIndex) != node) {
         newIndex += 1
@@ -475,31 +496,37 @@ trait DelayBackannotation extends Backannotation {
     for (line <- lines) {
       line match {
         case PathRegex(path) => {
-          ChiselError.info("\npath: %s".format(path))
+          // ChiselError.info("\npath: %s".format(path))
           points = path.split(" -> ")
           pointIndex = 0
         }
         case StartpointRegex(start) => {
-          ChiselError.info("start: " + start)
-          if (points.head != start){ 
-            points = Array(start) ++ points
+          var startPoint = start
+          if ((start drop (start.length - 4)) == "_reg")
+            startPoint = start take (start.length - 4)
+          // ChiselError.info("start: " + startPoint)
+          if (points.head != startPoint){ 
+            points = Array(startPoint) ++ points
           }
         }
         case EndpointRegex(end) => {
-          ChiselError.info("end: " + end)
-          if (points.last != end) 
-            points = points ++ Array(end)
+          var endPoint = end
+          if ((end drop (end.length - 4)) == "_reg")
+            endPoint = end take (end.length - 4)
+          // ChiselError.info("end: " + endPoint)
+          if (points.last != endPoint) 
+            points = points ++ Array(endPoint)
         }
         case PortinRegex(in, incr, path) => {
-          ChiselError.info("in: %s %s %s".format(in, incr, path))
-          // assert(in == points.head)
+          // ChiselError.info("in: %s %s %s".format(in, incr, path))
+          assert(in == points.head)
           val arrival = arrivalmap getOrElse (in, 0.0)
           if (arrival < path.toDouble) 
             arrivalmap(in) = path.toDouble
         }
         case PortoutRegex(out, incr, path) => {
-          ChiselError.info("out: %s %s %s".format(out, incr, path))
-          // assert(out == points.last)
+          // ChiselError.info("out: %s %s %s".format(out, incr, path))
+          assert(out == points.last)
           val arrival = arrivalmap getOrElse (out, 0.0)
           if (arrival < path.toDouble) 
             arrivalmap(out) = path.toDouble
@@ -507,8 +534,8 @@ trait DelayBackannotation extends Backannotation {
           inferDelay(out, arrivalmap(out))
         }
         case ReginRegex(reg, ref, incr, path) => {
-          ChiselError.info("reg/D: %s %s %s %s".format(reg, ref, incr, path))
-          // assert(reg == points.last)
+          // ChiselError.info("reg/D: %s %s %s %s".format(reg, ref, incr, path))
+          assert(reg == points.last)
           val arrival = arrivalmap getOrElse (reg, 0.0)
           if (arrival < path.toDouble) 
             arrivalmap(reg) = path.toDouble
@@ -516,59 +543,26 @@ trait DelayBackannotation extends Backannotation {
           inferDelay(reg, arrivalmap getOrElse (reg, 0.0))
         }
         case RegoutRegex(reg, ref, incr, path) => {
-          ChiselError.info("reg/Q: %s %s %s %s".format(reg, ref, incr, path))
-          // assert(reg == points.head)
+          // ChiselError.info("reg/Q: %s %s %s %s".format(reg, ref, incr, path))
+          assert(reg == points.head)
           val delay = delaymap getOrElse (reg, 0.0)
           if (delay < incr.toDouble)
             delaymap(reg) = incr.toDouble
         }
         case RegclkRegex(reg, ref, incr, path) => {
-          ChiselError.info("reg/CLK: %s %s %s %s".format(reg, ref, incr, path))
+          // ChiselError.info("reg/CLK: %s %s %s %s".format(reg, ref, incr, path))
         }
         case NetRegex(net, incr, path) => {
-          ChiselError.info("net: %s %s %s".format(net, incr, path))
+          // ChiselError.info("net: %s %s %s".format(net, incr, path))
 
           val arrival = arrivalmap getOrElse (net, 0.0)
           if (arrival < path.toDouble) 
             arrivalmap(net) = path.toDouble
 
           inferDelay (net, arrivalmap(net))
-
-          // We have disapearing signals,
-          // so guess the arrival time and delay for them
-/*
-          var newIndex = pointIndex
-          while (points(newIndex) != net && newIndex < points.length) {
-            newIndex += 1
-          }
-
-          val startpoint = points(pointIndex)
-          val startarrival: Double = arrivalmap getOrElse (startpoint, 0.0)
-          val netarrival: Double = arrivalmap getOrElse (net, 0.0) 
-          val startTime: Double = startarrival
-          val finishTime: Double = path.toDouble
-          // val finishTime: Double = if (netarrival > path.toDouble) netarrival else path.toDouble
-          val interval: Int = newIndex - pointIndex
-          val delay: Double = (finishTime - startTime) / interval.toDouble
-          var arrival = finishTime
-          while (newIndex > pointIndex) {
-            val point = points(newIndex)
-            val oldarrival = arrivalmap getOrElse (point, 0.0)
-
-            if (arrival > oldarrival)
-              arrivalmap(point) = arrival
-            else
-              arrival = oldarrival
-
-            arrival -= delay            
-            newIndex -= 1
-          }
-
-          pointIndex += interval
-*/
         }
         case PinRegex(pin, ref, incr, path) => { 
-          ChiselError.info("pin: %s %s %s %s".format(pin, ref, incr, path))
+          // ChiselError.info("pin: %s %s %s %s".format(pin, ref, incr, path))
         }
         case _ =>
       }
