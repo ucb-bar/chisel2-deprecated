@@ -684,11 +684,17 @@ abstract class Backend {
 
   // by Donggyu
   protected def getNodeIndices(m: Module) {
-    m bfs { node =>
+    /*m bfs { node =>
       if (node.isTypeNode) 
         emitTmp(node.getNode)
       else
         emitTmp(node)
+    }*/
+    m bfs { node =>
+      if (node.isTypeNode) 
+        emitRef(node.getNode)
+      else
+        emitRef(node)
     }
   }
 }

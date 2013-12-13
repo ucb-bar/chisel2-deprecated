@@ -2401,6 +2401,15 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         newWriteEn.addConsumers 
       }
     }
+    //wire zero to all Bool outputs if stage is not valid or is stalled; this is a hack to let outside components know that a pipeline stage is invalid
+    val outputs = pipelineComponent.io.flatten.filter(_._2.dir == OUTPUT).map(_._2)
+    for(output <- outputs) {
+      if(output.isInstanceOf[Bool]){
+        val outputStage = getStage(output)
+        val tempMux = Multiplex(~globalStall && stageValids(outputStage) && ~stageStalls(outputStage), output.inputs(0), Bool(false))
+        output.inputs(0) = tempMux
+      }
+    }
   }
   
   
