@@ -578,12 +578,6 @@ abstract class Backend {
     
     nameAll(c)//for debug
     if(Module.autoPipe){
-      for(node <- c.nodes){
-        if(node.isInstanceOf[Reg]){
-	  println(node.name)
-	  println(node.inputs)
-	}
-      }
       //c.insertPipelineRegisters()
       //c.colorPipelineStages()
       c.gatherSpecialComponents()
@@ -602,12 +596,6 @@ abstract class Backend {
       c.genAllMuxes
       c.inferAll()
       c.forceMatchingWidths
-      for(node <- c.nodes){
-        if(node.isInstanceOf[Reg]){
-	  println(node.name)
-	  println(node.inputs)
-	}
-      }
       c.removeTypeNodes()
     }
 
