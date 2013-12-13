@@ -9,47 +9,44 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.Stack
 
-object nodeToString {
-  def apply(node: Node) = nodeString(node)
+trait GraphTrace extends Backend {
+  preElaborateTransforms += ((c: Module) => printGraph(c.name + "_graph.rpt"))
 
-  def nodeString(node: Node): String = { 
+  def nodeToString(node: Node): String = { 
     node match {
-      case bits  : Chisel.Bits      => 
-        if (!node.isTypeNode || node.inputs.length == 0) {
+      case bits  : Bits      => 
+        if (!bits.isTypeNode || bits.inputs.length == 0) {
           if (bits.dir == OUTPUT) "OUTPUT(" + bits.name + ")"
           else if (bits.dir == INPUT) "INPUT(" +bits.name+ ")"
           else if (bits.name != null && !bits.name.isEmpty) bits.name 
           else "Bits(?)"
         }
-        else nodeString(node.inputs(0).getNode)
-      case bundle: Chisel.Bundle    => "Bundle(" + 
-        { for { (n, i) <- bundle.elements } yield n + " => " + nodeString(i) + ", " } + ")"
-      case vec   : Chisel.Vec[_]    => "Vec(" + vec.name + ")"
-      case reg   : Chisel.Reg       => "Reg(" + reg.name + ")"
-      case lit   : Chisel.Literal   => "Lit(" + lit.name + ")"
-      case op    : Chisel.Op        => 
-        if (op.inputs.length == 1) op.op + "(" + nodeString(op.inputs(0)) + ")"
-        else if (op.op == "Mux") "[ " + nodeString(op.inputs(0)) + " ] ? [ " + nodeString(op.inputs(1)) + " ] : [ " + nodeString(op.inputs(2)) + " ]"
-        else "[ " + nodeString(op.inputs(0)) + " ] " + op.op + " [ " + nodeString(op.inputs(1)) + " ]"
-      case cat   : Chisel.Cat       => 
-        { "{ " + ((nodeString(cat.inputs.head) /: cat.inputs.tail) (_ + ", " + nodeString(_))) + " }" }
-      case ext   : Chisel.Extract   => 
-        val hi: String = nodeString(ext.hi)
-        val lo: String = nodeString(ext.lo) 
-        nodeString(ext.inputs(0)) + "[" + { if (hi == lo) hi else hi + ":" + lo } + "]"  
-      case bind  : Chisel.Binding   => "Binding(" + nodeString(bind.inputs(0)) + ")"
-      case _ => node.toString
+        else nodeToString(bits.inputs(0).getNode)
+      case bundle: Bundle    => "Bundle(" + 
+        { for { (n, i) <- bundle.elements } yield n + " => " + nodeToString(i) + ", " } + ")"
+      case vec   : Vec[_]    => "Vec(" + vec.name + ")"
+      case reg   : Reg       => "Reg(" + reg.name + ")"
+      case lit   : Literal   => "Lit(" + lit.name + ")"
+      case op    : Op        => 
+        if (op.inputs.length == 1) op.op + "(" + nodeToString(op.inputs(0)) + ")"
+        else if (op.op == "Mux") "[ " + nodeToString(op.inputs(0)) + " ] ? [ " + nodeToString(op.inputs(1)) + " ] : [ " + nodeToString(op.inputs(2)) + " ]"
+        else "[ " + nodeToString(op.inputs(0)) + " ] " + op.op + " [ " + nodeToString(op.inputs(1)) + " ]"
+      case cat   : Cat       => 
+        { "{ " + ((nodeToString(cat.inputs.head) /: cat.inputs.tail) (_ + ", " + nodeToString(_))) + " }" }
+      case fill  : Fill      =>
+        { "Fill(" + nodeToString(fill.inputs(0)) + ", " + nodeToString(fill.n) + ")" }
+      case ext   : Extract   => 
+        val hi: String = nodeToString(ext.hi)
+        val lo: String = nodeToString(ext.lo) 
+        nodeToString(ext.inputs(0)) + "[" + { if (hi == lo) hi else hi + ":" + lo } + "]"  
+      case bind  : Binding   => "Binding(" + nodeToString(bind.inputs(0)) + ")"
+      case mem   : Mem[_]    => "Mem(" + mem.name + ")"
+      case memacc: MemAccess => nodeToString(memacc.mem) + "[" + nodeToString(memacc.addr) + "]"
+      case _ => if (node == null) "" else node.toString
     }      
   }
-}
 
-trait GraphTrace extends Backend {
-  // Print the graph before 'elaborate'
-  // preElaborateTransforms += ((c: Module) => printGraph(c.name + "_preelabgraph.rpt")) 
-  // Print the graph after 'elaborate'
-  // analyses               += ((c: Module) => printGraph(c.name + "_postelabgraph.rpt")) 
-
-  protected def printGraph(filename: String = "graph.rpt") = {
+  def printGraph(filename: String = "graph.rpt") = {
     val walked = new HashSet[Node]
     val basedir = ensureDir(Module.targetDir)
     val rptdir  = ensureDir(basedir+"report")
@@ -57,7 +54,7 @@ trait GraphTrace extends Backend {
     var report = new StringBuilder();
 
     def printNode(top: Node, level: Int) = {
-      report.append(genIndent(level) + nodeToString(top) + 
+      report.append(genIndent(level) + emitRef(top) + ":" + nodeToString(top) + 
                     "\t(arrival: %.4f, delay: %.4f)\n".format(top.arrival, top.delay))
     }
    
@@ -78,25 +75,24 @@ trait GraphTrace extends Backend {
       // do DFS
       while(!stack.isEmpty) {
         val (node, level) = stack.pop
-
-        node match {
-          case bits: Bits if bits.dir == INPUT =>
-          case _: Literal =>
-          case _ => {
-            printNode(node, level)
-            for (input <- node.inputs) {
-              if (walked contains input) {
-                input match {
-                  case _: Literal =>
-                  case _ => printNode(input, level+1)
+          node match {
+            case bits: Bits if bits.dir == INPUT || (bits.dir == OUTPUT && bits.componentOf != c) =>
+            case _: Literal =>
+            case _ => {
+              printNode(node, level)
+              for (input <- node.inputs) {
+                if (walked contains input) {
+                  input match {
+                    case _: Literal =>
+                    case _ => printNode(input, level+1)
+                  }
+                } else {
+                  walked += input
+                  stack push ((input, level + 1))
                 }
-              } else {
-                walked += input
-                stack push ((input, level + 1))
               }
             }
           }
-        } 
       }    
     }
 
@@ -110,6 +106,7 @@ trait GraphTrace extends Backend {
       dfs(c)
     }
 
+    report.append("\nCritical path = " + Module.criticalPath)
     report.append("\nCritical path delay = %.5f\n".format(Module.criticalPathDelay))
 
     // ChiselError.info(report) 
@@ -119,11 +116,5 @@ trait GraphTrace extends Backend {
     } finally {
       rptfile.close()
     }    
-  }
-
-  override def elaborate(c: Module) {
-    super.elaborate(c)
-
-    printGraph(c.name + "_graph.rpt") 
   }
 }
