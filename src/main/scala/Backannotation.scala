@@ -359,7 +359,6 @@ trait DelayBackannotation extends Backannotation {
         }
       }
   
-      ChiselError.info("hello!")
       val throughSets = powerset(truncation(via:::List(end))).sortWith(_.size > _.size)
       ChiselError.info("powerset size: " + throughSets.size.toString)
 
@@ -377,7 +376,6 @@ trait DelayBackannotation extends Backannotation {
       */
 
       reports(throughSets)      
-      ChiselError.info("hello!!!")
     }
 
     for (path <- paths) {
