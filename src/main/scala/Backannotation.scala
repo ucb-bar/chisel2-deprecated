@@ -443,7 +443,10 @@ trait DelayBackannotation extends Backannotation {
     // so guess the arrival time and delay for them
     def inferDelay(node: String, finishTime: Double) {
       var newIndex = pointIndex
-      while (points(newIndex) != node && newIndex < points.length) {
+      if (newIndex >= points.length)
+        return
+
+      while (newIndex < points.length && points(newIndex) != node) {
         newIndex += 1
       }
       val startpoint = points(pointIndex)
@@ -477,11 +480,13 @@ trait DelayBackannotation extends Backannotation {
           pointIndex = 0
         }
         case StartpointRegex(start) => {
+          ChiselError.info("start: " + start)
           if (points.head != start){ 
             points = Array(start) ++ points
           }
         }
         case EndpointRegex(end) => {
+          ChiselError.info("end: " + end)
           if (points.last != end) 
             points = points ++ Array(end)
         }
@@ -508,7 +513,7 @@ trait DelayBackannotation extends Backannotation {
           if (arrival < path.toDouble) 
             arrivalmap(reg) = path.toDouble
 
-          inferDelay(reg, arrivalmap(reg))
+          inferDelay(reg, arrivalmap getOrElse (reg, 0.0))
         }
         case RegoutRegex(reg, ref, incr, path) => {
           ChiselError.info("reg/Q: %s %s %s %s".format(reg, ref, incr, path))
