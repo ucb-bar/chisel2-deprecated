@@ -39,6 +39,9 @@ object Bool {
     res.init("", 1)
     res
   }
+
+  /** Factory method to create a don't-care. */
+  def DC = Lit("b?", 1){Bool()}
 }
 
 class Bool extends UInt {
