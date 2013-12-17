@@ -885,6 +885,8 @@ class NameSuite_DebugComp_1_t : public mod_t {
   void dump ( FILE* f, int t );
 };
 
+
+
 #endif
 """)
     assertFile(tmpdir.getRoot() + "/NameSuite_DebugComp_1.cpp",
