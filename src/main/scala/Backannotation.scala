@@ -11,6 +11,7 @@ import scala.collection.mutable.HashMap
 import scala.collection.mutable.Stack
 import scala.io.Source
 import scala.sys.process._
+import scala.util.Random
 
 trait Backannotation extends GraphTrace {
   preElaborateTransforms += ((c: Module) => levelChildren(c))
@@ -23,17 +24,6 @@ trait Backannotation extends GraphTrace {
   preElaborateTransforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
   preElaborateTransforms += ((c: Module) => nameAll(c))
   preElaborateTransforms += ((c: Module) => getNodeIndices(c))
-
-  /*
-  protected def getParentNames(m: Module, delim: String = "/"): String = {
-    if (m == Module.topComponent) ""
-    else getParentNames(m.parent) + emitRef(m) + delim
-  }
-
-  protected def getSignalName(n: Node, delim: String = "/"): String = {
-    if (n == null) "null" else getParentNames(n.componentOf, delim) + emitRef(n)
-  }
-  */
 }
 
 trait SignalBackannotation extends Backannotation {
@@ -304,10 +294,13 @@ trait DelayBackannotation extends Backannotation {
       } else { 
         "redirect -append " + rpt_filename + " { " 
       }
-    val cmdopts = " -significant_digits 5 -path only"
+    val cmdopts = " -significant_digits 5 -path only -nosplit"
     val cmdtail = " }\n"
 
-    tcl.append("report_timing > %s_critical.rpt\n".format(m.name))
+    tcl.append("report_timing %s > %s_critical.rpt\n".format(cmdopts, m.name))
+    tcl.append("report_timing -from [all_inputs] %s >> %s_critical.rpt\n".format(cmdopts, m.name))
+    tcl.append("report_timing -to [all_outputs] %s >> %s_critical.rpt\n".format(cmdopts, m.name))
+    tcl.append("report_timing -from [all_inputs] -to [all_outputs] %s >> %s_critical.rpt\n".format(cmdopts, m.name))
   
     val paths = getTimingPaths(m.initializeDFS)
  
@@ -316,13 +309,30 @@ trait DelayBackannotation extends Backannotation {
       // prune its input.
       // Otherwise, you will se a giant powerset.
       def truncation (list: List[Node]):List[Node] = {
-        list match {
-          case Nil => Nil
-          case _::Nil => Nil
-          case input::consumer::tail =>
-            if (consumer.inputs.length > 1) input::(truncation(consumer::tail))
-            else truncation(consumer::tail)
+        def iter(list: List[Node]): ArrayBuffer[Node] = 
+          list match {
+            case Nil => new ArrayBuffer[Node]()
+            case _::Nil => new ArrayBuffer[Node]()
+            case input::consumer::tail =>
+              if (consumer.inputs.length > 1) {
+                val array = (iter(consumer::tail) += input)
+                array
+              } else iter(consumer::tail)
+          }
+
+        val prunedList = iter(list)
+
+        // Randomly deleting points
+        val random = new Random
+        val sizeLimit = 10 // emperically best number
+        var listLength = prunedList.length
+        while (listLength > sizeLimit) {
+          val rmIndex = random.nextInt(listLength)
+          prunedList.remove(rmIndex)
+          listLength = listLength - 1
         }
+
+        prunedList.toList
       }
 
       def powerset (list: List[Node]): Array[Set[Node]] = {
@@ -360,7 +370,6 @@ trait DelayBackannotation extends Backannotation {
       }
   
       val throughSets = powerset(truncation(via:::List(end))).sortWith(_.size > _.size)
-      ChiselError.info("powerset size: " + throughSets.size.toString)
 
       /*
       for (throughs <- throughSets) {
@@ -465,7 +474,7 @@ trait DelayBackannotation extends Backannotation {
         return
       */
 
-      while (newIndex < points.length && points(newIndex) != node) {
+      while (newIndex < points.length - 1 && points(newIndex) != node) {
         newIndex += 1
       }
       val startpoint = points(pointIndex)
@@ -529,7 +538,7 @@ trait DelayBackannotation extends Backannotation {
           if (arrival < path.toDouble) 
             arrivalmap(out) = path.toDouble
           
-          inferDelay(out, arrivalmap(out))
+          inferDelay(out, arrivalmap getOrElse (out, 0.0))
         }
         case ReginRegex(reg, ref, incr, path) => {
           // ChiselError.info("reg/D: %s %s %s %s".format(reg, ref, incr, path))
@@ -557,7 +566,7 @@ trait DelayBackannotation extends Backannotation {
           if (arrival < path.toDouble) 
             arrivalmap(net) = path.toDouble
 
-          inferDelay (net, arrivalmap(net))
+          inferDelay (net, arrivalmap getOrElse (net, 0.0))
         }
         case PinRegex(pin, ref, incr, path) => { 
           // ChiselError.info("pin: %s %s %s %s".format(pin, ref, incr, path))

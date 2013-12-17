@@ -52,6 +52,8 @@ trait GraphTrace extends Backend {
       case bind  : Binding   => "Binding(" + nodeToString(bind.inputs(0)) + ")"
       case mem   : Mem[_]    => "Mem(" + mem.name + ")"
       case memacc: MemAccess => nodeToString(memacc.mem) + "[" + nodeToString(memacc.addr) + "]"
+      case rom   : ROM[_]    => { "ROM(" + rom.name + ")" }
+      case romread: ROMRead[_] => nodeToString(romread.rom) + "[" + nodeToString(romread.addr) + "]"
       case _ => if (node == null) "" else node.toString
     }      
   }
@@ -65,7 +67,7 @@ trait GraphTrace extends Backend {
 
     def printNode(top: Node, level: Int) = {
       report.append(genIndent(level) + getSignalName(top) + ":" + nodeToString(top) + 
-                    "\t(arrival: %.4f, delay: %.4f)\n".format(top.arrival, top.delay))
+                    "  (arrival: %.4f, delay: %.4f)\n".format(top.arrival, top.delay))
     }
    
     def dfs(c: Module) = {
