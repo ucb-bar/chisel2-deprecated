@@ -451,9 +451,14 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       res.enqueue(a)
     for(b <- Module.blackboxes)
       res.enqueue(b.io)
-    for(c <- Module.components)
+    for(c <- Module.components) {
       for((n, io) <- c.io.flatten)
         res.enqueue(io)
+      // edited by Donggyu
+      // TODO: side effects?
+      for(reset <- resets.values)
+        res.enqueue(reset)
+    }
 
     res
   }
