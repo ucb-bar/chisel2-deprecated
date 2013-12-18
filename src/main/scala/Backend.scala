@@ -129,6 +129,28 @@ abstract class Backend {
              }
            }
          }
+         case buf: collection.IndexedSeq[_] => {
+           /* This is a duplicate of ArrayBuffer[_] that was introduced
+            to support VecLike. ArrayBuffer and IndexedSeq have no parent/child
+            relationship. */
+           if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
+             val nodebuf = buf.asInstanceOf[Seq[Node]];
+             var i = 0;
+             for(elm <- nodebuf){
+               if( elm.isTypeNode || elm.name == null || elm.name.isEmpty ) {
+                 /* XXX This code is sensitive to when Bundle.nameIt is called.
+                  Whether it is called late (elm.name is empty) or we override
+                  any previous name that could have been infered,
+                  this has for side-effect to create modules with the exact
+                  same logic but textually different in input/output
+                  parameters, hence generating unnecessary modules. */
+                 elm.nameIt(asValidName(name + "_" + i));
+               }
+               nameSpace += elm.name;
+               i += 1;
+             }
+           }
+         }
          case cell: Cell => {
            cell.name = asValidName(name);
            cell.named = true;

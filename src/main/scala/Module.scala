@@ -222,6 +222,7 @@ object Module {
   }
 
   def getComponent(): Module = if(compStack.length != 0) compStack.top else null
+  def current: Module = compStack.top
 
   def setAsTopComponent(mod: Module) {
     topComponent = mod;
@@ -819,7 +820,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
     /** Returns the absolute path to a component instance from toplevel. */
   def getPathName: String = {
-    if ( parent == null ) name else parent.getPathName + "_" + name;
+    getPathName()
+  }
+  def getPathName(separator: String = "_"): String = {
+    if ( parent == null ) name else parent.getPathName(separator) + separator + name;
   }
 
   def traceNodes() {
@@ -915,5 +919,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def removeInputs(nodes: Seq[Node]): Seq[Node] =
     nodes.filter(n => !isInput(n))
 
+  override val hashCode: Int = components.size
+  override def equals(that: Any) = this eq that.asInstanceOf[AnyRef]
 }
 

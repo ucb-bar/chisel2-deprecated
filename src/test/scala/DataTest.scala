@@ -258,6 +258,8 @@ class DataSuite_BypassDataComp_1_t : public mod_t {
   void dump ( FILE* f, int t );
 };
 
+
+
 #endif
 """)
   }

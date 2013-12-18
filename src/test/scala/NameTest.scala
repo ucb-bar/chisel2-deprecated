@@ -885,6 +885,8 @@ class NameSuite_DebugComp_1_t : public mod_t {
   void dump ( FILE* f, int t );
 };
 
+
+
 #endif
 """)
     assertFile(tmpdir.getRoot() + "/NameSuite_DebugComp_1.cpp",
@@ -892,6 +894,14 @@ class NameSuite_DebugComp_1_t : public mod_t {
 
 void NameSuite_DebugComp_1_t::init ( bool rand_init ) {
   if (rand_init) NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.randomize();
+  nodes.clear();
+  mems.clear();
+  nodes.push_back(debug_node_t("NameSuite_DebugComp_1.io_ctrl_wb_wen", &NameSuite_DebugComp_1__io_ctrl_wb_wen));
+  nodes.push_back(debug_node_t("NameSuite_DebugComp_1.dpath.io_ctrl_wb_wen", &NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen));
+  nodes.push_back(debug_node_t("NameSuite_DebugComp_1.dpath.wb_wen", &NameSuite_DebugComp_1_dpath__wb_wen));
+  nodes.push_back(debug_node_t("NameSuite_DebugComp_1.dpath.wb_reg_ll_wb", &NameSuite_DebugComp_1_dpath__wb_reg_ll_wb));
+  nodes.push_back(debug_node_t("NameSuite_DebugComp_1.dpath.io_ctrl_out", &NameSuite_DebugComp_1_dpath__io_ctrl_out));
+  nodes.push_back(debug_node_t("NameSuite_DebugComp_1.io_ctrl_out", &NameSuite_DebugComp_1__io_ctrl_out));
 }
 void NameSuite_DebugComp_1_t::clock_lo ( dat_t<1> reset ) {
   { NameSuite_DebugComp_1_dpath__reset.values[0] = reset.values[0]; }
