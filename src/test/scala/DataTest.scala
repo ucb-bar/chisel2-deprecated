@@ -30,20 +30,15 @@
 
 
 /*
-Node Hierarchy:
+Data Hierarchy:
 
 nameable                (src/main/hcl.scala)
-  Node                  (src/main/Node.scala)
-    Delay               (src/main/hcl.scala)
-      Reg               (src/main/Reg.scala)
-      AccessTracker     (src/main/Mem.scala)
-        Mem             (src/main/Mem.scala)
     Data                (src/main/Data.scala)
-      Bits with proc    (src/main/Bits.scala, src/main/scala/hcl.scala)
-        SInt             (src/main/SInt.scala)
+      Bits              (src/main/Bits.scala)
+        SInt            (src/main/SInt.scala)
         UInt            (src/main/UInt.scala)
           Bool          (src/main/Bool.scala)
-      CompositeData     (src/main/Data.scala)
+      AggregateData     (src/main/Data.scala)
         Vec             (src/main/Vec.scala)
         Bundle          (src/main/Bundle.scala)
 */
@@ -71,8 +66,12 @@ class DataSuite extends AssertionsForJUnit {
     tmpdir.delete()
   }
 
-  def assertFile( filename: String, content: String ) {
-    val source = scala.io.Source.fromFile(filename, "utf-8")
+  def assertFile( filename: String ) {
+    val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
+    val content = reffile.mkString
+    reffile.close()
+    val source = scala.io.Source.fromFile(
+      tmpdir.getRoot() + "/" + filename, "utf-8")
     val lines = source.mkString
     source.close()
     assert(lines === content)
@@ -227,33 +226,7 @@ class DataSuite extends AssertionsForJUnit {
     chiselMain(Array[String]("--backend", "c",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new BypassDataComp))
-    assertFile(tmpdir.getRoot() + "/DataSuite_BypassDataComp_1.h",
-"""#ifndef __DataSuite_BypassDataComp_1__
-#define __DataSuite_BypassDataComp_1__
-
-#include "emulator.h"
-
-class DataSuite_BypassDataComp_1_t : public mod_t {
- public:
-  dat_t<3> T0;
-  dat_t<1> DataSuite_BypassDataComp_1__io_valid_2;
-  dat_t<3> DataSuite_BypassDataComp_1__io_data;
-  dat_t<1> DataSuite_BypassDataComp_1__io_valid_1;
-  dat_t<1> DataSuite_BypassDataComp_1__io_valid_0;
-  int clk;
-  int clk_cnt;
-
-  void init ( bool rand_init = false );
-  void clock_lo_clk ( dat_t<1> reset );
-  void clock_hi_clk ( dat_t<1> reset );
-  int clock ( dat_t<1> reset );
-  void print ( FILE* f );
-  bool scan ( FILE* f );
-  void dump ( FILE* f, int t );
-};
-
-#endif
-""")
+    assertFile("DataSuite_BypassDataComp_1.h")
   }
 
   /** Test case derived from issue #1 reported on github.

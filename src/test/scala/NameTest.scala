@@ -63,8 +63,12 @@ class NameSuite extends AssertionsForJUnit {
     tmpdir.delete()
   }
 
-  def assertFile( filename: String, content: String ) {
-    val source = scala.io.Source.fromFile(filename, "utf-8")
+  def assertFile( filename: String ) {
+    val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
+    val content = reffile.mkString
+    reffile.close()
+    val source = scala.io.Source.fromFile(
+      tmpdir.getRoot() + "/" + filename, "utf-8")
     val lines = source.mkString
     source.close()
     assert(lines === content)
@@ -100,29 +104,7 @@ class NameSuite extends AssertionsForJUnit {
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new ListLookupsComp()))
-    assertFile(tmpdir.getRoot() + "/NameSuite_ListLookupsComp_1.v",
-"""module NameSuite_ListLookupsComp_1(
-    input [31:0] io_inst,
-    output io_sigs_valid
-);
-
-  reg valid;
-  wire T0;
-
-  assign io_sigs_valid = valid;
-  always @(*) begin
-    casez (io_inst)
-      32'b00000000000000000010011101111011/* 0*/ : begin
-        valid = 1'h0/* 0*/;
-      end
-      default: begin
-        valid = 1'h0/* 0*/;
-      end
-    endcase
-  end
-endmodule
-
-""")
+    assertFile("NameSuite_ListLookupsComp_1.v")
   }
 
   /** This test checks names are correctly generated in the presence
@@ -168,53 +150,7 @@ endmodule
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new BindFirstComp()))
-   assertFile(tmpdir.getRoot() + "/NameSuite_BindFirstComp_1.v",
-"""module NameSuite_BlockDecoder_1(
-    input io_valid,
-    output io_replay,
-    output io_sigs_enq_cmdq,
-    output io_sigs_enq_ximm1q
-);
-
-
-  assign io_replay = io_valid;
-endmodule
-
-module NameSuite_BindFirstComp_1(
-    input valid_common,
-    output io_replay
-);
-
-  wire T0;
-  wire T1;
-  wire T2;
-  wire mask_cmdq_ready;
-  wire dec_io_sigs_enq_cmdq;
-  wire T3;
-  wire mask_ximm1q_ready;
-  wire dec_io_sigs_enq_ximm1q;
-
-  assign io_replay = T0;
-  assign T0 = valid_common && T1;
-  assign T1 = T2 || T3;
-  assign T2 = ! mask_cmdq_ready;
-  assign mask_cmdq_ready = ! dec_io_sigs_enq_cmdq;
-  assign T3 = ! mask_ximm1q_ready;
-  assign mask_ximm1q_ready = ! dec_io_sigs_enq_ximm1q;
-  NameSuite_BlockDecoder_1 dec(
-       //.io_valid(  )
-       //.io_replay(  )
-       .io_sigs_enq_cmdq( dec_io_sigs_enq_cmdq ),
-       .io_sigs_enq_ximm1q( dec_io_sigs_enq_ximm1q )
-  );
-  `ifndef SYNTHESIS
-    assign dec.io_valid = $random();
-    assign dec.io_sigs_enq_cmdq = $random();
-    assign dec.io_sigs_enq_ximm1q = $random();
-  `endif
-endmodule
-
-""")
+   assertFile("NameSuite_BindFirstComp_1.v")
    }
 
   /** Since *vec* is declared within a if() block and not as a Module
@@ -253,33 +189,7 @@ endmodule
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new BindSecondComp(true)))
-   assertFile(tmpdir.getRoot() + "/NameSuite_BindSecondComp_1.v",
-"""module NameSuite_Block_1(
-    input io_irq,
-    output [4:0] io_irq_cause
-);
-
-
-  assign io_irq_cause = 5'h2/* 2*/;
-endmodule
-
-module NameSuite_BindSecondComp_1(
-    input io_irq,
-    output [5:0] io_irq_cause
-);
-
-  wire [5:0] T0;
-  wire [4:0] NameSuite_Block_1_io_irq_cause;
-
-  assign io_irq_cause = T0;
-  assign T0 = {1'h1/* 1*/, NameSuite_Block_1_io_irq_cause};
-  NameSuite_Block_1 NameSuite_Block_1(
-       .io_irq( io_irq ),
-       .io_irq_cause( NameSuite_Block_1_io_irq_cause )
-  );
-endmodule
-
-""")
+   assertFile("NameSuite_BindSecondComp_1.v")
   }
 
   /** Propagation of bundle field names through bindings
@@ -330,52 +240,7 @@ endmodule
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new BindThirdComp()))
-    assertFile(tmpdir.getRoot() + "/NameSuite_BindThirdComp_1.v",
-"""module NameSuite_Comp_1(
-    input io_in_ren,
-    output io_out_ren
-);
-
-
-  assign io_out_ren = io_in_ren;
-endmodule
-
-module NameSuite_BindThirdComp_1(
-    input io_in_ren,
-    output io_result
-);
-
-  wire T0;
-  wire T1;
-  wire T2;
-  wire NameSuite_Comp_1_0_io_out_ren;
-  wire NameSuite_Comp_1_1_io_out_ren;
-  wire NameSuite_Comp_1_2_io_out_ren;
-  wire NameSuite_Comp_1_3_io_out_ren;
-
-  assign io_result = T0;
-  assign T0 = T1 | NameSuite_Comp_1_3_io_out_ren;
-  assign T1 = T2 | NameSuite_Comp_1_2_io_out_ren;
-  assign T2 = NameSuite_Comp_1_0_io_out_ren | NameSuite_Comp_1_1_io_out_ren;
-  NameSuite_Comp_1 NameSuite_Comp_1_0(
-       .io_in_ren( io_in_ren ),
-       .io_out_ren( NameSuite_Comp_1_0_io_out_ren )
-  );
-  NameSuite_Comp_1 NameSuite_Comp_1_1(
-       .io_in_ren( NameSuite_Comp_1_0_io_out_ren ),
-       .io_out_ren( NameSuite_Comp_1_1_io_out_ren )
-  );
-  NameSuite_Comp_1 NameSuite_Comp_1_2(
-       .io_in_ren( NameSuite_Comp_1_1_io_out_ren ),
-       .io_out_ren( NameSuite_Comp_1_2_io_out_ren )
-  );
-  NameSuite_Comp_1 NameSuite_Comp_1_3(
-       .io_in_ren( NameSuite_Comp_1_2_io_out_ren ),
-       .io_out_ren( NameSuite_Comp_1_3_io_out_ren )
-  );
-endmodule
-
-""")
+    assertFile("NameSuite_BindThirdComp_1.v")
   }
 
   /** Propagation of bundle field names through bindings
@@ -402,17 +267,7 @@ endmodule
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new BindFourthComp()))
-    assertFile(tmpdir.getRoot() + "/NameSuite_BindFourthComp_1.v",
-"""module NameSuite_BindFourthComp_1(
-    input [4:0] io_in,
-    output [4:0] io_out
-);
-
-
-  assign io_out = io_in;
-endmodule
-
-""")
+    assertFile("NameSuite_BindFourthComp_1.v")
   }
 
   /* An ArrayBuffer is added to after initialization, then later
@@ -464,75 +319,7 @@ endmodule
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new BindFithComp))
-    assertFile(tmpdir.getRoot() + "/NameSuite_BindFithComp_1.v",
-"""module NameSuite_Block_2(input clk,
-    input io_valid,
-    output [31:0] io_mine_0,
-    output [31:0] io_mine_1,
-    //input io_sub_resp_valid
-    //input io_sub_resp_bits_error
-    input [31:0] io_sub_resp_bits_ppn
-);
-
-  wire [31:0] T0;
-  wire T1;
-  wire [31:0] T2;
-  reg [31:0] tag_ram_0;
-  wire [31:0] T3;
-  wire [31:0] T4;
-  reg [31:0] tag_ram_1;
-  wire [31:0] T5;
-  wire [31:0] T6;
-  wire T7;
-
-  assign io_mine_0 = T0;
-  assign T0 = {31'h0/* 0*/, T1};
-  assign T1 = T2[1'h0/* 0*/:1'h0/* 0*/];
-  assign T2 = io_valid ? tag_ram_0 : tag_ram_1;
-  assign T3 = io_valid ? T4 : tag_ram_0;
-  assign T4 = io_valid ? io_sub_resp_bits_ppn : tag_ram_0;
-  assign T5 = 1'h0/* 0*/ ? T4 : tag_ram_1;
-  assign io_mine_1 = T6;
-  assign T6 = {31'h0/* 0*/, T7};
-  assign T7 = T2[1'h1/* 1*/:1'h1/* 1*/];
-
-  always @(posedge clk) begin
-    tag_ram_0 <= T3;
-    tag_ram_1 <= T5;
-  end
-endmodule
-
-module NameSuite_BindFithComp_1(input clk,
-    input io_imem_ptw_resp_valid,
-    input io_imem_ptw_resp_bits_error,
-    input [31:0] io_imem_ptw_resp_bits_ppn,
-    input io_dmem_ptw_resp_valid,
-    input io_dmem_ptw_resp_bits_error,
-    input [31:0] io_dmem_ptw_resp_bits_ppn,
-    output io_resp_resp_valid,
-    output io_resp_resp_bits_error,
-    output [31:0] io_resp_resp_bits_ppn
-);
-
-
-  assign io_resp_resp_valid = io_imem_ptw_resp_valid;
-  assign io_resp_resp_bits_error = io_imem_ptw_resp_bits_error;
-  assign io_resp_resp_bits_ppn = io_imem_ptw_resp_bits_ppn;
-  NameSuite_Block_2 NameSuite_Block_2(.clk(clk),
-       //.io_valid(  )
-       //.io_mine_0(  )
-       //.io_mine_1(  )
-       //.io_sub_resp_valid(  )
-       //.io_sub_resp_bits_error(  )
-       //.io_sub_resp_bits_ppn(  )
-  );
-  `ifndef SYNTHESIS
-    assign NameSuite_Block_2.io_valid = $random();
-    assign NameSuite_Block_2.io_sub_resp_bits_ppn = $random();
-  `endif
-endmodule
-
-""")
+    assertFile("NameSuite_BindFithComp_1.v")
   }
 
   /** Appending index to a node name in Vec::apply
@@ -572,36 +359,7 @@ endmodule
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new VecComp()))
-    assertFile(tmpdir.getRoot() + "/NameSuite_VecComp_1.v",
-"""module NameSuite_VecComp_1(input clk,
-    input io_r_en,
-    input [4:0] io_r_addr,
-    input [63:0] io_w_data,
-    output [7:0] io_status_im
-);
-
-  reg [7:0] reg_status_im;
-  wire [7:0] T0;
-  wire [7:0] T1;
-  wire [63:0] wdata;
-  reg [63:0] host_pcr_bits_data;
-  wire [7:0] T2;
-  wire [7:0] rdata;
-
-  assign io_status_im = reg_status_im;
-  assign T0 = T1;
-  assign T1 = wdata[3'h7/* 7*/:1'h0/* 0*/];
-  assign wdata = io_r_en ? io_w_data : host_pcr_bits_data;
-  assign T2 = io_r_en ? rdata : host_pcr_bits_data;
-  assign rdata = reg_status_im;
-
-  always @(posedge clk) begin
-    reg_status_im <= T0;
-    host_pcr_bits_data <= T2;
-  end
-endmodule
-
-""")
+    assertFile("NameSuite_VecComp_1.v")
   }
 
   /** Names for input/output vectors should be generated with index (0-3).
@@ -636,47 +394,7 @@ endmodule
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new VecSecondComp()))
-    assertFile(tmpdir.getRoot() + "/NameSuite_VecSecondComp_1.v",
-"""module NameSuite_VecSecondComp_1(input clk,
-    output io_requestor_0_req_ready,
-    input io_requestor_0_req_valid,
-    input io_requestor_0_req_bits_ready,
-    output io_requestor_1_req_ready,
-    input io_requestor_1_req_valid,
-    input io_requestor_1_req_bits_ready,
-    output io_requestor_2_req_ready,
-    input io_requestor_2_req_valid,
-    input io_requestor_2_req_bits_ready,
-    output io_requestor_3_req_ready,
-    input io_requestor_3_req_valid,
-    input io_requestor_3_req_bits_ready,
-    output io_mem
-);
-
-  wire T0;
-  reg r_valid_3;
-  wire T1;
-  reg r_valid_2;
-  wire T2;
-  reg r_valid_1;
-  wire T3;
-  reg r_valid_0;
-
-  assign io_mem = T0;
-  assign T0 = r_valid_3 ? io_requestor_3_req_ready : T1;
-  assign T1 = r_valid_2 ? io_requestor_2_req_ready : T2;
-  assign T2 = r_valid_1 ? io_requestor_1_req_ready : T3;
-  assign T3 = r_valid_0 ? io_requestor_0_req_ready : io_requestor_0_req_ready;
-
-  always @(posedge clk) begin
-    r_valid_3 <= io_requestor_3_req_ready;
-    r_valid_2 <= io_requestor_2_req_ready;
-    r_valid_1 <= io_requestor_1_req_ready;
-    r_valid_0 <= io_requestor_0_req_ready;
-  end
-endmodule
-
-""")
+    assertFile("NameSuite_VecSecondComp_1.v")
   }
 
 
@@ -713,54 +431,7 @@ endmodule
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new VariationComp()))
-    assertFile(tmpdir.getRoot() + "/NameSuite_VariationComp_1.v",
-"""module NameSuite_CompBlock_1_0(
-    input io_valid,
-    output io_replay
-);
-
-
-  assign io_replay = 1'h0/* 0*/;
-endmodule
-
-module NameSuite_CompBlock_1_1(
-    input io_valid,
-    output io_replay
-);
-
-
-  assign io_replay = io_valid;
-endmodule
-
-module NameSuite_VariationComp_1(
-    input io_valid,
-    output io_replay
-);
-
-  wire T0;
-  wire T1;
-  wire block_0_io_replay;
-  wire block_1_io_replay;
-  wire block_2_io_replay;
-
-  assign io_replay = T0;
-  assign T0 = T1 & block_2_io_replay;
-  assign T1 = block_0_io_replay & block_1_io_replay;
-  NameSuite_CompBlock_1_0 block_0(
-       .io_valid( io_valid ),
-       .io_replay( block_0_io_replay )
-  );
-  NameSuite_CompBlock_1_0 block_1(
-       .io_valid( io_valid ),
-       .io_replay( block_1_io_replay )
-  );
-  NameSuite_CompBlock_1_1 block_2(
-       .io_valid( io_valid ),
-       .io_replay( block_2_io_replay )
-  );
-endmodule
-
-""")
+    assertFile("NameSuite_VariationComp_1.v")
   }
 
   /** Generated names for memories which are actual modules (ie. not inlined).
@@ -789,33 +460,7 @@ endmodule
     chiselMain(Array[String]("--noInlineMem", "--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new MemComp()))
-    assertFile(tmpdir.getRoot() + "/NameSuite_MemComp_1.v",
-"""module NameSuite_MemComp_1(input clk, input reset,
-    input io_ren,
-    input [7:0] io_raddr,
-    output [64:0] io_rdata
-);
-
-  wire [64:0] T0;
-  reg [7:0] raddr;
-  wire [7:0] T1;
-
-  assign io_rdata = T0;
-  NameSuite_MemComp_1_rfile rfile (
-    .CLK(clk),
-    .RST(reset),
-    .R0A(raddr),
-    .R0E(1'h1/* 1*/),
-    .R0O(T0)
-  );
-  assign T1 = io_ren ? io_raddr : raddr;
-
-  always @(posedge clk) begin
-    raddr <= T1;
-  end
-endmodule
-
-""")
+    assertFile("NameSuite_MemComp_1.v")
   }
 
   /* Add signals which are not registers to the toplevel C++ class declaration.
@@ -852,107 +497,8 @@ endmodule
     chiselMain(Array[String]("--backend", "c", "--vcd",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new DebugComp))
-    assertFile(tmpdir.getRoot() + "/NameSuite_DebugComp_1.h",
-"""#ifndef __NameSuite_DebugComp_1__
-#define __NameSuite_DebugComp_1__
-
-#include "emulator.h"
-
-class NameSuite_DebugComp_1_t : public mod_t {
- public:
-  dat_t<1> NameSuite_DebugComp_1__io_ctrl_wb_wen;
-  dat_t<1> NameSuite_DebugComp_1__io_ctrl_wb_wen__prev;
-  dat_t<1> NameSuite_DebugComp_1__io_ctrl_out;
-  dat_t<1> NameSuite_DebugComp_1__io_ctrl_out__prev;
-  dat_t<1> NameSuite_DebugComp_1_dpath__io_ctrl_out;
-  dat_t<1> NameSuite_DebugComp_1_dpath__io_ctrl_out__prev;
-  dat_t<1> NameSuite_DebugComp_1_dpath__wb_reg_ll_wb;
-  dat_t<1> NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow;
-  dat_t<1> NameSuite_DebugComp_1_dpath__wb_reg_ll_wb__prev;
-  dat_t<1> NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen;
-  dat_t<1> NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen__prev;
-  int NameSuite_DebugComp_1__clk;
-  int NameSuite_DebugComp_1__clk_cnt;
-
-  void init ( bool rand_init = false );
-  void clock_lo_NameSuite_DebugComp_1__clk ( dat_t<1> reset );
-  void clock_hi_NameSuite_DebugComp_1__clk ( dat_t<1> reset );
-  int clock ( dat_t<1> reset );
-  void print ( FILE* f );
-  bool scan ( FILE* f );
-  void dump ( FILE* f, int t );
-};
-
-#endif
-""")
-    assertFile(tmpdir.getRoot() + "/NameSuite_DebugComp_1.cpp",
-"""#include "NameSuite_DebugComp_1.h"
-
-void NameSuite_DebugComp_1_t::init ( bool rand_init ) {
-  if (rand_init) NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.randomize();
-}
-void NameSuite_DebugComp_1_t::clock_lo_NameSuite_DebugComp_1__clk ( dat_t<1> reset ) {
-  { NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0] = NameSuite_DebugComp_1__io_ctrl_wb_wen.values[0]; }
-  val_t NameSuite_DebugComp_1_dpath__wb_wen__w0;
-  { NameSuite_DebugComp_1_dpath__wb_wen__w0 = NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0]||NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]; }
-  val_t T0__w0;
-  { val_t __mask = -NameSuite_DebugComp_1_dpath__wb_wen__w0; T0__w0 = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0] ^ ((NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0] ^ NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0]) & __mask); }
-  { NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow.values[0] = TERNARY(reset.values[0], 0x0L, T0__w0); }
-  { NameSuite_DebugComp_1_dpath__io_ctrl_out.values[0] = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]; }
-  { NameSuite_DebugComp_1__io_ctrl_out.values[0] = NameSuite_DebugComp_1_dpath__io_ctrl_out.values[0]; }
-}
-void NameSuite_DebugComp_1_t::clock_hi_NameSuite_DebugComp_1__clk ( dat_t<1> reset ) {
-  NameSuite_DebugComp_1_dpath__wb_reg_ll_wb = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow;
-}
-int NameSuite_DebugComp_1_t::clock ( dat_t<1> reset ) {
-  uint32_t min = ((uint32_t)1<<31)-1;
-  if (NameSuite_DebugComp_1__clk_cnt < min) min = NameSuite_DebugComp_1__clk_cnt;
-  NameSuite_DebugComp_1__clk_cnt-=min;
-  if (NameSuite_DebugComp_1__clk_cnt == 0) clock_lo_NameSuite_DebugComp_1__clk( reset );
-  if (NameSuite_DebugComp_1__clk_cnt == 0) clock_hi_NameSuite_DebugComp_1__clk( reset );
-  if (NameSuite_DebugComp_1__clk_cnt == 0) NameSuite_DebugComp_1__clk_cnt = NameSuite_DebugComp_1__clk;
-  return min;
-}
-void NameSuite_DebugComp_1_t::print ( FILE* f ) {
-}
-bool NameSuite_DebugComp_1_t::scan ( FILE* f ) {
-  return(!feof(f));
-}
-void NameSuite_DebugComp_1_t::dump(FILE *f, int t) {
-  if (t == 0) {
-    fprintf(f, "$timescale 1ps $end\n");
-    fprintf(f, "$scope module NameSuite_DebugComp_1 $end\n");
-    fprintf(f, "$var wire 1 N0 io_ctrl_wb_wen $end\n");
-    fprintf(f, "$var wire 1 N1 io_ctrl_out $end\n");
-    fprintf(f, "$var wire 1 N5 reset $end\n");
-    fprintf(f, "$scope module dpath $end\n");
-    fprintf(f, "$var wire 1 N2 io_ctrl_out $end\n");
-    fprintf(f, "$var wire 1 N3 wb_reg_ll_wb $end\n");
-    fprintf(f, "$var wire 1 N4 io_ctrl_wb_wen $end\n");
-    fprintf(f, "$upscope $end\n");
-    fprintf(f, "$upscope $end\n");
-    fprintf(f, "$enddefinitions $end\n");
-    fprintf(f, "$dumpvars\n");
-    fprintf(f, "$end\n");
-  }
-  fprintf(f, "#%d\n", t);
-  if (t == 0 || (NameSuite_DebugComp_1__io_ctrl_wb_wen != NameSuite_DebugComp_1__io_ctrl_wb_wen__prev).to_bool())
-    dat_dump(f, NameSuite_DebugComp_1__io_ctrl_wb_wen, "N0");
-  NameSuite_DebugComp_1__io_ctrl_wb_wen__prev = NameSuite_DebugComp_1__io_ctrl_wb_wen;
-  if (t == 0 || (NameSuite_DebugComp_1__io_ctrl_out != NameSuite_DebugComp_1__io_ctrl_out__prev).to_bool())
-    dat_dump(f, NameSuite_DebugComp_1__io_ctrl_out, "N1");
-  NameSuite_DebugComp_1__io_ctrl_out__prev = NameSuite_DebugComp_1__io_ctrl_out;
-  if (t == 0 || (NameSuite_DebugComp_1_dpath__io_ctrl_out != NameSuite_DebugComp_1_dpath__io_ctrl_out__prev).to_bool())
-    dat_dump(f, NameSuite_DebugComp_1_dpath__io_ctrl_out, "N2");
-  NameSuite_DebugComp_1_dpath__io_ctrl_out__prev = NameSuite_DebugComp_1_dpath__io_ctrl_out;
-  if (t == 0 || (NameSuite_DebugComp_1_dpath__wb_reg_ll_wb != NameSuite_DebugComp_1_dpath__wb_reg_ll_wb__prev).to_bool())
-    dat_dump(f, NameSuite_DebugComp_1_dpath__wb_reg_ll_wb, "N3");
-  NameSuite_DebugComp_1_dpath__wb_reg_ll_wb__prev = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb;
-  if (t == 0 || (NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen != NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen__prev).to_bool())
-    dat_dump(f, NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen, "N4");
-  NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen__prev = NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen;
-}
-""")
+    assertFile("NameSuite_DebugComp_1.h")
+    assertFile("NameSuite_DebugComp_1.cpp")
   }
 
   /* XXX test case derived from issue #6 on github.
@@ -971,17 +517,6 @@ void NameSuite_DebugComp_1_t::dump(FILE *f, int t) {
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new InputPortNameComp))
-    assertFile(tmpdir.getRoot() + "/NameSuite_InputPortNameComp_1.v",
-"""module NameSuite_InputPortNameComp_1(
-    input [19:0] io_in,
-    output[19:0] io_out
-);
-
-
-  assign io_out = io_in;
-endmodule
-
-"""
-    );
+    assertFile("NameSuite_InputPortNameComp_1.v");
   }
 }

@@ -54,8 +54,12 @@ class MultiClockSuite extends AssertionsForJUnit {
     tmpdir.delete()
   }
 
-  def assertFile( filename: String, content: String ) {
-    val source = scala.io.Source.fromFile(filename, "utf-8")
+  def assertFile( filename: String ) {
+    val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
+    val content = reffile.mkString
+    reffile.close()
+    val source = scala.io.Source.fromFile(
+      tmpdir.getRoot() + "/" + filename, "utf-8")
     val lines = source.mkString
     source.close()
     assert(lines === content)
@@ -87,38 +91,6 @@ class MultiClockSuite extends AssertionsForJUnit {
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new Comp()))
-    assertFile(tmpdir.getRoot() + "/MultiClockSuite_Comp_1.v",
-"""module MultiClockSuite_ClockedSubComp_1(input T0,
-    input io_ready,
-    output io_valid
-);
-
-  reg stored;
-
-  assign io_valid = stored;
-
-  always @(posedge T0) begin
-    stored <= io_ready;
-  end
-endmodule
-
-module MultiClockSuite_Comp_1(input T0,
-    input io_data0,
-    input io_data1,
-    output io_result
-);
-
-  wire sub_io_valid;
-  wire T1;
-
-  assign io_result = sub_io_valid;
-  assign T1 = io_data0 & io_data1;
-  MultiClockSuite_ClockedSubComp_1 sub(.T0(T0),
-       .io_ready( T1 ),
-       .io_valid( sub_io_valid )
-  );
-endmodule
-
-""")
+    assertFile("MultiClockSuite_Comp_1.v")
   }
 }
