@@ -179,6 +179,11 @@ object Module {
   }
 
   def current: Module = scope.compStack.top
+
+  def sprintf(message: String, args: Data*): UInt = {
+    UInt(new Sprintf(message, args.map(_.toBits.node)))
+  }
+
 }
 
 

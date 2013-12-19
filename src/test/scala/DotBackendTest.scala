@@ -54,8 +54,12 @@ class DotBackendSuite extends AssertionsForJUnit {
     tmpdir.delete()
   }
 
-  def assertFile( filename: String, content: String ) {
-    val source = scala.io.Source.fromFile(filename, "utf-8")
+  def assertFile( filename: String ) {
+    val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
+    val content = reffile.mkString
+    reffile.close()
+    val source = scala.io.Source.fromFile(
+      tmpdir.getRoot() + "/" + filename, "utf-8")
     val lines = source.mkString
     source.close()
     assert(lines === content)
@@ -92,29 +96,6 @@ class DotBackendSuite extends AssertionsForJUnit {
       "--backend", "Chisel.DotBackend",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new DAGComp()))
-    assertFile(tmpdir.getRoot() + "/DotBackendSuite_DAGComp_1.dot",
-"""digraph DotBackendSuite_DAGComp_1{
-rankdir = LR;
-  subgraph clustersub{
-    label = "sub"
-    DotBackendSuite_DAGComp_1_sub__io_valid[label="io_valid:OUTPUT"];
-    DotBackendSuite_DAGComp_1_sub__stored[shape=square,label="stored:RegDelay"];
-    DotBackendSuite_DAGComp_1_sub__io_ready[label="io_ready:INPUT"];
-    DotBackendSuite_DAGComp_1_sub__stored -> DotBackendSuite_DAGComp_1_sub__io_valid[label="1"];
-    DotBackendSuite_DAGComp_1_sub__io_ready -> DotBackendSuite_DAGComp_1_sub__stored[label="1"];
-  }
-  clk -> DotBackendSuite_DAGComp_1_sub__stored[label="1"];
-T0 -> DotBackendSuite_DAGComp_1_sub__io_ready[label="1"];
-  io_data0[label="io_data0:INPUT"];
-  io_data1[label="io_data1:INPUT"];
-  io_result[label="io_result:OUTPUT"];
-  sub_io_valid[label="sub_io_valid:INPUT"];
-  clk[label="clk:Update"];
-  T0[label="T0:AndOp"];
-  sub_io_valid -> io_result[label="1"];
-  DotBackendSuite_DAGComp_1_sub__io_valid -> sub_io_valid[label="1"];
-  io_data0 -> T0[label="1"];
-  io_data1 -> T0[label="1"];
-}""")
+    assertFile("DotBackendSuite_DAGComp_1.dot")
   }
 }

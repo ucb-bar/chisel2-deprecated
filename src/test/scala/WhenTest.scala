@@ -51,8 +51,12 @@ class WhenSuite extends AssertionsForJUnit {
     tmpdir.delete()
   }
 
-  def assertFile( filename: String, content: String ) {
-    val source = scala.io.Source.fromFile(filename, "utf-8")
+  def assertFile( filename: String ) {
+    val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
+    val content = reffile.mkString
+    reffile.close()
+    val source = scala.io.Source.fromFile(
+      tmpdir.getRoot() + "/" + filename, "utf-8")
     val lines = source.mkString
     source.close()
     assert(lines === content)
@@ -77,19 +81,7 @@ class WhenSuite extends AssertionsForJUnit {
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new WhenComp))
 
-    assertFile(tmpdir.getRoot() + "/WhenSuite_WhenComp_1.v",
-"""module WhenSuite_WhenComp_1(
-    input io_in,
-    output io_out
-);
-
-  wire T0;
-
-  assign io_out = T0;
-  assign T0 = io_in ? io_in : 1'h0/* 0*/;
-endmodule
-
-""")
+    assertFile("WhenSuite_WhenComp_1.v")
   }
 
   /** Put a when() inside another when() */
@@ -114,24 +106,7 @@ endmodule
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new EmbedWhenComp))
 
-    assertFile(tmpdir.getRoot() + "/WhenSuite_EmbedWhenComp_1.v",
-"""module WhenSuite_EmbedWhenComp_1(
-    input io_in0,
-    input io_in1,
-    output io_out
-);
-
-  wire T0;
-  wire T1;
-  wire T2;
-
-  assign io_out = T0;
-  assign T0 = T1 ? io_in1 : T2;
-  assign T1 = io_in0 && io_in1;
-  assign T2 = io_in0 ? io_in0 : 1'h0/* 0*/;
-endmodule
-
-""")
+    assertFile("WhenSuite_EmbedWhenComp_1.v")
   }
 
   /** When statement with elsewhen and otherwise clause.
@@ -159,26 +134,7 @@ endmodule
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new WhenClassComp))
 
-    assertFile(tmpdir.getRoot() + "/WhenSuite_WhenClassComp_1.v",
-"""module WhenSuite_WhenClassComp_1(
-    input io_in0,
-    input io_in1,
-    output io_out
-);
-
-  wire T0;
-  wire T1;
-  wire T2;
-  wire T3;
-
-  assign io_out = T0;
-  assign T0 = T1 ? io_in1 : T3;
-  assign T1 = T2 && io_in1;
-  assign T2 = ! io_in0;
-  assign T3 = io_in0 ? io_in0 : 1'h0/* 0*/;
-endmodule
-
-""")
+    assertFile("WhenSuite_WhenClassComp_1.v")
   }
 
   /** Forgot the dot prefix in elsewhen statement.
@@ -221,9 +177,7 @@ endmodule
         //      "--targetDir", tmpdir.getRoot().toString()),
         () => Module(new ForgotDotElseWhenComp))
 
-      assertFile(tmpdir.getRoot() + "/WhenSuite_ForgotDotElseWhen_1.v",
-"""
-""")
+      assertFile("WhenSuite_ForgotDotElseWhen_1.v")
   }
 
   /** instantiate module in a when block.
@@ -256,9 +210,7 @@ endmodule
         //      "--targetDir", tmpdir.getRoot().toString()),
         () => Module(new ModuleInWhenBlockComp))
 
-      assertFile(tmpdir.getRoot() + "/WhenSuite_ModuleInWhenBlockComp.v",
-"""
-""")
+      assertFile("WhenSuite_ModuleInWhenBlockComp.v")
   }
 
   /** Unless statement with elsewhen and otherwise clause.
@@ -290,22 +242,7 @@ endmodule
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new UnlessClassComp))
 
-    assertFile(tmpdir.getRoot() + "/WhenSuite_UnlessClassComp_1.v",
-"""module WhenSuite_UnlessClassComp_1(
-    input io_in0,
-    input io_in1,
-    output io_out
-);
-
-  wire T0;
-  wire T1;
-
-  assign io_out = T0;
-  assign T0 = T1 ? io_in1 : io_in0;
-  assign T1 = ! io_in0;
-endmodule
-
-""")
+    assertFile("WhenSuite_UnlessClassComp_1.v")
   }
 
 
@@ -330,22 +267,7 @@ endmodule
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new SwitchClassComp))
 
-    assertFile(tmpdir.getRoot() + "/WhenSuite_SwitchClassComp_1.v",
-"""module WhenSuite_SwitchClassComp_1(
-    input [7:0] io_in0,
-    input [7:0] io_in1,
-    output [7:0] io_out
-);
-
-  wire [7:0] T0;
-  wire T1;
-
-  assign io_out = T0;
-  assign T0 = T1 ? io_in1 : io_in0;
-  assign T1 = io_in0 == io_in1;
-endmodule
-
-""")
+    assertFile("WhenSuite_SwitchClassComp_1.v")
   }
 
 
