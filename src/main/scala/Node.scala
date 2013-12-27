@@ -153,6 +153,8 @@ abstract class Node extends nameable {
   // by Donggyu
   var arrival = 0.0
   var delay = 1.0
+  var seldelay = 0.0
+
 
   Module.nodes += this
 

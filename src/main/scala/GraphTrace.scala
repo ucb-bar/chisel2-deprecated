@@ -52,11 +52,13 @@ trait GraphTrace extends Backend {
       case bind  : Binding   => "Binding(" + nodeToString(bind.inputs(0)) + ")"
       case mem   : Mem[_]    => "Mem(" + mem.name + ")"
       case memacc: MemAccess => nodeToString(memacc.mem) + "[" + nodeToString(memacc.addr) + "]"
+      case rom   : ROM[_]    => { "ROM(" + rom.name + ")" }
+      case romread: ROMRead[_] => nodeToString(romread.rom) + "[" + nodeToString(romread.addr) + "]"
       case _ => if (node == null) "" else node.toString
     }      
   }
 
-  def printGraph(c: Module, filename: String = "graph.rpt") = {
+  def printGraph(c: Module, filename: String = "graph.rpt", isDelayBack: Boolean = true) = {
     val walked = new HashSet[Node]
     val basedir = ensureDir(Module.targetDir)
     val rptdir  = ensureDir(basedir+"report")
@@ -64,8 +66,13 @@ trait GraphTrace extends Backend {
     var report = new StringBuilder();
 
     def printNode(top: Node, level: Int) = {
-      report.append(genIndent(level) + getSignalName(top) + ":" + nodeToString(top) + 
-                    "\t(arrival: %.4f, delay: %.4f)\n".format(top.arrival, top.delay))
+      report.append(genIndent(level) + getSignalName(top) + ": " + nodeToString(top) + {
+        if (isDelayBack) {
+          "  (delay: %.4f, selection delay: %.4f)\n".format(top.delay, top.seldelay) 
+        } else {
+          "\n" 
+        }
+      })
     }
    
     def dfs(c: Module) = {
@@ -80,6 +87,10 @@ trait GraphTrace extends Backend {
       for ((n, flat) <- c.io.flatten) {
         stack push ((flat, 1))
         walked += flat
+      }
+      for (reset <- c.resets.values) {
+        stack push ((reset, 1))
+        walked += reset
       }
 
       // do DFS
@@ -114,8 +125,10 @@ trait GraphTrace extends Backend {
     report.append("Module name : " + c.name + "\n")
     dfs(c)
 
-    report.append("\nCritical path = " + Module.criticalPath)
-    report.append("\nCritical path delay = %.5f\n".format(Module.criticalPathDelay))
+    if(isDelayBack) {
+      report.append("\nCritical path = " + Module.criticalPath)
+      report.append("\nCritical path delay = %.5f\n".format(Module.criticalPathDelay))
+    }
 
     // ChiselError.info(report) 
     // write files into report
