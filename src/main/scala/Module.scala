@@ -379,22 +379,25 @@ object Module {
         return noStageNodes(node)
       } else {
         if((node.litOf != null) || (node == pipelineComponent.clock) || (node == pipelineComponent._reset)){
-	  noStageNodes(node) = true
-	  return true
-	} else if(isSource(node)) {
-	  noStageNodes(node) = false
-	  return false
-	} else if(isSink(node)){
-	  noStageNodes(node) = false
-	  return false
-	} else {
-	  var result = true
+	        noStageNodes(node) = true
+	        return true
+	      } else if(isSource(node)) {
+	        noStageNodes(node) = false
+	        return false
+	      } else if(isSink(node)){
+	        noStageNodes(node) = false
+	        return false
+	      } else if(node.isInstanceOf[Mem[_]]){
+	        noStageNodes(node) = false
+	        return false
+	      } else {
+	        var result = true
           for(input <- node.inputs){
             result = result && findIfNodeNeedsStageNum(input)
           }
-	  noStageNodes(node) = result
+	        noStageNodes(node) = result
           return result
-	}
+	      }
       }
     }
 
@@ -1235,39 +1238,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         fillerNodes ++= insertBitsOnOutputs(currentNode)
       }
     }
-
-    /*def insertFillerWires() = {//place extra wire nodes between all nodes
-      val bfsQueue = new ScalaQueue[Node]
-      val visited = new HashSet[Node]
-      
-      for(node <- regReadPoints){
-        for(output <- node.consumers){
-	  bfsQueue.enqueue(output)
-	}
-      }
-      for(node <- regWritePoints){
-        bfsQueue.enqueue(node)
-      }
-      for(node <- tMemReadAddrs){
-        bfsQueue.enqueue(node)
-      }
-      for(node <- tMemWritePoints){
-        bfsQueue.enqueue(node)
-      }
-      for(node <- outputNodes){
-        bfsQueue.enqueue(node)
-      }
-      while(!bfsQueue.isEmpty){
-        val currentNode = bfsQueue.dequeue
-        for(child <- currentNode.inputs){
-          if(!visited.contains(child) && !regReadPoints.contains(child) && !tMemReadDatas.contains(child) && !inputNodes.contains(child)){
-            bfsQueue.enqueue(child)
-          }
-        }
-        visited +=currentNode
-        fillerNodes ++= insertBitsOnInputs(currentNode)
-      }
-    }*/
   
     def propagatedToChild(parentStage: Int, child: Node) : Boolean = {
       if(!requiresNoStageNum(child)){
@@ -1441,6 +1411,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         }
       }
     }
+    //visualizeGraph(coloredNodes)
     coloredNodes
   }
     
@@ -1478,6 +1449,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           consumer.inputs(j) = new_bits
           new_bits.consumers += consumer
           new_bits.inputs += input
+          pipelineComponent.nodes += new_bits
         } 
       }
     }
@@ -1525,7 +1497,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     new_bits
   }
   
+  /*
   def optimizeRegisterPlacement(coloredNodes: HashMap[Node, ArrayBuffer[Int]]) = { 
+    println(coloredNodes)
     val lastMovedNodes = new ArrayBuffer[(Node, ArrayBuffer[Int])]//keep track of nodes we just moved so that we can undo the move later
     
     var temp = 10000.0
@@ -1826,7 +1800,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     println(findUnpipelinedPathLength(coloredNodes))
     println("max path delay before optimization:")
     println(findEnergy(coloredNodes))
-    while(temp > 0.001 && iterCount < 5000){
+    while(temp > 0.001 && iterCount < 10000){
       val currentEnergy = findEnergy(coloredNodes)
       getNewPlacement()
       val newEnergy = findEnergy(coloredNodes)
@@ -1848,6 +1822,283 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     println(findEnergy(coloredNodes))
     println(temp)
     println(iterCount)
+    println(coloredNodes)
+  }*/
+  
+  
+  def optimizeRegisterPlacement(coloredNodes: HashMap[Node, ArrayBuffer[Int]]) = { 
+    val lastMovedNodes = new ArrayBuffer[(Node, ArrayBuffer[Int])]//keep track of nodes we just moved so that we can undo the move later
+    val nodeArrivalTimes = new HashMap[Node, Double]
+    
+    var temp = 10000.0
+    val coolRate = 0.002
+    var iterCount = 0
+    
+    def acceptProbability(currentEnergy: Double, newEnergy: Double, temp: Double): Double = {
+      if(newEnergy <= currentEnergy){
+        return 1
+      } else {
+        return Math.exp((currentEnergy-newEnergy)/temp)
+      }
+    }
+
+    def calculateArrivalTimes() = {
+      def findArrivalTime(node: Node) : Double = {
+        if(nodeArrivalTimes.contains(node)){
+          return nodeArrivalTimes(node)
+        } else if(isSource(node)){
+          nodeArrivalTimes(node) = 0.0
+          return 0.0
+        } else if(node.isInstanceOf[Mem[_]]){
+          nodeArrivalTimes(node) = 0.0
+          return 0.0
+        } else if(requiresNoStageNum(node)){
+          nodeArrivalTimes(node) = 0.0
+          return 0.0
+        } else if(coloredNodes.contains(node) && coloredNodes(node).length > 1 && (coloredNodes(node)(0) != coloredNodes(node)(1))) {
+          nodeArrivalTimes(node) = 0.0
+          return 0.0
+        } else {
+          var arrivalTime :Double= 0.0
+          for(input <- node.inputs){
+            arrivalTime = Math.max(arrivalTime, findArrivalTime(input))
+          }
+          nodeArrivalTimes(node) = arrivalTime + node.delay
+          return arrivalTime + node.delay
+        }
+      }
+      nodeArrivalTimes.clear()
+      for(node <- pipelineComponent.nodes){
+        if(coloredNodes.contains(node) && coloredNodes(node).length > 1 && (coloredNodes(node)(0) != coloredNodes(node)(1))){
+          for(input <- node.inputs){
+            findArrivalTime(input)
+          }
+        }
+      }
+      for(node <- sinkNodes()){
+        findArrivalTime(node)
+      }
+    }
+    var maxPath:Node = null
+    def findEnergy(coloredNodes: HashMap[Node, ArrayBuffer[Int]]): Double = {
+      calculateArrivalTimes()
+      var maxLength = 0.0
+      for(node <- nodeArrivalTimes.keys){
+        maxLength = Math.max(maxLength, nodeArrivalTimes(node))
+        maxPath = node
+      }
+      return maxLength
+    } 
+    
+    def findUnpipelinedPathLength(coloredNodes: HashMap[Node, ArrayBuffer[Int]]): Double = {
+      val nodeArrivalTimes = new HashMap[Node, Double]
+      def calculateArrivalTimes() = {
+        def findArrivalTime(node: Node) : Double = {
+          if(nodeArrivalTimes.contains(node)){
+            return nodeArrivalTimes(node)
+          } else if(isSource(node)){
+            nodeArrivalTimes(node) = 0.0
+            return 0.0
+          } else if(node.isInstanceOf[Mem[_]]){
+            nodeArrivalTimes(node) = 0.0
+            return 0.0
+          } else if(requiresNoStageNum(node)){
+            nodeArrivalTimes(node) = 0.0
+            return 0.0
+          } else {
+            var arrivalTime :Double= 0.0
+            for(input <- node.inputs){
+              arrivalTime = Math.max(arrivalTime, findArrivalTime(input))
+            }
+            nodeArrivalTimes(node) = arrivalTime + node.delay
+            return arrivalTime + node.delay
+          }
+        }
+        nodeArrivalTimes.clear()
+        for(node <- sinkNodes()){
+          findArrivalTime(node)
+        }
+      }
+    
+      calculateArrivalTimes()
+      var maxLength = 0.0
+      for(node <- nodeArrivalTimes.keys){
+        maxLength = Math.max(maxLength, nodeArrivalTimes(node))
+      }
+      return maxLength
+    }
+    
+    //randomly move a combinational node across a pipeline boundary
+    def getNewPlacement() = {
+      if(Math.random > 0.5){//move node up a stage
+        val eligibleNodes = new ArrayBuffer[Node]//list of nodes that can be legally moved up one stage. A node can be legally moved up one stage if all of its consumer nodes have a stage number greater than its stage number
+        
+        //find eligibleNodes
+        for((node, stageNums) <- coloredNodes){
+          if(!requiresNoStageNum(node) && !annotatedStages.contains(node) && !isSource(node) && !isSink(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) < pipelineLength - 1) {
+            val nodeStage = coloredNodes(node)(0)
+            var consumersEligible = true
+            Predef.assert(coloredNodes(node).length <= 1, "" + node + " " + coloredNodes(node))
+            for(consumer <- node.consumers){
+              if(!requiresNoStageNum(consumer)){
+                if(coloredNodes.contains(consumer) && coloredNodes(consumer).length > 1){
+                  Predef.assert(coloredNodes(consumer).length <= 2)
+                  consumersEligible = consumersEligible && (Math.max(coloredNodes(consumer)(0), coloredNodes(consumer)(1)) > nodeStage)
+                } else {
+                  consumersEligible = consumersEligible && false
+                  //Predef.assert(coloredNodes(consumer)(0) == nodeStage)
+                }
+              }
+            }
+            if(consumersEligible) eligibleNodes += node
+          }
+        }
+        
+        //randomly select eligible node to move
+        //Predef.assert(eligibleNodes.length > 0)
+        if(eligibleNodes.length > 0){
+          val idx = scala.util.Random.nextInt(eligibleNodes.length)
+          val movedNode = eligibleNodes(idx)
+          lastMovedNodes += ((movedNode, coloredNodes(movedNode).clone()))
+          val movedNodeStage = coloredNodes(movedNode)(0)
+          coloredNodes(movedNode)(0) = coloredNodes(movedNode)(0) + 1
+          for(input <- movedNode.inputs){
+            if(!requiresNoStageNum(input)){
+              lastMovedNodes += ((input, coloredNodes(input).clone()))
+              if(coloredNodes(input).length == 2){
+                if(coloredNodes(input)(0) == movedNodeStage){
+                  coloredNodes(input)(0) = coloredNodes(input)(0) + 1
+                } else {
+                  coloredNodes(input)(1) = coloredNodes(input)(1) + 1
+                }
+                if(coloredNodes(input)(0) == coloredNodes(input)(1)){
+                  coloredNodes(input) -= coloredNodes(input)(1)
+                }
+              } else {
+                coloredNodes(input) += coloredNodes(input)(0) + 1
+              }
+            }
+          }
+          for(consumer <- movedNode.consumers){
+            if(!requiresNoStageNum(consumer)){
+              lastMovedNodes += ((consumer, coloredNodes(consumer).clone()))
+              if(coloredNodes(consumer).length == 2){
+                if(coloredNodes(consumer)(0) == movedNodeStage){
+                  coloredNodes(consumer)(0) = coloredNodes(consumer)(0) + 1
+                } else {
+                  coloredNodes(consumer)(1) = coloredNodes(consumer)(1) + 1
+                }
+                if(coloredNodes(consumer)(0) == coloredNodes(consumer)(1)){
+                  coloredNodes(consumer) -= coloredNodes(consumer)(1)
+                }
+              }
+            }
+          }
+          
+        }
+      } else {//move node down a stage
+        val eligibleNodes = new ArrayBuffer[Node]//list of nodes that can be legally moved up one stage. A node can be legally moved up one stage if all of its consumer nodes have a stage number less than its stage number
+        
+        //find eligible nodes
+        for((node, stageNums) <- coloredNodes){
+          
+          if(!requiresNoStageNum(node) && !annotatedStages.contains(node) && !isSource(node) && !isSink(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) > 0) {
+            val nodeStage = coloredNodes(node)(0)
+            var producersEligible = true
+            Predef.assert(coloredNodes(node).length <= 1, "" + node + " " + coloredNodes(node))
+            for(producer <- node.inputs){
+              if(!requiresNoStageNum(producer)){
+                if(coloredNodes.contains(producer) && coloredNodes(producer).length > 1){
+                  Predef.assert(coloredNodes(producer).length <= 2)
+                  producersEligible = producersEligible && (Math.min(coloredNodes(producer)(0), coloredNodes(producer)(1)) < nodeStage)
+                } else {
+                  producersEligible = producersEligible && false
+                  //Predef.assert(coloredNodes(producer)(0) == nodeStage)
+                }
+              }
+            }
+            if(producersEligible) eligibleNodes += node
+          }
+        }
+        
+        //Predef.assert(eligibleNodes.length > 0)
+        if(eligibleNodes.length > 0){
+          val idx = scala.util.Random.nextInt(eligibleNodes.length)
+          val movedNode = eligibleNodes(idx)
+          val movedNodeStage = coloredNodes(movedNode)(0)
+          lastMovedNodes += ((movedNode, coloredNodes(movedNode).clone()))
+          coloredNodes(movedNode)(0) = coloredNodes(movedNode)(0) - 1
+          for(input <- movedNode.inputs){
+            if(!requiresNoStageNum(input)){
+              lastMovedNodes += ((input, coloredNodes(input).clone()))
+              if(coloredNodes(input).length == 2){
+                if(coloredNodes(input)(0) == movedNodeStage){
+                  coloredNodes(input)(0) = coloredNodes(input)(0) - 1
+                } else {
+                  coloredNodes(input)(1) = coloredNodes(input)(1) - 1
+                }
+                if(coloredNodes(input)(0) == coloredNodes(input)(1)){
+                  coloredNodes(input) -= coloredNodes(input)(1)
+                }
+              }
+            }
+          }
+          for(consumer <- movedNode.consumers){
+            if(!requiresNoStageNum(consumer)){
+              lastMovedNodes += ((consumer, coloredNodes(consumer).clone()))
+              if(coloredNodes(consumer).length == 2){
+                if(coloredNodes(consumer)(0) == movedNodeStage){
+                  coloredNodes(consumer)(0) = coloredNodes(consumer)(0) - 1
+                } else {
+                  coloredNodes(consumer)(1) = coloredNodes(consumer)(1) - 1
+                }
+                if(coloredNodes(consumer)(0) == coloredNodes(consumer)(1)){
+                  coloredNodes(consumer) -= coloredNodes(consumer)(1)
+                }
+              } else {
+                coloredNodes(consumer) += coloredNodes(consumer)(0) - 1
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    //reset coloredNodes to its state before the last call of getNewPlacemement()
+    def recoverOldPlacement() = {
+      for((node, stages) <- lastMovedNodes){
+        coloredNodes(node) = stages
+      }
+    }
+    
+    println("max unpipelined path delay")
+    println(findUnpipelinedPathLength(coloredNodes))
+    println("max path delay before optimization:")
+    println(findEnergy(coloredNodes))
+    while(temp > 0.001){
+      val currentEnergy = findEnergy(coloredNodes)
+      getNewPlacement()
+      val newEnergy = findEnergy(coloredNodes)
+      /*println(currentEnergy)
+      println(newEnergy)*/
+      if(acceptProbability(currentEnergy, newEnergy, temp) < Math.random()){
+        recoverOldPlacement()
+      } 
+      lastMovedNodes.clear()
+      temp = temp - temp*coolRate
+      iterCount = iterCount + 1
+      if(iterCount/1000 > 0 && iterCount%1000 == 0){
+        println(temp)
+        println(currentEnergy)
+        println(maxPath)
+      }
+    }
+    println("max path delay after optimization:")
+    println(findEnergy(coloredNodes))
+    println(temp)
+    println(iterCount)
+    visualizeGraph(coloredNodes, "stages.gv")
+    visualizeGraph(nodeArrivalTimes, "delays.gv")
   }
   
   def insertPipelineRegisters() = {
@@ -2768,6 +3019,30 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       Predef.assert(getStage(vComponent.io.req.valid) == getStage(vComponent.resp_valid))
       Predef.assert(getStage(vComponent.io.req.valid) == getStage(vComponent.req_ready))
     }
+  }
+  
+  def visualizeGraph(nodeMap: HashMap[Node,_], fileName: String) = {
+    val outFile = new java.io.FileWriter("/home/eecs/wenyu/auto-pipelining/" + fileName)
+    outFile.write("digraph G {\n")
+    outFile.write("graph [rankdir=LR];\n")
+    var nameEnum = 0
+    val nodeNames = new HashMap[Node, String]
+    for(node <- nodeMap.keys){
+      outFile.write("n" + nameEnum + " [label=\"" + node.name + """\n""" + nodeMap(node) + "\"];\n")
+      nodeNames(node) = "n" + nameEnum
+      nameEnum = nameEnum + 1
+    }
+    for(node <- nodeMap.keys){
+      if(!isSource(node)){
+        for(input <- node.inputs){
+          if(nodeNames.contains(input)){
+            outFile.write(nodeNames(input) + " -> " + nodeNames(node) + ";\n")
+          }
+        }
+      }
+    }
+    outFile.write("}\n")
+    outFile.close
   }
   
   def compBfs(comp: Module, visit: Node => Unit) : Unit = {

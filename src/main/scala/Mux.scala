@@ -127,4 +127,5 @@ class Mux extends Op {
     if (inputs(1).width != width) inputs(1) = inputs(1).matchWidth(width)
     if (inputs(2).width != width) inputs(2) = inputs(2).matchWidth(width)
   }
+  
 }

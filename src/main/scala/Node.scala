@@ -152,7 +152,7 @@ abstract class Node extends nameable {
   // Delay annotation and Critical path calc
   // by Donggyu
   var arrival = 0.0
-  var delay = 0.0
+  var delay = 1.0
 
   Module.nodes += this
 
