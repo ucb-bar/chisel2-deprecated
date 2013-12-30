@@ -391,12 +391,14 @@ object Module {
 	        noStageNodes(node) = false
 	        return false
 	      } else {
-	        var result = true
+	        var inputsAreAllConsts = true
+	        var inputsContainWritePoint = false
           for(input <- node.inputs){
-            result = result && findIfNodeNeedsStageNum(input)
+            inputsContainWritePoint = inputsContainWritePoint || tMemWritePoints.contains(input)
+            inputsAreAllConsts = inputsAreAllConsts && findIfNodeNeedsStageNum(input)
           }
-	        noStageNodes(node) = result
-          return result
+	        noStageNodes(node) = inputsAreAllConsts || inputsContainWritePoint
+          return inputsAreAllConsts || inputsContainWritePoint
 	      }
       }
     }
@@ -1153,7 +1155,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         regWritePoints += i
       }
     }
-    
     //mark read and write ports for transactionMems
     for(tmem <- TransactionMems){
       for(i <- 0 until tmem.readPortNum){
@@ -1416,7 +1417,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         }
       }
     }
-    //visualizeGraph(coloredNodes)
+    //visualizeGraph(coloredNodes, "stages.gv")
     coloredNodes
   }
     
@@ -2050,6 +2051,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           }
           for(consumer <- movedNode.consumers){
             if(!requiresNoStageNum(consumer)){
+              visualizeSubGraph(consumer, "debug.gv", 9)
               lastMovedNodes += ((consumer, coloredNodes(consumer).clone()))
               if(coloredNodes(consumer).length == 2){
                 if(coloredNodes(consumer)(0) == movedNodeStage){
@@ -3008,13 +3010,13 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
     
     //check that all IO nodes are in the same stage
-    val ioNodes = pipelineComponent.io.flatten.map(_._2)
+    /*val ioNodes = pipelineComponent.io.flatten.map(_._2)
     if(ioNodes.length > 0){
       val IOstage = getStage(ioNodes(0))
       for(io <- ioNodes) {
         Predef.assert(nodeToStageMap(io) == IOstage, "IO nodes do not all belong to the same stage")
       }
-    }
+    }*/
     
     //check that all variable latency units have IO nodes in the same stage
     for(vComponent <- VariableLatencyComponents){
@@ -3024,6 +3026,53 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       Predef.assert(getStage(vComponent.io.req.valid) == getStage(vComponent.resp_valid))
       Predef.assert(getStage(vComponent.io.req.valid) == getStage(vComponent.req_ready))
     }
+  }
+  
+  //outputs graphviz file for subgraph centered around root
+  def visualizeSubGraph(root: Node, fileName: String, levels: Int) ={
+    val outFile = new java.io.FileWriter("/home/eecs/wenyu/auto-pipelining/" + fileName)
+    outFile.write("digraph G {\n")
+    outFile.write("graph [rankdir=LR];\n")
+    
+    var nameEnum = 0
+    var currentLevel = 0
+    val nodeNames = new HashMap[Node, String]
+    var currentQueue = new ScalaQueue[Node]
+    var nextQueue = new ScalaQueue[Node]
+    
+    currentQueue.enqueue(root)
+    outFile.write("n" + nameEnum + " [label=\"" + root.name +  """\n""" + "ROOT" +"\"];\n")
+    nodeNames(root) = "n" + nameEnum
+    nameEnum = nameEnum + 1
+    
+    while(currentLevel < levels){
+      while(!currentQueue.isEmpty){
+        val node = currentQueue.dequeue
+        for(input <- node.inputs){
+          if(!nodeNames.contains(input)){
+            nextQueue.enqueue(input)
+            outFile.write("n" + nameEnum + " [label=\"" + input.name + """\n""" + "level_" + currentLevel + "\"];\n")
+            nodeNames(input) = "n" + nameEnum
+            nameEnum = nameEnum + 1
+            outFile.write(nodeNames(input) + " -> " + nodeNames(node) + ";\n")
+          }
+        }
+        for(consumer <- node.consumers){
+          if(!nodeNames.contains(consumer)){
+            nextQueue.enqueue(consumer)
+            outFile.write("n" + nameEnum + " [label=\"" + consumer.name + """\n""" + "level_" + currentLevel + "\"];\n")
+            nodeNames(consumer) = "n" + nameEnum
+            nameEnum = nameEnum + 1
+            outFile.write(nodeNames(node) + " -> " + nodeNames(consumer) + ";\n")
+          }
+        }
+      }
+      currentLevel = currentLevel + 1
+      currentQueue = nextQueue
+      nextQueue = new ScalaQueue[Node]
+    }
+    outFile.write("}\n")
+    outFile.close
   }
   
   def visualizeGraph(nodeMap: HashMap[Node,_], fileName: String) = {
