@@ -341,7 +341,7 @@ object Module {
   def addPipeReg(stage: Int, n: Node, rst: Bits) = {//insert pipeline registers manually
     pipeline(stage) += (n -> rst)
   }
-  def annotateNodeStage(n: Node, s:Int) = {//insert pipeline registers by annotating nodes with stages
+  def setStage(n: Node, s:Int) = {//insert pipeline registers by annotating nodes with stages
     Predef.assert(!annotatedStages.contains(n), n.name + " already annotated as stage " + annotatedStages(n))
     if(n.isInstanceOf[Data] && n.asInstanceOf[Data].comp != null){
       annotatedStages(n.asInstanceOf[Data].comp) = s
@@ -349,7 +349,66 @@ object Module {
       annotatedStages(n) = s
     }
   }
-  
+  def setRegReadStage(node: Node, stage: Int) = {
+    val reg = node.asInstanceOf[Data].comp.asInstanceOf[Reg]
+    Predef.assert(!(annotatedStages.contains(reg) && annotatedStages(reg) != stage), reg.name + " already annotated as stage " + annotatedStages(reg))
+    annotatedStages(reg) = stage
+  }
+  def setRegWriteStage(node: Node, stage: Int) = {
+    val reg = node.asInstanceOf[Data].comp.asInstanceOf[Reg]
+    for(producer <- reg.getProducers()){
+      Predef.assert(!(annotatedStages.contains(producer) && annotatedStages(producer) != stage), producer.name + " already annotated as stage " + annotatedStages(producer))
+      annotatedStages(producer) = stage
+    }
+  }
+  def setTmemReadStage(tmem: TransactionMem[_], stage: Int) = {
+    for(i <- 0 until tmem.io.reads.length){
+      val readPoint = tmem.io.reads(i)
+      val readAddr = readPoint.adr.asInstanceOf[Node]
+      val readData = readPoint.dat.asInstanceOf[Node]
+      Predef.assert(!(annotatedStages.contains(readAddr) && annotatedStages(readAddr) != stage), readAddr.name + " already annotated as stage " + annotatedStages(readAddr))
+      annotatedStages(readAddr) = stage
+      Predef.assert(!(annotatedStages.contains(readData) && annotatedStages(readData) != stage), readData.name + " already annotated as stage " + annotatedStages(readData))
+      annotatedStages(readData) = stage
+    }
+  }
+  def setTmemWriteStage(tmem: TransactionMem[_], stage: Int) = {
+    for(i <- 0 until tmem.io.writes.length){
+      val writePoint = tmem.io.writes(i)
+      val writeAddr = writePoint.actualWaddr
+      val writeEn = writePoint.actualWen
+      val writeData = writePoint.actualWdata
+      Predef.assert(!(annotatedStages.contains(writeAddr) && annotatedStages(writeAddr) != stage), writeAddr.name + " already annotated as stage " + annotatedStages(writeAddr))
+      annotatedStages(writeAddr) = stage
+      Predef.assert(!(annotatedStages.contains(writeData) && annotatedStages(writeData) != stage), writeData.name + " already annotated as stage " + annotatedStages(writeData))
+      annotatedStages(writeData) = stage
+      Predef.assert(!(annotatedStages.contains(writeEn) && annotatedStages(writeEn) != stage), writeEn.name + " already annotated as stage " + annotatedStages(writeEn))
+      annotatedStages(writeEn) = stage
+    }
+  }
+  def setInputStage(stage: Int) = {
+    val inputs = pipelineComponent.io.flatten.filter(_._2.dir == INPUT).map(_._2)
+    for(input <- inputs){
+      Predef.assert(!annotatedStages.contains(input), input.name + " already annotated as stage " + annotatedStages(input))
+      annotatedStages(input) = stage
+    }
+  }
+  def setOutputStage(stage: Int) = {
+    val outputs = pipelineComponent.io.flatten.filter(_._2.dir == OUTPUT).map(_._2)
+    for(output <- outputs){
+      Predef.assert(!annotatedStages.contains(output), output.name + " already annotated as stage " + annotatedStages(output))
+      annotatedStages(output) = stage
+    }
+  }
+  def setVariableLatencyUnitStage(varComp: TransactionalComponent, stage: Int) = {
+    annotatedStages(varComp.io.req.valid) = stage
+    annotatedStages(varComp.io.req.bits) = stage
+    annotatedStages(varComp.resp_ready) = stage
+    annotatedStages(varComp.io.resp) = stage
+    annotatedStages(varComp.resp_valid) = stage
+    annotatedStages(varComp.req_ready) = stage
+  }
+
   def addForwardedReg(d: Reg) = {
     forwardedRegs += d
   }
@@ -2051,7 +2110,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           }
           for(consumer <- movedNode.consumers){
             if(!requiresNoStageNum(consumer)){
-              visualizeSubGraph(consumer, "debug.gv", 9)
               lastMovedNodes += ((consumer, coloredNodes(consumer).clone()))
               if(coloredNodes(consumer).length == 2){
                 if(coloredNodes(consumer)(0) == movedNodeStage){
