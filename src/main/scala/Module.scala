@@ -1327,6 +1327,33 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       result
     }
     
+    def propagateToChild(node: Node, direction: Boolean) = {
+      val propagatedChildren = new ArrayBuffer[Node]
+      var children:Seq[Node] = null
+      
+      //determine if we need/can propagate to child; direction = true means child is producer of node, direction = false means child is consumer of node
+      def childEligibleForPropagation(child: Node, direction: Boolean): Boolean ={
+        return false
+      }
+      //propagate node's stage number to child and record all new nodes that have been propagated to; direction = true means child is producer of node, direction = false means child is consumer of node
+      def propagateToChild(child: Node, direction: Boolean) = {
+      }
+      
+      if(direction){//propagate to consumers
+        children = node.consumers
+      } else {//propagate to producers
+        children = node.getProducers()
+      }
+      
+      for(child <- children) {
+        //check if we need/can propagate to child
+        if(childEligibleForPropagation(child, direction)){
+          //propagate stage to child
+          propagateToChild(child, direction)
+        }
+      }
+    }
+    
     def propagateToProducers(node: Node) = {
       val propagatedChildren = new ArrayBuffer[Node]
       for(producer <- node.getProducers()){
