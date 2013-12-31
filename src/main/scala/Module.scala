@@ -275,7 +275,7 @@ object Module {
   val stageStalls = new ArrayBuffer[Bool]
   val stageKills = new ArrayBuffer[Bool]
   val fillerNodes = new HashSet[Node]
-  val noStageNodes = new HashMap[Node, Boolean]
+  val requiresStageMap = new HashMap[Node, Boolean]
 
   val regWritePoints = new HashSet[Node] //list of all register write inputs and transactionMem write port nodes(including write addr, write data, write en)
   val regReadPoints = new HashSet[Node] //list of all register read outputs and transactionMem read port
@@ -428,44 +428,39 @@ object Module {
   }
   
   //we should not propagate stage numbers to literals, reset signals, and clock signals
-  def requiresNoStageNum(node: Node) : Boolean = {
-    //(node.litOf != null) || (node == pipelineComponent.clock) || (node == pipelineComponent._reset)
-    findIfNodeNeedsStageNum(node)
-  }
-  
-  def findIfNodeNeedsStageNum(node: Node): Boolean = {
-      if(noStageNodes.contains(node)){
-        return noStageNodes(node)
+  def requireStage(node: Node): Boolean = {
+    if(requiresStageMap.contains(node)){
+      return requiresStageMap(node)
+    } else {
+      if((node.litOf != null) || (node == pipelineComponent.clock) || (node == pipelineComponent._reset)){
+        requiresStageMap(node) = false
+        return false
+      } else if(isSource(node)) {
+        requiresStageMap(node) = true
+        return true
+      } else if(isSink(node)){
+        requiresStageMap(node) = true
+        return true
+      } else if(node.isInstanceOf[Mem[_]]){
+        requiresStageMap(node) = true
+        return true
       } else {
-        if((node.litOf != null) || (node == pipelineComponent.clock) || (node == pipelineComponent._reset)){
-	        noStageNodes(node) = true
-	        return true
-	      } else if(isSource(node)) {
-	        noStageNodes(node) = false
-	        return false
-	      } else if(isSink(node)){
-	        noStageNodes(node) = false
-	        return false
-	      } else if(node.isInstanceOf[Mem[_]]){
-	        noStageNodes(node) = false
-	        return false
-	      } else {
-	        var inputsAreAllConsts = true
-	        var inputsContainWritePoint = false
-          for(input <- node.inputs){
-            inputsContainWritePoint = inputsContainWritePoint || tMemWritePoints.contains(input)
-            inputsAreAllConsts = inputsAreAllConsts && findIfNodeNeedsStageNum(input)
-          }
-	        noStageNodes(node) = inputsAreAllConsts || inputsContainWritePoint
-          return inputsAreAllConsts || inputsContainWritePoint
-	      }
+        var inputsAreAllConsts = true
+        var inputsContainWritePoint = false
+        for(input <- node.inputs){
+          inputsContainWritePoint = inputsContainWritePoint || tMemWritePoints.contains(input)
+          inputsAreAllConsts = inputsAreAllConsts && !requireStage(input)
+        }
+        requiresStageMap(node) = !(inputsAreAllConsts || inputsContainWritePoint)
+        return !(inputsAreAllConsts || inputsContainWritePoint)
       }
     }
+  }
 
   def getStage(n: Node): Int = {
     if (nodeToStageMap.contains(n))
       return nodeToStageMap(n)
-    else if(requiresNoStageNum(n))
+    else if(!requireStage(n))
       return -1
     else
       Predef.assert(false, "node does not have astage number: " + n)
@@ -1278,15 +1273,41 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   
   
   def propagateStages() = {
-    
-    
     val bfsQueue = new ScalaQueue[(Node, Boolean)] //the 2nd item of the tuple indicateds which direction the node should propagate its stage number to. True means propagate to outputs, false means propagate to inputs
     val retryNodes = new ArrayBuffer[(Node, Boolean)] //list of nodes that need to retry their stage propagation because their children weren't ready
     
     val coloredNodes = new HashMap[Node, ArrayBuffer[Int]] //map of node to stage numbers to be returned
     var oldColoredNodes = new HashMap[Node, ArrayBuffer[Int]] //remember old colored nodes so that we can see if the algorithm is making progress
     
-    def insertFillerWires() = {//place extra wire nodes between all nodes
+    //initialize empty array buffer for all nodes in coloredNodes
+    def initializeColoredNodes() ={
+      val bfsQueue = new ScalaQueue[Node]
+      val visited = new HashSet[Node]
+      for(node <- sourceNodes()){
+        bfsQueue.enqueue(node)
+      }
+      while(!bfsQueue.isEmpty){
+        val currentNode = bfsQueue.dequeue
+        if(!isSink(currentNode)){
+          for(child <- currentNode.consumers){
+            if(!visited.contains(child)){
+              bfsQueue.enqueue(child)
+            }
+          }
+        }
+        visited +=currentNode
+        coloredNodes(currentNode) = new ArrayBuffer[Int]
+      }
+      for(node <- tMemWritePoints){//not reached by bfs through consumer
+        coloredNodes(node) = new ArrayBuffer[Int]
+      }
+      for(node <- tMemReadAddrs){//not reached by bfs through consumers
+        coloredNodes(node) = new ArrayBuffer[Int]
+      }
+    }
+    
+    //place extra wire nodes between all nodes
+    def insertFillerWires() = {
       val bfsQueue = new ScalaQueue[Node]
       val visited = new HashSet[Node]
       for(node <- sourceNodes()){
@@ -1305,7 +1326,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
   
     def propagatedToChild(parentStage: Int, child: Node) : Boolean = {
-      if(!requiresNoStageNum(child)){
+      if(requireStage(child)){
         if(!coloredNodes.contains(child)){
           return false
         } else {
@@ -1327,18 +1348,87 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       result
     }
     
-    def propagateToChild(node: Node, direction: Boolean) = {
-      val propagatedChildren = new ArrayBuffer[Node]
-      var children:Seq[Node] = null
+    def propagateToChildren(node: Node, direction: Boolean) = {
+      val propagatedChildren = new ArrayBuffer[Node] 
       
-      //determine if we need/can propagate to child; direction = true means child is producer of node, direction = false means child is consumer of node
+      //determine if we need/can propagate to child and return the stage number that should be propagated to child; direction = true means child is producer of node, direction = false means child is consumer of node
       def childEligibleForPropagation(child: Node, direction: Boolean): Boolean ={
-        return false
+        val childWasPropagated = propagatedToChild(coloredNodes(node)(0), child)
+        val fillerToReal = fillerNodes.contains(node) && !fillerNodes.contains(child) && coloredNodes(child).length > 0
+        var allParentsResolved = true
+        var childParents:Seq[Node] = null
+        if(direction){
+          childParents = child.consumers 
+        } else {
+          childParents = child.inputs
+        }
+        var edgeParentStage:Int = 0//this is the minimum stage of child's consumers when direction == true, this is the maximum stage of child's producers when direction == false
+        if(direction){
+          edgeParentStage = Int.MaxValue
+        } else {
+          edgeParentStage = 0
+        }
+
+        for(parent <- childParents.filter(requireStage(_))){
+          visualizeSubGraph(parent, "debug.gv", 5)
+          println(parent.component)
+          if(coloredNodes(parent).length == 0){
+            allParentsResolved = false
+          } else {
+            if(direction){
+              if(coloredNodes(parent).min < edgeParentStage){
+                edgeParentStage = coloredNodes(parent).min
+              }
+            } else {
+              if(coloredNodes(parent).max > edgeParentStage){
+                edgeParentStage = coloredNodes(parent).max
+              }
+            }
+          }
+        }
+        val childEligible = !childWasPropagated && !fillerToReal && allParentsResolved
+        return childEligible
       }
       //propagate node's stage number to child and record all new nodes that have been propagated to; direction = true means child is producer of node, direction = false means child is consumer of node
-      def propagateToChild(child: Node, direction: Boolean) = {
+      def doPropagation(child: Node, direction: Boolean) = {
+        var childParents:Seq[Node] = null
+        if(direction){
+          childParents = child.consumers 
+        } else {
+          childParents = child.inputs
+        }
+        var edgeParentStage:Int = 0//this is the minimum stage of child's consumers when direction == true, this is the maximum stage of child's producers when direction == false
+        if(direction){
+          edgeParentStage = Int.MaxValue
+        } else {
+          edgeParentStage = 0
+        }
+
+        for(parent <- childParents.filter(requireStage(_))){
+          if(direction){
+            if(coloredNodes(parent).min < edgeParentStage){
+              edgeParentStage = coloredNodes(parent).min
+            }
+          } else {
+            if(coloredNodes(parent).max > edgeParentStage){
+              edgeParentStage = coloredNodes(parent).max
+            }
+          }
+        }
+        //propagate stage to child
+        if(!coloredNodes(child).contains(edgeParentStage)){
+          coloredNodes(child) += edgeParentStage
+        }
+        //propagate child stage back to its parents
+        for(parent <- childParents.filter(requireStage(_))){
+          if(!coloredNodes(parent).contains(edgeParentStage)){
+            coloredNodes(parent) += edgeParentStage
+          }
+        }
+        propagatedChildren += child
       }
-      
+
+      var children:Seq[Node] = null
       if(direction){//propagate to consumers
         children = node.consumers
       } else {//propagate to producers
@@ -1349,9 +1439,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         //check if we need/can propagate to child
         if(childEligibleForPropagation(child, direction)){
           //propagate stage to child
-          propagateToChild(child, direction)
+          doPropagation(child, direction)
         }
       }
+      propagatedChildren
     }
     
     def propagateToProducers(node: Node) = {
@@ -1369,7 +1460,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
               var childResolvedAllProducers = true
               var lowestConsumerStage = Int.MaxValue
               for(childConsumer <- producer.consumers){
-                if(!requiresNoStageNum(childConsumer)){
+                if(requireStage(childConsumer)){
                   if(!coloredNodes.contains(childConsumer)){
                     childResolvedAllProducers = false
                   } else if(coloredNodes(childConsumer).length == 0) {
@@ -1391,7 +1482,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
                 }
                 //propagate child stage back to its producers
                 for(childConsumer <- producer.consumers){
-                  if(!requiresNoStageNum(childConsumer)){
+                  if(requireStage(childConsumer)){
                     if(!coloredNodes(childConsumer).contains(lowestConsumerStage)){
                       coloredNodes(childConsumer) += lowestConsumerStage  
                     }
@@ -1421,7 +1512,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
               var childResolvedAllProducers = true
               var highestProducerStage = 0
               for(childProducer <- consumer.getProducers()){
-                if(!requiresNoStageNum(childProducer)){
+                if(requireStage(childProducer)){
                   if(!coloredNodes.contains(childProducer)){
                     childResolvedAllProducers = false
                   } else if(coloredNodes(childProducer).length == 0) {
@@ -1443,7 +1534,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
                 }
                 //propagate child stage back to its consumers
                 for(childProducer <- consumer.getProducers()){
-                  if(!requiresNoStageNum(childProducer)){
+                  if(requireStage(childProducer)){
                     if(!coloredNodes(childProducer).contains(highestProducerStage)){
                       coloredNodes(childProducer) += highestProducerStage  
                     }
@@ -1460,7 +1551,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     
     //insert filler wires for easier stage propagation. ie make sure that there is a non-shared wire node between a combinational logic node and each of its inputs and consumers. Each filler node is gaurenteed to have only 1 producer and 1 consumer. This way we make sure that the pipeline boundary can always lie on these wire nodes, ensuring that we get a legal pipelining
     insertFillerWires()
-    
+    //initializeColoredNodes with empty ArrayBuffers for all nodes
+    initializeColoredNodes()
+
     //initialize bfs queue and coloredNodes with user annotated nodes
     for((node, stage) <- annotatedStages){
       Predef.assert(!(regReadPoints.contains(node) && regWritePoints.contains(node)), "same node marked as both read point and write point")
@@ -1492,6 +1585,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           } else {
             childrenPropagatedTo = propagateToProducers(currentNode)
           }
+          //childrenPropagatedTo = propagateToChildren(currentNode, currentDirection)
           for(child <- childrenPropagatedTo){
             if((coloredNodes(child).length < 2) && !isSource(child) && !isSink(child)){
               bfsQueue.enqueue(((child, currentDirection)))
@@ -1752,12 +1846,12 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         
         //find eligibleNodes
         for((node, stageNums) <- coloredNodes){
-          if(!requiresNoStageNum(node) && !annotatedStages.contains(node) && !isSource(node) && !isSink(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) < pipelineLength - 1) {
+          if(requireStage(node) && !annotatedStages.contains(node) && !isSource(node) && !isSink(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) < pipelineLength - 1) {
             val nodeStage = coloredNodes(node)(0)
             var consumersEligible = true
             Predef.assert(coloredNodes(node).length <= 1, "" + node + " " + coloredNodes(node))
             for(consumer <- node.consumers){
-              if(!requiresNoStageNum(consumer)){
+              if(requireStage(consumer)){
                 if(coloredNodes.contains(consumer) && coloredNodes(consumer).length > 1){
                   Predef.assert(coloredNodes(consumer).length <= 2)
                   consumersEligible = consumersEligible && (Math.max(coloredNodes(consumer)(0), coloredNodes(consumer)(1)) > nodeStage)
@@ -1780,7 +1874,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           val movedNodeStage = coloredNodes(movedNode)(0)
           coloredNodes(movedNode)(0) = coloredNodes(movedNode)(0) + 1
           for(input <- movedNode.inputs){
-            if(!requiresNoStageNum(input)){
+            if(requireStage(input)){
               lastMovedNodes += ((input, coloredNodes(input).clone()))
               if(coloredNodes(input).length == 2){
                 if(coloredNodes(input)(0) == movedNodeStage){
@@ -1797,7 +1891,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             }
           }
           for(consumer <- movedNode.consumers){
-            if(!requiresNoStageNum(consumer)){
+            if(requireStage(consumer)){
               lastMovedNodes += ((consumer, coloredNodes(consumer).clone()))
               if(coloredNodes(consumer).length == 2){
                 if(coloredNodes(consumer)(0) == movedNodeStage){
@@ -1819,12 +1913,12 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         //find eligible nodes
         for((node, stageNums) <- coloredNodes){
           
-          if(!requiresNoStageNum(node) && !annotatedStages.contains(node) && !isSource(node) && !isSink(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) > 0) {
+          if(requireStage(node) && !annotatedStages.contains(node) && !isSource(node) && !isSink(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) > 0) {
             val nodeStage = coloredNodes(node)(0)
             var producersEligible = true
             Predef.assert(coloredNodes(node).length <= 1, "" + node + " " + coloredNodes(node))
             for(producer <- node.inputs){
-              if(!requiresNoStageNum(producer)){
+              if(requireStage(producer)){
                 if(coloredNodes.contains(producer) && coloredNodes(producer).length > 1){
                   Predef.assert(coloredNodes(producer).length <= 2)
                   producersEligible = producersEligible && (Math.min(coloredNodes(producer)(0), coloredNodes(producer)(1)) < nodeStage)
@@ -1846,7 +1940,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           lastMovedNodes += ((movedNode, coloredNodes(movedNode).clone()))
           coloredNodes(movedNode)(0) = coloredNodes(movedNode)(0) - 1
           for(input <- movedNode.inputs){
-            if(!requiresNoStageNum(input)){
+            if(requireStage(input)){
               lastMovedNodes += ((input, coloredNodes(input).clone()))
               if(coloredNodes(input).length == 2){
                 if(coloredNodes(input)(0) == movedNodeStage){
@@ -1861,7 +1955,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             }
           }
           for(consumer <- movedNode.consumers){
-            if(!requiresNoStageNum(consumer)){
+            if(requireStage(consumer)){
               lastMovedNodes += ((consumer, coloredNodes(consumer).clone()))
               if(coloredNodes(consumer).length == 2){
                 if(coloredNodes(consumer)(0) == movedNodeStage){
@@ -1944,7 +2038,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         } else if(node.isInstanceOf[Mem[_]]){
           nodeArrivalTimes(node) = 0.0
           return 0.0
-        } else if(requiresNoStageNum(node)){
+        } else if(!requireStage(node)){
           nodeArrivalTimes(node) = 0.0
           return 0.0
         } else if(coloredNodes.contains(node) && coloredNodes(node).length > 1 && (coloredNodes(node)(0) != coloredNodes(node)(1))) {
@@ -1994,7 +2088,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           } else if(node.isInstanceOf[Mem[_]]){
             nodeArrivalTimes(node) = 0.0
             return 0.0
-          } else if(requiresNoStageNum(node)){
+          } else if(!requireStage(node)){
             nodeArrivalTimes(node) = 0.0
             return 0.0
           } else {
@@ -2026,13 +2120,13 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         val eligibleNodes = new ArrayBuffer[Node]//list of nodes that can be legally moved up one stage. A node can be legally moved up one stage if all of its consumer nodes have a stage number greater than its stage number
         
         //find eligibleNodes
-        for((node, stageNums) <- coloredNodes){
-          if(!requiresNoStageNum(node) && !annotatedStages.contains(node) && !isSource(node) && !isSink(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) < pipelineLength - 1) {
+        for((node, stageNums) <- coloredNodes.filter(_._2.length > 0)){ 
+          if(requireStage(node) && !annotatedStages.contains(node) && !isSource(node) && !isSink(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) < pipelineLength - 1) {
             val nodeStage = coloredNodes(node)(0)
             var consumersEligible = true
             Predef.assert(coloredNodes(node).length <= 1, "" + node + " " + coloredNodes(node))
             for(consumer <- node.consumers){
-              if(!requiresNoStageNum(consumer)){
+              if(requireStage(consumer)){
                 if(coloredNodes.contains(consumer) && coloredNodes(consumer).length > 1){
                   Predef.assert(coloredNodes(consumer).length <= 2)
                   consumersEligible = consumersEligible && (Math.max(coloredNodes(consumer)(0), coloredNodes(consumer)(1)) > nodeStage)
@@ -2055,7 +2149,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           val movedNodeStage = coloredNodes(movedNode)(0)
           coloredNodes(movedNode)(0) = coloredNodes(movedNode)(0) + 1
           for(input <- movedNode.inputs){
-            if(!requiresNoStageNum(input)){
+            if(requireStage(input)){
               lastMovedNodes += ((input, coloredNodes(input).clone()))
               if(coloredNodes(input).length == 2){
                 if(coloredNodes(input)(0) == movedNodeStage){
@@ -2072,7 +2166,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             }
           }
           for(consumer <- movedNode.consumers){
-            if(!requiresNoStageNum(consumer)){
+            if(requireStage(consumer)){
               lastMovedNodes += ((consumer, coloredNodes(consumer).clone()))
               if(coloredNodes(consumer).length == 2){
                 if(coloredNodes(consumer)(0) == movedNodeStage){
@@ -2092,14 +2186,13 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         val eligibleNodes = new ArrayBuffer[Node]//list of nodes that can be legally moved up one stage. A node can be legally moved up one stage if all of its consumer nodes have a stage number less than its stage number
         
         //find eligible nodes
-        for((node, stageNums) <- coloredNodes){
-          
-          if(!requiresNoStageNum(node) && !annotatedStages.contains(node) && !isSource(node) && !isSink(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) > 0) {
+        for((node, stageNums) <- coloredNodes.filter(_._2.length > 0)){ 
+          if(requireStage(node) && !annotatedStages.contains(node) && !isSource(node) && !isSink(node) && !fillerNodes.contains(node) && coloredNodes(node)(0) > 0) {
             val nodeStage = coloredNodes(node)(0)
             var producersEligible = true
             Predef.assert(coloredNodes(node).length <= 1, "" + node + " " + coloredNodes(node))
             for(producer <- node.inputs){
-              if(!requiresNoStageNum(producer)){
+              if(requireStage(producer)){
                 if(coloredNodes.contains(producer) && coloredNodes(producer).length > 1){
                   Predef.assert(coloredNodes(producer).length <= 2)
                   producersEligible = producersEligible && (Math.min(coloredNodes(producer)(0), coloredNodes(producer)(1)) < nodeStage)
@@ -2121,7 +2214,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           lastMovedNodes += ((movedNode, coloredNodes(movedNode).clone()))
           coloredNodes(movedNode)(0) = coloredNodes(movedNode)(0) - 1
           for(input <- movedNode.inputs){
-            if(!requiresNoStageNum(input)){
+            if(requireStage(input)){
               lastMovedNodes += ((input, coloredNodes(input).clone()))
               if(coloredNodes(input).length == 2){
                 if(coloredNodes(input)(0) == movedNodeStage){
@@ -2136,7 +2229,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             }
           }
           for(consumer <- movedNode.consumers){
-            if(!requiresNoStageNum(consumer)){
+            if(requireStage(consumer)){
               lastMovedNodes += ((consumer, coloredNodes(consumer).clone()))
               if(coloredNodes(consumer).length == 2){
                 if(coloredNodes(consumer)(0) == movedNodeStage){
@@ -2616,15 +2709,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
       
       //modify reg's write port
-      /*for(i <- 0 until reg.updates.length){
-        val en = reg.updates(i)._1
-        reg.updates(i) = ((en && kill, reg.updates(i)._2))
-      }
-      val doSpeculate = ~stageStalls(readStage) && ~globalStall && ~kill
-      doSpeculate.nameIt("do_speculate_" + reg.name)
-      reg.updates += ((doSpeculate, specWriteData))
-      reg.genned = false*/
-
       val doSpeculate = ~stageStalls(readStage) && ~globalStall && ~kill
       doSpeculate.nameIt("do_speculate_" + reg.name)
       reg.inputs(0) = Multiplex(kill, reg.inputs(0), reg)
@@ -2710,14 +2794,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     
     //wire stage valid and stall signals to architecural state write enables
     //regs
-    /*for(reg <- ArchitecturalRegs){
-      val writeStage = reg.updates.map(_._2).map(getStage(_)).filter(_ > - 1)(0)
-      for (i <- 0 until reg.updates.length){
-        val writeEn = reg.updates(i)._1
-        reg.updates(i) = ((writeEn && ~globalStall && stageValids(writeStage) && ~stageStalls(writeStage), reg.updates(i)._2))
-      }
-      reg.genned = false
-    }*/
     for(reg <- ArchitecturalRegs){
       val writeStage = reg.updates.map(_._2).map(getStage(_)).filter(_ > - 1)(0)
       reg.inputs(0) = Multiplex( ~globalStall && stageValids(writeStage) && ~stageStalls(writeStage), reg.inputs(0), reg)
@@ -2828,7 +2904,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def getVersions(node: Node, maxLen: Int): ArrayBuffer[Node] = {
     val result = new ArrayBuffer[Node]//stage of node decreases as the array index increases
     var currentNode = node
-    if(requiresNoStageNum(currentNode)){
+    if(!requireStage(currentNode)){
       for(i <- 0 until maxLen){
         result += currentNode
       }
