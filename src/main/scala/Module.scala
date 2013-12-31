@@ -428,7 +428,7 @@ object Module {
   }
   
   //we should not propagate stage numbers to literals, reset signals, and clock signals
-  def requireStage(node: Node): Boolean = {
+  /*def requireStage(node: Node): Boolean = {
     if(requiresStageMap.contains(node)){
       return requiresStageMap(node)
     } else {
@@ -455,8 +455,34 @@ object Module {
         return !(inputsAreAllConsts || inputsContainWritePoint)
       }
     }
+  }*/
+  def requireStage(node: Node): Boolean = {
+    if(requiresStageMap.contains(node)){
+      return requiresStageMap(node)
+    } else {
+      if((node.litOf != null) || (node == pipelineComponent.clock) || (node == pipelineComponent._reset)){
+        requiresStageMap(node) = false
+        return false
+      } else if(isSource(node)) {
+        requiresStageMap(node) = true
+        return true
+      } else if(isSink(node)){
+        requiresStageMap(node) = true
+        return true
+      } else if(node.isInstanceOf[Mem[_]]){
+        requiresStageMap(node) = true
+        return true
+      } else {
+        var someInputRequiresStage = false
+        for(input <- node.inputs){
+          someInputRequiresStage = someInputRequiresStage || requireStage(input)
+        }
+        requiresStageMap(node) = someInputRequiresStage
+        return someInputRequiresStage
+      }
+    }
   }
-
+  
   def getStage(n: Node): Int = {
     if (nodeToStageMap.contains(n))
       return nodeToStageMap(n)
@@ -1173,7 +1199,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     bfs(getConsumer(_))
     map
   }
-
+  
   def gatherSpecialComponents() = {
     println("gathering special pipelining components")
     ArchitecturalRegs = new ArrayBuffer[Reg]
@@ -1232,6 +1258,25 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
   }
   
+  def findNodesRequireStage() = {
+    for(tmem <- TransactionMems){
+      for(node <- tmem.nodes){
+        requiresStageMap(node) = false
+      }
+    }
+    for(varLatComp <- VariableLatencyComponents){
+      for(node <- varLatComp.nodes){
+        requiresStageMap(node) = false
+      }
+    }
+    for(node <- sourceNodes()){
+      requiresStageMap(node) = true
+    }
+    for(node <- sinkNodes()){
+      requiresStageMap(node) = true
+    }
+  }
+
   def insertPipelineRegisters2() = { 
     println("finding valid pipeline register placement")
     val coloredNodes = propagateStages()
@@ -1316,7 +1361,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       while(!bfsQueue.isEmpty){
         val currentNode = bfsQueue.dequeue
         for(child <- currentNode.consumers){
-          if(!visited.contains(child) && !regWritePoints.contains(child) && !tMemWritePoints.contains(child) && !outputNodes.contains(child) && !tMemReadAddrs.contains(child)){
+          if(!visited.contains(child) && !isSink(child)){
             bfsQueue.enqueue(child)
           }
         }
@@ -1371,6 +1416,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
         for(parent <- childParents.filter(requireStage(_))){
           visualizeSubGraph(parent, "debug.gv", 5)
+          println("DEBUG0")
+          println(child)
+          println(fillerNodes.contains(parent))
           println(parent.component)
           if(coloredNodes(parent).length == 0){
             allParentsResolved = false
