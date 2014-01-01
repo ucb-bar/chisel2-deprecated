@@ -1280,6 +1280,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def insertPipelineRegisters2() = { 
     println("finding valid pipeline register placement")
     val coloredNodes = propagateStages()
+    verifyLegalStageColoring(coloredNodes)
     var maxStage = 0
     for((node, stages) <- coloredNodes){
       if(stages.length > 0 && stages.max > maxStage){
@@ -1290,6 +1291,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
     println("optimizing pipeline register placement")
     optimizeRegisterPlacement(coloredNodes)
+    verifyLegalStageColoring(coloredNodes)
     println("inserting pipeline registers")
     
     var counter = 0//hack to get unique register names with out anything nodes being named already
@@ -3161,79 +3163,109 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
   }*/
   
-  def verifyLegalStageColoring() = {
-    this.bfs((n: Node) => {
-      n match {
-        case reg: Reg => {//check all architectural reg read and write ports are annotated; data and enable of each port is in same stage; all write ports are in same stage; write ports have stage >= read port stage
-          if(reg.component == pipelineComponent && !isPipeLineReg(reg)){
-            val readStage = getStage(reg)
-            val writeEnables = reg.updates.map(_._1).filter(_.name != "reset")
-            val writeDatas = reg.updates.filter(_._1.name != "reset").map(_._2)
-            val writeEnableStages = writeEnables.map(getStage(_)).filter(_ > -1)
-            val writeDataStages = writeDatas.map(getStage(_)).filter(_ > -1)
-            
-            Predef.assert(writeDataStages.length > 0, "register written by all constants; this case is not handled yet:" + writeDataStages)
-            val writeStage = writeDataStages.head
-            Predef.assert(writeStage >= readStage)
-            if(writeEnableStages.length > 0){
-              Predef.assert(writeEnableStages.tail.map( _ == writeStage).foldLeft(true)(_ && _), reg.name + " " + reg.line.getLineNumber + " " + reg.line.getClassName + " " + writeEnableStages) 
-            }
-            Predef.assert(writeDataStages.tail.map( _ == writeStage).foldLeft(true)(_ && _), reg.name + " " + reg.line.getLineNumber + " " + reg.line.getClassName + " " + writeDataStages)
-            
+  def verifyLegalStageColoring(coloredNodes: HashMap[Node, ArrayBuffer[Int]]) = {
+    object Direction extends Enumeration {
+      type Direction = Value
+      val PRODUCER, CONSUMER, DONTCARE = Value
+    }
+    import Direction._
+    def getStage(node: Node, dir: Direction): Int = {
+      if(coloredNodes.contains(node)){
+        if(coloredNodes(node).length > 1){
+          if(dir == PRODUCER){//if node is a pipeline register and is viewed as a producer
+            return Math.max(coloredNodes(node)(0), coloredNodes(node)(1))
+          } else if(dir == CONSUMER){//if node is a pipeline register and is viewed as a consumer
+            return Math.max(coloredNodes(node)(0), coloredNodes(node)(1))
+          } else {
+            Predef.assert(false, "node not expected to have more than 1 stage number")
+            return -3
           }
+        } else {
+          return coloredNodes(node)(0)
         }
-        case op: Op => {//check all combinational nodes have inputs coming from same stage
-          if(op.component == pipelineComponent && !op.isInstanceOf[Mux] && !(op.consumers(0).isInstanceOf[Reg] && op.consumers(0).inputs.contains(op))){//hack because muxes generated for pipeline register reset values don't have stages //also hack to deal with or node generated for register write enable in verilog backend
-            val opStage = getStage(op)
-            for(input <- op.inputs){
-              val inputStage = getStage(input)
-              Predef.assert(inputStage == opStage || inputStage == -1, "combinational node input does not have stage number")
-            }
-          }
-        }
-        case _ =>
+      } else if (!requireStage(node)){
+        return -1
+      } else {
+        Predef.assert(false, "node expected to have stage number, but does not have stage number: " + node)
+        return -2
       }
-    })
+    }
     
+    //check that all combinational logic nodes have all inputs from the same stage
+    for(node <- pipelineComponent.nodes){
+      if(node.isInstanceOf[Op] && requireStage(node)){
+        if(!node.isInstanceOf[Mux] && !(node.consumers(0).isInstanceOf[Reg] && node.consumers(0).inputs.contains(node))){//hack because muxes generated for pipeline register reset values don't have stages //also hack to deal with or node generated for register write enable in verilog backend
+          val nodeStage = getStage(node, DONTCARE)
+          for(input <- node.inputs.filter(requireStage(_))){
+            val inputStage = getStage(input, PRODUCER)
+            Predef.assert(inputStage == nodeStage || inputStage == -1, "combinational node input does not have stage number")
+          }
+        }
+      }
+    }
+    
+    //check that all architectural register has write points in the same stage and that its write stage >= its read stage
+    for(reg <- ArchitecturalRegs){
+      val readStage = getStage(reg, DONTCARE)
+      val writeEnables = reg.updates.map(_._1).filter(_.name != "reset")
+      val writeDatas = reg.updates.filter(_._1.name != "reset").map(_._2)
+      val writeEnableStages = writeEnables.map(getStage(_, DONTCARE)).filter(_ > -1)
+      val writeDataStages = writeDatas.map(getStage(_, DONTCARE)).filter(_ > -1)
+      
+      Predef.assert(writeDataStages.length > 0, "register written by all constants; this case is not handled yet:" + writeDataStages)
+      val writeStage = writeDataStages.head
+      Predef.assert(writeStage >= readStage)
+      if(writeEnableStages.length > 0){
+        Predef.assert(writeEnableStages.tail.map( _ == writeStage).foldLeft(true)(_ && _), reg.name + " " + reg.line.getLineNumber + " " + reg.line.getClassName + " " + writeEnableStages) 
+      }
+      Predef.assert(writeDataStages.tail.map( _ == writeStage).foldLeft(true)(_ && _), reg.name + " " + reg.line.getLineNumber + " " + reg.line.getClassName + " " + writeDataStages)
+    }
     
     for(tmem <- TransactionMems){//check all tmems read and write ports are annotated; data, addr, and enable of each port is in same stage; all read ports are in the same stage; all write ports are in same stage; write ports have stage >= read port stage
       val readPorts = tmem.io.reads
       val writePorts = tmem.io.writes
       
-      val readStage = getStage(readPorts(0).dat)
-      Predef.assert(getStage(readPorts(0).adr) == readStage, "transactionMem readport nodes do not all have same stage numbers")
+      val readStage = getStage(readPorts(0).dat, DONTCARE)
+      Predef.assert(getStage(readPorts(0).adr, DONTCARE) == readStage, "transactionMem readport nodes do not all have same stage numbers")
       for(readPort <- readPorts){
-        Predef.assert(getStage(readPort.adr) == readStage, "transactionMem readport nodes do not all have same stage numbers")
-        Predef.assert(getStage(readPort.dat) == readStage, "transactionMem readport nodes do not all have same stage numbers")
+        Predef.assert(getStage(readPort.adr, DONTCARE) == readStage, "transactionMem readport nodes do not all have same stage numbers")
+        Predef.assert(getStage(readPort.dat, DONTCARE) == readStage, "transactionMem readport nodes do not all have same stage numbers")
       }
        
-      val writeStage = getStage(writePorts(0).dat)
-      Predef.assert(getStage(writePorts(0).adr) == writeStage, "transactionMem writeport nodes do not all have same stage numbers")
+      val writeStage = getStage(writePorts(0).dat, DONTCARE)
+      Predef.assert(getStage(writePorts(0).adr, DONTCARE) == writeStage, "transactionMem writeport nodes do not all have same stage numbers")
       for(writePort <- writePorts){
-        Predef.assert(getStage(writePort.is) == writeStage, "transactionMem writeport nodes do not all have same stage numbers")
-        Predef.assert(getStage(writePort.adr) == writeStage, "transactionMem writeport nodes do not all have same stage numbers")
-        Predef.assert(getStage(writePort.dat) == writeStage, "transactionMem writeport nodes do not all have same stage numbers")
+        Predef.assert(getStage(writePort.is, DONTCARE) == writeStage, "transactionMem writeport nodes do not all have same stage numbers")
+        Predef.assert(getStage(writePort.adr, DONTCARE) == writeStage, "transactionMem writeport nodes do not all have same stage numbers")
+        Predef.assert(getStage(writePort.dat, DONTCARE) == writeStage, "transactionMem writeport nodes do not all have same stage numbers")
       } 
       
       Predef.assert(writeStage >= readStage, "transactionMem has writePort at earlier stage than readPort")         
     }
     
     //check that all IO nodes are in the same stage
-    /*val ioNodes = pipelineComponent.io.flatten.map(_._2)
-    if(ioNodes.length > 0){
-      val IOstage = getStage(ioNodes(0))
-      for(io <- ioNodes) {
-        Predef.assert(nodeToStageMap(io) == IOstage, "IO nodes do not all belong to the same stage")
+    val inputs = pipelineComponent.io.flatten.filter(_._2.dir == INPUT).map(_._2)
+    val outputs = pipelineComponent.io.flatten.filter(_._2.dir == OUTPUT).map(_._2)
+    if(inputs.length > 0){
+      val inputStage = getStage(inputs(0), DONTCARE)
+      for(input <- inputs) {
+        Predef.assert(getStage(input, DONTCARE) == inputStage, "input nodes do not all belong to the same stage")
       }
-    }*/
+    }
     
+    if(outputs.length > 0){
+      val outputStage = getStage(outputs(0), DONTCARE)
+      for(output <- outputs) {
+        Predef.assert(getStage(output, DONTCARE) == outputStage, "output nodes do not all belong to the same stage")
+      }
+    }
     //check that all variable latency units have IO nodes in the same stage
     for(vComponent <- VariableLatencyComponents){
-      Predef.assert(getStage(vComponent.io.req.valid) == getStage(vComponent.io.req.bits))
-      Predef.assert(getStage(vComponent.io.req.valid) == getStage(vComponent.resp_ready))
-      Predef.assert(getStage(vComponent.io.req.valid) == getStage(vComponent.io.resp))
-      Predef.assert(getStage(vComponent.io.req.valid) == getStage(vComponent.resp_valid))
-      Predef.assert(getStage(vComponent.io.req.valid) == getStage(vComponent.req_ready))
+      Predef.assert(getStage(vComponent.io.req.valid, DONTCARE) == getStage(vComponent.io.req.bits, DONTCARE))
+      Predef.assert(getStage(vComponent.io.req.valid, DONTCARE) == getStage(vComponent.resp_ready, DONTCARE))
+      Predef.assert(getStage(vComponent.io.req.valid, DONTCARE) == getStage(vComponent.io.resp, DONTCARE))
+      Predef.assert(getStage(vComponent.io.req.valid, DONTCARE) == getStage(vComponent.resp_valid, DONTCARE))
+      Predef.assert(getStage(vComponent.io.req.valid, DONTCARE) == getStage(vComponent.req_ready, DONTCARE))
     }
   }
   

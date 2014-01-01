@@ -588,7 +588,6 @@ abstract class Backend {
       c.inferAll()
       c.forceMatchingWidths
       c.removeTypeNodes()
-      c.verifyLegalStageColoring()
       c.findHazards()
       c.generateBypassLogic()
       c.generateSpeculationLogic()
