@@ -11,5 +11,5 @@ target/
 *.bak
 *.new
 *~
-*.swp
-*.swo
+.*.swp
+.*.swo
