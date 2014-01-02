@@ -581,7 +581,6 @@ abstract class Backend {
       //c.insertPipelineRegisters()
       //c.colorPipelineStages()
       c.gatherSpecialComponents()
-      c.findNodesRequireStage()
       c.insertPipelineRegisters2()
       connectResets
       c.genAllMuxes

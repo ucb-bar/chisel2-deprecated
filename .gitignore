@@ -12,3 +12,4 @@ target/
 *.new
 *~
 *.swp
+*.swo

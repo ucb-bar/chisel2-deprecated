@@ -275,7 +275,7 @@ object Module {
   val stageStalls = new ArrayBuffer[Bool]
   val stageKills = new ArrayBuffer[Bool]
   val fillerNodes = new HashSet[Node]
-  val requiresStageMap = new HashMap[Node, Boolean]
+  val requireStageSet = new HashSet[Node]
 
   val regWritePoints = new HashSet[Node] //list of all register write inputs and transactionMem write port nodes(including write addr, write data, write en)
   val regReadPoints = new HashSet[Node] //list of all register read outputs and transactionMem read port
@@ -428,59 +428,9 @@ object Module {
   }
   
   //we should not propagate stage numbers to literals, reset signals, and clock signals
-  /*def requireStage(node: Node): Boolean = {
-    if(requiresStageMap.contains(node)){
-      return requiresStageMap(node)
-    } else {
-      if((node.litOf != null) || (node == pipelineComponent.clock) || (node == pipelineComponent._reset)){
-        requiresStageMap(node) = false
-        return false
-      } else if(isSource(node)) {
-        requiresStageMap(node) = true
-        return true
-      } else if(isSink(node)){
-        requiresStageMap(node) = true
-        return true
-      } else if(node.isInstanceOf[Mem[_]]){
-        requiresStageMap(node) = true
-        return true
-      } else {
-        var inputsAreAllConsts = true
-        var inputsContainWritePoint = false
-        for(input <- node.inputs){
-          inputsContainWritePoint = inputsContainWritePoint || tMemWritePoints.contains(input)
-          inputsAreAllConsts = inputsAreAllConsts && !requireStage(input)
-        }
-        requiresStageMap(node) = !(inputsAreAllConsts || inputsContainWritePoint)
-        return !(inputsAreAllConsts || inputsContainWritePoint)
-      }
-    }
-  }*/
+
   def requireStage(node: Node): Boolean = {
-    if(requiresStageMap.contains(node)){
-      return requiresStageMap(node)
-    } else {
-      if((node.litOf != null) || (node == pipelineComponent.clock) || (node == pipelineComponent._reset)){
-        requiresStageMap(node) = false
-        return false
-      } else if(isSource(node)) {
-        requiresStageMap(node) = true
-        return true
-      } else if(isSink(node)){
-        requiresStageMap(node) = true
-        return true
-      } else if(node.isInstanceOf[Mem[_]]){
-        requiresStageMap(node) = true
-        return true
-      } else {
-        var someInputRequiresStage = false
-        for(input <- node.inputs){
-          someInputRequiresStage = someInputRequiresStage || requireStage(input)
-        }
-        requiresStageMap(node) = someInputRequiresStage
-        return someInputRequiresStage
-      }
-    }
+    return requireStageSet.contains(node)
   }
   
   def getStage(n: Node): Int = {
@@ -1259,28 +1209,48 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
   
   def findNodesRequireStage() = {
-    for(tmem <- TransactionMems){
-      for(node <- tmem.nodes){
-        requiresStageMap(node) = false
-      }
-    }
-    for(varLatComp <- VariableLatencyComponents){
-      for(node <- varLatComp.nodes){
-        requiresStageMap(node) = false
-      }
-    }
+    //mark nodes reachable from sourceNodes through the consumer pointer as requiring a stage number
+    val bfsQueue = new ScalaQueue[Node]
+    val visited = new HashSet[Node]
     for(node <- sourceNodes()){
-      requiresStageMap(node) = true
+      bfsQueue.enqueue(node)
+    }
+    while(!bfsQueue.isEmpty){
+      val currentNode = bfsQueue.dequeue
+      for(child <- currentNode.consumers){
+        if(!visited.contains(child) && !isSink(child)){
+          bfsQueue.enqueue(child)
+        }
+      }
+      visited +=currentNode
+      requireStageSet += currentNode
+    }
+    
+    //mark all source and sink nodes as requiring a stage number(need to do this separately because not all of them are reachable by following consumers pointers
+    for(node <- sourceNodes()){
+      requireStageSet += node
     }
     for(node <- sinkNodes()){
-      requiresStageMap(node) = true
+      requireStageSet += node
     }
   }
 
   def insertPipelineRegisters2() = { 
+    //insert filler wires for easier stage propagation. ie make sure that there is a non-shared wire node between a combinational logic node and each of its inputs and consumers. Each filler node is gaurenteed to have only 1 producer and 1 consumer. This way we make sure that the pipeline boundary can always lie on these wire nodes, ensuring that we get a legal pipelining
+    insertFillerWires()
+    
+    findNodesRequireStage()
+    
     println("finding valid pipeline register placement")
     val coloredNodes = propagateStages()
     verifyLegalStageColoring(coloredNodes)
+    
+    println("optimizing pipeline register placement")
+    optimizeRegisterPlacement(coloredNodes)
+    verifyLegalStageColoring(coloredNodes)
+    
+    println("inserting pipeline registers")
+    
     var maxStage = 0
     for((node, stages) <- coloredNodes){
       if(stages.length > 0 && stages.max > maxStage){
@@ -1289,11 +1259,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
     setPipelineLength(maxStage + 1)
 
-    println("optimizing pipeline register placement")
-    optimizeRegisterPlacement(coloredNodes)
-    verifyLegalStageColoring(coloredNodes)
-    println("inserting pipeline registers")
-    
     var counter = 0//hack to get unique register names with out anything nodes being named already
     nodeToStageMap = new HashMap[Node, Int]()
     for((node,stgs) <- coloredNodes){
@@ -1319,6 +1284,25 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
   
   
+  //place extra wire nodes between all nodes
+  def insertFillerWires() = {
+    val bfsQueue = new ScalaQueue[Node]
+    val visited = new HashSet[Node]
+    for(node <- sourceNodes()){
+      bfsQueue.enqueue(node)
+    }
+    while(!bfsQueue.isEmpty){
+      val currentNode = bfsQueue.dequeue
+      for(child <- currentNode.consumers){
+        if(!visited.contains(child) && !isSink(child)){
+          bfsQueue.enqueue(child)
+        }
+      }
+      visited +=currentNode
+      fillerNodes ++= insertBitsOnOutputs(currentNode)
+    }
+  }
+  
   def propagateStages() = {
     val bfsQueue = new ScalaQueue[(Node, Boolean)] //the 2nd item of the tuple indicateds which direction the node should propagate its stage number to. True means propagate to outputs, false means propagate to inputs
     val retryNodes = new ArrayBuffer[(Node, Boolean)] //list of nodes that need to retry their stage propagation because their children weren't ready
@@ -1328,49 +1312,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     
     //initialize empty array buffer for all nodes in coloredNodes
     def initializeColoredNodes() ={
-      val bfsQueue = new ScalaQueue[Node]
-      val visited = new HashSet[Node]
-      for(node <- sourceNodes()){
-        bfsQueue.enqueue(node)
-      }
-      while(!bfsQueue.isEmpty){
-        val currentNode = bfsQueue.dequeue
-        if(!isSink(currentNode)){
-          for(child <- currentNode.consumers){
-            if(!visited.contains(child)){
-              bfsQueue.enqueue(child)
-            }
-          }
-        }
-        visited +=currentNode
-        coloredNodes(currentNode) = new ArrayBuffer[Int]
-      }
-      for(node <- tMemWritePoints){//not reached by bfs through consumer
-        coloredNodes(node) = new ArrayBuffer[Int]
-      }
-      for(node <- tMemReadAddrs){//not reached by bfs through consumers
+      for(node <- requireStageSet){
         coloredNodes(node) = new ArrayBuffer[Int]
       }
     }
     
-    //place extra wire nodes between all nodes
-    def insertFillerWires() = {
-      val bfsQueue = new ScalaQueue[Node]
-      val visited = new HashSet[Node]
-      for(node <- sourceNodes()){
-        bfsQueue.enqueue(node)
-      }
-      while(!bfsQueue.isEmpty){
-        val currentNode = bfsQueue.dequeue
-        for(child <- currentNode.consumers){
-          if(!visited.contains(child) && !isSink(child)){
-            bfsQueue.enqueue(child)
-          }
-        }
-        visited +=currentNode
-        fillerNodes ++= insertBitsOnOutputs(currentNode)
-      }
-    }
   
     def propagatedToChild(parentStage: Int, child: Node) : Boolean = {
       if(requireStage(child)){
@@ -1398,40 +1344,35 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     def propagateToChildren(node: Node, direction: Boolean) = {
       val propagatedChildren = new ArrayBuffer[Node] 
       
-      //determine if we need/can propagate to child and return the stage number that should be propagated to child; direction = true means child is producer of node, direction = false means child is consumer of node
+      //determine if we need/can propagate to child and return the stage number that should be propagated to child; direction = false means child is producer of node, direction = true means child is consumer of node
       def childEligibleForPropagation(child: Node, direction: Boolean): Boolean ={
         val childWasPropagated = propagatedToChild(coloredNodes(node)(0), child)
         val fillerToReal = fillerNodes.contains(node) && !fillerNodes.contains(child) && coloredNodes(child).length > 0
         var allParentsResolved = true
         var childParents:Seq[Node] = null
         if(direction){
-          childParents = child.consumers 
+          childParents = child.getProducers() 
         } else {
-          childParents = child.inputs
+          childParents = child.consumers
         }
         var edgeParentStage:Int = 0//this is the minimum stage of child's consumers when direction == true, this is the maximum stage of child's producers when direction == false
         if(direction){
-          edgeParentStage = Int.MaxValue
-        } else {
           edgeParentStage = 0
+        } else {
+          edgeParentStage = Int.MaxValue
         }
 
         for(parent <- childParents.filter(requireStage(_))){
-          visualizeSubGraph(parent, "debug.gv", 5)
-          println("DEBUG0")
-          println(child)
-          println(fillerNodes.contains(parent))
-          println(parent.component)
           if(coloredNodes(parent).length == 0){
             allParentsResolved = false
           } else {
             if(direction){
-              if(coloredNodes(parent).min < edgeParentStage){
-                edgeParentStage = coloredNodes(parent).min
-              }
-            } else {
               if(coloredNodes(parent).max > edgeParentStage){
                 edgeParentStage = coloredNodes(parent).max
+              }
+            } else {
+              if(coloredNodes(parent).min < edgeParentStage){
+                edgeParentStage = coloredNodes(parent).min
               }
             }
           }
@@ -1439,29 +1380,29 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         val childEligible = !childWasPropagated && !fillerToReal && allParentsResolved
         return childEligible
       }
-      //propagate node's stage number to child and record all new nodes that have been propagated to; direction = true means child is producer of node, direction = false means child is consumer of node
+      //propagate node's stage number to child and record all new nodes that have been propagated to; direction = false means child is producer of node, direction = true means child is consumer of node
       def doPropagation(child: Node, direction: Boolean) = {
         var childParents:Seq[Node] = null
         if(direction){
-          childParents = child.consumers 
+          childParents = child.getProducers()
         } else {
-          childParents = child.inputs
+          childParents = child.consumers
         }
         var edgeParentStage:Int = 0//this is the minimum stage of child's consumers when direction == true, this is the maximum stage of child's producers when direction == false
         if(direction){
-          edgeParentStage = Int.MaxValue
-        } else {
           edgeParentStage = 0
+        } else {
+          edgeParentStage = Int.MaxValue
         }
 
         for(parent <- childParents.filter(requireStage(_))){
           if(direction){
-            if(coloredNodes(parent).min < edgeParentStage){
-              edgeParentStage = coloredNodes(parent).min
-            }
-          } else {
             if(coloredNodes(parent).max > edgeParentStage){
               edgeParentStage = coloredNodes(parent).max
+            }
+          } else {
+            if(coloredNodes(parent).min < edgeParentStage){
+              edgeParentStage = coloredNodes(parent).min
             }
           }
         }
@@ -1495,112 +1436,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       propagatedChildren
     }
     
-    def propagateToProducers(node: Node) = {
-      val propagatedChildren = new ArrayBuffer[Node]
-      for(producer <- node.getProducers()){
-        if(!propagatedToChild(coloredNodes(node)(0), producer)){//case if we have not already propagated to the producer
-          if(!(fillerNodes.contains(node) && !fillerNodes.contains(producer) && coloredNodes.contains(producer) && (coloredNodes(producer).length > 0))){//don't propagate to producer if node is a fillerNode and producer is not and producer already has atleast 1 stage number
-            if(producer.consumers.length <= 1){//case if producer only outputs to the current node
-              if(!coloredNodes.contains(producer)){
-                coloredNodes(producer) = new ArrayBuffer[Int]
-              }
-              coloredNodes(producer) += coloredNodes(node)(0)
-              propagatedChildren += producer
-            } else {
-              var childResolvedAllProducers = true
-              var lowestConsumerStage = Int.MaxValue
-              for(childConsumer <- producer.consumers){
-                if(requireStage(childConsumer)){
-                  if(!coloredNodes.contains(childConsumer)){
-                    childResolvedAllProducers = false
-                  } else if(coloredNodes(childConsumer).length == 0) {
-                    childResolvedAllProducers = false
-                  } else{
-                    if(coloredNodes(childConsumer).min < lowestConsumerStage){
-                      lowestConsumerStage = coloredNodes(childConsumer).min
-                    }
-                  }
-                }
-              }
-              if(childResolvedAllProducers){
-                if(!coloredNodes.contains(producer)){
-                  coloredNodes(producer) = new ArrayBuffer[Int]
-                }
-                //propagate stage to child
-                if(!coloredNodes(producer).contains(lowestConsumerStage)){
-                  coloredNodes(producer) += lowestConsumerStage  
-                }
-                //propagate child stage back to its producers
-                for(childConsumer <- producer.consumers){
-                  if(requireStage(childConsumer)){
-                    if(!coloredNodes(childConsumer).contains(lowestConsumerStage)){
-                      coloredNodes(childConsumer) += lowestConsumerStage  
-                    }
-                  }
-                }
-                propagatedChildren += producer
-              }
-            }
-          }
-        }
-      }
-      propagatedChildren
-    }
-    
-    def propagateToConsumers(node: Node) = {
-      val propagatedChildren = new ArrayBuffer[Node]
-      for(consumer <- node.consumers){
-        if(!propagatedToChild(coloredNodes(node)(0), consumer)){//case if we have not already propagated to the consumer
-          if(!(fillerNodes.contains(node) && !fillerNodes.contains(consumer) && coloredNodes.contains(consumer) && (coloredNodes(consumer).length > 0))){//don't propagate to consumer if node is a fillerNode and consumer is not and consumer already has atleast 1 stage number
-            if(consumer.getProducers.length <= 1){//case if consumer only consumes from the current node
-              if(!coloredNodes.contains(consumer)){
-                coloredNodes(consumer) = new ArrayBuffer[Int]
-              }
-              coloredNodes(consumer) += coloredNodes(node)(0)
-              propagatedChildren += consumer
-            } else {
-              var childResolvedAllProducers = true
-              var highestProducerStage = 0
-              for(childProducer <- consumer.getProducers()){
-                if(requireStage(childProducer)){
-                  if(!coloredNodes.contains(childProducer)){
-                    childResolvedAllProducers = false
-                  } else if(coloredNodes(childProducer).length == 0) {
-                    childResolvedAllProducers = false
-                  } else{
-                    if(coloredNodes(childProducer).max > highestProducerStage){
-                      highestProducerStage = coloredNodes(childProducer).max
-                    }
-                  }
-                }
-              }
-              if(childResolvedAllProducers){
-                if(!coloredNodes.contains(consumer)){
-                  coloredNodes(consumer) = new ArrayBuffer[Int]
-                }
-                //propagate stage to child
-                if(!coloredNodes(consumer).contains(highestProducerStage)){
-                  coloredNodes(consumer) += highestProducerStage  
-                }
-                //propagate child stage back to its consumers
-                for(childProducer <- consumer.getProducers()){
-                  if(requireStage(childProducer)){
-                    if(!coloredNodes(childProducer).contains(highestProducerStage)){
-                      coloredNodes(childProducer) += highestProducerStage  
-                    }
-                  }
-                }
-                propagatedChildren += consumer
-              }
-            }
-          }
-        }
-      }
-      propagatedChildren
-    }
-    
-    //insert filler wires for easier stage propagation. ie make sure that there is a non-shared wire node between a combinational logic node and each of its inputs and consumers. Each filler node is gaurenteed to have only 1 producer and 1 consumer. This way we make sure that the pipeline boundary can always lie on these wire nodes, ensuring that we get a legal pipelining
-    insertFillerWires()
     //initializeColoredNodes with empty ArrayBuffers for all nodes
     initializeColoredNodes()
 
@@ -1630,12 +1465,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         val currentDirection = current._2
         if(coloredNodes(currentNode).length < 2){
           var childrenPropagatedTo:ArrayBuffer[Node] = null
-          if(currentDirection){
-            childrenPropagatedTo = propagateToConsumers(currentNode)
-          } else {
-            childrenPropagatedTo = propagateToProducers(currentNode)
-          }
-          //childrenPropagatedTo = propagateToChildren(currentNode, currentDirection)
+          childrenPropagatedTo = propagateToChildren(currentNode, currentDirection)
           for(child <- childrenPropagatedTo){
             if((coloredNodes(child).length < 2) && !isSource(child) && !isSink(child)){
               bfsQueue.enqueue(((child, currentDirection)))
@@ -2338,33 +2168,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   
   def insertPipelineRegisters() = {
     for(stage <- 0 until pipeline.size) {
-      /*val valid = Reg(init = Bool(false))
-      valids += valid
-      if (stage > 0) 
-        valid := valids(stage-1)
-      else
-        valid := Bool(true)
-      valid.setName("HuyValid_" + stage)*/
       for ((p, enum) <- pipeline(stage) zip pipeline(stage).indices) {
-        /*val r = Reg(Bits())
-        r := p._1.asInstanceOf[Bits]
-        r.comp.asInstanceOf[Reg].clock = p._1.component.clock
-        when(p._1.component._reset){
-          r := p._2
-        }
-        //add pointer in p._1 to point to pipelined version of itself
-        p._1.pipelinedVersion = r
-        r.unPipelinedVersion = p._1
-        r.comp.setName("Huy_" + enum + "_" + p._1.name)
-        pipelineReg(stage) += r.comp.asInstanceOf[Reg]*/
         pipelineReg(stage) += insertRegister(p._1.asInstanceOf[Bits], p._2.asInstanceOf[Bits], "Huy_" + enum + "_" + p._1.name).comp.asInstanceOf[Reg]
-        /*for (c <- p._1.consumers) {
-          val producer_ind = c.inputs.indexOf(p._1)
-          if(producer_ind > -1) c.inputs(producer_ind) = r
-          val consumer_ind = p._1.consumers.indexOf(c)
-          r.consumers += c
-          p._1.consumers(consumer_ind) = r
-        }*/
       }
     }
   }
@@ -2881,76 +2686,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
   }
   
-  
-  
-  /*def findHazards() = {
-    println("searching for hazards...")
-    val comp = pipelineComponent
-    //nodeToStageMap = colorPipelineStages()
-
-    // handshaking stalls
-    globalStall = Bool(false)
-    for (tc <- VariableLatencyComponents) {
-      val stall = tc.io.req.valid && (!tc.req_ready || !tc.resp_valid)
-      globalStall = globalStall || stall
-    }
-    
-    // raw stalls
-    val speArchitecturalRegs = speculation.map(_._1.comp.asInstanceOf[Reg])
-    ArchitecturalRegs = ArchitecturalRegs.filter(!speArchitecturalRegs.contains(_))
-    for (p <- ArchitecturalRegs) {
-      if (p.updates.length > 1 && nodeToStageMap.contains(p)) {
-        val enables = p.updates.map(_._1).filter(_.name != "reset")
-        val enStgs = enables.map(getStage(_)).filter(_ > -1)
-        val stage = enStgs.head
-        
-        scala.Predef.assert(enStgs.tail.map( _ == stage).foldLeft(true)(_ && _), println(p.name + " " + p.line.getLineNumber + " " + p.line.getClassName + " " + enStgs)) // check all the stgs match
-        val rdStg = getStage(p)
-        for (en <- enables) {
-          val wrStg = getStage(en)
-          if (wrStg > rdStg) {
-            if (wrStg - rdStg > 1) {
-              val rdStgValid = if (rdStg == 0) Bool(true) else valids(rdStg-1)
-              for (stg <- rdStg + 1 until wrStg) {
-                hazards += ((rdStgValid && valids(stg-1), p, rdStg, stg, Bool(true), null))
-              }
-            }
-            hazards += (((en && (if (wrStg > 0) valids(wrStg-1) else Bool(true))), p, rdStg, wrStg, Bool(true), null))
-            println("found hazard " + en.line.getLineNumber + " " + en.line.getClassName)
-          }
-        }
-      }
-    }
-    // FunMem hazards
-    for (m <- TransactionMems) {
-      for(i <- 0 until m.io.writes.length){
-        val writePoint = m.io.writes(i)
-        val writeAddr = writePoint.adr.inputs(0).inputs(1)
-        val writeEn = writePoint.is.inputs(0).inputs(1)
-        val writeData = writePoint.dat.inputs(0).inputs(1)
-        val writeStage = getStage(writeEn)
-        val writeEnables = getVersions(writeEn.asInstanceOf[Bool])
-        val writeAddrs = getVersions(writeAddr.asInstanceOf[Bits],)
-        Predef.assert(getStage(writeEn) == getStage(writeData) || getStage(writeEn) == -1 || getStage(writeData) == -1, "writeEN stage" + "(" + writeEn.name + "): " + getStage(writeEn) + " writeData stage" + "(" + writeData + "): " + getStage(writeData))
-        Predef.assert(getStage(writeData) == getStage(writeAddr) || getStage(writeAddr) == -1 || getStage(writeData) == -1, "writeData stage: " + getStage(writeData) + " writeAddr stage: " + getStage(writeAddr))
-        var foundHazard = false
-        var readStage = -1
-        for(readPoint <- m.io.reads){
-          val readAddr = readPoint.adr
-          readStage = getStage(readAddr)
-          if(writeStage > 0 && readStage > 0 && writeStage > readStage){
-            Predef.assert((getStage(writeEnables.last) - readStage) == 1, println(writeEnables.length))
-            Predef.assert(writeEnables.length == writeAddrs.length, println(writeEnables.length + " " + writeAddrs.length))
-            for((en, waddr) <- writeEnables zip writeAddrs){
-              hazards += ((en.asInstanceOf[Bool] && waddr === readPoint.adr, null, readStage, getStage(en), en.asInstanceOf[Bool], readPoint))
-              println("found hazard" + en.line.getLineNumber + " " + en.line.getClassName + " " + en.name + " " + m.name)
-            }
-          }
-        }
-      }
-    }
-  }*/
-  
   def getVersions(node: Node, maxLen: Int): ArrayBuffer[Node] = {
     val result = new ArrayBuffer[Node]//stage of node decreases as the array index increases
     var currentNode = node
@@ -2977,82 +2712,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     result
   }
 
-  /*def resolveHazards() = {
-
-    // raw stalls
-    for ((hazard, s, rdStg, wrStg, wEn, rPort) <- hazards) {
-      stalls(rdStg) += hazard
-      kills(rdStg) += hazard
-    }
-
-    // back pressure stalls
-    for (stg <- 0 until stalls.size)
-      for (nstg <- stg + 1 until stalls.size)
-        stalls(stg) ++= stalls(nstg)
-
-    for ((s, v) <- speculation)
-      ArchitecturalRegs += s.comp.asInstanceOf[Reg]
-
-    val wStageMap = new HashMap[Reg, Int]()
-
-    for ((r, ind) <- (ArchitecturalRegs zip ArchitecturalRegs.indices)) {
-      if (r.updates.length > 1 && nodeToStageMap.contains(r)) {
-        val enStg = r.updates.map(_._1).map(getStage(_)).filter(_ > -1)(0)
-        wStageMap += (r -> enStg)
-        var mask = Bool(false)
-        if(stalls(enStg).length > 0)
-          mask = mask || stalls(enStg).reduceLeft(_ || _) // raw
-        if (enStg > 0)
-          mask = mask || !valids(enStg-1) // no transaction
-        if (VariableLatencyComponents.length > 0) mask = mask || globalStall
-        mask.nameIt("HuyMask_" + ind)
-        for (i <- 0 until r.updates.length) {
-          val en = r.updates(i)._1
-          r.updates(i) = ((en && ! mask, r.updates(i)._2))
-        }
-        r.genned = false
-      }
-    }
-
-    // speculation stuff
-    for ((s, v) <- speculation) {
-      val sStage = getStage(s)
-      val reg = s.comp.asInstanceOf[Reg]
-      val wStage = wStageMap(reg)
-      var mask = stalls(sStage).foldLeft(Bool(false))(_ || _) || globalStall // stall
-
-      var spec = v
-      for (stg <- sStage until wStage) {
-        val specReg = Reg(init = Bits(0))
-        specReg := spec
-        specReg.nameIt("Huy_specReg_" + stg)
-        pipelineReg(stg) += specReg.comp.asInstanceOf[Reg]
-        spec = specReg
-      }
-
-      val b = Bits()
-      b.inputs += s.comp.inputs(0)
-      val kill = (valids(wStage-1) && spec != b)
-      for (i <- 0 until reg.updates.length) {
-        val en = reg.updates(i)._1
-        reg.updates(i) = ((en && kill, reg.updates(i)._2))
-      }
-      val default = !mask && !kill
-      default.nameIt("Huy_doSpec")
-      reg.updates += ((default, v))
-      for (stg <- sStage until wStage)
-        speckills(stg) += kill
-    }
-
-    insertBubble(globalStall)
-    
-    for (m <- cMems) {
-      for (wprt <- m.writes) {
-        wprt.inputs(1) = wprt.inputs(1).asInstanceOf[Bool] && (!stalls(getStage(wprt.inputs(1))).foldLeft(Bool(false))(_ || _)).asInstanceOf[Bool] && !(globalStall.asInstanceOf[Bool])
-      }
-    }
-  }*/
-
   def insertBubble(globalStall: Bool) = {
     for (stage <- 0 until pipelineReg.size) {
       val stall = stalls(stage+1).foldLeft(Bool(false))(_ || _)
@@ -3075,94 +2734,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     
   }
   
-  /*def generateForwardingLogic() = {
-    def getPipelinedVersion(n: Node): Node = {
-      var result = n
-      if (n.pipelinedVersion != null){
-        result = n.pipelinedVersion
-      }
-      result
-    }
-    var consumerMap = getConsumers()
-    for(r <- forwardedRegs){
-      val forwardPoints = new HashMap[Int, ArrayBuffer[(Node,Node)]]()
-      for (i <- nodeToStageMap(r) + 1 to pipelineReg.size){
-        forwardPoints(i) = new ArrayBuffer[(Node,Node)]()
-      } 
-      for ((writeEn, writeData) <- r.updates){Predef.assert(nodeToStageMap(writeEn) == nodeToStageMap(writeData))
-        val writeEns = getVersions(writeEn)
-        val writeDatas = getVersions(writeData.asInstanceOf[Bits])
-        val numStagesAvail = Math.min(writeEns.length, writeDatas.length)
-        for(i <- 0 until numStagesAvail) {
-          forwardPoints(nodeToStageMap(writeEn) - i) += ((writeEns(i), writeDatas(i)))
-        }
-      }
-      val muxMapping = new ArrayBuffer[(Bool, Bits)]()
-      for(i <- nodeToStageMap(r) + 1 to pipelineReg.size){
-        //generate muxes
-        if(!forwardPoints(i).isEmpty){     
-          for((j,k) <- forwardPoints(i)){
-            muxMapping += ((j.asInstanceOf[Bool], k.asInstanceOf[Bits]))
-            //append forward condition to hazards list
-            for((cond, state, rStage, wStage, wEn, rPort) <- hazards){
-              if(state == r && wStage == i){
-                hazards -= ((cond, state, rStage, wStage, wEn, rPort))
-              }
-            }
-          }
-        }
-      }
-      val bypassMux = MuxCase(consumerMap(r)(0).asInstanceOf[Bits],muxMapping)
-      for (n <- consumerMap(consumerMap(r)(0))){
-        n.replaceProducer(consumerMap(r)(0), bypassMux)
-      }
-    }
-    for((fm, rp) <- forwardedMemReadPoints){
-      val forwardPoints = new HashMap[Int, ArrayBuffer[(Node, Node, Node)]]()
-      for (i <- nodeToStageMap(rp.adr) + 1 to pipelineReg.size){
-        forwardPoints(i) = new ArrayBuffer[(Node,Node,Node)]()
-      }
-      for(i <- 0 until fm.io.writes.length){
-        val writePoint = fm.io.writes(i)
-        if(!memNonForwardedWritePoints.contains(writePoint)){
-          val delayedWriteEn = getPipelinedVersion(writePoint.is.inputs(0).inputs(1))
-          val delayedWriteData = getPipelinedVersion(writePoint.dat.asInstanceOf[Node].inputs(0).inputs(1))
-          val delayedWriteAddr = getPipelinedVersion(writePoint.adr.inputs(0).inputs(1))
-          Predef.assert(nodeToStageMap(delayedWriteEn) == nodeToStageMap(delayedWriteData))
-          Predef.assert(nodeToStageMap(delayedWriteEn) == nodeToStageMap(delayedWriteAddr))
-          val writeEns = getVersions(delayedWriteEn.asInstanceOf[Bits])
-          val writeDatas = getVersions(delayedWriteData.asInstanceOf[Bits])
-          val writeAddrs = getVersions(delayedWriteAddr.asInstanceOf[Bits])
-          val numStagesAvail = Math.min(writeEns.length, Math.min(writeDatas.length, writeAddrs.length))
-          for(i <- 0 until numStagesAvail){
-            println("found fowarding point ("+ writeEns(i) + "," + writeDatas(i) + "," + writeAddrs(i) + ")")
-            forwardPoints(nodeToStageMap(delayedWriteEn) - i) += ((writeEns(i), writeDatas(i), writeAddrs(i))) 
-          }
-        }
-      }
-      val muxMapping = new ArrayBuffer[(Bool, Bits)]()
-      for(i <- nodeToStageMap(rp.adr) + 1 to pipelineReg.size){
-        //generate muxes
-        if(!forwardPoints(i).isEmpty){
-          for((writeEn, writeData, writeAddr) <- forwardPoints(i)){
-            val forwardCond = writeEn.asInstanceOf[Bool] & writeAddr.asInstanceOf[Bits] === rp.adr.asInstanceOf[Bits]
-            muxMapping += ((forwardCond, writeData.asInstanceOf[Bits]))
-            //append forward condition to hazards list
-            for((cond, state, rStage, wStage, wEn, rPort) <- hazards){
-              if(wStage == i & wEn == writeEn.asInstanceOf[Bool] & rp == rPort){
-                hazards -= ((cond, state, rStage, wStage, wEn, rPort))
-              }
-            }
-          }
-        }
-      }
-      val bypassMux = MuxCase(rp.dat.asInstanceOf[Bits], muxMapping)
-      for (n <- consumerMap(rp.dat.asInstanceOf[Node])){
-        n.replaceProducer(rp.dat.asInstanceOf[Node], bypassMux)    
-      }
-    }
-  }*/
-  
   def verifyLegalStageColoring(coloredNodes: HashMap[Node, ArrayBuffer[Int]]) = {
     object Direction extends Enumeration {
       type Direction = Value
@@ -3170,7 +2741,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
     import Direction._
     def getStage(node: Node, dir: Direction): Int = {
-      if(coloredNodes.contains(node)){
+      if(requireStage(node)){
         if(coloredNodes(node).length > 1){
           if(dir == PRODUCER){//if node is a pipeline register and is viewed as a producer
             return Math.max(coloredNodes(node)(0), coloredNodes(node)(1))
