@@ -277,10 +277,9 @@ trait DelayBackannotation extends Backannotation {
 
     ChiselError.info("Donggyu: generate a tcl file")
     tcl.append("""set ucb_vlsi_home [getenv UCB_VLSI_HOME]"""+"\n")
-    tcl.append("""set stdcells_home $ucb_vlsi_home/stdcells/synopsys-32nm/typical_rvt"""+"\n")
-    tcl.append("""set search_path "$stdcells_home/db $ucb_vlsi_home/install/vclib ../" """+"\n")
+    tcl.append("""set stdcells_home $ucb_vlsi_home/stdcells/[getenv UCB_STDCELLS]"""+"\n")
+    tcl.append("""set search_path "$stdcells_home/db ../" """+"\n")
     tcl.append("""set target_library "cells.db" """+"\n")
-    // tcl.append("""set synthetic_library "dw_foundation.sldb" """+"\n")
     tcl.append("""set synthetic_library "standard.sldb" """+"\n")
     tcl.append("""set link_library "* $target_library $synthetic_library" """+"\n")
     tcl.append("""set alib_library_analysis_path "alib" """+"\n\n")
@@ -307,6 +306,9 @@ trait DelayBackannotation extends Backannotation {
 
     tcl.append("set hdlin_infer_mux all\n")
     tcl.append("set hdlin_keep_signal_name all\n")
+
+    tcl.append("\nwrite -f verilog -hierarchy -output " + m.name + ".unmapped.v\n\n")
+
     // tcl.append("compile -no_design_rule\n\n")
     // tcl.append("compile -only_design_rule\n\n")
     tcl.append("compile -only_hold_time\n\n")
@@ -368,7 +370,7 @@ trait DelayBackannotation extends Backannotation {
 
         val prunedArray = pruneOneInput(list)
 
-        // Randomly deleting points
+        // Randomly deleting poins
         val random = new Random
         val sizeLimit = 8 // emperically best number
         var arrayLength = prunedArray.length
@@ -405,13 +407,14 @@ trait DelayBackannotation extends Backannotation {
           tcl.append(cmdhead + "report_timing" + from + to + cmdopts + cmdtail)
         } else {
           val head = sets.head
-          val mid = sets.tail.init
+          val mids = sets.tail.init
           val last = sets.last
           tcl.append("if " + condcmds(head))
-          for (via <- mid) {
-            tcl.append(" elseif " + condcmds(via))
+          for (mid <- mids) {
+            tcl.append(" elseif " + condcmds(mid))
           }
-          tcl.append(" else " + condcmds(last))
+          // tcl.append(" else " + condcmds(last))
+          tcl.append("\n")
         }
       }
   
@@ -444,12 +447,12 @@ trait DelayBackannotation extends Backannotation {
       
       (start, end) match {
         case (_: Delay, _: Delay) => {
-          val from = " -from [get_pins " + getSignalName(start) + "_reg*/CLK]"
+          val from = " -from [get_pins " + getSignalName(start) + "_reg*/CP]"
           val to = " -to [get_pins " + getSignalName(end) + "_reg*/D]"
           genReports(from, to, via, end)
         }
         case (_: Delay, bits: Bits) if bits.dir == OUTPUT => {
-          val from = " -from [get_pins " + getSignalName(start) + "_reg*/CLK]"
+          val from = " -from [get_pins " + getSignalName(start) + "_reg*/CP]"
           val to = " -to " + getSignalName(end)
           genReports(from, to, via, end)
         }
@@ -506,7 +509,7 @@ trait DelayBackannotation extends Backannotation {
     val EndpointRegex = """\s*Endpoint: ([\w/_]+)(?:\[\d+\])*.*""".r
     val delaymap = new HashMap[String, Double]
     val seldelaymap = new HashMap[String, Double]
-    val regdelaymap = new HashMap[String, Double]
+    val missdelaymap = new HashMap[String, (Int, Double)]
     var points: Array[String] = null
     var pointIndex = 0
     var startPoint = ""
@@ -534,9 +537,12 @@ trait DelayBackannotation extends Backannotation {
         if (pointIndex == newIndex && isRegin && prevPoint != null) {
           if ((seldelaymap getOrElse (prevPoint, 0.0)) < delay)
             seldelaymap(prevPoint) = delay
-        } else {
+        } else if (interval == 1) {
           if ((delaymap getOrElse (curPoint, 0.0)) < delay) 
             delaymap(curPoint) = delay
+        } else {
+          val (cnt, sum) = missdelaymap getOrElse (curPoint, (0, 0.0))
+          missdelaymap(curPoint) = (cnt + 1, sum + delay)
         }
 
         pointIndex += 1
@@ -598,7 +604,7 @@ trait DelayBackannotation extends Backannotation {
           // ChiselError.info("reg/Q: %s %s %s %s".format(reg, ref, incr, arr))
           assert(reg == points.head)
           val delay = incr.toDouble
-          if ((regdelaymap getOrElse (reg, 0.0)) < delay)
+          if ((delaymap getOrElse (reg, 0.0)) < delay)
             delaymap(reg) = delay
           pointIndex += 1
           prevArrivalTime = arr.toDouble
@@ -624,14 +630,24 @@ trait DelayBackannotation extends Backannotation {
     m bfs {node => 
       val nodeName = getSignalName(node)
       val delay = delaymap getOrElse (nodeName, 0.0)
+      val (cnt, missdelay) = missdelaymap getOrElse (nodeName, (0, 0.0))
 
       node match {
         // In this case, its input disappear, and it is higly likely that 
         // the delay is attributed to its input.
         case bits: Bits if bits.dir == OUTPUT && bits.inputs.length == 1 => {
-          val inputName = getSignalName(node.inputs(0))
-          val olddelay = delaymap getOrElse (inputName, 0.0)
-          delaymap(inputName) = olddelay + delay
+          // val inputName = getSignalName(node.inputs(0))
+          // val inputdelay = delaymap getOrElse (inputName, 0.0)
+          if (delay > 0) {
+            if (node.inputs(0).delay < delay) {
+              node.inputs(0).delay = delay
+            }
+          } else if (cnt != 0) {
+            if (node.inputs(0).delay < (missdelay / cnt.toDouble)) {
+              node.inputs(0).delay = (missdelay / cnt.toDouble)
+            }
+          }
+
           node.delay = 0.0
         }
         case _ => {
@@ -647,10 +663,24 @@ trait DelayBackannotation extends Backannotation {
               node.delay = delay
           }
           */
+
+          if (delay > 0.0) {
+            node.delay = node.delay + delay
+          } else if (cnt != 0) {
+            ChiselError.info("hi! " + nodeName + ": " +  node.delay.toString)
+            node.delay = node.delay + (missdelay / cnt.toDouble)
+            ChiselError.info("hi! " + nodeName + ": " +  node.delay.toString)
+          }
+
+          /*
+          if (cnt != 0)
+            node.delay = delay + (missdelay / cnt.toDouble)
+          else if (node.delay < delay)
+            node.delay = delay
+          */
+
           val seldelay = seldelaymap getOrElse (nodeName, 0.0)
 
-          if (node.delay < delay)
-            node.delay = delay
           if (node.seldelay < seldelay)
             node.seldelay = seldelay
         }
