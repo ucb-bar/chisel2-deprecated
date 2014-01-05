@@ -262,7 +262,7 @@ object Op {
 class Op extends Node {
   var op: String = "";
   var nGrow: Int = 0;
-  delay = 1.0
+  //delay = 5.0
   
   override def toString: String =
     if (inputs.length == 1) {
