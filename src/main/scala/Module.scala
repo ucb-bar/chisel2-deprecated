@@ -1400,12 +1400,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         var childParents = new ArrayBuffer[Node]
         if(variableLatencyUnitInputs.contains(child)){
           if(direction){
-            var varLatComp: TransactionalComponent = null
-            for(tComp <- VariableLatencyComponents){
-              if(tComp.io.flatten.filter(_._2.dir == INPUT).map(_._2).contains(child)){
-                varLatComp = tComp
-              }
-            }
+            val varLatComp = findVariableLatencyComp(child)
             for(varLatInput <- varLatComp.io.flatten.filter(_._2.dir == INPUT).map(_._2)){
               for(inputProducer <- varLatInput.inputs){
                 childParents += inputProducer
@@ -1415,16 +1410,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             Predef.assert(false)
           }
         } else if(variableLatencyUnitOutputs.contains(child)){
-          
           if(direction){
             Predef.assert(false)
           } else {
-            var varLatComp: TransactionalComponent = null
-            for(tComp <- VariableLatencyComponents){
-              if(tComp.io.flatten.filter(_._2.dir == OUTPUT).map(_._2).contains(child)){
-                varLatComp = tComp
-              }
-            }
+            val varLatComp = findVariableLatencyComp(child)
             for(varLatOutput <- varLatComp.io.flatten.filter(_._2.dir == OUTPUT).map(_._2)){
               for(outputConsumer <- varLatOutput.consumers){
                 childParents += outputConsumer
@@ -1433,6 +1422,14 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           }
         } else if(tMemReadAddrs.contains(child)){
           if(direction){
+            val tMem = findTransactionMem(child)
+            for(i <- 0 until tMem.io.reads.length){
+              val readPort = tMem.io.reads(i)
+              val readAddr = readPort.adr
+              for(readAddrProducer <- readAddr.getProducers){
+                childParents += readAddrProducer
+              }
+            }
           } else {
             Predef.assert(false)
           }
@@ -1440,6 +1437,14 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           if(direction){
             Predef.assert(false)
           } else {
+            val tMem = findTransactionMem(child)
+            for(i <- 0 until tMem.io.reads.length){
+              val readPort = tMem.io.reads(i)
+              val readData = readPort.dat
+              for(readDataConsumer <- readData.consumers){
+                childParents += readDataConsumer
+              }
+            }
           }
         } else {
           if(direction){
@@ -1479,12 +1484,67 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
       //propagate node's stage number to child and record all new nodes that have been propagated to; direction = false means child is producer of node, direction = true means child is consumer of node
       def doPropagation(child: Node, direction: Boolean) = {
-        var childParents:Seq[Node] = null
-        if(direction){
-          childParents = child.getProducers()
+        var childParents = new ArrayBuffer[Node]
+        if(variableLatencyUnitInputs.contains(child)){
+          if(direction){
+            val varLatComp = findVariableLatencyComp(child)
+            for(varLatInput <- varLatComp.io.flatten.filter(_._2.dir == INPUT).map(_._2)){
+              for(inputProducer <- varLatInput.inputs){
+                childParents += inputProducer
+              }
+            }
+          } else {
+            Predef.assert(false)
+          }
+        } else if(variableLatencyUnitOutputs.contains(child)){
+          if(direction){
+            Predef.assert(false)
+          } else {
+            val varLatComp = findVariableLatencyComp(child)
+            for(varLatOutput <- varLatComp.io.flatten.filter(_._2.dir == OUTPUT).map(_._2)){
+              for(outputConsumer <- varLatOutput.consumers){
+                childParents += outputConsumer
+              }
+            }
+          }
+        } else if(tMemReadAddrs.contains(child)){
+          if(direction){
+            val tMem = findTransactionMem(child)
+            for(i <- 0 until tMem.io.reads.length){
+              val readPort = tMem.io.reads(i)
+              val readAddr = readPort.adr
+              for(readAddrProducer <- readAddr.getProducers){
+                childParents += readAddrProducer
+              }
+            }
+          } else {
+            Predef.assert(false)
+          }
+        } else if(tMemReadDatas.contains(child)){
+          if(direction){
+            Predef.assert(false)
+          } else {
+            val tMem = findTransactionMem(child)
+            for(i <- 0 until tMem.io.reads.length){
+              val readPort = tMem.io.reads(i)
+              val readData = readPort.dat
+              for(readDataConsumer <- readData.consumers){
+                childParents += readDataConsumer
+              }
+            }
+          }
         } else {
-          childParents = child.consumers
+          if(direction){
+            for(childProducer <- child.getProducers()){
+              childParents += childProducer
+            }
+          } else {
+            for(childConsumer <- child.consumers){
+              childParents += childConsumer
+            }
+          }
         }
+        
         var edgeParentStage:Int = 0//this is the minimum stage of child's consumers when direction == true, this is the maximum stage of child's producers when direction == false
         if(direction){
           edgeParentStage = 0
@@ -1506,24 +1566,18 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         //propagate stage to child
         val childNodes = new ArrayBuffer[Node]
         if(variableLatencyUnitInputs.contains(child) || variableLatencyUnitOutputs.contains(child)){
-            var varLatComp: TransactionalComponent = null
-            for(tComp <- VariableLatencyComponents){
-              if(tComp.io.flatten.map(_._2).contains(child)){
-                varLatComp = tComp
-              }
-            }
-            for(varLatIO <- varLatComp.io.flatten.map(_._2)){
-              childNodes += varLatIO
-            }
-        } else if(tMemReadAddrs.contains(child)){
-          if(direction){
-          } else {
-            Predef.assert(false)
+          val varLatComp = findVariableLatencyComp(child)
+          for(varLatIO <- varLatComp.io.flatten.map(_._2)){
+            childNodes += varLatIO
           }
-        } else if(tMemReadDatas.contains(child)){
-          if(direction){
-            Predef.assert(false)
-          } else {
+        } else if(tMemReadAddrs.contains(child) || tMemReadDatas.contains(child)){
+          val tMem = findTransactionMem(child)
+          for(i <- 0 until tMem.io.reads.length){
+            val readPort = tMem.io.reads(i)
+            val readAddr = readPort.adr
+            val readData = readPort.dat
+            childNodes += readAddr
+            childNodes += readData
           }
         } else {
           childNodes += child
@@ -1543,12 +1597,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         //set propagatedChildren
         if(variableLatencyUnitInputs.contains(child)){
           if(direction){
-            var varLatComp: TransactionalComponent = null
-            for(tComp <- VariableLatencyComponents){
-              if(tComp.io.flatten.filter(_._2.dir == INPUT).map(_._2).contains(child)){
-                varLatComp = tComp
-              }
-            }
+            val varLatComp = findVariableLatencyComp(child)
             for(varLatOutput <- varLatComp.io.flatten.filter(_._2.dir == OUTPUT).map(_._2)){
               propagatedChildren += varLatOutput
             }
@@ -1559,18 +1608,19 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           if(direction){
             Predef.assert(false)
           } else {
-            var varLatComp: TransactionalComponent = null
-            for(tComp <- VariableLatencyComponents){
-              if(tComp.io.flatten.filter(_._2.dir == OUTPUT).map(_._2).contains(child)){
-                varLatComp = tComp
-              }
-            }
+            val varLatComp = findVariableLatencyComp(child)
             for(varLatInput <- varLatComp.io.flatten.filter(_._2.dir == INPUT).map(_._2)){
               propagatedChildren += varLatInput
             }
           }
         } else if(tMemReadAddrs.contains(child)){
           if(direction){
+            val tMem = findTransactionMem(child)
+            for(i <- 0 until tMem.io.reads.length){
+              val readPort = tMem.io.reads(i)
+              val readData = readPort.dat
+              propagatedChildren += readData
+            }
           } else {
             Predef.assert(false)
           }
@@ -1578,6 +1628,12 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           if(direction){
             Predef.assert(false)
           } else {
+            val tMem = findTransactionMem(child)
+            for(i <- 0 until tMem.io.reads.length){
+              val readPort = tMem.io.reads(i)
+              val readAddr = readPort.adr
+              propagatedChildren += readAddr
+            }
           }
         } else {
           propagatedChildren += child
@@ -1645,8 +1701,42 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     visualizeGraph(coloredNodes, "stages.gv")
     coloredNodes
   }
-    
   
+  def findVariableLatencyComp(node: Node): TransactionalComponent = {
+    var varLatComp: TransactionalComponent = null
+    for(tComp <- VariableLatencyComponents){
+      if(tComp.io.flatten.map(_._2).contains(node)){
+        varLatComp = tComp
+      }
+    }
+    return varLatComp
+  }
+   
+  def findReadPort(node: Node): FunRdIO[Data] = {
+    var result: FunRdIO[Data] = null
+    for(tMem <- TransactionMems){
+      for(i <- 0 until tMem.io.reads.length){
+        val readPort = tMem.io.reads(i)
+        if(readPort.adr == node || readPort.dat == node){
+          result = readPort
+        }
+      }
+    }
+    return result
+  }
+  
+  def findTransactionMem(node: Node): TransactionMem[Data] = {
+    var result: TransactionMem[Data] = null
+    for(tMem <- TransactionMems){
+      for(i <- 0 until tMem.io.reads.length){
+        val readPort = tMem.io.reads(i)
+        if(readPort.adr == node || readPort.dat == node){
+          result = tMem
+        }
+      }
+    }
+    return result
+  }
   //inserts register between *input* and its consumers
   def insertRegister(input: Bits, init_value: Bits, name: String) : Bits = {
     val new_reg = Reg(Bits())
@@ -1752,7 +1842,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         } else if(!requireStage(node)){
           arrivalTimes(node) = 0.0
           return 0.0
-        } else if(isSource(node) && dir == FORWARD || isSink(node) && dir == BACKWARD){
+        } else if(isSource2(node) && dir == FORWARD || isSink2(node) && dir == BACKWARD){
           arrivalTimes(node) = 0.0
           return 0.0
         } else if(coloredNodes.contains(node) && coloredNodes(node).length > 1 && (coloredNodes(node)(0) != coloredNodes(node)(1))) {
@@ -1760,18 +1850,84 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           return 0.0
         } else {
           var arrivalTime :Double= 0.0
-          var parents = node.inputs
-          if(dir == FORWARD){
-            parents = node.inputs
+          val parents = new ArrayBuffer[Node]
+          if(variableLatencyUnitInputs.contains(node)){
+            if(dir == FORWARD){
+              for(input <- node.inputs){
+                parents += input
+              }
+            } else {
+              val varLatComp = findVariableLatencyComp(node)
+              for(output <- varLatComp.io.flatten.filter(_._2.dir == OUTPUT).map(_._2)){
+                for(outputConsumer <- output.consumers){
+                  parents += outputConsumer
+                }
+              }
+            }
+          } else if(variableLatencyUnitOutputs.contains(node)){
+            if(dir == FORWARD){
+              val varLatComp = findVariableLatencyComp(node)
+              for(input <- varLatComp.io.flatten.filter(_._2.dir == INPUT).map(_._2)){
+                for(inputProducer <- input.inputs){
+                  parents += inputProducer
+                }
+              }
+            } else {
+              for(consumer <- node.consumers){
+                parents += consumer
+              }
+            }
+          } else if(tMemReadAddrs.contains(node)){
+            if(dir == FORWARD){
+              for(input <- node.inputs){
+                parents += input
+              }
+            } else {
+              val readPort = findReadPort(node)
+              for(consumer <- readPort.dat.consumers){
+                parents += consumer
+              }
+            }
+          } else if(tMemReadDatas.contains(node)){
+            if(dir == FORWARD){
+              val readPort = findReadPort(node)
+              for(input <- readPort.adr.inputs){
+                parents += input
+              }
+            } else {
+              for(consumer <- node.consumers){
+                parents += consumer
+              }
+            }
           } else {
-            parents = node.consumers
+            if(dir == FORWARD){
+              for(input <- node.inputs){
+                parents += input
+              }
+            } else {
+              for(consumer <- node.consumers){
+                parents += consumer
+              }
+            }
           }
 
           for(parent <- parents){
             arrivalTime = Math.max(arrivalTime, findArrivalTime(parent, dir))
           }
-          arrivalTimes(node) = arrivalTime + node.delay
-          return arrivalTime + node.delay
+          
+          if(variableLatencyUnitInputs.contains(node) || variableLatencyUnitOutputs.contains(node)){
+            val varLatComp = findVariableLatencyComp(node)
+            for(io <- varLatComp.io.flatten.map(_._2)){
+              arrivalTimes(io) = arrivalTime + 5.0 //hack for variableLatencyUnit delay
+            }
+          } else if(tMemReadAddrs.contains(node) || tMemReadDatas.contains(node)){
+            val readPort = findReadPort(node)
+            arrivalTimes(readPort.adr) = arrivalTime + 5.0//hack for readPort delay
+            arrivalTimes(readPort.dat) = arrivalTime + 5.0
+          } else {
+            arrivalTimes(node) = arrivalTime + node.delay
+          }
+          return arrivalTimes(node)
         }
       }
       //find forward delay times
@@ -1783,7 +1939,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           }
         }
       }
-      for(node <- sinkNodes()){
+      for(node <- sinkNodes2()){
         findArrivalTime(node, FORWARD)
       }
       //find backward delay times
@@ -1795,7 +1951,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           }
         }
       }
-      for(node <- sourceNodes()){
+      for(node <- sourceNodes2()){
         findArrivalTime(node, BACKWARD)
       }
     }
@@ -1806,7 +1962,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         def findArrivalTime(node: Node) : Double = {
           if(nodeArrivalTimes.contains(node)){
             return nodeArrivalTimes(node)
-          } else if(isSource(node)){
+          } else if(isSource2(node)){
             nodeArrivalTimes(node) = 0.0
             return 0.0
           } else if(node.isInstanceOf[Mem[_]]){
@@ -1817,15 +1973,54 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             return 0.0
           } else {
             var arrivalTime :Double= 0.0
-            for(input <- node.inputs){
-              arrivalTime = Math.max(arrivalTime, findArrivalTime(input))
+            val parents = new ArrayBuffer[Node]
+            if(variableLatencyUnitInputs.contains(node)){
+              for(input <- node.inputs){
+                parents += input
+              }
+            } else if(variableLatencyUnitOutputs.contains(node)){
+              val varLatComp = findVariableLatencyComp(node)
+              for(input <- varLatComp.io.flatten.filter(_._2.dir == INPUT).map(_._2)){
+                for(inputProducer <- input.inputs){
+                  parents += inputProducer
+                }
+              }
+            } else if(tMemReadAddrs.contains(node)){
+              for(input <- node.inputs){
+                parents += input
+              }
+            } else if(tMemReadDatas.contains(node)){
+              val readPort = findReadPort(node)
+              for(input <- readPort.adr.inputs){
+                parents += input
+              }
+            } else {
+              for(input <- node.inputs){
+                parents += input
+              }
             }
-            nodeArrivalTimes(node) = arrivalTime + node.delay
-            return arrivalTime + node.delay
+
+            for(parent <- parents){
+              arrivalTime = Math.max(arrivalTime, findArrivalTime(parent))
+            }
+            
+            if(variableLatencyUnitInputs.contains(node) || variableLatencyUnitOutputs.contains(node)){
+              val varLatComp = findVariableLatencyComp(node)
+              for(io <- varLatComp.io.flatten.map(_._2)){
+                nodeArrivalTimes(io) = arrivalTime + 5.0 //hack for variableLatencyUnit delay
+              }
+            } else if(tMemReadAddrs.contains(node) || tMemReadDatas.contains(node)){
+              val readPort = findReadPort(node)
+              nodeArrivalTimes(readPort.adr) = arrivalTime + 5.0//hack for readPort delay
+              nodeArrivalTimes(readPort.dat) = arrivalTime + 5.0
+            } else {
+              nodeArrivalTimes(node) = arrivalTime + node.delay
+            }
+            return nodeArrivalTimes(node)
           }
         }
         nodeArrivalTimes.clear()
-        for(node <- sinkNodes()){
+        for(node <- sinkNodes2()){
           findArrivalTime(node)
         }
       }
@@ -1866,7 +2061,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       //find nodes from possibleMoveNodes that can have the pipeline boundary be legally moved in "direction" accross the node and store them in eligibleMoveNodes
       def findEligibleNodes(direction: Direction) = {
         for(node <- possibleMoveNodes){
-          if(requireStage(node) && !annotatedStages.contains(node) && !fillerNodes.contains(node)){
+          if(requireStage(node) && !annotatedStages.contains(node) && !fillerNodes.contains(node) && !isSource(node) && ! isSink(node)){
             val nodeStage = coloredNodes(node)(0)
             Predef.assert(coloredNodes(node).length == 1, "" + node + " " + coloredNodes(node))
             var parentsEligible = true
@@ -1999,7 +2194,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     var oldMaxDelay = findUnpipelinedPathLength(coloredNodes)
     println("max unpipelined path: " + findUnpipelinedPathLength(coloredNodes))
     println("max delay before optimizeation: " + stageDelays.max)
-    while(!(iterCount % 100 == 0 && oldMaxDelay == stageDelays.max) && iterCount < 10000){
+    //while(!(iterCount % 100 == 0 && oldMaxDelay == stageDelays.max) && iterCount < 10000){
+   while(iterCount < 5000){   
       //find pipeline stage with longest delay
       val criticalStageNum = stageDelays.indexOf(stageDelays.max)
       //determine which pipeline boundary to move
