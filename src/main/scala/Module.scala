@@ -306,6 +306,23 @@ object Module {
   def sinkNodes(): HashSet[Node] = {
     regWritePoints | tMemReadAddrs | tMemWritePoints | outputNodes | variableLatencyUnitInputs
   }
+  
+  //hack to deal with variable latency units and tmem read ports in propagateStages and optimizePipelineRegisterPlacement for now
+   def isSource2(node: Node) =  {
+    regReadPoints.contains(node) || inputNodes.contains(node) 
+  }
+
+  def isSink2(node: Node) = {
+    regWritePoints.contains(node) || tMemWritePoints.contains(node) || outputNodes.contains(node) 
+  }
+
+  def sourceNodes2(): HashSet[Node] = {
+    regReadPoints | inputNodes 
+  }
+  def sinkNodes2(): HashSet[Node] = {
+    regWritePoints | tMemWritePoints | outputNodes 
+  } 
+  
   def setPipelineLength(length: Int) = {
     pipelineLength = length
     for (i <- 0 until pipelineLength - 1) {
@@ -1208,6 +1225,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     for(output <- outputs){
       outputNodes += output._2
     }
+
   }
   
   def findNodesRequireStage() = {
@@ -1297,7 +1315,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     //hack to deal with register default updates causing a cycle in C++ backend
     def dfs(node: Node, reg: Node): Unit  = {
       if(node.inputs.contains(reg)){
-        println("DEBUG0")
         reg.consumers -= node
         //regWritePoints += node
       } else if(!isSink(node) && !isSource(node) && !((node.litOf != null) || (node == pipelineComponent.clock) || (node == pipelineComponent._reset))){
@@ -1380,11 +1397,60 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         val childWasPropagated = propagatedToChild(coloredNodes(node)(0), child)
         val fillerToReal = fillerNodes.contains(node) && !fillerNodes.contains(child) && coloredNodes(child).length > 0
         var allParentsResolved = true
-        var childParents:Seq[Node] = null
-        if(direction){
-          childParents = child.getProducers() 
+        var childParents = new ArrayBuffer[Node]
+        if(variableLatencyUnitInputs.contains(child)){
+          if(direction){
+            var varLatComp: TransactionalComponent = null
+            for(tComp <- VariableLatencyComponents){
+              if(tComp.io.flatten.filter(_._2.dir == INPUT).map(_._2).contains(child)){
+                varLatComp = tComp
+              }
+            }
+            for(varLatInput <- varLatComp.io.flatten.filter(_._2.dir == INPUT).map(_._2)){
+              for(inputProducer <- varLatInput.inputs){
+                childParents += inputProducer
+              }
+            }
+          } else {
+            Predef.assert(false)
+          }
+        } else if(variableLatencyUnitOutputs.contains(child)){
+          
+          if(direction){
+            Predef.assert(false)
+          } else {
+            var varLatComp: TransactionalComponent = null
+            for(tComp <- VariableLatencyComponents){
+              if(tComp.io.flatten.filter(_._2.dir == OUTPUT).map(_._2).contains(child)){
+                varLatComp = tComp
+              }
+            }
+            for(varLatOutput <- varLatComp.io.flatten.filter(_._2.dir == OUTPUT).map(_._2)){
+              for(outputConsumer <- varLatOutput.consumers){
+                childParents += outputConsumer
+              }
+            }
+          }
+        } else if(tMemReadAddrs.contains(child)){
+          if(direction){
+          } else {
+            Predef.assert(false)
+          }
+        } else if(tMemReadDatas.contains(child)){
+          if(direction){
+            Predef.assert(false)
+          } else {
+          }
         } else {
-          childParents = child.consumers
+          if(direction){
+            for(childProducer <- child.getProducers()){
+              childParents += childProducer
+            }
+          } else {
+            for(childConsumer <- child.consumers){
+              childParents += childConsumer
+            }
+          }
         }
         var edgeParentStage:Int = 0//this is the minimum stage of child's consumers when direction == true, this is the maximum stage of child's producers when direction == false
         if(direction){
@@ -1438,8 +1504,34 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           }
         }
         //propagate stage to child
-        if(!coloredNodes(child).contains(edgeParentStage)){
-          coloredNodes(child) += edgeParentStage
+        val childNodes = new ArrayBuffer[Node]
+        if(variableLatencyUnitInputs.contains(child) || variableLatencyUnitOutputs.contains(child)){
+            var varLatComp: TransactionalComponent = null
+            for(tComp <- VariableLatencyComponents){
+              if(tComp.io.flatten.map(_._2).contains(child)){
+                varLatComp = tComp
+              }
+            }
+            for(varLatIO <- varLatComp.io.flatten.map(_._2)){
+              childNodes += varLatIO
+            }
+        } else if(tMemReadAddrs.contains(child)){
+          if(direction){
+          } else {
+            Predef.assert(false)
+          }
+        } else if(tMemReadDatas.contains(child)){
+          if(direction){
+            Predef.assert(false)
+          } else {
+          }
+        } else {
+          childNodes += child
+        }
+        for(childNode <- childNodes){
+          if(!coloredNodes(childNode).contains(edgeParentStage)){
+            coloredNodes(childNode) += edgeParentStage
+          }
         }
         //propagate child stage back to its parents
         for(parent <- childParents.filter(requireStage(_))){
@@ -1447,7 +1539,49 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             coloredNodes(parent) += edgeParentStage
           }
         }
-        propagatedChildren += child
+        
+        //set propagatedChildren
+        if(variableLatencyUnitInputs.contains(child)){
+          if(direction){
+            var varLatComp: TransactionalComponent = null
+            for(tComp <- VariableLatencyComponents){
+              if(tComp.io.flatten.filter(_._2.dir == INPUT).map(_._2).contains(child)){
+                varLatComp = tComp
+              }
+            }
+            for(varLatOutput <- varLatComp.io.flatten.filter(_._2.dir == OUTPUT).map(_._2)){
+              propagatedChildren += varLatOutput
+            }
+          } else {
+            Predef.assert(false)
+          }
+        } else if(variableLatencyUnitOutputs.contains(child)){
+          if(direction){
+            Predef.assert(false)
+          } else {
+            var varLatComp: TransactionalComponent = null
+            for(tComp <- VariableLatencyComponents){
+              if(tComp.io.flatten.filter(_._2.dir == OUTPUT).map(_._2).contains(child)){
+                varLatComp = tComp
+              }
+            }
+            for(varLatInput <- varLatComp.io.flatten.filter(_._2.dir == INPUT).map(_._2)){
+              propagatedChildren += varLatInput
+            }
+          }
+        } else if(tMemReadAddrs.contains(child)){
+          if(direction){
+          } else {
+            Predef.assert(false)
+          }
+        } else if(tMemReadDatas.contains(child)){
+          if(direction){
+            Predef.assert(false)
+          } else {
+          }
+        } else {
+          propagatedChildren += child
+        }
       }
 
       var children:Seq[Node] = null
@@ -1498,7 +1632,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           var childrenPropagatedTo:ArrayBuffer[Node] = null
           childrenPropagatedTo = propagateToChildren(currentNode, currentDirection)
           for(child <- childrenPropagatedTo){
-            if((coloredNodes(child).length < 2) && !isSource(child) && !isSink(child)){
+            if((coloredNodes(child).length < 2) && !isSource2(child) && !isSink2(child) && !annotatedStages.contains(child)){
               bfsQueue.enqueue(((child, currentDirection)))
             }
           }
@@ -1508,7 +1642,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         }
       }
     }
-    //visualizeGraph(coloredNodes, "stages.gv")
+    visualizeGraph(coloredNodes, "stages.gv")
     coloredNodes
   }
     
@@ -2838,10 +2972,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     //check that all variable latency units have IO nodes in the same stage
     for(vComponent <- VariableLatencyComponents){
       Predef.assert(getStage(vComponent.io.req.valid, DONTCARE) == getStage(vComponent.io.req.bits, DONTCARE))
-      Predef.assert(getStage(vComponent.io.req.valid, DONTCARE) == getStage(vComponent.resp_ready, DONTCARE))
+      //Predef.assert(getStage(vComponent.io.req.valid, DONTCARE) == getStage(vComponent.resp_ready, DONTCARE))
       Predef.assert(getStage(vComponent.io.req.valid, DONTCARE) == getStage(vComponent.io.resp, DONTCARE))
-      Predef.assert(getStage(vComponent.io.req.valid, DONTCARE) == getStage(vComponent.resp_valid, DONTCARE))
-      Predef.assert(getStage(vComponent.io.req.valid, DONTCARE) == getStage(vComponent.req_ready, DONTCARE))
+      //Predef.assert(getStage(vComponent.io.req.valid, DONTCARE) == getStage(vComponent.resp_valid, DONTCARE))
+      //Predef.assert(getStage(vComponent.io.req.valid, DONTCARE) == getStage(vComponent.req_ready, DONTCARE))
     }
   }
   
