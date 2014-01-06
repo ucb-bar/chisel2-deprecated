@@ -1219,15 +1219,17 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
     while(!bfsQueue.isEmpty){
       val currentNode = bfsQueue.dequeue
-      for(child <- currentNode.consumers){
-        if(!visited.contains(child) && !isSink(child)){
-          bfsQueue.enqueue(child)
+      if(!isSink(currentNode)){
+        for(child <- currentNode.consumers){
+          if(!visited.contains(child) && !isSink(child)){
+            bfsQueue.enqueue(child)
+          }
         }
+        requireStageSet += currentNode
       }
       visited +=currentNode
-      requireStageSet += currentNode
     }
-    
+
     //mark all source and sink nodes as requiring a stage number(need to do this separately because not all of them are reachable by following consumers pointers
     for(node <- sourceNodes()){
       requireStageSet += node
@@ -1687,8 +1689,17 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         stageDelays(i) = 0.0
       }
       for((node, stages) <- coloredNodes.filter(_._2.length == 1)){
-        if(forwardArrivalTimes(node) > stageDelays(stages(0))){
-          stageDelays(stages(0)) = forwardArrivalTimes(node)
+        /*println("DEBUG0")
+        println(node)
+        println(stages)
+        println(requireStage(node))
+        println(isSink(node))
+        println(isSource(node))
+        visualizeSubGraph(node, "debug.gv", 5)*/ 
+        if(forwardArrivalTimes.contains(node)){
+          if(forwardArrivalTimes(node) > stageDelays(stages(0))){
+            stageDelays(stages(0)) = forwardArrivalTimes(node)
+          }
         }
       }
     }
@@ -1833,36 +1844,19 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     var oldMaxDelay = findUnpipelinedPathLength(coloredNodes)
     println("max unpipelined path: " + findUnpipelinedPathLength(coloredNodes))
     println("max delay before optimizeation: " + stageDelays.max)
-    //while(!(iterCount % 100 == 0 && oldMaxDelay == stageDelays.max) && iterCount < 10000){
-    while(iterCount < 10000){  
-      calculateArrivalTimes()
-      findStageDelays()
+    while(!(iterCount % 100 == 0 && oldMaxDelay == stageDelays.max) && iterCount < 10000){
       //find pipeline stage with longest delay
       val criticalStageNum = stageDelays.indexOf(stageDelays.max)
       //determine which pipeline boundary to move
-      var pipelineBoundaryNum = 0
-      var direction = FORWARD
-      if(criticalStageNum == 0){
-        pipelineBoundaryNum = 0
-        direction = BACKWARD
-      } else if(criticalStageNum == pipelineLength - 1){
-        pipelineBoundaryNum = pipelineLength - 2
-        direction = FORWARD
-      } else {
-        if(stageDelays(criticalStageNum - 1) > stageDelays(criticalStageNum + 1)){
-          pipelineBoundaryNum = criticalStageNum - 1
-          direction = FORWARD
-        } else {
-          pipelineBoundaryNum = criticalStageNum
-          direction = BACKWARD
+      for(pipeBoundaryNum <- 0 until pipelineLength - 1){
+        calculateArrivalTimes()
+        findStageDelays()
+        if(stageDelays(pipeBoundaryNum) < stageDelays(pipeBoundaryNum + 1)){
+          movePipelineBoundary(pipeBoundaryNum, FORWARD)
+        } else if(stageDelays(pipeBoundaryNum) > stageDelays(pipeBoundaryNum + 1)){
+          movePipelineBoundary(pipeBoundaryNum, BACKWARD)
         }
       }
-      /*println("DEBUG0")
-      println(stageDelays)
-      println(criticalStageNum)
-      println(pipelineBoundaryNum)
-      println(direction)*/
-      movePipelineBoundary(pipelineBoundaryNum, direction)
       iterCount = iterCount + 1
       if(iterCount % 100 == 0){
         oldMaxDelay = stageDelays.max
@@ -1870,6 +1864,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
     calculateArrivalTimes()
     findStageDelays()
+    println(stageDelays)
     println("max delay after optimizeation: " + stageDelays.max)
     println("iteration count: " + iterCount)
     visualizeGraph(coloredNodes, "stages.gv")
