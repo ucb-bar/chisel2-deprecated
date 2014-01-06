@@ -1294,6 +1294,26 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   
   //place extra wire nodes between all nodes
   def insertFillerWires() = {
+    //hack to deal with register default updates causing a cycle in C++ backend
+    def dfs(node: Node, reg: Node): Unit  = {
+      if(node.inputs.contains(reg)){
+        println("DEBUG0")
+        reg.consumers -= node
+        //regWritePoints += node
+      } else if(!isSink(node) && !isSource(node) && !((node.litOf != null) || (node == pipelineComponent.clock) || (node == pipelineComponent._reset))){
+        for(input <- node.inputs){
+          if(!isSink(input) && !isSource(input) && !((input.litOf != null) || (input == pipelineComponent.clock) || (input == pipelineComponent._reset))){
+            dfs(input, reg)
+          }
+        }
+      }
+    }
+    for(reg <- ArchitecturalRegs){
+      for(input <- reg.inputs){
+        dfs(input, reg)
+      }
+    }
+    
     val bfsQueue = new ScalaQueue[Node]
     val visited = new HashSet[Node]
     for(node <- sourceNodes()){
@@ -1736,8 +1756,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
                 }
               }
             }
-
-            eligibleMoveNodes += node
+            if(parentsEligible){
+              eligibleMoveNodes += node
+            }
           }
         }
       }
@@ -1829,12 +1850,12 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       if(eligibleMoveNodes.length > 0){
         moveNode(criticalNode, direction)
       } else {
-        println("no eligible nodes")
+        /*println("no eligible nodes")
         println(boundaryNum)
         println(direction)
         println(possibleMoveNodes)
         visualizeGraph(coloredNodes, "debug.gv")
-        Predef.assert(false)
+        Predef.assert(false)*/
       }
     }
 
@@ -2729,6 +2750,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           } else if(dir == CONSUMER){//if node is a pipeline register and is viewed as a consumer
             return Math.max(coloredNodes(node)(0), coloredNodes(node)(1))
           } else {
+            println(node)
+            println((coloredNodes)(node))
+            visualizeSubGraph(node, "debug.gv", 5)
             Predef.assert(false, "node not expected to have more than 1 stage number")
             return -3
           }
