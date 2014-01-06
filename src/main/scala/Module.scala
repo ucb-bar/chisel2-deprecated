@@ -279,6 +279,9 @@ object Module {
   val fillerNodes = new HashSet[Node]
   val requireStageSet = new HashSet[Node]
 
+  var autoAnnotate = false
+  var autoAnnotateStageNum = 0
+  
   val regWritePoints = new HashSet[Node] //list of all register write inputs and transactionMem write port nodes(including write addr, write data, write en)
   val regReadPoints = new HashSet[Node] //list of all register read outputs and transactionMem read port
   val tMemWritePoints = new HashSet[Node] //list of all transactionMem write port nodes(including write addr, write data, write en)
@@ -360,6 +363,12 @@ object Module {
   def addPipeReg(stage: Int, n: Node, rst: Bits) = {//insert pipeline registers manually
     pipeline(stage) += (n -> rst)
   }
+  
+  def setStageNum(num: Int) = {//insert pipeline registers by specifying number of stages
+    autoAnnotate = true
+    autoAnnotateStageNum = num
+  }
+  
   def setStage(n: Node, s:Int) = {//insert pipeline registers by annotating nodes with stages
     Predef.assert(!annotatedStages.contains(n), n.name + " already annotated as stage " + annotatedStages(n))
     if(n.isInstanceOf[Data] && n.asInstanceOf[Data].comp != null){
@@ -369,12 +378,12 @@ object Module {
     }
   }
   def setRegReadStage(node: Node, stage: Int) = {
-    val reg = node.asInstanceOf[Data].comp.asInstanceOf[Reg]
+    val reg = node
     Predef.assert(!(annotatedStages.contains(reg) && annotatedStages(reg) != stage), reg.name + " already annotated as stage " + annotatedStages(reg))
     annotatedStages(reg) = stage
   }
   def setRegWriteStage(node: Node, stage: Int) = {
-    val reg = node.asInstanceOf[Data].comp.asInstanceOf[Reg]
+    val reg = node
     for(producer <- reg.getProducers()){
       Predef.assert(!(annotatedStages.contains(producer) && annotatedStages(producer) != stage), producer.name + " already annotated as stage " + annotatedStages(producer))
       annotatedStages(producer) = stage
@@ -1224,6 +1233,19 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
     for(output <- outputs){
       outputNodes += output._2
+    }
+    
+    //specify read/write point and IO stage numbers if auto annotate is on
+    if(autoAnnotate){
+      for(archReg <- ArchitecturalRegs){
+        Module.setRegReadStage(archReg, 0)
+        Module.setRegWriteStage(archReg, autoAnnotateStageNum - 1)
+      }
+      for(tMem <-TransactionMems){
+        Module.setTmemWriteStage(tMem, autoAnnotateStageNum - 1)
+      }
+      Module.setInputStage(0)
+      Module.setOutputStage(autoAnnotateStageNum - 1)
     }
 
   }
