@@ -2061,18 +2061,72 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       //find nodes from possibleMoveNodes that can have the pipeline boundary be legally moved in "direction" accross the node and store them in eligibleMoveNodes
       def findEligibleNodes(direction: Direction) = {
         for(node <- possibleMoveNodes){
-          if(requireStage(node) && !annotatedStages.contains(node) && !fillerNodes.contains(node) && !isSource(node) && ! isSink(node)){
+          if(requireStage(node) && !annotatedStages.contains(node) && !fillerNodes.contains(node) && !isSource2(node) && !isSink2(node)){
             val nodeStage = coloredNodes(node)(0)
             Predef.assert(coloredNodes(node).length == 1, "" + node + " " + coloredNodes(node))
             var parentsEligible = true
-            var parents: Seq[Node] = null
+            val parents = new ArrayBuffer[Node]
             
-            if(direction == FORWARD){
-              parents = node.inputs
-            } else if(direction == BACKWARD){
-              parents = node.consumers
+            if(variableLatencyUnitInputs.contains(node)){
+              if(direction == FORWARD){
+                val varLatComp = findVariableLatencyComp(node)
+                for(varLatInput <- varLatComp.io.flatten.filter(_._2.dir == INPUT).map(_._2)){
+                  for(varLatInputProducer <- varLatInput.inputs){
+                    parents += varLatInputProducer
+                  }
+                }
+              } else {
+                Predef.assert(false)
+              }
+            } else if(variableLatencyUnitOutputs.contains(node)){
+              if(direction == FORWARD){
+                Predef.assert(false)
+              } else {
+                val varLatComp = findVariableLatencyComp(node)
+                for(varLatOutput <- varLatComp.io.flatten.filter(_._2.dir == OUTPUT).map(_._2)){
+                  for(varLatOutputConsumer <- varLatOutput.consumers){
+                    parents += varLatOutputConsumer
+                  }
+                }
+              }
+            } else if(tMemReadAddrs.contains(node)){
+              if(direction == FORWARD){
+                val tMem = findTransactionMem(node)
+                for(i <- 0 until tMem.io.reads.length){
+                  val readPort = tMem.io.reads(i)
+                  val readAddr = readPort.adr
+                  for(readAddrInput <- readAddr.inputs){
+                    parents += readAddrInput
+                  }
+                }
+              } else {
+                Predef.assert(false)
+              }
+            } else if(tMemReadDatas.contains(node)){
+              if(direction == FORWARD){
+                Predef.assert(false)
+              } else {
+                val tMem = findTransactionMem(node)
+                for(i <- 0 until tMem.io.reads.length){
+                  val readPort = tMem.io.reads(i)
+                  val readData = readPort.dat
+                  for(readDataConsumer <- readData.consumers){
+                    parents += readDataConsumer
+                  }
+                }
+              }
+            } else {
+              if(direction == FORWARD){
+                for(input <- node.inputs){
+                  parents += input
+                }
+              } else {
+                for(consumer <- node.consumers){
+                  parents += consumer
+                }
+              }
             }
-
+          
             for(parent <- parents){
               if(requireStage(parent)){
                 Predef.assert(coloredNodes.contains(parent))
@@ -2100,16 +2154,64 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         } else {
           stageDelta = 1
         }
-
-        coloredNodes(movedNode)(0) = coloredNodes(movedNode)(0) + stageDelta
+        
+        val nodesToMove = new ArrayBuffer[Node]
+        if(variableLatencyUnitInputs.contains(movedNode) || variableLatencyUnitOutputs.contains(movedNode)){
+          val varLatComp = findVariableLatencyComp(movedNode)
+          for(varLatIO <- varLatComp.io.flatten.map(_._2)){
+            nodesToMove += varLatIO
+          }
+        } else if(tMemReadAddrs.contains(movedNode) || tMemReadDatas.contains(movedNode)){
+          val tMem = findTransactionMem(movedNode)
+          for(i <- 0 until tMem.io.reads.length){
+            val readPort = tMem.io.reads(i)
+            val readAddr = readPort.adr
+            val readData = readPort.dat
+            nodesToMove += readAddr
+            nodesToMove += readData
+          }
+        } else {
+          nodesToMove += movedNode
+        }
+        for(n <- nodesToMove){
+          coloredNodes(n)(0) = coloredNodes(n)(0) + stageDelta
+        }
 
         val parents = new ArrayBuffer[Node]
-        for(input <- movedNode.inputs){
-          parents += input
+        if(variableLatencyUnitInputs.contains(movedNode) || variableLatencyUnitOutputs.contains(movedNode)){
+          val varLatComp = findVariableLatencyComp(movedNode)
+          for(varLatInput <- varLatComp.io.flatten.filter(_._2.dir == INPUT).map(_._2)){
+            for(varLatInputProducer <- varLatInput.inputs){
+              parents += varLatInputProducer
+            }
+          }
+          for(varLatOutput <- varLatComp.io.flatten.filter(_._2.dir == OUTPUT).map(_._2)){
+            for(varLatOutputConsumer <- varLatOutput.consumers){
+              parents += varLatOutputConsumer
+            }
+          }
+        } else if(tMemReadAddrs.contains(movedNode) || tMemReadDatas.contains(movedNode)){
+          val tMem = findTransactionMem(movedNode)
+          for(i <- 0 until tMem.io.reads.length){
+            val readPort = tMem.io.reads(i)
+            val readAddr = readPort.adr
+            val readData = readPort.dat
+            for(readAddrInput <- readAddr.inputs){
+              parents += readAddrInput
+            }
+            for(readDataConsumer <- readData.consumers){
+              parents += readDataConsumer
+            }
+          }
+        } else {
+          for(input <- movedNode.inputs){
+            parents += input
+          }
+          for(consumer <- movedNode.consumers){
+            parents += consumer
+          }
         }
-        for(consumer <- movedNode.consumers){
-          parents += consumer
-        }
+        
         for(parent <- parents){
           if(requireStage(parent)){
             if(coloredNodes(parent).length == 2){
