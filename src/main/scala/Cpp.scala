@@ -602,6 +602,47 @@ class CppBackend extends Backend {
     }
   }
 
+  def generateNodeMapping(nodes: Seq[Node]): ArrayBuffer[Tuple2[String, Node]] = {
+    val mappings = new ArrayBuffer[Tuple2[String, Node]]
+    for (m <- nodes) {
+      m match {
+        case l: Literal => ;
+        case any        =>
+          if (m.name != "" && (m.name != "reset") && !(m.component == null)) {
+            val mapping = (m.component.getPathName(".") + "." + m.name, m)
+            mappings += mapping
+          }
+      }
+    }
+    return mappings
+  }
+
+  def emitMapping(mapping: Tuple2[String, Node]): String = {
+    val (name, node) = mapping
+    node match {
+      case x: Binding =>
+        ""
+      case x: Literal =>
+        ""
+      case x: ListNode =>
+        ""
+      case x: MapNode =>
+        ""
+      case x: LookupMap =>
+        ""
+      case x: Reg =>
+        "  nodes.push_back(debug_node_t(\"" + name + "\", &" + emitRef(node) + "));\n"
+      case m: Mem[_] =>
+        "  mems.push_back(debug_mem_t(\"" + name + "\", &" + emitRef(node) + "));\n"
+      case r: ROM[_] =>
+        "  mems.push_back(debug_mem_t(\"" + name + "\", &" + emitRef(node) + "));\n"
+      case c: Clock =>
+        "  nodes.push_back(debug_node_t(\"" + name + "\", &" + emitRef(node) + "));\n"
+      case _ =>
+        "  nodes.push_back(debug_node_t(\"" + name + "\", &" + emitRef(node) + "));\n"
+    }
+  }
+
   def backendElaborate(c: Module) = super.elaborate(c)
 
   override def elaborate(c: Module): Unit = {
@@ -624,6 +665,7 @@ class CppBackend extends Backend {
 
     c.collectNodes(c);
     c.findOrdering(); // search from roots  -- create omods
+    val mappings = generateNodeMapping(c.omods);
     renameNodes(c, c.omods);
     if (Module.isReportDims) {
       val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
@@ -699,6 +741,13 @@ class CppBackend extends Backend {
     }
     for (clock <- Module.clocks)
       out_c.write(emitInit(clock))
+    out_c.write("  nodes.clear();\n");
+    out_c.write("  mems.clear();\n");
+    for (m <- mappings) {
+      if (m._2.name != "reset" && (m._2.isInObject || m._2.isInVCD)) {
+        out_c.write(emitMapping(m));
+      }
+    }
     out_c.write("}\n");
 
     for (m <- c.omods) {
@@ -738,7 +787,7 @@ class CppBackend extends Backend {
       out_c.write("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
     }
     for (clock <- Module.clocks) {
-      out_c.write("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " + 
+      out_c.write("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " +
                   emitRef(clock) + ";\n")
     }
     out_c.write("  return min;\n")

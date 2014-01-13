@@ -79,7 +79,6 @@ class ConnectSuite extends AssertionsForJUnit {
     chiselMain(Array[String]("--v",
       "--targetDir", tmpdir.getRoot().toString()),
       () => Module(new UsesShimParent))
-    println(scala.io.Source.fromFile(tmpdir.getRoot() + "/ConnectSuite_UsesShimParent_1.v", "utf-8").mkString)
     assertFile(tmpdir.getRoot() + "/ConnectSuite_UsesShimParent_1.v",
 """module ConnectSuite_UsesShim_1(
     output io_in_ready,

@@ -820,7 +820,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
     /** Returns the absolute path to a component instance from toplevel. */
   def getPathName: String = {
-    if ( parent == null ) name else parent.getPathName + "_" + name;
+    getPathName()
+  }
+  def getPathName(separator: String = "_"): String = {
+    if ( parent == null ) name else parent.getPathName(separator) + separator + name;
   }
 
   def traceNodes() {
