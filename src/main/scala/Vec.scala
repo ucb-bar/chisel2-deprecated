@@ -74,8 +74,8 @@ object Vec {
     */
   def apply[T <: Data](elts: Iterable[T]): Vec[T] = {
     val res =
-      //if (!elts.isEmpty && elts.forall(_ isLit)) new ROM[T]
-      /*else */new Vec[T]
+      if (!elts.isEmpty && elts.forall(_ isLit)) new ROM[T](i => elts.head.clone)
+      else new Vec[T](i => elts.head.clone)
     res.self ++= elts
     res
   }
@@ -139,7 +139,7 @@ class VecProc extends proc {
   }
 }
 
-class Vec[T <: Data] extends CompositeData with VecLike[T] with Cloneable {
+class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] with Cloneable {
   val self = new ArrayBuffer[T]
   val readPortCache = new HashMap[UInt, T]
   var sortedElementsCache: ArrayBuffer[ArrayBuffer[Data]] = null
@@ -326,7 +326,8 @@ class Vec[T <: Data] extends CompositeData with VecLike[T] with Cloneable {
   }
 
   override def clone(): this.type =
-    Vec(this: Seq[T]).asInstanceOf[this.type]
+    Vec.tabulate(size)(gen).asInstanceOf[this.type]
+    //Vec(this: Seq[T]).asInstanceOf[this.type]
 
   override def toNode: Node = {
     if(flattenedVec == null){

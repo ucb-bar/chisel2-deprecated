@@ -34,7 +34,7 @@ import Node._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 
-class ROM[T <: Data] extends Vec[T] {
+class ROM[T <: Data](gen: (Int) => T) extends Vec[T](gen) {
   def lits = inputs
 
   override def read(addr: UInt): T = {
