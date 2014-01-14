@@ -550,7 +550,7 @@ abstract class Backend {
     ChiselError.info("start width checking")
     c.forceMatchingWidths;
     ChiselError.info("finished width checking")
-    ChiselError.info("started flattenning")
+    ChiselError.info("started flattening")
     val nbNodes = c.removeTypeNodes()
     ChiselError.info("finished flattening (" + nbNodes + ")")
     ChiselError.checkpoint()
