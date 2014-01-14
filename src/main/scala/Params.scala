@@ -79,15 +79,15 @@ object Params {
     writer.write(string)
     writer.close()
   }
-
+/*
   def load(filename: String) = {
     buildingSpace = false
     design = load_file(filename)
   }
 
-  def dump(filename: String, n: String) = {
-    dump_file(filename, space)
-  }
+  def dump(dir: String) = {
+    dump_file(dir + "/space.prm", space)
+  }*/
  
   def toCxxStringParams : String = {
     var string = new StringBuilder("")

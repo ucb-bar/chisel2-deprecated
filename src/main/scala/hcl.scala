@@ -168,9 +168,10 @@ object chiselMain {
         case "--prune" => Module.isPruning = true
         //Jackhammer Flags
         //case "--jEnable" => Module.jackEnable = true
-        case "--jLoad" => Module.jackLoad = true; Module.jackDesign = args(i+1); i+=1;
-        case "--jDump" => Module.jackDump = true; Module.jackDir = args(i+1); i+=1;
-        case "--jNumber" => Module.jackNumber = args(i + 1); i += 1;
+        case "--jDump" => Module.jackDump = args(i+1); i+=1; //mode of dump (i.e. space.prm, design.prm etc)
+        case "--jDir"  => Module.jackDir = args(i+1); i+=1;  //location of dump or load
+        case "--jLoad" => Module.jackLoad = args(i+1); i+=1; //design.prm file
+        //case "--jDesign" =>  Module.jackDesign = args(i+1); i+=1;
         case any => ChiselError.warning("'" + arg + "' is an unknown argument.");
       }
       i += 1;
@@ -187,7 +188,7 @@ object chiselMain {
 
     try {
       /* JACK - If loading design, read design.prm file*/
-      if (Module.jackLoad) { Params.load(Module.jackDesign)}
+      if (Module.jackLoad != null) { Jackhammer.load(Module.jackDir, Module.jackLoad) }
       val c = gen();
       if (scanner != null) {
         val s = scanner(c);
@@ -205,8 +206,8 @@ object chiselMain {
         Module.tester = ftester(c)
       }
       /* JACK - If dumping design, dump to jackDir with jackNumber points*/
-      if (Module.jackDump) { 
-        Params.dump(Module.jackDir, Module.jackNumber) 
+      if (Module.jackDump != null) { 
+        Jackhammer.dump(Module.jackDir, Module.jackDump) 
       } else {
         Module.backend.elaborate(c)
       }
