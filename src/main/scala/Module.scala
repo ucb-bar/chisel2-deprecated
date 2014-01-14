@@ -101,6 +101,13 @@ object Module {
   var implicitReset: Bool = null
   var implicitClock: Clock = null
 
+  /* Jackhammer flags */
+  var jackEnable = false
+  var jackDump = false
+  var jackLoad = false
+  var jackNumber: Int = 0
+  var jackDir: String = null;
+
   /* Any call to a *Module* constructor without a proper wrapping
    into a Module.apply() call will be detected when trigger is false. */
   var trigger: Boolean = false

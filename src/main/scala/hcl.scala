@@ -166,7 +166,12 @@ object chiselMain {
         case "--include" => Module.includeArgs = Module.splitArg(args(i + 1)); i += 1;
         case "--checkPorts" => Module.isCheckingPorts = true
         case "--prune" => Module.isPruning = true
-        case any => ChiselError.warning("'" + arg + "' is an unkown argument.");
+        //Jackhammer Flags
+        //case "--jEnable" => Module.jackEnable = true
+        case "--jLoad" => Module.jackLoad = true; Module.jackDesign = args(i+1); i+=1;
+        case "--jDump" => Module.jackDump = true; Module.jackDir = args(i+1); i+=1;
+        case "--jNumber" => Module.jackNumber = args(i + 1); i += 1;
+        case any => ChiselError.warning("'" + arg + "' is an unknown argument.");
       }
       i += 1;
     }
@@ -181,6 +186,8 @@ object chiselMain {
     readArgs(args)
 
     try {
+      /* JACK - If loading design, read design.prm file*/
+      if (Module.jackLoad) { Params.load(Module.jackDesign)}
       val c = gen();
       if (scanner != null) {
         val s = scanner(c);
@@ -197,7 +204,12 @@ object chiselMain {
       if (ftester != null) {
         Module.tester = ftester(c)
       }
-      Module.backend.elaborate(c)
+      /* JACK - If dumping design, dump to jackDir with jackNumber points*/
+      if (Module.jackDump) { 
+        Params.dump(Module.jackDir,Module.jackNumber) 
+      } else {
+        Module.backend.elaborate(c)
+      }
       if (Module.isCheckingPorts) Module.backend.checkPorts(c)
       if (Module.isCompiling && Module.isGenHarness) Module.backend.compile(c)
       if (Module.isTesting) Module.tester.tests()
