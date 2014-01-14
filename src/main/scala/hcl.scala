@@ -206,7 +206,7 @@ object chiselMain {
       }
       /* JACK - If dumping design, dump to jackDir with jackNumber points*/
       if (Module.jackDump) { 
-        Params.dump(Module.jackDir,Module.jackNumber) 
+        Params.dump(Module.jackDir, Module.jackNumber) 
       } else {
         Module.backend.elaborate(c)
       }

@@ -85,7 +85,7 @@ object Params {
     design = load_file(filename)
   }
 
-  def dump(filename: String, n: Int) = {
+  def dump(filename: String, n: String) = {
     dump_file(filename, space)
   }
  

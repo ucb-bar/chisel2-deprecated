@@ -103,9 +103,9 @@ object Module {
 
   /* Jackhammer flags */
   var jackEnable = false
-  var jackDump = false
-  var jackLoad = false
-  var jackNumber: Int = 0
+  var jackDump: String = null;
+  var jackLoad: String = null;
+  var jackNumber: String = null;
   var jackDir: String = null;
 
   /* Any call to a *Module* constructor without a proper wrapping
