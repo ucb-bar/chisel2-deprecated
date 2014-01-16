@@ -100,11 +100,15 @@ class SInt extends Bits {
   def -  (right: SInt): SInt = Sub(this, right)
 
   //SInt to UInt arithmetic
-  def +   (right: UInt): SInt = this + right.zext;
-  def -   (right: UInt): SInt = this - right.zext;
-  def *   (right: UInt): SInt = MulSU(this, right)
-  def /   (right: UInt): SInt = DivSU(this, right)
-  def %   (right: UInt): SInt = RemSU(this, right)
+  def + (right: UInt): SInt = this + right.zext
+  def - (right: UInt): SInt = this - right.zext
+  def * (right: UInt): SInt = {
+    val res = this * right.zext
+    res.node.inferWidth = new SumWidth(-1)
+    res
+  }
+  def / (right: UInt): SInt = this / right.zext
+  def % (right: UInt): SInt = this % right.zext
   def abs: UInt = Mux(this < SInt(0), UInt((-this).node), UInt(this.node))
 }
 
@@ -126,15 +130,6 @@ object DivS {
   }
 }
 
-object DivSU {
-  def apply[T <: SInt]( left: T, right: UInt)(implicit m: Manifest[T]): T = {
-    val op = new DivSUOp(left.lvalue(), right.zext.lvalue())
-    val result = m.runtimeClass.newInstance.asInstanceOf[T]
-    result.node = op
-    result
-  }
-}
-
 object MulS {
   def apply[T <: SInt]( left: T, right: T)(implicit m: Manifest[T]): T = {
     val op = new MulSOp(left.lvalue(), right.lvalue())
@@ -144,27 +139,9 @@ object MulS {
   }
 }
 
-object MulSU {
-  def apply[T <: SInt]( left: T, right: UInt)(implicit m: Manifest[T]): T = {
-    val op = new MulSUOp(left.lvalue(), right.zext.lvalue())
-    val result = m.runtimeClass.newInstance.asInstanceOf[T]
-    result.node = op
-    result
-  }
-}
-
 object RemS {
   def apply[T <: SInt]( left: T, right: T)(implicit m: Manifest[T]): T = {
     val op = new RemSOp(left.lvalue(), right.lvalue())
-    val result = m.runtimeClass.newInstance.asInstanceOf[T]
-    result.node = op
-    result
-  }
-}
-
-object RemSU {
-  def apply[T <: SInt]( left: T, right: UInt)(implicit m: Manifest[T]): T = {
-    val op = new RemSUOp(left.lvalue(), right.zext.lvalue())
     val result = m.runtimeClass.newInstance.asInstanceOf[T]
     result.node = op
     result

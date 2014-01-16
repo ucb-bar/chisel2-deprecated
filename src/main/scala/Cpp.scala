@@ -483,21 +483,6 @@ class CppBackend extends Backend {
         res.toString
       }
 
-      case o: MulSUOp => {
-        val res = new StringBuilder
-        val left = o.inputs(0)
-        val right = o.inputs(1)
-        val (signLeft, absLeft) = signAbs(left)
-        val prod = new MulOp(absLeft, right)
-        res.append(emitDefLo(prod))
-        val rev = new SignRevOp(prod)
-        res.append(emitDefLo(rev))
-        res.append(emitDefLo(signLeft))
-        val result = new MuxOp(signLeft, rev, prod)
-        res.append(emitDefLo(result))
-        res.toString
-      }
-
       case o: MulOp =>
         (if (o.width <= bpw) {
           ("  " + emitLoWordRef(o) + " = "

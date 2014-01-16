@@ -290,14 +290,6 @@ class VerilogBackend extends Backend {
         ("  assign " + emitTmp(x) + " = " + "$signed(" + emitRef(x.left) + ") "
           + "/ $signed(" + emitRef(x.right) + ");\n")
 
-      case x: DivUSOp =>
-        ("  assign " + emitTmp(x) + " = " + "$signed(" + emitRef(x.left) + ") "
-          + "/ $signed(" + emitRef(x.right) + ");\n")
-
-      case x: DivSUOp =>
-        ("  assign " + emitTmp(x) + " = " + "$signed(" + emitRef(x.left) + ") "
-          + "/ $signed(" + emitRef(x.right) + ");\n")
-
       case x: ExtractOp =>
         if (x.inputs.length < 3) {
           if(x.inputs(0).width > 1) {
@@ -391,19 +383,7 @@ class VerilogBackend extends Backend {
         ("  assign " + emitTmp(x) + " = " + "$signed(" + emitRef(x.left) + ") "
           + "* $signed(" + emitRef(x.right) + ");\n")
 
-      case x: MulSUOp =>
-        ("  assign " + emitTmp(x) + " = " + "$signed(" + emitRef(x.left) + ") "
-          + "* $signed(" + emitRef(x.right) + ");\n")
-
       case x: RemSOp =>
-        ("  assign " + emitTmp(x) + " = " + "$signed(" + emitRef(x.left) + ") "
-          + "% $signed(" + emitRef(x.right) + ");\n")
-
-      case x: RemUSOp =>
-        ("  assign " + emitTmp(x) + " = " + "$signed(" + emitRef(x.left) + ") "
-          + "% $signed(" + emitRef(x.right) + ");\n")
-
-      case x: RemSUOp =>
         ("  assign " + emitTmp(x) + " = " + "$signed(" + emitRef(x.left) + ") "
           + "% $signed(" + emitRef(x.right) + ");\n")
 

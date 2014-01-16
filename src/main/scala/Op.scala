@@ -195,18 +195,6 @@ class DivSOp(left: Node, right: Node) extends DivOp(left, right) {
 }
 
 
-class DivSUOp(left: Node, right: Node) extends DivOp(left, right) {
-  override def slug = "divsu"
-}
-
-
-class DivUSOp(left: Node, right: Node) extends DivOp(left, right) {
-  inferWidth = new WidthOf(0, -1)
-
-  override def slug = "divus"
-}
-
-
 class Log2Op(opand: Node, val nbits: Int) extends UnaryOp(opand) {
   inferWidth = new FixedWidth(nbits)
 
@@ -226,12 +214,6 @@ class MulSOp(left: Node, right: Node) extends MulOp(left, right) {
   override def slug = "muls"
 }
 
-
-class MulSUOp(left: Node, right: Node) extends MulOp(left, right) {
-  inferWidth = new SumWidth(-1)
-
-  override def slug = "mulsu"
-}
 
 /** XXX elseNode null because of regEnable */
 class MuxOp(condNode: Node, thenNodeP: Node, elseNode: Node = null ) extends Op {
@@ -278,22 +260,6 @@ class RemOp(left: Node, right: Node) extends BinaryOp(left, right) {
 
 class RemSOp(left: Node, right: Node) extends RemOp(left, right) {
   override def slug = "rems"
-}
-
-
-class RemSUOp(left: Node, right: Node) extends RemOp(left, right) {
-
-  inferWidth = new RemWidthOf(0, 1)
-
-  override def slug = "remsu"
-}
-
-
-class RemUSOp(left: Node, right: Node) extends RemOp(left, right) {
-
-  inferWidth = new RemWidthOf(1, 0)
-
-  override def slug = "remus"
 }
 
 

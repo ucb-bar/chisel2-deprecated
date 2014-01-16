@@ -99,22 +99,13 @@ class UInt extends Bits /* XXX with Numeric[UInt] */ {
   def + (right: SInt): SInt = this.zext + right
   def - (right: SInt): SInt = this.zext - right
   def * (right: SInt): SInt = right * this
-  def % (right: SInt): SInt = RemUS(this, right)
-  def / (right: SInt): SInt = DivUS(this, right)
+  def % (right: SInt): SInt = this.zext % right
+  def / (right: SInt): SInt = this.zext / right
 }
 
 object Div {
   def apply( left: UInt, right: UInt): UInt = {
     UInt(new DivOp(left.lvalue(), right.lvalue()))
-  }
-}
-
-object DivUS {
-  def apply[T <: SInt]( left: UInt, right: T)(implicit m: Manifest[T]): T = {
-    val op = new DivUSOp(left.lvalue(), right.lvalue())
-    val result = m.runtimeClass.newInstance.asInstanceOf[T]
-    result.node = op
-    result
   }
 }
 
@@ -164,14 +155,3 @@ object Rem {
     result
   }
 }
-
-object RemUS {
-  def apply[T <: SInt]( left: UInt, right: T)(implicit m: Manifest[T]): T = {
-    val op = new RemUSOp(left.zext.lvalue(), right.lvalue())
-    val result = m.runtimeClass.newInstance.asInstanceOf[T]
-    result.node = op
-    result
-  }
-}
-
-
