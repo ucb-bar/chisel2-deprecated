@@ -289,15 +289,14 @@ class NameSuite extends AssertionsForJUnit {
 
     class Block extends Module {
       val io = new Bundle {
-        val valid = Bool(INPUT)
-        val mine = Vec.fill(2){UInt(width = 32)}.asOutput
-        val sub = new BlockIO()
+        val in = new BlockIO()
+        val out = new BlockIO().flip
       }
-      val tag_ram = Vec.fill(2){ Reg(io.sub.resp.bits.ppn) }
-      when (io.valid) {
-        tag_ram(UInt(0)) := io.sub.resp.bits.ppn
+      val tag_ram = Vec.fill(2){ Reg(io.in.resp.bits.ppn) }
+      when (io.in.resp.valid) {
+        tag_ram(UInt(0)) := io.in.resp.bits.ppn
       }
-      io.mine := Mux(io.valid, Mux1H(UInt(1), tag_ram), Mux1H(UInt(0), tag_ram))
+      io.out.resp.bits.ppn := Mux1H(tag_ram(0), tag_ram)
     }
 
     class BindFithComp extends Module {
@@ -308,12 +307,10 @@ class NameSuite extends AssertionsForJUnit {
       }
 
       val ptw = collection.mutable.ArrayBuffer(io.imem_ptw, io.dmem_ptw)
-      if( true ) {
-        val vdtlb = Module(new Block())
-        ptw += vdtlb.io.sub
-        vdtlb.io <> io.imem_ptw
-      }
-      io.resp := ptw(0)
+      val vdtlb = Module(new Block())
+      io.resp := vdtlb.io.out
+      ptw += vdtlb.io.in
+      ptw.last <> io.imem_ptw
     }
 
     chiselMain(Array[String]("--v",
