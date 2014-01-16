@@ -29,40 +29,15 @@
 */
 
 import scala.collection.mutable.ArrayBuffer
-import org.scalatest.junit.AssertionsForJUnit
 import org.junit.Assert._
 import org.junit.Test
-import org.junit.Before
-import org.junit.After
-import org.junit.rules.TemporaryFolder;
 
 import Chisel._
 
 /** This testsuite checks the primitives of the standard library
   that will generate basic common graphs of *Node*.
 */
-class StdlibSuite extends AssertionsForJUnit {
-
-  val tmpdir = new TemporaryFolder();
-
-  @Before def initialize() {
-    tmpdir.create()
-  }
-
-  @After def done() {
-    tmpdir.delete()
-  }
-
-  def assertFile( filename: String ) {
-    val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
-    val content = reffile.mkString
-    reffile.close()
-    val source = scala.io.Source.fromFile(
-      tmpdir.getRoot() + "/" + filename, "utf-8")
-    val lines = source.mkString
-    source.close()
-    assert(lines === content)
-  }
+class StdlibSuite extends TestSuite {
 
   /** test of simple operators */
   @Test def testOperators() {
@@ -176,7 +151,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new OperatorComp()))
     } catch {
       case e => e.printStackTrace()
@@ -195,7 +170,7 @@ try {
       io.z := io.x * io.y
     }
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new MulUS()))
     assertFile("StdlibSuite_MulUS_1.v")
   }
@@ -212,7 +187,7 @@ try {
       io.z := io.x / io.y
     }
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new DivUS()))
     assertFile("StdlibSuite_DivUS_1.v")
   }
@@ -229,7 +204,7 @@ try {
       io.z := io.x % io.y
     }
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new RemUS()))
     assertFile("StdlibSuite_RemUS_1.v")
   }
@@ -246,7 +221,7 @@ try {
       io.z := io.x * io.y
     }
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new MulSU()))
     assertFile("StdlibSuite_MulSU_1.v")
   }
@@ -263,7 +238,7 @@ try {
       io.z := io.x / io.y
     }
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new DivSU()))
     assertFile("StdlibSuite_DivSU_1.v")
   }
@@ -280,7 +255,7 @@ try {
       io.z := io.x % io.y
     }
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new RemSU()))
     assertFile("StdlibSuite_RemSU_1.v")
   }
@@ -300,7 +275,7 @@ try {
       io.out := io.in
     }
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new AssignBundleComp()))
     assertFile("StdlibSuite_AssignBundleComp_1.v")
   }
@@ -319,7 +294,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new CatComp()))
     assertFile("StdlibSuite_CatComp_1.v")
   }
@@ -339,7 +314,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new LookupComp()))
   }
 
@@ -356,7 +331,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new PopCountComp()))
   }
 
@@ -373,7 +348,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new ReverseComp()))
   }
 
@@ -390,7 +365,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new ShiftRegisterComp()))
   }
 
@@ -409,7 +384,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new UIntToOHComp()))
   }
 
@@ -427,7 +402,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new foldRComp()))
   }
 
@@ -447,7 +422,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new ArbiterTest()))
     } catch {
       case e => e.printStackTrace()
@@ -470,9 +445,9 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-    "--targetDir", tmpdir.getRoot().toString()),
+    "--targetDir", dir.getPath.toString()),
       () => Module(new ArbiterNeedsLock()))
-    assertFile(tmpdir.getRoot() + "/NeedsLock.v",
+    assertFile(dir.getPath + "/NeedsLock.v",
 """
 """)
   }
@@ -492,7 +467,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new RRArbiterTest()))
     assertFile("StdlibSuite_RRArbiterTest_1.v")
   }
@@ -510,7 +485,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new FillInterleavedComp()))
   }
 
@@ -529,7 +504,7 @@ try {
       io.wrap := wrap
     }
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new CounterComp()))
   }
 
@@ -545,7 +520,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new OHToUIntComp()))
     assertFile("StdlibSuite_OHToUIntComp_1.v")
   }
@@ -557,7 +532,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new PipeComp()))
     assertFile("StdlibSuite_PipeComp_1.v")
   }
@@ -583,7 +558,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new PriorityMuxComp()))
   }
 
@@ -600,7 +575,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new PriorityEncoderComp()))
   }
 
@@ -617,7 +592,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new PriorityEncoderOHComp()))
   }
 
@@ -633,7 +608,7 @@ try {
     }
 
     chiselMain(Array[String]("--inlineMem", "--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new QueueComp()))
     assertFile("StdlibSuite_QueueComp_1.v")
   }
@@ -651,7 +626,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new FillComp()))
   }
 
@@ -668,7 +643,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new Log2Comp()))
   }
 
@@ -691,7 +666,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new MuxLookupComp()))
   }
 
@@ -711,7 +686,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new MuxCaseComp()))
   }
 
@@ -731,7 +706,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new MultiplexComp()))
   }
 
@@ -750,7 +725,7 @@ try {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new MuxComp()))
   }
 }

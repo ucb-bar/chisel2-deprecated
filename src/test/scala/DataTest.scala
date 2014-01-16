@@ -43,39 +43,14 @@ nameable                (src/main/hcl.scala)
         Bundle          (src/main/Bundle.scala)
 */
 
-import org.scalatest.junit.AssertionsForJUnit
 import scala.collection.mutable.ListBuffer
 import org.junit.Assert._
 import org.junit.Test
-import org.junit.Before
-import org.junit.After
-import org.junit.rules.TemporaryFolder;
 
 import Chisel._
 
 
-class DataSuite extends AssertionsForJUnit {
-
-  val tmpdir = new TemporaryFolder();
-
-  @Before def initialize() {
-    tmpdir.create()
-  }
-
-  @After def done() {
-    tmpdir.delete()
-  }
-
-  def assertFile( filename: String ) {
-    val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
-    val content = reffile.mkString
-    reffile.close()
-    val source = scala.io.Source.fromFile(
-      tmpdir.getRoot() + "/" + filename, "utf-8")
-    val lines = source.mkString
-    source.close()
-    assert(lines === content)
-  }
+class DataSuite extends TestSuite {
 
   @Test def testBoolFromValue() {
     val tested = Bool(true);
@@ -224,7 +199,7 @@ class DataSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--backend", "c",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new BypassDataComp))
     assertFile("DataSuite_BypassDataComp_1.h")
   }
@@ -247,7 +222,7 @@ class DataSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--backend", "c",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new CarryChainComp(4)))
     } catch {
       case _ : Throwable => assertTrue(!ChiselError.ChiselErrors.isEmpty);

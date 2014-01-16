@@ -3,3 +3,5 @@ target/
 .history
 .ensime
 .ensime_lucene/
+test-outputs/
+test-reports/

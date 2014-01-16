@@ -29,39 +29,14 @@
 */
 
 import scala.collection.mutable.ArrayBuffer
-import org.scalatest.junit.AssertionsForJUnit
 import org.junit.Assert._
 import org.junit.Test
-import org.junit.Before
-import org.junit.After
-import org.junit.rules.TemporaryFolder;
 
 import Chisel._
 
 /** This testsuite checks features dealing with debugging Chisel code.
 */
-class VerifSuite extends AssertionsForJUnit {
-
-  val tmpdir = new TemporaryFolder();
-
-  @Before def initialize() {
-    tmpdir.create()
-  }
-
-  @After def done() {
-    tmpdir.delete()
-  }
-
-  def assertFile( filename: String ) {
-    val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
-    val content = reffile.mkString
-    reffile.close()
-    val source = scala.io.Source.fromFile(
-      tmpdir.getRoot() + "/" + filename, "utf-8")
-    val lines = source.mkString
-    source.close()
-    assert(lines === content)
-  }
+class VerifSuite extends TestSuite {
 
   @Test def testAssertCpp() {
     println("testAssertCpp:")
@@ -76,7 +51,7 @@ class VerifSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--backend", "c",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new CppAssertComp()))
     assertFile("VerifSuite_CppAssertComp_1.cpp")
   }
@@ -94,7 +69,7 @@ class VerifSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new VerilogAssertComp()))
   }
 
@@ -112,9 +87,9 @@ class VerifSuite extends AssertionsForJUnit {
     /** XXX Can't run CppBackend back-to-back in the same process
       because the emulator resource is closed. 
     chiselMain(Array[String]("--backend", "c",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new CppPrintfComp()))
-    assertFile(tmpdir.getRoot() + "/VerifSuite_CppPrintfComp_1.cpp",
+    assertFile(dir.getPath + "/VerifSuite_CppPrintfComp_1.cpp",
 """#include "VerifSuite_CppPrintfComp_1.h"
 
 void VerifSuite_CppPrintfComp_1_t::init ( bool rand_init ) {
@@ -156,7 +131,7 @@ void VerifSuite_CppPrintfComp_1_t::dump(FILE *f, int t) {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new VerilogPrintfComp()))
   }
 }

@@ -28,39 +28,14 @@
  MODIFICATIONS.
 */
 
-import org.scalatest.junit.AssertionsForJUnit
 import org.junit.Assert._
 import org.junit.Test
-import org.junit.Before
-import org.junit.After
 import org.junit.Ignore
-import org.junit.rules.TemporaryFolder;
 
 import Chisel._
 
 
-class WhenSuite extends AssertionsForJUnit {
-
-  val tmpdir = new TemporaryFolder();
-
-  @Before def initialize() {
-    tmpdir.create()
-  }
-
-  @After def done() {
-    tmpdir.delete()
-  }
-
-  def assertFile( filename: String ) {
-    val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
-    val content = reffile.mkString
-    reffile.close()
-    val source = scala.io.Source.fromFile(
-      tmpdir.getRoot() + "/" + filename, "utf-8")
-    val lines = source.mkString
-    source.close()
-    assert(lines === content)
-  }
+class WhenSuite extends TestSuite {
 
   /** Using a single when() as intended.
     */
@@ -78,7 +53,7 @@ class WhenSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--backend", "v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new WhenComp))
 
     assertFile("WhenSuite_WhenComp_1.v")
@@ -103,7 +78,7 @@ class WhenSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--backend", "v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new EmbedWhenComp))
 
     assertFile("WhenSuite_EmbedWhenComp_1.v")
@@ -131,7 +106,7 @@ class WhenSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--backend", "v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new WhenClassComp))
 
     assertFile("WhenSuite_WhenClassComp_1.v")
@@ -174,7 +149,7 @@ class WhenSuite extends AssertionsForJUnit {
       }
 
       chiselMain(Array[String]("--backend", "v"),
-        //      "--targetDir", tmpdir.getRoot().toString()),
+        //      "--targetDir", dir.getPath.toString()),
         () => Module(new ForgotDotElseWhenComp))
 
       assertFile("WhenSuite_ForgotDotElseWhen_1.v")
@@ -207,7 +182,7 @@ class WhenSuite extends AssertionsForJUnit {
       }
 
       chiselMain(Array[String]("--backend", "v"),
-        //      "--targetDir", tmpdir.getRoot().toString()),
+        //      "--targetDir", dir.getPath.toString()),
         () => Module(new ModuleInWhenBlockComp))
 
       assertFile("WhenSuite_ModuleInWhenBlockComp.v")
@@ -239,7 +214,7 @@ class WhenSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--backend", "v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new UnlessClassComp))
 
     assertFile("WhenSuite_UnlessClassComp_1.v")
@@ -264,7 +239,7 @@ class WhenSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--backend", "v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new SwitchClassComp))
 
     assertFile("WhenSuite_SwitchClassComp_1.v")

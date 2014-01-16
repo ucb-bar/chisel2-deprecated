@@ -28,14 +28,10 @@
  MODIFICATIONS.
 */
 
-import org.scalatest.junit.AssertionsForJUnit
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.ListBuffer
-import org.junit.rules.TemporaryFolder
 import org.junit.Assert._
 import org.junit.Ignore
-import org.junit.Before
-import org.junit.After
 import org.junit.Test
 
 import Chisel._
@@ -43,28 +39,7 @@ import Chisel._
 
 /** This testsuite checks all methods in the Bits class.
 */
-class DelaySuite extends AssertionsForJUnit {
-
-  val tmpdir = new TemporaryFolder();
-
-  @Before def initialize() {
-    tmpdir.create()
-  }
-
-  @After def done() {
-    tmpdir.delete()
-  }
-
-  def assertFile( filename: String ) {
-    val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
-    val content = reffile.mkString
-    reffile.close()
-    val source = scala.io.Source.fromFile(
-      tmpdir.getRoot() + "/" + filename, "utf-8")
-    val lines = source.mkString
-    source.close()
-    assert(lines === content)
-  }
+class DelaySuite extends TestSuite {
 
   /** Uninitialized register, update on each clock. */
   @Test def testRegNoInitUpdate() {
@@ -79,7 +54,7 @@ class DelaySuite extends AssertionsForJUnit {
       io.out := res
     }
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new RegNoInitUpdate()))
     assertFile("DelaySuite_RegNoInitUpdate_1.v")
   }
@@ -100,7 +75,7 @@ class DelaySuite extends AssertionsForJUnit {
       io.out := res
     }
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new RegInitUpdate()))
     assertFile("DelaySuite_RegInitUpdate_1.v")
   }
@@ -120,7 +95,7 @@ class DelaySuite extends AssertionsForJUnit {
       io.out := res
     }
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new RegInitCondUpdate()))
     assertFile("DelaySuite_RegInitCondUpdate_1.v")
   }
@@ -137,7 +112,7 @@ class DelaySuite extends AssertionsForJUnit {
       io.out := mem(io.addr)
     }
     chiselMain(Array[String]("--v", "--inlineMem",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new MemReadModule()))
     assertFile("DelaySuite_MemReadModule_1.v")
   }
@@ -155,7 +130,7 @@ class DelaySuite extends AssertionsForJUnit {
       io.out := mem(io.addr)
     }
     chiselMain(Array[String]("--v", "--inlineMem",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new ReadWriteModule()))
     assertFile("DelaySuite_ReadWriteModule_1.v")
   }
@@ -179,7 +154,7 @@ class DelaySuite extends AssertionsForJUnit {
       io.out := mem(io.addr)
     }
     chiselMain(Array[String]("--v", "--inlineMem",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new ReadCondWriteModule()))
     assertFile("DelaySuite_ReadCondWriteModule_1.v")
   }
@@ -199,7 +174,7 @@ class DelaySuite extends AssertionsForJUnit {
       io.out := mem(io.addr)
     }
     chiselMain(Array[String]("--v", "--inlineMem",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new ReadCondMaskedWrite()))
     assertFile("DelaySuite_ReadCondMaskedWrite_1.v")
   }
@@ -218,9 +193,9 @@ class DelaySuite extends AssertionsForJUnit {
       io.out := rom(io.addr)
     }
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new ROMModule()))
-    assertFile(tmpdir.getRoot() + "/DelaySuite_ROMModule_1.v",
+    assertFile(dir.getPath + "/DelaySuite_ROMModule_1.v",
 """
 """)
   }*/

@@ -29,12 +29,9 @@
 */
 
 import scala.collection.mutable.ArrayBuffer
-import org.scalatest.junit.AssertionsForJUnit
 import scala.collection.mutable.ListBuffer
 import org.junit.Assert._
 import org.junit.Test
-import org.junit.Before
-import org.junit.After
 import org.junit.rules.TemporaryFolder;
 
 import Chisel._
@@ -42,28 +39,7 @@ import Chisel._
 
 /** This testsuite checks the generation of dot graphs.
 */
-class MultiClockSuite extends AssertionsForJUnit {
-
-  val tmpdir = new TemporaryFolder();
-
-  @Before def initialize() {
-    tmpdir.create()
-  }
-
-  @After def done() {
-    tmpdir.delete()
-  }
-
-  def assertFile( filename: String ) {
-    val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
-    val content = reffile.mkString
-    reffile.close()
-    val source = scala.io.Source.fromFile(
-      tmpdir.getRoot() + "/" + filename, "utf-8")
-    val lines = source.mkString
-    source.close()
-    assert(lines === content)
-  }
+class MultiClockSuite extends TestSuite {
 
   /** Test Register on a different clock */
   @Test def testRegClock() {
@@ -89,7 +65,7 @@ class MultiClockSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new Comp()))
     assertFile("MultiClockSuite_Comp_1.v")
   }

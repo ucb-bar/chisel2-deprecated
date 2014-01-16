@@ -29,14 +29,10 @@
 */
 
 import scala.collection.mutable.ArrayBuffer
-import org.scalatest.junit.AssertionsForJUnit
 import scala.collection.mutable.ListBuffer
 import org.junit.Assert._
 import org.junit.Test
-import org.junit.Before
-import org.junit.After
 import org.junit.Ignore
-import org.junit.rules.TemporaryFolder;
 
 import Chisel._
 
@@ -51,29 +47,7 @@ class Status extends Bundle {
 /** This testsuite checks the naming of variables in the generated
   verilog and C++ code.
 */
-class NameSuite extends AssertionsForJUnit {
-
-  val tmpdir = new TemporaryFolder();
-
-  @Before def initialize() {
-    tmpdir.create()
-  }
-
-  @After def done() {
-    tmpdir.delete()
-  }
-
-  def assertFile( filename: String ) {
-    val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
-    val content = reffile.mkString
-    reffile.close()
-    val source = scala.io.Source.fromFile(
-      tmpdir.getRoot() + "/" + filename, "utf-8")
-    val lines = source.mkString
-    source.close()
-    assert(lines === content)
-  }
-
+class NameSuite extends TestSuite {
 
   /** Checks names are correctly generated in the presence
    of ListLookups. */
@@ -102,7 +76,7 @@ class NameSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new ListLookupsComp()))
     assertFile("NameSuite_ListLookupsComp_1.v")
   }
@@ -148,7 +122,7 @@ class NameSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new BindFirstComp()))
    assertFile("NameSuite_BindFirstComp_1.v")
    }
@@ -187,7 +161,7 @@ class NameSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new BindSecondComp(true)))
    assertFile("NameSuite_BindSecondComp_1.v")
   }
@@ -238,7 +212,7 @@ class NameSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new BindThirdComp()))
     assertFile("NameSuite_BindThirdComp_1.v")
   }
@@ -265,7 +239,7 @@ class NameSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new BindFourthComp()))
     assertFile("NameSuite_BindFourthComp_1.v")
   }
@@ -314,7 +288,7 @@ class NameSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new BindFithComp))
     assertFile("NameSuite_BindFithComp_1.v")
   }
@@ -354,7 +328,7 @@ class NameSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new VecComp()))
     assertFile("NameSuite_VecComp_1.v")
   }
@@ -389,7 +363,7 @@ class NameSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new VecSecondComp()))
     assertFile("NameSuite_VecSecondComp_1.v")
   }
@@ -426,7 +400,7 @@ class NameSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new VariationComp()))
     assertFile("NameSuite_VariationComp_1.v")
   }
@@ -455,7 +429,7 @@ class NameSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--noInlineMem", "--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new MemComp()))
     assertFile("NameSuite_MemComp_1.v")
   }
@@ -492,7 +466,7 @@ class NameSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--backend", "c", "--vcd",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new DebugComp))
     assertFile("NameSuite_DebugComp_1.h")
     assertFile("NameSuite_DebugComp_1.cpp")
@@ -512,7 +486,7 @@ class NameSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new InputPortNameComp))
     assertFile("NameSuite_InputPortNameComp_1.v");
   }

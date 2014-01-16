@@ -42,29 +42,7 @@ import Chisel._
 
 /** This testsuite checks the generation of dot graphs.
 */
-class DotBackendSuite extends AssertionsForJUnit {
-
-  val tmpdir = new TemporaryFolder();
-
-  @Before def initialize() {
-    tmpdir.create()
-  }
-
-  @After def done() {
-    tmpdir.delete()
-  }
-
-  def assertFile( filename: String ) {
-    val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
-    val content = reffile.mkString
-    reffile.close()
-    val source = scala.io.Source.fromFile(
-      tmpdir.getRoot() + "/" + filename, "utf-8")
-    val lines = source.mkString
-    source.close()
-    assert(lines === content)
-  }
-
+class DotBackendSuite extends TestSuite {
 
   /** Checks generation of simple dataflow graph */
   @Test def testSimple() {
@@ -94,7 +72,7 @@ class DotBackendSuite extends AssertionsForJUnit {
 
     chiselMain(Array[String](
       "--backend", "Chisel.DotBackend",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new DAGComp()))
     assertFile("DotBackendSuite_DAGComp_1.dot")
   }

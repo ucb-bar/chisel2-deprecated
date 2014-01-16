@@ -1,11 +1,7 @@
 import scala.collection.mutable.ArrayBuffer
-import org.scalatest.junit.AssertionsForJUnit
 import org.junit.Assert._
 import org.junit.Test
-import org.junit.Before
-import org.junit.After
 import org.junit.Ignore
-import org.junit.rules.TemporaryFolder;
 
 import Chisel._
 
@@ -27,28 +23,7 @@ class RegStatus extends Bundle {
 /** This testsuite checks interaction of component class
   and runtime hierarchies.
 */
-class ConnectSuite extends AssertionsForJUnit {
-
-  val tmpdir = new TemporaryFolder();
-
-  @Before def initialize() {
-    tmpdir.create()
-  }
-
-  @After def done() {
-    tmpdir.delete()
-  }
-
-  def assertFile( filename: String ) {
-    val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
-    val content = reffile.mkString
-    reffile.close()
-    val source = scala.io.Source.fromFile(
-      tmpdir.getRoot() + "/" + filename, "utf-8")
-    val lines = source.mkString
-    source.close()
-    assert(lines === content)
-  }
+class ConnectSuite extends TestSuite {
 
   @Test def testShimConnections() {
     println("\n### testShimConnections ###")
@@ -82,7 +57,7 @@ class ConnectSuite extends AssertionsForJUnit {
       io.out <> us.io.out
     }
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new UsesShimParent))
     } catch {
       case e => e.printStackTrace()
@@ -132,7 +107,7 @@ class ConnectSuite extends AssertionsForJUnit {
       io.out := srs.io.out
     }
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new SuppliesResetsParent))
     assertFile("ConnectSuite_SuppliesResetsParent_1.v")
   }
@@ -167,7 +142,7 @@ class ConnectSuite extends AssertionsForJUnit {
       io.c_out := aComp.io.b_out
     }
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new NoClassRelation()))
     assertFile("ConnectSuite_NoClassRelation_1.v")
   }
@@ -197,7 +172,7 @@ class ConnectSuite extends AssertionsForJUnit {
       io.b_out := a1.io.a_out | a2.io.a_out | x
     }
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new LogicBtwInstances()))
     assertFile("ConnectSuite_LogicBtwInstances_1.v")
   }
@@ -229,7 +204,7 @@ class ConnectSuite extends AssertionsForJUnit {
       io.b_out := aInCComp.io.a_out | aInBComp.io.a_out
     }
     chiselMain(Array[String]("--v"),
-//      "--targetDir", tmpdir.getRoot().toString()),
+//      "--targetDir", dir.getPath.toString()),
       () => Module(new Instance2Level()))
      */
   }
@@ -249,7 +224,7 @@ class ConnectSuite extends AssertionsForJUnit {
       aInBComp.io.a_in := io.a_in
     }
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new InstanceSuperclass()))
     assertFile("ConnectSuite_InstanceSuperclass_1.v")
   }
@@ -272,7 +247,7 @@ class ConnectSuite extends AssertionsForJUnit {
       }
     }
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new A()))
     assertFile("ConnectSuite_A_4.v")
   }
