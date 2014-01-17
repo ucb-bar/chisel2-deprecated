@@ -68,7 +68,7 @@ object Jackhammer {
   def formatDesign(design: Params.Space) : String = {
     val str = new StringBuilder("_")
     for((mod,p,gID) <- design) {
-      str ++= p.pname+gID+":"+p.init+"_"
+      str ++= p.pname+p.init+"_"
     }
     if(str.length<20) {
       str.toString + MurmurHash3.stringHash(design.toString,1).toHexString 
