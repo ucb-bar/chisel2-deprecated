@@ -31,13 +31,15 @@
 package Chisel
 import ChiselError._
 
+import scala.reflect._
+import scala.reflect.runtime.universe._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
 
 /** Create an initialized Read-Only Memory.
   */
 object ROM {
-  def apply[T <: Data](lits: Seq[T]): ROM[T] = {
+  def apply[T <: Data : ClassTag](lits: Seq[T]): ROM[T] = {
     new ROM[T](() => lits.head,
       lits.map(x => x.toBits.node.asInstanceOf[Literal]),
       Module.scope.clock,
@@ -46,7 +48,7 @@ object ROM {
 }
 
 
-class ROM[T <: Data](gen: () => T, val lits: Seq[Literal],
+class ROM[T <: Data : ClassTag](gen: () => T, val lits: Seq[Literal],
   clock: Clock, reset: Bool,
   isInline: Boolean = Module.isInlineMem) extends Mem[T](
   gen, clock, reset, lits.length, false, isInline) {

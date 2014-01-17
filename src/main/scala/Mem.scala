@@ -32,6 +32,7 @@ package Chisel
 
 import ChiselError._
 import scala.reflect._
+import scala.reflect.runtime.universe._
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 
 
@@ -55,7 +56,7 @@ class MemReference(memN: MemDelay, addrN: Node) extends Node {
   a LFSR, which returns "1" on its first invocation).
   */
 object Mem {
-  def apply[T <: Data](out: T, depth: Int, seqRead: Boolean = false,
+  def apply[T <: Data : ClassTag](out: T, depth: Int, seqRead: Boolean = false,
     clock: Clock = Module.scope.clock, reset: Bool = Module.scope.reset): Mem[T] = {
 
     val gen = out.clone
@@ -90,7 +91,7 @@ abstract class AccessTracker extends nameable {
   port is writing to in the same cycle, the read data is random garbage (from
   a LFSR, which returns "1" on its first invocation).
   */
-class Mem[T <: Data](gen: () => T, clock: Clock, reset: Bool, val depth: Int,
+class Mem[T <: Data : ClassTag](gen: () => T, clock: Clock, reset: Bool, val depth: Int,
   val seqRead: Boolean, isInline: Boolean = Module.isInlineMem)
     extends AccessTracker {
 
@@ -185,7 +186,7 @@ class Mem[T <: Data](gen: () => T, clock: Clock, reset: Bool, val depth: Int,
 
 
   def apply(addr: UInt): T = {
-    val result = gen()
+    val result = implicitly[ClassTag[T]].runtimeClass.newInstance.asInstanceOf[T]
     result.fromBits(UInt(new MemReference(this.node, addr.node)))
     result
   }
