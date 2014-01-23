@@ -46,7 +46,7 @@ object ListLookup {
       mapping.map(x => (x._1.lvalue(), x._2.map(_.toBits.lvalue()))))
 
     var res: List[T] = Nil
-    for( i <- 0 to default.length ) {
+    for( i <- 0 to default.length-1 ) {
       val lookupRef: T = m.runtimeClass.newInstance.asInstanceOf[T]
       lookupRef.fromBits(UInt(new ListLookupRef(op, default.length - i - 1)))
       res = res.::(lookupRef) // This will actually prepend ref!

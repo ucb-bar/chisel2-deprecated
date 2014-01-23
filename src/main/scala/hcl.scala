@@ -87,6 +87,8 @@ object chiselMain {
             Module.backend = new CppBackend
           } else if (args(i + 1) == "flo") {
             Module.backend = new FloBackend
+          } else if (args(i + 1) == "dot") {
+            Module.backend = new DotBackend
           } else if (args(i + 1) == "fpga") {
             Module.backend = new FPGABackend
           } else {

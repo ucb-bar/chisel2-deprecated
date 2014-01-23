@@ -186,7 +186,8 @@ class Mem[T <: Data : ClassTag](gen: () => T, clock: Clock, reset: Bool, val dep
 
 
   def apply(addr: UInt): T = {
-    val result = implicitly[ClassTag[T]].runtimeClass.newInstance.asInstanceOf[T]
+    // val result = implicitly[ClassTag[T]].runtimeClass.newInstance.asInstanceOf[T]
+    val result = gen().asInstanceOf[T]
     result.fromBits(UInt(new MemReference(this.node, addr.node)))
     result
   }
