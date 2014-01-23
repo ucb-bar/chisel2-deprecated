@@ -96,7 +96,9 @@ class CppBackend extends Backend {
     if (w >= words(x)) {
       "0L"
     } else if (x.isInstanceOf[Literal]) {
-      var hex = x.asInstanceOf[Literal].value.toString(16)
+      val lit = x.asInstanceOf[Literal].value
+      val value = if (lit < 0) (BigInt(1) << x.width) + lit else lit
+      val hex = value.toString(16)
       if (hex.length > bpw/4*w) "0x" + hex.slice(hex.length-bpw/4*(w + 1), hex.length-bpw/4*w) + "L" else "0L"
     } else if (x.isInObject) {
       emitRef(x) + ".values[" + w + "]"
