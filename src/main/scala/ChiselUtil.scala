@@ -32,6 +32,7 @@ package Chisel
 import Node._
 import scala.math._
 import Literal._
+import scala.collection.mutable.ArrayBuffer
 
 object log2Up
 {
@@ -607,8 +608,10 @@ class WrIO[T <: Data](depth: Int)(data: => T) extends Bundle {
 
 class FunRdIO[T <: Data](depth: Int)(data: => T) extends RdIO(depth)(data) {
   adr := Bits(0);
-  def read(nadr: Bits): T = {
+  val en = Bool(INPUT);
+  def read(nadr: Bits, nen: Bool): T = {
     adr := nadr
+    en := nen
     dat
   }
 }
@@ -641,15 +644,45 @@ class FunStore[T <: Data](val depth: Int, numReads: Int, numWrites: Int)(data: =
   val io = new FunMemIO(depth, numReads, numWrites)( data )
 }
 
-class TransactionMem[T <: Data](depth: Int, numReads: Int, numVirtWrites: Int, numPhyWrites: Int)(data: => T) 
-    extends FunStore(depth, numReads, numVirtWrites)(data) {
-  val readPortNum = numReads
+class TransactionMem[T <: Data](depth: Int, numVirtReads: Int, numPhyReads: Int, virtReadToPhyReadMap: Array[Int], numVirtWrites: Int, numPhyWrites: Int, virtWriteToPhyWriteMap: Array[Int])(data: => T) 
+    extends FunStore(depth, numVirtReads, numVirtWrites)(data) {
+  val readPortNum = numVirtReads
   val virtWritePortNum = numVirtWrites
+
   val mem = Mem(data, depth)
-  def read(addr: UInt, idx: Int = 0): T = io.reads(idx).read(addr)
+  
+  def read(addr: UInt, en: Bool, virtIdx: Int = 0): T = {
+    io.reads(virtIdx).read(addr, en)
+  }
+  
   def write(addr: UInt, data: T, idx: Int = 0) = io.writes(idx).write(addr, data)
-  for (read <- io.reads)
-    read.dat := mem.read(read.adr)
+  
+  for(i <- 0 until numPhyReads){
+    val en = Bool()
+    val addr = Bits()
+    val data = Bits()
+    en := Bool(false)
+    addr := Bits(0)
+    val virtReads = new ArrayBuffer[Int]
+    //find all virtual read ports that map to this physical read port
+    for(j <- 0 until numVirtReads){
+      if(virtReadToPhyReadMap(j) == i){
+        virtReads += j
+      }
+    }
+    for (virtReadIdx <- virtReads){
+      when(io.reads(virtReadIdx).en){
+        en := Bool(true)
+        addr := io.reads(virtReadIdx).adr
+      }
+      io.reads(virtReadIdx).dat := data
+    }
+    data := mem.read(addr)
+    
+  }
+  //for (read <- io.reads)
+    //read.dat := mem.read(read.adr)
+  
   var roundUp = 0
   if(numVirtWrites%numPhyWrites > 0){
     roundUp = 1

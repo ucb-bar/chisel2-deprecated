@@ -579,8 +579,7 @@ abstract class Backend {
     nameAll(c)//for debug
     if(Module.autoPipe){
       c.gatherSpecialComponents()
-      //c.insertPipelineRegisters2()
-      c.insertPipelineRegisters3()
+      c.insertPipelineRegisters()
       connectResets
       c.genAllMuxes
       c.inferAll()
