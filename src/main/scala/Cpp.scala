@@ -95,13 +95,23 @@ class CppBackend extends Backend {
   def wordMangle(x: Node, w: Int): String = {
     if (w >= words(x)) {
       "0L"
-    } else if (x.isInstanceOf[Literal]) {
-      var hex = x.asInstanceOf[Literal].value.toString(16)
-      if (hex.length > bpw/4*w) "0x" + hex.slice(hex.length-bpw/4*(w + 1), hex.length-bpw/4*w) + "L" else "0L"
-    } else if (x.isInObject) {
-      emitRef(x) + ".values[" + w + "]"
     } else {
-      emitRef(x) + "__w" + w
+      x match {
+        case l: Literal => {
+          var hex = x.asInstanceOf[Literal].value.toString(16)
+          if (hex.length > bpw/4*w) "0x" + hex.slice(hex.length-bpw/4*(w+1), hex.length-bpw/4*w) + "L" else "0L"
+        }
+        case l: FloLiteral => 
+          "fromFloat(" + l.floValue + ")"
+        case l: DblLiteral => 
+          "fromDouble(" + l.dblValue + ")"
+        case _ => {
+          if (x.isInObject)
+            emitRef(x) + ".values[" + w + "]"
+          else
+            emitRef(x) + "__w" + w
+        }
+      }
     }
   }
   def emitWordRef(node: Node, w: Int): String = {
@@ -120,6 +130,10 @@ class CppBackend extends Backend {
       case x: Binding =>
         ""
       case x: Literal =>
+        ""
+      case x: FloLiteral => 
+        ""
+      case x: DblLiteral => 
         ""
       case x: ListNode =>
         ""
@@ -201,7 +215,47 @@ class CppBackend extends Backend {
             block((0 until words(o)).map(i => emitWordRef(o, i) + " = -" + emitWordRef(o.inputs(0), i) + (if (i > 0) " - __borrow" else if (words(o) > 1) "; val_t __borrow" else "") + (if (i < words(o)-1) "; __borrow = " + emitWordRef(o.inputs(0), i) + " || " + emitWordRef(o, i) else ""))) + trunc(o)
           } else if (o.op == "!") {
             "  " + emitLoWordRef(o) + " = !" + emitLoWordRef(o.inputs(0)) + ";\n"
-          } else {
+          } else if (o.op == "f-")
+            "  " + emitLoWordRef(o) + " = fromFloat(-(toFloat(" + emitLoWordRef(o.inputs(0)) + "));\n"
+          else if (o.op == "fsin")
+            "  " + emitLoWordRef(o) + " = fromFloat(sin(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "fcos")
+            "  " + emitLoWordRef(o) + " = fromFloat(sin(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "ftan")
+            "  " + emitLoWordRef(o) + " = fromFloat(tan(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "fsqrt")
+            "  " + emitLoWordRef(o) + " = fromFloat(sqrt(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "flog")
+            "  " + emitLoWordRef(o) + " = fromFloat(log(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "ffloor")
+            "  " + emitLoWordRef(o) + " = fromFloat(floor(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "fceil")
+            "  " + emitLoWordRef(o) + " = fromFloat(ceil(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "fround")
+            "  " + emitLoWordRef(o) + " = fromFloat(round(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "fToSInt")
+            "  " + emitLoWordRef(o) + " = (val_t)(toFloat(" + emitLoWordRef(o.inputs(0)) + "));\n"
+          else if (o.op == "d-")
+            "  " + emitLoWordRef(o) + " = fromDouble(-(toDouble(" + emitLoWordRef(o.inputs(0)) + "));\n"
+          else if (o.op == "dsin")
+            "  " + emitLoWordRef(o) + " = fromDouble(sin(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "dcos")
+            "  " + emitLoWordRef(o) + " = fromDouble(cos(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "dtan")
+            "  " + emitLoWordRef(o) + " = fromDouble(tan(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "dlog")
+            "  " + emitLoWordRef(o) + " = fromDouble(log(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "dsqrt")
+            "  " + emitLoWordRef(o) + " = fromDouble(sqrt(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "dfloor")
+            "  " + emitLoWordRef(o) + " = fromDouble(floor(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "dceil")
+            "  " + emitLoWordRef(o) + " = fromDouble(ceil(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "dround")
+            "  " + emitLoWordRef(o) + " = fromDouble(round(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "dToSInt")
+            "  " + emitLoWordRef(o) + " = (val_t)(toDouble(" + emitLoWordRef(o.inputs(0)) + "));\n"
+          else {
             assert(false, "operator " + o.op + " unsupported")
             ""
           })
@@ -322,6 +376,50 @@ class CppBackend extends Backend {
           val initial = (a: String, b: String) => a + " != " + b
           val subsequent = (i: String, a: String, b: String) => "(" + i + ") | (" + a + " != " + b + ")"
           "  " + emitLoWordRef(o) + " = " + opFoldLeft(o, initial, subsequent) + ";\n"
+        } else if (o.op == "f-") {
+            "  " + emitLoWordRef(o) + " = fromFloat(toFloat(" + emitLoWordRef(o.inputs(0)) + ") - toFloat(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "f+") {
+            "  " + emitLoWordRef(o) + " = fromFloat(toFloat(" + emitLoWordRef(o.inputs(0)) + ") + toFloat(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "f*") {
+            "  " + emitLoWordRef(o) + " = fromFloat(toFloat(" + emitLoWordRef(o.inputs(0)) + ") * toFloat(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "f/") {
+            "  " + emitLoWordRef(o) + " = fromFloat(toFloat(" + emitLoWordRef(o.inputs(0)) + ") / toFloat(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "f%") {
+            "  " + emitLoWordRef(o) + " = fromFloat(fmodf(toFloat(" + emitLoWordRef(o.inputs(0)) + "), toFloat(" + emitLoWordRef(o.inputs(1)) + ")));\n"
+        } else if (o.op == "fpow") {
+            "  " + emitLoWordRef(o) + " = fromFloat(pow(toFloat(" + emitLoWordRef(o.inputs(1)) + "), toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+        } else if (o.op == "f==") {
+            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") == toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "f!=") {
+            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") != toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "f>") {
+            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") > toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "f<=") {
+            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") <= toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "f>=") {
+            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") >= toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d-") {
+            "  " + emitLoWordRef(o) + " = fromDouble(toDouble(" + emitLoWordRef(o.inputs(0)) + ") - toDouble(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "d+") {
+            "  " + emitLoWordRef(o) + " = fromDouble(toDouble(" + emitLoWordRef(o.inputs(0)) + ") + toDouble(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "d*") {
+            "  " + emitLoWordRef(o) + " = fromDouble(toDouble(" + emitLoWordRef(o.inputs(0)) + ") * toDouble(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "d/") {
+            "  " + emitLoWordRef(o) + " = fromDouble(toDouble(" + emitLoWordRef(o.inputs(0)) + ") / toDouble(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "d%") {
+            "  " + emitLoWordRef(o) + " = fromDouble(fmod(toDouble(" + emitLoWordRef(o.inputs(0)) + "), toDouble(" + emitLoWordRef(o.inputs(1)) + ")));\n"
+        } else if (o.op == "dpow") {
+            "  " + emitLoWordRef(o) + " = fromDouble(pow(toDouble(" + emitLoWordRef(o.inputs(1)) + "), toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+        } else if (o.op == "d==") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") == toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d!=") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") != toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d>") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") > toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d<=") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") <= toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d>=") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") >= toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else {
           assert(false, "operator " + o.op + " unsupported")
           ""
@@ -591,6 +689,8 @@ class CppBackend extends Backend {
     for (m <- nodes) {
       m match {
         case l: Literal => ;
+        case l: FloLiteral => ;
+        case l: DblLiteral => ;
         case any        =>
           if (m.name != "" && !(m == c.defaultResetPin) && !(m.component == null)) {
             // only modify name if it is not the reset signal or not in top component

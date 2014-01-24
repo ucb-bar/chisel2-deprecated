@@ -53,6 +53,24 @@ object UnaryOp {
       case "-" => Op("-",  1, widthOf(0), x);
       case "~" => Op("~",  1, widthOf(0), x);
       case "!" => Op("!",  1, fixWidth(1), x);
+      case "f-" => Op("f-", 1, fixWidth(32), x);
+      case "fsin" => Op("fsin", 1, fixWidth(32), x);
+      case "fcos" => Op("fcos", 1, fixWidth(32), x);
+      case "ftan" => Op("ftan", 1, fixWidth(32), x);
+      case "fsqrt" => Op("fsqrt", 1, fixWidth(32), x);
+      case "flog" => Op("flog", 1, fixWidth(32), x);
+      case "ffloor" => Op("ffloor", 1, fixWidth(32), x);
+      case "fceil" => Op("fceil", 1, fixWidth(32), x);
+      case "fround" => Op("fround", 1, fixWidth(32), x);
+      case "d-" => Op("d-", 1, fixWidth(64), x);
+      case "dsin" => Op("dsin", 1, fixWidth(64), x);
+      case "dcos" => Op("dcos", 1, fixWidth(64), x);
+      case "dtan" => Op("dtan", 1, fixWidth(64), x);
+      case "dsqrt" => Op("dsqrt", 1, fixWidth(64), x);
+      case "dlog" => Op("dlog", 1, fixWidth(64), x);
+      case "dfloor" => Op("dfloor", 1, fixWidth(64), x);
+      case "dceil" => Op("dceil", 1, fixWidth(64), x);
+      case "dround" => Op("dround", 1, fixWidth(64), x);
       case any => throw new Exception("Unrecognized operator " + op);
     }
   }
@@ -83,6 +101,18 @@ object BinaryOp {
       case "##"  => Op("##", 2, sumWidth _,  x, y );
       case "&"   => Op("&",  2, maxWidth _, x, y );
       case "|"   => Op("|",  2, maxWidth _, x, y );
+      case "f+"  => Op("f+", 2, fixWidth(32), x, y );
+      case "f-"  => Op("f-", 2, fixWidth(32), x, y );
+      case "f*"  => Op("f*", 0, fixWidth(32), x, y );
+      case "f/"  => Op("f/", 0, fixWidth(32), x, y );
+      case "f%"  => Op("f%", 0, fixWidth(32), x, y );
+      case "fpow"  => Op("fpow", 0, fixWidth(32), x, y );
+      case "d+"  => Op("d+", 2, fixWidth(64), x, y );
+      case "d-"  => Op("d-", 2, fixWidth(64), x, y );
+      case "d*"  => Op("d*", 0, fixWidth(64), x, y );
+      case "d/"  => Op("d/", 0, fixWidth(64), x, y );
+      case "d%"  => Op("d%", 0, fixWidth(64), x, y );
+      case "dpow"  => Op("dpow", 0, fixWidth(64), x, y );
       case any   => throw new Exception("Unrecognized operator " + op);
     }
   }
@@ -109,6 +139,18 @@ object LogicalOp {
         case "s<=" => Op("s<=",2, fixWidth(1), x, y );
         case "&&"  => Op("&&", 2, fixWidth(1), x, y );
         case "||"  => Op("||", 2, fixWidth(1), x, y );
+        case "f==" => Op("f==", 2, fixWidth(1), x, y );
+        case "f!=" => Op("f!=", 2, fixWidth(1), x, y );
+        case "f>"  => Op("f>",  2, fixWidth(1), x, y );
+        case "f<"  => Op("f<",  2, fixWidth(1), x, y );
+        case "f<=" => Op("f<=", 2, fixWidth(1), x, y );
+        case "f>=" => Op("f>=", 2, fixWidth(1), x, y );
+        case "d==" => Op("d==", 2, fixWidth(1), x, y );
+        case "d!=" => Op("d!=", 2, fixWidth(1), x, y );
+        case "d>"  => Op("d>",  2, fixWidth(1), x, y );
+        case "d<"  => Op("d<",  2, fixWidth(1), x, y );
+        case "d<=" => Op("d<=", 2, fixWidth(1), x, y );
+        case "d>=" => Op("d>=", 2, fixWidth(1), x, y );
         case any   => throw new Exception("Unrecognized operator " + op);
       }
 
@@ -190,6 +232,119 @@ object Op {
         case _ => ;
       }
     }
+    if (a.isInstanceOf[Flo] && b.isInstanceOf[Flo]) {
+      val (fa, fb) = (a.asInstanceOf[Flo], b.asInstanceOf[Flo]);
+      if (fa.floLitOf != null && fb.floLitOf != null) { 
+      val (fa_val, fb_val) = (fa.floLitOf.floValue, fb.floLitOf.floValue);
+      name match {
+        case "f+" => return FloLit(fa_val + fb_val);
+        case "f-" => return FloLit(fa_val - fb_val);
+        case "f*" => return FloLit(fa_val * fb_val);
+        case "f/" => return FloLit(fa_val / fb_val);
+        case "f%" => return FloLit(fa_val % fb_val);
+        case "f==" => return Bool(fa_val == fb_val);
+        case "f!=" => return Bool(fa_val != fb_val);
+        case "f>" => return Bool(fa_val > fb_val);
+        case "f<" => return Bool(fa_val < fb_val);
+        case "f>=" => return Bool(fa_val >= fb_val);
+        case "f<=" => return Bool(fa_val <= fb_val);
+        case _ => ;
+      }
+      } else if (fa.floLitOf != null) { 
+        val fa_val = fa.floLitOf.floValue;
+        if (fa_val == 0.0) {
+          name match {
+            case "f+" => return b;
+            case "f*" => return FloLit(0.0.toFloat);
+            case "f/" => return FloLit(0.0.toFloat);
+            case _ => ;
+          }
+        } else if (fa_val == 1.0) {
+          name match {
+            case "f*" => return b;
+            case _ => ;
+          }
+        }        
+      } else if (fb.floLitOf != null) { 
+        val fb_val = fb.floLitOf.floValue;
+        if (fb_val == 0.0) {
+          name match {
+            case "f+" => return a;
+            case "f*" => return FloLit(0.0.toFloat);
+            case _ => ;
+          }
+        } else if (fb_val == 1.0) {
+          name match {
+            case "f*" => return a;
+            case "f/" => return a;
+            case "f%" => return a;
+            case _ => ;
+          }
+        }        
+      }
+    }
+      
+    if (a.isInstanceOf[Dbl] && b.isInstanceOf[Dbl]) {
+      val (fa, fb) = (a.asInstanceOf[Dbl], b.asInstanceOf[Dbl]);
+      // println("TRYING TO FOLD " + name + " FAL " + (if (fa.dblLitOf == null) fa.toString else fa.dblLitOf.dblValue.toString) + " FBL " + (if (fb.dblLitOf == null) fb.toString else fb.dblLitOf.dblValue.toString))
+      if (fa.dblLitOf != null && fb.dblLitOf != null) {
+      val (fa_val, fb_val) = (fa.dblLitOf.dblValue, fb.dblLitOf.dblValue);
+        // println(" FOLDING " + name + " " + fa_val + " " + fb_val);
+      name match {
+        case "d+" => return DblLit(fa_val + fb_val);
+        case "d-" => return DblLit(fa_val - fb_val);
+        case "d*" => return DblLit(fa_val * fb_val);
+        case "d/" => return DblLit(fa_val / fb_val);
+        case "d%" => return DblLit(fa_val % fb_val);
+        case "d==" => return Bool(fa_val == fb_val);
+        case "d!=" => return Bool(fa_val != fb_val);
+        case "d>" => return Bool(fa_val > fb_val);
+        case "d<" => return Bool(fa_val < fb_val);
+        case "d>=" => return Bool(fa_val >= fb_val);
+        case "d<=" => return Bool(fa_val <= fb_val);
+        case _ => ;
+      }
+    } else if (fa.dblLitOf != null) { 
+      val fa_val = fa.dblLitOf.dblValue;
+      // println("FA " + fa_val + " NAME " + name);
+      if (fa_val == 0.0) {
+        // println("FOLDING " + name);
+        name match {
+          case "d+" => return b;
+          case "d*" => return DblLit(0.0);
+          case "d/" => return DblLit(0.0);
+          case "d%" => return DblLit(0.0);
+          case _ => ;
+        }
+      } else if (fa_val == 1.0) {
+        // println("FOLDING " + name);
+        name match {
+          case "d*" => return b;
+          case _ => ;
+        }
+      }        
+    } else if (fb.dblLitOf != null) { 
+      val fb_val = fb.dblLitOf.dblValue;
+      // println("FB " + fb_val + " NAME " + name);
+      if (fb_val == 0.0) {
+        // println("FOLDING " + name);
+        name match {
+          case "d+" => return a;
+          case "d*" => return DblLit(0.0);
+          case _ => ;
+        }
+      } else if (fb_val == 1.0) {
+        // println("FOLDING " + name);
+        name match {
+          case "d*" => return a;
+          case "d/" => return a;
+          case "d%" => return a;
+          case _ => ;
+        }
+      }        
+    }
+
+    }
     }
     if (Module.backend.isInstanceOf[CppBackend] || Module.backend.isInstanceOf[FloBackend]) {
       def signAbs(x: Node): (Bool, UInt) = {
@@ -243,13 +398,45 @@ object Op {
     res
   }
   def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node): Node = {
-    if (Module.isFolding && a.litOf != null) {
+    if (Module.isFolding) {
+      if (a.litOf != null) {
+        name match {
+          case "!" => return if (a.litOf.value == 0) Literal(1) else Literal(0);
+          case "-" => return Literal(-a.litOf.value, a.litOf.width);
+          case "~" => return Literal((-a.litOf.value-1)&((BigInt(1) << a.litOf.width)-1), a.litOf.width);
+          case _ => ;
+        }
+      }
+    if (a.isInstanceOf[Dbl]) { 
+      val fa = a.asInstanceOf[Dbl];
+      if (fa.dblLitOf != null) {
+      val fa_val = fa.dblLitOf.dblValue;
       name match {
-        case "!" => return if (a.litOf.value == 0) Literal(1) else Literal(0);
-        case "-" => return Literal(-a.litOf.value, a.litOf.width);
-        case "~" => return Literal((-a.litOf.value-1)&((BigInt(1) << a.litOf.width)-1), a.litOf.width);
+        case "dsin" => return DblLit(Math.sin(fa_val));
+        case "dlog" => return DblLit(Math.log(fa_val));
+        case "dfloor" => return DblLit(Math.floor(fa_val));
+        case "dceil" => return DblLit(Math.ceil(fa_val));
+        case "dround" => return DblLit(Math.round(fa_val));
+        case "dToFix" => return Literal(fa_val.toInt);
         case _ => ;
       }
+      }
+    }
+    if (a.isInstanceOf[Flo]) {
+      val fa = a.asInstanceOf[Flo];
+      if (fa.floLitOf != null) {
+      val fa_val = fa.floLitOf.floValue;
+      name match {
+        case "fsin" => return FloLit(Math.sin(fa_val).toFloat);
+        case "flog" => return FloLit(Math.log(fa_val).toFloat);
+        case "ffloor" => return DblLit(Math.floor(fa_val).toFloat);
+        case "fceil" => return DblLit(Math.ceil(fa_val).toFloat);
+        case "fround" => return DblLit(Math.round(fa_val).toFloat);
+        case "fToFix" => return Literal(fa_val.toLong);
+        case _ => ;
+      }
+      }
+    }
     }
     val res = new Op();
     res.init("", widthInfer, a);

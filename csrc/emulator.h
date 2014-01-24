@@ -26,10 +26,49 @@ typedef uint32_t half_val_t;
 // typedef uint32_t val_t;
 // typedef uint8_t val_t;
 
+union flo2int_t {
+  float  f;
+  val_t  i;
+};
+
+inline float toFloat (val_t x) {
+  flo2int_t f2i;
+  f2i.i = x;
+  return f2i.f;
+}
+
+inline val_t fromFloat (float x) {
+  flo2int_t f2i;
+  f2i.f = x;
+  return f2i.i;
+}
+
+union dbl2int_t {
+  double f;
+  val_t  i;
+};
+
+inline double toDouble (val_t x) {
+  dbl2int_t f2i;
+  f2i.i = x;
+  return f2i.f;
+}
+
+inline val_t fromDouble (double x) {
+  dbl2int_t f2i;
+  f2i.f = x;
+  return f2i.i;
+}
+
+
 #define MASK(v, c) ((v) & -(val_t)(c))
 #define TERNARY(c, t, f) ((f) ^ (((f) ^ (t)) & -(c)))
+#ifndef MIN
 #define MIN(a, b) TERNARY((a) < (b), (a), (b))
+#endif
+#ifndef MAX
 #define MAX(a, b) TERNARY((a) > (b), (a), (b))
+#endif
 #define CLAMP(a, min, max) MAX(MIN(a, max), min)
 
 template<uint32_t x, uint32_t shifted=0, bool sticky=false> struct CeilLog {
@@ -1894,7 +1933,7 @@ bool dat_from_str(std::string in, dat_t<w>& res, int pos = 0) {
             cout << "dat_from_str: Invalid character '" << c << "'" << endl;
             return false;
         }
-        if (c_val > radix || c_val < 0) {
+        if (c_val > radix /* || c_val < 0 */) {
             cout << "dat_from_str: Invalid character '" << c << "'" << endl;
             return false;
         }
