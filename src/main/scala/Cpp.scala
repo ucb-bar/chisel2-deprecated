@@ -98,8 +98,10 @@ class CppBackend extends Backend {
     } else {
       x match {
         case l: Literal => {
-          var hex = x.asInstanceOf[Literal].value.toString(16)
-          if (hex.length > bpw/4*w) "0x" + hex.slice(hex.length-bpw/4*(w+1), hex.length-bpw/4*w) + "L" else "0L"
+          val lit = x.asInstanceOf[Literal].value
+          val value = if (lit < 0) (BigInt(1) << x.width) + lit else lit
+          val hex = value.toString(16)
+          if (hex.length > bpw/4*w) "0x" + hex.slice(hex.length-bpw/4*(w + 1), hex.length-bpw/4*w) + "L" else "0L"
         }
         case l: FloLiteral => 
           "fromFloat(" + l.floValue + ")"
