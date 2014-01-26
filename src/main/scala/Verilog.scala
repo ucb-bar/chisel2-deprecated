@@ -263,7 +263,8 @@ class VerilogBackend extends Backend {
 
       // by Donggyu: to infer MUX in Design Compiler
       case x: Mux =>
-        "  assign " + emitTmp(x) + " = " + emitRef(x.inputs(0)) + " ? /* synopsys infer_mux */ " + emitRef(x.inputs(1)) + " : " + emitRef(x.inputs(2)) + ";\n"
+        "  assign " + emitTmp(x) + " = " + emitRef(x.inputs(0)) + " ? " + emitRef(x.inputs(1)) + " : " + emitRef(x.inputs(2)) + ";\n"
+        // "  assign " + emitTmp(x) + " = " + emitRef(x.inputs(0)) + " ? /* synopsys infer_mux */ " + emitRef(x.inputs(1)) + " : " + emitRef(x.inputs(2)) + ";\n"
 
       case o: Op =>
         val c = o.component;

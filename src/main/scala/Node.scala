@@ -33,6 +33,7 @@ package Chisel
 import scala.collection.immutable.Vector
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
+import scala.collection.mutable.HashMap // By Donggyu
 import java.io.PrintStream
 
 import Node._;
@@ -142,11 +143,12 @@ abstract class Node extends nameable {
   var driveRand = false
   var clock: Clock = null
   var CppVertex: CppVertex = null
-  // Delay annotation and Critical path calc
+  // For signal annotation 
   // by Donggyu
-  var arrival = 0.0
-  var delay = 0.0
-  var seldelay = 0.0
+  var counter: Node = null
+  // For delay annotation
+  // by Donggyu
+  val delays = new HashMap[String, Double]
 
   Module.nodes += this
 

@@ -100,10 +100,7 @@ object Module {
   val clocks = new ArrayBuffer[Clock]()
   var implicitReset: Bool = null
   var implicitClock: Clock = null
-  var crossFilename: String = ""                                      // by Donggyu
-  val crosses = new ArrayBuffer[(Double, Array[Node], Array[Node])]() // by Donggyu
-  var criticalPath = ""                                               // by Donggyu
-  var criticalPathDelay = 0.0                                         // by Donggyu
+  var signalFilename: String = "" // by Donggyu
 
   /* Any call to a *Module* constructor without a proper wrapping
    into a Module.apply() call will be detected when trigger is false. */
@@ -174,8 +171,6 @@ object Module {
     implicitReset.setName("reset")
     implicitClock = new Clock()
     implicitClock.setName("clk")
-    crossFilename = ""  // by Donggyu
-    crosses.clear()     // by Donggyu
 
     /* Re-initialize global variables defined in object Node {} */
     nodes.clear()

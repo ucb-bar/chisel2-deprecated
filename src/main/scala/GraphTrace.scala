@@ -50,9 +50,9 @@ trait GraphTrace extends Backend {
         val lo: String = nodeToString(ext.lo) 
         nodeToString(ext.inputs(0)) + "[" + { if (hi == lo) hi else hi + ":" + lo } + "]"  
       case bind  : Binding   => "Binding(" + nodeToString(bind.inputs(0)) + ")"
-      case mem   : Mem[_]    => "Mem(" + mem.name + ")"
+      case mem   : Mem[_]    => "Mem(%s)".format(mem.name)
       case memacc: MemAccess => nodeToString(memacc.mem) + "[" + nodeToString(memacc.addr) + "]"
-      case rom   : ROM[_]    => { "ROM(" + rom.name + ")" }
+      case rom   : ROM[_]    => "ROM(%s)".format(rom.name) 
       case romread: ROMRead[_] => nodeToString(romread.rom) + "[" + nodeToString(romread.addr) + "]"
       case _ => if (node == null) "" else node.toString
     }      
@@ -68,7 +68,7 @@ trait GraphTrace extends Backend {
     def printNode(top: Node, level: Int) = {
       report.append(genIndent(level) + getSignalName(top) + ": " + nodeToString(top) + {
         if (isDelayBack) {
-          "  (delay: %.4f, selection delay: %.4f)\n".format(top.delay, top.seldelay) 
+          "\n" // "  (delay: %.4f, selection delay: %.4f)\n".format(top.delay, top.seldelay) 
         } else {
           "\n" 
         }
@@ -124,11 +124,6 @@ trait GraphTrace extends Backend {
 
     report.append("Module name : " + c.name + "\n")
     dfs(c)
-
-    if(isDelayBack) {
-      report.append("\nCritical path = " + Module.criticalPath)
-      report.append("\nCritical path delay = %.5f\n".format(Module.criticalPathDelay))
-    }
 
     // ChiselError.info(report) 
     // write files into report

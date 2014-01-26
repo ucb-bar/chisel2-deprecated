@@ -129,6 +129,28 @@ abstract class Backend {
              }
            }
          }
+         case buf: collection.IndexedSeq[_] => {
+           /* This is a duplicate of ArrayBuffer[_] that was introduced
+            to support VecLike. ArrayBuffer and IndexedSeq have no parent/child
+            relationship. */
+           if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
+             val nodebuf = buf.asInstanceOf[Seq[Node]];
+             var i = 0;
+             for(elm <- nodebuf){
+               if( elm.isTypeNode || elm.name == null || elm.name.isEmpty ) {
+                 /* XXX This code is sensitive to when Bundle.nameIt is called.
+                  Whether it is called late (elm.name is empty) or we override
+                  any previous name that could have been infered,
+                  this has for side-effect to create modules with the exact
+                  same logic but textually different in input/output
+                  parameters, hence generating unnecessary modules. */
+                 elm.nameIt(asValidName(name + "_" + i));
+               }
+               nameSpace += elm.name;
+               i += 1;
+             }
+           }
+         }
          case cell: Cell => {
            cell.name = asValidName(name);
            cell.named = true;
@@ -230,7 +252,7 @@ abstract class Backend {
     }
   }
 
-  def emitTmp(node: Node): String =
+ def emitTmp(node: Node): String =
     emitRef(node)
 
   def emitRef(node: Node): String = {
@@ -313,8 +335,7 @@ abstract class Backend {
       if (node.component == null) {
         println("NULL NODE COMPONENT " + node)
       }
-      if (!node.component.nodes.contains(node) 
-          && !node.isTypeNode/* by Donggyu */)
+      if (!node.component.nodes.contains(node))
         node.component.nodes += node
       for (input <- node.inputs) {
         if(!walked.contains(input)) {
@@ -529,13 +550,6 @@ abstract class Backend {
     ChiselError.info("start width checking")
     c.forceMatchingWidths;
     ChiselError.info("finished width checking")
-    // By Donggyu
-    ChiselError.info("resolving nodes to the components")
-    collectNodesIntoComp(initializeDFS)
-    ChiselError.info("finished resolving")
-    nameAll(c)
-    getNodeIndices(c)
-    /*************/
     ChiselError.info("started flattenning")
     val nbNodes = c.removeTypeNodes()
     ChiselError.info("finished flattening (" + nbNodes + ")")
@@ -552,17 +566,21 @@ abstract class Backend {
      Technically all user-defined transforms are responsible to update
      nodes and component correctly or call collectNodesIntoComp on return.
      */
-    // This is moved to in front of removeTypeNodes by Donggyu
-    /*
     ChiselError.info("resolving nodes to the components")
     collectNodesIntoComp(initializeDFS)
     ChiselError.info("finished resolving")
-    */
 
     // two transforms added in Mem.scala (referenced and computePorts)
     ChiselError.info("started transforms")
     execute(c, transforms)
     ChiselError.info("finished transforms")
+
+    // by Donggyu (for backannotation)
+    // Todo: port it to the new graph format
+    // ------------------------------------------------
+    nameAll(c)
+    Module.sortedComps map (_.nodes map (emitRef(_)))
+    // ------------------------------------------------
 
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
     c.traceNodes();
@@ -632,15 +650,6 @@ abstract class Backend {
     ChiselError.info(res)
   }
 
-  // by Donggyu
-  protected def getNodeIndices(m: Module) {
-    m bfs { node =>
-      if (node.isTypeNode) 
-        emitTmp(node.getNode)
-      else
-        emitTmp(node)
-    }
-  }
 }
 
 
