@@ -159,21 +159,37 @@ trait SignalBackannotation extends Backannotation {
 }
 
 trait DelayBackannotation extends Backannotation {
+  // Timing paths used for generating a tcl file & calculating a critical path
+  private val paths = new HashMap[String, ListBuffer[Node]]() 
+  protected def pathToString(path: ListBuffer[Node]) = { 
+    (getSignalName(path.head) /: path.tail) ( _ + " -> " + getSignalName(_))
+  }
+
+  val basedir = ensureDir(Module.targetDir)
+  val dcsyndir = ensureDir(basedir+"dc-syn")
+  protected var dctclfilename: String = ""
+  protected var rptfilename: String = ""
+
   preElaborateTransforms += ((c: Module) => c.removeTypeNodes)
+  preElaborateTransforms += ((c: Module) => getTimingPaths(c))
   preElaborateTransforms += ((c: Module) => generateTcl(c))
   preElaborateTransforms += ((c: Module) => executeDC())
   preElaborateTransforms += ((c: Module) => annotateDelay(c, c.name + "_timing.rpt"))
   preElaborateTransforms += ((c: Module) => calcCriticalPathDelay(c))
   preElaborateTransforms += ((c: Module) => printGraph(c, c.name + "_graph.rpt"))
 
-  private def getTimingPaths(m: Module): HashSet[List[Node]] = {
-    def insertToMultimap(multimap: HashMap[Node, HashSet[List[Node]]], node: Node, list: List[Node]) {
-      if (!(multimap contains node)) multimap(node) = new HashSet[List[Node]]
-      multimap(node) += list
+  private def getTimingPaths(m: Module) {
+    val newpaths = new HashSet[ListBuffer[Node]]() 
+    val tailpaths = new HashMap[Node, HashSet[ListBuffer[Node]]]() // Multimap for tail paths
+    val newtailAdded = new HashMap[Node, Boolean]()
+    def insertTails(multimap: HashMap[Node, HashSet[ListBuffer[Node]]], node: Node, listbuffer: ListBuffer[Node]): Boolean {
+      if (!(multimap contains node)) multimap(node) = new HashSet[ListBuffer[Node]]
+      listbuffer prepend node
+      multimap(node) add list
     }
+    def getTails(multimap: HashMap[Node, HashSet[List[Node]]], node: Node) = 
+      multimap getOrElse (node, new HashSet[List[Node]]())
 
-    val paths = new HashSet[List[Node]]() // Timing paths
-    val tailpaths = new HashMap[Node, HashSet[List[Node]]]() // Multimap for tail paths
     val walked = new HashSet[Node]() // Set of walked nodes (DFS)
     val stack = m.initializeDFS
 
@@ -184,56 +200,61 @@ trait DelayBackannotation extends Backannotation {
     while (!stack.isEmpty) {
       val node = stack.pop
 
-      node match {
+      val tailAdded = node match {
         // OUTPUT PORT: the end point of a timing path
         // => initialize timing paths
-        case bits: Bits if bits.dir == OUTPUT && node.componentOf == Module.topComponent => {
-          insertToMultimap(tailpaths, node, Nil)
-        }
+        case bits: Bits if bits.dir == OUTPUT && node.componentOf == Module.topComponent => 
+          insertTails(tailpaths, node, new ListBuffer())
         // REGISTER: the end point of a timing path
         // => initialize timing paths
-        case _: Reg => {
-          insertToMultimap(tailpaths, node, Nil)
-        }
+        case _: Reg =>
+          insertTails(tailpaths, node, new ListBuffer())
         // MEMORY: the end point of a timing path
         // => initialize timing paths
-        case mem: Mem[_] if mem.isInline => {
-          insertToMultimap(tailpaths, node, Nil)
-        }
-        case _ =>
+        case mem: Mem[_] =>
+          insertTails(tailpaths, node, new ListBuffer())
+        case _ => false
       }
 
-      val tails = tailpaths getOrElse (node, new HashSet[List[Node]]())
-      val newtailAdded = new HashMap[Node, Boolean]()
-
+      val tails = getTails(tailpaths, node)
+      
       for (input <- node.inputs) {
-        input match {
+        val inputTailAdded = input match {
           // INPUT PORT: the start point of a timing path
           // => return timing paths 
-          case bits: Bits if bits.dir == INPUT && input.componentOf == Module.topComponent =>
+          case bits: Bits if bits.dir == INPUT && input.componentOf == Module.topComponent => {
             for (tail <- tails) {
-              paths += (input::node::tail)
+              tail prepend input
+              newpaths += tail
             }
+            false
+          }  
           // REGISTER: the start point of a timing path
           // => return timing paths
-          case _: Reg => 
+          case _: Reg => {
             for (tail <- tails) {
-              paths += (input::node::tail)
+              tail prepend input
+              newpaths += tail
             }
+            false
+          }
           // MEMORY: the start point of a timing path
           // => return timing paths
-          case mem: Mem[_] if mem.isInline => 
+          case mem: Mem[_] => {
             for (tail <- tails) {
-              paths += (input::node::tail)
+              tail prepend input
+              newpaths += tail
             }
+            false
+          }
           // Other nodes => construct timing paths though this node
           case _ => {
-            val oldtails = (tailpaths getOrElse (input, new HashSet[List[Node]]())).clone
-            for (tail <- tails) {
-              insertToMultimap(tailpaths, input, node::tail)
-            } 
-            val newtails = tailpaths getOrElse (input, new HashSet[List[Node]]())
-            newtailAdded(input) = (oldtails != newtails)
+            val inputTails = getTails(tailpaths, input)
+            var added = false
+            for (tail <- inputTails) {
+              added |= insertTails(tailpaths, input, tail)
+            }
+            added
           }
         }
 
@@ -242,252 +263,222 @@ trait DelayBackannotation extends Backannotation {
           walked += input
           stack push input
         }
-        // When all the input's coumsumers are not visited, the input node should be visited later
-        /*
-        else if ((input.consumers foldLeft false) { (x, y) =>  x || !(walked contains y) }) {
-          stack push input
-        }
-        */
         // An input node should be visited again when its new tails are added
-        else if (newtailAdded getOrElse (input, false)) {
+        else if (inputTailAdded) {
           stack push input
         }
       }
-
-      newtailAdded.clear
     }
 
-    /*
-    for (path <- paths) {
-      ChiselError.info(
-        (getSignalName(path.head) /: path.tail) ( _ + " -> " + getSignalName(_))
-      )
+    // Prune superpaths
+    // e.g. Path1: x -> T1 -> y, Path2: x -> T1 -> T2 -> y ==> remove Path1
+    for (i <- 0 until newpaths.size) {
+      val path = newpaths(i)
+      val pathhead = path.head
+      val pathmid = path.tail.init
+      val pathlast = path.last
+      var isSuperpath = false
+      for (j <- i + 1 until newpaths.size) {
+        val p = newpaths(j)
+        val head = p.head
+        val mid = p.tail.init
+        val last = p.last
+        isSuperpath |= ( (path != p) && (pathhead == head) && (pathlast == last) &&
+          (true /: pathmid) ((x, y) => x && (mid contains y)) )
+      }
+      // Build the path map
+      if (!isSuperpath) {
+        val pathString = pathToString(path)
+        paths(pathString) = path
+        // ChiselError.info(pathString)
+      }
     }
-    */
-
-    paths
   }
 
-  private def generateTcl(m: Module, filename: String = "gentcl.tcl") {
-    val basedir = ensureDir(Module.targetDir)
-    val dcsyndir  = ensureDir(basedir+"dc-syn")
-    val tcl = new StringBuilder();
+  private def generateTcls(m: Module) {
+    dctclfilename = m.name + "_gendctcl.tcl"
+    val tcl = new StringBuilder
     val tclfile = new java.io.FileWriter(dcsyndir+filename)
-    val rpt_filename = m.name + "_timing.rpt"
+    val tclthreshold = (1 << 19) // write tcl to the tcl file when it's capacity exceeds this value
 
     ChiselError.info("Donggyu: generate a tcl file")
-    tcl.append("""set ucb_vlsi_home [getenv UCB_VLSI_HOME]"""+"\n")
-    tcl.append("""set stdcells_home $ucb_vlsi_home/stdcells/[getenv UCB_STDCELLS]"""+"\n")
-    tcl.append("""set search_path "$stdcells_home/db ../" """+"\n")
-    tcl.append("""set target_library "cells.db" """+"\n")
-    tcl.append("""set synthetic_library "standard.sldb" """+"\n")
-    tcl.append("""set link_library "* $target_library $synthetic_library" """+"\n")
-    tcl.append("""set alib_library_analysis_path "alib" """+"\n\n")
+    // Read designs
+    tcl append "analyze -format verilog %s.v\n".format(m.name)
+    tcl append "elaborate %s\n".format(m.name)
+    tcl append "link\n"
+    tcl append "check_design\n"
+    tcl append "create_clock clk -name ideal_clock1 -period 1\n"
 
-    tcl.append("analyze -format verilog " + m.name + ".v\n")
-    tcl.append("elaborate " + m.name + "\n")
-    tcl.append("link\n")
-    tcl.append("check_design\n")
-    tcl.append("create_clock clk -name ideal_clock1 -period 1\n")
-    // tcl.append("define_name_rules backannotation -dont_change_bus_members -dont_change_ports\n")
-    // tcl.append("change_names -rules backannotation\n")
+    // tcl.append("\nwrite -f verilog -hierarchy -output " + m.name + ".unmapped.v\n\n")
 
-    // set_dont_touch for signal preserving
-    /*
-    m bfs { node => 
-      node match {
-        case _: Op => {
-          tcl.append("set_dont_touch " + getSignalName(node) + "\n")
-        }
-        case _ =>
-      }
-    }
-    */
+    // Compile designs
+    tcl append "compile -only_hold_time\n\n"
 
-    tcl.append("set hdlin_infer_mux all\n")
-    tcl.append("set hdlin_keep_signal_name all\n")
+    // Critical path reports
+    tcl append "report_timing %s -nets > %s_critical.rpt\n".format(cmdopts, m.name)
+    tcl append "report_timing -from [all_inputs] %s -nets >> %s_critical.rpt\n".format(cmdopts, m.name)
+    tcl append "report_timing -to [all_outputs] %s -nets >> %s_critical.rpt\n".format(cmdopts, m.name)
+    tcl append "report_timing -from [all_inputs] -to [all_outputs] %s -nets >> %s_critical.rpt\n\n".format(cmdopts, m.name)
 
-    tcl.append("\nwrite -f verilog -hierarchy -output " + m.name + ".unmapped.v\n\n")
+    tclfile write tcl.result
+    tclfile.flush
+    tcl.clear
 
-    // tcl.append("compile -no_design_rule\n\n")
-    // tcl.append("compile -only_design_rule\n\n")
-    tcl.append("compile -only_hold_time\n\n")
-   
+    // Timing path reports  
+    rpt_filename = m.name + "_timing.rpt"
     var first_report = true
 
     def cmdhead = 
       if (first_report) { 
         first_report = false 
-        "redirect " + rpt_filename + " { " 
+        "redirect %s { ".format(rpt_filename) 
       } else { 
-        "redirect -append " + rpt_filename + " { " 
+        "redirect -append %s { ".format(rpt_filename)
       }
-    val cmdopts = " -significant_digits 5 -path only -nosplit"
+    val cmdopts = "-significant_digits 5 -path only -nosplit "
     val cmdtail = " }\n"
 
-    tcl.append("report_timing %s -nets > %s_critical.rpt\n".format(cmdopts, m.name))
-    tcl.append("report_timing -from [all_inputs] %s -nets >> %s_critical.rpt\n".format(cmdopts, m.name))
-    tcl.append("report_timing -to [all_outputs] %s -nets >> %s_critical.rpt\n".format(cmdopts, m.name))
-    tcl.append("report_timing -from [all_inputs] -to [all_outputs] %s -nets >> %s_critical.rpt\n".format(cmdopts, m.name))
-  
-    val paths = getTimingPaths(m)
+    // data structures used to generate reports
+    val mid = new ListBuffer[Node]()
+    val powerset = new ListBuffer[ListBuffer[Node]]()
+    val stack = new Stack[Node]()
+    val collections = new HashMap[Node, String]
 
-    // Remove superpaths
-    // e.g. Path1: x -> T1 -> y, Path2: x -> T1 -> T2 -> y ==> remove Path1
-    for (path <- paths) {
-      var flag = false
-      val pathhead = path.head
-      val pathmid = path.tail.init
-      val pathlast = path.last
-      for (p <- paths) {
-        val head = p.head
-        val mid = p.tail.init
-        val last = p.last
-        flag |= ( (path != p) && (pathhead == head) && (pathlast == last) &&
-          (true /: pathmid) ((x, y) => x && (mid contains y)) )
-      }
-      if (flag) paths -= path
-    }
+    for ((pathString, path) <- paths) {
+      tcl append (cmdhead + "echo \"\\n" + pathString + "\"" + cmdtail)
 
- 
-    def genReports(from: String, to: String, via: List[Node], end: Node) {
-      // When a node has only one input,
-      // prune its input.
-      // Otherwise, you will se a giant powerset.
-      def truncation (list: List[Node]):List[Node] = {
-        def pruneOneInput(list: List[Node]): ListBuffer[Node] = 
-          list match {
-            case Nil => new ListBuffer[Node]()
-            case _::Nil => new ListBuffer[Node]()
-            case input::consumer::tail =>
-              if (consumer.inputs.length > 1){
-                val list = pruneOneInput(consumer::tail)
-                list.prepend(input)
-                list
-              } else 
-                pruneOneInput(consumer::tail)
-          }
-
-        val prunedArray = pruneOneInput(list)
-
-        // Randomly deleting poins
-        val random = new Random
-        val sizeLimit = 8 // emperically best number
-        var arrayLength = prunedArray.length
-        while (arrayLength > sizeLimit) {
-          val rmIndex = random.nextInt(arrayLength)
-          prunedArray.remove(rmIndex)
-          arrayLength = arrayLength - 1
-        }
-
-        prunedArray.toList
-      }
-
-      def powerset (list: List[Node]): Array[List[Node]] = {
-        list match {
-          case Nil => Array(Nil)
-          case head::tail => (powerset(tail) map { head::_ }) ++ powerset(tail)
-        }
-      }
-
-      def reports (sets: Array[List[Node]]) {
-        def condcmds(via: List[Node]) = {
-          def cond(node: Node) = "[get_nets " + getSignalName(node) + " ] != \"\""
-          def conds = (cond(via.head) /: via.tail) (_ + " && " + cond(_))
-          def throughs = ("" /: via) (_ + " -through " + getSignalName(_))
-
-          if (via.isEmpty) 
-            "{\n\t" + cmdhead + "report_timing" + from + to + cmdopts + cmdtail + "}\n"
-          else
-            "{ " + conds + " } " +
-            "{\n\t" + cmdhead + "report_timing" + from + throughs + to + cmdopts + cmdtail + "}"
-        }
-
-        if (sets.size <= 1) {
-          tcl.append(cmdhead + "report_timing" + from + to + cmdopts + cmdtail)
+      // First, prune nodes the number of whose inputs is 1
+      // Otherwise, we will see a tremendous conditions
+      val head = path.head
+      val last = path.last
+      for (i <- 2 until path.length) {
+        val node = path(i)
+        if (node.inputs.length != 1) {
+          mid += path(i-1)
         } else {
-          val head = sets.head
-          val mids = sets.tail.init
-          val last = sets.last
-          tcl.append("if " + condcmds(head))
-          for (mid <- mids) {
-            tcl.append(" elseif " + condcmds(mid))
-          }
-          // tcl.append(" else " + condcmds(last))
-          tcl.append("\n")
+          // we don't have to include the node's input
+          // since all the timing paths though the node 
+          // also  go though its input
         }
       }
-  
-      val throughSets = powerset(truncation(via:::List(end))).sortWith(_.size > _.size)
-
-      /*
-      for (throughs <- throughSets) {
-        if (throughs.isEmpty) {
-          ChiselError.info("{}")
-        }
-        else {
-          ChiselError.info(
-            "{ " + ((getSignalName(throughs.head) /: throughs.tail) (_ + ", " + getSignalName(_))) + " }"
-          )
+    
+      //Next, generate a power set of the pruned path
+      stack ++= mid
+      powerset prepend (new ListBuffer[Node]())
+      while (!stack.isEmpty) {
+        val node = stack.pop
+        for (i <- powerset.size - 1 to 0) {
+          val list = poweset(i).clone
+          list prepend node
+          powerset prepend list
         }
       }
-      */
 
-      reports(throughSets)      
-    }
+      // Net collections for each node in the pruend path
+      var index = 0
+      for (node <- mid) {
+        val nodeName = getSignalName(node)
+        val collection = "set nets%d %s\n".format(index, nodeName)
+        tcl append collection
+        collections(node) = collection
+      }
 
-    for (path <- paths) {
-      val pathToString = (getSignalName(path.head) /: path.tail) ( _ + " -> " + getSignalName(_))
-      tcl.append(cmdhead + "echo \"\\n" + pathToString + "\"" + cmdtail)
-      // ChiselError.info(pathToString)
-
-      val start = path.head
-      val via = path.tail.init
-      val end = path.last
-      
-      (start, end) match {
+      // Report command with conditions
+      var isFirst = true
+      val headname = getSignalName(head)
+      val lastname = getSignalName(last)
+      val (from, to) = (head, last) match {
         case (_: Delay, _: Delay) => {
-          val from = " -from [get_pins " + getSignalName(start) + "_reg*/CP]"
-          val to = " -to [get_pins " + getSignalName(end) + "_reg*/D]"
-          genReports(from, to, via, end)
+          ( "-from [get_pins %s_reg*/CP %s_reg*/CLK] ".format(headname, headname),
+            "-to [get_pins %s_reg*/D] ".forname(lastname) )
         }
         case (_: Delay, bits: Bits) if bits.dir == OUTPUT => {
-          val from = " -from [get_pins " + getSignalName(start) + "_reg*/CP]"
-          val to = " -to " + getSignalName(end)
-          genReports(from, to, via, end)
+          ( "-from [get_pins %s_reg*/CP %s_reg*/CLK] ".format(headname, headname),
+            "-to %s ".forname(lastname) )
         }
         case (bits: Bits, _: Delay) if bits.dir == INPUT => {
-          val from = " -from " + getSignalName(start)
-          val to = " -to [get_pins " + getSignalName(end) + "_reg*/D]"
-          genReports(from, to, via, end)
+          ( "-from %s ".format(headname), "-to [get_pins %s_reg*/D] ".forname(lastname) )
         }
         case (input: Bits, output: Bits) if input.dir == INPUT && output.dir == OUTPUT => {
-          val from = " -from " + getSignalName(start)
-          val to = " -to " + getSignalName(end)
-          genReports(from, to, via, end)
+          ( "-from %s ".format(headname), "-to %s ".forname(lastname) )
         }
-        case (_, _) =>
+        // It shouldn't happen
+        // Todo: handle it as an exception
+        case (_, _) => ("", "")
       }
-    }
 
-    tcl.append("\nwrite -f verilog -hierarchy -output " + m.name + ".mapped.v\n\n")
-    tcl.append("exit\n")
+      if (powerset.size <= 1) {
+        tcl append (cmdhead + "report_timing " + from + to + cmdopt + cmdtail)
+      } else {
+        val report = new StringBuilder
+        for (list <- powerset) {
+          if (!(list isEmpty)) {
+            // Conditions
+            if (isFirst) {
+              report append "\tif { "
+              isFirst = false
+            } else {
+              report append "\telseif { "
+            }
+ 
+            val listhaed = list.head
+            val listtail = list.tail
+          
+            val headnets = collections(listhead)
+            report append " $%s != {}".format(headnets)
+            for (node <- listtail) {
+              val nets = collections(node)
+              report append " && $%s != {}".format(nets)
+            }
+            report append "} {\n\t"
 
-    // ChiselError.info(tcl.toString) 
+            // Reports
+            val throughs = ("" /: list) (_ + "-through %s ".format(getSignalName(_)))
+            report append (cmdhead + "report_timing " + from + throughs + to + cmdopt + cmdtail)
+            report append "}\n"
+          }
 
+          tcl append report.result
+          report.clear
+        }
+      }
+      
+      mid.clear
+      powerset.clear
+      stack.clear      
+      collections.clear
+      if (tcl.capacity > tclthreshold) {
+        tclfile write tcl.result
+        tclfile.flush
+        tcl.clear
+      }
+    } 
+
+    // Save the result
+    tcl append "\nwrite -f verilog -hierarchy -output %s.mapped.v\n\n".format(m.name)
+  
     try {
-      tclfile.write(tcl.toString)
+      tclfile write tcl.result
     } finally {
-      tclfile.close()
+      tclfile.close
     }
   }
 
-  private def executeDC(filename: String = "gentcl.tcl") = {
-    val basedir = ensureDir(Module.targetDir)
-    val dcsyndir  = ensureDir(basedir+"dc-syn")
+  private def executeDC() = {
+    // Copy the dcsetup.tcl file into the targetDir
+    val resourceStream = getClass getResouceAsStream "../resources/dcsetup.tcl"
+    if (resourceStream != null) {
+      val dcsetupFile =  new java.io.FileWriter(dcsyndir+"dcsetup.tcl")
+      while(resourceStream.available > 0) {
+        dcsetupFile write (resouceStream read)
+      }
+      dcsetupFile.close
+      resourceStream.close 
+    }
+
+    // Execute Design Compiler
     ChiselError.info("Donggyu: start Design Compiler")
-    val cmd = "make dc"
-    // val cmd = "dc_shell -64bit -f " + dcsyndir + filename
+    val cmd = "cd %s; dc_shell -64bit -f dcsetup.tcl".format(dcsyndir)
     val c = Process(cmd).!
     ChiselError.info("Donggyu: finish Design Compiler")
   }
