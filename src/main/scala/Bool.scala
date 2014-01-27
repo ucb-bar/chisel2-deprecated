@@ -93,22 +93,18 @@ object LogicalAnd {
 
 
 object LogicalOr {
-  def apply( left: Bits, right: Bits): Bool = {
-    Bool(
-      if (left.isConst) {
-        if( left.node.asInstanceOf[Literal].value > 0 ) {
-          left.node // alias to true
-        } else {
-          right.lvalue()
-        }
-      } else if( right.isConst ) {
-        if( right.node.asInstanceOf[Literal].value > 0 ) {
-          right.node // alias to true
-        } else {
-          left.lvalue()
-        }
-      } else {
-        new LogicalOrOp(left.lvalue(), right.lvalue())
-      })
+  def apply(left: Bits, right: Bits): Bool =
+    Bool(apply(left.lvalue, right.lvalue))
+
+  // Internal version to avoid duplication of constant folding logic
+  def apply(left: Node, right: Node): Node = {
+    if (left.isConst) {
+      if (left.asInstanceOf[Literal].value > 0) left
+      else right
+    } else if (right.isConst) {
+      apply(right, left)
+    } else {
+      new LogicalOrOp(left, right)
+    }
   }
 }

@@ -59,50 +59,42 @@ object MuxCase {
 
 object Mux {
   def apply[T <: Data](t: Bool, c: T, a: T): T = {
-    val op =
-      if( t.node.isInstanceOf[Literal] ) {
-        if( t.node.asInstanceOf[Literal].value == 0 ) a.toBits.lvalue() else c.toBits.lvalue()
-      } else if( c.toBits.node.isInstanceOf[Literal] && a.toBits.node.isInstanceOf[Literal]) {
-        if (c.toBits.node.asInstanceOf[Literal].value
-          == a.toBits.node.asInstanceOf[Literal].value) {
-          c.toBits.node
-        } else if (c.toBits.node.asInstanceOf[Literal].value == 1
-          && a.toBits.node.asInstanceOf[Literal].value == 0) {
-          /* special case where we can use the cond itself. */
-          if(c.toBits.node.width == 1 && a.toBits.node.width == 1) {
-            t.toBits.node
-          } else {
-            new CatOp(new FillOp(Literal(0,1),
-              max(c.toBits.node.width-1, a.toBits.node.width-1)), t.node)
-          }
-        } else if (c.toBits.node.asInstanceOf[Literal].value == 0
-          && a.toBits.node.asInstanceOf[Literal].value == 1) {
-          /* special case where we can use the cond itself. */
-          if(c.toBits.node.width == 1 && a.toBits.node.width == 1) {
-            new BitwiseRevOp(t.lvalue())
-          } else {
-            new CatOp(new FillOp(Literal(0,1),
-              max(c.toBits.node.width-1, a.toBits.node.width-1)),
-              new BitwiseRevOp(t.lvalue()))
-          }
-        } else {
-          new MuxOp(t.lvalue(), c.toBits.lvalue(), a.toBits.lvalue())
-        }
-      } else if (a.toBits.node.isInstanceOf[MuxOp]
-        && c.toBits.node.clearlyEquals(a.toBits.node.inputs(1))) {
-        new MuxOp(new LogicalOrOp(
-          t.lvalue(), a.toBits.node.inputs(0)), c.toBits.node, a.toBits.node.inputs(2))
-      } else {
-        new MuxOp(t.lvalue(), c.toBits.lvalue(), a.toBits.lvalue())
-      }
     /* XXX Cannot use classTag on Bundle/Vec until we solve
      the cloning issue. Passed that there is also the type erasure
      issue when executing a VecMux from a VecReference.
     val result = m.runtimeClass.newInstance.asInstanceOf[T]
      */
     val result = a.clone
-    result.fromBits(UInt(op))
+    result.fromBits(UInt(Mux(t.lvalue, c.toBits.lvalue, a.toBits.lvalue)))
     result
+  }
+
+  // Internal Node version to avoid duplicating constant folding logic
+  def apply(t: Node, c: Node, a: Node): Node = {
+    if (t.isConst) {
+      if (t.asInstanceOf[Literal].value == 0) a else c
+    } else if (c.isInstanceOf[Literal] && a.isInstanceOf[Literal]) {
+      if (c.asInstanceOf[Literal].value == a.asInstanceOf[Literal].value &&
+          c.width == a.width) {
+        c
+      } else if (c.asInstanceOf[Literal].value == 1 &&
+                 a.asInstanceOf[Literal].value == 0 &&
+                 c.width == 1 && a.width == 1) {
+        // Transform Mux(t, 1, 0) into t
+        t
+      } else if (c.asInstanceOf[Literal].value == 0 &&
+                 a.asInstanceOf[Literal].value == 1 &&
+                 c.width == 1 && a.width == 1) {
+        // Transform Mux(t, 0, 1) into !t
+        LogicalNeg(t)
+      } else {
+        new MuxOp(t, c, a)
+      }
+    } else if (a.isInstanceOf[MuxOp] && c.clearlyEquals(a.inputs(1))) {
+      new MuxOp(new LogicalOrOp(t, a.inputs(0)), c, a.inputs(2))
+    } else {
+      new MuxOp(t, c, a)
+    }
   }
 }
 

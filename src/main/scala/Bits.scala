@@ -111,7 +111,7 @@ abstract class Bits extends Data {
   /** Returns ``true`` when this Bits instance is bound to a ``Node``
     that generates a constant signal.
     */
-  def isConst: Boolean = node != null && node.isInstanceOf[Literal]
+  def isConst: Boolean = node != null && node.isConst
   def asConst: Literal = node.asInstanceOf[Literal]
 
   /** Returns the lvalue associated with the node */
@@ -519,14 +519,16 @@ object LeftShift {
 
 
 object LogicalNeg {
-  def apply( opand: Bits): Bool = {
-    Bool(
-      if( opand.isConst ) {
-        if( opand.node.asInstanceOf[Literal].value == 0) Literal(1)
-        else Literal(0)
-      } else {
-        new LogicalNegOp(opand.lvalue())
-      })
+  def apply(opand: Bits): Bool = Bool(apply(opand.lvalue))
+
+  // Internal version to avoid duplication of constant folding logic
+  def apply(opand: Node): Node = {
+    if (opand.isConst) {
+      if (opand.asInstanceOf[Literal].value == 0) Literal(1)
+      else Literal(0)
+    } else {
+      new LogicalNegOp(opand)
+    }
   }
 }
 

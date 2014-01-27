@@ -191,6 +191,7 @@ abstract class Node extends nameable {
       + "[" + width + "]")
   }
 
+  def isConst: Boolean = false
   // XXX These are only true for UInt
   def maxNum: BigInt = (BigInt(1) << width) - 1
   def minNum: BigInt = BigInt(0)
