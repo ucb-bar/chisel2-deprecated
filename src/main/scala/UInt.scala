@@ -99,9 +99,9 @@ class UInt extends Bits /* with Numeric[UInt] */ {
   def >= (b: UInt): Bool = b <= this
 
   //UInt op SInt arithmetic
-  def +   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "+"));
-  def -   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "-"));
-  def *   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "u*s"));
-  def %   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "u%s"));
-  def /   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "u/s"));
+  def +   (b: SInt): SInt = b + this
+  def *   (b: SInt): SInt = b * this
+  def -   (b: SInt): SInt = this.zext - b
+  def /   (b: SInt): SInt = this.zext / b
+  def %   (b: SInt): SInt = this.zext % b
 }

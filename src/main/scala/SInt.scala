@@ -112,10 +112,10 @@ class SInt extends Bits {
   def -  (b: SInt): SInt = newBinaryOp(b, "-");
 
   //SInt to UInt arithmetic
-  def +   (b: UInt): SInt = this + b.zext;
-  def -   (b: UInt): SInt = this - b.zext;
-  def *   (b: UInt): SInt = newBinaryOp(b.zext, "s*u");
-  def /   (b: UInt): SInt = newBinaryOp(b.zext, "s/u");
-  def %   (b: UInt): SInt = newBinaryOp(b.zext, "s%u");
+  def * (b: UInt): SInt = newBinaryOp(b.zext, "s*u")
+  def + (b: UInt): SInt = this + b.zext
+  def - (b: UInt): SInt = this - b.zext
+  def / (b: UInt): SInt = this / b.zext
+  def % (b: UInt): SInt = this % b.zext
   def abs: UInt = Mux(this < SInt(0), (-this).toUInt, this.toUInt)
 }
