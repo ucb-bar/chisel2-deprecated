@@ -91,10 +91,21 @@ object Reverse
 {
   def doit(in: UInt, base: Int, length: Int): UInt =
   {
-    val half = (1 << log2Up(length))/2
     if (length == 1) {
       in(base)
+    } else if (isPow2(length) && length >= 8 && length <= 64) {
+      // Do it in logarithmic time to speed up C++.  Neutral for real HW.
+      var res = in
+      var shift = length >> 1
+      var mask = UInt((BigInt(1) << length) - 1, length)
+      do {
+        mask = mask ^ (mask(length-shift-1,0) << UInt(shift))
+        res = ((res >> UInt(shift)) & mask) | (res(length-shift-1,0) << UInt(shift) & ~mask)
+        shift = shift >> 1
+      } while (shift > 0)
+      res
     } else {
+      val half = (1 << log2Up(length))/2
       Cat(doit(in, base, half), doit(in, base + half, length - half))
     }
   }
