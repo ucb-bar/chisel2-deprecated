@@ -73,20 +73,20 @@ class VcdBackend extends Backend {
   override def emitDec(node: Node): String =
     if (Module.isVCD && node.isInVCD) "  dat_t<" + node.width + "> " + emitRef(node) + "__prev" + ";\n" else ""
 
-  def dumpVCDScope(c: Module, file: java.io.FileWriter, top: Module, names: HashMap[Node, String]): Unit = {
-    file.write("    fprintf(f, \"" + "$scope module " + c.name + " $end" + "\\n\");\n");
+  def dumpVCDScope(c: Module, write: String => Unit, top: Module, names: HashMap[Node, String]): Unit = {
+    write("    fprintf(f, \"" + "$scope module " + c.name + " $end" + "\\n\");\n");
     for (mod <- top.omods) {
       if (mod.component == c && mod.isInVCD) {
-        file.write("    fprintf(f, \"$var wire " + mod.width + " " + names(mod) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\");\n");
+        write("    fprintf(f, \"$var wire " + mod.width + " " + names(mod) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\");\n");
       }
     }
     for (child <- c.children) {
-      dumpVCDScope(child, file, top, names);
+      dumpVCDScope(child, write, top, names);
     }
-    file.write("    fprintf(f, \"$upscope $end\\n\");\n");
+    write("    fprintf(f, \"$upscope $end\\n\");\n");
   }
 
-  def dumpVCD(c: Module, file: java.io.FileWriter): Unit = {
+  def dumpVCD(c: Module, write: String => Unit): Unit = {
     var num = 0;
     val names = new HashMap[Node, String];
     for (mod <- c.omods) {
@@ -95,23 +95,23 @@ class VcdBackend extends Backend {
         num += 1;
       }
     }
-    file.write("void " + c.name + "_t::dump(FILE *f, int t) {\n");
+    write("void " + c.name + "_t::dump(FILE *f, int t) {\n");
     if (Module.isVCD) {
-      file.write("  if (t == 0) {\n");
-      file.write("    fprintf(f, \"$timescale 1ps $end\\n\");\n");
-      dumpVCDScope(c, file, c, names);
-      file.write("    fprintf(f, \"$enddefinitions $end\\n\");\n");
-      file.write("    fprintf(f, \"$dumpvars\\n\");\n");
-      file.write("    fprintf(f, \"$end\\n\");\n");
-      file.write("  }\n");
-      file.write("  fprintf(f, \"#%d\\n\", t);\n");
+      write("  if (t == 0) {\n");
+      write("    fprintf(f, \"$timescale 1ps $end\\n\");\n");
+      dumpVCDScope(c, write, c, names);
+      write("    fprintf(f, \"$enddefinitions $end\\n\");\n");
+      write("    fprintf(f, \"$dumpvars\\n\");\n");
+      write("    fprintf(f, \"$end\\n\");\n");
+      write("  }\n");
+      write("  fprintf(f, \"#%d\\n\", t);\n");
       for (mod <- c.omods) {
         if (mod.isInVCD && mod.name != "reset") {
-          file.write(emitDef(mod, names(mod)));
+          write(emitDef(mod, names(mod)));
         }
       }
     }
-    file.write("}\n");
+    write("}\n");
   }
 
 }

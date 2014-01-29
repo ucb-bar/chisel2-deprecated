@@ -11,19 +11,6 @@ void NameSuite_DebugComp_1_t::init ( bool rand_init ) {
   nodes.push_back(debug_node_t("NameSuite_DebugComp_1.dpath.io_ctrl_out", &NameSuite_DebugComp_1_dpath__io_ctrl_out));
   nodes.push_back(debug_node_t("NameSuite_DebugComp_1.io_ctrl_out", &NameSuite_DebugComp_1__io_ctrl_out));
 }
-void NameSuite_DebugComp_1_t::clock_lo ( dat_t<1> reset ) {
-  { NameSuite_DebugComp_1_dpath__reset.values[0] = reset.values[0]; }
-  { NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0] = NameSuite_DebugComp_1__io_ctrl_wb_wen.values[0]; }
-  { NameSuite_DebugComp_1_dpath__wb_wen.values[0] = NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0]||NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]; }
-  val_t T0__w0;
-  { val_t __mask = -NameSuite_DebugComp_1_dpath__wb_wen.values[0]; T0__w0 = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0] ^ ((NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0] ^ NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0]) & __mask); }
-  { NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow.values[0] = TERNARY(NameSuite_DebugComp_1_dpath__reset.values[0], 0x0L, T0__w0); }
-  { NameSuite_DebugComp_1_dpath__io_ctrl_out.values[0] = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]; }
-  { NameSuite_DebugComp_1__io_ctrl_out.values[0] = NameSuite_DebugComp_1_dpath__io_ctrl_out.values[0]; }
-}
-void NameSuite_DebugComp_1_t::clock_hi ( dat_t<1> reset ) {
-  NameSuite_DebugComp_1_dpath__wb_reg_ll_wb = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow;
-}
 int NameSuite_DebugComp_1_t::clock ( dat_t<1> reset ) {
   uint32_t min = ((uint32_t)1<<31)-1;
   if (clk_cnt < min) min = clk_cnt;
@@ -75,4 +62,17 @@ void NameSuite_DebugComp_1_t::dump(FILE *f, int t) {
   if (t == 0 || (NameSuite_DebugComp_1__io_ctrl_out != NameSuite_DebugComp_1__io_ctrl_out__prev).to_bool())
     dat_dump(f, NameSuite_DebugComp_1__io_ctrl_out, "N6");
   NameSuite_DebugComp_1__io_ctrl_out__prev = NameSuite_DebugComp_1__io_ctrl_out;
+}
+void NameSuite_DebugComp_1_t::clock_lo ( dat_t<1> reset ) {
+  { NameSuite_DebugComp_1_dpath__reset.values[0] = reset.values[0]; }
+  { NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0] = NameSuite_DebugComp_1__io_ctrl_wb_wen.values[0]; }
+  { NameSuite_DebugComp_1_dpath__wb_wen.values[0] = NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0]||NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]; }
+  val_t T0__w0;
+  { val_t __mask = -NameSuite_DebugComp_1_dpath__wb_wen.values[0]; T0__w0 = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0] ^ ((NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0] ^ NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0]) & __mask); }
+  { NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow.values[0] = TERNARY(NameSuite_DebugComp_1_dpath__reset.values[0], 0x0L, T0__w0); }
+  { NameSuite_DebugComp_1_dpath__io_ctrl_out.values[0] = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]; }
+  { NameSuite_DebugComp_1__io_ctrl_out.values[0] = NameSuite_DebugComp_1_dpath__io_ctrl_out.values[0]; }
+}
+void NameSuite_DebugComp_1_t::clock_hi ( dat_t<1> reset ) {
+  NameSuite_DebugComp_1_dpath__wb_reg_ll_wb = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow;
 }

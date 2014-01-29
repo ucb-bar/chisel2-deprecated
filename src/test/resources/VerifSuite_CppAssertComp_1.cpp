@@ -7,14 +7,6 @@ void VerifSuite_CppAssertComp_1_t::init ( bool rand_init ) {
   nodes.push_back(debug_node_t("VerifSuite_CppAssertComp_1.io_x", &VerifSuite_CppAssertComp_1__io_x));
   nodes.push_back(debug_node_t("VerifSuite_CppAssertComp_1.io_z", &VerifSuite_CppAssertComp_1__io_z));
 }
-void VerifSuite_CppAssertComp_1_t::clock_lo ( dat_t<1> reset ) {
-  val_t T1__w0;
-  { T1__w0 = VerifSuite_CppAssertComp_1__io_y.values[0] | VerifSuite_CppAssertComp_1__io_x.values[0] << 8; }
-  { VerifSuite_CppAssertComp_1__io_z.values[0] = T1__w0; }
-  ASSERT(reset.values[0], "failure");
-}
-void VerifSuite_CppAssertComp_1_t::clock_hi ( dat_t<1> reset ) {
-}
 int VerifSuite_CppAssertComp_1_t::clock ( dat_t<1> reset ) {
   uint32_t min = ((uint32_t)1<<31)-1;
   if (clk_cnt < min) min = clk_cnt;
@@ -30,4 +22,12 @@ bool VerifSuite_CppAssertComp_1_t::scan ( FILE* f ) {
   return(!feof(f));
 }
 void VerifSuite_CppAssertComp_1_t::dump(FILE *f, int t) {
+}
+void VerifSuite_CppAssertComp_1_t::clock_lo ( dat_t<1> reset ) {
+  val_t T1__w0;
+  { T1__w0 = VerifSuite_CppAssertComp_1__io_y.values[0] | VerifSuite_CppAssertComp_1__io_x.values[0] << 8; }
+  { VerifSuite_CppAssertComp_1__io_z.values[0] = T1__w0; }
+  ASSERT(reset.values[0], "failure");
+}
+void VerifSuite_CppAssertComp_1_t::clock_hi ( dat_t<1> reset ) {
 }
