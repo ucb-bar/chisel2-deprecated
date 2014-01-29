@@ -9,6 +9,7 @@ abstract class AutoNode {
   var delay = 0.0
   var isSource = false
   var isSink = false
+  var isDecoupledIO = false
   val stages = new ArrayBuffer[Int]
   var isUserAnnotated = false
   val inputs = new ArrayBuffer[AutoNode]
@@ -16,6 +17,17 @@ abstract class AutoNode {
   override def toString() : String = {
     return name
   }
+  def findStage(node: Node, annotatedStages: HashMap[Node, Int]) = {
+    if(annotatedStages.contains(node)){
+      if(stages.isEmpty){
+        stages += annotatedStages(node)
+        isUserAnnotated = true
+      } else {
+        Predef.assert(annotatedStages(node) == stages(0), "all chiselNodes in the AutoNode must be annotated with same stage")
+      }
+    }
+  }
+
 }
 
 class AutoLogic extends AutoNode {

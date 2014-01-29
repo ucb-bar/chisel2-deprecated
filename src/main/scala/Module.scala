@@ -289,6 +289,7 @@ object Module {
   val tMemReadAddrs = new HashSet[Node]
   val inputNodes = new HashSet[Node] //list of all module Input Nodes
   val outputNodes = new HashSet[Node] //list of all module Output Nodes
+  val ioNodes = new HashSet[DecoupledIO[Data]]// of all module ioNodes in the form of DecoupledIO
   val variableLatencyUnitInputs = new HashSet[Node]// list of all variable latency unit input nodes
   val variableLatencyUnitOutputs = new HashSet[Node]// list of all variable latency unit output nodes
 
@@ -367,14 +368,16 @@ object Module {
   }
   def setRegReadStage(node: Node, stage: Int) = {
     val reg = node
-    Predef.assert(!(annotatedStages.contains(reg) && annotatedStages(reg) != stage), reg.name + " already annotated as stage " + annotatedStages(reg))
-    annotatedStages(reg) = stage
+    if(!annotatedStages.contains(reg)){
+      annotatedStages(reg) = stage
+    }
   }
   def setRegWriteStage(node: Node, stage: Int) = {
     val reg = node
     for(producer <- reg.getProducers()){
-      Predef.assert(!(annotatedStages.contains(producer) && annotatedStages(producer) != stage), producer.name + " already annotated as stage " + annotatedStages(producer))
-      annotatedStages(producer) = stage
+      if(!annotatedStages.contains(producer)){
+        annotatedStages(producer) = stage
+      }
     }
   }
   def setTmemReadStage(tmem: TransactionMem[_], stage: Int) = {
@@ -382,10 +385,12 @@ object Module {
       val readPoint = tmem.io.reads(i)
       val readAddr = readPoint.adr.asInstanceOf[Node]
       val readData = readPoint.dat.asInstanceOf[Node]
-      Predef.assert(!(annotatedStages.contains(readAddr) && annotatedStages(readAddr) != stage), readAddr.name + " already annotated as stage " + annotatedStages(readAddr))
-      annotatedStages(readAddr) = stage
-      Predef.assert(!(annotatedStages.contains(readData) && annotatedStages(readData) != stage), readData.name + " already annotated as stage " + annotatedStages(readData))
-      annotatedStages(readData) = stage
+      if(!annotatedStages.contains(readAddr)){
+        annotatedStages(readAddr) = stage
+      }
+      if(!annotatedStages.contains(readData)){
+        annotatedStages(readData) = stage
+      }
     }
   }
   def setTmemWriteStage(tmem: TransactionMem[_], stage: Int) = {
@@ -394,12 +399,15 @@ object Module {
       val writeAddr = writePoint.actualWaddr
       val writeEn = writePoint.actualWen
       val writeData = writePoint.actualWdata
-      Predef.assert(!(annotatedStages.contains(writeAddr) && annotatedStages(writeAddr) != stage), writeAddr.name + " already annotated as stage " + annotatedStages(writeAddr))
-      annotatedStages(writeAddr) = stage
-      Predef.assert(!(annotatedStages.contains(writeData) && annotatedStages(writeData) != stage), writeData.name + " already annotated as stage " + annotatedStages(writeData))
-      annotatedStages(writeData) = stage
-      Predef.assert(!(annotatedStages.contains(writeEn) && annotatedStages(writeEn) != stage), writeEn.name + " already annotated as stage " + annotatedStages(writeEn))
-      annotatedStages(writeEn) = stage
+      if(!annotatedStages.contains(writeAddr)){
+        annotatedStages(writeAddr) = stage
+      }
+      if(!annotatedStages.contains(writeData)){
+        annotatedStages(writeData) = stage
+      }
+      if(!annotatedStages.contains(writeEn)){
+        annotatedStages(writeEn) = stage
+      }
     }
   }
   def setInputStage(stage: Int) = {
@@ -414,6 +422,19 @@ object Module {
     for(output <- outputs){
       Predef.assert(!annotatedStages.contains(output), output.name + " already annotated as stage " + annotatedStages(output))
       annotatedStages(output) = stage
+    }
+  }
+  def setDecoupledIOStage(decoupledIO: DecoupledIO[Data], stage: Int) = {
+    if(!annotatedStages.contains(decoupledIO.ready)){
+      annotatedStages(decoupledIO.ready) = stage
+    }
+    if(!annotatedStages.contains(decoupledIO.valid)){
+      annotatedStages(decoupledIO.valid) = stage
+    }
+    for(data <- decoupledIO.bits.flatten.map(_._2)){
+      if(!annotatedStages.contains(data)){
+        annotatedStages(data) = stage
+      }
     }
   }
   def setVariableLatencyUnitStage(varComp: TransactionalComponent, stage: Int) = {
@@ -1226,12 +1247,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     for((name, io) <- pipelineComponent.io.asInstanceOf[Bundle].elements){
       io match {
         case decoupled: DecoupledIO[Data] => {
-          println(decoupled.ready)
-          println(decoupled.valid)
-          println(decoupled.bits)
+          ioNodes += decoupled  
         }
         case _ => {
-          println("DEBUG0")
+          Predef.assert(false, "all IO must be through the DecoupledIO interface")
         }
       }
     }
@@ -1245,8 +1264,18 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       for(tMem <-TransactionMems){
         Module.setTmemWriteStage(tMem, autoAnnotateStageNum - 1)
       }
-      Module.setInputStage(0)
-      Module.setOutputStage(autoAnnotateStageNum - 1)
+      //Module.setInputStage(0)
+      //Module.setOutputStage(autoAnnotateStageNum - 1)
+      for((name, io) <- pipelineComponent.io.asInstanceOf[Bundle].elements){
+        io match {
+          case decoupled: DecoupledIO[Data] => {
+            setDecoupledIOStage(decoupled, autoAnnotateStageNum/2)
+          }
+          case _ => {
+            Predef.assert(false, "all IO must be through DecoupledIO interfaces")
+          }
+        }
+      }
     }
 
   }
@@ -1372,10 +1401,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       writePoint.name = reg.name + "_writepoint"
       writePoint.isSink = true
       for(producer <- reg.getProducers){
-        if(writePoint.stages.length == 0 && annotatedStages.contains(producer)){
-          writePoint.stages += annotatedStages(producer)
-          writePoint.isUserAnnotated = true
-        }
+        writePoint.findStage(producer, annotatedStages)
         writePoint.inputChiselNodes += producer
         chiselNodeToAutoNodeMap(producer) = writePoint
       }
@@ -1390,14 +1416,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       for(i <- 0 until tMem.readPortNum){
         val readAddr = tMem.io.reads(i).adr
         val readData = tMem.io.reads(i).dat
-        if(readPoint.stages.length == 0 && annotatedStages.contains(readAddr)){
-          readPoint.stages += annotatedStages(readAddr)
-          readPoint.isUserAnnotated = true
-        } 
-        if(readPoint.stages.length == 0 && annotatedStages.contains(readData)){
-          readPoint.stages += annotatedStages(readData)
-          readPoint.isUserAnnotated = true
-        }
+        readPoint.findStage(readAddr, annotatedStages)
+        readPoint.findStage(readData, annotatedStages)
         readPoint.inputChiselNodes += readAddr
         readPoint.outputChiselNodes += readData
         chiselNodeToAutoNodeMap(readAddr) = readPoint
@@ -1412,18 +1432,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         val writeAddr = tMem.io.writes(i).actualWaddr
         val writeData = tMem.io.writes(i).actualWdata
         val writeEn = tMem.io.writes(i).actualWen
-        if(writePoint.stages.length == 0 && annotatedStages.contains(writeAddr)){
-          writePoint.stages += annotatedStages(writeAddr)
-          writePoint.isUserAnnotated = true
-        }
-        if(writePoint.stages.length == 0 && annotatedStages.contains(writeData)){
-          writePoint.stages += annotatedStages(writeData)
-          writePoint.isUserAnnotated = true
-        }
-        if(writePoint.stages.length == 0 && annotatedStages.contains(writeEn)){
-          writePoint.stages += annotatedStages(writeEn)
-          writePoint.isUserAnnotated = true
-        }
+        writePoint.findStage(writeAddr, annotatedStages)
+        writePoint.findStage(writeData, annotatedStages)
+        writePoint.findStage(writeEn, annotatedStages)
         writePoint.inputChiselNodes += writeAddr
         writePoint.inputChiselNodes += writeData
         writePoint.inputChiselNodes += writeEn
@@ -1442,24 +1453,19 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       varLatUnitNode.name = varLatUnit.name
       varLatUnitNode.delay = 5.0
       for(input <- inputs){
-        if(varLatUnitNode.stages.length == 0 && annotatedStages.contains(input)){
-          varLatUnitNode.stages += annotatedStages(input)
-          varLatUnitNode.isUserAnnotated = true
-        }
+        varLatUnitNode.findStage(input, annotatedStages)
         varLatUnitNode.inputChiselNodes += input
         chiselNodeToAutoNodeMap(input) = varLatUnitNode
       }
       for(output <- outputs){
-        if(varLatUnitNode.stages.length == 0 && annotatedStages.contains(output)){
-          varLatUnitNode.stages += annotatedStages(output)
-          varLatUnitNode.isUserAnnotated = true
-        }
+        varLatUnitNode.findStage(output, annotatedStages)
         varLatUnitNode.outputChiselNodes += output
         chiselNodeToAutoNodeMap(output) = varLatUnitNode
       }
       autoNodeGraph += varLatUnitNode 
     }
     
+    /*
     val inputsNode = new AutoLogic
     inputsNode.name = "inputs_node"
     inputsNode.isSource = true
@@ -1486,17 +1492,49 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       chiselNodeToAutoNodeMap(output) = outputsNode
     }
     autoNodeGraph += outputsNode
-    autoSinkNodes += outputsNode
+    autoSinkNodes += outputsNode*/
+    
+    for(io <- ioNodes){
+      val ioNode = new AutoLogic
+      ioNode.name = "io_node"
+      ioNode.isDecoupledIO = true
+      val dataBits = io.bits.flatten.map(_._2)
+      
+      ioNode.findStage(io.ready, annotatedStages)
+      if(io.ready.dir == INPUT){
+        ioNode.outputChiselNodes += io.ready
+      } else {
+        ioNode.inputChiselNodes += io.ready
+      }
+      chiselNodeToAutoNodeMap(io.ready) = ioNode
+
+      ioNode.findStage(io.valid, annotatedStages)
+      if(io.valid.dir == INPUT){
+        ioNode.outputChiselNodes += io.valid
+      } else {
+        ioNode.inputChiselNodes += io.valid
+      }
+      chiselNodeToAutoNodeMap(io.valid) = ioNode
+
+      for(data <- dataBits){
+        ioNode.findStage(data, annotatedStages)
+        if(data.dir == INPUT){
+          ioNode.outputChiselNodes += data
+        } else {
+          ioNode.inputChiselNodes += data
+        }
+        chiselNodeToAutoNodeMap(data) = ioNode
+      }
+      autoNodeGraph += ioNode
+    }
+    
 
     for(node <- requireStageSet){
       if(!isSource(node) && !isSink(node)){
         val autoNode = new AutoLogic
         autoNode.name = node.name
         autoNode.delay = node.delay
-        if(annotatedStages.contains(node)){
-          autoNode.stages += annotatedStages(node)
-          autoNode.isUserAnnotated = true
-        }
+        autoNode.findStage(node, annotatedStages)
         autoNode.inputChiselNodes += node
         autoNode.outputChiselNodes += node
         chiselNodeToAutoNodeMap(node) = autoNode
@@ -1515,10 +1553,18 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           }
         }
       }
+      if(autoNode.inputs.isEmpty){
+        autoNode.isSource = true
+        autoSourceNodes += autoNode
+      }
       for(output <- autoNode.asInstanceOf[AutoLogic].outputChiselNodes){
         for(consumer <- output.consumers.filter(requireStage(_))){
           autoNode.consumers += chiselNodeToAutoNodeMap(consumer)
         }
+      }
+      if(autoNode.consumers.isEmpty){
+        autoNode.isSink = true
+        autoSinkNodes += autoNode
       }
     }
 
@@ -1551,7 +1597,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
           //fix consumers pointers on input
           for(j <- 0 until input.consumers.length){
-            if(input.consumers(j) == currentNode){
+            if(input.consumers(j) == currentNode){//FIX THIS: this assumes that any consumer of input only goes into one of the input ports of input
               input.consumers(j) = autoWire
             }
           }
@@ -1727,7 +1773,73 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
     visualizeAutoLogicGraph(autoNodes, "stages.gv")
   }
-  
+ 
+  def separateIONodes(autoNodes: ArrayBuffer[AutoNode]) = {
+    //external state:
+    //autoNodes
+    //chiselNodetoAutoNodeMap
+    //autoSourceNodes
+    //autoSinkNodes
+    for(autoNode <- autoNodes.filter(_.isDecoupledIO).map(_.asInstanceOf[AutoLogic])){
+      val inputNode = new AutoLogic
+      inputNode.name = "input"
+      inputNode.isSource = true
+      for(stage <- autoNode.stages){
+        inputNode.stages += stage
+      }
+      if(!inputNode.stages.isEmpty){
+        inputNode.isUserAnnotated = true
+      }
+      for(consumer <- autoNode.consumers){
+        inputNode.consumers += consumer
+        for(i <- 0 until consumer.inputs.length){
+          if(consumer.inputs(i) == autoNode){
+            consumer.inputs(i) = inputNode
+          }
+        }
+      }
+      for(outputChiselNode <- autoNode.outputChiselNodes){
+        inputNode.outputChiselNodes += outputChiselNode
+      }
+      autoNodes += inputNode
+      autoSourceNodes += inputNode
+      
+      val outputNode = new AutoLogic
+      outputNode.name = "output"
+      outputNode.isSink = true
+      for(stage <- autoNode.stages){
+        outputNode.stages += stage
+      }
+      if(!outputNode.stages.isEmpty){
+        outputNode.isUserAnnotated = true
+      }
+      for(input <- autoNode.inputs){
+        outputNode.inputs += input
+        for(i <- 0 until input.consumers.length){
+          if(input.consumers(i) == autoNode){
+            input.consumers(i) = outputNode
+          }
+        }
+      }
+      for(inputChiselNode <- autoNode.inputChiselNodes){
+        outputNode.inputChiselNodes += inputChiselNode
+      }
+      for(inputAutoNode <- autoNode.inputMap.keys){
+        outputNode.inputMap(inputAutoNode) = autoNode.inputMap(inputAutoNode)
+      }
+      autoNodes += outputNode
+      autoSinkNodes += outputNode
+
+      autoNodes -= autoNode
+      if(autoSourceNodes.contains(autoNode)){
+        autoSourceNodes -= autoNode
+      }
+      if(autoSinkNodes.contains(autoNode)){
+        autoSinkNodes -= autoNode
+      }
+    }
+  }
+
   def optimizeRegisterPlacement(autoNodes: ArrayBuffer[AutoNode]) = { 
     val nodeArrivalTimes = new HashMap[AutoNode, Double]
     val forwardArrivalTimes = new HashMap[AutoNode, Double]
@@ -1747,6 +1859,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         if(arrivalTimes.contains(node)){
           return arrivalTimes(node)
         } else if(node.stages.length > 1 && (node.stages(0) != node.stages(1))) {
+          arrivalTimes(node) = 0.0
+          return 0.0
+        } else if(node.isDecoupledIO){
           arrivalTimes(node) = 0.0
           return 0.0
         } else {
@@ -1800,6 +1915,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         def findArrivalTime(node: AutoNode) : Double = {
           if(nodeArrivalTimes.contains(node)){
             return nodeArrivalTimes(node)
+          } else if(node.isDecoupledIO){
+            nodeArrivalTimes(node) = 0.0
+            return 0.0
           } else {
             var arrivalTime: Double= 0.0
             val parents = new ArrayBuffer[AutoNode]
@@ -1850,7 +1968,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       //find nodes from possibleMoveNodes that can have the pipeline boundary be legally moved in "direction" accross the node and store them in eligibleMoveNodes
       def findEligibleNodes(direction: Direction) = {
         for(node <- possibleMoveNodes){
-          if(!node.isUserAnnotated && node.isInstanceOf[AutoLogic] && !node.isSource && !node.isSink){
+          if((!node.isUserAnnotated || node.isDecoupledIO) && node.isInstanceOf[AutoLogic] && !node.isSource && !node.isSink){
             val nodeStage = node.stages(0)
             var parentsEligible = true
             val parents = new ArrayBuffer[AutoNode]
@@ -2009,8 +2127,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     println("max delay after optimizeation: " + stageDelays.max)
     println("iteration count: " + iterCount)
     visualizeAutoLogicGraph(autoNodes, "stages.gv")
-    //visualizeGraph(forwardArrivalTimes, "fdelays.gv")
-    //visualizeGraph(backwardArrivalTimes, "bdelays.gv")
+    visualizeAutoLogicGraph(forwardArrivalTimes, "fdelays.gv")
+    visualizeAutoLogicGraph(backwardArrivalTimes, "bdelays.gv")
   }
   
   def visualizeAutoLogicGraph(autoNodes: ArrayBuffer[AutoNode], fileName: String) = {
@@ -2029,6 +2147,34 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       nameEnum = nameEnum + 1
     }
     for(node <- autoNodes){
+      if(!node.isSource){
+        for(input <- node.inputs){
+          if(nodeNames.contains(input)){
+            outFile.write(nodeNames(input) + " -> " + nodeNames(node) + ";\n")
+          }
+        }
+      }
+    }
+    outFile.write("}\n")
+    outFile.close
+  }
+
+  def visualizeAutoLogicGraph(autoNodeMap: HashMap[AutoNode, _], fileName: String) = {
+    val outFile = new java.io.FileWriter("/home/eecs/wenyu/auto-pipelining/" + fileName)
+    outFile.write("digraph G {\n")
+    outFile.write("graph [rankdir=LR];\n")
+    var nameEnum = 0
+    val nodeNames = new HashMap[AutoNode, String]
+    for(node <- autoNodeMap.keys){
+      var fillColor = "red"
+      if(node.isInstanceOf[AutoLogic]){
+        fillColor = "green"
+      }
+      outFile.write("n" + nameEnum + " [label=\"" + node.name + " " + """\n""" + node.stages + " " + autoNodeMap(node) + "\"" + ", style = filled, fillcolor = " + fillColor + "];\n")
+      nodeNames(node) = "n" + nameEnum
+      nameEnum = nameEnum + 1
+    }
+    for(node <- autoNodeMap.keys){
       if(!node.isSource){
         for(input <- node.inputs){
           if(nodeNames.contains(input)){
@@ -2478,9 +2624,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         //fix writeEn's consumer list
         val writeEnMuxFillerInput = writePoint.is.inputs(0)//need a less hack way of finding this
         val consumer_index = writeEn.consumers.indexOf(writeEnMuxFillerInput)
-        println("DEBUG0")
-        println(writeEnMuxFillerInput)
-        println(writeEn.consumers)
         Predef.assert(consumer_index > -1)        
         writeEn.consumers(consumer_index) = newWriteEn
         //fix writeEnMux's inputs list
