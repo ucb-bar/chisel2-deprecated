@@ -3,10 +3,8 @@ module NameSuite_Block_1(
     output[4:0] io_irq_cause
 );
 
-  wire[4:0] T0;
 
-  assign io_irq_cause = T0;
-  assign T0 = {3'h0/* 0*/, 2'h2/* 2*/};
+  assign io_irq_cause = 5'h2/* 2*/;
 endmodule
 
 module NameSuite_BindSecondComp_1(

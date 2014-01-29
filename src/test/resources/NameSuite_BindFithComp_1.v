@@ -10,25 +10,21 @@ module NameSuite_Block_2(input clk,
   wire[31:0] T0;
   wire[31:0] T1;
   wire[31:0] T2;
-  wire[31:0] T3;
   reg[31:0] tag_ram_1;
-  wire T4;
+  wire T3;
   reg[31:0] tag_ram_0;
+  wire[31:0] T4;
   wire[31:0] T5;
-  wire[31:0] T6;
-  wire[31:0] T7;
-  wire T8;
+  wire T6;
 
   assign io_out_resp_bits_ppn = T0;
-  assign T0 = T5 | T1;
-  assign T1 = T4 ? T3 : T2;
-  assign T2 = {31'h0/* 0*/, 1'h0/* 0*/};
-  assign T3 = tag_ram_1;
-  assign T4 = tag_ram_0[1'h1/* 1*/:1'h1/* 1*/];
-  assign T5 = T8 ? T7 : T6;
-  assign T6 = {31'h0/* 0*/, 1'h0/* 0*/};
-  assign T7 = tag_ram_0;
-  assign T8 = tag_ram_0[1'h0/* 0*/:1'h0/* 0*/];
+  assign T0 = T4 | T1;
+  assign T1 = T3 ? T2 : 32'h0/* 0*/;
+  assign T2 = tag_ram_1;
+  assign T3 = tag_ram_0[1'h1/* 1*/:1'h1/* 1*/];
+  assign T4 = T6 ? T5 : 32'h0/* 0*/;
+  assign T5 = tag_ram_0;
+  assign T6 = tag_ram_0[1'h0/* 0*/:1'h0/* 0*/];
 
   always @(posedge clk) begin
     if(1'h0/* 0*/) begin

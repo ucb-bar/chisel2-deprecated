@@ -292,6 +292,10 @@ abstract class Bits extends Data with proc {
     }
   }
 
+  override def matchWidth(w: Int): Node =
+    if (isLit && !litOf.isZ) Literal(litOf.value & ((BigInt(1) << w)-1), w)
+    else super.matchWidth(w)
+
   // Operators
   protected final def newUnaryOp(opName: String): this.type = {
     fromNode(UnaryOp(this, opName))
