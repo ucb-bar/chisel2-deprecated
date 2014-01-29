@@ -46,6 +46,11 @@ object UInt {
   def apply(x: String, width: Int): UInt = Lit(x, width){UInt()};
   def apply(x: String, base: Char): UInt = Lit(x, base, -1){UInt()};
   def apply(x: String, base: Char, width: Int): UInt = Lit(x, base, width){UInt()};
+  def apply(x: Node): UInt = {
+    val res = new UInt
+    res.inputs += x
+    res
+  }
 
   def apply(dir: IODirection = null, width: Int = -1): UInt = {
     val res = new UInt();

@@ -135,9 +135,12 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
     }
   }
 
-  def write(addr: UInt, data: T) = doWrite(addr, conds.top, data, null.asInstanceOf[UInt])
+  def write(addr: UInt, data: T): Unit =
+    doWrite(addr, conds.top, data, null.asInstanceOf[UInt])
 
-  def write(addr: UInt, data: T, wmask: UInt) = doWrite(addr, conds.top, data, wmask)
+  def write(addr: UInt, data: T, wmask: UInt): Unit =
+    if (!Module.isInlineMem) doWrite(addr, conds.top, data, wmask)
+    else write(addr, gen().fromBits(data.toBits & wmask | read(addr).toBits & ~wmask))
 
   def apply(addr: UInt): T = {
     val rdata = read(addr)

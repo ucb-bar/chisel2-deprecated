@@ -563,15 +563,14 @@ class CppBackend extends Backend {
     node match {
       case m: MemWrite =>
         // schedule before Reg updates in case a MemWrite input is a Reg
-        if (m.inputs.length == 2) {
-          return ""
-        }
-        def mask(w: Int): String = "(-" + emitLoWordRef(m.cond) + (if (m.isMasked) " & " + emitWordRef(m.mask, w) else "") + ")"
-        block((0 until words(m)).map(i => emitRef(m.mem)
-          + ".put(" + emitLoWordRef(m.addr) + ", " + i
-          + ", (" + emitWordRef(m.data, i) + " & " + mask(i)
-          + ") | (" + emitRef(m.mem) + ".get(" + emitLoWordRef(m.addr)
-          + ", " + i + ") & ~" + mask(i) + "))"))
+        if (m.inputs.length == 2)
+          ""
+        else
+          block((0 until words(m)).map(i =>
+            "if (" + emitLoWordRef(m.cond) + ") " + emitRef(m.mem) +
+            ".put(" + emitLoWordRef(m.addr) + ", " +
+            i + ", " +
+            emitWordRef(m.data, i) + ")"))
 
       case _ =>
         ""

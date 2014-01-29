@@ -582,16 +582,8 @@ class VerilogBackend extends Backend {
 
       case m: MemWrite =>
         if (m.mem.isInline) {
-          val i = "i" + emitTmp(m)
-          if (m.isMasked) {
-            (0 until m.mem.width).map(i =>
-              "    if (" + emitRef(m.cond) + " && " + emitRef(m.mask) + "[" + i + "])\n" +
-                "      " + emitRef(m.mem) + "[" + emitRef(m.addr) + "][" + i + "] <= " + emitRef(m.data) + "[" + i + "];\n"
-            ).reduceLeft(_ + _)
-          } else {
-            "    if (" + emitRef(m.cond) + ")\n" +
-            "      " + emitRef(m.mem) + "[" + emitRef(m.addr) + "] <= " + emitRef(m.data) + ";\n"
-          }
+          "    if (" + emitRef(m.cond) + ")\n" +
+          "      " + emitRef(m.mem) + "[" + emitRef(m.addr) + "] <= " + emitRef(m.data) + ";\n"
         } else {
           ""
         }
