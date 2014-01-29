@@ -73,6 +73,8 @@ class UInt extends Bits /* with Numeric[UInt] */ {
     UInt(x).asInstanceOf[this.type]
   }
 
+  override def toBits: UInt = this
+
   // to support implicit convestions
   def ===(b: UInt): Bool = LogicalOp(this, b, "===")
 
