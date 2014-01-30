@@ -2181,5 +2181,5 @@ class mod_t {
     throw std::runtime_error("Assertion failed: " msg); \
 }
 
-#pragma GCC diagnostic push
+#pragma GCC diagnostic pop
 #endif
