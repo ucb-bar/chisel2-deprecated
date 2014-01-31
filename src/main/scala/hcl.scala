@@ -136,6 +136,7 @@ object chiselMain {
         case "--noCombLoop" => Module.dontFindCombLoop = true
         case "--genHarness" => Module.isGenHarness = true;
         case "--debug" => Module.isDebug = true;
+        case "--cse" => Module.isCSE = true
         case "--ioDebug" => Module.isIoDebug = true;
         case "--noIoDebug" => Module.isIoDebug = false;
         case "--clockGatingUpdates" => Module.isClockGatingUpdates = true;
