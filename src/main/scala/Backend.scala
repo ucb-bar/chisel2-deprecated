@@ -275,6 +275,7 @@ abstract class Backend {
 
   val preElaborateTransforms = ArrayBuffer[(Module) => Unit]()
   val transforms = ArrayBuffer[(Module) => Unit]()
+  if (Module.isCSE) transforms += CSE.transform
   val analyses = ArrayBuffer[(Module) => Unit]()
 
   def initializeDFS: Stack[Node] = {

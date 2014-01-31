@@ -57,6 +57,7 @@ object Module {
   var saveComponentTrace = false
   var dontFindCombLoop = false
   var isDebug = false;
+  var isCSE = false
   var isIoDebug = true;
   var isClockGatingUpdates = false;
   var isClockGatingUpdatesInline = false;

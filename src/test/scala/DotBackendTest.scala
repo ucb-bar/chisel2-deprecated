@@ -42,25 +42,7 @@ import Chisel._
 
 /** This testsuite checks the generation of dot graphs.
 */
-class DotBackendSuite extends AssertionsForJUnit {
-
-  val tmpdir = new TemporaryFolder();
-
-  @Before def initialize() {
-    tmpdir.create()
-  }
-
-  @After def done() {
-    tmpdir.delete()
-  }
-
-  def assertFile( filename: String, content: String ) {
-    val source = scala.io.Source.fromFile(filename, "utf-8")
-    val lines = source.mkString
-    source.close()
-    assert(lines === content)
-  }
-
+class DotBackendSuite extends TestSuite {
 
   /** Checks generation of simple dataflow graph */
   @Test def testSimple() {
@@ -90,27 +72,8 @@ class DotBackendSuite extends AssertionsForJUnit {
 
     chiselMain(Array[String](
       "--backend", "Chisel.DotBackend",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new DAGComp()))
-    assertFile(tmpdir.getRoot() + "/DotBackendSuite_DAGComp_1.dot",
-"""digraph DotBackendSuite_DAGComp_1{
-rankdir = LR;
-  subgraph clustersub{
-    label = "sub"
-    DotBackendSuite_DAGComp_1_sub__io_valid[label="io_valid:Bool"];
-    DotBackendSuite_DAGComp_1_sub__stored[shape=square,label="stored:Reg"];
-    DotBackendSuite_DAGComp_1_sub__io_ready[label="io_ready:Bool"];
-    DotBackendSuite_DAGComp_1_sub__stored -> DotBackendSuite_DAGComp_1_sub__io_valid[label="1"];
-    DotBackendSuite_DAGComp_1_sub__io_ready -> DotBackendSuite_DAGComp_1_sub__stored[label="1"];
-  }
-  T0 -> DotBackendSuite_DAGComp_1_sub__io_ready[label="1"];
-  io_result[label="io_result:Bool"];
-  T0[label="&"];
-  io_data1[label="io_data1:Bool"];
-  io_data0[label="io_data0:Bool"];
-  DotBackendSuite_DAGComp_1_sub__io_valid -> io_result[label="1"];
-  io_data0 -> T0[label="1"];
-  io_data1 -> T0[label="1"];
-}""")
+    assertFile("DotBackendSuite_DAGComp_1.dot")
   }
 }

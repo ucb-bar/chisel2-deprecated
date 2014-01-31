@@ -29,14 +29,10 @@
 */
 
 import scala.collection.mutable.ArrayBuffer
-import org.scalatest.junit.AssertionsForJUnit
 import scala.collection.mutable.ListBuffer
 import org.junit.Assert._
 import org.junit.Test
-import org.junit.Before
-import org.junit.After
 import org.junit.Ignore
-import org.junit.rules.TemporaryFolder;
 
 import Chisel._
 
@@ -51,29 +47,13 @@ class Status extends Bundle {
 /** This testsuite checks the naming of variables in the generated
   verilog and C++ code.
 */
-class NameSuite extends AssertionsForJUnit {
-
-  val tmpdir = new TemporaryFolder();
-
-  @Before def initialize() {
-    tmpdir.create()
-  }
-
-  @After def done() {
-    tmpdir.delete()
-  }
-
-  def assertFile( filename: String, content: String ) {
-    val source = scala.io.Source.fromFile(filename, "utf-8")
-    val lines = source.mkString
-    source.close()
-    assert(lines === content)
-  }
-
+class NameSuite extends TestSuite {
 
   /** Checks names are correctly generated in the presence
    of ListLookups. */
   @Test def testListLookups() {
+    println("\nRunning testListLookups:")
+
     trait Constants {
       val VXCPTHOLD  = UInt("b00000_00000_00000_0001001110_1111011", 32)
       val VCMD_X = UInt(0, 3)
@@ -96,38 +76,16 @@ class NameSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new ListLookupsComp()))
-    assertFile(tmpdir.getRoot() + "/NameSuite_ListLookupsComp_1.v",
-"""module NameSuite_ListLookupsComp_1(
-    input [31:0] io_inst,
-    output io_sigs_valid
-);
-
-  wire T0;
-  reg[0:0] valid;
-  wire T1;
-
-  assign io_sigs_valid = T0;
-  assign T0 = valid;
-  always @(*) begin
-    casez (io_inst)
-      32'b00000000000000000010011101111011/* 0*/ : begin
-        valid = 1'h0/* 0*/;
-      end
-      default: begin
-        valid = 1'h0/* 0*/;
-      end
-    endcase
-  end
-endmodule
-
-""")
+    assertFile("NameSuite_ListLookupsComp_1.v")
   }
 
   /** This test checks names are correctly generated in the presence
    of Binding. */
   @Test def testBindFirst() {
+    println("\nRunning testBindFirst:")
+
     class BlockIO extends Bundle {
       val valid = Bool(INPUT)
       val replay = Bool(OUTPUT)
@@ -164,55 +122,9 @@ endmodule
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new BindFirstComp()))
-   assertFile(tmpdir.getRoot() + "/NameSuite_BindFirstComp_1.v",
-"""module NameSuite_BlockDecoder_1(
-    input  io_valid,
-    output io_replay,
-    output io_sigs_enq_cmdq,
-    output io_sigs_enq_ximm1q
-);
-
-
-  assign io_replay = io_valid;
-endmodule
-
-module NameSuite_BindFirstComp_1(
-    input  valid_common,
-    output io_replay
-);
-
-  wire T0;
-  wire T1;
-  wire T2;
-  wire mask_ximm1q_ready;
-  wire dec_io_sigs_enq_ximm1q;
-  wire T3;
-  wire mask_cmdq_ready;
-  wire dec_io_sigs_enq_cmdq;
-
-  assign io_replay = T0;
-  assign T0 = valid_common && T1;
-  assign T1 = T3 || T2;
-  assign T2 = ! mask_ximm1q_ready;
-  assign mask_ximm1q_ready = ! dec_io_sigs_enq_ximm1q;
-  assign T3 = ! mask_cmdq_ready;
-  assign mask_cmdq_ready = ! dec_io_sigs_enq_cmdq;
-  NameSuite_BlockDecoder_1 dec(
-       //.io_valid(  )
-       //.io_replay(  )
-       .io_sigs_enq_cmdq( dec_io_sigs_enq_cmdq ),
-       .io_sigs_enq_ximm1q( dec_io_sigs_enq_ximm1q )
-  );
-  `ifndef SYNTHESIS
-    assign dec.io_valid = $random();
-    assign dec.io_sigs_enq_cmdq = $random();
-    assign dec.io_sigs_enq_ximm1q = $random();
-  `endif
-endmodule
-
-""")
+   assertFile("NameSuite_BindFirstComp_1.v")
    }
 
   /** Since *vec* is declared within a if() block and not as a Module
@@ -225,6 +137,8 @@ endmodule
     We thus generate a name for the component instance based on its class name.
     */
   @Test def testBindSecond() {
+    println("\nRunning testBindSecond:")
+
     class Block extends Module {
       val io = new Bundle() {
         val irq = Bool(INPUT)
@@ -247,37 +161,9 @@ endmodule
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new BindSecondComp(true)))
-   assertFile(tmpdir.getRoot() + "/NameSuite_BindSecondComp_1.v",
-"""module NameSuite_Block_1(
-    input  io_irq,
-    output[4:0] io_irq_cause
-);
-
-  wire[4:0] T0;
-
-  assign io_irq_cause = T0;
-  assign T0 = {3'h0/* 0*/, 2'h2/* 2*/};
-endmodule
-
-module NameSuite_BindSecondComp_1(
-    input  io_irq,
-    output[5:0] io_irq_cause
-);
-
-  wire[5:0] T0;
-  wire[4:0] NameSuite_Block_1_io_irq_cause;
-
-  assign io_irq_cause = T0;
-  assign T0 = {1'h1/* 1*/, NameSuite_Block_1_io_irq_cause};
-  NameSuite_Block_1 NameSuite_Block_1(
-       .io_irq( io_irq ),
-       .io_irq_cause( NameSuite_Block_1_io_irq_cause )
-  );
-endmodule
-
-""")
+   assertFile("NameSuite_BindSecondComp_1.v")
   }
 
   /** Propagation of bundle field names through bindings
@@ -286,6 +172,8 @@ endmodule
     instead of using a derived name derived from CompIO.
     */
   @Test def testBindThird() {
+    println("\nRunning testBindThird:")
+
     class BankToBankIO extends Bundle {
       val ren    = Bool(INPUT)
     }
@@ -324,54 +212,9 @@ endmodule
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new BindThirdComp()))
-    assertFile(tmpdir.getRoot() + "/NameSuite_BindThirdComp_1.v",
-"""module NameSuite_Comp_1(
-    input  io_in_ren,
-    output io_out_ren
-);
-
-
-  assign io_out_ren = io_in_ren;
-endmodule
-
-module NameSuite_BindThirdComp_1(
-    input  io_in_ren,
-    output io_result
-);
-
-  wire NameSuite_Comp_1_2_io_out_ren;
-  wire NameSuite_Comp_1_1_io_out_ren;
-  wire NameSuite_Comp_1_0_io_out_ren;
-  wire T0;
-  wire NameSuite_Comp_1_3_io_out_ren;
-  wire T1;
-  wire T2;
-
-  assign io_result = T0;
-  assign T0 = T1 | NameSuite_Comp_1_3_io_out_ren;
-  assign T1 = T2 | NameSuite_Comp_1_2_io_out_ren;
-  assign T2 = NameSuite_Comp_1_0_io_out_ren | NameSuite_Comp_1_1_io_out_ren;
-  NameSuite_Comp_1 NameSuite_Comp_1_0(
-       .io_in_ren( io_in_ren ),
-       .io_out_ren( NameSuite_Comp_1_0_io_out_ren )
-  );
-  NameSuite_Comp_1 NameSuite_Comp_1_1(
-       .io_in_ren( NameSuite_Comp_1_0_io_out_ren ),
-       .io_out_ren( NameSuite_Comp_1_1_io_out_ren )
-  );
-  NameSuite_Comp_1 NameSuite_Comp_1_2(
-       .io_in_ren( NameSuite_Comp_1_1_io_out_ren ),
-       .io_out_ren( NameSuite_Comp_1_2_io_out_ren )
-  );
-  NameSuite_Comp_1 NameSuite_Comp_1_3(
-       .io_in_ren( NameSuite_Comp_1_2_io_out_ren ),
-       .io_out_ren( NameSuite_Comp_1_3_io_out_ren )
-  );
-endmodule
-
-""")
+    assertFile("NameSuite_BindThirdComp_1.v")
   }
 
   /** Propagation of bundle field names through bindings
@@ -380,6 +223,8 @@ endmodule
     of the module.
     */
   @Test def testBindFourth() {
+    println("\nRunning testBindFourth:")
+
     class CompIO extends Bundle {
       val in = UInt(INPUT, 5)
       val out = UInt(OUTPUT, 5)
@@ -394,19 +239,9 @@ endmodule
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new BindFourthComp()))
-    assertFile(tmpdir.getRoot() + "/NameSuite_BindFourthComp_1.v",
-"""module NameSuite_BindFourthComp_1(
-    input [4:0] io_in,
-    output[4:0] io_out
-);
-
-
-  assign io_out = io_in;
-endmodule
-
-""")
+    assertFile("NameSuite_BindFourthComp_1.v")
   }
 
   /* An ArrayBuffer is added to after initialization, then later
@@ -414,9 +249,7 @@ endmodule
    of a subcomponent.
    */
   @Test def testBindFith() {
-
     println("\nRunning testBindFith:")
-
     class UnamedBundle extends Bundle {
       val error = Bool()
       val ppn = UInt(width = 32)
@@ -430,15 +263,14 @@ endmodule
 
     class Block extends Module {
       val io = new Bundle {
-        val valid = Bool(INPUT)
-        val mine = Vec.fill(2){UInt(width = 32)}.asOutput
-        val sub = new BlockIO()
+        val in = new BlockIO()
+        val out = new BlockIO().flip
       }
-      val tag_ram = Vec.fill(2){ Reg(io.sub.resp.bits.ppn) }
-      when (io.valid) {
-        tag_ram(UInt(0)) := io.sub.resp.bits.ppn
+      val tag_ram = Vec.fill(2){ Reg(io.in.resp.bits.ppn) }
+      when (io.in.resp.valid) {
+        tag_ram(UInt(0)) := io.in.resp.bits.ppn
       }
-      io.mine := Mux(io.valid, Mux1H(UInt(1), tag_ram), Mux1H(UInt(0), tag_ram))
+      io.out.resp.bits.ppn := Mux1H(tag_ram(0), tag_ram)
     }
 
     class BindFithComp extends Module {
@@ -449,88 +281,16 @@ endmodule
       }
 
       val ptw = collection.mutable.ArrayBuffer(io.imem_ptw, io.dmem_ptw)
-      if( true ) {
-        val vdtlb = Module(new Block())
-        ptw += vdtlb.io.sub
-        vdtlb.io <> io.imem_ptw
-      }
-      io.resp := ptw(0)
+      val vdtlb = Module(new Block())
+      io.resp := vdtlb.io.out
+      ptw += vdtlb.io.in
+      ptw.last <> io.imem_ptw
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new BindFithComp))
-    assertFile(tmpdir.getRoot() + "/NameSuite_BindFithComp_1.v",
-"""module NameSuite_Block_2(input clk,
-    input  io_valid,
-    output[31:0] io_mine_0,
-    output[31:0] io_mine_1,
-    //input  io_sub_resp_valid
-    //input  io_sub_resp_bits_error
-    input [31:0] io_sub_resp_bits_ppn
-);
-
-  wire[31:0] T0;
-  wire T1;
-  wire[31:0] T2;
-  wire[31:0] T3;
-  wire[31:0] T4;
-  wire[31:0] T5;
-  wire[31:0] T6;
-  reg[31:0] tag_ram_0;
-  wire[31:0] T7;
-  wire T8;
-
-  assign io_mine_1 = T0;
-  assign T0 = {31'h0/* 0*/, T1};
-  assign T1 = T2[1'h1/* 1*/:1'h1/* 1*/];
-  assign T2 = io_valid ? T4 : T3;
-  assign T3 = {31'h0/* 0*/, 1'h0/* 0*/};
-  assign T4 = T6 | T5;
-  assign T5 = {31'h0/* 0*/, 1'h0/* 0*/};
-  assign T6 = tag_ram_0;
-  assign io_mine_0 = T7;
-  assign T7 = {31'h0/* 0*/, T8};
-  assign T8 = T2[1'h0/* 0*/:1'h0/* 0*/];
-
-  always @(posedge clk) begin
-    if(io_valid) begin
-      tag_ram_0 <= io_sub_resp_bits_ppn;
-    end
-  end
-endmodule
-
-module NameSuite_BindFithComp_1(input clk,
-    input  io_imem_ptw_resp_valid,
-    input  io_imem_ptw_resp_bits_error,
-    input [31:0] io_imem_ptw_resp_bits_ppn,
-    input  io_dmem_ptw_resp_valid,
-    input  io_dmem_ptw_resp_bits_error,
-    input [31:0] io_dmem_ptw_resp_bits_ppn,
-    output io_resp_resp_valid,
-    output io_resp_resp_bits_error,
-    output[31:0] io_resp_resp_bits_ppn
-);
-
-
-  assign io_resp_resp_bits_ppn = io_imem_ptw_resp_bits_ppn;
-  assign io_resp_resp_bits_error = io_imem_ptw_resp_bits_error;
-  assign io_resp_resp_valid = io_imem_ptw_resp_valid;
-  NameSuite_Block_2 NameSuite_Block_2(.clk(clk),
-       //.io_valid(  )
-       //.io_mine_0(  )
-       //.io_mine_1(  )
-       //.io_sub_resp_valid(  )
-       //.io_sub_resp_bits_error(  )
-       //.io_sub_resp_bits_ppn(  )
-  );
-  `ifndef SYNTHESIS
-    assign NameSuite_Block_2.io_valid = $random();
-    assign NameSuite_Block_2.io_sub_resp_bits_ppn = $random();
-  `endif
-endmodule
-
-""")
+    assertFile("NameSuite_BindFithComp_1.v")
   }
 
   /** Appending index to a node name in Vec::apply
@@ -568,42 +328,9 @@ endmodule
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new VecComp()))
-    assertFile(tmpdir.getRoot() + "/NameSuite_VecComp_1.v",
-"""module NameSuite_VecComp_1(input clk,
-    input  io_r_en,
-    input [4:0] io_r_addr,
-    input [63:0] io_w_data,
-    output[7:0] io_status_im
-);
-
-  reg[7:0] reg_status_im;
-  wire[7:0] T0;
-  wire[63:0] wdata;
-  reg[63:0] host_pcr_bits_data;
-  wire[63:0] T1;
-  wire[7:0] rdata;
-  wire[7:0] elts_0;
-  wire[7:0] T2;
-
-  assign io_status_im = reg_status_im;
-  assign T0 = wdata[3'h7/* 7*/:1'h0/* 0*/];
-  assign wdata = io_r_en ? io_w_data : host_pcr_bits_data;
-  assign T1 = {56'h0/* 0*/, rdata};
-  assign rdata = elts_0;
-  assign elts_0 = T2;
-  assign T2 = {reg_status_im};
-
-  always @(posedge clk) begin
-    reg_status_im <= T0;
-    if(io_r_en) begin
-      host_pcr_bits_data <= T1;
-    end
-  end
-endmodule
-
-""")
+    assertFile("NameSuite_VecComp_1.v")
   }
 
   /** Names for input/output vectors should be generated with index (0-3).
@@ -636,49 +363,9 @@ endmodule
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new VecSecondComp()))
-    assertFile(tmpdir.getRoot() + "/NameSuite_VecSecondComp_1.v",
-"""module NameSuite_VecSecondComp_1(input clk,
-    output io_requestor_0_req_ready,
-    input  io_requestor_0_req_valid,
-    input  io_requestor_0_req_bits_ready,
-    output io_requestor_1_req_ready,
-    input  io_requestor_1_req_valid,
-    input  io_requestor_1_req_bits_ready,
-    output io_requestor_2_req_ready,
-    input  io_requestor_2_req_valid,
-    input  io_requestor_2_req_bits_ready,
-    output io_requestor_3_req_ready,
-    input  io_requestor_3_req_valid,
-    input  io_requestor_3_req_bits_ready,
-    output io_mem
-);
-
-  wire T0;
-  wire T1;
-  wire T2;
-  wire T3;
-  reg[0:0] r_valid_0;
-  reg[0:0] r_valid_1;
-  reg[0:0] r_valid_2;
-  reg[0:0] r_valid_3;
-
-  assign io_mem = T0;
-  assign T0 = r_valid_3 ? io_requestor_3_req_ready : T1;
-  assign T1 = r_valid_2 ? io_requestor_2_req_ready : T2;
-  assign T2 = r_valid_1 ? io_requestor_1_req_ready : T3;
-  assign T3 = r_valid_0 ? io_requestor_0_req_ready : io_requestor_0_req_ready;
-
-  always @(posedge clk) begin
-    r_valid_0 <= io_requestor_0_req_ready;
-    r_valid_1 <= io_requestor_1_req_ready;
-    r_valid_2 <= io_requestor_2_req_ready;
-    r_valid_3 <= io_requestor_3_req_ready;
-  end
-endmodule
-
-""")
+    assertFile("NameSuite_VecSecondComp_1.v")
   }
 
 
@@ -713,61 +400,16 @@ endmodule
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new VariationComp()))
-    assertFile(tmpdir.getRoot() + "/NameSuite_VariationComp_1.v",
-"""module NameSuite_CompBlock_1_0(
-    input  io_valid,
-    output io_replay
-);
-
-
-  assign io_replay = 1'h0/* 0*/;
-endmodule
-
-module NameSuite_CompBlock_1_1(
-    input  io_valid,
-    output io_replay
-);
-
-
-  assign io_replay = io_valid;
-endmodule
-
-module NameSuite_VariationComp_1(
-    input  io_valid,
-    output io_replay
-);
-
-  wire T0;
-  wire block_2_io_replay;
-  wire T1;
-  wire block_1_io_replay;
-  wire block_0_io_replay;
-
-  assign io_replay = T0;
-  assign T0 = T1 & block_2_io_replay;
-  assign T1 = block_0_io_replay & block_1_io_replay;
-  NameSuite_CompBlock_1_0 block_0(
-       .io_valid( io_valid ),
-       .io_replay( block_0_io_replay )
-  );
-  NameSuite_CompBlock_1_0 block_1(
-       .io_valid( io_valid ),
-       .io_replay( block_1_io_replay )
-  );
-  NameSuite_CompBlock_1_1 block_2(
-       .io_valid( io_valid ),
-       .io_replay( block_2_io_replay )
-  );
-endmodule
-
-""")
+    assertFile("NameSuite_VariationComp_1.v")
   }
 
   /** Generated names for memories which are actual modules (ie. not inlined).
     */
   @Test def testMemComp() {
+    println("\nRunning testMemComp:")
+
     val SZ_BREGLEN = 8
     val SZ_DATA = 65
 
@@ -786,41 +428,16 @@ endmodule
       io.rdata := rfile(raddr)
     }
 
-    chiselMain(Array[String]("--v", "--noInlineMem",
-      "--targetDir", tmpdir.getRoot().toString()),
+    chiselMain(Array[String]("--noInlineMem", "--v",
+      "--targetDir", dir.getPath.toString()),
       () => Module(new MemComp()))
-    assertFile(tmpdir.getRoot() + "/NameSuite_MemComp_1.v",
-"""module NameSuite_MemComp_1(input clk, input reset,
-    input  io_ren,
-    input [7:0] io_raddr,
-    output[64:0] io_rdata
-);
-
-  wire[64:0] T0;
-  reg[7:0] raddr;
-
-  assign io_rdata = T0;
-  NameSuite_MemComp_1_rfile rfile (
-    .CLK(clk),
-    .RST(reset),
-    .R0A(io_raddr),
-    .R0E(io_ren),
-    .R0O(T0)
-  );
-
-  always @(posedge clk) begin
-    if(io_ren) begin
-      raddr <= io_raddr;
-    end
-  end
-endmodule
-
-""")
+    assertFile("NameSuite_MemComp_1.v")
   }
 
   /* Add signals which are not registers to the toplevel C++ class declaration.
    */
   @Test def testDebug() {
+    println("testDebug:")
     class Block extends Module {
       val io = new Bundle {
         val ctrl_wb_wen = Bool(INPUT);
@@ -849,126 +466,10 @@ endmodule
     }
 
     chiselMain(Array[String]("--backend", "c", "--vcd",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new DebugComp))
-    assertFile(tmpdir.getRoot() + "/NameSuite_DebugComp_1.h",
-"""#ifndef __NameSuite_DebugComp_1__
-#define __NameSuite_DebugComp_1__
-
-#include "emulator.h"
-
-class NameSuite_DebugComp_1_t : public mod_t {
- public:
-  dat_t<1> NameSuite_DebugComp_1_dpath__reset;
-  dat_t<1> NameSuite_DebugComp_1_dpath__reset__prev;
-  dat_t<1> NameSuite_DebugComp_1__io_ctrl_wb_wen;
-  dat_t<1> NameSuite_DebugComp_1__io_ctrl_wb_wen__prev;
-  dat_t<1> NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen;
-  dat_t<1> NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen__prev;
-  dat_t<1> NameSuite_DebugComp_1_dpath__wb_wen;
-  dat_t<1> NameSuite_DebugComp_1_dpath__wb_reg_ll_wb;
-  dat_t<1> NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow;
-  dat_t<1> NameSuite_DebugComp_1_dpath__wb_reg_ll_wb__prev;
-  dat_t<1> NameSuite_DebugComp_1_dpath__io_ctrl_out;
-  dat_t<1> NameSuite_DebugComp_1_dpath__io_ctrl_out__prev;
-  dat_t<1> NameSuite_DebugComp_1__io_ctrl_out;
-  dat_t<1> NameSuite_DebugComp_1__io_ctrl_out__prev;
-  int clk;
-  int clk_cnt;
-
-  void init ( bool rand_init = false );
-  void clock_lo ( dat_t<1> reset );
-  void clock_hi ( dat_t<1> reset );
-  int clock ( dat_t<1> reset );
-  void print ( FILE* f, FILE* e);
-  bool scan ( FILE* f );
-  void dump ( FILE* f, int t );
-};
-
-
-
-#endif
-""")
-    assertFile(tmpdir.getRoot() + "/NameSuite_DebugComp_1.cpp",
-"""#include "NameSuite_DebugComp_1.h"
-
-void NameSuite_DebugComp_1_t::init ( bool rand_init ) {
-  if (rand_init) NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.randomize();
-  nodes.clear();
-  mems.clear();
-  nodes.push_back(debug_node_t("NameSuite_DebugComp_1.io_ctrl_wb_wen", &NameSuite_DebugComp_1__io_ctrl_wb_wen));
-  nodes.push_back(debug_node_t("NameSuite_DebugComp_1.dpath.io_ctrl_wb_wen", &NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen));
-  nodes.push_back(debug_node_t("NameSuite_DebugComp_1.dpath.wb_wen", &NameSuite_DebugComp_1_dpath__wb_wen));
-  nodes.push_back(debug_node_t("NameSuite_DebugComp_1.dpath.wb_reg_ll_wb", &NameSuite_DebugComp_1_dpath__wb_reg_ll_wb));
-  nodes.push_back(debug_node_t("NameSuite_DebugComp_1.dpath.io_ctrl_out", &NameSuite_DebugComp_1_dpath__io_ctrl_out));
-  nodes.push_back(debug_node_t("NameSuite_DebugComp_1.io_ctrl_out", &NameSuite_DebugComp_1__io_ctrl_out));
-}
-void NameSuite_DebugComp_1_t::clock_lo ( dat_t<1> reset ) {
-  { NameSuite_DebugComp_1_dpath__reset.values[0] = reset.values[0]; }
-  { NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0] = NameSuite_DebugComp_1__io_ctrl_wb_wen.values[0]; }
-  { NameSuite_DebugComp_1_dpath__wb_wen.values[0] = NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0]||NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]; }
-  val_t T0__w0;
-  { val_t __mask = -NameSuite_DebugComp_1_dpath__wb_wen.values[0]; T0__w0 = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0] ^ ((NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0] ^ NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0]) & __mask); }
-  { NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow.values[0] = TERNARY(NameSuite_DebugComp_1_dpath__reset.values[0], 0x0L, T0__w0); }
-  { NameSuite_DebugComp_1_dpath__io_ctrl_out.values[0] = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]; }
-  { NameSuite_DebugComp_1__io_ctrl_out.values[0] = NameSuite_DebugComp_1_dpath__io_ctrl_out.values[0]; }
-}
-void NameSuite_DebugComp_1_t::clock_hi ( dat_t<1> reset ) {
-  NameSuite_DebugComp_1_dpath__wb_reg_ll_wb = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow;
-}
-int NameSuite_DebugComp_1_t::clock ( dat_t<1> reset ) {
-  uint32_t min = ((uint32_t)1<<31)-1;
-  if (clk_cnt < min) min = clk_cnt;
-  clk_cnt-=min;
-  if (clk_cnt == 0) clock_lo( reset );
-  if (clk_cnt == 0) clock_hi( reset );
-  if (clk_cnt == 0) clk_cnt = clk;
-  return min;
-}
-void NameSuite_DebugComp_1_t::print ( FILE* f, FILE* e ) {
-}
-bool NameSuite_DebugComp_1_t::scan ( FILE* f ) {
-  return(!feof(f));
-}
-void NameSuite_DebugComp_1_t::dump(FILE *f, int t) {
-  if (t == 0) {
-    fprintf(f, "$timescale 1ps $end\n");
-    fprintf(f, "$scope module NameSuite_DebugComp_1 $end\n");
-    fprintf(f, "$var wire 1 N0 reset $end\n");
-    fprintf(f, "$var wire 1 N2 io_ctrl_wb_wen $end\n");
-    fprintf(f, "$var wire 1 N6 io_ctrl_out $end\n");
-    fprintf(f, "$scope module dpath $end\n");
-    fprintf(f, "$var wire 1 N1 reset $end\n");
-    fprintf(f, "$var wire 1 N3 io_ctrl_wb_wen $end\n");
-    fprintf(f, "$var wire 1 N4 wb_reg_ll_wb $end\n");
-    fprintf(f, "$var wire 1 N5 io_ctrl_out $end\n");
-    fprintf(f, "$upscope $end\n");
-    fprintf(f, "$upscope $end\n");
-    fprintf(f, "$enddefinitions $end\n");
-    fprintf(f, "$dumpvars\n");
-    fprintf(f, "$end\n");
-  }
-  fprintf(f, "#%d\n", t);
-  if (t == 0 || (NameSuite_DebugComp_1_dpath__reset != NameSuite_DebugComp_1_dpath__reset__prev).to_bool())
-    dat_dump(f, NameSuite_DebugComp_1_dpath__reset, "N1");
-  NameSuite_DebugComp_1_dpath__reset__prev = NameSuite_DebugComp_1_dpath__reset;
-  if (t == 0 || (NameSuite_DebugComp_1__io_ctrl_wb_wen != NameSuite_DebugComp_1__io_ctrl_wb_wen__prev).to_bool())
-    dat_dump(f, NameSuite_DebugComp_1__io_ctrl_wb_wen, "N2");
-  NameSuite_DebugComp_1__io_ctrl_wb_wen__prev = NameSuite_DebugComp_1__io_ctrl_wb_wen;
-  if (t == 0 || (NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen != NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen__prev).to_bool())
-    dat_dump(f, NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen, "N3");
-  NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen__prev = NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen;
-  if (t == 0 || (NameSuite_DebugComp_1_dpath__wb_reg_ll_wb != NameSuite_DebugComp_1_dpath__wb_reg_ll_wb__prev).to_bool())
-    dat_dump(f, NameSuite_DebugComp_1_dpath__wb_reg_ll_wb, "N4");
-  NameSuite_DebugComp_1_dpath__wb_reg_ll_wb__prev = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb;
-  if (t == 0 || (NameSuite_DebugComp_1_dpath__io_ctrl_out != NameSuite_DebugComp_1_dpath__io_ctrl_out__prev).to_bool())
-    dat_dump(f, NameSuite_DebugComp_1_dpath__io_ctrl_out, "N5");
-  NameSuite_DebugComp_1_dpath__io_ctrl_out__prev = NameSuite_DebugComp_1_dpath__io_ctrl_out;
-  if (t == 0 || (NameSuite_DebugComp_1__io_ctrl_out != NameSuite_DebugComp_1__io_ctrl_out__prev).to_bool())
-    dat_dump(f, NameSuite_DebugComp_1__io_ctrl_out, "N6");
-  NameSuite_DebugComp_1__io_ctrl_out__prev = NameSuite_DebugComp_1__io_ctrl_out;
-}
-""")
+    assertFile("NameSuite_DebugComp_1.h")
+    assertFile("NameSuite_DebugComp_1.cpp")
   }
 
   /* XXX test case derived from issue #6 on github.
@@ -985,19 +486,8 @@ void NameSuite_DebugComp_1_t::dump(FILE *f, int t) {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new InputPortNameComp))
-    assertFile(tmpdir.getRoot() + "/NameSuite_InputPortNameComp_1.v",
-"""module NameSuite_InputPortNameComp_1(
-    input [19:0] io_in,
-    output[19:0] io_out
-);
-
-
-  assign io_out = io_in;
-endmodule
-
-"""
-    );
+    assertFile("NameSuite_InputPortNameComp_1.v");
   }
 }

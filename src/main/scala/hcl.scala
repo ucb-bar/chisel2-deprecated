@@ -136,6 +136,7 @@ object chiselMain {
         case "--noCombLoop" => Module.dontFindCombLoop = true
         case "--genHarness" => Module.isGenHarness = true;
         case "--debug" => Module.isDebug = true;
+        case "--cse" => Module.isCSE = true
         case "--ioDebug" => Module.isIoDebug = true;
         case "--noIoDebug" => Module.isIoDebug = false;
         case "--clockGatingUpdates" => Module.isClockGatingUpdates = true;
@@ -227,8 +228,7 @@ object chiselMainTest {
 }
 
 trait proc extends Node {
-  var updates = new collection.mutable.ListBuffer[(Bool, Node)];
-  var updated = false
+  val updates = new collection.mutable.ListBuffer[(Bool, Node)]
   def genCond(): Bool = conds.top;
   def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
     val update = others.foldLeft(default)((v, u) => Multiplex(u._1, u._2, v))

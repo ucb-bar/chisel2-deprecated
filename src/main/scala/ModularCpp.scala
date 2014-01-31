@@ -276,7 +276,7 @@ class ModularCppBackend extends CppBackend {
     }
     out_c.write("  return(!feof(f));\n");
     out_c.write("}\n");
-    vcd.dumpVCD(c, out_c);
+    vcd.dumpVCD(c, out_c.write);
     out_c.close();
 
     /* Copy the emulator.h file into the targetDirectory. */

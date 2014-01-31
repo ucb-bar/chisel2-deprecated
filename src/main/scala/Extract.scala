@@ -138,4 +138,17 @@ class Extract extends Node {
                     " in class " + line.getClassName +
                     " in file " + line.getFileName))
   }
+
+  override def canCSE: Boolean = true
+  override def equalsForCSE(x: Node): Boolean = x match {
+    case x: Extract => {
+      if (inputs.length != x.inputs.length)
+        return false
+      for (i <- 0 until inputs.length)
+        if (!(inputs(i) == x.inputs(i)))
+          return false
+      true
+    }
+    case _ => false
+  }
 }

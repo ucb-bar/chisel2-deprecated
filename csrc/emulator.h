@@ -1,6 +1,16 @@
 #ifndef __IS_EMULATOR__
 #define __IS_EMULATOR__
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#pragma GCC diagnostic ignored "-Wparentheses"
+#pragma GCC diagnostic ignored "-Wreturn-type"
+#pragma GCC diagnostic ignored "-Wchar-subscripts"
+#pragma GCC diagnostic ignored "-Wtype-limits"
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wunused-variable"
+
 #include <assert.h>
 #include <inttypes.h>
 #include <stdio.h>
@@ -1499,7 +1509,7 @@ int dat_to_str(char* s, dat_t<w> x, int base = 16, char pad = '0') {
   return n_digs;
 }
 
-static int dat_to_str(char* s, val_t x, int base = 16, char pad = '0') {
+static __inline__ int dat_to_str(char* s, val_t x, int base = 16, char pad = '0') {
   return dat_to_str<sizeof(val_t)*8>(s, dat_t<sizeof(val_t)*8>(x), base, pad);
 }
 
@@ -1511,7 +1521,7 @@ int fix_to_str(char* s, dat_t<w> x, int base = 16, char pad = '0') {
   return len+1;
 }
 
-static int fix_to_str(char* s, val_t x, int base = 16, char pad = '0') {
+static __inline__ int fix_to_str(char* s, val_t x, int base = 16, char pad = '0') {
   return fix_to_str(s, dat_t<sizeof(val_t)*8>(x), base, pad);
 }
 
@@ -1545,12 +1555,12 @@ int dat_as_str(char* s, const dat_t<w>& x) {
   return w/8;
 }
 
-static int dat_as_str(char* s, val_t x) {
+static __inline__ int dat_as_str(char* s, val_t x) {
   return dat_as_str(s, dat_t<sizeof(val_t)*8>(x));
 }
 
 #if __cplusplus >= 201103L
-static void dat_format(char* s, const char* fmt)
+static void __attribute__((unused)) dat_format(char* s, const char* fmt)
 {
   for (char c; (c = *fmt); fmt++) {
     if (c == '%' && *++fmt != '%')
@@ -1776,7 +1786,6 @@ class mem_t : public mem_base_t {
   }
 };
 
-static char hex_to_char[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
 static int  char_to_hex[] = { 
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
@@ -2194,4 +2203,5 @@ class mod_t {
     throw std::runtime_error("Assertion failed: " msg); \
 }
 
+#pragma GCC diagnostic pop
 #endif

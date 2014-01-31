@@ -69,6 +69,7 @@ object CListLookup {
 }
 
 class CppBackend extends Backend {
+  transforms += CSE.transform
   val keywords = new HashSet[String]();
 
   override def emitTmp(node: Node): String = {
@@ -563,15 +564,14 @@ class CppBackend extends Backend {
     node match {
       case m: MemWrite =>
         // schedule before Reg updates in case a MemWrite input is a Reg
-        if (m.inputs.length == 2) {
-          return ""
-        }
-        def mask(w: Int): String = "(-" + emitLoWordRef(m.cond) + (if (m.isMasked) " & " + emitWordRef(m.mask, w) else "") + ")"
-        block((0 until words(m)).map(i => emitRef(m.mem)
-          + ".put(" + emitLoWordRef(m.addr) + ", " + i
-          + ", (" + emitWordRef(m.data, i) + " & " + mask(i)
-          + ") | (" + emitRef(m.mem) + ".get(" + emitLoWordRef(m.addr)
-          + ", " + i + ") & ~" + mask(i) + "))"))
+        if (m.inputs.length == 2)
+          ""
+        else
+          block((0 until words(m)).map(i =>
+            "if (" + emitLoWordRef(m.cond) + ") " + emitRef(m.mem) +
+            ".put(" + emitLoWordRef(m.addr) + ", " +
+            i + ", " +
+            emitWordRef(m.data, i) + ")"))
 
       case _ =>
         ""
@@ -787,7 +787,6 @@ class CppBackend extends Backend {
       genHarness(c, c.name);
     }
     val out_h = createOutputFile(c.name + ".h");
-    val out_c = createOutputFile(c.name + ".cpp");
     if (!Params.space.isEmpty) {
       val out_p = createOutputFile(c.name + ".p");
       out_p.write(Params.toDotpStringParams);
@@ -834,23 +833,36 @@ class CppBackend extends Backend {
     out_h.write("\n\n#endif\n");
     out_h.close();
 
-    out_c.write("#include \"" + c.name + ".h\"\n");
-    for(str <- Module.includeArgs) out_c.write("#include \"" + str + "\"\n");
-    out_c.write("\n");
-    out_c.write("void " + c.name + "_t::init ( bool rand_init ) {\n");
+    val out_cpps = ArrayBuffer[java.io.FileWriter]()
+    val all_cpp = new StringBuilder
+    def createCppFile(suffix: String = "-" + out_cpps.length) = {
+      val f = createOutputFile(c.name + suffix + ".cpp")
+      f.write("#include \"" + c.name + ".h\"\n")
+      for (str <- Module.includeArgs) f.write("#include \"" + str + "\"\n")
+      f.write("\n")
+      out_cpps += f
+      f
+    }
+    def writeCppFile(s: String) = {
+      out_cpps.last.write(s)
+      all_cpp.append(s)
+    }
+
+    createCppFile()
+    writeCppFile("void " + c.name + "_t::init ( bool rand_init ) {\n")
     for (m <- c.omods) {
-      out_c.write(emitInit(m));
+      writeCppFile(emitInit(m))
     }
     for (clock <- Module.clocks)
-      out_c.write(emitInit(clock))
-    out_c.write("  nodes.clear();\n");
-    out_c.write("  mems.clear();\n");
+      writeCppFile(emitInit(clock))
+    writeCppFile("  nodes.clear();\n")
+    writeCppFile("  mems.clear();\n")
     for (m <- mappings) {
       if (m._2.name != "reset" && (m._2.isInObject || m._2.isInVCD)) {
-        out_c.write(emitMapping(m));
+        writeCppFile(emitMapping(m))
       }
     }
-    out_c.write("}\n");
+    writeCppFile("}\n")
 
     for (m <- c.omods) {
       val clock = if (m.clock == null) Module.implicitClock else m.clock
@@ -870,30 +882,28 @@ class CppBackend extends Backend {
     for (clk <- clkDomains.keys) {
       clkDomains(clk)._1.append("}\n")
       clkDomains(clk)._2.append("}\n")
-      out_c.write(clkDomains(clk)._1.result)
-      out_c.write(clkDomains(clk)._2.result)
     }
 
-    out_c.write("int " + c.name + "_t::clock ( dat_t<1> reset ) {\n")
-    out_c.write("  uint32_t min = ((uint32_t)1<<31)-1;\n")
+    writeCppFile("int " + c.name + "_t::clock ( dat_t<1> reset ) {\n")
+    writeCppFile("  uint32_t min = ((uint32_t)1<<31)-1;\n")
     for (clock <- Module.clocks) {
-      out_c.write("  if (" + emitRef(clock) + "_cnt < min) min = " + emitRef(clock) +"_cnt;\n")
+      writeCppFile("  if (" + emitRef(clock) + "_cnt < min) min = " + emitRef(clock) +"_cnt;\n")
     }
     for (clock <- Module.clocks) {
-      out_c.write("  " + emitRef(clock) + "_cnt-=min;\n")
+      writeCppFile("  " + emitRef(clock) + "_cnt-=min;\n")
     }
     for (clock <- Module.clocks) {
-      out_c.write("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
+      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
     }
     for (clock <- Module.clocks) {
-      out_c.write("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
+      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
     }
     for (clock <- Module.clocks) {
-      out_c.write("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " +
+      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " +
                   emitRef(clock) + ";\n")
     }
-    out_c.write("  return min;\n")
-    out_c.write("}\n")
+    writeCppFile("  return min;\n")
+    writeCppFile("}\n")
 
     def splitFormat(s: String): Seq[String] = {
       var off = 0;
@@ -917,9 +927,9 @@ class CppBackend extends Backend {
       }
       res.reverse
     }
-    out_c.write("void " + c.name + "_t::print ( FILE* f, FILE* e ) {\n");
+    writeCppFile("void " + c.name + "_t::print ( FILE* f, FILE* e ) {\n")
     for (p <- Module.printfs)
-      out_c.write("#if __cplusplus >= 201103L\n"
+      writeCppFile("#if __cplusplus >= 201103L\n"
         + "  if (" + emitLoWordRef(p.cond)
         + ") dat_fprintf<" + p.width + ">(e, "
         + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
@@ -938,21 +948,21 @@ class CppBackend extends Backend {
         if (tok(0) == '%') {
           val nodes = Module.printArgs(i).maybeFlatten
           for (j <- 0 until nodes.length)
-            out_c.write("  fprintf(f, \"" + (if (j > 0) " " else "") +
+            writeCppFile("  fprintf(f, \"" + (if (j > 0) " " else "") +
                         "%s\", TO_CSTR(" + emitRef(nodes(j)) + "));\n");
           i += 1;
         } else {
-          out_c.write("  fprintf(f, \"%s\", \"" + tok + "\");\n");
+          writeCppFile("  fprintf(f, \"%s\", \"" + tok + "\");\n")
         }
       }
-      out_c.write("  fprintf(f, \"\\n\");\n");
-      out_c.write("  fflush(f);\n");
-      out_c.write("  fflush(e);\n");
+      writeCppFile("  fprintf(f, \"\\n\");\n")
+      writeCppFile("  fflush(f);\n")
+      writeCppFile("  fflush(e);\n")
     }
-    out_c.write("}\n");
+    writeCppFile("}\n")
     def constantArgSplit(arg: String): Array[String] = arg.split('=');
     def isConstantArg(arg: String): Boolean = constantArgSplit(arg).length == 2;
-    out_c.write("bool " + c.name + "_t::scan ( FILE* f ) {\n");
+    writeCppFile("bool " + c.name + "_t::scan ( FILE* f ) {\n")
     if (Module.scanArgs.length > 0) {
       val format =
         if (Module.scanFormat == "") {
@@ -966,18 +976,28 @@ class CppBackend extends Backend {
         if (tok(0) == '%') {
           val nodes = c.keepInputs(Module.scanArgs(i).maybeFlatten)
           for (j <- 0 until nodes.length)
-            out_c.write("  str_to_dat(read_tok(f), " + emitRef(nodes(j)) + ");\n");
+            writeCppFile("  str_to_dat(read_tok(f), " + emitRef(nodes(j)) + ");\n")
           i += 1;
         } else {
-          out_c.write("  fscanf(f, \"%s\", \"" + tok + "\");\n");
+          writeCppFile("  fscanf(f, \"%s\", \"" + tok + "\");\n")
         }
       }
-      // out_c.write("  getc(f);\n");
+      // writeCppFile("  getc(f);\n")
     }
-    out_c.write("  return(!feof(f));\n");
-    out_c.write("}\n");
-    vcd.dumpVCD(c, out_c);
-    out_c.close();
+    writeCppFile("  return(!feof(f));\n")
+    writeCppFile("}\n")
+
+    createCppFile()
+    vcd.dumpVCD(c, writeCppFile)
+
+    for (out <- clkDomains.values.map(_._1) ++ clkDomains.values.map(_._2)) {
+      createCppFile()
+      writeCppFile(out.result)
+    }
+
+    createCppFile("")
+    writeCppFile(all_cpp.result)
+    out_cpps.foreach(_.close)
 
     /* Copy the emulator.h file into the targetDirectory. */
     val resourceStream = getClass().getResourceAsStream("/emulator.h")

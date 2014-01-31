@@ -46,6 +46,11 @@ object UInt {
   def apply(x: String, width: Int): UInt = Lit(x, width){UInt()};
   def apply(x: String, base: Char): UInt = Lit(x, base, -1){UInt()};
   def apply(x: String, base: Char, width: Int): UInt = Lit(x, base, width){UInt()};
+  def apply(x: Node): UInt = {
+    val res = new UInt
+    res.inputs += x
+    res
+  }
 
   def apply(dir: IODirection = null, width: Int = -1): UInt = {
     val res = new UInt();
@@ -67,6 +72,8 @@ class UInt extends Bits /* with Numeric[UInt] */ {
   override def fromInt(x: Int): this.type = {
     UInt(x).asInstanceOf[this.type]
   }
+
+  override def toBits: UInt = this
 
   // to support implicit convestions
   def ===(b: UInt): Bool = LogicalOp(this, b, "===")
@@ -99,9 +106,9 @@ class UInt extends Bits /* with Numeric[UInt] */ {
   def >= (b: UInt): Bool = b <= this
 
   //UInt op SInt arithmetic
-  def +   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "+"));
-  def -   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "-"));
-  def *   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "u*s"));
-  def %   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "u%s"));
-  def /   (b: SInt): SInt = SInt(OUTPUT).fromNode(BinaryOp(this.zext, b, "u/s"));
+  def +   (b: SInt): SInt = b + this
+  def *   (b: SInt): SInt = b * this
+  def -   (b: SInt): SInt = this.zext - b
+  def /   (b: SInt): SInt = this.zext / b
+  def %   (b: SInt): SInt = this.zext % b
 }

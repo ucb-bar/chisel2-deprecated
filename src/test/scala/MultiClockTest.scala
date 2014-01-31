@@ -29,12 +29,9 @@
 */
 
 import scala.collection.mutable.ArrayBuffer
-import org.scalatest.junit.AssertionsForJUnit
 import scala.collection.mutable.ListBuffer
 import org.junit.Assert._
 import org.junit.Test
-import org.junit.Before
-import org.junit.After
 import org.junit.rules.TemporaryFolder;
 
 import Chisel._
@@ -42,28 +39,11 @@ import Chisel._
 
 /** This testsuite checks the generation of dot graphs.
 */
-class MultiClockSuite extends AssertionsForJUnit {
-
-  val tmpdir = new TemporaryFolder();
-
-  @Before def initialize() {
-    tmpdir.create()
-  }
-
-  @After def done() {
-    tmpdir.delete()
-  }
-
-  def assertFile( filename: String, content: String ) {
-    val source = scala.io.Source.fromFile(filename, "utf-8")
-    val lines = source.mkString
-    source.close()
-    assert(lines === content)
-  }
+class MultiClockSuite extends TestSuite {
 
   /** Test Register on a different clock */
   @Test def testRegClock() {
-
+    println("testRegClock:")
     class ClockedSubComp extends Module {
       val io = new Bundle {
         val ready = Bool(INPUT)
@@ -85,40 +65,8 @@ class MultiClockSuite extends AssertionsForJUnit {
     }
 
     chiselMain(Array[String]("--v",
-      "--targetDir", tmpdir.getRoot().toString()),
+      "--targetDir", dir.getPath.toString()),
       () => Module(new Comp()))
-    assertFile(tmpdir.getRoot() + "/MultiClockSuite_Comp_1.v",
-"""module MultiClockSuite_ClockedSubComp_1(input T0,
-    input  io_ready,
-    output io_valid
-);
-
-  reg[0:0] stored;
-
-  assign io_valid = stored;
-
-  always @(posedge T0) begin
-    stored <= io_ready;
-  end
-endmodule
-
-module MultiClockSuite_Comp_1(input T0,
-    input  io_data0,
-    input  io_data1,
-    output io_result
-);
-
-  wire T0;
-  wire sub_io_valid;
-
-  assign T0 = io_data0 & io_data1;
-  assign io_result = sub_io_valid;
-  MultiClockSuite_ClockedSubComp_1 sub(.T0(T0),
-       .io_ready( T0 ),
-       .io_valid( sub_io_valid )
-  );
-endmodule
-
-""")
+    assertFile("MultiClockSuite_Comp_1.v")
   }
 }

@@ -90,22 +90,13 @@ abstract class Bits extends Data with proc {
   // internal, non user exposed connectors
   var assigned = false;
 
+  override def assign(src: Node): Unit =
+    if (inputs.isEmpty) inputs += src
+    else ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
 
-  override def assign(src: Node) {
-    if(assigned || inputs.length > 0) {
-      ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
-    } else {
-      assigned = true; super.assign(src)
-    }
-  }
-
-  def procAssign(src: Node) {
-    if (assigned) {
-      ChiselError.error("reassignment to Node");
-    } else {
-      updates += ((genCond(), src))
-    }
-  }
+  override def procAssign(src: Node): Unit =
+    if (inputs.isEmpty) updates += ((genCond(), src))
+    else ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
 
   //code generation stuff
 
@@ -291,6 +282,10 @@ abstract class Bits extends Data with proc {
       inputs(0) = inputs(0).matchWidth(width)
     }
   }
+
+  override def matchWidth(w: Int): Node =
+    if (isLit && !litOf.isZ) Literal(litOf.value & ((BigInt(1) << w)-1), w)
+    else super.matchWidth(w)
 
   // Operators
   protected final def newUnaryOp(opName: String): this.type = {
