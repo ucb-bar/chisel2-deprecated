@@ -227,8 +227,7 @@ object chiselMainTest {
 }
 
 trait proc extends Node {
-  var updates = new collection.mutable.ListBuffer[(Bool, Node)];
-  var updated = false
+  val updates = new collection.mutable.ListBuffer[(Bool, Node)]
   def genCond(): Bool = conds.top;
   def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
     val update = others.foldLeft(default)((v, u) => Multiplex(u._1, u._2, v))

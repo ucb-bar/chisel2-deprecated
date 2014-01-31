@@ -222,14 +222,6 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] 
     }
   }
 
-  override def ^^(src: Node) = {
-    src match {
-      case other: Vec[T] =>
-        for((b, o) <- self zip other.self)
-          b ^^ o
-    }
-  }
-
   def <>(src: Vec[T]) {
     for((b, e) <- self zip src)
       b <> e;

@@ -182,19 +182,10 @@ abstract class Node extends nameable {
     (this.asInstanceOf[UInt] & ~bit) | (dat << off);
   }
   // TODO: MOVE TO WIRE
-  def assign(src: Node) {
-    if (inputs.length > 0) {
-      inputs(0) = src;
-    } else {
-      inputs += src;
-    }
-  }
-  def <>(src: Node) {
-    this assign src
-  }
-  def ^^(src: Node) {
-    src assign this;
-  }
+  def assign(src: Node): Unit = throw new Exception("unimplemented assign")
+  def <>(src: Node): Unit = throw new Exception("unimplemented <>")
+  def ^^(src: Node): Unit = src <> this
+
   def getLit: Literal = this.asInstanceOf[Literal]
   private var _isIo = false
   def isIo = _isIo
@@ -211,8 +202,7 @@ abstract class Node extends nameable {
   def initOf (n: String, width: (Node) => Int, ins: List[Node]): Node = {
     name = n;
     inferWidth = width;
-    for (i <- ins)
-      inputs += i;
+    inputs ++= ins
     this
   }
   def init (n: String, width: (Node) => Int, ins: Node*): Node = {
