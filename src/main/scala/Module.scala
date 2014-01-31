@@ -131,6 +131,7 @@ object Module {
     dontFindCombLoop = false
     isGenHarness = false;
     isDebug = false;
+    isCSE = false
     isIoDebug = true;
     isClockGatingUpdates = false;
     isClockGatingUpdatesInline = false;
