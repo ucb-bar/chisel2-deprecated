@@ -1473,9 +1473,13 @@ std::string dat_to_str(const dat_t<w>& x) {
   return s;
 }
 
+static int n_digits(int w, int base) {
+  return (int)ceil(log(2)/log(base)*w);
+}
+
 template <int w>
 int dat_to_str(char* s, dat_t<w> x, int base = 16, char pad = '0') {
-  int n_digs = (int)ceil(log(2)/log(base)*w);
+  int n_digs = n_digits(w, base);
   int j = n_digs-1, digit;
 
   do {
@@ -1512,6 +1516,23 @@ static int fix_to_str(char* s, val_t x, int base = 16, char pad = '0') {
 }
 
 template <int w>
+int flo_to_str(char* s, dat_t<w> x, char pad = ' ') {
+  char buf[1000];
+  int n_digs = (2+n_digits(52, 10)+2+n_digits(11, 10));
+  if (w == 32)
+    sprintf(buf, "%e", toFloat(x.values[0]));
+  else
+    sprintf(buf, "%e", toDouble(x.values[0]));
+  assert(strlen(buf) <= n_digs);
+  for (int i = 0; i < n_digs; i++)
+    s[i] = (i < strlen(buf)) ? buf[i] : pad;
+  s[n_digs] = 0;
+  // printf("N-DIGS = %d BUF %lu PAD %lu\n", n_digs, strlen(buf), n_digs-strlen(buf));
+  // return strlen(buf);
+  return n_digs;
+}
+
+template <int w>
 int dat_as_str(char* s, const dat_t<w>& x) {
   int i, j;
   for (i = 0, j = (w/8-1)*8; i < w/8; i++, j -= 8) {
@@ -1544,6 +1565,7 @@ static void dat_format(char* s, const char* fmt, T value, Args... args)
   while (*fmt) {
     if (*fmt == '%') {
       switch(fmt[1]) {
+        case 'e': s += flo_to_str(s, value, ' '); break;
         case 'h': s += dat_to_str(s, value, 16, '0'); break;
         case 'b': s += dat_to_str(s, value, 2, '0'); break;
         case 'd': s += dat_to_str(s, value, 10, ' '); break;

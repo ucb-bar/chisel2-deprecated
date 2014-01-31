@@ -49,11 +49,14 @@ class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
   inputs ++= argsIn.map(a => new BitsInObject(a))
   def args: ArrayBuffer[Node] = inputs
   override def isInObject: Boolean = true
+  def decIntSize(x: Int) = math.ceil(math.log(2)/math.log(10)*x).toInt
+  def decFloSize(m: Int, e: Int) = (2+decIntSize(m)+2+decIntSize(e))
 
   private var formats = ""
   private val lengths = new HashMap[Char, (Int => Int)]
   lengths += ('b' -> ((x: Int) => x))
-  lengths += ('d' -> ((x: Int) => math.ceil(math.log(2)/math.log(10)*x).toInt))
+  lengths += ('e' -> ((x: Int) => if (x == 32) decFloSize(23, 8) else decFloSize(52, 11)))
+  lengths += ('d' -> ((x: Int) => decIntSize(x)))
   lengths += ('x' -> ((x: Int) => (x + 3)/4))
   lengths += ('s' -> ((x: Int) => (x + 7)/8))
   lengths += ('%' -> ((x: Int) => 1))
