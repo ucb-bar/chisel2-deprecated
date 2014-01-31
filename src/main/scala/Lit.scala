@@ -262,12 +262,19 @@ class Literal extends Node {
   var isBinary = false;
   var base = 'x';
   var inputVal = BigInt(0);
-  override def value: BigInt = stringToVal(base, name);
+  override lazy val value: BigInt = stringToVal(base, name);
   override def isLit: Boolean = true;
   override def litOf: Literal = this
   override def toString: String = name;
   override def isInVCD: Boolean = false
 
   def d (x: BigInt): Literal = Literal(x, value.toInt)
+
+  override def canCSE: Boolean = true
+  override def hashCodeForCSE: Int = value.toInt
+  override def equalsForCSE(x: Node): Boolean = x match {
+    case x: Literal => value == x.value && isZ == x.isZ && width == x.width
+    case _ => false
+  }
 }
 

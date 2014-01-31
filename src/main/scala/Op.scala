@@ -85,7 +85,7 @@ object BinaryOp {
       case "+"   => Op("+",  2, maxWidth _,  x, y );
       case "*"   => Op("*",  0, sumWidth _,  x, y );
       case "s*s" => Op("s*s",  0, sumWidth _,  x, y );
-      case "s*u" => Op("s*s",  0, mulSUWidth _,  x, y );
+      case "s*u" => Op("s*u",  0, mulSUWidth _,  x, y );
       case "/"   => Op("/",  0, widthOf(0),  x, y );
       case "s/s" => Op("s/s",  0, widthOf(0),  x, y );
       case "%"   => Op("%",  0, minWidth _,  x, y );
@@ -365,7 +365,7 @@ object Op {
           if (a.litOf != null && a.litOf.isZ) {
             return Op(name, nGrow, widthInfer, b, a)
           }
-        case "s*s" =>
+        case "s*s" | "s*u" =>
           val (signA, absA) = signAbs(a)
           val (signB, absB) = signAbs(b)
           val prod = absA * absB
@@ -466,4 +466,18 @@ class Op extends Node {
     }
   }
 
+  override def canCSE: Boolean = true
+  override def equalsForCSE(x: Node): Boolean = x match {
+    case x: Op => {
+      if (op != x.op)
+        return false
+      if (inputs.length != x.inputs.length)
+        return false
+      for (i <- 0 until inputs.length)
+        if (!(inputs(i) == x.inputs(i)))
+          return false
+      true
+    }
+    case _ => false
+  }
 }

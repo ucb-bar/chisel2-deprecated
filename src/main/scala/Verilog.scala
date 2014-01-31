@@ -271,7 +271,7 @@ class VerilogBackend extends Backend {
           "{" + emitRef(node.inputs(0)) + ", " + emitRef(node.inputs(1)) + "}"
         } else if (node.inputs.length == 1) {
           o.op + " " + emitRef(node.inputs(0))
-        } else if (o.op == "s*s" || o.op == "s%s" || o.op == "s/s") {
+        } else if (o.op == "s*s" || o.op == "s*u" || o.op == "s%s" || o.op == "s/s") {
           "$signed(" + emitRef(node.inputs(0)) + ") " + o.op(1) + " $signed(" + emitRef(node.inputs(1)) + ")"
         } else if (o.op == "s<" || o.op == "s<=") {
           "$signed(" + emitRef(node.inputs(0)) + ") " + o.op.tail + " $signed(" + emitRef(node.inputs(1)) + ")"

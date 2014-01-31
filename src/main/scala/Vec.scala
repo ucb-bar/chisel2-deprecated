@@ -371,6 +371,9 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] 
   }
 
   def length: Int = self.size
+
+  override val hashCode: Int = System.identityHashCode(this)
+  override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
 }
 
 trait VecLike[T <: Data] extends collection.IndexedSeq[T] {

@@ -69,6 +69,7 @@ object CListLookup {
 }
 
 class CppBackend extends Backend {
+  transforms += CSE.transform
   val keywords = new HashSet[String]();
 
   override def emitTmp(node: Node): String = {

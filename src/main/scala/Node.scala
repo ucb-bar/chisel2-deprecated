@@ -237,8 +237,8 @@ abstract class Node extends nameable {
   }
   def isInObject: Boolean =
     (isIo && (Module.isIoDebug || component == Module.topComponent)) ||
-    Module.topComponent.debugs.contains(this) ||
-    isReg || isUsedByRam || Module.isDebug || isPrintArg || isScanArg;
+    Module.topComponent.debugs.contains(this) || isPrintArg || isScanArg ||
+    isReg || isUsedByRam || Module.isDebug && !name.isEmpty
 
   def isInVCD: Boolean = width > 0 &&
     ((isIo && isInObject) || isReg || (Module.isDebug && !name.isEmpty))
@@ -492,4 +492,10 @@ abstract class Node extends nameable {
     index
   }
 
+  override val hashCode: Int = System.identityHashCode(this)
+  override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
+
+  def canCSE: Boolean = false
+  def hashCodeForCSE: Int = inputs.head.hashCode
+  def equalsForCSE(x: Node): Boolean = false
 }
