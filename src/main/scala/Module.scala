@@ -262,10 +262,13 @@ object Module {
   
   var nodeToStageMap: HashMap[Node, Int] = null
   
+  var PipelineComponentNodes: ArrayBuffer[Node] = null
   var ArchitecturalRegs: ArrayBuffer[Reg] = null
   var TransactionMems: ArrayBuffer[TransactionMem[ Data ]] = null
   var VariableLatencyComponents: ArrayBuffer[TransactionalComponent] = null
   
+  var APConsumers: HashMap[Node, ArrayBuffer[(Node,Int)]] = null
+
   val valids = new ArrayBuffer[Bool]//need to deprecate
   val stalls = new HashMap[Int, ArrayBuffer[Bool]]
   val kills = new HashMap[Int, ArrayBuffer[Bool]]
@@ -1169,52 +1172,61 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     nodes.filter(n => !isInput(n))
     
   //automatic pipelining stuff
-
-  def getConsumers() = {
-    val map = new HashMap[Node, ArrayBuffer[Node]]
-
-    def getConsumer(node: Node) = {
-      for (i <- node.inputs) {
-        if (!map.contains(i)) {
-          map += (i -> new ArrayBuffer[Node])
-        }
-        //if(!map(i).contains(node))
-        map(i) += node
-      }
-    }
-
-    bfs(getConsumer(_))
-    map
-  }
-  
   def gatherSpecialComponents() = {
     println("gathering special pipelining components")
+    PipelineComponentNodes = new ArrayBuffer[Node]
     ArchitecturalRegs = new ArrayBuffer[Reg]
     TransactionMems = new ArrayBuffer[TransactionMem[Data]]
     VariableLatencyComponents = new ArrayBuffer[TransactionalComponent]()
+    
+    //collect all nodes within in the pipeline component, including all nodes in the submodules except for nodes within TransactionMems and VariableLatencyUnits
+    def registerNodes(module: Module): Unit = {
+      if(!module.isInstanceOf[TransactionMem[_]] && !module.isInstanceOf[TransactionalComponent]){
+        for(node <- module.nodes){
+          PipelineComponentNodes += node
+        }
+        for(childModule <- module.children){
+          registerNodes(childModule)
+        }
+      } else {
+        for(io <- module.io.flatten.map(_._2)){
+          PipelineComponentNodes += io
+        }
+      }
+    }
+    registerNodes(pipelineComponent)
+
     //mark architectural registers
-    for(node <- pipelineComponent.nodes){
-      if (node.isInstanceOf[Reg] && !isPipeLineReg(node)) ArchitecturalRegs += node.asInstanceOf[Reg]
+    for(node <- PipelineComponentNodes){
+      if (node.isInstanceOf[Reg] && !isPipeLineReg(node)) {
+        ArchitecturalRegs += node.asInstanceOf[Reg]
+      }
     }
     //mark TransactionMems
-    for(component <- pipelineComponent.children){
-      if(component.isInstanceOf[TransactionMem[Data]]){
-        TransactionMems += component.asInstanceOf[TransactionMem[Data]]
+    def registerTransactionMems(module: Module): Unit = {
+      if(!module.isInstanceOf[TransactionMem[_]] && !module.isInstanceOf[TransactionalComponent]){
+        for(childModule <- module.children){
+          registerTransactionMems(childModule)
+        }
+      } else if(module.isInstanceOf[TransactionMem[_]]){
+        TransactionMems += module.asInstanceOf[TransactionMem[Data]]
       }
     }
+    registerTransactionMems(pipelineComponent)
     //mark variable latency modules
-    for(component <- pipelineComponent.children){
-      if(component.isInstanceOf[TransactionalComponent]){
-        VariableLatencyComponents += component.asInstanceOf[TransactionalComponent]
-        variableLatencyUnitInputs += component.asInstanceOf[TransactionalComponent].io.req.valid
-        variableLatencyUnitInputs += component.asInstanceOf[TransactionalComponent].io.req.bits
-        variableLatencyUnitInputs += component.asInstanceOf[TransactionalComponent].resp_ready
-        variableLatencyUnitOutputs += component.asInstanceOf[TransactionalComponent].io.resp
-        variableLatencyUnitOutputs += component.asInstanceOf[TransactionalComponent].resp_valid
-        variableLatencyUnitOutputs += component.asInstanceOf[TransactionalComponent].req_ready
+    def registerVariableLatencyComponents(module: Module): Unit = {
+      if(!module.isInstanceOf[TransactionMem[_]] && !module.isInstanceOf[TransactionalComponent]){
+        for(childModule <- module.children){
+          registerVariableLatencyComponents(childModule)
+        }
+      } else if(module.isInstanceOf[TransactionalComponent]){
+        VariableLatencyComponents += module.asInstanceOf[TransactionalComponent]
+        variableLatencyUnitInputs += module.asInstanceOf[TransactionalComponent].io.req.valid
+        variableLatencyUnitInputs += module.asInstanceOf[TransactionalComponent].io.req.bits
+        variableLatencyUnitOutputs += module.asInstanceOf[TransactionalComponent].io.resp
       }
     }
-
+    registerVariableLatencyComponents(pipelineComponent)
     //mark read and write points for regs
     for (reg <- ArchitecturalRegs) {
       regReadPoints += reg
@@ -1246,8 +1258,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     
     for((name, io) <- pipelineComponent.io.asInstanceOf[Bundle].elements){
       io match {
-        case decoupled: DecoupledIO[Data] => {
-          ioNodes += decoupled  
+        case decoupled: DecoupledIO[_] => {
+          ioNodes += decoupled.asInstanceOf[DecoupledIO[Data]]  
         }
         case _ => {
           Predef.assert(false, "all IO must be through the DecoupledIO interface")
@@ -1255,31 +1267,50 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
     }
 
+    //find our own consumers list with input numbers attached to the consumer pointers and trace into submodules
+    findAPConsumers()
+    
     //specify read/write point and IO stage numbers if auto annotate is on
     if(autoAnnotate){
       for(archReg <- ArchitecturalRegs){
-        Module.setRegReadStage(archReg, 0)
-        Module.setRegWriteStage(archReg, autoAnnotateStageNum - 1)
+        setRegReadStage(archReg, 0)
+        setRegWriteStage(archReg, autoAnnotateStageNum - 1)
       }
       for(tMem <-TransactionMems){
-        Module.setTmemWriteStage(tMem, autoAnnotateStageNum - 1)
+        setTmemWriteStage(tMem, autoAnnotateStageNum - 1)
       }
-      //Module.setInputStage(0)
-      //Module.setOutputStage(autoAnnotateStageNum - 1)
-      for((name, io) <- pipelineComponent.io.asInstanceOf[Bundle].elements){
-        io match {
-          case decoupled: DecoupledIO[Data] => {
-            setDecoupledIOStage(decoupled, autoAnnotateStageNum/2)
-          }
-          case _ => {
-            Predef.assert(false, "all IO must be through DecoupledIO interfaces")
-          }
-        }
+      for(io <- ioNodes){
+        setDecoupledIOStage(io, autoAnnotateStageNum/2)
       }
     }
 
   }
-  
+ 
+  def findAPConsumers() = {
+    APConsumers = new HashMap[Node, ArrayBuffer[(Node, Int)]]()
+    val allNodes = new ArrayBuffer[Node]
+    def findAllNodes(module: Module):Unit = {
+      for(node <- module.nodes){
+        allNodes += node
+      }
+      for(child <- module.children){
+        findAllNodes(child)
+      }
+    }
+    findAllNodes(pipelineComponent)
+    for(node <- allNodes){
+      APConsumers(node) = new ArrayBuffer[(Node, Int)]()
+    }
+    for(node <- allNodes){
+      for(i <- 0 until node.inputs.length){
+        val nodeInput = node.inputs(i)
+        if(APConsumers.contains(nodeInput)){
+          APConsumers(nodeInput) += ((node, i))
+        }
+      }
+    }
+  }
+
   def findNodesRequireStage() = {
     //mark nodes reachable from sourceNodes through the consumer pointer as requiring a stage number
     val bfsQueue = new ScalaQueue[Node]
@@ -1290,7 +1321,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     while(!bfsQueue.isEmpty){
       val currentNode = bfsQueue.dequeue
       if(!isSink(currentNode)){
-        for(child <- currentNode.consumers){
+        for(child <- APConsumers(currentNode).map(_._1)){
           if(!visited.contains(child) && !isSink(child)){
             bfsQueue.enqueue(child)
           }
@@ -1313,7 +1344,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     setPipelineLength(annotatedStages.map(_._2).max + 1)
     
     removeRegConsumerCycle()
-    
+   
     findNodesRequireStage()
     
     val autoNodes = createAutoNodeGraph()
@@ -1361,7 +1392,16 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def removeRegConsumerCycle() = {  
     def dfs(node: Node, reg: Node): Unit  = {
       if(node.inputs.contains(reg)){
-        reg.consumers -= node
+        val consumerPairsToRemove = new ArrayBuffer[(Node, Int)]
+        for(i <- 0 until APConsumers(reg).length){
+          if(APConsumers(reg)(i)._1 == node){
+            consumerPairsToRemove += APConsumers(reg)(i)
+          }
+        }
+        for(consumerPair <- consumerPairsToRemove){
+          APConsumers(reg) -= consumerPair
+        }
+        reg.consumers -= node//remove after all .consumer calls are removed
         //regWritePoints += node
       } else if(!isSink(node) && !isSource(node) && !((node.litOf != null) || (node == pipelineComponent.clock) || (node == pipelineComponent._reset))){
         for(input <- node.inputs){
@@ -1465,35 +1505,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       autoNodeGraph += varLatUnitNode 
     }
     
-    /*
-    val inputsNode = new AutoLogic
-    inputsNode.name = "inputs_node"
-    inputsNode.isSource = true
-    for(input <- inputNodes){
-      if(inputsNode.stages.length == 0 && annotatedStages.contains(input)){
-        inputsNode.stages += annotatedStages(input)
-        inputsNode.isUserAnnotated = true
-      }
-      inputsNode.outputChiselNodes += input
-      chiselNodeToAutoNodeMap(input) = inputsNode
-    }
-    autoNodeGraph += inputsNode
-    autoSourceNodes += inputsNode
-
-    val outputsNode = new AutoLogic
-    outputsNode.name = "outputs_node"
-    outputsNode.isSink = true
-    for(output <- outputNodes){
-      if(outputsNode.stages.length == 0 && annotatedStages.contains(output)){
-        outputsNode.stages += annotatedStages(output)
-        outputsNode.isUserAnnotated = true
-      }
-      outputsNode.inputChiselNodes += output
-      chiselNodeToAutoNodeMap(output) = outputsNode
-    }
-    autoNodeGraph += outputsNode
-    autoSinkNodes += outputsNode*/
-    
     for(io <- ioNodes){
       val ioNode = new AutoLogic
       ioNode.name = "io_node"
@@ -1558,7 +1569,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         autoSourceNodes += autoNode
       }
       for(output <- autoNode.asInstanceOf[AutoLogic].outputChiselNodes){
-        for(consumer <- output.consumers.filter(requireStage(_))){
+        for(consumer <- APConsumers(output).map(_._1).filter(requireStage(_))){
           autoNode.consumers += chiselNodeToAutoNodeMap(consumer)
         }
       }
@@ -1596,8 +1607,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           currentNode.inputs(i) = autoWire
 
           //fix consumers pointers on input
+          var foundConsumer = false
           for(j <- 0 until input.consumers.length){
-            if(input.consumers(j) == currentNode){//FIX THIS: this assumes that any consumer of input only goes into one of the input ports of input
+            if(input.consumers(j) == currentNode && !foundConsumer){
+              foundConsumer = true
               input.consumers(j) = autoWire
             }
           }
@@ -1772,72 +1785,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
     }
     visualizeAutoLogicGraph(autoNodes, "stages.gv")
-  }
- 
-  def separateIONodes(autoNodes: ArrayBuffer[AutoNode]) = {
-    //external state:
-    //autoNodes
-    //chiselNodetoAutoNodeMap
-    //autoSourceNodes
-    //autoSinkNodes
-    for(autoNode <- autoNodes.filter(_.isDecoupledIO).map(_.asInstanceOf[AutoLogic])){
-      val inputNode = new AutoLogic
-      inputNode.name = "input"
-      inputNode.isSource = true
-      for(stage <- autoNode.stages){
-        inputNode.stages += stage
-      }
-      if(!inputNode.stages.isEmpty){
-        inputNode.isUserAnnotated = true
-      }
-      for(consumer <- autoNode.consumers){
-        inputNode.consumers += consumer
-        for(i <- 0 until consumer.inputs.length){
-          if(consumer.inputs(i) == autoNode){
-            consumer.inputs(i) = inputNode
-          }
-        }
-      }
-      for(outputChiselNode <- autoNode.outputChiselNodes){
-        inputNode.outputChiselNodes += outputChiselNode
-      }
-      autoNodes += inputNode
-      autoSourceNodes += inputNode
-      
-      val outputNode = new AutoLogic
-      outputNode.name = "output"
-      outputNode.isSink = true
-      for(stage <- autoNode.stages){
-        outputNode.stages += stage
-      }
-      if(!outputNode.stages.isEmpty){
-        outputNode.isUserAnnotated = true
-      }
-      for(input <- autoNode.inputs){
-        outputNode.inputs += input
-        for(i <- 0 until input.consumers.length){
-          if(input.consumers(i) == autoNode){
-            input.consumers(i) = outputNode
-          }
-        }
-      }
-      for(inputChiselNode <- autoNode.inputChiselNodes){
-        outputNode.inputChiselNodes += inputChiselNode
-      }
-      for(inputAutoNode <- autoNode.inputMap.keys){
-        outputNode.inputMap(inputAutoNode) = autoNode.inputMap(inputAutoNode)
-      }
-      autoNodes += outputNode
-      autoSinkNodes += outputNode
-
-      autoNodes -= autoNode
-      if(autoSourceNodes.contains(autoNode)){
-        autoSourceNodes -= autoNode
-      }
-      if(autoSinkNodes.contains(autoNode)){
-        autoSinkNodes -= autoNode
-      }
-    }
   }
 
   def optimizeRegisterPlacement(autoNodes: ArrayBuffer[AutoNode]) = { 
@@ -2190,6 +2137,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   //inserts register between *input* and its consumers
   def insertRegister(input: Bits, init_value: Bits, name: String) : Bits = {
     val new_reg = Reg(Bits())
+    PipelineComponentNodes += new_reg
+    APConsumers(new_reg) = new ArrayBuffer[(Node, Int)]
     new_reg := input
     new_reg.comp.asInstanceOf[Reg].clock = pipelineComponent.clock
     when(pipelineComponent._reset){
@@ -2198,68 +2147,32 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     input.pipelinedVersion = new_reg
     new_reg.unPipelinedVersion = input
     new_reg.comp.setName(name)
-    for(i <- 0 until input.consumers.size){
-      val consumer = input.consumers(i)
-      val producer_index = consumer.inputs.indexOf(input)
-      if(producer_index > -1) consumer.inputs(producer_index) = new_reg
-      new_reg.consumers += consumer
-      input.consumers(i) = new_reg
+    for(i <- 0 until APConsumers(input).size){
+      val consumer = APConsumers(input)(i)._1
+      val consumerInputIndex = APConsumers(input)(i)._2
+      consumer.inputs(consumerInputIndex) = new_reg
+      APConsumers(new_reg) += ((consumer, consumerInputIndex))
     }
+    APConsumers(input).clear()
+    APConsumers(input) += ((new_reg, 0))// the 0 is questionable, may need to actually figure out the matching new_reg input index
     new_reg
   }
   
-  //inserts additional bit nodes between *input* and its consumers(useful for automatic pipelining)
-  def insertBitsOnOutputs(input: Node) : ArrayBuffer[Node] = {
-    val newNodes = new ArrayBuffer[Node]()
-    for(i <- 0 until input.consumers.size){
-      val consumer = input.consumers(i)
-      for(j <- 0 until consumer.inputs.size){
-        if(consumer.inputs(j) == input){
-          val new_bits = Bits()
-          newNodes += new_bits
-          consumer.inputs(j) = new_bits
-          new_bits.consumers += consumer
-          new_bits.inputs += input
-          pipelineComponent.nodes += new_bits
-        } 
-      }
-    }
-    input.consumers.clear()
-    for(newNode <- newNodes){
-      input.consumers += newNode
-    }
-    newNodes
-  }
-  
-  //inserts additional bit nodes between *output* and its inputs(useful for automatic pipelining)
-  def insertBitsOnInputs(output: Node) : ArrayBuffer[Node] = {
-    val newNodes = new ArrayBuffer[Node]()
-    for(i <- 0 until output.inputs.size){
-      val input = output.inputs(i)
-      for(j <- 0 until input.consumers.size){
-        if(input.consumers(j) == output){
-          val new_bits = Bits()
-          newNodes += new_bits
-          input.consumers(j) = new_bits
-	  output.inputs(i) = new_bits
-          new_bits.inputs += input
-          new_bits.consumers += output
-        } 
-      }
-    }
-    newNodes
-  }
   
   //insert additional bit node between *output* and its input specified by *inputNum*
   def insertBitOnInput(output: Node, inputNum: Int): Bits = {
     val new_bits = Bits()
+    PipelineComponentNodes += new_bits
+    APConsumers(new_bits) = new ArrayBuffer[(Node, Int)]
     val input = output.inputs(inputNum)
-    for(i <- 0 until input.consumers.size){
-      if(input.consumers(i) == output){
-        input.consumers(i) = new_bits
+    for(i <- 0 until APConsumers(input).size){
+      val inputConsumer = APConsumers(input)(i)._1
+      val inputConsumerInputIndex = APConsumers(input)(i)._2
+      if(inputConsumer == output && inputConsumerInputIndex == inputNum){
+        APConsumers(input)(i) = ((new_bits, 0))
         output.inputs(inputNum) = new_bits
         new_bits.inputs += input
-        new_bits.consumers += output
+        APConsumers(new_bits) += ((output,inputConsumerInputIndex))
       }
     }
     return new_bits
@@ -2268,21 +2181,29 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   //inserts additional (SINGULAR) bit node between *input* and its consumers(useful for automatic pipelining)
   def insertBitOnOutputs(input: Node) : Node = {
     val new_bits = Bits()
+    PipelineComponentNodes += new_bits
+    APConsumers(new_bits) = new ArrayBuffer[(Node, Int)]
     new_bits.inputs += input
-    for(i <- 0 until input.consumers.size){
-      val consumer = input.consumers(i)
-      for(j <- 0 until consumer.inputs.size){
-        if(consumer.inputs(j) == input){
-          consumer.inputs(j) = new_bits
-          new_bits.consumers += consumer
-        } 
-      }
+    for(i <- 0 until APConsumers(input).size){
+      val consumer = APConsumers(input)(i)._1
+      val consumerInputIndex = APConsumers(input)(i)._2
+      consumer.inputs(consumerInputIndex) = new_bits
+      APConsumers(new_bits) += ((consumer, consumerInputIndex))
     }
-    input.consumers.clear()
-    input.consumers += new_bits
+    APConsumers(input).clear()
+    APConsumers(input) += ((new_bits, 0))
     new_bits
   }
   
+  //replace all occurances of *delete* with *add* in *node*'s inputs list
+  def replaceProducer(node: Node, delete: Node, add: Node): Unit = {
+    for(i <- 0 until node.inputs.length){
+      if(node.inputs(i) == delete){
+        node.inputs(i) = add
+        APConsumers(add) += ((node, i))
+      }
+    }
+  }
 
   //checks if n is a user defined pipeline register
   def isPipeLineReg(n: Node): Boolean = {
@@ -2413,12 +2334,15 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
 
       val tempBitsNode = insertBitOnOutputs(reg).asInstanceOf[Bits]
-      val originalConsumers = tempBitsNode.consumers.clone()
       val bypassMux = MuxCase(tempBitsNode, muxMapping)
+      PipelineComponentNodes += bypassMux
+      APConsumers(bypassMux) = new ArrayBuffer[(Node, Int)]
       bypassMux.nameIt("bypassMux_" + reg.name)
-      for (consumer <- originalConsumers){
-        consumer.replaceProducer(tempBitsNode, bypassMux)
+      for (consumer <- APConsumers(tempBitsNode).map(_._1)){
+        replaceProducer(consumer, tempBitsNode, bypassMux)
       }
+      APConsumers(tempBitsNode).clear()//TODO may need to fill this in right here; for now, we are relying a call to findAPConsumers after the transformations are done to get the correct APConsumers after this insertion
+      
     }
     
     //generate bypass logic for tmems
@@ -2461,11 +2385,14 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
       
       val bypassMux = MuxCase(readPort.dat.asInstanceOf[Bits], muxMapping)
+      PipelineComponentNodes += bypassMux
+      APConsumers(bypassMux) = new ArrayBuffer[(Node, Int)]
       bypassMux.nameIt("bypassMux_" + tMem.name + "_" + readPort.dat.asInstanceOf[Node].name)
       val originalConsumers = readPort.dat.asInstanceOf[Bits].consumers.clone()
-      for (consumer <- originalConsumers){
-        consumer.replaceProducer(readPort.dat.asInstanceOf[Node], bypassMux)    
+      for (consumer <- APConsumers(readPort.dat.asInstanceOf[Bits]).map(_._1)){
+        replaceProducer(consumer, readPort.dat.asInstanceOf[Node], bypassMux)    
       }
+      APConsumers(readPort.dat.asInstanceOf[Bits]).clear()//TODO may need to fill this in right here; for now, we are relying on a call to findAPConsumers after the transformations are done to get the correct APConumers after this insertion
     }
   }
   
@@ -2623,9 +2550,13 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         val newWriteEn = writeEn.asInstanceOf[Bool] && ~globalStall && stageValids(writeStage) && ~stageStalls(writeStage)
         //fix writeEn's consumer list
         val writeEnMuxFillerInput = writePoint.is.inputs(0)//need a less hack way of finding this
-        val consumer_index = writeEn.consumers.indexOf(writeEnMuxFillerInput)
-        Predef.assert(consumer_index > -1)        
-        writeEn.consumers(consumer_index) = newWriteEn
+        for(i <- 0 until APConsumers(writeEn).length){
+          val consumer = APConsumers(writeEn)(i)._1
+          val consumerInputIndex = APConsumers(writeEn)(i)._2
+          if(consumer == writeEnMuxFillerInput){
+            APConsumers(writeEn)(i) = ((newWriteEn, consumerInputIndex))
+          }
+        }
         //fix writeEnMux's inputs list
         val producer_index = writeEnMuxFillerInput.inputs.indexOf(writeEn)
         Predef.assert(producer_index > -1)
@@ -2737,116 +2668,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     //check that all IO nodes are in the same stage
   }
   
-  def verifyLegalStageColoring(coloredNodes: HashMap[Node, ArrayBuffer[Int]]) = {
-    object vDirection extends Enumeration {
-      type vDirection = Value
-      val PRODUCER, CONSUMER, DONTCARE = Value
-    }
-    import vDirection._
-    def getStage(node: Node, dir: vDirection): Int = {
-      if(requireStage(node)){
-        if(coloredNodes(node).length > 1){
-          if(dir == PRODUCER){//if node is a pipeline register and is viewed as a producer
-            return Math.max(coloredNodes(node)(0), coloredNodes(node)(1))
-          } else if(dir == CONSUMER){//if node is a pipeline register and is viewed as a consumer
-            return Math.max(coloredNodes(node)(0), coloredNodes(node)(1))
-          } else {
-            println(node)
-            println((coloredNodes)(node))
-            visualizeSubGraph(node, "debug.gv", 5)
-            Predef.assert(false, "node not expected to have more than 1 stage number")
-            return -3
-          }
-        } else {
-          return coloredNodes(node)(0)
-        }
-      } else if (!requireStage(node)){
-        return -1
-      } else {
-        Predef.assert(false, "node expected to have stage number, but does not have stage number: " + node)
-        return -2
-      }
-    }
-    
-    //add check that no node is both a register read point and a register write point
-    
-    //check that all combinational logic nodes have all inputs from the same stage
-    for(node <- pipelineComponent.nodes){
-      if(node.isInstanceOf[Op] && requireStage(node)){
-        if(!node.isInstanceOf[Mux] && !(node.consumers(0).isInstanceOf[Reg] && node.consumers(0).inputs.contains(node))){//hack because muxes generated for pipeline register reset values don't have stages //also hack to deal with or node generated for register write enable in verilog backend
-          val nodeStage = getStage(node, DONTCARE)
-          for(input <- node.inputs.filter(requireStage(_))){
-            val inputStage = getStage(input, PRODUCER)
-            Predef.assert(inputStage == nodeStage || inputStage == -1, "combinational node input does not have stage number")
-          }
-        }
-      }
-    }
-    
-    //check that all architectural register has write points in the same stage and that its write stage >= its read stage
-    for(reg <- ArchitecturalRegs){
-      val readStage = getStage(reg, DONTCARE)
-      val writeEnables = reg.updates.map(_._1).filter(_.name != "reset")
-      val writeDatas = reg.updates.filter(_._1.name != "reset").map(_._2)
-      val writeEnableStages = writeEnables.map(getStage(_, DONTCARE)).filter(_ > -1)
-      val writeDataStages = writeDatas.map(getStage(_, DONTCARE)).filter(_ > -1)
-      
-      Predef.assert(writeDataStages.length > 0, "register written by all constants; this case is not handled yet:" + writeDataStages)
-      val writeStage = writeDataStages.head
-      Predef.assert(writeStage >= readStage)
-      if(writeEnableStages.length > 0){
-        Predef.assert(writeEnableStages.tail.map( _ == writeStage).foldLeft(true)(_ && _), reg.name + " " + reg.line.getLineNumber + " " + reg.line.getClassName + " " + writeEnableStages) 
-      }
-      Predef.assert(writeDataStages.tail.map( _ == writeStage).foldLeft(true)(_ && _), reg.name + " " + reg.line.getLineNumber + " " + reg.line.getClassName + " " + writeDataStages)
-    }
-    
-    for(tmem <- TransactionMems){//check all tmems read and write ports are annotated; data, addr, and enable of each port is in same stage; all read ports are in the same stage; all write ports are in same stage; write ports have stage >= read port stage
-      val readPorts = tmem.io.reads
-      val writePorts = tmem.io.writes
-      
-      val readStage = getStage(readPorts(0).dat, DONTCARE)
-      Predef.assert(getStage(readPorts(0).adr, DONTCARE) == readStage, "transactionMem readport nodes do not all have same stage numbers")
-      for(readPort <- readPorts){
-        Predef.assert(getStage(readPort.adr, DONTCARE) == readStage, "transactionMem readport nodes do not all have same stage numbers")
-        Predef.assert(getStage(readPort.dat, DONTCARE) == readStage, "transactionMem readport nodes do not all have same stage numbers")
-      }
-       
-      val writeStage = getStage(writePorts(0).dat, DONTCARE)
-      Predef.assert(getStage(writePorts(0).adr, DONTCARE) == writeStage, "transactionMem writeport nodes do not all have same stage numbers")
-      for(writePort <- writePorts){
-        Predef.assert(getStage(writePort.is, DONTCARE) == writeStage, "transactionMem writeport nodes do not all have same stage numbers")
-        Predef.assert(getStage(writePort.adr, DONTCARE) == writeStage, "transactionMem writeport nodes do not all have same stage numbers")
-        Predef.assert(getStage(writePort.dat, DONTCARE) == writeStage, "transactionMem writeport nodes do not all have same stage numbers")
-      } 
-      
-      Predef.assert(writeStage >= readStage, "transactionMem has writePort at earlier stage than readPort")         
-    }
-    
-    //check that all IO nodes are in the same stage
-    val inputs = pipelineComponent.io.flatten.filter(_._2.dir == INPUT).map(_._2)
-    val outputs = pipelineComponent.io.flatten.filter(_._2.dir == OUTPUT).map(_._2)
-    if(inputs.length > 0){
-      val inputStage = getStage(inputs(0), DONTCARE)
-      for(input <- inputs) {
-        Predef.assert(getStage(input, DONTCARE) == inputStage, "input nodes do not all belong to the same stage")
-      }
-    }
-    
-    if(outputs.length > 0){
-      val outputStage = getStage(outputs(0), DONTCARE)
-      for(output <- outputs) {
-        Predef.assert(getStage(output, DONTCARE) == outputStage, "output nodes do not all belong to the same stage")
-      }
-    }
-    //check that all variable latency units have IO nodes in the same stage
-    for(vComponent <- VariableLatencyComponents){
-      Predef.assert(getStage(vComponent.io.req.valid, DONTCARE) == getStage(vComponent.io.req.bits, DONTCARE))
-      //Predef.assert(getStage(vComponent.io.req.valid, DONTCARE) == getStage(vComponent.resp_ready, DONTCARE))
-      Predef.assert(getStage(vComponent.io.req.valid, DONTCARE) == getStage(vComponent.io.resp, DONTCARE))
-      //Predef.assert(getStage(vComponent.io.req.valid, DONTCARE) == getStage(vComponent.resp_valid, DONTCARE))
-      //Predef.assert(getStage(vComponent.io.req.valid, DONTCARE) == getStage(vComponent.req_ready, DONTCARE))
-    }
-  }
   
   //outputs graphviz file for subgraph centered around root
   def visualizeSubGraph(root: Node, fileName: String, levels: Int) ={
@@ -2877,7 +2698,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             outFile.write(nodeNames(input) + " -> " + nodeNames(node) + ";\n")
           }
         }
-        for(consumer <- node.consumers){
+        for(consumer <- APConsumers(node).map(_._1)){
           if(!nodeNames.contains(consumer)){
             nextQueue.enqueue(consumer)
             outFile.write("n" + nameEnum + " [label=\"" + consumer.name + """\n""" + "level_" + currentLevel + "\"];\n")
