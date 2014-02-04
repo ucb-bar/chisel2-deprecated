@@ -454,6 +454,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       for(reset <- resets.values)
         res.enqueue(reset)
     }
+    // by Donggyu
+    for(clock <- Module.clocks) {
+      res.enqueue(clock)
+    }
 
     res
   }
@@ -799,8 +803,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def genAllMuxes {
     for (p <- procs) {
       p match {
-        case b: Bits  => if(b.updates.length > 0) b.genMuxes(b.default);
-        case r: Reg  => r.genMuxes(r);
+        case b: Bits => if(b.updates.length > 0) b.genMuxes(b.default);
+        case r: Reg => r.genMuxes(r);
         case mw: MemWrite =>
         case mw: PutativeMemWrite =>
         case e: Extract =>
@@ -848,6 +852,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       queue.push(() => d.traceNode(c, queue))
     for (b <- Module.blackboxes)
       queue.push(() => b.io.traceNode(this, queue));
+
     while (queue.length > 0) {
       val work = queue.pop();
       work();

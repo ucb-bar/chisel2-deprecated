@@ -199,8 +199,8 @@ object chiselMain {
         Module.tester = ftester(c)
       }
       Module.backend.elaborate(c)
-      if (Module.isCheckingPorts) Module.backend.checkPorts(c)
-      if (Module.isCompiling && Module.isGenHarness) Module.backend.compile(c)
+      if (Module.isCheckingPorts) Module.backend.checkPorts(Module.topComponent) // by Donggyu
+      if (Module.isCompiling && Module.isGenHarness) Module.backend.compile(Module.topComponent) // by Donggyu
       if (Module.isTesting) Module.tester.tests()
       c
     } finally {

@@ -252,19 +252,23 @@ abstract class Backend {
     }
   }
 
- def emitTmp(node: Node): String =
+  def emitTmp(node: Node): String =
     emitRef(node)
 
+  // by Donggyu (for backannotation)
+  // Todo: port it to the new graph format
   def emitRef(node: Node): String = {
     node match {
       case r: Reg =>
-        if (r.name == "") "R" + r.emitIndex else r.name
+        if (r.name == "") {
+          r setName ("R" + r.emitIndex)
+        } 
+        r.name
       case _ =>
         if(node.name == "") {
-          "T" + node.emitIndex
-        } else {
-          node.name
-        }
+          node setName ("T" + node.emitIndex)
+        } 
+        node.name
     }
   }
 
@@ -512,6 +516,9 @@ abstract class Backend {
     }
   }
 
+  // This is modified for couter infrastructure
+  // Each method in elaborate calls with Module.topComponent instead of c
+  // by Donggyu
   def elaborate(c: Module): Unit = {
     println("backend elaborate")
     Module.setAsTopComponent(c)
@@ -534,24 +541,24 @@ abstract class Backend {
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
     // Module.assignResets()
 
-    levelChildren(c)
-    Module.sortedComps = gatherChildren(c).sortWith(
+    levelChildren(Module.topComponent)
+    Module.sortedComps = gatherChildren(Module.topComponent).sortWith(
       (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)));
 
     assignClockAndResetToModules
     Module.sortedComps.map(_.addDefaultReset)
-    c.addClockAndReset
+    Module.topComponent.addClockAndReset
     gatherClocksAndResets
     connectResets
 
     ChiselError.info("started inference")
-    val nbOuterLoops = c.inferAll();
+    val nbOuterLoops = Module.topComponent.inferAll();
     ChiselError.info("finished inference (" + nbOuterLoops + ")")
     ChiselError.info("start width checking")
-    c.forceMatchingWidths;
+    Module.topComponent.forceMatchingWidths;
     ChiselError.info("finished width checking")
     ChiselError.info("started flattenning")
-    val nbNodes = c.removeTypeNodes()
+    val nbNodes = Module.topComponent.removeTypeNodes()
     ChiselError.info("finished flattening (" + nbNodes + ")")
     ChiselError.checkpoint()
 
@@ -570,20 +577,20 @@ abstract class Backend {
     collectNodesIntoComp(initializeDFS)
     ChiselError.info("finished resolving")
 
-    // two transforms added in Mem.scala (referenced and computePorts)
-    ChiselError.info("started transforms")
-    execute(c, transforms)
-    ChiselError.info("finished transforms")
-
     // by Donggyu (for backannotation)
     // Todo: port it to the new graph format
     // ------------------------------------------------
-    nameAll(c)
-    Module.sortedComps map (_.nodes map (emitRef(_)))
+    nameAll(Module.topComponent)
+    Module.sortedComps map (_.nodes map ((emitRef(_))))
     // ------------------------------------------------
 
+    // two transforms added in Mem.scala (referenced and computePorts)
+    ChiselError.info("started transforms")
+    execute(Module.topComponent, transforms)
+    ChiselError.info("finished transforms")
+
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
-    c.traceNodes();
+    Module.topComponent.traceNodes();
     val clkDomainWalkedNodes = new ArrayBuffer[Node]
     for (comp <- Module.sortedComps)
       for (node <- comp.nodes)
@@ -593,10 +600,10 @@ abstract class Backend {
 
     /* We execute nameAll after traceNodes because bindings would not have been
        created yet otherwise. */
-    nameAll(c)
+    nameAll(Module.topComponent)
     nameRsts
 
-    execute(c, analyses)
+    execute(Module.topComponent, analyses)
 
     for (comp <- Module.sortedComps ) {
       // remove unconnected outputs
@@ -607,7 +614,7 @@ abstract class Backend {
 
     if(!Module.dontFindCombLoop) {
       ChiselError.info("checking for combinational loops")
-      c.findCombLoop();
+      Module.topComponent.findCombLoop();
       ChiselError.checkpoint()
       ChiselError.info("NO COMBINATIONAL LOOP FOUND")
     }
@@ -649,7 +656,6 @@ abstract class Backend {
     }
     ChiselError.info(res)
   }
-
 }
 
 

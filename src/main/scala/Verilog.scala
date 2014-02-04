@@ -767,9 +767,9 @@ class VerilogBackend extends Backend {
   override def elaborate(c: Module) {
     super.elaborate(c)
 
-    val out = createOutputFile(c.name + ".v");
-    doCompile(c, out, 0);
-    c.verifyAllMuxes;
+    val out = createOutputFile(Module.topComponent.name + ".v"); // by Donggyu
+    doCompile(Module.topComponent, out, 0); // by Donggyu
+    Module.topComponent.verifyAllMuxes; // by Donggyu
     ChiselError.checkpoint()
     out.close();
 

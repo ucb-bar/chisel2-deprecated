@@ -1,8 +1,5 @@
 package Chisel
 
-import Chisel._
-import Module._
-import Node._
 // import GraphTrace._
 import ChiselError._
 import scala.collection.mutable.ArrayBuffer
@@ -28,8 +25,8 @@ object nodeToString {
       case bundle: Bundle    => "Bundle(" + 
         { for { (n, i) <- bundle.elements } yield n + " => " + nodeToString(i) + ", " } + ")"
       case vec   : Vec[_]    => "Vec(" + vec.name + ")"
-      case reg   : Reg       => "Reg(" + reg.name + ")"
-      case lit   : Literal   => "Lit(" + lit.name + ")"
+      case reg   : Reg       => "Reg(%s)".format(reg.name)
+      case lit   : Literal   => "Lit(%s)".format(lit.name)
       case op    : Op        => 
         if (op.inputs.length == 1) op.op + "(" + nodeToString(op.inputs(0)) + ")"
         else if (op.op == "Mux") "[ " + nodeToString(op.inputs(0)) + " ] ? [ " + nodeToString(op.inputs(1)) + " ] : [ " + nodeToString(op.inputs(2)) + " ]"
@@ -61,27 +58,40 @@ trait Backannotation extends Backend {
       (x, y) => (x.level < y.level || 
           (x.level == y.level && x.traversal < y.traversal) ) ) )
   // TODO: No side effiects?
-  preElaborateTransforms += ((c: Module) => assignClockAndResetToModules)
-  preElaborateTransforms += ((c: Module) => Module.sortedComps map (_.addDefaultReset))
-  preElaborateTransforms += ((c: Module) => c.addClockAndReset)
-  preElaborateTransforms += ((c: Module) => gatherClocksAndResets)
-  preElaborateTransforms += ((c: Module) => connectResets)
-  /*************************/
+  // preElaborateTransforms += ((c: Module) => Module.sortedComps map (_.addDefaultReset))
+  // preElaborateTransforms += ((c: Module) => connectResets)
+
   preElaborateTransforms += ((c: Module) => c.inferAll)
   preElaborateTransforms += ((c: Module) => c.forceMatchingWidths)
   preElaborateTransforms += ((c: Module) => c.removeTypeNodes)
   preElaborateTransforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
+
   // Todo: get rid of the followings using the new graph format
   preElaborateTransforms += ((c: Module) => nameAll(c))
   preElaborateTransforms += ((c: Module) => Module.sortedComps map (_.nodes map (emitRef(_))))
 
+  // Todo: no recursion
   protected def getParentNames(m: Module, delim: String = "/"): String = {
-    if (m == Module.topComponent) ""
+    if (m == Module.topComponent) emitRef(m) + delim
     else getParentNames(m.parent) + emitRef(m) + delim
   }
 
   protected def getSignalName(n: Node, delim: String = "/"): String = {
     if (n == null) "null" else getParentNames(n.componentOf, delim) + emitRef(n)
+  }
+
+  protected def copyResource(filename: String, toDir: String) {
+    val resourceStream = getClass getResourceAsStream "/" + filename //Todo: understand it (Java?)
+    if (resourceStream != null) {
+      val file =  new java.io.FileWriter(toDir+filename)
+      while(resourceStream.available > 0) {
+        file write (resourceStream read)
+      }
+      file.close
+      resourceStream.close 
+    } else {
+      ChiselError.info("Critical Error: we should be able to access resource/" + filename)
+    }
   }
 }
 
@@ -89,8 +99,7 @@ trait SignalBackannotation extends Backannotation {
   val signals = new HashSet[Node]
 
   preElaborateTransforms += ((c: Module) => annotateSignals(c))
-  preElaborateTransforms += ((c: Module) => generateCounters(c))
-  preElaborateTransforms += ((c: Module) => reportSignals(c))
+  // analyses += ((c: Module) => reportSignals(c))
 
   private def annotateSignals(m: Module) {
     ChiselError.info("Backannotation: annotate signals")
@@ -131,33 +140,6 @@ trait SignalBackannotation extends Backannotation {
     }
   }
 
-  def generateCounters (m: Module) {
-    ChiselError.info("Signal Backannotation: generate counters")
-
-    for (signal <- signals) {
-      val signalWidth = signal.getWidth
-      val signalType = Bits(0, signalWidth)
-      signalType.inputs += signal
-
-      val counter = Reg(init = UInt(0, 32))
-      signal.counter = counter.getNode
-
-      // This is a signal
-      if (signalWidth == 1) {
-        counter := counter + signalType
-      }
-      // This is a bus
-      else {
-        val xor = signalType ^ Reg(next = signalType)
-        val add = Bits(0)
-        for (i <- 0 until signalWidth) {
-          add := add + xor(i)
-        }
-        counter := counter + add
-      } 
-    }
-  }  
-
   private def reportSignals(m: Module) {
     val rptdir  = ensureDir(targetdir+"report")
     val rptfile = new java.io.FileWriter(rptdir+"%s_signal.rpt".format(m.name))
@@ -170,27 +152,27 @@ trait SignalBackannotation extends Backannotation {
     report append "\t\t|                     by Donggyu Kim  |\n"
     report append "\t\t+-------------------------------------+\n\n"
 
-    val walked = new HashSet[Module]
-    val stack = new Stack[Module]
-    stack push m
-
-    while (!stack.isEmpty) {
-      val module = stack.pop
-      
+    Module.sortedComps map { module =>
       report append "Module: %s\n".format(module.getPathName)
-      for(mod <- module.mods) {
-        if (signals contains mod) {
-          report append "  %s : %s => %s\n".format(getSignalName(mod), nodeToString(mod), getSignalName(mod.counter))
-        }
+      module.nodes map { node =>
+       if (signals contains node) {
+          val counter = node.counter
+          report append "  %s: %s => %s ==> %s\n".format(
+            getSignalName(node), 
+            nodeToString(node), 
+            getSignalName(counter), 
+            nodeToString(counter.inputs(0))
+          )
+       }
       }
-      report append "\n\n"
-      walked += module
+    } 
 
-      for(child <- module.children) {
-        if (!(walked contains child)) {
-          stack push child
-        }
-      }
+    ChiselError.info(report.result)
+
+    try {
+      rptfile.write(report.result)
+    } finally {
+      rptfile.close()
     }
   }
 }
@@ -491,7 +473,9 @@ trait DelayBackannotation extends Backannotation {
 
   private def executeDC(m: Module) = {
     if (!(new java.io.File(dcsyndir+"dcsetup.tcl").exists)) {
+      copyResource("dcsetup.tcl", dcsyndir)
       // Copy the dcsetup.tcl file into the targetDir
+      /*
       val resourceStream = getClass getResourceAsStream "/dcsetup.tcl" //Todo: understand it (Java?)
       if (resourceStream != null) {
         val dcsetupFile =  new java.io.FileWriter(dcsyndir+"dcsetup.tcl")
@@ -503,6 +487,7 @@ trait DelayBackannotation extends Backannotation {
       } else {
         ChiselError.info("Critical Error: we should be able to access chisel/src/main/resources/dcsetup.tcl")
       }
+      */
     }
 
     if (!(new java.io.File(dcsyndir+"%s_timing.rpt".format(m.name)).exists)) {

@@ -145,7 +145,7 @@ abstract class Node extends nameable {
   var CppVertex: CppVertex = null
   // For signal annotation 
   // by Donggyu
-  var counter: Node = null
+  var counter: Bits = null
   // For delay annotation
   // by Donggyu
   val delays = new HashMap[String, Double]
@@ -350,7 +350,7 @@ abstract class Node extends nameable {
             assert( node.component == nextComp,
               ChiselError.error((if(node.name != null && !node.name.isEmpty)
                 node.name else "?")
-                + "[" + node.getClass.getName
+                + "[" + /*node.getClass.getName*/ nodeToString(node)
                 + "] has no match between component "
                 + (if( node.component == null ) "(null)" else node.component)
                 + " and '" + nextComp + "' input of "
