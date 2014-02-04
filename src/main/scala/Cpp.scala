@@ -194,8 +194,7 @@ class CppBackend extends Backend {
     node match {
       case x: Mux =>
         emitTmpDec(x) +
-        block(List("val_t __mask = -" + emitLoWordRef(x.inputs(0))) ++
-              (0 until words(x)).map(i => emitWordRef(x, i) + " = " + emitWordRef(x.inputs(2), i) + " ^ ((" + emitWordRef(x.inputs(2), i) + " ^ " + emitWordRef(x.inputs(1), i) + ") & __mask)"))
+        block((0 until words(x)).map(i => emitWordRef(x, i) + " = TERNARY(" + emitLoWordRef(x.inputs(0)) + ", " + emitWordRef(x.inputs(1), i) + ", " + emitWordRef(x.inputs(2), i) + ")"))
 
       case o: Op => {
         emitTmpDec(o) +

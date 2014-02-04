@@ -205,14 +205,10 @@ static void rsha_n (val_t d[], val_t s0[], int amount, int nw, int w) {
       d[nw-i-1] = 0;
     }
 
-//   printf("RSHA-N MSB: %d (A %d) NSB %d NSW %d NRSB %d  (NW %d  W %d):", 
-//            msb, amount, n_shift_bits, n_shift_words, n_rev_shift_bits, nw,w);
-//   printf("S: 0x%llx_%llx_%llx  >> %d \n", s0[2],s0[1],s0[0],amount);
   for (int i = nw-1; i >= n_shift_words; i--) {
     val_t val = s0[i];
     d[i-n_shift_words] = val >> n_shift_bits | carry;
     carry              = is_zero_carry ? 0 : val << n_rev_shift_bits;
-//    printf("%d S %16llx D %16llx C %16llx \n", i, val, d[i-n_shift_words], carry);
   }
 
   if (msb == 0) {
@@ -241,14 +237,11 @@ static void rsh_n (val_t d[], val_t s0[], int amount, int nw) {
   int is_zero_carry    = n_shift_bits == 0;
   for (int i = 0; i < n_shift_words; i++)  
     d[nw-i-1] = 0;
-//   printf("RSH-N A %d NSB %d NSW %d NRSB %d NW %d: ", amount, n_shift_bits, n_shift_words, n_rev_shift_bits, nw);
   for (int i = nw-1; i >= n_shift_words; i--) {
     val_t val = s0[i];
     d[i-n_shift_words] = val >> n_shift_bits | carry;
     carry              = is_zero_carry ? 0 : val << n_rev_shift_bits;
-    // printf("%d:S%llx:D%llx:C%llx ", i, val, d[i-n_shift_words], carry);
   }
-  // printf("\n");
 }
 
 static void lsh_n (val_t d[], val_t s0[], int amount, int nwd, int nws) {
@@ -269,11 +262,7 @@ static void lsh_n (val_t d[], val_t s0[], int amount, int nwd, int nws) {
 }
 
 static inline val_t mask_val(int n) {
-  // if (n == val_n_bits())
-  //   return val_all_ones();
-  // else
   val_t res = val_all_ones() >> (val_n_bits()-n);
-  // printf("RES %d %llx\n", n, res);
   return res;
 }
 
@@ -292,22 +281,6 @@ static inline void mask_n (val_t d[], int nw, int nb) {
   if (n_word_bits > 0) 
     d[n_full_words] = mask_val(n_word_bits);
 }
-
-/*
-static const val_t b[] = {0x2, 0xC, 0xF0, 0xFF00, 0xFFFF0000, 0xFFFFFFFF00000000};
-static const val_t S[] = {1, 2, 4, 8, 16, 32};
-
-static inline val_t log2_1 (val_t v) {
-  val_t r = 0; 
-  for (int i = 5; i >= 0; i--) {
-    if (v & b[i]) {
-      v >>= S[i];
-      r |= S[i];
-    } 
-  }
-  return r;
-}
-*/
 
 static inline val_t log2_1 (val_t v) {
   val_t r; 
@@ -1070,7 +1043,6 @@ class dat_t : public dat_base_t {
         return false;
     }
     dat_t<1> equals = *other_ptr == *this;
-    // cout << values[0] << " " << other_ptr->values[0] << endl;
     return equals.values[0];
   }
   std::string to_str () {
@@ -1104,36 +1076,16 @@ class dat_t : public dat_base_t {
     r.randomize();
     return r;
   }
-  inline dat_t<w> () { 
-//     for (int i = 0; i < n_words; i++) 
-//       values[i] = 0; 
+  inline dat_t<w> () {
   }
   template <int sw>
-  inline dat_t<w> (const dat_t<sw>& src) { 
+  inline dat_t<w> (const dat_t<sw>& src) {
     bit_word_funs<n_words>::copy(values, (val_t*)src.values, src.n_words);
-    /*
-    int sww = src.n_words;
-    if (sww > n_words) {
-      for (int i = 0; i < n_words; i++) {
-        // printf("A I %d\n", i); fflush(stdout);
-        values[i] = src.values[i];
-      }
-    } else {
-      for (int i = 0; i < sww; i++) {
-        // printf("B I %d\n", i); fflush(stdout);
-        values[i] = src.values[i];
-      }
-      for (int i = sww; i < n_words; i++) {
-        // printf("C I %d\n", i); fflush(stdout);
-        values[i] = 0;
-      }
-    }
-    */
+    if (sw != w && val_n_word_bits(w))
+      values[n_words-1] &= mask_val(val_n_word_bits(w));
   }
   inline dat_t<w> (const dat_t<w>& src) { 
     bit_word_funs<n_words>::set(values, (val_t*)src.values);
-    // for (int i = 0; i < n_words; i++) 
-    //   values[i] = src.values[i];
   }
   inline dat_t<w> (val_t val) { 
     values[0] = val; 
@@ -1144,7 +1096,6 @@ class dat_t : public dat_base_t {
   template <int sw>
   dat_t<w> mask(dat_t<sw> fill, int n) {
     dat_t<w> res;
-    // const int nw = (dw - 1)/val_n_bits() + 1;
     bit_word_funs<n_words>::mask(res.values, n);
     return res;
   }
@@ -1236,19 +1187,16 @@ class dat_t : public dat_base_t {
     dat_t<1> res;
     bit_word_funs<n_words>::gtu(res.values, values, o.values);
     return res;
-    // return o < *this;
   }
   dat_t<1> operator >= ( dat_t<w> o ) {
     dat_t<1> res;
     bit_word_funs<n_words>::gteu(res.values, values, o.values);
     return res;
-    // return !(*this < o);
   }
   dat_t<1> operator <= ( dat_t<w> o ) {
     dat_t<1> res;
     bit_word_funs<n_words>::lteu(res.values, values, o.values);
     return res;
-    // return !(o < *this);
   }
   inline dat_t<1> gt ( dat_t<w> o ) {
     dat_t<1> res;
@@ -1313,37 +1261,16 @@ class dat_t : public dat_base_t {
     return res;
   }
   dat_t<w> operator << ( int amount ) {
-    // TODO: TOO MANY CASES
     dat_t<w> res;  
-    // if (amount >= w) {
-    // bit_word_funs<n_words>::fill(res.values, 0);
-    // } else if ((amount % val_n_bits()) == 0) {
-    // int n_shift_words = amount / val_n_bits();
-    // for (int i = 0; i < n_shift_words; i++) 
-    // res.values[i] = 0;
-    // for (int i = 0; i < (n_words-n_shift_words); i++) 
-    // res.values[i+n_shift_words] = values[i];
-    // } else {
-      bit_word_funs<n_words>::lsh(res.values, values, amount);
-    // }
+    bit_word_funs<n_words>::lsh(res.values, values, amount);
     return res;
   }
   inline dat_t<w> operator << ( dat_t<w> o ) {
     return *this << o.lo_word();
   }
   dat_t<w> operator >> ( int amount ) {
-    // TODO: GET RID OF CASES
-    //printf(">> called\n");
     dat_t<w> res;  
-    // if (amount >= w) {
-    // bit_word_funs<n_words>::fill(res.values, 0);
-    // } else if ((amount % val_n_bits()) == 0) {
-    // int n_shift_words = amount / val_n_bits();
-    // for (int i = n_words-1; i >= n_shift_words; i--) 
-    // res.values[i-n_shift_words] = values[i];
-    // } else {
-      bit_word_funs<n_words>::rsh(res.values, values, amount);
-    // }
+    bit_word_funs<n_words>::rsh(res.values, values, amount);
     return res; 
   }
   inline dat_t<w> operator >> ( dat_t<w> o ) {
@@ -1361,8 +1288,6 @@ class dat_t : public dat_base_t {
   }
   dat_t<w> fill_bit( val_t bit ) { 
     dat_t<w> res;
-    // const val_t val_0s_1s[2] = { 0L, ~(val_t)0L };
-    // bit_word_funs<n_words>::fill_nb(res.values, val_0s_1s[bit], w);
     val_t word = 0L - bit;
     bit_word_funs<n_words>::fill_nb(res.values, word, w);
     return res;
@@ -1384,40 +1309,16 @@ class dat_t : public dat_base_t {
     } else {
       return res.fill_byte(lo_word(), w, n);
     }
-    // FASTER VERSION BELOW BUT ABOVE SHOULD GET RID OF BRANCHES
-    /*
-    if (lo_word()) {
-      return mask<n>();
-    } else {
-      return DAT<n>(0);
-    } 
-    */
-      // // TODO: finish this
-      // dat_t<dw> d0(0);
-      // printf("ERROR UNIMPLEMENTED FILL\n");
-      // return d0;
-      // }
   }
   template <int dw, int nw>
   dat_t<dw> fill( dat_t<nw> n ) { 
     // TODO: GET RID OF IF'S
-    // if (w == 1) {
     dat_t<dw> res;
     if (w == 1) {
       return res.fill_bit(lo_word()&1);
     } else {
       return res.fill_byte(lo_word(), w, n);
     }
-    // if (lo_word()) {
-    //   return mask<dw>(n.lo_word());
-    // } else {
-    //   return DAT<dw>(0);
-    // } 
-      // // TODO: finish this
-      // dat_t<dw> d0(0);
-      // printf("ERROR UNIMPLEMENTED FILL\n");
-      // return d0;
-      // }
   }
   template <int dw>
   dat_t<dw> extract() {
@@ -1460,7 +1361,6 @@ class dat_t : public dat_base_t {
     return res;
   }
   inline dat_t<1> bit(val_t b) { 
-    //printf("%llx\n", b);
     int n_full_words = val_n_full_words(b);
     int n_word_bits  = val_n_word_bits(b);
     return DAT<1>((values[n_full_words] >> n_word_bits)&1); 
@@ -1608,18 +1508,14 @@ inline dat_t<w> mux ( dat_t<1> t, dat_t<w> c, dat_t<w> a ) {
   dat_t<w> mask;
   bit_word_funs<val_n_words(w)>::fill(mask.values, -t.lo_word());
   return a ^ ((a ^ c) & mask);
-  // return t.lo_word() != 0 ? c : a; 
 }
 
 template <int w>
 class datz_t : public dat_t<w> {
  public:
   dat_t<w> mask;
-  // dat_t<1> EQZ ( dat_t<w> o ) {
   inline dat_t<1> operator == ( dat_t<w> o ) {
     dat_t<w> masked = (o & mask);
-    // printf("(VAL=%lx & MASK=%lx) = %lx == PAT=%lx => %d\n",
-    //        o.to_ulong(), mask.to_ulong(), masked.to_ulong(), this->to_ulong(), ((o & mask) == *this).to_bool());
     return (o & mask) == (dat_t<w>)*this;
   }
 };
@@ -1755,7 +1651,6 @@ class mem_t : public mem_base_t {
     for (int addr = 0; addr < d && !ifp.eof();) {
       getline(ifp, hex_line);
       if (dat_from_hex(hex_line, hex_dat) > 0) {
-	// printf("Mem[%d] = %x\n", addr, hex_dat.values[0]);
 	contents[addr++] = hex_dat;
       }
     }
