@@ -330,9 +330,9 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] 
   }
 
   override def fromNode(n: Node): this.type = {
-    val res = Vec(this.reverse).asInstanceOf[this.type]
-    var ind = 0;
-    for((name, io) <- res.flatten.toList.reverse) {
+    val res = this.clone
+    var ind = 0
+    for ((name, io) <- res.flatten) {
       io.asOutput();
       if(io.width > 1) {
         io assign NodeExtract(n, ind + io.width-1, ind)
