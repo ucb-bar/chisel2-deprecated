@@ -405,6 +405,12 @@ object Op {
       val fa_val = a_lit.dblValue;
       name match {
         case "dsin" => return Dbl(Math.sin(fa_val));
+        case "dcos" => return Dbl(Math.cos(fa_val));
+        case "dtan" => return Dbl(Math.tan(fa_val));
+        case "dasin" => return Dbl(Math.asin(fa_val));
+        case "dacos" => return Dbl(Math.acos(fa_val));
+        case "datan" => return Dbl(Math.atan(fa_val));
+        case "dsqrt" => return Dbl(Math.sqrt(fa_val));
         case "dlog" => return Dbl(Math.log(fa_val));
         case "dfloor" => return Dbl(Math.floor(fa_val));
         case "dceil" => return Dbl(Math.ceil(fa_val));
@@ -419,6 +425,12 @@ object Op {
       val fa_val = a_lit.floValue;
       name match {
         case "fsin" => return Flo(Math.sin(fa_val).toFloat);
+        case "fcos" => return Flo(Math.cos(fa_val).toFloat);
+        case "ftan" => return Flo(Math.tan(fa_val).toFloat);
+        case "fasin" => return Flo(Math.asin(fa_val).toFloat);
+        case "facos" => return Flo(Math.acos(fa_val).toFloat);
+        case "fatan" => return Flo(Math.atan(fa_val).toFloat);
+        case "fsqrt" => return Flo(Math.sqrt(fa_val).toFloat);
         case "flog" => return Flo(Math.log(fa_val).toFloat);
         case "ffloor" => return Dbl(Math.floor(fa_val).toFloat);
         case "fceil" => return Dbl(Math.ceil(fa_val).toFloat);

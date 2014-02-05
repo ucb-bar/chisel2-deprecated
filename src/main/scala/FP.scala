@@ -6,24 +6,6 @@ import ChiselError._
 
 import java.lang.Float.floatToIntBits
 
-/*
-object FloLit {
-  def apply(x: Float) = {
-    val lit = new FloLiteral(x);
-    val res = (new Flo()).fromNode(lit)
-    // res.value = lit.value
-    // res.isLit = true
-    res
-  }
-}
-class FloLiteral(val floValue: Float) extends Node {
-  override val value: BigInt = BigInt(floatToIntBits(floValue))
-  println("FLO-LIT " + value + " FLO-VALUE " + floValue)
-  // override def isLit = true
-  inferWidth = fixWidth(32)
-}
-*/
-
 object Flo {
   def apply(x: Float): Flo = Lit(floatToIntBits(x), 32){ Flo() }
   def apply(x: Double): Flo = Flo(x.toFloat);
@@ -87,6 +69,9 @@ class Flo extends Bits {
   def sin: Flo = newUnaryOp("fsin")
   def cos: Flo = newUnaryOp("fcos")
   def tan: Flo = newUnaryOp("ftan")
+  def asin: Flo = newUnaryOp("fasin")
+  def acos: Flo = newUnaryOp("facos")
+  def atan: Flo = newUnaryOp("fatan")
   def sqrt: Flo = newUnaryOp("fsqrt")
   def floor: Flo = newUnaryOp("ffloor")
   def ceil: Flo = newUnaryOp("fceil")
@@ -99,18 +84,6 @@ class Flo extends Bits {
 /// DBL
 
 import java.lang.Double.doubleToLongBits
-
-/*
-object DblLit {
-  def apply(x: Double) = {
-    (new Dbl()).fromNode(new DblLiteral(x))
-  }
-}
-class DblLiteral(val dblValue: Double) extends Node {
-  override val value: BigInt = BigInt(doubleToLongBits(dblValue))
-  inferWidth = fixWidth(64)
-}
-*/
 
 object Dbl {
 
@@ -176,6 +149,9 @@ class Dbl extends Bits {
   def sin: Dbl = newUnaryOp("dsin")
   def cos: Dbl = newUnaryOp("dcos")
   def tan: Dbl = newUnaryOp("dtan")
+  def asin: Dbl = newUnaryOp("dasin")
+  def acos: Dbl = newUnaryOp("dacos")
+  def atan: Dbl = newUnaryOp("datan")
   def sqrt: Dbl = newUnaryOp("dsqrt")
   def floor: Dbl = newUnaryOp("dfloor")
   def ceil: Dbl = newUnaryOp("dceil")
@@ -198,6 +174,21 @@ object Cos {
 object Tan {
   def apply (x: Flo): Flo = x.tan
   def apply (x: Dbl): Dbl = x.tan
+}
+
+object ASin {
+  def apply (x: Flo): Flo = x.asin
+  def apply (x: Dbl): Dbl = x.asin
+}
+
+object ACos {
+  def apply (x: Flo): Flo = x.acos
+  def apply (x: Dbl): Dbl = x.acos
+}
+
+object ATan {
+  def apply (x: Flo): Flo = x.atan
+  def apply (x: Dbl): Dbl = x.atan
 }
 
 object Sqrt {
