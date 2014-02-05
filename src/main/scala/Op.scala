@@ -228,15 +228,14 @@ object Op {
       }
     }
     if (a.isInstanceOf[Flo] && b.isInstanceOf[Flo]) {
-      val (fa, fb) = (a.asInstanceOf[Flo], b.asInstanceOf[Flo]);
-      if (fa.floLitOf != null && fb.floLitOf != null) { 
-      val (fa_val, fb_val) = (fa.floLitOf.floValue, fb.floLitOf.floValue);
+      if (a_lit != null && b_lit != null) {
+      val (fa_val, fb_val) = (a_lit.floValue, b_lit.floValue);
       name match {
-        case "f+" => return FloLit(fa_val + fb_val);
-        case "f-" => return FloLit(fa_val - fb_val);
-        case "f*" => return FloLit(fa_val * fb_val);
-        case "f/" => return FloLit(fa_val / fb_val);
-        case "f%" => return FloLit(fa_val % fb_val);
+        case "f+" => return Flo(fa_val + fb_val);
+        case "f-" => return Flo(fa_val - fb_val);
+        case "f*" => return Flo(fa_val * fb_val);
+        case "f/" => return Flo(fa_val / fb_val);
+        case "f%" => return Flo(fa_val % fb_val);
         case "f==" => return Bool(fa_val == fb_val);
         case "f!=" => return Bool(fa_val != fb_val);
         case "f>" => return Bool(fa_val > fb_val);
@@ -245,13 +244,13 @@ object Op {
         case "f<=" => return Bool(fa_val <= fb_val);
         case _ => ;
       }
-      } else if (fa.floLitOf != null) { 
-        val fa_val = fa.floLitOf.floValue;
+      } else if (a_lit != null) { 
+        val fa_val = a_lit.floValue;
         if (fa_val == 0.0) {
           name match {
             case "f+" => return b;
-            case "f*" => return FloLit(0.0.toFloat);
-            case "f/" => return FloLit(0.0.toFloat);
+            case "f*" => return Flo(0.0.toFloat);
+            case "f/" => return Flo(0.0.toFloat);
             case _ => ;
           }
         } else if (fa_val == 1.0) {
@@ -260,12 +259,12 @@ object Op {
             case _ => ;
           }
         }        
-      } else if (fb.floLitOf != null) { 
-        val fb_val = fb.floLitOf.floValue;
+      } else if (b_lit != null) { 
+        val fb_val = b_lit.floValue;
         if (fb_val == 0.0) {
           name match {
             case "f+" => return a;
-            case "f*" => return FloLit(0.0.toFloat);
+            case "f*" => return Flo(0.0.toFloat);
             case _ => ;
           }
         } else if (fb_val == 1.0) {
@@ -280,17 +279,15 @@ object Op {
     }
       
     if (a.isInstanceOf[Dbl] && b.isInstanceOf[Dbl]) {
-      val (fa, fb) = (a.asInstanceOf[Dbl], b.asInstanceOf[Dbl]);
-      // println("TRYING TO FOLD " + name + " FAL " + (if (fa.dblLitOf == null) fa.toString else fa.dblLitOf.dblValue.toString) + " FBL " + (if (fb.dblLitOf == null) fb.toString else fb.dblLitOf.dblValue.toString))
-      if (fa.dblLitOf != null && fb.dblLitOf != null) {
-      val (fa_val, fb_val) = (fa.dblLitOf.dblValue, fb.dblLitOf.dblValue);
+      if (a_lit != null && b_lit != null) {
+      val (fa_val, fb_val) = (a_lit.dblValue, b_lit.dblValue);
         // println(" FOLDING " + name + " " + fa_val + " " + fb_val);
       name match {
-        case "d+" => return DblLit(fa_val + fb_val);
-        case "d-" => return DblLit(fa_val - fb_val);
-        case "d*" => return DblLit(fa_val * fb_val);
-        case "d/" => return DblLit(fa_val / fb_val);
-        case "d%" => return DblLit(fa_val % fb_val);
+        case "d+" => return Dbl(fa_val + fb_val);
+        case "d-" => return Dbl(fa_val - fb_val);
+        case "d*" => return Dbl(fa_val * fb_val);
+        case "d/" => return Dbl(fa_val / fb_val);
+        case "d%" => return Dbl(fa_val % fb_val);
         case "d==" => return Bool(fa_val == fb_val);
         case "d!=" => return Bool(fa_val != fb_val);
         case "d>" => return Bool(fa_val > fb_val);
@@ -299,16 +296,16 @@ object Op {
         case "d<=" => return Bool(fa_val <= fb_val);
         case _ => ;
       }
-    } else if (fa.dblLitOf != null) { 
-      val fa_val = fa.dblLitOf.dblValue;
+    } else if (a_lit != null) { 
+      val fa_val = a_lit.dblValue;
       // println("FA " + fa_val + " NAME " + name);
       if (fa_val == 0.0) {
         // println("FOLDING " + name);
         name match {
           case "d+" => return b;
-          case "d*" => return DblLit(0.0);
-          case "d/" => return DblLit(0.0);
-          case "d%" => return DblLit(0.0);
+          case "d*" => return Dbl(0.0);
+          case "d/" => return Dbl(0.0);
+          case "d%" => return Dbl(0.0);
           case _ => ;
         }
       } else if (fa_val == 1.0) {
@@ -318,14 +315,14 @@ object Op {
           case _ => ;
         }
       }        
-    } else if (fb.dblLitOf != null) { 
-      val fb_val = fb.dblLitOf.dblValue;
+    } else if (b_lit != null) { 
+      val fb_val = b_lit.dblValue;
       // println("FB " + fb_val + " NAME " + name);
       if (fb_val == 0.0) {
         // println("FOLDING " + name);
         name match {
           case "d+" => return a;
-          case "d*" => return DblLit(0.0);
+          case "d*" => return Dbl(0.0);
           case _ => ;
         }
       } else if (fb_val == 1.0) {
@@ -339,7 +336,6 @@ object Op {
       }        
     }
 
-    }
     }
     if (Module.backend.isInstanceOf[CppBackend] || Module.backend.isInstanceOf[FloBackend]) {
       def signAbs(x: Node): (Bool, UInt) = {
@@ -386,6 +382,7 @@ object Op {
         case _ =>
       }
     }
+    }
     val res = new Op();
     res.init("", widthInfer, a, b);
     res.op = name;
@@ -402,31 +399,30 @@ object Op {
           case _ => ;
         }
       }
+      val a_lit = a.litOf
     if (a.isInstanceOf[Dbl]) { 
-      val fa = a.asInstanceOf[Dbl];
-      if (fa.dblLitOf != null) {
-      val fa_val = fa.dblLitOf.dblValue;
+      if (a_lit != null) {
+      val fa_val = a_lit.dblValue;
       name match {
-        case "dsin" => return DblLit(Math.sin(fa_val));
-        case "dlog" => return DblLit(Math.log(fa_val));
-        case "dfloor" => return DblLit(Math.floor(fa_val));
-        case "dceil" => return DblLit(Math.ceil(fa_val));
-        case "dround" => return DblLit(Math.round(fa_val));
+        case "dsin" => return Dbl(Math.sin(fa_val));
+        case "dlog" => return Dbl(Math.log(fa_val));
+        case "dfloor" => return Dbl(Math.floor(fa_val));
+        case "dceil" => return Dbl(Math.ceil(fa_val));
+        case "dround" => return Dbl(Math.round(fa_val));
         case "dToFix" => return Literal(fa_val.toInt);
         case _ => ;
       }
       }
     }
     if (a.isInstanceOf[Flo]) {
-      val fa = a.asInstanceOf[Flo];
-      if (fa.floLitOf != null) {
-      val fa_val = fa.floLitOf.floValue;
+      if (a_lit != null) {
+      val fa_val = a_lit.floValue;
       name match {
-        case "fsin" => return FloLit(Math.sin(fa_val).toFloat);
-        case "flog" => return FloLit(Math.log(fa_val).toFloat);
-        case "ffloor" => return DblLit(Math.floor(fa_val).toFloat);
-        case "fceil" => return DblLit(Math.ceil(fa_val).toFloat);
-        case "fround" => return DblLit(Math.round(fa_val).toFloat);
+        case "fsin" => return Flo(Math.sin(fa_val).toFloat);
+        case "flog" => return Flo(Math.log(fa_val).toFloat);
+        case "ffloor" => return Dbl(Math.floor(fa_val).toFloat);
+        case "fceil" => return Dbl(Math.ceil(fa_val).toFloat);
+        case "fround" => return Dbl(Math.round(fa_val).toFloat);
         case "fToFix" => return Literal(fa_val.toLong);
         case _ => ;
       }

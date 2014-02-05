@@ -4,19 +4,29 @@ import ChiselError._
 
 /// FLO
 
+import java.lang.Float.floatToIntBits
+
+/*
 object FloLit {
   def apply(x: Float) = {
-    (new Flo()).fromNode(new FloLiteral(x))
+    val lit = new FloLiteral(x);
+    val res = (new Flo()).fromNode(lit)
+    // res.value = lit.value
+    // res.isLit = true
+    res
   }
 }
 class FloLiteral(val floValue: Float) extends Node {
-  override val value: BigInt = floValue.toInt
+  override val value: BigInt = BigInt(floatToIntBits(floValue))
+  println("FLO-LIT " + value + " FLO-VALUE " + floValue)
+  // override def isLit = true
   inferWidth = fixWidth(32)
 }
+*/
 
 object Flo {
-  def apply(x: Float): Flo = FloLit(x);
-  def apply(x: Double): Flo = FloLit(x.toFloat);
+  def apply(x: Float): Flo = Lit(floatToIntBits(x), 32){ Flo() }
+  def apply(x: Double): Flo = Flo(x.toFloat);
   
   def apply(dir: IODirection = null): Flo = {
     val res = new Flo();
@@ -57,17 +67,6 @@ class Flo extends Bits {
     }
   }
 
-  def floLitOf: FloLiteral = 
-    if (inputs.length == 1) {
-      if (inputs(0).isInstanceOf[FloLiteral])
-        inputs(0).asInstanceOf[FloLiteral] 
-      else if (inputs(0).isInstanceOf[Flo])
-        inputs(0).asInstanceOf[Flo].floLitOf
-      else 
-        null;
-    } else 
-      null;
-
   def :=(src: Flo)  = colonEqual(src);
 
   def gen[T <: Bits](): T = Flo().asInstanceOf[T];
@@ -99,20 +98,24 @@ class Flo extends Bits {
 
 /// DBL
 
+import java.lang.Double.doubleToLongBits
+
+/*
 object DblLit {
   def apply(x: Double) = {
     (new Dbl()).fromNode(new DblLiteral(x))
   }
 }
 class DblLiteral(val dblValue: Double) extends Node {
-  override val value: BigInt = dblValue.toInt
+  override val value: BigInt = BigInt(doubleToLongBits(dblValue))
   inferWidth = fixWidth(64)
 }
+*/
 
 object Dbl {
 
-  def apply(x: Float): Dbl = DblLit(x.toDouble);
-  def apply(x: Double): Dbl = DblLit(x);
+  def apply(x: Float): Dbl = Dbl(x.toDouble);
+  def apply(x: Double): Dbl = Lit(doubleToLongBits(x), 64){ Dbl() }
   
   def apply(dir: IODirection = null): Dbl = {
     val res = new Dbl();
@@ -136,17 +139,6 @@ class Dbl extends Bits {
   override def fromInt(x: Int): this.type = {
     Dbl(x.toDouble).asInstanceOf[this.type]
   }
-
-  def dblLitOf: DblLiteral =
-    if (inputs.length == 1) {
-      if (inputs(0).isInstanceOf[DblLiteral])
-        inputs(0).asInstanceOf[DblLiteral] 
-      else if (inputs(0).isInstanceOf[Dbl])
-        inputs(0).asInstanceOf[Dbl].dblLitOf
-      else 
-        null;
-    } else 
-      null;
 
   private def colonEqual(src: Dbl) = {
     if(comp != null)

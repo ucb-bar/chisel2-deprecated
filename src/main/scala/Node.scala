@@ -38,6 +38,9 @@ import java.io.PrintStream
 import Node._;
 import ChiselError._;
 
+import java.lang.Double.longBitsToDouble
+import java.lang.Float.intBitsToFloat
+
 object Node {
   def sprintf(message: String, args: Node*): Bits = {
     val s = Bits().fromNode(new Sprintf(message, args))
@@ -177,6 +180,10 @@ abstract class Node extends nameable {
     if (isLit) litOf.value
     else default
   def value: BigInt = BigInt(-1);
+  def floValue: Float = intBitsToFloat(value.toInt)
+  def dblValue: Double = longBitsToDouble(value.toLong)
+  def floLitValue: Float = intBitsToFloat(litValue().toInt)
+  def dblLitValue: Double = longBitsToDouble(litValue().toLong)
   def bitSet(off: UInt, dat: UInt): UInt = {
     val bit = UInt(1, 1) << off;
     (this.asInstanceOf[UInt] & ~bit) | (dat << off);

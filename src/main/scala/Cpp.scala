@@ -103,10 +103,6 @@ class CppBackend extends Backend {
           val hex = value.toString(16)
           if (hex.length > bpw/4*w) "0x" + hex.slice(hex.length-bpw/4*(w + 1), hex.length-bpw/4*w) + "L" else "0L"
         }
-        case l: FloLiteral => 
-          "fromFloat(" + l.floValue + ")"
-        case l: DblLiteral => 
-          "fromDouble(" + l.dblValue + ")"
         case _ => {
           if (x.isInObject)
             emitRef(x) + ".values[" + w + "]"
@@ -132,10 +128,6 @@ class CppBackend extends Backend {
       case x: Binding =>
         ""
       case x: Literal =>
-        ""
-      case x: FloLiteral => 
-        ""
-      case x: DblLiteral => 
         ""
       case x: ListNode =>
         ""
@@ -690,8 +682,6 @@ class CppBackend extends Backend {
     for (m <- nodes) {
       m match {
         case l: Literal => ;
-        case l: FloLiteral => ;
-        case l: DblLiteral => ;
         case any        =>
           if (m.name != "" && !(m == c.defaultResetPin) && !(m.component == null)) {
             // only modify name if it is not the reset signal or not in top component
