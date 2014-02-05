@@ -68,7 +68,7 @@ void NameSuite_DebugComp_1_t::clock_lo ( dat_t<1> reset ) {
   { NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0] = NameSuite_DebugComp_1__io_ctrl_wb_wen.values[0]; }
   { NameSuite_DebugComp_1_dpath__wb_wen.values[0] = NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0]||NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]; }
   val_t T0__w0;
-  { val_t __mask = -NameSuite_DebugComp_1_dpath__wb_wen.values[0]; T0__w0 = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0] ^ ((NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0] ^ NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0]) & __mask); }
+  { T0__w0 = TERNARY(NameSuite_DebugComp_1_dpath__wb_wen.values[0], NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0], NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]); }
   { NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow.values[0] = TERNARY(NameSuite_DebugComp_1_dpath__reset.values[0], 0x0L, T0__w0); }
   { NameSuite_DebugComp_1_dpath__io_ctrl_out.values[0] = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]; }
   { NameSuite_DebugComp_1__io_ctrl_out.values[0] = NameSuite_DebugComp_1_dpath__io_ctrl_out.values[0]; }
