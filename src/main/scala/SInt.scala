@@ -46,7 +46,7 @@ object SInt {
   }
 }
 
-class SInt extends Bits {
+class SInt extends Bits with Num[SInt] {
   type T = SInt;
 
   /** Factory method to create and assign a *SInt* type to a Node *n*.

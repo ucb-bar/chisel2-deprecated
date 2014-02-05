@@ -60,7 +60,7 @@ object UInt {
 }
 
 
-class UInt extends Bits /* with Numeric[UInt] */ {
+class UInt extends Bits with Num[UInt] {
   type T = UInt;
 
   /** Factory method to create and assign a *UInt* type to a Node *n*.

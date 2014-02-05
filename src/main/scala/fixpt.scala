@@ -61,7 +61,7 @@ object UFix {
   def apply(exp: Int, width: Int): UFix = new UFix(exp, UInt(width=width))
 }
 
-class UFix(exp: Int, raw: UInt) extends Fix[UInt,UFix](exp, raw) {
+class UFix(exp: Int, raw: UInt) extends Fix[UInt,UFix](exp, raw) with Num[UFix] {
   def Factory(exp: Int, width: Int) = UFix(exp, width)
   def toRaw(a: Bits) = a.toUInt
   def get_sext(source: Bits) = UInt(0,1)
@@ -72,13 +72,22 @@ class UFix(exp: Int, raw: UInt) extends Fix[UInt,UFix](exp, raw) {
 
   def <<(b: Int): UFix = new UFix(exp+b, raw)
   def >>(b: Int): UFix = new UFix(exp-b, raw)
+
+  def unary_-(): UFix = throw new Exception("unimplemented unary -");
+  def /  (b: UFix): UFix = throw new Exception("unimplemented /");;
+  def %  (b: UFix): UFix = throw new Exception("unimplemented %");;
+  def -  (b: UFix): UFix = throw new Exception("unimplemented -");;
+  def <  (b: UFix): Bool = throw new Exception("unimplemented <");;
+  def <= (b: UFix): Bool = throw new Exception("unimplemented <=");;
+  def >  (b: UFix): Bool = throw new Exception("unimplemented >");;
+  def >= (b: UFix): Bool = throw new Exception("unimplemented >=");;
 }
 
 object SFix {
   def apply(exp: Int, width: Int): SFix = new SFix(exp, SInt(width=width))
 }
 
-class SFix(exp: Int, raw: SInt) extends Fix[SInt,SFix](exp, raw) {
+class SFix(exp: Int, raw: SInt) extends Fix[SInt,SFix](exp, raw) with Num[SFix] {
   def Factory(exp: Int, width: Int) = SFix(exp, width)
   def toRaw(a: Bits) = a.toSInt
   def get_sext(source: Bits) = source(source.width-1,source.width-2)
@@ -89,4 +98,13 @@ class SFix(exp: Int, raw: SInt) extends Fix[SInt,SFix](exp, raw) {
 
   def <<(b: Int): SFix = new SFix(exp+b, raw)
   def >>(b: Int): SFix = new SFix(exp-b, raw)
+
+  def unary_-(): SFix = throw new Exception("unimplemented unary -");
+  def /  (b: SFix): SFix = throw new Exception("unimplemented /");;
+  def %  (b: SFix): SFix = throw new Exception("unimplemented %");;
+  def -  (b: SFix): SFix = throw new Exception("unimplemented -");;
+  def <  (b: SFix): Bool = throw new Exception("unimplemented <");;
+  def <= (b: SFix): Bool = throw new Exception("unimplemented <=");;
+  def >  (b: SFix): Bool = throw new Exception("unimplemented >");;
+  def >= (b: SFix): Bool = throw new Exception("unimplemented >=");;
 }

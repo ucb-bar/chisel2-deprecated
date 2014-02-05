@@ -18,7 +18,7 @@ object Flo {
   }
 }
 
-class Flo extends Bits {
+class Flo extends Bits with Num[Flo] {
   // setIsSigned
 
   // override def setIsTypeNode = {inputs(0).setIsSigned; super.setIsTypeNode}
@@ -98,7 +98,7 @@ object Dbl {
   }
 }
 
-class Dbl extends Bits {
+class Dbl extends Bits with Num[Dbl] {
   // setIsSigned
 
   // override def setIsTypeNode = {inputs(0).setIsSigned; super.setIsTypeNode}
