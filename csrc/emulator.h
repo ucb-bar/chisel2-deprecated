@@ -1383,7 +1383,7 @@ std::string dat_to_str(const dat_t<w>& x) {
   return s;
 }
 
-static int n_digits(int w, int base) {
+static __inline__ int n_digits(int w, int base) {
   return (int)ceil(log(2)/log(base)*w);
 }
 
@@ -1425,11 +1425,16 @@ static __inline__ int fix_to_str(char* s, val_t x, int base = 16, char pad = '0'
   return fix_to_str(s, dat_t<sizeof(val_t)*8>(x), base, pad);
 }
 
+static __inline__ int flo_digits(int m, int e) {
+  return 2 + n_digits(m, 10) + 2 + n_digits(e, 10);
+}
+
 template <int w>
 int flo_to_str(char* s, dat_t<w> x, char pad = ' ') {
   char buf[1000];
-  int n_digs = (2+n_digits(52, 10)+2+n_digits(11, 10));
+  int n_digs = (w == 32) ? flo_digits(32, 8) : flo_digits(52, 11);
   double val = (w == 32) ? toFloat(x.values[0]) : toDouble(x.values[0]);
+  // sprintf(buf, "%d %d%*e", w, n_digs, n_digs, val);
   sprintf(buf, "%*e", n_digs, val);
   assert(strlen(buf) <= n_digs);
   for (int i = 0; i < n_digs; i++)
