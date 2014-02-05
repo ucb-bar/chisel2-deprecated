@@ -1529,10 +1529,8 @@ template <int w>
 int flo_to_str(char* s, dat_t<w> x, char pad = ' ') {
   char buf[1000];
   int n_digs = (2+n_digits(52, 10)+2+n_digits(11, 10));
-  if (w == 32)
-    sprintf(buf, "%e", toFloat(x.values[0]));
-  else
-    sprintf(buf, "%e", toDouble(x.values[0]));
+  double val = (w == 32) ? toFloat(x.values[0]) : toDouble(x.values[0]);
+  sprintf(buf, "%*e", n_digs, val);
   assert(strlen(buf) <= n_digs);
   for (int i = 0; i < n_digs; i++)
     s[i] = (i < strlen(buf)) ? buf[i] : pad;
