@@ -323,14 +323,14 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] 
 
   override def toNode: Node = {
     if(flattenedVec == null){
-      val nodes = flatten.map{case(n, i) => i};
+      val nodes = Vec(this.reverse).flatten.map{case(n, i) => i}
       flattenedVec = Concatenate(nodes.head, nodes.tail.toList: _*)
     }
     flattenedVec
   }
 
   override def fromNode(n: Node): this.type = {
-    val res = this.clone();
+    val res = Vec(this.reverse).asInstanceOf[this.type]
     var ind = 0;
     for((name, io) <- res.flatten.toList.reverse) {
       io.asOutput();
@@ -363,11 +363,6 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] 
     isTypeNode = true;
     for(elm <- self)
       elm.setIsTypeNode
-  }
-
-  override def toBits(): UInt = {
-    val reversed = this.reverse.map(_.toBits)
-    Cat(reversed.head, reversed.tail: _*)
   }
 
   def length: Int = self.size
