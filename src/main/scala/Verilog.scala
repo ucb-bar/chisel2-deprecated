@@ -379,7 +379,7 @@ class VerilogBackend extends Backend {
         for (i <- 0 until r.lits.length)
           inits append "    " + emitRef(r) + "[" + i + "] = " + emitRef(r.lits(i)) + ";\n"
 
-        "  always @(*) begin\n" +
+        "  " + romStyle + " begin\n" +
         inits +
         "  end\n"
 
@@ -790,6 +790,6 @@ class VerilogBackend extends Backend {
 
   }
 
-
+  def romStyle: String = "always @(*)"
 }
 

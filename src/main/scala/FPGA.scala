@@ -99,4 +99,6 @@ class FPGABackend extends VerilogBackend
         super.emitDef(node)
     }
   }
+
+  override def romStyle: String = "initial"
 }
