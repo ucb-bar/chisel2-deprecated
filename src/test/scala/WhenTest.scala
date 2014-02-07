@@ -31,32 +31,43 @@
 import org.junit.Assert._
 import org.junit.Test
 import org.junit.Ignore
-
+import scala.collection.mutable.HashMap
 import Chisel._
-
 
 class WhenSuite extends TestSuite {
 
-  /** Using a single when() as intended.
-    */
+  // Using a single when
   @Test def testWhenStatement() {
-    class WhenComp extends Module {
+    class WhenModule extends Module {
       val io = new Bundle {
-        val in = Bool(INPUT)
-        val out = Bool(OUTPUT)
+        val en = Bool(INPUT)
+        val in = UInt(INPUT,4)
+        val out = UInt(OUTPUT,4)
       }
-
-      io.out := Bool(false);
-      when( io.in ) {
-        io.out := io.in;
+      io.out := UInt(0)
+      when( io.en ) {
+        io.out := io.in
       }
     }
 
-    chiselMain(Array[String]("--backend", "v",
-      "--targetDir", dir.getPath.toString()),
-      () => Module(new WhenComp))
+    class WhenModuleTests(m: WhenModule) extends Tester(m, Array(m.io)) {
+      defTests {
+        val vars = new HashMap[Node, Node]() 
+        List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
+          case (en, i) =>
+            vars(m.io.en) = Bool(en)
+            vars(m.io.in) = UInt(i)
+            vars(m.io.out) = UInt(if(en) i else 0)
+            step(vars)
+        } reduce(_&&_)
+      }
+    }
 
-    assertFile("WhenSuite_WhenComp_1.v")
+    chiselMainTest(Array[String]("--backend", "c",
+      "--targetDir", dir.getPath.toString(),"--test"),
+      () => Module(new WhenModule)) {
+      c => new WhenModuleTests(c)
+    }
   }
 
   /** Put a when() inside another when() */
