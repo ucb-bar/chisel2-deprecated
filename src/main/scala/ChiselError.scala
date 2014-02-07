@@ -117,9 +117,14 @@ object ChiselError {
   def checkpoint() {
     if(hasErrors) {
       throw new IllegalStateException(
-        "CODE HAS " +
-        ChiselErrors.filter(_.isError).length + " ERRORS and " +
-        ChiselErrors.filter(_.isWarning).length + " WARNINGS")
+        Console.UNDERLINED + "CODE HAS " +
+        Console.UNDERLINED + Console.BOLD + ChiselErrors.filter(_.isError).length + Console.RESET +
+        Console.UNDERLINED + " " +
+        Console.UNDERLINED + Console.RED + "ERRORS" + Console.RESET +
+        Console.UNDERLINED + " and " +
+        Console.UNDERLINED + Console.BOLD + ChiselErrors.filter(_.isWarning).length + Console.RESET +
+        Console.UNDERLINED + " " +
+        Console.UNDERLINED + Console.YELLOW + "WARNINGS" + Console.RESET)
     }
   }
 }
@@ -136,7 +141,9 @@ val errlevel: Int = 0) {
 
   def print() {
     /* Following conventions for error formatting */
-    val levelstr = if (isError) "error" else "warning"
+    val levelstr =
+      if (isError) Console.RED + "error" + Console.RESET
+      else Console.YELLOW + "warning" + Console.RESET
     if( line != null ) {
       println(line.getFileName + ":" + line.getLineNumber
         + ": " + levelstr + ": " + msgFun() +
