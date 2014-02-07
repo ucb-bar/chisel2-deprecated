@@ -142,11 +142,11 @@ val errlevel: Int = 0) {
   def print() {
     /* Following conventions for error formatting */
     val levelstr =
-      if (isError) Console.RED + "error" + Console.RESET
-      else Console.YELLOW + "warning" + Console.RESET
+      if (isError) "[" + Console.RED + "error" + Console.RESET + "]"
+      else "[" + Console.YELLOW + "warn" + Console.RESET + "]"
     if( line != null ) {
-      println(line.getFileName + ":" + line.getLineNumber
-        + ": " + levelstr + ": " + msgFun() +
+      println(levelstr + " " + line.getFileName + ":" +
+        line.getLineNumber + ": " + msgFun() +
         " in class " + line.getClassName)
     } else {
       println(levelstr + ": " + msgFun())
