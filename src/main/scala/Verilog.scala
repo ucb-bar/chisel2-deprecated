@@ -375,16 +375,15 @@ class VerilogBackend extends Backend {
           ""
         }
       case r: ROM[_] =>
-        val inits = new StringBuilder
-        for (i <- 0 until r.lits.length)
-          inits append "    " + emitRef(r) + "[" + i + "] = " + emitRef(r.lits(i)) + ";\n"
-
-        "  " + romStyle + " begin\n" +
-        inits +
-        "  end\n"
+        "" //Define is already done by Vec
 
       case r: ROMRead[_] =>
-        "  assign " + emitTmp(r) + " = " + emitRef(r.rom) + "[" + emitRef(r.addr) + "];\n"
+        val reads = new StringBuilder
+        reads append "  assign " + emitTmp(r) + " = \n" 
+        for (i <-0 until r.rom.asInstanceOf[ROM[_]].lits.length)
+          reads append "    " + emitRef(r.addr) + " == " + r.addr.width.toString + "'d" + i + " ? " + emitRef(r.rom) + "_" + i + " :\n"
+
+	reads + "    $random();\n"
 
       case s: Sprintf =>
         "  always @(*) $sformat(" + emitTmp(s) + ", " + s.args.map(emitRef _).foldLeft(CString(s.format))(_ + ", " + _) + ");\n"
@@ -435,7 +434,7 @@ class VerilogBackend extends Backend {
           ""
         }
       case r: ROM[_] =>
-        "  reg [" + (r.width-1) + ":0] " + emitRef(r) + " [" + (r.lits.length-1) + ":0];\n"
+        "" //Vec generates the declaration statements
 
       case x: MemAccess =>
         x.referenced = true
