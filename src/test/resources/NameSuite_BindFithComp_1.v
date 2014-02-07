@@ -17,13 +17,13 @@ module NameSuite_Block_2(input clk,
 
   assign io_out_resp_bits_ppn = T0;
   assign T0 = T3 | T1;
-  assign T1 = T2 ? tag_ram_1 : 32'h0/* 0*/;
-  assign T2 = tag_ram_0[1'h1/* 1*/:1'h1/* 1*/];
-  assign T3 = T4 ? tag_ram_0 : 32'h0/* 0*/;
-  assign T4 = tag_ram_0[1'h0/* 0*/:1'h0/* 0*/];
+  assign T1 = T2 ? tag_ram_1 : 32'h0;
+  assign T2 = tag_ram_0[1'h1:1'h1];
+  assign T3 = T4 ? tag_ram_0 : 32'h0;
+  assign T4 = tag_ram_0[1'h0:1'h0];
 
   always @(posedge clk) begin
-    if(1'h0/* 0*/) begin
+    if(1'h0) begin
       tag_ram_1 <= io_in_resp_bits_ppn;
     end
     if(io_in_resp_valid) begin

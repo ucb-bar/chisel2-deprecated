@@ -51,24 +51,24 @@ module StdlibSuite_ArbiterTest_1(
 
   assign io_chosen = T0;
   assign T0 = T1;
-  assign T1 = io_in_0_valid ? 2'h0/* 0*/ : T2;
-  assign T2 = io_in_1_valid ? 2'h1/* 1*/ : T3;
-  assign T3 = io_in_2_valid ? 2'h2/* 2*/ : 2'h3/* 3*/;
+  assign T1 = io_in_0_valid ? 2'h0 : T2;
+  assign T2 = io_in_1_valid ? 2'h1 : T3;
+  assign T3 = io_in_2_valid ? 2'h2 : 2'h3;
   assign io_out_bits = T4;
   assign T4 = T10 ? T8 : T5;
   assign T5 = T6 ? io_in_1_bits : io_in_0_bits;
-  assign T6 = T7[1'h0/* 0*/:1'h0/* 0*/];
+  assign T6 = T7[1'h0:1'h0];
   assign T7 = T0;
   assign T8 = T9 ? io_in_3_bits : io_in_2_bits;
-  assign T9 = T7[1'h0/* 0*/:1'h0/* 0*/];
-  assign T10 = T7[1'h1/* 1*/:1'h1/* 1*/];
+  assign T9 = T7[1'h0:1'h0];
+  assign T10 = T7[1'h1:1'h1];
   assign io_out_valid = T11;
   assign T11 = T16 ? T14 : T12;
   assign T12 = T13 ? io_in_1_valid : io_in_0_valid;
-  assign T13 = T7[1'h0/* 0*/:1'h0/* 0*/];
+  assign T13 = T7[1'h0:1'h0];
   assign T14 = T15 ? io_in_3_valid : io_in_2_valid;
-  assign T15 = T7[1'h0/* 0*/:1'h0/* 0*/];
-  assign T16 = T7[1'h1/* 1*/:1'h1/* 1*/];
+  assign T15 = T7[1'h0:1'h0];
+  assign T16 = T7[1'h1:1'h1];
   assign io_in_3_ready = T17;
   assign T17 = T18 && io_out_ready;
   assign T18 = T19;
@@ -86,6 +86,6 @@ module StdlibSuite_ArbiterTest_1(
   assign T28 = ! io_in_0_valid;
   assign io_in_0_ready = T29;
   assign T29 = T30 && io_out_ready;
-  assign T30 = 1'h1/* 1*/;
+  assign T30 = 1'h1;
 endmodule
 

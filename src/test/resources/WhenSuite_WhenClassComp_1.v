@@ -13,9 +13,9 @@ module WhenSuite_WhenClassComp_1(
   wire T6;
 
   assign io_out = T0;
-  assign T0 = T5 ? 1'h0/* 0*/ : T1;
+  assign T0 = T5 ? 1'h0 : T1;
   assign T1 = T3 ? io_in1 : T2;
-  assign T2 = io_in0 ? io_in0 : 1'h0/* 0*/;
+  assign T2 = io_in0 ? io_in0 : 1'h0;
   assign T3 = T4 && io_in1;
   assign T4 = ! io_in0;
   assign T5 = ! T6;

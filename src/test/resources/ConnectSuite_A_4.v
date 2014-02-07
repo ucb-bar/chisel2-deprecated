@@ -38,27 +38,27 @@ module ConnectSuite_A_4(input clk,
   wire[7:0] T10;
 
   assign io_status_et = reg_status_et;
-  assign T0 = io_wdata[1'h0/* 0*/:1'h0/* 0*/];
+  assign T0 = io_wdata[1'h0:1'h0];
   assign io_status_ef = reg_status_ef;
-  assign T1 = io_wdata[1'h1/* 1*/:1'h1/* 1*/];
+  assign T1 = io_wdata[1'h1:1'h1];
   assign io_status_ev = reg_status_ev;
-  assign T2 = io_wdata[2'h2/* 2*/:2'h2/* 2*/];
+  assign T2 = io_wdata[2'h2:2'h2];
   assign io_status_ec = reg_status_ec;
-  assign T3 = io_wdata[2'h3/* 3*/:2'h3/* 3*/];
+  assign T3 = io_wdata[2'h3:2'h3];
   assign io_status_ps = reg_status_ps;
-  assign T4 = io_wdata[3'h4/* 4*/:3'h4/* 4*/];
+  assign T4 = io_wdata[3'h4:3'h4];
   assign io_status_s = reg_status_s;
-  assign T5 = io_wdata[3'h5/* 5*/:3'h5/* 5*/];
+  assign T5 = io_wdata[3'h5:3'h5];
   assign io_status_u64 = reg_status_u64;
-  assign T6 = io_wdata[3'h6/* 6*/:3'h6/* 6*/];
+  assign T6 = io_wdata[3'h6:3'h6];
   assign io_status_s64 = reg_status_s64;
-  assign T7 = io_wdata[3'h7/* 7*/:3'h7/* 7*/];
+  assign T7 = io_wdata[3'h7:3'h7];
   assign io_status_vm = reg_status_vm;
-  assign T8 = io_wdata[4'h8/* 8*/:4'h8/* 8*/];
+  assign T8 = io_wdata[4'h8:4'h8];
   assign io_status_zero = reg_status_zero;
-  assign T9 = io_wdata[4'hf/* 15*/:4'h9/* 9*/];
+  assign T9 = io_wdata[4'hf:4'h9];
   assign io_status_im = reg_status_im;
-  assign T10 = io_wdata[5'h17/* 23*/:5'h10/* 16*/];
+  assign T10 = io_wdata[5'h17:5'h10];
 
   always @(posedge clk) begin
     if(io_wen) begin

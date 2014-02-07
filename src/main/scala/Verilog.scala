@@ -114,19 +114,9 @@ class VerilogBackend extends Backend {
   override def emitRef(node: Node): String = {
     node match {
       case x: Literal =>
-        (if (x.width == -1) {
-          x.name
-        } else if(x.isBinary) {
-          ("" + x.width + "'b" + x.name)
-        } else if(x.base == 'x') {
-          ("" + x.width + "'h" + x.name.substring(2, x.name.length))
-        } else if(x.base == 'd') {
-          ("" + x.width + "'d" + x.name)
-        } else if(x.base == 'h') {
-          ("" + x.width + "'h" + x.name)
-        } else {
-          ""}
-        ) + "/* " + x.inputVal + "*/";
+        val lit = x.value
+        val value = if (lit < 0) (BigInt(1) << x.width) + lit else lit
+        x.width + "'h" + value.toString(16)
 
       case _ =>
         super.emitRef(node)

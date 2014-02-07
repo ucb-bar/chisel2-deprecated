@@ -103,34 +103,34 @@ module StdlibSuite_RRArbiterTest_1(input clk, input reset,
 
   assign io_chosen = T0;
   assign T0 = T1;
-  assign T1 = T13 ? 2'h1/* 1*/ : T2;
-  assign T2 = T11 ? 2'h2/* 2*/ : T3;
-  assign T3 = T7 ? 2'h3/* 3*/ : T4;
-  assign T4 = io_in_0_valid ? 2'h0/* 0*/ : T5;
-  assign T5 = io_in_1_valid ? 2'h1/* 1*/ : T6;
-  assign T6 = io_in_2_valid ? 2'h2/* 2*/ : 2'h3/* 3*/;
+  assign T1 = T13 ? 2'h1 : T2;
+  assign T2 = T11 ? 2'h2 : T3;
+  assign T3 = T7 ? 2'h3 : T4;
+  assign T4 = io_in_0_valid ? 2'h0 : T5;
+  assign T5 = io_in_1_valid ? 2'h1 : T6;
+  assign T6 = io_in_2_valid ? 2'h2 : 2'h3;
   assign T7 = io_in_3_valid && T8;
-  assign T8 = R9 < 2'h3/* 3*/;
+  assign T8 = R9 < 2'h3;
   assign T10 = io_out_ready && io_out_valid;
   assign T11 = io_in_2_valid && T12;
-  assign T12 = R9 < 2'h2/* 2*/;
+  assign T12 = R9 < 2'h2;
   assign T13 = io_in_1_valid && T14;
-  assign T14 = R9 < 2'h1/* 1*/;
+  assign T14 = R9 < 2'h1;
   assign io_out_bits = T15;
   assign T15 = T21 ? T19 : T16;
   assign T16 = T17 ? io_in_1_bits : io_in_0_bits;
-  assign T17 = T18[1'h0/* 0*/:1'h0/* 0*/];
+  assign T17 = T18[1'h0:1'h0];
   assign T18 = T0;
   assign T19 = T20 ? io_in_3_bits : io_in_2_bits;
-  assign T20 = T18[1'h0/* 0*/:1'h0/* 0*/];
-  assign T21 = T18[1'h1/* 1*/:1'h1/* 1*/];
+  assign T20 = T18[1'h0:1'h0];
+  assign T21 = T18[1'h1:1'h1];
   assign io_out_valid = T22;
   assign T22 = T27 ? T25 : T23;
   assign T23 = T24 ? io_in_1_valid : io_in_0_valid;
-  assign T24 = T18[1'h0/* 0*/:1'h0/* 0*/];
+  assign T24 = T18[1'h0:1'h0];
   assign T25 = T26 ? io_in_3_valid : io_in_2_valid;
-  assign T26 = T18[1'h0/* 0*/:1'h0/* 0*/];
-  assign T27 = T18[1'h1/* 1*/:1'h1/* 1*/];
+  assign T26 = T18[1'h0:1'h0];
+  assign T27 = T18[1'h1:1'h1];
   assign io_in_3_ready = T28;
   assign T28 = T29 && io_out_ready;
   assign T29 = T30;
@@ -141,17 +141,17 @@ module StdlibSuite_RRArbiterTest_1(input clk, input reset,
   assign T34 = T35 || io_in_0_valid;
   assign T35 = T38 || T36;
   assign T36 = io_in_3_valid && T37;
-  assign T37 = R9 < 2'h3/* 3*/;
+  assign T37 = R9 < 2'h3;
   assign T38 = T41 || T39;
   assign T39 = io_in_2_valid && T40;
-  assign T40 = R9 < 2'h2/* 2*/;
+  assign T40 = R9 < 2'h2;
   assign T41 = T44 || T42;
   assign T42 = io_in_1_valid && T43;
-  assign T43 = R9 < 2'h1/* 1*/;
+  assign T43 = R9 < 2'h1;
   assign T44 = io_in_0_valid && T45;
-  assign T45 = R9 < 2'h0/* 0*/;
+  assign T45 = R9 < 2'h0;
   assign T46 = T48 && T47;
-  assign T47 = R9 < 2'h3/* 3*/;
+  assign T47 = R9 < 2'h3;
   assign T48 = ! T49;
   assign T49 = T50 || T39;
   assign T50 = T44 || T42;
@@ -166,7 +166,7 @@ module StdlibSuite_RRArbiterTest_1(input clk, input reset,
   assign T58 = T59 || T39;
   assign T59 = T44 || T42;
   assign T60 = T62 && T61;
-  assign T61 = R9 < 2'h2/* 2*/;
+  assign T61 = R9 < 2'h2;
   assign T62 = ! T63;
   assign T63 = T44 || T42;
   assign io_in_1_ready = T64;
@@ -179,7 +179,7 @@ module StdlibSuite_RRArbiterTest_1(input clk, input reset,
   assign T70 = T71 || T39;
   assign T71 = T44 || T42;
   assign T72 = T74 && T73;
-  assign T73 = R9 < 2'h1/* 1*/;
+  assign T73 = R9 < 2'h1;
   assign T74 = ! T44;
   assign io_in_0_ready = T75;
   assign T75 = T76 && io_out_ready;
@@ -189,11 +189,11 @@ module StdlibSuite_RRArbiterTest_1(input clk, input reset,
   assign T79 = T80 || T36;
   assign T80 = T81 || T39;
   assign T81 = T44 || T42;
-  assign T82 = R9 < 2'h0/* 0*/;
+  assign T82 = R9 < 2'h0;
 
   always @(posedge clk) begin
     if(reset) begin
-      R9 <= 2'h0/* 0*/;
+      R9 <= 2'h0;
     end else if(T10) begin
       R9 <= T0;
     end
