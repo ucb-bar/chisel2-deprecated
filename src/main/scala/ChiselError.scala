@@ -117,7 +117,9 @@ object ChiselError {
   def checkpoint() {
     if(hasErrors) {
       throw new IllegalStateException(
-        "CODE HAS " + ChiselErrors.length + " ERRORS/WARNINGS");
+        "CODE HAS " +
+        ChiselErrors.filter(_.isError).length + " ERRORS and " +
+        ChiselErrors.filter(_.isWarning).length + " WARNINGS")
     }
   }
 }
@@ -129,9 +131,12 @@ val errlevel: Int = 0) {
   val line = errline
   val msgFun = errmsgFun
 
+  def isError = (level == 0)
+  def isWarning = (level == 1)
+
   def print() {
     /* Following conventions for error formatting */
-    val levelstr = if( level == 0 ) "error" else "warning"
+    val levelstr = if (isError) "error" else "warning"
     if( line != null ) {
       println(line.getFileName + ":" + line.getLineNumber
         + ": " + levelstr + ": " + msgFun() +
