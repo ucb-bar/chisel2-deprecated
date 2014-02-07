@@ -141,7 +141,6 @@ object chiselMain {
         case "--noIoDebug" => Module.isIoDebug = false;
         case "--clockGatingUpdates" => Module.isClockGatingUpdates = true;
         case "--clockGatingUpdatesInline" => Module.isClockGatingUpdatesInline = true;
-        case "--folding" => Module.isFolding = true;
         case "--vcd" => Module.isVCD = true;
         case "--v" => Module.backend = new VerilogBackend
         case "--moduleNamePrefix" => Backend.moduleNamePrefix = args(i + 1); i += 1
