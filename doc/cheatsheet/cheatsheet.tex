@@ -3,6 +3,7 @@
 \usepackage[landscape]{geometry}
 \usepackage[procnames]{listings}
 \usepackage[parfill]{parskip}
+\usepackage{fixltx2e}
 
 % Remove section numbering
 \setcounter{secnumdepth}{0}
@@ -24,7 +25,8 @@
 \verb$c, x, y$ are Chisel types; \verb$n, m$ are Scala integers \newline
 \verb$wx, wy$ are the widths of \verb$x, y$ (respectively) \newline
 \verb$minVal(x)$, \verb$maxVal(x)$ are the min or max of \verb$x$ \newline
-\verb$s$ is a Scala string; \verb$b$ is a Scala boolean
+\verb$s$ is a Scala string; \verb$b$ is a Scala boolean \newline
+\verb$[ ... ]$ in functions are optional arguments
 
 \section{Basic Operators}
 \begin{tabular}{l l}
@@ -41,12 +43,17 @@
 \end{tabular}
 
 \subsection{Bits, SInt, UInt Constructors}
-Constructors also applicable for \isc$UInt$, \isc$SInt$
-
+Constructors also applicable for \isc$UInt$, \isc$SInt$ \newline
 \begin{tabular}{l l}
 \isc$Bits([width=n])$ & Create an un-assigned wire \\
 \isc$Bits(x=n, [width=m])$ & Create a literal from integer \\
 \isc$Bits(x=s, [width=m])$ & Create a literal from string \\
+\end{tabular}
+
+\subsection{Bits, UInt, SInt Casts}
+\begin{tabular}{l l}
+\isc$UInt$ to \isc$SInt$ & zero-extend to SInt \\
+all others & reinterpret cast \\
 \end{tabular}
 
 \subsection{Bool Operators}
@@ -109,11 +116,41 @@ Chisel & Explanation & Width \\
 \isc$x >> n$ & Arithmetic right shift & \verb$wx - n$ \\
 \end{tabular}
 
-\subsection{Bits, UInt, SInt Casts}
-\begin{tabular}{l l}
-\isc$UInt$ to \isc$SInt$ & zero-extend to SInt \\
-all others & reinterpret cast \\
-\end{tabular}
+\section{Helpers}
+\subsection{When}
+Use \verb$when$ to execute statements conditionally \newline
+\verb$when$ behaves similarly to Verilog \newline \verb$always @(posedge clk)$
+\begin{scala}
+when(condition1) {
+	// run if condition1 true
+} .elsewhen(condition2) {
+	// run if condition2 true
+} .unless(condition3) {
+	// run if condition3 false
+} .otherwise {
+	// run if none of the above true
+}
+\end{scala}
+
+\subsection{Switch}
+Use \verb$switch$ to execute statements conditionally \newline
+on the value of a wire \newline
+\begin{scala}
+switch(x) {
+	is(value1) {
+		// run if x === value1
+	} is(value2) {
+		// run if x === value2
+	}
+}
+\end{scala}
+
+\subsection{Enum}
+Use \isc$enum$s to generate list values \newline
+\isc$val s1::s2::$...\isc$::s$\textsubscript{n}\isc$::Nil := Enum(t, n)$ \newline
+where \isc$t$ is an empty Chisel wire (i.e. \verb$Bits()$) \newline
+and \isc$n$ is the number of values \newline
+and \isc$s1$, \isc$s2$, ..., \isc$s$\textsubscript{n} will have distinct values
 
 \section{Aggregate Types}
 \subsection{Bundle}
