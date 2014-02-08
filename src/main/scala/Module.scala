@@ -235,17 +235,6 @@ object Module {
   }
 }
 
-object withModule {
-  def apply( c: Module, block: () => Node ): Node = {
-    compStack.push(c);
-    val res = block();
-    compStack.pop();
-    res
-  }
-}
-// object withModuleOf {
-//   def apply(node: Node)( body: () => Unit ) = withModule(node.component, body );
-// }
 
 /* ----- RULES FOR CLOCKS AND RESETS -----
    ( + ) clock parameter

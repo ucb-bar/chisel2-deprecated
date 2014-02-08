@@ -121,7 +121,7 @@ abstract class Node extends nameable {
   var sccLowlink = -1
   var walked = false;
   /* Assigned in Binding and Mod.reset */
-  var component: Module = Module.getComponent(); 
+  var component: Module = Module.getComponent();
   var flattened = false;
   var isTypeNode = false;
   var depth = 0;
@@ -405,7 +405,6 @@ abstract class Node extends nameable {
   def forceMatchingWidths { }
 
   def matchWidth(w: Int): Node = {
-    // withModule(component, () =>
     if (w > this.width) {
       val zero = Literal(0, w - this.width); zero.infer
       val res = Concatenate(zero, this); res.infer
@@ -416,7 +415,6 @@ abstract class Node extends nameable {
     } else {
       this
     }
-    // )
   }
 
   def setName(n: String) {

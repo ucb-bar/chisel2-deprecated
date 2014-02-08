@@ -60,7 +60,6 @@ class SInt extends Bits with Num[SInt] {
   }
 
   override def matchWidth(w: Int): Node = {
-    // withModule(component, () =>
     if (w > this.width) {
       val topBit = NodeExtract(this, this.width-1); topBit.infer
       val fill = NodeFill(w - this.width, topBit); fill.infer
@@ -72,7 +71,6 @@ class SInt extends Bits with Num[SInt] {
     } else {
       this
     }
-    // )
   }
 
   /** casting from UInt followed by assignment. */

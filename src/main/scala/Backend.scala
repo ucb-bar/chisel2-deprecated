@@ -354,7 +354,8 @@ ChiselError.info("ssibal! => " + node.nameHolder.name)
         }
       if (node.component == null) {
         println("NULL NODE COMPONENT " + node)
-      } else if (!node.component.nodes.contains(node))
+      }
+      if (!node.component.nodes.contains(node))
         node.component.nodes += node
       for (input <- node.inputs) {
         if(!walked.contains(input)) {
