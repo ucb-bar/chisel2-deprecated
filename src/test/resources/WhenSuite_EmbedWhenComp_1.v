@@ -10,7 +10,7 @@ module WhenSuite_EmbedWhenComp_1(
 
   assign io_out = T0;
   assign T0 = T2 ? io_in1 : T1;
-  assign T1 = io_in0 ? io_in0 : 1'h0/* 0*/;
+  assign T1 = io_in0 ? io_in0 : 1'h0;
   assign T2 = io_in0 && io_in1;
 endmodule
 
