@@ -578,22 +578,24 @@ abstract class Backend {
     
     nameAll(c)//for debug
     if(Module.autoPipe){
-      c.gatherSpecialComponents()
-      c.insertPipelineRegisters()
-      connectResets
-      c.genAllMuxes
-      c.inferAll()
-      c.forceMatchingWidths
-      c.removeTypeNodes()
-      c.findHazards()
-      c.generateBypassLogic()
-      c.generateSpeculationLogic()
-      c.generateInterlockLogic()
-      connectResets
-      c.genAllMuxes
-      c.inferAll()
-      c.forceMatchingWidths
-      c.removeTypeNodes()
+      for(module <- Module.pipelineComponents){
+        module.gatherSpecialComponents()
+        module.insertPipelineRegisters()
+        connectResets
+        module.genAllMuxes
+        module.inferAll()
+        module.forceMatchingWidths
+        module.removeTypeNodes()
+        module.findHazards()
+        module.generateBypassLogic()
+        module.generateSpeculationLogic()
+        module.generateInterlockLogic()
+        connectResets
+        module.genAllMuxes
+        module.inferAll()
+        module.forceMatchingWidths
+        module.removeTypeNodes()
+      }
     }
 
     Module.sortedComps.map(_.nodes.map(_.addConsumers))

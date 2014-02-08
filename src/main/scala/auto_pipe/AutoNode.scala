@@ -12,6 +12,7 @@ abstract class AutoNode {
   var isDecoupledIO = false
   val stages = new ArrayBuffer[Int]
   var isUserAnnotated = false
+  var isAutoAnnotated = false
   val inputs = new ArrayBuffer[AutoNode]
   val consumers = new ArrayBuffer[AutoNode]
   override def toString() : String = {
@@ -27,7 +28,14 @@ abstract class AutoNode {
       }
     }
   }
-
+  def findStageAuto(node: Node, annotatedStages: HashMap[Node, Int]) = {
+    if(annotatedStages.contains(node)){
+      if(stages.isEmpty){
+        stages += annotatedStages(node)
+        isAutoAnnotated = true
+      } 
+    }
+  }
 }
 
 class AutoLogic extends AutoNode {

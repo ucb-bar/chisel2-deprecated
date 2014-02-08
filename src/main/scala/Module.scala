@@ -245,244 +245,9 @@ object Module {
     topComponent.hasExplicitClock = true    
   }
   
-  // automatic pipeline stuff
+  //auto pipelining stuff
+  val pipelineComponents = new ArrayBuffer[Module]
   var autoPipe = false
-  var pipeline = new HashMap[Int, ArrayBuffer[(Node, Bits)]]() //need to be deprecated
-  var pipelineComponent: Module = null
-  var pipelineReg = new HashMap[Int, ArrayBuffer[Reg]]()
-  
-  val forwardedRegs = new HashSet[Reg]
-  val forwardedMemReadPorts = new HashSet[(TransactionMem[_], FunRdIO[_])]
-  val memNonForwardedWritePoints = new HashSet[FunWrIO[_]]
-  
-  val speculation = new ArrayBuffer[(Bits, Bits)]//need to deprecate
-  val speculatedRegs = new ArrayBuffer[(Reg, Data)]
-  
-  var annotatedStages = new HashMap[Node, Int]()
-  
-  var nodeToStageMap: HashMap[Node, Int] = null
-  
-  var PipelineComponentNodes: ArrayBuffer[Node] = null
-  var ArchitecturalRegs: ArrayBuffer[Reg] = null
-  var TransactionMems: ArrayBuffer[TransactionMem[ Data ]] = null
-  var VariableLatencyComponents: ArrayBuffer[TransactionalComponent] = null
-  
-  var APConsumers: HashMap[Node, ArrayBuffer[(Node,Int)]] = null
-
-  val valids = new ArrayBuffer[Bool]//need to deprecate
-  val stalls = new HashMap[Int, ArrayBuffer[Bool]]
-  val kills = new HashMap[Int, ArrayBuffer[Bool]]
-  val speckills = new HashMap[Int, ArrayBuffer[Bool]]
-  var globalStall: Bool = null
-  val hazards = new ArrayBuffer[(Bool, Delay, Int, Int, Bool, FunRdIO[Data])]//need to deprecate
-  
-  var pipelineLength = 0
-  val stageValids = new ArrayBuffer[Bool]
-  val stageStalls = new ArrayBuffer[Bool]
-  val stageKills = new ArrayBuffer[Bool]
-  val requireStageSet = new HashSet[Node]
-
-  var autoAnnotate = false
-  var autoAnnotateStageNum = 0
-  
-  val regWritePoints = new HashSet[Node] //list of all register write inputs and transactionMem write port nodes(including write addr, write data, write en)
-  val regReadPoints = new HashSet[Node] //list of all register read outputs and transactionMem read port
-  val tMemWritePoints = new HashSet[Node] //list of all transactionMem write port nodes(including write addr, write data, write en)
-  val tMemReadDatas = new HashSet[Node] //list of all transactionMem read port nodes(including read addr, read data, read en)
-  val tMemReadAddrs = new HashSet[Node]
-  val inputNodes = new HashSet[Node] //list of all module Input Nodes
-  val outputNodes = new HashSet[Node] //list of all module Output Nodes
-  val ioNodes = new HashSet[DecoupledIO[Data]]// of all module ioNodes in the form of DecoupledIO
-  val variableLatencyUnitInputs = new HashSet[Node]// list of all variable latency unit input nodes
-  val variableLatencyUnitOutputs = new HashSet[Node]// list of all variable latency unit output nodes
-
-  val regRAWHazards = new HashMap[(Reg, Int, Int), Bool] //map of (register, updatelist num, write stage) -> RAW signal
-  val tMemRAWHazards = new HashMap[(FunRdIO[Data], Int, Int), Bool] //map of (tmem readport, writeport number, write stage) -> RAW signal 
-  
-  def isSource(node: Node) =  {
-    regReadPoints.contains(node) || tMemReadDatas.contains(node) || inputNodes.contains(node) || variableLatencyUnitOutputs.contains(node)
-  }
-
-  def isSink(node: Node) = {
-    regWritePoints.contains(node) || tMemReadAddrs.contains(node) || tMemWritePoints.contains(node) || outputNodes.contains(node) || variableLatencyUnitInputs.contains(node)
-  }
-
-  def sourceNodes(): HashSet[Node] = {
-    regReadPoints | tMemReadDatas | inputNodes |  variableLatencyUnitOutputs
-  }
-  def sinkNodes(): HashSet[Node] = {
-    regWritePoints | tMemReadAddrs | tMemWritePoints | outputNodes | variableLatencyUnitInputs
-  }
-  
-
-  var autoSourceNodes: ArrayBuffer[AutoNode] = null
-  var autoSinkNodes: ArrayBuffer[AutoNode] = null
-  
-  def setPipelineLength(length: Int) = {
-    pipelineLength = length
-    for (i <- 0 until pipelineLength - 1) {
-      pipelineReg += (i -> new ArrayBuffer[Reg]())
-    }
-    for (i <- 0 until pipelineLength) {
-      val valid = Bool()
-      stageValids += valid
-      valid.nameIt("PipeStage_Valid_" + i)
-    }
-    for (i <- 0 until pipelineLength) {
-      val stall = Bool()
-      stageStalls += stall
-      stall.nameIt("PipeStage_Stall_" + i)
-    }
-    for (i <- 0 until pipelineLength) {
-      val kill = Bool()
-      stageKills += kill
-      kill.nameIt("PipeStage_Kill_" + i)
-    }
-  }
-  
-  def setNumStages(x: Int) = {
-    for (i <- 0 until x-1) {
-      pipeline += (i -> new ArrayBuffer[(Node, Bits)]())
-      pipelineReg += (i -> new ArrayBuffer[Reg]())
-    }
-    for (i <- 0 until x) {
-      stalls += (i -> new ArrayBuffer[Bool])
-      kills += (i -> new ArrayBuffer[Bool])
-      speckills += (i -> new ArrayBuffer[Bool])
-    }
-  }
-  
-  def addPipeReg(stage: Int, n: Node, rst: Bits) = {//insert pipeline registers manually
-    pipeline(stage) += (n -> rst)
-  }
-  
-  def setStageNum(num: Int) = {//insert pipeline registers by specifying number of stages
-    autoAnnotate = true
-    autoAnnotateStageNum = num
-  }
-  
-  def setStage(n: Node, s:Int) = {//insert pipeline registers by annotating nodes with stages
-    Predef.assert(!annotatedStages.contains(n), n.name + " already annotated as stage " + annotatedStages(n))
-    if(n.isInstanceOf[Data] && n.asInstanceOf[Data].comp != null){
-      annotatedStages(n.asInstanceOf[Data].comp) = s
-    } else {
-      annotatedStages(n) = s
-    }
-  }
-  def setRegReadStage(node: Node, stage: Int) = {
-    val reg = node
-    if(!annotatedStages.contains(reg)){
-      annotatedStages(reg) = stage
-    }
-  }
-  def setRegWriteStage(node: Node, stage: Int) = {
-    val reg = node
-    for(producer <- reg.getProducers()){
-      if(!annotatedStages.contains(producer)){
-        annotatedStages(producer) = stage
-      }
-    }
-  }
-  def setTmemReadStage(tmem: TransactionMem[_], stage: Int) = {
-    for(i <- 0 until tmem.io.reads.length){
-      val readPoint = tmem.io.reads(i)
-      val readAddr = readPoint.adr.asInstanceOf[Node]
-      val readData = readPoint.dat.asInstanceOf[Node]
-      if(!annotatedStages.contains(readAddr)){
-        annotatedStages(readAddr) = stage
-      }
-      if(!annotatedStages.contains(readData)){
-        annotatedStages(readData) = stage
-      }
-    }
-  }
-  def setTmemWriteStage(tmem: TransactionMem[_], stage: Int) = {
-    for(i <- 0 until tmem.io.writes.length){
-      val writePoint = tmem.io.writes(i)
-      val writeAddr = writePoint.actualWaddr
-      val writeEn = writePoint.actualWen
-      val writeData = writePoint.actualWdata
-      if(!annotatedStages.contains(writeAddr)){
-        annotatedStages(writeAddr) = stage
-      }
-      if(!annotatedStages.contains(writeData)){
-        annotatedStages(writeData) = stage
-      }
-      if(!annotatedStages.contains(writeEn)){
-        annotatedStages(writeEn) = stage
-      }
-    }
-  }
-  def setInputStage(stage: Int) = {
-    val inputs = pipelineComponent.io.flatten.filter(_._2.dir == INPUT).map(_._2)
-    for(input <- inputs){
-      Predef.assert(!annotatedStages.contains(input), input.name + " already annotated as stage " + annotatedStages(input))
-      annotatedStages(input) = stage
-    }
-  }
-  def setOutputStage(stage: Int) = {
-    val outputs = pipelineComponent.io.flatten.filter(_._2.dir == OUTPUT).map(_._2)
-    for(output <- outputs){
-      Predef.assert(!annotatedStages.contains(output), output.name + " already annotated as stage " + annotatedStages(output))
-      annotatedStages(output) = stage
-    }
-  }
-  def setDecoupledIOStage(decoupledIO: DecoupledIO[Data], stage: Int) = {
-    if(!annotatedStages.contains(decoupledIO.ready)){
-      annotatedStages(decoupledIO.ready) = stage
-    }
-    if(!annotatedStages.contains(decoupledIO.valid)){
-      annotatedStages(decoupledIO.valid) = stage
-    }
-    for(data <- decoupledIO.bits.flatten.map(_._2)){
-      if(!annotatedStages.contains(data)){
-        annotatedStages(data) = stage
-      }
-    }
-  }
-  def setVariableLatencyUnitStage(varComp: TransactionalComponent, stage: Int) = {
-    annotatedStages(varComp.io.req.valid) = stage
-    annotatedStages(varComp.io.req.bits) = stage
-    annotatedStages(varComp.resp_ready) = stage
-    annotatedStages(varComp.io.resp) = stage
-    annotatedStages(varComp.resp_valid) = stage
-    annotatedStages(varComp.req_ready) = stage
-  }
-
-  def addForwardedReg(d: Reg) = {
-    forwardedRegs += d
-  }
-  def addForwardedMemReadPort(m: TransactionMem[_], r: FunRdIO[_]) = {
-    forwardedMemReadPorts += ((m.asInstanceOf[TransactionMem[Data]], r.asInstanceOf[FunRdIO[Data]]))
-  }
-  def addNonForwardedMemWritePoint[T <: Data] (writePoint: FunWrIO[T]) = {
-    memNonForwardedWritePoints += writePoint
-  }
-
-  def speculate(s: Bits, v: Bits) = {//need to deprecate
-    speculation += ((s, v))
-  }
-  
-  def speculate(reg: Reg, specValue: Data) = {
-    speculatedRegs += ((reg, specValue))
-  }
-  
-  //we should not propagate stage numbers to literals, reset signals, and clock signals
-
-  def requireStage(node: Node): Boolean = {
-    return requireStageSet.contains(node)
-  }
-  
-  def getStage(n: Node): Int = {
-    if (nodeToStageMap.contains(n))
-      return nodeToStageMap(n)
-    else if(!requireStage(n))
-      return -1
-    else
-      Predef.assert(false, "node does not have astage number: " + n)
-      return -2
-  }
-  //end automatic pipeline stuff
 }
 
 
@@ -1171,6 +936,202 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def removeInputs(nodes: Seq[Node]): Seq[Node] =
     nodes.filter(n => !isInput(n))
     
+  // automatic pipeline stuff
+  var pipelineReg = new HashMap[Int, ArrayBuffer[Reg]]()
+  
+  val forwardedRegs = new HashSet[Reg]
+  val forwardedMemReadPorts = new HashSet[(TransactionMem[_], FunRdIO[_])]
+  val memNonForwardedWritePoints = new HashSet[FunWrIO[_]]
+  
+  val speculatedRegs = new ArrayBuffer[(Reg, Data)]
+  
+  val userAnnotatedStages = new HashMap[Node, Int]()
+  val autoAnnotatedStages = new HashMap[Node, Int]()
+
+  var nodeToStageMap: HashMap[Node, Int] = null
+  
+  var PipelineComponentNodes: ArrayBuffer[Node] = null
+  var ArchitecturalRegs: ArrayBuffer[Reg] = null
+  var TransactionMems: ArrayBuffer[TransactionMem[ Data ]] = null
+  var VariableLatencyComponents: ArrayBuffer[TransactionalComponent] = null
+  
+  var APConsumers: HashMap[Node, ArrayBuffer[(Node,Int)]] = null
+
+  var globalStall: Bool = null
+  
+  var pipelineLength = 0
+  val stageValids = new ArrayBuffer[Bool]
+  val stageStalls = new ArrayBuffer[Bool]
+  val stageKills = new ArrayBuffer[Bool]
+  val requireStageSet = new HashSet[Node]
+
+  var autoAnnotate = false
+  var autoAnnotateStageNum = 0
+  
+  val regWritePoints = new HashSet[Node] //list of all register write inputs and transactionMem write port nodes(including write addr, write data, write en)
+  val regReadPoints = new HashSet[Node] //list of all register read outputs and transactionMem read port
+  val tMemWritePoints = new HashSet[Node] //list of all transactionMem write port nodes(including write addr, write data, write en)
+  val tMemReadDatas = new HashSet[Node] //list of all transactionMem read port nodes(including read addr, read data, read en)
+  val tMemReadAddrs = new HashSet[Node]
+  val inputNodes = new HashSet[Node] //list of all module Input Nodes
+  val outputNodes = new HashSet[Node] //list of all module Output Nodes
+  val ioNodes = new HashSet[DecoupledIO[Data]]// of all module ioNodes in the form of DecoupledIO
+  val variableLatencyUnitInputs = new HashSet[Node]// list of all variable latency unit input nodes
+  val variableLatencyUnitOutputs = new HashSet[Node]// list of all variable latency unit output nodes
+
+  val regRAWHazards = new HashMap[(Reg, Int, Int), Bool] //map of (register, updatelist num, write stage) -> RAW signal
+  val tMemRAWHazards = new HashMap[(FunRdIO[Data], Int, Int), Bool] //map of (tmem readport, writeport number, write stage) -> RAW signal 
+  
+  var autoSourceNodes: ArrayBuffer[AutoNode] = null
+  var autoSinkNodes: ArrayBuffer[AutoNode] = null
+  
+  def isSource(node: Node) =  {
+    regReadPoints.contains(node) || tMemReadDatas.contains(node) || inputNodes.contains(node) || variableLatencyUnitOutputs.contains(node)
+  }
+
+  def isSink(node: Node) = {
+    regWritePoints.contains(node) || tMemReadAddrs.contains(node) || tMemWritePoints.contains(node) || outputNodes.contains(node) || variableLatencyUnitInputs.contains(node)
+  }
+
+  def sourceNodes(): HashSet[Node] = {
+    regReadPoints | tMemReadDatas | inputNodes |  variableLatencyUnitOutputs
+  }
+  def sinkNodes(): HashSet[Node] = {
+    regWritePoints | tMemReadAddrs | tMemWritePoints | outputNodes | variableLatencyUnitInputs
+  }
+  
+  
+  def setPipelineLength(length: Int) = {
+    pipelineLength = length
+    for (i <- 0 until pipelineLength - 1) {
+      pipelineReg += (i -> new ArrayBuffer[Reg]())
+    }
+    for (i <- 0 until pipelineLength) {
+      val valid = Bool()
+      stageValids += valid
+      valid.nameIt("PipeStage_Valid_" + i)
+    }
+    for (i <- 0 until pipelineLength) {
+      val stall = Bool()
+      stageStalls += stall
+      stall.nameIt("PipeStage_Stall_" + i)
+    }
+    for (i <- 0 until pipelineLength) {
+      val kill = Bool()
+      stageKills += kill
+      kill.nameIt("PipeStage_Kill_" + i)
+    }
+  }
+  
+  def setStageNum(num: Int) = {//insert pipeline registers by specifying number of stages
+    autoAnnotate = true
+    autoAnnotateStageNum = num
+  }
+  
+  def setStage(n: Node, s:Int) = {//insert pipeline registers by annotating nodes with stages
+    Predef.assert(!userAnnotatedStages.contains(n), n.name + " already annotated as stage " + userAnnotatedStages(n))
+    if(n.isInstanceOf[Data] && n.asInstanceOf[Data].comp != null){
+      userAnnotatedStages(n.asInstanceOf[Data].comp) = s
+    } else {
+      userAnnotatedStages(n) = s
+    }
+  }
+  def setRegReadStage(node: Node, stage: Int) = {
+    val reg = node
+    if(!userAnnotatedStages.contains(reg)){
+      userAnnotatedStages(reg) = stage
+    }
+  }
+  def setRegWriteStage(node: Node, stage: Int) = {
+    val reg = node
+    for(producer <- reg.getProducers()){
+      if(!userAnnotatedStages.contains(producer)){
+        userAnnotatedStages(producer) = stage
+      }
+    }
+  }
+  def setTmemReadStage(tmem: TransactionMem[_], stage: Int) = {
+    for(i <- 0 until tmem.io.reads.length){
+      val readPoint = tmem.io.reads(i)
+      val readAddr = readPoint.adr.asInstanceOf[Node]
+      val readData = readPoint.dat.asInstanceOf[Node]
+      if(!userAnnotatedStages.contains(readAddr)){
+        userAnnotatedStages(readAddr) = stage
+      }
+      if(!userAnnotatedStages.contains(readData)){
+        userAnnotatedStages(readData) = stage
+      }
+    }
+  }
+  def setTmemWriteStage(tmem: TransactionMem[_], stage: Int) = {
+    for(i <- 0 until tmem.io.writes.length){
+      val writePoint = tmem.io.writes(i)
+      val writeAddr = writePoint.actualWaddr
+      val writeEn = writePoint.actualWen
+      val writeData = writePoint.actualWdata
+      if(!userAnnotatedStages.contains(writeAddr)){
+        userAnnotatedStages(writeAddr) = stage
+      }
+      if(!userAnnotatedStages.contains(writeData)){
+        userAnnotatedStages(writeData) = stage
+      }
+      if(!userAnnotatedStages.contains(writeEn)){
+        userAnnotatedStages(writeEn) = stage
+      }
+    }
+  }
+  def setDecoupledIOStage(decoupledIO: DecoupledIO[Data], stage: Int) = {
+    if(!userAnnotatedStages.contains(decoupledIO.ready)){
+      userAnnotatedStages(decoupledIO.ready) = stage
+    }
+    if(!userAnnotatedStages.contains(decoupledIO.valid)){
+      userAnnotatedStages(decoupledIO.valid) = stage
+    }
+    for(data <- decoupledIO.bits.flatten.map(_._2)){
+      if(!userAnnotatedStages.contains(data)){
+        userAnnotatedStages(data) = stage
+      }
+    }
+  }
+  def setVariableLatencyUnitStage(varComp: TransactionalComponent, stage: Int) = {
+    userAnnotatedStages(varComp.io.req.valid) = stage
+    userAnnotatedStages(varComp.io.req.bits) = stage
+    userAnnotatedStages(varComp.resp_ready) = stage
+    userAnnotatedStages(varComp.io.resp) = stage
+    userAnnotatedStages(varComp.resp_valid) = stage
+    userAnnotatedStages(varComp.req_ready) = stage
+  }
+
+  def addForwardedReg(d: Reg) = {
+    forwardedRegs += d
+  }
+  def addForwardedMemReadPort(m: TransactionMem[_], r: FunRdIO[_]) = {
+    forwardedMemReadPorts += ((m.asInstanceOf[TransactionMem[Data]], r.asInstanceOf[FunRdIO[Data]]))
+  }
+  def addNonForwardedMemWritePoint[T <: Data] (writePoint: FunWrIO[T]) = {
+    memNonForwardedWritePoints += writePoint
+  }
+
+  def speculate(reg: Reg, specValue: Data) = {
+    speculatedRegs += ((reg, specValue))
+  }
+  
+  //we should not propagate stage numbers to literals, reset signals, and clock signals
+
+  def requireStage(node: Node): Boolean = {
+    return requireStageSet.contains(node)
+  }
+  
+  def getStage(n: Node): Int = {
+    if (nodeToStageMap.contains(n))
+      return nodeToStageMap(n)
+    else if(!requireStage(n))
+      return -1
+    else
+      Predef.assert(false, "node does not have astage number: " + n)
+      return -2
+  }
+  
   //automatic pipelining stuff
   def gatherSpecialComponents() = {
     println("gathering special pipelining components")
@@ -1194,7 +1155,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         }
       }
     }
-    registerNodes(pipelineComponent)
+    registerNodes(this)
 
     //mark architectural registers
     for(node <- PipelineComponentNodes){
@@ -1212,7 +1173,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         TransactionMems += module.asInstanceOf[TransactionMem[Data]]
       }
     }
-    registerTransactionMems(pipelineComponent)
+    registerTransactionMems(this)
     //mark variable latency modules
     def registerVariableLatencyComponents(module: Module): Unit = {
       if(!module.isInstanceOf[TransactionMem[_]] && !module.isInstanceOf[TransactionalComponent]){
@@ -1226,7 +1187,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         variableLatencyUnitOutputs += module.asInstanceOf[TransactionalComponent].io.resp
       }
     }
-    registerVariableLatencyComponents(pipelineComponent)
+    registerVariableLatencyComponents(this)
     //mark read and write points for regs
     for (reg <- ArchitecturalRegs) {
       regReadPoints += reg
@@ -1247,8 +1208,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
     }
     //find module IO nodes
-    val inputs = pipelineComponent.io.flatten.filter(_._2.dir == INPUT)
-    val outputs = pipelineComponent.io.flatten.filter(_._2.dir == OUTPUT)
+    val inputs = this.io.flatten.filter(_._2.dir == INPUT)
+    val outputs = this.io.flatten.filter(_._2.dir == OUTPUT)
     for(input <- inputs){
       inputNodes += input._2
     }
@@ -1256,7 +1217,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       outputNodes += output._2
     }
     
-    for((name, io) <- pipelineComponent.io.asInstanceOf[Bundle].elements){
+    for((name, io) <- this.io.asInstanceOf[Bundle].elements){
       io match {
         case decoupled: DecoupledIO[_] => {
           ioNodes += decoupled.asInstanceOf[DecoupledIO[Data]]  
@@ -1297,7 +1258,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         findAllNodes(child)
       }
     }
-    findAllNodes(pipelineComponent)
+    findAllNodes(this)
     for(node <- allNodes){
       APConsumers(node) = new ArrayBuffer[(Node, Int)]()
     }
@@ -1341,7 +1302,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
   
   def insertPipelineRegisters() = { 
-    setPipelineLength(annotatedStages.map(_._2).max + 1)
+    setPipelineLength(userAnnotatedStages.map(_._2).max + 1)
     
     removeRegConsumerCycle()
    
@@ -1403,9 +1364,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         }
         reg.consumers -= node//remove after all .consumer calls are removed
         //regWritePoints += node
-      } else if(!isSink(node) && !isSource(node) && !((node.litOf != null) || (node == pipelineComponent.clock) || (node == pipelineComponent._reset))){
+      } else if(!isSink(node) && !isSource(node) && !((node.litOf != null) || (node == this.clock) || (node == this._reset))){
         for(input <- node.inputs){
-          if(!isSink(input) && !isSource(input) && !((input.litOf != null) || (input == pipelineComponent.clock) || (input == pipelineComponent._reset))){
+          if(!isSink(input) && !isSource(input) && !((input.litOf != null) || (input == this.clock) || (input == this._reset))){
             dfs(input, reg)
           }
         }
@@ -1429,8 +1390,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       val readPoint = new AutoLogic
       readPoint.name = reg.name
       readPoint.isSource = true
-      Predef.assert(annotatedStages.contains(reg), "all register read points must be annotated with stages")
-      readPoint.stages += annotatedStages(reg)
+      Predef.assert(userAnnotatedStages.contains(reg), "all register read points must be annotated with stages")
+      readPoint.stages += userAnnotatedStages(reg)
       readPoint.isUserAnnotated = true
       readPoint.outputChiselNodes += reg
       chiselNodeToAutoNodeMap(reg) = readPoint
@@ -1441,7 +1402,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       writePoint.name = reg.name + "_writepoint"
       writePoint.isSink = true
       for(producer <- reg.getProducers){
-        writePoint.findStage(producer, annotatedStages)
+        writePoint.findStage(producer, userAnnotatedStages)
         writePoint.inputChiselNodes += producer
         chiselNodeToAutoNodeMap(producer) = writePoint
       }
@@ -1456,8 +1417,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       for(i <- 0 until tMem.readPortNum){
         val readAddr = tMem.io.reads(i).adr
         val readData = tMem.io.reads(i).dat
-        readPoint.findStage(readAddr, annotatedStages)
-        readPoint.findStage(readData, annotatedStages)
+        readPoint.findStage(readAddr, userAnnotatedStages)
+        readPoint.findStage(readData, userAnnotatedStages)
         readPoint.inputChiselNodes += readAddr
         readPoint.outputChiselNodes += readData
         chiselNodeToAutoNodeMap(readAddr) = readPoint
@@ -1472,9 +1433,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         val writeAddr = tMem.io.writes(i).actualWaddr
         val writeData = tMem.io.writes(i).actualWdata
         val writeEn = tMem.io.writes(i).actualWen
-        writePoint.findStage(writeAddr, annotatedStages)
-        writePoint.findStage(writeData, annotatedStages)
-        writePoint.findStage(writeEn, annotatedStages)
+        writePoint.findStage(writeAddr, userAnnotatedStages)
+        writePoint.findStage(writeData, userAnnotatedStages)
+        writePoint.findStage(writeEn, userAnnotatedStages)
         writePoint.inputChiselNodes += writeAddr
         writePoint.inputChiselNodes += writeData
         writePoint.inputChiselNodes += writeEn
@@ -1493,12 +1454,12 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       varLatUnitNode.name = varLatUnit.name
       varLatUnitNode.delay = 5.0
       for(input <- inputs){
-        varLatUnitNode.findStage(input, annotatedStages)
+        varLatUnitNode.findStage(input, userAnnotatedStages)
         varLatUnitNode.inputChiselNodes += input
         chiselNodeToAutoNodeMap(input) = varLatUnitNode
       }
       for(output <- outputs){
-        varLatUnitNode.findStage(output, annotatedStages)
+        varLatUnitNode.findStage(output, userAnnotatedStages)
         varLatUnitNode.outputChiselNodes += output
         chiselNodeToAutoNodeMap(output) = varLatUnitNode
       }
@@ -1511,7 +1472,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       ioNode.isDecoupledIO = true
       val dataBits = io.bits.flatten.map(_._2)
       
-      ioNode.findStage(io.ready, annotatedStages)
+      ioNode.findStage(io.ready, userAnnotatedStages)
       if(io.ready.dir == INPUT){
         ioNode.outputChiselNodes += io.ready
       } else {
@@ -1519,7 +1480,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
       chiselNodeToAutoNodeMap(io.ready) = ioNode
 
-      ioNode.findStage(io.valid, annotatedStages)
+      ioNode.findStage(io.valid, userAnnotatedStages)
       if(io.valid.dir == INPUT){
         ioNode.outputChiselNodes += io.valid
       } else {
@@ -1528,7 +1489,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       chiselNodeToAutoNodeMap(io.valid) = ioNode
 
       for(data <- dataBits){
-        ioNode.findStage(data, annotatedStages)
+        ioNode.findStage(data, userAnnotatedStages)
         if(data.dir == INPUT){
           ioNode.outputChiselNodes += data
         } else {
@@ -1545,7 +1506,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         val autoNode = new AutoLogic
         autoNode.name = node.name
         autoNode.delay = node.delay
-        autoNode.findStage(node, annotatedStages)
+        autoNode.findStage(node, userAnnotatedStages)
         autoNode.inputChiselNodes += node
         autoNode.outputChiselNodes += node
         chiselNodeToAutoNodeMap(node) = autoNode
@@ -2140,8 +2101,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     PipelineComponentNodes += new_reg
     APConsumers(new_reg) = new ArrayBuffer[(Node, Int)]
     new_reg := input
-    new_reg.comp.asInstanceOf[Reg].clock = pipelineComponent.clock
-    when(pipelineComponent._reset){
+    new_reg.comp.asInstanceOf[Reg].clock = this.clock
+    when(this._reset){
       new_reg := init_value
     }
     input.pipelinedVersion = new_reg
@@ -2406,7 +2367,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       ArchitecturalRegs -= reg
       val readStage = getStage(reg)
       val writeStage = Math.max(getStage(reg.updates(0)._1), getStage(reg.updates(0)._2))
-      
       //generate registers to hold the speculated data
       var currentStageSpecWriteData = specWriteData
       for(stage <- readStage until writeStage){
@@ -2414,10 +2374,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         when(~stageStalls(stage) && ~globalStall){
           specWriteDataReg := currentStageSpecWriteData
         }
-        when(pipelineComponent._reset){
+        when(this._reset){
           specWriteDataReg := Bits(0)
         }
-        specWriteDataReg.comp.asInstanceOf[Reg].clock = pipelineComponent.clock
+        specWriteDataReg.comp.asInstanceOf[Reg].clock = this.clock
         specWriteDataReg.nameIt("spec_write_data_reg_" + reg.name + "_" + stage)
         specWriteDataReg := currentStageSpecWriteData
         currentStageSpecWriteData = specWriteDataReg
@@ -2448,7 +2408,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           }
         }
       }
-      
       //modify reg's write port
       val doSpeculate = ~stageStalls(readStage) && ~globalStall && ~kill
       doSpeculate.nameIt("do_speculate_" + reg.name)
@@ -2476,10 +2435,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       when(~stageStalls(i) && ~globalStall){
         validReg := stageValids(i)
       }
-      when(pipelineComponent._reset){
+      when(this._reset){
         validReg := Bool(false)
       }
-      validReg.comp.asInstanceOf[Reg].clock = pipelineComponent.clock
+      validReg.comp.asInstanceOf[Reg].clock = this.clock
       validRegs += validReg
       validReg.comp.nameIt("Stage_" + i + "_valid_reg")
     }
@@ -2566,13 +2525,15 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
     }
     //wire zero to all Bool outputs if stage is not valid or is stalled; this is a hack to let outside components know that a pipeline stage is invalid
-    val outputs = pipelineComponent.io.flatten.filter(_._2.dir == OUTPUT).map(_._2)
-    for(output <- outputs) {
-      if(output.isInstanceOf[Bool]){
-        val outputStage = getStage(output)
-        val tempMux = Multiplex(~globalStall && stageValids(outputStage) && ~stageStalls(outputStage), output.inputs(0), Bool(false))
-        output.inputs(0) = tempMux
-      }
+    for(ready <- ioNodes.map(_.ready).filter(_.dir == OUTPUT)){
+      val readyStage = getStage(ready)
+      val tempMux = Multiplex(~globalStall && stageValids(readyStage) && ~stageStalls(readyStage), ready.inputs(0), Bool(false))
+      ready.inputs(0) = tempMux
+    }
+    for(valid <- ioNodes.map(_.valid).filter(_.dir == OUTPUT)){
+      val validStage = getStage(valid)
+      val tempMux = Multiplex(~globalStall && stageValids(validStage) && ~stageStalls(validStage), valid.inputs(0), Bool(false))
+      valid.inputs(0) = tempMux
     }
   }
   
@@ -2602,28 +2563,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     result
   }
 
-  def insertBubble(globalStall: Bool) = {
-    for (stage <- 0 until pipelineReg.size) {
-      val stall = stalls(stage+1).foldLeft(Bool(false))(_ || _)
-      val kill = kills(stage).foldLeft(Bool(false))(_ || _)
-      val speckill = speckills(stage).foldLeft(Bool(false))(_ || _)
-      for (r <- pipelineReg(stage)) {
-        r.updates += ((kill, r.init))
-        r.updates += ((stall, r))
-        r.updates += ((speckill, r.init))
-        r.updates += ((globalStall, r))
-        r.genned = false
-      }
-      val valid = valids(stage).comp
-      valid.updates += ((kill, Bool(false)))
-      valid.updates += ((stall, valid))
-      valid.updates += ((speckill, Bool(false)))
-      valid.updates += ((globalStall, valid))
-      valid.genned = false
-    }
-    
-  }
-  
   def verifyLegalStageColoring(autoNodes: ArrayBuffer[AutoNode]) = {
     object vDirection extends Enumeration {
       type vDirection = Value
