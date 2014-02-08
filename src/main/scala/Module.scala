@@ -1093,6 +1093,19 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
     }
   }
+  def setDecoupledIOStageAuto(decoupledIO: DecoupledIO[Data], stage: Int) = {
+    if(!userAnnotatedStages.contains(decoupledIO.ready)){
+      autoAnnotatedStages(decoupledIO.ready) = stage
+    }
+    if(!userAnnotatedStages.contains(decoupledIO.valid)){
+      autoAnnotatedStages(decoupledIO.valid) = stage
+    }
+    for(data <- decoupledIO.bits.flatten.map(_._2)){
+      if(!userAnnotatedStages.contains(data)){
+        autoAnnotatedStages(data) = stage
+      }
+    }
+  }
   def setVariableLatencyUnitStage(varComp: TransactionalComponent, stage: Int) = {
     userAnnotatedStages(varComp.io.req.valid) = stage
     userAnnotatedStages(varComp.io.req.bits) = stage
@@ -1202,9 +1215,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         tMemReadDatas += tmem.io.reads(i).dat
       }
       for(i <- 0 until tmem.virtWritePortNum){
-        tMemWritePoints += tmem.io.writes(i).actualWaddr
-        tMemWritePoints += tmem.io.writes(i).actualWdata
-        tMemWritePoints += tmem.io.writes(i).actualWen
+        tMemWritePoints += tmem.io.writes(i).adr
+        tMemWritePoints += tmem.io.writes(i).dat
+        tMemWritePoints += tmem.io.writes(i).is
       }
     }
     //find module IO nodes
@@ -1241,7 +1254,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         setTmemWriteStage(tMem, autoAnnotateStageNum - 1)
       }
       for(io <- ioNodes){
-        setDecoupledIOStage(io, autoAnnotateStageNum/2)
+        //setDecoupledIOStage(io, autoAnnotateStageNum/2)
+        setDecoupledIOStageAuto(io, autoAnnotateStageNum/2)
       }
     }
 
@@ -1390,9 +1404,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       val readPoint = new AutoLogic
       readPoint.name = reg.name
       readPoint.isSource = true
-      Predef.assert(userAnnotatedStages.contains(reg), "all register read points must be annotated with stages")
-      readPoint.stages += userAnnotatedStages(reg)
-      readPoint.isUserAnnotated = true
+      readPoint.findStage(reg, userAnnotatedStages)
       readPoint.outputChiselNodes += reg
       chiselNodeToAutoNodeMap(reg) = readPoint
       autoNodeGraph += readPoint
@@ -1430,9 +1442,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       writePoint.name = tMem.name + "_writeports"
       writePoint.isSink = true
       for(i <- 0 until tMem.virtWritePortNum){
-        val writeAddr = tMem.io.writes(i).actualWaddr
-        val writeData = tMem.io.writes(i).actualWdata
-        val writeEn = tMem.io.writes(i).actualWen
+        val writeAddr = tMem.io.writes(i).adr
+        val writeData = tMem.io.writes(i).dat
+        val writeEn = tMem.io.writes(i).is
         writePoint.findStage(writeAddr, userAnnotatedStages)
         writePoint.findStage(writeData, userAnnotatedStages)
         writePoint.findStage(writeEn, userAnnotatedStages)
@@ -1473,6 +1485,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       val dataBits = io.bits.flatten.map(_._2)
       
       ioNode.findStage(io.ready, userAnnotatedStages)
+      ioNode.findStageAuto(io.ready, autoAnnotatedStages)
       if(io.ready.dir == INPUT){
         ioNode.outputChiselNodes += io.ready
       } else {
@@ -1481,6 +1494,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       chiselNodeToAutoNodeMap(io.ready) = ioNode
 
       ioNode.findStage(io.valid, userAnnotatedStages)
+      ioNode.findStageAuto(io.valid, autoAnnotatedStages)
       if(io.valid.dir == INPUT){
         ioNode.outputChiselNodes += io.valid
       } else {
@@ -1490,6 +1504,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
       for(data <- dataBits){
         ioNode.findStage(data, userAnnotatedStages)
+        ioNode.findStageAuto(data, autoAnnotatedStages)
         if(data.dir == INPUT){
           ioNode.outputChiselNodes += data
         } else {
@@ -1711,7 +1726,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
     //initialize bfs queue and coloredNodes with user annotated nodes
     for(autoNode <- autoNodes){
-      if(autoNode.isUserAnnotated){
+      if(autoNode.isUserAnnotated || autoNode.isAutoAnnotated){
         if(!autoNode.isSink){
           retryNodes += ((autoNode, FORWARD))
         }
@@ -1735,7 +1750,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           var childrenPropagatedTo:ArrayBuffer[AutoNode] = null
           childrenPropagatedTo = propagateToChildren(currentNode, currentDirection)
           for(child <- childrenPropagatedTo){
-            if((child.stages.length < 2) && !child.isSource && !child.isSink && !child.isUserAnnotated){
+            if((child.stages.length < 2) && !child.isSource && !child.isSink && !child.isUserAnnotated && !child.isAutoAnnotated){
               bfsQueue.enqueue(((child, currentDirection)))
             }
           }
@@ -1876,7 +1891,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       //find nodes from possibleMoveNodes that can have the pipeline boundary be legally moved in "direction" accross the node and store them in eligibleMoveNodes
       def findEligibleNodes(direction: Direction) = {
         for(node <- possibleMoveNodes){
-          if((!node.isUserAnnotated || node.isDecoupledIO) && node.isInstanceOf[AutoLogic] && !node.isSource && !node.isSink){
+          if(!node.isUserAnnotated && node.isInstanceOf[AutoLogic] && !node.isSource && !node.isSink){
             val nodeStage = node.stages(0)
             var parentsEligible = true
             val parents = new ArrayBuffer[AutoNode]
