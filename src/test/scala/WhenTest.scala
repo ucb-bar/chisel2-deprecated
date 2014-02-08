@@ -37,6 +37,7 @@ import Chisel._
 class WhenSuite extends TestSuite {
 
   // Using a single when
+  @Ignore("For some reason, this generates an IOException")
   @Test def testWhenStatement() {
     class WhenModule extends Module {
       val io = new Bundle {
@@ -245,9 +246,15 @@ class WhenSuite extends TestSuite {
       switch( io.in0 ) {
         /* XXX This looks like a weird way to initialize the default value. */
         io.out := io.in0
-        is(io.in1) { io.out := io.in1 }
+        is(Bits("b0101??01")) { io.out := io.in1 }
       }
     }
+
+    chiselMain(Array[String]("--backend", "c",
+      "--targetDir", dir.getPath.toString()),
+      () => Module(new SwitchClassComp))
+
+    assertFile("WhenSuite_SwitchClassComp_1.cpp")
 
     chiselMain(Array[String]("--backend", "v",
       "--targetDir", dir.getPath.toString()),

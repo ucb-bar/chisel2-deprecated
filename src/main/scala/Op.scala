@@ -197,12 +197,16 @@ object Op {
       name match {
         case "&&" => return if (a_lit.value == 0) Literal(0) else b;
         case "||" => return if (a_lit.value == 0) b else Literal(1);
+        case "==" => if (a_lit.isZ) return zEquals(b, a)
+        case "!=" => if (a_lit.isZ) return !zEquals(b, a)
         case _ => ;
       }
     } else if (a_lit == null && b_lit != null) {
       name match {
         case "&&" => return if (b_lit.value == 0) Literal(0) else a;
         case "||" => return if (b_lit.value == 0) a else Literal(1);
+        case "==" => if (b_lit.isZ) return zEquals(a, b)
+        case "!=" => if (b_lit.isZ) return !zEquals(a, b)
         case _ => ;
       }
     } else if (a_lit != null && b_lit != null) {
@@ -352,14 +356,6 @@ object Op {
             val ucond = Bool(OUTPUT).fromNode(LogicalOp(fixA, fixB, name.tail))
             return Mux(msbA === msbB, ucond, msbA)
           }
-        case "==" =>
-          if (b.litOf != null && b.litOf.isZ) {
-            val (bits, mask, swidth) = parseLit(b.litOf.name)
-            return Op(name, widthInfer, Op("&", maxWidth _, a, Literal(BigInt(mask, 2))), Literal(BigInt(bits, 2)))
-          }
-          if (a.litOf != null && a.litOf.isZ) {
-            return Op(name, widthInfer, b, a)
-          }
         case "s*s" | "s*u" =>
           val (signA, absA) = signAbs(a)
           val (signB, absB) = signAbs(b)
@@ -381,6 +377,8 @@ object Op {
         case _ =>
       }
     }
+    if (a.isLit && a.litOf.isZ || b.isLit && b.litOf.isZ)
+      ChiselError.error({"Operator " + name + " with inputs " + a + ", " + b + " does not support literals with ?"});
     val res = new Op();
     res.init("", widthInfer, a, b);
     res.op = name;
@@ -388,6 +386,8 @@ object Op {
   }
   def apply (name: String, widthInfer: (Node) => Int, a: Node): Node = {
       if (a.litOf != null) {
+        if (a.litOf.isZ)
+          ChiselError.error({"Operator " + name + " with input " + a + " does not support literals with ?"});
         name match {
           case "!" => return if (a.litOf.value == 0) Literal(1) else Literal(0);
           case "-" => return Literal(-a.litOf.value, a.litOf.width);
@@ -440,6 +440,11 @@ object Op {
     res.init("", widthInfer, a);
     res.op = name;
     res
+  }
+
+  private def zEquals(a: Node, b: Node) = {
+    val (bits, mask, swidth) = parseLit(b.litOf.name)
+    UInt(Op("==", fixWidth(1), Op("&", maxWidth _, a, Literal(BigInt(mask, 2))), Literal(BigInt(bits, 2))))
   }
 }
 

@@ -14,8 +14,8 @@ module DelaySuite_ROMModule_1(
     io_addr == 2'd1 ? rom_1 :
     io_addr == 2'd2 ? rom_2 :
     $random();
-  assign rom_2 = 4'h3/* 3*/;
-  assign rom_1 = 4'h2/* 2*/;
-  assign rom_0 = 4'h1/* 1*/;
+  assign rom_2 = 4'h3;
+  assign rom_1 = 4'h2;
+  assign rom_0 = 4'h1;
 endmodule
 
