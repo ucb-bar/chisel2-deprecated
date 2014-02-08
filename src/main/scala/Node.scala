@@ -171,7 +171,7 @@ abstract class Node extends nameable {
   }
 
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
-  def ##(b: Node): Node  = Op("##", 2, sumWidth _,  this, b );
+  def ##(b: Node): Node  = Op("##", sumWidth _,  this, b );
   def maxNum: BigInt = {
     // XXX This makes sense for UInt, but not in general.
     val w = if (width < 0) inferWidth(this) else width

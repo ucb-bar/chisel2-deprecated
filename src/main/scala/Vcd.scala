@@ -42,27 +42,6 @@ class VcdBackend extends Backend {
   override def emitTmp(node: Node): String =
     emitRef(node)
 
-  override def emitRef(node: Node): String = {
-    node match {
-      case x: Literal =>
-        (if (x.isBinary) {
-          var (bits, mask, swidth) = parseLit(x.name);
-          var bwidth = if(x.base == 'b') x.width else swidth;
-          if (x.isZ) {
-            ("LITZ<" + bwidth + ">(0x" + toHex(bits) + ", 0x" + toHex(mask) + ")")
-          } else {
-            ("LIT<" + bwidth + ">(0x" + toHex(bits) + ")")
-          }
-        } else if(x.base == 'd' || x.base == 'x') {
-          ("LIT<" + x.width + ">(" + x.name + "L)")
-        } else {
-          ("LIT<" + x.width + ">(0x" + x.name + "L)")
-        })
-      case _ =>
-        super.emitRef(node)
-    }
-  }
-
   def emitDef(node: Node, vcdname: String): String = { // vcdname: String
     ("  if (t == 0 || ("
       + emitRef(node) + " != " + emitRef(node) + "__prev).to_bool())\n" +

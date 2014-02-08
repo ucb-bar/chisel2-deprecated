@@ -17,11 +17,11 @@ module StdlibSuite_PipeComp_1(input clk, input reset,
     if(R1) begin
       R0 <= R2;
     end
-    R1 <= reset ? 1'h0/* 0*/ : io_enq_valid;
+    R1 <= reset ? 1'h0 : io_enq_valid;
     if(io_enq_valid) begin
       R2 <= io_enq_bits;
     end
-    R3 <= reset ? 1'h0/* 0*/ : R1;
+    R3 <= reset ? 1'h0 : R1;
   end
 endmodule
 

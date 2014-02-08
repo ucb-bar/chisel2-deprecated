@@ -34,7 +34,7 @@ import Node._
 object Cat {
   private def doit[T <: Data](mods: Seq[T]): UInt = {
     val modsList = mods.filter(_ != null).toList
-    val isLit = Module.isFolding && modsList.forall(_.litOf != null)
+    val isLit = modsList.forall(_.litOf != null)
     val res = if(!isLit && Module.backend.isInstanceOf[VerilogBackend]) {
       (new Cat()).initOf("", sumWidth _, modsList)
     } else {

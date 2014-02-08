@@ -54,24 +54,22 @@ object MuxCase {
 
 object Multiplex{
   def apply (t: Node, c: Node, a: Node): Node = {
-    if (Module.isFolding) {
-      if (t.litOf != null) {
-        return if (t.litOf.value == 0) a else c
+    if (t.litOf != null) {
+      return if (t.litOf.value == 0) a else c
+    }
+    if (c.litOf != null && a.litOf != null) {
+      if (c.litOf.value == a.litOf.value) {
+        return c
       }
-      if (c.litOf != null && a.litOf != null) {
-        if (c.litOf.value == a.litOf.value) {
-          return c
-        }
-        if (c.litOf.value == 1 && a.litOf.value == 0) {
-          if(c.litOf.width == 1 && a.litOf.width == 1) return t
-          val fill = NodeFill(max(c.litOf.width-1, a.litOf.width-1), Literal(0,1))
-          fill.infer
-          val bit = NodeExtract(t, 0)
-          bit.infer
-          val cat = Concatenate(fill, bit)
-          cat.infer
-          return cat
-        }
+      if (c.litOf.value == 1 && a.litOf.value == 0) {
+        if(c.litOf.width == 1 && a.litOf.width == 1) return t
+        val fill = NodeFill(max(c.litOf.width-1, a.litOf.width-1), Literal(0,1))
+        fill.infer
+        val bit = NodeExtract(t, 0)
+        bit.infer
+        val cat = Concatenate(fill, bit)
+        cat.infer
+        return cat
       }
     }
     new Mux().init("", maxWidth _, t, c, a);

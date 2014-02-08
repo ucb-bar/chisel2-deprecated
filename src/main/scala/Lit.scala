@@ -248,7 +248,7 @@ object Literal {
       }
     }
     res.base = base;
-    if (base == 'b') {res.isZ = literal.contains('?'); res.isBinary = true;}
+    if (base == 'b') res.isZ = literal.contains('?')
     res
   }
 }
@@ -259,7 +259,6 @@ object Literal {
 class Literal extends Node {
   var hasInferredWidth = false
   var isZ = false;
-  var isBinary = false;
   var base = 'x';
   var inputVal = BigInt(0);
   override lazy val value: BigInt = stringToVal(base, name);
@@ -268,8 +267,6 @@ class Literal extends Node {
   override def toString: String = name;
   override def isInVCD: Boolean = false
 
-  def d (x: BigInt): Literal = Literal(x, value.toInt)
-
   override def canCSE: Boolean = true
   override def hashCodeForCSE: Int = value.toInt
   override def equalsForCSE(x: Node): Boolean = x match {
@@ -277,4 +274,3 @@ class Literal extends Node {
     case _ => false
   }
 }
-

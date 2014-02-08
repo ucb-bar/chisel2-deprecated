@@ -38,7 +38,7 @@ object Fill {
     val (bits_lit) = (mod.litOf);
     if (n == 1) {
       mod
-    } else if (Module.isFolding && bits_lit != null) {
+    } else if (bits_lit != null) {
       var res = bits_lit.value;
       val w   = mod.getWidth();
       for (i <- 0 until n-1)
@@ -72,7 +72,7 @@ object Fill {
 object NodeFill {
 
   def apply(n: Int, mod: Node): Node = {
-    if (Module.isFolding && mod.litOf != null) {
+    if (mod.litOf != null) {
       var c = BigInt(0)
       val w = mod.litOf.width
       val a = mod.litOf.value

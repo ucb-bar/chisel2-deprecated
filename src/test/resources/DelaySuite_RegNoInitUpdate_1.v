@@ -6,7 +6,7 @@ module DelaySuite_RegNoInitUpdate_1(input clk,
   wire[31:0] T0;
 
   assign io_out = res;
-  assign T0 = res + 32'h1/* 1*/;
+  assign T0 = res + 32'h1;
 
   always @(posedge clk) begin
     res <= T0;
