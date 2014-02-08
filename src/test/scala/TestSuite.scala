@@ -1,6 +1,9 @@
 import org.scalatest.junit.AssertionsForJUnit
 import org.junit.Before
 import java.io.File
+import scala.reflect.ClassTag
+import scala.collection.JavaConversions
+import Chisel._
 
 class TestSuite extends AssertionsForJUnit {
 
@@ -20,4 +23,13 @@ class TestSuite extends AssertionsForJUnit {
     source.close()
     assert(lines === content)
   }
+
+  def launchTester[M <: Module : ClassTag, T <: Tester[M]](b: String, t: M => T) {
+    val ctor = implicitly[ClassTag[M]].runtimeClass.getConstructors.head
+    chiselMainTest(Array[String]("--backend", b,
+      "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
+      () => Module(ctor.newInstance(this).asInstanceOf[M])) {t}
+  }
+  def launchCppTester[M <: Module : ClassTag, T <: Tester[M]](t: M => T) = launchTester("c", t)
+  def launchVerilogTester[M <: Module : ClassTag, T <: Tester[M]](t: M => T) = launchTester("v", t)
 }
