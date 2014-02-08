@@ -298,47 +298,6 @@ class VerilogBackend extends Backend {
       case x: Fill =>
         "  assign " + emitTmp(node) + " = {" + emitRef(node.inputs(1)) + "{" + emitRef(node.inputs(0)) + "}};\n";
 
-      case ll: ListLookup[_] =>
-        val res = new StringBuilder()
-        res.append("  always @(*) begin\n" +
-                   //"    " + emitRef + " = " + inputs(1).emitRef + ";\n" +
-                   "    casez (" + emitRef(node.inputs(0)) + ")" + "\n");
-
-        for ((addr, data) <- ll.map) {
-          res.append("      " + emitRef(addr) + " : begin\n");
-          for ((w, e) <- ll.wires zip data) {
-            if(w.component != null && w.component.mods.contains(w) ) {
-              res.append("        " + emitRef(w) + " = " + emitRef(e) + ";\n");
-            }
-          }
-          res.append("      end\n")
-        }
-        res.append("      default: begin\n")
-        for ((w, e) <- ll.wires zip ll.defaultWires) {
-          if(w.component != null && w.component.mods.contains(w)) {
-            res.append("        " + emitRef(w) + " = " + emitRef(e) + ";\n");
-          }
-        }
-        res.append("      end\n");
-        res.append(
-          "    endcase\n" +
-          "  end\n");
-        res.toString
-
-      case l: Lookup =>
-        var res =
-          "  always @(*) begin\n" +
-          "    " + emitRef(l) + " = " + emitRef(l.inputs(1)) + ";\n" +
-          "    casez (" + emitRef(l.inputs(0)) + ")" + "\n";
-
-        for (node <- l.map)
-          res = res +
-            "      " + emitRef(node.addr) + " : " + emitRef(l) + " = " + emitRef(node.data) + ";\n";
-        res = res +
-          "    endcase\n" +
-          "  end\n";
-        res
-
       case m: Mem[_] =>
         if(!m.isInline) {
           val configStr =
@@ -397,21 +356,9 @@ class VerilogBackend extends Backend {
         } else {
           ""
         }
-      case x: ListLookupRef[_] =>
-        "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
-
-      case x: Lookup =>
-        "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
-
       case x: Sprintf =>
         "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
 
-      case x: ListNode =>
-        ""
-      case x: MapNode =>
-        ""
-      case x: LookupMap =>
-        ""
       case x: Literal =>
         ""
 

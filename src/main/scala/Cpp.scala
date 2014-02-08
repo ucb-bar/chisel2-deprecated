@@ -59,15 +59,6 @@ object CString {
   }
 }
 
-object CListLookup {
-  def apply[T <: Data](addr: UInt, default: List[T], mapping: Array[(UInt, List[T])]): List[T] = {
-    val map = mapping.map(m => (addr === m._1, m._2))
-    default.zipWithIndex map { case (d, i) =>
-      map.foldRight(d)((m, n) => Mux(m._1, m._2(i), n))
-    }
-  }
-}
-
 class CppBackend extends Backend {
   val keywords = new HashSet[String]();
 
@@ -128,12 +119,6 @@ class CppBackend extends Backend {
       case x: Binding =>
         ""
       case x: Literal =>
-        ""
-      case x: ListNode =>
-        ""
-      case x: MapNode =>
-        ""
-      case x: LookupMap =>
         ""
       case x: Reg =>
         "  dat_t<" + node.width + "> " + emitRef(node) + ";\n" +
@@ -725,12 +710,6 @@ class CppBackend extends Backend {
       case x: Binding =>
         ""
       case x: Literal =>
-        ""
-      case x: ListNode =>
-        ""
-      case x: MapNode =>
-        ""
-      case x: LookupMap =>
         ""
       case x: Reg =>
         "  nodes.push_back(debug_node_t(\"" + name + "\", &" + emitRef(node) + "));\n"
