@@ -14,7 +14,7 @@ module ConnectSuite_UsesShim_1(
 
   assign io_out_bits = s_bits;
   assign s_bits = T0;
-  assign T0 = io_in_bits + 1'h1/* 1*/;
+  assign T0 = io_in_bits + 1'h1;
   assign io_out_valid = s_valid;
   assign s_valid = io_in_valid;
   assign io_in_ready = s_ready;

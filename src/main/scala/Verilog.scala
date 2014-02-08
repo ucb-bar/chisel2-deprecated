@@ -114,19 +114,9 @@ class VerilogBackend extends Backend {
   override def emitRef(node: Node): String = {
     node match {
       case x: Literal =>
-        (if (x.width == -1) {
-          x.name
-        } else if(x.isBinary) {
-          ("" + x.width + "'b" + x.name)
-        } else if(x.base == 'x') {
-          ("" + x.width + "'h" + x.name.substring(2, x.name.length))
-        } else if(x.base == 'd') {
-          ("" + x.width + "'d" + x.name)
-        } else if(x.base == 'h') {
-          ("" + x.width + "'h" + x.name)
-        } else {
-          ""}
-        ) + "/* " + x.inputVal + "*/";
+        val lit = x.value
+        val value = if (lit < 0) (BigInt(1) << x.width) + lit else lit
+        x.width + "'h" + value.toString(16)
 
       case _ =>
         super.emitRef(node)
@@ -375,16 +365,16 @@ class VerilogBackend extends Backend {
           ""
         }
       case r: ROM[_] =>
-        val inits = new StringBuilder
-        for (i <- 0 until r.lits.length)
-          inits append "    " + emitRef(r) + "[" + i + "] = " + emitRef(r.lits(i)) + ";\n"
-
-        "  always @(*) begin\n" +
-        inits +
-        "  end\n"
+        "" //Define is already done by Vec
 
       case r: ROMRead[_] =>
-        "  assign " + emitTmp(r) + " = " + emitRef(r.rom) + "[" + emitRef(r.addr) + "];\n"
+        val reads = new StringBuilder
+        reads append "  assign " + emitTmp(r) + " = \n" 
+        reads append "      " + emitRef(r.addr) + " == " + r.addr.width.toString + "'d0" + " ? " + emitRef(r.rom) + "_0" + "\n"
+        for (i <-1 until r.rom.asInstanceOf[ROM[_]].lits.length)
+          reads append "    : " + emitRef(r.addr) + " == " + r.addr.width.toString + "'d" + i + " ? " + emitRef(r.rom) + "_" + i + "\n"
+
+	reads + "`ifndef SYNTHESIS\n    :$random()\n`endif\n    ;\n"
 
       case s: Sprintf =>
         "  always @(*) $sformat(" + emitTmp(s) + ", " + s.args.map(emitRef _).foldLeft(CString(s.format))(_ + ", " + _) + ");\n"
@@ -435,7 +425,7 @@ class VerilogBackend extends Backend {
           ""
         }
       case r: ROM[_] =>
-        "  reg [" + (r.width-1) + ":0] " + emitRef(r) + " [" + (r.lits.length-1) + ":0];\n"
+        "" //Vec generates the declaration statements
 
       case x: MemAccess =>
         x.referenced = true
@@ -790,6 +780,6 @@ class VerilogBackend extends Backend {
 
   }
 
-
+  def romStyle: String = "always @(*)"
 }
 

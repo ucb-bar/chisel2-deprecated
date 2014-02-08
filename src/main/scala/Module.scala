@@ -63,7 +63,6 @@ object Module {
   var isClockGatingUpdatesInline = false;
   var isVCD = false;
   var isInlineMem = true;
-  var isFolding = true;
   var isGenHarness = false;
   var isReportDims = false;
   var isPruning = false;
@@ -136,7 +135,6 @@ object Module {
     isClockGatingUpdates = false;
     isClockGatingUpdatesInline = false;
     isVCD = false;
-    isFolding = true;
     isReportDims = false;
     scanFormat = "";
     scanArgs = new ArrayBuffer[Node]();

@@ -4,7 +4,7 @@ module NameSuite_Block_1(
 );
 
 
-  assign io_irq_cause = 5'h2/* 2*/;
+  assign io_irq_cause = 5'h2;
 endmodule
 
 module NameSuite_BindSecondComp_1(
@@ -16,7 +16,7 @@ module NameSuite_BindSecondComp_1(
   wire[4:0] NameSuite_Block_1_io_irq_cause;
 
   assign io_irq_cause = T0;
-  assign T0 = {1'h1/* 1*/, NameSuite_Block_1_io_irq_cause};
+  assign T0 = {1'h1, NameSuite_Block_1_io_irq_cause};
   NameSuite_Block_1 NameSuite_Block_1(
        .io_irq( io_irq ),
        .io_irq_cause( NameSuite_Block_1_io_irq_cause )

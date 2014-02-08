@@ -15,9 +15,9 @@ module NameSuite_VecComp_1(input clk,
   wire[7:0] T2;
 
   assign io_status_im = reg_status_im;
-  assign T0 = wdata[3'h7/* 7*/:1'h0/* 0*/];
+  assign T0 = wdata[3'h7:1'h0];
   assign wdata = io_r_en ? io_w_data : host_pcr_bits_data;
-  assign T1 = {56'h0/* 0*/, rdata};
+  assign T1 = {56'h0, rdata};
   assign rdata = elts_0;
   assign elts_0 = T2;
   assign T2 = {reg_status_im};

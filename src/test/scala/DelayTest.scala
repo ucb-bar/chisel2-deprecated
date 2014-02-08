@@ -179,24 +179,20 @@ class DelaySuite extends TestSuite {
     assertFile("DelaySuite_ReadCondMaskedWrite_1.v")
   }
 
-  /** Initialized ROM.
-
-    XXX Skip object ROM not implemented.
+  /** Initialized ROM. */
 
   @Test def testROM() {
     class ROMModule extends Module {
       val io = new Bundle() {
-        val addr = UInt(INPUT)
-        val out = UInt(OUTPUT)
+        val addr = UInt(INPUT, width = 2)
+        val out = UInt(OUTPUT, width = 4)
       }
-      val rom = ROM(UInt(1) :: UInt(2) :: UInt(3) :: Nil)
+      val rom = Vec(UInt(1,width = 4), UInt(2,width = 4), UInt(3,width = 4))
       io.out := rom(io.addr)
     }
     chiselMain(Array[String]("--v",
       "--targetDir", dir.getPath.toString()),
       () => Module(new ROMModule()))
-    assertFile(dir.getPath + "/DelaySuite_ROMModule_1.v",
-"""
-""")
-  }*/
+    assertFile("DelaySuite_ROMModule_1.v")
+  }
 }

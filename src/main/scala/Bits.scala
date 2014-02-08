@@ -324,7 +324,7 @@ abstract class Bits extends Data with proc {
         }
       }
       case any =>
-        this.asInstanceOf[Data] := src
+        ChiselError.error("can't assign " + src.toString + " to Bits")
     }
   }
 

@@ -23,14 +23,14 @@ module DelaySuite_ReadCondWriteModule_1(input clk,
   assign T0 = mem[T12];
   assign T2 = T3;
   assign T3 = mem[T4];
-  assign T4 = T5[2'h2/* 2*/:1'h0/* 0*/];
-  assign T5 = io_addr + 32'h4/* 4*/;
+  assign T4 = T5[2'h2:1'h0];
+  assign T5 = io_addr + 32'h4;
   assign T6 = ! io_enable;
-  assign T7 = io_addr[2'h2/* 2*/:1'h0/* 0*/];
+  assign T7 = io_addr[2'h2:1'h0];
   assign T9 = T10;
-  assign T10 = T0 + 32'h1/* 1*/;
-  assign T11 = io_addr[2'h2/* 2*/:1'h0/* 0*/];
-  assign T12 = io_addr[2'h2/* 2*/:1'h0/* 0*/];
+  assign T10 = T0 + 32'h1;
+  assign T11 = io_addr[2'h2:1'h0];
+  assign T12 = io_addr[2'h2:1'h0];
 
   always @(posedge clk) begin
     if (T6)

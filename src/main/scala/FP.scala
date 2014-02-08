@@ -77,8 +77,8 @@ class Flo extends Bits with Num[Flo] {
   def ceil: Flo = newUnaryOp("fceil")
   def round: Flo = newUnaryOp("fround")
   def log: Flo = newUnaryOp("flog")
-  override def toSInt (): SInt = SInt(OUTPUT).fromNode(Op("fToSInt", 1, fixWidth(32), this))
-  override def toUInt (): UInt = UInt(OUTPUT).fromNode(Op("fToUInt", 1, fixWidth(32), this))
+  override def toSInt (): SInt = SInt(OUTPUT).fromNode(Op("fToSInt", fixWidth(32), this))
+  override def toUInt (): UInt = UInt(OUTPUT).fromNode(Op("fToUInt", fixWidth(32), this))
 }
 
 /// DBL
@@ -157,8 +157,8 @@ class Dbl extends Bits with Num[Dbl] {
   def ceil: Dbl = newUnaryOp("dceil")
   def round: Dbl = newUnaryOp("dround")
   def log: Dbl = newUnaryOp("dlog")
-  override def toSInt (): SInt = SInt(OUTPUT).fromNode(Op("dToSInt", 1, fixWidth(64), this))
-  override def toUInt (): UInt = UInt(OUTPUT).fromNode(Op("dToUInt", 1, fixWidth(64), this))
+  override def toSInt (): SInt = SInt(OUTPUT).fromNode(Op("dToSInt", fixWidth(64), this))
+  override def toUInt (): UInt = UInt(OUTPUT).fromNode(Op("dToUInt", fixWidth(64), this))
 }
 
 object Sin {

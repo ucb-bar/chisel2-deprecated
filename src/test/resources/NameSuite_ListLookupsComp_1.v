@@ -11,11 +11,11 @@ module NameSuite_ListLookupsComp_1(
   assign T0 = valid;
   always @(*) begin
     casez (io_inst)
-      32'b00000000000000000010011101111011/* 0*/ : begin
-        valid = 1'h0/* 0*/;
+      32'h277b : begin
+        valid = 1'h0;
       end
       default: begin
-        valid = 1'h0/* 0*/;
+        valid = 1'h0;
       end
     endcase
   end
