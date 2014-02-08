@@ -224,7 +224,6 @@ object Literal {
     }
     res.init("0x" + xString, w);
     res.hasInferredWidth = width == -1
-    res.inputVal = x;
     res
   }
 
@@ -260,7 +259,6 @@ class Literal extends Node {
   var hasInferredWidth = false
   var isZ = false;
   var base = 'x';
-  var inputVal = BigInt(0);
   override lazy val value: BigInt = stringToVal(base, name);
   override def isLit: Boolean = true;
   override def litOf: Literal = this
