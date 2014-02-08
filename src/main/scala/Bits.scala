@@ -42,6 +42,8 @@ object Bits {
   def apply(x: String, width: Int): UInt = UInt(x, width);
 
   def apply(dir: IODirection = null, width: Int = -1): UInt = UInt(dir, width);
+
+  def DC(width: Int): UInt = UInt.DC(width)
 }
 
 
