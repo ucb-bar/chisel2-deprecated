@@ -1,0 +1,145 @@
+\documentclass[10pt,landscape]{article}
+\usepackage{multicol}
+\usepackage[landscape]{geometry}
+\usepackage[procnames]{listings}
+\usepackage[parfill]{parskip}
+
+% Remove section numbering
+\setcounter{secnumdepth}{0}
+
+\geometry{top=1cm,left=1cm,right=1cm,bottom=1cm}
+
+\pagestyle{empty}
+
+\input{scala.tex}
+
+\begin{document}
+\begin{multicols}{3}
+
+\begin{center}
+\Large{Chisel Cheat Sheet}
+\end{center}
+
+\section{Notation}
+\verb$c, x, y$ are Chisel types; \verb$n, m$ are Scala integers \newline
+\verb$wx, wy$ are the widths of \verb$x, y$ (respectively) \newline
+\verb$minVal(x)$, \verb$maxVal(x)$ are the min or max of \verb$x$ \newline
+\verb$s$ is a Scala string; \verb$b$ is a Scala boolean
+
+\section{Basic Operators}
+\begin{tabular}{l l}
+\isc$val x = UInt()$ & Allocate \verb$a$ as \verb$UInt()$ \\
+\isc$val x := y$ & Re-assign \verb$y$ to \verb$x$ \\
+\isc$x <> y$ & Connect \verb$x$ and \verb$y$, inferring direction \\
+\end{tabular}
+
+\section{Basic Data Types}
+\subsection{Bool Constructors}
+\begin{tabular}{l l l}
+\isc$Bool()$ & Create an un-assigned wire \\
+\isc$Bool(b)$ & Create a literal \\
+\end{tabular}
+
+\subsection{Bits, SInt, UInt Constructors}
+Constructors also applicable for \isc$UInt$, \isc$SInt$
+
+\begin{tabular}{l l}
+\isc$Bits([width=n])$ & Create an un-assigned wire \\
+\isc$Bits(x=n, [width=m])$ & Create a literal from integer \\
+\isc$Bits(x=s, [width=m])$ & Create a literal from string \\
+\end{tabular}
+
+\subsection{Bool Operators}
+\begin{tabular}{l l l}
+Chisel & Explanation & Width \\
+\hline
+\hline
+\isc$!x$ & Logical NOT & \verb$1$ \\
+\isc$x && y$ & Logical AND & \verb$1$ \\
+\isc$x || y$ & Logical OR & \verb$1$ \\
+\end{tabular}
+
+\subsection{Bits Operators}
+\begin{tabular}{l l l}
+Chisel & Explanation & Width \\
+\hline
+\hline
+\isc$x(n)$ & Extract bit (0 is LSB) & \verb$1$ \\
+\isc$x(n, m)$ & Extract bitfield & \verb$n - m + 1$ \\
+\isc$x << y$ & Left shift & \verb$wx + maxVal(y)$ \\
+\isc$x >> y$ & Right shift & \verb$wx - minVal(y)$ \\
+\isc$x << n$ & Left shift & \verb$wx + n$ \\
+\isc$x >> n$ & Right shift & \verb$wx - n$ \\
+\isc$Fill(n, x)$ & Replicate \verb$x$ \verb$n$ times & \verb$n * wx$ \\
+\isc$Cat(x, y)$ & Concatenate bitfields & \verb$wx + wy$ \\
+\isc$Mux(c, x, y)$ & If \verb$c$ then \verb$x$ else \verb$y$ & \verb$max(wx, wy)$ \\
+\hline
+\isc$~x$ & Bitwise NOT & \verb$wx$ \\
+\isc$x & y$ & Bitwise AND & \verb$max(wx, wy)$ \\
+\isc$x | y$ & Bitwise OR & \verb$max(wx, wy)$ \\
+\isc$x ^ y$ & Bitwise XOR & \verb$max(wx, wy)$ \\
+\hline
+\isc$x === y$ & Equality & \verb$1$ \\
+\isc$x != y$ & Inequality & \verb$1$ \\
+\hline
+\isc$andR(x)$ & AND-reduce & \verb$1$ \\
+\isc$orR(x)$ & OR-reduce & \verb$1$ \\
+\isc$xorR(x)$ & XOR-reduce & \verb$1$ \\
+\end{tabular}
+
+\subsection{UInt, SInt Operators}
+Bitwidths only valid for UInt operations
+
+\begin{tabular}{l l l}
+Chisel & Explanation & Width \\
+\hline
+\hline
+\isc$x + y$ & Addition & \verb$max(wx, wy)$ \\
+\isc$x - y$ & Subtraction & \verb$max(wx, wy)$ \\
+\isc$x * y$ & Multiplication & \verb$wx + wy$ \\
+\isc$x / y$ & Division & \verb$wx$ \\
+\isc$x % y$ & Modulus & \verb$bits(maxVal(y) - 1)$ \\
+\hline
+\isc$x > y$ & Greater than & \verb$1$ \\
+\isc$x >= y$ & Greater than or equal & \verb$1$ \\
+\isc$x < y$ & Less than & \verb$1$ \\
+\isc$x <= y$ & Less than or equal & \verb$1$ \\
+\hline
+\isc$x >> y$ & Arithmetic right shift & \verb$wx - minVal(y)$ \\
+\isc$x >> n$ & Arithmetic right shift & \verb$wx - n$ \\
+\end{tabular}
+
+\subsection{Bits, UInt, SInt Casts}
+\begin{tabular}{l l}
+\isc$UInt$ to \isc$SInt$ & zero-extend to SInt \\
+all others & reinterpret cast \\
+\end{tabular}
+
+\section{Aggregate Types}
+\subsection{Bundle}
+
+\subsection{Vec}
+
+\section{State Elements}
+\subsection{Registers}
+
+\subsection{Memory}
+
+\section{Modules}
+
+\section{Scala Hardware Generation}
+\subsection{For}
+
+\subsection{If}
+
+\subsection{Functional Abstraction}
+
+\section{Standard Library}
+\subsection{Decoupled}
+\subsection{PipeIO}
+\subsection{Arbiter}
+\subsection{RRAArbiter}
+
+
+\end{multicols}
+\end{document}
