@@ -166,6 +166,10 @@ abstract class Node extends nameable {
     }
   }
 
+  def setVarName (name_ : String) {
+    varName = name_;
+  }
+
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
   def ##(b: Node): Node  = Op("##", 2, sumWidth _,  this, b );
   def maxNum: BigInt = {
