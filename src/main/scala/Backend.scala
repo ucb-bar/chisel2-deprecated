@@ -244,7 +244,6 @@ abstract class Backend {
     for( node <- Module.nodes ) {
       if( (node.nameHolder != null && !node.nameHolder.name.isEmpty)
         && !node.named && !node.isInstanceOf[Literal] ){
-ChiselError.info("ssibal! => " + node.nameHolder.name)
         node.name = node.nameHolder.name; // Not using nameIt to avoid override
         node.named = node.nameHolder.named;
         node.nameHolder.name = "";
