@@ -48,7 +48,7 @@ object chiselCast {
 }
 
 object UnaryOp {
-  def apply[T <: Bits](x: T, op: String): Node = {
+  def apply(x: Node, op: String): Node = {
     op match {
       case "-" => Op("-", widthOf(0), x)
       case "~" => Op("~", widthOf(0), x)
@@ -77,7 +77,7 @@ object UnaryOp {
 }
 
 object BinaryOp {
-  def apply[T <: Bits](x: T, y: T, op: String): Node = {
+  def apply(x: Node, y: Node, op: String): Node = {
     op match {
       case "<<"  => Op("<<", lshWidthOf(0, y),  x, y )
       case ">>"  => Op(">>", rshWidthOf(0, y),  x, y )
@@ -160,7 +160,7 @@ object LogicalOp {
 }
 
 object ReductionOp {
-  def apply[T <: Bits](x: T, op: String): Node = {
+  def apply(x: Node, op: String): Node = {
     op match {
       case "&" => Op("&", fixWidth(1), x)
       case "|" => Op("|", fixWidth(1), x)

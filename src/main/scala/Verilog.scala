@@ -271,14 +271,6 @@ class VerilogBackend extends Backend {
           emitRef(node.inputs(0)) + " " + o.op + " " + emitRef(node.inputs(1))
         }) + ";\n"
 
-      case x: Cat =>
-        var res = "  assign " + emitTmp(node) + " = {";
-        var first = true;
-        for(e <- node.inputs)
-          res += (if(first) {first = false; ""} else ", ") + emitRef(e);
-        res += "};\n";
-        res
-
       case x: Extract =>
         node.inputs.tail.foreach(x.validateIndex)
         if (node.inputs.length < 3) {
@@ -294,9 +286,6 @@ class VerilogBackend extends Backend {
             "  assign " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ";\n"
           }
         }
-
-      case x: Fill =>
-        "  assign " + emitTmp(node) + " = {" + emitRef(node.inputs(1)) + "{" + emitRef(node.inputs(0)) + "}};\n";
 
       case m: Mem[_] =>
         if(!m.isInline) {
