@@ -10,10 +10,13 @@ module DelaySuite_ROMModule_1(
 
   assign io_out = T0;
   assign T0 = 
-    io_addr == 2'd0 ? rom_0 :
-    io_addr == 2'd1 ? rom_1 :
-    io_addr == 2'd2 ? rom_2 :
-    $random();
+      io_addr == 2'd0 ? rom_0
+    : io_addr == 2'd1 ? rom_1
+    : io_addr == 2'd2 ? rom_2
+`ifndef SYNTHESIS
+    :$random()
+`endif
+    ;
   assign rom_2 = 4'h3/* 3*/;
   assign rom_1 = 4'h2/* 2*/;
   assign rom_0 = 4'h1/* 1*/;

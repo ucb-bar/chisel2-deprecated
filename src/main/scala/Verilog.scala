@@ -380,10 +380,11 @@ class VerilogBackend extends Backend {
       case r: ROMRead[_] =>
         val reads = new StringBuilder
         reads append "  assign " + emitTmp(r) + " = \n" 
-        for (i <-0 until r.rom.asInstanceOf[ROM[_]].lits.length)
-          reads append "    " + emitRef(r.addr) + " == " + r.addr.width.toString + "'d" + i + " ? " + emitRef(r.rom) + "_" + i + " :\n"
+        reads append "      " + emitRef(r.addr) + " == " + r.addr.width.toString + "'d0" + " ? " + emitRef(r.rom) + "_0" + "\n"
+        for (i <-1 until r.rom.asInstanceOf[ROM[_]].lits.length)
+          reads append "    : " + emitRef(r.addr) + " == " + r.addr.width.toString + "'d" + i + " ? " + emitRef(r.rom) + "_" + i + "\n"
 
-	reads + "    $random();\n"
+	reads + "`ifndef SYNTHESIS\n    :$random()\n`endif\n    ;\n"
 
       case s: Sprintf =>
         "  always @(*) $sformat(" + emitTmp(s) + ", " + s.args.map(emitRef _).foldLeft(CString(s.format))(_ + ", " + _) + ");\n"
