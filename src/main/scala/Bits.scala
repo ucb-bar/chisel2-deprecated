@@ -90,13 +90,19 @@ abstract class Bits extends Data with proc {
   // internal, non user exposed connectors
   var assigned = false;
 
-  override def assign(src: Node): Unit =
+  override def assign(src: Node): Unit = {
+    if (this.dir == INPUT && this.component == src.component)
+      ChiselError.error({"assigning to your own input port " + this + " RHS: " + src});
     if (inputs.isEmpty) inputs += src
     else ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
+  }
 
-  override def procAssign(src: Node): Unit =
+  override def procAssign(src: Node): Unit = {
+    if (this.dir == INPUT && this.component == src.component)
+      ChiselError.error({"assigning to your own input port " + this + " RHS: " + src});
     if (inputs.isEmpty) updates += ((genCond(), src))
     else ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
+  }
 
   //code generation stuff
 
@@ -283,9 +289,12 @@ abstract class Bits extends Data with proc {
     }
   }
 
-  override def matchWidth(w: Int): Node =
-    if (isLit && !litOf.isZ) Literal(litOf.value & ((BigInt(1) << w)-1), w)
-    else super.matchWidth(w)
+  override def matchWidth(w: Int): Node = {
+    // withModule(component, () =>
+      if (isLit && !litOf.isZ) Literal(litOf.value & ((BigInt(1) << w)-1), w) 
+      else super.matchWidth(w)
+    // )
+  }
 
   // Operators
   protected final def newUnaryOp(opName: String): this.type = {

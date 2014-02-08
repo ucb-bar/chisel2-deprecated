@@ -335,8 +335,7 @@ abstract class Backend {
         }
       if (node.component == null) {
         println("NULL NODE COMPONENT " + node)
-      }
-      if (!node.component.nodes.contains(node))
+      } else if (!node.component.nodes.contains(node))
         node.component.nodes += node
       for (input <- node.inputs) {
         if(!walked.contains(input)) {
