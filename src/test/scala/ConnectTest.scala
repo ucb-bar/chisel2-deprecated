@@ -1,4 +1,5 @@
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.HashMap
 import org.junit.Assert._
 import org.junit.Test
 import org.junit.Ignore
@@ -6,34 +7,19 @@ import org.junit.Ignore
 import Chisel._
 
 class RegStatus extends Bundle {
-  val im = UInt(width = 8)
-  val zero = UInt(width = 7)
-  val vm = Bool()
-  val s64 = Bool()
-  val u64 = Bool()
-  val s = Bool()
-  val ps = Bool()
-  val ec = Bool()
-  val ev = Bool()
-  val ef = Bool()
-  val et = Bool()
+  val im0 = UInt(width = 2)
+  val im1 = UInt(width = 2)
 }
-
 
 /** This testsuite checks interaction of component class
   and runtime hierarchies.
 */
 class ConnectSuite extends TestSuite {
 
+  // Test out wiring to a shim made via a scala def
   @Test def testShimConnections() {
-    println("\n### testShimConnections ###")
-    try{
     class UsesShim extends Module {
-      val io = new Bundle {
-        val in = Decoupled(UInt(width = 1)).flip
-        val out = Decoupled(UInt(width = 1))
-      }
-
+      val io = new DecoupledUIntIO
       def makeShim(in: DecoupledIO[UInt]): DecoupledIO[UInt] = {
         val out = Decoupled(UInt())
         out.bits := in.bits + UInt(1)
@@ -41,42 +27,38 @@ class ConnectSuite extends TestSuite {
         in.ready := out.ready
         out
       }
-
       val s = makeShim(io.in)
       io.out.bits := s.bits
       io.out.valid := s.valid
       s.ready := io.out.ready
     }
     class UsesShimParent extends Module {
-      val io = new Bundle {
-        val in = Decoupled(UInt(width = 1)).flip
-        val out = Decoupled(UInt(width = 1))
-      }
+      val io = new DecoupledUIntIO
       val us = Module(new UsesShim)
       us.io.in <> io.in
       io.out <> us.io.out
     }
-    chiselMain(Array[String]("--v",
-      "--targetDir", dir.getPath.toString()),
-      () => Module(new UsesShimParent))
-    } catch {
-      case e => e.printStackTrace()
+    class ShimConnectionsTests(m: UsesShimParent) extends Tester(m, Array(m.io)) {
+      defTests {
+        val vars = new HashMap[Node, Node]() 
+        (0 until 4).map { i =>
+          vars(m.io.in.bits) = UInt(i)
+          vars(m.io.in.valid) = Bool(true)
+          vars(m.io.in.ready) = Bool(true)
+          vars(m.io.out.bits) = UInt(i+1)
+          vars(m.io.out.valid) = Bool(true)
+          vars(m.io.out.ready) = Bool(true)
+          step(vars)
+        } reduce(_&&_)
+      }
     }
-    assertFile("ConnectSuite_UsesShimParent_1.v")
+    launchCppTester((m: UsesShimParent) => new ShimConnectionsTests(m))
   }
 
-    /** XXX The following text output was generated with scala 2.10
-      running on a java 1.6 virtual machine. Though the logic generated
-      is the same, the textual output will be different when running on
-      a java 1.7 virtual machine due to variable name propagation in constant
-      folding optimization. */
-  @Ignore("java 1.6 vs 1.7 issue") @Test def testResetConnections() {
-    println("\n### testResetConnections ###")
+  // Test different forms of reset propagation
+  @Test def testResetConnections() {
     class UsesReset(resetSignal: Bool = null) extends Module(_reset = resetSignal) { 
-      val io = new Bundle {
-        val in = Bool(INPUT)
-        val out = Bool(OUTPUT)
-      }
+      val io = new BoolIO
       val q = Module(new Queue(Bool(), 1))
       q.io.enq.valid := Bool(true)
       q.io.enq.bits := io.in
@@ -84,10 +66,7 @@ class ConnectSuite extends TestSuite {
       io.out := q.io.deq.bits || reset
     }
     class SuppliesResets extends Module {
-      val io = new Bundle {
-        val in = Bool(INPUT)
-        val out = Bool(OUTPUT)
-      }
+      val io = new BoolIO
       val delayed = Reg(next=this.reset)
       val a0 = Module(new UsesReset(this.reset))
       val a1 = Module(new UsesReset(delayed))
@@ -98,158 +77,170 @@ class ConnectSuite extends TestSuite {
       io.out := a0.io.out || a1.io.out || a2.io.out || delayed
     }
     class SuppliesResetsParent extends Module {
-      val io = new Bundle {
-        val in = Bool(INPUT)
-        val out = Bool(OUTPUT)
-      }
+      val io = new BoolIO
       val srs = Module(new SuppliesResets)
       srs.io.in := io.in
       io.out := srs.io.out
     }
-    chiselMain(Array[String]("--v",
-      "--targetDir", dir.getPath.toString()),
-      () => Module(new SuppliesResetsParent))
-    assertFile("ConnectSuite_SuppliesResetsParent_1.v")
+    class SuppliesResetsTests(m: SuppliesResetsParent) extends Tester(m, Array(m.io)) {
+      defTests {
+        val vars = new HashMap[Node, Node]() 
+        List(true,false,false,false,false,false).zip(
+        List(true,true,true,false,false,false)).map {
+          case (i, o) =>
+            vars(m.io.in) = Bool(i)
+            vars(m.io.out) = Bool(o)
+            step(vars)
+        } reduce(_&&_)
+      }
+    }
+    launchCppTester((m: SuppliesResetsParent) => new SuppliesResetsTests(m))
   }
 
-  /** Instantiate a component tree where all component classes have
-    no relationship. */
-  @Test def testNoClassRelation() {
-    println("\n### testNoClassRelation ###")
+  // Connect module hierarchy with unrelated classes
+  @Test def testUnrelatedSubmodules() {
     class A extends Module {
-      val io = new Bundle {
-        val a_in = UInt(INPUT, 1)
-        val a_out = UInt(OUTPUT, 1)
-      }
-      io.a_out := io.a_in
+      val io = new UIntIO
+      io.out := io.in
     }
     class B extends Module {
-      val io = new Bundle {
-        val b_in = UInt(INPUT, 1)
-        val b_out = UInt(OUTPUT, 1)
-      }
-      val aComp = Module(new A())
-      aComp.io.a_in := io.b_in
-      io.b_out := aComp.io.a_out
+      val io = new UIntIO
+      val a = Module(new A)
+      a.io.in := io.in
+      io.out := a.io.out
     }
-    class NoClassRelation extends Module {
-      val io = new Bundle {
-        val c_in = UInt(INPUT, 1)
-        val c_out = UInt(OUTPUT, 1)
-      }
-      val aComp = Module(new B())
-      aComp.io.b_in := io.c_in
-      io.c_out := aComp.io.b_out
+    class Unrelated extends Module {
+      val io = new UIntIO
+      val b = Module(new B)
+      b.io.in := io.in
+      io.out := b.io.out
     }
-    chiselMain(Array[String]("--v",
-      "--targetDir", dir.getPath.toString()),
-      () => Module(new NoClassRelation()))
-    assertFile("ConnectSuite_NoClassRelation_1.v")
+    class UnrelatedSubmodulesTests(m: Unrelated) extends Tester(m, Array(m.io)) {
+      defTests {
+        val vars = new HashMap[Node, Node]() 
+        (0 until 4).map { i =>
+          vars(m.io.in) = UInt(i)
+          vars(m.io.out) = UInt(i)
+          step(vars)
+        } reduce(_&&_)
+      }
+    }
+    launchCppTester((m: Unrelated) => new UnrelatedSubmodulesTests(m))
   }
 
-  /** Instantiate a component of the same class (*A*) twice
-    with logic in-between. */
+  // Test multiple instantiations of single submodule
   @Test def testLogicBtwInstances() {
-    println("\n### testLogicBtwInstances ###")
     class A extends Module {
-      val io = new Bundle {
-        val a_in = UInt(INPUT, 1)
-        val a_out = UInt(OUTPUT, 1)
-      }
-      io.a_out := io.a_in
+      val io = new UIntIO
+      io.out := io.in
     }
     class LogicBtwInstances extends Module {
-      val io = new Bundle {
-        val b_in = UInt(INPUT, 1)
-        val b_out = UInt(OUTPUT, 1)
-      }
-      val a1 = Module(new A())
-      val x = Reg(UInt(1))
-      x := io.b_in
-      val a2 = Module(new A())
-      a1.io.a_in := io.b_in
-      a2.io.a_in := io.b_in
-      io.b_out := a1.io.a_out | a2.io.a_out | x
+      val io = new UIntIO
+      val a1 = Module(new A)
+      a1.io.in := io.in
+      val x = Reg(next = a1.io.out)
+      val a2 = Module(new A)
+      a2.io.in := x
+      io.out := a2.io.out
     }
-    chiselMain(Array[String]("--v",
-      "--targetDir", dir.getPath.toString()),
-      () => Module(new LogicBtwInstances()))
-    assertFile("ConnectSuite_LogicBtwInstances_1.v")
+    class LogicBtwInstancesTests(m: LogicBtwInstances) extends Tester(m, Array(m.io)) {
+      defTests {
+        val vars = new HashMap[Node, Node]() 
+        (0 until 4).map { i =>
+          vars(m.io.in) = UInt(i)
+          vars(m.io.out) = if(i == 0) UInt(0) else UInt(i-1)
+          step(vars)
+        } reduce(_&&_)
+      }
+    }
+    launchCppTester((m: LogicBtwInstances) => new LogicBtwInstancesTests(m))
   }
 
   /** Instantiate a component of the same class (*A*) at two levels
     of a component class hierarchy (*B* < *C*). */
-  @Test def test2Instance2Level() {
-    println("\n### test2Instance2Level ###")
-    /* XXX This test will fail to pick up the correct pop sequence
-     on the Module stack.
+  @Test def testOneInstancePerRelation() {
     class A extends Module {
-      val io = new Bundle {
-        val a_in = UInt(INPUT, 1)
-        val a_out = UInt(OUTPUT, 1)
-      }
-      io.a_out := io.a_in
+      val io = new UIntIO
+      io.out := io.in
     }
     class B extends Module {
-      val io = new Bundle {
-        val b_in = UInt(INPUT, 1)
-        val b_out = UInt(OUTPUT, 1)
+      val io = new UIntIO
+      val aInB = Module(new A)
+      aInB.io.in := io.in
+      io.out := aInB.io.out
+    }
+    class C extends B {
+      val aInC = Module(new A)
+      aInC.io.in := io.in
+      io.out := aInC.io.out | aInB.io.out
+    }
+    class OneInstancePerRelationTests(m: C) extends Tester(m, Array(m.io)) {
+      defTests {
+        val vars = new HashMap[Node, Node]() 
+        (0 until 4).map { i =>
+          vars(m.io.in) = UInt(i)
+          vars(m.io.out) = UInt(i)
+          step(vars)
+        } reduce(_&&_)
       }
-      val aInBComp = Module(new A())
-      aInBComp.io.a_in := io.b_in
     }
-    class Instance2Level extends B {
-      val aInCComp = Module(new A())
-      aInCComp.io.a_in := io.b_in
-      io.b_out := aInCComp.io.a_out | aInBComp.io.a_out
-    }
-    chiselMain(Array[String]("--v"),
-//      "--targetDir", dir.getPath.toString()),
-      () => Module(new Instance2Level()))
-     */
+    launchCppTester((m: C) => new OneInstancePerRelationTests(m))
   }
 
   /** Instantiate a component superclass inside a component */
   @Test def testInstanceSuperclass() {
-    println("\n### testInstanceSuperclass ###")
     class A extends Module {
-      val io = new Bundle {
-        val a_in = UInt(INPUT, 1)
-        val a_out = UInt(OUTPUT, 1)
+      val io = new UIntIO
+      io.out := io.in
+    }
+    class B extends A {
+      val aInB = Module(new A)
+      aInB.io.in := io.in
+      io.out := aInB.io.out
+    }
+    class InstanceSuperclassTests(m: B) extends Tester(m, Array(m.io)) {
+      defTests {
+        val vars = new HashMap[Node, Node]() 
+        (0 until 4).map { i =>
+          vars(m.io.in) = UInt(i)
+          vars(m.io.out) = UInt(i)
+          step(vars)
+        } reduce(_&&_)
       }
-      io.a_out := io.a_in
     }
-    class InstanceSuperclass extends A {
-      val aInBComp = Module(new A())
-      aInBComp.io.a_in := io.a_in
-    }
-    chiselMain(Array[String]("--v",
-      "--targetDir", dir.getPath.toString()),
-      () => Module(new InstanceSuperclass()))
-    assertFile("ConnectSuite_InstanceSuperclass_1.v")
+    launchCppTester((m: B) => new InstanceSuperclassTests(m))
   }
 
   /** Test hooking-up Registers. */
   @Test def testRegisterHook() {
-    println("\ntestRegisterHook:")
     class A extends Module {
       val io = new Bundle {
-        val status = new RegStatus().asOutput
         val wen   = Bool(INPUT)
-        val wdata = UInt(INPUT, 32)
+        val wdata = UInt(INPUT, 4)
+        val status = new RegStatus().asOutput
       }
-
-      val reg_status = Reg(new RegStatus) // reset down below
-
-      io.status := reg_status
+      val reg_status = Reg(new RegStatus)
       when (io.wen) {
         reg_status := new RegStatus().fromBits(io.wdata)
       }
+      io.status := reg_status
     }
-    chiselMain(Array[String]("--v",
-      "--targetDir", dir.getPath.toString()),
-      () => Module(new A()))
-    assertFile("ConnectSuite_A_4.v")
+    class RegisterHookTests(m: A) extends Tester(m, Array(m.io)) {
+      defTests {
+        val vars = new HashMap[Node, Node]() 
+        List(1,     2,     4,     6,     8,     12,    15,   15).zip(
+        List(false, true,  true,  false, true,  false, true, false)).zip(
+        List((0,0), (0,0), (0,2), (1,0), (1,0), (2,0), (2,0), (3,3), (3,3))).map { 
+          case ((in, en), (im0, im1)) =>
+            vars(m.io.wdata) = UInt(in)
+            vars(m.io.wen) = Bool(en)
+            vars(m.io.status.im0) = UInt(im0)
+            vars(m.io.status.im1) = UInt(im1)
+            step(vars)
+        } reduce(_&&_)
+      }
+    }
+    launchCppTester((m: A) => new RegisterHookTests(m))
   }
 
 }

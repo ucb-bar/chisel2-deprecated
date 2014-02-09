@@ -32,4 +32,26 @@ class TestSuite extends AssertionsForJUnit {
   }
   def launchCppTester[M <: Module : ClassTag, T <: Tester[M]](t: M => T) = launchTester("c", t)
   def launchVerilogTester[M <: Module : ClassTag, T <: Tester[M]](t: M => T) = launchTester("v", t)
+
+
+  class BoolIO extends Bundle {
+    val in  = Bool(INPUT)
+    val out = Bool(OUTPUT)
+  }
+
+  class UIntIO extends Bundle {
+    val in  = UInt(INPUT, 4)
+    val out = UInt(OUTPUT, 4)
+  }
+
+  class DecoupledUIntIO extends Bundle {
+    val in = Decoupled(UInt(width = 4)).flip
+    val out = Decoupled(UInt(width = 4))
+  }
+
+  class EnableIO extends Bundle {
+    val en  = Bool(INPUT)
+    val in  = UInt(INPUT, 4)
+    val out = UInt(OUTPUT, 4)
+  }
 }
