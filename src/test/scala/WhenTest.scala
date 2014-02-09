@@ -37,7 +37,6 @@ import Chisel._
 class WhenSuite extends TestSuite {
 
   // Using a single when
-  @Ignore("For some reason, this generates an IOException")
   @Test def testWhenStatement() {
     class WhenModule extends Module {
       val io = new Bundle {
@@ -134,79 +133,46 @@ class WhenSuite extends TestSuite {
     launchCppTester((m: ElsewhenModule) => new ElsewhenModuleTests(m))
   }
 
-  // Forgot the dot prefix in elsewhen statement.
-  @Ignore("to fix: error message")
-  @Test def testForgotDotElseWhen() {
-      class ForgotDotElseWhenComp extends Module {
-        val io = new Bundle {
-          val in0 = Bool(INPUT)
-          val in1 = Bool(INPUT)
-          val out = Bool(OUTPUT)
-        }
-
-        io.out := io.in0;
-        when( io.in0 ) {
-          io.out := io.in0;
-        }
-        /**
-          XXX Replace the weird overloaded error by a more meaningful message.
-
-          \code
-          error: overloaded method value apply with alternatives:
-          (bit: Chisel.UInt)Chisel.Bool <and>
-          (bit: Int)Chisel.Bool
-          cannot be applied to (Unit)
-          } elsewhen( io.in1 ) {
-          \endcode
-
-          Note: We cannot catch this as an exception since it is happening
-          at compile-time.
-        */
-        /*
-        elsewhen( io.in1 ) {
-          io.out := io.in1;
-        }
-        */
-      }
-
-      chiselMain(Array[String]("--backend", "v"),
-        //      "--targetDir", dir.getPath.toString()),
-        () => Module(new ForgotDotElseWhenComp))
-
-      assertFile("WhenSuite_ForgotDotElseWhen_1.v")
-  }
-
   /** instantiate module in a when block.
     */
   @Ignore("to fix: emit correct code with no error messages.")
   @Test def testModuleInWhenBlock() {
-      class ModuleInWhenBlockSub extends Module {
-        val io = new Bundle {
-          val in = Bool(INPUT)
-          val out = Bool(OUTPUT)
-        }
-        /* XXX This generates an error: NO DEFAULT SPECIFIED FOR WIRE */
-        io.out := io.in
+    class Submodule extends Module {
+      val io = new Bundle {
+        val in = UInt(INPUT,4)
+        val out = UInt(OUTPUT,4)
       }
+      /* XXX This generates an error: NO DEFAULT SPECIFIED FOR WIRE */
+      io.out := io.in
+    }
 
-      class ModuleInWhenBlockComp extends Module {
-        val io = new Bundle {
-          val in = Bool(INPUT)
-          val out = Bool(OUTPUT)
-        }
-
-        io.out := io.in;
-        when( io.in ) {
-          val sub = Module(new ModuleInWhenBlockSub())
-          io <> sub.io;
-        }
+    class SubmoduleInWhenBlock extends Module {
+      val io = new Bundle {
+        val en = Bool(INPUT)
+        val in = UInt(INPUT,4)
+        val out = UInt(OUTPUT,4)
       }
+      io.out := UInt(0)
+      when( io.en ) {
+        val sub = Module(new Submodule)
+        io <> sub.io
+      }
+    }
 
-      chiselMain(Array[String]("--backend", "v"),
-        //      "--targetDir", dir.getPath.toString()),
-        () => Module(new ModuleInWhenBlockComp))
+    class SubmoduleInWhenBlockTests(m: SubmoduleInWhenBlock) extends Tester(m, Array(m.io)) {
+      defTests {
+        val vars = new HashMap[Node, Node]() 
+        List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
+          case (en, i) =>
+            vars(m.io.en) = Bool(en)
+            vars(m.io.in) = UInt(i)
+            vars(m.io.out) = UInt(if(en) i else 0)
+            step(vars)
+        } reduce(_&&_)
+      }
+    }
 
-      assertFile("WhenSuite_ModuleInWhenBlockComp.v")
+    launchCppTester((m: SubmoduleInWhenBlock) => new SubmoduleInWhenBlockTests(m))
   }
 
   // Unless statement with elsewhen and otherwise clause
@@ -238,7 +204,7 @@ class WhenSuite extends TestSuite {
   }
 
 
-  // switch statement, is clauses, and 
+  // switch statement, is clauses, and ? literals
   @Test def testSwitch() {
     class SwitchModule extends Module {
       val io = new Bundle {
