@@ -172,3 +172,13 @@ class Fame1QueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Modul
 	io.empty := tail_pointer === UInt(0)
 	io.entry_avail := aregs(0) != UInt(0)
 }
+
+class REGIO[T <: Data](data: T) extends Bundle
+{
+	val bits = data.clone.asOutput
+}
+
+class RegBundle extends Bundle
+{
+	val data = UInt(width = 32)
+}
