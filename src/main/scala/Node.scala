@@ -48,12 +48,6 @@ object Node {
     s
   }
 
-  var isCoercingArgs = true;
-  val conds = new Stack[Bool]();
-  conds.push(Bool(true));
-  // XXX ??
-  val keys  = new Stack[Bits]();
-
   var isInGetWidth = false
 
   def fixWidth(w: Int) = {

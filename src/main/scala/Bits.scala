@@ -97,7 +97,7 @@ abstract class Bits extends Data with proc {
     else ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
 
   override def procAssign(src: Node): Unit =
-    if (inputs.isEmpty) updates += ((genCond(), src))
+    if (inputs.isEmpty) updates += ((Module.current.whenCond, src))
     else ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
 
   //code generation stuff

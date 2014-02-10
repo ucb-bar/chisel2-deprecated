@@ -66,7 +66,6 @@ object VerilogBackend {
 
 class VerilogBackend extends Backend {
   Module.isEmittingComponents = true
-  isCoercingArgs = false
   val keywords = VerilogBackend.keywords
 
   val flushedTexts = HashSet[String]()

@@ -176,8 +176,8 @@ class Reg extends Delay with proc {
     if (assigned) {
       ChiselError.error("reassignment to Reg");
     }
-    val cond = genCond();
-    if (conds.length >= 1) {
+    val cond = Module.current.whenCond
+    if (Module.current.hasWhenCond) {
       enable = if (isEnable) enable || cond else cond
       isEnable = true
     }

@@ -38,9 +38,9 @@ import ChiselError._
 
 object when {
   def execWhen(cond: Bool)(block: => Unit) {
-    conds.push(conds.top && cond);
-    block;
-    conds.pop();
+    Module.current.whenConds.push(Module.current.whenCond && cond)
+    block
+    Module.current.whenConds.pop()
   }
   def apply(cond: Bool)(block: => Unit): when = {
     execWhen(cond){ block }
@@ -55,7 +55,7 @@ class when (prevCond: Bool) {
   }
   def otherwise (block: => Unit) {
     val cond = !prevCond
-    if (conds.length == 1) cond.canBeUsedAsDefault = true
+    if (!Module.current.hasWhenCond) cond.canBeUsedAsDefault = true
     when.execWhen(cond){ block }
   }
 }
@@ -68,27 +68,20 @@ object unless {
 
 object switch {
   def apply(c: Bits)(block: => Unit) {
-    keys.push(c);
-    block;
-    keys.pop();
+    Module.current.switchKeys.push(c)
+    block
+    Module.current.switchKeys.pop()
   }
 }
 object is {
-  def apply(v: Bits)(block: => Unit) {
-    if (keys.length == 0) {
-      ChiselError.error("NO KEY SPECIFIED");
-    } else {
-      val c = keys(0) === v;
-      when (c) { block; }
-    }
-  }
-  def apply(v: Bits, vr: Bits*)(block: => Unit) {
-    if (keys.length == 0) {
-      ChiselError.error("NO KEY SPECIFIED");
-    } else {
-      val c = vr.foldLeft(keys(0) === v)( (p: Bool, v: Bits) => keys(0) === v || p );
-      when (c) { block; }
-    }
+  def apply(v: Bits)(block: => Unit): Unit =
+    apply(Seq(v))(block)
+  def apply(v: Bits, vr: Bits*)(block: => Unit): Unit =
+    apply(v :: vr.toList)(block)
+  def apply(v: Iterable[Bits])(block: => Unit): Unit = {
+    val keys = Module.current.switchKeys
+    if (keys.isEmpty) ChiselError.error("The 'is' keyword may not be used outside of a switch.")
+    else if (!v.isEmpty) when (v.map(_ === keys.top).reduce(_||_)) { block }
   }
 }
 
@@ -228,7 +221,6 @@ object chiselMainTest {
 
 trait proc extends Node {
   val updates = new collection.mutable.ListBuffer[(Bool, Node)]
-  def genCond(): Bool = conds.top;
   def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
     val update = others.foldLeft(default)((v, u) => Multiplex(u._1, u._2, v))
     if (inputs.isEmpty) inputs += update else inputs(0) = update

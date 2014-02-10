@@ -135,14 +135,12 @@ class WhenSuite extends TestSuite {
 
   /** instantiate module in a when block.
     */
-  @Ignore("to fix: emit correct code with no error messages.")
   @Test def testModuleInWhenBlock() {
     class Submodule extends Module {
       val io = new Bundle {
         val in = UInt(INPUT,4)
         val out = UInt(OUTPUT,4)
       }
-      /* XXX This generates an error: NO DEFAULT SPECIFIED FOR WIRE */
       io.out := io.in
     }
 
@@ -155,7 +153,8 @@ class WhenSuite extends TestSuite {
       io.out := UInt(0)
       when( io.en ) {
         val sub = Module(new Submodule)
-        io <> sub.io
+        io.out := sub.io.out
+        io <> sub.io /* connect only io.in to sub.io.in */
       }
     }
 
