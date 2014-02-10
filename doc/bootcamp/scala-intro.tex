@@ -31,11 +31,36 @@ val els2 = x :: y :: y :: Nil
 val a :: b :: c :: Nil = els
 val m = els.length
 
+// Tuple's
+val (x, y, z) = (1, 2, 3)
 \end{scala}
 \end{frame}
 
-% // Tuple's
-% val (x, y, z) = (1, 2, 3)
+\begin{frame}[fragile]{Scala Maps and Sets}
+\begin{scala}
+import scala.collection.mutable.HashMap
+
+val vars = new HashMap[String, Int]()
+vars("a") = 1
+vars("b") = 2
+vars.size
+vars.contains("c")
+vars.getOrElse("c", -1)
+vars.keys
+vars.values
+\end{scala}
+
+\begin{scala}
+import scala.collection.mutable.HashSet
+
+val keys = new HashSet[Int]()
+keys += 1
+keys += 5
+keys.size -> 2
+keys.contains(2) -> false
+\end{scala}
+\end{frame}
+
 
 
 \begin{frame}[fragile]{Scala Iteration}
@@ -50,6 +75,10 @@ for (i <- 0 until tbl.length)
 val tbl2 = new ArrayBuffer[Int]
 for (e <- tbl)
   tbl2 += 2*e
+
+// loop over hashmap key / values
+for ((x, y) <- vars) 
+  println("K " + x + " V " + y)
 \end{scala}
 
 % // create second table with doubled elements
