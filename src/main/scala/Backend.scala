@@ -260,15 +260,9 @@ abstract class Backend {
   def emitRef(node: Node): String = {
     node match {
       case r: Reg =>
-        if (r.name == "") {
-          r setName ("R" + r.emitIndex)
-        } 
-        r.name
+        if (r.name == "") "R" + r.emitIndex else r.name
       case _ =>
-        if(node.name == "") {
-          node setName ("T" + node.emitIndex)
-        } 
-        node.name
+        if(node.name == "") "T" + node.emitIndex else node.name
     }
   }
 
@@ -519,6 +513,7 @@ abstract class Backend {
   // This is modified for couter infrastructure
   // Each method in elaborate calls with Module.topComponent instead of c
   // by Donggyu
+  // Todo: eliminate side effects
   def elaborate(c: Module): Unit = {
     println("backend elaborate")
     Module.setAsTopComponent(c)
@@ -535,6 +530,11 @@ abstract class Backend {
     for (c <- Module.components)
       c.markComponent();
     // XXX This will create nodes after the tree is traversed!
+    // For backannotation by Donggyu
+    //--------------------------------------------------------//
+    nameAll(c) 
+    c bfs (x => if(!x.isTypeNode) emitRef(x))
+    //--------------------------------------------------------//
     c.genAllMuxes;
     execute(c, preElaborateTransforms)
     Module.components.foreach(_.postMarkNet(0));
@@ -577,13 +577,6 @@ abstract class Backend {
     collectNodesIntoComp(initializeDFS)
     ChiselError.info("finished resolving")
 
-    // by Donggyu (for backannotation)
-    // Todo: port it to the new graph format
-    // ------------------------------------------------
-    nameAll(Module.topComponent)
-    Module.sortedComps map (_.nodes map ((emitRef(_))))
-    // ------------------------------------------------
-
     // two transforms added in Mem.scala (referenced and computePorts)
     ChiselError.info("started transforms")
     execute(Module.topComponent, transforms)
@@ -591,6 +584,7 @@ abstract class Backend {
 
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
     Module.topComponent.traceNodes();
+
     val clkDomainWalkedNodes = new ArrayBuffer[Node]
     for (comp <- Module.sortedComps)
       for (node <- comp.nodes)

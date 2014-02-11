@@ -52,23 +52,25 @@ object nodeToString {
 trait Backannotation extends Backend {
   val targetdir = ensureDir(Module.targetDir)
 
+  preElaborateTransforms += ((c: Module) => c.genAllMuxes)
+  preElaborateTransforms += ((c: Module) => nameAll(c))
+  preElaborateTransforms += ((c: Module) => c bfs (x => if(!x.isTypeNode) emitRef(x)))
+ 
+  // TODO: remove them 
+  /*
   preElaborateTransforms += ((c: Module) => levelChildren(c))
   preElaborateTransforms += ((c: Module) => 
     Module.sortedComps = gatherChildren(c).sortWith(
       (x, y) => (x.level < y.level || 
           (x.level == y.level && x.traversal < y.traversal) ) ) )
-  // TODO: No side effiects?
-  // preElaborateTransforms += ((c: Module) => Module.sortedComps map (_.addDefaultReset))
-  // preElaborateTransforms += ((c: Module) => connectResets)
-
+  preElaborateTransforms += ((c: Module) => Module.sortedComps map (_.addDefaultReset))
+  preElaborateTransforms += ((c: Module) => connectResets)
   preElaborateTransforms += ((c: Module) => c.inferAll)
   preElaborateTransforms += ((c: Module) => c.forceMatchingWidths)
   preElaborateTransforms += ((c: Module) => c.removeTypeNodes)
   preElaborateTransforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
-
-  // Todo: get rid of the followings using the new graph format
   preElaborateTransforms += ((c: Module) => nameAll(c))
-  preElaborateTransforms += ((c: Module) => Module.sortedComps map (_.nodes map (emitRef(_))))
+  */
 
   // Todo: no recursion
   protected def getParentNames(m: Module, delim: String = "/"): String = {
@@ -124,9 +126,11 @@ trait SignalBackannotation extends Backannotation {
 
     // Find correspoinding nodes
     m bfs { node =>
-      val signalName = getSignalName(node, ".")
-      if (signalNames contains signalName) {
-        signals += node
+      if (!node.isTypeNode) {
+        val signalName = getSignalName(node, ".")
+        if (signalNames contains signalName) {
+          signals += node
+        }
       }
     }
 
@@ -140,6 +144,7 @@ trait SignalBackannotation extends Backannotation {
     }
   }
 
+  // TODO: elaborate it
   private def reportSignals(m: Module) {
     val rptdir  = ensureDir(targetdir+"report")
     val rptfile = new java.io.FileWriter(rptdir+"%s_signal.rpt".format(m.name))

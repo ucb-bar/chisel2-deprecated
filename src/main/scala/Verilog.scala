@@ -767,9 +767,9 @@ class VerilogBackend extends Backend {
   override def elaborate(c: Module) {
     super.elaborate(c)
 
-    val out = createOutputFile(Module.topComponent.name + ".v"); // by Donggyu
-    doCompile(Module.topComponent, out, 0); // by Donggyu
-    Module.topComponent.verifyAllMuxes; // by Donggyu
+    val out = createOutputFile(Module.topComponent.name + ".v");
+    doCompile(Module.topComponent, out, 0);
+    Module.topComponent.verifyAllMuxes; 
     ChiselError.checkpoint()
     out.close();
 
@@ -783,7 +783,7 @@ class VerilogBackend extends Backend {
       Module.printArgs.clear(); Module.printArgs ++= Module.tester.testNonInputNodes; Module.printFormat = ""
     }
     if (Module.isGenHarness) {
-      genHarness(c, c.name);
+      genHarness(Module.topComponent, Module.topComponent.name);
     }
   }
 

@@ -7,7 +7,8 @@ class Clock(reset: Bool = Module.implicitReset) extends Node {
   Module.clocks += this
   init("", 1)
 
-  var srcClock: Clock = null
+  // var srcClock: Clock = null
+  var srcClock: Node = null // by Donggyu
   var initStr = ""
 
   // returns a reset pin connected to reset for the component in scope

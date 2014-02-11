@@ -220,6 +220,7 @@ object throwException {
   }
 }
 
+// edited by Donggyu
 object chiselMainTest {
   def apply[T <: Module](args: Array[String], gen: () => T)(tester: T => Tester[T]): T =
     chiselMain(args, gen, null, null, tester)
