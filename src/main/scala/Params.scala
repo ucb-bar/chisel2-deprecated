@@ -210,12 +210,24 @@ object Params {
       // case EnumParam(init, list) =>
         //"(range," + init + "," + list + ")"
       //   "const int " + name + " = " + init + ";\n"
-      case RangeParam(pname, init, min, max) =>
-        init.toString
       case ValueParam(pname, init) =>
         init.toString
+      case RangeParam(pname, init, min, max) =>
+        init.toString
+      case LessParam(pname, init, min, par) =>
+        init.toString
+      case LessEqParam(pname, init, min, par) =>
+        init.toString
+      case GreaterParam(pname, init, min, par) =>
+        init.toString
+      case GreaterEqParam(pname, init, min, par) =>
+        init.toString
+      case DivisorParam(pname, init, min, max, par) =>
+        init.toString
+      case EnumParam(pname, init, values) =>
+        init.toString
       case _ =>
-        "uhoh "
+        throw new ParamInvalidException("Unknown parameter class!"); ""
     }
   }
 }
