@@ -59,15 +59,6 @@ object CString {
   }
 }
 
-object CListLookup {
-  def apply[T <: Data](addr: UInt, default: List[T], mapping: Array[(UInt, List[T])]): List[T] = {
-    val map = mapping.map(m => (addr === m._1, m._2))
-    default.zipWithIndex map { case (d, i) =>
-      map.foldRight(d)((m, n) => Mux(m._1, m._2(i), n))
-    }
-  }
-}
-
 class CppBackend extends Backend {
   val keywords = new HashSet[String]();
 
@@ -95,15 +86,21 @@ class CppBackend extends Backend {
   def wordMangle(x: Node, w: Int): String = {
     if (w >= words(x)) {
       "0L"
-    } else if (x.isInstanceOf[Literal]) {
-      val lit = x.asInstanceOf[Literal].value
-      val value = if (lit < 0) (BigInt(1) << x.width) + lit else lit
-      val hex = value.toString(16)
-      if (hex.length > bpw/4*w) "0x" + hex.slice(hex.length-bpw/4*(w + 1), hex.length-bpw/4*w) + "L" else "0L"
-    } else if (x.isInObject) {
-      emitRef(x) + ".values[" + w + "]"
     } else {
-      emitRef(x) + "__w" + w
+      x match {
+        case l: Literal => {
+          val lit = l.value
+          val value = if (lit < 0) (BigInt(1) << x.width) + lit else lit
+          val hex = value.toString(16)
+          if (hex.length > bpw/4*w) "0x" + hex.slice(hex.length-bpw/4*(w + 1), hex.length-bpw/4*w) + "L" else "0L"
+        }
+        case _ => {
+          if (x.isInObject)
+            emitRef(x) + ".values[" + w + "]"
+          else
+            emitRef(x) + "__w" + w
+        }
+      }
     }
   }
   def emitWordRef(node: Node, w: Int): String = {
@@ -122,12 +119,6 @@ class CppBackend extends Backend {
       case x: Binding =>
         ""
       case x: Literal =>
-        ""
-      case x: ListNode =>
-        ""
-      case x: MapNode =>
-        ""
-      case x: LookupMap =>
         ""
       case x: Reg =>
         "  dat_t<" + node.width + "> " + emitRef(node) + ";\n" +
@@ -180,8 +171,7 @@ class CppBackend extends Backend {
     node match {
       case x: Mux =>
         emitTmpDec(x) +
-        block(List("val_t __mask = -" + emitLoWordRef(x.inputs(0))) ++
-              (0 until words(x)).map(i => emitWordRef(x, i) + " = " + emitWordRef(x.inputs(2), i) + " ^ ((" + emitWordRef(x.inputs(2), i) + " ^ " + emitWordRef(x.inputs(1), i) + ") & __mask)"))
+        block((0 until words(x)).map(i => emitWordRef(x, i) + " = TERNARY(" + emitLoWordRef(x.inputs(0)) + ", " + emitWordRef(x.inputs(1), i) + ", " + emitWordRef(x.inputs(2), i) + ")"))
 
       case o: Op => {
         emitTmpDec(o) +
@@ -203,7 +193,59 @@ class CppBackend extends Backend {
             block((0 until words(o)).map(i => emitWordRef(o, i) + " = -" + emitWordRef(o.inputs(0), i) + (if (i > 0) " - __borrow" else if (words(o) > 1) "; val_t __borrow" else "") + (if (i < words(o)-1) "; __borrow = " + emitWordRef(o.inputs(0), i) + " || " + emitWordRef(o, i) else ""))) + trunc(o)
           } else if (o.op == "!") {
             "  " + emitLoWordRef(o) + " = !" + emitLoWordRef(o.inputs(0)) + ";\n"
-          } else {
+          } else if (o.op == "f-")
+            "  " + emitLoWordRef(o) + " = fromFloat(-(toFloat(" + emitLoWordRef(o.inputs(0)) + "));\n"
+          else if (o.op == "fsin")
+            "  " + emitLoWordRef(o) + " = fromFloat(sin(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "fcos")
+            "  " + emitLoWordRef(o) + " = fromFloat(cos(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "ftan")
+            "  " + emitLoWordRef(o) + " = fromFloat(tan(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "fasin")
+            "  " + emitLoWordRef(o) + " = fromFloat(asin(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "facos")
+            "  " + emitLoWordRef(o) + " = fromFloat(acos(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "fatan")
+            "  " + emitLoWordRef(o) + " = fromFloat(atan(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "fsqrt")
+            "  " + emitLoWordRef(o) + " = fromFloat(sqrt(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "flog")
+            "  " + emitLoWordRef(o) + " = fromFloat(log(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "ffloor")
+            "  " + emitLoWordRef(o) + " = fromFloat(floor(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "fceil")
+            "  " + emitLoWordRef(o) + " = fromFloat(ceil(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "fround")
+            "  " + emitLoWordRef(o) + " = fromFloat(round(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "fToSInt")
+            "  " + emitLoWordRef(o) + " = (val_t)(toFloat(" + emitLoWordRef(o.inputs(0)) + "));\n"
+          else if (o.op == "d-")
+            "  " + emitLoWordRef(o) + " = fromDouble(-(toDouble(" + emitLoWordRef(o.inputs(0)) + "));\n"
+          else if (o.op == "dsin")
+            "  " + emitLoWordRef(o) + " = fromDouble(sin(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "dcos")
+            "  " + emitLoWordRef(o) + " = fromDouble(cos(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "dtan")
+            "  " + emitLoWordRef(o) + " = fromDouble(tan(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "dasin")
+            "  " + emitLoWordRef(o) + " = fromDouble(asin(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "dacos")
+            "  " + emitLoWordRef(o) + " = fromDouble(acos(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "datan")
+            "  " + emitLoWordRef(o) + " = fromDouble(atan(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "dlog")
+            "  " + emitLoWordRef(o) + " = fromDouble(log(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "dsqrt")
+            "  " + emitLoWordRef(o) + " = fromDouble(sqrt(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "dfloor")
+            "  " + emitLoWordRef(o) + " = fromDouble(floor(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "dceil")
+            "  " + emitLoWordRef(o) + " = fromDouble(ceil(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "dround")
+            "  " + emitLoWordRef(o) + " = fromDouble(round(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+          else if (o.op == "dToSInt")
+            "  " + emitLoWordRef(o) + " = (val_t)(toDouble(" + emitLoWordRef(o.inputs(0)) + "));\n"
+          else {
             assert(false, "operator " + o.op + " unsupported")
             ""
           })
@@ -324,6 +366,50 @@ class CppBackend extends Backend {
           val initial = (a: String, b: String) => a + " != " + b
           val subsequent = (i: String, a: String, b: String) => "(" + i + ") | (" + a + " != " + b + ")"
           "  " + emitLoWordRef(o) + " = " + opFoldLeft(o, initial, subsequent) + ";\n"
+        } else if (o.op == "f-") {
+            "  " + emitLoWordRef(o) + " = fromFloat(toFloat(" + emitLoWordRef(o.inputs(0)) + ") - toFloat(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "f+") {
+            "  " + emitLoWordRef(o) + " = fromFloat(toFloat(" + emitLoWordRef(o.inputs(0)) + ") + toFloat(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "f*") {
+            "  " + emitLoWordRef(o) + " = fromFloat(toFloat(" + emitLoWordRef(o.inputs(0)) + ") * toFloat(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "f/") {
+            "  " + emitLoWordRef(o) + " = fromFloat(toFloat(" + emitLoWordRef(o.inputs(0)) + ") / toFloat(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "f%") {
+            "  " + emitLoWordRef(o) + " = fromFloat(fmodf(toFloat(" + emitLoWordRef(o.inputs(0)) + "), toFloat(" + emitLoWordRef(o.inputs(1)) + ")));\n"
+        } else if (o.op == "fpow") {
+            "  " + emitLoWordRef(o) + " = fromFloat(pow(toFloat(" + emitLoWordRef(o.inputs(1)) + "), toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+        } else if (o.op == "f==") {
+            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") == toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "f!=") {
+            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") != toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "f>") {
+            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") > toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "f<=") {
+            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") <= toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "f>=") {
+            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") >= toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d-") {
+            "  " + emitLoWordRef(o) + " = fromDouble(toDouble(" + emitLoWordRef(o.inputs(0)) + ") - toDouble(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "d+") {
+            "  " + emitLoWordRef(o) + " = fromDouble(toDouble(" + emitLoWordRef(o.inputs(0)) + ") + toDouble(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "d*") {
+            "  " + emitLoWordRef(o) + " = fromDouble(toDouble(" + emitLoWordRef(o.inputs(0)) + ") * toDouble(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "d/") {
+            "  " + emitLoWordRef(o) + " = fromDouble(toDouble(" + emitLoWordRef(o.inputs(0)) + ") / toDouble(" + emitLoWordRef(o.inputs(1)) + "));\n"
+        } else if (o.op == "d%") {
+            "  " + emitLoWordRef(o) + " = fromDouble(fmod(toDouble(" + emitLoWordRef(o.inputs(0)) + "), toDouble(" + emitLoWordRef(o.inputs(1)) + ")));\n"
+        } else if (o.op == "dpow") {
+            "  " + emitLoWordRef(o) + " = fromDouble(pow(toDouble(" + emitLoWordRef(o.inputs(1)) + "), toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
+        } else if (o.op == "d==") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") == toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d!=") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") != toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d>") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") > toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d<=") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") <= toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d>=") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") >= toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else {
           assert(false, "operator " + o.op + " unsupported")
           ""
@@ -357,17 +443,6 @@ class CppBackend extends Backend {
                 }))) + trunc(node)
           }
         })
-
-      case x: Fill =>
-        // require(node.inputs(1).isLit)
-        require(node.inputs(0).width == 1)
-        emitTmpDec(node) + block((0 until words(node)).map(
-          i => emitWordRef(node, i) + " = "
-            + (if (node.inputs(0).isLit) {
-              0L - node.inputs(0).value.toInt
-            } else {
-              "-" + emitLoWordRef(node.inputs(0))
-            }))) + trunc(node)
 
       case x: Clock =>
         ""
@@ -465,15 +540,14 @@ class CppBackend extends Backend {
     node match {
       case m: MemWrite =>
         // schedule before Reg updates in case a MemWrite input is a Reg
-        if (m.inputs.length == 2) {
-          return ""
-        }
-        def mask(w: Int): String = "(-" + emitLoWordRef(m.cond) + (if (m.isMasked) " & " + emitWordRef(m.mask, w) else "") + ")"
-        block((0 until words(m)).map(i => emitRef(m.mem)
-          + ".put(" + emitLoWordRef(m.addr) + ", " + i
-          + ", (" + emitWordRef(m.data, i) + " & " + mask(i)
-          + ") | (" + emitRef(m.mem) + ".get(" + emitLoWordRef(m.addr)
-          + ", " + i + ") & ~" + mask(i) + "))"))
+        if (m.inputs.length == 2)
+          ""
+        else
+          block((0 until words(m)).map(i =>
+            "if (" + emitLoWordRef(m.cond) + ") " + emitRef(m.mem) +
+            ".put(" + emitLoWordRef(m.addr) + ", " +
+            i + ", " +
+            emitWordRef(m.data, i) + ")"))
 
       case _ =>
         ""
@@ -626,12 +700,6 @@ class CppBackend extends Backend {
         ""
       case x: Literal =>
         ""
-      case x: ListNode =>
-        ""
-      case x: MapNode =>
-        ""
-      case x: LookupMap =>
-        ""
       case x: Reg =>
         "  nodes.push_back(debug_node_t(\"" + name + "\", &" + emitRef(node) + "));\n"
       case m: Mem[_] =>
@@ -687,7 +755,6 @@ class CppBackend extends Backend {
       genHarness(c, c.name);
     }
     val out_h = createOutputFile(c.name + ".h");
-    val out_c = createOutputFile(c.name + ".cpp");
     if (!Params.space.isEmpty) {
       val out_p = createOutputFile(c.name + ".p");
       out_p.write(Params.toDotpStringParams);
@@ -734,23 +801,36 @@ class CppBackend extends Backend {
     out_h.write("\n\n#endif\n");
     out_h.close();
 
-    out_c.write("#include \"" + c.name + ".h\"\n");
-    for(str <- Module.includeArgs) out_c.write("#include \"" + str + "\"\n");
-    out_c.write("\n");
-    out_c.write("void " + c.name + "_t::init ( bool rand_init ) {\n");
+    val out_cpps = ArrayBuffer[java.io.FileWriter]()
+    val all_cpp = new StringBuilder
+    def createCppFile(suffix: String = "-" + out_cpps.length) = {
+      val f = createOutputFile(c.name + suffix + ".cpp")
+      f.write("#include \"" + c.name + ".h\"\n")
+      for (str <- Module.includeArgs) f.write("#include \"" + str + "\"\n")
+      f.write("\n")
+      out_cpps += f
+      f
+    }
+    def writeCppFile(s: String) = {
+      out_cpps.last.write(s)
+      all_cpp.append(s)
+    }
+
+    createCppFile()
+    writeCppFile("void " + c.name + "_t::init ( bool rand_init ) {\n")
     for (m <- c.omods) {
-      out_c.write(emitInit(m));
+      writeCppFile(emitInit(m))
     }
     for (clock <- Module.clocks)
-      out_c.write(emitInit(clock))
-    out_c.write("  nodes.clear();\n");
-    out_c.write("  mems.clear();\n");
+      writeCppFile(emitInit(clock))
+    writeCppFile("  nodes.clear();\n")
+    writeCppFile("  mems.clear();\n")
     for (m <- mappings) {
       if (m._2.name != "reset" && (m._2.isInObject || m._2.isInVCD)) {
-        out_c.write(emitMapping(m));
+        writeCppFile(emitMapping(m))
       }
     }
-    out_c.write("}\n");
+    writeCppFile("}\n")
 
     for (m <- c.omods) {
       val clock = if (m.clock == null) Module.implicitClock else m.clock
@@ -770,30 +850,28 @@ class CppBackend extends Backend {
     for (clk <- clkDomains.keys) {
       clkDomains(clk)._1.append("}\n")
       clkDomains(clk)._2.append("}\n")
-      out_c.write(clkDomains(clk)._1.result)
-      out_c.write(clkDomains(clk)._2.result)
     }
 
-    out_c.write("int " + c.name + "_t::clock ( dat_t<1> reset ) {\n")
-    out_c.write("  uint32_t min = ((uint32_t)1<<31)-1;\n")
+    writeCppFile("int " + c.name + "_t::clock ( dat_t<1> reset ) {\n")
+    writeCppFile("  uint32_t min = ((uint32_t)1<<31)-1;\n")
     for (clock <- Module.clocks) {
-      out_c.write("  if (" + emitRef(clock) + "_cnt < min) min = " + emitRef(clock) +"_cnt;\n")
+      writeCppFile("  if (" + emitRef(clock) + "_cnt < min) min = " + emitRef(clock) +"_cnt;\n")
     }
     for (clock <- Module.clocks) {
-      out_c.write("  " + emitRef(clock) + "_cnt-=min;\n")
+      writeCppFile("  " + emitRef(clock) + "_cnt-=min;\n")
     }
     for (clock <- Module.clocks) {
-      out_c.write("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
+      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
     }
     for (clock <- Module.clocks) {
-      out_c.write("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
+      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
     }
     for (clock <- Module.clocks) {
-      out_c.write("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " +
+      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " +
                   emitRef(clock) + ";\n")
     }
-    out_c.write("  return min;\n")
-    out_c.write("}\n")
+    writeCppFile("  return min;\n")
+    writeCppFile("}\n")
 
     def splitFormat(s: String): Seq[String] = {
       var off = 0;
@@ -817,9 +895,9 @@ class CppBackend extends Backend {
       }
       res.reverse
     }
-    out_c.write("void " + c.name + "_t::print ( FILE* f, FILE* e ) {\n");
+    writeCppFile("void " + c.name + "_t::print ( FILE* f, FILE* e ) {\n")
     for (p <- Module.printfs)
-      out_c.write("#if __cplusplus >= 201103L\n"
+      writeCppFile("#if __cplusplus >= 201103L\n"
         + "  if (" + emitLoWordRef(p.cond)
         + ") dat_fprintf<" + p.width + ">(e, "
         + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
@@ -838,21 +916,21 @@ class CppBackend extends Backend {
         if (tok(0) == '%') {
           val nodes = Module.printArgs(i).maybeFlatten
           for (j <- 0 until nodes.length)
-            out_c.write("  fprintf(f, \"" + (if (j > 0) " " else "") +
+            writeCppFile("  fprintf(f, \"" + (if (j > 0) " " else "") +
                         "%s\", TO_CSTR(" + emitRef(nodes(j)) + "));\n");
           i += 1;
         } else {
-          out_c.write("  fprintf(f, \"%s\", \"" + tok + "\");\n");
+          writeCppFile("  fprintf(f, \"%s\", \"" + tok + "\");\n")
         }
       }
-      out_c.write("  fprintf(f, \"\\n\");\n");
-      out_c.write("  fflush(f);\n");
-      out_c.write("  fflush(e);\n");
+      writeCppFile("  fprintf(f, \"\\n\");\n")
+      writeCppFile("  fflush(f);\n")
+      writeCppFile("  fflush(e);\n")
     }
-    out_c.write("}\n");
+    writeCppFile("}\n")
     def constantArgSplit(arg: String): Array[String] = arg.split('=');
     def isConstantArg(arg: String): Boolean = constantArgSplit(arg).length == 2;
-    out_c.write("bool " + c.name + "_t::scan ( FILE* f ) {\n");
+    writeCppFile("bool " + c.name + "_t::scan ( FILE* f ) {\n")
     if (Module.scanArgs.length > 0) {
       val format =
         if (Module.scanFormat == "") {
@@ -866,18 +944,28 @@ class CppBackend extends Backend {
         if (tok(0) == '%') {
           val nodes = c.keepInputs(Module.scanArgs(i).maybeFlatten)
           for (j <- 0 until nodes.length)
-            out_c.write("  str_to_dat(read_tok(f), " + emitRef(nodes(j)) + ");\n");
+            writeCppFile("  str_to_dat(read_tok(f), " + emitRef(nodes(j)) + ");\n")
           i += 1;
         } else {
-          out_c.write("  fscanf(f, \"%s\", \"" + tok + "\");\n");
+          writeCppFile("  fscanf(f, \"%s\", \"" + tok + "\");\n")
         }
       }
-      // out_c.write("  getc(f);\n");
+      // writeCppFile("  getc(f);\n")
     }
-    out_c.write("  return(!feof(f));\n");
-    out_c.write("}\n");
-    vcd.dumpVCD(c, out_c);
-    out_c.close();
+    writeCppFile("  return(!feof(f));\n")
+    writeCppFile("}\n")
+
+    createCppFile()
+    vcd.dumpVCD(c, writeCppFile)
+
+    for (out <- clkDomains.values.map(_._1) ++ clkDomains.values.map(_._2)) {
+      createCppFile()
+      writeCppFile(out.result)
+    }
+
+    createCppFile("")
+    writeCppFile(all_cpp.result)
+    out_cpps.foreach(_.close)
 
     /* Copy the emulator.h file into the targetDirectory. */
     val resourceStream = getClass().getResourceAsStream("/emulator.h")

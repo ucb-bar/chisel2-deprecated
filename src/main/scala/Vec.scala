@@ -222,14 +222,6 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] 
     }
   }
 
-  override def ^^(src: Node) = {
-    src match {
-      case other: Vec[T] =>
-        for((b, o) <- self zip other.self)
-          b ^^ o
-    }
-  }
-
   def <>(src: Vec[T]) {
     for((b, e) <- self zip src)
       b <> e;
@@ -331,16 +323,16 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] 
 
   override def toNode: Node = {
     if(flattenedVec == null){
-      val nodes = flatten.map{case(n, i) => i};
+      val nodes = Vec(this.reverse).flatten.map{case(n, i) => i}
       flattenedVec = Concatenate(nodes.head, nodes.tail.toList: _*)
     }
     flattenedVec
   }
 
   override def fromNode(n: Node): this.type = {
-    val res = this.clone();
-    var ind = 0;
-    for((name, io) <- res.flatten.toList.reverse) {
+    val res = this.clone
+    var ind = 0
+    for ((name, io) <- res.flatten) {
       io.asOutput();
       if(io.width > 1) {
         io assign NodeExtract(n, ind + io.width-1, ind)
@@ -373,12 +365,10 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] 
       elm.setIsTypeNode
   }
 
-  override def toBits(): UInt = {
-    val reversed = this.reverse.map(_.toBits)
-    Cat(reversed.head, reversed.tail: _*)
-  }
-
   def length: Int = self.size
+
+  override val hashCode: Int = System.identityHashCode(this)
+  override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
 }
 
 trait VecLike[T <: Data] extends collection.IndexedSeq[T] {

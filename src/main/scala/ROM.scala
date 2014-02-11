@@ -60,6 +60,10 @@ class ROM[T <: Data](gen: (Int) => T) extends Vec[T](gen) {
     }
   }
 
+  override def forceMatchingWidths =
+    for (i <- 0 until inputs.length)
+      inputs(i) = inputs(i).matchWidth(width)
+
   override def isInObject: Boolean = true
   override def isInVCD: Boolean = false
 

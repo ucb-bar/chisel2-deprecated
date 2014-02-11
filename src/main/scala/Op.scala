@@ -48,42 +48,67 @@ object chiselCast {
 }
 
 object UnaryOp {
-  def apply[T <: Bits](x: T, op: String): Node = {
+  def apply(x: Node, op: String): Node = {
     op match {
-      case "-" => Op("-",  1, widthOf(0), x);
-      case "~" => Op("~",  1, widthOf(0), x);
-      case "!" => Op("!",  1, fixWidth(1), x);
-      case any => throw new Exception("Unrecognized operator " + op);
+      case "-" => Op("-", widthOf(0), x)
+      case "~" => Op("~", widthOf(0), x)
+      case "!" => Op("!", fixWidth(1), x)
+      case "f-" => Op("f-", fixWidth(32), x)
+      case "fsin" => Op("fsin", fixWidth(32), x)
+      case "fcos" => Op("fcos", fixWidth(32), x)
+      case "ftan" => Op("ftan", fixWidth(32), x)
+      case "fsqrt" => Op("fsqrt", fixWidth(32), x)
+      case "flog" => Op("flog", fixWidth(32), x)
+      case "ffloor" => Op("ffloor", fixWidth(32), x)
+      case "fceil" => Op("fceil", fixWidth(32), x)
+      case "fround" => Op("fround", fixWidth(32), x)
+      case "d-" => Op("d-", fixWidth(64), x)
+      case "dsin" => Op("dsin", fixWidth(64), x)
+      case "dcos" => Op("dcos", fixWidth(64), x)
+      case "dtan" => Op("dtan", fixWidth(64), x)
+      case "dsqrt" => Op("dsqrt", fixWidth(64), x)
+      case "dlog" => Op("dlog", fixWidth(64), x)
+      case "dfloor" => Op("dfloor", fixWidth(64), x)
+      case "dceil" => Op("dceil", fixWidth(64), x)
+      case "dround" => Op("dround", fixWidth(64), x)
+      case any => throw new Exception("Unrecognized operator " + op)
     }
   }
 }
 
 object BinaryOp {
-  def apply[T <: Bits](x: T, y: T, op: String): Node = {
+  def apply(x: Node, y: Node, op: String): Node = {
     op match {
-      case "<<"  => Op("<<", 0, lshWidthOf(0, y),  x, y );
-      case ">>"  => Op(">>", 0, rshWidthOf(0, y),  x, y );
-      case "s>>" => Op("s>>", 0, rshWidthOf(0, y),  x, y );
-      case "+"   => Op("+",  2, maxWidth _,  x, y );
-      case "*"   => Op("*",  0, sumWidth _,  x, y );
-      case "s*s" => Op("s*s",  0, sumWidth _,  x, y );
-      case "s*u" => Op("s*s",  0, mulSUWidth _,  x, y );
-      case "u*s" => Op("s*s",  0, mulSUWidth _,  y, x );
-      case "/"   => Op("/",  0, widthOf(0),  x, y );
-      case "s/s" => Op("s/s",  0, widthOf(0),  x, y );
-      case "s/u" => Op("s/s",  0, widthOf(0),  x, y );
-      case "u/s" => Op("s/s",  0, divUSWidth _, x, y );
-      case "%"   => Op("%",  0, minWidth _,  x, y );
-      case "s%s" => Op("s%s",  0, minWidth _,  x, y );
-      case "s%u" => Op("s%s",  0, modSUWidth _,  x, y );
-      case "u%s" => Op("s%s",  0, modUSWidth _, x, y );
-      case "^"   => Op("^",  2, maxWidth _,  x, y );
-      case "?"   => Multiplex(x, y, null);
-      case "-"   => Op("-",  2, maxWidth _,  x, y );
-      case "##"  => Op("##", 2, sumWidth _,  x, y );
-      case "&"   => Op("&",  2, maxWidth _, x, y );
-      case "|"   => Op("|",  2, maxWidth _, x, y );
-      case any   => throw new Exception("Unrecognized operator " + op);
+      case "<<"  => Op("<<", lshWidthOf(0, y),  x, y )
+      case ">>"  => Op(">>", rshWidthOf(0, y),  x, y )
+      case "s>>" => Op("s>>", rshWidthOf(0, y),  x, y )
+      case "+"   => Op("+", maxWidth _,  x, y )
+      case "*"   => Op("*", sumWidth _,  x, y )
+      case "s*s" => Op("s*s", sumWidth _,  x, y )
+      case "s*u" => Op("s*u", mulSUWidth _,  x, y )
+      case "/"   => Op("/", widthOf(0),  x, y )
+      case "s/s" => Op("s/s", widthOf(0),  x, y )
+      case "%"   => Op("%", minWidth _,  x, y )
+      case "s%s" => Op("s%s", minWidth _,  x, y )
+      case "^"   => Op("^", maxWidth _,  x, y )
+      case "?"   => Multiplex(x, y, null)
+      case "-"   => Op("-", maxWidth _,  x, y )
+      case "##"  => Op("##", sumWidth _,  x, y )
+      case "&"   => Op("&", maxWidth _, x, y )
+      case "|"   => Op("|", maxWidth _, x, y )
+      case "f+"  => Op("f+", fixWidth(32), x, y )
+      case "f-"  => Op("f-", fixWidth(32), x, y )
+      case "f*"  => Op("f*", fixWidth(32), x, y )
+      case "f/"  => Op("f/", fixWidth(32), x, y )
+      case "f%"  => Op("f%", fixWidth(32), x, y )
+      case "fpow"  => Op("fpow", fixWidth(32), x, y )
+      case "d+"  => Op("d+", fixWidth(64), x, y )
+      case "d-"  => Op("d-", fixWidth(64), x, y )
+      case "d*"  => Op("d*", fixWidth(64), x, y )
+      case "d/"  => Op("d/", fixWidth(64), x, y )
+      case "d%"  => Op("d%", fixWidth(64), x, y )
+      case "dpow"  => Op("dpow", fixWidth(64), x, y )
+      case any   => throw new Exception("Unrecognized operator " + op)
     }
   }
 
@@ -101,14 +126,26 @@ object LogicalOp {
       Module.chiselAndMap((x, y))
     } else {
       val node = op match {
-        case "===" => Op("==", 2, fixWidth(1), x, y );
-        case "!="  => Op("!=", 2, fixWidth(1), x, y );
-        case "<"   => Op("<",  2, fixWidth(1), x, y );
-        case "<="  => Op("<=", 2, fixWidth(1), x, y );
-        case "s<"  => Op("s<", 2, fixWidth(1), x, y );
-        case "s<=" => Op("s<=",2, fixWidth(1), x, y );
-        case "&&"  => Op("&&", 2, fixWidth(1), x, y );
-        case "||"  => Op("||", 2, fixWidth(1), x, y );
+        case "===" => Op("==",  fixWidth(1), x, y)
+        case "!="  => Op("!=",  fixWidth(1), x, y)
+        case "<"   => Op("<",   fixWidth(1), x, y)
+        case "<="  => Op("<=",  fixWidth(1), x, y)
+        case "s<"  => Op("s<",  fixWidth(1), x, y)
+        case "s<=" => Op("s<=", fixWidth(1), x, y)
+        case "&&"  => Op("&&",  fixWidth(1), x, y)
+        case "||"  => Op("||",  fixWidth(1), x, y)
+        case "f==" => Op("f==", fixWidth(1), x, y)
+        case "f!=" => Op("f!=", fixWidth(1), x, y)
+        case "f>"  => Op("f>",  fixWidth(1), x, y)
+        case "f<"  => Op("f<",  fixWidth(1), x, y)
+        case "f<=" => Op("f<=", fixWidth(1), x, y)
+        case "f>=" => Op("f>=", fixWidth(1), x, y)
+        case "d==" => Op("d==", fixWidth(1), x, y)
+        case "d!=" => Op("d!=", fixWidth(1), x, y)
+        case "d>"  => Op("d>",  fixWidth(1), x, y)
+        case "d<"  => Op("d<",  fixWidth(1), x, y)
+        case "d<=" => Op("d<=", fixWidth(1), x, y)
+        case "d>=" => Op("d>=", fixWidth(1), x, y)
         case any   => throw new Exception("Unrecognized operator " + op);
       }
 
@@ -123,12 +160,12 @@ object LogicalOp {
 }
 
 object ReductionOp {
-  def apply[T <: Bits](x: T, op: String): Node = {
+  def apply(x: Node, op: String): Node = {
     op match {
-      case "&" => Op("&",  1, fixWidth(1), x);
-      case "|" => Op("|",  1, fixWidth(1), x);
-      case "^" => Op("^",  1, fixWidth(1), x);
-      case any => throw new Exception("Unrecognized operator " + op);
+      case "&" => Op("&", fixWidth(1), x)
+      case "|" => Op("|", fixWidth(1), x)
+      case "^" => Op("^", fixWidth(1), x)
+      case any => throw new Exception("Unrecognized operator " + op)
     }
   }
 }
@@ -139,8 +176,8 @@ object BinaryBoolOp {
       Module.chiselAndMap((x, y))
     } else {
       val node = op match {
-        case "&&"  => Op("&&", 2, fixWidth(1), x, y );
-        case "||"  => Op("||", 2, fixWidth(1), x, y );
+        case "&&"  => Op("&&", fixWidth(1), x, y );
+        case "||"  => Op("||", fixWidth(1), x, y );
         case any   => throw new Exception("Unrecognized operator " + op);
       }
       val output = Bool(OUTPUT).fromNode(node)
@@ -154,19 +191,22 @@ object BinaryBoolOp {
 
 
 object Op {
-  def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
+  def apply (name: String, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
     val (a_lit, b_lit) = (a.litOf, b.litOf);
-    if (Module.isFolding) {
     if (a_lit != null && b_lit == null) {
       name match {
         case "&&" => return if (a_lit.value == 0) Literal(0) else b;
         case "||" => return if (a_lit.value == 0) b else Literal(1);
+        case "==" => if (a_lit.isZ) return zEquals(b, a)
+        case "!=" => if (a_lit.isZ) return !zEquals(b, a)
         case _ => ;
       }
     } else if (a_lit == null && b_lit != null) {
       name match {
         case "&&" => return if (b_lit.value == 0) Literal(0) else a;
         case "||" => return if (b_lit.value == 0) a else Literal(1);
+        case "==" => if (b_lit.isZ) return zEquals(a, b)
+        case "!=" => if (b_lit.isZ) return !zEquals(a, b)
         case _ => ;
       }
     } else if (a_lit != null && b_lit != null) {
@@ -190,6 +230,115 @@ object Op {
         case _ => ;
       }
     }
+    if (a.isInstanceOf[Flo] && b.isInstanceOf[Flo]) {
+      if (a_lit != null && b_lit != null) {
+      val (fa_val, fb_val) = (a_lit.floValue, b_lit.floValue);
+      name match {
+        case "f+" => return Flo(fa_val + fb_val);
+        case "f-" => return Flo(fa_val - fb_val);
+        case "f*" => return Flo(fa_val * fb_val);
+        case "f/" => return Flo(fa_val / fb_val);
+        case "f%" => return Flo(fa_val % fb_val);
+        case "f==" => return Bool(fa_val == fb_val);
+        case "f!=" => return Bool(fa_val != fb_val);
+        case "f>" => return Bool(fa_val > fb_val);
+        case "f<" => return Bool(fa_val < fb_val);
+        case "f>=" => return Bool(fa_val >= fb_val);
+        case "f<=" => return Bool(fa_val <= fb_val);
+        case _ => ;
+      }
+      } else if (a_lit != null) { 
+        val fa_val = a_lit.floValue;
+        if (fa_val == 0.0) {
+          name match {
+            case "f+" => return b;
+            case "f*" => return Flo(0.0.toFloat);
+            case "f/" => return Flo(0.0.toFloat);
+            case _ => ;
+          }
+        } else if (fa_val == 1.0) {
+          name match {
+            case "f*" => return b;
+            case _ => ;
+          }
+        }        
+      } else if (b_lit != null) { 
+        val fb_val = b_lit.floValue;
+        if (fb_val == 0.0) {
+          name match {
+            case "f+" => return a;
+            case "f*" => return Flo(0.0.toFloat);
+            case _ => ;
+          }
+        } else if (fb_val == 1.0) {
+          name match {
+            case "f*" => return a;
+            case "f/" => return a;
+            case "f%" => return a;
+            case _ => ;
+          }
+        }        
+      }
+    }
+      
+    if (a.isInstanceOf[Dbl] && b.isInstanceOf[Dbl]) {
+      if (a_lit != null && b_lit != null) {
+      val (fa_val, fb_val) = (a_lit.dblValue, b_lit.dblValue);
+        // println(" FOLDING " + name + " " + fa_val + " " + fb_val);
+      name match {
+        case "d+" => return Dbl(fa_val + fb_val);
+        case "d-" => return Dbl(fa_val - fb_val);
+        case "d*" => return Dbl(fa_val * fb_val);
+        case "d/" => return Dbl(fa_val / fb_val);
+        case "d%" => return Dbl(fa_val % fb_val);
+        case "d==" => return Bool(fa_val == fb_val);
+        case "d!=" => return Bool(fa_val != fb_val);
+        case "d>" => return Bool(fa_val > fb_val);
+        case "d<" => return Bool(fa_val < fb_val);
+        case "d>=" => return Bool(fa_val >= fb_val);
+        case "d<=" => return Bool(fa_val <= fb_val);
+        case _ => ;
+      }
+    } else if (a_lit != null) { 
+      val fa_val = a_lit.dblValue;
+      // println("FA " + fa_val + " NAME " + name);
+      if (fa_val == 0.0) {
+        // println("FOLDING " + name);
+        name match {
+          case "d+" => return b;
+          case "d*" => return Dbl(0.0);
+          case "d/" => return Dbl(0.0);
+          case "d%" => return Dbl(0.0);
+          case _ => ;
+        }
+      } else if (fa_val == 1.0) {
+        // println("FOLDING " + name);
+        name match {
+          case "d*" => return b;
+          case _ => ;
+        }
+      }        
+    } else if (b_lit != null) { 
+      val fb_val = b_lit.dblValue;
+      // println("FB " + fb_val + " NAME " + name);
+      if (fb_val == 0.0) {
+        // println("FOLDING " + name);
+        name match {
+          case "d+" => return a;
+          case "d*" => return Dbl(0.0);
+          case _ => ;
+        }
+      } else if (fb_val == 1.0) {
+        // println("FOLDING " + name);
+        name match {
+          case "d*" => return a;
+          case "d/" => return a;
+          case "d%" => return a;
+          case _ => ;
+        }
+      }        
+    }
+
     }
     if (Module.backend.isInstanceOf[CppBackend] || Module.backend.isInstanceOf[FloBackend]) {
       def signAbs(x: Node): (Bool, UInt) = {
@@ -207,15 +356,7 @@ object Op {
             val ucond = Bool(OUTPUT).fromNode(LogicalOp(fixA, fixB, name.tail))
             return Mux(msbA === msbB, ucond, msbA)
           }
-        case "==" =>
-          if (b.litOf != null && b.litOf.isZ) {
-            val (bits, mask, swidth) = parseLit(b.litOf.name)
-            return Op(name, nGrow, widthInfer, Op("&", 2, maxWidth _, a, Literal(BigInt(mask, 2))), Literal(BigInt(bits, 2)))
-          }
-          if (a.litOf != null && a.litOf.isZ) {
-            return Op(name, nGrow, widthInfer, b, a)
-          }
-        case "s*s" =>
+        case "s*s" | "s*u" =>
           val (signA, absA) = signAbs(a)
           val (signB, absB) = signAbs(b)
           val prod = absA * absB
@@ -232,36 +373,83 @@ object Op {
           return Mux(signA, -rem, rem)
         case "%" =>
           val (au, bu) = (a.asInstanceOf[UInt], b.asInstanceOf[UInt])
-          return Op("-", nGrow, widthInfer, au, au/bu*bu)
+          return Op("-", widthInfer, au, au/bu*bu)
         case _ =>
       }
     }
+    if (a.isLit && a.litOf.isZ || b.isLit && b.litOf.isZ)
+      ChiselError.error({"Operator " + name + " with inputs " + a + ", " + b + " does not support literals with ?"});
     val res = new Op();
     res.init("", widthInfer, a, b);
     res.op = name;
-    res.nGrow = nGrow;
     res
   }
-  def apply (name: String, nGrow: Int, widthInfer: (Node) => Int, a: Node): Node = {
-    if (Module.isFolding && a.litOf != null) {
+  def apply (name: String, widthInfer: (Node) => Int, a: Node): Node = {
+      if (a.litOf != null) {
+        if (a.litOf.isZ)
+          ChiselError.error({"Operator " + name + " with input " + a + " does not support literals with ?"});
+        name match {
+          case "!" => return if (a.litOf.value == 0) Literal(1) else Literal(0);
+          case "-" => return Literal(-a.litOf.value, a.litOf.width);
+          case "~" => return Literal((-a.litOf.value-1)&((BigInt(1) << a.litOf.width)-1), a.litOf.width);
+          case _ => ;
+        }
+      }
+      val a_lit = a.litOf
+    if (a.isInstanceOf[Dbl]) { 
+      if (a_lit != null) {
+      val fa_val = a_lit.dblValue;
       name match {
-        case "!" => return if (a.litOf.value == 0) Literal(1) else Literal(0);
-        case "-" => return Literal(-a.litOf.value, a.litOf.width);
-        case "~" => return Literal((-a.litOf.value-1)&((BigInt(1) << a.litOf.width)-1), a.litOf.width);
+        case "dsin" => return Dbl(Math.sin(fa_val));
+        case "dcos" => return Dbl(Math.cos(fa_val));
+        case "dtan" => return Dbl(Math.tan(fa_val));
+        case "dasin" => return Dbl(Math.asin(fa_val));
+        case "dacos" => return Dbl(Math.acos(fa_val));
+        case "datan" => return Dbl(Math.atan(fa_val));
+        case "dsqrt" => return Dbl(Math.sqrt(fa_val));
+        case "dlog" => return Dbl(Math.log(fa_val));
+        case "dfloor" => return Dbl(Math.floor(fa_val));
+        case "dceil" => return Dbl(Math.ceil(fa_val));
+        case "dround" => return Dbl(Math.round(fa_val));
+        case "dToFix" => return Literal(fa_val.toInt);
         case _ => ;
+      }
+      }
+    }
+    if (a.isInstanceOf[Flo]) {
+      if (a_lit != null) {
+      val fa_val = a_lit.floValue;
+      name match {
+        case "fsin" => return Flo(Math.sin(fa_val).toFloat);
+        case "fcos" => return Flo(Math.cos(fa_val).toFloat);
+        case "ftan" => return Flo(Math.tan(fa_val).toFloat);
+        case "fasin" => return Flo(Math.asin(fa_val).toFloat);
+        case "facos" => return Flo(Math.acos(fa_val).toFloat);
+        case "fatan" => return Flo(Math.atan(fa_val).toFloat);
+        case "fsqrt" => return Flo(Math.sqrt(fa_val).toFloat);
+        case "flog" => return Flo(Math.log(fa_val).toFloat);
+        case "ffloor" => return Dbl(Math.floor(fa_val).toFloat);
+        case "fceil" => return Dbl(Math.ceil(fa_val).toFloat);
+        case "fround" => return Dbl(Math.round(fa_val).toFloat);
+        case "fToFix" => return Literal(fa_val.toLong);
+        case _ => ;
+      }
       }
     }
     val res = new Op();
     res.init("", widthInfer, a);
     res.op = name;
-    res.nGrow = nGrow;
     res
+  }
+
+  private def zEquals(a: Node, b: Node) = {
+    val (bits, mask, swidth) = parseLit(b.litOf.name)
+    UInt(Op("==", fixWidth(1), Op("&", maxWidth _, a, Literal(BigInt(mask, 2))), Literal(BigInt(bits, 2))))
   }
 }
 
 class Op extends Node {
   var op: String = "";
-  var nGrow: Int = 0;
 
   override def toString: String =
     if (inputs.length == 1) {
@@ -284,4 +472,18 @@ class Op extends Node {
     }
   }
 
+  override def canCSE: Boolean = true
+  override def equalsForCSE(x: Node): Boolean = x match {
+    case x: Op => {
+      if (op != x.op)
+        return false
+      if (inputs.length != x.inputs.length)
+        return false
+      for (i <- 0 until inputs.length)
+        if (!(inputs(i) == x.inputs(i)))
+          return false
+      true
+    }
+    case _ => false
+  }
 }

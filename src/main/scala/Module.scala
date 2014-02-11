@@ -57,12 +57,12 @@ object Module {
   var saveComponentTrace = false
   var dontFindCombLoop = false
   var isDebug = false;
+  var isCSE = false
   var isIoDebug = true;
   var isClockGatingUpdates = false;
   var isClockGatingUpdatesInline = false;
   var isVCD = false;
   var isInlineMem = true;
-  var isFolding = true;
   var isGenHarness = false;
   var isReportDims = false;
   var isPruning = false;
@@ -136,11 +136,11 @@ object Module {
     dontFindCombLoop = false
     isGenHarness = false;
     isDebug = false;
+    isCSE = false
     isIoDebug = true;
     isClockGatingUpdates = false;
     isClockGatingUpdatesInline = false;
     isVCD = false;
-    isFolding = true;
     isReportDims = false;
     scanFormat = "";
     scanArgs = new ArrayBuffer[Node]();
@@ -182,11 +182,7 @@ object Module {
     clk = UInt(INPUT, 1)
     clk.setName("clk")
 
-    isCoercingArgs = true
     isInGetWidth = false
-    conds.clear()
-    conds.push(Bool(true))
-    keys.clear()
   }
 
   //component stack handling stuff
@@ -274,8 +270,14 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   val children = new ArrayBuffer[Module];
   val debugs = HashSet[Node]();
 
+  val switchKeys = Stack[Bits]()
+  val whenConds = Stack[Bool]()
+  private lazy val trueCond = Bool(true)
+  def hasWhenCond: Boolean = !whenConds.isEmpty
+  def whenCond: Bool = if (hasWhenCond) whenConds.top else trueCond
+
   val nodes = new ArrayBuffer[Node]
-  val mods  = new ArrayBuffer[Node];
+  val mods = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
 
   val regs  = new ArrayBuffer[Reg];
@@ -380,7 +382,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   def printf(message: String, args: Node*): Unit = {
-    val p = new Printf(conds.top && !this.reset, message, args)
+    val p = new Printf(Module.current.whenCond && !this.reset, message, args)
     printfs += p
     debug(p)
     p.inputs.foreach(debug _)

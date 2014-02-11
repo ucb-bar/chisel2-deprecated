@@ -99,9 +99,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
     data
   }
 
-  /** XXX Cannot specify return type as it can either be proc or MemWrite
-    depending on the execution path you believe. */
-  def doWrite(addr: UInt, condIn: Bool, wdata: Node, wmaskIn: UInt) = {
+  def doWrite(addr: UInt, condIn: Bool, wdata: Node, wmaskIn: UInt): Unit = {
     val cond = // add bounds check if depth is not a power of 2
       condIn && (Bool(isPow2(n)) || addr(log2Up(n)-1,0) < UInt(n))
     val wmask = // remove constant-1 write masks
@@ -111,33 +109,32 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
         wmaskIn
       }
 
-    def doit(addr: UInt, cond: Bool, wdata: Node, wmask: UInt) = {
-      val wr = new MemWrite(this, cond, addr, wdata, wmask)
-      writes += wr
-      inputs += wr
-      wr
-    }
+    if (orderedWrites) // enforce priority ordering of write ports
+      for (w <- writes)
+        w.cond = w.cond.asInstanceOf[Bool] && !(cond && addr === w.addr.asInstanceOf[UInt])
 
+    val wr = new MemWrite(this, cond, addr, wdata, wmask)
+    writes += wr
+    inputs += wr
+  }
+
+  def write(addr: UInt, data: T): Unit = {
+    val cond = Module.current.whenCond
     if (seqRead && Module.backend.isInstanceOf[CppBackend] && gen().isInstanceOf[Bits]) {
       // generate bogus data when reading & writing same address on same cycle
-      val reg_data = new Reg().init("", widthOf(0), wdata)
-      val reg_wmask = if (wmask == null) null else Reg(next=wmask)
+      val reg_data = new Reg().init("", widthOf(0), data)
       val random16 = LFSR16()
       val random_data = Cat(random16, Array.fill((width-1)/16){random16}:_*)
-      doit(Reg(next=addr), Reg(next=cond), reg_data, reg_wmask)
-      doit(addr, cond, random_data, wmask)
-      reg_data
+      doWrite(Reg(next=addr), Reg(next=cond), reg_data, null.asInstanceOf[UInt])
+      doWrite(addr, cond, random_data, null.asInstanceOf[UInt])
     } else {
-      if (orderedWrites) // enforce priority ordering of write ports
-        for (w <- writes)
-          w.cond = w.cond.asInstanceOf[Bool] && !(cond && addr === w.addr.asInstanceOf[UInt])
-      doit(addr, cond, wdata, wmask)
+      doWrite(addr, cond, data, null.asInstanceOf[UInt])
     }
   }
 
-  def write(addr: UInt, data: T) = doWrite(addr, conds.top, data, null.asInstanceOf[UInt])
-
-  def write(addr: UInt, data: T, wmask: UInt) = doWrite(addr, conds.top, data, wmask)
+  def write(addr: UInt, data: T, wmask: UInt): Unit =
+    if (!Module.isInlineMem) doWrite(addr, Module.current.whenCond, data, wmask)
+    else doWrite(addr, Module.current.whenCond, gen().fromBits(data.toBits & wmask | read(addr).toBits & ~wmask), null.asInstanceOf[UInt])
 
   def apply(addr: UInt): T = {
     val rdata = read(addr)
@@ -145,7 +142,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
     rdata
   }
 
-  override def hashCode: Int = System.identityHashCode(this)
+  override val hashCode: Int = System.identityHashCode(this)
   override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
 
   def apply(addr: Int): T = apply(UInt(addr))
@@ -220,7 +217,7 @@ class MemSeqRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
 
 class PutativeMemWrite(mem: Mem[_], addri: UInt) extends Node with proc {
   override def procAssign(src: Node) =
-    mem.doWrite(addri, conds.top, src, null.asInstanceOf[UInt])
+    mem.doWrite(addri, Module.current.whenCond, src, null.asInstanceOf[UInt])
 }
 
 class MemReadWrite(val read: MemSeqRead, val write: MemWrite) extends MemAccess(read.mem, null)

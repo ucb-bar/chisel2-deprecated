@@ -249,17 +249,6 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
     }
   }
 
-  override def ^^(src: Node) {
-    src match {
-      case other: Bundle =>
-        for ((n, i) <- elements) {
-          if(other.contains(n)) {
-            i ^^ other(n);
-          }
-        }
-    }
-  }
-
   def contains(name: String): Boolean = {
     for((n,i) <- elements)
       if(n == name) return true;

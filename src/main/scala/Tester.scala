@@ -160,6 +160,7 @@ class Tester[+T <: Module](val c: T, val testNodes: Array[Node]) {
       if (p != null) endTest(p)
     }
     println(if (res) "PASSED" else "*** FAILED ***")
+    if(!res) throwException("Module under test FAILED at least one test vector.")
     res
   }
   var tests: () => Boolean = () => { println("DEFAULT TESTS"); true }

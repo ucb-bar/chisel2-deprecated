@@ -38,9 +38,9 @@ import ChiselError._
 
 object when {
   def execWhen(cond: Bool)(block: => Unit) {
-    conds.push(conds.top && cond);
-    block;
-    conds.pop();
+    Module.current.whenConds.push(Module.current.whenCond && cond)
+    block
+    Module.current.whenConds.pop()
   }
   def apply(cond: Bool)(block: => Unit): when = {
     execWhen(cond){ block }
@@ -55,7 +55,7 @@ class when (prevCond: Bool) {
   }
   def otherwise (block: => Unit) {
     val cond = !prevCond
-    if (conds.length == 1) cond.canBeUsedAsDefault = true
+    if (!Module.current.hasWhenCond) cond.canBeUsedAsDefault = true
     when.execWhen(cond){ block }
   }
 }
@@ -68,27 +68,20 @@ object unless {
 
 object switch {
   def apply(c: Bits)(block: => Unit) {
-    keys.push(c);
-    block;
-    keys.pop();
+    Module.current.switchKeys.push(c)
+    block
+    Module.current.switchKeys.pop()
   }
 }
 object is {
-  def apply(v: Bits)(block: => Unit) {
-    if (keys.length == 0) {
-      ChiselError.error("NO KEY SPECIFIED");
-    } else {
-      val c = keys(0) === v;
-      when (c) { block; }
-    }
-  }
-  def apply(v: Bits, vr: Bits*)(block: => Unit) {
-    if (keys.length == 0) {
-      ChiselError.error("NO KEY SPECIFIED");
-    } else {
-      val c = vr.foldLeft(keys(0) === v)( (p: Bool, v: Bits) => keys(0) === v || p );
-      when (c) { block; }
-    }
+  def apply(v: Bits)(block: => Unit): Unit =
+    apply(Seq(v))(block)
+  def apply(v: Bits, vr: Bits*)(block: => Unit): Unit =
+    apply(v :: vr.toList)(block)
+  def apply(v: Iterable[Bits])(block: => Unit): Unit = {
+    val keys = Module.current.switchKeys
+    if (keys.isEmpty) ChiselError.error("The 'is' keyword may not be used outside of a switch.")
+    else if (!v.isEmpty) when (v.map(_ === keys.top).reduce(_||_)) { block }
   }
 }
 
@@ -136,11 +129,11 @@ object chiselMain {
         case "--noCombLoop" => Module.dontFindCombLoop = true
         case "--genHarness" => Module.isGenHarness = true;
         case "--debug" => Module.isDebug = true;
+        case "--cse" => Module.isCSE = true
         case "--ioDebug" => Module.isIoDebug = true;
         case "--noIoDebug" => Module.isIoDebug = false;
         case "--clockGatingUpdates" => Module.isClockGatingUpdates = true;
         case "--clockGatingUpdatesInline" => Module.isClockGatingUpdatesInline = true;
-        case "--folding" => Module.isFolding = true;
         case "--vcd" => Module.isVCD = true;
         case "--v" => Module.backend = new VerilogBackend
         case "--moduleNamePrefix" => Backend.moduleNamePrefix = args(i + 1); i += 1
@@ -153,6 +146,8 @@ object chiselMain {
             Module.backend = new CppBackend
           } else if (args(i + 1) == "flo") {
             Module.backend = new FloBackend
+          } else if (args(i + 1) == "dot") {
+            Module.backend = new DotBackend
           } else if (args(i + 1) == "fpga") {
             Module.backend = new FPGABackend
           } else {
@@ -238,9 +233,7 @@ object chiselMainTest {
 }
 
 trait proc extends Node {
-  var updates = new collection.mutable.ListBuffer[(Bool, Node)];
-  var updated = false
-  def genCond(): Bool = conds.top;
+  val updates = new collection.mutable.ListBuffer[(Bool, Node)]
   def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
     val update = others.foldLeft(default)((v, u) => Multiplex(u._1, u._2, v))
     if (inputs.isEmpty) inputs += update else inputs(0) = update
@@ -278,6 +271,7 @@ trait nameable {
   /** _named_ is used to indicates name was set explicitely
    and should not be overriden by a _nameIt_ generator. */
   var named = false;
+  var varName: String = "";
 }
 
 abstract class BlackBox extends Module {

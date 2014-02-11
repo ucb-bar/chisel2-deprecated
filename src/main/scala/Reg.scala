@@ -176,8 +176,8 @@ class Reg extends Delay with proc {
     if (assigned) {
       ChiselError.error("reassignment to Reg");
     }
-    val cond = genCond();
-    if (conds.length >= 1) {
+    val cond = Module.current.whenCond
+    if (Module.current.hasWhenCond) {
       enable = if (isEnable) enable || cond else cond
       isEnable = true
     }
@@ -193,7 +193,9 @@ class Reg extends Delay with proc {
       super.genMuxes(default)
     }
   }
-  def nameOpt: String = if (name.length > 0) name else "REG"
+
+  def nameOpt: String = if (name.length > 0) name else varName// "REG"
+  // def nameOpt: String = varName
   override def toString: String = {
     "REG(" + nameOpt + ")"
   }
@@ -207,7 +209,7 @@ class Reg extends Delay with proc {
   }
 
   override def forceMatchingWidths {
-    if (inputs(0).width != width) {
+    if (inputs(0) != null && inputs(0).width != width) {
       inputs(0) = inputs(0).matchWidth(width)
     }
   }
