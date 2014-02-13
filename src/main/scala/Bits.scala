@@ -91,20 +91,24 @@ abstract class Bits extends Data with proc {
     else super.litOf
 
   // internal, non user exposed connectors
-  override def assign(src: Node): Unit = {
+  def checkAssign(src: Node): Unit = {
     if (this.component != null) this.component.checkIo
     if (this.dir == INPUT && this.component == Module.current && this.isModuleIo) {
-      ChiselError.error({"assigning to your own input port " + this + " (" + hashCode + ") RHS: " + src});
+      ChiselError.error({"assigning to your own input port " + this + " RHS: " + src});
     }
+    if (this.dir == OUTPUT && this.component != Module.current &&
+        src.component != null && src.component.parent != this.component) {
+      ChiselError.error({"assigning to a non parent module's output port: " + this + " RHS: " + src});
+    }
+  }
+  override def assign(src: Node): Unit = {
+    checkAssign(src)
     if (inputs.isEmpty) inputs += src
     else ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
   }
 
   override def procAssign(src: Node): Unit = {
-    if (this.component != null) this.component.checkIo
-    if (this.dir == INPUT && this.component == Module.current && this.isModuleIo) {
-      ChiselError.error({"assigning to your own input port " + this + " (" + hashCode + ") RHS: " + src});
-    }
+    checkAssign(src)
     if (inputs.isEmpty) updates += ((Module.current.whenCond, src))
     else ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
   }

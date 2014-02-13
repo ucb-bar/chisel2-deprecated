@@ -207,6 +207,36 @@ class DataSuite extends TestSuite {
     assertTrue(!ChiselError.ChiselErrors.isEmpty);
   }
 
+  // tests assigning to non parent's outputs
+  @Test def testAssignToChildOutput() {
+    try {
+    class Child extends Module {
+      val io = new Bundle {
+        val input  = Bits(INPUT, width = 8)
+        val output = Bits(OUTPUT, width = 8)
+      }
+      io.output := io.input
+    }
+
+    class Parent extends Module {
+      val io = new Bundle {
+        val input  = Bits(INPUT, width = 8)
+        val output = Bits(OUTPUT, width = 8)
+      }
+      val child = Module(new Child)
+      // child.io.input := io.input
+      child.io.output := io.input
+      io.output := child.io.output
+    }
+
+    chiselMain(Array[String]("--backend", "v"), () => Module(new Parent()))
+
+    } catch {
+      case _ : Throwable => ;
+    }
+    assertTrue(!ChiselError.ChiselErrors.isEmpty);
+  }
+
   /** Test case derived from issue #1 reported on github.
     Check an out-of-range bit extract throws an exception.
     */
@@ -228,9 +258,12 @@ class DataSuite extends TestSuite {
       "--targetDir", dir.getPath.toString()),
       () => Module(new CarryChainComp(4)))
     } catch {
-      case _ : Throwable => assertTrue(!ChiselError.ChiselErrors.isEmpty);
+      case _ : Throwable => ;
     }
+    assertTrue(!ChiselError.ChiselErrors.isEmpty);
   }
+
+
 
 }
 

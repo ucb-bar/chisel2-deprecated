@@ -243,4 +243,34 @@ class ConnectSuite extends TestSuite {
     launchCppTester((m: A) => new RegisterHookTests(m))
   }
 
+  // tests assigning to non parent's outputs
+  @Test def testAssignToChildOutput() {
+    try {
+    class Child extends Module {
+      val io = new Bundle {
+        val input  = Bits(INPUT, width = 8)
+        val output = Bits(OUTPUT, width = 8)
+      }
+      io.output := io.input
+    }
+
+    class AssignChildOutput extends Module {
+      val io = new Bundle {
+        val input  = Bits(INPUT, width = 8)
+        val output = Bits(OUTPUT, width = 8)
+      }
+      val child = Module(new Child)
+      // child.io.input := io.input
+      child.io.output := io.input
+      io.output := child.io.output
+    }
+
+    chiselMain(Array[String]("--backend", "v"), () => Module(new AssignChildOutput()))
+
+    } catch {
+      case _ : Throwable => ;
+    }
+    assertTrue(!ChiselError.ChiselErrors.isEmpty);
+  }
+
 }
