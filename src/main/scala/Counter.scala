@@ -39,6 +39,7 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
 
   // Define two different clock domains for the daisy chain
   val daisyClock = Module.implicitClock
+  val stopClock = -daisyClock
   val emulClock = new Clock
   emulClock setName "emul_clk"
 
@@ -46,7 +47,8 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
   preElaborateTransforms += ((c: Module) => generateCounters(c))
   preElaborateTransforms += ((c: Module) => generateDaisyChain(c))
   preElaborateTransforms += ((c: Module) => generateSlave(c))
-  analyses += ((c: Module) => copyResource("wrapper.v", targetdir))
+  transforms += ((c: Module) => c.clocks -= emulClock)
+  analyses   += ((c: Module) => copyResource("wrapper.v", targetdir))
 
   def getTypeNode(node: Node) = {
     val typeNode = new UInt
@@ -111,21 +113,18 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
       val stall = Bool(INPUT)
       val daisy_control = Bits(INPUT, 3)
       val daisy_out = Decoupled(Bits(width = 32))
-      val in_valid = m.io("in") match { case in: DecoupledIO[_] => in.ready case _ => null }
-      // val copy = stall && daisy_control === Bits(1, daisy_control.getWidth)
+      val in_valid = m.io("in") match { 
+        case in: DecoupledIO[_] => in.ready 
+        case _ => null 
+      }
       def ready(i: Int) = stall && (daisy_control === Bits(i, daisy_control.getWidth)) && daisy_out.ready
-      /*
-      val read = enabled(1) && daisy_out.ready
-      val init = enabled(2) && in_valid
-      */
 
       m.clock = emulClock
       m.clocks.clear
       m.clocks += daisyClock
 
-      // copy.getNode setName "copy"
-      ready(1).getNode setName "read"
-      ready(2).getNode setName "init"
+      ready(1).getNode setName "copy"
+      ready(2).getNode setName "read"
 
       ops(m) = (ready(1), ready(2))
 
@@ -153,14 +152,14 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
         val signalType = getTypeNode(signal)
         val signalWidth = signal.getWidth
         val counter = addCounter(signal, Reg(init = Bits(0, 32), clock = daisyClock))
-        val init = ops(signal.component)._2
+        val copy = ops(signal.component)._1
 
         stall match {
           case isStall: Bool => {
             if (signalWidth == 1) {
               when(!isStall) {
                 counter := counter + signalType
-              }.elsewhen(init) {
+              }.elsewhen(copy) {
                 counter := Bits(0, 32)
               }
             }
@@ -174,7 +173,7 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
               buffer := signalType
               when(!isStall){
                 counter := counter + hd
-              }.elsewhen(init) {
+              }.elsewhen(copy) {
                 counter := Bits(0, 32)
               }
             }
@@ -201,6 +200,7 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
  
     // Daisy chain
     // Connect shodows
+    // todo: hierarchical modules
     if (!shadows.isEmpty) {
       val shadow = shadows.head
       val read = ops(shadow.component)._1
@@ -217,19 +217,23 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
       val shadow = shadows(i-1)
       val nextShadow = shadows(i)
       val counter = shadowCounterMap(shadow)
-      val read = ops(shadow.component)._1
+      val copy = ops(shadow.component)._1
+      val read = ops(shadow.component)._2
 
-      when (read) {
-        shadow := nextShadow
-      }.otherwise {
+      when (copy) {
         shadow := counter
+      }.elsewhen (read) {
+        shadow := nextShadow
       }
     }
     if (!shadows.isEmpty) {
       val shadow = shadows.last
       val counter = shadowCounterMap(shadow)
+      val copy = ops(shadow.component)._1
 
-      shadow := counter
+      when (copy) {
+        shadow := counter
+      }
     }
   }
 
@@ -250,6 +254,7 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
     val topInBits = Reg(init = Bits(0, 32), clock = daisyClock)
     val clkCounter = Reg(init = Bits(0, 32), clock = daisyClock)
     val first = Reg(init = Bool(true), clock = daisyClock)
+    val stop = Reg(init = Bool(false), clock = stopClock)
     val notStall = clkCounter.orR
     val stall = !notStall
 
@@ -259,8 +264,9 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
     clkCounter.comp setName "clk_counter" 
     first.comp.component = slave
     first.comp setName "first"
+    stop.comp.component = slave
+    stop.comp setName "stop" 
     stall.getNode setName "stall"
-    notStall.getNode setName "not_stall"
 
     // for input ports
     (slaveAddr, slaveIn, top.io("in")) match {
@@ -269,36 +275,33 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
         top.io("daisy_control") := addr(2,0)
 
         val writeAddr = addr(4,3) 
-        def writeValid(i: Int) = fromIO.valid && writeAddr === UInt(i, 2)
+        def writeValid(i: Int) = fromIO.valid && stall && writeAddr === UInt(i, 2)
         val ready = Vec(Bool(false), Bool(true), toIO.ready, Bool(false))
-        /*
-        val writeToReg = writeAddr === UInt(1, 2) && fromIO.valid
-        val inputToTop = writeAddr === UInt(2, 2) && fromIO.valid
-        writeToReg.getNode setName "write_to_reg"
-        inputToTop.getNode setName "input_to_top"
-        */
         fromIO.ready := first || ready(writeAddr)
 
-        // address = 1
-        // => Write to the clock counter
-        
-        // address = 2
-        // => Set inputs to the device
+        // address = 1 => Write to the clock counter
+        // address = 2 => Set inputs to the device
         (fromIO.bits, toIO.bits) match {
           case (bits: Bits, bundle: Bundle) => {
             val (name0, a) = bundle.elements(0)
             val (name1, b) = bundle.elements(1)
 
+            // todo: stop with new inputs?
             when (writeValid(1)) {
               clkCounter := fromIO.bits
+              stop := Bool(false)
             }.elsewhen (writeValid(2)) {
-              clkCounter := Bits(1, 32)
               topInBits := bits
+              stop := Bool(false)
+              // clkCounter := Bits(1, 32)
+            }.elsewhen (clkCounter === Bits(1, 32)) {
+              clkCounter := clkCounter - Bits(1, 32)
+              stop := Bool(true)
             }.elsewhen (notStall) {
               clkCounter := clkCounter - Bits(1, 32)
               first := Bool(false)
             }
-            
+  
             a := topInBits(31, 16)
             b := topInBits(15, 0)
           }
@@ -320,11 +323,9 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
         val bits = Vec(Bits(0), toIO1.bits, toIO2.bits, Bits(0))
         val valids = Vec(Bool(false), toIO1.valid, toIO2.valid, Bool(false))
 
-        // address == 1
-        // => Read from daisy chains
+        // address == 1 => Read from daisy chains
+        // address == 2 => Read from the device result
         toIO1.ready := readReady(1) 
-        // address =2 2
-        // => Read from the device result
         // toIO2.ready := readReady(2) // no ready?
         fromIO.valid := valids(readAddr)
         fromIO.bits := bits(readAddr)
@@ -334,31 +335,13 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
 
     // emulation clock
     val clockType = getTypeNode(daisyClock)
-    val enabledClk = clockType.toBool && notStall
+    val clockBool = clockType.toBool
+    val notStop = !stop
+    val enabledClk = clockBool && notStop && notStall
+    clockBool.isTypeNode = true
+    enabledClk.getNode.component = slave
     enabledClk.getNode setName "emul_clk"
-   
-    val stack = new Stack[Node]
-    val walked = new HashSet[Node]
-    stack push enabledClk
-    while(!stack.isEmpty) {
-      val node = stack.pop
-      node.infer
-      walked += node
-      if (!node.isTypeNode && !node.isReg) {
-        slave.mods += node
-      }
-      for (i <- 0 until node.inputs.size) {
-        if (node.inputs(i) != null) {
-          if (node.inputs(i).isTypeNode) {
-            node.inputs(i) = node.inputs(i).getNode
-          } 
-          if (!(walked contains node.inputs(i))) {
-            stack push node.inputs(i)
-            walked += node.inputs(i)
-          }
-        }
-      }
-    }
+    daisyClock.srcClock = enabledClk.getNode
 
     slave.genAllMuxes
   }

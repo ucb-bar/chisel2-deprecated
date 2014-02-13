@@ -544,12 +544,18 @@ class VerilogBackend extends Backend {
     val clkDomains = new HashMap[Clock, StringBuilder]
     for (clock <- c.clocks) {
       val sb = new StringBuilder
-      sb.append("  always @(posedge " + emitRef(clock) + ") begin\n")
+      // by Donggyu
+      if (clock.edge == PosEdge) {
+        sb.append("  always @(posedge " + emitRef(clock) + ") begin\n")
+      } else if (clock.edge == NegEdge && clock.srcClock != null) {
+        sb.append("  always @(negedge " + emitRef(clock) + ") begin\n")
+      }
       clkDomains += (clock -> sb)
     }
     for (m <- c.mods) {
-      if (m.clock != null)
+      if (m.clock != null){
         clkDomains(m.clock).append(emitReg(m))
+      }
     }
     for (clock <- c.clocks) {
       clkDomains(clock).append("  end\n")
@@ -633,8 +639,27 @@ class VerilogBackend extends Backend {
     val res = new StringBuilder()
     var first = true;
     var nl = "";
+    /*
     if (c.clocks.length > 0 || c.resets.size > 0)
       res.append((c.clocks ++ c.resets.values.toList).map(x => "input " + emitRef(x)).reduceLeft(_ + ", " + _))
+    */
+    // by Donggyu
+    val names = new HashSet[String]
+    val list = c.clocks ++ c.resets.values.toList
+    if (list.size > 0) {
+      val head = list.head
+      val tail = list.tail
+      val name = emitRef(head)
+      res append "input %s".format(name)
+      names += name
+      for (n <- list.tail) {
+        val name = emitRef(n)
+        if (!(names contains name)) {
+          res append ", input %s".format(name)
+          names += name
+        }
+      }
+    }
     val ports = new ArrayBuffer[StringBuilder]
     for ((n, w) <- c.wires) {
       // if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";

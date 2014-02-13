@@ -456,7 +456,13 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
     // by Donggyu
     for(clock <- Module.clocks) {
-      res.enqueue(clock)
+      val src = clock.srcClock
+      if (src != null) {
+        src match {
+          case _ : Clock =>
+          case _ => res.enqueue(src)
+        }
+      }
     }
 
     res
@@ -542,10 +548,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     bfs {x =>
       scala.Predef.assert(!x.isTypeNode)
       count += 1
-      for (i <- 0 until x.inputs.length)
+      for (i <- 0 until x.inputs.length) {
         if (x.inputs(i) != null && x.inputs(i).isTypeNode) {
           x.inputs(i) = x.inputs(i).getNode
         }
+      }
     }
     count
   }
@@ -852,6 +859,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       queue.push(() => d.traceNode(c, queue))
     for (b <- Module.blackboxes)
       queue.push(() => b.io.traceNode(this, queue));
+
+    for (clk <- Module.clocks)
+      if (clk.srcClock != null)
+        queue.push(() => clk.srcClock.traceNode(Module.topComponent, queue))
 
     while (queue.length > 0) {
       val work = queue.pop();

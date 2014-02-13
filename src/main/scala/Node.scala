@@ -342,7 +342,7 @@ abstract class Node extends nameable {
       }
       var i = 0;
       for (node <- inputs) {
-        if (node != null) {
+        if (node != null /***/ && !node.isInstanceOf[Clock] /* by Donggyu */) {
            //tmp fix, what happens if multiple componenets reference static nodes?
           if (node.component == null || !Module.components.contains(node.component)) {
             /* If Backend.collectNodesIntoComp does not resolve the component

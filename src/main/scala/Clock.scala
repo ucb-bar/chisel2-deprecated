@@ -2,7 +2,11 @@ package Chisel
 
 import scala.collection.mutable.ArrayBuffer
 
-class Clock(reset: Bool = Module.implicitReset) extends Node {
+trait ClockEdge
+object PosEdge extends ClockEdge
+object NegEdge extends ClockEdge
+
+class Clock(reset: Bool = Module.implicitReset, val edge: ClockEdge = PosEdge) extends Node {
   val stateElms = new ArrayBuffer[Node]
   Module.clocks += this
   init("", 1)
@@ -35,4 +39,12 @@ class Clock(reset: Bool = Module.implicitReset) extends Node {
     clock.initStr = " / " + x + ";\n"
     clock
   }
+
+  // for negative edge 
+  def unary_- = {
+    val clock = new Clock(reset, NegEdge)
+    clock.init(name, 1)
+    clock.srcClock = this
+    clock
+  } 
 }

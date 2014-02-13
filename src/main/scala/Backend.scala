@@ -289,6 +289,17 @@ abstract class Backend {
         res.push(flat)
       }
     }
+
+    for (clk <- Module.clocks) {
+      val srcClock = clk.srcClock
+      if (srcClock != null) {
+        srcClock match {
+          case _: Clock =>
+          case _ => res.push(srcClock)  
+        }
+      }
+    }
+
     res
   }
 
@@ -585,11 +596,14 @@ abstract class Backend {
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
     Module.topComponent.traceNodes();
 
+    // Todo: why need it?
+    /*
     val clkDomainWalkedNodes = new ArrayBuffer[Node]
     for (comp <- Module.sortedComps)
       for (node <- comp.nodes)
         if (node.isInstanceOf[Reg])
-            createClkDomain(node, clkDomainWalkedNodes)
+             createClkDomain(node, clkDomainWalkedNodes)
+    */
     ChiselError.checkpoint()
 
     /* We execute nameAll after traceNodes because bindings would not have been

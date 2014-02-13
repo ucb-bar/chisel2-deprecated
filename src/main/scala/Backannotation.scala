@@ -18,7 +18,8 @@ object nodeToString {
         if (!bits.isTypeNode || bits.inputs.length == 0) {
           if (bits.dir == OUTPUT) "OUTPUT(" + bits.name + ")"
           else if (bits.dir == INPUT) "INPUT(" +bits.name+ ")"
-          else if (bits.name != null && !bits.name.isEmpty) bits.name 
+          else if (bits.name != null && !bits.inputs.isEmpty) 
+            "Bits(%s)".format(nodeToString(bits.inputs(0)))
           else "Bits(?)"
         }
         else nodeToString(bits.inputs(0).getNode)
@@ -44,6 +45,7 @@ object nodeToString {
       case memacc: MemAccess => nodeToString(memacc.mem) + "[" + nodeToString(memacc.addr) + "]"
       case rom   : ROM[_]    => "ROM(%s)".format(rom.name) 
       case romread: ROMRead[_] => nodeToString(romread.rom) + "[" + nodeToString(romread.addr) + "]"
+      case clk   : Clock     => "Clock(%s)".format(clk.name)
       case _ => if (node == null) "" else node.toString
     }      
   }
