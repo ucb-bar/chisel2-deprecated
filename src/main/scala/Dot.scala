@@ -57,8 +57,6 @@ class DotBackend extends Backend {
     } else {
       m match {
         case x: Literal  => false;
-        case x: MapNode  => false;
-        case x: ListNode => false;
         case _           => true;
       }
     }

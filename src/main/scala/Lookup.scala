@@ -33,36 +33,16 @@ import Node._
 import Literal._
 import scala.collection.mutable.ArrayBuffer
 
-object Lookup {
-  def apply[T <: Bits](addr: UInt, default: T, mapping: Seq[(UInt, T)]): T = {
-    if (Module.backend.isInstanceOf[CppBackend] || Module.backend.isInstanceOf[FloBackend]) {
-      CListLookup(addr, List(default), mapping.map(m => (m._1, List(m._2))).toArray).head
-    } else {
-      val lookup = new Lookup()
-      val mappingNode = mapping.map(x => LookupMap(x))
-      lookup.initOf("", widthOf(1), List(addr, default) ++ mappingNode)
-      default.fromNode(lookup)
+object ListLookup {
+  def apply[T <: Data](addr: UInt, default: List[T], mapping: Array[(UInt, List[T])]): List[T] = {
+    val map = mapping.map(m => (addr === m._1, m._2))
+    default.zipWithIndex map { case (d, i) =>
+      map.foldRight(d)((m, n) => Mux(m._1, m._2(i), n))
     }
   }
 }
 
-object LookupMap {
-  def apply[T <: Data](map: (UInt, T)): LookupMap = {
-    val res = new LookupMap()
-    res.init("", widthOf(0), map._1, map._2)
-    res
-  }
-}
-
-class LookupMap extends Node {
-  def addr: Node = inputs(0)
-  def data: Node = inputs(1)
-}
-
-class Lookup extends Node {
-  override def isInObject: Boolean = true;
-
-  def map: Seq[LookupMap] = inputs.slice(2, inputs.length).map(x => x.asInstanceOf[LookupMap])
-
-  override def toString: String = "LOOKUP(" + inputs(0) + ")";
+object Lookup {
+  def apply[T <: Bits](addr: UInt, default: T, mapping: Seq[(UInt, T)]): T =
+    ListLookup(addr, List(default), mapping.map(m => (m._1, List(m._2))).toArray).head
 }

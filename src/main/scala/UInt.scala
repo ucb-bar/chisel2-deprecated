@@ -57,6 +57,8 @@ object UInt {
     res.create(dir, width)
     res
   }
+
+  def DC(width: Int): UInt = Lit("b" + "?"*width, width){UInt()}
 }
 
 

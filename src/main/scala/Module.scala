@@ -176,11 +176,7 @@ object Module {
     clk = UInt(INPUT, 1)
     clk.setName("clk")
 
-    isCoercingArgs = true
     isInGetWidth = false
-    conds.clear()
-    conds.push(Bool(true))
-    keys.clear()
   }
 
   //component stack handling stuff
@@ -235,17 +231,6 @@ object Module {
   }
 }
 
-object withModule {
-  def apply( c: Module, block: () => Node ): Node = {
-    compStack.push(c);
-    val res = block();
-    compStack.pop();
-    res
-  }
-}
-// object withModuleOf {
-//   def apply(node: Node)( body: () => Unit ) = withModule(node.component, body );
-// }
 
 /* ----- RULES FOR CLOCKS AND RESETS -----
    ( + ) clock parameter
@@ -279,8 +264,14 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   val children = new ArrayBuffer[Module];
   val debugs = HashSet[Node]();
 
+  val switchKeys = Stack[Bits]()
+  val whenConds = Stack[Bool]()
+  private lazy val trueCond = Bool(true)
+  def hasWhenCond: Boolean = !whenConds.isEmpty
+  def whenCond: Bool = if (hasWhenCond) whenConds.top else trueCond
+
   val nodes = new ArrayBuffer[Node]
-  val mods  = new ArrayBuffer[Node];
+  val mods = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
 
   val regs  = new ArrayBuffer[Reg];
@@ -358,6 +349,22 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   def io: Data
+
+  // for making sure that all module io's are ports and 
+  // for marking all io's as module io's
+  var isIoChecked = false
+  def checkIo = {
+    if (io != null && !isIoChecked) {
+      isIoChecked = true;
+      for((n, flat) <- io.flatten) {
+        if (flat.dir == null) 
+          ChiselError.error("All IO's must be ports (dir set): " + flat);
+        // else if (flat.width_ == -1) 
+        //   ChiselError.error("All IO's must be have width set: " + flat);
+        flat.isModuleIo = true;
+      }
+    }
+  }
   def nextIndex : Int = { nindex = nindex + 1; nindex }
 
   var isWalking = new HashSet[Node];
@@ -385,7 +392,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   def printf(message: String, args: Node*): Unit = {
-    val p = new Printf(conds.top && !this.reset, message, args)
+    val p = new Printf(Module.current.whenCond && !this.reset, message, args)
     printfs += p
     debug(p)
     p.inputs.foreach(debug _)

@@ -56,9 +56,12 @@ class NameSuite extends TestSuite {
 
     trait Constants {
       val VXCPTHOLD  = UInt("b00000_00000_00000_0001001110_1111011", 32)
+      val VXCPTSAVE  = UInt("b00000_00000_00000_0001001010_1111011", 32)
       val VCMD_X = UInt(0, 3)
-      val VIMM_X = UInt(0, 1)
-      val N = UInt(0, 1);
+      val VCMD_S = UInt(1, 3)
+      val VCMD_H = UInt(4, 3)
+      val N = Bool(false)
+      val Y = Bool(true)
     }
 
     class ListLookupsComp extends Module with Constants {
@@ -68,11 +71,11 @@ class NameSuite extends TestSuite {
       }
       val veccs =
         ListLookup(io.inst,
-          List(N, VCMD_X, VIMM_X,   VIMM_X,  N),
-          Array(VXCPTHOLD-> List(N, VCMD_X, VIMM_X, VIMM_X,  N)))
+                            List(Y, VCMD_X),
+          Array(VXCPTHOLD-> List(Y, VCMD_H),
+                VXCPTSAVE-> List(N, VCMD_S)))
 
-      val valid :: veccs0 = veccs
-      io.sigs_valid := valid.toBool
+      io.sigs_valid := (veccs(0) ^ veccs(1)(2)).toBool
     }
 
     chiselMain(Array[String]("--v",
@@ -300,7 +303,7 @@ class NameSuite extends TestSuite {
     println("\nRunning testVec:")
     class VecComp extends Module {
       val io = new Bundle {
-        val pcr_req_data = UInt(width = 64)
+        val pcr_req_data = UInt(INPUT, width = 64)
 
         val r_en   = Bool(INPUT)
         val r_addr = UInt(INPUT, log2Up(32))

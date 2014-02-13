@@ -119,21 +119,22 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
   }
 
   def write(addr: UInt, data: T): Unit = {
+    val cond = Module.current.whenCond
     if (seqRead && Module.backend.isInstanceOf[CppBackend] && gen().isInstanceOf[Bits]) {
       // generate bogus data when reading & writing same address on same cycle
       val reg_data = new Reg().init("", widthOf(0), data)
       val random16 = LFSR16()
       val random_data = Cat(random16, Array.fill((width-1)/16){random16}:_*)
-      doWrite(Reg(next=addr), Reg(next=conds.top), reg_data, null.asInstanceOf[UInt])
-      doWrite(addr, conds.top, random_data, null.asInstanceOf[UInt])
+      doWrite(Reg(next=addr), Reg(next=cond), reg_data, null.asInstanceOf[UInt])
+      doWrite(addr, cond, random_data, null.asInstanceOf[UInt])
     } else {
-      doWrite(addr, conds.top, data, null.asInstanceOf[UInt])
+      doWrite(addr, cond, data, null.asInstanceOf[UInt])
     }
   }
 
   def write(addr: UInt, data: T, wmask: UInt): Unit =
-    if (!Module.isInlineMem) doWrite(addr, conds.top, data, wmask)
-    else doWrite(addr, conds.top, gen().fromBits(data.toBits & wmask | read(addr).toBits & ~wmask), null.asInstanceOf[UInt])
+    if (!Module.isInlineMem) doWrite(addr, Module.current.whenCond, data, wmask)
+    else doWrite(addr, Module.current.whenCond, gen().fromBits(data.toBits & wmask | read(addr).toBits & ~wmask), null.asInstanceOf[UInt])
 
   def apply(addr: UInt): T = {
     val rdata = read(addr)
@@ -216,7 +217,7 @@ class MemSeqRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
 
 class PutativeMemWrite(mem: Mem[_], addri: UInt) extends Node with proc {
   override def procAssign(src: Node) =
-    mem.doWrite(addri, conds.top, src, null.asInstanceOf[UInt])
+    mem.doWrite(addri, Module.current.whenCond, src, null.asInstanceOf[UInt])
 }
 
 class MemReadWrite(val read: MemSeqRead, val write: MemWrite) extends MemAccess(read.mem, null)

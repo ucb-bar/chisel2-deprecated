@@ -178,18 +178,23 @@ A \verb+select+ value of \verb+true+ will output the first value \verb+A+, while
 val out = Mux(select, A, B)
 \end{scala}
 
-Thus if \verb+A=10+, \verb+B=14+, and \verb+select+ was \verb+true+, the value of \verb+out+ would be assigned 10. Notice how using the \verb+Mux+ primitive type abstracts away the logic structures required if we had wanted to implement the multiplexor explicitly. The instantiation would look something like this:
+Thus if \verb+A=10+, \verb+B=14+, and \verb+select+ was \verb+true+, the value of \verb+out+ would be assigned 10. Notice how using the \verb+Mux+ primitive type abstracts away the logic structures required if we had wanted to implement the multiplexor explicitly.
 
-\begin{scala}
-// where n is the width of A and m is the width of B
-val mux = Module(new Mux(n, m))
-mux.io.select := select
-mux.io.A      := A
-mux.io.B      := B
-val out = mux.io.out
-\end{scala}
+% Martin: I would drop the following as it is just confusing in a tutorial
+% state simple that there is a Mux primitive and that is fine.
 
-We see that clearly it is much cleaner to use the primitive \verb+Mux+ type instead of trying to write and implement our own general multiplexor since the \verb+Mux+ type does all the wiring for you.
+%The instantiation would look something like this:
+%
+%\begin{scala}
+%// where n is the width of A and m is the width of B
+%val mux = Module(new Mux(n, m))
+%mux.io.select := select
+%mux.io.A      := A
+%mux.io.B      := B
+%val out = mux.io.out
+%\end{scala}
+%
+%We see that clearly it is much cleaner to use the primitive \verb+Mux+ type instead of trying to write and implement our own general multiplexor since the \verb+Mux+ type does all the wiring for you.
 
 
 %\section{Exercises}

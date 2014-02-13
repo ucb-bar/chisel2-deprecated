@@ -37,7 +37,6 @@ import Chisel._
 class WhenSuite extends TestSuite {
 
   // Using a single when
-  @Ignore("For some reason, this generates an IOException")
   @Test def testWhenStatement() {
     class WhenModule extends Module {
       val io = new Bundle {
@@ -46,9 +45,7 @@ class WhenSuite extends TestSuite {
         val out = UInt(OUTPUT,4)
       }
       io.out := UInt(0)
-      when( io.en ) {
-        io.out := io.in
-      }
+      when(io.en) { io.out := io.in }
     }
 
     class WhenModuleTests(m: WhenModule) extends Tester(m, Array(m.io)) {
@@ -64,204 +61,173 @@ class WhenSuite extends TestSuite {
       }
     }
 
-    chiselMainTest(Array[String]("--backend", "c",
-      "--targetDir", dir.getPath.toString(),"--test"),
-      () => Module(new WhenModule)) {
-      c => new WhenModuleTests(c)
-    }
+    launchCppTester((m: WhenModule) => new WhenModuleTests(m))
   }
 
-  /** Put a when() inside another when() */
+  // Put a when inside another when
   @Test def testEmbedWhenStatement() {
-    class EmbedWhenComp extends Module {
+    class EmbedWhenModule extends Module {
       val io = new Bundle {
-        val in0 = Bool(INPUT)
-        val in1 = Bool(INPUT)
-        val out = Bool(OUTPUT)
+        val en0 = Bool(INPUT)
+        val en1 = Bool(INPUT)
+        val in = UInt(INPUT,4)
+        val out = UInt(OUTPUT,4)
       }
+      io.out := UInt(0)
+      when(io.en0) { when(io.en1) { io.out := io.in } }
+    }
 
-      io.out := Bool(false);
-      when( io.in0 ) {
-        io.out := io.in0;
-        when( io.in1 ) {
-          io.out := io.in1;
-        }
+    class EmbedWhenModuleTests(m: EmbedWhenModule) extends Tester(m, Array(m.io)) {
+      defTests {
+        val vars = new HashMap[Node, Node]() 
+        List(false, true, false, true,  true, false, true,  true).zip(
+        List(false, true, true,  false, true, true,  false, true)).zipWithIndex.map { 
+          case ((en0, en1), i) =>
+            vars(m.io.en0) = Bool(en0)
+            vars(m.io.en1) = Bool(en1)
+            vars(m.io.in) = UInt(i)
+            vars(m.io.out) = UInt(if(en0 && en1) i else 0)
+            step(vars)
+        } reduce(_&&_)
       }
     }
 
-    chiselMain(Array[String]("--backend", "v",
-      "--targetDir", dir.getPath.toString()),
-      () => Module(new EmbedWhenComp))
-
-    assertFile("WhenSuite_EmbedWhenComp_1.v")
+    launchCppTester((m: EmbedWhenModule) => new EmbedWhenModuleTests(m))
   }
 
-  /** When statement with elsewhen and otherwise clause.
-    */
-  @Test def testWhenClass() {
-    println("\ntestWhenClass:")
-
-    class WhenClassComp extends Module {
+  // When statement with elsewhen and otherwise clause.
+  @Test def testElsewhen() {
+    class ElsewhenModule extends Module {
       val io = new Bundle {
-        val in0 = Bool(INPUT)
-        val in1 = Bool(INPUT)
-        val out = Bool(OUTPUT)
+        val en0 = Bool(INPUT)
+        val en1 = Bool(INPUT)
+        val in0 = UInt(INPUT,4)
+        val in1 = UInt(INPUT,4)
+        val out = UInt(OUTPUT,4)
       }
-
-      when( io.in0 ) {
-        io.out := io.in0;
-      } .elsewhen( io.in1 ) {
-        io.out := io.in1;
+      when(io.en0) {
+        io.out := io.in0
+      } .elsewhen(io.en1) {
+        io.out := io.in1
       } .otherwise {
-        io.out := Bool(false);
+        io.out := UInt(0)
       }
     }
 
-    chiselMain(Array[String]("--backend", "v",
-      "--targetDir", dir.getPath.toString()),
-      () => Module(new WhenClassComp))
-
-    assertFile("WhenSuite_WhenClassComp_1.v")
-  }
-
-  /** Forgot the dot prefix in elsewhen statement.
-  */
-  @Ignore("to fix: error message")
-  @Test def testForgotDotElseWhen() {
-      class ForgotDotElseWhenComp extends Module {
-        val io = new Bundle {
-          val in0 = Bool(INPUT)
-          val in1 = Bool(INPUT)
-          val out = Bool(OUTPUT)
-        }
-
-        io.out := io.in0;
-        when( io.in0 ) {
-          io.out := io.in0;
-        }
-        /**
-          XXX Replace the weird overloaded error by a more meaningful message.
-
-          \code
-          error: overloaded method value apply with alternatives:
-          (bit: Chisel.UInt)Chisel.Bool <and>
-          (bit: Int)Chisel.Bool
-          cannot be applied to (Unit)
-          } elsewhen( io.in1 ) {
-          \endcode
-
-          Note: We cannot catch this as an exception since it is happening
-          at compile-time.
-        */
-        /*
-        elsewhen( io.in1 ) {
-          io.out := io.in1;
-        }
-        */
+    class ElsewhenModuleTests(m: ElsewhenModule) extends Tester(m, Array(m.io)) {
+      defTests {
+        val vars = new HashMap[Node, Node]() 
+        List(false, true, false, true,  true, false, true,  true).zip(
+        List(false, true, true,  false, true, true,  false, true)).zipWithIndex.map { 
+          case ((en0, en1), i) =>
+            vars(m.io.en0) = Bool(en0)
+            vars(m.io.en1) = Bool(en1)
+            vars(m.io.in0) = UInt(i)
+            vars(m.io.in1) = UInt(i+1)
+            vars(m.io.out) = UInt(if(en0) i else if(en1) i+1 else 0)
+            step(vars)
+        } reduce(_&&_)
       }
+    }
 
-      chiselMain(Array[String]("--backend", "v"),
-        //      "--targetDir", dir.getPath.toString()),
-        () => Module(new ForgotDotElseWhenComp))
-
-      assertFile("WhenSuite_ForgotDotElseWhen_1.v")
+    launchCppTester((m: ElsewhenModule) => new ElsewhenModuleTests(m))
   }
 
   /** instantiate module in a when block.
     */
-  @Ignore("to fix: emit correct code with no error messages.")
   @Test def testModuleInWhenBlock() {
-      class ModuleInWhenBlockSub extends Module {
-        val io = new Bundle {
-          val in = Bool(INPUT)
-          val out = Bool(OUTPUT)
-        }
-        /* XXX This generates an error: NO DEFAULT SPECIFIED FOR WIRE */
-        io.out := io.in
+    class Submodule extends Module {
+      val io = new Bundle {
+        val in = UInt(INPUT,4)
+        val out = UInt(OUTPUT,4)
       }
+      io.out := io.in
+    }
 
-      class ModuleInWhenBlockComp extends Module {
-        val io = new Bundle {
-          val in = Bool(INPUT)
-          val out = Bool(OUTPUT)
-        }
-
-        io.out := io.in;
-        when( io.in ) {
-          val sub = Module(new ModuleInWhenBlockSub())
-          io <> sub.io;
-        }
+    class SubmoduleInWhenBlock extends Module {
+      val io = new Bundle {
+        val en = Bool(INPUT)
+        val in = UInt(INPUT,4)
+        val out = UInt(OUTPUT,4)
       }
+      io.out := UInt(0)
+      when( io.en ) {
+        val sub = Module(new Submodule)
+        io.out := sub.io.out
+        io <> sub.io /* connect only io.in to sub.io.in */
+      }
+    }
 
-      chiselMain(Array[String]("--backend", "v"),
-        //      "--targetDir", dir.getPath.toString()),
-        () => Module(new ModuleInWhenBlockComp))
+    class SubmoduleInWhenBlockTests(m: SubmoduleInWhenBlock) extends Tester(m, Array(m.io)) {
+      defTests {
+        val vars = new HashMap[Node, Node]() 
+        List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
+          case (en, i) =>
+            vars(m.io.en) = Bool(en)
+            vars(m.io.in) = UInt(i)
+            vars(m.io.out) = UInt(if(en) i else 0)
+            step(vars)
+        } reduce(_&&_)
+      }
+    }
 
-      assertFile("WhenSuite_ModuleInWhenBlockComp.v")
+    launchCppTester((m: SubmoduleInWhenBlock) => new SubmoduleInWhenBlockTests(m))
   }
 
-  /** Unless statement with elsewhen and otherwise clause.
-    */
-  @Test def testUnlessClass() {
-    println("\ntestUnlessClass:")
-
-    class UnlessClassComp extends Module {
+  // Unless statement with elsewhen and otherwise clause
+  @Test def testUnless() {
+    class UnlessModule extends Module {
       val io = new Bundle {
-        val in0 = Bool(INPUT)
-        val in1 = Bool(INPUT)
+        val en = Bool(INPUT)
+        val in = UInt(INPUT,4)
+        val out = UInt(OUTPUT,4)
+      }
+      io.out := io.in
+      unless(io.en) { io.out := UInt(0) }
+    }
+
+    class UnlessModuleTests(m: UnlessModule) extends Tester(m, Array(m.io)) {
+      defTests {
+        val vars = new HashMap[Node, Node]() 
+        List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
+          case (en, i) =>
+            vars(m.io.en) = Bool(en)
+            vars(m.io.in) = UInt(i)
+            vars(m.io.out) = UInt(if(en) i else 0)
+            step(vars)
+        } reduce(_&&_)
+      }
+    }
+
+    launchCppTester((m: UnlessModule) => new UnlessModuleTests(m))
+  }
+
+
+  // switch statement, is clauses, and ? literals
+  @Test def testSwitch() {
+    class SwitchModule extends Module {
+      val io = new Bundle {
+        val in = UInt(INPUT,4)
         val out = Bool(OUTPUT)
       }
-
-      io.out := io.in0;
-      unless( io.in0 ) {
-        io.out := io.in1;
-      }
-      /**XXX why is this impossible?
-        .elsewhen( io.in1 ) {
-        io.out := io.in1;
-      } .otherwise {
-        io.out := Bool(false);
-      }
-      */
-    }
-
-    chiselMain(Array[String]("--backend", "v",
-      "--targetDir", dir.getPath.toString()),
-      () => Module(new UnlessClassComp))
-
-    assertFile("WhenSuite_UnlessClassComp_1.v")
-  }
-
-
-  /** switch statement and is clauses.
-    */
-  @Test def testSwitchClass() {
-    class SwitchClassComp extends Module {
-      val io = new Bundle {
-        val in0 = UInt(INPUT, width=8)
-        val in1 = UInt(INPUT, width=8)
-        val out = UInt(OUTPUT, width=8)
-      }
-
-      switch( io.in0 ) {
-        /* XXX This looks like a weird way to initialize the default value. */
-        io.out := io.in0
-        is(Bits("b0101??01")) { io.out := io.in1 }
+      io.out := Bool(false)
+      switch(io.in) {
+        is(UInt(0)) { io.out := Bool(true) }
+        is(Bits("b???1")) { io.out := Bool(true) }
       }
     }
 
-    chiselMain(Array[String]("--backend", "c",
-      "--targetDir", dir.getPath.toString()),
-      () => Module(new SwitchClassComp))
+    class SwitchModuleTests(m: SwitchModule) extends Tester(m, Array(m.io)) {
+      defTests {
+        val vars = new HashMap[Node, Node]() 
+        (0 until 8).map { i =>
+          vars(m.io.in) = UInt(i)
+          vars(m.io.out) = if(i == 0) UInt(1) else UInt(i % 2)
+          step(vars)
+        } reduce(_&&_)
+      }
+    }
 
-    assertFile("WhenSuite_SwitchClassComp_1.cpp")
-
-    chiselMain(Array[String]("--backend", "v",
-      "--targetDir", dir.getPath.toString()),
-      () => Module(new SwitchClassComp))
-
-    assertFile("WhenSuite_SwitchClassComp_1.v")
+    launchCppTester((m: SwitchModule) => new SwitchModuleTests(m))
   }
-
-
 }

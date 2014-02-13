@@ -42,6 +42,8 @@ object Bits {
   def apply(x: String, width: Int): UInt = UInt(x, width);
 
   def apply(dir: IODirection = null, width: Int = -1): UInt = UInt(dir, width);
+
+  def DC(width: Int): UInt = UInt.DC(width)
 }
 
 
@@ -52,6 +54,7 @@ abstract class Bits extends Data with proc {
 
   var canBeUsedAsDefault = false
   var dir: IODirection = null;
+  var isModuleIo = false
 
   def create(dir: IODirection, width: Int) {
     this.dir = dir;
@@ -88,19 +91,21 @@ abstract class Bits extends Data with proc {
     else super.litOf
 
   // internal, non user exposed connectors
-  var assigned = false;
-
   override def assign(src: Node): Unit = {
-    if (this.dir == INPUT && this.component == src.component)
-      ChiselError.error({"assigning to your own input port " + this + " RHS: " + src});
+    if (this.component != null) this.component.checkIo
+    if (this.dir == INPUT && this.component == src.component && this.isModuleIo) {
+      ChiselError.error({"assigning to your own input port " + this + " (" + hashCode + ") RHS: " + src});
+    }
     if (inputs.isEmpty) inputs += src
     else ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
   }
 
   override def procAssign(src: Node): Unit = {
-    if (this.dir == INPUT && this.component == src.component)
-      ChiselError.error({"assigning to your own input port " + this + " RHS: " + src});
-    if (inputs.isEmpty) updates += ((genCond(), src))
+    if (this.component != null) this.component.checkIo
+    if (this.dir == INPUT && this.component == Module.current && this.isModuleIo) {
+      ChiselError.error({"assigning to your own input port " + this + " (" + hashCode + ") RHS: " + src});
+    }
+    if (inputs.isEmpty) updates += ((Module.current.whenCond, src))
     else ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
   }
 
@@ -289,12 +294,9 @@ abstract class Bits extends Data with proc {
     }
   }
 
-  override def matchWidth(w: Int): Node = {
-    // withModule(component, () =>
-      if (isLit && !litOf.isZ) Literal(litOf.value & ((BigInt(1) << w)-1), w) 
-      else super.matchWidth(w)
-    // )
-  }
+  override def matchWidth(w: Int): Node =
+    if (isLit && !litOf.isZ) Literal(litOf.value & ((BigInt(1) << w)-1), w)
+    else super.matchWidth(w)
 
   // Operators
   protected final def newUnaryOp(opName: String): this.type = {

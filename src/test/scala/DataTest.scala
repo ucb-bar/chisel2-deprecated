@@ -44,6 +44,7 @@ nameable                (src/main/hcl.scala)
 */
 
 import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.HashMap
 import org.junit.Assert._
 import org.junit.Test
 import org.junit.Ignore
@@ -185,24 +186,25 @@ class DataSuite extends TestSuite {
     to be an error to so. This is fixed as well.
     */
   @Test def testBypassData() {
-    class BypassData(num_bypass_ports:Int) extends Bundle() {
+    try {
+    class BypassDataIO(num_bypass_ports:Int) extends Bundle() {
       val data = UInt(INPUT, width=num_bypass_ports)
-      val valid = Vec.fill(num_bypass_ports){Bool()}
+      val valid = Vec.fill(num_bypass_ports){ Bool() }
         // XXX Module.findRoots does not support Vec as a graph root.
       def get_num_ports: Int = num_bypass_ports
     }
-
     class BypassDataComp extends Module {
-      val io = new BypassData(3)
-
+      val io = new BypassDataIO(3)
       io.valid := io.data | UInt(1)
-      debug(io.valid)
     }
-
     chiselMain(Array[String]("--backend", "c",
       "--targetDir", dir.getPath.toString()),
       () => Module(new BypassDataComp))
-    assertFile("DataSuite_BypassDataComp_1.h")
+    // assertFile("DataSuite_BypassDataComp_1.h")
+    } catch {
+      case _ : Throwable => ;
+    }
+    assertTrue(!ChiselError.ChiselErrors.isEmpty);
   }
 
   /** Test case derived from issue #1 reported on github.

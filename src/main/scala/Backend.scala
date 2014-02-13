@@ -244,7 +244,6 @@ abstract class Backend {
     for( node <- Module.nodes ) {
       if( (node.nameHolder != null && !node.nameHolder.name.isEmpty)
         && !node.named && !node.isInstanceOf[Literal] ){
-ChiselError.info("ssibal! => " + node.nameHolder.name)
         node.name = node.nameHolder.name; // Not using nameIt to avoid override
         node.named = node.nameHolder.named;
         node.nameHolder.name = "";
@@ -354,7 +353,8 @@ ChiselError.info("ssibal! => " + node.nameHolder.name)
         }
       if (node.component == null) {
         println("NULL NODE COMPONENT " + node)
-      } else if (!node.component.nodes.contains(node))
+      }
+      if (!node.component.nodes.contains(node))
         node.component.nodes += node
       for (input <- node.inputs) {
         if(!walked.contains(input)) {
@@ -376,6 +376,8 @@ ChiselError.info("ssibal! => " + node.nameHolder.name)
   }
 
   def pruneUnconnectedIOs(m: Module) {
+    m.checkIo // make sure all module ios are ports
+
     val inputs = m.io.flatten.filter(_._2.dir == INPUT)
     val outputs = m.io.flatten.filter(_._2.dir == OUTPUT)
 
@@ -397,7 +399,7 @@ ChiselError.info("ssibal! => " + node.nameHolder.name)
       if (o.inputs.length == 0) {
         if (o.consumers.length > 0) {
           if (Module.warnOutputs)
-            ChiselError.warning({"UNCONNETED OUTPUT " + emitRef(o) + " in component " + o.component + 
+            ChiselError.warning({"UNCONNECTED OUTPUT " + emitRef(o) + " in component " + o.component + 
                                  " has consumers on line " + o.consumers(0).line})
           o.driveRand = true
         } else {
