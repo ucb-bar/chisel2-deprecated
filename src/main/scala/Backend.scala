@@ -376,6 +376,8 @@ abstract class Backend {
   }
 
   def pruneUnconnectedIOs(m: Module) {
+    m.checkIo // make sure all module ios are ports
+
     val inputs = m.io.flatten.filter(_._2.dir == INPUT)
     val outputs = m.io.flatten.filter(_._2.dir == OUTPUT)
 
@@ -397,7 +399,7 @@ abstract class Backend {
       if (o.inputs.length == 0) {
         if (o.consumers.length > 0) {
           if (Module.warnOutputs)
-            ChiselError.warning({"UNCONNETED OUTPUT " + emitRef(o) + " in component " + o.component + 
+            ChiselError.warning({"UNCONNECTED OUTPUT " + emitRef(o) + " in component " + o.component + 
                                  " has consumers on line " + o.consumers(0).line})
           o.driveRand = true
         } else {

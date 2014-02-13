@@ -349,6 +349,22 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   def io: Data
+
+  // for making sure that all module io's are ports and 
+  // for marking all io's as module io's
+  var isIoChecked = false
+  def checkIo = {
+    if (io != null && !isIoChecked) {
+      isIoChecked = true;
+      for((n, flat) <- io.flatten) {
+        if (flat.dir == null) 
+          ChiselError.error("All IO's must be ports (dir set): " + flat);
+        // else if (flat.width_ == -1) 
+        //   ChiselError.error("All IO's must be have width set: " + flat);
+        flat.isModuleIo = true;
+      }
+    }
+  }
   def nextIndex : Int = { nindex = nindex + 1; nindex }
 
   var isWalking = new HashSet[Node];

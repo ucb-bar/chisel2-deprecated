@@ -303,7 +303,7 @@ class NameSuite extends TestSuite {
     println("\nRunning testVec:")
     class VecComp extends Module {
       val io = new Bundle {
-        val pcr_req_data = UInt(width = 64)
+        val pcr_req_data = UInt(INPUT, width = 64)
 
         val r_en   = Bool(INPUT)
         val r_addr = UInt(INPUT, log2Up(32))
