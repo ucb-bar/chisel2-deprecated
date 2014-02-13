@@ -243,29 +243,28 @@ class ConnectSuite extends TestSuite {
     launchCppTester((m: A) => new RegisterHookTests(m))
   }
 
-  // tests assigning to non parent's outputs
-  @Test def testAssignToChildOutput() {
+  // tests flagging bad cross module references
+  @Test def testCrossModuleReferences() {
     try {
-    class Child extends Module {
-      val io = new Bundle {
-        val input  = Bits(INPUT, width = 8)
-        val output = Bits(OUTPUT, width = 8)
+      class ForeignMod extends Module {
+        val io = new Bundle {
+          val input  = UInt(INPUT, width = 8)
+          val output = UInt(OUTPUT, width = 8)
+        }
+        val add = io.input + io.input
+        io.output := add + UInt(1)
       }
-      io.output := io.input
-    }
 
-    class AssignChildOutput extends Module {
-      val io = new Bundle {
-        val input  = Bits(INPUT, width = 8)
-        val output = Bits(OUTPUT, width = 8)
+      class ForeignRef extends Module {
+        val io = new Bundle {
+          val input  = Bits(INPUT, width = 8)
+          val output = Bits(OUTPUT, width = 8)
+        }
+        val foreign = Module(new ForeignMod)
+        io.output := io.input + foreign.add
       }
-      val child = Module(new Child)
-      // child.io.input := io.input
-      child.io.output := io.input
-      io.output := child.io.output
-    }
 
-    chiselMain(Array[String]("--backend", "v"), () => Module(new AssignChildOutput()))
+      chiselMain(Array[String]("--backend", "v"), () => Module(new ForeignRef()))
 
     } catch {
       case _ : Throwable => ;

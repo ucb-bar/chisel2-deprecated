@@ -334,6 +334,11 @@ abstract class Backend {
     passed as input to sub-module without being tied to an output
     of *this.component*.
     */
+  def isBitsIo(node: Node, dir: IODirection): Boolean = node match {
+    case b: Bits => b.isIo && b.dir == dir
+    case _ => false
+  }
+
   def collectNodesIntoComp(dfsStack: Stack[Node]) {
     val walked = new HashSet[Node]()
     walked ++= dfsStack
@@ -357,6 +362,10 @@ abstract class Backend {
       if (!node.component.nodes.contains(node))
         node.component.nodes += node
       for (input <- node.inputs) {
+        if (input.component != null && input.component != node.component) {
+          if (!input.isLit && !isBitsIo(node, INPUT) && !isBitsIo(input, OUTPUT))
+            ChiselErrors += new ChiselError(() => { "Illegal cross module reference between " + node + " and " + input}, node.line)
+        }
         if(!walked.contains(input)) {
           if( input.component == null ) {
             input.component = curComp
