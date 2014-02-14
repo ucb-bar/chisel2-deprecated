@@ -93,7 +93,7 @@ abstract class Bits extends Data with proc {
   // internal, non user exposed connectors
   override def assign(src: Node): Unit = {
     if (this.component != null) this.component.checkIo
-    if (this.dir == INPUT && this.component == src.component && this.isModuleIo) {
+    if (this.dir == INPUT && this.component == Module.current && this.isModuleIo) {
       ChiselError.error({"assigning to your own input port " + this + " (" + hashCode + ") RHS: " + src});
     }
     if (inputs.isEmpty) inputs += src
