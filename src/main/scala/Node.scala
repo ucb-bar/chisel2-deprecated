@@ -152,8 +152,8 @@ abstract class Node extends nameable {
     inferWidth = fixWidth(w);
   }
 
-  def nameIt (path: String) {
-    if( !named ) {
+  def nameIt (path: String, isNamingIo: Boolean) {
+    if( (!isIo && !named) || (isIo && isNamingIo) ) {
       /* If the name was set explicitely through *setName*,
        we don't override it. */
       name = path;

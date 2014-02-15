@@ -173,6 +173,7 @@ class NameSuite extends TestSuite {
 
     At the toplevel *Comp*, variables should be named conn_X
     instead of using a derived name derived from CompIO.
+    But importantly io names should be derived from their io names.
     */
   @Test def testBindThird() {
     println("\nRunning testBindThird:")
@@ -251,8 +252,8 @@ class NameSuite extends TestSuite {
    the last entry of the ArrayBuffer is attached to a io port
    of a subcomponent.
    */
-  @Test def testBindFith() {
-    println("\nRunning testBindFith:")
+  @Test def testBindFifth() {
+    println("\nRunning testBindFifth:")
     class UnamedBundle extends Bundle {
       val error = Bool()
       val ppn = UInt(width = 32)
@@ -276,7 +277,7 @@ class NameSuite extends TestSuite {
       io.out.resp.bits.ppn := Mux1H(tag_ram(0), tag_ram)
     }
 
-    class BindFithComp extends Module {
+    class BindFifthComp extends Module {
       val io = new Bundle {
         val imem_ptw = new BlockIO()
         val dmem_ptw = new BlockIO()
@@ -292,8 +293,8 @@ class NameSuite extends TestSuite {
 
     chiselMain(Array[String]("--v",
       "--targetDir", dir.getPath.toString()),
-      () => Module(new BindFithComp))
-    assertFile("NameSuite_BindFithComp_1.v")
+      () => Module(new BindFifthComp))
+    assertFile("NameSuite_BindFifthComp_1.v")
   }
 
   /** Appending index to a node name in Vec::apply

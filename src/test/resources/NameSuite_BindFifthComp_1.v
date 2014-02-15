@@ -32,7 +32,7 @@ module NameSuite_Block_2(input clk,
   end
 endmodule
 
-module NameSuite_BindFithComp_1(input clk,
+module NameSuite_BindFifthComp_1(input clk,
     input  io_imem_ptw_resp_valid,
     input  io_imem_ptw_resp_bits_error,
     input [31:0] io_imem_ptw_resp_bits_ppn,

@@ -102,7 +102,7 @@ abstract class Backend {
 
   def nameChildren(root: Module) {
     // Name all nodes at this level
-    root.io.nameIt("io");
+    root.io.nameIt("io", true);
     val nameSpace = new HashSet[String];
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], Cell, BlackBox and Modules.
@@ -120,7 +120,7 @@ abstract class Backend {
            /* XXX It seems to always be true. How can name be empty? */
            if ((node.isTypeNode || name != ""
              || node.name == null || (node.name == "" && !node.named))) {
-             node.nameIt(asValidName(name));
+             node.nameIt(asValidName(name), false);
            }
            nameSpace += node.name;
          }
@@ -140,7 +140,7 @@ abstract class Backend {
                   this has for side-effect to create modules with the exact
                   same logic but textually different in input/output
                   parameters, hence generating unnecessary modules. */
-                 elm.nameIt(asValidName(name + "_" + i));
+                 elm.nameIt(asValidName(name + "_" + i), false);
                }
                nameSpace += elm.name;
                i += 1;
@@ -162,7 +162,7 @@ abstract class Backend {
                   this has for side-effect to create modules with the exact
                   same logic but textually different in input/output
                   parameters, hence generating unnecessary modules. */
-                 elm.nameIt(asValidName(name + "_" + i));
+                 elm.nameIt(asValidName(name + "_" + i), false);
                }
                nameSpace += elm.name;
                i += 1;
