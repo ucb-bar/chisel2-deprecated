@@ -596,6 +596,7 @@ object PriorityEncoderOH
 }
 
 class RdIO[T <: Data](depth: Int)(data: => T) extends Bundle {
+  val is  = Bool( INPUT );
   val adr = Bits( INPUT,  log2Up(depth) ); 
   val dat = data.asOutput; 
 }
@@ -606,7 +607,7 @@ class WrIO[T <: Data](depth: Int)(data: => T) extends Bundle {
   val dat = data.asInput;                         
 }
 
-class FunRdIO[T <: Data](depth: Int)(data: => T) extends RdIO(depth)(data) {
+/*class FunRdIO[T <: Data](depth: Int)(data: => T) extends RdIO(depth)(data) {
   adr := Bits(0);
   val en = Bool(INPUT);
   def read(nadr: Bits, nen: Bool): T = {
@@ -633,11 +634,11 @@ class FunWrIO[T <: Data](depth: Int)(data: => T) extends WrIO(depth)(data) {
     actualWaddr = nadr
     actualWdata = ndat
   }
-}
+}*/
 
 class FunMemIO[T <: Data](depth: Int, numReads: Int, numWrites: Int)(data: => T) extends Bundle {
-  val reads  = Vec.fill(numReads){ new FunRdIO(depth)(data) }
-  val writes = Vec.fill(numWrites){ new FunWrIO(depth)(data) }
+  val reads  = Vec.fill(numReads){ new RdIO(depth)(data) }
+  val writes = Vec.fill(numWrites){ new WrIO(depth)(data) }
 }
 
 class FunStore[T <: Data](val depth: Int, numReads: Int, numWrites: Int)(data: => T) extends Module {
@@ -651,11 +652,11 @@ class TransactionMem[T <: Data](depth: Int, numVirtReads: Int, numPhyReads: Int,
 
   val mem = Mem(data, depth)
   
-  def read(addr: UInt, en: Bool, virtIdx: Int = 0): T = {
+  /*def read(addr: UInt, en: Bool, virtIdx: Int = 0): T = {
     io.reads(virtIdx).read(addr, en)
-  }
+  }*/
   
-  def write(addr: UInt, data: T, idx: Int = 0) = io.writes(idx).write(addr, data)
+  //def write(addr: UInt, data: T, idx: Int = 0) = io.writes(idx).write(addr, data)
   
   for(i <- 0 until numPhyReads){
     val en = Bool()
@@ -671,7 +672,75 @@ class TransactionMem[T <: Data](depth: Int, numVirtReads: Int, numPhyReads: Int,
       }
     }
     for (virtReadIdx <- virtReads){
-      when(io.reads(virtReadIdx).en){
+      when(io.reads(virtReadIdx).is){
+        en := Bool(true)
+        addr := io.reads(virtReadIdx).adr
+      }
+      io.reads(virtReadIdx).dat := data
+    }
+    data := mem.read(addr)
+    
+  }
+  //for (read <- io.reads)
+    //read.dat := mem.read(read.adr)
+  
+  var roundUp = 0
+  if(numVirtWrites%numPhyWrites > 0){
+    roundUp = 1
+  }
+  val virtPerPhys = numVirtWrites/numPhyWrites + roundUp
+  val ens = Vec.fill(numPhyWrites){Bool()}
+  val addrs = Vec.fill(numPhyWrites){Bits()}
+  val datas = Vec.fill(numPhyWrites){Bits()}
+  for(i <- 0 until numVirtWrites/virtPerPhys){
+    var en = Bool(false)
+    var addr = Bits(); addr := Bits(0)
+    var data = Bits(); data := Bits(0)
+    for(j <- 0 until virtPerPhys){
+      en = en || io.writes(i*virtPerPhys + j).is
+      when (io.writes(i*virtPerPhys + j).is){
+        addr := io.writes(i*virtPerPhys + j).adr
+        data := io.writes(i*virtPerPhys + j).dat
+      }
+    }
+    ens(i) := en
+    addrs(i) := addr
+    datas(i) := data
+  }
+  for(i <- numVirtWrites/virtPerPhys until numPhyWrites){
+    ens(i) := Bool(false)
+    addrs(i) := Bits(0)
+    datas(i) := Bits(0)
+  }
+  for(i <- 0 until numPhyWrites){
+    when(ens(i)){
+      mem.write(addrs(i), datas(i).asInstanceOf[T])
+    }
+  }
+}
+
+class TransactionMemSeq[T <: Data](depth: Int, numVirtReads: Int, numPhyReads: Int, virtReadToPhyReadMap: Array[Int], numVirtWrites: Int, numPhyWrites: Int, virtWriteToPhyWriteMap: Array[Int])(data: => T) 
+    extends FunStore(depth, numVirtReads, numVirtWrites)(data) {
+  val readPortNum = numVirtReads
+  val virtWritePortNum = numVirtWrites
+
+  val mem = Mem(data, depth)
+  
+  for(i <- 0 until numPhyReads){
+    val en = Bool()
+    val addr = Bits()
+    val data = Bits()
+    en := Bool(false)
+    addr := Bits(0)
+    val virtReads = new ArrayBuffer[Int]
+    //find all virtual read ports that map to this physical read port
+    for(j <- 0 until numVirtReads){
+      if(virtReadToPhyReadMap(j) == i){
+        virtReads += j
+      }
+    }
+    for (virtReadIdx <- virtReads){
+      when(io.reads(virtReadIdx).is){
         en := Bool(true)
         addr := io.reads(virtReadIdx).adr
       }

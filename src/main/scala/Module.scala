@@ -940,8 +940,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   var pipelineReg = new HashMap[Int, ArrayBuffer[Reg]]()
   
   val forwardedRegs = new HashSet[Reg]
-  val forwardedMemReadPorts = new HashSet[(TransactionMem[_], FunRdIO[_])]
-  val memNonForwardedWritePoints = new HashSet[FunWrIO[_]]
+  val forwardedMemReadPorts = new HashSet[(TransactionMem[_], RdIO[_])]
+  val memNonForwardedWritePoints = new HashSet[WrIO[_]]
   
   val speculatedRegs = new ArrayBuffer[(Reg, Data)]
   
@@ -980,7 +980,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   val variableLatencyUnitOutputs = new HashSet[Node]// list of all variable latency unit output nodes
 
   val regRAWHazards = new HashMap[(Reg, Int, Int), Bool] //map of (register, updatelist num, write stage) -> RAW signal
-  val tMemRAWHazards = new HashMap[(FunRdIO[Data], Int, Int), Bool] //map of (tmem readport, writeport number, write stage) -> RAW signal 
+  val tMemRAWHazards = new HashMap[(RdIO[Data], Int, Int), Bool] //map of (tmem readport, writeport number, write stage) -> RAW signal 
   
   var autoSourceNodes: ArrayBuffer[AutoNode] = null
   var autoSinkNodes: ArrayBuffer[AutoNode] = null
@@ -1066,9 +1066,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def setTmemWriteStage(tmem: TransactionMem[_], stage: Int) = {
     for(i <- 0 until tmem.io.writes.length){
       val writePoint = tmem.io.writes(i)
-      val writeAddr = writePoint.actualWaddr
-      val writeEn = writePoint.actualWen
-      val writeData = writePoint.actualWdata
+      val writeAddr = writePoint.adr
+      val writeEn = writePoint.is
+      val writeData = writePoint.dat.asInstanceOf[Node]
       if(!userAnnotatedStages.contains(writeAddr)){
         userAnnotatedStages(writeAddr) = stage
       }
@@ -1118,10 +1118,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def addForwardedReg(d: Reg) = {
     forwardedRegs += d
   }
-  def addForwardedMemReadPort(m: TransactionMem[_], r: FunRdIO[_]) = {
-    forwardedMemReadPorts += ((m.asInstanceOf[TransactionMem[Data]], r.asInstanceOf[FunRdIO[Data]]))
+  def addForwardedMemReadPort(m: TransactionMem[_], r: RdIO[_]) = {
+    forwardedMemReadPorts += ((m.asInstanceOf[TransactionMem[Data]], r.asInstanceOf[RdIO[Data]]))
   }
-  def addNonForwardedMemWritePoint[T <: Data] (writePoint: FunWrIO[T]) = {
+  def addNonForwardedMemWritePoint[T <: Data] (writePoint: WrIO[T]) = {
     memNonForwardedWritePoints += writePoint
   }
 
@@ -2234,9 +2234,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     for (m <- TransactionMems) {
       for(i <- 0 until m.io.writes.length){
         val writePoint = m.io.writes(i)
-        val writeAddr = writePoint.actualWaddr
-        val writeEn = writePoint.actualWen
-        val writeData = writePoint.actualWdata
+        val writeAddr = writePoint.adr
+        val writeEn = writePoint.is
+        val writeData = writePoint.dat
         val writeStage = Math.max(getStage(writeEn),Math.max(getStage(writeAddr), getStage(writeData)))
         Predef.assert(writeStage > -1)
         for(j <- 0 until m.io.reads.length){
@@ -2331,9 +2331,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       for(i <- 0 until tMem.io.writes.length){
         val writePoint = tMem.io.writes(i)
         if(!memNonForwardedWritePoints.contains(writePoint)){
-          val writeAddr = writePoint.actualWaddr
-          val writeEn = writePoint.actualWen
-          val writeData = writePoint.actualWdata
+          val writeAddr = writePoint.adr
+          val writeEn = writePoint.is
+          val writeData = writePoint.dat.asInstanceOf[Node]
           val writeStage = Math.max(getStage(writeEn),Math.max(getStage(writeAddr), getStage(writeData)))
           Predef.assert(writeStage > -1)
           val writeEns = getVersions(writeEn.asInstanceOf[Bool], writeStage - readStage + 1)
@@ -2352,9 +2352,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       for(j <- getStage(readPort.adr) + 1 to pipelineReg.size){
         for(i <- 0 until tMem.io.writes.length){
           if(forwardPoints.contains(((i, j)))){
-            val forwardCond = tMemRAWHazards(((readPort.asInstanceOf[FunRdIO[Data]], i, j)))
+            val forwardCond = tMemRAWHazards(((readPort.asInstanceOf[RdIO[Data]], i, j)))
             muxMapping +=((forwardCond, forwardPoints(((i, j))).asInstanceOf[Bits]))
-            tMemRAWHazards -= ((readPort.asInstanceOf[FunRdIO[Data]], i, j))
+            tMemRAWHazards -= ((readPort.asInstanceOf[RdIO[Data]], i, j))
             println("added fowarding point (" + readPort.dat.asInstanceOf[Node].name + ", write port #" + i + ", write stage: " + j +  ")")
           }
         }
@@ -2517,25 +2517,20 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     for(tmem <- TransactionMems){
       for(i <- 0 until tmem.io.writes.length){
         val writePoint = tmem.io.writes(i)
-        val writeAddr = writePoint.actualWaddr
-        val writeEn = writePoint.actualWen
-        val writeData = writePoint.actualWdata
+        val writeAddr = writePoint.adr
+        val writeEn = writePoint.is
+        val writeData = writePoint.dat
         val writeStage = Math.max(getStage(writeEn),Math.max(getStage(writeAddr), getStage(writeData)))
         val newWriteEn = writeEn.asInstanceOf[Bool] && ~globalStall && stageValids(writeStage) && ~stageStalls(writeStage)
-        //fix writeEn's consumer list
-        val writeEnMuxFillerInput = writePoint.is.inputs(0)//need a less hack way of finding this
-        for(i <- 0 until APConsumers(writeEn).length){
-          val consumer = APConsumers(writeEn)(i)._1
-          val consumerInputIndex = APConsumers(writeEn)(i)._2
-          if(consumer == writeEnMuxFillerInput){
-            APConsumers(writeEn)(i) = ((newWriteEn, consumerInputIndex))
-          }
+        
+        for((consumer, consumerInputIndex) <- APConsumers(writeEn)){
+          val writeEnIndex = consumer.inputs.indexOf(writeEn)
+          Predef.assert(writeEnIndex > -1)
+          consumer.inputs(writeEnIndex) = newWriteEn
         }
-        //fix writeEnMux's inputs list
-        val producer_index = writeEnMuxFillerInput.inputs.indexOf(writeEn)
-        Predef.assert(producer_index > -1)
-        writeEnMuxFillerInput.inputs(producer_index) = newWriteEn
+
         //populate newWriteEn's consumer list
+        writeEn.addConsumers
         newWriteEn.addConsumers 
       }
     }
