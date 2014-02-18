@@ -2,21 +2,10 @@ package Chisel
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
-
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.Stack
+import scala.math.pow
 
-/*
-object Slave {
-  def apply(top: Module) = {
-    val slave = Module(new Slave)
-    top.parent = slave
-    slave.top = top
-    slave.children += top
-    slave
-  }
-}
-*/
 
 class Slave extends Module {
   val addr_width = 5
@@ -29,6 +18,11 @@ class Slave extends Module {
 }
 
 class CounterBackend extends FPGABackend with SignalBackannotation {
+  val addr_width = 5
+  val data_width = 32
+  val daisy_ctrl_width = 2
+  val data_addr_width = addr_width - daisy_ctrl_width
+
   val shadows = new ArrayBuffer[Bits]
   val signalCounterMap = new HashMap[Node, Bits]
   val shadowCounterMap = new HashMap[Bits, Bits]
@@ -48,7 +42,6 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
   preElaborateTransforms += ((c: Module) => generateDaisyChain(c))
   preElaborateTransforms += ((c: Module) => generateSlave(c))
   transforms += ((c: Module) => c.clocks -= emulClock)
-  analyses   += ((c: Module) => copyResource("wrapper.v", targetdir))
 
   def getTypeNode(node: Node) = {
     val typeNode = new UInt
@@ -117,6 +110,7 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
         case in: DecoupledIO[_] => in.ready 
         case _ => null 
       }
+
       def ready(i: Int) = stall && (daisy_control === Bits(i, daisy_control.getWidth)) && daisy_out.ready
 
       m.clock = emulClock
@@ -254,7 +248,8 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
     val topInBits = Reg(init = Bits(0, 32), clock = daisyClock)
     val clkCounter = Reg(init = Bits(0, 32), clock = daisyClock)
     val first = Reg(init = Bool(true), clock = daisyClock)
-    val stop = Reg(init = Bool(false), clock = stopClock)
+    val init = Reg(init = Bool(true), clock = daisyClock)
+    val stop = Reg(init = Bool(false), clock = stopClock) // works at negative edges
     val notStall = clkCounter.orR
     val stall = !notStall
 
@@ -266,48 +261,54 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
     first.comp setName "first"
     stop.comp.component = slave
     stop.comp setName "stop" 
+    init.comp.component = slave
+    init.comp setName "init" 
     stall.getNode setName "stall"
 
     // for input ports
     (slaveAddr, slaveIn, top.io("in")) match {
-      case (addr: Bits, fromIO: DecoupledIO[_], toIO: DecoupledIO[_]) => {
+      case (addr: Bits, slaveIO: DecoupledIO[_], topIO: DecoupledIO[_]) => {
         top.io("stall") := stall
-        top.io("daisy_control") := addr(2,0)
+        top.io("daisy_control") := addr(daisy_ctrl_width-1, 0)
 
-        val writeAddr = addr(4,3) 
-        def writeValid(i: Int) = fromIO.valid && stall && writeAddr === UInt(i, 2)
-        val ready = Vec(Bool(false), Bool(true), toIO.ready, Bool(false))
-        fromIO.ready := first || ready(writeAddr)
+        val writeAddr = addr(addr_width-1, daisy_ctrl_width) 
+        def writeValid(i: Int) = slaveIO.valid && stall && writeAddr === UInt(i, data_addr_width)
+        val ready = Vec(Range(0, pow(2, data_addr_width).toInt) map { 
+          case 0 => topIO.ready
+          case 1 => Bool(true)
+          case _ => Bool(false)
+        })
+        // val ready = Vec(Bool(false), Bool(true), topIO.ready, Bool(false))
 
+        // address = 0 => Set inputs to the device
         // address = 1 => Write to the clock counter
-        // address = 2 => Set inputs to the device
-        (fromIO.bits, toIO.bits) match {
+        slaveIO.ready := first || ready(writeAddr)
+        topIO.valid := first || writeValid(2)
+
+        (slaveIO.bits, topIO.bits) match {
           case (bits: Bits, bundle: Bundle) => {
             val (name0, a) = bundle.elements(0)
             val (name1, b) = bundle.elements(1)
 
             // todo: stop with new inputs?
-            when (writeValid(1)) {
-              clkCounter := fromIO.bits
-              stop := Bool(false)
-            }.elsewhen (writeValid(2)) {
+            when (writeValid(0)) {
               topInBits := bits
+              init := Bool(false)
+            }.elsewhen (writeValid(1)) {
+              clkCounter := slaveIO.bits
+              first := Bool(false)
               stop := Bool(false)
-              // clkCounter := Bits(1, 32)
             }.elsewhen (clkCounter === Bits(1, 32)) {
               clkCounter := clkCounter - Bits(1, 32)
               stop := Bool(true)
-            }.elsewhen (notStall) {
+            }.elsewhen (!stall) {
               clkCounter := clkCounter - Bits(1, 32)
-              first := Bool(false)
             }
-  
+
             a := topInBits(31, 16)
             b := topInBits(15, 0)
           }
         }
-
-        toIO.valid := writeValid(2) || first
       }
       case _ =>
     }
@@ -315,20 +316,37 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
     // output ports
     (slaveAddr, slaveOut, top.io("daisy_out"), top.io("out")) match {
       case (addr: Bits, 
-            fromIO: DecoupledIO[_], 
-            toIO1: DecoupledIO[_], 
-            toIO2: ValidIO[_]) => {
-        val readAddr = addr(4,3)
-        def readReady(i: Int) = fromIO.ready && readAddr === UInt(i, 2)
-        val bits = Vec(Bits(0), toIO1.bits, toIO2.bits, Bits(0))
-        val valids = Vec(Bool(false), toIO1.valid, toIO2.valid, Bool(false))
+            slaveIO: DecoupledIO[_], 
+            daisyIO: DecoupledIO[_], 
+            topIO: ValidIO[_]) => {
+        val readAddr = addr(addr_width-1, daisy_ctrl_width)
+        val bits = Vec(Range(0, pow(2, data_addr_width).toInt) map { 
+          case 2 => daisyIO.bits
+          case 3 => topIO.valid
+          case 4 => topIO.bits
+          case _ => Bits(0)
+        })
+        val valids = Vec(Range(0, pow(2, data_addr_width).toInt) map { 
+          case 2 => daisyIO.valid
+          case 3 => Bool(true)
+          case 4 => topIO.valid
+          case _ => Bool(false)
+        })
+        // val bits = Vec(Bits(0), daisyIO.bits, topIO.bits, topIO.valid)
+        // val valids = Vec(Bool(false), daisyIO.valid, topIO.valid, Bool(true))
 
-        // address == 1 => Read from daisy chains
-        // address == 2 => Read from the device result
-        toIO1.ready := readReady(1) 
-        // toIO2.ready := readReady(2) // no ready?
-        fromIO.valid := valids(readAddr)
-        fromIO.bits := bits(readAddr)
+        // address == 2 => Read from daisy chains
+        // address == 3 => Check whether or not the target finished
+        // address == 4 => Read from the device result
+
+        daisyIO.ready := (readAddr === UInt(2, data_addr_width)) && slaveIO.ready
+        slaveIO.valid := valids(readAddr)
+        slaveIO.bits  := bits(readAddr)
+  
+        // ready to get inputs for the target
+        when(topIO.valid) {
+          first := Bool(true)
+        }
       }
       case _ =>
     }
@@ -337,7 +355,7 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
     val clockType = getTypeNode(daisyClock)
     val clockBool = clockType.toBool
     val notStop = !stop
-    val enabledClk = clockBool && notStop && notStall
+    val enabledClk = clockBool && (notStall && notStop || init)
     clockBool.isTypeNode = true
     enabledClk.getNode.component = slave
     enabledClk.getNode setName "emul_clk"
