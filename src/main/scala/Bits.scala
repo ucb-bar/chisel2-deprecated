@@ -54,7 +54,6 @@ abstract class Bits extends Data with proc {
 
   var canBeUsedAsDefault = false
   var dir: IODirection = null;
-  var isModuleIo = false
 
   def create(dir: IODirection, width: Int) {
     this.dir = dir;
@@ -92,8 +91,7 @@ abstract class Bits extends Data with proc {
 
   // internal, non user exposed connectors
   def checkAssign(src: Node): Unit = {
-    if (this.component != null) this.component.checkIo
-    if (this.dir == INPUT && this.component == Module.current && this.isModuleIo) {
+    if (this.dir == INPUT && this.component == Module.current && this.isIo) {
       ChiselError.error({"assigning to your own input port " + this + " RHS: " + src});
     }
     if (this.dir == OUTPUT && this.component != Module.current &&
