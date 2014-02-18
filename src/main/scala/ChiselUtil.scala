@@ -645,7 +645,7 @@ class FunStore[T <: Data](val depth: Int, numReads: Int, numWrites: Int)(data: =
   val io = new FunMemIO(depth, numReads, numWrites)( data )
 }
 
-class TransactionMem[T <: Data](depth: Int, numVirtReads: Int, numPhyReads: Int, virtReadToPhyReadMap: Array[Int], numVirtWrites: Int, numPhyWrites: Int, virtWriteToPhyWriteMap: Array[Int])(data: => T) 
+/*class TransactionMem[T <: Data](depth: Int, numVirtReads: Int, numPhyReads: Int, virtReadToPhyReadMap: Array[Int], numVirtWrites: Int, numPhyWrites: Int, virtWriteToPhyWriteMap: Array[Int])(data: => T) 
     extends FunStore(depth, numVirtReads, numVirtWrites)(data) {
   val readPortNum = numVirtReads
   val virtWritePortNum = numVirtWrites
@@ -717,14 +717,15 @@ class TransactionMem[T <: Data](depth: Int, numVirtReads: Int, numPhyReads: Int,
       mem.write(addrs(i), datas(i).asInstanceOf[T])
     }
   }
-}
+}*/
 
-class TransactionMemSeq[T <: Data](depth: Int, numVirtReads: Int, numPhyReads: Int, virtReadToPhyReadMap: Array[Int], numVirtWrites: Int, numPhyWrites: Int, virtWriteToPhyWriteMap: Array[Int])(data: => T) 
+class TransactionMem[T <: Data](depth: Int, numVirtReads: Int, numPhyReads: Int, virtReadToPhyReadMap: Array[Int], numVirtWrites: Int, numPhyWrites: Int, virtWriteToPhyWriteMap: Array[Int], seqRead: Boolean = false)(data: => T) 
     extends FunStore(depth, numVirtReads, numVirtWrites)(data) {
   val readPortNum = numVirtReads
   val virtWritePortNum = numVirtWrites
+  val isSeqRead = seqRead
 
-  val mem = Mem(data, depth)
+  val mem = Mem(data, depth, seqRead = seqRead)
   
   for(i <- 0 until numPhyReads){
     val en = Bool()
@@ -746,7 +747,15 @@ class TransactionMemSeq[T <: Data](depth: Int, numVirtReads: Int, numPhyReads: I
       }
       io.reads(virtReadIdx).dat := data
     }
-    data := mem.read(addr)
+    if(seqRead){
+      val addr_reg = Reg(init=Bits(0))
+      when(en){
+        addr_reg := addr
+      }
+      data := mem.read(addr_reg)
+    } else {
+      data := mem.read(addr)
+    }
     
   }
   //for (read <- io.reads)
