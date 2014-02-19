@@ -102,7 +102,7 @@ abstract class Backend {
 
   def nameChildren(root: Module) {
     // Name all nodes at this level
-    root.io.nameIt("io");
+    root.io.nameIt("io", true);
     val nameSpace = new HashSet[String];
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], Cell, BlackBox and Modules.
@@ -120,7 +120,7 @@ abstract class Backend {
            /* XXX It seems to always be true. How can name be empty? */
            if ((node.isTypeNode || name != ""
              || node.name == null || (node.name == "" && !node.named))) {
-             node.nameIt(asValidName(name));
+             node.nameIt(asValidName(name), false);
            }
            nameSpace += node.name;
          }
@@ -140,7 +140,7 @@ abstract class Backend {
                   this has for side-effect to create modules with the exact
                   same logic but textually different in input/output
                   parameters, hence generating unnecessary modules. */
-                 elm.nameIt(asValidName(name + "_" + i));
+                 elm.nameIt(asValidName(name + "_" + i), false);
                }
                nameSpace += elm.name;
                i += 1;
@@ -162,7 +162,7 @@ abstract class Backend {
                   this has for side-effect to create modules with the exact
                   same logic but textually different in input/output
                   parameters, hence generating unnecessary modules. */
-                 elm.nameIt(asValidName(name + "_" + i));
+                 elm.nameIt(asValidName(name + "_" + i), false);
                }
                nameSpace += elm.name;
                i += 1;
@@ -334,6 +334,11 @@ abstract class Backend {
     passed as input to sub-module without being tied to an output
     of *this.component*.
     */
+  def isBitsIo(node: Node, dir: IODirection): Boolean = node match {
+    case b: Bits => b.isIo && b.dir == dir
+    case _ => false
+  }
+
   def collectNodesIntoComp(dfsStack: Stack[Node]) {
     val walked = new HashSet[Node]()
     walked ++= dfsStack
@@ -357,6 +362,10 @@ abstract class Backend {
       if (!node.component.nodes.contains(node))
         node.component.nodes += node
       for (input <- node.inputs) {
+        if (input.component != null && input.component != node.component) {
+          if (!input.isLit && !isBitsIo(node, INPUT) && !isBitsIo(input, OUTPUT))
+            ChiselErrors += new ChiselError(() => { "Illegal cross module reference between " + node + " and " + input}, node.line)
+        }
         if(!walked.contains(input)) {
           if( input.component == null ) {
             input.component = curComp
@@ -376,6 +385,8 @@ abstract class Backend {
   }
 
   def pruneUnconnectedIOs(m: Module) {
+    m.checkIo // make sure all module ios are ports
+
     val inputs = m.io.flatten.filter(_._2.dir == INPUT)
     val outputs = m.io.flatten.filter(_._2.dir == OUTPUT)
 
@@ -397,7 +408,7 @@ abstract class Backend {
       if (o.inputs.length == 0) {
         if (o.consumers.length > 0) {
           if (Module.warnOutputs)
-            ChiselError.warning({"UNCONNETED OUTPUT " + emitRef(o) + " in component " + o.component + 
+            ChiselError.warning({"UNCONNECTED OUTPUT " + emitRef(o) + " in component " + o.component + 
                                  " has consumers on line " + o.consumers(0).line})
           o.driveRand = true
         } else {

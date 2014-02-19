@@ -8,7 +8,7 @@
 \input{../style/scala.tex}
 \input{../style/talk.tex}
 
-\title{Chisel Bootcamp}
+\title{Chisel Bootcamp 4}
 \author{Jonathan Bachrach}
 \date{\today}
 \institute[UC Berkeley]{EECS UC Berkeley}
@@ -45,13 +45,30 @@
 \begin{frame}[fragile]{Goals for Bootcamp}
 
 \begin{itemize}
-\item get yout started with Chisel
+\item get you started with Chisel
 \item get a basic working knowledge of Chisel
 \item learn how to think in Chisel
 \item know where to get more information
 \end{itemize}
 
 \end{frame}
+
+\begin{frame}[fragile]{CS291C Specific Notes for Bootcamp}
+
+\begin{itemize}
+\item teaching digital circuit design in chisel
+\item will later teach 
+\begin{itemize}
+\item floating point
+\item fixed point 
+\item complex numbers
+\item integration with matlab
+\end{itemize}
+\item new chisel release with DSP support coming soon
+\end{itemize}
+
+\end{frame}
+
 
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Logging into EC2}
@@ -86,7 +103,7 @@ screen -r
 
 if you don't have chisel-tutorial already
 \begin{scala}
-git clone git@github.com:ucb-bar/chisel-tutorial.git
+git clone https://github.com/ucb-bar/chisel-tutorial.git
 cd chisel-tutorial
 \end{scala}
 
@@ -123,7 +140,7 @@ chisel-tutorial/
 
 \begin{center}
 \fbox{
-\url{chisel.eecs.berkeley.edu/bootcamp-20140206.pdf}
+\url{chisel.eecs.berkeley.edu/2.0.6/chisel-bootcamp-20140206.pdf}
 }
 \end{center}
 
@@ -783,7 +800,7 @@ class BasicALU extends Module {
   } .elsewhen (io.opcode === UInt(2)) {
     io.output := io.a + UInt(1)         // inc A by 1
   } .elsewhen (io.opcode === UInt(3)) {
-    io.output := io.a - UInt(1)         // inc B by 1
+    io.output := io.a - UInt(1)         // dec B by 1
   } .elsewhen (io.opcode === UInt(4)) {
     io.output := io.a + UInt(4)         // inc A by 4
   } .elsewhen (io.opcode === UInt(5)) {
@@ -826,7 +843,7 @@ Symbol & Operation & Output Type \\ \hline
 \verb+^+ & Bitwise XOR & UInt\\ \hline
 \verb+&+ & Bitwise AND & UInt \\ \hline
 \verb+|+ & Bitwise OR & Bool \\ \hline
-\verb+===+ & Equal & Bool \\ \hline
+{\color{red}\verb+===+} & Equal & Bool \\ \hline
 \verb+!=+ & Not Equal & Bool \\ \hline
 \verb+>+ & Greater & Bool \\ \hline
 \verb+<+ & Less & Bool \\ \hline
@@ -978,10 +995,10 @@ module HiLoMultiplier(
   wire[15:0] T1;
 
   assign io_Lo = T0;
-  assign T0 = mult[4'hf/*15*/:1'h0/*0*/];
+  assign T0 = mult[4'hf:1'h0];
   assign mult = io_A * io_B;
   assign io_Hi = T1;
-  assign T1 = mult[5'h1f/*31*/:5'h10/*16*/];
+  assign T1 = mult[5'h1f:5'h10];
 endmodule
 \end{scala}
 }
@@ -1215,7 +1232,7 @@ class VecShiftRegister extends Module {
     val out   = UInt(OUTPUT, 1)
   }
   val delays = Vec.fill(4){ Reg(UInt()) }
-  when ( ...) {
+  when ( ... ) {
   // fill in here ...
   } .elsewhen (io.shift) {
     ...
@@ -1362,7 +1379,7 @@ PASSED   // Final pass assertion
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Testbench for MaxN -- \tt MaxN.scala}
 \begin{columns}
-\column{0.48\textwidth}
+\column{0.49\textwidth}
 
 \begin{itemize}
 \item write a testbench for MaxN
@@ -1389,7 +1406,7 @@ class MaxN(val n: Int, val w: Int)
 val x = rnd.nextInt(lim) 
 \end{scala}
 
-\column{0.43\textwidth}
+\column{0.42\textwidth}
 
 {\lstset{basicstyle={\scriptsize\ttfamily}}
 \begin{scala}
@@ -1433,7 +1450,7 @@ class MemorySearch extends Module {
   val list   = Vec(UInt(0), UInt(4), UInt(15), UInt(14), 
                    UInt(2), UInt(5), UInt(13)){ UInt(width = 4) }
   val memVal = list(index)
-  val done = !io.en && ((memVal === io.target) || (index === UInt(7)))
+  val done   = !io.en && ((memVal === io.target) || (index === UInt(7)))
   when (io.en) {
     index := UInt(0)
   } .elsewhen (done === Bool(false)) {
@@ -1514,8 +1531,7 @@ Sequential read ports are inferred when:
 \end{itemize}
 
 \begin{scala}
-al ram1r1w =
-  Mem(UInt(width = 32), 1024, seqRead = true)
+val ram1r1w = Mem(UInt(width = 32), 1024, seqRead = true)
 val reg_raddr = Reg(UInt())
 when (wen) { ram1r1w(waddr) := wdata }
 when (ren) { reg_raddr := raddr }
@@ -1880,7 +1896,34 @@ it turns out that functional programming is a powerful way to define hardware. \
 for example, you can create a parallel set of blocks using map and reduce to creation reduction trees and chain to create a pipeline.}
 \end{frame}
 
-\begin{frame}[fragile]{Map / Reduce Generator}
+\begin{frame}[fragile]{Flo Map / Reduce Generator}
+
+{\lstset{basicstyle={\scriptsize\ttfamily}}
+\begin{scala}
+object FloDelays {
+  def apply(x: Flo, n: Int): List[Flo] = 
+    if (n <= 1) List(x) else x :: FloDelays(RegNext(x), n-1)
+}
+object FloFIR {
+  def apply(ws: Seq[Flo], x: T): T = 
+    (ws, FloDelays(x, ws.length)).zipped.map( _ * _ ).reduce( _ + _ )
+}
+class FIR extends Module {
+  val io = new Bundle { val x = Flo(INPUT); val z = Flo(OUTPUT) }
+  val ws = Array(Flo(0.25), Flo(0.75))
+  io.z  := FloFIR(ws, io.x)
+}
+\end{scala}
+}
+\begin{center}
+\includegraphics[height=0.35\textheight]{../cs294-88/lectures/advanced-chisel/figs/inner-product-fir.png} 
+\end{center}
+\note{as an advanced example, consider writing an FIR filter which is defined by the equation below. \\[1cm]
+essentially it's a sum of products of coefficients and delayed versions of input.\\[1cm]
+we can write this quite simply using map and reduce as above.}
+\end{frame}
+
+\begin{frame}[fragile]{Generic Map / Reduce Generator}
 
 {\lstset{basicstyle={\scriptsize\ttfamily}}
 \begin{scala}
@@ -2223,7 +2266,6 @@ assert(x < UInt(10))
 \begin{tabular}{rl}
 \textbf{manual} & \code{manual.pdf} \\
 \textbf{bootcamp2014} & \code{bootcamp-20140206.pdf} \\
-\textbf{bootcamp2013} & \code{bootcamp-20130930.pdf} \\
 \textbf{bootcamp2012} & \code{bootcamp-20121026.pdf} \\
 \textbf{tutorial} & \code{tutorial.pdf} \\
 \textbf{getting started} & \code{getting-started.pdf} \\
@@ -2287,8 +2329,8 @@ assert(x < UInt(10))
 
 \begin{frame}{Thanks}
 \begin{itemize}
-\item \textbf{Arrangements} -- Roxana and Kostas
-\item \textbf{EC2 configuration} -- Sebastien Mirolo
+\item \textbf{Arrangements} -- Borivoje Nikolic
+\item \textbf{Educational Machines} -- Michael Zimmer
 \item \textbf{Bootcamp Materials} -- Vincent Lee, Stephen Twigg, Huy Vo
 \item \textbf{Funding} -- Department of Energy, Department of Defense
 \end{itemize}

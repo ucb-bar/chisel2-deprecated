@@ -177,10 +177,8 @@ class Reg extends Delay with proc {
       ChiselError.error("reassignment to Reg");
     }
     val cond = Module.current.whenCond
-    if (Module.current.hasWhenCond) {
-      enable = if (isEnable) enable || cond else cond
-      isEnable = true
-    }
+    enable = if (isEnable) enable || cond else cond
+    isEnable = true
     updates += ((cond, src))
   }
   override def genMuxes(default: Node): Unit = {

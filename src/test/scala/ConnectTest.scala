@@ -243,4 +243,33 @@ class ConnectSuite extends TestSuite {
     launchCppTester((m: A) => new RegisterHookTests(m))
   }
 
+  // tests flagging bad cross module references
+  @Test def testCrossModuleReferences() {
+    try {
+      class ForeignMod extends Module {
+        val io = new Bundle {
+          val input  = UInt(INPUT, width = 8)
+          val output = UInt(OUTPUT, width = 8)
+        }
+        val add = io.input + io.input
+        io.output := add + UInt(1)
+      }
+
+      class ForeignRef extends Module {
+        val io = new Bundle {
+          val input  = Bits(INPUT, width = 8)
+          val output = Bits(OUTPUT, width = 8)
+        }
+        val foreign = Module(new ForeignMod)
+        io.output := io.input + foreign.add
+      }
+
+      chiselMain(Array[String]("--backend", "v"), () => Module(new ForeignRef()))
+
+    } catch {
+      case _ : Throwable => ;
+    }
+    assertTrue(!ChiselError.ChiselErrors.isEmpty);
+  }
+
 }

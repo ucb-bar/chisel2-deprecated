@@ -294,7 +294,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] 
     this
   }
 
-  override def nameIt (path: String) {
+  override def nameIt (path: String, isNamingIo: Boolean) {
     if( !named
       && (name.isEmpty
         || (!path.isEmpty && name != path)) ) {
@@ -310,7 +310,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] 
         } else {
           elm.name
         }
-        elm.nameIt(prefix + i + suffix)
+        elm.nameIt(prefix + i + suffix, isNamingIo)
       }
     } else {
       /* We are trying to rename a Vec that has a fixed name. */
