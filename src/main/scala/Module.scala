@@ -1224,23 +1224,42 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     val inputs = this.io.flatten.filter(_._2.dir == INPUT)
     val outputs = this.io.flatten.filter(_._2.dir == OUTPUT)
     for(input <- inputs){
-      inputNodes += input._2
+      if(input._2.name != "io_tid_x" && input._2.name != "io_tid_y"){//hack to ignore tid input for Dreamer
+        inputNodes += input._2
+      }
     }
     for(output <- outputs){
       outputNodes += output._2
     }
     
-    for((name, io) <- this.io.asInstanceOf[Bundle].elements){
-      io match {
-        case decoupled: DecoupledIO[_] => {
-          ioNodes += decoupled.asInstanceOf[DecoupledIO[Data]]  
+    def findDecoupledIO(collection: Data): Unit = {
+      if(collection.isInstanceOf[Bundle]){
+        for((name, elm) <- collection.asInstanceOf[Bundle].elements){
+          elm match {
+            case decoupled: DecoupledIO[_] => {
+              ioNodes += decoupled.asInstanceOf[DecoupledIO[Data]]
+            }
+            case any => {
+              findDecoupledIO(any.asInstanceOf[Data])  
+            }
+          }
         }
-        case _ => {
-          Predef.assert(false, "all IO must be through the DecoupledIO interface")
+      } else if(collection.isInstanceOf[Vec[_]]){
+        for(elm <- collection.asInstanceOf[Vec[Data]].self){
+          elm match{
+            case decoupled: DecoupledIO[_] => {
+              ioNodes += decoupled.asInstanceOf[DecoupledIO[Data]]
+            }
+            case any => {
+              findDecoupledIO(any.asInstanceOf[Data])
+            }
+          }
         }
       }
     }
-
+    
+    findDecoupledIO(this.io)
+    
     //find our own consumers list with input numbers attached to the consumer pointers and trace into submodules
     findAPConsumers()
     
