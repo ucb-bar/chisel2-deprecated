@@ -254,11 +254,15 @@ trait proc extends Node {
 }
 
 trait nameable {
-  var name: String = "";
+  var name: String = ""
   /** _named_ is used to indicates name was set explicitely
    and should not be overriden by a _nameIt_ generator. */
-  var named = false;
-  var varName: String = "";
+  var named = false
+  var varName: String = ""
+
+  def setVarName(name_ : String) {
+    varName = name_
+  }
 }
 
 abstract class BlackBox extends Module {

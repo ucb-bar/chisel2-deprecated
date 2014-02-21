@@ -726,7 +726,7 @@ class CppBackend extends Backend {
     for (cc <- Module.components) {
       if (!(cc == c)) {
         c.debugs ++= cc.debugs
-        c.mods       ++= cc.mods;
+        c.mods   ++= cc.mods;
       }
     }
     c.findConsumers();

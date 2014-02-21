@@ -143,6 +143,14 @@ abstract class Data extends Node {
     }
   }
 
+  override def setVarName(name_ : String) {
+    if (isTypeNode && comp != null) {
+      comp.setVarName(name_)
+    } else {
+      super.setVarName(name_)
+    }
+  }
+
   def setWidth(w: Int) {
     this.width = w;
   }
