@@ -971,8 +971,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   val regWritePoints = new HashSet[Node] //list of all register write inputs and transactionMem write port nodes(including write addr, write data, write en)
   val regReadPoints = new HashSet[Node] //list of all register read outputs and transactionMem read port
   val tMemWritePoints = new HashSet[Node] //list of all transactionMem write port nodes(including write addr, write data, write en)
-  val tMemReadDatas = new HashSet[Node] //list of all transactionMem read port nodes(including read addr, read data, read en)
+  val tMemReadDatas = new HashSet[Node] 
   val tMemReadAddrs = new HashSet[Node]
+  val tMemReadEns = new HashSet[Node]
+
   val inputNodes = new HashSet[Node] //list of all module Input Nodes
   val outputNodes = new HashSet[Node] //list of all module Output Nodes
   val ioNodes = new HashSet[DecoupledIO[Data]]// of all module ioNodes in the form of DecoupledIO
@@ -990,14 +992,14 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   def isSink(node: Node) = {
-    regWritePoints.contains(node) || tMemReadAddrs.contains(node) || tMemWritePoints.contains(node) || outputNodes.contains(node) || variableLatencyUnitInputs.contains(node)
+    regWritePoints.contains(node) || tMemReadAddrs.contains(node) || tMemReadEns.contains(node) || tMemWritePoints.contains(node) || outputNodes.contains(node) || variableLatencyUnitInputs.contains(node)
   }
 
   def sourceNodes(): HashSet[Node] = {
     regReadPoints | tMemReadDatas | inputNodes |  variableLatencyUnitOutputs
   }
   def sinkNodes(): HashSet[Node] = {
-    regWritePoints | tMemReadAddrs | tMemWritePoints | outputNodes | variableLatencyUnitInputs
+    regWritePoints | tMemReadAddrs | tMemReadEns | tMemWritePoints | outputNodes | variableLatencyUnitInputs
   }
   
   
@@ -1213,6 +1215,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       for(i <- 0 until tmem.readPortNum){
         tMemReadAddrs += tmem.io.reads(i).adr
         tMemReadDatas += tmem.io.reads(i).dat
+        tMemReadEns += tmem.io.reads(i).is
       }
       for(i <- 0 until tmem.virtWritePortNum){
         tMemWritePoints += tmem.io.writes(i).adr
@@ -1499,11 +1502,15 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       for(i <- 0 until tMem.readPortNum){
         val readAddr = tMem.io.reads(i).adr
         val readData = tMem.io.reads(i).dat
+        val readEn = tMem.io.reads(i).is
         readPoint.findStage(readAddr, userAnnotatedStages)
         readPoint.findStage(readData, userAnnotatedStages)
+        readPoint.findStage(readEn, userAnnotatedStages)
         readPoint.inputChiselNodes += readAddr
+        readPoint.inputChiselNodes += readEn
         readPoint.outputChiselNodes += readData
         chiselNodeToAutoNodeMap(readAddr) = readPoint
+        chiselNodeToAutoNodeMap(readEn) = readPoint
         chiselNodeToAutoNodeMap(readData) = readPoint
       }
       autoNodeGraph += readPoint
