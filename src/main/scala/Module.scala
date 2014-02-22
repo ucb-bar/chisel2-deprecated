@@ -507,6 +507,25 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
   }
 
+  def dfs(visit: Node => Unit): Unit = {
+    val walked = new HashSet[Node]
+    val dfsStack = initializeDFS
+
+    while(!dfsStack.isEmpty){
+      val top = dfsStack.pop
+      walked += top
+      visit(top)
+      for(i <- top.inputs) {
+        if(!(i == null)) {
+          if(!(walked contains i)) {
+            dfsStack push i
+            walked += i
+          }
+        }
+      }
+    }
+  }
+
   def inferAll(): Int = {
     val nodesList = ArrayBuffer[Node]()
     bfs { nodesList += _ }
@@ -759,8 +778,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   // 1) name the component
   // 2) name the IO
   // 3) name and set the component of all statically declared nodes through introspection
+  // 4) set variable names of each node
   /* XXX deprecated. make sure containsReg and isClk are set properly. */
-  def markComponent() {
+  def markComponent(nameSpace: HashSet[String]) {
     ownIo();
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], Cell, BlackBox and Modules.
@@ -776,6 +796,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
          o match {
          case node: Node => {
            if (node.isReg || node.isClkInput) containsReg = true;
+           node setVarName (backend asValidName name)
+           nameSpace += node.varName
          }
          case buf: ArrayBuffer[_] => {
            /* We would prefer to match for ArrayBuffer[Node] but that's
@@ -784,24 +806,49 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             in Module that are solely there for implementation purposes. */
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
              val nodebuf = buf.asInstanceOf[Seq[Node]];
-             for(elm <- nodebuf){
+             for((elm, i) <- nodebuf.zipWithIndex){
                if (elm.isReg || elm.isClkInput) {
                  containsReg = true;
                }
+               val idxName = name + '_' + i
+               elm setVarName (backend asValidName idxName)
+               nameSpace += elm.varName
              }
            }
          }
+         case buf: collection.IndexedSeq[_] => {
+           /* To support VecLike structures */
+           // Todo: is this necessary?
+           if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
+             val nodebuf = buf.asInstanceOf[Seq[Node]];
+             for((elm, i) <- nodebuf.zipWithIndex){
+               if (elm.isReg || elm.isClkInput) {
+                 containsReg = true;
+               }
+               val idxName = name + '_' + i
+               elm setVarName (backend asValidName idxName)
+               nameSpace += elm.varName
+             }
+           }
+         }
+         // Todo: do we have Cell anymore?
          case cell: Cell => {
            if(cell.isReg) containsReg = true;
+           cell.name = backend asValidName name 
+           nameSpace += cell.varName
          }
          case bb: BlackBox => {
            bb.pathParent = this;
            for((n, elm) <- io.flatten) {
              if (elm.isClkInput) containsReg = true
            }
+           bb.moduleName = backend asValidName name
+           nameSpace += bb.moduleName
          }
          case comp: Module => {
            comp.pathParent = this;
+           comp.moduleName = backend asValidName name
+           nameSpace += comp.moduleName
          }
          case any =>
        }

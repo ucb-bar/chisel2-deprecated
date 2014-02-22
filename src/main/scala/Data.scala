@@ -135,17 +135,23 @@ abstract class Data extends Node {
     }
   }
 
-  override def nameIt(path: String, isNamingIo: Boolean) {
+  override def nameIt(path: String) {
     if (isTypeNode && comp != null) {
-      comp.nameIt(path, isNamingIo)
+      comp.nameIt(path)
     } else {
-      super.nameIt(path, isNamingIo)
+      super.nameIt(path)
     }
   }
 
   override def setVarName(name_ : String) {
-    if (isTypeNode && comp != null) {
-      comp.setVarName(name_)
+    if (isTypeNode) {
+      if (comp != null) {
+        comp.setVarName(name_)
+      } else if (inputs.length > 0) {
+        getNode.setVarName(name_)
+      } else {
+        super.setVarName(name_)
+      }
     } else {
       super.setVarName(name_)
     }
