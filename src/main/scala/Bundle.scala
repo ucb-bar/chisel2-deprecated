@@ -154,14 +154,14 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
     elementsCache = elts; this
   }
 
-  override def nameIt (path: String, isNamingIo: Boolean) {
+  override def nameIt (path: String) {
     if( !named
       && (name.isEmpty
         || (!path.isEmpty && name != path)) ) {
       name = path
       val prefix = if (name.length > 0) name + "_" else ""
       for ((n, i) <- elements) {
-        i.nameIt(prefix + n, isNamingIo)
+        i.nameIt(prefix + n)
       }
     } else {
       /* We are trying to rename a Bundle that has a fixed name. */

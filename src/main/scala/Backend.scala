@@ -83,6 +83,7 @@ abstract class Backend {
   }
 
   // Hack to get variable names of Chisel Nodes
+  // Todo: obsolte...
   def parseVarNames {
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], Cell, BlackBox and Modules.
@@ -116,9 +117,53 @@ abstract class Backend {
     }
   }
 
+  def setNames(top: Module) {
+    // First, check whether there are multiple instances of a module
+    val classNames = new HashMap[String, ArrayBuffer[Module]]
+
+    for (c <- Module.components) {
+      c.io nameIt "io" // naming ios
+      
+      val className = extractClassName(c)
+      if (!(classNames contains className)) {
+        classNames(className) = new ArrayBuffer[Module]
+      }
+      classNames(className) += c
+    }
+
+    // Give names to components according to their instrance numbers
+    for ((name, comps) <- classNames) {
+      // A class has more than one instance
+      if (comps.size > 1) {
+        for ((c, i) <- comps.zipWithIndex) {
+          c.name = asValidName(name + "_" + i)
+        }
+      }
+      // only one instance
+      else {
+        comps.head.name = asValidName(name)
+      }
+    }
+
+    // Next, give names to nodes
+    top dfs { node =>
+      if (!node.isTypeNode && !node.isLit && !node.isIo) {
+        if (node.varName != "") {
+          node nameIt asValidName(node.varName)
+        } else {
+          if (node.isReg) 
+            node nameIt asValidName("R" + node.emitIndex)
+          else 
+            node nameIt asValidName("T" + node.emitIndex)
+        }
+      }
+    }
+  }
+
+  // Todo: remove it!
   def nameChildren(root: Module) {
     // Name all nodes at this level
-    root.io.nameIt("io", true);
+    root.io.nameIt("io");
     val nameSpace = new HashSet[String];
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], Cell, BlackBox and Modules.
@@ -136,7 +181,7 @@ abstract class Backend {
            /* XXX It seems to always be true. How can name be empty? */
            if ((node.isTypeNode || name != ""
              || node.name == null || (node.name == "" && !node.named))) {
-             node.nameIt(asValidName(name), false);
+             node.nameIt(asValidName(name));
            }
            nameSpace += node.name;
          }
@@ -156,7 +201,7 @@ abstract class Backend {
                   this has for side-effect to create modules with the exact
                   same logic but textually different in input/output
                   parameters, hence generating unnecessary modules. */
-                 elm.nameIt(asValidName(name + "_" + i), false);
+                 elm.nameIt(asValidName(name + "_" + i));
                }
                nameSpace += elm.name;
                i += 1;
@@ -178,7 +223,7 @@ abstract class Backend {
                   this has for side-effect to create modules with the exact
                   same logic but textually different in input/output
                   parameters, hence generating unnecessary modules. */
-                 elm.nameIt(asValidName(name + "_" + i), false);
+                 elm.nameIt(asValidName(name + "_" + i));
                }
                nameSpace += elm.name;
                i += 1;
@@ -254,6 +299,7 @@ abstract class Backend {
     if (keywords.contains(name)) name + "_" else name;
   }
 
+  // Todo: obsolete...
   def nameAll(root: Module) {
     root.name = extractClassName(root);
     nameChildren(root);
@@ -535,6 +581,21 @@ abstract class Backend {
     }
   }
 
+  def nameBindings(nameSpace: HashSet[String]) {
+    for (c <- Module.sortedComps ; bind <- c.bindings) {
+      var genName = ""
+      if (bind.targetNode.name != null || bind.targetNode.name != null)
+        genName = bind.targetComponent.name + "_" + bind.targetNode.name
+
+      if(nameSpace contains genName) 
+        genName += ("_" + bind.emitIndex)
+
+      // Not using nameIt to avoid override
+      bind.name = asValidName(genName)
+      bind.named = true;
+    }
+  }
+
   // walk forward from root register assigning consumer clk = root.clock
   def createClkDomain(root: Node, walked: ArrayBuffer[Node]) = {
     val dfsStack = new Stack[Node]
@@ -565,32 +626,45 @@ abstract class Backend {
     /* XXX If we call nameAll here and again further down, we end-up with
      duplicate names in the generated C++.
     nameAll(c) */
-    // Instead, we assign variables names to each node
-    parseVarNames
 
     Module.components.foreach(_.elaborate(0));
 
     /* XXX We should name all signals before error messages are generated
      so as to give a clue where problems are showing up but that interfers
      with the *bindings* (see later comment). */
+    // Now we get variable names for nodes
+    val nameSpace = new HashSet[String]
     for (c <- Module.components)
-      c.markComponent();
+      c markComponent nameSpace
+
     // XXX This will create nodes after the tree is traversed!
     c.genAllMuxes;
-    execute(c, preElaborateTransforms)
-    Module.components.foreach(_.postMarkNet(0));
-    ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
-    // Module.assignResets()
 
+    // set signal signals except bindings because they are not generated.
+    // Bindings are named separately after generated
+    setNames(c)
+
+    // obtain sorted modules before preElaborateTransforms
     levelChildren(c)
     Module.sortedComps = gatherChildren(c).sortWith(
       (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)));
+
+    // We have a high-leve IR here, 
+    // so we can include optimizations
+    // like backannotation, automatic tools
+    // in preElaborateTransforms
+    execute(c, preElaborateTransforms)
+
+    Module.components.foreach(_.postMarkNet(0));
+    ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
+    // Module.assignResets()
 
     assignClockAndResetToModules
     Module.sortedComps.map(_.addDefaultReset)
     c.addClockAndReset
     gatherClocksAndResets
     connectResets
+    nameRsts // name resets here
 
     ChiselError.info("started inference")
     val nbOuterLoops = c.inferAll();
@@ -619,12 +693,15 @@ abstract class Backend {
     ChiselError.info("finished resolving")
 
     // two transforms added in Mem.scala (referenced and computePorts)
+    // then, we have a medium-level IR
+    // include optimizations into transforms
     ChiselError.info("started transforms")
     execute(c, transforms)
     ChiselError.info("finished transforms")
 
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
-    c.traceNodes();
+    c.traceNodes
+    nameBindings(nameSpace)
     val clkDomainWalkedNodes = new ArrayBuffer[Node]
     for (comp <- Module.sortedComps)
       for (node <- comp.nodes)
@@ -632,10 +709,10 @@ abstract class Backend {
             createClkDomain(node, clkDomainWalkedNodes)
     ChiselError.checkpoint()
 
-    /* We execute nameAll after traceNodes because bindings would not have been
+    /* XXX We execute nameAll after traceNodes because bindings would not have been
        created yet otherwise. */
-    nameAll(c)
-    nameRsts
+    // nameAll(c)
+    // nameRsts
 
     execute(c, analyses)
 
@@ -690,7 +767,6 @@ abstract class Backend {
     }
     ChiselError.info(res)
   }
-
 }
 
 
