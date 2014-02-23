@@ -437,6 +437,7 @@ abstract class Backend {
     }
   }
 
+  val nameSpace = new HashSet[String]
   def elaborate(c: Module): Unit = {
     println("backend elaborate")
     Module.setAsTopComponent(c)
@@ -451,7 +452,6 @@ abstract class Backend {
      so as to give a clue where problems are showing up but that interfers
      with the *bindings* (see later comment). */
     // Now we get variable names for nodes
-    val nameSpace = new HashSet[String]
     for (c <- Module.components)
       c markComponent nameSpace
 
