@@ -187,7 +187,10 @@ class DelaySuite extends TestSuite {
         val addr = UInt(INPUT, width = 2)
         val out = UInt(OUTPUT, width = 4)
       }
-      val rom = Vec(UInt(1,width = 4), UInt(2,width = 4), UInt(3,width = 4))
+      val a = UInt(1,width = 4)
+      val b = UInt(2,width = 4)
+      val c = UInt(3,width = 4)
+      val rom = Vec(Array(a,b,c))
       io.out := rom(io.addr)
     }
     chiselMain(Array[String]("--v",
