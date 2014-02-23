@@ -816,7 +816,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
                if (name != "" && elm.name == "") {
                  val idxName = name + '_' + i
                  elm nameIt (backend asValidName idxName, false)
-                 nameSpace += elm.varName
+                 nameSpace += elm.name
                }
              }
            }
@@ -832,7 +832,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
                if (name != "" && elm.name == "") {
                  val idxName = name + '_' + i
                  elm nameIt (backend asValidName idxName, false)
-                 nameSpace += elm.varName
+                 nameSpace += elm.name
                }
              }
            }

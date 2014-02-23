@@ -145,8 +145,6 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] 
   var sortedElementsCache: ArrayBuffer[ArrayBuffer[Data]] = null
   var flattenedVec: Node = null
 
-  override def isVec = true
-
   override def apply(idx: Int): T = self(idx)
 
   def sortedElements: ArrayBuffer[ArrayBuffer[Data]] = {
@@ -313,24 +311,11 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] 
           elm.name
         }
         elm nameIt (prefix + i + suffix, isNamingIO)
-        // if ((!elm.named && !elm.isIo) || (elm.isIo && isNamingIO)) {
-          // elm.name = prefix + i + suffix
-          // elm.named = true
-        // }
       }
     } else {
       /* We are trying to rename a Vec that has a fixed name. */
     }
   }
-
-  /*
-  override def setVarName (name_ : String) {
-    varName = name_
-    for ((elm, i) <- self.zipWithIndex) {
-      elm setVarName (name_ + "_" + i)
-    }
-  }
-  */
 
   override def clone(): this.type =
     Vec.tabulate(size)(gen).asInstanceOf[this.type]

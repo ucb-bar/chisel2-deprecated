@@ -191,7 +191,6 @@ abstract class Node extends nameable {
   private var _isIo = false
   def isIo = _isIo
   def isIo_=(isIo: Boolean) = _isIo = isIo
-  def isVec: Boolean = false
   def isReg: Boolean = false
   def isUsedByRam: Boolean = {
     for (c <- consumers)

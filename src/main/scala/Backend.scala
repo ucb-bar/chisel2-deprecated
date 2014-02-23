@@ -82,41 +82,6 @@ abstract class Backend {
     if(x == 0) "" else "    " + genIndent(x-1);
   }
 
-  // Hack to get variable names of Chisel Nodes
-  // Todo: obsolte...
-  def parseVarNames {
-    /* We are going through all declarations, which can return Nodes,
-     ArrayBuffer[Node], Cell, BlackBox and Modules.
-     Since we call invoke() to get a proper instance of the correct type,
-     we have to insure the method is accessible, thus all fields
-     that will generate C++ or Verilog code must be made public. */
-    for (c <- Module.components ; m <- c.getClass.getDeclaredMethods) {
-      val name = m.getName;
-      val params = m.getParameterTypes;
-      if (params.length == 0 && isPublic(m.getModifiers)) { 
-        (m invoke c) match {
-          case node: nameable => node.setVarName(name)
-          case buf: ArrayBuffer[_] if !buf.isEmpty => {
-            var i = 0
-            buf map {
-              case node: Node => node.setVarName(name + "_" + i)
-              case _ =>
-            }
-          }
-          case buf: collection.IndexedSeq[_] if !buf.isEmpty => {
-            var i = 0
-            buf map {
-              case node: Node => node.setVarName(name + "_" + i)
-              case _ =>
-            }
-          }
-          case mod: Module => mod.moduleName = name
-          case _ =>
-        }
-      }
-    }
-  }
-
   def setNames(top: Module) {
     // First, check whether there are multiple instances of a module
     val classNames = new HashMap[String, ArrayBuffer[Module]]
@@ -147,179 +112,16 @@ abstract class Backend {
       }
     }
 
-    // Next, give names to nodes
-    def nameNode(node: Node) {
-      if (node.varName != "") {
-//        node nameIt asValidName(node.varName, false)
-      } else if (node.name == "") {
-        node match {
-          case _: Reg =>
-//            node nameIt asValidName("R" + node.emitIndex)
-          case _ if !node.isTypeNode => 
-//            node nameIt asValidName("T" + node.emitIndex)
-          case _ =>
-        }
-      }
-    }
-
     // Todo: more efficient way?
     top dfs { node =>
-      if (node.varName != "" && !node.isIo) {
-        node nameIt (asValidName(node.varName), false)
-      }
       if( node.nameHolder != null && node.nameHolder.name != "" &&
           !node.named && !node.isLit ){
         node.name = node.nameHolder.name; // Not using nameIt to avoid override
         node.named = node.nameHolder.named;
         node.nameHolder.name = ""
-      }
-    }
-
-    top dfs { node =>
-      if (!node.isTypeNode && node.name == "") {
+      } else if (!node.isTypeNode && node.name == "") {
         emitRef(node)
-        /*
-        node match {
-          case _: Reg =>
-            node nameIt asValidName("R" + node.emitIndex)
-          case _ => 
-            node nameIt asValidName("T" + node.emitIndex)
-        }
-        */
       }
-    }
-  }
-
-  // Todo: remove it!
-  def nameChildren(root: Module) {
-    // Name all nodes at this level
-    root.io.nameIt("io", true);
-    val nameSpace = new HashSet[String];
-    /* We are going through all declarations, which can return Nodes,
-     ArrayBuffer[Node], Cell, BlackBox and Modules.
-     Since we call invoke() to get a proper instance of the correct type,
-     we have to insure the method is accessible, thus all fields
-     that will generate C++ or Verilog code must be made public. */
-    for (m <- root.getClass().getDeclaredMethods) {
-      val name = m.getName();
-      val types = m.getParameterTypes();
-      if (types.length == 0
-        && isPublic(m.getModifiers()) && !(Module.keywords contains name)) {
-        val o = m.invoke(root);
-        o match {
-         case node: Node => {
-           /* XXX It seems to always be true. How can name be empty? */
-           if ((node.isTypeNode || name != ""
-             || node.name == null || (node.name == "" && !node.named))) {
-             node.nameIt(asValidName(name), false);
-           }
-           nameSpace += node.name;
-         }
-         case buf: ArrayBuffer[_] => {
-           /* We would prefer to match for ArrayBuffer[Node] but that's
-            impossible because of JVM constraints which lead to type erasure.
-            XXX Using Seq instead of ArrayBuffer will pick up members defined
-            in Module that are solely there for implementation purposes. */
-           if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
-             val nodebuf = buf.asInstanceOf[Seq[Node]];
-             var i = 0;
-             for(elm <- nodebuf){
-               if( elm.isTypeNode || elm.name == null || elm.name.isEmpty ) {
-                 /* XXX This code is sensitive to when Bundle.nameIt is called.
-                  Whether it is called late (elm.name is empty) or we override
-                  any previous name that could have been infered,
-                  this has for side-effect to create modules with the exact
-                  same logic but textually different in input/output
-                  parameters, hence generating unnecessary modules. */
-                 elm.nameIt(asValidName(name + "_" + i), false);
-               }
-               nameSpace += elm.name;
-               i += 1;
-             }
-           }
-         }
-         case buf: collection.IndexedSeq[_] => {
-           /* This is a duplicate of ArrayBuffer[_] that was introduced
-            to support VecLike. ArrayBuffer and IndexedSeq have no parent/child
-            relationship. */
-           if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
-             val nodebuf = buf.asInstanceOf[Seq[Node]];
-             var i = 0;
-             for(elm <- nodebuf){
-               if( elm.isTypeNode || elm.name == null || elm.name.isEmpty ) {
-                 /* XXX This code is sensitive to when Bundle.nameIt is called.
-                  Whether it is called late (elm.name is empty) or we override
-                  any previous name that could have been infered,
-                  this has for side-effect to create modules with the exact
-                  same logic but textually different in input/output
-                  parameters, hence generating unnecessary modules. */
-                 elm.nameIt(asValidName(name + "_" + i), false);
-               }
-               nameSpace += elm.name;
-               i += 1;
-             }
-           }
-         }
-         case cell: Cell => {
-           cell.name = asValidName(name);
-           cell.named = true;
-           nameSpace += cell.name;
-         }
-         case bb: BlackBox => {
-           if(!bb.named) {
-             bb.name = name;
-             bb.named = true
-           };
-           nameSpace += bb.name;
-         }
-         case comp: Module => {
-           if(!comp.named) {
-             comp.name = asValidName(name);
-             comp.named = true
-           };
-           nameSpace += comp.name;
-         }
-         case any => {
-           /* We have no idea what to do with class members which are
-            neither of the previous types. Let's discard them. */
-         }
-        }
-      }
-    }
-    /* Recursively name the nodes and components inside this root.
-     This code must be executed between the root-level naming and the naming
-     of bindings otherwise some identifiers will leak into the input/output
-     of a module. */
-    val byNames = new HashMap[String, ArrayBuffer[Module] ];
-    for (c <- root.children) {
-      nameChildren(c);
-      if( c.name.isEmpty ) {
-        /* We don't have a name because we are not dealing with
-         a class member. */
-        val className = extractClassName(c);
-        if( byNames contains className ) {
-          byNames(className).append(c);
-        } else {
-          byNames += (className -> ArrayBuffer[Module](c));
-        }
-      }
-    }
-
-    for( (className, comps) <- byNames ) {
-        if( comps.length > 1 ) {
-          for( (c, index) <- comps.zipWithIndex ) {
-            c.name = className + "_" + index.toString
-          }
-        } else {
-          comps(0).name = className;
-        }
-    }
-
-    for (bind <- root.bindings) {
-      var genName = if (bind.targetNode.name == null || bind.targetNode.name.length() == 0) "" else bind.targetComponent.name + "_" + bind.targetNode.name;
-      if(nameSpace.contains(genName)) genName += ("_" + bind.emitIndex);
-      bind.name = asValidName(genName); // Not using nameIt to avoid override
-      bind.named = true;
     }
   }
 
@@ -327,20 +129,6 @@ abstract class Backend {
    identifier for the targeted backend. */
   def asValidName( name: String ): String = {
     if (keywords.contains(name)) name + "_" else name;
-  }
-
-  // Todo: obsolete...
-  def nameAll(root: Module) {
-    root.name = extractClassName(root);
-    nameChildren(root);
-    for( node <- Module.nodes ) {
-      if( (node.nameHolder != null && !node.nameHolder.name.isEmpty)
-        && !node.named && !node.isInstanceOf[Literal] ){
-        node.name = node.nameHolder.name; // Not using nameIt to avoid override
-        node.named = node.nameHolder.named;
-        node.nameHolder.name = "";
-      }
-    }
   }
 
   def fullyQualifiedName( m: Node ): String = {
@@ -362,7 +150,7 @@ abstract class Backend {
     }
   }
 
- def emitTmp(node: Node): String =
+  def emitTmp(node: Node): String =
     emitRef(node)
 
   def emitRef(node: Node): String = {
@@ -679,7 +467,7 @@ abstract class Backend {
     Module.sortedComps = gatherChildren(c).sortWith(
       (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)));
 
-    // We have a high-leve IR here, 
+    // We have high-leve IRs here, 
     // so we can include optimizations
     // like backannotation, automatic tools
     // in preElaborateTransforms
@@ -723,7 +511,7 @@ abstract class Backend {
     ChiselError.info("finished resolving")
 
     // two transforms added in Mem.scala (referenced and computePorts)
-    // then, we have a medium-level IR
+    // then, we have medium-level IRs
     // include optimizations into transforms
     ChiselError.info("started transforms")
     execute(c, transforms)
@@ -744,12 +532,13 @@ abstract class Backend {
     // nameAll(c)
     // nameRsts
 
-    execute(c, analyses)
-
     for (comp <- Module.sortedComps ) {
       // remove unconnected outputs
       pruneUnconnectedIOs(comp)
     }
+
+    // We have low-level IRs 
+    execute(c, analyses)
 
     ChiselError.checkpoint()
 
@@ -759,6 +548,7 @@ abstract class Backend {
       ChiselError.checkpoint()
       ChiselError.info("NO COMBINATIONAL LOOP FOUND")
     }
+
     if(Module.saveComponentTrace) {
       printStack
     }

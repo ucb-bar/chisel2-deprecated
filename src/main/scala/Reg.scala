@@ -192,8 +192,7 @@ class Reg extends Delay with proc {
     }
   }
 
-  def nameOpt: String = if (name.length > 0) name else varName// "REG"
-  // def nameOpt: String = varName
+  def nameOpt: String = if (name.length > 0) name else Module.backend emitRef this
   override def toString: String = {
     "REG(" + nameOpt + ")"
   }
