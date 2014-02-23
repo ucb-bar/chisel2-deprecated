@@ -1056,12 +1056,12 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     for(i <- 0 until tmem.io.reads.length){
       val readPoint = tmem.io.reads(i)
       val readAddr = readPoint.adr.asInstanceOf[Node]
-      val readData = readPoint.dat.asInstanceOf[Node]
+      val readEn = readPoint.is.asInstanceOf[Node]
       if(!userAnnotatedStages.contains(readAddr)){
         userAnnotatedStages(readAddr) = stage
       }
-      if(!userAnnotatedStages.contains(readData)){
-        userAnnotatedStages(readData) = stage
+      if(!userAnnotatedStages.contains(readEn)){
+        userAnnotatedStages(readEn) = stage
       }
     }
   }
@@ -1504,7 +1504,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         val readData = tMem.io.reads(i).dat
         val readEn = tMem.io.reads(i).is
         readPoint.findStage(readAddr, userAnnotatedStages)
-        readPoint.findStage(readData, userAnnotatedStages)
         readPoint.findStage(readEn, userAnnotatedStages)
         readPoint.inputChiselNodes += readAddr
         readPoint.inputChiselNodes += readEn
@@ -2795,7 +2794,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           val readPoint = m.io.reads(j)
           val readAddr = readPoint.adr
           val readData = readPoint.dat
-          val readStage = getStage(readAddr)
+          val readEn = readPoint.is
+          val readStage = Math.max(getStage(readAddr), getStage(readEn))
           Predef.assert(readStage > -1)
           val writeEnables = getVersions(writeEn.asInstanceOf[Bool], writeStage - readStage + 1)
           val writeAddrs = getVersions(writeAddr.asInstanceOf[Bits], writeStage - readStage + 1)
@@ -2813,7 +2813,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
               }
               val stageValidTemp = Bool()
               stageValidTemp.inputs += stageValids(stage)//hack to deal with empty bool() being merged with what its &&ed with randomly
-              tMemRAWHazards(((readPoint, i, stage))) = stageValidTemp && currentStageWriteEnable && (readAddr === currentStageWriteAddr)
+              tMemRAWHazards(((readPoint, i, stage))) = stageValidTemp && currentStageWriteEnable && readEn && (readAddr === currentStageWriteAddr)
               tMemRAWHazards(((readPoint, i, stage))).nameIt("hazard_num" + raw_counter + "_" +m.name + "_readport_num" + j + "_"+ stage + "_" + writeEn.name)
               raw_counter = raw_counter + 1
               println("found hazard" + writeEn.line.getLineNumber + " " + writeEn.line.getClassName + " " + j + " " + stage + " " + currentStageWriteEnable.name + " " + readAddr.name + " " + currentStageWriteAddr.name + " " + m.name)
@@ -2872,8 +2872,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       APConsumers(tempBitsNode).clear()//TODO may need to fill this in right here; for now, we are relying a call to findAPConsumers after the transformations are done to get the correct APConsumers after this insertion
       
     }
-    
+   
     //generate bypass logic for tmems
+    var delayedBypassDatas: HashMap[(TransactionMem[_], Node), Node] = new HashMap[(TransactionMem[_], Node), Node]
     for((tMem, readPort) <- forwardedMemReadPorts){
       val forwardPoints = new HashMap[(Int, Int), Node]()// map of (writeport number, write stage) -> write data
       val readAddr = readPort.adr
@@ -2901,18 +2902,45 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
           }
         }
       }
+      
+      if(tMem.isSeqRead){
+        for(((i, j), bypassData) <- forwardPoints){
+          if(!delayedBypassDatas.contains(((tMem, bypassData)))){
+            val delayedBypassData = Reg(Bits())
+            delayedBypassData := bypassData.asInstanceOf[Bits]
+            delayedBypassData.comp.asInstanceOf[Reg].clock = this.clock
+            when(this._reset){
+              delayedBypassData := Bits(0)
+            }
+            delayedBypassDatas(((tMem, bypassData))) = delayedBypassData
+          }
+        }
+      }
+      
       val muxMapping = new ArrayBuffer[(Bool, Bits)]()
       for(j <- getStage(readPort.adr) + 1 to pipelineReg.size){
         for(i <- 0 until tMem.io.writes.length){
           if(forwardPoints.contains(((i, j)))){
             val forwardCond = tMemRAWHazards(((readPort.asInstanceOf[RdIO[Data]], i, j)))
-            muxMapping +=((forwardCond, forwardPoints(((i, j))).asInstanceOf[Bits]))
+            var delayedForwardCond:Bool = null
+            if(tMem.isSeqRead){
+              delayedForwardCond = Reg(Bool())
+              delayedForwardCond := forwardCond.asInstanceOf[Bool]
+              delayedForwardCond.comp.asInstanceOf[Reg].clock = this.clock
+              when(this._reset){
+                delayedForwardCond := Bool(false)
+              }
+            }
+            if(tMem.isSeqRead){
+              muxMapping += ((delayedForwardCond, delayedBypassDatas( ((tMem, forwardPoints(((i, j))))) ).asInstanceOf[Bits] ))
+            } else {
+              muxMapping +=((forwardCond, forwardPoints(((i, j))).asInstanceOf[Bits]))
+            }
             tMemRAWHazards -= ((readPort.asInstanceOf[RdIO[Data]], i, j))
             println("added fowarding point (" + readPort.dat.asInstanceOf[Node].name + ", write port #" + i + ", write stage: " + j +  ")")
           }
         }
       }
-      
       val bypassMux = MuxCase(readPort.dat.asInstanceOf[Bits], muxMapping)
       PipelineComponentNodes += bypassMux
       APConsumers(bypassMux) = new ArrayBuffer[(Node, Int)]
