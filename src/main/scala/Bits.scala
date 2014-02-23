@@ -42,6 +42,8 @@ object Bits {
   def apply(x: String, width: Int): UInt = UInt(x, width);
 
   def apply(dir: IODirection = null, width: Int = -1): UInt = UInt(dir, width);
+
+  def DC(width: Int): UInt = UInt.DC(width)
 }
 
 
@@ -52,6 +54,7 @@ abstract class Bits extends Data with proc {
 
   var canBeUsedAsDefault = false
   var dir: IODirection = null;
+  var isModuleIo = false
 
   def create(dir: IODirection, width: Int) {
     this.dir = dir;
@@ -88,26 +91,42 @@ abstract class Bits extends Data with proc {
     else super.litOf
 
   // internal, non user exposed connectors
-  var assigned = false;
-
-
-  override def assign(src: Node) {
-    if(assigned || inputs.length > 0) {
-      ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
-    } else {
-      assigned = true; super.assign(src)
+  def checkAssign(src: Node): Unit = {
+    if (this.component != null) this.component.checkIo
+    if (this.dir == INPUT && this.component == Module.current && this.isModuleIo) {
+      ChiselError.error({"assigning to your own input port " + this + " RHS: " + src});
+    }
+    if (this.dir == OUTPUT && this.component != Module.current &&
+        src.component != null && src.component.parent != this.component) {
+      ChiselError.error({"assigning to a non parent module's output port: " + this + " RHS: " + src});
     }
   }
+  override def assign(src: Node): Unit = {
+    checkAssign(src)
+    if (inputs.isEmpty) inputs += src
+    else ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
+  }
 
-  def procAssign(src: Node) {
-    if (assigned) {
-      ChiselError.error("reassignment to Node");
-    } else {
-      updates += ((genCond(), src))
-    }
+  override def procAssign(src: Node): Unit = {
+    checkAssign(src)
+    if (inputs.isEmpty) updates += ((Module.current.whenCond, src))
+    else ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
   }
 
   //code generation stuff
+
+  // Define nameIt to deal with type nodes before they are removed
+  override def nameIt (path : String, isNamingIO: Boolean) {
+    if (isIo) {
+      super.nameIt(path, isNamingIO)
+    } else if (isTypeNode && comp != null) {
+      comp nameIt (path, isNamingIO)
+    } else if (isTypeNode && !inputs.isEmpty && !inputs.head.isLit) {
+      inputs.head nameIt (path, isNamingIO)
+    } else {
+      super.nameIt(path, isNamingIO)
+    } 
+  }
 
   override def apply(name: String): Data = this
 
@@ -292,6 +311,10 @@ abstract class Bits extends Data with proc {
     }
   }
 
+  override def matchWidth(w: Int): Node =
+    if (isLit && !litOf.isZ) Literal(litOf.value & ((BigInt(1) << w)-1), w)
+    else super.matchWidth(w)
+
   // Operators
   protected final def newUnaryOp(opName: String): this.type = {
     fromNode(UnaryOp(this, opName))
@@ -320,7 +343,7 @@ abstract class Bits extends Data with proc {
         }
       }
       case any =>
-        this.asInstanceOf[Data] := src
+        ChiselError.error("can't assign " + src.toString + " to Bits")
     }
   }
 

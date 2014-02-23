@@ -1,6 +1,16 @@
 #ifndef __IS_EMULATOR__
 #define __IS_EMULATOR__
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#pragma GCC diagnostic ignored "-Wparentheses"
+#pragma GCC diagnostic ignored "-Wreturn-type"
+#pragma GCC diagnostic ignored "-Wchar-subscripts"
+#pragma GCC diagnostic ignored "-Wtype-limits"
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wunused-variable"
+
 #include <assert.h>
 #include <inttypes.h>
 #include <stdio.h>
@@ -26,10 +36,49 @@ typedef uint32_t half_val_t;
 // typedef uint32_t val_t;
 // typedef uint8_t val_t;
 
+union flo2int_t {
+  float  f;
+  val_t  i;
+};
+
+inline float toFloat (val_t x) {
+  flo2int_t f2i;
+  f2i.i = x;
+  return f2i.f;
+}
+
+inline val_t fromFloat (float x) {
+  flo2int_t f2i;
+  f2i.f = x;
+  return f2i.i;
+}
+
+union dbl2int_t {
+  double f;
+  val_t  i;
+};
+
+inline double toDouble (val_t x) {
+  dbl2int_t f2i;
+  f2i.i = x;
+  return f2i.f;
+}
+
+inline val_t fromDouble (double x) {
+  dbl2int_t f2i;
+  f2i.f = x;
+  return f2i.i;
+}
+
+
 #define MASK(v, c) ((v) & -(val_t)(c))
 #define TERNARY(c, t, f) ((f) ^ (((f) ^ (t)) & -(c)))
+#ifndef MIN
 #define MIN(a, b) TERNARY((a) < (b), (a), (b))
+#endif
+#ifndef MAX
 #define MAX(a, b) TERNARY((a) > (b), (a), (b))
+#endif
 #define CLAMP(a, min, max) MAX(MIN(a, max), min)
 
 template<uint32_t x, uint32_t shifted=0, bool sticky=false> struct CeilLog {
@@ -156,14 +205,10 @@ static void rsha_n (val_t d[], val_t s0[], int amount, int nw, int w) {
       d[nw-i-1] = 0;
     }
 
-//   printf("RSHA-N MSB: %d (A %d) NSB %d NSW %d NRSB %d  (NW %d  W %d):", 
-//            msb, amount, n_shift_bits, n_shift_words, n_rev_shift_bits, nw,w);
-//   printf("S: 0x%llx_%llx_%llx  >> %d \n", s0[2],s0[1],s0[0],amount);
   for (int i = nw-1; i >= n_shift_words; i--) {
     val_t val = s0[i];
     d[i-n_shift_words] = val >> n_shift_bits | carry;
     carry              = is_zero_carry ? 0 : val << n_rev_shift_bits;
-//    printf("%d S %16llx D %16llx C %16llx \n", i, val, d[i-n_shift_words], carry);
   }
 
   if (msb == 0) {
@@ -192,14 +237,11 @@ static void rsh_n (val_t d[], val_t s0[], int amount, int nw) {
   int is_zero_carry    = n_shift_bits == 0;
   for (int i = 0; i < n_shift_words; i++)  
     d[nw-i-1] = 0;
-//   printf("RSH-N A %d NSB %d NSW %d NRSB %d NW %d: ", amount, n_shift_bits, n_shift_words, n_rev_shift_bits, nw);
   for (int i = nw-1; i >= n_shift_words; i--) {
     val_t val = s0[i];
     d[i-n_shift_words] = val >> n_shift_bits | carry;
     carry              = is_zero_carry ? 0 : val << n_rev_shift_bits;
-    // printf("%d:S%llx:D%llx:C%llx ", i, val, d[i-n_shift_words], carry);
   }
-  // printf("\n");
 }
 
 static void lsh_n (val_t d[], val_t s0[], int amount, int nwd, int nws) {
@@ -220,11 +262,7 @@ static void lsh_n (val_t d[], val_t s0[], int amount, int nwd, int nws) {
 }
 
 static inline val_t mask_val(int n) {
-  // if (n == val_n_bits())
-  //   return val_all_ones();
-  // else
   val_t res = val_all_ones() >> (val_n_bits()-n);
-  // printf("RES %d %llx\n", n, res);
   return res;
 }
 
@@ -243,22 +281,6 @@ static inline void mask_n (val_t d[], int nw, int nb) {
   if (n_word_bits > 0) 
     d[n_full_words] = mask_val(n_word_bits);
 }
-
-/*
-static const val_t b[] = {0x2, 0xC, 0xF0, 0xFF00, 0xFFFF0000, 0xFFFFFFFF00000000};
-static const val_t S[] = {1, 2, 4, 8, 16, 32};
-
-static inline val_t log2_1 (val_t v) {
-  val_t r = 0; 
-  for (int i = 5; i >= 0; i--) {
-    if (v & b[i]) {
-      v >>= S[i];
-      r |= S[i];
-    } 
-  }
-  return r;
-}
-*/
 
 static inline val_t log2_1 (val_t v) {
   val_t r; 
@@ -986,8 +1008,23 @@ static val_t rand_val()
   return x;
 }
 
+// Abstract dat_t with a basic width-independent interface.
+class dat_base_t {
+ public:
+  // Returns the bitwidth of this data.
+  virtual int width() = 0;
+  virtual string to_str() = 0;  // TODO(ducky): define standardized interface and expected output.
+                                // Also allow different bases and representations (with defaults).
+  virtual bool set_from_str(string val) = 0;    // TODO(ducky): define standardized interface and input format
+                                                // allowing multiple representations (0x, 0h, 0b, ...).
+  virtual dat_base_t* copy() = 0;   // this is an AWFUL hack to get around the awful templating
+                                    // to be able to create an object of the same width
+                                    // for fast compare operations
+  virtual bool equals(dat_base_t& other) = 0;
+};
+
 template <int w>
-class dat_t {
+class dat_t : public dat_base_t {
  public:
   const static int n_words = ((w - 1) / 64) + 1;
   // const static int n_words = (w >> CeilLog<sizeof(val_t)*8>::v) + 1;
@@ -997,6 +1034,17 @@ class dat_t {
   inline bool to_bool ( void ) { return lo_word() != 0; }
   inline val_t lo_word ( void ) { return values[0]; }
   inline unsigned long to_ulong ( void ) { return (unsigned long)lo_word(); }
+  dat_base_t* copy() {
+    return new dat_t<w>(*this);
+  }
+  bool equals(dat_base_t& other) {
+    dat_t<w> *other_ptr = dynamic_cast<dat_t<w>*>(&other);
+    if (other_ptr == NULL) {
+        return false;
+    }
+    dat_t<1> equals = *other_ptr == *this;
+    return equals.values[0];
+  }
   std::string to_str () {
     std::string rres, res;
     int nn = (int)ceilf(w / 4.0);
@@ -1014,6 +1062,9 @@ class dat_t {
       res.push_back(rres[rres.size()-i-1]);
     return res;
   }
+  virtual bool set_from_str(string val) {
+    return dat_from_str(val, *this);
+  }
   void randomize() {
     for (int i = 0; i < n_words; i++)
       values[i] = rand_val();
@@ -1025,36 +1076,16 @@ class dat_t {
     r.randomize();
     return r;
   }
-  inline dat_t<w> () { 
-//     for (int i = 0; i < n_words; i++) 
-//       values[i] = 0; 
+  inline dat_t<w> () {
   }
   template <int sw>
-  inline dat_t<w> (const dat_t<sw>& src) { 
+  inline dat_t<w> (const dat_t<sw>& src) {
     bit_word_funs<n_words>::copy(values, (val_t*)src.values, src.n_words);
-    /*
-    int sww = src.n_words;
-    if (sww > n_words) {
-      for (int i = 0; i < n_words; i++) {
-        // printf("A I %d\n", i); fflush(stdout);
-        values[i] = src.values[i];
-      }
-    } else {
-      for (int i = 0; i < sww; i++) {
-        // printf("B I %d\n", i); fflush(stdout);
-        values[i] = src.values[i];
-      }
-      for (int i = sww; i < n_words; i++) {
-        // printf("C I %d\n", i); fflush(stdout);
-        values[i] = 0;
-      }
-    }
-    */
+    if (sw != w && val_n_word_bits(w))
+      values[n_words-1] &= mask_val(val_n_word_bits(w));
   }
   inline dat_t<w> (const dat_t<w>& src) { 
     bit_word_funs<n_words>::set(values, (val_t*)src.values);
-    // for (int i = 0; i < n_words; i++) 
-    //   values[i] = src.values[i];
   }
   inline dat_t<w> (val_t val) { 
     values[0] = val; 
@@ -1065,7 +1096,6 @@ class dat_t {
   template <int sw>
   dat_t<w> mask(dat_t<sw> fill, int n) {
     dat_t<w> res;
-    // const int nw = (dw - 1)/val_n_bits() + 1;
     bit_word_funs<n_words>::mask(res.values, n);
     return res;
   }
@@ -1157,19 +1187,16 @@ class dat_t {
     dat_t<1> res;
     bit_word_funs<n_words>::gtu(res.values, values, o.values);
     return res;
-    // return o < *this;
   }
   dat_t<1> operator >= ( dat_t<w> o ) {
     dat_t<1> res;
     bit_word_funs<n_words>::gteu(res.values, values, o.values);
     return res;
-    // return !(*this < o);
   }
   dat_t<1> operator <= ( dat_t<w> o ) {
     dat_t<1> res;
     bit_word_funs<n_words>::lteu(res.values, values, o.values);
     return res;
-    // return !(o < *this);
   }
   inline dat_t<1> gt ( dat_t<w> o ) {
     dat_t<1> res;
@@ -1234,37 +1261,16 @@ class dat_t {
     return res;
   }
   dat_t<w> operator << ( int amount ) {
-    // TODO: TOO MANY CASES
     dat_t<w> res;  
-    // if (amount >= w) {
-    // bit_word_funs<n_words>::fill(res.values, 0);
-    // } else if ((amount % val_n_bits()) == 0) {
-    // int n_shift_words = amount / val_n_bits();
-    // for (int i = 0; i < n_shift_words; i++) 
-    // res.values[i] = 0;
-    // for (int i = 0; i < (n_words-n_shift_words); i++) 
-    // res.values[i+n_shift_words] = values[i];
-    // } else {
-      bit_word_funs<n_words>::lsh(res.values, values, amount);
-    // }
+    bit_word_funs<n_words>::lsh(res.values, values, amount);
     return res;
   }
   inline dat_t<w> operator << ( dat_t<w> o ) {
     return *this << o.lo_word();
   }
   dat_t<w> operator >> ( int amount ) {
-    // TODO: GET RID OF CASES
-    //printf(">> called\n");
     dat_t<w> res;  
-    // if (amount >= w) {
-    // bit_word_funs<n_words>::fill(res.values, 0);
-    // } else if ((amount % val_n_bits()) == 0) {
-    // int n_shift_words = amount / val_n_bits();
-    // for (int i = n_words-1; i >= n_shift_words; i--) 
-    // res.values[i-n_shift_words] = values[i];
-    // } else {
-      bit_word_funs<n_words>::rsh(res.values, values, amount);
-    // }
+    bit_word_funs<n_words>::rsh(res.values, values, amount);
     return res; 
   }
   inline dat_t<w> operator >> ( dat_t<w> o ) {
@@ -1282,8 +1288,6 @@ class dat_t {
   }
   dat_t<w> fill_bit( val_t bit ) { 
     dat_t<w> res;
-    // const val_t val_0s_1s[2] = { 0L, ~(val_t)0L };
-    // bit_word_funs<n_words>::fill_nb(res.values, val_0s_1s[bit], w);
     val_t word = 0L - bit;
     bit_word_funs<n_words>::fill_nb(res.values, word, w);
     return res;
@@ -1305,40 +1309,16 @@ class dat_t {
     } else {
       return res.fill_byte(lo_word(), w, n);
     }
-    // FASTER VERSION BELOW BUT ABOVE SHOULD GET RID OF BRANCHES
-    /*
-    if (lo_word()) {
-      return mask<n>();
-    } else {
-      return DAT<n>(0);
-    } 
-    */
-      // // TODO: finish this
-      // dat_t<dw> d0(0);
-      // printf("ERROR UNIMPLEMENTED FILL\n");
-      // return d0;
-      // }
   }
   template <int dw, int nw>
   dat_t<dw> fill( dat_t<nw> n ) { 
     // TODO: GET RID OF IF'S
-    // if (w == 1) {
     dat_t<dw> res;
     if (w == 1) {
       return res.fill_bit(lo_word()&1);
     } else {
       return res.fill_byte(lo_word(), w, n);
     }
-    // if (lo_word()) {
-    //   return mask<dw>(n.lo_word());
-    // } else {
-    //   return DAT<dw>(0);
-    // } 
-      // // TODO: finish this
-      // dat_t<dw> d0(0);
-      // printf("ERROR UNIMPLEMENTED FILL\n");
-      // return d0;
-      // }
   }
   template <int dw>
   dat_t<dw> extract() {
@@ -1381,7 +1361,6 @@ class dat_t {
     return res;
   }
   inline dat_t<1> bit(val_t b) { 
-    //printf("%llx\n", b);
     int n_full_words = val_n_full_words(b);
     int n_word_bits  = val_n_word_bits(b);
     return DAT<1>((values[n_full_words] >> n_word_bits)&1); 
@@ -1404,9 +1383,13 @@ std::string dat_to_str(const dat_t<w>& x) {
   return s;
 }
 
+static __inline__ int n_digits(int w, int base) {
+  return (int)ceil(log(2)/log(base)*w);
+}
+
 template <int w>
 int dat_to_str(char* s, dat_t<w> x, int base = 16, char pad = '0') {
-  int n_digs = (int)ceil(log(2)/log(base)*w);
+  int n_digs = n_digits(w, base);
   int j = n_digs-1, digit;
 
   do {
@@ -1426,7 +1409,7 @@ int dat_to_str(char* s, dat_t<w> x, int base = 16, char pad = '0') {
   return n_digs;
 }
 
-static int dat_to_str(char* s, val_t x, int base = 16, char pad = '0') {
+static __inline__ int dat_to_str(char* s, val_t x, int base = 16, char pad = '0') {
   return dat_to_str<sizeof(val_t)*8>(s, dat_t<sizeof(val_t)*8>(x), base, pad);
 }
 
@@ -1438,8 +1421,28 @@ int fix_to_str(char* s, dat_t<w> x, int base = 16, char pad = '0') {
   return len+1;
 }
 
-static int fix_to_str(char* s, val_t x, int base = 16, char pad = '0') {
+static __inline__ int fix_to_str(char* s, val_t x, int base = 16, char pad = '0') {
   return fix_to_str(s, dat_t<sizeof(val_t)*8>(x), base, pad);
+}
+
+static __inline__ int flo_digits(int m, int e) {
+  return 2 + n_digits(m, 10) + 2 + n_digits(e, 10);
+}
+
+template <int w>
+int flo_to_str(char* s, dat_t<w> x, char pad = ' ') {
+  char buf[1000];
+  int n_digs = (w == 32) ? flo_digits(32, 8) : flo_digits(52, 11);
+  double val = (w == 32) ? toFloat(x.values[0]) : toDouble(x.values[0]);
+  // sprintf(buf, "%d %d%*e", w, n_digs, n_digs, val);
+  sprintf(buf, "%*e", n_digs, val);
+  assert(strlen(buf) <= n_digs);
+  for (int i = 0; i < n_digs; i++)
+    s[i] = (i < strlen(buf)) ? buf[i] : pad;
+  s[n_digs] = 0;
+  // printf("N-DIGS = %d BUF %lu PAD %lu\n", n_digs, strlen(buf), n_digs-strlen(buf));
+  // return strlen(buf);
+  return n_digs;
 }
 
 template <int w>
@@ -1455,12 +1458,12 @@ int dat_as_str(char* s, const dat_t<w>& x) {
   return w/8;
 }
 
-static int dat_as_str(char* s, val_t x) {
+static __inline__ int dat_as_str(char* s, val_t x) {
   return dat_as_str(s, dat_t<sizeof(val_t)*8>(x));
 }
 
 #if __cplusplus >= 201103L
-static void dat_format(char* s, const char* fmt)
+static void __attribute__((unused)) dat_format(char* s, const char* fmt)
 {
   for (char c; (c = *fmt); fmt++) {
     if (c == '%' && *++fmt != '%')
@@ -1475,6 +1478,7 @@ static void dat_format(char* s, const char* fmt, T value, Args... args)
   while (*fmt) {
     if (*fmt == '%') {
       switch(fmt[1]) {
+        case 'e': s += flo_to_str(s, value, ' '); break;
         case 'h': s += dat_to_str(s, value, 16, '0'); break;
         case 'b': s += dat_to_str(s, value, 2, '0'); break;
         case 'd': s += dat_to_str(s, value, 10, ' '); break;
@@ -1529,18 +1533,14 @@ inline dat_t<w> mux ( dat_t<1> t, dat_t<w> c, dat_t<w> a ) {
   dat_t<w> mask;
   bit_word_funs<val_n_words(w)>::fill(mask.values, -t.lo_word());
   return a ^ ((a ^ c) & mask);
-  // return t.lo_word() != 0 ? c : a; 
 }
 
 template <int w>
 class datz_t : public dat_t<w> {
  public:
   dat_t<w> mask;
-  // dat_t<1> EQZ ( dat_t<w> o ) {
   inline dat_t<1> operator == ( dat_t<w> o ) {
     dat_t<w> masked = (o & mask);
-    // printf("(VAL=%lx & MASK=%lx) = %lx == PAT=%lx => %d\n",
-    //        o.to_ulong(), mask.to_ulong(), masked.to_ulong(), this->to_ulong(), ((o & mask) == *this).to_bool());
     return (o & mask) == (dat_t<w>)*this;
   }
 };
@@ -1582,10 +1582,29 @@ inline dat_t<1> reduction_xor(dat_t<w1> d) {
   return res;
 }
 
+// Abstract mem_t with a basic width- and size-independent interface.
+class mem_base_t {
+ public:
+  // Returns the bitwidth of each memory element
+  virtual int width() = 0;
+  // Returns the number of elements in this memory
+  virtual int length() = 0;
+  virtual string get_to_str(string index) = 0;  // TODO(ducky): standardize (see dat_base_t).
+  virtual bool put_from_str(string index, string val) = 0;   // TODO(ducky): standardize (see dat_base_t).
+};
+
 template <int w, int d>
-class mem_t {
+class mem_t : public mem_base_t {
  public:
   dat_t<w> contents[d];
+  
+  int width() {
+    return w; 
+  }
+  int length() {
+    return d;
+  }
+  
   template <int iw>
   dat_t<w> get (dat_t<iw> idx) {
     return get(idx.lo_word() & (nextpow2_1(d)-1));
@@ -1600,6 +1619,11 @@ class mem_t {
       return rand_val() & (word == val_n_words(w) && val_n_word_bits(w) ? mask_val(w) : -1L);
     return contents[idx].values[word];
   }
+  string get_to_str(string index) {
+    dat_t<w> val = get(atoi(index.c_str()));
+    return val.to_str();
+  }
+  
   template <int iw>
   void put (dat_t<iw> idx, dat_t<w> val) {
     put(idx.lo_word(), val);
@@ -1612,6 +1636,18 @@ class mem_t {
     if (ispow2(d) || idx < d)
       contents[idx].values[word] = val;
   }
+  bool put_from_str(string index, string val) {
+    int i = atoi(index.c_str());
+    if (i > length()) {
+        cout << "mem_t::put_from_str: Index " << index << " out of range (max: " << length() << ")" << endl;
+        return false;
+    }
+    dat_t<w> dat_val;
+    dat_val.set_from_str(val);
+    put(i, dat_val);
+    return true;
+  }
+  
   void print ( void ) {
     for (int j = 0; j < d/4; j++) {
       for (int i = 0; i < 4; i++) {
@@ -1640,7 +1676,6 @@ class mem_t {
     for (int addr = 0; addr < d && !ifp.eof();) {
       getline(ifp, hex_line);
       if (dat_from_hex(hex_line, hex_dat) > 0) {
-	// printf("Mem[%d] = %x\n", addr, hex_dat.values[0]);
 	contents[addr++] = hex_dat;
       }
     }
@@ -1649,7 +1684,6 @@ class mem_t {
   }
 };
 
-static char hex_to_char[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
 static int  char_to_hex[] = { 
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 
@@ -1746,6 +1780,102 @@ size_t dat_from_hex(std::string hex_line, dat_t<w>& res, size_t offset = 0) {
   return last_digit + 1;
 }
 
+/**
+ * Copy one val_t array to another.
+ * nb must be the exact number of bits the val_t represents.
+ */
+static void val_cpy(val_t* dst, val_t* src, int nb) {
+    for (int i=0; i<val_n_words(nb); i++) {
+        dst[i] = src[i];
+    }
+}
+
+/**
+ * Empty a val_t array (sets to zero).
+ * nb must be the exact number of bits the val_t represents.
+ */
+static void val_empty(val_t* dst, int nb) {
+    for (int i=0; i<val_n_words(nb); i++) {
+        dst[i] = 0;
+    }
+}
+
+/**
+ * Set a val_t array to a integer number. Obviously, the maximum integer
+ * is capped by the width of a single val_t element.
+ * nb must be the exact number of bits the val_t represents.
+ */
+static void val_set(val_t* dst, val_t nb, val_t num) {
+    val_empty(dst, nb);
+    dst[0] = num;
+}
+
+/**
+ * Creates a dat_t from a std::string, where the string radix is automatically determined
+ * from the string, or defaults to 10.
+ * Returns true on success and false on failure.
+ */
+template <int w>
+bool dat_from_str(std::string in, dat_t<w>& res, int pos = 0) {
+    int radix = 10;
+    
+    if (!in.substr(pos, 1).compare("d")) {
+        radix = 10;
+        pos++;
+    } else if (!in.substr(pos, 1).compare("h")
+               || !in.substr(pos, 1).compare("x")) {
+        radix = 16;
+        pos++;
+    } else if (!in.substr(pos, 2).compare("0h")
+               || !in.substr(pos, 2).compare("0x")) {
+        radix = 16;
+        pos += 2;
+    } else if (!in.substr(pos, 1).compare("b")) {
+        radix = 2;
+        pos++;
+    } else if (!in.substr(pos, 2).compare("0b")) {
+        radix = 2;
+        pos += 2;
+    }
+    
+    val_t radix_val = radix;
+    val_t temp_prod[val_n_words(w)];
+    val_t curr_base[val_n_words(w)];
+    val_t temp_alias[val_n_words(w)];
+    val_t *dest_val = res.values;
+    val_set(curr_base, w, 1);
+    val_empty(dest_val, w);
+    
+    for (int rpos=in.length()-1; rpos>=pos; rpos--) {
+        char c = in[rpos];
+        val_t c_val = 0;
+        if (c == '_') {
+            continue;
+        }
+        if (c >= '0' && c <= '9') {
+            c_val = c - '0';
+        } else if (c >= 'a' && c <= 'z') {
+            c_val = c - 'a' + 10;
+        } else if (c >= 'A' && c <= 'Z') {
+            c_val = c - 'A' + 10;
+        } else {
+            cout << "dat_from_str: Invalid character '" << c << "'" << endl;
+            return false;
+        }
+        if (c_val > radix /* || c_val < 0 */) {
+            cout << "dat_from_str: Invalid character '" << c << "'" << endl;
+            return false;
+        }
+        
+        mul_n(temp_prod, curr_base, &c_val, w, w, val_n_bits());
+        val_cpy(temp_alias, dest_val, w);   // copy to prevent aliasing on add
+        add_n(dest_val, temp_alias, temp_prod, val_n_words(w), w);
+        val_cpy(temp_alias, curr_base, w);
+        mul_n(curr_base, temp_alias, &radix_val, w, w, val_n_bits());
+    }
+    return true;
+}
+
 template <int w>
 void dat_dump (FILE* file, dat_t<w> val, const char* name) {
   int namelen = strlen(name), pos = 0;
@@ -1792,15 +1922,178 @@ void dat_dump (FILE* file, mem_t<w,d> val, std::string name) {
 
 template <int w, int d> mem_t<w,d> MEM( void );
 
+struct debug_node_t {
+    string name;
+    dat_base_t* dat_ptr;
+    
+    debug_node_t(string in_name, dat_base_t* in_ptr) :
+        name(in_name), dat_ptr(in_ptr) {
+    }
+};
+
+struct debug_mem_t {
+    string name;
+    mem_base_t* mem_ptr;
+    
+    debug_mem_t(string in_name, mem_base_t* in_ptr) :
+        name(in_name), mem_ptr(in_ptr) {
+    }
+};
+
+// Generic templatized function to return a list of names in either a
+// debug_node_t or debug_mem_t.
+template<typename T> vector<string> get_list_names(vector<T>* in_vec) {
+  vector<string> out;
+  typedef typename vector<T>::iterator iter_t;
+  for (iter_t it = in_vec->begin(); it != in_vec->end(); ++it) {
+    out.push_back(it->name);
+  }
+  return out;
+}
+
+// Generic templatized function to return an element pointer from a list
+// given a name. Returns NULL if no match is found.
+template<typename T> T* get_list_elem(vector<T>* in_vec, string name) {
+  typedef typename vector<T>::iterator iter_t;
+  for (iter_t it = in_vec->begin(); it != in_vec->end(); ++it) {
+    if (it->name == name) {
+      return &(*it);
+    }    
+  }
+  return NULL;
+}
+
 class mod_t {
  public:
   std::vector< mod_t* > children;
-  virtual void init ( void ) { };
+  virtual void init ( bool rand_init=false ) { };
   virtual void clock_lo ( dat_t<1> reset ) { };
   virtual void clock_hi ( dat_t<1> reset ) { };
+  
   virtual void print ( FILE* f ) { };
   virtual bool scan ( FILE* f ) { return true; };
   virtual void dump ( FILE* f, int t ) { };
+  
+  virtual void init_debug_interface ( ) { };
+  
+  // Lists containing node/mem names to pointers, to be populated by init().
+  vector<debug_node_t> nodes;
+  vector<debug_mem_t> mems;
+  
+  // Returns a list of all nodes accessible by the debugging interface.
+  virtual vector<string> get_nodes() {
+    return get_list_names<debug_node_t>(&nodes);
+  }
+  // Returns a list of all memory objects accessible by the debugging interface.
+  virtual vector<string> get_mems() {
+    return get_list_names<debug_mem_t>(&mems);
+  }
+  // Reads the value on a node. Returns empty on error.
+  virtual string node_read(string name) {
+    debug_node_t* node = get_list_elem<debug_node_t>(&nodes, name);
+    if (node != NULL) {
+      return node->dat_ptr->to_str();
+    } else {
+      cout << "mod_t::node_read: Unable to find node '" << name << "'" << endl;
+      return "";
+    }
+  }
+  // Writes a value to a node. Returns true on success and false on error.
+  // Recommended to only be used on state elements.
+  virtual bool node_write(string name, string val) {
+    debug_node_t* node = get_list_elem<debug_node_t>(&nodes, name);
+    if (node != NULL) {
+      bool success = node->dat_ptr->set_from_str(val);
+      clock_lo(dat_t<1>(0));
+      return success;
+    } else {
+      cout << "mod_t::node_write: Unable to find node '" << name << "'" << endl;
+      return false;
+    }
+  }
+  // Reads the an element from a memory.
+  virtual string mem_read(string name, string index) {
+    debug_mem_t* mem = get_list_elem<debug_mem_t>(&mems, name);
+    if (mem != NULL) {
+      return mem->mem_ptr->get_to_str(index);
+    } else {
+      cout << "mod_t::mem_read: Unable to find mem '" << name << "'" << endl;
+      return "";
+    }
+  }
+  // Writes an element to a memory.
+  virtual bool mem_write(string name, string index, string val) {
+    debug_mem_t* mem = get_list_elem<debug_mem_t>(&mems, name);
+    if (mem != NULL) {
+      bool success = mem->mem_ptr->put_from_str(index, val);
+      clock_lo(dat_t<1>(0));
+      return success;
+    } else {
+      cout << "mod_t::mem_write: Unable to find mem '" << name << "'" << endl;
+      return false;
+    }
+  }
+  
+  // Clocks in a reset
+  virtual void reset() {
+    clock_lo(dat_t<1>(1));
+    clock_hi(dat_t<1>(1));
+    clock_lo(dat_t<1>(1));
+  }
+  
+  // Clocks one cycle
+  virtual void cycle() {
+    clock_lo(dat_t<1>(0));
+    clock_hi(dat_t<1>(0));
+    clock_lo(dat_t<1>(0));
+  }
+  
+  // Clocks until a node is equal to the value.
+  // Returns the number of cycles executed or -1 if the maximum was exceeded
+  // or -2 if some error was encountered.
+  virtual int clock_until_node_equal(string name, string val, int max=1000000) {
+    int cycles = 0;
+    debug_node_t* node = get_list_elem<debug_node_t>(&nodes, name);
+    dat_base_t* target_dat = node->dat_ptr;
+    dat_base_t* target_val = target_dat->copy();
+    target_val->set_from_str(val);
+    
+    while (true) {
+        if (target_dat->equals(*target_val)) {
+            return cycles;
+        } else {
+            cycles++;
+            cycle();
+            if (cycles >= max) {
+                return -1;
+            }
+        }
+    }
+  }
+  
+  // Clocks until a node is equal to the value.
+  // Returns the number of cycles executed or -1 if the maximum was exceeded
+  // or -2 if some error was encountered.
+  virtual int clock_until_node_not_equal(string name, string val, int max=1000000) {
+    int cycles = 0;
+    debug_node_t* node = get_list_elem<debug_node_t>(&nodes, name);
+    int w = node->dat_ptr->width();
+    dat_base_t* target_dat = node->dat_ptr;
+    dat_base_t* target_val = target_dat->copy();
+    target_val->set_from_str(val);
+    
+    while (true) {
+        if (!target_dat->equals(*target_val)) {
+            return cycles;
+        } else {
+            cycles++;
+            cycle();
+            if (cycles >= max) {
+                return -1;
+            }
+        }
+    }
+  }
 };
 
 #define ASSERT(cond, msg) { \
@@ -1808,4 +2101,5 @@ class mod_t {
     throw std::runtime_error("Assertion failed: " msg); \
 }
 
+#pragma GCC diagnostic pop
 #endif

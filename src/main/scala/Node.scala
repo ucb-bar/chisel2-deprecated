@@ -39,18 +39,15 @@ import java.io.PrintStream
 import Node._;
 import ChiselError._;
 
+import java.lang.Double.longBitsToDouble
+import java.lang.Float.intBitsToFloat
+
 object Node {
   def sprintf(message: String, args: Node*): Bits = {
     val s = Bits().fromNode(new Sprintf(message, args))
     s.setIsTypeNode
     s
   }
-
-  var isCoercingArgs = true;
-  val conds = new Stack[Bool]();
-  conds.push(Bool(true));
-  // XXX ??
-  val keys  = new Stack[Bits]();
 
   var isInGetWidth = false
 
@@ -162,8 +159,8 @@ abstract class Node extends nameable {
     inferWidth = fixWidth(w);
   }
 
-  def nameIt (path: String) {
-    if( !named ) {
+  def nameIt (path: String, isNamingIO: Boolean) {
+    if( (!named && !isIo) || (isIo && isNamingIO) ) {
       /* If the name was set explicitely through *setName*,
        we don't override it. */
       name = path;
@@ -171,42 +168,37 @@ abstract class Node extends nameable {
   }
 
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
-  def ##(b: Node): Node  = Op("##", 2, sumWidth _,  this, b );
+  def ##(b: Node): Node  = Op("##", sumWidth _,  this, b );
   def maxNum: BigInt = {
     // XXX This makes sense for UInt, but not in general.
     val w = if (width < 0) inferWidth(this) else width
     litValue((BigInt(1) << w) - 1)
   }
-  def minNum: BigInt = BigInt(0);
+  def minNum: BigInt = litValue(0)
   def isLit: Boolean = false
   def litOf: Literal = null
   def litValue(default: BigInt = BigInt(-1)): BigInt =
     if (isLit) litOf.value
     else default
   def value: BigInt = BigInt(-1);
+  def floValue: Float = intBitsToFloat(value.toInt)
+  def dblValue: Double = longBitsToDouble(value.toLong)
+  def floLitValue: Float = intBitsToFloat(litValue().toInt)
+  def dblLitValue: Double = longBitsToDouble(litValue().toLong)
   def bitSet(off: UInt, dat: UInt): UInt = {
     val bit = UInt(1, 1) << off;
     (this.asInstanceOf[UInt] & ~bit) | (dat << off);
   }
   // TODO: MOVE TO WIRE
-  def assign(src: Node) {
-    if (inputs.length > 0) {
-      inputs(0) = src;
-    } else {
-      inputs += src;
-    }
-  }
-  def <>(src: Node) {
-    this assign src
-  }
-  def ^^(src: Node) {
-    src assign this;
-  }
+  def assign(src: Node): Unit = throw new Exception("unimplemented assign")
+  def <>(src: Node): Unit = throw new Exception("unimplemented <>")
+  def ^^(src: Node): Unit = src <> this
+
   def getLit: Literal = this.asInstanceOf[Literal]
   private var _isIo = false
   def isIo = _isIo
   def isIo_=(isIo: Boolean) = _isIo = isIo
-  def isReg: Boolean = false;
+  def isReg: Boolean = false
   def isUsedByRam: Boolean = {
     for (c <- consumers)
       if (c.isRamWriteInput(this)) {
@@ -218,8 +210,7 @@ abstract class Node extends nameable {
   def initOf (n: String, width: (Node) => Int, ins: List[Node]): Node = {
     name = n;
     inferWidth = width;
-    for (i <- ins)
-      inputs += i;
+    inputs ++= ins
     this
   }
   def init (n: String, width: (Node) => Int, ins: Node*): Node = {
@@ -254,8 +245,8 @@ abstract class Node extends nameable {
   }
   def isInObject: Boolean =
     (isIo && (Module.isIoDebug || component == Module.topComponent)) ||
-    Module.topComponent.debugs.contains(this) ||
-    isReg || isUsedByRam || Module.isDebug || isPrintArg || isScanArg;
+    Module.topComponent.debugs.contains(this) || isPrintArg || isScanArg ||
+    isReg || isUsedByRam || Module.isDebug && !name.isEmpty
 
   def isInVCD: Boolean = width > 0 &&
     ((isIo && isInObject) || isReg || (Module.isDebug && !name.isEmpty))
@@ -510,4 +501,10 @@ abstract class Node extends nameable {
     index
   }
 
+  override val hashCode: Int = System.identityHashCode(this)
+  override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
+
+  def canCSE: Boolean = false
+  def hashCodeForCSE: Int = inputs.head.hashCode
+  def equalsForCSE(x: Node): Boolean = false
 }

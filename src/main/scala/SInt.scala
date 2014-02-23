@@ -46,7 +46,7 @@ object SInt {
   }
 }
 
-class SInt extends Bits {
+class SInt extends Bits with Num[SInt] {
   type T = SInt;
 
   /** Factory method to create and assign a *SInt* type to a Node *n*.
@@ -112,10 +112,10 @@ class SInt extends Bits {
   def -  (b: SInt): SInt = newBinaryOp(b, "-");
 
   //SInt to UInt arithmetic
-  def +   (b: UInt): SInt = this + b.zext;
-  def -   (b: UInt): SInt = this - b.zext;
-  def *   (b: UInt): SInt = newBinaryOp(b.zext, "s*u");
-  def /   (b: UInt): SInt = newBinaryOp(b.zext, "s/u");
-  def %   (b: UInt): SInt = newBinaryOp(b.zext, "s%u");
+  def * (b: UInt): SInt = newBinaryOp(b.zext, "s*u")
+  def + (b: UInt): SInt = this + b.zext
+  def - (b: UInt): SInt = this - b.zext
+  def / (b: UInt): SInt = this / b.zext
+  def % (b: UInt): SInt = this % b.zext
   def abs: UInt = Mux(this < SInt(0), (-this).toUInt, this.toUInt)
 }

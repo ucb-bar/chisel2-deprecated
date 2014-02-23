@@ -32,10 +32,6 @@ object nodeToString {
         if (op.inputs.length == 1) op.op + "(" + nodeToString(op.inputs(0)) + ")"
         else if (op.op == "Mux") "[ " + nodeToString(op.inputs(0)) + " ] ? [ " + nodeToString(op.inputs(1)) + " ] : [ " + nodeToString(op.inputs(2)) + " ]"
         else "[ " + nodeToString(op.inputs(0)) + " ] " + op.op + " [ " + nodeToString(op.inputs(1)) + " ]"
-      case cat   : Cat       => 
-        { "{ " + ((nodeToString(cat.inputs.head) /: cat.inputs.tail) (_ + ", " + nodeToString(_))) + " }" }
-      case fill  : Fill      =>
-        { "Fill(" + nodeToString(fill.inputs(0)) + ", " + nodeToString(fill.n) + ")" }
       case ext   : Extract   => 
         val hi: String = nodeToString(ext.hi)
         val lo: String = nodeToString(ext.lo) 
@@ -43,7 +39,7 @@ object nodeToString {
       case bind  : Binding   => "Binding(" + nodeToString(bind.inputs(0)) + ")"
       case mem   : Mem[_]    => "Mem(%s)".format(mem.name)
       case memacc: MemAccess => nodeToString(memacc.mem) + "[" + nodeToString(memacc.addr) + "]"
-      case rom   : ROM[_]    => "ROM(%s)".format(rom.name) 
+      // case rom   : ROM[_]    => "ROM(%s)".format(rom.name) 
       case romread: ROMRead[_] => nodeToString(romread.rom) + "[" + nodeToString(romread.addr) + "]"
       case clk   : Clock     => "Clock(%s)".format(clk.name)
       case _ => if (node == null) "" else node.toString
@@ -54,34 +50,8 @@ object nodeToString {
 trait Backannotation extends Backend {
   val targetdir = ensureDir(Module.targetDir)
 
-  preElaborateTransforms += ((c: Module) => c.genAllMuxes)
-  preElaborateTransforms += ((c: Module) => nameAll(c))
-  preElaborateTransforms += ((c: Module) => c bfs (x => if(!x.isTypeNode) emitRef(x)))
- 
-  // TODO: remove them 
-  /*
-  preElaborateTransforms += ((c: Module) => levelChildren(c))
-  preElaborateTransforms += ((c: Module) => 
-    Module.sortedComps = gatherChildren(c).sortWith(
-      (x, y) => (x.level < y.level || 
-          (x.level == y.level && x.traversal < y.traversal) ) ) )
-  preElaborateTransforms += ((c: Module) => Module.sortedComps map (_.addDefaultReset))
-  preElaborateTransforms += ((c: Module) => connectResets)
-  preElaborateTransforms += ((c: Module) => c.inferAll)
-  preElaborateTransforms += ((c: Module) => c.forceMatchingWidths)
-  preElaborateTransforms += ((c: Module) => c.removeTypeNodes)
-  preElaborateTransforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
-  preElaborateTransforms += ((c: Module) => nameAll(c))
-  */
-
-  // Todo: no recursion
-  protected def getParentNames(m: Module, delim: String = "/"): String = {
-    if (m == Module.topComponent) emitRef(m) + delim
-    else getParentNames(m.parent) + emitRef(m) + delim
-  }
-
-  protected def getSignalName(n: Node, delim: String = "/"): String = {
-    if (n == null) "null" else getParentNames(n.componentOf, delim) + emitRef(n)
+  protected def getSignalPathName(n: Node, delim: String = "/"): String = {
+    if (n == null) "null" else (n.component getPathName delim) + emitRef(n)
   }
 
   protected def copyResource(filename: String, toDir: String) {
@@ -89,97 +59,12 @@ trait Backannotation extends Backend {
     if (resourceStream != null) {
       val file =  new java.io.FileWriter(toDir+filename)
       while(resourceStream.available > 0) {
-        file write (resourceStream read)
+        file write (resourceStream.read)
       }
       file.close
       resourceStream.close 
     } else {
       ChiselError.info("Critical Error: we should be able to access resource/" + filename)
-    }
-  }
-}
-
-trait SignalBackannotation extends Backannotation {
-  val signals = new HashSet[Node]
-
-  preElaborateTransforms += ((c: Module) => annotateSignals(c))
-  // analyses += ((c: Module) => reportSignals(c))
-
-  private def annotateSignals(m: Module) {
-    ChiselError.info("Backannotation: annotate signals")
-
-    // Read the signal list file
-    // TODO: generalize the signal file format
-    val lines = Source.fromFile(Module.signalFilename).getLines
-    val TermRegex = """\s*([\w\._\:]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)""".r
-    val signalNames = new HashSet[String]
-
-    for (line <- lines) {
-      line match {
-        case TermRegex(exp, coeff, se, tstat, pvalue) => {
-          val vars = exp split ":"
-          if (tstat != "NaN" && pvalue != "NaN") {
-            signalNames ++= vars
-          }
-        }
-        case _ =>
-      }
-    }
-
-    // Find correspoinding nodes
-    m bfs { node =>
-      if (!node.isTypeNode) {
-        val signalName = getSignalName(node, ".")
-        if (signalNames contains signalName) {
-          signals += node
-        }
-      }
-    }
-
-    // For resets
-    for (m <- Module.components) {
-      val reset = m.reset
-      val resetName = getSignalName(reset, ".")
-      if (signalNames contains resetName) {
-        signals += reset
-      }
-    }
-  }
-
-  // TODO: elaborate it
-  private def reportSignals(m: Module) {
-    val rptdir  = ensureDir(targetdir+"report")
-    val rptfile = new java.io.FileWriter(rptdir+"%s_signal.rpt".format(m.name))
-    val report = new StringBuilder();
-
-    ChiselError.info("Backannotation: report annotated signals")
-
-    report append "\t\t+-------------------------------------+\n"
-    report append "\t\t|     Signal and Conter Report        |\n"
-    report append "\t\t|                     by Donggyu Kim  |\n"
-    report append "\t\t+-------------------------------------+\n\n"
-
-    Module.sortedComps map { module =>
-      report append "Module: %s\n".format(module.getPathName)
-      module.nodes map { node =>
-       if (signals contains node) {
-          val counter = node.counter
-          report append "  %s: %s => %s ==> %s\n".format(
-            getSignalName(node), 
-            nodeToString(node), 
-            getSignalName(counter), 
-            nodeToString(counter.inputs(0))
-          )
-       }
-      }
-    } 
-
-    ChiselError.info(report.result)
-
-    try {
-      rptfile.write(report.result)
-    } finally {
-      rptfile.close()
     }
   }
 }
@@ -191,19 +76,17 @@ trait DelayBackannotation extends Backannotation {
   protected var criticalpath = ""
   protected var criticaldelay = 0.0
   protected def pathToString(path: ListBuffer[Node]) = { 
-    (getSignalName(path.head) /: path.tail) ( _ + " -> " + getSignalName(_))
+    (getSignalPathName(path.head) /: path.tail) ( _ + " -> " + getSignalPathName(_))
   }
 
   val dcsyndir = ensureDir(targetdir+"dc-syn")
 
-  // preElaborateTransforms += ((c: Module) => c.removeTypeNodes)
   preElaborateTransforms += ((c: Module) => getTimingPaths(c))
   preElaborateTransforms += ((c: Module) => generateTcl(c))
   preElaborateTransforms += ((c: Module) => executeDC(c))
   preElaborateTransforms += ((c: Module) => annotateDelay(c))
   preElaborateTransforms += ((c: Module) => calculateCriticalPath)
   analyses += ((c: Module) => reportDelay(c))
-  // preElaborateTransforms += ((c: Module) => printGraph(c, c.name + "_graph.rpt"))
 
   private def getTimingPaths(m: Module) {
     val newpaths = new HashSet[ListBuffer[Node]] 
@@ -395,8 +278,8 @@ trait DelayBackannotation extends Backannotation {
 
       // Net collections for each node in the pruend path
       for (node <- mids) {
-        val setName = getSignalName(node, "_")
-        val nodeName = getSignalName(node)
+        val setName = getSignalPathName(node, "_")
+        val nodeName = getSignalPathName(node)
         tcl append "set %s_nets [get_nets %s]\n".format(setName, nodeName)
       }
 
@@ -404,8 +287,8 @@ trait DelayBackannotation extends Backannotation {
       var isFirst = true
       val head = path.head
       val last = path.last
-      val headname = getSignalName(head, "_")
-      val lastname = getSignalName(last, "_")
+      val headname = getSignalPathName(head, "_")
+      val lastname = getSignalPathName(last, "_")
       val (from, to) = (head, last) match {
         case (_: Delay, _: Delay) => {
           ( "-from [get_pins { %s_reg*/CP %s_reg*/CLK }]".format(headname, headname),
@@ -430,11 +313,11 @@ trait DelayBackannotation extends Backannotation {
         tcl append "report_timing %s %s %s >> %s_timing.rpt\n\n".format(from, to, rptopts, m.name)
       } else {
         for (list <- powerset.reverse) {
-          if (!(list isEmpty)) {
-            val conds = ("$%s_nets != {} ".format(getSignalName(list.head, "_")) /: list.tail) (
-              (x, y) => x + "&& $%s_nets != {} ".format(getSignalName(y, "_"))
+          if (!(list.isEmpty)) {
+            val conds = ("$%s_nets != {} ".format(getSignalPathName(list.head, "_")) /: list.tail) (
+              (x, y) => x + "&& $%s_nets != {} ".format(getSignalPathName(y, "_"))
             )
-            val throughs = ("" /: list) ((x, y) => x + "-through %s ".format(getSignalName(y)))
+            val throughs = ("" /: list) ((x, y) => x + "-through %s ".format(getSignalPathName(y)))
 
             if (isFirst) {
               isFirst = false
@@ -547,7 +430,7 @@ trait DelayBackannotation extends Backannotation {
           var prevArrtime = 0.0
           var isFirst = true
           for (node <- path) {
-            val signalName = getSignalName(node)
+            val signalName = getSignalPathName(node)
             val arrtime = 
               if (signalName == startpoint) startArrtime 
               else if (signalName == endpoint) endArrtime 
@@ -561,7 +444,7 @@ trait DelayBackannotation extends Backannotation {
                 for (missingNode <- missingNodes) {
                   //if (delay >= (missingNode.delays getOrElse (prevSignalName, 0.0)))
                   missingNode.delays(prevSignalName) = delay
-                  prevSignalName = getSignalName(missingNode)
+                  prevSignalName = getSignalPathName(missingNode)
                   prevArrtime += delay
                 }                
 
@@ -619,7 +502,7 @@ trait DelayBackannotation extends Backannotation {
                   if (delay >= (missingNode.delays getOrElse (prevSignalName, 0.0))) 
                     missingNode.delays(prevSignalName) = delay
                   
-                  prevSignalName = getSignalName(missingNode)
+                  prevSignalName = getSignalPathName(missingNode)
                 }
 
                 missingNets.clear
@@ -722,7 +605,7 @@ trait DelayBackannotation extends Backannotation {
       var delay = 0.0
       var isFirst = true
       for (node <- path) {
-        val signalName = getSignalName(node)
+        val signalName = getSignalPathName(node)
         if (isFirst) {
           node match {
             case _: Delay => delay += (node.delays getOrElse (signalName, 0.0))
@@ -768,7 +651,7 @@ trait DelayBackannotation extends Backannotation {
       
       report append "Module: %s\n".format(module.getPathName)
       for(mod <- module.mods) {
-        report append "  %s (%s): ".format(getSignalName(mod), nodeToString(mod))
+        report append "  %s (%s): ".format(getSignalPathName(mod), nodeToString(mod))
         for ((signal, delay) <- mod.delays) {
           report append " %f (%s) ".format(delay, signal)
         }

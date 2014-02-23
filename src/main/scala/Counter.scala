@@ -5,6 +5,7 @@ import scala.collection.mutable.HashMap
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.Stack
 import scala.math.pow
+import scala.io.Source
 
 
 class Slave extends Module {
@@ -17,12 +18,13 @@ class Slave extends Module {
   }
 }
 
-class CounterBackend extends FPGABackend with SignalBackannotation {
+abstract class CounterBackend extends Backannotation {
   val addr_width = 5
   val data_width = 32
   val daisy_ctrl_width = 2
   val data_addr_width = addr_width - daisy_ctrl_width
 
+  val signals = new HashSet[Node]
   val shadows = new ArrayBuffer[Bits]
   val signalCounterMap = new HashMap[Node, Bits]
   val shadowCounterMap = new HashMap[Bits, Bits]
@@ -37,6 +39,7 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
   val emulClock = new Clock
   emulClock setName "emul_clk"
 
+  preElaborateTransforms += ((c: Module) => annotateSignals(c))
   preElaborateTransforms += ((c: Module) => generateCtrls)
   preElaborateTransforms += ((c: Module) => generateCounters(c))
   preElaborateTransforms += ((c: Module) => generateDaisyChain(c))
@@ -98,6 +101,47 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
     shadow.component = m
     shadows += shadow
     shadow
+  }
+
+  private def annotateSignals(m: Module) {
+    ChiselError.info("Backannotation: annotate signals")
+
+    // Read the signal list file
+    // TODO: generalize the signal file format
+    val lines = Source.fromFile(Module.signalFilename).getLines
+    val TermRegex = """\s*([\w\._\:]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)""".r
+    val signalNames = new HashSet[String]
+
+    for (line <- lines) {
+      line match {
+        case TermRegex(exp, coeff, se, tstat, pvalue) => {
+          val vars = exp split ":"
+          if (tstat != "NaN" && pvalue != "NaN") {
+            signalNames ++= vars
+          }
+        }
+        case _ =>
+      }
+    }
+
+    // Find correspoinding nodes
+    m bfs { node =>
+      if (!node.isTypeNode) {
+        val signalName = getSignalPathName(node, ".")
+        if (signalNames contains signalName) {
+          signals += node
+        }
+      }
+    }
+
+    // For resets
+    for (m <- Module.components) {
+      val reset = m.reset
+      val resetName = getSignalPathName(reset, ".")
+      if (signalNames contains resetName) {
+        signals += reset
+      }
+    }
   }
 
   def generateCtrls {
@@ -239,7 +283,7 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
     slave.children += top
     top.parent = slave
     Module.setAsTopComponent(slave)
-    slave.markComponent
+    slave markComponent nameSpace
 
     // connect pins
     val slaveAddr = slave.io("addr")
@@ -362,5 +406,41 @@ class CounterBackend extends FPGABackend with SignalBackannotation {
     daisyClock.srcClock = enabledClk.getNode
 
     slave.genAllMuxes
+  }
+
+  private def reportSignals(m: Module) {
+    val rptdir  = ensureDir(targetdir+"report")
+    val rptfile = new java.io.FileWriter(rptdir+"%s_signal.rpt".format(m.name))
+    val report = new StringBuilder();
+
+    ChiselError.info("Backannotation: report annotated signals")
+
+    report append "\t\t+-------------------------------------+\n"
+    report append "\t\t|     Signal and Conter Report        |\n"
+    report append "\t\t|                     by Donggyu Kim  |\n"
+    report append "\t\t+-------------------------------------+\n\n"
+
+    Module.sortedComps map { module =>
+      report append "Module: %s\n".format(module.getPathName)
+      module.nodes map { node =>
+       if (signals contains node) {
+          val counter = node.counter
+          report append "  %s: %s => %s ==> %s\n".format(
+            getSignalPathName(node), 
+            nodeToString(node), 
+            getSignalPathName(counter), 
+            nodeToString(counter.inputs(0))
+          )
+       }
+      }
+    } 
+
+    ChiselError.info(report.result)
+
+    try {
+      rptfile.write(report.result)
+    } finally {
+      rptfile.close()
+    }
   }
 }

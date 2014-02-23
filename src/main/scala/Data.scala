@@ -33,6 +33,21 @@ package Chisel
 import Node._
 import ChiselError._
 
+abstract trait Num[T <: Data] {
+  // def << (b: T): T;
+  // def >> (b: T): T;
+  def unary_-(): T;
+  def +  (b: T): T;
+  def *  (b: T): T;
+  def /  (b: T): T;
+  def %  (b: T): T;
+  def -  (b: T): T;
+  def <  (b: T): Bool;
+  def <= (b: T): Bool;
+  def >  (b: T): Bool;
+  def >= (b: T): Bool;
+}
+
 /** *Data* is part of the *Node* Composite Pattern class hierarchy.
   It is the root of the type system which includes composites (Bundle, Vec)
   and atomic types (UInt, SInt, etc.).
@@ -120,13 +135,15 @@ abstract class Data extends Node {
     }
   }
 
-  override def nameIt(path: String) {
+  /*
+  override def nameIt(path: String, isNamingIO: Boolean) {
     if (isTypeNode && comp != null) {
-      comp.nameIt(path)
+      comp nameIt (path, isNamingIO)
     } else {
-      super.nameIt(path)
+      super.nameIt(path, isNamingIO)
     }
   }
+  */
 
   def setWidth(w: Int) {
     this.width = w;

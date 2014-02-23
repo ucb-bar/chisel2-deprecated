@@ -1,4 +1,6 @@
 target/
+test-outputs/
+test-reports/
 .DS_Store
 .history
 .ensime

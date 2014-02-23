@@ -57,12 +57,12 @@ object Module {
   var saveComponentTrace = false
   var dontFindCombLoop = false
   var isDebug = false;
+  var isCSE = false
   var isIoDebug = true;
   var isClockGatingUpdates = false;
   var isClockGatingUpdatesInline = false;
   var isVCD = false;
   var isInlineMem = true;
-  var isFolding = true;
   var isGenHarness = false;
   var isReportDims = false;
   var isPruning = false;
@@ -131,11 +131,11 @@ object Module {
     dontFindCombLoop = false
     isGenHarness = false;
     isDebug = false;
+    isCSE = false
     isIoDebug = true;
     isClockGatingUpdates = false;
     isClockGatingUpdatesInline = false;
     isVCD = false;
-    isFolding = true;
     isReportDims = false;
     scanFormat = "";
     scanArgs = new ArrayBuffer[Node]();
@@ -177,11 +177,7 @@ object Module {
     clk = UInt(INPUT, 1)
     clk.setName("clk")
 
-    isCoercingArgs = true
     isInGetWidth = false
-    conds.clear()
-    conds.push(Bool(true))
-    keys.clear()
   }
 
   //component stack handling stuff
@@ -222,7 +218,9 @@ object Module {
     }
   }
 
+  // XXX Remove and instead call current()
   def getComponent(): Module = if(compStack.length != 0) compStack.top else null
+  def current: Module = getComponent
 
   def setAsTopComponent(mod: Module) {
     topComponent = mod;
@@ -268,8 +266,14 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   val children = new ArrayBuffer[Module];
   val debugs = HashSet[Node]();
 
+  val switchKeys = Stack[Bits]()
+  val whenConds = Stack[Bool]()
+  private lazy val trueCond = Bool(true)
+  def hasWhenCond: Boolean = !whenConds.isEmpty
+  def whenCond: Bool = if (hasWhenCond) whenConds.top else trueCond
+
   val nodes = new ArrayBuffer[Node]
-  val mods  = new ArrayBuffer[Node];
+  val mods = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
 
   val regs  = new ArrayBuffer[Reg];
@@ -347,6 +351,22 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   def io: Data
+
+  // for making sure that all module io's are ports and 
+  // for marking all io's as module io's
+  var isIoChecked = false
+  def checkIo = {
+    if (io != null && !isIoChecked) {
+      isIoChecked = true;
+      for((n, flat) <- io.flatten) {
+        if (flat.dir == null) 
+          ChiselError.error("All IO's must be ports (dir set): " + flat);
+        // else if (flat.width_ == -1) 
+        //   ChiselError.error("All IO's must be have width set: " + flat);
+        flat.isModuleIo = true;
+      }
+    }
+  }
   def nextIndex : Int = { nindex = nindex + 1; nindex }
 
   var isWalking = new HashSet[Node];
@@ -374,7 +394,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   def printf(message: String, args: Node*): Unit = {
-    val p = new Printf(conds.top && !this.reset, message, args)
+    val p = new Printf(Module.current.whenCond && !this.reset, message, args)
     printfs += p
     debug(p)
     p.inputs.foreach(debug _)
@@ -496,6 +516,25 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         if(!(i == null)) {
           if(!walked.contains(i)) {
             bfsQueue.enqueue(i)
+            walked += i
+          }
+        }
+      }
+    }
+  }
+
+  def dfs(visit: Node => Unit): Unit = {
+    val walked = new HashSet[Node]
+    val dfsStack = initializeDFS
+
+    while(!dfsStack.isEmpty){
+      val top = dfsStack.pop
+      walked += top
+      visit(top)
+      for(i <- top.inputs) {
+        if(!(i == null)) {
+          if(!(walked contains i)) {
+            dfsStack push i
             walked += i
           }
         }
@@ -756,9 +795,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   // 1) name the component
   // 2) name the IO
   // 3) name and set the component of all statically declared nodes through introspection
+  // 4) name declared nodes
   /* XXX deprecated. make sure containsReg and isClk are set properly. */
-  def markComponent() {
+  def markComponent(nameSpace: HashSet[String]) {
     ownIo();
+    io nameIt ("io", true)
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], Cell, BlackBox and Modules.
      Since we call invoke() to get a proper instance of the correct type,
@@ -772,7 +813,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
          val o = m.invoke(this);
          o match {
          case node: Node => {
-           if (node.isReg || node.isClkInput) containsReg = true;
+           if (node.isReg || node.isClkInput) containsReg = true
+           if (name != "" && node.name == "") {
+             node nameIt (backend asValidName name, false)
+             nameSpace += node.name
+           }
          }
          case buf: ArrayBuffer[_] => {
            /* We would prefer to match for ArrayBuffer[Node] but that's
@@ -780,25 +825,53 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             XXX Using Seq instead of ArrayBuffer will pick up members defined
             in Module that are solely there for implementation purposes. */
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
-             val nodebuf = buf.asInstanceOf[Seq[Node]];
-             for(elm <- nodebuf){
+             val nodebuf = buf.asInstanceOf[Seq[Node]]
+             for((elm, i) <- nodebuf.zipWithIndex){
                if (elm.isReg || elm.isClkInput) {
                  containsReg = true;
+               }
+               if (name != "" && elm.name == "") {
+                 val idxName = name + '_' + i
+                 elm nameIt (backend asValidName idxName, false)
+                 nameSpace += elm.name
                }
              }
            }
          }
+         case buf: collection.IndexedSeq[_] => {
+           /* To support VecLike structures */
+           if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
+             val nodebuf = buf.asInstanceOf[Seq[Node]]
+             for((elm, i) <- nodebuf.zipWithIndex){
+               if (elm.isReg || elm.isClkInput) {
+                 containsReg = true;
+               }
+               if (name != "" && elm.name == "") {
+                 val idxName = name + '_' + i
+                 elm nameIt (backend asValidName idxName, false)
+                 nameSpace += elm.name
+               }
+             }
+           }
+         }
+         // Todo: do we have Cell anymore?
          case cell: Cell => {
            if(cell.isReg) containsReg = true;
+           cell.name = backend asValidName name 
+           nameSpace += cell.name
          }
          case bb: BlackBox => {
            bb.pathParent = this;
            for((n, elm) <- io.flatten) {
              if (elm.isClkInput) containsReg = true
            }
+           bb.name = backend asValidName name
+           nameSpace += bb.name
          }
          case comp: Module => {
            comp.pathParent = this;
+           comp.name = backend asValidName name
+           nameSpace += comp.name
          }
          case any =>
        }
@@ -836,7 +909,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
     /** Returns the absolute path to a component instance from toplevel. */
   def getPathName: String = {
-    if ( parent == null ) name else parent.getPathName + "_" + name;
+    getPathName()
+  }
+  def getPathName(separator: String = "_"): String = {
+    if ( parent == null ) name else parent.getPathName(separator) + separator + name;
   }
 
   def traceNodes() {
@@ -937,5 +1013,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def removeInputs(nodes: Seq[Node]): Seq[Node] =
     nodes.filter(n => !isInput(n))
 
+  override val hashCode: Int = components.size
+  override def equals(that: Any) = this eq that.asInstanceOf[AnyRef]
 }
 

@@ -154,14 +154,14 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
     elementsCache = elts; this
   }
 
-  override def nameIt (path: String) {
+  override def nameIt (path: String, isNamingIO: Boolean) {
     if( !named
       && (name.isEmpty
         || (!path.isEmpty && name != path)) ) {
       name = path
       val prefix = if (name.length > 0) name + "_" else ""
       for ((n, i) <- elements) {
-        i.nameIt(prefix + n)
+        i nameIt (prefix + n, isNamingIO)
       }
     } else {
       /* We are trying to rename a Bundle that has a fixed name. */
@@ -246,17 +246,6 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
         case default =>
           ChiselError.warning("CONNECTING INCORRECT TYPES INTO WIRE OR REG")
       }
-    }
-  }
-
-  override def ^^(src: Node) {
-    src match {
-      case other: Bundle =>
-        for ((n, i) <- elements) {
-          if(other.contains(n)) {
-            i ^^ other(n);
-          }
-        }
     }
   }
 

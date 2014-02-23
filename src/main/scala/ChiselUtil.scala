@@ -91,10 +91,21 @@ object Reverse
 {
   def doit(in: UInt, base: Int, length: Int): UInt =
   {
-    val half = (1 << log2Up(length))/2
     if (length == 1) {
       in(base)
+    } else if (isPow2(length) && length >= 8 && length <= 64) {
+      // Do it in logarithmic time to speed up C++.  Neutral for real HW.
+      var res = in
+      var shift = length >> 1
+      var mask = UInt((BigInt(1) << length) - 1, length)
+      do {
+        mask = mask ^ (mask(length-shift-1,0) << UInt(shift))
+        res = ((res >> UInt(shift)) & mask) | (res(length-shift-1,0) << UInt(shift) & ~mask)
+        shift = shift >> 1
+      } while (shift > 0)
+      res
     } else {
+      val half = (1 << log2Up(length))/2
       Cat(doit(in, base, half), doit(in, base + half, length - half))
     }
   }
@@ -146,18 +157,18 @@ object UIntToOH
   */
 object Mux1H
 {
-  def apply[T <: Data](sel: Seq[Bool], in: Seq[T]): T = {
-    if (in.size == 1) in(0)
+  def apply[T <: Data](sel: Iterable[Bool], in: Iterable[T]): T = {
+    if (in.tail.isEmpty) in.head
     else {
       val masked = (sel, in).zipped map ((s, i) => Mux(s, i.toBits, Bits(0)))
-      in(0).fromBits(masked.reduceLeft(_|_))
+      in.head.fromBits(masked.reduceLeft(_|_))
     }
   }
-  def apply[T <: Data](in: Seq[(Bool, T)]): T = {
+  def apply[T <: Data](in: Iterable[(Bool, T)]): T = {
     val (sel, data) = in.unzip
     apply(sel, data)
   }
-  def apply[T <: Data](sel: Bits, in: Seq[T]): T =
+  def apply[T <: Data](sel: Bits, in: Iterable[T]): T =
     apply((0 until in.size).map(sel(_)), in)
 }
 
@@ -558,15 +569,15 @@ object Pipe
   */
 object PriorityMux
 {
-  def apply[T <: Bits](in: Seq[(Bool, T)]): T = {
+  def apply[T <: Bits](in: Iterable[(Bool, T)]): T = {
     if (in.size == 1) {
       in.head._2
     } else {
       Mux(in.head._1, in.head._2, apply(in.tail))
     }
   }
-  def apply[T <: Bits](sel: Seq[Bool], in: Seq[T]): T = apply(sel zip in)
-  def apply[T <: Bits](sel: Bits, in: Seq[T]): T = apply((0 until in.size).map(sel(_)), in)
+  def apply[T <: Bits](sel: Iterable[Bool], in: Iterable[T]): T = apply(sel zip in)
+  def apply[T <: Bits](sel: Bits, in: Iterable[T]): T = apply((0 until in.size).map(sel(_)), in)
 }
 
 /** Returns the bit position of the trailing 1 in the input vector
@@ -574,7 +585,7 @@ object PriorityMux
   */
 object PriorityEncoder
 {
-  def apply(in: Seq[Bool]): UInt = PriorityMux(in, (0 until in.size).map(UInt(_)))
+  def apply(in: Iterable[Bool]): UInt = PriorityMux(in, (0 until in.size).map(UInt(_)))
   def apply(in: Bits): UInt = apply((0 until in.getWidth).map(in(_)))
 }
 

@@ -72,10 +72,10 @@ object Vec {
 
   /** Returns a new *Vec* from a sequence of *Data* nodes.
     */
-  def apply[T <: Data](elts: Seq[T]): Vec[T] = {
+  def apply[T <: Data](elts: Iterable[T]): Vec[T] = {
     val res =
-      if (!elts.isEmpty && elts.forall(_ isLit)) new ROM[T]
-      else new Vec[T]
+      if (!elts.isEmpty && elts.forall(_.isLit)) new ROM[T](i => elts.head.clone)
+      else new Vec[T](i => elts.head.clone)
     res.self ++= elts
     res
   }
@@ -139,7 +139,7 @@ class VecProc extends proc {
   }
 }
 
-class Vec[T <: Data] extends CompositeData with VecLike[T] with Cloneable {
+class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] with Cloneable {
   val self = new ArrayBuffer[T]
   val readPortCache = new HashMap[UInt, T]
   var sortedElementsCache: ArrayBuffer[ArrayBuffer[Data]] = null
@@ -222,14 +222,6 @@ class Vec[T <: Data] extends CompositeData with VecLike[T] with Cloneable {
     }
   }
 
-  override def ^^(src: Node) = {
-    src match {
-      case other: Vec[T] =>
-        for((b, o) <- self zip other.self)
-          b ^^ o
-    }
-  }
-
   def <>(src: Vec[T]) {
     for((b, e) <- self zip src)
       b <> e;
@@ -302,7 +294,7 @@ class Vec[T <: Data] extends CompositeData with VecLike[T] with Cloneable {
     this
   }
 
-  override def nameIt (path: String) {
+  override def nameIt (path: String, isNamingIO: Boolean ) {
     if( !named
       && (name.isEmpty
         || (!path.isEmpty && name != path)) ) {
@@ -318,7 +310,7 @@ class Vec[T <: Data] extends CompositeData with VecLike[T] with Cloneable {
         } else {
           elm.name
         }
-        elm.nameIt(prefix + i + suffix)
+        elm nameIt (prefix + i + suffix, isNamingIO)
       }
     } else {
       /* We are trying to rename a Vec that has a fixed name. */
@@ -326,20 +318,21 @@ class Vec[T <: Data] extends CompositeData with VecLike[T] with Cloneable {
   }
 
   override def clone(): this.type =
-    Vec(this: Seq[T]).asInstanceOf[this.type]
+    Vec.tabulate(size)(gen).asInstanceOf[this.type]
+    //Vec(this: Seq[T]).asInstanceOf[this.type]
 
   override def toNode: Node = {
     if(flattenedVec == null){
-      val nodes = flatten.map{case(n, i) => i};
+      val nodes = Vec(this.reverse).flatten.map{case(n, i) => i}
       flattenedVec = Concatenate(nodes.head, nodes.tail.toList: _*)
     }
     flattenedVec
   }
 
   override def fromNode(n: Node): this.type = {
-    val res = this.clone();
-    var ind = 0;
-    for((name, io) <- res.flatten.toList.reverse) {
+    val res = this.clone
+    var ind = 0
+    for ((name, io) <- res.flatten) {
       io.asOutput();
       if(io.width > 1) {
         io assign NodeExtract(n, ind + io.width-1, ind)
@@ -372,12 +365,10 @@ class Vec[T <: Data] extends CompositeData with VecLike[T] with Cloneable {
       elm.setIsTypeNode
   }
 
-  override def toBits(): UInt = {
-    val reversed = this.reverse.map(_.toBits)
-    Cat(reversed.head, reversed.tail: _*)
-  }
-
   def length: Int = self.size
+
+  override val hashCode: Int = System.identityHashCode(this)
+  override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
 }
 
 trait VecLike[T <: Data] extends collection.IndexedSeq[T] {
