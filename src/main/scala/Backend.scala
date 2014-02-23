@@ -122,13 +122,15 @@ abstract class Backend {
     val classNames = new HashMap[String, ArrayBuffer[Module]]
 
     for (c <- Module.components) {
-      c.io nameIt "io" // naming ios
+      // c.io nameIt ("io", true) // naming ios
       
-      val className = extractClassName(c)
-      if (!(classNames contains className)) {
-        classNames(className) = new ArrayBuffer[Module]
+      if (c.name == "") {
+        val className = extractClassName(c)
+        if (!(classNames contains className)) {
+          classNames(className) = new ArrayBuffer[Module]
+        }
+        classNames(className) += c
       }
-      classNames(className) += c
     }
 
     // Give names to components according to their instrance numbers
@@ -146,16 +148,44 @@ abstract class Backend {
     }
 
     // Next, give names to nodes
+    def nameNode(node: Node) {
+      if (node.varName != "") {
+//        node nameIt asValidName(node.varName, false)
+      } else if (node.name == "") {
+        node match {
+          case _: Reg =>
+//            node nameIt asValidName("R" + node.emitIndex)
+          case _ if !node.isTypeNode => 
+//            node nameIt asValidName("T" + node.emitIndex)
+          case _ =>
+        }
+      }
+    }
+
+    // Todo: more efficient way?
     top dfs { node =>
-      if (!node.isTypeNode && !node.isLit && !node.isIo) {
-        if (node.varName != "") {
-          node nameIt asValidName(node.varName)
-        } else {
-          if (node.isReg) 
+      if (node.varName != "" && !node.isIo) {
+        node nameIt (asValidName(node.varName), false)
+      }
+      if( node.nameHolder != null && node.nameHolder.name != "" &&
+          !node.named && !node.isLit ){
+        node.name = node.nameHolder.name; // Not using nameIt to avoid override
+        node.named = node.nameHolder.named;
+        node.nameHolder.name = ""
+      }
+    }
+
+    top dfs { node =>
+      if (!node.isTypeNode && node.name == "") {
+        emitRef(node)
+        /*
+        node match {
+          case _: Reg =>
             node nameIt asValidName("R" + node.emitIndex)
-          else 
+          case _ => 
             node nameIt asValidName("T" + node.emitIndex)
         }
+        */
       }
     }
   }
@@ -163,7 +193,7 @@ abstract class Backend {
   // Todo: remove it!
   def nameChildren(root: Module) {
     // Name all nodes at this level
-    root.io.nameIt("io");
+    root.io.nameIt("io", true);
     val nameSpace = new HashSet[String];
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], Cell, BlackBox and Modules.
@@ -181,7 +211,7 @@ abstract class Backend {
            /* XXX It seems to always be true. How can name be empty? */
            if ((node.isTypeNode || name != ""
              || node.name == null || (node.name == "" && !node.named))) {
-             node.nameIt(asValidName(name));
+             node.nameIt(asValidName(name), false);
            }
            nameSpace += node.name;
          }
@@ -201,7 +231,7 @@ abstract class Backend {
                   this has for side-effect to create modules with the exact
                   same logic but textually different in input/output
                   parameters, hence generating unnecessary modules. */
-                 elm.nameIt(asValidName(name + "_" + i));
+                 elm.nameIt(asValidName(name + "_" + i), false);
                }
                nameSpace += elm.name;
                i += 1;
@@ -223,7 +253,7 @@ abstract class Backend {
                   this has for side-effect to create modules with the exact
                   same logic but textually different in input/output
                   parameters, hence generating unnecessary modules. */
-                 elm.nameIt(asValidName(name + "_" + i));
+                 elm.nameIt(asValidName(name + "_" + i), false);
                }
                nameSpace += elm.name;
                i += 1;
@@ -584,7 +614,7 @@ abstract class Backend {
   def nameBindings(nameSpace: HashSet[String]) {
     for (c <- Module.sortedComps ; bind <- c.bindings) {
       var genName = ""
-      if (bind.targetNode.name != null || bind.targetNode.name != null)
+      if (bind.targetNode.name != null || bind.targetNode.name != "")
         genName = bind.targetComponent.name + "_" + bind.targetNode.name
 
       if(nameSpace contains genName) 
@@ -637,12 +667,12 @@ abstract class Backend {
     for (c <- Module.components)
       c markComponent nameSpace
 
-    // XXX This will create nodes after the tree is traversed!
-    c.genAllMuxes;
-
     // set signal signals except bindings because they are not generated.
     // Bindings are named separately after generated
     setNames(c)
+
+    // XXX This will create nodes after the tree is traversed!
+    c.genAllMuxes
 
     // obtain sorted modules before preElaborateTransforms
     levelChildren(c)

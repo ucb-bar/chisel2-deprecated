@@ -115,6 +115,19 @@ abstract class Bits extends Data with proc {
 
   //code generation stuff
 
+  // Define nameIt to deal with type nodes before they are removed
+  override def nameIt (path : String, isNamingIO: Boolean) {
+    if (isIo) {
+      super.nameIt(path, isNamingIO)
+    } else if (isTypeNode && comp != null) {
+      comp nameIt (path, isNamingIO)
+    } else if (isTypeNode && !inputs.isEmpty && !inputs.head.isLit) {
+      inputs.head nameIt (path, isNamingIO)
+    } else {
+      super.nameIt(path, isNamingIO)
+    } 
+  }
+
   override def apply(name: String): Data = this
 
   override def flatten: Array[(String, Bits)] = Array((name, this));

@@ -152,8 +152,8 @@ abstract class Node extends nameable {
     inferWidth = fixWidth(w);
   }
 
-  def nameIt (path: String) {
-    if( !named ) {
+  def nameIt (path: String, isNamingIO: Boolean) {
+    if( (!named && !isIo) || (isIo && isNamingIO) ) {
       /* If the name was set explicitely through *setName*,
        we don't override it. */
       name = path;
@@ -191,7 +191,8 @@ abstract class Node extends nameable {
   private var _isIo = false
   def isIo = _isIo
   def isIo_=(isIo: Boolean) = _isIo = isIo
-  def isReg: Boolean = false;
+  def isVec: Boolean = false
+  def isReg: Boolean = false
   def isUsedByRam: Boolean = {
     for (c <- consumers)
       if (c.isRamWriteInput(this)) {

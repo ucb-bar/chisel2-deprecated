@@ -74,7 +74,7 @@ object Vec {
     */
   def apply[T <: Data](elts: Iterable[T]): Vec[T] = {
     val res =
-      if (!elts.isEmpty && elts.forall(_.iisLit)) new ROM[T](i => elts.head.clone)
+      if (!elts.isEmpty && elts.forall(_.isLit)) new ROM[T](i => elts.head.clone)
       else new Vec[T](i => elts.head.clone)
     res.self ++= elts
     res
@@ -144,6 +144,8 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] 
   val readPortCache = new HashMap[UInt, T]
   var sortedElementsCache: ArrayBuffer[ArrayBuffer[Data]] = null
   var flattenedVec: Node = null
+
+  override def isVec = true
 
   override def apply(idx: Int): T = self(idx)
 
@@ -294,7 +296,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] 
     this
   }
 
-  override def nameIt (path: String ) {
+  override def nameIt (path: String, isNamingIO: Boolean ) {
     if( !named
       && (name.isEmpty
         || (!path.isEmpty && name != path)) ) {
@@ -310,12 +312,25 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] 
         } else {
           elm.name
         }
-        elm.nameIt(prefix + i + suffix)
+        elm nameIt (prefix + i + suffix, isNamingIO)
+        // if ((!elm.named && !elm.isIo) || (elm.isIo && isNamingIO)) {
+          // elm.name = prefix + i + suffix
+          // elm.named = true
+        // }
       }
     } else {
       /* We are trying to rename a Vec that has a fixed name. */
     }
   }
+
+  /*
+  override def setVarName (name_ : String) {
+    varName = name_
+    for ((elm, i) <- self.zipWithIndex) {
+      elm setVarName (name_ + "_" + i)
+    }
+  }
+  */
 
   override def clone(): this.type =
     Vec.tabulate(size)(gen).asInstanceOf[this.type]
