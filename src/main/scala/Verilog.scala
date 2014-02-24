@@ -473,7 +473,7 @@ class VerilogBackend extends Backend {
     }
     for (m <- c.mods) {
       val clkDomain = clkDomains getOrElse (m.clock, new StringBuilder)
-      if (m.clock != null && clkDomain.size <= 0)
+      if (m.clock != null && clkDomain.size > 0)
         clkDomain.append(emitReg(m))
     }
     for (clock <- c.clocks) {
