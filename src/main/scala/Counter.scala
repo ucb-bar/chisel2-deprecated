@@ -18,7 +18,7 @@ class Slave extends Module {
   }
 }
 
-abstract class CounterBackend extends Backannotation {
+trait CounterBackend extends Backannotation {
   val addr_width = 5
   val data_width = 32
   val daisy_ctrl_width = 2
@@ -44,23 +44,33 @@ abstract class CounterBackend extends Backannotation {
   preElaborateTransforms += ((c: Module) => generateCounters(c))
   preElaborateTransforms += ((c: Module) => generateDaisyChain(c))
   preElaborateTransforms += ((c: Module) => generateSlave(c))
-  transforms += ((c: Module) => c.clocks -= emulClock)
+  transforms += ((c: Module) => Module.topComponent.clocks -= emulClock)
 
   def getTypeNode(node: Node) = {
-    val typeNode = new UInt
-    typeNode.isTypeNode = true
-    typeNode.inputs += node
-    for (consumer <- node.consumers) {
-      consumer.inputs -= node
-      consumer.inputs += typeNode
+    def genTypeNode(node: Node) = {
+      val typeNode = Bits()
+      typeNode.inputs += node
+      for (consumer <- node.consumers) {
+        consumer.inputs -= node
+        consumer.inputs += typeNode
+      }
+      typeNode
+    }     
+
+    if (node.consumers.size == 1) {
+      node.consumers.head match {
+        case bits: Bits => bits
+        case _ => genTypeNode(node)
+      }
+    } else {
+      genTypeNode(node)
     }
-    typeNode
   }
 
   def addPin(m: Module, pin: Data, name: String = "") {
     pin.component = m
     pin.isIo = true
-    pin setName (name)
+    pin setName name
 
     pin match {
       case dio: DecoupledIO[_] => {
@@ -146,7 +156,7 @@ abstract class CounterBackend extends Backannotation {
 
   def generateCtrls {
     // Create pins
-    for (m <- Module.components) {
+    for (m <- Module.sortedComps) {
       val stall = Bool(INPUT)
       val daisy_control = Bits(INPUT, 3)
       val daisy_out = Decoupled(Bits(width = 32))
@@ -155,7 +165,8 @@ abstract class CounterBackend extends Backannotation {
         case _ => null 
       }
 
-      def ready(i: Int) = stall && (daisy_control === Bits(i, daisy_control.getWidth)) && daisy_out.ready
+      def ready(i: Int) = stall && daisy_out.ready &&
+          (daisy_control === Bits(i, daisy_control.getWidth))
 
       m.clock = emulClock
       m.clocks.clear
@@ -170,7 +181,8 @@ abstract class CounterBackend extends Backannotation {
       addPin(m, daisy_control, "daisy_control")
       addPin(m, daisy_out, "daisy_out")
 
-      daisy_out.valid := stall
+      /* daisy_out.valid := ready(2) */
+      daisy_out.valid.updates += ((Bool(true), stall))
     }
   }
 
@@ -187,7 +199,7 @@ abstract class CounterBackend extends Backannotation {
         // ChiselError.info(emitRef(signal) + ": " + nodeToString(signal))
         val stall = signal.component.io("stall")
         val daisyControl = signal.component.io("daisy_control")
-        val signalType = getTypeNode(signal)
+        val signalValue = getTypeNode(signal)
         val signalWidth = signal.getWidth
         val counter = addCounter(signal, Reg(init = Bits(0, 32), clock = daisyClock))
         val copy = ops(signal.component)._1
@@ -195,25 +207,34 @@ abstract class CounterBackend extends Backannotation {
         stall match {
           case isStall: Bool => {
             if (signalWidth == 1) {
+              /*
               when(!isStall) {
-                counter := counter + signalType
+                counter := counter + signalValue
               }.elsewhen(copy) {
                 counter := Bits(0, 32)
               }
+              */
+              counter.comp.updates += ((!isStall, counter + signalValue))
+              counter.comp.updates += ((copy, Bits(0, 32)))
             }
             // This is a bus
             else {
               val buffer = Reg(init = Bits(0, signalWidth), clock = daisyClock)
-              val xor = signalType ^ buffer
+              val xor = signalValue ^ buffer
               val hd = PopCount(xor)
-              buffer.comp setName "buffer%d".format(counterIdx)
-              buffer.comp.component = m
-              buffer := signalType
+              /*
+              buffer := signalValue
               when(!isStall){
                 counter := counter + hd
               }.elsewhen(copy) {
                 counter := Bits(0, 32)
               }
+              */
+              buffer.comp setName "buffer%d".format(counterIdx)
+              buffer.comp.component = m
+              buffer.comp.updates += ((Bool(true), signalValue))
+              counter.comp.updates += ((!isStall, counter + hd))
+              counter.comp.updates += ((copy, Bits(0, 32)))
             }
           }
           case _ =>
@@ -241,12 +262,16 @@ abstract class CounterBackend extends Backannotation {
     // todo: hierarchical modules
     if (!shadows.isEmpty) {
       val shadow = shadows.head
-      val read = ops(shadow.component)._1
+      // val read = ops(shadow.component)._1
       val stall = shadow.component.io("stall")
-      val daisy_out = shadow.component.io("daisy_out")
-      (daisy_out, stall) match {
+      val daisyOut = shadow.component.io("daisy_out")
+      (daisyOut, stall) match {
         case (dio: DecoupledIO[_], isStall: Bool) => {
-          dio.bits := shadow
+          // dio.bits := shadow
+          dio.bits match {
+            case bits: Bits => bits.updates += ((Bool(true), shadow))
+            case _ =>
+          }
         }
         case _ =>
       }
@@ -258,20 +283,27 @@ abstract class CounterBackend extends Backannotation {
       val copy = ops(shadow.component)._1
       val read = ops(shadow.component)._2
 
+      /*
       when (copy) {
         shadow := counter
       }.elsewhen (read) {
         shadow := nextShadow
       }
+      */
+      shadow.comp.updates += ((copy, counter))
+      shadow.comp.updates += ((read, nextShadow))
     }
     if (!shadows.isEmpty) {
       val shadow = shadows.last
       val counter = shadowCounterMap(shadow)
       val copy = ops(shadow.component)._1
 
+      /*
       when (copy) {
         shadow := counter
       }
+      */
+      shadow.comp.updates += ((copy, counter))
     }
   }
 
@@ -280,10 +312,12 @@ abstract class CounterBackend extends Backannotation {
 
     // initialize Slave module
     val slave = Module(new Slave)
+    slave.name = "Slave"
     slave.children += top
     top.parent = slave
     Module.setAsTopComponent(slave)
     slave markComponent nameSpace
+    Module.sortedComps prepend slave
 
     // connect pins
     val slaveAddr = slave.io("addr")
@@ -309,14 +343,23 @@ abstract class CounterBackend extends Backannotation {
     init.comp setName "init" 
     stall.getNode setName "stall"
 
-    // for input ports
-    (slaveAddr, slaveIn, top.io("in")) match {
-      case (addr: Bits, slaveIO: DecoupledIO[_], topIO: DecoupledIO[_]) => {
-        top.io("stall") := stall
+    // for the top's input ports
+    (slaveAddr, slaveIn, top.io("in"), top.io("stall"), top.io("daisy_control")) match {
+      case (addr: Bits, 
+            slaveIO: DecoupledIO[_], 
+            topIO: DecoupledIO[_], 
+            topStall: Bits, 
+            daisyControl: Bits) => {
+        /*
+        top.io("stall") := stall 
         top.io("daisy_control") := addr(daisy_ctrl_width-1, 0)
+        */
+        topStall.updates     += ((Bool(true), stall))
+        daisyControl.updates += ((Bool(true), addr(daisy_ctrl_width-1, 0)))
 
         val writeAddr = addr(addr_width-1, daisy_ctrl_width) 
-        def writeValid(i: Int) = slaveIO.valid && stall && writeAddr === UInt(i, data_addr_width)
+        def writeValid(i: Int) = slaveIO.valid && stall && 
+                      writeAddr === UInt(i, data_addr_width)
         val ready = Vec(Range(0, pow(2, data_addr_width).toInt) map { 
           case 0 => topIO.ready
           case 1 => Bool(true)
@@ -326,15 +369,27 @@ abstract class CounterBackend extends Backannotation {
 
         // address = 0 => Set inputs to the device
         // address = 1 => Write to the clock counter
+        /*
         slaveIO.ready := first || ready(writeAddr)
         topIO.valid := first || writeValid(2)
+        */
+        slaveIO.ready.updates += ((Bool(true), first || ready(writeAddr)))
+        topIO.valid.updates   += ((Bool(true), first || writeValid(2)))
+       
 
         (slaveIO.bits, topIO.bits) match {
           case (bits: Bits, bundle: Bundle) => {
-            val (name0, a) = bundle.elements(0)
-            val (name1, b) = bundle.elements(1)
+            val (a, b) = (bundle.elements(0)._2, bundle.elements(1)._2) match {
+              case (bitsA: Bits, bitsB: Bits) => (bitsA, bitsB)
+              case _ => (Bits(0), Bits(0)) // error?
+            }
+            // val (name0, a) = bundle.elements(0)
+            // val (name1, b) = bundle.elements(1)
+            val clkCounterIsOne = clkCounter === Bits(1)
+            val clkCounterDecr  = clkCounter - Bits(1, 32)
 
             // todo: stop with new inputs?
+            /*
             when (writeValid(0)) {
               topInBits := bits
               init := Bool(false)
@@ -351,13 +406,22 @@ abstract class CounterBackend extends Backannotation {
 
             a := topInBits(31, 16)
             b := topInBits(15, 0)
+            */
+            stop.comp.updates       += ((clkCounterIsOne, Bool(true)))
+            init.comp.updates       += ((writeValid(0), Bool(false)))
+            first.comp.updates      += ((writeValid(1), Bool(false)))
+            topInBits.comp.updates  += ((writeValid(0), bits))
+            clkCounter.comp.updates += ((writeValid(1), slaveIO.bits))
+            clkCounter.comp.updates += ((!stall, clkCounterDecr))
+            a.updates               += ((Bool(true), topInBits(31, 16)))
+            b.updates               += ((Bool(true), topInBits(15, 0)))
           }
         }
       }
-      case _ =>
+      case _ => // Error?
     }
 
-    // output ports
+    // for top's output ports
     (slaveAddr, slaveOut, top.io("daisy_out"), top.io("out")) match {
       case (addr: Bits, 
             slaveIO: DecoupledIO[_], 
@@ -382,7 +446,8 @@ abstract class CounterBackend extends Backannotation {
         // address == 2 => Read from daisy chains
         // address == 3 => Check whether or not the target finished
         // address == 4 => Read from the device result
-
+        
+        /*
         daisyIO.ready := (readAddr === UInt(2, data_addr_width)) && slaveIO.ready
         slaveIO.valid := valids(readAddr)
         slaveIO.bits  := bits(readAddr)
@@ -391,15 +456,23 @@ abstract class CounterBackend extends Backannotation {
         when(topIO.valid) {
           first := Bool(true)
         }
+        */
+        first.comp.updates    += ((topIO.valid, Bool(true)))
+        daisyIO.ready.updates += ((Bool(true), (readAddr === UInt(2) && slaveIO.ready)))
+        slaveIO.valid.updates += ((Bool(true), valids(readAddr)))
+        slaveIO.bits match {
+          case outBits: Bits => outBits.updates  += ((Bool(true), bits(readAddr)))
+          case _ => // Error?
+        }
       }
-      case _ =>
+      case _ => // Error?
     }
 
     // emulation clock
     val clockType = getTypeNode(daisyClock)
     val clockBool = clockType.toBool
     val notStop = !stop
-    val enabledClk = clockBool && (notStall && notStop || init)
+    val enabledClk = (notStall && notStop || init) && clockBool
     clockBool.isTypeNode = true
     enabledClk.getNode.component = slave
     enabledClk.getNode setName "emul_clk"

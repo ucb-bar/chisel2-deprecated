@@ -51,7 +51,7 @@ trait Backannotation extends Backend {
   val targetdir = ensureDir(Module.targetDir)
 
   protected def getSignalPathName(n: Node, delim: String = "/"): String = {
-    if (n == null) "null" else (n.component getPathName delim) + emitRef(n)
+    if (n == null) "null" else (n.componentOf getPathName delim) + delim + emitRef(n)
   }
 
   protected def copyResource(filename: String, toDir: String) {
