@@ -32,55 +32,55 @@ class ByteSelector extends Module {
   }    
 }
 
-class ByteSelectorTests(c: ByteSelector) extends Tester(c, Array(c.io)) {  
-  defTests {
-    var allGood = true
-    val vars = new HashMap[Node, Node]()
-    val test_in = UInt(12345678)
-    for (t <- 0 until 4) {
-      vars(c.io.in) = test_in
-      vars(c.io.offset) = UInt(t)
-      val ref_out =
-        (test_in >> (UInt(t * 8))) & UInt(0xFF)
-      vars(c.io.out) = ref_out
-      allGood = step(vars) && allGood
-    }
-    allGood
+class ByteSelectorTests(c: ByteSelector) extends Tester(c) {
+  val test_in = 12345678
+  for (t <- 0 until 4) {
+    poke(c.io.in,     test_in)
+    poke(c.io.offset, t)
+    step()
+    expect(c.io.out, (test_in >> (t * 8)) & 0xFF)
   }
 }
 \end{scala}
 
-In the test harness \verb+ByteSelectorTests+ we see that the test portion is written in Scala with some Chisel constructs inside of a \verb+defTests+ block. The first thing to notice is that we use a hash map \verb+vars+ to hold the input-output combination behavior for the device we are testing. The device under test is passed to us as a parameter \verb+c+ which is why we prepend \verb+c+ to the I/O names when specifying them. 
+In the test harness \verb+ByteSelectorTests+ we see that the test portion is written in Scala with some Chisel constructs inside a \verb+Tester+ class definition. The device under test is passed to us as a parameter \verb+c+. 
 
-In the \verb+for+ loop, the assignments for each io of the \verb+ByteSelector+ is set to the appropriate values. For this particular example, we are testing the \verb+ByteSelector+ by hardcoding the input to some known value and checking if each of the 4 offsets returns the appropriate byte. To do this, on each iteration we generate appropriate inputs to the module and tell the simulation to assign this value to the input of the device we are testing \verb+c+:
+In the \verb+for+ loop, the assignments for each input of the \verb+ByteSelector+ is set to the appropriate values using \verb+poke+. For this particular example, we are testing the \verb+ByteSelector+ by hardcoding the input to some known value and checking if each of the 4 offsets returns the appropriate byte. To do this, on each iteration we generate appropriate inputs to the module and tell the simulation to assign this value to the input of the device we are testing \verb+c+:
 
 \begin{scala}
-val test_in = UInt(12345678)
+val test_in = 12345678
 for (t <- 0 until 4) {
   // set in of the DUT to be some known word
-  vars(c.io.in) = test_in  
+  poke(c.io.in,     test_in)
   // set the offset of the DUT
-  vars(c.io.offset) = UInt(t) 
-  ..
+  poke(c.io.offset, t)
+  ...
 }
 \end{scala}
 
-The next step is to define the expected reference output to \verb+ByteSelector+ and assign the expected output of the device under test \verb+c+. In this example, this is done in the next two lines:
+Next we step the circuit.  We next advance the simulation by calling the \verb+step+ function. This effectively advances the simulation one clock cycle in the presence of sequential logic. 
 
 \begin{scala}
-val ref_out = (test_in >> (UInt(t * 8))) & UInt(0xFF)
-vars(c.io.out) = ref_out
+step()
 \end{scala}
 
-This defines the reference output expected for this particular cycle of the simulation. Since the circuit we are testing is purely combinational, we expected that output we define appears on any advancement of the simulation.
-
-We next advance the simulation by calling the \verb+step+ function. This effectively advances the simulation one clock cycle in the presence of sequential logic. In our simulation, we want to output at the end if the simulation failed or not so we effectively accumulate the failures by:
+Finally, we check for expected outputs.
+In this case, we check the expected output of \verb+ByteSelector+ as follows:
 
 \begin{scala}
-allGood = step(vars) && allGood
+expect(c.io.out, (test_in >> (t * 8)) & 0xFF)
 \end{scala}
 
-The \verb+step+ function will return either true or false after checking if for the inputs defined earlier, the device generates the expected reference output. Thus if the inputs defined for \verb+c.io.in+ and \verb+c.io.offset+ does not result in \verb+c.io.out+, the \verb+step+ function will return a failure. Notice that the \verb+step+ function knows about the pin assignments and reference output through the hash map \verb+vars+ that gets passed to it. We also notice that the \verb+allGood+ Boolean value will end up false in the event of one or more failures and true if none of the simulation checks fail.
+This defines the reference output expected for this particular cycle of the simulation. Since the circuit we are testing is purely combinational, we expected that the output we define appears on any advancement of the simulation.  The \verb+expect+ function will record either true or false after checking if the output generates the expected reference output. The results of successive \verb+expect+'s are anded into a \verb+Tester+ field called \verb+ok+ which starts out as \verb+true+.  The value of the \verb+ok+ field determines the success or failure of the tester execution.
+
+Actually \verb+expect+ is defined in terms of \verb+peek+ roughly as follows:
+
+\begin{scala}
+def expect (data: Bits, expected: BigInt) = 
+  ok = peek(data) == expected && ok
+\end{scala}
+
+where \verb+peek+ gets the value of a signal from the DUT.
 
 \subsection{Simulation Debug Output}
 
@@ -91,39 +91,24 @@ When we run the testbench, we will notice that the simulation produces debug out
 \begin{bash}
 STARTING ../emulator/problems/ByteSelector
 ---
-INPUTS
-  INPUT(ByteSelector__io_in.ByteSelector) = 12345678
-  INPUT(ByteSelector__io_offset.ByteSelector) = 0
-OUTPUTS
-  READ OUTPUT(ByteSelector__io_out.ByteSelector) = 78
-  EXPECTED: OUTPUT(ByteSelector__io_out.ByteSelector) = 78
-  SUCCESS
----
-INPUTS
-  INPUT(ByteSelector__io_in.ByteSelector) = 12345678
-  INPUT(ByteSelector__io_offset.ByteSelector) = 1
-OUTPUTS
-  READ OUTPUT(ByteSelector__io_out.ByteSelector) = 97
-  EXPECTED: OUTPUT(ByteSelector__io_out.ByteSelector) = 97
-  SUCCESS
----
-INPUTS
-  INPUT(ByteSelector__io_in.ByteSelector) = 12345678
-  INPUT(ByteSelector__io_offset.ByteSelector) = 2
-OUTPUTS
-  READ OUTPUT(ByteSelector__io_out.ByteSelector) = 188
-  EXPECTED: OUTPUT(ByteSelector__io_out.ByteSelector) = 188
-  SUCCESS
----
-INPUTS
-  INPUT(ByteSelector__io_in.ByteSelector) = 12345678
-  INPUT(ByteSelector__io_offset.ByteSelector) = 3
-OUTPUTS
-  READ OUTPUT(ByteSelector__io_out.ByteSelector) = 0
-  EXPECTED: OUTPUT(ByteSelector__io_out.ByteSelector) = 0
-  SUCCESS
+POKE ByteSelector__io_in <- 12345678
+POKE ByteSelector__io_offset <- 0
+STEP 1 <- 0
+PEEK ByteSelector__io_out -> 0x4e
+EXPECT ByteSelector__io_out <- 78 == 78 PASS
+POKE ByteSelector__io_in <- 12345678
+POKE ByteSelector__io_offset <- 1
+STEP 1 <- 0
+PEEK ByteSelector__io_out -> 0x61
+EXPECT ByteSelector__io_out <- 97 == 97 PASS
+...
+POKE ByteSelector__io_in <- 12345678
+POKE ByteSelector__io_offset <- 3
+STEP 1 <- 0
+PEEK ByteSelector__io_out -> 0x00
+EXPECT ByteSelector__io_out <- 0 == 0 PASS
 PASSED   // Final pass assertion
-[success] Total time: 26 s, ...
+[success] Total time: 6 s, completed Feb 23, 2014 9:52:22 PM
 \end{bash}
 
 Also notice that there is a final pass assertion "PASSED" at the end which corresponds to the \verb+allGood+ at the very end of the testbench. In this case, we know that the test passed since the allGood assertion resulted in a "PASSED". In the event of a failure, the assertion would result in a "FAILED" output message here.
@@ -133,12 +118,10 @@ Also notice that there is a final pass assertion "PASSED" at the end which corre
 In general, the scala testbench should have the following rough structure:
 
 \begin{itemize}
-\item Define hash map for I/O and any initializations
-\item Set inputs to device under test in hash map
-\item Determine expected output for simulation advance for hash map
-\item Advance simulation and track success/failure (ex. allGood)
+\item Set inputs using \verb+poke+
+\item Advance simulation using \verb+step+
+\item Check expected values using \verb+expect+ (and/or \verb+peek+)
 \item Repeat until all appropriate test cases verified
-\item Assert if test passed or failed (allGood)
 \end{itemize}
 
 For sequential components we may want to delay the output definition to the appropriate time as the \verb+step+ function implicitly advances the clock one period in the simulation. Unlike Verilog, you do not need to explicitly specify the timing advances of the simulation; Chisel will take care of these details for you.

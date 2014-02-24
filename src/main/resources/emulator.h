@@ -1922,114 +1922,80 @@ void dat_dump (FILE* file, mem_t<w,d> val, std::string name) {
 
 template <int w, int d> mem_t<w,d> MEM( void );
 
-struct debug_node_t {
-    string name;
-    dat_base_t* dat_ptr;
-    
-    debug_node_t(string in_name, dat_base_t* in_ptr) :
-        name(in_name), dat_ptr(in_ptr) {
-    }
-};
-
-struct debug_mem_t {
-    string name;
-    mem_base_t* mem_ptr;
-    
-    debug_mem_t(string in_name, mem_base_t* in_ptr) :
-        name(in_name), mem_ptr(in_ptr) {
-    }
-};
-
-// Generic templatized function to return a list of names in either a
-// debug_node_t or debug_mem_t.
-template<typename T> vector<string> get_list_names(vector<T>* in_vec) {
-  vector<string> out;
-  typedef typename vector<T>::iterator iter_t;
-  for (iter_t it = in_vec->begin(); it != in_vec->end(); ++it) {
-    out.push_back(it->name);
-  }
-  return out;
-}
-
-// Generic templatized function to return an element pointer from a list
-// given a name. Returns NULL if no match is found.
-template<typename T> T* get_list_elem(vector<T>* in_vec, string name) {
-  typedef typename vector<T>::iterator iter_t;
-  for (iter_t it = in_vec->begin(); it != in_vec->end(); ++it) {
-    if (it->name == name) {
-      return &(*it);
-    }    
-  }
-  return NULL;
-}
-
 class mod_t {
  public:
   std::vector< mod_t* > children;
   virtual void init ( bool rand_init=false ) { };
   virtual void clock_lo ( dat_t<1> reset ) { };
   virtual void clock_hi ( dat_t<1> reset ) { };
+  virtual int  clock ( dat_t<1> reset ) { };
+  virtual void setClocks ( std::vector< int >& periods ) { };
   
   virtual void print ( FILE* f ) { };
-  virtual bool scan ( FILE* f ) { return true; };
   virtual void dump ( FILE* f, int t ) { };
   
   virtual void init_debug_interface ( ) { };
   
   // Lists containing node/mem names to pointers, to be populated by init().
-  vector<debug_node_t> nodes;
-  vector<debug_mem_t> mems;
+  map<string, dat_base_t*> nodes;
+  map<string, mem_base_t*> mems;
   
   // Returns a list of all nodes accessible by the debugging interface.
   virtual vector<string> get_nodes() {
-    return get_list_names<debug_node_t>(&nodes);
+    vector<string> res;
+    typedef std::map<std::string, dat_base_t*>::iterator it_type;
+    for(it_type iterator = nodes.begin(); iterator != nodes.end(); iterator++) 
+      res.push_back(iterator->first);
+    return res;
   }
   // Returns a list of all memory objects accessible by the debugging interface.
   virtual vector<string> get_mems() {
-    return get_list_names<debug_mem_t>(&mems);
+    vector<string> res;
+    typedef std::map<std::string, mem_base_t*>::iterator it_type;
+    for(it_type iterator = mems.begin(); iterator != mems.end(); iterator++) 
+      res.push_back(iterator->first);
+    return res;
   }
   // Reads the value on a node. Returns empty on error.
   virtual string node_read(string name) {
-    debug_node_t* node = get_list_elem<debug_node_t>(&nodes, name);
-    if (node != NULL) {
-      return node->dat_ptr->to_str();
+    dat_base_t* dat = nodes[name];
+    if (dat != NULL) {
+      return dat->to_str();
     } else {
-      cout << "mod_t::node_read: Unable to find node '" << name << "'" << endl;
-      return "";
+      cerr << "mod_t::node_read: Unable to find node '" << name << "'" << endl;
+      return "0";
     }
   }
   // Writes a value to a node. Returns true on success and false on error.
   // Recommended to only be used on state elements.
   virtual bool node_write(string name, string val) {
-    debug_node_t* node = get_list_elem<debug_node_t>(&nodes, name);
-    if (node != NULL) {
-      bool success = node->dat_ptr->set_from_str(val);
-      clock_lo(dat_t<1>(0));
+    dat_base_t* dat = nodes[name];
+    if (dat != NULL) {
+      bool success = dat->set_from_str(val);
       return success;
     } else {
-      cout << "mod_t::node_write: Unable to find node '" << name << "'" << endl;
+      cerr << "mod_t::node_write: Unable to find node '" << name << "'" << endl;
       return false;
     }
   }
   // Reads the an element from a memory.
   virtual string mem_read(string name, string index) {
-    debug_mem_t* mem = get_list_elem<debug_mem_t>(&mems, name);
+    mem_base_t* mem = mems[name];
     if (mem != NULL) {
-      return mem->mem_ptr->get_to_str(index);
+      return mem->get_to_str(index);
     } else {
-      cout << "mod_t::mem_read: Unable to find mem '" << name << "'" << endl;
-      return "";
+      cerr << "mod_t::mem_read: Unable to find mem '" << name << "'" << endl;
+      return "0";
     }
   }
   // Writes an element to a memory.
   virtual bool mem_write(string name, string index, string val) {
-    debug_mem_t* mem = get_list_elem<debug_mem_t>(&mems, name);
+    mem_base_t* mem = mems[name];
     if (mem != NULL) {
-      bool success = mem->mem_ptr->put_from_str(index, val);
-      clock_lo(dat_t<1>(0));
+      bool success = mem->put_from_str(index, val);
       return success;
     } else {
-      cout << "mod_t::mem_write: Unable to find mem '" << name << "'" << endl;
+      cerr << "mod_t::mem_write: Unable to find mem '" << name << "'" << endl;
       return false;
     }
   }
@@ -2053,8 +2019,7 @@ class mod_t {
   // or -2 if some error was encountered.
   virtual int clock_until_node_equal(string name, string val, int max=1000000) {
     int cycles = 0;
-    debug_node_t* node = get_list_elem<debug_node_t>(&nodes, name);
-    dat_base_t* target_dat = node->dat_ptr;
+    dat_base_t* target_dat = nodes[name];
     dat_base_t* target_val = target_dat->copy();
     target_val->set_from_str(val);
     
@@ -2076,9 +2041,8 @@ class mod_t {
   // or -2 if some error was encountered.
   virtual int clock_until_node_not_equal(string name, string val, int max=1000000) {
     int cycles = 0;
-    debug_node_t* node = get_list_elem<debug_node_t>(&nodes, name);
-    int w = node->dat_ptr->width();
-    dat_base_t* target_dat = node->dat_ptr;
+    dat_base_t* target_dat = nodes[name];
+    int w = target_dat->width();
     dat_base_t* target_val = target_dat->copy();
     target_val->set_from_str(val);
     
@@ -2094,6 +2058,91 @@ class mod_t {
         }
     }
   }
+
+  int timestep;
+
+  int step (bool is_reset, int n, FILE* f, bool is_print = false) {
+    int delta = 0;
+    // fprintf(stderr, "STEP %d R %d P %d\n", n, is_reset, is_print);
+    for (int i = 0; i < n; i++) {
+      dat_t<1> reset = LIT<1>(is_reset); 
+      delta += clock(reset);
+      if (f != NULL) dump(f, timestep);
+      if (is_print) print(stderr);
+      timestep += 1;
+    }
+    return delta;
+  }
+
+  std::vector< std::string > tokenize(std::string str) {
+    std::vector< std::string > res;
+    int i = 0;
+    int c = ' ';
+    while ( i < str.size() ) {
+      while (isspace(c)) {
+        if (i >= str.size()) return res;
+        c = str[i++];
+      }
+      std::string s;
+      while (!isspace(c) && i < str.size()) { 
+        s.push_back(c);
+        c = str[i++];
+      }
+      if (i >= str.size()) s.push_back(c);
+      if (s.size() > 0)
+        res.push_back(s);
+    }
+    return res;
+  }
+
+  void read_eval_print (FILE *f) {
+    timestep = 0;
+    for (;;) {
+      std::string str_in;
+      getline(cin,str_in);
+      std::vector< std::string > tokens = tokenize(str_in);
+      std::string cmd = tokens[0];
+      if (cmd == "peek") {
+        std::string res;
+        if (tokens.size() == 2) {
+          res = node_read(tokens[1]);
+        } else if (tokens.size() == 3) {
+          res = mem_read(tokens[1], tokens[2]);
+        }
+        // fprintf(stderr, "-PEEK %s -> %s\n", tokens[1].c_str(), res.c_str());
+        cout << res << endl;
+      } else if (cmd == "poke") {
+        bool res;
+        // fprintf(stderr, "-POKE %s <- %s\n", tokens[1].c_str(), tokens[2].c_str());
+        if (tokens.size() == 3)
+          res = node_write(tokens[1], tokens[2]);
+        else if (tokens.size() == 4)
+          res = mem_write(tokens[1], tokens[2], tokens[3]);
+      } else if (cmd == "step") {
+        int n = atoi(tokens[1].c_str());
+        // fprintf(stderr, "-STEP %d\n", n);
+        int new_delta = step(0, n, f, true);
+        cout << new_delta << endl;
+      } else if (cmd == "reset") {
+        int n = atoi(tokens[1].c_str());
+        // fprintf(stderr, "-RESET %d\n", n);
+        step(1, n, f, false);
+      } else if (cmd == "set-clocks") {
+        std::vector< int > periods;
+        for (int i = 1; i < tokens.size(); i++) {
+          int period = atoi(tokens[i].c_str());
+          periods.push_back(period);
+        }
+        setClocks(periods);
+      } else if (cmd == "quit") {
+        return 0;
+      } else {
+        fprintf(stderr, "Unknown command: |%s|\n", cmd.c_str());
+      }
+    }
+  }
+
+
 };
 
 #define ASSERT(cond, msg) { \

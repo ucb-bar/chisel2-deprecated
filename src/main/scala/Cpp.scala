@@ -559,51 +559,28 @@ class CppBackend extends Backend {
 
   def genHarness(c: Module, name: String) {
     val harness  = createOutputFile(name + "-emulator.cpp");
-    harness.write("#include \"" + name + ".h\"\n");
-    harness.write("int main (int argc, char* argv[]) {\n");
-    harness.write("  " + name + "_t* c = new " + name + "_t();\n");
-    harness.write("  int lim = (argc > 1) ? atoi(argv[1]) : -1;\n");
-    harness.write("  int period;\n")
+    harness.write("#include \"" + name + ".h\"\n\n");
     if (Module.clocks.length > 1) {
+      harness.write("void " + c.name + "_t::setClocks ( std::vector< int > &periods ) {\n");
+      var i = 0;
       for (clock <- Module.clocks) {
         if (clock.srcClock == null) {
-          harness.write("  period = atoi(read_tok(stdin).c_str());\n")
-          harness.write("  c->" + emitRef(clock) + " = period;\n")
-          harness.write("  c->" + emitRef(clock) + "_cnt = period;\n")
+          harness.write("  " + emitRef(clock) + " = periods[" + i + "];\n")
+          harness.write("  " + emitRef(clock) + "_cnt = periods[" + i + "];\n")
+          i += 1;
         }
       }
+      harness.write("}\n\n");
     }
+    harness.write("int main (int argc, char* argv[]) {\n");
+    harness.write("  " + name + "_t* c = new " + name + "_t();\n");
     harness.write("  c->init();\n");
     if (Module.isVCD) {
       harness.write("  FILE *f = fopen(\"" + name + ".vcd\", \"w\");\n");
-    }
-    harness.write("  int delta = 0;\n")
-    harness.write("  for(int i = 0; i < 5; i++) {\n")
-    harness.write("    dat_t<1> reset = LIT<1>(1);\n")
-    if (Module.clocks.length > 1) {
-      harness.write("    delta += c->clock(reset);\n")
     } else {
-      harness.write("    c->clock_lo(reset);\n")
-      harness.write("    c->clock_hi(reset);\n")
+      harness.write("  FILE *f = NULL;\n");
     }
-    harness.write("  }\n")
-    harness.write("  for (int t = 0; lim < 0 || t < lim; t++) {\n");
-    harness.write("    dat_t<1> reset = LIT<1>(0);\n");
-    harness.write("    if (!c->scan(stdin)) break;\n");
-    if (Module.clocks.length > 1) {
-      harness.write("    delta += c->clock(reset);\n")
-      harness.write("    fprintf(stdout, \"%d\", delta);\n")
-      harness.write("    fprintf(stdout, \"%s\", \" \");\n")
-      harness.write("    c->print(stdout, stderr);\n")
-      harness.write("    delta = 0;\n")
-      if (Module.isVCD) { harness.write("    c->dump(f, t);\n"); }
-    } else {
-      harness.write("    c->clock_lo(reset);\n");
-      harness.write("    c->print(stdout, stderr);\n");
-      if (Module.isVCD) { harness.write("    c->dump(f, t);\n"); }
-      harness.write("    c->clock_hi(reset);\n");
-    }
-    harness.write("  }\n");
+    harness.write("  c->read_eval_print(f);\n");
     harness.write("}\n");
     harness.close();
   }
@@ -681,13 +658,9 @@ class CppBackend extends Backend {
   def generateNodeMapping(nodes: Seq[Node]): ArrayBuffer[Tuple2[String, Node]] = {
     val mappings = new ArrayBuffer[Tuple2[String, Node]]
     for (m <- nodes) {
-      m match {
-        case l: Literal => ;
-        case any        =>
-          if (m.name != "" && (m.name != "reset") && !(m.component == null)) {
-            val mapping = (m.component.getPathName(".") + "." + m.name, m)
-            mappings += mapping
-          }
+      if (m.chiselName != "") {
+        val mapping = (m.chiselName, m)
+        mappings += mapping
       }
     }
     return mappings
@@ -701,15 +674,15 @@ class CppBackend extends Backend {
       case x: Literal =>
         ""
       case x: Reg =>
-        "  nodes.push_back(debug_node_t(\"" + name + "\", &" + emitRef(node) + "));\n"
+        "  nodes[\"" + name + "\"] = &" + emitRef(node) + ";\n"
       case m: Mem[_] =>
-        "  mems.push_back(debug_mem_t(\"" + name + "\", &" + emitRef(node) + "));\n"
+        "  mems[\"" + name + "\"] = &" + emitRef(node) + ";\n"
       case r: ROM[_] =>
-        "  mems.push_back(debug_mem_t(\"" + name + "\", &" + emitRef(node) + "));\n"
+        "  mems[\"" + name + "\"] = &" + emitRef(node) + ";\n"
       case c: Clock =>
-        "  nodes.push_back(debug_node_t(\"" + name + "\", &" + emitRef(node) + "));\n"
+        "  nodes[\"" + name + "\"] = &" + emitRef(node) + ";\n"
       case _ =>
-        "  nodes.push_back(debug_node_t(\"" + name + "\", &" + emitRef(node) + "));\n"
+        "  nodes[\"" + name + "\"] = &" + emitRef(node) + ";\n"
     }
   }
 
@@ -765,13 +738,6 @@ class CppBackend extends Backend {
     out_h.write("#include \"emulator.h\"\n\n");
     out_h.write("class " + c.name + "_t : public mod_t {\n");
     out_h.write(" public:\n");
-    if (Module.isTesting && Module.tester != null) {
-      Module.scanArgs.clear();  Module.scanArgs  ++= Module.tester.testInputNodes;    Module.scanFormat  = ""
-      Module.printArgs.clear(); Module.printArgs ++= Module.tester.testNonInputNodes; Module.printFormat = ""
-
-      for (n <- Module.scanArgs ++ Module.printArgs)
-        if(!c.omods.contains(n)) c.omods += n
-    }
     val vcd = new VcdBackend()
     for (m <- c.omods) {
       if(m.name != "reset") {
@@ -793,8 +759,10 @@ class CppBackend extends Backend {
       out_h.write("  void clock_hi" + clkName(clock) + " ( dat_t<1> reset );\n")
     }
     out_h.write("  int clock ( dat_t<1> reset );\n")
-    out_h.write("  void print ( FILE* f, FILE* e);\n");
-    out_h.write("  bool scan ( FILE* f );\n");
+    if (Module.clocks.length > 1) {
+      out_h.write("  void setClocks ( std::vector< int >& periods );\n")
+    }
+    out_h.write("  void print ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
     out_h.write("};\n\n");
     out_h.write(Params.toCxxStringParams);
@@ -873,86 +841,16 @@ class CppBackend extends Backend {
     writeCppFile("  return min;\n")
     writeCppFile("}\n")
 
-    def splitFormat(s: String): Seq[String] = {
-      var off = 0;
-      var res: List[String] = Nil;
-      for (i <- 0 until s.length) {
-        if (s(i) == '%') {
-          if (off < i) {
-            res = s.substring(off, i) :: res;
-          }
-          res = "%" :: res;
-          if (i == (s.length-1)) {
-            ChiselError.error("Badly formed format argument kind: %");
-          } else if (s(i + 1) != 'x') {
-            ChiselError.error("Unsupported format argument kind: %" + s(i + 1));
-          }
-          off = i + 2;
-        }
-      }
-      if (off < (s.length-1)) {
-        res = s.substring(off, s.length) :: res;
-      }
-      res.reverse
-    }
-    writeCppFile("void " + c.name + "_t::print ( FILE* f, FILE* e ) {\n")
+    writeCppFile("void " + c.name + "_t::print ( FILE* f ) {\n")
     for (p <- Module.printfs)
       writeCppFile("#if __cplusplus >= 201103L\n"
         + "  if (" + emitLoWordRef(p.cond)
-        + ") dat_fprintf<" + p.width + ">(e, "
+        + ") dat_fprintf<" + p.width + ">(f, "
         + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
         + ");\n"
         + "#endif\n")
-    if (Module.printArgs.length > 0) {
-      val format =
-        if (Module.printFormat == "") {
-          Module.printArgs.map(a => "%x").reduceLeft((y,z) => z + " " + y)
-        } else {
-          Module.printFormat;
-        }
-      val toks = splitFormat(format);
-      var i = 0;
-      for (tok <- toks) {
-        if (tok(0) == '%') {
-          val nodes = Module.printArgs(i).maybeFlatten
-          for (j <- 0 until nodes.length)
-            writeCppFile("  fprintf(f, \"" + (if (j > 0) " " else "") +
-                        "%s\", TO_CSTR(" + emitRef(nodes(j)) + "));\n");
-          i += 1;
-        } else {
-          writeCppFile("  fprintf(f, \"%s\", \"" + tok + "\");\n")
-        }
-      }
-      writeCppFile("  fprintf(f, \"\\n\");\n")
-      writeCppFile("  fflush(f);\n")
-      writeCppFile("  fflush(e);\n")
-    }
-    writeCppFile("}\n")
-    def constantArgSplit(arg: String): Array[String] = arg.split('=');
-    def isConstantArg(arg: String): Boolean = constantArgSplit(arg).length == 2;
-    writeCppFile("bool " + c.name + "_t::scan ( FILE* f ) {\n")
-    if (Module.scanArgs.length > 0) {
-      val format =
-        if (Module.scanFormat == "") {
-          Module.scanArgs.map(a => "%x").reduceLeft((y,z) => z + y)
-        } else {
-          Module.scanFormat;
-        }
-      val toks = splitFormat(format);
-      var i = 0;
-      for (tok <- toks) {
-        if (tok(0) == '%') {
-          val nodes = c.keepInputs(Module.scanArgs(i).maybeFlatten)
-          for (j <- 0 until nodes.length)
-            writeCppFile("  str_to_dat(read_tok(f), " + emitRef(nodes(j)) + ");\n")
-          i += 1;
-        } else {
-          writeCppFile("  fscanf(f, \"%s\", \"" + tok + "\");\n")
-        }
-      }
-      // writeCppFile("  getc(f);\n")
-    }
-    writeCppFile("  return(!feof(f));\n")
+    if (Module.printfs.length > 0)
+      writeCppFile("fflush(f);\n");
     writeCppFile("}\n")
 
     createCppFile()

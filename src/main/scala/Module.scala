@@ -66,11 +66,6 @@ object Module {
   var isGenHarness = false;
   var isReportDims = false;
   var isPruning = false;
-  var scanFormat = "";
-  var scanArgs: ArrayBuffer[Node] = null;
-  var printFormat = "";
-  var printArgs: ArrayBuffer[Node] = null;
-  var tester: Tester[Module] = null;
   var includeArgs: List[String] = Nil;
   var targetDir: String = null;
   var isEmittingComponents = false;
@@ -136,11 +131,6 @@ object Module {
     isClockGatingUpdatesInline = false;
     isVCD = false;
     isReportDims = false;
-    scanFormat = "";
-    scanArgs = new ArrayBuffer[Node]();
-    printFormat = "";
-    printArgs = new ArrayBuffer[Node]();
-    tester = null;
     targetDir = "."
     components.clear();
     compStack.clear();

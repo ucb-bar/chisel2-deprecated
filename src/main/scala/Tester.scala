@@ -33,141 +33,179 @@ import Chisel._
 import scala.math._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
+import scala.util.Random
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.PrintStream
 import scala.sys.process._
 import Literal._
 
-class Tester[+T <: Module](val c: T, val testNodes: Array[Node]) {
-  var testIn: InputStream = null
+class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
+  var testIn:  InputStream  = null
   var testOut: OutputStream = null
-  var testErr: InputStream = null
-  var testInputNodes: Array[Node] = null
-  var testNonInputNodes: Array[Node] = null
+  var testErr: InputStream  = null
+  val sb = new StringBuilder()
   var delta = 0
-  var first = true
-  def splitFlattenNodes(args: Seq[Node]): (Seq[Node], Seq[Node]) = {
-    if (args.length == 0) {
-      (Array[Node](), Array[Node]())
-    } else {
-      val testNodes = args.map(i => i.maybeFlatten).reduceLeft(_ ++ _).map(x => x.getNode);
-      (c.keepInputs(testNodes), c.removeInputs(testNodes))
-    }
-  }
 
   def setClocks(clocks: HashMap[Clock, Int]) {
-    println("SETTING UP CLOCKS")
     for (clock <- Module.clocks) {
+      puts("set-clocks");
       if (clock.srcClock == null) {
         val s = BigInt(clocks(clock)).toString(16)
-        for (c <- s)
-          testOut.write(c)
-        testOut.write(' ')
+        puts(" " + s);
       }
     }
     testOut.write('\n')
     testOut.flush()
   }
 
-  def step(svars: HashMap[Node, Node],
-           ovars: HashMap[Node, Node] = new HashMap[Node, Node],
-           isTrace: Boolean = true): Boolean = {
-    if (isTrace) {
-        println("---")
-        println("INPUTS")
-    }
-    for (n <- testInputNodes) {
-      val v = svars.getOrElse(n, null)
-      val i = if (v == null) BigInt(0) else v.litValue() // TODO: WARN
-      val s = i.toString(16)
-      if (isTrace) println("  " + n + " = " + i)
-      for (c <- s) {
-        testOut.write(c)
-      }
-      testOut.write(' ')
-    }
-    testOut.write('\n')
-    testOut.flush()
-    if (isTrace) println("OUTPUTS")
-    var isSame = true
-    //Copy stderr from the module (could be made faster)
+  def isSpace(c: Int) : Boolean = c == 0x20 || c == 0x9 || c == 0xD || c == 0xA
+
+  def puts(str: String) = {
+    for (e <- str) testOut.write(e);
+  }
+
+  def drainErr () = {
     while(testErr.available() > 0) {
       System.err.print(Character.toChars(testErr.read()))
     }
+  }
 
+  def gets() = {
     var c = testIn.read
-    val sb = new StringBuilder()
-    def isSpace(c: Int) : Boolean = c == 0x20 || c == 0x9 || c == 0xD || c == 0xA
-    if (Module.clocks.length > 1) {
-      while (isSpace(c)) c = testIn.read
-      while (!isSpace(c)) {
-        sb += c.toChar
-        c = testIn.read
-      }
-      delta += sb.toString.toInt
+    sb.clear()
+    while (isSpace(c)) {
+      c = testIn.read
     }
-    for (o <- testNonInputNodes) {
-      sb.clear()
-      while (isSpace(c)) {
-        c = testIn.read
-      }
-      while (!isSpace(c)) {
-        sb += c.toChar
-        c   = testIn.read
-      }
-      val s = sb.toString
-      val rv = toLitVal(s)
-      if (isTrace) println("  READ " + o + " = " + rv)
-      if (!svars.contains(o)) {
-        ovars(o) = Literal(rv)
-      } else {
-        val tv = svars(o).litValue()
-        if (isTrace) println("  EXPECTED: " + o + " = " + tv)
-        if (tv != rv) {
-          isSame = false
-          if (isTrace) println("  *** FAILURE ***")
-        } else {
-          if (isTrace) println("  SUCCESS")
-        }
-      }
+    while (!isSpace(c)) {
+      sb += c.toChar
+      c   = testIn.read
     }
-    isSame
+    sb.toString
   }
-  def startTest: Process = {
-    val cmd = Module.targetDir + "/" + c.name + (if(Module.backend.isInstanceOf[VerilogBackend]) " -q" else "")
-    val process = Process(cmd)
-    val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => testErr = err)
-    val p = process.run(pio)
-    println("STARTING " + cmd)
-    p
-  }
-  def endTest(p: Process) {
-    testOut.close()
-    testIn.close()
-    testErr.close()
-    p.destroy()
-  }
-  def withTesting(body: => Boolean): Boolean = {
-    var res = false
-    var p: Process = null
-    try {
-      while(testIn == null)
 
-      p = startTest
-      res = body
-    } finally {
-      if (p != null) endTest(p)
+  def peekBits(data: Node, off: Int = -1): BigInt = {
+    if (data.chiselName == "") {
+      println("Unable to peek data " + data)
+      -1
+    } else {
+      val off = -1;
+      puts("peek " + data.chiselName);
+      if (off != -1)
+        puts(" " + off);
+      puts("\n")
+      testOut.flush()
+      val s = gets()
+      val rv = toLitVal(s)
+      if (isTrace) println("PEEK " + data.name + " " + (if (off >= 0) (off + " ") else "") + "-> " + s)
+      drainErr()
+      rv
     }
-    println(if (res) "PASSED" else "*** FAILED ***")
-    if(!res) throwException("Module under test FAILED at least one test vector.")
-    res
   }
-  var tests: () => Boolean = () => { println("DEFAULT TESTS"); true }
-  var testVars: Array[Node] = null
-  def defTests(body: => Boolean) {
-    val (ins, outs) = splitFlattenNodes(testNodes)
-    testInputNodes = ins.toArray; testNonInputNodes = outs.toArray
-    tests = () => withTesting { body }
+
+  def peekAt[T <: Bits](data: Mem[T], off: Int): BigInt = {
+    peekBits(data, off)
   }
+
+  def peek(data: Bits): BigInt = {
+    peekBits(data.getNode)
+  }
+
+  def peek(data: CompositeData /*, off: Int = -1 */): Array[BigInt] = {
+    data.flatten.map(x => x._2).map(peek(_))
+  }
+
+  def reset(n: Int = 1) = {
+    puts("reset " + n + "\n");  
+    if (isTrace) println("RESET " + n)
+    testOut.flush()
+    drainErr()
+  }
+
+  def pokeBits(data: Node, x: BigInt, off: Int = -1): Unit = {
+    if (data.chiselName == "") {
+      println("Unable to poke data " + data)
+    } else {
+      puts("poke " + data.chiselName);
+      if (isTrace) println("POKE " + data.name + " " + (if (off >= 0) (off + " ") else "") + "<- " + x)
+      if (off != -1)
+        puts(" " + off);
+      puts(" 0x" + x.toString(16) + "\n");
+      testOut.flush()
+      drainErr()
+    }
+  }
+
+  def pokeAt[T <: Bits](data: Mem[T], x: BigInt, off: Int): Unit = {
+    pokeBits(data, x, off)
+  }
+
+  def poke(data: Bits, x: BigInt): Unit = {
+    pokeBits(data, x)
+  }
+
+  def poke(data: CompositeData, x: Array[BigInt]): Unit = {
+    val kv = (data.flatten.map(x => x._2), x).zipped;
+    for ((x, y) <- kv)
+      poke(x, y)
+  }
+
+  def step(n: Int = 1) = {
+    puts("step " + n + "\n");
+    testOut.flush()
+    val s = gets()
+    delta += s.toInt
+    if (isTrace) println("STEP " + n + " <- " + s)
+    drainErr()
+  }
+
+  val rnd = new Random()
+  var process: Process = null
+
+  def startTesting(): Process = {
+    val cmd = Module.targetDir + "/" + c.name + (if(Module.backend.isInstanceOf[VerilogBackend]) " -q" else "")
+    println("STARTING " + cmd)
+    val processBuilder = Process(cmd)
+    val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => testErr = err)
+    process = processBuilder.run(pio)
+    while(testIn == null) { }
+    reset(5)
+    process
+  }
+
+  var ok = true;
+
+  def expect (good: Boolean, msg: String): Boolean = {
+    if (isTrace)
+      println(msg + " " + (if (good) "PASS" else "FAIL"))
+    if (!good) ok = false;
+    good
+  }
+
+  def expect (data: Bits, expected: BigInt): Boolean = {
+    val got = peek(data)
+    expect(got == expected, 
+       "EXPECT " + data.name + " <- " + got + " == " + expected)
+  }
+
+  def expect (data: CompositeData, expected: Array[BigInt]): Boolean = {
+    val kv = (data.flatten.map(x => x._2), expected).zipped;
+    var allGood = true
+    for ((d, e) <- kv)
+      allGood = expect(d, e) && allGood
+    allGood
+  }
+
+  def endTesting(): Boolean = {
+    if (process != null) {
+      puts("quit\n"); testOut.flush();
+      testOut.close()
+      testIn.close()
+      testErr.close()
+      process.destroy()
+    }
+    ok
+  }
+
+  startTesting()
 }

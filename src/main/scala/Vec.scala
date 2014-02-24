@@ -80,7 +80,7 @@ object Vec {
     res
   }
 
-  /** Returns a new *Vec* from the contatenation of a *Data* node
+  /** Returns a new *Vec* from the concatenation of a *Data* node
     and a sequence of *Data* nodes.
     */
   def apply[T <: Data](elt0: T, elts: T*): Vec[T] =

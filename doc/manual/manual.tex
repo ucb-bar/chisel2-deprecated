@@ -1036,24 +1036,33 @@ testing circuits by providing test vectors within Scala using
 subclasses of the \code{Tester} class:
 
 \begin{scala}
-class Tester[T <: Module]
-  (val c: T, val testNodes: Array[Node])
+class Tester[T <: Module] (val c: T) {
+  var ok: Boolean
+  val rnd: Random
+  def reset(n: Int = 1)
+  def step(n: Int = 1): Int
+  def poke(data: Mem[T], index: Int, x: BigInt): Unit
+  def poke(data: Bits, x: BigInt): Unit
+  def poke(data: CompositeData, x: Array[BigInt]): Unit
+  def peek(data: Mem[T], index: Int): Unit
+  def peek(data: Bits): BigInt
+  def peek(data: CompositeData): Array[BigInt]
+  def expect (good: Boolean, msg: String): Boolean
+  def expect (data: Bits, expected: BigInt): Boolean
+}
 \end{scala}
 
 \noindent
-which binds a tester to a module, and specifies the nodes to test,
-and finally allows users to write a \code{defTests} function.
-The definition for \code{defTests} is:
+which binds a tester to a module
+and allows users to write tests using the given debug protocol.  In particular, users use:
+\begin{itemize}
+\item \code{poke} to set input port and state values,
+\item \code{step} to execute the circuit one time unit,
+\item \code{peek} to read port and state values, and
+\item \code{expect} to compare peeked circuit values to expected arguments.
+\end{itemize}
 
-\begin{scala}
-def defTests(body: => Boolean)
-\end{scala}
-
-\noindent
-where \code{testNodes} are the graph nodes that will be input to and
-output from the DUT, and where
-users write calls to \code{step} in the body.  Users connect tester
-instances to modules using:
+Users connect tester instances to modules using:
 
 \begin{scala}
 object chiselMainTest {
@@ -1064,49 +1073,35 @@ object chiselMainTest {
 \end{scala}
 
 \noindent
-When \code{--test} is given as an argument to \code{chiselMain}, a
+When \code{-{-}test} is given as an argument to \code{chiselMain}, a
 tester instance runs the Design Under Test (DUT) in a separate
 process with stdin and stdout connected so that inputs can be sent to
 the DUT and outputs can received from the DUT as shown in
 Figure~\ref{fig:dut}.
 \noindent
 
-\begin{scala}
-def step(vars: HashMap[Node, Node]): Boolean
-\end{scala}
-
-\noindent
-where \code{vars} is a mapping of test nodes to literals, 
-with assignments to input nodes being sent to the DUT and assignments to
-non-input nodes being interpreted as expected values.
-\code{test} first sends inputs specifed in vars, steps the DUT and then either
-compares expected values from vars or sets vars for test nodes without
-entries in \code{vars}.
-The following is an example for defining tests for \code{Mux2}:
+For example, in the following:
 
 \begin{scala}
-class Mux2Tests(c: Mux2) 
-    extends Tester(c, Array(c.io)) {  
-  defTests {
-    var allGood = true
-    val n = pow(2, 3).toInt
-    val vars = new HashMap[Node, Node]()
-    for (s <- 0 until 2) {
+class Mux2Tests(c: Mux2) extends Tester(c) {
+  val n = pow(2, 3).toInt
+  for (s <- 0 until 2) {
     for (i0 <- 0 until 2) {
-    for (i1 <- 0 until 2) {
-      vars(c.io.sel) = UInt(s)
-      vars(c.io.in1) = UInt(i1)
-      vars(c.io.in0) = UInt(i0)
-      vars(c.io.out) = UInt(if (s == 1) i1 else i0)
-      allGood &&= step(vars)
-    } } } 
-    allGood
+      for (i1 <- 0 until 2) {
+        poke(c.io.sel, s)
+        poke(c.io.in1, i1)
+        poke(c.io.in0, i0)
+        step()
+        expect(c.io.out, (if (s == 1) i1 else i0))
+      }
+    }
   }
 }
 \end{scala}
 
 \noindent
-and the following shows how it is invoked:
+In the \verb+for+ loop, the assignments for each input of \verb+Mux2+ is set to the appropriate values using \verb+poke+. For this particular example, we are testing the \verb+Mux2+ by hardcoding the input to some known value and checking if the output corresponds to the known one. To do this, on each iteration we generate appropriate inputs to the module and tell the simulation to assign this value to the input of the device we are testing \verb+c+, step the circuit, and test the expected value.  
+Finally, the following shows how it is invoked:
 
 \begin{scala}
 chiselMainTest(args + "--test", () => new Mux2()){ 
