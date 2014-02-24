@@ -151,4 +151,11 @@ abstract class Data extends Node {
 }
 
 abstract class CompositeData extends Data {
+  override def nameIt(path: String, isNamingIO: Boolean) {
+    if (isTypeNode && comp != null) {
+      comp nameIt (path, isNamingIO)
+    } else {
+      super.nameIt(path, isNamingIO)
+    }
+  }
 }

@@ -165,6 +165,8 @@ abstract class Node extends nameable {
        we don't override it. */
       name = path;
     }
+    while (!(component.names.getOrElseUpdate(name, this) eq this))
+      name += "_"
   }
 
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS

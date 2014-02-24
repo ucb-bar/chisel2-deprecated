@@ -82,7 +82,6 @@ object Module {
   val components = ArrayBuffer[Module]();
   var sortedComps: ArrayBuffer[Module] = null
   val procs = ArrayBuffer[proc]();
-  val resetList = ArrayBuffer[Node]();
   val muxes = ArrayBuffer[Node]();
   val nodes = ArrayBuffer[Node]()
   val blackboxes = ArrayBuffer[BlackBox]()
@@ -149,7 +148,6 @@ object Module {
     printfs.clear();
     printStackStruct.clear();
     procs.clear();
-    resetList.clear()
     muxes.clear();
     blackboxes.clear();
     ioMap.clear()
@@ -278,6 +276,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
   val regs  = new ArrayBuffer[Reg];
   val nexts = new ScalaQueue[Node];
+  val names = new HashMap[String, Node]
   var nindex = -1;
   var defaultWidth = 32;
   var pathParent: Module = null;
