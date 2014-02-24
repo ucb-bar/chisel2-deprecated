@@ -158,6 +158,8 @@ abstract class Node extends nameable {
        we don't override it. */
       name = path;
     }
+    while (!(component.names.getOrElseUpdate(name, this) eq this))
+      name += "_"
   }
 
   def setVarName (name_ : String) {
