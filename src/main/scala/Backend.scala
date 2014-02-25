@@ -120,7 +120,7 @@ abstract class Backend {
         node.named = node.nameHolder.named;
         node.nameHolder.name = ""
       } else if (!node.isTypeNode && node.name == "") {
-        emitRef(node)
+        node.emitIndex
       }
     }
   }
