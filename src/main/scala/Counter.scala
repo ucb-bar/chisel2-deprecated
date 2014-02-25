@@ -452,7 +452,7 @@ trait CounterBackend extends Backannotation {
         def writeValid(i: Int) = slaveIO.valid && stall && writeAddr === UInt(i)
 
         slaveIO.ready.updates += ((Bool(true), inputRdy || ready(writeAddr)))
-        topIO.valid.updates   += ((Bool(true), inputRdy && writeValid(0)))
+        topIO.valid.updates   += ((Bool(true), inputRdy || writeValid(0)))
        
         (slaveIO.bits, topIO.bits) match {
           case (bits: Bits, bundle: Bundle) => {
@@ -509,8 +509,8 @@ trait CounterBackend extends Backannotation {
     val notStop = !stop
     val enable = (notStall && notStop || init) 
     enable.getNode.component = slave
-    enable.getNode setName "emul_clk"
     emulClock enabledBy (daisyClock, enable)
+    emulClock.inputs.head.getNode setName "emul_clk"
 
     slave.genAllMuxes
   }
