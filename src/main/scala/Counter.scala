@@ -377,10 +377,6 @@ trait CounterBackend extends Backannotation {
     notStall.getNode.component = slave
     stall.getNode setName "stall"
     stall.getNode.component = slave
-    if (!(slave.debugs contains notStall.getNode))
-      slave.debugs contains notStall.getNode
-    if (!(slave.debugs contains stall.getNode))
-      slave.debugs contains stall.getNode
 
     // for top's output ports
     (slaveAddr, slaveOut, top.io("daisy_out"), top.io("out")) match {
@@ -402,10 +398,6 @@ trait CounterBackend extends Backannotation {
           case _ => Bool(false)
         })
         val daisyRdy = readAddr === UInt(2) && slaveIO.ready
-        daisyRdy.getNode.component = slave
-        daisyRdy.getNode setName "daisy_rdy"
-        if (!(slave.debugs contains daisyRdy.getNode))
-          slave.debugs += daisyRdy.getNode
 
         // address == 2 => Read from daisy chains
         // address == 3 => Check whether or not the target finished
@@ -441,15 +433,13 @@ trait CounterBackend extends Backannotation {
             topIO: DecoupledIO[_], 
             topStall: Bits, 
             daisyControl: Bits) => {
-        /*
-        top.io("stall") := stall 
-        top.io("daisy_control") := addr(daisy_ctrl_width-1, 0)
-        */
         val daisyAddr = addr(daisy_ctrl_width-1, 0)
+        /*
         daisyAddr.getNode.component = slave
         daisyAddr.getNode setName "daisy_addr"
         if (!(slave.debugs contains daisyAddr.getNode))
           slave.debugs += daisyAddr.getNode
+        */
         topStall.updates     += ((Bool(true), stall))
         daisyControl.updates += ((Bool(true), daisyAddr))
 
@@ -459,39 +449,10 @@ trait CounterBackend extends Backannotation {
           case _ => Bool(false)
         })
         val writeAddr = addr(addr_width-1, daisy_ctrl_width) 
-        val topIn = slaveIO.valid && stall && writeAddr === UInt(0)
-        val clkIn = slaveIO.valid && stall && writeAddr === UInt(1)
-        val topIn2 = slaveIO.valid && stall && writeAddr === UInt(2)
-        val slaveRdy = inputRdy || ready(writeAddr)
-        val topVal = inputRdy || topIn2
+        def writeValid(i: Int) = slaveIO.valid && stall && writeAddr === UInt(i)
 
-        topIn.getNode.component = slave
-        clkIn.getNode.component = slave
-        slaveRdy.getNode.component = slave
-        topVal.getNode.component = slave
-        topIn.getNode setName ("top_in")
-        clkIn.getNode setName ("clk_in")
-        slaveRdy.getNode setName ("slave_in_rdy")
-        topVal.getNode setName ("top_in_val")
-
-        if (!(slave.debugs contains clkIn.getNode))
-          slave.debugs += clkIn.getNode
-        if (!(slave.debugs contains topIn.getNode))
-          slave.debugs += topIn.getNode
-        if (!(slave.debugs contains slaveRdy.getNode))
-          slave.debugs += slaveRdy.getNode
-        if (!(slave.debugs contains topVal.getNode))
-          slave.debugs += topVal.getNode
-
-
-        // address = 0 => Set inputs to the device
-        // address = 1 => Write to the clock counter
-        /*
-        slaveIO.ready := inputRdy || ready(writeAddr)
-        topIO.valid := inputRdy || writeValid(2)
-        */
-        slaveIO.ready.updates += ((Bool(true), slaveRdy))
-        topIO.valid.updates   += ((Bool(true), topVal))
+        slaveIO.ready.updates += ((Bool(true), inputRdy || ready(writeAddr)))
+        topIO.valid.updates   += ((Bool(true), inputRdy && writeValid(0)))
        
         (slaveIO.bits, topIO.bits) match {
           case (bits: Bits, bundle: Bundle) => {
@@ -499,18 +460,12 @@ trait CounterBackend extends Backannotation {
               case (bitsA: Bits, bitsB: Bits) => (bitsA, bitsB)
               case _ => (Bits(0), Bits(0)) // error?
             }
-            // val (name0, a) = bundle.elements(0)
-            // val (name1, b) = bundle.elements(1)
             val clkCounterIsOne = clkCounter === Bits(1)
             val clkCounterDecr  = clkCounter - Bits(1, 32)
             clkCounterIsOne.getNode.component = slave
             clkCounterDecr.getNode.component = slave
             clkCounterIsOne.getNode setName "clk_cnt_is_one"
             clkCounterDecr.getNode setName "clk_cnt_decr"
-            if (slave.debugs contains clkCounterIsOne.getNode)
-              slave.debugs += clkCounterIsOne.getNode
-            if (slave.debugs contains clkCounterDecr.getNode)
-              slave.debugs += clkCounterDecr.getNode
 
             // todo: stop with new inputs?
             /*
@@ -533,15 +488,15 @@ trait CounterBackend extends Backannotation {
             */
             stop.comp.updates       += ((Bool(true), stop))
             stop.comp.updates       += ((clkCounterIsOne, Bool(true)))
-            stop.comp.updates       += ((clkIn, Bool(false)))
+            stop.comp.updates       += ((writeValid(1), Bool(false)))
             init.comp.updates       += ((Bool(true), init))
-            init.comp.updates       += ((topIn, Bool(false)))
+            init.comp.updates       += ((writeValid(0), Bool(false)))
             topInBits.comp.updates  += ((Bool(true), topInBits))
-            topInBits.comp.updates  += ((topIn, bits))
+            topInBits.comp.updates  += ((writeValid(0), bits))
             clkCounter.comp.updates += ((Bool(true), clkCounter))
             clkCounter.comp.updates += ((notStall, clkCounterDecr))
-            clkCounter.comp.updates += ((clkIn, slaveIO.bits))
-            inputRdy.comp.updates   += ((clkIn, Bool(false)))
+            clkCounter.comp.updates += ((writeValid(1), slaveIO.bits))
+            inputRdy.comp.updates   += ((writeValid(1), Bool(false)))
             a.updates               += ((Bool(true), topInBits(31, 16)))
             b.updates               += ((Bool(true), topInBits(15, 0)))
           }
@@ -551,11 +506,8 @@ trait CounterBackend extends Backannotation {
     }
 
     // emulation clock
-    // val clockType = getTypeNode(daisyClock)
-    // val clockBool = clockType.toBool
     val notStop = !stop
-    val enable = (notStall && notStop || init) /* && clockBool */
-    // clockBool.isTypeNode = true
+    val enable = (notStall && notStop || init) 
     enable.getNode.component = slave
     enable.getNode setName "emul_clk"
     emulClock enabledBy (daisyClock, enable)
