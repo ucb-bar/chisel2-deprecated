@@ -81,7 +81,7 @@ class Tester[+T <: Module](val c: T, val testNodes: Array[Node]) {
       val v = svars.getOrElse(n, null)
       val i = if (v == null) BigInt(0) else v.litValue() // TODO: WARN
       val s = i.toString(16)
-      if (isTrace) println("  " + n + " = " + i)
+      if (isTrace) println("  " + n.name + " = " + i)
       for (c <- s) {
         testOut.write(c)
       }
@@ -99,6 +99,8 @@ class Tester[+T <: Module](val c: T, val testNodes: Array[Node]) {
     var c = testIn.read
     val sb = new StringBuilder()
     def isSpace(c: Int) : Boolean = c == 0x20 || c == 0x9 || c == 0xD || c == 0xA
+ 
+    /* TODO: Fix it
     if (Module.clocks.length > 1) {
       while (isSpace(c)) c = testIn.read
       while (!isSpace(c)) {
@@ -107,6 +109,8 @@ class Tester[+T <: Module](val c: T, val testNodes: Array[Node]) {
       }
       delta += sb.toString.toInt
     }
+    */
+
     for (o <- testNonInputNodes) {
       sb.clear()
       while (isSpace(c)) {
@@ -118,12 +122,12 @@ class Tester[+T <: Module](val c: T, val testNodes: Array[Node]) {
       }
       val s = sb.toString
       val rv = toLitVal(s)
-      if (isTrace) println("  READ " + o + " = " + rv)
+      if (isTrace) println("  READ " + o.name + " = " + rv)
       if (!svars.contains(o)) {
         ovars(o) = Literal(rv)
       } else {
         val tv = svars(o).litValue()
-        if (isTrace) println("  EXPECTED: " + o + " = " + tv)
+        if (isTrace) println("  EXPECTED: " + o.name + " = " + tv)
         if (tv != rv) {
           isSame = false
           if (isTrace) println("  *** FAILURE ***")

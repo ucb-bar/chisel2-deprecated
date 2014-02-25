@@ -16,6 +16,55 @@ class Slave extends Module {
     val out = Decoupled(Bits(width = data_width))
     val addr = Bits(INPUT, addr_width)
   }
+  val signals = new ArrayBuffer[Node]
+  val signalCounterMap = new HashMap[Node, Node]
+}
+
+class SlaveTester(s: Slave) extends Tester(s, Array(s.io) ++ s.signals /* ++ (Module.clocks filter (_.isEnabled))*/ ) {
+  defTests {
+    val (a, b, z) = (80, 16, 16)
+    val svars = new HashMap[Node, Node]
+    val ovars = new HashMap[Node, Node]
+    val counters = new HashMap[Int, Int]
+
+    for (i <- 0 until 16) {
+      counters(i) = 0
+    }
+
+    var t = 0
+    svars.clear
+    // Set inputs
+    svars(s.io.addr) = Bits(0 << 2)
+    svars(s.io.in.bits) = Bits(80 << 16 | 16)
+    svars(s.io.in.valid) = Bool(true)
+    svars(s.io.out.ready) = Bool(false)
+    step(svars, ovars)
+    svars(s.io.in.bits) = Bits(0)
+    svars(s.io.in.valid) = Bool(false)
+    step(svars, ovars)
+    step(svars, ovars)
+//    do {
+      val first = (t == 0)
+      svars(c.io.addr) = Bits(1 << 2)
+      svars(c.io.in.bits) = Bits(1)
+      svars(c.io.in.valid) = Bool(true)
+      step(svars, ovars)
+      svars(c.io.addr) = Bits(2 << 2 | 1)
+      svars(c.io.out.ready) = Bool(true)
+      step(svars, ovars)
+      svars(c.io.addr) = Bits(2 << 2 | 2)
+      for (i <- 0 until 16) {
+        step(svars, ovars)
+        counters(i) = counters(i) + ovars(s.io.out.bits).litValue().toInt
+      }
+      svars(c.io.addr) = Bits(3 << 2 | 2)
+      step(svars, ovars)
+//    } while (t <= 1 || ovars(c.io.out.valid) == Bool(true))
+    for (i <- 0 until 16) {
+      ChiselError.info("counter%d: %d".format(i, counters(i)))
+    }
+    ovars(s.io.out.bits) == Bits(z)
+  }
 }
 
 trait CounterBackend extends Backannotation {
@@ -44,8 +93,8 @@ trait CounterBackend extends Backannotation {
   preElaborateTransforms += ((c: Module) => generateCounters(c))
   preElaborateTransforms += ((c: Module) => generateDaisyChain(c))
   preElaborateTransforms += ((c: Module) => generateSlave(c))
-  // transforms += ((c: Module) => Module.topComponent.clocks -= emulClock) //Todo: remove it
   analyses += ((c: Module) => findClockCrossingPoints(c))
+  analyses += ((c: Module) => initTester(c))
 
   def getTypeNode(node: Node) = {
     def genTypeNode(node: Node) = {
@@ -350,13 +399,15 @@ trait CounterBackend extends Backannotation {
     Module.setAsTopComponent(slave)
     slave markComponent nameSpace
     Module.sortedComps prepend slave
+    slave.signals ++= signals
+    slave.signalCounterMap ++= ( for ((x, y) <- signalCounterMap) yield ((x, y.getNode)) )
 
     // connect pins
     val slaveAddr = slave.io("addr")
     val slaveIn = slave.io("in")
     val slaveOut = slave.io("out")
-    val topInBits = Reg(init = Bits(0, 32), clock = daisyClock)
-    val clkCounter = Reg(init = Bits(0, 32), clock = daisyClock)
+    val topInBits = Reg(init = Bits(0), clock = daisyClock)
+    val clkCounter = Reg(init = Bits(100), clock = daisyClock)
     val inputRdy = Reg(init = Bool(true), clock = daisyClock)
     val init = Reg(init = Bool(true), clock = daisyClock)
     val stop = Reg(init = Bool(false), clock = stopClock) // works at negative edges
@@ -434,12 +485,6 @@ trait CounterBackend extends Backannotation {
             topStall: Bits, 
             daisyControl: Bits) => {
         val daisyAddr = addr(daisy_ctrl_width-1, 0)
-        /*
-        daisyAddr.getNode.component = slave
-        daisyAddr.getNode setName "daisy_addr"
-        if (!(slave.debugs contains daisyAddr.getNode))
-          slave.debugs += daisyAddr.getNode
-        */
         topStall.updates     += ((Bool(true), stall))
         daisyControl.updates += ((Bool(true), daisyAddr))
 
@@ -532,6 +577,13 @@ trait CounterBackend extends Backannotation {
           }
         }
       }
+    }
+  }
+
+  def initTester(m: Module) {
+    m match {
+      case s: Slave if Module.isTesting => Module.tester = new SlaveTester(s)
+      case _ =>
     }
   }
 

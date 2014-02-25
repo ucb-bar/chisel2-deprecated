@@ -569,6 +569,8 @@ class CppBackend extends Backend {
     harness.write("  " + name + "_t* c = new " + name + "_t();\n");
     harness.write("  int lim = (argc > 1) ? atoi(argv[1]) : -1;\n");
     harness.write("  int period;\n")
+
+/*  TODO: Fix it!
     if (Module.clocks.length > 1) {
       for (clock <- Module.clocks) {
         if (clock.srcClock == null) {
@@ -578,6 +580,7 @@ class CppBackend extends Backend {
         }
       }
     }
+*/
     harness.write("  c->init();\n");
     if (Module.isVCD) {
       harness.write("  FILE *f = fopen(\"" + name + ".vcd\", \"w\");\n");
@@ -585,9 +588,10 @@ class CppBackend extends Backend {
     harness.write("  int delta = 0;\n")
     harness.write("  for(int i = 0; i < 5; i++) {\n")
     harness.write("    dat_t<1> reset = LIT<1>(1);\n")
+
     if (Module.clocks.length > 1) {
       harness.write("    delta += c->clock(reset);\n")
-    } else {
+    } else { 
       harness.write("    c->clock_lo(reset);\n")
       harness.write("    c->clock_hi(reset);\n")
     }
@@ -597,12 +601,12 @@ class CppBackend extends Backend {
     harness.write("    if (!c->scan(stdin)) break;\n");
     if (Module.clocks.length > 1) {
       harness.write("    delta += c->clock(reset);\n")
-      harness.write("    fprintf(stdout, \"%d\", delta);\n")
-      harness.write("    fprintf(stdout, \"%s\", \" \");\n")
+//      harness.write("    fprintf(stdout, \"%d\", delta);\n")
+//      harness.write("    fprintf(stdout, \"%s\", \" \");\n")
       harness.write("    c->print(stdout, stderr);\n")
       harness.write("    delta = 0;\n")
       if (Module.isVCD) { harness.write("    c->dump(f, t);\n"); }
-    } else {
+    } else { 
       harness.write("    c->clock_lo(reset);\n");
       harness.write("    c->print(stdout, stderr);\n");
       if (Module.isVCD) { harness.write("    c->dump(f, t);\n"); }
