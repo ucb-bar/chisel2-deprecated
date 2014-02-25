@@ -407,7 +407,7 @@ trait CounterBackend extends Backannotation {
     val slaveIn = slave.io("in")
     val slaveOut = slave.io("out")
     val topInBits = Reg(init = Bits(0), clock = daisyClock)
-    val clkCounter = Reg(init = Bits(100), clock = daisyClock)
+    val clkCounter = Reg(init = Bits(0), clock = daisyClock)
     val inputRdy = Reg(init = Bool(true), clock = daisyClock)
     val init = Reg(init = Bool(true), clock = daisyClock)
     val stop = Reg(init = Bool(false), clock = stopClock) // works at negative edges
