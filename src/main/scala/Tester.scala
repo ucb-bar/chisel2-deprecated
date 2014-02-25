@@ -40,7 +40,7 @@ import java.io.PrintStream
 import scala.sys.process._
 import Literal._
 
-class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
+class Testy[+T <: Module](val c: T, val isTrace: Boolean = true) {
   var testIn:  InputStream  = null
   var testOut: OutputStream = null
   var testErr: InputStream  = null
@@ -111,7 +111,7 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
     peekBits(data.getNode)
   }
 
-  def peek(data: CompositeData /*, off: Int = -1 */): Array[BigInt] = {
+  def peek(data: Aggregate /*, off: Int = -1 */): Array[BigInt] = {
     data.flatten.map(x => x._2).map(peek(_))
   }
 
@@ -144,33 +144,19 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
     pokeBits(data, x)
   }
 
-  def poke(data: CompositeData, x: Array[BigInt]): Unit = {
+  def poke(data: Aggregate, x: Array[BigInt]): Unit = {
     val kv = (data.flatten.map(x => x._2), x).zipped;
     for ((x, y) <- kv)
       poke(x, y)
   }
 
-  def step(n: Int = 1) = {
+  def step(n: Int) = {
     puts("step " + n + "\n");
     testOut.flush()
     val s = gets()
     delta += s.toInt
     if (isTrace) println("STEP " + n + " <- " + s)
     drainErr()
-  }
-
-  val rnd = new Random()
-  var process: Process = null
-
-  def startTesting(): Process = {
-    val cmd = Module.targetDir + "/" + c.name + (if(Module.backend.isInstanceOf[VerilogBackend]) " -q" else "")
-    println("STARTING " + cmd)
-    val processBuilder = Process(cmd)
-    val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => testErr = err)
-    process = processBuilder.run(pio)
-    while(testIn == null) { }
-    reset(5)
-    process
   }
 
   var ok = true;
@@ -188,12 +174,27 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
        "EXPECT " + data.name + " <- " + got + " == " + expected)
   }
 
-  def expect (data: CompositeData, expected: Array[BigInt]): Boolean = {
+  def expect (data: Aggregate, expected: Array[BigInt]): Boolean = {
     val kv = (data.flatten.map(x => x._2), expected).zipped;
     var allGood = true
     for ((d, e) <- kv)
       allGood = expect(d, e) && allGood
     allGood
+  }
+
+  val rnd = new Random()
+  var process: Process = null
+
+  def startTesting(): Process = {
+    val cmd = Module.targetDir + "/" + c.name + (if(Module.backend.isInstanceOf[VerilogBackend]) " -q" else "")
+    println("STARTING " + cmd)
+    val processBuilder = Process(cmd)
+    val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => testErr = err)
+    process = processBuilder.run(pio)
+    while(testIn == null || testErr == null || testOut == null) { }
+    println("STARTING TESTING ...")
+    reset(5)
+    process
   }
 
   def endTesting(): Boolean = {
@@ -208,4 +209,51 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
   }
 
   startTesting()
+}
+
+class Tester[+T <: Module](c: T, val testNodes: Array[Node]) extends Testy(c, false) {
+  def splitFlattenNodes(args: Seq[Node]): (Seq[Node], Seq[Node]) = {
+    if (args.length == 0) {
+      (Array[Node](), Array[Node]())
+    } else {
+      val testNodes = args.map(i => i.maybeFlatten).reduceLeft(_ ++ _).map(x => x.getNode);
+      (c.keepInputs(testNodes), c.removeInputs(testNodes))
+    }
+  }
+  val (ins, outs) = splitFlattenNodes(testNodes)
+  val testInputNodes    = ins.toArray; 
+  val testNonInputNodes = outs.toArray
+  def step(svars: HashMap[Node, Node],
+           ovars: HashMap[Node, Node] = new HashMap[Node, Node],
+           isTrace: Boolean = true): Boolean = {
+    if (isTrace) { println("---"); println("INPUTS") }
+    for (n <- testInputNodes) {
+      val v = svars.getOrElse(n, null)
+      val i = if (v == null) BigInt(0) else v.litValue() // TODO: WARN
+      pokeBits(n, i)
+    }
+    if (isTrace) println("OUTPUTS")
+    var isSame = true
+    step(1)
+    for (o <- testNonInputNodes) {
+      val rv = peekBits(o)
+      if (isTrace) println("  READ " + o + " = " + rv)
+      if (!svars.contains(o)) {
+        ovars(o) = Literal(rv)
+      } else {
+        val tv = svars(o).litValue()
+        if (isTrace) println("  EXPECTED: " + o + " = " + tv)
+        if (tv != rv) {
+          isSame = false
+          if (isTrace) println("  *** FAILURE ***")
+        } else {
+          if (isTrace) println("  SUCCESS")
+        }
+      }
+    }
+    isSame
+  }
+  var tests: () => Boolean = () => { println("DEFAULT TESTS"); true }
+  def defTests(body: => Boolean) = body
+
 }

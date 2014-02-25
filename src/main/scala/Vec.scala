@@ -139,7 +139,7 @@ class VecProc extends proc {
   }
 }
 
-class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] with Cloneable {
+class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with Cloneable {
   val self = new ArrayBuffer[T]
   val readPortCache = new HashMap[UInt, T]
   var sortedElementsCache: ArrayBuffer[ArrayBuffer[Data]] = null

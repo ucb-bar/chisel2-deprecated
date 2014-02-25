@@ -170,7 +170,7 @@ object chiselMain {
   def run[T <: Module] (args: Array[String], gen: () => T): T = apply(args, () => Module(gen())) // hack to avoid supplying default parameters and invoke Module.apply manually for invocation in sbt
 
   def apply[T <: Module]
-      (args: Array[String], gen: () => T, ftester: T => Tester[T] = null) = {
+      (args: Array[String], gen: () => T, ftester: T => Testy[T] = null) = {
     Module.initChisel();
     readArgs(args)
 
@@ -181,7 +181,7 @@ object chiselMain {
       if (Module.isCompiling && Module.isGenHarness) Module.backend.compile(c)
       if (ftester != null && !Module.backend.isInstanceOf[VerilogBackend]) {
         var res = false
-        var tester: Tester[T] = null
+        var tester: Testy[T] = null
         try {
           tester = ftester(c)
         } finally {
@@ -210,7 +210,7 @@ object throwException {
 }
 
 object chiselMainTest {
-  def apply[T <: Module](args: Array[String], gen: () => T)(tester: T => Tester[T]): T =
+  def apply[T <: Module](args: Array[String], gen: () => T)(tester: T => Testy[T]): T =
     chiselMain(args, gen, tester)
 }
 
