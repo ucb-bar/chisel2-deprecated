@@ -11,9 +11,13 @@ class Clock(reset: Bool = Module.implicitReset, val edge: ClockEdge = PosEdge) e
   Module.clocks += this
   init("", 1)
 
-  // var srcClock: Clock = null
-  var srcClock: Node = null // by Donggyu
+  // by Donggyu
+  var srcClock: Clock = null
+  // def srcClock: Node = if (inputs.isEmpty) null else inputs(0)
+  var isEnabled = false          
   var initStr = ""
+  
+  override def isInObject = super.isInObject || isEnabled
 
   // returns a reset pin connected to reset for the component in scope
   def getReset: Bool = {
@@ -40,11 +44,30 @@ class Clock(reset: Bool = Module.implicitReset, val edge: ClockEdge = PosEdge) e
     clock
   }
 
-  // for negative edge 
+  // for negative clock edges
   def unary_- = {
     val clock = new Clock(reset, NegEdge)
     clock.init(name, 1)
     clock.srcClock = this
+    // clock.inputs += this
     clock
-  } 
+  }
+
+  // for enabled clocks
+  // Todo: generalize it!
+  def enabledBy (src: Clock, enable: Bool) {
+    srcClock = src
+    isEnabled = true
+    component = enable.getNode.component
+    Module.backend match {
+      case _: VerilogBackend => {
+        val typeNode = Bool()
+        typeNode.inputs += src
+        inputs += enable && typeNode
+      }
+      case _ => {
+        inputs += enable
+      }
+    }
+  }
 }

@@ -115,11 +115,12 @@ abstract class Backend {
     top dfs { node =>
       if( node.nameHolder != null && node.nameHolder.name != "" &&
           !node.named && !node.isLit ){
-        node.name = node.nameHolder.name; // Not using nameIt to avoid override
-        node.named = node.nameHolder.named;
+        node.name = node.nameHolder.name // Not using nameIt to avoid override
+        node.named = node.nameHolder.named
         node.nameHolder.name = ""
       } else if (!node.isTypeNode && node.name == "") {
-        emitRef(node)
+        node.emitIndex
+        // emitRef(node)
       }
     }
   }
@@ -177,22 +178,15 @@ abstract class Backend {
     /* XXX Make sure roots are consistent between initializeBFS, initializeDFS
      and findRoots.
      */
+    for( clock <- Module.clocks ; if clock.isEnabled) {
+      res.push(clock)
+    }
     for( c <- Module.components ) {
       for( a <- c.debugs ) {
         res.push(a)
       }
       for((n, flat) <- c.io.flatten) {
         res.push(flat)
-      }
-    }
-
-    for (clk <- Module.clocks) {
-      val srcClock = clk.srcClock
-      if (srcClock != null) {
-        srcClock match {
-          case _: Clock =>
-          case _ => res.push(srcClock)  
-        }
       }
     }
 
@@ -364,7 +358,7 @@ abstract class Backend {
   def gatherClocksAndResets {
     for (parent <- Module.sortedComps) {
       for (child <- parent.children) {
-        for (clock <- child.clocks) {
+        for (clock <- child.clocks ; if !clock.isEnabled) {
           parent.addClock(clock)
         }
         for (reset <- child.resets.keys) {
@@ -529,7 +523,7 @@ abstract class Backend {
     for (comp <- Module.sortedComps)
       for (node <- comp.nodes)
         if (node.isInstanceOf[Reg])
-             createClkDomain(node, clkDomainWalkedNodes)
+          createClkDomain(node, clkDomainWalkedNodes)
     ChiselError.checkpoint()
 
     for (comp <- Module.sortedComps ) {

@@ -468,20 +468,14 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     for(c <- Module.components) {
       for((n, io) <- c.io.flatten)
         res.enqueue(io)
-      // edited by Donggyu
+      // by Donggyu
       // TODO: side effects?
       for(reset <- resets.values)
         res.enqueue(reset)
     }
     // by Donggyu
-    for(clock <- Module.clocks) {
-      val src = clock.srcClock
-      if (src != null) {
-        src match {
-          case _ : Clock =>
-          case _ => res.enqueue(src)
-        }
-      }
+    for(clock <- Module.clocks ; if clock.isEnabled) {
+      res.enqueue(clock)
     }
 
     res
@@ -493,6 +487,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     /* XXX Make sure roots are consistent between initializeBFS, initializeDFS
      and findRoots.
      */
+    // by Donggyu
+    for(clock <- clocks ; if clock.isEnabled) {
+      res.push(clock)
+    }
     for( a <- this.debugs ) {
       res.push(a)
     }
@@ -935,9 +933,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     for (b <- Module.blackboxes)
       queue.push(() => b.io.traceNode(this, queue));
 
-    for (clk <- Module.clocks)
-      if (clk.srcClock != null)
-        queue.push(() => clk.srcClock.traceNode(Module.topComponent, queue))
+    for (clock <- Module.clocks ; if clock.isEnabled){
+      val src = clock.inputs(0).getNode
+      queue.push(() => src.traceNode(src.component, queue))
+    }
 
     while (queue.length > 0) {
       val work = queue.pop();

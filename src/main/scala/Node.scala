@@ -101,6 +101,7 @@ object Node {
   /* clk is initialized in Module.initChisel */
   var clk: Node = null
 
+  var nodeIndex = 0
 }
 
 /** *Node* defines the root class of the class hierarchy for
@@ -498,7 +499,9 @@ abstract class Node extends nameable {
   
   def emitIndex(): Int = {
     if (index == -1) {
-      index = componentOf.nextIndex;
+//      index = componentOf.nextIndex;
+      nodeIndex = nodeIndex + 1
+      index = nodeIndex
     }
     index
   }

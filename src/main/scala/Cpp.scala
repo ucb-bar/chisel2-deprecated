@@ -127,9 +127,14 @@ class CppBackend extends Backend {
         "  mem_t<" + m.width + "," + m.n + "> " + emitRef(m) + ";\n"
       case r: ROM[_] =>
         "  mem_t<" + r.width + "," + r.lits.length + "> " + emitRef(r) + ";\n"
-      case c: Clock =>
-        "  int " + emitRef(node) + ";\n" +
-        "  int " + emitRef(node) + "_cnt;\n";
+      case c: Clock if c.edge == PosEdge => {
+        if (!c.isEnabled) {
+          "  int " + emitRef(node) + ";\n" +
+          "  int " + emitRef(node) + "_cnt;\n";
+        } else {
+          "  dat_t<1> " + emitRef(node) + ";\n"
+        }
+      }
       // case f: AsyncFIFO =>
       //   "  async_fifo_t<" + f.width + ",32> " + emitRef(f) + ";\n"
       case _ =>
@@ -508,8 +513,8 @@ class CppBackend extends Backend {
 
   def emitInit(node: Node): String = {
     node match {
-      case x: Clock =>
-        if (x.srcClock != null) {
+      case x: Clock if x.edge == PosEdge =>
+        if (x.srcClock != null && !x.isEnabled) {
           "  " + emitRef(node) + " = " + emitRef(x.srcClock) + x.initStr +
           "  " + emitRef(node) + "_cnt = " + emitRef(node) + ";\n"
         } else
@@ -673,6 +678,8 @@ class CppBackend extends Backend {
             if(m.name != "reset" || !(m.component == c)) {
               m.name = m.component.getPathName + "__" + m.name;
             }
+          } else if (m.component.debugs contains m) {
+            m.name = m.component.getPathName + "__" + emitRef(m)
           }
       }
     }
@@ -684,9 +691,12 @@ class CppBackend extends Backend {
       m match {
         case l: Literal => ;
         case any        =>
-          if (m.name != "" && (m.name != "reset") && !(m.component == null)) {
-            val mapping = (m.component.getPathName(".") + "." + m.name, m)
-            mappings += mapping
+          if (m.name != "reset" && m.component != null) {
+            if (m.name != "") {
+              mappings += ((m.component.getPathName(".") + "." + m.name, m))
+            } else if (Module.topComponent.debugs contains m) {
+              mappings += ((m.component.getPathName(".") + "." + emitRef(m), m))
+            }
           }
       }
     }
@@ -719,26 +729,28 @@ class CppBackend extends Backend {
     println("CPP elaborate")
     super.elaborate(c)
 
+    val top = Module.topComponent
+
     /* We flatten all signals in the toplevel component after we had
      a change to associate node and components correctly first
      otherwise we are bound for assertions popping up left and right
      in the Backend.elaborate method. */
     for (cc <- Module.components) {
-      if (!(cc == c)) {
-        c.debugs ++= cc.debugs
-        c.mods   ++= cc.mods;
+      if (!(cc == top)) {
+        top.debugs ++= cc.debugs
+        top.mods   ++= cc.mods;
       }
     }
-    c.findConsumers();
-    c.verifyAllMuxes;
+    top.findConsumers();
+    top.verifyAllMuxes;
     ChiselError.checkpoint()
 
-    c.collectNodes(c);
-    c.findOrdering(); // search from roots  -- create omods
-    val mappings = generateNodeMapping(c.omods);
-    renameNodes(c, c.omods);
+    top.collectNodes(top);
+    top.findOrdering(); // search from roots  -- create omods
+    val mappings = generateNodeMapping(top.omods);
+    renameNodes(top, top.omods);
     if (Module.isReportDims) {
-      val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
+      val (numNodes, maxWidth, maxDepth) = top.findGraphDims();
       ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
 
@@ -746,34 +758,36 @@ class CppBackend extends Backend {
     for (clock <- Module.clocks) {
       val clock_lo = new StringBuilder
       val clock_hi = new StringBuilder
-      clkDomains += (clock -> ((clock_lo, clock_hi)))
-      clock_lo.append("void " + c.name + "_t::clock_lo" + clkName(clock) + " ( dat_t<1> reset ) {\n")
-      clock_hi.append("void " + c.name + "_t::clock_hi" + clkName(clock) + " ( dat_t<1> reset ) {\n")
+      if (clock.edge == PosEdge) {
+        clkDomains += (clock -> ((clock_lo, clock_hi)))
+        clock_lo.append("void " + top.name + "_t::clock_lo" + clkName(clock) + " ( dat_t<1> reset ) {\n")
+        clock_hi.append("void " + top.name + "_t::clock_hi" + clkName(clock) + " ( dat_t<1> reset ) {\n")
+      }
     }
 
     if (Module.isGenHarness) {
-      genHarness(c, c.name);
+      genHarness(top, top.name);
     }
-    val out_h = createOutputFile(c.name + ".h");
+    val out_h = createOutputFile(top.name + ".h");
     if (!Params.space.isEmpty) {
-      val out_p = createOutputFile(c.name + ".p");
+      val out_p = createOutputFile(top.name + ".p");
       out_p.write(Params.toDotpStringParams);
       out_p.close();
     }
-    out_h.write("#ifndef __" + c.name + "__\n");
-    out_h.write("#define __" + c.name + "__\n\n");
+    out_h.write("#ifndef __" + top.name + "__\n");
+    out_h.write("#define __" + top.name + "__\n\n");
     out_h.write("#include \"emulator.h\"\n\n");
-    out_h.write("class " + c.name + "_t : public mod_t {\n");
+    out_h.write("class " + top.name + "_t : public mod_t {\n");
     out_h.write(" public:\n");
     if (Module.isTesting && Module.tester != null) {
       Module.scanArgs.clear();  Module.scanArgs  ++= Module.tester.testInputNodes;    Module.scanFormat  = ""
       Module.printArgs.clear(); Module.printArgs ++= Module.tester.testNonInputNodes; Module.printFormat = ""
 
       for (n <- Module.scanArgs ++ Module.printArgs)
-        if(!c.omods.contains(n)) c.omods += n
+        if(!top.omods.contains(n)) top.omods += n
     }
     val vcd = new VcdBackend()
-    for (m <- c.omods) {
+    for (m <- top.omods) {
       if(m.name != "reset") {
         if (m.isInObject) {
           out_h.write(emitDec(m));
@@ -783,12 +797,12 @@ class CppBackend extends Backend {
         }
       }
     }
-    for (clock <- Module.clocks)
+    for (clock <- Module.clocks ; if clock.edge == PosEdge)
       out_h.write(emitDec(clock))
 
     out_h.write("\n");
     out_h.write("  void init ( bool rand_init = false );\n");
-    for ( clock <- Module.clocks) {
+    for (clock <- Module.clocks ; if clock.edge == PosEdge) {
       out_h.write("  void clock_lo" + clkName(clock) + " ( dat_t<1> reset );\n")
       out_h.write("  void clock_hi" + clkName(clock) + " ( dat_t<1> reset );\n")
     }
@@ -804,8 +818,8 @@ class CppBackend extends Backend {
     val out_cpps = ArrayBuffer[java.io.FileWriter]()
     val all_cpp = new StringBuilder
     def createCppFile(suffix: String = "-" + out_cpps.length) = {
-      val f = createOutputFile(c.name + suffix + ".cpp")
-      f.write("#include \"" + c.name + ".h\"\n")
+      val f = createOutputFile(top.name + suffix + ".cpp")
+      f.write("#include \"" + top.name + ".h\"\n")
       for (str <- Module.includeArgs) f.write("#include \"" + str + "\"\n")
       f.write("\n")
       out_cpps += f
@@ -817,11 +831,11 @@ class CppBackend extends Backend {
     }
 
     createCppFile()
-    writeCppFile("void " + c.name + "_t::init ( bool rand_init ) {\n")
-    for (m <- c.omods) {
+    writeCppFile("void " + top.name + "_t::init ( bool rand_init ) {\n")
+    for (m <- top.omods) {
       writeCppFile(emitInit(m))
     }
-    for (clock <- Module.clocks)
+    for (clock <- Module.clocks if clock.edge == PosEdge && !clock.isEnabled)
       writeCppFile(emitInit(clock))
     writeCppFile("  nodes.clear();\n")
     writeCppFile("  mems.clear();\n")
@@ -832,19 +846,32 @@ class CppBackend extends Backend {
     }
     writeCppFile("}\n")
 
-    for (m <- c.omods) {
+    for (m <- top.omods) {
       val clock = if (m.clock == null) Module.implicitClock else m.clock
-      clkDomains(clock)._1.append(emitDefLo(m))
+      if (m.isReg && clock.edge == NegEdge) {
+        clkDomains(clock.srcClock)._2.append(emitDefLo(m)) 
+      } else if (clock.edge == NegEdge) {
+        clkDomains(clock.srcClock)._1.append(emitDefLo(m))
+      } else {
+        clkDomains(clock)._1.append(emitDefLo(m))
+      }
     }
 
-    for (m <- c.omods) {
+    for (m <- top.omods) {
       val clock = if (m.clock == null) Module.implicitClock else m.clock
-      clkDomains(clock)._2.append(emitInitHi(m))
+      if (clock.edge == PosEdge) 
+        clkDomains(clock)._2.append(emitInitHi(m))
     }
 
-    for (m <- c.omods) {
+    for (m <- top.omods) {
       val clock = if (m.clock == null) Module.implicitClock else m.clock
-      clkDomains(clock)._2.append(emitDefHi(m))
+      if (m.isReg && clock.edge == NegEdge) {
+        clkDomains(clock.srcClock)._1.append(emitDefHi(m)) 
+      } else if (clock.edge == NegEdge) {
+        clkDomains(clock.srcClock)._2.append(emitDefHi(m))
+      } else {
+        clkDomains(clock)._2.append(emitDefHi(m))
+      }
     }
 
     for (clk <- clkDomains.keys) {
@@ -852,21 +879,29 @@ class CppBackend extends Backend {
       clkDomains(clk)._2.append("}\n")
     }
 
-    writeCppFile("int " + c.name + "_t::clock ( dat_t<1> reset ) {\n")
+    writeCppFile("int " + top.name + "_t::clock ( dat_t<1> reset ) {\n")
     writeCppFile("  uint32_t min = ((uint32_t)1<<31)-1;\n")
-    for (clock <- Module.clocks) {
+    for (clock <- Module.clocks ; if clock.edge == PosEdge && !clock.isEnabled) {
       writeCppFile("  if (" + emitRef(clock) + "_cnt < min) min = " + emitRef(clock) +"_cnt;\n")
     }
-    for (clock <- Module.clocks) {
+    for (clock <- Module.clocks ; if clock.edge == PosEdge && !clock.isEnabled) {
       writeCppFile("  " + emitRef(clock) + "_cnt-=min;\n")
     }
-    for (clock <- Module.clocks) {
-      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
+    for (clock <- Module.clocks ; if clock.edge == PosEdge) {
+      if (!clock.isEnabled) {
+        writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
+      } else {
+        writeCppFile("  if (" + emitLoWordRef(clock) + ") clock_lo" + clkName(clock) + "( reset );\n")
+      }
     }
-    for (clock <- Module.clocks) {
-      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
+    for (clock <- Module.clocks ; if clock.edge == PosEdge) {
+      if (!clock.isEnabled) {
+        writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
+      } else {
+        writeCppFile("  if (" + emitLoWordRef(clock) + ") clock_hi" + clkName(clock) + "( reset );\n")
+      }
     }
-    for (clock <- Module.clocks) {
+    for (clock <- Module.clocks ; if clock.edge == PosEdge && !clock.isEnabled) {
       writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " +
                   emitRef(clock) + ";\n")
     }
@@ -895,7 +930,7 @@ class CppBackend extends Backend {
       }
       res.reverse
     }
-    writeCppFile("void " + c.name + "_t::print ( FILE* f, FILE* e ) {\n")
+    writeCppFile("void " + top.name + "_t::print ( FILE* f, FILE* e ) {\n")
     for (p <- Module.printfs)
       writeCppFile("#if __cplusplus >= 201103L\n"
         + "  if (" + emitLoWordRef(p.cond)
@@ -930,7 +965,7 @@ class CppBackend extends Backend {
     writeCppFile("}\n")
     def constantArgSplit(arg: String): Array[String] = arg.split('=');
     def isConstantArg(arg: String): Boolean = constantArgSplit(arg).length == 2;
-    writeCppFile("bool " + c.name + "_t::scan ( FILE* f ) {\n")
+    writeCppFile("bool " + top.name + "_t::scan ( FILE* f ) {\n")
     if (Module.scanArgs.length > 0) {
       val format =
         if (Module.scanFormat == "") {
@@ -942,7 +977,7 @@ class CppBackend extends Backend {
       var i = 0;
       for (tok <- toks) {
         if (tok(0) == '%') {
-          val nodes = c.keepInputs(Module.scanArgs(i).maybeFlatten)
+          val nodes = top.keepInputs(Module.scanArgs(i).maybeFlatten)
           for (j <- 0 until nodes.length)
             writeCppFile("  str_to_dat(read_tok(f), " + emitRef(nodes(j)) + ");\n")
           i += 1;
@@ -956,7 +991,7 @@ class CppBackend extends Backend {
     writeCppFile("}\n")
 
     createCppFile()
-    vcd.dumpVCD(c, writeCppFile)
+    vcd.dumpVCD(top, writeCppFile)
 
     for (out <- clkDomains.values.map(_._1) ++ clkDomains.values.map(_._2)) {
       createCppFile()
