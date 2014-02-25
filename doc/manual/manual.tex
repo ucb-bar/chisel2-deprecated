@@ -1037,9 +1037,8 @@ and thus in Chisel we provide a mechanism for
 testing circuits by providing test vectors within Scala using
 subclasses of the \code{Testy} class:
 
-\begin{tiny}
 \begin{scala}
-class Testy[T <: Module] (val c: T) {
+class Testy[T <: Module] (val c: T, val isTrace: Boolean = true) {
   var ok: Boolean
   val rnd: Random
   def reset(n: Int = 1)
@@ -1054,7 +1053,6 @@ class Testy[T <: Module] (val c: T) {
   def expect (data: Bits, target: BigInt): Boolean
 }
 \end{scala}
-\end{tiny}
 
 \noindent
 which binds a tester to a module

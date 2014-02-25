@@ -41,11 +41,21 @@ import scala.sys.process._
 import Literal._
 
 class Testy[+T <: Module](val c: T, val isTrace: Boolean = true) {
+  /*
+  val testIn = new Queue[Int]()
+  val testOut = new Queue[Int]()
+  val testErr = new Queue[Int]()
+  */
   var testIn:  InputStream  = null
   var testOut: OutputStream = null
   var testErr: InputStream  = null
   val sb = new StringBuilder()
   var delta = 0
+
+  def puts(str: String) = {
+    while (testOut == null) { Thread.sleep(100) }
+    for (e <- str) testOut.write(e);
+  }
 
   def setClocks(clocks: HashMap[Clock, Int]) {
     for (clock <- Module.clocks) {
@@ -55,23 +65,22 @@ class Testy[+T <: Module](val c: T, val isTrace: Boolean = true) {
         puts(" " + s);
       }
     }
-    testOut.write('\n')
+    puts("\n")
     testOut.flush()
   }
 
   def isSpace(c: Int) : Boolean = c == 0x20 || c == 0x9 || c == 0xD || c == 0xA
 
-  def puts(str: String) = {
-    for (e <- str) testOut.write(e);
-  }
-
   def drainErr () = {
-    while(testErr.available() > 0) {
-      System.err.print(Character.toChars(testErr.read()))
+    if (testErr != null) {
+      while(testErr.available() > 0) {
+        System.err.print(Character.toChars(testErr.read()))
+      }
     }
   }
 
   def gets() = {
+    while (testIn == null) { Thread.sleep(100) }
     var c = testIn.read
     sb.clear()
     while (isSpace(c)) {
@@ -97,7 +106,7 @@ class Testy[+T <: Module](val c: T, val isTrace: Boolean = true) {
       testOut.flush()
       val s = gets()
       val rv = toLitVal(s)
-      if (isTrace) println("PEEK " + data.name + " " + (if (off >= 0) (off + " ") else "") + "-> " + s)
+      if (isTrace) println("  PEEK " + data.name + " " + (if (off >= 0) (off + " ") else "") + "-> " + s)
       drainErr()
       rv
     }
@@ -127,7 +136,7 @@ class Testy[+T <: Module](val c: T, val isTrace: Boolean = true) {
       println("Unable to poke data " + data)
     } else {
       puts("poke " + data.chiselName);
-      if (isTrace) println("POKE " + data.name + " " + (if (off >= 0) (off + " ") else "") + "<- " + x)
+      if (isTrace) println("  POKE " + data.name + " " + (if (off >= 0) (off + " ") else "") + "<- " + x)
       if (off != -1)
         puts(" " + off);
       puts(" 0x" + x.toString(16) + "\n");
@@ -191,8 +200,7 @@ class Testy[+T <: Module](val c: T, val isTrace: Boolean = true) {
     val processBuilder = Process(cmd)
     val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => testErr = err)
     process = processBuilder.run(pio)
-    while(testIn == null || testErr == null || testOut == null) { }
-    println("STARTING TESTING ...")
+    // while(testIn == null || testErr == null) { }
     reset(5)
     process
   }
