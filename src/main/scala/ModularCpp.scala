@@ -153,7 +153,6 @@ class ModularCppBackend extends CppBackend {
     out_h.write("  void clock_lo ( dat_t<1> reset );\n")
     out_h.write("  void clock_hi ( dat_t<1> reset );\n")
     out_h.write("  void print ( FILE* f );\n");
-    out_h.write("  bool scan ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
     out_h.write("};\n\n");
     out_h.write("#endif\n");
@@ -196,28 +195,6 @@ class ModularCppBackend extends CppBackend {
     }
     out_c.write("}\n")
 
-    def splitFormat(s: String): Seq[String] = {
-      var off = 0;
-      var res: List[String] = Nil;
-      for (i <- 0 until s.length) {
-        if (s(i) == '%') {
-          if (off < i) {
-            res = s.substring(off, i) :: res;
-          }
-          res = "%" :: res;
-          if (i == (s.length-1)) {
-            ChiselError.error("Badly formed format argument kind: %");
-          } else if (s(i + 1) != 'x') {
-            ChiselError.error("Unsupported format argument kind: %" + s(i + 1));
-          }
-          off = i + 2;
-        }
-      }
-      if (off < (s.length-1)) {
-        res = s.substring(off, s.length) :: res;
-      }
-      res.reverse
-    }
     out_c.write("void " + c.name + "_t::print ( FILE* f ) {\n");
     for (p <- Module.printfs)
       out_c.write("#if __cplusplus >= 201103L\n"
@@ -226,55 +203,6 @@ class ModularCppBackend extends CppBackend {
         + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
         + ");\n"
         + "#endif\n")
-    if (Module.printArgs.length > 0) {
-      val format =
-        if (Module.printFormat == "") {
-          Module.printArgs.map(a => "%x").reduceLeft((y,z) => z + " " + y)
-        } else {
-          Module.printFormat;
-        }
-      val toks = splitFormat(format);
-      var i = 0;
-      for (tok <- toks) {
-        if (tok(0) == '%') {
-          val nodes = Module.printArgs(i).maybeFlatten
-          for (j <- 0 until nodes.length)
-            out_c.write("  fprintf(f, \"" + (if (j > 0) " " else "") +
-                        "%s\", TO_CSTR(" + emitRef(nodes(j)) + "));\n");
-          i += 1;
-        } else {
-          out_c.write("  fprintf(f, \"%s\", \"" + tok + "\");\n");
-        }
-      }
-      out_c.write("  fprintf(f, \"\\n\");\n");
-      out_c.write("  fflush(f);\n");
-    }
-    out_c.write("}\n");
-    def constantArgSplit(arg: String): Array[String] = arg.split('=');
-    def isConstantArg(arg: String): Boolean = constantArgSplit(arg).length == 2;
-    out_c.write("bool " + c.name + "_t::scan ( FILE* f ) {\n");
-    if (Module.scanArgs.length > 0) {
-      val format =
-        if (Module.scanFormat == "") {
-          Module.scanArgs.map(a => "%x").reduceLeft((y,z) => z + y)
-        } else {
-          Module.scanFormat;
-        }
-      val toks = splitFormat(format);
-      var i = 0;
-      for (tok <- toks) {
-        if (tok(0) == '%') {
-          val nodes = c.keepInputs(Module.scanArgs(i).maybeFlatten)
-          for (j <- 0 until nodes.length)
-            out_c.write("  str_to_dat(read_tok(f), " + emitRef(nodes(j)) + ");\n");
-          i += 1;
-        } else {
-          out_c.write("  fscanf(f, \"%s\", \"" + tok + "\");\n");
-        }
-      }
-      // out_c.write("  getc(f);\n");
-    }
-    out_c.write("  return(!feof(f));\n");
     out_c.write("}\n");
     vcd.dumpVCD(c, out_c.write);
     out_c.close();

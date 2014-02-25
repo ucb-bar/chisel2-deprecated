@@ -47,6 +47,8 @@ EECS Department, UC Berkeley\\
 
 \input{../style/scala.tex}
 
+\lstset{frame=, basicstyle={\footnotesize\ttfamily}}
+
 \lstset{frame=}
 
 \begin{document}
@@ -933,7 +935,7 @@ object chiselMain {
 which when run creates C++ files named
 \code{{\it module\_name}.cpp} and \code{{\it module\_name}.h} in
 the directory specified with
-\code{--targetDir {\it dir\_name}} argument.
+\code{-{-}targetDir {\it dir\_name}} argument.
 
 % \begin{scala}
 % class TestIO
@@ -1026,87 +1028,85 @@ the directory specified with
 \begin{center}
 \includegraphics[width=0.45\textwidth]{../tutorial/figs/DUT.pdf}
 \end{center}
-\caption{DUT run using a Tester object in Scala with stdin and stdout connected}
+\caption{DUT run using a Testy object in Scala with stdin and stdout connected}
 \label{fig:dut}
 \end{figure}
  
 Testing is a crucial part of circuit design, 
 and thus in Chisel we provide a mechanism for
 testing circuits by providing test vectors within Scala using
-subclasses of the \code{Tester} class:
+subclasses of the \code{Testy} class:
 
+\begin{tiny}
 \begin{scala}
-class Tester[T <: Module]
-  (val c: T, val testNodes: Array[Node])
+class Testy[T <: Module] (val c: T) {
+  var ok: Boolean
+  val rnd: Random
+  def reset(n: Int = 1)
+  def step(n: Int): Int
+  def poke(data: Mem[T], index: Int, x: BigInt)
+  def poke(data: Bits, x: BigInt)
+  def poke(data: Aggregate, x: Array[BigInt])
+  def peek(data: Mem[T], index: Int)
+  def peek(data: Bits): BigInt
+  def peek(data: Aggregate): Array[BigInt]
+  def expect (good: Boolean, msg: String): Boolean
+  def expect (data: Bits, target: BigInt): Boolean
+}
 \end{scala}
+\end{tiny}
 
 \noindent
-which binds a tester to a module, and specifies the nodes to test,
-and finally allows users to write a \code{defTests} function.
-The definition for \code{defTests} is:
-
-\begin{scala}
-def defTests(body: => Boolean)
-\end{scala}
+which binds a tester to a module
+and allows users to write tests using the given debug protocol.  In particular, users utilize:
+\begin{itemize}
+\item \code{poke} to set input port and state values,
+\item \code{step} to execute the circuit one time unit,
+\item \code{peek} to read port and state values, and
+\item \code{expect} to compare peeked circuit values to expected arguments.
+\end{itemize}
 
 \noindent
-where \code{testNodes} are the graph nodes that will be input to and
-output from the DUT, and where
-users write calls to \code{step} in the body.  Users connect tester
-instances to modules using:
+Users connect tester instances to modules using:
 
 \begin{scala}
 object chiselMainTest {
   def apply[T <: Module]
     (args: Array[String], comp: () => T)(
-     tester: T => Tester[T]): T
+     tester: T => Testy[T]): T
 }
 \end{scala}
 
 \noindent
-When \code{--test} is given as an argument to \code{chiselMain}, a
+When \code{-{-}test} is given as an argument to \code{chiselMain}, a
 tester instance runs the Design Under Test (DUT) in a separate
-process with stdin and stdout connected so that inputs can be sent to
-the DUT and outputs can received from the DUT as shown in
+process with \code{stdin} and \code{stdout} connected so that debug commands can 
+be sent to the DUT and responses can be received from the DUT as shown in
 Figure~\ref{fig:dut}.
 \noindent
 
-\begin{scala}
-def step(vars: HashMap[Node, Node]): Boolean
-\end{scala}
-
-\noindent
-where \code{vars} is a mapping of test nodes to literals, 
-with assignments to input nodes being sent to the DUT and assignments to
-non-input nodes being interpreted as expected values.
-\code{test} first sends inputs specifed in vars, steps the DUT and then either
-compares expected values from vars or sets vars for test nodes without
-entries in \code{vars}.
-The following is an example for defining tests for \code{Mux2}:
+For example, in the following:
 
 \begin{scala}
-class Mux2Tests(c: Mux2) 
-    extends Tester(c, Array(c.io)) {  
-  defTests {
-    var allGood = true
-    val n = pow(2, 3).toInt
-    val vars = new HashMap[Node, Node]()
-    for (s <- 0 until 2) {
+class Mux2Tests(c: Mux2) extends Testy(c) {
+  val n = pow(2, 3).toInt
+  for (s <- 0 until 2) {
     for (i0 <- 0 until 2) {
-    for (i1 <- 0 until 2) {
-      vars(c.io.sel) = UInt(s)
-      vars(c.io.in1) = UInt(i1)
-      vars(c.io.in0) = UInt(i0)
-      vars(c.io.out) = UInt(if (s == 1) i1 else i0)
-      allGood &&= step(vars)
-    } } } 
-    allGood
+      for (i1 <- 0 until 2) {
+        poke(c.io.sel, s)
+        poke(c.io.in1, i1)
+        poke(c.io.in0, i0)
+        step(1)
+        expect(c.io.out, (if (s == 1) i1 else i0))
+      }
+    }
   }
 }
 \end{scala}
 
 \noindent
-and the following shows how it is invoked:
+assignments for each input of \verb+Mux2+ is set to the appropriate values using \verb+poke+. For this particular example, we are testing the \verb+Mux2+ by hardcoding the inputs to some known values and checking if the output corresponds to the known one. To do this, on each iteration we generate appropriate inputs to the module and tell the simulation to assign these values to the inputs of the device we are testing \verb+c+, step the circuit, and test the expected value.  
+Finally, the following shows how the tester is invoked:
 
 \begin{scala}
 chiselMainTest(args + "--test", () => new Mux2()){ 
@@ -1114,41 +1114,17 @@ chiselMainTest(args + "--test", () => new Mux2()){
 }
 \end{scala}
 
-% The app exits with its return code equal to all test vectors not matching.
-% For example, we can test \code{Mux2} using the following:
-% 
-% \begin{scala}
-% object tutorial {
-%   val tsts = 
-%      Array(Array(0, 0, 0, 0),
-%            Array(0, 0, 1, 0),
-%            Array(0, 1, 0, 1),
-%            Array(0, 1, 1, 1),
-%            Array(1, 0, 0, 0),
-%            Array(1, 0, 1, 1),
-%            Array(1, 1, 0, 0),
-%            Array(1, 1, 1, 1))
-%   def main(args: Array[String]) = {
-%     val targs = args ++ Array("--genHarness") 
-%     chiselMainTest(targs, () => new Mux2())(
-%       c => Printer("%x", c.io),
-%       c => Tester(tsts, c.io)
-%    )
-%   }
-% }
-% \end{scala}
-
 Finally, command arguments for \code{chiselMain*} are as follows: \\
 
 \begin{tabular}{lll}
-\code{--targetDir} & target pathname prefix \\
-\code{--genHarness} & generate harness file for C++ \\
-\code{--debug} & put all wires in C++ class file \\
-\code{--compile} & compiles generated C++ \\
-\code{--test} & runs tests using C++ app \\
+\verb+--targetDir+ & target pathname prefix \\
+\verb+--genHarness+ & generate harness file for C++ \\
+\verb+--debug+ & put all wires in C++ class file \\
+\verb+--compile+ & compiles generated C++ \\
+\verb+--test+ & runs tests using C++ app \\
 \verb+--backend v+ & generate verilog \\ 
 \verb+--backend c+ & generate C++ (default)\\
-\code{--vcd} & enable vcd dumping \\
+\verb+--vcd+ & enable vcd dumping \\
 \end{tabular}
 
 

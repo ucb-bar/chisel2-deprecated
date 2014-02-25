@@ -148,5 +148,5 @@ abstract class Data extends Node {
   }
 }
 
-abstract class CompositeData extends Data {
+abstract class Aggregate extends Data {
 }

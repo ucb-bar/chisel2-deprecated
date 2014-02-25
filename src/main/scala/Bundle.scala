@@ -72,7 +72,7 @@ object sort {
 /** Defines a collection of datum of different types into a single coherent
   whole.
   */
-class Bundle(view_arg: Seq[String] = null) extends CompositeData {
+class Bundle(view_arg: Seq[String] = null) extends Aggregate {
   var dir = "";
   var view = view_arg;
   private var elementsCache: ArrayBuffer[(String, Data)] = null;

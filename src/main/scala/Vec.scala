@@ -80,7 +80,7 @@ object Vec {
     res
   }
 
-  /** Returns a new *Vec* from the contatenation of a *Data* node
+  /** Returns a new *Vec* from the concatenation of a *Data* node
     and a sequence of *Data* nodes.
     */
   def apply[T <: Data](elt0: T, elts: T*): Vec[T] =
@@ -139,7 +139,7 @@ class VecProc extends proc {
   }
 }
 
-class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] with Cloneable {
+class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with Cloneable {
   val self = new ArrayBuffer[T]
   val readPortCache = new HashMap[UInt, T]
   var sortedElementsCache: ArrayBuffer[ArrayBuffer[Data]] = null

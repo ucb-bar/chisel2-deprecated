@@ -28,10 +28,7 @@ class HelloModule extends Module {
   printf("Hello World!\n")
 }
 
-class HelloModuleTests(c: HelloModule) extends Tester(c, Array(c.io)) {
-  defTests {
-    true
-  }
+class HelloModuleTests(c: HelloModule) extends Tester(c) {
 }
 
 object hello {
