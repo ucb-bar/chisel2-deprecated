@@ -214,6 +214,7 @@ trait CounterBackend extends Backannotation {
                 counter := Bits(0, 32)
               }
               */
+              counter.comp.updates += ((Bool(true), counter))
               counter.comp.updates += ((!isStall, counter + signalValue))
               counter.comp.updates += ((copy, Bits(0, 32)))
             }
@@ -233,8 +234,9 @@ trait CounterBackend extends Backannotation {
               buffer.comp setName "buffer%d".format(counterIdx)
               buffer.comp.component = m
               buffer.comp.updates += ((Bool(true), signalValue))
+              counter.comp.updates += ((Bool(true), counter))
               counter.comp.updates += ((!isStall, counter + hd))
-              counter.comp.updates += ((copy, Bits(0, 32)))
+              counter.comp.updates += ((copy, Bits(0)))
             }
           }
           case _ =>
@@ -290,6 +292,7 @@ trait CounterBackend extends Backannotation {
         shadow := nextShadow
       }
       */
+      shadow.comp.updates += ((Bool(true), shadow))
       shadow.comp.updates += ((copy, counter))
       shadow.comp.updates += ((read, nextShadow))
     }
@@ -303,6 +306,7 @@ trait CounterBackend extends Backannotation {
         shadow := counter
       }
       */
+      shadow.comp.updates += ((Bool(true), shadow))
       shadow.comp.updates += ((copy, counter))
     }
   }
@@ -325,7 +329,7 @@ trait CounterBackend extends Backannotation {
     val slaveOut = slave.io("out")
     val topInBits = Reg(init = Bits(0, 32), clock = daisyClock)
     val clkCounter = Reg(init = Bits(0, 32), clock = daisyClock)
-    val first = Reg(init = Bool(true), clock = daisyClock)
+    val inputRdy = Reg(init = Bool(true), clock = daisyClock)
     val init = Reg(init = Bool(true), clock = daisyClock)
     val stop = Reg(init = Bool(false), clock = stopClock) // works at negative edges
     val notStall = clkCounter.orR
@@ -335,91 +339,13 @@ trait CounterBackend extends Backannotation {
     topInBits.comp setName "top_in_bits"
     clkCounter.comp.component = slave
     clkCounter.comp setName "clk_counter" 
-    first.comp.component = slave
-    first.comp setName "first"
+    inputRdy.comp.component = slave
+    inputRdy.comp setName "input_rdy"
     stop.comp.component = slave
     stop.comp setName "stop" 
     init.comp.component = slave
     init.comp setName "init" 
     stall.getNode setName "stall"
-
-    // for the top's input ports
-    (slaveAddr, slaveIn, top.io("in"), top.io("stall"), top.io("daisy_control")) match {
-      case (addr: Bits, 
-            slaveIO: DecoupledIO[_], 
-            topIO: DecoupledIO[_], 
-            topStall: Bits, 
-            daisyControl: Bits) => {
-        /*
-        top.io("stall") := stall 
-        top.io("daisy_control") := addr(daisy_ctrl_width-1, 0)
-        */
-        topStall.updates     += ((Bool(true), stall))
-        daisyControl.updates += ((Bool(true), addr(daisy_ctrl_width-1, 0)))
-
-        val writeAddr = addr(addr_width-1, daisy_ctrl_width) 
-        def writeValid(i: Int) = slaveIO.valid && stall && 
-                      writeAddr === UInt(i, data_addr_width)
-        val ready = Vec(Range(0, pow(2, data_addr_width).toInt) map { 
-          case 0 => topIO.ready
-          case 1 => Bool(true)
-          case _ => Bool(false)
-        })
-        // val ready = Vec(Bool(false), Bool(true), topIO.ready, Bool(false))
-
-        // address = 0 => Set inputs to the device
-        // address = 1 => Write to the clock counter
-        /*
-        slaveIO.ready := first || ready(writeAddr)
-        topIO.valid := first || writeValid(2)
-        */
-        slaveIO.ready.updates += ((Bool(true), first || ready(writeAddr)))
-        topIO.valid.updates   += ((Bool(true), first || writeValid(2)))
-       
-
-        (slaveIO.bits, topIO.bits) match {
-          case (bits: Bits, bundle: Bundle) => {
-            val (a, b) = (bundle.elements(0)._2, bundle.elements(1)._2) match {
-              case (bitsA: Bits, bitsB: Bits) => (bitsA, bitsB)
-              case _ => (Bits(0), Bits(0)) // error?
-            }
-            // val (name0, a) = bundle.elements(0)
-            // val (name1, b) = bundle.elements(1)
-            val clkCounterIsOne = clkCounter === Bits(1)
-            val clkCounterDecr  = clkCounter - Bits(1, 32)
-
-            // todo: stop with new inputs?
-            /*
-            when (writeValid(0)) {
-              topInBits := bits
-              init := Bool(false)
-            }.elsewhen (writeValid(1)) {
-              clkCounter := slaveIO.bits
-              first := Bool(false)
-              stop := Bool(false)
-            }.elsewhen (clkCounter === Bits(1, 32)) {
-              clkCounter := clkCounter - Bits(1, 32)
-              stop := Bool(true)
-            }.elsewhen (!stall) {
-              clkCounter := clkCounter - Bits(1, 32)
-            }
-
-            a := topInBits(31, 16)
-            b := topInBits(15, 0)
-            */
-            stop.comp.updates       += ((clkCounterIsOne, Bool(true)))
-            init.comp.updates       += ((writeValid(0), Bool(false)))
-            first.comp.updates      += ((writeValid(1), Bool(false)))
-            topInBits.comp.updates  += ((writeValid(0), bits))
-            clkCounter.comp.updates += ((writeValid(1), slaveIO.bits))
-            clkCounter.comp.updates += ((!stall, clkCounterDecr))
-            a.updates               += ((Bool(true), topInBits(31, 16)))
-            b.updates               += ((Bool(true), topInBits(15, 0)))
-          }
-        }
-      }
-      case _ => // Error?
-    }
 
     // for top's output ports
     (slaveAddr, slaveOut, top.io("daisy_out"), top.io("out")) match {
@@ -454,15 +380,99 @@ trait CounterBackend extends Backannotation {
   
         // ready to get inputs for the target
         when(topIO.valid) {
-          first := Bool(true)
+          inputRdy := Bool(true)
         }
         */
-        first.comp.updates    += ((topIO.valid, Bool(true)))
+        inputRdy.comp.updates   += ((Bool(true), inputRdy))
+        inputRdy.comp.updates += ((topIO.valid, Bool(true)))
         daisyIO.ready.updates += ((Bool(true), (readAddr === UInt(2) && slaveIO.ready)))
         slaveIO.valid.updates += ((Bool(true), valids(readAddr)))
         slaveIO.bits match {
           case outBits: Bits => outBits.updates  += ((Bool(true), bits(readAddr)))
           case _ => // Error?
+        }
+      }
+      case _ => // Error?
+    }
+
+    // for the top's input ports
+    (slaveAddr, slaveIn, top.io("in"), top.io("stall"), top.io("daisy_control")) match {
+      case (addr: Bits, 
+            slaveIO: DecoupledIO[_], 
+            topIO: DecoupledIO[_], 
+            topStall: Bits, 
+            daisyControl: Bits) => {
+        /*
+        top.io("stall") := stall 
+        top.io("daisy_control") := addr(daisy_ctrl_width-1, 0)
+        */
+        topStall.updates     += ((Bool(true), stall))
+        daisyControl.updates += ((Bool(true), addr(daisy_ctrl_width-1, 0)))
+
+        val writeAddr = addr(addr_width-1, daisy_ctrl_width) 
+        def writeValid(i: Int) = slaveIO.valid && stall && 
+                      writeAddr === UInt(i, data_addr_width)
+        val ready = Vec(Range(0, pow(2, data_addr_width).toInt) map { 
+          case 0 => topIO.ready
+          case 1 => Bool(true)
+          case _ => Bool(false)
+        })
+        // val ready = Vec(Bool(false), Bool(true), topIO.ready, Bool(false))
+
+        // address = 0 => Set inputs to the device
+        // address = 1 => Write to the clock counter
+        /*
+        slaveIO.ready := inputRdy || ready(writeAddr)
+        topIO.valid := inputRdy || writeValid(2)
+        */
+        slaveIO.ready.updates += ((Bool(true), inputRdy || ready(writeAddr)))
+        topIO.valid.updates   += ((Bool(true), inputRdy || writeValid(2)))
+       
+
+        (slaveIO.bits, topIO.bits) match {
+          case (bits: Bits, bundle: Bundle) => {
+            val (a, b) = (bundle.elements(0)._2, bundle.elements(1)._2) match {
+              case (bitsA: Bits, bitsB: Bits) => (bitsA, bitsB)
+              case _ => (Bits(0), Bits(0)) // error?
+            }
+            // val (name0, a) = bundle.elements(0)
+            // val (name1, b) = bundle.elements(1)
+            val clkCounterIsOne = clkCounter === Bits(1)
+            val clkCounterDecr  = clkCounter - Bits(1, 32)
+
+            // todo: stop with new inputs?
+            /*
+            when (writeValid(0)) {
+              topInBits := bits
+              init := Bool(false)
+            }.elsewhen (writeValid(1)) {
+              clkCounter := slaveIO.bits
+              inputRdy := Bool(false)
+              stop := Bool(false)
+            }.elsewhen (clkCounter === Bits(1, 32)) {
+              clkCounter := clkCounter - Bits(1, 32)
+              stop := Bool(true)
+            }.elsewhen (!stall) {
+              clkCounter := clkCounter - Bits(1, 32)
+            }
+
+            a := topInBits(31, 16)
+            b := topInBits(15, 0)
+            */
+            stop.comp.updates       += ((Bool(true), stop))
+            stop.comp.updates       += ((clkCounterIsOne, Bool(true)))
+            stop.comp.updates       += ((writeValid(1), Bool(false)))
+            init.comp.updates       += ((Bool(true), init))
+            init.comp.updates       += ((writeValid(0), Bool(false)))
+            topInBits.comp.updates  += ((Bool(true), topInBits))
+            topInBits.comp.updates  += ((writeValid(0), bits))
+            clkCounter.comp.updates += ((Bool(true), clkCounter))
+            clkCounter.comp.updates += ((!stall, clkCounterDecr))
+            clkCounter.comp.updates += ((writeValid(1), slaveIO.bits))
+            inputRdy.comp.updates   += ((writeValid(1), Bool(false)))
+            a.updates               += ((Bool(true), topInBits(31, 16)))
+            b.updates               += ((Bool(true), topInBits(15, 0)))
+          }
         }
       }
       case _ => // Error?
@@ -480,6 +490,8 @@ trait CounterBackend extends Backannotation {
 
     slave.genAllMuxes
   }
+
+
 
   private def reportSignals(m: Module) {
     val rptdir  = ensureDir(targetdir+"report")
