@@ -385,7 +385,7 @@ abstract class Backend {
     }
 
     for ((name, o) <- outputs) {
-      if (o.inputs.length == 0) {
+      if (o.inputs.length == 0 && !o.component.isInstanceOf[BlackBox]) {
         if (o.consumers.length > 0) {
           if (Module.warnOutputs)
             ChiselError.warning({"UNCONNECTED OUTPUT " + emitRef(o) + " in component " + o.component + 
