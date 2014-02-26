@@ -82,24 +82,6 @@ abstract class Backend {
     if(x == 0) "" else "    " + genIndent(x-1);
   }
 
-  // hack to get variable names of Chisel Nodes
-  def setVarNames {
-    for (c <- Module.components ; m <- c.getClass.getDeclaredMethods) {
-      val name = m.getName;
-      val params = m.getParameterTypes;
-      if (params.length == 0 && isPublic(m.getModifiers)) { 
-        val obj = m.invoke(c);
-        obj match {
-          case data: Data => 
-            if (data.isTypeNode && data.comp != null) data.comp.varName = name
-            else data.varName = name
-          case node: Node => node.varName = name
-          case _ =>
-        }
-      }
-    }
-  }
-
   def nameChildren(root: Module) {
     // Name all nodes at this level
     root.io.nameIt("io", true);
@@ -547,8 +529,6 @@ abstract class Backend {
     /* XXX If we call nameAll here and again further down, we end-up with
      duplicate names in the generated C++.
     nameAll(c) */
-    // Instead, we assign variables names to each node
-    setVarNames
 
     Module.components.foreach(_.elaborate(0));
 
