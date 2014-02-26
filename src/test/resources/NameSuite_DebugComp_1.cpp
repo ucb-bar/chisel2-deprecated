@@ -4,12 +4,12 @@ void NameSuite_DebugComp_1_t::init ( bool rand_init ) {
   if (rand_init) NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.randomize();
   nodes.clear();
   mems.clear();
-  nodes.push_back(debug_node_t("NameSuite_DebugComp_1.io_ctrl_wb_wen", &NameSuite_DebugComp_1__io_ctrl_wb_wen));
-  nodes.push_back(debug_node_t("NameSuite_DebugComp_1.dpath.io_ctrl_wb_wen", &NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen));
-  nodes.push_back(debug_node_t("NameSuite_DebugComp_1.dpath.wb_wen", &NameSuite_DebugComp_1_dpath__wb_wen));
-  nodes.push_back(debug_node_t("NameSuite_DebugComp_1.dpath.wb_reg_ll_wb", &NameSuite_DebugComp_1_dpath__wb_reg_ll_wb));
-  nodes.push_back(debug_node_t("NameSuite_DebugComp_1.dpath.io_ctrl_out", &NameSuite_DebugComp_1_dpath__io_ctrl_out));
-  nodes.push_back(debug_node_t("NameSuite_DebugComp_1.io_ctrl_out", &NameSuite_DebugComp_1__io_ctrl_out));
+  nodes["NameSuite_DebugComp_1.io_ctrl_wb_wen"] = &NameSuite_DebugComp_1__io_ctrl_wb_wen;
+  nodes["NameSuite_DebugComp_1.dpath.io_ctrl_wb_wen"] = &NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen;
+  nodes["NameSuite_DebugComp_1.dpath.wb_wen"] = &NameSuite_DebugComp_1_dpath__wb_wen;
+  nodes["NameSuite_DebugComp_1.dpath.wb_reg_ll_wb"] = &NameSuite_DebugComp_1_dpath__wb_reg_ll_wb;
+  nodes["NameSuite_DebugComp_1.dpath.io_ctrl_out"] = &NameSuite_DebugComp_1_dpath__io_ctrl_out;
+  nodes["NameSuite_DebugComp_1.io_ctrl_out"] = &NameSuite_DebugComp_1__io_ctrl_out;
 }
 int NameSuite_DebugComp_1_t::clock ( dat_t<1> reset ) {
   uint32_t min = ((uint32_t)1<<31)-1;
@@ -20,10 +20,7 @@ int NameSuite_DebugComp_1_t::clock ( dat_t<1> reset ) {
   if (clk_cnt == 0) clk_cnt = clk;
   return min;
 }
-void NameSuite_DebugComp_1_t::print ( FILE* f, FILE* e ) {
-}
-bool NameSuite_DebugComp_1_t::scan ( FILE* f ) {
-  return(!feof(f));
+void NameSuite_DebugComp_1_t::print ( FILE* f ) {
 }
 void NameSuite_DebugComp_1_t::dump(FILE *f, int t) {
   if (t == 0) {
