@@ -603,7 +603,7 @@ class VerilogBackend extends Backend {
         var textLevel = 0;
         for( flushComp <- comps ) {
           textLevel = flushComp.level;
-          if( flushComp.level == level ) {
+          if( flushComp.level == level && flushComp.moduleName == "") {
             flushComp.moduleName = moduleName
           }
         }
