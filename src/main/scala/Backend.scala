@@ -265,8 +265,6 @@ abstract class Backend {
   }
 
   def pruneUnconnectedIOs(m: Module) {
-    m.checkIo // make sure all module ios are ports
-
     val inputs = m.io.flatten.filter(_._2.dir == INPUT)
     val outputs = m.io.flatten.filter(_._2.dir == OUTPUT)
 

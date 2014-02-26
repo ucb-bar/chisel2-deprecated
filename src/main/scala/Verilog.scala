@@ -374,6 +374,7 @@ class VerilogBackend extends Backend {
   }
 
   def genHarness(c: Module, name: String) {
+    /*
     val harness  = createOutputFile(name + "-harness.v");
     val printFormat = Module.printArgs.map(a => "0x%x").fold("")((y,z) => z + " " + y)
     val scanFormat = Module.scanArgs.map(a => "%x").fold("")((y,z) => z + " " + y)
@@ -450,6 +451,7 @@ class VerilogBackend extends Backend {
     harness.write("  end\n")
     harness.write("endmodule\n")
     harness.close();
+    */
   }
 
   def emitDefs(c: Module): StringBuilder = {
@@ -694,10 +696,6 @@ class VerilogBackend extends Backend {
       val out_conf = createOutputFile(Module.topComponent.name + ".conf");
       out_conf.write(getMemConfString);
       out_conf.close();
-    }
-    if( Module.tester != null ) {
-      Module.scanArgs.clear();  Module.scanArgs  ++= Module.tester.testInputNodes;    Module.scanFormat  = ""
-      Module.printArgs.clear(); Module.printArgs ++= Module.tester.testNonInputNodes; Module.printFormat = ""
     }
     if (Module.isGenHarness) {
       genHarness(c, c.name);

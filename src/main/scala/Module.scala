@@ -66,11 +66,6 @@ object Module {
   var isGenHarness = false;
   var isReportDims = false;
   var isPruning = false;
-  var scanFormat = "";
-  var scanArgs: ArrayBuffer[Node] = null;
-  var printFormat = "";
-  var printArgs: ArrayBuffer[Node] = null;
-  var tester: Tester[Module] = null;
   var includeArgs: List[String] = Nil;
   var targetDir: String = null;
   var isEmittingComponents = false;
@@ -112,6 +107,10 @@ object Module {
     val res = c
     pop()
     for ((n, io) <- res.wires) {
+      if (io.dir == null)
+         ChiselErrors += new ChiselError(() => {"All IO's must be ports (dir set): " + io}, io.line);
+      // else if (io.width_ == -1)
+      //   ChiselErrors += new ChiselError(() => {"All IO's must have width set: " + io}, io.line);
       io.isIo = true
     }
     res
@@ -135,11 +134,6 @@ object Module {
     isClockGatingUpdatesInline = false;
     isVCD = false;
     isReportDims = false;
-    scanFormat = "";
-    scanArgs = new ArrayBuffer[Node]();
-    printFormat = "";
-    printArgs = new ArrayBuffer[Node]();
-    tester = null;
     targetDir = "."
     components.clear();
     compStack.clear();
@@ -350,21 +344,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
   def io: Data
 
-  // for making sure that all module io's are ports and 
-  // for marking all io's as module io's
-  var isIoChecked = false
-  def checkIo = {
-    if (io != null && !isIoChecked) {
-      isIoChecked = true;
-      for((n, flat) <- io.flatten) {
-        if (flat.dir == null) 
-          ChiselError.error("All IO's must be ports (dir set): " + flat);
-        // else if (flat.width_ == -1) 
-        //   ChiselError.error("All IO's must be have width set: " + flat);
-        flat.isModuleIo = true;
-      }
-    }
-  }
   def nextIndex : Int = { nindex = nindex + 1; nindex }
 
   var isWalking = new HashSet[Node];

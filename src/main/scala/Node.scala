@@ -162,6 +162,15 @@ abstract class Node extends nameable {
       name += "_"
   }
 
+  lazy val chiselName = this match {
+    case l: Literal => "";
+    case any        =>
+      if (name != "" && (name != "reset") && !(component == null)) 
+        component.getPathName(".") + "." + name
+      else
+        ""
+  }
+
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
   def ##(b: Node): Node  = Op("##", sumWidth _,  this, b );
   def maxNum: BigInt = {
