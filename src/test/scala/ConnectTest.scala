@@ -264,7 +264,9 @@ class ConnectSuite extends TestSuite {
         io.output := io.input + foreign.add
       }
 
-      chiselMain(Array[String]("--backend", "v"), () => Module(new ForeignRef()))
+      chiselMain(Array[String]("--v",
+        "--targetDir", dir.getPath.toString), 
+        () => Module(new ForeignRef()))
 
     } catch {
       case _ : Throwable => ;
