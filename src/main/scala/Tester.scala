@@ -219,7 +219,7 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
   startTesting()
 }
 
-class Tester21[+T <: Module](c: T, val testNodes: Array[Node]) extends Tester(c, false) {
+class MapTester[+T <: Module](c: T, val testNodes: Array[Node]) extends Tester(c, false) {
   def splitFlattenNodes(args: Seq[Node]): (Seq[Node], Seq[Node]) = {
     if (args.length == 0) {
       (Array[Node](), Array[Node]())
