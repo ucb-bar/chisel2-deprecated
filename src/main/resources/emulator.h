@@ -2135,7 +2135,7 @@ class mod_t {
         }
         setClocks(periods);
       } else if (cmd == "quit") {
-        return 0;
+          return;
       } else {
         fprintf(stderr, "Unknown command: |%s|\n", cmd.c_str());
       }
