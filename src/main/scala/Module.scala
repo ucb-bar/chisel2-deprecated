@@ -737,6 +737,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   // 1) name the component
   // 2) name the IO
   // 3) name and set the component of all statically declared nodes through introspection
+  // 4) set variable names
   /* XXX deprecated. make sure containsReg and isClk are set properly. */
   def markComponent() {
     ownIo();
@@ -754,6 +755,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
          o match {
          case node: Node => {
            if (node.isReg || node.isClkInput) containsReg = true;
+           node.getNode.varName = name
          }
          case buf: ArrayBuffer[_] => {
            /* We would prefer to match for ArrayBuffer[Node] but that's
@@ -762,15 +764,17 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             in Module that are solely there for implementation purposes. */
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
              val nodebuf = buf.asInstanceOf[Seq[Node]];
-             for(elm <- nodebuf){
+             for((elm, i) <- nodebuf.zipWithIndex){
                if (elm.isReg || elm.isClkInput) {
                  containsReg = true;
                }
+               elm.getNode.varName = name + "_" + i
              }
            }
          }
          case cell: Cell => {
            if(cell.isReg) containsReg = true;
+           cell.varName = name
          }
          case bb: BlackBox => {
            bb.pathParent = this;

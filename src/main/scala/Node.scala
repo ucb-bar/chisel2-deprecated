@@ -162,10 +162,6 @@ abstract class Node extends nameable {
       name += "_"
   }
 
-  def setVarName (name_ : String) {
-    varName = name_;
-  }
-
   lazy val chiselName = this match {
     case l: Literal => "";
     case any        =>
