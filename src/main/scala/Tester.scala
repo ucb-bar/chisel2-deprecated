@@ -40,7 +40,7 @@ import java.io.PrintStream
 import scala.sys.process._
 import Literal._
 
-class Testy[+T <: Module](val c: T, val isTrace: Boolean = true) {
+class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
   /*
   val testIn = new Queue[Int]()
   val testOut = new Queue[Int]()
@@ -219,7 +219,7 @@ class Testy[+T <: Module](val c: T, val isTrace: Boolean = true) {
   startTesting()
 }
 
-class Tester[+T <: Module](c: T, val testNodes: Array[Node]) extends Testy(c, false) {
+class Tester21[+T <: Module](c: T, val testNodes: Array[Node]) extends Tester(c, false) {
   def splitFlattenNodes(args: Seq[Node]): (Seq[Node], Seq[Node]) = {
     if (args.length == 0) {
       (Array[Node](), Array[Node]())

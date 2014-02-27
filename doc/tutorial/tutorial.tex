@@ -716,17 +716,17 @@ object tutorial {
 \begin{center}
 \includegraphics[width=0.45\textwidth]{../tutorial/figs/DUT.pdf}
 \end{center}
-\caption{DUT run using a Testy object in Scala with stdin and stdout connected}
+\caption{DUT run using a Tester object in Scala with stdin and stdout connected}
 \label{fig:dut}
 \end{figure}
  
 Testing is a crucial part of circuit design, 
 and thus in Chisel we provide a mechanism for
 testing circuits by providing test vectors within Scala using
-subclasses of the \code{Testy} class:
+subclasses of the \code{Tester} class:
 
 \begin{scala}
-class Testy[T <: Module] (val c: T, val isTrace: Boolean = true) {
+class Tester[T <: Module] (val c: T, val isTrace: Boolean = true) {
   var ok: Boolean
   val rnd: Random
   def reset(n: Int = 1)
@@ -759,7 +759,7 @@ Users connect tester instances to modules using:
 object chiselMainTest {
   def apply[T <: Module]
     (args: Array[String], comp: () => T)(
-     tester: T => Testy[T]): T
+     tester: T => Tester[T]): T
 }
 \end{scala}
 
@@ -774,7 +774,7 @@ Figure~\ref{fig:dut}.
 For example, in the following:
 
 \begin{scala}
-class Mux2Tests(c: Mux2) extends Testy(c) {
+class Mux2Tests(c: Mux2) extends Tester(c) {
   val n = pow(2, 3).toInt
   for (s <- 0 until 2) {
     for (i0 <- 0 until 2) {
