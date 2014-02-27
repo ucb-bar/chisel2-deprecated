@@ -310,7 +310,8 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
         } else {
           elm.name
         }
-        elm.nameIt(prefix + i + suffix, isNamingIo)
+        if (elm.name == "")
+          elm.nameIt(prefix + i + suffix, isNamingIo)
       }
     } else {
       /* We are trying to rename a Vec that has a fixed name. */
