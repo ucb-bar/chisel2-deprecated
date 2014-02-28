@@ -24,7 +24,7 @@
 \renewcommand{\tabcolsep}{.5mm}
 
 \section{Notation}
-\verb$c, x, y$ are Chisel types; \verb$n, m$ are Scala integers \newline
+\verb$c, x, y$ are Chisel \verb$Data$s; \verb$n, m$ are Scala \verb$Int$s \newline
 \verb$wx, wy$ are the widths of \verb$x, y$ (respectively) \newline
 \verb$minVal(x)$, \verb$maxVal(x)$ are the min or max of \verb$x$ \newline
 \verb$s$ is a Scala string; \verb$b$ is a Scala boolean \newline
@@ -32,8 +32,8 @@
 
 \section{Basic Operators}
 \begin{tabular}{l l}
-\verb$val x = UInt()$ & Allocate \verb$a$ as \verb$UInt()$ \\
-\verb$val x := y$ & Re-assign \verb$y$ to \verb$x$ \\
+\verb$val x = UInt()$ & Allocate \verb$a$ as wire of \verb$UInt()$ \\
+\verb$x := y$ & Assign \verb$y$ to wire \verb$x$ \\
 \verb$x <> y$ & Connect \verb$x$ and \verb$y$, inferring direction \\
 \end{tabular}
 
@@ -45,17 +45,19 @@
 \end{tabular}
 
 \subsection{Bits, SInt, UInt Constructors}
-Constructors also applicable for \verb$UInt$, \verb$SInt$ \newline
-\begin{tabular}{l l}
-\verb$Bits([width=n])$ & Create an un-assigned wire \\
-\verb$Bits(x=n, [width=m])$ & Create a literal from integer \\
-\verb$Bits(x=s, [width=m])$ & Create a literal from string \\
+\verb$Bits(x:Int|String, width:Int)$ \newline
+\verb$UInt(x:Int|String, width:Int)$ \newline
+\verb$SInt(x:Int|String, width:Int)$ \newline
+\begin{tabular}{l l l}
+& \verb$x$ & create a literal from int or parsed string \\
+& & or declare unassigned if missing \\
+& \verb$width$ & bit width (or inferred) \\
 \end{tabular}
 
 \subsection{Bits, UInt, SInt Casts}
 \begin{tabular}{l l}
-\verb$UInt$ to \verb$SInt$ & zero-extend to SInt \\
-all others & reinterpret cast \\
+\verb$UInt$ $\rightarrow$ \verb$SInt$ & Zero-extend to SInt \\
+(all others) & Reinterpret cast \\
 \end{tabular}
 
 \subsection{Bool Operators}
@@ -124,13 +126,13 @@ Use \verb$when$ to execute statements conditionally \newline
 \verb$when$ behaves similarly to Verilog \newline \verb$always @(posedge clk)$
 \begin{scala}
 when(condition1) {
-	// run if condition1 true
+  // run if condition1 true
 } .elsewhen(condition2) {
-	// run if condition2 true
+  // run if condition2 true
 } .unless(condition3) {
-	// run if condition3 false
+  // run if condition3 false
 } .otherwise {
-	// run if none of the above true
+  // run if none of the above true
 }
 \end{scala}
 
@@ -139,30 +141,72 @@ Use \verb$switch$ to execute statements conditionally \newline
 on the value of a wire \newline
 \begin{scala}
 switch(x) {
-	is(value1) {
-		// run if x === value1
-	} is(value2) {
-		// run if x === value2
-	}
+  is(value1) {
+    // run if x === value1
+  } is(value2) {
+    // run if x === value2
+  }
 }
 \end{scala}
 
 \subsection{Enum}
 Use \verb$enum$s to generate list values \newline
-\verb$val s1::s2::$...\verb$::s$\textsubscript{n}\verb$::Nil := Enum(t, n)$ \newline
-where \verb$t$ is an empty Chisel wire (i.e. \verb$Bits()$) \newline
-and \verb$n$ is the number of values \newline
-and \verb$s1$, \verb$s2$, ..., \verb$s$\textsubscript{n} will have distinct values
+\verb$val s1::s2::$ ... \verb$::sn::Nil$ \newline
+\verb$ := Enum(nodeType:UInt, n:Int)$ \newline
+\begin{tabular}{l l l}
+& \verb$s1$, \verb$s2$, ..., \verb$sn$ & will be created with distinct values \\
+& \verb$nodeType$ & type of \verb$s1$, \verb$s2$, ..., \verb$sn$ \\
+& \verb$n$ & element count \\
+\end{tabular}
 
 \section{Aggregate Types}
 \subsection{Bundle}
 
 \subsection{Vec}
+\verb$Vec$ contain an indexable vector of \verb$Data$ types
+\subsubsection{Constructor}
+\verb$val myVec = Vec.fill(n:Int) {gen:Data}$ \newline
+\begin{tabular}{l l l}
+& \verb$n$ & vector depth (elements) \\
+& \verb$gen$ & element data type \\
+\end{tabular}
+\subsubsection{Reading}
+\verb$val readVal = myVec(ind:Data)$ (index by wire) \newline
+\verb$val readVal = myVec(idx:Int)$ (static index) \newline
+\subsubsection{Writing}
+\verb$myVec(ind:Data) := y$ (index by wire) \newline
+\verb$myVec(idx:Int) := y$ (static index) \newline
 
 \section{State Elements}
 \subsection{Registers}
+\subsubsection{Constructor}
+\verb$val reg = Reg([outType:Data], [next:Data],$ \newline
+\verb$              [init:Data])$ \newline
+\begin{tabular}{l l l}
+& \verb$outType$ & register type (or inferred) \\
+& \verb$next$ & update value every clock \\
+& \verb$init$ & initialization value on reset \\
+\end{tabular}
+\subsubsection{Updating}
+\verb$reg := x$ latches \verb$x$ into \verb$reg$ on the next clock \newline
+The last update (lexically, per clock) runs
 
-\subsection{Memory}
+\subsection{Read-Write Memory}
+\subsubsection{Constructor}
+\verb$val mem = Mem(out:Data, n:Int,$ \newline
+\verb$              seqRead:Boolean)$ \newline
+\begin{tabular}{l l l}
+& \verb$out$ & memory element type \\
+& \verb$n$ & memory depth (elements) \\
+& \verb$seqRead$ & only update reads on clock edge \\
+\end{tabular}
+\subsubsection{Reading}
+\verb$val readVal = mem(addr:UInt|Int)$ \newline
+Synchronous read: assign output to \verb$Reg$
+\subsubsection{Writing}
+\verb$mem(addr:UInt|Int) := y$ \newline
+
+\subsubsection{}
 
 \section{Modules}
 
