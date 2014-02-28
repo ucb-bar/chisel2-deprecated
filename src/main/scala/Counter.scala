@@ -75,6 +75,7 @@ trait CounterBackend extends Backannotation {
 
   val signals = new HashSet[Node]
   val shadows = new HashMap[Module, ArrayBuffer[Bits]]
+  val crosses = new ArrayBuffer[(Double, Array[Node])]
   val signalCounterMap = new HashMap[Node, Bits]
   val shadowCounterMap = new HashMap[Bits, Bits]
   val ops = new HashMap[Module, (Bool, Bool)]
@@ -94,6 +95,7 @@ trait CounterBackend extends Backannotation {
   preElaborateTransforms += ((c: Module) => generateSlave(c))
   analyses += ((c: Module) => findClockCrossingPoints(c))
   analyses += ((c: Module) => initTester(c))
+  analyses += ((c: Module) => reportCounters(c))
 
   def getTypeNode(node: Node) = {
     def genTypeNode(node: Node) = {
@@ -185,6 +187,8 @@ trait CounterBackend extends Backannotation {
     val lines = Source.fromFile(Module.signalFilename).getLines
     val TermRegex = """\s*([\w\._\:]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)""".r
     val signalNames = new HashSet[String]
+    val signalNameMap = new HashMap[String, Node]
+    val coeffs = new HashSet[(Double, Array[String])]
 
     collectNodesIntoComp(initializeDFS)
 
@@ -194,6 +198,7 @@ trait CounterBackend extends Backannotation {
           val vars = exp split ":"
           if (tstat != "NaN" && pvalue != "NaN") {
             signalNames ++= vars
+            coeffs += ((coeff.toDouble, vars))
           }
         }
         case _ =>
@@ -201,7 +206,7 @@ trait CounterBackend extends Backannotation {
     }
 
     // Find correspoinding nodes
-    for (m <- Module.components) {
+    for (m <- Module.sortedComps) {
       val reset = m.reset
       val resetName = getSignalPathName(reset, ".")
       if (signalNames contains resetName) {
@@ -213,11 +218,19 @@ trait CounterBackend extends Backannotation {
         val signalName = getSignalPathName(node, ".")
         if (signalNames contains signalName) {
           signals += node
+          signalNameMap(signalName) = node
           if (!(node.component.debugs contains node))
             node.component.debugs += node
         }
       }
     }
+   
+    for ((coeff, vars) <- coeffs) {
+      val cross = vars map { x => signalNameMap getOrElse (x, null) }
+      if (!(cross contains null)) {
+        crosses += ((coeff, cross))
+      }
+    } 
   }
 
   def generateCtrls(m: Module) {
@@ -714,34 +727,39 @@ trait CounterBackend extends Backannotation {
     }
   }
 
-  private def reportSignals(m: Module) {
-    val rptdir  = ensureDir(targetdir+"report")
+  def reportCounters (m: Module) {
+    val rptdir  = ensureDir(targetdir)
     val rptfile = new java.io.FileWriter(rptdir+"%s_signal.rpt".format(m.name))
     val report = new StringBuilder();
 
-    ChiselError.info("Backannotation: report annotated signals")
-
+    ChiselError.info("Counter Backend: report annotated signals")
+    
     report append "\t\t+-------------------------------------+\n"
-    report append "\t\t|     Signal and Conter Report        |\n"
+    report append "\t\t|          Counter Report             |\n"
     report append "\t\t|                     by Donggyu Kim  |\n"
     report append "\t\t+-------------------------------------+\n\n"
 
-    Module.sortedComps map { module =>
-      report append "Module: %s\n".format(module.getPathName)
-      module.nodes map { node =>
-       if (signals contains node) {
-          val counter = node.counter
-          report append "  %s: %s => %s ==> %s\n".format(
-            getSignalPathName(node), 
-            nodeToString(node), 
-            getSignalPathName(counter), 
-            nodeToString(counter.inputs(0))
-          )
-       }
+    report append "Weigts\t\t\tCross\t\t\tSingals\n"
+    for ((coeff, cross) <- crosses) {
+      report append "%.5e".format(coeff)
+      report append "\t\t"
+      if (!cross.isEmpty) {
+        report append emitRef(signalCounterMap(cross.head).comp)
+        for (term <- cross.tail) {
+          report append "*"
+          report append emitRef(signalCounterMap(term).comp)
+        }
       }
-    } 
-
-    ChiselError.info(report.result)
+      report append "\t\t"
+      if (!cross.isEmpty) {
+        report append getSignalPathName(cross.head) 
+        for (term <- cross.tail) {
+          report append ", "
+          report append getSignalPathName(term) 
+        }
+      }
+      report append "\n"
+    }
 
     try {
       rptfile.write(report.result)
