@@ -54,7 +54,6 @@ abstract class Bits extends Data with proc {
 
   var canBeUsedAsDefault = false
   var dir: IODirection = null;
-  var isModuleIo = false
 
   def create(dir: IODirection, width: Int) {
     this.dir = dir;
@@ -92,8 +91,7 @@ abstract class Bits extends Data with proc {
 
   // internal, non user exposed connectors
   def checkAssign(src: Node): Unit = {
-    if (this.component != null) this.component.checkIo
-    if (this.dir == INPUT && this.component == Module.current && this.isModuleIo) {
+    if (this.dir == INPUT && this.component == Module.current && this.isIo) {
       ChiselError.error({"assigning to your own input port " + this + " RHS: " + src});
     }
     if (this.dir == OUTPUT && this.component != Module.current &&
@@ -181,7 +179,8 @@ abstract class Bits extends Data with proc {
           if(this.component == other.component && !isTypeNode) {//passthrough
             other assign this
           } else if (this.component.parent == other.component.parent || isTypeNode) { //producer - consumer
-            if(other.inputs.length > 0 || other.updates.length > 0 ) {
+            if(other.inputs.length > 0 || other.updates.length > 0 || 
+               other.component.isInstanceOf[BlackBox]) { // includes when a child is a blackbox
               this assign other // only do assignment if output has stuff connected to it
             }
           } else {
@@ -214,7 +213,8 @@ abstract class Bits extends Data with proc {
             if (this.component == other.component && !isTypeNode) { //passthrough
               this assign other;
             } else if (this.component.parent == other.component.parent || isTypeNode) { //producer - consumer
-              if(this.inputs.length > 0 || this.updates.length > 0) {
+              if(this.inputs.length > 0 || this.updates.length > 0 ||
+                 this.component.isInstanceOf[BlackBox]) { // includes when a child is a black box
                 other assign this; // only do connection if I have stuff connected to me
               }
             } else {
@@ -222,11 +222,13 @@ abstract class Bits extends Data with proc {
             }
           } else if (other.dir == OUTPUT) { // output <> output connections
             if(this.component == other.component.parent) { // parent <> child
-              if(other.inputs.length > 0 || other.updates.length > 0) {
+              if(other.inputs.length > 0 || other.updates.length > 0 || 
+                 other.component.isInstanceOf[BlackBox]) { // includes when a child is a black box
                 this assign other // only do connection if child is assigning to that output
               }
             } else if (this.component.parent == other.component) { // child <> parent
-              if(this.inputs.length > 0 || this.updates.length > 0) {
+              if(this.inputs.length > 0 || this.updates.length > 0 || 
+                 this.component.isInstanceOf[BlackBox]) { // includes when a child is a black box
                 other assign this // only do connection if child (me) is assinging that output
               }
             } else if (this.isTypeNode && other.isTypeNode) { //connecting two type nodes together

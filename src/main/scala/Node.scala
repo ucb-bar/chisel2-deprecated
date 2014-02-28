@@ -158,10 +158,17 @@ abstract class Node extends nameable {
        we don't override it. */
       name = path;
     }
+    while (!(component.names.getOrElseUpdate(name, this) eq this))
+      name += "_"
   }
 
-  def setVarName (name_ : String) {
-    varName = name_;
+  lazy val chiselName = this match {
+    case l: Literal => "";
+    case any        =>
+      if (name != "" && (name != "reset") && !(component == null)) 
+        component.getPathName(".") + "." + name
+      else
+        ""
   }
 
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS

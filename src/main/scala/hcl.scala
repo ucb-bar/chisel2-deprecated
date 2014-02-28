@@ -176,8 +176,7 @@ object chiselMain {
   def run[T <: Module] (args: Array[String], gen: () => T): T = apply(args, () => Module(gen())) // hack to avoid supplying default parameters and invoke Module.apply manually for invocation in sbt
 
   def apply[T <: Module]
-      (args: Array[String], gen: () => T,
-       scanner: T => TestIO = null, printer: T => TestIO = null, ftester: T => Tester[T] = null): T = {
+      (args: Array[String], gen: () => T, ftester: T => Tester[T] = null) = {
     Module.initChisel();
     readArgs(args)
 
@@ -185,21 +184,7 @@ object chiselMain {
       /* JACK - If loading design, read design.prm file*/
       if (Module.jackLoad != null) { Jackhammer.load(Module.jackDir, Module.jackLoad) }
       val c = gen();
-      if (scanner != null) {
-        val s = scanner(c);
-        Module.scanArgs  ++= s.args;
-        for (a <- s.args) a.isScanArg = true
-        Module.scanFormat  = s.format;
-      }
-      if (printer != null) {
-        val p = printer(c);
-        Module.printArgs   ++= p.args;
-        for(a <- p.args) a.isPrintArg = true
-        Module.printFormat   = p.format;
-      }
-      if (ftester != null) {
-        Module.tester = ftester(c)
-      }
+
       /* JACK - If dumping design, dump to jackDir with jackNumber points*/
       if (Module.jackDump != null) { 
         Jackhammer.dump(Module.jackDir, Module.jackDump) 
@@ -208,7 +193,18 @@ object chiselMain {
       }
       if (Module.isCheckingPorts) Module.backend.checkPorts(c)
       if (Module.isCompiling && Module.isGenHarness) Module.backend.compile(c)
-      if (Module.isTesting) Module.tester.tests()
+      if (ftester != null && !Module.backend.isInstanceOf[VerilogBackend]) {
+        var res = false
+        var tester: Tester[T] = null
+        try {
+          tester = ftester(c)
+        } finally {
+          if (tester != null && tester.process != null) 
+            res = tester.endTesting()
+        }
+        println(if (res) "PASSED" else "*** FAILED ***")
+        if(!res) throwException("Module under test FAILED at least one test vector.")
+      }
       c
     } finally {
       ChiselError.report()
@@ -229,7 +225,7 @@ object throwException {
 
 object chiselMainTest {
   def apply[T <: Module](args: Array[String], gen: () => T)(tester: T => Tester[T]): T =
-    chiselMain(args, gen, null, null, tester)
+    chiselMain(args, gen, tester)
 }
 
 trait proc extends Node {

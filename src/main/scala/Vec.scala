@@ -80,7 +80,7 @@ object Vec {
     res
   }
 
-  /** Returns a new *Vec* from the contatenation of a *Data* node
+  /** Returns a new *Vec* from the concatenation of a *Data* node
     and a sequence of *Data* nodes.
     */
   def apply[T <: Data](elt0: T, elts: T*): Vec[T] =
@@ -139,7 +139,7 @@ class VecProc extends proc {
   }
 }
 
-class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] with Cloneable {
+class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with Cloneable {
   val self = new ArrayBuffer[T]
   val readPortCache = new HashMap[UInt, T]
   var sortedElementsCache: ArrayBuffer[ArrayBuffer[Data]] = null
@@ -310,7 +310,8 @@ class Vec[T <: Data](val gen: (Int) => T) extends CompositeData with VecLike[T] 
         } else {
           elm.name
         }
-        elm.nameIt(prefix + i + suffix, isNamingIo)
+        if (elm.name == "")
+          elm.nameIt(prefix + i + suffix, isNamingIo)
       }
     } else {
       /* We are trying to rename a Vec that has a fixed name. */

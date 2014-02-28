@@ -312,14 +312,14 @@ class VerilogBackend extends Backend {
           ""
         }
       case r: ROM[_] =>
-        "" //Define is already done by Vec
-
+             "" //Define is already done by Vec
+     
       case r: ROMRead[_] =>
         val reads = new StringBuilder
         reads append "  assign " + emitTmp(r) + " = \n" 
-        reads append "      " + emitRef(r.addr) + " == " + r.addr.width.toString + "'d0" + " ? " + emitRef(r.rom) + "_0" + "\n"
+        reads append "      " + emitRef(r.addr) + " == " + r.addr.width.toString + "'d0" + " ? " + emitRef(r.rom.asInstanceOf[ROM[_]].lits(0)) + "\n"
         for (i <-1 until r.rom.asInstanceOf[ROM[_]].lits.length)
-          reads append "    : " + emitRef(r.addr) + " == " + r.addr.width.toString + "'d" + i + " ? " + emitRef(r.rom) + "_" + i + "\n"
+          reads append "    : " + emitRef(r.addr) + " == " + r.addr.width.toString + "'d" + i + " ? " + emitRef(r.rom.asInstanceOf[ROM[_]].lits(i)) + "\n"
 
 	reads + "`ifndef SYNTHESIS\n    :$random()\n`endif\n    ;\n"
 
@@ -360,7 +360,8 @@ class VerilogBackend extends Backend {
           ""
         }
       case r: ROM[_] =>
-        "" //Vec generates the declaration statements
+        ""
+        //Vec generates the declaration statements
 
       case x: MemAccess =>
         x.referenced = true
@@ -373,6 +374,7 @@ class VerilogBackend extends Backend {
   }
 
   def genHarness(c: Module, name: String) {
+    /*
     val harness  = createOutputFile(name + "-harness.v");
     val printFormat = Module.printArgs.map(a => "0x%x").fold("")((y,z) => z + " " + y)
     val scanFormat = Module.scanArgs.map(a => "%x").fold("")((y,z) => z + " " + y)
@@ -449,6 +451,7 @@ class VerilogBackend extends Backend {
     harness.write("  end\n")
     harness.write("endmodule\n")
     harness.close();
+    */
   }
 
   def emitDefs(c: Module): StringBuilder = {
@@ -600,7 +603,7 @@ class VerilogBackend extends Backend {
         var textLevel = 0;
         for( flushComp <- comps ) {
           textLevel = flushComp.level;
-          if( flushComp.level == level ) {
+          if( flushComp.level == level && flushComp.moduleName == "") {
             flushComp.moduleName = moduleName
           }
         }
@@ -692,10 +695,6 @@ class VerilogBackend extends Backend {
       val out_conf = createOutputFile(Module.topComponent.name + ".conf");
       out_conf.write(getMemConfString);
       out_conf.close();
-    }
-    if( Module.tester != null ) {
-      Module.scanArgs.clear();  Module.scanArgs  ++= Module.tester.testInputNodes;    Module.scanFormat  = ""
-      Module.printArgs.clear(); Module.printArgs ++= Module.tester.testNonInputNodes; Module.printFormat = ""
     }
     if (Module.isGenHarness) {
       genHarness(c, c.name);
