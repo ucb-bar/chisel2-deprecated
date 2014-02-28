@@ -48,7 +48,7 @@ class WhenSuite extends TestSuite {
       when(io.en) { io.out := io.in }
     }
 
-    class WhenModuleTests(m: WhenModule) extends Tester(m, Array(m.io)) {
+    class WhenModuleTests(m: WhenModule) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
@@ -77,7 +77,7 @@ class WhenSuite extends TestSuite {
       when(io.en0) { when(io.en1) { io.out := io.in } }
     }
 
-    class EmbedWhenModuleTests(m: EmbedWhenModule) extends Tester(m, Array(m.io)) {
+    class EmbedWhenModuleTests(m: EmbedWhenModule) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         List(false, true, false, true,  true, false, true,  true).zip(
@@ -114,7 +114,7 @@ class WhenSuite extends TestSuite {
       }
     }
 
-    class ElsewhenModuleTests(m: ElsewhenModule) extends Tester(m, Array(m.io)) {
+    class ElsewhenModuleTests(m: ElsewhenModule) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         List(false, true, false, true,  true, false, true,  true).zip(
@@ -158,7 +158,7 @@ class WhenSuite extends TestSuite {
       }
     }
 
-    class SubmoduleInWhenBlockTests(m: SubmoduleInWhenBlock) extends Tester(m, Array(m.io)) {
+    class SubmoduleInWhenBlockTests(m: SubmoduleInWhenBlock) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
@@ -186,7 +186,7 @@ class WhenSuite extends TestSuite {
       unless(io.en) { io.out := UInt(0) }
     }
 
-    class UnlessModuleTests(m: UnlessModule) extends Tester(m, Array(m.io)) {
+    class UnlessModuleTests(m: UnlessModule) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
@@ -217,7 +217,7 @@ class WhenSuite extends TestSuite {
       }
     }
 
-    class SwitchModuleTests(m: SwitchModule) extends Tester(m, Array(m.io)) {
+    class SwitchModuleTests(m: SwitchModule) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         (0 until 8).map { i =>

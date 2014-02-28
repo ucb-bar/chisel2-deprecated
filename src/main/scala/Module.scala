@@ -756,9 +756,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   // 1) name the component
   // 2) name the IO
   // 3) name and set the component of all statically declared nodes through introspection
-  // 4) name declared nodes
+  // 4) set variable names
   /* XXX deprecated. make sure containsReg and isClk are set properly. */
-  def markComponent(nameSpace: HashSet[String]) {
+  def markComponent() {
     ownIo();
     io nameIt ("io", true)
     /* We are going through all declarations, which can return Nodes,
@@ -774,11 +774,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
          val o = m.invoke(this);
          o match {
          case node: Node => {
-           if (node.isReg || node.isClkInput) containsReg = true
-           if (name != "" && node.name == "") {
-             node nameIt (backend asValidName name, false)
-             nameSpace += node.name
-           }
+           if (node.isReg || node.isClkInput) containsReg = true;
+           node.getNode.varName = name
          }
          case buf: ArrayBuffer[_] => {
            /* We would prefer to match for ArrayBuffer[Node] but that's
@@ -786,53 +783,28 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             XXX Using Seq instead of ArrayBuffer will pick up members defined
             in Module that are solely there for implementation purposes. */
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
-             val nodebuf = buf.asInstanceOf[Seq[Node]]
+             val nodebuf = buf.asInstanceOf[Seq[Node]];
              for((elm, i) <- nodebuf.zipWithIndex){
                if (elm.isReg || elm.isClkInput) {
                  containsReg = true;
                }
-               if (name != "" && elm.name == "") {
-                 val idxName = name + '_' + i
-                 elm nameIt (backend asValidName idxName, false)
-                 nameSpace += elm.name
-               }
-             }
-           }
-         }
-         case buf: collection.IndexedSeq[_] => {
-           /* To support VecLike structures */
-           if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
-             val nodebuf = buf.asInstanceOf[Seq[Node]]
-             for((elm, i) <- nodebuf.zipWithIndex){
-               if (elm.isReg || elm.isClkInput) {
-                 containsReg = true;
-               }
-               if (name != "" && elm.name == "") {
-                 val idxName = name + '_' + i
-                 elm nameIt (backend asValidName idxName, false)
-                 nameSpace += elm.name
-               }
+               elm.getNode.varName = name + "_" + i
              }
            }
          }
          // Todo: do we have Cell anymore?
          case cell: Cell => {
            if(cell.isReg) containsReg = true;
-           cell.name = backend asValidName name 
-           nameSpace += cell.name
+           cell.varName = name
          }
          case bb: BlackBox => {
            bb.pathParent = this;
            for((n, elm) <- io.flatten) {
              if (elm.isClkInput) containsReg = true
            }
-           bb.name = backend asValidName name
-           nameSpace += bb.name
          }
          case comp: Module => {
            comp.pathParent = this;
-           comp.name = backend asValidName name
-           nameSpace += comp.name
          }
          case any =>
        }

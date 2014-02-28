@@ -294,7 +294,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
     this
   }
 
-  override def nameIt (path: String, isNamingIO: Boolean ) {
+  override def nameIt (path: String, isNamingIo: Boolean ) {
     if( !named
       && (name.isEmpty
         || (!path.isEmpty && name != path)) ) {
@@ -310,7 +310,8 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
         } else {
           elm.name
         }
-        elm nameIt (prefix + i + suffix, isNamingIO)
+        if (elm.name == "")
+          elm.nameIt(prefix + i + suffix, isNamingIo)
       }
     } else {
       /* We are trying to rename a Vec that has a fixed name. */

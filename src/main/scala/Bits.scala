@@ -192,7 +192,8 @@ abstract class Bits extends Data with proc {
           if(this.component == other.component && !isTypeNode) {//passthrough
             other assign this
           } else if (this.component.parent == other.component.parent || isTypeNode) { //producer - consumer
-            if(other.inputs.length > 0 || other.updates.length > 0 ) {
+            if(other.inputs.length > 0 || other.updates.length > 0 || 
+               other.component.isInstanceOf[BlackBox]) { // includes when a child is a blackbox
               this assign other // only do assignment if output has stuff connected to it
             }
           } else {
@@ -225,7 +226,8 @@ abstract class Bits extends Data with proc {
             if (this.component == other.component && !isTypeNode) { //passthrough
               this assign other;
             } else if (this.component.parent == other.component.parent || isTypeNode) { //producer - consumer
-              if(this.inputs.length > 0 || this.updates.length > 0) {
+              if(this.inputs.length > 0 || this.updates.length > 0 ||
+                 this.component.isInstanceOf[BlackBox]) { // includes when a child is a black box
                 other assign this; // only do connection if I have stuff connected to me
               }
             } else {
@@ -233,11 +235,13 @@ abstract class Bits extends Data with proc {
             }
           } else if (other.dir == OUTPUT) { // output <> output connections
             if(this.component == other.component.parent) { // parent <> child
-              if(other.inputs.length > 0 || other.updates.length > 0) {
+              if(other.inputs.length > 0 || other.updates.length > 0 || 
+                 other.component.isInstanceOf[BlackBox]) { // includes when a child is a black box
                 this assign other // only do connection if child is assigning to that output
               }
             } else if (this.component.parent == other.component) { // child <> parent
-              if(this.inputs.length > 0 || this.updates.length > 0) {
+              if(this.inputs.length > 0 || this.updates.length > 0 || 
+                 this.component.isInstanceOf[BlackBox]) { // includes when a child is a black box
                 other assign this // only do connection if child (me) is assinging that output
               }
             } else if (this.isTypeNode && other.isTypeNode) { //connecting two type nodes together

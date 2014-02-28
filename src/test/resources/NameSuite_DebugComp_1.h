@@ -26,8 +26,7 @@ class NameSuite_DebugComp_1_t : public mod_t {
   void clock_lo ( dat_t<1> reset );
   void clock_hi ( dat_t<1> reset );
   int clock ( dat_t<1> reset );
-  void print ( FILE* f, FILE* e);
-  bool scan ( FILE* f );
+  void print ( FILE* f );
   void dump ( FILE* f, int t );
 };
 
