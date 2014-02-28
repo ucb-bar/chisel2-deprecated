@@ -32,7 +32,7 @@
 \end{itemize}
 
 \noindent
-and \verb+new+ used to construct components and connect used to wire them together:
+and \verb+new+ used to construct components and \verb+connect+ used to wire them together:
 \begin{itemize}
 \item \verb+new Register()+
 \item ...
@@ -47,7 +47,7 @@ and \verb+new+ used to construct components and connect used to wire them togeth
 \column{0.50\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset       = new Wire("reset");
   val counter     = new Register("counter");
@@ -82,7 +82,7 @@ def main (): Int = {
 \column{0.50\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset       = new Wire("reset");
   val counter     = new Register("counter");
@@ -121,7 +121,7 @@ def main (): Int = {
 \column{0.50\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset       = new Wire("reset");
   val counter     = new Register("counter");
@@ -159,7 +159,7 @@ def main (): Int = {
 \column{0.4\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset       = new Wire("reset");
   val counter     = new Register("counter");
@@ -190,7 +190,7 @@ $\Rightarrow$
 
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset       = new Wire("reset");
   val counter     = new Register("counter");
@@ -219,7 +219,7 @@ def main (): Int = {
 \column{0.4\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset       = new Wire("reset");
   val counter     = new Register("counter");
@@ -246,7 +246,7 @@ $\Rightarrow$
 \column{0.4\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset   = new Wire("reset");
   val counter = new Register("counter");
@@ -273,7 +273,7 @@ def main (): Int = {
 \column{0.4\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset   = new Wire("reset");
   val counter = new Register("counter");
@@ -298,7 +298,7 @@ $\Rightarrow$
 \column{0.4\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset   = new Wire("reset");
   val counter = new Register("counter");
@@ -323,7 +323,7 @@ def main (): Int = {
 \column{0.4\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset   = new Wire("reset");
   val counter = new Register("counter");
@@ -346,7 +346,7 @@ $\Rightarrow$
 \column{0.4\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset   = new Wire("reset");
   val counter = new Register("counter");
@@ -371,7 +371,7 @@ def main (): Int = {
 \column{0.4\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset   = new Wire("reset");
   val counter = new Register("counter");
@@ -394,7 +394,7 @@ $\Rightarrow$
 \column{0.4\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset   = new Wire("reset");
   val counter = new Register("counter");
@@ -419,7 +419,7 @@ def main (): Int = {
 \column{0.4\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset   = new Wire("reset");
   val counter = new Register("counter");
@@ -442,7 +442,7 @@ $\Rightarrow$
 \column{0.4\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset   = new Wire("reset");
   val counter = new Register("counter");
@@ -468,7 +468,7 @@ def main (): Int = {
 \column{0.4\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset   = new Wire("reset");
   val counter = new Register("counter");
@@ -492,7 +492,7 @@ $\Rightarrow$
 \column{0.4\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset   = new Wire();
   val counter = new Register();
@@ -518,7 +518,7 @@ def main (): Int = {
 \column{0.4\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset   = new Wire();
   val counter = new Register();
@@ -552,7 +552,7 @@ def make_counter(reset: Boolean) = {
   counter
 }
 
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset   = new Wire();
   val counter = make_counter(reset);
@@ -581,7 +581,7 @@ def make_counter(reset: Boolean) = {
   counter
 }
 
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset   = new Wire();
   val counter = make_counter(reset);
@@ -608,7 +608,7 @@ def make_counter() = {
   counter
 }
 
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset   = new Wire();
   val counter = 
@@ -639,7 +639,7 @@ def make_counter() = {
   counter
 }
 
-def main (): Int = {
+def main(args: Array[String]) = {
   // Create Components
   val reset   = new Wire();
   val counter = 

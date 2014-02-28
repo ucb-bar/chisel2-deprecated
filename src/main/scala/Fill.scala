@@ -33,63 +33,37 @@ import Fill._
 import Lit._
 
 object Fill {
-  def fillWidthOf(i: Int, n: Node): (Node) => (Int) = { (m: Node) => (m.inputs(i).width * n.maxNum.toInt) }
-  def apply(n: Int, mod: UInt): UInt = {
+  def apply(n: Int, mod: UInt): UInt = UInt(NodeFill(n, mod))
+  def apply(mod: UInt, n: Int): UInt = apply(n, mod)
+}
+
+object NodeFill {
+  def apply(n: Int, mod: Node): Node = {
     val (bits_lit) = (mod.litOf);
     if (n == 1) {
       mod
-    } else if (Module.isFolding && bits_lit != null) {
-      var res = bits_lit.value;
-      val w   = mod.getWidth();
-      for (i <- 0 until n-1)
-        res = (res << w)|bits_lit.value;
-      Lit(res, n * w){ UInt() };
-    } else if ((Module.backend.isInstanceOf[CppBackend] || Module.backend.isInstanceOf[FloBackend]) && mod.width != 1) {
-      var out: UInt = null
+    } else if (mod.isLit) {
+      val value = mod.litOf.value
+      val w = mod.getWidth
+      var res = value
+      for (i <- 1 until n)
+        res = (res << w)|value
+      Literal(res, n * w)
+    } else if (mod.width == 1 && n > 2) {
+      Op("-", Node.fixWidth(n), mod) /* 2's-comp. negation <-> 1-bit fill */
+    } else {
+      /* Build up a Concatenate tree for more ILP in simulation. */
+      var out: Node = null
       var i = 0
       var cur = mod
       while ((1 << i) <= n) {
         if ((n & (1 << i)) != 0) {
-          out = Cat(cur, out)
+          out = Concatenate(cur, out)
         }
-        cur = Cat(cur, cur)
+        cur = Concatenate(cur, cur)
         i = i + 1
       }
       out
-    } else {
-      val fill = new Fill()
-      val fillConst = UInt(n)
-      fill.init("", fillWidthOf(0, fillConst), mod, fillConst)
-      UInt(OUTPUT).fromNode(fill)
     }
   }
-  def apply(mod: UInt, n: Int): UInt = apply(n, mod)
-  def apply(n: UInt, mod: UInt): UInt = {
-    (mod << n) - UInt(1)
-  }
-}
-
-object NodeFill {
-
-  def apply(n: Int, mod: Node): Node = {
-    if (Module.isFolding && mod.litOf != null) {
-      var c = BigInt(0)
-      val w = mod.litOf.width
-      val a = mod.litOf.value
-      for (i <- 0 until n)
-        c = (c << w) | a
-      Literal(c,n*w)
-    } else {
-      val res = new Fill()
-      res.init("", (m: Node) => {m.inputs(0).width * n}, mod, Literal(n))
-      res
-    }
-  }
-
-  def apply(mod: Node, n: Int): Node = apply(n, mod)
-}
-
-class Fill extends Node {
-  var n: Node = if(inputs.length >= 2) inputs(1) else null;
-  override def toString: String = "FILL(" + inputs(0) + ", " + n + ")";
 }

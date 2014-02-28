@@ -117,7 +117,14 @@ object ChiselError {
   def checkpoint() {
     if(hasErrors) {
       throw new IllegalStateException(
-        "CODE HAS " + ChiselErrors.length + " ERRORS/WARNINGS");
+        Console.UNDERLINED + "CODE HAS " +
+        Console.UNDERLINED + Console.BOLD + ChiselErrors.filter(_.isError).length + Console.RESET +
+        Console.UNDERLINED + " " +
+        Console.UNDERLINED + Console.RED + "ERRORS" + Console.RESET +
+        Console.UNDERLINED + " and " +
+        Console.UNDERLINED + Console.BOLD + ChiselErrors.filter(_.isWarning).length + Console.RESET +
+        Console.UNDERLINED + " " +
+        Console.UNDERLINED + Console.YELLOW + "WARNINGS" + Console.RESET)
     }
   }
 }
@@ -129,12 +136,17 @@ val errlevel: Int = 0) {
   val line = errline
   val msgFun = errmsgFun
 
+  def isError = (level == 0)
+  def isWarning = (level == 1)
+
   def print() {
     /* Following conventions for error formatting */
-    val levelstr = if( level == 0 ) "error" else "warning"
+    val levelstr =
+      if (isError) "[" + Console.RED + "error" + Console.RESET + "]"
+      else "[" + Console.YELLOW + "warn" + Console.RESET + "]"
     if( line != null ) {
-      println(line.getFileName + ":" + line.getLineNumber
-        + ": " + levelstr + ": " + msgFun() +
+      println(levelstr + " " + line.getFileName + ":" +
+        line.getLineNumber + ": " + msgFun() +
         " in class " + line.getClassName)
     } else {
       println(levelstr + ": " + msgFun())

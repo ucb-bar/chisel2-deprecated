@@ -44,7 +44,7 @@ object NodeExtract {
     } else if (mod.litOf == null) {
       makeExtract(mod, bit)
     } else { // don't use Extract on literals
-      Op(">>", 0, fixWidth(1), mod, bit)
+      Op(">>", fixWidth(1), mod, bit)
     }
   }
 
@@ -72,10 +72,10 @@ object NodeExtract {
     } else if (mod.litOf == null && (hiLit != null && loLit != null)) {
       makeExtract(mod, hi, lo, widthInfer)
     } else { // don't use Extract on literals
-      val rsh = Op(">>", 0, widthInfer, mod, lo)
-      val hiMinusLoPlus1 = Op("+", 2, maxWidth _, Op("-", 2, maxWidth _, hi, lo), UInt(1))
-      val mask = Op("-", 2, widthInfer, Op("<<", 0, widthInfer, UInt(1), hiMinusLoPlus1), UInt(1))
-      Op("&", 2, widthInfer, rsh, mask)
+      val rsh = Op(">>", widthInfer, mod, lo)
+      val hiMinusLoPlus1 = Op("+", maxWidth _, Op("-", maxWidth _, hi, lo), UInt(1))
+      val mask = Op("-", widthInfer, Op("<<", widthInfer, UInt(1), hiMinusLoPlus1), UInt(1))
+      Op("&", widthInfer, rsh, mask)
     }
   }
 

@@ -3,9 +3,9 @@
 void VerifSuite_CppAssertComp_1_t::init ( bool rand_init ) {
   nodes.clear();
   mems.clear();
-  nodes.push_back(debug_node_t("VerifSuite_CppAssertComp_1.io_y", &VerifSuite_CppAssertComp_1__io_y));
-  nodes.push_back(debug_node_t("VerifSuite_CppAssertComp_1.io_x", &VerifSuite_CppAssertComp_1__io_x));
-  nodes.push_back(debug_node_t("VerifSuite_CppAssertComp_1.io_z", &VerifSuite_CppAssertComp_1__io_z));
+  nodes["VerifSuite_CppAssertComp_1.io_y"] = &VerifSuite_CppAssertComp_1__io_y;
+  nodes["VerifSuite_CppAssertComp_1.io_x"] = &VerifSuite_CppAssertComp_1__io_x;
+  nodes["VerifSuite_CppAssertComp_1.io_z"] = &VerifSuite_CppAssertComp_1__io_z;
 }
 int VerifSuite_CppAssertComp_1_t::clock ( dat_t<1> reset ) {
   uint32_t min = ((uint32_t)1<<31)-1;
@@ -16,10 +16,7 @@ int VerifSuite_CppAssertComp_1_t::clock ( dat_t<1> reset ) {
   if (clk_cnt == 0) clk_cnt = clk;
   return min;
 }
-void VerifSuite_CppAssertComp_1_t::print ( FILE* f, FILE* e ) {
-}
-bool VerifSuite_CppAssertComp_1_t::scan ( FILE* f ) {
-  return(!feof(f));
+void VerifSuite_CppAssertComp_1_t::print ( FILE* f ) {
 }
 void VerifSuite_CppAssertComp_1_t::dump(FILE *f, int t) {
 }

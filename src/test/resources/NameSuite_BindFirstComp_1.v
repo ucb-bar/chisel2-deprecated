@@ -10,7 +10,7 @@ module NameSuite_BlockDecoder_1(
 endmodule
 
 module NameSuite_BindFirstComp_1(
-    input  valid_common,
+    input  io_valid,
     output io_replay
 );
 
@@ -24,7 +24,7 @@ module NameSuite_BindFirstComp_1(
   wire dec_io_sigs_enq_cmdq;
 
   assign io_replay = T0;
-  assign T0 = valid_common && T1;
+  assign T0 = io_valid && T1;
   assign T1 = T3 || T2;
   assign T2 = ! mask_ximm1q_ready;
   assign mask_ximm1q_ready = ! dec_io_sigs_enq_ximm1q;

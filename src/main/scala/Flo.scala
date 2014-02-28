@@ -107,8 +107,8 @@ class FloBackend extends Backend {
              case "&"  => "and/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "&&" => "and/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "^"  => "xor/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "==" => "eq/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "!=" => "neq/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
+             case "==" => "eq/" + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
+             case "!=" => "neq/" + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
            }
          }) + "\n"
 
@@ -117,9 +117,6 @@ class FloBackend extends Backend {
           emitDec(node) + "rsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1)) + "\n"     
         else
           emitDec(node) + "rsh/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(2)) + "\n"
-
-      case x: Fill =>
-        emitDec(x) + "msk/" + node.width + " " + emitRef(node.inputs(0)) + " " + node.width + "\n"
 
       case x: Bits =>
         if (x.inputs.length == 1) {
@@ -161,9 +158,6 @@ class FloBackend extends Backend {
       case x: Log2 => // TODO: log2 instruction?
         emitDec(x) + "log2/" + x.width + " " + emitRef(x.inputs(0)) + "\n"
 
-      case c: Cat =>
-        emitDec(c) + "cat/" + c.inputs(1).width + " " + emitRef(c.inputs(0)) + " " + emitRef(c.inputs(1)) + "\n"
-        
       case l: Literal =>
         ""
       case _ =>

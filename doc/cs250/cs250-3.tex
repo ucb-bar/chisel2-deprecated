@@ -142,8 +142,6 @@ assert(x < UInt(10))
 \begin{scala}
 package Tutorial
 import Chisel._
-import scala.collection.mutable.HashMap
-import scala.util.Random
 
 class Combinational extends Module {
   val io = new Bundle {
@@ -154,47 +152,41 @@ class Combinational extends Module {
 }
 
 class CombinationalTests(c: Combinational) 
-    extends Tester(c, Array(c.io)) {
-  defTests {
-    var allGood = true
-    val vars    = new HashMap[Node, Node]()
-    val rnd     = new Random()
-    val maxInt  = 1 << 16
-    for (i <- 0 until 10) {
-      vars.clear()
-      val x        = rnd.nextInt(maxInt)
-      val y        = rnd.nextInt(maxInt)
-      vars(c.io.x) = UInt(x)
-      vars(c.io.y) = UInt(y)
-      vars(c.io.z) = UInt((x + y)&(maxInt-1))
-      allGood      = step(vars) && allGood
-    }
-    allGood
-} }
+    extends Tester(c) {
+  val maxInt = 1 << 16
+  for (i <- 0 until 10) {
+    val x = rnd.nextInt(maxInt)
+    val y = rnd.nextInt(maxInt)
+    poke(c.io.x, x)
+    poke(c.io.y, y)
+    step(1)
+    expect(c.io.z, (x + y)&(maxInt-1))
+  }
+}
 \end{scala}
 }
 \column{0.5\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
 class Tester[T <: Module]
-  (val c: T, val testNodes: Array[Node])
-
-def defTests(body: => Boolean)
-
-def step(vars: HashMap[Node, Node]): Boolean
+  (val c: T, val isTrace: Boolean = true) {
+  var ok: Boolean
+  val rnd: Random
+  def reset(n: Int = 1)
+  def poke(data: Bits, x: BigInt)
+  def step(n: Int): Int
+  def peek(data: Bits): BigInt
+  def expect (data: Bits, target: BigInt): Boolean
+}
 \end{scala}
 }
 \begin{scriptsize}
+users utilize:
 \begin{itemize}
-\item user subclasses {\tt Tester} defining DUT and
-{\tt testNodes} and tests in {\tt defTests} body
-\item {\tt vars} is mapping from {\tt testNodes} to literals, called bindings
-\item {\tt step} runs test with given bindings, where
-var values for input ports are sent to DUT,
-DUT computes next outputs, and
-DUT sends next outputs to Chisel
-\item finally {\tt step} compares received values against var values
-  and returns false if any comparisons fail
+\item \code{poke} to set input port and state values,
+\item \code{step} to execute the circuit one time unit,
+\item \code{peek} to read port and state values, and
+\item \code{expect} to compare peeked circuit values to expected arguments.
 \end{itemize}
 \end{scriptsize}
 
@@ -210,14 +202,15 @@ DUT sends next outputs to Chisel
 \begin{scala}
 object chiselMainTest {
   def apply[T <: Module]
-    (args: Array[String], comp: () => T)(tester: T => Tester[T]): T
+    (args: Array[String], comp: () => T)(
+     tester: T => Tester[T]): T
 }
 \end{scala}
 
 \noindent and used as follows:
 
 \begin{scala}
-chiselMainTest(args ++ Array("--compile", "--test",  "--genHarness"), 
+chiselMainTest(args  ++ Array("--compile", "--test",  "--genHarness"),  
                () => new Combinational()){ 
   c => new CombinationalTests(c) 
 }
@@ -260,20 +253,18 @@ PASSED
 
 \begin{frame}[fragile]{Simple Decoupled Circuits Testing}
 \begin{scala}
-class GCDTests(c: GCD) extends Tester(c, Array(c.io)) {
-  defTests {
-    val (a, b, z) = (64, 48, 16)
-    val svars = new HashMap[Node, Node]()
-    val ovars = new HashMap[Node, Node]()
-    var t = 0
-    do {
-      svars(c.io.a) = UInt(a)
-      svars(c.io.b) = UInt(b)
-      step(svars, ovars)
-      t += 1
-    } while (t <= 1 || ovars(c.io.v).litValue() == 0)
-    ovars(c.io.z).litValue() == z
-  }
+class GCDTests(c: GCD) extends Tester(c) {
+  val (a, b, z) = (64, 48, 16)
+  var t = 0
+  do {
+    val first = if (t == 0) 1 else 0;
+    poke(c.io.a, a)
+    poke(c.io.b, b)
+    poke(c.io.e, first)
+    step(1)
+    t += 1
+  } while (t <= 1 || peek(c.io.v) == 0)
+  expect(c.io.z, z)
 }
 \end{scala}
 \end{frame}

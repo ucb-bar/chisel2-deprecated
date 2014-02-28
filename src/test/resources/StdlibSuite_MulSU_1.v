@@ -11,6 +11,6 @@ module StdlibSuite_MulSU_1(
   assign io_z = T0;
   assign T0 = $signed(io_x) * $signed(T1);
   assign T1 = T2;
-  assign T2 = {1'h0/* 0*/, io_y};
+  assign T2 = {1'h0, io_y};
 endmodule
 

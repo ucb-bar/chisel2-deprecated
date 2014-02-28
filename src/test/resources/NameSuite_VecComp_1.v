@@ -1,4 +1,5 @@
 module NameSuite_VecComp_1(input clk,
+    input [63:0] io_pcr_req_data,
     input  io_r_en,
     input [4:0] io_r_addr,
     input [63:0] io_w_data,
@@ -12,15 +13,13 @@ module NameSuite_VecComp_1(input clk,
   wire[63:0] T1;
   wire[7:0] rdata;
   wire[7:0] elts_0;
-  wire[7:0] T2;
 
   assign io_status_im = reg_status_im;
-  assign T0 = wdata[3'h7/* 7*/:1'h0/* 0*/];
+  assign T0 = wdata[3'h7:1'h0];
   assign wdata = io_r_en ? io_w_data : host_pcr_bits_data;
-  assign T1 = {56'h0/* 0*/, rdata};
+  assign T1 = {56'h0, rdata};
   assign rdata = elts_0;
-  assign elts_0 = T2;
-  assign T2 = {reg_status_im};
+  assign elts_0 = reg_status_im;
 
   always @(posedge clk) begin
     reg_status_im <= T0;

@@ -7,11 +7,11 @@ module DelaySuite_RegInitUpdate_1(input clk, input reset,
   wire T1;
 
   assign io_out = T0;
-  assign T0 = {31'h0/* 0*/, res};
-  assign T1 = res + 1'h1/* 1*/;
+  assign T0 = {31'h0, res};
+  assign T1 = res + 1'h1;
 
   always @(posedge clk) begin
-    res <= reset ? 1'h0/* 0*/ : T1;
+    res <= reset ? 1'h0 : T1;
   end
 endmodule
 

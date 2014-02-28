@@ -44,6 +44,7 @@ nameable                (src/main/hcl.scala)
 */
 
 import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.HashMap
 import org.junit.Assert._
 import org.junit.Test
 import org.junit.Ignore
@@ -185,24 +186,55 @@ class DataSuite extends TestSuite {
     to be an error to so. This is fixed as well.
     */
   @Test def testBypassData() {
-    class BypassData(num_bypass_ports:Int) extends Bundle() {
+    try {
+    class BypassDataIO(num_bypass_ports:Int) extends Bundle() {
       val data = UInt(INPUT, width=num_bypass_ports)
-      val valid = Vec.fill(num_bypass_ports){Bool()}
+      val valid = Vec.fill(num_bypass_ports){ Bool() }
         // XXX Module.findRoots does not support Vec as a graph root.
       def get_num_ports: Int = num_bypass_ports
     }
-
     class BypassDataComp extends Module {
-      val io = new BypassData(3)
-
+      val io = new BypassDataIO(3)
       io.valid := io.data | UInt(1)
-      debug(io.valid)
     }
-
     chiselMain(Array[String]("--backend", "c",
       "--targetDir", dir.getPath.toString()),
       () => Module(new BypassDataComp))
-    assertFile("DataSuite_BypassDataComp_1.h")
+    // assertFile("DataSuite_BypassDataComp_1.h")
+    } catch {
+      case _ : Throwable => ;
+    }
+    assertTrue(!ChiselError.ChiselErrors.isEmpty);
+  }
+
+  // tests assigning to non parent's outputs
+  @Test def testAssignToChildOutput() {
+    try {
+    class Child extends Module {
+      val io = new Bundle {
+        val input  = Bits(INPUT, width = 8)
+        val output = Bits(OUTPUT, width = 8)
+      }
+      io.output := io.input
+    }
+
+    class Parent extends Module {
+      val io = new Bundle {
+        val input  = Bits(INPUT, width = 8)
+        val output = Bits(OUTPUT, width = 8)
+      }
+      val child = Module(new Child)
+      // child.io.input := io.input
+      child.io.output := io.input
+      io.output := child.io.output
+    }
+
+    chiselMain(Array[String]("--backend", "v"), () => Module(new Parent()))
+
+    } catch {
+      case _ : Throwable => ;
+    }
+    assertTrue(!ChiselError.ChiselErrors.isEmpty);
   }
 
   /** Test case derived from issue #1 reported on github.
@@ -226,9 +258,12 @@ class DataSuite extends TestSuite {
       "--targetDir", dir.getPath.toString()),
       () => Module(new CarryChainComp(4)))
     } catch {
-      case _ : Throwable => assertTrue(!ChiselError.ChiselErrors.isEmpty);
+      case _ : Throwable => ;
     }
+    assertTrue(!ChiselError.ChiselErrors.isEmpty);
   }
+
+
 
 }
 

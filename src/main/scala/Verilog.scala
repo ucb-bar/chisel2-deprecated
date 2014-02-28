@@ -66,7 +66,6 @@ object VerilogBackend {
 
 class VerilogBackend extends Backend {
   Module.isEmittingComponents = true
-  isCoercingArgs = false
   val keywords = VerilogBackend.keywords
 
   val flushedTexts = HashSet[String]()
@@ -114,19 +113,9 @@ class VerilogBackend extends Backend {
   override def emitRef(node: Node): String = {
     node match {
       case x: Literal =>
-        (if (x.width == -1) {
-          x.name
-        } else if(x.isBinary) {
-          ("" + x.width + "'b" + x.name)
-        } else if(x.base == 'x') {
-          ("" + x.width + "'h" + x.name.substring(2, x.name.length))
-        } else if(x.base == 'd') {
-          ("" + x.width + "'d" + x.name)
-        } else if(x.base == 'h') {
-          ("" + x.width + "'h" + x.name)
-        } else {
-          ""}
-        ) + "/* " + x.inputVal + "*/";
+        val lit = x.value
+        val value = if (lit < 0) (BigInt(1) << x.width) + lit else lit
+        x.width + "'h" + value.toString(16)
 
       case _ =>
         super.emitRef(node)
@@ -281,14 +270,6 @@ class VerilogBackend extends Backend {
           emitRef(node.inputs(0)) + " " + o.op + " " + emitRef(node.inputs(1))
         }) + ";\n"
 
-      case x: Cat =>
-        var res = "  assign " + emitTmp(node) + " = {";
-        var first = true;
-        for(e <- node.inputs)
-          res += (if(first) {first = false; ""} else ", ") + emitRef(e);
-        res += "};\n";
-        res
-
       case x: Extract =>
         node.inputs.tail.foreach(x.validateIndex)
         if (node.inputs.length < 3) {
@@ -304,50 +285,6 @@ class VerilogBackend extends Backend {
             "  assign " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ";\n"
           }
         }
-
-      case x: Fill =>
-        "  assign " + emitTmp(node) + " = {" + emitRef(node.inputs(1)) + "{" + emitRef(node.inputs(0)) + "}};\n";
-
-      case ll: ListLookup[_] =>
-        val res = new StringBuilder()
-        res.append("  always @(*) begin\n" +
-                   //"    " + emitRef + " = " + inputs(1).emitRef + ";\n" +
-                   "    casez (" + emitRef(node.inputs(0)) + ")" + "\n");
-
-        for ((addr, data) <- ll.map) {
-          res.append("      " + emitRef(addr) + " : begin\n");
-          for ((w, e) <- ll.wires zip data) {
-            if(w.component != null && w.component.mods.contains(w) ) {
-              res.append("        " + emitRef(w) + " = " + emitRef(e) + ";\n");
-            }
-          }
-          res.append("      end\n")
-        }
-        res.append("      default: begin\n")
-        for ((w, e) <- ll.wires zip ll.defaultWires) {
-          if(w.component != null && w.component.mods.contains(w)) {
-            res.append("        " + emitRef(w) + " = " + emitRef(e) + ";\n");
-          }
-        }
-        res.append("      end\n");
-        res.append(
-          "    endcase\n" +
-          "  end\n");
-        res.toString
-
-      case l: Lookup =>
-        var res =
-          "  always @(*) begin\n" +
-          "    " + emitRef(l) + " = " + emitRef(l.inputs(1)) + ";\n" +
-          "    casez (" + emitRef(l.inputs(0)) + ")" + "\n";
-
-        for (node <- l.map)
-          res = res +
-            "      " + emitRef(node.addr) + " : " + emitRef(l) + " = " + emitRef(node.data) + ";\n";
-        res = res +
-          "    endcase\n" +
-          "  end\n";
-        res
 
       case m: Mem[_] =>
         if(!m.isInline) {
@@ -375,16 +312,16 @@ class VerilogBackend extends Backend {
           ""
         }
       case r: ROM[_] =>
-        val inits = new StringBuilder
-        for (i <- 0 until r.lits.length)
-          inits append "    " + emitRef(r) + "[" + i + "] = " + emitRef(r.lits(i)) + ";\n"
-
-        "  " + romStyle + " begin\n" +
-        inits +
-        "  end\n"
-
+             "" //Define is already done by Vec
+     
       case r: ROMRead[_] =>
-        "  assign " + emitTmp(r) + " = " + emitRef(r.rom) + "[" + emitRef(r.addr) + "];\n"
+        val reads = new StringBuilder
+        reads append "  assign " + emitTmp(r) + " = \n" 
+        reads append "      " + emitRef(r.addr) + " == " + r.addr.width.toString + "'d0" + " ? " + emitRef(r.rom.asInstanceOf[ROM[_]].lits(0)) + "\n"
+        for (i <-1 until r.rom.asInstanceOf[ROM[_]].lits.length)
+          reads append "    : " + emitRef(r.addr) + " == " + r.addr.width.toString + "'d" + i + " ? " + emitRef(r.rom.asInstanceOf[ROM[_]].lits(i)) + "\n"
+
+	reads + "`ifndef SYNTHESIS\n    :$random()\n`endif\n    ;\n"
 
       case s: Sprintf =>
         "  always @(*) $sformat(" + emitTmp(s) + ", " + s.args.map(emitRef _).foldLeft(CString(s.format))(_ + ", " + _) + ");\n"
@@ -407,21 +344,9 @@ class VerilogBackend extends Backend {
         } else {
           ""
         }
-      case x: ListLookupRef[_] =>
-        "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
-
-      case x: Lookup =>
-        "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
-
       case x: Sprintf =>
         "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
 
-      case x: ListNode =>
-        ""
-      case x: MapNode =>
-        ""
-      case x: LookupMap =>
-        ""
       case x: Literal =>
         ""
 
@@ -435,7 +360,8 @@ class VerilogBackend extends Backend {
           ""
         }
       case r: ROM[_] =>
-        "  reg [" + (r.width-1) + ":0] " + emitRef(r) + " [" + (r.lits.length-1) + ":0];\n"
+        ""
+        //Vec generates the declaration statements
 
       case x: MemAccess =>
         x.referenced = true
@@ -448,6 +374,7 @@ class VerilogBackend extends Backend {
   }
 
   def genHarness(c: Module, name: String) {
+    /*
     val harness  = createOutputFile(name + "-harness.v");
     val printFormat = Module.printArgs.map(a => "0x%x").fold("")((y,z) => z + " " + y)
     val scanFormat = Module.scanArgs.map(a => "%x").fold("")((y,z) => z + " " + y)
@@ -524,6 +451,7 @@ class VerilogBackend extends Backend {
     harness.write("  end\n")
     harness.write("endmodule\n")
     harness.close();
+    */
   }
 
   def emitDefs(c: Module): StringBuilder = {
@@ -675,7 +603,7 @@ class VerilogBackend extends Backend {
         var textLevel = 0;
         for( flushComp <- comps ) {
           textLevel = flushComp.level;
-          if( flushComp.level == level ) {
+          if( flushComp.level == level && flushComp.moduleName == "") {
             flushComp.moduleName = moduleName
           }
         }
@@ -767,10 +695,6 @@ class VerilogBackend extends Backend {
       val out_conf = createOutputFile(Module.topComponent.name + ".conf");
       out_conf.write(getMemConfString);
       out_conf.close();
-    }
-    if( Module.tester != null ) {
-      Module.scanArgs.clear();  Module.scanArgs  ++= Module.tester.testInputNodes;    Module.scanFormat  = ""
-      Module.printArgs.clear(); Module.printArgs ++= Module.tester.testNonInputNodes; Module.printFormat = ""
     }
     if (Module.isGenHarness) {
       genHarness(c, c.name);

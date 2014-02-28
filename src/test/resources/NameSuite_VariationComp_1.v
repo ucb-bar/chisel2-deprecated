@@ -4,7 +4,7 @@ module NameSuite_CompBlock_1_0(
 );
 
 
-  assign io_replay = 1'h0/* 0*/;
+  assign io_replay = 1'h0;
 endmodule
 
 module NameSuite_CompBlock_1_1(
