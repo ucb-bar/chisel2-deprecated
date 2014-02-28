@@ -5,6 +5,8 @@
 \usepackage[parfill]{parskip}
 \usepackage{fixltx2e}
 
+\input{scala.tex}
+
 % Remove section numbering
 \setcounter{secnumdepth}{0}
 
@@ -12,14 +14,14 @@
 
 \pagestyle{empty}
 
-\input{scala.tex}
-
 \begin{document}
 \begin{multicols}{3}
 
 \begin{center}
 \Large{Chisel Cheat Sheet}
 \end{center}
+
+\renewcommand{\tabcolsep}{.5mm}
 
 \section{Notation}
 \verb$c, x, y$ are Chisel types; \verb$n, m$ are Scala integers \newline
@@ -30,29 +32,29 @@
 
 \section{Basic Operators}
 \begin{tabular}{l l}
-\isc$val x = UInt()$ & Allocate \verb$a$ as \verb$UInt()$ \\
-\isc$val x := y$ & Re-assign \verb$y$ to \verb$x$ \\
-\isc$x <> y$ & Connect \verb$x$ and \verb$y$, inferring direction \\
+\verb$val x = UInt()$ & Allocate \verb$a$ as \verb$UInt()$ \\
+\verb$val x := y$ & Re-assign \verb$y$ to \verb$x$ \\
+\verb$x <> y$ & Connect \verb$x$ and \verb$y$, inferring direction \\
 \end{tabular}
 
 \section{Basic Data Types}
 \subsection{Bool Constructors}
 \begin{tabular}{l l l}
-\isc$Bool()$ & Create an un-assigned wire \\
-\isc$Bool(b)$ & Create a literal \\
+\verb$Bool()$ & Create an un-assigned wire \\
+\verb$Bool(b)$ & Create a literal \\
 \end{tabular}
 
 \subsection{Bits, SInt, UInt Constructors}
-Constructors also applicable for \isc$UInt$, \isc$SInt$ \newline
+Constructors also applicable for \verb$UInt$, \verb$SInt$ \newline
 \begin{tabular}{l l}
-\isc$Bits([width=n])$ & Create an un-assigned wire \\
-\isc$Bits(x=n, [width=m])$ & Create a literal from integer \\
-\isc$Bits(x=s, [width=m])$ & Create a literal from string \\
+\verb$Bits([width=n])$ & Create an un-assigned wire \\
+\verb$Bits(x=n, [width=m])$ & Create a literal from integer \\
+\verb$Bits(x=s, [width=m])$ & Create a literal from string \\
 \end{tabular}
 
 \subsection{Bits, UInt, SInt Casts}
 \begin{tabular}{l l}
-\isc$UInt$ to \isc$SInt$ & zero-extend to SInt \\
+\verb$UInt$ to \verb$SInt$ & zero-extend to SInt \\
 all others & reinterpret cast \\
 \end{tabular}
 
@@ -61,9 +63,9 @@ all others & reinterpret cast \\
 Chisel & Explanation & Width \\
 \hline
 \hline
-\isc$!x$ & Logical NOT & \verb$1$ \\
-\isc$x && y$ & Logical AND & \verb$1$ \\
-\isc$x || y$ & Logical OR & \verb$1$ \\
+\verb$!x$ & Logical NOT & \verb$1$ \\
+\verb$x && y$ & Logical AND & \verb$1$ \\
+\verb$x || y$ & Logical OR & \verb$1$ \\
 \end{tabular}
 
 \subsection{Bits Operators}
@@ -71,27 +73,27 @@ Chisel & Explanation & Width \\
 Chisel & Explanation & Width \\
 \hline
 \hline
-\isc$x(n)$ & Extract bit (0 is LSB) & \verb$1$ \\
-\isc$x(n, m)$ & Extract bitfield & \verb$n - m + 1$ \\
-\isc$x << y$ & Left shift & \verb$wx + maxVal(y)$ \\
-\isc$x >> y$ & Right shift & \verb$wx - minVal(y)$ \\
-\isc$x << n$ & Left shift & \verb$wx + n$ \\
-\isc$x >> n$ & Right shift & \verb$wx - n$ \\
-\isc$Fill(n, x)$ & Replicate \verb$x$ \verb$n$ times & \verb$n * wx$ \\
-\isc$Cat(x, y)$ & Concatenate bitfields & \verb$wx + wy$ \\
-\isc$Mux(c, x, y)$ & If \verb$c$ then \verb$x$ else \verb$y$ & \verb$max(wx, wy)$ \\
+\verb$x(n)$ & Extract bit (0 is LSB) & \verb$1$ \\
+\verb$x(n, m)$ & Extract bitfield & \verb$n - m + 1$ \\
+\verb$x << y$ & Left shift & \verb$wx + maxVal(y)$ \\
+\verb$x >> y$ & Right shift & \verb$wx - minVal(y)$ \\
+\verb$x << n$ & Left shift & \verb$wx + n$ \\
+\verb$x >> n$ & Right shift & \verb$wx - n$ \\
+\verb$Fill(n, x)$ & Replicate \verb$x$ \verb$n$ times & \verb$n * wx$ \\
+\verb$Cat(x, y)$ & Concatenate bitfields & \verb$wx + wy$ \\
+\verb$Mux(c, x, y)$ & If \verb$c$ then \verb$x$ else \verb$y$ & \verb$max(wx, wy)$ \\
 \hline
-\isc$~x$ & Bitwise NOT & \verb$wx$ \\
-\isc$x & y$ & Bitwise AND & \verb$max(wx, wy)$ \\
-\isc$x | y$ & Bitwise OR & \verb$max(wx, wy)$ \\
-\isc$x ^ y$ & Bitwise XOR & \verb$max(wx, wy)$ \\
+\verb$~x$ & Bitwise NOT & \verb$wx$ \\
+\verb$x & y$ & Bitwise AND & \verb$max(wx, wy)$ \\
+\verb$x | y$ & Bitwise OR & \verb$max(wx, wy)$ \\
+\verb$x ^ y$ & Bitwise XOR & \verb$max(wx, wy)$ \\
 \hline
-\isc$x === y$ & Equality & \verb$1$ \\
-\isc$x != y$ & Inequality & \verb$1$ \\
+\verb$x === y$ & Equality & \verb$1$ \\
+\verb$x != y$ & Inequality & \verb$1$ \\
 \hline
-\isc$andR(x)$ & AND-reduce & \verb$1$ \\
-\isc$orR(x)$ & OR-reduce & \verb$1$ \\
-\isc$xorR(x)$ & XOR-reduce & \verb$1$ \\
+\verb$andR(x)$ & AND-reduce & \verb$1$ \\
+\verb$orR(x)$ & OR-reduce & \verb$1$ \\
+\verb$xorR(x)$ & XOR-reduce & \verb$1$ \\
 \end{tabular}
 
 \subsection{UInt, SInt Operators}
@@ -101,19 +103,19 @@ Bitwidths only valid for UInt operations
 Chisel & Explanation & Width \\
 \hline
 \hline
-\isc$x + y$ & Addition & \verb$max(wx, wy)$ \\
-\isc$x - y$ & Subtraction & \verb$max(wx, wy)$ \\
-\isc$x * y$ & Multiplication & \verb$wx + wy$ \\
-\isc$x / y$ & Division & \verb$wx$ \\
-\isc$x % y$ & Modulus & \verb$bits(maxVal(y) - 1)$ \\
+\verb$x + y$ & Addition & \verb$max(wx, wy)$ \\
+\verb$x - y$ & Subtraction & \verb$max(wx, wy)$ \\
+\verb$x * y$ & Multiplication & \verb$wx + wy$ \\
+\verb$x / y$ & Division & \verb$wx$ \\
+\verb$x % y$ & Modulus & \verb$bits(maxVal(y) - 1)$ \\
 \hline
-\isc$x > y$ & Greater than & \verb$1$ \\
-\isc$x >= y$ & Greater than or equal & \verb$1$ \\
-\isc$x < y$ & Less than & \verb$1$ \\
-\isc$x <= y$ & Less than or equal & \verb$1$ \\
+\verb$x > y$ & Greater than & \verb$1$ \\
+\verb$x >= y$ & Greater than or equal & \verb$1$ \\
+\verb$x < y$ & Less than & \verb$1$ \\
+\verb$x <= y$ & Less than or equal & \verb$1$ \\
 \hline
-\isc$x >> y$ & Arithmetic right shift & \verb$wx - minVal(y)$ \\
-\isc$x >> n$ & Arithmetic right shift & \verb$wx - n$ \\
+\verb$x >> y$ & Arithmetic right shift & \verb$wx - minVal(y)$ \\
+\verb$x >> n$ & Arithmetic right shift & \verb$wx - n$ \\
 \end{tabular}
 
 \section{Helpers}
@@ -146,11 +148,11 @@ switch(x) {
 \end{scala}
 
 \subsection{Enum}
-Use \isc$enum$s to generate list values \newline
-\isc$val s1::s2::$...\isc$::s$\textsubscript{n}\isc$::Nil := Enum(t, n)$ \newline
-where \isc$t$ is an empty Chisel wire (i.e. \verb$Bits()$) \newline
-and \isc$n$ is the number of values \newline
-and \isc$s1$, \isc$s2$, ..., \isc$s$\textsubscript{n} will have distinct values
+Use \verb$enum$s to generate list values \newline
+\verb$val s1::s2::$...\verb$::s$\textsubscript{n}\verb$::Nil := Enum(t, n)$ \newline
+where \verb$t$ is an empty Chisel wire (i.e. \verb$Bits()$) \newline
+and \verb$n$ is the number of values \newline
+and \verb$s1$, \verb$s2$, ..., \verb$s$\textsubscript{n} will have distinct values
 
 \section{Aggregate Types}
 \subsection{Bundle}

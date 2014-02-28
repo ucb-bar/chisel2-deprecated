@@ -1,6 +1,5 @@
 % "define" Scala
 \usepackage[T1]{fontenc}  
-\usepackage[scaled=0.82]{beramono}  
 \usepackage{microtype} 
 
 \sbox0{\small\ttfamily A}
@@ -56,21 +55,3 @@
 {\lstset{language=verilog}}
 {}
 
-\newcommand{\isc}{
-\lstinline
-}
-
-\lstdefinestyle{scala}{language=scala,
-  showstringspaces=false,
-  columns=fixed, % basewidth=\mybasewidth,
-  basicstyle={\small\ttfamily},
-  numbers=none,
-  numberstyle=\footnotesize\color{gray},
-  % identifierstyle=\color{red},
-  keywordstyle=\color{blue},
-  commentstyle=\color{dkgreen},
-  stringstyle=\color{mauve},
-  breakatwhitespace=true,
-  procnamekeys={def, val, var, class, trait, object, extends},
-  procnamestyle=\ttfamily\color{red},
-}
