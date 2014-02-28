@@ -69,5 +69,6 @@ class Clock(reset: Bool = Module.implicitReset, val edge: ClockEdge = PosEdge) e
         inputs += enable
       }
     }
+    inputs.head.getNode setName name
   }
 }

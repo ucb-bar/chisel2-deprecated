@@ -242,7 +242,7 @@ abstract class Backend {
       if (!node.component.nodes.contains(node))
         node.component.nodes += node
       for (input <- node.inputs) {
-        if (input.component != null && input.component != node.component) {
+        if (!input.isInstanceOf[Clock] && input.component != null && input.component != node.component) {
           if (!input.isLit && !isBitsIo(node, INPUT) && !isBitsIo(input, OUTPUT))
             ChiselErrors += new ChiselError(() => { "Illegal cross module reference between " + node + " and " + input}, node.line)
         }
