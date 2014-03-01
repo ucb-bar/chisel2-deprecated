@@ -14,6 +14,24 @@
 
 \pagestyle{empty}
 
+\makeatletter
+\renewcommand{\section}{\@startsection{section}{1}{0mm}%
+                                {-0.ex plus 1 ex}%
+                                {0.01ex plus .01ex}%x
+                                {\normalfont\large\bfseries}}
+\renewcommand{\subsection}{\@startsection{subsection}{2}{0mm}%
+                                {-0.ex plus 1 ex}%
+                                {0.01ex plus .01ex}%
+                                {\normalfont\normalsize\bfseries}}
+\renewcommand{\subsubsection}{\@startsection{subsubsection}{3}{0mm}%
+                                {-0.ex plus 1 ex}%
+                                {0.01ex plus .01ex}%
+                                {\normalfont\small\bfseries}}
+\makeatother
+
+
+
+
 \begin{document}
 \begin{multicols}{3}
 
@@ -39,9 +57,10 @@
 
 \section{Basic Data Types}
 \subsection{Bool Constructors}
+\verb$Bool([x:Boolean])$ \newline
 \begin{tabular}{l l l}
-\verb$Bool()$ & Create an un-assigned wire \\
-\verb$Bool(b)$ & Create a literal \\
+& \verb$x$ & create a literal from Boolean \\
+& & or declare unassigned if missing \\
 \end{tabular}
 
 \subsection{Bits, SInt, UInt Constructors}
@@ -49,7 +68,7 @@
 \verb$UInt(x:Int|String, width:Int)$ \newline
 \verb$SInt(x:Int|String, width:Int)$ \newline
 \begin{tabular}{l l l}
-& \verb$x$ & create a literal from int or parsed string \\
+& \verb$x$ & create a literal from \verb$Int$ or parsed \verb$String$ \\
 & & or declare unassigned if missing \\
 & \verb$width$ & bit width (or inferred) \\
 \end{tabular}
@@ -152,7 +171,7 @@ switch(x) {
 \subsection{Enum}
 Use \verb$enum$s to generate list values \newline
 \verb$val s1::s2::$ ... \verb$::sn::Nil$ \newline
-\verb$ := Enum(nodeType:UInt, n:Int)$ \newline
+\verb$    := Enum(nodeType:UInt, n:Int)$ \newline
 \begin{tabular}{l l l}
 & \verb$s1$, \verb$s2$, ..., \verb$sn$ & will be created with distinct values \\
 & \verb$nodeType$ & type of \verb$s1$, \verb$s2$, ..., \verb$sn$ \\
@@ -161,68 +180,166 @@ Use \verb$enum$s to generate list values \newline
 
 \section{Aggregate Types}
 \subsection{Bundle}
+\verb$Bundle$ contains \verb$Data$ types indexed by name
+\subsubsection{Defining}
+Define a \verb$Bundle$ by subclassing \verb$Bundle$ and \newline
+populating with components:
+\begin{scala}
+class MyBundle extends Bundle {
+  val a = Bool()
+  val b = UInt(width = 32)
+}
+\end{scala}
+\subsubsection{Constructor}
+Instantiate a \verb$Bundle$ subclass: \newline
+\verb$val my_bundle = new MyBundle()$ \newline
+Or define an inline Bundle type:
+\begin{scala}
+val my_bundle = new Bundle {
+  val a = Bool()
+  val b = UInt(width = 32)
+}
+\end{scala}
+\subsubsection{Using}
+Access elements using dot notation: \newline
+\verb$val bundleVal = my_bundle.a$ \newline
+\verb$my_bundle.a := Bool(true)$
 
 \subsection{Vec}
-\verb$Vec$ contain an indexable vector of \verb$Data$ types
+\verb$Vec$ is an indexable vector of \verb$Data$ types
 \subsubsection{Constructor}
 \verb$val myVec = Vec.fill(n:Int) {gen:Data}$ \newline
 \begin{tabular}{l l l}
 & \verb$n$ & vector depth (elements) \\
 & \verb$gen$ & element data type \\
 \end{tabular}
-\subsubsection{Reading}
-\verb$val readVal = myVec(ind:Data)$ (index by wire) \newline
-\verb$val readVal = myVec(idx:Int)$ (static index) \newline
-\subsubsection{Writing}
-\verb$myVec(ind:Data) := y$ (index by wire) \newline
-\verb$myVec(idx:Int) := y$ (static index) \newline
+\subsubsection{Using}
+Access elements by indexing into a \verb$Vec$: \newline
+\verb$readVal := myVec(ind:Data)$ (index by wire) \newline
+\verb$readVal := myVec(idx:Int)$ (static index) \newline
+\verb$myVec(ind:Data) := writeVal$ (index by wire) \newline
+\verb$myVec(idx:Int) := writeVal$ (static index) \newline
 
 \section{State Elements}
 \subsection{Registers}
 \subsubsection{Constructor}
-\verb$val reg = Reg([outType:Data], [next:Data],$ \newline
-\verb$              [init:Data])$ \newline
+\verb$val my_reg = Reg([outType:Data], [next:Data],$ \newline
+\verb$                 [init:Data])$ \newline
 \begin{tabular}{l l l}
 & \verb$outType$ & register type (or inferred) \\
 & \verb$next$ & update value every clock \\
 & \verb$init$ & initialization value on reset \\
 \end{tabular}
 \subsubsection{Updating}
-\verb$reg := x$ latches \verb$x$ into \verb$reg$ on the next clock \newline
+Assign to latch a new value on the next clock: \newline
+\verb$my_reg := next_val$ \newline
 The last update (lexically, per clock) runs
 
 \subsection{Read-Write Memory}
 \subsubsection{Constructor}
-\verb$val mem = Mem(out:Data, n:Int,$ \newline
-\verb$              seqRead:Boolean)$ \newline
+\verb$val my_mem = Mem(out:Data, n:Int,$ \newline
+\verb$                 seqRead:Boolean)$ \newline
 \begin{tabular}{l l l}
 & \verb$out$ & memory element type \\
 & \verb$n$ & memory depth (elements) \\
 & \verb$seqRead$ & only update reads on clock edge \\
 \end{tabular}
-\subsubsection{Reading}
+\subsubsection{Usage}
+Access elements by indexing into a \verb$Mem$: \newline
 \verb$val readVal = mem(addr:UInt|Int)$ \newline
-Synchronous read: assign output to \verb$Reg$
-\subsubsection{Writing}
-\verb$mem(addr:UInt|Int) := y$ \newline
-
-\subsubsection{}
+Synchronous read: assign output to \verb$Reg$ \newline
+\verb$mem(addr:UInt|Int) := y$
 
 \section{Modules}
+\subsubsection{Defining}
+Define a \verb$Module$ by subclassing \verb$Module$ and \newline
+populating with components and code: \newline
+(\verb$Module$s may be parameterized and hierarchical) \newline
+\begin{scala}
+class SyncAdder(width:Int) extends Module {
+  val io = new Bundle {
+    val op_a = UInt(INPUT,  width)
+    val op_b = UInt(INPUT,  width)
+    val out  = UInt(OUTPUT, width)
+  }
+  val latch = new Reg(UInt())
+  latch := io.op_a + io.op_b
+  out := io.latch
+}
+\end{scala}
+\subsubsection{Usage}
+Elements can be accessed using dot notation: \newline
+\begin{scala}
+val my_module = Module(new SyncAdder(32))
+my_module.io.op_a := UInt(1)
+my_module.io.op_b := some_data
+val sum := my_module.io.out
+\end{scala}
 
-\section{Scala Hardware Generation}
-\subsection{For}
+\section{Hardware Generation}
+\subsection{Functions}
+\subsubsection{Defining}
+Define Scala functions containing Chisel code: \newline
+\begin{scala}
+def FunAdder(op_a:UInt, op_b:UInt): UInt {
+  a + b
+}
+\end{scala}
+\subsubsection{Usage}
+Hardware is instantiated when called: \newline
+\begin{scala}
+sum := FunAdder(UInt(1), some_data)
+\end{scala}
 
-\subsection{If}
-
-\subsection{Functional Abstraction}
+\subsection{If, For}
+Use Scala \verb$if$, \verb$for$ to generate hardware
 
 \section{Standard Library}
 \subsection{Decoupled}
-\subsection{PipeIO}
-\subsection{Arbiter}
-\subsection{RRAArbiter}
+\verb$Decoupled$ is a \verb$Bundle$ with a ready-valid interface,\newline
+where the consumer should flip the interface: \newline
+\subsubsection{Constructor}
+\verb$val my_rv = Decoupled(type:Data)$ \newline
+\begin{tabular}{l l l}
+& \verb$type$ & data type \\
+\end{tabular}
+\subsubsection{Interface}
+\begin{tabular}{l l l}
+& \verb$.ready$ & ready \verb$Bool$ \\
+& \verb$.valid$ & valid \verb$Bool$ \\
+& \verb$.bits$ & data \\
+\end{tabular}
 
+\subsection{PipeIO}
+\verb$PipeIO$ is a \verb$Bundle$ with a valid interface,\newline
+where the consumer should flip the interface: \newline
+\subsubsection{Constructor}
+\verb$val my_rv = PipeIO(type:Data)$ \newline
+\begin{tabular}{l l l}
+& \verb$type$ & data type \\
+\end{tabular}
+\subsubsection{Interface}
+\begin{tabular}{l l l}
+& \verb$.valid$ & valid \verb$Bool$ \\
+& \verb$.bits$ & data \\
+\end{tabular}
+
+\subsection{Arbiters}
+\verb$Arbiter$ is a \verb$Module$ connecting multiple producers \newline
+to one consumer, {\bf prioritizing lower producers} \newline
+\verb$RRArbiter$ is a \verb$Module$ connecting multiple producers \newline
+to one consumer {\bf in round-robin order} \newline
+\subsubsection{Constructor}
+\verb$val arb = Arbiter(gen:Data, n:Int)$ \newline
+\begin{tabular}{l l l}
+& \verb$gen$ & data type \\
+& \verb$n$ & number of producers \\
+\end{tabular}
+\subsubsection{Interface}
+\begin{tabular}{l l l}
+& \verb$.io.in$ & \verb$Vec$ of \verb$Decoupled$ inputs \\
+& \verb$.io.out$ & output as \verb$Decoupled$ \\
+\end{tabular}
 
 \end{multicols}
 \end{document}
