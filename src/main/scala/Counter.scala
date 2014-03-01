@@ -74,8 +74,9 @@ trait CounterBackend extends Backannotation {
   val data_addr_width = addr_width - daisy_ctrl_width
 
   val signals = new HashSet[Node]
-  val shadows = new HashMap[Module, ArrayBuffer[Bits]]
   val crosses = new ArrayBuffer[(Double, Array[Node])]
+  val shadows = new HashMap[Module, ArrayBuffer[Bits]]
+  val compSignalMap = new HashMap[Module, ArrayBuffer[Node]]
   val signalCounterMap = new HashMap[Node, Bits]
   val shadowCounterMap = new HashMap[Bits, Bits]
   val ops = new HashMap[Module, (Bool, Bool)]
@@ -93,8 +94,8 @@ trait CounterBackend extends Backannotation {
   preElaborateTransforms += ((c: Module) => generateCounters(c))
   preElaborateTransforms += ((c: Module) => generateDaisyChain(c))
   preElaborateTransforms += ((c: Module) => generateSlave(c))
-  analyses += ((c: Module) => findClockCrossingPoints(c))
-  analyses += ((c: Module) => initTester(c))
+  // analyses += ((c: Module) => findClockCrossingPoints(c))
+  // analyses += ((c: Module) => initTester(c))
   analyses += ((c: Module) => reportCounters(c))
 
   def getTypeNode(node: Node) = {
@@ -207,10 +208,13 @@ trait CounterBackend extends Backannotation {
 
     // Find correspoinding nodes
     for (m <- Module.sortedComps) {
+      compSignalMap(m) = new ArrayBuffer[Node]
       val reset = m.reset
       val resetName = getSignalPathName(reset, ".")
       if (signalNames contains resetName) {
         signals += reset
+        compSignalMap(m) += reset
+        signalNameMap(resetName) = reset
         if (!(m.debugs contains reset))
           m.debugs += reset
       }
@@ -218,6 +222,7 @@ trait CounterBackend extends Backannotation {
         val signalName = getSignalPathName(node, ".")
         if (signalNames contains signalName) {
           signals += node
+          compSignalMap(m) += node
           signalNameMap(signalName) = node
           if (!(node.component.debugs contains node))
             node.component.debugs += node
@@ -242,11 +247,6 @@ trait CounterBackend extends Backannotation {
       val daisy_control = Bits(INPUT, 3)
       val daisy_out = Decoupled(Bits(width = 32))
       val daisy_in = Valid(Bits(width = 32)).flip
-      val in_valid = m.io("in") match { 
-        case in: DecoupledIO[_] => in.ready match {
-          case bool: Bool => bool
-        }
-      }
       
       def ready(i: Int) = {
         val readyVal = stall && daisy_out.ready &&
@@ -268,10 +268,12 @@ trait CounterBackend extends Backannotation {
 
       ops(m) = (ready(1), ready(2))
 
-      addPin(m, stall, "stall")
-      addPin(m, daisy_control, "daisy_control")
-      addPin(m, daisy_out, "daisy_out")
-      addPin(m, daisy_in, "daisy_in")
+      // if (!m.children.isEmpty || (compSignalMap(m) != null && !compSignalMap(m).isEmpty)) {
+        addPin(m, stall, "stall")
+        addPin(m, daisy_control, "daisy_control")
+        addPin(m, daisy_out, "daisy_out")
+        addPin(m, daisy_in, "daisy_in")
+      // }
 
       if (!m.children.isEmpty) {
         val not_stop = Bool(INPUT)
@@ -533,10 +535,12 @@ trait CounterBackend extends Backannotation {
     }
   }
 
-  def generateSlave(top: Module) {
+  def generateSlave(slave: Module) {
     ChiselError.info("Counter Backend: generate the slave")
 
+    val top = slave.children.head
     // initialize Slave module
+    /*
     val slave = Module(new Slave)
     slave.name = "Slave"
     slave.children += top
@@ -546,11 +550,12 @@ trait CounterBackend extends Backannotation {
     Module.sortedComps prepend slave
     slave.signals ++= signals
     slave.signalCounterMap ++= ( for ((x, y) <- signalCounterMap) yield ((x, y.getNode)) )
+    */
 
     // Registers to control the daisy chain
-    val topInReg = Reg(init = Bits(0), clock = daisyClock)
+    // val topInReg = Reg(init = Bits(0), clock = daisyClock)
     val clkCounter = Reg(init = Bits(0), clock = daisyClock)
-    val inputRdy = Reg(init = Bool(true), clock = daisyClock)
+    // val inputRdy = Reg(init = Bool(true), clock = daisyClock)
     val init = Reg(init = Bool(true), clock = daisyClock)
     val stop = Reg(init = Bool(false), clock = stopClock) // works at negative edges
     val notStop = !stop
@@ -559,12 +564,13 @@ trait CounterBackend extends Backannotation {
     val clkCounterIsOne = clkCounter === Bits(1)
     val clkCounterDecr  = clkCounter - Bits(1, 32)
 
-    topInReg.comp.component = slave
-    topInReg.comp setName "top_in_bits"
+
+    // topInReg.comp.component = slave
+    // topInReg.comp setName "top_in_bits"
     clkCounter.comp.component = slave
     clkCounter.comp setName "clk_counter" 
-    inputRdy.comp.component = slave
-    inputRdy.comp setName "input_rdy"
+    // inputRdy.comp.component = slave
+    // inputRdy.comp setName "input_rdy"
     stop.comp.component = slave
     stop.comp setName "stop" 
     init.comp.component = slave
@@ -594,20 +600,17 @@ trait CounterBackend extends Backannotation {
     val slaveOutBits = slaveOut.bits match {
       case bits: Bits => bits
     }
+    /*
     val topIn = top.io("in") match {
       case dio: DecoupledIO[_] => dio
     }
-    /*
-    val topInBits = topIn.bits match {
-      case bits: Bits => bits
-    }
-    */
     val topOut = top.io("out") match {
       case dio: ValidIO[_] => dio
     }
     val topOutBits = topOut.bits match {
       case bits: Bits => bits
     }
+    */
     val topStall = top.io("stall") match {
       case bool: Bool => bool
     }
@@ -633,62 +636,68 @@ trait CounterBackend extends Backannotation {
       case bits: Bits => bits
     }
     
-    val outBits = Vec(Range(0, pow(2, data_addr_width).toInt) map { 
-      case 2 => daisyOutBits
-      case 3 => topOut.valid
-      case 4 => topOutBits
-      case _ => Bits(0)
-    })
-
+    /*
     val dataAddr  = addr(addr_width-1, daisy_ctrl_width) 
     val daisyAddr = addr(daisy_ctrl_width-1, 0)
-    val outValid = Vec(Range(0, pow(2, data_addr_width).toInt) map { 
-      case 2 => daisyOut.valid
-      case 3 => Bool(true)
-      case 4 => topOut.valid
-      case _ => Bool(false)
-    })
-    val daisyReady = dataAddr === UInt(2) && slaveOut.ready
+    */
+    /*
     val inputReady = Vec(Range(0, pow(2, data_addr_width).toInt) map { 
       case 0 => topIn.ready
       case 1 => Bool(true)
       case _ => Bool(false)
     })
-    def inValid(i: Int) = slaveIn.valid && stall && dataAddr === UInt(i)
+    */
 
+    /*
     val (a, b) = topIn.bits match {
       case bundle: Bundle => (bundle.elements(0)._2, bundle.elements(1)._2) match {
         case (bitsA: Bits, bitsB: Bits) => (bitsA, bitsB)
       }
     }
+    */
+
+    def outReady(i: Int) = slaveOut.ready && addr === UInt(i)
+    def inValid(i: Int) = slaveIn.valid && stall && addr === UInt(i)
 
     topStall.updates       += ((Bool(true), stall))
     topNotStop.updates     += ((Bool(true), notStop))
     topInit.updates        += ((Bool(true), init))
-    daisyControl.updates   += ((Bool(true), daisyAddr))
+/*
     a.updates              += ((Bool(true), topInReg(31, 16)))
     b.updates              += ((Bool(true), topInReg(15, 0)))
-    daisyOut.ready.updates += ((Bool(true), daisyReady))
-    daisyIn.valid.updates  += ((Bool(true), daisyReady))
-    daisyInBits.updates    += ((Bool(true), Bits(0)))
-    slaveOut.valid.updates += ((Bool(true), outValid(dataAddr)))
-    slaveOutBits.updates   += ((Bool(true), outBits(dataAddr)))
-    slaveIn.ready.updates  += ((Bool(true), inputRdy || inputReady(dataAddr)))
-    topIn.valid.updates    += ((Bool(true), inputRdy || inValid(0)))
+*/
 
+    // daisy chains
+    daisyControl.updates   += ((Bool(true), addr(4)))
+    daisyOut.ready.updates += ((Bool(true), outReady(4)))
+    daisyIn.valid.updates  += ((Bool(true), outReady(4)))
+    daisyInBits.updates    += ((Bool(true), Bits(0)))
+    slaveOut.valid.updates += ((addr === UInt(4), daisyOut.valid))
+    slaveOutBits.updates   += ((addr === UInt(4), daisyOut.bits))
+    // write to clk reg
+    slaveIn.ready.updates  += ((addr === UInt(4), Bool(true)))
+    
+    
+    // slaveIn.ready.updates  += ((Bool(true), /* inputRdy || */ inputReady(dataAddr)))
+    // topIn.valid.updates    += ((Bool(true), /* inputRdy || */ inValid(0)))
+
+/*
     topInReg.comp.updates   += ((Bool(true), topInReg))
     topInReg.comp.updates   += ((inValid(0), slaveInBits))
+*/
     init.comp.updates       += ((Bool(true), init))
-    init.comp.updates       += ((inValid(0), Bool(false)))
+    init.comp.updates       += ((inValid(4), Bool(false))) // Is it right?
     clkCounter.comp.updates += ((Bool(true), clkCounter))
     clkCounter.comp.updates += ((notStall, clkCounterDecr))
-    clkCounter.comp.updates += ((inValid(1), slaveInBits))
+    clkCounter.comp.updates += ((inValid(4), slaveInBits))
     stop.comp.updates       += ((Bool(true), stop))
     stop.comp.updates       += ((clkCounterIsOne, Bool(true)))
-    stop.comp.updates       += ((inValid(1), Bool(false)))
+    stop.comp.updates       += ((inValid(4), Bool(false)))
+/*
     inputRdy.comp.updates   += ((Bool(true), inputRdy))
     inputRdy.comp.updates   += ((topOut.valid, Bool(true)))
     inputRdy.comp.updates   += ((inValid(1), Bool(false)))
+*/
 
     // emulation clock
     val enable = (notStall && notStop || init) 
@@ -739,6 +748,10 @@ trait CounterBackend extends Backannotation {
     report append "\t\t|                     by Donggyu Kim  |\n"
     report append "\t\t+-------------------------------------+\n\n"
 
+    report append "CountNo\t"
+    report append signals.size.toString + "\n" 
+    report append "CrossNo\t"
+    report append crosses.size.toString + "\n"
     report append "Weigts\t\t\tCross\t\t\tSingals\n"
     for ((coeff, cross) <- crosses) {
       report append "%.5e".format(coeff)
