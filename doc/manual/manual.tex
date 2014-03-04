@@ -1448,7 +1448,7 @@ def PriorityEncoderOH(in: Seq[Boo]): UInt
 // standard used is that the
 // consumer uses the flipped
 // interface.
-class Decoupled[+T <: Data](type: T) 
+class DecoupledIO[+T <: Data](type: T) 
     extends Bundle {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
@@ -1459,7 +1459,7 @@ class Decoupled[+T <: Data](type: T)
 // interface. The standard used is
 // that the consumer uses the
 // fliped interface.
-class PipeIO[+T <: Data](type: T) 
+class ValidIO[+T <: Data](type: T) 
     extends Bundle {
   val valid = Bool(OUTPUT)
   val bits = data.asOutput
