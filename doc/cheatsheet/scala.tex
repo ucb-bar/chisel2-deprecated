@@ -25,6 +25,7 @@
 \definecolor{dkgreen}{rgb}{0,0.6,0}
 \definecolor{gray}{rgb}{0.5,0.5,0.5}
 \definecolor{mauve}{rgb}{0.58,0,0.82}
+\definecolor{light-gray}{gray}{0.75}
 
 % Default settings for code listings
 \lstset{language=scala,
@@ -41,9 +42,10 @@
   procnamekeys={def, val, var, class, trait, object, extends},
   procnamestyle=\ttfamily\color{red},
   frame=leftline,
+  rulecolor=\color{light-gray},
   xleftmargin=2mm,
   aboveskip=2pt,
-  belowskip=2pt
+  belowskip=2pt,
 }
 
 \lstnewenvironment{scala}
