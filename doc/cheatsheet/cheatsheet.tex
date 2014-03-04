@@ -6,6 +6,7 @@
 \usepackage{fixltx2e}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
+\usepackage{graphicx}
 
 \input{scala.tex}
 
@@ -21,7 +22,7 @@
 \makeatletter
 \renewcommand{\section}{\@startsection{section}{1}{0mm}%
                                 {-2ex plus 4ex}%
-                                {0.01ex plus .01ex}%x
+                                {-0.01ex plus .01ex}%x
                                 {\normalfont\large\bfseries}}
 \renewcommand{\subsection}{\@startsection{subsection}{2}{0mm}%
                                 {-1ex plus 4ex}%
@@ -35,31 +36,32 @@
 
 
 
-
 \begin{document}
 \begin{multicols}{3}
 
-\begin{center}
-\Large{\textbf{Chisel Cheat Sheet}}
-\end{center}
-
+\newcommand*\ruleline[1]{\par\noindent\raisebox{.8ex}{\makebox[\linewidth]{\hrulefill\hspace{1ex}\raisebox{-.8ex}{#1}\hspace{1ex}\hrulefill}}}
 \renewcommand{\tabcolsep}{.5mm}
+
+\ruleline{\Large{\textbf{Chisel Cheat Sheet}}}
+\begin{center}
+\includegraphics[scale=0.02]{bigduck} Version 0.3 (beta): \today
+\end{center}
 
 \fbox{ \parbox{0.95\columnwidth} {
 \subsection{Notation In This Document}:
 \subsubsection{For Functions and Constructors}: \newline
-Arguments are given as \texttt{kwd:type}, where \texttt{kwd} is the \newline
-\phantom{x} argument name/keyword and \texttt{type} is the type. \newline
+Arguments given as \texttt{kwd:type} (name and type(s)) \newline
 Arguments in brackets (\texttt{[...]}) are optional.
 \subsubsection{For Operators}: \newline
-\texttt{c}, \texttt{x}, \texttt{y} are Chisel \texttt{Data}s \newline
-\texttt{n}, \texttt{m} are Scala \texttt{Int}s \newline
+\texttt{c}, \texttt{x}, \texttt{y} are of type Chisel \texttt{Data} \newline
+\texttt{n}, \texttt{m} are of type Scala \texttt{Int} \newline
 \texttt{w(x)}, \texttt{w(y)} are the widths of \texttt{x}, \texttt{y} (respectively) \newline
 \texttt{minVal(x)}, \texttt{maxVal(x)} are the minimum or \newline
 \phantom{x} maximum possible values of \texttt{x}
 } }
-\newline
-\subsection{Chisel Operators}: \newline
+
+\section{Basic Chisel Constructs } \hrulefill
+\subsection{Chisel Wire Operators}: \newline
 \begin{tabular}{l l}
 \verb$val x = UInt()$ & Allocate \verb$a$ as wire of type \verb$UInt()$ \\
 \verb$x := y$ & Assign \verb$y$ to wire \verb$x$ \\
@@ -94,7 +96,7 @@ switch(x) {
 
 \subsection{Enum } generates value literals for enumerations \newline
 \verb$val s1::s2::$ ... \verb$::sn::Nil$ \newline
-\verb$    := Enum(nodeType:UInt, n:Int)$ \newline
+\verb$    = Enum(nodeType:UInt, n:Int)$ \newline
 \begin{tabular}{l l l}
 & \verb$s1$, \verb$s2$, ..., \verb$sn$ & will be created as \verb$nodeType$ literals \\
 & & with distinct values \\
@@ -104,6 +106,7 @@ switch(x) {
 
 \columnbreak
 
+\section{Basic Data Types } \hrulefill
 \subsubsection{Constructors}: \newline
 \verb$Bool([x:Boolean])$ \newline
 \verb$Bits/UInt/SInt([x:Int/String], [width:Int])$ \newline
@@ -139,9 +142,9 @@ Chisel & Explanation & Width \\
 \verb$x >> y$ & Dynamic right shift & \verb$w(x) - minVal(y)$ \\
 \verb$x << n$ & Static left shift & \verb$w(x) + n$ \\
 \verb$x >> n$ & Static right shift & \verb$w(x) - n$ \\
-\verb$Fill(n, x)$ & Replicate \verb$x$ \verb$n$ times & \verb$n * w(x)$ \\
+\verb$Fill(n, x)$ & Replicate \verb$x$, \verb$n$ times & \verb$n * w(x)$ \\
 \verb$Cat(x, y)$ & Concatenate bits & \verb$w(x) + w(y)$ \\
-\verb$Mux(c, x, y)$ & If \verb$c$ then \verb$x$ else \verb$y$ & \verb$max(w(x), w(y))$ \\
+\verb$Mux(c, x, y)$ & If \verb$c$: then \verb$x$, else \verb$y$ & \verb$max(w(x), w(y))$ \\
 \hline
 \verb$~x$ & Bitwise NOT & \verb$w(x)$ \\
 \verb$x & y$ & Bitwise AND & \verb$max(w(x), w(y))$ \\
@@ -178,7 +181,7 @@ Chisel & Explanation & Width \\
 
 \columnbreak
 
-\section{Aggregate Types}
+\section{Aggregate Types } \hrulefill
 \subsection{Bundle } contains \verb$Data$ types indexed by name
 \subsubsection{Defining}: subclass \verb$Bundle$, define components:
 \begin{scala}
@@ -208,12 +211,14 @@ val my_bundle = new Bundle {
 & \verb$gen$ & element data type \\
 \end{tabular}
 \subsubsection{Using}: access elements by indexing: \newline
-\verb$readVal := myVec(ind:Data)$ (index by wire) \newline
+\verb$readVal := myVec(ind:Data)$ (dynamic index) \newline
 \verb$readVal := myVec(idx:Int)$ (static index) \newline
-\verb$myVec(ind:Data) := writeVal$ (index by wire) \newline
+\verb$myVec(ind:Data) := writeVal$ (dynamic index) \newline
 \verb$myVec(idx:Int) := writeVal$ (static index)
 
-\section{Modules}
+
+
+\section{Modules } \hrulefill
 \subsubsection{Defining}: subclass \verb$Module$ with elements and code: \newline
 (\verb$Module$s may be parameterized and hierarchical)
 \begin{scala}
@@ -237,7 +242,7 @@ val sum := my_module.io.out
 
 \columnbreak
 
-\section{State Elements}
+\section{State Elements } \hrulefill
 \subsection{Registers } retain state until updated
 \subsubsection{Constructor}: \newline
 \verb$val my_reg = Reg([outType:Data], [next:Data],$ \newline
@@ -265,7 +270,7 @@ The last update (lexically, per clock) runs
 Synchronous read: assign output to \verb$Reg$ \newline
 \verb$mem(addr:UInt/Int) := y$
 
-\section{Hardware Generation}
+\section{Hardware Generation } \hrulefill
 \subsection{Functions } provide block abstractions for code
 \subsubsection{Defining}: write Scala functions with Chisel code:
 \begin{scala}
@@ -281,11 +286,11 @@ sum := FunAdder(UInt(1), some_data)
 \subsection{If/For } can be used to control hardware generation \newline
 \phantom{x} and is equivalent to Verilog \verb$generate if$/\verb$for$
 
-\section{Standard Library}
+\section{Standard Library } \hrulefill
 \subsection{Decoupled } is a \verb$Bundle$ with a ready-valid interface,\newline
 \phantom{x} where the consumer should flip the interface:
 \subsubsection{Constructor}: \newline
-\verb$val my_rv = Decoupled(type:Data)$ \newline
+\verb$val my_readyvalid = Decoupled(type:Data)$ \newline
 \begin{tabular}{l l l}
 & \verb$type$ & data type \\
 \end{tabular}
@@ -299,7 +304,7 @@ sum := FunAdder(UInt(1), some_data)
 \subsection{PipeIO } is a \verb$Bundle$ with a valid interface,\newline
 \phantom{x} where the consumer should flip the interface
 \subsubsection{Constructor}: \newline
-\verb$val my_rv = PipeIO(type:Data)$ \newline
+\verb$val my_pipe = PipeIO(type:Data)$ \newline
 \begin{tabular}{l l l}
 & \verb$type$ & data type \\
 \end{tabular}
