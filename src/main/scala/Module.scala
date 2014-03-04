@@ -279,6 +279,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   var verilog_parameters = "";
   val clocks = new ArrayBuffer[Clock]
   val resets = new HashMap[Bool, Bool]
+  val signals = new ArrayBuffer[Node]
 
   def hasReset = !(reset == null)
   def hasClock = !(clock == null)
@@ -369,7 +370,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     from the outputs. */
   def debug(x: Node): Unit = {
     // XXX Because We cannot guarentee x is flatten later on in collectComp.
-    x.component = this
     x.getNode.component = this
     debugs += x.getNode
   }
@@ -502,6 +502,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
   }
 
+  // Todo: skip types
   def dfs(visit: Node => Unit): Unit = {
     val walked = new HashSet[Node]
     val dfsStack = initializeDFS
@@ -910,7 +911,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     getPathName()
   }
   def getPathName(separator: String = "_"): String = {
-    if ( parent == null ) name else parent.getPathName(separator) + separator + name;
+    if ( parent == null ) name 
+    else if ( parent.isInstanceOf[AXISlave] ) (Module.backend extractClassName this)
+    else parent.getPathName(separator) + separator + name;
   }
 
   def traceNodes() {

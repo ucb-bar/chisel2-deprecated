@@ -82,7 +82,15 @@ abstract class Backend {
     if(x == 0) "" else "    " + genIndent(x-1);
   }
 
-  def setNames(top: Module, nameSpace: HashSet[String]) {
+  def setNames(c: Module, nameSpace: HashSet[String]) {
+    def assignIndex(node: Node) {
+      if (node.component == Module.topComponent || Module.isEmittingComponents) {
+        node.nameIdx = node.emitIndex
+      } else {
+        node.nameIdx = node.component.nextIndex
+      }
+    }
+
     // First, name components
     for ((comp, name) <- Module.compsToBeNamed){
       if (!comp.named){
@@ -121,20 +129,13 @@ abstract class Backend {
       }
     }
 
-    // Give names to predefined nodes (by users)
-    /*
-    top bfs { node =>
-      if( node.varName != "" ) 
-        node nameIt (asValidName(node.varName), false)
-    }
-    */
-
+    // Name nodes to be named
     for ((node, name) <- Module.nodesToBeNamed){
       node nameIt (asValidName(name), false)
       nameSpace += node.name
     }
 
-    // Give names to nodes who have name holders
+    // Name the nodes who have name holders
     for (node <- Module.nodes) {
       if( node.nameHolder != null && node.nameHolder.name != "" &&
           !node.named && !node.isLit ){
@@ -144,20 +145,20 @@ abstract class Backend {
       }
     }
 
-    // Assign components to nodes
-    for (m <- Module.components ; node <- m.nodes) {
-      node.component = m
+    // Assign indices to non type nodes
+    val top = c match {
+      case s: AXISlave => {
+        for (node <- s.nodes ; if !node.isTypeNode && node.name == "") {
+          assignIndex(node)
+        }
+        s.top
+      }
+      case _ => c
     }
 
-    // Give indices to non type nodes
     top dfs { node =>
       if (!node.isTypeNode && node.name == "") {
-        // emitRef(node)
-        if (node.component == Module.topComponent || Module.isEmittingComponents) {
-          node.nameIdx = node.emitIndex
-        } else {
-          node.nameIdx = node.component.nextIndex
-        }
+        assignIndex(node)
       }
     }
   }
@@ -484,8 +485,10 @@ abstract class Backend {
     for (c <- Module.components)
       c.markComponent
 
+    c.genAllMuxes;
+
     // Resolve components before naming
-    // collectNodesIntoComp(initializeDFS)
+    collectNodesIntoComp(initializeDFS)
 
     // Set signal signals except bindings because they are not generated.
     // Bindings are named separately after generated
@@ -493,7 +496,7 @@ abstract class Backend {
     setNames(c, nameSpace)
 
     // XXX This will create nodes after the tree is traversed!
-    c.genAllMuxes;
+    // c.genAllMuxes;
 
     execute(c, preElaborateTransforms)
 

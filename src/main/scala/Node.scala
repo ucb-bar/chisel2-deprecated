@@ -142,8 +142,8 @@ abstract class Node extends nameable {
   var driveRand = false
   var clock: Clock = null
   var CppVertex: CppVertex = null
-  // For delay annotation
-  // by Donggyu
+  var counter: Bits = null
+  var shadow: Bits = null
   val delays = new HashMap[String, Double]
 
   Module.nodes += this

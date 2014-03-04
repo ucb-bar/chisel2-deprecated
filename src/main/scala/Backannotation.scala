@@ -36,7 +36,7 @@ object nodeToString {
         val hi: String = nodeToString(ext.hi)
         val lo: String = nodeToString(ext.lo) 
         nodeToString(ext.inputs(0)) + "[" + { if (hi == lo) hi else hi + ":" + lo } + "]"  
-      case bind  : Binding   => "Binding(" + nodeToString(bind.inputs(0)) + ")"
+      case bind  : Binding   => "Binding(" + nodeToString(bind.targetNode) + ")"
       case mem   : Mem[_]    => "Mem(%s)".format(mem.name)
       case memacc: MemAccess => nodeToString(memacc.mem) + "[" + nodeToString(memacc.addr) + "]"
       // case rom   : ROM[_]    => "ROM(%s)".format(rom.name) 
@@ -51,7 +51,18 @@ trait Backannotation extends Backend {
   val targetdir = ensureDir(Module.targetDir)
 
   protected def getSignalPathName(n: Node, delim: String = "/"): String = {
-    if (n == null) "null" else (n.componentOf getPathName delim) + delim + emitRef(n)
+    if (n == null) "null" else {
+      ( n.component match {
+        case s: AXISlave => ""
+        case m => (m getPathName delim) + delim 
+      } ) +
+      ( n match {
+        case r: Reg =>
+          if (r.name == "") "R" + r.nameIdx else r.name
+        case _ =>
+          if (n.name == "") "T" + n.nameIdx else n.name
+      } )
+    }
   }
 
   protected def copyResource(filename: String, toDir: String) {

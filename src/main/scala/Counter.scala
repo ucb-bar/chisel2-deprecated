@@ -7,21 +7,34 @@ import scala.collection.mutable.Stack
 import scala.math.pow
 import scala.io.Source
 
-
-class Slave extends Module {
-  val addr_width = 5
-  val data_width = 32
-  val io = new Bundle {
-    val in = Decoupled(Bits(width = data_width)).flip
-    val out = Decoupled(Bits(width = data_width))
-    val addr = Bits(INPUT, addr_width)
-  }
+object AXISlave {
+  val aw = 5
+  val dw = 32
+  val daisyw = 1
+  val n = pow(2, aw-daisyw).toInt
   val signals = new ArrayBuffer[Node]
-  val signalCounterMap = new HashMap[Node, Node]
+}
+
+abstract class AXISlave extends Module {
+  def top: Module
+  val io = new Bundle {
+    val in = Decoupled(Bits(width = AXISlave.dw)).flip
+    val out = Decoupled(Bits(width = AXISlave.dw))
+    val addr = Bits(INPUT, AXISlave.aw)
+  }
+  def wen(i: Int) = io.in.valid && io.addr(log2Up(AXISlave.n)-1, 0) === UInt(i)
+  def ren(i: Int) = io.out.ready && io.addr(log2Up(AXISlave.n)-1, 0) === UInt(i)
+  val rdata = Vec.fill(AXISlave.n){Bits(width = AXISlave.dw)}
+  val rvalid = Vec.fill(AXISlave.n){Bool()}
+  val wready = Vec.fill(AXISlave.n){Bool()}
+  
+  io.in.ready := wready(io.addr)
+  io.out.valid := rvalid(io.addr)
+  io.out.bits := rdata(io.addr) 
 }
 
 /*
-class SlaveTester(s: Slave) extends Tester(s, Array(s.io) ++ s.signals ++ (Module.clocks filter (_.isEnabled)) ) {
+class AXISlaveTester(s: AXISlave) extends Tester(s, Array(s.io) ++ s.signals ++ (Module.clocks filter (_.isEnabled)) ) {
   defTests {
     val (a, b, z) = (80, 16, 16)
     val svars = new HashMap[Node, Node]
@@ -70,35 +83,32 @@ class SlaveTester(s: Slave) extends Tester(s, Array(s.io) ++ s.signals ++ (Modul
 */
 
 trait CounterBackend extends Backannotation {
-  val addr_width = 5
-  val data_width = 32
-  val daisy_ctrl_width = 2
-  val data_addr_width = addr_width - daisy_ctrl_width
-
-  val signals = new HashSet[Node]
   val crosses = new ArrayBuffer[(Double, Array[Node])]
-  val shadows = new HashMap[Module, ArrayBuffer[Bits]]
-  val compSignalMap = new HashMap[Module, ArrayBuffer[Node]]
-  val signalCounterMap = new HashMap[Node, Bits]
-  val shadowCounterMap = new HashMap[Bits, Bits]
-  val ops = new HashMap[Module, (Bool, Bool)]
+  val dreadyPairs = new HashMap[Module, (Bool, Bool)]
 
   var counterIdx = -1
-  var shadowIdx = -1
 
-  // Define two different clock domains for the daisy chain
+  // Define different clock domains for the daisy chain
   val daisyClock = Module.implicitClock
   val stopClock = -daisyClock
-  val emulClock = new Clock
 
+  preElaborateTransforms += ((c: Module) => Module.components map (_.addDefaultReset))
+  preElaborateTransforms += ((c: Module) => c bfs (_.addConsumers))
   preElaborateTransforms += ((c: Module) => annotateSignals(c))
   preElaborateTransforms += ((c: Module) => generateCtrls(c))
-  preElaborateTransforms += ((c: Module) => generateCounters(c))
-  preElaborateTransforms += ((c: Module) => generateDaisyChain(c))
-  preElaborateTransforms += ((c: Module) => generateSlave(c))
+  preElaborateTransforms += ((c: Module) => generateCounters)
+  preElaborateTransforms += ((c: Module) => generateDaisyChains)
+  preElaborateTransforms += ((c: Module) => c.genAllMuxes)
+  // preElaborateTransforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
   // analyses += ((c: Module) => findClockCrossingPoints(c))
   // analyses += ((c: Module) => initTester(c))
-  analyses += ((c: Module) => reportCounters(c))
+  // analyses += ((c: Module) => reportCounters(c))
+
+
+  def emitCounterIdx = {
+    counterIdx = counterIdx + 1
+    counterIdx
+  }
 
   def getTypeNode(node: Node) = {
     def genTypeNode(node: Node) = {
@@ -109,16 +119,18 @@ trait CounterBackend extends Backannotation {
         consumer.inputs += typeNode
       }
       typeNode
-    }     
-
-    if (node.consumers.size == 1) {
-      node.consumers.head match {
-        case bits: Bits => bits
-        case _ => genTypeNode(node)
-      }
-    } else {
-      genTypeNode(node)
     }
+
+    node match {
+      case bits: Bits => bits
+      case _ if node.consumers.size == 1=> {
+        node.consumers.head match {
+          case bits: Bits => bits
+          case _ => genTypeNode(node)
+        }
+      }
+      case _ => genTypeNode(node)
+    } 
   }
 
   def addPin(m: Module, pin: Data, name: String = "") {
@@ -156,32 +168,6 @@ trait CounterBackend extends Backannotation {
     }
   }
 
-  def addCounter(signal: Node, counter: Bits) = {
-    val reg = counter.comp
-
-    counterIdx += 1
-    reg.component = signal.component
-    reg setName "counter%d".format(counterIdx)
-    signalCounterMap(signal) = counter
-    counter
-  }
-
-  def addShadow(counter: Bits, shadow: Bits) = {
-    val reg = shadow.comp
-    val m = counter.comp.component
-    
-    shadowIdx += 1
-    reg setName "shadow%d".format(shadowIdx)
-    reg.component = m
-
-    // shadows += shadow
-    if (!(shadows contains m)) {
-      shadows(m) = new ArrayBuffer[Bits]
-    }
-    shadows(m) += shadow
-    shadow
-  }
-
   private def annotateSignals(m: Module) {
     ChiselError.info("Backannotation: annotate signals")
 
@@ -192,8 +178,6 @@ trait CounterBackend extends Backannotation {
     val signalNames = new HashSet[String]
     val signalNameMap = new HashMap[String, Node]
     val coeffs = new HashSet[(Double, Array[String])]
-
-    collectNodesIntoComp(initializeDFS)
 
     for (line <- lines) {
       line match {
@@ -209,13 +193,11 @@ trait CounterBackend extends Backannotation {
     }
 
     // Find correspoinding nodes
-    for (m <- Module.sortedComps) {
-      compSignalMap(m) = new ArrayBuffer[Node]
+    for (m <- Module.components ; if !m.isInstanceOf[AXISlave]) {
       val reset = m.reset
       val resetName = getSignalPathName(reset, ".")
       if (signalNames contains resetName) {
-        signals += reset
-        compSignalMap(m) += reset
+        m.signals += reset
         signalNameMap(resetName) = reset
         if (!(m.debugs contains reset))
           m.debugs += reset
@@ -223,11 +205,10 @@ trait CounterBackend extends Backannotation {
       for (node <- m.nodes ; if !node.isTypeNode) {
         val signalName = getSignalPathName(node, ".")
         if (signalNames contains signalName) {
-          signals += node
-          compSignalMap(m) += node
+          m.signals += node
           signalNameMap(signalName) = node
-          if (!(node.component.debugs contains node))
-            node.component.debugs += node
+          if (!(m.debugs contains node))
+            m.debugs += node
         }
       }
     }
@@ -240,50 +221,43 @@ trait CounterBackend extends Backannotation {
     } 
   }
 
-  def generateCtrls(m: Module) {
+  def generateCtrls(c: Module) {
     ChiselError.info("Counter Backend: generate daisy controls")
 
-    // Create pins
-    for (m <- Module.sortedComps) {
+    // Add pins
+    for (m <- Module.components ; if !m.isInstanceOf[AXISlave]) {
       val stall = Bool(INPUT)
-      val daisy_control = Bits(INPUT, 3)
-      val daisy_out = Decoupled(Bits(width = 32))
-      val daisy_in = Valid(Bits(width = 32)).flip
+      val daisyControl = Bits(INPUT, width = AXISlave.daisyw)
+      val daisyOut = Decoupled(Bits(width = AXISlave.dw))
+      val daisyIn = Valid(Bits(width = AXISlave.dw)).flip
       
-      def ready(i: Int) = {
-        val readyVal = stall && daisy_out.ready &&
-          (daisy_control === Bits(i, daisy_control.getWidth))
-        readyVal.getNode.component = m
-        if (i == 1) {
-          readyVal.getNode setName "copy"
-        } else if (i == 2) {
-          readyVal.getNode setName "read"
-        }
-        if (!(m.debugs contains readyVal.getNode))
-          m.debugs += readyVal.getNode
-
-        readyVal
+      def daisyReady(i: Int) = {
+        val dready = stall && daisyOut.ready && daisyControl === Bits(i)
+        dready.getNode.component = m
+        if (i == 0) { dready.getNode setName "copy" }
+        if (i == 1) { dready.getNode setName "read" }
+        if (!(m.debugs contains dready.getNode))
+          m.debugs += dready.getNode
+        dready
       }
 
       m.clocks.clear
       m.clocks += daisyClock
 
-      ops(m) = (ready(1), ready(2))
+      dreadyPairs(m) = (daisyReady(0), daisyReady(1))
 
-      // if (!m.children.isEmpty || (compSignalMap(m) != null && !compSignalMap(m).isEmpty)) {
-        addPin(m, stall, "stall")
-        addPin(m, daisy_control, "daisy_control")
-        addPin(m, daisy_out, "daisy_out")
-        addPin(m, daisy_in, "daisy_in")
-      // }
+      addPin(m, stall,        "stall")
+      addPin(m, daisyControl, "daisy_control")
+      addPin(m, daisyOut,     "daisy_out")
+      addPin(m, daisyIn,      "daisy_in")
 
       if (!m.children.isEmpty) {
-        val not_stop = Bool(INPUT)
-        val init = Bool(INPUT)
-        addPin(m, not_stop, "not_stop")
-        addPin(m, init, "init")
+        val notStop = Bool(INPUT)
+        // val init = Bool(INPUT)
+        addPin(m, notStop, "not_stop")
+        // addPin(m, init,    "init")
         val childClock = new Clock
-        val enable = (!stall && not_stop || init) 
+        val enable = (!stall && notStop || m.reset) 
         enable.getNode.component = m
         childClock setName ("emul_clk_" + m.level)
         childClock enabledBy (daisyClock, enable)
@@ -292,218 +266,269 @@ trait CounterBackend extends Backannotation {
         }
       }
 
-      /* daisy_out.valid := ready(2) */
-      daisy_out.valid.updates += ((Bool(true), stall))
+      daisyOut.valid.updates += ((Bool(true), stall))
+      // daisyOut.valid.updates += ((Bool(true), daisyReady(2)))
     }
 
-    // Connect components
-    val daisyInBits = m.io("daisy_in") match {
-      case vio: ValidIO[_] => vio.bits match {
-        case bits: Bits => bits
+    val slave = c match {
+      case s: AXISlave => {
+        initializeSlave(s)
+        s
       }
     }
-    daisyInBits.updates += ((Bool(true), Bits(0)))
-
     val stack = new Stack[Module]
     val walked = new HashSet[Module]
-    stack push m
+    stack push slave.top
+
     while (!stack.isEmpty) {
-      val top = stack.pop
-      val daisyOut = top.io("daisy_out") match {
-        case dio: DecoupledIO[_] => dio
-      }
-      val daisyOutBits = daisyOut.bits match {
-        case bits: Bits => bits
-      }
-      val daisyIn = top.io("daisy_in") match {
-        case vio: ValidIO[_] => vio
-      }
-      val daisyInBits = daisyIn.bits match {
-        case bits: Bits => bits
-      }
-      val daisyControl = m.io("daisy_control") match {
-        case addr: Bits => addr
-      }
-      val stall = m.io("stall") match {
-        case bool: Bool => bool
-      }
-      val notStop = m.io("not_stop") match {
-        case bool: Bool => bool
-      }
-      val init = m.io("init") match {
-        case bool: Bool => bool
-      }
-
-      if (!(top.children.isEmpty)) {
-        val headDaisyIn = top.children.head.io("daisy_in") match {
-          case vio: ValidIO[_] => vio
-        }
-        val headDaisyInBits = headDaisyIn.bits match {
-          case bits: Bits => bits
-        }
-        val lastDaisyOut = top.children.last.io("daisy_out") match {
-          case dio: DecoupledIO[_] => dio
-        }
-        val lastDaisyOutBits = lastDaisyOut.bits match {
-          case bits: Bits => bits
-        }
-        val headStall = top.children.head.io("stall") match {
-          case bool: Bool => bool
-        }
-        val headDaisyControl = top.children.head.io("daisy_control") match {
-          case addr: Bits => addr
-        }
-
-        headDaisyIn.valid.updates  += ((Bool(true), daisyIn.valid))
-        headDaisyInBits.updates    += ((Bool(true), daisyInBits))
-        lastDaisyOut.ready.updates += ((Bool(true), daisyOut.ready))
-        daisyOut.valid.updates     += ((Bool(true), lastDaisyOut.valid))
-        daisyOutBits.updates       += ((Bool(true), lastDaisyOutBits))
-        headDaisyControl.updates   += ((Bool(true), daisyControl))
-        headStall.updates          += ((Bool(true), stall))
-
-        if (!top.children.head.children.isEmpty) {
-          val headNotStop = top.children.head.io("not_stop") match {
-            case bool: Bool => bool
-          }
-          val headInit = top.children.head.io("init") match {
-            case bool: Bool => bool
-          }
-          headNotStop.updates      += ((Bool(true), notStop))
-          headInit.updates         += ((Bool(true), init))
-        }
- 
-        stack push top.children.head
-      }
-
-      for (i <- 1 until top.children.size) {
-        val child = top.children(i-1)
-        val nextChild = top.children(i)
-      
-        val cDaisyOut = child.io("daisy_out") match {
-          case dio: DecoupledIO[_] => dio
-        }
-        val cDaisyOutBits = cDaisyOut.bits match {
-          case bits: Bits => bits
-        }
-        val ncDaisyIn = nextChild.io("daisy_in") match {
-          case vio: ValidIO[_] => vio
-        }
-        val ncDaisyInBits = ncDaisyIn.bits match {
-          case bits: Bits => bits
-        }
-        val ncStall = nextChild.io("stall") match {
-          case bool: Bool => bool
-        }
-        val ncDaisyControl = nextChild.io("daisy_control") match {
-          case addr: Bits => addr
-        }
-
-        cDaisyOut.ready.updates  += ((Bool(true), daisyOut.ready))
-        ncDaisyIn.valid.updates  += ((Bool(true), cDaisyOut.valid))
-        ncDaisyInBits.updates    += ((Bool(true), cDaisyOutBits))
-        ncStall.updates          += ((Bool(true), stall))
-        ncDaisyControl.updates   += ((Bool(true), daisyControl))
-
-        if (!nextChild.children.isEmpty) {
-          val ncNotStop = nextChild.io("not_stop") match {
-            case bool: Bool => bool
-          }
-          val ncInit = nextChild.io("init") match {
-            case bool: Bool => bool
-          }
-          ncNotStop.updates      += ((Bool(true), notStop))
-          ncInit.updates         += ((Bool(true), init))
-        }
-
-        stack push nextChild
+      val m = stack.pop
+      connectDaisyPins(m)
+      for (child <- m.children) {
+        stack push child
       }
     }
   }
 
-  def generateCounters (m: Module) {
-    ChiselError.info("Counter Backend: generate counters")
+  def initializeSlave (slave: AXISlave) {
+    // AXISlave & daisy  pins 
+    val slaveAddr = slave.io("addr") match {
+      case bits: Bits => bits }
+    val slaveIn = slave.io("in") match {
+      case dio: DecoupledIO[_] => dio }
+    val slaveInBits = slaveIn.bits match {
+      case bits: Bits => bits }
+    val daisyReady = slave.ren(4) match {
+      case bool: Bool => bool }
+    val clkReady = slave.wen(4) match {
+      case bool: Bool => bool }
+    val daisyIn = slave.top.io("daisy_in") match {
+      case vio: ValidIO[_] => vio }
+    val daisyOut = slave.top.io("daisy_out") match {
+      case dio: DecoupledIO[_] => dio }
+    val daisyOutBits = daisyOut.bits match {
+      case bits: Bits => bits }
 
-    m bfs (_.addConsumers)
+    val clkCounter = Reg(init = Bits(0), clock = daisyClock)
+    val notStall = clkCounter.orR
+    val stall = !notStall
+    clkCounter.comp.component = slave
+    clkCounter.comp setName "clk_counter"
+    notStall.getNode.component = slave
+    stall.getNode.component = slave
+    stall.getNode setName "stall"
+
+    val stop = Reg(init = Bool(false), clock = stopClock) // works at negative edges
+    stop.comp.component = slave
+    stop.comp setName "stop" 
+
+    slave.top.io("daisy_control") match {
+      case bits: Bits => bits.updates   += ((Bool(true), slaveAddr(AXISlave.aw - AXISlave.daisyw))) } 
+    slave.top.io("stall") match {
+      case bool: Bool => bool.updates   += ((Bool(true), stall)) }
+    if (!slave.top.children.isEmpty) {
+      slave.top.io("not_stop") match {
+        case bool: Bool => bool.updates += ((Bool(true), !stop)) }
+    }
+
+    // top's daisy input pin <= 0
+    daisyIn.bits match {
+      case bits: Bits => bits.updates += ((Bool(true), Bits(0))) }
+    daisyIn.valid.updates             += ((Bool(true), daisyReady && stall))
+
+    // read cr4 -> daisy_out
+    slave.rdata(4) match {
+      case bits: Bits => bits.updates += ((Bool(true), daisyOutBits)) }
+    slave.rvalid(4) match {
+      case bool: Bool => bool.updates += ((Bool(true), daisyOut.valid)) }
+    daisyOut.ready.updates            += ((Bool(true), daisyReady && stall)) 
+
+    // write r4 -> clk_counter
+    slave.wready(4) match {
+      case bool: Bool => bool.updates += ((Bool(true), stall)) }
+    clkCounter.comp.updates           += ((Bool(true), clkCounter))
+    clkCounter.comp.updates           += ((notStall, clkCounter - UInt(1)))
+    clkCounter.comp.updates           += ((clkReady && stall, slaveInBits)) 
+
+    stop.comp.updates                 += ((Bool(true), stop))
+    stop.comp.updates                 += ((clkCounter === UInt(1), Bool(true)))
+    stop.comp.updates                 += ((clkReady, Bool(false)))
+
+    // val init = Reg(init = Bool(true), clock = daisyClock)
+    // init.comp.component = slave
+    // init.comp setName "init" 
+    // init.comp.updates       += ((Bool(true), init))
+    // init.comp.updates       += ((inValid(4), Bool(false))) // Is it right?
+
+    // Set emulation clock
+    val emulClock = new Clock
+    val enable = (notStall && !stop || slave.reset) 
+    enable.getNode.component = slave
+    emulClock setName "emul_clk"
+    emulClock enabledBy (daisyClock, enable)
+    slave.top.clock = emulClock
+  }
+
+  def connectDaisyPins (top: Module) {
+    // daisy pins of 'top' component
+    val daisyOut = top.io("daisy_out") match {
+        case dio: DecoupledIO[_] => dio }
+    val daisyOutBits = daisyOut.bits match {
+      case bits: Bits => bits }
+    val daisyIn = top.io("daisy_in") match {
+      case vio: ValidIO[_] => vio }
+    val daisyInBits = daisyIn.bits match {
+      case bits: Bits => bits }
+    val daisyControl = top.io("daisy_control") match {
+      case addr: Bits => addr }
+    val stall = top.io("stall") match {
+      case bool: Bool => bool }
+
+    // 'top' has children components
+    // ==> connect 'top' and the first and last child
+    if (!(top.children.isEmpty)) {
+      val notStop = top.io("not_stop") match {
+        case bool: Bool => bool }
+      // val init = top.io("init") match {
+      //   case bool: Bool => bool }
+      val headDaisyIn = top.children.head.io("daisy_in") match {
+        case vio: ValidIO[_] => vio }
+      val headDaisyInBits = headDaisyIn.bits match {
+        case bits: Bits => bits }
+      val lastDaisyOut = top.children.last.io("daisy_out") match {
+        case dio: DecoupledIO[_] => dio }
+      val lastDaisyOutBits = lastDaisyOut.bits match {
+        case bits: Bits => bits }
+      val headStall = top.children.head.io("stall") match {
+        case bool: Bool => bool }
+      val headDaisyControl = top.children.head.io("daisy_control") match {
+        case addr: Bits => addr }
+
+      // top's daisy input pins  =>  the first child's daisy input pins
+      // top's daisy output pins <=  the last child's daisy output pins
+      headDaisyIn.valid.updates  += ((Bool(true), daisyIn.valid))
+      headDaisyInBits.updates    += ((Bool(true), daisyInBits))
+      lastDaisyOut.ready.updates += ((Bool(true), daisyOut.ready))
+      daisyOut.valid.updates     += ((Bool(true), lastDaisyOut.valid))
+      daisyOutBits.updates       += ((Bool(true), lastDaisyOutBits))
+      headDaisyControl.updates   += ((Bool(true), daisyControl))
+      headStall.updates          += ((Bool(true), stall))
+
+      // connect 'not_stop' & 'init' pins 
+      if (!top.children.last.children.isEmpty) {
+        val lastNotStop = top.children.last.io("not_stop") match {
+          case bool: Bool => bool.updates += ((Bool(true), notStop)) }
+        /*
+        val lastInit = m.children.last.io("init") match {
+          case bool: Bool => bool }
+        lastInit.updates         += ((Bool(true), init))
+        */
+      }
+    }
+
+    // Chain children along daisy pins
+    for (i <- 0 until top.children.size - 1) {
+      val notStop = top.io("not_stop") match {
+        case bool: Bool => bool }
+      // val init = top.io("init") match {
+      //   case bool: Bool => bool }
+
+      val child = top.children(i)
+      val nextChild = top.children(i+1)
+      
+      val cDaisyOut = child.io("daisy_out") match {
+        case dio: DecoupledIO[_] => dio }
+      val cDaisyOutBits = cDaisyOut.bits match {
+        case bits: Bits => bits }
+      val ncDaisyIn = nextChild.io("daisy_in") match {
+        case vio: ValidIO[_] => vio }
+      val ncDaisyInBits = ncDaisyIn.bits match {
+        case bits: Bits => bits }
+      val ncDaisyControl = nextChild.io("daisy_control") match {
+        case addr: Bits => addr }
+
+      // child's daisy input pin     =>  next child's input pin
+      cDaisyOut.ready.updates += ((Bool(true), daisyOut.ready))
+      ncDaisyIn.valid.updates += ((Bool(true), cDaisyOut.valid))
+      ncDaisyInBits.updates   += ((Bool(true), cDaisyOutBits))
+      // child's stall pin           <=  top's stall pin 
+      child.io("stall") match {
+        case bool: Bool => bool.updates += ((Bool(true), stall)) }
+      // child's daisy control pin   <=  top's daisy control pin
+      child.io("daisy_control") match {
+        case bits: Bits => bits.updates += ((Bool(true), daisyControl)) }
+
+      // connect 'not_stop' & 'init' pins 
+      if (!child.children.isEmpty) {
+        child.io("not_stop") match {
+          case bool: Bool => bool.updates += ((Bool(true), notStop)) }
+        /*
+        val cInit = child.io("init") match {
+          case bool: Bool => bool }
+        cNotStop.updates      += ((Bool(true), notStop))
+        cInit.updates         += ((Bool(true), init))
+        */
+      }
+    }
+  }
+
+  def generateCounters {
+    ChiselError.info("Counter Backend: generate counters")
 
     val stack = new Stack[Module]
     val walked = new HashSet[Module]
 
-    for (m <- Module.sortedComps ; signal <- m.nodes) {
-      if (signals contains signal) {
-        // ChiselError.info(emitRef(signal) + ": " + nodeToString(signal))
-        val stall = signal.component.io("stall")
-        val daisyControl = signal.component.io("daisy_control")
-        val signalValue = getTypeNode(signal)
-        val signalWidth = signal.getWidth
-        val counter = addCounter(signal, Reg(init = Bits(0, 32), clock = daisyClock))
-        val copy = ops(signal.component)._1
+    for (m <- Module.components ; signal <- m.signals ; if !m.isInstanceOf[AXISlave]) {
+      val stall = m.io("stall") match {
+        case bool: Bool => bool }
+      val signalValue = getTypeNode(signal)
+      val signalWidth = signal.getWidth
+      val copy = dreadyPairs(signal.component)._1
+      val counter = Reg(init = Bits(0, 32), clock = daisyClock)
+      val shadow  = Reg(init = Bits(0, 32), clock = daisyClock)
+      counter.comp.component = m
+      counter.comp setName "counter_%d".format(emitCounterIdx)
+      signal.counter = counter
+      shadow.comp.component = m
+      shadow.comp setName "shadow_%d".format(counterIdx)
+      signal.shadow = shadow
 
-        stall match {
-          case isStall: Bool => {
-            if (signalWidth == 1) {
-              /*
-              when(!isStall) {
-                counter := counter + signalValue
-              }.elsewhen(copy) {
-                counter := Bits(0, 32)
-              }
-              */
-              val counterValue = counter + signalValue
-              counterValue.getNode.component = signal.component
-              counterValue.getNode setName "c_value%d".format(counterIdx)
-              if ( !(signal.component.debugs contains counterValue.getNode))
-                signal.component.debugs += counterValue.getNode
-              counter.comp.updates += ((Bool(true), counter))
-              counter.comp.updates += ((!isStall, counterValue))
-              counter.comp.updates += ((copy, Bits(0, 32)))
-            }
-            // This is a bus
-            else {
-              val buffer = Reg(init = Bits(0, signalWidth), clock = daisyClock)
-              val xor = signalValue ^ buffer
-              val hd = PopCount(xor)
-              val counterValue = counter + hd
-              counterValue.getNode.component = signal.component
-              counterValue.getNode setName "c_value%d".format(counterIdx)
-              if ( !(signal.component.debugs contains counterValue.getNode))
-                signal.component.debugs += counterValue.getNode
-              /*
-              buffer := signalValue
-              when(!isStall){
-                counter := counter + hd
-              }.elsewhen(copy) {
-                counter := Bits(0, 32)
-              }
-              */
-              buffer.comp setName "buffer%d".format(counterIdx)
-              buffer.comp.component = m
-              buffer.comp.updates += ((Bool(true), signalValue))
-              counter.comp.updates += ((Bool(true), counter))
-              counter.comp.updates += ((!isStall, counterValue))
-              counter.comp.updates += ((copy, Bits(0)))
-            }
-          }
-          case _ =>
-        }
+      // Signal
+      if (signalWidth == 1) {
+        val counterValue = counter + signalValue
+        counterValue.getNode.component = m
+        counterValue.getNode setName "c_value_%d".format(counterIdx)
+        if ( !(m.debugs contains counterValue.getNode))
+          m.debugs += counterValue.getNode
+        counter.comp.updates += ((Bool(true), counter))
+        counter.comp.updates += ((!stall, counterValue))
+        counter.comp.updates += ((copy, Bits(0, 32)))
+      // Bus
+      } else {
+        val buffer = Reg(init = Bits(0, signalWidth), clock = daisyClock)
+        val xor = signalValue ^ buffer
+        val hd = PopCount(xor)
+        val counterValue = counter + hd
+        counterValue.getNode.component = m
+        counterValue.getNode setName "c_value_%d".format(counterIdx)
+        if ( !(m.debugs contains counterValue.getNode))
+          m.debugs += counterValue.getNode
+        buffer.comp setName "buffer_%d".format(counterIdx)
+        buffer.comp.component = m
+        buffer.comp.updates += ((Bool(true), signalValue))
+        counter.comp.updates += ((Bool(true), counter))
+        counter.comp.updates += ((!stall, counterValue))
+        counter.comp.updates += ((copy, Bits(0)))
       }
     }
   }  
   
-  def generateDaisyChain(m: Module) {
+  def generateDaisyChains {
     ChiselError.info("Counter Backend: generate daisy chains")
  
-    // Couple counters with shadows
-    for ((signal, counter) <- signalCounterMap) {
-      val shadow = addShadow(counter, Reg(init = Bits(0, 32), clock = daisyClock))
-      shadowCounterMap(shadow) = counter
-    }
-
     // Daisy chaining
-    for (m <- Module.sortedComps) {
-      val shadowlist = shadows getOrElse (m, new ArrayBuffer[Bits])
-      val copy = ops(m)._1
-      val read = ops(m)._2
+    for (m <- Module.components ; if !m.isInstanceOf[AXISlave]) {
+      val copy = dreadyPairs(m)._1
+      val read = dreadyPairs(m)._2
       val daisyOut = m.io("daisy_out") match {
         case dio: DecoupledIO[_] => dio
       }
@@ -518,197 +543,23 @@ trait CounterBackend extends Backannotation {
       }
 
       // Copy logic
-      if (!shadowlist.isEmpty) {
-        daisyOutBits.updates += ((Bool(true), shadowlist.head))
-        shadowlist.last.comp.updates += ((read, daisyInBits))
+      if (!m.signals.isEmpty) {
+        daisyOutBits.updates += ((Bool(true), m.signals.head.shadow))
+        m.signals.last.shadow.comp.updates += ((read, daisyInBits))
       } else if (m.children.isEmpty){
         daisyOutBits.updates += ((Bool(true), daisyInBits))
       }
 
-      for (i <- 1 until shadowlist.size) {
-        val shadow = shadowlist(i-1)
-        val nextShadow = shadowlist(i)
-        val counter = shadowCounterMap(shadow)
+      for (i <- 0 until m.signals.size - 1) {
+        val counter = m.signals(i).counter
+        val shadow = m.signals(i).shadow
+        val nextShadow = m.signals(i+1).shadow
       
         shadow.comp.updates += ((Bool(true), shadow))
         shadow.comp.updates += ((copy, counter))
         shadow.comp.updates += ((read, nextShadow))
       }
     }
-  }
-
-  def generateSlave(slave: Module) {
-    ChiselError.info("Counter Backend: generate the slave")
-
-    val top = slave.children.head
-    // initialize Slave module
-    /*
-    val slave = Module(new Slave)
-    slave.name = "Slave"
-    slave.children += top
-    top.parent = slave
-    Module.setAsTopComponent(slave)
-    slave markComponent nameSpace
-    Module.sortedComps prepend slave
-    slave.signals ++= signals
-    slave.signalCounterMap ++= ( for ((x, y) <- signalCounterMap) yield ((x, y.getNode)) )
-    */
-
-    // Registers to control the daisy chain
-    // val topInReg = Reg(init = Bits(0), clock = daisyClock)
-    val clkCounter = Reg(init = Bits(0), clock = daisyClock)
-    // val inputRdy = Reg(init = Bool(true), clock = daisyClock)
-    val init = Reg(init = Bool(true), clock = daisyClock)
-    val stop = Reg(init = Bool(false), clock = stopClock) // works at negative edges
-    val notStop = !stop
-    val notStall = clkCounter.orR
-    val stall = !notStall
-    val clkCounterIsOne = clkCounter === Bits(1)
-    val clkCounterDecr  = clkCounter - Bits(1, 32)
-
-
-    // topInReg.comp.component = slave
-    // topInReg.comp setName "top_in_bits"
-    clkCounter.comp.component = slave
-    clkCounter.comp setName "clk_counter" 
-    // inputRdy.comp.component = slave
-    // inputRdy.comp setName "input_rdy"
-    stop.comp.component = slave
-    stop.comp setName "stop" 
-    init.comp.component = slave
-    init.comp setName "init" 
-    notStall.getNode setName "not_stall"
-    notStall.getNode.component = slave
-    stall.getNode setName "stall"
-    stall.getNode.component = slave
-    clkCounterIsOne.getNode setName "clk_cnt_is_one"
-    clkCounterIsOne.getNode.component = slave
-    clkCounterDecr.getNode setName "clk_cnt_decr"
-    clkCounterDecr.getNode.component = slave
-
-    // Pin connection
-    val addr = slave.io("addr") match {
-      case addr: Bits => addr
-    }
-    val slaveIn = slave.io("in") match {
-      case dio: DecoupledIO[_] => dio
-    }
-    val slaveInBits = slaveIn.bits match {
-      case bits: Bits => bits
-    }
-    val slaveOut = slave.io("out") match {
-      case dio: DecoupledIO[_] => dio
-    }
-    val slaveOutBits = slaveOut.bits match {
-      case bits: Bits => bits
-    }
-    /*
-    val topIn = top.io("in") match {
-      case dio: DecoupledIO[_] => dio
-    }
-    val topOut = top.io("out") match {
-      case dio: ValidIO[_] => dio
-    }
-    val topOutBits = topOut.bits match {
-      case bits: Bits => bits
-    }
-    */
-    val topStall = top.io("stall") match {
-      case bool: Bool => bool
-    }
-    val topNotStop = top.io("not_stop") match {
-      case bool: Bool => bool
-    }
-    val topInit = top.io("init") match {
-      case bool: Bool => bool
-    }
-    val daisyControl = top.io("daisy_control") match {
-      case addr: Bits => addr
-    }
-    val daisyIn = top.io("daisy_in") match {
-      case vio: ValidIO[_] => vio
-    }
-    val daisyInBits = daisyIn.bits match {
-      case bits: Bits => bits
-    }
-    val daisyOut = top.io("daisy_out") match {
-      case dio: DecoupledIO[_] => dio
-    }
-    val daisyOutBits = daisyOut.bits match {
-      case bits: Bits => bits
-    }
-    
-    /*
-    val dataAddr  = addr(addr_width-1, daisy_ctrl_width) 
-    val daisyAddr = addr(daisy_ctrl_width-1, 0)
-    */
-    /*
-    val inputReady = Vec(Range(0, pow(2, data_addr_width).toInt) map { 
-      case 0 => topIn.ready
-      case 1 => Bool(true)
-      case _ => Bool(false)
-    })
-    */
-
-    /*
-    val (a, b) = topIn.bits match {
-      case bundle: Bundle => (bundle.elements(0)._2, bundle.elements(1)._2) match {
-        case (bitsA: Bits, bitsB: Bits) => (bitsA, bitsB)
-      }
-    }
-    */
-
-    def outReady(i: Int) = slaveOut.ready && addr === UInt(i)
-    def inValid(i: Int) = slaveIn.valid && stall && addr === UInt(i)
-
-    topStall.updates       += ((Bool(true), stall))
-    topNotStop.updates     += ((Bool(true), notStop))
-    topInit.updates        += ((Bool(true), init))
-/*
-    a.updates              += ((Bool(true), topInReg(31, 16)))
-    b.updates              += ((Bool(true), topInReg(15, 0)))
-*/
-
-    // daisy chains
-    daisyControl.updates   += ((Bool(true), addr(4)))
-    daisyOut.ready.updates += ((Bool(true), outReady(4)))
-    daisyIn.valid.updates  += ((Bool(true), outReady(4)))
-    daisyInBits.updates    += ((Bool(true), Bits(0)))
-    slaveOut.valid.updates += ((addr === UInt(4), daisyOut.valid))
-    slaveOutBits.updates   += ((addr === UInt(4), daisyOut.bits))
-    // write to clk reg
-    slaveIn.ready.updates  += ((addr === UInt(4), Bool(true)))
-    
-    
-    // slaveIn.ready.updates  += ((Bool(true), /* inputRdy || */ inputReady(dataAddr)))
-    // topIn.valid.updates    += ((Bool(true), /* inputRdy || */ inValid(0)))
-
-/*
-    topInReg.comp.updates   += ((Bool(true), topInReg))
-    topInReg.comp.updates   += ((inValid(0), slaveInBits))
-*/
-    init.comp.updates       += ((Bool(true), init))
-    init.comp.updates       += ((inValid(4), Bool(false))) // Is it right?
-    clkCounter.comp.updates += ((Bool(true), clkCounter))
-    clkCounter.comp.updates += ((notStall, clkCounterDecr))
-    clkCounter.comp.updates += ((inValid(4), slaveInBits))
-    stop.comp.updates       += ((Bool(true), stop))
-    stop.comp.updates       += ((clkCounterIsOne, Bool(true)))
-    stop.comp.updates       += ((inValid(4), Bool(false)))
-/*
-    inputRdy.comp.updates   += ((Bool(true), inputRdy))
-    inputRdy.comp.updates   += ((topOut.valid, Bool(true)))
-    inputRdy.comp.updates   += ((inValid(1), Bool(false)))
-*/
-
-    // emulation clock
-    val enable = (notStall && notStop || init) 
-    enable.getNode.component = slave
-    emulClock setName "emul_clk"
-    emulClock enabledBy (daisyClock, enable)
-    top.clock = emulClock
-
-    slave.genAllMuxes
   }
 
   def findClockCrossingPoints(m: Module) {
@@ -734,7 +585,7 @@ trait CounterBackend extends Backannotation {
   /*
   def initTester(m: Module) {
     m match {
-      case s: Slave if Module.isTesting => Module.tester = new SlaveTester(s)
+      case s: AXISlave if Module.isTesting => Module.tester = new AXISlaveTester(s)
       case _ =>
     }
   }
@@ -753,7 +604,7 @@ trait CounterBackend extends Backannotation {
     report append "\t\t+-------------------------------------+\n\n"
 
     report append "CountNo\t"
-    report append signals.size.toString + "\n" 
+    // report append signals.size.toString + "\n" 
     report append "CrossNo\t"
     report append crosses.size.toString + "\n"
     report append "Weigts\t\t\tCross\t\t\tSingals\n"
@@ -761,10 +612,10 @@ trait CounterBackend extends Backannotation {
       report append "%.5e".format(coeff)
       report append "\t\t"
       if (!cross.isEmpty) {
-        report append emitRef(signalCounterMap(cross.head).comp)
+        // report append emitRef(signalCounterMap(cross.head).comp)
         for (term <- cross.tail) {
           report append "*"
-          report append emitRef(signalCounterMap(term).comp)
+          // report append emitRef(signalCounterMap(term).comp)
         }
       }
       report append "\t\t"
