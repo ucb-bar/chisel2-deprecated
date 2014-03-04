@@ -740,13 +740,20 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
   }
 
+  def getClassValNames(c: Class[_]): ArrayBuffer[String] = {
+    val valnames = new ArrayBuffer[String]()
+    for (v <- c.getDeclaredFields) {
+      v.setAccessible(true)
+      valnames += v.getName
+    }     
+    if (c.getSuperclass != null) { valnames ++= getClassValNames(c.getSuperclass) }
+    valnames
+  }
+
   // Allow checking if a method name is also the name of a val -- reveals accessors
   def getValNames = {
     val valnames = new ArrayBuffer[String]()
-    for (v <- getClass.getFields) {
-      v.setAccessible(true)
-      valnames += v.getName
-    }
+    valnames ++= getClassValNames(getClass)    
     valnames
   }
 
