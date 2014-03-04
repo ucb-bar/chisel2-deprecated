@@ -16,16 +16,16 @@
 
 \makeatletter
 \renewcommand{\section}{\@startsection{section}{1}{0mm}%
-                                {-0.ex plus 1 ex}%
+                                {-0.ex plus .25 ex}%
                                 {0.01ex plus .01ex}%x
                                 {\normalfont\large\bfseries}}
 \renewcommand{\subsection}{\@startsection{subsection}{2}{0mm}%
-                                {-0.ex plus 1 ex}%
-                                {0.01ex plus .01ex}%
+                                {-0.ex plus .25 ex}%
+                                {-0.01ex plus .01ex}%
                                 {\normalfont\normalsize\bfseries}}
 \renewcommand{\subsubsection}{\@startsection{subsubsection}{3}{0mm}%
-                                {-0.ex plus 1 ex}%
-                                {0.01ex plus .01ex}%
+                                {-0.ex plus .01 ex}%
+                                {-0.01ex plus .01ex}%
                                 {\normalfont\small\bfseries}}
 \makeatother
 
@@ -36,98 +36,78 @@
 \begin{multicols}{3}
 
 \begin{center}
-\Large{Chisel Cheat Sheet}
+\Large{\textbf{Chisel Cheat Sheet}}
 \end{center}
 
 \renewcommand{\tabcolsep}{.5mm}
 
-\section{Notation}
-\verb$c, x, y$ are Chisel \verb$Data$s; \verb$n, m$ are Scala \verb$Int$s \newline
-\verb$wx, wy$ are the widths of \verb$x, y$ (respectively) \newline
-\verb$minVal(x)$, \verb$maxVal(x)$ are the min or max of \verb$x$ \newline
-\verb$s$ is a Scala string; \verb$b$ is a Scala boolean \newline
-\verb$[ ... ]$ in functions are optional arguments
 
-\section{Basic Operators}
+\fbox{ \parbox{0.95\columnwidth} {
+\section{Notation In This Document}
+\subsection{For Functions and Constructors}: \newline
+Arguments are given as \texttt{kwd:type}, where \texttt{kwd} is the \newline
+\phantom{x} argument name/keyword and \texttt{type} is the type. \newline
+Arguments in brackets (\texttt{[...]}) are optional.
+\subsection{For Operators}: \newline
+\texttt{c}, \texttt{x}, \texttt{y} are Chisel \texttt{Data}s \newline
+\texttt{n}, \texttt{m} are Scala \texttt{Int}s \newline
+\texttt{w(x)}, \texttt{w(y)} are the widths of \texttt{x}, \texttt{y} (respectively) \newline
+\texttt{minVal(x)}, \texttt{maxVal(x)} are the minimum or \newline
+\phantom{x} maximum possible values of \texttt{x}
+} }
+
+\section{Basics}
+\subsubsection{Chisel Operators}: \newline
 \begin{tabular}{l l}
-\verb$val x = UInt()$ & Allocate \verb$a$ as wire of \verb$UInt()$ \\
+\verb$val x = UInt()$ & Allocate \verb$a$ as wire of type \verb$UInt()$ \\
 \verb$x := y$ & Assign \verb$y$ to wire \verb$x$ \\
-\verb$x <> y$ & Connect \verb$x$ and \verb$y$, inferring direction \\
+\verb$x <> y$ & Connect \verb$x$ and \verb$y$, wire directionality \\
+ & is automatically inferred \\
 \end{tabular}
 
-\section{Basic Data Types}
-\subsection{Bool Constructors}
+\subsection{Basic Data Types}
+\subsubsection{Constructors}: \newline
 \verb$Bool([x:Boolean])$ \newline
 \begin{tabular}{l l l}
-& \verb$x$ & create a literal from Boolean \\
+& \verb$x$ & {\em (optional)} create a \verb$Boolean$ literal if given, \\
 & & or declare unassigned if missing \\
 \end{tabular}
-
-\subsection{Bits, SInt, UInt Constructors}
-\verb$Bits(x:Int|String, width:Int)$ \newline
-\verb$UInt(x:Int|String, width:Int)$ \newline
-\verb$SInt(x:Int|String, width:Int)$ \newline
+\verb$Bits([x:Int/String], [width:Int])$ \newline
+\verb$UInt([x:Int/String], [width:Int])$ \newline
+\verb$SInt([x:Int/String], [width:Int])$ \newline
 \begin{tabular}{l l l}
-& \verb$x$ & create a literal from \verb$Int$ or parsed \verb$String$ \\
-& & or declare unassigned if missing \\
-& \verb$width$ & bit width (or inferred) \\
+& \verb$x$ & {\em (optional)} create a literal from \verb$Int$ or parsed \\
+& & \verb$String$, or declare unassigned if missing \\
+& \verb$width$ & {\em (optional)} bit width (or inferred) \\
 \end{tabular}
 
-\subsection{Bits, UInt, SInt Casts}
+\subsubsection{Bits, UInt, SInt Casts}: \newline
 \begin{tabular}{l l}
 \verb$UInt$ $\rightarrow$ \verb$SInt$ & Zero-extend to SInt \\
 (all others) & Reinterpret cast \\
 \end{tabular}
 
-\subsection{Bool Operators}
-\begin{tabular}{l l l}
+\subsubsection{Bool Operators}: \newline
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill} } l l l}
 Chisel & Explanation & Width \\
 \hline
 \hline
 \verb$!x$ & Logical NOT & \verb$1$ \\
 \verb$x && y$ & Logical AND & \verb$1$ \\
 \verb$x || y$ & Logical OR & \verb$1$ \\
-\end{tabular}
+\end{tabular*}
 
-\subsection{Bits Operators}
-\begin{tabular}{l l l}
-Chisel & Explanation & Width \\
-\hline
-\hline
-\verb$x(n)$ & Extract bit (0 is LSB) & \verb$1$ \\
-\verb$x(n, m)$ & Extract bitfield & \verb$n - m + 1$ \\
-\verb$x << y$ & Left shift & \verb$wx + maxVal(y)$ \\
-\verb$x >> y$ & Right shift & \verb$wx - minVal(y)$ \\
-\verb$x << n$ & Left shift & \verb$wx + n$ \\
-\verb$x >> n$ & Right shift & \verb$wx - n$ \\
-\verb$Fill(n, x)$ & Replicate \verb$x$ \verb$n$ times & \verb$n * wx$ \\
-\verb$Cat(x, y)$ & Concatenate bitfields & \verb$wx + wy$ \\
-\verb$Mux(c, x, y)$ & If \verb$c$ then \verb$x$ else \verb$y$ & \verb$max(wx, wy)$ \\
-\hline
-\verb$~x$ & Bitwise NOT & \verb$wx$ \\
-\verb$x & y$ & Bitwise AND & \verb$max(wx, wy)$ \\
-\verb$x | y$ & Bitwise OR & \verb$max(wx, wy)$ \\
-\verb$x ^ y$ & Bitwise XOR & \verb$max(wx, wy)$ \\
-\hline
-\verb$x === y$ & Equality & \verb$1$ \\
-\verb$x != y$ & Inequality & \verb$1$ \\
-\hline
-\verb$andR(x)$ & AND-reduce & \verb$1$ \\
-\verb$orR(x)$ & OR-reduce & \verb$1$ \\
-\verb$xorR(x)$ & XOR-reduce & \verb$1$ \\
-\end{tabular}
-
-\subsection{UInt, SInt Operators}
+\subsubsection{UInt, SInt Operators}: \newline
 Bitwidths only valid for UInt operations
 
-\begin{tabular}{l l l}
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill} } l l l}
 Chisel & Explanation & Width \\
 \hline
 \hline
-\verb$x + y$ & Addition & \verb$max(wx, wy)$ \\
-\verb$x - y$ & Subtraction & \verb$max(wx, wy)$ \\
-\verb$x * y$ & Multiplication & \verb$wx + wy$ \\
-\verb$x / y$ & Division & \verb$wx$ \\
+\verb$x + y$ & Addition & \verb$max(w(x), w(y))$ \\
+\verb$x - y$ & Subtraction & \verb$max(w(x), w(y))$ \\
+\verb$x * y$ & Multiplication & \verb$w(x) + w(y)$ \\
+\verb$x / y$ & Division & \verb$w(x)$ \\
 \verb$x % y$ & Modulus & \verb$bits(maxVal(y) - 1)$ \\
 \hline
 \verb$x > y$ & Greater than & \verb$1$ \\
@@ -135,14 +115,42 @@ Chisel & Explanation & Width \\
 \verb$x < y$ & Less than & \verb$1$ \\
 \verb$x <= y$ & Less than or equal & \verb$1$ \\
 \hline
-\verb$x >> y$ & Arithmetic right shift & \verb$wx - minVal(y)$ \\
-\verb$x >> n$ & Arithmetic right shift & \verb$wx - n$ \\
-\end{tabular}
+\verb$x >> y$ & Arithmetic right shift & \verb$w(x) - minVal(y)$ \\
+\verb$x >> n$ & Arithmetic right shift & \verb$w(x) - n$ \\
+\end{tabular*}
+
+\subsubsection{Bits Operators}: \newline
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill} } l l l}
+Chisel & Explanation & Width \\
+\hline
+\hline
+\verb$x(n)$ & Extract bit, \verb$0$ is LSB & \verb$1$ \\
+\verb$x(n, m)$ & Extract bitfield & \verb$n - m + 1$ \\
+\verb$x << y$ & Dynamic left shift & \verb$w(x) + maxVal(y)$ \\
+\verb$x >> y$ & Dynamic right shift & \verb$w(x) - minVal(y)$ \\
+\verb$x << n$ & Static left shift & \verb$w(x) + n$ \\
+\verb$x >> n$ & Static right shift & \verb$w(x) - n$ \\
+\verb$Fill(n, x)$ & Replicate \verb$x$ \verb$n$ times & \verb$n * w(x)$ \\
+\verb$Cat(x, y)$ & Concatenate bits & \verb$w(x) + w(y)$ \\
+\verb$Mux(c, x, y)$ & If \verb$c$ then \verb$x$ else \verb$y$ & \verb$max(w(x), w(y))$ \\
+\hline
+\verb$~x$ & Bitwise NOT & \verb$w(x)$ \\
+\verb$x & y$ & Bitwise AND & \verb$max(w(x), w(y))$ \\
+\verb$x | y$ & Bitwise OR & \verb$max(w(x), w(y))$ \\
+\verb$x ^ y$ & Bitwise XOR & \verb$max(w(x), w(y))$ \\
+\hline
+\verb$x === y$ & Equality & \verb$1$ \\
+\verb$x != y$ & Inequality & \verb$1$ \\
+\hline
+\verb$andR(x)$ & AND-reduce & \verb$1$ \\
+\verb$orR(x)$ & OR-reduce & \verb$1$ \\
+\verb$xorR(x)$ & XOR-reduce & \verb$1$ \\
+\end{tabular*}
 
 \section{Helpers}
-\subsection{When}
-Use \verb$when$ to execute statements conditionally \newline
-\verb$when$ behaves similarly to Verilog \newline \verb$always @(posedge clk)$
+
+\subsection{When } executes blocks conditionally by \verb$Bool$, \newline
+\phantom{x} and is equivalent to Verilog \verb$if$
 \begin{scala}
 when(condition1) {
   // run if condition1 true
@@ -155,9 +163,7 @@ when(condition1) {
 }
 \end{scala}
 
-\subsection{Switch}
-Use \verb$switch$ to execute statements conditionally \newline
-on the value of a wire \newline
+\subsection{Switch } executes blocks conditionally by wire value \newline
 \begin{scala}
 switch(x) {
   is(value1) {
@@ -168,53 +174,46 @@ switch(x) {
 }
 \end{scala}
 
-\subsection{Enum}
-Use \verb$enum$s to generate list values \newline
+\subsection{Enum } generates value literals for enumerations  \newline
 \verb$val s1::s2::$ ... \verb$::sn::Nil$ \newline
 \verb$    := Enum(nodeType:UInt, n:Int)$ \newline
 \begin{tabular}{l l l}
-& \verb$s1$, \verb$s2$, ..., \verb$sn$ & will be created with distinct values \\
+& \verb$s1$, \verb$s2$, ..., \verb$sn$ & will be created as \verb$nodeType$ literals \\
+& & with distinct values \\
 & \verb$nodeType$ & type of \verb$s1$, \verb$s2$, ..., \verb$sn$ \\
 & \verb$n$ & element count \\
 \end{tabular}
 
 \section{Aggregate Types}
-\subsection{Bundle}
-\verb$Bundle$ contains \verb$Data$ types indexed by name
-\subsubsection{Defining}
-Define a \verb$Bundle$ by subclassing \verb$Bundle$ and \newline
-populating with components:
+\subsection{Bundle } contains \verb$Data$ types indexed by name \newline
+\subsubsection{Defining}: subclass \verb$Bundle$ and define components \newline
 \begin{scala}
 class MyBundle extends Bundle {
   val a = Bool()
   val b = UInt(width = 32)
 }
 \end{scala}
-\subsubsection{Constructor}
-Instantiate a \verb$Bundle$ subclass: \newline
+\subsubsection{Constructor}: instantiate \verb$Bundle$ subclass: \newline
 \verb$val my_bundle = new MyBundle()$ \newline
-Or define an inline Bundle type:
+\subsubsection{Inline defining}: define a \verb$Bundle$ type:
 \begin{scala}
 val my_bundle = new Bundle {
   val a = Bool()
   val b = UInt(width = 32)
 }
 \end{scala}
-\subsubsection{Using}
-Access elements using dot notation: \newline
+\subsubsection{Using}: access elements through dot notation: \newline
 \verb$val bundleVal = my_bundle.a$ \newline
 \verb$my_bundle.a := Bool(true)$
 
-\subsection{Vec}
-\verb$Vec$ is an indexable vector of \verb$Data$ types
-\subsubsection{Constructor}
+\subsection{Vec } is an indexable vector of \verb$Data$ types
+\subsubsection{Constructor}: \newline
 \verb$val myVec = Vec.fill(n:Int) {gen:Data}$ \newline
 \begin{tabular}{l l l}
 & \verb$n$ & vector depth (elements) \\
 & \verb$gen$ & element data type \\
 \end{tabular}
-\subsubsection{Using}
-Access elements by indexing into a \verb$Vec$: \newline
+\subsubsection{Using}: access elements by indexing: \newline
 \verb$readVal := myVec(ind:Data)$ (index by wire) \newline
 \verb$readVal := myVec(idx:Int)$ (static index) \newline
 \verb$myVec(ind:Data) := writeVal$ (index by wire) \newline
@@ -222,21 +221,20 @@ Access elements by indexing into a \verb$Vec$: \newline
 
 \section{State Elements}
 \subsection{Registers}
-\subsubsection{Constructor}
+\subsubsection{Constructor}: \newline
 \verb$val my_reg = Reg([outType:Data], [next:Data],$ \newline
 \verb$                 [init:Data])$ \newline
 \begin{tabular}{l l l}
-& \verb$outType$ & register type (or inferred) \\
-& \verb$next$ & update value every clock \\
-& \verb$init$ & initialization value on reset \\
+& \verb$outType$ & {\em (optional)} register type (or inferred) \\
+& \verb$next$ & {\em (optional)} update value every clock \\
+& \verb$init$ & {\em (optional)} initialization value on reset \\
 \end{tabular}
-\subsubsection{Updating}
-Assign to latch a new value on the next clock: \newline
+\subsubsection{Updating}: assign to latch new value on next clock: \newline
 \verb$my_reg := next_val$ \newline
 The last update (lexically, per clock) runs
 
 \subsection{Read-Write Memory}
-\subsubsection{Constructor}
+\subsubsection{Constructor}: \newline
 \verb$val my_mem = Mem(out:Data, n:Int,$ \newline
 \verb$                 seqRead:Boolean)$ \newline
 \begin{tabular}{l l l}
@@ -244,16 +242,14 @@ The last update (lexically, per clock) runs
 & \verb$n$ & memory depth (elements) \\
 & \verb$seqRead$ & only update reads on clock edge \\
 \end{tabular}
-\subsubsection{Usage}
-Access elements by indexing into a \verb$Mem$: \newline
-\verb$val readVal = mem(addr:UInt|Int)$ \newline
+\subsubsection{Using}: access elements by indexing: \newline
+\verb$val readVal = mem(addr:UInt/Int)$ \newline
 Synchronous read: assign output to \verb$Reg$ \newline
-\verb$mem(addr:UInt|Int) := y$
+\verb$mem(addr:UInt/Int) := y$
 
 \section{Modules}
-\subsubsection{Defining}
-Define a \verb$Module$ by subclassing \verb$Module$ and \newline
-populating with components and code: \newline
+\subsubsection{Defining}: subclass \verb$Module$ and populate with \newline
+\phantom{x} components and code: \newline
 (\verb$Module$s may be parameterized and hierarchical) \newline
 \begin{scala}
 class SyncAdder(width:Int) extends Module {
@@ -267,8 +263,8 @@ class SyncAdder(width:Int) extends Module {
   out := io.latch
 }
 \end{scala}
-\subsubsection{Usage}
-Elements can be accessed using dot notation: \newline
+\subsubsection{Usage}: access elements using dot notation: \newline
+\phantom{x} (code inside a \verb$Module$ is always running) \newline
 \begin{scala}
 val my_module = Module(new SyncAdder(32))
 my_module.io.op_a := UInt(1)
@@ -277,65 +273,60 @@ val sum := my_module.io.out
 \end{scala}
 
 \section{Hardware Generation}
-\subsection{Functions}
-\subsubsection{Defining}
-Define Scala functions containing Chisel code: \newline
+\subsection{Functions } provide block abstractions for code
+\subsubsection{Defining}: write Scala functions with Chisel code: \newline
 \begin{scala}
 def FunAdder(op_a:UInt, op_b:UInt): UInt {
   a + b
 }
 \end{scala}
-\subsubsection{Usage}
-Hardware is instantiated when called: \newline
+\subsubsection{Usage}: hardware is instantiated when called: \newline
 \begin{scala}
 sum := FunAdder(UInt(1), some_data)
 \end{scala}
 
-\subsection{If, For}
-Use Scala \verb$if$, \verb$for$ to generate hardware
+\subsection{If/For } can be used to control hardware generation \newline
+\phantom{x} and is equivalent to Verilog \verb$generate if$/\verb$for$ \newline
 
 \section{Standard Library}
-\subsection{Decoupled}
-\verb$Decoupled$ is a \verb$Bundle$ with a ready-valid interface,\newline
-where the consumer should flip the interface: \newline
-\subsubsection{Constructor}
+\subsection{Decoupled } is a \verb$Bundle$ with a ready-valid interface,\newline
+\phantom{x} where the consumer should flip the interface: \newline
+\subsubsection{Constructor}: \newline
 \verb$val my_rv = Decoupled(type:Data)$ \newline
 \begin{tabular}{l l l}
 & \verb$type$ & data type \\
 \end{tabular}
-\subsubsection{Interface}
+\subsubsection{Interface}: \newline
 \begin{tabular}{l l l}
 & \verb$.ready$ & ready \verb$Bool$ \\
 & \verb$.valid$ & valid \verb$Bool$ \\
 & \verb$.bits$ & data \\
 \end{tabular}
 
-\subsection{PipeIO}
-\verb$PipeIO$ is a \verb$Bundle$ with a valid interface,\newline
-where the consumer should flip the interface: \newline
-\subsubsection{Constructor}
+\subsection{PipeIO } is a \verb$Bundle$ with a valid interface,\newline
+\phantom{x} where the consumer should flip the interface: \newline
+\subsubsection{Constructor}: \newline
 \verb$val my_rv = PipeIO(type:Data)$ \newline
 \begin{tabular}{l l l}
 & \verb$type$ & data type \\
 \end{tabular}
-\subsubsection{Interface}
+\subsubsection{Interface}: \newline
 \begin{tabular}{l l l}
 & \verb$.valid$ & valid \verb$Bool$ \\
 & \verb$.bits$ & data \\
 \end{tabular}
 
-\subsection{Arbiters}
-\verb$Arbiter$ is a \verb$Module$ connecting multiple producers \newline
-to one consumer, {\bf prioritizing lower producers} \newline
-\verb$RRArbiter$ is a \verb$Module$ connecting multiple producers \newline
-to one consumer {\bf in round-robin order} \newline
-\subsubsection{Constructor}
+\subsection{Arbiters } are \verb$Module$s connecting multiple producers\newline
+\phantom{x} to one consumer \newline
+\verb$Arbiter$ prioritizes lower producers \newline
+\verb$RRArbiter$ runs in round-robin order \newline
+\subsubsection{Constructor}: \newline
 \verb$val arb = Arbiter(gen:Data, n:Int)$ \newline
 \begin{tabular}{l l l}
 & \verb$gen$ & data type \\
 & \verb$n$ & number of producers \\
 \end{tabular}
-\subsubsection{Interface}
+\subsubsection{Interface}: \newline
 \begin{tabular}{l l l}
 & \verb$.io.in$ & \verb$Vec$ of \verb$Decoupled$ inputs \\
 & \verb$.io.out$ & output as \verb$Decoupled$ \\
