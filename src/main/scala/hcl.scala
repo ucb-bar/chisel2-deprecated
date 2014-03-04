@@ -171,33 +171,28 @@ object chiselMain {
   def run[T <: Module] (args: Array[String], gen: () => T): T = apply(args, () => Module(gen())) // hack to avoid supplying default parameters and invoke Module.apply manually for invocation in sbt
 
   def apply[T <: Module]
-      (args: Array[String], gen: () => T,
-       scanner: T => TestIO = null, printer: T => TestIO = null, ftester: T => Tester[T] = null): T = {
+      (args: Array[String], gen: () => T, ftester: T => Tester[T] = null) = {
     Module.initChisel();
     readArgs(args)
 
     try {
       val c = gen();
-      if (scanner != null) {
-        val s = scanner(c);
-        Module.scanArgs  ++= s.args;
-        for (a <- s.args) a.isScanArg = true
-        Module.scanFormat  = s.format;
-      }
-      if (printer != null) {
-        val p = printer(c);
-        Module.printArgs   ++= p.args;
-        for(a <- p.args) a.isPrintArg = true
-        Module.printFormat   = p.format;
-      }
-      if (ftester != null) {
-        Module.tester = ftester(c)
-      }
       Module.backend.elaborate(c)
       val top = Module.topComponent
       if (Module.isCheckingPorts) Module.backend.checkPorts(top) // by Donggyu
       if (Module.isCompiling && Module.isGenHarness) Module.backend.compile(top) // by Donggyu
-      if (Module.isTesting) Module.tester.tests()
+      if (ftester != null && !Module.backend.isInstanceOf[VerilogBackend]) {
+        var res = false
+        var tester: Tester[T] = null
+        try {
+          tester = ftester(c)
+        } finally {
+          if (tester != null && tester.process != null) 
+            res = tester.endTesting()
+        }
+        println(if (res) "PASSED" else "*** FAILED ***")
+        if(!res) throwException("Module under test FAILED at least one test vector.")
+      }
       c
     } finally {
       ChiselError.report()
@@ -219,7 +214,7 @@ object throwException {
 // edited by Donggyu
 object chiselMainTest {
   def apply[T <: Module](args: Array[String], gen: () => T)(tester: T => Tester[T]): T =
-    chiselMain(args, gen, null, null, tester)
+    chiselMain(args, gen, tester)
 }
 
 trait proc extends Node {
@@ -261,6 +256,7 @@ trait nameable {
   /** _named_ is used to indicates name was set explicitely
    and should not be overriden by a _nameIt_ generator. */
   var named = false
+  var varName = ""
 }
 
 abstract class BlackBox extends Module {

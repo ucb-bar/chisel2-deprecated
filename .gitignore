@@ -12,3 +12,4 @@ test-reports/
 *.toc
 *.bak
 *.new
+*.jar

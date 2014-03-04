@@ -20,7 +20,8 @@ class Slave extends Module {
   val signalCounterMap = new HashMap[Node, Node]
 }
 
-class SlaveTester(s: Slave) extends Tester(s, Array(s.io) ++ s.signals /* ++ (Module.clocks filter (_.isEnabled))*/ ) {
+/*
+class SlaveTester(s: Slave) extends Tester(s, Array(s.io) ++ s.signals ++ (Module.clocks filter (_.isEnabled)) ) {
   defTests {
     val (a, b, z) = (80, 16, 16)
     val svars = new HashMap[Node, Node]
@@ -66,6 +67,7 @@ class SlaveTester(s: Slave) extends Tester(s, Array(s.io) ++ s.signals /* ++ (Mo
     ovars(s.io.out.bits) == Bits(z)
   }
 }
+*/
 
 trait CounterBackend extends Backannotation {
   val addr_width = 5
@@ -729,12 +731,14 @@ trait CounterBackend extends Backannotation {
     }
   }
 
+  /*
   def initTester(m: Module) {
     m match {
       case s: Slave if Module.isTesting => Module.tester = new SlaveTester(s)
       case _ =>
     }
   }
+  */
 
   def reportCounters (m: Module) {
     val rptdir  = ensureDir(targetdir)

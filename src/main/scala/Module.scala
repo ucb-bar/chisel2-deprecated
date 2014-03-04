@@ -66,11 +66,6 @@ object Module {
   var isGenHarness = false;
   var isReportDims = false;
   var isPruning = false;
-  var scanFormat = "";
-  var scanArgs: ArrayBuffer[Node] = null;
-  var printFormat = "";
-  var printArgs: ArrayBuffer[Node] = null;
-  var tester: Tester[Module] = null;
   var includeArgs: List[String] = Nil;
   var targetDir: String = null;
   var isEmittingComponents = false;
@@ -97,6 +92,8 @@ object Module {
   val printfs = ArrayBuffer[Printf]()
   val randInitIOs = new ArrayBuffer[Node]()
   val clocks = new ArrayBuffer[Clock]()
+  val nodesToBeNamed = new ArrayBuffer[(Node, String)]
+  val compsToBeNamed = new ArrayBuffer[(Module, String)]
   var implicitReset: Bool = null
   var implicitClock: Clock = null
   var signalFilename: String = "" // by Donggyu
@@ -113,6 +110,10 @@ object Module {
     val res = c
     pop()
     for ((n, io) <- res.wires) {
+      if (io.dir == null)
+         ChiselErrors += new ChiselError(() => {"All IO's must be ports (dir set): " + io}, io.line);
+      // else if (io.width_ == -1)
+      //   ChiselErrors += new ChiselError(() => {"All IO's must have width set: " + io}, io.line);
       io.isIo = true
     }
     res
@@ -136,11 +137,6 @@ object Module {
     isClockGatingUpdatesInline = false;
     isVCD = false;
     isReportDims = false;
-    scanFormat = "";
-    scanArgs = new ArrayBuffer[Node]();
-    printFormat = "";
-    printArgs = new ArrayBuffer[Node]();
-    tester = null;
     targetDir = "."
     components.clear();
     compStack.clear();
@@ -351,21 +347,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
   def io: Data
 
-  // for making sure that all module io's are ports and 
-  // for marking all io's as module io's
-  var isIoChecked = false
-  def checkIo = {
-    if (io != null && !isIoChecked) {
-      isIoChecked = true;
-      for((n, flat) <- io.flatten) {
-        if (flat.dir == null) 
-          ChiselError.error("All IO's must be ports (dir set): " + flat);
-        // else if (flat.width_ == -1) 
-        //   ChiselError.error("All IO's must be have width set: " + flat);
-        flat.isModuleIo = true;
-      }
-    }
-  }
   def nextIndex : Int = { nindex = nindex + 1; nindex }
 
   var isWalking = new HashSet[Node];
@@ -388,6 +369,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     from the outputs. */
   def debug(x: Node): Unit = {
     // XXX Because We cannot guarentee x is flatten later on in collectComp.
+    x.component = this
     x.getNode.component = this
     debugs += x.getNode
   }
@@ -528,11 +510,35 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       val top = dfsStack.pop
       walked += top
       visit(top)
-      for(i <- top.inputs) {
-        if(!(i == null)) {
-          if(!(walked contains i)) {
-            dfsStack push i
-            walked += i
+      top match {
+        case v: Vec[_] => {
+          for ((n, i) <- v.flatten) {
+            if(!(i == null)) {
+              if(!(walked contains i)) {
+                dfsStack push i
+                walked += i
+              }
+            }
+          }
+        }
+        case b: Bundle => {
+          for ((n, i) <- b.flatten) {
+            if(!(i == null)) {
+              if(!(walked contains i)) {
+                dfsStack push i
+                walked += i
+              }
+            }
+          }
+        }
+        case _ => {
+          for(i <- top.inputs) {
+            if(!(i == null)) {
+              if(!(walked contains i)) {
+                dfsStack push i
+                walked += i
+              }
+            }
           }
         }
       }
@@ -792,9 +798,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   // 1) name the component
   // 2) name the IO
   // 3) name and set the component of all statically declared nodes through introspection
-  // 4) name declared nodes
+  // 4) set variable names
   /* XXX deprecated. make sure containsReg and isClk are set properly. */
-  def markComponent(nameSpace: HashSet[String]) {
+  def markComponent() {
     ownIo();
     io nameIt ("io", true)
     /* We are going through all declarations, which can return Nodes,
@@ -810,11 +816,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
          val o = m.invoke(this);
          o match {
          case node: Node => {
-           if (node.isReg || node.isClkInput) containsReg = true
-           if (name != "" && node.name == "") {
-             node nameIt (backend asValidName name, false)
-             nameSpace += node.name
-           }
+           if (node.isReg || node.isClkInput) containsReg = true;
+           node.getNode.varName = name
+           nodesToBeNamed += ((node, name))
          }
          case buf: ArrayBuffer[_] => {
            /* We would prefer to match for ArrayBuffer[Node] but that's
@@ -822,53 +826,50 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             XXX Using Seq instead of ArrayBuffer will pick up members defined
             in Module that are solely there for implementation purposes. */
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
-             val nodebuf = buf.asInstanceOf[Seq[Node]]
+             val nodebuf = buf.asInstanceOf[Seq[Node]];
              for((elm, i) <- nodebuf.zipWithIndex){
                if (elm.isReg || elm.isClkInput) {
                  containsReg = true;
                }
-               if (name != "" && elm.name == "") {
-                 val idxName = name + '_' + i
-                 elm nameIt (backend asValidName idxName, false)
-                 nameSpace += elm.name
-               }
+               elm.getNode.varName = name + "_" + i
+               nodesToBeNamed += ((elm, name + "_" + i))
              }
            }
          }
          case buf: collection.IndexedSeq[_] => {
-           /* To support VecLike structures */
+           /* We would prefer to match for ArrayBuffer[Node] but that's
+            impossible because of JVM constraints which lead to type erasure.
+            XXX Using Seq instead of ArrayBuffer will pick up members defined
+            in Module that are solely there for implementation purposes. */
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
-             val nodebuf = buf.asInstanceOf[Seq[Node]]
+             val nodebuf = buf.asInstanceOf[Seq[Node]];
              for((elm, i) <- nodebuf.zipWithIndex){
                if (elm.isReg || elm.isClkInput) {
                  containsReg = true;
                }
-               if (name != "" && elm.name == "") {
-                 val idxName = name + '_' + i
-                 elm nameIt (backend asValidName idxName, false)
-                 nameSpace += elm.name
-               }
+               elm.getNode.varName = name + "_" + i
+               nodesToBeNamed += ((elm, name + "_" + i))
              }
            }
          }
          // Todo: do we have Cell anymore?
          case cell: Cell => {
            if(cell.isReg) containsReg = true;
-           cell.name = backend asValidName name 
-           nameSpace += cell.name
+           cell.varName = name
          }
          case bb: BlackBox => {
            bb.pathParent = this;
            for((n, elm) <- io.flatten) {
              if (elm.isClkInput) containsReg = true
            }
-           bb.name = backend asValidName name
-           nameSpace += bb.name
+           if (!bb.named) {
+             bb.name = name
+             bb.named = true
+           }
          }
          case comp: Module => {
            comp.pathParent = this;
-           comp.name = backend asValidName name
-           nameSpace += comp.name
+           compsToBeNamed += ((comp, name))
          }
          case any =>
        }

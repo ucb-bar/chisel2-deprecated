@@ -107,8 +107,8 @@ class FloBackend extends Backend {
              case "&"  => "and/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "&&" => "and/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "^"  => "xor/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "==" => "eq/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "!=" => "neq/" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
+             case "==" => "eq/" + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
+             case "!=" => "neq/" + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
            }
          }) + "\n"
 

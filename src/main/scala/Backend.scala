@@ -82,7 +82,16 @@ abstract class Backend {
     if(x == 0) "" else "    " + genIndent(x-1);
   }
 
-  def setNames(top: Module) {
+  def setNames(top: Module, nameSpace: HashSet[String]) {
+    // First, name components
+    for ((comp, name) <- Module.compsToBeNamed){
+      if (!comp.named){
+        comp.name = asValidName(name)
+        comp.named = true
+        nameSpace += comp.name
+      }
+    }
+
     // First, check whether there are multiple instances of a module
     val classNames = new HashMap[String, ArrayBuffer[Module]]
 
@@ -112,16 +121,59 @@ abstract class Backend {
       }
     }
 
-    top dfs { node =>
+    // Give names to predefined nodes (by users)
+    /*
+    top bfs { node =>
+      if( node.varName != "" ) 
+        node nameIt (asValidName(node.varName), false)
+    }
+    */
+
+    for ((node, name) <- Module.nodesToBeNamed){
+      node nameIt (asValidName(name), false)
+      nameSpace += node.name
+    }
+
+    // Give names to nodes who have name holders
+    for (node <- Module.nodes) {
       if( node.nameHolder != null && node.nameHolder.name != "" &&
           !node.named && !node.isLit ){
         node.name = node.nameHolder.name // Not using nameIt to avoid override
         node.named = node.nameHolder.named
         node.nameHolder.name = ""
-      } else if (!node.isTypeNode && node.name == "") {
-        node.emitIndex
-        // emitRef(node)
       }
+    }
+
+    // Assign components to nodes
+    for (m <- Module.components ; node <- m.nodes) {
+      node.component = m
+    }
+
+    // Give indices to non type nodes
+    top dfs { node =>
+      if (!node.isTypeNode && node.name == "") {
+        // emitRef(node)
+        if (node.component == Module.topComponent || Module.isEmittingComponents) {
+          node.nameIdx = node.emitIndex
+        } else {
+          node.nameIdx = node.component.nextIndex
+        }
+      }
+    }
+  }
+
+  def nameBindings(nameSpace: HashSet[String]) {
+    for (c <- Module.sortedComps ; bind <- c.bindings) {
+      var genName = ""
+      if (bind.targetNode.name != null || bind.targetNode.name != "")
+        genName = bind.targetComponent.name + "_" + bind.targetNode.name
+
+      if(nameSpace contains genName) 
+        genName += ("_" + bind.emitIndex)
+
+      // Not using nameIt to avoid override
+      bind.name = asValidName(genName)
+      bind.named = true;
     }
   }
 
@@ -150,7 +202,7 @@ abstract class Backend {
     }
   }
 
-  def emitTmp(node: Node): String =
+ def emitTmp(node: Node): String =
     emitRef(node)
 
   def emitRef(node: Node): String = {
@@ -184,7 +236,7 @@ abstract class Backend {
     for( c <- Module.components ) {
       for( a <- c.debugs ) {
         res.push(a)
-      }
+      } 
       for((n, flat) <- c.io.flatten) {
         res.push(flat)
       }
@@ -265,8 +317,6 @@ abstract class Backend {
   }
 
   def pruneUnconnectedIOs(m: Module) {
-    m.checkIo // make sure all module ios are ports
-
     val inputs = m.io.flatten.filter(_._2.dir == INPUT)
     val outputs = m.io.flatten.filter(_._2.dir == OUTPUT)
 
@@ -285,7 +335,7 @@ abstract class Backend {
     }
 
     for ((name, o) <- outputs) {
-      if (o.inputs.length == 0) {
+      if (o.inputs.length == 0 && !o.component.isInstanceOf[BlackBox]) {
         if (o.consumers.length > 0) {
           if (Module.warnOutputs)
             ChiselError.warning({"UNCONNECTED OUTPUT " + emitRef(o) + " in component " + o.component + 
@@ -399,21 +449,6 @@ abstract class Backend {
     }
   }
 
-  def nameBindings(nameSpace: HashSet[String]) {
-    for (c <- Module.sortedComps ; bind <- c.bindings) {
-      var genName = ""
-      if (bind.targetNode.name != null || bind.targetNode.name != "")
-        genName = bind.targetComponent.name + "_" + bind.targetNode.name
-
-      if(nameSpace contains genName) 
-        genName += ("_" + bind.emitIndex)
-
-      // Not using nameIt to avoid override
-      bind.name = asValidName(genName)
-      bind.named = true;
-    }
-  }
-
   // walk forward from root register assigning consumer clk = root.clock
   def createClkDomain(root: Node, walked: ArrayBuffer[Node]) = {
     val dfsStack = new Stack[Node]
@@ -437,7 +472,6 @@ abstract class Backend {
     }
   }
 
-  val nameSpace = new HashSet[String]
   def elaborate(c: Module): Unit = {
     println("backend elaborate")
     Module.setAsTopComponent(c)
@@ -448,24 +482,19 @@ abstract class Backend {
      so as to give a clue where problems are showing up but that interfers
      with the *bindings* (see later comment). */
     for (c <- Module.components)
-      c markComponent nameSpace
+      c.markComponent
+
+    // Resolve components before naming
+    // collectNodesIntoComp(initializeDFS)
 
     // Set signal signals except bindings because they are not generated.
     // Bindings are named separately after generated
-    setNames(c)
+    val nameSpace = new HashSet[String]
+    setNames(c, nameSpace)
 
     // XXX This will create nodes after the tree is traversed!
-    c.genAllMuxes
+    c.genAllMuxes;
 
-    // obtain sorted modules before preElaborateTransforms
-    levelChildren(c)
-    Module.sortedComps = gatherChildren(c).sortWith(
-      (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)));
-
-    // We have high-leve IRs here, 
-    // so we can include optimizations
-    // like backannotation, automatic tools
-    // in preElaborateTransforms
     execute(c, preElaborateTransforms)
 
     // preElaborateTransforms can change the top component
@@ -476,12 +505,15 @@ abstract class Backend {
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
     // Module.assignResets()
 
+    levelChildren(c)
+    Module.sortedComps = gatherChildren(c).sortWith(
+      (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)));
+
     assignClockAndResetToModules
     Module.sortedComps.map(_.addDefaultReset)
     top.addClockAndReset
     gatherClocksAndResets
     connectResets
-    nameRsts // name resets here
 
     ChiselError.info("started inference")
     val nbOuterLoops = top.inferAll();
@@ -510,8 +542,6 @@ abstract class Backend {
     ChiselError.info("finished resolving")
 
     // two transforms added in Mem.scala (referenced and computePorts)
-    // then, we have medium-level IRs
-    // include optimizations into transforms
     ChiselError.info("started transforms")
     execute(top, transforms)
     ChiselError.info("finished transforms")
@@ -542,7 +572,6 @@ abstract class Backend {
       ChiselError.checkpoint()
       ChiselError.info("NO COMBINATIONAL LOOP FOUND")
     }
-
     if(Module.saveComponentTrace) {
       printStack
     }
@@ -581,6 +610,7 @@ abstract class Backend {
     }
     ChiselError.info(res)
   }
+
 }
 
 

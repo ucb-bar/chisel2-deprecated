@@ -124,6 +124,7 @@ abstract class Node extends nameable {
   def componentOf: Module = if (Module.isEmittingComponents && component != null) component else Module.topComponent
   var width_ = -1;
   var index = -1;
+  var nameIdx = -1;
   var isFixedWidth = false;
   val consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
   val inputs = new ArrayBuffer[Node];
@@ -141,9 +142,6 @@ abstract class Node extends nameable {
   var driveRand = false
   var clock: Clock = null
   var CppVertex: CppVertex = null
-  // For signal annotation 
-  // by Donggyu
-  var counter: Bits = null
   // For delay annotation
   // by Donggyu
   val delays = new HashMap[String, Double]
@@ -168,6 +166,15 @@ abstract class Node extends nameable {
     }
     while (!(component.names.getOrElseUpdate(name, this) eq this))
       name += "_"
+  }
+
+  lazy val chiselName = this match {
+    case l: Literal => "";
+    case any        =>
+      if (name != "" && (name != "reset") && !(component == null)) 
+        component.getPathName(".") + "." + name
+      else
+        ""
   }
 
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
@@ -499,9 +506,7 @@ abstract class Node extends nameable {
   
   def emitIndex(): Int = {
     if (index == -1) {
-//      index = componentOf.nextIndex;
-      nodeIndex = nodeIndex + 1
-      index = nodeIndex
+      index = componentOf.nextIndex;
     }
     index
   }
