@@ -42,7 +42,7 @@
 
 \ruleline{\Large{\textbf{Chisel Cheat Sheet}}}
 \begin{center}
-\includegraphics[scale=0.02]{bigduck} Version 0.3 (beta): \today
+\includegraphics[scale=0.02]{bigduck} Version 0.4 (beta): \today
 \end{center}
 
 \fbox{ \parbox{0.95\columnwidth} {
@@ -149,7 +149,7 @@ Chisel & Explanation & Width \\
 \verb$x | y$ & Bitwise OR & \verb$max(w(x), w(y))$ \\
 \verb$x ^ y$ & Bitwise XOR & \verb$max(w(x), w(y))$ \\
 \hline
-\verb$x === y$ & Equality & \verb$1$ \\
+\verb$x === y$ & Equality {\small\textcolor{red}{(triple equals)}} & \verb$1$ \\
 \verb$x != y$ & Inequality & \verb$1$ \\
 \hline
 \verb$andR(x)$ & AND-reduce & \verb$1$ \\
@@ -206,7 +206,7 @@ val my_bundle = new Bundle {
 \verb$val myVec = Vec.fill(n:Int) {gen:Data}$ \newline
 \begin{tabular}{l l l}
 & \verb$n$ & vector depth (elements) \\
-& \verb$gen$ & element data type \\
+& \verb$gen$ & initial element data, called once per element \\
 \end{tabular}
 \subsubsection{Using}: access elements by indexing: \newline
 \verb$readVal := myVec(ind:Data)$ (dynamic index) \newline
@@ -214,13 +214,11 @@ val my_bundle = new Bundle {
 \verb$myVec(ind:Data) := writeVal$ (dynamic index) \newline
 \verb$myVec(idx:Int) := writeVal$ (static index)
 
-
-
 \section{Modules } \hrulefill
 \subsubsection{Defining}: subclass \verb$Module$ with elements and code: \newline
 (\verb$Module$s may be parameterized and hierarchical)
 \begin{scala}
-class SyncAccum(width:Int) extends Module {
+class Accum(width:Int) extends Module {
   val io = new Bundle {
     val in = UInt(INPUT,  width)
     val out  = UInt(OUTPUT, width)
@@ -233,7 +231,7 @@ class SyncAccum(width:Int) extends Module {
 \subsubsection{Usage}: access elements using dot notation: \newline
 \phantom{x} (code inside a \verb$Module$ is always running)
 \begin{scala}
-val my_module = Module(new SyncAccum(32))
+val my_module = Module(new Accum(32))
 my_module.io.in := some_data
 val sum := my_module.io.out
 \end{scala}
@@ -272,25 +270,25 @@ Synchronous read: assign output to \verb$Reg$ \newline
 \subsection{Functions } provide block abstractions for code
 \subsubsection{Defining}: write Scala functions with Chisel code:
 \begin{scala}
-def FunAdder(op_a:UInt, op_b:UInt): UInt {
-  a + b
+def Adder(op_a:UInt, op_b:UInt): UInt = {
+  op_a + op_b
 }
 \end{scala}
 \subsubsection{Usage}: hardware is instantiated when called:
 \begin{scala}
-sum := FunAdder(UInt(1), some_data)
+sum := Adder(UInt(1), some_data)
 \end{scala}
 
 \subsection{If/For } can be used to control hardware generation \newline
 \phantom{x} and is equivalent to Verilog \verb$generate if$/\verb$for$
 
 \section{Standard Library } \hrulefill
-\subsection{Decoupled } is a \verb$Bundle$ with a ready-valid interface,\newline
+\subsection{DecoupledIO } is a \verb$Bundle$ with a ready-valid interface,\newline
 \phantom{x} where the consumer should flip the interface:
 \subsubsection{Constructor}: \newline
-\verb$val my_readyvalid = Decoupled(type:Data)$ \newline
+\verb$val my_readyvalid = Decoupled(gen:Data)$ \newline
 \begin{tabular}{l l l}
-& \verb$type$ & data type \\
+& \verb$gen$ & Chisel \verb$Data$ to wrap ready-valid protocol around \\
 \end{tabular}
 \subsubsection{Interface}: \newline
 \begin{tabular}{l l l}
@@ -299,12 +297,12 @@ sum := FunAdder(UInt(1), some_data)
 & \verb$.bits$ & data \\
 \end{tabular}
 
-\subsection{PipeIO } is a \verb$Bundle$ with a valid interface,\newline
+\subsection{ValidIO } is a \verb$Bundle$ with a valid interface,\newline
 \phantom{x} where the consumer should flip the interface
 \subsubsection{Constructor}: \newline
-\verb$val my_pipe = PipeIO(type:Data)$ \newline
+\verb$val my_valid = Valid(gen:Data)$ \newline
 \begin{tabular}{l l l}
-& \verb$type$ & data type \\
+& \verb$gen$ & Chisel \verb$Data$ to wrap valid protocol around \\
 \end{tabular}
 \subsubsection{Interface}: \newline
 \begin{tabular}{l l l}
@@ -324,8 +322,8 @@ sum := FunAdder(UInt(1), some_data)
 \end{tabular}
 \subsubsection{Interface}: \newline
 \begin{tabular}{l l l}
-& \verb$.io.in$ & \verb$Vec$ of \verb$Decoupled$ inputs \\
-& \verb$.io.out$ & output as \verb$Decoupled$ \\
+& \verb$.io.in$ & \verb$Vec$ of \verb$DecoupledIO$ inputs \\
+& \verb$.io.out$ & output as \verb$DecoupledIO$ \\
 \end{tabular}
 
 \end{multicols}
