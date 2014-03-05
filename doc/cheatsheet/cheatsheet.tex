@@ -71,13 +71,13 @@ Arguments in brackets (\texttt{[...]}) are optional.
 \phantom{x} and is equivalent to Verilog \verb$if$
 \begin{scala}
 when(condition1) {
-  // run if condition1 true
+  // run if condition1 true and skip rest
 } .elsewhen(condition2) {
-  // run if condition2 true
+  // run if condition2 true and skip rest
 } .unless(condition3) {
-  // run if condition3 false
+  // run if condition3 false and skip rest
 } .otherwise {
-  // run if none of the above true
+  // run if none of the above ran
 }
 \end{scala}
 
