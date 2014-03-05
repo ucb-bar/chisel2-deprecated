@@ -747,7 +747,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       valnames += v.getName
     }
     val sc = c.getSuperclass
-    if (sc != null && isSubclassOfModule(sc)) { valnames ++= getClassValNames(sc) }
+    if (sc != null) { valnames ++= getClassValNames(sc) }
     valnames
   }
 
