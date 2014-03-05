@@ -745,8 +745,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     for (v <- c.getDeclaredFields) {
       v.setAccessible(true)
       valnames += v.getName
-    }     
-    if (c.getSuperclass != null) { valnames ++= getClassValNames(c.getSuperclass) }
+    }
+    val sc = c.getSuperclass
+    if (sc != null && isSubclassOfModule(sc)) { valnames ++= getClassValNames(sc) }
     valnames
   }
 
