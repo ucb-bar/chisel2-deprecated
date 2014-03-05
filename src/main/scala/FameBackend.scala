@@ -202,7 +202,7 @@ class Fame1Wrapper(f: => Module) extends Module {
   def transform(isTop: Boolean, module: Module, parent: Module): Unit = {
     Fame1Transform.fame1Modules += module
     val isFire = Bool(INPUT)
-    isFire.nameIt("is_fire")
+    isFire.nameIt("is_fire", true)
     isFire.component = module
     Fame1Transform.fireSignals(module) = isFire
     if(!isTop){
@@ -249,7 +249,7 @@ class Fame1Wrapper(f: => Module) extends Module {
         if (is_flip) fame1Decoupled.flip()
         for ((name, element) <- decoupled.bits.elements) {
           val elementClone = if (is_flip) element.clone.asInput else element.clone.asOutput
-          elementClone.nameIt(name)
+          elementClone.nameIt(name, true)
           fame1Decoupled.target.bits.asInstanceOf[Bundle] += elementClone
         }
         originalDecoupledIOs(name) = decoupled
@@ -264,7 +264,7 @@ class Fame1Wrapper(f: => Module) extends Module {
         }
         for ((name, element) <- reg.bits.elements) {
           val elementClone = if (is_flip) element.clone.asInput else element.clone.asOutput
-          elementClone.nameIt(name)
+          elementClone.nameIt(name, true)
           fame1REGIO.bits.asInstanceOf[Bundle] += elementClone
         }
         originalREGIOs(name) = reg
@@ -275,7 +275,7 @@ class Fame1Wrapper(f: => Module) extends Module {
         if (name != "is_fire") {
           originalOtherIO(name) = ioNode
           val elementClone = ioNode.clone
-          elementClone.nameIt(name)
+          elementClone.nameIt(name, true)
           fame1OtherIO(name) = elementClone
           io.other.asInstanceOf[Bundle] += elementClone
         }
