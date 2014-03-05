@@ -142,7 +142,7 @@ Chisel & Explanation & Width \\
 \verb$x >> n$ & Static right shift & \verb$w(x) - n$ \\
 \verb$Fill(n, x)$ & Replicate \verb$x$, \verb$n$ times & \verb$n * w(x)$ \\
 \verb$Cat(x, y)$ & Concatenate bits & \verb$w(x) + w(y)$ \\
-\verb$Mux(c, x, y)$ & If \verb$c$: then \verb$x$, else \verb$y$ & \verb$max(w(x), w(y))$ \\
+\verb$Mux(c, x, y)$ & If \verb$c$, then \verb$x$; else \verb$y$ & \verb$max(w(x), w(y))$ \\
 \hline
 \verb$~x$ & Bitwise NOT & \verb$w(x)$ \\
 \verb$x & y$ & Bitwise AND & \verb$max(w(x), w(y))$ \\
