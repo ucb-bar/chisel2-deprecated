@@ -90,15 +90,26 @@ abstract class Bits extends Data with proc {
     else super.litOf
 
   // internal, non user exposed connectors
-  var assigned = false;
-
-  override def assign(src: Node): Unit =
+  def checkAssign(src: Node): Unit = {
+    if (this.dir == INPUT && this.component == Module.current && this.isIo) {
+      ChiselError.error({"assigning to your own input port " + this + " RHS: " + src});
+    }
+    if (this.dir == OUTPUT && this.component != Module.current &&
+        src.component != null && src.component.parent != this.component) {
+      ChiselError.error({"assigning to a non parent module's output port: " + this + " RHS: " + src});
+    }
+  }
+  override def assign(src: Node): Unit = {
+    checkAssign(src)
     if (inputs.isEmpty) inputs += src
     else ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
+  }
 
-  override def procAssign(src: Node): Unit =
-    if (inputs.isEmpty) updates += ((genCond(), src))
+  override def procAssign(src: Node): Unit = {
+    checkAssign(src)
+    if (inputs.isEmpty) updates += ((Module.current.whenCond, src))
     else ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
+  }
 
   //code generation stuff
 
@@ -168,7 +179,8 @@ abstract class Bits extends Data with proc {
           if(this.component == other.component && !isTypeNode) {//passthrough
             other assign this
           } else if (this.component.parent == other.component.parent || isTypeNode) { //producer - consumer
-            if(other.inputs.length > 0 || other.updates.length > 0 ) {
+            if(other.inputs.length > 0 || other.updates.length > 0 || 
+               other.component.isInstanceOf[BlackBox]) { // includes when a child is a blackbox
               this assign other // only do assignment if output has stuff connected to it
             }
           } else {
@@ -201,7 +213,8 @@ abstract class Bits extends Data with proc {
             if (this.component == other.component && !isTypeNode) { //passthrough
               this assign other;
             } else if (this.component.parent == other.component.parent || isTypeNode) { //producer - consumer
-              if(this.inputs.length > 0 || this.updates.length > 0) {
+              if(this.inputs.length > 0 || this.updates.length > 0 ||
+                 this.component.isInstanceOf[BlackBox]) { // includes when a child is a black box
                 other assign this; // only do connection if I have stuff connected to me
               }
             } else {
@@ -209,11 +222,13 @@ abstract class Bits extends Data with proc {
             }
           } else if (other.dir == OUTPUT) { // output <> output connections
             if(this.component == other.component.parent) { // parent <> child
-              if(other.inputs.length > 0 || other.updates.length > 0) {
+              if(other.inputs.length > 0 || other.updates.length > 0 || 
+                 other.component.isInstanceOf[BlackBox]) { // includes when a child is a black box
                 this assign other // only do connection if child is assigning to that output
               }
             } else if (this.component.parent == other.component) { // child <> parent
-              if(this.inputs.length > 0 || this.updates.length > 0) {
+              if(this.inputs.length > 0 || this.updates.length > 0 || 
+                 this.component.isInstanceOf[BlackBox]) { // includes when a child is a black box
                 other assign this // only do connection if child (me) is assinging that output
               }
             } else if (this.isTypeNode && other.isTypeNode) { //connecting two type nodes together

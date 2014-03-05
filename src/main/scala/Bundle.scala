@@ -72,7 +72,7 @@ object sort {
 /** Defines a collection of datum of different types into a single coherent
   whole.
   */
-class Bundle(view_arg: Seq[String] = null) extends CompositeData {
+class Bundle(view_arg: Seq[String] = null) extends Aggregate {
   var dir = "";
   var view = view_arg;
   private var elementsCache: ArrayBuffer[(String, Data)] = null;
@@ -154,14 +154,14 @@ class Bundle(view_arg: Seq[String] = null) extends CompositeData {
     elementsCache = elts; this
   }
 
-  override def nameIt (path: String) {
+  override def nameIt (path: String, isNamingIo: Boolean) {
     if( !named
       && (name.isEmpty
         || (!path.isEmpty && name != path)) ) {
       name = path
       val prefix = if (name.length > 0) name + "_" else ""
       for ((n, i) <- elements) {
-        i.nameIt(prefix + n)
+        i.nameIt(prefix + n, isNamingIo)
       }
     } else {
       /* We are trying to rename a Bundle that has a fixed name. */

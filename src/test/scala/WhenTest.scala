@@ -48,7 +48,7 @@ class WhenSuite extends TestSuite {
       when(io.en) { io.out := io.in }
     }
 
-    class WhenModuleTests(m: WhenModule) extends Tester(m, Array(m.io)) {
+    class WhenModuleTests(m: WhenModule) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
@@ -77,7 +77,7 @@ class WhenSuite extends TestSuite {
       when(io.en0) { when(io.en1) { io.out := io.in } }
     }
 
-    class EmbedWhenModuleTests(m: EmbedWhenModule) extends Tester(m, Array(m.io)) {
+    class EmbedWhenModuleTests(m: EmbedWhenModule) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         List(false, true, false, true,  true, false, true,  true).zip(
@@ -114,7 +114,7 @@ class WhenSuite extends TestSuite {
       }
     }
 
-    class ElsewhenModuleTests(m: ElsewhenModule) extends Tester(m, Array(m.io)) {
+    class ElsewhenModuleTests(m: ElsewhenModule) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         List(false, true, false, true,  true, false, true,  true).zip(
@@ -135,14 +135,12 @@ class WhenSuite extends TestSuite {
 
   /** instantiate module in a when block.
     */
-  @Ignore("to fix: emit correct code with no error messages.")
   @Test def testModuleInWhenBlock() {
     class Submodule extends Module {
       val io = new Bundle {
         val in = UInt(INPUT,4)
         val out = UInt(OUTPUT,4)
       }
-      /* XXX This generates an error: NO DEFAULT SPECIFIED FOR WIRE */
       io.out := io.in
     }
 
@@ -155,11 +153,12 @@ class WhenSuite extends TestSuite {
       io.out := UInt(0)
       when( io.en ) {
         val sub = Module(new Submodule)
-        io <> sub.io
+        io.out := sub.io.out
+        io <> sub.io /* connect only io.in to sub.io.in */
       }
     }
 
-    class SubmoduleInWhenBlockTests(m: SubmoduleInWhenBlock) extends Tester(m, Array(m.io)) {
+    class SubmoduleInWhenBlockTests(m: SubmoduleInWhenBlock) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
@@ -187,7 +186,7 @@ class WhenSuite extends TestSuite {
       unless(io.en) { io.out := UInt(0) }
     }
 
-    class UnlessModuleTests(m: UnlessModule) extends Tester(m, Array(m.io)) {
+    class UnlessModuleTests(m: UnlessModule) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
@@ -218,7 +217,7 @@ class WhenSuite extends TestSuite {
       }
     }
 
-    class SwitchModuleTests(m: SwitchModule) extends Tester(m, Array(m.io)) {
+    class SwitchModuleTests(m: SwitchModule) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         (0 until 8).map { i =>

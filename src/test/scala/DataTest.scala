@@ -186,28 +186,55 @@ class DataSuite extends TestSuite {
     to be an error to so. This is fixed as well.
     */
   @Test def testBypassData() {
+    try {
     class BypassDataIO(num_bypass_ports:Int) extends Bundle() {
       val data = UInt(INPUT, width=num_bypass_ports)
-      val valid = Vec.fill(num_bypass_ports){Bool()}.asOutput
+      val valid = Vec.fill(num_bypass_ports){ Bool() }
+        // XXX Module.findRoots does not support Vec as a graph root.
+      def get_num_ports: Int = num_bypass_ports
     }
-    class BypassData extends Module {
+    class BypassDataComp extends Module {
       val io = new BypassDataIO(3)
       io.valid := io.data | UInt(1)
     }
-    class BypassDataTests(m: BypassData) extends Tester(m, Array(m.io)) {
-      defTests {
-        val vars = new HashMap[Node, Node]() 
-        (0 until 4).map { i =>
-          vars(m.io.data) = UInt(i)
-          vars(m.io.valid(0)) = Bool(true)
-          for ( j <- 1 until 3 ) {
-            vars(m.io.valid(j)) = Bool(if(((i >> j) & 1) == 1) true else false)
-          }
-          step(vars)
-        } reduce(_&&_)
-      }
+    chiselMain(Array[String]("--backend", "c",
+      "--targetDir", dir.getPath.toString()),
+      () => Module(new BypassDataComp))
+    // assertFile("DataSuite_BypassDataComp_1.h")
+    } catch {
+      case _ : Throwable => ;
     }
-    launchCppTester((m: BypassData) => new BypassDataTests(m))
+    assertTrue(!ChiselError.ChiselErrors.isEmpty);
+  }
+
+  // tests assigning to non parent's outputs
+  @Test def testAssignToChildOutput() {
+    try {
+    class Child extends Module {
+      val io = new Bundle {
+        val input  = Bits(INPUT, width = 8)
+        val output = Bits(OUTPUT, width = 8)
+      }
+      io.output := io.input
+    }
+
+    class Parent extends Module {
+      val io = new Bundle {
+        val input  = Bits(INPUT, width = 8)
+        val output = Bits(OUTPUT, width = 8)
+      }
+      val child = Module(new Child)
+      // child.io.input := io.input
+      child.io.output := io.input
+      io.output := child.io.output
+    }
+
+    chiselMain(Array[String]("--backend", "v"), () => Module(new Parent()))
+
+    } catch {
+      case _ : Throwable => ;
+    }
+    assertTrue(!ChiselError.ChiselErrors.isEmpty);
   }
 
   /** Test case derived from issue #1 reported on github.
@@ -231,9 +258,12 @@ class DataSuite extends TestSuite {
       "--targetDir", dir.getPath.toString()),
       () => Module(new CarryChainComp(4)))
     } catch {
-      case _ : Throwable => assertTrue(!ChiselError.ChiselErrors.isEmpty);
+      case _ : Throwable => ;
     }
+    assertTrue(!ChiselError.ChiselErrors.isEmpty);
   }
+
+
 
 }
 

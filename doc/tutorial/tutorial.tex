@@ -65,7 +65,7 @@
 %  %\vspace*{-0.1in}
 %  }
 
-\title{Chisel 2.1 Tutorial}
+\title{Chisel 2.2 Tutorial}
 \author{Jonathan Bachrach, Krste Asanovi\'{c}, John Wawrzynek \\
 EECS Department, UC Berkeley\\
 {\tt  \{jrb|krste|johnw\}@eecs.berkeley.edu}
@@ -716,34 +716,44 @@ object tutorial {
 \begin{center}
 \includegraphics[width=0.45\textwidth]{../tutorial/figs/DUT.pdf}
 \end{center}
-\caption{DUT run in Tester object in Scala with stdin and stdout connected}
+\caption{DUT run using a Tester object in Scala with stdin and stdout connected}
 \label{fig:dut}
 \end{figure}
  
 Testing is a crucial part of circuit design, 
-and thus in Chisel we include a mechanism for
+and thus in Chisel we provide a mechanism for
 testing circuits by providing test vectors within Scala using
 subclasses of the \code{Tester} class:
 
 \begin{scala}
-class Tester[T <: Module]
-  (val c: T, val testNodes: Array[Node])
+class Tester[T <: Module] (val c: T, val isTrace: Boolean = true) {
+  var ok: Boolean
+  val rnd: Random
+  def reset(n: Int = 1)
+  def step(n: Int): Int
+  def poke(data: Mem[T], index: Int, x: BigInt)
+  def poke(data: Bits, x: BigInt)
+  def poke(data: Aggregate, x: Array[BigInt])
+  def peek(data: Mem[T], index: Int)
+  def peek(data: Bits): BigInt
+  def peek(data: Aggregate): Array[BigInt]
+  def expect (good: Boolean, msg: String): Boolean
+  def expect (data: Bits, target: BigInt): Boolean
+}
 \end{scala}
 
 \noindent
-which binds a tester to a module, and where specify nodes to test,
-and finally where users write a \code{defTests} function.
-The definition for \code{defTests} is:
-
-\begin{scala}
-def defTests(body: => Boolean)
-\end{scala}
+which binds a tester to a module
+and allows users to write tests using the given debug protocol.  In particular, users utilize:
+\begin{itemize}
+\item \code{poke} to set input port and state values,
+\item \code{step} to execute the circuit one time unit,
+\item \code{peek} to read port and state values, and
+\item \code{expect} to compare peeked circuit values to expected arguments.
+\end{itemize}
 
 \noindent
-where \code{testNodes} are the graph nodes that will be input to and
-output from the DUT, and where
-users write calls to \code{step} in the body.  Users connect tester
-instances to modules using:
+Users connect tester instances to modules using:
 
 \begin{scala}
 object chiselMainTest {
@@ -754,56 +764,41 @@ object chiselMainTest {
 \end{scala}
 
 \noindent
-When \code{-{-}test} is given as an argument to \code{chiselMainTest}, 
-a tester instance runs the Design Under Test (DUT) is as a process
-with stdin and stdout connected so that inputs can be sent to the DUT and outputs can
-received from the DUT as shown in Figure~\ref{fig:dut}.  
+When \code{-{-}test} is given as an argument to \code{chiselMain}, a
+tester instance runs the Design Under Test (DUT) in a separate
+process with \code{stdin} and \code{stdout} connected so that debug commands can 
+be sent to the DUT and responses can be received from the DUT as shown in
+Figure~\ref{fig:dut}.
 \noindent
 
-\begin{scala}
-def step(vars: HashMap[Node, Node]): Boolean
-\end{scala}
-
-\noindent
-where \code{vars} is a mapping of test nodes to literals, 
-with assignments to input nodes being sent to the DUT and assignments to
-non-input nodes being interpreted as expected values.\footnote{Note that
-only output nodes are accessible, not internal nodes of a module.}
-\code{test} first sends inputs specified in vars, steps the DUT and then either
-compares expected values from vars or sets vars for test nodes without
-entries in \code{vars}.
-The following is an example for defining tests for \code{Mux2}:
+For example, in the following:
 
 \begin{scala}
-class Mux2Tests(c: Mux2) 
-    extends Tester(c, Array(c.io)) {  
-  defTests {
-    var allGood = true
-    val n = pow(2, 3).toInt
-    val vars = new HashMap[Node, Node]()
-    for (s <- 0 until 2) {
+class Mux2Tests(c: Mux2) extends Tester(c) {
+  val n = pow(2, 3).toInt
+  for (s <- 0 until 2) {
     for (i0 <- 0 until 2) {
-    for (i1 <- 0 until 2) {
-      vars(c.io.sel) = UInt(s)
-      vars(c.io.in1) = UInt(i1)
-      vars(c.io.in0) = UInt(i0)
-      vars(c.io.out) = UInt(if (s == 1) i1 else i0)
-      allGood = step(vars) && allGood
-    } } } 
-    allGood
+      for (i1 <- 0 until 2) {
+        poke(c.io.sel, s)
+        poke(c.io.in1, i1)
+        poke(c.io.in0, i0)
+        step(1)
+        expect(c.io.out, (if (s == 1) i1 else i0))
+      }
+    }
   }
 }
 \end{scala}
 
 \noindent
-and the following shows how it is invoked:
+assignments for each input of \verb+Mux2+ is set to the appropriate values using \verb+poke+. For this particular example, we are testing the \verb+Mux2+ by hardcoding the inputs to some known values and checking if the output corresponds to the known one. To do this, on each iteration we generate appropriate inputs to the module and tell the simulation to assign these values to the inputs of the device we are testing \verb+c+, step the circuit, and test the expected value.  
+Finally, the following shows how the tester is invoked:
 
 \begin{scala}
 chiselMainTest(args + "--test", () => new Mux2()){ 
   c => new Mux2Tests(c) 
 }
 \end{scala}
-
 
 Other command arguments are as follows:
 \begin{tabular}{lll}
@@ -1730,19 +1725,19 @@ In Chisel this can be defined as:
 % MS: just out of curiosity: does this example generate several delay lines?
 \begin{scala}
 def delays[T <: Data](x: T, n: Int): List[T] = 
-  if (n <= 1) List(x) else x :: delays(Reg(next = x), n-1)
+  if (n <= 1) List(x) else x :: Delays(RegNext(x), n-1)
 
-def innerProductFIR[T <: Num](ws: Seq[T], x: T): T = 
-  (ws, delays(x, ws.length)).zipped.
-    map( _ * _ ).reduceRight( _ + _ )
+def FIR[T <: Data with Num[T]](ws: Seq[T], x: T): T = 
+  (ws, Delays(x, ws.length)).zipped.
+    map( _ * _ ).reduce( _ + _ )
 \end{scala}
  
 \noindent
 where 
 \code{delays} creates a list of incrementally increasing delays of its input and
-\code{reduceRight} constructs a reduction circuit given a binary combiner function \code{f}.  
-In this case, \code{reduceRight} creates a summation circuit.
-Finally, the \code{innerProductFIR} function is constrained to work on inputs of type \code{Num} where Chisel multiplication and addition are defined.
+\code{reduce} constructs a reduction circuit given a binary combiner function \code{f}.  
+In this case, \code{reduce} creates a summation circuit.
+Finally, the \code{FIR} function is constrained to work on inputs of type \code{Num} where Chisel multiplication and addition are defined.
 
 \subsection{Parameterized Classes}
 

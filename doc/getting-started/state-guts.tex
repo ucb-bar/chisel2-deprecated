@@ -33,8 +33,8 @@ An example of this statement in action is shown in the following implementation 
 class StackPointer(depth:Int) extends Module {
   val io = new Bundle {
     val push = Bool(INPUT)
-    val en = Bool(INPUT)
-    val pop = Bool(INPUT)
+    val en   = Bool(INPUT)
+    val pop  = Bool(INPUT)
   }
 
   val sp = Reg(init = UInt(0, width = log2Up(depth)))
@@ -79,6 +79,9 @@ The explicit assignment to preserve the value of \verb+sp+ is redundant in this 
 
 \subsection{The unless Clause}
 
+% Martin: this feels a little bit strange as it is not a usual construct in a programming language.
+% It is simple !condition, right? So I would drop it.
+
 To complement the \verb+when+ statement, Chisel also supports an \verb+unless+ statement. The \verb+unless+ statement is a conditional assignment that triggers only if the condition is false. The general structure for the \verb+unless+ statement is:
 
 \begin{scala}
@@ -96,12 +99,12 @@ class MemorySearch extends Module {
     val done    = Bool(INPUT)
   }
   val index  = Reg(init = UInt(0, width = 3))
-  val list   = Vec(UInt(0), UInt(4), UInt(15), UInt(14), UInt(2), UInt(5), UInt(13)){ UInt(width = 4) }
+  val list   = Vec(UInt(0), UInt(4), UInt(15), UInt(14), UInt(2), UInt(5), UInt(13))
   val memVal = list(index)
 
   val done = (memVal === io.target) || (index === UInt(7))
 
-  unless (done === Bool(true)) {
+  unless (done) {
     index := index + UInt(1)
   }
   io.done    := done
@@ -193,6 +196,8 @@ Likewise, if we wanted a synchronous read 128 entry memory of 32 bit UInt types,
 val syncMem = Mem(UInt(width = 32), 128, seqRead = true)
 \end{scala}
 
+% this needs more elaboration. Memories in hardware are tough...
+
 By default, Chisel will assume that the read behavior is combinational.
 
 \subsection{Adding Write Ports}
@@ -269,7 +274,10 @@ when (re) {
 
 \subsection{Example of Mem in Action}
 
-We introduced a basic stack pointer bookkeeping example earlier in the tutorial. In this section we show how the complete stack implementation would look like.
+% Martin: no, it was not yet shown
+%We introduced a basic stack pointer bookkeeping example earlier in the tutorial. In this section we show how the complete stack implementation would look like.
+
+Here we provide a small example of using a memory by implementing a stack.
 
 Suppose we would like to implement a stack that takes two signals \verb+push+ and \verb+pop+ where \verb+push+ tells the stack to push an input \verb+dataIn+ to the top of the stack, and \verb+pop+ tells the stack to pop off the top value from the stack. Furthermore, an enable signal \verb+en+ disables pushing or popping if not asserted. Finally, the stack should always output the top value of the stack.
 

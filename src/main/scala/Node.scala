@@ -48,12 +48,6 @@ object Node {
     s
   }
 
-  var isCoercingArgs = true;
-  val conds = new Stack[Bool]();
-  conds.push(Bool(true));
-  // XXX ??
-  val keys  = new Stack[Bits]();
-
   var isInGetWidth = false
 
   def fixWidth(w: Int) = {
@@ -158,16 +152,23 @@ abstract class Node extends nameable {
     inferWidth = fixWidth(w);
   }
 
-  def nameIt (path: String) {
-    if( !named ) {
+  def nameIt (path: String, isNamingIo: Boolean) {
+    if( (!isIo && !named) || (isIo && isNamingIo) ) {
       /* If the name was set explicitely through *setName*,
        we don't override it. */
       name = path;
     }
+    while (!(component.names.getOrElseUpdate(name, this) eq this))
+      name += "_"
   }
 
-  def setVarName (name_ : String) {
-    varName = name_;
+  lazy val chiselName = this match {
+    case l: Literal => "";
+    case any        =>
+      if (name != "" && (name != "reset") && !(component == null)) 
+        component.getPathName(".") + "." + name
+      else
+        ""
   }
 
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS

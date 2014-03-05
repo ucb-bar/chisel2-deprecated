@@ -66,11 +66,6 @@ object Module {
   var isGenHarness = false;
   var isReportDims = false;
   var isPruning = false;
-  var scanFormat = "";
-  var scanArgs: ArrayBuffer[Node] = null;
-  var printFormat = "";
-  var printArgs: ArrayBuffer[Node] = null;
-  var tester: Tester[Module] = null;
   var includeArgs: List[String] = Nil;
   var targetDir: String = null;
   var isEmittingComponents = false;
@@ -82,7 +77,6 @@ object Module {
   val components = ArrayBuffer[Module]();
   var sortedComps: ArrayBuffer[Module] = null
   val procs = ArrayBuffer[proc]();
-  val resetList = ArrayBuffer[Node]();
   val muxes = ArrayBuffer[Node]();
   val nodes = ArrayBuffer[Node]()
   val blackboxes = ArrayBuffer[BlackBox]()
@@ -101,6 +95,12 @@ object Module {
   var implicitReset: Bool = null
   var implicitClock: Clock = null
 
+  /* Jackhammer flags */
+  var jackDump: String = null;
+  var jackDir: String = null;
+  var jackLoad: String = null;
+  //var jackDesign: String = null;
+
   /* Any call to a *Module* constructor without a proper wrapping
    into a Module.apply() call will be detected when trigger is false. */
   var trigger: Boolean = false
@@ -113,6 +113,10 @@ object Module {
     val res = c
     pop()
     for ((n, io) <- res.wires) {
+      if (io.dir == null)
+         ChiselErrors += new ChiselError(() => {"All IO's must be ports (dir set): " + io}, io.line);
+      // else if (io.width_ == -1)
+      //   ChiselErrors += new ChiselError(() => {"All IO's must have width set: " + io}, io.line);
       io.isIo = true
     }
     res
@@ -136,11 +140,6 @@ object Module {
     isClockGatingUpdatesInline = false;
     isVCD = false;
     isReportDims = false;
-    scanFormat = "";
-    scanArgs = new ArrayBuffer[Node]();
-    printFormat = "";
-    printArgs = new ArrayBuffer[Node]();
-    tester = null;
     targetDir = "."
     components.clear();
     compStack.clear();
@@ -148,7 +147,6 @@ object Module {
     printfs.clear();
     printStackStruct.clear();
     procs.clear();
-    resetList.clear()
     muxes.clear();
     blackboxes.clear();
     ioMap.clear()
@@ -176,11 +174,7 @@ object Module {
     clk = UInt(INPUT, 1)
     clk.setName("clk")
 
-    isCoercingArgs = true
     isInGetWidth = false
-    conds.clear()
-    conds.push(Bool(true))
-    keys.clear()
   }
 
   //component stack handling stuff
@@ -221,8 +215,9 @@ object Module {
     }
   }
 
+  // XXX Remove and instead call current()
   def getComponent(): Module = if(compStack.length != 0) compStack.top else null
-  def current: Module = compStack.top
+  def current: Module = getComponent
 
   def setAsTopComponent(mod: Module) {
     topComponent = mod;
@@ -268,12 +263,19 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   val children = new ArrayBuffer[Module];
   val debugs = HashSet[Node]();
 
+  val switchKeys = Stack[Bits]()
+  val whenConds = Stack[Bool]()
+  private lazy val trueCond = Bool(true)
+  def hasWhenCond: Boolean = !whenConds.isEmpty
+  def whenCond: Bool = if (hasWhenCond) whenConds.top else trueCond
+
   val nodes = new ArrayBuffer[Node]
-  val mods  = new ArrayBuffer[Node];
+  val mods = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
 
   val regs  = new ArrayBuffer[Reg];
   val nexts = new ScalaQueue[Node];
+  val names = new HashMap[String, Node]
   var nindex = -1;
   var defaultWidth = 32;
   var pathParent: Module = null;
@@ -347,6 +349,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   def io: Data
+
   def nextIndex : Int = { nindex = nindex + 1; nindex }
 
   var isWalking = new HashSet[Node];
@@ -374,7 +377,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   def printf(message: String, args: Node*): Unit = {
-    val p = new Printf(conds.top && !this.reset, message, args)
+    val p = new Printf(Module.current.whenCond && !this.reset, message, args)
     printfs += p
     debug(p)
     p.inputs.foreach(debug _)
@@ -740,6 +743,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   // 1) name the component
   // 2) name the IO
   // 3) name and set the component of all statically declared nodes through introspection
+  // 4) set variable names
   /* XXX deprecated. make sure containsReg and isClk are set properly. */
   def markComponent() {
     ownIo();
@@ -757,6 +761,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
          o match {
          case node: Node => {
            if (node.isReg || node.isClkInput) containsReg = true;
+           node.getNode.varName = name
          }
          case buf: ArrayBuffer[_] => {
            /* We would prefer to match for ArrayBuffer[Node] but that's
@@ -765,15 +770,17 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             in Module that are solely there for implementation purposes. */
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
              val nodebuf = buf.asInstanceOf[Seq[Node]];
-             for(elm <- nodebuf){
+             for((elm, i) <- nodebuf.zipWithIndex){
                if (elm.isReg || elm.isClkInput) {
                  containsReg = true;
                }
+               elm.getNode.varName = name + "_" + i
              }
            }
          }
          case cell: Cell => {
            if(cell.isReg) containsReg = true;
+           cell.varName = name
          }
          case bb: BlackBox => {
            bb.pathParent = this;

@@ -38,7 +38,7 @@ class ConnectSuite extends TestSuite {
       us.io.in <> io.in
       io.out <> us.io.out
     }
-    class ShimConnectionsTests(m: UsesShimParent) extends Tester(m, Array(m.io)) {
+    class ShimConnectionsTests(m: UsesShimParent) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         (0 until 4).map { i =>
@@ -82,7 +82,7 @@ class ConnectSuite extends TestSuite {
       srs.io.in := io.in
       io.out := srs.io.out
     }
-    class SuppliesResetsTests(m: SuppliesResetsParent) extends Tester(m, Array(m.io)) {
+    class SuppliesResetsTests(m: SuppliesResetsParent) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         List(true,false,false,false,false,false).zip(
@@ -115,7 +115,7 @@ class ConnectSuite extends TestSuite {
       b.io.in := io.in
       io.out := b.io.out
     }
-    class UnrelatedSubmodulesTests(m: Unrelated) extends Tester(m, Array(m.io)) {
+    class UnrelatedSubmodulesTests(m: Unrelated) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         (0 until 4).map { i =>
@@ -143,7 +143,7 @@ class ConnectSuite extends TestSuite {
       a2.io.in := x
       io.out := a2.io.out
     }
-    class LogicBtwInstancesTests(m: LogicBtwInstances) extends Tester(m, Array(m.io)) {
+    class LogicBtwInstancesTests(m: LogicBtwInstances) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         (0 until 4).map { i =>
@@ -174,7 +174,7 @@ class ConnectSuite extends TestSuite {
       aInC.io.in := io.in
       io.out := aInC.io.out | aInB.io.out
     }
-    class OneInstancePerRelationTests(m: C) extends Tester(m, Array(m.io)) {
+    class OneInstancePerRelationTests(m: C) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         (0 until 4).map { i =>
@@ -198,7 +198,7 @@ class ConnectSuite extends TestSuite {
       aInB.io.in := io.in
       io.out := aInB.io.out
     }
-    class InstanceSuperclassTests(m: B) extends Tester(m, Array(m.io)) {
+    class InstanceSuperclassTests(m: B) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         (0 until 4).map { i =>
@@ -225,7 +225,7 @@ class ConnectSuite extends TestSuite {
       }
       io.status := reg_status
     }
-    class RegisterHookTests(m: A) extends Tester(m, Array(m.io)) {
+    class RegisterHookTests(m: A) extends MapTester(m, Array(m.io)) {
       defTests {
         val vars = new HashMap[Node, Node]() 
         List(1,     2,     4,     6,     8,     12,    15,   15).zip(
@@ -241,6 +241,37 @@ class ConnectSuite extends TestSuite {
       }
     }
     launchCppTester((m: A) => new RegisterHookTests(m))
+  }
+
+  // tests flagging bad cross module references
+  @Test def testCrossModuleReferences() {
+    try {
+      class ForeignMod extends Module {
+        val io = new Bundle {
+          val input  = UInt(INPUT, width = 8)
+          val output = UInt(OUTPUT, width = 8)
+        }
+        val add = io.input + io.input
+        io.output := add + UInt(1)
+      }
+
+      class ForeignRef extends Module {
+        val io = new Bundle {
+          val input  = Bits(INPUT, width = 8)
+          val output = Bits(OUTPUT, width = 8)
+        }
+        val foreign = Module(new ForeignMod)
+        io.output := io.input + foreign.add
+      }
+
+      chiselMain(Array[String]("--v",
+        "--targetDir", dir.getPath.toString), 
+        () => Module(new ForeignRef()))
+
+    } catch {
+      case _ : Throwable => ;
+    }
+    assertTrue(!ChiselError.ChiselErrors.isEmpty);
   }
 
 }

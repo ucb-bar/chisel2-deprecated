@@ -1,4 +1,5 @@
 module NameSuite_VecComp_1(input clk,
+    input [63:0] io_pcr_req_data,
     input  io_r_en,
     input [4:0] io_r_addr,
     input [63:0] io_w_data,

@@ -417,13 +417,21 @@ try {
     */
   @Test def testArbiter() {
     println("\ntestArbiter ...")
-try {
-    class ArbiterTest extends Arbiter(SInt(width=8), 4) {
-    }
+    try {
+      def gen = SInt(width=8)
+      val n = 4
+      class ArbiterTest extends Module {
+        val io = new ArbiterIO(gen, n) {
+          val fire = Bool(OUTPUT)
+        }
+        val arb = Module(new Arbiter(gen, n))
+        io <> arb.io
+        io.fire := arb.io.out.fire()
+      }
 
-    chiselMain(Array[String]("--v",
-      "--targetDir", dir.getPath.toString()),
-      () => Module(new ArbiterTest()))
+      chiselMain(Array[String]("--v",
+        "--targetDir", dir.getPath.toString()),
+        () => Module(new ArbiterTest()))
     } catch {
       case e => e.printStackTrace()
     }

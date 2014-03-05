@@ -38,9 +38,9 @@ import ChiselError._
 
 object when {
   def execWhen(cond: Bool)(block: => Unit) {
-    conds.push(conds.top && cond);
-    block;
-    conds.pop();
+    Module.current.whenConds.push(Module.current.whenCond && cond)
+    block
+    Module.current.whenConds.pop()
   }
   def apply(cond: Bool)(block: => Unit): when = {
     execWhen(cond){ block }
@@ -55,7 +55,7 @@ class when (prevCond: Bool) {
   }
   def otherwise (block: => Unit) {
     val cond = !prevCond
-    if (conds.length == 1) cond.canBeUsedAsDefault = true
+    if (!Module.current.hasWhenCond) cond.canBeUsedAsDefault = true
     when.execWhen(cond){ block }
   }
 }
@@ -68,27 +68,20 @@ object unless {
 
 object switch {
   def apply(c: Bits)(block: => Unit) {
-    keys.push(c);
-    block;
-    keys.pop();
+    Module.current.switchKeys.push(c)
+    block
+    Module.current.switchKeys.pop()
   }
 }
 object is {
-  def apply(v: Bits)(block: => Unit) {
-    if (keys.length == 0) {
-      ChiselError.error("NO KEY SPECIFIED");
-    } else {
-      val c = keys(0) === v;
-      when (c) { block; }
-    }
-  }
-  def apply(v: Bits, vr: Bits*)(block: => Unit) {
-    if (keys.length == 0) {
-      ChiselError.error("NO KEY SPECIFIED");
-    } else {
-      val c = vr.foldLeft(keys(0) === v)( (p: Bool, v: Bits) => keys(0) === v || p );
-      when (c) { block; }
-    }
+  def apply(v: Bits)(block: => Unit): Unit =
+    apply(Seq(v))(block)
+  def apply(v: Bits, vr: Bits*)(block: => Unit): Unit =
+    apply(v :: vr.toList)(block)
+  def apply(v: Iterable[Bits])(block: => Unit): Unit = {
+    val keys = Module.current.switchKeys
+    if (keys.isEmpty) ChiselError.error("The 'is' keyword may not be used outside of a switch.")
+    else if (!v.isEmpty) when (v.map(_ === keys.top).reduce(_||_)) { block }
   }
 }
 
@@ -168,7 +161,13 @@ object chiselMain {
         case "--include" => Module.includeArgs = Module.splitArg(args(i + 1)); i += 1;
         case "--checkPorts" => Module.isCheckingPorts = true
         case "--prune" => Module.isPruning = true
-        case any => ChiselError.warning("'" + arg + "' is an unkown argument.");
+        //Jackhammer Flags
+        //case "--jEnable" => Module.jackEnable = true
+        case "--jackDump" => Module.jackDump = args(i+1); i+=1; //mode of dump (i.e. space.prm, design.prm etc)
+        case "--jackDir"  => Module.jackDir = args(i+1); i+=1;  //location of dump or load
+        case "--jackLoad" => Module.jackLoad = args(i+1); i+=1; //design.prm file
+        //case "--jDesign" =>  Module.jackDesign = args(i+1); i+=1;
+        case any => ChiselError.warning("'" + arg + "' is an unknown argument.");
       }
       i += 1;
     }
@@ -177,32 +176,35 @@ object chiselMain {
   def run[T <: Module] (args: Array[String], gen: () => T): T = apply(args, () => Module(gen())) // hack to avoid supplying default parameters and invoke Module.apply manually for invocation in sbt
 
   def apply[T <: Module]
-      (args: Array[String], gen: () => T,
-       scanner: T => TestIO = null, printer: T => TestIO = null, ftester: T => Tester[T] = null): T = {
+      (args: Array[String], gen: () => T, ftester: T => Tester[T] = null) = {
     Module.initChisel();
     readArgs(args)
 
     try {
+      /* JACK - If loading design, read design.prm file*/
+      if (Module.jackLoad != null) { Jackhammer.load(Module.jackDir, Module.jackLoad) }
       val c = gen();
-      if (scanner != null) {
-        val s = scanner(c);
-        Module.scanArgs  ++= s.args;
-        for (a <- s.args) a.isScanArg = true
-        Module.scanFormat  = s.format;
+
+      /* JACK - If dumping design, dump to jackDir with jackNumber points*/
+      if (Module.jackDump != null) { 
+        Jackhammer.dump(Module.jackDir, Module.jackDump) 
+      } else {
+        Module.backend.elaborate(c)
       }
-      if (printer != null) {
-        val p = printer(c);
-        Module.printArgs   ++= p.args;
-        for(a <- p.args) a.isPrintArg = true
-        Module.printFormat   = p.format;
-      }
-      if (ftester != null) {
-        Module.tester = ftester(c)
-      }
-      Module.backend.elaborate(c)
       if (Module.isCheckingPorts) Module.backend.checkPorts(c)
       if (Module.isCompiling && Module.isGenHarness) Module.backend.compile(c)
-      if (Module.isTesting) Module.tester.tests()
+      if (ftester != null && !Module.backend.isInstanceOf[VerilogBackend]) {
+        var res = false
+        var tester: Tester[T] = null
+        try {
+          tester = ftester(c)
+        } finally {
+          if (tester != null && tester.process != null) 
+            res = tester.endTesting()
+        }
+        println(if (res) "PASSED" else "*** FAILED ***")
+        if(!res) throwException("Module under test FAILED at least one test vector.")
+      }
       c
     } finally {
       ChiselError.report()
@@ -223,12 +225,11 @@ object throwException {
 
 object chiselMainTest {
   def apply[T <: Module](args: Array[String], gen: () => T)(tester: T => Tester[T]): T =
-    chiselMain(args, gen, null, null, tester)
+    chiselMain(args, gen, tester)
 }
 
 trait proc extends Node {
   val updates = new collection.mutable.ListBuffer[(Bool, Node)]
-  def genCond(): Bool = conds.top;
   def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
     val update = others.foldLeft(default)((v, u) => Multiplex(u._1, u._2, v))
     if (inputs.isEmpty) inputs += update else inputs(0) = update
