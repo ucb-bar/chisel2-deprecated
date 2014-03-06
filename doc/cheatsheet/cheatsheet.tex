@@ -202,17 +202,20 @@ val my_bundle = new Bundle {
 \verb$my_bundle.a := Bool(true)$
 
 \subsection{Vec } is an indexable vector of \verb$Data$ types
-\subsubsection{Constructor}: \newline
+\subsubsection{Constructors}: \newline
+\verb$val myVec = Vec(elts:Iterable[Data])$ \newline
+\begin{tabular}{l l l}
+& \verb$elts$ & initial element \verb$Data$  \\
+\end{tabular}
+
 \verb$val myVec = Vec.fill(n:Int) {gen:Data}$ \newline
 \begin{tabular}{l l l}
 & \verb$n$ & vector depth (elements) \\
-& \verb$gen$ & initial element data, called once per element \\
+& \verb$gen$ & initial element \verb$Data$, called once per element \\
 \end{tabular}
-\subsubsection{Using}: access elements by indexing: \newline
-\verb$readVal := myVec(ind:Data)$ (dynamic index) \newline
-\verb$readVal := myVec(idx:Int)$ (static index) \newline
-\verb$myVec(ind:Data) := writeVal$ (dynamic index) \newline
-\verb$myVec(idx:Int) := writeVal$ (static index)
+\subsubsection{Using}: access elements by dynamic or static indexing: \newline
+\verb$readVal := myVec(ind:Data/idx:Int)$ \newline
+\verb$myVec(ind:Data/idx:Int) := writeVal$
 
 \section{Modules } \hrulefill
 \subsubsection{Defining}: subclass \verb$Module$ with elements and code: \newline
@@ -282,8 +285,7 @@ sum := Adder(UInt(1), some_data)
 \subsection{If/For } can be used to control hardware generation \newline
 \phantom{x} and is equivalent to Verilog \verb$generate if$/\verb$for$
 
-\section{Standard Library: Functions } \hrulefill
-\subsection{Math and Hardware Generation Helpers}: \newline
+\subsection{Math Helpers}: \newline
 \verb$log2Up(in:Int): Int$ \newline
 \phantom{x} $log_2(\texttt{in})$ rounded up \newline
 \verb$log2Down(in:Int): Int$ \newline
@@ -291,7 +293,9 @@ sum := Adder(UInt(1), some_data)
 \verb$isPow2(in:Int): Boolean$ \newline
 \phantom{x} \verb$True$ if \verb$in$ is a power of 2
 
-\subsection{Functional Blocks, Stateless}: \newline
+
+\section{Standard Library: Function Blocks } \hrulefill
+\subsection{Stateless}: \newline
 \verb$PopCount(in:Bits/Seq[Bool]): UInt$ \newline
 \phantom{x} Returns number of hot (= 1) bits in \verb$in$
 
@@ -333,7 +337,7 @@ sum := Adder(UInt(1), some_data)
 \verb$PriorityEncoderOH(in:Bits): UInt$ \newline
 \phantom{x} Returns the position of the hot bit in \verb$in$
 
-\subsection{Functional Blocks, Stateful}: \newline
+\subsection{Stateful}: \newline
 \verb$LFSR16([increment:Bool]): UInt$ \newline
 \begin{tabular}{l l l}
 & \multicolumn{2}{l}{16-bit LFSR (to generate pseudorandom numbers)} \\
