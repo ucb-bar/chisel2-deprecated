@@ -4,9 +4,9 @@ module DelaySuite_ROMModule_1(
 );
 
   wire[3:0] T0;
-  wire[3:0] c;
-  wire[3:0] b;
-  wire[3:0] a;
+  wire[3:0] rom_2c;
+  wire[3:0] rom_1b;
+  wire[3:0] rom_0a;
 
   assign io_out = T0;
   assign T0 = 
@@ -17,8 +17,8 @@ module DelaySuite_ROMModule_1(
     :$random()
 `endif
     ;
-  assign c = 4'h3;
-  assign b = 4'h2;
-  assign a = 4'h1;
+  assign rom_2c = 4'h3;
+  assign rom_1b = 4'h2;
+  assign rom_0a = 4'h1;
 endmodule
 
