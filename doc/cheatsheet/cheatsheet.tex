@@ -283,6 +283,52 @@ sum := Adder(UInt(1), some_data)
 \phantom{x} and is equivalent to Verilog \verb$generate if$/\verb$for$
 
 \section{Standard Library: Function Blocks } \hrulefill
+\verb$PopCount(in:Bits/Seq[Bool]): UInt$ \newline
+\begin{tabular}{l l l}
+& \multicolumn{2}{l}{Returns number of bits set (= 1) in \texttt{in}} \\
+& \verb$in$ & input to count \verb$1$s \\
+\end{tabular}
+
+\verb$Reverse(in:UInt): UInt$ \newline
+\begin{tabular}{l l l}
+& \multicolumn{2}{l}{Reverses the bit order of \texttt{in}} \\
+& \verb$in$ & input to reverse \\
+\end{tabular}
+
+\verb$UIntToOH(in:UInt, width:Int): Bits$ \newline
+\begin{tabular}{l l l}
+& \multicolumn{2}{l}{Returns the one-hot encoding of \texttt{in}} \\
+& \verb$in$ & numerical input \\
+& \verb$width$ & {\em(optional)} output width (inferred if unspecified) \\
+\end{tabular}
+
+\verb$OHToUInt(in:Bits/Seq[Bool]): UInt$ \newline
+\begin{tabular}{l l l}
+& \multicolumn{2}{l}{Returns the numerical representation of one-hot \texttt{in}} \\
+& \verb$in$ & one-hot input \\
+\end{tabular}
+
+\verb$PriorityMux(in:Iterable[(Bits, Bool]): Bits$ \newline
+\verb$PriorityMux(sel:Bits/Iterable[Bool],$ \newline
+\verb$            in:Iterable[Bits]): Bits$ \newline
+\begin{tabular}{l l l}
+& \multicolumn{2}{l}{A mux with multiple select signals, prioritizing the first} \\
+& \verb$in$ & \verb$Iterable[(Bits, Bool)]$ combined input and select \\
+& \verb$in$ & \verb$Iterable[Bits]$ mux inputs \\
+& \verb$sel$ & select signals or bitvector, one per input \\
+\end{tabular}
+
+\verb$PriorityEncoder(in:Bits/Iterable[Bool]): UInt$ \newline
+\begin{tabular}{l l l}
+& \multicolumn{2}{l}{Returns the position the least significant \texttt{1} in \texttt{in}} \\
+& \verb$in$ & input bitvector \\
+\end{tabular}
+
+\verb$PriorityEncoderOH(in:Bits): UInt$ \newline
+\begin{tabular}{l l l}
+& \multicolumn{2}{l}{Returns the position of the hot bit in \texttt{in}} \\
+& \verb$in$ & one-hot input \\
+\end{tabular}
 
 \section{Standard Library: Interfaces } \hrulefill
 \subsection{DecoupledIO } is a \verb$Bundle$ with a ready-valid interface,\newline
