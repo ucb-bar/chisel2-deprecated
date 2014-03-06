@@ -293,29 +293,19 @@ sum := Adder(UInt(1), some_data)
 
 \subsection{Functional Blocks, Stateless}: \newline
 \verb$PopCount(in:Bits/Seq[Bool]): UInt$ \newline
-\begin{tabular}{l l l}
-& \multicolumn{2}{l}{Returns number of bits set (= 1) in \texttt{in}} \\
-& \verb$in$ & input to count \verb$1$s \\
-\end{tabular}
+\phantom{x} Returns number of hot (= 1) bits in \verb$in$
 
 \verb$Reverse(in:UInt): UInt$ \newline
-\begin{tabular}{l l l}
-& \multicolumn{2}{l}{Reverses the bit order of \texttt{in}} \\
-& \verb$in$ & input to reverse \\
-\end{tabular}
+\phantom{x} Reverses the bit order of \verb$in$
 
-\verb$UIntToOH(in:UInt, width:Int): Bits$ \newline
+\verb$UIntToOH(in:UInt, [width:Int]): Bits$ \newline
 \begin{tabular}{l l l}
 & \multicolumn{2}{l}{Returns the one-hot encoding of \texttt{in}} \\
-& \verb$in$ & numerical input \\
 & \verb$width$ & {\em(optional)} output width (inferred if unspecified) \\
 \end{tabular}
 
 \verb$OHToUInt(in:Bits/Seq[Bool]): UInt$ \newline
-\begin{tabular}{l l l}
-& \multicolumn{2}{l}{Returns the numerical representation of one-hot \texttt{in}} \\
-& \verb$in$ & one-hot input \\
-\end{tabular}
+\phantom{x} Returns the \verb$UInt$ representation of one-hot \verb$in$
 
 \verb$Mux1H(in:Iterable[(Data, Bool]): Data$ \newline
 \verb$Mux1H(sel:Bits/Iterable[Bool],$ \newline
@@ -338,16 +328,10 @@ sum := Adder(UInt(1), some_data)
 \end{tabular}
 
 \verb$PriorityEncoder(in:Bits/Iterable[Bool]): UInt$ \newline
-\begin{tabular}{l l l}
-& \multicolumn{2}{l}{Returns the position the least significant \texttt{1} in \texttt{in}} \\
-& \verb$in$ & input bitvector \\
-\end{tabular}
+\phantom{x} Returns the position the least significant \verb$1$ in \verb$in$
 
 \verb$PriorityEncoderOH(in:Bits): UInt$ \newline
-\begin{tabular}{l l l}
-& \multicolumn{2}{l}{Returns the position of the hot bit in \texttt{in}} \\
-& \verb$in$ & one-hot input \\
-\end{tabular}
+\phantom{x} Returns the position of the hot bit in \verb$in$
 
 \subsection{Functional Blocks, Stateful}: \newline
 \verb$LFSR16([increment:Bool]): UInt$ \newline
@@ -358,9 +342,7 @@ sum := Adder(UInt(1), some_data)
 
 \verb$ShiftRegister(n:Int, in:Data, [en:Bool]): Data$ \newline
 \begin{tabular}{l l l}
-& \multicolumn{2}{l}{Shift register, returns $n$-cycle delayed input} \\
-& \verb$n$ & delay cycles \\
-& \verb$in$ & input to delay \\
+& \multicolumn{2}{l}{Shift register, returns \texttt{n}-cycle delayed input \texttt{in}} \\
 & \verb$en$ & {\em(optional, default True)} enable \\
 \end{tabular}
 
