@@ -238,7 +238,7 @@ val sum := my_module.io.out
 
 \columnbreak
 
-\section{State Elements } \hrulefill
+\section{State Elements } \hrulefill\
 \subsection{Registers } retain state until updated
 \subsubsection{Constructor}: \newline
 \verb$val my_reg = Reg([outType:Data], [next:Data],$ \newline
@@ -282,7 +282,16 @@ sum := Adder(UInt(1), some_data)
 \subsection{If/For } can be used to control hardware generation \newline
 \phantom{x} and is equivalent to Verilog \verb$generate if$/\verb$for$
 
-\section{Standard Library: Function Blocks } \hrulefill
+\section{Standard Library: Functions } \hrulefill
+\subsection{Math and Hardware Generation Helpers}: \newline
+\verb$log2Up(in:Int): Int$ \newline
+\phantom{x} $log_2(\texttt{in})$ rounded up \newline
+\verb$log2Down(in:Int): Int$ \newline
+\phantom{x} $log_2(\texttt{in})$ rounded down \newline
+\verb$isPow2(in:Int): Boolean$ \newline
+\phantom{x} \verb$True$ if \verb$in$ is a power of 2
+
+\subsection{Functional Blocks, Stateless}: \newline
 \verb$PopCount(in:Bits/Seq[Bool]): UInt$ \newline
 \begin{tabular}{l l l}
 & \multicolumn{2}{l}{Returns number of bits set (= 1) in \texttt{in}} \\
@@ -308,13 +317,23 @@ sum := Adder(UInt(1), some_data)
 & \verb$in$ & one-hot input \\
 \end{tabular}
 
-\verb$PriorityMux(in:Iterable[(Bits, Bool]): Bits$ \newline
+\verb$Mux1H(in:Iterable[(Data, Bool]): Data$ \newline
+\verb$Mux1H(sel:Bits/Iterable[Bool],$ \newline
+\verb$      in:Iterable[Data]): Data$ \newline
+\begin{tabular}{l l l}
+& \multicolumn{2}{l}{A mux tree with a one-hot select} \\
+& \verb$in$ & iterable of combined input and select \verb$(Bool, Data)$ \\
+& & tuples or just mux input \verb$Data$ \\
+& \verb$sel$ & select signals or bitvector, one per input \\
+\end{tabular}
+
+\verb$PriorityMux(in:Iterable[(Bool, Bits]): Bits$ \newline
 \verb$PriorityMux(sel:Bits/Iterable[Bool],$ \newline
 \verb$            in:Iterable[Bits]): Bits$ \newline
 \begin{tabular}{l l l}
-& \multicolumn{2}{l}{A mux with multiple select signals, prioritizing the first} \\
-& \verb$in$ & \verb$Iterable[(Bits, Bool)]$ combined input and select \\
-& \verb$in$ & \verb$Iterable[Bits]$ mux inputs \\
+& \multicolumn{2}{l}{A mux tree with multiple selects, prioritizing the first} \\
+& \verb$in$ & iterable of combined input and select \verb$(Bool, Bits)$ \\
+& & tuples or just mux input \verb$Bits$ \\
 & \verb$sel$ & select signals or bitvector, one per input \\
 \end{tabular}
 
@@ -328,6 +347,21 @@ sum := Adder(UInt(1), some_data)
 \begin{tabular}{l l l}
 & \multicolumn{2}{l}{Returns the position of the hot bit in \texttt{in}} \\
 & \verb$in$ & one-hot input \\
+\end{tabular}
+
+\subsection{Functional Blocks, Stateful}: \newline
+\verb$LFSR16([increment:Bool]): UInt$ \newline
+\begin{tabular}{l l l}
+& \multicolumn{2}{l}{16-bit LFSR (to generate pseudorandom numbers)} \\
+& \verb$increment$ & {\em(optional, default True)} shift on next clock \\
+\end{tabular}
+
+\verb$ShiftRegister(n:Int, in:Data, [en:Bool]): Data$ \newline
+\begin{tabular}{l l l}
+& \multicolumn{2}{l}{Shift register, returns $n$-cycle delayed input} \\
+& \verb$n$ & delay cycles \\
+& \verb$in$ & input to delay \\
+& \verb$en$ & {\em(optional, default True)} enable \\
 \end{tabular}
 
 \section{Standard Library: Interfaces } \hrulefill
