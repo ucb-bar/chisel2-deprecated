@@ -580,7 +580,11 @@ class CppBackend extends Backend {
     } else {
       harness.write("  FILE *f = NULL;\n");
     }
-    harness.write("  FILE *tee = fopen(\"" + name + ".stdin\", \"w\");\n");
+    if (Module.dumpTestInput) {
+      harness.write("  FILE *tee = fopen(\"" + name + ".stdin\", \"w\");\n");
+    } else {
+      harness.write("  FILE *tee = NULL;");
+    }
     harness.write("  c->read_eval_print(f, tee);\n");
     harness.write("  fclose(f);\n");
     harness.write("  fclose(tee);\n");
