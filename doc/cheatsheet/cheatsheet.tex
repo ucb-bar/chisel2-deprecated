@@ -62,7 +62,7 @@ Arguments in brackets (\texttt{[...]}) are optional.
 \subsection{Chisel Wire Operators}: \newline
 \begin{tabular}{l l}
 \verb$val x = UInt()$ & Allocate \verb$a$ as wire of type \verb$UInt()$ \\
-\verb$x := y$ & Assign \verb$y$ to wire \verb$x$ \\
+\verb$x := y$ & Assign (connect) wire \verb$y$ to wire \verb$x$ \\
 \verb$x <> y$ & Connect \verb$x$ and \verb$y$, wire directionality \\
  & is automatically inferred \\
 \end{tabular}
@@ -282,11 +282,13 @@ sum := Adder(UInt(1), some_data)
 \subsection{If/For } can be used to control hardware generation \newline
 \phantom{x} and is equivalent to Verilog \verb$generate if$/\verb$for$
 
-\section{Standard Library } \hrulefill
+\section{Standard Library: Function Blocks } \hrulefill
+
+\section{Standard Library: Interfaces } \hrulefill
 \subsection{DecoupledIO } is a \verb$Bundle$ with a ready-valid interface,\newline
 \phantom{x} where the consumer should flip the interface:
 \subsubsection{Constructor}: \newline
-\verb$val my_readyvalid = Decoupled(gen:Data)$ \newline
+\verb$Decoupled(gen:Data)$ \newline
 \begin{tabular}{l l l}
 & \verb$gen$ & Chisel \verb$Data$ to wrap ready-valid protocol around \\
 \end{tabular}
@@ -300,7 +302,7 @@ sum := Adder(UInt(1), some_data)
 \subsection{ValidIO } is a \verb$Bundle$ with a valid interface,\newline
 \phantom{x} where the consumer should flip the interface
 \subsubsection{Constructor}: \newline
-\verb$val my_valid = Valid(gen:Data)$ \newline
+\verb$Valid(gen:Data)$ \newline
 \begin{tabular}{l l l}
 & \verb$gen$ & Chisel \verb$Data$ to wrap valid protocol around \\
 \end{tabular}
@@ -315,7 +317,7 @@ sum := Adder(UInt(1), some_data)
 \verb$Arbiter$ prioritizes lower producers \newline
 \verb$RRArbiter$ runs in round-robin order
 \subsubsection{Constructor}: \newline
-\verb$val arb = Arbiter(gen:Data, n:Int)$ \newline
+\verb$Arbiter(gen:Data, n:Int)$ \newline
 \begin{tabular}{l l l}
 & \verb$gen$ & data type \\
 & \verb$n$ & number of producers \\
@@ -323,8 +325,43 @@ sum := Adder(UInt(1), some_data)
 \subsubsection{Interface}: \newline
 \begin{tabular}{l l l}
 & \verb$.io.in$ & \verb$Vec$ of \verb$DecoupledIO$ inputs \\
-& \verb$.io.out$ & output as \verb$DecoupledIO$ \\
+& \verb$.io.out$ & \verb$DecoupledIO$ output \\
+& \verb$.io.chosen$ & \verb$UInt$ input index on \verb$.io.out$, \\
+& & does not imply output is valid \\
 \end{tabular}
+
+\subsection{Queue } is a \verb$Module$ providing a hardware queue
+\subsubsection{Constructor}: \newline
+\verb$Queue(enq:DecoupledIO, entries:Int)$ \newline
+\begin{tabular}{l l l}
+& \verb$enq$ & \verb$DecoupledIO$ source for the queue \\
+& \verb$entries$ & size of queue \\
+\end{tabular}
+\subsubsection{Interface}: \newline
+\begin{tabular}{l l l}
+& \verb$.io.enq$ & \verb$DecoupledIO$ source \\
+& \verb$.io.deq$ & \verb$DecoupledIO$ sink \\
+& \verb$.io.count$ & \verb$UInt$ count of elements in the queue \\
+\end{tabular}
+
+\subsection{Pipe } is a \verb$Module$ delaying input data
+\subsubsection{Constructor}: \newline
+\verb$Pipe(enqValid:Bool, enqBits:Data, [latency:Int])$ \newline
+\verb$Pipe(enq:ValidIO, [latency:Int])$ \newline
+\begin{tabular}{l l l}
+& \verb$enqValid$ & input data, valid component \\
+& \verb$enqBits$ & input data, data component \\
+& \verb$enq$ & input data as \verb$ValidIO$ \\
+& \verb$latency$ & {\em(optional, default 1)} cycles to delay data by \\
+\end{tabular}
+\subsubsection{Interface}: \newline
+\begin{tabular}{l l l}
+& \verb$.io.enq$ & \verb$ValidIO$ source \\
+& \verb$.io.deq$ & \verb$ValidIO$ sink \\
+\end{tabular}
+
+\section{Testing Library } \hrulefill
+
 
 \end{multicols}
 \end{document}
