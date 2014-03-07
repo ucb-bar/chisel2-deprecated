@@ -179,6 +179,80 @@ Chisel & Explanation & Width \\
 
 \columnbreak
 
+\section{State Elements } \hrulefill\
+\subsection{Registers } retain state until updated
+\subsubsection{Constructor}: \newline
+\verb$val my_reg = Reg([outType:Data], [next:Data],$ \newline
+\verb$                 [init:Data])$ \newline
+\begin{tabular}{l l l}
+& \verb$outType$ & {\em (optional)} register type (or inferred) \\
+& \verb$next$ & {\em (optional)} update value every clock \\
+& \verb$init$ & {\em (optional)} initialization value on reset \\
+\end{tabular}
+\subsubsection{Updating}: assign to latch new value on next clock: \newline
+\verb$my_reg := next_val$ \newline
+The last update (lexically, per clock) runs
+
+\subsection{Read-Write Memory}
+\subsubsection{Constructor}: \newline
+\verb$val my_mem = Mem(out:Data, n:Int,$ \newline
+\verb$                 seqRead:Boolean)$ \newline
+\begin{tabular}{l l l}
+& \verb$out$ & memory element type \\
+& \verb$n$ & memory depth (elements) \\
+& \verb$seqRead$ & only update reads on clock edge \\
+\end{tabular}
+\subsubsection{Using}: access elements by indexing: \newline
+\verb$val readVal = mem(addr:UInt/Int)$ \newline
+\phantom{x} for synchronous read: assign output to \verb$Reg$ \newline
+\verb$mem(addr:UInt/Int) := y$
+
+\section{Modules } \hrulefill
+\subsubsection{Defining}: subclass \verb$Module$ with elements and code: \newline
+(\verb$Module$s may be parameterized and hierarchical)
+\begin{scala}
+class Accum(width:Int) extends Module {
+  val io = new Bundle {
+    val in = UInt(INPUT,  width)
+    val out  = UInt(OUTPUT, width)
+  }
+  val sum = new Reg(UInt())
+  sum := sum + io.in
+  io.out := sum
+}
+\end{scala}
+\subsubsection{Usage}: access elements using dot notation: \newline
+\phantom{x} (code inside a \verb$Module$ is always running)
+\begin{scala}
+val my_module = Module(new Accum(32))
+my_module.io.in := some_data
+val sum := my_module.io.out
+\end{scala}
+
+\section{Hardware Generation } \hrulefill
+\subsection{Functions } provide block abstractions for code
+\subsubsection{Defining}: write Scala functions with Chisel code:
+\begin{scala}
+def Adder(op_a:UInt, op_b:UInt): UInt = {
+  op_a + op_b
+}
+\end{scala}
+\subsubsection{Usage}: hardware is instantiated when called:
+\begin{scala}
+sum := Adder(UInt(1), some_data)
+\end{scala}
+
+\subsection{If/For } can be used to control hardware generation \newline
+\phantom{x} and is equivalent to Verilog \verb$generate if$/\verb$for$
+
+\subsection{Math Helpers}: \newline
+\verb$log2Up(in:Int): Int$ \newline
+\phantom{x} $log_2(\texttt{in})$ rounded up \newline
+\verb$log2Down(in:Int): Int$ \newline
+\phantom{x} $log_2(\texttt{in})$ rounded down \newline
+\verb$isPow2(in:Int): Boolean$ \newline
+\phantom{x} \verb$True$ if \verb$in$ is a power of 2
+
 \section{Aggregate Types } \hrulefill
 \subsection{Bundle } contains \verb$Data$ types indexed by name
 \subsubsection{Defining}: subclass \verb$Bundle$, define components:
@@ -205,7 +279,7 @@ val my_bundle = new Bundle {
 \subsubsection{Constructors}: \newline
 \verb$val myVec = Vec(elts:Iterable[Data])$ \newline
 \begin{tabular}{l l l}
-& \verb$elts$ & initial element \verb$Data$  \\
+& \verb$elts$ & initial element \verb$Data$ (vector depth inferred) \\
 \end{tabular}
 
 \verb$val myVec = Vec.fill(n:Int) {gen:Data}$ \newline
@@ -216,83 +290,18 @@ val my_bundle = new Bundle {
 \subsubsection{Using}: access elements by dynamic or static indexing: \newline
 \verb$readVal := myVec(ind:Data/idx:Int)$ \newline
 \verb$myVec(ind:Data/idx:Int) := writeVal$
-
-\section{Modules } \hrulefill
-\subsubsection{Defining}: subclass \verb$Module$ with elements and code: \newline
-(\verb$Module$s may be parameterized and hierarchical)
-\begin{scala}
-class Accum(width:Int) extends Module {
-  val io = new Bundle {
-    val in = UInt(INPUT,  width)
-    val out  = UInt(OUTPUT, width)
-  }
-  val sum = new Reg(UInt())
-  sum := sum + io.in
-  io.out := sum
-}
-\end{scala}
-\subsubsection{Usage}: access elements using dot notation: \newline
-\phantom{x} (code inside a \verb$Module$ is always running)
-\begin{scala}
-val my_module = Module(new Accum(32))
-my_module.io.in := some_data
-val sum := my_module.io.out
-\end{scala}
-
-\columnbreak
-
-\section{State Elements } \hrulefill\
-\subsection{Registers } retain state until updated
-\subsubsection{Constructor}: \newline
-\verb$val my_reg = Reg([outType:Data], [next:Data],$ \newline
-\verb$                 [init:Data])$ \newline
+\subsubsection{Functions}: (\verb$T$ is the \verb$Vec$'s element type) \newline
 \begin{tabular}{l l l}
-& \verb$outType$ & {\em (optional)} register type (or inferred) \\
-& \verb$next$ & {\em (optional)} update value every clock \\
-& \verb$init$ & {\em (optional)} initialization value on reset \\
+& \verb$.forall(p:T=>Bool):Bool$ & AND-reduce \verb$p$ on all elts \\
+& \verb$.exists(p:T=>Bool):Bool$ & OR-reduce \verb$p$ on all elts \\
+& \verb$.contains(x:T):Bool$ & \verb$True$ if this contains \verb$x$ \\
+& \verb$.count(p:T=>Bool):UInt$ & count elts where \verb$p$ is \verb$True$ \\
 \end{tabular}
-\subsubsection{Updating}: assign to latch new value on next clock: \newline
-\verb$my_reg := next_val$ \newline
-The last update (lexically, per clock) runs
-
-\subsection{Read-Write Memory}
-\subsubsection{Constructor}: \newline
-\verb$val my_mem = Mem(out:Data, n:Int,$ \newline
-\verb$                 seqRead:Boolean)$ \newline
 \begin{tabular}{l l l}
-& \verb$out$ & memory element type \\
-& \verb$n$ & memory depth (elements) \\
-& \verb$seqRead$ & only update reads on clock edge \\
+& \verb$.indexWhere(p:T=>Bool):UInt$ & \\
+& \verb$.lastIndexWhere(p:T=>Bool):UInt$ & \\
+& \verb$.onlyIndexWhere(p:T=>Bool):UInt$ & \\
 \end{tabular}
-\subsubsection{Using}: access elements by indexing: \newline
-\verb$val readVal = mem(addr:UInt/Int)$ \newline
-Synchronous read: assign output to \verb$Reg$ \newline
-\verb$mem(addr:UInt/Int) := y$
-
-\section{Hardware Generation } \hrulefill
-\subsection{Functions } provide block abstractions for code
-\subsubsection{Defining}: write Scala functions with Chisel code:
-\begin{scala}
-def Adder(op_a:UInt, op_b:UInt): UInt = {
-  op_a + op_b
-}
-\end{scala}
-\subsubsection{Usage}: hardware is instantiated when called:
-\begin{scala}
-sum := Adder(UInt(1), some_data)
-\end{scala}
-
-\subsection{If/For } can be used to control hardware generation \newline
-\phantom{x} and is equivalent to Verilog \verb$generate if$/\verb$for$
-
-\subsection{Math Helpers}: \newline
-\verb$log2Up(in:Int): Int$ \newline
-\phantom{x} $log_2(\texttt{in})$ rounded up \newline
-\verb$log2Down(in:Int): Int$ \newline
-\phantom{x} $log_2(\texttt{in})$ rounded down \newline
-\verb$isPow2(in:Int): Boolean$ \newline
-\phantom{x} \verb$True$ if \verb$in$ is a power of 2
-
 
 \section{Standard Library: Function Blocks } \hrulefill
 \subsection{Stateless}: \newline
@@ -314,18 +323,12 @@ sum := Adder(UInt(1), some_data)
 \verb$Mux1H(in:Iterable[(Data, Bool]): Data$ \newline
 \verb$Mux1H(sel:Bits/Iterable[Bool],$ \newline
 \verb$      in:Iterable[Data]): Data$ \newline
-\begin{tabular}{l l l}
-& \multicolumn{2}{l}{A mux tree with a one-hot select} \\
-& \verb$in$ & iterable of combined input and select \verb$(Bool, Data)$ \\
-& & tuples or just mux input \verb$Data$ \\
-& \verb$sel$ & select signals or bitvector, one per input \\
-\end{tabular}
-
 \verb$PriorityMux(in:Iterable[(Bool, Bits]): Bits$ \newline
 \verb$PriorityMux(sel:Bits/Iterable[Bool],$ \newline
-\verb$            in:Iterable[Bits]): Bits$ \newline
+\verb$                  in:Iterable[Bits]): Bits$ \newline
 \begin{tabular}{l l l}
-& \multicolumn{2}{l}{A mux tree with multiple selects, prioritizing the first} \\
+& \multicolumn{2}{l}{A mux tree with either a one-hot select or multiple} \\
+& \multicolumn{2}{l}{\phantom{x} selects (where the first inputs are prioritized)} \\
 & \verb$in$ & iterable of combined input and select \verb$(Bool, Bits)$ \\
 & & tuples or just mux input \verb$Bits$ \\
 & \verb$sel$ & select signals or bitvector, one per input \\
