@@ -311,11 +311,19 @@ val my_bundle = new Bundle {
 \verb$UIntToOH(in:UInt, [width:Int]): Bits$ \newline
 \begin{tabular}{l l l}
 & \multicolumn{2}{l}{Returns the one-hot encoding of \texttt{in}} \\
-& \verb$width$ & {\em(optional)} output width (inferred if unspecified) \\
+& \verb$width$ & {\em(optional, else inferred)} output width \\
 \end{tabular}
 
 \verb$OHToUInt(in:Bits/Seq[Bool]): UInt$ \newline
 \phantom{x} Returns the \verb$UInt$ representation of one-hot \verb$in$
+
+\columnbreak
+
+\verb$PriorityEncoder(in:Bits/Iterable[Bool]): UInt$ \newline
+\phantom{x} Returns the position the least significant \verb$1$ in \verb$in$
+
+\verb$PriorityEncoderOH(in:Bits): UInt$ \newline
+\phantom{x} Returns the position of the hot bit in \verb$in$
 
 \verb$Mux1H(in:Iterable[(Data, Bool]): Data$ \newline
 \verb$Mux1H(sel:Bits/Iterable[Bool],$ \newline
@@ -330,12 +338,6 @@ val my_bundle = new Bundle {
 & & tuples or just mux input \verb$Bits$ \\
 & \verb$sel$ & select signals or bitvector, one per input \\
 \end{tabular}
-
-\verb$PriorityEncoder(in:Bits/Iterable[Bool]): UInt$ \newline
-\phantom{x} Returns the position the least significant \verb$1$ in \verb$in$
-
-\verb$PriorityEncoderOH(in:Bits): UInt$ \newline
-\phantom{x} Returns the position of the hot bit in \verb$in$
 
 \subsection{Stateful}: \newline
 \verb$LFSR16([increment:Bool]): UInt$ \newline
@@ -378,6 +380,38 @@ val my_bundle = new Bundle {
 & \verb$.bits$ & data \\
 \end{tabular}
 
+\subsection{Queue } is a \verb$Module$ providing a hardware queue
+\subsubsection{Constructor}: \newline
+\verb$Queue(enq:DecoupledIO, entries:Int)$ \newline
+\begin{tabular}{l l l}
+& \verb$enq$ & \verb$DecoupledIO$ source for the queue \\
+& \verb$entries$ & size of queue \\
+\end{tabular}
+\subsubsection{Interface}: \newline
+\begin{tabular}{l l l}
+& \verb$.io.enq$ & \verb$DecoupledIO$ source \\
+& \verb$.io.deq$ & \verb$DecoupledIO$ sink \\
+& \verb$.io.count$ & \verb$UInt$ count of elements in the queue \\
+\end{tabular}
+
+\columnbreak
+
+\subsection{Pipe } is a \verb$Module$ delaying input data
+\subsubsection{Constructor}: \newline
+\verb$Pipe(enqValid:Bool, enqBits:Data, [latency:Int])$ \newline
+\verb$Pipe(enq:ValidIO, [latency:Int])$ \newline
+\begin{tabular}{l l l}
+& \verb$enqValid$ & input data, valid component \\
+& \verb$enqBits$ & input data, data component \\
+& \verb$enq$ & input data as \verb$ValidIO$ \\
+& \verb$latency$ & {\em(optional, default 1)} cycles to delay data by \\
+\end{tabular}
+\subsubsection{Interface}: \newline
+\begin{tabular}{l l l}
+& \verb$.io.enq$ & \verb$ValidIO$ source \\
+& \verb$.io.deq$ & \verb$ValidIO$ sink \\
+\end{tabular}
+
 \subsection{Arbiters } are \verb$Module$s connecting multiple producers\newline
 \phantom{x} to one consumer \newline
 \verb$Arbiter$ prioritizes lower producers \newline
@@ -396,38 +430,37 @@ val my_bundle = new Bundle {
 & & does not imply output is valid \\
 \end{tabular}
 
-\subsection{Queue } is a \verb$Module$ providing a hardware queue
-\subsubsection{Constructor}: \newline
-\verb$Queue(enq:DecoupledIO, entries:Int)$ \newline
-\begin{tabular}{l l l}
-& \verb$enq$ & \verb$DecoupledIO$ source for the queue \\
-& \verb$entries$ & size of queue \\
-\end{tabular}
-\subsubsection{Interface}: \newline
-\begin{tabular}{l l l}
-& \verb$.io.enq$ & \verb$DecoupledIO$ source \\
-& \verb$.io.deq$ & \verb$DecoupledIO$ sink \\
-& \verb$.io.count$ & \verb$UInt$ count of elements in the queue \\
-\end{tabular}
+\section{Tester } \hrulefill
 
-\subsection{Pipe } is a \verb$Module$ delaying input data
-\subsubsection{Constructor}: \newline
-\verb$Pipe(enqValid:Bool, enqBits:Data, [latency:Int])$ \newline
-\verb$Pipe(enq:ValidIO, [latency:Int])$ \newline
-\begin{tabular}{l l l}
-& \verb$enqValid$ & input data, valid component \\
-& \verb$enqBits$ & input data, data component \\
-& \verb$enq$ & input data as \verb$ValidIO$ \\
-& \verb$latency$ & {\em(optional, default 1)} cycles to delay data by \\
-\end{tabular}
-\subsubsection{Interface}: \newline
-\begin{tabular}{l l l}
-& \verb$.io.enq$ & \verb$ValidIO$ source \\
-& \verb$.io.deq$ & \verb$ValidIO$ sink \\
-\end{tabular}
-
-\section{Testing Library } \hrulefill
-
+\verb$Tester$ is a class with functions for testing \verb$Module$s, connecting and communicating with a simulator: \newline
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill} } l l}
+\verb$reset([n:Int])$ & reset the DUT for \verb$n$ (default 1) clocks \\
+\verb$step(n:Int$) & steps the DUT for \verb$n$ clocks \\
+\hline \end{tabular*} \begin{tabular*}{\columnwidth}{@{\extracolsep{\fill} } l l l}
+\verb$poke(data:Bits, x:BigInt)$ & writes \verb$x$ to wire \verb$data$ \\
+\multicolumn{2}{l}{\texttt{poke(data:Aggregate, x:Array[BigInt])}} \\
+\multicolumn{2}{l}{\phantom{x} writes values from \texttt{x} to corresponding wires in \texttt{data}} \\
+\verb$peek(data:Bits): BigInt$ & reads from wire \verb$data$ \\
+\multicolumn{2}{l}{\texttt{peek(data:Aggregate): Array[BigInt]}} \\
+\multicolumn{2}{l}{\phantom{x} reads multiple values from source wires in \texttt{data}} \\
+\hline \end{tabular*} \begin{tabular*}{\columnwidth}{@{\extracolsep{\fill} } l l l}
+\multicolumn{2}{l}{\texttt{expect(good:Boolean, msg:String): Boolean}} \\
+\multicolumn{2}{l}{\phantom{x} fails unless \texttt{good} is \texttt{True}, \texttt{msg} should describe the test} \\
+\multicolumn{2}{l}{\texttt{expect(data:Bits, target:BigInt): Boolean}} \\
+\multicolumn{2}{l}{\phantom{x} fails unless the value in wire \texttt{data} equals \texttt{target}} \\
+\end{tabular*}
+\subsubsection{Defining}:\newline
+Subclass \verb$Tester$ with testing code:
+\begin{scala}
+class MuxTester(c:Mux) extends Tester(c) {
+  for (sel <- 0 until 2) {
+    poke(c.io.sel, sel)
+    poke(c.io.in0, 0); poke(c.io.in1, 1)
+    step(1)
+    expect(c.io.out, sel)
+  }
+}
+\end{scala}
 
 \end{multicols}
 \end{document}
