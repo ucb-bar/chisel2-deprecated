@@ -156,7 +156,7 @@ Chisel & Explanation & Width \\
 \verb$x | y$ & Bitwise OR & \verb$max(w(x), w(y))$ \\
 \verb$x ^ y$ & Bitwise XOR & \verb$max(w(x), w(y))$ \\
 \hline
-\verb$x === y$ & Equality {\small\textcolor{red}{(triple equals)}} & \verb$1$ \\
+\verb$x === y$ & Equality{\small\textcolor{red}{(triple equals)}} & \verb$1$ \\
 \verb$x != y$ & Inequality & \verb$1$ \\
 \hline
 \verb$andR(x)$ & AND-reduce & \verb$1$ \\
@@ -187,8 +187,7 @@ Chisel & Explanation & Width \\
 \columnbreak
 
 \section{State Elements } \hrulefill\
-\subsection{Registers } retain state until updated
-\subsubsection{Constructor}: \newline
+\subsection{Registers } retain state until updated \newline
 \verb$val my_reg = Reg([outType:Data], [next:Data],$ \newline
 \verb$                 [init:Data])$ \newline
 \begin{tabular}{l l l}
@@ -200,8 +199,7 @@ Chisel & Explanation & Width \\
 \verb$my_reg := next_val$ \newline
 The last update (lexically, per clock) runs
 
-\subsection{Read-Write Memory}
-\subsubsection{Constructor}: \newline
+\subsection{Read-Write Memory } provide addressable memories \newline
 \verb$val my_mem = Mem(out:Data, n:Int,$ \newline
 \verb$                 seqRead:Boolean)$ \newline
 \begin{tabular}{l l l}
@@ -215,8 +213,7 @@ The last update (lexically, per clock) runs
 \verb$mem(addr:UInt/Int) := y$
 
 \section{Modules } \hrulefill
-\subsubsection{Defining}: subclass \verb$Module$ with elements and code: \newline
-(\verb$Module$s may be parameterized and hierarchical)
+\subsubsection{Defining}: subclass \verb$Module$ with elements, code:
 \begin{scala}
 class Accum(width:Int) extends Module {
   val io = new Bundle {
@@ -252,6 +249,8 @@ sum := Adder(UInt(1), some_data)
 \subsection{If/For } can be used to control hardware generation \newline
 \phantom{x} and is equivalent to Verilog \verb$generate if$/\verb$for$
 
+\columnbreak
+
 \section{Aggregate Types } \hrulefill
 \subsection{Bundle } contains \verb$Data$ types indexed by name
 \subsubsection{Defining}: subclass \verb$Bundle$, define components:
@@ -274,8 +273,7 @@ val my_bundle = new Bundle {
 \verb$val bundleVal = my_bundle.a$ \newline
 \verb$my_bundle.a := Bool(true)$
 
-\subsection{Vec } is an indexable vector of \verb$Data$ types
-\subsubsection{Constructors}: \newline
+\subsection{Vec } is an indexable vector of \verb$Data$ types \newline
 \verb$val myVec = Vec(elts:Iterable[Data])$ \newline
 \begin{tabular}{l l l}
 & \verb$elts$ & initial element \verb$Data$ (vector depth inferred) \\
@@ -289,17 +287,17 @@ val my_bundle = new Bundle {
 \subsubsection{Using}: access elements by dynamic or static indexing: \newline
 \verb$readVal := myVec(ind:Data/idx:Int)$ \newline
 \verb$myVec(ind:Data/idx:Int) := writeVal$
-\subsubsection{Functions}: (\verb$T$ is the \verb$Vec$'s element type) \newline
+\subsubsection{Functions}: (\verb$T$ is the \verb$Vec$ element's type) \newline
 \begin{tabular}{l l l}
-& \verb$.forall(p:T=>Bool):Bool$ & AND-reduce \verb$p$ on all elts \\
-& \verb$.exists(p:T=>Bool):Bool$ & OR-reduce \verb$p$ on all elts \\
-& \verb$.contains(x:T):Bool$ & \verb$True$ if this contains \verb$x$ \\
-& \verb$.count(p:T=>Bool):UInt$ & count elts where \verb$p$ is \verb$True$ \\
+& \verb$.forall(p:T=>Bool): Bool$ & AND-reduce \verb$p$ on all elts \\
+& \verb$.exists(p:T=>Bool): Bool$ & OR-reduce \verb$p$ on all elts \\
+& \verb$.contains(x:T): Bool$ & \verb$True$ if this contains \verb$x$ \\
+& \verb$.count(p:T=>Bool): UInt$ & count elts where \verb$p$ is \verb$True$ \\
 \end{tabular}
 \begin{tabular}{l l l}
-& \verb$.indexWhere(p:T=>Bool):UInt$ & \\
-& \verb$.lastIndexWhere(p:T=>Bool):UInt$ & \\
-& \verb$.onlyIndexWhere(p:T=>Bool):UInt$ & \\
+& \verb$.indexWhere(p:T=>Bool): UInt$ & \\
+& \verb$.lastIndexWhere(p:T=>Bool): UInt$ & \\
+& \verb$.onlyIndexWhere(p:T=>Bool): UInt$ & \\
 \end{tabular}
 
 \section{Standard Library: Function Blocks } \hrulefill
