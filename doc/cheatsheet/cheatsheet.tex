@@ -21,11 +21,11 @@
 
 \makeatletter
 \renewcommand{\section}{\@startsection{section}{1}{0mm}%
-                                {-2ex plus 4ex}%
+                                {-0.5ex plus 4ex}%
                                 {-0.01ex plus .01ex}%x
                                 {\normalfont\large\bfseries}}
 \renewcommand{\subsection}{\@startsection{subsection}{2}{0mm}%
-                                {-1ex plus 4ex}%
+                                {-0.5ex plus 4ex}%
                                 {-0.01ex plus .01ex}%
                                 {\normalfont\normalsize\bfseries}}
 \renewcommand{\subsubsection}{\@startsection{subsubsection}{3}{0mm}%
@@ -51,8 +51,8 @@
 Arguments given as \texttt{kwd:type} (name and type(s)) \newline
 Arguments in brackets (\texttt{[...]}) are optional.
 \subsubsection{For Operators}: \newline
-\texttt{c}, \texttt{x}, \texttt{y} are of type Chisel \texttt{Data} \newline
-\texttt{n}, \texttt{m} are of type Scala \texttt{Int} \newline
+\texttt{c}, \texttt{x}, \texttt{y} are Chisel \texttt{Data};
+\texttt{n}, \texttt{m} are Scala \texttt{Int} \newline
 \texttt{w(x)}, \texttt{w(y)} are the widths of \texttt{x}, \texttt{y} (respectively) \newline
 \texttt{minVal(x)}, \texttt{maxVal(x)} are the minimum or \newline
 \phantom{x} maximum possible values of \texttt{x}
@@ -100,6 +100,13 @@ switch(x) {
 & & with distinct values \\
 & \verb$nodeType$ & type of \verb$s1$, \verb$s2$, ..., \verb$sn$ \\
 & \verb$n$ & element count \\
+\end{tabular}
+
+\subsection{Math Helpers}: \newline
+\begin{tabular}{l l}
+\verb$log2Up(in:Int): Int$ & $log_2(\texttt{in})$ rounded up \\
+\verb$log2Down(in:Int): Int$ & $log_2(\texttt{in})$ rounded down \\
+\verb$isPow2(in:Int): Boolean$ & \verb$True$ if \verb$in$ is a power of 2 \\
 \end{tabular}
 
 \columnbreak
@@ -244,14 +251,6 @@ sum := Adder(UInt(1), some_data)
 
 \subsection{If/For } can be used to control hardware generation \newline
 \phantom{x} and is equivalent to Verilog \verb$generate if$/\verb$for$
-
-\subsection{Math Helpers}: \newline
-\verb$log2Up(in:Int): Int$ \newline
-\phantom{x} $log_2(\texttt{in})$ rounded up \newline
-\verb$log2Down(in:Int): Int$ \newline
-\phantom{x} $log_2(\texttt{in})$ rounded down \newline
-\verb$isPow2(in:Int): Boolean$ \newline
-\phantom{x} \verb$True$ if \verb$in$ is a power of 2
 
 \section{Aggregate Types } \hrulefill
 \subsection{Bundle } contains \verb$Data$ types indexed by name
