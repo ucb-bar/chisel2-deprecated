@@ -207,10 +207,19 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
 
   def endTesting(): Boolean = {
     if (process != null) {
-      puts("quit\n"); testOut.flush();
-      testOut.close()
-      testIn.close()
-      testErr.close()
+      puts("quit\n")
+
+      if (testOut != null) {
+        testOut.flush()
+        testOut.close()
+      }
+      if (testIn != null) {
+        testIn.close()
+      }
+      if (testErr != null) {
+        testErr.close()
+      }
+
       process.destroy()
     }
     ok
