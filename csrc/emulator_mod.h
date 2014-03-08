@@ -1787,117 +1787,6 @@ class mod_t {
   virtual void print ( FILE* f ) { };
   virtual void dump ( FILE* f, int t ) { };
 
-  virtual void init_debug_interface ( ) { };
-
-  // Lists containing node/mem names to pointers, to be populated by init().
-  map<string, dat_base_t*> nodes;
-  map<string, mem_base_t*> mems;
-
-  // Returns a list of all nodes accessible by the debugging interface.
-  virtual vector<string> get_nodes() {
-    vector<string> res;
-    typedef std::map<std::string, dat_base_t*>::iterator it_type;
-    for(it_type iterator = nodes.begin(); iterator != nodes.end(); iterator++)
-      res.push_back(iterator->first);
-    return res;
-  }
-  // Returns a list of all memory objects accessible by the debugging interface.
-  virtual vector<string> get_mems() {
-    vector<string> res;
-    typedef std::map<std::string, mem_base_t*>::iterator it_type;
-    for(it_type iterator = mems.begin(); iterator != mems.end(); iterator++)
-      res.push_back(iterator->first);
-    return res;
-  }
-  // Reads the value on a node. Returns empty on error.
-  virtual string node_read(string name) {
-    dat_base_t* dat = nodes[name];
-    if (dat != NULL) {
-      return dat->to_str();
-    } else {
-      cerr << "mod_t::node_read: Unable to find node '" << name << "'" << endl;
-      return "0";
-    }
-  }
-  // Writes a value to a node. Returns true on success and false on error.
-  // Recommended to only be used on state elements.
-  virtual bool node_write(string name, string val) {
-    dat_base_t* dat = nodes[name];
-    if (dat != NULL) {
-      bool success = dat->set_from_str(val);
-      return success;
-    } else {
-      cerr << "mod_t::node_write: Unable to find node '" << name << "'" << endl;
-      return false;
-    }
-  }
-  // Reads the an element from a memory.
-  virtual string mem_read(string name, string index) {
-    mem_base_t* mem = mems[name];
-    if (mem != NULL) {
-      return mem->get_to_str(index);
-    } else {
-      cerr << "mod_t::mem_read: Unable to find mem '" << name << "'" << endl;
-      return "0";
-    }
-  }
-  // Writes an element to a memory.
-  virtual bool mem_write(string name, string index, string val) {
-    mem_base_t* mem = mems[name];
-    if (mem != NULL) {
-      bool success = mem->put_from_str(index, val);
-      return success;
-    } else {
-      cerr << "mod_t::mem_write: Unable to find mem '" << name << "'" << endl;
-      return false;
-    }
-  }
-
-  // Clocks until a node is equal to the value.
-  // Returns the number of cycles executed or -1 if the maximum was exceeded
-  // or -2 if some error was encountered.
-  virtual int clock_until_node_equal(string name, string val, int max=1000000) {
-    int cycles = 0;
-    dat_base_t* target_dat = nodes[name];
-    dat_base_t* target_val = target_dat->copy();
-    target_val->set_from_str(val);
-
-    while (true) {
-        if (target_dat->equals(*target_val)) {
-            return cycles;
-        } else {
-            cycles++;
-            cycle();
-            if (cycles >= max) {
-                return -1;
-            }
-        }
-    }
-  }
-
-  // Clocks until a node is equal to the value.
-  // Returns the number of cycles executed or -1 if the maximum was exceeded
-  // or -2 if some error was encountered.
-  virtual int clock_until_node_not_equal(string name, string val, int max=1000000) {
-    int cycles = 0;
-    dat_base_t* target_dat = nodes[name];
-    int w = target_dat->width();
-    dat_base_t* target_val = target_dat->copy();
-    target_val->set_from_str(val);
-
-    while (true) {
-        if (!target_dat->equals(*target_val)) {
-            return cycles;
-        } else {
-            cycles++;
-            cycle();
-            if (cycles >= max) {
-                return -1;
-            }
-        }
-    }
-  }
-
   int timestep;
 
   int step (bool is_reset, int n, FILE* f, bool is_print = false) {
@@ -1922,22 +1811,7 @@ class mod_t {
       getline(cin,str_in);
       std::vector< std::string > tokens = tokenize(str_in);
       std::string cmd = tokens[0];
-      if (cmd == "peek") {
-        std::string res;
-        if (tokens.size() == 2) {
-          res = node_read(tokens[1]);
-        } else if (tokens.size() == 3) {
-          res = mem_read(tokens[1], tokens[2]);
-        }
-        // fprintf(stderr, "-PEEK %s -> %s\n", tokens[1].c_str(), res.c_str());
-        cout << res << endl;
-      } else if (cmd == "poke") {
-        bool res;
-        // fprintf(stderr, "-POKE %s <- %s\n", tokens[1].c_str(), tokens[2].c_str());
-        if (tokens.size() == 3)
-          res = node_write(tokens[1], tokens[2]);
-        else if (tokens.size() == 4)
-          res = mem_write(tokens[1], tokens[2], tokens[3]);
+
       } else if (cmd == "step") {
         int n = atoi(tokens[1].c_str());
         // fprintf(stderr, "-STEP %d\n", n);
@@ -1954,8 +1828,7 @@ class mod_t {
           periods.push_back(period);
         }
         setClocks(periods);
-      } else if (cmd == "quit") {
-          return;
+
       } else {
         fprintf(stderr, "Unknown command: |%s|\n", cmd.c_str());
       }

@@ -297,7 +297,7 @@ public:
 			if (!check_command_length(tokens, 0, 0)) { break; }
 			return get_api_support();
 
-		} else if (tokens[0] == "clock") {
+		} else if (tokens[0] == "clock" || tokens[0] == "step") {
 			if (!check_command_length(tokens, 1, 1)) { break; }
 			int cycles = atoi(tokens[1]);
 		    for (int i=0; i<cycles; i++) {
@@ -317,6 +317,25 @@ public:
 			   	module->clock_hi(dat_t<1>(1));
 		    }
 		    module->clock_lo(dat_t<1>(0));
+
+		} else if (tokens[0] == "peek") {
+			if (!check_command_length(tokens, 1, 2)) { break; }
+			cerr << "peek is deprecated, use node_peek or mem_peek" << std::end;
+			if (tokens.size() == 2) {
+				return get_dat_by_name(tokens[1]).get_value();
+			} else if (tokens.size() == 3) {
+				return get_mem_by_name(tokens[1]).get_value(tokens[2]);
+			}
+		} else if (tokens[0] == "poke") {
+			if (!check_command_length(tokens, 2, 3)) { break; }
+			cerr << "poke is deprecated, use node_poke or mem_poke" << std::end;
+			bool success
+			if (tokens.size() == 3) {
+				success = get_dat_by_name(tokens[1]).set_value(tokens[2]);
+			else if (tokens.size() == 4) {
+				success = get_mem_by_name(tokens[1]).set_value(tokens[2], tokens[3]);
+			}
+			return success ? "true" : "false";
 
 		} else if (tokens[0] == "node_peek") {
 			if (!check_command_length(tokens, 1, 1)) { break; }
@@ -360,7 +379,11 @@ public:
 		while (true) {
 		    std::string str_in;
 		    getline(cin, str_in);
-		    cout << eval_command(str_in) << std::endl;
+		    if (str_in == "quit") {
+		    	break;
+		    } else {
+		    	cout << eval_command(str_in) << std::endl;
+		    }
 		}
 	}
 
