@@ -44,6 +44,8 @@ import Module._
 import scala.collection.mutable.HashSet
 
 class FloBackend extends Backend {
+  // TODO: SHOULD BE IN ENV VAR
+  val floDir = "/Users/jrb/bar/flo/emulator/"
   val keywords = new HashSet[String]();
   var isRnd = false
 
@@ -208,5 +210,26 @@ class FloBackend extends Backend {
       out.write(emit(m));
     out.close();
   }
+
+  override def compile(c: Module, flagsIn: String) {
+    val flags = if (flagsIn == null) "-O2" else flagsIn
+
+    val chiselENV = java.lang.System.getenv("CHISEL")
+    val c11 = if(Module.printfs.size > 0) " -std=c++11 " else ""
+    val allFlags = flags + c11 + " -I../ -I" + chiselENV + "/csrc/"
+    val dir = Module.targetDir + "/"
+    def run(cmd: String) {
+      val bashCmd = Seq("bash", "-c", cmd)
+      val c = bashCmd.!
+      ChiselError.info(cmd + " RET " + c)
+    }
+    def build(name: String) {
+      val cmd = floDir + "lay -is-console :num-cols 1 :num-cols 1 < " + dir + name + ".flo | " + floDir + "fix-sched > " + dir + name + ".hex"
+      println("BUILDING " + cmd)
+      run(cmd)
+    }
+    build(c.name)
+  }
+
 
 }
