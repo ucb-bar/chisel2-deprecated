@@ -370,14 +370,22 @@ private:
 	// Mapping table functions
 	virtual init_mapping_table();
 	dat_api& get_dat_by_name(std::string name) {
+		static dat_dummy dummy = new dat_dummy();
 		if (dat_table.find(name) != map<string, dat_api>.end) {
 			return dat_table[name];
 		} else {
 			std::cerr << "Unable to find dat '" << name << "'" << std::endl;
+			return dummy;
 		}
 	}
 	mem_api& get_mem_by_name(std::string name) {
-		return mem_table[name];
+		static mem_dummy dummy = new mem_dummy();
+		if (mem_table.find(name) != map<string, mem_api>.end) {
+			return mem_table[name];
+		} else {
+			std::cerr << "Unable to find mem '" << name << "'" << std::endl;
+			return dummy;
+		}
 	}
 
 	map<string, dat_api> dat_table;
