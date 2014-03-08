@@ -1729,102 +1729,6 @@ size_t dat_from_hex(std::string hex_line, dat_t<w>& res, size_t offset = 0) {
   return last_digit + 1;
 }
 
-/**
- * Copy one val_t array to another.
- * nb must be the exact number of bits the val_t represents.
- */
-static void val_cpy(val_t* dst, val_t* src, int nb) {
-    for (int i=0; i<val_n_words(nb); i++) {
-        dst[i] = src[i];
-    }
-}
-
-/**
- * Empty a val_t array (sets to zero).
- * nb must be the exact number of bits the val_t represents.
- */
-static void val_empty(val_t* dst, int nb) {
-    for (int i=0; i<val_n_words(nb); i++) {
-        dst[i] = 0;
-    }
-}
-
-/**
- * Set a val_t array to a integer number. Obviously, the maximum integer
- * is capped by the width of a single val_t element.
- * nb must be the exact number of bits the val_t represents.
- */
-static void val_set(val_t* dst, val_t nb, val_t num) {
-    val_empty(dst, nb);
-    dst[0] = num;
-}
-
-/**
- * Creates a dat_t from a std::string, where the string radix is automatically determined
- * from the string, or defaults to 10.
- * Returns true on success and false on failure.
- */
-template <int w>
-bool dat_from_str(std::string in, dat_t<w>& res, int pos = 0) {
-    int radix = 10;
-
-    if (!in.substr(pos, 1).compare("d")) {
-        radix = 10;
-        pos++;
-    } else if (!in.substr(pos, 1).compare("h")
-               || !in.substr(pos, 1).compare("x")) {
-        radix = 16;
-        pos++;
-    } else if (!in.substr(pos, 2).compare("0h")
-               || !in.substr(pos, 2).compare("0x")) {
-        radix = 16;
-        pos += 2;
-    } else if (!in.substr(pos, 1).compare("b")) {
-        radix = 2;
-        pos++;
-    } else if (!in.substr(pos, 2).compare("0b")) {
-        radix = 2;
-        pos += 2;
-    }
-
-    val_t radix_val = radix;
-    val_t temp_prod[val_n_words(w)];
-    val_t curr_base[val_n_words(w)];
-    val_t temp_alias[val_n_words(w)];
-    val_t *dest_val = res.values;
-    val_set(curr_base, w, 1);
-    val_empty(dest_val, w);
-
-    for (int rpos=in.length()-1; rpos>=pos; rpos--) {
-        char c = in[rpos];
-        val_t c_val = 0;
-        if (c == '_') {
-            continue;
-        }
-        if (c >= '0' && c <= '9') {
-            c_val = c - '0';
-        } else if (c >= 'a' && c <= 'z') {
-            c_val = c - 'a' + 10;
-        } else if (c >= 'A' && c <= 'Z') {
-            c_val = c - 'A' + 10;
-        } else {
-            cout << "dat_from_str: Invalid character '" << c << "'" << endl;
-            return false;
-        }
-        if (c_val > radix /* || c_val < 0 */) {
-            cout << "dat_from_str: Invalid character '" << c << "'" << endl;
-            return false;
-        }
-
-        mul_n(temp_prod, curr_base, &c_val, w, w, val_n_bits());
-        val_cpy(temp_alias, dest_val, w);   // copy to prevent aliasing on add
-        add_n(dest_val, temp_alias, temp_prod, val_n_words(w), w);
-        val_cpy(temp_alias, curr_base, w);
-        mul_n(curr_base, temp_alias, &radix_val, w, w, val_n_bits());
-    }
-    return true;
-}
-
 template <int w>
 void dat_dump (FILE* file, dat_t<w> val, const char* name) {
   int namelen = strlen(name), pos = 0;
@@ -1949,20 +1853,6 @@ class mod_t {
     }
   }
 
-  // Clocks in a reset
-  virtual void reset() {
-    clock_lo(dat_t<1>(1));
-    clock_hi(dat_t<1>(1));
-    clock_lo(dat_t<1>(1));
-  }
-
-  // Clocks one cycle
-  virtual void cycle() {
-    clock_lo(dat_t<1>(0));
-    clock_hi(dat_t<1>(0));
-    clock_lo(dat_t<1>(0));
-  }
-
   // Clocks until a node is equal to the value.
   // Returns the number of cycles executed or -1 if the maximum was exceeded
   // or -2 if some error was encountered.
@@ -2023,26 +1913,7 @@ class mod_t {
     return delta;
   }
 
-  std::vector< std::string > tokenize(std::string str) {
-    std::vector< std::string > res;
-    int i = 0;
-    int c = ' ';
-    while ( i < str.size() ) {
-      while (isspace(c)) {
-        if (i >= str.size()) return res;
-        c = str[i++];
-      }
-      std::string s;
-      while (!isspace(c) && i < str.size()) {
-        s.push_back(c);
-        c = str[i++];
-      }
-      if (i >= str.size()) s.push_back(c);
-      if (s.size() > 0)
-        res.push_back(s);
-    }
-    return res;
-  }
+
 
   void read_eval_print (FILE *f) {
     timestep = 0;
