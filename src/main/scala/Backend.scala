@@ -94,7 +94,7 @@ abstract class Backend {
     for (m <- root.getClass().getDeclaredMethods) {
       val name = m.getName();
       val types = m.getParameterTypes();
-      if (types.length == 0
+      if (types.length == 0 && root.isValName(name) // patch to avoid defs
         && isPublic(m.getModifiers()) && !(Module.keywords contains name)) {
         val o = m.invoke(root);
         o match {
