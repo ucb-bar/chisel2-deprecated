@@ -740,6 +740,29 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
   }
 
+  def getClassValNames(c: Class[_]): ArrayBuffer[String] = {
+    val valnames = new ArrayBuffer[String]()
+    for (v <- c.getDeclaredFields) {
+      v.setAccessible(true)
+      valnames += v.getName
+    }
+    val sc = c.getSuperclass
+    if (sc != null) { valnames ++= getClassValNames(sc) }
+    valnames
+  }
+
+  // Allow checking if a method name is also the name of a val -- reveals accessors
+  def getValNames = {
+    val valnames = new ArrayBuffer[String]()
+    valnames ++= getClassValNames(getClass)    
+    valnames
+  }
+
+  object isValName {
+    val valnames = Module.this.getValNames
+    def apply(name: String) = valnames.contains(name)
+  }
+
   // 1) name the component
   // 2) name the IO
   // 3) name and set the component of all statically declared nodes through introspection
@@ -755,7 +778,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
      for (m <- getClass().getDeclaredMethods) {
        val name = m.getName();
        val types = m.getParameterTypes();
-       if (types.length == 0
+       if (types.length == 0 && isValName(name) // patch to avoid defs
         && isPublic(m.getModifiers()) && !(Module.keywords contains name)) {
          val o = m.invoke(this);
          o match {
