@@ -1,6 +1,7 @@
 package Chisel
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
+import scala.collection.mutable.HashSet
 
 class ioQueueFame1[T <: Data](data: T) extends Bundle
 {
@@ -22,7 +23,7 @@ class QueueFame1[T <: Data] (val entries: Int)(data: => T) extends Module
   val was_reset = Reg(init = Bool(true))
   was_reset := Bool(false)
   
-  val target_queue = new Queue(data, entries)
+  val target_queue = Module(new Queue(data, entries))
   val tracker = Module(new Fame1QueueTracker(entries, entries))
   
   target_queue.io.enq.valid := io.enq.host_valid && io.enq.target.valid
@@ -185,6 +186,7 @@ class RegBundle extends Bundle
   val data = UInt(width = 32)
 }
 
+/*
 class Fame1WrapperIO(n: Int, num_regs: Int) extends Bundle {
   var queues:Vec[ioQueueFame1[Bundle]] = null
   if(n > 0) {
@@ -199,14 +201,14 @@ class Fame1WrapperIO(n: Int, num_regs: Int) extends Bundle {
 
 class Fame1Wrapper(f: => Module) extends Module {
   def transform(isTop: Boolean, module: Module, parent: Module): Unit = {
-    module.isFame1 = true
+    Fame1Transform.fame1Modules += module
     val isFire = Bool(INPUT)
-    isFire.nameIt("is_fire")
+    isFire.nameIt("is_fire", true)
     isFire.component = module
-    module.isFire = isFire
+    Fame1Transform.fireSignals(module) = isFire
     if(!isTop){
-      Predef.assert(parent.isFire != null)
-      isFire := parent.isFire
+      Predef.assert(Fame1Transform.fireSignals(parent) != null)
+      isFire := Fame1Transform.fireSignals(parent)
     }
     module.io.asInstanceOf[Bundle] += isFire
     for(submodule <- module.children){
@@ -248,7 +250,7 @@ class Fame1Wrapper(f: => Module) extends Module {
         if (is_flip) fame1Decoupled.flip()
         for ((name, element) <- decoupled.bits.elements) {
           val elementClone = if (is_flip) element.clone.asInput else element.clone.asOutput
-          elementClone.nameIt(name)
+          elementClone.nameIt(name, true)
           fame1Decoupled.target.bits.asInstanceOf[Bundle] += elementClone
         }
         originalDecoupledIOs(name) = decoupled
@@ -263,7 +265,7 @@ class Fame1Wrapper(f: => Module) extends Module {
         }
         for ((name, element) <- reg.bits.elements) {
           val elementClone = if (is_flip) element.clone.asInput else element.clone.asOutput
-          elementClone.nameIt(name)
+          elementClone.nameIt(name, true)
           fame1REGIO.bits.asInstanceOf[Bundle] += elementClone
         }
         originalREGIOs(name) = reg
@@ -274,7 +276,7 @@ class Fame1Wrapper(f: => Module) extends Module {
         if (name != "is_fire") {
           originalOtherIO(name) = ioNode
           val elementClone = ioNode.clone
-          elementClone.nameIt(name)
+          elementClone.nameIt(name, true)
           fame1OtherIO(name) = elementClone
           io.other.asInstanceOf[Bundle] += elementClone
         }
@@ -296,7 +298,7 @@ class Fame1Wrapper(f: => Module) extends Module {
   }
   
   //general host read and host valid signals
-  originalModule.isFire := fire_tgt_clk
+  Fame1Transform.fireSignals(originalModule) := fire_tgt_clk
   if (io.queues != null){
     for (q <- io.queues) {
       if (q.host_valid.dir == OUTPUT) 
@@ -317,6 +319,9 @@ class Fame1Wrapper(f: => Module) extends Module {
   //connect wrapper IOs to original module IOs28
   for ((name, decoupledIO) <- fame1DecoupledIOs) {
     originalDecoupledIOs(name) <> decoupledIO.target
+    println("DEBUG0")
+    println(name)
+    println(decoupledIO.target.bits.elements)
   }
   for ((name, regIO) <- fame1REGIOs) {
     if (regIO.bits.flatten(0)._2.dir == INPUT){
@@ -328,6 +333,144 @@ class Fame1Wrapper(f: => Module) extends Module {
   for ((name, element) <- fame1OtherIO) {
     originalOtherIO(name) <> element
   }
+}*/
+
+
+class Fame1WrapperIO(n: Int, num_regs: Int) extends Bundle {
+  var queues:Vec[ioQueueFame1[Bits]] = null
+  if(n > 0) {
+    queues = Vec.fill(n){ new ioQueueFame1(Bits())}
+  }
+  var regs:Vec[DecoupledIO[Bits]] = null
+  if(num_regs > 0) {
+    regs = Vec.fill(num_regs){ new DecoupledIO(Bits())}
+  }
+  val other  = new Bundle()
+}
+
+class Fame1Wrapper(f: => Module) extends Module {
+  def transform(isTop: Boolean, module: Module, parent: Module): Unit = {
+    Fame1Transform.fame1Modules += module
+    val isFire = Bool(INPUT)
+    isFire.nameIt("is_fire", true)
+    isFire.component = module
+    Fame1Transform.fireSignals(module) = isFire
+    if(!isTop){
+      Predef.assert(Fame1Transform.fireSignals(parent) != null)
+      isFire := Fame1Transform.fireSignals(parent)
+    }
+    module.io.asInstanceOf[Bundle] += isFire
+    for(submodule <- module.children){
+      transform(false, submodule, module)
+    }
+  }
+  
+  val originalModule = Module(f)
+  transform(true, originalModule, null)
+
+  //counter number of REGIO and Decoupled IO in original module
+  var num_decoupled_io = 0
+  var num_reg_io = 0
+  for ((name, io) <- originalModule.io.asInstanceOf[Bundle].elements){ 
+    io match { 
+      case q : DecoupledIO[_] => num_decoupled_io += 1; 
+      case r : REGIO[_] => num_reg_io += 1;
+      case _ => 
+    }
+  }
+
+  val io = new Fame1WrapperIO(num_decoupled_io, num_reg_io)
+  
+  val fame1REGIOs = new HashMap[String, DecoupledIO[Bits]]()
+  val fame1DecoupledIOs  = new HashMap[String, ioQueueFame1[Bits]]()
+  val fame1OtherIO = new HashMap[String, Data]()
+
+  var decoupled_counter = 0
+  var reg_counter = 0
+  
+  //populate fame1REGIO and fame1DecoupledIO bundles with the elements from the original REGIO and DecoupleIOs
+  for ((name, ioNode) <- originalModule.io.asInstanceOf[Bundle].elements) {
+    ioNode match {
+      case decoupled : DecoupledIO[_] => {
+        val is_flip = (decoupled.ready.dir == OUTPUT)
+        val fame1Decoupled      = io.queues(decoupled_counter)
+        if (is_flip) {
+          fame1Decoupled.flip()
+          fame1Decoupled.target.ready := decoupled.ready
+          decoupled.valid := fame1Decoupled.target.valid
+          val decoupledBitsClone = decoupled.bits.clone()
+          decoupled.bits := decoupledBitsClone.fromBits(fame1Decoupled.target.bits)
+        } else {
+          decoupled.ready := fame1Decoupled.target.ready
+          fame1Decoupled.target.bits := decoupled.bits.toBits
+          fame1Decoupled.target.valid := decoupled.valid 
+          println("DEBUG1")
+          println(fame1Decoupled.target.bits)
+        }
+        fame1DecoupledIOs(name) = fame1Decoupled
+        decoupled_counter += 1
+      }
+      case reg : REGIO[_] => {
+        val is_flip = (reg.bits.flatten(0)._2.dir == INPUT)
+        val fame1REGIO = io.regs(reg_counter)
+        if (is_flip) {
+          fame1REGIO.flip()
+          val regBitsClone = reg.bits.clone()
+          reg.bits := regBitsClone.fromBits(fame1REGIO.bits)
+        } else {
+          fame1REGIO.bits := reg.bits.toBits
+        }
+        fame1REGIOs(name) = fame1REGIO
+        reg_counter += 1
+      }
+      case _ => {
+        if (name != "is_fire") {
+          val elementClone = ioNode.clone
+          elementClone.nameIt(name, true)
+          fame1OtherIO(name) = elementClone
+          io.other.asInstanceOf[Bundle] += elementClone
+          elementClone <> ioNode
+        }
+      }
+    }
+  }
+  //generate fire_tgt_clk signal
+  var fire_tgt_clk = Bool(true)
+  if (io.queues != null){
+    for (q <- io.queues)
+      fire_tgt_clk = fire_tgt_clk && 
+        (if (q.host_valid.dir == OUTPUT) q.host_ready else q.host_valid)
+  }
+  if (io.regs != null){
+    for (r <- io.regs) {
+      fire_tgt_clk = fire_tgt_clk && 
+        (if (r.valid.dir == OUTPUT) r.ready else r.valid)
+    }
+  }
+  
+  //generate host read and host valid signals
+  Fame1Transform.fireSignals(originalModule) := fire_tgt_clk
+  if (io.queues != null){
+    for (q <- io.queues) {
+      if (q.host_valid.dir == OUTPUT) 
+        q.host_valid := fire_tgt_clk
+      else
+        q.host_ready := fire_tgt_clk
+    }
+  }
+  if (io.regs != null){
+    for (r <- io.regs) {
+      if (r.valid.dir == OUTPUT) 
+        r.valid := fire_tgt_clk
+      else
+        r.ready := fire_tgt_clk
+    }
+  }
+}
+
+object Fame1Transform {
+  val fame1Modules = new HashSet[Module]
+  val fireSignals = new HashMap[Module, Bool]
 }
 
 trait Fame1Transform extends Backend {
@@ -335,7 +478,7 @@ trait Fame1Transform extends Backend {
     val regs = new ArrayBuffer[(Module, Reg)]
     //find all the registers in FAME1 modules
     def findRegs(module: Module): Unit = {
-      if(module.isFame1){
+      if(Fame1Transform.fame1Modules.contains(module)){
         for(reg <- module.nodes.filter(_.isInstanceOf[Reg])){
           regs += ((module, reg.asInstanceOf[Reg]))
         }
@@ -351,13 +494,37 @@ trait Fame1Transform extends Backend {
       for(i <- 0 until reg.updates.length){
         val wEn = reg.updates(i)._1
         val wData = reg.updates(i)._2
-        reg.updates(i) = ((wEn && module.isFire, wData))
+        reg.updates(i) = ((wEn && Fame1Transform.fireSignals(module), wData))
       }
     }
   }
-  
+ 
+  private def appendFireToMemWriteEnables(top: Module) = {
+    val mems = new ArrayBuffer[(Module, Mem[Data])]
+    //find all the mems in FAME1 modules
+    def findMems(module: Module): Unit = {
+      if(Fame1Transform.fame1Modules.contains(module)){
+        for(mem <- module.nodes.filter(_.isInstanceOf[Mem[Data]])){
+          mems += ((module, mem.asInstanceOf[Mem[Data]]))
+        }
+      }
+      for(childModule <- module.children){
+        findMems(childModule)
+      }
+    }
+    findMems(top)
+
+    for((module, mem) <- mems){
+      for(memWrite <- mem.writeAccesses){
+        memWrite.inputs(1) = memWrite.inputs(1).asInstanceOf[Data].toBool && Fame1Transform.fireSignals(module)
+      }
+    }
+  }
+
   preElaborateTransforms += ((top: Module) => collectNodesIntoComp(initializeDFS))
   preElaborateTransforms += ((top: Module) => appendFireToRegWriteEnables(top))
+  preElaborateTransforms += ((top: Module) => top.genAllMuxes)
+  preElaborateTransforms += ((top: Module) => appendFireToMemWriteEnables(top))
 }
 
 class Fame1CppBackend extends CppBackend with Fame1Transform

@@ -186,6 +186,7 @@ class RegBundle extends Bundle
   val data = UInt(width = 32)
 }
 
+/*
 class Fame1WrapperIO(n: Int, num_regs: Int) extends Bundle {
   var queues:Vec[ioQueueFame1[Bundle]] = null
   if(n > 0) {
@@ -318,6 +319,9 @@ class Fame1Wrapper(f: => Module) extends Module {
   //connect wrapper IOs to original module IOs28
   for ((name, decoupledIO) <- fame1DecoupledIOs) {
     originalDecoupledIOs(name) <> decoupledIO.target
+    println("DEBUG0")
+    println(name)
+    println(decoupledIO.target.bits.elements)
   }
   for ((name, regIO) <- fame1REGIOs) {
     if (regIO.bits.flatten(0)._2.dir == INPUT){
@@ -328,6 +332,137 @@ class Fame1Wrapper(f: => Module) extends Module {
   }
   for ((name, element) <- fame1OtherIO) {
     originalOtherIO(name) <> element
+  }
+}*/
+
+
+class Fame1WrapperIO(n: Int, num_regs: Int) extends Bundle {
+  var queues:Vec[ioQueueFame1[Bits]] = null
+  if(n > 0) {
+    queues = Vec.fill(n){ new ioQueueFame1(Bits())}
+  }
+  var regs:Vec[DecoupledIO[Bits]] = null
+  if(num_regs > 0) {
+    regs = Vec.fill(num_regs){ new DecoupledIO(Bits())}
+  }
+  val other  = new Bundle()
+}
+
+class Fame1Wrapper(f: => Module) extends Module {
+  def transform(isTop: Boolean, module: Module, parent: Module): Unit = {
+    Fame1Transform.fame1Modules += module
+    val isFire = Bool(INPUT)
+    isFire.nameIt("is_fire", true)
+    isFire.component = module
+    Fame1Transform.fireSignals(module) = isFire
+    if(!isTop){
+      Predef.assert(Fame1Transform.fireSignals(parent) != null)
+      isFire := Fame1Transform.fireSignals(parent)
+    }
+    module.io.asInstanceOf[Bundle] += isFire
+    for(submodule <- module.children){
+      transform(false, submodule, module)
+    }
+  }
+  
+  val originalModule = Module(f)
+  transform(true, originalModule, null)
+
+  //counter number of REGIO and Decoupled IO in original module
+  var num_decoupled_io = 0
+  var num_reg_io = 0
+  for ((name, io) <- originalModule.io.asInstanceOf[Bundle].elements){ 
+    io match { 
+      case q : DecoupledIO[_] => num_decoupled_io += 1; 
+      case r : REGIO[_] => num_reg_io += 1;
+      case _ => 
+    }
+  }
+
+  val io = new Fame1WrapperIO(num_decoupled_io, num_reg_io)
+  
+  val fame1REGIOs = new HashMap[String, DecoupledIO[Bits]]()
+  val fame1DecoupledIOs  = new HashMap[String, ioQueueFame1[Bits]]()
+  val fame1OtherIO = new HashMap[String, Data]()
+
+  var decoupled_counter = 0
+  var reg_counter = 0
+  
+  //populate fame1REGIO and fame1DecoupledIO bundles with the elements from the original REGIO and DecoupleIOs
+  for ((name, ioNode) <- originalModule.io.asInstanceOf[Bundle].elements) {
+    ioNode match {
+      case decoupled : DecoupledIO[_] => {
+        val is_flip = (decoupled.ready.dir == OUTPUT)
+        val fame1Decoupled      = io.queues(decoupled_counter)
+        if (is_flip) {
+          fame1Decoupled.flip()
+          fame1Decoupled.target.ready := decoupled.ready
+          decoupled.valid := fame1Decoupled.target.valid
+          val decoupledBitsClone = decoupled.bits.clone()
+          decoupled.bits := decoupledBitsClone.fromBits(fame1Decoupled.target.bits)
+        } else {
+          decoupled.ready := fame1Decoupled.target.ready
+          fame1Decoupled.target.bits := decoupled.bits.toBits
+          fame1Decoupled.target.valid := decoupled.valid 
+        }
+        fame1DecoupledIOs(name) = fame1Decoupled
+        decoupled_counter += 1
+      }
+      case reg : REGIO[_] => {
+        val is_flip = (reg.bits.flatten(0)._2.dir == INPUT)
+        val fame1REGIO = io.regs(reg_counter)
+        if (is_flip) {
+          fame1REGIO.flip()
+          val regBitsClone = reg.bits.clone()
+          reg.bits := regBitsClone.fromBits(fame1REGIO.bits)
+        } else {
+          fame1REGIO.bits := reg.bits.toBits
+        }
+        fame1REGIOs(name) = fame1REGIO
+        reg_counter += 1
+      }
+      case _ => {
+        if (name != "is_fire") {
+          val elementClone = ioNode.clone
+          elementClone.nameIt(name, true)
+          fame1OtherIO(name) = elementClone
+          io.other.asInstanceOf[Bundle] += elementClone
+          elementClone <> ioNode
+        }
+      }
+    }
+  }
+  //generate fire_tgt_clk signal
+  var fire_tgt_clk = Bool(true)
+  if (io.queues != null){
+    for (q <- io.queues)
+      fire_tgt_clk = fire_tgt_clk && 
+        (if (q.host_valid.dir == OUTPUT) q.host_ready else q.host_valid)
+  }
+  if (io.regs != null){
+    for (r <- io.regs) {
+      fire_tgt_clk = fire_tgt_clk && 
+        (if (r.valid.dir == OUTPUT) r.ready else r.valid)
+    }
+  }
+  
+  //generate host read and host valid signals
+  Fame1Transform.fireSignals(originalModule) := fire_tgt_clk
+  if (io.queues != null){
+    for (q <- io.queues) {
+      if (q.host_valid.dir == OUTPUT) 
+        q.host_valid := fire_tgt_clk
+      else
+        q.host_ready := fire_tgt_clk
+    }
+  }
+  if (io.regs != null){
+    for (r <- io.regs) {
+      if (r.valid.dir == OUTPUT) 
+        r.valid := fire_tgt_clk
+      else
+        r.ready := fire_tgt_clk
+    }
   }
 }
 
