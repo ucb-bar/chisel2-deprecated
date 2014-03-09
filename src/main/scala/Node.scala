@@ -152,14 +152,19 @@ abstract class Node extends nameable {
     inferWidth = fixWidth(w);
   }
 
-  def nameIt (path: String, isNamingIO: Boolean) {
-    if( (!named && !isIo) || (isIo && isNamingIO) ) {
+  def nameIt (path: String, isNamingIo: Boolean) {
+    if( (!named && !isIo) || (isIo && isNamingIo) ) {
       /* If the name was set explicitely through *setName*,
        we don't override it. */
       name = path;
     }
     while (!(component.names.getOrElseUpdate(name, this) eq this))
       name += "_"
+  }
+
+  def setPseudoName(path: String, isNamingIo: Boolean) {
+    if (!isIo || (isIo && isNamingIo))
+      pName = path
   }
 
   lazy val chiselName = this match {

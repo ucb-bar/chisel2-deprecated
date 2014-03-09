@@ -135,15 +135,13 @@ abstract class Data extends Node {
     }
   }
 
-  /*
-  override def nameIt(path: String, isNamingIO: Boolean) {
+  override def nameIt(path: String, isNamingIo: Boolean) {
     if (isTypeNode && comp != null) {
-      comp nameIt (path, isNamingIO)
+      comp.nameIt(path, isNamingIo)
     } else {
-      super.nameIt(path, isNamingIO)
+      super.nameIt(path, isNamingIo)
     }
   }
-  */
 
   def setWidth(w: Int) {
     this.width = w;
@@ -151,11 +149,11 @@ abstract class Data extends Node {
 }
 
 abstract class Aggregate extends Data {
-  override def nameIt(path: String, isNamingIO: Boolean) {
+  override def setPseudoName(path: String, isNamingIo: Boolean) {
     if (isTypeNode && comp != null) {
-      comp nameIt (path, isNamingIO)
+      comp setPseudoName (path, isNamingIo)
     } else {
-      super.nameIt(path, isNamingIO)
+      super.setPseudoName(path, isNamingIo)
     }
   }
 }

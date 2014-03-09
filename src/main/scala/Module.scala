@@ -255,6 +255,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   var name: String = "";
   /** Name of the module this component generates (defaults to class name). */
   var moduleName: String = "";
+  var pName = ""
   var named = false;
   val bindings = new ArrayBuffer[Binding];
   var wiresCache: Array[(String, Bits)] = null;
@@ -499,13 +500,22 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       val top = dfsStack.pop
       walked += top
       visit(top)
-      for(i <- top.inputs) {
-        if(!(i == null)) {
-          if(!(walked contains i)) {
+      top match {
+        case b: Bundle => 
+          for((n, i) <- b.flatten ; if !(i == null) && !(walked contains i)) {
             dfsStack push i
             walked += i
           }
-        }
+        case v: Vec[_] =>
+          for((n, i) <- v.flatten ; if !(i == null) && !(walked contains i)) {
+            dfsStack push i
+            walked += i
+          }
+        case _ => 
+          for(i <- top.inputs ; if !(i == null) && !(walked contains i)) {
+            dfsStack push i
+            walked += i
+          }
       }
     }
   }
@@ -789,7 +799,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   /* XXX deprecated. make sure containsReg and isClk are set properly. */
   def markComponent() {
     ownIo();
-    io nameIt ("io", true)
+    io setPseudoName ("io", true)
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], Cell, BlackBox and Modules.
      Since we call invoke() to get a proper instance of the correct type,
@@ -804,7 +814,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
          o match {
          case node: Node => {
            if (node.isReg || node.isClkInput) containsReg = true;
-           node.getNode.varName = name
+           node setPseudoName (name, false)
          }
          case buf: ArrayBuffer[_] => {
            /* We would prefer to match for ArrayBuffer[Node] but that's
@@ -817,23 +827,36 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
                if (elm.isReg || elm.isClkInput) {
                  containsReg = true;
                }
-               elm.getNode.varName = name + "_" + i
+               elm setPseudoName (name + "_" + i, false)
+             }
+           }
+         }
+         case buf: collection.IndexedSeq[_] => {
+           if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
+             val nodebuf = buf.asInstanceOf[Seq[Node]];
+             for((elm, i) <- nodebuf.zipWithIndex){
+               if (elm.isReg || elm.isClkInput) {
+                 containsReg = true;
+               }
+               elm setPseudoName (name + "_" + i, false)
              }
            }
          }
          // Todo: do we have Cell anymore?
          case cell: Cell => {
            if(cell.isReg) containsReg = true;
-           cell.varName = name
+           cell.pName = name
          }
          case bb: BlackBox => {
            bb.pathParent = this;
+           bb.pName = name
            for((n, elm) <- io.flatten) {
              if (elm.isClkInput) containsReg = true
            }
          }
          case comp: Module => {
            comp.pathParent = this;
+           comp.pName = name
          }
          case any =>
        }

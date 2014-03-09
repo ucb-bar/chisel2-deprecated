@@ -113,16 +113,15 @@ abstract class Bits extends Data with proc {
 
   //code generation stuff
 
-  // Define nameIt to deal with type nodes before they are removed
-  override def nameIt (path : String, isNamingIO: Boolean) {
+  override def setPseudoName (path : String, isNamingIo: Boolean) {
     if (isIo) {
-      super.nameIt(path, isNamingIO)
+      super.setPseudoName(path, isNamingIo)
     } else if (isTypeNode && comp != null) {
-      comp nameIt (path, isNamingIO)
+      comp setPseudoName (path, isNamingIo)
     } else if (isTypeNode && !inputs.isEmpty && !inputs.head.isLit) {
-      inputs.head nameIt (path, isNamingIO)
+      inputs.head setPseudoName (path, isNamingIo)
     } else {
-      super.nameIt(path, isNamingIO)
+      super.setPseudoName(path, isNamingIo)
     } 
   }
 

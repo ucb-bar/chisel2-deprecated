@@ -194,7 +194,7 @@ class Reg extends Delay with proc {
 
   def nameOpt: String = 
     if (name.length > 0) name 
-    else if (varName.length > 0) varName
+    else if (pName.length > 0) pName
     else "REG"
   override def toString: String = {
     "REG(" + nameOpt + ")"

@@ -252,7 +252,7 @@ abstract class Backend {
     }
   }
 
- def emitTmp(node: Node): String =
+  def emitTmp(node: Node): String =
     emitRef(node)
 
   def emitRef(node: Node): String = {
@@ -522,6 +522,45 @@ abstract class Backend {
     }
   }
 
+  // Assign psuedo names for backannotation
+  def setPseudoNames(c: Module) {
+    val classNames = new HashMap[String, ArrayBuffer[Module]]
+
+    for (m <- Module.sortedComps ; if m.pName == "") {
+      val className = extractClassName(m)
+      if (!(classNames contains className)) {
+        classNames(className) = new ArrayBuffer[Module]
+      }
+      classNames(className) += m
+    }
+   
+    for ((name, comps) <- classNames) {
+      if (comps.size > 1) {
+        for ((c, i) <- comps.zipWithIndex) {
+          c.pName = name + "_" + i
+        }
+      }
+    }
+
+    c dfs { node =>
+      if (!node.isTypeNode && !node.isLit && node.pName == "") {
+        if (node.name != "") {
+          node.pName = node.name
+        } else {
+          val prefix = node match {
+            case _: Reg => "R"
+            case _ => "T"
+          }
+          if (Module.isEmittingComponents) {
+            node.pName = prefix + node.emitIndex
+          } else {
+            node.pName = prefix + node.component.nextIndex
+          }
+        }
+      }
+    }
+  }
+
   def elaborate(c: Module): Unit = {
     println("backend elaborate")
     Module.setAsTopComponent(c)
@@ -579,6 +618,9 @@ abstract class Backend {
     ChiselError.info("resolving nodes to the components")
     collectNodesIntoComp(initializeDFS)
     ChiselError.info("finished resolving")
+
+    // Assign pseudo names for backannotation
+    setPseudoNames(c)
 
     // two transforms added in Mem.scala (referenced and computePorts)
     ChiselError.info("started transforms")

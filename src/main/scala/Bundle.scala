@@ -154,17 +154,27 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     elementsCache = elts; this
   }
 
-  override def nameIt (path: String, isNamingIO: Boolean) {
+  override def nameIt (path: String, isNamingIo: Boolean) {
     if( !named
       && (name.isEmpty
         || (!path.isEmpty && name != path)) ) {
       name = path
       val prefix = if (name.length > 0) name + "_" else ""
       for ((n, i) <- elements) {
-        i nameIt (prefix + n, isNamingIO)
+        i nameIt (prefix + n, isNamingIo)
       }
     } else {
       /* We are trying to rename a Bundle that has a fixed name. */
+    }
+  }
+
+  override def setPseudoName (path: String, isNamingIo: Boolean) {
+    if (pName != "" || (path != "" && pName != path)) {
+      pName = path
+      val prefix = if (name.length > 0) name + "_" else ""
+      for ((n, i) <- elements) {
+        i setPseudoName (prefix + n, isNamingIo)
+      }
     }
   }
 
