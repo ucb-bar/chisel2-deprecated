@@ -345,8 +345,11 @@ abstract class Backend {
         node.component.nodes += node
       for (input <- node.inputs) {
         if (input.component != null && input.component != node.component) {
-          if (!input.isLit && !isBitsIo(node, INPUT) && !isBitsIo(input, OUTPUT))
-            ChiselErrors += new ChiselError(() => { "Illegal cross module reference between " + node + " and " + input}, node.line)
+          if (!input.isLit &&
+              !isBitsIo(input, OUTPUT) && !isBitsIo(node, INPUT) &&
+              // READ BACK INPUT -- TODO: TIGHTEN THIS UP
+              !isBitsIo(input, INPUT))
+            ChiselErrors += new ChiselError(() => { "Illegal cross module reference between " + node + " and " + input }, node.line)
         }
         if(!walked.contains(input)) {
           if( input.component == null ) {

@@ -168,6 +168,7 @@ object chiselMain {
         case "--jackDump" => Module.jackDump = args(i+1); i+=1; //mode of dump (i.e. space.prm, design.prm etc)
         case "--jackDir"  => Module.jackDir = args(i+1); i+=1;  //location of dump or load
         case "--jackLoad" => Module.jackLoad = args(i+1); i+=1; //design.prm file
+        case "--dumpTestInput" => Module.dumpTestInput = true;
         //case "--jDesign" =>  Module.jackDesign = args(i+1); i+=1;
         case any => ChiselError.warning("'" + arg + "' is an unknown argument.");
       }
