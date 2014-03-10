@@ -789,14 +789,8 @@ class CppBackend extends Backend {
     for (m <- c.omods) {
       writeCppFile(emitInit(m))
     }
-    for (clock <- Module.clocks)
+    for (clock <- Module.clocks) {
       writeCppFile(emitInit(clock))
-    writeCppFile("  nodes.clear();\n")
-    writeCppFile("  mems.clear();\n")
-    for (m <- mappings) {
-      if (m._2.name != "reset" && (m._2.isInObject || m._2.isInVCD)) {
-        writeCppFile(emitMapping(m))
-      }
     }
     writeCppFile("}\n")
 
@@ -853,6 +847,15 @@ class CppBackend extends Backend {
       writeCppFile("fflush(f);\n");
     writeCppFile("}\n")
 
+    writeCppFile("  nodes.clear();\n")
+    writeCppFile("  mems.clear();\n")
+    
+    for (m <- mappings) {
+      if (m._2.name != "reset" && (m._2.isInObject || m._2.isInVCD)) {
+        writeCppFile(emitMapping(m))
+      }
+    }
+    
     createCppFile()
     vcd.dumpVCD(c, writeCppFile)
 
@@ -865,16 +868,23 @@ class CppBackend extends Backend {
     writeCppFile(all_cpp.result)
     out_cpps.foreach(_.close)
 
-    /* Copy the emulator.h file into the targetDirectory. */
-    val resourceStream = getClass().getResourceAsStream("/emulator.h")
-    if( resourceStream != null ) {
-      val classFile = createOutputFile("emulator.h")
-      while(resourceStream.available > 0) {
-        classFile.write(resourceStream.read())
-      }
-      classFile.close()
-      resourceStream.close()
+    def copyToTarget(filename: String) = {
+	  val resourceStream = getClass().getResourceAsStream("/" + filename)
+	  if( resourceStream != null ) {
+	    val classFile = createOutputFile(filename)
+	    while(resourceStream.available > 0) {
+	      classFile.write(resourceStream.read())
+	    }
+	    classFile.close()
+	    resourceStream.close()
+	  } else {
+		println(s"WARNING: Unable to copy '$filename'" )
+	  }
     }
+    /* Copy the emulator headers into the targetDirectory. */
+    copyToTarget("emulator_mod.h")
+    copyToTarget("emulator_api.h")
+    copyToTarget("emulator.h")
   }
 
 }
