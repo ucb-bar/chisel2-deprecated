@@ -101,6 +101,10 @@ object Module {
   var jackLoad: String = null;
   //var jackDesign: String = null;
 
+  // Setting this to TRUE will case the test harness to print its
+  // standard input stream to a file.
+  var dumpTestInput = false;
+
   /* Any call to a *Module* constructor without a proper wrapping
    into a Module.apply() call will be detected when trigger is false. */
   var trigger: Boolean = false
