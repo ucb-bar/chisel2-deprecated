@@ -240,7 +240,9 @@ protected:
 
 class mod_api_t {
 public:
-	virtual mod_t get_module();
+	mod_t get_module() {
+		return module;
+	}
 
 	// API basic functions
 	std::string get_host_name() {return "C++ Emulator API";}
@@ -269,6 +271,8 @@ public:
 	    return res;
 	}
 
+	// helper to verify command length, returning false and printing an error
+	// to stderr if the length isn't in the specified range
 	bool check_command_length(std::vector<std::string>& tokenized_command,
 			int min_args, int max_args=-1) {
 		if (tokenized_command.size() - 1 < min_args) {
