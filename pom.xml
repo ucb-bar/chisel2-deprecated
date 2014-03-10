@@ -6,7 +6,7 @@
 
     <groupId>edu.berkeley.eecs</groupId>
     <artifactId>chisel</artifactId>
-    <version>2.1-SNAPSHOT</version>
+    <version>2.3-SNAPSHOT</version>
     <name>Chisel HDL</name>
     <description>Chisel HDL DSL based in Scala.</description>
 
@@ -15,6 +15,30 @@
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-library</artifactId>
             <version>2.10.3</version>
+        </dependency>
+
+        <dependency>
+            <groupId>ucl.ac.be</groupId>
+            <artifactId>oscar-algo</artifactId>
+            <version>2.10-1.0-M1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>ucl.ac.be</groupId>
+            <artifactId>oscar-cp</artifactId>
+            <version>2.10-1.0-M1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>ucl.ac.be</groupId>
+            <artifactId>oscar-util</artifactId>
+            <version>2.10-1.0-M1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>ucl.ac.be</groupId>
+            <artifactId>oscar-visual</artifactId>
+            <version>2.10-1.0-M1</version>
         </dependency>
 
         <dependency>

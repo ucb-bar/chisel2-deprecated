@@ -127,6 +127,13 @@ Publishing to public Maven repo:
 
 Making the Chisel jar file with Maven (>=3.0.4)
 
+Some of the library jars in /lib are not available in the central Maven repository.
+They can be installed to your local repo using the script 'install_maven_libs':
+
+    $ ./install_maven_libs
+
+Build Chisel with:
+
     $ mvn install
 
 Two maven profiles to skip the tests or ignore failures respectively
