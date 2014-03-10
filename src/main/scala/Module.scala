@@ -94,7 +94,7 @@ object Module {
   val clocks = new ArrayBuffer[Clock]()
   var implicitReset: Bool = null
   var implicitClock: Clock = null
-
+  var model = ""
   /* Jackhammer flags */
   var jackDump: String = null;
   var jackDir: String = null;
@@ -273,6 +273,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   val nodes = new ArrayBuffer[Node]
   val mods = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
+  val signals = new ArrayBuffer[Node]
 
   val regs  = new ArrayBuffer[Reg];
   val nexts = new ScalaQueue[Node];

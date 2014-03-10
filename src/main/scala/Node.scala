@@ -139,6 +139,8 @@ abstract class Node extends nameable {
   var driveRand = false
   var clock: Clock = null
   var CppVertex: CppVertex = null
+  var counter: Bits = null
+  var shadow: Bits = null
 
   Module.nodes += this
 
