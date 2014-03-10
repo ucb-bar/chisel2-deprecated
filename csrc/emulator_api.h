@@ -5,6 +5,7 @@
 #include "emulator_mod.h"
 
 #include <string>
+#include <sstream>
 #include <map>
 
 /**
@@ -67,7 +68,7 @@ bool dat_from_str(std::string in, dat_t<w>& res, int pos = 0) {
 
     val_t radix_val = radix;
     val_t temp_prod[val_n_words(w)];
-    val_rest curr_base[val_n_words(w)];
+    val_t curr_base[val_n_words(w)];
     val_t temp_alias[val_n_words(w)];
     val_t *dest_val = res.values;
     val_set(curr_base, w, 1);
@@ -108,9 +109,13 @@ bool dat_from_str(std::string in, dat_t<w>& res, int pos = 0) {
 // API base class, providing common functions
 class api_base {
 public:
+	api_base(std::string new_name, std::string new_path) :
+		name(new_name),
+		path(new_path)
+	{}
 	// returns the fully qualified name of this object (path + dot + name)
 	std::string get_pathname() {
-		return self.path + "." + self.name;
+		return path + "." + name;
 	}
 	// returns the short name of this object
 	std::string get_name() {
@@ -128,16 +133,24 @@ protected:
 // API base (non width templated) class for API accessors to dat_t
 class dat_api_base : public api_base {
 public:
+	dat_api_base(std::string new_name, std::string new_path) :
+		api_base(new_name, new_path)
+	{}
 	// returns the value of this wire as a string, or empty string on failure
 	virtual std::string get_value() = 0;
 	// sets the value of this wire from a string, returning true on success
-	virtual void set_value(string value) = 0;
+	virtual bool set_value(std::string value) = 0;
+	// returns the bitwidth of this wire
+	virtual std::string get_width() = 0;
 };
 
 // dat_api dummy class, does nothing except for return errors
 // to be used when a real dat_api object can't be found
 class dat_dummy : public dat_api_base {
 public:
+	dat_dummy() :
+		dat_api_base("", "")
+	{}
 	std::string get_value() {
 		return "";
 	}
@@ -153,10 +166,9 @@ public:
 
 template<int w> class dat_api : public dat_api_base {
 public:
-	dat_api(dat_t<w>* dat, std::string name, std::string path) :
-		dat_ptr(dat),
-		name(name),
-		path(path)
+	dat_api(dat_t<w>* new_dat, std::string new_name, std::string new_path) :
+		api_base(new_name, new_path),
+		dat_ptr(new_dat)
 	{}
 
 	std::string get_value() {
@@ -178,16 +190,26 @@ protected:
 // API base (non width/depth templated) class for API accessors to mem_t
 class mem_api_base : public api_base {
 public:
+	mem_api_base(std::string new_name, std::string new_path) :
+		api_base(new_name, new_path)
+	{}
 	// return the value of an element as a string, or empty string on failure
 	virtual std::string get_element(std::string index) = 0;
 	// sets the value of an element from a string, returning true on success
-	virtual void set_element(std::string index, std::string value) = 0;
+	virtual bool set_element(std::string index, std::string value) = 0;
+	// returns the bitwidth of a memory element
+	virtual std::string get_width() = 0;
+	// returns the number of memory elements
+	virtual std::string get_depth() = 0;
 };
 
 // mem_api dummy class, does nothing except for return errors
 // to be used when a real mem_api object can't be found
 class mem_dummy : public mem_api_base {
 public:
+	mem_dummy() :
+		mem_api_base("", "")
+	{}
 	string get_element(std::string index) {
 		return "";
 	}
@@ -203,17 +225,13 @@ public:
 	std::string get_depth() {
 		return "";
 	}
-
-protected:
-	mem_t<w, d>* mem_ptr;
 };
 
 template<int w, int d> class mem_api : public mem_api_base {
 public:
-	mem_api(mem_t<w, d>* new_mem, std::string name, std::string path) :
-		mem_ptr(mem),
-		name(name),
-		path(path)
+	mem_api(mem_t<w, d>* new_mem, std::string new_name, std::string new_path) :
+		api_base(new_name, new_path),
+		mem_ptr(new_mem)
 	{}
 
 	string get_element(std::string index) {
@@ -240,7 +258,7 @@ protected:
 
 class mod_api_t {
 public:
-	mod_t get_module() {
+	mod_t* get_module() {
 		return module;
 	}
 
@@ -276,12 +294,12 @@ public:
 	bool check_command_length(std::vector<std::string>& tokenized_command,
 			int min_args, int max_args=-1) {
 		if (tokenized_command.size() - 1 < min_args) {
-			std::cerr << tokenized_command[0] " expects at least " << min_args
+			std::cerr << tokenized_command[0] << " expects at least " << min_args
 					<< " args, got " << tokenized_command.size() - 1
 					<< std::endl;
 			return false;
 		} else if (max_args >= 0 && tokenized_command.size() - 1 > max_args) {
-			std::cerr << tokenized_command[0] " expects at most " << max_args
+			std::cerr << tokenized_command[0] << " expects at most " << max_args
 					<< " args, got " << tokenized_command.size() - 1
 					<< std::endl;
 			return false;
@@ -289,21 +307,21 @@ public:
 		return true;
 	}
 
-	string eval_command(string command) {
+	std::string eval_command(string command) {
 		std::vector<std::string> tokens = tokenize(command);
 		if (tokens[0] == "get_host_name") {
-			if (!check_command_length(tokens, 0, 0)) { break; }
+			if (!check_command_length(tokens, 0, 0)) { return ""; }
 			return get_host_name();
 		} else if (tokens[0] == "get_api_version") {
-			if (!check_command_length(tokens, 0, 0)) { break; }
+			if (!check_command_length(tokens, 0, 0)) { return ""; }
 			return get_api_version();
 		} else if (tokens[0] == "get_api_support") {
-			if (!check_command_length(tokens, 0, 0)) { break; }
+			if (!check_command_length(tokens, 0, 0)) { return ""; }
 			return get_api_support();
 
 		} else if (tokens[0] == "clock" || tokens[0] == "step") {
-			if (!check_command_length(tokens, 1, 1)) { break; }
-			int cycles = atoi(tokens[1]);
+			if (!check_command_length(tokens, 1, 1)) { return ""; }
+			int cycles = atoi(tokens[1].c_str());
 		    for (int i=0; i<cycles; i++) {
 		    	module->clock_lo(dat_t<1>(0));
 		    	module->clock_hi(dat_t<1>(0));
@@ -311,10 +329,10 @@ public:
 		    module->clock_lo(dat_t<1>(0));
 
 		} else if (tokens[0] == "reset") {
-			if (!check_command_length(tokens, 0, 1)) { break; }
+			if (!check_command_length(tokens, 0, 1)) { return ""; }
 			int cycles = 1;
 			if (tokens.size() >= 2) {
-				cycles = atoi(tokens[1])
+				cycles = atoi(tokens[1].c_str());
 			}
 			for (int i=0; i<cycles; i++) {
 			   	module->clock_lo(dat_t<1>(1));
@@ -323,55 +341,55 @@ public:
 		    module->clock_lo(dat_t<1>(0));
 
 		} else if (tokens[0] == "peek") {
-			if (!check_command_length(tokens, 1, 2)) { break; }
-			cerr << "peek is deprecated, use node_peek or mem_peek" << std::end;
+			if (!check_command_length(tokens, 1, 2)) { return ""; }
+			cerr << "peek is deprecated, use node_peek or mem_peek" << std::endl;
 			if (tokens.size() == 2) {
-				return get_dat_by_name(tokens[1]).get_value();
+				return get_dat_by_name(tokens[1])->get_value();
 			} else if (tokens.size() == 3) {
-				return get_mem_by_name(tokens[1]).get_value(tokens[2]);
+				return get_mem_by_name(tokens[1])->get_element(tokens[2]);
 			}
 		} else if (tokens[0] == "poke") {
-			if (!check_command_length(tokens, 2, 3)) { break; }
-			cerr << "poke is deprecated, use node_poke or mem_poke" << std::end;
-			bool success
+			if (!check_command_length(tokens, 2, 3)) { return ""; }
+			cerr << "poke is deprecated, use node_poke or mem_poke" << std::endl;
+			bool success;
 			if (tokens.size() == 3) {
-				success = get_dat_by_name(tokens[1]).set_value(tokens[2]);
-			else if (tokens.size() == 4) {
-				success = get_mem_by_name(tokens[1]).set_value(tokens[2], tokens[3]);
+				success = get_dat_by_name(tokens[1])->set_value(tokens[2]);
+			} else if (tokens.size() == 4) {
+				success = get_mem_by_name(tokens[1])->set_element(tokens[2], tokens[3]);
 			}
 			return success ? "true" : "false";
 
 		} else if (tokens[0] == "node_peek") {
-			if (!check_command_length(tokens, 1, 1)) { break; }
-			return get_dat_by_name(tokens[1]).get_value();
+			if (!check_command_length(tokens, 1, 1)) { return ""; }
+			return get_dat_by_name(tokens[1])->get_value();
 		} else if (tokens[0] == "node_poke") {
-			if (!check_command_length(tokens, 2, 2)) { break; }
-			bool success = get_dat_by_name(tokens[1]).set_value(tokens[2]);
+			if (!check_command_length(tokens, 2, 2)) { return ""; }
+			bool success = get_dat_by_name(tokens[1])->set_value(tokens[2]);
 			return success ? "true" : "false";
 		} else if (tokens[0] == "mem_peek") {
-			if (!check_command_length(tokens, 2, 2)) { break; }
-			return get_mem_by_name(tokens[1]).get_value(tokens[2]);
+			if (!check_command_length(tokens, 2, 2)) { return ""; }
+			return get_mem_by_name(tokens[1])->get_element(tokens[2]);
 		} else if (tokens[0] == "mem_poke") {
-			if (!check_command_length(tokens, 3, 3)) { break; }
-			bool success = get_mem_by_name(tokens[1]).set_value(tokens[2], tokens[3]);
+			if (!check_command_length(tokens, 3, 3)) { return ""; }
+			bool success = get_mem_by_name(tokens[1])->set_element(tokens[2], tokens[3]);
 			return success ? "true" : "false";
 
 		} else if (tokens[0] == "list_nodes") {
-			if (!check_command_length(tokens, 0, 0)) { break; }
+			if (!check_command_length(tokens, 0, 0)) { return ""; }
 			// TODO: Implement me!
 		} else if (tokens[0] == "list_mems") {
-			if (!check_command_length(tokens, 0, 0)) { break; }
+			if (!check_command_length(tokens, 0, 0)) { return ""; }
 			// TODO: Implement me!
 
 		} else if (tokens[0] == "node_width") {
-			if (!check_command_length(tokens, 1, 1)) { break; }
-			return get_dat_by_name(tokens[1]).get_width();
+			if (!check_command_length(tokens, 1, 1)) { return ""; }
+			return get_dat_by_name(tokens[1])->get_width();
 		} else if (tokens[0] == "mem_width") {
-			if (!check_command_length(tokens, 1, 1)) { break; }
-			return get_mem_by_name(tokens[1]).get_width();
+			if (!check_command_length(tokens, 1, 1)) { return ""; }
+			return get_mem_by_name(tokens[1])->get_width();
 		} else if (tokens[0] == "mem_depth") {
-			if (!check_command_length(tokens, 1, 1)) { break; }
-			return get_mem_by_name(tokens[1]).get_depth();
+			if (!check_command_length(tokens, 1, 1)) { return ""; }
+			return get_mem_by_name(tokens[1])->get_depth();
 
 		} else {
 			std::cerr << "Unknown command: '" << tokens[0] << "'" << std::endl;
@@ -392,31 +410,31 @@ public:
 	}
 
 private:
-	mod_t module;
+	mod_t* module;
 
 	// Mapping table functions
-	virtual init_mapping_table();
-	dat_api& get_dat_by_name(std::string name) {
-		static dat_dummy dummy = new dat_dummy();
-		if (dat_table.find(name) != map<string, dat_api>.end) {
+	virtual void init_mapping_table() = 0;
+	dat_api_base* get_dat_by_name(std::string name) {
+		if (dat_table.find(name) != dat_table.end()) {
 			return dat_table[name];
 		} else {
 			std::cerr << "Unable to find dat '" << name << "'" << std::endl;
-			return dummy;
+			return &this_dat_dummy;
 		}
 	}
-	mem_api& get_mem_by_name(std::string name) {
-		static mem_dummy dummy = new mem_dummy();
-		if (mem_table.find(name) != map<string, mem_api>.end) {
+	mem_api_base* get_mem_by_name(std::string name) {
+		if (mem_table.find(name) != mem_table.end()) {
 			return mem_table[name];
 		} else {
 			std::cerr << "Unable to find mem '" << name << "'" << std::endl;
-			return dummy;
+			return &this_mem_dummy;
 		}
 	}
 
-	map<string, dat_api> dat_table;
-	map<string, mem_api> mem_table;
+	map<string, dat_api_base*> dat_table;
+	map<string, mem_api_base*> mem_table;
+	dat_dummy this_dat_dummy;
+	mem_dummy this_mem_dummy;
 };
 
 #endif

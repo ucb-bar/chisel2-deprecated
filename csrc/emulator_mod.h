@@ -1558,7 +1558,7 @@ inline dat_t<1> reduction_xor(dat_t<w1> d) {
 }
 
 template <int w, int d>
-class mem_t : public mem_base_t {
+class mem_t {
  public:
   dat_t<w> contents[d];
 
@@ -1809,10 +1809,10 @@ class mod_t {
     for (;;) {
       std::string str_in;
       getline(cin,str_in);
-      std::vector< std::string > tokens = tokenize(str_in);
+      std::vector< std::string > tokens;
       std::string cmd = tokens[0];
 
-      } else if (cmd == "step") {
+      if (cmd == "step") {
         int n = atoi(tokens[1].c_str());
         // fprintf(stderr, "-STEP %d\n", n);
         int new_delta = step(0, n, f, true);
