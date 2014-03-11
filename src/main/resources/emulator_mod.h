@@ -1801,41 +1801,6 @@ class mod_t {
     }
     return delta;
   }
-
-
-
-  void read_eval_print (FILE *f) {
-    timestep = 0;
-    for (;;) {
-      std::string str_in;
-      getline(cin,str_in);
-      std::vector< std::string > tokens;
-      std::string cmd = tokens[0];
-
-      if (cmd == "step") {
-        int n = atoi(tokens[1].c_str());
-        // fprintf(stderr, "-STEP %d\n", n);
-        int new_delta = step(0, n, f, true);
-        cout << new_delta << endl;
-      } else if (cmd == "reset") {
-        int n = atoi(tokens[1].c_str());
-        // fprintf(stderr, "-RESET %d\n", n);
-        step(1, n, f, false);
-      } else if (cmd == "set-clocks") {
-        std::vector< int > periods;
-        for (int i = 1; i < tokens.size(); i++) {
-          int period = atoi(tokens[i].c_str());
-          periods.push_back(period);
-        }
-        setClocks(periods);
-
-      } else {
-        fprintf(stderr, "Unknown command: |%s|\n", cmd.c_str());
-      }
-    }
-  }
-
-
 };
 
 #define ASSERT(cond, msg) { \

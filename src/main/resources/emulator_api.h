@@ -329,16 +329,24 @@ public:
 	std::string eval_command(string command) {
 		std::vector<std::string> tokens = tokenize(command);
 		if (tokens[0] == "get_host_name") {
+			// IN:  get_host_name
+			// OUT: API host's name
 			if (!check_command_length(tokens, 0, 0)) { return ""; }
 			return get_host_name();
 		} else if (tokens[0] == "get_api_version") {
+			// IN:  get_api_version
+			// OUT: API version supported by this host
 			if (!check_command_length(tokens, 0, 0)) { return ""; }
 			return get_api_version();
 		} else if (tokens[0] == "get_api_support") {
+			// IN:  get_api_support
+			// OUT: list of supported API features
 			if (!check_command_length(tokens, 0, 0)) { return ""; }
 			return get_api_support();
 
 		} else if (tokens[0] == "clock" || tokens[0] == "step") {
+			// IN:  clock <num_cycles>
+			// OUT: actual number of cycles stepped
 			if (!check_command_length(tokens, 1, 1)) { return ""; }
 			int cycles = atoi(tokens[1].c_str());
 		    for (int i=0; i<cycles; i++) {
@@ -348,6 +356,8 @@ public:
 		    module->clock_lo(dat_t<1>(0));
 		    return itos(cycles);
 		} else if (tokens[0] == "set-clocks") {
+			// IN:  set-clocks
+			// OUT: ???
 			// I'm not really sure what this is supposed to do, but it was
 			// in the old command API, so it's here now
 	        std::vector< int > periods;
@@ -359,6 +369,8 @@ public:
 	        return "ok";
 
 		} else if (tokens[0] == "reset") {
+			// IN:  reset <num_cycles>
+			// OUT: actual number of cycles in reset
 			if (!check_command_length(tokens, 0, 1)) { return ""; }
 			int cycles = 1;
 			if (tokens.size() >= 2) {
@@ -372,6 +384,8 @@ public:
 		    return itos(cycles);
 
 		} else if (tokens[0] == "peek") {
+			// IN:  peek <node_name> | peek <mem_name> <mem_index>
+			// OUT: value
 			if (!check_command_length(tokens, 1, 2)) { return ""; }
 			cerr << "peek is deprecated, use node_peek or mem_peek" << std::endl;
 			if (tokens.size() == 2) {
@@ -380,6 +394,8 @@ public:
 				return get_mem_by_name(tokens[1])->get_element(tokens[2]);
 			}
 		} else if (tokens[0] == "poke") {
+			// IN:  poke <node_name> <value> | poke <mem_name> <mem_index> <value>
+			// OUT: true (on success), false (on failure)
 			if (!check_command_length(tokens, 2, 3)) { return ""; }
 			cerr << "poke is deprecated, use node_poke or mem_poke" << std::endl;
 			bool success;
@@ -391,21 +407,31 @@ public:
 			return success ? "true" : "false";
 
 		} else if (tokens[0] == "node_peek") {
+			// IN:  node_peek <node_name>
+			// OUT: value
 			if (!check_command_length(tokens, 1, 1)) { return ""; }
 			return get_dat_by_name(tokens[1])->get_value();
 		} else if (tokens[0] == "node_poke") {
+			// IN:  node_poke <node_name> <value>
+			// OUT: true (on success), false (on failure)
 			if (!check_command_length(tokens, 2, 2)) { return ""; }
 			bool success = get_dat_by_name(tokens[1])->set_value(tokens[2]);
 			return success ? "true" : "false";
 		} else if (tokens[0] == "mem_peek") {
+			// IN:  mem_peek <mem_name> <mem_index>
+			// OUT: value
 			if (!check_command_length(tokens, 2, 2)) { return ""; }
 			return get_mem_by_name(tokens[1])->get_element(tokens[2]);
 		} else if (tokens[0] == "mem_poke") {
+			// IN:  mem_poke <mem_name> <mem_index> <value>
+			// OUT: true (on success), false (on failure)
 			if (!check_command_length(tokens, 3, 3)) { return ""; }
 			bool success = get_mem_by_name(tokens[1])->set_element(tokens[2], tokens[3]);
 			return success ? "true" : "false";
 
 		} else if (tokens[0] == "list_nodes") {
+			// IN:  list_nodes
+			// OUT: list of nodes
 			if (!check_command_length(tokens, 0, 0)) { return ""; }
 			std::string out = "";
 			for (std::map<string, dat_api_base*>::iterator it = dat_table.begin(); it != dat_table.end(); it++) {
@@ -418,6 +444,8 @@ public:
 			}
 
 		} else if (tokens[0] == "list_mems") {
+			// IN:  list_mems
+			// OUT: list of memories
 			if (!check_command_length(tokens, 0, 0)) { return ""; }
 			std::string out = "";
 			for (std::map<string, mem_api_base*>::iterator it = mem_table.begin(); it != mem_table.end(); it++) {
@@ -430,12 +458,18 @@ public:
 			}
 
 		} else if (tokens[0] == "node_width") {
+			// IN:  node_width <node>
+			// OUT: bitwidth of node
 			if (!check_command_length(tokens, 1, 1)) { return ""; }
 			return get_dat_by_name(tokens[1])->get_width();
 		} else if (tokens[0] == "mem_width") {
+			// IN:  mem_width <node>
+			// OUT: bitwidth of memory element
 			if (!check_command_length(tokens, 1, 1)) { return ""; }
 			return get_mem_by_name(tokens[1])->get_width();
 		} else if (tokens[0] == "mem_depth") {
+			// IN:  mem_depth <node>
+			// OUT: elements in memory
 			if (!check_command_length(tokens, 1, 1)) { return ""; }
 			return get_mem_by_name(tokens[1])->get_depth();
 
