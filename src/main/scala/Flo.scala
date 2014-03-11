@@ -124,9 +124,10 @@ class FloBackend extends Backend {
         if (x.inputs.length == 1) {
           // println("NAME " + x.name + " DIR " + x.dir + " COMP " + x.componentOf + " TOP-COMP " + topComponent)
           if (node.isInObject && x.inputs.length == 1) {
-            if (x.dir == OUTPUT && x.componentOf == topComponent && x.consumers.length == 0) 
+            if (x.dir == OUTPUT && x.componentOf == topComponent && 
+                x.consumers.forall(x => x.componentOf == topComponent))
               emitDec(x) + (if (isRnd) "eat" else ("out/" + x.width))  + " " + emitRef(x.inputs(0)) + "\n"
-            else
+            else 
               emitDec(x) + "mov/" + x.width + " " + emitRef(x.inputs(0)) + "\n"
           } else if (!node.isInObject && x.inputs.length == 0) {
             emitDec(x) + "rnd/" + x.width + "\n"
@@ -142,9 +143,20 @@ class FloBackend extends Backend {
         emitDec(m) + "mem/" + m.width + " " + m.n + "\n"
         // emitDec(m) + "mem " + m.n + "\n" + trueAll(emitRef(m) + "__is_all_read", m.reads)
 
+      case m: ROM[_] =>
+        val res = new StringBuilder
+        res append emitDec(m) + "mem/" + m.width + " " + m.lits.length + "\n"
+        // emitDec(m) + "mem " + m.n + "\n" + trueAll(emitRef(m) + "__is_all_read", m.reads)
+        for (i <- 0 until m.lits.length)
+          res append "init " + emitRef(m) + " " + i + " " + emitRef(m.lits(i)) + "\n"
+        res.toString
+
       case m: MemRead =>
         // emitDec(m) + "rd/" + node.width + " " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n" 
         emitDec(m) + "rd/" + node.width + " 1 " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n" 
+
+      case m: ROMRead[_] =>
+        emitDec(m) + "rd/" + node.width + " 1 " + emitRef(m.rom) + " " + emitRef(m.addr) + "\n" 
 
       case m: MemWrite =>
         if (m.inputs.length == 2) 
