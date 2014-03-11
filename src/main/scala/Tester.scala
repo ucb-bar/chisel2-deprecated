@@ -205,7 +205,7 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
     allGood
   }
 
-  val rnd = new Random()
+  val rnd = if (Module.testerSeedValid) new Random(Module.testerSeed) else new Random()
   var process: Process = null
 
   def startTesting(): Process = {

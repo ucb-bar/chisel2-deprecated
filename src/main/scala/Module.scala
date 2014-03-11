@@ -105,6 +105,11 @@ object Module {
   // standard input stream to a file.
   var dumpTestInput = false;
 
+  // Setting this to TRUE will initialize the tester's RNG with the
+  // seed below.
+  var testerSeedValid = false;
+  var testerSeed = 0;
+
   /* Any call to a *Module* constructor without a proper wrapping
    into a Module.apply() call will be detected when trigger is false. */
   var trigger: Boolean = false
