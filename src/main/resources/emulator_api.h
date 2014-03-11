@@ -9,6 +9,16 @@
 #include <map>
 
 /**
+ * Converts an integer to a std::string without needing additional libraries
+ * or C++11.
+ */
+static std::string itos(int in) {
+	std::stringstream out;
+	out << in;
+	return out.str();
+}
+
+/**
  * Copy one val_t array to another.
  * nb must be the exact number of bits the val_t represents.
  */
@@ -115,7 +125,11 @@ public:
 	{}
 	// returns the fully qualified name of this object (path + dot + name)
 	std::string get_pathname() {
-		return path + "." + name;
+		if (path.empty()) {
+			return name;
+		} else {
+			return path + "." + name;
+		}
 	}
 	// returns the short name of this object
 	std::string get_name() {
@@ -180,7 +194,7 @@ public:
 	}
 
 	std::string get_width() {
-		std::stringstream out;	out << w;	return out.str();
+		return itos(w);
 	}
 
 protected:
@@ -245,11 +259,11 @@ public:
 	}
 
 	std::string get_width() {
-		std::stringstream out;	out << w;	return out.str();
+		return itos(w);
 	}
 
 	std::string get_depth() {
-		std::stringstream out;	out << d;	return out.str();
+		return itos(d);
 	}
 
 protected:
@@ -332,6 +346,7 @@ public:
 		    	module->clock_hi(dat_t<1>(0));
 		    }
 		    module->clock_lo(dat_t<1>(0));
+		    return itos(cycles);
 
 		} else if (tokens[0] == "reset") {
 			if (!check_command_length(tokens, 0, 1)) { return ""; }
@@ -344,6 +359,7 @@ public:
 			   	module->clock_hi(dat_t<1>(1));
 		    }
 		    module->clock_lo(dat_t<1>(0));
+		    return itos(cycles);
 
 		} else if (tokens[0] == "peek") {
 			if (!check_command_length(tokens, 1, 2)) { return ""; }
@@ -381,10 +397,27 @@ public:
 
 		} else if (tokens[0] == "list_nodes") {
 			if (!check_command_length(tokens, 0, 0)) { return ""; }
-			// TODO: Implement me!
+			std::string out = "";
+			for (std::map<string, dat_api_base*>::iterator it = dat_table.begin(); it != dat_table.end(); it++) {
+				out = out + it->second->get_pathname() + " ";
+			}
+			if (out.size() >= 1) {
+				return out.substr(0, out.size() - 1);
+			} else {
+				return "";
+			}
+
 		} else if (tokens[0] == "list_mems") {
 			if (!check_command_length(tokens, 0, 0)) { return ""; }
-			// TODO: Implement me!
+			std::string out = "";
+			for (std::map<string, mem_api_base*>::iterator it = mem_table.begin(); it != mem_table.end(); it++) {
+				out = out + it->second->get_pathname() + " ";
+			}
+			if (out.size() >= 1) {
+				return out.substr(0, out.size() - 1);
+			} else {
+				return "";
+			}
 
 		} else if (tokens[0] == "node_width") {
 			if (!check_command_length(tokens, 1, 1)) { return ""; }
@@ -399,7 +432,7 @@ public:
 		} else {
 			std::cerr << "Unknown command: '" << tokens[0] << "'" << std::endl;
 		}
-		return "error";
+		return "";
 	}
 
 	void read_eval_print_loop() {
@@ -437,8 +470,8 @@ protected:
 		}
 	}
 
-	map<string, dat_api_base*> dat_table;
-	map<string, mem_api_base*> mem_table;
+	std::map<string, dat_api_base*> dat_table;
+	std::map<string, mem_api_base*> mem_table;
 	dat_dummy this_dat_dummy;
 	mem_dummy this_mem_dummy;
 };
