@@ -1939,6 +1939,7 @@ class mod_t {
   // Lists containing node/mem names to pointers, to be populated by init().
   map<string, dat_base_t*> nodes;
   map<string, mem_base_t*> mems;
+  vector<string> signals;
   
   // Returns a list of all nodes accessible by the debugging interface.
   virtual vector<string> get_nodes() {

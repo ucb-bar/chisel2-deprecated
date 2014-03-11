@@ -33,16 +33,18 @@ abstract class CounterWrapper(val conf: CounterConfiguration) extends Module {
   val wready = Vec.fill(conf.n){Bool()}
 
   val clks = Reg(init = UInt(0))
-  val fire = clks.orR
+  val fire = clks != UInt(0)
 
   clks.comp setName "clks"
   fire.getNode setName "fire"
+
+  // debug(fire)
  
   io.in.ready := wready(io.addr)
   io.out.valid := rvalid(io.addr)
-  io.out.bits := rdata(io.addr) 
+  io.out.bits := rdata(io.addr)
 
-  // write r4 -> clks
+  // write(aar = 4) -> clks
   when(wen(4) && !fire) {
     clks := io.in.bits
   }.elsewhen(fire) {
@@ -51,66 +53,171 @@ abstract class CounterWrapper(val conf: CounterConfiguration) extends Module {
   wready(4) := !fire
 }
 
-/*
-class AXISlaveTester(s: AXISlave) extends Tester(s, Array(s.io) ++ s.signals ++ (Module.clocks filter (_.isEnabled)) ) {
-  defTests {
-    val (a, b, z) = (80, 16, 16)
-    val svars = new HashMap[Node, Node]
-    val ovars = new HashMap[Node, Node]
-    val counters = new HashMap[Int, Int]
+abstract class CounterTester[+T <: CounterWrapper](c: T, val clks: Int = 1) extends Tester(c) {
+  val prevPeeks = new HashMap[Node, BigInt]
+  val counts = new HashMap[Node, BigInt]
 
-    for (i <- 0 until 16) {
-      counters(i) = 0
+  def calcHD(a: BigInt, b: BigInt) = {
+    var xor = a ^ b
+    var hd: BigInt = 0
+    while (xor > 0) {
+      hd = hd + (xor & 1)
+      xor = xor >> 1
     }
+    hd
+  }
 
-    var t = 0
-    svars.clear
-    // Set inputs
-    svars(s.io.addr) = Bits(0 << 2)
-    svars(s.io.in.bits) = Bits(80 << 16 | 16)
-    svars(s.io.in.valid) = Bool(true)
-    svars(s.io.out.ready) = Bool(false)
-    step(svars, ovars)
-    svars(s.io.in.bits) = Bits(0)
-    svars(s.io.in.valid) = Bool(false)
-    step(svars, ovars)
-    step(svars, ovars)
-//    do {
-      val first = (t == 0)
-      svars(c.io.addr) = Bits(1 << 2)
-      svars(c.io.in.bits) = Bits(1)
-      svars(c.io.in.valid) = Bool(true)
-      step(svars, ovars)
-      svars(c.io.addr) = Bits(2 << 2 | 1)
-      svars(c.io.out.ready) = Bool(true)
-      step(svars, ovars)
-      svars(c.io.addr) = Bits(2 << 2 | 2)
-      for (i <- 0 until 16) {
-        step(svars, ovars)
-        counters(i) = counters(i) + ovars(s.io.out.bits).litValue().toInt
+  def pokeClear {
+    poke(c.io.addr, 0)
+    poke(c.io.in.valid, 0)
+    poke(c.io.in.bits, 0)
+    poke(c.io.out.ready, 0)
+    step(1)
+  }
+
+  def pokeReset {
+    println("------------------------")
+    println("|  Reset: write(31, 0) |")
+    println("------------------------")
+    // write (31, 0)
+    while (peek(c.io.in.ready) == 0) {
+      step(1)
+    }
+    poke(c.io.addr, 31)
+    poke(c.io.in.valid, 1)
+    poke(c.io.in.bits, 0)
+    poke(c.io.out.ready, 0)
+    step(1)
+  }
+
+  def pokeClks {
+    println("------------------------------")
+    println("| Poke clks: write(4, %4d) |".format(clks))
+    println("------------------------------")
+    // write (4, clks)
+    while (peek(c.io.in.ready) == 0) {
+      step(1)
+    }
+    poke(c.io.addr, 4)
+    poke(c.io.in.bits, clks)
+    poke(c.io.in.valid, 1)
+    poke(c.io.out.ready, 0)
+    for (signal <- Module.signals ; if signal.width > 1) {
+      prevPeeks(signal) = peekBits(signal)
+    }
+    step(1)
+  }
+
+  def peekDaisyCopy = {
+    println("--------------------------------")
+    println("| Daisy copy: read(4 | 0 << 4) |")
+    println("--------------------------------")
+    // read (4 | 0 << 4)
+    do {
+      poke(c.io.addr, 4 | 0 << 4)
+      poke(c.io.in.bits, 0)
+      poke(c.io.in.valid, 0)
+      poke(c.io.out.ready, 1)
+      step(1)
+    } while (peek(c.io.out.valid) == 0)
+
+    peek(c.io.out.bits)
+  }
+
+  def peekDaisyRead = {
+    println("--------------------------------")
+    println("| Daisy read: read(4 | 1 << 4) |")
+    println("--------------------------------")
+    // read (4 | 1 << 4)
+    do {
+      poke(c.io.addr, 4 | 1 << 4)
+      poke(c.io.in.bits, 0)
+      poke(c.io.in.valid, 0)
+      poke(c.io.out.ready, 1)
+      step(1)
+    } while (peek(c.io.out.valid) == 0)
+
+    peek(c.io.out.bits)
+  }
+
+  def peekSignals {
+    println("----------------------")
+    println("|    Read signals    |")
+    println("----------------------")
+    step(1)
+    for ((signal, i) <- Module.signals.zipWithIndex) {
+      val curPeek = peekBits(signal)
+      val cntrPeek = peek(signal.counter)
+      if (signal.width == 1) {
+        counts(signal) += curPeek
+      } else {
+        counts(signal) += calcHD(curPeek, prevPeeks(signal))
+        prevPeeks(signal) = curPeek
       }
-      svars(c.io.addr) = Bits(3 << 2 | 2)
-      step(svars, ovars)
-//    } while (t <= 1 || ovars(c.io.out.valid) == Bool(true))
-    for (i <- 0 until 16) {
-      ChiselError.info("counter%d: %d".format(i, counters(i)))
+      println("  counts of counter_%d = %x".format(i, counts(signal)))
     }
-    ovars(s.io.out.bits) == Bits(z)
+  }
+
+  var good = true
+  var cycles = 0
+
+  def loop {
+    for (signal <- Module.signals) {
+      counts(signal) = 0
+    }
+
+    pokeClks
+    pokeClear
+
+    while (peek(c.fire) == 1) {
+      cycles += 1
+      peekSignals
+    }
+    pokeClear
+    pokeClear
+
+    var ready: BigInt = 0
+    var bits: BigInt = 0
+
+    val read = peekDaisyCopy
+    pokeClear
+    pokeClear
+    for (signal <- Module.signals) {
+      peek(signal.shadow)
+    }
+    var i = 0
+    for (signal <- Module.signals) {
+      val read = peekDaisyRead
+      for (s <- Module.signals) {
+        peek(s.shadow)
+      }
+      good &= expect(read == counts(signal), "Counter" + i)
+      println("out bits: %x\tfrom signal: %x".format(
+               read, counts(signal)))
+      i += 1
+    }
+  }
+
+  // initialization
+  pokeReset
+  for (signal <- Module.signals) {
+    counts(signal) = 0
+    prevPeeks(signal) = 0
   }
 }
-*/
 
 trait CounterBackend extends Backannotation {
   val crosses = new ArrayBuffer[(Double, Array[Node])]
 
   val fires = new HashMap[Module, Bool]
+  val firedRegs = new HashMap[Module, Bool]
   val daisyIns = new HashMap[Module, ValidIO[UInt]]
   val daisyOuts = new HashMap[Module, DecoupledIO[UInt]]
   val daisyCtrls = new HashMap[Module, Bits]
   val counterCopy = new HashMap[Module, Bool]
-  val counterRead = new HashMap[Module, Bool]
- 
+  val counterRead = new HashMap[Module, Bool] 
   val counterRegs = new ArrayBuffer[proc]
+  val signalTypes = new ArrayBuffer[Bits]
 
   var counterIdx = -1
 
@@ -121,11 +228,12 @@ trait CounterBackend extends Backannotation {
   transforms += ((c: Module) => connectDaisyPins(c))
   transforms += ((c: Module) => generateCounters(c))
   transforms += ((c: Module) => generateDaisyChains)
-  transforms += ((c: Module) => genCounterMuxes(c))
 
+  transforms += ((c: Module) => genCounterMuxes(c))
   transforms += ((c: Module) => c.inferAll)
   transforms += ((c: Module) => c.forceMatchingWidths)
   transforms += ((c: Module) => c.removeTypeNodes)
+  transforms += ((c: Module) => removeSignalTypes)
   transforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
 
   // analyses += ((c: Module) => reportCounters(c))
@@ -183,7 +291,7 @@ trait CounterBackend extends Backannotation {
     }
   }
 
-  private def annotateSignals(m: Module) {
+  private def annotateSignals(c: Module) {
     ChiselError.info("Backannotation: annotate signals")
 
     // Read the signal list file
@@ -208,7 +316,7 @@ trait CounterBackend extends Backannotation {
     }
 
     // Find correspoinding nodes
-    for (m <- Module.sortedComps ; if !m.isInstanceOf[CounterWrapper]) {
+    for (m <- Module.sortedComps ; if m != c) {
       // TODO: include resets
       /*
       val reset = m.reset
@@ -220,11 +328,15 @@ trait CounterBackend extends Backannotation {
           m.debugs += reset
       }
       */
-      for (node <- m.nodes ; if !node.isTypeNode) {
+      for (node <- m.nodes) {
         val signalName = getSignalPathName(node, ".")
-        if ((signalNames contains signalName) && !(signalName contains "reset")){
+        if ((signalNames contains signalName) && signalName != "reset"){
           m.signals += node
           signalNameMap(signalName) = node
+          // Backannotated signals should be accessible by names
+          // in emulators, so their names are given here
+          // if (!this.isInstanceOf[VerilogBackend] && node.name == "")
+          //   node setName node.pName
           if (!(m.debugs contains node))
             m.debugs += node
         }
@@ -242,24 +354,45 @@ trait CounterBackend extends Backannotation {
   def decoupleTarget(c: Module) {
     ChiselError.info("Counter Backend: target decoupling")
 
-    val counterConf = c match {
-      case c: CounterWrapper => c.conf
+    var counterConf: CounterConfiguration = null 
+    c match {
+      case m: CounterWrapper => {
+        counterConf = m.conf
+        val fired = Reg(init = Bool(false), next = m.fire, clock = m.clock)
+        fired.comp.component = m
+        fired.comp setName "fired"
+        if (!(counterRegs contains fired.comp))
+          counterRegs += fired.comp
+        if (!(m.debugs contains fired.comp))
+          m.debugs += fired.comp
+        firedRegs(m) = fired
+      }
     }
 
-    for (m <- Module.sortedComps; if !m.isInstanceOf[CounterWrapper]) {
+
+    for (m <- Module.sortedComps; if m != c) {
       // Add pins
       val fire = Bool(INPUT)
       val daisyIn = Valid(Bits(width = counterConf.dataWidth)).flip
       val daisyOut = Decoupled(Bits(width = counterConf.dataWidth))
       val daisyCtrl = Bits(INPUT, width = counterConf.daisyCtrlWidth)
+      val fired = Reg(init = Bool(false), next = fire, clock = m.clock)
+      fired.comp.component = m
+      fired.comp setName "fired"
+      if (!(counterRegs contains fired.comp))
+        counterRegs += fired.comp
+      if (!(m.debugs contains fired.comp))
+        m.debugs += fired.comp
       
       def daisyReady(i: Int) = {
-        val dready = !fire && daisyOut.ready && daisyCtrl === Bits(i)
+        val dready = daisyOut.ready && daisyCtrl === Bits(i)
         dready.getNode.component = m
         if (i == 0) { dready.getNode setName "copy" }
         if (i == 1) { dready.getNode setName "read" }
+        /*
         if (!(m.debugs contains dready.getNode))
           m.debugs += dready.getNode
+        */
         dready
       }
 
@@ -269,6 +402,7 @@ trait CounterBackend extends Backannotation {
       addPin(m, daisyCtrl, "daisy_ctrl")
 
       fires(m)         = fire
+      firedRegs(m)     = fired
       daisyIns(m)      = daisyIn
       daisyOuts(m)     = daisyOut
       daisyCtrls(m)    = daisyCtrl
@@ -278,10 +412,13 @@ trait CounterBackend extends Backannotation {
       // FAME1 Transforms
       for (node <- m.nodes) {
         node match {
-          case reg: Reg => {
+          case reg: Reg if this.isInstanceOf[VerilogBackend] => {
             val enable = fire && reg.enable
             enable.getNode setName (reg.enable.getNode.pName + "_fire")
             reg.inputs(reg.enableIndex) = enable.getNode
+          }
+          case reg: Reg => {
+            reg.inputs(0) = Multiplex(fire, reg.next, reg)
           }
           case mem: Mem[_] => {
             for (write <- mem.writeAccesses) {
@@ -313,12 +450,13 @@ trait CounterBackend extends Backannotation {
     }
   }
 
+  // Connect daisy pins to support hierarchical modules
   def connectDaisyPins(c: Module) {
     ChiselError.info("Counter Backend: connect daisy pins")
 
     val top = c match {
       case m: CounterWrapper => {
-        val daisyReady = m.ren(4) && !m.fire
+        val daisyReady = m.ren(4) && !firedRegs(m)
         m.rdata(4).updates             += ((Bool(true), daisyOuts(m.top).bits))
         m.rvalid(4).updates            += ((Bool(true), daisyOuts(m.top).valid))
         fires(m.top).updates           += ((Bool(true), m.fire))
@@ -383,75 +521,91 @@ trait CounterBackend extends Backannotation {
       case m: CounterWrapper => m.conf.counterWidth
     }
 
-    for (m <- Module.sortedComps ; signal <- m.signals ; if !m.isInstanceOf[CounterWrapper]) {
-      val signalValue = UInt()
-      val signalWidth = signal.getWidth
-      val counter = Reg(init = Bits(0, counterWidth), clock = m.clock)
-      val shadow  = Reg(init = Bits(0, counterWidth), clock = m.clock)
+    for (m <- Module.sortedComps; if m != c) {
+      val counterEnable = firedRegs(m) || counterCopy(m)
+      val shadowEnable = counterCopy(m) || counterRead(m)
 
-      signalValue.inputs += signal
-      counterRegs += counter.comp
-      counterRegs += shadow.comp 
-      signal.counter = counter
-      signal.shadow = shadow
+      for (signal <- m.signals) {
+        val signalValue = UInt(signal)
+        val signalWidth = signal.getWidth
+        val counter = Reg(init = Bits(0, counterWidth), clock = m.clock)
+        val shadow  = Reg(init = Bits(0, counterWidth), clock = m.clock)
 
-      counter.comp match {
-        case reg: Reg => {
-          reg.component = m
-          reg.enable   = fires(m) || counterCopy(m)
-          reg.isEnable = true
-          reg setName "counter_%d".format(emitCounterIdx)
-        }
-      }
-      shadow.comp match {
-        case reg: Reg => {
-          reg.component = m
-          reg.enable   = counterCopy(m) || counterRead(m)
-          reg.isEnable = true
-          reg setName "shadow_%d".format(counterIdx)
-        }
-      }
+        signal.counter = counter
+        signal.shadow = shadow
+        counterRegs += counter.comp
+        counterRegs += shadow.comp 
 
-      // Signal
-      if (signalWidth == 1) {
-        val counterValue = counter + signalValue
-        counterValue.getNode.component = m
-        counterValue.getNode setName "c_value_%d".format(counterIdx)
-        if ( !(m.debugs contains counterValue.getNode))
-          m.debugs += counterValue.getNode
-        counter.comp.updates += ((fires(m), counterValue))
-        counter.comp.updates += ((counterCopy(m), Bits(0)))
-      // Bus
-      } else {
-        val buffer = Reg(init = Bits(0, signalWidth), clock = m.clock)
-        val xor = signalValue ^ buffer
-        val hd = PopCount(xor)
-        val counterValue = counter + hd
-        counterValue.getNode.component = m
-        counterValue.getNode setName "c_value_%d".format(counterIdx)
-        if ( !(m.debugs contains counterValue.getNode))
-          m.debugs += counterValue.getNode
-        counterRegs += buffer.comp
-        buffer.comp setName "buffer_%d".format(counterIdx)
-        buffer.comp.component = m
-        buffer.comp match {
+        counter.comp match {
           case reg: Reg => {
-            reg.enable   = Bool(true)
+            reg.component = m
+            reg.enable   = counterEnable
             reg.isEnable = true
+            reg setName "counter_%d".format(emitCounterIdx)
           }
         }
-        buffer.comp.updates  += ((Bool(true), signalValue))
-        counter.comp.updates += ((fires(m), counterValue))
-        counter.comp.updates += ((counterCopy(m), Bits(0)))
+        shadow.comp match {
+          case reg: Reg => {
+            reg.component = m
+            reg.enable   = shadowEnable
+            reg.isEnable = true
+            reg setName "shadow_%d".format(counterIdx)
+          }
+        }
+      
+        // Signal
+        if (signalWidth == 1) {
+          val counterValue = counter + signalValue
+          counterValue.getNode.component = m
+          counterValue.getNode setName "c_value_%d".format(counterIdx)
+          /*
+          if ( !(m.debugs contains counterValue.getNode))
+            m.debugs += counterValue.getNode
+          */
+          counter.comp.updates += ((firedRegs(m), counterValue))
+          counter.comp.updates += ((counterCopy(m), Bits(0)))
+        // Bus
+        } else {
+          val buffer  = Reg(init = Bits(0, signalWidth), 
+                            next = signalValue, 
+                            clock = m.clock)
+          val xor = signalValue ^ buffer
+          val hd = PopCount(xor)
+          val counterValue = counter + hd
+          counterValue.getNode.component = m
+          counterValue.getNode setName "c_value_%d".format(counterIdx)
+          /*
+          if ( !(m.debugs contains counterValue.getNode))
+            m.debugs += counterValue.getNode
+          */
+          counterRegs += buffer.comp
+          buffer.comp setName "buffer_%d".format(counterIdx)
+          buffer.comp.component = m
+          /*
+          buffer.comp match {
+            case reg: Reg => {
+              reg.enable   = Bool(true)
+              reg.isEnable = true
+            }
+          }
+          buffer.comp.updates  += ((Bool(true), signalValue))
+          */
+          counter.comp.updates += ((firedRegs(m), counterValue))
+          counter.comp.updates += ((counterCopy(m), Bits(0)))
+        }
+
+        // for debugging
+        // if (this.isInstanceOf[VerilogBackend])
+        signal setName "signal_%d_%s".format(counterIdx, signal.pName)
       }
     }
   }  
-  
+ 
   def generateDaisyChains {
     ChiselError.info("Counter Backend: generate daisy chains")
  
     // Daisy chaining
-    for (m <- Module.components ; if !m.isInstanceOf[CounterWrapper]) {
+    for (m <- Module.sortedComps ; if !m.isInstanceOf[CounterWrapper]) {
       val copy = counterCopy(m)
       val read = counterRead(m)
 
@@ -476,10 +630,19 @@ trait CounterBackend extends Backannotation {
       
         cur.comp.updates += ((copy, counter))
         cur.comp.updates += ((read, next))
+
+        // Signals are collected in order so that
+        // counter values are verified and
+        // power numbers are calculated
+        Module.signals += m.signals(i) 
       }
+      Module.signals += m.signals.last
     }
   }
 
+  // Here, we should not generate muxes using genAllMuxes
+  // Only genMuxes of new 'proc's are invoked
+  // Otherwise, there will be side effects
   def genCounterMuxes (c: Module) {
     ChiselError.info("Counter Backend: generate muxes for counter structure")
 
@@ -527,14 +690,12 @@ trait CounterBackend extends Backannotation {
       reg.genMuxes(reg)
       reg.inputs += reg.component.reset
     }
+  }
 
-    /*
-    for (m <- Module.sortedComps ; signal <- m.signals) {
-      val counter = signal.counter.comp
-      val shadow = signal.shadow.comp
-      counter.genMuxes(counter)
-      shadow.genMuxes(shadow)
-    } */
+  def removeSignalTypes {
+    for (signalType <- signalTypes) {
+      signalType.inputs.clear
+    }
   }
 
   def reportCounters (m: Module) {

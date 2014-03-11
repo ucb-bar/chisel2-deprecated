@@ -95,6 +95,7 @@ object Module {
   var implicitReset: Bool = null
   var implicitClock: Clock = null
   var model = ""
+  val signals = new ArrayBuffer[Node]
   /* Jackhammer flags */
   var jackDump: String = null;
   var jackDir: String = null;
@@ -506,6 +507,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       walked += top
       visit(top)
       top match {
+        /*
         case b: Bundle => 
           for((n, i) <- b.flatten ; if !(i == null) && !(walked contains i)) {
             dfsStack push i
@@ -516,6 +518,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             dfsStack push i
             walked += i
           }
+        */
         case _ => 
           for(i <- top.inputs ; if !(i == null) && !(walked contains i)) {
             dfsStack push i

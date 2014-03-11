@@ -576,7 +576,7 @@ class CppBackend extends Backend {
     harness.write("  " + name + "_t* c = new " + name + "_t();\n");
     harness.write("  c->init();\n");
     if (Module.isVCD) {
-      harness.write("  FILE *f = fopen(\"" + name + ".vcd\", \"w\");\n");
+      harness.write("  FILE *f = fopen(\"" + ensureDir(Module.targetDir) + name + ".vcd\", \"w\");\n");
     } else {
       harness.write("  FILE *f = NULL;\n");
     }
@@ -693,6 +693,15 @@ class CppBackend extends Backend {
     }
   }
 
+  def emitSignals(c: Module) = {
+    (Module.signals foldLeft "") { (res, signal) => 
+      if ((c.omods contains signal) && (signal.chiselName != ""))
+        res + "  signals.push_back(\"" + signal.chiselName + "\");\n"
+      else 
+        res
+    }
+  }
+
   def backendElaborate(c: Module) = super.elaborate(c)
 
   override def elaborate(c: Module): Unit = {
@@ -805,6 +814,7 @@ class CppBackend extends Backend {
         writeCppFile(emitMapping(m))
       }
     }
+    writeCppFile(emitSignals(c))
     writeCppFile("}\n")
 
     for (m <- c.omods) {
