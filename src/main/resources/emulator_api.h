@@ -347,6 +347,16 @@ public:
 		    }
 		    module->clock_lo(dat_t<1>(0));
 		    return itos(cycles);
+		} else if (tokens[0] == "set-clocks") {
+			// I'm not really sure what this is supposed to do, but it was
+			// in the old command API, so it's here now
+	        std::vector< int > periods;
+	        for (int i = 1; i < tokens.size(); i++) {
+	          int period = atoi(tokens[i].c_str());
+	          periods.push_back(period);
+	        }
+	        module->setClocks(periods);
+	        return "ok";
 
 		} else if (tokens[0] == "reset") {
 			if (!check_command_length(tokens, 0, 1)) { return ""; }
