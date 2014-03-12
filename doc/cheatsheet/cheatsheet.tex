@@ -42,7 +42,7 @@
 
 \ruleline{\Large{\textbf{Chisel Cheat Sheet}}}
 \begin{center}
-\includegraphics[scale=0.02]{bigduck} Version 0.4 (beta): \today
+\includegraphics[scale=0.02]{bigduck} Version 0.5 (beta): \today
 \end{center}
 
 \fbox{ \parbox{0.95\columnwidth} {
@@ -361,10 +361,10 @@ val my_bundle = new Bundle {
 & \verb$gen$ & Chisel \verb$Data$ to wrap ready-valid protocol around \\
 \end{tabular}
 \subsubsection{Interface}: \newline
-\begin{tabular}{l l l}
-& \verb$.ready$ & ready \verb$Bool$ \\
-& \verb$.valid$ & valid \verb$Bool$ \\
-& \verb$.bits$ & data \\
+\begin{tabular}{c c l l}
+& (in) & \verb$.ready$ & ready \verb$Bool$ \\
+& (out) & \verb$.valid$ & valid \verb$Bool$ \\
+& (out) & \verb$.bits$ & data \\
 \end{tabular}
 
 \subsection{ValidIO } is a \verb$Bundle$ with a valid interface,\newline
@@ -375,9 +375,9 @@ val my_bundle = new Bundle {
 & \verb$gen$ & Chisel \verb$Data$ to wrap valid protocol around \\
 \end{tabular}
 \subsubsection{Interface}: \newline
-\begin{tabular}{l l l}
-& \verb$.valid$ & valid \verb$Bool$ \\
-& \verb$.bits$ & data \\
+\begin{tabular}{c c l l}
+& (out) & \verb$.valid$ & valid \verb$Bool$ \\
+& (out) & \verb$.bits$ & data \\
 \end{tabular}
 
 \subsection{Queue } is a \verb$Module$ providing a hardware queue
@@ -389,7 +389,7 @@ val my_bundle = new Bundle {
 \end{tabular}
 \subsubsection{Interface}: \newline
 \begin{tabular}{l l l}
-& \verb$.io.enq$ & \verb$DecoupledIO$ source \\
+& \verb$.io.enq$ & \verb$DecoupledIO$ source (flipped) \\
 & \verb$.io.deq$ & \verb$DecoupledIO$ sink \\
 & \verb$.io.count$ & \verb$UInt$ count of elements in the queue \\
 \end{tabular}
@@ -408,7 +408,7 @@ val my_bundle = new Bundle {
 \end{tabular}
 \subsubsection{Interface}: \newline
 \begin{tabular}{l l l}
-& \verb$.io.enq$ & \verb$ValidIO$ source \\
+& \verb$.io.enq$ & \verb$ValidIO$ source (flipped) \\
 & \verb$.io.deq$ & \verb$ValidIO$ sink \\
 \end{tabular}
 
@@ -424,7 +424,7 @@ val my_bundle = new Bundle {
 \end{tabular}
 \subsubsection{Interface}: \newline
 \begin{tabular}{l l l}
-& \verb$.io.in$ & \verb$Vec$ of \verb$DecoupledIO$ inputs \\
+& \verb$.io.in$ & \verb$Vec$ of \verb$DecoupledIO$ inputs (flipped) \\
 & \verb$.io.out$ & \verb$DecoupledIO$ output \\
 & \verb$.io.chosen$ & \verb$UInt$ input index on \verb$.io.out$, \\
 & & does not imply output is valid \\
