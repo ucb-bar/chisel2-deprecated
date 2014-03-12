@@ -125,7 +125,7 @@ class CppBackend extends Backend {
         "  dat_t<" + node.width + "> " + emitRef(node) + "_shadow;\n";
       case m: Mem[_] =>
         "  mem_t<" + m.width + "," + m.n + "> " + emitRef(m) + ";\n"
-      case r: ROM[_] =>
+      case r: ROMData =>
         "  mem_t<" + r.width + "," + r.lits.length + "> " + emitRef(r) + ";\n"
       case c: Clock =>
         "  int " + emitRef(node) + ";\n" +
@@ -463,7 +463,7 @@ class CppBackend extends Backend {
           + " = " + emitRef(m.mem) + ".get(" + emitLoWordRef(m.addr) + ", "
           + i + ")"))
 
-      case r: ROMRead[_] =>
+      case r: ROMRead =>
         emitTmpDec(r) + block((0 until words(r)).map(i => emitWordRef(r, i)
           + " = " + emitRef(r.rom) + ".get(" + emitLoWordRef(r.addr) + ", "
           + i + ")"))
@@ -520,7 +520,7 @@ class CppBackend extends Backend {
       case x: Mem[_] =>
         "  if (rand_init) " + emitRef(node) + ".randomize();\n"
 
-      case r: ROM[_] =>
+      case r: ROMData =>
         val res = new StringBuilder
         for (i <- 0 until r.lits.length)
           res append block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(r.lits(i), j) + ")"))
@@ -684,7 +684,7 @@ class CppBackend extends Backend {
         "  nodes[\"" + name + "\"] = &" + emitRef(node) + ";\n"
       case m: Mem[_] =>
         "  mems[\"" + name + "\"] = &" + emitRef(node) + ";\n"
-      case r: ROM[_] =>
+      case r: ROMData =>
         "  mems[\"" + name + "\"] = &" + emitRef(node) + ";\n"
       case c: Clock =>
         "  nodes[\"" + name + "\"] = &" + emitRef(node) + ";\n"

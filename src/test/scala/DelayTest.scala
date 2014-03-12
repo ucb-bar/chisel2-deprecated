@@ -193,9 +193,16 @@ class DelaySuite extends TestSuite {
       val rom = Vec(Array(a,b,c))
       io.out := rom(io.addr)
     }
+
     chiselMain(Array[String]("--v",
       "--targetDir", dir.getPath.toString()),
       () => Module(new ROMModule()))
     assertFile("DelaySuite_ROMModule_1.v")
+
+    chiselMain(Array[String](
+      "--targetDir", dir.getPath.toString()),
+      () => Module(new ROMModule()))
+    assertFile("DelaySuite_ROMModule_1.h")
+    assertFile("DelaySuite_ROMModule_1.cpp")
   }
 }

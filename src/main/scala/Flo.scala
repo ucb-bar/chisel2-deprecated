@@ -143,7 +143,7 @@ class FloBackend extends Backend {
         emitDec(m) + "mem/" + m.width + " " + m.n + "\n"
         // emitDec(m) + "mem " + m.n + "\n" + trueAll(emitRef(m) + "__is_all_read", m.reads)
 
-      case m: ROM[_] =>
+      case m: ROMData =>
         val res = new StringBuilder
         res append emitDec(m) + "mem/" + m.width + " " + m.lits.length + "\n"
         // emitDec(m) + "mem " + m.n + "\n" + trueAll(emitRef(m) + "__is_all_read", m.reads)
@@ -155,7 +155,7 @@ class FloBackend extends Backend {
         // emitDec(m) + "rd/" + node.width + " " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n" 
         emitDec(m) + "rd/" + node.width + " 1 " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n" 
 
-      case m: ROMRead[_] =>
+      case m: ROMRead =>
         emitDec(m) + "rd/" + node.width + " 1 " + emitRef(m.rom) + " " + emitRef(m.addr) + "\n" 
 
       case m: MemWrite =>
