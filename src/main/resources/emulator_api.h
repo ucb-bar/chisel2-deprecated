@@ -387,7 +387,7 @@ public:
 			// IN:  peek <node_name> | peek <mem_name> <mem_index>
 			// OUT: value
 			if (!check_command_length(tokens, 1, 2)) { return ""; }
-			cerr << "peek is deprecated, use node_peek or mem_peek" << std::endl;
+			cerr << "peek is deprecated, use wire_peek or mem_peek" << std::endl;
 			if (tokens.size() == 2) {
 				return get_dat_by_name(tokens[1])->get_value();
 			} else if (tokens.size() == 3) {
@@ -397,7 +397,7 @@ public:
 			// IN:  poke <node_name> <value> | poke <mem_name> <mem_index> <value>
 			// OUT: true (on success), false (on failure)
 			if (!check_command_length(tokens, 2, 3)) { return ""; }
-			cerr << "poke is deprecated, use node_poke or mem_poke" << std::endl;
+			cerr << "poke is deprecated, use wire_poke or mem_poke" << std::endl;
 			bool success;
 			if (tokens.size() == 3) {
 				success = get_dat_by_name(tokens[1])->set_value(tokens[2]);
@@ -406,13 +406,13 @@ public:
 			}
 			return success ? "true" : "false";
 
-		} else if (tokens[0] == "node_peek") {
-			// IN:  node_peek <node_name>
+		} else if (tokens[0] == "wire_peek") {
+			// IN:  wire_peek <node_name>
 			// OUT: value
 			if (!check_command_length(tokens, 1, 1)) { return ""; }
 			return get_dat_by_name(tokens[1])->get_value();
-		} else if (tokens[0] == "node_poke") {
-			// IN:  node_poke <node_name> <value>
+		} else if (tokens[0] == "wire_poke") {
+			// IN:  wire_poke <node_name> <value>
 			// OUT: true (on success), false (on failure)
 			if (!check_command_length(tokens, 2, 2)) { return ""; }
 			bool success = get_dat_by_name(tokens[1])->set_value(tokens[2]);
@@ -429,9 +429,9 @@ public:
 			bool success = get_mem_by_name(tokens[1])->set_element(tokens[2], tokens[3]);
 			return success ? "true" : "false";
 
-		} else if (tokens[0] == "list_nodes") {
-			// IN:  list_nodes
-			// OUT: list of nodes
+		} else if (tokens[0] == "list_wires") {
+			// IN:  list_wires
+			// OUT: list of wires
 			if (!check_command_length(tokens, 0, 0)) { return ""; }
 			std::string out = "";
 			for (std::map<string, dat_api_base*>::iterator it = dat_table.begin(); it != dat_table.end(); it++) {
@@ -457,9 +457,9 @@ public:
 				return "";
 			}
 
-		} else if (tokens[0] == "node_width") {
-			// IN:  node_width <node>
-			// OUT: bitwidth of node
+		} else if (tokens[0] == "wire_width") {
+			// IN:  wire_width <node>
+			// OUT: bitwidth of wire
 			if (!check_command_length(tokens, 1, 1)) { return ""; }
 			return get_dat_by_name(tokens[1])->get_width();
 		} else if (tokens[0] == "mem_width") {
