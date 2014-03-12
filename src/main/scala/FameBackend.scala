@@ -495,11 +495,11 @@ trait Fame1Transform extends Backend {
     val seqMemReadRegs = new HashSet[Reg]
     for((module, mem) <- mems){
       val memSeqReads = mem.seqreads ++ mem.readwrites.map(_.read)
-      if(mem.seqRead){
+      /*if(mem.seqRead){
         for(memRead <- mem.reads){
           seqMemReadRegs += memRead.addr.inputs(0).asInstanceOf[Reg]
         }
-      }
+      }*/
       for(memSeqRead <- memSeqReads){
         seqMemReadRegs += memSeqRead.addrReg
       }
@@ -561,7 +561,7 @@ trait Fame1Transform extends Backend {
           memWrite.inputs(1) = memWrite.inputs(1).asInstanceOf[Bool] && Fame1Transform.fireSignals(module)
         }
       }
-      if(mem.seqRead){
+      /*if(mem.seqRead){
         for(memRead <- mem.reads){
           Predef.assert(memRead.addr.inputs(0).asInstanceOf[Reg].updates.length == 1)
           val oldReadAddr = Bits()
@@ -588,7 +588,7 @@ trait Fame1Transform extends Backend {
           memRead.addr.inputs(0).asInstanceOf[Reg].updates.clear
           memRead.addr.inputs(0).asInstanceOf[Reg].updates += ((newRen, newReadAddr))
         }
-      }
+      }*/
       for(memSeqRead <- memSeqReads){
         Predef.assert(memSeqRead.addrReg.updates.length == 1)
         val oldReadAddr = Bits()
