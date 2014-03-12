@@ -1042,12 +1042,15 @@ class Tester[T <: Module] (val c: T, val isTrace: Boolean = true) {
   var t: Int
   var ok: Boolean
   val rnd: Random
+  def int(x: Boolean): BigInt
+  def int(x: Int): BigInt
+  def int(x: Bits): BigInt
   def reset(n: Int = 1)
   def step(n: Int): Int
-  def poke(data: Mem[T], index: Int, x: BigInt)
+  def pokeAt(data: Mem[T], index: Int, x: BigInt)
   def poke(data: Bits, x: BigInt)
   def poke(data: Aggregate, x: Array[BigInt])
-  def peek(data: Mem[T], index: Int)
+  def peekAt(data: Mem[T], index: Int)
   def peek(data: Bits): BigInt
   def peek(data: Aggregate): Array[BigInt]
   def expect (good: Boolean, msg: String): Boolean
