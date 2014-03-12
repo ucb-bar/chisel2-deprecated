@@ -122,6 +122,10 @@ class VerilogBackend extends Backend {
     }
   }
 
+  // $random only emits 32 bits; repeat its result to fill the Node
+  private def emitRand(node: Node): String =
+    "{" + ((node.width+31)/32) + "{$random}}"
+
   def emitPortDef(m: MemAccess, idx: Int): String = {
     def str(prefix: String, ports: (String, String)*): String =
       ports.toList.filter(_._2 != null)
@@ -226,7 +230,7 @@ class VerilogBackend extends Backend {
       res += "  `ifndef SYNTHESIS\n"
       for ((n, w) <- c.wires) {
         if (w.driveRand) {
-          res += "    assign " + c.name + "." + n + " = $random();\n"
+          res += "    assign " + c.name + "." + n + " = " + emitRand(w) + ";\n"
         }
       }
       res += "  `endif\n"
