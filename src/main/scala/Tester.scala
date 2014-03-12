@@ -173,9 +173,9 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
     testOut.flush()
     val s = gets()
     delta += s.toInt
-    if (isTrace) println("STEP " + n + " <- " + s)
     drainErr()
     t += n
+    if (isTrace) println("STEP " + n + " -> " + t)
   }
 
   def int(x: Boolean): BigInt = if (x) 1 else 0
@@ -183,11 +183,12 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
   def int(x: Bits): BigInt = x.litValue()
 
   var ok = true;
+  var failureTime = -1
 
   def expect (good: Boolean, msg: String): Boolean = {
     if (isTrace)
       println(msg + " " + (if (good) "PASS" else "FAIL"))
-    if (!good) ok = false;
+    if (!good) { ok = false; if (failureTime == -1) failureTime = t; }
     good
   }
 
@@ -217,6 +218,7 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
       } else {
          target + (if(Module.backend.isInstanceOf[VerilogBackend]) " -q" else "")
       })
+    println("SEED " + Module.testerSeed)
     println("STARTING " + cmd)
     val processBuilder = Process(cmd)
     val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => testErr = err)
@@ -243,7 +245,7 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
 
       process.destroy()
     }
-    println("RAN " + t + " CYCLES " + (if (ok) "PASSED" else "FAILED"))
+    println("RAN " + t + " CYCLES " + (if (ok) "PASSED" else { "FAILED FIRST AT CYCLE " + failureTime }))
     ok
   }
 

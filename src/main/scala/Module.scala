@@ -108,7 +108,7 @@ object Module {
   // Setting this to TRUE will initialize the tester's RNG with the
   // seed below.
   var testerSeedValid = false;
-  var testerSeed = 0;
+  var testerSeed = System.currentTimeMillis();
 
   /* Any call to a *Module* constructor without a proper wrapping
    into a Module.apply() call will be detected when trigger is false. */
