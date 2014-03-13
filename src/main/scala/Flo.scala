@@ -45,7 +45,7 @@ import scala.collection.mutable.HashSet
 
 class FloBackend extends Backend {
   // TODO: SHOULD BE IN ENV VAR
-  val floDir = java.lang.System.getenv("DREAMER")
+  val floDir = java.lang.System.getenv("DREAMER") + "/emulator/"
   val keywords = new HashSet[String]();
   var isRnd = false
 
@@ -236,7 +236,7 @@ class FloBackend extends Backend {
       ChiselError.info(cmd + " RET " + c)
     }
     def build(name: String) {
-      val cmd = floDir + "/emulator/lay -is-console :num-cols 1 :num-cols 1 < " + dir + name + ".flo | " + floDir + "fix-sched > " + dir + name + ".hex"
+      val cmd = floDir + "lay -is-console :num-cols 1 :num-cols 1 < " + dir + name + ".flo | " + floDir + "fix-sched > " + dir + name + ".hex"
       println("BUILDING " + cmd)
       run(cmd)
     }

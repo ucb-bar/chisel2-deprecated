@@ -347,6 +347,8 @@ abstract class Backend {
         if (input.component != null && input.component != node.component) {
           if (!input.isLit &&
               !isBitsIo(input, OUTPUT) && !isBitsIo(node, INPUT) &&
+              // ok if parent referring to any child nodes
+              // not symmetric and only applies to direct children
               // READ BACK INPUT -- TODO: TIGHTEN THIS UP
               !isBitsIo(input, INPUT))
             ChiselErrors += new ChiselError(() => { "Illegal cross module reference between " + node + " and " + input }, node.line)
