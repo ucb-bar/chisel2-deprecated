@@ -390,6 +390,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     printfs += p
     debug(p)
     p.inputs.foreach(debug _)
+    for (arg <- args)
+      if (arg.isInstanceOf[Aggregate])
+        ChiselErrors += new ChiselError(() => { "unable to printf aggregate argument " + arg }, arg.line)
   }
 
   def <>(src: Module) {
