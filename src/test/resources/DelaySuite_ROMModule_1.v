@@ -4,21 +4,18 @@ module DelaySuite_ROMModule_1(
 );
 
   wire[3:0] T0;
-  wire[3:0] rom_2c;
-  wire[3:0] rom_1b;
-  wire[3:0] rom_0a;
+  reg [3:0] T1 [2:0];
 
   assign io_out = T0;
-  assign T0 = 
-      io_addr == 2'd0 ? 4'h1
-    : io_addr == 2'd1 ? 4'h2
-    : io_addr == 2'd2 ? 4'h3
 `ifndef SYNTHESIS
-    :$random()
+  assign T0 = io_addr >= 2'h3 ? {1{$random}} : T1[io_addr];
+`else
+  assign T0 = T1[io_addr];
 `endif
-    ;
-  assign rom_2c = 4'h3;
-  assign rom_1b = 4'h2;
-  assign rom_0a = 4'h1;
+  always @(*) begin
+    T1[0] = 4'h1;
+    T1[1] = 4'h2;
+    T1[2] = 4'h3;
+  end
 endmodule
 

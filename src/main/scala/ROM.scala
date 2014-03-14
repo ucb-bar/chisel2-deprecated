@@ -31,50 +31,44 @@
 package Chisel
 import ChiselError._
 import Node._
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.Stack
 
-class ROM[T <: Data](gen: (Int) => T) extends Vec[T](gen) {
-  def lits = inputs
+class ROM[T <: Data](elts: IndexedSeq[T]) extends Vec[T](i => elts.head.clone) {
+  private lazy val data = new ROMData(elts)
 
   override def read(addr: UInt): T = {
-    inputs.clear
-    inputs ++= self
-
-    val data = this(0).clone
-    var port = new ROMRead().init("", widthOf(1), addr, this)
-    data assign port
-    data.setIsTypeNode
-    data
-  }
-
-  override def write(addr: UInt, data: T) {
-    ChiselError.error("Can't write to ROM")
-  }
-
-  override def equals(x: Any): Boolean = {
-    if (x.isInstanceOf[ROM[_]]) {
-      this.eq(x.asInstanceOf[AnyRef])
+    if (elts.length != self.length) {
+      // fall back to Vec.read if the user has appended to us
+      super.read(addr)
     } else {
-      super.equals(x)
+      val res = gen(0)
+      val port = new ROMRead().init("", widthOf(1), addr, data)
+      res assign port
+      res.setIsTypeNode
+      res
     }
   }
 
-  override def forceMatchingWidths =
-    for (i <- 0 until inputs.length)
-      inputs(i) = inputs(i).matchWidth(width)
+  override def write(addr: UInt, data: T): Unit =
+    ChiselError.error("Can't write to ROM")
+}
+
+class ROMData(elts: IndexedSeq[Node]) extends Node {
+  val lits = {
+    val width = elts.map(_.litOf.width).max
+    inferWidth = fixWidth(width)
+    elts.map(_.matchWidth(width).litOf)
+  }
 
   override def isInObject: Boolean = true
   override def isInVCD: Boolean = false
-
-  override def traceableNodes: Array[Node] = lits.toArray
 }
 
-class ROMRead[T <: Data]() extends Node {
+class ROMRead extends Node {
+  inferWidth = (x: Node) => inputs.map(_.width).tail.max
   def addr: Node = inputs(0)
-  def rom: Node = inputs(1)
-  // inputs += addri
-  // inputs += rom
+  def rom: ROMData = inputs(1).asInstanceOf[ROMData]
+  override def toString: String = rom + "[" + addr + "]"
 
-  override def toString: String = inputs(1) + "[" + inputs(0) + "]"
+  override def forceMatchingWidths: Unit =
+    inputs(0) = addr.matchWidth(log2Up(rom.lits.length))
 }

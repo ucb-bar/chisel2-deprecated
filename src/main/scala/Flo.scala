@@ -45,7 +45,7 @@ import scala.collection.mutable.HashSet
 
 class FloBackend extends Backend {
   // TODO: SHOULD BE IN ENV VAR
-  val floDir = "/Users/jrb/bar/flo/emulator/"
+  val floDir = java.lang.System.getenv("DREAMER") + "/emulator/"
   val keywords = new HashSet[String]();
   var isRnd = false
 
@@ -124,9 +124,10 @@ class FloBackend extends Backend {
         if (x.inputs.length == 1) {
           // println("NAME " + x.name + " DIR " + x.dir + " COMP " + x.componentOf + " TOP-COMP " + topComponent)
           if (node.isInObject && x.inputs.length == 1) {
-            if (x.dir == OUTPUT && x.componentOf == topComponent && x.consumers.length == 0) 
+            if (x.dir == OUTPUT && x.componentOf == topComponent && 
+                x.consumers.forall(x => x.componentOf == topComponent))
               emitDec(x) + (if (isRnd) "eat" else ("out/" + x.width))  + " " + emitRef(x.inputs(0)) + "\n"
-            else
+            else 
               emitDec(x) + "mov/" + x.width + " " + emitRef(x.inputs(0)) + "\n"
           } else if (!node.isInObject && x.inputs.length == 0) {
             emitDec(x) + "rnd/" + x.width + "\n"
@@ -142,9 +143,20 @@ class FloBackend extends Backend {
         emitDec(m) + "mem/" + m.width + " " + m.n + "\n"
         // emitDec(m) + "mem " + m.n + "\n" + trueAll(emitRef(m) + "__is_all_read", m.reads)
 
+      case m: ROMData =>
+        val res = new StringBuilder
+        res append emitDec(m) + "mem/" + m.width + " " + m.lits.length + "\n"
+        // emitDec(m) + "mem " + m.n + "\n" + trueAll(emitRef(m) + "__is_all_read", m.reads)
+        for (i <- 0 until m.lits.length)
+          res append "init " + emitRef(m) + " " + i + " " + emitRef(m.lits(i)) + "\n"
+        res.toString
+
       case m: MemRead =>
         // emitDec(m) + "rd/" + node.width + " " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n" 
         emitDec(m) + "rd/" + node.width + " 1 " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n" 
+
+      case m: ROMRead =>
+        emitDec(m) + "rd/" + node.width + " 1 " + emitRef(m.rom) + " " + emitRef(m.addr) + "\n" 
 
       case m: MemWrite =>
         if (m.inputs.length == 2) 
@@ -215,8 +227,7 @@ class FloBackend extends Backend {
     val flags = if (flagsIn == null) "-O2" else flagsIn
 
     val chiselENV = java.lang.System.getenv("CHISEL")
-    val c11 = if(Module.printfs.size > 0) " -std=c++11 " else ""
-    val allFlags = flags + c11 + " -I../ -I" + chiselENV + "/csrc/"
+    val allFlags = flags + " -I../ -I" + chiselENV + "/csrc/"
     val dir = Module.targetDir + "/"
     def run(cmd: String) {
       val bashCmd = Seq("bash", "-c", cmd)

@@ -112,15 +112,22 @@ class VerilogBackend extends Backend {
 
   override def emitRef(node: Node): String = {
     node match {
-      case x: Literal =>
-        val lit = x.value
-        val value = if (lit < 0) (BigInt(1) << x.width) + lit else lit
-        x.width + "'h" + value.toString(16)
-
-      case _ =>
-        super.emitRef(node)
+      case x: Literal => emitLit(x.value, x.width)
+      case _ => super.emitRef(node)
     }
   }
+
+  private def emitLit(x: BigInt): String =
+    emitLit(x, x.bitLength + (if (x < 0) 1 else 0))
+  private def emitLit(x: BigInt, w: Int): String = {
+    val unsigned = if (x < 0) (BigInt(1) << w) + x else x
+    require(x >= 0)
+    w + "'h" + unsigned.toString(16)
+  }
+
+  // $random only emits 32 bits; repeat its result to fill the Node
+  private def emitRand(node: Node): String =
+    "{" + ((node.width+31)/32) + "{$random}}"
 
   def emitPortDef(m: MemAccess, idx: Int): String = {
     def str(prefix: String, ports: (String, String)*): String =
@@ -226,7 +233,7 @@ class VerilogBackend extends Backend {
       res += "  `ifndef SYNTHESIS\n"
       for ((n, w) <- c.wires) {
         if (w.driveRand) {
-          res += "    assign " + c.name + "." + n + " = $random();\n"
+          res += "    assign " + c.name + "." + n + " = " + emitRand(w) + ";\n"
         }
       }
       res += "  `endif\n"
@@ -311,17 +318,24 @@ class VerilogBackend extends Backend {
         } else {
           ""
         }
-      case r: ROM[_] =>
-             "" //Define is already done by Vec
+      case r: ROMData =>
+        val inits = new StringBuilder
+        for (i <- 0 until r.lits.length)
+          inits append "    " + emitRef(r) + "[" + i + "] = " + emitRef(r.lits(i)) + ";\n"
+        "  " + romStyle + " begin\n" +
+        inits +
+        "  end\n"
      
-      case r: ROMRead[_] =>
-        val reads = new StringBuilder
-        reads append "  assign " + emitTmp(r) + " = \n" 
-        reads append "      " + emitRef(r.addr) + " == " + r.addr.width.toString + "'d0" + " ? " + emitRef(r.rom.asInstanceOf[ROM[_]].lits(0)) + "\n"
-        for (i <-1 until r.rom.asInstanceOf[ROM[_]].lits.length)
-          reads append "    : " + emitRef(r.addr) + " == " + r.addr.width.toString + "'d" + i + " ? " + emitRef(r.rom.asInstanceOf[ROM[_]].lits(i)) + "\n"
-
-	reads + "`ifndef SYNTHESIS\n    :$random()\n`endif\n    ;\n"
+      case r: ROMRead =>
+        val port = "  assign " + emitTmp(r) + " = " + emitRef(r.rom) + "[" + emitRef(r.addr) + "];\n"
+        if (!isPow2(r.rom.lits.length))
+          "`ifndef SYNTHESIS\n" +
+          "  assign " + emitTmp(r) + " = " + emitRef(r.addr) + " >= " + emitLit(r.rom.lits.length) + " ? " + emitRand(r) + " : " + emitRef(r.rom) + "[" + emitRef(r.addr) + "];\n" +
+          "`else\n" +
+          port +
+          "`endif\n"
+        else
+          port
 
       case s: Sprintf =>
         "  always @(*) $sformat(" + emitTmp(s) + ", " + s.args.map(emitRef _).foldLeft(CString(s.format))(_ + ", " + _) + ");\n"
@@ -359,9 +373,8 @@ class VerilogBackend extends Backend {
         } else {
           ""
         }
-      case r: ROM[_] =>
-        ""
-        //Vec generates the declaration statements
+      case r: ROMData =>
+        "  reg [" + (r.width-1) + ":0] " + emitRef(r) + " [" + (r.lits.length-1) + ":0];\n"
 
       case x: MemAccess =>
         x.referenced = true
@@ -468,21 +481,47 @@ class VerilogBackend extends Backend {
   def emitRegs(c: Module): StringBuilder = {
     val res = new StringBuilder();
     val clkDomains = new HashMap[Clock, StringBuilder]
-    for (clock <- c.clocks) {
-      val sb = new StringBuilder
-      sb.append("  always @(posedge " + emitRef(clock) + ") begin\n")
-      clkDomains += (clock -> sb)
-    }
+    for (clock <- c.clocks)
+      clkDomains += (clock -> new StringBuilder)
+    for (p <- c.asserts)
+      clkDomains(p.clock).append(emitAssert(p))
+    for (clock <- c.clocks)
+      clkDomains(clock).append("  always @(posedge " + emitRef(clock) + ") begin\n")
     for (m <- c.mods) {
       val clkDomain = clkDomains getOrElse (m.clock, new StringBuilder)
       if (m.clock != null && clkDomain.size > 0)
         clkDomain.append(emitReg(m))
     }
+    for (p <- c.printfs)
+      clkDomains(p.clock).append(emitPrintf(p))
     for (clock <- c.clocks) {
       clkDomains(clock).append("  end\n")
       res.append(clkDomains(clock).result())
     }
     res
+  }
+
+  def emitPrintf(p: Printf): String = {
+    "`ifndef SYNTHESIS\n" +
+    "`ifdef PRINTF_COND\n" +
+    "    if (`PRINTF_COND)\n" +
+    "`endif\n" +
+    "      if (" + emitRef(p.cond) + ")\n" +
+    "        $fwrite(32'h80000002, " + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _) + ");\n" +
+    "`endif\n"
+  }
+  def emitAssert(a: Assert): String = {
+    val gate = emitRef(a) + "__gate__"
+    "`ifndef SYNTHESIS\n" +
+    "  reg " + gate + " = 1'b0;\n" +
+    "  always @(posedge " + emitRef(a.clock) + ") begin\n" +
+    "    if(" + emitRef(a.reset) + ") " + gate + " <= 1'b1;\n" +
+    "    if(!" + emitRef(a.cond) + " && " + gate +") begin\n" +
+    "      $fwrite(32'h80000002, " + CString("ASSERTION FAILED: %s\n") + ", " + CString(a.message) + ");\n" +
+    "      $finish;\n" +
+    "    end\n" +
+    "  end\n" +
+    "`endif\n"
   }
 
   def emitReg(node: Node): String = {
@@ -516,21 +555,6 @@ class VerilogBackend extends Backend {
         } else {
           ""
         }
-      case a: Assert =>
-        "`ifndef SYNTHESIS\n" +
-        "    if(!" + emitRef(a.cond) + ") begin\n" +
-        "      $fwrite(32'h80000002, " + CString("ASSERTION FAILED: %s\n") + ", " + CString(a.message) + ");\n" +
-        "      $finish;\n" +
-        "    end\n" +
-        "`endif\n"
-      case p: Printf =>
-        "`ifndef SYNTHESIS\n" +
-        "`ifdef PRINTF_COND\n" +
-        "    if (`PRINTF_COND)\n" +
-        "`endif\n" +
-        "      if (" + emitRef(p.cond) + ")\n" +
-        "        $fwrite(32'h80000002, " + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _) + ");\n" +
-        "`endif"
       case _ =>
         ""
     }

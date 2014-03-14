@@ -40,10 +40,10 @@ object nodeToString {
           op.op, 
           name(op.inputs(1).getNode, isRealName) )
       case ext   : Extract   => 
-        val hi: String = nodeToString(ext.hi)
-        val lo: String = nodeToString(ext.lo) 
-        nodeToString(ext.inputs(0)) + "[" + { if (hi == lo) hi else hi + ":" + lo } + "]"  
-      case bind  : Binding   => "Binding(" + nodeToString(bind.targetNode) + ")"
+        val hi: String = nodeToString(ext.hi, isRealName)
+        val lo: String = nodeToString(ext.lo, isRealName) 
+        nodeToString(ext.inputs.head, isRealName) + "[" + { if (hi == lo) hi else hi + ":" + lo } + "]"  
+      case bind  : Binding   => "Binding(" + nodeToString(bind.targetNode, isRealName) + ")"
       case bundle: Bundle    => 
         if (!bundle.elements.isEmpty) {
           val head = bundle.elements.head._2
@@ -84,9 +84,9 @@ object nodeToString {
         "MEM(%s)[%d]".format(name(mem, isRealName), mem.n)
       }
       case memacc: MemAccess => "%s[%s]".format(
-        name(memacc.mem, isRealName), nodeToString(memacc.addr))
-      case romread: ROMRead[_] => "%s[%s]".format(
-        name(romread.rom, isRealName), nodeToString(romread.addr))
+        name(memacc.mem, isRealName), nodeToString(memacc.addr, isRealName))
+      case romread: ROMRead => "%s[%s]".format(
+        name(romread.rom, isRealName), nodeToString(romread.addr, isRealName))
       // case clk   : Clock     => "Clock(%s)".format(clk.pName)
       case _ => if (node == null) "" else node.toString
     }      
