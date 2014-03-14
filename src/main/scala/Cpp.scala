@@ -485,7 +485,9 @@ class CppBackend extends Backend {
             "TERNARY(" + _ + ", " + _ + ")") + ";\n")
 
       case a: Assert =>
-        "  ASSERT(" + emitLoWordRef(a.cond) + ", " + CString(a.message) + ");\n"
+        val cond = emitLoWordRef(a.cond) +
+          (if (emitRef(a.cond) == "reset") "" else " || reset.lo_word()")
+        "  ASSERT(" + cond + ", " + CString(a.message) + ");\n"
 
       case s: Sprintf =>
         ("#if __cplusplus >= 201103L\n"

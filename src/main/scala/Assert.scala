@@ -35,9 +35,11 @@ import scala.collection.mutable.ArrayBuffer
 import Node._
 import ChiselError._
 
-class Assert(condArg: Bool, val message: String) extends Node {
-  inputs += condArg;
-  def cond: Node = inputs(0);
+class Assert(condIn: Bool, resetIn: Bool, val message: String) extends Node {
+  inputs += condIn || resetIn
+  inputs += resetIn
+  def cond: Node = inputs(0)
+  def reset: Node = inputs(1)
 }
 
 class BitsInObject(x: Node) extends UInt {

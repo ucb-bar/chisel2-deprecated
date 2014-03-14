@@ -481,11 +481,12 @@ class VerilogBackend extends Backend {
   def emitRegs(c: Module): StringBuilder = {
     val res = new StringBuilder();
     val clkDomains = new HashMap[Clock, StringBuilder]
-    for (clock <- c.clocks) {
-      val sb = new StringBuilder
-      sb.append("  always @(posedge " + emitRef(clock) + ") begin\n")
-      clkDomains += (clock -> sb)
-    }
+    for (clock <- c.clocks)
+      clkDomains += (clock -> new StringBuilder)
+    for (p <- c.asserts)
+      clkDomains(p.clock).append(emitAssert(p))
+    for (clock <- c.clocks)
+      clkDomains(clock).append("  always @(posedge " + emitRef(clock) + ") begin\n")
     for (m <- c.mods) {
       if (m.clock != null)
         clkDomains(m.clock).append(emitReg(m))
@@ -506,6 +507,19 @@ class VerilogBackend extends Backend {
     "`endif\n" +
     "      if (" + emitRef(p.cond) + ")\n" +
     "        $fwrite(32'h80000002, " + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _) + ");\n" +
+    "`endif\n"
+  }
+  def emitAssert(a: Assert): String = {
+    val gate = emitRef(a) + "__gate__"
+    "`ifndef SYNTHESIS\n" +
+    "  reg " + gate + " = 1'b0;\n" +
+    "  always @(posedge " + emitRef(a.clock) + ") begin\n" +
+    "    if(" + emitRef(a.reset) + ") " + gate + " <= 1'b1;\n" +
+    "    if(!" + emitRef(a.cond) + " && " + gate +") begin\n" +
+    "      $fwrite(32'h80000002, " + CString("ASSERTION FAILED: %s\n") + ", " + CString(a.message) + ");\n" +
+    "      $finish;\n" +
+    "    end\n" +
+    "  end\n" +
     "`endif\n"
   }
 
@@ -540,13 +554,6 @@ class VerilogBackend extends Backend {
         } else {
           ""
         }
-      case a: Assert =>
-        "`ifndef SYNTHESIS\n" +
-        "    if(!" + emitRef(a.cond) + ") begin\n" +
-        "      $fwrite(32'h80000002, " + CString("ASSERTION FAILED: %s\n") + ", " + CString(a.message) + ");\n" +
-        "      $finish;\n" +
-        "    end\n" +
-        "`endif\n"
       case _ =>
         ""
     }
