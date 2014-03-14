@@ -255,7 +255,7 @@ public:
 
 	bool set_element(std::string index, std::string value) {
 		int index_int = atoi(index.c_str());
-		return dat_from_str<w>(mem_ptr->contents[index_int]);
+		return dat_from_str<w>(value, mem_ptr->contents[index_int]);
 	}
 
 	std::string get_width() {
@@ -344,7 +344,7 @@ public:
 			if (!check_command_length(tokens, 0, 0)) { return "error"; }
 			return get_api_support();
 
-		} else if (tokens[0] == "clock" || tokens[0] == "step") {
+		} else if (tokens[0] == "clock") {
 			// IN:  clock <num_cycles>
 			// OUT: actual number of cycles stepped
 			if (!check_command_length(tokens, 1, 1)) { return "error"; }
@@ -355,6 +355,13 @@ public:
 		    }
 		    module->clock_lo(dat_t<1>(0));
 		    return itos(cycles);
+		} else if (tokens[0] == "step") {
+			// IN:  step <num_cycles>
+			// OUT: actual number of cycles stepped
+			if (!check_command_length(tokens, 1, 1)) { return "error"; }
+			int n = atoi(tokens[1].c_str());
+		    int ret = module->step(dat_t<1>(0), n);
+		    return itos(ret);
 		} else if (tokens[0] == "set-clocks") {
 			// IN:  set-clocks
 			// OUT: ???

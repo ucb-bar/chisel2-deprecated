@@ -1789,14 +1789,14 @@ class mod_t {
 
   int timestep;
 
-  int step (bool is_reset, int n, FILE* f, bool is_print = false) {
+  int step (bool is_reset, int n) {
     int delta = 0;
-    // fprintf(stderr, "STEP %d R %d P %d\n", n, is_reset, is_print);
     for (int i = 0; i < n; i++) {
       dat_t<1> reset = LIT<1>(is_reset);
       delta += clock(reset);
-      if (f != NULL) dump(f, timestep);
-      if (is_print) print(stderr);
+      // TODO(ducky): add these in a more elegant format
+      //if (f != NULL) dump(f, timestep);
+      //if (is_print) print(stderr);
       timestep += 1;
     }
     return delta;

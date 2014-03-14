@@ -575,23 +575,24 @@ class CppBackend extends Backend {
       }
       harness.write("}\n\n");
     }
-    harness.write("int main (int argc, char* argv[]) {\n");
-    harness.write("  " + name + "_t* c = new " + name + "_t();\n");
-    harness.write("  c->init();\n");
+    harness.write(s"""int main (int argc, char* argv[]) {\n""");
+    harness.write(s"""  ${name}_t* module = new ${name}_t();\n""");
+    harness.write(s"""  ${name}_api_t* api = new ${name}_api_t();\n""");
+    harness.write(s"""  api->init(module);\n""");
     if (Module.isVCD) {
-      harness.write("  FILE *f = fopen(\"" + name + ".vcd\", \"w\");\n");
+      harness.write(s"""  FILE *f = fopen("${name}.vcd", "w");\n""");
     } else {
-      harness.write("  FILE *f = NULL;\n");
+      harness.write(s"""  FILE *f = NULL;\n""");
     }
     if (Module.dumpTestInput) {
-      harness.write("  FILE *tee = fopen(\"" + name + ".stdin\", \"w\");\n");
+      harness.write(s"""  FILE *tee = fopen("${name}.stdin", "w");\n""");
     } else {
-      harness.write("  FILE *tee = NULL;");
+      harness.write(s"""  FILE *tee = NULL;""");
     }
-    harness.write("  c->read_eval_print(f, tee);\n");
-    harness.write("  fclose(f);\n");
-    harness.write("  fclose(tee);\n");
-    harness.write("}\n");
+    harness.write(s"""  api->read_eval_print_loop();\n""");
+    harness.write(s"""  fclose(f);\n""");
+    harness.write(s"""  fclose(tee);\n""");
+    harness.write(s"""}\n""");
     harness.close();
   }
 
@@ -690,9 +691,9 @@ class CppBackend extends Backend {
       case x: Reg =>
         s"""  dat_table["${name}"] = new dat_api<${node.width}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
       case m: Mem[_] =>
-        s"""  mem_table["${name}"] = new mem_api<${node.width}, ${node.depth}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
+        s"""  mem_table["${name}"] = new mem_api<${m.width}, ${m.n}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
       case r: ROMData =>
-        s"""  mem_table["${name}"] = new mem_api<${node.width}, ${node.depth}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
+        s"""  mem_table["${name}"] = new mem_api<${r.width}, ${r.lits.length}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
       case c: Clock =>
         s"""  dat_table["${name}"] = new dat_api<${node.width}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
       case _ =>
