@@ -527,9 +527,12 @@ abstract class Backend {
 
   // Assign psuedo names for backannotation
   def setPseudoNames(c: Module) {
-    val classNames = new HashMap[String, ArrayBuffer[Module]]
+    ChiselError.info("[Backannotation] pseudo naming")
 
-    for (m <- Module.sortedComps ; if m.pName == "") {
+    c.pName = extractClassName(c)
+
+    val classNames = new HashMap[String, ArrayBuffer[Module]]
+    for (m <- Module.sortedComps ; if m.pName == "" && m != c) {
       val className = extractClassName(m)
       if (!(classNames contains className)) {
         classNames(className) = new ArrayBuffer[Module]
@@ -542,14 +545,17 @@ abstract class Backend {
         for ((c, i) <- comps.zipWithIndex) {
           c.pName = name + "_" + i
         }
+      } else {
+        comps.head.pName = name
       }
     }
 
     c dfs { node =>
-      if (!node.isTypeNode && !node.isLit && node.pName == "") {
-        if (node.name != "") {
-          node.pName = node.name
-        } else {
+      if (!node.isTypeNode && node.pName == "") {
+        if (node.name != "" || node.isLit) {
+          node.pName = node.name 
+        } else if (getPseudoPath(node.component) != "") {
+                   /* This means valid path */
           val prefix = node match {
             case _: Reg => "R"
             case _ => "T"
@@ -561,6 +567,52 @@ abstract class Backend {
           }
         }
       }
+    }
+  }
+  
+  def getPseudoPath(c: Module, delim: String = "/"): String =
+    if (c.parent == null) c.pName else getPseudoPath(c.parent) + delim + c.pName
+  def getSignalPathName(n: Node, delim: String = "/", isRealName: Boolean = false): String =
+    if (n == null || n.pName == "") "null" 
+    else ( getPseudoPath(n.component) + delim + 
+     ( if (!isRealName) n.pName 
+       else if (n.name != "") n.name 
+       else emitRef(n) ) )
+
+  // Write out DFS graph traversal
+  // to verify backannotation later
+  def writeOutGraph(c: Module) {
+    ChiselError.info("[Backannotation] write out graphs")
+    val dir = ensureDir(Module.targetDir)
+    val file = new java.io.FileWriter(dir+"%s.dfs".format(c.pName))
+    val res = new StringBuilder
+
+    c dfs { node =>
+      if (!node.isTypeNode && !node.isLit)
+        res append (getSignalPathName(node, isRealName = true) + ":" + nodeToString(node, isRealName = true) + "\n")
+    }
+  
+    try {
+      file write res.result
+    } finally {
+      file.close
+    }
+  }
+
+  def checkBackannotation(c: Module) { }
+
+  def backannotationTransforms { }
+
+  def backannotationAnalyses {
+    analyses += { c => writeOutGraph(c) }
+  }
+
+  def initBackannotation {
+    if (Module.isBackannotating) {
+      transforms += { c => setPseudoNames(c) }
+      transforms += { c => checkBackannotation(c) }
+      backannotationTransforms
+      backannotationAnalyses
     }
   }
 
@@ -621,9 +673,6 @@ abstract class Backend {
     ChiselError.info("resolving nodes to the components")
     collectNodesIntoComp(initializeDFS)
     ChiselError.info("finished resolving")
-
-    // Assign pseudo names for backannotation
-    setPseudoNames(c)
 
     // two transforms added in Mem.scala (referenced and computePorts)
     ChiselError.info("started transforms")

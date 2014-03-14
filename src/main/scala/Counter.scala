@@ -185,8 +185,7 @@ abstract class CounterTester[+T <: CounterWrapper](c: T, val clks: Int = 1) exte
     for (signal <- Module.signals) {
       peek(signal.shadow)
     }
-    var i = 0
-    for (signal <- Module.signals) {
+    for ((signal, i) <- Module.signals.zipWithIndex) {
       val read = peekDaisyRead
       for (s <- Module.signals) {
         peek(s.shadow)
@@ -194,7 +193,6 @@ abstract class CounterTester[+T <: CounterWrapper](c: T, val clks: Int = 1) exte
       good &= expect(read == counts(signal), "Counter" + i)
       println("out bits: %x\tfrom signal: %x".format(
                read, counts(signal)))
-      i += 1
     }
   }
 
@@ -217,37 +215,45 @@ trait CounterBackend extends Backannotation {
   val counterCopy = new HashMap[Module, Bool]
   val counterRead = new HashMap[Module, Bool] 
   val counterRegs = new ArrayBuffer[proc]
-  val signalTypes = new ArrayBuffer[Bits]
 
   var counterIdx = -1
 
-  transforms += ((c: Module) => c bfs (_.addConsumers))
+  override def backannotationTransforms {
+    transforms += ((c: Module) => c bfs (_.addConsumers))
 
-  transforms += ((c: Module) => annotateSignals(c))
-  transforms += ((c: Module) => decoupleTarget(c))
-  transforms += ((c: Module) => connectDaisyPins(c))
-  transforms += ((c: Module) => generateCounters(c))
-  transforms += ((c: Module) => generateDaisyChains)
+    transforms += ((c: Module) => annotateSignals(c))
+    transforms += ((c: Module) => decoupleTarget(c))
+    transforms += ((c: Module) => connectDaisyPins(c))
+    transforms += ((c: Module) => generateCounters(c))
+    transforms += ((c: Module) => generateDaisyChains)
 
-  transforms += ((c: Module) => genCounterMuxes(c))
-  transforms += ((c: Module) => c.inferAll)
-  transforms += ((c: Module) => c.forceMatchingWidths)
-  transforms += ((c: Module) => c.removeTypeNodes)
-  transforms += ((c: Module) => removeSignalTypes)
-  transforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
+    transforms += ((c: Module) => genCounterMuxes(c))
+    transforms += ((c: Module) => c.inferAll)
+    transforms += ((c: Module) => c.forceMatchingWidths)
+    transforms += ((c: Module) => c.removeTypeNodes)
+    transforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
+  }
 
   // analyses += ((c: Module) => reportCounters(c))
 
   override def getPseudoPath(c: Module, delim: String = "/"): String = {
-    c.parent match {
-      case _: CounterWrapper => extractClassName(c)
-      case _ => getPseudoPath(c.parent, delim) + delim + c.pName
-    }
+    if (!(c.parent == null)) {
+      c.parent match {
+        case _: CounterWrapper => extractClassName(c)
+        case _ => getPseudoPath(c.parent, delim) + delim + c.pName
+      }
+    } else ""
   }
 
   override def setPseudoNames(c: Module) {
     c match {
       case m: CounterWrapper => super.setPseudoNames(m.top)
+    }
+  }
+
+  override def checkBackannotation(c: Module) {
+    c match {
+      case m: CounterWrapper => super.checkBackannotation(m.top)
     }
   }
 
@@ -292,7 +298,7 @@ trait CounterBackend extends Backannotation {
   }
 
   private def annotateSignals(c: Module) {
-    ChiselError.info("Backannotation: annotate signals")
+    ChiselError.info("[Backannotation] annotate signals")
 
     // Read the signal list file
     // TODO: generalize the signal file format
@@ -352,7 +358,7 @@ trait CounterBackend extends Backannotation {
   }
 
   def decoupleTarget(c: Module) {
-    ChiselError.info("Counter Backend: target decoupling")
+    ChiselError.info("[CounterBackend] target decoupling")
 
     var counterConf: CounterConfiguration = null 
     c match {
@@ -452,7 +458,7 @@ trait CounterBackend extends Backannotation {
 
   // Connect daisy pins to support hierarchical modules
   def connectDaisyPins(c: Module) {
-    ChiselError.info("Counter Backend: connect daisy pins")
+    ChiselError.info("[CounterBackend] connect daisy pins")
 
     val top = c match {
       case m: CounterWrapper => {
@@ -513,7 +519,7 @@ trait CounterBackend extends Backannotation {
   }
 
   def generateCounters(c: Module) {
-    ChiselError.info("Counter Backend: generate counters")
+    ChiselError.info("[CounterBackend] generate counters")
 
     val stack = new Stack[Module]
     val walked = new HashSet[Module]
@@ -602,7 +608,7 @@ trait CounterBackend extends Backannotation {
   }  
  
   def generateDaisyChains {
-    ChiselError.info("Counter Backend: generate daisy chains")
+    ChiselError.info("[CounterBackend] generate daisy chains")
  
     // Daisy chaining
     for (m <- Module.sortedComps ; if !m.isInstanceOf[CounterWrapper]) {
@@ -644,7 +650,7 @@ trait CounterBackend extends Backannotation {
   // Only genMuxes of new 'proc's are invoked
   // Otherwise, there will be side effects
   def genCounterMuxes (c: Module) {
-    ChiselError.info("Counter Backend: generate muxes for counter structure")
+    ChiselError.info("[CounterBackend] generate muxes for counter structure")
 
     c match {
       case m: CounterWrapper => {
@@ -692,18 +698,12 @@ trait CounterBackend extends Backannotation {
     }
   }
 
-  def removeSignalTypes {
-    for (signalType <- signalTypes) {
-      signalType.inputs.clear
-    }
-  }
-
   def reportCounters (m: Module) {
     val rptdir  = ensureDir(targetdir)
     val rptfile = new java.io.FileWriter(rptdir+"%s_signal.rpt".format(m.name))
     val report = new StringBuilder();
 
-    ChiselError.info("Counter Backend: report annotated signals")
+    ChiselError.info("[CounterBackend] report annotated signals")
     
     report append "\t\t+-------------------------------------+\n"
     report append "\t\t|          Counter Report             |\n"

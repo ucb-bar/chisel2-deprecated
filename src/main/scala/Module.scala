@@ -94,6 +94,8 @@ object Module {
   val clocks = new ArrayBuffer[Clock]()
   var implicitReset: Bool = null
   var implicitClock: Clock = null
+  /* Backannotation flags */
+  var isBackannotating = false
   var model = ""
   val signals = new ArrayBuffer[Node]
   /* Jackhammer flags */
@@ -179,7 +181,11 @@ object Module {
     clk = UInt(INPUT, 1)
     clk.setName("clk")
 
+    // Backannotation
     isInGetWidth = false
+    isBackannotating = false
+    model = ""
+    signals.clear
   }
 
   //component stack handling stuff
@@ -507,20 +513,49 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       walked += top
       visit(top)
       top match {
-        /*
-        case b: Bundle => 
-          for((n, i) <- b.flatten ; if !(i == null) && !(walked contains i)) {
-            dfsStack push i
-            walked += i
+        // Special caution is needed for registers
+        // because genMuxes works differently
+        // for VerilogBackend and CppBackend
+        // We want the same graph traversal
+        // for two cases
+        case r: Reg => {
+          val init = if (r.isReset) r.init else null
+          val enable = 
+            if (Module.isEmittingComponents) {
+              r.enable
+            } else {
+              r.next match {
+                case mux: Mux => mux.inputs(0)
+                case _ => null
+              }
+            }
+          val next = 
+            if (Module.isEmittingComponents) {
+              r.next
+            } else {
+              r.next match {
+                case mux: Mux => mux.inputs(1)
+                case _ => r.next
+              }
+            }
+
+ 
+          if (!(next == null ) && !(walked contains next)) {
+            dfsStack push next
+            walked += next
           }
-        case v: Vec[_] =>
-          for((n, i) <- v.flatten ; if !(i == null) && !(walked contains i)) {
-            dfsStack push i
-            walked += i
+          if (!(init == null) && !(walked contains init)) {
+            dfsStack push init
+            walked += init
           }
-        */
+          if (!(enable == null) && enable != Bool(true) && !(walked contains enable)) {
+            dfsStack push enable
+            walked += enable
+          }
+        }
         case _ => 
-          for(i <- top.inputs ; if !(i == null) && !(walked contains i)) {
+          for(i <- top.inputs ; 
+            if !(i == null) && !(walked contains i) && !i.component.isInstanceOf[CounterWrapper]) {
             dfsStack push i
             walked += i
           }

@@ -162,6 +162,7 @@ object chiselMain {
         case "--checkPorts" => Module.isCheckingPorts = true
         case "--prune" => Module.isPruning = true
         // Counter backend flags
+        case "--backannotation" => Module.isBackannotating = true
         case "--model" => Module.model = args(i + 1) ; i += 1
         //Jackhammer Flags
         //case "--jEnable" => Module.jackEnable = true
@@ -182,11 +183,12 @@ object chiselMain {
       (args: Array[String], gen: () => T, ftester: T => Tester[T] = null) = {
     Module.initChisel();
     readArgs(args)
-
     try {
       /* JACK - If loading design, read design.prm file*/
       if (Module.jackLoad != null) { Jackhammer.load(Module.jackDir, Module.jackLoad) }
       val c = gen();
+
+      Module.backend.initBackannotation
 
       /* JACK - If dumping design, dump to jackDir with jackNumber points*/
       if (Module.jackDump != null) { 
