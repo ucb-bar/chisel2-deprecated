@@ -179,6 +179,35 @@ class DelaySuite extends TestSuite {
     assertFile("DelaySuite_ReadCondMaskedWrite_1.v")
   }
 
+  @Test def testSeqReadBundle() {
+    class A extends Bundle {
+      val a = new Bundle {
+        val a = UInt(width = 8)
+        val b = UInt(width = 16)
+      }
+      val a_b = UInt(width = 32) // this tests name mangling
+      override def clone = new A().asInstanceOf[this.type]
+    }
+    class SeqReadBundle extends Module {
+      val io = new Bundle {
+        val ren = Bool(INPUT)
+        val raddr = UInt(INPUT, width = 4)
+        val wen = Bool(INPUT)
+        val waddr = UInt(INPUT, width = 4)
+        val in = new A().asInput
+        val out = new A().asOutput
+      }
+      val mem = Mem(io.in.clone, 16, seqRead = true)
+      when (io.wen) { mem(io.waddr) := io.in }
+      io.out := mem(RegEnable(io.raddr, io.ren))
+    }
+    chiselMain(Array[String](
+      "--targetDir", dir.getPath.toString()),
+      () => Module(new SeqReadBundle()))
+    assertFile("DelaySuite_SeqReadBundle_1.h")
+    assertFile("DelaySuite_SeqReadBundle_1.cpp")
+  }
+
   /** Initialized ROM. */
 
   @Test def testROM() {
@@ -193,9 +222,16 @@ class DelaySuite extends TestSuite {
       val rom = Vec(Array(a,b,c))
       io.out := rom(io.addr)
     }
+
     chiselMain(Array[String]("--v",
       "--targetDir", dir.getPath.toString()),
       () => Module(new ROMModule()))
     assertFile("DelaySuite_ROMModule_1.v")
+
+    chiselMain(Array[String](
+      "--targetDir", dir.getPath.toString()),
+      () => Module(new ROMModule()))
+    assertFile("DelaySuite_ROMModule_1.h")
+    assertFile("DelaySuite_ROMModule_1.cpp")
   }
 }

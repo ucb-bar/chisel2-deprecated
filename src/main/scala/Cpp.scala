@@ -61,6 +61,7 @@ object CString {
 
 class CppBackend extends Backend {
   val keywords = new HashSet[String]();
+  private var hasPrintfs = false
 
   override def emitTmp(node: Node): String = {
     require(false)
@@ -125,7 +126,7 @@ class CppBackend extends Backend {
         "  dat_t<" + node.width + "> " + emitRef(node) + "_shadow;\n";
       case m: Mem[_] =>
         "  mem_t<" + m.width + "," + m.n + "> " + emitRef(m) + ";\n"
-      case r: ROM[_] =>
+      case r: ROMData =>
         "  mem_t<" + r.width + "," + r.lits.length + "> " + emitRef(r) + ";\n"
       case c: Clock =>
         "  int " + emitRef(node) + ";\n" +
@@ -463,7 +464,7 @@ class CppBackend extends Backend {
           + " = " + emitRef(m.mem) + ".get(" + emitLoWordRef(m.addr) + ", "
           + i + ")"))
 
-      case r: ROMRead[_] =>
+      case r: ROMRead =>
         emitTmpDec(r) + block((0 until words(r)).map(i => emitWordRef(r, i)
           + " = " + emitRef(r.rom) + ".get(" + emitLoWordRef(r.addr) + ", "
           + i + ")"))
@@ -484,7 +485,9 @@ class CppBackend extends Backend {
             "TERNARY(" + _ + ", " + _ + ")") + ";\n")
 
       case a: Assert =>
-        "  ASSERT(" + emitLoWordRef(a.cond) + ", " + CString(a.message) + ");\n"
+        val cond = emitLoWordRef(a.cond) +
+          (if (emitRef(a.cond) == "reset") "" else " || reset.lo_word()")
+        "  ASSERT(" + cond + ", " + CString(a.message) + ");\n"
 
       case s: Sprintf =>
         ("#if __cplusplus >= 201103L\n"
@@ -520,7 +523,7 @@ class CppBackend extends Backend {
       case x: Mem[_] =>
         "  if (rand_init) " + emitRef(node) + ".randomize();\n"
 
-      case r: ROM[_] =>
+      case r: ROMData =>
         val res = new StringBuilder
         for (i <- 0 until r.lits.length)
           res append block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(r.lits(i), j) + ")"))
@@ -580,7 +583,14 @@ class CppBackend extends Backend {
     } else {
       harness.write("  FILE *f = NULL;\n");
     }
-    harness.write("  c->read_eval_print(f);\n");
+    if (Module.dumpTestInput) {
+      harness.write("  FILE *tee = fopen(\"" + name + ".stdin\", \"w\");\n");
+    } else {
+      harness.write("  FILE *tee = NULL;");
+    }
+    harness.write("  c->read_eval_print(f, tee);\n");
+    harness.write("  fclose(f);\n");
+    harness.write("  fclose(tee);\n");
     harness.write("}\n");
     harness.close();
   }
@@ -589,7 +599,7 @@ class CppBackend extends Backend {
     val flags = if (flagsIn == null) "-O2" else flagsIn
 
     val chiselENV = java.lang.System.getenv("CHISEL")
-    val c11 = if(Module.printfs.size > 0) " -std=c++11 " else ""
+    val c11 = if (hasPrintfs) " -std=c++11 " else ""
     val allFlags = flags + c11 + " -I../ -I" + chiselENV + "/csrc/"
     val dir = Module.targetDir + "/"
     def run(cmd: String) {
@@ -681,7 +691,7 @@ class CppBackend extends Backend {
         s"""  dat_table["${name}"] = new dat_api<${node.width}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
       case m: Mem[_] =>
         s"""  mem_table["${name}"] = new mem_api<${node.width}, ${node.depth}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
-      case r: ROM[_] =>
+      case r: ROMData =>
         s"""  mem_table["${name}"] = new mem_api<${node.width}, ${node.depth}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
       case c: Clock =>
         s"""  dat_table["${name}"] = new dat_api<${node.width}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
@@ -855,14 +865,16 @@ class CppBackend extends Backend {
 
     // geenrate print(...) function
     writeCppFile("void " + c.name + "_t::print ( FILE* f ) {\n")
-    for (p <- Module.printfs)
+    for (cc <- Module.components; p <- cc.printfs) {
+      hasPrintfs = true
       writeCppFile("#if __cplusplus >= 201103L\n"
         + "  if (" + emitLoWordRef(p.cond)
         + ") dat_fprintf<" + p.width + ">(f, "
         + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
         + ");\n"
         + "#endif\n")
-    if (Module.printfs.length > 0)
+    }
+    if (hasPrintfs)
       writeCppFile("fflush(f);\n");
     writeCppFile("}\n")
 

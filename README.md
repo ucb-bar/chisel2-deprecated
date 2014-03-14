@@ -42,23 +42,18 @@ Edit the source files for your circuit
     import Chisel._
 
     class HelloModule extends Module {
-
-        val io = new Bundle {}
-
-        printf("Hello World!\n")
+      val io = new Bundle {}
+      printf("Hello World!\n")
     }
 
-    class HelloModuleTests(c: HelloModule) extends Tester(c, Array(c.io)) {
-        defTests {
-            true
-        }
+    class HelloModuleTests(c: HelloModule) extends Tester(c) {
     }
 
     object hello {
-        def main(args: Array[String]): Unit = {
-            chiselMainTest(Array[String]("--backend", "c", "--genHarness"),
-                () => Module(new HelloModule())){c => new HelloModuleTests(c)}
-        }
+      def main(args: Array[String]): Unit = {
+        chiselMainTest(Array[String]("--backend", "c", "--testing", "--genHarness"),
+           () => Module(new HelloModule())){c => new HelloModuleTests(c)}
+      }
     }
 
 At this point you will need to [download and install sbt](http://www.scala-sbt.org/release/docs/Getting-Started/Setup.html#installing-sbt)
@@ -110,12 +105,12 @@ the Chisel jar locally and remake your third-party project. Example:
 
     $ cat *srcTop*/chisel/build.sbt
     ...
-    version := "2.1-SNAPSHOT"
+    version := "2.3-SNAPSHOT"
     ...
 
     $ cat *srcTop*/riscv-sodor/project/build.scala
     ...
-    libraryDependencies += "edu.berkeley.cs" %% "chisel" % "2.1-SNAPSHOT"
+    libraryDependencies += "edu.berkeley.cs" %% "chisel" % "2.3-SNAPSHOT"
     ...
 
     $ rm -rf ~/.sbt ~/.ivy2
@@ -125,12 +120,19 @@ the Chisel jar locally and remake your third-party project. Example:
 Publishing to public Maven repo:
 
     $ diff -u build.sbt
-    -version := "2.1-SNAPSHOT"
-    +version := "2.1"
+    -version := "2.3-SNAPSHOT"
+    +version := "2.3"
 
     $ sbt publish-signed
 
 Making the Chisel jar file with Maven (>=3.0.4)
+
+Some of the library jars in /lib are not available in the central Maven repository.
+They can be installed to your local repo using the script 'install_maven_libs':
+
+    $ ./install_maven_libs
+
+Build Chisel with:
 
     $ mvn install
 

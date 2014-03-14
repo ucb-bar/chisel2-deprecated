@@ -114,6 +114,27 @@ void VerifSuite_CppPrintfComp_1_t::dump(FILE *f, int t) {
       */
   }
 
+  // test that printf of bundles are flagged
+  @Test def testPrintfBundle() {
+
+    try {
+    class PrintfBundle extends Module {
+      val io = new Bundle {
+        val in  = UInt(INPUT,  4)
+        val out = UInt(OUTPUT, 4)
+      }
+      printf("IO = %x", io)
+      io.out := io.in + UInt(1)
+    }
+    chiselMain(Array[String]("--cpp",
+      "--targetDir", dir.getPath.toString()),
+      () => Module(new PrintfBundle()))
+    } catch {
+      case _ : Throwable => ;
+    }
+    assertTrue(!ChiselError.ChiselErrors.isEmpty);
+  }
+
   @Test def testPrintfVerilog() {
 
     class VerilogPrintfComp extends Module {

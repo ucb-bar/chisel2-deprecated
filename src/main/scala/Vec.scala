@@ -74,7 +74,7 @@ object Vec {
     */
   def apply[T <: Data](elts: Iterable[T]): Vec[T] = {
     val res =
-      if (!elts.isEmpty && elts.forall(_ isLit)) new ROM[T](i => elts.head.clone)
+      if (!elts.isEmpty && elts.forall(_.isLit)) new ROM[T](elts.toIndexedSeq)
       else new Vec[T](i => elts.head.clone)
     res.self ++= elts
     res
@@ -310,8 +310,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
         } else {
           elm.name
         }
-        if (elm.name == "")
-          elm.nameIt(prefix + i + suffix, isNamingIo)
+        elm.nameIt(prefix + i + suffix, isNamingIo)
       }
     } else {
       /* We are trying to rename a Vec that has a fixed name. */

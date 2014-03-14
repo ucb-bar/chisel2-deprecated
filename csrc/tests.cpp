@@ -2,58 +2,10 @@
 #include <string.h>
 #include "emulator.h"
 
-template <int w>
-
-dat_t<w> str_to_dat (const char* s) {
-  dat_t<w> res;
-  std::string str;
-  if (s[0] == '0' && s[1] == 'x') {
-    s += 2;
-    int n_rem_bits = val_n_rem_word_bits(strlen(s)*4);
-    int n_str_rem = ceilf(n_rem_bits/4.0);
-    for (int j = 0; j < n_str_rem; j++)
-      str.push_back('0');
-    for (int j = 0; j < strlen(s); j++)
-      str.push_back(s[j]);
-    int n_words   = val_n_words(str.size()*4);
-    int bits_left = w;
-    int n = 0;
-    for (int j = n_words-1; j >= 0; j--) {
-      res.values[j] = 0;
-      for (int i = 0; i < val_n_bits(); i += 4, n++)
-        res.values[j] = (res.values[j] << 4)|char_to_hex[str[n]];
-    }
-  } else if (s[0] == '0' && s[1] == 'b') {
-    s += 2;
-    int n_rem_bits = val_n_rem_word_bits(strlen(s));
-    int n_str_rem = n_rem_bits;
-    for (int j = 0; j < n_str_rem; j++)
-      str.push_back('0');
-    for (int j = 0; j < strlen(s); j++)
-      str.push_back(s[j]);
-    int n_words   = val_n_words(str.size());
-    int bits_left = w;
-    int n = 0;
-    for (int j = n_words-1; j >= 0; j--) {
-      res.values[j] = 0;
-      for (int i = 0; i < val_n_bits(); i += 1, n++) {
-        uint8_t b;
-        switch (str[n]) {
-        case '0': b = 0; break;
-        case '1': b = 1; break;
-        default: printf("UNSUPPORTED BINARY FORMAT %s\n", s);
-        }
-        res.values[j] = (res.values[j] << 1)|b;
-      }
-    }
-  } else {
-    printf("UNSUPPORTED NUMBER FORMAT %s\n", s);
-  }
-  return res;
-}
-
 template <int w> dat_t<w> LITS(const char* str) { 
-  return str_to_dat<w>(str);
+  dat_t<w> dat;
+  str_to_dat<w>(str, dat);
+  return dat;
 }
 
 template <int w>

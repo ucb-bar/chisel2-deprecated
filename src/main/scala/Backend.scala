@@ -94,7 +94,7 @@ abstract class Backend {
     for (m <- root.getClass().getDeclaredMethods) {
       val name = m.getName();
       val types = m.getParameterTypes();
-      if (types.length == 0
+      if (types.length == 0 && root.isValName(name) // patch to avoid defs
         && isPublic(m.getModifiers()) && !(Module.keywords contains name)) {
         val o = m.invoke(root);
         o match {
@@ -345,8 +345,13 @@ abstract class Backend {
         node.component.nodes += node
       for (input <- node.inputs) {
         if (input.component != null && input.component != node.component) {
-          if (!input.isLit && !isBitsIo(node, INPUT) && !isBitsIo(input, OUTPUT))
-            ChiselErrors += new ChiselError(() => { "Illegal cross module reference between " + node + " and " + input}, node.line)
+          if (!input.isLit &&
+              !isBitsIo(input, OUTPUT) && !isBitsIo(node, INPUT) &&
+              // ok if parent referring to any child nodes
+              // not symmetric and only applies to direct children
+              // READ BACK INPUT -- TODO: TIGHTEN THIS UP
+              !isBitsIo(input, INPUT))
+            ChiselErrors += new ChiselError(() => { "Illegal cross module reference between " + node + " and " + input }, node.line)
         }
         if(!walked.contains(input)) {
           if( input.component == null ) {
@@ -560,7 +565,7 @@ abstract class Backend {
     ChiselError.info("start width checking")
     c.forceMatchingWidths;
     ChiselError.info("finished width checking")
-    ChiselError.info("started flattenning")
+    ChiselError.info("started flattening")
     val nbNodes = c.removeTypeNodes()
     ChiselError.info("finished flattening (" + nbNodes + ")")
     ChiselError.checkpoint()

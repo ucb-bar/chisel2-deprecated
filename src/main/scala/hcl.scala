@@ -161,7 +161,19 @@ object chiselMain {
         case "--include" => Module.includeArgs = Module.splitArg(args(i + 1)); i += 1;
         case "--checkPorts" => Module.isCheckingPorts = true
         case "--prune" => Module.isPruning = true
-        case any => ChiselError.warning("'" + arg + "' is an unkown argument.");
+        //Jackhammer Flags
+        //case "--jEnable" => Module.jackEnable = true
+        case "--jackDump" => Module.jackDump = args(i+1); i+=1; //mode of dump (i.e. space.prm, design.prm etc)
+        case "--jackDir"  => Module.jackDir = args(i+1); i+=1;  //location of dump or load
+        case "--jackLoad" => Module.jackLoad = args(i+1); i+=1; //design.prm file
+        case "--dumpTestInput" => Module.dumpTestInput = true;
+        case "--testerSeed" => {
+          Module.testerSeedValid = true
+          Module.testerSeed = args(i+1).toInt
+          i += 1
+        }
+        //case "--jDesign" =>  Module.jackDesign = args(i+1); i+=1;
+        case any => ChiselError.warning("'" + arg + "' is an unknown argument.");
       }
       i += 1;
     }
@@ -175,8 +187,16 @@ object chiselMain {
     readArgs(args)
 
     try {
+      /* JACK - If loading design, read design.prm file*/
+      if (Module.jackLoad != null) { Jackhammer.load(Module.jackDir, Module.jackLoad) }
       val c = gen();
-      Module.backend.elaborate(c)
+
+      /* JACK - If dumping design, dump to jackDir with jackNumber points*/
+      if (Module.jackDump != null) { 
+        Jackhammer.dump(Module.jackDir, Module.jackDump) 
+      } else {
+        Module.backend.elaborate(c)
+      }
       if (Module.isCheckingPorts) Module.backend.checkPorts(c)
       if (Module.isCompiling && Module.isGenHarness) Module.backend.compile(c)
       if (ftester != null && !Module.backend.isInstanceOf[VerilogBackend]) {
