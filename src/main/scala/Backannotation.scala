@@ -96,7 +96,7 @@ object nodeToString {
 trait Backannotation extends Backend {
   Module.isBackannotating = true
 
-  val targetdir = ensureDir(Module.targetDir)
+  lazy val targetdir = ensureDir(Module.targetDir)
   protected def copyResource(filename: String, toDir: String) {
     val resourceStream = getClass getResourceAsStream "/" + filename //Todo: understand it (Java?)
     if (resourceStream != null) {
@@ -114,11 +114,13 @@ trait Backannotation extends Backend {
   override def checkBackannotation(c: Module) {
     ChiselError.info("[Backannotation] check backannotation")
     try {
-      val lines = Source.fromFile("%s.dfs".format(targetdir + c.pName)).getLines.toArray
+      val lines = Source.fromFile("%s.trace".format(targetdir + c.pName)).getLines.toArray
       val dfsTraversal = new HashSet[String]
       
-      c dfs { node =>
-        dfsTraversal += getSignalPathName(node) + ":" + nodeToString(node)
+      for (m <- Module.sortedComps) {
+        m dfs { node =>
+          dfsTraversal += getSignalPathName(node) + ":" + nodeToString(node)
+        }
       }
 
       var ok = true
@@ -128,6 +130,7 @@ trait Backannotation extends Backend {
           val contains = dfsTraversal contains line
           if (!(dfsTraversal contains line))
             ChiselError.warning("[Backannotation] %s does not appear in this graph".format(line))
+          dfsTraversal -= line
           ok &= contains
         }
       }
@@ -137,7 +140,8 @@ trait Backannotation extends Backend {
       } 
     } catch {
       case ex: java.io.FileNotFoundException => 
-        ChiselError.warning("[Backannotation] no DFS file (%s.dfs): cannot verify backannotation".format(c.pName))
+        ChiselError.warning("[Backannotation] no trace file (%s.trace), ".format(Module.targetDir + c.pName) + 
+                            "no backannotation verification")
     } 
   }
 

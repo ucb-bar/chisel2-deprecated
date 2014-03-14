@@ -219,6 +219,7 @@ trait CounterBackend extends Backannotation {
   var counterIdx = -1
 
   override def backannotationTransforms {
+    transforms += { c => writeOutGraph(c) }
     transforms += ((c: Module) => c bfs (_.addConsumers))
 
     transforms += ((c: Module) => annotateSignals(c))
@@ -300,61 +301,66 @@ trait CounterBackend extends Backannotation {
   private def annotateSignals(c: Module) {
     ChiselError.info("[Backannotation] annotate signals")
 
-    // Read the signal list file
-    // TODO: generalize the signal file format
-    val lines = Source.fromFile(Module.model).getLines
-    val TermRegex = """\s*([\w\._\:]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)""".r
-    val signalNames = new HashSet[String]
-    val signalNameMap = new HashMap[String, Node]
-    val coeffs = new HashSet[(Double, Array[String])]
+    try {
+      // Read the signal list file
+      // TODO: generalize the signal file format
+      val lines = Source.fromFile(Module.model).getLines
+      val TermRegex = """\s*([\w\._\:]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)""".r
+      val signalNames = new HashSet[String]
+      val signalNameMap = new HashMap[String, Node]
+      val coeffs = new HashSet[(Double, Array[String])]
 
-    for (line <- lines) {
-      line match {
-        case TermRegex(exp, coeff, se, tstat, pvalue) => {
-          val vars = exp split ":"
-          if (tstat != "NaN" && pvalue != "NaN") {
-            signalNames ++= vars
-            coeffs += ((coeff.toDouble, vars))
+      for (line <- lines) {
+        line match {
+          case TermRegex(exp, coeff, se, tstat, pvalue) => {
+            val vars = exp split ":"
+            if (tstat != "NaN" && pvalue != "NaN") {
+              signalNames ++= vars
+              coeffs += ((coeff.toDouble, vars))
+            }
+          }
+          case _ =>
+        }
+      }
+
+      // Find correspoinding nodes
+      for (m <- Module.sortedComps ; if m != c) {
+        // TODO: include resets
+        /*
+        val reset = m.reset
+        val resetName = getSignalPathName(reset, ".")
+        if (signalNames contains resetName) {
+          m.signals += reset
+          signalNameMap(resetName) = reset
+          if (!(m.debugs contains reset))
+            m.debugs += reset
+        }
+        */
+        for (node <- m.nodes) {
+          val signalName = getSignalPathName(node, ".")
+          if ((signalNames contains signalName) && signalName != "reset"){
+            m.signals += node
+            signalNameMap(signalName) = node
+            // Backannotated signals should be accessible by names
+            // in emulators, so their names are given here
+            // if (!this.isInstanceOf[VerilogBackend] && node.name == "")
+            //   node setName node.pName
+            if (!(m.debugs contains node))
+              m.debugs += node
           }
         }
-        case _ =>
       }
-    }
-
-    // Find correspoinding nodes
-    for (m <- Module.sortedComps ; if m != c) {
-      // TODO: include resets
-      /*
-      val reset = m.reset
-      val resetName = getSignalPathName(reset, ".")
-      if (signalNames contains resetName) {
-        m.signals += reset
-        signalNameMap(resetName) = reset
-        if (!(m.debugs contains reset))
-          m.debugs += reset
-      }
-      */
-      for (node <- m.nodes) {
-        val signalName = getSignalPathName(node, ".")
-        if ((signalNames contains signalName) && signalName != "reset"){
-          m.signals += node
-          signalNameMap(signalName) = node
-          // Backannotated signals should be accessible by names
-          // in emulators, so their names are given here
-          // if (!this.isInstanceOf[VerilogBackend] && node.name == "")
-          //   node setName node.pName
-          if (!(m.debugs contains node))
-            m.debugs += node
-        }
-      }
-    }
    
-    for ((coeff, vars) <- coeffs) {
-      val cross = vars map { x => signalNameMap getOrElse (x, null) }
-      if (!(cross contains null)) {
-        crosses += ((coeff, cross))
-      }
-    } 
+      for ((coeff, vars) <- coeffs) {
+        val cross = vars map { x => signalNameMap getOrElse (x, null) }
+        if (!(cross contains null)) {
+          crosses += ((coeff, cross))
+        }
+      } 
+    } catch {
+      case ex: java.io.FileNotFoundException => 
+        ChiselError.warning("[Backannotation] no model file, no backannotation")
+    }
   }
 
   def decoupleTarget(c: Module) {
@@ -428,13 +434,13 @@ trait CounterBackend extends Backannotation {
           }
           case mem: Mem[_] => {
             for (write <- mem.writeAccesses) {
-              write.inputs(1) match {
-                case en: Bool => { 
-                  val newEn = fire && en
-                  newEn.getNode setName (en.getNode.pName + "_fire")
-                  write.inputs(1) = newEn
-                }
+              val en = write.inputs(1) match {
+                case bool: Bool => bool
+                case _ => UInt(write.inputs(1)).toBool
               }
+              val newEn = fire && en
+              newEn.getNode setName (en.getNode.pName + "_fire")
+              write.inputs(1) = newEn
             }
           }
           case _ =>
@@ -587,21 +593,11 @@ trait CounterBackend extends Backannotation {
           counterRegs += buffer.comp
           buffer.comp setName "buffer_%d".format(counterIdx)
           buffer.comp.component = m
-          /*
-          buffer.comp match {
-            case reg: Reg => {
-              reg.enable   = Bool(true)
-              reg.isEnable = true
-            }
-          }
-          buffer.comp.updates  += ((Bool(true), signalValue))
-          */
           counter.comp.updates += ((firedRegs(m), counterValue))
           counter.comp.updates += ((counterCopy(m), Bits(0)))
         }
 
         // for debugging
-        // if (this.isInstanceOf[VerilogBackend])
         signal setName "signal_%d_%s".format(counterIdx, signal.pName)
       }
     }
@@ -642,7 +638,8 @@ trait CounterBackend extends Backannotation {
         // power numbers are calculated
         Module.signals += m.signals(i) 
       }
-      Module.signals += m.signals.last
+      if (!m.signals.isEmpty)
+        Module.signals += m.signals.last
     }
   }
 
@@ -743,3 +740,6 @@ trait CounterBackend extends Backannotation {
     }
   }
 }
+
+class CounterCppBackend extends CppBackend with CounterBackend
+class CounterVBackend extends FPGABackend with CounterBackend

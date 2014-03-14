@@ -565,7 +565,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         }
         case _ => 
           for(i <- top.inputs ; 
-            if !(i == null) && !(walked contains i) && !i.component.isInstanceOf[CounterWrapper]) {
+            if !(i == null) && !(walked contains i) && 
+               i.component == top.component && !(bindings contains i)) {
             dfsStack push i
             walked += i
           }
