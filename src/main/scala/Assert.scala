@@ -92,6 +92,9 @@ class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
     val argLength = formats.zip(inputs).map{case (a,b) => lengths(a)(b.width)}.sum
     8*(format.length - 2*formats.length + argLength)
   }
+
+  override def isReg: Boolean = true
+  override def isInVCD: Boolean = false
 }
 
 class Sprintf(formatIn: String, argsIn: Seq[Node]) extends PrintfBase(formatIn, argsIn)

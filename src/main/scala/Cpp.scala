@@ -61,6 +61,7 @@ object CString {
 
 class CppBackend extends Backend {
   val keywords = new HashSet[String]();
+  private var hasPrintfs = false
 
   override def emitTmp(node: Node): String = {
     require(false)
@@ -596,7 +597,7 @@ class CppBackend extends Backend {
     val flags = if (flagsIn == null) "-O2" else flagsIn
 
     val chiselENV = java.lang.System.getenv("CHISEL")
-    val c11 = if(Module.printfs.size > 0) " -std=c++11 " else ""
+    val c11 = if (hasPrintfs) " -std=c++11 " else ""
     val allFlags = flags + c11 + " -I../ -I" + chiselENV + "/csrc/"
     val dir = Module.targetDir + "/"
     def run(cmd: String) {
@@ -849,14 +850,16 @@ class CppBackend extends Backend {
     writeCppFile("}\n")
 
     writeCppFile("void " + c.name + "_t::print ( FILE* f ) {\n")
-    for (p <- Module.printfs)
+    for (cc <- Module.components; p <- cc.printfs) {
+      hasPrintfs = true
       writeCppFile("#if __cplusplus >= 201103L\n"
         + "  if (" + emitLoWordRef(p.cond)
         + ") dat_fprintf<" + p.width + ">(f, "
         + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
         + ");\n"
         + "#endif\n")
-    if (Module.printfs.length > 0)
+    }
+    if (hasPrintfs)
       writeCppFile("fflush(f);\n");
     writeCppFile("}\n")
 

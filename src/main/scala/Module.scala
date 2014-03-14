@@ -89,7 +89,6 @@ object Module {
   val compStack = new Stack[Module]();
   var stackIndent = 0;
   var printStackStruct = ArrayBuffer[(Int, Module)]();
-  val printfs = ArrayBuffer[Printf]()
   val randInitIOs = new ArrayBuffer[Node]()
   val clocks = new ArrayBuffer[Clock]()
   var implicitReset: Bool = null
@@ -153,7 +152,6 @@ object Module {
     components.clear();
     compStack.clear();
     stackIndent = 0;
-    printfs.clear();
     printStackStruct.clear();
     procs.clear();
     muxes.clear();
@@ -269,8 +267,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   var wiresCache: Array[(String, Bits)] = null;
   var parent: Module = null;
   var containsReg = false;
-  val children = new ArrayBuffer[Module];
-  val debugs = HashSet[Node]();
+  val children = ArrayBuffer[Module]()
+  val debugs = HashSet[Node]()
+  val printfs = ArrayBuffer[Printf]()
 
   val switchKeys = Stack[Bits]()
   val whenConds = Stack[Bool]()

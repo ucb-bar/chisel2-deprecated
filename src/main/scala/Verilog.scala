@@ -490,11 +490,23 @@ class VerilogBackend extends Backend {
       if (m.clock != null)
         clkDomains(m.clock).append(emitReg(m))
     }
+    for (p <- c.printfs)
+      clkDomains(p.clock).append(emitPrintf(p))
     for (clock <- c.clocks) {
       clkDomains(clock).append("  end\n")
       res.append(clkDomains(clock).result())
     }
     res
+  }
+
+  def emitPrintf(p: Printf): String = {
+    "`ifndef SYNTHESIS\n" +
+    "`ifdef PRINTF_COND\n" +
+    "    if (`PRINTF_COND)\n" +
+    "`endif\n" +
+    "      if (" + emitRef(p.cond) + ")\n" +
+    "        $fwrite(32'h80000002, " + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _) + ");\n" +
+    "`endif\n"
   }
 
   def emitReg(node: Node): String = {
@@ -535,14 +547,6 @@ class VerilogBackend extends Backend {
         "      $finish;\n" +
         "    end\n" +
         "`endif\n"
-      case p: Printf =>
-        "`ifndef SYNTHESIS\n" +
-        "`ifdef PRINTF_COND\n" +
-        "    if (`PRINTF_COND)\n" +
-        "`endif\n" +
-        "      if (" + emitRef(p.cond) + ")\n" +
-        "        $fwrite(32'h80000002, " + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _) + ");\n" +
-        "`endif"
       case _ =>
         ""
     }

@@ -227,8 +227,7 @@ class FloBackend extends Backend {
     val flags = if (flagsIn == null) "-O2" else flagsIn
 
     val chiselENV = java.lang.System.getenv("CHISEL")
-    val c11 = if(Module.printfs.size > 0) " -std=c++11 " else ""
-    val allFlags = flags + c11 + " -I../ -I" + chiselENV + "/csrc/"
+    val allFlags = flags + " -I../ -I" + chiselENV + "/csrc/"
     val dir = Module.targetDir + "/"
     def run(cmd: String) {
       val bashCmd = Seq("bash", "-c", cmd)
