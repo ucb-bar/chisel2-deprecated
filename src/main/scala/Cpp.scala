@@ -900,7 +900,7 @@ class CppBackend extends Backend {
         writeCppFile(emitMapping(m))
       }
     }
-    writeCppFile(s"}\n\n");
+    writeCppFile(s"}\n");
     
     createCppFile("")
     writeCppFile(all_cpp.result)

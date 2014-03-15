@@ -2,14 +2,6 @@
 
 void NameSuite_DebugComp_1_t::init ( bool rand_init ) {
   if (rand_init) NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.randomize();
-  nodes.clear();
-  mems.clear();
-  nodes["NameSuite_DebugComp_1.io_ctrl_wb_wen"] = &NameSuite_DebugComp_1__io_ctrl_wb_wen;
-  nodes["NameSuite_DebugComp_1.dpath.io_ctrl_wb_wen"] = &NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen;
-  nodes["NameSuite_DebugComp_1.dpath.wb_wen"] = &NameSuite_DebugComp_1_dpath__wb_wen;
-  nodes["NameSuite_DebugComp_1.dpath.wb_reg_ll_wb"] = &NameSuite_DebugComp_1_dpath__wb_reg_ll_wb;
-  nodes["NameSuite_DebugComp_1.dpath.io_ctrl_out"] = &NameSuite_DebugComp_1_dpath__io_ctrl_out;
-  nodes["NameSuite_DebugComp_1.io_ctrl_out"] = &NameSuite_DebugComp_1__io_ctrl_out;
 }
 int NameSuite_DebugComp_1_t::clock ( dat_t<1> reset ) {
   uint32_t min = ((uint32_t)1<<31)-1;
@@ -72,4 +64,16 @@ void NameSuite_DebugComp_1_t::clock_lo ( dat_t<1> reset ) {
 }
 void NameSuite_DebugComp_1_t::clock_hi ( dat_t<1> reset ) {
   NameSuite_DebugComp_1_dpath__wb_reg_ll_wb = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow;
+}
+void NameSuite_DebugComp_1_api_t::init_mapping_table() {
+  dat_table.clear();
+  mem_table.clear();
+  NameSuite_DebugComp_1_t* mod_typed = dynamic_cast<NameSuite_DebugComp_1_t*>(module);
+  assert(mod_typed);
+  dat_table["NameSuite_DebugComp_1.io_ctrl_wb_wen"] = new dat_api<1>(&mod_typed->NameSuite_DebugComp_1__io_ctrl_wb_wen, "NameSuite_DebugComp_1.io_ctrl_wb_wen", "");
+  dat_table["NameSuite_DebugComp_1.dpath.io_ctrl_wb_wen"] = new dat_api<1>(&mod_typed->NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen, "NameSuite_DebugComp_1.dpath.io_ctrl_wb_wen", "");
+  dat_table["NameSuite_DebugComp_1.dpath.wb_wen"] = new dat_api<1>(&mod_typed->NameSuite_DebugComp_1_dpath__wb_wen, "NameSuite_DebugComp_1.dpath.wb_wen", "");
+  dat_table["NameSuite_DebugComp_1.dpath.wb_reg_ll_wb"] = new dat_api<1>(&mod_typed->NameSuite_DebugComp_1_dpath__wb_reg_ll_wb, "NameSuite_DebugComp_1.dpath.wb_reg_ll_wb", "");
+  dat_table["NameSuite_DebugComp_1.dpath.io_ctrl_out"] = new dat_api<1>(&mod_typed->NameSuite_DebugComp_1_dpath__io_ctrl_out, "NameSuite_DebugComp_1.dpath.io_ctrl_out", "");
+  dat_table["NameSuite_DebugComp_1.io_ctrl_out"] = new dat_api<1>(&mod_typed->NameSuite_DebugComp_1__io_ctrl_out, "NameSuite_DebugComp_1.io_ctrl_out", "");
 }
