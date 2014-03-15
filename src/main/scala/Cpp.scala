@@ -577,6 +577,7 @@ class CppBackend extends Backend {
     }
     harness.write(s"""int main (int argc, char* argv[]) {\n""");
     harness.write(s"""  ${name}_t* module = new ${name}_t();\n""");
+    harness.write(s"""  module->init();\n""");
     harness.write(s"""  ${name}_api_t* api = new ${name}_api_t();\n""");
     harness.write(s"""  api->init(module);\n""");
     if (Module.isVCD) {
