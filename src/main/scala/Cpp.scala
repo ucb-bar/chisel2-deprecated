@@ -590,6 +590,8 @@ class CppBackend extends Backend {
     } else {
       harness.write(s"""  FILE *tee = NULL;""");
     }
+    harness.write(s"""  module->set_dumpfile(f);\n""");
+    harness.write(s"""  api->set_teefile(tee);\n""");
     harness.write(s"""  api->read_eval_print_loop();\n""");
     harness.write(s"""  fclose(f);\n""");
     harness.write(s"""  fclose(tee);\n""");
