@@ -552,20 +552,22 @@ abstract class Backend {
       }
     }
 
-    c dfs { node =>
-      if (!node.isTypeNode && node.pName == "") {
-        if (node.name != "" || node.isLit) {
-          node.pName = node.name 
-        } else if (getPseudoPath(node.component) != "") {
-                   /* This means valid path */
-          val prefix = node match {
-            case _: Reg => "R"
-            case _ => "T"
-          }
-          if (Module.isEmittingComponents) {
-            node.pName = prefix + node.emitIndex
-          } else {
-            node.pName = prefix + node.component.nextIndex
+    for (m <- Module.sortedComps) {
+      m dfs { node =>
+        if (!node.isTypeNode && node.pName == "") {
+          if (node.name != "" || node.isLit) {
+            node.pName = node.name 
+          } else if (getPseudoPath(node.component) != "") {
+                     /* This means valid path */
+            val prefix = node match {
+              case _: Reg => "R"
+              case _ => "T"
+            }
+            if (Module.isEmittingComponents) {
+             node.pName = prefix + node.emitIndex
+            } else {
+              node.pName = prefix + node.component.nextIndex
+            }
           }
         }
       }
@@ -586,12 +588,14 @@ abstract class Backend {
   def writeOutGraph(c: Module) {
     ChiselError.info("[Backannotation] write out graphs")
     val dir = ensureDir(Module.targetDir)
-    val file = new java.io.FileWriter(dir+"%s.dfs".format(c.pName))
+    val file = new java.io.FileWriter(dir+"%s.trace".format(c.name))
     val res = new StringBuilder
 
-    c dfs { node =>
-      if (!node.isTypeNode && !node.isLit)
-        res append (getSignalPathName(node, isRealName = true) + ":" + nodeToString(node, isRealName = true) + "\n")
+    for (m <- Module.sortedComps) {
+      m dfs { node =>
+        if (!node.isTypeNode && !node.isLit)
+          res append (getSignalPathName(node, isRealName = true) + ":" + nodeToString(node, isRealName = true) + "\n")
+      }
     }
   
     try {
