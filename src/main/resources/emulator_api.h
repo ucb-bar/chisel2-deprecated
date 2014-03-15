@@ -272,9 +272,17 @@ protected:
 
 class mod_api_t {
 public:
+	mod_api_t():
+		teefile(NULL)
+	{}
+
 	void init(mod_t* new_module) {
 		module = new_module;
 		init_mapping_table();
+	}
+
+	void set_teefile(FILE* new_teefile) {
+		teefile = new_teefile;
 	}
 
 	mod_t* get_module() {
@@ -490,6 +498,10 @@ public:
 		while (true) {
 		    std::string str_in;
 		    getline(cin, str_in);
+		    if (teefile != NULL) {
+		        fprintf(teefile, "%s\n", str_in.c_str());
+		        fflush(teefile);
+		    }
 		    if (str_in == "quit") {
 		    	break;
 		    } else {
@@ -499,6 +511,7 @@ public:
 	}
 
 protected:
+	FILE* teefile;
 	mod_t* module;
 
 	// Mapping table functions

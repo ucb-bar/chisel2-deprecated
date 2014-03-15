@@ -1777,6 +1777,9 @@ template <int w, int d> mem_t<w,d> MEM( void );
 
 class mod_t {
  public:
+	mod_t():
+	  dumpfile(NULL)
+    {}
   std::vector< mod_t* > children;
   virtual void init ( bool rand_init=false ) { };
   virtual void clock_lo ( dat_t<1> reset ) { };
@@ -1787,6 +1790,10 @@ class mod_t {
   virtual void print ( FILE* f ) { };
   virtual void dump ( FILE* f, int t ) { };
 
+  void set_dumpfile(FILE* f) {
+	dumpfile = f;
+  }
+
   int timestep;
 
   int step (bool is_reset, int n) {
@@ -1794,13 +1801,13 @@ class mod_t {
     for (int i = 0; i < n; i++) {
       dat_t<1> reset = LIT<1>(is_reset);
       delta += clock(reset);
-      // TODO(ducky): add these in a more elegant format
-      //if (f != NULL) dump(f, timestep);
-      //if (is_print) print(stderr);
+      if (dumpfile != NULL) dump(dumpfile, timestep);
       timestep += 1;
     }
     return delta;
   }
+ protected:
+  FILE* dumpfile;
 };
 
 #define ASSERT(cond, msg) { \
