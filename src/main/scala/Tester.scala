@@ -101,7 +101,11 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
     while(testErr.available() > 0) {
       System.err.print(Character.toChars(testErr.read()))
     }
-      
+    
+    if (sb == "error") {
+      System.err.print(s"FAILED: emulatorCmd($str): returned error")
+      ok = false
+    }
     return sb.toString
   }
 
@@ -114,6 +118,7 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
       }
     }
     emulatorCmd(cmd)
+    // TODO: check for errors in return
   }
 
   def dumpName(data: Node): String = {
@@ -154,7 +159,8 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
   }
 
   def reset(n: Int = 1) = {
-    emulatorCmd("reset " + n)  
+    emulatorCmd("reset " + n)
+    // TODO: check for errors in return
     if (isTrace) println("RESET " + n)
   }
 
@@ -171,7 +177,11 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
         cmd = "wire_poke " + dumpName(data);
       }
       cmd = cmd + " 0x" + x.toString(16);
-      emulatorCmd(cmd)
+      val rtn = emulatorCmd(cmd)
+      if (rtn != "true") {
+        System.err.print(s"FAILED: poke(${dumpName(data)}) returned false")
+        ok = false
+      }
     }
   }
 

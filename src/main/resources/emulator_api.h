@@ -360,7 +360,7 @@ public:
 			// OUT: actual number of cycles stepped
 			if (!check_command_length(tokens, 1, 1)) { return "error"; }
 			int n = atoi(tokens[1].c_str());
-		    int ret = module->step(dat_t<1>(0), n);
+		    int ret = module->step(false, n);
 		    return itos(ret);
 		} else if (tokens[0] == "set-clocks") {
 			// IN:  set-clocks
