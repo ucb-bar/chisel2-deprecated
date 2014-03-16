@@ -60,8 +60,8 @@ module NameSuite_BindFifthComp_1(input clk,
        .io_out_resp_bits_ppn( vdtlb_io_out_resp_bits_ppn )
   );
   `ifndef SYNTHESIS
-    assign vdtlb.io_out_resp_valid = $random();
-    assign vdtlb.io_out_resp_bits_error = $random();
+    assign vdtlb.io_out_resp_valid = {1{$random}};
+    assign vdtlb.io_out_resp_bits_error = {1{$random}};
   `endif
 endmodule
 

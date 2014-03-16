@@ -51,6 +51,7 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
   var testErr: InputStream  = null
   val sb = new StringBuilder()
   var delta = 0
+  var t = 0
 
   def puts(str: String) = {
     while (testOut == null) { Thread.sleep(100) }
@@ -76,7 +77,8 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
       while(testErr.available() > 0) {
         System.err.print(Character.toChars(testErr.read()))
       }
-    }
+    } else
+      println("ERR NULL")
   }
 
   def gets() = {
@@ -93,20 +95,27 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
     sb.toString
   }
 
+  def dumpName(data: Node): String = {
+    if (Module.backend.isInstanceOf[FloBackend]) {
+      data.name
+    } else
+      data.chiselName
+  }
+
   def peekBits(data: Node, off: Int = -1): BigInt = {
-    if (data.chiselName == "") {
+    if (dumpName(data) == "") {
       println("Unable to peek data " + data)
       -1
     } else {
       val off = -1;
-      puts("peek " + data.chiselName);
+      puts("peek " + dumpName(data));
       if (off != -1)
         puts(" " + off);
       puts("\n")
       testOut.flush()
       val s = gets()
       val rv = toLitVal(s)
-      if (isTrace) println("  PEEK " + data.name + " " + (if (off >= 0) (off + " ") else "") + "-> " + s)
+      if (isTrace) println("  PEEK " + dumpName(data) + " " + (if (off >= 0) (off + " ") else "") + "-> " + s)
       drainErr()
       rv
     }
@@ -132,11 +141,11 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
   }
 
   def pokeBits(data: Node, x: BigInt, off: Int = -1): Unit = {
-    if (data.chiselName == "") {
+    if (dumpName(data) == "") {
       println("Unable to poke data " + data)
     } else {
-      puts("poke " + data.chiselName);
-      if (isTrace) println("  POKE " + data.name + " " + (if (off >= 0) (off + " ") else "") + "<- " + x)
+      puts("poke " + dumpName(data));
+      if (isTrace) println("  POKE " + dumpName(data) + " " + (if (off >= 0) (off + " ") else "") + "<- " + x)
       if (off != -1)
         puts(" " + off);
       puts(" 0x" + x.toString(16) + "\n");
@@ -164,23 +173,29 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
     testOut.flush()
     val s = gets()
     delta += s.toInt
-    if (isTrace) println("STEP " + n + " <- " + s)
     drainErr()
+    t += n
+    if (isTrace) println("STEP " + n + " -> " + t)
   }
 
+  def int(x: Boolean): BigInt = if (x) 1 else 0
+  def int(x: Int): BigInt = x
+  def int(x: Bits): BigInt = x.litValue()
+
   var ok = true;
+  var failureTime = -1
 
   def expect (good: Boolean, msg: String): Boolean = {
     if (isTrace)
       println(msg + " " + (if (good) "PASS" else "FAIL"))
-    if (!good) ok = false;
+    if (!good) { ok = false; if (failureTime == -1) failureTime = t; }
     good
   }
 
   def expect (data: Bits, expected: BigInt): Boolean = {
     val got = peek(data)
     expect(got == expected, 
-       "EXPECT " + data.name + " <- " + got + " == " + expected)
+       "EXPECT " + dumpName(data) + " <- " + got + " == " + expected)
   }
 
   def expect (data: Aggregate, expected: Array[BigInt]): Boolean = {
@@ -191,11 +206,19 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
     allGood
   }
 
-  val rnd = new Random()
+  val rnd = if (Module.testerSeedValid) new Random(Module.testerSeed) else new Random()
   var process: Process = null
 
   def startTesting(): Process = {
-    val cmd = Module.targetDir + "/" + c.name + (if(Module.backend.isInstanceOf[VerilogBackend]) " -q" else "")
+    val target = Module.targetDir + "/" + c.name
+    val cmd = 
+      (if (Module.backend.isInstanceOf[FloBackend]) {
+         val dir = Module.backend.asInstanceOf[FloBackend].floDir
+         dir + "fix-console :is-debug true :filename " + target + ".hex"
+      } else {
+         target + (if(Module.backend.isInstanceOf[VerilogBackend]) " -q" else "")
+      })
+    println("SEED " + Module.testerSeed)
     println("STARTING " + cmd)
     val processBuilder = Process(cmd)
     val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => testErr = err)
@@ -222,6 +245,7 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
 
       process.destroy()
     }
+    println("RAN " + t + " CYCLES " + (if (ok) "PASSED" else { "FAILED FIRST AT CYCLE " + failureTime }))
     ok
   }
 

@@ -35,9 +35,11 @@ import scala.collection.mutable.ArrayBuffer
 import Node._
 import ChiselError._
 
-class Assert(condArg: Bool, val message: String) extends Node {
-  inputs += condArg;
-  def cond: Node = inputs(0);
+class Assert(condIn: Bool, resetIn: Bool, val message: String) extends Node {
+  inputs += condIn || resetIn
+  inputs += resetIn
+  def cond: Node = inputs(0)
+  def reset: Node = inputs(1)
 }
 
 class BitsInObject(x: Node) extends UInt {
@@ -92,6 +94,9 @@ class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
     val argLength = formats.zip(inputs).map{case (a,b) => lengths(a)(b.width)}.sum
     8*(format.length - 2*formats.length + argLength)
   }
+
+  override def isReg: Boolean = true
+  override def isInVCD: Boolean = false
 }
 
 class Sprintf(formatIn: String, argsIn: Seq[Node]) extends PrintfBase(formatIn, argsIn)
