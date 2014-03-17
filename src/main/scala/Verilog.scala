@@ -50,11 +50,11 @@ object VerilogBackend {
     "disable", "edge", "else", "end", "endattribute", "endcase", "endfunction",
     "endmodule", "endprimitive", "endspecify", "endtable", "endtask", "event",
     "for", "force", "forever", "fork", "function", "highz0", "highz1", "if",
-    "ifnone", "initial", "inout", "input", "integer", "join", "medium",
-    "module", "large", "macromodule", "nand", "negedge", "nmos", "nor", "not",
-    "notif0", "notif1", "or", "output", "parameter", "pmos", "posedge",
-    "primitive", "pull0", "pull1", "pulldown", "pullup", "rcmos", "real",
-    "realtime", "reg", "release", "repeat", "rnmos", "rpmos", "rtran",
+    "ifnone", "initial", "inout", "input", "integer", "initvar", "join",
+    "medium", "module", "large", "macromodule", "nand", "negedge", "nmos",
+    "nor", "not", "notif0", "notif1", "or", "output", "parameter", "pmos",
+    "posedge", "primitive", "pull0", "pull1", "pulldown", "pullup", "rcmos",
+    "real", "realtime", "reg", "release", "repeat", "rnmos", "rpmos", "rtran",
     "rtranif0", "rtranif1", "scalared", "signed", "small", "specify",
     "specparam", "strength", "strong0", "strong1", "supply0", "supply1",
     "table", "task", "time", "tran", "tranif0", "tranif1", "tri", "tri0",
@@ -358,14 +358,14 @@ class VerilogBackend extends Backend {
         } else {
           ""
         }
-      case x: Sprintf =>
-        "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n";
-
-      case x: Literal =>
-        ""
-
-      case x: Reg =>
+      case _: Reg =>
         "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n"
+
+      case _: Sprintf =>
+        "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n"
+
+      case _: Literal =>
+        ""
 
       case m: Mem[_] =>
         if (m.isInline) {
@@ -384,6 +384,19 @@ class VerilogBackend extends Backend {
         emitDecBase(node)
     }
     (if (node.prune && res != "") "//" else "") + res
+  }
+
+  def emitInit(node: Node): String = node match {
+    case r: Reg =>
+      "    " + emitRef(r) + " = " + emitRand(r) + ";\n"
+    case m: Mem[_] =>
+      if (m.isInline)
+        "    for (initvar = 0; initvar < " + m.n + "; initvar = initvar+1)\n" +
+        "      " + emitRef(m) + "[initvar] = " + emitRand(m) + ";\n"
+      else
+        ""
+    case _ =>
+      ""
   }
 
   def genHarness(c: Module, name: String) {
@@ -560,14 +573,20 @@ class VerilogBackend extends Backend {
     }
   }
 
-  def emitDecs(c: Module): StringBuilder = {
-    val res = new StringBuilder();
-    for (m <- c.mods) {
-      res.append(emitDec(m))
-    }
-    res
-  }
+  def emitDecs(c: Module): StringBuilder =
+    c.mods.map(emitDec(_)).addString(new StringBuilder)
 
+  def emitInits(c: Module): StringBuilder = {
+    val sb = new StringBuilder
+    sb append "`ifndef SYNTHESIS\n"
+    if (c.mods.exists(_.isInstanceOf[Mem[_]]))
+      sb append "  integer initvar;\n"
+    sb append "  initial begin\n"
+    c.mods.map(emitInit(_)).addString(sb)
+    sb append "  end\n"
+    sb append "`endif\n"
+    sb
+  }
 
   def emitModuleText(c: Module): String = {
     if (c.isInstanceOf[BlackBox])
@@ -603,6 +622,8 @@ class VerilogBackend extends Backend {
     for (m <- c.mods)
       emitTmp(m);
     res.append(emitDecs(c));
+    res.append("\n");
+    res.append(emitInits(c));
     res.append("\n");
     res.append(emitDefs(c));
     if (c.containsReg) {
