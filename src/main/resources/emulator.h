@@ -2095,11 +2095,19 @@ class mod_t {
     return res;
   }
 
-  void read_eval_print (FILE *f) {
+  void read_eval_print (FILE *f, FILE *teefile = NULL) {
     timestep = 0;
     for (;;) {
       std::string str_in;
       getline(cin,str_in);
+      if (teefile != NULL) {
+          fprintf(teefile, "%s\n", str_in.c_str());
+          fflush(teefile);
+      }
+      if (strcmp("", str_in.c_str()) == 0) {
+          fprintf(stderr, "Read empty string in tester stdin\n");
+          abort();
+      }
       std::vector< std::string > tokens = tokenize(str_in);
       std::string cmd = tokens[0];
       if (cmd == "peek") {

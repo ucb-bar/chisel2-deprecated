@@ -196,7 +196,7 @@ class ModularCppBackend extends CppBackend {
     out_c.write("}\n")
 
     out_c.write("void " + c.name + "_t::print ( FILE* f ) {\n");
-    for (p <- Module.printfs)
+    for (cc <- Module.components; p <- cc.printfs)
       out_c.write("#if __cplusplus >= 201103L\n"
         + "  if (" + emitLoWordRef(p.cond)
         + ") dat_fprintf<" + p.width + ">(f, "

@@ -211,7 +211,7 @@ abstract class Node extends nameable {
     return false;
   }
   def isRamWriteInput(i: Node): Boolean = false;
-  def initOf (n: String, width: (Node) => Int, ins: List[Node]): Node = {
+  def initOf (n: String, width: (Node) => Int, ins: Iterable[Node]): Node = {
     name = n;
     inferWidth = width;
     inputs ++= ins

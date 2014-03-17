@@ -1292,6 +1292,9 @@ class Testy[+T <: Module] (val c: T) {
   val rnd: Random
   def reset(n: Int = 1)
   def step(n: Int): Int
+  def int(x: Boolean): BigInt
+  def int(x: Int): BigInt
+  def int(x: Bits): BigInt
   // users use flatten / litValue to convert to BigInts
   def poke(data: Mem[T], index: Int, x: BigInt): Unit
   def poke(data: Bits, x: BigInt): Unit

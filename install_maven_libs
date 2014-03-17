@@ -1,0 +1,9 @@
+#!/bin/bash
+pushd lib
+
+mvn install:install-file -Dfile=oscar-algo_2.10-1.0-M1.jar -DgroupId=ucl.ac.be -DartifactId=oscar-algo -Dversion=2.10-1.0-M1 -Dpackaging=jar
+mvn install:install-file -Dfile=oscar-cp_2.10-1.0-M1.jar -DgroupId=ucl.ac.be -DartifactId=oscar-cp -Dversion=2.10-1.0-M1 -Dpackaging=jar
+mvn install:install-file -Dfile=oscar-util_2.10-1.0-M1.jar -DgroupId=ucl.ac.be -DartifactId=oscar-util -Dversion=2.10-1.0-M1 -Dpackaging=jar
+mvn install:install-file -Dfile=oscar-visual_2.10-1.0-M1.jar -DgroupId=ucl.ac.be -DartifactId=oscar-visual -Dversion=2.10-1.0-M1 -Dpackaging=jar
+
+popd
