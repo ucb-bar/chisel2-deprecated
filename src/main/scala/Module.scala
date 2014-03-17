@@ -30,12 +30,9 @@
 
 package Chisel
 import scala.math._
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.{ArrayBuffer, Stack, BitSet}
+import scala.collection.mutable.{LinkedHashSet, HashSet, HashMap}
 import scala.collection.mutable.{Queue=>ScalaQueue}
-import scala.collection.mutable.Stack
-import scala.collection.mutable.HashSet
-import scala.collection.mutable.HashMap
-import scala.collection.mutable.BitSet
 import java.lang.reflect.Modifier._
 import scala.sys.process._
 import scala.math.max;
@@ -276,7 +273,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   var parent: Module = null;
   var containsReg = false;
   val children = ArrayBuffer[Module]()
-  val debugs = HashSet[Node]()
+  val debugs = LinkedHashSet[Node]()
   val printfs = ArrayBuffer[Printf]()
   val asserts = ArrayBuffer[Assert]()
 
