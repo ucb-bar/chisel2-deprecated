@@ -72,7 +72,7 @@ class ioFame1QueueTracker() extends Bundle{
 class Fame1QueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Module{
   val io = new ioFame1QueueTracker()
   val aregs = Vec.fill(num_tgt_cycles){ Reg(init = UInt(0, width = log2Up(num_tgt_entries))) }
-  val tail_pointer = Reg(init = UInt(0, width = log2Up(num_tgt_cycles)))
+  val tail_pointer = Reg(init = UInt(1, width = log2Up(num_tgt_cycles)))
   //debug
   io.reg0 := aregs(0)
   io.reg1 := aregs(1)
@@ -186,156 +186,6 @@ class RegBundle extends Bundle
   val data = UInt(width = 32)
 }
 
-/*
-class Fame1WrapperIO(n: Int, num_regs: Int) extends Bundle {
-  var queues:Vec[ioQueueFame1[Bundle]] = null
-  if(n > 0) {
-    queues = Vec.fill(n){ new ioQueueFame1(new Bundle())}
-  }
-  var regs:Vec[DecoupledIO[Bundle]] = null
-  if(num_regs > 0) {
-    regs = Vec.fill(num_regs){ new DecoupledIO(new Bundle())}
-  }
-  val other  = new Bundle()
-}
-
-class Fame1Wrapper(f: => Module) extends Module {
-  def transform(isTop: Boolean, module: Module, parent: Module): Unit = {
-    Fame1Transform.fame1Modules += module
-    val isFire = Bool(INPUT)
-    isFire.nameIt("is_fire", true)
-    isFire.component = module
-    Fame1Transform.fireSignals(module) = isFire
-    if(!isTop){
-      Predef.assert(Fame1Transform.fireSignals(parent) != null)
-      isFire := Fame1Transform.fireSignals(parent)
-    }
-    module.io.asInstanceOf[Bundle] += isFire
-    for(submodule <- module.children){
-      transform(false, submodule, module)
-    }
-  }
-  
-  val originalModule = Module(f)
-  transform(true, originalModule, null)
-
-  //counter number of REGIO and Decoupled IO in original module
-  var num_decoupled_io = 0
-  var num_reg_io = 0
-  for ((name, io) <- originalModule.io.asInstanceOf[Bundle].elements){ 
-    io match { 
-      case q : DecoupledIO[Bundle] => num_decoupled_io += 1; 
-      case r : REGIO[Bundle] => num_reg_io += 1;
-      case _ => 
-    }
-  }
-
-  val io = new Fame1WrapperIO(num_decoupled_io, num_reg_io)
-  val originalREGIOs = new HashMap[String, REGIO[Bundle]]()
-  val fame1REGIOs = new HashMap[String, DecoupledIO[Bundle]]()
-  val originalDecoupledIOs  = new HashMap[String, DecoupledIO[Bundle]]()
-  val fame1DecoupledIOs  = new HashMap[String, ioQueueFame1[Bundle]]()
-  val originalOtherIO = new HashMap[String, Data]()
-  val fame1OtherIO = new HashMap[String, Data]()
-
-  var decoupled_counter = 0
-  var reg_counter = 0
-  
-  //populate fame1REGIO and fame1DecoupledIO bundles with the elements from the original REGIO and DecoupleIOs
-  for ((name, ioNode) <- originalModule.io.asInstanceOf[Bundle].elements) {
-    ioNode match {
-      case decoupled : DecoupledIO[Bundle] => {
-        val is_flip = (decoupled.ready.dir == OUTPUT)
-        val fame1Decoupled      = io.queues(decoupled_counter)
-        if (is_flip) fame1Decoupled.flip()
-        for ((name, element) <- decoupled.bits.elements) {
-          val elementClone = if (is_flip) element.clone.asInput else element.clone.asOutput
-          elementClone.nameIt(name, true)
-          fame1Decoupled.target.bits.asInstanceOf[Bundle] += elementClone
-        }
-        originalDecoupledIOs(name) = decoupled
-        fame1DecoupledIOs(name) = fame1Decoupled
-        decoupled_counter += 1
-      }
-      case reg : REGIO[Bundle] => {
-        val is_flip = (reg.bits.flatten(0)._2.dir == INPUT)
-        val fame1REGIO = io.regs(reg_counter)
-        if (is_flip) {
-          fame1REGIO.flip()
-        }
-        for ((name, element) <- reg.bits.elements) {
-          val elementClone = if (is_flip) element.clone.asInput else element.clone.asOutput
-          elementClone.nameIt(name, true)
-          fame1REGIO.bits.asInstanceOf[Bundle] += elementClone
-        }
-        originalREGIOs(name) = reg
-        fame1REGIOs(name) = fame1REGIO
-        reg_counter += 1
-      }
-      case _ => {
-        if (name != "is_fire") {
-          originalOtherIO(name) = ioNode
-          val elementClone = ioNode.clone
-          elementClone.nameIt(name, true)
-          fame1OtherIO(name) = elementClone
-          io.other.asInstanceOf[Bundle] += elementClone
-        }
-      }
-    }
-  }
-  //generate fire_tgt_clk signal
-  var fire_tgt_clk = Bool(true)
-  if (io.queues != null){
-    for (q <- io.queues)
-      fire_tgt_clk = fire_tgt_clk && 
-        (if (q.host_valid.dir == OUTPUT) q.host_ready else q.host_valid)
-  }
-  if (io.regs != null){
-    for (r <- io.regs) {
-      fire_tgt_clk = fire_tgt_clk && 
-        (if (r.valid.dir == OUTPUT) r.ready else r.valid)
-    }
-  }
-  
-  //general host read and host valid signals
-  Fame1Transform.fireSignals(originalModule) := fire_tgt_clk
-  if (io.queues != null){
-    for (q <- io.queues) {
-      if (q.host_valid.dir == OUTPUT) 
-        q.host_valid := fire_tgt_clk
-      else
-        q.host_ready := fire_tgt_clk
-    }
-  }
-  if (io.regs != null){
-    for (r <- io.regs) {
-      if (r.valid.dir == OUTPUT) 
-        r.valid := fire_tgt_clk
-      else
-        r.ready := fire_tgt_clk
-    }
-  }
-  
-  //connect wrapper IOs to original module IOs28
-  for ((name, decoupledIO) <- fame1DecoupledIOs) {
-    originalDecoupledIOs(name) <> decoupledIO.target
-    println("DEBUG0")
-    println(name)
-    println(decoupledIO.target.bits.elements)
-  }
-  for ((name, regIO) <- fame1REGIOs) {
-    if (regIO.bits.flatten(0)._2.dir == INPUT){
-      originalREGIOs(name).bits := regIO.bits
-    } else {
-      regIO.bits := originalREGIOs(name).bits
-    }
-  }
-  for ((name, element) <- fame1OtherIO) {
-    originalOtherIO(name) <> element
-  }
-}*/
-
-
 class Fame1WrapperIO(n: Int, num_regs: Int) extends Bundle {
   var queues:Vec[ioQueueFame1[Bits]] = null
   if(n > 0) {
@@ -352,7 +202,8 @@ class Fame1Wrapper(f: => Module) extends Module {
   def transform(isTop: Boolean, module: Module, parent: Module): Unit = {
     Fame1Transform.fame1Modules += module
     val isFire = Bool(INPUT)
-    isFire.nameIt("is_fire", true)
+    isFire.isIo = true
+    isFire.setName("is_fire")
     isFire.component = module
     Fame1Transform.fireSignals(module) = isFire
     if(!isTop){
@@ -424,7 +275,8 @@ class Fame1Wrapper(f: => Module) extends Module {
       case _ => {
         if (name != "is_fire") {
           val elementClone = ioNode.clone
-          elementClone.nameIt(name, true)
+          elementClone.isIo = true
+          elementClone.setName(name)
           fame1OtherIO(name) = elementClone
           io.other.asInstanceOf[Bundle] += elementClone
           elementClone <> ioNode
@@ -561,34 +413,6 @@ trait Fame1Transform extends Backend {
           memWrite.inputs(1) = memWrite.inputs(1).asInstanceOf[Bool] && Fame1Transform.fireSignals(module)
         }
       }
-      /*if(mem.seqRead){
-        for(memRead <- mem.reads){
-          Predef.assert(memRead.addr.inputs(0).asInstanceOf[Reg].updates.length == 1)
-          val oldReadAddr = Bits()
-          oldReadAddr.inputs += memRead.addr.inputs(0).asInstanceOf[Reg].updates(0)._2
-          val oldReadAddrReg = Reg(Bits())
-          oldReadAddrReg.comp.component = module
-          oldReadAddrReg.comp.asInstanceOf[Reg].enable = if (oldReadAddrReg.comp.asInstanceOf[Reg].isEnable) oldReadAddrReg.comp.asInstanceOf[Reg].enable || Fame1Transform.fireSignals(module) else Fame1Transform.fireSignals(module)
-          oldReadAddrReg.comp.asInstanceOf[Reg].isEnable = true
-          oldReadAddrReg.comp.asInstanceOf[Reg].updates += ((Fame1Transform.fireSignals(module), oldReadAddr))
-          
-          val newReadAddr = Mux(Fame1Transform.fireSignals(module), oldReadAddr, oldReadAddrReg)
-          
-          val oldReadEn = Bool()
-          oldReadEn.inputs += memRead.addr.inputs(0).asInstanceOf[Reg].updates(0)._1
-          val renReg = Reg(init=Bool(false))
-          renReg.comp.component = module
-          
-          renReg.comp.asInstanceOf[Reg].enable = if(renReg.comp.asInstanceOf[Reg].isEnable) renReg.comp.asInstanceOf[Reg].enable || Fame1Transform.fireSignals(module) else Fame1Transform.fireSignals(module)
-          renReg.comp.asInstanceOf[Reg].isEnable = true
-          renReg.comp.asInstanceOf[Reg].updates += ((Fame1Transform.fireSignals(module), oldReadEn))
-          val newRen = Mux(Fame1Transform.fireSignals(module), oldReadEn, renReg)
-          
-          memRead.addr.inputs(0).asInstanceOf[Reg].enable = newRen
-          memRead.addr.inputs(0).asInstanceOf[Reg].updates.clear
-          memRead.addr.inputs(0).asInstanceOf[Reg].updates += ((newRen, newReadAddr))
-        }
-      }*/
       for(memSeqRead <- memSeqReads){
         Predef.assert(memSeqRead.addrReg.updates.length == 1)
         val oldReadAddr = Bits()
@@ -628,3 +452,4 @@ trait Fame1Transform extends Backend {
 }
 
 class Fame1CppBackend extends CppBackend with Fame1Transform
+class Fame1VerilogBackend extends VerilogBackend with Fame1Transform
