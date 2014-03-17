@@ -34,9 +34,7 @@ import scala.math._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
 import scala.util.Random
-import java.io.InputStream
-import java.io.OutputStream
-import java.io.PrintStream
+import java.io.{IOException, InputStream, OutputStream, PrintStream}
 import scala.sys.process._
 import Literal._
 
@@ -74,8 +72,13 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
 
   def drainErr () = {
     if (testErr != null) {
+      try {
       while(testErr.available() > 0) {
         System.err.print(Character.toChars(testErr.read()))
+      }
+      }
+      catch {
+        case e : IOException => testErr = null; println("ERR EXCEPTION")
       }
     } else
       println("ERR NULL")
