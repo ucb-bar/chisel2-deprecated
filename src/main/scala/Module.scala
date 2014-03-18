@@ -515,7 +515,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     val walked = new HashSet[Node]
     val dfsStack = initializeDFS
 
-    while(!dfsStack.isEmpty){
+    def isVisiting(node: Node) =
+      !(node == null) && !(walked contains node) && (node.component == this || node.isIo)
+
+    while(!dfsStack.isEmpty) {
       val top = dfsStack.pop
       walked += top
       visit(top)
@@ -546,27 +549,26 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
               }
             }
 
- 
-          if (!(next == null ) && !(walked contains next)) {
+          if (isVisiting(next)) {
             dfsStack push next
             walked += next
           }
-          if (!(init == null) && !(walked contains init)) {
+ 
+          if (isVisiting(init)) {
             dfsStack push init
             walked += init
           }
-          if (!(enable == null) && enable != Bool(true) && !(walked contains enable)) {
+          if (enable != Bool(true) && isVisiting(enable)) {
             dfsStack push enable
             walked += enable
           }
         }
-        case _ => 
-          for(i <- top.inputs ; 
-            if !(i == null) && !(walked contains i) && 
-               i.component == top.component && !(bindings contains i)) {
+        case _ => for(i <- top.inputs) {
+          if (isVisiting(i)) {
             dfsStack push i
             walked += i
           }
+        }
       }
     }
   }

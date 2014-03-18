@@ -219,7 +219,6 @@ trait CounterBackend extends Backannotation {
   var counterIdx = -1
 
   override def backannotationTransforms {
-    transforms += { c => writeOutGraph(c) }
     transforms += ((c: Module) => c bfs (_.addConsumers))
 
     transforms += ((c: Module) => annotateSignals(c))

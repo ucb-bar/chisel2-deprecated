@@ -564,7 +564,7 @@ abstract class Backend {
               case _ => "T"
             }
             if (Module.isEmittingComponents) {
-             node.pName = prefix + node.emitIndex
+              node.pName = prefix + node.emitIndex
             } else {
               node.pName = prefix + node.component.nextIndex
             }
@@ -577,11 +577,14 @@ abstract class Backend {
   def getPseudoPath(c: Module, delim: String = "/"): String =
     if (c.parent == null) c.pName else getPseudoPath(c.parent) + delim + c.pName
   def getSignalPathName(n: Node, delim: String = "/", isRealName: Boolean = false): String =
-    if (n == null || n.pName == "") "null" 
-    else ( getPseudoPath(n.component) + delim + 
-     ( if (!isRealName) n.pName 
-       else if (n.name != "") n.name 
-       else emitRef(n) ) )
+    if (n == null) {
+      "null" 
+    } else if (isRealName) {
+      n.component.getPathName(delim) + delim + (if (n.name != "") n.name else emitRef(n))
+    } else {
+      // n.component.getPseudoPath(delim) + delim + n.pName
+      getPseudoPath(n.component, delim) + delim + n.pName
+    }
 
   // Write out DFS graph traversal
   // to verify backannotation later
@@ -593,8 +596,14 @@ abstract class Backend {
 
     for (m <- Module.sortedComps) {
       m dfs { node =>
-        if (!node.isTypeNode && !node.isLit)
-          res append (getSignalPathName(node, isRealName = true) + ":" + nodeToString(node, isRealName = true) + "\n")
+        node match {
+          case _: Binding =>
+          case _: Literal =>
+          case _ => if (!node.isTypeNode) {
+            res append (getSignalPathName(node, isRealName = false) + 
+                        ":" + nodeToString(node, isRealName = false) + "\n")
+          }
+        }
       }
     }
   

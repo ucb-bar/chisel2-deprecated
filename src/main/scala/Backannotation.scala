@@ -5,6 +5,7 @@ import ChiselError._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashSet
+import scala.collection.mutable.LinkedHashSet
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.Stack
 import scala.io.Source
@@ -12,16 +13,39 @@ import scala.sys.process._
 import scala.util.Random
 
 object nodeToString {
-  def name(node: Node, isRealName: Boolean) =
-    if (!isRealName) node.pName 
-    else if (node.name != "") node.name
-    else Module.backend.emitRef(node)
+  def name(node: Node, isRealName: Boolean, consumer: Node = null): String = {
+    def getName(node: Node) = {
+      if (!isRealName) node.pName
+      else if (node.name != "") node.name
+      else Module.backend.emitRef(node)
+    }
+
+    node match {
+      case b: Binding => 
+        name(b.targetNode, isRealName)
+      case io: Bits if io.isIo && io.dir == INPUT && !io.inputs.isEmpty && consumer != null => {
+        if ((!consumer.isIo && 
+             consumer.component == io.component.parent) ||
+            (consumer.isInstanceOf[Bits] && 
+             consumer.asInstanceOf[Bits].dir == OUTPUT && 
+             consumer.component == io.component.parent)) {
+          getName(io.inputs.head)
+        } else ""
+      }
+      case _ => 
+        getName(node.getNode)
+        /*
+        if ((isRealName && (node.name contains "io_")) || 
+            (!isRealName && (node.pName contains "io_"))) ""
+        else getName(node.getNode) */
+    }
+  }
 
   def apply(node: Node, isRealName: Boolean = false): String = { 
     node match {
       case bits  : Bits      => 
-        if (bits.dir == OUTPUT) "OUTPUT"
-        else if (bits.dir == INPUT) "INPUT"
+        if (bits.dir == OUTPUT && !bits.isTypeNode) "OUTPUT"
+        else if (bits.dir == INPUT && !bits.isTypeNode) "INPUT"
         else bits match {
           case bool  : Bool => "Bool(%s)".format(name(bool.getNode, isRealName))
           case uint  : UInt => "UInt(%s)".format(name(uint.getNode, isRealName))
@@ -30,20 +54,21 @@ object nodeToString {
       case reg   : Reg       => "Reg(%s)".format(name(reg, isRealName))
       case lit   : Literal   => "Lit(%s)".format(lit.name)
       case op    : Op        => 
-        if (op.inputs.length == 1) op.op + "(%s)".format(name(op.inputs(0).getNode, isRealName))
+        if (op.inputs.length == 1) op.op + "[%s]".format(
+          name(op.inputs.head.getNode, isRealName, op))
         else if (op.op == "Mux") "[%s]?[%s]:[%s]".format(
-          name(op.inputs(0).getNode, isRealName),
-          name(op.inputs(1).getNode, isRealName),
-          name(op.inputs(2).getNode, isRealName) )
+          name(op.inputs(0).getNode, isRealName, op),
+          name(op.inputs(1).getNode, isRealName, op),
+          name(op.inputs(2).getNode, isRealName, op) )
         else "[%s]%s[%s]".format(
-          name(op.inputs(0).getNode, isRealName), 
+          name(op.inputs(0).getNode, isRealName, op), 
           op.op, 
-          name(op.inputs(1).getNode, isRealName) )
+          name(op.inputs(1).getNode, isRealName, op) )
       case ext   : Extract   => 
-        val hi: String = nodeToString(ext.hi, isRealName)
-        val lo: String = nodeToString(ext.lo, isRealName) 
-        nodeToString(ext.inputs.head, isRealName) + "[" + { if (hi == lo) hi else hi + ":" + lo } + "]"  
-      case bind  : Binding   => "Binding(" + nodeToString(bind.targetNode, isRealName) + ")"
+        val hi: String = name(ext.hi.getNode, isRealName, ext)
+        val lo: String = name(ext.lo.getNode, isRealName, ext) 
+        name(ext.inputs.head.getNode, isRealName, ext) + "[" + { if (hi == lo) hi else hi + ":" + lo } + "]"  
+      case bind  : Binding   => "Binding(" + name(bind.targetNode.getNode, isRealName) + ")"
       case bundle: Bundle    => 
         if (!bundle.elements.isEmpty) {
           val head = bundle.elements.head._2
@@ -115,11 +140,17 @@ trait Backannotation extends Backend {
     ChiselError.info("[Backannotation] check backannotation")
     try {
       val lines = Source.fromFile("%s.trace".format(targetdir + c.pName)).getLines.toArray
-      val dfsTraversal = new HashSet[String]
+      val dfsTraversal = new LinkedHashSet[String]
       
-      for (m <- Module.sortedComps) {
+      for (m <- Module.sortedComps ; if !m.isInstanceOf[CounterWrapper]) {
         m dfs { node =>
-          dfsTraversal += getSignalPathName(node) + ":" + nodeToString(node)
+          node match {
+            case _: Binding =>
+            case _: Literal =>
+            case _ => if (!node.isTypeNode) {
+              dfsTraversal += getSignalPathName(node) + ":" + nodeToString(node)
+            }
+          }
         }
       }
 
@@ -130,7 +161,6 @@ trait Backannotation extends Backend {
           val contains = dfsTraversal contains line
           if (!(dfsTraversal contains line))
             ChiselError.warning("[Backannotation] %s does not appear in this graph".format(line))
-          dfsTraversal -= line
           ok &= contains
         }
       }
