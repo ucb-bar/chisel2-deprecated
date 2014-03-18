@@ -34,16 +34,22 @@ import scala.math._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
 import scala.util.Random
-import java.io.{IOException, InputStream, OutputStream, PrintStream}
+import java.io.{File, IOException, InputStream, OutputStream, PrintStream}
 import scala.sys.process._
+import scala.io.Source._
 import Literal._
 
-class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
-  /*
-  val testIn = new Queue[Int]()
-  val testOut = new Queue[Int]()
-  val testErr = new Queue[Int]()
-  */
+case class Poke(val node: Node, val index: Int, val value: BigInt);
+
+class Snapshot(val t: Int) {
+  val pokes = new ArrayBuffer[Poke]()
+}
+
+class ManualTester[+T <: Module]
+    (val c: T, 
+      val isTrace: Boolean = true,
+      val isSnapshotting: Boolean = false, 
+      val isLoggingPokes: Boolean = false) {
   var testIn:  InputStream  = null
   var testOut: OutputStream = null
   var testErr: InputStream  = null
@@ -64,7 +70,143 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
       }
     }
   }
-  
+
+  val snapshots = ArrayBuffer[Snapshot]();
+  val pokez = ArrayBuffer[Snapshot]();
+
+  val regs  = c.omods.filter(x => x.isInstanceOf[Reg]).map(x => x.getNode);
+  val mems  = c.omods.filter(x => x.isInstanceOf[Mem[_]]).map(x => x.getNode);
+  val mappings = new HashMap[String, Node]()
+
+  def dump(): Snapshot = {
+    val snap = new Snapshot(t)
+    for (reg <- regs) 
+      snap.pokes += Poke(reg, 0, peekBits(reg))
+    for (mem <- mems) 
+      for (i <- 0 until mem.depth) 
+        snap.pokes += Poke(mem, i, peekBits(mem, i))
+    snap
+  }
+
+  def snapshot(): Snapshot = {
+    val snap = dump()
+    snapshots += snap
+    snap
+  }
+
+  def addPoke(snaps: ArrayBuffer[Snapshot], now: Int, poke: Poke) = {
+    if (snaps.length > 0 && snaps.last.t > now) {
+      val lastIndex = findSnapshotIndex(snaps, now)
+      val amount = snaps.length-lastIndex-1
+      println("TRIMMING " + amount + " FROM " + snaps.length)
+      if (amount > 0) snaps.trimEnd(amount)
+    }
+    println("ADDING POKE T=" + now)
+    if (snaps.length > 0 && snaps.last.t == now) 
+      snaps.last.pokes += poke 
+    else { 
+      val snap = new Snapshot(now); 
+      snap.pokes += poke
+      snaps += snap;
+    }
+  }
+
+  def loadSnapshots(filename: String): ArrayBuffer[Snapshot] = {
+    var now = 0
+    var lines = io.Source.fromFile(filename).getLines
+    val snaps = new ArrayBuffer[Snapshot]()
+    println("LOADING")
+    for (line <- lines) {
+      val words = line.split(" ")
+      if (words.length > 0) {
+        if (words(0) == "STEP") {
+          assert(words.length == 2, "STEP TAKES ONE ARG")
+          now += words(1).toInt
+          println("  <STEP " + words(1).toInt + " T=" + now)
+        } else if (words(0) == "POKE") {
+          assert(words.length == 3 || words.length == 4, "POKE TAKES THREE / FOUR ARGS")
+          val off = if (words.length == 4) words(3).toInt else -1
+          addPoke(snaps, now, Poke(mappings(words(1)), off, words(2).toInt))
+          println("  <POKE " + words(1) + " T=" + now)
+        }
+      }
+    }
+    println("LOADED " + snaps.length + " SNAPSHOTS")
+    for (snap <- snaps)
+      println("  SNAP T=" + snap.t + " N=" + snap.pokes.length)
+    snaps
+  }
+
+  def loadSnapshotsInto(filename: String, snaps: ArrayBuffer[Snapshot]) = {
+    snaps.trimStart(snaps.length)
+    snaps ++= loadSnapshots(filename)
+  }
+
+  def loadPokes(filename: String) = {
+    loadSnapshotsInto(filename, pokez)
+    checkForPokes(0, t)
+  }
+
+  // TODO: MOVE TO SOMEWHERE COMMON TO BACKEND
+  def ensureDir(dir: String): String = {
+    val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/")
+    new File(d).mkdirs()
+    d
+  }
+  def createOutputFile(name: String): java.io.FileWriter = {
+    val baseDir = ensureDir(Module.targetDir)
+    new java.io.FileWriter(baseDir + name)
+  }
+
+  def dumpSnapshots(filename: String, snapshots: ArrayBuffer[Snapshot]) = {
+    var now = 0;
+    val f = createOutputFile(filename)
+    for (snapshot <- snapshots) {
+      if (snapshot.t > now) {
+        f.write("STEP " + (snapshot.t - now) + "\n")
+        now = snapshot.t
+      }
+      for (p <- snapshot.pokes) {
+        f.write("POKE " + dumpName(p.node) + " " + p.value + (if (p.index == -1) "" else (" " + p.index)) + "\n")
+      }
+    }
+    f.close()
+  }
+
+  def load(s: Snapshot) = {
+    println("LOADING SNAPSHOT AT " + s.t)
+    for (poke <- s.pokes) 
+      doPokeBits(poke.node, poke.value, poke.index)
+  }
+
+  def findSnapshotIndex(snaps: ArrayBuffer[Snapshot], target: Int): Int = {
+    println("LOOKING FOR T=" + target + " OUT OF " + snaps.length + " SNAPS")
+    for (i <- 0 until (snaps.length-1)) {
+      if (snaps(i+1).t > target) {
+        println("  FOUND I=" + i + " AT T=" + snaps(i).t)
+        return i
+      }
+    }
+    println("  DEFAULT I=" + (snaps.length-1) + " AT T=" + snaps.last.t)
+    return snaps.length-1
+  }
+
+  def goto(target: Int) = {
+    val lastIndex = findSnapshotIndex(snapshots, target)
+    val snap = snapshots(lastIndex)
+    snapshots.trimEnd(snapshots.length-lastIndex-1)
+    println("FOUND SNAPSHOT AT T=" + snap.t)
+    load(snap);
+    t = snap.t
+    for (tk <- snap.t to target) 
+      step(1)
+  }
+
+  def puts(str: String) = {
+    while (testOut == null) { Thread.sleep(100) }
+    for (e <- str) testOut.write(e);
+  }
+
   /**
    * Sends a command to the emulator and returns the reply.
    * The standard protocol treats a single line as a command, which always
@@ -166,7 +308,10 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
     if (isTrace) println("RESET " + n)
   }
 
-  def pokeBits(data: Node, x: BigInt, off: Int = -1): Unit = {
+  def unstep(n: Int) = 
+    goto(max(0, t-n))
+
+  def doPokeBits(data: Node, x: BigInt, off: Int = -1): Unit = {
     if (dumpName(data) == "") {
       println("Unable to poke data " + data)
     } else {
@@ -187,12 +332,18 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
     }
   }
 
+  def pokeBits(data: Node, x: BigInt, off: Int = -1): Unit = {
+    if (isSnapshotting || isLoggingPokes)
+      addPoke(pokez, t, Poke(data, off, x))
+    doPokeBits(data, x, off)
+  }
+
   def pokeAt[T <: Bits](data: Mem[T], x: BigInt, off: Int): Unit = {
     pokeBits(data, x, off)
   }
 
   def poke(data: Bits, x: BigInt): Unit = {
-    pokeBits(data, x)
+    pokeBits(data.getNode, x)
   }
 
   def poke(data: Aggregate, x: Array[BigInt]): Unit = {
@@ -201,11 +352,29 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
       poke(x, y)
   }
 
+  def checkForPokes(start: Int, target: Int) = {
+    var pokeIndex = findSnapshotIndex(pokez, start)
+    println("CHECKING POKES FROM T=" + start + " TO T=" + target + " POKEZ INDEX " + pokeIndex)
+    for (tk <- start to target) {
+      if (pokeIndex < pokez.length) {
+        val snap = pokez(pokeIndex)
+        println("  LOOKING AT POKES(" + pokeIndex + ") T=" + snap.t + " VS T=" + tk + " WITH N=" + snap.pokes.length + " POKES")
+        if (snap.t == tk) {
+          print("FOUND: ")
+          load(snap)
+          pokeIndex += 1
+        }
+      }
+    }
+  }
+
   def step(n: Int) = {
-    val s = emulatorCmd("step " + n)
-    delta += s.toInt
+    if (isSnapshotting) snapshot()
+    val target = t + n
+    if (isTrace) println("STEP " + n + " -> " + target)
+    if (isSnapshotting) 
+      checkForPokes(t+1, target)
     t += n
-    if (isTrace) println("STEP " + n + " -> " + t)
   }
 
   def int(x: Boolean): BigInt = if (x) 1 else 0
@@ -239,7 +408,7 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
   val rnd = if (Module.testerSeedValid) new Random(Module.testerSeed) else new Random()
   var process: Process = null
 
-  def startTesting(): Process = {
+  def start(): Process = {
     val target = Module.targetDir + "/" + c.name
     val cmd = 
       (if (Module.backend.isInstanceOf[FloBackend]) {
@@ -254,11 +423,13 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
     val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => testErr = err)
     process = processBuilder.run(pio)
     waitForStreams()
+    t = 0
     reset(5)
+    for (mod <- c.omods.map(x => x.getNode)) mappings(dumpName(mod)) = mod
     process
   }
 
-  def endTesting(): Boolean = {
+  def finish(): Boolean = {
     if (process != null) {
       emulatorCmd("quit")
 
@@ -278,8 +449,10 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
     println("RAN " + t + " CYCLES " + (if (ok) "PASSED" else { "FAILED FIRST AT CYCLE " + failureTime }))
     ok
   }
+}
 
-  startTesting()
+class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends ManualTester(c, isTrace) {
+  start()
 }
 
 class MapTester[+T <: Module](c: T, val testNodes: Array[Node]) extends Tester(c, false) {
@@ -328,3 +501,158 @@ class MapTester[+T <: Module](c: T, val testNodes: Array[Node]) extends Tester(c
   def defTests(body: => Boolean) = body
 
 }
+
+/*
+class AdvTester[+T <: Module](val dut: T) extends Tester[T](dut) {
+  val defaultMaxCycles = 1024
+  type HMNN = HashMap[Node, Node]
+
+  val preprocessors = new ArrayBuffer[Processable]()
+  val postprocessors = new ArrayBuffer[Processable]()
+
+  def takestep(work: => Unit = {}) = {
+    step(1) 
+    preprocessors.foreach(_.process())
+    work
+    postprocessors.foreach(_.process())
+  }
+
+  def until(pred: =>Boolean, maxCycles: Int = defaultMaxCycles)(work: =>Unit): Boolean = {
+    var timeout_cycles = 0
+    while(!pred && (timeout_cycles < maxCycles)) {
+      takestep(work)
+      timeout_cycles += 1
+    }
+    assert(timeout_cycles < maxCycles,
+      "until timed out after %d cycles".format(timeout_cycles))
+    pred
+  }
+  def eventually(pred: =>Boolean, maxCycles: Int = defaultMaxCycles) = {until(pred, maxCycles){}}
+  def doUntil(work: =>Unit)(pred: =>Boolean, maxCycles: Int = defaultMaxCycles): Boolean = {
+    takestep(work)
+    until(pred, maxCycles){work}
+  }
+
+  class DecoupledSink[T <: Data, R]( socket: DecoupledIO[T], cvt: (HMNN,T)=>R ) extends Processable {
+    var max_count = -1
+    val outputs = new scala.collection.mutable.Queue[R]()
+    def isFired = () => peek(socket.valid) == 1 && peek(socket.ready) == 1
+
+    def process() = {
+      if(isFired()) {
+        outputs.enqueue(cvt(ovars, socket.bits))
+      }
+      poke(socket.ready, int(max_count < 1 || outputs.length < max_count))
+    }
+
+    // Initialize
+    poke(socket.ready, true)
+    preprocessors += this
+  }
+
+  object DecoupledSink {
+    def apply[T<:Bits](socket: DecoupledIO[T]) = 
+      new DecoupledSink(socket, (db:HMNN, socket_bits: T) => fix_neg(socket_bits, db(socket_bits).litValue()) )
+    def apply[T<:Data](socket: DecoupledIO[T], extracts: Array[Bits]) = 
+      new DecoupledSink(socket, (db:HMNN, socket_bits: T) => extracts.map(d => fix_neg(d, db(d).litValue()))
+    )
+  }
+
+  class ValidSink[T <: Data, R]( socket: ValidIO[T], cvt: (HMNN,T)=>R ) extends Processable { 
+    val outputs = new scala.collection.mutable.Queue[R]()
+    def isValid = ovars(socket.valid).litValue() == 1
+
+    def process() = {
+      if(isValid) {
+        outputs.enqueue(cvt(ovars, socket.bits))
+      }
+    }
+
+    // Initialize
+    preprocessors += this
+  }
+  object ValidSink {
+    def apply[T<:Bits](socket: ValidIO[T]) = new ValidSink(socket, (db:HMNN, socket_bits: T) => fix_neg(socket_bits, db(socket_bits).litValue()) )
+    def apply[T<:Data](socket: ValidIO[T], extracts: Array[Bits]) = new ValidSink(socket,
+      (db:HMNN, socket_bits: T) => extracts.map(d => fix_neg(d, db(d).litValue()))
+    )
+  }
+
+  class DecoupledSource[T <: Data, R]( socket: DecoupledIO[T], post: (HMNN,T,R)=>Unit ) extends Processable
+  {
+    val inputs = new scala.collection.mutable.Queue[R]()
+    var justFired = false // Adjust for the fact that the step function returns ivars/ovars of BEFORE the clock edge
+
+    private def isPresenting = ivars(socket.valid).litValue() == 1
+    def isFired = ivars(socket.valid).litValue() == 1 && ovars(socket.ready).litValue() == 1
+    def isIdle = !isPresenting && inputs.isEmpty && !justFired
+
+    def process() = {
+      justFired = isFired
+      if(isFired) {
+        ivars(socket.valid) = Bool(false)
+      }
+      if(!isPresenting && !inputs.isEmpty) {
+        ivars(socket.valid) = Bool(true)
+        post(ivars, socket.bits, inputs.dequeue())
+      }
+    }
+
+    // Initialize
+    ivars(socket.valid) = Bool(false)
+    postprocessors += this
+  }
+  object DecoupledSource {
+    def apply[T<:Bits](socket: DecoupledIO[T]) = new DecoupledSource(socket,
+      (db:HMNN, socket_bits: T, in: BigInt) =>
+        { db(socket_bits) = Lit.makeLit(Literal(in, width=socket_bits.getWidth, signed=in<0)){socket_bits} }
+    )
+    def apply[T<:Data](socket: DecoupledIO[T], injects: Array[Bits]) = new DecoupledSource(socket,
+      (db:HMNN, socket_bits: T, ins: Array[BigInt]) => {
+        injects.zip(ins).foreach(Function.tupled((inj, in) =>
+          { db(inj) = Lit.makeLit(Literal(in, width=inj.getWidth, signed=in<0)){inj} }))
+      }
+    )
+  }
+  
+  class ValidSource[T <: Data, R]( socket: ValidIO[T], post: (HMNN,T,R)=>Unit ) extends Processable
+  {
+    val inputs = new scala.collection.mutable.Queue[R]()
+    var justFired = false // Adjust for the fact that the step function returns ivars/ovars of BEFORE the clock edge
+    
+    private def isPresenting = ivars(socket.valid).litValue() == 1
+    def isIdle = !isPresenting && inputs.isEmpty && !justFired
+
+    def process() = {
+      // Always advance the input
+      justFired = isPresenting // input is always fired on clock edge!
+      ivars(socket.valid) = Bool(false)
+      if(!inputs.isEmpty) {
+        ivars(socket.valid) = Bool(true)
+        post(ivars, socket.bits, inputs.dequeue())
+      }
+    }
+
+    // Initialize
+    ivars(socket.valid) = Bool(false)
+    postprocessors += this
+  }
+  object ValidSource {
+    def apply[T<:Bits](socket: ValidIO[T]) = new ValidSource(socket,
+      (db:HMNN, socket_bits: T, in: BigInt) =>
+        { db(socket_bits) = Lit.makeLit(Literal(in, width=socket_bits.getWidth, signed=in<0)){socket_bits} }
+    )
+    def apply[T<:Data](socket: ValidIO[T], injects: Array[Bits]) = new ValidSource(socket,
+      (db:HMNN, socket_bits: T, ins: Array[BigInt]) => {
+        injects.zip(ins).foreach(Function.tupled((inj, in) =>
+          { db(inj) = Lit.makeLit(Literal(in, width=inj.getWidth, signed=in<0)){inj} }))
+      }
+    )
+  }
+
+}
+
+trait Processable {
+  def process(): Unit
+}
+ */
