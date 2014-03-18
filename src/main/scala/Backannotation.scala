@@ -140,15 +140,17 @@ trait Backannotation extends Backend {
     ChiselError.info("[Backannotation] check backannotation")
     try {
       val lines = Source.fromFile("%s.trace".format(targetdir + c.pName)).getLines.toArray
-      val dfsTraversal = new LinkedHashSet[String]
+      val traversal = new LinkedHashSet[String]
       
       for (m <- Module.sortedComps ; if !m.isInstanceOf[CounterWrapper]) {
         m dfs { node =>
           node match {
+            case _: Assert =>
+            case _: PrintfBase =>
             case _: Binding =>
             case _: Literal =>
             case _ => if (!node.isTypeNode) {
-              dfsTraversal += getSignalPathName(node) + ":" + nodeToString(node)
+              traversal += getSignalPathName(node) + ":" + nodeToString(node)
             }
           }
         }
@@ -158,8 +160,8 @@ trait Backannotation extends Backend {
 
       if (ok) {
         for (line <- lines) {
-          val contains = dfsTraversal contains line
-          if (!(dfsTraversal contains line))
+          val contains = traversal contains line
+          if (!contains)
             ChiselError.warning("[Backannotation] %s does not appear in this graph".format(line))
           ok &= contains
         }

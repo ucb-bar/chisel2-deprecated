@@ -597,6 +597,8 @@ abstract class Backend {
     for (m <- Module.sortedComps) {
       m dfs { node =>
         node match {
+          case _: Assert =>
+          case _: PrintfBase =>
           case _: Binding =>
           case _: Literal =>
           case _ => if (!node.isTypeNode) {
