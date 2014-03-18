@@ -30,14 +30,12 @@ object nodeToString {
              consumer.asInstanceOf[Bits].dir == OUTPUT && 
              consumer.component == io.component.parent)) {
           getName(io.inputs.head)
+        } else if (io.component == consumer.component) {
+          getName(io.getNode)
         } else ""
       }
       case _ => 
         getName(node.getNode)
-        /*
-        if ((isRealName && (node.name contains "io_")) || 
-            (!isRealName && (node.pName contains "io_"))) ""
-        else getName(node.getNode) */
     }
   }
 

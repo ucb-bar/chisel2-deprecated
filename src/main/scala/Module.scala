@@ -393,6 +393,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     debugs += x.getNode
   }
 
+  def counter(x: Node) {
+    signals += x
+    Module.signals += x
+  }
+
   def printf(message: String, args: Node*): Unit = {
     val p = new Printf(Module.current.whenCond && !this.reset, message, args)
     printfs += p
@@ -530,37 +535,32 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         // for two cases
         case r: Reg => {
           val init = if (r.isReset) r.init else null
-          val enable = 
-            if (Module.isEmittingComponents) {
-              r.enable
-            } else {
-              r.next match {
-                case mux: Mux => mux.inputs(0)
-                case _ => null
-              }
-            }
-          val next = 
-            if (Module.isEmittingComponents) {
-              r.next
-            } else {
-              r.next match {
-                case mux: Mux => mux.inputs(1)
-                case _ => r.next
-              }
-            }
+          val enable = r.enable
 
-          if (isVisiting(next)) {
-            dfsStack push next
-            walked += next
-          }
- 
           if (isVisiting(init)) {
             dfsStack push init
             walked += init
           }
-          if (enable != Bool(true) && isVisiting(enable)) {
+          if (!enable.isTrue && isVisiting(enable)) {
             dfsStack push enable
             walked += enable
+          }
+          for (update <- r.updates.reverse) {
+            val mux = r.muxes getOrElse (update, null)
+            if (isVisiting(mux)) {
+              dfsStack push mux
+              walked += mux 
+            }
+          }
+          for ((cond, value) <- r.updates.reverse) {
+            if (isVisiting(value)) {
+              dfsStack push value
+              walked += value
+            }
+            if (isVisiting(cond)) {
+              dfsStack push cond
+              walked += cond
+            }
           }
         }
         case _ => for(i <- top.inputs) {

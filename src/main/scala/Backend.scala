@@ -582,11 +582,10 @@ abstract class Backend {
     } else if (isRealName) {
       n.component.getPathName(delim) + delim + (if (n.name != "") n.name else emitRef(n))
     } else {
-      // n.component.getPseudoPath(delim) + delim + n.pName
       getPseudoPath(n.component, delim) + delim + n.pName
     }
 
-  // Write out DFS graph traversal
+  // Write out graph traversal
   // to verify backannotation later
   def writeOutGraph(c: Module) {
     ChiselError.info("[Backannotation] write out graphs")
