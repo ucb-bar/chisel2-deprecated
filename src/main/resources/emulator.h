@@ -497,13 +497,8 @@ struct bit_word_funs {
     d[0] = 1;
   }
   static void neq (val_t d[], val_t s0[], val_t s1[]) {
-    for (int i = 0; i < nw; i++) {
-      if (s0[i] == s1[i]) {
-        d[0] = 1;
-        return;
-      }
-    }
-    d[0] = 0;
+    eq(d, s0, s1);
+    d[0] = !d[0];
   }
   static void rsha (val_t d[], val_t s0[], int amount, int w) {
     rsha_n(d, s0, amount, nw, w);
