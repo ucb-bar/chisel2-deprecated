@@ -51,51 +51,76 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
   var delta = 0
   var t = 0
 
-  def puts(str: String) = {
-    while (testOut == null) { Thread.sleep(100) }
-    for (e <- str) testOut.write(e);
-  }
-
-  def setClocks(clocks: HashMap[Clock, Int]) {
-    for (clock <- Module.clocks) {
-      puts("set-clocks");
-      if (clock.srcClock == null) {
-        val s = BigInt(clocks(clock)).toString(16)
-        puts(" " + s);
+  /**
+   * Waits until the emulator streams are ready. This is a dirty hack related
+   * to the way Process works. TODO: FIXME. 
+   */
+  def waitForStreams() = {
+    var waited = 0
+    while (testOut == null || testIn == null || testErr == null) {
+      Thread.sleep(100)
+      if (waited % 10 == 0 && waited > 30) {
+        println("waiting for emulator process treams to be valid ...")
       }
     }
-    puts("\n")
+  }
+  
+  /**
+   * Sends a command to the emulator and returns the reply.
+   * The standard protocol treats a single line as a command, which always
+   * returns a single line of reply.
+   */
+  def emulatorCmd(str: String): String = {
+    // validate cmd
+    if (str contains "\n") {
+      System.err.print(s"emulatorCmd($str): command should not contain newline")
+      return "error"
+    }
+    
+    waitForStreams()
+    
+    // send command to emulator
+    for (e <- str) testOut.write(e);
+    testOut.write('\n');
     testOut.flush()
-  }
 
-  def isSpace(c: Int) : Boolean = c == 0x20 || c == 0x9 || c == 0xD || c == 0xA
-
-  def drainErr () = {
-    if (testErr != null) {
-      try {
-      while(testErr.available() > 0) {
-        System.err.print(Character.toChars(testErr.read()))
-      }
-      }
-      catch {
-        case e : IOException => testErr = null; println("ERR EXCEPTION")
-      }
-    } else
-      println("ERR NULL")
-  }
-
-  def gets() = {
-    while (testIn == null) { Thread.sleep(100) }
+    // read output from emulator
     var c = testIn.read
     sb.clear()
-    while (isSpace(c)) {
-      c = testIn.read
-    }
-    while (!isSpace(c)) {
+    while (c != '\n' && c != -1) {
+      if (c == 0) {
+        Thread.sleep(100)
+      }
       sb += c.toChar
       c   = testIn.read
     }
-    sb.toString
+    
+    // drain errors
+    try {
+      while(testErr.available() > 0) {
+        System.err.print(Character.toChars(testErr.read()))
+      }
+    } catch {
+      case e : IOException => testErr = null; println("ERR EXCEPTION")
+    }
+    
+    if (sb == "error") {
+      System.err.print(s"FAILED: emulatorCmd($str): returned error")
+      ok = false
+    }
+    return sb.toString
+  }
+
+  def setClocks(clocks: HashMap[Clock, Int]) {
+    var cmd = "set-clocks"
+    for (clock <- Module.clocks) {
+      if (clock.srcClock == null) {
+        val s = BigInt(clocks(clock)).toString(16)
+        cmd = cmd + " " + s
+      }
+    }
+    emulatorCmd(cmd)
+    // TODO: check for errors in return
   }
 
   def dumpName(data: Node): String = {
@@ -110,16 +135,15 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
       println("Unable to peek data " + data)
       -1
     } else {
-      val off = -1;
-      puts("peek " + dumpName(data));
-      if (off != -1)
-        puts(" " + off);
-      puts("\n")
-      testOut.flush()
-      val s = gets()
+      var cmd = ""
+      if (off != -1) {
+        cmd = "wire_peek " + dumpName(data) + " " + off;
+      } else {
+        cmd = "wire_peek " + dumpName(data);
+      }
+      val s = emulatorCmd(cmd)
       val rv = toLitVal(s)
       if (isTrace) println("  PEEK " + dumpName(data) + " " + (if (off >= 0) (off + " ") else "") + "-> " + s)
-      drainErr()
       rv
     }
   }
@@ -137,23 +161,29 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
   }
 
   def reset(n: Int = 1) = {
-    puts("reset " + n + "\n");  
+    emulatorCmd("reset " + n)
+    // TODO: check for errors in return
     if (isTrace) println("RESET " + n)
-    testOut.flush()
-    drainErr()
   }
 
   def pokeBits(data: Node, x: BigInt, off: Int = -1): Unit = {
     if (dumpName(data) == "") {
       println("Unable to poke data " + data)
     } else {
-      puts("poke " + dumpName(data));
+      
       if (isTrace) println("  POKE " + dumpName(data) + " " + (if (off >= 0) (off + " ") else "") + "<- " + x)
-      if (off != -1)
-        puts(" " + off);
-      puts(" 0x" + x.toString(16) + "\n");
-      testOut.flush()
-      drainErr()
+      var cmd = ""
+      if (off != -1) {
+        cmd = "mem_poke " + dumpName(data) + " " + off;
+      } else {
+        cmd = "wire_poke " + dumpName(data);
+      }
+      cmd = cmd + " 0x" + x.toString(16);
+      val rtn = emulatorCmd(cmd)
+      if (rtn != "true") {
+        System.err.print(s"FAILED: poke(${dumpName(data)}) returned false")
+        ok = false
+      }
     }
   }
 
@@ -172,11 +202,8 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
   }
 
   def step(n: Int) = {
-    puts("step " + n + "\n");
-    testOut.flush()
-    val s = gets()
+    val s = emulatorCmd("step " + n)
     delta += s.toInt
-    drainErr()
     t += n
     if (isTrace) println("STEP " + n + " -> " + t)
   }
@@ -226,14 +253,14 @@ class Tester[+T <: Module](val c: T, val isTrace: Boolean = true) {
     val processBuilder = Process(cmd)
     val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => testErr = err)
     process = processBuilder.run(pio)
-    // while(testIn == null || testErr == null) { }
+    waitForStreams()
     reset(5)
     process
   }
 
   def endTesting(): Boolean = {
     if (process != null) {
-      puts("quit\n")
+      emulatorCmd("quit")
 
       if (testOut != null) {
         testOut.flush()

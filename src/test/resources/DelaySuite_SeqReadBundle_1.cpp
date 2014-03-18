@@ -3,19 +3,6 @@
 void DelaySuite_SeqReadBundle_1_t::init ( bool rand_init ) {
   if (rand_init) R0.randomize();
   if (rand_init) DelaySuite_SeqReadBundle_1__mem.randomize();
-  nodes.clear();
-  mems.clear();
-  nodes["DelaySuite_SeqReadBundle_1.io_out_a_a"] = &DelaySuite_SeqReadBundle_1__io_out_a_a;
-  nodes["DelaySuite_SeqReadBundle_1.io_out_a_b"] = &DelaySuite_SeqReadBundle_1__io_out_a_b;
-  nodes["DelaySuite_SeqReadBundle_1.io_raddr"] = &DelaySuite_SeqReadBundle_1__io_raddr;
-  nodes["DelaySuite_SeqReadBundle_1.io_ren"] = &DelaySuite_SeqReadBundle_1__io_ren;
-  nodes["DelaySuite_SeqReadBundle_1.io_in_a_b_"] = &DelaySuite_SeqReadBundle_1__io_in_a_b_;
-  nodes["DelaySuite_SeqReadBundle_1.io_in_a_b"] = &DelaySuite_SeqReadBundle_1__io_in_a_b;
-  nodes["DelaySuite_SeqReadBundle_1.io_in_a_a"] = &DelaySuite_SeqReadBundle_1__io_in_a_a;
-  nodes["DelaySuite_SeqReadBundle_1.io_wen"] = &DelaySuite_SeqReadBundle_1__io_wen;
-  nodes["DelaySuite_SeqReadBundle_1.io_waddr"] = &DelaySuite_SeqReadBundle_1__io_waddr;
-  mems["DelaySuite_SeqReadBundle_1.mem"] = &DelaySuite_SeqReadBundle_1__mem;
-  nodes["DelaySuite_SeqReadBundle_1.io_out_a_b_"] = &DelaySuite_SeqReadBundle_1__io_out_a_b_;
 }
 int DelaySuite_SeqReadBundle_1_t::clock ( dat_t<1> reset ) {
   uint32_t min = ((uint32_t)1<<31)-1;
@@ -57,4 +44,21 @@ void DelaySuite_SeqReadBundle_1_t::clock_lo ( dat_t<1> reset ) {
 void DelaySuite_SeqReadBundle_1_t::clock_hi ( dat_t<1> reset ) {
   { if (DelaySuite_SeqReadBundle_1__io_wen.values[0]) DelaySuite_SeqReadBundle_1__mem.put(DelaySuite_SeqReadBundle_1__io_waddr.values[0], 0, T1.values[0]); }
   R0 = R0_shadow;
+}
+void DelaySuite_SeqReadBundle_1_api_t::init_mapping_table() {
+  dat_table.clear();
+  mem_table.clear();
+  DelaySuite_SeqReadBundle_1_t* mod_typed = dynamic_cast<DelaySuite_SeqReadBundle_1_t*>(module);
+  assert(mod_typed);
+  dat_table["DelaySuite_SeqReadBundle_1.io_out_a_a"] = new dat_api<8>(&mod_typed->DelaySuite_SeqReadBundle_1__io_out_a_a, "DelaySuite_SeqReadBundle_1.io_out_a_a", "");
+  dat_table["DelaySuite_SeqReadBundle_1.io_out_a_b"] = new dat_api<16>(&mod_typed->DelaySuite_SeqReadBundle_1__io_out_a_b, "DelaySuite_SeqReadBundle_1.io_out_a_b", "");
+  dat_table["DelaySuite_SeqReadBundle_1.io_raddr"] = new dat_api<4>(&mod_typed->DelaySuite_SeqReadBundle_1__io_raddr, "DelaySuite_SeqReadBundle_1.io_raddr", "");
+  dat_table["DelaySuite_SeqReadBundle_1.io_ren"] = new dat_api<1>(&mod_typed->DelaySuite_SeqReadBundle_1__io_ren, "DelaySuite_SeqReadBundle_1.io_ren", "");
+  dat_table["DelaySuite_SeqReadBundle_1.io_in_a_b_"] = new dat_api<32>(&mod_typed->DelaySuite_SeqReadBundle_1__io_in_a_b_, "DelaySuite_SeqReadBundle_1.io_in_a_b_", "");
+  dat_table["DelaySuite_SeqReadBundle_1.io_in_a_b"] = new dat_api<16>(&mod_typed->DelaySuite_SeqReadBundle_1__io_in_a_b, "DelaySuite_SeqReadBundle_1.io_in_a_b", "");
+  dat_table["DelaySuite_SeqReadBundle_1.io_in_a_a"] = new dat_api<8>(&mod_typed->DelaySuite_SeqReadBundle_1__io_in_a_a, "DelaySuite_SeqReadBundle_1.io_in_a_a", "");
+  dat_table["DelaySuite_SeqReadBundle_1.io_wen"] = new dat_api<1>(&mod_typed->DelaySuite_SeqReadBundle_1__io_wen, "DelaySuite_SeqReadBundle_1.io_wen", "");
+  dat_table["DelaySuite_SeqReadBundle_1.io_waddr"] = new dat_api<4>(&mod_typed->DelaySuite_SeqReadBundle_1__io_waddr, "DelaySuite_SeqReadBundle_1.io_waddr", "");
+  mem_table["DelaySuite_SeqReadBundle_1.mem"] = new mem_api<56, 16>(&mod_typed->DelaySuite_SeqReadBundle_1__mem, "DelaySuite_SeqReadBundle_1.mem", "");
+  dat_table["DelaySuite_SeqReadBundle_1.io_out_a_b_"] = new dat_api<32>(&mod_typed->DelaySuite_SeqReadBundle_1__io_out_a_b_, "DelaySuite_SeqReadBundle_1.io_out_a_b_", "");
 }
