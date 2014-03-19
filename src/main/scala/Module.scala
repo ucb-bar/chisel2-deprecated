@@ -94,6 +94,7 @@ object Module {
   var isBackannotating = false
   var model = ""
   val signals = new ArrayBuffer[Node]
+  val pseudoMuxes = new HashMap[Node, Node]
   /* Jackhammer flags */
   var jackDump: String = null;
   var jackDir: String = null;
@@ -560,25 +561,25 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
                 walked += headmux
                 if (r.pseudoMux == null) {
                   r.pseudoMux = Multiplex(
-                    tailheadmux.inputs(0).getNode, 
-                    tailheadmux.inputs(1).getNode, 
-                    headmux.inputs(1).getNode )
+                    tailheadmux.inputs(0), 
+                    tailheadmux.inputs(1), 
+                    headmux.inputs(1) )
                   r.pseudoMux.component = this
                   r.muxes(tailhead) = r.pseudoMux
+                  Module.pseudoMuxes(headmux) = r.pseudoMux
                 }
-                r.updates.init 
+                r.updates.tail 
               } else {
                 r.muxes(head) = headmux match {
                   case _: Mux => headmux.inputs(1)
                   case _ => headmux
                 }
-                r.updates
+                r.updates.tail
               }
             }
           for (update <- updates.reverse) {
             val mux = r.muxes getOrElse (update, null)
             if (isVisiting(mux)) {
-              mux.component = this
               dfsStack push mux
               walked += mux 
             }
@@ -594,10 +595,17 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             }
           }
         }
-        case _ => for(i <- top.inputs) {
-          if (isVisiting(i)) {
-            dfsStack push i
-            walked += i
+        case _ => {
+          if (!Module.isEmittingComponents && 
+              top.isInstanceOf[Mux] &&
+              top.inputs(2).isInstanceOf[Mux] &&
+              (Module.pseudoMuxes contains top.inputs(2).inputs(2)) )
+            walked += top.inputs(2)
+          for(i <- top.inputs) {
+            if (isVisiting(i)) {
+              dfsStack push i
+              walked += i
+            }
           }
         }
       }

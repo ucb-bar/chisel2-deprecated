@@ -57,7 +57,12 @@ object nodeToString {
         else if (op.op == "Mux") "[%s]?[%s]:[%s]".format(
           name(op.inputs(0).getNode, isRealName, op),
           name(op.inputs(1).getNode, isRealName, op),
-          name(op.inputs(2).getNode, isRealName, op) )
+          op.inputs(2) match {
+            case mux: Mux if (Module.pseudoMuxes contains mux.inputs(2).getNode) =>
+              name(Module.pseudoMuxes(mux.inputs(2).getNode), isRealName, op)
+            case _ =>
+              name(op.inputs(2).getNode, isRealName, op)
+          } )
         else "[%s]%s[%s]".format(
           name(op.inputs(0).getNode, isRealName, op), 
           op.op, 
