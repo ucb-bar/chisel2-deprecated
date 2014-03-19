@@ -551,10 +551,12 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             if (Module.isEmittingComponents) {
               r.updates
             } else {
-              val head = r.updates.head
+              val head = 
+                if (!r.updates.isEmpty) r.updates.head
+                else null
               val headmux = r.muxes getOrElse (head, null)
               val tailhead = 
-                if (!r.updates.init.isEmpty) r.updates.tail.head 
+                if (!r.updates.isEmpty && !r.updates.tail.isEmpty) r.updates.tail.head 
                 else null
               val tailheadmux = r.muxes getOrElse (tailhead, null)
               if (!(tailheadmux == null) && !(headmux == null)) {
@@ -569,19 +571,21 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
                   Module.pseudoMuxes(headmux) = r.pseudoMux
                 }
                 r.updates.tail 
-              } else {
+              } else if (head != null) {
                 r.muxes(head) = headmux match {
                   case _: Mux => headmux.inputs(1)
                   case _ => headmux
                 }
                 r.updates.tail
-              }
+              } else null
             }
-          for (update <- updates.reverse) {
-            val mux = r.muxes getOrElse (update, null)
-            if (isVisiting(mux)) {
-              dfsStack push mux
-              walked += mux 
+          if (updates != null) {
+            for (update <- updates.reverse) {
+              val mux = r.muxes getOrElse (update, null)
+              if (isVisiting(mux)) {
+                dfsStack push mux
+                walked += mux 
+              }
             }
           }
           for ((cond, value) <- r.updates.reverse) {
