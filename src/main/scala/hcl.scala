@@ -247,8 +247,9 @@ trait proc extends Node {
   val updates = new collection.mutable.ListBuffer[(Bool, Node)]
   def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
     val update = others.foldLeft(default){(v, u) => 
-      muxes((u._1, u._2)) = v
-      Multiplex(u._1, u._2, v)
+      val mux = Multiplex(u._1, u._2, v)
+      muxes((u._1, u._2)) = mux.getNode
+      mux
     }
     if (inputs.isEmpty) inputs += update else inputs(0) = update
   }

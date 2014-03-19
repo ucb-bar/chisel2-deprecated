@@ -171,6 +171,7 @@ class Reg extends Delay with proc {
   def update (x: Node) { inputs(0) = x };
   var assigned = false;
   var enable = Bool(true)
+  var pseudoMux: Node = null // Mux for backannotation
 
   def procAssign(src: Node) {
     if (assigned) {
@@ -183,16 +184,10 @@ class Reg extends Delay with proc {
   }
   override def genMuxes(default: Node): Unit = {
     if(!updates.isEmpty && Module.backend.isInstanceOf[VerilogBackend]) {
-      // Pseudo Mux for backannotation
-      val headCond = updates.head._1
-      val headValue = updates.head._2
-      muxes((headCond, headValue)) = default
       // use clock enable to keep old value, rather than muxing in old value
       genMuxes(updates.head._2, updates.toList.tail)
       inputs += enable;
       enableIndex = inputs.length - 1;
-      if (!updates.tail.isEmpty)
-        muxes(updates.tail.head) = Multiplex(headCond, headValue, default)
     } else {
       super.genMuxes(default)
     }

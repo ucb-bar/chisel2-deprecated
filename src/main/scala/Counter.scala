@@ -597,7 +597,7 @@ trait CounterBackend extends Backannotation {
         }
 
         // for debugging
-        // signal setName "signal_%d_%s".format(counterIdx, signal.pName)
+        signal setName "signal_%d_%s".format(counterIdx, signal.pName)
       }
     }
   }  
