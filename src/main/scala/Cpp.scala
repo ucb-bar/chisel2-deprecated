@@ -704,15 +704,6 @@ class CppBackend extends Backend {
     }
   }
 
-  def emitSignals(c: Module) = {
-    (Module.signals foldLeft "") { (res, signal) => 
-      if ((c.omods contains signal) && (signal.chiselName != ""))
-        res + "  signals.push_back(\"" + signal.chiselName + "\");\n"
-      else 
-        res
-    }
-  }
-
   def backendElaborate(c: Module) = super.elaborate(c)
 
   override def elaborate(c: Module): Unit = {
@@ -832,7 +823,6 @@ class CppBackend extends Backend {
     for (clock <- Module.clocks) {
       writeCppFile(emitInit(clock))
     }
-    writeCppFile(emitSignals(c))
     writeCppFile("}\n")
 
     for (m <- c.omods) {
