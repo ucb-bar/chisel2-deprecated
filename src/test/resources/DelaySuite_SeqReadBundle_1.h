@@ -30,6 +30,10 @@ class DelaySuite_SeqReadBundle_1_t : public mod_t {
   void dump ( FILE* f, int t );
 };
 
+class DelaySuite_SeqReadBundle_1_api_t : public mod_api_t {
+  void init_mapping_table();
+};
+
 
 
 #endif
