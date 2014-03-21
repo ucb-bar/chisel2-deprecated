@@ -15,13 +15,7 @@ class QueueFame1[T <: Data] (val entries: Int)(data: => T) extends Module
   val io = new Bundle{
     val deq = new ioQueueFame1(data)
     val enq = new ioQueueFame1(data).flip()
-    val tracker_reg0 = UInt(OUTPUT, log2Up(entries))
-      val tracker_reg1 = UInt(OUTPUT, log2Up(entries))
-      val tracker_reg2 = UInt(OUTPUT, log2Up(entries))
-      val tracker_reg3 = UInt(OUTPUT, log2Up(entries))
   }
-  val was_reset = Reg(init = Bool(true))
-  was_reset := Bool(false)
   
   val target_queue = Module(new Queue(data, entries))
   val tracker = Module(new Fame1QueueTracker(entries, entries))
@@ -39,19 +33,10 @@ class QueueFame1[T <: Data] (val entries: Int)(data: => T) extends Module
   tracker.io.consume := io.deq.host_valid && io.deq.host_ready
   tracker.io.tgt_enq := target_queue.io.enq.valid && target_queue.io.enq.ready
   tracker.io.tgt_deq := io.deq.target.valid && target_queue.io.deq.ready
-  when(was_reset){
-    tracker.io.produce := Bool(true)
-    tracker.io.consume := Bool(false)
-    tracker.io.tgt_enq := Bool(false)
-  }
+
   io.enq.host_ready := !tracker.io.full && target_queue.io.enq.ready 
   io.deq.host_valid := !tracker.io.empty
   
-  //debug
-  io.tracker_reg0 := tracker.io.reg0
-  io.tracker_reg1 := tracker.io.reg1
-  io.tracker_reg2 := tracker.io.reg2
-  io.tracker_reg3 := tracker.io.reg3
 }
 
 class ioFame1QueueTracker() extends Bundle{
@@ -63,21 +48,12 @@ class ioFame1QueueTracker() extends Bundle{
   val empty = Bool(OUTPUT)
   val full = Bool(OUTPUT)
   val entry_avail = Bool(OUTPUT)
-  val reg0 = UInt(OUTPUT)
-  val reg1 = UInt(OUTPUT)
-  val reg2 = UInt(OUTPUT)
-  val reg3 = UInt(OUTPUT)
 }
 
 class Fame1QueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Module{
   val io = new ioFame1QueueTracker()
   val aregs = Vec.fill(num_tgt_cycles){ Reg(init = UInt(0, width = log2Up(num_tgt_entries))) }
   val tail_pointer = Reg(init = UInt(1, width = log2Up(num_tgt_cycles)))
-  //debug
-  io.reg0 := aregs(0)
-  io.reg1 := aregs(1)
-  io.reg2 := aregs(2)
-  io.reg3 := aregs(3)
   
   val next_tail_pointer = UInt()
   tail_pointer := next_tail_pointer
@@ -453,3 +429,4 @@ trait Fame1Transform extends Backend {
 
 class Fame1CppBackend extends CppBackend with Fame1Transform
 class Fame1VerilogBackend extends VerilogBackend with Fame1Transform
+class Fame1FPGABackend extends FPGABackend with Fame1Transform
