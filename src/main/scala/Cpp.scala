@@ -575,23 +575,27 @@ class CppBackend extends Backend {
       }
       harness.write("}\n\n");
     }
-    harness.write("int main (int argc, char* argv[]) {\n");
-    harness.write("  " + name + "_t* c = new " + name + "_t();\n");
-    harness.write("  c->init();\n");
+    harness.write(s"""int main (int argc, char* argv[]) {\n""");
+    harness.write(s"""  ${name}_t* module = new ${name}_t();\n""");
+    harness.write(s"""  module->init();\n""");
+    harness.write(s"""  ${name}_api_t* api = new ${name}_api_t();\n""");
+    harness.write(s"""  api->init(module);\n""");
     if (Module.isVCD) {
-      harness.write("  FILE *f = fopen(\"" + name + ".vcd\", \"w\");\n");
+      harness.write(s"""  FILE *f = fopen("${name}.vcd", "w");\n""");
     } else {
-      harness.write("  FILE *f = NULL;\n");
+      harness.write(s"""  FILE *f = NULL;\n""");
     }
     if (Module.dumpTestInput) {
-      harness.write("  FILE *tee = fopen(\"" + name + ".stdin\", \"w\");\n");
+      harness.write(s"""  FILE *tee = fopen("${name}.stdin", "w");\n""");
     } else {
-      harness.write("  FILE *tee = NULL;");
+      harness.write(s"""  FILE *tee = NULL;""");
     }
-    harness.write("  c->read_eval_print(f, tee);\n");
-    harness.write("  fclose(f);\n");
-    harness.write("  fclose(tee);\n");
-    harness.write("}\n");
+    harness.write(s"""  module->set_dumpfile(f);\n""");
+    harness.write(s"""  api->set_teefile(tee);\n""");
+    harness.write(s"""  api->read_eval_print_loop();\n""");
+    harness.write(s"""  fclose(f);\n""");
+    harness.write(s"""  fclose(tee);\n""");
+    harness.write(s"""}\n""");
     harness.close();
   }
 
@@ -647,7 +651,7 @@ class CppBackend extends Backend {
     res
   }
 
-  /** Insures each node such that it has a unique name accross the whole
+  /** Ensures each node such that it has a unique name accross the whole
     hierarchy by prefixing its name by a component path (except for "reset"
     and all nodes in *c*). */
   def renameNodes(c: Module, nodes: Seq[Node]) {
@@ -665,6 +669,10 @@ class CppBackend extends Backend {
     }
   }
 
+  /**
+   * Takes a list of nodes and returns a list of tuples with the names attached.
+   * Used to preserve original node names before the rename process.
+   */
   def generateNodeMapping(nodes: Seq[Node]): ArrayBuffer[Tuple2[String, Node]] = {
     val mappings = new ArrayBuffer[Tuple2[String, Node]]
     for (m <- nodes) {
@@ -684,15 +692,15 @@ class CppBackend extends Backend {
       case x: Literal =>
         ""
       case x: Reg =>
-        "  nodes[\"" + name + "\"] = &" + emitRef(node) + ";\n"
+        s"""  dat_table["${name}"] = new dat_api<${node.width}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
       case m: Mem[_] =>
-        "  mems[\"" + name + "\"] = &" + emitRef(node) + ";\n"
+        s"""  mem_table["${name}"] = new mem_api<${m.width}, ${m.n}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
       case r: ROMData =>
-        "  mems[\"" + name + "\"] = &" + emitRef(node) + ";\n"
+        s"""  mem_table["${name}"] = new mem_api<${r.width}, ${r.lits.length}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
       case c: Clock =>
-        "  nodes[\"" + name + "\"] = &" + emitRef(node) + ";\n"
+        s"""  dat_table["${name}"] = new dat_api<${node.width}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
       case _ =>
-        "  nodes[\"" + name + "\"] = &" + emitRef(node) + ";\n"
+        s"""  dat_table["${name}"] = new dat_api<${node.width}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
     }
   }
 
@@ -743,9 +751,13 @@ class CppBackend extends Backend {
       out_p.write(Params.toDotpStringParams);
       out_p.close();
     }
+    
+    // Generate header file
     out_h.write("#ifndef __" + c.name + "__\n");
     out_h.write("#define __" + c.name + "__\n\n");
     out_h.write("#include \"emulator.h\"\n\n");
+    
+    // Generate module headers
     out_h.write("class " + c.name + "_t : public mod_t {\n");
     out_h.write(" public:\n");
     val vcd = new VcdBackend()
@@ -776,9 +788,16 @@ class CppBackend extends Backend {
     out_h.write("  void dump ( FILE* f, int t );\n");
     out_h.write("};\n\n");
     out_h.write(Params.toCxxStringParams);
+    
+    // Generate API headers
+    out_h.write(s"class ${c.name}_api_t : public mod_api_t {\n");
+    out_h.write(s"  void init_mapping_table();\n");
+    out_h.write(s"};\n\n");
+    
     out_h.write("\n\n#endif\n");
     out_h.close();
 
+    // Generate CPP files
     val out_cpps = ArrayBuffer[java.io.FileWriter]()
     val all_cpp = new StringBuilder
     def createCppFile(suffix: String = "-" + out_cpps.length) = {
@@ -795,18 +814,14 @@ class CppBackend extends Backend {
     }
 
     createCppFile()
+    
+    // generate init block
     writeCppFile("void " + c.name + "_t::init ( bool rand_init ) {\n")
     for (m <- c.omods) {
       writeCppFile(emitInit(m))
     }
-    for (clock <- Module.clocks)
+    for (clock <- Module.clocks) {
       writeCppFile(emitInit(clock))
-    writeCppFile("  nodes.clear();\n")
-    writeCppFile("  mems.clear();\n")
-    for (m <- mappings) {
-      if (m._2.name != "reset" && (m._2.isInObject || m._2.isInVCD)) {
-        writeCppFile(emitMapping(m))
-      }
     }
     writeCppFile("}\n")
 
@@ -830,6 +845,7 @@ class CppBackend extends Backend {
       clkDomains(clk)._2.append("}\n")
     }
 
+    // generate clock(...) function
     writeCppFile("int " + c.name + "_t::clock ( dat_t<1> reset ) {\n")
     writeCppFile("  uint32_t min = ((uint32_t)1<<31)-1;\n")
     for (clock <- Module.clocks) {
@@ -851,6 +867,7 @@ class CppBackend extends Backend {
     writeCppFile("  return min;\n")
     writeCppFile("}\n")
 
+    // geenrate print(...) function
     writeCppFile("void " + c.name + "_t::print ( FILE* f ) {\n")
     for (cc <- Module.components; p <- cc.printfs) {
       hasPrintfs = true
@@ -873,20 +890,41 @@ class CppBackend extends Backend {
       writeCppFile(out.result)
     }
 
+    // Generate API functions
+    createCppFile()
+    writeCppFile(s"void ${c.name}_api_t::init_mapping_table() {\n");
+    writeCppFile(s"  dat_table.clear();\n")
+    writeCppFile(s"  mem_table.clear();\n")
+    writeCppFile(s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(module);\n")
+    writeCppFile(s"  assert(mod_typed);\n")
+    for (m <- mappings) {
+      if (m._2.name != "reset" && (m._2.isInObject || m._2.isInVCD)) {
+        writeCppFile(emitMapping(m))
+      }
+    }
+    writeCppFile(s"}\n");
+    
     createCppFile("")
     writeCppFile(all_cpp.result)
     out_cpps.foreach(_.close)
 
-    /* Copy the emulator.h file into the targetDirectory. */
-    val resourceStream = getClass().getResourceAsStream("/emulator.h")
-    if( resourceStream != null ) {
-      val classFile = createOutputFile("emulator.h")
-      while(resourceStream.available > 0) {
-        classFile.write(resourceStream.read())
-      }
-      classFile.close()
-      resourceStream.close()
+    def copyToTarget(filename: String) = {
+	  val resourceStream = getClass().getResourceAsStream("/" + filename)
+	  if( resourceStream != null ) {
+	    val classFile = createOutputFile(filename)
+	    while(resourceStream.available > 0) {
+	      classFile.write(resourceStream.read())
+	    }
+	    classFile.close()
+	    resourceStream.close()
+	  } else {
+		println(s"WARNING: Unable to copy '$filename'" )
+	  }
     }
+    /* Copy the emulator headers into the targetDirectory. */
+    copyToTarget("emulator_mod.h")
+    copyToTarget("emulator_api.h")
+    copyToTarget("emulator.h")
   }
 
 }

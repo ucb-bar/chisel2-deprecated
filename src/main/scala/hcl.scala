@@ -182,7 +182,7 @@ object chiselMain {
   def run[T <: Module] (args: Array[String], gen: () => T): T = apply(args, () => Module(gen())) // hack to avoid supplying default parameters and invoke Module.apply manually for invocation in sbt
 
   def apply[T <: Module]
-      (args: Array[String], gen: () => T, ftester: T => Tester[T] = null) = {
+      (args: Array[String], gen: () => T, ftester: T => Tester[T] = null): T = {
     Module.initChisel();
     readArgs(args)
 
@@ -206,7 +206,7 @@ object chiselMain {
           tester = ftester(c)
         } finally {
           if (tester != null && tester.process != null) 
-            res = tester.endTesting()
+            res = tester.finish()
         }
         println(if (res) "PASSED" else "*** FAILED ***")
         if(!res) throwException("Module under test FAILED at least one test vector.")

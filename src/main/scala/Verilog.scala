@@ -59,7 +59,8 @@ object VerilogBackend {
     "specparam", "strength", "strong0", "strong1", "supply0", "supply1",
     "table", "task", "time", "tran", "tranif0", "tranif1", "tri", "tri0",
     "tri1", "triand", "trior", "trireg", "unsigned", "vectored", "wait",
-    "wand", "weak0", "weak1", "while", "wire", "wor", "xnor", "xor")
+    "wand", "weak0", "weak1", "while", "wire", "wor", "xnor", "xor",
+    "SYNTHESIS", "PRINTF_COND", "RANDOM_SEED")
 
   var traversalIndex = 0
 }
@@ -575,16 +576,30 @@ class VerilogBackend extends Backend {
   def emitDecs(c: Module): StringBuilder =
     c.mods.map(emitDec(_)).addString(new StringBuilder)
 
+  private var randomIsSeeded = false
   def emitInits(c: Module): StringBuilder = {
     val sb = new StringBuilder
-    sb append "`ifndef SYNTHESIS\n"
-    if (c.mods.exists(_.isInstanceOf[Mem[_]]))
-      sb append "  integer initvar;\n"
-    sb append "  initial begin\n"
     c.mods.map(emitInit(_)).addString(sb)
-    sb append "  end\n"
-    sb append "`endif\n"
-    sb
+
+    val res = new StringBuilder
+    if (!sb.isEmpty) {
+      res append "`ifndef SYNTHESIS\n"
+      res append "  integer initvar;\n"
+      res append "  initial begin\n"
+      if (!randomIsSeeded) {
+        randomIsSeeded = true
+        res append "    #0.001;\n"
+        res append "`ifdef RANDOM_SEED\n"
+        res append "    initvar = $random(`RANDOM_SEED);\n"
+        res append "`endif\n"
+        res append "    #0.001;\n"
+      } else
+        res append "    #0.002;\n"
+      res append sb
+      res append "  end\n"
+      res append "`endif\n"
+    }
+    res
   }
 
   def emitModuleText(c: Module): String = {
