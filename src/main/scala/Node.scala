@@ -141,6 +141,7 @@ abstract class Node extends nameable {
   var CppVertex: CppVertex = null
   var counter: Bits = null
   var shadow: Bits = null
+  var cntrIdx = -1
 
   Module.nodes += this
 
