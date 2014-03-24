@@ -1,24 +1,21 @@
 package Chisel
 
-// import GraphTrace._
 import ChiselError._
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashSet
-import scala.collection.mutable.LinkedHashSet
 import scala.collection.mutable.HashMap
-import scala.collection.mutable.Stack
 import scala.io.Source
-import scala.sys.process._
-import scala.util.Random
 
 object nodeToString {
   def name(node: Node, isRealName: Boolean, consumer: Node = null): String = {
     def getName(node: Node) = {
-      if (node.isLit) node.name
-      else if (!isRealName) node.pName
-      else if (node.name != "") node.name
-      else Module.backend.emitRef(node)
+      node match {
+        case _: Literal => node.name
+        case _ =>
+          if (!isRealName) node.pName
+          else if (node.name != "") node.name
+          else Module.backend.emitRef(node)
+      }
     }
 
     node match {
@@ -157,9 +154,8 @@ trait Backannotation extends Backend {
   def checkBackannotation(c: Module) {
     ChiselError.info("[Backannotation] check backannotation")
     try {
-      val lines = Source.fromFile("%s.trace".format(targetdir + c.pName)).getLines.toArray
-      val traversal = new LinkedHashSet[String]
-      
+      val lines = Source.fromFile("%s.trace".format(targetdir + c.pName)).getLines.toSet
+      var ok = true 
       for (m <- Module.sortedComps) {
         m dfs { node =>
           node match {
@@ -168,20 +164,15 @@ trait Backannotation extends Backend {
             case _: Binding =>
             case _: Literal =>
             case _ => if (!node.isTypeNode) {
-              traversal += getSignalPathName(node) + ":" + nodeToString(node)
+              val l = getSignalPathName(node) + ":" + nodeToString(node)
+              val contains = lines contains l
+              if (!contains) 
+                ChiselError.warning(
+                  "[Backannotation] %s does not appear in the trace".format(l)
+                )
+              ok &= contains
             }
           }
-        }
-      }
-
-      var ok = true
-
-      if (ok) {
-        for (line <- lines) {
-          val contains = traversal contains line
-          if (!contains)
-            ChiselError.warning("[Backannotation] %s does not appear in this graph".format(line))
-          ok &= contains
         }
       }
 
@@ -190,7 +181,7 @@ trait Backannotation extends Backend {
       } 
     } catch {
       case ex: java.io.FileNotFoundException => 
-        ChiselError.warning("[Backannotation] no trace file (%s.trace), ".format(Module.targetDir + c.pName) + 
+        ChiselError.warning("[Backannotation] no trace file (%s.trace), ".format(targetdir + c.pName) + 
                             "no backannotation verification")
     } 
   }

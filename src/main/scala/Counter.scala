@@ -1,11 +1,8 @@
 package Chisel
 
-import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
-import scala.collection.mutable.HashSet
 import scala.collection.mutable.Stack
 import scala.math.pow
-import scala.io.Source
 
 trait CounterBackend extends Backend {
   val fires = new HashMap[Module, Bool]
