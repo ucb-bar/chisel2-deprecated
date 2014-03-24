@@ -15,7 +15,8 @@ import scala.util.Random
 object nodeToString {
   def name(node: Node, isRealName: Boolean, consumer: Node = null): String = {
     def getName(node: Node) = {
-      if (!isRealName) node.pName
+      if (node.isLit) node.name
+      else if (!isRealName) node.pName
       else if (node.name != "") node.name
       else Module.backend.emitRef(node)
     }
@@ -117,7 +118,19 @@ object nodeToString {
         name(memacc.mem, isRealName), nodeToString(memacc.addr, isRealName))
       case romread: ROMRead => "%s[%s]".format(
         name(romread.rom, isRealName), nodeToString(romread.addr, isRealName))
-      // case clk   : Clock     => "Clock(%s)".format(clk.pName)
+      case romdata: ROMData => {
+        if (!romdata.lits.isEmpty) {
+          val head = romdata.lits.head
+          val tail = romdata.lits.tail
+          (tail foldLeft ("Vec(%s){%s".format(
+              name(romdata, isRealName),
+              name(head.getNode, isRealName)))) { 
+                (res, node) => res + "," + name(node.getNode, isRealName)
+              } + "}"
+        } else {
+          "ROMData(%s)".format(name(romdata, isRealName))
+        }
+      }
       case _ => if (node == null) "" else node.toString
     }      
   }
@@ -127,7 +140,7 @@ trait Backannotation extends Backend {
   Module.isBackannotating = true
 
   lazy val targetdir = ensureDir(Module.targetDir)
-  protected def copyResource(filename: String, toDir: String) {
+  def copyResource(filename: String, toDir: String) {
     val resourceStream = getClass getResourceAsStream "/" + filename //Todo: understand it (Java?)
     if (resourceStream != null) {
       val file =  new java.io.FileWriter(toDir+filename)
@@ -182,5 +195,70 @@ trait Backannotation extends Backend {
     } 
   }
 
+  override def backannotationTransforms {
+    super.backannotationTransforms
+    transforms += { c => checkBackannotation(c) }
+  }
+
   override def backannotationAnalyses { }
+}
+
+trait CounterBackannotation extends Backannotation {
+  val crosses = new ArrayBuffer[(Double, Array[Node])]
+
+  private def annotateSignals(c: Module) {
+    ChiselError.info("[Backannotation] annotate signals")
+
+    try {
+      // Read the signal list file
+      val lines = Source.fromFile(Module.model).getLines
+      val TermRegex = """\s*([\w\._\:]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)""".r
+      val signalNames = new HashSet[String]
+      val signalNameMap = new HashMap[String, Node]
+      val coeffs = new HashSet[(Double, Array[String])]
+
+      for (line <- lines) {
+        line match {
+          case TermRegex(exp, coeff, se, tstat, pvalue) => {
+            val vars = exp split ":"
+            if (tstat != "NaN" && pvalue != "NaN") {
+              signalNames ++= vars
+              coeffs += ((coeff.toDouble, vars))
+            }
+          }
+          case _ =>
+        }
+      }
+
+      // Find correspoinding nodes
+      for (m <- Module.sortedComps ; if m != c) {
+        for (node <- m.nodes) {
+          val signalName = getSignalPathName(node, ".")
+          if (signalNames contains signalName){
+            m.counter(node)
+            m.debug(node)
+            signalNameMap(signalName) = node
+          }
+        }
+        for ((reset, pin) <- m.resets) {
+          val resetPinName = getSignalPathName(pin, ".")
+          if (signalNames contains resetPinName) {
+            m.counter(pin)
+            m.debug(pin)
+            signalNameMap(resetPinName) = pin
+          }
+        }
+      }
+   
+      for ((coeff, vars) <- coeffs) {
+        val cross = vars map { x => signalNameMap getOrElse (x, null) }
+        if (!(cross contains null)) {
+          crosses += ((coeff, cross))
+        }
+      } 
+    } catch {
+      case ex: java.io.FileNotFoundException => 
+        ChiselError.warning("[Backannotation] no signal file, no backannotation")
+    }
+  }
 }

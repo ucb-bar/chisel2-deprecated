@@ -8,8 +8,6 @@ import scala.math.pow
 import scala.io.Source
 
 trait CounterBackend extends Backend {
-  val crosses = new ArrayBuffer[(Double, Array[Node])]
-
   val fires = new HashMap[Module, Bool]
   val daisyIns = new HashMap[Module, UInt]
   val daisyOuts = new HashMap[Module, DecoupledIO[UInt]]
@@ -24,10 +22,6 @@ trait CounterBackend extends Backend {
     super.backannotationTransforms
 
     transforms += ((c: Module) => c bfs (_.addConsumers))
-
-    if (Module.isBackannotating) {
-      transforms += ((c: Module) => annotateSignals(c))
-    }
 
     transforms += ((c: Module) => decoupleTarget(c))
     transforms += ((c: Module) => connectDaisyPins(c))
@@ -104,62 +98,6 @@ trait CounterBackend extends Backend {
     for (consumer <- input.consumers) {
       val idx = consumer.inputs indexOf input
       consumer.inputs(idx) = via
-    }
-  }
-
-  private def annotateSignals(c: Module) {
-    ChiselError.info("[Backannotation] annotate signals")
-
-    try {
-      // Read the signal list file
-      val lines = Source.fromFile(Module.model).getLines
-      val TermRegex = """\s*([\w\._\:]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)""".r
-      val signalNames = new HashSet[String]
-      val signalNameMap = new HashMap[String, Node]
-      val coeffs = new HashSet[(Double, Array[String])]
-
-      for (line <- lines) {
-        line match {
-          case TermRegex(exp, coeff, se, tstat, pvalue) => {
-            val vars = exp split ":"
-            if (tstat != "NaN" && pvalue != "NaN") {
-              signalNames ++= vars
-              coeffs += ((coeff.toDouble, vars))
-            }
-          }
-          case _ =>
-        }
-      }
-
-      // Find correspoinding nodes
-      for (m <- Module.sortedComps ; if m != c) {
-        for (node <- m.nodes) {
-          val signalName = getSignalPathName(node, ".")
-          if (signalNames contains signalName){
-            m.counter(node)
-            m.debug(node)
-            signalNameMap(signalName) = node
-          }
-        }
-        for ((reset, pin) <- m.resets) {
-          val resetPinName = getSignalPathName(pin, ".")
-          if (signalNames contains resetPinName) {
-            m.counter(pin)
-            m.debug(pin)
-            signalNameMap(resetPinName) = pin
-          }
-        }
-      }
-   
-      for ((coeff, vars) <- coeffs) {
-        val cross = vars map { x => signalNameMap getOrElse (x, null) }
-        if (!(cross contains null)) {
-          crosses += ((coeff, cross))
-        }
-      } 
-    } catch {
-      case ex: java.io.FileNotFoundException => 
-        ChiselError.warning("[Backannotation] no signal file, no backannotation")
     }
   }
 

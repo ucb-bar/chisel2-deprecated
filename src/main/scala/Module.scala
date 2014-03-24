@@ -537,6 +537,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         // for VerilogBackend and CppBackend
         // We want the same graph traversal
         // for two cases
+        /*
         case r: Reg => {
           val init = if (r.isReset) r.init else null
           val enable = r.enable
@@ -601,13 +602,15 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
               walked += cond
             }
           }
-        }
+        }*/
         case _ => {
+          /*
           if (!Module.isEmittingComponents && 
               top.isInstanceOf[Mux] &&
               top.inputs(2).isInstanceOf[Mux] &&
               (Module.pseudoMuxes contains top.inputs(2).inputs(2)) )
             walked += top.inputs(2)
+          */
           for(i <- top.inputs) {
             if (isVisiting(i)) {
               dfsStack push i
