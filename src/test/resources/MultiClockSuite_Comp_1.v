@@ -5,6 +5,18 @@ module MultiClockSuite_ClockedSubComp_1(input T0,
 
   reg[0:0] stored;
 
+`ifndef SYNTHESIS
+  integer initvar;
+  initial begin
+    #0.001;
+`ifdef RANDOM_SEED
+    initvar = $random(`RANDOM_SEED);
+`endif
+    #0.001;
+    stored = {1{$random}};
+  end
+`endif
+
   assign io_valid = stored;
 
   always @(posedge T0) begin
@@ -20,6 +32,7 @@ module MultiClockSuite_Comp_1(input T0,
 
   wire T0;
   wire sub_io_valid;
+
 
   assign T0 = io_data0 & io_data1;
   assign io_result = sub_io_valid;

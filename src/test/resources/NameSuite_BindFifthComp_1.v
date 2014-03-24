@@ -15,6 +15,18 @@ module NameSuite_Block_2(input clk,
   wire[31:0] T3;
   wire T4;
 
+`ifndef SYNTHESIS
+  integer initvar;
+  initial begin
+    #0.001;
+`ifdef RANDOM_SEED
+    initvar = $random(`RANDOM_SEED);
+`endif
+    #0.001;
+    tag_ram_1 = {1{$random}};
+    tag_ram_0 = {1{$random}};
+  end
+`endif
   assign io_out_resp_bits_ppn = T0;
   assign T0 = T3 | T1;
   assign T1 = T2 ? tag_ram_1 : 32'h0;

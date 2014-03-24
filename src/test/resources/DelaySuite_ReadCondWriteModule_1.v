@@ -19,6 +19,19 @@ module DelaySuite_ReadCondWriteModule_1(input clk,
   wire[2:0] T11;
   wire[2:0] T12;
 
+`ifndef SYNTHESIS
+  integer initvar;
+  initial begin
+    #0.001;
+`ifdef RANDOM_SEED
+    initvar = $random(`RANDOM_SEED);
+`endif
+    #0.001;
+    for (initvar = 0; initvar < 8; initvar = initvar+1)
+      mem[initvar] = {1{$random}};
+  end
+`endif
+
   assign io_out = T0;
   assign T0 = mem[T12];
   assign T2 = T3;

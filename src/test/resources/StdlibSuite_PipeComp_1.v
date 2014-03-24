@@ -10,6 +10,21 @@ module StdlibSuite_PipeComp_1(input clk, input reset,
   reg[7:0] R2;
   reg[0:0] R3;
 
+`ifndef SYNTHESIS
+  integer initvar;
+  initial begin
+    #0.001;
+`ifdef RANDOM_SEED
+    initvar = $random(`RANDOM_SEED);
+`endif
+    #0.001;
+    R0 = {1{$random}};
+    R1 = {1{$random}};
+    R2 = {1{$random}};
+    R3 = {1{$random}};
+  end
+`endif
+
   assign io_deq_bits = R0;
   assign io_deq_valid = R3;
 

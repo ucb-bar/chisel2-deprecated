@@ -8,20 +8,20 @@ import Chisel._
 class TestSuite extends AssertionsForJUnit {
 
   val dir = new File("test-outputs")
-
+  val blankLines_re = """(?m)^\s*$[\r\n]+""".r
   @Before def initialize() {
     dir.mkdir
   }
 
   def assertFile( filename: String ) {
     val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
-    val content = reffile.mkString
+    val refstring = reffile.mkString
     reffile.close()
-    val source = scala.io.Source.fromFile(
+    val testfile = scala.io.Source.fromFile(
       dir.getPath + "/" + filename, "utf-8")
-    val lines = source.mkString
-    source.close()
-    assert(lines === content)
+    val teststring = testfile.mkString
+    testfile.close()
+    assert(blankLines_re.replaceAllIn(teststring, "") === blankLines_re.replaceAllIn(refstring, ""))
   }
 
   def launchTester[M <: Module : ClassTag, T <: Tester[M]](b: String, t: M => T) {

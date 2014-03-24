@@ -14,6 +14,18 @@ module NameSuite_VecComp_1(input clk,
   wire[7:0] rdata;
   wire[7:0] elts_0;
 
+`ifndef SYNTHESIS
+  integer initvar;
+  initial begin
+    #0.001;
+`ifdef RANDOM_SEED
+    initvar = $random(`RANDOM_SEED);
+`endif
+    #0.001;
+    reg_status_im = {1{$random}};
+    host_pcr_bits_data = {2{$random}};
+  end
+`endif
   assign io_status_im = reg_status_im;
   assign T0 = wdata[3'h7:1'h0];
   assign wdata = io_r_en ? io_w_data : host_pcr_bits_data;
