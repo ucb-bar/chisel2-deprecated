@@ -581,7 +581,8 @@ class CppBackend extends Backend {
     harness.write(s"""  ${name}_api_t* api = new ${name}_api_t();\n""");
     harness.write(s"""  api->init(module);\n""");
     if (Module.isVCD) {
-      harness.write(s"""  FILE *f = fopen("${name}.vcd", "w");\n""");
+      val basedir = ensureDir(Module.targetDir)
+      harness.write(s"""  FILE *f = fopen("${basedir}${name}.vcd", "w");\n""");
     } else {
       harness.write(s"""  FILE *f = NULL;\n""");
     }

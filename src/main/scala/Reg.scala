@@ -183,7 +183,8 @@ class Reg extends Delay with proc {
     updates += ((cond, src))
   }
   override def genMuxes(default: Node): Unit = {
-    if(!updates.isEmpty && Module.backend.isInstanceOf[VerilogBackend]) {
+    if(!updates.isEmpty && Module.backend.isInstanceOf[VerilogBackend] && 
+       !Module.isBackannotating) {
       // use clock enable to keep old value, rather than muxing in old value
       genMuxes(updates.head._2, updates.toList.tail)
       inputs += enable;

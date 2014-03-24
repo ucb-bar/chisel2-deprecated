@@ -541,7 +541,8 @@ class VerilogBackend extends Backend {
   def emitReg(node: Node): String = {
     node match {
       case reg: Reg =>
-        if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1)){
+        if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1) &&
+           !Module.isBackannotating){
           if(reg.isReset){
             "    if(" + emitRef(reg.inputs.last) + ") begin\n" +
             "      " + emitRef(reg) + " <= " + emitRef(reg.init) + ";\n" +

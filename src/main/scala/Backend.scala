@@ -585,8 +585,7 @@ abstract class Backend {
       getPseudoPath(n.component, delim) + delim + n.pName
     }
 
-  // Write out graph traversal
-  // to verify backannotation later
+  // Write out graph trace to verify backannotation later
   def writeOutGraph(c: Module) {
     ChiselError.info("[Backannotation] write out graphs")
     val dir = ensureDir(Module.targetDir)
@@ -615,21 +614,21 @@ abstract class Backend {
     }
   }
 
-  def checkBackannotation(c: Module) { }
-
-  def backannotationTransforms { }
+  def backannotationTransforms { 
+    if (Module.isBackannotating) {
+      transforms += { c => setPseudoNames(c) }
+    }
+  }
 
   def backannotationAnalyses {
-    analyses += { c => writeOutGraph(c) }
+    if (Module.isBackannotating) {
+      analyses += { c => writeOutGraph(c) }
+    }
   }
 
   def initBackannotation {
-    if (Module.isBackannotating) {
-      transforms += { c => setPseudoNames(c) }
-      transforms += { c => checkBackannotation(c) }
-      backannotationTransforms
-      backannotationAnalyses
-    }
+    backannotationTransforms
+    backannotationAnalyses
   }
 
   def elaborate(c: Module): Unit = {

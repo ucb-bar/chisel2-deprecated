@@ -62,11 +62,13 @@ object nodeToString {
               name(Module.pseudoMuxes(mux.inputs(2).getNode), isRealName, op)
             case _ =>
               name(op.inputs(2).getNode, isRealName, op)
-          } )
+          } 
+        )
         else "[%s]%s[%s]".format(
           name(op.inputs(0).getNode, isRealName, op), 
           op.op, 
-          name(op.inputs(1).getNode, isRealName, op) )
+          name(op.inputs(1).getNode, isRealName, op) 
+        )
       case ext   : Extract   => 
         val hi: String = name(ext.hi.getNode, isRealName, ext)
         val lo: String = name(ext.lo.getNode, isRealName, ext) 
@@ -103,8 +105,8 @@ object nodeToString {
           (tail foldLeft ("Vec(%s){%s".format(
               name(vec, isRealName),
               name(head.getNode, isRealName)))) { 
-            (res, node) => res + "," + name(node.getNode, isRealName)
-          } + "}"
+                (res, node) => res + "," + name(node.getNode, isRealName)
+              } + "}"
         } else {
           "Vec(%s)".format(name(vec, isRealName))
         }
@@ -139,13 +141,13 @@ trait Backannotation extends Backend {
     }
   }
 
-  override def checkBackannotation(c: Module) {
+  def checkBackannotation(c: Module) {
     ChiselError.info("[Backannotation] check backannotation")
     try {
       val lines = Source.fromFile("%s.trace".format(targetdir + c.pName)).getLines.toArray
       val traversal = new LinkedHashSet[String]
       
-      for (m <- Module.sortedComps ; if !m.isInstanceOf[CounterWrapper]) {
+      for (m <- Module.sortedComps) {
         m dfs { node =>
           node match {
             case _: Assert =>

@@ -395,8 +395,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   def counter(x: Node) {
-    signals += x
-    Module.signals += x
+    x.getNode.component = this
+    signals += x.getNode
+  }
+  def counter(xs: Node*) {
+    xs.foreach(counter _)
   }
 
   def printf(message: String, args: Node*): Unit = {
