@@ -40,29 +40,6 @@ trait CounterBackend extends Backend {
     transforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
   }
 
-  /*
-  override def getPseudoPath(c: Module, delim: String = "/"): String = {
-    if (!(c.parent == null)) {
-      c.parent match {
-        case _: CounterWrapper => extractClassName(c)
-        case _ => getPseudoPath(c.parent, delim) + delim + c.pName
-      }
-    } else ""
-  }
-
-  override def setPseudoNames(c: Module) {
-    c match {
-      case m: CounterWrapper => super.setPseudoNames(m.top)
-    }
-  }
-
-  override def checkBackannotation(c: Module) {
-    c match {
-      case m: CounterWrapper => super.checkBackannotation(m.top)
-    }
-  }
-  */
-
   def emitCounterIdx = {
     counterIdx = counterIdx + 1
     counterIdx
@@ -339,7 +316,7 @@ trait CounterBackend extends Backend {
 
     val stack = new Stack[Module]
 
-    for (m <- Module.components) {
+    for (m <- Module.components ; if !m.signals.isEmpty) {
       val counterEnable = fires(m) || counterCopy(m)
       val shadowEnable = counterCopy(m) || counterRead(m)
 
@@ -425,8 +402,9 @@ trait CounterBackend extends Backend {
   }
 }
 
-class CounterVBackend extends VerilogBackend with CounterBackend
 class CounterCppBackend extends CppBackend with CounterBackend
+class CounterVBackend extends VerilogBackend with CounterBackend
+class CounterFPGABackend extends FPGABackend with CounterBackend
 
 abstract class CounterTester[+T <: Module](c: T) extends Tester(c) {
   val prevPeeks = new HashMap[Node, BigInt]
@@ -440,22 +418,6 @@ abstract class CounterTester[+T <: Module](c: T) extends Tester(c) {
       xor = xor >> 1
     }
     hd
-  }
-
-  val clks = c.io("clks") match {
-    case dio: DecoupledIO[_] => dio
-  }
-  val fire = c.io("fire") match {
-    case bool: Bool => bool
-  }
-  val daisyCtrl = c.io("daisy_ctrl") match {
-    case bits: Bits => bits
-  }
-  val daisyOut = c.io("daisy_out") match {
-    case dio: DecoupledIO[_] => dio
-  }
-  val daisyOutBits = daisyOut.bits match {
-    case bits: Bits => bits
   }
 
   def clock (n: Int) {
@@ -472,6 +434,46 @@ abstract class CounterTester[+T <: Module](c: T) extends Tester(c) {
     }
   }
 
+  def pokeClks (n: Int) {
+    val clks = c.io("clks") match {
+      case dio: DecoupledIO[_] => dio
+    }
+    while(peek(clks.ready) == 0) {
+      clock(1)
+    }
+    pokeBits(clks.bits, n)
+    pokeBits(clks.valid, 1)
+    clock(1)
+    pokeBits(clks.valid, 0)
+  }
+
+  def peekDaisy (i: Int) {
+    val fire = c.io("fire") match {
+      case bool: Bool => bool
+    }
+    val daisyCtrl = c.io("daisy_ctrl") match {
+      case bits: Bits => bits
+    }
+    val daisyOut = c.io("daisy_out") match {
+      case dio: DecoupledIO[_] => dio
+    }
+    do {
+      poke(daisyCtrl, i)
+      poke(daisyOut.ready, 1)
+      clock(1)
+    } while (peek(daisyOut.valid) == 0)
+  }
+
+  def checkDaisy(count: BigInt) {
+    val daisyOut = c.io("daisy_out") match {
+      case dio: DecoupledIO[_] => dio
+    }
+    val daisyOutBits = daisyOut.bits match {
+      case bits: Bits => bits
+    }
+    expect(daisyOutBits, count)
+  }
+
   override def step (n: Int = 1) { 
     println("-------------------------")
     println("| Counter Strcture Step |")
@@ -482,14 +484,7 @@ abstract class CounterTester[+T <: Module](c: T) extends Tester(c) {
     }
 
     // set clock register
-    while(peek(clks.ready) == 0) {
-      clock(1)
-    }
-  
-    pokeBits(clks.bits, n)
-    pokeBits(clks.valid, 1)
-    clock(1)
-    pokeBits(clks.valid, 0)
+    pokeClks(n)
 
     // run the target until it is stalled
     println("*** RUN THE TAREGT / READ SIGNAL VALUES ***")
@@ -511,13 +506,8 @@ abstract class CounterTester[+T <: Module](c: T) extends Tester(c) {
       expect(signal.counter, counts(signal))
     }
 
-    // daisy copy
-    do {
-      println("*** Daisy Copy ***")
-      poke(daisyCtrl, 0)
-      poke(daisyOut.ready, 1)
-      clock(1)
-    } while (peek(fire) == 1)
+    println("*** Daisy Copy ***")
+    peekDaisy(0)
 
     println("--- CURRENT CHAIN ---")
     for (s <- Module.signals) {
@@ -525,13 +515,9 @@ abstract class CounterTester[+T <: Module](c: T) extends Tester(c) {
     }
 
     // daisy read
-    for ((signal, i) <- Module.signals.zipWithIndex) {
-      println("*** Daisy Output ***")
-      do {
-        poke(daisyCtrl, 1)
-        poke(daisyOut.ready, 1)
-        clock(1)
-      } while (peek(fire) == 1)
+    for (signal <- Module.signals) {
+      println("*** Daisy Read ***")
+      peekDaisy(1)
 
       println("--- CURRENT CHAIN ---")
       for (s <- Module.signals) {
@@ -539,7 +525,7 @@ abstract class CounterTester[+T <: Module](c: T) extends Tester(c) {
       }
       println("---------------------")
 
-      expect(daisyOutBits, counts(signal))
+      checkDaisy(counts(signal))
     }
 
     t += n
@@ -551,158 +537,61 @@ abstract class CounterTester[+T <: Module](c: T) extends Tester(c) {
   }
 }
 
-/*
-abstract class CounterTester[+T <: CounterWrapper](c: T, val clks: Int = 1) extends Tester(c) {
-  val prevPeeks = new HashMap[Node, BigInt]
-  val counts = new HashMap[Node, BigInt]
-
-  def calcHD(a: BigInt, b: BigInt) = {
-    var xor = a ^ b
-    var hd: BigInt = 0
-    while (xor > 0) {
-      hd = hd + (xor & 1)
-      xor = xor >> 1
-    }
-    hd
-  }
-
-  def pokeClear {
-    poke(c.io.addr, 0)
-    poke(c.io.in.valid, 0)
-    poke(c.io.in.bits, 0)
-    poke(c.io.out.ready, 0)
-    step(1)
-  }
-
-  def pokeReset {
-    println("------------------------")
-    println("|  Reset: write(31, 0) |")
-    println("------------------------")
-    // write (31, 0)
-    while (peek(c.io.in.ready) == 0) {
-      step(1)
-    }
-    poke(c.io.addr, 31)
-    poke(c.io.in.valid, 1)
-    poke(c.io.in.bits, 0)
-    poke(c.io.out.ready, 0)
-    step(1)
-  }
-
-  def pokeClks {
-    println("------------------------------")
-    println("| Poke clks: write(4, %4d) |".format(clks))
-    println("------------------------------")
-    // write (4, clks)
-    while (peek(c.io.in.ready) == 0) {
-      step(1)
-    }
-    poke(c.io.addr, 4)
-    poke(c.io.in.bits, clks)
-    poke(c.io.in.valid, 1)
-    poke(c.io.out.ready, 0)
-    for (signal <- Module.signals ; if signal.width > 1) {
-      prevPeeks(signal) = peekBits(signal)
-    }
-    step(1)
-  }
-
-  def peekDaisyCopy = {
-    println("--------------------------------")
-    println("| Daisy copy: read(4 | 0 << 4) |")
-    println("--------------------------------")
-    // read (4 | 0 << 4)
-    do {
-      poke(c.io.addr, 4 | 0 << 4)
-      poke(c.io.in.bits, 0)
-      poke(c.io.in.valid, 0)
-      poke(c.io.out.ready, 1)
-      step(1)
-    } while (peek(c.io.out.valid) == 0)
-
-    peek(c.io.out.bits)
-  }
-
-  def peekDaisyRead = {
-    println("--------------------------------")
-    println("| Daisy read: read(4 | 1 << 4) |")
-    println("--------------------------------")
-    // read (4 | 1 << 4)
-    do {
-      poke(c.io.addr, 4 | 1 << 4)
-      poke(c.io.in.bits, 0)
-      poke(c.io.in.valid, 0)
-      poke(c.io.out.ready, 1)
-      step(1)
-    } while (peek(c.io.out.valid) == 0)
-
-    peek(c.io.out.bits)
-  }
-
-  def peekSignals {
-    println("----------------------")
-    println("|    Read signals    |")
-    println("----------------------")
-    step(1)
-    for ((signal, i) <- Module.signals.zipWithIndex) {
-      val curPeek = peekBits(signal)
-      val cntrPeek = peek(signal.counter)
-      if (signal.width == 1) {
-        counts(signal) += curPeek
-      } else {
-        counts(signal) += calcHD(curPeek, prevPeeks(signal))
-        prevPeeks(signal) = curPeek
+trait CounterWrapperBackend extends CounterBackend {
+  override def getPseudoPath(c: Module, delim: String = "/"): String = {
+    if (!(c.parent == null)) {
+      c.parent match {
+        case _: CounterWrapper => extractClassName(c)
+        case _ => getPseudoPath(c.parent, delim) + delim + c.pName
       }
-      println("  counts of counter_%d = %x".format(i, counts(signal)))
+    } else ""
+  }
+
+  override def setPseudoNames(c: Module) {
+    c match {
+      case m: CounterWrapper => super.setPseudoNames(m.top)
     }
   }
 
-  var good = true
-  var cycles = 0
-
-  def loop {
-    for (signal <- Module.signals) {
-      counts(signal) = 0
-    }
-
-    pokeClks
-    pokeClear
-
-    while (peek(c.fire) == 1) {
-      cycles += 1
-      peekSignals
-    }
-    pokeClear
-    pokeClear
-
-    var ready: BigInt = 0
-    var bits: BigInt = 0
-
-    val read = peekDaisyCopy
-    pokeClear
-    pokeClear
-    for (signal <- Module.signals) {
-      peek(signal.shadow)
-    }
-    for ((signal, i) <- Module.signals.zipWithIndex) {
-      val read = peekDaisyRead
-      for (s <- Module.signals) {
-        peek(s.shadow)
+  override def decoupleTarget(c: Module) {
+    c match {
+      case m: CounterWrapper => {
+        super.decoupleTarget(m.top)
+        // write 4 => clks
+        val clks = m.top.io("clks") match {
+          case dio: DecoupledIO[_] => dio
+        }
+        val fire = m.top.io("fire") match {
+          case bool: Bool => bool
+        }
+        wirePin(clks.bits,  m.io.in.bits)
+        wirePin(clks.valid, m.wen(4))
+        wirePin(m.wready(4), clks.ready)
       }
-      good &= expect(read == counts(signal), "Counter" + i)
-      println("out bits: %x\tfrom signal: %x".format(
-               read, counts(signal)))
     }
   }
 
-  // initialization
-  pokeReset
-  for (signal <- Module.signals) {
-    counts(signal) = 0
-    prevPeeks(signal) = 0
+  override def connectDaisyPins(c: Module) {
+    c match {
+      case m: CounterWrapper => {
+        super.connectDaisyPins(m.top)
+        // read 4 => daisy outputs
+        wirePin(m.rdata(4),  daisyOuts(m.top).bits)
+        wirePin(m.rvalid(4), daisyOuts(m.top).valid)
+        wirePin(daisyOuts(m.top).ready, m.ren(4))
+        val daisyCtrlBits = m.io("addr") match {
+          case bits: Bits => 
+            if (m.conf.daisyCtrlWidth == 1) bits(m.conf.addrWidth - 1)
+            else bits(m.conf.addrWidth - 1, m.conf.addrWidth - m.conf.daisyCtrlWidth)
+        }
+        wirePin(daisyCtrls(m.top), daisyCtrlBits)        
+      }
+    }
   }
 }
-*/
+
+class CounterWrapperCppBackend extends CounterCppBackend with CounterWrapperBackend
+class CounterWrapperFPGABackend extends CounterFPGABackend with CounterWrapperBackend
 
 case class CounterConfiguration(
   addrWidth: Int = 5,
@@ -729,23 +618,65 @@ abstract class CounterWrapper(val conf: CounterConfiguration) extends Module {
   val rvalid = Vec.fill(conf.n){Bool()}
   val wready = Vec.fill(conf.n){Bool()}
 
-  val clks = Reg(init = UInt(0))
-  val fire = clks != UInt(0)
-
-  clks.comp setName "clks"
-  fire.getNode setName "fire"
-
-  // debug(fire)
- 
-  io.in.ready := wready(io.addr)
+  io.in.ready  := wready(io.addr)
   io.out.valid := rvalid(io.addr)
-  io.out.bits := rdata(io.addr)
+  io.out.bits  := rdata(io.addr)
+}
 
-  // write(aar = 4) -> clks
-  when(wen(4) && !fire) {
-    clks := io.in.bits
-  }.elsewhen(fire) {
-    clks := clks - UInt(1)
+abstract class CounterFPGATester[+T <: CounterWrapper](c: T) extends CounterTester(c) {
+  def pokeAddr(addr: BigInt, bits: BigInt) {
+    do {
+      poke(c.io.addr, addr)
+      clock(1)
+    } while (peek(c.io.in.ready) == 0)
+
+    poke(c.io.in.bits, bits)
+    poke(c.io.in.valid, 1)
+    clock(1)
+    poke(c.io.in.valid, 0)
   }
-  wready(4) := !fire
+
+  def peekAddr(addr: BigInt) = {
+    do {
+      poke(c.io.addr, addr)
+      poke(c.io.out.ready, 1)
+      clock(1)
+    } while (peek(c.io.out.valid) == 0)
+
+    peek(c.io.out.bits)
+  }
+
+  def expectAddr(addr: BigInt, expected: BigInt) = {
+    do {
+      poke(c.io.addr, addr)
+      poke(c.io.out.ready, 1)
+      clock(1)
+    } while (peek(c.io.out.valid) == 0)
+   
+    expect(c.io.out.bits, expected)
+  }
+
+  override def pokeClks (n: Int) {
+    do {
+      poke(c.io.addr, 4)
+      clock(1)
+    } while (peek(c.io.in.ready) == 0)
+ 
+    pokeBits(c.io.in.bits, n)
+    pokeBits(c.io.in.valid, 1)
+    clock(1)
+    pokeBits(c.io.in.valid, 0)
+  }
+
+  override def peekDaisy (i: Int) {
+    do {
+      pokeBits(c.io.addr, 4 | i << 4)
+      pokeBits(c.io.out.ready, 1)
+      clock(1)
+    } while (peek(c.io.out.valid) == 0)
+  }
+
+  override def checkDaisy(count: BigInt) {
+    expect(c.io.out.bits, count)
+  }
 }
