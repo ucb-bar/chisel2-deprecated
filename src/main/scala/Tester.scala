@@ -371,6 +371,8 @@ class ManualTester[+T <: Module]
   def step(n: Int) = {
     if (isSnapshotting) snapshot()
     val target = t + n
+    val s = emulatorCmd("step " + n)
+    delta += s.toInt
     if (isTrace) println("STEP " + n + " -> " + target)
     if (isSnapshotting) 
       checkForPokes(t+1, target)
