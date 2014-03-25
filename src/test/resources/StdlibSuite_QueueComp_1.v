@@ -31,6 +31,22 @@ module Queue(input clk, input reset,
   wire T12;
   wire full;
 
+`ifndef SYNTHESIS
+  integer initvar;
+  initial begin
+    #0.001;
+`ifdef RANDOM_SEED
+    initvar = $random(`RANDOM_SEED);
+`endif
+    #0.001;
+    for (initvar = 0; initvar < 2; initvar = initvar+1)
+      ram[initvar] = {1{$random}};
+    enq_ptr = {1{$random}};
+    deq_ptr = {1{$random}};
+    maybe_full = {1{$random}};
+  end
+`endif
+
   assign io_deq_bits = T0;
   assign T0 = ram[deq_ptr];
   assign T2 = io_enq_bits;
@@ -86,6 +102,7 @@ module StdlibSuite_QueueComp_1(input clk, input reset,
   wire[7:0] Queue_io_deq_bits;
   wire Queue_io_deq_valid;
   wire Queue_io_enq_ready;
+
 
   assign io_resp_bits = Queue_io_deq_bits;
   assign io_resp_valid = Queue_io_deq_valid;

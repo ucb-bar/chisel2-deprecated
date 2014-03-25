@@ -101,6 +101,18 @@ module StdlibSuite_RRArbiterTest_1(input clk, input reset,
   wire T81;
   wire T82;
 
+`ifndef SYNTHESIS
+  integer initvar;
+  initial begin
+    #0.001;
+`ifdef RANDOM_SEED
+    initvar = $random(`RANDOM_SEED);
+`endif
+    #0.001;
+    R9 = {1{$random}};
+  end
+`endif
+
   assign io_chosen = T0;
   assign T0 = T1;
   assign T1 = T13 ? 2'h1 : T2;
