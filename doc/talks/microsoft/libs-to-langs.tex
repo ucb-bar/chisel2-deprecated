@@ -1,0 +1,31 @@
+\documentclass[xcolor=pdflatex,dvipsnames,table]{beamer}
+% \usepackage{pgfpages}
+% \setbeamertemplate{note page}[plain]
+% \setbeameroption{show notes on second screen=right}
+\usepackage{epsfig,graphicx}
+\usepackage{palatino}
+\usepackage{fancybox}
+\usepackage{relsize}
+\usepackage[procnames]{listings}
+
+\input{../../style/scala.tex}
+\input{../../style/talk.tex}
+
+\title{Chisel @ Microsoft}
+\author{{\Large Jonathan Bachrach} + Huy Vo + Andrew Waterman + \\
+Sebastian Mirolo + John Wawrzynek + Krste Asanovi\'{c} + \\
+many more}
+\date{\today}
+\institute[UC Berkeley]{EECS UC Berkeley}
+
+\begin{document}
+
+\begin{frame}
+\titlepage
+\end{frame}
+\addtocounter{framenumber}{-1}
+
+\input{libs-to-langs-guts.tex}
+
+\end{document}
+ 

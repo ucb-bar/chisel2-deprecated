@@ -1,0 +1,645 @@
+\documentclass[xcolor=pdflatex,dvipsnames,table]{beamer}
+\usepackage{epsfig,graphicx}
+\usepackage{palatino}
+\usepackage{fancybox}
+\usepackage{relsize}
+\usepackage[procnames]{listings}
+
+\input{../../style/scala.tex}
+\input{../../style/talk.tex}
+
+% \def\poster{1}
+
+\title{Chisel: Constructing Hardware In a Scala Embedded Language}
+\author[Jonathan Bachrach et al]{Jonathan Bachrach, Huy Vo, Brian Richards, \\
+Yunsup Lee, Andrew Waterman, Rimas Avizienis, \\
+John Wawrzynek, Krste Asanovic}
+\date{\today}
+\institute[UC Berkeley]{EECS UC Berkeley}
+
+\begin{document}
+
+\begin{frame}
+\titlepage
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{21st Century Architecture Design}
+{\Large\textbf{Harder to get hardware / software efficiency gains}}
+\vskip5mm
+\begin{itemize}
+\item Need massive design-space exploration
+\begin{itemize}
+\item Hardware and software codesign and cotuning
+\end{itemize}
+\item Need meaningful results
+\begin{itemize}
+\item Cycle counts
+\item Cycle time, power and area
+\item Real chips
+\end{itemize}
+\item Traditional architectural simulators, hardware-description
+  languages, and tools are inadequate
+\begin{itemize}
+\item Slow
+\item Inaccurate
+\item Error prone
+\item Difficult to modify and parameterize
+\end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Bottom Line -- Shorten Design Loop}
+{\LARGE\textbf{If you make it}}
+\vskip2mm
+\begin{itemize}
+\item Easier to make design changes
+\begin{itemize}
+\item Fewer lines of design code ( \textbf{>> 3x} )
+\item More reusable code
+\item Parameterize designs
+\end{itemize}
+\item Faster to test results ( \textbf{>> 8x} )
+\begin{itemize}
+\item Fast compilation
+\item Fast simulation
+\item Easy testing
+\item Easy verification
+\end{itemize}
+\end{itemize}
+\vskip0.8cm
+{\LARGE\textbf{Then you can}}
+\begin{itemize}
+\item Explore more design space
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Chisel is ...}
+
+\begin{columns}[c]
+
+\column{0.55\textwidth}
+
+\begin{itemize}
+\item Best of hardware and software design ideas
+\item Embedded within Scala language to leverage mindshare and language design
+\item Algebraic construction and wiring
+\item Hierarchical, object oriented, and functional construction
+\item Abstract data types and interfaces
+\item Bulk connections
+\item Multiple targets
+\begin{itemize}
+\item Simulation and synthesis
+\item Memory IP is target-specific
+\end{itemize}
+\end{itemize}
+
+\column{0.40\textwidth}
+
+\begin{center}
+single source \\
+\includegraphics[width=0.99\textwidth]{./figs/targets.pdf} \\
+multiple targets \\
+\end{center}
+
+\end{columns}
+
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{The Scala Programming Language}
+
+\begin{columns}[c]
+
+\column{0.75\textwidth}
+
+\begin{itemize}
+\item Compiled to JVM
+\begin{itemize}
+\item Good performance
+\item Great Java interoperability
+\item Mature debugging, execution environments
+\end{itemize}
+\item Object Oriented
+\begin{itemize}
+\item Factory Objects, Classes
+\item Traits, overloading etc
+\end{itemize}
+\item Functional
+\begin{itemize}
+\item Higher order functions
+\item Anonymous functions
+\item Currying etc
+\end{itemize}
+\item Extensible
+\begin{itemize}
+\item Domain Specific Languages (DSLs)
+\end{itemize}
+\end{itemize}
+
+\column{0.25\textwidth}
+
+\begin{center}
+\includegraphics[height=0.4\textheight]{../../bootcamp/figs/programming-scala.pdf} \\
+\includegraphics[height=0.4\textheight]{../../bootcamp/figs/programming-in-scala.pdf}
+\end{center}
+
+\end{columns}
+\end{frame}
+
+
+\begin{frame}[fragile]{Primitive Datatypes}
+\begin{itemize}
+\item{Chisel has 4 primitive datatypes}
+\begin{description}
+\item[Bits]  -- raw collection of bits
+\item[Fix]   -- signed fixed-point number
+\item[UFix] -- unsigned fixed-point number
+\item[Bool] -- Boolean value
+\end{description}
+\item Can do arithmetic and logic with these datatypes
+\end{itemize}
+
+\textbf{Example Literal Constructions}
+\begin{scala}
+val sel = Bool(false)
+val a   = UFix(25)
+val b   = Fix(-35)
+\end{scala}
+where \verb+val+ is a Scala keyword used to declare variables whose values won't change
+\end{frame}
+
+\begin{frame}[fragile]{Aggregate Data Types}
+
+\textbf{Bundle}
+
+\begin{itemize}
+\item User-extendable collection of values with named fields
+\item Similar to structs
+\end{itemize}
+
+\begin{footnotesize}
+% \textbf{Bundle Example}
+\begin{scala}
+class MyFloat extends Bundle{
+  val sign        = Bool()
+  val exponent    = UFix(width=8)
+  val significand = UFix(width=23)
+}
+\end{scala}
+\end{footnotesize}
+
+\textbf{Vec}
+
+\begin{itemize}
+\item Create indexable collection of values
+\item Similar to array
+\end{itemize}
+
+\begin{footnotesize}
+% \textbf{Vec Example}
+\begin{scala}
+val myVec = Vec(5){ Fix(width=23) }
+\end{scala}
+\end{footnotesize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Example}
+\begin{columns}
+
+\column{0.45\textwidth}
+
+\begin{footnotesize}
+\begin{scala}
+class GCD extends Component {
+  val io = new Bundle {
+    val a     = UFix(INPUT, 16)
+    val b     = UFix(INPUT, 16)
+    val z     = UFix(OUTPUT, 16)
+    val valid = Bool(OUTPUT) }
+  val x = Reg(resetVal = io.a)
+  val y = Reg(resetVal = io.b)
+  when (x > y) {
+    x := x - y
+  } .otherwise {
+    y := y - x
+  }
+  io.z     := x
+  io.valid := y === UFix(0)
+}
+\end{scala}
+\end{footnotesize}
+
+\column{0.45\textwidth}
+
+\begin{center}
+\includegraphics[width=0.9\textwidth]{../../bootcamp/figs/gcd.pdf} 
+\end{center}
+
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Polymorphism and Parameterization}
+\begin{itemize}
+\item Chisel users can define their own parameterized functions
+\begin{itemize}
+\item Parameterization encourages reusability
+\item Data types can be inferred and propagated
+\end{itemize}
+\end{itemize}
+
+\textbf{Example Shift Register:}
+\begin{scala}
+def delay[T <: Bits](x: T, n: Int): T = 
+  if(n == 0) x else Reg(delay(x, n - 1))
+\end{scala}
+where
+\begin{itemize}
+\item The input \verb+x+ is delayed n cycles
+\item \verb+x+ can by of any type that extends from \verb+Bits+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Abstract Data Types}
+\begin{itemize}
+\item The user can construct new data types
+\begin{itemize}
+\item Allows for compact, readable code
+\end{itemize}
+\item Example: Complex numbers
+\begin{itemize}
+\item Useful for FFT, Correlator, other DSP
+\item Define arithmetic on complex numbers
+\end{itemize}
+\end{itemize}
+
+\begin{footnotesize}
+\begin{scala}
+class Complex(val real: Fix, val imag: Fix) 
+    extends Bundle {
+  def + (b: Complex): Complex = 
+    new Complex(real + b.real, imag + b.imag)
+  ...
+}
+val a = new Complex(Fix(32), Fix(-16))
+val b = new Complex(Fix(-15), Fix(21))
+val c = a + b
+\end{scala}
+\end{footnotesize}
+
+\end{frame}
+
+\begin{frame}[fragile, shrink]
+\frametitle{Functional Composition}
+
+% \begin{itemize}
+% \item natural
+% \item reusable
+% \item composable
+% \end{itemize}
+% \vskip1cm
+
+\begin{Large}
+\begin{columns}
+
+\column{0.45\textwidth}
+\verb+Map(ins, x => x * y)+ \\
+\begin{center}
+\includegraphics[height=0.6\textheight]{../../bootcamp/figs/map.pdf} \\[2cm]
+\end{center}
+
+\column{0.45\textwidth}
+\vskip2mm
+\verb+Chain(n, in, x => f(x))+ \\
+\begin{center}
+\includegraphics[width=0.9\textwidth]{../../bootcamp/figs/chain.pdf} \\
+\end{center}
+
+\verb+Reduce(data, Max)+ \\
+\begin{center}
+\includegraphics[width=0.9\textwidth]{../../bootcamp/figs/reduce.pdf} \\
+\end{center}
+
+
+\end{columns}
+
+\end{Large}
+
+\end{frame}
+
+\begin{frame}[fragile]{Generator}
+\begin{footnotesize}
+\begin{scala}
+class Cache(cache_type:    Int = DIR_MAPPED,
+            associativity: Int = 1,
+            line_size:     Int = 128,
+            cache_depth:   Int = 16,
+            write_policy:  Int = WRITE_THRU
+           ) extends Component {
+  val io = new Bundle() {
+    val cpu = new IoCacheToCPU()
+    val mem = new IoCacheToMem().flip()
+  }
+  val addr_idx_width = log2(cache_depth).toInt
+  val addr_off_width = log2(line_size/32).toInt
+  val addr_tag_width = 32 - addr_idx_width - addr_off_width - 2
+  val log2_assoc     = log2(associativity).toInt
+  ...
+  if (cache_type == DIR_MAPPED)
+    ...
+\end{scala}
+\end{footnotesize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Testing}
+
+\begin{columns}
+\column{0.45\textwidth}
+{\lstset{basicstyle={\tiny\ttfamily}}
+\begin{scala}
+package Tutorial {
+import Chisel._
+import scala.collection.mutable.HashMap
+import scala.util.Random
+
+class Combinational extends Component {
+  val io = new Bundle {
+    val x = UFix(INPUT, 16)
+    val y = UFix(INPUT, 16)
+    val z = UFix(OUTPUT, 16) }
+  io.z := io.x + io.y
+}
+
+class CombinationalTests(c: Combinational) 
+    extends Tester(c, Array(c.io)) {
+  defTests {
+    var allGood = true
+    val vars    = new HashMap[Node, Node]()
+    val rnd     = new Random()
+    val maxInt  = 1 << 16
+    for (i <- 0 until 10) {
+      vars.clear()
+      val x        = rnd.nextInt(maxInt)
+      val y        = rnd.nextInt(maxInt)
+      vars(c.io.x) = UFix(x)
+      vars(c.io.y) = UFix(y)
+      vars(c.io.z) = UFix((x + y)&(maxInt-1))
+      allGood      = step(vars) && allGood
+    }
+    allGood
+  } } }
+\end{scala}
+}
+\column{0.45\textwidth}
+{\lstset{basicstyle={\tiny\ttfamily}}
+\begin{scala}
+class Tester[T <: Component]
+  (val c: T, val testNodes: Array[Node])
+
+def defTests(body: => Boolean)
+
+def step(vars: HashMap[Node, Node]): Boolean
+\end{scala}
+}
+\begin{tiny}
+\begin{itemize}
+\item user subclasses \code{Tester} defining DUT and
+\code{testNodes} and tests in \code{defTests} body
+\item \code{vars} is mapping from \code{testNodes} to literals, called bindings
+\item \code{step} runs test with given bindings, where
+var values for input ports are sent to DUT,
+DUT computes next outputs, and
+DUT sends next outputs to Chisel
+\item finally \code{step} compares received values against var values
+ for output ports and returns false if any comparisons fail
+\end{itemize}
+\end{tiny}
+
+\begin{center}
+\includegraphics[width=0.9\textwidth]{../../tutorial/figs/DUT.pdf}
+\end{center}
+
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Chisel Line Count Breakdown}
+
+\begin{columns}
+
+\column{0.3\textwidth}
+
+\begin{itemize}
+\item \verb+~+5200 lines total
+\item Embeds into Scala well
+\end{itemize}
+
+\column{0.7\textwidth}
+
+\begin{center}
+\includegraphics[width=0.9\textwidth]{figs/linecount.png}
+\end{center}
+
+\end{columns}
+
+\end{frame}
+
+\begin{frame}
+\frametitle {Chisel versus Hand-Coded Verilog}
+
+\begin{itemize}
+\item 3-stage RISCV CPU hand-coded in Verilog
+\item Translated to Chisel
+\item Resulted in 3x reduction in lines of code
+\item Most savings in wiring
+\item Lots more savings to go ...
+% \item Chisel-generated Verilog gives comparable synthesis quality of results
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Related Work}
+
+\begin{itemize}
+\item SystemVerilog
+\begin{itemize}
+\item Lacks general purpose programming and extensibility
+\end{itemize}
+\item Lava
+\begin{itemize}
+\item Elegant but focus on spatial layout
+\end{itemize}
+\item Domain-specific (Bluespec + Esterel + AutoESL)
+\begin{itemize}
+\item Powerful but needs to match task at hand	
+\end{itemize}
+\item Generator language (Genesis2 + SpiralFFT)
+\begin{itemize}
+\item Either inherit poor abstraction qualities of underlying HDL or
+\item Do not provide complete solution
+\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Rocket Microarchitecture}
+\begin{itemize}
+\item 6-stage RISC decoupled integer datapath + 5-stage IEEE FPU + MMU
+  and non-blocking caches
+\item Completely written in Chisel
+\end{itemize}
+\includegraphics[width=\textwidth]{figs/rocket-microarchitecture.pdf}
+
+\end{frame}
+
+\ifx\poster\undefined
+\begin{frame}[fragile]
+\frametitle{Single Source / Multiple Targets}
+
+\begin{center}
+single source \\
+\includegraphics[width=0.95\textwidth]{./figs/targets.pdf} \\
+multiple targets \
+\end{center}
+
+\end{frame}
+\fi
+
+\begin{frame}[fragile]
+\frametitle{Fast Cycle-Accurate Simulation in C++}
+
+\begin{itemize}
+\item Compiles to single class 
+\begin{itemize}
+\item Keep state and top level io in class fields
+\item \verb+clock_lo+ and \verb+clock_hi+ methods
+\end{itemize}
+\item Generates calls to fast multiword library using C++ templates 
+\begin{itemize}
+\item specializing for small word cases
+\item remove branching as much as possible to utilize maximum ILP in processor
+\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Simulator Comparison}
+
+\textbf{Comparison of simulation time when booting Tessellation OS}
+\vskip0.5cm
+
+\begin{footnotesize}
+\begin{tabular}{lrrrrrr}
+\textbf{Simulator} & \textbf{Compile}  & \textbf{Compile} & \textbf{Run}  & \textbf{Run} & \textbf{Total} & \textbf{Total} \\
+& \textbf{Time (s)}  & \textbf{Speedup} & \textbf{Time (s)}  & \textbf{Speedup} & \textbf{Time (s)} & \textbf{Speedup} \\
+\hline
+VCS             &   22 & 1.000 & 5368 & 1.00 & 5390 & 1.00 \\ 
+Chisel C++  & 119 & 0.184 & 575 & 9.33 & 694 & 7.77\\
+Virtex-6 & 3660 & 0.006 & 76 & 70.60 & 3736 & 1.44\\
+\end{tabular}
+\end{footnotesize}
+
+
+\end{frame}
+
+\ifx\poster\undefined
+\begin{frame}
+\frametitle{Simulation Crossover Points}
+
+% \begin{columns}
+% \begin{tabular}{ll}
+% \textbf{Simulation} & \textbf{Worth it if ...} \\
+% \hline
+% Chisel C++ & millions of cycles \\
+% FPGA & billions of cycles \\
+% \end{tabular}
+% 
+% \column{0.55\textwidth}
+
+\begin{center}
+\includegraphics[height=0.8\textheight]{figs/perf.pdf}
+\end{center}
+
+% \end{columns}
+
+\end{frame}
+\fi
+
+\begin{frame}[fragile]
+\frametitle{Data Parallel Processor Tape Out Results}
+
+\begin{center}
+Completely written in Chisel
+\includegraphics[height=0.7\textheight]{figs/ibm45.png}
+
+\begin{footnotesize}
+The data-parallel processor layout results using IBM 45nm SOI 10-metal layer process using memory compiler generated 6T and 8T SRAM blocks.
+\end{footnotesize}
+\end{center}
+
+\end{frame}
+
+\begin{frame}[fragile]{Products}
+
+\begin{itemize}
+\item Open source with BSD license
+\begin{itemize}
+\item \verb+chisel.eecs.berkeley.edu+
+\item complete set of documentation
+\item public alpha now
+\end{itemize}
+\item Library of components
+\begin{itemize}
+\item queues, decoders, encoders, popcount, scoreboards, integer ALUs, LFSR, Booth multiplier, iterative divider, ROMs, RAMs, CAMs, TLB, caches, prefetcher, fixed-priority arbiters, round-robin arbiters, IEEE-754/2008 floating-point units
+\end{itemize}
+\item Set of educational processors including:
+\begin{itemize}
+\item microcoded processor, one-stage, two-stage, and five-stage pipelines, and an out-of-order processor, all with accompanying visualizations.
+\end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\ifx\poster\undefined
+\begin{frame}[fragile]
+\frametitle{Future}
+
+\begin{itemize}
+\item Automated design space exploration
+\item Insertion of activity counters for power monitors
+\item Automatic fault insertion
+\item Faster and more scalable simulation
+\item More generators
+\item More little languages
+\item Compilation to UCLID
+\end{itemize}
+
+\end{frame}
+\fi
+
+\ifx\poster\undefined
+\begin{frame}[fragile]{Come to Poster}
+
+\begin{itemize}
+\item Open source plans
+\item Manual, tutorial, and bootcamp
+\item Chisel workflow
+\item More on testing
+\item Educational processors
+\end{itemize}
+
+\end{frame}
+\fi
+
+
+
+\end{document}
