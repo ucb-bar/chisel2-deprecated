@@ -370,10 +370,6 @@ class ManualTester[+T <: Module]
 
   def step(n: Int) = {
     if (isSnapshotting) snapshot()
-    else {
-      val s = emulatorCmd("step " + n)
-      delta += s.toInt
-    }
     val target = t + n
     val s = emulatorCmd("step " + n)
     delta += s.toInt
