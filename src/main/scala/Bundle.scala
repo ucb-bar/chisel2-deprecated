@@ -161,7 +161,7 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
       name = path
       val prefix = if (name.length > 0) name + "_" else ""
       for ((n, i) <- elements) {
-        i nameIt (prefix + n, isNamingIo)
+        i.nameIt(prefix + n, isNamingIo)
       }
     } else {
       /* We are trying to rename a Bundle that has a fixed name. */

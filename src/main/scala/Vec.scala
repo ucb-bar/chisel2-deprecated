@@ -294,7 +294,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
     this
   }
 
-  override def nameIt (path: String, isNamingIo: Boolean ) {
+  override def nameIt (path: String, isNamingIo: Boolean) {
     if( !named
       && (name.isEmpty
         || (!path.isEmpty && name != path)) ) {

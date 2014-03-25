@@ -183,8 +183,9 @@ object Module {
     clk = UInt(INPUT, 1)
     clk.setName("clk")
 
-    // Backannotation
     isInGetWidth = false
+
+    // Backannotation
     isBackannotating = false
     model = ""
     signals.clear

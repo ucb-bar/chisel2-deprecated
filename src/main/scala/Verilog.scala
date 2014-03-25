@@ -502,8 +502,8 @@ class VerilogBackend extends Backend {
     for (clock <- c.clocks)
       clkDomains(clock).append("  always @(posedge " + emitRef(clock) + ") begin\n")
     for (m <- c.mods) {
-      val clkDomain = clkDomains getOrElse (m.clock, new StringBuilder)
-      if (m.clock != null && clkDomain.size > 0)
+      val clkDomain = clkDomains getOrElse (m.clock, null)
+      if (m.clock != null && clkDomain != null)
         clkDomain.append(emitReg(m))
     }
     for (p <- c.printfs)
