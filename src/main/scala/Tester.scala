@@ -375,6 +375,8 @@ class ManualTester[+T <: Module]
       delta += s.toInt
     }
     val target = t + n
+    val s = emulatorCmd("step " + n)
+    delta += s.toInt
     if (isTrace) println("STEP " + n + " -> " + target)
     if (isSnapshotting) 
       checkForPokes(t+1, target)
