@@ -1,0 +1,198 @@
+\begin{frame}[fragile]{Scala Bindings}
+\begin{scala}
+// constant
+val x = 1
+val (x, y) = (1, 2)
+
+// variable
+var y = 2
+y = 3
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{Scala Collections}
+\begin{scala}
+// Array's
+val tbl = new Array[Int](256)
+tbl(0) = 32
+val y = tbl(0)
+val n = tbl.length
+
+// ArrayBuffer's
+import scala.collection.mutable.ArrayBuffer
+val buf = new ArrayBuffer[Int]()
+buf += 12
+val z = buf(0)
+val l = buf.length
+
+// List's
+val els = List(1, 2, 3)
+val els2 = x :: y :: y :: Nil
+val a :: b :: c :: Nil = els
+val m = els.length
+
+// Tuple's
+val (x, y, z) = (1, 2, 3)
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{Scala Maps and Sets}
+\begin{scala}
+import scala.collection.mutable.HashMap
+
+val vars = new HashMap[String, Int]()
+vars("a") = 1
+vars("b") = 2
+vars.size
+vars.contains("c")
+vars.getOrElse("c", -1)
+vars.keys
+vars.values
+\end{scala}
+
+\begin{scala}
+import scala.collection.mutable.HashSet
+
+val keys = new HashSet[Int]()
+keys += 1
+keys += 5
+keys.size -> 2
+keys.contains(2) -> false
+\end{scala}
+\end{frame}
+
+
+
+\begin{frame}[fragile]{Scala Iteration}
+\begin{scala}
+val tbl = new Array[Int](256)
+
+// loop over all indices
+for (i <- 0 until tbl.length)
+  tbl(i) = i
+
+// loop of each sequence element
+val tbl2 = new ArrayBuffer[Int]
+for (e <- tbl)
+  tbl2 += 2*e
+
+// loop over hashmap key / values
+for ((x, y) <- vars) 
+  println("K " + x + " V " + y)
+\end{scala}
+
+% // create second table with doubled elements
+% val tbl2 = for (i <- 0 until 16) yield tbl(i)*2
+% // nested loop
+% for (i <- 0 until 16; j <- 0 until 16)
+%   tbl(j*16 + i) = i
+
+\end{frame}
+
+\begin{frame}[fragile]{Scala Functions}
+\begin{scala}
+// simple scaling function, e.g., x2(3) => 6
+def x2 (x: Int) = 2 * x
+\end{scala}
+
+\begin{scala}
+// more complicated function with statements
+def f (x: Int, y: Int) = {
+  val xy = x + y;
+  if (x < y) xy else -xy
+}
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{Scala Functional}
+\begin{scala}
+// simple scaling function, e.g., x2(3) => 6
+def x2 (x: Int) = 2 * x
+\end{scala}
+
+\begin{scala}
+// produce list of 2 * elements, e.g., x2list(List(1, 2, 3)) => List(2, 4, 6)
+def x2list (xs: List[Int]) = xs.map(x2)
+\end{scala}
+
+\begin{scala}
+// simple addition function, e.g., add(1, 2) => 3
+def add (x: Int, y: Int) = x + y
+\end{scala}
+
+\begin{scala}
+// sum all elements using pairwise reduction, e.g., sum(List(1, 2, 3)) => 6
+def sum (xs: List[Int]) = xs.foldLeft(0)(add)
+\end{scala}
+\end{frame}
+
+\begin{frame}[fragile]{Scala Object Oriented}
+
+\begin{scala}
+class Blimp(r: Double) {
+  val rad = r
+  println("Another Blimp")
+}
+
+new Blimp(10.0)
+\end{scala}
+
+\begin{scala}
+class Zep(h: Boolean, r: Double) extends Blimp(r) {
+  val isHydrogen = h
+}
+
+new Zep(true, 100.0)
+\end{scala}
+
+\end{frame}
+
+\begin{frame}[fragile]{Scala Singleton Objects}
+
+\begin{itemize}
+\item like Java class methods
+\item for top level methods
+\end{itemize}
+\begin{scala}
+object Blimp {
+  var numBlimps = 0
+  def apply(r: Double) = {
+    numBlimps += 1
+    new Blimp(r)
+  }
+}
+
+Blimp.numBlimps
+Blimp(10.0)
+\end{scala}
+
+\end{frame}
+
+% \begin{frame}[fragile]{Cloning}
+% \begin{itemize}
+% \item shallow copy of object
+% \item user can override method to incorporate parameters
+% \item \verb+this.type+ allows precise return types
+% \end{itemize}
+% \begin{scala}
+% class Blimp(r: Double) {
+%   val rad = r
+%   override def clone(): this.type = new Blimp(r)
+% }
+% 
+% val b1 = new Blimp(10)
+% val b2 = b1.clone()
+% \end{scala}
+% \end{frame}
+% \begin{frame}[fragile]{Scala Console}
+% \begin{scala}
+% > scala
+% scala> 1 + 2
+% => 3
+% scala> def f (x: Int) = 2 * x
+% => (Int) => Int
+% scala> f(4)
+% => 8
+% \end{scala}
+% \end{frame}
+% 
