@@ -94,6 +94,7 @@ object Module {
   var isBackannotating = false
   var model = ""
   val signals = new ArrayBuffer[Node]
+  val signals_shadow = new HashSet[Node]
   val pseudoMuxes = new HashMap[Node, Node]
   /* Jackhammer flags */
   var jackDump: String = null;
@@ -395,9 +396,19 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   def counter(x: Node) {
-    x.getNode.component = this
-    signals += x.getNode
+    x.getNode match {
+      case _: VecLike[_] =>
+      case _: Aggregate =>
+      case _: ROMData =>
+      case _: Literal =>
+      case any if !(signals_shadow contains any) => {
+        signals += any
+        signals_shadow += any
+      }
+      case _ =>
+    }
   }
+
   def counter(xs: Node*) {
     xs.foreach(counter _)
   }
