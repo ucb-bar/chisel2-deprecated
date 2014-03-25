@@ -2,7 +2,6 @@ package Chisel
 
 import scala.collection.mutable.HashMap
 import scala.math.pow
-import scala.io.Source
 
 trait CounterBackend extends Backend {
   val firedPins = new HashMap[Module, Bool]

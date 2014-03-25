@@ -536,98 +536,17 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     val dfsStack = initializeDFS
 
     def isVisiting(node: Node) =
-      !(node == null) && !(walked contains node) && (node.component == this || node.isIo)
+      !(node == null) && !(walked contains node) && 
+      (node.component == this || node.isIo)
 
     while(!dfsStack.isEmpty) {
       val top = dfsStack.pop
       walked += top
       visit(top)
-      top match {
-        // Special caution is needed for registers
-        // because genMuxes works differently
-        // for VerilogBackend and CppBackend
-        // We want the same graph traversal
-        // for two cases
-        /*
-        case r: Reg => {
-          val init = if (r.isReset) r.init else null
-          val enable = r.enable
-
-          if (isVisiting(init)) {
-            dfsStack push init
-            walked += init
-          }
-          if (!enable.isTrue && isVisiting(enable)) {
-            enable.component = this
-            dfsStack push enable
-            walked += enable
-          }
-          val updates = 
-            if (Module.isEmittingComponents) {
-              r.updates
-            } else {
-              val head = 
-                if (!r.updates.isEmpty) r.updates.head
-                else null
-              val headmux = r.muxes getOrElse (head, null)
-              val tailhead = 
-                if (!r.updates.isEmpty && !r.updates.tail.isEmpty) r.updates.tail.head 
-                else null
-              val tailheadmux = r.muxes getOrElse (tailhead, null)
-              if (!(tailheadmux == null) && !(headmux == null)) {
-                walked += headmux
-                if (r.pseudoMux == null) {
-                  r.pseudoMux = Multiplex(
-                    tailheadmux.inputs(0), 
-                    tailheadmux.inputs(1), 
-                    headmux.inputs(1) )
-                  r.pseudoMux.component = this
-                  r.muxes(tailhead) = r.pseudoMux
-                  Module.pseudoMuxes(headmux) = r.pseudoMux
-                }
-                r.updates.tail 
-              } else if (head != null) {
-                r.muxes(head) = headmux match {
-                  case _: Mux => headmux.inputs(1)
-                  case _ => headmux
-                }
-                r.updates.tail
-              } else null
-            }
-          if (updates != null) {
-            for (update <- updates.reverse) {
-              val mux = r.muxes getOrElse (update, null)
-              if (isVisiting(mux)) {
-                dfsStack push mux
-                walked += mux 
-              }
-            }
-          }
-          for ((cond, value) <- r.updates.reverse) {
-            if (isVisiting(value)) {
-              dfsStack push value
-              walked += value
-            }
-            if (isVisiting(cond)) {
-              dfsStack push cond
-              walked += cond
-            }
-          }
-        }*/
-        case _ => {
-          /*
-          if (!Module.isEmittingComponents && 
-              top.isInstanceOf[Mux] &&
-              top.inputs(2).isInstanceOf[Mux] &&
-              (Module.pseudoMuxes contains top.inputs(2).inputs(2)) )
-            walked += top.inputs(2)
-          */
-          for(i <- top.inputs) {
-            if (isVisiting(i)) {
-              dfsStack push i
-              walked += i
-            }
-          }
+      for(i <- top.inputs) {
+        if (isVisiting(i)) {
+          dfsStack push i
+          walked += i
         }
       }
     }

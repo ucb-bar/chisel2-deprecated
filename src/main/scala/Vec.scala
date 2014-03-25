@@ -318,7 +318,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
   }
 
   override def setPseudoName (path: String, isNamingIo: Boolean) {
-    if (pName != "" || (path != "" && pName != path)) {
+    if (pName == "" || (path != "" && pName != path)) {
       val prevPrefix = if (pName != "") pName + "_" else ""
       pName = path
       val prefix = if (pName != "") pName + "_" else ""
