@@ -340,7 +340,8 @@ object Op {
     }
 
     }
-    if (Module.backend.isInstanceOf[CppBackend] || Module.backend.isInstanceOf[FloBackend]) {
+    if (Module.backend.isInstanceOf[CppBackend] || Module.backend.isInstanceOf[FloBackend] ||
+        Module.isBackannotating) {
       def signAbs(x: Node): (Bool, UInt) = {
         val f = x.asInstanceOf[SInt]
         val s = f < SInt(0)

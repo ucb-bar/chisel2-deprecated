@@ -90,7 +90,12 @@ object Module {
   val clocks = new ArrayBuffer[Clock]()
   var implicitReset: Bool = null
   var implicitClock: Clock = null
-
+  /* Backannotation flags */
+  var isBackannotating = false
+  var model = ""
+  val signals = new ArrayBuffer[Node]
+  val signals_shadow = new HashSet[Node]
+  val pseudoMuxes = new HashMap[Node, Node]
   /* Jackhammer flags */
   var jackDump: String = null;
   var jackDir: String = null;
@@ -179,6 +184,11 @@ object Module {
     clk.setName("clk")
 
     isInGetWidth = false
+
+    // Backannotation
+    isBackannotating = false
+    model = ""
+    signals.clear
   }
 
   //component stack handling stuff
@@ -259,6 +269,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   var name: String = "";
   /** Name of the module this component generates (defaults to class name). */
   var moduleName: String = "";
+  var pName = ""
   var named = false;
   val bindings = new ArrayBuffer[Binding];
   var wiresCache: Array[(String, Bits)] = null;
@@ -278,6 +289,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   val nodes = new ArrayBuffer[Node]
   val mods = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
+  val signals = new ArrayBuffer[Node]
 
   val regs  = new ArrayBuffer[Reg];
   val nexts = new ScalaQueue[Node];
@@ -382,6 +394,24 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     // XXX Because We cannot guarentee x is flatten later on in collectComp.
     x.getNode.component = this
     debugs += x.getNode
+  }
+
+  def counter(x: Node) {
+    x.getNode match {
+      case _: VecLike[_] =>
+      case _: Aggregate =>
+      case _: ROMData =>
+      case _: Literal =>
+      case any if !(signals_shadow contains any) => {
+        signals += any
+        signals_shadow += any
+      }
+      case _ =>
+    }
+  }
+
+  def counter(xs: Node*) {
+    xs.foreach(counter _)
   }
 
   def printf(message: String, args: Node*): Unit = {
@@ -497,6 +527,27 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             bfsQueue.enqueue(i)
             walked += i
           }
+        }
+      }
+    }
+  }
+
+  def dfs(visit: Node => Unit): Unit = {
+    val walked = new HashSet[Node]
+    val dfsStack = initializeDFS
+
+    def isVisiting(node: Node) =
+      !(node == null) && !(walked contains node) && 
+      (node.component == this || node.isIo)
+
+    while(!dfsStack.isEmpty) {
+      val top = dfsStack.pop
+      walked += top
+      visit(top)
+      for(i <- top.inputs) {
+        if (isVisiting(i)) {
+          dfsStack push i
+          walked += i
         }
       }
     }
@@ -781,6 +832,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   /* XXX deprecated. make sure containsReg and isClk are set properly. */
   def markComponent() {
     ownIo();
+    io setPseudoName ("io", true)
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], Cell, BlackBox and Modules.
      Since we call invoke() to get a proper instance of the correct type,
@@ -795,7 +847,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
          o match {
          case node: Node => {
            if (node.isReg || node.isClkInput) containsReg = true;
-           node.getNode.varName = name
+           node setPseudoName (name, false)
          }
          case buf: ArrayBuffer[_] => {
            /* We would prefer to match for ArrayBuffer[Node] but that's
@@ -808,22 +860,36 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
                if (elm.isReg || elm.isClkInput) {
                  containsReg = true;
                }
-               elm.getNode.varName = name + "_" + i
+               elm setPseudoName (name + "_" + i, false)
              }
            }
          }
+         case buf: collection.IndexedSeq[_] => {
+           if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
+             val nodebuf = buf.asInstanceOf[Seq[Node]];
+             for((elm, i) <- nodebuf.zipWithIndex){
+               if (elm.isReg || elm.isClkInput) {
+                 containsReg = true;
+               }
+               elm setPseudoName (name + "_" + i, false)
+             }
+           }
+         }
+         // Todo: do we have Cell anymore?
          case cell: Cell => {
            if(cell.isReg) containsReg = true;
-           cell.varName = name
+           cell.pName = name
          }
          case bb: BlackBox => {
            bb.pathParent = this;
+           bb.pName = name
            for((n, elm) <- io.flatten) {
              if (elm.isClkInput) containsReg = true
            }
          }
          case comp: Module => {
            comp.pathParent = this;
+           comp.pName = name
          }
          case any =>
        }

@@ -478,7 +478,7 @@ class NameSuite extends TestSuite {
 
   /* XXX test case derived from issue #6 on github.
    */
-  @Ignore("clean use of nameHolder") @Test def testInputPortNameChange() {
+  @Test def testInputPortNameChange() {
     class InputPortNameComp extends Module {
       val io = new Bundle {
         val in = Bits(INPUT, 20)
