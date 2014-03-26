@@ -168,6 +168,16 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     }
   }
 
+  override def setPseudoName (path: String, isNamingIo: Boolean) {
+    if (pName == "" || (path != "" && pName != path)) {
+      pName = path
+      val prefix = if (pName != "") pName + "_" else ""
+      for ((n, i) <- elements) {
+        i setPseudoName (prefix + n, isNamingIo)
+      }
+    }
+  }
+
   def +(other: Bundle): Bundle = {
     var elts = ArrayBuffer[(String, Data)]();
     for ((n, i) <- elements)

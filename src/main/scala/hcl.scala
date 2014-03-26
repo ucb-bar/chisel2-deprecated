@@ -150,6 +150,14 @@ object chiselMain {
             Module.backend = new DotBackend
           } else if (args(i + 1) == "fpga") {
             Module.backend = new FPGABackend
+          } else if (args(i + 1) == "counterc") {
+            Module.backend = new CounterCppBackend
+          } else if (args(i + 1) == "counterv") {
+            Module.backend = new CounterVBackend
+          } else if (args(i + 1) == "counterfpga") {
+            Module.backend = new CounterFPGABackend
+          } else if (args(i + 1) == "counterw") {
+            Module.backend = new CounterWBackend
           } else {
             Module.backend = Class.forName(args(i + 1)).newInstance.asInstanceOf[Backend]
           }
@@ -161,6 +169,9 @@ object chiselMain {
         case "--include" => Module.includeArgs = Module.splitArg(args(i + 1)); i += 1;
         case "--checkPorts" => Module.isCheckingPorts = true
         case "--prune" => Module.isPruning = true
+        // Counter backend flags
+        case "--backannotation" => Module.isBackannotating = true
+        case "--model" => Module.model = args(i + 1) ; i += 1
         //Jackhammer Flags
         //case "--jEnable" => Module.jackEnable = true
         case "--jackDump" => Module.jackDump = args(i+1); i+=1; //mode of dump (i.e. space.prm, design.prm etc)
@@ -185,11 +196,12 @@ object chiselMain {
       (args: Array[String], gen: () => T, ftester: T => Tester[T] = null): T = {
     Module.initChisel();
     readArgs(args)
-
     try {
       /* JACK - If loading design, read design.prm file*/
       if (Module.jackLoad != null) { Jackhammer.load(Module.jackDir, Module.jackLoad) }
       val c = gen();
+
+      Module.backend.initBackannotation
 
       /* JACK - If dumping design, dump to jackDir with jackNumber points*/
       if (Module.jackDump != null) { 
@@ -235,6 +247,7 @@ object chiselMainTest {
 }
 
 trait proc extends Node {
+  val muxes = new collection.mutable.HashMap[(Bool, Node), Node]
   val updates = new collection.mutable.ListBuffer[(Bool, Node)]
   def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
     val update = others.foldLeft(default)((v, u) => Multiplex(u._1, u._2, v))
@@ -269,11 +282,11 @@ trait proc extends Node {
 }
 
 trait nameable {
-  var name: String = "";
+  var name: String = ""
   /** _named_ is used to indicates name was set explicitely
    and should not be overriden by a _nameIt_ generator. */
-  var named = false;
-  var varName: String = "";
+  var named = false
+  var pName = ""
 }
 
 abstract class BlackBox extends Module {

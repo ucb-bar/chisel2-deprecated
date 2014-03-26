@@ -254,7 +254,7 @@ class ManualTester[+T <: Module]
   }
 
   def setClocks(clocks: HashMap[Clock, Int]) {
-    var cmd = "set-clocks"
+    var cmd = "set_clocks"
     for (clock <- Module.clocks) {
       if (clock.srcClock == null) {
         val s = BigInt(clocks(clock)).toString(16)

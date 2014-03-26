@@ -502,8 +502,9 @@ class VerilogBackend extends Backend {
     for (clock <- c.clocks)
       clkDomains(clock).append("  always @(posedge " + emitRef(clock) + ") begin\n")
     for (m <- c.mods) {
-      if (m.clock != null)
-        clkDomains(m.clock).append(emitReg(m))
+      val clkDomain = clkDomains getOrElse (m.clock, null)
+      if (m.clock != null && clkDomain != null)
+        clkDomain.append(emitReg(m))
     }
     for (p <- c.printfs)
       clkDomains(p.clock).append(emitPrintf(p))
@@ -540,7 +541,8 @@ class VerilogBackend extends Backend {
   def emitReg(node: Node): String = {
     node match {
       case reg: Reg =>
-        if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1)){
+        if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1) &&
+           !Module.isBackannotating){
           if(reg.isReset){
             "    if(" + emitRef(reg.inputs.last) + ") begin\n" +
             "      " + emitRef(reg) + " <= " + emitRef(reg.init) + ";\n" +
