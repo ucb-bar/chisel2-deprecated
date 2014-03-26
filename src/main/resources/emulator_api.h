@@ -336,6 +336,10 @@ public:
 
 	std::string eval_command(string command) {
 		std::vector<std::string> tokens = tokenize(command);
+		if (tokens.size() == 0) {
+			std::cerr << "Empty command: '" << command << "'" << std::endl;
+			return "error";
+		}
 		if (tokens[0] == "get_host_name") {
 			// IN:  get_host_name
 			// OUT: API host's name
