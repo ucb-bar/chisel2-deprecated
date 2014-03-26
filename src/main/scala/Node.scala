@@ -139,6 +139,9 @@ abstract class Node extends nameable {
   var driveRand = false
   var clock: Clock = null
   var CppVertex: CppVertex = null
+  var counter: Bits = null
+  var shadow: Bits = null
+  var cntrIdx = -1
 
   Module.nodes += this
 
@@ -160,6 +163,11 @@ abstract class Node extends nameable {
     }
     while (!(component.names.getOrElseUpdate(name, this) eq this))
       name += "_"
+  }
+
+  def setPseudoName(path: String, isNamingIo: Boolean) {
+    if (!isIo || (isIo && isNamingIo))
+      pName = path
   }
 
   lazy val chiselName = this match {
@@ -202,7 +210,7 @@ abstract class Node extends nameable {
   private var _isIo = false
   def isIo = _isIo
   def isIo_=(isIo: Boolean) = _isIo = isIo
-  def isReg: Boolean = false;
+  def isReg: Boolean = false
   def isUsedByRam: Boolean = {
     for (c <- consumers)
       if (c.isRamWriteInput(this)) {

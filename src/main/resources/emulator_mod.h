@@ -1793,12 +1793,13 @@ class mod_t {
 
   int step (bool is_reset, int n) {
     int delta = 0;
+    dat_t<1> reset = LIT<1>(is_reset);
     for (int i = 0; i < n; i++) {
-      dat_t<1> reset = LIT<1>(is_reset);
       delta += clock(reset);
       if (dumpfile != NULL) dump(dumpfile, timestep);
       timestep += 1;
     }
+    clock_lo(reset);
     return delta;
   }
  protected:

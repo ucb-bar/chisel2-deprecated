@@ -3,22 +3,43 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.HashSet
 
-class ioQueueFame1[T <: Data](data: T) extends Bundle
+object FameDecoupledIO
+{
+  def connect[T <: Bundle](flattened: FameDecoupledIO[Bits], connectTo: FameDecoupledIO[T], tgt_bits_type: Bundle): Unit = {
+    val is_flip = (flattened.host_ready.dir == OUTPUT)
+    if(is_flip){
+      flattened.host_valid := connectTo.host_valid
+      connectTo.host_ready := flattened.host_ready
+      flattened.target.valid := connectTo.target.valid
+      connectTo.target.ready := flattened.target.ready
+      flattened.target.bits := connectTo.target.bits.toBits
+    } else {
+      connectTo.host_valid := flattened.host_valid
+      flattened.host_ready := connectTo.host_ready
+      connectTo.target.valid := flattened.target.valid
+      flattened.target.ready := connectTo.target.ready
+      connectTo.target.bits := tgt_bits_type.fromBits(flattened.target.bits)
+    }
+  }
+}
+
+class FameDecoupledIO[T <: Data](data: T) extends Bundle
 {
   val host_valid = Bool(OUTPUT)
   val host_ready = Bool(INPUT)
   val target = new DecoupledIO(data)
+  override def clone: this.type = { new FameDecoupledIO(data).asInstanceOf[this.type]}
 }
 
-class QueueFame1[T <: Data] (val entries: Int)(data: => T) extends Module
+class FameQueue[T <: Data] (val entries: Int)(data: => T) extends Module
 {
   val io = new Bundle{
-    val deq = new ioQueueFame1(data)
-    val enq = new ioQueueFame1(data).flip()
+    val deq = new FameDecoupledIO(data)
+    val enq = new FameDecoupledIO(data).flip()
   }
   
   val target_queue = Module(new Queue(data, entries))
-  val tracker = Module(new Fame1QueueTracker(entries, entries))
+  val tracker = Module(new FameQueueTracker(entries, entries))
   
   target_queue.io.enq.valid := io.enq.host_valid && io.enq.target.valid
   target_queue.io.enq.bits := io.enq.target.bits
@@ -39,7 +60,7 @@ class QueueFame1[T <: Data] (val entries: Int)(data: => T) extends Module
   
 }
 
-class ioFame1QueueTracker() extends Bundle{
+class FameQueueTrackerIO() extends Bundle{
   val tgt_queue_count = UInt(INPUT)
   val produce = Bool(INPUT)
   val consume = Bool(INPUT)
@@ -50,8 +71,8 @@ class ioFame1QueueTracker() extends Bundle{
   val entry_avail = Bool(OUTPUT)
 }
 
-class Fame1QueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Module{
-  val io = new ioFame1QueueTracker()
+class FameQueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Module{
+  val io = new FameQueueTrackerIO()
   val aregs = Vec.fill(num_tgt_cycles){ Reg(init = UInt(0, width = log2Up(num_tgt_entries))) }
   val tail_pointer = Reg(init = UInt(1, width = log2Up(num_tgt_cycles)))
   
@@ -152,7 +173,7 @@ class Fame1QueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Modul
   io.entry_avail := aregs(0) != UInt(0)
 }
 
-class REGIO[T <: Data](data: T) extends Bundle
+class RegIO[T <: Data](data: T) extends Bundle
 {
   val bits = data.clone.asOutput
 }
@@ -163,9 +184,9 @@ class RegBundle extends Bundle
 }
 
 class Fame1WrapperIO(n: Int, num_regs: Int) extends Bundle {
-  var queues:Vec[ioQueueFame1[Bits]] = null
+  var queues:Vec[FameDecoupledIO[Bits]] = null
   if(n > 0) {
-    queues = Vec.fill(n){ new ioQueueFame1(Bits())}
+    queues = Vec.fill(n){ new FameDecoupledIO(Bits())}
   }
   var regs:Vec[DecoupledIO[Bits]] = null
   if(num_regs > 0) {
@@ -195,27 +216,27 @@ class Fame1Wrapper(f: => Module) extends Module {
   val originalModule = Module(f)
   transform(true, originalModule, null)
 
-  //counter number of REGIO and Decoupled IO in original module
+  //counter number of RegIO and Decoupled IO in original module
   var num_decoupled_io = 0
   var num_reg_io = 0
   for ((name, io) <- originalModule.io.asInstanceOf[Bundle].elements){ 
     io match { 
       case q : DecoupledIO[_] => num_decoupled_io += 1; 
-      case r : REGIO[_] => num_reg_io += 1;
+      case r : RegIO[_] => num_reg_io += 1;
       case _ => 
     }
   }
 
   val io = new Fame1WrapperIO(num_decoupled_io, num_reg_io)
   
-  val fame1REGIOs = new HashMap[String, DecoupledIO[Bits]]()
-  val fame1DecoupledIOs  = new HashMap[String, ioQueueFame1[Bits]]()
-  val fame1OtherIO = new HashMap[String, Data]()
+  val RegIOs = new HashMap[String, DecoupledIO[Bits]]()
+  val DecoupledIOs  = new HashMap[String, FameDecoupledIO[Bits]]()
+  val DebugIOs = new HashMap[String, Data]()
 
   var decoupled_counter = 0
   var reg_counter = 0
   
-  //populate fame1REGIO and fame1DecoupledIO bundles with the elements from the original REGIO and DecoupleIOs
+  //populate fame1RegIO and fame1DecoupledIO bundles with the elements from the original RegIO and DecoupleIOs
   for ((name, ioNode) <- originalModule.io.asInstanceOf[Bundle].elements) {
     ioNode match {
       case decoupled : DecoupledIO[_] => {
@@ -232,20 +253,20 @@ class Fame1Wrapper(f: => Module) extends Module {
           fame1Decoupled.target.bits := decoupled.bits.toBits
           fame1Decoupled.target.valid := decoupled.valid 
         }
-        fame1DecoupledIOs(name) = fame1Decoupled
+        DecoupledIOs(name) = fame1Decoupled
         decoupled_counter += 1
       }
-      case reg : REGIO[_] => {
+      case reg : RegIO[_] => {
         val is_flip = (reg.bits.flatten(0)._2.dir == INPUT)
-        val fame1REGIO = io.regs(reg_counter)
+        val fame1RegIO = io.regs(reg_counter)
         if (is_flip) {
-          fame1REGIO.flip()
+          fame1RegIO.flip()
           val regBitsClone = reg.bits.clone()
-          reg.bits := regBitsClone.fromBits(fame1REGIO.bits)
+          reg.bits := regBitsClone.fromBits(fame1RegIO.bits)
         } else {
-          fame1REGIO.bits := reg.bits.toBits
+          fame1RegIO.bits := reg.bits.toBits
         }
-        fame1REGIOs(name) = fame1REGIO
+        RegIOs(name) = fame1RegIO
         reg_counter += 1
       }
       case _ => {
@@ -253,7 +274,7 @@ class Fame1Wrapper(f: => Module) extends Module {
           val elementClone = ioNode.clone
           elementClone.isIo = true
           elementClone.setName(name)
-          fame1OtherIO(name) = elementClone
+          DebugIOs(name) = elementClone
           io.other.asInstanceOf[Bundle] += elementClone
           elementClone <> ioNode
         }
