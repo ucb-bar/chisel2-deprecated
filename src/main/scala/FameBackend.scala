@@ -178,21 +178,19 @@ class RegIO[T <: Data](data: T) extends Bundle
   val bits = data.clone.asOutput
 }
 
-class RegBundle extends Bundle
-{
-  val data = UInt(width = 32)
-}
-
-class Fame1WrapperIO(n: Int, num_regs: Int) extends Bundle {
+class Fame1WrapperIO(num_queues: Int, num_regs: Int, num_debug: Int) extends Bundle {
   var queues:Vec[FameDecoupledIO[Bits]] = null
-  if(n > 0) {
-    queues = Vec.fill(n){ new FameDecoupledIO(Bits())}
+  if(num_queues > 0) {
+    queues = Vec.fill(num_queues){ new FameDecoupledIO(Bits())}
   }
   var regs:Vec[DecoupledIO[Bits]] = null
   if(num_regs > 0) {
     regs = Vec.fill(num_regs){ new DecoupledIO(Bits())}
   }
-  val other  = new Bundle()
+  var debug:Vec[Bits] = null
+  if(num_debug > 0) {
+    debug = Vec.fill(num_debug){Bits()}
+  }
 }
 
 class Fame1Wrapper(f: => Module) extends Module {
@@ -219,15 +217,20 @@ class Fame1Wrapper(f: => Module) extends Module {
   //counter number of RegIO and Decoupled IO in original module
   var num_decoupled_io = 0
   var num_reg_io = 0
+  var num_debug_io = 0
   for ((name, io) <- originalModule.io.asInstanceOf[Bundle].elements){ 
     io match { 
       case q : DecoupledIO[_] => num_decoupled_io += 1; 
       case r : RegIO[_] => num_reg_io += 1;
-      case _ => 
+      case _ => {
+        if (name != "is_fire") {
+          num_debug_io += 1
+        }
+      }
     }
   }
 
-  val io = new Fame1WrapperIO(num_decoupled_io, num_reg_io)
+  val io = new Fame1WrapperIO(num_decoupled_io, num_reg_io, num_debug_io)
   
   val RegIOs = new HashMap[String, DecoupledIO[Bits]]()
   val DecoupledIOs  = new HashMap[String, FameDecoupledIO[Bits]]()
@@ -235,7 +238,7 @@ class Fame1Wrapper(f: => Module) extends Module {
 
   var decoupled_counter = 0
   var reg_counter = 0
-  
+  var debug_counter = 0 
   //populate fame1RegIO and fame1DecoupledIO bundles with the elements from the original RegIO and DecoupleIOs
   for ((name, ioNode) <- originalModule.io.asInstanceOf[Bundle].elements) {
     ioNode match {
@@ -271,12 +274,22 @@ class Fame1Wrapper(f: => Module) extends Module {
       }
       case _ => {
         if (name != "is_fire") {
+          Predef.assert(ioNode.isInstanceOf[Bits])
           val elementClone = ioNode.clone
           elementClone.isIo = true
           elementClone.setName(name)
           DebugIOs(name) = elementClone
-          io.other.asInstanceOf[Bundle] += elementClone
           elementClone <> ioNode
+          if(ioNode.toBits.dir == INPUT){
+            io.debug(debug_counter).asInput
+            ioNode := io.debug(debug_counter)
+            DebugIOs(name) = io.debug(debug_counter)
+          } else {
+            io.debug(debug_counter).asOutput
+            io.debug(debug_counter) := ioNode.toBits
+            DebugIOs(name) = io.debug(debug_counter)
+          }
+          debug_counter += 1
         }
       }
     }
