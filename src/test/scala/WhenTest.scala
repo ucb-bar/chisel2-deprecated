@@ -31,7 +31,6 @@
 import org.junit.Assert._
 import org.junit.Test
 import org.junit.Ignore
-import scala.collection.mutable.HashMap
 import Chisel._
 
 class WhenSuite extends TestSuite {
@@ -48,16 +47,13 @@ class WhenSuite extends TestSuite {
       when(io.en) { io.out := io.in }
     }
 
-    class WhenModuleTests(m: WhenModule) extends MapTester(m, Array(m.io)) {
-      defTests {
-        val vars = new HashMap[Node, Node]() 
-        List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
-          case (en, i) =>
-            vars(m.io.en) = Bool(en)
-            vars(m.io.in) = UInt(i)
-            vars(m.io.out) = UInt(if(en) i else 0)
-            step(vars)
-        } reduce(_&&_)
+    class WhenModuleTests(m: WhenModule) extends Tester(m) {
+      List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
+        case (en, i) =>
+          poke(m.io.en, int(en))
+          poke(m.io.in, i)
+          step(1)
+          expect(m.io.out, if(en) i else 0)
       }
     }
 
@@ -77,19 +73,16 @@ class WhenSuite extends TestSuite {
       when(io.en0) { when(io.en1) { io.out := io.in } }
     }
 
-    class EmbedWhenModuleTests(m: EmbedWhenModule) extends MapTester(m, Array(m.io)) {
-      defTests {
-        val vars = new HashMap[Node, Node]() 
-        List(false, true, false, true,  true, false, true,  true).zip(
-        List(false, true, true,  false, true, true,  false, true)).zipWithIndex.map { 
-          case ((en0, en1), i) =>
-            vars(m.io.en0) = Bool(en0)
-            vars(m.io.en1) = Bool(en1)
-            vars(m.io.in) = UInt(i)
-            vars(m.io.out) = UInt(if(en0 && en1) i else 0)
-            step(vars)
-        } reduce(_&&_)
-      }
+    class EmbedWhenModuleTests(m: EmbedWhenModule) extends Tester(m) {
+      List(false, true, false, true,  true, false, true,  true).zip(
+      List(false, true, true,  false, true, true,  false, true)).zipWithIndex.map { 
+        case ((en0, en1), i) =>
+          poke(m.io.en0, int(en0))
+          poke(m.io.en1, int(en1))
+          poke(m.io.in,  i)
+          step(1)
+          expect(m.io.out, if(en0 && en1) i else 0)
+      } 
     }
 
     launchCppTester((m: EmbedWhenModule) => new EmbedWhenModuleTests(m))
@@ -114,20 +107,17 @@ class WhenSuite extends TestSuite {
       }
     }
 
-    class ElsewhenModuleTests(m: ElsewhenModule) extends MapTester(m, Array(m.io)) {
-      defTests {
-        val vars = new HashMap[Node, Node]() 
-        List(false, true, false, true,  true, false, true,  true).zip(
-        List(false, true, true,  false, true, true,  false, true)).zipWithIndex.map { 
-          case ((en0, en1), i) =>
-            vars(m.io.en0) = Bool(en0)
-            vars(m.io.en1) = Bool(en1)
-            vars(m.io.in0) = UInt(i)
-            vars(m.io.in1) = UInt(i+1)
-            vars(m.io.out) = UInt(if(en0) i else if(en1) i+1 else 0)
-            step(vars)
-        } reduce(_&&_)
-      }
+    class ElsewhenModuleTests(m: ElsewhenModule) extends Tester(m) {
+      List(false, true, false, true,  true, false, true,  true).zip(
+      List(false, true, true,  false, true, true,  false, true)).zipWithIndex.map { 
+        case ((en0, en1), i) =>
+          poke(m.io.en0, int(en0))
+          poke(m.io.en1, int(en1))
+          poke(m.io.in0, i)
+          poke(m.io.in1, i+1)
+          step(1)
+          expect(m.io.out, if(en0) i else if(en1) i+1 else 0)
+      } 
     }
 
     launchCppTester((m: ElsewhenModule) => new ElsewhenModuleTests(m))
@@ -158,16 +148,13 @@ class WhenSuite extends TestSuite {
       }
     }
 
-    class SubmoduleInWhenBlockTests(m: SubmoduleInWhenBlock) extends MapTester(m, Array(m.io)) {
-      defTests {
-        val vars = new HashMap[Node, Node]() 
-        List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
-          case (en, i) =>
-            vars(m.io.en) = Bool(en)
-            vars(m.io.in) = UInt(i)
-            vars(m.io.out) = UInt(if(en) i else 0)
-            step(vars)
-        } reduce(_&&_)
+    class SubmoduleInWhenBlockTests(m: SubmoduleInWhenBlock) extends Tester(m) {
+      List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
+        case (en, i) =>
+          poke(m.io.en, int(en))
+          poke(m.io.in, i)
+          step(1)
+          expect(m.io.out, if(en) i else 0)
       }
     }
 
@@ -186,16 +173,13 @@ class WhenSuite extends TestSuite {
       unless(io.en) { io.out := UInt(0) }
     }
 
-    class UnlessModuleTests(m: UnlessModule) extends MapTester(m, Array(m.io)) {
-      defTests {
-        val vars = new HashMap[Node, Node]() 
-        List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
-          case (en, i) =>
-            vars(m.io.en) = Bool(en)
-            vars(m.io.in) = UInt(i)
-            vars(m.io.out) = UInt(if(en) i else 0)
-            step(vars)
-        } reduce(_&&_)
+    class UnlessModuleTests(m: UnlessModule) extends Tester(m) {
+      List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
+        case (en, i) =>
+          poke(m.io.en, int(en))
+          poke(m.io.in, i)
+          step(1)
+          expect(m.io.out, if(en) i else 0)
       }
     }
 
@@ -217,15 +201,12 @@ class WhenSuite extends TestSuite {
       }
     }
 
-    class SwitchModuleTests(m: SwitchModule) extends MapTester(m, Array(m.io)) {
-      defTests {
-        val vars = new HashMap[Node, Node]() 
-        (0 until 8).map { i =>
-          vars(m.io.in) = UInt(i)
-          vars(m.io.out) = if(i == 0) UInt(1) else UInt(i % 2)
-          step(vars)
-        } reduce(_&&_)
-      }
+    class SwitchModuleTests(m: SwitchModule) extends Tester(m) {
+      (0 until 8).map { i =>
+        poke(m.io.in, i)
+        step(1)
+        expect(m.io.out, if(i == 0) (1) else (i % 2))
+      } 
     }
 
     launchCppTester((m: SwitchModule) => new SwitchModuleTests(m))

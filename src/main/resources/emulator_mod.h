@@ -1799,7 +1799,7 @@ class mod_t {
       if (dumpfile != NULL) dump(dumpfile, timestep);
       timestep += 1;
     }
-    clock_lo(reset);
+    // clock_lo(reset);
     return delta;
   }
  protected:

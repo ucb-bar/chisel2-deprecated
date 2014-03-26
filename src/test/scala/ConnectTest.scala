@@ -1,5 +1,4 @@
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.HashMap
 import org.junit.Assert._
 import org.junit.Test
 import org.junit.Ignore
@@ -38,19 +37,16 @@ class ConnectSuite extends TestSuite {
       us.io.in <> io.in
       io.out <> us.io.out
     }
-    class ShimConnectionsTests(m: UsesShimParent) extends MapTester(m, Array(m.io)) {
-      defTests {
-        val vars = new HashMap[Node, Node]() 
-        (0 until 4).map { i =>
-          vars(m.io.in.bits) = UInt(i)
-          vars(m.io.in.valid) = Bool(true)
-          vars(m.io.in.ready) = Bool(true)
-          vars(m.io.out.bits) = UInt(i+1)
-          vars(m.io.out.valid) = Bool(true)
-          vars(m.io.out.ready) = Bool(true)
-          step(vars)
-        } reduce(_&&_)
-      }
+    class ShimConnectionsTests(m: UsesShimParent) extends Tester(m) {
+      (0 until 4).map { i =>
+        poke(m.io.in.bits,   i)
+        poke(m.io.in.valid,  int(true))
+        poke(m.io.out.ready, int(true))
+        step(1)
+        expect(m.io.out.valid, int(true))
+        expect(m.io.in.ready,  int(true))
+        expect(m.io.out.bits,  i+1)
+      } 
     }
     launchCppTester((m: UsesShimParent) => new ShimConnectionsTests(m))
   }
@@ -82,16 +78,13 @@ class ConnectSuite extends TestSuite {
       srs.io.in := io.in
       io.out := srs.io.out
     }
-    class SuppliesResetsTests(m: SuppliesResetsParent) extends MapTester(m, Array(m.io)) {
-      defTests {
-        val vars = new HashMap[Node, Node]() 
-        List(true,false,false,false,false,false).zip(
-        List(true,true,true,false,false,false)).map {
-          case (i, o) =>
-            vars(m.io.in) = Bool(i)
-            vars(m.io.out) = Bool(o)
-            step(vars)
-        } reduce(_&&_)
+    class SuppliesResetsTests(m: SuppliesResetsParent) extends Tester(m) {
+      List(true,false,false,false,false,false).zip(
+      List(true,true, true, false,false,false)).map {
+        case (i, o) =>
+          poke(m.io.in,    int(i))
+          step(1)
+          expect(m.io.out, int(o))
       }
     }
     launchCppTester((m: SuppliesResetsParent) => new SuppliesResetsTests(m))
@@ -115,14 +108,11 @@ class ConnectSuite extends TestSuite {
       b.io.in := io.in
       io.out := b.io.out
     }
-    class UnrelatedSubmodulesTests(m: Unrelated) extends MapTester(m, Array(m.io)) {
-      defTests {
-        val vars = new HashMap[Node, Node]() 
-        (0 until 4).map { i =>
-          vars(m.io.in) = UInt(i)
-          vars(m.io.out) = UInt(i)
-          step(vars)
-        } reduce(_&&_)
+    class UnrelatedSubmodulesTests(m: Unrelated) extends Tester(m) {
+      (0 until 4).map { i =>
+        poke(m.io.in, i)
+        step(1)
+        expect(m.io.out, i)
       }
     }
     launchCppTester((m: Unrelated) => new UnrelatedSubmodulesTests(m))
@@ -143,14 +133,11 @@ class ConnectSuite extends TestSuite {
       a2.io.in := x
       io.out := a2.io.out
     }
-    class LogicBtwInstancesTests(m: LogicBtwInstances) extends MapTester(m, Array(m.io)) {
-      defTests {
-        val vars = new HashMap[Node, Node]() 
-        (0 until 4).map { i =>
-          vars(m.io.in) = UInt(i)
-          vars(m.io.out) = if(i == 0) UInt(0) else UInt(i-1)
-          step(vars)
-        } reduce(_&&_)
+    class LogicBtwInstancesTests(m: LogicBtwInstances) extends Tester(m) {
+      (0 until 4).map { i =>
+        poke(m.io.in, i)
+        step(1)
+        expect(m.io.out, if(i == 0) 0 else i-1)
       }
     }
     launchCppTester((m: LogicBtwInstances) => new LogicBtwInstancesTests(m))
@@ -174,14 +161,11 @@ class ConnectSuite extends TestSuite {
       aInC.io.in := io.in
       io.out := aInC.io.out | aInB.io.out
     }
-    class OneInstancePerRelationTests(m: C) extends MapTester(m, Array(m.io)) {
-      defTests {
-        val vars = new HashMap[Node, Node]() 
-        (0 until 4).map { i =>
-          vars(m.io.in) = UInt(i)
-          vars(m.io.out) = UInt(i)
-          step(vars)
-        } reduce(_&&_)
+    class OneInstancePerRelationTests(m: C) extends Tester(m) {
+      (0 until 4).map { i =>
+        poke(m.io.in, i)
+        step(1)
+        expect(m.io.out, i)
       }
     }
     launchCppTester((m: C) => new OneInstancePerRelationTests(m))
@@ -198,14 +182,11 @@ class ConnectSuite extends TestSuite {
       aInB.io.in := io.in
       io.out := aInB.io.out
     }
-    class InstanceSuperclassTests(m: B) extends MapTester(m, Array(m.io)) {
-      defTests {
-        val vars = new HashMap[Node, Node]() 
-        (0 until 4).map { i =>
-          vars(m.io.in) = UInt(i)
-          vars(m.io.out) = UInt(i)
-          step(vars)
-        } reduce(_&&_)
+    class InstanceSuperclassTests(m: B) extends Tester(m) {
+      (0 until 4).map { i =>
+        poke(m.io.in, i)
+        step(1)
+        expect(m.io.out, i)
       }
     }
     launchCppTester((m: B) => new InstanceSuperclassTests(m))
@@ -225,19 +206,16 @@ class ConnectSuite extends TestSuite {
       }
       io.status := reg_status
     }
-    class RegisterHookTests(m: A) extends MapTester(m, Array(m.io)) {
-      defTests {
-        val vars = new HashMap[Node, Node]() 
-        List(1,     2,     4,     6,     8,     12,    15,   15).zip(
-        List(false, true,  true,  false, true,  false, true, false)).zip(
-        List((0,0), (0,0), (0,2), (1,0), (1,0), (2,0), (2,0), (3,3), (3,3))).map { 
-          case ((in, en), (im0, im1)) =>
-            vars(m.io.wdata) = UInt(in)
-            vars(m.io.wen) = Bool(en)
-            vars(m.io.status.im0) = UInt(im0)
-            vars(m.io.status.im1) = UInt(im1)
-            step(vars)
-        } reduce(_&&_)
+    class RegisterHookTests(m: A) extends Tester(m) {
+      List(1,     2,     4,     6,     8,     12,    15,   15).zip(
+      List(false, true,  true,  false, true,  false, true, false)).zip(
+      List((0,0), (0,0), (0,2), (1,0), (1,0), (2,0), (2,0), (3,3), (3,3))).map { 
+        case ((in, en), (im0, im1)) =>
+          poke(m.io.wdata, in)
+          poke(m.io.wen,   int(en))
+          step(1)
+          expect(m.io.status.im0, im0)
+          expect(m.io.status.im1, im1)
       }
     }
     launchCppTester((m: A) => new RegisterHookTests(m))
