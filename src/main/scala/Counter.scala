@@ -374,8 +374,8 @@ abstract class CounterTester[+T <: Module](c: T) extends Tester(c) {
   }
 
   def clock (n: Int) {
-    val clk = emulatorCmd("step %d".format(n))
-    println("  CLOCK %d".format(n))
+    val clk = emulatorCmd("clock %d".format(n))
+    println("  CLOCK %s".format(clk))
   }
 
   override def reset(n: Int = 1) {

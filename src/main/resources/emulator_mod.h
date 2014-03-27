@@ -1791,15 +1791,18 @@ class mod_t {
 
   int timestep;
 
+  void dump () {
+    if (dumpfile != NULL) dump(dumpfile, timestep);
+    timestep += 1;
+  }
+
   int step (bool is_reset, int n) {
     int delta = 0;
     dat_t<1> reset = LIT<1>(is_reset);
     for (int i = 0; i < n; i++) {
       delta += clock(reset);
-      if (dumpfile != NULL) dump(dumpfile, timestep);
-      timestep += 1;
+      dump();
     }
-    // clock_lo(reset);
     return delta;
   }
  protected:
