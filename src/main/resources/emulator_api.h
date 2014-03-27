@@ -355,7 +355,6 @@ public:
 			// OUT: list of supported API features
 			if (!check_command_length(tokens, 0, 0)) { return "error"; }
 			return get_api_support();
-
 		} else if (tokens[0] == "clock") {
 			// IN:  clock <num_cycles>
 			// OUT: actual number of cycles stepped
@@ -364,6 +363,7 @@ public:
 		    for (int i=0; i<cycles; i++) {
 		    	module->clock_lo(dat_t<1>(0));
 		    	module->clock_hi(dat_t<1>(0));
+			module->dump();
 		    }
 		    module->clock_lo(dat_t<1>(0));
 		    return itos(cycles);

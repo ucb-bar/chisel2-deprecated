@@ -359,7 +359,7 @@ trait CounterBackend extends Backend {
 class CounterCppBackend extends CppBackend with CounterBackend
 class CounterVBackend extends VerilogBackend with CounterBackend
 
-abstract class CounterTester[+T <: Module](c: T) extends Tester(c) {
+abstract class CounterTester[+T <: Module](c: T, isTrace: Boolean = true) extends Tester(c, isTrace) {
   val prevPeeks = new HashMap[Node, BigInt]
   val counts = new HashMap[Node, BigInt]
 
@@ -374,8 +374,8 @@ abstract class CounterTester[+T <: Module](c: T) extends Tester(c) {
   }
 
   def clock (n: Int) {
-    val clk = emulatorCmd("step %d".format(n))
-    println("  CLOCK %d".format(n))
+    val clk = emulatorCmd("clock %d".format(n))
+    if (isTrace) println("  CLOCK %s".format(clk))
   }
 
   override def reset(n: Int = 1) {
@@ -429,9 +429,11 @@ abstract class CounterTester[+T <: Module](c: T) extends Tester(c) {
   }
 
   override def step (n: Int = 1) { 
-    println("-------------------------")
-    println("| Counter Strcture Step |")
-    println("-------------------------")
+    if (isTrace) {
+      println("-------------------------")
+      println("| Counter Strcture Step |")
+      println("-------------------------")
+    }
 
     for (signal <- Module.signals) {
       counts(signal) = 0
@@ -441,7 +443,7 @@ abstract class CounterTester[+T <: Module](c: T) extends Tester(c) {
     pokeClks(n)
 
     // run the target until it is stalled
-    println("*** RUN THE TAREGT / READ SIGNAL VALUES ***")
+    if (isTrace) println("*** RUN THE TAREGT / READ SIGNAL VALUES ***")
     for (i <- 0 until n) {
       for (signal <- Module.signals) {
         val curPeek = peekBits(signal)
@@ -455,29 +457,29 @@ abstract class CounterTester[+T <: Module](c: T) extends Tester(c) {
       clock(1)
     }
   
-    println("*** CHECK COUNTER VALUES ***")
+    if (isTrace) println("*** CHECK COUNTER VALUES ***")
     for (signal <- Module.signals) {
       expect(signal.counter, counts(signal))
     }
 
-    println("*** Daisy Copy ***")
+    if (isTrace) println("*** Daisy Copy ***")
     peekDaisy(0)
 
-    println("--- CURRENT CHAIN ---")
+    if (isTrace) println("--- CURRENT CHAIN ---")
     for (s <- Module.signals) {
       peek(s.shadow)
     }
 
     // daisy read
     for (signal <- Module.signals) {
-      println("*** Daisy Read ***")
+      if (isTrace) println("*** Daisy Read ***")
       peekDaisy(1)
 
-      println("--- CURRENT CHAIN ---")
+      if (isTrace) println("--- CURRENT CHAIN ---")
       for (s <- Module.signals) {
         peek(s.shadow)
       }
-      println("---------------------")
+      if (isTrace) println("---------------------")
 
       checkDaisy(counts(signal))
     }
@@ -589,7 +591,7 @@ abstract class CounterWrapper(val conf: CounterConfiguration) extends Module {
   io.out.bits  := rdata(io.addr)
 }
 
-abstract class CounterWrapperTester[+T <: CounterWrapper](c: T) extends CounterTester(c) {
+abstract class CounterWrapperTester[+T <: CounterWrapper](c: T, isTrace: Boolean = true) extends CounterTester(c, isTrace) {
   def pokeAddr(addr: BigInt, bits: BigInt) {
     do {
       poke(c.io.addr, addr)

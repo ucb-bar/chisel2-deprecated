@@ -77,6 +77,8 @@ class UInt extends Bits with Num[UInt] {
 
   override def toBits: UInt = this
 
+  def toBools: Vec[Bool] = Vec.tabulate(this.getWidth)(i => this(i))
+
   // to support implicit convestions
   def ===(b: UInt): Bool = LogicalOp(this, b, "===")
 

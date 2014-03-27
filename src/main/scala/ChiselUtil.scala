@@ -142,14 +142,9 @@ object ShiftRegister
   */
 object UIntToOH
 {
-  def apply(in: UInt, width: Int = -1): Bits =
-  {
-    if (width == -1) {
-      UInt(1) << in
-    } else {
-      UInt(1) << in(log2Up(width)-1,0)
-    }
-  }
+  def apply(in: UInt, width: Int = -1): UInt =
+    if (width == -1) UInt(1) << in
+    else UInt(1) << in(log2Up(width)-1,0)
 }
 
 /** Builds a Mux tree out of the input signal vector using a one hot encoded
