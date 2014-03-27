@@ -156,13 +156,20 @@ abstract class Node extends nameable {
   }
 
   def nameIt (path: String, isNamingIo: Boolean) {
-    if( (!isIo && !named) || (isIo && isNamingIo) ) {
-      /* If the name was set explicitely through *setName*,
-       we don't override it. */
-      name = path;
+    try {
+      if( (!isIo && !named) || (isIo && isNamingIo) ) {
+        /* If the name was set explicitely through *setName*,
+         we don't override it. */
+        name = path;
+      }
+      while (!(component.names.getOrElseUpdate(name, this) eq this))
+        name += "_"
+    } catch {
+      case e:NullPointerException => {
+        println("Node:nameIt() NullPointerException: name '" + name + "'")
+        printTree(System.out, 1)
+      }
     }
-    while (!(component.names.getOrElseUpdate(name, this) eq this))
-      name += "_"
   }
 
   def setPseudoName(path: String, isNamingIo: Boolean) {
