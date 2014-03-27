@@ -45,4 +45,13 @@ object CSE {
     }
     removed
   }
+
+  def inputsEqual(x: Node, y: Node): Boolean = {
+    if (x.width != y.width || x.inputs.length != y.inputs.length)
+      return false
+    for (i <- 0 until x.inputs.length)
+      if (!(x.inputs(i) == y.inputs(i)))
+        return false
+    true
+  }
 }

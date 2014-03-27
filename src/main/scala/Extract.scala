@@ -140,15 +140,8 @@ class Extract extends Node {
   }
 
   override def canCSE: Boolean = true
-  override def equalsForCSE(x: Node): Boolean = x match {
-    case x: Extract => {
-      if (inputs.length != x.inputs.length)
-        return false
-      for (i <- 0 until inputs.length)
-        if (!(inputs(i) == x.inputs(i)))
-          return false
-      true
-    }
+  override def equalsForCSE(that: Node): Boolean = that match {
+    case _: Extract => CSE.inputsEqual(this, that)
     case _ => false
   }
 }
