@@ -492,11 +492,13 @@ abstract class CounterTester[+T <: Module](c: T, isTrace: Boolean = true) extend
 
   // Show me the current status of the daisy chain
   def showCurrentChain {
-    if (isTrace) println("--- CURRENT CHAIN ---")
-    for (s <- Module.signals) {
-      peek(s.shadow)
+    if (isTrace) {
+      println("--- CURRENT CHAIN ---")
+      for (s <- Module.signals) {
+        peek(s.shadow)
+      }
+      println("---------------------")
     }
-    if (isTrace) println("---------------------")
   }
 
   override def step (n: Int = 1) { 
