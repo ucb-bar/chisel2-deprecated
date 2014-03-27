@@ -204,7 +204,10 @@ class DelaySuite extends TestSuite {
     chiselMain(Array[String](
       "--targetDir", dir.getPath.toString()),
       () => Module(new SeqReadBundle()))
-    assertFile("DelaySuite_SeqReadBundle_1.h")
+    // We used to:
+    //    assertFile("DelaySuite_SeqReadBundle_1.h")
+    // but this fails the name-mangling test since the
+    // choice of name to mangle isn't deterministic
     assertFile("DelaySuite_SeqReadBundle_1.cpp")
   }
 
