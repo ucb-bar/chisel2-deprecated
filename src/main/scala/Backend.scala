@@ -527,14 +527,6 @@ abstract class Backend {
     }
   }
 
-  def createClkDomain {
-    val clkDomainWalkedNodes = new ArrayBuffer[Node]
-    for (comp <- Module.sortedComps)
-      for (node <- comp.nodes)
-        if (node.isInstanceOf[Reg])
-            createClkDomain(node, clkDomainWalkedNodes)
-  }
-
   // Assign psuedo names for backannotation
   def setPseudoNames(c: Module) {
     ChiselError.info("[Backannotation] pseudo naming")
@@ -704,7 +696,11 @@ abstract class Backend {
 
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
     c.traceNodes();
-    createClkDomain
+    val clkDomainWalkedNodes = new ArrayBuffer[Node]
+    for (comp <- Module.sortedComps)
+      for (node <- comp.nodes)
+        if (node.isInstanceOf[Reg])
+            createClkDomain(node, clkDomainWalkedNodes)
     ChiselError.checkpoint()
 
     /* We execute nameAll after traceNodes because bindings would not have been
