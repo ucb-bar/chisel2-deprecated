@@ -35,8 +35,7 @@ import ChiselError._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.{Queue=>ScalaQueue}
 import scala.collection.mutable.Stack
-import scala.collection.mutable.HashSet
-import scala.collection.mutable.HashMap
+import scala.collection.mutable.{HashSet, HashMap, LinkedHashMap}
 import java.lang.reflect.Modifier._
 import java.io.File
 import java.io.InputStream
@@ -181,7 +180,7 @@ abstract class Backend {
      This code must be executed between the root-level naming and the naming
      of bindings otherwise some identifiers will leak into the input/output
      of a module. */
-    val byNames = new HashMap[String, ArrayBuffer[Module] ];
+    val byNames = LinkedHashMap[String, ArrayBuffer[Module]]();
     for (c <- root.children) {
       nameChildren(c);
       if( c.name.isEmpty ) {
@@ -533,7 +532,7 @@ abstract class Backend {
 
     c.pName = extractClassName(c)
 
-    val classNames = new HashMap[String, ArrayBuffer[Module]]
+    val classNames = LinkedHashMap[String, ArrayBuffer[Module]]()
     for (m <- Module.sortedComps ; if m.pName == "" && m != c) {
       val className = extractClassName(m)
       if (!(classNames contains className)) {

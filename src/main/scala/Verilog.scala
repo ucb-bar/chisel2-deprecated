@@ -651,7 +651,7 @@ class VerilogBackend extends Backend {
   }
 
   def flushModules( out: java.io.FileWriter,
-    defs: HashMap[String, LinkedHashMap[String, ArrayBuffer[Module] ]],
+    defs: LinkedHashMap[String, LinkedHashMap[String, ArrayBuffer[Module] ]],
     level: Int ) {
     for( (className, modules) <- defs ) {
       var index = 0
@@ -680,7 +680,7 @@ class VerilogBackend extends Backend {
 
 
   def emitChildren(top: Module,
-    defs: HashMap[String, LinkedHashMap[String, ArrayBuffer[Module] ]],
+    defs: LinkedHashMap[String, LinkedHashMap[String, ArrayBuffer[Module] ]],
     out: java.io.FileWriter, depth: Int) {
     if (top.isInstanceOf[BlackBox])
       return
@@ -706,7 +706,7 @@ class VerilogBackend extends Backend {
     /* *defs* maps Mod classes to Mod instances through
        the generated text of their module.
        We use a LinkedHashMap such that later iteration is predictable. */
-    val defs = new HashMap[String, LinkedHashMap[String, ArrayBuffer[Module] ]];
+    val defs = LinkedHashMap[String, LinkedHashMap[String, ArrayBuffer[Module]]]()
     var level = 0;
     for( c <- Module.sortedComps ) {
       ChiselError.info(depthString(depth) + "COMPILING " + c
