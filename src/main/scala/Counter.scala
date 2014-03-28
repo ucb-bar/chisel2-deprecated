@@ -24,6 +24,8 @@ trait CounterBackend extends Backend {
     transforms += ((c: Module) => generateCounters(c))
     transforms += ((c: Module) => generateDaisyChains(c))
 
+    transforms += ((c: Module) => c.addClockAndReset)
+    transforms += ((c: Module) => gatherClocksAndResets)
     transforms += ((c: Module) => c.inferAll)
     transforms += ((c: Module) => c.forceMatchingWidths)
     transforms += ((c: Module) => c.removeTypeNodes)
