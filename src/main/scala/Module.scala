@@ -403,6 +403,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       case _: ROMData =>
       case _: Literal =>
       case any if !(signals_shadow contains any) => {
+        if (!any.isIo) debug(x)
         signals += any
         signals_shadow += any
       }
