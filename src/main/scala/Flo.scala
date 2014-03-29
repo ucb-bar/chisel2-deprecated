@@ -87,6 +87,9 @@ class FloBackend extends Backend {
             case "~" => "not'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
             case "!" => "not'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
             case "-" => "neg'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
+            case "|" => "neq'" + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + "0";
+            case "&" => "eq'" + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + "-1";
+            case "^" => "xorr'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
           }
          } else {
            o.op match {
@@ -234,7 +237,7 @@ class FloBackend extends Backend {
       ChiselError.info(cmd + " RET " + c)
     }
     def build(name: String) {
-      val cmd = floDir + "lay -is-console :num-cols 1 :num-cols 1 < " + dir + name + ".flo | " + floDir + "fix-sched > " + dir + name + ".hex"
+      val cmd = floDir + "lay -is-console :num-rows 1 :num-cols 1 < " + dir + name + ".flo | " + floDir + "fix-sched > " + dir + name + ".hex"
       println("BUILDING " + cmd)
       run(cmd)
     }
