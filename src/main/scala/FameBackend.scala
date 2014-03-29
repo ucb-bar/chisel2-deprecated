@@ -459,6 +459,7 @@ class Fame1CppBackend extends CppBackend with Fame1Transform
 class Fame1VerilogBackend extends VerilogBackend with Fame1Transform
 class Fame1FPGABackend extends FPGABackend with Fame1Transform
 
+/*
 class Fame5WrapperIO(num_copies: Int, num_queues: Int, num_regs: Int, num_debug: Int) extends Bundle {
   var queues:Vec[FameDecoupledIO[Bits]] = null
   if(num_queues > 0) {
@@ -475,7 +476,7 @@ class Fame5WrapperIO(num_copies: Int, num_queues: Int, num_regs: Int, num_debug:
 }
 
 class Fame5Wrapper(num_copies: Int, f: => Module) extends Module {
-  def transform(isTop: Boolean, module: Module, parent: Module): Unit = {
+  def addFireToIO(isTop: Boolean, module: Module, parent: Module): Unit = {
     Fame5Transform.fame1Modules += module
     val isFire = Bool(INPUT)
     isFire.isIo = true
@@ -488,16 +489,19 @@ class Fame5Wrapper(num_copies: Int, f: => Module) extends Module {
     }
     module.io.asInstanceOf[Bundle] += isFire
     for(submodule <- module.children){
-      transform(false, submodule, module)
+      addFireToIO(false, submodule, module)
     }
   }
   
+  def replicateIO(module: Module): Unit = {
+  }
+
   val originalModules = new ArrayBuffer[Module]
   for(i <- 0 until num_copies){
     originalModules += Module(f)
   }
   for(originalModule <- originalModules){
-    transform(true, originalModule, null)
+    addFireToIO(true, originalModule, null)
   }
   
   //counter number of RegIO and Decoupled IO in original module
@@ -640,11 +644,6 @@ trait Fame5Transform extends Backend {
     val seqMemReadRegs = new HashSet[Reg]
     for((module, mem) <- mems){
       val memSeqReads = mem.seqreads ++ mem.readwrites.map(_.read)
-      /*if(mem.seqRead){
-        for(memRead <- mem.reads){
-          seqMemReadRegs += memRead.addr.inputs(0).asInstanceOf[Reg]
-        }
-      }*/
       for(memSeqRead <- memSeqReads){
         seqMemReadRegs += memSeqRead.addrReg
       }
@@ -742,6 +741,382 @@ trait Fame5Transform extends Backend {
   preElaborateTransforms += ((top: Module) => appendFireToMemEnables(top))
   preElaborateTransforms += ((top: Module) => collectNodesIntoComp(initializeDFS))
   preElaborateTransforms += ((top: Module) => top.genAllMuxes)
+}
+
+class Fame5CppBackend extends CppBackend with Fame5Transform
+class Fame5VerilogBackend extends VerilogBackend with Fame5Transform
+class Fame5FPGABackend extends FPGABackend with Fame5Transform*/
+
+class Fame5WrapperIO(num_copies: Int, num_queues: Int, num_regs: Int, num_debug: Int) extends Bundle {
+  var queues:Vec[FameDecoupledIO[Bits]] = null
+  if(num_queues > 0) {
+    queues = Vec.fill(num_copies*num_queues){ new FameDecoupledIO(Bits())}
+  }
+  var regs:Vec[DecoupledIO[Bits]] = null
+  if(num_regs > 0) {
+    regs = Vec.fill(num_copies*num_regs){ new DecoupledIO(Bits())}
+  }
+  var debug:Vec[Bits] = null
+  if(num_debug > 0) {
+    debug = Vec.fill(num_copies*num_debug){Bits(OUTPUT)}
+  }
+}
+
+class Fame5Wrapper(num_copies: Int, f: => Module) extends Module {
+  def MarkFame5Modules(module: Module): Unit = {
+    Fame5Transform.fame5Modules += module
+    for(submodule <- module.children){
+      MarkFame5Modules(submodule)
+    }
+  }
+  
+  def replicateIO(module: Module): Unit = {
+    Fame5Transform.DecoupledIOs(module) = new HashMap[String, ArrayBuffer[DecoupledIO[Bits]]]
+    Fame5Transform.RegIOs(module) = new HashMap[String, ArrayBuffer[RegIO[Bits]]]
+    Fame5Transform.DebugIOs(module) = new HashMap[String, ArrayBuffer[Bits]]
+
+    for ((name, io) <- originalModule.io.asInstanceOf[Bundle].elements){ 
+      io match { 
+        case queue : DecoupledIO[_] => {
+          val queueAsBits = queue.asInstanceOf[DecoupledIO[Bits]]
+          Fame5Transform.DecoupledIOs(module)(name) = new ArrayBuffer[DecoupledIO[Bits]]
+          Fame5Transform.DecoupledIOs(module)(name) += queueAsBits
+          for(i <- 1 until num_copies){
+            val ioCopy = new DecoupledIO(queueAsBits.bits.asInstanceOf[Bits])
+            if(queueAsBits.ready.dir == OUTPUT){
+              ioCopy.flip
+            }
+            ioCopy.valid.isIo = true
+            ioCopy.ready.isIo = true
+            ioCopy.bits.isIo = true
+            ioCopy.setName(name + "_" + i)
+            ioCopy.component = module
+            Fame5Transform.DecoupledIOs(module)(name) += ioCopy
+          }
+        }
+        case reg : RegIO[_] => {
+          val regAsBits = reg.asInstanceOf[RegIO[Bits]]
+          Fame5Transform.RegIOs(module)(name) = new ArrayBuffer[RegIO[Bits]]
+          Fame5Transform.RegIOs(module)(name) += regAsBits
+          for(i <- 1 until num_copies){
+            val ioCopy = new RegIO(regAsBits.bits.asInstanceOf[Bits])
+            if(regAsBits.bits.dir == INPUT){
+              ioCopy.flip
+            }
+            ioCopy.bits.isIo = true
+            ioCopy.setName(name + "_" + i)
+            ioCopy.component = module
+            Fame5Transform.RegIOs(module)(name) += ioCopy
+          }
+        }
+        case _ => {
+          val ioAsBits = io.asInstanceOf[Bits]
+          Fame5Transform.DebugIOs(module)(name) = new ArrayBuffer[Bits]
+          Fame5Transform.DebugIOs(module)(name) += ioAsBits
+          for(i <- 1 until num_copies){
+            val ioCopy = ioAsBits.clone
+            Predef.assert(ioCopy.inputs.size == 0)
+            Predef.assert(ioCopy.updates.size == 0)
+            ioCopy.dir = ioAsBits.dir
+            ioCopy.isIo = true
+            ioCopy.setName(name + "_" + i)
+            ioCopy.component = module
+            Fame5Transform.DebugIOs(module)(name) += ioCopy
+          }
+        }
+      }
+    } 
+  }
+  
+  def addFireToIO(isTop: Boolean, module: Module, parent: Module): Unit = {
+    Fame5Transform.fireSignals(module) = new ArrayBuffer[Bool]
+    for(i <- 0 until num_copies){
+      val isFire = Bool(INPUT)
+      isFire.isIo = true
+      isFire.setName("is_fire" + "_" + i)
+      isFire.component = module
+      Fame5Transform.fireSignals(module) += isFire
+      if(!isTop){
+        Predef.assert(Fame5Transform.fireSignals(parent)(i) != null)
+        isFire := Fame5Transform.fireSignals(parent)(i)
+      }
+      module.io.asInstanceOf[Bundle] += isFire
+    }
+    for(submodule <- module.children){
+      addFireToIO(false, submodule, module)
+    }
+  }
+  
+  def addThreadSelToIO(isTop: Boolean, module: Module, parent: Module): Unit = {
+    val threadSel = UInt(INPUT, width = log2Up(num_copies))
+    threadSel.isIo = true
+    threadSel.setName("thread_sel")
+    threadSel.component = module
+    Fame5Transform.threadSelSignals(module) = threadSel
+    if(!isTop){
+      Predef.assert(Fame5Transform.threadSelSignals(parent) != null)
+      threadSel := Fame5Transform.threadSelSignals(parent)
+    }
+    module.io.asInstanceOf[Bundle] += threadSel
+    for(submodule <- module.children){
+      addThreadSelToIO(false, submodule, module)
+    }
+  }
+  
+  def connectWrapperIOs(): Unit = {
+    /*
+    for(i <- 0 until num_copies){
+      var decoupled_counter = 0
+      var reg_counter = 0
+      var debug_counter = 0 
+      //populate fame1RegIO and fame1DecoupledIO bundles with the elements from the original RegIO and DecoupleIOs
+      for ((name, ioNode) <- originalModule.io.asInstanceOf[Bundle].elements) {
+        ioNode match {
+          case decoupled : DecoupledIO[_] => {
+            val is_flip = (decoupled.ready.dir == OUTPUT)
+            val fame1Decoupled = io.queues(num_copies*i + decoupled_counter)
+            if (is_flip) {
+              fame1Decoupled.flip()
+              fame1Decoupled.target.ready := decoupled.ready
+              decoupled.valid := fame1Decoupled.target.valid
+              val decoupledBitsClone = decoupled.bits.clone()
+              decoupled.bits := decoupledBitsClone.fromBits(fame1Decoupled.target.bits)
+            } else {
+              decoupled.ready := fame1Decoupled.target.ready
+              fame1Decoupled.target.bits := decoupled.bits.toBits
+              fame1Decoupled.target.valid := decoupled.valid 
+            }
+            DecoupledIOs(i)(name) = fame1Decoupled
+            decoupled_counter += 1
+          }
+          case reg : RegIO[_] => {
+            val is_flip = (reg.bits.flatten(0)._2.dir == INPUT)
+            val fame1RegIO = io.regs(num_copies*i + reg_counter)
+            if (is_flip) {
+              fame1RegIO.flip()
+              val regBitsClone = reg.bits.clone()
+              reg.bits := regBitsClone.fromBits(fame1RegIO.bits)
+            } else {
+              fame1RegIO.bits := reg.bits.toBits
+            }
+            RegIOs(i)(name) = fame1RegIO
+            reg_counter += 1
+          }
+          case _ => {
+            if (name != "is_fire") {
+              Predef.assert(ioNode.isInstanceOf[Bits])
+              if(ioNode.toBits.dir == INPUT){
+                io.debug(debug_counter).asInput
+                ioNode := io.debug(debug_counter)
+              } else {
+                io.debug(debug_counter).asOutput
+                io.debug(debug_counter) := ioNode.toBits
+              }
+              DebugIOs(i)(name) = io.debug(num_copies*i + debug_counter)
+              debug_counter += 1
+            }
+          }
+        }
+      }
+    }*/
+  }
+
+  val originalModule = Module(f)
+
+  //count number of RegIO and DecoupledIO in original module
+  var num_decoupled_io = 0
+  var num_reg_io = 0
+  var num_debug_io = 0
+  for ((name, io) <- originalModule.io.asInstanceOf[Bundle].elements){ 
+    io match { 
+      case q : DecoupledIO[_] => num_decoupled_io += 1; 
+      case r : RegIO[_] => num_reg_io += 1;
+      case _ => num_debug_io += 1;
+    }
+  }
+
+  val io = new Fame5WrapperIO(num_copies, num_decoupled_io, num_reg_io, num_debug_io)
+  
+  val RegIOs = new ArrayBuffer[HashMap[String, DecoupledIO[Bits]]]()
+  val DecoupledIOs  = new ArrayBuffer[HashMap[String, FameDecoupledIO[Bits]]]()
+  val DebugIOs = new ArrayBuffer[HashMap[String, Data]]()
+
+  for(i <- 0 until num_copies){
+    RegIOs += new HashMap[String, DecoupledIO[Bits]]()
+    DecoupledIOs  += new HashMap[String, FameDecoupledIO[Bits]]()
+    DebugIOs += new HashMap[String, Data]()
+  }
+  
+  
+  MarkFame5Modules(originalModule)
+  replicateIO(originalModule)
+  addFireToIO(true, originalModule, null)
+  addThreadSelToIO(true, originalModule, null)
+  
+  
+   
+  
+
+  
+  for(i <- 0 until num_copies){
+    //generate fire_tgt_clk signal
+    var fire_tgt_clk = Bool(true)
+    for (queue <- DecoupledIOs(i).values){
+      fire_tgt_clk = fire_tgt_clk && (if (queue.host_valid.dir == OUTPUT) queue.host_ready else queue.host_valid)
+    }
+    for (reg <- RegIOs(i).values) {
+      fire_tgt_clk = fire_tgt_clk && (if (reg.valid.dir == OUTPUT) reg.ready else reg.valid)
+    }
+    
+    //generate host read and host valid signals
+    Fame5Transform.fireSignals(originalModule) := fire_tgt_clk
+    for (queue <- DecoupledIOs(i).values) {
+      if (queue.host_valid.dir == OUTPUT){ 
+        queue.host_valid := fire_tgt_clk
+      } else {
+        queue.host_ready := fire_tgt_clk
+      }
+    }
+    for (reg <- RegIOs(i).values) {
+      if (reg.valid.dir == OUTPUT) {
+        reg.valid := fire_tgt_clk
+      } else {
+        reg.ready := fire_tgt_clk
+      }
+    }
+  }
+}
+
+object Fame5Transform {
+  val fame5Modules = new HashSet[Module]
+  val fireSignals = new HashMap[Module, ArrayBuffer[Bool]]
+  val threadSelSignals = new HashMap[Module, UInt]
+  val DecoupledIOs = new HashMap[Module, HashMap[String, ArrayBuffer[DecoupledIO[Bits]]]]
+  val RegIOs = new HashMap[Module, HashMap[String, ArrayBuffer[RegIO[Bits]]]]
+  val DebugIOs = new HashMap[Module, HashMap[String, ArrayBuffer[Bits]]]
+}
+
+trait Fame5Transform extends Backend {
+  /*private def collectMems(module: Module): ArrayBuffer[(Module, Mem[Data])] = {
+    val mems = new ArrayBuffer[(Module, Mem[Data])]
+    //find all the mems in FAME1 modules
+    def findMems(module: Module): Unit = {
+      if(Fame5Transform.fame5Modules.contains(module)){
+        for(mem <- module.nodes.filter(_.isInstanceOf[Mem[Data]])){
+          mems += ((module, mem.asInstanceOf[Mem[Data]]))
+        }
+      }
+      for(childModule <- module.children){
+        findMems(childModule)
+      }
+    }
+    findMems(module)
+    return mems
+  }
+  
+  private def appendFireToRegWriteEnables(top: Module) = {
+    //find regs that are part of sequential mem read ports
+    val mems = collectMems(top)
+    val seqMemReadRegs = new HashSet[Reg]
+    for((module, mem) <- mems){
+      val memSeqReads = mem.seqreads ++ mem.readwrites.map(_.read)
+      for(memSeqRead <- memSeqReads){
+        seqMemReadRegs += memSeqRead.addrReg
+      }
+    }
+
+    //find all the registers in FAME1 modules
+    val regs = new ArrayBuffer[(Module, Reg)]
+    def findRegs(module: Module): Unit = {
+      if(Fame5Transform.fame5Modules.contains(module)){
+        for(reg <- module.nodes.filter(_.isInstanceOf[Reg])){
+          if(!seqMemReadRegs.contains(reg.asInstanceOf[Reg])){
+            regs += ((module, reg.asInstanceOf[Reg]))
+          }
+        }
+      }
+      for(childModule <- module.children){
+        findRegs(childModule)
+      }
+    }
+    findRegs(top)
+    
+    
+    for((module, reg) <- regs){
+      reg.enable = reg.enable && Fame5Transform.fireSignals(module)
+      if(reg.updates.length == 0){
+        val regOutput = Bits()
+        regOutput.inputs += reg
+        val regMux = Bits()
+        regMux.inputs += reg.inputs(0)
+        reg.inputs(0) = Mux(Fame5Transform.fireSignals(module), regMux, regOutput)
+      } else {
+        for(i <- 0 until reg.updates.length){
+          val wEn = reg.updates(i)._1
+          val wData = reg.updates(i)._2
+          reg.updates(i) = ((wEn && Fame5Transform.fireSignals(module), wData))
+        }
+      }
+    }
+  }
+ 
+  private def appendFireToMemEnables(top: Module) = {
+    val mems = collectMems(top)
+
+    for((module, mem) <- mems){
+      val memWrites = mem.writes ++ mem.readwrites.map(_.write)
+      val memSeqReads = mem.seqreads ++ mem.readwrites.map(_.read)
+      for(memWrite <- memWrites){
+        if(mem.seqRead){
+          if(Module.backend.isInstanceOf[CppBackend]){
+            if(memWrite.inputs(0).asInstanceOf[Data].comp != null && memWrite.inputs(1).asInstanceOf[Data].comp != null){//huge hack for extra MemWrite generated for seqread mems in CPP backed; if both the cond and enable both happen to be directly from registers, this will fail horribly
+              memWrite.inputs(1) = memWrite.inputs(1).asInstanceOf[Bool] && Fame5Transform.fireSignals(module)
+            } else {
+              memWrite.inputs(1) = Bool(false)
+            }
+          } else {
+            memWrite.inputs(1) = memWrite.inputs(1).asInstanceOf[Bool] && Fame5Transform.fireSignals(module)
+          }
+        } else {
+          memWrite.inputs(1) = memWrite.inputs(1).asInstanceOf[Bool] && Fame5Transform.fireSignals(module)
+        }
+      }
+      for(memSeqRead <- memSeqReads){
+        Predef.assert(memSeqRead.addrReg.updates.length == 1)
+        val oldReadAddr = Bits()
+        oldReadAddr.inputs += memSeqRead.addrReg.updates(0)._2
+        val oldReadAddrReg = Reg(Bits())
+        oldReadAddrReg.comp.component = module
+        oldReadAddrReg.comp.asInstanceOf[Reg].enable = if (oldReadAddrReg.comp.asInstanceOf[Reg].isEnable) oldReadAddrReg.comp.asInstanceOf[Reg].enable || Fame5Transform.fireSignals(module) else Fame5Transform.fireSignals(module)
+        oldReadAddrReg.comp.asInstanceOf[Reg].isEnable = true
+        oldReadAddrReg.comp.asInstanceOf[Reg].updates += ((Fame5Transform.fireSignals(module), oldReadAddr))
+        
+        val newReadAddr = Mux(Fame5Transform.fireSignals(module), oldReadAddr, oldReadAddrReg)
+        
+        val oldReadEn = Bool()
+        oldReadEn.inputs += memSeqRead.addrReg.updates(0)._1
+        val renReg = Reg(init=Bool(false))
+        renReg.comp.component = module
+        
+        renReg.comp.asInstanceOf[Reg].enable = if(renReg.comp.asInstanceOf[Reg].isEnable) renReg.comp.asInstanceOf[Reg].enable || Fame5Transform.fireSignals(module) else Fame5Transform.fireSignals(module)
+        renReg.comp.asInstanceOf[Reg].isEnable = true
+        renReg.comp.asInstanceOf[Reg].updates += ((Fame5Transform.fireSignals(module), oldReadEn))
+        val newRen = Mux(Fame5Transform.fireSignals(module), oldReadEn, renReg)
+        
+        memSeqRead.addrReg.enable = newRen
+        memSeqRead.addrReg.updates.clear
+        memSeqRead.addrReg.updates += ((newRen, newReadAddr))
+      }
+    }
+  }*/
+  
+  
+  /*preElaborateTransforms += ((top: Module) => collectNodesIntoComp(initializeDFS))
+  preElaborateTransforms += ((top: Module) => appendFireToRegWriteEnables(top))
+  preElaborateTransforms += ((top: Module) => top.genAllMuxes)
+  preElaborateTransforms += ((top: Module) => appendFireToMemEnables(top))
+  preElaborateTransforms += ((top: Module) => collectNodesIntoComp(initializeDFS))
+  preElaborateTransforms += ((top: Module) => top.genAllMuxes)*/
 }
 
 class Fame5CppBackend extends CppBackend with Fame5Transform
