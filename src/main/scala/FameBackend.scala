@@ -178,6 +178,60 @@ class RegIO[T <: Data](data: T) extends Bundle
   val bits = data.clone.asOutput
 }
 
+class FameReg[T <: Data] (entries: Int)(data: T, resetVal: T = null) extends Module
+{
+  val io = new Bundle{
+    val deq = new DecoupledIO(data)
+    val enq = new DecoupledIO(data).flip()
+  }
+  
+  val shiftRegs = new ArrayBuffer[T]
+  for(i <- 0 until entries){
+    if(i == 0){
+      shiftRegs += RegInit(resetVal)
+    } else {
+      shiftRegs += Reg(data.clone)
+    }
+  }
+  
+  val tailPointer = Reg(init = UInt(1, width = log2Up(entries)))
+  val enqueue = io.enq.valid && io.enq.ready
+  val dequeue = io.deq.valid && io.deq.ready
+  when(enqueue && !dequeue){
+    tailPointer := tailPointer + UInt(1)
+  }.elsewhen(!enqueue && dequeue){
+    tailPointer := tailPointer - UInt(1)
+  }
+  val empty = tailPointer === UInt(0)
+  val full = (tailPointer === UInt(entries))
+
+  for(i <- 0 until (entries - 1)){
+    when(dequeue){
+      shiftRegs(i) := shiftRegs(i + 1)
+    }
+  }
+  
+  for(i <- 0 until entries){
+    when(UInt(i) === tailPointer){
+      when(enqueue){
+        when(!dequeue){
+          shiftRegs(i) := io.enq.bits
+        }
+      }
+    }.elsewhen(UInt(i) === (tailPointer - UInt(1))){
+      when(enqueue){
+        when(dequeue){
+          shiftRegs(i) := io.enq.bits
+        }
+      }
+    }
+  }
+  io.deq.valid := !empty
+  io.deq.bits := shiftRegs(0)
+  io.enq.ready := !full
+
+}
+
 class Fame1WrapperIO(num_queues: Int, num_regs: Int, num_debug: Int) extends Bundle {
   var queues:Vec[FameDecoupledIO[Bits]] = null
   if(num_queues > 0) {
