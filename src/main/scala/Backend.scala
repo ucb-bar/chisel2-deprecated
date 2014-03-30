@@ -504,7 +504,7 @@ abstract class Backend {
   }
 
   // walk forward from root register assigning consumer clk = root.clock
-  def createClkDomain(root: Node, walked: ArrayBuffer[Node]) = {
+  private def createClkDomain(root: Node, walked: HashSet[Node]) = {
     val dfsStack = new Stack[Node]
     walked += root; dfsStack.push(root)
     val clock = root.clock
@@ -695,7 +695,7 @@ abstract class Backend {
 
     Module.sortedComps.map(_.nodes.map(_.addConsumers))
     c.traceNodes();
-    val clkDomainWalkedNodes = new ArrayBuffer[Node]
+    val clkDomainWalkedNodes = new HashSet[Node]
     for (comp <- Module.sortedComps)
       for (node <- comp.nodes)
         if (node.isInstanceOf[Reg])
