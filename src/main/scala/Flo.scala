@@ -87,8 +87,8 @@ class FloBackend extends Backend {
             case "~" => "not'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
             case "!" => "not'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
             case "-" => "neg'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
-            case "|" => "neq'" + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + "0";
-            case "&" => "eq'" + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + "-1";
+            case "|" => "neq'" + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + "0'" + node.inputs(0).width;
+            case "&" => "eq'" + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + "-1'" + node.inputs(0).width;
             case "^" => "xorr'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
           }
          } else {
