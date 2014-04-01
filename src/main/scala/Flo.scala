@@ -55,17 +55,19 @@ class FloBackend extends Backend {
   override def emitTmp(node: Node): String =
     emitRef(node)
 
-  override def emitRef(node: Node): String = {
+  override def emitRef(node: Node): String = { emitRef(node, node) }
+
+  def emitRef(node: Node, cnode: Node): String = {
     // if (node.litOf == null) {
       node match {
         case x: Literal =>
-          "" + x.value + "'" + x.width
+          "" + x.value + "'" + cnode.width
 
         case x: Binding =>
-          emitRef(x.inputs(0))
+          emitRef(x.inputs(0), cnode)
 
         case x: Bits =>
-          if (!node.isInObject && node.inputs.length == 1) emitRef(node.inputs(0)) else super.emitRef(node)
+          if (!node.isInObject && node.inputs.length == 1) emitRef(node.inputs(0), cnode) else super.emitRef(node)
 
         case _ =>
           super.emitRef(node)
@@ -78,7 +80,7 @@ class FloBackend extends Backend {
   def emit(node: Node): String = {
     node match {
       case x: Mux =>
-        emitDec(x) + "mux" + " " + emitRef(x.inputs(0)) + " " + emitRef(x.inputs(1)) + " " + emitRef(x.inputs(2)) + "\n"
+        emitDec(x) + "mux" + " " + emitRef(x.inputs(0)) + " " + emitRef(x.inputs(1), x) + " " + emitRef(x.inputs(2), x) + "\n"
 
       case o: Op =>
         emitDec(o) +
@@ -93,26 +95,26 @@ class FloBackend extends Backend {
           }
          } else {
            o.op match {
-             case "<"  => "lt'"   + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
+             case "<"  => "lt'"   + node.inputs(0).width + " " + emitRef(node.inputs(0), node.inputs(1)) + " " + emitRef(node.inputs(1), node.inputs(0))
              case "s<" => "rsh'1 " + emitRef(node.inputs(0)) + " " + (node.inputs(0).width-1)
-             case ">=" => "gte'"  + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "<=" => "gte'"  + node.inputs(0).width + " " + emitRef(node.inputs(1)) + " " + emitRef(node.inputs(0))
-             case ">"  => "lt'"   + node.inputs(0).width + " " + emitRef(node.inputs(1)) + " " + emitRef(node.inputs(0))
-             case "+"  => "add'" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "-"  => "sub'" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "*"  => "mul'" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "/"  => "div'" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
+             case ">=" => "gte'"  + node.inputs(0).width + " " + emitRef(node.inputs(0), node.inputs(1)) + " " + emitRef(node.inputs(1), node.inputs(0))
+             case "<=" => "gte'"  + node.inputs(0).width + " " + emitRef(node.inputs(1), node.inputs(0)) + " " + emitRef(node.inputs(0), node.inputs(1))
+             case ">"  => "lt'"   + node.inputs(0).width + " " + emitRef(node.inputs(1), node.inputs(0)) + " " + emitRef(node.inputs(0), node.inputs(1))
+             case "+"  => "add'" + node.width + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
+             case "-"  => "sub'" + node.width + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
+             case "*"  => "mul'" + node.width + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
+             case "/"  => "div'" + node.width + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
              case "<<" => "lsh" + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case ">>" => "rsh'" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "s>>" => "arsh'" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "##" => "cat'" + node.inputs(1).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "|"  => "or" + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "||" => "or" + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "&"  => "and" + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "&&" => "and" + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "^"  => "xor" + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "==" => "eq" + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "!=" => "neq" + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
+             case "|"  => "or" + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
+             case "||" => "or" + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
+             case "&"  => "and" + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
+             case "&&" => "and" + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
+             case "^"  => "xor" + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
+             case "==" => "eq" + " " + emitRef(node.inputs(0), node.inputs(1)) + " " + emitRef(node.inputs(1), node.inputs(0))
+             case "!=" => "neq" + " " + emitRef(node.inputs(0), node.inputs(1)) + " " + emitRef(node.inputs(1), node.inputs(0))
            }
          }) + "\n"
 
@@ -166,7 +168,7 @@ class FloBackend extends Backend {
         emitDec(m) + "wr'" + m.data.width + " " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + " " + emitRef(m.data) + "\n"
       case x: Reg => // TODO: need resetData treatment
         (if (x.isReset) 
-          (emitRef(x) + "__update = mux'" + x.width + " " + emitRef(x.inputs.last) + " " + emitRef(x.init) + " " + emitRef(x.next) + "\n") 
+          (emitRef(x) + "__update = mux'" + x.width + " " + emitRef(x.inputs.last) + " " + emitRef(x.init, x) + " " + emitRef(x.next, x) + "\n")
          else "") +
         emitDec(x) + "reg'" + x.width + " 1 " + //  + (if (x.isEnable) emitRef(x.enableSignal) else "1") + " "
           (if (x.isReset) (emitRef(x) + "__update") else emitRef(x.next)) + "\n"
