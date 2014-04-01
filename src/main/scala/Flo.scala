@@ -49,6 +49,11 @@ class FloBackend extends Backend {
   val keywords = new HashSet[String]();
   var isRnd = false
 
+  object DreamerConfiguration {
+    var numRows = 1
+    var numCols = 1
+  }
+
   override def emitDec(node: Node): String =
     emitRef(node) + " = "
 
@@ -237,9 +242,14 @@ class FloBackend extends Backend {
       ChiselError.info(cmd + " RET " + c)
     }
     def build(name: String) {
-      val cmd = floDir + "lay -is-console :num-rows 1 :num-cols 1 < " + dir + name + ".flo | " + floDir + "fix-sched > " + dir + name + ".hex"
-      println("BUILDING " + cmd)
-      run(cmd)
+      val cmd = ArrayBuffer(floDir + "lay", "-is-console")
+      cmd ++= ArrayBuffer(":num-rows", DreamerConfiguration.numRows.toString())
+      cmd ++= ArrayBuffer(":num-cols", DreamerConfiguration.numCols.toString())
+      cmd ++= ArrayBuffer("<", dir + name + ".flo", "|")
+      cmd ++= ArrayBuffer(floDir + "fix-sched", ">", dir + name + ".hex")
+      val cmdString = cmd.mkString(" ")
+      println("BUILDING " + cmdString)
+      run(cmdString)
     }
     build(c.name)
   }

@@ -184,6 +184,19 @@ object chiselMain {
           i += 1
         }
         //case "--jDesign" =>  Module.jackDesign = args(i+1); i+=1;
+	// Dreamer configuration flags
+	case "--numRows" => {
+          if (Module.backend.isInstanceOf[FloBackend]) {
+	    Module.backend.asInstanceOf[FloBackend].DreamerConfiguration.numRows = args(i+1).toInt
+          }
+          i += 1
+        }
+	case "--numCols" => {
+          if (Module.backend.isInstanceOf[FloBackend]) {
+	    Module.backend.asInstanceOf[FloBackend].DreamerConfiguration.numCols = args(i+1).toInt
+          }
+          i += 1
+        }
         case any => ChiselError.warning("'" + arg + "' is an unknown argument.");
       }
       i += 1;
