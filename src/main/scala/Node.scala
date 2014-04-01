@@ -168,6 +168,7 @@ abstract class Node extends nameable {
       case e:NullPointerException => {
         println("Node:nameIt() NullPointerException: name '" + name + "'")
         printTree(System.out, 1)
+        throwException("NullPointer " + this.getClass + ":name " + name, e)
       }
     }
   }
