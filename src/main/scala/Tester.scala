@@ -415,7 +415,9 @@ class ManualTester[+T <: Module]
     val cmd = 
       (if (Module.backend.isInstanceOf[FloBackend]) {
          val dir = Module.backend.asInstanceOf[FloBackend].floDir
-         dir + "fix-console :is-debug true :filename " + target + ".hex"
+	 val command = ArrayBuffer(dir + "fix-console", ":is-debug", "true", ":filename", target + ".hex")
+	 if (Module.isVCD) { command ++= ArrayBuffer(":is-vcd-dump", "true") }
+         command.mkString(" ")
       } else {
          target + (if(Module.backend.isInstanceOf[VerilogBackend]) " -q" else "")
       })
