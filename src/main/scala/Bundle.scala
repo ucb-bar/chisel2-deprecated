@@ -83,7 +83,9 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     val c      = getClass();
     var elts   = ArrayBuffer[(String, Data)]();
     val seen   = ArrayBuffer[Object]();
-    for (m <- c.getMethods) {
+    for (m <- c.getMethods.sortWith(
+      (x, y) => (x.getName() < y.getName())
+    )) {
       val name = m.getName();
       val modifiers = m.getModifiers();
       val types = m.getParameterTypes();

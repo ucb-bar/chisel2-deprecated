@@ -839,7 +839,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
      Since we call invoke() to get a proper instance of the correct type,
      we have to insure the method is accessible, thus all fields
      that will generate C++ or Verilog code must be made public. */
-     for (m <- getClass().getDeclaredMethods) {
+     for (m <- getClass().getDeclaredMethods.sortWith(
+      (x, y) => (x.getName() < y.getName())
+    )) {
        val name = m.getName();
        val types = m.getParameterTypes();
        if (types.length == 0 && isValName(name) // patch to avoid defs
