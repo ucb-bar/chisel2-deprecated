@@ -232,7 +232,7 @@ object Op {
     }
     if (a.isInstanceOf[Flo] && b.isInstanceOf[Flo]) {
       if (a_lit != null && b_lit != null) {
-      val (fa_val, fb_val) = (a_lit.floValue, b_lit.floValue);
+      val (fa_val, fb_val) = (a_lit.floLitValue, b_lit.floLitValue)
       name match {
         case "f+" => return Flo(fa_val + fb_val);
         case "f-" => return Flo(fa_val - fb_val);
@@ -248,7 +248,7 @@ object Op {
         case _ => ;
       }
       } else if (a_lit != null) { 
-        val fa_val = a_lit.floValue;
+        val fa_val = a_lit.floLitValue
         if (fa_val == 0.0) {
           name match {
             case "f+" => return b;
@@ -263,7 +263,7 @@ object Op {
           }
         }        
       } else if (b_lit != null) { 
-        val fb_val = b_lit.floValue;
+        val fb_val = b_lit.floLitValue
         if (fb_val == 0.0) {
           name match {
             case "f+" => return a;
@@ -283,7 +283,7 @@ object Op {
       
     if (a.isInstanceOf[Dbl] && b.isInstanceOf[Dbl]) {
       if (a_lit != null && b_lit != null) {
-      val (fa_val, fb_val) = (a_lit.dblValue, b_lit.dblValue);
+      val (fa_val, fb_val) = (a_lit.dblLitValue, b_lit.dblLitValue)
         // println(" FOLDING " + name + " " + fa_val + " " + fb_val);
       name match {
         case "d+" => return Dbl(fa_val + fb_val);
@@ -300,7 +300,7 @@ object Op {
         case _ => ;
       }
     } else if (a_lit != null) { 
-      val fa_val = a_lit.dblValue;
+      val fa_val = a_lit.dblLitValue
       // println("FA " + fa_val + " NAME " + name);
       if (fa_val == 0.0) {
         // println("FOLDING " + name);
@@ -319,7 +319,7 @@ object Op {
         }
       }        
     } else if (b_lit != null) { 
-      val fb_val = b_lit.dblValue;
+      val fb_val = b_lit.dblLitValue
       // println("FB " + fb_val + " NAME " + name);
       if (fb_val == 0.0) {
         // println("FOLDING " + name);
@@ -399,7 +399,7 @@ object Op {
       val a_lit = a.litOf
     if (a.isInstanceOf[Dbl]) { 
       if (a_lit != null) {
-      val fa_val = a_lit.dblValue;
+      val fa_val = a_lit.dblLitValue
       name match {
         case "dsin" => return Dbl(Math.sin(fa_val));
         case "dcos" => return Dbl(Math.cos(fa_val));
@@ -419,7 +419,7 @@ object Op {
     }
     if (a.isInstanceOf[Flo]) {
       if (a_lit != null) {
-      val fa_val = a_lit.floValue;
+      val fa_val = a_lit.floLitValue
       name match {
         case "fsin" => return Flo(Math.sin(fa_val).toFloat);
         case "fcos" => return Flo(Math.cos(fa_val).toFloat);

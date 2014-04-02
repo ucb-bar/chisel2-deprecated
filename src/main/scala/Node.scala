@@ -121,7 +121,6 @@ abstract class Node extends nameable {
   var depth = 0;
   def componentOf: Module = if (Module.isEmittingComponents && component != null) component else Module.topComponent
   var width_ = -1;
-  var index = -1;
   var isFixedWidth = false;
   val consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
   val inputs = new ArrayBuffer[Node];
@@ -200,9 +199,6 @@ abstract class Node extends nameable {
   def litValue(default: BigInt = BigInt(-1)): BigInt =
     if (isLit) litOf.value
     else default
-  def value: BigInt = BigInt(-1);
-  def floValue: Float = intBitsToFloat(value.toInt)
-  def dblValue: Double = longBitsToDouble(value.toLong)
   def floLitValue: Float = intBitsToFloat(litValue().toInt)
   def dblLitValue: Double = longBitsToDouble(litValue().toLong)
   def bitSet(off: UInt, dat: UInt): UInt = {
@@ -299,7 +295,7 @@ abstract class Node extends nameable {
     writer.println("isTypeNode: " + isTypeNode)
     writer.println("depth: " + depth)
     writer.println("width_: " + width_)
-    writer.println("index: " + index)
+    writer.println("index: " + emitIndex)
     writer.println("isFixedWidth: " + isFixedWidth)
     writer.println("consumers.length: " + consumers.length)
     writer.println("nameHolder: " + nameHolder)
@@ -515,12 +511,8 @@ abstract class Node extends nameable {
         Array[Node](getNode);
     }
   }
-  def emitIndex(): Int = {
-    if (index == -1) {
-      index = componentOf.nextIndex;
-    }
-    index
-  }
+
+  lazy val emitIndex: Int = componentOf.nextIndex
 
   override val hashCode: Int = System.identityHashCode(this)
   override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
