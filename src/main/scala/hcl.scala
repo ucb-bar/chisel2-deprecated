@@ -183,6 +183,10 @@ object chiselMain {
           Module.testerSeed = args(i+1).toInt
           i += 1
         }
+        case "--emitTempNodes" => {
+            Module.isDebug = true
+            Module.emitTempNodes = true
+        }
         //case "--jDesign" =>  Module.jackDesign = args(i+1); i+=1;
 	// Dreamer configuration flags
 	case "--numRows" => {
