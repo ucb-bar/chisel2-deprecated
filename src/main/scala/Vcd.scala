@@ -55,12 +55,22 @@ class VcdBackend extends Backend {
   def dumpVCDScope(c: Module, write: String => Unit, top: Module, names: HashMap[Node, String]): Unit = {
     write("    fprintf(f, \"" + "$scope module " + c.name + " $end" + "\\n\");\n");
     for (mod <- top.omods) {
-      if (mod.component == c && mod.isInVCD) {
+      if (mod.component == c && mod.isInVCD && !mod.name.isEmpty) {
         write("    fprintf(f, \"$var wire " + mod.width + " " + names(mod) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\");\n");
       }
     }
     for (child <- c.children) {
       dumpVCDScope(child, write, top, names);
+    }
+    write("    fprintf(f, \"$upscope $end\\n\");\n");
+  }
+
+  def dumpScopeForTemps(c: Module, write: String => Unit, names: HashMap[Node, String]): Unit = {
+    write("    fprintf(f, \"$scope module _chisel_temps_ $end\\n\");\n");
+    for ((mod, name) <- names) {
+      if (mod.name.isEmpty) {
+        write("    fprintf(f, \"$var wire " + mod.width + " " + names(mod) + " " + c.stripComponent(emitRef(mod)) + " $end\\n\");\n");
+      }
     }
     write("    fprintf(f, \"$upscope $end\\n\");\n");
   }
@@ -79,6 +89,7 @@ class VcdBackend extends Backend {
       write("  if (t == 0) {\n");
       write("    fprintf(f, \"$timescale 1ps $end\\n\");\n");
       dumpVCDScope(c, write, c, names);
+      dumpScopeForTemps(c, write, names);
       write("    fprintf(f, \"$enddefinitions $end\\n\");\n");
       write("    fprintf(f, \"$dumpvars\\n\");\n");
       write("    fprintf(f, \"$end\\n\");\n");

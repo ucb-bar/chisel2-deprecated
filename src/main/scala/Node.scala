@@ -266,10 +266,12 @@ abstract class Node extends nameable {
   def isInObject: Boolean =
     (isIo && (Module.isIoDebug || component == Module.topComponent)) ||
     Module.topComponent.debugs.contains(this) || isPrintArg || isScanArg ||
-    isReg || isUsedByRam || Module.isDebug && !name.isEmpty
+    isReg || isUsedByRam || Module.isDebug && !name.isEmpty ||
+    Module.emitTempNodes
 
   def isInVCD: Boolean = width > 0 &&
-    ((isIo && isInObject) || isReg || (Module.isDebug && !name.isEmpty))
+    ((isIo && isInObject) || isReg || (Module.isDebug && !name.isEmpty)) ||
+    Module.emitTempNodes
 
   /** Prints all members of a node and recursively its inputs up to a certain
     depth level. This method is purely used for debugging. */

@@ -115,6 +115,10 @@ object Module {
    into a Module.apply() call will be detected when trigger is false. */
   var trigger: Boolean = false
 
+  // Setting this to TRUE will result in temporary values (ie, nodes
+  // named "T*") to be emited to the VCD file.
+  var emitTempNodes = false;
+
   def apply[T <: Module](c: => T): T = {
     trigger = true
     /* *push* is done in the Module constructor because we don't have
