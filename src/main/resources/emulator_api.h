@@ -451,7 +451,7 @@ public:
 			return get_dat_by_name(tokens[1])->get_value();
 		} else if (tokens[0] == "wire_poke") {
 			// IN:  wire_poke <node_name> <value>
-			// OUT: ok (on success) or error
+			// OUT: ok (on success)
 			if (!check_command_length(tokens, 2, 2)) { return "error"; }
 			bool success = get_dat_by_name(tokens[1])->set_value(tokens[2]);
 			return success ? "ok" : "error";
@@ -462,7 +462,7 @@ public:
 			return get_mem_by_name(tokens[1])->get_element(tokens[2]);
 		} else if (tokens[0] == "mem_poke") {
 			// IN:  mem_poke <mem_name> <mem_index> <value>
-			// OUT: ok (on success) or error
+			// OUT: ok (on success)
 			if (!check_command_length(tokens, 3, 3)) { return "error"; }
 			bool success = get_mem_by_name(tokens[1])->set_element(tokens[2], tokens[3]);
 			return success ? "ok" : "error";
@@ -525,7 +525,7 @@ public:
 			return tokens[1];
 		} else if (tokens[0] == "referenced_snapshot_restore") {
 			// BETA FUNCTION: semantics subject to change, use with caution
-			// IN:  referenced_snapshot_restore <reference_name>
+			// IN:  referenced_snapshot_restore <name>
 			// OUT: ok (on success)
 			if (!check_command_length(tokens, 1, 1)) { return "error"; }
 			mod_t *snapshot = get_snapshot_by_reference(tokens[1]);
