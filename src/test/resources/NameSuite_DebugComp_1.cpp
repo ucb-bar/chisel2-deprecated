@@ -12,6 +12,10 @@ int NameSuite_DebugComp_1_t::clock ( dat_t<1> reset ) {
   if (clk_cnt == 0) clk_cnt = clk;
   return min;
 }
+mod_t* NameSuite_DebugComp_1_t::clone() {
+  mod_t* cloned = new NameSuite_DebugComp_1_t(*this);
+  return cloned;
+}
 void NameSuite_DebugComp_1_t::print ( FILE* f ) {
 }
 void NameSuite_DebugComp_1_t::dump(FILE *f, int t) {

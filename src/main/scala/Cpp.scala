@@ -785,9 +785,9 @@ class CppBackend extends Backend {
     if (Module.clocks.length > 1) {
       out_h.write("  void setClocks ( std::vector< int >& periods );\n")
     }
+    out_h.write("  mod_t* clone();\n");
     out_h.write("  void print ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
-    out_h.write("  mod_t* clone();\n");
     out_h.write("};\n\n");
     out_h.write(Params.toCxxStringParams);
     
@@ -869,7 +869,13 @@ class CppBackend extends Backend {
     writeCppFile("  return min;\n")
     writeCppFile("}\n")
 
-    // geenrate print(...) function
+    // generate clone() function
+    writeCppFile(s"mod_t* ${c.name}_t::clone() {\n")
+    writeCppFile(s"  mod_t* cloned = new ${c.name}_t(*this);\n")
+    writeCppFile(s"  return cloned;\n")
+    writeCppFile(s"}\n")
+    
+    // generate print(...) function
     writeCppFile("void " + c.name + "_t::print ( FILE* f ) {\n")
     for (cc <- Module.components; p <- cc.printfs) {
       hasPrintfs = true
@@ -883,11 +889,6 @@ class CppBackend extends Backend {
     if (hasPrintfs)
       writeCppFile("fflush(f);\n");
     writeCppFile("}\n")
-
-    writeCppFile(s"mod_t* ${c.name}_t::clone() {\n")
-    writeCppFile(s"  mod_t* cloned = new ${c.name}_t(*this);\n")
-    writeCppFile(s"  return cloned;\n")
-    writeCppFile(s"}\n")
     
     createCppFile()
     vcd.dumpVCD(c, writeCppFile)

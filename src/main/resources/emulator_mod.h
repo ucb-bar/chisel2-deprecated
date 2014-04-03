@@ -1782,13 +1782,13 @@ class mod_t {
   virtual int  clock ( dat_t<1> reset ) { };
   virtual void setClocks ( std::vector< int >& periods ) { };
 
-  virtual void print ( FILE* f ) { };
-  virtual void dump ( FILE* f, int t ) { };
-
   // Returns a clone of this object, preserving timestep and circuit state
   // (both registers and wires). Currently, it is undefined what happens
   // to dumpfile / other internal state, so use with care.
   virtual mod_t* clone() = 0;
+
+  virtual void print ( FILE* f ) { };
+  virtual void dump ( FILE* f, int t ) { };
 
   void set_dumpfile(FILE* f) {
 	dumpfile = f;

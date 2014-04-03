@@ -11,6 +11,10 @@ int VerifSuite_CppAssertComp_1_t::clock ( dat_t<1> reset ) {
   if (clk_cnt == 0) clk_cnt = clk;
   return min;
 }
+mod_t* VerifSuite_CppAssertComp_1_t::clone() {
+  mod_t* cloned = new VerifSuite_CppAssertComp_1_t(*this);
+  return cloned;
+}
 void VerifSuite_CppAssertComp_1_t::print ( FILE* f ) {
 }
 void VerifSuite_CppAssertComp_1_t::dump(FILE *f, int t) {
