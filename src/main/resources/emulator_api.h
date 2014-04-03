@@ -334,6 +334,11 @@ public:
 		return true;
 	}
 
+	// Evaluates an API command, returning the reply as a string (without
+	// the trailing newline).
+	// Errors return "error", printing a more detailed description to stderr.
+	// TODO: find a way to pass errors in-line, so transport layers other than
+	// stdin/stdout (like TCP/IP) are possible while also communicating errors.
 	std::string eval_command(string command) {
 		std::vector<std::string> tokens = tokenize(command);
 		if (tokens.size() == 0) {
@@ -342,15 +347,17 @@ public:
 		}
 		if (tokens[0] == "get_host_name") {
 			// IN:  get_host_name
-			// OUT: API host's name
+			// OUT: API host's name (arbitrary string)
 			if (!check_command_length(tokens, 0, 0)) { return "error"; }
 			return get_host_name();
 		} else if (tokens[0] == "get_api_version") {
+			// BETA FUNCTION: semantics subject to change, use with caution
 			// IN:  get_api_version
 			// OUT: API version supported by this host
 			if (!check_command_length(tokens, 0, 0)) { return "error"; }
 			return get_api_version();
 		} else if (tokens[0] == "get_api_support") {
+			// BETA FUNCTION: semantics subject to change, use with caution
 			// IN:  get_api_support
 			// OUT: list of supported API features
 			if (!check_command_length(tokens, 0, 0)) { return "error"; }
@@ -375,6 +382,7 @@ public:
 		    int ret = module->step(false, n);
 		    return itos(ret);
 		} else if (tokens[0] == "set_clocks") {
+			// BETA FUNCTION: semantics subject to change, use with caution
 			// IN:  set_clocks
 			// OUT: ???
 			// I'm not really sure what this is supposed to do, but it was
@@ -403,6 +411,7 @@ public:
 		    return itos(cycles);
 
 		} else if (tokens[0] == "peek") {
+			// LEGACY FUNCTION: do not use in new code
 			// IN:  peek <node_name> | peek <mem_name> <mem_index>
 			// OUT: value
 			if (!check_command_length(tokens, 1, 2)) { return "error"; }
@@ -413,6 +422,7 @@ public:
 				return get_mem_by_name(tokens[1])->get_element(tokens[2]);
 			}
 		} else if (tokens[0] == "poke") {
+			// LEGACY FUNCTION: do not use in new code
 			// IN:  poke <node_name> <value> | poke <mem_name> <mem_index> <value>
 			// OUT: true (on success), false (on failure)
 			if (!check_command_length(tokens, 2, 3)) { return ""; }
@@ -432,10 +442,10 @@ public:
 			return get_dat_by_name(tokens[1])->get_value();
 		} else if (tokens[0] == "wire_poke") {
 			// IN:  wire_poke <node_name> <value>
-			// OUT: true (on success), false (on failure)
+			// OUT: ok (on success) or error
 			if (!check_command_length(tokens, 2, 2)) { return "error"; }
 			bool success = get_dat_by_name(tokens[1])->set_value(tokens[2]);
-			return success ? "true" : "false";
+			return success ? "ok" : "error";
 		} else if (tokens[0] == "mem_peek") {
 			// IN:  mem_peek <mem_name> <mem_index>
 			// OUT: value
@@ -443,10 +453,10 @@ public:
 			return get_mem_by_name(tokens[1])->get_element(tokens[2]);
 		} else if (tokens[0] == "mem_poke") {
 			// IN:  mem_poke <mem_name> <mem_index> <value>
-			// OUT: true (on success), false (on failure)
+			// OUT: ok (on success) or error
 			if (!check_command_length(tokens, 3, 3)) { return "error"; }
 			bool success = get_mem_by_name(tokens[1])->set_element(tokens[2], tokens[3]);
-			return success ? "true" : "false";
+			return success ? "ok" : "error";
 
 		} else if (tokens[0] == "list_wires") {
 			// IN:  list_wires
@@ -491,6 +501,22 @@ public:
 			// OUT: elements in memory
 			if (!check_command_length(tokens, 1, 1)) { return "error"; }
 			return get_mem_by_name(tokens[1])->get_depth();
+
+		} else if (tokens[0] == "referenced_snapshot_save") {
+			// BETA FUNCTION: semantics subject to change, use with caution
+			// IN:  referenced_snapshot_save
+			// OUT: unique reference name (an arbitrary string) for saved
+			//      snapshot of current state
+			// Caution: the state may not be self-consistent (i.e. clk_lo
+			// does not need to have been applied before this, and calls to
+			// clk_lo immediately after restoring may change the state).
+			if (!check_command_length(tokens, 0, 0)) { return "error"; }
+
+		} else if (tokens[0] == "referenced_snapshot_restore") {
+			// BETA FUNCTION: semantics subject to change, use with caution
+			// IN:  referenced_snapshot_restore <reference_name>
+			// OUT: restores the snapshot addressed by the reference
+			if (!check_command_length(tokens, 0, 0)) { return "error"; }
 
 		} else {
 			std::cerr << "Unknown command: '" << tokens[0] << "'" << std::endl;
