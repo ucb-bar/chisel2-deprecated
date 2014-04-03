@@ -506,8 +506,11 @@ class VerilogBackend extends Backend {
       if (m.clock != null && clkDomain != null)
         clkDomain.append(emitReg(m))
     }
-    for (p <- c.printfs)
-      clkDomains(p.clock).append(emitPrintf(p))
+    for (p <- c.printfs) {
+      val clkDomain = clkDomains getOrElse (p.clock, null)
+      if (p.clock != null && clkDomain != null)
+        clkDomain.append(emitPrintf(p))
+    }
     for (clock <- c.clocks) {
       clkDomains(clock).append("  end\n")
       res.append(clkDomains(clock).result())
