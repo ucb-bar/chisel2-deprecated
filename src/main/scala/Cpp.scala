@@ -787,6 +787,7 @@ class CppBackend extends Backend {
     }
     out_h.write("  void print ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
+    out_h.write("  mod_t* clone();\n");
     out_h.write("};\n\n");
     out_h.write(Params.toCxxStringParams);
     
@@ -883,6 +884,11 @@ class CppBackend extends Backend {
       writeCppFile("fflush(f);\n");
     writeCppFile("}\n")
 
+    writeCppFile(s"mod_t* ${c.name}_t::clone() {\n")
+    writeCppFile(s"  mod_t* cloned = new ${c.name}_t(*this);\n")
+    writeCppFile(s"  return cloned;\n")
+    writeCppFile(s"}\n")
+    
     createCppFile()
     vcd.dumpVCD(c, writeCppFile)
 

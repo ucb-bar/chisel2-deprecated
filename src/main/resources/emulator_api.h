@@ -363,6 +363,7 @@ public:
 			if (!check_command_length(tokens, 0, 0)) { return "error"; }
 			return get_api_support();
 		} else if (tokens[0] == "clock") {
+			// BETA FUNCTION: semantics subject to change, use with caution
 			// IN:  clock <num_cycles>
 			// OUT: actual number of cycles stepped
 			if (!check_command_length(tokens, 1, 1)) { return "error"; }
@@ -374,6 +375,14 @@ public:
 		    }
 		    module->clock_lo(dat_t<1>(0));
 		    return itos(cycles);
+		} else if (tokens[0] == "propagate") {
+			// BETA FUNCTION: semantics subject to change, use with caution
+			// IN:  propagate
+			// OUT: ok (on success)
+			// This function propagates the combinational logic, without
+			// updating registers.
+		    module->clock_lo(dat_t<1>(0));
+		    return "ok";
 		} else if (tokens[0] == "step") {
 			// IN:  step <num_cycles>
 			// OUT: actual number of cycles stepped
@@ -504,19 +513,28 @@ public:
 
 		} else if (tokens[0] == "referenced_snapshot_save") {
 			// BETA FUNCTION: semantics subject to change, use with caution
-			// IN:  referenced_snapshot_save
-			// OUT: unique reference name (an arbitrary string) for saved
-			//      snapshot of current state
+			// IN:  referenced_snapshot_save <name>
+			// OUT: Reference name (an arbitrary string) for saved snapshot
+			//      of current state, should be equivalent to the input.
 			// Caution: the state may not be self-consistent (i.e. clk_lo
 			// does not need to have been applied before this, and calls to
 			// clk_lo immediately after restoring may change the state).
-			if (!check_command_length(tokens, 0, 0)) { return "error"; }
-
+			if (!check_command_length(tokens, 1, 1)) { return "error"; }
+			mod_t *snapshot = module->clone();
+			snapshot_table[tokens[1]] = snapshot;
+			return tokens[1];
 		} else if (tokens[0] == "referenced_snapshot_restore") {
 			// BETA FUNCTION: semantics subject to change, use with caution
 			// IN:  referenced_snapshot_restore <reference_name>
-			// OUT: restores the snapshot addressed by the reference
-			if (!check_command_length(tokens, 0, 0)) { return "error"; }
+			// OUT: ok (on success)
+			if (!check_command_length(tokens, 1, 1)) { return "error"; }
+			mod_t *snapshot = get_snapshot_by_reference(tokens[1]);
+			if (snapshot == NULL) {	return "error";	}
+			// TODO: make this a bit less hacky? perhaps a save-state /
+			// load-state function inside mod_t?
+			module = snapshot;
+			init_mapping_table();
+			return "ok";
 
 		} else {
 			std::cerr << "Unknown command: '" << tokens[0] << "'" << std::endl;
@@ -564,10 +582,24 @@ protected:
 		}
 	}
 
-	std::map<string, dat_api_base*> dat_table;
-	std::map<string, mem_api_base*> mem_table;
+	mod_t* get_snapshot_by_reference(std::string name) {
+		if (snapshot_table.find(name) != snapshot_table.end()) {
+			return snapshot_table[name];
+		} else {
+			std::cerr << "Unable to find snapshot reference '" << name << "'" << std::endl;
+			return NULL;
+		}
+	}
+
+	std::map<std::string, dat_api_base*> dat_table;
+	std::map<std::string, mem_api_base*> mem_table;
+	// TODO: replace the dummy with explicit NULL checks - this is simple
+	// but a bit inelegant
 	dat_dummy this_dat_dummy;
 	mem_dummy this_mem_dummy;
+
+	// Snapshot functions
+	std::map<std::string, mod_t*> snapshot_table;
 };
 
 #endif

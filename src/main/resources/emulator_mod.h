@@ -1785,6 +1785,11 @@ class mod_t {
   virtual void print ( FILE* f ) { };
   virtual void dump ( FILE* f, int t ) { };
 
+  // returns a clone of this object, preserving timestep and internal state
+  // (including registers and wires).
+  // Currently, it is undefined what happens to dumpfile.
+  virtual mod_t* clone() = 0;
+
   void set_dumpfile(FILE* f) {
 	dumpfile = f;
   }
