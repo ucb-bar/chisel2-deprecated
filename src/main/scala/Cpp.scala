@@ -115,27 +115,34 @@ class CppBackend extends Backend {
     }
   }
 
-  override def emitDec(node: Node): String = {
+  // Returns a list of tuples (type, name) of variables needed by a node
+  def nodeVars(node: Node): List[(String, String)] = {
     node match {
       case x: Binding =>
-        ""
+        List()
       case x: Literal =>
-        ""
+        List()
       case x: Reg =>
-        "  dat_t<" + node.width + "> " + emitRef(node) + ";\n" +
-        "  dat_t<" + node.width + "> " + emitRef(node) + "_shadow;\n";
+        List((s"dat_t<${node.width}>", emitRef(node)),
+             (s"dat_t<${node.width}>", emitRef(node) + "_shadow"))
       case m: Mem[_] =>
-        "  mem_t<" + m.width + "," + m.n + "> " + emitRef(m) + ";\n"
+        List((s"mem_t<${m.width},${m.n}>", emitRef(m)))
       case r: ROMData =>
-        "  mem_t<" + r.width + "," + r.lits.length + "> " + emitRef(r) + ";\n"
+        List((s"mem_t<${r.width},${r.lits.length}>", emitRef(r)))
       case c: Clock =>
-        "  int " + emitRef(node) + ";\n" +
-        "  int " + emitRef(node) + "_cnt;\n";
-      // case f: AsyncFIFO =>
-      //   "  async_fifo_t<" + f.width + ",32> " + emitRef(f) + ";\n"
+        List(("int", emitRef(node)),
+             ("int", emitRef(node) + "_cnt"))
       case _ =>
-        "  dat_t<" + node.width + "> " + emitRef(node) + ";\n"
+        List((s"dat_t<${node.width}>", emitRef(node)))
     }
+  }
+  
+  override def emitDec(node: Node): String = {
+    val out = new StringBuilder("") 
+    for (varDef <- nodeVars(node)) {
+      out.append(s"  ${varDef._1} ${varDef._2};\n")
+    }
+    out.toString()
   }
 
   val bpw = 64
@@ -786,6 +793,7 @@ class CppBackend extends Backend {
       out_h.write("  void setClocks ( std::vector< int >& periods );\n")
     }
     out_h.write("  mod_t* clone();\n");
+    //out_h.write("  bool mod_t::set_circuit_from(mod_t* src) {\n")
     out_h.write("  void print ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
     out_h.write("};\n\n");
@@ -874,6 +882,26 @@ class CppBackend extends Backend {
     writeCppFile(s"  mod_t* cloned = new ${c.name}_t(*this);\n")
     writeCppFile(s"  return cloned;\n")
     writeCppFile(s"}\n")
+    
+    // generate set_circuit_from function
+    /*writeCppFile(s"bool ${c.name}_t::set_circuit_from(mod_t* src) {\n")
+    writeCppFile(s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(src);\n")
+    writeCppFile(s"  assert(src);\n")
+    
+    for (m <- c.omods) {
+      if(m.name != "reset") {
+        if (m.isInObject) {
+          out_h.write(emitDec(m));
+        }
+        if (m.isInVCD) {
+          out_h.write(vcd.emitDec(m));
+        }
+      }
+    }
+    for (clock <- Module.clocks)
+      out_h.write(emitDec(clock))
+      
+    writeCppFile(s"}\n")*/
     
     // generate print(...) function
     writeCppFile("void " + c.name + "_t::print ( FILE* f ) {\n")
