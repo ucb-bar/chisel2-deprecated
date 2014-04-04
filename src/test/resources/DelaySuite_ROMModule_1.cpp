@@ -18,6 +18,16 @@ mod_t* DelaySuite_ROMModule_1_t::clone() {
   mod_t* cloned = new DelaySuite_ROMModule_1_t(*this);
   return cloned;
 }
+bool DelaySuite_ROMModule_1_t::set_circuit_from(mod_t* src) {
+  DelaySuite_ROMModule_1_t* mod_typed = dynamic_cast<DelaySuite_ROMModule_1_t*>(src);
+  assert(mod_typed);
+  T0 = mod_typed->T0;
+  DelaySuite_ROMModule_1__io_addr = mod_typed->DelaySuite_ROMModule_1__io_addr;
+  DelaySuite_ROMModule_1__io_out = mod_typed->DelaySuite_ROMModule_1__io_out;
+  clk = mod_typed->clk;
+  clk_cnt = mod_typed->clk_cnt;
+  return true;
+}
 void DelaySuite_ROMModule_1_t::print ( FILE* f ) {
 }
 void DelaySuite_ROMModule_1_t::dump(FILE *f, int t) {

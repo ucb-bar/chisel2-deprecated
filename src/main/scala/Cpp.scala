@@ -904,7 +904,7 @@ class CppBackend extends Backend {
     for (clock <- Module.clocks) {
       writeCppFile(emitCircuitAssign("mod_typed->", clock))
     }
-    writeCppFile("  return true;")
+    writeCppFile("  return true;\n")
     writeCppFile(s"}\n")
     
     // generate print(...) function

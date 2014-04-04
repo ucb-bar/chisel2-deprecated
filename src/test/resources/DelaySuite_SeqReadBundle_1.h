@@ -27,6 +27,7 @@ class DelaySuite_SeqReadBundle_1_t : public mod_t {
   void clock_hi ( dat_t<1> reset );
   int clock ( dat_t<1> reset );
   mod_t* clone();
+  bool set_circuit_from(mod_t* src);
   void print ( FILE* f );
   void dump ( FILE* f, int t );
 };

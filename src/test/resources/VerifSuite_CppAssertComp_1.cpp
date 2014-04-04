@@ -15,6 +15,17 @@ mod_t* VerifSuite_CppAssertComp_1_t::clone() {
   mod_t* cloned = new VerifSuite_CppAssertComp_1_t(*this);
   return cloned;
 }
+bool VerifSuite_CppAssertComp_1_t::set_circuit_from(mod_t* src) {
+  VerifSuite_CppAssertComp_1_t* mod_typed = dynamic_cast<VerifSuite_CppAssertComp_1_t*>(src);
+  assert(mod_typed);
+  VerifSuite_CppAssertComp_1__io_y = mod_typed->VerifSuite_CppAssertComp_1__io_y;
+  VerifSuite_CppAssertComp_1__io_x = mod_typed->VerifSuite_CppAssertComp_1__io_x;
+  VerifSuite_CppAssertComp_1__io_z = mod_typed->VerifSuite_CppAssertComp_1__io_z;
+  T0 = mod_typed->T0;
+  clk = mod_typed->clk;
+  clk_cnt = mod_typed->clk_cnt;
+  return true;
+}
 void VerifSuite_CppAssertComp_1_t::print ( FILE* f ) {
 }
 void VerifSuite_CppAssertComp_1_t::dump(FILE *f, int t) {

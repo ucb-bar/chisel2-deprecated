@@ -16,6 +16,21 @@ mod_t* NameSuite_DebugComp_1_t::clone() {
   mod_t* cloned = new NameSuite_DebugComp_1_t(*this);
   return cloned;
 }
+bool NameSuite_DebugComp_1_t::set_circuit_from(mod_t* src) {
+  NameSuite_DebugComp_1_t* mod_typed = dynamic_cast<NameSuite_DebugComp_1_t*>(src);
+  assert(mod_typed);
+  NameSuite_DebugComp_1_dpath__reset = mod_typed->NameSuite_DebugComp_1_dpath__reset;
+  NameSuite_DebugComp_1__io_ctrl_wb_wen = mod_typed->NameSuite_DebugComp_1__io_ctrl_wb_wen;
+  NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen = mod_typed->NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen;
+  NameSuite_DebugComp_1_dpath__wb_wen = mod_typed->NameSuite_DebugComp_1_dpath__wb_wen;
+  NameSuite_DebugComp_1_dpath__wb_reg_ll_wb = mod_typed->NameSuite_DebugComp_1_dpath__wb_reg_ll_wb;
+  NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow = mod_typed->NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow;
+  NameSuite_DebugComp_1_dpath__io_ctrl_out = mod_typed->NameSuite_DebugComp_1_dpath__io_ctrl_out;
+  NameSuite_DebugComp_1__io_ctrl_out = mod_typed->NameSuite_DebugComp_1__io_ctrl_out;
+  clk = mod_typed->clk;
+  clk_cnt = mod_typed->clk_cnt;
+  return true;
+}
 void NameSuite_DebugComp_1_t::print ( FILE* f ) {
 }
 void NameSuite_DebugComp_1_t::dump(FILE *f, int t) {

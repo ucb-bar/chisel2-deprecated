@@ -17,6 +17,27 @@ mod_t* DelaySuite_SeqReadBundle_1_t::clone() {
   mod_t* cloned = new DelaySuite_SeqReadBundle_1_t(*this);
   return cloned;
 }
+bool DelaySuite_SeqReadBundle_1_t::set_circuit_from(mod_t* src) {
+  DelaySuite_SeqReadBundle_1_t* mod_typed = dynamic_cast<DelaySuite_SeqReadBundle_1_t*>(src);
+  assert(mod_typed);
+  DelaySuite_SeqReadBundle_1__io_out_a_a = mod_typed->DelaySuite_SeqReadBundle_1__io_out_a_a;
+  DelaySuite_SeqReadBundle_1__io_out_a_b = mod_typed->DelaySuite_SeqReadBundle_1__io_out_a_b;
+  DelaySuite_SeqReadBundle_1__io_raddr = mod_typed->DelaySuite_SeqReadBundle_1__io_raddr;
+  DelaySuite_SeqReadBundle_1__io_ren = mod_typed->DelaySuite_SeqReadBundle_1__io_ren;
+  R0 = mod_typed->R0;
+  R0_shadow = mod_typed->R0_shadow;
+  DelaySuite_SeqReadBundle_1__io_in_a_b_ = mod_typed->DelaySuite_SeqReadBundle_1__io_in_a_b_;
+  DelaySuite_SeqReadBundle_1__io_in_a_b = mod_typed->DelaySuite_SeqReadBundle_1__io_in_a_b;
+  DelaySuite_SeqReadBundle_1__io_in_a_a = mod_typed->DelaySuite_SeqReadBundle_1__io_in_a_a;
+  T1 = mod_typed->T1;
+  DelaySuite_SeqReadBundle_1__io_wen = mod_typed->DelaySuite_SeqReadBundle_1__io_wen;
+  DelaySuite_SeqReadBundle_1__io_waddr = mod_typed->DelaySuite_SeqReadBundle_1__io_waddr;
+  DelaySuite_SeqReadBundle_1__mem = mod_typed->DelaySuite_SeqReadBundle_1__mem;
+  DelaySuite_SeqReadBundle_1__io_out_a_b_ = mod_typed->DelaySuite_SeqReadBundle_1__io_out_a_b_;
+  clk = mod_typed->clk;
+  clk_cnt = mod_typed->clk_cnt;
+  return true;
+}
 void DelaySuite_SeqReadBundle_1_t::print ( FILE* f ) {
 }
 void DelaySuite_SeqReadBundle_1_t::dump(FILE *f, int t) {
