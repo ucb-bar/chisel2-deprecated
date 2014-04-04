@@ -894,7 +894,7 @@ class CppBackend extends Backend {
     // generate set_circuit_from function
     writeCppFile(s"bool ${c.name}_t::set_circuit_from(mod_t* src) {\n")
     writeCppFile(s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(src);\n")
-    writeCppFile(s"  assert(src);\n")
+    writeCppFile(s"  assert(mod_typed);\n")
     
     for (m <- c.omods) {
       if(m.name != "reset" && m.isInObject) {

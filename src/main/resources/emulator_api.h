@@ -530,8 +530,8 @@ public:
 			if (!check_command_length(tokens, 1, 1)) { return "error"; }
 			mod_t *snapshot = get_snapshot_by_reference(tokens[1]);
 			if (snapshot == NULL) {	return "error";	}
-			module->set_circuit_from(snapshot);
-			return "ok";
+			bool success = module->set_circuit_from(snapshot)
+			return success ? "ok" : "error";
 
 		} else {
 			std::cerr << "Unknown command: '" << tokens[0] << "'" << std::endl;
