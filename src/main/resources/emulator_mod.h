@@ -1790,7 +1790,7 @@ class mod_t {
   // For mod_t subclasses, src must be the same class.
   // Returns true on success, and false on failure. Currently, no guarantees
   // are made about state consistency on failure,
-  //virtual bool set_circuit_from(mod_t* src) = 0;
+  virtual bool set_circuit_from(mod_t* src) = 0;
 
   virtual void print ( FILE* f ) { };
   virtual void dump ( FILE* f, int t ) { };

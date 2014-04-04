@@ -530,10 +530,7 @@ public:
 			if (!check_command_length(tokens, 1, 1)) { return "error"; }
 			mod_t *snapshot = get_snapshot_by_reference(tokens[1]);
 			if (snapshot == NULL) {	return "error";	}
-			// TODO: make this a bit less hacky? perhaps a save-state /
-			// load-state function inside mod_t?
-			module = snapshot;
-			init_mapping_table();
+			module->set_circuit_from(snapshot);
 			return "ok";
 
 		} else {

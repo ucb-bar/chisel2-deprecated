@@ -145,6 +145,14 @@ class CppBackend extends Backend {
     out.toString()
   }
 
+  def emitCircuitAssign(srcPrefix:String, node: Node): String = {
+    val out = new StringBuilder("") 
+    for (varDef <- nodeVars(node)) {
+      out.append(s"  ${varDef._2} = ${srcPrefix}${varDef._2};\n")
+    }
+    out.toString()
+  }
+
   val bpw = 64
   def words(node: Node): Int = (node.width - 1) / bpw + 1
   def fullWords(node: Node): Int = node.width/bpw
@@ -793,7 +801,7 @@ class CppBackend extends Backend {
       out_h.write("  void setClocks ( std::vector< int >& periods );\n")
     }
     out_h.write("  mod_t* clone();\n");
-    //out_h.write("  bool mod_t::set_circuit_from(mod_t* src) {\n")
+    out_h.write("  bool set_circuit_from(mod_t* src);\n");
     out_h.write("  void print ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
     out_h.write("};\n\n");
@@ -884,24 +892,20 @@ class CppBackend extends Backend {
     writeCppFile(s"}\n")
     
     // generate set_circuit_from function
-    /*writeCppFile(s"bool ${c.name}_t::set_circuit_from(mod_t* src) {\n")
+    writeCppFile(s"bool ${c.name}_t::set_circuit_from(mod_t* src) {\n")
     writeCppFile(s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(src);\n")
     writeCppFile(s"  assert(src);\n")
     
     for (m <- c.omods) {
-      if(m.name != "reset") {
-        if (m.isInObject) {
-          out_h.write(emitDec(m));
-        }
-        if (m.isInVCD) {
-          out_h.write(vcd.emitDec(m));
-        }
+      if(m.name != "reset" && m.isInObject) {
+        writeCppFile(emitCircuitAssign("mod_typed->", m))
       }
     }
-    for (clock <- Module.clocks)
-      out_h.write(emitDec(clock))
-      
-    writeCppFile(s"}\n")*/
+    for (clock <- Module.clocks) {
+      writeCppFile(emitCircuitAssign("mod_typed->", clock))
+    }
+    writeCppFile("  return true;")
+    writeCppFile(s"}\n")
     
     // generate print(...) function
     writeCppFile("void " + c.name + "_t::print ( FILE* f ) {\n")
