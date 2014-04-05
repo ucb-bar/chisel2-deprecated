@@ -817,10 +817,10 @@ class Fame5WrapperIO(num_copies: Int, num_queues: Int, num_regs: Int, num_debug:
 }
 
 class Fame5Wrapper(num_copies: Int, f: => Module) extends Module {
-  def MarkFame5Modules(module: Module): Unit = {
+  def markFame5Modules(module: Module): Unit = {
     Fame5Transform.fame5Modules += module
     for(submodule <- module.children){
-      MarkFame5Modules(submodule)
+      markFame5Modules(submodule)
     }
   }
   
@@ -1015,7 +1015,8 @@ class Fame5Wrapper(num_copies: Int, f: => Module) extends Module {
   }
 
   val originalModule = Module(f)
-  Fame5Transform.topLevelFame5Module = originalModule
+  Fame5Transform.topModule = originalModule
+  Fame5Transform.numCopies = num_copies
   //count number of RegIO and DecoupledIO in original module
   var num_decoupled_io = 0
   var num_reg_io = 0
@@ -1040,7 +1041,7 @@ class Fame5Wrapper(num_copies: Int, f: => Module) extends Module {
     DebugIOs += new HashMap[String, Data]()
   }
   
-  MarkFame5Modules(originalModule)
+  markFame5Modules(originalModule)
   replicateIO()//replicateIO must be called before addThreadReadyToIO and addThreadSelToIO because we don't want the added threadReady and threadSelID signals to be replecated
   connectWrapperTargetIOs()
   addThreadReadyToIO(true, originalModule, null)
@@ -1052,13 +1053,16 @@ class Fame5Wrapper(num_copies: Int, f: => Module) extends Module {
 
 object Fame5Transform {
   val fame5Modules = new HashSet[Module]
-  var topLevelFame5Module: Module = null
+  var numCopies: Int = 0
+  var topModule: Module = null
   val threadReadySignals = new HashMap[Module, ArrayBuffer[Bool]]
   val threadSelIDSignals = new HashMap[Module, UInt]
   val DecoupledIOs = new HashMap[String, ArrayBuffer[DecoupledIO[Bits]]]
   val RegIOs = new HashMap[String, ArrayBuffer[RegIO[Bits]]]
   val DebugIOs = new HashMap[String, ArrayBuffer[Bits]]
   val consumerMap = new HashMap[Node, ArrayBuffer[(Node, Int)]]
+  val regCopiesMap = new HashMap[Reg, ArrayBuffer[Reg]]//hash map of original fame0 register to a list of all of its copies,including itself
+  val regTypeNodesMap = new HashMap[Reg, Bits]
 }
 
 trait Fame5Transform extends Backend {
@@ -1074,6 +1078,13 @@ trait Fame5Transform extends Backend {
     }
     findAllNodes(module)
     for(node <- allNodes){
+      if(node.isInstanceOf[Data]){//huge hack should move this out to its own method
+        if(node.asInstanceOf[Data].comp != null){
+          if(node.asInstanceOf[Data].comp.isInstanceOf[Reg]){
+            Fame5Transform.regTypeNodesMap(node.asInstanceOf[Data].comp.asInstanceOf[Reg]) = node.asInstanceOf[Bits]
+          }
+        }
+      }
       if(!Fame5Transform.consumerMap.contains(node)){
         Fame5Transform.consumerMap(node) = new ArrayBuffer[(Node, Int)]
         for(i <- 0 until node.inputs.length){
@@ -1132,18 +1143,18 @@ trait Fame5Transform extends Backend {
         for(decoupledIO <- decoupledIOs){
           validCopies += decoupledIO.valid
         }
-        insertMuxOnConsumers(originalDecoupledIO.valid, validCopies, Fame5Transform.threadSelIDSignals(Fame5Transform.topLevelFame5Module))
+        insertMuxOnConsumers(originalDecoupledIO.valid, validCopies, Fame5Transform.threadSelIDSignals(Fame5Transform.topModule))
         val dataCopies = new ArrayBuffer[Bits]
         for(decoupledIO <- decoupledIOs){
           dataCopies += decoupledIO.bits.asInstanceOf[Bits]
         }
-        insertMuxOnConsumers(originalDecoupledIO.bits.asInstanceOf[Bits], dataCopies, Fame5Transform.threadSelIDSignals(Fame5Transform.topLevelFame5Module))
+        insertMuxOnConsumers(originalDecoupledIO.bits.asInstanceOf[Bits], dataCopies, Fame5Transform.threadSelIDSignals(Fame5Transform.topModule))
       } else {
         val readyCopies = new ArrayBuffer[Bits]
         for(decoupledIO <- decoupledIOs){
           readyCopies += decoupledIO.ready
         }
-        insertMuxOnConsumers(originalDecoupledIO.bits.asInstanceOf[Bits], readyCopies, Fame5Transform.threadSelIDSignals(Fame5Transform.topLevelFame5Module))
+        insertMuxOnConsumers(originalDecoupledIO.bits.asInstanceOf[Bits], readyCopies, Fame5Transform.threadSelIDSignals(Fame5Transform.topModule))
       }
     }
     for((name, regIOs) <- Fame5Transform.RegIOs){
@@ -1153,7 +1164,7 @@ trait Fame5Transform extends Backend {
         for (regIO <- regIOs){
           copies += regIO.bits.asInstanceOf[Bits]
         }
-        insertMuxOnConsumers(originalRegIO.bits.asInstanceOf[Bits], copies, Fame5Transform.threadSelIDSignals(Fame5Transform.topLevelFame5Module))
+        insertMuxOnConsumers(originalRegIO.bits.asInstanceOf[Bits], copies, Fame5Transform.threadSelIDSignals(Fame5Transform.topModule))
       }
     }
     for((name, debugIOs) <- Fame5Transform.DebugIOs){
@@ -1163,7 +1174,7 @@ trait Fame5Transform extends Backend {
         for(debugIO <- debugIOs){
           copies += debugIO.asInstanceOf[Bits]
         }
-        insertMuxOnConsumers(originalDebug, copies, Fame5Transform.threadSelIDSignals(Fame5Transform.topLevelFame5Module))
+        insertMuxOnConsumers(originalDebug, copies, Fame5Transform.threadSelIDSignals(Fame5Transform.topModule))
       }
     }
   }
@@ -1179,8 +1190,8 @@ trait Fame5Transform extends Backend {
       consumer.inputs(inputNum) = mux
     }
   }
-  
-  /*private def collectMems(module: Module): ArrayBuffer[(Module, Mem[Data])] = {
+ 
+  private def collectMems(module: Module): ArrayBuffer[(Module, Mem[Data])] = {
     val mems = new ArrayBuffer[(Module, Mem[Data])]
     //find all the mems in FAME1 modules
     def findMems(module: Module): Unit = {
@@ -1197,18 +1208,32 @@ trait Fame5Transform extends Backend {
     return mems
   }
   
-  private def appendFireToRegWriteEnables(top: Module) = {
-    //find regs that are part of sequential mem read ports
-    val mems = collectMems(top)
+  private def replicateRegisters(): Unit = {
+    val mems = collectMems(Fame5Transform.topModule)  
     val seqMemReadRegs = new HashSet[Reg]
+    val seqMemCPPWriteRegs = new HashSet[Reg]
+    //find extra regs associated with mems that we do not want to replicate
     for((module, mem) <- mems){
       val memSeqReads = mem.seqreads ++ mem.readwrites.map(_.read)
       for(memSeqRead <- memSeqReads){
         seqMemReadRegs += memSeqRead.addrReg
       }
+      if(mem.seqRead){
+        if(Module.backend.isInstanceOf[CppBackend]){
+          val memWrites = mem.writeAccesses
+          for(memWrite <- memWrites){
+            if(memWrite.inputs(0).asInstanceOf[Data].comp != null && memWrite.inputs(1).asInstanceOf[Data].comp != null){//huge hack for extra registers generated infront f mem write addr, write enable and write data ports for seq read mems in the CPP backend; if both the cond and enable both happen to be directly from registers, this will fail horribly
+              seqMemCPPWriteRegs += memWrite.inputs(0).asInstanceOf[Data].comp.asInstanceOf[Reg]
+              seqMemCPPWriteRegs += memWrite.inputs(1).asInstanceOf[Data].comp.asInstanceOf[Reg]
+              Predef.assert(memWrite.inputs(2).inputs.length == 1)
+              seqMemCPPWriteRegs += memWrite.inputs(2).inputs(0).asInstanceOf[Reg]
+            }
+          }
+        }
+      }
     }
 
-    //find all the registers in FAME1 modules
+    //find all the registers in FAME5 modules
     val regs = new ArrayBuffer[(Module, Reg)]
     def findRegs(module: Module): Unit = {
       if(Fame5Transform.fame5Modules.contains(module)){
@@ -1222,28 +1247,78 @@ trait Fame5Transform extends Backend {
         findRegs(childModule)
       }
     }
-    findRegs(top)
+    findRegs(Fame5Transform.topModule)
     
-    
+    //replicate registers
     for((module, reg) <- regs){
-      reg.enable = reg.enable && Fame5Transform.fireSignals(module)
-      if(reg.updates.length == 0){
+      Fame5Transform.regCopiesMap(reg) = new ArrayBuffer[Reg]
+      Fame5Transform.regCopiesMap(reg) += reg
+      for(i <- 1 until Fame5Transform.numCopies){
+        Fame5Transform.regCopiesMap(reg) += copyReg(reg)
+      }
+    }
+  }
+  
+  private def copyReg(reg: Reg): Reg = {
+    val regCopy = new Reg()
+    regCopy.inputs += reg.inputs(0)
+    regCopy.inputs += reg.inputs(1)
+    regCopy.enableIndex = reg.enableIndex
+    regCopy.isReset = reg.isReset
+    regCopy.isEnable = reg.isEnable
+    regCopy.assigned = reg.assigned
+    regCopy.enable = reg.enable
+    regCopy.inputs += regCopy.enable
+    for((en, data) <- reg.updates){
+      regCopy.updates += ((en,data))
+    }
+    return regCopy
+  }
+
+  private def muxRegOutputs():Unit = {
+    for(reg <- Fame5Transform.regCopiesMap.keys){
+      val regsAsBits = new ArrayBuffer[Bits]
+      for(register <- Fame5Transform.regCopiesMap(reg)){
         val regOutput = Bits()
-        regOutput.inputs += reg
-        val regMux = Bits()
-        regMux.inputs += reg.inputs(0)
-        reg.inputs(0) = Mux(Fame5Transform.fireSignals(module), regMux, regOutput)
-      } else {
-        for(i <- 0 until reg.updates.length){
-          val wEn = reg.updates(i)._1
-          val wData = reg.updates(i)._2
-          reg.updates(i) = ((wEn && Fame5Transform.fireSignals(module), wData))
+        regOutput.inputs += register
+        regsAsBits += regOutput
+      }
+      insertMuxOnConsumers(Fame5Transform.regTypeNodesMap(reg), regsAsBits, Fame5Transform.threadSelIDSignals(reg.component)) 
+    }
+  }
+
+  private def appendFireToRegWriteEnables(top: Module) = {
+    //find regs that are part of sequential mem read ports
+    val mems = collectMems(top)
+    val seqMemReadRegs = new HashSet[Reg]
+    for((module, mem) <- mems){
+      val memSeqReads = mem.seqreads ++ mem.readwrites.map(_.read)
+      for(memSeqRead <- memSeqReads){
+        seqMemReadRegs += memSeqRead.addrReg
+      }
+    }
+    
+    for(reg <- Fame5Transform.regCopiesMap.keys){
+      for(i <- 0 until Fame5Transform.regCopiesMap(reg).length){
+        val register = Fame5Transform.regCopiesMap(reg)(i)
+        val fameEnable = Fame5Transform.threadReadySignals(reg.component)(i) && (UInt(i) === Fame5Transform.threadSelIDSignals(reg.component))
+        register.enable = register.enable && fameEnable
+        val registerOutput = Bits()
+        registerOutput.inputs += register
+        val registerMux = Bits()
+        registerMux.inputs += register.inputs(0)
+        register.inputs(0) = Mux(fameEnable, registerMux, registerOutput)
+        
+        for(i <- 0 until register.updates.length){
+          val wEn = register.updates(i)._1
+          val wData = register.updates(i)._2
+          register.updates(i) = ((wEn && fameEnable, wData))
         }
       }
     }
   }
  
-  private def appendFireToMemEnables(top: Module) = {
+  /*private def appendFireToMemEnables(top: Module) = {
     val mems = collectMems(top)
 
     for((module, mem) <- mems){
@@ -1252,7 +1327,7 @@ trait Fame5Transform extends Backend {
       for(memWrite <- memWrites){
         if(mem.seqRead){
           if(Module.backend.isInstanceOf[CppBackend]){
-            if(memWrite.inputs(0).asInstanceOf[Data].comp != null && memWrite.inputs(1).asInstanceOf[Data].comp != null){//huge hack for extra MemWrite generated for seqread mems in CPP backed; if both the cond and enable both happen to be directly from registers, this will fail horribly
+            if(memWrite.inputs(0).asInstanceOf[Data].comp != null && memWrite.inputs(1).asInstanceOf[Data].comp != null){//huge hack for extra MemWrite generated to simulate bogus data if read and write is performed on the same cycle for seqread mems in CPP backed; if both the cond and enable both happen to be directly from registers, this will fail horribly
               memWrite.inputs(1) = memWrite.inputs(1).asInstanceOf[Bool] && Fame5Transform.fireSignals(module)
             } else {
               memWrite.inputs(1) = Bool(false)
@@ -1299,10 +1374,13 @@ trait Fame5Transform extends Backend {
   preElaborateTransforms += ((top: Module) => findConsumerMap(top)) 
   preElaborateTransforms += ((top: Module) => driveOutputs())
   preElaborateTransforms += ((top: Module) => muxInputs())
-  /*preElaborateTransforms += ((top: Module) => appendFireToRegWriteEnables(top))
-  preElaborateTransforms += ((top: Module) => top.genAllMuxes)
-  preElaborateTransforms += ((top: Module) => appendFireToMemEnables(top))
+  preElaborateTransforms += ((top: Module) => replicateRegisters())
+  preElaborateTransforms += ((top: Module) => muxRegOutputs())
+  preElaborateTransforms += ((top: Module) => appendFireToRegWriteEnables(top))
   preElaborateTransforms += ((top: Module) => collectNodesIntoComp(initializeDFS))
+
+  /*preElaborateTransforms += ((top: Module) => top.genAllMuxes)
+  preElaborateTransforms += ((top: Module) => appendFireToMemEnables(top))
   preElaborateTransforms += ((top: Module) => top.genAllMuxes)*/
 
 }
