@@ -761,7 +761,7 @@ class CppBackend extends Backend {
     // Generate module headers
     out_h.write("class " + c.name + "_t : public mod_t {\n");
     out_h.write(" public:\n");
-    val vcd = new VcdBackend()
+    val vcd = new VcdBackend(c)
     for (m <- c.omods) {
       if(m.name != "reset") {
         if (m.isInObject) {
@@ -787,6 +787,7 @@ class CppBackend extends Backend {
     }
     out_h.write("  void print ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
+    out_h.write("  void dump_init ( FILE* f );\n");
     out_h.write("};\n\n");
     out_h.write(Params.toCxxStringParams);
     
@@ -884,7 +885,10 @@ class CppBackend extends Backend {
     writeCppFile("}\n")
 
     createCppFile()
-    vcd.dumpVCD(c, writeCppFile)
+    vcd.dumpVCDInit(writeCppFile)
+
+    createCppFile()
+    vcd.dumpVCD(writeCppFile)
 
     for (out <- clkDomains.values.map(_._1) ++ clkDomains.values.map(_._2)) {
       createCppFile()

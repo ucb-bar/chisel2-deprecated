@@ -265,9 +265,9 @@ abstract class Node extends nameable {
     isReg || isUsedByRam || Module.isDebug && !name.isEmpty ||
     Module.emitTempNodes
 
-  def isInVCD: Boolean = width > 0 &&
-    ((isIo && isInObject) || isReg || (Module.isDebug && !name.isEmpty)) ||
-    Module.emitTempNodes
+  def isInVCD: Boolean = name != "reset" && width > 0 &&
+     (!name.isEmpty || Module.emitTempNodes) &&
+     ((isIo && isInObject) || isReg || Module.isDebug)
 
   /** Prints all members of a node and recursively its inputs up to a certain
     depth level. This method is purely used for debugging. */

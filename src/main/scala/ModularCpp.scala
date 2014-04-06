@@ -161,7 +161,7 @@ class ModularCppBackend extends CppBackend {
     out_h.write("#include \"emulator.h\"\n\n");
     out_h.write("class " + c.name + "_t : public mod_t {\n");
     out_h.write(" public:\n");
-    val vcd = new VcdBackend()
+    val vcd = new VcdBackend(c)
     for (vertex <- vertices) {
       for (m <- vertex.sortedNodes) {
         if(m.name != "reset") {
@@ -184,6 +184,7 @@ class ModularCppBackend extends CppBackend {
     out_h.write("  void clock_hi ( dat_t<1> reset );\n")
     out_h.write("  void print ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
+    out_h.write("  void dump_init ( FILE* f );\n");
     out_h.write("};\n\n");
     out_h.write("#endif\n");
     out_h.close();
@@ -234,7 +235,8 @@ class ModularCppBackend extends CppBackend {
         + ");\n"
         + "#endif\n")
     out_c.write("}\n");
-    vcd.dumpVCD(c, out_c.write);
+    vcd.dumpVCDInit(out_c.write);
+    vcd.dumpVCD(out_c.write);
     out_c.close();
 
     /* Copy the emulator.h file into the targetDirectory. */
