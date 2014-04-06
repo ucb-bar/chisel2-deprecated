@@ -910,10 +910,12 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       p match {
         case b: Bits  => if(b.updates.length > 0) b.genMuxes(b.default);
         case r: Reg  => r.genMuxes(r);
-        case mw: MemWrite =>
-        case mw: PutativeMemWrite =>
-        case e: Extract =>
-        case v: VecProc =>
+        case _ =>
+      }
+    }
+    bfs { _ match {
+        case r: Reg => r.verifyMuxes
+        case _ =>
       }
     }
   }
