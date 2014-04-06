@@ -17,6 +17,7 @@ class DelaySuite_ROMModule_1_t : public mod_t {
   int clock ( dat_t<1> reset );
   void print ( FILE* f );
   void dump ( FILE* f, int t );
+  void dump_init ( FILE* f );
 };
 
 class DelaySuite_ROMModule_1_api_t : public mod_api_t {
