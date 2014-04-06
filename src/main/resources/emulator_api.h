@@ -119,7 +119,7 @@ bool dat_from_str(std::string in, dat_t<w>& res, int pos = 0) {
 // API base class, providing common functions
 class api_base {
 public:
-	api_base(std::string new_name, std::string new_path) :
+	api_base(const char* new_name, const char* new_path) :
 		name(new_name),
 		path(new_path)
 	{}
@@ -147,7 +147,7 @@ protected:
 // API base (non width templated) class for API accessors to dat_t
 class dat_api_base : public api_base {
 public:
-	dat_api_base(std::string new_name, std::string new_path) :
+	dat_api_base(const char* new_name, const char* new_path) :
 		api_base(new_name, new_path)
 	{}
 	// returns the value of this wire as a string, or empty string on failure
@@ -180,7 +180,7 @@ public:
 
 template<int w> class dat_api : public dat_api_base {
 public:
-	dat_api(dat_t<w>* new_dat, std::string new_name, std::string new_path) :
+	dat_api(dat_t<w>* new_dat, const char* new_name, const char* new_path) :
 		dat_api_base(new_name, new_path),
 		dat_ptr(new_dat)
 	{}
@@ -204,7 +204,7 @@ protected:
 // API base (non width/depth templated) class for API accessors to mem_t
 class mem_api_base : public api_base {
 public:
-	mem_api_base(std::string new_name, std::string new_path) :
+	mem_api_base(const char* new_name, const char* new_path) :
 		api_base(new_name, new_path)
 	{}
 	// return the value of an element as a string, or empty string on failure
@@ -243,7 +243,7 @@ public:
 
 template<int w, int d> class mem_api : public mem_api_base {
 public:
-	mem_api(mem_t<w, d>* new_mem, std::string new_name, std::string new_path) :
+	mem_api(mem_t<w, d>* new_mem, const char* new_name, const char* new_path) :
 		mem_api_base(new_name, new_path),
 		mem_ptr(new_mem)
 	{}
