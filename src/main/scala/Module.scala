@@ -94,7 +94,6 @@ object Module {
   var isBackannotating = false
   var model = ""
   val signals = new ArrayBuffer[Node]
-  val signals_shadow = new HashSet[Node]
   val pseudoMuxes = new HashMap[Node, Node]
   /* Jackhammer flags */
   var jackDump: String = null;
@@ -293,7 +292,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   val nodes = new ArrayBuffer[Node]
   val mods = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
-  val signals = new ArrayBuffer[Node]
+  val signals = new LinkedHashSet[Node]
 
   val regs  = new ArrayBuffer[Reg];
   val nexts = new ScalaQueue[Node];
@@ -406,10 +405,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       case _: Aggregate =>
       case _: ROMData =>
       case _: Literal =>
-      case any if !(signals_shadow contains any) => {
+      case any if !(signals contains any) => {
         if (!any.isIo) debug(x)
         signals += any
-        signals_shadow += any
       }
       case _ =>
     }
