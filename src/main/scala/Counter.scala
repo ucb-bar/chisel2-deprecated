@@ -33,26 +33,25 @@ package Chisel
 import scala.collection.mutable.HashMap
 import scala.math.pow
 
-trait CounterBackend extends Backend {
-  val firedPins = new HashMap[Module, Bool]
+object DaisyChain {
+  var top: Module = null
+  val fires = new HashMap[Module, Bool]
   val daisyIns = new HashMap[Module, UInt]
   val daisyOuts = new HashMap[Module, DecoupledIO[UInt]]
   val daisyCtrls = new HashMap[Module, Bits]
-  val counterCopy = new HashMap[Module, Bool]
-  val counterRead = new HashMap[Module, Bool]
-  val decoupledPins = new HashMap[Node, Bits]
+  val daisyCopy = new HashMap[Module, Bool]
+  val daisyRead = new HashMap[Module, Bool]
+}
 
-  var counterIdx = -1
-
+trait DaisyChain extends Backannotation {
   override def backannotationTransforms {
     super.backannotationTransforms
 
-    transforms += ((c: Module) => c bfs (_.addConsumers))
+    // transforms += ((c: Module) => c bfs (_.addConsumers))
 
-    transforms += ((c: Module) => decoupleTarget(c))
-    transforms += ((c: Module) => connectDaisyPins(c))
-    transforms += ((c: Module) => generateCounters(c))
-    transforms += ((c: Module) => generateDaisyChains(c))
+    transforms += ((c: Module) => appendFires(DaisyChain.top))
+    transforms += ((c: Module) => genCounters(DaisyChain.top))
+    transforms += ((c: Module) => daisyChain(DaisyChain.top))
 
     transforms += ((c: Module) => c.addClockAndReset)
     transforms += ((c: Module) => gatherClocksAndResets)
@@ -63,50 +62,24 @@ trait CounterBackend extends Backend {
     transforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
   }
 
+  override def elaborate(c: Module) {
+    try {
+      require (c.isInstanceOf[DaisyWrapper])
+      super.elaborate(c)
+    } catch {
+      case ex: java.lang.IllegalArgumentException => ChiselError.error(
+        "[DaisyChain] No DaisyWrapper Declaration"
+      )
+    }
+  }
+
+  var counterIdx = -1
   def emitCounterIdx = {
     counterIdx = counterIdx + 1
     counterIdx
   }
 
-  def addPin(m: Module, pin: Data, name: String) {
-    // assign component
-    pin.component = m
-    // a hack to index pins by their name
-    pin setName name
-    // include in io
-    pin.isIo = true
-    (m.io) match {
-      case io: Bundle => io += pin
-    }
-    // set its real name
-    pin setName ("io_" + name)
-
-    // for complex pins
-    pin match {
-      case dio: DecoupledIO[_] => {
-        dio.ready.component = m
-        dio.valid.component = m
-        dio.bits.component = m
-        dio.ready.isIo = true
-        dio.valid.isIo = true
-        dio.bits.isIo = true
-        dio.ready setName ("io_" + name + "_ready")
-        dio.valid setName ("io_" + name + "_valid")
-        dio.bits setName ("io_" + name + "_bits")
-      }
-      case vio: ValidIO[_] => {
-        vio.valid.component = m
-        vio.bits.component = m
-        vio.valid.isIo = true
-        vio.bits.isIo = true
-        vio.valid setName ("io_" + name + "_valid")
-        vio.bits setName ("io_" + name + "_bits")
-      }
-      case _ =>
-    } 
-  }
-
-  def wirePin(pin: Data, input: Node) {
+  def wire(pin: Data, input: Node) {
     if (pin.inputs.isEmpty) pin.inputs += input
     else pin.inputs(0) = input
   }
@@ -141,57 +114,33 @@ trait CounterBackend extends Backend {
       reg.inputs += m.reset
   }
 
-  def connectConsumers(input: Node, via: Node) {
-    for (consumer <- input.consumers) {
-      val idx = consumer.inputs indexOf input
-      consumer.inputs(idx) = via
+  override def annotateSignals(c: Module) {
+    val queue = new scala.collection.mutable.Queue[Module]
+    queue enqueue c
+   
+    // collect signals for snapshotting
+    while (!queue.isEmpty) {
+      val top = queue.dequeue
+      // collect registers and memory access
+      top.nodes map { 
+        _ match {
+          case reg: Reg => 
+            top.counter(reg)
+          case mem: Mem[_] => {
+            for (write <- mem.writeAccesses) {
+              top.counter(write)
+            }
+          }
+          case _ =>
+        }
+      }
+      // visit children
+      top.children map (queue enqueue _)
     }
   }
 
-  def decoupleTarget(c: Module) {
-    ChiselError.info("[CounterBackend] target decoupling")
-
-    val clksPin = Decoupled(UInt(width = 32)).flip
-    val clksReg = Reg(init = UInt(0, 32))
-    val fired = clksReg.orR
-    val notFired = !fired
-    val firedPin = Bool(OUTPUT)
-
-    addReg(c, clksReg, "clks", Map(
-      (clksPin.valid && notFired) -> clksPin.bits,
-      fired                       -> (clksReg - UInt(1))
-    ))
-
-    // For the input and output pins of the top component
-    // insert buffers so that their values are avaiable
-    // after the target is stalled
-    for ((n, pin) <- c.io.flatten) {
-      pin match {
-        case in: Bits if in.dir == INPUT => {
-          val in_reg = Reg(UInt())
-          addReg(c, in_reg, in.pName + "_buf",
-            Map(notFired -> in)
-          )
-          connectConsumers(in, in_reg)
-          decoupledPins(in) = in_reg
-        }
-        case out: Bits if out.dir == OUTPUT => {
-          val out_reg = Reg(UInt())
-          addReg(c, out_reg, out.pName + "_buf", 
-            Map(fired -> out.inputs.head)
-          )
-          wirePin(out, out_reg)
-          decoupledPins(out) = out_reg
-        }
-      }
-    }
-
-    // pins for the clock counter & fire signal
-    addPin(c, clksPin, "clks")
-    addPin(c, firedPin, "fire")
-    wirePin(firedPin, fired)
-    wirePin(clksPin.ready, notFired)
-    firedPins(c) = fired
+  def appendFires(c: Module) {
+    ChiselError.info("[DaisyChain] append fire signals to Reg and Mem")
 
     val queue = new scala.collection.mutable.Queue[Module]
     queue enqueue c
@@ -205,36 +154,455 @@ trait CounterBackend extends Backend {
           // For Reg, different muxes are generated by different backend
           case reg: Reg if this.isInstanceOf[VerilogBackend] && 
                            !Module.isBackannotating => {
-            val enable = firedPins(top) && reg.enable
+            val enable = DaisyChain.fires(top) && reg.enable
             reg.inputs(reg.enableIndex) = enable.getNode
           }
           case reg: Reg => {
-            reg.inputs(0) = Multiplex(firedPins(top), reg.next, reg)
+            reg.inputs(0) = Multiplex(DaisyChain.fires(top), reg.next, reg)
           }
           case mem: Mem[_] => {
             for (write <- mem.writeAccesses) {
               val en = Bool()
-              val newEn = firedPins(top) && en
+              val newEn = DaisyChain.fires(top) && en
               if (Module.isBackannotating)
                 newEn.getNode setName (en.getNode.pName + "_fire")
-              wirePin(en, write.inputs(1))
+              wire(en, write.inputs(1))
               write.inputs(1) = newEn
             }
           }
           case _ =>
         }
       }
+    
+      top.children map (queue enqueue _)
+    }  
+  }
 
-      // insert the fire signal pin to children
-      for (child <- top.children) {
-        val firedPin = Bool(INPUT)
-        addPin(child, firedPin, "fire")
-        wirePin(firedPin, firedPins(top))
-        firedPins(child) = firedPin
-        queue enqueue child
+  def genCounters (c: Module) {
+    ChiselError.info("[DaisyChain] generate activity counters")
+
+    val queue = new scala.collection.mutable.Queue[Module]
+    queue enqueue c
+ 
+    while (!queue.isEmpty) {
+      val top = queue.dequeue
+
+      // activity counters <- { Reg, MemWrite }
+      for (signal <- top.signals) {
+        signal.cntrIdx = emitCounterIdx
+        signal.counter = signal match {
+          case reg: Reg => 
+            UInt(reg)
+          // ToDo: better way?
+          case mem: MemWrite => {
+            val counter = Reg(Bits(width = 32))
+            val en = UInt(mem.cond).toBool
+            addReg(top, counter, "counter_" + signal.cntrIdx,
+              Map((DaisyChain.fires(top) && en) -> mem.data)
+            )
+            counter
+          }
+        }
+        signal.shadow  = Reg(Bits(width = 32))
+      }
+
+      // visit children
+      top.children map (queue enqueue _)
+    }
+  }  
+
+  def daisyChain(c: Module) {
+    ChiselError.info("[DaisyChain] daisy chaining")
+ 
+    val queue = new scala.collection.mutable.Queue[Module] 
+    queue enqueue c
+
+    // Daisy chaining
+    while (!queue.isEmpty) {
+      val top = queue.dequeue
+      val copy = DaisyChain.daisyCopy(top)
+      val read = DaisyChain.daisyRead(top)
+
+      (top.children.isEmpty, top.signals.isEmpty) match {
+        // no children & no singals 
+        case (true, true) => {
+          // daisy output <- daisy input
+          wire(DaisyChain.daisyOuts(top).bits, DaisyChain.daisyIns(top))
+        }
+        // children but no signals
+        case (false, true) => {
+          // daisy output <- head child's daisy output
+          wire(DaisyChain.daisyOuts(top).bits, DaisyChain.daisyOuts(top.children.head).bits)
+          // last child's daisy input <- daisy input
+          wire(DaisyChain.daisyIns(top.children.last), DaisyChain.daisyIns(top))
+        }
+        // no children but signals
+        case (true, false) => {
+          // daisy output <- head shadow
+          wire(DaisyChain.daisyOuts(top).bits, top.signals.head.shadow)
+          // last shadow <- daisy input
+          addReg(top, top.signals.last.shadow, "shadow_" + top.signals.last.cntrIdx,
+            Map (
+              copy -> top.signals.last.counter,
+              read -> DaisyChain.daisyIns(top)
+            )
+          )
+        }
+        // children & signals
+        case (false, false) => {
+          // daisy output <- head shadow
+          wire(DaisyChain.daisyOuts(top).bits, top.signals.head.shadow)
+          // last shadow <- daisy input
+          addReg(top, top.signals.last.shadow, "shadow_" + top.signals.last.cntrIdx,
+            Map (
+              copy -> top.signals.last.counter,
+              read -> DaisyChain.daisyOuts(top.children.head).bits
+            )
+          )
+          // last child's daisy input <- daisy input
+          wire(DaisyChain.daisyOuts(top.children.last).bits, DaisyChain.daisyIns(top))
+        }
+      }
+
+      for (s <- top.children.sliding(2)) {
+        val cur = s.head
+        val next = s.last
+        // cur child's daisy input <- next child's daisy output
+        wire(DaisyChain.daisyIns(cur), DaisyChain.daisyOuts(next).bits)
+      }
+
+      for (s <- top.signals.sliding(2)) {
+        val cur = s.head
+        val next = s.last
+        /****** Shaodw Counter *****/
+        // daisy_ctrl == 'copy' -> current counter
+        // daisy_ctrl == 'read' -> next shadow 
+        addReg(top, cur.shadow, "shadow_" + cur.cntrIdx,
+          Map(
+            copy -> cur.counter,
+            read -> next.shadow
+          )
+        )
+      }
+
+      // collect signal lists
+      Module.signals ++= top.signals
+      // visit children
+      top.children map (queue enqueue _)
+    }
+  }  
+}
+
+class DaisyVerilogBackend extends VerilogBackend with DaisyChain
+class DaisyCppBackend extends CppBackend with DaisyChain
+
+class DaisyWrapperIO(topIO: Bundle) extends Bundle {
+  val clks = Decoupled(UInt(width = 32)).flip
+  val daisyOut = Decoupled(UInt(width = 32))
+  val daisyCtrl = UInt(INPUT, 1)
+}
+
+object DaisyWrapper {
+  val ioMap = new HashMap[Bits, Bits]
+  def apply(c: => Module) = Module(new DaisyWrapper(c))
+}
+
+class DaisyWrapper(c: => Module) extends Module {
+  val top = Module(c)
+  val io = new DaisyWrapperIO(top.io.asInstanceOf[Bundle])
+  DaisyChain.top = top
+  DaisyChain.daisyOuts(this) = io.daisyOut
+  DaisyChain.daisyCtrls(this) = io.daisyCtrl
+
+  // clock counters
+  val clksReg = Reg(init = UInt(0, 32))
+  val fired = clksReg.orR
+  val notFired = !fired
+  DaisyChain.fires(this) = fired
+
+  when (io.clks.valid && notFired) {
+    clksReg := io.clks.bits
+  }.elsewhen (fired) {
+    clksReg := clksReg - UInt(1)
+  }
+  io.clks.ready := notFired
+
+  def addPin(m: Module, pin: Data, name: String) {
+    // set name
+    pin nameIt (name, true)
+    for ((name, io) <- pin.flatten) {
+      // assign component
+      io.component = m
+      // include in io
+      io.isIo = true
+    }
+    (m.io) match {
+      case io: Bundle => io += pin
+    }
+  }
+
+  for((name, targetPin) <- top.io.asInstanceOf[Bundle].elements) {
+    val hostPin = targetPin.clone
+    addPin(this, hostPin, name)
+    for ((hostIO, targetIO) <- (hostPin.flatten zip targetPin.flatten)) {
+      // assert(hostIO._1 === targetIO._1, "fuck!")
+      DaisyWrapper.ioMap(targetIO._2) = hostIO._2
+    }
+  }
+
+  def decouple (c: Module) = {
+    /* target decoupling */
+    // For the input and output pins of the top component
+    // insert buffers so that their values are avaiable
+    // after the target is stalled
+    val flattenIO = io.flatten
+    for ((name, targetPin) <- c.io.flatten) {
+      val hostPin = DaisyWrapper.ioMap(targetPin)
+      if (hostPin.dir == INPUT) {
+        val in_reg = Reg(next = hostPin)
+        in_reg nameIt (hostPin.name + "_buf", false)
+        targetPin := in_reg
+      } else if (hostPin.dir == OUTPUT) {
+        val out_reg = Reg(next = targetPin)
+        out_reg nameIt (hostPin.name + "_buf", false)
+        hostPin := out_reg
       }
     }
   }
+
+  def insertDaisyPins (c: Module) = {
+    /* insert pins */
+    val queue = new scala.collection.mutable.Queue[Module]
+    queue enqueue c
+    while (!queue.isEmpty) {
+      val m = queue.dequeue
+      val fire = Bool(INPUT)
+      val daisyIn = UInt(INPUT, 32)
+      val daisyOut = Decoupled(UInt(width = 32))
+      val daisyCtrl = UInt(INPUT, 1)
+      val daisyFire = daisyOut.ready && !fire
+      val copy = daisyFire && daisyCtrl === Bits(0)
+      val read = daisyFire && daisyCtrl === Bits(1)
+      copy nameIt ("copy", false)
+      read nameIt ("read", false)
+      daisyFire.getNode.component = m
+      copy.getNode.component = m
+      read.getNode.component = m
+      daisyFire.getNode.inputs map (_.getNode.component = m)
+      copy.getNode.inputs map (_.getNode.component = m)
+      read.getNode.inputs map (_.getNode.component = m)
+      addPin(m, fire, "fire")
+      addPin(m, daisyIn, "daisy_in")
+      addPin(m, daisyOut, "daisy_out")
+      addPin(m, daisyCtrl, "daisy_ctrl")
+      DaisyChain.fires(m) = fire
+      DaisyChain.daisyIns(m) = daisyIn
+      DaisyChain.daisyOuts(m) = daisyOut
+      DaisyChain.daisyCtrls(m) = daisyCtrl
+      DaisyChain.daisyCopy(m) = copy
+      DaisyChain.daisyRead(m) = read
+
+      fire.inputs += DaisyChain.fires(m.parent)
+      daisyCtrl.inputs += DaisyChain.daisyCtrls(m.parent)
+      daisyOut.ready.inputs += DaisyChain.daisyOuts(m.parent).ready
+      daisyOut.valid.inputs += daisyFire
+
+      // visit children
+      m.children map (queue enqueue _)
+    }
+  }
+
+  decouple(top)
+  insertDaisyPins(top)
+  DaisyChain.daisyIns(top) := UInt(0)
+  // Insert a daisy output buffer
+  // so that the head shadow is read
+  val daisyBuf = Reg(next = DaisyChain.daisyOuts(top).bits)
+  io.daisyOut.bits := daisyBuf
+}
+
+abstract class CounterTester[+T <: Module](c: T, isTrace: Boolean = true) extends Tester(c, isTrace) {
+  val prevPeeks = new HashMap[Node, BigInt]
+  val counts = new HashMap[Node, BigInt]
+
+  // compute the hamming distance of 'a' and 'b'
+  def calcHD(a: BigInt, b: BigInt) = {
+    var xor = a ^ b
+    var hd: BigInt = 0
+    while (xor > 0) {
+      hd = hd + (xor & 1)
+      xor = xor >> 1
+    }
+    hd
+  }
+
+  // proceed 'n' clocks
+  def clock (n: Int) {
+    val clk = emulatorCmd("clock %d".format(n))
+    if (isTrace) println("  CLOCK %s".format(clk))
+  }
+
+  override def reset(n: Int = 1) {
+    super.reset(n)
+    if (t >= 1) {
+      // reset prevPeeks
+      for (signal <- Module.signals ; if signal.width > 1) {
+        prevPeeks(signal) = 0
+      }
+    }
+  }
+
+  // proceed 'n' clocks
+  def pokeClks (n: Int) {
+    val clks = c.io("clks") match {
+      case dio: DecoupledIO[_] => dio
+    }
+    val fire = c.io("fire") match {
+      case bool: Bool => bool
+    }
+    // Wait until the clock counter is ready
+    // (the target is stalled)
+    while(peek(clks.ready) == 0) {
+      clock(1)
+    }
+    // Set the clock counter
+    pokeBits(clks.bits, n)
+    pokeBits(clks.valid, 1)
+    clock(1)
+    pokeBits(clks.valid, 0)
+  }
+
+  // i = 0 -> daisy copy
+  // i = 1 -> daisy read 
+  def peekDaisy (i: Int) {
+    val daisyCtrl = c.io("daisy_ctrl") match {
+      case bits: Bits => bits
+    }
+    val daisyOut = c.io("daisy_out") match {
+      case dio: DecoupledIO[_] => dio
+    }
+    // request the daisy output
+    // until it is valid
+    do {
+      poke(daisyCtrl, i)
+      poke(daisyOut.ready, 1)
+      clock(1)
+    } while (peek(daisyOut.valid) == 0)
+    poke(daisyOut.ready, 0)
+  }
+
+  // Do you believe the diasy output
+  def checkDaisy(count: BigInt) {
+    val daisyOut = c.io("daisy_out") match {
+      case dio: DecoupledIO[_] => dio
+    }
+    val daisyOutBits = daisyOut.bits match {
+      case bits: Bits => bits
+    }
+    expect(daisyOutBits, count)
+  }
+
+  // Show me the current status of the daisy chain
+  def showCurrentChain {
+    if (isTrace) {
+      println("--- CURRENT CHAIN ---")
+      for (s <- Module.signals) {
+        peek(s.shadow)
+      }
+      println("---------------------")
+    }
+  }
+
+  override def step (n: Int = 1) { 
+    if (isTrace) {
+      println("-------------------------")
+      println("| Counter Strcture Step |")
+      println("-------------------------")
+    }
+
+    for (signal <- Module.signals) {
+      counts(signal) = 0
+    }
+
+    // set clock register
+    pokeClks(n)
+
+    // run the target until it is stalled
+    if (isTrace) println("*** RUN THE TAREGT / READ SIGNAL VALUES ***")
+    for (i <- 0 until n) {
+      for (signal <- Module.signals) {
+        val curPeek = peekBits(signal)
+        if (signal.width == 1) {
+          // increment by the signal's value
+          counts(signal) += curPeek
+        } else {
+          // increment by the hamming distance
+          counts(signal) += calcHD(curPeek, prevPeeks(signal))
+          prevPeeks(signal) = curPeek
+        }
+      }
+      clock(1)
+    }
+
+    // Check activity counter values 
+    if (isTrace) println("*** CHECK COUNTER VALUES ***")
+    for (signal <- Module.signals) {
+      expect(signal.counter, counts(signal))
+    }
+
+    if (isTrace) println("*** Daisy Copy ***")
+    // Copy activity counter values to shadow counters
+    peekDaisy(0)
+    showCurrentChain
+
+    for (signal <- Module.signals) {
+      if (isTrace) println("*** Daisy Read ***")
+      // Read out the daisy chain
+      peekDaisy(1)
+      showCurrentChain
+      // Check the daisy output
+      checkDaisy(counts(signal))
+    }
+
+    t += n
+  }
+
+  // initialization
+  for (signal <- Module.signals ; if signal.width > 1) {
+    prevPeeks(signal) = 0
+  }
+}
+
+/*
+object CounterTransform {
+  val counterCopy = new HashMap[Module, Bool]
+  val counterRead = new HashMap[Module, Bool]
+}
+
+trait CounterTransform extends Backend {
+  val decoupledPins = new HashMap[Node, Bits]
+
+  var counterIdx = -1
+
+  override def backannotationTransforms {
+    super.backannotationTransforms
+
+    transforms += ((c: Module) => c bfs (_.addConsumers))
+
+    transforms += ((c: Module) => appendFires(c))
+    transforms += ((c: Module) => connectDaisyPins(c))
+    transforms += ((c: Module) => generateCounters(c))
+    transforms += ((c: Module) => generateDaisyChains(c))
+
+    transforms += ((c: Module) => c.addClockAndReset)
+    transforms += ((c: Module) => gatherClocksAndResets)
+    transforms += ((c: Module) => connectResets)
+    transforms += ((c: Module) => c.inferAll)
+    transforms += ((c: Module) => c.forceMatchingWidths)
+    transforms += ((c: Module) => c.removeTypeNodes)
+    transforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
+  }
+
 
   // Connect daisy pins of hierarchical modules
   def connectDaisyPins(c: Module) {
@@ -260,10 +628,9 @@ trait CounterBackend extends Backend {
       addPin(m, daisyCtrl, "daisy_ctrl")
       if (m != c) {
         addPin(m, daisyIn, "daisy_in")
-        wirePin(daisyOut.ready, daisyOuts(m.parent).ready)
-        wirePin(daisyCtrl,      daisyCtrls(m.parent))
+        wire(daisyOut.ready, daisyOuts(m.parent).ready)
       }
-      wirePin(daisyOut.valid,   daisyFire)
+      wire(daisyOut.valid,   daisyFire)
 
       // The top component has no daisy input
       daisyIns(m)    = if (m ==c) UInt(0) else daisyIn
@@ -295,10 +662,10 @@ trait CounterBackend extends Backend {
             // when shadow counter values are shifted
             val buf = Reg(next = daisyOuts(head).bits)
             addReg(m, buf, "shadow_buf")
-            wirePin(daisyOuts(m).bits, buf)            
+            wire(daisyOuts(m).bits, buf)            
           } else {
             // Otherwise, just connect them
-            wirePin(daisyOuts(m).bits, daisyOuts(head).bits)
+            wire(daisyOuts(m).bits, daisyOuts(head).bits)
           }
         }
 
@@ -306,15 +673,15 @@ trait CounterBackend extends Backend {
           val cur = m.children(i)
           val next = m.children(i+1)
           // the current child's daisy input <- the next child's daisy output
-          wirePin(daisyIns(cur), daisyOuts(next).bits)
+          wire(daisyIns(cur), daisyOuts(next).bits)
         }
 
         // the last child's daisy input <- the module's diasy input
-        wirePin(daisyIns(last), daisyIns(m))
+        wire(daisyIns(last), daisyIns(m))
       } else if (m.signals.isEmpty) {
         // No children & no singals for counters
         // the daisy output <- the daisy input
-        wirePin(daisyOuts(m).bits, daisyIns(m))
+        wire(daisyOuts(m).bits, daisyIns(m))
       }
 
       m.children map (queue enqueue _)
@@ -399,10 +766,10 @@ trait CounterBackend extends Backend {
           // when shadow counter values are shifted
           val buf = Reg(next = head.shadow)
           addReg(m, buf, "shadow_buf")
-          wirePin(daisyOuts(m).bits, buf)
+          wire(daisyOuts(m).bits, buf)
         } else {
           // Ohterwise, just connect them
-          wirePin(daisyOuts(m).bits, head.shadow)
+          wire(daisyOuts(m).bits, head.shadow)
         }
 
         for (i <- 0 until m.signals.size - 1) {
@@ -442,8 +809,9 @@ trait CounterBackend extends Backend {
   }
 }
 
-class CounterCppBackend extends CppBackend with CounterBackend
-class CounterVBackend extends VerilogBackend with CounterBackend
+class CounterCppBackend extends CppBackend with CounterTransform
+class CounterVBackend extends VerilogBackend with CounterTransform
+
 
 abstract class CounterTester[+T <: Module](c: T, isTrace: Boolean = true) extends Tester(c, isTrace) {
   val prevPeeks = new HashMap[Node, BigInt]
@@ -625,9 +993,9 @@ trait CounterWrapperBackend extends CounterBackend {
         val fire = m.top.io("fire") match {
           case bool: Bool => bool
         }
-        wirePin(clks.bits,  m.io.in.bits)
-        wirePin(clks.valid, m.wen(4))
-        wirePin(m.wready(4), clks.ready)
+        wire(clks.bits,  m.io.in.bits)
+        wire(clks.valid, m.wen(4))
+        wire(m.wready(4), clks.ready)
       }
     }
   }
@@ -637,15 +1005,15 @@ trait CounterWrapperBackend extends CounterBackend {
       case m: CounterWrapper => {
         super.connectDaisyPins(m.top)
         // read 4 => daisy outputs
-        wirePin(m.rdata(4),  daisyOuts(m.top).bits)
-        wirePin(m.rvalid(4), daisyOuts(m.top).valid)
-        wirePin(daisyOuts(m.top).ready, m.ren(4))
+        wire(m.rdata(4),  daisyOuts(m.top).bits)
+        wire(m.rvalid(4), daisyOuts(m.top).valid)
+        wire(daisyOuts(m.top).ready, m.ren(4))
         val daisyCtrlBits = m.io("addr") match {
           case bits: Bits => 
             if (m.conf.daisyCtrlWidth == 1) bits(m.conf.addrWidth - 1)
             else bits(m.conf.addrWidth - 1, m.conf.addrWidth - m.conf.daisyCtrlWidth)
         }
-        wirePin(daisyCtrls(m.top), daisyCtrlBits)        
+        wire(daisyCtrls(m.top), daisyCtrlBits)        
       }
     }
   }
@@ -763,3 +1131,4 @@ abstract class CounterWrapperTester[+T <: CounterWrapper](c: T, isTrace: Boolean
     expect(c.io.out.bits, count)
   }
 }
+*/

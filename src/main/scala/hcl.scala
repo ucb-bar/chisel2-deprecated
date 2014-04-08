@@ -150,6 +150,7 @@ object chiselMain {
             Module.backend = new DotBackend
           } else if (args(i + 1) == "fpga") {
             Module.backend = new FPGABackend
+          /*
           } else if (args(i + 1) == "counterc") {
             Module.backend = new CounterCppBackend
           } else if (args(i + 1) == "counterv") {
@@ -158,6 +159,7 @@ object chiselMain {
             Module.backend = new CounterFPGABackend
           } else if (args(i + 1) == "counterw") {
             Module.backend = new CounterWBackend
+          */
           } else {
             Module.backend = Class.forName(args(i + 1)).newInstance.asInstanceOf[Backend]
           }

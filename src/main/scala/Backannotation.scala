@@ -216,9 +216,12 @@ trait Backannotation extends Backend {
     } 
   }
 
+  def annotateSignals(c: Module) { }
+
   override def backannotationTransforms {
     super.backannotationTransforms
     transforms += { c => checkBackannotation(c) }
+    transforms += { c => annotateSignals(c) }
   }
 
   override def backannotationAnalyses { }
@@ -227,7 +230,7 @@ trait Backannotation extends Backend {
 trait CounterBackannotation extends Backannotation {
   val crosses = new ArrayBuffer[(Double, Array[Node])]
 
-  private def annotateSignals(c: Module) {
+  override def annotateSignals(c: Module) {
     ChiselError.info("[Backannotation] annotate signals")
 
     try {
