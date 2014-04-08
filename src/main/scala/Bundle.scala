@@ -83,7 +83,7 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     val c      = getClass();
     var elts   = ArrayBuffer[(String, Data)]();
     val seen   = ArrayBuffer[Object]();
-    for (m <- c.getMethods.sortWith(
+    for (m <- FindValAccessors(c).sortWith(
       (x, y) => (x.getName() < y.getName())
     )) {
       val name = m.getName();
@@ -104,7 +104,7 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
         }
       } while (!isFound);
       // TODO: SPLIT THIS OUT TO TOP LEVEL LIST
-      if( types.length == 0 && !isStatic(modifiers) && isInterface
+      if(!isStatic(modifiers) && isInterface
         && !(Bundle.keywords contains name)
         && (view == null || view.contains(name)) ) {
         val o = m.invoke(this);

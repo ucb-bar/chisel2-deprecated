@@ -90,13 +90,12 @@ abstract class Backend {
      Since we call invoke() to get a proper instance of the correct type,
      we have to insure the method is accessible, thus all fields
      that will generate C++ or Verilog code must be made public. */
-    for (m <- root.getClass().getDeclaredMethods.sortWith(
+    for (m <- FindValAccessors(root.getClass()).sortWith(
       (x, y) => (x.getName() < y.getName())
     )) {
       val name = m.getName();
       val types = m.getParameterTypes();
-      if (types.length == 0 && root.isValName(name) // patch to avoid defs
-        && isPublic(m.getModifiers()) && !(Module.keywords contains name)) {
+      if (isPublic(m.getModifiers()) && !(Module.keywords contains name)) {
         val o = m.invoke(root);
         o match {
          case node: Node => {
