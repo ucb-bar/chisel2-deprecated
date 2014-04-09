@@ -69,10 +69,30 @@ class FloBackend extends Backend {
           "" + x.value + "'" + cnode.width
 
         case x: Binding =>
-          emitRef(x.inputs(0), cnode)
+          emitRef(x.inputs(0))
 
         case x: Bits =>
           if (!node.isInObject && node.inputs.length == 1) emitRef(node.inputs(0), cnode) else super.emitRef(node)
+
+        case _ =>
+          super.emitRef(node)
+      }
+    // } else {
+    //   "" + node.litOf.value
+    // }
+  }
+
+  def emitRef(node: Node, sum_to: Node, other: Node): String = {
+    // if (node.litOf == null) {
+      node match {
+        case x: Literal =>
+          "" + x.value + "'" + (sum_to.width - other.width)
+
+        case x: Binding =>
+          emitRef(x.inputs(0))
+
+        case x: Bits =>
+          if (!node.isInObject && node.inputs.length == 1) emitRef(node.inputs(0)) else super.emitRef(node)
 
         case _ =>
           super.emitRef(node)
@@ -107,7 +127,7 @@ class FloBackend extends Backend {
              case ">"  => "lt'"   + node.inputs(0).width + " " + emitRef(node.inputs(1), node.inputs(0)) + " " + emitRef(node.inputs(0), node.inputs(1))
              case "+"  => "add'" + node.width + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
              case "-"  => "sub'" + node.width + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
-             case "*"  => "mul'" + node.width + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
+             case "*"  => "mul'" + node.width + " " + emitRef(node.inputs(0), node, node.inputs(1)) + " " + emitRef(node.inputs(1), node, node.inputs(0))
              case "/"  => "div'" + node.width + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
              case "<<" => "lsh" + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case ">>" => "rsh'" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
