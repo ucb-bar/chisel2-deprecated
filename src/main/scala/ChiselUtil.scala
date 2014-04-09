@@ -32,6 +32,7 @@ package Chisel
 import Node._
 import scala.math._
 import Literal._
+import scala.collection.mutable.ArrayBuffer
 
 object log2Up
 {
@@ -605,4 +606,87 @@ object PriorityEncoderOH
   def apply(in: Bits): UInt = encode((0 until in.getWidth).map(i => in(i)))
 }
 
+class RdIO[T <: Data](depth: Int)(data: => T) extends Bundle {
+  val is  = Bool( INPUT );
+  val adr = Bits( INPUT,  log2Up(depth) ); 
+  val dat = data.asOutput; 
+}
+
+class WrIO[T <: Data](depth: Int)(data: => T) extends Bundle {
+  val is  = Bool( INPUT );                        
+  val adr = Bits( INPUT, log2Up(depth) ); 
+  val dat = data.asInput;                         
+}
+
+class FunMemIO[T <: Data](depth: Int, numReads: Int, numWrites: Int)(data: => T) extends Bundle {
+  val reads  = Vec.fill(numReads){ new RdIO(depth)(data) }
+  val writes = Vec.fill(numWrites){ new WrIO(depth)(data) }
+}
+
+class TransactionMem[T <: Data](depth: Int, numReads: Int, numVirtWrites: Int, numPhyWrites: Int, virtWriteToPhyWriteMap: Array[Int], seqRead: Boolean = false)(data: => T) extends Module{
+  val numMemLines = depth
+  val readPortNum = numReads
+  val virtWritePortNum = numVirtWrites
+  val phyWritePortNum = numPhyWrites
+  val writeMap = virtWriteToPhyWriteMap
+  val isSeqRead = seqRead
+  val dataType = data
+  
+  val io = new FunMemIO(depth, numReads, numVirtWrites)(data)
+  
+  val mem = Mem(data, depth, seqRead = seqRead)
+  
+  for(i <- 0 until numReads){
+    if(seqRead){
+      val addr_reg = Reg(init=Bits(0))
+      when(io.reads(i).is){
+        addr_reg := io.reads(i).adr
+      }
+      io.reads(i).dat := mem.read(addr_reg)
+    } else {
+      io.reads(i).dat := mem.read(io.reads(i).adr)
+    }
+    
+  }
+  //for (read <- io.reads)
+    //read.dat := mem.read(read.adr)
+  
+  var roundUp = 0
+  if(numVirtWrites%numPhyWrites > 0){
+    roundUp = 1
+  }
+  val virtPerPhys = numVirtWrites/numPhyWrites + roundUp
+  val ens = Vec.fill(numPhyWrites){Bool()}
+  val addrs = Vec.fill(numPhyWrites){Bits()}
+  val datas = Vec.fill(numPhyWrites){Bits()}
+  for(i <- 0 until numVirtWrites/virtPerPhys){
+    var en = Bool(false)
+    var addr = Bits(); addr := Bits(0)
+    var data = Bits(); data := Bits(0)
+    for(j <- 0 until virtPerPhys){
+      en = en || io.writes(i*virtPerPhys + j).is
+      when (io.writes(i*virtPerPhys + j).is){
+        addr := io.writes(i*virtPerPhys + j).adr
+        data := io.writes(i*virtPerPhys + j).dat
+      }
+    }
+    ens(i) := en
+    addrs(i) := addr
+    datas(i) := data
+  }
+  for(i <- numVirtWrites/virtPerPhys until numPhyWrites){
+    ens(i) := Bool(false)
+    addrs(i) := Bits(0)
+    datas(i) := Bits(0)
+  }
+  for(i <- 0 until numPhyWrites){
+    when(ens(i)){
+      mem.write(addrs(i), datas(i).asInstanceOf[T])
+    }
+  }
+  
+  override def clone():TransactionMem[T] = {
+    return new TransactionMem(depth, numReads, numVirtWrites, numPhyWrites, virtWriteToPhyWriteMap, seqRead)(data)
+  }
+}
 
