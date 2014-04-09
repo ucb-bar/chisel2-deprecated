@@ -94,7 +94,6 @@ object Module {
   var isBackannotating = false
   var model = ""
   val signals = new ArrayBuffer[Node]
-  val pseudoMuxes = new HashMap[Node, Node]
   /* Jackhammer flags */
   var jackDump: String = null;
   var jackDir: String = null;
