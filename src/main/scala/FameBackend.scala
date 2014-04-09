@@ -2,6 +2,7 @@ package Chisel
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.HashSet
+import scala.collection.mutable.{Queue=>ScalaQueue}
 
 object FameDecoupledIO
 {
@@ -840,11 +841,18 @@ class Fame5Wrapper(num_copies: Int, f: => Module) extends Module {
               ioCopy.flip
             }
             ioCopy.valid.isIo = true
+            ioCopy.valid.setName("io_" + name + "_valid_" + i)
+            ioCopy.valid.component = originalModule
             ioCopy.ready.isIo = true
+            ioCopy.ready.setName("io_" + name + "_ready_" + i)
+            ioCopy.ready.component = originalModule
             ioCopy.bits.isIo = true
+            ioCopy.bits.setName("io_" + name + "_bits_" + i)
+            ioCopy.bits.component = originalModule
+            ioCopy.isIo = true
             ioCopy.setName(name + "_" + i)
             ioCopy.component = originalModule
-            //originalModule.io.asInstanceOf[Bundle] += ioCopy
+            originalModule.io.asInstanceOf[Bundle] += ioCopy
             Fame5Transform.DecoupledIOs(name) += ioCopy
           }
         }
@@ -858,9 +866,12 @@ class Fame5Wrapper(num_copies: Int, f: => Module) extends Module {
               ioCopy.flip
             }
             ioCopy.bits.isIo = true
+            ioCopy.bits.setName("io_" + name + "_bits_" + i)
+            ioCopy.bits.component = originalModule
+            ioCopy.isIo = true
             ioCopy.setName(name + "_" + i)
             ioCopy.component = originalModule
-            //originalModule.io.asInstanceOf[Bundle] += ioCopy
+            originalModule.io.asInstanceOf[Bundle] += ioCopy
             Fame5Transform.RegIOs(name) += ioCopy
           }
         }
@@ -876,7 +887,7 @@ class Fame5Wrapper(num_copies: Int, f: => Module) extends Module {
             ioCopy.isIo = true
             ioCopy.setName(name + "_" + i)
             ioCopy.component = originalModule
-            //originalModule.io.asInstanceOf[Bundle] += ioCopy
+            originalModule.io.asInstanceOf[Bundle] += ioCopy
             Fame5Transform.DebugIOs(name) += ioCopy
           }
         }
@@ -889,9 +900,9 @@ class Fame5Wrapper(num_copies: Int, f: => Module) extends Module {
     threadSelID.isIo = true
     threadSelID.setName("test")
     threadSelID.component = module
-    Fame5Transform.testSignals(module) += threadSelID
+    Fame5Transform.testSignals(module) = threadSelID
     if(!isTop){
-      threadSelId := Fame5Transform.testSignals(parent)
+      threadSelID := Fame5Transform.testSignals(parent)
     }
     module.io.asInstanceOf[Bundle] += threadSelID
     for(submodule <- module.children){
@@ -1014,7 +1025,7 @@ class Fame5Wrapper(num_copies: Int, f: => Module) extends Module {
     val threadSelID = UInt()
     threadSelID := counter
     Fame5Transform.threadSelIDSignals(originalModule) := threadSelID
-    Fame5Transform.testSignal(originalModule) := threadSelID
+    Fame5Transform.testSignals(originalModule) := UInt(0, width = 4)
   }
 
   def connectWrapperHostIOs() = {
@@ -1084,7 +1095,7 @@ object Fame5Transform {
   val DecoupledIOs = new HashMap[String, ArrayBuffer[DecoupledIO[Bits]]]
   val RegIOs = new HashMap[String, ArrayBuffer[RegIO[Bits]]]
   val DebugIOs = new HashMap[String, ArrayBuffer[Bits]]
-  val consumerMap = new HashMap[Node, ArrayBuffer[(Node, Int)]]
+  var consumerMap = new HashMap[Node, ArrayBuffer[(Node, Int)]]
   val regCopiesMap = new HashMap[Reg, ArrayBuffer[Reg]]//hash map of original fame0 register to a list of all of its copies,including itself
   val regTypeNodesMap = new HashMap[Reg, Bits]
   val memCopiesMap = new HashMap[TransactionMem[Data], ArrayBuffer[TransactionMem[Data]]]
@@ -1092,6 +1103,7 @@ object Fame5Transform {
 
 trait Fame5Transform extends Backend {
   private def findConsumerMap(module: Module) = {
+    Fame5Transform.consumerMap = new HashMap[Node, ArrayBuffer[(Node, Int)]]
     val allNodes = new ArrayBuffer[Node]
     def findAllNodes(module: Module):Unit = {
       for(node <- module.nodes){
@@ -1102,6 +1114,10 @@ trait Fame5Transform extends Backend {
       }
     }
     findAllNodes(module)
+
+    for(node <- allNodes){
+      Fame5Transform.consumerMap(node) = new ArrayBuffer[(Node, Int)]
+    }
     for(node <- allNodes){
       if(node.isInstanceOf[Data]){//huge hack should move this out to its own method
         if(node.asInstanceOf[Data].comp != null){
@@ -1110,18 +1126,15 @@ trait Fame5Transform extends Backend {
           }
         }
       }
-      if(!Fame5Transform.consumerMap.contains(node)){
-        Fame5Transform.consumerMap(node) = new ArrayBuffer[(Node, Int)]
-        for(i <- 0 until node.inputs.length){
-          val nodeInput = node.inputs(i)
-          if(Fame5Transform.consumerMap.contains(nodeInput)){
-            Fame5Transform.consumerMap(nodeInput) += ((node, i))
-          }
+      for(i <- 0 until node.inputs.length){
+        val nodeInput = node.inputs(i)
+        if(Fame5Transform.consumerMap.contains(nodeInput)){
+          Fame5Transform.consumerMap(nodeInput) += ((node, i))
         }
       }
     }
   }
-  
+
   private def driveOutputs(): Unit = {
     for((name, decoupledIOs) <- Fame5Transform.DecoupledIOs){
       for(i <- 1 until decoupledIOs.length){
@@ -1179,7 +1192,7 @@ trait Fame5Transform extends Backend {
         for(decoupledIO <- decoupledIOs){
           readyCopies += decoupledIO.ready
         }
-        insertMuxOnConsumers(originalDecoupledIO.bits.asInstanceOf[Bits], readyCopies, Fame5Transform.threadSelIDSignals(Fame5Transform.topModule))
+        insertMuxOnConsumers(originalDecoupledIO.ready, readyCopies, Fame5Transform.threadSelIDSignals(Fame5Transform.topModule))
       }
     }
     for((name, regIOs) <- Fame5Transform.RegIOs){
@@ -1189,7 +1202,7 @@ trait Fame5Transform extends Backend {
         for (regIO <- regIOs){
           copies += regIO.bits.asInstanceOf[Bits]
         }
-        insertMuxOnConsumers(originalRegIO.bits.asInstanceOf[Bits], copies, Fame5Transform.threadSelIDSignals(Fame5Transform.topModule))
+        insertMuxOnConsumers(originalRegIO.bits.asInstanceOf[Bits], copies, Fame5Transform.threadSelIDSignals(Fame5Transform.topModule) + Fame5Transform.testSignals(Fame5Transform.topModule))
       }
     }
     for((name, debugIOs) <- Fame5Transform.DebugIOs){
@@ -1211,7 +1224,10 @@ trait Fame5Transform extends Backend {
     }
     //using MuxCase here is a hack, it is much more effiient to directly use the threadSelId as the signal to a large n-way mux
     val mux = MuxCase(node, muxMapping)
+    println("DEBUG0") 
     for((consumer, inputNum) <- Fame5Transform.consumerMap(node)){
+      println("DEBUG1")
+      println(consumer)
       consumer.inputs(inputNum) = mux
     }
   }
@@ -1288,7 +1304,7 @@ trait Fame5Transform extends Backend {
   
   private def copyReg(reg: Reg): Reg = {
     val regCopy = new Reg()
-    regCopy.inputs += reg.inputs(0)
+    //regCopy.inputs += reg.inputs(0)
     regCopy.inputs += reg.inputs(1)
     regCopy.enableIndex = reg.enableIndex
     regCopy.isReset = reg.isReset
@@ -1299,6 +1315,7 @@ trait Fame5Transform extends Backend {
     for((en, data) <- reg.updates){
       regCopy.updates += ((en,data))
     }
+    regCopy.genMuxes(regCopy)
     return regCopy
   }
 
@@ -1492,6 +1509,8 @@ trait Fame5Transform extends Backend {
   preElaborateTransforms += ((top: Module) => collectNodesIntoComp(initializeDFS))
   preElaborateTransforms += ((top: Module) => findConsumerMap(top)) 
   preElaborateTransforms += ((top: Module) => driveOutputs())
+  preElaborateTransforms += ((top: Module) => collectNodesIntoComp(initializeDFS))
+  preElaborateTransforms += ((top: Module) => findConsumerMap(top)) 
   preElaborateTransforms += ((top: Module) => muxInputs())
   preElaborateTransforms += ((top: Module) => replicateRegisters())
   preElaborateTransforms += ((top: Module) => muxRegOutputs())

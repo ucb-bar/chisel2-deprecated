@@ -544,6 +544,7 @@ abstract class Backend {
       c.markComponent();
     // XXX This will create nodes after the tree is traversed!
     c.genAllMuxes;
+    nameAll(c)
     execute(c, preElaborateTransforms)
     Module.components.foreach(_.postMarkNet(0));
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
@@ -601,7 +602,7 @@ abstract class Backend {
 
     /* We execute nameAll after traceNodes because bindings would not have been
        created yet otherwise. */
-    nameAll(c)
+    //nameAll(c)
     nameRsts
 
     execute(c, analyses)
