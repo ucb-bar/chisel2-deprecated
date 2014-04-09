@@ -156,7 +156,7 @@ abstract class Node extends nameable {
 
   def nameIt (path: String, isNamingIo: Boolean) {
     try {
-      if( (!isIo && !named) || (isIo && isNamingIo) ) {
+      if (!named && (!isIo || isNamingIo)) {
         /* If the name was set explicitely through *setName*,
          we don't override it. */
         name = path;
