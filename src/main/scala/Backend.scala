@@ -582,7 +582,6 @@ abstract class Backend {
         module.gatherSpecialComponents()
         module.insertPipelineRegisters()
         connectResets
-        module.genAllMuxes
         module.inferAll()
         module.forceMatchingWidths
         module.removeTypeNodes()
@@ -590,6 +589,15 @@ abstract class Backend {
         module.generateBypassLogic()
         module.generateSpeculationLogic()
         module.generateInterlockLogic()
+        /*
+        module.generateStageValids
+        module.injectStageKills
+        module.generateStageStalls
+        module.connectStageValids
+        module.connectStageStalls
+        module.generateBypassMuxes
+        module.generateSpeculateMuxes
+        */
         connectResets
         module.genAllMuxes
         module.inferAll()

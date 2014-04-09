@@ -937,7 +937,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     nodes.filter(n => !isInput(n))
     
   // automatic pipeline stuff
-  var pipelineReg = new HashMap[Int, ArrayBuffer[Reg]]()
+  var pipelineRegs = new HashMap[Int, ArrayBuffer[Reg]]()
   
   val forwardedRegs = new HashSet[Reg]
   val forwardedMemReadPorts = new HashSet[(TransactionMem[_], RdIO[_])]
@@ -1006,7 +1006,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def setPipelineLength(length: Int) = {
     pipelineLength = length
     for (i <- 0 until pipelineLength - 1) {
-      pipelineReg += (i -> new ArrayBuffer[Reg]())
+      pipelineRegs += (i -> new ArrayBuffer[Reg]())
     }
     for (i <- 0 until pipelineLength) {
       val valid = Bool()
@@ -1337,54 +1337,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
   }
   
-  /*def insertPipelineRegisters() = { 
-    setPipelineLength(userAnnotatedStages.map(_._2).max + 1)
-    
-    removeRegConsumerCycle()
-   
-    findNodesRequireStage()
-    
-    val autoNodes = createAutoNodeGraph()
-    visualizeAutoLogicGraph(autoNodes, "debug.gv") 
-    println("finding valid pipeline register placement")
-    propagateStages(autoNodes)
-    verifyLegalStageColoring(autoNodes)
-    
-    println("optimizing pipeline register placement")
-    optimizeRegisterPlacement(autoNodes)
-    verifyLegalStageColoring(autoNodes)
-    
-    println("inserting pipeline registers")
-
-    var counter = 0//hack to get unique register names with out anything nodes being named already
-    nodeToStageMap = new HashMap[Node, Int]()
-    for(wire <- autoNodes.filter(_.isInstanceOf[AutoWire]).map(_.asInstanceOf[AutoWire])){
-      if(wire.stages.length == 2){
-        val stageDifference = Math.abs(wire.stages(1) - wire.stages(0))
-        Predef.assert(stageDifference > 0, stageDifference)
-        var currentChiselNode = insertBitOnInput(wire.consumerChiselNode, wire.consumerChiselNodeInputNum)
-        nodeToStageMap(currentChiselNode) = Math.min(wire.stages(0), wire.stages(1))
-        for(i <- 0 until stageDifference){
-          println("inserting pipeline register")
-          currentChiselNode = insertRegister(currentChiselNode, Bits(0), "Stage_" + (Math.min(wire.stages(0),wire.stages(1)) + i) + "_" + "PipeReg_"+ currentChiselNode.name + counter)
-          nodeToStageMap(currentChiselNode) = Math.min(wire.stages(0),wire.stages(1)) + i + 1
-          nodeToStageMap(currentChiselNode.asInstanceOf[Bits].comp) = Math.min(wire.stages(0),wire.stages(1)) + i + 1
-          counter = counter + 1
-          pipelineReg(Math.min(wire.stages(0),wire.stages(1)) + i) += currentChiselNode.asInstanceOf[Bits].comp.asInstanceOf[Reg]
-        }
-      }
-    }
-
-    for(node <- autoNodes.filter(_.isInstanceOf[AutoLogic])){
-      for(inputChiselNode <- node.asInstanceOf[AutoLogic].inputChiselNodes){
-        nodeToStageMap(inputChiselNode) = node.stages(0)
-      }
-      for(outputChiselNode <- node.asInstanceOf[AutoLogic].outputChiselNodes){
-        nodeToStageMap(outputChiselNode) = node.stages(0)
-      }
-    }
-  }*/
-
   def insertPipelineRegisters() = { 
     setPipelineLength(userAnnotatedStages.map(_._2).max + 1)
     
@@ -1408,17 +1360,16 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     nodeToStageMap = new HashMap[Node, Int]()
     for(wire <- autoNodes.filter(_.isInstanceOf[AutoWire]).map(_.asInstanceOf[AutoWire])){
       if(wire.inputStage != wire.outputStage){
-        val stageDifference = Math.abs(wire.inputStage - wire.outputStage)
+        val stageDifference = wire.outputStage - wire.inputStage
         Predef.assert(stageDifference > 0, stageDifference)
         var currentChiselNode = insertBitOnInput(wire.consumerChiselNode, wire.consumerChiselNodeInputNum)
         nodeToStageMap(currentChiselNode) = Math.min(wire.inputStage, wire.outputStage)
         for(i <- 0 until stageDifference){
-          println("inserting pipeline register")
           currentChiselNode = insertRegister(currentChiselNode, Bits(0), "Stage_" + (Math.min(wire.inputStage,wire.outputStage) + i) + "_" + "PipeReg_"+ currentChiselNode.name + counter)
-          nodeToStageMap(currentChiselNode) = Math.min(wire.inputStage,wire.outputStage) + i + 1
-          nodeToStageMap(currentChiselNode.asInstanceOf[Bits].comp) = Math.min(wire.inputStage, wire.outputStage) + i + 1
+          nodeToStageMap(currentChiselNode) = wire.inputStage + i + 1
+          nodeToStageMap(currentChiselNode.asInstanceOf[Bits].comp) = wire.inputStage + i + 1
           counter = counter + 1
-          pipelineReg(Math.min(wire.inputStage, wire.outputStage) + i) += currentChiselNode.asInstanceOf[Bits].comp.asInstanceOf[Reg]
+          pipelineRegs(Math.min(wire.inputStage, wire.outputStage) + i) += currentChiselNode.asInstanceOf[Bits].comp.asInstanceOf[Reg]
         }
       }
     }
@@ -1674,172 +1625,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     return autoNodeGraph
   }
   
-  /*def propagateStages(autoNodes: ArrayBuffer[AutoNode]) = {
-    val bfsQueue = new ScalaQueue[(AutoNode, Direction)] //the 2nd item of the tuple indicateds which direction the node should propagate its stage number to. True means propagate to outputs, false means propagate to inputs
-    val retryNodes = new ArrayBuffer[(AutoNode, Direction)] //list of nodes that need to retry their stage propagation because their children weren't ready
-  
-    def propagatedToChild(parentStage: Int, child: AutoNode) : Boolean = {
-      return child.stages.contains(parentStage)
-    }
-    
-    def propagatedToAllChildren(node: AutoNode, stage: Int, direction: Direction) : Boolean = {
-      var children = node.inputs
-      if(direction == FORWARD){
-        children = node.consumers
-      }
-      var result = true
-      for(child <- children){
-        result = result && propagatedToChild(stage, child)
-      }
-      return result
-    }
-    
-    def propagateToChildren(node: AutoNode, direction: Direction) = {
-      val propagatedChildren = new ArrayBuffer[AutoNode] 
-      
-      //determine if we need/can propagate to child and return the stage number that should be propagated to child; direction = false means child is producer of node, direction = true means child is consumer of node
-      def childEligibleForPropagation(child: AutoNode, direction: Direction): Boolean = {
-        val childWasPropagated = propagatedToChild(node.stages(0), child)
-        val wireToLogic = node.isInstanceOf[AutoWire] && child.isInstanceOf[AutoLogic] && child.stages.length > 0
-        var allParentsResolved = true
-        var childParents = new ArrayBuffer[AutoNode]
-        if(direction == FORWARD){
-          for(childProducer <- child.inputs){
-            childParents += childProducer
-          }
-        } else {
-          for(childConsumer <- child.consumers){
-            childParents += childConsumer
-          }
-        }
-        var edgeParentStage:Int = 0//this is the minimum stage of child's consumers when direction == true, this is the maximum stage of child's producers when direction == false
-        if(direction == FORWARD){
-          edgeParentStage = 0
-        } else {
-          edgeParentStage = Int.MaxValue
-        }
-
-        for(parent <- childParents){
-          if(parent.stages.length == 0){
-            allParentsResolved = false
-          } else {
-            if(direction == FORWARD){
-              if(parent.stages.max > edgeParentStage){
-                edgeParentStage = parent.stages.max
-              }
-            } else {
-              if(parent.stages.min < edgeParentStage){
-                edgeParentStage = parent.stages.min
-              }
-            }
-          }
-        }
-        val childEligible = !childWasPropagated && !wireToLogic && allParentsResolved
-        return childEligible
-      }
-      //propagate node's stage number to child and record all new nodes that have been propagated to; direction = false means child is producer of node, direction = true means child is consumer of node
-      def doPropagation(child: AutoNode, direction: Direction) = {
-        var childParents = new ArrayBuffer[AutoNode]
-        if(direction == FORWARD){
-          for(childProducer <- child.inputs){
-            childParents += childProducer
-          }
-        } else {
-          for(childConsumer <- child.consumers){
-            childParents += childConsumer
-          }
-        }
-        
-        var edgeParentStage:Int = 0//this is the minimum stage of child's consumers when direction == true, this is the maximum stage of child's producers when direction == false
-        if(direction == FORWARD){
-          edgeParentStage = 0
-        } else {
-          edgeParentStage = Int.MaxValue
-        }
-
-        for(parent <- childParents){
-          if(direction == FORWARD){
-            if(parent.stages.max > edgeParentStage){
-              edgeParentStage = parent.stages.max
-            }
-          } else {
-            if(parent.stages.min < edgeParentStage){
-              edgeParentStage = parent.stages.min
-            }
-          }
-        }
-        //propagate stage to child
-        if(!child.stages.contains(edgeParentStage)){
-          child.stages += edgeParentStage
-        }
-        //propagate child stage back to its parents
-        for(parent <- childParents){
-          if(!parent.stages.contains(edgeParentStage)){
-            parent.stages += edgeParentStage
-          }
-        }
-        
-        //set propagatedChildren
-        propagatedChildren += child
-      }
-
-      var children:Seq[AutoNode] = null
-      if(direction == FORWARD){//propagate to consumers
-        children = node.consumers
-      } else {//propagate to producers
-        children = node.inputs
-      }
-      
-      for(child <- children) {
-        //check if we need/can propagate to child
-        if(childEligibleForPropagation(child, direction)){
-          //propagate stage to child
-          doPropagation(child, direction)
-        }
-      }
-      propagatedChildren
-    }
-    
-
-    //initialize bfs queue and coloredNodes with user annotated nodes
-    for(autoNode <- autoNodes){
-      if(autoNode.isUserAnnotated || autoNode.isAutoAnnotated){
-        if(!autoNode.isSink){
-          retryNodes += ((autoNode, FORWARD))
-        }
-        if(!autoNode.isSource){
-          retryNodes += ((autoNode, BACKWARD))
-        }
-      }
-    }
-    
-    //do stage propagation
-    while(!retryNodes.isEmpty){
-      for((node, direction) <- retryNodes){
-        bfsQueue.enqueue(((node, direction)))
-      }
-      retryNodes.clear
-      while(!bfsQueue.isEmpty){
-        val current = bfsQueue.dequeue
-        val currentNode = current._1
-        val currentDirection = current._2
-        if(currentNode.stages.length < 2){
-          var childrenPropagatedTo:ArrayBuffer[AutoNode] = null
-          childrenPropagatedTo = propagateToChildren(currentNode, currentDirection)
-          for(child <- childrenPropagatedTo){
-            if((child.stages.length < 2) && !child.isSource && !child.isSink && !child.isUserAnnotated && !child.isAutoAnnotated){
-              bfsQueue.enqueue(((child, currentDirection)))
-            }
-          }
-          if(!propagatedToAllChildren(currentNode, currentNode.stages(0), currentDirection)){
-            retryNodes += ((currentNode, currentDirection))
-          }
-        }
-      }
-    }
-    visualizeAutoLogicGraph(autoNodes, "stages.gv")
-  }*/
-  
   def propagateStages(autoNodes: ArrayBuffer[AutoNode]) = {
     val bfsQueue = new ScalaQueue[(AutoNode, Direction)] //the 2nd item of the tuple indicateds which direction the node should propagate its stage number to. True means propagate to outputs, false means propagate to inputs
     val retryNodes = new ArrayBuffer[(AutoNode, Direction)] //list of nodes that need to retry their stage propagation because their children weren't ready
@@ -2014,297 +1799,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     visualizeAutoLogicGraph(autoNodes, "stages.gv")
   }
 
-  /*def optimizeRegisterPlacement(autoNodes: ArrayBuffer[AutoNode]) = { 
-    val nodeArrivalTimes = new HashMap[AutoNode, Double]
-    val forwardArrivalTimes = new HashMap[AutoNode, Double]
-    val backwardArrivalTimes = new HashMap[AutoNode, Double]
-
-    val stageDelays = ArrayBuffer.fill(pipelineLength)(0.0)
-    
-    def calculateArrivalTimes() = {
-      def findArrivalTime(node: AutoNode, dir: Direction): Double = {
-        var arrivalTimes = forwardArrivalTimes
-        if(dir == FORWARD){
-          arrivalTimes = forwardArrivalTimes
-        } else {
-          arrivalTimes = backwardArrivalTimes
-        }
-
-        if(arrivalTimes.contains(node)){
-          return arrivalTimes(node)
-        } else if(node.stages.length > 1 && (node.stages(0) != node.stages(1))) {
-          arrivalTimes(node) = 0.0
-          return 0.0
-        } else if(node.isDecoupledIO){
-          arrivalTimes(node) = 0.0
-          return 0.0
-        } else {
-          var arrivalTime :Double= 0.0
-          val parents = new ArrayBuffer[AutoNode]
-          if(dir == FORWARD){
-            for(input <- node.inputs){
-              parents += input
-            }
-          } else {
-            for(consumer <- node.consumers){
-              parents += consumer
-            }
-          }
-          for(parent <- parents){
-            arrivalTime = Math.max(arrivalTime, findArrivalTime(parent, dir))
-          }
-          arrivalTimes(node) = arrivalTime + node.delay
-          return arrivalTimes(node)
-        }
-      }
-      //find forward delay times
-      forwardArrivalTimes.clear()
-      for(node <- autoNodes){
-        if(node.stages.length > 1 && (node.stages(0) != node.stages(1))){
-          for(input <- node.inputs){
-            findArrivalTime(input, FORWARD)
-          }
-        }
-      }
-      for(node <- autoSinkNodes){
-        findArrivalTime(node, FORWARD)
-      }
-      //find backward delay times
-      backwardArrivalTimes.clear()
-      for(node <- autoNodes){
-        if(node.stages.length > 1 && (node.stages(0) != node.stages(1))){
-          for(consumer <- node.consumers){
-            findArrivalTime(consumer, BACKWARD)
-          }
-        }
-      }
-      for(node <- autoSourceNodes){
-        findArrivalTime(node, BACKWARD)
-      }
-    }
-    
-    def findUnpipelinedPathLength(): Double = {
-      val nodeArrivalTimes = new HashMap[AutoNode, Double]
-      def calculateArrivalTimes() = {
-        def findArrivalTime(node: AutoNode) : Double = {
-          if(nodeArrivalTimes.contains(node)){
-            return nodeArrivalTimes(node)
-          } else if(node.isDecoupledIO){
-            nodeArrivalTimes(node) = 0.0
-            return 0.0
-          } else {
-            var arrivalTime: Double= 0.0
-            val parents = new ArrayBuffer[AutoNode]
-            for(input <- node.inputs){
-              parents += input
-            }
-
-            for(parent <- parents){
-              arrivalTime = Math.max(arrivalTime, findArrivalTime(parent))
-            }
-            
-            nodeArrivalTimes(node) = arrivalTime + node.delay
-            return nodeArrivalTimes(node)
-          }
-        }
-        nodeArrivalTimes.clear()
-        for(node <- autoSinkNodes){
-          findArrivalTime(node)
-        }
-      }
-    
-      calculateArrivalTimes()
-      var maxLength = 0.0
-      for(node <- nodeArrivalTimes.keys){
-        maxLength = Math.max(maxLength, nodeArrivalTimes(node))
-      }
-      return maxLength
-    }
-    
-    def findStageDelays() = {
-      for(i <- 0 until pipelineLength){
-        stageDelays(i) = 0.0
-      }
-      for(node <- autoNodes.filter(_.stages.length == 1)){ 
-        if(forwardArrivalTimes.contains(node)){
-          if(forwardArrivalTimes(node) > stageDelays(node.stages(0))){
-            stageDelays(node.stages(0)) = forwardArrivalTimes(node)
-          }
-        }
-      }
-    }
-
-    def movePipelineBoundary(boundaryNum: Int, direction: Direction) = {
-      val boundaryNodes = new ArrayBuffer[AutoNode]
-      val possibleMoveNodes = new ArrayBuffer[AutoNode]
-      val eligibleMoveNodes = new ArrayBuffer[AutoNode]
-      
-      //find nodes from possibleMoveNodes that can have the pipeline boundary be legally moved in "direction" accross the node and store them in eligibleMoveNodes
-      def findEligibleNodes(direction: Direction) = {
-        for(node <- possibleMoveNodes){
-          if(!node.isUserAnnotated && node.isInstanceOf[AutoLogic] && !node.isSource && !node.isSink){
-            val nodeStage = node.stages(0)
-            var parentsEligible = true
-            val parents = new ArrayBuffer[AutoNode]
-            
-            if(direction == FORWARD){
-              for(input <- node.inputs){
-                parents += input
-              }
-            } else {
-              for(consumer <- node.consumers){
-                parents += consumer
-              }
-            }
-          
-            for(parent <- parents){
-              Predef.assert(parent.stages.length > 0)
-              Predef.assert(parent.stages.length <= 2)
-              if(parent.stages.length == 1){
-                parentsEligible = false
-              } else {
-                Predef.assert(parent.stages.contains(nodeStage))
-              }
-            }
-            if(parentsEligible){
-              eligibleMoveNodes += node
-            }
-          }
-        }
-      }
-      //move pipeline boundary in "direction" across "node"
-      def moveNode(movedNode: AutoNode, direction: Direction) = {
-        val nodeStage = movedNode.stages(0)
-        var stageDelta = 0
-        if(direction == FORWARD){
-          stageDelta = -1
-        } else {
-          stageDelta = 1
-        }
-        
-        val nodesToMove = new ArrayBuffer[AutoNode]
-        nodesToMove += movedNode
-        
-        for(n <- nodesToMove){
-          n.stages(0) = n.stages(0) + stageDelta
-        }
-
-        val parents = new ArrayBuffer[AutoNode]
-        for(input <- movedNode.inputs){
-          parents += input
-        }
-        for(consumer <- movedNode.consumers){
-          parents += consumer
-        }
-        
-        for(parent <- parents){
-          if(parent.stages.length == 2){
-            if(parent.stages(0) == nodeStage){
-              parent.stages(0) = parent.stages(0) + stageDelta
-            } else {
-              parent.stages(1) = parent.stages(1) + stageDelta
-            }
-            if(parent.stages(0) == parent.stages(1)){
-              parent.stages -= parent.stages(1)
-            }
-          } else {
-            parent.stages += parent.stages(0) + stageDelta
-          }
-        }
-      }
-      
-      //populate boundaryNodes
-	    for(node <- autoNodes.filter(_.stages.length == 2)){
-	      val stages = node.stages
-        if(stages.contains(boundaryNum) && stages.contains(boundaryNum + 1)){
-          boundaryNodes += node
-        } else {
-          if(direction == FORWARD){
-            if(stages.contains(boundaryNum + 1) && stages.filter(_ != boundaryNum + 1)(0) < boundaryNum + 1){
-              boundaryNodes += node
-            }
-          } else if(direction == BACKWARD) {
-            if(stages.contains(boundaryNum) && stages.filter(_ != boundaryNum)(0)  > boundaryNum){
-              boundaryNodes += node
-            }
-          }
-        }
-      }
-      //find nodes that are producers/consumers of the boundary nodes
-      if(direction == FORWARD){
-        for(node <- boundaryNodes){
-          for(consumer <- node.consumers){
-            possibleMoveNodes += consumer
-          }
-        }
-      } else if(direction == BACKWARD){
-        for(node <- boundaryNodes){
-          for(input <- node.inputs){
-            possibleMoveNodes += input
-          }
-        }
-      }
-
-      //find nodes that are eligible to be moved accross the pipeline boundary
-      findEligibleNodes(direction)
-      //find eligible node with the highest dealy
-      var criticalNode: AutoNode = null
-      var highestDelay = 0.0
-      var arrivalTimes = forwardArrivalTimes
-      if(direction == FORWARD){
-        arrivalTimes = backwardArrivalTimes
-      } else {
-        arrivalTimes = forwardArrivalTimes
-      }
-      for(node <- eligibleMoveNodes){
-        val nodeDelay = arrivalTimes(node)
-        if(nodeDelay >= highestDelay){
-          criticalNode = node
-          highestDelay = nodeDelay
-        }
-      }
-      if(eligibleMoveNodes.length > 0){
-        moveNode(criticalNode, direction)
-      } 
-    }
-
-    var iterCount = 1
-    calculateArrivalTimes()
-    findStageDelays()
-    println(stageDelays)
-    val unPipelinedDelay = findUnpipelinedPathLength()
-    var oldMaxDelay = unPipelinedDelay
-    println("max unpipelined path: " + unPipelinedDelay)
-    println("max delay before optimizeation: " + stageDelays.max)
-    //while(!(iterCount % 100 == 0 && oldMaxDelay == stageDelays.max) && iterCount < 10000){
-    while(stageDelays.max > unPipelinedDelay/pipelineLength && iterCount < 5000){   
-      //find pipeline stage with longest delay
-      val criticalStageNum = stageDelays.indexOf(stageDelays.max)
-      //determine which pipeline boundary to move
-      for(pipeBoundaryNum <- 0 until pipelineLength - 1){
-        calculateArrivalTimes()
-        findStageDelays()
-        if(stageDelays(pipeBoundaryNum) < stageDelays(pipeBoundaryNum + 1)){
-          movePipelineBoundary(pipeBoundaryNum, FORWARD)
-        } else if(stageDelays(pipeBoundaryNum) > stageDelays(pipeBoundaryNum + 1)){
-          movePipelineBoundary(pipeBoundaryNum, BACKWARD)
-        }
-      }
-      iterCount = iterCount + 1
-      if(iterCount % 100 == 0){
-        oldMaxDelay = stageDelays.max
-      }
-    }
-    calculateArrivalTimes()
-    findStageDelays()
-    println(stageDelays)
-    println("max delay after optimizeation: " + stageDelays.max)
-    println("iteration count: " + iterCount)
-    visualizeAutoLogicGraph(autoNodes, "stages.gv")
-    visualizeAutoLogicGraph(forwardArrivalTimes, "fdelays.gv")
-    visualizeAutoLogicGraph(backwardArrivalTimes, "bdelays.gv")
-  }*/
-
+  
   def optimizeRegisterPlacement(autoNodes: ArrayBuffer[AutoNode]) = { 
     val nodeArrivalTimes = new HashMap[AutoNode, Double]
     val forwardArrivalTimes = new HashMap[AutoNode, Double]
@@ -2663,14 +2158,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   
   //inserts register between *input* and its consumers
   def insertRegister(input: Bits, init_value: Bits, name: String) : Bits = {
-    val new_reg = Reg(Bits())
+    val new_reg = Reg(next = input, init = init_value)
+    new_reg.comp.asInstanceOf[Reg].inputs += this.getResetPin(this._reset)
     PipelineComponentNodes += new_reg
     APConsumers(new_reg) = new ArrayBuffer[(Node, Int)]
-    new_reg := input
-    new_reg.comp.asInstanceOf[Reg].clock = this.clock
-    when(this._reset){
-      new_reg := init_value
-    }
     input.pipelinedVersion = new_reg
     new_reg.unPipelinedVersion = input
     new_reg.comp.setName(name)
@@ -2682,7 +2173,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
     APConsumers(input).clear()
     APConsumers(input) += ((new_reg, 0))// the 0 is questionable, may need to actually figure out the matching new_reg input index
-    new_reg
+    new_reg.setName(input.name)
+    return new_reg
   }
   
   
@@ -2735,7 +2227,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   //checks if n is a user defined pipeline register
   def isPipeLineReg(n: Node): Boolean = {
     var result = false
-    for(i <- pipelineReg.values){
+    for(i <- pipelineRegs.values){
       if(i.contains(n)){
         result = true
       }
@@ -2822,11 +2314,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         }
       }
     }
-    
-    println("reg raw hazards")
-    println(regRAWHazards)
-    println("tMem raw hazards")
-    println(tMemRAWHazards)
   }
   
   def generateBypassLogic() = {
@@ -2850,7 +2337,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
 
       val muxMapping = new ArrayBuffer[(Bool, Bits)]()
-      for(j <- getStage(reg) + 1 to pipelineReg.size){
+      for(j <- getStage(reg) + 1 to pipelineRegs.size){
         for(i <- 0 until reg.updates.length){
           if(forwardPoints.contains(((i,j)))){ 
             val forwardCond = regRAWHazards(((reg, i, j)))
@@ -2918,7 +2405,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
       
       val muxMapping = new ArrayBuffer[(Bool, Bits)]()
-      for(j <- getStage(readPort.adr) + 1 to pipelineReg.size){
+      for(j <- getStage(readPort.adr) + 1 to pipelineRegs.size){
         for(i <- 0 until tMem.io.writes.length){
           if(forwardPoints.contains(((i, j)))){
             val forwardCond = tMemRAWHazards(((readPort.asInstanceOf[RdIO[Data]], i, j)))
@@ -3027,14 +2514,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     //initialize registers for stageValid signals
     val validRegs = new ArrayBuffer[Bool]
     for (i <- 0 until pipelineLength - 1) {
-      val validReg = Reg(Bool())
-      when(~stageStalls(i) && ~globalStall){
-        validReg := stageValids(i)
-      }
-      when(this._reset){
-        validReg := Bool(false)
-      }
-      validReg.comp.asInstanceOf[Reg].clock = this.clock
+      val validReg = Reg(init = Bool(false))
+      validReg.comp.asInstanceOf[Reg].inputs += this.getResetPin(this._reset)
+      val validRegEnable = ~stageStalls(i) && ~globalStall
+      validReg.comp.asInstanceOf[Reg].inputs(0) = Multiplex(validRegEnable, stageValids(i), validReg)
+      validReg.comp.asInstanceOf[Reg].enable = validRegEnable
       validRegs += validReg
       validReg.comp.nameIt("Stage_" + i + "_valid_reg")
     }
@@ -3069,23 +2553,46 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       }
     }
     
+    //wire input valid and output readies to stage valid and stage stalls
+    /*val inputIOs = new ArrayBuffer[DecoupledIO[Data]]
+    val outputIOs = new ArrayBuffer[DecoupledIO[Data]]
+    for(io <- ioNodes){
+      if(io.valid.dir == INPUT){
+        inputIOs += io
+      } else {
+        outputIOs += io
+      }
+    }
+
+    for(input <- inputIOs){
+      val stage = getStage(input.ready)
+      tempValids(stage) = tempValids(stage) && (input.valid || ~input.ready)
+      if(stage > 0){
+        tempStalls(stage - 1) = tempStalls(stage - 1) || (~input.valid && input.ready)
+      }
+    }
+    
+    for(output <- outputIOs){
+      val stage = getStage(output.valid)
+      tempValids(stage) + tempValids(stage) && (output.ready || ~output.valid)
+      if(stage > 0){
+        tempStalls(stage - 1) = tempStalls(stage - 1) || (~output.ready && output.valid)
+      }
+    }*/
+
+    //OR stage x stall with stage x-1 stall
+    for(i <- (0 until pipelineLength - 2).reverse) {
+      tempStalls(i) = tempStalls(i) || tempStalls(i+1)
+    }
+    
     //connect actual stage valids to the tempValids
     for(i <- 0 until pipelineLength){
       stageValids(i).inputs += tempValids(i)
     }
     
-    //generate logic for stall signals
-    for(i <- (0 until pipelineLength - 2).reverse) {
-      tempStalls(i) = tempStalls(i) || tempStalls(i+1)
-    }
-
     //connect actual stage stalls to the tempStalls
     for(i <- 0 until pipelineLength){
-      if(tempStalls(i).litOf != null){
-        stageStalls(i) := ~(stageValids(0) === stageValids(0))//hack to get around stage(i) := const failing to code gen properly
-      } else {
-        stageStalls(i) := tempStalls(i)
-      }
+      stageStalls(i).inputs += tempStalls(i)
     }
     
     //wire stage valid and stall signals to architecural state write enables
@@ -3115,6 +2622,19 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         newWriteEn.addConsumers 
       }
     }
+    
+    //wire stall signals to pipeline registers
+    for(i <- 0 until pipelineLength - 1){
+      for(pipeReg <- pipelineRegs(i)){
+        pipeReg.enable = pipeReg.enable && ~globalStall && ~stageStalls(i)
+        val regOutput = Bits()
+        regOutput.inputs += pipeReg
+        val regMux = Bits()
+        regMux.inputs += pipeReg.inputs(0)
+        pipeReg.inputs(0) = Mux(~globalStall && ~stageStalls(i), regMux, regOutput)
+      }
+    }
+    
     //wire zero to all Bool outputs if stage is not valid or is stalled; this is a hack to let outside components know that a pipeline stage is invalid
     for(ready <- ioNodes.map(_.ready).filter(_.dir == OUTPUT)){
       val readyStage = getStage(ready)
@@ -3126,6 +2646,27 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       val tempMux = Multiplex(~globalStall && stageValids(validStage) && ~stageStalls(validStage), valid.inputs(0), Bool(false))
       valid.inputs(0) = tempMux
     }
+  }
+
+  def generateStageValids() = {
+  }
+
+  def injectStageKills() = {
+  }
+
+  def generateStageStalls() = {
+  }
+
+  def connectStageValids() = {
+  }
+
+  def connectStageStalls() = {
+  }
+
+  def generateBypassMuxes() = {
+  }
+
+  def generateSpeculateMuxes() = {
   }
   
   def getVersions(node: Node, maxLen: Int): ArrayBuffer[Node] = {
