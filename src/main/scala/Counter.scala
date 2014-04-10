@@ -49,6 +49,7 @@ object DaisyChain {
 }
 
 trait DaisyChain extends Backannotation {
+  val ioBuffers = new HashMap[Bits, Bits]
   Module.isBackannotating = false
   override def backannotationTransforms {
     super.backannotationTransforms
@@ -116,10 +117,17 @@ trait DaisyChain extends Backannotation {
   }
 
   override def annotateSignals(c: Module) {
+   
+    /*** collect signals for snapshotting ***/
+    // First, collect the top component's inputs
+    for ((name, targetPin) <- c.io.flatten ; 
+      if !(daisyNames contains name) && targetPin.dir == INPUT) {
+        c.counter(targetPin)
+      }
+
+    // Second, collect all the state elements (Reg & Mem)
     val queue = new scala.collection.mutable.Queue[Module]
     queue enqueue c
-   
-    // collect signals for snapshotting
     while (!queue.isEmpty) {
       val top = queue.dequeue
       // collect registers and memory access
@@ -197,12 +205,14 @@ trait DaisyChain extends Backannotation {
           val idx = consumer.inputs indexOf targetPin
           consumer.inputs(idx) = in_reg
         }
+        ioBuffers(targetPin) = in_reg
       } else if (targetPin.dir == OUTPUT) {
         val out_reg = Reg(UInt())
         addReg(c, out_reg, name + "_buf",
           Map(DaisyChain.fires(c) -> targetPin.inputs.head)
         )
         wire(targetPin, out_reg)
+        ioBuffers(targetPin) = out_reg
       }
     }
   }
@@ -220,8 +230,9 @@ trait DaisyChain extends Backannotation {
       for (signal <- top.signals) {
         signal.cntrIdx = emitCounterIdx
         signal.counter = signal match {
-          case reg: Reg => UInt(reg)
-          case read: MemRead => UInt(read)
+          case reg:   Reg     => UInt(reg)
+          case read:  MemRead => UInt(read)
+          case input: Bits    => ioBuffers(input)
         }
         signal.shadow  = Reg(Bits(width = 32))
       }
@@ -485,7 +496,6 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     delta += clk.toInt
   }
 
-  // proceed 'n' clocks
   def pokeClks (n: Int) {
     // Wait until the clock counter is ready
     // (the target is stalled)
@@ -499,28 +509,34 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     poke(clks.valid, 0)
   }
 
-  // i = 0 -> daisy copy
-  // i = 1 -> daisy read 
-  def peekDaisy (i: Int) {
-    // request the daisy output
-    // until it is valid
-    do {
-      poke(daisyCtrl, i)
-      poke(daisyOut.ready, 1)
-      clock(1)
-    } while (peek(daisyOut.valid) == 0)
-    poke(daisyOut.ready, 0)
-  }
-
   // Show me the current status of the daisy chain
   def showCurrentChain() = {
     if (isTrace) {
       println("--- CURRENT CHAIN ---")
-      for (s <- Module.signals) {
-        peek(s.shadow)
-      }
+      Module.signals map (x => peek(x.shadow))
       println("---------------------")
     }
+  }
+
+  def daisyCopy() {
+    do {
+      poke(daisyCtrl, 0)
+      poke(daisyOut.ready, 1)
+      clock(1)
+    } while (peek(daisyOut.valid) == 0)
+    poke(daisyOut.ready, 0)
+    showCurrentChain()
+  }
+
+  def daisyRead() = {
+    do {
+      poke(daisyCtrl, 1)
+      poke(daisyOut.ready, 1)
+      clock(1)
+    } while (peek(daisyOut.valid) == 0)
+    poke(daisyOut.ready, 0)
+    showCurrentChain()
+    peek(daisyOut.bits)
   }
 
   override def dump(): Snapshot = {
@@ -528,21 +544,19 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
 
     if (isTrace) println("*** Daisy Copy ***")
     // Copy activity counter values to shadow counters
-    peekDaisy(0)
-    showCurrentChain()
+    daisyCopy()
 
     for ((signal, i) <- Module.signals.zipWithIndex) {
       if (isTrace) println("*** Daisy Read ***")
       // Read out the daisy chain
-      peekDaisy(1)
-      showCurrentChain()
+      val daisyValue = daisyRead()
       // Check the daisy output
       expect(daisyOut.bits, peeks(i))
       signal match {
         case read: MemRead =>
-          snap.pokes += Poke(read.mem, read.addr.litValue(0).toInt, peek(daisyOut.bits))
+          snap.pokes += Poke(read.mem, read.addr.litValue(0).toInt, daisyValue)
         case _ =>
-          snap.pokes += Poke(signal, 0, peek(daisyOut.bits))
+          snap.pokes += Poke(signal, 0, daisyValue)
       }
     }
     snap
@@ -557,22 +571,30 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
 
     /*** Snapshotting! ***/
     if (t != 0) snapshot()
+    val target = t + n
+
     // set clock register
     pokeClks(n)
+
     // run the target until it is stalled
-    if (isTrace) println("*** CYCLE THE TAREGT / READ SIGNAL VALUES ***")
+    if (isTrace) println("*** CYCLE THE TARGET ***")
     clock(n)
+    // read out signal values
+    if (isTrace) println("*** READ SIGNAL VALUES ***")
     peeks.clear
-    for (signal <- Module.signals) {
-      peeks += ( signal match {
-        case read: MemRead => 
-          peekBits(read.mem, read.addr.litValue(0).toInt)
-        case _ => 
-          peekBits(signal)
-      } )
+    peeks ++= Module.signals map {
+      case read: MemRead =>
+        peekBits(read.mem, read.addr.litValue(0).toInt)
+      case signal =>
+        peekBits(signal)
     }
- 
+
     t += n
+  }
+
+  override def finish(): Boolean = {
+    dumpSnapshots("%s.snapshots".format(c.name), snapshots)
+    super.finish()
   }
 }
 
