@@ -43,10 +43,6 @@ import ChiselError._
 import Module._
 
 object Module {
-  /* We have to keep a list of public methods which happen to be public,
-   have no arguments yet should not be used to generate C++ or Verilog code. */
-  val keywords = HashSet[String]("test")
-
   var warnInputs = false
   var warnOutputs = false
   var saveWidthWarnings = false
@@ -846,7 +842,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
        val name = m.getName();
        val types = m.getParameterTypes();
        if (types.length == 0 && isValName(name) // patch to avoid defs
-        && isPublic(m.getModifiers()) && !(Module.keywords contains name)) {
+        && isPublic(m.getModifiers())) {
          val o = m.invoke(this);
          o match {
          case node: Node => {

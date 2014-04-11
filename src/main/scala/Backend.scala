@@ -96,7 +96,7 @@ abstract class Backend {
       val name = m.getName();
       val types = m.getParameterTypes();
       if (types.length == 0 && root.isValName(name) // patch to avoid defs
-        && isPublic(m.getModifiers()) && !(Module.keywords contains name)) {
+        && isPublic(m.getModifiers())) {
         val o = m.invoke(root);
         o match {
          case node: Node => {
