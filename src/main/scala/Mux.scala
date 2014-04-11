@@ -115,7 +115,6 @@ object Mux {
 
 class Mux extends Op {
   Module.muxes += this;
-  stack = Thread.currentThread.getStackTrace;
   op = "Mux";
   override def toString: String =
     inputs(0) + " ? " + inputs(1) + " : " + inputs(2)

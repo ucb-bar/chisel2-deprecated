@@ -130,8 +130,10 @@ abstract class Node extends nameable {
   var isClkInput = false;
   var inferCount = 0;
   var genError = false;
-  var stack: Array[StackTraceElement] = null;
-  var line: StackTraceElement = findFirstUserLine(Thread.currentThread().getStackTrace) getOrElse Thread.currentThread().getStackTrace()(0)
+  val line: StackTraceElement = {
+    val trace = new Throwable().getStackTrace
+    findFirstUserLine(trace) getOrElse trace(0)
+  }
   var isScanArg = false
   var isPrintArg = false
   var prune = false
@@ -302,7 +304,6 @@ abstract class Node extends nameable {
     writer.println("isClkInput: " + isClkInput)
     writer.println("inferCount: " + inferCount)
     writer.println("genError: " + genError)
-    writer.println("stack.length: " + (if(stack != null) { stack.length } else { 0 }))
     writer.println("line: " + line)
     writer.println("isScanArg: " + isScanArg)
     writer.println("isPrintArg: " + isPrintArg)
