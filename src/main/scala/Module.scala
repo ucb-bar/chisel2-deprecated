@@ -57,7 +57,6 @@ object Module {
   var isReportDims = false;
   var includeArgs: List[String] = Nil;
   var targetDir: String = null;
-  var isEmittingComponents = false;
   var isCompiling = false;
   var isCheckingPorts = false
   var isTesting = false;
@@ -155,7 +154,6 @@ object Module {
     chiselAndMap.clear()
     searchAndMap = false
     ioCount = 0;
-    isEmittingComponents = false;
     isCompiling = false;
     isCheckingPorts = false
     isTesting = false;
@@ -908,7 +906,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
   def verifyAllMuxes {
     for(m <- Module.muxes) {
-      if(m.inputs(0).width != 1 && m.component != null && (!Module.isEmittingComponents || !m.component.isInstanceOf[BlackBox])) {
+      if(m.inputs(0).width != 1 && m.component != null && (!Module.backend.isEmittingComponents || !m.component.isInstanceOf[BlackBox])) {
         ChiselError.error({"Mux " + m.name + " has " + m.inputs(0).width + "-bit selector " + m.inputs(0).name}, m.line);
       }
     }

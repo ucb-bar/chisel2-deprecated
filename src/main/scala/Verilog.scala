@@ -66,8 +66,9 @@ object VerilogBackend {
 }
 
 class VerilogBackend extends Backend {
-  Module.isEmittingComponents = true
   val keywords = VerilogBackend.keywords
+
+  override def isEmittingComponents: Boolean = true
 
   val flushedTexts = HashSet[String]()
 

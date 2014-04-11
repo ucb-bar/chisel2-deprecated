@@ -119,7 +119,7 @@ abstract class Node extends nameable {
   var flattened = false;
   var isTypeNode = false;
   var depth = 0;
-  def componentOf: Module = if (Module.isEmittingComponents && component != null) component else Module.topComponent
+  def componentOf: Module = if (Module.backend.isEmittingComponents && component != null) component else Module.topComponent
   var width_ = -1;
   var isFixedWidth = false;
   val consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs

@@ -35,7 +35,7 @@ import Node._
 object Binding {
 
   def apply(m: Node, c: Module, ioComp: Module): Node = {
-    if (Module.isEmittingComponents) {
+    if (Module.backend.isEmittingComponents) {
       val res = c.findBinding(m);
       if (res == null) {
         val res = new Binding(m, ioComp);

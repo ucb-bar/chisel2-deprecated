@@ -51,6 +51,9 @@ abstract class Backend {
   /* Set of keywords which cannot be used as node and component names. */
   val keywords: HashSet[String];
 
+  /* Whether or not this backend decomposes along Module boundaries. */
+  def isEmittingComponents: Boolean = false
+
   def createOutputFile(name: String): java.io.FileWriter = {
     val baseDir = ensureDir(Module.targetDir)
     new java.io.FileWriter(baseDir + name)
@@ -564,7 +567,7 @@ abstract class Backend {
               case _: Reg => "R"
               case _ => "T"
             }
-            if (Module.isEmittingComponents) {
+            if (isEmittingComponents) {
               node.pName = prefix + node.emitIndex
             } else {
               node.pName = prefix + node.component.nextIndex
