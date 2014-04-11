@@ -35,7 +35,6 @@ import scala.collection.mutable.Stack
 import java.lang.reflect.Modifier._
 import Node._;
 import ChiselError._
-import sort._
 
 object Bundle {
   val keywords = HashSet[String]("elements", "flip", "toString",
@@ -49,24 +48,6 @@ object Bundle {
     res
   }
 
-}
-
-object sort {
-  def apply(a: Array[(String, Bits)]): Array[(String, Bits)] = {
-    var i = 0
-    for (j <- 1 until a.length) {
-      val keyElm = a(j);
-      val key = keyElm._2._id
-      i = j - 1
-
-      while (i >= 0 && a(i)._2._id > key) {
-        a(i + 1) = a(i)
-        i = i - 1
-      }
-      a(i + 1) = keyElm
-    }
-    a
-  }
 }
 
 /** Defines a collection of datum of different types into a single coherent
@@ -302,7 +283,7 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     for ((n, i) <- elements){
       res = res ++ i.flatten
     }
-    sort(res.toArray)
+    res.sortWith(_._2._id < _._2._id).toArray
   }
 
   override def getWidth(): Int = {
