@@ -131,8 +131,6 @@ object chiselMain {
         case "--cse" => Module.isCSE = true
         case "--ioDebug" => Module.isIoDebug = true;
         case "--noIoDebug" => Module.isIoDebug = false;
-        case "--clockGatingUpdates" => Module.isClockGatingUpdates = true;
-        case "--clockGatingUpdatesInline" => Module.isClockGatingUpdatesInline = true;
         case "--vcd" => Module.isVCD = true;
         case "--v" => Module.backend = new VerilogBackend
         case "--moduleNamePrefix" => Backend.moduleNamePrefix = args(i + 1); i += 1
@@ -167,7 +165,6 @@ object chiselMain {
         case "--targetDir" => Module.targetDir = args(i + 1); i += 1;
         case "--include" => Module.includeArgs = Module.splitArg(args(i + 1)); i += 1;
         case "--checkPorts" => Module.isCheckingPorts = true
-        case "--prune" => Module.isPruning = true
         // Counter backend flags
         case "--backannotation" => Module.isBackannotating = true
         case "--model" => Module.model = args(i + 1) ; i += 1

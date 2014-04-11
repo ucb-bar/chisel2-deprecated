@@ -51,13 +51,10 @@ object Module {
   var isDebug = false;
   var isCSE = false
   var isIoDebug = true;
-  var isClockGatingUpdates = false;
-  var isClockGatingUpdatesInline = false;
   var isVCD = false;
   var isInlineMem = true;
   var isGenHarness = false;
   var isReportDims = false;
-  var isPruning = false;
   var includeArgs: List[String] = Nil;
   var targetDir: String = null;
   var isEmittingComponents = false;
@@ -142,8 +139,6 @@ object Module {
     isDebug = false;
     isCSE = false
     isIoDebug = true;
-    isClockGatingUpdates = false;
-    isClockGatingUpdatesInline = false;
     isVCD = false;
     isReportDims = false;
     targetDir = "."
