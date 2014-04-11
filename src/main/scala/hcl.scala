@@ -115,7 +115,6 @@ object chiselMain {
       val arg = args(i);
       arg match {
         case "--Wall" => {
-          Module.saveWidthWarnings = true
           Module.saveConnectionWarnings = true
           Module.saveComponentTrace = true
           Module.isCheckingPorts = true
@@ -123,7 +122,7 @@ object chiselMain {
         case "--wi" => Module.warnInputs = true
         case "--wo" => Module.warnOutputs = true
         case "--wio" => {Module.warnInputs = true; Module.warnOutputs = true}
-        case "--Wwidth" => Module.saveWidthWarnings = true
+        case "--Wwidth" => /* no longer supported */
         case "--Wconnection" => Module.saveConnectionWarnings = true
         case "--Wcomponent" => Module.saveComponentTrace = true
         case "--noCombLoop" => Module.dontFindCombLoop = true

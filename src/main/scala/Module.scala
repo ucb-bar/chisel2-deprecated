@@ -45,7 +45,6 @@ import Module._
 object Module {
   var warnInputs = false
   var warnOutputs = false
-  var saveWidthWarnings = false
   var saveConnectionWarnings = false
   var saveComponentTrace = false
   var dontFindCombLoop = false
@@ -136,7 +135,6 @@ object Module {
     ChiselError.clear();
     warnInputs = false
     warnOutputs = false
-    saveWidthWarnings = false
     saveConnectionWarnings = false
     saveComponentTrace = false
     dontFindCombLoop = false
