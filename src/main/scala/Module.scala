@@ -68,12 +68,10 @@ object Module {
   val muxes = ArrayBuffer[Node]();
   val nodes = ArrayBuffer[Node]()
   val blackboxes = ArrayBuffer[BlackBox]()
-  var ioMap = new HashMap[Node, Int];
   var chiselOneHotMap = new HashMap[(UInt, Int), UInt]
   var chiselOneHotBitMap = new HashMap[(Bits, Int), Bool]
   var chiselAndMap = new HashMap[(Node, Node), Bool]
   var searchAndMap = true
-  var ioCount = 0;
   val compStack = new Stack[Module]();
   var stackIndent = 0;
   var printStackStruct = ArrayBuffer[(Int, Module)]();
@@ -148,12 +146,10 @@ object Module {
     procs.clear();
     muxes.clear();
     blackboxes.clear();
-    ioMap.clear()
     chiselOneHotMap.clear()
     chiselOneHotBitMap.clear()
     chiselAndMap.clear()
     searchAndMap = false
-    ioCount = 0;
     isCompiling = false;
     isCheckingPorts = false
     isTesting = false;

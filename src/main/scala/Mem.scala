@@ -142,7 +142,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
     rdata
   }
 
-  override val hashCode: Int = System.identityHashCode(this)
+  override val hashCode: Int = _id
   override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
 
   def apply(addr: Int): T = apply(UInt(addr))

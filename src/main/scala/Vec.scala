@@ -384,7 +384,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
 
   def length: Int = self.size
 
-  override val hashCode: Int = System.identityHashCode(this)
+  override val hashCode: Int = _id
   override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
 }
 

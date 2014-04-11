@@ -144,6 +144,7 @@ abstract class Node extends nameable {
   var shadow: Bits = null
   var cntrIdx = -1
 
+  val _id = Module.nodes.length
   Module.nodes += this
 
   def isByValue: Boolean = true;
@@ -515,7 +516,7 @@ abstract class Node extends nameable {
 
   lazy val emitIndex: Int = componentOf.nextIndex
 
-  override val hashCode: Int = System.identityHashCode(this)
+  override def hashCode: Int = _id
   override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
 
   def canCSE: Boolean = false

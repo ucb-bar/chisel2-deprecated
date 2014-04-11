@@ -49,9 +49,6 @@ object Bits {
 
 /** Base class for built-in Chisel types Bits and SInt. */
 abstract class Bits extends Data with proc {
-  Module.ioMap += ((this, Module.ioCount));
-  Module.ioCount += 1;
-
   var canBeUsedAsDefault = false
   var dir: IODirection = null;
 

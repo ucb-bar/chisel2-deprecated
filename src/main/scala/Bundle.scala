@@ -56,10 +56,10 @@ object sort {
     var i = 0
     for (j <- 1 until a.length) {
       val keyElm = a(j);
-      val key = Module.ioMap(keyElm._2)
+      val key = keyElm._2._id
       i = j - 1
 
-      while (i >= 0 && Module.ioMap(a(i)._2) > key) {
+      while (i >= 0 && a(i)._2._id > key) {
         a(i + 1) = a(i)
         i = i - 1
       }
