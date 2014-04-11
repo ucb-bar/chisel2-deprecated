@@ -70,8 +70,10 @@ object nodeToString {
   def apply(node: Node, isRealName: Boolean = false): String = { 
     node match {
       case bits  : Bits      => 
-        if (bits.dir == OUTPUT && !bits.isTypeNode) "OUTPUT"
-        else if (bits.dir == INPUT && !bits.isTypeNode) "INPUT"
+        if (bits.dir == OUTPUT && !bits.isTypeNode) 
+          "OUTPUT(%s)".format(name(bits.getNode, isRealName))
+        else if (bits.dir == INPUT && !bits.isTypeNode) 
+          "INPUT(%s)".format(name(bits.getNode, isRealName))
         else bits match {
           case bool  : Bool => "Bool(%s)".format(name(bool.getNode, isRealName))
           case uint  : UInt => "UInt(%s)".format(name(uint.getNode, isRealName))
@@ -133,9 +135,8 @@ object nodeToString {
         } else {
           "Vec(%s)".format(name(vec, isRealName))
         }
-      case mem   : Mem[_]    => {
+      case mem   : Mem[_]    =>
         "MEM(%s)[%d]".format(name(mem, isRealName), mem.n)
-      }
       case memacc: MemAccess => "%s[%s]".format(
         name(memacc.mem, isRealName), nodeToString(memacc.addr, isRealName))
       case romread: ROMRead => "%s[%s]".format(

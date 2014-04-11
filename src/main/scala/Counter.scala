@@ -32,8 +32,7 @@ package Chisel
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
-import scala.Dynamic
-import scala.language.dynamics
+import scala.collection.mutable.HashSet
 import scala.math.pow
 
 object DaisyChain {
@@ -55,8 +54,8 @@ trait DaisyChain extends Backannotation {
     super.backannotationTransforms
 
     transforms += ((c: Module) => c bfs (_.addConsumers))
-    transforms += ((c: Module) => appendFires(DaisyChain.top))
     transforms += ((c: Module) => decouple(DaisyChain.top))
+    transforms += ((c: Module) => appendFires(DaisyChain.top))
     transforms += ((c: Module) => genCounters(DaisyChain.top))
     transforms += ((c: Module) => daisyChain(DaisyChain.top))
 
@@ -69,7 +68,7 @@ trait DaisyChain extends Backannotation {
     transforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
   }
 
-  val daisyNames = Set(
+  val daisyNames = HashSet(
     "clk_cntr", "clks_bits", "clks_valid", "clks_ready", 
     "daisy_out_bits", "daisy_out_valid", "daisy_out_ready",
     "daisy_buf", "daisy_ctrl"
@@ -146,6 +145,40 @@ trait DaisyChain extends Backannotation {
     }
   }
 
+  /* target decoupling */
+  def decouple (c: Module) = {
+    for ((name, io) <- c.io.asInstanceOf[Bundle].elements) {
+      io nameIt (name, true)
+    }
+
+    // For the input and output pins of the top component
+    // insert buffers so that their values are avaiable
+    // after the target is stalled
+    for ((name, targetPin) <- c.io.flatten ; if !(daisyNames contains name)) {
+      val bufName = name + "_buf"
+      ioBuffers(targetPin) = {
+        val buf = Reg(UInt())
+        if (targetPin.dir == INPUT) {
+          addReg(c, buf, bufName,
+            Map(!DaisyChain.fires(c) -> targetPin)
+          )
+          for (consumer <- targetPin.consumers) {
+            val idx = consumer.inputs indexOf targetPin
+            consumer.inputs(idx) = buf
+          }
+        } else if (targetPin.dir == OUTPUT) {
+          addReg(c, buf, bufName,
+            Map(DaisyChain.fires(c) -> targetPin.inputs.head)
+          )
+          wire(targetPin, buf)
+        }
+        buf
+      }
+      daisyNames += bufName
+    }
+  }
+
+
   def appendFires(c: Module) {
     ChiselError.info("[DaisyChain] append fire signals to Reg and Mem")
 
@@ -183,38 +216,6 @@ trait DaisyChain extends Backannotation {
     
       top.children map (queue enqueue _)
     }  
-  }
-
-  /* target decoupling */
-  def decouple (c: Module) = {
-    for ((name, io) <- c.io.asInstanceOf[Bundle].elements) {
-      io nameIt (name, true)
-    }
-
-    // For the input and output pins of the top component
-    // insert buffers so that their values are avaiable
-    // after the target is stalled
-    for ((name, targetPin) <- c.io.flatten ; if !(daisyNames contains name)) {
-      // val hostPin = ioMap(targetPin)
-      if (targetPin.dir == INPUT) {
-        val in_reg = Reg(UInt())
-        addReg(c, in_reg, name + "_buf",
-          Map(!DaisyChain.fires(c) -> targetPin)
-        )
-        for (consumer <- targetPin.consumers) {
-          val idx = consumer.inputs indexOf targetPin
-          consumer.inputs(idx) = in_reg
-        }
-        ioBuffers(targetPin) = in_reg
-      } else if (targetPin.dir == OUTPUT) {
-        val out_reg = Reg(UInt())
-        addReg(c, out_reg, name + "_buf",
-          Map(DaisyChain.fires(c) -> targetPin.inputs.head)
-        )
-        wire(targetPin, out_reg)
-        ioBuffers(targetPin) = out_reg
-      }
-    }
   }
 
   def genCounters (c: Module) {
@@ -341,14 +342,15 @@ trait DaisyChain extends Backannotation {
         }
       }
 
-      for (s <- top.children.sliding(2)) {
+      
+      for (s <- top.children sliding 2 ; if s.size == 2) {
         val cur = s.head
         val next = s.last
         // cur child's daisy input <- next child's daisy output
         wire(DaisyChain.daisyIns(cur), DaisyChain.daisyOuts(next).bits)
       }
 
-      for (s <- top.signals.sliding(2)) {
+      for (s <- top.signals sliding 2 ; if s.size == 2) {
         val cur = s.head
         val next = s.last
         /****** Shaodw Counter *****/
