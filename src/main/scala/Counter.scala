@@ -797,9 +797,9 @@ trait CounterTransform extends Backend {
           wire(daisyOuts(m).bits, head.shadow)
         }
 
-        for (i <- 0 until m.signals.size - 1) {
-          val cur = m.signals(i)
-          val next = m.signals(i+1)
+        for (s <- m.signals.sliding(2)) {
+          val cur = s.head
+          val next = s.last
           /****** Shaodw Counter *****/
           // 1) 'copy' control signal -> copy counter values from the activity counter
           // 2) 'read' control signal -> shift counter values from the next shadow counter
