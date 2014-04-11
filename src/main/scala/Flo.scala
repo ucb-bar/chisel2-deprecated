@@ -133,8 +133,9 @@ class FloBackend extends Backend {
         if (x.inputs.length == 1) {
           // println("NAME " + x.name + " DIR " + x.dir + " COMP " + x.componentOf + " TOP-COMP " + topComponent)
           if (node.isInObject && x.inputs.length == 1) {
-            if (x.dir == OUTPUT && x.componentOf == topComponent && 
-                x.consumers.forall(x => x.componentOf == topComponent))
+            // ((x.consumers.length > 1 && x.consumers.forall(x => x.componentOf == topComponent)) ||
+            // TODO: SHOULD HANDLE TOP OUTPUTS THAT ARE ALSO FANNED OUT -- NEED EXTRA NODE
+            if (x.dir == OUTPUT && x.componentOf == topComponent && x.consumers.length == 0)
               emitDec(x) + (if (isRnd) "eat" else ("out'" + x.width))  + " " + emitRef(x.inputs(0)) + "\n"
             else 
               emitDec(x) + "mov" + " " + emitRef(x.inputs(0)) + "\n"
