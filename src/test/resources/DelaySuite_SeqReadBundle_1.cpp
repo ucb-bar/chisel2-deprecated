@@ -15,6 +15,8 @@ int DelaySuite_SeqReadBundle_1_t::clock ( dat_t<1> reset ) {
 }
 void DelaySuite_SeqReadBundle_1_t::print ( FILE* f ) {
 }
+void DelaySuite_SeqReadBundle_1_t::dump_init(FILE *f) {
+}
 void DelaySuite_SeqReadBundle_1_t::dump(FILE *f, int t) {
 }
 void DelaySuite_SeqReadBundle_1_t::clock_lo ( dat_t<1> reset ) {

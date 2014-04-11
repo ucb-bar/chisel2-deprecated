@@ -271,28 +271,22 @@ trait proc extends Node {
     if (inputs.isEmpty) inputs += update else inputs(0) = update
   }
   def genMuxes(default: Node): Unit = {
-    if (updates.length == 0) {
-      if (inputs.length == 0 || inputs(0) == null) {
-        ChiselError.error({"NO UPDATES ON " + this}, this.line)
-      }
-      return
-    }
-    val (topCond, topValue) = updates.head
-    val (lastCond, lastValue) = updates.last
-    if (default == null && !topCond.isTrue && !lastCond.canBeUsedAsDefault) {
-      ChiselError.error(
-        {"NO DEFAULT SPECIFIED FOR WIRE: " + this + " in component " + this.component.getClass}, 
-        this.line)
-      return
-    }
-    if (default != null) {
-      genMuxes(default, updates)
-    } else {
-      if (topCond.isTrue)
+    if (updates.length != 0) {
+      val (topCond, topValue) = updates.head
+      val (lastCond, lastValue) = updates.last
+      if (default != null)
+        genMuxes(default, updates)
+      else if (topCond.isTrue)
         genMuxes(topValue, updates.toList.tail)
       else if (lastCond.canBeUsedAsDefault)
         genMuxes(lastValue, updates)
+      else
+        ChiselError.error({"NO DEFAULT SPECIFIED FOR WIRE: " + this + " in component " + this.component.getClass}, this.line)
     }
+  }
+  def verifyMuxes: Unit = {
+    if (updates.length == 0 && (inputs.length == 0 || inputs(0) == null))
+      ChiselError.error({"NO UPDATES ON " + this}, this.line)
   }
   def procAssign(src: Node): Unit
   Module.procs += this;

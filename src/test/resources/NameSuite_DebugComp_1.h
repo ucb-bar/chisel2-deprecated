@@ -28,6 +28,7 @@ class NameSuite_DebugComp_1_t : public mod_t {
   int clock ( dat_t<1> reset );
   void print ( FILE* f );
   void dump ( FILE* f, int t );
+  void dump_init ( FILE* f );
 };
 
 class NameSuite_DebugComp_1_api_t : public mod_api_t {

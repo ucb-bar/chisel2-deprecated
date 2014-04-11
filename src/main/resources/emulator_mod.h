@@ -490,18 +490,14 @@ struct bit_word_funs {
       d[0] = !val_top_bit(diff[nw-1]);
     }
   }
-  static void eq (val_t d[], val_t s0[], val_t s1[]) {
-    for (int i = 0; i < nw; i++) {
-      if (s0[i] != s1[i]) {
-        d[0] = 0;
-        return;
-      }
-    }
-    d[0] = 1;
+  static bool eq (val_t s0[], val_t s1[]) {
+    for (int i = 0; i < nw; i++)
+      if (s0[i] != s1[i])
+        return false;
+    return true;
   }
-  static void neq (val_t d[], val_t s0[], val_t s1[]) {
-    eq(d, s0, s1);
-    d[0] = !d[0];
+  static bool neq (val_t s0[], val_t s1[]) {
+    return !eq(s0, s1);
   }
   static void rsha (val_t d[], val_t s0[], int amount, int w) {
     rsha_n(d, s0, amount, nw, w);
@@ -631,11 +627,11 @@ struct bit_word_funs<1> {
   static void bit_or (val_t d[], val_t s0[], val_t s1[]) {
     d[0] = (s0[0] | s1[0]);
   }
-  static void eq (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = (s0[0] == s1[0]);
+  static bool eq (val_t s0[], val_t s1[]) {
+    return s0[0] == s1[0];
   }
-  static void neq (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = (s0[0] != s1[0]);
+  static bool neq (val_t s0[], val_t s1[]) {
+    return s0[0] != s1[0];
   }
   static void lsh (val_t d[], val_t s0[], int amount) {
     d[0] = (s0[0] << amount);
@@ -762,11 +758,11 @@ struct bit_word_funs<2> {
     d[0] = ~s0[0];
     d[1] = ~s0[1] & mask_val(nb - val_n_bits());
   }
-  static void eq (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = (s0[0] == s1[0]) & (s0[1] == s1[1]);
+  static bool eq (val_t s0[], val_t s1[]) {
+    return (s0[0] == s1[0]) & (s0[1] == s1[1]);
   }
-  static void neq (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = (s0[0] != s1[0]) | (s0[1] != s1[1]);
+  static bool neq (val_t s0[], val_t s1[]) {
+    return (s0[0] != s1[0]) | (s0[1] != s1[1]);
   }
   static void extract (val_t d[], val_t s0[], int e, int s, int nb) {
     val_t msk[2];
@@ -944,11 +940,11 @@ struct bit_word_funs<3> {
     d[1] = ~s0[1];
     d[2] = ~s0[2] & mask_val(nb - 2*val_n_bits());
   }
-  static void eq (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = (s0[0] == s1[0]) & (s0[1] == s1[1]) & (s0[2] == s1[2]);
+  static bool eq (val_t s0[], val_t s1[]) {
+    return (s0[0] == s1[0]) & (s0[1] == s1[1]) & (s0[2] == s1[2]);
   }
-  static void neq (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = (s0[0] != s1[0]) | (s0[1] != s1[1]) | (s0[2] != s1[2]);
+  static bool neq (val_t s0[], val_t s1[]) {
+    return (s0[0] != s1[0]) | (s0[1] != s1[1]) | (s0[2] != s1[2]);
   }
   static void extract (val_t d[], val_t s0[], int e, int s, int nb) {
     val_t msk[3];
@@ -1217,18 +1213,14 @@ class dat_t {
   dat_t<1> operator || ( dat_t<1> o ) {
     return DAT<1>(lo_word() | o.lo_word());
   }
-  dat_t<1> operator == ( dat_t<w> o ) {
-    dat_t<1> res;
-    bit_word_funs<n_words>::eq(res.values, values, o.values);
-    return res;
+  bool operator == ( dat_t<w> o ) {
+    return bit_word_funs<n_words>::eq(values, o.values);
   }
-  dat_t<1> operator == ( datz_t<w> o ) {
+  bool operator == ( datz_t<w> o ) {
     return o == *this;
   }
-  dat_t<1> operator != ( dat_t<w> o ) {
-    dat_t<1> res;
-    bit_word_funs<n_words>::neq(res.values, values, o.values);
-    return res;
+  bool operator != ( dat_t<w> o ) {
+    return bit_word_funs<n_words>::neq(values, o.values);
   }
   dat_t<w> operator << ( int amount ) {
     dat_t<w> res;
@@ -1371,7 +1363,7 @@ int dat_to_str(char* s, dat_t<w> x, int base = 16, char pad = '0') {
       x = x / base;
     }
     s[j] = (digit >= 10 ? 'a'-10 : '0') + digit;
-  } while (--j >= 0 && (x != 0).to_bool());
+  } while (--j >= 0 && x != 0);
 
   for ( ; j >= 0; j--)
     s[j] = pad;
@@ -1509,7 +1501,7 @@ template <int w>
 class datz_t : public dat_t<w> {
  public:
   dat_t<w> mask;
-  inline dat_t<1> operator == ( dat_t<w> o ) {
+  inline bool operator == ( dat_t<w> o ) {
     dat_t<w> masked = (o & mask);
     return (o & mask) == (dat_t<w>)*this;
   }
@@ -1628,6 +1620,8 @@ class mem_t {
   }
 };
 
+static char hex_to_char[] = "0123456789abcdef";
+
 static int  char_to_hex[] = {
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
@@ -1724,23 +1718,30 @@ size_t dat_from_hex(std::string hex_line, dat_t<w>& res, size_t offset = 0) {
   return last_digit + 1;
 }
 
-template <int w>
-void dat_dump (FILE* file, dat_t<w> val, const char* name) {
-  int namelen = strlen(name), pos = 0;
-  char str[1 + w + 1 + namelen + 1 + 1];
+#pragma GCC push_options
+#pragma GCC optimize ("no-stack-protector")
+
+template <int s, int w>
+void dat_dump (FILE* f, const dat_t<w>& val, val_t name) {
+  size_t pos = 0;
+  char str[1 + w + 1 + s + 1];
 
   str[pos++] = 'b';
-  for (int j = 0, wl = w; j < (w+8*sizeof(val_t)-1)/(8*sizeof(val_t)); j++)
-    for (int i = 0; i < val_n_bits() && wl; i++)
-      str[pos + --wl] = (val.values[j] >> i) & 1 ? '1' : '0';
+  for (int i = 0; i < w; i++)
+    str[pos + w-i-1] = '0' + ((val.values[i/val_n_bits()] >> (i%val_n_bits())) & 1);
   pos += w;
-  str[pos++] = ' ';
-  memcpy(str + pos, name, namelen); pos += namelen;
-  str[pos++] = '\n';
-  str[pos] = 0;
 
-  fputs(str, file);
+  str[pos++] = ' ';
+  for (int i = 0; i < s; i++) {
+    str[pos++] = name;
+    name >>= 8;
+  }
+  str[pos++] = '\n';
+
+  fwrite(str, 1, sizeof(str), f);
 }
+
+#pragma GCC pop_options
 
 inline std::string read_tok(FILE* f) {
   std::string res;
@@ -1764,8 +1765,8 @@ inline std::string read_tok(FILE* f) {
   }
 }
 
-template <int w, int d>
-void dat_dump (FILE* file, mem_t<w,d> val, std::string name) {
+template <int s, int w, int d>
+void dat_dump(FILE* file, const mem_t<w,d>& val, val_t name) {
 }
 
 template <int w, int d> mem_t<w,d> MEM( void );

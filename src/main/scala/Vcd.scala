@@ -36,73 +36,90 @@ import ChiselError._
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.HashSet
 
-class VcdBackend extends Backend {
-  val keywords = new HashSet[String]();
+class VcdBackend(top: Module) extends Backend {
+  val keywords = new HashSet[String]()
 
   override def emitTmp(node: Node): String =
     emitRef(node)
 
-  def emitDef(node: Node, vcdname: String): String = { // vcdname: String
-    ("  if (t == 0 || ("
-      + emitRef(node) + " != " + emitRef(node) + "__prev).to_bool())\n" +
-    "    dat_dump(f, " + emitRef(node) + ", \"" + vcdname + "\");\n" +
-    "  " + emitRef(node) + "__prev = " + emitRef(node) + ";\n")
-  }
+  private def emitDefUnconditional(node: Node, index: Int) =
+    "  dat_dump<" + varNameLength(index) + ">(f, " + emitRef(node) + ", 0x" + varNumber(index).toHexString + ");\n"
+
+  private def emitDef1(node: Node, index: Int) =
+    "  if (" + emitRef(node) + " != " + emitRef(node) + "__prev)\n" +
+    "    goto L" + index + ";\n" +
+    "K" + index + ":\n"
+
+  private def emitDef2(node: Node, index: Int) =
+    "L" + index + ":\n" +
+    "  " + emitRef(node) + "__prev = " + emitRef(node) + ";\n" +
+    emitDefUnconditional(node, index) +
+    "  goto K" + index + ";\n"
 
   override def emitDec(node: Node): String =
     if (Module.isVCD && node.isInVCD) "  dat_t<" + node.width + "> " + emitRef(node) + "__prev" + ";\n" else ""
 
-  def dumpVCDScope(c: Module, write: String => Unit, top: Module, names: HashMap[Node, String]): Unit = {
-    write("    fprintf(f, \"" + "$scope module " + c.name + " $end" + "\\n\");\n");
-    for (mod <- top.omods) {
-      if (mod.component == c && mod.isInVCD && !mod.name.isEmpty) {
-        write("    fprintf(f, \"$var wire " + mod.width + " " + names(mod) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\");\n");
-      }
+  def dumpVCDScope(c: Module, write: String => Unit): Unit = {
+    write("  fputs(\"" + "$scope module " + c.name + " $end" + "\\n\", f);\n")
+    for (i <- 0 until sortedMods.length) {
+      val mod = sortedMods(i)
+      if (mod.component == c && !mod.name.isEmpty)
+        write("  fputs(\"$var wire " + mod.width + " " + varName(i) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\", f);\n")
     }
     for (child <- c.children) {
-      dumpVCDScope(child, write, top, names);
+      dumpVCDScope(child, write)
     }
-    write("    fprintf(f, \"$upscope $end\\n\");\n");
+    write("  fputs(\"$upscope $end\\n\", f);\n")
   }
 
-  def dumpScopeForTemps(c: Module, write: String => Unit, names: HashMap[Node, String]): Unit = {
-    write("    fprintf(f, \"$scope module _chisel_temps_ $end\\n\");\n");
-    for ((mod, name) <- names) {
-      if (mod.name.isEmpty) {
-        write("    fprintf(f, \"$var wire " + mod.width + " " + names(mod) + " " + c.stripComponent(emitRef(mod)) + " $end\\n\");\n");
-      }
+  def dumpScopeForTemps(write: String => Unit): Unit = {
+    write("  fputs(\"" + "$scope module _chisel_temps_ $end" + "\\n\", f);\n")
+    for (i <- 0 until sortedMods.length) {
+      val mod = sortedMods(i)
+      if (mod.name.isEmpty)
+        write("  fputs(\"$var wire " + mod.width + " " + varName(i) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\", f);\n")
     }
-    write("    fprintf(f, \"$upscope $end\\n\");\n");
+    write("  fputs(\"$upscope $end\\n\", f);\n")
   }
 
-  def dumpVCD(c: Module, write: String => Unit): Unit = {
-    var num = 0;
-    val names = new HashMap[Node, String];
-    for (mod <- c.omods) {
-      if (mod.isInVCD) {
-        names(mod) = "N" + num;
-        num += 1;
-      }
-    }
-    write("void " + c.name + "_t::dump(FILE *f, int t) {\n");
+  def dumpVCDInit(write: String => Unit): Unit = {
+    write("void " + top.name + "_t::dump_init(FILE *f) {\n")
     if (Module.isVCD) {
-      write("  if (t == 0) {\n");
-      write("    fprintf(f, \"$timescale 1ps $end\\n\");\n");
-      dumpVCDScope(c, write, c, names);
-      dumpScopeForTemps(c, write, names);
-      write("    fprintf(f, \"$enddefinitions $end\\n\");\n");
-      write("    fprintf(f, \"$dumpvars\\n\");\n");
-      write("    fprintf(f, \"$end\\n\");\n");
-      write("  }\n");
-      write("  fprintf(f, \"#%d\\n\", t);\n");
-      for (mod <- c.omods) {
-        if (mod.isInVCD && mod.name != "reset") {
-          write(emitDef(mod, names(mod)));
-        }
-      }
+      write("  fputs(\"$timescale 1ps $end\\n\", f);\n")
+      dumpVCDScope(top, write)
+      dumpScopeForTemps(write)
+      write("  fputs(\"$enddefinitions $end\\n\", f);\n")
+      write("  fputs(\"$dumpvars\\n\", f);\n")
+      write("  fputs(\"$end\\n\", f);\n")
+      write("  fputs(\"#0\\n\", f);\n")
+      for (i <- 0 until sortedMods.length)
+        write(emitDefUnconditional(sortedMods(i), i))
     }
-    write("}\n");
+    write("}\n")
   }
 
-}
+  def dumpVCD(write: String => Unit): Unit = {
+    write("void " + top.name + "_t::dump(FILE *f, int t) {\n")
+    if (Module.isVCD) {
+      write("  if (t == 0) return dump_init(f);\n")
+      write("  fprintf(f, \"#%d\\n\", t);\n")
+      for (i <- 0 until sortedMods.length)
+        write(emitDef1(sortedMods(i), i))
+      write("  return;\n")
+      for (i <- 0 until sortedMods.length)
+        write(emitDef2(sortedMods(i), i))
+    }
+    write("}\n")
+  }
 
+  private val sortedMods = top.omods.filter(_.isInVCD).sortWith(_.width < _.width)
+
+  private val (lo, hi) = ('!'.toInt, '~'.toInt)
+  private val range = hi - lo + 1
+  private def varName(x: Int): String =
+    ("\\x" + (lo + (x % range)).toHexString) + (if (x >= range) varName(x / range) else "")
+  private def varNumber(x: Int): Long =
+    (if (x >= range) varNumber(x / range) * 256 else 0) + (lo + (x % range))
+  private def varNameLength(x: Int): Int =
+    1 + (if (x >= range) varNameLength(x / range) else 0)
+}

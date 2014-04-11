@@ -279,7 +279,7 @@ class ManualTester[+T <: Module]
     } else {
       var cmd = ""
       if (off != -1) {
-        cmd = "wire_peek " + dumpName(data) + " " + off;
+        cmd = "mem_peek " + dumpName(data) + " " + off;
       } else {
         cmd = "wire_peek " + dumpName(data);
       }

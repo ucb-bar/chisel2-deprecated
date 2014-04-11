@@ -259,7 +259,7 @@ class Literal extends Node {
   var hasInferredWidth = false
   var isZ = false;
   var base = 'x';
-  override lazy val value: BigInt = stringToVal(base, name);
+  lazy val value: BigInt = stringToVal(base, name);
   override def isLit: Boolean = true;
   override def litOf: Literal = this
   override def toString: String = name;

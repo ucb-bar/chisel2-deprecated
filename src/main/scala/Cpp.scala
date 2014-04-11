@@ -422,7 +422,7 @@ class CppBackend extends Backend {
         emitTmpDec(node) +
         (if (node.inputs.length < 3 || node.width == 1) {
           if (node.inputs(1).isLit) {
-            val value = node.inputs(1).value.toInt
+            val value = node.inputs(1).litValue().toInt
             "  " + emitLoWordRef(node) + " = (" + emitWordRef(node.inputs(0), value/bpw) + " >> " + (value%bpw) + ") & 1;\n"
           } else if (node.inputs(0).width <= bpw) {
             "  " + emitLoWordRef(node) + " = (" + emitLoWordRef(node.inputs(0)) + " >> " + emitLoWordRef(node.inputs(1)) + ") & 1;\n"
@@ -430,7 +430,7 @@ class CppBackend extends Backend {
             block(toArray("__e", node.inputs(0)) ++ List(emitLoWordRef(node) + " = __e[" + emitLoWordRef(node.inputs(1)) + "/" + bpw + "] >> (" + emitLoWordRef(node.inputs(1)) + "%" + bpw + ") & 1"))
           }
         } else {
-          val rsh = node.inputs(2).value.toInt
+          val rsh = node.inputs(2).litValue().toInt
           if (rsh % bpw == 0) {
             block((0 until words(node)).map(i => emitWordRef(node, i) + " = " + emitWordRef(node.inputs(0), i + rsh/bpw))) + trunc(node)
           } else {
@@ -761,7 +761,7 @@ class CppBackend extends Backend {
     // Generate module headers
     out_h.write("class " + c.name + "_t : public mod_t {\n");
     out_h.write(" public:\n");
-    val vcd = new VcdBackend()
+    val vcd = new VcdBackend(c)
     for (m <- c.omods) {
       if(m.name != "reset") {
         if (m.isInObject) {
@@ -787,6 +787,7 @@ class CppBackend extends Backend {
     }
     out_h.write("  void print ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
+    out_h.write("  void dump_init ( FILE* f );\n");
     out_h.write("};\n\n");
     out_h.write(Params.toCxxStringParams);
     
@@ -884,7 +885,10 @@ class CppBackend extends Backend {
     writeCppFile("}\n")
 
     createCppFile()
-    vcd.dumpVCD(c, writeCppFile)
+    vcd.dumpVCDInit(writeCppFile)
+
+    createCppFile()
+    vcd.dumpVCD(writeCppFile)
 
     for (out <- clkDomains.values.map(_._1) ++ clkDomains.values.map(_._2)) {
       createCppFile()

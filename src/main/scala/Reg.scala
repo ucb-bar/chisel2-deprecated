@@ -171,7 +171,6 @@ class Reg extends Delay with proc {
   def update (x: Node) { inputs(0) = x };
   var assigned = false;
   var enable = Bool(true)
-  var pseudoMux: Node = null // Mux for backannotation
 
   def procAssign(src: Node) {
     if (assigned) {

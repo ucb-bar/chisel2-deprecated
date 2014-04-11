@@ -14,43 +14,77 @@ int NameSuite_DebugComp_1_t::clock ( dat_t<1> reset ) {
 }
 void NameSuite_DebugComp_1_t::print ( FILE* f ) {
 }
+void NameSuite_DebugComp_1_t::dump_init(FILE *f) {
+  fputs("$timescale 1ps $end\n", f);
+  fputs("$scope module NameSuite_DebugComp_1 $end\n", f);
+  fputs("$var wire 1 \x22 io_ctrl_wb_wen $end\n", f);
+  fputs("$var wire 1 \x26 io_ctrl_out $end\n", f);
+  fputs("$scope module dpath $end\n", f);
+  fputs("$var wire 1 \x21 reset $end\n", f);
+  fputs("$var wire 1 \x23 io_ctrl_wb_wen $end\n", f);
+  fputs("$var wire 1 \x24 wb_reg_ll_wb $end\n", f);
+  fputs("$var wire 1 \x25 io_ctrl_out $end\n", f);
+  fputs("$upscope $end\n", f);
+  fputs("$upscope $end\n", f);
+  fputs("$scope module _chisel_temps_ $end\n", f);
+  fputs("$upscope $end\n", f);
+  fputs("$enddefinitions $end\n", f);
+  fputs("$dumpvars\n", f);
+  fputs("$end\n", f);
+  fputs("#0\n", f);
+  dat_dump<1>(f, NameSuite_DebugComp_1_dpath__reset, 0x21);
+  dat_dump<1>(f, NameSuite_DebugComp_1__io_ctrl_wb_wen, 0x22);
+  dat_dump<1>(f, NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen, 0x23);
+  dat_dump<1>(f, NameSuite_DebugComp_1_dpath__wb_reg_ll_wb, 0x24);
+  dat_dump<1>(f, NameSuite_DebugComp_1_dpath__io_ctrl_out, 0x25);
+  dat_dump<1>(f, NameSuite_DebugComp_1__io_ctrl_out, 0x26);
+}
 void NameSuite_DebugComp_1_t::dump(FILE *f, int t) {
-  if (t == 0) {
-    fprintf(f, "$timescale 1ps $end\n");
-    fprintf(f, "$scope module NameSuite_DebugComp_1 $end\n");
-    fprintf(f, "$var wire 1 N0 reset $end\n");
-    fprintf(f, "$var wire 1 N2 io_ctrl_wb_wen $end\n");
-    fprintf(f, "$var wire 1 N6 io_ctrl_out $end\n");
-    fprintf(f, "$scope module dpath $end\n");
-    fprintf(f, "$var wire 1 N1 reset $end\n");
-    fprintf(f, "$var wire 1 N3 io_ctrl_wb_wen $end\n");
-    fprintf(f, "$var wire 1 N4 wb_reg_ll_wb $end\n");
-    fprintf(f, "$var wire 1 N5 io_ctrl_out $end\n");
-    fprintf(f, "$upscope $end\n");
-    fprintf(f, "$upscope $end\n");
-    fprintf(f, "$enddefinitions $end\n");
-    fprintf(f, "$dumpvars\n");
-    fprintf(f, "$end\n");
-  }
+  if (t == 0) return dump_init(f);
   fprintf(f, "#%d\n", t);
-  if (t == 0 || (NameSuite_DebugComp_1_dpath__reset != NameSuite_DebugComp_1_dpath__reset__prev).to_bool())
-    dat_dump(f, NameSuite_DebugComp_1_dpath__reset, "N1");
+  if (NameSuite_DebugComp_1_dpath__reset != NameSuite_DebugComp_1_dpath__reset__prev)
+    goto L0;
+K0:
+  if (NameSuite_DebugComp_1__io_ctrl_wb_wen != NameSuite_DebugComp_1__io_ctrl_wb_wen__prev)
+    goto L1;
+K1:
+  if (NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen != NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen__prev)
+    goto L2;
+K2:
+  if (NameSuite_DebugComp_1_dpath__wb_reg_ll_wb != NameSuite_DebugComp_1_dpath__wb_reg_ll_wb__prev)
+    goto L3;
+K3:
+  if (NameSuite_DebugComp_1_dpath__io_ctrl_out != NameSuite_DebugComp_1_dpath__io_ctrl_out__prev)
+    goto L4;
+K4:
+  if (NameSuite_DebugComp_1__io_ctrl_out != NameSuite_DebugComp_1__io_ctrl_out__prev)
+    goto L5;
+K5:
+  return;
+L0:
   NameSuite_DebugComp_1_dpath__reset__prev = NameSuite_DebugComp_1_dpath__reset;
-  if (t == 0 || (NameSuite_DebugComp_1__io_ctrl_wb_wen != NameSuite_DebugComp_1__io_ctrl_wb_wen__prev).to_bool())
-    dat_dump(f, NameSuite_DebugComp_1__io_ctrl_wb_wen, "N2");
+  dat_dump<1>(f, NameSuite_DebugComp_1_dpath__reset, 0x21);
+  goto K0;
+L1:
   NameSuite_DebugComp_1__io_ctrl_wb_wen__prev = NameSuite_DebugComp_1__io_ctrl_wb_wen;
-  if (t == 0 || (NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen != NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen__prev).to_bool())
-    dat_dump(f, NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen, "N3");
+  dat_dump<1>(f, NameSuite_DebugComp_1__io_ctrl_wb_wen, 0x22);
+  goto K1;
+L2:
   NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen__prev = NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen;
-  if (t == 0 || (NameSuite_DebugComp_1_dpath__wb_reg_ll_wb != NameSuite_DebugComp_1_dpath__wb_reg_ll_wb__prev).to_bool())
-    dat_dump(f, NameSuite_DebugComp_1_dpath__wb_reg_ll_wb, "N4");
+  dat_dump<1>(f, NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen, 0x23);
+  goto K2;
+L3:
   NameSuite_DebugComp_1_dpath__wb_reg_ll_wb__prev = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb;
-  if (t == 0 || (NameSuite_DebugComp_1_dpath__io_ctrl_out != NameSuite_DebugComp_1_dpath__io_ctrl_out__prev).to_bool())
-    dat_dump(f, NameSuite_DebugComp_1_dpath__io_ctrl_out, "N5");
+  dat_dump<1>(f, NameSuite_DebugComp_1_dpath__wb_reg_ll_wb, 0x24);
+  goto K3;
+L4:
   NameSuite_DebugComp_1_dpath__io_ctrl_out__prev = NameSuite_DebugComp_1_dpath__io_ctrl_out;
-  if (t == 0 || (NameSuite_DebugComp_1__io_ctrl_out != NameSuite_DebugComp_1__io_ctrl_out__prev).to_bool())
-    dat_dump(f, NameSuite_DebugComp_1__io_ctrl_out, "N6");
+  dat_dump<1>(f, NameSuite_DebugComp_1_dpath__io_ctrl_out, 0x25);
+  goto K4;
+L5:
   NameSuite_DebugComp_1__io_ctrl_out__prev = NameSuite_DebugComp_1__io_ctrl_out;
+  dat_dump<1>(f, NameSuite_DebugComp_1__io_ctrl_out, 0x26);
+  goto K5;
 }
 void NameSuite_DebugComp_1_t::clock_lo ( dat_t<1> reset ) {
   { NameSuite_DebugComp_1_dpath__reset.values[0] = reset.values[0]; }
