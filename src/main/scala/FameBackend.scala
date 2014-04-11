@@ -364,12 +364,12 @@ object Fame1Transform {
 }
 
 trait Fame1Transform extends Backend {
-  private def collectMems(module: Module): ArrayBuffer[(Module, Mem[Data])] = {
-    val mems = new ArrayBuffer[(Module, Mem[Data])]
+  private def collectMems(module: Module): ArrayBuffer[(Module, Mem[_])] = {
+    val mems = new ArrayBuffer[(Module, Mem[_])]
     //find all the mems in FAME1 modules
     def findMems(module: Module): Unit = {
       if(Fame1Transform.fame1Modules.contains(module)){
-        for(mem <- module.nodes.filter(_.isInstanceOf[Mem[Data]])){
+        for(mem <- module.nodes.filter(_.isInstanceOf[Mem[_]])){
           mems += ((module, mem.asInstanceOf[Mem[Data]]))
         }
       }
