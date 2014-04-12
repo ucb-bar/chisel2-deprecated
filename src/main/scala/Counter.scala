@@ -405,7 +405,6 @@ object DaisyTransform {
     DaisyChain.daisyIns(DaisyChain.top) = UInt(0)
     addPin(top, clks, "clks")
     clks.ready.inputs += notFired
-    fired.getNode.component = top
 
     clksReg.comp match {
       case reg: Reg => {
