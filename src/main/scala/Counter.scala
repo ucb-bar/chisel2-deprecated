@@ -70,7 +70,7 @@ trait DaisyChain extends Backend {
   val daisyNames = HashSet(
     "clk_cntr", "clks_bits", "clks_valid", "clks_ready", 
     "daisy_out_bits", "daisy_out_valid", "daisy_out_ready",
-    "daisy_buf", "daisy_ctrl", "fired"
+    "daisy_buf", "daisy_ctrl"
   )                 
 
   var counterIdx = -1
@@ -353,20 +353,12 @@ object DaisyTransform {
     }
   }
 
-  lazy val fired: Bool = {
-    DaisyChain.top.io("fired") match {
-      case bool: Bool => bool
-    }
-  }
-  
-
   def apply[T <: Module](c: => T) = {
     // clock counters
     val clks = Decoupled(UInt(width = 32)).flip
     val clksReg = Reg(UInt(width = 32))
     val fired = clksReg.orR
     val notFired = !fired
-    val fireOut = Bool(OUTPUT)
     val top: T = Module(c)
     DaisyChain.top = top
     DaisyChain.clks = clks
@@ -374,9 +366,7 @@ object DaisyTransform {
     DaisyChain.fires(DaisyChain.top) = fired
     DaisyChain.daisyIns(DaisyChain.top) = UInt(0)
     addPin(top, clks, "clks")
-    addPin(top, fireOut, "fired")
     clks.ready.inputs += notFired
-    fireOut.inputs += fired
 
     clksReg.comp match {
       case reg: Reg => {
@@ -458,7 +448,6 @@ object DaisyTransform {
 abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends Tester(c, isTrace) {
   val peeks = new ArrayBuffer[BigInt]
   val clks  = DaisyTransform.clks
-  val fired = DaisyTransform.fired
   val daisyOut  = DaisyTransform.daisyOut
   val daisyCtrl = DaisyTransform.daisyCtrl
 
@@ -555,9 +544,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
 
     // run the target until it is stalled
     if (isTrace) println("*** CYCLE THE TARGET ***")
-    do {
-      takeSteps(1)
-    } while (peek(fired) == 1)
+    takeSteps(n)
 
     // read out signal values
     if (isTrace) println("*** READ SIGNAL VALUES ***")
@@ -600,7 +587,6 @@ abstract class AXISlave(val aw: Int = 5, val dw: Int = 32, val n: Int = 32 /* 2^
 class DaisyFPGAWrapper[+T <: Module](c: => T) extends AXISlave(n = 16 /* 2^(aw - 1) */){
   val top       = DaisyTransform(c)
   val clks      = DaisyTransform.clks
-  val fired     = DaisyTransform.fired
   val daisyOut  = DaisyTransform.daisyOut
   val daisyCtrl = DaisyTransform.daisyCtrl
   // write 4 => clks
