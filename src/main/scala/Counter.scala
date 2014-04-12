@@ -449,12 +449,12 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
 
   def pokeClks (n: Int) {
     val clks  = DaisyTransform.clks(c)
-    // Wait until the takeSteps counter is ready
+    // Wait until the clock counter is ready
     // (the target is stalled)
     while(peek(clks.ready) == 0) {
       takeSteps(1)
     }
-    // Set the takeSteps counter
+    // Set the clock counter
     poke(clks.bits, n)
     poke(clks.valid, 1)
     takeSteps(1)
