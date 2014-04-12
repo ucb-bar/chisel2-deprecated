@@ -41,7 +41,7 @@ class CSENode(val node: Node) {
 
 object CSE {
   def transform(mod: Module): Unit = {
-    Module.components foreach doCSE
+    Driver.components foreach doCSE
   }
 
   private def doCSE(mod: Module): Unit = while (doCSEOnce(mod)) {}

@@ -57,7 +57,7 @@ class VcdBackend(top: Module) extends Backend {
     "  goto K" + index + ";\n"
 
   override def emitDec(node: Node): String =
-    if (Module.isVCD && node.isInVCD) "  dat_t<" + node.width + "> " + emitRef(node) + "__prev" + ";\n" else ""
+    if (Driver.isVCD && node.isInVCD) "  dat_t<" + node.width + "> " + emitRef(node) + "__prev" + ";\n" else ""
 
   def dumpVCDScope(c: Module, write: String => Unit): Unit = {
     write("  fputs(\"" + "$scope module " + c.name + " $end" + "\\n\", f);\n")
@@ -84,7 +84,7 @@ class VcdBackend(top: Module) extends Backend {
 
   def dumpVCDInit(write: String => Unit): Unit = {
     write("void " + top.name + "_t::dump_init(FILE *f) {\n")
-    if (Module.isVCD) {
+    if (Driver.isVCD) {
       write("  fputs(\"$timescale 1ps $end\\n\", f);\n")
       dumpVCDScope(top, write)
       dumpScopeForTemps(write)
@@ -100,7 +100,7 @@ class VcdBackend(top: Module) extends Backend {
 
   def dumpVCD(write: String => Unit): Unit = {
     write("void " + top.name + "_t::dump(FILE *f, int t) {\n")
-    if (Module.isVCD) {
+    if (Driver.isVCD) {
       write("  if (t == 0) return dump_init(f);\n")
       write("  fprintf(f, \"#%d\\n\", t);\n")
       for (i <- 0 until sortedMods.length)

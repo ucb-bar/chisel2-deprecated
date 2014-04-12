@@ -502,7 +502,7 @@ object Log2 {
       log2.init("", fixWidth(sizeof(n-1)), mod)
       UInt().fromNode(log2)
     }
-    Module.backend match {
+    Driver.backend match {
       case x: CppBackend => log2it
       case x: FloBackend => log2it
       case _ => {

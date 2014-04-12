@@ -114,8 +114,8 @@ object Mux {
 }
 
 class Mux extends Op {
-  Module.muxes += this;
-  op = "Mux";
+  Driver.muxes += this
+  op = "Mux"
   override def toString: String =
     inputs(0) + " ? " + inputs(1) + " : " + inputs(2)
   def ::(a: Node): Mux = { inputs(2) = a; this }

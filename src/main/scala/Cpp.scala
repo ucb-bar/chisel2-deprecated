@@ -558,15 +558,15 @@ class CppBackend extends Backend {
   }
 
   def clkName (clock: Clock): String =
-    (if (clock == Module.implicitClock) "" else "_" + emitRef(clock))
+    (if (clock == Driver.implicitClock) "" else "_" + emitRef(clock))
 
   def genHarness(c: Module, name: String) {
     val harness  = createOutputFile(name + "-emulator.cpp");
     harness.write("#include \"" + name + ".h\"\n\n");
-    if (Module.clocks.length > 1) {
+    if (Driver.clocks.length > 1) {
       harness.write("void " + c.name + "_t::setClocks ( std::vector< int > &periods ) {\n");
       var i = 0;
-      for (clock <- Module.clocks) {
+      for (clock <- Driver.clocks) {
         if (clock.srcClock == null) {
           harness.write("  " + emitRef(clock) + " = periods[" + i + "];\n")
           harness.write("  " + emitRef(clock) + "_cnt = periods[" + i + "];\n")
@@ -580,13 +580,13 @@ class CppBackend extends Backend {
     harness.write(s"""  module->init();\n""");
     harness.write(s"""  ${name}_api_t* api = new ${name}_api_t();\n""");
     harness.write(s"""  api->init(module);\n""");
-    if (Module.isVCD) {
-      val basedir = ensureDir(Module.targetDir)
+    if (Driver.isVCD) {
+      val basedir = ensureDir(Driver.targetDir)
       harness.write(s"""  FILE *f = fopen("${basedir}${name}.vcd", "w");\n""");
     } else {
       harness.write(s"""  FILE *f = NULL;\n""");
     }
-    if (Module.dumpTestInput) {
+    if (Driver.dumpTestInput) {
       harness.write(s"""  FILE *tee = fopen("${name}.stdin", "w");\n""");
     } else {
       harness.write(s"""  FILE *tee = NULL;""");
@@ -606,7 +606,7 @@ class CppBackend extends Backend {
     val chiselENV = java.lang.System.getenv("CHISEL")
     val c11 = if (hasPrintfs) " -std=c++11 " else ""
     val allFlags = flags + c11 + " -I../ -I" + chiselENV + "/csrc/"
-    val dir = Module.targetDir + "/"
+    val dir = Driver.targetDir + "/"
     def run(cmd: String) {
       val bashCmd = Seq("bash", "-c", cmd)
       val c = bashCmd.!
@@ -715,7 +715,7 @@ class CppBackend extends Backend {
      a change to associate node and components correctly first
      otherwise we are bound for assertions popping up left and right
      in the Backend.elaborate method. */
-    for (cc <- Module.components) {
+    for (cc <- Driver.components) {
       if (!(cc == c)) {
         c.debugs ++= cc.debugs
         c.mods   ++= cc.mods;
@@ -729,13 +729,13 @@ class CppBackend extends Backend {
     c.findOrdering(); // search from roots  -- create omods
     val mappings = generateNodeMapping(c.omods);
     renameNodes(c, c.omods);
-    if (Module.isReportDims) {
+    if (Driver.isReportDims) {
       val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
       ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
 
     val clkDomains = new HashMap[Clock, (StringBuilder, StringBuilder)]
-    for (clock <- Module.clocks) {
+    for (clock <- Driver.clocks) {
       val clock_lo = new StringBuilder
       val clock_hi = new StringBuilder
       clkDomains += (clock -> ((clock_lo, clock_hi)))
@@ -743,7 +743,7 @@ class CppBackend extends Backend {
       clock_hi.append("void " + c.name + "_t::clock_hi" + clkName(clock) + " ( dat_t<1> reset ) {\n")
     }
 
-    if (Module.isGenHarness) {
+    if (Driver.isGenHarness) {
       genHarness(c, c.name);
     }
     val out_h = createOutputFile(c.name + ".h");
@@ -772,17 +772,17 @@ class CppBackend extends Backend {
         }
       }
     }
-    for (clock <- Module.clocks)
+    for (clock <- Driver.clocks)
       out_h.write(emitDec(clock))
 
     out_h.write("\n");
     out_h.write("  void init ( bool rand_init = false );\n");
-    for ( clock <- Module.clocks) {
+    for ( clock <- Driver.clocks) {
       out_h.write("  void clock_lo" + clkName(clock) + " ( dat_t<1> reset );\n")
       out_h.write("  void clock_hi" + clkName(clock) + " ( dat_t<1> reset );\n")
     }
     out_h.write("  int clock ( dat_t<1> reset );\n")
-    if (Module.clocks.length > 1) {
+    if (Driver.clocks.length > 1) {
       out_h.write("  void setClocks ( std::vector< int >& periods );\n")
     }
     out_h.write("  void print ( FILE* f );\n");
@@ -805,7 +805,7 @@ class CppBackend extends Backend {
     def createCppFile(suffix: String = "-" + out_cpps.length) = {
       val f = createOutputFile(c.name + suffix + ".cpp")
       f.write("#include \"" + c.name + ".h\"\n")
-      for (str <- Module.includeArgs) f.write("#include \"" + str + "\"\n")
+      for (str <- Driver.includeArgs) f.write("#include \"" + str + "\"\n")
       f.write("\n")
       out_cpps += f
       f
@@ -822,23 +822,23 @@ class CppBackend extends Backend {
     for (m <- c.omods) {
       writeCppFile(emitInit(m))
     }
-    for (clock <- Module.clocks) {
+    for (clock <- Driver.clocks) {
       writeCppFile(emitInit(clock))
     }
     writeCppFile("}\n")
 
     for (m <- c.omods) {
-      val clock = if (m.clock == null) Module.implicitClock else m.clock
+      val clock = if (m.clock == null) Driver.implicitClock else m.clock
       clkDomains(clock)._1.append(emitDefLo(m))
     }
 
     for (m <- c.omods) {
-      val clock = if (m.clock == null) Module.implicitClock else m.clock
+      val clock = if (m.clock == null) Driver.implicitClock else m.clock
       clkDomains(clock)._2.append(emitInitHi(m))
     }
 
     for (m <- c.omods) {
-      val clock = if (m.clock == null) Module.implicitClock else m.clock
+      val clock = if (m.clock == null) Driver.implicitClock else m.clock
       clkDomains(clock)._2.append(emitDefHi(m))
     }
 
@@ -850,19 +850,19 @@ class CppBackend extends Backend {
     // generate clock(...) function
     writeCppFile("int " + c.name + "_t::clock ( dat_t<1> reset ) {\n")
     writeCppFile("  uint32_t min = ((uint32_t)1<<31)-1;\n")
-    for (clock <- Module.clocks) {
+    for (clock <- Driver.clocks) {
       writeCppFile("  if (" + emitRef(clock) + "_cnt < min) min = " + emitRef(clock) +"_cnt;\n")
     }
-    for (clock <- Module.clocks) {
+    for (clock <- Driver.clocks) {
       writeCppFile("  " + emitRef(clock) + "_cnt-=min;\n")
     }
-    for (clock <- Module.clocks) {
+    for (clock <- Driver.clocks) {
       writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
     }
-    for (clock <- Module.clocks) {
+    for (clock <- Driver.clocks) {
       writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
     }
-    for (clock <- Module.clocks) {
+    for (clock <- Driver.clocks) {
       writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " +
                   emitRef(clock) + ";\n")
     }
@@ -871,7 +871,7 @@ class CppBackend extends Backend {
 
     // geenrate print(...) function
     writeCppFile("void " + c.name + "_t::print ( FILE* f ) {\n")
-    for (cc <- Module.components; p <- cc.printfs) {
+    for (cc <- Driver.components; p <- cc.printfs) {
       hasPrintfs = true
       writeCppFile("#if __cplusplus >= 201103L\n"
         + "  if (" + emitLoWordRef(p.cond)

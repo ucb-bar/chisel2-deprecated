@@ -43,12 +43,12 @@ object VecUIntToOH
 {
   def apply(in: UInt, width: Int): UInt =
   {
-    if(Module.chiselOneHotMap.contains((in, width))) {
-      Module.chiselOneHotMap((in, width))
+    if (Driver.chiselOneHotMap.contains((in, width))) {
+      Driver.chiselOneHotMap((in, width))
     } else {
       val out = UInt(1, width)
       val res = (out << in)(width-1,0)
-      Module.chiselOneHotMap += ((in, width) -> res)
+      Driver.chiselOneHotMap += ((in, width) -> res)
       res
     }
   }
@@ -97,11 +97,11 @@ object Vec {
 
   def getEnable(onehot: UInt, i: Int): Bool = {
     var enable: Bool = null
-      if(Module.chiselOneHotBitMap.contains(onehot, i)){
-        enable = Module.chiselOneHotBitMap(onehot, i)
+      if (Driver.chiselOneHotBitMap.contains(onehot, i)){
+        enable = Driver.chiselOneHotBitMap(onehot, i)
       } else {
         enable = onehot(i)
-        Module.chiselOneHotBitMap += ((onehot, i) -> enable)
+        Driver.chiselOneHotBitMap += ((onehot, i) -> enable)
       }
     enable
   }
@@ -125,7 +125,7 @@ class VecProc extends proc {
 
   def procAssign(src: Node) {
     val onehot = VecUIntToOH(addr, elms.length)
-    Module.searchAndMap = true
+    Driver.searchAndMap = true
     for(i <- 0 until elms.length){
       when (getEnable(onehot, i)) {
         if(elms(i).comp != null) {
@@ -135,7 +135,7 @@ class VecProc extends proc {
         }
       }
     }
-    Module.searchAndMap = false
+    Driver.searchAndMap = false
   }
 }
 
@@ -174,13 +174,13 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
     if(data.isInstanceOf[Node]){
 
       val onehot = VecUIntToOH(addr, length)
-      Module.searchAndMap = true
+      Driver.searchAndMap = true
       for(i <- 0 until length){
         when (getEnable(onehot, i)) {
           this(i).comp procAssign data.toNode
         }
       }
-      Module.searchAndMap = false
+      Driver.searchAndMap = false
     }
   }
 

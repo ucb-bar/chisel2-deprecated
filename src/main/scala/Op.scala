@@ -122,8 +122,8 @@ object BinaryOp {
 
 object LogicalOp {
   def apply[T <: Bits](x: T, y: T, op: String): Bool = {
-    if(Module.searchAndMap && op == "&&" && Module.chiselAndMap.contains((x, y))) {
-      Module.chiselAndMap((x, y))
+    if (Driver.searchAndMap && op == "&&" && Driver.chiselAndMap.contains((x, y))) {
+      Driver.chiselAndMap((x, y))
     } else {
       val node = op match {
         case "===" => Op("==",  fixWidth(1), x, y)
@@ -151,8 +151,8 @@ object LogicalOp {
 
       // make output
       val output = Bool(OUTPUT).fromNode(node)
-      if(Module.searchAndMap && op == "&&" && !Module.chiselAndMap.contains((x, y))) {
-        Module.chiselAndMap += ((x, y) -> output)
+      if (Driver.searchAndMap && op == "&&" && !Driver.chiselAndMap.contains((x, y))) {
+        Driver.chiselAndMap += ((x, y) -> output)
       }
       output
     }
@@ -172,8 +172,8 @@ object ReductionOp {
 
 object BinaryBoolOp {
   def apply(x: Bool, y: Bool, op: String): Bool = {
-    if(Module.searchAndMap && op == "&&" && Module.chiselAndMap.contains((x, y))) {
-      Module.chiselAndMap((x, y))
+    if (Driver.searchAndMap && op == "&&" && Driver.chiselAndMap.contains((x, y))) {
+      Driver.chiselAndMap((x, y))
     } else {
       val node = op match {
         case "&&"  => Op("&&", fixWidth(1), x, y );
@@ -181,8 +181,8 @@ object BinaryBoolOp {
         case any   => throw new Exception("Unrecognized operator " + op);
       }
       val output = Bool(OUTPUT).fromNode(node)
-      if(Module.searchAndMap && op == "&&" && !Module.chiselAndMap.contains((x, y))) {
-        Module.chiselAndMap += ((x, y) -> output)
+      if (Driver.searchAndMap && op == "&&" && !Driver.chiselAndMap.contains((x, y))) {
+        Driver.chiselAndMap += ((x, y) -> output)
       }
       output
     }
@@ -340,8 +340,8 @@ object Op {
     }
 
     }
-    if (Module.backend.isInstanceOf[CppBackend] || Module.backend.isInstanceOf[FloBackend] ||
-        Module.isBackannotating) {
+    if (Driver.backend.isInstanceOf[CppBackend] || Driver.backend.isInstanceOf[FloBackend] ||
+        Driver.isBackannotating) {
       def signAbs(x: Node): (Bool, UInt) = {
         val f = x.asInstanceOf[SInt]
         val s = f < SInt(0)

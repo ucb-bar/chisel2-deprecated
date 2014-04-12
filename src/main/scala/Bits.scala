@@ -290,11 +290,6 @@ abstract class Bits extends Data with proc {
     }
   }
 
-  override def setIsClkInput {
-    isClkInput = true
-    this assign clk
-  }
-
   override def clone: this.type = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
     res.inferWidth = this.inferWidth

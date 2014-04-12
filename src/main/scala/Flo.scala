@@ -131,11 +131,11 @@ class FloBackend extends Backend {
 
       case x: Bits =>
         if (x.inputs.length == 1) {
-          // println("NAME " + x.name + " DIR " + x.dir + " COMP " + x.componentOf + " TOP-COMP " + topComponent)
+          // println("NAME " + x.name + " DIR " + x.dir + " COMP " + x.componentOf + " TOP-COMP " + Driver.topComponent)
           if (node.isInObject && x.inputs.length == 1) {
-            // ((x.consumers.length > 1 && x.consumers.forall(x => x.componentOf == topComponent)) ||
+            // ((x.consumers.length > 1 && x.consumers.forall(x => x.componentOf == Driver.topComponent)) ||
             // TODO: SHOULD HANDLE TOP OUTPUTS THAT ARE ALSO FANNED OUT -- NEED EXTRA NODE
-            if (x.dir == OUTPUT && x.componentOf == topComponent && x.consumers.length == 0)
+            if (x.dir == OUTPUT && x.componentOf == Driver.topComponent && x.consumers.length == 0)
               emitDec(x) + (if (isRnd) "eat" else ("out'" + x.width))  + " " + emitRef(x.inputs(0)) + "\n"
             else 
               emitDec(x) + "mov" + " " + emitRef(x.inputs(0)) + "\n"
@@ -208,7 +208,7 @@ class FloBackend extends Backend {
   override def elaborate(c: Module): Unit = {
     super.elaborate(c)
 
-    for (cc <- Module.components) {
+    for (cc <- Driver.components) {
       if (!(cc == c)) {
         c.mods       ++= cc.mods;
         c.debugs     ++= cc.debugs;
@@ -221,7 +221,7 @@ class FloBackend extends Backend {
     c.collectNodes(c);
     c.findOrdering(); // search from roots  -- create omods
     renameNodes(c, c.omods);
-    if (Module.isReportDims) {
+    if (Driver.isReportDims) {
       val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
       // ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
@@ -238,7 +238,7 @@ class FloBackend extends Backend {
 
     val chiselENV = java.lang.System.getenv("CHISEL")
     val allFlags = flags + " -I../ -I" + chiselENV + "/csrc/"
-    val dir = Module.targetDir + "/"
+    val dir = Driver.targetDir + "/"
     def run(cmd: String) {
       val bashCmd = Seq("bash", "-c", cmd)
       val c = bashCmd.!

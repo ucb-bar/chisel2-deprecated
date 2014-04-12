@@ -182,17 +182,17 @@ class VerilogBackend extends Backend {
           case io: Bits  =>
             if (io.dir == INPUT) { // if reached, then input has consumers
               if (io.inputs.length == 0) {
-                  // if(Module.saveConnectionWarnings) {
+                  // if (Driver.saveConnectionWarnings) {
                   //   ChiselError.warning("" + io + " UNCONNECTED IN " + io.component);
                   // } removed this warning because pruneUnconnectedIOs should have picked it up
                 portDec = "//" + portDec
               } else if (io.inputs.length > 1) {
-                  if(Module.saveConnectionWarnings) {
+                  if (Driver.saveConnectionWarnings) {
                     ChiselError.warning("" + io + " CONNECTED TOO MUCH " + io.inputs.length);
                   }
                 portDec = "//" + portDec
               } else if (!c.isWalked.contains(w)){
-                  if(Module.saveConnectionWarnings) {
+                  if (Driver.saveConnectionWarnings) {
                     ChiselError.warning(" UNUSED INPUT " + io + " OF " + c + " IS REMOVED");
                   }
                 portDec = "//" + portDec
@@ -201,14 +201,14 @@ class VerilogBackend extends Backend {
               }
             } else if(io.dir == OUTPUT) {
               if (io.consumers.length == 0) {
-                  // if(Module.saveConnectionWarnings) {
+                  // if (Driver.saveConnectionWarnings) {
                   //   ChiselError.warning("" + io + " UNCONNECTED IN " + io.component + " BINDING " + c.findBinding(io));
                   // } removed this warning because pruneUnconnectedsIOs should have picked it up
                 portDec = "//" + portDec
               } else {
                 var consumer: Node = c.parent.findBinding(io);
                 if (consumer == null) {
-                  if(Module.saveConnectionWarnings) {
+                  if (Driver.saveConnectionWarnings) {
                     ChiselError.warning("" + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + io.consumers.length + ") IN " + c.parent);
                   }
                   portDec = "//" + portDec
@@ -404,10 +404,10 @@ class VerilogBackend extends Backend {
   def genHarness(c: Module, name: String) {
     /*
     val harness  = createOutputFile(name + "-harness.v");
-    val printFormat = Module.printArgs.map(a => "0x%x").fold("")((y,z) => z + " " + y)
-    val scanFormat = Module.scanArgs.map(a => "%x").fold("")((y,z) => z + " " + y)
-    val printNodes = for (arg <- Module.printArgs; node <- arg.maybeFlatten) yield arg
-    val scanNodes = for (arg <- Module.scanArgs; node <- c.keepInputs(arg.maybeFlatten)) yield arg
+    val printFormat = Driver.printArgs.map(a => "0x%x").fold("")((y,z) => z + " " + y)
+    val scanFormat = Driver.scanArgs.map(a => "%x").fold("")((y,z) => z + " " + y)
+    val printNodes = for (arg <- Driver.printArgs; node <- arg.maybeFlatten) yield arg
+    val scanNodes = for (arg <- Driver.scanArgs; node <- c.keepInputs(arg.maybeFlatten)) yield arg
     harness.write("module test;\n")
     for (node <- scanNodes)
       harness.write("    reg [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
@@ -546,7 +546,7 @@ class VerilogBackend extends Backend {
     node match {
       case reg: Reg =>
         if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1) &&
-           !Module.isBackannotating){
+           !Driver.isBackannotating) {
           if(reg.isReset){
             "    if(" + emitRef(reg.inputs.last) + ") begin\n" +
             "      " + emitRef(reg) + " <= " + emitRef(reg.init) + ";\n" +
@@ -622,7 +622,7 @@ class VerilogBackend extends Backend {
       // if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
       w match {
         case io: Bits => {
-          val prune = if (io.prune && c != Module.topComponent) "//" else ""
+          val prune = if (io.prune && c != Driver.topComponent) "//" else ""
           if (io.dir == INPUT) {
             ports += new StringBuilder(nl + "    " + prune + "input " + 
                                        emitWidth(io) + " " + emitRef(io));
@@ -712,7 +712,7 @@ class VerilogBackend extends Backend {
        We use a LinkedHashMap such that later iteration is predictable. */
     val defs = LinkedHashMap[String, LinkedHashMap[String, ArrayBuffer[Module]]]()
     var level = 0;
-    for( c <- Module.sortedComps ) {
+    for (c <- Driver.sortedComps) {
       ChiselError.info(depthString(depth) + "COMPILING " + c
         + " " + c.children.length + " CHILDREN"
         + " (" + c.level + "," + c.traversal + ")");
@@ -758,11 +758,11 @@ class VerilogBackend extends Backend {
     out.close();
 
     if (!memConfs.isEmpty) {
-      val out_conf = createOutputFile(Module.topComponent.name + ".conf");
+      val out_conf = createOutputFile(Driver.topComponent.name + ".conf")
       out_conf.write(getMemConfString);
       out_conf.close();
     }
-    if (Module.isGenHarness) {
+    if (Driver.isGenHarness) {
       genHarness(c, c.name);
     }
   }
@@ -773,7 +773,7 @@ class VerilogBackend extends Backend {
       val c = Process(cmd).!
       ChiselError.info(cmd + " RET " + c)
     }
-    val dir = Module.targetDir + "/"
+    val dir = Driver.targetDir + "/"
     val src = dir + c.name + "-harness.v " + dir + c.name + ".v"
     val cmd = "vcs +vc +v2k -timescale=10ns/10ps " + src + " -o " + dir + c.name
     run(cmd)

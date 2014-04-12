@@ -48,8 +48,6 @@ object Node {
     s
   }
 
-  var isInGetWidth = false
-
   def fixWidth(w: Int) = {
     assert(w != -1, ChiselError.error("invalid width for fixWidth object"));
     (m: Node) => {m.isFixedWidth = true; w}
@@ -61,7 +59,7 @@ object Node {
     } catch {
         case e: java.lang.IndexOutOfBoundsException => {
           val error = new ChiselError(() => {m + " in " + m.component + " is unconnected. Ensure that is assigned."}, m.line)
-          if (!ChiselErrors.contains(error) && !isInGetWidth) {
+          if (!ChiselErrors.contains(error) && !Driver.isInGetWidth) {
             ChiselErrors += error
           }
           -1
@@ -96,10 +94,6 @@ object Node {
   }
 
   def rshWidthOf(i: Int, n: Node): (Node) => (Int) = { (m: Node) => m.inputs(i).width - n.minNum.toInt }
-
-  /* clk is initialized in Module.initChisel */
-  var clk: Node = null
-
 }
 
 /** *Node* defines the root class of the class hierarchy for
@@ -115,11 +109,11 @@ abstract class Node extends nameable {
   var sccLowlink = -1
   var walked = false;
   /* Assigned in Binding and Mod.reset */
-  var component: Module = Module.getComponent();
+  var component: Module = Module.getComponent
   var flattened = false;
   var isTypeNode = false;
   var depth = 0;
-  def componentOf: Module = if (Module.backend.isEmittingComponents && component != null) component else Module.topComponent
+  def componentOf: Module = if (Driver.backend.isEmittingComponents && component != null) component else Driver.topComponent
   var width_ = -1;
   var isFixedWidth = false;
   val consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
@@ -144,11 +138,11 @@ abstract class Node extends nameable {
   var shadow: Bits = null
   var cntrIdx = -1
 
-  val _id = Module.nodes.length
-  Module.nodes += this
+  val _id = Driver.nodes.length
+  Driver.nodes += this
 
   def isByValue: Boolean = true;
-  def width: Int = if(isInGetWidth) inferWidth(this) else width_;
+  def width: Int = if (Driver.isInGetWidth) inferWidth(this) else width_
 
   /** Sets the width of a Node. */
   def width_=(w: Int) {
@@ -263,14 +257,14 @@ abstract class Node extends nameable {
     }
   }
   def isInObject: Boolean =
-    (isIo && (Module.isIoDebug || component == Module.topComponent)) ||
-    Module.topComponent.debugs.contains(this) || isPrintArg || isScanArg ||
-    isReg || isUsedByRam || Module.isDebug && !name.isEmpty ||
-    Module.emitTempNodes
+    (isIo && (Driver.isIoDebug || component == Driver.topComponent)) ||
+    Driver.topComponent.debugs.contains(this) || isPrintArg || isScanArg ||
+    isReg || isUsedByRam || Driver.isDebug && !name.isEmpty ||
+    Driver.emitTempNodes
 
   def isInVCD: Boolean = name != "reset" && width > 0 &&
-     (!name.isEmpty || Module.emitTempNodes) &&
-     ((isIo && isInObject) || isReg || Module.isDebug)
+     (!name.isEmpty || Driver.emitTempNodes) &&
+     ((isIo && isInObject) || isReg || Driver.isDebug)
 
   /** Prints all members of a node and recursively its inputs up to a certain
     depth level. This method is purely used for debugging. */
@@ -355,7 +349,7 @@ abstract class Node extends nameable {
       for (node <- inputs) {
         if (node != null) {
            //tmp fix, what happens if multiple componenets reference static nodes?
-          if (node.component == null || !Module.components.contains(node.component)) {
+          if (node.component == null || !Driver.components.contains(node.component)) {
             /* If Backend.collectNodesIntoComp does not resolve the component
              field for all components, we will most likely end-up here. */
             assert( node.component == nextComp,
@@ -368,7 +362,7 @@ abstract class Node extends nameable {
                 + (if(this.name != null && !this.name.isEmpty)
                 this.name else "?")))
           }
-          if (!Module.backend.isInstanceOf[VerilogBackend] || !node.isIo) {
+          if (!Driver.backend.isInstanceOf[VerilogBackend] || !node.isIo) {
             stack.push(() => node.traceNode(nextComp, stack));
           }
           val j = i;
@@ -439,14 +433,12 @@ abstract class Node extends nameable {
     named = true;
   }
 
-  def setIsClkInput {};
-
   var isWidthWalked = false;
 
   def getWidth(): Int = {
-    isInGetWidth = true
+    Driver.isInGetWidth = true
     val w = width
-    isInGetWidth = false
+    Driver.isInGetWidth = false
     w
   }
 

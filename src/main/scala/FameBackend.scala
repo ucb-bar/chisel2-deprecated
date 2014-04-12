@@ -440,7 +440,7 @@ trait Fame1Transform extends Backend {
       val memSeqReads = mem.seqreads ++ mem.readwrites.map(_.read)
       for(memWrite <- memWrites){
         if(mem.seqRead){
-          if(Module.backend.isInstanceOf[CppBackend]){
+          if (Driver.backend.isInstanceOf[CppBackend]){
             if(memWrite.inputs(0).asInstanceOf[Data].comp != null && memWrite.inputs(1).asInstanceOf[Data].comp != null){//huge hack for extra MemWrite generated for seqread mems in CPP backed; if both the cond and enable both happen to be directly from registers, this will fail horribly
               memWrite.inputs(1) = memWrite.inputs(1).asInstanceOf[Bool] && Fame1Transform.fireSignals(module)
             } else {

@@ -154,7 +154,7 @@ class ManualTester[+T <: Module]
     d
   }
   def createOutputFile(name: String): java.io.FileWriter = {
-    val baseDir = ensureDir(Module.targetDir)
+    val baseDir = ensureDir(Driver.targetDir)
     new java.io.FileWriter(baseDir + name)
   }
 
@@ -255,7 +255,7 @@ class ManualTester[+T <: Module]
 
   def setClocks(clocks: HashMap[Clock, Int]) {
     var cmd = "set_clocks"
-    for (clock <- Module.clocks) {
+    for (clock <- Driver.clocks) {
       if (clock.srcClock == null) {
         val s = BigInt(clocks(clock)).toString(16)
         cmd = cmd + " " + s
@@ -266,7 +266,7 @@ class ManualTester[+T <: Module]
   }
 
   def dumpName(data: Node): String = {
-    if (Module.backend.isInstanceOf[FloBackend]) {
+    if (Driver.backend.isInstanceOf[FloBackend]) {
       data.name
     } else
       data.chiselName
@@ -407,21 +407,21 @@ class ManualTester[+T <: Module]
     allGood
   }
 
-  val rnd = if (Module.testerSeedValid) new Random(Module.testerSeed) else new Random()
+  val rnd = if (Driver.testerSeedValid) new Random(Driver.testerSeed) else new Random()
   var process: Process = null
 
   def start(): Process = {
-    val target = Module.targetDir + "/" + c.name
+    val target = Driver.targetDir + "/" + c.name
     val cmd = 
-      (if (Module.backend.isInstanceOf[FloBackend]) {
-         val dir = Module.backend.asInstanceOf[FloBackend].floDir
+      (if (Driver.backend.isInstanceOf[FloBackend]) {
+         val dir = Driver.backend.asInstanceOf[FloBackend].floDir
 	 val command = ArrayBuffer(dir + "fix-console", ":is-debug", "true", ":filename", target + ".hex")
-	 if (Module.isVCD) { command ++= ArrayBuffer(":is-vcd-dump", "true") }
+	 if (Driver.isVCD) { command ++= ArrayBuffer(":is-vcd-dump", "true") }
          command.mkString(" ")
       } else {
-         target + (if(Module.backend.isInstanceOf[VerilogBackend]) " -q" else "")
+         target + (if (Driver.backend.isInstanceOf[VerilogBackend]) " -q" else "")
       })
-    println("SEED " + Module.testerSeed)
+    println("SEED " + Driver.testerSeed)
     println("STARTING " + cmd)
     val processBuilder = Process(cmd)
     val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => testErr = err)
