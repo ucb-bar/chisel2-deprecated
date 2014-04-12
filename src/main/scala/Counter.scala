@@ -49,7 +49,7 @@ object DaisyChain {
 
 trait DaisyChain extends Backannotation {
   val ioBuffers = new HashMap[Bits, Bits]
-  Module.isBackannotating = false
+  Module.isBackannotating = true
   override def backannotationTransforms {
     super.backannotationTransforms
 
@@ -399,18 +399,19 @@ object DaisyTransform {
     val clksReg = Reg(UInt(width = 32))
     val fired = clksReg.orR
     val notFired = !fired
-    DaisyChain.top = Module(c)
+    val top: T = Module(c)
+    DaisyChain.top = top
     DaisyChain.clks = clks
     DaisyChain.clksReg = clksReg
     DaisyChain.fires(DaisyChain.top) = fired
     DaisyChain.daisyIns(DaisyChain.top) = UInt(0)
-    addPin(DaisyChain.top, clks, "clks")
+    addPin(top, clks, "clks")
     clks.ready.inputs += notFired
-    fired.getNode.component = DaisyChain.top
+    fired.getNode.component = top
 
     clksReg.comp match {
       case reg: Reg => {
-        reg.component = DaisyChain.top
+        reg.component = top
         reg.isEnable  = true
         reg.enable    = fired || (clks.valid && notFired)
         reg.updates ++= Map (
@@ -421,9 +422,9 @@ object DaisyTransform {
     }
     clksReg nameIt ("clk_cntr", false)
 
-    insertDaisyPins(DaisyChain.top)
+    insertDaisyPins(top)
 
-    DaisyChain.top.asInstanceOf[T]
+    top
   }
 
   def addPin(m: Module, pin: Data, name: String) {
@@ -487,9 +488,6 @@ object DaisyTransform {
 
 abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends Tester(c, isTrace) {
   val peeks = new ArrayBuffer[BigInt]
-  val clks  = DaisyTransform.clks(c)
-  val daisyOut  = DaisyTransform.daisyOut(c)
-  val daisyCtrl = DaisyTransform.daisyCtrl(c)
 
   // proceed 'n' clocks
   def clock (n: Int) {
@@ -499,6 +497,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   }
 
   def pokeClks (n: Int) {
+    val clks  = DaisyTransform.clks(c)
     // Wait until the clock counter is ready
     // (the target is stalled)
     while(peek(clks.ready) == 0) {
@@ -521,6 +520,8 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   }
 
   def daisyCopy() {
+    val daisyOut  = DaisyTransform.daisyOut(c)
+    val daisyCtrl = DaisyTransform.daisyCtrl(c)
     do {
       poke(daisyCtrl, 0)
       poke(daisyOut.ready, 1)
@@ -531,6 +532,8 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   }
 
   def daisyRead() = {
+    val daisyOut  = DaisyTransform.daisyOut(c)
+    val daisyCtrl = DaisyTransform.daisyCtrl(c)
     do {
       poke(daisyCtrl, 1)
       poke(daisyOut.ready, 1)
@@ -539,6 +542,11 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     poke(daisyOut.ready, 0)
     showCurrentChain()
     peek(daisyOut.bits)
+  }
+
+  def daisyCheck(expected: BigInt) {
+    val daisyOut  = DaisyTransform.daisyOut(c)
+    expect(daisyOut.bits, expected)
   }
 
   override def dump(): Snapshot = {
@@ -553,7 +561,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
       // Read out the daisy chain
       val daisyValue = daisyRead()
       // Check the daisy output
-      expect(daisyOut.bits, peeks(i))
+      daisyCheck(peeks(i))
       signal match {
         case read: MemRead =>
           snap.pokes += Poke(read.mem, read.addr.litValue(0).toInt, daisyValue)
@@ -597,6 +605,109 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   override def finish(): Boolean = {
     dumpSnapshots("%s.snapshots".format(c.name), snapshots)
     super.finish()
+  }
+}
+
+abstract class AXISlave(val aw: Int = 5, val dw: Int = 32, val n: Int = 32 /* 2^aw */) extends Module {
+  val io = new Bundle {
+    val in = Decoupled(Bits(width = dw)).flip
+    val out = Decoupled(Bits(width = dw))
+    val addr = Bits(INPUT, aw)
+  }
+
+  def wen(i: Int) = io.in.valid && io.addr(log2Up(n)-1, 0) === UInt(i)
+  def ren(i: Int) = io.out.ready && io.addr(log2Up(n)-1, 0) === UInt(i)
+  val rdata = Vec.fill(n){Bits(width = dw)}
+  val rvalid = Vec.fill(n){Bool()}
+  val wready = Vec.fill(n){Bool()}
+
+  io.in.ready  := wready(io.addr)
+  io.out.valid := rvalid(io.addr)
+  io.out.bits  := rdata(io.addr)
+}
+
+class DaisyFPGAWrapper[+T <: Module](c: => T) extends AXISlave(n = 16 /* 2^(aw - 1) */){
+  val top       = DaisyTransform(c)
+  val clks      = DaisyTransform.clks(top)
+  val daisyOut  = DaisyTransform.daisyOut(top)
+  val daisyCtrl = DaisyTransform.daisyCtrl(top)
+  // write 4 => clks
+  clks.bits := io.in.bits
+  clks.valid := wen(4)
+  wready(4) := clks.ready
+  // read 4 => daisychain
+  rdata(4) := daisyOut.bits
+  rvalid(4) := daisyOut.valid
+  daisyOut.ready := ren(4)
+  // daisy control bit <- MSB of addr
+  daisyCtrl := io.addr(aw-1) 
+}
+
+abstract class DaisyWrapperTester[+T <: DaisyFPGAWrapper[_]](c: T, isTrace: Boolean = true) extends DaisyTester(c, isTrace) {
+  // poke 'bits' to the address 'addr'
+  def pokeAddr(addr: BigInt, bits: BigInt) {
+    do {
+      poke(c.io.addr, addr)
+      clock(1)
+    } while (peek(c.io.in.ready) == 0)
+
+    poke(c.io.in.bits, bits)
+    poke(c.io.in.valid, 1)
+    clock(1)
+    poke(c.io.in.valid, 0)
+  }
+
+  // peek the signal from the address 'addr'
+  def peekAddr(addr: BigInt) = {
+    do {
+      poke(c.io.addr, addr)
+      poke(c.io.out.ready, 1)
+      clock(1)
+    } while (peek(c.io.out.valid) == 0)
+
+    peek(c.io.out.bits)
+  }
+
+  // compare the signal value from the address 'addr' with 'expected'
+  def expectAddr(addr: BigInt, expected: BigInt) = {
+    do {
+      poke(c.io.addr, addr)
+      poke(c.io.out.ready, 1)
+      clock(1)
+    } while (peek(c.io.out.valid) == 0)
+   
+    expect(c.io.out.bits, expected)
+  }
+
+  // poke 'n' clocks to the clock counter
+  // whose address is 4
+  override def pokeClks (n: Int) {
+    do {
+      poke(c.io.addr, 4)
+      clock(1)
+    } while (peek(c.io.in.ready) == 0)
+ 
+    pokeBits(c.io.in.bits, n)
+    pokeBits(c.io.in.valid, 1)
+    clock(1)
+    pokeBits(c.io.in.valid, 0)
+  }
+
+  // read at 4 | 0 << 4 -> daisy copy
+  override def daisyCopy() {
+    peekAddr(4)
+    showCurrentChain()
+  }
+
+  // read at 4 | 1 << 4 -> daisy read
+  override def daisyRead() = {
+    val daisyValue = peekAddr(4 | 1 << 4)
+    showCurrentChain()
+    daisyValue
+  }
+
+  override def daisyCheck(expected: BigInt) {
+    expect(c.io.out.bits, expected)
   }
 }
 
