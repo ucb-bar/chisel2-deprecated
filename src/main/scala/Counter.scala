@@ -328,22 +328,29 @@ class DaisyVerilogBackend extends VerilogBackend with DaisyChain
 class DaisyCppBackend extends CppBackend with DaisyChain
 
 object DaisyTransform {
-  def clks(c: Module): DecoupledIO[UInt] = {
-    c.io("clks") match {
+  lazy val clks: DecoupledIO[UInt] = {
+    DaisyChain.top.io("clks") match {
       case dio: DecoupledIO[UInt] => dio
     }
   }
-  def daisyOut(c: Module): DecoupledIO[UInt] = {
-    c.io("daisy_out") match {
+  lazy val daisyOut: DecoupledIO[UInt] = {
+    DaisyChain.top.io("daisy_out") match {
       case dio: DecoupledIO[UInt] => dio
     }
   }
 
-  def daisyCtrl(c: Module): Bits = {
-    c.io("daisy_ctrl") match {
+  lazy val daisyCtrl: Bits = {
+    DaisyChain.top.io("daisy_ctrl") match {
       case bits: Bits => bits
     }
   }
+
+  lazy val fired: Bool = {
+    DaisyChain.top.io("fired") match {
+      case bool: Bool => bool
+    }
+  }
+  
 
   def apply[T <: Module](c: => T) = {
     // clock counters
@@ -442,6 +449,10 @@ object DaisyTransform {
 
 abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends Tester(c, isTrace) {
   val peeks = new ArrayBuffer[BigInt]
+  val clks  = DaisyTransform.clks
+  val fired = DaisyTransform.fired
+  val daisyOut  = DaisyTransform.daisyOut
+  val daisyCtrl = DaisyTransform.daisyCtrl
 
   // proceed 'n' clocks
   def takeSteps (n: Int) {
@@ -451,7 +462,6 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   }
 
   def pokeClks (n: Int) {
-    val clks  = DaisyTransform.clks(c)
     // Wait until the clock counter is ready
     // (the target is stalled)
     while(peek(clks.ready) == 0) {
@@ -474,8 +484,6 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   }
 
   def daisyCopy() {
-    val daisyOut  = DaisyTransform.daisyOut(c)
-    val daisyCtrl = DaisyTransform.daisyCtrl(c)
     do {
       poke(daisyCtrl, 0)
       poke(daisyOut.ready, 1)
@@ -486,8 +494,6 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   }
 
   def daisyRead() = {
-    val daisyOut  = DaisyTransform.daisyOut(c)
-    val daisyCtrl = DaisyTransform.daisyCtrl(c)
     do {
       poke(daisyCtrl, 1)
       poke(daisyOut.ready, 1)
@@ -499,7 +505,6 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   }
 
   def daisyCheck(expected: BigInt) {
-    val daisyOut  = DaisyTransform.daisyOut(c)
     expect(daisyOut.bits, expected)
   }
 
@@ -542,7 +547,10 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
 
     // run the target until it is stalled
     if (isTrace) println("*** CYCLE THE TARGET ***")
-    takeSteps(n)
+    do {
+      takeSteps(1)
+    } while (peek(fired) == 1)
+
     // read out signal values
     if (isTrace) println("*** READ SIGNAL VALUES ***")
     peeks.clear
@@ -583,9 +591,10 @@ abstract class AXISlave(val aw: Int = 5, val dw: Int = 32, val n: Int = 32 /* 2^
 
 class DaisyFPGAWrapper[+T <: Module](c: => T) extends AXISlave(n = 16 /* 2^(aw - 1) */){
   val top       = DaisyTransform(c)
-  val clks      = DaisyTransform.clks(top)
-  val daisyOut  = DaisyTransform.daisyOut(top)
-  val daisyCtrl = DaisyTransform.daisyCtrl(top)
+  val clks      = DaisyTransform.clks
+  val fired     = DaisyTransform.fired
+  val daisyOut  = DaisyTransform.daisyOut
+  val daisyCtrl = DaisyTransform.daisyCtrl
   // write 4 => clks
   clks.bits := io.in.bits
   clks.valid := wen(4)
