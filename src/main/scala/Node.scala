@@ -124,10 +124,11 @@ abstract class Node extends nameable {
   var isClkInput = false;
   var inferCount = 0;
   var genError = false;
-  val line: StackTraceElement = {
-    val trace = new Throwable().getStackTrace
-    findFirstUserLine(trace) getOrElse trace(0)
-  }
+  val line: StackTraceElement =
+    if (Driver.getLineNumbers) {
+      val trace = new Throwable().getStackTrace
+      findFirstUserLine(trace) getOrElse trace(0)
+    } else null
   var isScanArg = false
   var isPrintArg = false
   var prune = false

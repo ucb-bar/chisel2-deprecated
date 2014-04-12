@@ -39,6 +39,10 @@ object Driver {
       execute(gen)
     } finally {
       ChiselError.report
+      if (ChiselError.hasErrors && !getLineNumbers) {
+        println("Re-running Chisel in debug mode to obtain erroneous line numbers...")
+        apply(args :+ "--lineNumbers", gen)
+      }
     }
   }
 
@@ -99,6 +103,7 @@ object Driver {
     dontFindCombLoop = false
     isGenHarness = false
     isDebug = false
+    getLineNumbers = false
     isCSE = false
     isIoDebug = true
     isVCD = false
@@ -158,6 +163,7 @@ object Driver {
         case "--noCombLoop" => dontFindCombLoop = true
         case "--genHarness" => isGenHarness = true
         case "--debug" => isDebug = true
+        case "--lineNumbers" => getLineNumbers = true
         case "--cse" => isCSE = true
         case "--ioDebug" => isIoDebug = true
         case "--noIoDebug" => isIoDebug = false
@@ -239,6 +245,7 @@ object Driver {
   var saveComponentTrace = false
   var dontFindCombLoop = false
   var isDebug = false
+  var getLineNumbers = false
   var isCSE = false
   var isIoDebug = true
   var isVCD = false
