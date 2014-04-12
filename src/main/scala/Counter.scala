@@ -70,7 +70,7 @@ trait DaisyChain extends Backend {
   val daisyNames = HashSet(
     "clk_cntr", "clks_bits", "clks_valid", "clks_ready", 
     "daisy_out_bits", "daisy_out_valid", "daisy_out_ready",
-    "daisy_buf", "daisy_ctrl"
+    "daisy_buf", "daisy_ctrl", "fired"
   )                 
 
   var counterIdx = -1
@@ -267,7 +267,7 @@ trait DaisyChain extends Backend {
           wire(DaisyChain.daisyIns(top.children.last), DaisyChain.daisyIns(top))
         }
         // no children but signals
-        case (true, false, _) => {
+        case (true, false) => {
           // daisy output <- head shadow
           wire(DaisyChain.daisyOuts(top).bits, top.signals.head.shadow)
           // last shadow <- daisy input
@@ -351,6 +351,7 @@ object DaisyTransform {
     val clksReg = Reg(UInt(width = 32))
     val fired = clksReg.orR
     val notFired = !fired
+    val fireOut = Bool(OUTPUT)
     val top: T = Module(c)
     DaisyChain.top = top
     DaisyChain.clks = clks
@@ -358,7 +359,9 @@ object DaisyTransform {
     DaisyChain.fires(DaisyChain.top) = fired
     DaisyChain.daisyIns(DaisyChain.top) = UInt(0)
     addPin(top, clks, "clks")
+    addPin(top, fireOut, "fired")
     clks.ready.inputs += notFired
+    fireOut.inputs += fired
 
     clksReg.comp match {
       case reg: Reg => {
