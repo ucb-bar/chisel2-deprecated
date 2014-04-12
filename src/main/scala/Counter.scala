@@ -204,8 +204,6 @@ trait DaisyChain extends Backannotation {
             for (write <- mem.writeAccesses) {
               val en = Bool()
               val newEn = DaisyChain.fires(top) && en
-              if (Module.isBackannotating)
-                newEn.getNode setName (en.getNode.pName + "_fire")
               wire(en, write.inputs(1))
               write.inputs(1) = newEn
             }
