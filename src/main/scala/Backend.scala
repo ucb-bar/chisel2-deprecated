@@ -590,8 +590,8 @@ abstract class Backend {
     }
 
   // Write out graph trace to verify backannotation later
-  def writeOutGraph(c: Module) {
-    ChiselError.info("[Backannotation] write out graphs")
+  def writeOutTrace(c: Module) {
+    ChiselError.info("[Backannotation] write out graph trace")
     val dir = ensureDir(Module.targetDir)
     val file = new java.io.FileWriter(dir+"%s.trace".format(c.name))
     val res = new StringBuilder
@@ -626,7 +626,7 @@ abstract class Backend {
 
   def backannotationAnalyses {
     if (Module.isBackannotating) {
-      analyses += { c => writeOutGraph(c) }
+      analyses += { c => writeOutTrace(c) }
     }
   }
 

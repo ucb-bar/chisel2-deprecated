@@ -47,13 +47,12 @@ object DaisyChain {
   val daisyRead = new HashMap[Module, Bool]
 }
 
-trait DaisyChain extends Backannotation {
+trait DaisyChain extends Backend {
   val ioBuffers = new HashMap[Bits, Bits]
-  Module.isBackannotating = true
   override def backannotationTransforms {
     super.backannotationTransforms
-
     transforms += ((c: Module) => c bfs (_.addConsumers))
+    transforms += ((c: Module) => findStates(DaisyChain.top)) 
     transforms += ((c: Module) => decouple(DaisyChain.top))
     transforms += ((c: Module) => appendFires(DaisyChain.top))
     transforms += ((c: Module) => genCounters(DaisyChain.top))
@@ -115,9 +114,9 @@ trait DaisyChain extends Backannotation {
       reg.inputs += m.reset
   }
 
-  override def annotateSignals(c: Module) {
-   
-    /*** collect signals for snapshotting ***/
+  def findStates(c: Module) { 
+    ChiselError.info("[DaisyChain] find state elements")
+    /*** collect state elements for snapshotting ***/
     // First, collect the top component's inputs
     for ((name, targetPin) <- c.io.flatten ; 
       if !(daisyNames contains name) && targetPin.dir == INPUT) {
@@ -147,6 +146,7 @@ trait DaisyChain extends Backannotation {
 
   /* target decoupling */
   def decouple (c: Module) = {
+    ChiselError.info("[DaisyChain] target decoupling")
     for ((name, io) <- c.io.asInstanceOf[Bundle].elements) {
       io nameIt (name, true)
     }
@@ -253,21 +253,21 @@ trait DaisyChain extends Backannotation {
       val copy = DaisyChain.daisyCopy(top)
       val read = DaisyChain.daisyRead(top)
 
-      (top.children.isEmpty, top.signals.isEmpty, c == top) match {
+      (top.children.isEmpty, top.signals.isEmpty) match {
         // no children & no singals 
-        case (true, true, _) => {
+        case (true, true) => {
           // daisy output <- daisy input
           wire(DaisyChain.daisyOuts(top).bits, DaisyChain.daisyIns(top))
         }
         // children but no signals
-        case (false, true, false) => {
+        case (false, true) => {
           // daisy output <- head child's daisy output
           wire(DaisyChain.daisyOuts(top).bits, DaisyChain.daisyOuts(top.children.head).bits)
           // last child's daisy input <- daisy input
           wire(DaisyChain.daisyIns(top.children.last), DaisyChain.daisyIns(top))
         }
         // no children but signals
-        case (true, false, false) => {
+        case (true, false, _) => {
           // daisy output <- head shadow
           wire(DaisyChain.daisyOuts(top).bits, top.signals.head.shadow)
           // last shadow <- daisy input
@@ -279,55 +279,9 @@ trait DaisyChain extends Backannotation {
           )
         }
         // children & signals
-        case (false, false, false) => {
+        case (false, false) => {
           // daisy output <- head shadow
           wire(DaisyChain.daisyOuts(top).bits, top.signals.head.shadow)
-          // last shadow <- daisy input
-          addReg(top, top.signals.last.shadow, "shadow_" + top.signals.last.cntrIdx,
-            Map (
-              copy -> top.signals.last.counter,
-              read -> DaisyChain.daisyOuts(top.children.head).bits
-            )
-          )
-          // last child's daisy input <- daisy input
-          wire(DaisyChain.daisyOuts(top.children.last).bits, DaisyChain.daisyIns(top))
-        }
-        /*-------------------------------------*/
-        /* Insert a daisy output buffer        */
-        /* so that the head shadow can be read */
-        /*-------------------------------------*/
-        // children but no signals and top component
-        case (false, true, true) => {
-          // daisy buf <- head child's daisy output
-          val daisyBuf = Reg(next = DaisyChain.daisyOuts(top.children.head).bits)
-          addReg(top, daisyBuf, "daisy_buf")
-          // daisy output <- daisy buf
-          wire(DaisyChain.daisyOuts(top).bits, daisyBuf)
-          // last child's daisy input <- daisy input
-          wire(DaisyChain.daisyIns(top.children.last), DaisyChain.daisyIns(top))
-        }
-        // no children but signals and top component
-        case (true, false, true) => {
-          // daisy buffer <- head shadow
-          val daisyBuf = Reg(next = top.signals.head.shadow)
-          addReg(top, daisyBuf, "daisy_buf")
-          // daisy output <- daisy buffer
-          wire(DaisyChain.daisyOuts(top).bits, daisyBuf)
-          // last shadow <- daisy input
-          addReg(top, top.signals.last.shadow, "shadow_" + top.signals.last.cntrIdx,
-            Map (
-              copy -> top.signals.last.counter,
-              read -> DaisyChain.daisyIns(top)
-            )
-          )
-        }
-        // children & signals and top coponent
-        case (false, false, true) => {
-          // daisy buffer <- head shadow
-          val daisyBuf = Reg(next = top.signals.head.shadow)
-          addReg(top, daisyBuf, "daisy_buf")
-          // daisy output <- daisy buffer
-          wire(DaisyChain.daisyOuts(top).bits, daisyBuf)
           // last shadow <- daisy input
           addReg(top, top.signals.last.shadow, "shadow_" + top.signals.last.cntrIdx,
             Map (
@@ -487,23 +441,23 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   val peeks = new ArrayBuffer[BigInt]
 
   // proceed 'n' clocks
-  def clock (n: Int) {
-    val clk = emulatorCmd("clock %d".format(n))
-    if (isTrace) println("  CLOCK %s".format(clk))
+  def takeSteps (n: Int) {
+    val clk = emulatorCmd("step %d".format(n))
+    if (isTrace) println("  STEP %d".format(n))
     delta += clk.toInt
   }
 
   def pokeClks (n: Int) {
     val clks  = DaisyTransform.clks(c)
-    // Wait until the clock counter is ready
+    // Wait until the takeSteps counter is ready
     // (the target is stalled)
     while(peek(clks.ready) == 0) {
-      clock(1)
+      takeSteps(1)
     }
-    // Set the clock counter
+    // Set the takeSteps counter
     poke(clks.bits, n)
     poke(clks.valid, 1)
-    clock(1)
+    takeSteps(1)
     poke(clks.valid, 0)
   }
 
@@ -522,7 +476,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     do {
       poke(daisyCtrl, 0)
       poke(daisyOut.ready, 1)
-      clock(1)
+      takeSteps(1)
     } while (peek(daisyOut.valid) == 0)
     poke(daisyOut.ready, 0)
     showCurrentChain()
@@ -534,7 +488,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     do {
       poke(daisyCtrl, 1)
       poke(daisyOut.ready, 1)
-      clock(1)
+      takeSteps(1)
     } while (peek(daisyOut.valid) == 0)
     poke(daisyOut.ready, 0)
     showCurrentChain()
@@ -585,7 +539,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
 
     // run the target until it is stalled
     if (isTrace) println("*** CYCLE THE TARGET ***")
-    clock(n)
+    takeSteps(n)
     // read out signal values
     if (isTrace) println("*** READ SIGNAL VALUES ***")
     peeks.clear
@@ -595,6 +549,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
       case signal =>
         peekBits(signal)
     }
+    takeSteps(1)
 
     t += n
   }
@@ -645,12 +600,11 @@ abstract class DaisyWrapperTester[+T <: DaisyFPGAWrapper[_]](c: T, isTrace: Bool
   def pokeAddr(addr: BigInt, bits: BigInt) {
     do {
       poke(c.io.addr, addr)
-      clock(1)
+      takeSteps(1)
     } while (peek(c.io.in.ready) == 0)
-
     poke(c.io.in.bits, bits)
     poke(c.io.in.valid, 1)
-    clock(1)
+    takeSteps(1)
     poke(c.io.in.valid, 0)
   }
 
@@ -659,7 +613,7 @@ abstract class DaisyWrapperTester[+T <: DaisyFPGAWrapper[_]](c: T, isTrace: Bool
     do {
       poke(c.io.addr, addr)
       poke(c.io.out.ready, 1)
-      clock(1)
+      takeSteps(1)
     } while (peek(c.io.out.valid) == 0)
 
     peek(c.io.out.bits)
@@ -670,7 +624,7 @@ abstract class DaisyWrapperTester[+T <: DaisyFPGAWrapper[_]](c: T, isTrace: Bool
     do {
       poke(c.io.addr, addr)
       poke(c.io.out.ready, 1)
-      clock(1)
+      takeSteps(1)
     } while (peek(c.io.out.valid) == 0)
    
     expect(c.io.out.bits, expected)
@@ -681,12 +635,12 @@ abstract class DaisyWrapperTester[+T <: DaisyFPGAWrapper[_]](c: T, isTrace: Bool
   override def pokeClks (n: Int) {
     do {
       poke(c.io.addr, 4)
-      clock(1)
+      takeSteps(1)
     } while (peek(c.io.in.ready) == 0)
  
     pokeBits(c.io.in.bits, n)
     pokeBits(c.io.in.valid, 1)
-    clock(1)
+    takeSteps(1)
     pokeBits(c.io.in.valid, 0)
   }
 
