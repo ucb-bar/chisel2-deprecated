@@ -159,17 +159,10 @@ trait DaisyChain extends Backend {
       ioBuffers(targetPin) = {
         val buf = Reg(UInt())
         if (targetPin.dir == INPUT) {
-          // Input buffers work differently depending on
-          // whether the target is top or not
-          if (c == Module.topComponent) {
-            addReg(c, buf, bufName,
-              Map(!DaisyChain.fires(c) -> targetPin)
-            )
-          } else {
-            addReg(c, buf, bufName,
-              Map(DaisyChain.fires(c) -> targetPin)
-            )
-          }
+          // Input buffers work when the clock counter value is set
+          addReg(c, buf, bufName,
+            Map(DaisyChain.clks.valid -> targetPin)
+          )
           for (consumer <- targetPin.consumers) {
             val idx = consumer.inputs indexOf targetPin
             consumer.inputs(idx) = buf
