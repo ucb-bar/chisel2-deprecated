@@ -122,7 +122,6 @@ abstract class Node extends nameable {
   var inferWidth: (Node) => Int = maxWidth;
   var nameHolder: nameable = null;
   var isClkInput = false;
-  var inferCount = 0;
   var genError = false;
   val line: StackTraceElement =
     if (Driver.getLineNumbers) {
@@ -237,24 +236,13 @@ abstract class Node extends nameable {
   }
   def infer: Boolean = {
     val res = inferWidth(this);
-    if(inferCount > 1000000) {
-      if(genError) {
-        val error = new ChiselError(() => {"Unable to infer width of " + this}, this.line);
-        if (!ChiselErrors.contains(error)) {
-          ChiselErrors += error
-        }
-      } else {
-        genError = true;
-      }
-      return false;
-    }
-    if(res == -1) {
-      return true
+    if (res == -1) {
+      true
     } else if (res != width) {
-      width_ = res;
-      return true;
-    } else{
-      return false;
+      width_ = res
+      true
+    } else {
+      false
     }
   }
   lazy val isInObject: Boolean =
@@ -298,7 +286,6 @@ abstract class Node extends nameable {
     writer.println("consumers.length: " + consumers.length)
     writer.println("nameHolder: " + nameHolder)
     writer.println("isClkInput: " + isClkInput)
-    writer.println("inferCount: " + inferCount)
     writer.println("genError: " + genError)
     writer.println("line: " + line)
     writer.println("isScanArg: " + isScanArg)
