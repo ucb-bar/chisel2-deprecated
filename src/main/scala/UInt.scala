@@ -100,7 +100,7 @@ class UInt extends Bits with Num[UInt] {
   def *  (b: UInt): UInt = newBinaryOp(b, "*");
   def /  (b: UInt): UInt = newBinaryOp(b, "/");
   def %  (b: UInt): UInt = newBinaryOp(b, "%");
-  def ?  (b: UInt): UInt = newBinaryOp(b, "?");
+  def ?  (b: UInt): UInt = fromNode(Multiplex(this.toBool, b, null))
   def -  (b: UInt): UInt = newBinaryOp(b, "-");
 
   // order operators

@@ -753,13 +753,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
   }
 
-  def verifyAllMuxes {
-    for(m <- Driver.muxes) {
-      if(m.inputs(0).width != 1 && m.component != null && (!Driver.backend.isEmittingComponents || !m.component.isInstanceOf[BlackBox])) {
-        ChiselError.error({"Mux " + m.name + " has " + m.inputs(0).width + "-bit selector " + m.inputs(0).name}, m.line);
-      }
-    }
-  }
   /* XXX Not sure what the two following do.
    They never get overridden yet it is called
    for each component (See Backend implementations). */

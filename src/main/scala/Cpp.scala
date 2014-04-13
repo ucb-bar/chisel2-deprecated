@@ -721,8 +721,7 @@ class CppBackend extends Backend {
         c.mods   ++= cc.mods;
       }
     }
-    c.findConsumers();
-    c.verifyAllMuxes;
+    c.findConsumers()
     ChiselError.checkpoint()
 
     c.collectNodes(c);

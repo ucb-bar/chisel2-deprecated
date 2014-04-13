@@ -751,11 +751,10 @@ class VerilogBackend extends Backend {
   override def elaborate(c: Module) {
     super.elaborate(c)
 
-    val out = createOutputFile(c.name + ".v");
-    doCompile(c, out, 0);
-    c.verifyAllMuxes;
+    val out = createOutputFile(c.name + ".v")
+    doCompile(c, out, 0)
     ChiselError.checkpoint()
-    out.close();
+    out.close()
 
     if (!memConfs.isEmpty) {
       val out_conf = createOutputFile(Driver.topComponent.name + ".conf")

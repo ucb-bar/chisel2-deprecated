@@ -214,8 +214,7 @@ class FloBackend extends Backend {
         c.debugs     ++= cc.debugs;
       }
     }
-    c.findConsumers();
-    c.verifyAllMuxes;
+    c.findConsumers()
     ChiselError.checkpoint()
 
     c.collectNodes(c);

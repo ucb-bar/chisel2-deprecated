@@ -91,7 +91,6 @@ object BinaryOp {
       case "%"   => Op("%", minWidth _,  x, y )
       case "s%s" => Op("s%s", minWidth _,  x, y )
       case "^"   => Op("^", maxWidth _,  x, y )
-      case "?"   => Multiplex(x, y, null)
       case "-"   => Op("-", maxWidth _,  x, y )
       case "##"  => Op("##", sumWidth _,  x, y )
       case "&"   => Op("&", maxWidth _, x, y )

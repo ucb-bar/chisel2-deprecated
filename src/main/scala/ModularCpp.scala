@@ -143,7 +143,6 @@ class ModularCppBackend extends CppBackend {
   override def elaborate(c: Module): Unit = {
     backendElaborate(c)
     c.findConsumers()
-    c.verifyAllMuxes
     ChiselError.checkpoint()
 
     val vertices = createVertices(c)
