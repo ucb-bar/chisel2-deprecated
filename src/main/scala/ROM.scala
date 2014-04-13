@@ -59,8 +59,8 @@ class ROMData(elts: IndexedSeq[Node]) extends Node {
     elts.map(_.matchWidth(width).litOf)
   }
 
-  override def isInObject: Boolean = true
-  override def isInVCD: Boolean = false
+  override lazy val isInObject: Boolean = true
+  override lazy val isInVCD: Boolean = false
 }
 
 class ROMRead extends Node {

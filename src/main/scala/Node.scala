@@ -257,13 +257,13 @@ abstract class Node extends nameable {
       return false;
     }
   }
-  def isInObject: Boolean =
+  lazy val isInObject: Boolean =
     (isIo && (Driver.isIoDebug || component == Driver.topComponent)) ||
     Driver.topComponent.debugs.contains(this) || isPrintArg || isScanArg ||
     isReg || isUsedByRam || Driver.isDebug && !name.isEmpty ||
     Driver.emitTempNodes
 
-  def isInVCD: Boolean = name != "reset" && width > 0 &&
+  lazy val isInVCD: Boolean = name != "reset" && width > 0 &&
      (!name.isEmpty || Driver.emitTempNodes) &&
      ((isIo && isInObject) || isReg || Driver.isDebug)
 

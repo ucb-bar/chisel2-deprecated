@@ -31,10 +31,9 @@
 package Chisel
 
 class CSENode(val node: Node) {
-  val isInObject = node.isInObject
   override def hashCode: Int = node.hashCodeForCSE
   override def equals(x: Any): Boolean = x match {
-    case x: CSENode => node.equalsForCSE(x.node) && !x.isInObject
+    case x: CSENode => node.equalsForCSE(x.node) && !x.node.isInObject
     case _ => false
   }
 }

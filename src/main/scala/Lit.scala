@@ -263,7 +263,7 @@ class Literal extends Node {
   override def isLit: Boolean = true;
   override def litOf: Literal = this
   override def toString: String = name;
-  override def isInVCD: Boolean = false
+  override lazy val isInVCD: Boolean = false
 
   override def canCSE: Boolean = true
   override def hashCodeForCSE: Int = value.toInt
