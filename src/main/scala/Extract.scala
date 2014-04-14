@@ -55,7 +55,9 @@ object NodeExtract {
       ChiselError.error("Extract(hi = " + hi + ", lo = " + lo + ") requires hi >= lo")
     val w = if (width == -1) hi - lo + 1 else width
     val bits_lit = mod.litOf
-    if (bits_lit != null) {
+    if (lo == 0 && w == mod.width) {
+      mod
+    } else if (bits_lit != null) {
       Literal((bits_lit.value >> lo) & ((BigInt(1) << w) - BigInt(1)), w)
     } else {
       makeExtract(mod, Literal(hi), Literal(lo), fixWidth(w))
