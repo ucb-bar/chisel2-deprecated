@@ -133,10 +133,7 @@ class Extract extends Node {
     assert(lit == null || lit.value >= 0 && lit.value < inputs(0).width,
            ChiselError.error("Extract(" + lit.value + ")" +
                     " out of range [0," + (inputs(0).width-1) + "]" +
-                    " of " + inputs(0) +
-                    " on line " + line.getLineNumber +
-                    " in class " + line.getClassName +
-                    " in file " + line.getFileName))
+                    " of " + inputs(0), line))
   }
 
   override def canCSE: Boolean = true

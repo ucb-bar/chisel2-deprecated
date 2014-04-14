@@ -844,11 +844,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         containsCombPath = true
         ChiselError.error("FOUND COMBINATIONAL PATH!")
         for((node, ind) <- nodelist zip nodelist.indices) {
-          val ste = node.line
-          ChiselError.error("  (" + ind +  ") on line " + ste.getLineNumber +
-                                  " in class " + ste.getClassName +
-                                  " in file " + ste.getFileName +
-                                  ", " + node.name)
+          ChiselError.error("  (" + ind +  ")", node.line)
         }
       }
     }
