@@ -87,7 +87,8 @@ class VcdBackend(top: Module) extends Backend {
     if (Driver.isVCD) {
       write("  fputs(\"$timescale 1ps $end\\n\", f);\n")
       dumpVCDScope(top, write)
-      dumpScopeForTemps(write)
+      if (Module.emitTempNodes)
+        dumpScopeForTemps(write)
       write("  fputs(\"$enddefinitions $end\\n\", f);\n")
       write("  fputs(\"$dumpvars\\n\", f);\n")
       write("  fputs(\"$end\\n\", f);\n")

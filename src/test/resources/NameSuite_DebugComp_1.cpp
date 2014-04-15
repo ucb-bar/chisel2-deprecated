@@ -45,8 +45,6 @@ void NameSuite_DebugComp_1_t::dump_init(FILE *f) {
   fputs("$var wire 1 \x25 io_ctrl_out $end\n", f);
   fputs("$upscope $end\n", f);
   fputs("$upscope $end\n", f);
-  fputs("$scope module _chisel_temps_ $end\n", f);
-  fputs("$upscope $end\n", f);
   fputs("$enddefinitions $end\n", f);
   fputs("$dumpvars\n", f);
   fputs("$end\n", f);
