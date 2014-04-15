@@ -79,7 +79,10 @@ class SInt extends Bits with Num[SInt] {
   }
 
   /** casting from UInt followed by assignment. */
-  def :=(src: UInt): Unit = this := src.zext;
+  override protected def colonEquals(that: Bits): Unit = that match {
+    case u: UInt => this := u.zext
+    case _ => super.colonEquals(that)
+  }
 
   def gen[T <: Bits](): T = SInt().asInstanceOf[T];
 

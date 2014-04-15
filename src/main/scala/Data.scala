@@ -114,13 +114,19 @@ abstract class Data extends Node {
     n
   }
 
-  def :=[T <: Data](data: T): Unit = {
-    if(this.getClass != data.getClass) {
-      ChiselError.error(":= not defined on " + this.getClass
-        + " and " + data.getClass);
-    }
-    comp procAssign data;
+  def :=(that: Data): Unit = that match {
+    case b: Bits => this colonEquals b
+    case b: Bundle => this colonEquals b
+    case b: Vec[_] => this colonEquals b
+    case _ => illegalAssignment(that)
   }
+
+  protected def colonEquals(that: Bits): Unit = illegalAssignment(that)
+  protected def colonEquals(that: Bundle): Unit = illegalAssignment(that)
+  protected def colonEquals[T <: Data](that: Iterable[T]): Unit = illegalAssignment(that)
+
+  protected def illegalAssignment(that: Any): Unit =
+    ChiselError.error(":= not defined on " + this.getClass + " and " + that.getClass)
 
   override def clone(): this.type = {
     try {

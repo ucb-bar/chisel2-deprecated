@@ -326,20 +326,9 @@ abstract class Bits extends Data with proc {
   }
 
   /** Assignment operator */
-  override def :=[T <: Data](src: T): Unit = {
-    src match {
-      case b: Bits => {
-        if(comp != null) {
-          comp procAssign src;
-        } else {
-          this procAssign src;
-        }
-      }
-      case any =>
-        ChiselError.error("can't assign " + src.toString + " to Bits")
-    }
+  override protected def colonEquals(that: Bits): Unit = {
+    (if (comp != null) comp else this) procAssign that
   }
-
 
   // bitwise operators
   // =================

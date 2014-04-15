@@ -232,45 +232,33 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
       b <> e;
   }
 
-  def :=[T <: Data](src: Iterable[T]): Unit = {
+  override protected def colonEquals[T <: Data](that: Iterable[T]): Unit = {
+    def unidirectional[U <: Data](who: Iterable[(String, Bits)]) =
+      who.forall(_._2.dir == who.head._2.dir)
 
-    // Check matching size
-    assert(this.size == src.size, {
+    assert(this.size == that.size, {
       ChiselError.error("Can't wire together Vecs of mismatched lengths")
     })
 
-    // Check LHS to make sure unidirection
-    val dirLHS = this.flatten(0)._2.dir
-    this.flatten.map(x => {assert(x._2.dir == dirLHS, {
+    assert(unidirectional(this.flatten), {
       ChiselError.error("Cannot mix directions on left hand side of :=")
     })
+
+    assert(unidirectional(that.flatMap(_.flatten)), {
+      ChiselError.error("Cannot mix directions on left hand side of :=")
     })
 
-    // Check RHS to make sure unidirection
-    val dirRHS = src.head.flatten(0)._2.dir
-    for (elm <- src) {
-      elm.flatten.map(x => {assert(x._2.dir == dirRHS, {
-        ChiselError.error("Cannot mix directions on right hand side of :=")
-      })
-      })
-    }
-
-    for((me, other) <- this zip src){
-      me match {
-        case bundle: Bundle =>
-          bundle := other.asInstanceOf[Bundle]
-        case v: Vec[_] =>
-          v := other.asInstanceOf[Vec[Data]]
-        case _ =>
-          me := other
-      }
-    }
+    for ((me, other) <- this zip that)
+      me := other
   }
 
-  def := (src: UInt) {
-    for(i <- 0 until length)
-      this(i) := src(i)
+  override protected def colonEquals(that: Bits): Unit = {
+    for (i <- 0 until length)
+      this(i) := that(i)
   }
+
+  // We need this special := because Iterable[T] is not a Data.
+  def :=[T <: Data](that: Iterable[T]): Unit = colonEquals(that)
 
   override def removeTypeNodes() {
     for(bundle <- self)

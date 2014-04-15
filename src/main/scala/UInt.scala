@@ -82,14 +82,6 @@ class UInt extends Bits with Num[UInt] {
   // to support implicit convestions
   def ===(b: UInt): Bool = LogicalOp(this, b, "===")
 
-  def :=(src: UInt) {
-    if(comp != null) {
-      comp procAssign src.toNode;
-    } else {
-      this procAssign src.toNode;
-    }
-  }
-
   // arithmetic operators
   def zext(): SInt = Cat(UInt(0,1), this).toSInt
   def unary_-(): UInt = newUnaryOp("-");

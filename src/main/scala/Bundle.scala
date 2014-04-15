@@ -248,33 +248,13 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     return false;
   }
 
-  override def :=[T <: Data](src: T): Unit = {
-    src match {
-      case bun: Bundle => this := bun
-      case any => super.:=(any)
-    }
-  }
-
-  def :=(src: Bundle): Unit = {
-    if(this.isTypeNode && comp != null) {
+  override protected def colonEquals(src: Bundle): Unit = {
+    if (this.isTypeNode && comp != null) {
       this.comp.procAssign(src.toNode)
-      return
-    }
-    for((n, i) <- elements) {
-      i match {
-        case bundle: Bundle => {
-          if (src.contains(n)) bundle := src(n).asInstanceOf[Bundle]
-        }
-        case bits: Bits => {
-          if (src.contains(n)) bits := src(n).asInstanceOf[Bits]
-        }
-        case vec: Vec[_] => {
-           /* We would prefer to match for Vec[Data] but that's impossible
-            because of JVM constraints which lead to type erasure. */
-          val vecdata = vec.asInstanceOf[Vec[Data]]
-          if (src.contains(n)) vecdata := src(n).asInstanceOf[Vec[Data]]
-        }
-      }
+    } else {
+      for ((n, i) <- elements)
+        if (src contains n)
+          i := src(n)
     }
   }
 
