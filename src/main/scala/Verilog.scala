@@ -401,12 +401,11 @@ class VerilogBackend extends Backend {
   }
 
   def genHarness(c: Module, name: String) {
-    /*
     val harness  = createOutputFile(name + "-harness.v");
-    val printFormat = Module.printArgs.map(a => "0x%x").fold("")((y,z) => z + " " + y)
-    val scanFormat = Module.scanArgs.map(a => "%x").fold("")((y,z) => z + " " + y)
-    val printNodes = for (arg <- Module.printArgs; node <- arg.maybeFlatten) yield arg
-    val scanNodes = for (arg <- Module.scanArgs; node <- c.keepInputs(arg.maybeFlatten)) yield arg
+    val printNodes = for ((n, io) <- c.io.flatten ; if io.dir == OUTPUT) yield io
+    val scanNodes = for ((n, io) <- c.io.flatten ; if io.dir == INPUT) yield io
+    val printFormat = printNodes.map(a => "0x%x").fold("")((y,z) => z + " " + y)
+    val scanFormat = scanNodes.map(a => "%x").fold("")((y,z) => z + " " + y)
     harness.write("module test;\n")
     for (node <- scanNodes)
       harness.write("    reg [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
@@ -425,10 +424,9 @@ class VerilogBackend extends Backend {
     harness.write("    " + c.moduleName + "\n")
     harness.write("      " + c.moduleName + "(\n")
 
-    if(c.containsRegInTree) {
-      harness.write("        .clk(clk),\n")
-      harness.write("        .reset(reset),\n")
-    }
+    if(!c.clocks.isEmpty) harness.write("        .clk(clk),\n")
+    if(!c.resets.isEmpty) harness.write("        .reset(reset),\n")
+    
 
     var first = true
     for (node <- (scanNodes ++ printNodes))
@@ -478,7 +476,6 @@ class VerilogBackend extends Backend {
     harness.write("  end\n")
     harness.write("endmodule\n")
     harness.close();
-    */
   }
 
   def emitDefs(c: Module): StringBuilder = {
@@ -774,7 +771,7 @@ class VerilogBackend extends Backend {
     }
     val dir = Module.targetDir + "/"
     val src = dir + c.name + "-harness.v " + dir + c.name + ".v"
-    val cmd = "vcs +vc +v2k -timescale=10ns/10ps " + src + " -o " + dir + c.name
+    val cmd = "vcs -full64 +vc +v2k -timescale=10ns/10ps " + src + " -o " + dir + c.name
     run(cmd)
 
   }
