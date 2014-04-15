@@ -49,7 +49,9 @@ object Driver {
   def apply[T <: Module](args: Array[String], gen: () => T,
                          ftester: T => Tester[T]): T = {
     val mod = apply(args, gen)
-    test(mod, ftester)
+    // allow testers only for CppBackend
+    if (Driver.backend.isInstanceOf[CppBackend])
+      test(mod, ftester)
     mod
   }
 
