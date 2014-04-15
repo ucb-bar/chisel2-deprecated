@@ -325,7 +325,7 @@ class ManualTester[+T <: Module]
       }
       cmd = cmd + " 0x" + x.toString(16);
       val rtn = emulatorCmd(cmd)
-      if (rtn != "true") {
+      if (rtn != "ok") {
         System.err.print(s"FAILED: poke(${dumpName(data)}) returned false")
         ok = false
       }
