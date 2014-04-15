@@ -4,6 +4,7 @@ module NameSuite_Comp_1(
 );
 
 
+
   assign io_out_ren = io_in_ren;
 endmodule
 
@@ -19,6 +20,7 @@ module NameSuite_BindThirdComp_1(
   wire NameSuite_Comp_1_3_io_out_ren;
   wire T1;
   wire T2;
+
 
   assign io_result = T0;
   assign T0 = T1 | NameSuite_Comp_1_3_io_out_ren;

@@ -8,6 +8,7 @@ module StdlibSuite_DivUS_1(
   wire[32:0] T1;
   wire[32:0] T2;
 
+
   assign io_z = T0;
   assign T0 = $signed(T1) / $signed(io_y);
   assign T1 = T2;

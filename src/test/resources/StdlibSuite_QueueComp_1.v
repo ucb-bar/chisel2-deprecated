@@ -34,11 +34,7 @@ module Queue(input clk, input reset,
 `ifndef SYNTHESIS
   integer initvar;
   initial begin
-    #0.001;
-`ifdef RANDOM_SEED
-    initvar = $random(`RANDOM_SEED);
-`endif
-    #0.001;
+    #0.002;
     for (initvar = 0; initvar < 2; initvar = initvar+1)
       ram[initvar] = {1{$random}};
     enq_ptr = {1{$random}};

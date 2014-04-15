@@ -10,11 +10,7 @@ module DelaySuite_RegInitCondUpdate_1(input clk, input reset,
 `ifndef SYNTHESIS
   integer initvar;
   initial begin
-    #0.001;
-`ifdef RANDOM_SEED
-    initvar = $random(`RANDOM_SEED);
-`endif
-    #0.001;
+    #0.002;
     res = {1{$random}};
   end
 `endif

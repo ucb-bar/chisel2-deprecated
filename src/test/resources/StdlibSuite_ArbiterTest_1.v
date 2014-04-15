@@ -49,6 +49,7 @@ module Arbiter(
   wire T29;
   wire T30;
 
+
   assign io_chosen = T0;
   assign T0 = T1;
   assign T1 = io_in_0_valid ? 2'h0 : T2;
@@ -117,6 +118,7 @@ module StdlibSuite_ArbiterTest_1(
   wire arb_io_in_2_ready;
   wire arb_io_in_1_ready;
   wire arb_io_in_0_ready;
+
 
   assign io_fire = T0;
   assign T0 = io_out_ready && arb_io_out_valid;

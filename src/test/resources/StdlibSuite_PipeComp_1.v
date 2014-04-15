@@ -13,11 +13,7 @@ module StdlibSuite_PipeComp_1(input clk, input reset,
 `ifndef SYNTHESIS
   integer initvar;
   initial begin
-    #0.001;
-`ifdef RANDOM_SEED
-    initvar = $random(`RANDOM_SEED);
-`endif
-    #0.001;
+    #0.002;
     R0 = {1{$random}};
     R1 = {1{$random}};
     R2 = {1{$random}};

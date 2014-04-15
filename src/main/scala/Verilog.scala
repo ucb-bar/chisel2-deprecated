@@ -60,7 +60,7 @@ object VerilogBackend {
     "table", "task", "time", "tran", "tranif0", "tranif1", "tri", "tri0",
     "tri1", "triand", "trior", "trireg", "unsigned", "vectored", "wait",
     "wand", "weak0", "weak1", "while", "wire", "wor", "xnor", "xor",
-    "SYNTHESIS", "PRINTF_COND", "RANDOM_SEED")
+    "SYNTHESIS", "PRINTF_COND", "VCS")
 
   var traversalIndex = 0
 }
@@ -582,7 +582,6 @@ class VerilogBackend extends Backend {
   def emitDecs(c: Module): StringBuilder =
     c.mods.map(emitDec(_)).addString(new StringBuilder)
 
-  private var randomIsSeeded = false
   def emitInits(c: Module): StringBuilder = {
     val sb = new StringBuilder
     c.mods.map(emitInit(_)).addString(sb)
@@ -592,15 +591,7 @@ class VerilogBackend extends Backend {
       res append "`ifndef SYNTHESIS\n"
       res append "  integer initvar;\n"
       res append "  initial begin\n"
-      if (!randomIsSeeded) {
-        randomIsSeeded = true
-        res append "    #0.001;\n"
-        res append "`ifdef RANDOM_SEED\n"
-        res append "    initvar = $random(`RANDOM_SEED);\n"
-        res append "`endif\n"
-        res append "    #0.001;\n"
-      } else
-        res append "    #0.002;\n"
+      res append "    #0.002;\n"
       res append sb
       res append "  end\n"
       res append "`endif\n"
