@@ -37,7 +37,7 @@ import scala.reflect._
 object Reg {
 
   def regMaxWidth(m: Node) =
-    if (isInGetWidth) {
+    if (Driver.isInGetWidth) {
       throw new Exception("getWidth was called on a Register or on an object connected in some way to a Register that has a statically uninferrable width")
     } else {
       maxWidth(m)
@@ -182,8 +182,8 @@ class Reg extends Delay with proc {
     updates += ((cond, src))
   }
   override def genMuxes(default: Node): Unit = {
-    if(!updates.isEmpty && Module.backend.isInstanceOf[VerilogBackend] && 
-       !Module.isBackannotating) {
+    if(!updates.isEmpty && Driver.backend.isInstanceOf[VerilogBackend] && 
+       !Driver.isBackannotating) {
       // use clock enable to keep old value, rather than muxing in old value
       genMuxes(updates.head._2, updates.toList.tail)
       inputs += enable;

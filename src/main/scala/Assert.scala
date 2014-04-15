@@ -44,13 +44,13 @@ class Assert(condIn: Bool, resetIn: Bool, val message: String) extends Node {
 
 class BitsInObject(x: Node) extends UInt {
   inputs += x
-  override def isInObject: Boolean = true
+  override lazy val isInObject: Boolean = true
 }
 
 class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
   inputs ++= argsIn.map(a => new BitsInObject(a))
   def args: ArrayBuffer[Node] = inputs
-  override def isInObject: Boolean = true
+  override lazy val isInObject: Boolean = true
   def decIntSize(x: Int) = math.ceil(math.log(2)/math.log(10)*x).toInt
   def decFloSize(m: Int, e: Int) = (2+decIntSize(m)+2+decIntSize(e))
 
@@ -96,7 +96,7 @@ class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
   }
 
   override def isReg: Boolean = true
-  override def isInVCD: Boolean = false
+  override lazy val isInVCD: Boolean = false
 }
 
 class Sprintf(formatIn: String, argsIn: Seq[Node]) extends PrintfBase(formatIn, argsIn)

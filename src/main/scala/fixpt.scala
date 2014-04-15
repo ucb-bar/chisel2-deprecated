@@ -98,7 +98,11 @@ class UFix(exp: Int, raw: UInt) extends Fix[UInt,UFix](exp, raw) with Num[UFix] 
 
   def + (b: UFix): UFix = do_add(b)
   def * (b: UFix): UFix = do_mult(b)
-  def :=(source: UFix): Unit = do_truncate(source)
+
+  override protected def colonEquals(that: Bundle): Unit = that match {
+    case u: UFix => do_truncate(u)
+    case _ => illegalAssignment(that)
+  }
 
   def <<(b: Int): UFix = new UFix(exp+b, raw)
   def >>(b: Int): UFix = new UFix(exp-b, raw)
@@ -124,7 +128,11 @@ class SFix(exp: Int, raw: SInt) extends Fix[SInt,SFix](exp, raw) with Num[SFix] 
 
   def + (b: SFix): SFix = do_add(b)
   def * (b: SFix): SFix = do_mult(b)
-  def :=(source: SFix): Unit = do_truncate(source)
+
+  override protected def colonEquals(that: Bundle): Unit = that match {
+    case s: SFix => do_truncate(s)
+    case _ => illegalAssignment(that)
+  }
 
   def <<(b: Int): SFix = new SFix(exp+b, raw)
   def >>(b: Int): SFix = new SFix(exp-b, raw)

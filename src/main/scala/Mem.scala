@@ -49,7 +49,7 @@ object Mem {
     res
   }
 
-  Module.backend.transforms.prepend { c =>
+  Driver.backend.transforms.prepend { c =>
     c.bfs { n =>
       if (n.isInstanceOf[MemAccess]) {
         n.asInstanceOf[MemAccess].referenced = true
@@ -89,7 +89,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
     }
 
     val addrIsReg = addr.isInstanceOf[UInt] && addr.inputs.length == 1 && addr.inputs(0).isInstanceOf[Reg]
-    val rd = if (seqRead && !Module.isInlineMem && addrIsReg) {
+    val rd = if (seqRead && !Driver.isInlineMem && addrIsReg) {
       (seqreads += new MemSeqRead(this, addr.inputs(0))).last
     } else {
       (reads += new MemRead(this, addr)).last
@@ -120,7 +120,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
 
   def write(addr: UInt, data: T): Unit = {
     val cond = Module.current.whenCond
-    if (seqRead && Module.backend.isInstanceOf[CppBackend] && gen().isInstanceOf[Bits]) {
+    if (seqRead && Driver.backend.isInstanceOf[CppBackend] && gen().isInstanceOf[Bits]) {
       // generate bogus data when reading & writing same address on same cycle
       val reg_data = new Reg().init("", widthOf(0), data)
       val random16 = LFSR16()
@@ -133,7 +133,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
   }
 
   def write(addr: UInt, data: T, wmask: UInt): Unit =
-    if (!Module.isInlineMem) doWrite(addr, Module.current.whenCond, data, wmask)
+    if (!Driver.isInlineMem) doWrite(addr, Module.current.whenCond, data, wmask)
     else doWrite(addr, Module.current.whenCond, gen().fromBits(data.toBits & wmask | read(addr).toBits & ~wmask), null.asInstanceOf[UInt])
 
   def apply(addr: UInt): T = {
@@ -142,14 +142,14 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
     rdata
   }
 
-  override val hashCode: Int = System.identityHashCode(this)
+  override val hashCode: Int = _id
   override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
 
   def apply(addr: Int): T = apply(UInt(addr))
 
   def length: Int = n
 
-  override def isInVCD = false
+  override lazy val isInVCD = false
 
   override def toString: String = "TMEM(" + ")"
 
@@ -169,7 +169,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
     seqreads --= readwrites.map(_.read)
   }
 
-  def isInline = Module.isInlineMem || !reads.isEmpty
+  def isInline = Driver.isInlineMem || !reads.isEmpty
 }
 
 abstract class MemAccess(val mem: Mem[_], addri: Node) extends Node {

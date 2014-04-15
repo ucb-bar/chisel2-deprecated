@@ -60,14 +60,15 @@ object VerilogBackend {
     "table", "task", "time", "tran", "tranif0", "tranif1", "tri", "tri0",
     "tri1", "triand", "trior", "trireg", "unsigned", "vectored", "wait",
     "wand", "weak0", "weak1", "while", "wire", "wor", "xnor", "xor",
-    "SYNTHESIS", "PRINTF_COND", "RANDOM_SEED")
+    "SYNTHESIS", "PRINTF_COND", "VCS")
 
   var traversalIndex = 0
 }
 
 class VerilogBackend extends Backend {
-  Module.isEmittingComponents = true
   val keywords = VerilogBackend.keywords
+
+  override def isEmittingComponents: Boolean = true
 
   val flushedTexts = HashSet[String]()
 
@@ -181,17 +182,17 @@ class VerilogBackend extends Backend {
           case io: Bits  =>
             if (io.dir == INPUT) { // if reached, then input has consumers
               if (io.inputs.length == 0) {
-                  // if(Module.saveConnectionWarnings) {
+                  // if (Driver.saveConnectionWarnings) {
                   //   ChiselError.warning("" + io + " UNCONNECTED IN " + io.component);
                   // } removed this warning because pruneUnconnectedIOs should have picked it up
                 portDec = "//" + portDec
               } else if (io.inputs.length > 1) {
-                  if(Module.saveConnectionWarnings) {
+                  if (Driver.saveConnectionWarnings) {
                     ChiselError.warning("" + io + " CONNECTED TOO MUCH " + io.inputs.length);
                   }
                 portDec = "//" + portDec
               } else if (!c.isWalked.contains(w)){
-                  if(Module.saveConnectionWarnings) {
+                  if (Driver.saveConnectionWarnings) {
                     ChiselError.warning(" UNUSED INPUT " + io + " OF " + c + " IS REMOVED");
                   }
                 portDec = "//" + portDec
@@ -200,14 +201,14 @@ class VerilogBackend extends Backend {
               }
             } else if(io.dir == OUTPUT) {
               if (io.consumers.length == 0) {
-                  // if(Module.saveConnectionWarnings) {
+                  // if (Driver.saveConnectionWarnings) {
                   //   ChiselError.warning("" + io + " UNCONNECTED IN " + io.component + " BINDING " + c.findBinding(io));
                   // } removed this warning because pruneUnconnectedsIOs should have picked it up
                 portDec = "//" + portDec
               } else {
                 var consumer: Node = c.parent.findBinding(io);
                 if (consumer == null) {
-                  if(Module.saveConnectionWarnings) {
+                  if (Driver.saveConnectionWarnings) {
                     ChiselError.warning("" + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + io.consumers.length + ") IN " + c.parent);
                   }
                   portDec = "//" + portDec
@@ -542,7 +543,7 @@ class VerilogBackend extends Backend {
     node match {
       case reg: Reg =>
         if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1) &&
-           !Module.isBackannotating){
+           !Driver.isBackannotating) {
           if(reg.isReset){
             "    if(" + emitRef(reg.inputs.last) + ") begin\n" +
             "      " + emitRef(reg) + " <= " + emitRef(reg.init) + ";\n" +
@@ -578,7 +579,6 @@ class VerilogBackend extends Backend {
   def emitDecs(c: Module): StringBuilder =
     c.mods.map(emitDec(_)).addString(new StringBuilder)
 
-  private var randomIsSeeded = false
   def emitInits(c: Module): StringBuilder = {
     val sb = new StringBuilder
     c.mods.map(emitInit(_)).addString(sb)
@@ -588,15 +588,7 @@ class VerilogBackend extends Backend {
       res append "`ifndef SYNTHESIS\n"
       res append "  integer initvar;\n"
       res append "  initial begin\n"
-      if (!randomIsSeeded) {
-        randomIsSeeded = true
-        res append "    #0.001;\n"
-        res append "`ifdef RANDOM_SEED\n"
-        res append "    initvar = $random(`RANDOM_SEED);\n"
-        res append "`endif\n"
-        res append "    #0.001;\n"
-      } else
-        res append "    #0.002;\n"
+      res append "    #0.002;\n"
       res append sb
       res append "  end\n"
       res append "`endif\n"
@@ -618,7 +610,7 @@ class VerilogBackend extends Backend {
       // if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
       w match {
         case io: Bits => {
-          val prune = if (io.prune && c != Module.topComponent) "//" else ""
+          val prune = if (io.prune && c != Driver.topComponent) "//" else ""
           if (io.dir == INPUT) {
             ports += new StringBuilder(nl + "    " + prune + "input " + 
                                        emitWidth(io) + " " + emitRef(io));
@@ -708,7 +700,7 @@ class VerilogBackend extends Backend {
        We use a LinkedHashMap such that later iteration is predictable. */
     val defs = LinkedHashMap[String, LinkedHashMap[String, ArrayBuffer[Module]]]()
     var level = 0;
-    for( c <- Module.sortedComps ) {
+    for (c <- Driver.sortedComps) {
       ChiselError.info(depthString(depth) + "COMPILING " + c
         + " " + c.children.length + " CHILDREN"
         + " (" + c.level + "," + c.traversal + ")");
@@ -747,18 +739,17 @@ class VerilogBackend extends Backend {
   override def elaborate(c: Module) {
     super.elaborate(c)
 
-    val out = createOutputFile(c.name + ".v");
-    doCompile(c, out, 0);
-    c.verifyAllMuxes;
+    val out = createOutputFile(c.name + ".v")
+    doCompile(c, out, 0)
     ChiselError.checkpoint()
-    out.close();
+    out.close()
 
     if (!memConfs.isEmpty) {
-      val out_conf = createOutputFile(Module.topComponent.name + ".conf");
+      val out_conf = createOutputFile(Driver.topComponent.name + ".conf")
       out_conf.write(getMemConfString);
       out_conf.close();
     }
-    if (Module.isGenHarness) {
+    if (Driver.isGenHarness) {
       genHarness(c, c.name);
     }
   }
@@ -769,7 +760,7 @@ class VerilogBackend extends Backend {
       val c = Process(cmd).!
       ChiselError.info(cmd + " RET " + c)
     }
-    val dir = Module.targetDir + "/"
+    val dir = Driver.targetDir + "/"
     val src = dir + c.name + "-harness.v " + dir + c.name + ".v"
     val cmd = "vcs -full64 +vc +v2k -timescale=10ns/10ps " + src + " -o " + dir + c.name
     run(cmd)

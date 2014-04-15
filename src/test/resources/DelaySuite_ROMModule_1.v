@@ -6,6 +6,7 @@ module DelaySuite_ROMModule_1(
   wire[3:0] T0;
   reg [3:0] T1 [2:0];
 
+
   assign io_out = T0;
 `ifndef SYNTHESIS
   assign T0 = io_addr >= 2'h3 ? {1{$random}} : T1[io_addr];

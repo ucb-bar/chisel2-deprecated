@@ -56,22 +56,17 @@ class Bool extends UInt {
     Bool(x > 0).asInstanceOf[this.type]
   }
 
-  def :=(src: Bool): Unit = {
-    if(comp != null) {
-      comp procAssign src;
-    } else {
-      this procAssign src;
+  override protected def colonEquals(src: Bits): Unit = src match {
+    case _: Bool => super.colonEquals(src(0))
+    case _ => {
+      if (src.getWidth > 1) {
+        throw new Exception("multi bit signal " + src + " converted to Bool");
+      }
+      if (src.getWidth == -1) {
+        throw new Exception("unable to automatically convert " + src + " to Bool, convert manually instead");
+      }
+      super.colonEquals(src(0)) // We only have one bit in *src*.
     }
-  }
-
-  def := (src: Bits): Unit = {
-    if(src.getWidth > 1) {
-      throw new Exception("multi bit signal " + src + " converted to Bool");
-    }
-    if(src.getWidth == -1) {
-      throw new Exception("unable to automatically convert " + src + " to Bool, convert manually instead");
-    }
-    this := src(0) // We only have one bit in *src*.
   }
 
   def && (b: Bool): Bool = if (b.isTrue) this else if (this.isTrue) b else BinaryBoolOp(this, b, "&&");

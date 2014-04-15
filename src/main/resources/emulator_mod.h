@@ -1783,6 +1783,16 @@ class mod_t {
   virtual int  clock ( dat_t<1> reset ) { };
   virtual void setClocks ( std::vector< int >& periods ) { };
 
+  // Returns a clone of this object's circuit state (both registers and wires).
+  // Currently, it is undefined what happens to other state (like dumpfile and
+  // timestep), so use with care.
+  virtual mod_t* clone() = 0;
+  // Sets this module's circuit state (registers and wires) from the src mod_t.
+  // For mod_t subclasses, src must be the same class.
+  // Returns true on success, and false on failure. Currently, no guarantees
+  // are made about state consistency on failure,
+  virtual bool set_circuit_from(mod_t* src) = 0;
+
   virtual void print ( FILE* f ) { };
   virtual void dump ( FILE* f, int t ) { };
 

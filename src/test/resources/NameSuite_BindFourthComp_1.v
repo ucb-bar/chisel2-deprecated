@@ -4,6 +4,7 @@ module NameSuite_BindFourthComp_1(
 );
 
 
+
   assign io_out = io_in;
 endmodule
 

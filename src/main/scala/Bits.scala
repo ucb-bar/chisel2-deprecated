@@ -49,9 +49,6 @@ object Bits {
 
 /** Base class for built-in Chisel types Bits and SInt. */
 abstract class Bits extends Data with proc {
-  Module.ioMap += ((this, Module.ioCount));
-  Module.ioCount += 1;
-
   var canBeUsedAsDefault = false
   var dir: IODirection = null;
 
@@ -293,11 +290,6 @@ abstract class Bits extends Data with proc {
     }
   }
 
-  override def setIsClkInput {
-    isClkInput = true
-    this assign clk
-  }
-
   override def clone: this.type = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
     res.inferWidth = this.inferWidth
@@ -334,20 +326,9 @@ abstract class Bits extends Data with proc {
   }
 
   /** Assignment operator */
-  override def :=[T <: Data](src: T): Unit = {
-    src match {
-      case b: Bits => {
-        if(comp != null) {
-          comp procAssign src;
-        } else {
-          this procAssign src;
-        }
-      }
-      case any =>
-        ChiselError.error("can't assign " + src.toString + " to Bits")
-    }
+  override protected def colonEquals(that: Bits): Unit = {
+    (if (comp != null) comp else this) procAssign that
   }
-
 
   // bitwise operators
   // =================

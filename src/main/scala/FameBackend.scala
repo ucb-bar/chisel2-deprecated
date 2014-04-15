@@ -364,12 +364,12 @@ object Fame1Transform {
 }
 
 trait Fame1Transform extends Backend {
-  private def collectMems(module: Module): ArrayBuffer[(Module, Mem[Data])] = {
-    val mems = new ArrayBuffer[(Module, Mem[Data])]
+  private def collectMems(module: Module): ArrayBuffer[(Module, Mem[_])] = {
+    val mems = new ArrayBuffer[(Module, Mem[_])]
     //find all the mems in FAME1 modules
     def findMems(module: Module): Unit = {
       if(Fame1Transform.fame1Modules.contains(module)){
-        for(mem <- module.nodes.filter(_.isInstanceOf[Mem[Data]])){
+        for(mem <- module.nodes.filter(_.isInstanceOf[Mem[_]])){
           mems += ((module, mem.asInstanceOf[Mem[Data]]))
         }
       }
@@ -440,7 +440,7 @@ trait Fame1Transform extends Backend {
       val memSeqReads = mem.seqreads ++ mem.readwrites.map(_.read)
       for(memWrite <- memWrites){
         if(mem.seqRead){
-          if(Module.backend.isInstanceOf[CppBackend]){
+          if (Driver.backend.isInstanceOf[CppBackend]){
             if(memWrite.inputs(0).asInstanceOf[Data].comp != null && memWrite.inputs(1).asInstanceOf[Data].comp != null){//huge hack for extra MemWrite generated for seqread mems in CPP backed; if both the cond and enable both happen to be directly from registers, this will fail horribly
               memWrite.inputs(1) = memWrite.inputs(1).asInstanceOf[Bool] && Fame1Transform.fireSignals(module)
             } else {

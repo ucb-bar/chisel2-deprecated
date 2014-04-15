@@ -101,7 +101,7 @@ object Printer {
   the constructor of a sub class of Module which is passed as a parameter.
   That execution tree is simplified by aggregating all calls which are not
   constructors of a Module instance into the parent which is.
-  The simplified tree (encoded through _Module.children_) forms the basis
+  The simplified tree (encoded through _Driver.children_) forms the basis
   of the generated verilog. Each node in the simplified execution tree is
   a _Module_ instance from which a verilog module is textually derived.
   As an optimization, _Backend_ classes output modules which are
@@ -109,144 +109,16 @@ object Printer {
   _moduleName_ accordingly.
 */
 object chiselMain {
-  def readArgs(args: Array[String]) {
-    var i = 0;
-    while (i < args.length) {
-      val arg = args(i);
-      arg match {
-        case "--Wall" => {
-          Module.saveWidthWarnings = true
-          Module.saveConnectionWarnings = true
-          Module.saveComponentTrace = true
-          Module.isCheckingPorts = true
-        }
-        case "--wi" => Module.warnInputs = true
-        case "--wo" => Module.warnOutputs = true
-        case "--wio" => {Module.warnInputs = true; Module.warnOutputs = true}
-        case "--Wwidth" => Module.saveWidthWarnings = true
-        case "--Wconnection" => Module.saveConnectionWarnings = true
-        case "--Wcomponent" => Module.saveComponentTrace = true
-        case "--noCombLoop" => Module.dontFindCombLoop = true
-        case "--genHarness" => Module.isGenHarness = true;
-        case "--debug" => Module.isDebug = true;
-        case "--cse" => Module.isCSE = true
-        case "--ioDebug" => Module.isIoDebug = true;
-        case "--noIoDebug" => Module.isIoDebug = false;
-        case "--clockGatingUpdates" => Module.isClockGatingUpdates = true;
-        case "--clockGatingUpdatesInline" => Module.isClockGatingUpdatesInline = true;
-        case "--vcd" => Module.isVCD = true;
-        case "--v" => Module.backend = new VerilogBackend
-        case "--moduleNamePrefix" => Backend.moduleNamePrefix = args(i + 1); i += 1
-        case "--inlineMem" => Module.isInlineMem = true;
-        case "--noInlineMem" => Module.isInlineMem = false;
-        case "--backend" => {
-          if (args(i + 1) == "v") {
-            Module.backend = new VerilogBackend
-          } else if (args(i + 1) == "c") {
-            Module.backend = new CppBackend
-          } else if (args(i + 1) == "flo") {
-            Module.backend = new FloBackend
-          } else if (args(i + 1) == "dot") {
-            Module.backend = new DotBackend
-          } else if (args(i + 1) == "fpga") {
-            Module.backend = new FPGABackend
-          } else if (args(i + 1) == "counterc") {
-            Module.backend = new CounterCppBackend
-          } else if (args(i + 1) == "counterv") {
-            Module.backend = new CounterVBackend
-          } else if (args(i + 1) == "counterfpga") {
-            Module.backend = new CounterFPGABackend
-          } else if (args(i + 1) == "counterw") {
-            Module.backend = new CounterWBackend
-          } else {
-            Module.backend = Class.forName(args(i + 1)).newInstance.asInstanceOf[Backend]
-          }
-          i += 1
-        }
-        case "--compile" => Module.isCompiling = true
-        case "--test" => Module.isTesting = true;
-        case "--targetDir" => Module.targetDir = args(i + 1); i += 1;
-        case "--include" => Module.includeArgs = Module.splitArg(args(i + 1)); i += 1;
-        case "--checkPorts" => Module.isCheckingPorts = true
-        case "--prune" => Module.isPruning = true
-        // Counter backend flags
-        case "--backannotation" => Module.isBackannotating = true
-        case "--model" => Module.model = args(i + 1) ; i += 1
-        //Jackhammer Flags
-        //case "--jEnable" => Module.jackEnable = true
-        case "--jackDump" => Module.jackDump = args(i+1); i+=1; //mode of dump (i.e. space.prm, design.prm etc)
-        case "--jackDir"  => Module.jackDir = args(i+1); i+=1;  //location of dump or load
-        case "--jackLoad" => Module.jackLoad = args(i+1); i+=1; //design.prm file
-        case "--dumpTestInput" => Module.dumpTestInput = true;
-        case "--testerSeed" => {
-          Module.testerSeedValid = true
-          Module.testerSeed = args(i+1).toInt
-          i += 1
-        }
-        case "--emitTempNodes" => {
-            Module.isDebug = true
-            Module.emitTempNodes = true
-        }
-        //case "--jDesign" =>  Module.jackDesign = args(i+1); i+=1;
-	// Dreamer configuration flags
-	case "--numRows" => {
-          if (Module.backend.isInstanceOf[FloBackend]) {
-	    Module.backend.asInstanceOf[FloBackend].DreamerConfiguration.numRows = args(i+1).toInt
-          }
-          i += 1
-        }
-	case "--numCols" => {
-          if (Module.backend.isInstanceOf[FloBackend]) {
-	    Module.backend.asInstanceOf[FloBackend].DreamerConfiguration.numCols = args(i+1).toInt
-          }
-          i += 1
-        }
-        case any => ChiselError.warning("'" + arg + "' is an unknown argument.");
-      }
-      i += 1;
-    }
-  }
+  def apply[T <: Module](args: Array[String], gen: () => T): T =
+    Driver(args, gen)
 
-  def run[T <: Module] (args: Array[String], gen: () => T): T = apply(args, () => Module(gen())) // hack to avoid supplying default parameters and invoke Module.apply manually for invocation in sbt
+  def apply[T <: Module](args: Array[String], gen: () => T, ftester: T => Tester[T]): T =
+    Driver(args, gen, ftester)
 
-  def apply[T <: Module]
-      (args: Array[String], gen: () => T, ftester: T => Tester[T] = null): T = {
-    Module.initChisel();
-    readArgs(args)
-    try {
-      /* JACK - If loading design, read design.prm file*/
-      if (Module.jackLoad != null) { Jackhammer.load(Module.jackDir, Module.jackLoad) }
-      val c = gen();
-
-      Module.backend.initBackannotation
-
-      /* JACK - If dumping design, dump to jackDir with jackNumber points*/
-      if (Module.jackDump != null) { 
-        Jackhammer.dump(Module.jackDir, Module.jackDump) 
-      } else {
-        Module.backend.elaborate(c)
-      }
-      if (Module.isCheckingPorts) Module.backend.checkPorts(c)
-      if (Module.isCompiling && Module.isGenHarness) Module.backend.compile(c)
-      if (ftester != null && !Module.backend.isInstanceOf[VerilogBackend]) {
-        var res = false
-        var tester: Tester[T] = null
-        try {
-          tester = ftester(c)
-        } finally {
-          if (tester != null && tester.process != null) 
-            res = tester.finish()
-        }
-        println(if (res) "PASSED" else "*** FAILED ***")
-        if(!res) throwException("Module under test FAILED at least one test vector.")
-      }
-      c
-    } finally {
-      ChiselError.report()
-    }
-  }
+  // hack to avoid calling Driver.apply from within sbt
+  def run[T <: Module] (args: Array[String], gen: () => T): T =
+    apply(args, () => Module(gen()))
 }
-
 
 class ChiselException(message: String, cause: Throwable) extends Exception(message, cause)
 
@@ -289,7 +161,7 @@ trait proc extends Node {
       ChiselError.error({"NO UPDATES ON " + this}, this.line)
   }
   def procAssign(src: Node): Unit
-  Module.procs += this;
+  Driver.procs += this
 }
 
 trait nameable {
@@ -301,7 +173,7 @@ trait nameable {
 }
 
 abstract class BlackBox extends Module {
-  Module.blackboxes += this
+  Driver.blackboxes += this
 
   def setVerilogParameters(string: String) {
     this.asInstanceOf[Module].verilog_parameters = string;

@@ -6,6 +6,7 @@ module NameSuite_BlockDecoder_1(
 );
 
 
+
   assign io_replay = io_valid;
 endmodule
 
@@ -22,6 +23,7 @@ module NameSuite_BindFirstComp_1(
   wire T3;
   wire mask_cmdq_ready;
   wire dec_io_sigs_enq_cmdq;
+
 
   assign io_replay = T0;
   assign T0 = io_valid && T1;
