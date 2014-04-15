@@ -49,9 +49,7 @@ object Driver {
   def apply[T <: Module](args: Array[String], gen: () => T,
                          ftester: T => Tester[T]): T = {
     val mod = apply(args, gen)
-    // not allow testers for VerilogBackend
-    if (!Driver.backend.isInstanceOf[VerilogBackend])
-      test(mod, ftester)
+    if (Driver.isTesting) test(mod, ftester)
     mod
   }
 
