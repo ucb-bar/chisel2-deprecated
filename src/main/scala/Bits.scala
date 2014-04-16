@@ -98,8 +98,9 @@ abstract class Bits extends Data with proc {
   }
   override def assign(src: Node): Unit = {
     checkAssign(src)
+    if (Module.current.hasWhenCond) ChiselError.error({"cannot conditionally assign to Wire " + this + " RHS: " + src});
     if (inputs.isEmpty) inputs += src
-    else ChiselError.error({"reassignment to Wire " + this + " with inputs " + this.inputs(0) + " RHS: " + src});
+    else inputs.update(0, src)
   }
 
   override def procAssign(src: Node): Unit = {
