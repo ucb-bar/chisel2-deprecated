@@ -73,11 +73,11 @@ object LFSR16
   */
 object PopCount
 {
-  def apply(in: Seq[Bool]): UInt = {
+  def apply(in: Iterable[Bool]): UInt = {
     if (in.size == 0) {
       UInt(0)
     } else if (in.size == 1) {
-      in(0)
+      in.head
     } else {
       apply(in.slice(0, in.size/2)) + Cat(UInt(0), apply(in.slice(in.size/2, in.size)))
     }
