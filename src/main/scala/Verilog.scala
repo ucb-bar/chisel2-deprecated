@@ -423,8 +423,6 @@ class VerilogBackend extends Backend {
     harness.write("  integer offset;\n")
     harness.write("  integer steps;\n")
     harness.write("  reg isStep = 0;\n")
-    harness.write("  wire #10 isStep_delay = isStep;\n")
-    harness.write("  wire #10 clk_delay = clk && isStep;\n")
     
     harness.write("  initial begin\n")
     harness.write("    reset = 1;\n")
@@ -453,9 +451,18 @@ class VerilogBackend extends Backend {
     harness.write("\n")
     harness.write(" );\n")
 
-    val (mems, wires) = ((Driver.components foldLeft List[Node]()) { (x, y) =>
-      x ++ (y.nodes filter { z => (z.name != "reset") && (z.isInObject || z.isInVCD) })
-    }) span (_.isInstanceOf[Mem[_]])
+    val mems = new ArrayBuffer[Node]
+    val wires = new ArrayBuffer[Node]
+
+    for (m <- Driver.components ; mod <- m.mods ; 
+       if mod.isInObject || mod.isInVCD) {
+       mod match {
+         case bool: Bool if c.resets contains bool =>
+         case _: ROMData =>
+         case _: Mem[_] => mems += mod
+         case _ => wires += mod
+       }
+    }
 
     for (wire <- wires) {
       harness.write("  reg [%d:0] %s_shadow = 0;\n".format(wire.width-1, emitRef(wire)))
@@ -561,7 +568,8 @@ class VerilogBackend extends Backend {
     harness.write("  always @(posedge clk) begin\n")
     harness.write("    if (isStep) begin\n")
     for (wire <- wires) {
-      val wireName = if ((scanNodes ++ printNodes) contains wire) emitRef(wire) else wire.chiselName
+      val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
+      val wireName = if ((scanNodes ++ printNodes) contains wire) emitRef(wire) else pathName
       harness.write("      %s_shadow = %s;\n".format(emitRef(wire), wireName))
     }
     harness.write("    end\n")
