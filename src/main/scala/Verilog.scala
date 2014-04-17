@@ -405,16 +405,27 @@ class VerilogBackend extends Backend {
     val harness  = createOutputFile(name + "-harness.v");
     val printNodes = for ((n, io) <- c.io.flatten ; if io.dir == OUTPUT) yield io
     val scanNodes = for ((n, io) <- c.io.flatten ; if io.dir == INPUT) yield io
-    val printFormat = printNodes.map(a => "0x%x").fold("")((y,z) => z + " " + y)
-    val scanFormat = scanNodes.map(a => "%x").fold("")((y,z) => z + " " + y)
+    // val printFormat = printNodes.map(a => "0x%x").fold("")((y,z) => z + " " + y)
+    // val scanFormat = scanNodes.map(a => "%x").fold("")((y,z) => z + " " + y)
     harness.write("module test;\n")
-    for (node <- scanNodes)
-      harness.write("    reg [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
-    for (node <- printNodes)
-      harness.write("     wire [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
-
+    for (node <- scanNodes) {
+      harness.write("  reg [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
+    }
+    for (node <- printNodes) {
+      harness.write("  wire [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
+    }
     harness.write("  reg clk = 0;\n")
     harness.write("  reg reset = 1;\n\n")
+
+    harness.write("  reg[20*8:0] cmd;\n")
+    harness.write("  reg[1000*8:0] node;\n")
+    harness.write("  integer value;\n")
+    harness.write("  integer offset;\n")
+    harness.write("  integer steps;\n")
+    harness.write("  reg isStep = 0;\n")
+    harness.write("  wire #10 isStep_delay = isStep;\n")
+    harness.write("  wire #10 clk_delay = clk && isStep;\n")
+    
     harness.write("  initial begin\n")
     harness.write("    reset = 1;\n")
     harness.write("    #250 reset = 0;\n")
@@ -425,10 +436,10 @@ class VerilogBackend extends Backend {
     harness.write("    " + c.moduleName + "\n")
     harness.write("      " + c.moduleName + "(\n")
 
-    if(!c.clocks.isEmpty) harness.write("        .clk(clk),\n")
+    if(!c.clocks.isEmpty) harness.write("        .clk(clk && isStep),\n")
     if(!c.resets.isEmpty) harness.write("        .reset(reset),\n")
     
-
+    // DUT instantiation
     var first = true
     for (node <- (scanNodes ++ printNodes))
       if(node.isIo && node.component == c) {
@@ -442,40 +453,121 @@ class VerilogBackend extends Backend {
     harness.write("\n")
     harness.write(" );\n")
 
-    harness.write("  integer count;\n")
-    harness.write("  always @(negedge clk) begin\n")
-    harness.write("  #50;\n")
-    harness.write("    if (!reset) ")
-    harness.write("count = $fscanf('h80000000, \"" + scanFormat.slice(0,scanFormat.length-1) + "\"")
-    for (node <- scanNodes)
-      harness.write(", " + emitRef(node))
-    harness.write(");\n")
-    harness.write("      if (count == -1) $finish(1);\n")
-    harness.write("  end\n")
-    harness.write("  always @(posedge clk) begin\n")
-    harness.write("    if (!reset) ")
-    harness.write("$display(\"" + printFormat.slice(0,printFormat.length-1) + "\"")
+    val (mems, wires) = ((Driver.components foldLeft List[Node]()) { (x, y) =>
+      x ++ (y.nodes filter { z => (z.name != "reset") && (z.isInObject || z.isInVCD) })
+    }) span (_.isInstanceOf[Mem[_]])
 
-    for (node <- printNodes) {
-
-      if(node.isIo && node.component == c) {
-        harness.write(", " + emitRef(node))
-      } else {
-        var nextComp = node.component
-        var path = "."
-        while(nextComp != c) {
-          /* XXX This code is most likely never executed otherwise
-                 it would end in an infinite loop. */
-          path = "." + nextComp.name + path
-        }
-        path = c.name + path + emitRef(node)
-        harness.write(", " + path)
-      }
-
+    for (wire <- wires) {
+      harness.write("  reg [%d:0] %s_shadow = 0;\n".format(wire.width-1, emitRef(wire)))
     }
-    harness.write(");\n")
+
+    harness.write("  integer count;\n")
+
+    def fscanf(form: String, args: String*) =
+      "count = $fscanf('h80000000, \"%s\", %s);\n".format(form, (args.tail foldLeft args.head) (_ + ", " + _))
+    def display(form: String, args: String*) =
+      "$display(\"%s\", %s);\n".format(form, (args.tail foldLeft args.head) (_ + ", " + _)) 
+
+    harness.write("  always @(negedge clk) begin\n")
+    harness.write("  #50\n")
+    harness.write("  if (!reset && !isStep) begin\n")
+    harness.write("    "+ fscanf("%s", "cmd"))
+    harness.write("    case (cmd)\n")
+    harness.write("      \"reset\": begin\n")
+    harness.write("        " + fscanf("%d", "steps"))
+    harness.write("        reset = 1;\n")
+    harness.write("        isStep = 1;\n")
+    harness.write("        " + display("%1d", "steps")) 
+    harness.write("      end\n")
+    harness.write("      \"wire_peek\": begin\n")
+    harness.write("        " + fscanf("%s", "node")) 
+    harness.write("        case (node)\n")
+    if (!wires.isEmpty) {
+      for (wire <- wires) {
+        val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
+        val wireName = if (printNodes contains wire) emitRef(wire) else pathName
+        harness.write("          \"%s\": ".format(wire.chiselName) + 
+          display("0x%1x", emitRef(wire) + "_shadow")
+        )
+      }
+    }
+    harness.write("          default: " + display("%s", "\"error\""))
+    harness.write("        endcase\n")
+    harness.write("      end\n")
+    harness.write("      \"mem_peek\": begin\n")
+    harness.write("        " + fscanf("%s %d", "node", "offset"))
+    harness.write("        case (node)\n")
+    if (!mems.isEmpty) {
+      for (mem <- mems) {
+        val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
+        harness.write("          \"%s\": ".format(mem.chiselName) + 
+          display("0x%1x", "%s[%s]".format(pathName, "offset"))
+        )
+      }
+    }
+    harness.write("          default: " + display("%s", "\"error\""))
+    harness.write("        endcase\n")
+    harness.write("      end\n")
+    harness.write("      \"wire_poke\": begin\n")
+    harness.write("        " + fscanf("%s 0x%x", "node", "value"))
+    harness.write("        case (node)\n")
+    if (!wires.isEmpty) {
+      for (wire <- wires ; if wire.isReg || (scanNodes contains wire)) {
+        val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
+        val wireName = if (scanNodes contains wire) emitRef(wire) else pathName
+        harness.write("          \"%s\": begin\n".format(wire.chiselName))
+        harness.write("            %s = %s;\n".format(wireName, "value"))
+        harness.write("            " + display("%s", "\"ok\""))
+        harness.write("          end\n")
+      }
+    }
+    harness.write("          default: " + display("%s", "\"error\""))
+    harness.write("        endcase\n")
+    harness.write("      end\n")
+    harness.write("      \"mem_poke\": begin\n")
+    harness.write("        " + fscanf("%s %d 0x%x", "node", "offset", "value")) 
+    if (!mems.isEmpty) {
+      harness.write("        case (node)\n")
+      for (mem <- mems) {
+        val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
+        harness.write("          \"%s\": begin\n".format(mem.chiselName))
+        harness.write("            %s[%s] = %s;\n".format(pathName, "offset", "value"))
+        harness.write("            " + display("%s", "\"ok\""))
+        harness.write("          end\n")
+      }
+      harness.write("          default: " + display("%s", "\"error\""))
+      harness.write("        endcase\n")
+    }
+    harness.write("      end\n")
+    harness.write("      \"step\": begin\n")
+    harness.write("        " + fscanf("%d", "steps"))
+    harness.write("        isStep = 1;\n")
+    harness.write("        " + display("%1d", "steps"))
+    harness.write("      end\n")
+    harness.write("      \"quit\": $finish;\n")
+    // harness.write("      default: " + display("%s", "\"error\""))
+    harness.write("    endcase\n")
+    harness.write("    end\n\n")
+    harness.write("    if (steps > 0) begin \n")
+    harness.write("      steps = steps - 1;\n")
+    harness.write("    end else begin \n")
+    harness.write("      isStep = 0;\n")
+    harness.write("      reset = 0;\n")
+    harness.write("    end\n")
+
+    harness.write("    if (count == -1) $finish(1);\n")
+    harness.write("  end\n")
+
+    harness.write("  always @(posedge clk) begin\n")
+    harness.write("    if (isStep) begin\n")
+    for (wire <- wires) {
+      val wireName = if ((scanNodes ++ printNodes) contains wire) emitRef(wire) else wire.chiselName
+      harness.write("      %s_shadow = %s;\n".format(emitRef(wire), wireName))
+    }
+    harness.write("    end\n")
     harness.write("  end\n")
     harness.write("endmodule\n")
+
     harness.close();
   }
 
