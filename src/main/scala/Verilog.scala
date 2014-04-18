@@ -488,6 +488,12 @@ class VerilogBackend extends Backend {
       shadowNames(wire) = shadowName
       harness.write("  reg [%d:0] %s = 0;\n".format(wire.width-1, shadowName))
     }
+    for (mem <- mems) {
+      val shadowName = mem.component.getPathName("_") + "_" + emitRef(mem) + "_shadow"
+      shadowNames(mem) = shadowName
+      harness.write("  reg [%d:0] %s [%d:0];\n".format(mem.width-1, shadowName, mem.n-1))
+    }
+
 
     harness.write("  integer count;\n")
 
@@ -592,6 +598,12 @@ class VerilogBackend extends Backend {
       val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
       val wireName = if (printNodes contains wire) emitRef(wire) else pathName
       harness.write("      %s = %s;\n".format(shadowNames(wire), wireName))
+    }
+    for (mem <- mems) {
+      val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
+      for (i <- 0 until mem.n) {
+        harness.write("      %s[%d] = %s[%d];\n".format(shadowNames(mem), i, pathName, i))
+      }
     }
     harness.write("    end\n")
     harness.write("  end\n")
