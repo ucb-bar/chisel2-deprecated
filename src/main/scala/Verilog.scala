@@ -646,7 +646,7 @@ class VerilogBackend extends Backend {
     apis.append("      steps = steps - 1;\n")
     apis.append("    end\n")
     apis.append("    // stall the target when step counts is zero\n")
-    apis.append("    else begin \n")
+    apis.append("    else if (isStep) begin \n")
     apis.append("      isStep = 0;\n")
     apis.append("      reset = 0;\n")
     apis.append("    end\n")
