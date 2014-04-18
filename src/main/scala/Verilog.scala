@@ -416,11 +416,12 @@ class VerilogBackend extends Backend {
     harness.write("  reg clk = 0;\n")
     harness.write("  reg reset = 1;\n\n")
 
-    harness.write("  reg[20*8:0] cmd;\n")
-    harness.write("  reg[1000*8:0] node;\n")
-    harness.write("  integer value;\n")
-    harness.write("  integer offset;\n")
-    harness.write("  integer steps;\n")
+    harness.write("  /*** API variables ***/\n")
+    harness.write("  reg[20*8:0] cmd;    // API command\n")    
+    harness.write("  reg[1000*8:0] node; // Chisel node name;\n") 
+    harness.write("  integer value;      // 'poked' value\n")      
+    harness.write("  integer offset;     // mem's offset\n")
+    harness.write("  integer steps;      // number of steps\n")
     harness.write("  reg isStep = 0;\n")
     
     harness.write("  initial begin\n")
@@ -430,13 +431,11 @@ class VerilogBackend extends Backend {
 
     harness.write("  always #100 clk = ~clk;\n")
 
+    harness.write("  /*** DUT instantiation ***/\n")
     harness.write("    " + c.moduleName + "\n")
     harness.write("      " + c.moduleName + "(\n")
-
     if(!c.clocks.isEmpty) harness.write("        .clk(clk && isStep),\n")
     if(!c.resets.isEmpty) harness.write("        .reset(reset),\n")
-    
-    // DUT instantiation
     var first = true
     for (node <- (scanNodes ++ printNodes))
       if(node.isIo && node.component == c) {
@@ -464,7 +463,7 @@ class VerilogBackend extends Backend {
        }
     }
 
-    // ROM & Mem initialization
+    harness.write("  /*** ROM & Mem initialization ***/\n")
     harness.write("  integer i = 0;\n")
     harness.write("  initial begin\n")
     harness.write("  #50;\n")
@@ -482,20 +481,22 @@ class VerilogBackend extends Backend {
     }
     harness.write("  end\n\n")
 
+    harness.write("  /*** Shadow declaration for 'peeking' ***/\n")
     val shadowNames = new HashMap[Node, String]
+    harness.write("  // wire shadows\n")
     for (wire <- wires) {
       val shadowName = wire.component.getPathName("_") + "_" + emitRef(wire) + "_shadow"
       shadowNames(wire) = shadowName
       harness.write("  reg [%d:0] %s = 0;\n".format(wire.width-1, shadowName))
     }
+    harness.write("  // mem shadows\n")
     for (mem <- mems) {
       val shadowName = mem.component.getPathName("_") + "_" + emitRef(mem) + "_shadow"
       shadowNames(mem) = shadowName
       harness.write("  reg [%d:0] %s [%d:0];\n".format(mem.width-1, shadowName, mem.n-1))
     }
 
-
-    harness.write("  integer count;\n")
+    harness.write("\n  integer count;\n")
 
     def fscanf(form: String, args: String*) =
       "count = $fscanf('h80000000, \"%s\", %s);\n".format(form, (args.tail foldLeft args.head) (_ + ", " + _))
@@ -503,16 +504,26 @@ class VerilogBackend extends Backend {
       "$display(\"%s\", %s);\n".format(form, (args.tail foldLeft args.head) (_ + ", " + _)) 
 
     harness.write("  always @(negedge clk) begin\n")
-    harness.write("  #50\n")
+    harness.write("  /*** API interpreter ***/\n")
+    harness.write("  // process API command at every clock's negedge\n")
+    harness.write("  // when the target is stalled\n")
     harness.write("  if (!reset && !isStep) begin\n")
     harness.write("    "+ fscanf("%s", "cmd"))
     harness.write("    case (cmd)\n")
+
+    harness.write("      // < reset >\n")
+    harness.write("      // inputs: # cycles the reset consumes\n")
+    harness.write("      // return: none\n")
     harness.write("      \"reset\": begin\n")
     harness.write("        " + fscanf("%d", "steps"))
     harness.write("        reset = 1;\n")
     harness.write("        isStep = 1;\n")
     harness.write("        " + display("%1d", "steps")) 
     harness.write("      end\n")
+
+    harness.write("      // < wire_peek >\n")
+    harness.write("      // inputs: wire's name\n")
+    harness.write("      // return: wire's value from its shadow\n")
     harness.write("      \"wire_peek\": begin\n")
     harness.write("        " + fscanf("%s", "node")) 
     harness.write("        case (node)\n")
@@ -528,6 +539,10 @@ class VerilogBackend extends Backend {
     harness.write("          default: " + display("%s", "\"error\""))
     harness.write("        endcase\n")
     harness.write("      end\n")
+
+    harness.write("      // < mem_peek >\n")
+    harness.write("      // inputs: mem's name\n")
+    harness.write("      // return: mem's value from its shadow\n")
     harness.write("      \"mem_peek\": begin\n")
     harness.write("        " + fscanf("%s %d", "node", "offset"))
     harness.write("        case (node)\n")
@@ -542,6 +557,10 @@ class VerilogBackend extends Backend {
     harness.write("          default: " + display("%s", "\"error\""))
     harness.write("        endcase\n")
     harness.write("      end\n")
+
+    harness.write("      // < wire_poke >\n")
+    harness.write("      // inputs: wire's name\n")
+    harness.write("      // return: \"ok\" or \"error\"\n")
     harness.write("      \"wire_poke\": begin\n")
     harness.write("        " + fscanf("%s 0x%x", "node", "value"))
     harness.write("        case (node)\n")
@@ -558,6 +577,10 @@ class VerilogBackend extends Backend {
     harness.write("          default: " + display("%s", "\"error\""))
     harness.write("        endcase\n")
     harness.write("      end\n")
+
+    harness.write("      // < mem_poke >\n")
+    harness.write("      // inputs: wire's name\n")
+    harness.write("      // return: \"ok\" or \"error\"\n")
     harness.write("      \"mem_poke\": begin\n")
     harness.write("        " + fscanf("%s %d 0x%x", "node", "offset", "value")) 
     if (!mems.isEmpty) {
@@ -573,26 +596,38 @@ class VerilogBackend extends Backend {
       harness.write("        endcase\n")
     }
     harness.write("      end\n")
+
+    harness.write("      // < step > \n")
+    harness.write("      // inputs: # cycles\n")
+    harness.write("      // return: # cycles the target will proceed\n") 
     harness.write("      \"step\": begin\n")
     harness.write("        " + fscanf("%d", "steps"))
     harness.write("        isStep = 1;\n")
     harness.write("        " + display("%1d", "steps"))
     harness.write("      end\n")
+
+    harness.write("      // < quit>: finish simulation\n")
     harness.write("      \"quit\": $finish;\n")
-    // harness.write("      default: " + display("%s", "\"error\""))
+    harness.write("      // default return: \"error\"\n")
+    harness.write("      default: " + display("%s", "\"error\""))
     harness.write("    endcase\n")
     harness.write("    end\n\n")
+
+    harness.write("    // decrement step counts\n")
     harness.write("    if (steps > 0) begin \n")
     harness.write("      steps = steps - 1;\n")
-    harness.write("    end else begin \n")
+    harness.write("    end\n")
+    harness.write("    // stall the target when step counts is zero\n")
+    harness.write("    else begin \n")
     harness.write("      isStep = 0;\n")
     harness.write("      reset = 0;\n")
     harness.write("    end\n")
 
     harness.write("    if (count == -1) $finish(1);\n")
-    harness.write("  end\n")
+    harness.write("  end\n\n")
 
     harness.write("  always @(posedge clk) begin\n")
+    harness.write("     // copy wires' & mems' value into shadows for 'peeking'\n")
     harness.write("    if (isStep) begin\n")
     for (wire <- wires) {
       val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
