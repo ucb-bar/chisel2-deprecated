@@ -499,170 +499,179 @@ class VerilogBackend extends Backend {
     }
     harness.write("  end\n\n")
 
-    harness.write("  /*** Shadow declaration for 'peeking' ***/\n")
+    if (Driver.isTesting) harness write harnessAPIs(wires, mems, scanNodes, printNodes)
+    harness.write("endmodule\n")
+
+    harness.close();
+  }
+
+  def harnessAPIs (wires: ArrayBuffer[Node], mems: ArrayBuffer[Mem[_]], 
+                   scanNodes: Array[Bits], printNodes: Array[Bits]) = {
+    val apis = new StringBuilder
+
+    apis.append("  /*** Shadow declaration for 'peeking' ***/\n")
     val shadowNames = new HashMap[Node, String]
-    harness.write("  // wire shadows\n")
+    apis.append("  // wire shadows\n")
     for (wire <- wires) {
       val shadowName = wire.component.getPathName("_") + "_" + emitRef(wire) + "_shadow"
       shadowNames(wire) = shadowName
-      harness.write("  reg [%d:0] %s = 0;\n".format(wire.width-1, shadowName))
+      apis.append("  reg [%d:0] %s = 0;\n".format(wire.width-1, shadowName))
     }
-    harness.write("  // mem shadows\n")
+    apis.append("  // mem shadows\n")
     for (mem <- mems) {
       val shadowName = mem.component.getPathName("_") + "_" + emitRef(mem) + "_shadow"
       shadowNames(mem) = shadowName
-      harness.write("  reg [%d:0] %s [%d:0];\n".format(mem.width-1, shadowName, mem.n-1))
+      apis.append("  reg [%d:0] %s [%d:0];\n".format(mem.width-1, shadowName, mem.n-1))
     }
 
-    harness.write("\n  integer count;\n")
+    apis.append("\n  integer count;\n")
 
     def fscanf(form: String, args: String*) =
       "count = $fscanf('h80000000, \"%s\", %s);\n".format(form, (args.tail foldLeft args.head) (_ + ", " + _))
     def display(form: String, args: String*) =
       "$display(\"%s\", %s);\n".format(form, (args.tail foldLeft args.head) (_ + ", " + _)) 
 
-    harness.write("  always @(negedge clk) begin\n")
-    harness.write("  /*** API interpreter ***/\n")
-    harness.write("  // process API command at every clock's negedge\n")
-    harness.write("  // when the target is stalled\n")
-    harness.write("  if (!reset && !isStep) begin\n")
-    harness.write("    "+ fscanf("%s", "cmd"))
-    harness.write("    case (cmd)\n")
+    apis.append("  always @(negedge clk) begin\n")
+    apis.append("  /*** API interpreter ***/\n")
+    apis.append("  // process API command at every clock's negedge\n")
+    apis.append("  // when the target is stalled\n")
+    apis.append("  if (!reset && !isStep) begin\n")
+    apis.append("    "+ fscanf("%s", "cmd"))
+    apis.append("    case (cmd)\n")
 
-    harness.write("      // < reset >\n")
-    harness.write("      // inputs: # cycles the reset consumes\n")
-    harness.write("      // return: none\n")
-    harness.write("      \"reset\": begin\n")
-    harness.write("        " + fscanf("%d", "steps"))
-    harness.write("        reset = 1;\n")
-    harness.write("        isStep = 1;\n")
-    harness.write("        " + display("%1d", "steps")) 
-    harness.write("      end\n")
+    apis.append("      // < reset >\n")
+    apis.append("      // inputs: # cycles the reset consumes\n")
+    apis.append("      // return: none\n")
+    apis.append("      \"reset\": begin\n")
+    apis.append("        " + fscanf("%d", "steps"))
+    apis.append("        reset = 1;\n")
+    apis.append("        isStep = 1;\n")
+    apis.append("        " + display("%1d", "steps")) 
+    apis.append("      end\n")
 
-    harness.write("      // < wire_peek >\n")
-    harness.write("      // inputs: wire's name\n")
-    harness.write("      // return: wire's value from its shadow\n")
-    harness.write("      \"wire_peek\": begin\n")
-    harness.write("        " + fscanf("%s", "node")) 
-    harness.write("        case (node)\n")
+    apis.append("      // < wire_peek >\n")
+    apis.append("      // inputs: wire's name\n")
+    apis.append("      // return: wire's value from its shadow\n")
+    apis.append("      \"wire_peek\": begin\n")
+    apis.append("        " + fscanf("%s", "node")) 
+    apis.append("        case (node)\n")
     if (!wires.isEmpty) {
       for (wire <- wires) {
         val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
         val wireName = if (shadowNames contains wire) shadowNames(wire) else pathName
-        harness.write("          \"%s\": ".format(pathName) + 
+        apis.append("          \"%s\": ".format(pathName) + 
           display("0x%1x", shadowNames(wire))
         )
       }
     }
-    harness.write("          default: " + display("%s", "\"error\""))
-    harness.write("        endcase\n")
-    harness.write("      end\n")
+    apis.append("          default: " + display("%s", "\"error\""))
+    apis.append("        endcase\n")
+    apis.append("      end\n")
 
-    harness.write("      // < mem_peek >\n")
-    harness.write("      // inputs: mem's name\n")
-    harness.write("      // return: mem's value from its shadow\n")
-    harness.write("      \"mem_peek\": begin\n")
-    harness.write("        " + fscanf("%s %d", "node", "offset"))
-    harness.write("        case (node)\n")
+    apis.append("      // < mem_peek >\n")
+    apis.append("      // inputs: mem's name\n")
+    apis.append("      // return: mem's value from its shadow\n")
+    apis.append("      \"mem_peek\": begin\n")
+    apis.append("        " + fscanf("%s %d", "node", "offset"))
+    apis.append("        case (node)\n")
     if (!mems.isEmpty) {
       for (mem <- mems) {
         val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
-        harness.write("          \"%s\": ".format(pathName) + 
+        apis.append("          \"%s\": ".format(pathName) + 
           display("0x%1x", "%s[%s]".format(pathName, "offset"))
         )
       }
     }
-    harness.write("          default: " + display("%s", "\"error\""))
-    harness.write("        endcase\n")
-    harness.write("      end\n")
+    apis.append("          default: " + display("%s", "\"error\""))
+    apis.append("        endcase\n")
+    apis.append("      end\n")
 
-    harness.write("      // < wire_poke >\n")
-    harness.write("      // inputs: wire's name\n")
-    harness.write("      // return: \"ok\" or \"error\"\n")
-    harness.write("      \"wire_poke\": begin\n")
-    harness.write("        " + fscanf("%s 0x%x", "node", "value"))
-    harness.write("        case (node)\n")
+    apis.append("      // < wire_poke >\n")
+    apis.append("      // inputs: wire's name\n")
+    apis.append("      // return: \"ok\" or \"error\"\n")
+    apis.append("      \"wire_poke\": begin\n")
+    apis.append("        " + fscanf("%s 0x%x", "node", "value"))
+    apis.append("        case (node)\n")
     if (!wires.isEmpty) {
       for (wire <- wires ; if wire.isReg || (scanNodes contains wire)) {
         val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
         val wireName = if (scanNodes contains wire) emitRef(wire) else pathName
-        harness.write("          \"%s\": begin\n".format(pathName))
-        harness.write("            %s = %s;\n".format(wireName, "value"))
-        harness.write("            " + display("%s", "\"ok\""))
-        harness.write("          end\n")
+        apis.append("          \"%s\": begin\n".format(pathName))
+        apis.append("            %s = %s;\n".format(wireName, "value"))
+        apis.append("            " + display("%s", "\"ok\""))
+        apis.append("          end\n")
       }
     }
-    harness.write("          default: " + display("%s", "\"error\""))
-    harness.write("        endcase\n")
-    harness.write("      end\n")
+    apis.append("          default: " + display("%s", "\"error\""))
+    apis.append("        endcase\n")
+    apis.append("      end\n")
 
-    harness.write("      // < mem_poke >\n")
-    harness.write("      // inputs: wire's name\n")
-    harness.write("      // return: \"ok\" or \"error\"\n")
-    harness.write("      \"mem_poke\": begin\n")
-    harness.write("        " + fscanf("%s %d 0x%x", "node", "offset", "value")) 
+    apis.append("      // < mem_poke >\n")
+    apis.append("      // inputs: wire's name\n")
+    apis.append("      // return: \"ok\" or \"error\"\n")
+    apis.append("      \"mem_poke\": begin\n")
+    apis.append("        " + fscanf("%s %d 0x%x", "node", "offset", "value")) 
     if (!mems.isEmpty) {
-      harness.write("        case (node)\n")
+      apis.append("        case (node)\n")
       for (mem <- mems) {
         val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
-        harness.write("          \"%s\": begin\n".format(pathName))
-        harness.write("            %s[%s] = %s;\n".format(pathName, "offset", "value"))
-        harness.write("            " + display("%s", "\"ok\""))
-        harness.write("          end\n")
+        apis.append("          \"%s\": begin\n".format(pathName))
+        apis.append("            %s[%s] = %s;\n".format(pathName, "offset", "value"))
+        apis.append("            " + display("%s", "\"ok\""))
+        apis.append("          end\n")
       }
-      harness.write("          default: " + display("%s", "\"error\""))
-      harness.write("        endcase\n")
+      apis.append("          default: " + display("%s", "\"error\""))
+      apis.append("        endcase\n")
     }
-    harness.write("      end\n")
+    apis.append("      end\n")
 
-    harness.write("      // < step > \n")
-    harness.write("      // inputs: # cycles\n")
-    harness.write("      // return: # cycles the target will proceed\n") 
-    harness.write("      \"step\": begin\n")
-    harness.write("        " + fscanf("%d", "steps"))
-    harness.write("        isStep = 1;\n")
-    harness.write("        " + display("%1d", "steps"))
-    harness.write("      end\n")
+    apis.append("      // < step > \n")
+    apis.append("      // inputs: # cycles\n")
+    apis.append("      // return: # cycles the target will proceed\n") 
+    apis.append("      \"step\": begin\n")
+    apis.append("        " + fscanf("%d", "steps"))
+    apis.append("        isStep = 1;\n")
+    apis.append("        " + display("%1d", "steps"))
+    apis.append("      end\n")
 
-    harness.write("      // < quit>: finish simulation\n")
-    harness.write("      \"quit\": $finish;\n")
-    harness.write("      // default return: \"error\"\n")
-    harness.write("      default: " + display("%s", "\"error\""))
-    harness.write("    endcase\n")
-    harness.write("    end\n\n")
+    apis.append("      // < quit>: finish simulation\n")
+    apis.append("      \"quit\": $finish;\n")
+    apis.append("      // default return: \"error\"\n")
+    apis.append("      default: " + display("%s", "\"error\""))
+    apis.append("    endcase\n")
+    apis.append("    end\n\n")
 
-    harness.write("    // decrement step counts\n")
-    harness.write("    if (steps > 0) begin \n")
-    harness.write("      steps = steps - 1;\n")
-    harness.write("    end\n")
-    harness.write("    // stall the target when step counts is zero\n")
-    harness.write("    else begin \n")
-    harness.write("      isStep = 0;\n")
-    harness.write("      reset = 0;\n")
-    harness.write("    end\n")
+    apis.append("    // decrement step counts\n")
+    apis.append("    if (steps > 0) begin \n")
+    apis.append("      steps = steps - 1;\n")
+    apis.append("    end\n")
+    apis.append("    // stall the target when step counts is zero\n")
+    apis.append("    else begin \n")
+    apis.append("      isStep = 0;\n")
+    apis.append("      reset = 0;\n")
+    apis.append("    end\n")
 
-    harness.write("    if (count == -1) $finish(1);\n")
-    harness.write("  end\n\n")
+    apis.append("    if (count == -1) $finish(1);\n")
+    apis.append("  end\n\n")
 
-    harness.write("  always @(posedge clk) begin\n")
-    harness.write("     // copy wires' & mems' value into shadows for 'peeking'\n")
-    harness.write("    if (isStep) begin\n")
+    apis.append("  always @(posedge clk) begin\n")
+    apis.append("     // copy wires' & mems' value into shadows for 'peeking'\n")
+    apis.append("    if (isStep) begin\n")
     for (wire <- wires) {
       val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
       val wireName = if (printNodes contains wire) emitRef(wire) else pathName
-      harness.write("      %s = %s;\n".format(shadowNames(wire), wireName))
+      apis.append("      %s = %s;\n".format(shadowNames(wire), wireName))
     }
     for (mem <- mems) {
       val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
       for (i <- 0 until mem.n) {
-        harness.write("      %s[%d] = %s[%d];\n".format(shadowNames(mem), i, pathName, i))
+        apis.append("      %s[%d] = %s[%d];\n".format(shadowNames(mem), i, pathName, i))
       }
     }
-    harness.write("    end\n")
-    harness.write("  end\n")
-    harness.write("endmodule\n")
-
-    harness.close();
+    apis.append("    end\n")
+    apis.append("  end\n")
+    
+    apis.result
   }
 
   def emitDefs(c: Module): StringBuilder = {
