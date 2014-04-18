@@ -406,7 +406,8 @@ class VerilogBackend extends Backend {
     val harness  = createOutputFile(name + "-harness.v");
     val printNodes = for ((n, io) <- c.io.flatten ; if io.dir == OUTPUT) yield io
     val scanNodes = for ((n, io) <- c.io.flatten ; if io.dir == INPUT) yield io
-    val clocks = c.clocks
+    val clocks = LinkedHashSet(Driver.implicitClock)
+    clocks ++= c.clocks
     val (_, resets: ArrayBuffer[Bool]) = c.resets.unzip
 
     harness.write("module test;\n")
@@ -416,8 +417,13 @@ class VerilogBackend extends Backend {
     for (node <- printNodes) {
       harness.write("  wire [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
     }
-    for (clk <- clocks)
+    for (clk <- clocks) {
+      val clkLength = 
+        if (clk == Driver.implicitClock) "100" else 
+        Driver.implicitClock.name + "_length" + clk.initStr
       harness.write("  reg %s = 0;\n".format(clk.name))
+      harness.write("  parameter %s_length = %s;\n".format(clk.name, clkLength))
+    }
     for (rst <- resets)
       harness.write("  reg %s = 1;\n".format(rst.name))
 
@@ -455,12 +461,14 @@ class VerilogBackend extends Backend {
     }
     harness.write("  end\n\n")
 
-    harness.write("  always #100 clk = ~clk;\n")
+    for (clk <- clocks)
+      harness.write("  always #%s_length %s = ~%s;\n".format(clk.name, clk.name, clk.name))
+    // harness.write("  always #100 clk = ~clk;\n")
 
     harness.write("  /*** DUT instantiation ***/\n")
     harness.write("    " + c.moduleName + "\n")
     harness.write("      " + c.moduleName + "(\n")
-    for (clk <- clocks)
+    for (clk <- c.clocks)
       harness.write("        .%s(%s && isStep),\n".format(clk.name, clk.name))
     for (rst <- resets)
       harness.write("        .%s(%s),\n".format(rst.name, rst.name))
@@ -516,7 +524,7 @@ class VerilogBackend extends Backend {
     harness.close();
   }
 
-  def harnessAPIs (clocks: ArrayBuffer[Clock], resets: ArrayBuffer[Bool], 
+  def harnessAPIs (clocks: LinkedHashSet[Clock], resets: ArrayBuffer[Bool], 
                    wires: ArrayBuffer[Node], mems: ArrayBuffer[Mem[_]], 
                    scanNodes: Array[Bits], printNodes: Array[Bits]) = {
     val apis = new StringBuilder
@@ -543,7 +551,8 @@ class VerilogBackend extends Backend {
     def display(form: String, args: String*) =
       "$display(\"%s\", %s);\n".format(form, (args.tail foldLeft args.head) (_ + ", " + _)) 
 
-    apis.append("  always @(negedge clk) begin\n")
+    apis.append("  always @(%s) begin\n".format((clocks.tail foldLeft ("negedge " + clocks.head.name))
+      (_ + " or negedge " + _.name)))
     apis.append("  /*** API interpreter ***/\n")
     apis.append("  // process API command at every clock's negedge\n")
     apis.append("  // when the target is stalled\n")
@@ -668,7 +677,8 @@ class VerilogBackend extends Backend {
     apis.append("    if (count == -1) $finish(1);\n")
     apis.append("  end\n\n")
 
-    apis.append("  always @(posedge clk) begin\n")
+    apis.append("  always @(%s) begin\n".format((clocks.tail foldLeft ("posedge " + clocks.head.name))
+      (_ + " or posedge " + _.name)))
     apis.append("     // copy wires' & mems' value into shadows for 'peeking'\n")
     apis.append("    if (isStep) begin\n")
     for (wire <- wires) {
