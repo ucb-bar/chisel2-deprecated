@@ -456,7 +456,7 @@ class VerilogBackend extends Backend {
     for (m <- Driver.components ; mod <- m.mods ; 
        if mod.isInObject || mod.isInVCD) {
        mod match {
-         case bool: Bool if c.resets contains bool =>
+         case bool: Bool if bool == "reset" =>
          case rom:  ROMData => roms += rom
          case mem:  Mem[_] =>  mems += mem
          case _ => wires += mod
