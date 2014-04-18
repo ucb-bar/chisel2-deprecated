@@ -405,8 +405,7 @@ class VerilogBackend extends Backend {
     val harness  = createOutputFile(name + "-harness.v");
     val printNodes = for ((n, io) <- c.io.flatten ; if io.dir == OUTPUT) yield io
     val scanNodes = for ((n, io) <- c.io.flatten ; if io.dir == INPUT) yield io
-    // val printFormat = printNodes.map(a => "0x%x").fold("")((y,z) => z + " " + y)
-    // val scanFormat = scanNodes.map(a => "%x").fold("")((y,z) => z + " " + y)
+
     harness.write("module test;\n")
     for (node <- scanNodes) {
       harness.write("  reg [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
@@ -449,20 +448,39 @@ class VerilogBackend extends Backend {
         }
       }
     harness.write("\n")
-    harness.write(" );\n")
+    harness.write(" );\n\n")
 
-    val mems = new ArrayBuffer[Node]
+    val mems =  new ArrayBuffer[Mem[_]]
+    val roms  = new ArrayBuffer[ROMData]
     val wires = new ArrayBuffer[Node]
 
     for (m <- Driver.components ; mod <- m.mods ; 
        if mod.isInObject || mod.isInVCD) {
        mod match {
          case bool: Bool if c.resets contains bool =>
-         case _: ROMData =>
-         case _: Mem[_] => mems += mod
+         case rom:  ROMData => roms += rom
+         case mem:  Mem[_] =>  mems += mem
          case _ => wires += mod
        }
     }
+
+    // ROM & Mem initialization
+    harness.write("  integer i = 0;\n")
+    harness.write("  initial begin\n")
+    harness.write("  #50;\n")
+    for (rom <- roms) {
+      val pathName = rom.component.getPathName(".") + "." + emitRef(rom)
+      for (i <- 0 until rom.lits.size) {
+        harness.write("    %s[%d] = %s;\n".format(pathName, i, emitRef(rom.lits(i))))
+      }
+    }
+    for (mem <- mems) {
+      val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
+      harness.write("    for (i = 0 ; i < %d ; i = i + 1) begin\n".format(mem.n))
+      harness.write("      %s[i] = 0;\n".format(pathName))
+      harness.write("    end\n")
+    }
+    harness.write("  end\n\n")
 
     for (wire <- wires) {
       harness.write("  reg [%d:0] %s_shadow = 0;\n".format(wire.width-1, emitRef(wire)))
@@ -862,7 +880,7 @@ class VerilogBackend extends Backend {
     }
     val dir = Driver.targetDir + "/"
     val src = dir + c.name + "-harness.v " + dir + c.name + ".v"
-    val cmd = "vcs -full64 +vc +v2k -timescale=10ns/10ps " + src + " -o " + dir + c.name
+    val cmd = "vcs -full64 -quiet +vc +v2k -timescale=10ns/10ps " + src + " -o " + dir + c.name
     run(cmd)
 
   }
