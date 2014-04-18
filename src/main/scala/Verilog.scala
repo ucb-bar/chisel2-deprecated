@@ -463,7 +463,6 @@ class VerilogBackend extends Backend {
 
     for (clk <- clocks)
       harness.write("  always #%s_length %s = ~%s;\n".format(clk.name, clk.name, clk.name))
-    // harness.write("  always #100 clk = ~clk;\n")
 
     harness.write("  /*** DUT instantiation ***/\n")
     harness.write("    " + c.moduleName + "\n")
@@ -493,6 +492,19 @@ class VerilogBackend extends Backend {
        if mod.isInObject && !mod.isLit) {
        mod match {
          case bool: Bool if resets contains bool => // exclude resets
+         case _: Binding =>
+         case io: Bits if m != c => {
+           var included = true
+           if (io.dir == INPUT) {
+             if (io.inputs.length == 0 || io.inputs.length > 1 || (m.isWalked contains io))
+               included = false
+           }
+           else if (io.dir == OUTPUT) {
+             if (io.consumers.length == 0 || m.parent.findBinding(io) == null || io.prune)
+               included = false
+           }
+           if (included) wires += io
+         }
          case rom:  ROMData => roms += rom
          case mem:  Mem[_] =>  mems += mem
          case _ => wires += mod
