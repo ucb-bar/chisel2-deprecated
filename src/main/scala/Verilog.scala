@@ -427,6 +427,24 @@ class VerilogBackend extends Backend {
     harness.write("  initial begin\n")
     harness.write("    reset = 1;\n")
     harness.write("    #250 reset = 0;\n")
+    if (Driver.isDebug) {
+      harness.write("    /*** Debuggin with VPD dump ***/\n")
+      harness.write("    $vcdplusfile(\"%s.vcd\");\n".format(ensureDir(Driver.targetDir)+c.name))
+      harness.write("    $vcdpluson;\n")
+    }
+    else if (Driver.isVCD) {
+      harness.write("    /*** VCD dump ***/\n")
+      val dumpvars = new StringBuilder
+      var first = true
+      for (cc <- Driver.components ; m <- cc.mods ; if m.isInVCD) {
+        val pathName = cc.getPathName(".") + "." + emitRef(m)
+        dumpvars append (if (first) {first = false ; ""} else ", ") 
+        dumpvars append pathName
+      }
+      harness.write("    $dumpvars(%s);\n".format(dumpvars.result))
+      harness.write("    $dumpfile(\"%s.vcd\");\n".format(ensureDir(Driver.targetDir)+c.name))
+      harness.write("    $dumpon;\n")
+    }
     harness.write("  end\n\n")
 
     harness.write("  always #100 clk = ~clk;\n")
@@ -454,9 +472,9 @@ class VerilogBackend extends Backend {
     val wires = new ArrayBuffer[Node]
 
     for (m <- Driver.components ; mod <- m.mods ; 
-       if mod.isInObject || mod.isInVCD) {
+       if mod.isInObject && !mod.isLit) {
        mod match {
-         case bool: Bool if bool == "reset" =>
+         case bool: Bool if bool.name == "reset" =>
          case rom:  ROMData => roms += rom
          case mem:  Mem[_] =>  mems += mem
          case _ => wires += mod
@@ -930,9 +948,9 @@ class VerilogBackend extends Backend {
     }
     val dir = Driver.targetDir + "/"
     val src = dir + c.name + "-harness.v " + dir + c.name + ".v"
-    val cmd = "vcs -full64 -quiet +vc +v2k -timescale=10ns/10ps " + src + " -o " + dir + c.name
+    val cmd = "vcs -full64 -quiet +vc +v2k -timescale=10ns/10ps " + src + " -o " + dir + c.name + 
+              (if (Driver.isDebug) " -debug_pp" else "")
     run(cmd)
-
   }
 
   def romStyle: String = "always @(*)"
