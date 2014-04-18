@@ -568,7 +568,12 @@ class VerilogBackend extends Backend {
     apis.append("  /*** API interpreter ***/\n")
     apis.append("  // process API command at every clock's negedge\n")
     apis.append("  // when the target is stalled\n")
-    apis.append("  if (%s!isStep) begin\n".format((resets foldLeft "")(_ + "!" + _.name + " & ")))
+    apis.append("  if (%s!isStep) begin\n".format(
+      (resets foldLeft "")(_ + "!" + _.name + " & ") +
+      ( if (clocks.size > 1) 
+         (clocks foldLeft "")(_ + "!" + _.name + " & ")
+        else "" ) )
+    )
     apis.append("    "+ fscanf("%s", "cmd"))
     apis.append("    case (cmd)\n")
 
@@ -692,7 +697,11 @@ class VerilogBackend extends Backend {
     apis.append("  always @(%s) begin\n".format((clocks.tail foldLeft ("posedge " + clocks.head.name))
       (_ + " or posedge " + _.name)))
     apis.append("     // copy wires' & mems' value into shadows for 'peeking'\n")
-    apis.append("    if (isStep) begin\n")
+    apis.append("    if (%sisStep) begin\n".format(
+      if (clocks.size > 1) 
+         (clocks foldLeft "")(_ + _.name + " & ")
+      else "" )
+    )
     for (wire <- wires) {
       val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
       val wireName = if (printNodes contains wire) emitRef(wire) else pathName
