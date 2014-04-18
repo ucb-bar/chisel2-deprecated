@@ -41,6 +41,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.LinkedHashMap
+import scala.collection.mutable.LinkedHashSet
 
 object VerilogBackend {
 
@@ -405,6 +406,8 @@ class VerilogBackend extends Backend {
     val harness  = createOutputFile(name + "-harness.v");
     val printNodes = for ((n, io) <- c.io.flatten ; if io.dir == OUTPUT) yield io
     val scanNodes = for ((n, io) <- c.io.flatten ; if io.dir == INPUT) yield io
+    val clocks = c.clocks
+    val (_, resets: ArrayBuffer[Bool]) = c.resets.unzip
 
     harness.write("module test;\n")
     for (node <- scanNodes) {
@@ -413,20 +416,25 @@ class VerilogBackend extends Backend {
     for (node <- printNodes) {
       harness.write("  wire [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
     }
-    harness.write("  reg clk = 0;\n")
-    harness.write("  reg reset = 1;\n\n")
+    for (clk <- clocks)
+      harness.write("  reg %s = 0;\n".format(clk.name))
+    for (rst <- resets)
+      harness.write("  reg %s = 1;\n".format(rst.name))
 
-    harness.write("  /*** API variables ***/\n")
+    harness.write("\n  /*** API variables ***/\n")
     harness.write("  reg[20*8:0] cmd;    // API command\n")    
-    harness.write("  reg[1000*8:0] node; // Chisel node name;\n") 
-    harness.write("  integer value;      // 'poked' value\n")      
+    harness.write("  reg[1000*8:0] node; // Chisel node name;\n")
+    harness.write("  integer value;      // 'poked' value\n")  
     harness.write("  integer offset;     // mem's offset\n")
     harness.write("  integer steps;      // number of steps\n")
     harness.write("  reg isStep = 0;\n")
     
     harness.write("  initial begin\n")
-    harness.write("    reset = 1;\n")
-    harness.write("    #250 reset = 0;\n")
+    for (rst <- resets)
+      harness.write("    %s = 1;\n".format(rst.name))
+    harness.write("    #250;\n")
+    for (rst <- resets)
+      harness.write("    %s = 0;\n".format(rst.name))
     if (Driver.isDebug) {
       harness.write("    /*** Debuggin with VPD dump ***/\n")
       harness.write("    $vcdplusfile(\"%s.vpd\");\n".format(ensureDir(Driver.targetDir)+c.name))
@@ -452,8 +460,10 @@ class VerilogBackend extends Backend {
     harness.write("  /*** DUT instantiation ***/\n")
     harness.write("    " + c.moduleName + "\n")
     harness.write("      " + c.moduleName + "(\n")
-    if(!c.clocks.isEmpty) harness.write("        .clk(clk && isStep),\n")
-    if(!c.resets.isEmpty) harness.write("        .reset(reset),\n")
+    for (clk <- clocks)
+      harness.write("        .%s(%s && isStep),\n".format(clk.name, clk.name))
+    for (rst <- resets)
+      harness.write("        .%s(%s),\n".format(rst.name, rst.name))
     var first = true
     for (node <- (scanNodes ++ printNodes))
       if(node.isIo && node.component == c) {
@@ -474,7 +484,7 @@ class VerilogBackend extends Backend {
     for (m <- Driver.components ; mod <- m.mods ; 
        if mod.isInObject && !mod.isLit) {
        mod match {
-         case bool: Bool if bool.name == "reset" =>
+         case bool: Bool if resets contains bool => // exclude resets
          case rom:  ROMData => roms += rom
          case mem:  Mem[_] =>  mems += mem
          case _ => wires += mod
@@ -499,13 +509,15 @@ class VerilogBackend extends Backend {
     }
     harness.write("  end\n\n")
 
-    if (Driver.isTesting) harness write harnessAPIs(wires, mems, scanNodes, printNodes)
+    if (Driver.isTesting) 
+      harness write harnessAPIs(clocks, resets, wires, mems, scanNodes, printNodes)
     harness.write("endmodule\n")
 
     harness.close();
   }
 
-  def harnessAPIs (wires: ArrayBuffer[Node], mems: ArrayBuffer[Mem[_]], 
+  def harnessAPIs (clocks: ArrayBuffer[Clock], resets: ArrayBuffer[Bool], 
+                   wires: ArrayBuffer[Node], mems: ArrayBuffer[Mem[_]], 
                    scanNodes: Array[Bits], printNodes: Array[Bits]) = {
     val apis = new StringBuilder
 
@@ -535,7 +547,7 @@ class VerilogBackend extends Backend {
     apis.append("  /*** API interpreter ***/\n")
     apis.append("  // process API command at every clock's negedge\n")
     apis.append("  // when the target is stalled\n")
-    apis.append("  if (!reset && !isStep) begin\n")
+    apis.append("  if (%s!isStep) begin\n".format((resets foldLeft "")(_ + "!" + _.name + " & ")))
     apis.append("    "+ fscanf("%s", "cmd"))
     apis.append("    case (cmd)\n")
 
@@ -544,7 +556,8 @@ class VerilogBackend extends Backend {
     apis.append("      // return: none\n")
     apis.append("      \"reset\": begin\n")
     apis.append("        " + fscanf("%d", "steps"))
-    apis.append("        reset = 1;\n")
+    for (rst <- resets)
+      apis.append("        %s = 1;\n".format(rst.name))
     apis.append("        isStep = 1;\n")
     apis.append("        " + display("%1d", "steps")) 
     apis.append("      end\n")
@@ -648,7 +661,8 @@ class VerilogBackend extends Backend {
     apis.append("    // stall the target when step counts is zero\n")
     apis.append("    else if (isStep) begin \n")
     apis.append("      isStep = 0;\n")
-    apis.append("      reset = 0;\n")
+    for (rst <- resets)
+      apis.append("      %s = 0;\n".format(rst.name))
     apis.append("    end\n")
 
     apis.append("    if (count == -1) $finish(1);\n")
