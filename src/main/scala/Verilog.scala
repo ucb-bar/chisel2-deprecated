@@ -482,8 +482,11 @@ class VerilogBackend extends Backend {
     }
     harness.write("  end\n\n")
 
+    val shadowNames = new HashMap[Node, String]
     for (wire <- wires) {
-      harness.write("  reg [%d:0] %s_shadow = 0;\n".format(wire.width-1, emitRef(wire)))
+      val shadowName = wire.component.getPathName("_") + "_" + emitRef(wire) + "_shadow"
+      shadowNames(wire) = shadowName
+      harness.write("  reg [%d:0] %s = 0;\n".format(wire.width-1, shadowName))
     }
 
     harness.write("  integer count;\n")
@@ -510,9 +513,9 @@ class VerilogBackend extends Backend {
     if (!wires.isEmpty) {
       for (wire <- wires) {
         val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
-        val wireName = if (printNodes contains wire) emitRef(wire) else pathName
-        harness.write("          \"%s\": ".format(wire.chiselName) + 
-          display("0x%1x", emitRef(wire) + "_shadow")
+        val wireName = if (shadowNames contains wire) shadowNames(wire) else pathName
+        harness.write("          \"%s\": ".format(pathName) + 
+          display("0x%1x", shadowNames(wire))
         )
       }
     }
@@ -525,7 +528,7 @@ class VerilogBackend extends Backend {
     if (!mems.isEmpty) {
       for (mem <- mems) {
         val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
-        harness.write("          \"%s\": ".format(mem.chiselName) + 
+        harness.write("          \"%s\": ".format(pathName) + 
           display("0x%1x", "%s[%s]".format(pathName, "offset"))
         )
       }
@@ -540,7 +543,7 @@ class VerilogBackend extends Backend {
       for (wire <- wires ; if wire.isReg || (scanNodes contains wire)) {
         val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
         val wireName = if (scanNodes contains wire) emitRef(wire) else pathName
-        harness.write("          \"%s\": begin\n".format(wire.chiselName))
+        harness.write("          \"%s\": begin\n".format(pathName))
         harness.write("            %s = %s;\n".format(wireName, "value"))
         harness.write("            " + display("%s", "\"ok\""))
         harness.write("          end\n")
@@ -555,7 +558,7 @@ class VerilogBackend extends Backend {
       harness.write("        case (node)\n")
       for (mem <- mems) {
         val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
-        harness.write("          \"%s\": begin\n".format(mem.chiselName))
+        harness.write("          \"%s\": begin\n".format(pathName))
         harness.write("            %s[%s] = %s;\n".format(pathName, "offset", "value"))
         harness.write("            " + display("%s", "\"ok\""))
         harness.write("          end\n")
@@ -587,8 +590,8 @@ class VerilogBackend extends Backend {
     harness.write("    if (isStep) begin\n")
     for (wire <- wires) {
       val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
-      val wireName = if ((scanNodes ++ printNodes) contains wire) emitRef(wire) else pathName
-      harness.write("      %s_shadow = %s;\n".format(emitRef(wire), wireName))
+      val wireName = if (printNodes contains wire) emitRef(wire) else pathName
+      harness.write("      %s = %s;\n".format(shadowNames(wire), wireName))
     }
     harness.write("    end\n")
     harness.write("  end\n")
