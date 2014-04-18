@@ -429,7 +429,7 @@ class VerilogBackend extends Backend {
     harness.write("    #250 reset = 0;\n")
     if (Driver.isDebug) {
       harness.write("    /*** Debuggin with VPD dump ***/\n")
-      harness.write("    $vcdplusfile(\"%s.vcd\");\n".format(ensureDir(Driver.targetDir)+c.name))
+      harness.write("    $vcdplusfile(\"%s.vpd\");\n".format(ensureDir(Driver.targetDir)+c.name))
       harness.write("    $vcdpluson;\n")
     }
     else if (Driver.isVCD) {
