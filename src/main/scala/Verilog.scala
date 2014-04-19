@@ -441,17 +441,17 @@ class VerilogBackend extends Backend {
     harness.write("  reg isStep = 0;\n")
     
     harness.write("  initial begin\n")
-    for (rst <- resets)
-      harness.write("    %s = 1;\n".format(rst.name))
-    harness.write("    #250;\n")
-    for (rst <- resets)
-      harness.write("    %s = 0;\n".format(rst.name))
     if (Driver.isDebug) {
       harness.write("    /*** Debuggin with VPD dump ***/\n")
       harness.write("    $vcdplusfile(\"%s.vpd\");\n".format(ensureDir(Driver.targetDir)+c.name))
       harness.write("    $vcdpluson;\n")
     }
-    else if (Driver.isVCD) {
+    for (rst <- resets)
+      harness.write("    %s = 1;\n".format(rst.name))
+    harness.write("    #250;\n")
+    for (rst <- resets)
+      harness.write("    %s = 0;\n".format(rst.name)) 
+   if (Driver.isVCD && !Driver.isDebug) {
       harness.write("    /*** VCD dump ***/\n")
       val dumpvars = new StringBuilder
       var first = true
@@ -466,10 +466,7 @@ class VerilogBackend extends Backend {
     }
     harness.write("  end\n\n")
 
-    harness.write("  integer min = (1 << 31 -1);\n".format(mainClk.name))
-    harness.write("  always #100 begin\n")
-    harness.write("    %s = ~%s;\n".format(mainClk.name, mainClk.name))
-    harness.write("  end\n")
+    harness.write("  always #100 %s = ~%s;\n".format(mainClk.name, mainClk.name))
 
     harness.write("  /*** DUT instantiation ***/\n")
     harness.write("    " + c.moduleName + "\n")
@@ -692,8 +689,7 @@ class VerilogBackend extends Backend {
       apis.append("      \"set_clocks\": begin\n")
       val clkFormat = ((clocks filter (_.srcClock == null)).toList map (x => "%x"))
       val clkFires  = ((clocks filter (_.srcClock == null)) map (_.name + "_length")).toList
-      apis.append("        " + fscanf((clkFormat.tail foldLeft clkFormat.head)(_ + " " + _), 
-        clkFires:_*) )
+      apis.append("        " + fscanf((clkFormat foldLeft "")(_ + " " + _), clkFires:_*) )
       apis.append("        " + display("%s", "\"ok\""))
       apis.append("      end\n")
     }
@@ -733,6 +729,7 @@ class VerilogBackend extends Backend {
     apis.append("    if (count == -1) $finish(1);\n")
     apis.append("  end\n\n")
 
+    apis.append("  integer min = (1 << 31 -1);\n")
     apis.append("  always @(posedge %s) begin\n".format(mainClk.name))
     if (clocks.size > 1) {
       apis.append("    // fire clocks according to their relative length\n")
@@ -755,6 +752,7 @@ class VerilogBackend extends Backend {
           clk.name, clk.name, clk.name) )
       apis.append("      end\n")
       apis.append("    end\n")
+
       apis.append("    // hack to reset\n")
       apis.append("    else if (isStep%s) begin\n".format(
         if (resets.isEmpty) ""
@@ -764,7 +762,7 @@ class VerilogBackend extends Backend {
         apis.append("      %s_cnt = 0;\n".format(clk.name, clk.name))
         apis.append("      %s_fire = 1;\n".format(clk.name, clk.name))
       }
-      apis.append("    end\n")
+      apis.append("    end\n\n")
     }
 
     apis.append("     // copy wires' & mems' value into shadows for 'peeking'\n")
