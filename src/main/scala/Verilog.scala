@@ -432,41 +432,17 @@ class VerilogBackend extends Backend {
     for (rst <- resets)
       harness.write("  reg %s = 1;\n".format(rst.name))
 
-    harness.write("\n  /*** API variables ***/\n")
-    harness.write("  reg[20*8:0] cmd;    // API command\n")    
-    harness.write("  reg[1000*8:0] node; // Chisel node name;\n")
-    harness.write("  integer value;      // 'poked' value\n")  
-    harness.write("  integer offset;     // mem's offset\n")
-    harness.write("  integer steps;      // number of steps\n")
-    harness.write("  reg isStep = 0;\n")
-    
-    harness.write("  initial begin\n")
-    if (Driver.isDebug) {
-      harness.write("    /*** Debuggin with VPD dump ***/\n")
-      harness.write("    $vcdplusfile(\"%s.vpd\");\n".format(ensureDir(Driver.targetDir)+c.name))
-      harness.write("    $vcdpluson;\n")
+    if (Driver.isTesting) {
+      harness.write("\n  /*** API variables ***/\n")
+      harness.write("  reg[20*8:0] cmd;    // API command\n")    
+      harness.write("  reg[1000*8:0] node; // Chisel node name;\n")
+      harness.write("  integer value;      // 'poked' value\n")  
+      harness.write("  integer offset;     // mem's offset\n")
+      harness.write("  integer steps;      // number of steps\n")
+      harness.write("  reg isStep = 0;\n\n")
     }
-    for (rst <- resets)
-      harness.write("    %s = 1;\n".format(rst.name))
-    harness.write("    #250;\n")
-    for (rst <- resets)
-      harness.write("    %s = 0;\n".format(rst.name)) 
-   if (Driver.isVCD && !Driver.isDebug) {
-      harness.write("    /*** VCD dump ***/\n")
-      val dumpvars = new StringBuilder
-      var first = true
-      for (cc <- Driver.components ; m <- cc.mods ; if m.isInVCD) {
-        val pathName = cc.getPathName(".") + "." + emitRef(m)
-        dumpvars append (if (first) {first = false ; ""} else ", ") 
-        dumpvars append pathName
-      }
-      harness.write("    $dumpvars(%s);\n".format(dumpvars.result))
-      harness.write("    $dumpfile(\"%s.vcd\");\n".format(ensureDir(Driver.targetDir)+c.name))
-      harness.write("    $dumpon;\n")
-    }
-    harness.write("  end\n\n")
 
-    harness.write("  always #100 %s = ~%s;\n".format(mainClk.name, mainClk.name))
+    harness.write("  always #100 %s = ~%s;\n\n".format(mainClk.name, mainClk.name))
 
     harness.write("  /*** DUT instantiation ***/\n")
     harness.write("    " + c.moduleName + "\n")
@@ -497,29 +473,73 @@ class VerilogBackend extends Backend {
     val mems =  new ArrayBuffer[Mem[_]]
     val roms  = new ArrayBuffer[ROMData]
     val wires = new ArrayBuffer[Node]
+    val dumpvars = new ArrayBuffer[Node]
 
-    for (m <- Driver.components ; mod <- m.mods ; 
-       if mod.isInObject && !mod.isLit) {
-       mod match {
-         case bool: Bool if resets contains bool => // exclude resets
-         case _: Binding =>
-         case io: Bits if m != c => {
-           var included = true
-           if (io.dir == INPUT) {
-             if (io.inputs.length == 0 || io.inputs.length > 1 || (m.isWalked contains io))
-               included = false
-           }
-           else if (io.dir == OUTPUT) {
-             if (io.consumers.length == 0 || m.parent.findBinding(io) == null || io.prune)
-               included = false
-           }
-           if (included) wires += io
-         }
-         case rom:  ROMData => roms += rom
-         case mem:  Mem[_] =>  mems += mem
-         case _ => wires += mod
-       }
+    // select Chisel nodes for APIs(peek, poke)  and VCD dump
+    for (m <- Driver.components ; mod <- m.mods) { 
+      if (mod.isInObject && !mod.isLit) {
+        mod match {
+          case bool: Bool if resets contains bool => // exclude resets
+          case _: Binding =>
+          case io: Bits if m != c => {
+            var included = true
+            if (io.dir == INPUT) {
+              if (io.inputs.length == 0 || io.inputs.length > 1 || (m.isWalked contains io))
+                included = false
+            }
+            else if (io.dir == OUTPUT) {
+              if (io.consumers.length == 0 || m.parent.findBinding(io) == null || io.prune)
+                included = false
+            }
+            if (included) wires += io
+          }
+          case rom:  ROMData => roms += rom
+          case mem:  Mem[_] =>  mems += mem
+          case _ => wires += mod
+        }
+      }
+      if (mod.isInVCD) {
+        mod match {
+          case io: Bits if m != c => {
+            var included = true
+            if (io.dir == INPUT) {
+              if (io.inputs.length == 0 || io.inputs.length > 1 || (m.isWalked contains io))
+                included = false
+            }
+            else if (io.dir == OUTPUT) {
+              if (io.consumers.length == 0 || m.parent.findBinding(io) == null || io.prune)
+                included = false
+            }
+            if (included) dumpvars += io
+          }
+          case _ => dumpvars += mod
+        }
+      }
     }
+    
+    harness.write("  /*** resets &&  VCD / VPD dumps ***/\n")
+    harness.write("  initial begin\n")
+    for (rst <- resets)
+      harness.write("  %s = 1;\n".format(rst.name))
+    if (Driver.isDebug) {
+      harness.write("    /*** Debuggin with VPD dump ***/\n")
+      harness.write("    $vcdplusfile(\"%s.vpd\");\n".format(ensureDir(Driver.targetDir)+c.name))
+      harness.write("    $vcdpluson;\n")
+    }
+    harness.write("  #250;\n")
+    for (rst <- resets)
+      harness.write("  %s = 0;\n".format(rst.name))
+    if (!Driver.isDebug && Driver.isVCD) {
+      harness.write("    /*** VCD dump ***/\n")
+      var first = true
+      for (dumpvar <- dumpvars) {
+        val pathName = dumpvar.component.getPathName(".") + "." + emitRef(dumpvar)
+        harness.write("    $dumpvars(1, %s);\n".format(pathName))
+      }
+      harness.write("    $dumpfile(\"%s.vcd\");\n".format(ensureDir(Driver.targetDir)+c.name))
+      harness.write("    $dumpon;\n")
+    }
+    harness.write("  end\n\n")
 
     harness.write("  /*** ROM & Mem initialization ***/\n")
     harness.write("  integer i = 0;\n")
