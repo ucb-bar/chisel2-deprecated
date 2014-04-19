@@ -83,13 +83,13 @@ class FPGABackend extends VerilogBackend
           "  generate\n" +
           "    genvar " + i + ";\n" +
           "    for (" + i + " = 0; " + i + " < " + max + "; " + i + " = " + i + " + 1) begin: f" + emitTmp(m) + "\n" +
-          "      always @(posedge clk)\n" +
+          "      always @(posedge " + emitRef(m.clock) + ")\n" +
           "        if (" + emitRef(m.cond) + " && " + emitRef(m.mask) + "[" + maskIdx + "])\n" +
           "          " + meStr + "[" + emitRef(m.addr) + "][" + dataIdx + "] <= " + emitRef(m.data) + "[" + dataIdx + "]" + (if (mw) " ^ " + emitRef(m.mem) + "_w" + me + "[" + dataIdx + "]" else "") + ";\n" +
           "    end\n" +
           "  endgenerate\n"
         } else {
-          "  always @(posedge clk)\n" +
+          "  always @(posedge " + emitRef(m.clock) + ")\n" +
           "    if (" + emitRef(m.cond) + ")\n" +
           "      " + meStr + "[" + emitRef(m.addr) + "] <= " + emitRef(m.data) + (if (mw) " ^ " + emitRef(m.mem) + "_w" + me else "") + ";\n"
         })
