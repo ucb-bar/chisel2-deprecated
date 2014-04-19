@@ -264,10 +264,13 @@ class FloBackend extends Backend {
       ChiselError.info(cmd + " RET " + c)
     }
     def build(name: String) {
+      val mweCmd = ArrayBuffer("flo-mwe", "--width", "32", "--depth", "64", "--input", dir + name + ".flo", "--output", dir + name + ".mwe.flo")
+      println("EXPANDING WITH " + mweCmd)
+      run(mweCmd.mkString(" "))
       val cmd = ArrayBuffer(floDir + "lay", "-is-console")
       cmd ++= ArrayBuffer(":num-rows", DreamerConfiguration.numRows.toString())
       cmd ++= ArrayBuffer(":num-cols", DreamerConfiguration.numCols.toString())
-      cmd ++= ArrayBuffer("<", dir + name + ".flo", "|")
+      cmd ++= ArrayBuffer("<", dir + name + ".mwe.flo", "|")
       cmd ++= ArrayBuffer(floDir + "fix-sched", ">", dir + name + ".hex")
       val cmdString = cmd.mkString(" ")
       println("BUILDING " + cmdString)
