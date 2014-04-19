@@ -434,7 +434,6 @@ class ManualTester[+T <: Module]
       var vpdmsg = testIn.read
       while (vpdmsg != '\n' && vpdmsg != -1)
         vpdmsg = testIn.read
-      println(vpdmsg)
     }
     for (mod <- c.omods.map(x => x.getNode)) mappings(dumpName(mod)) = mod
     process
