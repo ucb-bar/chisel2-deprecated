@@ -418,19 +418,36 @@ class VerilogBackend extends Backend {
     for (node <- printNodes) {
       harness.write("  wire [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
     }
-    harness.write("  reg %s = 0;\n".format(mainClk.name))
-    if (clocks.size > 1) {
-      for (clk <- clocks) {
-        val clkLength = 
-          if (clk.srcClock == null) "0" else 
-          clk.srcClock.name + "_length " + clk.initStr
-        harness.write("  integer %s_length = %s;\n".format(clk.name, clkLength))
-        harness.write("  integer %s_cnt = 0;\n".format(clk.name))
-        harness.write("  reg %s_fire = 0;\n".format(clk.name))
-      }
-    }
     for (rst <- resets)
       harness.write("  reg %s = 1;\n".format(rst.name))
+
+    // Diffent code generation for clocks
+    if (Driver.isTesting) {
+      harness.write("  reg %s = 0;\n".format(mainClk.name))
+      if (clocks.size > 1) {
+        for (clk <- clocks) {
+          val clkLength = 
+            if (clk.srcClock == null) "0" else 
+            clk.srcClock.name + "_length " + clk.initStr
+          harness.write("  integer %s_length = %s;\n".format(clk.name, clkLength))
+          harness.write("  integer %s_cnt = 0;\n".format(clk.name))
+          harness.write("  reg %s_fire = 0;\n".format(clk.name))
+        }
+      }
+
+      harness.write("  always #100 %s = ~%s;\n\n".format(mainClk.name, mainClk.name))
+    } else {
+      for (clk <- clocks) {
+        val clkLength = 
+            if (clk.srcClock == null) "120" else 
+            clk.srcClock.name + "_length " + clk.initStr
+        harness.write("  reg %s = 0;\n".format(clk.name))
+        harness.write("  parameter %s_length = %s;\n".format(clk.name, clkLength))
+      }
+      for (clk <- clocks) {
+        harness.write("  always #%s_length %s = ~%s;\n".format(clk.name, clk.name, clk.name))
+      }
+    }
 
     if (Driver.isTesting) {
       harness.write("\n  /*** API variables ***/\n")
@@ -442,18 +459,21 @@ class VerilogBackend extends Backend {
       harness.write("  reg isStep = 0;\n\n")
     }
 
-    harness.write("  always #100 %s = ~%s;\n\n".format(mainClk.name, mainClk.name))
-
     harness.write("  /*** DUT instantiation ***/\n")
     harness.write("    " + c.moduleName + "\n")
     harness.write("      " + c.moduleName + "(\n")
-    if (c.clocks.size == 1) {
-      harness.write("        .%s(%s && isStep),\n".format(mainClk.name, mainClk.name))
+    if (Driver.isTesting) {
+      if (c.clocks.size == 1) {
+        harness.write("        .%s(%s && isStep),\n".format(mainClk.name, mainClk.name))
+      } else {
+        for (clk <- c.clocks)
+          harness.write("        .%s(%s && %s_fire %s && isStep),\n".format(
+            clk.name, mainClk.name, clk.name)
+         )
+      }
     } else {
       for (clk <- c.clocks)
-        harness.write("        .%s(%s && %s_fire && isStep),\n".format(
-          clk.name, mainClk.name, clk.name)
-       )
+        harness.write("        .%s(%s),\n".format(clk.name, clk.name))
     }
     for (rst <- resets)
       harness.write("        .%s(%s),\n".format(rst.name, rst.name))
