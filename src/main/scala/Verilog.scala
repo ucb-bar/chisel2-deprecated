@@ -467,7 +467,7 @@ class VerilogBackend extends Backend {
         harness.write("        .%s(%s && isStep),\n".format(mainClk.name, mainClk.name))
       } else {
         for (clk <- c.clocks)
-          harness.write("        .%s(%s && %s_fire %s && isStep),\n".format(
+          harness.write("        .%s(%s && %s_fire && isStep),\n".format(
             clk.name, mainClk.name, clk.name)
          )
       }
