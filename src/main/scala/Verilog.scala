@@ -406,7 +406,8 @@ class VerilogBackend extends Backend {
     val harness  = createOutputFile(name + "-harness.v");
     val printNodes = for ((n, io) <- c.io.flatten ; if io.dir == OUTPUT) yield io
     val scanNodes = for ((n, io) <- c.io.flatten ; if io.dir == INPUT) yield io
-    val clocks = LinkedHashSet(Driver.implicitClock)
+    val mainClk = Driver.implicitClock
+    val clocks = LinkedHashSet(mainClk)
     clocks ++= c.clocks
     val (_, resets: ArrayBuffer[Bool]) = c.resets.unzip
 
@@ -417,12 +418,16 @@ class VerilogBackend extends Backend {
     for (node <- printNodes) {
       harness.write("  wire [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
     }
-    for (clk <- clocks) {
-      val clkLength = 
-        if (clk == Driver.implicitClock) "100" else 
-        Driver.implicitClock.name + "_length" + clk.initStr
-      harness.write("  reg %s = 0;\n".format(clk.name))
-      harness.write("  parameter %s_length = %s;\n".format(clk.name, clkLength))
+    harness.write("  reg %s = 0;\n".format(mainClk.name))
+    if (clocks.size > 1) {
+      for (clk <- clocks) {
+        val clkLength = 
+          if (clk.srcClock == null) "0" else 
+          clk.srcClock.name + "_length " + clk.initStr
+        harness.write("  integer %s_length = %s;\n".format(clk.name, clkLength))
+        harness.write("  integer %s_cnt = 0;\n".format(clk.name))
+        harness.write("  reg %s_fire = 0;\n".format(clk.name))
+      }
     }
     for (rst <- resets)
       harness.write("  reg %s = 1;\n".format(rst.name))
@@ -461,14 +466,22 @@ class VerilogBackend extends Backend {
     }
     harness.write("  end\n\n")
 
-    for (clk <- clocks)
-      harness.write("  always #%s_length %s = ~%s;\n".format(clk.name, clk.name, clk.name))
+    harness.write("  integer min = (1 << 31 -1);\n".format(mainClk.name))
+    harness.write("  always #100 begin\n")
+    harness.write("    %s = ~%s;\n".format(mainClk.name, mainClk.name))
+    harness.write("  end\n")
 
     harness.write("  /*** DUT instantiation ***/\n")
     harness.write("    " + c.moduleName + "\n")
     harness.write("      " + c.moduleName + "(\n")
-    for (clk <- c.clocks)
-      harness.write("        .%s(%s && isStep),\n".format(clk.name, clk.name))
+    if (c.clocks.size == 1) {
+      harness.write("        .%s(%s && isStep),\n".format(mainClk.name, mainClk.name))
+    } else {
+      for (clk <- c.clocks)
+        harness.write("        .%s(%s && %s_fire && isStep),\n".format(
+          clk.name, mainClk.name, clk.name)
+       )
+    }
     for (rst <- resets)
       harness.write("        .%s(%s),\n".format(rst.name, rst.name))
     var first = true
@@ -530,13 +543,13 @@ class VerilogBackend extends Backend {
     harness.write("  end\n\n")
 
     if (Driver.isTesting) 
-      harness write harnessAPIs(clocks, resets, wires, mems, scanNodes, printNodes)
+      harness write harnessAPIs(mainClk, clocks, resets, wires, mems, scanNodes, printNodes)
     harness.write("endmodule\n")
 
     harness.close();
   }
 
-  def harnessAPIs (clocks: LinkedHashSet[Clock], resets: ArrayBuffer[Bool], 
+  def harnessAPIs (mainClk: Clock, clocks: LinkedHashSet[Clock], resets: ArrayBuffer[Bool], 
                    wires: ArrayBuffer[Node], mems: ArrayBuffer[Mem[_]], 
                    scanNodes: Array[Bits], printNodes: Array[Bits]) = {
     val apis = new StringBuilder
@@ -558,20 +571,19 @@ class VerilogBackend extends Backend {
 
     apis.append("\n  integer count;\n")
 
-    def fscanf(form: String, args: String*) =
+    def fscanf(form: String, args: String*) = 
       "count = $fscanf('h80000000, \"%s\", %s);\n".format(form, (args.tail foldLeft args.head) (_ + ", " + _))
     def display(form: String, args: String*) =
       "$display(\"%s\", %s);\n".format(form, (args.tail foldLeft args.head) (_ + ", " + _)) 
 
-    apis.append("  always @(%s) begin\n".format((clocks.tail foldLeft ("negedge " + clocks.head.name))
-      (_ + " or negedge " + _.name)))
+    apis.append("  always @(negedge %s) begin\n".format(mainClk.name))
     apis.append("  /*** API interpreter ***/\n")
     apis.append("  // process API command at every clock's negedge\n")
     apis.append("  // when the target is stalled\n")
-    apis.append("  if (%s!isStep) begin\n".format(
-      (resets foldLeft "")(_ + "!" + _.name + " & ") +
+    apis.append("  if (!isStep%s) begin\n".format(
+      (resets foldLeft "")(_ + " && !" + _.name) +
       ( if (clocks.size > 1) 
-         (clocks foldLeft "")(_ + "!" + _.name + " & ")
+         (clocks foldLeft "")(_ + " && " + _.name + "_cnt == 0")
         else "" ) )
     )
     apis.append("    "+ fscanf("%s", "cmd"))
@@ -673,6 +685,19 @@ class VerilogBackend extends Backend {
     apis.append("        " + display("%1d", "steps"))
     apis.append("      end\n")
 
+    if (clocks.size > 1) {
+      apis.append("      // <set_clocks> \n")
+      apis.append("      // inputs: clocks' length\n")
+      apis.append("      // return: \"ok\" or \"error\"\n")
+      apis.append("      \"set_clocks\": begin\n")
+      val clkFormat = ((clocks filter (_.srcClock == null)).toList map (x => "%x"))
+      val clkFires  = ((clocks filter (_.srcClock == null)) map (_.name + "_length")).toList
+      apis.append("        " + fscanf((clkFormat.tail foldLeft clkFormat.head)(_ + " " + _), 
+        clkFires:_*) )
+      apis.append("        " + display("%s", "\"ok\""))
+      apis.append("      end\n")
+    }
+
     apis.append("      // < quit>: finish simulation\n")
     apis.append("      \"quit\": $finish;\n")
     apis.append("      // default return: \"error\"\n")
@@ -681,25 +706,71 @@ class VerilogBackend extends Backend {
     apis.append("    end\n\n")
 
     apis.append("    // decrement step counts\n")
-    apis.append("    if (steps > 0) begin \n")
+    apis.append("    if (steps > 0%s) begin \n".format(
+      if (clocks.size > 1) 
+       (clocks foldLeft "")(_ + " && " + _.name + "_cnt == 0")
+      else "" ) )
     apis.append("      steps = steps - 1;\n")
+    if (clocks.size > 1) {
+      for (clk <- clocks)
+        apis.append("      %s_cnt = %s_length;\n".format(clk.name, clk.name))
+    }
     apis.append("    end\n")
     apis.append("    // stall the target when step counts is zero\n")
-    apis.append("    else if (isStep) begin \n")
+    apis.append("    else if (isStep%s) begin \n". format(
+      if (clocks.size > 1) 
+       (clocks foldLeft "")(_ + " && " + _.name + "_cnt == 0")
+      else "" ) )
     apis.append("      isStep = 0;\n")
     for (rst <- resets)
       apis.append("      %s = 0;\n".format(rst.name))
+    if (clocks.size > 1) {
+      for (clk <- clocks)
+        apis.append("      %s_fire = 0;\n".format(clk.name))
+    }
     apis.append("    end\n")
 
     apis.append("    if (count == -1) $finish(1);\n")
     apis.append("  end\n\n")
 
-    apis.append("  always @(%s) begin\n".format((clocks.tail foldLeft ("posedge " + clocks.head.name))
-      (_ + " or posedge " + _.name)))
+    apis.append("  always @(posedge %s) begin\n".format(mainClk.name))
+    if (clocks.size > 1) {
+      apis.append("    // fire clocks according to their relative length\n")
+      apis.append("    if (isStep%s) begin\n".format(
+        (resets foldLeft "")(_ + " && !" + _.name)
+      ) )
+      for (clk <- clocks)
+        apis.append("      if (%s_length < min) min = %s_cnt;\n".format(clk.name, clk.name))
+      for (clk <- clocks)
+        apis.append("      %s_cnt = %s_cnt - min;\n".format(clk.name, clk.name))
+      for (clk <- clocks) {
+        apis.append("      if (%s_cnt == 0) %s_fire = 1;\n".format(clk.name, clk.name))
+        apis.append("      else %s_fire = 0;\n".format(clk.name))
+      }
+      apis.append("      if (!(%s)) begin\n".format(
+        (clocks.tail foldLeft (clocks.head.name + "_cnt == 0"))(_ + " && " + _.name + "_cnt == 0")
+      ) )
+      for (clk <- clocks)
+        apis.append("        if (%s_cnt == 0) %s_cnt = %s_length;\n".format(
+          clk.name, clk.name, clk.name) )
+      apis.append("      end\n")
+      apis.append("    end\n")
+      apis.append("    // hack to reset\n")
+      apis.append("    else if (isStep%s) begin\n".format(
+        if (resets.isEmpty) ""
+        else ((resets.tail foldLeft (" && (" + resets.head.name))(_ + " || " + _.name)) + ")"
+      ) )
+      for (clk <- clocks) {
+        apis.append("      %s_cnt = 0;\n".format(clk.name, clk.name))
+        apis.append("      %s_fire = 1;\n".format(clk.name, clk.name))
+      }
+      apis.append("    end\n")
+    }
+
     apis.append("     // copy wires' & mems' value into shadows for 'peeking'\n")
     apis.append("    if (%sisStep) begin\n".format(
       if (clocks.size > 1) 
-         (clocks foldLeft "")(_ + _.name + " & ")
+         (clocks foldLeft "")(_ + _.name + "_fire && ")
       else "" )
     )
     for (wire <- wires) {
