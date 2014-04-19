@@ -539,8 +539,11 @@ class VerilogBackend extends Backend {
     }
     harness.write("  end\n\n")
 
-    if (Driver.isTesting) 
+    // TODO: select interface according to the tester
+    if (Driver.isTesting) { 
       harness write harnessAPIs(mainClk, clocks, resets, wires, mems, scanNodes, printNodes)
+      // harness write harnessMap(mainClk, resets, wires, scanNodes, printNodes)
+    }
     harness.write("endmodule\n")
 
     harness.close();
@@ -786,6 +789,39 @@ class VerilogBackend extends Backend {
     apis.append("  end\n")
     
     apis.result
+  }
+
+  def harnessMap (mainClk: Clock, resets: ArrayBuffer[Bool], wires: ArrayBuffer[Node], scanNodes: Array[Bits], printNodes: Array[Bits]) = {
+    val map = new StringBuilder
+    val printFormat = wires.map(a => "0x%x").fold("")((y,z) => z + " " + y)
+    val scanFormat = scanNodes.map(a => "%x").fold("")((y,z) => z + " " + y)
+
+    map.append("  integer count;\n")
+    map.append("  always @(negedge %s) begin\n".format(mainClk.name))
+    map.append("  #50;\n")
+    if (!resets.isEmpty)
+      map.append("    if (%s)\n".format(
+        (resets.tail foldLeft ("!" + resets.head.name))(_ + " || !" + _.name)))
+    map.append("      count = $fscanf('h80000000, \"" + scanFormat.slice(0,scanFormat.length-1) + "\"")
+    for (node <- scanNodes)
+      map.append(", " + emitRef(node))
+    map.append(");\n")
+    map.append("      if (count == -1) $finish(1);\n")
+    map.append("  end\n")
+    map.append("  always @(posedge %s) begin\n".format(mainClk.name))
+    if (!resets.isEmpty)
+      map.append("    if (%s)\n".format(
+        (resets.tail foldLeft ("!" + resets.head.name))(_ + " || !" + _.name)))
+    map.append("      $display(\"" + printFormat.slice(0,printFormat.length-1) + "\"")
+    for (wire <- wires) {
+      val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
+      val wireName = if (scanNodes contains wire) emitRef(wire) else pathName
+      map.append(", " + wireName)
+    }
+    map.append(");\n")
+    map.append("  end\n")
+
+    map.result
   }
 
   def emitDefs(c: Module): StringBuilder = {
