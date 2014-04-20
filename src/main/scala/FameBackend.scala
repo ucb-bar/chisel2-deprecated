@@ -1224,10 +1224,7 @@ trait Fame5Transform extends Backend {
     }
     //using MuxCase here is a hack, it is much more effiient to directly use the threadSelId as the signal to a large n-way mux
     val mux = MuxCase(node, muxMapping)
-    println("DEBUG0") 
     for((consumer, inputNum) <- Fame5Transform.consumerMap(node)){
-      println("DEBUG1")
-      println(consumer)
       consumer.inputs(inputNum) = mux
     }
   }
@@ -1373,17 +1370,24 @@ trait Fame5Transform extends Backend {
   }
   
   private def copyMem(mem: TransactionMem[Data]): TransactionMem[Data] = {
-    Module.trigger = true
-    val memCopy = new TransactionMem(mem.numMemLines, mem.readPortNum, mem.virtWritePortNum, mem.phyWritePortNum, mem.writeMap, mem.isSeqRead)(mem.dataType)
+    /*Module.trigger = true
+    val memCopy = new TransactionMem(mem.numMemLines, mem.readPortNum, mem.virtWritePortNum, mem.phyWritePortNum, mem.writeMap, mem.isSeqRead)(mem.dataType.clone)
+    memCopy.parent = mem.parent
+    mem.parent.children += memCopy
+    memCopy.level = mem.level
+    for((name, ioWire) <- memCopy.wires){
+      ioWire.isIo = true
+    }*/
+    Module.compStack.clear()
+    Module.compStack.push(mem.parent)
+    val memCopy = Module(new TransactionMem(mem.numMemLines, mem.readPortNum, mem.virtWritePortNum, mem.phyWritePortNum, mem.writeMap, mem.isSeqRead)(mem.dataType.clone))
+
     memCopy.genAllMuxes
-    for(i <- 0 until mem.readPortNum){
+    /*for(i <- 0 until mem.readPortNum){
       Predef.assert(mem.io.reads(i).is.inputs.length == 1)
       memCopy.io.reads(i).is.inputs += mem.io.reads(i).is.inputs(0)
       Predef.assert(mem.io.reads(i).adr.inputs.length == 1)
       memCopy.io.reads(i).adr.inputs += mem.io.reads(i).adr.inputs(0)
-      mem.io.reads(i).is.isIo = true
-      mem.io.reads(i).adr.isIo = true
-      mem.io.reads(i).dat.isIo = true
     }
     for(i <- 0 until mem.virtWritePortNum){
       Predef.assert(mem.io.writes(i).is.inputs.length == 1)
@@ -1392,13 +1396,7 @@ trait Fame5Transform extends Backend {
       memCopy.io.writes(i).adr.inputs += mem.io.writes(i).adr.inputs(0)
       Predef.assert(mem.io.writes(i).dat.inputs.length == 1)
       memCopy.io.writes(i).dat.inputs += mem.io.writes(i).dat.inputs(0)
-      mem.io.writes(i).is.isIo = true
-      mem.io.writes(i).adr.isIo = true
-      mem.io.writes(i).dat.isIo = true
-    }
-    memCopy.parent = mem.parent
-    mem.parent.children += memCopy
-    memCopy.level = mem.level
+    }*/
     return memCopy.asInstanceOf[TransactionMem[Data]]
   }
 
@@ -1515,10 +1513,12 @@ trait Fame5Transform extends Backend {
   preElaborateTransforms += ((top: Module) => replicateRegisters())
   preElaborateTransforms += ((top: Module) => muxRegOutputs())
   preElaborateTransforms += ((top: Module) => appendFireToRegWriteEnables())
-  preElaborateTransforms += ((top: Module) => replicateTransactionMems())
-  preElaborateTransforms += ((top: Module) => muxTransactionMemOutputs())
-  preElaborateTransforms += ((top: Module) => appendFireToTransactionMemEnables())
   preElaborateTransforms += ((top: Module) => collectNodesIntoComp(initializeDFS))
+  preElaborateTransforms += ((top: Module) => findConsumerMap(top)) 
+  preElaborateTransforms += ((top: Module) => replicateTransactionMems())
+  //preElaborateTransforms += ((top: Module) => muxTransactionMemOutputs())
+  //preElaborateTransforms += ((top: Module) => appendFireToTransactionMemEnables())
+  //preElaborateTransforms += ((top: Module) => collectNodesIntoComp(initializeDFS))
   //preElaborateTransforms += ((top: Module) => visualizeGraph(Fame5Transform.topModule.nodes, "nodeGraph.gv"))
   /*preElaborateTransforms += ((top: Module) => top.genAllMuxes)
   preElaborateTransforms += ((top: Module) => appendFireToMemEnables(top))
