@@ -18,15 +18,12 @@ module NameSuite_Block_2(input clk,
 `ifndef SYNTHESIS
   integer initvar;
   initial begin
-    #0.001;
-`ifdef RANDOM_SEED
-    initvar = $random(`RANDOM_SEED);
-`endif
-    #0.001;
+    #0.002;
     tag_ram_1 = {1{$random}};
     tag_ram_0 = {1{$random}};
   end
 `endif
+
   assign io_out_resp_bits_ppn = T0;
   assign T0 = T3 | T1;
   assign T1 = T2 ? tag_ram_1 : 32'h0;
@@ -59,6 +56,7 @@ module NameSuite_BindFifthComp_1(input clk,
   wire[31:0] vdtlb_io_out_resp_bits_ppn;
   wire vdtlb_io_out_resp_bits_error;
   wire vdtlb_io_out_resp_valid;
+
 
   assign io_resp_resp_bits_ppn = vdtlb_io_out_resp_bits_ppn;
   assign io_resp_resp_bits_error = vdtlb_io_out_resp_bits_error;

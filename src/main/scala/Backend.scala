@@ -51,8 +51,11 @@ abstract class Backend {
   /* Set of keywords which cannot be used as node and component names. */
   val keywords: HashSet[String];
 
+  /* Whether or not this backend decomposes along Module boundaries. */
+  def isEmittingComponents: Boolean = false
+
   def createOutputFile(name: String): java.io.FileWriter = {
-    val baseDir = ensureDir(Module.targetDir)
+    val baseDir = ensureDir(Driver.targetDir)
     new java.io.FileWriter(baseDir + name)
   }
 
@@ -96,7 +99,7 @@ abstract class Backend {
       val name = m.getName();
       val types = m.getParameterTypes();
       if (types.length == 0 && root.isValName(name) // patch to avoid defs
-        && isPublic(m.getModifiers()) && !(Module.keywords contains name)) {
+        && isPublic(m.getModifiers())) {
         val o = m.invoke(root);
         o match {
          case node: Node => {
@@ -224,7 +227,7 @@ abstract class Backend {
   def nameAll(root: Module) {
     root.name = extractClassName(root);
     nameChildren(root);
-    for( node <- Module.nodes ) {
+    for( node <- Driver.nodes ) {
       if( (node.nameHolder != null && !node.nameHolder.name.isEmpty)
         && !node.named && !node.isInstanceOf[Literal] ){
         node.name = node.nameHolder.name; // Not using nameIt to avoid override
@@ -239,10 +242,10 @@ abstract class Backend {
       case l: Literal => l.toString;
       case any       =>
         if (m.name != ""
-          && m != Module.topComponent.defaultResetPin && m.component != null) {
+          && m != Driver.topComponent.defaultResetPin && m.component != null) {
           /* Only modify name if it is not the reset signal
            or not in top component */
-          if(m.name != "reset" && m.component != Module.topComponent) {
+          if(m.name != "reset" && m.component != Driver.topComponent) {
             m.component.getPathName + "__" + m.name;
           } else {
             m.name
@@ -276,7 +279,7 @@ abstract class Backend {
 
   val preElaborateTransforms = ArrayBuffer[(Module) => Unit]()
   val transforms = ArrayBuffer[(Module) => Unit]()
-  if (Module.isCSE) transforms += CSE.transform
+  if (Driver.isCSE) transforms += CSE.transform
   val analyses = ArrayBuffer[(Module) => Unit]()
 
   def initializeDFS: Stack[Node] = {
@@ -285,7 +288,7 @@ abstract class Backend {
     /* XXX Make sure roots are consistent between initializeBFS, initializeDFS
      and findRoots.
      */
-    for( c <- Module.components ) {
+    for( c <- Driver.components ) {
       for( a <- c.debugs ) {
         res.push(a)
       }
@@ -303,7 +306,7 @@ abstract class Backend {
     such nodes.
 
     This method walks all nodes from all component roots (outputs, debugs).
-    and reassociates the component to the node both ways (i.e. in Module.nodes
+    and reassociates the component to the node both ways (i.e. in Driver.nodes
     and Node.component).
 
     We assume here that all nodes at the components boundaries (io) have
@@ -380,14 +383,14 @@ abstract class Backend {
     val outputs = m.io.flatten.filter(_._2.dir == OUTPUT)
 
     for ((name, i) <- inputs) {
-      if (i.inputs.length == 0 && m != Module.topComponent)
+      if (i.inputs.length == 0 && m != Driver.topComponent)
         if (i.consumers.length > 0) {
-          if (Module.warnInputs)
+          if (Driver.warnInputs)
             ChiselError.warning({"UNCONNECTED INPUT " + emitRef(i) + " in COMPONENT " + i.component +
                                  " has consumers"})
           i.driveRand = true
         } else {
-          if (Module.warnInputs)
+          if (Driver.warnInputs)
             ChiselError.warning({"FLOATING INPUT " + emitRef(i) + " in COMPONENT " + i.component})
           i.prune = true
         }
@@ -396,12 +399,12 @@ abstract class Backend {
     for ((name, o) <- outputs) {
       if (o.inputs.length == 0 && !o.component.isInstanceOf[BlackBox]) {
         if (o.consumers.length > 0) {
-          if (Module.warnOutputs)
+          if (Driver.warnOutputs)
             ChiselError.warning({"UNCONNECTED OUTPUT " + emitRef(o) + " in component " + o.component + 
                                  " has consumers on line " + o.consumers(0).line})
           o.driveRand = true
         } else {
-          if (Module.warnOutputs)
+          if (Driver.warnOutputs)
             ChiselError.warning({"FLOATING OUTPUT " + emitRef(o) + " in component " + o.component})
           o.prune = true
         }
@@ -412,7 +415,7 @@ abstract class Backend {
   def pruneNodes {
     val walked = new HashSet[Node]
     val bfsQueue = new ScalaQueue[Node]
-    for (node <- Module.randInitIOs) bfsQueue.enqueue(node)
+    for (node <- Driver.randInitIOs) bfsQueue.enqueue(node)
     var pruneCount = 0
 
     // conduct bfs to find all reachable nodes
@@ -455,7 +458,7 @@ abstract class Backend {
 
   // go through every Module and set its clock and reset field
   def assignClockAndResetToModules {
-    for (module <- Module.sortedComps.reverse) {
+    for (module <- Driver.sortedComps.reverse) {
       if (module.clock == null)
         module.clock = module.parent.clock
       if (!module.hasExplicitReset)
@@ -465,7 +468,7 @@ abstract class Backend {
 
   // go through every Module, add all clocks+resets used in it's tree to it's list of clocks+resets
   def gatherClocksAndResets {
-    for (parent <- Module.sortedComps) {
+    for (parent <- Driver.sortedComps) {
       for (child <- parent.children) {
         for (clock <- child.clocks) {
           parent.addClock(clock)
@@ -477,7 +480,7 @@ abstract class Backend {
             parent.addResetPin(reset)
 
           // special case for implicit reset
-          if (reset == Module.implicitReset && parent == Module.topComponent)
+          if (reset == Driver.implicitReset && parent == Driver.topComponent)
             if (!parent.resets.contains(reset))
               parent.resets += (reset -> reset)
         }
@@ -486,7 +489,7 @@ abstract class Backend {
   }
 
   def connectResets {
-    for (parent <- Module.sortedComps) {
+    for (parent <- Driver.sortedComps) {
       for (child <- parent.children) {
         for (reset <- child.resets.keys) {
           if (child.resets(reset).inputs.length == 0)
@@ -500,7 +503,7 @@ abstract class Backend {
   }
 
   def nameRsts {
-    for (comp <- Module.sortedComps) {
+    for (comp <- Driver.sortedComps) {
       for (rst <- comp.resets.keys) {
         if (!comp.resets(rst).named)
             comp.resets(rst).setName(rst.name)
@@ -538,7 +541,7 @@ abstract class Backend {
     c.pName = extractClassName(c)
 
     val classNames = LinkedHashMap[String, ArrayBuffer[Module]]()
-    for (m <- Module.sortedComps ; if m.pName == "" && m != c) {
+    for (m <- Driver.sortedComps ; if m.pName == "" && m != c) {
       val className = extractClassName(m)
       if (!(classNames contains className)) {
         classNames(className) = new ArrayBuffer[Module]
@@ -556,7 +559,7 @@ abstract class Backend {
       }
     }
 
-    for (m <- Module.sortedComps) {
+    for (m <- Driver.sortedComps) {
       m dfs { node =>
         if (!node.isTypeNode && node.pName == "") {
           if (node.name != "" || node.isLit) {
@@ -567,7 +570,7 @@ abstract class Backend {
               case _: Reg => "R"
               case _ => "T"
             }
-            if (Module.isEmittingComponents) {
+            if (isEmittingComponents) {
               node.pName = prefix + node.emitIndex
             } else {
               node.pName = prefix + node.component.nextIndex
@@ -592,11 +595,11 @@ abstract class Backend {
   // Write out graph trace to verify backannotation later
   def writeOutTrace(c: Module) {
     ChiselError.info("[Backannotation] write out graph trace")
-    val dir = ensureDir(Module.targetDir)
+    val dir = ensureDir(Driver.targetDir)
     val file = new java.io.FileWriter(dir+"%s.trace".format(c.name))
     val res = new StringBuilder
 
-    for (m <- Module.sortedComps) {
+    for (m <- Driver.sortedComps) {
       m dfs { node =>
         node match {
           case _: Assert =>
@@ -619,13 +622,13 @@ abstract class Backend {
   }
 
   def backannotationTransforms { 
-    if (Module.isBackannotating) {
+    if (Driver.isBackannotating) {
       transforms += { c => setPseudoNames(c) }
     }
   }
 
   def backannotationAnalyses {
-    if (Module.isBackannotating) {
+    if (Driver.isBackannotating) {
       analyses += { c => writeOutTrace(c) }
     }
   }
@@ -637,32 +640,32 @@ abstract class Backend {
 
   def elaborate(c: Module): Unit = {
     println("backend elaborate")
-    Module.setAsTopComponent(c)
+    Driver.setTopComponent(c)
 
     /* XXX If we call nameAll here and again further down, we end-up with
      duplicate names in the generated C++.
     nameAll(c) */
 
-    Module.components.foreach(_.elaborate(0));
+    Driver.components.foreach(_.elaborate(0))
 
     /* XXX We should name all signals before error messages are generated
      so as to give a clue where problems are showing up but that interfers
      with the *bindings* (see later comment). */
-    for (c <- Module.components)
+    for (c <- Driver.components)
       c.markComponent();
     // XXX This will create nodes after the tree is traversed!
     c.genAllMuxes;
     execute(c, preElaborateTransforms)
-    Module.components.foreach(_.postMarkNet(0));
+    Driver.components.foreach(_.postMarkNet(0))
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
-    // Module.assignResets()
+    // Driver.assignResets()
 
     levelChildren(c)
-    Module.sortedComps = gatherChildren(c).sortWith(
+    Driver.sortedComps = gatherChildren(c).sortWith(
       (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)));
 
     assignClockAndResetToModules
-    Module.sortedComps.map(_.addDefaultReset)
+    Driver.sortedComps.map(_.addDefaultReset)
     c.addClockAndReset
     gatherClocksAndResets
     connectResets
@@ -698,10 +701,10 @@ abstract class Backend {
     execute(c, transforms)
     ChiselError.info("finished transforms")
 
-    Module.sortedComps.map(_.nodes.map(_.addConsumers))
+    Driver.sortedComps.map(_.nodes.map(_.addConsumers))
     c.traceNodes();
     val clkDomainWalkedNodes = new HashSet[Node]
-    for (comp <- Module.sortedComps)
+    for (comp <- Driver.sortedComps)
       for (node <- comp.nodes)
         if (node.isInstanceOf[Reg])
             createClkDomain(node, clkDomainWalkedNodes)
@@ -714,20 +717,20 @@ abstract class Backend {
 
     execute(c, analyses)
 
-    for (comp <- Module.sortedComps ) {
+    for (comp <- Driver.sortedComps ) {
       // remove unconnected outputs
       pruneUnconnectedIOs(comp)
     }
 
     ChiselError.checkpoint()
 
-    if(!Module.dontFindCombLoop) {
+    if(!Driver.dontFindCombLoop) {
       ChiselError.info("checking for combinational loops")
       c.findCombLoop();
       ChiselError.checkpoint()
       ChiselError.info("NO COMBINATIONAL LOOP FOUND")
     }
-    if(Module.saveComponentTrace) {
+    if (Driver.saveComponentTrace) {
       printStack
     }
   }
@@ -745,7 +748,7 @@ abstract class Backend {
         + " is unconnected in module " + compInstName + " " + compName)
     }
 
-    for (c <- Module.components) {
+    for (c <- Driver.components) {
       if (c != topC) {
         for ((n,i) <- c.io.flatten) {
           if (i.inputs.length == 0) {
@@ -760,7 +763,7 @@ abstract class Backend {
   /** Prints the call stack of Component as seen by the push/pop runtime. */
   protected def printStack {
     var res = ""
-    for((i, c) <- Module.printStackStruct){
+    for((i, c) <- Driver.printStackStruct){
       res += (genIndent(i) + c.moduleName + " " + c.name + "\n")
     }
     ChiselError.info(res)

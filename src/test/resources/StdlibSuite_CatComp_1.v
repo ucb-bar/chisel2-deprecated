@@ -6,6 +6,7 @@ module StdlibSuite_CatComp_1(
 
   wire[15:0] T0;
 
+
   assign io_z = T0;
   assign T0 = {io_x, io_y};
 endmodule

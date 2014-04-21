@@ -39,7 +39,7 @@ abstract class Fix[B<:Bits,T<:Fix[B,T]](val exp: Int, val raw: B) extends Bundle
   def toRaw(a: Bits): B
   def get_sext(source: Bits): UInt
 
-  def do_add(b: T): T = {
+  def do_add(b: T, isSub: Boolean = false): T = {
     val teff_exp = exp-raw.width
     val beff_exp = b.exp-b.raw.width
 
@@ -52,7 +52,7 @@ abstract class Fix[B<:Bits,T<:Fix[B,T]](val exp: Int, val raw: B) extends Bundle
     val new_exp = int_exp + new_width
     val result = Factory(new_exp, new_width)
 
-    result.raw := t_adj_rd + b_adj_rd
+    result.raw := (if(isSub) t_adj_rd - b_adj_rd else t_adj_rd + b_adj_rd)
     result
   }
   def do_mult(b: T): T = {
@@ -98,7 +98,11 @@ class UFix(exp: Int, raw: UInt) extends Fix[UInt,UFix](exp, raw) with Num[UFix] 
 
   def + (b: UFix): UFix = do_add(b)
   def * (b: UFix): UFix = do_mult(b)
-  def :=(source: UFix): Unit = do_truncate(source)
+
+  override protected def colonEquals(that: Bundle): Unit = that match {
+    case u: UFix => do_truncate(u)
+    case _ => illegalAssignment(that)
+  }
 
   def <<(b: Int): UFix = new UFix(exp+b, raw)
   def >>(b: Int): UFix = new UFix(exp-b, raw)
@@ -123,18 +127,63 @@ class SFix(exp: Int, raw: SInt) extends Fix[SInt,SFix](exp, raw) with Num[SFix] 
   def get_sext(source: Bits) = source(source.width-1,source.width-2)
 
   def + (b: SFix): SFix = do_add(b)
+  def - (b: SFix): SFix = do_add(b, isSub=true)
   def * (b: SFix): SFix = do_mult(b)
-  def :=(source: SFix): Unit = do_truncate(source)
+  def unary_-(): SFix = (new SFix(exp,SInt(0))) - this
+
+  override protected def colonEquals(that: Bundle): Unit = that match {
+    case s: SFix => do_truncate(s)
+    case _ => illegalAssignment(that)
+  }
 
   def <<(b: Int): SFix = new SFix(exp+b, raw)
   def >>(b: Int): SFix = new SFix(exp-b, raw)
 
-  def unary_-(): SFix = throw new Exception("unimplemented unary -");
   def /  (b: SFix): SFix = throw new Exception("unimplemented /");;
   def %  (b: SFix): SFix = throw new Exception("unimplemented %");;
-  def -  (b: SFix): SFix = throw new Exception("unimplemented -");;
   def <  (b: SFix): Bool = throw new Exception("unimplemented <");;
   def <= (b: SFix): Bool = throw new Exception("unimplemented <=");;
   def >  (b: SFix): Bool = throw new Exception("unimplemented >");;
   def >= (b: SFix): Bool = throw new Exception("unimplemented >=");;
 }
+
+object QR {
+  def genSFix(int: Int, frac: Int) = SFix(int, int+frac)
+  def genUFix(int: Int, frac: Int) = UFix(int, int+frac)
+}
+
+/*
+class Toy extends Module {
+  val io = new Bundle {
+    val in0 = SFix(2, 4).asInput
+    val in1 = SFix(2, 4).asInput
+
+    val out = SFix(4,16).asOutput
+    val oraw = Bits(OUTPUT, width=128)
+  }
+
+  val int_result = -io.in0 * (io.in0 + io.in1)
+
+  io.out := int_result
+  io.oraw := int_result.raw
+}
+
+class ToyTester(dut: Toy) extends AdvTester.AdvTester(dut) {
+  poke(dut.io.in0.raw, BigInt(16-2))
+  poke(dut.io.in1.raw, BigInt(5))
+  takestep()
+  def signed_peek(target: Bits): Double = {
+    val raw = peek(target)
+    val max_pos = (BigInt(1) << (target.getWidth-1))-1
+    (if(raw > max_pos) raw - (BigInt(1) << target.getWidth) else raw).toDouble
+  }
+  def convert[T<:Fix[_,_]](target: T): Double = {
+    target match {
+      case s: SFix => (signed_peek(s.raw).toDouble * math.pow(2, s.exp-s.raw.width))
+      case u: UFix => (peek(u.raw).toDouble * math.pow(2, u.exp-u.raw.width))
+    }
+  }
+  println("In = %g, %g : Out = %g".format(convert(dut.io.in0), convert(dut.io.in1), convert(dut.io.out)))
+  println("Raw output is: %s".format(peek(dut.io.oraw).toByteArray.map("%02X".format(_)).reduce(_+" "+_)))
+}
+*/

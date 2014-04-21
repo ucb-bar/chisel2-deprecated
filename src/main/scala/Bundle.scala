@@ -35,7 +35,6 @@ import scala.collection.mutable.Stack
 import java.lang.reflect.Modifier._
 import Node._;
 import ChiselError._
-import sort._
 
 object Bundle {
   val keywords = HashSet[String]("elements", "flip", "toString",
@@ -49,24 +48,6 @@ object Bundle {
     res
   }
 
-}
-
-object sort {
-  def apply(a: Array[(String, Bits)]): Array[(String, Bits)] = {
-    var i = 0
-    for (j <- 1 until a.length) {
-      val keyElm = a(j);
-      val key = Module.ioMap(keyElm._2)
-      i = j - 1
-
-      while (i >= 0 && Module.ioMap(a(i)._2) > key) {
-        a(i + 1) = a(i)
-        i = i - 1
-      }
-      a(i + 1) = keyElm
-    }
-    a
-  }
 }
 
 /** Defines a collection of datum of different types into a single coherent
@@ -267,33 +248,13 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     return false;
   }
 
-  override def :=[T <: Data](src: T): Unit = {
-    src match {
-      case bun: Bundle => this := bun
-      case any => super.:=(any)
-    }
-  }
-
-  def :=(src: Bundle): Unit = {
-    if(this.isTypeNode && comp != null) {
+  override protected def colonEquals(src: Bundle): Unit = {
+    if (this.isTypeNode && comp != null) {
       this.comp.procAssign(src.toNode)
-      return
-    }
-    for((n, i) <- elements) {
-      i match {
-        case bundle: Bundle => {
-          if (src.contains(n)) bundle := src(n).asInstanceOf[Bundle]
-        }
-        case bits: Bits => {
-          if (src.contains(n)) bits := src(n).asInstanceOf[Bits]
-        }
-        case vec: Vec[_] => {
-           /* We would prefer to match for Vec[Data] but that's impossible
-            because of JVM constraints which lead to type erasure. */
-          val vecdata = vec.asInstanceOf[Vec[Data]]
-          if (src.contains(n)) vecdata := src(n).asInstanceOf[Vec[Data]]
-        }
-      }
+    } else {
+      for ((n, i) <- elements)
+        if (src contains n)
+          i := src(n)
     }
   }
 
@@ -302,7 +263,7 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     for ((n, i) <- elements){
       res = res ++ i.flatten
     }
-    sort(res.toArray)
+    res.sortWith(_._2._id < _._2._id).toArray
   }
 
   override def getWidth(): Int = {

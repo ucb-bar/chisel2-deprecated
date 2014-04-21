@@ -143,7 +143,6 @@ class ModularCppBackend extends CppBackend {
   override def elaborate(c: Module): Unit = {
     backendElaborate(c)
     c.findConsumers()
-    c.verifyAllMuxes
     ChiselError.checkpoint()
 
     val vertices = createVertices(c)
@@ -190,7 +189,7 @@ class ModularCppBackend extends CppBackend {
     out_h.close();
 
     out_c.write("#include \"" + c.name + ".h\"\n");
-    for(str <- Module.includeArgs) out_c.write("#include \"" + str + "\"\n");
+    for (str <- Driver.includeArgs) out_c.write("#include \"" + str + "\"\n")
     out_c.write("\n");
     out_c.write("void " + c.name + "_t::init ( bool rand_init ) {\n");
     for (vertex <- vertices) {
@@ -227,7 +226,7 @@ class ModularCppBackend extends CppBackend {
     out_c.write("}\n")
 
     out_c.write("void " + c.name + "_t::print ( FILE* f ) {\n");
-    for (cc <- Module.components; p <- cc.printfs)
+    for (cc <- Driver.components; p <- cc.printfs)
       out_c.write("#if __cplusplus >= 201103L\n"
         + "  if (" + emitLoWordRef(p.cond)
         + ") dat_fprintf<" + p.width + ">(f, "

@@ -44,7 +44,7 @@ object nodeToString {
         case _ =>
           if (!isRealName) node.pName
           else if (node.name != "") node.name
-          else Module.backend.emitRef(node)
+          else Driver.backend.emitRef(node)
       }
     }
 
@@ -160,9 +160,9 @@ object nodeToString {
 }
 
 trait Backannotation extends Backend {
-  Module.isBackannotating = true
+  Driver.isBackannotating = true
 
-  lazy val targetdir = ensureDir(Module.targetDir)
+  lazy val targetdir = ensureDir(Driver.targetDir)
   def copyResource(filename: String, toDir: String) {
     val resourceStream = getClass getResourceAsStream "/" + filename //Todo: understand it (Java?)
     if (resourceStream != null) {
@@ -182,7 +182,7 @@ trait Backannotation extends Backend {
     try {
       val lines = Source.fromFile("%s.trace".format(targetdir + c.pName)).getLines.toSet
       var ok = true 
-      for (m <- Module.sortedComps) {
+      for (m <- Driver.sortedComps) {
         m dfs { node =>
           node match {
             case _: Assert =>
@@ -231,7 +231,7 @@ trait CounterBackannotation extends Backannotation {
 
     try {
       // Read the signal list file
-      val lines = Source.fromFile(Module.model).getLines
+      val lines = Source.fromFile(Driver.model).getLines
       val TermRegex = """\s*([\w\._\:]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)\s+([\d\.\+-e]+)""".r
       val signalNames = new HashSet[String]
       val signalNameMap = new HashMap[String, Node]
@@ -251,7 +251,7 @@ trait CounterBackannotation extends Backannotation {
       }
 
       // Find correspoinding nodes
-      for (m <- Module.sortedComps ; if m != c) {
+      for (m <- Driver.sortedComps ; if m != c) {
         for (node <- m.nodes) {
           val signalName = getSignalPathName(node, ".")
           if (signalNames contains signalName){

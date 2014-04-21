@@ -61,10 +61,15 @@ class SInt extends Bits with Num[SInt] {
 
   override def matchWidth(w: Int): Node = {
     if (w > this.width) {
-      val topBit = NodeExtract(this, this.width-1); topBit.infer
-      val fill = NodeFill(w - this.width, topBit); fill.infer
-      val res = Concatenate(fill, this); res.infer
-      res
+      if (this.width == 1) {
+        val res = NodeFill(w, this); res.infer
+        res
+      } else {
+        val topBit = NodeExtract(this, this.width-1); topBit.infer
+        val fill = NodeFill(w - this.width, topBit); fill.infer
+        val res = Concatenate(fill, this); res.infer
+        res
+      }
     } else if (w < this.width) {
       val res = NodeExtract(this, w-1,0); res.infer
       res
@@ -74,7 +79,10 @@ class SInt extends Bits with Num[SInt] {
   }
 
   /** casting from UInt followed by assignment. */
-  def :=(src: UInt): Unit = this := src.zext;
+  override protected def colonEquals(that: Bits): Unit = that match {
+    case u: UInt => this := u.zext
+    case _ => super.colonEquals(that)
+  }
 
   def gen[T <: Bits](): T = SInt().asInstanceOf[T];
 
@@ -83,7 +91,7 @@ class SInt extends Bits with Num[SInt] {
   def unary_!(): SInt = newUnaryOp("!");
   def << (b: UInt): SInt = newBinaryOp(b, "<<");
   def >> (b: UInt): SInt = newBinaryOp(b, "s>>");
-  def ?  (b: SInt): SInt = newBinaryOp(b, "?");
+  def ?  (b: SInt): SInt = fromNode(Multiplex(this.toBool, b, null))
 
   // order operators
   def <  (b: SInt): Bool = newLogicalOp(b, "s<");

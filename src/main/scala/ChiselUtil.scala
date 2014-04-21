@@ -73,11 +73,11 @@ object LFSR16
   */
 object PopCount
 {
-  def apply(in: Seq[Bool]): UInt = {
+  def apply(in: Iterable[Bool]): UInt = {
     if (in.size == 0) {
       UInt(0)
     } else if (in.size == 1) {
-      in(0)
+      in.head
     } else {
       apply(in.slice(0, in.size/2)) + Cat(UInt(0), apply(in.slice(in.size/2, in.size)))
     }
@@ -502,7 +502,7 @@ object Log2 {
       log2.init("", fixWidth(sizeof(n-1)), mod)
       UInt().fromNode(log2)
     }
-    Module.backend match {
+    Driver.backend match {
       case x: CppBackend => log2it
       case x: FloBackend => log2it
       case _ => {
