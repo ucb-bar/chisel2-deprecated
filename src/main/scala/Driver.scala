@@ -183,14 +183,6 @@ object Driver {
             backend = new DotBackend
           } else if (args(i + 1) == "fpga") {
             backend = new FPGABackend
-          } else if (args(i + 1) == "counterc") {
-            backend = new CounterCppBackend
-          } else if (args(i + 1) == "counterv") {
-            backend = new CounterVBackend
-          } else if (args(i + 1) == "counterfpga") {
-            backend = new CounterFPGABackend
-          } else if (args(i + 1) == "counterw") {
-            backend = new CounterWBackend
           } else {
             backend = Class.forName(args(i + 1)).newInstance.asInstanceOf[Backend]
           }

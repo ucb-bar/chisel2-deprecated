@@ -33,353 +33,11 @@ package Chisel
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.HashSet
+import scala.collection.mutable.{Queue => ScalaQueue}
 import scala.math.pow
 
-object DaisyChain {
-  var top: Module = null
-  var clks: DecoupledIO[UInt] = null
-  var clksReg: Bits = null
-  val fires = new HashMap[Module, Bool]
-  val daisyIns = new HashMap[Module, UInt]
-  val daisyOuts = new HashMap[Module, DecoupledIO[UInt]]
-  val daisyCtrls = new HashMap[Module, Bits]
-  val daisyCopy = new HashMap[Module, Bool]
-  val daisyRead = new HashMap[Module, Bool]
-}
-
-trait DaisyChain extends Backend {
-  val ioBuffers = new HashMap[Bits, Bits]
-  override def backannotationTransforms {
-    super.backannotationTransforms
-    transforms += ((c: Module) => c bfs (_.addConsumers))
-    transforms += ((c: Module) => findStates(DaisyChain.top)) 
-    transforms += ((c: Module) => decouple(DaisyChain.top))
-    transforms += ((c: Module) => appendFires(DaisyChain.top))
-    transforms += ((c: Module) => genCounters(DaisyChain.top))
-    transforms += ((c: Module) => daisyChain(DaisyChain.top))
-
-    transforms += ((c: Module) => c.addClockAndReset)
-    transforms += ((c: Module) => gatherClocksAndResets)
-    transforms += ((c: Module) => connectResets)
-    transforms += ((c: Module) => c.inferAll)
-    transforms += ((c: Module) => c.forceMatchingWidths)
-    transforms += ((c: Module) => c.removeTypeNodes)
-    transforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
-  }
-
-  val daisyNames = HashSet(
-    "clk_cntr", "clks_bits", "clks_valid", "clks_ready", 
-    "daisy_out_bits", "daisy_out_valid", "daisy_out_ready",
-    "daisy_buf", "daisy_ctrl"
-  )                 
-
-  var counterIdx = -1
-  def emitCounterIdx = {
-    counterIdx = counterIdx + 1
-    counterIdx
-  }
-
-  def wire(pin: Data, input: Node) {
-    if (pin.inputs.isEmpty) pin.inputs += input
-    else pin.inputs(0) = input
-  }
-
-  def addReg(m: Module, outType: Bits, name: String = "", updates: Map[Bool, Node] = Map()) {
-    val reg = outType.comp match {
-      case r: Reg => r
-    }
-    // assign component
-    reg.component = m
-
-    // assign clock
-    reg.clock = m.clock
-
-    // assign name
-    if (name != "") reg setName name
-
-    // set enable signal
-    reg.isEnable = !updates.isEmpty
-    for ((cond, value) <- updates) {
-      reg.enable = reg.enable || cond
-    }
-
-    // add updates
-    reg.updates ++= updates
-
-    // genreate muxes
-    reg genMuxes reg
-
-    // assign reset
-    if (reg.isReset) 
-      reg.inputs += m.reset
-  }
-
-  def findStates(c: Module) { 
-    ChiselError.info("[DaisyChain] find state elements")
-    /*** collect state elements for snapshotting ***/
-    // First, collect the top component's inputs
-    for ((name, targetPin) <- c.io.flatten ; 
-      if !(daisyNames contains name) && targetPin.dir == INPUT) {
-        c.counter(targetPin)
-      }
-
-    // Second, collect all the state elements (Reg & Mem)
-    val queue = new scala.collection.mutable.Queue[Module]
-    queue enqueue c
-    while (!queue.isEmpty) {
-      val top = queue.dequeue
-      // collect registers and memory access
-      top.nodes map { 
-        _ match {
-          case reg: Reg if !(daisyNames contains reg.name) =>
-            top.counter(reg)
-          case mem: Mem[_] =>
-            for (i <- 0 until mem.size)
-              top.counter(new MemRead(mem, UInt(i)))
-          case _ =>
-        }
-      }
-      // visit children
-      top.children map (queue enqueue _)
-    }
-  }
-
-  /* target decoupling */
-  def decouple (c: Module) = {
-    ChiselError.info("[DaisyChain] target decoupling")
-    for ((name, io) <- c.io.asInstanceOf[Bundle].elements) {
-      io nameIt (name, true)
-    }
-
-    // For the input and output pins of the top component
-    // insert buffers so that their values are avaiable
-    // after the target is stalled
-    for ((name, targetPin) <- c.io.flatten ; if !(daisyNames contains name)) {
-      val bufName = name + "_buf"
-      ioBuffers(targetPin) = {
-        val buf = Reg(UInt())
-        if (targetPin.dir == INPUT) {
-          // Input buffers work when the clock counter value is set
-          addReg(c, buf, bufName,
-            Map(DaisyChain.clks.valid -> targetPin)
-          )
-          for (consumer <- targetPin.consumers) {
-            val idx = consumer.inputs indexOf targetPin
-            consumer.inputs(idx) = buf
-          }
-        } else if (targetPin.dir == OUTPUT) {
-          addReg(c, buf, bufName,
-            Map(DaisyChain.fires(c) -> targetPin.inputs.head)
-          )
-          wire(targetPin, buf)
-        }
-        buf
-      }
-      daisyNames += bufName
-    }
-  }
-
-
-  def appendFires(c: Module) {
-    ChiselError.info("[DaisyChain] append fire signals to Reg and Mem")
-
-    val queue = new scala.collection.mutable.Queue[Module]
-    queue enqueue c
-
-    while (!queue.isEmpty) {
-      val top = queue.dequeue
-
-      // Make all delay nodes be enabled by the fire signal
-      for (node <- top.nodes ; if !(daisyNames contains node.name)) {
-        node match {
-          // For Reg, different muxes are generated by different backend
-          case reg: Reg if this.isInstanceOf[VerilogBackend] && 
-                           !Driver.isBackannotating => {
-            val enable = DaisyChain.fires(top) && reg.enable
-            reg.inputs(reg.enableIndex) = enable.getNode
-          }
-          case reg: Reg => {
-            reg.inputs(0) = Multiplex(DaisyChain.fires(top), reg.next, reg)
-          }
-          case mem: Mem[_] => {
-            for (write <- mem.writeAccesses) {
-              val en = Bool()
-              val newEn = DaisyChain.fires(top) && en
-              wire(en, write.inputs(1))
-              write.inputs(1) = newEn
-            }
-          }
-          case _ =>
-        }
-      }
-    
-      top.children map (queue enqueue _)
-    }  
-  }
-
-  def genCounters (c: Module) {
-    ChiselError.info("[DaisyChain] generate activity counters")
-
-    val queue = new scala.collection.mutable.Queue[Module]
-    queue enqueue c
- 
-    while (!queue.isEmpty) {
-      val top = queue.dequeue
-
-      // activity counters <- { Reg, MemWrite }
-      for (signal <- top.signals) {
-        signal.cntrIdx = emitCounterIdx
-        signal.counter = signal match {
-          case reg:   Reg     => UInt(reg)
-          case read:  MemRead => UInt(read)
-          case input: Bits    => ioBuffers(input)
-        }
-        signal.shadow  = Reg(Bits(width = 32))
-      }
-
-      // visit children
-      top.children map (queue enqueue _)
-    }
-  }  
-
-  def daisyChain(c: Module) {
-    ChiselError.info("[DaisyChain] daisy chaining")
- 
-    val queue = new scala.collection.mutable.Queue[Module] 
-    queue enqueue c
-
-    // Daisy chaining
-    while (!queue.isEmpty) {
-      val top = queue.dequeue
-      val copy = DaisyChain.daisyCopy(top)
-      val read = DaisyChain.daisyRead(top)
-
-      (top.children.isEmpty, top.signals.isEmpty) match {
-        // no children & no singals 
-        case (true, true) => {
-          // daisy output <- daisy input
-          wire(DaisyChain.daisyOuts(top).bits, DaisyChain.daisyIns(top))
-        }
-        // children but no signals
-        case (false, true) => {
-          // daisy output <- head child's daisy output
-          wire(DaisyChain.daisyOuts(top).bits, DaisyChain.daisyOuts(top.children.head).bits)
-          // last child's daisy input <- daisy input
-          wire(DaisyChain.daisyIns(top.children.last), DaisyChain.daisyIns(top))
-        }
-        // no children but signals
-        case (true, false) => {
-          // daisy output <- head shadow
-          wire(DaisyChain.daisyOuts(top).bits, top.signals.head.shadow)
-          // last shadow <- daisy input
-          addReg(top, top.signals.last.shadow, "shadow_" + top.signals.last.cntrIdx,
-            Map (
-              copy -> top.signals.last.counter,
-              read -> DaisyChain.daisyIns(top)
-            )
-          )
-        }
-        // children & signals
-        case (false, false) => {
-          // daisy output <- head shadow
-          wire(DaisyChain.daisyOuts(top).bits, top.signals.head.shadow)
-          // last shadow <- daisy input
-          addReg(top, top.signals.last.shadow, "shadow_" + top.signals.last.cntrIdx,
-            Map (
-              copy -> top.signals.last.counter,
-              read -> DaisyChain.daisyOuts(top.children.head).bits
-            )
-          )
-          // last child's daisy input <- daisy input
-          wire(DaisyChain.daisyOuts(top.children.last).bits, DaisyChain.daisyIns(top))
-        }
-      }
-
-      
-      for (s <- top.children sliding 2 ; if s.size == 2) {
-        val cur = s.head
-        val next = s.last
-        // cur child's daisy input <- next child's daisy output
-        wire(DaisyChain.daisyIns(cur), DaisyChain.daisyOuts(next).bits)
-      }
-
-      for (s <- top.signals sliding 2 ; if s.size == 2) {
-        val cur = s.head
-        val next = s.last
-        /****** Shaodw Counter *****/
-        // daisy_ctrl == 'copy' -> current counter
-        // daisy_ctrl == 'read' -> next shadow 
-        addReg(top, cur.shadow, "shadow_" + cur.cntrIdx,
-          Map(
-            copy -> cur.counter,
-            read -> next.shadow
-          )
-        )
-      }
-
-      // collect signal lists
-      Module.signals ++= top.signals
-      // visit children
-      top.children map (queue enqueue _)
-    }
-  }  
-}
-
-class DaisyVerilogBackend extends VerilogBackend with DaisyChain
-class DaisyCppBackend extends CppBackend with DaisyChain
-
-object DaisyTransform {
-  lazy val clks: DecoupledIO[UInt] = {
-    DaisyChain.top.io("clks") match {
-      case dio: DecoupledIO[UInt] => dio
-    }
-  }
-  lazy val daisyOut: DecoupledIO[UInt] = {
-    DaisyChain.top.io("daisy_out") match {
-      case dio: DecoupledIO[UInt] => dio
-    }
-  }
-
-  lazy val daisyCtrl: Bits = {
-    DaisyChain.top.io("daisy_ctrl") match {
-      case bits: Bits => bits
-    }
-  }
-
-  def apply[T <: Module](c: => T) = {
-    // clock counters
-    val clks = Decoupled(UInt(width = 32)).flip
-    val clksReg = Reg(UInt(width = 32))
-    val fired = clksReg.orR
-    val notFired = !fired
-    val top: T = Module(c)
-    DaisyChain.top = top
-    DaisyChain.clks = clks
-    DaisyChain.clksReg = clksReg
-    DaisyChain.fires(DaisyChain.top) = fired
-    DaisyChain.daisyIns(DaisyChain.top) = UInt(0)
-    addPin(top, clks, "clks")
-    clks.ready.inputs += notFired
-
-    clksReg.comp match {
-      case reg: Reg => {
-        reg.component = top
-        reg.isEnable  = true
-        reg.enable    = fired || (clks.valid && notFired)
-        reg.updates ++= Map (
-          (notFired && clks.valid) -> clks.bits,
-          fired                    -> (clksReg - UInt(1))
-        )
-      }
-    }
-    clksReg nameIt ("clk_cntr", false)
-
-    insertDaisyPins(top)
-
-    top
-  }
-
-  def addPin(m: Module, pin: Data, name: String) {
+object addPin {
+  def apply(m: Module, pin: Data, name: String) {
     for ((n, io) <- pin.flatten) {
       // assign component
       io.component = m
@@ -392,57 +50,418 @@ object DaisyTransform {
       case io: Bundle => io += pin
     }
   }
+}
 
-  def insertDaisyPins (c: Module) = {
+object wire {
+  def apply(pair: (Node, Data)) {
+    val input = pair._1
+    val consumer = pair._2
+    if (consumer.inputs.isEmpty) consumer.inputs += input
+    else consumer.inputs(0) = input
+  }
+}
+
+// DaisyTransform inserts the step counter and
+// the snapshot and evenet counter pins
+object DaisyTransform {
+  var top: Module = null
+
+  val stepsIn = Decoupled(UInt(width = 32)).flip
+  val snapOut = Decoupled(UInt(width = 32))
+  val snapCtrl = UInt(INPUT, 1)
+  val cntrOut = Decoupled(UInt(width = 32))
+  val cntrCtrl = UInt(INPUT, 1)
+
+  val fires = new HashMap[Module, Bool]
+  val snapIns = new HashMap[Module, UInt]
+  val snapOuts = new HashMap[Module, DecoupledIO[UInt]]
+  val snapCtrls = new HashMap[Module, Bits]
+  val snapCopies = new HashMap[Module, Bool]
+  val snapReads = new HashMap[Module, Bool]
+  val cntrIns = new HashMap[Module, UInt]
+  val cntrOuts = new HashMap[Module, DecoupledIO[UInt]]
+  val cntrCtrls = new HashMap[Module, Bits]
+  val cntrCopies = new HashMap[Module, Bool]
+  val cntrReads = new HashMap[Module, Bool]
+
+  val states = new ArrayBuffer[Node]
+
+  def apply[T <: Module](c: => T) = {
+    top = Module(c)
+
+    // clock counters
+    val steps = Reg(init = UInt(0, 32))
+    val fired = steps.orR
+    val notFired = !fired
+
+    addReg(top, steps, "steps",
+      (notFired && stepsIn.valid) -> stepsIn.bits,
+      fired                       -> (steps - UInt(1))
+    )
+
+    ChiselError.info("[DaisyTransform] add daisy pins")
+
+    addPin(top, stepsIn, "steps_in")
+    addPin(top, snapOut, "snap_out")
+    addPin(top, snapCtrl, "snap_ctrl")
+    addPin(top, cntrOut, "cntr_out")
+    addPin(top, cntrCtrl, "cntr_ctrl")
+    
+    wire(notFired -> stepsIn.ready)
+    fires(top)     = fired
+    snapIns(top)   = UInt(0)
+    snapOuts(top)  = snapOut
+    snapCtrls(top) = snapCtrl
+    cntrIns(top)   = UInt(0)
+    cntrOuts(top)  = cntrOut
+    cntrCtrls(top) = cntrCtrl
+
+    val snapFire = addTypeNode(top, snapOut.ready && notFired, "snap_fire")
+    val snapCopy = addTypeNode(top, snapFire && snapCtrl === Bits(0), "snap_copy")
+    val snapRead = addTypeNode(top, snapFire && snapCtrl === Bits(1), "snap_read")
+    val cntrFire = addTypeNode(top, cntrOut.ready && notFired, "cntr_fire")
+    val cntrCopy = addTypeNode(top, cntrFire && cntrCtrl === Bits(0), "cntr_copy")
+    val cntrRead = addTypeNode(top, cntrFire && cntrCtrl === Bits(1), "cntr_read")
+    snapCopies(top) = snapCopy
+    snapReads(top)  = snapRead
+    cntrCopies(top) = cntrCopy
+    cntrReads(top)  = cntrRead
+    wire((snapFire && notFired) -> snapOut.valid)
+    wire((cntrFire && notFired) -> cntrOut.valid)
+    
+    top.children foreach (addDaisyPins(_))
+    top.asInstanceOf[T]
+  }
+
+
+  def addDaisyPins (c: Module) = {
     /* insert pins */
-    val queue = new scala.collection.mutable.Queue[Module]
-    queue enqueue c
+    val queue = ScalaQueue(c)
     while (!queue.isEmpty) {
       val m = queue.dequeue
       val fire = Bool(INPUT)
-      val daisyIn = UInt(INPUT, 32)
-      val daisyOut = Decoupled(UInt(width = 32))
-      val daisyCtrl = UInt(INPUT, 1)
-      addPin(m, daisyOut, "daisy_out")
-      addPin(m, daisyCtrl, "daisy_ctrl")
-      DaisyChain.daisyOuts(m) = daisyOut
-      DaisyChain.daisyCtrls(m) = daisyCtrl
-      if (m != c) {
-        addPin(m, fire, "fire")
-        addPin(m, daisyIn, "daisy_in")
-        DaisyChain.fires(m) = fire
-        DaisyChain.daisyIns(m) = daisyIn
-        fire.inputs += DaisyChain.fires(m.parent)
-        daisyCtrl.inputs += DaisyChain.daisyCtrls(m.parent)
-        daisyOut.ready.inputs += DaisyChain.daisyOuts(m.parent).ready
-      } 
+      val snapIn = UInt(INPUT, 32)
+      val snapOut = Decoupled(UInt(width = 32))
+      val snapCtrl = UInt(INPUT, 1)
+      val cntrIn = UInt(INPUT, 32)
+      val cntrOut = Decoupled(UInt(width = 32))
+      val cntrCtrl = UInt(INPUT, 1)
+      addPin(m, fire,   "fire")
+      addPin(m, snapIn, "snap_in")
+      addPin(m, cntrIn, "cntr_in")
+      addPin(m, snapOut,  "snap_out")
+      addPin(m, snapCtrl, "snap_ctrl")
+      addPin(m, cntrOut,  "cntr_out")
+      addPin(m, cntrCtrl, "cntr_ctrl")
+      fires(m)     = fire
+      snapIns(m)   = snapIn
+      snapOuts(m)  = snapOut
+      snapCtrls(m) = snapCtrl
+      cntrIns(m)   = cntrIn
+      cntrOuts(m)  = cntrOut
+      cntrCtrls(m) = cntrCtrl
+      wire(snapCtrls(m.parent) -> snapCtrl)
+      wire(snapOuts(m.parent).ready -> snapOut.ready)
 
-      val daisyFire = daisyOut.ready && !DaisyChain.fires(m)
-      val copy = daisyFire && daisyCtrl === Bits(0)
-      val read = daisyFire && daisyCtrl === Bits(1)
-      daisyFire.getNode.component = m
-      daisyFire.getNode.inputs map (_.getNode.component = m)
-      copy.getNode.component = m
-      read.getNode.component = m
-      copy.getNode.inputs map (_.getNode.component = m)
-      read.getNode.inputs map (_.getNode.component = m)
-      copy.getNode setName "copy"
-      read.getNode setName "read"
-      DaisyChain.daisyCopy(m) = copy
-      DaisyChain.daisyRead(m) = read
-      daisyOut.valid.inputs += daisyFire && !DaisyChain.fires(m)
+      val snapFire = addTypeNode(m, snapOut.ready && !fire, "snap_fire")
+      val snapCopy = addTypeNode(m, snapFire && snapCtrl === Bits(0), "snap_copy")
+      val snapRead = addTypeNode(m, snapFire && snapCtrl === Bits(1), "snap_read")
+      val cntrFire = addTypeNode(m, cntrOut.ready && !fire, "cntr_fire")
+      val cntrCopy = addTypeNode(m, cntrFire && cntrCtrl === Bits(0), "cntr_copy")
+      val cntrRead = addTypeNode(m, cntrFire && cntrCtrl === Bits(1), "cntr_read")
+      snapCopies(m) = snapCopy
+      snapReads(m)  = snapRead
+      cntrCopies(m) = cntrCopy
+      cntrReads(m)  = cntrRead
+      wire((snapFire && !fire) -> snapOut.valid)
+      wire((cntrFire && !fire) -> cntrOut.valid)
 
       // visit children
-      m.children map (queue enqueue _)
+      m.children foreach (queue enqueue _)
+    }
+  }
+
+  def addReg(m: Module, outType: Bits, name: String, updates: (Bool, Node)*) {
+    val reg = outType.comp match {
+      case r: Reg => r
+    }
+    // assign component
+    reg.component = m
+    // assign clock
+    reg.clock = m.clock
+    // assign name
+    if (name != "") reg setName name
+    // set enable signal
+    reg.isEnable = !updates.isEmpty
+    for ((cond, value) <- updates) {
+      reg.enable = reg.enable || cond
+    }
+    // add updates
+    reg.updates ++= updates
+  }
+
+  def addTypeNode[T <: Data](m: Module, typeNode: T, name: String) = {
+    typeNode.getNode.component = m
+    typeNode.getNode.inputs foreach (_.getNode.component = m)
+    typeNode.getNode setName name
+    typeNode
+  }
+}
+
+trait DaisyChain extends Backend {
+  override def backannotationTransforms {
+    super.backannotationTransforms
+    transforms += ((c: Module) => c bfs (_.addConsumers))
+    transforms ++= daisyTransforms
+    transforms += ((c: Module) => c.addClockAndReset)
+    transforms += ((c: Module) => gatherClocksAndResets)
+    transforms += ((c: Module) => connectResets)
+    transforms += ((c: Module) => c.inferAll)
+    transforms += ((c: Module) => c.forceMatchingWidths)
+    transforms += ((c: Module) => c.removeTypeNodes)
+    transforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
+  }
+  val daisyTransforms = ArrayBuffer(
+    {(c: Module) => appendFires(DaisyTransform.top)},
+    {(c: Module) => decoupleTarget(DaisyTransform.top)}
+  )
+
+  val ioBuffers = new HashMap[Node, Bits]
+  val daisyNames = HashSet("steps", "fire",
+    "snap_in", "snap_ctrl", "cntr_in", "cntr_ctrl",
+    "steps_in_ready", "steps_in_valid", "steps_in_bits",
+    "snap_out_ready", "snap_out_valid", "snap_out_bits",
+    "cntr_out_ready", "cntr_out_valid", "cntr_out_bits",
+    "snap_fire", "snap_copy", "snap_read",
+    "cntr_fire", "cntr_copy", "cntr_read")
+
+  def addReg(m: Module, outType: Bits, name: String, updates: (Bool, Node)*) {
+    val reg = outType.comp match {
+      case r: Reg => r
+    }
+    // assign component
+    reg.component = m
+    // assign clock
+    reg.clock = m.clock
+    // assign name
+    if (name != "") reg setName name
+    // set enable signal
+    reg.isEnable = !updates.isEmpty
+    for ((cond, value) <- updates) {
+      reg.enable = reg.enable || cond
+    }
+    // add updates
+    reg.updates ++= updates
+    // genreate muxes
+    reg genMuxes reg
+    // assign reset
+    if (reg.isReset) 
+      reg.inputs += m.reset
+  }
+
+  def appendFires(c: Module) {
+    ChiselError.info("[DaisyChain] append fire signals to Reg and Mem")
+
+    val queue = ScalaQueue(c)
+    while (!queue.isEmpty) {
+      val top = queue.dequeue
+
+      // Make all delay nodes be enabled by the fire signal
+      for (node <- top.nodes ; if !(daisyNames contains node.name)) {
+        node match {
+          // For Reg, different muxes are generated by different backend
+          case reg: Reg if this.isInstanceOf[VerilogBackend] && 
+                           !Driver.isBackannotating => {
+            val enable = DaisyTransform.fires(top) && reg.enable
+            reg.inputs(reg.enableIndex) = enable.getNode
+          }
+          case reg: Reg => {
+            reg.inputs(0) = Multiplex(DaisyTransform.fires(top), reg.next, reg)
+          }
+          case mem: Mem[_] => {
+            for (write <- mem.writeAccesses) {
+              val en = Bool()
+              val newEn = DaisyTransform.fires(top) && en
+              wire(write.inputs(1) -> en)
+              write.inputs(1) = newEn
+            }
+          }
+          case _ =>
+        }
+      }
+    
+      top.children foreach (queue enqueue _)
+    }  
+  }
+
+  /* target decoupling */
+  def decoupleTarget(c: Module) = {
+    ChiselError.info("[DaisyChain] target decoupling")
+
+    for ((name, io) <- c.io.asInstanceOf[Bundle].elements) {
+      io nameIt (name, true)
+    }
+    // For the input and output pins of the c component
+    // insert buffers so that their values are avaiable
+    // after the target is stalled
+    for ((name, targetPin) <- c.io.flatten; if !(daisyNames contains name)) {
+      val bufName = name + "_buf"
+      daisyNames += bufName
+      ioBuffers(targetPin) = {
+        val buf = Reg(UInt())
+        if (targetPin.dir == INPUT) {
+          // Input buffers work when the clock counter value is set
+          addReg(c, buf, bufName, 
+            DaisyTransform.stepsIn.valid -> targetPin)
+          for (consumer <- targetPin.consumers) {
+            val idx = consumer.inputs indexOf targetPin
+            consumer.inputs(idx) = buf
+          }
+        } else if (targetPin.dir == OUTPUT) {
+          addReg(c, buf, bufName, 
+            DaisyTransform.fires(c) -> targetPin.inputs.head)
+          wire(buf -> targetPin)
+        }
+        buf
+      }
     }
   }
 }
 
+trait SnapshotChain extends DaisyChain {
+  daisyTransforms += { c => findStates(DaisyTransform.top) }
+  daisyTransforms += { c => genSnapshotChain(DaisyTransform.top) }
+
+  var snapIdx = -1
+  def emitSnapIdx = {
+    snapIdx = snapIdx + 1
+    snapIdx
+  }
+
+  def findStates(c: Module) { 
+    ChiselError.info("[SnapshotChain] find state elements")
+    /*** collect state elements for snapshotting ***/
+    // First, collect the top component's inputs
+    for ((name, targetPin) <- c.io.flatten ; 
+      if !(daisyNames contains name) && targetPin.dir == INPUT) {
+        c.states += targetPin
+      }
+
+    // Second, collect all the state elements (Reg & Mem)
+    val queue = ScalaQueue(c)
+    while (!queue.isEmpty) {
+      val top = queue.dequeue
+      // collect registers and memory access
+      top.nodes foreach { 
+        _ match {
+          case reg: Reg if !(daisyNames contains reg.name) =>
+            top.states += reg
+          case mem: Mem[_] =>
+            for (i <- 0 until mem.size)
+              top.states += (new MemRead(mem, UInt(i)))
+          case _ =>
+        }
+      }
+      // visit children
+      top.children foreach (queue enqueue _)
+    }
+  }
+
+  def genSnapshotChain(c: Module) {
+    ChiselError.info("[SnapshotChain] generate snapshot chains")
+ 
+    val queue = ScalaQueue(c)
+    // Daisy chaining
+    while (!queue.isEmpty) {
+      val m = queue.dequeue
+      val copy = DaisyTransform.snapCopies(m)
+      val read = DaisyTransform.snapReads(m)
+ 
+      m.states foreach { node =>
+        node.snapShadow = Reg(UInt(width=32))
+        node.snapIdx = emitSnapIdx
+      }
+
+      (m.children.isEmpty, m.states.isEmpty) match {
+        // no children & no singals 
+        case (true, true) => {
+          // snap output <- snap input
+          wire(DaisyTransform.snapIns(m) -> 
+               DaisyTransform.snapOuts(m).bits)
+        }
+        // children but no signals
+        case (false, true) => {
+          // head child's snap output -> snap output
+          wire(DaisyTransform.snapOuts(m.children.head).bits -> 
+               DaisyTransform.snapOuts(m).bits)
+          // snap input -> last child's snap input 
+          wire(DaisyTransform.snapIns(m) -> 
+               DaisyTransform.snapIns(m.children.last))
+        }
+        // no children but signals
+        case (true, false) => {
+          // snap output -> head shadow
+          wire(m.states.head.snapShadow -> 
+               DaisyTransform.snapOuts(m).bits)
+          val state = ioBuffers getOrElse (m.states.last, m.states.last)
+          // snap input -> last shadow 
+          addReg(m, m.states.last.snapShadow, "snap_shadow_" + m.states.last.snapIdx,
+            copy -> state,
+            read -> DaisyTransform.snapIns(m))
+        }
+        // children & signals
+        case (false, false) => {
+          // snap output <- head shadow
+          wire(m.states.head.snapShadow ->
+               DaisyTransform.snapOuts(m).bits)
+          val state = ioBuffers getOrElse (m.states.last, m.states.last)
+          // last shadow <- snap input
+          addReg(m, m.states.last.snapShadow, "snap_shadow_" + m.states.last.snapIdx,
+            copy -> state,
+            read -> DaisyTransform.snapOuts(m.children.head).bits)
+          // last child's snap input <- snap input
+          wire(DaisyTransform.snapIns(m) ->
+               DaisyTransform.snapOuts(m.children.last).bits)
+        }
+      }
+ 
+      for (s <- m.children sliding 2 ; if s.size == 2) {
+        val cur = s.head
+        val next = s.last
+        // next child's daisy output -> cur child's daisy input
+        wire(DaisyTransform.snapOuts(next).bits -> 
+             DaisyTransform.snapIns(cur))
+      }
+
+      for (s <- m.states sliding 2 ; if s.size == 2) {
+        val cur = s.head
+        val next = s.last
+        val state = ioBuffers getOrElse (cur, cur)
+        /****** Shaodw Counter *****/
+        // daisy_ctrl == 'copy' -> current state
+        // daisy_ctrl == 'read' -> next shadow 
+        addReg(m, cur.snapShadow, "snap_shadow_" + cur.snapIdx,
+          copy -> state,
+          read -> next.snapShadow
+        )
+      }
+      // collect signal lists
+      DaisyTransform.states ++= m.states
+      // visit children
+      m.children foreach (queue enqueue _)
+    }
+  }  
+}
+
+class SnapshotVerilog extends VerilogBackend with SnapshotChain
+class SnapshotCpp     extends CppBackend     with SnapshotChain
+
 abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends Tester(c, isTrace) {
   val peeks = new ArrayBuffer[BigInt]
-  val clks  = DaisyTransform.clks
-  val daisyOut  = DaisyTransform.daisyOut
-  val daisyCtrl = DaisyTransform.daisyCtrl
+  val stepsIn  = DaisyTransform.stepsIn
+  val snapOut  = DaisyTransform.snapOut
+  val snapCtrl = DaisyTransform.snapCtrl
+  val states   = DaisyTransform.states
 
   // proceed 'n' clocks
   def takeSteps (n: Int) {
@@ -451,71 +470,71 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     delta += clk.toInt
   }
 
-  def pokeClks (n: Int) {
+  def pokeSteps (n: Int) {
     // Wait until the clock counter is ready
     // (the target is stalled)
-    while(peek(clks.ready) == 0) {
+    while(peek(stepsIn.ready) == 0) {
       takeSteps(1)
     }
     // Set the clock counter
-    poke(clks.bits, n)
-    poke(clks.valid, 1)
+    poke(stepsIn.bits, n)
+    poke(stepsIn.valid, 1)
     takeSteps(1)
-    poke(clks.valid, 0)
+    poke(stepsIn.valid, 0)
   }
 
   // Show me the current status of the daisy chain
-  def showCurrentChain() = {
-    if (isTrace) {
+  def showCurrentSnapChain() = {
+    if (isTrace && !states.isEmpty) {
       println("--- CURRENT CHAIN ---")
-      Module.signals map (x => peek(x.shadow))
+      states foreach (x => peek(x.snapShadow))
       println("---------------------")
     }
   }
 
-  def daisyCopy() {
+  def snapCopy() {
     do {
-      poke(daisyCtrl, 0)
-      poke(daisyOut.ready, 1)
+      poke(snapCtrl, 0)
+      poke(snapOut.ready, 1)
       takeSteps(1)
-    } while (peek(daisyOut.valid) == 0)
-    poke(daisyOut.ready, 0)
-    showCurrentChain()
+    } while (peek(snapOut.valid) == 0)
+    poke(snapOut.ready, 0)
+    showCurrentSnapChain()
   }
 
-  def daisyRead() = {
+  def snapRead() = {
     do {
-      poke(daisyCtrl, 1)
-      poke(daisyOut.ready, 1)
+      poke(snapCtrl, 1)
+      poke(snapOut.ready, 1)
       takeSteps(1)
-    } while (peek(daisyOut.valid) == 0)
-    poke(daisyOut.ready, 0)
-    showCurrentChain()
-    peek(daisyOut.bits)
+    } while (peek(snapOut.valid) == 0)
+    poke(snapOut.ready, 0)
+    showCurrentSnapChain()
+    peek(snapOut.bits)
   }
 
-  def daisyCheck(expected: BigInt) {
-    expect(daisyOut.bits, expected)
+  def snapCheck(expected: BigInt) {
+    expect(snapOut.bits, expected)
   }
 
   override def dump(): Snapshot = {
     val snap = new Snapshot(t)
 
-    if (isTrace) println("*** Daisy Copy ***")
+    if (isTrace) println("*** Snapshot Chain Copy ***")
     // Copy activity counter values to shadow counters
-    daisyCopy()
+    snapCopy()
 
-    for ((signal, i) <- Module.signals.zipWithIndex) {
-      if (isTrace) println("*** Daisy Read ***")
-      // Read out the daisy chain
-      val daisyValue = daisyRead()
-      // Check the daisy output
-      daisyCheck(peeks(i))
-      signal match {
+    for ((state, i) <- states.zipWithIndex) {
+      if (isTrace) println("*** Snapshot Chain Read ***")
+      // Read out the snap chain
+      val snapValue = snapRead()
+      // Check the snap output
+      snapCheck(peeks(i))
+      state match {
         case read: MemRead =>
-          snap.pokes += Poke(read.mem, read.addr.litValue(0).toInt, daisyValue)
+          snap.pokes += Poke(read.mem, read.addr.litValue(0).toInt, snapValue)
         case _ =>
-          snap.pokes += Poke(signal, 0, daisyValue)
+          snap.pokes += Poke(state, 0, snapValue)
       }
     }
     snap
@@ -524,7 +543,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   override def step (n: Int = 1) { 
     if (isTrace) {
       println("-------------------------")
-      println("| Counter Strcture Step |")
+      println("|  Snapshot Chain Step  |")
       println("-------------------------")
     }
 
@@ -533,16 +552,16 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     val target = t + n
 
     // set clock register
-    pokeClks(n)
+    pokeSteps(n)
 
     // run the target until it is stalled
     if (isTrace) println("*** CYCLE THE TARGET ***")
     takeSteps(n)
 
     // read out signal values
-    if (isTrace) println("*** READ SIGNAL VALUES ***")
+    if (isTrace) println("*** READ STATE VALUES ***")
     peeks.clear
-    peeks ++= Module.signals map {
+    peeks ++= states map {
       case read: MemRead =>
         peekBits(read.mem, read.addr.litValue(0).toInt)
       case signal =>
@@ -578,20 +597,27 @@ abstract class AXISlave(val aw: Int = 5, val dw: Int = 32, val n: Int = 32 /* 2^
 }
 
 class DaisyFPGAWrapper[+T <: Module](c: => T) extends AXISlave(n = 16 /* 2^(aw - 1) */){
-  val top       = DaisyTransform(c)
-  val clks      = DaisyTransform.clks
-  val daisyOut  = DaisyTransform.daisyOut
-  val daisyCtrl = DaisyTransform.daisyCtrl
-  // write 4 => clks
-  clks.bits := io.in.bits
-  clks.valid := wen(4)
-  wready(4) := clks.ready
-  // read 4 => daisychain
-  rdata(4) := daisyOut.bits
-  rvalid(4) := daisyOut.valid
-  daisyOut.ready := ren(4)
-  // daisy control bit <- MSB of addr
-  daisyCtrl := io.addr(aw-1) 
+  val top      = DaisyTransform(c)
+  val stepsIn  = DaisyTransform.stepsIn
+  val snapOut  = DaisyTransform.snapOut
+  val snapCtrl = DaisyTransform.snapCtrl
+  val cntrOut  = DaisyTransform.cntrOut
+  val cntrCtrl = DaisyTransform.cntrCtrl
+  // write 4 => steps
+  stepsIn.bits := io.in.bits
+  stepsIn.valid := wen(4)
+  wready(4) := stepsIn.ready
+  // read 4 => snapchain
+  rdata(4) := snapOut.bits
+  rvalid(4) := snapOut.valid
+  snapOut.ready := ren(4)
+  // read 5 => cntrchain
+  rdata(5) := cntrOut.bits
+  rvalid(5) := cntrOut.valid
+  cntrOut.ready := ren(5)
+  // snap & cntr control bit <- MSB of addr
+  snapCtrl := io.addr(aw-1) 
+  cntrCtrl := io.addr(aw-1) 
 }
 
 abstract class DaisyWrapperTester[+T <: DaisyFPGAWrapper[_]](c: T, isTrace: Boolean = true) extends DaisyTester(c, isTrace) {
@@ -631,7 +657,7 @@ abstract class DaisyWrapperTester[+T <: DaisyFPGAWrapper[_]](c: T, isTrace: Bool
 
   // poke 'n' clocks to the clock counter
   // whose address is 4
-  override def pokeClks (n: Int) {
+  override def pokeSteps (n: Int) {
     do {
       poke(c.io.addr, 4)
       takeSteps(1)
@@ -644,19 +670,19 @@ abstract class DaisyWrapperTester[+T <: DaisyFPGAWrapper[_]](c: T, isTrace: Bool
   }
 
   // read at 4 | 0 << 4 -> daisy copy
-  override def daisyCopy() {
+  override def snapCopy() {
     peekAddr(4)
-    showCurrentChain()
+    showCurrentSnapChain()
   }
 
-  // read at 4 | 1 << 4 -> daisy read
-  override def daisyRead() = {
-    val daisyValue = peekAddr(4 | 1 << 4)
-    showCurrentChain()
-    daisyValue
+  // read at 4 | 1 << 4 -> snap read
+  override def snapRead() = {
+    val snapValue = peekAddr(4 | 1 << 4)
+    showCurrentSnapChain()
+    snapValue
   }
 
-  override def daisyCheck(expected: BigInt) {
+  override def snapCheck(expected: BigInt) {
     expect(c.io.out.bits, expected)
   }
 }

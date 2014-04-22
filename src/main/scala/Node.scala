@@ -134,9 +134,8 @@ abstract class Node extends nameable {
   var driveRand = false
   var clock: Clock = null
   var CppVertex: CppVertex = null
-  var counter: Bits = null
-  var shadow: Bits = null
-  var cntrIdx = -1
+  var snapShadow: Bits = null
+  var snapIdx = -1
 
   val _id = Driver.nodes.length
   Driver.nodes += this

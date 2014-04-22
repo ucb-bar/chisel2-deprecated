@@ -138,6 +138,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   val mods = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
   val signals = new LinkedHashSet[Node]
+  val states = new ArrayBuffer[Node]
 
   val regs  = new ArrayBuffer[Reg];
   val nexts = new ScalaQueue[Node];
@@ -240,9 +241,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       case _: Aggregate =>
       case _: ROMData =>
       case _: Literal =>
-      case any if !(Driver.signals contains any) => {
+      case any if !(signals contains any) => {
         if (!any.isIo) debug(x)
-        Driver.signals += any
+        signals += any
       }
       case _ =>
     }
