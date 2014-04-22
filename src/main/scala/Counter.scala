@@ -222,8 +222,8 @@ trait DaisyChain extends Backend {
     transforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
   }
   val daisyTransforms = ArrayBuffer(
-    {(c: Module) => appendFires(DaisyTransform.top)},
-    {(c: Module) => decoupleTarget(DaisyTransform.top)}
+    {(c: Module) => decoupleTarget(DaisyTransform.top)},
+    {(c: Module) => appendFires(DaisyTransform.top)}
   )
 
   val ioBuffers = new HashMap[Node, Bits]
