@@ -245,8 +245,7 @@ class FloBackend extends Backend {
     }
     def build(name: String) {
       val cmd = ArrayBuffer(floDir + "lay", "-is-console")
-      cmd ++= ArrayBuffer(":num-rows", DreamerConfiguration.numRows.toString())
-      cmd ++= ArrayBuffer(":num-cols", DreamerConfiguration.numCols.toString())
+      cmd ++= ArrayBuffer(":dims", DreamerConfiguration.numCols.toString() + "," + DreamerConfiguration.numRows.toString())
       cmd ++= ArrayBuffer("<", dir + name + ".flo", "|")
       cmd ++= ArrayBuffer(floDir + "fix-sched", ">", dir + name + ".hex")
       val cmdString = cmd.mkString(" ")
