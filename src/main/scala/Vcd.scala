@@ -93,8 +93,11 @@ class VcdBackend(top: Module) extends Backend {
       write("  fputs(\"$dumpvars\\n\", f);\n")
       write("  fputs(\"$end\\n\", f);\n")
       write("  fputs(\"#0\\n\", f);\n")
-      for (i <- 0 until sortedMods.length)
+      for (i <- 0 until sortedMods.length) {
         write(emitDefUnconditional(sortedMods(i), i))
+        val ref = emitRef(sortedMods(i))
+        write("  " + ref + "__prev = " + ref +";\n");
+      }
     }
     write("}\n")
   }
