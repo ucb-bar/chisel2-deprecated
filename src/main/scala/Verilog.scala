@@ -360,6 +360,10 @@ class VerilogBackend extends Backend {
         } else {
           ""
         }
+
+      case _: Assert =>
+        "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + " = 1'b0;\n"
+
       case _: Reg =>
         "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n"
 
@@ -493,12 +497,12 @@ class VerilogBackend extends Backend {
   def emitRegs(c: Module): StringBuilder = {
     val res = new StringBuilder();
     val clkDomains = new HashMap[Clock, StringBuilder]
-    for (clock <- c.clocks)
+    for (clock <- c.clocks) {
       clkDomains += (clock -> new StringBuilder)
-    for (p <- c.asserts)
+    }
+    for (p <- c.asserts) {
       clkDomains(p.clock).append(emitAssert(p))
-    for (clock <- c.clocks)
-      clkDomains(clock).append("  always @(posedge " + emitRef(clock) + ") begin\n")
+    }
     for (m <- c.mods) {
       val clkDomain = clkDomains getOrElse (m.clock, null)
       if (m.clock != null && clkDomain != null)
@@ -510,8 +514,14 @@ class VerilogBackend extends Backend {
         clkDomain.append(emitPrintf(p))
     }
     for (clock <- c.clocks) {
-      clkDomains(clock).append("  end\n")
-      res.append(clkDomains(clock).result())
+      val dom = clkDomains(clock)
+      if (!dom.isEmpty) {
+        if (res.isEmpty)
+          res.append("\n")
+        res.append("  always @(posedge " + emitRef(clock) + ") begin\n")
+        res.append(dom.result())
+        res.append("  end\n")
+      }
     }
     res
   }
@@ -526,15 +536,11 @@ class VerilogBackend extends Backend {
     "`endif\n"
   }
   def emitAssert(a: Assert): String = {
-    val gate = emitRef(a) + "__gate__"
     "`ifndef SYNTHESIS\n" +
-    "  reg " + gate + " = 1'b0;\n" +
-    "  always @(posedge " + emitRef(a.clock) + ") begin\n" +
-    "    if(" + emitRef(a.reset) + ") " + gate + " <= 1'b1;\n" +
-    "    if(!" + emitRef(a.cond) + " && " + gate +") begin\n" +
-    "      $fwrite(32'h80000002, " + CString("ASSERTION FAILED: %s\n") + ", " + CString(a.message) + ");\n" +
-    "      $finish;\n" +
-    "    end\n" +
+    "  if(" + emitRef(a.reset) + ") " + emitRef(a) + " <= 1'b1;\n" +
+    "  if(!" + emitRef(a.cond) + " && " + emitRef(a) +") begin\n" +
+    "    $fwrite(32'h80000002, " + CString("ASSERTION FAILED: %s\n") + ", " + CString(a.message) + ");\n" +
+    "    $finish;\n" +
     "  end\n" +
     "`endif\n"
   }
@@ -634,10 +640,7 @@ class VerilogBackend extends Backend {
     res.append(emitInits(c));
     res.append("\n");
     res.append(emitDefs(c));
-    if (c.containsReg) {
-      res.append("\n");
-      res.append(emitRegs(c));
-    }
+    res.append(emitRegs(c))
     res.append("endmodule\n\n");
     res.result();
   }

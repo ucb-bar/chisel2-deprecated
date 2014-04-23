@@ -122,7 +122,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   val bindings = new ArrayBuffer[Binding];
   var wiresCache: Array[(String, Bits)] = null;
   var parent: Module = null;
-  var containsReg = false;
   val children = ArrayBuffer[Module]()
   val debugs = LinkedHashSet[Node]()
   val printfs = ArrayBuffer[Printf]()
@@ -176,13 +175,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   override def toString = this.getClass.toString
-
-  def depthString(depth: Int): String = {
-    var res = "";
-    for (i <- 0 until depth)
-      res += "  ";
-    res
-  }
 
   // This function sets the IO's component.
   def ownIo() {
@@ -304,23 +296,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   // COMPILATION OF BODY
-  def isInferenceTerminal(m: Node): Boolean = {
-    m.isFixedWidth || (
-      m match {
-        case io: Bits => io.dir != null;
-        case b: Binding => true;
-        case _ => false }
-    )
-    /*
-    var isAllKnown = true;
-    for (i <- m.inputs) {
-      if (i.width == -1)
-        isAllKnown = false;
-    }
-    isAllKnown
-    */
-  }
-
   def initializeBFS: ScalaQueue[Node] = {
     val res = new ScalaQueue[Node]
 
@@ -536,7 +511,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         node.depth = max(node.depth, newDepth);
         if (!comp.isWalked.contains(node)) {
           comp.isWalked += node;
-          node.walked = true;
           stack.push((-1, node));
           for (i <- node.inputs) {
             if (i != null) {
@@ -627,19 +601,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
   def traceableNodes: Array[Node] = io.traceableNodes;
 
-  /** Returns true if this module or any of its children contains
-    at least one register. */
-  def containsRegInTree: Boolean = {
-    if( containsReg ) {
-      true
-    } else {
-      for(child <- children){
-        if( child.containsRegInTree ) return true
-      }
-      false
-    }
-  }
-
   def getClassValNames(c: Class[_]): ArrayBuffer[String] = {
     val valnames = new ArrayBuffer[String]()
     for (v <- c.getDeclaredFields) {
@@ -667,12 +628,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   // 2) name the IO
   // 3) name and set the component of all statically declared nodes through introspection
   // 4) set variable names
-  /* XXX deprecated. make sure containsReg and isClk are set properly. */
   def markComponent() {
     ownIo();
     io setPseudoName ("io", true)
     /* We are going through all declarations, which can return Nodes,
-     ArrayBuffer[Node], Cell, BlackBox and Modules.
+     ArrayBuffer[Node], BlackBox and Modules.
      Since we call invoke() to get a proper instance of the correct type,
      we have to insure the method is accessible, thus all fields
      that will generate C++ or Verilog code must be made public. */
@@ -686,7 +646,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
          val o = m.invoke(this);
          o match {
          case node: Node => {
-           if (node.isReg || node.isClkInput) containsReg = true;
            node setPseudoName (name, false)
          }
          case buf: ArrayBuffer[_] => {
@@ -697,9 +656,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
              val nodebuf = buf.asInstanceOf[Seq[Node]];
              for((elm, i) <- nodebuf.zipWithIndex){
-               if (elm.isReg || elm.isClkInput) {
-                 containsReg = true;
-               }
                elm setPseudoName (name + "_" + i, false)
              }
            }
@@ -708,23 +664,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
              val nodebuf = buf.asInstanceOf[Seq[Node]];
              for((elm, i) <- nodebuf.zipWithIndex){
-               if (elm.isReg || elm.isClkInput) {
-                 containsReg = true;
-               }
                elm setPseudoName (name + "_" + i, false)
              }
-           }
-         }
-         // Todo: do we have Cell anymore?
-         case cell: Cell => {
-           if(cell.isReg) containsReg = true;
-           cell.pName = name
-         }
-         case bb: BlackBox => {
-           bb.pathParent = this;
-           bb.pName = name
-           for((n, elm) <- io.flatten) {
-             if (elm.isClkInput) containsReg = true
            }
          }
          case comp: Module => {

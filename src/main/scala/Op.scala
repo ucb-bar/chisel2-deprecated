@@ -33,12 +33,6 @@ import scala.math.max
 import Node._
 import Literal._
 
-abstract class Cell extends nameable{
-  val io: Data;
-  val primitiveNode: Node;
-  var isReg = false;
-}
-
 object chiselCast {
   def apply[S <: Data, T <: Bits](x: S)(gen: => T): T = {
     val res = gen
