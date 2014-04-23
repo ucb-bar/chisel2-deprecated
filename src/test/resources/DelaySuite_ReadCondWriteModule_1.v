@@ -34,7 +34,7 @@ module DelaySuite_ReadCondWriteModule_1(input clk,
   assign T3 = mem[T4];
   assign T4 = T5[2'h2:1'h0];
   assign T5 = io_addr + 32'h4;
-  assign T6 = ! io_enable;
+  assign T6 = io_enable == 1'h0;
   assign T7 = io_addr[2'h2:1'h0];
   assign T9 = T10;
   assign T10 = T0 + 32'h1;

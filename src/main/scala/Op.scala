@@ -46,7 +46,6 @@ object UnaryOp {
     op match {
       case "-" => Op("-", widthOf(0), x)
       case "~" => Op("~", widthOf(0), x)
-      case "!" => Op("!", fixWidth(1), x)
       case "f-" => Op("f-", fixWidth(32), x)
       case "fsin" => Op("fsin", fixWidth(32), x)
       case "fcos" => Op("fcos", fixWidth(32), x)
@@ -114,7 +113,7 @@ object BinaryOp {
 
 
 object LogicalOp {
-  def apply[T <: Bits](x: T, y: T, op: String): Bool = {
+  def apply(x: Node, y: Node, op: String): Bool = {
     if (Driver.searchAndMap && op == "&&" && Driver.chiselAndMap.contains((x, y))) {
       Driver.chiselAndMap((x, y))
     } else {
@@ -383,7 +382,6 @@ object Op {
         if (a.litOf.isZ)
           ChiselError.error({"Operator " + name + " with input " + a + " does not support literals with ?"});
         name match {
-          case "!" => return if (a.litOf.value == 0) Literal(1) else Literal(0);
           case "-" => return Literal(-a.litOf.value, a.litOf.width);
           case "~" => return Literal((-a.litOf.value-1)&((BigInt(1) << a.litOf.width)-1), a.litOf.width);
           case _ => ;

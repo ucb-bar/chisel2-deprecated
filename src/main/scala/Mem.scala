@@ -262,7 +262,7 @@ class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) 
         List(x)
       }
     }
-    def isNegOf(x: Node, y: Node) = x.isInstanceOf[Op] && x.asInstanceOf[Op].op == "!" && x.inputs(0) == y
+    def isNegOf(x: Node, y: Node) = x.isInstanceOf[Op] && x.asInstanceOf[Op].op == "==" && x.inputs(0) == y && x.inputs(1).litValue() == 0
 
     val wp = getProducts(cond)
     val rp = getProducts(r.cond)

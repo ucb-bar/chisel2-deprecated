@@ -23,6 +23,6 @@ module NameSuite_ListLookupsComp_1(
   assign T5 = io_inst == 32'h257b;
   assign T6 = io_inst == 32'h277b;
   assign T7 = T6 ? 1'h1 : T8;
-  assign T8 = ! T5;
+  assign T8 = T5 == 1'h0;
 endmodule
 
