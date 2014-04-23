@@ -212,6 +212,70 @@ class DecoupledIO[T <: Data](gen: T) extends Bundle
   val valid = Bool(OUTPUT)
   val bits  = gen.clone.asOutput
   def fire(dummy: Int = 0): Bool = ready && valid
+  
+  //left to right simple connection
+  def >>(next: DecoupledIO[T]) : DecoupledIO[T] = {
+    next.valid := this.valid
+    this.ready := next.ready
+    next.bits := this.bits
+    next
+  }
+
+  //left to right connection (cut data path, add 1 cycle latency)
+  def >->(next: DecoupledIO[T]) : DecoupledIO[T] = {
+    val rValid = Reg(init = Bool(false))
+    val rBits = Reg(gen)
+
+    this.ready := (~next.valid) | next.ready
+
+    when(this.ready) {
+      rValid := this.valid
+      rBits := this.bits
+    }
+
+    next.valid := rValid
+    next.bits := rBits
+    next
+  }
+    
+  //left to right connection (cut ready path, no latency added)
+  def >/>(next: DecoupledIO[T]) : DecoupledIO[T] = {
+    val rValid = Reg(init = Bool(false))
+    val rBits = Reg(gen)
+
+    next.valid := this.valid || rValid
+    this.ready := ~rValid
+    next.bits := Mux(rValid, rBits, this.bits)
+
+    when(next.ready) {
+      rValid := Bool(false)
+    }
+
+    when(this.ready && (~next.ready)) {
+      rValid := this.valid
+      rBits := this.bits
+    }
+    next
+  }
+ 
+  //left to right connection (cut ready and data path, add 1 cycle latency)
+  def >/->(next: DecoupledIO[T]) : DecoupledIO[T] = {
+    val stage = this.clone
+    this >/> stage
+    stage >-> next
+    next
+  }  
+  
+  //Take left DecoupledIO arbitration with right bits and return a new stream with
+  //Usefull to translate DecoupledIO to a other type  (inputDecoupledIO ~ newBitsCalculatedFromInput) >> outputStream
+  def ~[T2 <: Data](nextBits: T2): DecoupledIO[T2] = {
+    val next = new DecoupledIO(nextBits)
+    next.valid := this.valid
+    this.ready := next.ready
+    next.bits := nextBits
+    next
+  }  
+  
   override def clone: this.type =
     try {
       super.clone()
