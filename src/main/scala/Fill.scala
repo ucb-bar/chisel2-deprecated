@@ -39,18 +39,10 @@ object Fill {
 
 object NodeFill {
   def apply(n: Int, mod: Node): Node = {
-    val (bits_lit) = (mod.litOf);
     if (n == 1) {
       mod
-    } else if (mod.isLit) {
-      val value = mod.litOf.value
-      val w = mod.getWidth
-      var res = value
-      for (i <- 1 until n)
-        res = (res << w)|value
-      Literal(res, n * w)
-    } else if (mod.width == 1 && n > 2) {
-      Op("-", Node.fixWidth(n), mod) /* 2's-comp. negation <-> 1-bit fill */
+    } else if (mod.width == 1) {
+      Multiplex(mod, Literal((BigInt(1) << n) - 1, n), Literal(0, n))
     } else {
       /* Build up a Concatenate tree for more ILP in simulation. */
       var out: Node = null
