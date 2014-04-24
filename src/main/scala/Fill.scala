@@ -33,6 +33,7 @@ import Fill._
 import Lit._
 
 object Fill {
+  def apply(n: Int, mod: Bool): UInt = if (n == 1) mod else UInt(0, n) - mod
   def apply(n: Int, mod: UInt): UInt = UInt(NodeFill(n, mod))
   def apply(mod: UInt, n: Int): UInt = apply(n, mod)
 }
