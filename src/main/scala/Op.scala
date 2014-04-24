@@ -211,8 +211,8 @@ object Op {
         case "<"  => return Literal(if (av <  bv) 1 else 0);
         case "<=" => return Literal(if (av <= bv) 1 else 0);
         case "##" => return Literal(av << bw | bv, aw + bw);
-        case "+"  => return Literal(av + bv, max(aw, bw) + 1);
-        case "-"  => return Literal(av - bv, max(aw, bw) + 1);
+        case "+"  => return Literal(av + bv, max(aw, bw))
+        case "-"  => return Literal(av - bv, max(aw, bw))
         case "|"  => return Literal(av | bv, max(aw, bw));
         case "&"  => return Literal(av & bv, max(aw, bw));
         case "^"  => return Literal(av ^ bv, max(aw, bw));
