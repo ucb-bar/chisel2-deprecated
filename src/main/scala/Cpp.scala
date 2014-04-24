@@ -359,7 +359,7 @@ class CppBackend extends Backend {
                     } else {
                       ""
                     })))
-        } else if (o.op == "|" || o.op == "&" || o.op == "^" || o.op == "||" || o.op == "&&") {
+        } else if (o.op == "|" || o.op == "&" || o.op == "^") {
           block((0 until words(o)).map(i => emitWordRef(o, i) + " = " + emitWordRef(o.inputs(0), i) + o.op + emitWordRef(o.inputs(1), i)))
         } else if (o.op == "s<") {
           require(o.inputs(1).litOf.value == 0)

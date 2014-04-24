@@ -125,7 +125,6 @@ class VecProc extends proc {
 
   def procAssign(src: Node) {
     val onehot = VecUIntToOH(addr, elms.length)
-    Driver.searchAndMap = true
     for(i <- 0 until elms.length){
       when (getEnable(onehot, i)) {
         if(elms(i).comp != null) {
@@ -135,7 +134,6 @@ class VecProc extends proc {
         }
       }
     }
-    Driver.searchAndMap = false
   }
 }
 
@@ -174,13 +172,11 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
     if(data.isInstanceOf[Node]){
 
       val onehot = VecUIntToOH(addr, length)
-      Driver.searchAndMap = true
       for(i <- 0 until length){
         when (getEnable(onehot, i)) {
           this(i).comp procAssign data.toNode
         }
       }
-      Driver.searchAndMap = false
     }
   }
 

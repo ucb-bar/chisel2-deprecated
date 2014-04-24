@@ -256,7 +256,7 @@ class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) 
   var pairedRead: MemSeqRead = null
   def emitRWEnable(r: MemSeqRead) = {
     def getProducts(x: Node): List[Node] = {
-      if (x.isInstanceOf[Op] && x.asInstanceOf[Op].op == "&&") {
+      if (x.isInstanceOf[Op] && x.asInstanceOf[Op].op == "&") {
         List(x) ++ getProducts(x.inputs(0)) ++ getProducts(x.inputs(1))
       } else {
         List(x)

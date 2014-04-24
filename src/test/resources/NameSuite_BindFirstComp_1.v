@@ -26,8 +26,8 @@ module NameSuite_BindFirstComp_1(
 
 
   assign io_replay = T0;
-  assign T0 = io_valid && T1;
-  assign T1 = T3 || T2;
+  assign T0 = io_valid & T1;
+  assign T1 = T3 | T2;
   assign T2 = mask_ximm1q_ready == 1'h0;
   assign mask_ximm1q_ready = dec_io_sigs_enq_ximm1q == 1'h0;
   assign T3 = mask_cmdq_ready == 1'h0;
