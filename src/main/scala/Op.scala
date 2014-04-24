@@ -141,8 +141,6 @@ object LogicalOp {
 object ReductionOp {
   def apply(x: Node, op: String): Node = {
     op match {
-      case "&" => Op("&", fixWidth(1), x)
-      case "|" => Op("|", fixWidth(1), x)
       case "^" => Op("^", fixWidth(1), x)
       case any => throw new Exception("Unrecognized operator " + op)
     }

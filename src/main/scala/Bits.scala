@@ -344,8 +344,8 @@ abstract class Bits extends Data with proc {
   final def apply(range: (Int, Int)): UInt = this(range._1, range._2);
 
   def unary_~(): this.type   = newUnaryOp("~");
-  def andR(): Bool           = newReductionOp("&");
-  def orR(): Bool            = newReductionOp("|");
+  def andR(): Bool           = newLogicalOp(SInt(-1), "===")
+  def orR(): Bool            = newLogicalOp(UInt(0), "!=")
   def xorR(): Bool           = newReductionOp("^");
   def != (b: Bits): Bool     = newLogicalOp(b, "!=");
   def & (b: Bits): this.type = newBinaryOp(b, "&");

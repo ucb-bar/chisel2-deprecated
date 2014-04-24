@@ -192,11 +192,7 @@ class CppBackend extends Backend {
       case o: Op => {
         emitTmpDec(o) +
         (if (o.inputs.length == 1) {
-          (if (o.op == "|") {
-            "  " + emitLoWordRef(o) + " = (" + (0 until words(o.inputs(0))).map(emitWordRef(o.inputs(0), _)).reduceLeft(_ + " | " + _) + ") != 0;\n"
-          } else if (o.op == "&") {
-            "  " + emitLoWordRef(o) + " = " + (0 until words(o.inputs(0))).map(i => "(" + emitWordRef(o.inputs(0), i) + " == " + (if (o.inputs(0).width - i*bpw < bpw) (1L << (o.inputs(0).width - i*bpw))-1 else "(val_t)-1") + ")").reduceLeft(_ + " & " + _) + ";\n"
-          } else if (o.op == "^") {
+          (if (o.op == "^") {
             val res = ArrayBuffer[String]()
             res += "val_t __x = " + (0 until words(o.inputs(0))).map(emitWordRef(o.inputs(0), _)).reduceLeft(_ + " ^ " + _)
             for (i <- log2Up(min(bpw, o.inputs(0).width))-1 to 0 by -1)
