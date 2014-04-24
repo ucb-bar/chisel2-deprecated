@@ -112,7 +112,6 @@ class FloBackend extends Backend {
         (if (o.inputs.length == 1) {
           o.op match {
             case "~" => "not'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
-            case "-" => "neg'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
             case "|" => "neq'" + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + "0'" + node.inputs(0).width;
             case "&" => "eq'" + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + "-1'" + node.inputs(0).width;
             case "^" => "xorr'" + node.inputs(0).width + " " + emitRef(node.inputs(0))

@@ -44,7 +44,6 @@ object chiselCast {
 object UnaryOp {
   def apply(x: Node, op: String): Node = {
     op match {
-      case "-" => Op("-", widthOf(0), x)
       case "~" => Op("~", widthOf(0), x)
       case "f-" => Op("f-", fixWidth(32), x)
       case "fsin" => Op("fsin", fixWidth(32), x)
@@ -382,7 +381,6 @@ object Op {
         if (a.litOf.isZ)
           ChiselError.error({"Operator " + name + " with input " + a + " does not support literals with ?"});
         name match {
-          case "-" => return Literal(-a.litOf.value, a.litOf.width);
           case "~" => return Literal((-a.litOf.value-1)&((BigInt(1) << a.litOf.width)-1), a.litOf.width);
           case _ => ;
         }

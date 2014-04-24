@@ -87,7 +87,7 @@ class SInt extends Bits with Num[SInt] {
   def gen[T <: Bits](): T = SInt().asInstanceOf[T];
 
   // arithmetic operators
-  def unary_-(): SInt = newUnaryOp("-");
+  def unary_-(): SInt = SInt(0) - this
   def unary_!(): Bool = this === SInt(0)
   def << (b: UInt): SInt = newBinaryOp(b, "<<");
   def >> (b: UInt): SInt = newBinaryOp(b, "s>>");
