@@ -89,7 +89,7 @@ abstract class Backend {
     root.io.nameIt("io", true);
     val nameSpace = new HashSet[String];
     /* We are going through all declarations, which can return Nodes,
-     ArrayBuffer[Node], Cell, BlackBox and Modules.
+     ArrayBuffer[Node], BlackBox and Modules.
      Since we call invoke() to get a proper instance of the correct type,
      we have to insure the method is accessible, thus all fields
      that will generate C++ or Verilog code must be made public. */
@@ -154,11 +154,6 @@ abstract class Backend {
                i += 1;
              }
            }
-         }
-         case cell: Cell => {
-           cell.name = asValidName(name);
-           cell.named = true;
-           nameSpace += cell.name;
          }
          case bb: BlackBox => {
            if(!bb.named) {

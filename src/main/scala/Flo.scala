@@ -112,10 +112,6 @@ class FloBackend extends Backend {
         (if (o.inputs.length == 1) {
           o.op match {
             case "~" => "not'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
-            case "!" => "not'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
-            case "-" => "neg'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
-            case "|" => "neq'" + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + "0'" + node.inputs(0).width;
-            case "&" => "eq'" + node.inputs(0).width + " " + emitRef(node.inputs(0)) + " " + "-1'" + node.inputs(0).width;
             case "^" => "xorr'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
           }
          } else {
@@ -134,9 +130,7 @@ class FloBackend extends Backend {
              case "s>>" => "arsh'" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "##" => "cat'" + node.inputs(1).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "|"  => "or" + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
-             case "||" => "or" + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
              case "&"  => "and" + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
-             case "&&" => "and" + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
              case "^"  => "xor" + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
              case "==" => "eq" + " " + emitRef(node.inputs(0), node.inputs(1)) + " " + emitRef(node.inputs(1), node.inputs(0))
              case "!=" => "neq" + " " + emitRef(node.inputs(0), node.inputs(1)) + " " + emitRef(node.inputs(1), node.inputs(0))
@@ -268,8 +262,7 @@ class FloBackend extends Backend {
       println("EXPANDING WITH " + mweCmd)
       run(mweCmd.mkString(" "))
       val cmd = ArrayBuffer(floDir + "lay", "-is-console")
-      cmd ++= ArrayBuffer(":num-rows", DreamerConfiguration.numRows.toString())
-      cmd ++= ArrayBuffer(":num-cols", DreamerConfiguration.numCols.toString())
+      cmd ++= ArrayBuffer(":dims", DreamerConfiguration.numCols.toString() + "," + DreamerConfiguration.numRows.toString())
       cmd ++= ArrayBuffer("<", dir + name + ".mwe.flo", "|")
       cmd ++= ArrayBuffer(floDir + "fix-sched", ">", dir + name + ".hex")
       val cmdString = cmd.mkString(" ")

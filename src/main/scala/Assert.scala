@@ -35,7 +35,7 @@ import scala.collection.mutable.ArrayBuffer
 import Node._
 import ChiselError._
 
-class Assert(condIn: Bool, resetIn: Bool, val message: String) extends Node {
+class Assert(condIn: Bool, resetIn: Bool, val message: String) extends Delay {
   inputs += condIn || resetIn
   inputs += resetIn
   def cond: Node = inputs(0)

@@ -62,7 +62,7 @@ object Multiplex{
         return c
       }
       if (c.litOf.width == 1 && a.litOf.width == 1) {
-        return if (c.litOf.value == 0) Op("!", fixWidth(1), t) else t
+        return if (c.litOf.value == 0) LogicalOp(t, Literal(0,1), "===") else t
       }
     }
     new Mux().init("", maxWidth _, t, c, a);

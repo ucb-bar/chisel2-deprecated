@@ -192,11 +192,7 @@ class CppBackend extends Backend {
       case o: Op => {
         emitTmpDec(o) +
         (if (o.inputs.length == 1) {
-          (if (o.op == "|") {
-            "  " + emitLoWordRef(o) + " = (" + (0 until words(o.inputs(0))).map(emitWordRef(o.inputs(0), _)).reduceLeft(_ + " | " + _) + ") != 0;\n"
-          } else if (o.op == "&") {
-            "  " + emitLoWordRef(o) + " = " + (0 until words(o.inputs(0))).map(i => "(" + emitWordRef(o.inputs(0), i) + " == " + (if (o.inputs(0).width - i*bpw < bpw) (1L << (o.inputs(0).width - i*bpw))-1 else "(val_t)-1") + ")").reduceLeft(_ + " & " + _) + ";\n"
-          } else if (o.op == "^") {
+          (if (o.op == "^") {
             val res = ArrayBuffer[String]()
             res += "val_t __x = " + (0 until words(o.inputs(0))).map(emitWordRef(o.inputs(0), _)).reduceLeft(_ + " ^ " + _)
             for (i <- log2Up(min(bpw, o.inputs(0).width))-1 to 0 by -1)
@@ -205,10 +201,6 @@ class CppBackend extends Backend {
             block(res)
           } else if (o.op == "~") {
             block((0 until words(o)).map(i => emitWordRef(o, i) + " = ~" + emitWordRef(o.inputs(0), i))) + trunc(o)
-          } else if (o.op == "-") {
-            block((0 until words(o)).map(i => emitWordRef(o, i) + " = -" + emitWordRef(o.inputs(0), i) + (if (i > 0) " - __borrow" else if (words(o) > 1) "; val_t __borrow" else "") + (if (i < words(o)-1) "; __borrow = " + emitWordRef(o.inputs(0), i) + " || " + emitWordRef(o, i) else ""))) + trunc(o)
-          } else if (o.op == "!") {
-            "  " + emitLoWordRef(o) + " = !" + emitLoWordRef(o.inputs(0)) + ";\n"
           } else if (o.op == "f-")
             "  " + emitLoWordRef(o) + " = fromFloat(-(toFloat(" + emitLoWordRef(o.inputs(0)) + "));\n"
           else if (o.op == "fsin")
@@ -363,7 +355,7 @@ class CppBackend extends Backend {
                     } else {
                       ""
                     })))
-        } else if (o.op == "|" || o.op == "&" || o.op == "^" || o.op == "||" || o.op == "&&") {
+        } else if (o.op == "|" || o.op == "&" || o.op == "^") {
           block((0 until words(o)).map(i => emitWordRef(o, i) + " = " + emitWordRef(o.inputs(0), i) + o.op + emitWordRef(o.inputs(1), i)))
         } else if (o.op == "s<") {
           require(o.inputs(1).litOf.value == 0)

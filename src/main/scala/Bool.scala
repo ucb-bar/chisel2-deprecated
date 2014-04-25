@@ -69,18 +69,15 @@ class Bool extends UInt {
     }
   }
 
-  def && (b: Bool): Bool = if (b.isTrue) this else if (this.isTrue) b else BinaryBoolOp(this, b, "&&");
-  def || (b: Bool): Bool = BinaryBoolOp(this, b, "||");
+  def && (b: Bool): Bool =
+    if (this.isLit) { if (isTrue) b else Bool(false) }
+    else if (b.isLit) b && this
+    else newBinaryOp(b, "&")
 
-  def isTrue: Boolean = {
-    if(inputs.length == 0) {
-      false
-    } else {
-      inputs(0) match {
-        case l: Literal => {l.isLit && l.value == 1};
-        case any        => false;
-      }
-    }
-  }
+  def || (b: Bool): Bool =
+    if (this.isLit) { if (isTrue) Bool(true) else b }
+    else if (b.isLit) b || this
+    else newBinaryOp(b, "|")
 
+  def isTrue: Boolean = litValue() == 1
 }

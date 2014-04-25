@@ -33,12 +33,6 @@ import scala.math.max
 import Node._
 import Literal._
 
-abstract class Cell extends nameable{
-  val io: Data;
-  val primitiveNode: Node;
-  var isReg = false;
-}
-
 object chiselCast {
   def apply[S <: Data, T <: Bits](x: S)(gen: => T): T = {
     val res = gen
@@ -50,9 +44,7 @@ object chiselCast {
 object UnaryOp {
   def apply(x: Node, op: String): Node = {
     op match {
-      case "-" => Op("-", widthOf(0), x)
       case "~" => Op("~", widthOf(0), x)
-      case "!" => Op("!", fixWidth(1), x)
       case "f-" => Op("f-", fixWidth(32), x)
       case "fsin" => Op("fsin", fixWidth(32), x)
       case "fcos" => Op("fcos", fixWidth(32), x)
@@ -120,90 +112,52 @@ object BinaryOp {
 
 
 object LogicalOp {
-  def apply[T <: Bits](x: T, y: T, op: String): Bool = {
-    if (Driver.searchAndMap && op == "&&" && Driver.chiselAndMap.contains((x, y))) {
-      Driver.chiselAndMap((x, y))
-    } else {
-      val node = op match {
-        case "===" => Op("==",  fixWidth(1), x, y)
-        case "!="  => Op("!=",  fixWidth(1), x, y)
-        case "<"   => Op("<",   fixWidth(1), x, y)
-        case "<="  => Op("<=",  fixWidth(1), x, y)
-        case "s<"  => Op("s<",  fixWidth(1), x, y)
-        case "s<=" => Op("s<=", fixWidth(1), x, y)
-        case "&&"  => Op("&&",  fixWidth(1), x, y)
-        case "||"  => Op("||",  fixWidth(1), x, y)
-        case "f==" => Op("f==", fixWidth(1), x, y)
-        case "f!=" => Op("f!=", fixWidth(1), x, y)
-        case "f>"  => Op("f>",  fixWidth(1), x, y)
-        case "f<"  => Op("f<",  fixWidth(1), x, y)
-        case "f<=" => Op("f<=", fixWidth(1), x, y)
-        case "f>=" => Op("f>=", fixWidth(1), x, y)
-        case "d==" => Op("d==", fixWidth(1), x, y)
-        case "d!=" => Op("d!=", fixWidth(1), x, y)
-        case "d>"  => Op("d>",  fixWidth(1), x, y)
-        case "d<"  => Op("d<",  fixWidth(1), x, y)
-        case "d<=" => Op("d<=", fixWidth(1), x, y)
-        case "d>=" => Op("d>=", fixWidth(1), x, y)
-        case any   => throw new Exception("Unrecognized operator " + op);
-      }
-
-      // make output
-      val output = Bool(OUTPUT).fromNode(node)
-      if (Driver.searchAndMap && op == "&&" && !Driver.chiselAndMap.contains((x, y))) {
-        Driver.chiselAndMap += ((x, y) -> output)
-      }
-      output
+  def apply(x: Node, y: Node, op: String): Bool = {
+    val node = op match {
+      case "===" => Op("==",  fixWidth(1), x, y)
+      case "!="  => Op("!=",  fixWidth(1), x, y)
+      case "<"   => Op("<",   fixWidth(1), x, y)
+      case "<="  => Op("<=",  fixWidth(1), x, y)
+      case "s<"  => Op("s<",  fixWidth(1), x, y)
+      case "s<=" => Op("s<=", fixWidth(1), x, y)
+      case "f==" => Op("f==", fixWidth(1), x, y)
+      case "f!=" => Op("f!=", fixWidth(1), x, y)
+      case "f>"  => Op("f>",  fixWidth(1), x, y)
+      case "f<"  => Op("f<",  fixWidth(1), x, y)
+      case "f<=" => Op("f<=", fixWidth(1), x, y)
+      case "f>=" => Op("f>=", fixWidth(1), x, y)
+      case "d==" => Op("d==", fixWidth(1), x, y)
+      case "d!=" => Op("d!=", fixWidth(1), x, y)
+      case "d>"  => Op("d>",  fixWidth(1), x, y)
+      case "d<"  => Op("d<",  fixWidth(1), x, y)
+      case "d<=" => Op("d<=", fixWidth(1), x, y)
+      case "d>=" => Op("d>=", fixWidth(1), x, y)
+      case any   => throw new Exception("Unrecognized operator " + op);
     }
+    Bool(OUTPUT).fromNode(node)
   }
 }
 
 object ReductionOp {
   def apply(x: Node, op: String): Node = {
     op match {
-      case "&" => Op("&", fixWidth(1), x)
-      case "|" => Op("|", fixWidth(1), x)
       case "^" => Op("^", fixWidth(1), x)
       case any => throw new Exception("Unrecognized operator " + op)
     }
   }
 }
 
-object BinaryBoolOp {
-  def apply(x: Bool, y: Bool, op: String): Bool = {
-    if (Driver.searchAndMap && op == "&&" && Driver.chiselAndMap.contains((x, y))) {
-      Driver.chiselAndMap((x, y))
-    } else {
-      val node = op match {
-        case "&&"  => Op("&&", fixWidth(1), x, y );
-        case "||"  => Op("||", fixWidth(1), x, y );
-        case any   => throw new Exception("Unrecognized operator " + op);
-      }
-      val output = Bool(OUTPUT).fromNode(node)
-      if (Driver.searchAndMap && op == "&&" && !Driver.chiselAndMap.contains((x, y))) {
-        Driver.chiselAndMap += ((x, y) -> output)
-      }
-      output
-    }
-  }
-}
-
-
 object Op {
   def apply (name: String, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
     val (a_lit, b_lit) = (a.litOf, b.litOf);
     if (a_lit != null && b_lit == null) {
       name match {
-        case "&&" => return if (a_lit.value == 0) Literal(0) else b;
-        case "||" => return if (a_lit.value == 0) b else Literal(1);
         case "==" => if (a_lit.isZ) return zEquals(b, a)
         case "!=" => if (a_lit.isZ) return !zEquals(b, a)
         case _ => ;
       }
     } else if (a_lit == null && b_lit != null) {
       name match {
-        case "&&" => return if (b_lit.value == 0) Literal(0) else a;
-        case "||" => return if (b_lit.value == 0) a else Literal(1);
         case "==" => if (b_lit.isZ) return zEquals(a, b)
         case "!=" => if (b_lit.isZ) return !zEquals(a, b)
         case _ => ;
@@ -212,15 +166,13 @@ object Op {
       val (aw, bw) = (a_lit.width, b_lit.width);
       val (av, bv) = (a_lit.value, b_lit.value);
       name match {
-        case "&&" => return if (av == 0) Literal(0) else b;
-        case "||" => return if (bv == 0) a else Literal(1);
         case "==" => return Literal(if (av == bv) 1 else 0)
         case "!=" => return Literal(if (av != bv) 1 else 0);
         case "<"  => return Literal(if (av <  bv) 1 else 0);
         case "<=" => return Literal(if (av <= bv) 1 else 0);
         case "##" => return Literal(av << bw | bv, aw + bw);
-        case "+"  => return Literal(av + bv, max(aw, bw) + 1);
-        case "-"  => return Literal(av - bv, max(aw, bw) + 1);
+        case "+"  => return Literal(av + bv, max(aw, bw))
+        case "-"  => return Literal(av - bv, max(aw, bw))
         case "|"  => return Literal(av | bv, max(aw, bw));
         case "&"  => return Literal(av & bv, max(aw, bw));
         case "^"  => return Literal(av ^ bv, max(aw, bw));
@@ -389,8 +341,6 @@ object Op {
         if (a.litOf.isZ)
           ChiselError.error({"Operator " + name + " with input " + a + " does not support literals with ?"});
         name match {
-          case "!" => return if (a.litOf.value == 0) Literal(1) else Literal(0);
-          case "-" => return Literal(-a.litOf.value, a.litOf.width);
           case "~" => return Literal((-a.litOf.value-1)&((BigInt(1) << a.litOf.width)-1), a.litOf.width);
           case _ => ;
         }

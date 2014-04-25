@@ -50,7 +50,7 @@ object Node {
 
   def fixWidth(w: Int) = {
     assert(w != -1, ChiselError.error("invalid width for fixWidth object"));
-    (m: Node) => {m.isFixedWidth = true; w}
+    (m: Node) => w
   }
 
   def widthOf(i: Int) = { (m: Node) => {
@@ -107,29 +107,22 @@ object Node {
 abstract class Node extends nameable {
   var sccIndex = -1
   var sccLowlink = -1
-  var walked = false;
   /* Assigned in Binding and Mod.reset */
   var component: Module = Module.getComponent
-  var flattened = false;
   var isTypeNode = false;
   var depth = 0;
   def componentOf: Module = if (Driver.backend.isEmittingComponents && component != null) component else Driver.topComponent
   var width_ = -1;
-  var isFixedWidth = false;
   val consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
   val inputs = new ArrayBuffer[Node];
   def traceableNodes: Array[Node] = Array[Node]();
   var inferWidth: (Node) => Int = maxWidth;
   var nameHolder: nameable = null;
-  var isClkInput = false;
-  var genError = false;
   val line: StackTraceElement =
     if (Driver.getLineNumbers) {
       val trace = new Throwable().getStackTrace
       findFirstUserLine(trace) getOrElse trace(0)
     } else null
-  var isScanArg = false
-  var isPrintArg = false
   var prune = false
   var driveRand = false
   var clock: Clock = null
@@ -145,7 +138,6 @@ abstract class Node extends nameable {
 
   /** Sets the width of a Node. */
   def width_=(w: Int) {
-    isFixedWidth = true;
     width_ = width;
     inferWidth = fixWidth(w);
   }
@@ -229,7 +221,6 @@ abstract class Node extends nameable {
     initOf(n, width, ins.toList);
   }
   def init (n: String, w: Int, ins: Node*): Node = {
-    isFixedWidth = true;
     width_ = w;
     initOf(n, fixWidth(w), ins.toList)
   }
@@ -246,7 +237,7 @@ abstract class Node extends nameable {
   }
   lazy val isInObject: Boolean =
     (isIo && (Driver.isIoDebug || component == Driver.topComponent)) ||
-    Driver.topComponent.debugs.contains(this) || isPrintArg || isScanArg ||
+    Driver.topComponent.debugs.contains(this) ||
     isReg || isUsedByRam || Driver.isDebug && !name.isEmpty ||
     Driver.emitTempNodes
 
@@ -274,21 +265,14 @@ abstract class Node extends nameable {
     }
     writer.println("sccIndex: " + sccIndex)
     writer.println("sccLowlink: " + sccLowlink)
-    writer.println("walked: " + walked)
     writer.println("component: " + component)
-    writer.println("flattened: " + flattened)
     writer.println("isTypeNode: " + isTypeNode)
     writer.println("depth: " + depth)
     writer.println("width_: " + width_)
     writer.println("index: " + emitIndex)
-    writer.println("isFixedWidth: " + isFixedWidth)
     writer.println("consumers.length: " + consumers.length)
     writer.println("nameHolder: " + nameHolder)
-    writer.println("isClkInput: " + isClkInput)
-    writer.println("genError: " + genError)
     writer.println("line: " + line)
-    writer.println("isScanArg: " + isScanArg)
-    writer.println("isPrintArg: " + isPrintArg)
     for (in <- inputs) {
       if (in == null) {
         writer.println("null");
@@ -299,11 +283,6 @@ abstract class Node extends nameable {
   }
 
   def traceNode(c: Module, stack: Stack[() => Any]): Any = {
-    // determine whether or not the component needs a clock input
-    if ((isReg || isClkInput) && !(component == null)) {
-      component.containsReg = true
-    }
-
     // pushes and pops components as necessary in order to later mark the parent of nodes
     val (comp, nextComp) =
       this match {

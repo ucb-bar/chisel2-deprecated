@@ -71,22 +71,22 @@ module Arbiter(
   assign T15 = T7[1'h0:1'h0];
   assign T16 = T7[1'h1:1'h1];
   assign io_in_3_ready = T17;
-  assign T17 = T18 && io_out_ready;
+  assign T17 = T18 & io_out_ready;
   assign T18 = T19;
-  assign T19 = ! T20;
-  assign T20 = T21 || io_in_2_valid;
-  assign T21 = io_in_0_valid || io_in_1_valid;
+  assign T19 = T20 == 1'h0;
+  assign T20 = T21 | io_in_2_valid;
+  assign T21 = io_in_0_valid | io_in_1_valid;
   assign io_in_2_ready = T22;
-  assign T22 = T23 && io_out_ready;
+  assign T22 = T23 & io_out_ready;
   assign T23 = T24;
-  assign T24 = ! T25;
-  assign T25 = io_in_0_valid || io_in_1_valid;
+  assign T24 = T25 == 1'h0;
+  assign T25 = io_in_0_valid | io_in_1_valid;
   assign io_in_1_ready = T26;
-  assign T26 = T27 && io_out_ready;
+  assign T26 = T27 & io_out_ready;
   assign T27 = T28;
-  assign T28 = ! io_in_0_valid;
+  assign T28 = io_in_0_valid == 1'h0;
   assign io_in_0_ready = T29;
-  assign T29 = T30 && io_out_ready;
+  assign T29 = T30 & io_out_ready;
   assign T30 = 1'h1;
 endmodule
 
@@ -121,7 +121,7 @@ module StdlibSuite_ArbiterTest_1(
 
 
   assign io_fire = T0;
-  assign T0 = io_out_ready && arb_io_out_valid;
+  assign T0 = io_out_ready & arb_io_out_valid;
   assign io_chosen = arb_io_chosen;
   assign io_out_bits = arb_io_out_bits;
   assign io_out_valid = arb_io_out_valid;

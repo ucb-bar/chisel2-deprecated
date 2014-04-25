@@ -50,11 +50,17 @@ void NameSuite_DebugComp_1_t::dump_init(FILE *f) {
   fputs("$end\n", f);
   fputs("#0\n", f);
   dat_dump<1>(f, NameSuite_DebugComp_1_dpath__reset, 0x21);
+  NameSuite_DebugComp_1_dpath__reset__prev = NameSuite_DebugComp_1_dpath__reset;
   dat_dump<1>(f, NameSuite_DebugComp_1__io_ctrl_wb_wen, 0x22);
+  NameSuite_DebugComp_1__io_ctrl_wb_wen__prev = NameSuite_DebugComp_1__io_ctrl_wb_wen;
   dat_dump<1>(f, NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen, 0x23);
+  NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen__prev = NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen;
   dat_dump<1>(f, NameSuite_DebugComp_1_dpath__wb_reg_ll_wb, 0x24);
+  NameSuite_DebugComp_1_dpath__wb_reg_ll_wb__prev = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb;
   dat_dump<1>(f, NameSuite_DebugComp_1_dpath__io_ctrl_out, 0x25);
+  NameSuite_DebugComp_1_dpath__io_ctrl_out__prev = NameSuite_DebugComp_1_dpath__io_ctrl_out;
   dat_dump<1>(f, NameSuite_DebugComp_1__io_ctrl_out, 0x26);
+  NameSuite_DebugComp_1__io_ctrl_out__prev = NameSuite_DebugComp_1__io_ctrl_out;
 }
 void NameSuite_DebugComp_1_t::dump(FILE *f, int t) {
   if (t == 0) return dump_init(f);
@@ -106,7 +112,7 @@ L5:
 void NameSuite_DebugComp_1_t::clock_lo ( dat_t<1> reset ) {
   { NameSuite_DebugComp_1_dpath__reset.values[0] = reset.values[0]; }
   { NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0] = NameSuite_DebugComp_1__io_ctrl_wb_wen.values[0]; }
-  { NameSuite_DebugComp_1_dpath__wb_wen.values[0] = NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0]||NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]; }
+  { NameSuite_DebugComp_1_dpath__wb_wen.values[0] = NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0]|NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]; }
   val_t T0__w0;
   { T0__w0 = TERNARY(NameSuite_DebugComp_1_dpath__wb_wen.values[0], NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0], NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]); }
   { NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow.values[0] = TERNARY(NameSuite_DebugComp_1_dpath__reset.values[0], 0x0L, T0__w0); }

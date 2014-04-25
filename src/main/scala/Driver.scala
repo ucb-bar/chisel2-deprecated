@@ -118,8 +118,6 @@ object Driver {
     blackboxes.clear()
     chiselOneHotMap.clear()
     chiselOneHotBitMap.clear()
-    chiselAndMap.clear()
-    searchAndMap = false
     isCompiling = false
     isCheckingPorts = false
     isTesting = false
@@ -259,8 +257,6 @@ object Driver {
   val blackboxes = ArrayBuffer[BlackBox]()
   val chiselOneHotMap = HashMap[(UInt, Int), UInt]()
   val chiselOneHotBitMap = HashMap[(Bits, Int), Bool]()
-  val chiselAndMap = HashMap[(Node, Node), Bool]()
-  var searchAndMap = true
   val compStack = Stack[Module]()
   var stackIndent = 0
   val printStackStruct = ArrayBuffer[(Int, Module)]()

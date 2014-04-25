@@ -429,6 +429,12 @@ class ManualTester[+T <: Module]
     waitForStreams()
     t = 0
     reset(5)
+    // Skip vpd message
+    if (Driver.backend.isInstanceOf[VerilogBackend] && Driver.isDebug) {
+      var vpdmsg = testIn.read
+      while (vpdmsg != '\n' && vpdmsg != -1)
+        vpdmsg = testIn.read
+    }
     for (mod <- c.omods.map(x => x.getNode)) mappings(dumpName(mod)) = mod
     process
   }

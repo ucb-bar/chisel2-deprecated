@@ -26,12 +26,12 @@ module NameSuite_BindFirstComp_1(
 
 
   assign io_replay = T0;
-  assign T0 = io_valid && T1;
-  assign T1 = T3 || T2;
-  assign T2 = ! mask_ximm1q_ready;
-  assign mask_ximm1q_ready = ! dec_io_sigs_enq_ximm1q;
-  assign T3 = ! mask_cmdq_ready;
-  assign mask_cmdq_ready = ! dec_io_sigs_enq_cmdq;
+  assign T0 = io_valid & T1;
+  assign T1 = T3 | T2;
+  assign T2 = mask_ximm1q_ready == 1'h0;
+  assign mask_ximm1q_ready = dec_io_sigs_enq_ximm1q == 1'h0;
+  assign T3 = mask_cmdq_ready == 1'h0;
+  assign mask_cmdq_ready = dec_io_sigs_enq_cmdq == 1'h0;
   NameSuite_BlockDecoder_1 dec(
        //.io_valid(  )
        //.io_replay(  )
