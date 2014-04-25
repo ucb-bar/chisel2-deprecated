@@ -62,6 +62,30 @@ object wire {
   }
 }
 
+object addRegBase {
+  def apply(m: Module, outType: Bits, name: String, updates: Seq[(Bool, Node)]) = {
+    val reg = outType.comp match {
+      case r: Reg => r
+    }
+    // assign component
+    reg.component = m
+    // assign clock
+    reg.clock = m.clock
+    // assign name
+    if (name != "") reg setName name
+    // add updates
+    reg.updates ++= updates
+    // set enable signal
+    reg.isEnable = !updates.isEmpty
+    if (reg.isEnable) {
+      val (conds, assigns) = updates.unzip
+      reg.enable = (conds.tail foldLeft conds.head)(_ || _) 
+    }
+
+    reg
+  }
+}
+
 // DaisyTransform inserts the step counter and
 // the snapshot and evenet counter pins
 object DaisyTransform {
@@ -255,23 +279,8 @@ object DaisyTransform {
     }
   }
 
-  def addReg(m: Module, outType: Bits, name: String, updates: (Bool, Node)*) {
-    val reg = outType.comp match {
-      case r: Reg => r
-    }
-    // assign component
-    reg.component = m
-    // assign clock
-    reg.clock = m.clock
-    // assign name
-    if (name != "") reg setName name
-    // set enable signal
-    reg.isEnable = !updates.isEmpty
-    for ((cond, value) <- updates) {
-      reg.enable = reg.enable || cond
-    }
-    // add updates
-    reg.updates ++= updates
+  def addReg(m: Module, outType: Bits, name: String, updates: (Bool, Node)*) = {
+    addRegBase(m, outType, name, updates)
   }
 
   def addTypeNode[T <: Data](m: Module, typeNode: T, name: String) = {
@@ -302,28 +311,15 @@ trait DaisyChain extends Backend {
   val ioBuffers = new HashMap[Node, Bits]
   lazy val daisyNames = DaisyTransform.daisyNames
 
-  def addReg(m: Module, outType: Bits, name: String, updates: (Bool, Node)*) {
-    val reg = outType.comp match {
-      case r: Reg => r
-    }
-    // assign component
-    reg.component = m
-    // assign clock
-    reg.clock = m.clock
-    // assign name
-    if (name != "") reg setName name
-    // set enable signal
-    reg.isEnable = !updates.isEmpty
-    for ((cond, value) <- updates) {
-      reg.enable = reg.enable || cond
-    }
-    // add updates
-    reg.updates ++= updates
+  def addReg(m: Module, outType: Bits, name: String, updates: (Bool, Node)*) = {
+    val reg = addRegBase(m, outType, name, updates)
     // genreate muxes
     reg genMuxes reg
     // assign reset
     if (reg.isReset) 
       reg.inputs += m.reset
+
+    reg
   }
 
   /* target decoupling */
