@@ -601,7 +601,7 @@ class VerilogBackend extends Backend {
     apis.append("  /*** Shadow declaration for 'peeking' ***/\n")
     val shadowNames = new HashMap[Node, String]
     apis.append("  // wire shadows\n")
-    for (wire <- wires) {
+    for (wire <- wires ; if !wire.isReg) {
       val shadowName = wire.component.getPathName("_") + "_" + emitRef(wire) + "_shadow"
       shadowNames(wire) = shadowName
       apis.append("  reg [%d:0] %s = 0;\n".format(wire.width-1, shadowName))
@@ -655,7 +655,7 @@ class VerilogBackend extends Backend {
         val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
         val wireName = if (shadowNames contains wire) shadowNames(wire) else pathName
         apis.append("          \"%s\": ".format(pathName) + 
-          display("0x%1x", shadowNames(wire))
+          display("0x%1x", wireName)
         )
       }
     }
@@ -818,16 +818,10 @@ class VerilogBackend extends Backend {
          (clocks foldLeft "")(_ + _.name + "_fire && ")
       else "" )
     )
-    for (wire <- wires) {
+    for (wire <- wires ; if !wire.isReg) {
       val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
       val wireName = if (printNodes contains wire) emitRef(wire) else pathName
       apis.append("      %s = %s;\n".format(shadowNames(wire), wireName))
-    }
-    for (mem <- mems) {
-      val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
-      for (i <- 0 until mem.n) {
-        apis.append("      %s[%d] = %s[%d];\n".format(shadowNames(mem), i, pathName, i))
-      }
     }
     apis.append("    end\n")
     apis.append("  end\n")
