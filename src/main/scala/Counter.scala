@@ -376,7 +376,13 @@ trait DaisyChain extends Backend {
           case reg: Reg if this.isInstanceOf[VerilogBackend] && 
                            !Driver.isBackannotating => {
             val enable = fire && isStep && reg.enable
-            reg.inputs(reg.enableIndex) = enable.getNode
+            if (reg.isEnable) {
+              reg.inputs(reg.enableIndex) = enable.getNode  
+            } else {
+              reg.isEnable = true
+              reg.enableIndex = if (reg.isReset) 2 else 1
+              reg.inputs insert (reg.enableIndex, enable.getNode)
+            }
             if (Driver.clocks.size > 1)
               reg.clock = top.clock
           }
