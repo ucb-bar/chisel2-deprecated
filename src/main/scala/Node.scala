@@ -128,6 +128,7 @@ abstract class Node extends nameable {
   var clock: Clock = null
   var CppVertex: CppVertex = null
   /* For daisy chains */
+  var counter: Bits = null
   var snapShadow: Bits = null
   var snapIdx = -1
   var cntrShadow: Bits = null
