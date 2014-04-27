@@ -227,22 +227,25 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     debugs += x.getNode
   }
 
-  def counter(x: Node) {
+  def counter(x: Node, cntrT: CounterType = Ones) {
     x.getNode match {
       case _: VecLike[_] =>
       case _: Aggregate =>
       case _: ROMData =>
       case _: Literal =>
-      case any if !(signals contains any) => {
+      case any => {
         if (!any.isIo) debug(x)
-        signals += any
+        DaisyTransform.counters += EventCounter(any, cntrT)
       }
-      case _ =>
     }
   }
 
   def counter(xs: Node*) {
-    xs.foreach(counter _)
+    xs.foreach(counter (_, Ones))
+  }
+
+  def counter(cntrT: CounterType, xs: Node*) {
+    xs.foreach(counter (_, cntrT))
   }
 
   def printf(message: String, args: Node*): Unit = {

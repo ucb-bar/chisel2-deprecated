@@ -37,6 +37,17 @@ import scala.collection.mutable.LinkedHashMap
 import scala.collection.mutable.{Queue => ScalaQueue}
 import scala.math.pow
 
+// Counter type definition
+trait CounterType
+object Activity extends CounterType
+object Ones extends CounterType
+object Zeros extends CounterType
+object Posedge extends CounterType
+object Negedge extends CounterType
+
+// Event counter type
+case class EventCounter(signal: Node, counterT: CounterType)
+
 object wire {
   def apply(pair: (Node, Data)) {
     val input = pair._1
@@ -97,6 +108,7 @@ object DaisyTransform {
 
   val states = new ArrayBuffer[Node]
   val signals = new ArrayBuffer[Node]
+  val counters = new ArrayBuffer[EventCounter]
   lazy val clkRegs = (Driver.clocks map (_ -> Reg(UInt(width = 32)))).toMap
   lazy val clkCnts = (Driver.clocks map (_ -> Reg(UInt(width = 32)))).toMap
 
@@ -168,6 +180,8 @@ object DaisyTransform {
           fire              -> clkRegs(clock))
       }
     }
+   
+    isStep
   }
 
   def addDaisyPins (c: Module, isStep: Bool) = {
@@ -400,6 +414,7 @@ trait DaisyChain extends Backend {
     }
   }
 
+  /*
   def genCounters (c: Module) {
     ChiselError.info("[CounterBackend] generate counters")
     val queue = ScalaQueue(c)
@@ -453,7 +468,8 @@ trait DaisyChain extends Backend {
       // visit children
       m.children map (queue enqueue _)
     }
-  }  
+  }
+  */
 
   trait ChainType
   object SnapshotChain extends ChainType
