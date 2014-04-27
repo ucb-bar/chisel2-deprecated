@@ -137,7 +137,6 @@ object Driver {
     isBackannotating = false
     model = ""
     signals.clear
-    pseudoMuxes.clear
     modStackPushed = false
 
     readArgs(args)
@@ -192,6 +191,8 @@ object Driver {
         case "--include" => includeArgs = args(i + 1).split(' ').toList; i += 1
         case "--checkPorts" => isCheckingPorts = true
         // Counter backend flags
+        case "--snapshot" => isSnapshotting = true
+        case "--counter" => genCounter = true
         case "--backannotation" => isBackannotating = true
         case "--model" => model = args(i + 1) ; i += 1
         //Jackhammer Flags
@@ -267,9 +268,10 @@ object Driver {
   var isInGetWidth: Boolean = false
   /* Backannotation flags */
   var isBackannotating = false
+  var isSnapshotting = false
+  var genCounter = false
   var model = ""
   val signals = LinkedHashSet[Node]()
-  val pseudoMuxes = HashMap[Node, Node]()
   var modStackPushed: Boolean = false
   /* Jackhammer flags */
   var jackDump: String = null

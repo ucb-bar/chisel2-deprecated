@@ -37,7 +37,6 @@ import scala.collection.mutable.LinkedHashMap
 import scala.collection.mutable.{Queue => ScalaQueue}
 import scala.math.pow
 
-
 object wire {
   def apply(pair: (Node, Data)) {
     val input = pair._1
@@ -97,6 +96,7 @@ object DaisyTransform {
   val cntrRead = new HashMap[Module, Bool]
 
   val states = new ArrayBuffer[Node]
+  val signals = new ArrayBuffer[Node]
   lazy val clkRegs = (Driver.clocks map (_ -> Reg(UInt(width = 32)))).toMap
   lazy val clkCnts = (Driver.clocks map (_ -> Reg(UInt(width = 32)))).toMap
 
@@ -161,38 +161,30 @@ object DaisyTransform {
           (!fire && isStep) -> (clkCnts(clock) - min),
           fire              -> clkRegs(clock))
       }
-
-      /*
-      val fireAll = addTypeNode(top, (fires foldLeft Bool(true))((res, map) => res && (map._2)(top)), "fire_all")
-      addReg(top, steps, "steps",
-        (!isStep && stepsIn.valid) -> stepsIn.bits,
-        (fireAll && isStep) -> (steps - UInt(1)))
-      */
     }
 
-    if (Driver.clocks.size > 1)
-      addPin(top, clockIn, "clock_in")
-    addPin(top, stepsIn, "steps_in")
-    wire(!isStep -> stepsIn.ready)
-    isSteps(top) = isStep
-    snapIns(top) = UInt(0)
-    cntrIns(top) = UInt(0)
-
-    addDaisyPins(top)
+    addDaisyPins(top, isStep)
     top.asInstanceOf[T]
   }
 
-  def addDaisyPins (c: Module) = {
+  def addDaisyPins (c: Module, isStep: Bool) = {
     ChiselError.info("[DaisyTransform] add daisy pins")
 
     val queue = ScalaQueue(c)
     while (!queue.isEmpty) {
       val m = queue.dequeue
       if (m == c) {
+        if (Driver.clocks.size > 1)
+          addPin(top, clockIn, "clock_in")
+        addPin(top, stepsIn, "steps_in")
+        isSteps(m)   = isStep
+        snapIns(m)   = UInt(0)
+        cntrIns(m)   = UInt(0)
 	snapOuts(m)  = addPin(m, snapOut, "snap_out")
 	snapCtrls(m) = addPin(m, snapCtrl, "snap_ctrl")
 	cntrOuts(m)  = addPin(m, cntrOut, "cntr_out")
 	cntrCtrls(m) = addPin(m, cntrCtrl, "cntr_ctrl") 
+        wire(!isSteps(m) -> stepsIn.ready)
       } else {
         isSteps(m)   = addPin(m, Bool(INPUT), "is_step")
         snapIns(m)   = addPin(m, UInt(INPUT, 32), "snap_in")
@@ -258,7 +250,15 @@ trait DaisyChain extends Backend {
   override def backannotationTransforms {
     super.backannotationTransforms
     transforms += ((c: Module) => c bfs (_.addConsumers))
-    transforms ++= daisyTransforms
+    transforms += ((c: Module) => decoupleTarget(DaisyTransform.top))
+    transforms += ((c: Module) => appendFires(DaisyTransform.top))
+    if (Driver.isSnapshotting) {
+      transforms += (c => findStates(DaisyTransform.top))
+      transforms += (c => genDaisyChain(DaisyTransform.top, SnapshotChain))
+    }
+    if (Driver.genCounter) {
+      transforms += (c => genDaisyChain(DaisyTransform.top, CounterChain))
+    }
     transforms += ((c: Module) => c.addClockAndReset)
     transforms += ((c: Module) => gatherClocksAndResets)
     transforms += ((c: Module) => connectResets)
@@ -267,9 +267,6 @@ trait DaisyChain extends Backend {
     transforms += ((c: Module) => c.removeTypeNodes)
     transforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
   }
-  val daisyTransforms = ArrayBuffer(
-    {(c: Module) => decoupleTarget(DaisyTransform.top)},
-    {(c: Module) => appendFires(DaisyTransform.top)})
 
   val ioBuffers = new HashMap[Node, Bits]
   lazy val daisyNames = DaisyTransform.daisyNames
@@ -370,17 +367,6 @@ trait DaisyChain extends Backend {
       top.children foreach (queue enqueue _)
     }  
   }
-}
-
-trait SnapshotChain extends DaisyChain {
-  daisyTransforms += { c => findStates(DaisyTransform.top) }
-  daisyTransforms += { c => genSnapshotChain(DaisyTransform.top) }
-
-  var snapIdx = -1
-  def emitSnapIdx = {
-    snapIdx = snapIdx + 1
-    snapIdx
-  }
 
   def findStates(c: Module) { 
     ChiselError.info("[SnapshotChain] find state elements")
@@ -411,94 +397,218 @@ trait SnapshotChain extends DaisyChain {
     }
   }
 
-  def genSnapshotChain(c: Module) {
+  def genCounters (c: Module) {
+    ChiselError.info("[CounterBackend] generate counters")
+    val queue = ScalaQueue(c)
+    while (!queue.isEmpty) {
+      val m = queue.dequeue
+      for (signal <- m.signals) {
+        val signalWidth = signal.width
+        val signalValue = 
+          if (decoupledPins contains signal) decoupledPins(signal) 
+          else UInt(signal)
+        // Todo: configurable counter width
+        val counter = Reg(Bits(width = 32))
+        val shadow  = Reg(Bits(width = 32))
+        signal.counter = counter
+        signal.shadow = shadow
+        signal.cntrIdx = emitCounterIdx
+
+        val counterValue = {
+          // Signal
+          if (signalWidth == 1) {
+            counter + signalValue
+          // Bus -> hamming distance
+          } else {
+            val buffer = Reg(UInt(width = signalWidth))
+            val xor = signalValue ^ buffer
+            xor.inferWidth = (x: Node) => signalWidth
+            val hd = PopCount(xor)
+            addReg(m, buffer, "buffer_%d".format(signal.cntrIdx), 
+              Map(firedPins(m) -> signalValue)
+            )
+            counter + hd
+          }
+        }
+        counterValue.getNode.component = m
+        counterValue.getNode setName "c_value_%d".format(signal.cntrIdx)
+
+        /****** Activity Counter *****/
+        // 1) fire signal -> increment counter
+        // 2) 'copy' control signal when the target is stalled -> reset
+        addReg(m, counter, "counter_%d".format(signal.cntrIdx), Map(
+          firedPins(m)   -> counterValue,
+          counterCopy(m) -> Bits(0)
+        ))
+
+        // for debugging
+        if (Driver.isBackannotating) {
+          signal setName "signal_%d_%s".format(counterIdx, signal.pName)
+        }
+      }
+
+      // visit children
+      m.children map (queue enqueue _)
+    }
+  }  
+
+  trait ChainType
+  object SnapshotChain extends ChainType
+  object CounterChain extends ChainType
+
+  var snapIdx = -1
+  def emitSnapIdx = {
+    snapIdx = snapIdx + 1
+    snapIdx
+  }
+
+  def genDaisyChain(c: Module, chainT: ChainType) {
     ChiselError.info("[SnapshotChain] generate snapshot chains")
  
     val queue = ScalaQueue(c)
     // Daisy chaining
     while (!queue.isEmpty) {
       val m = queue.dequeue
-      val copy = DaisyTransform.snapCopy(m)
-      val read = DaisyTransform.snapRead(m)
- 
-      m.states foreach { node =>
-        node.snapShadow = Reg(UInt(width=32))
-        node.snapIdx = emitSnapIdx
+      val copy = chainT match {
+        case SnapshotChain => DaisyTransform.snapCopy(m)
+        case CounterChain  => DaisyTransform.cntrCopy(m)
+      }
+      val read = chainT match {
+        case SnapshotChain => DaisyTransform.snapRead(m)
+        case CounterChain  => DaisyTransform.cntrRead(m)
+      }
+      val chain = chainT match {
+        case SnapshotChain => {
+          m.states foreach { node =>
+            node.snapShadow = Reg(UInt(width=32))
+            node.snapIdx = emitSnapIdx
+          }
+          m.states
+        }
+        case CounterChain  => m.signals
+      }
+      val daisyOut = chainT match {
+        case SnapshotChain => DaisyTransform.snapOuts(m)
+        case CounterChain  => DaisyTransform.cntrOuts(m)
+      }
+      val daisyIn = chainT match {
+        case SnapshotChain => DaisyTransform.snapIns(m)
+        case CounterChain  => DaisyTransform.cntrIns(m)
       }
 
-      (m.children.isEmpty, m.states.isEmpty) match {
+      (m.children.isEmpty, chain.isEmpty) match {
         // no children & no singals 
         case (true, true) => {
-          // snap output <- snap input
-          wire(DaisyTransform.snapIns(m) -> 
-               DaisyTransform.snapOuts(m).bits)
+          wire(daisyIn -> daisyOut.bits)
         }
         // children but no signals
         case (false, true) => {
-          // head child's snap output -> snap output
-          wire(DaisyTransform.snapOuts(m.children.head).bits -> 
-               DaisyTransform.snapOuts(m).bits)
-          // snap input -> last child's snap input 
-          wire(DaisyTransform.snapIns(m) -> 
-               DaisyTransform.snapIns(m.children.last))
+	  val headDaisyOut = chainT match {
+	    case SnapshotChain => DaisyTransform.snapOuts(m.children.head)
+	    case CounterChain  => DaisyTransform.cntrOuts(m.children.head)
+	  }
+	  val lastDaisyIn = chainT match {
+	    case SnapshotChain => DaisyTransform.snapIns(m.children.last)
+	    case CounterChain  => DaisyTransform.cntrIns(m.children.last)
+	  }
+          // the head child's daisy output -> daisy output
+          wire(headDaisyOut.bits -> daisyOut.bits)
+          // daisy input -> last child's daisy input 
+          wire(daisyIn -> lastDaisyIn)
         }
         // no children but signals
         case (true, false) => {
+          val lastShadow = chainT match {
+            case SnapshotChain => chain.last.snapShadow
+            case CounterChain  => chain.last.cntrShadow
+          }
+          val shadowName = chainT match {
+            case SnapshotChain => "snap_shadow_" + chain.last.snapIdx
+            case CounterChain  => "cntr_shadow_" + chain.last.cntrIdx
+          }
           // snap output -> head shadow
-          wire(m.states.head.snapShadow -> 
-               DaisyTransform.snapOuts(m).bits)
-          val state = ioBuffers getOrElse (m.states.last, m.states.last)
+          wire(chain.head.snapShadow -> daisyOut.bits)
+          val state = ioBuffers getOrElse (chain.last, chain.last)
           // snap input -> last shadow 
-          addReg(m, m.states.last.snapShadow, "snap_shadow_" + m.states.last.snapIdx,
-            copy -> state,
-            read -> DaisyTransform.snapIns(m))
+          addReg(m, lastShadow, shadowName, copy -> state, read -> daisyIn)
         }
         // children & signals
         case (false, false) => {
-          // snap output <- head shadow
-          wire(m.states.head.snapShadow ->
-               DaisyTransform.snapOuts(m).bits)
-          val state = ioBuffers getOrElse (m.states.last, m.states.last)
-          // last shadow <- snap input
-          addReg(m, m.states.last.snapShadow, "snap_shadow_" + m.states.last.snapIdx,
-            copy -> state,
-            read -> DaisyTransform.snapOuts(m.children.head).bits)
-          // last child's snap input <- snap input
-          wire(DaisyTransform.snapIns(m) ->
-               DaisyTransform.snapOuts(m.children.last).bits)
+	  val headDaisyOut = chainT match {
+	    case SnapshotChain => DaisyTransform.snapOuts(m.children.head)
+	    case CounterChain  => DaisyTransform.cntrOuts(m.children.head)
+	  }
+	  val lastDaisyIn = chainT match {
+	    case SnapshotChain => DaisyTransform.snapIns(m.children.last)
+	    case CounterChain  => DaisyTransform.cntrIns(m.children.last)
+	  }
+          val headShadow = chainT match {
+            case SnapshotChain => chain.head.snapShadow
+            case CounterChain  => chain.head.cntrShadow
+          }
+          val lastShadow = chainT match {
+            case SnapshotChain => chain.last.snapShadow
+            case CounterChain  => chain.last.cntrShadow
+          }
+          val shadowName = chainT match {
+            case SnapshotChain => "snap_shadow_" + chain.last.snapIdx
+            case CounterChain  => "cntr_shadow_" + chain.last.cntrIdx
+          }
+          // head shadow -> daisy output
+          wire(headShadow -> daisyOut.bits)
+          val state = ioBuffers getOrElse (chain.last, chain.last)
+          // daisy input -> last shadow
+          addReg(m, lastShadow, shadowName, copy -> state, read -> headDaisyOut.bits)
+          // daisy input -> last child's snap input
+          wire(daisyIn -> lastDaisyIn)
         }
       }
  
       for (s <- m.children sliding 2 ; if s.size == 2) {
-        val cur = s.head
-        val next = s.last
-        // next child's daisy output -> cur child's daisy input
-        wire(DaisyTransform.snapOuts(next).bits -> 
-             DaisyTransform.snapIns(cur))
+        val curDaisyIn = chainT match {
+          case SnapshotChain => DaisyTransform.snapIns(s.head)
+          case CounterChain  => DaisyTransform.cntrIns(s.head)
+        }
+        val nextDaisyOut = chainT match {
+          case SnapshotChain => DaisyTransform.snapOuts(s.last)
+          case CounterChain  => DaisyTransform.cntrOuts(s.last)
+        }
+        // the next child's daisy output -> the cur child's daisy input
+        wire(nextDaisyOut.bits -> curDaisyIn)
       }
 
-      for (s <- m.states sliding 2 ; if s.size == 2) {
-        val cur = s.head
-        val next = s.last
-        val state = ioBuffers getOrElse (cur, cur)
+      for (s <- chain sliding 2 ; if s.size == 2) {
+        val state = ioBuffers getOrElse (s.head, s.head)
+        val curShadow = chainT match {
+          case SnapshotChain => s.head.snapShadow
+          case CounterChain  => s.head.cntrShadow
+        }
+        val nextShadow = chainT match {
+          case SnapshotChain => s.last.snapShadow
+          case CounterChain  => s.last.cntrShadow
+        }
+        val shadowName = chainT match {
+          case SnapshotChain => "snap_shadow_" + s.head.snapIdx
+          case CounterChain  => "cntr_shadow_" + s.head.cntrIdx
+        }
         /****** Shaodw Counter *****/
         // daisy_ctrl == 'copy' -> current state
         // daisy_ctrl == 'read' -> next shadow 
-        addReg(m, cur.snapShadow, "snap_shadow_" + cur.snapIdx,
-          copy -> state,
-          read -> next.snapShadow
-        )
+        addReg(m, curShadow, shadowName, copy -> state, read -> nextShadow)
       }
       // collect signal lists
-      DaisyTransform.states ++= m.states
+      chainT match {
+        case SnapshotChain => DaisyTransform.states  ++= m.states
+        case CounterChain  => DaisyTransform.signals ++= m.signals
+      }
       // visit children
       m.children foreach (queue enqueue _)
     }
   }  
 }
 
-class SnapshotVerilog extends VerilogBackend with SnapshotChain
-class SnapshotCpp     extends CppBackend     with SnapshotChain
+class DaisyVerilog extends VerilogBackend with DaisyChain
+class DaisyCpp     extends CppBackend     with DaisyChain
 
 abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends Tester(c, isTrace) {
   val peeks = new ArrayBuffer[BigInt]
@@ -776,245 +886,6 @@ abstract class DaisyWrapperTester[+T <: DaisyFPGAWrapper[_]](c: T, isTrace: Bool
 }
 
 /*
-object CounterTransform {
-  val counterCopy = new HashMap[Module, Bool]
-  val counterRead = new HashMap[Module, Bool]
-}
-
-trait CounterTransform extends Backend {
-  val decoupledPins = new HashMap[Node, Bits]
-
-  var counterIdx = -1
-
-  override def backannotationTransforms {
-    super.backannotationTransforms
-
-    transforms += ((c: Module) => c bfs (_.addConsumers))
-
-    transforms += ((c: Module) => appendFires(c))
-    transforms += ((c: Module) => connectDaisyPins(c))
-    transforms += ((c: Module) => generateCounters(c))
-    transforms += ((c: Module) => generateDaisyChains(c))
-
-    transforms += ((c: Module) => c.addClockAndReset)
-    transforms += ((c: Module) => gatherClocksAndResets)
-    transforms += ((c: Module) => connectResets)
-    transforms += ((c: Module) => c.inferAll)
-    transforms += ((c: Module) => c.forceMatchingWidths)
-    transforms += ((c: Module) => c.removeTypeNodes)
-    transforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
-  }
-
-
-  // Connect daisy pins of hierarchical modules
-  def connectDaisyPins(c: Module) {
-    ChiselError.info("[CounterBackend] connect daisy pins")
-
-    val queue = new scala.collection.mutable.Queue[Module]
-    queue enqueue c
-
-    while (!queue.isEmpty) {
-      val m = queue.dequeue
-
-      // add daisy pins and wire them to its parent's daisy pins
-      val daisyIn = UInt(INPUT, 32)
-      val daisyOut = Decoupled(UInt(width = 32))
-      val daisyCtrl = UInt(INPUT, 1)
-      val daisyFire = daisyOut.ready && !firedPins(m)
-      val copy = daisyFire && daisyCtrl === Bits(0)
-      val read = daisyFire && daisyCtrl === Bits(1)
-      copy.getNode setName "copy"
-      read.getNode setName "read"
-  
-      addPin(m, daisyOut,  "daisy_out")
-      addPin(m, daisyCtrl, "daisy_ctrl")
-      if (m != c) {
-        addPin(m, daisyIn, "daisy_in")
-        wire(daisyOut.ready, daisyOuts(m.parent).ready)
-      }
-      wire(daisyOut.valid,   daisyFire)
-
-      // The top component has no daisy input
-      daisyIns(m)    = if (m ==c) UInt(0) else daisyIn
-      daisyOuts(m)   = daisyOut
-      daisyCtrls(m)  = daisyCtrl
-      counterCopy(m) = copy
-      counterRead(m) = read
-
-      // visit children
-      m.children map (queue enqueue _)
-   }
-
-    queue enqueue c
-
-    while (!queue.isEmpty) {
-      val m = queue.dequeue
-
-      if (!m.children.isEmpty) {
-        val head = m.children.head
-        val last = m.children.last
-
-        // If the component has its children and no signals for counters,
-        // its first child's daisy output is connected to its daisy output
-        if (m.signals.isEmpty) {
-          if (m == c) {
-            // For the top component, the shaodw buffer is inserted
-            // between the outpins 
-            // so that the first counter value would not be missed
-            // when shadow counter values are shifted
-            val buf = Reg(next = daisyOuts(head).bits)
-            addReg(m, buf, "shadow_buf")
-            wire(daisyOuts(m).bits, buf)            
-          } else {
-            // Otherwise, just connect them
-            wire(daisyOuts(m).bits, daisyOuts(head).bits)
-          }
-        }
-
-        for (i <- 0 until m.children.size - 1) {
-          val cur = m.children(i)
-          val next = m.children(i+1)
-          // the current child's daisy input <- the next child's daisy output
-          wire(daisyIns(cur), daisyOuts(next).bits)
-        }
-
-        // the last child's daisy input <- the module's diasy input
-        wire(daisyIns(last), daisyIns(m))
-      } else if (m.signals.isEmpty) {
-        // No children & no singals for counters
-        // the daisy output <- the daisy input
-        wire(daisyOuts(m).bits, daisyIns(m))
-      }
-
-      m.children map (queue enqueue _)
-    }
-  }
-
-  def generateCounters (c: Module) {
-    ChiselError.info("[CounterBackend] generate counters")
-
-    val queue = new scala.collection.mutable.Queue[Module]
-    queue enqueue c
- 
-    while (!queue.isEmpty) {
-      val m = queue.dequeue
-
-      for (signal <- m.signals) {
-        val signalWidth = signal.width
-        val signalValue = 
-          if (decoupledPins contains signal) decoupledPins(signal) 
-          else UInt(signal)
-        // Todo: configurable counter width
-        val counter = Reg(Bits(width = 32))
-        val shadow  = Reg(Bits(width = 32))
-        signal.counter = counter
-        signal.shadow = shadow
-        signal.cntrIdx = emitCounterIdx
-
-        val counterValue = {
-          // Signal
-          if (signalWidth == 1) {
-            counter + signalValue
-          // Bus -> hamming distance
-          } else {
-            val buffer = Reg(UInt(width = signalWidth))
-            val xor = signalValue ^ buffer
-            xor.inferWidth = (x: Node) => signalWidth
-            val hd = PopCount(xor)
-            addReg(m, buffer, "buffer_%d".format(signal.cntrIdx), 
-              Map(firedPins(m) -> signalValue)
-            )
-            counter + hd
-          }
-        }
-        counterValue.getNode.component = m
-        counterValue.getNode setName "c_value_%d".format(signal.cntrIdx)
-
-        /****** Activity Counter *****/
-        // 1) fire signal -> increment counter
-        // 2) 'copy' control signal when the target is stalled -> reset
-        addReg(m, counter, "counter_%d".format(signal.cntrIdx), Map(
-          firedPins(m)   -> counterValue,
-          counterCopy(m) -> Bits(0)
-        ))
-
-        // for debugging
-        if (Driver.isBackannotating) {
-          signal setName "signal_%d_%s".format(counterIdx, signal.pName)
-        }
-      }
-
-      // visit children
-      m.children map (queue enqueue _)
-    }
-  }  
- 
-  def generateDaisyChains(c: Module) {
-    ChiselError.info("[CounterBackend] daisy chaining")
- 
-    val queue = new scala.collection.mutable.Queue[Module] 
-    queue enqueue c
-
-    // Daisy chaining
-    while (!queue.isEmpty) {
-      val m = queue.dequeue 
-      if (!m.signals.isEmpty) {
-        val head = m.signals.head
-        val last = m.signals.last
-        if (m == c) {
-          // For the top component, the shaodw buffer is inserted
-          // at the frontend of the daisy chain
-          // so that the first counter value would not be missed
-          // when shadow counter values are shifted
-          val buf = Reg(next = head.shadow)
-          addReg(m, buf, "shadow_buf")
-          wire(daisyOuts(m).bits, buf)
-        } else {
-          // Ohterwise, just connect them
-          wire(daisyOuts(m).bits, head.shadow)
-        }
-
-        for (s <- m.signals.sliding(2)) {
-          val cur = s.head
-          val next = s.last
-          /****** Shaodw Counter *****/
-          // 1) 'copy' control signal -> copy counter values from the activity counter
-          // 2) 'read' control signal -> shift counter values from the next shadow counter
-          addReg(m, cur.shadow, "shadow_%d".format(cur.cntrIdx), Map(
-            counterCopy(m) -> cur.counter,
-            counterRead(m) -> next.shadow
-          ))
-      
-          // Signals are collected in order
-          // so that counter values are verified 
-          // and power numbers are calculated
-          Driver.signals += cur
-        }
-
-        // For the last counter of the daisy chain
-        // 1) the module has chilren -> its first child's daisy output
-        // 2) otherwise -> its daisy input 
-        val lastread = 
-          if (m.children.isEmpty) daisyIns(m) 
-          else daisyOuts(m.children.head).bits
-        addReg(m, last.shadow, "shadow_%d".format(last.cntrIdx), Map(
-          counterCopy(m) -> last.counter,
-          counterRead(m) -> lastread
-        ))
-
-        Driver.signals += m.signals.last
-      }
-
-      // visit children
-      m.children map (queue enqueue _)
-    }
-  }
-}
-
-class CounterCppBackend extends CppBackend with CounterTransform
-class CounterVBackend extends VerilogBackend with CounterTransform
-
-
 abstract class CounterTester[+T <: Module](c: T, isTrace: Boolean = true) extends Tester(c, isTrace) {
   val prevPeeks = new HashMap[Node, BigInt]
   val counts = new HashMap[Node, BigInt]
