@@ -117,10 +117,9 @@ object DaisyTransform {
     // step counters
     val steps = Reg(init = UInt(0, 32))
     val isStep = addTypeNode(top, steps.orR, "is_step") 
-   
     addReg(top, steps, "steps",
       (!isStep && stepsIn.valid) -> stepsIn.bits,
-      isStep                      -> (steps - UInt(1)))
+      isStep                     -> (steps - UInt(1)))
 
     // generate clock counters for multi clock domains
     if (Driver.clocks.size > 1) { 
@@ -155,10 +154,9 @@ object DaisyTransform {
 
       for ((clock, idx) <- Driver.clocks.zipWithIndex) {
         val fire = addTypeNode(top, !clkCnts(clock).orR, "fire_" + idx)
-        val firemap = HashMap(top -> fire)
         val clkCntName = "clock_cnt_" + idx
         daisyNames += clkCntName
-        fires(clock) = firemap
+        fires(clock) = HashMap(top -> fire)
         addReg(top, clkCnts(clock), clkCntName,
           (!fire && isStep) -> (clkCnts(clock) - min),
           fire              -> clkRegs(clock))
@@ -208,7 +206,7 @@ object DaisyTransform {
         wire(snapOuts(m.parent).ready -> snapOuts(m).ready)
       }
 
-      if (Driver.clocks.size > 1) {
+      if (m != c && Driver.clocks.size > 1) {
         for ((clock, idx) <- Driver.clocks.zipWithIndex) {
           fires(clock)(m) = addPin(m, Bool(INPUT), "fire_" + idx)
           wire(fires(clock)(m.parent) -> fires(clock)(m))
@@ -229,8 +227,8 @@ object DaisyTransform {
     }
   }
 
-  def addReg(m: Module, outType: Bits, name: String, updates: (Bool, Node)*) = {
-    addRegBase(m, outType, name, updates)
+  def addReg(m: Module, outType: Bits, name: String, updates: (Bool, Node)*) {
+    val reg = addRegBase(m, outType, name, updates)
   }
 
   def addPin[T <: Data](m: Module, pin: T, name: String) = {
@@ -276,18 +274,15 @@ trait DaisyChain extends Backend {
   val ioBuffers = new HashMap[Node, Bits]
   lazy val daisyNames = DaisyTransform.daisyNames
 
-  def addReg(m: Module, outType: Bits, name: String, updates: (Bool, Node)*) = {
+  def addReg(m: Module, outType: Bits, name: String, updates: (Bool, Node)*) {
     val reg = addRegBase(m, outType, name, updates)
     // genreate muxes
     reg genMuxes reg
     // assign reset
     if (reg.isReset) 
       reg.inputs += m.reset
-
-    reg
   }
 
-  /* target decoupling */
   def decoupleTarget(c: Module) = {
     ChiselError.info("[DaisyChain] target decoupling")
     for ((name, io) <- c.io.asInstanceOf[Bundle].elements) {
