@@ -113,7 +113,13 @@ object DaisyTransform {
   def apply[T <: Module](c: => T) = {
     top = Module(c)
 
-    ChiselError.info("[DaisyTransform] generate step and clock counters")
+    val isStep = addStepAndClkCnts(top)
+    addDaisyPins(top, isStep)
+    top.asInstanceOf[T]
+  }
+
+  def addStepAndClkCnts (top: Module) = {
+    ChiselError.info("[DaisyTransform] add step and clock counts")
     // step counters
     val steps = Reg(init = UInt(0, 32))
     val isStep = addTypeNode(top, steps.orR, "is_step") 
@@ -162,9 +168,6 @@ object DaisyTransform {
           fire              -> clkRegs(clock))
       }
     }
-
-    addDaisyPins(top, isStep)
-    top.asInstanceOf[T]
   }
 
   def addDaisyPins (c: Module, isStep: Bool) = {
