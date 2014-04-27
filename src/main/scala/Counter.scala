@@ -548,8 +548,9 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   val snapOut  = DaisyTransform.snapOut
   val snapCtrl = DaisyTransform.snapCtrl
   val states   = DaisyTransform.states
+  val clockVals = new LinkedHashMap[Clock, Int]
+  val clockCnts = new LinkedHashMap[Clock, Int]
 
-  // proceed 'n' clocks
   def takeSteps (n: Int) {
     val clk = emulatorCmd("step %d".format(n))
     if (isTrace) println("  STEP %d".format(n))
@@ -613,7 +614,18 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
         poke(clockIn.valid, 1)
         takeSteps(1)
         poke(clockIn.valid, 0)
+        // set clock values for the tester
+        clockVals(clock) = clocks(clock)
+      } else {
+        val tokens = clock.initStr split " "
+        tokens(1) match {
+          case "*" => 
+            clockVals(clock) = clockVals(clock.srcClock) * tokens(2).toInt
+          case "/" => 
+            clockVals(clock) = clockVals(clock.srcClock) / tokens(2).toInt
+        }
       }
+      clockCnts(clock) = clockVals(clock)
     }
   }
 
@@ -669,8 +681,19 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     }
     takeSteps(1)
 
+    // set t & delta
     t += n
-    delta += 6 * n
+    if (Driver.clocks.size > 1) {
+      for (i <- 0 until n) {
+        val delta_i = clockCnts.minBy(_._2)._2
+        for (clock <- Driver.clocks) {
+          clockCnts(clock) -= delta_i
+          if (clockCnts(clock) == 0)
+            clockCnts(clock) = clockVals(clock)
+        }
+        delta += delta_i
+      }
+    }
   }
 
   override def finish(): Boolean = {
