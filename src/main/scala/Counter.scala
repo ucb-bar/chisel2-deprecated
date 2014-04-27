@@ -37,21 +37,6 @@ import scala.collection.mutable.LinkedHashMap
 import scala.collection.mutable.{Queue => ScalaQueue}
 import scala.math.pow
 
-object addPin {
-  def apply(m: Module, pin: Data, name: String) {
-    for ((n, io) <- pin.flatten) {
-      // assign component
-      io.component = m
-      io.isIo = true
-    }
-    // set name
-    pin nameIt (name, true)
-    // included in io
-    (m.io) match {
-      case io: Bundle => io += pin
-    }
-  }
-}
 
 object wire {
   def apply(pair: (Node, Data)) {
@@ -103,13 +88,13 @@ object DaisyTransform {
   val snapIns = new HashMap[Module, UInt]
   val snapOuts = new HashMap[Module, DecoupledIO[UInt]]
   val snapCtrls = new HashMap[Module, Bits]
-  val snapCopies = new HashMap[Module, Bool]
-  val snapReads = new HashMap[Module, Bool]
+  val snapCopy = new HashMap[Module, Bool]
+  val snapRead = new HashMap[Module, Bool]
   val cntrIns = new HashMap[Module, UInt]
   val cntrOuts = new HashMap[Module, DecoupledIO[UInt]]
   val cntrCtrls = new HashMap[Module, Bits]
-  val cntrCopies = new HashMap[Module, Bool]
-  val cntrReads = new HashMap[Module, Bool]
+  val cntrCopy = new HashMap[Module, Bool]
+  val cntrRead = new HashMap[Module, Bool]
 
   val states = new ArrayBuffer[Node]
   lazy val clkRegs = (Driver.clocks map (_ -> Reg(UInt(width = 32)))).toMap
@@ -187,93 +172,57 @@ object DaisyTransform {
       */
     }
 
-    ChiselError.info("[DaisyTransform] add daisy pins")
-
-    addPin(top, stepsIn, "steps_in")
-    addPin(top, snapOut, "snap_out")
-    addPin(top, snapCtrl, "snap_ctrl")
-    addPin(top, cntrOut, "cntr_out")
-    addPin(top, cntrCtrl, "cntr_ctrl")
     if (Driver.clocks.size > 1)
       addPin(top, clockIn, "clock_in")
-    
+    addPin(top, stepsIn, "steps_in")
     wire(!isStep -> stepsIn.ready)
-    isSteps(top)   = isStep
-    snapIns(top)   = UInt(0)
-    snapOuts(top)  = snapOut
-    snapCtrls(top) = snapCtrl
-    cntrIns(top)   = UInt(0)
-    cntrOuts(top)  = cntrOut
-    cntrCtrls(top) = cntrCtrl
+    isSteps(top) = isStep
+    snapIns(top) = UInt(0)
+    cntrIns(top) = UInt(0)
 
-    val snapFire = addTypeNode(top, snapOut.ready && !isStep, "snap_fire")
-    val snapCopy = addTypeNode(top, snapFire && snapCtrl === Bits(0), "snap_copy")
-    val snapRead = addTypeNode(top, snapFire && snapCtrl === Bits(1), "snap_read")
-    val cntrFire = addTypeNode(top, cntrOut.ready && !isStep, "cntr_fire")
-    val cntrCopy = addTypeNode(top, cntrFire && cntrCtrl === Bits(0), "cntr_copy")
-    val cntrRead = addTypeNode(top, cntrFire && cntrCtrl === Bits(1), "cntr_read")
-    snapCopies(top) = snapCopy
-    snapReads(top)  = snapRead
-    cntrCopies(top) = cntrCopy
-    cntrReads(top)  = cntrRead
-    wire(snapFire -> snapOut.valid)
-    wire(cntrFire -> cntrOut.valid)
-    
-    top.children foreach (addDaisyPins(_))
+    addDaisyPins(top)
     top.asInstanceOf[T]
   }
 
   def addDaisyPins (c: Module) = {
-    /* insert pins */
+    ChiselError.info("[DaisyTransform] add daisy pins")
+
     val queue = ScalaQueue(c)
     while (!queue.isEmpty) {
       val m = queue.dequeue
-      val isStep = Bool(INPUT)
-      val snapIn = UInt(INPUT, 32)
-      val snapOut = Decoupled(UInt(width = 32))
-      val snapCtrl = UInt(INPUT, 1)
-      val cntrIn = UInt(INPUT, 32)
-      val cntrOut = Decoupled(UInt(width = 32))
-      val cntrCtrl = UInt(INPUT, 1)
-      addPin(m, isStep, "is_step")
-      addPin(m, snapIn, "snap_in")
-      addPin(m, cntrIn, "cntr_in")
-      addPin(m, snapOut,  "snap_out")
-      addPin(m, snapCtrl, "snap_ctrl")
-      addPin(m, cntrOut,  "cntr_out")
-      addPin(m, cntrCtrl, "cntr_ctrl")
-      isSteps(m)   = isStep
-      snapIns(m)   = snapIn
-      snapOuts(m)  = snapOut
-      snapCtrls(m) = snapCtrl
-      cntrIns(m)   = cntrIn
-      cntrOuts(m)  = cntrOut
-      cntrCtrls(m) = cntrCtrl
-      wire(isSteps(m.parent) -> isStep)
-      wire(snapCtrls(m.parent) -> snapCtrl)
-      wire(snapOuts(m.parent).ready -> snapOut.ready)
+      if (m == c) {
+	snapOuts(m)  = addPin(m, snapOut, "snap_out")
+	snapCtrls(m) = addPin(m, snapCtrl, "snap_ctrl")
+	cntrOuts(m)  = addPin(m, cntrOut, "cntr_out")
+	cntrCtrls(m) = addPin(m, cntrCtrl, "cntr_ctrl") 
+      } else {
+        isSteps(m)   = addPin(m, Bool(INPUT), "is_step")
+        snapIns(m)   = addPin(m, UInt(INPUT, 32), "snap_in")
+        cntrIns(m)   = addPin(m, UInt(INPUT, 32), "cntr_in")
+	snapOuts(m)  = addPin(m, Decoupled(UInt(width = 32)), "snap_out")
+	snapCtrls(m) = addPin(m, UInt(INPUT, 1), "snap_ctrl")
+	cntrOuts(m)  = addPin(m, Decoupled(UInt(width = 32)), "cntr_out")
+	cntrCtrls(m) = addPin(m, UInt(INPUT, 1), "cntr_cntrl")
+        wire(isSteps(m.parent) -> isSteps(m))
+        wire(snapCtrls(m.parent) -> snapCtrls(m))
+        wire(snapOuts(m.parent).ready -> snapOuts(m).ready)
+      }
 
       if (Driver.clocks.size > 1) {
         for ((clock, idx) <- Driver.clocks.zipWithIndex) {
-          val fire = Bool(INPUT)
-          addPin(m, fire, "fire_" + idx)
-          fires(clock)(m) = fire
-          wire(fires(clock)(m.parent) -> fire)
+          fires(clock)(m) = addPin(m, Bool(INPUT), "fire_" + idx)
+          wire(fires(clock)(m.parent) -> fires(clock)(m))
         }
       }
 
-      val snapFire = addTypeNode(m, snapOut.ready && !isStep, "snap_fire")
-      val snapCopy = addTypeNode(m, snapFire && snapCtrl === Bits(0), "snap_copy")
-      val snapRead = addTypeNode(m, snapFire && snapCtrl === Bits(1), "snap_read")
-      val cntrFire = addTypeNode(m, cntrOut.ready && !isStep, "cntr_fire")
-      val cntrCopy = addTypeNode(m, cntrFire && cntrCtrl === Bits(0), "cntr_copy")
-      val cntrRead = addTypeNode(m, cntrFire && cntrCtrl === Bits(1), "cntr_read")
-      snapCopies(m) = snapCopy
-      snapReads(m)  = snapRead
-      cntrCopies(m) = cntrCopy
-      cntrReads(m)  = cntrRead
-      wire(snapFire -> snapOut.valid)
-      wire(cntrFire -> cntrOut.valid)
+      val snapFire = addTypeNode(m, snapOuts(m).ready && !isSteps(m), "snap_fire")
+      val cntrFire = addTypeNode(m, cntrOuts(m).ready && !isSteps(m), "cntr_fire")
+      snapCopy(m) = addTypeNode(m, snapFire && snapCtrls(m) === Bits(0), "snap_copy")
+      snapRead(m) = addTypeNode(m, snapFire && snapCtrls(m) === Bits(1), "snap_read")
+      cntrCopy(m) = addTypeNode(m, cntrFire && cntrCtrls(m) === Bits(0), "cntr_copy")
+      cntrRead(m) = addTypeNode(m, cntrFire && cntrCtrls(m) === Bits(1), "cntr_read")
+      wire(snapFire -> snapOuts(m).valid)
+      wire(cntrFire -> cntrOuts(m).valid)
 
       // visit children
       m.children foreach (queue enqueue _)
@@ -282,6 +231,21 @@ object DaisyTransform {
 
   def addReg(m: Module, outType: Bits, name: String, updates: (Bool, Node)*) = {
     addRegBase(m, outType, name, updates)
+  }
+
+  def addPin[T <: Data](m: Module, pin: T, name: String) = {
+    for ((n, io) <- pin.flatten) {
+      // assign component
+      io.component = m
+      io.isIo = true
+    }
+    // set name
+    pin nameIt (name, true)
+    // included in io
+    (m.io) match {
+      case io: Bundle => io += pin
+    }
+    pin
   }
 
   def addTypeNode[T <: Data](m: Module, typeNode: T, name: String) = {
@@ -459,8 +423,8 @@ trait SnapshotChain extends DaisyChain {
     // Daisy chaining
     while (!queue.isEmpty) {
       val m = queue.dequeue
-      val copy = DaisyTransform.snapCopies(m)
-      val read = DaisyTransform.snapReads(m)
+      val copy = DaisyTransform.snapCopy(m)
+      val read = DaisyTransform.snapRead(m)
  
       m.states foreach { node =>
         node.snapShadow = Reg(UInt(width=32))
