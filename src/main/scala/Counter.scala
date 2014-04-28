@@ -40,6 +40,7 @@ import scala.math.pow
 
 // Counter type definition
 trait CounterType
+object Default extends CounterType
 object Activity extends CounterType
 object Ones extends CounterType
 object Zeros extends CounterType
@@ -309,7 +310,6 @@ object DaisyTransform {
     }
     pin
   }
-
 }
 
 trait DaisyChain extends Backend {
@@ -484,6 +484,7 @@ trait DaisyChain extends Backend {
         else DaisyTransform.fires(signal.clock)(c)
       val signalValue = ioBuffers getOrElse (signal, UInt(signal))
       val cntrValue = addTypeNode(c, counter.cntrT match {
+        case Default => counter.src + signalValue
         case Activity => {
           val buffer = addBuffer(c, signal, fire && isStep, signalValue)
           val xor = signalValue ^ buffer
@@ -491,7 +492,8 @@ trait DaisyChain extends Backend {
           counter.src + PopCount(xor)
         }
         case Ones => {
-          counter.src + signalValue
+          signalValue.inferWidth = (x: Node) => width
+          counter.src + (UInt(width) - PopCount(signalValue))
         }
         case Zeros => {
           signalValue.inferWidth = (x: Node) => width

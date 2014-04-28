@@ -227,7 +227,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     debugs += x.getNode
   }
 
-  def counter(x: Node, cntrT: CounterType = Ones) {
+  def counter(x: Node, cntrT: CounterType = Default) {
     x.getNode match {
       case _: VecLike[_] =>
       case _: Aggregate =>
