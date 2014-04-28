@@ -89,10 +89,9 @@ object PopCount
 */
 object Reverse
 {
-  def doit(in: UInt, base: Int, length: Int): UInt =
-  {
+  private def doit(in: UInt, length: Int): UInt = {
     if (length == 1) {
-      in(base)
+      in
     } else if (isPow2(length) && length >= 8 && length <= 64) {
       // Do it in logarithmic time to speed up C++.  Neutral for real HW.
       var res = in
@@ -106,10 +105,10 @@ object Reverse
       res
     } else {
       val half = (1 << log2Up(length))/2
-      Cat(doit(in, base, half), doit(in, base + half, length - half))
+      Cat(doit(in(half-1,0), half), doit(in(length-1,half), length-half))
     }
   }
-  def apply(in: UInt): UInt = doit(in, 0, in.getWidth)
+  def apply(in: UInt): UInt = doit(in, in.getWidth)
 }
 
 
