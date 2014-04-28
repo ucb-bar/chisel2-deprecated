@@ -124,7 +124,6 @@ object addRegBase {
       val (conds, assigns) = updates.unzip
       reg.enable = (conds.tail foldLeft conds.head)(_ || _) 
     }
-
     reg
   }
 }
@@ -151,7 +150,9 @@ object DaisyTransform {
   val cntrCtrl = UInt(INPUT, 1)
 
   val fires = new LinkedHashMap[Clock, HashMap[Module, Bool]]
+  val fireBufs = new LinkedHashMap[Clock, HashMap[Module, Bool]]
   val isSteps = new HashMap[Module, Bool]
+  val isStepBufs = new HashMap[Module, Bool]
   val snapIns = new HashMap[Module, UInt]
   val snapOuts = new HashMap[Module, DecoupledIO[UInt]]
   val snapCtrls = new HashMap[Module, Bits]
@@ -166,7 +167,8 @@ object DaisyTransform {
   lazy val clkRegs = (Driver.clocks map (_ -> Reg(UInt(width = 32)))).toMap
   lazy val clkCnts = (Driver.clocks map (_ -> Reg(UInt(width = 32)))).toMap
 
-  val daisyNames = HashSet("steps", "is_step",
+  val daisyNames = HashSet(
+    "steps", "is_step", "is_step_buf",
     "snap_in", "snap_ctrl", "cntr_in", "cntr_ctrl",
     "steps_in_ready", "steps_in_valid", "steps_in_bits",
     "clock_in_ready", "clock_in_valid", "clock_in_bits",
@@ -232,6 +234,10 @@ object DaisyTransform {
         addReg(top, clkCnts(clock), clkCntName,
           (!fire && isStep) -> (clkCnts(clock) - min),
           fire              -> clkRegs(clock))
+        if (Driver.genCounter) {
+          fireBufs(clock) = HashMap(top -> Reg(next=fire))
+          addReg(top, fireBufs(clock)(top), "fire_buf_" + idx)
+        }
       }
     }
    
@@ -248,44 +254,70 @@ object DaisyTransform {
         if (Driver.clocks.size > 1)
           addPin(top, clockIn, "clock_in")
         addPin(top, stepsIn, "steps_in")
-        isSteps(m)   = isStep
-        snapIns(m)   = UInt(0)
-        cntrIns(m)   = UInt(0)
-	snapOuts(m)  = addPin(m, snapOut, "snap_out")
-	snapCtrls(m) = addPin(m, snapCtrl, "snap_ctrl")
-	cntrOuts(m)  = addPin(m, cntrOut, "cntr_out")
-	cntrCtrls(m) = addPin(m, cntrCtrl, "cntr_ctrl") 
+        isSteps(m) = isStep
+        if (Driver.isSnapshotting) {
+          snapIns(m)   = UInt(0)
+          snapOuts(m)  = addPin(m, snapOut, "snap_out")
+          snapCtrls(m) = addPin(m, snapCtrl, "snap_ctrl")
+        }
+        if (Driver.genCounter) {
+          cntrIns(m)   = UInt(0)
+          cntrOuts(m)  = addPin(m, cntrOut, "cntr_out")
+          cntrCtrls(m) = addPin(m, cntrCtrl, "cntr_ctrl") 
+        }
         wire(!isSteps(m) -> stepsIn.ready)
       } else {
-        isSteps(m)   = addPin(m, Bool(INPUT), "is_step")
-        snapIns(m)   = addPin(m, UInt(INPUT, 32), "snap_in")
-        cntrIns(m)   = addPin(m, UInt(INPUT, 32), "cntr_in")
-	snapOuts(m)  = addPin(m, Decoupled(UInt(width = 32)), "snap_out")
-	snapCtrls(m) = addPin(m, UInt(INPUT, 1), "snap_ctrl")
-	cntrOuts(m)  = addPin(m, Decoupled(UInt(width = 32)), "cntr_out")
-	cntrCtrls(m) = addPin(m, UInt(INPUT, 1), "cntr_ctrl")
+        isSteps(m) = addPin(m, Bool(INPUT), "is_step")
+        if (Driver.isSnapshotting) {
+          snapIns(m)   = addPin(m, UInt(INPUT, 32), "snap_in")
+          snapOuts(m)  = addPin(m, Decoupled(UInt(width = 32)), "snap_out")
+          snapCtrls(m) = addPin(m, UInt(INPUT, 1), "snap_ctrl")
+          wire(snapCtrls(m.parent) -> snapCtrls(m))
+          wire(snapOuts(m.parent).ready -> snapOuts(m).ready)
+        }
+        if (Driver.genCounter) {
+          cntrIns(m)   = addPin(m, UInt(INPUT, 32), "cntr_in")
+          cntrOuts(m)  = addPin(m, Decoupled(UInt(width = 32)), "cntr_out")
+          cntrCtrls(m) = addPin(m, UInt(INPUT, 1), "cntr_ctrl")
+          wire(cntrCtrls(m.parent) -> cntrCtrls(m))
+          wire(cntrOuts(m.parent).ready -> cntrOuts(m).ready)
+        }
         wire(isSteps(m.parent) -> isSteps(m))
-        wire(snapCtrls(m.parent) -> snapCtrls(m))
-        wire(cntrCtrls(m.parent) -> cntrCtrls(m))
-        wire(snapOuts(m.parent).ready -> snapOuts(m).ready)
-        wire(cntrOuts(m.parent).ready -> cntrOuts(m).ready)
       }
 
+      // add a 'is_step' buffer used by event counters
+      // Event counters should increase one cycle after
+      // the target is activated
+      isStepBufs(m) = Reg(next=isSteps(m))
+      addReg(m, isStepBufs(m), "is_step_buf")
+ 
       if (m != c && Driver.clocks.size > 1) {
         for ((clock, idx) <- Driver.clocks.zipWithIndex) {
-          fires(clock)(m) = addPin(m, Bool(INPUT), "fire_" + idx)
+          val fireName = "fire_" + idx
+          daisyNames += fireName
+          fires(clock)(m) = addPin(m, Bool(INPUT), fireName)
           wire(fires(clock)(m.parent) -> fires(clock)(m))
+          if (Driver.genCounter) {
+            val fireBufName = "fire_buf_" + idx
+            daisyNames += fireBufName
+            fireBufs(clock)(m) = Reg(next=fires(clock)(m))
+            addReg(m, fireBufs(clock)(m), fireBufName)
+          }
         }
       }
 
-      val snapFire = addTypeNode(m, snapOuts(m).ready && !isSteps(m), "snap_fire")
-      val cntrFire = addTypeNode(m, cntrOuts(m).ready && !isSteps(m), "cntr_fire")
-      snapCopy(m) = addTypeNode(m, snapFire && snapCtrls(m) === Bits(0), "snap_copy")
-      snapRead(m) = addTypeNode(m, snapFire && snapCtrls(m) === Bits(1), "snap_read")
-      cntrCopy(m) = addTypeNode(m, cntrFire && cntrCtrls(m) === Bits(0), "cntr_copy")
-      cntrRead(m) = addTypeNode(m, cntrFire && cntrCtrls(m) === Bits(1), "cntr_read")
-      wire(snapFire -> snapOuts(m).valid)
-      wire(cntrFire -> cntrOuts(m).valid)
+      if (Driver.isSnapshotting) {
+        val snapFire = addTypeNode(m, snapOuts(m).ready && !isSteps(m), "snap_fire")
+        snapCopy(m) = addTypeNode(m, snapFire && snapCtrls(m) === Bits(0), "snap_copy")
+        snapRead(m) = addTypeNode(m, snapFire && snapCtrls(m) === Bits(1), "snap_read")
+        wire(snapFire -> snapOuts(m).valid)
+      }
+      if (Driver.genCounter) {
+        val cntrFire = addTypeNode(m, cntrOuts(m).ready && !isStepBufs(m), "cntr_fire")
+        cntrCopy(m) = addTypeNode(m, cntrFire && cntrCtrls(m) === Bits(0), "cntr_copy")
+        cntrRead(m) = addTypeNode(m, cntrFire && cntrCtrls(m) === Bits(1), "cntr_read")
+        wire(cntrFire -> cntrOuts(m).valid)
+      }
 
       // visit children
       m.children foreach (queue enqueue _)
@@ -479,9 +511,13 @@ trait DaisyChain extends Backend {
       val c = signal.component
       val width = signal.width
       val isStep = DaisyTransform.isSteps(c)
+      val isStepBuf = DaisyTransform.isStepBufs(c)
       val fire = 
         if (Driver.clocks.size <= 1 || signal.clock == null) Bool(true)
         else DaisyTransform.fires(signal.clock)(c)
+      val fireBuf = 
+        if (Driver.clocks.size <= 1 || signal.clock == null) Bool(true)
+        else DaisyTransform.fireBufs(signal.clock)(c)
       val signalValue = ioBuffers getOrElse (signal, UInt(signal))
       val cntrValue = addTypeNode(c, counter.cntrT match {
         case Default => counter.src + signalValue
@@ -519,7 +555,7 @@ trait DaisyChain extends Backend {
       val cntrName = "counter_%d".format(counter.idx)
       val cntrCopy = DaisyTransform.cntrCopy(c)
       addReg(c, counter.src, cntrName, 
-        (fire && isStep) -> cntrValue, cntrCopy -> Bits(0))
+        (fireBuf && isStepBuf) -> cntrValue, cntrCopy -> Bits(0))
     }
   }
 
