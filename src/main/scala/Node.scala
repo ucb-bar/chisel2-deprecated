@@ -111,7 +111,7 @@ abstract class Node extends nameable {
   var component: Module = Module.getComponent
   var isTypeNode = false;
   var depth = 0;
-  def componentOf: Module = if (Driver.backend.isEmittingComponents && component != null && component != DaisyTransform.top) component else Driver.topComponent
+  def componentOf: Module = if (Driver.backend.isEmittingComponents && component != null) component else Driver.topComponent
   var width_ = -1;
   val consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
   val inputs = new ArrayBuffer[Node];

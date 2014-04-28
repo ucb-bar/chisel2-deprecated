@@ -121,6 +121,8 @@ object addRegBase {
     reg.isEnable = !updates.isEmpty
     if (reg.isEnable) {
       val (conds, assigns) = updates.unzip
+      conds foreach (addTypeNode(m, _))
+      assigns foreach (addTypeNode(m, _))
       reg.enable = addTypeNode(m, (conds.tail foldLeft conds.head)(_ || _))
     }
     reg
@@ -128,9 +130,19 @@ object addRegBase {
 }
 
 object addTypeNode {
-  def apply[T <: Data](m: Module, typeNode: T, name: String = "") = {
-    typeNode.getNode.component = m
-    typeNode.getNode.inputs foreach (_.getNode.component = m)
+  def apply[T <: Node](m: Module, typeNode: T, name: String = "") = {
+    val queue = ScalaQueue(typeNode.getNode)
+    val visited = new HashSet[Node]
+    while (!queue.isEmpty && !typeNode.isIo) {
+      val node = queue.dequeue
+      visited += node
+      node.component = m
+      for (i <- node.inputs ; if i != null) {
+        val inode = i.getNode
+        if (!inode.isIo && !(visited contains inode))
+          queue enqueue inode
+      }
+    }
     if (name != "") typeNode.getNode setName name
     typeNode
   }
@@ -140,6 +152,7 @@ object addTypeNode {
 // the snapshot and evenet counter pins
 object DaisyTransform {
   var top: Module = null
+  var done = false
 
   lazy val stepsIn =  addPin(top, Decoupled(UInt(width = 32)).flip, "steps_in")
   lazy val clockIn =  addPin(top, Decoupled(UInt(width = 32)).flip, "clock_in")
@@ -177,21 +190,20 @@ object DaisyTransform {
     "cntr_fire", "cntr_copy", "cntr_read",
     "clk_num_reg")
 
-  def apply[T <: Module](c: => T) = {
-    top = Module(c)
-
+  def apply[T <: Module](c: => T, fromDriver: Boolean = false) = {
+    top = if (fromDriver) c else Module(c)
+    done = true
     val isStep = addStepAndClkCnts(top)
     addDaisyPins(top, isStep)
     top.asInstanceOf[T]
   }
 
-  def addStepAndClkCnts (top: Module) = {
+  def addStepAndClkCnts (c: Module) = {
     ChiselError.info("[DaisyTransform] add step and clock counts")
     // step counters
     val steps = Reg(init = UInt(0, 32))
-    val isStep = addTypeNode(top, steps.orR, "is_step") 
-    addReg(top, steps, "steps",
-      //addTypeNode(top, (!isStep && stepsIn.valid)) -> stepsIn.bits,
+    val isStep = addTypeNode(c, steps.orR, "is_step") 
+    addReg(c, steps, "steps",
       (!isStep && stepsIn.valid) -> stepsIn.bits,
       isStep                     -> (steps - UInt(1)))
 
@@ -199,8 +211,8 @@ object DaisyTransform {
     if (Driver.clocks.size > 1) { 
       var clkIdx = Driver.clocks count (_.srcClock == null)
       val clkNum = Reg(init = UInt(clkIdx, 8))
-      addReg(top, clkNum, "clk_num_reg", clockIn.valid -> (clkNum - UInt(1)))
-      wire(clkNum.orR -> clockIn.ready)
+      addReg(c, clkNum, "clk_num_reg", clockIn.valid -> (clkNum - UInt(1)))
+      wire(addTypeNode(c, clkNum.orR) -> clockIn.ready)
 
       for ((clock, idx) <- Driver.clocks.zipWithIndex) {
         val clkRegName = "clock_reg_" + idx
@@ -209,34 +221,34 @@ object DaisyTransform {
           val clkExp = (clock.initStr split " ").tail
           clkExp(0) match {
             case "*" => 
-              addReg(top, clkRegs(clock), clkRegName,
+              addReg(c, clkRegs(clock), clkRegName,
                 Bool(true) -> (clkRegs(clock.srcClock) * UInt(clkExp(1))))
             case "/" =>
-              addReg(top, clkRegs(clock), clkRegName,
+              addReg(c, clkRegs(clock), clkRegName,
                 Bool(true) -> (clkRegs(clock.srcClock) / UInt(clkExp(1))))
           }
         } else {
-          addReg(top, clkRegs(clock), clkRegName,
+          addReg(c, clkRegs(clock), clkRegName,
             (clockIn.valid && clkNum === UInt(clkIdx)) -> clockIn.bits)
           clkIdx = clkIdx - 1
         }
       }
  
-      val min = addTypeNode(top, (Driver.clocks foldLeft UInt(1 << 31 - 1))(
+      val min = addTypeNode(c, (Driver.clocks foldLeft UInt(1 << 31 - 1))(
         (mux, clock) => Mux(clkCnts(clock) < mux, clkCnts(clock), mux)), "min")
-      top.debug(min) // for debug
+      c.debug(min) // for debug
 
       for ((clock, idx) <- Driver.clocks.zipWithIndex) {
-        val fire = addTypeNode(top, !clkCnts(clock).orR, "fire_" + idx)
+        val fire = addTypeNode(c, !clkCnts(clock).orR, "fire_" + idx)
         val clkCntName = "clock_cnt_" + idx
         daisyNames += clkCntName
-        fires(clock) = HashMap(top -> fire)
-        addReg(top, clkCnts(clock), clkCntName,
+        fires(clock) = HashMap(c -> fire)
+        addReg(c, clkCnts(clock), clkCntName,
           (!fire && isStep) -> (clkCnts(clock) - min),
           fire              -> clkRegs(clock))
         if (Driver.genCounter) {
-          fireBufs(clock) = HashMap(top -> Reg(next=fire))
-          addReg(top, fireBufs(clock)(top), "fire_buf_" + idx)
+          fireBufs(clock) = HashMap(c -> Reg(next=fire))
+          addReg(c, fireBufs(clock)(c), "fire_buf_" + idx)
         }
       }
     }
@@ -261,7 +273,7 @@ object DaisyTransform {
           cntrOuts(m)  = cntrOut 
           cntrCtrls(m) = cntrCtrl 
         }
-        wire(!isSteps(m) -> stepsIn.ready)
+        wire(addTypeNode(m, !isStep) -> stepsIn.ready)
       } else {
         isSteps(m) = addPin(m, Bool(INPUT), "is_step")
         if (Driver.isSnapshotting) {
@@ -677,8 +689,9 @@ trait DaisyChain extends Backend {
   }  
 }
 
-class DaisyVerilog extends VerilogBackend with DaisyChain
-class DaisyCpp     extends CppBackend     with DaisyChain
+class DaisyVerilogBackend extends VerilogBackend with DaisyChain
+class DaisyCppBackend     extends CppBackend     with DaisyChain
+class DaisyFPGABackend    extends FPGABackend    with DaisyChain
 
 abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends Tester(c, isTrace) {
   val clockIn  = DaisyTransform.clockIn
