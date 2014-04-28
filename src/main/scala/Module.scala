@@ -136,8 +136,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   val nodes = new ArrayBuffer[Node]
   val mods = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
-  val states = new ArrayBuffer[Node]
-  val counters = new ArrayBuffer[Bits]
+  val states = new ArrayBuffer[DaisyType]
+  val counters = new ArrayBuffer[DaisyType]
 
   val regs  = new ArrayBuffer[Reg];
   val nexts = new ScalaQueue[Node];
@@ -235,7 +235,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       case _: Literal =>
       case any => {
         if (!any.isIo) debug(x)
-        DaisyTransform.eventCounters += EventCounter(any, cntrT)
+        counters += EventCounter(any, cntrT)
       }
     }
   }
