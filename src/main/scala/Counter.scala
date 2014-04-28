@@ -464,9 +464,9 @@ trait DaisyChain extends Backend {
     }
   }
 
-  def addBuffer(c: Module, signal: Node, en: Bool, signalValue: Bits) = {
-    val buffer = Reg(UInt(width=signal.width))
-    val bufName = "buffer_%d".format(signal.counter.cntrIdx)
+  def addBuffer(c: Module, w: Int, i: Int, en: Bool, signalValue: Bits) = {
+    val buffer = Reg(UInt(width=w))
+    val bufName = "buffer_%d".format(i)
     addReg(c, buffer, bufName, en -> signalValue)
     buffer
   }
@@ -486,7 +486,7 @@ trait DaisyChain extends Backend {
       val cntrValue = addTypeNode(c, counter.cntrT match {
         case Default => counter.src + signalValue
         case Activity => {
-          val buffer = addBuffer(c, signal, fire && isStep, signalValue)
+          val buffer = addBuffer(c, width, counter.idx, fire && isStep, signalValue)
           val xor = signalValue ^ buffer
           xor.inferWidth = (x: Node) => width
           counter.src + PopCount(xor)
@@ -500,13 +500,13 @@ trait DaisyChain extends Backend {
           counter.src + (UInt(width) - PopCount(signalValue))
         }
         case Posedge => {
-          val buffer = addBuffer(c, signal, fire && isStep, signalValue)
+          val buffer = addBuffer(c, width, counter.idx, fire && isStep, signalValue)
           val res = (signalValue ^ buffer) & signalValue
           res.inferWidth = (x: Node) => width
           counter.src + PopCount(res)          
         } 
         case Negedge => {
-          val buffer = addBuffer(c, signal, fire && isStep, signalValue)
+          val buffer = addBuffer(c, width, counter.idx, fire && isStep, signalValue)
           val res = (signalValue ^ buffer) & (~signalValue)
           res.inferWidth = (x: Node) => width
           counter.src + PopCount(res)          
@@ -649,7 +649,6 @@ class DaisyVerilog extends VerilogBackend with DaisyChain
 class DaisyCpp     extends CppBackend     with DaisyChain
 
 abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends Tester(c, isTrace) {
-  val peeks = new ArrayBuffer[BigInt]
   val clockIn  = DaisyTransform.clockIn
   val stepsIn  = DaisyTransform.stepsIn
   val snapOut  = DaisyTransform.snapOut
@@ -658,10 +657,16 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   val cntrCtrl = DaisyTransform.cntrCtrl
   val states   = DaisyType.states
   val counters = DaisyType.counters
+  val statePeeks = new ArrayBuffer[BigInt]
+  val counterVals = new ArrayBuffer[BigInt]
+  val counterPeeks = new ArrayBuffer[BigInt]
   val clockVals = new LinkedHashMap[Clock, Int]
   val clockCnts = new LinkedHashMap[Clock, Int]
 
-  def popCount(x: BigInt) {
+  counterPeeks.clear
+  counterPeeks ++= Array.fill(counters.size)(BigInt(0))
+
+  def popCount(x: BigInt) = {
     var in = x
     var res: BigInt = 0
     while (in > 0) {
@@ -670,10 +675,17 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     }
     res
   }
-  def activity(cur: BigInt, buf: BigInt) = popCount(cur ^ buf)
-  def ones(cur: BigInt) = popCount(cur)
-  def posedge(cur: BigInt, buf: BigInt) = popCount((cur ^ buf) & cur)
-  def negedge(cur: BigInt, buf: BigInt) = popCount((cur ^ buf) & ~cur)
+
+  def calcCounterVal(counter: EventCounter, cur: BigInt, prev: BigInt) = {
+    counter.cntrT match {
+      case Default => cur
+      case Activity => popCount(cur ^ prev)
+      case Ones => popCount(cur)
+      case Zeros => (counter.signal.width - popCount(cur))
+      case Posedge => popCount((cur ^ prev) & cur)
+      case Negedge => popCount((cur ^ prev) & cur)
+    }
+  }
 
   def takeSteps (n: Int) {
     val clk = emulatorCmd("step %d".format(n))
@@ -762,6 +774,11 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   }
 
   def dumpCounters() {
+    if (isTrace) println("*** Counter Values ***")
+    for (counter <- counters) {
+      val counterVal = peek(counter.src)
+    }
+
     if (isTrace) println("*** Counter Chain Copy ***")
     // Copy activity counter values to shadow counters
     cntrCopy()
@@ -771,7 +788,15 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
       // Read out the cntr chain
       val cntrValue = cntrRead()
       // Check the cntr output
-      // cntrCheck(peeks(i))
+      cntrCheck(counterVals(i))
+    }
+  }
+
+  override def reset(n: Int) {
+    super.reset(n)
+    if (t > 0) {
+      counterPeeks.clear
+      counterPeeks ++= Array.fill(counters.size)(BigInt(0))
     }
   }
 
@@ -813,7 +838,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
       // Read out the snap chain
       val snapValue = snapRead()
       // Check the snap output
-      snapCheck(peeks(i))
+      snapCheck(statePeeks(i))
       state.src match {
         case read: MemRead =>
           snap.pokes += Poke(read.mem, read.addr.litValue(0).toInt, snapValue)
@@ -843,16 +868,33 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
 
     // run the target until it is stalled
     if (isTrace) println("*** CYCLE THE TARGET ***")
-    takeSteps(n)
-
+    counterVals.clear
+    counterVals ++= Array.fill(counters.size)(BigInt(0))
+    for (k <- 0 until n) {
+      takeSteps(1)
+      if (Driver.genCounter) {
+        if (isTrace) println("*** READ COUNTER SIGNALS ***")
+        for ((counter, i) <- counters.zipWithIndex) {
+          val curPeek = counter.signal match {
+            // case read: MemRead =>
+            //   peekBits(read.mem, read.addr.litValue(0).toInt)
+            case signal =>
+              peekBits(signal) }
+          counterVals(i) += calcCounterVal(counter, curPeek, counterPeeks(i))
+          counterPeeks(i) = curPeek
+        }
+      }
+    }
     // read out signal values
-    if (isTrace) println("*** READ STATE VALUES ***")
-    peeks.clear
-    peeks ++= states map { _.src match {
-      case read: MemRead =>
-        peekBits(read.mem, read.addr.litValue(0).toInt)
-      case signal =>
-        peekBits(signal) }
+    if (Driver.isSnapshotting) {
+      if (isTrace) println("*** READ STATE VALUES ***")
+      statePeeks.clear
+      statePeeks ++= states map { _.src match {
+        case read: MemRead =>
+          peekBits(read.mem, read.addr.litValue(0).toInt)
+        case signal =>
+          peekBits(signal) }
+      }
     }
     takeSteps(1)
 

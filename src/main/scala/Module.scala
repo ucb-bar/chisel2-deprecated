@@ -241,7 +241,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   def counter(xs: Node*) {
-    xs.foreach(counter (_, Ones))
+    xs.foreach(counter (_, Default))
   }
 
   def counter(cntrT: CounterType, xs: Node*) {
