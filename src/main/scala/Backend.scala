@@ -349,10 +349,10 @@ abstract class Backend {
               // ok if parent referring to any child nodes
               // not symmetric and only applies to direct children
               // READ BACK INPUT -- TODO: TIGHTEN THIS UP
-              !isBitsIo(input, INPUT) /* &&
+              !isBitsIo(input, INPUT) &&
               // For DaisyWrappers, it's ok
               !(input.component.isInstanceOf[DaisyFPGAWrapper[_]] || 
-                 node.component.isInstanceOf[DaisyFPGAWrapper[_]])*/ )
+                 node.component.isInstanceOf[DaisyFPGAWrapper[_]]) )
             ChiselErrors += new ChiselError(() => { "Illegal cross module reference between " + node + " and " + input }, node.line)
         }
         if(!walked.contains(input)) {

@@ -508,7 +508,8 @@ class VerilogBackend extends Backend {
           case io: Bits if m != c => {
             var included = true
             if (io.dir == INPUT) {
-              if (io.inputs.length == 0 || io.inputs.length > 1 || (m.isWalked contains io))
+              if (io.inputs.length == 0 || io.inputs.length > 1 || 
+                 ((m.isWalked contains io) && m != DaisyTransform.top))
                 included = false
             }
             else if (io.dir == OUTPUT) {
