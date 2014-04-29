@@ -694,6 +694,8 @@ class DaisyCppBackend     extends CppBackend     with DaisyChain
 class DaisyFPGABackend    extends FPGABackend    with DaisyChain
 
 abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends Tester(c, isTrace) {
+  require(DaisyTransform.done)
+
   val clockIn  = DaisyTransform.clockIn
   val stepsIn  = DaisyTransform.stepsIn
   val snapOut  = DaisyTransform.snapOut
