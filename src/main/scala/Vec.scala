@@ -229,23 +229,27 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
   }
 
   override protected def colonEquals[T <: Data](that: Iterable[T]): Unit = {
-    def unidirectional[U <: Data](who: Iterable[(String, Bits)]) =
-      who.forall(_._2.dir == who.head._2.dir)
+    if (comp != null) {
+      comp procAssign Vec(that)
+    } else {
+      def unidirectional[U <: Data](who: Iterable[(String, Bits)]) =
+        who.forall(_._2.dir == who.head._2.dir)
 
-    assert(this.size == that.size, {
-      ChiselError.error("Can't wire together Vecs of mismatched lengths")
-    })
+      assert(this.size == that.size, {
+        ChiselError.error("Can't wire together Vecs of mismatched lengths")
+      })
 
-    assert(unidirectional(this.flatten), {
-      ChiselError.error("Cannot mix directions on left hand side of :=")
-    })
+      assert(unidirectional(this.flatten), {
+        ChiselError.error("Cannot mix directions on left hand side of :=")
+      })
 
-    assert(unidirectional(that.flatMap(_.flatten)), {
-      ChiselError.error("Cannot mix directions on left hand side of :=")
-    })
+      assert(unidirectional(that.flatMap(_.flatten)), {
+        ChiselError.error("Cannot mix directions on left hand side of :=")
+      })
 
-    for ((me, other) <- this zip that)
-      me := other
+      for ((me, other) <- this zip that)
+        me := other
+    }
   }
 
   override protected def colonEquals(that: Bits): Unit = {
