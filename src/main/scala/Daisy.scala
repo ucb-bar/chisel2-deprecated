@@ -1016,7 +1016,7 @@ class DaisyWrapper[+T <: Module](c: => T) extends AXISlave(n = 16 /* 2^(aw - 1) 
   cntrCtrl := io.addr(aw-1) 
 }
 
-abstract class DaisyWrapperTester[+T <: DaisyFPGAWrapper[_]](c: T, isTrace: Boolean = true) extends DaisyTester(c, isTrace) {
+abstract class DaisyWrapperTester[+T <: DaisyWrapper[_]](c: T, isTrace: Boolean = true) extends DaisyTester(c, isTrace) {
   val stepAddr = c.n-2
   val clockAddr = c.n-1
   val snapAddr = c.n-2
