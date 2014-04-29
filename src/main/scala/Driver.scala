@@ -121,6 +121,7 @@ object Driver {
     isCompiling = false
     isCheckingPorts = false
     isTesting = false
+    isDebugMem = false
     backend = new CppBackend
     topComponent = null
     randInitIOs.clear()
@@ -170,6 +171,7 @@ object Driver {
         case "--moduleNamePrefix" => Backend.moduleNamePrefix = args(i + 1); i += 1
         case "--inlineMem" => isInlineMem = true
         case "--noInlineMem" => isInlineMem = false
+        case "--debugMem" => isDebugMem = false
         case "--backend" => {
           if (args(i + 1) == "v") {
             backend = new VerilogBackend
@@ -256,6 +258,7 @@ object Driver {
   var isCompiling = false
   var isCheckingPorts = false
   var isTesting = false
+  var isDebugMem = false
   var backend: Backend = null
   var topComponent: Module = null
   val components = ArrayBuffer[Module]()
