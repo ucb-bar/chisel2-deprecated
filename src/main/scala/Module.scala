@@ -448,12 +448,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
             val reset = 
               if (x.component.hasExplicitReset)
                 x.component._reset
-              else if (x.clock != null)
-                x.clock.getReset
-              else if (x.component.hasExplicitClock)
-                x.component.clock.getReset
-              else
-                x.component._reset
+              else 
+                clock.getReset
             x.inputs += x.component.getResetPin(reset)
           }
           x.clock = clock
