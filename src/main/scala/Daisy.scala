@@ -987,7 +987,7 @@ abstract class AXISlave(val aw: Int = 5, val dw: Int = 32, val n: Int = 32 /* 2^
   io.out.bits  := rdata(io.addr)
 }
 
-class DaisyFPGAWrapper[+T <: Module](c: => T) extends AXISlave(n = 16 /* 2^(aw - 1) */){
+class DaisyWrapper[+T <: Module](c: => T) extends AXISlave(n = 16 /* 2^(aw - 1) */){
   val top      = DaisyTransform(c)
   val stepsIn  = DaisyTransform.stepsIn
   val clockIn  = DaisyTransform.clockIn
