@@ -62,7 +62,7 @@ object Driver {
 
     /* JACK - If dumping design, dump to jackDir with jackNumber points*/
     if (Driver.jackDump != null) { 
-      Jackhammer.dump(Driver.jackDir, Driver.jackDump) 
+      Jackhammer.dump(Driver.jackDir, Driver.jackDump, Driver.jackN) 
     } else {
       Driver.backend.elaborate(c)
     }
@@ -204,7 +204,8 @@ object Driver {
         case "--model" => model = args(i + 1) ; i += 1
         //Jackhammer Flags
         //case "--jEnable" => jackEnable = true
-        case "--jackDump" => jackDump = args(i+1); i+=1; //mode of dump (i.e. space.prm, design.prm etc)
+        case "--jackDump" => jackDump = args(i+1); i+=1; //mode of dump, can be of set {space, point} (i.e. space.prm, design.prm etc)
+        case "--jackN" => jackN = args(i+1).toInt; i+=1; //number of points (random). Default is exaustive
         case "--jackDir"  => jackDir = args(i+1); i+=1;  //location of dump or load
         case "--jackLoad" => jackLoad = args(i+1); i+=1; //design.prm file
         case "--dumpTestInput" => dumpTestInput = true
@@ -283,6 +284,7 @@ object Driver {
   var jackDump: String = null
   var jackDir: String = null
   var jackLoad: String = null
+  var jackN: Int = 0
   //var jackDesign: String = null
 
   // Setting this to TRUE will case the test harness to print its

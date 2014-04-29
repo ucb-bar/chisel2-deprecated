@@ -45,49 +45,75 @@ import oscar.algo.search._
 import oscar.util._
 import oscar.cp.search.BinaryFirstFailBranching
 
+case class InvalidJackParameterException(msg: String) extends Exception
 
 object Jackhammer {
 
   val spaceName = "space.prm"
 
-  def dump(dir: String, mode: String) = {
+  def dump(dir: String, mode: String, n: Int) = {
     Params.buildingSpace = false
     mode match {
       case "space" => Params.dump_file(dir + "/" + spaceName, Params.space)
-      case "all"   => process(Params.space,dir)
+      case "point" => process(Params.space,dir,n)
+      case _ => throw new InvalidJackParameterException("Invalid Jack parameter: " + mode)
     }
   }
 
-  def process(space: Space, dir: String) = {
-    val cp = CPSolver()
-    val sol = new ArrayBuffer[ArrayBuffer[Int]]
-
-    var x = new ArrayBuffer[CPVarInt]
+  def process(space: Space, dir: String, n:Int) = {
+    var sol = new ArrayBuffer[Tuple2[String,ArrayBuffer[Int]]]
     var newspace = new Params.Space
     for(t <- space){
-      x = cvt(t,cp,x) 
       newspace += t
     }
-    cp.onSolution {
-      sol += x.map(x => x.getValue);
+    if(n <= 0) sol = solve(space,n) else {
+      while(sol.length != n) {
+        val ret = solve(space,1)
+	      if(sol.isEmpty) {
+	        sol ++= ret 
+	      } else {
+          if(sol.map(x => {!(x._1 == ret(0)._1) }).reduce((a,b) => a && b)) { 
+	          sol ++= ret;
+	        }
+	      }
+      }
     }
-    cp.solve subjectTo {
-    } search {
-      new BinaryFirstFailBranching(x,_.randomValue)
-    }
-    val stats = cp.start()
-    println(stats)
-
     for(d <- sol){
       var newDesign = new Params.Space
       for(t <- newspace){
-        val p = new ValueParam(t._2.pname,d(t._2.index))
+        val p = new ValueParam(t._2.pname,d._2(t._2.index))
         p.gID = t._3
         newDesign += ((t._1,p,t._3))
       }
       writeDesign(dir,newDesign)
     }
   }
+
+  def solve(space: Space, nbSol:Int):ArrayBuffer[Tuple2[String,ArrayBuffer[Int]]] = {
+    val cp = CPSolver()
+    val sol = new ArrayBuffer[Tuple2[String,ArrayBuffer[Int]]]
+
+    var x = new ArrayBuffer[CPVarInt]
+    for(t <- space){
+      x = cvt(t,cp,x) 
+    }
+    cp.onSolution {
+      val ret = x.map(x => x.getValue);
+      sol += ((ret.toString,ret))
+    }
+    cp.solve subjectTo {
+    } search {
+      new BinaryFirstFailBranching(x,trueRandom(_))
+    }
+    val stats = if (nbSol <= 0) cp.start() else cp.start(nbSol)
+    //println(stats)
+    sol
+  }
+  def trueRandom(x:CPVarInt):Int = {
+    val r = math.random
+    math.rint(r*(x.max - x.min)).toInt + x.min
+  }
+
 
   def writeDesign(dir: String, design: Params.Space) = {
     val design_tag = formatDesign(design)
@@ -98,25 +124,27 @@ object Jackhammer {
   def formatDesign(design: Params.Space) : String = {
     val str = new StringBuilder("_")
     for((mod,p,gID) <- design) {
-      str ++= p.pname+p.init+"_"
+      str ++= p.pname + "-" + p.init+"_"
     }
-    if(str.length<20) {
+    if(str.length<40) {
       str.toString + MurmurHash3.stringHash(design.toString,1).toHexString 
     } else {
-      str.substring(0,20) + MurmurHash3.stringHash(design.toString,1).toHexString 
+      str.substring(0,40) + "_" + MurmurHash3.stringHash(design.toString,1).toHexString 
     }
  }
 
   def load(dir: String, designName: String) = {
     Params.buildingSpace = false
     Params.design = Params.load_file(dir + "/" + designName)
+    Params.gID = 0
+    //Params.design.map(println(_))
   }
 
 
 
   def cvt(t: Tuple3[String,Param[Any],Int], cp: CPSolver, x: ArrayBuffer[CPVarInt]): ArrayBuffer[CPVarInt] = {
     t._2 match {
-      case RangeParam(n,init,min,max)       => println(t._2.index);t._2.index = x.length; println(t._2.index);x += (CPVarInt(cp,min to max)); x
+      case RangeParam(n,init,min,max)       => t._2.index = x.length; x += (CPVarInt(cp,min to max)); x
       case LessParam(n,init,min,par)        => t._2.index = x.length; x += (CPVarInt(cp,min to t._2.max)); cp.add(x(x.length-1) < x(par.index)); println("par index: " + par.index); x
       case LessEqParam(n,init,min,par)      => t._2.index = x.length; x += (CPVarInt(cp,min to t._2.max)); cp.add(x(x.length-1) <= x(par.index)); println("par index: " + par.index); x
       case GreaterParam(n,init,par,max)     => t._2.index = x.length; x += (CPVarInt(cp,t._2.min to max)); cp.add(x(x.length-1) > x(par.index)); println("par index: " + par.index); x

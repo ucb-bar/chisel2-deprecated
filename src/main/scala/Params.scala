@@ -108,7 +108,7 @@ object Params {
     val mname= if(module == null) "TOP" else {module.getClass.getName}
     if(buildingSpace) p.init
     else{
-      val x = design.find(t => (t._3) == (gID))
+      val x = design.find(t => (t._3) == (p.gID))
       if(x.isEmpty){ 
         throw new ParamInvalidException("Missing parameter " + pname + " in Module " + mname) 
       } else {
@@ -122,9 +122,9 @@ object Params {
     modules(mname) = module
     if(buildingSpace) {
       space += ((mname,p,gID))
-      p.gID = gID
-      gID += 1
     }
+    p.gID = gID
+    gID += 1
     p
   }
 
@@ -137,6 +137,7 @@ object Params {
       println("Loaded: " + line + "\nfrom " + filename)
       Params.deserialize(line,space)
     }
+    //space.map(println(_))
     space
   }
    
