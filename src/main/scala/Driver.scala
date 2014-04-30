@@ -59,6 +59,8 @@ object Driver {
     val genC = gen()
     val c = if((!isSnapshotting && !genCounter) || DaisyTransform.done) genC else DaisyTransform(genC, true)
 
+    if (isSnapshotting || genCounter) DaisyChain(backend)
+
     Driver.backend.initBackannotation
 
     /* JACK - If dumping design, dump to jackDir with jackNumber points*/
@@ -166,21 +168,21 @@ object Driver {
         case "--ioDebug" => isIoDebug = true
         case "--noIoDebug" => isIoDebug = false
         case "--vcd" => isVCD = true
-        case "--v" => backend = if (!isSnapshotting && !genCounter) new VerilogBackend else new DaisyVerilogBackend
+        case "--v" => backend = new VerilogBackend
         case "--moduleNamePrefix" => Backend.moduleNamePrefix = args(i + 1); i += 1
         case "--inlineMem" => isInlineMem = true
         case "--noInlineMem" => isInlineMem = false
         case "--backend" => {
           if (args(i + 1) == "v") {
-            backend = if (!isSnapshotting && !genCounter) new VerilogBackend else new DaisyVerilogBackend
+            backend = new VerilogBackend
           } else if (args(i + 1) == "c") {
-            backend = if (!isSnapshotting && !genCounter) new CppBackend else new DaisyCppBackend
+            backend = new CppBackend
           } else if (args(i + 1) == "flo") {
             backend = new FloBackend
           } else if (args(i + 1) == "dot") {
             backend = new DotBackend
           } else if (args(i + 1) == "fpga") {
-            backend = if (!isSnapshotting && !genCounter) new FPGABackend else new DaisyFPGABackend
+            backend = new FPGABackend
           } else {
             backend = Class.forName(args(i + 1)).newInstance.asInstanceOf[Backend]
           }
@@ -191,25 +193,9 @@ object Driver {
         case "--targetDir" => targetDir = args(i + 1); i += 1
         case "--include" => includeArgs = args(i + 1).split(' ').toList; i += 1
         case "--checkPorts" => isCheckingPorts = true
-        // Counter backend flags
-        case "--snapshot" => {
-          isSnapshotting = true
-          backend match {
-            case _: FPGABackend => backend = new DaisyFPGABackend
-            case _: VerilogBackend => backend = new DaisyVerilogBackend
-            case _: CppBackend => backend = new DaisyCppBackend
-            case _ =>
-          }
-        }
-        case "--counter" => {
-          genCounter = true
-          backend match {
-            case _: FPGABackend => backend = new DaisyFPGABackend
-            case _: VerilogBackend => backend = new DaisyVerilogBackend
-            case _: CppBackend => backend = new DaisyCppBackend
-            case _ =>
-          }
-        }
+        // DaisyChain flags
+        case "--snapshot" => isSnapshotting = true
+        case "--counter" => genCounter = true
         case "--backannotation" => isBackannotating = true
         case "--model" => model = args(i + 1) ; i += 1
         //Jackhammer Flags
@@ -283,7 +269,7 @@ object Driver {
   var implicitReset: Bool = null
   var implicitClock: Clock = null
   var isInGetWidth: Boolean = false
-  /* Backannotation flags */
+  /* DaisyChain flags */
   var isBackannotating = false
   var isSnapshotting = false
   var genCounter = false
