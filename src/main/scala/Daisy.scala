@@ -54,7 +54,7 @@ object DaisyType {
   lazy val counters = eventCounters sortWith ((x, y) => {
       val compX = x.src.component
       val compY = y.src.component
-      (compX.level < compY.level) || 
+      (compX.level > compY.level) || 
       (compX.level == compY.level && compX.traversal < compY.traversal) })
 }
 
@@ -216,10 +216,6 @@ object DaisyTransform {
   val cntrRead = new HashMap[Module, Bool]
   val clkRegs = new HashMap[Clock, UInt]
   val clkCnts = new HashMap[Clock, UInt]
-  /*
-  lazy val clkRegs = (Driver.clocks map (_ -> Reg(UInt(width = 32)))).toMap
-  lazy val clkCnts = (Driver.clocks map (_ -> Reg(UInt(width = 32)))).toMap
-  */
 
   val daisyNames = HashSet(
     "steps", "is_step", "is_step_buf",
@@ -235,8 +231,8 @@ object DaisyTransform {
   def apply[T <: Module](c: => T, fromDriver: Boolean = false) = {
     top = if (fromDriver) c else Module(c)
     done = true
-    val isStep = addStepAndClkCnts(top)
-    addDaisyPins(top, isStep)
+    addStepAndClkCnts(top)
+    addDaisyPins(top)
     top.asInstanceOf[T]
   }
 
@@ -244,22 +240,22 @@ object DaisyTransform {
     ChiselError.info("[DaisyTransform] add step and clock counts")
     // step counters
     val steps =  addReg(c, Reg(init = UInt(0, 32)), "steps")
-    val isStep = addNode(c, steps.orR, "is_step") 
+    isSteps(c) = addNode(c, steps.orR, "is_step") 
     wire(steps, Seq(
-      (!isStep && stepsIn.valid) -> stepsIn.bits,
-      isStep                     -> (steps - UInt(1))) )
+      (!isSteps(c) && stepsIn.valid) -> stepsIn.bits,
+      isSteps(c)                     -> (steps - UInt(1))) )
 
     // generate clock counters for multi clock domains
     if (Driver.clocks.size > 1) { 
       var clkIdx = Driver.clocks count (_.srcClock == null)
-      val clkNum = addReg(c, Reg(init = UInt(clkIdx, 8)), "clk_num_reg")
+      val clkNum = addReg(c, Reg(init = UInt(clkIdx, 8), clock=Driver.implicitClock), "clk_num_reg")
       wire(clkNum, Seq(clockIn.valid -> (clkNum - UInt(1))))
       wire(clkNum.orR -> clockIn.ready)
 
       for ((clock, idx) <- Driver.clocks.zipWithIndex) {
         val clkRegName = "clock_reg_" + idx
-        clkRegs(clock) = addReg(c, Reg(UInt(width=8)))
         daisyNames += clkRegName
+        clkRegs(clock) = addReg(c, Reg(UInt(width=8), clock=Driver.implicitClock), clkRegName)
         if (clock.srcClock != null) {
           val clkExp = (clock.initStr split " ").tail
           clkExp(0) match {
@@ -274,35 +270,37 @@ object DaisyTransform {
         }
       }
  
+      for ((clock, idx) <- Driver.clocks.zipWithIndex) {
+        val clkCntName = "clock_cnt_" + idx
+        daisyNames += clkCntName
+        clkCnts(clock) = addReg(c, Reg(UInt(width = 8)), clkCntName)
+      }
+
       val min = addNode(c, (Driver.clocks foldLeft UInt(1 << 31 - 1))(
         (mux, clock) => Mux(clkCnts(clock) < mux, clkCnts(clock), mux)), "min")
       c.debug(min) // for debug
 
       for ((clock, idx) <- Driver.clocks.zipWithIndex) {
-        val clkCntName = "clock_cnt_" + idx
-        daisyNames += clkCntName
-        clkCnts(clock) = addReg(c, Reg(UInt(width = 8)), clkCntName)
-        val fire = addNode(c, !clkCnts(clock).orR, "fire_" + idx)
-        fires(clock) = HashMap(c -> fire)
+        val fireName = "fire_" + idx
+        val fireBufName = "fire_buf_" + idx
+        daisyNames += fireName
+        daisyNames += fireBufName
+
+        fires(clock) =    HashMap(c -> addNode(c, !clkCnts(clock).orR, fireName))
+        fireBufs(clock) = HashMap(c -> addReg(c, Reg(next=fires(clock)(c), clock=Driver.implicitClock), fireBufName))
         wire(clkCnts(clock), Seq(
-          (!fire && isStep) -> (clkCnts(clock) - min),
-          fire              -> clkRegs(clock)) )
-        if (Driver.genCounter) {
-          fireBufs(clock) = HashMap(c -> addReg(c, Reg(next=fire), "fire_buf_" + idx))
-        }
+          (!fires(clock)(c) && isSteps(c)) -> (clkCnts(clock) - min),
+          fires(clock)(c)                  -> clkRegs(clock)) )
       }
     }
-   
-    isStep
   }
 
-  def addDaisyPins (c: Module, isStep: Bool) = {
+  def addDaisyPins (c: Module) = {
     ChiselError.info("[DaisyTransform] add daisy pins")
     val queue = ScalaQueue(c)
     while (!queue.isEmpty) {
       val m = queue.dequeue
       if (m == c) {
-        isSteps(m) = isStep
         if (Driver.isSnapshotting) {
           snapIns(m)   = UInt(0)
           snapOuts(m)  = snapOut 
@@ -313,7 +311,7 @@ object DaisyTransform {
           cntrOuts(m)  = cntrOut 
           cntrCtrls(m) = cntrCtrl 
         }
-        wire(!isStep -> stepsIn.ready)
+        wire(!isSteps(c) -> stepsIn.ready)
       } else {
         isSteps(m) = addPin(m, Bool(INPUT), "is_step")
         if (Driver.isSnapshotting) {
@@ -336,33 +334,30 @@ object DaisyTransform {
       // add a 'is_step' buffer used by event counters
       // Event counters should increase one cycle after
       // the target is activated
-      isStepBufs(m) = Reg(next=isSteps(m))
-      addReg(m, isStepBufs(m), "is_step_buf")
+      isStepBufs(m) = addReg(m, Reg(next=isSteps(m)), "is_step_buf")
  
       if (m != c && Driver.clocks.size > 1) {
         for ((clock, idx) <- Driver.clocks.zipWithIndex) {
           val fireName = "fire_" + idx
+          val fireBufName = "fire_buf_" + idx
           daisyNames += fireName
-          fires(clock)(m) = addPin(m, Bool(INPUT), fireName)
+          daisyNames += fireBufName
+          fires(clock)(m)    = addPin(m, Bool(INPUT), fireName)
+          fireBufs(clock)(m) = addReg(m, Reg(next=fires(clock)(m)), fireBufName)
           wire(fires(clock)(m.parent) -> fires(clock)(m))
-          if (Driver.genCounter) {
-            val fireBufName = "fire_buf_" + idx
-            daisyNames += fireBufName
-            fireBufs(clock)(m) = addReg(m, Reg(next=fires(clock)(m)), fireBufName)
-          }
         }
       }
 
       if (Driver.isSnapshotting) {
         val snapFire = addNode(m, snapOuts(m).ready && addNode(m, !isSteps(m)), "snap_fire")
-        snapCopy(m) = addNode(m, snapFire && addNode(m, snapCtrls(m) === Bits(0)), "snap_copy")
-        snapRead(m) = addNode(m, snapFire && addNode(m, snapCtrls(m) === Bits(1)), "snap_read")
+        snapCopy(m) = addNode(m, snapFire && addNode(m, snapCtrls(m) === addNode(m, Bits(0))), "snap_copy")
+        snapRead(m) = addNode(m, snapFire && addNode(m, snapCtrls(m) === addNode(m, Bits(1))), "snap_read")
         wire(snapFire -> snapOuts(m).valid)
       }
       if (Driver.genCounter) {
         val cntrFire = addNode(m, cntrOuts(m).ready && addNode(m, !isSteps(m)), "cntr_fire")
-        cntrCopy(m) = addNode(m, cntrFire && addNode(m, cntrCtrls(m) === Bits(0)), "cntr_copy")
-        cntrRead(m) = addNode(m, cntrFire && addNode(m, cntrCtrls(m) === Bits(1)), "cntr_read")
+        cntrCopy(m) = addNode(m, cntrFire && addNode(m, cntrCtrls(m) === addNode(m, Bits(0))), "cntr_copy")
+        cntrRead(m) = addNode(m, cntrFire && addNode(m, cntrCtrls(m) === addNode(m, Bits(1))), "cntr_read")
         wire(cntrFire -> cntrOuts(m).valid)
       }
 
@@ -434,7 +429,7 @@ trait DaisyChain extends Backend {
           consumer.inputs(idx) = ioBuffers(targetPin)
         }
       } else if (targetPin.dir == OUTPUT) {
-        wire(ioBuffers(targetPin), isSteps(c) -> targetPin.inputs.head)
+        wire(ioBuffers(targetPin), isStepBufs(c) -> targetPin.inputs.head)
         wire(ioBuffers(targetPin) -> targetPin)
       }
     }
@@ -445,25 +440,24 @@ trait DaisyChain extends Backend {
 
     val queue = ScalaQueue(c)
     while (!queue.isEmpty) {
-      val top = queue.dequeue
-      val isStep = isSteps(top)
+      val m = queue.dequeue
+      val isStepBuf = isStepBufs(m)
       if (Driver.clocks.size > 1) {
-        top.clocks.clear
-        top.clock = Driver.implicitClock
-        top.clocks += Driver.implicitClock
+        m.clocks.clear
+        m.clock = Driver.implicitClock
+        m.clocks += Driver.implicitClock
       }
 
       // Make all delay nodes be enabled by the fire signal
-      for (node <- top.nodes ; if !(daisyNames contains node.name)) {
-        val fire = 
+      for (node <- m.nodes ; if !(daisyNames contains node.name)) {
+        val fireBuf = 
           if (Driver.clocks.size <= 1 || node.clock == null) Bool(true)
-          else fires(node.clock)(top)
+          else fireBufs(node.clock)(m)
         node match {
           // For Reg, different muxes are generated by different backend
           case reg: Reg if this.isInstanceOf[VerilogBackend] && 
                            !Driver.isBackannotating => {
-            // val enable = addNode(top, fire && isStep && reg.enable)
-            val enable = fire && isStep && reg.enable
+            val enable = fireBuf && isStepBuf && reg.enable
             if (reg.isEnable) {
               reg.inputs(reg.enableIndex) = enable.getNode  
             } else {
@@ -472,30 +466,36 @@ trait DaisyChain extends Backend {
               reg.inputs insert (reg.enableIndex, enable.getNode)
             }
             if (Driver.clocks.size > 1)
-              reg.clock = top.clock
+              reg.clock = m.clock
           }
           case reg: Reg => {
-            reg.inputs(0) = Multiplex(fire && isStep, reg.next, reg)
+            reg.inputs(0) = Multiplex(fireBuf && isStepBuf, reg.next, reg)
             if (Driver.clocks.size > 1)
-              reg.clock = top.clock
+              reg.clock = m.clock
           }
           case mem: Mem[_] => {
             for (write <- mem.writeAccesses) {
               val en = Bool()
-              // val newEn = addNode(top, fire && isStep && en)
-              val newEn = fire && isStep && en
+              val newEn = fireBuf && isStepBuf && en
               wire(write.inputs(1) -> en)
               write.inputs(1) = newEn
             }
             if (Driver.clocks.size > 1)
-              mem.clock = top.clock
+              mem.clock = m.clock
           }
           case _ =>
         }
       }
  
-      top.children foreach (queue enqueue _)
-    }  
+      m.children foreach (queue enqueue _)
+    }
+  
+    for ((m, isStepBuf) <- isStepBufs) {
+      isStepBuf.comp.clock = m.clock
+    }
+    for (clock <- Driver.clocks ; (m, fireBuf) <- fireBufs(clock)) {
+      fireBuf.comp.clock = m.clock
+    }
   }
 
   def findStates(c: Module) { 
@@ -510,20 +510,20 @@ trait DaisyChain extends Backend {
     // Second, collect all the state elements (Reg & Mem)
     val queue = ScalaQueue(c)
     while (!queue.isEmpty) {
-      val top = queue.dequeue
+      val m = queue.dequeue
       // collect registers and memory access
-      top.nodes foreach { 
+      m.nodes foreach { 
         _ match {
           case reg: Reg if !(daisyNames contains reg.name) =>
-            top.states += State(reg)
+            m.states += State(reg)
           case mem: Mem[_] =>
             for (i <- 0 until mem.size)
-              top.states += State(new MemRead(mem, UInt(i)))
+              m.states += State(new MemRead(mem, UInt(i)))
           case _ =>
         }
       }
       // visit children
-      top.children foreach (queue enqueue _)
+      m.children foreach (queue enqueue _)
     }
   }
 
@@ -550,8 +550,6 @@ trait DaisyChain extends Backend {
         if (Driver.clocks.size <= 1 || signal.clock == null) Bool(true)
         else fireBufs(signal.clock)(c)
       val signalValue = signal match { 
-        /*case io: Bits if io.dir == INPUT => 
-          ioBuffers getOrElse (io, io)*/
         case io: Bits => 
           ioBuffers getOrElse (io, io)
         case _ => 
@@ -574,13 +572,13 @@ trait DaisyChain extends Backend {
           counter.src + (UInt(width) - PopCount(signalValue))
         }
         case Posedge => {
-          val buffer = addBuffer(c, counter.idx, width, fireBuf && isStepBuf, signalValue)
+          val buffer = addBuffer(c, counter.idx, width, fireBuf && isStep, signalValue)
           val res = (signalValue ^ buffer) & signalValue
           res.inferWidth = (x: Node) => width
           counter.src + PopCount(res)          
         } 
         case Negedge => {
-          val buffer = addBuffer(c, counter.idx, width, fireBuf && isStepBuf, signalValue)
+          val buffer = addBuffer(c, counter.idx, width, fireBuf && isStep, signalValue)
           val res = (signalValue ^ buffer) & (~signalValue)
           res.inferWidth = (x: Node) => width
           counter.src + PopCount(res)          
@@ -592,7 +590,7 @@ trait DaisyChain extends Backend {
       // 1) fire signal -> increment counter
       // 2) 'copy' control signal when the target is stalled -> reset
       counter.src.getNode setName "counter_%d".format(counter.idx)
-      wire(counter.src, (fireBuf && isStepBuf) -> cntrValue, cntrCopy(c) -> Bits(0))
+      wire(counter.src, (fireBuf && isStep) -> cntrValue, cntrCopy(c) -> Bits(0))
     }
   }
 
@@ -963,7 +961,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
           peekBits(signal) }
       }
     }
-    takeSteps(1)
+    takeSteps(2)
 
     // set t & delta
     t += n
