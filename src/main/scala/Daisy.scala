@@ -531,10 +531,10 @@ object DaisyChain extends Backend {
     }
   }
 
-  def addBuffer(c: Module, i: Int, w: Int, en: Bool, signalValue: Bits) = {
+  def addBuffer(c: Module, i: Int, w: Int, update: (Bool, Node)) = {
     val bufName = "buffer_%d".format(i)
-    val buffer = addReg(c, Reg(Bits(width=w)), bufName)
-    wire(buffer, en -> signalValue)
+    val buffer = addReg(c, Reg(init=UInt(0, w)), bufName)
+    wire(buffer, update)
     buffer
   }
 
@@ -562,7 +562,7 @@ object DaisyChain extends Backend {
       val cntrValue = counter.cntrT match {
         case Default => counter.src + signalValue
         case Activity => {
-          val buffer = addBuffer(c, counter.idx, width, fireBuf && isStepBuf, signalValue)
+          val buffer = addBuffer(c, counter.idx, width, (fireBuf && isStepBuf) -> signalValue)
           val xor = signalValue ^ buffer
           xor.inferWidth = (x: Node) => width
           counter.src + PopCount(xor)
@@ -576,13 +576,13 @@ object DaisyChain extends Backend {
           counter.src + (UInt(width) - PopCount(signalValue))
         }
         case Posedge => {
-          val buffer = addBuffer(c, counter.idx, width, fireBuf && isStepBuf, signalValue)
+          val buffer = addBuffer(c, counter.idx, width, (fireBuf && isStepBuf) -> signalValue)
           val res = (signalValue ^ buffer) & signalValue
           res.inferWidth = (x: Node) => width
           counter.src + PopCount(res)          
         } 
         case Negedge => {
-          val buffer = addBuffer(c, counter.idx, width, fireBuf && isStepBuf, signalValue)
+          val buffer = addBuffer(c, counter.idx, width, (fireBuf && isStepBuf) -> signalValue)
           val res = (signalValue ^ buffer) & (~signalValue)
           res.inferWidth = (x: Node) => width
           counter.src + PopCount(res)          
@@ -1003,7 +1003,7 @@ abstract class AXISlave(val aw: Int = 5, val dw: Int = 32, val n: Int = 32 /* 2^
 }
 
 class DaisyWrapper[+T <: Module](c: => T) extends AXISlave(n = 16 /* 2^(aw - 1) */){
-  val top      = DaisyTransform(c)
+  val top = DaisyTransform(c)
   // write n-2 => steps
   stepsIn.bits := io.in.bits
   stepsIn.valid := wen(n-2)
