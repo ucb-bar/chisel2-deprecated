@@ -489,12 +489,15 @@ trait DaisyChain extends Backend {
  
       m.children foreach (queue enqueue _)
     }
-  
-    for ((m, isStepBuf) <- isStepBufs) {
-      isStepBuf.comp.clock = m.clock
-    }
-    for (clock <- Driver.clocks ; (m, fireBuf) <- fireBufs(clock)) {
-      fireBuf.comp.clock = m.clock
+ 
+    // assign clocks to isStep & fire buffers
+    if (Driver.clocks.size > 1) { 
+      for ((m, isStepBuf) <- isStepBufs) {
+        isStepBuf.comp.clock = m.clock
+      }
+      for (clock <- Driver.clocks ; (m, fireBuf) <- fireBufs(clock)) {
+        fireBuf.comp.clock = m.clock
+      }
     }
   }
 
@@ -539,8 +542,8 @@ trait DaisyChain extends Backend {
 
     for (counter <- counters) {
       val signal = counter.signal
-      val c = signal.component
       val width = signal.width
+      val c = counter.src.comp.component
       val isStep = isSteps(c)
       val isStepBuf = isStepBufs(c)
       val fire = 
@@ -572,13 +575,13 @@ trait DaisyChain extends Backend {
           counter.src + (UInt(width) - PopCount(signalValue))
         }
         case Posedge => {
-          val buffer = addBuffer(c, counter.idx, width, fireBuf && isStep, signalValue)
+          val buffer = addBuffer(c, counter.idx, width, fireBuf && isStepBuf, signalValue)
           val res = (signalValue ^ buffer) & signalValue
           res.inferWidth = (x: Node) => width
           counter.src + PopCount(res)          
         } 
         case Negedge => {
-          val buffer = addBuffer(c, counter.idx, width, fireBuf && isStep, signalValue)
+          val buffer = addBuffer(c, counter.idx, width, fireBuf && isStepBuf, signalValue)
           val res = (signalValue ^ buffer) & (~signalValue)
           res.inferWidth = (x: Node) => width
           counter.src + PopCount(res)          
@@ -589,8 +592,8 @@ trait DaisyChain extends Backend {
       /****** Activity Counter *****/
       // 1) fire signal -> increment counter
       // 2) 'copy' control signal when the target is stalled -> reset
-      counter.src.getNode setName "counter_%d".format(counter.idx)
-      wire(counter.src, (fireBuf && isStep) -> cntrValue, cntrCopy(c) -> Bits(0))
+      counter.src.comp setName "counter_%d".format(counter.idx)
+      wire(counter.src, (fire && isStep) -> cntrValue, cntrCopy(c) -> Bits(0))
     }
   }
 
@@ -703,8 +706,8 @@ trait DaisyChain extends Backend {
         } ) + s.head.idx )
         /****** Shaodw Counter *****/
         // daisy_ctrl == 'copy' -> current source
-        // daisy_ctrl == 'read' -> next shadow 
-        wire(s.head.shadow, copy -> realSrc, read -> s.last.shadow)
+        // daisy_ctrl == 'read' -> next shadow
+        wire(s.head.shadow, copy -> realSrc, read -> s.last.shadow) 
       }
       // visit children
       m.children foreach (queue enqueue _)
