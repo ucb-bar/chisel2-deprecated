@@ -169,7 +169,7 @@ object addNode {
     // set enable signal
     if (reg.isEnable) {
       val (conds, values) = updates.unzip
-      reg.enable = (conds.tail foldLeft conds.head)(_ || _)
+      reg.enable = addNode(reg.component, (conds.tail foldLeft conds.head)((x, y) => addNode(reg.component, x || y)))
     }
     finish()
   }
@@ -242,15 +242,15 @@ object DaisyTransform {
     val steps =  addReg(c, Reg(init = UInt(0, 32)), "steps")
     isSteps(c) = addNode(c, steps.orR, "is_step") 
     wire(steps, Seq(
-      (!isSteps(c) && stepsIn.valid) -> stepsIn.bits,
-      isSteps(c)                     -> (steps - UInt(1))) )
+      addNode(c, (addNode(c, !isSteps(c)) && stepsIn.valid)) -> stepsIn.bits,
+      addNode(c, isSteps(c))                     -> addNode(c, (steps - UInt(1)))) )
 
     // generate clock counters for multi clock domains
     if (Driver.clocks.size > 1) { 
       var clkIdx = Driver.clocks count (_.srcClock == null)
       val clkNum = addReg(c, Reg(init = UInt(clkIdx, 8)), "clk_num_reg")
-      wire(clkNum, Seq(clockIn.valid -> (clkNum - UInt(1))))
-      wire(clkNum.orR -> clockIn.ready)
+      wire(clkNum, Seq(clockIn.valid -> addNode(c, (clkNum - addNode(c, UInt(1))))))
+      wire(addNode(c, clkNum.orR) -> clockIn.ready)
 
       for ((clock, idx) <- Driver.clocks.zipWithIndex) {
         val clkRegName = "clock_reg_" + idx
@@ -265,7 +265,7 @@ object DaisyTransform {
               wire(clkRegs(clock), Seq(Bool(true) -> (clkRegs(clock.srcClock) / UInt(clkExp(1)))))
           }
         } else {
-          wire(clkRegs(clock), Seq((clockIn.valid && clkNum === UInt(clkIdx)) -> clockIn.bits))
+          wire(clkRegs(clock), Seq(addNode(c, (clockIn.valid && addNode(c, clkNum === addNode(c, UInt(clkIdx))))) -> clockIn.bits))
           clkIdx = clkIdx - 1
         }
       }
@@ -276,8 +276,8 @@ object DaisyTransform {
         clkCnts(clock) = addReg(c, Reg(UInt(width = 8)), clkCntName)
       }
 
-      val min = addNode(c, (Driver.clocks foldLeft UInt(1 << 31 - 1))(
-        (mux, clock) => Mux(clkCnts(clock) < mux, clkCnts(clock), mux)), "min")
+      val min = addNode(c, (Driver.clocks foldLeft addNode(c, UInt(1 << 31 - 1)))(
+        (mux, clock) => addNode(c, Mux(addNode(c, clkCnts(clock) < mux), clkCnts(clock), mux))), "min")
       c.debug(min) // for debug
 
       for ((clock, idx) <- Driver.clocks.zipWithIndex) {
@@ -286,10 +286,10 @@ object DaisyTransform {
         daisyNames += fireName
         daisyNames += fireBufName
 
-        fires(clock) =    HashMap(c -> addNode(c, !clkCnts(clock).orR, fireName))
+        fires(clock) =    HashMap(c -> addNode(c, addNode(c, !addNode(c, clkCnts(clock).orR)), fireName))
         fireBufs(clock) = HashMap(c -> addReg(c, Reg(next=fires(clock)(c)), fireBufName))
         wire(clkCnts(clock), Seq(
-          (!fires(clock)(c) && isSteps(c)) -> (clkCnts(clock) - min),
+          addNode(c, (addNode(c, !fires(clock)(c)) && isSteps(c))) -> addNode(c, (clkCnts(clock) - min)),
           fires(clock)(c)                  -> clkRegs(clock)) )
       }
     }
