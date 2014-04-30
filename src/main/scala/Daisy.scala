@@ -199,6 +199,7 @@ object DaisyTransform {
   lazy val snapCtrl = addPin(top, UInt(INPUT, 1), "snap_ctrl")
   lazy val cntrOut =  addPin(top, Decoupled(UInt(width = 32)), "cntr_out")
   lazy val cntrCtrl = addPin(top, UInt(INPUT, 1), "cntr_ctrl")
+  lazy val outVal   = addPin(top, Bool(OUTPUT), "output_valid")
 
   val fires = new LinkedHashMap[Clock, HashMap[Module, Bool]]
   val fireBufs = new LinkedHashMap[Clock, HashMap[Module, Bool]]
@@ -217,7 +218,7 @@ object DaisyTransform {
   val clkRegs = new HashMap[Clock, UInt]
   val clkCnts = new HashMap[Clock, UInt]
 
-  val daisyNames = HashSet(
+  val daisyNames = HashSet("output_valid",
     "steps", "is_step", "is_step_buf",
     "snap_in", "snap_ctrl", "cntr_in", "cntr_ctrl",
     "steps_in_ready", "steps_in_valid", "steps_in_bits",
@@ -248,14 +249,14 @@ object DaisyTransform {
     // generate clock counters for multi clock domains
     if (Driver.clocks.size > 1) { 
       var clkIdx = Driver.clocks count (_.srcClock == null)
-      val clkNum = addReg(c, Reg(init = UInt(clkIdx, 8), clock=Driver.implicitClock), "clk_num_reg")
+      val clkNum = addReg(c, Reg(init = UInt(clkIdx, 8)), "clk_num_reg")
       wire(clkNum, Seq(clockIn.valid -> (clkNum - UInt(1))))
       wire(clkNum.orR -> clockIn.ready)
 
       for ((clock, idx) <- Driver.clocks.zipWithIndex) {
         val clkRegName = "clock_reg_" + idx
         daisyNames += clkRegName
-        clkRegs(clock) = addReg(c, Reg(UInt(width=8), clock=Driver.implicitClock), clkRegName)
+        clkRegs(clock) = addReg(c, Reg(UInt(width=8)), clkRegName)
         if (clock.srcClock != null) {
           val clkExp = (clock.initStr split " ").tail
           clkExp(0) match {
@@ -287,7 +288,7 @@ object DaisyTransform {
         daisyNames += fireBufName
 
         fires(clock) =    HashMap(c -> addNode(c, !clkCnts(clock).orR, fireName))
-        fireBufs(clock) = HashMap(c -> addReg(c, Reg(next=fires(clock)(c), clock=Driver.implicitClock), fireBufName))
+        fireBufs(clock) = HashMap(c -> addReg(c, Reg(next=fires(clock)(c)), fireBufName))
         wire(clkCnts(clock), Seq(
           (!fires(clock)(c) && isSteps(c)) -> (clkCnts(clock) - min),
           fires(clock)(c)                  -> clkRegs(clock)) )
@@ -335,6 +336,7 @@ object DaisyTransform {
       // Event counters should increase one cycle after
       // the target is activated
       isStepBufs(m) = addReg(m, Reg(next=isSteps(m)), "is_step_buf")
+      if (m == c) wire((!isSteps(m) && !isStepBufs(m)) -> outVal)
  
       if (m != c && Driver.clocks.size > 1) {
         for ((clock, idx) <- Driver.clocks.zipWithIndex) {
@@ -376,13 +378,13 @@ object DaisyChain extends Backend {
     b.transforms += ((c: Module) => c bfs (_.addConsumers))
     b.transforms += ((c: Module) => decoupleTarget(top))
     b.transforms += ((c: Module) => appendFires(top))
-    if (Driver.isSnapshotting) {
-      b.transforms += (c => findStates(top))
-      b.transforms += (c => genDaisyChain(top, SnapshotChain))
-    }
     if (Driver.genCounter) {
       b.transforms += (c => genCounters)
       b.transforms += (c => genDaisyChain(top, CounterChain))
+    }
+    if (Driver.isSnapshotting) {
+      b.transforms += (c => findStates(top))
+      b.transforms += (c => genDaisyChain(top, SnapshotChain))
     }
     b.transforms += ((c: Module) => c.addClockAndReset)
     b.transforms += ((c: Module) => gatherClocksAndResets)
@@ -534,6 +536,7 @@ object DaisyChain extends Backend {
   def addBuffer(c: Module, i: Int, w: Int, update: (Bool, Node)) = {
     val bufName = "buffer_%d".format(i)
     val buffer = addReg(c, Reg(init=UInt(0, w)), bufName)
+    daisyNames += bufName
     wire(buffer, update)
     buffer
   }
@@ -588,12 +591,15 @@ object DaisyChain extends Backend {
           counter.src + PopCount(res)          
         }
       }
+    
       cntrValue.getNode setName "cntr_val_%d".format(counter.idx)
 
       /****** Activity Counter *****/
       // 1) fire signal -> increment counter
       // 2) 'copy' control signal when the target is stalled -> reset
-      counter.src.comp setName "counter_%d".format(counter.idx)
+      val counterName = "counter_%d".format(counter.idx)
+      daisyNames += counterName
+      counter.src.comp setName counterName
       wire(counter.src, (fire && isStep) -> cntrValue, cntrCopy(c) -> Bits(0))
     }
   }
@@ -653,10 +659,13 @@ object DaisyChain extends Backend {
         // no children but signals
         case (true, false) => {
           val realSrc = ioBuffers getOrElse (chain.last.src, chain.last.src)
-          chain.last.shadow.getNode setName ( ( chainT match {
+          val shadowName = ( chainT match {
             case SnapshotChain => "snap_shadow_"
             case CounterChain  => "cntr_shadow_"
-          } ) + chain.last.idx )
+          } ) + chain.last.idx
+          daisyNames += shadowName
+          chain.last.shadow.comp.component = m 
+          chain.last.shadow.comp setName shadowName
           // snap output -> head shadow
           wire(chain.head.shadow -> daisyOut.bits)
           // snap input -> last shadow 
@@ -673,10 +682,13 @@ object DaisyChain extends Backend {
 	    case CounterChain  => cntrIns(m.children.last)
 	  }
           val realSrc = ioBuffers getOrElse (chain.last.src, chain.last.src)
-          chain.last.shadow.getNode setName ( ( chainT match {
+          val shadowName = ( chainT match {
             case SnapshotChain => "snap_shadow_"
             case CounterChain  => "cntr_shadow_"
-          } ) + chain.last.idx )
+          } ) + chain.last.idx
+          daisyNames += shadowName
+          chain.last.shadow.comp.component = m 
+          chain.last.shadow.comp setName shadowName
           // head shadow -> daisy output
           wire(chain.head.shadow -> daisyOut.bits)
           // daisy input -> last shadow
@@ -701,10 +713,13 @@ object DaisyChain extends Backend {
 
       for (s <- chain sliding 2 ; if s.size == 2) {
         val realSrc = ioBuffers getOrElse (s.head.src, s.head.src)
-        s.head.shadow.getNode setName ( ( chainT match {
+        val shadowName = ( chainT match {
           case SnapshotChain => "snap_shadow_"
           case CounterChain  => "cntr_shadow_"
-        } ) + s.head.idx )
+        } ) + s.head.idx
+        daisyNames += shadowName
+        s.head.shadow.comp.component = m 
+        s.head.shadow.comp setName shadowName
         /****** Shaodw Counter *****/
         // daisy_ctrl == 'copy' -> current source
         // daisy_ctrl == 'read' -> next shadow
@@ -950,6 +965,9 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
       }
     }
 
+    while (peek(outVal) == 0)
+      takeSteps(1)
+
     // read out signal values
     if (Driver.isSnapshotting) {
       if (isTrace) println("*** READ STATE VALUES ***")
@@ -961,7 +979,6 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
           peekBits(signal) }
       }
     }
-    takeSteps(2)
 
     // set t & delta
     t += n
