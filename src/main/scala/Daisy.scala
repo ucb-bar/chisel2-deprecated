@@ -175,7 +175,7 @@ object addNode {
     finish()
   }
 
-  def wire[T <: Node, Q <: Node](pair: => ((T, Q))) {
+  def wire(pair: => ((Node, Node))) {
     start()
     val input = pair._1
     val consumer = pair._2
@@ -560,7 +560,7 @@ trait DaisyChain extends Backend {
       val cntrValue = counter.cntrT match {
         case Default => counter.src + signalValue
         case Activity => {
-          val buffer = addBuffer(c, counter.idx, width, fire && isStep, signalValue)
+          val buffer = addBuffer(c, counter.idx, width, fireBuf && isStepBuf, signalValue)
           val xor = signalValue ^ buffer
           xor.inferWidth = (x: Node) => width
           counter.src + PopCount(xor)
@@ -574,13 +574,13 @@ trait DaisyChain extends Backend {
           counter.src + (UInt(width) - PopCount(signalValue))
         }
         case Posedge => {
-          val buffer = addBuffer(c, counter.idx, width, fire && isStep, signalValue)
+          val buffer = addBuffer(c, counter.idx, width, fireBuf && isStepBuf, signalValue)
           val res = (signalValue ^ buffer) & signalValue
           res.inferWidth = (x: Node) => width
           counter.src + PopCount(res)          
         } 
         case Negedge => {
-          val buffer = addBuffer(c, counter.idx, width, fire && isStep, signalValue)
+          val buffer = addBuffer(c, counter.idx, width, fireBuf && isStepBuf, signalValue)
           val res = (signalValue ^ buffer) & (~signalValue)
           res.inferWidth = (x: Node) => width
           counter.src + PopCount(res)          
@@ -592,7 +592,7 @@ trait DaisyChain extends Backend {
       // 1) fire signal -> increment counter
       // 2) 'copy' control signal when the target is stalled -> reset
       counter.src.getNode setName "counter_%d".format(counter.idx)
-      wire(counter.src, (fireBuf && isStep) -> cntrValue, cntrCopy(c) -> Bits(0))
+      wire(counter.src, (fireBuf && isStepBuf) -> cntrValue, cntrCopy(c) -> Bits(0))
     }
   }
 
