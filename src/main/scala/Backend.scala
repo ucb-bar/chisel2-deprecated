@@ -350,7 +350,8 @@ abstract class Backend {
               // not symmetric and only applies to direct children
               // READ BACK INPUT -- TODO: TIGHTEN THIS UP
               !isBitsIo(input, INPUT))
-            ChiselErrors += new ChiselError(() => { "Illegal cross module reference between " + node + " and " + input }, node.line)
+            ChiselError.info("Illegal cross module reference between " + node.component + ":" + nodeToString(node) + " and " + input.component + ":" + nodeToString(input))
+            // ChiselErrors += new ChiselError(() => { "Illegal cross module reference between " + node + " and " + input }, node.line)
         }
         if(!walked.contains(input)) {
           if( input.component == null ) {
