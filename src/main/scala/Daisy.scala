@@ -102,7 +102,6 @@ object addNode {
   val tempStack = new ListBuffer[Module]
 
   private def start() {
-    tempStack.clear
     while (!Driver.compStack.isEmpty) 
       tempStack prepend Driver.compStack.pop
   }
@@ -1039,7 +1038,11 @@ class DaisyWrapper[+T <: Module](c: => T) extends AXISlave(n = 16 /* 2^(aw - 1) 
   cntrOut.ready := ren(n-1)
   // snap & cntr control bit <- MSB of addr
   snapCtrl := io.addr(aw-1) 
-  cntrCtrl := io.addr(aw-1) 
+  cntrCtrl := io.addr(aw-1)
+  
+  for (i <- 0 until n-3) {
+    rvalid(i) := outVal
+  }
 }
 
 abstract class DaisyWrapperTester[+T <: DaisyWrapper[_]](c: T, isTrace: Boolean = true) extends DaisyTester(c, isTrace) {
