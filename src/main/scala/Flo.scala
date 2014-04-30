@@ -125,7 +125,7 @@ class FloBackend extends Backend {
              case "-"  => "sub'" + node.width + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
              case "*"  => "mul'" + node.width + " " + emitRef(node.inputs(0), node, node.inputs(1)) + " " + emitRef(node.inputs(1), node, node.inputs(0))
              case "/"  => "div'" + node.width + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
-             case "<<" => "lsh" + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
+             case "<<" => "lsh'" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case ">>" => "rsh'" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "s>>" => "arsh'" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "##" => "cat'" + node.inputs(1).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
