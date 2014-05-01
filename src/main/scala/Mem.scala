@@ -118,9 +118,10 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
     inputs += wr
   }
 
-  def write(addr: UInt, data: T): Unit = {
+  def write(addr: UInt, dataIn: T): Unit = {
     val cond = Module.current.whenCond
-    if (seqRead && Driver.backend.isInstanceOf[CppBackend] && gen().isInstanceOf[Bits]) {
+    val data = dataIn.toBits
+    if (seqRead && Driver.backend.isInstanceOf[CppBackend]) {
       // generate bogus data when reading & writing same address on same cycle
       val reg_data = new Reg().init("", widthOf(0), data)
       val random16 = LFSR16()
