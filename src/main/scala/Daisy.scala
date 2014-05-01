@@ -241,15 +241,16 @@ object DaisyTransform {
     // step counters
     val steps =  addReg(c, Reg(init = UInt(0, 32)), "steps")
     isSteps(c) = addNode(c, steps.orR, "is_step") 
-    wire(steps, Seq(
-      addNode(c, (addNode(c, !isSteps(c)) && stepsIn.valid)) -> stepsIn.bits,
-      addNode(c, isSteps(c))                     -> addNode(c, (steps - UInt(1)))) )
+    val isStepsIn = addNode(c, addNode(c, !isSteps(c)) && stepsIn.valid)
+    val decOne = addNode(c, steps - addNode(UInt(1)))
+    wire(steps, Seq(isStepsIn -> stepsIn.bits, isSteps(c) -> decOne))
 
     // generate clock counters for multi clock domains
     if (Driver.clocks.size > 1) { 
       var clkIdx = Driver.clocks count (_.srcClock == null)
-      val clkNum = addReg(c, Reg(init = UInt(clkIdx, 8)), "clk_num_reg")
-      wire(clkNum, Seq(clockIn.valid -> addNode(c, (clkNum - addNode(c, UInt(1))))))
+      val clkNum    = addReg (c, Reg(init = UInt(clkIdx, 8)), "clk_num_reg")
+      val clkNumDec = addNode(c, clkNum - addNode(c, UInt(1)))
+      wire(clkNum, Seq(clockIn.valid -> clkNumDec))
       wire(addNode(c, clkNum.orR) -> clockIn.ready)
 
       for ((clock, idx) <- Driver.clocks.zipWithIndex) {
@@ -259,13 +260,19 @@ object DaisyTransform {
         if (clock.srcClock != null) {
           val clkExp = (clock.initStr split " ").tail
           clkExp(0) match {
-            case "*" => 
-              wire(clkRegs(clock), Seq(Bool(true) -> (clkRegs(clock.srcClock) * UInt(clkExp(1)))))
-            case "/" =>
-              wire(clkRegs(clock), Seq(Bool(true) -> (clkRegs(clock.srcClock) / UInt(clkExp(1)))))
+            case "*" => {
+              val clkRegMul = addNode(c, clkRegs(clock.srcClock) * addNode(c, UInt(clkExp(1))))
+              wire(clkRegs(clock), Seq(Bool(true) -> clkRegMul))
+            }
+            case "/" => {
+              val clkRegDiv = addNode(c, clkRegs(clock.srcClock) / addNode(c, UInt(clkExp(1))))
+              wire(clkRegs(clock), Seq(Bool(true) -> clkRegDiv))
+            }
           }
         } else {
-          wire(clkRegs(clock), Seq(addNode(c, (clockIn.valid && addNode(c, clkNum === addNode(c, UInt(clkIdx))))) -> clockIn.bits))
+          val clkNumEqIdx = addNode(c, clkNum === addNode(c, UInt(clkIdx)))
+          val isClkInput =  addNode(c, clockIn.valid && clkNumEqIdx)
+          wire(clkRegs(clock), Seq(isClkInput -> clockIn.bits))
           clkIdx = clkIdx - 1
         }
       }
@@ -276,8 +283,10 @@ object DaisyTransform {
         clkCnts(clock) = addReg(c, Reg(UInt(width = 8)), clkCntName)
       }
 
-      val min = addNode(c, (Driver.clocks foldLeft addNode(c, UInt(1 << 31 - 1)))(
-        (mux, clock) => addNode(c, Mux(addNode(c, clkCnts(clock) < mux), clkCnts(clock), mux))), "min")
+      val min = addNode(c, (Driver.clocks foldLeft addNode(c, UInt(1 << 31 - 1)))((mux, clock) => {
+        val lessThanMux = addNode(c, clkCnts(clock) < mux)
+        addNode(c, Mux(lessThanMux, clkCnts(clock), mux))
+        }) )
       c.debug(min) // for debug
 
       for ((clock, idx) <- Driver.clocks.zipWithIndex) {
@@ -285,12 +294,14 @@ object DaisyTransform {
         val fireBufName = "fire_buf_" + idx
         daisyNames += fireName
         daisyNames += fireBufName
-
-        fires(clock) =    HashMap(c -> addNode(c, addNode(c, !addNode(c, clkCnts(clock).orR)), fireName))
-        fireBufs(clock) = HashMap(c -> addReg(c, Reg(next=fires(clock)(c)), fireBufName))
-        wire(clkCnts(clock), Seq(
-          addNode(c, (addNode(c, !fires(clock)(c)) && isSteps(c))) -> addNode(c, (clkCnts(clock) - min)),
-          fires(clock)(c)                  -> clkRegs(clock)) )
+        val fire    = addNode(c, !addNode(c, clkCnts(clock).orR), fireName)
+        val fireBuf = addReg (c, Reg(next=fire), fireBufName)
+        fires(clock)    = HashMap(c -> fire)
+        fireBufs(clock) = HashMap(c -> fireBuf)
+        val notFire     = addNode(c, !fire)
+        val isClkCntDec = addNode(c, notFire && isSteps(c))
+        val decMin      = addNode(c, clkCnts(clock) - min)
+        wire(clkCnts(clock), Seq(isClkCntDec -> decMin, fire -> clkRegs(clock)))
       }
     }
   }
