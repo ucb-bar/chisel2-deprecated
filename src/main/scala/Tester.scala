@@ -417,6 +417,7 @@ class ManualTester[+T <: Module]
          val dir = Driver.backend.asInstanceOf[FloBackend].floDir
 	 val command = ArrayBuffer(dir + "fix-console", ":is-debug", "true", ":filename", target + ".hex")
 	 if (Driver.isVCD) { command ++= ArrayBuffer(":is-vcd-dump", "true") }
+         command ++= ArrayBuffer(":target-dir", Driver.targetDir)
          command.mkString(" ")
       } else {
          target + (if (Driver.backend.isInstanceOf[VerilogBackend]) " -q" else "")
