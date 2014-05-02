@@ -198,7 +198,7 @@ object DaisyTransform {
   lazy val snapCtrl = addPin(top, UInt(INPUT, 1), "snap_ctrl")
   lazy val cntrOut =  addPin(top, Decoupled(UInt(width = 32)), "cntr_out")
   lazy val cntrCtrl = addPin(top, UInt(INPUT, 1), "cntr_ctrl")
-  lazy val outVal   = addPin(top, Bool(OUTPUT), "output_valid")
+  lazy val stalled   = addPin(top, Bool(OUTPUT), "stalled")
 
   val fires = new LinkedHashMap[Clock, HashMap[Module, Bool]]
   val fireBufs = new LinkedHashMap[Clock, HashMap[Module, Bool]]
@@ -217,7 +217,7 @@ object DaisyTransform {
   val clkRegs = new HashMap[Clock, UInt]
   val clkCnts = new HashMap[Clock, UInt]
 
-  val daisyNames = HashSet("output_valid",
+  val daisyNames = HashSet("stalled",
     "steps", "is_step", "is_step_buf",
     "snap_in", "snap_ctrl", "cntr_in", "cntr_ctrl",
     "steps_in_ready", "steps_in_valid", "steps_in_bits",
@@ -346,7 +346,7 @@ object DaisyTransform {
       // Event counters should increase one cycle after
       // the target is activated
       isStepBufs(m) = addReg(m, Reg(next=isSteps(m)), "is_step_buf")
-      if (m == c) wire((!isSteps(m) && !isStepBufs(m)) -> outVal)
+      if (m == c) wire((!isSteps(m) && !isStepBufs(m)) -> stalled)
  
       if (m != c && Driver.clocks.size > 1) {
         for ((clock, idx) <- Driver.clocks.zipWithIndex) {
@@ -946,7 +946,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
       println("-------------------------")
     }
 
-    /*** Snapshotting! ***/
+    /*** Snapshotting and  counter dumpig ***/
     if (t > 0) {
       if (Driver.isSnapshotting) snapshot()
       if (Driver.genCounter) dumpCounters()
@@ -975,7 +975,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
       }
     }
 
-    while (peek(outVal) == 0)
+    while (peek(stalled) == 0)
       takeSteps(1)
 
     // read out signal values
@@ -1050,9 +1050,10 @@ class DaisyWrapper[+T <: Module](c: => T) extends AXISlave(n = 16 /* 2^(aw - 1) 
   // snap & cntr control bit <- MSB of addr
   snapCtrl := io.addr(aw-1) 
   cntrCtrl := io.addr(aw-1)
-  
+  // read & write are ready when the target is stalled 
   for (i <- 0 until n-3) {
-    rvalid(i) := outVal
+    wready(i) := stalled
+    rvalid(i) := stalled
   }
 }
 
@@ -1099,28 +1100,13 @@ abstract class DaisyWrapperTester[+T <: DaisyWrapper[_]](c: T, isTrace: Boolean 
 
   // poke 'clk' to  clock counters
   override def pokeClock (clk: Int) {
-    do {
-      poke(c.io.addr, clockAddr)
-      takeSteps(1)
-    } while (peek(c.io.in.ready) == 0)
-    poke(c.io.in.bits, clk)
-    poke(c.io.in.valid, 1)
-    takeSteps(1)
-    poke(c.io.in.valid, 0)
+    pokeAddr(clockAddr, clk)
   }
 
   // poke 'n' to the step counter
   // whose address is 'stepAddr'
   override def pokeSteps (n: Int) {
-    do {
-      poke(c.io.addr, stepAddr)
-      takeSteps(1)
-    } while (peek(c.io.in.ready) == 0)
- 
-    pokeBits(c.io.in.bits, n)
-    pokeBits(c.io.in.valid, 1)
-    takeSteps(1)
-    pokeBits(c.io.in.valid, 0)
+    pokeAddr(stepAddr, n)
   }
 
   // read(snapAddr) -> snapshot copy
