@@ -317,7 +317,7 @@ object DaisyTransform {
           snapOuts(m)  = snapOut 
           snapCtrls(m) = snapCtrl 
         }
-        if (Driver.genCounter) {
+        if (Driver.isCounting) {
           cntrIns(m)   = UInt(0)
           cntrOuts(m)  = cntrOut 
           cntrCtrls(m) = cntrCtrl 
@@ -332,7 +332,7 @@ object DaisyTransform {
           wire(snapCtrls(m.parent) -> snapCtrls(m))
           wire(snapOuts(m.parent).ready -> snapOuts(m).ready)
         }
-        if (Driver.genCounter) {
+        if (Driver.isCounting) {
           cntrIns(m)   = addPin(m, UInt(INPUT, 32), "cntr_in")
           cntrOuts(m)  = addPin(m, Decoupled(UInt(width = 32)), "cntr_out")
           cntrCtrls(m) = addPin(m, UInt(INPUT, 1), "cntr_ctrl")
@@ -366,7 +366,7 @@ object DaisyTransform {
         snapRead(m) = addNode(m, snapFire && addNode(m, snapCtrls(m) === addNode(m, Bits(1))), "snap_read")
         wire(snapFire -> snapOuts(m).valid)
       }
-      if (Driver.genCounter) {
+      if (Driver.isCounting) {
         val cntrFire = addNode(m, cntrOuts(m).ready && addNode(m, !isSteps(m)), "cntr_fire")
         cntrCopy(m) = addNode(m, cntrFire && addNode(m, cntrCtrls(m) === addNode(m, Bits(0))), "cntr_copy")
         cntrRead(m) = addNode(m, cntrFire && addNode(m, cntrCtrls(m) === addNode(m, Bits(1))), "cntr_read")
@@ -388,7 +388,7 @@ object DaisyChain extends Backend {
     b.transforms += ((c: Module) => c bfs (_.addConsumers))
     b.transforms += ((c: Module) => decoupleTarget(top))
     b.transforms += ((c: Module) => appendFires(top))
-    if (Driver.genCounter) {
+    if (Driver.isCounting) {
       b.transforms += (c => genCounters)
       b.transforms += (c => genDaisyChain(top, CounterChain))
     }
@@ -946,10 +946,10 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
       println("-------------------------")
     }
 
-    /*** Snapshotting and  counter dumpig ***/
+    /*** Snapshotting and counter dumpig ***/
     if (t > 0) {
       if (Driver.isSnapshotting) snapshot()
-      if (Driver.genCounter) dumpCounters()
+      if (Driver.isCounting) dumpCounters()
     }
 
     // set clock register
@@ -961,7 +961,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     counterVals ++= Array.fill(counters.size)(BigInt(0))
     for (k <- 0 until n) {
       takeSteps(1)
-      if (Driver.genCounter) {
+      if (Driver.isCounting) {
         if (isTrace) println("*** READ COUNTER SIGNALS ***")
         for ((counter, i) <- counters.zipWithIndex) {
           val curPeek = counter.signal match {

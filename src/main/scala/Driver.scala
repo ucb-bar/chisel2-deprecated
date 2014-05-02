@@ -57,9 +57,9 @@ object Driver {
     /* JACK - If loading design, read design.prm file*/
     if (Driver.jackLoad != null) { Jackhammer.load(Driver.jackDir, Driver.jackLoad) }
     val genC = gen()
-    val c = if((!isSnapshotting && !genCounter) || DaisyTransform.done) genC else DaisyTransform(genC, true)
+    val c = if((!isSnapshotting && !isCounting) || DaisyTransform.done) genC else DaisyTransform(genC, true)
 
-    if (isSnapshotting || genCounter) DaisyChain(backend)
+    if (isSnapshotting || isCounting) DaisyChain(backend)
 
     Driver.backend.initBackannotation
 
@@ -195,7 +195,7 @@ object Driver {
         case "--checkPorts" => isCheckingPorts = true
         // DaisyChain flags
         case "--snapshot" => isSnapshotting = true
-        case "--counter" => genCounter = true
+        case "--counter" => isCounting = true
         case "--backannotation" => isBackannotating = true
         case "--model" => model = args(i + 1) ; i += 1
         //Jackhammer Flags
@@ -273,7 +273,7 @@ object Driver {
   /* DaisyChain flags */
   var isBackannotating = false
   var isSnapshotting = false
-  var genCounter = false
+  var isCounting = false
   var model = ""
   val signals = LinkedHashSet[Node]()
   var modStackPushed: Boolean = false
