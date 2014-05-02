@@ -38,6 +38,7 @@ import scala.collection.mutable.LinkedHashSet
 import scala.collection.mutable.LinkedHashMap
 import scala.collection.mutable.{Queue => ScalaQueue}
 import scala.math.pow
+import scala.math.max
 
 // Counter type definition
 trait CounterType
@@ -191,6 +192,8 @@ import addNode._
 object DaisyTransform {
   var top: Module = null
   var done = false
+  var inNum = -1
+  var outNum = -1
 
   lazy val stepsIn =  addPin(top, Decoupled(UInt(width = 32)).flip, "steps_in")
   lazy val clockIn =  addPin(top, Decoupled(UInt(width = 32)).flip, "clock_in")
@@ -230,6 +233,8 @@ object DaisyTransform {
 
   def apply[T <: Module](c: => T, fromDriver: Boolean = false) = {
     top = if (fromDriver) c else Module(c)
+    inNum  = top.io.flatten count (x => x._2.dir == INPUT)
+    outNum = top.io.flatten count (x => x._2.dir == OUTPUT)
     done = true
     addStepAndClkCnts(top)
     addDaisyPins(top)
@@ -427,9 +432,9 @@ object DaisyChain extends Backend {
     for ((name, io) <- c.io.asInstanceOf[Bundle].elements) {
       io nameIt (name, true)
     }
-    // For the input and output pins of the c component
+    // For the input and output pins of the 'c' component
     // insert buffers so that their values are avaiable
-    // after the target is stalled
+    // even though the target is stalled
     for ((name, targetPin) <- c.io.flatten; if !(daisyNames contains name)) {
       val bufName = name + "_buf"
       daisyNames += bufName
@@ -604,9 +609,9 @@ object DaisyChain extends Backend {
     
       cntrValue.getNode setName "cntr_val_%d".format(counter.idx)
 
-      /****** Activity Counter *****/
-      // 1) fire signal -> increment counter
-      // 2) 'copy' control signal when the target is stalled -> reset
+      /* Activity Counter */
+      // 1) steps > 0 -> increment counter
+      // 2) the target is stalled with a copy bit -> reset
       val counterName = "counter_%d".format(counter.idx)
       daisyNames += counterName
       counter.src.comp setName counterName
@@ -730,7 +735,7 @@ object DaisyChain extends Backend {
         daisyNames += shadowName
         s.head.shadow.comp.component = m 
         s.head.shadow.comp setName shadowName
-        /****** Shaodw Counter *****/
+        /* Shaodw Counter*/
         // daisy_ctrl == 'copy' -> current source
         // daisy_ctrl == 'read' -> next shadow
         wire(s.head.shadow, copy -> realSrc, read -> s.last.shadow) 
@@ -1030,7 +1035,10 @@ abstract class AXISlave(val aw: Int = 5, val dw: Int = 32, val n: Int = 32 /* 2^
 }
 
 class DaisyWrapper[+T <: Module](c: => T) extends AXISlave(n = 16 /* 2^(aw - 1) */){
-  val top = DaisyTransform(c)
+  val top    = DaisyTransform(c)
+  val outNum = max(n-3, DaisyTransform.outNum)
+  val inNum  = max(n-3, DaisyTransform.inNum)
+  val wdata  = Vec.fill(inNum) { Reg(UInt()) }
   // write n-2 => steps
   stepsIn.bits := io.in.bits
   stepsIn.valid := wen(n-2)
@@ -1050,10 +1058,17 @@ class DaisyWrapper[+T <: Module](c: => T) extends AXISlave(n = 16 /* 2^(aw - 1) 
   // snap & cntr control bit <- MSB of addr
   snapCtrl := io.addr(aw-1) 
   cntrCtrl := io.addr(aw-1)
-  // read & write are ready when the target is stalled 
-  for (i <- 0 until n-3) {
-    wready(i) := stalled
+  // writes are ready when the target is stalled 
+  for (i <- 0 until outNum) {
     rvalid(i) := stalled
+  }
+  // reads are ready when the target is stalled
+  // with the corresponding address bits 
+  for (i <- 0 until inNum) {
+    wready(i) := stalled
+    when (wen(i)) {
+      wdata(i) := io.in.bits
+    }
   }
 }
 
