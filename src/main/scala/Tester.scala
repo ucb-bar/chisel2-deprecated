@@ -292,8 +292,9 @@ class ManualTester[+T <: Module]
 
   def signed_fix(dtype: Bits, rv: BigInt): BigInt = {
     dtype match {
-      case _: UInt => (rv)
       case _: SInt => (if(rv >= (BigInt(1) << dtype.getWidth-1)) (rv - (BigInt(1) << dtype.getWidth)) else rv)
+      /* anything else (i.e., UInt, Flo, or Dbl) */
+      case _ => (rv)
     }
   }
 
