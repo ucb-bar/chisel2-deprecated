@@ -405,6 +405,7 @@ object DaisyChain extends Backend {
     b.transforms += ((c: Module) => c.forceMatchingWidths)
     b.transforms += ((c: Module) => c.removeTypeNodes)
     b.transforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
+    b.analyses   += ((c: Module) => genChainOffsets(c))
   }
 
   val ioBuffers = new HashMap[Node, Bits]
@@ -733,6 +734,45 @@ object DaisyChain extends Backend {
       }
       // visit children
       m.children foreach (queue enqueue _)
+    }
+  }
+
+  def genChainOffsets (c: Module) {
+    if (Driver.isSnapshotting) {
+      val snapchain = createOutputFile(c.name + ".snapchain")
+      val res = new StringBuilder
+      for (state <- states) {
+        state.src match {
+          case read: MemRead => 
+            res append ("%s[%s] %d\n".format(
+              read.mem.chiselName, 
+              read.addr.litValue(0), 
+              state.idx) ) 
+          case _ =>
+            res append ("%s %d\n".format(
+              state.src.chiselName, 
+              state.idx)) 
+        }
+      }
+      try {
+        snapchain write res.result
+      } finally {
+        snapchain.close
+      }
+    }
+    if (Driver.isCounting) {
+      val cntrchain = createOutputFile(c.name + ".cntrchain")
+      val res = new StringBuilder
+      for (counter <- counters) {
+        res append ("%s %s\n".format(
+          counter.signal.chiselName, 
+          counter.idx))
+      }
+      try {
+        cntrchain write res.result
+      } finally {
+        cntrchain.close
+      }
     }
   }  
 }
