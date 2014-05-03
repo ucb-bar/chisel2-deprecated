@@ -290,12 +290,20 @@ class ManualTester[+T <: Module]
     }
   }
 
+  def signed_fix(dtype: Bits, rv: BigInt): BigInt = {
+    dtype match {
+      case _: SInt => (if(rv >= (BigInt(1) << dtype.getWidth-1)) (rv - (BigInt(1) << dtype.getWidth)) else rv)
+      /* anything else (i.e., UInt, Flo, or Dbl) */
+      case _ => (rv)
+    }
+  }
+
   def peekAt[T <: Bits](data: Mem[T], off: Int): BigInt = {
-    peekBits(data, off)
+    signed_fix(data(1), peekBits(data, off))
   }
 
   def peek(data: Bits): BigInt = {
-    peekBits(data.getNode)
+    signed_fix(data, peekBits(data.getNode))
   }
 
   def peek(data: Aggregate /*, off: Int = -1 */): Array[BigInt] = {
@@ -417,6 +425,7 @@ class ManualTester[+T <: Module]
          val dir = Driver.backend.asInstanceOf[FloBackend].floDir
 	 val command = ArrayBuffer(dir + "fix-console", ":is-debug", "true", ":filename", target + ".hex")
 	 if (Driver.isVCD) { command ++= ArrayBuffer(":is-vcd-dump", "true") }
+         command ++= ArrayBuffer(":target-dir", Driver.targetDir)
          command.mkString(" ")
       } else {
          target + (if (Driver.backend.isInstanceOf[VerilogBackend]) " -q" else "")

@@ -588,6 +588,9 @@ class VerilogBackend extends Backend {
     if (Driver.isTesting) { 
       harness write harnessAPIs(mainClk, clocks, resets, wires, mems, scanNodes, printNodes)
       // harness write harnessMap(mainClk, resets, wires, scanNodes, printNodes)
+    } else {
+      // for scripts: show the states
+      harness write harnessMap(mainClk, resets, wires, Array(), printNodes)
     }
     harness.write("endmodule\n")
 
@@ -835,18 +838,20 @@ class VerilogBackend extends Backend {
     val printFormat = wires.map(a => "0x%x").fold("")((y,z) => z + " " + y)
     val scanFormat = scanNodes.map(a => "%x").fold("")((y,z) => z + " " + y)
 
-    map.append("  integer count;\n")
-    map.append("  always @(negedge %s) begin\n".format(mainClk.name))
-    map.append("  #50;\n")
-    if (!resets.isEmpty)
-      map.append("    if (%s)\n".format(
-        (resets.tail foldLeft ("!" + resets.head.name))(_ + " || !" + _.name)))
-    map.append("      count = $fscanf('h80000000, \"" + scanFormat.slice(0,scanFormat.length-1) + "\"")
-    for (node <- scanNodes)
-      map.append(", " + emitRef(node))
-    map.append(");\n")
-    map.append("      if (count == -1) $finish(1);\n")
-    map.append("  end\n")
+    if (!scanNodes.isEmpty) {
+      map.append("  integer count;\n")
+      map.append("  always @(negedge %s) begin\n".format(mainClk.name))
+      map.append("  #50;\n")
+      if (!resets.isEmpty)
+        map.append("    if (%s)\n".format(
+          (resets.tail foldLeft ("!" + resets.head.name))(_ + " || !" + _.name)))
+      map.append("      count = $fscanf('h80000000, \"" + scanFormat.slice(0,scanFormat.length-1) + "\"")
+      for (node <- scanNodes)
+        map.append(", " + emitRef(node))
+      map.append(");\n")
+      map.append("      if (count == -1) $finish(1);\n")
+      map.append("  end\n")
+    }
     map.append("  always @(posedge %s) begin\n".format(mainClk.name))
     if (!resets.isEmpty)
       map.append("    if (%s)\n".format(
@@ -1146,7 +1151,9 @@ class VerilogBackend extends Backend {
     val dir = Driver.targetDir + "/"
     val src = dir + c.name + "-harness.v " + dir + c.name + ".v"
     val cmd = "vcs -full64 -quiet +vc +v2k -timescale=10ns/10ps " + src + " -o " + dir + c.name + 
-              (if (Driver.isDebug) " -debug_pp" else "")
+              ( if (!Driver.isTesting) " -debug" /* for ucli scripts */
+                else if (Driver.isDebug) " -debug_pp" /* for vpd dump */ 
+                else "" ) 
     run(cmd)
   }
 
