@@ -750,7 +750,7 @@ object DaisyChain extends Backend {
               state.idx) ) 
           case _ =>
             res append ("%s %d\n".format(
-              state.src.chiselName, 
+              state.src.chiselName stripPrefix (top.name + "Wrapper."), 
               state.idx)) 
         }
       }
@@ -765,7 +765,7 @@ object DaisyChain extends Backend {
       val res = new StringBuilder
       for (counter <- counters) {
         res append ("%s %s\n".format(
-          counter.signal.chiselName, 
+          counter.signal.chiselName stripPrefix (top.name + "Wrapper."), 
           counter.idx))
       }
       try {
@@ -952,6 +952,14 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     }
   }
 
+  val (names, ios) = top.io.flatten.unzip
+  override def dumpName(data: Node): String = {
+    if (finished && (ios contains data))
+      data.name
+    else
+      super.dumpName(data)
+  }
+
   override def dump(): Snapshot = {
     val snap = new Snapshot(t)
 
@@ -1041,7 +1049,9 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     }
   }
 
+  var finished = false
   override def finish(): Boolean = {
+    finished = true
     dumpSnapshots("%s.snapshots".format(c.name), snapshots)
     super.finish()
   }
@@ -1187,5 +1197,12 @@ abstract class DaisyWrapperTester[+T <: DaisyWrapper[_]](c: T, isTrace: Boolean 
 
   override def cntrCheck(expected: BigInt) {
     expect(c.io.out.bits, expected)
+  }
+
+  override def dumpName(data: Node): String = {
+    if (finished)
+      super.dumpName(data) stripPrefix (c.name + ".")
+    else
+      super.dumpName(data)
   }
 }
