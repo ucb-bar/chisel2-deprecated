@@ -365,13 +365,13 @@ object DaisyTransform {
         val snapFire = addNode(m, snapOuts(m).ready && addNode(m, !isSteps(m)), "snap_fire")
         snapCopy(m) = addNode(m, snapFire && addNode(m, snapCtrls(m) === addNode(m, Bits(0))), "snap_copy")
         snapRead(m) = addNode(m, snapFire && addNode(m, snapCtrls(m) === addNode(m, Bits(1))), "snap_read")
-        wire(snapFire -> snapOuts(m).valid)
+        // wire(snapFire -> snapOuts(m).valid)
       }
       if (Driver.isCounting) {
         val cntrFire = addNode(m, cntrOuts(m).ready && addNode(m, !isSteps(m)), "cntr_fire")
         cntrCopy(m) = addNode(m, cntrFire && addNode(m, cntrCtrls(m) === addNode(m, Bits(0))), "cntr_copy")
         cntrRead(m) = addNode(m, cntrFire && addNode(m, cntrCtrls(m) === addNode(m, Bits(1))), "cntr_read")
-        wire(cntrFire -> cntrOuts(m).valid)
+        // wire(cntrFire -> cntrOuts(m).valid)
       }
 
       // visit children
@@ -390,7 +390,7 @@ object DaisyChain extends Backend {
     b.transforms += ((c: Module) => decoupleTarget(top))
     b.transforms += ((c: Module) => appendFires(top))
     if (Driver.isCounting) {
-      b.transforms += (c => genCounters)
+      b.transforms += (c => genCounters(top))
       b.transforms += (c => genDaisyChain(top, CounterChain))
     }
     if (Driver.isSnapshotting) {
@@ -540,6 +540,12 @@ object DaisyChain extends Backend {
       // visit children
       m.children foreach (queue enqueue _)
     }
+    // turn off the snapOut valid signal when 
+    val stateNum = addReg(c, Reg(UInt(width=32)), "state_num")
+    wire(stateNum, 
+      stepsIn.valid -> UInt(states.size), 
+      (snapRead(c) && stateNum.orR) -> (stateNum - UInt(1)))
+    wire((snapCopy(c) || (stateNum.orR)) -> snapOut.valid)
   }
 
   def addBuffer(c: Module, i: Int, w: Int, update: (Bool, Node)) = {
@@ -550,7 +556,7 @@ object DaisyChain extends Backend {
     buffer
   }
 
-  def genCounters() {
+  def genCounters(c: Module) {
     ChiselError.info("[CounterBackend] generate counters")
 
     for (counter <- counters) {
@@ -608,6 +614,12 @@ object DaisyChain extends Backend {
       counter.src.comp setName counterName
       wire(counter.src, isStep -> cntrValue, cntrCopy(c) -> Bits(0))
     }
+    // turn off the cntrOut valid signal when 
+    val counterNum = addReg(c, Reg(UInt(width=32)), "counter_num")
+    wire(counterNum, 
+      stepsIn.valid -> UInt(counters.size), 
+      (cntrRead(c) && counterNum.orR) -> (counterNum - UInt(1)))
+    wire((cntrCopy(c) || counterNum.orR) -> cntrOut.valid)
   }
 
   trait ChainType
