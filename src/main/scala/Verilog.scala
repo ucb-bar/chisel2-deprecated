@@ -427,7 +427,7 @@ class VerilogBackend extends Backend {
 
     // Diffent code generation for clocks
     if (Driver.isTesting) {
-      harness.write("  reg %s = 0;\n".format(mainClk.name))
+      harness.write("  reg %s = 1;\n".format(mainClk.name))
       if (clocks.size > 1) {
         for (clk <- clocks) {
           val clkLength = 
