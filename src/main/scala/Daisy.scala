@@ -327,7 +327,7 @@ object DaisyTransform {
           cntrOuts(m)  = cntrOut 
           cntrCtrls(m) = cntrCtrl 
         }
-        wire(!isSteps(c) -> stepsIn.ready)
+        wire(Bool(true) -> stepsIn.ready)
       } else {
         isSteps(m) = addPin(m, Bool(INPUT), "is_step")
         if (Driver.isSnapshotting) {
