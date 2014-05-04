@@ -748,9 +748,9 @@ object DaisyChain extends Backend {
               read.addr.litValue(0), 
               state.idx) ) 
           case _ =>
-            res append ("%s %d\n".format(
+            res append ("%s %d %d\n".format(
               state.src.chiselName stripPrefix (top.name + "Wrapper."), 
-              state.idx)) 
+              state.src.width, state.idx)) 
         }
       }
       try {
@@ -763,9 +763,9 @@ object DaisyChain extends Backend {
       val cntrchain = createOutputFile(c.name + ".cntrchain")
       val res = new StringBuilder
       for (counter <- counters) {
-        res append ("%s %s\n".format(
+        res append ("%s %d %d\n".format(
           counter.signal.chiselName stripPrefix (top.name + "Wrapper."), 
-          counter.idx))
+          counter.signal.width, counter.idx))
       }
       try {
         cntrchain write res.result
