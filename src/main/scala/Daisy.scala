@@ -244,9 +244,8 @@ object DaisyTransform {
     // step counters
     val steps =  addReg(c, Reg(init = UInt(0, 32)), "steps")
     isSteps(c) = addNode(c, steps.orR, "is_step") 
-    val isStepsIn = addNode(c, addNode(c, !isSteps(c)) && stepsIn.valid)
     val decOne = addNode(c, steps - addNode(UInt(1)))
-    wire(steps, Seq(isStepsIn -> stepsIn.bits, isSteps(c) -> decOne))
+    wire(steps, Seq(stepsIn.valid -> stepsIn.bits, isSteps(c) -> decOne))
 
     // generate clock counters for multi clock domains
     if (Driver.clocks.size > 1) { 
@@ -954,9 +953,12 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
 
   val (names, ios) = top.io.flatten.unzip
   override def dumpName(data: Node): String = {
-    if (finished && (ios contains data))
-      data.name
-    else
+    if (finished) {
+      if (ios contains data)
+        "%s %d".format(data.name, data.width)
+      else
+        "%s %d".format(data.chiselName, data.width) 
+    } else
       super.dumpName(data)
   }
 
