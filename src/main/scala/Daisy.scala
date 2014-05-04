@@ -245,7 +245,7 @@ object DaisyTransform {
     val steps =  addReg(c, Reg(init = UInt(0, 32)), "steps")
     isSteps(c) = addNode(c, steps.orR, "is_step") 
     val decOne = addNode(c, steps - addNode(UInt(1)))
-    wire(steps, Seq(stepsIn.valid -> stepsIn.bits, isSteps(c) -> decOne))
+    wire(steps, Seq(isSteps(c) -> decOne, stepsIn.valid -> stepsIn.bits))
 
     // generate clock counters for multi clock domains
     if (Driver.clocks.size > 1) { 
@@ -827,7 +827,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   def pokeSteps (n: Int) {
     // Wait until the clock counter is ready
     // (the target is stalled)
-    while(peek(stepsIn.ready) == 0) {
+    while(peek(stalled) == 0) {
       takeSteps(1)
     }
     // Set the step counter
