@@ -587,10 +587,9 @@ class VerilogBackend extends Backend {
     // TODO: select interface according to the tester
     if (Driver.isTesting) { 
       harness write harnessAPIs(mainClk, clocks, resets, wires, mems, scanNodes, printNodes)
-      // harness write harnessMap(mainClk, resets, wires, scanNodes, printNodes)
     } else {
       // for scripts: show the states
-      harness write harnessMap(mainClk, resets, wires, Array(), printNodes)
+      harness write harnessMap(mainClk, resets, scanNodes, printNodes)
     }
     harness.write("endmodule\n")
 
@@ -833,12 +832,12 @@ class VerilogBackend extends Backend {
     apis.result
   }
 
-  def harnessMap (mainClk: Clock, resets: ArrayBuffer[Bool], wires: ArrayBuffer[Node], scanNodes: Array[Bits], printNodes: Array[Bits]) = {
+  def harnessMap (mainClk: Clock, resets: ArrayBuffer[Bool], scanNodes: Array[Bits], printNodes: Array[Bits]) = {
     val map = new StringBuilder
-    val printFormat = wires.map(a => "0x%x").fold("")((y,z) => z + " " + y)
+    val printFormat = printNodes.map(a => "0x%x").fold("")((y,z) => z + " " + y)
     val scanFormat = scanNodes.map(a => "%x").fold("")((y,z) => z + " " + y)
 
-    if (!scanNodes.isEmpty) {
+    if (Driver.isTesting) {
       map.append("  integer count;\n")
       map.append("  always @(negedge %s) begin\n".format(mainClk.name))
       map.append("  #50;\n")
@@ -857,10 +856,8 @@ class VerilogBackend extends Backend {
       map.append("    if (%s)\n".format(
         (resets.tail foldLeft ("!" + resets.head.name))(_ + " || !" + _.name)))
     map.append("      $display(\"" + printFormat.slice(0,printFormat.length-1) + "\"")
-    for (wire <- wires) {
-      val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
-      val wireName = if (scanNodes contains wire) emitRef(wire) else pathName
-      map.append(", " + wireName)
+    for (node <- printNodes) {
+      map.append(", " + emitRef(node))
     }
     map.append(");\n")
     map.append("  end\n")
