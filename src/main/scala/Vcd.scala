@@ -35,6 +35,7 @@ import Literal._
 import ChiselError._
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.HashSet
+import scala.collection.mutable.ArrayBuffer
 
 class VcdBackend(top: Module) extends Backend {
   val keywords = new HashSet[String]()
@@ -45,8 +46,17 @@ class VcdBackend(top: Module) extends Backend {
   private def emitDefUnconditional(node: Node, index: Int) =
     "  dat_dump<" + varNameLength(index) + ">(f, " + emitRef(node) + ", 0x" + varNumber(index).toHexString + ");\n"
 
+  private def emitDefUnconditional(node: Node, offset: Int, index: Int) =
+    "  dat_dump<" + varNameLength(index) + ">(f, " + emitRef(node) + ".get(0x" + offset.toHexString +"), 0x" + varNumber(index).toHexString + ");\n"
+
   private def emitDef1(node: Node, index: Int) =
     "  if (" + emitRef(node) + " != " + emitRef(node) + "__prev)\n" +
+    "    goto L" + index + ";\n" +
+    "K" + index + ":\n"
+
+  private def emitDef1(node: Node, offset: Int, index: Int) =
+    "  if (" + emitRef(node) + ".get(0x" + offset.toHexString +") != " + emitRef(node) + 
+    "__prev.get(0x" + offset.toHexString + "))\n" +
     "    goto L" + index + ";\n" +
     "K" + index + ":\n"
 
@@ -56,15 +66,51 @@ class VcdBackend(top: Module) extends Backend {
     emitDefUnconditional(node, index) +
     "  goto K" + index + ";\n"
 
+  private def emitDef2(node: Node, offset: Int, index: Int) =
+    "L" + index + ":\n" +
+    "  " + emitRef(node) + "__prev.get(0x" + offset.toHexString + ") = " + 
+    emitRef(node) + ".get(0x" + offset.toHexString + ");\n" +
+    emitDefUnconditional(node, offset, index) +
+    "  goto K" + index + ";\n"
+
   override def emitDec(node: Node): String =
-    if (Driver.isVCD && node.isInVCD) "  dat_t<" + node.width + "> " + emitRef(node) + "__prev" + ";\n" else ""
+    if (Driver.isVCD && node.isInVCD) {
+      node match {
+        case m: Mem[_] =>
+          "  mem_t<" + m.width + "," + m.n + "> " + emitRef(node) + "__prev" + ";\n"
+        case r: ROMData =>
+          "  mem_t<" + r.width + "," + r.lits.size + "> " + emitRef(node) + "__prev" + ";\n"
+        case _ => 
+          "  dat_t<" + node.width + "> " + emitRef(node) + "__prev" + ";\n" 
+      }
+    }
+    else ""
 
   def dumpVCDScope(c: Module, write: String => Unit): Unit = {
     write("  fputs(\"" + "$scope module " + c.name + " $end" + "\\n\", f);\n")
     for (i <- 0 until sortedMods.length) {
       val mod = sortedMods(i)
-      if (mod.component == c && !mod.name.isEmpty)
-        write("  fputs(\"$var wire " + mod.width + " " + varName(i) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\", f);\n")
+      if (mod.component == c && !mod.name.isEmpty) 
+        write("  fputs(\"$var wire " + mod.width + " " + varName(i) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\", f);\n") 
+    }
+    var baseIdx = sortedMods.length
+    for (mem <- sortedMems) {
+      if (mem.component == c && !mem.name.isEmpty) {
+        for (offset <- 0 until mem.n) {
+          write("  fputs(\"$var wire " + mem.width + " " + varName(baseIdx + offset) + " " + 
+            top.stripComponent(emitRef(mem)) + "[%d] $end\\n\", f);\n".format(offset)) 
+        }
+      }
+      baseIdx += mem.n
+    }
+    for (rom <- sortedROMs) {
+      if (rom.component == c && !rom.name.isEmpty) {
+        for (offset <- 0 until rom.lits.size) {
+          write("  fputs(\"$var wire " + rom.width + " " + varName(baseIdx + offset) + " " + 
+            top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset)) 
+        }
+      }
+      baseIdx += rom.lits.size
     }
     for (child <- c.children) {
       dumpVCDScope(child, write)
@@ -78,6 +124,25 @@ class VcdBackend(top: Module) extends Backend {
       val mod = sortedMods(i)
       if (mod.name.isEmpty)
         write("  fputs(\"$var wire " + mod.width + " " + varName(i) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\", f);\n")
+    }
+    var baseIdx = sortedMods.length
+    for (mem <- sortedMems) {
+      if (mem.name.isEmpty) {
+        for (offset <- 0 until mem.n) {
+          write("  fputs(\"$var wire " + mem.width + " " + varName(baseIdx + offset) + " " + 
+            top.stripComponent(emitRef(mem)) + "[%d] $end\\n\", f);\n".format(offset)) 
+        }
+      }
+      baseIdx += mem.n
+    }
+    for (rom <- sortedROMs) {
+      if (rom.name.isEmpty) {
+        for (offset <- 0 until rom.lits.size) {
+          write("  fputs(\"$var wire " + rom.width + " " + varName(baseIdx + offset) + " " + 
+            top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset)) 
+        }
+      }
+      baseIdx += rom.lits.size
     }
     write("  fputs(\"$upscope $end\\n\", f);\n")
   }
@@ -98,6 +163,17 @@ class VcdBackend(top: Module) extends Backend {
         val ref = emitRef(sortedMods(i))
         write("  " + ref + "__prev = " + ref +";\n");
       }
+      var baseIdx = sortedMods.length
+      for (mem <- sortedMems) {
+        for (offset <- 0 until mem.n) 
+          write(emitDefUnconditional(mem, offset, baseIdx + offset))
+        baseIdx += mem.n
+      }
+      for (rom <- sortedROMs) {
+        for (offset <- 0 until rom.lits.size) 
+          write(emitDefUnconditional(rom, offset, baseIdx + offset))
+        baseIdx += rom.lits.size
+      }
     }
     write("}\n")
   }
@@ -109,14 +185,50 @@ class VcdBackend(top: Module) extends Backend {
       write("  fprintf(f, \"#%d\\n\", t);\n")
       for (i <- 0 until sortedMods.length)
         write(emitDef1(sortedMods(i), i))
+      var baseIdx = sortedMods.length
+      for (mem <- sortedMems) {
+        for (offset <- 0 until mem.n)
+          write(emitDef1(mem, offset, baseIdx + offset))
+        baseIdx += mem.n
+      }
+      for (rom <- sortedROMs) {
+        for (offset <- 0 until rom.lits.size)
+          write(emitDef1(rom, offset, baseIdx + offset))
+        baseIdx += rom.lits.size
+      }
       write("  return;\n")
       for (i <- 0 until sortedMods.length)
         write(emitDef2(sortedMods(i), i))
+      baseIdx = sortedMods.length
+      for (mem <- sortedMems) {
+        for (offset <- 0 until mem.n)
+          write(emitDef2(mem, offset, baseIdx + offset))
+        baseIdx += mem.n
+      }
+      for (rom <- sortedROMs) {
+        for (offset <- 0 until rom.lits.size)
+          write(emitDef2(rom, offset, baseIdx + offset))
+        baseIdx += rom.lits.size
+      }
     }
     write("}\n")
   }
 
-  private val sortedMods = top.omods.filter(_.isInVCD).sortWith(_.width < _.width)
+  private val sortedMods = (top.omods foldLeft Array[Node]()){
+    case (array: Array[Node], mem: Mem[_]) => array
+    case (array: Array[Node], rom: ROMData) => array
+    case (array: Array[Node], node: Node) => if (node.isInVCD) array ++ Array(node) else array
+  } sortWith (_.width < _.width)
+
+  private val sortedMems = (top.omods foldLeft Array[Mem[_]]()){
+    case (array: Array[Mem[_]], mem: Mem[_]) => if (mem.isInVCD) array ++ Array(mem) else array
+    case (array: Array[Mem[_]], node: Node) => array
+  } sortWith (_.width < _.width)
+
+  private val sortedROMs = (top.omods foldLeft Array[ROMData]()){
+    case (array: Array[ROMData], rom: ROMData) => if (rom.isInVCD) array ++ Array(rom) else array
+    case (array: Array[ROMData], node: Node) => array
+  } sortWith (_.width < _.width)
 
   private val (lo, hi) = ('!'.toInt, '~'.toInt)
   private val range = hi - lo + 1

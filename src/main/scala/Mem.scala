@@ -149,7 +149,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
 
   def length: Int = n
 
-  override lazy val isInVCD = false
+  // override lazy val isInVCD = false
 
   override def toString: String = "TMEM(" + ")"
 
