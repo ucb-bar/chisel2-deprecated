@@ -420,7 +420,7 @@ abstract class Node extends nameable {
     if (!isTypeNode || inputs.isEmpty) this
     else inputs(0).getNode
 
-  def toBits: UInt = chiselCast(this){UInt()}
+  def toBits(): UInt = chiselCast(this){UInt()}
 
   def toNode: Node = this
 
