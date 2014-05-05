@@ -187,11 +187,7 @@ class FloBackend extends Backend {
           return ""
         emitDec(m) + "wr'" + m.data.width + " " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + " " + emitRef(m.data) + "\n"
       case x: Reg => // TODO: need resetData treatment
-        (if (x.isReset) 
-          (emitRef(x) + "__update = mux'" + x.width + " " + emitRef(x.inputs.last) + " " + emitRef(x.init, x) + " " + emitRef(x.next, x) + "\n")
-         else "") +
-        emitDec(x) + "reg'" + x.width + " 1 " + //  + (if (x.isEnable) emitRef(x.enableSignal) else "1") + " "
-          (if (x.isReset) (emitRef(x) + "__update") else emitRef(x.next)) + "\n"
+        emitDec(x) + "reg'" + x.width + " 1 " + emitRef(x.next) + "\n"
 
       case x: Log2 => // TODO: log2 instruction?
         emitDec(x) + "log2'" + x.width + " " + emitRef(x.inputs(0)) + "\n"

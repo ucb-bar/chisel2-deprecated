@@ -88,9 +88,9 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
       return readPortCache(addr)
     }
 
-    val addrIsReg = addr.isInstanceOf[UInt] && addr.inputs.length == 1 && addr.inputs(0).isInstanceOf[Reg]
+    val addrIsReg = addr.getNode.isInstanceOf[Reg]
     val rd = if (seqRead && !Driver.isInlineMem && addrIsReg) {
-      (seqreads += new MemSeqRead(this, addr.inputs(0))).last
+      (seqreads += new MemSeqRead(this, addr.getNode)).last
     } else {
       (reads += new MemRead(this, addr)).last
     }
@@ -171,6 +171,11 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
   }
 
   def isInline = Driver.isInlineMem || !reads.isEmpty
+
+  override def assignClock(clk: Clock): Unit = {
+    for (w <- writes) w.clock = clk
+    super.assignClock(clk)
+  }
 }
 
 abstract class MemAccess(val mem: Mem[_], addri: Node) extends Node {
@@ -198,14 +203,13 @@ class MemRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
 
 class MemSeqRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
   val addrReg = addri.asInstanceOf[Reg]
-  override def cond = addrReg.enableSignal
   override def isReg = true
-  override def addr = if(inputs.length > 2) inputs(2) else null
+  override def addr = if (inputs.length > 2) inputs(2) else null
+  override def cond = if (inputs.length > 3) inputs(3) else null
 
   override def forceMatchingWidths = {
-    val forced = addrReg.next.matchWidth(log2Up(mem.n))
-    inputs += forced
-    assert(addr == forced)
+    inputs += addrReg.updateValue.matchWidth(log2Up(mem.n))
+    inputs += addrReg.enableSignal
   }
 
   inputs += mem
@@ -213,12 +217,11 @@ class MemSeqRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
 
   override def toString: String = mem + "[" + addr + "]"
   override def getPortType: String = "read"
-  override def isRamWriteInput(n: Node) = addrReg.isEnable && addrReg.enableSignal == n || addr == n
 }
 
 class PutativeMemWrite(mem: Mem[_], addri: UInt) extends Node with proc {
   override def procAssign(src: Node) =
-    mem.doWrite(addri, Module.current.whenCond, src, null.asInstanceOf[UInt])
+    mem.doWrite(addri, Module.current.whenCond, src, null)
 }
 
 class MemReadWrite(val read: MemSeqRead, val write: MemWrite) extends MemAccess(read.mem, null)
@@ -228,30 +231,21 @@ class MemReadWrite(val read: MemSeqRead, val write: MemWrite) extends MemAccess(
 }
 
 class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) extends MemAccess(mem, addri) {
-  inputs += condi
   override def cond = inputs(1)
   def cond_=(c: Bool) = inputs(1) = c
   clock = mem.clock
 
   inferWidth = fixWidth(mem.data.getWidth)
 
-  if (datai != null) {
-    def wrap(x: Node) = { // prevent Verilog syntax errors when indexing constants
-      val b = UInt()
-      b.inputs += x
-      b
-    }
-    inputs += wrap(datai)
-    if (maski != null) {
-      inputs += wrap(maski)
-    }
-  }
+  inputs += condi
+  inputs += datai
+  if (maski != null)
+    inputs += maski
 
   override def forceMatchingWidths = {
-    val w = mem.width
     super.forceMatchingWidths
-    if(inputs.length >= 3 && inputs(2).width != w) inputs(2) = inputs(2).matchWidth(w)
-    if(inputs.length >= 4 && inputs(3).width != w) inputs(3) = inputs(3).matchWidth(w)
+    inputs(2) = inputs(2).matchWidth(mem.width)
+    if (isMasked) inputs(3) = inputs(3).matchWidth(mem.width)
   }
 
   var pairedRead: MemSeqRead = null
@@ -263,11 +257,10 @@ class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) 
         List(x)
       }
     }
-    def isNegOf(x: Node, y: Node) = x.isInstanceOf[Op] && x.asInstanceOf[Op].op == "==" && x.inputs(0) == y && x.inputs(1).litValue() == 0
 
     val wp = getProducts(cond)
     val rp = getProducts(r.cond)
-    wp.find(wc => rp.exists(rc => isNegOf(rc, wc) || isNegOf(wc, rc)))
+    wp.find(wc => rp.exists(rc => rc._isComplementOf(wc)))
   }
   def data = inputs(2)
   def mask = inputs(3)

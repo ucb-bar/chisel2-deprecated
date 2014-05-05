@@ -150,7 +150,7 @@ abstract class Node extends nameable {
          we don't override it. */
         name = path;
       }
-      while (!(component.names.getOrElseUpdate(name, this) eq this))
+      while (component.names.getOrElseUpdate(name, this) ne this)
         name += "_"
     } catch {
       case e:NullPointerException => {
@@ -183,8 +183,8 @@ abstract class Node extends nameable {
     litValue((BigInt(1) << w) - 1)
   }
   def minNum: BigInt = litValue(0)
-  def isLit: Boolean = false
-  def litOf: Literal = null
+  final def isLit: Boolean = litOf ne null
+  def litOf: Literal = if (getNode != this) getNode.litOf else null
   def litValue(default: BigInt = BigInt(-1)): BigInt =
     if (isLit) litOf.value
     else default
@@ -296,13 +296,6 @@ abstract class Node extends nameable {
         }
         case any    => (c, c);
       }
-
-    // give the components reset signal to the current node
-    // if(this.isInstanceOf[Reg]) {
-    //   val reg = this.asInstanceOf[Reg]
-    //   if(reg.isReset) reg.inputs += reg.component.reset
-    //   reg.hasResetSignal = true
-    // } obsolete now...
 
     assert( comp != null );
     if (comp != null && !comp.isWalked.contains(this)) {
@@ -422,13 +415,10 @@ abstract class Node extends nameable {
       }
     }
   }
-  def getNode(): Node = {
-    if(!isTypeNode || inputs.length == 0) {
-      this
-    } else {
-      inputs(0).getNode
-    }
-  }
+
+  def getNode: Node =
+    if (!isTypeNode || inputs.isEmpty) this
+    else inputs(0).getNode
 
   def addConsumers() {
     for ((i, off) <- inputs.zipWithIndex) {
@@ -481,4 +471,12 @@ abstract class Node extends nameable {
   def canCSE: Boolean = false
   def hashCodeForCSE: Int = inputs.head.hashCode
   def equalsForCSE(x: Node): Boolean = false
+
+  def _isComplementOf(x: Node): Boolean = {
+    def checkOne(x: Node, y: Node) = x.getNode match {
+      case op: Op => op.op == "==" && op.inputs(0).getNode == y.getNode && op.inputs(1).litValue() == 0
+      case _ => false
+    }
+    checkOne(this, x) || checkOne(x, this)
+  }
 }

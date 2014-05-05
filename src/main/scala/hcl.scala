@@ -29,61 +29,7 @@
 */
 
 package Chisel
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.Stack
-import scala.collection.mutable.{Queue=>ScalaQueue}
-import Literal._
-import Node._
 import ChiselError._
-
-object when {
-  def execWhen(cond: Bool)(block: => Unit) {
-    Module.current.whenConds.push(Module.current.whenCond && cond)
-    block
-    Module.current.whenConds.pop()
-  }
-  def apply(cond: Bool)(block: => Unit): when = {
-    execWhen(cond){ block }
-    new when(cond);
-  }
-}
-
-class when (prevCond: Bool) {
-  def elsewhen (cond: Bool)(block: => Unit): when = {
-    when.execWhen(!prevCond && cond){ block }
-    new when(prevCond || cond);
-  }
-  def otherwise (block: => Unit) {
-    val cond = !prevCond
-    if (!Module.current.hasWhenCond) cond.canBeUsedAsDefault = true
-    when.execWhen(cond){ block }
-  }
-}
-
-object unless {
-  def apply(c: Bool)(block: => Unit) {
-    when (!c) { block }
-  }
-}
-
-object switch {
-  def apply(c: Bits)(block: => Unit) {
-    Module.current.switchKeys.push(c)
-    block
-    Module.current.switchKeys.pop()
-  }
-}
-object is {
-  def apply(v: Bits)(block: => Unit): Unit =
-    apply(Seq(v))(block)
-  def apply(v: Bits, vr: Bits*)(block: => Unit): Unit =
-    apply(v :: vr.toList)(block)
-  def apply(v: Iterable[Bits])(block: => Unit): Unit = {
-    val keys = Module.current.switchKeys
-    if (keys.isEmpty) ChiselError.error("The 'is' keyword may not be used outside of a switch.")
-    else if (!v.isEmpty) when (v.map(_ === keys.top).reduce(_||_)) { block }
-  }
-}
 
 class TestIO(val format: String, val args: Seq[Data] = null)
 
@@ -136,32 +82,44 @@ object chiselMainTest {
 }
 
 trait proc extends Node {
-  val muxes = new collection.mutable.HashMap[(Bool, Node), Node]
-  val updates = new collection.mutable.ListBuffer[(Bool, Node)]
-  def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
-    val update = others.foldLeft(default)((v, u) => Multiplex(u._1, u._2, v))
-    if (inputs.isEmpty) inputs += update else inputs(0) = update
+  protected var procAssigned = false
+
+  protected[Chisel] def verifyMuxes: Unit = {
+    if (!defaultRequired && (inputs.length == 0 || inputs(0) == null))
+      ChiselError.error({"NO UPDATES ON " + this}, this.line)
+    if (defaultRequired && defaultMissing)
+      ChiselError.error({"NO DEFAULT SPECIFIED FOR WIRE: " + this + " in component " + this.component.getClass}, this.line)
   }
-  def genMuxes(default: Node): Unit = {
-    if (updates.length != 0) {
-      val (topCond, topValue) = updates.head
-      val (lastCond, lastValue) = updates.last
-      if (default != null)
-        genMuxes(default, updates)
-      else if (topCond.isTrue)
-        genMuxes(topValue, updates.toList.tail)
-      else if (lastCond.canBeUsedAsDefault)
-        genMuxes(lastValue, updates)
-      else
-        ChiselError.error({"NO DEFAULT SPECIFIED FOR WIRE: " + this + " in component " + this.component.getClass}, this.line)
+
+  protected[Chisel] def doProcAssign(src: Node, cond: Bool): Unit = {
+    if (cond.canBeUsedAsDefault && defaultMissing) {
+      setDefault(src)
+    } else if (procAssigned) {
+      inputs(0) = Multiplex(cond, src, inputs(0))
+    } else if (cond.litValue() != 0) {
+      procAssigned = true
+      val mux = Multiplex(cond, src, default)
+      if (inputs.isEmpty) inputs += mux
+      else { require(inputs(0) == null); inputs(0) = mux }
     }
   }
-  def verifyMuxes: Unit = {
-    if (updates.length == 0 && (inputs.length == 0 || inputs(0) == null))
-      ChiselError.error({"NO UPDATES ON " + this}, this.line)
+
+  protected[Chisel] def procAssign(src: Node): Unit =
+    doProcAssign(src, Module.current.whenCond)
+
+  protected[Chisel] def muxes: Seq[Mux] = {
+    def traverse(x: Node): List[Mux] = x match {
+      case m: Mux => m :: (if (m.inputs(2) eq default) Nil else traverse(m.inputs(2)))
+      case _ => Nil
+    }
+    traverse(inputs(0))
   }
-  def procAssign(src: Node): Unit
-  Driver.procs += this
+
+  protected def default = if (defaultRequired) null else this
+  protected def defaultRequired: Boolean = false
+  protected def defaultMissing: Boolean =
+    procAssigned && inputs(0).isInstanceOf[Mux] && (muxes.last.inputs(2) eq default)
+  protected def setDefault(src: Node): Unit = muxes.last.inputs(2) = src
 }
 
 trait nameable {
@@ -186,6 +144,8 @@ abstract class BlackBox extends Module {
 
 
 class Delay extends Node {
-  override def isReg: Boolean = true;
+  override def isReg: Boolean = true
+  def assignReset(rst: => Bool): Boolean = false
+  def assignClock(clk: Clock): Unit = { clock = clk }
 }
 

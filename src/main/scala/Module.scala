@@ -91,6 +91,12 @@ object Module {
   // despite being notionally internal, these have leaked into the API
   def backend: Backend = Driver.backend
   def components: ArrayBuffer[Module] = Driver.components
+
+  protected[Chisel] def asModule(m: Module)(block: => Unit): Unit = {
+    push(m)
+    block
+    pop()
+  }
 }
 
 /* ----- RULES FOR CLOCKS AND RESETS -----
@@ -268,31 +274,24 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     res
   }
 
-  def addResetPin(reset: Bool) {
-    if (!this.resets.contains(reset)) {
-      val pin = 
-        if (reset == _reset) {
-          this.reset
-        } else {
-          val res = Bool(INPUT)
-          res.isIo = true
-          res.component = this
-          res
-        }
-      this.resets += (reset -> pin)
+  // returns the pin connected to the reset signal, creates a new one if
+  // no such pin exists
+  def addResetPin(reset: Bool): Bool = {
+    def makeIO = {
+      val res = Bool(INPUT)
+      res.isIo = true
+      res.component = this
+      res
     }
+    def pin =
+      if (reset == _reset) this.reset
+      else makeIO
+    this.resets.getOrElseUpdate(reset, pin)
   }
 
   def addClock(clock: Clock) {
     if (!this.clocks.contains(clock))
       this.clocks += clock
-  }
-
-  // returns the pin connected to the reset signal, creates a new one if 
-  // no such pin exists
-  def getResetPin(reset: Bool): Bool = {
-    addResetPin(reset)
-    resets(reset)
   }
 
   // COMPILATION OF BODY
@@ -439,29 +438,18 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   //          delay's explicit clock's reset
   //          component's clock's reset
   def addClockAndReset {
-    bfs {x => 
-      {
-        if (x.isInstanceOf[Delay]) {
+    bfs { _ match {
+        case x: Delay =>
           val clock = if (x.clock == null) x.component.clock else x.clock
-          if (x.isInstanceOf[Reg] && x.asInstanceOf[Reg].isReset ||
-              x.isInstanceOf[Mem[ _ ]] && !Driver.isInlineMem) { // assign resets to regs
-            val reset = 
-              if (x.component.hasExplicitReset)
-                x.component._reset
-              else if (x.clock != null)
-                x.clock.getReset
-              else if (x.component.hasExplicitClock)
-                x.component.clock.getReset
-              else
-                x.component._reset
-            x.inputs += x.component.getResetPin(reset)
-          }
-          x.clock = clock
-          if (x.isInstanceOf[Mem[ _ ]])
-            for (i <- x.inputs)
-              if (i.isInstanceOf[MemWrite]) i.clock = clock
+          val reset =
+            if (x.component.hasExplicitReset) x.component._reset
+            else if (x.clock != null) x.clock.getReset
+            else if (x.component.hasExplicitClock) x.component.clock.getReset
+            else x.component._reset
+          x.assignReset(x.component.addResetPin(reset))
+          x.assignClock(clock)
           x.component.addClock(clock)
-        }
+        case _ =>
       }
     }
   }
@@ -680,15 +668,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
 
   def genAllMuxes {
-    for (p <- Driver.procs) {
-      p match {
-        case b: Bits  => if(b.updates.length > 0) b.genMuxes(b.default);
-        case r: Reg  => r.genMuxes(r);
-        case _ =>
-      }
-    }
     bfs { _ match {
-        case r: Reg => r.verifyMuxes
+        case p: proc => p.verifyMuxes
         case _ =>
       }
     }

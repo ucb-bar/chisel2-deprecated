@@ -382,29 +382,12 @@ trait Fame1Transform extends Backend {
   }
   
   private def appendFireToRegWriteEnables(top: Module) = {
-    //find regs that are part of sequential mem read ports
-    val mems = collectMems(top)
-    val seqMemReadRegs = new HashSet[Reg]
-    for((module, mem) <- mems){
-      val memSeqReads = mem.seqreads ++ mem.readwrites.map(_.read)
-      /*if(mem.seqRead){
-        for(memRead <- mem.reads){
-          seqMemReadRegs += memRead.addr.inputs(0).asInstanceOf[Reg]
-        }
-      }*/
-      for(memSeqRead <- memSeqReads){
-        seqMemReadRegs += memSeqRead.addrReg
-      }
-    }
-
     //find all the registers in FAME1 modules
     val regs = new ArrayBuffer[(Module, Reg)]
     def findRegs(module: Module): Unit = {
       if(Fame1Transform.fame1Modules.contains(module)){
         for(reg <- module.nodes.filter(_.isInstanceOf[Reg])){
-          if(!seqMemReadRegs.contains(reg.asInstanceOf[Reg])){
-            regs += ((module, reg.asInstanceOf[Reg]))
-          }
+          regs += ((module, reg.asInstanceOf[Reg]))
         }
       }
       for(childModule <- module.children){
@@ -413,21 +396,9 @@ trait Fame1Transform extends Backend {
     }
     findRegs(top)
     
-    
-    for((module, reg) <- regs){
-      reg.enable = reg.enable && Fame1Transform.fireSignals(module)
-      if(reg.updates.length == 0){
-        val regOutput = Bits()
-        regOutput.inputs += reg
-        val regMux = Bits()
-        regMux.inputs += reg.inputs(0)
-        reg.inputs(0) = Mux(Fame1Transform.fireSignals(module), regMux, regOutput)
-      } else {
-        for(i <- 0 until reg.updates.length){
-          val wEn = reg.updates(i)._1
-          val wData = reg.updates(i)._2
-          reg.updates(i) = ((wEn && Fame1Transform.fireSignals(module), wData))
-        }
+    for((module, reg) <- regs) Module.asModule(module) {
+      when (!Fame1Transform.fireSignals(module)) {
+        reg procAssign reg
       }
     }
   }
@@ -439,45 +410,7 @@ trait Fame1Transform extends Backend {
       val memWrites = mem.writes ++ mem.readwrites.map(_.write)
       val memSeqReads = mem.seqreads ++ mem.readwrites.map(_.read)
       for(memWrite <- memWrites){
-        if(mem.seqRead){
-          if (Driver.backend.isInstanceOf[CppBackend]){
-            if(memWrite.inputs(0).asInstanceOf[Data].comp != null && memWrite.inputs(1).asInstanceOf[Data].comp != null){//huge hack for extra MemWrite generated for seqread mems in CPP backed; if both the cond and enable both happen to be directly from registers, this will fail horribly
-              memWrite.inputs(1) = memWrite.inputs(1).asInstanceOf[Bool] && Fame1Transform.fireSignals(module)
-            } else {
-              memWrite.inputs(1) = Bool(false)
-            }
-          } else {
-            memWrite.inputs(1) = memWrite.inputs(1).asInstanceOf[Bool] && Fame1Transform.fireSignals(module)
-          }
-        } else {
-          memWrite.inputs(1) = memWrite.inputs(1).asInstanceOf[Bool] && Fame1Transform.fireSignals(module)
-        }
-      }
-      for(memSeqRead <- memSeqReads){
-        Predef.assert(memSeqRead.addrReg.updates.length == 1)
-        val oldReadAddr = Bits()
-        oldReadAddr.inputs += memSeqRead.addrReg.updates(0)._2
-        val oldReadAddrReg = Reg(Bits())
-        oldReadAddrReg.comp.component = module
-        oldReadAddrReg.comp.asInstanceOf[Reg].enable = if (oldReadAddrReg.comp.asInstanceOf[Reg].isEnable) oldReadAddrReg.comp.asInstanceOf[Reg].enable || Fame1Transform.fireSignals(module) else Fame1Transform.fireSignals(module)
-        oldReadAddrReg.comp.asInstanceOf[Reg].isEnable = true
-        oldReadAddrReg.comp.asInstanceOf[Reg].updates += ((Fame1Transform.fireSignals(module), oldReadAddr))
-        
-        val newReadAddr = Mux(Fame1Transform.fireSignals(module), oldReadAddr, oldReadAddrReg)
-        
-        val oldReadEn = Bool()
-        oldReadEn.inputs += memSeqRead.addrReg.updates(0)._1
-        val renReg = Reg(init=Bool(false))
-        renReg.comp.component = module
-        
-        renReg.comp.asInstanceOf[Reg].enable = if(renReg.comp.asInstanceOf[Reg].isEnable) renReg.comp.asInstanceOf[Reg].enable || Fame1Transform.fireSignals(module) else Fame1Transform.fireSignals(module)
-        renReg.comp.asInstanceOf[Reg].isEnable = true
-        renReg.comp.asInstanceOf[Reg].updates += ((Fame1Transform.fireSignals(module), oldReadEn))
-        val newRen = Mux(Fame1Transform.fireSignals(module), oldReadEn, renReg)
-        
-        memSeqRead.addrReg.enable = newRen
-        memSeqRead.addrReg.updates.clear
-        memSeqRead.addrReg.updates += ((newRen, newReadAddr))
+        memWrite.inputs(1) = memWrite.inputs(1).asInstanceOf[Bool] && Fame1Transform.fireSignals(module)
       }
     }
   }
@@ -485,10 +418,8 @@ trait Fame1Transform extends Backend {
   
   preElaborateTransforms += ((top: Module) => collectNodesIntoComp(initializeDFS))
   preElaborateTransforms += ((top: Module) => appendFireToRegWriteEnables(top))
-  preElaborateTransforms += ((top: Module) => top.genAllMuxes)
   preElaborateTransforms += ((top: Module) => appendFireToMemEnables(top))
   preElaborateTransforms += ((top: Module) => collectNodesIntoComp(initializeDFS))
-  preElaborateTransforms += ((top: Module) => top.genAllMuxes)
 }
 
 class Fame1CppBackend extends CppBackend with Fame1Transform
