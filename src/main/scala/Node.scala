@@ -420,6 +420,10 @@ abstract class Node extends nameable {
     if (!isTypeNode || inputs.isEmpty) this
     else inputs(0).getNode
 
+  def toBits: UInt = chiselCast(this){UInt()}
+
+  def toNode: Node = this
+
   def addConsumers() {
     for ((i, off) <- inputs.zipWithIndex) {
       /* By construction we should not end-up with null inputs. */

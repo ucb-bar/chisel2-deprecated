@@ -34,7 +34,7 @@ import Node._
 import Literal._
 
 object chiselCast {
-  def apply[S <: Data, T <: Bits](x: S)(gen: => T): T = {
+  def apply[S <: Node, T <: Bits](x: S)(gen: => T): T = {
     val res = gen
     res assign x.toNode
     res
