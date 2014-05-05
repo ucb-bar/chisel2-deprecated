@@ -93,6 +93,7 @@ object Module {
   def components: ArrayBuffer[Module] = Driver.components
 
   protected[Chisel] def asModule(m: Module)(block: => Unit): Unit = {
+    Driver.modStackPushed = true
     push(m)
     block
     pop()
