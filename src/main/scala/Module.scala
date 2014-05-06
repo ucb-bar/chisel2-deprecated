@@ -256,6 +256,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     xs.foreach(counter (_, cntrT))
   }
 
+  def setStallVal(x: Bool) {
+    DaisyTransform.stallVal = x
+  }
+
   def setStallAck(x: Bool) {
     debug(x)
     stallAcks += x

@@ -151,6 +151,7 @@ object DaisyTransform {
   var done = false
   var inNum = -1
   var outNum = -1
+  var stallVal: Bool = null
 
   lazy val stepsIn  = addPin(top, Decoupled(UInt(width = 32)).flip, "steps_in")
   lazy val clockIn  = addPin(top, Decoupled(UInt(width = 32)).flip, "clock_in")
@@ -307,6 +308,9 @@ object DaisyChain extends Backend {
         stepPins(m) = addNode(m, steps.orR, "step_pin")
         firePins(m) = stepPins(m)
         updateReg(steps, stepPins(m) -> (steps - UInt(1)), stepsIn.valid -> stepsIn.bits)
+        if (stallVal != null) {
+          wire(stepPins(m) -> stallVal)
+        }
       } else {
         // already has a bool-type input port named "step_pin", use it
         // that is, "step_pin" is reserved!
