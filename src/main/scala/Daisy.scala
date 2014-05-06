@@ -770,8 +770,10 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   val counterPeeks = new ArrayBuffer[BigInt]
   val clockVals = new LinkedHashMap[Clock, Int]
   val clockCnts = new LinkedHashMap[Clock, Int]
-  override val outputs = top.io.flatten.unzip._2 filter (x => 
-    x.dir == OUTPUT && !(DaisyChain.keywords contains (x.name stripPrefix "io_")))
+  override val outputs = top.io.flatten.unzip._2 filter (x => {
+    val name = x.chiselName.split('.').last
+    x.dir == OUTPUT && !(DaisyChain.keywords contains (name stripPrefix "io_"))
+  })
 
   counterPeeks.clear
   counterPeeks ++= Array.fill(counters.size)(BigInt(0))
@@ -944,7 +946,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   override def dumpName(data: Node): String = {
     if (finished) {
       if (ios contains data)
-        "%s %d".format(data.name, data.width)
+        "%s %d".format(data.chiselName.split('.').last, data.width)
       else
         "%s %d".format(data.chiselName, data.width) 
     } else
