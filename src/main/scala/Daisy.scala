@@ -1092,6 +1092,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
 
   var finished = false
   override def finish(): Boolean = {
+    checkSnapshots()
     finished = true
     dumpSnapshots("%s.snapshots".format(c.name), snapshots)
     super.finish()
