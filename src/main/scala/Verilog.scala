@@ -833,7 +833,7 @@ class VerilogBackend extends Backend {
 
   def harnessMap (mainClk: Clock, resets: ArrayBuffer[Bool], scanNodes: Array[Bits], printNodes: Array[Bits]) = {
     val map = new StringBuilder
-    val printFormat = printNodes.map(a => "0x%x").fold("")((y,z) => z + " " + y)
+    val printFormat = printNodes.map(a => a.chiselName + ": 0x%x, ").fold("")((y,z) => z + " " + y)
     val scanFormat = scanNodes.map(a => "%x").fold("")((y,z) => z + " " + y)
 
     if (Driver.isTesting) {
