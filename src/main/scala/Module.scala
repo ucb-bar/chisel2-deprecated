@@ -145,7 +145,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   val omods = new ArrayBuffer[Node];
   val states = new ArrayBuffer[DaisyType]
   val counters = new ArrayBuffer[DaisyType]
-  val stallAcks = new ArrayBuffer[Bool]
 
   val regs  = new ArrayBuffer[Reg];
   val nexts = new ScalaQueue[Node];
@@ -261,12 +260,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   def setStallAck(x: Bool) {
-    debug(x)
-    stallAcks += x
-  }
-
-  def setStallAck(xs: Bool*) {
-    xs.foreach(setStallAck(_))
+    DaisyTransform.stallAck = x
   }
 
   def printf(message: String, args: Node*): Unit = {

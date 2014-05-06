@@ -152,6 +152,7 @@ object DaisyTransform {
   var inNum = -1
   var outNum = -1
   var stallVal: Bool = null
+  var stallAck: Bool = null
 
   lazy val stepsIn  = addPin(top, Decoupled(UInt(width = 32)).flip, "steps_in")
   lazy val clockIn  = addPin(top, Decoupled(UInt(width = 32)).flip, "clock_in")
@@ -222,7 +223,7 @@ import DaisyTransform._
 
 object DaisyChain extends Backend {
   val keywords = HashSet(
-    "stalled", "steps", "step_pin", "step_pin_buf",
+    "stalled", "steps", "step_pin", "step_pin_buf", "fire",
     "state_num", "counter_num", "fire_pin", "fire_pin_buf",
     "snap_in", "snap_ctrl", "cntr_in", "cntr_ctrl",
     "steps_in_ready", "steps_in_valid", "steps_in_bits",
@@ -288,7 +289,6 @@ object DaisyChain extends Backend {
   val fires = new HashMap[Module, Bool]
   val fireBufs = new HashMap[Module, Bool]
   val firePins = new HashMap[Module, Bool]
-  val stepPins = new HashMap[Module, Bool]
   val enClks = new LinkedHashMap[Clock, HashMap[Module, Bool]]
   val clkRegs = new HashMap[Clock, UInt]
   val clkCnts = new HashMap[Clock, UInt]
@@ -304,56 +304,30 @@ object DaisyChain extends Backend {
       val m = queue.dequeue
       if (m == c) {
         // Top component: add the step counter
-        val steps =  addReg(m, Reg(init = UInt(0, 32)), "steps")
-        stepPins(m) = addNode(m, steps.orR, "step_pin")
-        firePins(m) = stepPins(m)
-        updateReg(steps, stepPins(m) -> (steps - UInt(1)), stepsIn.valid -> stepsIn.bits)
+        val steps  = addReg(m, Reg(init = UInt(0, 32)), "steps")
+        val isStep = addNode(m, steps.orR, "step_pin")
+        updateReg(steps, isStep -> (steps - UInt(1)), stepsIn.valid -> stepsIn.bits)
+        if (stallAck != null) {
+          firePins(m) = addNode(m, isStep && stallAck, "fire")
+        } else {
+          firePins(m) = isStep
+        }
         if (stallVal != null) {
-          wire(stepPins(m) -> stallVal)
+          wire(isStep -> stallVal)
         }
       } else {
-        // already has a bool-type input port named "step_pin", use it
-        // that is, "step_pin" is reserved!
-        if (m.io.asInstanceOf[Bundle] contains "step_pin") {
-          stepPins(m) = m("step_pin").asInstanceOf[Bool]
-        // otherwiser, add the step pin
-        } else {
-          stepPins(m) = addPin(m, Bool(INPUT), "step_pin")
-        }
         firePins(m) = addPin(m, Bool(INPUT), "fire_pin")
-        // Children: connect 
-        // 1) parent's step pin -> step pin  
-        // 2) parent's fire signal -> fire pin
-        wire(stepPins(m.parent) -> stepPins(m))
         wire(firePins(m.parent) -> firePins(m))
       }
 
       // add a fire pin buffer used by event counters
       // Event counters should increase one cycle after
       // the target is activated
-      val firePinBuf = addReg(m, Reg(next=firePins(m)), "fire_pin_buf")
-      firePinBuf.comp.clock = Driver.implicitClock
-      if (m.stallAcks.isEmpty) {
-        fires(m)    = firePins(m)
-        fireBufs(m) = firePinBuf
-      } else {
-        var i = 0
-        fires(m)    = (m.stallAcks foldLeft firePins(m))(_ || !_)
-        fireBufs(m) = (m.stallAcks foldLeft firePinBuf)(
-          (res, ack) => {
-            val ackName = "ack_" + i
-            val ackReg  = addReg(m, Reg(next=ack), ackName)
-            keywords += ackName
-            i += 1
-            res || !ackReg
-          } )
-      }
+      fireBufs(m) = addReg(m, Reg(next=firePins(m)), "fire_pin_buf")
+      fireBufs(m).comp.clock = Driver.implicitClock
 
       if (Driver.isSnapshotting) {
-        val snapValid = 
-          if (m.children.isEmpty) (!fires(m) && !fireBufs(m))
-          else (m.children foldLeft (!fires(m) && !fireBufs(m)))(
-            (res, x) => res && snapOuts(x).valid)
+        val snapValid = !firePins(m) && !fireBufs(m)
         val snapFire = addNode(m, snapOuts(m).ready && snapValid, "snap_fire")
         snapCopy(m) = addNode(m, snapFire && (snapCtrls(m) === Bits(0)), "snap_copy")
         snapRead(m) = addNode(m, snapFire && (snapCtrls(m) === Bits(1)), "snap_read")
@@ -364,10 +338,7 @@ object DaisyChain extends Backend {
         }
       }
       if (Driver.isCounting) {
-        val cntrValid = 
-          if (m.children.isEmpty) (!fires(m) && !fireBufs(m))
-          else (m.children foldLeft (!fires(m) && !fireBufs(m)))(
-            (res, x) => res && cntrOuts(x).valid)
+        val cntrValid = !firePins(m) && !fireBufs(m) 
         val cntrFire = addNode(m, cntrOuts(m).ready && cntrValid, "cntr_fire")
         cntrCopy(m) = addNode(m, cntrFire && (cntrCtrls(m) === Bits(0)), "cntr_copy")
         cntrRead(m) = addNode(m, cntrFire && (cntrCtrls(m) === Bits(1)), "cntr_read")
@@ -430,9 +401,9 @@ object DaisyChain extends Backend {
         keywords += enClkName
         enClks(clock) = HashMap(c -> enClk)
         updateReg(clkCnts(clock), 
-          isClkInput(clock)                -> clockIn.bits, 
-          (fires(c) && !enClk)             -> (clkCnts(clock) - min), 
-          (fires(c) && !isClkInput(clock)) -> clkRegs(clock))
+          isClkInput(clock)                   -> clockIn.bits, 
+          (firePins(c) && !enClk)             -> (clkCnts(clock) - min), 
+          (firePins(c) && !isClkInput(clock)) -> clkRegs(clock))
       }
     }
 
@@ -615,7 +586,7 @@ object DaisyChain extends Backend {
       val counterName = "counter_%d".format(counter.idx)
       keywords += counterName
       counter.src.comp setName counterName
-      updateReg(counter.src, fires(c) -> cntrValue, cntrCopy(c) -> Bits(0))
+      updateReg(counter.src, firePins(c) -> cntrValue, cntrCopy(c) -> Bits(0))
     }
 
     // turn off the cntrOut valid signal after reading out all the values 
