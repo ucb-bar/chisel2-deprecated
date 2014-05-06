@@ -45,6 +45,7 @@ object Bool {
 }
 
 class Bool extends UInt {
+  protected[Chisel] var canBeUsedAsDefault: Boolean = false
 
   /** Factory method to create and assign a *Bool* type to a Node *n*.
     */
@@ -72,11 +73,13 @@ class Bool extends UInt {
   def && (b: Bool): Bool =
     if (this.isLit) { if (isTrue) b else Bool(false) }
     else if (b.isLit) b && this
+    else if (this._isComplementOf(b)) Bool(false)
     else newBinaryOp(b, "&")
 
   def || (b: Bool): Bool =
     if (this.isLit) { if (isTrue) Bool(true) else b }
     else if (b.isLit) b || this
+    else if (this._isComplementOf(b)) Bool(true)
     else newBinaryOp(b, "|")
 
   def isTrue: Boolean = litValue() == 1

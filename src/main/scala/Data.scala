@@ -65,8 +65,6 @@ abstract class Data extends Node {
       + " and " + right.getClass)
   }
 
-  def toBits(): UInt = chiselCast(this){UInt()};
-
   def toBool(): Bool = {
     if(this.getWidth > 1) {
       throw new Exception("multi bit signal " + this + " converted to Bool");
@@ -102,8 +100,6 @@ abstract class Data extends Node {
   def asOutput(): this.type
   def asDirectionless(): this.type
   def isDirectionless: Boolean = true;
-
-  def toNode: Node = this;
 
   /** Factory method to create and assign a leaf-type instance out of a subclass
     of *Node* instance which we have lost the concrete type. */

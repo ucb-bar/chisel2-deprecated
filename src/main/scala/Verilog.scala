@@ -306,11 +306,11 @@ class VerilogBackend extends Backend {
           val name = getMemName(m, configStr)
           ChiselError.info("MEM " + name)
 
-          val clkrst = Array("    .CLK(clk)", "    .RST(" + emitRef(m.inputs.last) + ")")
+          val clk = "    .CLK(" + emitRef(m.clock) + ")"
           val portdefs = for (i <- 0 until m.ports.size)
-          yield emitPortDef(m.ports(i), i)
+            yield emitPortDef(m.ports(i), i)
           "  " + name + " " + emitRef(m) + " (\n" +
-            (clkrst ++ portdefs).reduceLeft(_ + ",\n" + _) + "\n" +
+            (clk +: portdefs).reduceLeft(_ + ",\n" + _) + "\n" +
           "  );\n"
         } else {
           ""
@@ -834,7 +834,7 @@ class VerilogBackend extends Backend {
 
   def harnessMap (mainClk: Clock, resets: ArrayBuffer[Bool], scanNodes: Array[Bits], printNodes: Array[Bits]) = {
     val map = new StringBuilder
-    val printFormat = printNodes.map(a => "0x%x").fold("")((y,z) => z + " " + y)
+    val printFormat = printNodes.map(a => a.chiselName + ": 0x%x, ").fold("")((y,z) => z + " " + y)
     val scanFormat = scanNodes.map(a => "%x").fold("")((y,z) => z + " " + y)
 
     if (Driver.isTesting) {
@@ -930,27 +930,16 @@ class VerilogBackend extends Backend {
   def emitReg(node: Node): String = {
     node match {
       case reg: Reg =>
-        if(reg.isEnable && (reg.enableSignal.litOf == null || reg.enableSignal.litOf.value != 1) &&
-           !Driver.isBackannotating) {
-          if(reg.isReset){
-            "    if(" + emitRef(reg.inputs.last) + ") begin\n" +
-            "      " + emitRef(reg) + " <= " + emitRef(reg.init) + ";\n" +
-            "    end else if(" + emitRef(reg.enableSignal) + ") begin\n" +
-            "      " + emitRef(reg) + " <= " + emitRef(reg.next) + ";\n" +
-            "    end\n"
-          } else {
-            "    if(" + emitRef(reg.enableSignal) + ") begin\n" +
-            "      " + emitRef(reg) + " <= " + emitRef(reg.next) + ";\n" +
-            "    end\n"
-          }
-        } else {
-          "    " + emitRef(reg) + " <= " +
-          (if (reg.isReset) {
-            emitRef(reg.inputs.last) + " ? " + emitRef(reg.init) + " : "
-          } else {
-            ""
-          }) + emitRef(reg.next) + ";\n"
+        def cond(c: Node) = "if(" + emitRef(c) + ") begin"
+        def uncond = "begin"
+        def sep = "\n      "
+        def assign(r: Reg, x: Node) = emitRef(r) + " <= " + emitRef(x) + ";\n"
+        def traverseMuxes(r: Reg, x: Node): List[String] = x match {
+          case m: Mux => (cond(m.inputs(0)) + sep + assign(r, m.inputs(1))) :: traverseMuxes(r, m.inputs(2))
+          case _ => if (x eq r) Nil else List(uncond + sep + assign(r, x))
         }
+        if (!reg.next.isInstanceOf[Mux]) "    " + assign(reg, reg.next)
+        else "    " + traverseMuxes(reg, reg.next).reduceLeft(_ + "    end else " + _) + "    end\n"
 
       case m: MemWrite =>
         if (m.mem.isInline) {

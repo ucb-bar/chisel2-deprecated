@@ -116,14 +116,13 @@ object Driver {
     compStack.clear()
     stackIndent = 0
     printStackStruct.clear()
-    procs.clear()
-    muxes.clear()
     blackboxes.clear()
     chiselOneHotMap.clear()
     chiselOneHotBitMap.clear()
     isCompiling = false
     isCheckingPorts = false
     isTesting = false
+    isDebugMem = false
     backend = new CppBackend
     topComponent = null
     randInitIOs.clear()
@@ -172,6 +171,7 @@ object Driver {
         case "--moduleNamePrefix" => Backend.moduleNamePrefix = args(i + 1); i += 1
         case "--inlineMem" => isInlineMem = true
         case "--noInlineMem" => isInlineMem = false
+        case "--debugMem" => isDebugMem = true
         case "--backend" => {
           if (args(i + 1) == "v") {
             backend = new VerilogBackend
@@ -252,12 +252,11 @@ object Driver {
   var isCompiling = false
   var isCheckingPorts = false
   var isTesting = false
+  var isDebugMem = false
   var backend: Backend = null
   var topComponent: Module = null
   val components = ArrayBuffer[Module]()
   var sortedComps: ArrayBuffer[Module] = null
-  val procs = ArrayBuffer[proc]()
-  val muxes = ArrayBuffer[Node]()
   val nodes = ArrayBuffer[Node]()
   val blackboxes = ArrayBuffer[BlackBox]()
   val chiselOneHotMap = HashMap[(UInt, Int), UInt]()

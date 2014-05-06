@@ -60,7 +60,7 @@ class ROMData(elts: IndexedSeq[Node]) extends Node {
   }
 
   override lazy val isInObject: Boolean = true
-  override lazy val isInVCD: Boolean = false
+  // override lazy val isInVCD: Boolean = false
 }
 
 class ROMRead extends Node {

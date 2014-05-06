@@ -260,7 +260,6 @@ class Literal extends Node {
   var isZ = false;
   var base = 'x';
   lazy val value: BigInt = stringToVal(base, name);
-  override def isLit: Boolean = true;
   override def litOf: Literal = this
   override def toString: String = name;
   override lazy val isInVCD: Boolean = false

@@ -43,7 +43,7 @@ class Clock(reset: Bool = Driver.implicitReset) extends Node {
   // returns a reset pin connected to reset for the component in scope
   def getReset: Bool = {
     if (Driver.compStack.length != 0) {
-      Driver.compStack.top.getResetPin(reset)
+      Driver.compStack.top.addResetPin(reset)
     } else {
       reset
     }

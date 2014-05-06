@@ -34,11 +34,13 @@ import Reg._
 import ChiselError._
 import scala.reflect._
 
+class GetWidthException(s: String) extends Exception(s)
+
 object Reg {
 
   def regMaxWidth(m: Node) =
     if (Driver.isInGetWidth) {
-      throw new Exception("getWidth was called on a Register or on an object connected in some way to a Register that has a statically uninferrable width")
+      throw new GetWidthException("getWidth was called on a Register or on an object connected in some way to a Register that has a statically uninferrable width")
     } else {
       maxWidth(m)
     }
@@ -68,9 +70,8 @@ object Reg {
 
   def validateGen[T <: Data](gen: => T) {
     for ((n, i) <- gen.flatten)
-      if (!i.inputs.isEmpty || !i.updates.isEmpty) {
+      if (!i.inputs.isEmpty)
         throwException("Invalid Type Specifier for Reg")
-      }
   }
 
   /** *type_out* defines the data type of the register when it is read.
@@ -93,41 +94,27 @@ object Reg {
     val gen = mType.clone
     validateGen(gen)
 
-    val d: Array[(String, Bits)] =
-      if(next == null) {
-        gen.flatten.map{case(x, y) => (x -> null)}
-      } else {
-        next.flatten
-      }
-
     // asOutput flip the direction and returns this.
     val res = gen.asOutput
 
-    if(init != null) {
-      for((((res_n, res_i), (data_n, data_i)), (rval_n, rval_i)) <- res.flatten zip d zip init.flatten) {
-
-        assert(rval_i.getWidth > 0,
-          {ChiselError.error("Negative width to wire " + res_i)})
-        val reg = new Reg()
-
-        reg.init("", regWidth(rval_i), data_i, rval_i)
-
-        // make output
-        reg.isReset = true
-        res_i.inputs += reg
-        res_i.comp = reg
-      }
-    } else {
-      for(((res_n, res_i), (data_n, data_i)) <- res.flatten zip d) {
-        val w = res_i.getWidth
-        val reg = new Reg()
-        reg.init("", regWidth(w), data_i)
-
-        // make output
-        res_i.inputs += reg
-        res_i.comp = reg
-      }
+    for ((res_n, res_i) <- res.flatten) {
     }
+
+    if (init != null) for (((res_n, res_i), (rval_n, rval_i)) <- res.flatten zip init.flatten) {
+      if (rval_i.getWidth < 0) ChiselError.error("Negative width to wire " + res_i)
+      res_i.comp = new RegReset
+      res_i.comp.init("", regWidth(rval_i), null, rval_i)
+      res_i.inputs += res_i.comp
+    } else for ((res_n, res_i) <- res.flatten) {
+      res_i.comp = new Reg
+      res_i.comp.init("", regWidth(res_i.getWidth), null)
+      res_i.inputs += res_i.comp
+    }
+
+    if (next != null) for (((res_n, res_i), (next_n, next_i)) <- res.flatten zip next.flatten) {
+      res_i.comp.doProcAssign(next_i, Bool(true))
+    }
+
     res.setIsTypeNode
 
     // set clock
@@ -159,59 +146,26 @@ object RegInit {
 
 }
 
+class RegReset extends Reg {
+  override def assignReset(rst: => Bool): Boolean = {
+    this.doProcAssign(inputs(1), rst)
+    true
+  }
+}
 
 class Reg extends Delay with proc {
-  def next: Node = inputs(0);
-  def init: Node  = inputs(1);
-  def enableSignal: Node = inputs(enableIndex);
-  var enableIndex = 0;
-  var isReset = false
-  var isEnable = false;
-  def isUpdate: Boolean = !(next == null);
-  def update (x: Node) { inputs(0) = x };
-  var assigned = false;
-  var enable = Bool(true)
-
-  def procAssign(src: Node) {
-    if (assigned) {
-      ChiselError.error("reassignment to Reg");
-    }
-    val cond = Module.current.whenCond
-    enable = if (isEnable) enable || cond else cond
-    isEnable = true
-    updates += ((cond, src))
-  }
-  override def genMuxes(default: Node): Unit = {
-    if(!updates.isEmpty && Driver.backend.isInstanceOf[VerilogBackend] && 
-       !Driver.isBackannotating) {
-      // use clock enable to keep old value, rather than muxing in old value
-      genMuxes(updates.head._2, updates.toList.tail)
-      inputs += enable;
-      enableIndex = inputs.length - 1;
-    } else {
-      super.genMuxes(default)
-    }
-  }
-
-  def nameOpt: String = 
-    if (name.length > 0) name 
-    else if (pName.length > 0) pName
-    else "REG"
   override def toString: String = {
-    "REG(" + nameOpt + ")"
+    val nom = if (!name.isEmpty) name else pName
+    "REG(" + nom + ")"
   }
 
-  override def assign(src: Node) {
-    if(assigned || inputs(0) != null) {
-      ChiselError.error("reassignment to Reg");
-    } else {
-      assigned = true; super.assign(src)
-    }
-  }
+  override def forceMatchingWidths: Unit =
+    inputs.transform(_.matchWidth(width))
 
-  override def forceMatchingWidths {
-    if (inputs(0) != null && inputs(0).width != width) {
-      inputs(0) = inputs(0).matchWidth(width)
-    }
-  }
+  def next: Node = inputs(0)
+
+  // these are used to infer read enables on Mems
+  protected[Chisel] def isEnable: Boolean = next.isInstanceOf[Mux] && (next.inputs(2) eq this)
+  protected[Chisel] def enableSignal: Node = if (isEnable) next.inputs(0) else Bool(true)
+  protected[Chisel] def updateValue: Node = if (isEnable) next.inputs(1) else next
 }

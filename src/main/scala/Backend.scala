@@ -647,6 +647,7 @@ abstract class Backend {
       c.markComponent();
     // XXX This will create nodes after the tree is traversed!
     c.genAllMuxes;
+    ChiselError.checkpoint()
     execute(c, preElaborateTransforms)
     Driver.components.foreach(_.postMarkNet(0))
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");

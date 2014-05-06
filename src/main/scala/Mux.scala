@@ -57,7 +57,10 @@ object Multiplex{
     if (t.litOf != null) {
       return if (t.litOf.value == 0) a else c
     }
-    if (c.litOf != null && a.litOf != null) {
+    if (a != null && a.isInstanceOf[Mux] && t._isComplementOf(a.inputs(0))) {
+      return Multiplex(t, c, a.inputs(1))
+    }
+    if (c.litOf != null && a != null && a.litOf != null) {
       if (c.litOf.value == a.litOf.value) {
         return c
       }
@@ -107,7 +110,6 @@ object Mux {
 }
 
 class Mux extends Op {
-  Driver.muxes += this
   op = "Mux"
   override def toString: String =
     inputs(0) + " ? " + inputs(1) + " : " + inputs(2)

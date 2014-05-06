@@ -39,21 +39,6 @@ import scala.math._
 import Vec._
 import Node._
 
-object VecUIntToOH
-{
-  def apply(in: UInt, width: Int): UInt =
-  {
-    if (Driver.chiselOneHotMap.contains((in, width))) {
-      Driver.chiselOneHotMap((in, width))
-    } else {
-      val out = UInt(1, width)
-      val res = (out << in)(width-1,0)
-      Driver.chiselOneHotMap += ((in, width) -> res)
-      res
-    }
-  }
-}
-
 object VecMux {
   def apply(addr: UInt, elts: Seq[Data]): Data = {
     def doit(elts: Seq[Data], pos: Int): Data = {
@@ -95,17 +80,6 @@ object Vec {
     Vec.tabulate(n){ i => gen }
   }
 
-  def getEnable(onehot: UInt, i: Int): Bool = {
-    var enable: Bool = null
-      if (Driver.chiselOneHotBitMap.contains(onehot, i)){
-        enable = Driver.chiselOneHotBitMap(onehot, i)
-      } else {
-        enable = onehot(i)
-        Driver.chiselOneHotBitMap += ((onehot, i) -> enable)
-      }
-    enable
-  }
-
   /** Returns an array containing values of a given function over
     a range of integer values starting from 0.
     */
@@ -117,22 +91,11 @@ object Vec {
 
 }
 
-class VecProc extends proc {
-  var addr: UInt = null
-  var elms: ArrayBuffer[Bits] = null
-
-  override def genMuxes(default: Node) {}
-
-  def procAssign(src: Node) {
-    val onehot = VecUIntToOH(addr, elms.length)
-    for(i <- 0 until elms.length){
-      when (getEnable(onehot, i)) {
-        if(elms(i).comp != null) {
-          elms(i).comp procAssign src
-        } else {
-          elms(i) procAssign src
-        }
-      }
+class VecProc(enables: Iterable[Bool], elms: Iterable[Data]) extends proc {
+  override def procAssign(src: Node): Unit = {
+    for ((en, elm) <- enables zip elms) when (en) {
+      if(elm.comp != null) elm.comp procAssign src
+      else elm.asInstanceOf[Bits] procAssign src
     }
   }
 }
@@ -168,33 +131,23 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
   def apply(ind: UInt): T =
     read(ind)
 
-  def write(addr: UInt, data: T) {
-    if(data.isInstanceOf[Node]){
-
-      val onehot = VecUIntToOH(addr, length)
-      for(i <- 0 until length){
-        when (getEnable(onehot, i)) {
-          this(i).comp procAssign data.toNode
-        }
-      }
-    }
-  }
+  def write(addr: UInt, data: T): Unit =
+    this(addr) := data
 
   def read(addr: UInt): T = {
     if(readPortCache.contains(addr)) {
       return readPortCache(addr)
     }
 
+    val iaddr = UInt(width = log2Up(length))
+    iaddr assign addr
+    val enables = (UInt(1) << iaddr).toBools
     val res = this(0).clone
-    val iaddr = UInt(width=log2Up(length))
-    iaddr.inputs += addr
     for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
       io assign VecMux(iaddr, sortedElm)
 
       // setup the comp for writes
-      val io_comp = new VecProc()
-      io_comp.addr = iaddr
-      io_comp.elms = sortedElm.asInstanceOf[ArrayBuffer[Bits]] // XXX ?
+      val io_comp = new VecProc(enables, sortedElm)
       io.comp = io_comp
     }
     readPortCache += (addr -> res)
