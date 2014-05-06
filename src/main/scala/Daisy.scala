@@ -99,7 +99,7 @@ class EventCounter(
   val src = Reg(init = Bits(0, w))
 }
 
-object addNode {
+object addPin {
   val tempStack = new ListBuffer[Module]
 
   private def start() {
@@ -114,21 +114,7 @@ object addNode {
     }
   }
 
-  def apply[T <: Bits](gen: =>T, name: String = ""): T = {
-    val res = gen
-    start()
-    if (name != "") res.getNode setName name
-    finish()
-    res
-  }
-
-  def apply[T <: Bits](m: Module, gen: => T, name: String = ""): T = {
-    val res = apply(gen, name)
-    res.getNode.component = m
-    res
-  }
-
-  def addPin[T <: Data](m: Module, gen: => T, name: String) = {
+  def apply[T <: Data](m: Module, gen: => T, name: String) = {
     require(name != "")
     start()
     val pin = gen
@@ -147,34 +133,6 @@ object addNode {
     pin
   }
 
-  def addReg[T <: Bits](m: Module, gen: => T, name: String = "") = {
-    start()
-    val res = gen
-    val reg = res.comp match { case r: Reg => r }
-    // assign component
-    reg.component = m
-    // assign clock
-    reg.clock = m.clock
-    // assign name
-    if (name != "") reg setName name
-    finish()
-    res
-  }
-
-  def wire[T <: Bits](regType: T, updates: => Seq[(Bool, Node)]) {
-    start()
-    val reg = regType.comp match { case r: Reg => r }
-    // add updates
-    reg.updates ++= updates
-    reg.isEnable = !updates.isEmpty
-    // set enable signal
-    if (reg.isEnable) {
-      val (conds, values) = updates.unzip
-      reg.enable = addNode(reg.component, (conds.tail foldLeft conds.head)((x, y) => addNode(reg.component, x || y)))
-    }
-    finish()
-  }
-
   def wire(pair: => ((Node, Node))) {
     start()
     val (input, consumer) = pair
@@ -184,7 +142,7 @@ object addNode {
   }
 }
 
-import addNode._
+import addPin._
 
 // DaisyTransform inserts the step counter and
 // the snapshot and evenet counter pins
@@ -298,14 +256,35 @@ object DaisyChain extends Backend {
     b.analyses   += ((c: Module) => genChainOffsets(c))
   }
 
-  def wire(pair: (Node, Node)) {
-    addNode.wire(pair)
+  def addNode[T <: Bits](m: Module, gen: => T, name: String = ""): T = {
+    val res = gen
+    if (name != "") res.getNode setName name
+    res.getNode.component = m
+    res
   }
 
-  def wire(outType: Bits, updates: (Bool, Node)*) {
-    addNode.wire(outType, updates)
+  def addReg[T <: Bits](m: Module, gen: => T, name: String = "") = {
+    val res = gen
+    val reg = res.comp match { case r: Reg => r }
+    // assign component
+    reg.component = m
+    // assign clock
+    reg.clock = m.clock
+    // assign name
+    if (name != "") reg setName name
+    res
+  }
 
-    val reg = outType.comp match { case r: Reg => r }
+  def updateReg(regType: Bits, updates: (Bool, Node)*) {
+    val reg = regType.comp match { case r: Reg => r }
+    // add updates
+    reg.updates ++= updates
+    reg.isEnable = !updates.isEmpty
+    // set enable signal
+    if (reg.isEnable) {
+      val (conds, values) = updates.unzip
+      reg.enable = (conds.tail foldLeft conds.head)(_ || _)
+    }
     // genreate muxes
     reg genMuxes reg
     // assign reset
@@ -336,7 +315,7 @@ object DaisyChain extends Backend {
         val steps =  addReg(m, Reg(init = UInt(0, 32)), "steps")
         stepPins(m) = addNode(m, steps.orR, "step_pin")
         firePins(m) = stepPins(m)
-        wire(steps, stepPins(m) -> (steps - UInt(1)), stepsIn.valid -> stepsIn.bits)
+        updateReg(steps, stepPins(m) -> (steps - UInt(1)), stepsIn.valid -> stepsIn.bits)
       } else {
         // already has a bool-type input port named "step_pin", use it
         // that is, "step_pin" is reserved!
@@ -413,7 +392,7 @@ object DaisyChain extends Backend {
       // generate clock counters for multi clock domains
       var clkIdx = Driver.clocks count (_.srcClock == null)
       val clkNum = addReg(c, Reg(init = UInt(clkIdx, 8)), "clk_num_reg")
-      wire(clkNum, clockIn.valid -> (clkNum - UInt(1)))
+      updateReg(clkNum, clockIn.valid -> (clkNum - UInt(1)))
       wire(clkNum.orR -> clockIn.ready)
 
       val isClkInput = new HashMap[Clock, Bool]
@@ -426,16 +405,16 @@ object DaisyChain extends Backend {
           clkExp(0) match {
             case "*" => {
               val clkRegMul = clkRegs(clock.srcClock) * UInt(clkExp(1))
-              wire(clkRegs(clock), Bool(true) -> clkRegMul)
+              updateReg(clkRegs(clock), Bool(true) -> clkRegMul)
             }
             case "/" => {
               val clkRegDiv = clkRegs(clock.srcClock) / UInt(clkExp(1))
-              wire(clkRegs(clock), Bool(true) -> clkRegDiv)
+              updateReg(clkRegs(clock), Bool(true) -> clkRegDiv)
             }
           }
         } else {
           isClkInput(clock) = clockIn.valid && (clkNum === UInt(clkIdx))
-          wire(clkRegs(clock), isClkInput(clock) -> clockIn.bits)
+          updateReg(clkRegs(clock), isClkInput(clock) -> clockIn.bits)
           clkIdx = clkIdx - 1
         }
       }
@@ -455,7 +434,7 @@ object DaisyChain extends Backend {
         val enClk     = addNode(c, !clkCnts(clock).orR, enClkName)
         keywords += enClkName
         enClks(clock) = HashMap(c -> enClk)
-        wire(clkCnts(clock), 
+        updateReg(clkCnts(clock), 
           isClkInput(clock)                -> clockIn.bits, 
           (fires(c) && !enClk)             -> (clkCnts(clock) - min), 
           (fires(c) && !isClkInput(clock)) -> clkRegs(clock))
@@ -492,13 +471,13 @@ object DaisyChain extends Backend {
       ioBuffers(targetPin) = addReg(c, Reg(UInt()), bufName)
       if (targetPin.dir == INPUT) {
         // Input buffers work when the clock counter value is set
-        wire(ioBuffers(targetPin), stepsIn.valid -> targetPin)
+        updateReg(ioBuffers(targetPin), stepsIn.valid -> targetPin)
         for (consumer <- targetPin.consumers) {
           val idx = consumer.inputs indexOf targetPin
           consumer.inputs(idx) = ioBuffers(targetPin)
         }
       } else if (targetPin.dir == OUTPUT) {
-        wire(ioBuffers(targetPin), fireBufs(c) -> targetPin.inputs.head)
+        updateReg(ioBuffers(targetPin), fireBufs(c) -> targetPin.inputs.head)
         wire(ioBuffers(targetPin) -> targetPin)
       }
     }
@@ -586,17 +565,17 @@ object DaisyChain extends Backend {
 
     // turn off the snapOut valid signal after reading out all the values 
     val stateNum = addReg(c, Reg(UInt(width=32)), "state_num")
-    wire(stateNum, 
+    updateReg(stateNum, 
       (snapRead(c) && stateNum.orR) -> (stateNum - UInt(1)),
       stepsIn.valid -> UInt(states.size))
     wire((snapCopy(c) || stateNum.orR) -> snapOuts(c).valid)
   }
 
-  def addBuffer(c: Module, i: Int, w: Int, update: (Bool, Node)) = {
+  def addBuffer(c: Module, i: Int, w: Int, updates: (Bool, Node)) = {
     val bufName = "buffer_%d".format(i)
     val buffer = addReg(c, Reg(init=UInt(0, w)), bufName)
     keywords += bufName
-    wire(buffer, update)
+    updateReg(buffer, updates)
     buffer
   }
 
@@ -654,12 +633,12 @@ object DaisyChain extends Backend {
       val counterName = "counter_%d".format(counter.idx)
       keywords += counterName
       counter.src.comp setName counterName
-      wire(counter.src, fires(c) -> cntrValue, cntrCopy(c) -> Bits(0))
+      updateReg(counter.src, fires(c) -> cntrValue, cntrCopy(c) -> Bits(0))
     }
 
     // turn off the cntrOut valid signal after reading out all the values 
     val counterNum = addReg(c, Reg(UInt(width=32)), "counter_num")
-    wire(counterNum, 
+    updateReg(counterNum, 
       (cntrRead(c) && counterNum.orR) -> (counterNum - UInt(1)),
       stepsIn.valid -> UInt(counters.size))
     wire((cntrCopy(c) || (counterNum.orR)) -> cntrOuts(c).valid)
@@ -730,7 +709,7 @@ object DaisyChain extends Backend {
           // snap output -> head shadow
           wire(chain.head.shadow -> daisyOut.bits)
           // snap input -> last shadow 
-          wire(chain.last.shadow, copy -> realSrc, read -> daisyIn)
+          updateReg(chain.last.shadow, copy -> realSrc, read -> daisyIn)
         }
         // children & signals
         case (false, false) => {
@@ -753,7 +732,7 @@ object DaisyChain extends Backend {
           // head shadow -> daisy output
           wire(chain.head.shadow -> daisyOut.bits)
           // daisy input -> last shadow
-          wire(chain.last.shadow, copy -> realSrc, read -> headDaisyOut.bits)
+          updateReg(chain.last.shadow, copy -> realSrc, read -> headDaisyOut.bits)
           // daisy input -> last child's snap input
           wire(daisyIn -> lastDaisyIn)
         }
@@ -784,7 +763,7 @@ object DaisyChain extends Backend {
         /* Shaodw Counter*/
         // daisy_ctrl == 'copy' -> current source
         // daisy_ctrl == 'read' -> next shadow
-        wire(s.head.shadow, copy -> realSrc, read -> s.last.shadow) 
+        updateReg(s.head.shadow, copy -> realSrc, read -> s.last.shadow) 
       }
       // visit children
       m.children foreach (queue enqueue _)
