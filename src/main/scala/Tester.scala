@@ -40,9 +40,11 @@ import scala.io.Source._
 import Literal._
 
 case class Poke(val node: Node, val index: Int, val value: BigInt);
+case class Expect(val node: Node, val t: Int, val expected: BigInt);
 
 class Snapshot(val t: Int) {
   val pokes = new ArrayBuffer[Poke]()
+  val expects = new ArrayBuffer[Expect]()
 }
 
 class ManualTester[+T <: Module]
@@ -76,6 +78,7 @@ class ManualTester[+T <: Module]
 
   val regs  = c.omods.filter(x => x.isInstanceOf[Reg]).map(x => x.getNode);
   val mems  = c.omods.filter(x => x.isInstanceOf[Mem[_]]).map(x => x.getNode);
+  val outputs = c.io.flatten.unzip._2.filter(_.dir == OUTPUT)
   val mappings = new HashMap[String, Node]()
 
   def dump(): Snapshot = {
@@ -92,6 +95,16 @@ class ManualTester[+T <: Module]
     val snap = dump()
     snapshots += snap
     snap
+  }
+
+  def checkSnapshots() {
+    println("CHECK OUTPUTS FOR SNAPSHOT VERIFICATION")
+    if (!snapshots.isEmpty) {
+      for (out <- outputs) {
+        snapshots.last.expects += Expect(out, t, peekBits(out))
+      }
+    }
+    println("=======================================")
   }
 
   def addPoke(snaps: ArrayBuffer[Snapshot], now: Int, poke: Poke) = {
@@ -168,6 +181,13 @@ class ManualTester[+T <: Module]
       }
       for (p <- snapshot.pokes) {
         f.write("POKE " + dumpName(p.node) + " " + p.value + (if (p.index == -1) "" else (" " + p.index)) + "\n")
+      }
+      for (e <- snapshot.expects) {
+        if (e.t > now) {
+          f.write("STEP " + (e.t - now) + "\n")
+          now = e.t
+        }
+        f.write("EXPECT " + dumpName(e.node) + " " + e.expected + "\n")
       }
     }
     f.close()

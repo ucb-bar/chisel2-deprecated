@@ -817,6 +817,8 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   val counterPeeks = new ArrayBuffer[BigInt]
   val clockVals = new LinkedHashMap[Clock, Int]
   val clockCnts = new LinkedHashMap[Clock, Int]
+  override val outputs = top.io.flatten.unzip._2 filter (x => 
+    x.dir == OUTPUT && !(DaisyChain.keywords contains (x.name stripPrefix "io_")))
 
   counterPeeks.clear
   counterPeeks ++= Array.fill(counters.size)(BigInt(0))
@@ -1028,7 +1030,10 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
 
     /*** Snapshotting and counter dumpig ***/
     if (t > 0) {
-      if (Driver.isSnapshotting) snapshot()
+      if (Driver.isSnapshotting) {
+        checkSnapshots()
+        snapshot()
+      }
       if (Driver.isCounting) dumpCounters()
     }
 
