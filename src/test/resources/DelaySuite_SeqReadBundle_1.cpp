@@ -1,7 +1,7 @@
 #include "DelaySuite_SeqReadBundle_1.h"
 
 void DelaySuite_SeqReadBundle_1_t::init ( bool rand_init ) {
-  if (rand_init) R0.randomize();
+  if (rand_init) R1.randomize();
   if (rand_init) DelaySuite_SeqReadBundle_1__mem.randomize();
 }
 int DelaySuite_SeqReadBundle_1_t::clock ( dat_t<1> reset ) {
@@ -24,12 +24,12 @@ bool DelaySuite_SeqReadBundle_1_t::set_circuit_from(mod_t* src) {
   DelaySuite_SeqReadBundle_1__io_out_a_b = mod_typed->DelaySuite_SeqReadBundle_1__io_out_a_b;
   DelaySuite_SeqReadBundle_1__io_raddr = mod_typed->DelaySuite_SeqReadBundle_1__io_raddr;
   DelaySuite_SeqReadBundle_1__io_ren = mod_typed->DelaySuite_SeqReadBundle_1__io_ren;
-  R0 = mod_typed->R0;
-  R0_shadow = mod_typed->R0_shadow;
+  T0 = mod_typed->T0;
+  R1 = mod_typed->R1;
   DelaySuite_SeqReadBundle_1__io_in_a_b_ = mod_typed->DelaySuite_SeqReadBundle_1__io_in_a_b_;
   DelaySuite_SeqReadBundle_1__io_in_a_b = mod_typed->DelaySuite_SeqReadBundle_1__io_in_a_b;
   DelaySuite_SeqReadBundle_1__io_in_a_a = mod_typed->DelaySuite_SeqReadBundle_1__io_in_a_a;
-  T1 = mod_typed->T1;
+  T2 = mod_typed->T2;
   DelaySuite_SeqReadBundle_1__io_wen = mod_typed->DelaySuite_SeqReadBundle_1__io_wen;
   DelaySuite_SeqReadBundle_1__io_waddr = mod_typed->DelaySuite_SeqReadBundle_1__io_waddr;
   DelaySuite_SeqReadBundle_1__mem = mod_typed->DelaySuite_SeqReadBundle_1__mem;
@@ -45,32 +45,31 @@ void DelaySuite_SeqReadBundle_1_t::dump_init(FILE *f) {
 void DelaySuite_SeqReadBundle_1_t::dump(FILE *f, int t) {
 }
 void DelaySuite_SeqReadBundle_1_t::clock_lo ( dat_t<1> reset ) {
-  val_t T2__w0;
-  { T2__w0 = DelaySuite_SeqReadBundle_1__mem.get(R0.values[0], 0); }
   val_t T3__w0;
-  { T3__w0 = T2__w0 >> 48; }
-  T3__w0 = T3__w0 & 255;
-  { DelaySuite_SeqReadBundle_1__io_out_a_a.values[0] = T3__w0; }
+  { T3__w0 = DelaySuite_SeqReadBundle_1__mem.get(R1.values[0], 0); }
   val_t T4__w0;
-  { T4__w0 = T2__w0 >> 32; }
-  T4__w0 = T4__w0 & 65535;
-  { DelaySuite_SeqReadBundle_1__io_out_a_b.values[0] = T4__w0; }
+  { T4__w0 = T3__w0 >> 48; }
+  T4__w0 = T4__w0 & 255;
+  { DelaySuite_SeqReadBundle_1__io_out_a_a.values[0] = T4__w0; }
   val_t T5__w0;
-  { T5__w0 = TERNARY(DelaySuite_SeqReadBundle_1__io_ren.values[0], DelaySuite_SeqReadBundle_1__io_raddr.values[0], R0.values[0]); }
-  { R0_shadow.values[0] = T5__w0; }
+  { T5__w0 = T3__w0 >> 32; }
+  T5__w0 = T5__w0 & 65535;
+  { DelaySuite_SeqReadBundle_1__io_out_a_b.values[0] = T5__w0; }
+  { T0.values[0] = TERNARY(DelaySuite_SeqReadBundle_1__io_ren.values[0], DelaySuite_SeqReadBundle_1__io_raddr.values[0], R1.values[0]); }
   val_t T6__w0;
   { T6__w0 = DelaySuite_SeqReadBundle_1__io_in_a_b.values[0] | DelaySuite_SeqReadBundle_1__io_in_a_a.values[0] << 16; }
   val_t T7__w0;
   { T7__w0 = DelaySuite_SeqReadBundle_1__io_in_a_b_.values[0] | T6__w0 << 32; }
-  { T1.values[0] = T7__w0; }
+  { T2.values[0] = T7__w0; }
   val_t T8__w0;
-  { T8__w0 = T2__w0; }
+  { T8__w0 = T3__w0; }
   T8__w0 = T8__w0 & 4294967295;
   { DelaySuite_SeqReadBundle_1__io_out_a_b_.values[0] = T8__w0; }
 }
 void DelaySuite_SeqReadBundle_1_t::clock_hi ( dat_t<1> reset ) {
-  { if (DelaySuite_SeqReadBundle_1__io_wen.values[0]) DelaySuite_SeqReadBundle_1__mem.put(DelaySuite_SeqReadBundle_1__io_waddr.values[0], 0, T1.values[0]); }
-  R0 = R0_shadow;
+  dat_t<4> R1__shadow = T0;
+  { if (DelaySuite_SeqReadBundle_1__io_wen.values[0]) DelaySuite_SeqReadBundle_1__mem.put(DelaySuite_SeqReadBundle_1__io_waddr.values[0], 0, T2.values[0]); }
+  R1 = T0;
 }
 void DelaySuite_SeqReadBundle_1_api_t::init_mapping_table() {
   dat_table.clear();

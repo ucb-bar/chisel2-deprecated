@@ -9,12 +9,12 @@ class DelaySuite_SeqReadBundle_1_t : public mod_t {
   dat_t<16> DelaySuite_SeqReadBundle_1__io_out_a_b;
   dat_t<4> DelaySuite_SeqReadBundle_1__io_raddr;
   dat_t<1> DelaySuite_SeqReadBundle_1__io_ren;
-  dat_t<4> R0;
-  dat_t<4> R0_shadow;
+  dat_t<4> T0;
+  dat_t<4> R1;
   dat_t<32> DelaySuite_SeqReadBundle_1__io_in_a_b_;
   dat_t<16> DelaySuite_SeqReadBundle_1__io_in_a_b;
   dat_t<8> DelaySuite_SeqReadBundle_1__io_in_a_a;
-  dat_t<56> T1;
+  dat_t<56> T2;
   dat_t<1> DelaySuite_SeqReadBundle_1__io_wen;
   dat_t<4> DelaySuite_SeqReadBundle_1__io_waddr;
   mem_t<56,16> DelaySuite_SeqReadBundle_1__mem;

@@ -266,5 +266,5 @@ class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) 
   def isMasked = inputs.length > 3
   override def toString: String = mem + "[" + addr + "] = " + data + " COND " + cond
   override def getPortType: String = if (isMasked) "mwrite" else "write"
-  override def isRamWriteInput(n: Node) = inputs.contains(n)
+  override def usesInClockHi(n: Node) = inputs.contains(n)
 }
