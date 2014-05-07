@@ -437,7 +437,7 @@ object DaisyChain extends Backend {
       if (targetPin.dir == INPUT) {
         // Input buffers work when the clock counter value is set
         ioBuffers(targetPin) = addReg(c, Reg(UInt()), bufName)
-        updateReg(ioBuffers(targetPin), stepsIn.valid -> targetPin)
+        updateReg(ioBuffers(targetPin), (stepsIn.valid || firePins(c)) -> targetPin)
         for (consumer <- targetPin.consumers) {
           val idx = consumer.inputs indexOf targetPin
           consumer.inputs(idx) = ioBuffers(targetPin)
