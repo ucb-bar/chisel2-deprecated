@@ -427,7 +427,7 @@ class VerilogBackend extends Backend {
 
     // Diffent code generation for clocks
     if (Driver.isTesting) {
-      harness.write("  reg %s = 1;\n".format(mainClk.name))
+      harness.write("  reg %s = 0;\n".format(mainClk.name))
       if (clocks.size > 1) {
         for (clk <- clocks) {
           val clkLength = 
@@ -566,23 +566,25 @@ class VerilogBackend extends Backend {
     }
     harness.write("  end\n\n")
 
-    harness.write("  /*** ROM & Mem initialization ***/\n")
-    harness.write("  integer i = 0;\n")
-    harness.write("  initial begin\n")
-    harness.write("  #50;\n")
-    for (rom <- roms) {
-      val pathName = rom.component.getPathName(".") + "." + emitRef(rom)
-      for (i <- 0 until rom.lits.size) {
-        harness.write("    %s[%d] = %s;\n".format(pathName, i, emitRef(rom.lits(i))))
+    if (Driver.isTesting) {
+      harness.write("  /*** ROM & Mem initialization ***/\n")
+      harness.write("  integer i = 0;\n")
+      harness.write("  initial begin\n")
+      harness.write("  #50;\n")
+      for (rom <- roms) {
+        val pathName = rom.component.getPathName(".") + "." + emitRef(rom)
+        for (i <- 0 until rom.lits.size) {
+          harness.write("    %s[%d] = %s;\n".format(pathName, i, emitRef(rom.lits(i))))
+        }
       }
+      for (mem <- mems) {
+        val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
+        harness.write("    for (i = 0 ; i < %d ; i = i + 1) begin\n".format(mem.n))
+        harness.write("      %s[i] = 0;\n".format(pathName))
+        harness.write("    end\n")
+      }
+      harness.write("  end\n\n")
     }
-    for (mem <- mems) {
-      val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
-      harness.write("    for (i = 0 ; i < %d ; i = i + 1) begin\n".format(mem.n))
-      harness.write("      %s[i] = 0;\n".format(pathName))
-      harness.write("    end\n")
-    }
-    harness.write("  end\n\n")
 
     // TODO: select interface according to the tester
     if (Driver.isTesting) { 
@@ -834,8 +836,8 @@ class VerilogBackend extends Backend {
 
   def harnessMap (mainClk: Clock, resets: ArrayBuffer[Bool], scanNodes: Array[Bits], printNodes: Array[Bits]) = {
     val map = new StringBuilder
-    val printFormat = printNodes.map(a => a.chiselName + ": 0x%x, ").fold("")((y,z) => z + " " + y)
-    val scanFormat = scanNodes.map(a => "%x").fold("")((y,z) => z + " " + y)
+    val printFormat = printNodes.map(a => a.chiselName + ": 0x%x, ").fold("")((y,z) => y + " " + z)
+    val scanFormat = scanNodes.map(a => "%x").fold("")((y,z) => y + " " + z)
 
     if (Driver.isTesting) {
       map.append("  integer count;\n")

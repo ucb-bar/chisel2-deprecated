@@ -98,13 +98,13 @@ class ManualTester[+T <: Module]
   }
 
   def checkSnapshots() {
-    if (isTrace) println("CHECK OUTPUTS FOR SNAPSHOT VERIFICATION")
     if (!snapshots.isEmpty) {
+      if (isTrace) println("*** CHECK SNAPSHOTS ***")
       for (out <- outputs) {
         snapshots.last.expects += Expect(out, t, peekBits(out))
       }
+      if (isTrace) println("***********************")
     }
-    if (isTrace) println("=======================================")
   }
 
   def addPoke(snaps: ArrayBuffer[Snapshot], now: Int, poke: Poke) = {

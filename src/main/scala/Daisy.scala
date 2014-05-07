@@ -313,7 +313,7 @@ object DaisyChain extends Backend {
           firePins(m) = isStep
         }
         if (stallVal != null) {
-          wire(isStep -> stallVal)
+          wire(!isStep -> stallVal)
         }
       } else {
         firePins(m) = addPin(m, Bool(INPUT), "fire_pin")
@@ -401,9 +401,9 @@ object DaisyChain extends Backend {
         keywords += enClkName
         enClks(clock) = HashMap(c -> enClk)
         updateReg(clkCnts(clock), 
-          isClkInput(clock)                   -> clockIn.bits, 
-          (firePins(c) && !enClk)             -> (clkCnts(clock) - min), 
-          (firePins(c) && !isClkInput(clock)) -> clkRegs(clock))
+          isClkInput(clock)             -> clockIn.bits, 
+          (!enClk && firePins(c))       -> (clkCnts(clock) - min), 
+          (enClk && !isClkInput(clock)) -> clkRegs(clock))
       }
     }
 
@@ -985,10 +985,6 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
 
     /*** Snapshotting and counter dumpig ***/
     if (t > 0) {
-      if (Driver.isSnapshotting) {
-        checkSnapshots()
-        snapshot()
-      }
       if (Driver.isCounting) dumpCounters()
     }
 
@@ -1018,8 +1014,8 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     while (peek(stalled) == 0)
       takeSteps(1)
 
-    // read out signal values
     if (Driver.isSnapshotting) {
+      // read out signal values
       if (isTrace) println("*** READ STATE VALUES ***")
       statePeeks.clear
       statePeeks ++= states map { _.src match {
@@ -1028,6 +1024,9 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
         case signal =>
           peekBits(signal) }
       }
+
+      // take a snapshot
+      snapshot()
     }
 
     // set t & delta
@@ -1043,11 +1042,13 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
         delta += delta_i
       }
     }
+
+    // check snapshotting
+    if (Driver.isSnapshotting) checkSnapshots()
   }
 
   var finished = false
   override def finish(): Boolean = {
-    checkSnapshots()
     finished = true
     dumpSnapshots("%s.snapshots".format(c.name), snapshots)
     super.finish()
