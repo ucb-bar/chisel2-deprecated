@@ -434,16 +434,19 @@ object DaisyChain extends Backend {
     for ((name, targetPin) <- c.io.flatten; if !(keywords contains name)) {
       val bufName = name + "_buf"
       keywords += bufName
-      ioBuffers(targetPin) = addReg(c, Reg(UInt()), bufName)
       if (targetPin.dir == INPUT) {
         // Input buffers work when the clock counter value is set
+        ioBuffers(targetPin) = addReg(c, Reg(UInt()), bufName)
         updateReg(ioBuffers(targetPin), stepsIn.valid -> targetPin)
         for (consumer <- targetPin.consumers) {
           val idx = consumer.inputs indexOf targetPin
           consumer.inputs(idx) = ioBuffers(targetPin)
         }
       } else if (targetPin.dir == OUTPUT) {
-        updateReg(ioBuffers(targetPin), fireBufs(c) -> targetPin.inputs.head)
+        val pinInput = targetPin.inputs.head.getNode
+        val pinWidth = targetPin.width
+        ioBuffers(targetPin) = addReg(c, Reg(init=UInt(pinInput, pinWidth)), bufName)
+        updateReg(ioBuffers(targetPin), fireBufs(c) -> pinInput)
         wire(ioBuffers(targetPin) -> targetPin)
       }
     }
