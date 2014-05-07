@@ -445,7 +445,7 @@ class VerilogBackend extends Backend {
         val clkLength = 
             if (clk.srcClock == null) "120" else 
             clk.srcClock.name + "_length " + clk.initStr
-        harness.write("  reg %s = 0;\n".format(clk.name))
+        harness.write("  reg %s = 1;\n".format(clk.name))
         harness.write("  parameter %s_length = %s;\n".format(clk.name, clkLength))
       }
       for (clk <- clocks) {
