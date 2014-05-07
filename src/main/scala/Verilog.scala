@@ -423,11 +423,11 @@ class VerilogBackend extends Backend {
       harness.write("  wire [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
     }
     for (rst <- resets)
-      harness.write("  reg %s = 1;\n".format(rst.name))
+      harness.write("  reg %s = 0;\n".format(rst.name))
 
     // Diffent code generation for clocks
     if (Driver.isTesting) {
-      harness.write("  reg %s = 0;\n".format(mainClk.name))
+      harness.write("  reg %s = 1;\n".format(mainClk.name))
       if (clocks.size > 1) {
         for (clk <- clocks) {
           val clkLength = 
@@ -609,7 +609,7 @@ class VerilogBackend extends Backend {
     for (wire <- wires ; if !wire.isReg) {
       val shadowName = wire.component.getPathName("_") + "_" + emitRef(wire) + "_shadow"
       shadowNames(wire) = shadowName
-      apis.append("  reg [%d:0] %s = 0;\n".format(wire.width-1, shadowName))
+      apis.append("  reg [%d:0] %s = 1;\n".format(wire.width-1, shadowName))
     }
     apis.append("  // mem shadows\n")
     for (mem <- mems) {
