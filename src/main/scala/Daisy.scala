@@ -308,7 +308,7 @@ object DaisyChain extends Backend {
         val isStep = addNode(m, steps.orR, "step_pin")
         updateReg(steps, isStep -> (steps - UInt(1)), stepsIn.valid -> stepsIn.bits)
         if (stallAck != null) {
-          firePins(m) = addNode(m, isStep && stallAck, "fire")
+          firePins(m) = addNode(m, isStep && !stallAck, "fire")
         } else {
           firePins(m) = isStep
         }
