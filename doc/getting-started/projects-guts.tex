@@ -67,7 +67,7 @@ The SBT project file contains a reference to Scala version greater or equal to 2
 In order to launch SBT to compile the Chisel code we must first be in the directory \verb+$BASEDIR/+. The following call is then made to compile and run the Hello module:
 
 \begin{bash}
-sbt run --backend c
+sbt "run --backend c"
 \end{bash}
 
 \subsection{Running the Chisel Tests}
@@ -75,7 +75,7 @@ sbt run --backend c
 To actually run the tests referenced in the main method of \verb+$BASEDIR/Hello.scala+, we need to tell SBT to also generate the harness and run the tests. For instance, for our Hello module introduced earlier, the Chisel main method references a test routine \verb+HelloTests+. In order to both compile the Hello component and run the tests defined in \verb+Hello+, we make the following call to sbt:
 
 \begin{bash}
-sbt run --backend c --compile --test --genHarness
+sbt "run --backend c --compile --test --genHarness"
 \end{bash}
 
 Note the addition of the 5 arguments at the end of the call to \verb+run+. This will both compile the \verb+.cpp+ and \verb+.h+ files for the emulator and run the Chisel tests defined. 
@@ -85,7 +85,7 @@ Note the addition of the 5 arguments at the end of the call to \verb+run+. This 
 Similarly to compile the Chisel code and generate the Verilog HDL, a similar call to SBT is made with slightly different arguments. The call looks like:
 
 \begin{bash}
-sbt run --backend v --genHarness"
+sbt "run --backend v --genHarness"
 \end{bash}
 
 Notice the call is very similar to when generating C++; the key difference is the parameter to the \verb+--backend+ attribute which is now \verb+v+ which specifies to sbt that we would like to compile our Chisel component to Verilog. 
