@@ -731,9 +731,9 @@ class CppBackend extends Backend {
     ChiselError.checkpoint()
 
     c.collectNodes(c);
-    c.findOrdering(); // search from roots  -- create omods
-    val mappings = generateNodeMapping(c.omods);
-    renameNodes(c, c.omods);
+    c.findOrdering(); // search from roots  -- create nodes
+    val mappings = generateNodeMapping(c.nodes);
+    renameNodes(c, c.nodes);
     if (Driver.isReportDims) {
       val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
       ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
@@ -767,7 +767,7 @@ class CppBackend extends Backend {
     out_h.write("class " + c.name + "_t : public mod_t {\n");
     out_h.write(" public:\n");
     val vcd = new VcdBackend(c)
-    for (m <- c.omods) {
+    for (m <- c.nodes) {
       if(m.name != "reset") {
         if (m.isInObject) {
           out_h.write(emitDec(m));
@@ -826,7 +826,7 @@ class CppBackend extends Backend {
     
     // generate init block
     writeCppFile("void " + c.name + "_t::init ( bool rand_init ) {\n")
-    for (m <- c.omods) {
+    for (m <- c.nodes) {
       writeCppFile(emitInit(m))
     }
     for (clock <- Driver.clocks) {
@@ -836,13 +836,13 @@ class CppBackend extends Backend {
 
     def clock(n: Node) = if (n.clock == null) Driver.implicitClock else n.clock
 
-    for (m <- c.omods)
+    for (m <- c.nodes)
       clkDomains(clock(m))._1.append(emitDefLo(m))
 
-    for (m <- c.omods)
+    for (m <- c.nodes)
       clkDomains(clock(m))._2.append(emitInitHi(m))
 
-    for (m <- c.omods)
+    for (m <- c.nodes)
       clkDomains(clock(m))._2.append(emitDefHi(m))
 
     for (clk <- clkDomains.keys) {
@@ -883,7 +883,7 @@ class CppBackend extends Backend {
     writeCppFile(s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(src);\n")
     writeCppFile(s"  assert(mod_typed);\n")
     
-    for (m <- c.omods) {
+    for (m <- c.nodes) {
       if(m.name != "reset" && m.isInObject) {
         writeCppFile(emitCircuitAssign("mod_typed->", m))
       }
