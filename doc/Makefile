@@ -9,10 +9,14 @@ version   := 2.1
 PDFLATEX  := pdflatex
 WWW_PAGES := index.html documentation.html download.html faq.html
 WWW_EXTRA := manual.html getting-started.html # tutorial.html cs250-1.html cs250-2.html cs250-3.html
-PDFS      := $(addsuffix .pdf,$(addprefix chisel-,\
-             cs250-1 cs250-2 cs250-3 \
-             dac12-talk manual tutorial getting-started \
-             bootcamp installation))
+
+# The following subdirectories build documentation correctly.
+PDF_DIRS	:= installation manual tutorial getting-started dac12-talk
+# The following documentation directories are currently broken
+# so we don't bother building them.
+brokenPDF_DIRS	:= bootcamp cs250-1 cs250-2 cs250-3
+PDFS      := $(addsuffix .pdf,$(addprefix chisel-,$(PDF_DIRS)))	
+
 srcDir    := .
 installTop:= ../www
 
