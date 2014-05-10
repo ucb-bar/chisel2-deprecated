@@ -54,7 +54,6 @@ object Bundle {
   whole.
   */
 class Bundle(view_arg: Seq[String] = null) extends Aggregate {
-  var dir = "";
   var view = view_arg;
   private var elementsCache: ArrayBuffer[(String, Data)] = null;
   var bundledElm: Node = null;
@@ -213,10 +212,8 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     return null;
   }
 
-  override def <>(src: Node) {
-    if(comp == null || (dir == "output" &&
-      src.isInstanceOf[Bundle] &&
-      src.asInstanceOf[Bundle].dir == "output")){
+  override def <>(src: Node): Unit = {
+    if (comp == null) {
       src match {
         case other: Bundle => {
           for ((n, i) <- elements) {
@@ -295,25 +292,20 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
 
   override def asDirectionless(): this.type = {
     elements.foreach(_._2.asDirectionless)
-    this.dir = ""
     this
   }
 
   override def asInput(): this.type = {
     elements.foreach(_._2.asInput)
-    this.dir = "input"
     this
   }
 
   override def asOutput(): this.type = {
     elements.foreach(_._2.asOutput)
-    this.dir = "output"
     this
   }
 
-  override def isDirectionless: Boolean = {
-    (dir == "") && elements.map{case (n,i) => i.isDirectionless}.reduce(_&&_)
-  }
+  override def isDirectionless: Boolean = elements.forall(_._2.isDirectionless)
 
   override def setIsTypeNode() {
     isTypeNode = true;
