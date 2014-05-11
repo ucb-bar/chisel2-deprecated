@@ -1,16 +1,16 @@
 module StdlibSuite_RRArbiterTest_1(input clk, input reset,
-    output io_in_0_ready,
-    input  io_in_0_valid,
-    input [7:0] io_in_0_bits,
-    output io_in_1_ready,
-    input  io_in_1_valid,
-    input [7:0] io_in_1_bits,
-    output io_in_2_ready,
-    input  io_in_2_valid,
-    input [7:0] io_in_2_bits,
     output io_in_3_ready,
     input  io_in_3_valid,
     input [7:0] io_in_3_bits,
+    output io_in_2_ready,
+    input  io_in_2_valid,
+    input [7:0] io_in_2_bits,
+    output io_in_1_ready,
+    input  io_in_1_valid,
+    input [7:0] io_in_1_bits,
+    output io_in_0_ready,
+    input  io_in_0_valid,
+    input [7:0] io_in_0_bits,
     input  io_out_ready,
     output io_out_valid,
     output[7:0] io_out_bits,
@@ -143,65 +143,65 @@ module StdlibSuite_RRArbiterTest_1(input clk, input reset,
   assign T27 = T28 ? io_in_3_valid : io_in_2_valid;
   assign T28 = T20[1'h0:1'h0];
   assign T29 = T20[1'h1:1'h1];
-  assign io_in_3_ready = T30;
+  assign io_in_0_ready = T30;
   assign T30 = T31 & io_out_ready;
   assign T31 = T32;
-  assign T32 = T48 | T33;
+  assign T32 = T45 | T33;
   assign T33 = T34 == 1'h0;
-  assign T34 = T35 | io_in_2_valid;
-  assign T35 = T36 | io_in_1_valid;
-  assign T36 = T37 | io_in_0_valid;
+  assign T34 = T37 | T35;
+  assign T35 = io_in_3_valid & T36;
+  assign T36 = R9 < 2'h3;
   assign T37 = T40 | T38;
-  assign T38 = io_in_3_valid & T39;
-  assign T39 = R9 < 2'h3;
+  assign T38 = io_in_2_valid & T39;
+  assign T39 = R9 < 2'h2;
   assign T40 = T43 | T41;
-  assign T41 = io_in_2_valid & T42;
-  assign T42 = R9 < 2'h2;
-  assign T43 = T46 | T44;
-  assign T44 = io_in_1_valid & T45;
-  assign T45 = R9 < 2'h1;
-  assign T46 = io_in_0_valid & T47;
-  assign T47 = R9 < 2'h0;
-  assign T48 = T50 & T49;
-  assign T49 = R9 < 2'h3;
-  assign T50 = T51 == 1'h0;
-  assign T51 = T52 | T41;
-  assign T52 = T46 | T44;
-  assign io_in_2_ready = T53;
-  assign T53 = T54 & io_out_ready;
-  assign T54 = T55;
-  assign T55 = T62 | T56;
-  assign T56 = T57 == 1'h0;
-  assign T57 = T58 | io_in_1_valid;
-  assign T58 = T59 | io_in_0_valid;
-  assign T59 = T60 | T38;
-  assign T60 = T61 | T41;
-  assign T61 = T46 | T44;
-  assign T62 = T64 & T63;
-  assign T63 = R9 < 2'h2;
-  assign T64 = T65 == 1'h0;
-  assign T65 = T46 | T44;
-  assign io_in_1_ready = T66;
-  assign T66 = T67 & io_out_ready;
-  assign T67 = T68;
-  assign T68 = T74 | T69;
-  assign T69 = T70 == 1'h0;
-  assign T70 = T71 | io_in_0_valid;
-  assign T71 = T72 | T38;
-  assign T72 = T73 | T41;
-  assign T73 = T46 | T44;
-  assign T74 = T76 & T75;
-  assign T75 = R9 < 2'h1;
-  assign T76 = T46 == 1'h0;
-  assign io_in_0_ready = T77;
-  assign T77 = T78 & io_out_ready;
-  assign T78 = T79;
-  assign T79 = T84 | T80;
-  assign T80 = T81 == 1'h0;
-  assign T81 = T82 | T38;
-  assign T82 = T83 | T41;
-  assign T83 = T46 | T44;
-  assign T84 = R9 < 2'h0;
+  assign T41 = io_in_1_valid & T42;
+  assign T42 = R9 < 2'h1;
+  assign T43 = io_in_0_valid & T44;
+  assign T44 = R9 < 2'h0;
+  assign T45 = R9 < 2'h0;
+  assign io_in_1_ready = T46;
+  assign T46 = T47 & io_out_ready;
+  assign T47 = T48;
+  assign T48 = T54 | T49;
+  assign T49 = T50 == 1'h0;
+  assign T50 = T51 | io_in_0_valid;
+  assign T51 = T52 | T35;
+  assign T52 = T53 | T38;
+  assign T53 = T43 | T41;
+  assign T54 = T56 & T55;
+  assign T55 = R9 < 2'h1;
+  assign T56 = T43 == 1'h0;
+  assign io_in_2_ready = T57;
+  assign T57 = T58 & io_out_ready;
+  assign T58 = T59;
+  assign T59 = T66 | T60;
+  assign T60 = T61 == 1'h0;
+  assign T61 = T62 | io_in_1_valid;
+  assign T62 = T63 | io_in_0_valid;
+  assign T63 = T64 | T35;
+  assign T64 = T65 | T38;
+  assign T65 = T43 | T41;
+  assign T66 = T68 & T67;
+  assign T67 = R9 < 2'h2;
+  assign T68 = T69 == 1'h0;
+  assign T69 = T43 | T41;
+  assign io_in_3_ready = T70;
+  assign T70 = T71 & io_out_ready;
+  assign T71 = T72;
+  assign T72 = T80 | T73;
+  assign T73 = T74 == 1'h0;
+  assign T74 = T75 | io_in_2_valid;
+  assign T75 = T76 | io_in_1_valid;
+  assign T76 = T77 | io_in_0_valid;
+  assign T77 = T78 | T35;
+  assign T78 = T79 | T38;
+  assign T79 = T43 | T41;
+  assign T80 = T82 & T81;
+  assign T81 = R9 < 2'h3;
+  assign T82 = T83 == 1'h0;
+  assign T83 = T84 | T38;
+  assign T84 = T43 | T41;
 
   always @(posedge clk) begin
     if(reset) begin

@@ -56,7 +56,6 @@ object Bundle {
 class Bundle(view_arg: Seq[String] = null) extends Aggregate {
   var view = view_arg;
   private var elementsCache: ArrayBuffer[(String, Data)] = null;
-  var bundledElm: Node = null;
 
   /** Populates the cache of elements declared in the Bundle. */
   private def calcElements(view: Seq[String]): ArrayBuffer[(String, Data)] = {
@@ -256,11 +255,10 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
   }
 
   override def flatten: Array[(String, Bits)] = {
-    var res = ArrayBuffer[(String, Bits)]();
-    for ((n, i) <- elements){
-      res = res ++ i.flatten
-    }
-    res.sortWith(_._2._id < _._2._id).toArray
+    val res = ArrayBuffer[(String, Bits)]()
+    for ((n, i) <- elements.sortWith(_._2._id < _._2._id))
+      res ++= i.flatten
+    res.toArray
   }
 
   override def getWidth(): Int = {
@@ -268,26 +266,6 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     for((name, io) <- elements)
       w += io.getWidth
     w
-  }
-
-  override def toNode: Node = {
-    if(bundledElm == null) {
-      val nodes = flatten.map{case (n, i) => i};
-      bundledElm = Concatenate(nodes.head, nodes.tail.toList: _*)
-    }
-    bundledElm
-  }
-
-  override def fromNode(n: Node): this.type = {
-    val res = this.clone()
-    var ind = 0;
-    for((name, io) <- res.flatten.toList.reverse) {
-      io.asOutput();
-      if(io.width > 1) io assign NodeExtract(n, ind + io.width-1, ind) else io assign NodeExtract(n, ind);
-      ind += io.width;
-    }
-    res.setIsTypeNode
-    res
   }
 
   override def asDirectionless(): this.type = {
