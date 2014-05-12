@@ -50,8 +50,8 @@ class Snapshot(val t: Int) {
 class ManualTester[+T <: Module]
     (val c: T, 
       val isTrace: Boolean = true,
-      val isSnapshotting: Boolean = false, 
-      val isLoggingPokes: Boolean = false) {
+      var isSnapshotting: Boolean = false, 
+      var isLoggingPokes: Boolean = false) {
   var testIn:  InputStream  = null
   var testOut: OutputStream = null
   var testErr: InputStream  = null
@@ -97,11 +97,11 @@ class ManualTester[+T <: Module]
     snap
   }
 
-  def checkSnapshots() {
-    if (!snapshots.isEmpty) {
-      if (isTrace) println("CHECK SNAPSHOTS at T = " + t)
+  def checkSnapshots(snaps: ArrayBuffer[Snapshot]) {
+    if (!snaps.isEmpty) {
       for (out <- outputs) {
-        snapshots.last.expects += Expect(out, t, peekBits(out))
+        if (isTrace) println("ADDING EXPECT AT T = " + t)
+        snaps.last.expects += Expect(out, t, peekBits(out))
       }
     }
   }
@@ -117,6 +117,7 @@ class ManualTester[+T <: Module]
     if (snaps.length > 0 && snaps.last.t == now) 
       snaps.last.pokes += poke 
     else { 
+      checkSnapshots(snaps)
       val snap = new Snapshot(now); 
       snap.pokes += poke
       snaps += snap;
@@ -147,7 +148,7 @@ class ManualTester[+T <: Module]
     for (snap <- snaps)
       println("  SNAP T=" + snap.t + " N=" + snap.pokes.length)
     snaps
-  }
+ }
 
   def loadSnapshotsInto(filename: String, snaps: ArrayBuffer[Snapshot]) = {
     snaps.trimStart(snaps.length)
@@ -360,8 +361,8 @@ class ManualTester[+T <: Module]
   }
 
   def pokeBits(data: Node, x: BigInt, off: Int = -1): Unit = {
-    if (isSnapshotting || isLoggingPokes)
-      addPoke(pokez, t, Poke(data, off, x))
+    if (isSnapshotting) addPoke(snapshots, t, Poke(data, off, x)) 
+    if (isLoggingPokes) addPoke(pokez, t, Poke(data, off, x))
     doPokeBits(data, x, off)
   }
 

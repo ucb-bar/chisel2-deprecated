@@ -768,6 +768,7 @@ object DaisyChain extends Backend {
 
 abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends Tester(c, isTrace) {
   require(DaisyTransform.done)
+  isSnapshotting = true
   val statePeeks = new ArrayBuffer[BigInt]
   val counterVals = new ArrayBuffer[BigInt]
   val counterPeeks = new ArrayBuffer[BigInt]
@@ -1032,7 +1033,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
 
       if (dice == 0) {
         // check snapshotting
-        checkSnapshots()
+        checkSnapshots(snapshots)
         // take a snapshot
         snapshot()
       }
@@ -1055,9 +1056,9 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
 
   var finished = false
   override def finish(): Boolean = {
-    finished = true
     // check snapshotting before quitting the tester
-    checkSnapshots()
+    checkSnapshots(snapshots)
+    finished = true
     dumpSnapshots("%s.snapshots".format(c.name), snapshots)
     super.finish()
   }
