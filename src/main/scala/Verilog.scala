@@ -439,11 +439,11 @@ class VerilogBackend extends Backend {
         }
       }
 
-      harness.write("  always #100 %s = ~%s;\n\n".format(mainClk.name, mainClk.name))
+      harness.write("  always #`CLOCK_PERIOD %s = ~%s;\n\n".format(mainClk.name, mainClk.name))
     } else {
       for (clk <- clocks) {
         val clkLength = 
-            if (clk.srcClock == null) "120" else 
+            if (clk.srcClock == null) "`CLOCK_PERIOD" else 
             clk.srcClock.name + "_length " + clk.initStr
         harness.write("  reg %s = 1;\n".format(clk.name))
         harness.write("  parameter %s_length = %s;\n".format(clk.name, clkLength))
@@ -580,7 +580,7 @@ class VerilogBackend extends Backend {
       for (mem <- mems) {
         val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
         harness.write("    for (i = 0 ; i < %d ; i = i + 1) begin\n".format(mem.n))
-        harness.write("      %s[i] = 0;\n".format(pathName))
+        harness.write("      %s[i] = $random;\n".format(pathName))
         harness.write("    end\n")
       }
       harness.write("  end\n\n")
@@ -1138,7 +1138,7 @@ class VerilogBackend extends Backend {
     }
     val dir = Driver.targetDir + "/"
     val src = dir + c.name + "-harness.v " + dir + c.name + ".v"
-    val cmd = "vcs -full64 -quiet +vc +v2k -timescale=10ns/10ps " + src + " -o " + dir + c.name + 
+    val cmd = "vcs -full64 -quiet +vc +v2k -timescale=10ns/10ps +define+CLOCK_PERIOD=120 " + src + " -o " + dir + c.name + 
               ( if (!Driver.isTesting) " -debug" /* for ucli scripts */
                 else if (Driver.isDebug) " -debug_pp" /* for vpd dump */ 
                 else "" ) 
