@@ -99,11 +99,10 @@ class ManualTester[+T <: Module]
 
   def checkSnapshots() {
     if (!snapshots.isEmpty) {
-      if (isTrace) println("*** CHECK SNAPSHOTS ***")
+      if (isTrace) println("CHECK SNAPSHOTS at T = " + t)
       for (out <- outputs) {
         snapshots.last.expects += Expect(out, t, peekBits(out))
       }
-      if (isTrace) println("***********************")
     }
   }
 

@@ -1030,8 +1030,12 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
           peekBits(signal) }
       }
 
-      // take a snapshot
-      if (dice == 0) snapshot()
+      if (dice == 0) {
+        // check snapshotting
+        checkSnapshots()
+        // take a snapshot
+        snapshot()
+      }
     }
 
     // set t & delta
@@ -1047,14 +1051,13 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
         delta += delta_i
       }
     }
-
-    // check snapshotting
-    if (Driver.isSnapshotting && dice == 0) checkSnapshots()
   }
 
   var finished = false
   override def finish(): Boolean = {
     finished = true
+    // check snapshotting before quitting the tester
+    checkSnapshots()
     dumpSnapshots("%s.snapshots".format(c.name), snapshots)
     super.finish()
   }
