@@ -54,10 +54,8 @@ object Bundle {
   whole.
   */
 class Bundle(view_arg: Seq[String] = null) extends Aggregate {
-  var dir = "";
   var view = view_arg;
   private var elementsCache: ArrayBuffer[(String, Data)] = null;
-  var bundledElm: Node = null;
 
   /** Populates the cache of elements declared in the Bundle. */
   private def calcElements(view: Seq[String]): ArrayBuffer[(String, Data)] = {
@@ -213,10 +211,8 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     return null;
   }
 
-  override def <>(src: Node) {
-    if(comp == null || (dir == "output" &&
-      src.isInstanceOf[Bundle] &&
-      src.asInstanceOf[Bundle].dir == "output")){
+  override def <>(src: Node): Unit = {
+    if (comp == null) {
       src match {
         case other: Bundle => {
           for ((n, i) <- elements) {
@@ -259,11 +255,10 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
   }
 
   override def flatten: Array[(String, Bits)] = {
-    var res = ArrayBuffer[(String, Bits)]();
-    for ((n, i) <- elements){
-      res = res ++ i.flatten
-    }
-    res.sortWith(_._2._id < _._2._id).toArray
+    val res = ArrayBuffer[(String, Bits)]()
+    for ((n, i) <- elements.sortWith(_._2._id < _._2._id))
+      res ++= i.flatten
+    res.toArray
   }
 
   override def getWidth(): Int = {
@@ -273,47 +268,22 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     w
   }
 
-  override def toNode: Node = {
-    if(bundledElm == null) {
-      val nodes = flatten.map{case (n, i) => i};
-      bundledElm = Concatenate(nodes.head, nodes.tail.toList: _*)
-    }
-    bundledElm
-  }
-
-  override def fromNode(n: Node): this.type = {
-    val res = this.clone()
-    var ind = 0;
-    for((name, io) <- res.flatten.toList.reverse) {
-      io.asOutput();
-      if(io.width > 1) io assign NodeExtract(n, ind + io.width-1, ind) else io assign NodeExtract(n, ind);
-      ind += io.width;
-    }
-    res.setIsTypeNode
-    res
-  }
-
   override def asDirectionless(): this.type = {
     elements.foreach(_._2.asDirectionless)
-    this.dir = ""
     this
   }
 
   override def asInput(): this.type = {
     elements.foreach(_._2.asInput)
-    this.dir = "input"
     this
   }
 
   override def asOutput(): this.type = {
     elements.foreach(_._2.asOutput)
-    this.dir = "output"
     this
   }
 
-  override def isDirectionless: Boolean = {
-    (dir == "") && elements.map{case (n,i) => i.isDirectionless}.reduce(_&&_)
-  }
+  override def isDirectionless: Boolean = elements.forall(_._2.isDirectionless)
 
   override def setIsTypeNode() {
     isTypeNode = true;

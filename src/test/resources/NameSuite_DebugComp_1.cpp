@@ -23,8 +23,8 @@ bool NameSuite_DebugComp_1_t::set_circuit_from(mod_t* src) {
   NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen = mod_typed->NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen;
   NameSuite_DebugComp_1_dpath__wb_wen = mod_typed->NameSuite_DebugComp_1_dpath__wb_wen;
   NameSuite_DebugComp_1_dpath__reset = mod_typed->NameSuite_DebugComp_1_dpath__reset;
+  T0 = mod_typed->T0;
   NameSuite_DebugComp_1_dpath__wb_reg_ll_wb = mod_typed->NameSuite_DebugComp_1_dpath__wb_reg_ll_wb;
-  NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow = mod_typed->NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow;
   NameSuite_DebugComp_1_dpath__io_ctrl_out = mod_typed->NameSuite_DebugComp_1_dpath__io_ctrl_out;
   NameSuite_DebugComp_1__io_ctrl_out = mod_typed->NameSuite_DebugComp_1__io_ctrl_out;
   clk = mod_typed->clk;
@@ -112,17 +112,16 @@ L5:
 void NameSuite_DebugComp_1_t::clock_lo ( dat_t<1> reset ) {
   { NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0] = NameSuite_DebugComp_1__io_ctrl_wb_wen.values[0]; }
   { NameSuite_DebugComp_1_dpath__wb_wen.values[0] = NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0]|NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]; }
-  val_t T0__w0;
-  { T0__w0 = TERNARY(NameSuite_DebugComp_1_dpath__wb_wen.values[0], NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0], NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]); }
-  { NameSuite_DebugComp_1_dpath__reset.values[0] = reset.values[0]; }
   val_t T1__w0;
-  { T1__w0 = TERNARY(NameSuite_DebugComp_1_dpath__reset.values[0], 0x0L, T0__w0); }
-  { NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow.values[0] = T1__w0; }
+  { T1__w0 = TERNARY(NameSuite_DebugComp_1_dpath__wb_wen.values[0], NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0], NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]); }
+  { NameSuite_DebugComp_1_dpath__reset.values[0] = reset.values[0]; }
+  { T0.values[0] = TERNARY(NameSuite_DebugComp_1_dpath__reset.values[0], 0x0L, T1__w0); }
   { NameSuite_DebugComp_1_dpath__io_ctrl_out.values[0] = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]; }
   { NameSuite_DebugComp_1__io_ctrl_out.values[0] = NameSuite_DebugComp_1_dpath__io_ctrl_out.values[0]; }
 }
 void NameSuite_DebugComp_1_t::clock_hi ( dat_t<1> reset ) {
-  NameSuite_DebugComp_1_dpath__wb_reg_ll_wb = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb_shadow;
+  dat_t<1> NameSuite_DebugComp_1_dpath__wb_reg_ll_wb__shadow = T0;
+  NameSuite_DebugComp_1_dpath__wb_reg_ll_wb = T0;
 }
 void NameSuite_DebugComp_1_api_t::init_mapping_table() {
   dat_table.clear();

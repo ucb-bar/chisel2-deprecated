@@ -88,7 +88,7 @@ abstract class Data extends Node {
   }
 
   def apply(name: String): Data = null
-  def flatten: Array[(String, Bits)] = Array[(String, Bits)]();
+  def flatten: Array[(String, Bits)]
   def terminate(): Unit = { }
   def flip(): this.type = this;
   def asInput(): this.type = this;
@@ -103,11 +103,23 @@ abstract class Data extends Node {
 
   /** Factory method to create and assign a leaf-type instance out of a subclass
     of *Node* instance which we have lost the concrete type. */
-  def fromNode(n: Node): this.type;
-  def fromBits(b: Bits): this.type = {
-    val n = fromNode(b)
-    n.setIsTypeNode
-    n
+  def fromNode(n: Node): this.type = {
+    val res = this.clone
+    var ind = 0
+    for ((name, io) <- res.flatten.reverse) {
+      io.asOutput()
+      io assign NodeExtract(n, ind + io.getWidth-1, ind)
+      ind += io.getWidth
+    }
+    res.setIsTypeNode
+    res
+  }
+
+  def fromBits(b: Bits): this.type = this.fromNode(b)
+
+  override lazy val toNode: Node = {
+    val nodes = this.flatten.map(_._2)
+    Concatenate(nodes.head, nodes.tail:_*)
   }
 
   def :=(that: Data): Unit = that match {

@@ -201,14 +201,8 @@ abstract class Node extends nameable {
   def isIo = _isIo
   def isIo_=(isIo: Boolean) = _isIo = isIo
   def isReg: Boolean = false
-  def isUsedByRam: Boolean = {
-    for (c <- consumers)
-      if (c.isRamWriteInput(this)) {
-        return true;
-      }
-    return false;
-  }
-  def isRamWriteInput(i: Node): Boolean = false;
+  def isUsedByClockHi: Boolean = consumers.exists(_.usesInClockHi(this))
+  def usesInClockHi(i: Node): Boolean = false
   def initOf (n: String, width: (Node) => Int, ins: Iterable[Node]): Node = {
     name = n;
     inferWidth = width;
@@ -236,7 +230,7 @@ abstract class Node extends nameable {
   lazy val isInObject: Boolean =
     (isIo && (Driver.isIoDebug || component == Driver.topComponent)) ||
     Driver.topComponent.debugs.contains(this) ||
-    isReg || isUsedByRam || Driver.isDebug && !name.isEmpty ||
+    isReg || isUsedByClockHi || Driver.isDebug && !name.isEmpty ||
     Driver.emitTempNodes
 
   lazy val isInVCD: Boolean = name != "reset" && width > 0 &&

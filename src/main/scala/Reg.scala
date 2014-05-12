@@ -164,6 +164,8 @@ class Reg extends Delay with proc {
 
   def next: Node = inputs(0)
 
+  override def usesInClockHi(n: Node) = n eq next
+
   // these are used to infer read enables on Mems
   protected[Chisel] def isEnable: Boolean = next.isInstanceOf[Mux] && (next.inputs(2) eq this)
   protected[Chisel] def enableSignal: Node = if (isEnable) next.inputs(0) else Bool(true)

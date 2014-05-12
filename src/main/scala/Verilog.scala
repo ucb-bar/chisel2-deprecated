@@ -275,7 +275,7 @@ class VerilogBackend extends Backend {
         } else if (o.op == "s<" || o.op == "s<=") {
           "$signed(" + emitRef(node.inputs(0)) + ") " + o.op.tail + " $signed(" + emitRef(node.inputs(1)) + ")"
         } else if (o.op == "s>>") {
-          "$signed(" + emitRef(node.inputs(0)) + ") " + ">>>" + " $signed(" + emitRef(node.inputs(1)) + ")"
+          "$signed(" + emitRef(node.inputs(0)) + ") >>> " + emitRef(node.inputs(1))
         } else {
           emitRef(node.inputs(0)) + " " + o.op + " " + emitRef(node.inputs(1))
         }) + ";\n"

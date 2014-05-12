@@ -1,16 +1,16 @@
 module Arbiter(
-    output io_in_0_ready,
-    input  io_in_0_valid,
-    input [7:0] io_in_0_bits,
-    output io_in_1_ready,
-    input  io_in_1_valid,
-    input [7:0] io_in_1_bits,
-    output io_in_2_ready,
-    input  io_in_2_valid,
-    input [7:0] io_in_2_bits,
     output io_in_3_ready,
     input  io_in_3_valid,
     input [7:0] io_in_3_bits,
+    output io_in_2_ready,
+    input  io_in_2_valid,
+    input [7:0] io_in_2_bits,
+    output io_in_1_ready,
+    input  io_in_1_valid,
+    input [7:0] io_in_1_bits,
+    output io_in_0_ready,
+    input  io_in_0_valid,
+    input [7:0] io_in_0_bits,
     input  io_out_ready,
     output io_out_valid,
     output[7:0] io_out_bits,
@@ -70,39 +70,39 @@ module Arbiter(
   assign T14 = T15 ? io_in_3_valid : io_in_2_valid;
   assign T15 = T7[1'h0:1'h0];
   assign T16 = T7[1'h1:1'h1];
-  assign io_in_3_ready = T17;
+  assign io_in_0_ready = T17;
   assign T17 = T18 & io_out_ready;
-  assign T18 = T19;
-  assign T19 = T20 == 1'h0;
-  assign T20 = T21 | io_in_2_valid;
-  assign T21 = io_in_0_valid | io_in_1_valid;
+  assign T18 = 1'h1;
+  assign io_in_1_ready = T19;
+  assign T19 = T20 & io_out_ready;
+  assign T20 = T21;
+  assign T21 = io_in_0_valid == 1'h0;
   assign io_in_2_ready = T22;
   assign T22 = T23 & io_out_ready;
   assign T23 = T24;
   assign T24 = T25 == 1'h0;
   assign T25 = io_in_0_valid | io_in_1_valid;
-  assign io_in_1_ready = T26;
+  assign io_in_3_ready = T26;
   assign T26 = T27 & io_out_ready;
   assign T27 = T28;
-  assign T28 = io_in_0_valid == 1'h0;
-  assign io_in_0_ready = T29;
-  assign T29 = T30 & io_out_ready;
-  assign T30 = 1'h1;
+  assign T28 = T29 == 1'h0;
+  assign T29 = T30 | io_in_2_valid;
+  assign T30 = io_in_0_valid | io_in_1_valid;
 endmodule
 
 module StdlibSuite_ArbiterTest_1(
-    output io_in_0_ready,
-    input  io_in_0_valid,
-    input [7:0] io_in_0_bits,
-    output io_in_1_ready,
-    input  io_in_1_valid,
-    input [7:0] io_in_1_bits,
-    output io_in_2_ready,
-    input  io_in_2_valid,
-    input [7:0] io_in_2_bits,
     output io_in_3_ready,
     input  io_in_3_valid,
     input [7:0] io_in_3_bits,
+    output io_in_2_ready,
+    input  io_in_2_valid,
+    input [7:0] io_in_2_bits,
+    output io_in_1_ready,
+    input  io_in_1_valid,
+    input [7:0] io_in_1_bits,
+    output io_in_0_ready,
+    input  io_in_0_valid,
+    input [7:0] io_in_0_bits,
     input  io_out_ready,
     output io_out_valid,
     output[7:0] io_out_bits,
@@ -114,10 +114,10 @@ module StdlibSuite_ArbiterTest_1(
   wire arb_io_out_valid;
   wire[1:0] arb_io_chosen;
   wire[7:0] arb_io_out_bits;
-  wire arb_io_in_3_ready;
-  wire arb_io_in_2_ready;
-  wire arb_io_in_1_ready;
   wire arb_io_in_0_ready;
+  wire arb_io_in_1_ready;
+  wire arb_io_in_2_ready;
+  wire arb_io_in_3_ready;
 
 
   assign io_fire = T0;
@@ -125,23 +125,23 @@ module StdlibSuite_ArbiterTest_1(
   assign io_chosen = arb_io_chosen;
   assign io_out_bits = arb_io_out_bits;
   assign io_out_valid = arb_io_out_valid;
-  assign io_in_3_ready = arb_io_in_3_ready;
-  assign io_in_2_ready = arb_io_in_2_ready;
-  assign io_in_1_ready = arb_io_in_1_ready;
   assign io_in_0_ready = arb_io_in_0_ready;
+  assign io_in_1_ready = arb_io_in_1_ready;
+  assign io_in_2_ready = arb_io_in_2_ready;
+  assign io_in_3_ready = arb_io_in_3_ready;
   Arbiter arb(
-       .io_in_0_ready( arb_io_in_0_ready ),
-       .io_in_0_valid( io_in_0_valid ),
-       .io_in_0_bits( io_in_0_bits ),
-       .io_in_1_ready( arb_io_in_1_ready ),
-       .io_in_1_valid( io_in_1_valid ),
-       .io_in_1_bits( io_in_1_bits ),
-       .io_in_2_ready( arb_io_in_2_ready ),
-       .io_in_2_valid( io_in_2_valid ),
-       .io_in_2_bits( io_in_2_bits ),
        .io_in_3_ready( arb_io_in_3_ready ),
        .io_in_3_valid( io_in_3_valid ),
        .io_in_3_bits( io_in_3_bits ),
+       .io_in_2_ready( arb_io_in_2_ready ),
+       .io_in_2_valid( io_in_2_valid ),
+       .io_in_2_bits( io_in_2_bits ),
+       .io_in_1_ready( arb_io_in_1_ready ),
+       .io_in_1_valid( io_in_1_valid ),
+       .io_in_1_bits( io_in_1_bits ),
+       .io_in_0_ready( arb_io_in_0_ready ),
+       .io_in_0_valid( io_in_0_valid ),
+       .io_in_0_bits( io_in_0_bits ),
        .io_out_ready( io_out_ready ),
        .io_out_valid( arb_io_out_valid ),
        .io_out_bits( arb_io_out_bits ),

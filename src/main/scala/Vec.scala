@@ -104,7 +104,6 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
   val self = new ArrayBuffer[T]
   val readPortCache = new HashMap[UInt, T]
   var sortedElementsCache: ArrayBuffer[ArrayBuffer[Data]] = null
-  var flattenedVec: Node = null
 
   override def apply(idx: Int): T = self(idx)
 
@@ -157,7 +156,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
 
   override def flatten: Array[(String, Bits)] = {
     val res = new ArrayBuffer[(String, Bits)]
-    for (elm <- self)
+    for (elm <- self.reverse)
       res ++= elm.flatten
     res.toArray
   }
@@ -278,29 +277,6 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
   override def clone(): this.type =
     Vec.tabulate(size)(gen).asInstanceOf[this.type]
     //Vec(this: Seq[T]).asInstanceOf[this.type]
-
-  override def toNode: Node = {
-    if(flattenedVec == null){
-      val nodes = Vec(this.reverse).flatten.map{case(n, i) => i}
-      flattenedVec = Concatenate(nodes.head, nodes.tail.toList: _*)
-    }
-    flattenedVec
-  }
-
-  override def fromNode(n: Node): this.type = {
-    val res = this.clone
-    var ind = 0
-    for ((name, io) <- res.flatten) {
-      io.asOutput();
-      if(io.width > 1) {
-        io assign NodeExtract(n, ind + io.width-1, ind)
-      } else {
-        io assign NodeExtract(n, ind);
-      }
-      ind += io.width;
-    }
-    res
-  }
 
   override def asDirectionless(): this.type = {
     self.foreach(_.asDirectionless)

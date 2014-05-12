@@ -123,8 +123,7 @@ class CppBackend extends Backend {
       case x: Literal =>
         List()
       case x: Reg =>
-        List((s"dat_t<${node.width}>", emitRef(node)),
-             (s"dat_t<${node.width}>", emitRef(node) + "_shadow"))
+        List((s"dat_t<${node.width}>", emitRef(node)))
       case m: Mem[_] =>
         List((s"mem_t<${m.width},${m.n}>", emitRef(m)))
       case r: ROMData =>
@@ -476,10 +475,6 @@ class CppBackend extends Backend {
           + " = " + emitRef(r.rom) + ".get(" + emitLoWordRef(r.addr) + ", "
           + i + ")"))
 
-      case reg: Reg =>
-        def shadow(w: Int): String = emitRef(reg) + "_shadow.values[" + w + "]"
-        block((0 until words(reg)).map(i => shadow(i) + " = " + emitWordRef(reg.next, i)))
-
       case x: Log2 =>
         (emitTmpDec(x) + "  " + emitLoWordRef(x) + " = "
           + (words(x.inputs(0))-1 to 1 by -1).map(
@@ -506,10 +501,18 @@ class CppBackend extends Backend {
     }
   }
 
+  def emitRefHi(node: Node): String = node match {
+    case reg: Reg =>
+      if (reg.next.isReg) emitRef(reg) + "__shadow"
+      else emitRef(reg.next)
+    case _ => emitRef(node)
+  }
+
   def emitDefHi(node: Node): String = {
     node match {
       case reg: Reg =>
-        "  " + emitRef(reg) + " = " + emitRef(reg) + "_shadow;\n"
+        s"  ${emitRef(reg)} = ${emitRefHi(reg)};\n"
+
       case _ => ""
     }
   }
@@ -546,16 +549,14 @@ class CppBackend extends Backend {
 
   def emitInitHi(node: Node): String = {
     node match {
+      case reg: Reg =>
+        s"  dat_t<${node.width}> ${emitRef(reg)}__shadow = ${emitRef(reg.next)};\n"
+
       case m: MemWrite =>
-        // schedule before Reg updates in case a MemWrite input is a Reg
-        if (m.inputs.length == 2)
-          ""
-        else
-          block((0 until words(m)).map(i =>
-            "if (" + emitLoWordRef(m.cond) + ") " + emitRef(m.mem) +
-            ".put(" + emitLoWordRef(m.addr) + ", " +
-            i + ", " +
-            emitWordRef(m.data, i) + ")"))
+        block((0 until words(m)).map(i =>
+          s"if (${emitLoWordRef(m.cond)}) ${emitRef(m.mem)}" +
+          s".put(${emitLoWordRef(m.addr)}, " +
+          s"${i}, ${emitWordRef(m.data, i)})"))
 
       case _ =>
         ""
@@ -833,20 +834,16 @@ class CppBackend extends Backend {
     }
     writeCppFile("}\n")
 
-    for (m <- c.omods) {
-      val clock = if (m.clock == null) Driver.implicitClock else m.clock
-      clkDomains(clock)._1.append(emitDefLo(m))
-    }
+    def clock(n: Node) = if (n.clock == null) Driver.implicitClock else n.clock
 
-    for (m <- c.omods) {
-      val clock = if (m.clock == null) Driver.implicitClock else m.clock
-      clkDomains(clock)._2.append(emitInitHi(m))
-    }
+    for (m <- c.omods)
+      clkDomains(clock(m))._1.append(emitDefLo(m))
 
-    for (m <- c.omods) {
-      val clock = if (m.clock == null) Driver.implicitClock else m.clock
-      clkDomains(clock)._2.append(emitDefHi(m))
-    }
+    for (m <- c.omods)
+      clkDomains(clock(m))._2.append(emitInitHi(m))
+
+    for (m <- c.omods)
+      clkDomains(clock(m))._2.append(emitDefHi(m))
 
     for (clk <- clkDomains.keys) {
       clkDomains(clk)._1.append("}\n")
