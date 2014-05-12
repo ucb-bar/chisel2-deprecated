@@ -1017,6 +1017,8 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     while (peek(stalled) == 0)
       takeSteps(1)
 
+    val dice = rnd.nextInt(5)
+
     if (Driver.isSnapshotting) {
       // read out signal values
       if (isTrace) println("*** READ STATE VALUES ***")
@@ -1029,7 +1031,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
       }
 
       // take a snapshot
-      snapshot()
+      if (dice == 0) snapshot()
     }
 
     // set t & delta
@@ -1047,7 +1049,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     }
 
     // check snapshotting
-    if (Driver.isSnapshotting) checkSnapshots()
+    if (Driver.isSnapshotting && dice == 0) checkSnapshots()
   }
 
   var finished = false
