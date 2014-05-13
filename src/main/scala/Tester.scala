@@ -475,8 +475,8 @@ class ManualTester[+T <: Module]
       dumpSnapshots(c.name + ".snaps", snapshots)
     }
     if (isLoggingPokes) {
-      addExpects(snapshots)
-      dumpSnapshots(c.name + ".pokes", snapshots)
+      addExpects(pokez)
+      dumpSnapshots(c.name + ".pokes", pokez)
     }
     if (process != null) {
       emulatorCmd("quit")
