@@ -50,8 +50,8 @@ class Snapshot(val t: Int) {
 class ManualTester[+T <: Module]
     (val c: T, 
       val isTrace: Boolean = true,
-      var isSnapshotting: Boolean = false, 
-      var isLoggingPokes: Boolean = false) {
+      val isSnapshotting: Boolean = false, 
+      val isLoggingPokes: Boolean = false) {
   var testIn:  InputStream  = null
   var testOut: OutputStream = null
   var testErr: InputStream  = null
@@ -92,15 +92,16 @@ class ManualTester[+T <: Module]
   }
 
   def snapshot(): Snapshot = {
+    addExpects(snapshots)
     val snap = dump()
     snapshots += snap
     snap
   }
 
-  def checkSnapshots(snaps: ArrayBuffer[Snapshot]) {
-    if (!snaps.isEmpty) {
+  def addExpects(snaps: ArrayBuffer[Snapshot]) {
+    if (t > 1 && !snaps.isEmpty) {
       for (out <- outputs) {
-        if (isTrace) println("ADDING EXPECT AT T = " + t)
+        if (isTrace) println("ADDING EXPECT AT T=" + t)
         snaps.last.expects += Expect(out, t, peekBits(out))
       }
     }
@@ -117,7 +118,7 @@ class ManualTester[+T <: Module]
     if (snaps.length > 0 && snaps.last.t == now) 
       snaps.last.pokes += poke 
     else { 
-      checkSnapshots(snaps)
+      addExpects(snaps)
       val snap = new Snapshot(now); 
       snap.pokes += poke
       snaps += snap;
@@ -180,14 +181,14 @@ class ManualTester[+T <: Module]
         now = snapshot.t
       }
       for (p <- snapshot.pokes) {
-        f.write("POKE " + dumpName(p.node) + " " + p.value + (if (p.index == -1) "" else (" " + p.index)) + "\n")
+        f.write("POKE " + dumpName(p.node) + " " + p.node.width + " " + p.value + (if (p.index == -1) "" else (" " + p.index)) + "\n")
       }
       for (e <- snapshot.expects) {
         if (e.t > now) {
           f.write("STEP " + (e.t - now) + "\n")
           now = e.t
         }
-        f.write("EXPECT " + dumpName(e.node) + " " + e.expected + "\n")
+        f.write("EXPECT " + dumpName(e.node) + " " + e.node.width + " " + e.expected + "\n")
       }
     }
     f.close()
@@ -362,7 +363,7 @@ class ManualTester[+T <: Module]
 
   def pokeBits(data: Node, x: BigInt, off: Int = -1): Unit = {
     if (isSnapshotting) addPoke(snapshots, t, Poke(data, off, x)) 
-    if (isLoggingPokes) addPoke(pokez, t, Poke(data, off, x))
+    if (isLoggingPokes) addPoke(pokez,     t, Poke(data, off, x))
     doPokeBits(data, x, off)
   }
 
@@ -469,6 +470,14 @@ class ManualTester[+T <: Module]
   }
 
   def finish(): Boolean = {
+    if (isSnapshotting) {
+      addExpects(snapshots)
+      dumpSnapshots(c.name + ".snaps", snapshots)
+    }
+    if (isLoggingPokes) {
+      addExpects(snapshots)
+      dumpSnapshots(c.name + ".pokes", snapshots)
+    }
     if (process != null) {
       emulatorCmd("quit")
 
@@ -490,7 +499,9 @@ class ManualTester[+T <: Module]
   }
 }
 
-class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends ManualTester(c, isTrace) {
+class Tester[+T <: Module](c: T, isTrace: Boolean = true, 
+    isSnapshotting: Boolean = false, 
+    isLoggingPokes: Boolean = false) extends ManualTester(c, isTrace, isSnapshotting, isLoggingPokes) {
   start()
 }
 

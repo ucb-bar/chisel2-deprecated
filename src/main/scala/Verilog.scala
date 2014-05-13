@@ -543,7 +543,7 @@ class VerilogBackend extends Backend {
     }
     
     harness.write("  /*** resets &&  VCD / VPD dumps ***/\n")
-    harness.write("  parameter reset_period = `CLOCK_PERIOD * 4;\n")
+    if (!resets.isEmpty) harness.write("  parameter reset_period = `CLOCK_PERIOD * 4;\n")
     harness.write("  initial begin\n")
     for (rst <- resets)
       harness.write("  %s = 1;\n".format(rst.name))
@@ -552,7 +552,7 @@ class VerilogBackend extends Backend {
       harness.write("    $vcdplusfile(\"%s.vpd\");\n".format(ensureDir(Driver.targetDir)+c.name))
       harness.write("    $vcdpluson;\n")
     }
-    harness.write("  #reset_period;\n")
+    if (!resets.isEmpty) harness.write("  #reset_period;\n")
     for (rst <- resets)
       harness.write("  %s = 0;\n".format(rst.name))
     if (!Driver.isDebug && Driver.isVCD) {
@@ -587,7 +587,6 @@ class VerilogBackend extends Backend {
       harness.write("  end\n\n")
     }
 
-    // TODO: select interface according to the tester
     if (Driver.isTesting) { 
       harness write harnessAPIs(mainClk, clocks, resets, wires, mems, scanNodes, printNodes)
     } else {
@@ -782,7 +781,7 @@ class VerilogBackend extends Backend {
     apis.append("    if (count == -1) $finish(1);\n")
     apis.append("  end\n\n")
 
-    apis.append("  integer min = (1 << 31 -1);\n")
+    if (clocks.size > 1) apis.append("  integer min = (1 << 31 -1);\n")
     apis.append("  always @(posedge %s) begin\n".format(mainClk.name))
     if (clocks.size > 1) {
       apis.append("    // fire clocks according to their relative length\n")
@@ -835,26 +834,13 @@ class VerilogBackend extends Backend {
     apis.result
   }
 
+  /*** Test bench for replay ***/
   def harnessMap (mainClk: Clock, resets: ArrayBuffer[Bool], scanNodes: Array[Bits], printNodes: Array[Bits]) = {
     val map = new StringBuilder
     val printFormat = printNodes.map(a => a.chiselName + ": 0x%x, ").fold("")((y,z) => y + " " + z)
     val scanFormat = scanNodes.map(a => "%x").fold("")((y,z) => y + " " + z)
 
-    if (Driver.isTesting) {
-      map.append("  integer count;\n")
-      map.append("  always @(negedge %s) begin\n".format(mainClk.name))
-      map.append("  #50;\n")
-      if (!resets.isEmpty)
-        map.append("    if (%s)\n".format(
-          (resets.tail foldLeft ("!" + resets.head.name))(_ + " || !" + _.name)))
-      map.append("      count = $fscanf('h80000000, \"" + scanFormat.slice(0,scanFormat.length-1) + "\"")
-      for (node <- scanNodes)
-        map.append(", " + emitRef(node))
-      map.append(");\n")
-      map.append("      if (count == -1) $finish(1);\n")
-      map.append("  end\n")
-    }
-    map.append("  always @(posedge %s) begin\n".format(mainClk.name))
+    map.append("\n  always @(negedge %s) begin\n".format(mainClk.name))
     if (!resets.isEmpty)
       map.append("    if (%s)\n".format(
         (resets.tail foldLeft ("!" + resets.head.name))(_ + " || !" + _.name)))
@@ -863,7 +849,7 @@ class VerilogBackend extends Backend {
       map.append(", " + emitRef(node))
     }
     map.append(");\n")
-    map.append("  end\n")
+    map.append("  end\n\n")
 
     map.result
   }
