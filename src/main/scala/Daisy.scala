@@ -1173,7 +1173,7 @@ abstract class DaisyWrapperTester[+T <: DaisyWrapper[_]](c: T, isTrace: Boolean 
   }
 
   override def step(n: Int) = {
-    println("*** POKES ***")
+    if (isTrace) println("*** POKES ***")
     for (i <- 0 until c.waddr) {
       pokeAddr(i, pokeValues(i))
     }
@@ -1181,7 +1181,7 @@ abstract class DaisyWrapperTester[+T <: DaisyWrapper[_]](c: T, isTrace: Boolean 
     for (i <- 0 until c.waddr) {
       pokeValues(i) = 0
     }
-    println("*** PEEKS ***")
+    if (isTrace) println("*** PEEKS ***")
     for (i <- 0 until c.raddr) {
       peekValues(i) = peekAddr(i) 
     }
