@@ -840,7 +840,18 @@ class VerilogBackend extends Backend {
     val printFormat = printNodes.map(a => a.chiselName + ": 0x%x, ").fold("")((y,z) => y + " " + z)
     val scanFormat = scanNodes.map(a => "%x").fold("")((y,z) => y + " " + z)
 
-    map.append("\n  always @(negedge %s) begin\n".format(mainClk.name))
+    map.append("  task expect;\n")
+    map.append("    input [63:0] data;\n")
+    map.append("    input [63:0] expected;\n")
+    map.append("    begin\n")
+    map.append("      if (data == expected)\n")
+    map.append("        $display(\"PASS\");\n")
+    map.append("      else\n")
+    map.append("        $display(\"FAIL\");\n")
+    map.append("    end\n\n")
+    map.append("  endtask\n\n")
+
+    map.append("  always @(negedge %s) begin\n".format(mainClk.name))
     if (!resets.isEmpty)
       map.append("    if (%s)\n".format(
         (resets.tail foldLeft ("!" + resets.head.name))(_ + " || !" + _.name)))
