@@ -111,10 +111,10 @@ class ManualTester[+T <: Module]
     if (snaps.length > 0 && snaps.last.t > now) {
       val lastIndex = findSnapshotIndex(snaps, now)
       val amount = snaps.length-lastIndex-1
-      println("TRIMMING " + amount + " FROM " + snaps.length)
+      if (isTrace) println("TRIMMING " + amount + " FROM " + snaps.length)
       if (amount > 0) snaps.trimEnd(amount)
     }
-    println("ADDING POKE T=" + now)
+    if (isTrace) println("ADDING POKE T=" + now)
     if (snaps.length > 0 && snaps.last.t == now) 
       snaps.last.pokes += poke 
     else { 
@@ -129,25 +129,25 @@ class ManualTester[+T <: Module]
     var now = 0
     var lines = io.Source.fromFile(filename).getLines
     val snaps = new ArrayBuffer[Snapshot]()
-    println("LOADING")
+    if (isTrace) println("LOADING")
     for (line <- lines) {
       val words = line.split(" ")
       if (words.length > 0) {
         if (words(0) == "STEP") {
           assert(words.length == 2, "STEP TAKES ONE ARG")
           now += words(1).toInt
-          println("  <STEP " + words(1).toInt + " T=" + now)
+          if (isTrace) println("  <STEP " + words(1).toInt + " T=" + now)
         } else if (words(0) == "POKE") {
           assert(words.length == 3 || words.length == 4, "POKE TAKES THREE / FOUR ARGS")
           val off = if (words.length == 4) words(3).toInt else -1
           addPoke(snaps, now, Poke(mappings(words(1)), off, words(2).toInt))
-          println("  <POKE " + words(1) + " T=" + now)
+          if (isTrace) println("  <POKE " + words(1) + " T=" + now)
         }
       }
     }
-    println("LOADED " + snaps.length + " SNAPSHOTS")
+    if (isTrace) println("LOADED " + snaps.length + " SNAPSHOTS")
     for (snap <- snaps)
-      println("  SNAP T=" + snap.t + " N=" + snap.pokes.length)
+      if (isTrace) println("  SNAP T=" + snap.t + " N=" + snap.pokes.length)
     snaps
  }
 
@@ -195,20 +195,20 @@ class ManualTester[+T <: Module]
   }
 
   def load(s: Snapshot) = {
-    println("LOADING SNAPSHOT AT " + s.t)
+    if (isTrace) println("LOADING SNAPSHOT AT " + s.t)
     for (poke <- s.pokes) 
       doPokeBits(poke.node, poke.value, poke.index)
   }
 
   def findSnapshotIndex(snaps: ArrayBuffer[Snapshot], target: Int): Int = {
-    println("LOOKING FOR T=" + target + " OUT OF " + snaps.length + " SNAPS")
+    if (isTrace) println("LOOKING FOR T=" + target + " OUT OF " + snaps.length + " SNAPS")
     for (i <- 0 until (snaps.length-1)) {
       if (snaps(i+1).t > target) {
-        println("  FOUND I=" + i + " AT T=" + snaps(i).t)
+        if (isTrace) println("  FOUND I=" + i + " AT T=" + snaps(i).t)
         return i
       }
     }
-    println("  DEFAULT I=" + (snaps.length-1) + " AT T=" + snaps.last.t)
+    if (isTrace) println("  DEFAULT I=" + (snaps.length-1) + " AT T=" + snaps.last.t)
     return snaps.length-1
   }
 
@@ -216,7 +216,7 @@ class ManualTester[+T <: Module]
     val lastIndex = findSnapshotIndex(snapshots, target)
     val snap = snapshots(lastIndex)
     snapshots.trimEnd(snapshots.length-lastIndex-1)
-    println("FOUND SNAPSHOT AT T=" + snap.t)
+    if (isTrace) println("FOUND SNAPSHOT AT T=" + snap.t)
     load(snap);
     t = snap.t
     for (tk <- snap.t to target) 
@@ -383,11 +383,11 @@ class ManualTester[+T <: Module]
 
   def checkForPokes(start: Int, target: Int) = {
     var pokeIndex = findSnapshotIndex(pokez, start)
-    println("CHECKING POKES FROM T=" + start + " TO T=" + target + " POKEZ INDEX " + pokeIndex)
+    if (isTrace) println("CHECKING POKES FROM T=" + start + " TO T=" + target + " POKEZ INDEX " + pokeIndex)
     for (tk <- start to target) {
       if (pokeIndex < pokez.length) {
         val snap = pokez(pokeIndex)
-        println("  LOOKING AT POKES(" + pokeIndex + ") T=" + snap.t + " VS T=" + tk + " WITH N=" + snap.pokes.length + " POKES")
+        if (isTrace) println("  LOOKING AT POKES(" + pokeIndex + ") T=" + snap.t + " VS T=" + tk + " WITH N=" + snap.pokes.length + " POKES")
         if (snap.t == tk) {
           print("FOUND: ")
           load(snap)

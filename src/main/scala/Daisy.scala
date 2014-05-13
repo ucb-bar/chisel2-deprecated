@@ -309,7 +309,7 @@ object DaisyChain extends Backend {
         var offset = 0
         for (in <- ins) {
           wrapper.ioMap(in) = ((wrapper.waddr, offset))
-          wire(wrapper.wdata(wrapper.waddr)(in.width-1, offset) -> in)
+          wire(wrapper.wdata(wrapper.waddr)(in.width-1+offset, offset) -> in)
           offset += in.width
         }
         wire(stalled -> wrapper.wready(wrapper.waddr))
