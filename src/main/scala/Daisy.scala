@@ -241,13 +241,13 @@ object DaisyChain extends Backend {
     b.transforms += ((c: Module) => setClockDomains(top))
     b.transforms += ((c: Module) => decoupleTarget(top))
     b.transforms += ((c: Module) => appendFires(top))
+    if (Driver.isSnapshotting) {
+      b.transforms += (c => findDelays(top))
+      b.transforms += (c => genDaisyChain(top, SnapshotChain))
+    }
     if (Driver.isCounting) {
       b.transforms += (c => genCounters(top))
       b.transforms += (c => genDaisyChain(top, CounterChain))
-    }
-    if (Driver.isSnapshotting) {
-      b.transforms += (c => findStates(top))
-      b.transforms += (c => genDaisyChain(top, SnapshotChain))
     }
     b.transforms += ((c: Module) => c.addClockAndReset)
     b.transforms += ((c: Module) => gatherClocksAndResets)
@@ -288,7 +288,6 @@ object DaisyChain extends Backend {
 
   val ioBuffers = new HashMap[Node, Bits]
   val fires = new HashMap[Module, Bool]
-  val fireBufs = new HashMap[Module, Bool]
   val firePins = new HashMap[Module, Bool]
   val enClks = new LinkedHashMap[Clock, HashMap[Module, Bool]]
   val clkRegs = new HashMap[Clock, UInt]
@@ -370,14 +369,8 @@ object DaisyChain extends Backend {
         wire(firePins(m.parent) -> firePins(m))
       }
 
-      // add a fire pin buffer used by event counters
-      // Event counters should increase one cycle after
-      // the target is activated
-      fireBufs(m) = addReg(m, Reg(next=firePins(m)), "fire_pin_buf")
-      fireBufs(m).comp.clock = Driver.implicitClock
-
       if (Driver.isSnapshotting) {
-        val snapValid = !firePins(m) && !fireBufs(m)
+        val snapValid = !firePins(m) 
         val snapFire = addNode(m, snapOuts(m).ready && snapValid, "snap_fire")
         snapCopy(m) = addNode(m, snapFire && (snapCtrls(m) === Bits(0)), "snap_copy")
         snapRead(m) = addNode(m, snapFire && (snapCtrls(m) === Bits(1)), "snap_read")
@@ -388,7 +381,7 @@ object DaisyChain extends Backend {
         }
       }
       if (Driver.isCounting) {
-        val cntrValid = !firePins(m) && !fireBufs(m) 
+        val cntrValid = !firePins(m) 
         val cntrFire = addNode(m, cntrOuts(m).ready && cntrValid, "cntr_fire")
         cntrCopy(m) = addNode(m, cntrFire && (cntrCtrls(m) === Bits(0)), "cntr_copy")
         cntrRead(m) = addNode(m, cntrFire && (cntrCtrls(m) === Bits(1)), "cntr_read")
@@ -473,7 +466,7 @@ object DaisyChain extends Backend {
   }
 
   def decoupleTarget(c: Module) = {
-    ChiselError.info("[DaisyChain] target decoupling")
+    ChiselError.info("[DaisyChain] insert IO buffers")
     for ((name, io) <- c.io.asInstanceOf[Bundle].elements) {
       io nameIt (name, true)
     }
@@ -496,7 +489,7 @@ object DaisyChain extends Backend {
         val pinInput = targetPin.inputs.head.getNode
         val pinWidth = targetPin.width
         ioBuffers(targetPin) = addReg(c, Reg(init=UInt(pinInput, pinWidth)), bufName)
-        updateReg(ioBuffers(targetPin), fireBufs(c) -> pinInput)
+        updateReg(ioBuffers(targetPin), firePins(c) -> pinInput)
         wire(ioBuffers(targetPin) -> targetPin)
       }
     }
@@ -517,8 +510,8 @@ object DaisyChain extends Backend {
       // Make all delay nodes be enabled by the fire signal
       for (node <- m.nodes ; if !(keywords contains node.name)) {
         val fire = 
-          if (Driver.clocks.size <= 1 || node.clock == null) fireBufs(m) 
-          else fireBufs(m) && enClks(node.clock)(m) 
+          if (Driver.clocks.size <= 1 || node.clock == null) firePins(m) 
+          else firePins(m) && enClks(node.clock)(m) 
         node match {
           case reg: Reg => {
             reg.inputs(0) = Multiplex(fire, reg.next, reg)
@@ -541,19 +534,9 @@ object DaisyChain extends Backend {
     }
   }
 
-  def findStates(c: Module) { 
-    ChiselError.info("[SnapshotChain] find state elements")
-    /*** collect state elements for snapshotting ***/
-    // First, collect the top component's inputs
-    // TODO: do not include any more
-    /*
-    for ((name, targetPin) <- c.io.flatten ; 
-      if !(keywords contains name) && targetPin.dir == INPUT) {
-        c.states += State(targetPin)
-      }
-    */
-
-    // Second, collect all the state elements (Reg & Mem)
+  def findDelays(c: Module) { 
+    ChiselError.info("[SnapshotChain] find delay elements")
+    /*** collect delay elements(Reg/Mem) for snapshotting ***/
     val queue = ScalaQueue(c)
     while (!queue.isEmpty) {
       val m = queue.dequeue
@@ -596,8 +579,8 @@ object DaisyChain extends Backend {
       val width = signal.width
       val c = counter.src.comp.component
       val fire = 
-        if (Driver.clocks.size <= 1 || signal.clock == null) fireBufs(c) 
-        else fireBufs(c) && enClks(signal.clock)(c) 
+        if (Driver.clocks.size <= 1 || signal.clock == null) firePins(c) 
+        else firePins(c) && enClks(signal.clock)(c) 
       val signalValue = signal match { 
         case io: Bits => 
           ioBuffers getOrElse (io, io)
@@ -855,6 +838,19 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     }
   }
 
+  def takeSteps (n: Int) {
+    val clk = emulatorCmd("step %d".format(n))
+    if (isTrace) println("  STEP %d".format(n))
+  }
+
+  def propagate () {
+    val str = emulatorCmd("propagate")
+  }
+
+  def tick () {
+    val str = emulatorCmd("tick")
+  }
+
   // set clock counters
   def pokeClock (clk: Int) {
     while (peek(clockIn.ready) == 0) {
@@ -864,11 +860,6 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     pokeBits(clockIn.valid, 1)
     takeSteps(1)
     pokeBits(clockIn.valid, 0)
-  }
-
-  def takeSteps (n: Int) {
-    val clk = emulatorCmd("step %d".format(n))
-    if (isTrace) println("  STEP %d".format(n))
   }
 
   def pokeSteps (n: Int) {
@@ -1046,7 +1037,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     counterVals.clear
     counterVals ++= Array.fill(counters.size)(BigInt(0))
     for (k <- 0 until n) {
-      takeSteps(1)
+      propagate()
       if (Driver.isCounting) {
         if (isTrace) println("*** READ COUNTER SIGNALS ***")
         for ((counter, i) <- counters.zipWithIndex) {
@@ -1059,6 +1050,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
           counterPeeks(i) = curPeek
         }
       }
+      tick()
     }
 
     while (peek(stalled) == 0)
