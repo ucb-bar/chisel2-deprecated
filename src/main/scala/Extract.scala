@@ -37,16 +37,9 @@ object NodeExtract {
   def apply(mod: Node, bit: Int): Node = apply(mod, bit, bit)
 
   // extract one bit
-  def apply(mod: Node, bit: Node): Node = {
-    val bitLit = bit.litOf
-    if (bitLit != null) {
-      apply(mod, bitLit.value.toInt)
-    } else if (mod.litOf == null) {
-      makeExtract(mod, bit)
-    } else { // don't use Extract on literals
-      Op(">>", fixWidth(1), mod, bit)
-    }
-  }
+  def apply(mod: Node, bit: Node): Node =
+    if (mod.isLit || bit.isLit) apply(mod, bit, bit, 1)
+    else makeExtract(mod, bit, bit, fixWidth(1))
 
   // extract bit range
   def apply(mod: Node, hi: Int, lo: Int): Node = apply(mod, hi, lo, -1)
@@ -71,22 +64,12 @@ object NodeExtract {
     val widthInfer = if (width == -1) widthOf(0) else fixWidth(width)
     if (hiLit != null && loLit != null) {
       apply(mod, hiLit.value.toInt, loLit.value.toInt, width)
-    } else if (mod.litOf == null && (hiLit != null && loLit != null)) {
-      makeExtract(mod, hi, lo, widthInfer)
     } else { // don't use Extract on literals
       val rsh = Op(">>", widthInfer, mod, lo)
       val hiMinusLoPlus1 = Op("+", maxWidth _, Op("-", maxWidth _, hi, lo), UInt(1))
       val mask = Op("-", widthInfer, Op("<<", widthInfer, UInt(1), hiMinusLoPlus1), UInt(1))
       Op("&", widthInfer, rsh, mask)
     }
-  }
-
-  private def makeExtract(mod: Node, bit: Node) = {
-    val res = new Extract
-    res.init("", fixWidth(1), mod, bit)
-    res.hi = bit
-    res.lo = bit
-    res
   }
 
   private def makeExtract(mod: Node, hi: Node, lo: Node, width: (Node) => Int) = {
