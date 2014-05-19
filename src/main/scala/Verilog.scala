@@ -568,25 +568,25 @@ class VerilogBackend extends Backend {
     }
     harness.write("  end\n\n")
 
-    if (Driver.isTesting) {
-      harness.write("  /*** ROM & Mem initialization ***/\n")
-      harness.write("  integer i = 0;\n")
-      harness.write("  initial begin\n")
-      harness.write("  #50;\n")
-      for (rom <- roms) {
-        val pathName = rom.component.getPathName(".") + "." + emitRef(rom)
-        for (i <- 0 until rom.lits.size) {
-          harness.write("    %s[%d] = %s;\n".format(pathName, i, emitRef(rom.lits(i))))
-        }
+    harness.write("`ifndef GATE_LEVEL\n")
+    harness.write("  /*** ROM & Mem initialization ***/\n")
+    harness.write("  integer i = 0;\n")
+    harness.write("  initial begin\n")
+    for (rom <- roms) {
+      val pathName = rom.component.getPathName(".") + "." + emitRef(rom)
+      for (i <- 0 until rom.lits.size) {
+        harness.write("    %s[%d] = %s;\n".format(pathName, i, emitRef(rom.lits(i))))
       }
-      for (mem <- mems) {
-        val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
-        harness.write("    for (i = 0 ; i < %d ; i = i + 1) begin\n".format(mem.n))
-        harness.write("      %s[i] = 0;\n".format(pathName))
-        harness.write("    end\n")
-      }
-      harness.write("  end\n\n")
     }
+    harness.write("  #50;\n")
+    for (mem <- mems) {
+      val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
+      harness.write("    for (i = 0 ; i < %d ; i = i + 1) begin\n".format(mem.n))
+      harness.write("      %s[i] = 0;\n".format(pathName))
+      harness.write("    end\n")
+    }
+    harness.write("  end\n\n")
+    harness.write("`endif\n")
 
     if (Driver.isTesting) { 
       harness write harnessAPIs(mainClk, clocks, resets, wires, mems, scanNodes, printNodes)
@@ -872,7 +872,7 @@ class VerilogBackend extends Backend {
     map.append("    end\n\n")
     map.append("  endtask\n\n")
 
-    map.append("  always @(negedge %s) begin\n".format(mainClk.name))
+    map.append("  always @(posedge %s) begin\n".format(mainClk.name))
     if (!resets.isEmpty)
       map.append("    if (%s)\n".format(
         (resets.tail foldLeft ("!" + resets.head.name))(_ + " || !" + _.name)))

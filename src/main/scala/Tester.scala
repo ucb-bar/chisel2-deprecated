@@ -100,6 +100,7 @@ class ManualTester[+T <: Module]
 
   def addExpects(snaps: ArrayBuffer[Snapshot]) {
     if (t > 1 && !snaps.isEmpty) {
+      propagate()
       for (out <- outputs) {
         if (isTrace) println("ADDING EXPECT AT T=" + t)
         snaps.last.expects += Expect(out, t, peekBits(out))
@@ -395,6 +396,14 @@ class ManualTester[+T <: Module]
         }
       }
     }
+  }
+
+  def propagate() = {
+    val s = emulatorCmd("propagate")
+  }
+
+  def tick() = {
+    val s = emulatorCmd("tick")
   }
 
   def step(n: Int) = {

@@ -860,14 +860,6 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     if (isTrace) println("  STEP %d".format(n))
   }
 
-  def propagate () {
-    val str = emulatorCmd("propagate")
-  }
-
-  def tick () {
-    val str = emulatorCmd("tick")
-  }
-
   // set clock counters
   def pokeClock (clk: Int) {
     while (peek(clockIn.ready) == 0) {
