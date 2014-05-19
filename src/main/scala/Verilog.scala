@@ -578,12 +578,14 @@ class VerilogBackend extends Backend {
         harness.write("    %s[%d] = %s;\n".format(pathName, i, emitRef(rom.lits(i))))
       }
     }
-    harness.write("  #50;\n")
-    for (mem <- mems) {
-      val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
-      harness.write("    for (i = 0 ; i < %d ; i = i + 1) begin\n".format(mem.n))
-      harness.write("      %s[i] = 0;\n".format(pathName))
-      harness.write("    end\n")
+    if (Driver.isTesting) {
+      harness.write("  #50;\n")
+      for (mem <- mems) {
+        val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
+        harness.write("    for (i = 0 ; i < %d ; i = i + 1) begin\n".format(mem.n))
+        harness.write("      %s[i] = 0;\n".format(pathName))
+        harness.write("    end\n")
+      }
     }
     harness.write("  end\n\n")
     harness.write("`endif\n")
