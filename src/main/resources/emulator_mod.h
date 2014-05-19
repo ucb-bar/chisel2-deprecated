@@ -998,7 +998,7 @@ static val_t rand_val_seed = time(NULL) | 1;
 static val_t rand_val()
 {
   val_t x = rand_val_seed;
-  rand_val_seed = x>>1 | (x>>0^x>>60^x>>61^x>>63)<<63;
+  rand_val_seed = (x << 1) ^ (-(sval_t(x) < 0) & 0x1B);
   return x;
 }
 
