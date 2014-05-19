@@ -417,7 +417,7 @@ class VerilogBackend extends Backend {
 
     harness.write("module test;\n")
     for (node <- scanNodes) {
-      harness.write("  reg [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
+      harness.write("  reg [" + (node.width-1) + ":0] " + emitRef(node) + " = 0;\n")
     }
     for (node <- printNodes) {
       harness.write("  wire [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
@@ -618,6 +618,17 @@ class VerilogBackend extends Backend {
       apis.append("  reg [%d:0] %s [%d:0];\n".format(mem.width-1, shadowName, mem.n-1))
     }
 
+    apis.append("\n  // combinational logic propagation\n")
+    apis.append("  task propagate;\n")
+    apis.append("    begin\n")
+    for (wire <- wires ; if !wire.isReg) {
+      val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
+      val wireName = if (printNodes contains wire) emitRef(wire) else pathName
+      apis.append("      %s = %s;\n".format(shadowNames(wire), wireName))
+    }
+    apis.append("    end\n")
+    apis.append("  endtask\n")
+
     apis.append("\n  integer count;\n")
 
     def fscanf(form: String, args: String*) = 
@@ -734,6 +745,21 @@ class VerilogBackend extends Backend {
     apis.append("        " + display("%1d", "steps"))
     apis.append("      end\n")
 
+    apis.append("      // < tick > \n")
+    apis.append("      // Update registers without propagation\n")
+    apis.append("      \"tick\": begin\n")
+    apis.append("        steps = 1;\n")
+    apis.append("        isStep = 1;\n")
+    apis.append("        $display(\"ok\");\n")
+    apis.append("      end\n")
+
+    apis.append("      // < propagate > \n")
+    apis.append("      // Propagate the combinational logic\n")
+    apis.append("      \"propagate\": begin\n")
+    apis.append("        propagate();\n")
+    apis.append("        $display(\"ok\");\n")
+    apis.append("      end\n")
+
     if (clocks.size > 1) {
       apis.append("      // <set_clocks> \n")
       apis.append("      // inputs: clocks' length\n")
@@ -818,17 +844,7 @@ class VerilogBackend extends Backend {
     }
 
     apis.append("     // copy wires' & mems' value into shadows for 'peeking'\n")
-    apis.append("    if (%sisStep) begin\n".format(
-      if (clocks.size > 1) 
-         (clocks foldLeft "")(_ + _.name + "_fire && ")
-      else "" )
-    )
-    for (wire <- wires ; if !wire.isReg) {
-      val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
-      val wireName = if (printNodes contains wire) emitRef(wire) else pathName
-      apis.append("      %s = %s;\n".format(shadowNames(wire), wireName))
-    }
-    apis.append("    end\n")
+    apis.append("    if (isStep && steps == 0) propagate();\n")
     apis.append("  end\n")
     
     apis.result
