@@ -73,9 +73,26 @@ object State {
     snapIdx
   }
   def apply(src: Node) = {
-    val state = new State(src, emitSnapIdx)
-    states += state
-    state
+    val width = src.width
+    // Todo: parameterize
+    val shadowWidth = 32
+    val res = new ArrayBuffer[State]
+    if (width <= shadowWidth) {
+      val state = new State(src, emitSnapIdx)
+      states += state
+      res += state
+    } else {
+      val srcType = UInt(src)
+      var offset = 0
+      while (offset < width) {
+        val limit = if (width > shadowWidth) offset + shadowWidth - 1 else offset + width - 1
+        val state = new State(srcType(offset, limit), emitSnapIdx)
+        states += state
+        res += state
+        offset += shadowWidth
+      }
+    }
+    res
   }
 }
 class State(val src: Node, idx: Int) extends DaisyType(idx)
@@ -544,10 +561,10 @@ object DaisyChain extends Backend {
       m.nodes foreach { 
         _ match {
           case reg: Reg if !(keywords contains reg.name) =>
-            m.states += State(reg)
+            m.states ++= State(reg)
           case mem: Mem[_] =>
             for (i <- 0 until mem.size)
-              m.states += State(new MemRead(mem, UInt(i)))
+              m.states ++= State(new MemRead(mem, UInt(i)))
           case _ =>
         }
       }

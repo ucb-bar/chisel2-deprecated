@@ -460,7 +460,8 @@ class VerilogBackend extends Backend {
       harness.write("  integer value;      // 'poked' value\n")  
       harness.write("  integer offset;     // mem's offset\n")
       harness.write("  integer steps;      // number of steps\n")
-      harness.write("  reg isStep = 0;\n\n")
+      harness.write("  reg isStep = 0;\n")
+      harness.write("  reg isTick = 0;\n\n")
     }
 
     harness.write("  /*** DUT instantiation ***/\n")
@@ -581,7 +582,7 @@ class VerilogBackend extends Backend {
       for (mem <- mems) {
         val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
         harness.write("    for (i = 0 ; i < %d ; i = i + 1) begin\n".format(mem.n))
-        harness.write("      %s[i] = $random;\n".format(pathName))
+        harness.write("      %s[i] = 0;\n".format(pathName))
         harness.write("    end\n")
       }
       harness.write("  end\n\n")
@@ -750,6 +751,7 @@ class VerilogBackend extends Backend {
     apis.append("      \"tick\": begin\n")
     apis.append("        steps = 1;\n")
     apis.append("        isStep = 1;\n")
+    apis.append("        isTick = 1;\n")
     apis.append("        $display(\"ok\");\n")
     apis.append("      end\n")
 
@@ -803,6 +805,9 @@ class VerilogBackend extends Backend {
         apis.append("      %s_fire = 0;\n".format(clk.name))
     }
     apis.append("    end\n")
+    apis.append("    else if (isTick) begin \n")
+    apis.append("      isTick = 0;\n")
+    apis.append("    end\n")
 
     apis.append("    if (count == -1) $finish(1);\n")
     apis.append("  end\n\n")
@@ -844,7 +849,7 @@ class VerilogBackend extends Backend {
     }
 
     apis.append("     // copy wires' & mems' value into shadows for 'peeking'\n")
-    apis.append("    if (isStep && steps == 0) propagate();\n")
+    apis.append("    if (isStep && !isTick && steps == 0) propagate();\n")
     apis.append("  end\n")
     
     apis.result
