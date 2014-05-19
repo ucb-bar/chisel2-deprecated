@@ -56,7 +56,10 @@ object Lit {
   }
 
   def makeLit[T <: Bits](x: Literal)(gen: => T): T = {
-    gen.fromNode(x)
+    val res = gen.fromNode(x)
+    // Inherit the width of the literal node.
+    res.setWidth(x.width.needWidth())
+    res
   }
 }
 

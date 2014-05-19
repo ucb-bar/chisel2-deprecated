@@ -344,6 +344,7 @@ try {
         val in = UInt(INPUT, 8)
         val out = UInt(OUTPUT)
       }
+      io.printTree(System.err)
       io.out := Reverse(io.in)
     }
 

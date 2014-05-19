@@ -108,8 +108,10 @@ class VerilogBackend extends Backend {
     memConfs(configStr)
   }
 
-  def emitWidth(node: Node): String =
-    if (node.width == 1) "" else "[" + (node.width-1) + ":0]"
+  def emitWidth(node: Node): String = {
+    val w = node.width.needWidth()
+    if (w == 1) "" else "[" + (w-1) + ":0]"
+  }
 
   override def emitTmp(node: Node): String =
     emitRef(node)
@@ -131,7 +133,7 @@ class VerilogBackend extends Backend {
 
   // $random only emits 32 bits; repeat its result to fill the Node
   private def emitRand(node: Node): String =
-    "{" + ((node.width+31)/32) + "{$random}}"
+    "{" + ((node.width.needWidth()+31)/32) + "{$random}}"
 
   def emitPortDef(m: MemAccess, idx: Int): String = {
     def str(prefix: String, ports: (String, String)*): String =

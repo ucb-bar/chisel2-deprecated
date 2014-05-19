@@ -106,8 +106,8 @@ object BinaryOp {
   // width inference functions for signed-unsigned operations
   private def mulSUWidth(x: Node) = sumWidth(x) - 1
   private def divUSWidth(x: Node) = widthOf(0)(x) - 1
-  private def modUSWidth(x: Node) = x.inputs(1).width.min(x.inputs(0).width - 1)
-  private def modSUWidth(x: Node) = x.inputs(0).width.min(x.inputs(1).width - 1)
+  private def modUSWidth(x: Node) = x.inputs(1).width.needWidth().min(x.inputs(0).width.needWidth() - 1)
+  private def modSUWidth(x: Node) = x.inputs(0).width.needWidth().min(x.inputs(1).width.needWidth() - 1)
 }
 
 
@@ -176,7 +176,10 @@ object Op {
         case "&"  => return Literal(av & bv, max(aw, bw));
         case "^"  => return Literal(av ^ bv, max(aw, bw));
         case "<<" => return Literal(av << bv.toInt, aw + bv.toInt);
-        case ">>" => return Literal(av >> bv.toInt, aw - bv.toInt);
+        case ">>" => {
+	     println("Literal >>: aw " + aw)
+	     return Literal(av >> bv.toInt, aw - bv.toInt);
+	}
         case _ => ;
       }
     }
@@ -411,8 +414,8 @@ class Op(val op: String) extends Node {
         if (inputs(1).width != width) inputs(1) = inputs(1).matchWidth(width)
       } else if (List("==", "!=", "<", "<=").contains(op)) {
         val w = max(inputs(0).width, inputs(1).width)
-        if (inputs(0).width != w) inputs(0) = inputs(0).matchWidth(w)
-        if (inputs(1).width != w) inputs(1) = inputs(1).matchWidth(w)
+        if (inputs(0).width.needWidth() != w) inputs(0) = inputs(0).matchWidth(w)
+        if (inputs(1).width.needWidth() != w) inputs(1) = inputs(1).matchWidth(w)
       }
     }
   }

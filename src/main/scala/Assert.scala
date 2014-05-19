@@ -91,7 +91,7 @@ class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
   }
 
   inferWidth = (x: Node) => {
-    val argLength = formats.zip(inputs).map{case (a,b) => lengths(a)(b.width)}.sum
+    val argLength = formats.zip(inputs).map{case (a,b) => lengths(a)(b.width.width)}.sum
     8*(format.length - 2*formats.length + argLength)
   }
 

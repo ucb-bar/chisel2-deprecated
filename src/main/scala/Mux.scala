@@ -64,7 +64,7 @@ object Multiplex{
       if (c.litOf.value == a.litOf.value) {
         return c
       }
-      if (c.litOf.width == 1 && a.litOf.width == 1) {
+      if (c.litOf.width.toInt == 1 && a.litOf.width.toInt == 1) {
         return if (c.litOf.value == 0) LogicalOp(t, Literal(0,1), "===") else t
       }
     }

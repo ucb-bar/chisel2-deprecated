@@ -70,6 +70,7 @@ class ROMData(elts: SortedMap[Int, Node], val n: Int) extends Node {
     elts.mapValues(_.matchWidth(w).litOf)
   }
   val lits = {
+    val w = elts.values.map(_.litOf.needWidth()).max
     val dc = UInt.DC(w).litOf
     Array.tabulate(n)(i => sparseLits.getOrElse(i, dc))
   }

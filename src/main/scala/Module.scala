@@ -373,7 +373,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     def verify {
       var hasError = false
       for (elm <- nodesList) {
-        if (elm.infer || elm.width == -1) {
+        // TODO: width.width is Driver.isInGetWidth dependent
+        // What are we trying to accomplish here?
+        if (elm.infer || elm.width.width == -1) {
           ChiselError.error("Could not infer the width on: " + elm)
           hasError = true
         }

@@ -98,8 +98,10 @@ object Reverse
       var shift = length >> 1
       var mask = UInt((BigInt(1) << length) - 1, length)
       do {
-        mask = mask ^ (mask(length-shift-1,0) << UInt(shift))
-        res = ((res >> UInt(shift)) & mask) | (res(length-shift-1,0) << UInt(shift) & ~mask)
+        val shiftn = UInt(shift)
+        mask = mask ^ (mask(length-shift-1,0) << shiftn)
+	println("Reverse: shiftn " + shiftn + ", res " + res)
+        res = ((res >> shiftn) & mask) | (res(length-shift-1,0) << shiftn & ~mask)
         shift = shift >> 1
       } while (shift > 0)
       res

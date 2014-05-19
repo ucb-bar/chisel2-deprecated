@@ -143,7 +143,9 @@ abstract class Data extends Node {
     try {
       val constructor = this.getClass.getConstructors.head
       val res = constructor.newInstance(Array.fill(constructor.getParameterTypes.size)(null):_*)
-      res.asInstanceOf[this.type]
+      val nc = res.asInstanceOf[this.type]
+      println("Data.clone - old width " + this.width + ", new width " + nc.width)
+      nc
     } catch {
       case npe: java.lang.reflect.InvocationTargetException if npe.getCause.isInstanceOf[java.lang.NullPointerException] =>
         throwException("Parameterized Bundle " + this.getClass + " needs clone method. You are probably using an anonymous Bundle object that captures external state and hence is un-cloneable", npe)
@@ -158,10 +160,6 @@ abstract class Data extends Node {
     } else {
       super.nameIt(path, isNamingIo)
     }
-  }
-
-  def setWidth(w: Int) {
-    this.width = w;
   }
 }
 

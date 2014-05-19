@@ -33,6 +33,8 @@ package Chisel
 import scala.collection.mutable.HashMap
 import scala.math.pow
 
+// import Width._
+
 trait CounterBackend extends Backend {
   val firedPins = new HashMap[Module, Bool]
   val daisyIns = new HashMap[Module, UInt]
@@ -314,7 +316,7 @@ trait CounterBackend extends Backend {
       val m = queue.dequeue
 
       for (signal <- m.signals) {
-        val signalWidth = signal.width
+        val signalWidth = signal.width.needWidth()
         val signalValue = 
           if (decoupledPins contains signal) decoupledPins(signal) 
           else UInt(signal)
@@ -539,7 +541,7 @@ abstract class CounterTester[+T <: Module](c: T, isTrace: Boolean = true) extend
     for (i <- 0 until n) {
       for (signal <- Driver.signals) {
         val curPeek = peekBits(signal)
-        if (signal.width == 1) {
+        if (signal.width.needWidth() == 1) {
           // increment by the signal's value
           counts(signal) += curPeek
         } else {
