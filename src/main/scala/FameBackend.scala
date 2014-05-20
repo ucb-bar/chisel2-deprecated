@@ -53,7 +53,7 @@ object FameDecoupledIO
   }
 }
 
-class FameDecoupledIO[T <: Data](data: T) extends Bundle
+class FameDecoupledIO[+T <: Data](data: T) extends Bundle
 {
   val host_valid = Bool(OUTPUT)
   val host_ready = Bool(INPUT)
@@ -209,18 +209,9 @@ class RegIO[T <: Data](data: T) extends Bundle
 }
 
 class Fame1WrapperIO(num_queues: Int, num_regs: Int, num_debug: Int) extends Bundle {
-  var queues:Vec[FameDecoupledIO[Bits]] = null
-  if(num_queues > 0) {
-    queues = Vec.fill(num_queues){ new FameDecoupledIO(Bits())}
-  }
-  var regs:Vec[DecoupledIO[Bits]] = null
-  if(num_regs > 0) {
-    regs = Vec.fill(num_regs){ new DecoupledIO(Bits())}
-  }
-  var debug:Vec[Bits] = null
-  if(num_debug > 0) {
-    debug = Vec.fill(num_debug){Bits()}
-  }
+  val queues = Vec.fill(num_queues){ new FameDecoupledIO(Bits())}
+  val regs = Vec.fill(num_regs){ new DecoupledIO(Bits())}
+  val debug = Vec.fill(num_debug){Bits()}
 }
 
 class Fame1Wrapper(f: => Module) extends Module {
@@ -326,35 +317,27 @@ class Fame1Wrapper(f: => Module) extends Module {
   }
   //generate fire_tgt_clk signal
   var fire_tgt_clk = Bool(true)
-  if (io.queues != null){
-    for (q <- io.queues)
-      fire_tgt_clk = fire_tgt_clk && 
-        (if (q.host_valid.dir == OUTPUT) q.host_ready else q.host_valid)
-  }
-  if (io.regs != null){
-    for (r <- io.regs) {
-      fire_tgt_clk = fire_tgt_clk && 
-        (if (r.valid.dir == OUTPUT) r.ready else r.valid)
-    }
+  for (q <- io.queues)
+    fire_tgt_clk = fire_tgt_clk &&
+      (if (q.host_valid.dir == OUTPUT) q.host_ready else q.host_valid)
+  for (r <- io.regs) {
+    fire_tgt_clk = fire_tgt_clk &&
+      (if (r.valid.dir == OUTPUT) r.ready else r.valid)
   }
   
   //generate host read and host valid signals
   Fame1Transform.fireSignals(originalModule) := fire_tgt_clk
-  if (io.queues != null){
-    for (q <- io.queues) {
-      if (q.host_valid.dir == OUTPUT) 
-        q.host_valid := fire_tgt_clk
-      else
-        q.host_ready := fire_tgt_clk
-    }
+  for (q <- io.queues) {
+    if (q.host_valid.dir == OUTPUT)
+      q.host_valid := fire_tgt_clk
+    else
+      q.host_ready := fire_tgt_clk
   }
-  if (io.regs != null){
-    for (r <- io.regs) {
-      if (r.valid.dir == OUTPUT) 
-        r.valid := fire_tgt_clk
-      else
-        r.ready := fire_tgt_clk
-    }
+  for (r <- io.regs) {
+    if (r.valid.dir == OUTPUT)
+      r.valid := fire_tgt_clk
+    else
+      r.ready := fire_tgt_clk
   }
 }
 

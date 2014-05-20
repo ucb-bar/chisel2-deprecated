@@ -205,7 +205,7 @@ object Valid {
   def apply[T <: Data](gen: T): ValidIO[T] = new ValidIO(gen)
 }
 
-class DecoupledIO[T <: Data](gen: T) extends Bundle
+class DecoupledIO[+T <: Data](gen: T) extends Bundle
 {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)

@@ -190,10 +190,6 @@ abstract class Node extends nameable {
     else default
   def floLitValue: Float = intBitsToFloat(litValue().toInt)
   def dblLitValue: Double = longBitsToDouble(litValue().toLong)
-  def bitSet(off: UInt, dat: UInt): UInt = {
-    val bit = UInt(1, 1) << off;
-    (this.asInstanceOf[UInt] & ~bit) | (dat << off);
-  }
   // TODO: MOVE TO WIRE
   def assign(src: Node): Unit = throw new Exception("unimplemented assign")
   def <>(src: Node): Unit = throw new Exception("unimplemented <>")
