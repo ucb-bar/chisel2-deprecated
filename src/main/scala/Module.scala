@@ -303,12 +303,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       res.enqueue(a)
     for(b <- Driver.blackboxes)
       res.enqueue(b.io)
-    for(c <- Driver.components) {
-      for((n, io) <- c.io.flatten) {
-        println(io.name)
+    for(c <- Driver.components)
+      for((n, io) <- c.io.flatten)
         res.enqueue(io)
-      }
-    }
 
     res
   }
