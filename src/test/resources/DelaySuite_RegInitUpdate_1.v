@@ -3,7 +3,7 @@ module DelaySuite_RegInitUpdate_1(input clk, input reset,
 );
 
   wire[31:0] T0;
-  reg[0:0] res;
+  reg  res;
   wire T1;
   wire T2;
 

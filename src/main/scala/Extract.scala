@@ -35,11 +35,7 @@ import Lit._
 object NodeExtract {
   // extract one bit
   def apply(mod: Node, bit: Int): Node = apply(mod, bit, bit)
-
-  // extract one bit
-  def apply(mod: Node, bit: Node): Node =
-    if (mod.isLit || bit.isLit) apply(mod, bit, bit, 1)
-    else makeExtract(mod, bit, bit, fixWidth(1))
+  def apply(mod: Node, bit: Node): Node = apply(mod, bit, bit, 1)
 
   // extract bit range
   def apply(mod: Node, hi: Int, lo: Int): Node = apply(mod, hi, lo, -1)
@@ -64,7 +60,7 @@ object NodeExtract {
     val widthInfer = if (width == -1) widthOf(0) else fixWidth(width)
     if (hiLit != null && loLit != null) {
       apply(mod, hiLit.value.toInt, loLit.value.toInt, width)
-    } else { // don't use Extract on literals
+    } else { // avoid extracting from constants and avoid variable part selects
       val rsh = Op(">>", widthInfer, mod, lo)
       val hiMinusLoPlus1 = Op("+", maxWidth _, Op("-", maxWidth _, hi, lo), UInt(1))
       val mask = Op("-", widthInfer, Op("<<", widthInfer, UInt(1), hiMinusLoPlus1), UInt(1))

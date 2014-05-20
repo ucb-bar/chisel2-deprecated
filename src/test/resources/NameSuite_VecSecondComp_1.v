@@ -18,10 +18,10 @@ module NameSuite_VecSecondComp_1(input clk,
   wire T1;
   wire T2;
   wire T3;
-  reg[0:0] r_valid_0;
-  reg[0:0] r_valid_1;
-  reg[0:0] r_valid_2;
-  reg[0:0] r_valid_3;
+  reg  r_valid_0;
+  reg  r_valid_1;
+  reg  r_valid_2;
+  reg  r_valid_3;
 
 `ifndef SYNTHESIS
   integer initvar;

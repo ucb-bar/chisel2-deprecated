@@ -5,13 +5,13 @@ module StdlibSuite_PipeComp_1(input clk, input reset,
     output[7:0] io_deq_bits
 );
 
-  reg[7:0] R0;
+  reg [7:0] R0;
   wire[7:0] T1;
-  reg[7:0] R2;
+  reg [7:0] R2;
   wire[7:0] T3;
-  reg[0:0] R4;
+  reg  R4;
   wire T5;
-  reg[0:0] R6;
+  reg  R6;
   wire T7;
 
 `ifndef SYNTHESIS
