@@ -13,7 +13,7 @@ module DelaySuite_ROMModule_1(
 `else
   assign T0 = T1[io_addr];
 `endif
-  always @(*) begin
+  initial begin
     T1[0] = 4'h1;
     T1[1] = 4'h2;
     T1[2] = 4'h3;

@@ -345,6 +345,11 @@ abstract class Bits extends Data with proc {
   def & (b: Bits): this.type = newBinaryOp(b, "&");
   def | (b: Bits): this.type = newBinaryOp(b, "|");
   def ^ (b: Bits): this.type = newBinaryOp(b, "^");
+
+  def bitSet(off: UInt, dat: UInt): this.type = {
+    val bit = UInt(1, 1) << off
+    this & ~bit | dat.toSInt & bit
+  }
   
   def error(b: Bits): Bits = {
     throw new Exception("+ not defined on " + this.getClass + " and " + b.getClass)
