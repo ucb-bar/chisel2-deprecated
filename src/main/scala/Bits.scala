@@ -329,8 +329,12 @@ abstract class Bits extends Data with proc {
 
   /** Extract a single Bool at index *bit*.
     */
-  final def apply(bit: Int): Bool = { Extract(this, bit){Bool()}};
-  final def apply(bit: UInt): Bool = {Extract(this, bit){Bool()}};
+  final def apply(bit: Int): Bool = apply(UInt(bit))
+  final def apply(bit: UInt): Bool = {
+    val res = Extract(this, bit){Bool()}
+    res.comp = new Insert(this, bit)
+    res
+  }
 
   /** Extract a range of bits */
   final def apply(hi: Int, lo: Int): UInt = {Extract(this, hi, lo){UInt()}};

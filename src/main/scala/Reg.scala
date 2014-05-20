@@ -162,8 +162,6 @@ class Reg extends Delay with proc {
   override def forceMatchingWidths: Unit =
     inputs.transform(_.matchWidth(width))
 
-  def next: Node = inputs(0)
-
   override def usesInClockHi(n: Node) = n eq next
 
   // these are used to infer read enables on Mems
