@@ -1142,6 +1142,7 @@ class VerilogBackend extends Backend {
     run(cmd)
   }
 
-  def romStyle: String = "always @(*)"
+  //def romStyle: String = "always @(*)"
+  def romStyle: String = "initial"
 }
 
