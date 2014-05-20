@@ -321,23 +321,25 @@ class VerilogBackend extends Backend {
         } else {
           ""
         }
-      case r: ROMData =>
-        val inits = new StringBuilder
-        for (i <- 0 until r.lits.length)
-          inits append "    " + emitRef(r) + "[" + i + "] = " + emitRef(r.lits(i)) + ";\n"
-        "  " + romStyle + " begin\n" +
-        inits +
-        "  end\n"
+
+      case r: ROMData => ""
      
       case r: ROMRead =>
+        val inits = new StringBuilder
+        for (i <- 0 until r.rom.lits.length)
+          inits append "    " + emitRef(r.rom) + "[" + i + "] = " + emitRef(r.rom.lits(i)) + ";\n"
+
         val port = "  assign " + emitTmp(r) + " = " + emitRef(r.rom) + "[" + emitRef(r.addr) + "];\n"
+        val dec = "  " + romStyle + "(" + emitRef(r.addr) + ")" + " begin\n" + inits + "  end\n"
         if (!isPow2(r.rom.lits.length))
+          dec +
           "`ifndef SYNTHESIS\n" +
           "  assign " + emitTmp(r) + " = " + emitRef(r.addr) + " >= " + emitLit(r.rom.lits.length) + " ? " + emitRand(r) + " : " + emitRef(r.rom) + "[" + emitRef(r.addr) + "];\n" +
           "`else\n" +
           port +
           "`endif\n"
         else
+          dec +
           port
 
       case s: Sprintf =>
@@ -1142,7 +1144,6 @@ class VerilogBackend extends Backend {
     run(cmd)
   }
 
-  //def romStyle: String = "always @(*)"
-  def romStyle: String = "initial"
+  def romStyle: String = "always @"
 }
 

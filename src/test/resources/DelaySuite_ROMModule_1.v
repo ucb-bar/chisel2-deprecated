@@ -8,15 +8,15 @@ module DelaySuite_ROMModule_1(
 
 
   assign io_out = T0;
+  always @(io_addr) begin
+    T1[0] = 4'h1;
+    T1[1] = 4'h2;
+    T1[2] = 4'h3;
+  end
 `ifndef SYNTHESIS
   assign T0 = io_addr >= 2'h3 ? {1{$random}} : T1[io_addr];
 `else
   assign T0 = T1[io_addr];
 `endif
-  initial begin
-    T1[0] = 4'h1;
-    T1[1] = 4'h2;
-    T1[2] = 4'h3;
-  end
 endmodule
 
