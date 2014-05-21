@@ -170,16 +170,19 @@ object Mux1H
   */
 object OHToUInt
 {
-  def apply(in: Seq[Bool]): UInt = {
-    if (in.size <= 1) return UInt(0)
-    if (in.size == 2) return in(1)
-    if (!isPow2(in.size)) return apply(in.padTo(1 << log2Up(in.size), Bool(false)))
-    val hi = in.slice(in.size/2, in.size)
-    val lo = in.slice(0, in.size/2)
-    Cat(hi.reduceLeft((s1, s2) => {s1 || s2}),
-      apply(hi zip lo map { case (x, y) => (x || y) }))
+  def apply(in: Seq[Bool]): UInt = apply(Vec(in))
+  def apply(in: Vec[Bool]): UInt = apply(in.toBits, in.length)
+  def apply(in: Bits): UInt = apply(in, in.getWidth)
+  def apply(in: Bits, length: Int): UInt = {
+    if (length <= 1) UInt(0)
+    else if (length == 2) in(1)
+    else {
+      val half = 1 << (log2Up(length)-1)
+      val hi = in(length-1,half)
+      val lo = in(half-1,0)
+      Cat(hi.orR, apply(hi | lo))
+    }
   }
-  def apply(in: Bits): UInt = apply((0 until in.getWidth).map(in(_)))
 }
 
 
