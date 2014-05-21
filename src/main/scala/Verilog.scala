@@ -503,6 +503,7 @@ class VerilogBackend extends Backend {
         mod match {
           case bool: Bool if resets contains bool => // exclude resets
           case _: Binding =>
+          case _: ROMData =>
           case io: Bits if m != c => {
             var included = true
             if (io.dir == INPUT) {
