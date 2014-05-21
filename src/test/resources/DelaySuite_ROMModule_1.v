@@ -3,20 +3,19 @@ module DelaySuite_ROMModule_1(
     output[3:0] io_out
 );
 
-  wire[3:0] T0;
-  reg [3:0] T1 [2:0];
+  reg [3:0] T0;
 
 
   assign io_out = T0;
+  always @(*) case (io_addr)
+    0: T0 = 4'h1;
+    1: T0 = 4'h2;
+    2: T0 = 4'h3;
 `ifndef SYNTHESIS
-  assign T0 = io_addr >= 2'h3 ? {1{$random}} : T1[io_addr];
+    default: T0 = {1{$random}};
 `else
-  assign T0 = T1[io_addr];
+    default: T0 = 4'bx;
 `endif
-  initial begin
-    T1[0] = 4'h1;
-    T1[1] = 4'h2;
-    T1[2] = 4'h3;
-  end
+  endcase
 endmodule
 

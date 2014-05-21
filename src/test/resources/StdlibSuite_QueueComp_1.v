@@ -14,11 +14,11 @@ module Queue(input clk, input reset,
   wire T2;
   wire do_flow;
   wire T3;
-  reg[0:0] enq_ptr;
+  reg  enq_ptr;
   wire T4;
   wire T5;
   wire T6;
-  reg[0:0] deq_ptr;
+  reg  deq_ptr;
   wire T7;
   wire T8;
   wire T9;
@@ -28,7 +28,7 @@ module Queue(input clk, input reset,
   wire T12;
   wire empty;
   wire T13;
-  reg[0:0] maybe_full;
+  reg  maybe_full;
   wire T14;
   wire T15;
   wire T16;

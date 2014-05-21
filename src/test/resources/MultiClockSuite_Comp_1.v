@@ -3,7 +3,7 @@ module MultiClockSuite_ClockedSubComp_1(input T0,
     output io_valid
 );
 
-  reg[0:0] stored;
+  reg  stored;
 
 `ifndef SYNTHESIS
   integer initvar;

@@ -26,7 +26,7 @@ module StdlibSuite_RRArbiterTest_1(input clk, input reset,
   wire[1:0] T6;
   wire T7;
   wire T8;
-  reg[1:0] R9;
+  reg [1:0] R9;
   wire[1:0] T10;
   wire[1:0] T11;
   wire T12;

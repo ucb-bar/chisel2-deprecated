@@ -6,10 +6,10 @@ module NameSuite_VecComp_1(input clk,
     output[7:0] io_status_im
 );
 
-  reg[7:0] reg_status_im;
+  reg [7:0] reg_status_im;
   wire[7:0] T0;
   wire[63:0] wdata;
-  reg[63:0] host_pcr_bits_data;
+  reg [63:0] host_pcr_bits_data;
   wire[63:0] T1;
   wire[63:0] T2;
   wire[7:0] rdata;

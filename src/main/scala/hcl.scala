@@ -115,6 +115,10 @@ trait proc extends Node {
     traverse(inputs(0))
   }
 
+  protected[Chisel] def next: Node = {
+    val node = getNode
+    if (node.inputs.isEmpty) null else node.inputs(0)
+  }
   protected def default = if (defaultRequired) null else this
   protected def defaultRequired: Boolean = false
   protected def defaultMissing: Boolean =

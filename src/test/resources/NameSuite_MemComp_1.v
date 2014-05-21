@@ -5,7 +5,7 @@ module NameSuite_MemComp_1(input clk,
 );
 
   wire[64:0] T0;
-  reg[7:0] raddr;
+  reg [7:0] raddr;
   wire[7:0] T1;
 
 `ifndef SYNTHESIS

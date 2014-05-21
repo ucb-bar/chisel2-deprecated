@@ -321,24 +321,19 @@ class VerilogBackend extends Backend {
         } else {
           ""
         }
-      case r: ROMData =>
-        val inits = new StringBuilder
-        for (i <- 0 until r.lits.length)
-          inits append "    " + emitRef(r) + "[" + i + "] = " + emitRef(r.lits(i)) + ";\n"
-        "  " + romStyle + " begin\n" +
-        inits +
-        "  end\n"
-     
+
       case r: ROMRead =>
-        val port = "  assign " + emitTmp(r) + " = " + emitRef(r.rom) + "[" + emitRef(r.addr) + "];\n"
-        if (!isPow2(r.rom.lits.length))
-          "`ifndef SYNTHESIS\n" +
-          "  assign " + emitTmp(r) + " = " + emitRef(r.addr) + " >= " + emitLit(r.rom.lits.length) + " ? " + emitRand(r) + " : " + emitRef(r.rom) + "[" + emitRef(r.addr) + "];\n" +
-          "`else\n" +
-          port +
-          "`endif\n"
-        else
-          port
+        val inits = new StringBuilder
+        for (i <- 0 until r.rom.lits.length)
+          inits append s"    ${i}: ${emitRef(r)} = ${emitRef(r.rom.lits(i))};\n"
+        s"  always @(*) case (${emitRef(r.inputs.head)})\n" +
+        inits +
+        "`ifndef SYNTHESIS\n" +
+        s"    default: ${emitRef(r)} = ${emitRand(r)};\n" +
+        "`else\n" +
+        s"    default: ${emitRef(r)} = ${r.width}'bx;\n" +
+        "`endif\n" +
+        "  endcase\n"
 
       case s: Sprintf =>
         "  always @(*) $sformat(" + emitTmp(s) + ", " + s.args.map(emitRef _).foldLeft(CString(s.format))(_ + ", " + _) + ");\n"
@@ -349,8 +344,10 @@ class VerilogBackend extends Backend {
     (if (node.prune && res != "") "//" else "") + res    
   }
 
-  def emitDecBase(node: Node): String =
-    "  wire" + emitWidth(node) + " " + emitRef(node) + ";\n"
+  def emitDecBase(node: Node, wire: String = "wire"): String =
+    s"  ${wire}${emitWidth(node)} ${emitRef(node)};\n"
+
+  def emitDecReg(node: Node): String = emitDecBase(node, "reg ")
 
   override def emitDec(node: Node): String = {
     val res = 
@@ -366,13 +363,13 @@ class VerilogBackend extends Backend {
         "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + " = 1'b0;\n"
 
       case _: Reg =>
-        "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n"
+        emitDecReg(node)
 
       case _: Sprintf =>
-        "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + ";\n"
+        emitDecReg(node)
 
-      case _: Literal =>
-        ""
+      case _: ROMRead =>
+        emitDecReg(node)
 
       case m: Mem[_] =>
         if (m.isInline) {
@@ -380,12 +377,14 @@ class VerilogBackend extends Backend {
         } else {
           ""
         }
-      case r: ROMData =>
-        "  reg [" + (r.width-1) + ":0] " + emitRef(r) + " [" + (r.lits.length-1) + ":0];\n"
 
       case x: MemAccess =>
         x.referenced = true
         emitDecBase(node)
+
+      case _: ROMData => ""
+
+      case _: Literal => ""
 
       case _ =>
         emitDecBase(node)
@@ -496,7 +495,6 @@ class VerilogBackend extends Backend {
     harness.write(" );\n\n")
 
     val mems =  new ArrayBuffer[Mem[_]]
-    val roms  = new ArrayBuffer[ROMData]
     val wires = new ArrayBuffer[Node]
     val dumpvars = new ArrayBuffer[Node]
 
@@ -519,7 +517,6 @@ class VerilogBackend extends Backend {
             }
             if (included) wires += io
           }
-          case rom:  ROMData => roms += rom
           case mem:  Mem[_] =>  mems += mem
           case _ => wires += mod
         }
@@ -569,16 +566,10 @@ class VerilogBackend extends Backend {
     harness.write("  end\n\n")
 
     harness.write("`ifndef GATE_LEVEL\n")
-    harness.write("  /*** ROM & Mem initialization ***/\n")
+    harness.write("  /*** Mem initialization ***/\n")
     harness.write("  integer i = 0;\n")
     harness.write("  initial begin\n")
     harness.write("  #1;\n")
-    for (rom <- roms) {
-      val pathName = rom.component.getPathName(".") + "." + emitRef(rom)
-      for (i <- 0 until rom.lits.size) {
-        harness.write("    %s[%d] = %s;\n".format(pathName, i, emitRef(rom.lits(i))))
-      }
-    }
     for (mem <- mems) {
       val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
       harness.write("    for (i = 0 ; i < %d ; i = i + 1) begin\n".format(mem.n))
@@ -1165,8 +1156,5 @@ class VerilogBackend extends Backend {
                 else "" ) 
     run(cmd)
   }
-
-  //def romStyle: String = "always @(*)"
-  def romStyle: String = "initial"
 }
 

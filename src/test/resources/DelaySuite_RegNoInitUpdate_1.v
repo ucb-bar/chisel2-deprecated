@@ -2,7 +2,7 @@ module DelaySuite_RegNoInitUpdate_1(input clk,
     output[31:0] io_out
 );
 
-  reg[31:0] res;
+  reg [31:0] res;
   wire[31:0] T0;
 
 `ifndef SYNTHESIS

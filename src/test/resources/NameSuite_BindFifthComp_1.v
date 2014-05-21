@@ -9,14 +9,14 @@ module NameSuite_Block_2(input clk,
 
   wire[31:0] T0;
   wire[31:0] T1;
-  reg[31:0] tag_ram_1;
+  reg [31:0] tag_ram_1;
   wire[31:0] T2;
   wire T3;
   wire T4;
   wire[1:0] T5;
   wire T6;
   wire T7;
-  reg[31:0] tag_ram_0;
+  reg [31:0] tag_ram_0;
   wire[31:0] T8;
   wire T9;
   wire T10;
