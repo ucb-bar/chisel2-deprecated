@@ -143,8 +143,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   val nodes = new ArrayBuffer[Node]
   val mods = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
-  val states = new ArrayBuffer[DaisyType]
+  val delays = new ArrayBuffer[DaisyType]
   val counters = new ArrayBuffer[DaisyType]
+  val events = new ArrayBuffer[(Node, CounterType)]
 
   val regs  = new ArrayBuffer[Reg];
   val nexts = new ScalaQueue[Node];
@@ -242,7 +243,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       case _: Literal =>
       case any => {
         if (!any.isIo) debug(x)
-        counters += EventCounter(any, cntrT)
+        events += ((any, cntrT))
+        // counters ++= EventCounter(any, cntrT)
       }
     }
   }
