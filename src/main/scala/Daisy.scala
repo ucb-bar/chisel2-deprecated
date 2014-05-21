@@ -1148,7 +1148,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   }
 
   def extract(value: BigInt, width: Int, offset: Int) =
-    (value & (((BigInt(1) << (width + 1)) - 1) << offset)) >> offset
+    (value & (((BigInt(1) << width) - 1) << offset)) >> offset
 
   override def step (n: Int = 1) { 
     if (isTrace) {
@@ -1177,12 +1177,12 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
           val curPeek = counter.signal match {
             case read: MemRead if counter.limit - counter.offset > 0 =>
                extract(peekBits(read.mem, read.addr.litValue(0).toInt),
-                       counter.limit - counter.offset, counter.offset)
+                       counter.limit - counter.offset + 1, counter.offset)
             case read: MemRead =>
                peekBits(read.mem, read.addr.litValue(0).toInt)
             case signal if counter.limit - counter.offset > 0 =>
               extract(peekBits(signal),
-                      counter.limit - counter.offset, counter.offset)
+                      counter.limit - counter.offset + 1, counter.offset)
             case signal =>
               peekBits(signal) }
           counterVals(i) += calcCounterVal(counter, curPeek, counterPeeks(i))
@@ -1204,12 +1204,12 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
       delayPeeks ++= delays map { delay => delay.src match {
         case read: MemRead if delay.limit - delay.offset > 0 =>
           extract(peekBits(read.mem, read.addr.litValue(0).toInt), 
-                  delay.limit - delay.offset, delay.offset)
+                  delay.limit - delay.offset + 1, delay.offset)
         case read: MemRead =>
           peekBits(read.mem, read.addr.litValue(0).toInt)
         case signal if delay.limit - delay.offset > 0 =>
           extract(peekBits(signal), 
-                  delay.limit - delay.offset, delay.offset)
+                  delay.limit - delay.offset + 1, delay.offset)
         case signal =>
           peekBits(signal) }
       }
