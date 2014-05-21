@@ -468,6 +468,12 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     val roots = new ArrayBuffer[Node];
     for (c <- Driver.components) {
       roots ++= c.debugs
+      if (c.parent == null) {
+        val topIOs = c.io.flatten;
+        for ((name, wire) <- topIOs) {
+          roots += wire
+        }
+      }
     }
     for (b <- Driver.blackboxes)
       roots += b.io;
