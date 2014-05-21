@@ -331,9 +331,8 @@ object Op {
     }
     if (a.isLit && a.litOf.isZ || b.isLit && b.litOf.isZ)
       ChiselError.error({"Operator " + name + " with inputs " + a + ", " + b + " does not support literals with ?"});
-    val res = new Op();
+    val res = new Op(name)
     res.init("", widthInfer, a, b);
-    res.op = name;
     res
   }
   def apply (name: String, widthInfer: (Node) => Int, a: Node): Node = {
@@ -386,9 +385,8 @@ object Op {
       }
       }
     }
-    val res = new Op();
+    val res = new Op(name)
     res.init("", widthInfer, a);
-    res.op = name;
     res
   }
 
@@ -398,9 +396,7 @@ object Op {
   }
 }
 
-class Op extends Node {
-  var op: String = "";
-
+class Op(val op: String) extends Node {
   override def toString: String =
     if (inputs.length == 1) {
       op + "(" + inputs(0) + ")"

@@ -109,8 +109,7 @@ object Mux {
   }
 }
 
-class Mux extends Op {
-  op = "Mux"
+class Mux extends Op("Mux") {
   override def toString: String =
     inputs(0) + " ? " + inputs(1) + " : " + inputs(2)
   def ::(a: Node): Mux = { inputs(2) = a; this }
