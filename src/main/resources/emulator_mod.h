@@ -35,9 +35,6 @@ using namespace std;
 typedef uint64_t val_t;
 typedef int64_t sval_t;
 typedef uint32_t half_val_t;
-//typedef __uint128_t dub_val_t;
-// typedef uint32_t val_t;
-// typedef uint8_t val_t;
 
 union flo2int_t {
   float  f;
@@ -96,19 +93,15 @@ template<uint32_t shifted, bool sticky> struct CeilLog<1, shifted, sticky> {
     static uint32_t const v = sticky ? shifted + 1 : shifted;
 };
 
-inline val_t val_n_bits( void ) { return sizeof(val_t)*8; }
-inline val_t val_all_ones( void ) { return ~((val_t)0); }
-// const val_t val_ones_or_zeroes[2] = { 0L, val_all_ones() };
-// inline val_t val_all_ones_or_zeroes( val_t bit ) { return val_ones_or_zeroes[bit]; }
-inline val_t val_all_ones_or_zeroes( val_t bit ) {
-  return (val_t) ((sval_t) ((sval_t) bit << (val_n_bits() - 1)) >> (val_n_bits() -1));
-  }
+#define val_n_bits() (sizeof(val_t)*8)
+#define val_n_half_bits() (val_n_bits()/2)
+#define val_all_ones() val_all_ones_or_zeroes(1)
+#define val_all_ones_or_zeroes(bit) (val_t(0) - val_t(bit))
+#define val_n_words(n_bits) (1+((n_bits)-1)/val_n_bits())
+#define val_n_half_words(n_bits) (1+((n_bits)-1)/val_n_half_bits())
 inline val_t val_top_bit( val_t v ) { return (v >> (val_n_bits()-1)); }
-#define val_n_words(n_bits) (1+((n_bits)-1)/(8*sizeof(val_t)))
-#define val_n_half_words(n_bits) (1+((n_bits)-1)/(8*sizeof(half_val_t)))
 inline val_t val_n_full_words( val_t n_bits ) { return n_bits / val_n_bits(); }
 inline val_t val_n_word_bits( val_t n_bits ) { return n_bits % val_n_bits(); }
-inline val_t val_n_half_bits( void ) { return sizeof(half_val_t)*8; }
 inline val_t val_n_nibs( void ) { return val_n_bits()>>2; }
 inline val_t val_half_mask( void ) { return (((val_t)1)<<(val_n_half_bits()))-1; }
 inline val_t val_lo_half( val_t n_bits ) { return n_bits & val_half_mask(); }
@@ -253,25 +246,18 @@ static void lsh_n (val_t d[], val_t s0[], int amount, int nwd, int nws) {
   int n_shift_words    = amount / val_n_bits();
   int n_rev_shift_bits = val_n_bits() - n_shift_bits;
   int is_zero_carry    = n_shift_bits == 0;
-  for (int i = 0; i < n_shift_words; i++)
+  for (int i = 0; i < nwd; i++)
     d[i] = 0;
   for (int i = 0; i < (nws-n_shift_words); i++) {
     val_t val = s0[i];
     d[i+n_shift_words] = val << n_shift_bits | carry;
     carry              = is_zero_carry ? 0 : val >> n_rev_shift_bits;
   }
-  for (int i = nws-n_shift_words; i < nwd; i++)
-    d[i] = 0;
 }
 
 static inline val_t mask_val(int n) {
   val_t res = val_all_ones() >> (val_n_bits()-n);
   return res;
-}
-
-static void div_n (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
-  assert(MAX(nbd, MAX(nb0, nb1)) <= val_n_bits()); // TODO: generalize
-  d[0] = s1[0] == 0 ? mask_val(nb0) : s0[0] / s1[0];
 }
 
 static inline void mask_n (val_t d[], int nw, int nb) {
@@ -426,68 +412,36 @@ struct bit_word_funs {
     for (int i = 0; i < nw; i++)
       d[i] = ~s0[i] & msk[i];
   }
-  static void ltu (val_t d[], val_t s0[], val_t s1[]) {
+  static bool ltu (val_t s0[], val_t s1[]) {
     val_t diff[nw];
     sub(diff, s0, s1, nw*val_n_bits());
-    d[0] = val_top_bit(diff[nw-1]);
+    return val_top_bit(diff[nw-1]);
   }
-  static void lt (val_t d[], val_t s0[], val_t s1[], int w) {
+  static bool lt (val_t s0[], val_t s1[], int w) {
     int msb_0 = (s0[1] >> (w - (nw-1)*val_n_bits() - 1)) & 0x1;
     int msb_1 = (s1[1] >> (w - (nw-1)*val_n_bits() - 1)) & 0x1;
     if (msb_0 != msb_1) {
-      d[0] = msb_0;
+      return msb_0;
     } else {
       val_t diff[nw];
       sub(diff, s0, s1, nw*val_n_bits());
-      d[0] = val_top_bit(diff[nw-1]);
+      return val_top_bit(diff[nw-1]);
     }
   }
-  static void gtu (val_t d[], val_t s0[], val_t s1[]) {
+  static bool lteu (val_t s0[], val_t s1[]) {
     val_t diff[nw];
     sub(diff, s1, s0, nw*val_n_bits());
-    d[0] = val_top_bit(diff[nw-1]);
+    return !val_top_bit(diff[nw-1]);
   }
-  static void gt (val_t d[], val_t s0[], val_t s1[], int w) {
+  static bool lte (val_t s0[], val_t s1[], int w) {
     int msb_0 = (s0[1] >> (w - (nw-1)*val_n_bits() - 1)) & 0x1;
     int msb_1 = (s1[1] >> (w - (nw-1)*val_n_bits() - 1)) & 0x1;
     if (msb_0 != msb_1) {
-      d[0] = msb_1;
+      return msb_0;
     } else {
       val_t diff[nw];
       sub(diff, s1, s0, nw*val_n_bits());
-      d[0] = val_top_bit(diff[nw-1]);
-    }
-  }
-  static void lteu (val_t d[], val_t s0[], val_t s1[]) {
-    val_t diff[nw];
-    sub(diff, s1, s0, nw*val_n_bits());
-    d[0] = !val_top_bit(diff[nw-1]);
-  }
-  static void lte (val_t d[], val_t s0[], val_t s1[], int w) {
-    int msb_0 = (s0[1] >> (w - (nw-1)*val_n_bits() - 1)) & 0x1;
-    int msb_1 = (s1[1] >> (w - (nw-1)*val_n_bits() - 1)) & 0x1;
-    if (msb_0 != msb_1) {
-      d[0] = msb_0;
-    } else {
-      val_t diff[nw];
-      sub(diff, s1, s0, nw*val_n_bits());
-      d[0] = !val_top_bit(diff[nw-1]);
-    }
-  }
-  static void gteu (val_t d[], val_t s0[], val_t s1[]) {
-    val_t diff[nw];
-    sub(diff, s0, s1, nw*val_n_bits());
-    d[0] = !val_top_bit(diff[nw-1]);
-  }
-  static void gte (val_t d[], val_t s0[], val_t s1[], int w) {
-    int msb_0 = (s0[1] >> (w - (nw-1)*val_n_bits() - 1)) & 0x1;
-    int msb_1 = (s1[1] >> (w - (nw-1)*val_n_bits() - 1)) & 0x1;
-    if (msb_0 != msb_1) {
-      d[0] = msb_1;
-    } else {
-      val_t diff[nw];
-      sub(diff, s0, s1, nw*val_n_bits());
-      d[0] = !val_top_bit(diff[nw-1]);
+      return !val_top_bit(diff[nw-1]);
     }
   }
   static bool eq (val_t s0[], val_t s1[]) {
@@ -583,37 +537,21 @@ struct bit_word_funs<1> {
     else
       mul_n(d, s0, s1, nbd, nb0, nb1);
   }
-  static void ltu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = (s0[0] < s1[0]);
+  static bool ltu (val_t s0[], val_t s1[]) {
+    return (s0[0] < s1[0]);
   }
-  static void lt (val_t d[], val_t s0[], val_t s1[], int w) {
+  static bool lt (val_t s0[], val_t s1[], int w) {
     sval_t a = s0[0] << (val_n_bits() - w);
     sval_t b = s1[0] << (val_n_bits() - w);
-    d[0] = (a < b);
+    return (a < b);
   }
-  static void gtu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = (s0[0] > s1[0]);
+  static bool lteu (val_t s0[], val_t s1[]) {
+    return (s0[0] <= s1[0]);
   }
-  static void gt (val_t d[], val_t s0[], val_t s1[], int w) {
+  static bool lte (val_t s0[], val_t s1[], int w) {
     sval_t a = s0[0] << (val_n_bits() - w);
     sval_t b = s1[0] << (val_n_bits() - w);
-    d[0] = (a > b);
-  }
-  static void lteu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = (s0[0] <= s1[0]);
-  }
-  static void lte (val_t d[], val_t s0[], val_t s1[], int w) {
-    sval_t a = s0[0] << (val_n_bits() - w);
-    sval_t b = s1[0] << (val_n_bits() - w);
-    d[0] = (a <= b);
-  }
-  static void gteu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = (s0[0] >= s1[0]);
-  }
-  static void gte (val_t d[], val_t s0[], val_t s1[], int w) {
-    sval_t a = s0[0] << (val_n_bits() - w);
-    sval_t b = s1[0] << (val_n_bits() - w);
-    d[0] = (a >= b);
+    return (a <= b);
   }
   static void bit_neg (val_t d[], val_t s0[], int nb) {
     d[0] = ~s0[0] & mask_val(nb);
@@ -702,45 +640,25 @@ struct bit_word_funs<2> {
   static void mul (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
     mul_n(d, s0, s1, nbd, nb0, nb1);
   }
-  static void ltu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = ((s0[1] < s1[1]) | (s0[1] == s1[1] & s0[0] < s1[0]));
+  static bool ltu (val_t s0[], val_t s1[]) {
+    return ((s0[1] < s1[1]) | (s0[1] == s1[1] & s0[0] < s1[0]));
   }
-  static void lt (val_t d[], val_t s0[], val_t s1[], int w) {
+  static bool lt (val_t s0[], val_t s1[], int w) {
     int msb_0 = (s0[1] >> (w - val_n_bits() - 1)) & 0x1;
     int msb_1 = (s1[1] >> (w - val_n_bits() - 1)) & 0x1;
     int cond  = msb_0 ^ msb_1;
-    d[0] = (cond && msb_0)
+    return (cond && msb_0)
         || (!cond && ((s0[1] < s1[1]) | (s0[1] == s1[1] & s0[0] < s1[0])));
   }
-  static void gtu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = ((s0[1] > s1[1]) | (s0[1] == s1[1] & s0[0] > s1[0]));
+  static bool lteu (val_t s0[], val_t s1[]) {
+    return ((s0[1] < s1[1]) | (s0[1] == s1[1] & s0[0] <= s1[0]));
   }
-  static void gt (val_t d[], val_t s0[], val_t s1[], int w) {
+  static bool lte (val_t s0[], val_t s1[], int w) {
     int msb_0 = (s0[1] >> (w - val_n_bits() - 1)) & 0x1;
     int msb_1 = (s1[1] >> (w - val_n_bits() - 1)) & 0x1;
     int cond = msb_0 ^ msb_1;
-    d[0] = (cond && msb_1)
-        || (!cond && ((s0[1] > s1[1]) | (s0[1] == s1[1] & s0[0] > s1[0])));
-  }
-  static void lteu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = ((s0[1] < s1[1]) | (s0[1] == s1[1] & s0[0] <= s1[0]));
-  }
-  static void lte (val_t d[], val_t s0[], val_t s1[], int w) {
-    int msb_0 = (s0[1] >> (w - val_n_bits() - 1)) & 0x1;
-    int msb_1 = (s1[1] >> (w - val_n_bits() - 1)) & 0x1;
-    int cond = msb_0 ^ msb_1;
-    d[0] = (cond && msb_0)
+    return (cond && msb_0)
         || (!cond && ((s0[1] < s1[1]) | (s0[1] == s1[1] & s0[0] <= s1[0])));
-  }
-  static void gteu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = ((s0[1] > s1[1]) | (s0[1] == s1[1] & s0[0] >= s1[0]));
-  }
-  static void gte (val_t d[], val_t s0[], val_t s1[], int w) {
-    int msb_0 = (s0[1] >> (w - val_n_bits() - 1)) & 0x1;
-    int msb_1 = (s1[1] >> (w - val_n_bits() - 1)) & 0x1;
-    int cond = msb_0 ^ msb_1;
-    d[0] = (cond && msb_1)
-        || (!cond && ((s0[1] > s1[1]) | (s0[1] == s1[1] & s0[0] >= s1[0])));
   }
   static void bit_xor (val_t d[], val_t s0[], val_t s1[]) {
     d[0] = (s0[0] ^ s1[0]);
@@ -880,45 +798,25 @@ struct bit_word_funs<3> {
   static void mul (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
     mul_n(d, s0, s1, nbd, nb0, nb1);
   }
-  static void ltu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = ((s0[2] < s1[2]) | ((s0[2] == s1[2]) & ((s0[1] < s1[1]) | ((s0[1] == s1[1]) & (s0[0] < s1[0])))));
+  static bool ltu (val_t s0[], val_t s1[]) {
+    return ((s0[2] < s1[2]) | ((s0[2] == s1[2]) & ((s0[1] < s1[1]) | ((s0[1] == s1[1]) & (s0[0] < s1[0])))));
   }
-  static void lt (val_t d[], val_t s0[], val_t s1[], int w) {
+  static bool lt (val_t s0[], val_t s1[], int w) {
     int msb_0 = (s0[1] >> (w - 2*val_n_bits() - 1)) & 0x1;
     int msb_1 = (s1[1] >> (w - 2*val_n_bits() - 1)) & 0x1;
     int cond  = msb_0 ^ msb_1;
-    d[0] = (cond && msb_0)
+    return (cond && msb_0)
         || (!cond && (((s0[2] < s1[2]) | ((s0[2] == s1[2]) & ((s0[1] < s1[1]) | ((s0[1] == s1[1]) & (s0[0] < s1[0])))))));
   }
-  static void gtu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = ((s0[2] > s1[2]) | ((s0[2] == s1[2]) & ((s0[1] > s1[1]) | ((s0[1] == s1[1]) & (s0[0] > s1[0])))));
+  static bool lteu (val_t s0[], val_t s1[]) {
+    return ((s0[2] < s1[2]) | ((s0[2] == s1[2]) & ((s0[1] < s1[1]) | ((s0[1] == s1[1]) & (s0[0] <= s1[0])))));
   }
-  static void gt (val_t d[], val_t s0[], val_t s1[], int w) {
+  static bool lte (val_t s0[], val_t s1[], int w) {
     int msb_0 = (s0[1] >> (w - 2*val_n_bits() - 1)) & 0x1;
     int msb_1 = (s1[1] >> (w - 2*val_n_bits() - 1)) & 0x1;
     int cond  = msb_0 ^ msb_1;
-    d[0] = (cond && msb_1)
-        || (!cond && ((s0[2] > s1[2]) | ((s0[2] == s1[2]) & ((s0[1] > s1[1]) | ((s0[1] == s1[1]) & (s0[0] > s1[0]))))));
-  }
-  static void lteu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = ((s0[2] < s1[2]) | ((s0[2] == s1[2]) & ((s0[1] < s1[1]) | ((s0[1] == s1[1]) & (s0[0] <= s1[0])))));
-  }
-  static void lte (val_t d[], val_t s0[], val_t s1[], int w) {
-    int msb_0 = (s0[1] >> (w - 2*val_n_bits() - 1)) & 0x1;
-    int msb_1 = (s1[1] >> (w - 2*val_n_bits() - 1)) & 0x1;
-    int cond  = msb_0 ^ msb_1;
-    d[0] = (cond && msb_0)
+    return (cond && msb_0)
         || (!cond && ((s0[2] < s1[2]) | ((s0[2] == s1[2]) & ((s0[1] < s1[1]) | ((s0[1] == s1[1]) & (s0[0] <= s1[0]))))));
-  }
-  static void gteu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = ((s0[2] > s1[2]) | ((s0[2] == s1[2]) & ((s0[1] > s1[1]) | ((s0[1] == s1[1]) & (s0[0] >= s1[0])))));
-  }
-  static void gte (val_t d[], val_t s0[], val_t s1[], int w) {
-    int msb_0 = (s0[1] >> (w - 2*val_n_bits() - 1)) & 0x1;
-    int msb_1 = (s1[1] >> (w - 2*val_n_bits() - 1)) & 0x1;
-    int cond  = msb_0 ^ msb_1;
-    d[0] = (cond && msb_1)
-        || (!cond && ((s0[2] > s1[2]) | ((s0[2] == s1[2]) & ((s0[1] > s1[1]) | ((s0[1] == s1[1]) & (s0[0] >= s1[0]))))));
   }
   static void bit_xor (val_t d[], val_t s0[], val_t s1[]) {
     d[0] = (s0[0] ^ s1[0]);
@@ -1053,10 +951,15 @@ class dat_t {
   inline dat_t<w> (const dat_t<w>& src) {
     bit_word_funs<n_words>::set(values, (val_t*)src.values);
   }
+  static inline dat_t<w> from_vals(val_t val[n_words]) {
+    dat_t<w> res;
+    for (int i = 0; i < n_words; i++)
+      res.values[i] = val[i];
+    return res;
+  }
   inline dat_t<w> (val_t val) {
     values[0] = val;
-    int sww = n_words;
-    for (int i = 1; i < sww; i++)
+    for (int i = 1; i < n_words; i++)
       values[i] = 0;
   }
   template <int sw>
@@ -1088,9 +991,10 @@ class dat_t {
   dat_t<w> operator - ( ) {
     return ~(*this) + DAT<w>(1);
   }
-  dat_t<w+w> operator * ( dat_t<w> o ) {
-    dat_t<w+w> res;
-    bit_word_funs<n_words>::mul(res.values, values, o.values, w+w, w, w);
+  template <int w2>
+  dat_t<w+w2> operator * ( dat_t<w2> o ) {
+    dat_t<w+w2> res;
+    bit_word_funs<n_words>::mul(res.values, values, o.values, w+w2, w, w2);
     return res;
   }
   dat_t<w+w> fix_times_fix( dat_t<w> o ) {
@@ -1109,8 +1013,23 @@ class dat_t {
     }
   }
   dat_t<w> operator / ( dat_t<w> o ) {
-    dat_t<w> res;
-    div_n(res.values, values, o.values, w, w, w);
+    dat_t<w> res(0);
+    if (o == 0) {
+      res.fill_bit(1);
+    } else if (n_words == 1) {
+      res.values[0] = values[0] / o.values[0];
+    } else {
+      dat_t<2*w> p = *this, d = o;
+      d = d << w;
+
+      for (int i = w-1; i >= 0; i--) {
+        p = p << 1;
+        if (p >= d) {
+          p = p - d;
+          res.values[i / val_n_bits()] |= val_t(1) << (i % val_n_bits());
+        }
+      }
+    }
     return res;
   }
   dat_t<w> operator % ( dat_t<w> o ) {
@@ -1144,45 +1063,29 @@ class dat_t {
       return sgn_a ? -res : res;
     }
   }
-  dat_t<1> operator < ( dat_t<w> o ) {
-    dat_t<1> res;
-    bit_word_funs<n_words>::ltu(res.values, values, o.values);
-    return res;
+  inline bool operator < ( dat_t<w> o ) {
+    return bit_word_funs<n_words>::ltu(values, o.values);
   }
-  dat_t<1> operator > ( dat_t<w> o ) {
-    dat_t<1> res;
-    bit_word_funs<n_words>::gtu(res.values, values, o.values);
-    return res;
+  inline bool operator <= ( dat_t<w> o ) {
+    return bit_word_funs<n_words>::lteu(values, o.values);
   }
-  dat_t<1> operator >= ( dat_t<w> o ) {
-    dat_t<1> res;
-    bit_word_funs<n_words>::gteu(res.values, values, o.values);
-    return res;
+  inline bool operator > ( dat_t<w> o ) {
+    return o < *this;
   }
-  dat_t<1> operator <= ( dat_t<w> o ) {
-    dat_t<1> res;
-    bit_word_funs<n_words>::lteu(res.values, values, o.values);
-    return res;
+  inline bool operator >= ( dat_t<w> o ) {
+    return o <= *this;
   }
-  inline dat_t<1> gt ( dat_t<w> o ) {
-    dat_t<1> res;
-    bit_word_funs<n_words>::gt(res.values, values, o.values, w);
-    return res;
+  inline bool lt ( dat_t<w> o ) {
+    return bit_word_funs<n_words>::lt(values, o.values, w);
   }
-  inline dat_t<1> gte ( dat_t<w> o ) {
-    dat_t<1> res;
-    bit_word_funs<n_words>::gte(res.values, values, o.values, w);
-    return res;
+  inline bool lte ( dat_t<w> o ) {
+    return bit_word_funs<n_words>::lte(values, o.values, w);
   }
-  inline dat_t<1> lt ( dat_t<w> o ) {
-    dat_t<1> res;
-    bit_word_funs<n_words>::lt(res.values, values, o.values, w);
-    return res;
+  inline bool gt ( dat_t<w> o ) {
+    return o.lt(*this);
   }
-  inline dat_t<1> lte ( dat_t<w> o ) {
-    dat_t<1> res;
-    bit_word_funs<n_words>::lte(res.values, values, o.values, w);
-    return res;
+  inline bool gte ( dat_t<w> o ) {
+    return o.lte(*this);
   }
   dat_t<w> operator ^ ( dat_t<w> o ) {
     dat_t<w> res;
@@ -1225,6 +1128,8 @@ class dat_t {
   dat_t<w> operator << ( int amount ) {
     dat_t<w> res;
     bit_word_funs<n_words>::lsh(res.values, values, amount);
+    if (val_n_word_bits(w))
+      res.values[n_words-1] &= mask_val(val_n_word_bits(w));
     return res;
   }
   inline dat_t<w> operator << ( dat_t<w> o ) {

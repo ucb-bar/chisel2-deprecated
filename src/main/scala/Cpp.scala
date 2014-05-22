@@ -169,7 +169,8 @@ class CppBackend extends Backend {
     else
       "  {" + s.map(" " + _ + ";").reduceLeft(_ + _) + " }\n"
   def makeArray(s: String, x: Node): List[String] = List("val_t " + s + "[" + words(x) + "]")
-  def toArray(s: String, x: Node): List[String] = makeArray(s, x) ++ (0 until words(x)).map(i => s + "[" + i + "] = " + emitWordRef(x, i))
+  def toArray(s: String, x: Node): List[String] = makeArray(s, x) ++ copyToArray(s, x)
+  def copyToArray(s: String, x: Node): List[String] = (0 until words(x)).map(i => s + "[" + i + "] = " + emitWordRef(x, i)).toList
   def fromArray(s: String, x: Node) =
     (0 until words(x)).map(i => emitWordRef(x, i) + " = " + s + "[" + i + "]")
   def trunc(x: Node): String = {
@@ -270,15 +271,11 @@ class CppBackend extends Backend {
             res += emitWordRef(o, i) + " = " + emitWordRef(o.inputs(0), i) + o.op + emitWordRef(o.inputs(1), i) + o.op + "__c"
           }
           block(res) + trunc(o)
-        } else if (o.op == "/") {
-          val cmd = "div_n(__d, __x, __y, " + o.width + ", " + o.inputs(0).width + ", " + o.inputs(1).width + ")"
-          block(makeArray("__d", o) ++ toArray("__x", o.inputs(0)) ++ toArray("__y", o.inputs(1)) ++ List(cmd) ++ fromArray("__d", o))
-        } else if (o.op == "*") {
-          if (o.width <= bpw) {
-            "  " + emitLoWordRef(o) + " = " + emitLoWordRef(o.inputs(0)) + " * " + emitLoWordRef(o.inputs(1)) + ";\n"
+        } else if (o.op == "*" || o.op == "/") {
+          if (o.op == "*" && o.width <= bpw) {
+            s"  ${emitLoWordRef(o)} = ${emitLoWordRef(o.inputs(0))} ${o.op} ${emitLoWordRef(o.inputs(1))};\n"
           } else {
-            val cmd = "mul_n(__d, __x, __y, " + o.width + ", " + o.inputs(0).width + ", " + o.inputs(1).width + ")"
-            block(makeArray("__d", o) ++ toArray("__x", o.inputs(0)) ++ toArray("__y", o.inputs(1)) ++ List(cmd) ++ fromArray("__d", o))
+            block(s"dat_t<${o.inputs(0).width}> __x" :: s"dat_t<${o.inputs(1).width}> __y" :: (copyToArray("__x.values", o.inputs(0)) ++ copyToArray("__y.values", o.inputs(1)) :+ s" dat_t<${o.width}> __d = __x ${o.op} __y") ++ fromArray("__d.values", o))
           }
         } else if (o.op == "<<") {
           if (o.width <= bpw) {
