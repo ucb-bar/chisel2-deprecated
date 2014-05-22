@@ -54,11 +54,11 @@ object Node {
     (m: Node) => w
   }
 
-  // TODO: width.width is Driver.isInGetWidth dependent
+  // TODO: width is Driver.isInGetWidth dependent
   // What are we trying to accomplish here?
   def widthOf(i: Int) = { (m: Node) => {
     try {
-      m.inputs(i).width.width
+      m.inputs(i).width
     } catch {
         case e: java.lang.IndexOutOfBoundsException => {
           val error = new ChiselError(() => {m + " in " + m.component + " is unconnected. Ensure that is assigned."}, m.line)
@@ -71,27 +71,27 @@ object Node {
 
   // Compute the maximum width required for a node,
   // ignoring unspecified input widths
-  // TODO: width.width is Driver.isInGetWidth dependent
+  // TODO: width is Driver.isInGetWidth dependent
   // What are we trying to accomplish here?
   def maxWidth(m: Node): Int = {
     var w = 0
     for (i <- m.inputs)
       if (!(i == null || i == m)) {
-        w = w.max(i.width.width)
+        w = w.max(i._width.widthOrValue(0))
       }
     w
   }
 
-  def minWidth(m: Node): Int = m.inputs.map(_.width.WidthOrValue(0)).min
+  def minWidth(m: Node): Int = m.inputs.map(_._width.widthOrValue(0)).min
 
   def maxWidthPlusOne(m: Node): Int = maxWidth(m) + 1;
 
   def sumWidth(m: Node): Int = {
     var res = 0;
     for (i <- m.inputs) {
-      // TODO: width.width is Driver.isInGetWidth dependent
+      // TODO: width is Driver.isInGetWidth dependent
       // What are we trying to accomplish here?
-      val w = i.width.width
+      val w = i._width.widthOrValue(0)
       if (w > 0) {
         res = res + w
       }
@@ -101,14 +101,14 @@ object Node {
 
   def lshWidthOf(i: Int, n: Node): (Node) => (Int) = {
     (m: Node) => {
-      val res = m.inputs(0).width.needWidth() + n.maxNum.toInt;
+      val res = m.inputs(0)._width.widthOrValue(0) + n.maxNum.toInt;
       res
     }
   }
 
   def rshWidthOf(i: Int, n: Node): (Node) => (Int) = {
     (m: Node) => {
-      val w = m.inputs(i).width.needWidth() - n.minNum.toInt
+      val w = m.inputs(i)._width.widthOrValue(0) - n.minNum.toInt
       if (w < 0) n.minNum.toInt else w
     }
   }
@@ -132,14 +132,14 @@ abstract class Node extends nameable {
   def componentOf: Module = if (Driver.backend.isEmittingComponents && component != null) component else Driver.topComponent
   // The semantics of width are sufficiently complicated that
   // it deserves its own class
-  var width = Width(this)
+  var _width = Width(this)
   val consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
   val inputs = new ArrayBuffer[Node];
   def traceableNodes: Array[Node] = Array[Node]();
   var inferWidth: (Node) => Int = maxWidth;
 
   // Pass the buck.
-  def setInferWidth(widthfunc: (Node) => Int) = width.setInferWidth(widthfunc)
+  def setInferWidth(widthfunc: (Node) => Int) = _width.setInferWidth(widthfunc)
 
   var nameHolder: nameable = null;
   val line: StackTraceElement =
@@ -159,6 +159,14 @@ abstract class Node extends nameable {
   Driver.nodes += this
 
   def isByValue: Boolean = true;
+  def width: Int = if (Driver.isInGetWidth) inferWidth(this) else _width.width
+
+  /** Sets the width of a Node. */
+  def width_=(w: Int) {
+    _width.setWidth(w);
+    inferWidth = fixWidth(w);
+  }
+
   def nameIt (path: String, isNamingIo: Boolean) {
     try {
       if (!named && (!isIo || isNamingIo)) {
@@ -195,7 +203,7 @@ abstract class Node extends nameable {
   def ##(b: Node): Node  = Op("##", sumWidth _,  this, b );
   def maxNum: BigInt = {
     // XXX This makes sense for UInt, but not in general.
-    val w = if (width.width < 0) inferWidth(this) else width.width
+    val w = if (width < 0) inferWidth(this) else width
     litValue((BigInt(1) << w) - 1)
   }
   def minNum: BigInt = litValue(0)
@@ -228,15 +236,20 @@ abstract class Node extends nameable {
     initOf(n, width, ins.toList);
   }
   def init (n: String, w: Int, ins: Node*): Node = {
-    width.setWidth(w)
+    _width.setWidth(w)
     initOf(n, fixWidth(w), ins.toList)
   }
   def infer: Boolean = {
     val res = inferWidth(this);
     if (res == -1) {
       true
-    } else if (res != width.width) {
-      width.setWidth(res)
+    } else if (res != width) {
+      if (res < -1) {
+        this.printTree(System.out)
+        assert(res > -2, ChiselError.error("infer: setting width to " + res
+          + " for node " + this))
+      }
+      _width.setWidth(res)
       true
     } else {
       false
@@ -248,9 +261,7 @@ abstract class Node extends nameable {
     isReg || isUsedByClockHi || Driver.isDebug && !name.isEmpty ||
     Driver.emitTempNodes
 
-  // TODO: width.width is Driver.isInGetWidth dependent
-  // What are we trying to accomplish here?
-  lazy val isInVCD: Boolean = name != "reset" && width.width > 0 &&
+  lazy val isInVCD: Boolean = name != "reset" && width > 0 &&
      (!name.isEmpty || Driver.emitTempNodes) &&
      ((isIo && isInObject) || isReg || Driver.isDebug)
 
@@ -277,7 +288,7 @@ abstract class Node extends nameable {
     writer.println("component: " + component)
     writer.println("isTypeNode: " + isTypeNode)
     writer.println("depth: " + depth)
-    writer.println("width: " + width)
+    writer.println("width: " + _width)
     writer.println("index: " + emitIndex)
     writer.println("consumers.length: " + consumers.length)
     writer.println("nameHolder: " + nameHolder)
@@ -384,7 +395,7 @@ abstract class Node extends nameable {
   def forceMatchingWidths { }
 
   def matchWidth(w: Int): Node = {
-    val my_width = this.width.needWidth()
+    val my_width = this._width.needWidth()
     if (w > my_width) {
       val zero = Literal(0, w - my_width); zero.infer
       val res = Concatenate(zero, this); res.infer
@@ -404,17 +415,11 @@ abstract class Node extends nameable {
 
   var isWidthWalked = false;
 
-  // We had better have a legitimate width value to return here.
-  // Throw an exception if width is uninitialized (None).
   def getWidth(): Int = {
     Driver.isInGetWidth = true
-    try {
-        // TODO: width.width is Driver.isInGetWidth dependent
-        // What are we trying to accomplish here?
-        width.width
-    } finally {
-        Driver.isInGetWidth = false
-    }
+    val w = width
+    Driver.isInGetWidth = false
+    w
   }
 
   def removeTypeNodes() {
@@ -499,7 +504,9 @@ abstract class Node extends nameable {
     checkOne(this, x) || checkOne(x, this)
   }
   def setWidth(w: Int) = {
-    width.setWidth(w)
+    _width.setWidth(w)
     inferWidth = fixWidth(w);
   }
+  // Return a value or raise an exception.
+  def needWidth(): Int = _width.needWidth()
 }

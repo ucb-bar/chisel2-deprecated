@@ -42,7 +42,7 @@ object NodeFill {
   def apply(n: Int, mod: Node): Node = {
     if (n == 1) {
       mod
-    } else if (mod.width.needWidth() == 1) {
+    } else if (mod.needWidth() == 1) {
       Multiplex(mod, Literal((BigInt(1) << n) - 1, n), Literal(0, n))
     } else {
       /* Build up a Concatenate tree for more ILP in simulation. */

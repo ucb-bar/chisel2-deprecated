@@ -44,9 +44,9 @@ object NodeExtract {
       ChiselError.error("Extract(hi = " + hi + ", lo = " + lo + ") requires hi >= lo")
     val w = if (width == -1) hi - lo + 1 else width
     val bits_lit = mod.litOf
-    // TODO: width.width is Driver.isInGetWidth dependent
+    // TODO: width is Driver.isInGetWidth dependent
     // What are we trying to accomplish here?
-    if (lo == 0 && w == mod.width.width) {
+    if (lo == 0 && w == mod.width) {
       mod
     } else if (bits_lit != null) {
       Literal((bits_lit.value >> lo) & ((BigInt(1) << w) - BigInt(1)), w)
@@ -113,7 +113,7 @@ class Extract extends Node {
 
   def validateIndex(x: Node) {
     val lit = x.litOf
-    assert(lit == null || lit.value >= 0 && lit.value < inputs(0).width.needWidth(),
+    assert(lit == null || lit.value >= 0 && lit.value < inputs(0).needWidth(),
            ChiselError.error("Extract(" + lit.value + ")" +
                     " out of range [0," + (inputs(0).width-1) + "]" +
                     " of " + inputs(0), line))

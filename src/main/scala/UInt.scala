@@ -66,8 +66,10 @@ class UInt extends Bits with Num[UInt] {
     */
   override def fromNode(n: Node): this.type = {
     val res = UInt(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
-    res.width = n.width.clone(res)
-    println("UInt.fromNode - old width " + n.width + ", new width " + res.width)
+    res._width = n._width.clone(res)
+    if (n._width.debug) {
+      println("UInt.fromNode - old width " + n.width + ", new width " + res.width)
+    }
     res
   }
 

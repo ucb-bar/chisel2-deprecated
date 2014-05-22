@@ -84,13 +84,13 @@ class DataSuite extends TestSuite {
     assertTrue( fixFromLitWithWidth.isInstanceOf[Literal] );
     assertFalse( fixFromLitWithWidth.named );
     /* XXX width is -1 here for some reason
-    assertTrue( fixFromLitWithWidth.width == 16 );
+    assertTrue( fixFromLitWithwidth == 16 );
      */
   }
 
   @Ignore @Test def testSIntFromWidthDir() {
     val fixFromWidthDir = SInt(width = 8, dir = INPUT);
-    assertTrue( fixFromWidthDir.width.needWidth() == 8 );
+    assertTrue( fixFromWidthDir.needWidth() == 8 );
     assertTrue( fixFromWidthDir.dir == INPUT );
     assertFalse( fixFromWidthDir.named );
   }
@@ -100,7 +100,7 @@ class DataSuite extends TestSuite {
   @Ignore @Test def testUIntVal() {
     // apply(x: Int): UInt
     val dat = UInt(5)
-    assertTrue( dat.width.needWidth() == 3 );
+    assertTrue( dat.needWidth() == 3 );
     assertTrue( dat.isInstanceOf[Literal] );
     assertFalse( dat.named );
   }
@@ -108,7 +108,7 @@ class DataSuite extends TestSuite {
   @Ignore @Test def testUIntValWidth() {
     // def apply(x: Int, width: Int): UInt
     val dat = UInt(5, 4)
-    assertTrue( dat.width.needWidth() == 4 )
+    assertTrue( dat.needWidth() == 4 )
     assertTrue( dat.isInstanceOf[Literal] )
     assertFalse( dat.named );
   }
@@ -128,7 +128,7 @@ class DataSuite extends TestSuite {
   @Ignore @Test def testUIntStringWidth() {
     // def apply(x: String, width: Int): UInt
     val dat = UInt("101", 4)
-    assertTrue( dat.width.needWidth() == 4 )
+    assertTrue( dat.needWidth() == 4 )
     assertTrue( dat.isInstanceOf[Literal] )
     assertFalse( dat.named )
   }
@@ -136,7 +136,7 @@ class DataSuite extends TestSuite {
   @Ignore @Test def testUIntStringBaseBinary() {
     // def apply(x: String, base: Char): UInt
     val dat = UInt("1010", 'b')
-    assertTrue( dat.width.needWidth() == 4 )
+    assertTrue( dat.needWidth() == 4 )
     assertTrue( dat.isInstanceOf[Literal] )
     assertFalse( dat.named )
   }
@@ -144,7 +144,7 @@ class DataSuite extends TestSuite {
   @Ignore @Test def testUIntStringBaseOctal() {
     // def apply(x: String, base: Char): UInt
     val dat = UInt("644", 'o')
-    assertTrue( dat.width.needWidth() == 9 );
+    assertTrue( dat.needWidth() == 9 );
     assertTrue( dat.isInstanceOf[Literal] )
     assertFalse( dat.named );
   }
@@ -164,7 +164,7 @@ class DataSuite extends TestSuite {
   @Ignore @Test def testUIntStringBaseHex() {
     // def apply(x: String, base: Char): UInt
     val dat = UInt("abc", 'h')
-    assertTrue( dat.width.needWidth() == 12 )
+    assertTrue( dat.needWidth() == 12 )
     assertTrue( dat.isInstanceOf[Literal] )
     assertFalse( dat.named )
   }
@@ -172,7 +172,7 @@ class DataSuite extends TestSuite {
   @Test def testUIntDirWidth() {
     // def apply(dir: IODirection = null, width: Int = -1): UInt
     val dat = UInt(INPUT, 4)
-    assertTrue( dat.width.needWidth() == 4 );
+    assertTrue( dat.needWidth() == 4 );
     assertTrue( dat.dir == INPUT );
     assertFalse( dat.named );
   }

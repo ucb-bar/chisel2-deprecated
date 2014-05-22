@@ -60,7 +60,7 @@ class SInt extends Bits with Num[SInt] {
   }
 
   override def matchWidth(w: Int): Node = {
-    val my_width = this.width.needWidth()
+    val my_width = this.needWidth()
     if (w > my_width) {
       if (my_width == 1) {
         val res = NodeFill(w, this); res.infer

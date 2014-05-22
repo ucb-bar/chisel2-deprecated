@@ -316,7 +316,7 @@ trait CounterBackend extends Backend {
       val m = queue.dequeue
 
       for (signal <- m.signals) {
-        val signalWidth = signal.width.needWidth()
+        val signalWidth = signal.needWidth()
         val signalValue = 
           if (decoupledPins contains signal) decoupledPins(signal) 
           else UInt(signal)
@@ -541,7 +541,7 @@ abstract class CounterTester[+T <: Module](c: T, isTrace: Boolean = true) extend
     for (i <- 0 until n) {
       for (signal <- Driver.signals) {
         val curPeek = peekBits(signal)
-        if (signal.width.needWidth() == 1) {
+        if (signal.needWidth() == 1) {
           // increment by the signal's value
           counts(signal) += curPeek
         } else {

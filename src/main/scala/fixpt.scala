@@ -48,7 +48,7 @@ abstract class Fix[B<:Bits,T<:Fix[B,T]](val exp: Int, val raw: B) extends Bundle
     val t_adj_rd = toRaw(if(teff_exp > int_exp) Cat(  raw, UInt(0, width=teff_exp-int_exp)) else   raw)
     val b_adj_rd = toRaw(if(beff_exp > int_exp) Cat(b.raw, UInt(0, width=beff_exp-int_exp)) else b.raw)
 
-    val new_width = math.max(raw.width.needWidth() + teff_exp-int_exp, b.raw.width.needWidth() + beff_exp-int_exp)+1
+    val new_width = math.max(raw.needWidth() + teff_exp-int_exp, b.raw.needWidth() + beff_exp-int_exp)+1
     val new_exp = int_exp + new_width
     val result = Factory(new_exp, new_width)
 
@@ -56,7 +56,7 @@ abstract class Fix[B<:Bits,T<:Fix[B,T]](val exp: Int, val raw: B) extends Bundle
     result
   }
   def do_mult(b: T): T = {
-    val result = Factory(exp+b.exp,raw.width.needWidth()+b.raw.width.needWidth())
+    val result = Factory(exp+b.exp,raw.needWidth()+b.raw.needWidth())
     result.raw := raw * b.raw
     return result
   }

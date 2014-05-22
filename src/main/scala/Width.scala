@@ -52,12 +52,16 @@ object Width {
 class Width(_node: Node, _width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
   val node = _node
   var width_ = _width
-  val throwIfUnsetNeed = _throwIfUnset
+  val throwIfUnsetRef = _throwIfUnset
   val originalSet: Boolean = false
+  val debug: Boolean = false
 
   var inferWidth: (Node) => Int = maxWidth;
+  if (debug) {
+    ChiselError.warning("Width: w " + _width + ", throw " + _throwIfUnset + ", at " + node)
+  }
   def width_value: Int = width
-  def width: Int = if (Driver.isInGetWidth) inferWidth(node) else width_
+  def width: Int = width_
 
   /** Sets the width of a Node. */
   def width_=(w: Int) {
@@ -65,13 +69,20 @@ class Width(_node: Node, _width: Int, _throwIfUnset: Boolean) extends Ordered[Wi
   }
 
   def setWidth(w: Int) = {
+    assert(w > -2, ChiselError.error("Width.setWidth: setting width to " + w
+      + " for node " + node))
+    if (w < 0 && throwIfUnsetRef) {
+      throw new Exception("Width:setWidth < -1");
+    }
     // The original set code looks wrong. It sets width_ to the previous width
     if (originalSet)
       width_ = width
     else
       width_ = w
     inferWidth = fixWidth(w);
-    println("Width(" + this + "):setWidth(" + w + "), " + node)
+    if (debug) {
+      println("Width(" + this + "):setWidth(" + w + "), " + node)
+    }
     if (w < -1) {
       ChiselError.warning("Width:setWidth < -1: " + node)
       throw new Exception("Width:setWidth < -1");
@@ -93,16 +104,17 @@ class Width(_node: Node, _width: Int, _throwIfUnset: Boolean) extends Ordered[Wi
     val w = width
     if (w == -1) {
       ChiselError.warning("needWidth but width not set: " + node)
-      node.printTree(System.err)
-      if (throwIfUnsetNeed)
+      node.printTree(System.out)
+      if (throwIfUnsetRef) {
         ChiselError.report()
         throw new Exception("uninitialized width");
+      }
     }
     w
   }
 
   // Return a value or 0 if the width isn't set
-  def WidthOrValue(v: Int): Int = {
+  def widthOrValue(v: Int): Int = {
     val w = width
     if (w >= 0) w else v
   }
@@ -118,8 +130,14 @@ class Width(_node: Node, _width: Int, _throwIfUnset: Boolean) extends Ordered[Wi
 
   override def toString: String = width_.toString
 
+  def copy(n: Node = null, w: Int = this.width_, t: Boolean = throwIfUnsetRef): Width = {
+    val neww = new Width(n, w, t)
+    neww.inferWidth = this.inferWidth
+    neww
+  }
+
   def clone(n: Node = null): Width = {
-    val w = new Width(n, width_, throwIfUnsetNeed)
+    val w = new Width(n, width_, throwIfUnsetRef)
     w.inferWidth = this.inferWidth
     w
   }

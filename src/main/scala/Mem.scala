@@ -187,7 +187,7 @@ abstract class MemAccess(val mem: Mem[_], addri: Node) extends Node {
   def getPortType: String
 
   override def forceMatchingWidths =
-    if (addr.width.needWidth() != log2Up(mem.n)) inputs(0) = addr.matchWidth(log2Up(mem.n))
+    if (addr.needWidth() != log2Up(mem.n)) inputs(0) = addr.matchWidth(log2Up(mem.n))
 }
 
 class MemRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {

@@ -115,6 +115,7 @@ object ChiselError {
     before this point. */
   def checkpoint() {
     if(hasErrors) {
+      report()
       throw new IllegalStateException(
         Console.UNDERLINED + "CODE HAS " +
         Console.UNDERLINED + Console.BOLD + ChiselErrors.filter(_.isError).length + Console.RESET +

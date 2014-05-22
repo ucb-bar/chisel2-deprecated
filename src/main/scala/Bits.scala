@@ -286,7 +286,7 @@ abstract class Bits extends Data with proc {
   override def clone: this.type = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
     res.inferWidth = this.inferWidth
-    res.width = this.width.clone(res)
+    res._width = this._width.clone(res)
     res.dir = this.dir;
     res
   }
