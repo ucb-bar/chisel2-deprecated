@@ -52,7 +52,9 @@ class SInt extends Bits with Num[SInt] {
   /** Factory method to create and assign a *SInt* type to a Node *n*.
     */
   override def fromNode(n: Node): this.type = {
-    SInt(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
+    val res = SInt(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
+    res._width = n._width.clone(res)
+    res
   }
 
   override def fromInt(x: Int): this.type = {
