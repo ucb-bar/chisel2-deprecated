@@ -88,15 +88,18 @@ object Node {
 
   def sumWidth(m: Node): Int = {
     var res = 0;
+    var widthUnknown = false
     for (i <- m.inputs) {
       // TODO: width is Driver.isInGetWidth dependent
       // What are we trying to accomplish here?
-      val w = i._width.widthOrValue(0)
+      val w = i.width
       if (w > 0) {
         res = res + w
+      } else {
+        widthUnknown = true
       }
     }
-    res
+    if (widthUnknown) -1 else res
   }
 
   def lshWidthOf(i: Int, n: Node): (Node) => (Int) = {
@@ -137,9 +140,6 @@ abstract class Node extends nameable {
   val inputs = new ArrayBuffer[Node];
   def traceableNodes: Array[Node] = Array[Node]();
   var inferWidth: (Node) => Int = maxWidth;
-
-  // Pass the buck.
-  def setInferWidth(widthfunc: (Node) => Int) = _width.setInferWidth(widthfunc)
 
   var nameHolder: nameable = null;
   val line: StackTraceElement =
@@ -239,16 +239,18 @@ abstract class Node extends nameable {
     _width.setWidth(w)
     initOf(n, fixWidth(w), ins.toList)
   }
+  
+  // Called while we're walking the graph inferring the width of nodes.
+  // We return true if we should continue to walk the graph,
+  // either because there's a node whose width we don't know,
+  // or because we updated a node's width.
   def infer: Boolean = {
     val res = inferWidth(this);
-    if (res == -1) {
+    if (res <= -1) {
       true
     } else if (res != width) {
-      if (res < -1) {
-        this.printTree(System.out)
-        assert(res > -2, ChiselError.error("infer: setting width to " + res
-          + " for node " + this))
-      }
+      // NOTE: This should NOT stop us using inferWidth, since the value
+      // we set here may not be correct.
       _width.setWidth(res)
       true
     } else {
