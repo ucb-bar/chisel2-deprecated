@@ -199,6 +199,7 @@ object Driver {
         case "--targetDir" => targetDir = args(i + 1); i += 1
         case "--include" => includeArgs = args(i + 1).split(' ').toList; i += 1
         case "--checkPorts" => isCheckingPorts = true
+        case "--reportDims" => isReportDims = true
         // Counter backend flags
         case "--backannotation" => isBackannotating = true
         case "--model" => model = args(i + 1) ; i += 1
