@@ -332,12 +332,16 @@ abstract class Bits extends Data with proc {
   final def apply(bit: Int): Bool = apply(UInt(bit))
   final def apply(bit: UInt): Bool = {
     val res = Extract(this, bit){Bool()}
-    res.comp = new Insert(this, bit)
+    res.comp = new Insert(this, bit, 1)
     res
   }
 
   /** Extract a range of bits */
-  final def apply(hi: Int, lo: Int): UInt = {Extract(this, hi, lo){UInt()}};
+  final def apply(hi: Int, lo: Int): UInt = {
+    val res = Extract(this, hi, lo){UInt()}
+    res.comp = new Insert(this, UInt(lo), hi - lo + 1)
+    res
+  }
   final def apply(hi: UInt, lo: UInt): UInt = {Extract(this, hi, lo, -1){UInt()}};
   final def apply(range: (Int, Int)): UInt = this(range._1, range._2);
 
@@ -349,6 +353,7 @@ abstract class Bits extends Data with proc {
   def & (b: Bits): this.type = newBinaryOp(b, "&");
   def | (b: Bits): this.type = newBinaryOp(b, "|");
   def ^ (b: Bits): this.type = newBinaryOp(b, "^");
+  def <<(b: UInt): this.type = newBinaryOp(b, "<<")
 
   def bitSet(off: UInt, dat: UInt): this.type = {
     val bit = UInt(1, 1) << off

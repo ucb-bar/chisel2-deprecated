@@ -87,7 +87,6 @@ class UInt extends Bits with Num[UInt] {
   def zext(): SInt = Cat(UInt(0,1), this).toSInt
   def unary_-(): UInt = UInt(0) - this
   def unary_!(): Bool = this === UInt(0)
-  def << (b: UInt): UInt = newBinaryOp(b, "<<");
   def >> (b: UInt): UInt = newBinaryOp(b, ">>");
   def +  (b: UInt): UInt = newBinaryOp(b, "+");
   def *  (b: UInt): UInt = newBinaryOp(b, "*");

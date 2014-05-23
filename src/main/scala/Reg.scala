@@ -97,17 +97,14 @@ object Reg {
     // asOutput flip the direction and returns this.
     val res = gen.asOutput
 
-    for ((res_n, res_i) <- res.flatten) {
-    }
-
     if (init != null) for (((res_n, res_i), (rval_n, rval_i)) <- res.flatten zip init.flatten) {
       if (rval_i.getWidth < 0) ChiselError.error("Negative width to wire " + res_i)
       res_i.comp = new RegReset
-      res_i.comp.init("", regWidth(rval_i), null, rval_i)
+      res_i.comp.init("", regWidth(rval_i), res_i.comp, rval_i)
       res_i.inputs += res_i.comp
     } else for ((res_n, res_i) <- res.flatten) {
       res_i.comp = new Reg
-      res_i.comp.init("", regWidth(res_i.getWidth), null)
+      res_i.comp.init("", regWidth(res_i.getWidth), res_i.comp)
       res_i.inputs += res_i.comp
     }
 

@@ -100,7 +100,7 @@ trait proc extends Node {
       procAssigned = true
       val mux = Multiplex(cond, src, default)
       if (inputs.isEmpty) inputs += mux
-      else { require(inputs(0) == null); inputs(0) = mux }
+      else { require(inputs(0) == default); inputs(0) = mux }
     }
   }
 

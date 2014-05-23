@@ -89,7 +89,6 @@ class SInt extends Bits with Num[SInt] {
   // arithmetic operators
   def unary_-(): SInt = SInt(0) - this
   def unary_!(): Bool = this === SInt(0)
-  def << (b: UInt): SInt = newBinaryOp(b, "<<");
   def >> (b: UInt): SInt = newBinaryOp(b, "s>>");
   def ?  (b: SInt): SInt = fromNode(Multiplex(this.toBool, b, null))
 
