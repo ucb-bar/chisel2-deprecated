@@ -92,7 +92,6 @@ class ManualTester[+T <: Module]
   }
 
   def snapshot(): Snapshot = {
-    addExpects(snapshots)
     val snap = dump()
     snapshots += snap
     snap
@@ -100,7 +99,6 @@ class ManualTester[+T <: Module]
 
   def addExpects(snaps: ArrayBuffer[Snapshot]) {
     if (t > 1 && !snaps.isEmpty) {
-      propagate()
       for (out <- outputs) {
         if (isTrace) println("ADDING EXPECT AT T=" + t)
         snaps.last.expects += Expect(out, t, peekBits(out))
@@ -119,7 +117,7 @@ class ManualTester[+T <: Module]
     if (snaps.length > 0 && snaps.last.t == now) 
       snaps.last.pokes += poke 
     else { 
-      addExpects(snaps)
+      if (isLoggingPokes) addExpects(snaps)
       val snap = new Snapshot(now); 
       snap.pokes += poke
       snaps += snap;

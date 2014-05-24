@@ -566,20 +566,6 @@ class VerilogBackend extends Backend {
     }
     harness.write("  end\n\n")
 
-    harness.write("`ifndef GATE_LEVEL\n")
-    harness.write("  /*** Mem initialization ***/\n")
-    harness.write("  integer i = 0;\n")
-    harness.write("  initial begin\n")
-    harness.write("  #1;\n")
-    for (mem <- mems) {
-      val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
-      harness.write("    for (i = 0 ; i < %d ; i = i + 1) begin\n".format(mem.n))
-      harness.write("      %s[i] = 0;\n".format(pathName))
-      harness.write("    end\n")
-    }
-    harness.write("  end\n\n")
-    harness.write("`endif\n")
-
     if (Driver.isTesting) { 
       harness write harnessAPIs(mainClk, clocks, resets, wires, mems, scanNodes, printNodes)
     } else {
@@ -850,10 +836,17 @@ class VerilogBackend extends Backend {
   /*** Test bench for replay ***/
   def harnessMap (mainClk: Clock, resets: ArrayBuffer[Bool], scanNodes: Array[Bits], printNodes: Array[Bits]) = {
     val map = new StringBuilder
+    val shadowNames = new HashMap[Node, String]
     val printFormat = printNodes.map(a => a.chiselName + ": 0x%x, ").fold("")((y,z) => y + " " + z)
     val scanFormat = scanNodes.map(a => "%x").fold("")((y,z) => y + " " + z)
 
-    map.append("  task expect;\n")
+    for (node <- printNodes) {
+      val shadowName = node.component.getPathName("_") + "_" + emitRef(node) + "_shadow"
+      shadowNames(node) = shadowName
+      map.append("  reg [%d:0] %s = 0;\n".format(node.width-1, shadowName))
+    }
+
+    map.append("  task check_value;\n")
     map.append("    input [63:0] data;\n")
     map.append("    input [63:0] expected;\n")
     map.append("    begin\n")
@@ -873,6 +866,9 @@ class VerilogBackend extends Backend {
       map.append(", " + emitRef(node))
     }
     map.append(");\n")
+    for (node <- printNodes) {
+      map.append("    %s = %s;\n".format(shadowNames(node), emitRef(node)))
+    }
     map.append("  end\n\n")
 
     map.result

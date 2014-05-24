@@ -434,6 +434,7 @@ object DaisyChain extends Backend {
     for ((name, io) <- top.io.asInstanceOf[Bundle].elements) {
       io nameIt (name, true)
     }
+
     if (c.isInstanceOf[DaisyWrapper[_]]) {
       ChiselError.info("[DaisyChain] assign IO addresses")
       val wrapper = c.asInstanceOf[DaisyWrapper[Module]]
@@ -523,7 +524,9 @@ object DaisyChain extends Backend {
       }
       if (!ins.isEmpty) assignInputs(ins)
       if (!outs.isEmpty) assignOutputs(outs)
+
     } else {
+
       ChiselError.info("[DaisyChain] insert IO buffers")
       // For the input and output pins of the 'c' component
       // insert buffers so that their values are avaiable
@@ -940,17 +943,20 @@ object DaisyChain extends Backend {
   }  
 }
 
-abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends Tester(c, isTrace) {
+abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snapsize: Int = 10) extends Tester(c, isTrace) {
   require(DaisyTransform.done)
   val delayPeeks = new ArrayBuffer[BigInt]
   val counterVals = new ArrayBuffer[BigInt]
   val counterPeeks = new ArrayBuffer[BigInt]
   val clockVals = new LinkedHashMap[Clock, Int]
   val clockCnts = new LinkedHashMap[Clock, Int]
+
   override val outputs = top.io.flatten.unzip._2 filter (x => {
     val name = x.chiselName.split('.').last
     x.dir == OUTPUT && !(DaisyChain.keywords contains (name stripPrefix "io_"))
   })
+  var isInSnapshot = false
+  var snapCount = 0
 
   counterPeeks.clear
   counterPeeks ++= Array.fill(counters.size)(BigInt(0))
@@ -1093,7 +1099,10 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
   }
 
   override def poke(data: Bits, x: BigInt) {
-    addPoke(snapshots, t, Poke(data, -1, x))
+    if (isInSnapshot) 
+      addPoke(snapshots, t, Poke(data, -1, x))
+    else 
+      addPoke(pokez, t, Poke(data, -1, x))
     super.pokeBits(data, x)
   }
 
@@ -1141,9 +1150,17 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
         case read: MemRead =>
           snap.pokes += Poke(read.mem, read.addr.litValue(0).toInt, snapValue)
         case _ =>
-          snap.pokes += Poke(delay.src, 0, snapValue)
+          snap.pokes += Poke(delay.src, -1, snapValue)
       }
     }
+
+    // Recover inputs
+    if (!pokez.isEmpty) {
+      for (poke <- pokez.last.pokes) {
+        snap.pokes += poke
+      }
+    }
+
     snap
   }
 
@@ -1195,7 +1212,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
     while (peek(stalled) == 0)
       takeSteps(1)
 
-    val dice = rnd.nextInt(5)
+    val dice = rnd.nextInt(30)
 
     if (Driver.isSnapshotting) {
       // read out signal values
@@ -1215,7 +1232,16 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true) extends 
       }
 
       // take a snapshot
-      if (dice == 0) snapshot()
+      if (isInSnapshot && snapCount > 0) {
+        snapCount -= 1
+      } else if (isInSnapshot) {
+        addExpects(snapshots)
+        isInSnapshot = false
+      } else if (dice == 0) {
+        snapshot()
+        isInSnapshot = true
+        snapCount = snapsize
+      }
     }
 
     // set t & delta
@@ -1304,7 +1330,7 @@ abstract class DaisyWrapperTester[+T <: DaisyWrapper[_]](c: T, isTrace: Boolean 
   }
 
   override def poke(data: Bits, x: BigInt) {
-    addPoke(snapshots, t, Poke(data, -1, x))
+    if (isInSnapshot) addPoke(snapshots, t, Poke(data, -1, x))
     var (addr, off) = c.ioMap(data)
     if (data.width > AXISlave.dw) {
       while (off < data.width) {
