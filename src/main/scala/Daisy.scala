@@ -435,6 +435,8 @@ object DaisyChain extends Backend {
       io nameIt (name, true)
     }
 
+    // For daisy wrappers, assign IO addresses and buffers for IOs
+    // (except daisy IOs, which are allocated in the frontend)
     if (c.isInstanceOf[DaisyWrapper[_]]) {
       ChiselError.info("[DaisyChain] assign IO addresses")
       val wrapper = c.asInstanceOf[DaisyWrapper[Module]]
@@ -524,9 +526,10 @@ object DaisyChain extends Backend {
       }
       if (!ins.isEmpty) assignInputs(ins)
       if (!outs.isEmpty) assignOutputs(outs)
-
-    } else {
-
+    } 
+    // For designs without daisy wrappers,
+    // Just insert IO buffers to all IOs execpt daisy IOs
+    else {
       ChiselError.info("[DaisyChain] insert IO buffers")
       // For the input and output pins of the 'c' component
       // insert buffers so that their values are avaiable
