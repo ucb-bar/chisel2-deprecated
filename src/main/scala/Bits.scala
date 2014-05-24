@@ -62,7 +62,7 @@ abstract class Bits extends Data with proc {
 
   /** assigns this instance as the data type for *node*.
     */
-  protected final def asTypeFor(node: Node): this.type = {
+  protected[Chisel] final def asTypeFor(node: Node): this.type = {
     this assign node
     this.setIsTypeNode
     if(!node.isInstanceOf[Literal]) node.nameHolder = this
@@ -359,6 +359,8 @@ abstract class Bits extends Data with proc {
     val bit = UInt(1, 1) << off
     this & ~bit | dat.toSInt & bit
   }
+
+  def toBools: Vec[Bool] = Vec.tabulate(this.getWidth)(i => this(i))
   
   def error(b: Bits): Bits = {
     throw new Exception("+ not defined on " + this.getClass + " and " + b.getClass)

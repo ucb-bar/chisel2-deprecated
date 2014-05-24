@@ -419,6 +419,20 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     count
   }
 
+  def lowerNodes(needsLowering: Set[String]): Unit = if (!needsLowering.isEmpty) {
+    val lowerTo = new HashMap[Node, Node]
+    bfs { x =>
+      for (i <- 0 until x.inputs.length) x.inputs(i) match {
+        case op: Op =>
+          if (needsLowering contains op.op)
+            x.inputs(i) = lowerTo.getOrElseUpdate(op, op.lower)
+        case _ =>
+      }
+    }
+    if (!lowerTo.isEmpty)
+      inferAll
+  }
+
   def forceMatchingWidths {
     bfs(_.forceMatchingWidths)
   }

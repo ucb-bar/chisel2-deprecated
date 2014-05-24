@@ -47,16 +47,11 @@ object NodeFill {
     } else {
       /* Build up a Concatenate tree for more ILP in simulation. */
       var out: Node = null
-      var i = 0
-      var cur = mod
-      while ((1 << i) <= n) {
-        if ((n & (1 << i)) != 0) {
-          out = Concatenate(cur, out)
-        }
-        cur = Concatenate(cur, cur)
-        i = i + 1
-      }
-      out
+      val p2 = Array.ofDim[Node](log2Up(n+1))
+      p2(0) = mod
+      for (i <- 1 until p2.length)
+        p2(i) = Concatenate(p2(i-1), p2(i-1))
+      Concatenate((0 until log2Up(n+1)).filter(i => (n & (1 << i)) != 0).map(p2(_)))
     }
   }
 }

@@ -164,27 +164,8 @@ object Mux1H
   }
   def apply[T <: Data](sel: Bits, in: Iterable[T]): T =
     apply((0 until in.size).map(sel(_)), in)
+  def apply(sel: Bits, in: Bits): Bool = (sel & in).orR
 }
-
-/** Does the inverse of UIntToOH.
-  */
-object OHToUInt
-{
-  def apply(in: Seq[Bool]): UInt = apply(Vec(in))
-  def apply(in: Vec[Bool]): UInt = apply(in.toBits, in.length)
-  def apply(in: Bits): UInt = apply(in, in.getWidth)
-  def apply(in: Bits, length: Int): UInt = {
-    if (length <= 1) UInt(0)
-    else if (length == 2) in(1)
-    else {
-      val half = 1 << (log2Up(length)-1)
-      val hi = in(length-1,half)
-      val lo = in(half-1,0)
-      Cat(hi.orR, apply(hi | lo))
-    }
-  }
-}
-
 
 class ValidIO[+T <: Data](gen: T) extends Bundle
 {
@@ -353,13 +334,8 @@ class Arbiter[T <: Data](gen: T, n: Int) extends LockingArbiter[T](gen, n, 1)
 
 object FillInterleaved
 {
-  def apply(n: Int, in: Bits): UInt =
-  {
-    var out = Fill(n, in(0))
-    for (i <- 1 until in.getWidth)
-      out = Cat(Fill(n, in(i)), out)
-    out
-  }
+  def apply(n: Int, in: Bits): UInt = apply(n, in.toBools)
+  def apply(n: Int, in: Seq[Bool]): UInt = Vec(in.map(Fill(n, _))).toBits
 }
 
 
@@ -497,30 +473,6 @@ class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) e
   io.deq.bits := mem(rptr_bin(asize-1,0))
 }
 
-object Log2 {
-  def apply (mod: Bits, n: Int): UInt = {
-    def log2it() = {
-      val log2 = new Log2()
-      log2.init("", fixWidth(sizeof(n-1)), mod)
-      UInt().fromNode(log2)
-    }
-    Driver.backend match {
-      case x: CppBackend => log2it
-      case x: FloBackend => log2it
-      case _ => {
-        var res = UInt(0);
-        for (i <- 1 until n)
-          res = Mux(mod(i), UInt(i, sizeof(n-1)), res);
-        res
-      }
-    }
-  }
-}
-
-class Log2 extends Node {
-  override def toString: String = "LOG2(" + inputs(0) + ")";
-}
-
 class Pipe[T <: Data](gen: T, latency: Int = 1) extends Module
 {
   val io = new Bundle {
@@ -577,15 +529,6 @@ object PriorityMux
   def apply[T <: Bits](sel: Bits, in: Iterable[T]): T = apply((0 until in.size).map(sel(_)), in)
 }
 
-/** Returns the bit position of the trailing 1 in the input vector
-  with the assumption that multiple bits of the input bit vector can be set
-  */
-object PriorityEncoder
-{
-  def apply(in: Iterable[Bool]): UInt = PriorityMux(in, (0 until in.size).map(UInt(_)))
-  def apply(in: Bits): UInt = apply((0 until in.getWidth).map(in(_)))
-}
-
 /** Returns a bit vector in which only the least-significant 1 bit in
   the input vector, if any, is set.
   */
@@ -601,5 +544,3 @@ object PriorityEncoderOH
   }
   def apply(in: Bits): UInt = encode((0 until in.getWidth).map(i => in(i)))
 }
-
-

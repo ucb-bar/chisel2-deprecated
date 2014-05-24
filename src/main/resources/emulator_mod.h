@@ -272,9 +272,11 @@ static inline void mask_n (val_t d[], int nw, int nb) {
 }
 
 static inline val_t log2_1 (val_t v) {
+#ifdef __GNUC__
+  return val_n_bits() - 1 - __builtin_clzll(v);
+#else
   val_t r;
   val_t shift;
-
   r     = (v > 0xFFFFFFFF) << 5; v >>= r;
   shift = (v > 0xFFFF    ) << 4; v >>= shift; r |= shift;
   shift = (v > 0xFF      ) << 3; v >>= shift; r |= shift;
@@ -282,6 +284,25 @@ static inline val_t log2_1 (val_t v) {
   shift = (v > 0x3       ) << 1; v >>= shift; r |= shift;
   r    |= (v >> 1);
   return r;
+#endif
+}
+
+static inline val_t reverse_1 (val_t v) {
+  v = ((v >>  1) & 0x5555555555555555) | ((v & 0x5555555555555555) <<  1);
+  v = ((v >>  2) & 0x3333333333333333) | ((v & 0x3333333333333333) <<  2);
+  v = ((v >>  4) & 0x0F0F0F0F0F0F0F0F) | ((v & 0x0F0F0F0F0F0F0F0F) <<  4);
+  v = ((v >>  8) & 0x00FF00FF00FF00FF) | ((v & 0x00FF00FF00FF00FF) <<  8);
+  v = ((v >> 16) & 0x0000FFFF0000FFFF) | ((v & 0x0000FFFF0000FFFF) << 16);
+  v = ( v >> 32                      ) | ( v                       << 32);
+  return v;
+}
+
+static inline val_t priority_encode_1 (val_t v) {
+#ifdef __GNUC__
+  return __builtin_ctzll(v);
+#else
+  return val_n_bits() - 1 - log2_1(reverse_1(v));
+#endif
 }
 
 #define ispow2(x) (((x) & ((x)-1)) == 0)

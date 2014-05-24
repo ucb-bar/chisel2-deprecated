@@ -47,9 +47,12 @@ object Backend {
 }
 
 abstract class Backend {
-
   /* Set of keywords which cannot be used as node and component names. */
   val keywords: HashSet[String];
+
+  /* Set of Ops that this backend doesn't natively support and thus must be
+     lowered to simpler Ops. */
+  val needsLowering = Set[String]()
 
   /* Whether or not this backend decomposes along Module boundaries. */
   def isEmittingComponents: Boolean = false
@@ -631,13 +634,13 @@ abstract class Backend {
   }
 
   def elaborate(c: Module): Unit = {
-    println("backend elaborate")
     Driver.setTopComponent(c)
 
     /* XXX If we call nameAll here and again further down, we end-up with
      duplicate names in the generated C++.
     nameAll(c) */
 
+    ChiselError.info("elaborating modules")
     Driver.components.foreach(_.elaborate(0))
 
     /* XXX We should name all signals before error messages are generated
@@ -651,7 +654,6 @@ abstract class Backend {
     execute(c, preElaborateTransforms)
     Driver.components.foreach(_.postMarkNet(0))
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
-    // Driver.assignResets()
 
     levelChildren(c)
     Driver.sortedComps = gatherChildren(c).sortWith(
@@ -663,15 +665,14 @@ abstract class Backend {
     gatherClocksAndResets
     connectResets
 
-    ChiselError.info("started inference")
-    val nbOuterLoops = c.inferAll();
-    ChiselError.info("finished inference (" + nbOuterLoops + ")")
-    ChiselError.info("start width checking")
-    c.forceMatchingWidths;
-    ChiselError.info("finished width checking")
-    ChiselError.info("started flattening")
+    ChiselError.info("inferring widths")
+    c.inferAll
+    ChiselError.info("checking widths")
+    c.forceMatchingWidths
+    ChiselError.info("lowering complex nodes to primitives")
+    c.lowerNodes(needsLowering)
+    ChiselError.info("removing type nodes")
     val nbNodes = c.removeTypeNodes()
-    ChiselError.info("finished flattening (" + nbNodes + ")")
     ChiselError.checkpoint()
 
     /* *collectNodesIntoComp* associates components to nodes that were
@@ -687,12 +688,10 @@ abstract class Backend {
      */
     ChiselError.info("resolving nodes to the components")
     collectNodesIntoComp(initializeDFS)
-    ChiselError.info("finished resolving")
 
     // two transforms added in Mem.scala (referenced and computePorts)
-    ChiselError.info("started transforms")
+    ChiselError.info("executing custom transforms")
     execute(c, transforms)
-    ChiselError.info("finished transforms")
 
     Driver.sortedComps.map(_.nodes.map(_.addConsumers))
     c.traceNodes();

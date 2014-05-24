@@ -47,6 +47,7 @@ class FloBackend extends Backend {
   // TODO: SHOULD BE IN ENV VAR
   val floDir = java.lang.System.getenv("DREAMER") + "/emulator/"
   val keywords = new HashSet[String]();
+  override val needsLowering = Set("PriEnc", "OHToUInt")
   var isRnd = false
 
   object DreamerConfiguration {
@@ -113,6 +114,7 @@ class FloBackend extends Backend {
           o.op match {
             case "~" => "not'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
             case "^" => "xorr'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
+            case "Log2" => "log2'" + node.width + " " + emitRef(node.inputs(0)) + "\n"
           }
          } else {
            o.op match {
@@ -188,9 +190,6 @@ class FloBackend extends Backend {
         emitDec(m) + "wr'" + m.data.width + " " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + " " + emitRef(m.data) + "\n"
       case x: Reg => // TODO: need resetData treatment
         emitDec(x) + "reg'" + x.width + " 1 " + emitRef(x.next) + "\n"
-
-      case x: Log2 => // TODO: log2 instruction?
-        emitDec(x) + "log2'" + x.width + " " + emitRef(x.inputs(0)) + "\n"
 
       case l: Literal =>
         ""

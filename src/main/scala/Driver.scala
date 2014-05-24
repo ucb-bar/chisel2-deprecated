@@ -84,6 +84,8 @@ object Driver {
     if(!res) throwException("Module under test FAILED at least one test vector.")
   }
 
+  def elapsedTime: Long = System.currentTimeMillis - startTime
+
   def setTopComponent(mod: Module): Unit = {
     topComponent = mod
     implicitReset.component = Driver.topComponent
@@ -131,6 +133,7 @@ object Driver {
     implicitClock.setName("clk")
     nodes.clear()
     isInGetWidth = false
+    startTime = System.currentTimeMillis
 
     // Backannotation
     isBackannotating = false
@@ -280,6 +283,7 @@ object Driver {
   val signals = LinkedHashSet[Node]()
   val pseudoMuxes = HashMap[Node, Node]()
   var modStackPushed: Boolean = false
+  var startTime = 0L
   /* Jackhammer flags */
   var jackDump: String = null
   var jackDir: String = null

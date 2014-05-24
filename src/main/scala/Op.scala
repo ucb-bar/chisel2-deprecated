@@ -149,20 +149,19 @@ object ReductionOp {
 
 object Op {
   def apply (name: String, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
-    val (a_lit, b_lit) = (a.litOf, b.litOf);
-    if (a_lit != null && b_lit == null) {
-      name match {
-        case "==" => if (a_lit.isZ) return zEquals(b, a)
-        case "!=" => if (a_lit.isZ) return !zEquals(b, a)
-        case _ => ;
-      }
-    } else if (a_lit == null && b_lit != null) {
-      name match {
-        case "==" => if (b_lit.isZ) return zEquals(a, b)
-        case "!=" => if (b_lit.isZ) return !zEquals(a, b)
-        case _ => ;
-      }
-    } else if (a_lit != null && b_lit != null) {
+    val (a_lit, b_lit) = (a.litOf, b.litOf)
+    if (a_lit != null) name match {
+      case "==" => if (a_lit.isZ) return zEquals(b, a)
+      case "!=" => if (a_lit.isZ) return !zEquals(b, a)
+      case "<<" | ">>" | "s>>" => if (a_lit.value == 0) return Literal(0)
+      case _ => ;
+    }
+    if (b_lit != null) name match {
+      case "==" => if (b_lit.isZ) return zEquals(a, b)
+      case "!=" => if (b_lit.isZ) return !zEquals(a, b)
+      case _ => ;
+    }
+    if (a_lit != null && b_lit != null) {
       val (aw, bw) = (a_lit.width, b_lit.width);
       val (av, bv) = (a_lit.value, b_lit.value);
       name match {
@@ -423,4 +422,6 @@ class Op(val op: String) extends Node {
     case that: Op => this.op == that.op && CSE.inputsEqual(this, that)
     case _ => false
   }
+
+  def lower: Node = throw new Exception("lowering " + op + " is not supported")
 }

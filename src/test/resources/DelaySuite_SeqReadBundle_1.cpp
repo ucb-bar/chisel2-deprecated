@@ -75,15 +75,15 @@ void DelaySuite_SeqReadBundle_1_t::clock_lo ( dat_t<1> reset ) {
   { DelaySuite_SeqReadBundle_1__io_out_0_a_b.values[0] = T8__w0; }
   { T0.values[0] = TERNARY(DelaySuite_SeqReadBundle_1__io_ren.values[0], DelaySuite_SeqReadBundle_1__io_raddr.values[0], R1.values[0]); }
   val_t T9__w0;
-  { T9__w0 = DelaySuite_SeqReadBundle_1__io_in_1_a_b.values[0] | DelaySuite_SeqReadBundle_1__io_in_1_a_a.values[0] << 16; }
+  { T9__w0 = DelaySuite_SeqReadBundle_1__io_in_0_a_b_.values[0] | DelaySuite_SeqReadBundle_1__io_in_0_a_b.values[0] << 32; }
   val_t T10__w0;
-  { T10__w0 = DelaySuite_SeqReadBundle_1__io_in_1_a_b_.values[0] | T9__w0 << 32; }
+  { T10__w0 = T9__w0 | DelaySuite_SeqReadBundle_1__io_in_0_a_a.values[0] << 48; }
   val_t T11__w0;
-  { T11__w0 = DelaySuite_SeqReadBundle_1__io_in_0_a_a.values[0] | T10__w0 << 8; }
-  val_t T12__w0, T12__w1;
-  { T12__w0 = DelaySuite_SeqReadBundle_1__io_in_0_a_b.values[0] | T11__w0 << 16; T12__w1 = T11__w0 >> 48; }
+  { T11__w0 = DelaySuite_SeqReadBundle_1__io_in_1_a_b_.values[0] | DelaySuite_SeqReadBundle_1__io_in_1_a_b.values[0] << 32; }
+  val_t T12__w0;
+  { T12__w0 = T11__w0 | DelaySuite_SeqReadBundle_1__io_in_1_a_a.values[0] << 48; }
   val_t T13__w0, T13__w1;
-  { T13__w0 = DelaySuite_SeqReadBundle_1__io_in_0_a_b_.values[0] | T12__w0 << 32; T13__w1 = T12__w0 >> 32 | T12__w1 << 32; }
+  { T13__w0 = T10__w0 | T12__w0 << 56; T13__w1 = T12__w0 >> 8; }
   { T2.values[0] = T13__w0; T2.values[1] = T13__w1; }
   val_t T14__w0;
   { T14__w0 = T3__w0; }

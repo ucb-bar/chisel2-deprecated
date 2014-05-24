@@ -57,9 +57,8 @@ object ChiselError {
 
   /** Emit an informational message
     (useful to track long running passes) */
-  def info(m: String) {
-    println(m)
-  }
+  def info(m: String): Unit =
+    println(tag("info", Console.MAGENTA) + " [%2.3f] ".format(Driver.elapsedTime/1e3) + m)
 
   /** emit a warning message */
   def warning(m: => String) {
@@ -127,6 +126,9 @@ object ChiselError {
         Console.UNDERLINED + Console.YELLOW + "WARNINGS" + Console.RESET)
     }
   }
+
+  def tag(name: String, color: String): String =
+    s"[${color}${name}${Console.RESET}]"
 }
 
 class ChiselError(val errmsgFun: () => String, val errline: StackTraceElement,
@@ -142,8 +144,8 @@ val errlevel: Int = 0) {
   def print() {
     /* Following conventions for error formatting */
     val levelstr =
-      if (isError) "[" + Console.RED + "error" + Console.RESET + "]"
-      else "[" + Console.YELLOW + "warn" + Console.RESET + "]"
+      if (isError) ChiselError.tag("error", Console.RED)
+      else ChiselError.tag("warn", Console.YELLOW)
     if( line != null ) {
       println(levelstr + " " + line.getFileName + ":" +
         line.getLineNumber + ": " + msgFun() +

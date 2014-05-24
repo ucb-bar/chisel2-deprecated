@@ -47,11 +47,7 @@ object UInt {
   def apply(x: String, base: Char): UInt = Lit(x, base, -1){UInt()};
   def apply(x: String, base: Char, width: Int): UInt = Lit(x, base, width){UInt()};
   def apply(x: Node): UInt = UInt(x, -1)
-  def apply(x: Node, width: Int): UInt = {
-    val res = UInt(width = width)
-    res assign x
-    res
-  }
+  def apply(x: Node, width: Int): UInt = UInt(width = width).asTypeFor(x)
 
   def apply(dir: IODirection = null, width: Int = -1): UInt = {
     val res = new UInt();
@@ -77,8 +73,6 @@ class UInt extends Bits with Num[UInt] {
   }
 
   override def toBits: UInt = this
-
-  def toBools: Vec[Bool] = Vec.tabulate(this.getWidth)(i => this(i))
 
   // to support implicit convestions
   def ===(b: UInt): Bool = LogicalOp(this, b, "===")

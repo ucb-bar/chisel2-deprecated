@@ -183,6 +183,15 @@ class CppBackend extends Backend {
   def opFoldLeft(o: Op, initial: (String, String) => String, subsequent: (String, String, String) => String) =
     (1 until words(o.inputs(0))).foldLeft(initial(emitLoWordRef(o.inputs(0)), emitLoWordRef(o.inputs(1))))((c, i) => subsequent(c, emitWordRef(o.inputs(0), i), emitWordRef(o.inputs(1), i)))
 
+  def emitLog2(x: Node, priEnc: Boolean = false) = {
+    val (func, range) =
+      if (priEnc) ("priority_encode_1", (0 until words(x.inputs(0))-1))
+      else ("log2_1", (words(x.inputs(0))-1 to 1 by -1))
+    val body = range.map(i => s"${emitWordRef(x.inputs(0), i)} != 0, ${(i*bpw)} + ${func}(${emitWordRef(x.inputs(0), i)})")
+                    .foldRight(s"${func}(${emitLoWordRef(x.inputs(0))})")((x, y) => s"TERNARY(${x}, ${y})")
+    s"  ${emitLoWordRef(x)} = ${body};\n"
+  }
+
   def emitDefLo(node: Node): String = {
     node match {
       case x: Mux =>
@@ -253,6 +262,10 @@ class CppBackend extends Backend {
             "  " + emitLoWordRef(o) + " = fromDouble(round(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
           else if (o.op == "dToSInt")
             "  " + emitLoWordRef(o) + " = (val_t)(toDouble(" + emitLoWordRef(o.inputs(0)) + "));\n"
+          else if (o.op == "Log2")
+            emitLog2(o)
+          else if (o.op == "PriEnc" || o.op == "OHToUInt")
+            emitLog2(o, true)
           else {
             assert(false, "operator " + o.op + " unsupported")
             ""
@@ -471,15 +484,6 @@ class CppBackend extends Backend {
         emitTmpDec(r) + block((0 until words(r)).map(i => emitWordRef(r, i)
           + " = " + emitRef(r.rom) + ".get(" + emitLoWordRef(r.addr) + ", "
           + i + ")"))
-
-      case x: Log2 =>
-        (emitTmpDec(x) + "  " + emitLoWordRef(x) + " = "
-          + (words(x.inputs(0))-1 to 1 by -1).map(
-            i => emitWordRef(x.inputs(0), i) + " != 0, "
-              + (i*bpw) + " + log2_1("
-              + emitWordRef(x.inputs(0), i) + ")").foldRight("log2_1("
-                + emitLoWordRef(x.inputs(0)) + ")")(
-            "TERNARY(" + _ + ", " + _ + ")") + ";\n")
 
       case a: Assert =>
         val cond = emitLoWordRef(a.cond) +
@@ -764,16 +768,16 @@ class CppBackend extends Backend {
     out_h.write("class " + c.name + "_t : public mod_t {\n");
     out_h.write(" public:\n");
     val vcd = new VcdBackend(c)
-    for (m <- c.omods) {
-      if(m.name != "reset") {
-        if (m.isInObject) {
-          out_h.write(emitDec(m));
-        }
-        if (m.isInVCD) {
-          out_h.write(vcd.emitDec(m));
-        }
-      }
+    def headerOrderFunc(a: Node, b: Node) = {
+      // pack smaller objects at start of header for better locality
+      val aMem = a.isInstanceOf[Mem[_]] || a.isInstanceOf[ROMData]
+      val bMem = b.isInstanceOf[Mem[_]] || b.isInstanceOf[ROMData]
+      aMem < bMem || aMem == bMem && a.width < b.width
     }
+    for (m <- c.omods.filter(_.isInObject).sortWith(headerOrderFunc))
+      out_h.write(emitDec(m))
+    for (m <- c.omods.filter(_.isInVCD).sortWith(headerOrderFunc))
+      out_h.write(vcd.emitDec(m))
     for (clock <- Driver.clocks)
       out_h.write(emitDec(clock))
 
