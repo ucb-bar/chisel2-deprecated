@@ -34,7 +34,7 @@ import scala.collection.mutable.ArrayBuffer
 
 object Clock{
   //clockingSource == null => Get the current module as clock provider
-  def apply(clockingSource : Clock,reset: Bool = Driver.implicitReset) : Clock = {
+  def apply(clockingSource : Clock,reset: Bool) : Clock = {
     val clock = new Clock(reset)
     if(clockingSource != null)
     	clock.setClockingSource(clockingSource);
