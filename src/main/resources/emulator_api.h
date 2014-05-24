@@ -125,10 +125,10 @@ public:
 	{}
 	// returns the fully qualified name of this object (path + dot + name)
 	std::string get_pathname() {
-		if (path.empty()) {
+		if (*path == '\0') {
 			return name;
 		} else {
-			return path + "." + name;
+			return get_path() + "." + name;
 		}
 	}
 	// returns the short name of this object
@@ -140,8 +140,8 @@ public:
 		return path;
 	}
 protected:
-	std::string name;
-	std::string path;
+	const char* name;
+	const char* path;
 };
 
 // API base (non width templated) class for API accessors to dat_t
@@ -472,7 +472,7 @@ public:
 			// OUT: list of wires
 			if (!check_command_length(tokens, 0, 0)) { return "error"; }
 			std::string out = "";
-			for (std::map<string, dat_api_base*>::iterator it = dat_table.begin(); it != dat_table.end(); it++) {
+			for (std::map<const char*, dat_api_base*>::iterator it = dat_table.begin(); it != dat_table.end(); it++) {
 				out = out + it->second->get_pathname() + " ";
 			}
 			if (out.size() >= 1) {
@@ -486,7 +486,7 @@ public:
 			// OUT: list of memories
 			if (!check_command_length(tokens, 0, 0)) { return "error"; }
 			std::string out = "";
-			for (std::map<string, mem_api_base*>::iterator it = mem_table.begin(); it != mem_table.end(); it++) {
+			for (std::map<const char*, mem_api_base*>::iterator it = mem_table.begin(); it != mem_table.end(); it++) {
 				out = out + it->second->get_pathname() + " ";
 			}
 			if (out.size() >= 1) {
@@ -563,16 +563,16 @@ protected:
 	virtual void init_mapping_table() = 0;
 
 	dat_api_base* get_dat_by_name(std::string name) {
-		if (dat_table.find(name) != dat_table.end()) {
-			return dat_table[name];
+		if (dat_table.find(name.c_str()) != dat_table.end()) {
+			return dat_table[name.c_str()];
 		} else {
 			std::cerr << "Unable to find dat '" << name << "'" << std::endl;
 			return &this_dat_dummy;
 		}
 	}
 	mem_api_base* get_mem_by_name(std::string name) {
-		if (mem_table.find(name) != mem_table.end()) {
-			return mem_table[name];
+		if (mem_table.find(name.c_str()) != mem_table.end()) {
+			return mem_table[name.c_str()];
 		} else {
 			std::cerr << "Unable to find mem '" << name << "'" << std::endl;
 			return &this_mem_dummy;
@@ -588,8 +588,15 @@ protected:
 		}
 	}
 
-	std::map<std::string, dat_api_base*> dat_table;
-	std::map<std::string, mem_api_base*> mem_table;
+	class string_comparator {
+	public:
+		bool operator()(const char* x, const char* y) {
+			return strcmp(x, y) < 0;
+		}
+	};
+
+	std::map<const char*, dat_api_base*, string_comparator> dat_table;
+	std::map<const char*, mem_api_base*, string_comparator> mem_table;
 	// TODO: replace the dummy with explicit NULL checks - this is simple
 	// but a bit inelegant
 	dat_dummy this_dat_dummy;
