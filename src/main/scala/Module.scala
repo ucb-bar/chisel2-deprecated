@@ -442,14 +442,15 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     bfs { _ match {
         case x: Delay =>
           val clock = if (x.clock == null) x.component.clock else x.clock
+          val clockingSource = clock.getClockingSource()
+          
           val reset =
-            if (x.component.hasExplicitReset) x.component._reset
-            else if (x.clock != null) x.clock.getReset
-            else if (x.component.hasExplicitClock) x.component.clock.getReset
-            else x.component._reset
+            if (x.component.hasExplicitReset) x.component._reset //legacy hasExplicitReset ?
+            else clock.getReset
+            
           x.assignReset(x.component.addResetPin(reset))
-          x.assignClock(clock)
-          x.component.addClock(clock)
+          x.assignClock(clockingSource)
+          x.component.addClock(clockingSource)
         case _ =>
       }
     }

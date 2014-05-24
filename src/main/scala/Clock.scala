@@ -32,12 +32,48 @@ package Chisel
 
 import scala.collection.mutable.ArrayBuffer
 
+object Clock{
+  //clockingSource == null => Get the current module as clock provider
+  def apply(clockingSource : Clock,reset: Bool = Driver.implicitReset) : Clock = {
+    val clock = new Clock(reset)
+    if(clockingSource != null)
+    	clock.setClockingSource(clockingSource);
+    else 
+      clock.setClockingSource(Driver.compStack.top);
+    
+    clock
+  }
+}
+
 class Clock(reset: Bool = Driver.implicitReset) extends Node {
   val stateElms = new ArrayBuffer[Node]
   Driver.clocks += this
   init("", 1)
 
-  var srcClock: Clock = null
+  var hasClockingSource : Boolean = false //could enable clockingSource and moduleClockingSource
+  var clockingSource : Clock = null; //exclusive with moduleClockingSource
+  var moduleClockingSource : Module = null //exclusive with clockingSource
+  
+  def setClockingSource(clockingSource : Clock){
+    hasClockingSource = true;
+    this.clockingSource = clockingSource;
+    this.moduleClockingSource = null;
+  }
+  
+  def setClockingSource(moduleClockingSource : Module){
+    hasClockingSource = true;
+    this.clockingSource = null;
+    this.moduleClockingSource = moduleClockingSource;
+  }
+  
+  def getClockingSource() : Clock = {
+    if(hasClockingSource == false) return this
+    if(clockingSource != null) return clockingSource.getClockingSource()
+    if(moduleClockingSource != null) return moduleClockingSource.clock
+	return null;
+  }  
+  
+  var srcClock: Clock = null 
   var initStr = ""
 
   // returns a reset pin connected to reset for the component in scope
