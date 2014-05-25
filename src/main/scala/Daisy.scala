@@ -687,9 +687,9 @@ object DaisyChain extends Backend {
     
         cntrValue.getNode setName "cntr_val_%d".format(counter.idx)
 
-        /* Activity Counter */
-        // 1) steps > 0 -> increment counter
-        // 2) the target is stalled with a copy bit -> reset
+        /* Event Counter */
+        // 1) steps > 0 -> increment counters
+        // 2) A copy bit with the target's stall -> reset
         val counterName = "counter_%d".format(counter.idx)
         keywords += counterName
         addReg(m, counter.src, counterName)
@@ -853,7 +853,7 @@ object DaisyChain extends Backend {
           case CounterChain  => "cntr_shadow_"
         } ) + s.head.idx
         keywords += shadowName
-        /* Shaodw Counter*/
+        /* Shaodw Counter */
         // daisy_ctrl == 'copy' -> current source
         // daisy_ctrl == 'read' -> next shadow
         addReg(m, s.head.shadow, shadowName)
@@ -1217,7 +1217,8 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
 
     val dice = rnd.nextInt(30)
 
-    if (Driver.isSnapshotting) {
+    /*** Snapshot Sampling ***/
+    if (Driver.isSnapshotting && dice == 0 && !isInSnapshot) {
       // read out signal values
       if (isTrace) println("*** READ STATE VALUES ***")
       delayPeeks.clear
@@ -1235,16 +1236,9 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
       }
 
       // take a snapshot
-      if (isInSnapshot && snapCount > 0) {
-        snapCount -= 1
-      } else if (isInSnapshot) {
-        addExpects(snapshots)
-        isInSnapshot = false
-      } else if (dice == 0) {
-        snapshot()
-        isInSnapshot = true
-        snapCount = snapsize
-      }
+      snapshot()
+      isInSnapshot = true
+      snapCount = snapsize
     }
 
     // set t & delta
@@ -1260,9 +1254,17 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
         delta += delta_i
       }
     }
+
+    if (isInSnapshot && snapCount > 0) {
+      snapCount -= 1
+    } else if (isInSnapshot) {
+      addExpects(snapshots)
+      isInSnapshot = false 
+    }
   }
 
   override def finish(): Boolean = {
+    addExpects(snapshots)
     dumpSnapshots(c.name + ".snaps", snapshots)
     super.finish()
   }
