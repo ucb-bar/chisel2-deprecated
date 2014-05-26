@@ -88,10 +88,10 @@ object Driver {
 
   def setTopComponent(mod: Module): Unit = {
     topComponent = mod
-    implicitReset.component = Driver.topComponent
-    implicitClock.component = Driver.topComponent
-    topComponent.reset = Driver.implicitReset
-    topComponent.hasExplicitReset = true
+    //implicitReset.component = Driver.topComponent
+    //implicitClock.component = Driver.topComponent
+    //topComponent.reset = Driver.implicitReset
+    //topComponent.hasExplicitReset = true
     topComponent.clock = Driver.implicitClock
     topComponent.hasExplicitClock = true    
   }
@@ -129,7 +129,7 @@ object Driver {
     implicitReset = Bool(INPUT)
     implicitReset.isIo = true
     implicitReset.setName("reset")
-    implicitClock = new Clock()
+    implicitClock = new Clock(implicitReset)
     implicitClock.setName("clk")
     nodes.clear()
     isInGetWidth = false

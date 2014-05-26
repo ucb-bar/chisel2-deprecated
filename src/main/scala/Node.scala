@@ -359,7 +359,12 @@ abstract class Node extends nameable {
         }
         i += 1;
       }
-      comp.mods += this;
+            
+      //This dont add to mods the node when it is already into comp.resets list
+      //Maybe it's not a nice way to do that
+      if(! this.isInstanceOf[Bool] || ! comp.resets.contains(this.asInstanceOf[Bool])){
+        comp.mods += this;
+      }
     }
   }
 
