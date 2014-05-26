@@ -736,4 +736,19 @@ try {
       "--targetDir", dir.getPath.toString()),
       () => Module(new MuxComp()))
   }
+
+  @Test def testRepeat() {
+    println("\ntestRepeat ...")
+    class RepeatComp extends Module {
+      val io = new Bundle {
+        val a = UInt(INPUT, 8)
+        val out = UInt(OUTPUT)
+      }
+      io.out := Repeat(io.a, 4)
+    }
+
+    chiselMain(Array[String]("--v",
+      "--targetDir", dir.getPath.toString()),
+      () => Module(new RepeatComp()))
+  }
 }

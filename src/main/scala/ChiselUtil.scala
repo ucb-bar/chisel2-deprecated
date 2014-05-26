@@ -544,3 +544,10 @@ object PriorityEncoderOH
   }
   def apply(in: Bits): UInt = encode((0 until in.getWidth).map(i => in(i)))
 }
+
+object Repeat
+{
+  def apply[T <: Bits](in: T, n: Int): UInt = {
+    Cat((0 until n).map { _ => in })
+  }
+}
