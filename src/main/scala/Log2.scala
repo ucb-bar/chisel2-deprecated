@@ -25,7 +25,11 @@ object OHToUInt
 
 abstract class Log2Like(x: Bits, name: String) extends Op(name) {
   inputs += x
-  inferWidth = (x: Node) => log2Up(Node.widthOf(0)(x))
+  inferWidth = log2Width
+
+  private def log2Width(x: Node): Int =
+    if (x.inputs(0).width < 2) x.inputs(0).width // TODO 0WW
+    else log2Up(x.inputs(0).width)
 }
 
 class Log2(x: Bits) extends Log2Like(x, "Log2") {
