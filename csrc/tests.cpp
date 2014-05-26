@@ -4,7 +4,7 @@
 
 template <int w> dat_t<w> LITS(const char* str) { 
   dat_t<w> dat;
-  str_to_dat<w>(str, dat);
+  assert(dat_from_str<w>(str, dat));
   return dat;
 }
 
@@ -30,7 +30,6 @@ int main (int argc, char* argv[]) {
 
   printf("N BITS %d\n", CeilLog<sizeof(val_t)*8>::v);
 
-  printf("1<<64 %llx %llx MSK(64) %llx\n", 1L<<64, (1L<<64)-1L, mask_val(64));
   test("ltu-1-0", LIT<2>(1) < LIT<2>(0), LIT<1>(0));
   test("ltu-1-1", LIT<2>(0) < LIT<2>(1), LIT<1>(1));
   test("ltu-1-2", LIT<2>(0) < LIT<2>(0), LIT<1>(0));

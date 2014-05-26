@@ -35,6 +35,10 @@ using namespace std;
 typedef uint64_t val_t;
 typedef int64_t sval_t;
 typedef uint32_t half_val_t;
+#if defined(__GNUC__) && defined(__SIZEOF_INT128__)
+#define __HAVE_DUB_VAL_T__
+typedef unsigned __int128 dub_val_t;
+#endif
 
 union flo2int_t {
   float  f;
@@ -70,9 +74,23 @@ inline val_t fromDouble (double x) {
   return f2i.i;
 }
 
+#define TERNARY(c, t, f) ((f) ^ (((f) ^ (t)) & -(c)))
+
+#if defined(__GNUC__) && defined(__x86_64__)
+#define TERNARY_1(c, t, f) ({ \
+  val_t __res; \
+  if (!__builtin_constant_p(c)) { \
+    __res = (f); \
+    val_t __t = (t); \
+    uint8_t __c = (c); \
+    asm ("testb $1, %1; cmovne %2, %0" : "+r"(__res) : "rm"(__c), "rm"(__t) : "cc"); \
+  } else __res = TERNARY(c, t, f); \
+  __res; })
+#else
+#define TERNARY_1(c, t, f) TERNARY(c, t, f)
+#endif
 
 #define MASK(v, c) ((v) & -(val_t)(c))
-#define TERNARY(c, t, f) ((f) ^ (((f) ^ (t)) & -(c)))
 #ifndef MIN
 #define MIN(a, b) TERNARY((a) < (b), (a), (b))
 #endif
@@ -99,9 +117,9 @@ template<uint32_t shifted, bool sticky> struct CeilLog<1, shifted, sticky> {
 #define val_all_ones_or_zeroes(bit) (val_t(0) - val_t(bit))
 #define val_n_words(n_bits) (1+((n_bits)-1)/val_n_bits())
 #define val_n_half_words(n_bits) (1+((n_bits)-1)/val_n_half_bits())
-inline val_t val_top_bit( val_t v ) { return (v >> (val_n_bits()-1)); }
-inline val_t val_n_full_words( val_t n_bits ) { return n_bits / val_n_bits(); }
-inline val_t val_n_word_bits( val_t n_bits ) { return n_bits % val_n_bits(); }
+#define val_top_bit(v) (val_t(v) >> (val_n_bits()-1))
+#define val_n_full_words(n_bits) ((n_bits)/val_n_bits())
+#define val_n_word_bits(n_bits) ((n_bits) % val_n_bits())
 inline val_t val_n_nibs( void ) { return val_n_bits()>>2; }
 inline val_t val_half_mask( void ) { return (((val_t)1)<<(val_n_half_bits()))-1; }
 inline val_t val_lo_half( val_t n_bits ) { return n_bits & val_half_mask(); }
@@ -162,11 +180,12 @@ static void sub_n (val_t d[], val_t s0[], val_t s1[], int nw, int nb) {
   }
 }
 
-static void mul_n (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
+static void mul_n (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
 // Adapted from Hacker's Delight, from Knuth
 #if BYTE_ORDER != LITTLE_ENDIAN
 # error mul_n assumes a little-endian architecture
 #endif
+  int nbd = nb0 + nb1;
   for (int i = 0; i < val_n_words(nbd); i++)
     d[i] = 0;
 
@@ -273,7 +292,7 @@ static inline void mask_n (val_t d[], int nw, int nb) {
 
 static inline val_t log2_1 (val_t v) {
 #ifdef __GNUC__
-  return val_n_bits() - 1 - __builtin_clzll(v);
+  return TERNARY(v != 0, val_n_bits() - 1 - __builtin_clzll(v), 0);
 #else
   val_t r;
   val_t shift;
@@ -299,7 +318,7 @@ static inline val_t reverse_1 (val_t v) {
 
 static inline val_t priority_encode_1 (val_t v) {
 #ifdef __GNUC__
-  return __builtin_ctzll(v);
+  return TERNARY(v != 0, __builtin_ctzll(v), 0);
 #else
   return val_n_bits() - 1 - log2_1(reverse_1(v));
 #endif
@@ -412,8 +431,8 @@ struct bit_word_funs {
   static void sub (val_t d[], val_t s0[], val_t s1[], int nb) {
     sub_n(d, s0, s1, nw, nb);
   }
-  static void mul (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
-    mul_n(d, s0, s1, nbd, nb0, nb1);
+  static void mul (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
+    mul_n(d, s0, s1, nb0, nb1);
   }
   static void bit_xor (val_t d[], val_t s0[], val_t s1[]) {
     for (int i = 0; i < nw; i++)
@@ -552,11 +571,8 @@ struct bit_word_funs<1> {
   static void neg (val_t d[], val_t s0[], int nb) {
     d[0] = (- s0[0]) & mask_val(nb);
   }
-  static void mul (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
-    if (nbd <= val_n_bits())
-      d[0] = (s0[0] * s1[0]) & mask_val(nbd);
-    else
-      mul_n(d, s0, s1, nbd, nb0, nb1);
+  static void mul (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
+    d[0] = s0[0] * s1[0];
   }
   static bool ltu (val_t s0[], val_t s1[]) {
     return (s0[0] < s1[0]);
@@ -658,8 +674,17 @@ struct bit_word_funs<2> {
     d[1] = -s0[1] - (s0[0] != 0);
     d[0] = d0;
   }
-  static void mul (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
-    mul_n(d, s0, s1, nbd, nb0, nb1);
+  static void mul (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
+#ifdef __HAVE_DUB_VAL_T__
+    dub_val_t a = s0[0], b = s1[0];
+    if (nb0 > val_n_bits()) a |= dub_val_t(s0[1]) << val_n_bits();
+    if (nb1 > val_n_bits()) b |= dub_val_t(s1[1]) << val_n_bits();
+    dub_val_t res = a * b;
+    d[0] = res;
+    d[1] = res >> val_n_bits();
+#else
+    mul_n(d, s0, s1, nb0, nb1);
+#endif
   }
   static bool ltu (val_t s0[], val_t s1[]) {
     return ((s0[1] < s1[1]) | (s0[1] == s1[1] & s0[0] < s1[0]));
@@ -816,8 +841,8 @@ struct bit_word_funs<3> {
   static void neg (val_t d[], val_t s0[], int nb) {
     neg_n(d, s0, 3, nb);
   }
-  static void mul (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
-    mul_n(d, s0, s1, nbd, nb0, nb1);
+  static void mul (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
+    mul_n(d, s0, s1, nb0, nb1);
   }
   static bool ltu (val_t s0[], val_t s1[]) {
     return ((s0[2] < s1[2]) | ((s0[2] == s1[2]) & ((s0[1] < s1[1]) | ((s0[1] == s1[1]) & (s0[0] < s1[0])))));
@@ -1015,21 +1040,21 @@ class dat_t {
   template <int w2>
   dat_t<w+w2> operator * ( dat_t<w2> o ) {
     dat_t<w+w2> res;
-    bit_word_funs<n_words>::mul(res.values, values, o.values, w+w2, w, w2);
+    bit_word_funs<val_n_words(w+w2)>::mul(res.values, values, o.values, w, w2);
     return res;
   }
-  dat_t<w+w> fix_times_fix( dat_t<w> o ) {
-    // TODO: CLEANUP AND ADD DIFFERENT WIDTHS FOR EACH OPERAND
-    if (n_words == 1 && ((w + w) <= val_n_bits())) {
-      val_t res = (val_t)(((sval_t)(values[0])) * ((sval_t)(o.values[0])));
-      return DAT<w+w>(res & mask_val(w+w));
+  template <int w2>
+  dat_t<w+w2> fix_times_fix( dat_t<w2> o ) {
+    if (w+w2 <= val_n_bits()) {
+      sval_t a = sval_t(values[0] << (val_n_bits()-w)) >> (val_n_bits()-w);
+      sval_t b = sval_t(o.values[0] << (val_n_bits()-w2)) >> (val_n_bits()-w2);
+      return dat_t<w+w2>((a * b) & mask_val(w+w2));
     } else {
       val_t sgn_a = msb();
       dat_t<w> abs_a = sgn_a ? -(*this) : (*this);
       val_t sgn_b = o.msb();
-      dat_t<w> abs_b = sgn_b ? -o : o;
-      dat_t<w+w> res;
-      bit_word_funs<n_words>::mul(res.values, abs_a.values, abs_b.values, w+w, w, w);
+      dat_t<w2> abs_b = sgn_b ? -o : o;
+      dat_t<w+w2> res = abs_a * abs_b;
       return (sgn_a ^ sgn_b) ? -res : res;
     }
   }
@@ -1057,30 +1082,17 @@ class dat_t {
     return *this - *this / o * o;
   }
   dat_t<w+w> ufix_times_fix( dat_t<w> o ) {
-    // TODO: CLEANUP AND ADD DIFFERENT WIDTHS FOR EACH OPERAND
-    if (n_words == 1 && ((w + w) <= val_n_bits())) {
-      val_t res = (val_t)(values[0] * ((sval_t)(o.values[0])));
-      return DAT<w+w>(res & mask_val(w+w));
-    } else {
-      dat_t<w> abs_a = (*this);
-      val_t sgn_b = o.msb();
-      dat_t<w> abs_b = sgn_b ? -o : o;
-      dat_t<w+w> res;
-      bit_word_funs<n_words>::mul(res.values, abs_a.values, abs_b.values, w+w, w, w);
-      return sgn_b ? -res : res;
-    }
+    return o.fix_times_ufix(*this);
   }
-  dat_t<w+w> fix_times_ufix( dat_t<w> o ) {
-    // TODO: CLEANUP AND ADD DIFFERENT WIDTHS FOR EACH OPERAND
-    if (n_words == 1 && ((w + w) <= val_n_bits())) {
-      val_t res = (val_t)(((sval_t)(values[0])) * o.values[0]);
-      return DAT<w+w>(res & mask_val(w+w));
+  template<int w2>
+  dat_t<w+w2> fix_times_ufix( dat_t<w2> o ) {
+    if (w+w2 <= val_n_bits()) {
+      sval_t a = sval_t(values[0] << (val_n_bits()-w)) >> (val_n_bits()-w);
+      return dat_t<w+w2>((a * o.values[0]) & mask_val(w+w2));
     } else {
       val_t sgn_a = msb();
       dat_t<w> abs_a = sgn_a ? -(*this) : (*this);
-      dat_t<w> abs_b = o;
-      dat_t<w+w> res;
-      bit_word_funs<n_words>::mul(res.values, abs_a.values, abs_b.values, w+w, w, w);
+      dat_t<w+w2> res = abs_a * o;
       return sgn_a ? -res : res;
     }
   }
@@ -1248,15 +1260,11 @@ class dat_t {
     bit_word_funs<n_words>::log2(res.values, values);
     return res;
   }
-  inline dat_t<1> bit(val_t b) {
-    int n_full_words = val_n_full_words(b);
-    int n_word_bits  = val_n_word_bits(b);
-    return DAT<1>((values[n_full_words] >> n_word_bits)&1);
+  inline val_t bit(val_t b) {
+    return (values[val_n_full_words(b)] >> val_n_word_bits(b)) & 1;
   }
   inline val_t msb() {
-    int n_full_words = val_n_full_words(w-1);
-    int n_word_bits  = val_n_word_bits(w-1);
-    return (values[n_full_words] >> n_word_bits)&1;
+    return values[n_words-1] >> val_n_word_bits(w-1);
   }
   template <int iw>
   inline dat_t<1> bit(dat_t<iw> b) {
@@ -1303,14 +1311,10 @@ static __inline__ int dat_to_str(char* s, val_t x, int base = 16, char pad = '0'
 
 template <int w>
 int fix_to_str(char* s, dat_t<w> x, int base = 16, char pad = '0') {
-  bool neg = x.bit(w-1).to_bool();
+  bool neg = x.msb();
   s[0] = neg;
   int len = dat_to_str<w>(s+1, neg ? -x : x, base, pad);
   return len+1;
-}
-
-static __inline__ int fix_to_str(char* s, val_t x, int base = 16, char pad = '0') {
-  return fix_to_str(s, dat_t<sizeof(val_t)*8>(x), base, pad);
 }
 
 static __inline__ int flo_digits(int m, int e) {
@@ -1565,35 +1569,6 @@ static int  char_to_hex[] = {
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1 };
-
-#define TO_CSTR(d) (d.to_str().c_str())
-
-template <int w>
-void str_to_dat(std::string str, dat_t<w>& res) {
-  val_t word_accum = 0;
-  int digit_val, digit, w_index, bit;
-  for (digit = str.size()-1, w_index = 0, bit = 0; digit >= 0 && w_index < res.n_words; digit--) {
-    digit_val = char_to_hex[str[digit]];
-    if (digit_val >= 0) {
-      word_accum |= ((val_t)digit_val) << bit;
-      bit += 4;
-      if (bit == 64) {
-	res.values[w_index] = word_accum;
-	word_accum          = 0L;
-	bit                 = 0;
-	w_index++;
-      }
-    }
-  }
-  if (bit != 0) {
-    res.values[w_index] = word_accum;
-    ++w_index;
-  }
-  for( ; w_index < res.n_words; ++w_index ) {
-      res.values[w_index] = 0;
-  }
-  assert( res.n_words == w_index );
-}
 
 // dat_from_hex: Read a hex value from a std::string into a given dat_t variable.
 // Author: B. Richards, for parsing data formatted for Verilog $readmemh

@@ -7,6 +7,7 @@
 #include <string>
 #include <sstream>
 #include <map>
+#include <cassert>
 
 /**
  * Converts an integer to a std::string without needing additional libraries
@@ -76,13 +77,11 @@ bool dat_from_str(std::string in, dat_t<w>& res, int pos = 0) {
         pos += 2;
     }
 
-    val_t radix_val = radix;
-    val_t temp_prod[val_n_words(w)];
-    val_t curr_base[val_n_words(w)];
-    val_t temp_alias[val_n_words(w)];
-    val_t *dest_val = res.values;
-    val_set(curr_base, w, 1);
-    val_empty(dest_val, w);
+    const int log_max_radix = 4;
+    assert(radix <= (1 << log_max_radix));
+
+    dat_t<w> curr_base = 1;
+    res = 0;
 
     for (int rpos=in.length()-1; rpos>=pos; rpos--) {
         char c = in[rpos];
@@ -107,11 +106,9 @@ bool dat_from_str(std::string in, dat_t<w>& res, int pos = 0) {
             return false;
         }
 
-        mul_n(temp_prod, curr_base, &c_val, w, w, val_n_bits());
-        val_cpy(temp_alias, dest_val, w);   // copy to prevent aliasing on add
-        add_n(dest_val, temp_alias, temp_prod, val_n_words(w), w);
-        val_cpy(temp_alias, curr_base, w);
-        mul_n(curr_base, temp_alias, &radix_val, w, w, val_n_bits());
+        dat_t<w> temp_prod = curr_base * dat_t<log_max_radix>(c_val);
+        res = res + temp_prod;
+        curr_base = curr_base * dat_t<log_max_radix+1>(radix);
     }
     return true;
 }

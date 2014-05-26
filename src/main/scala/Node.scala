@@ -468,7 +468,7 @@ abstract class Node extends nameable {
 
   def _isComplementOf(x: Node): Boolean = {
     def checkOne(x: Node, y: Node) = x.getNode match {
-      case op: Op => op.op == "==" && op.inputs(0).getNode == y.getNode && op.inputs(1).litValue() == 0
+      case op: Op => op.op == "^" && op.inputs(0).getNode == y.getNode && op.inputs(1).litValue() == 1
       case _ => false
     }
     checkOne(this, x) || checkOne(x, this)
