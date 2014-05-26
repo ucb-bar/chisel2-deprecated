@@ -171,10 +171,10 @@ class FloBackend extends Backend {
 
       case m: ROMData =>
         val res = new StringBuilder
-        res append emitDec(m) + "mem'" + m.width + " " + m.lits.length + "\n"
+        res append emitDec(m) + "mem'" + m.width + " " + m.n + "\n"
         // emitDec(m) + "mem " + m.n + "\n" + trueAll(emitRef(m) + "__is_all_read", m.reads)
-        for (i <- 0 until m.lits.length)
-          res append "init " + emitRef(m) + " " + i + " " + emitRef(m.lits(i)) + "\n"
+        for ((i, v) <- m.sparseLits)
+          res append "init " + emitRef(m) + " " + i + " " + emitRef(v) + "\n"
         res.toString
 
       case m: MemRead =>

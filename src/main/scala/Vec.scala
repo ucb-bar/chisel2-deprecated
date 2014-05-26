@@ -59,7 +59,7 @@ object Vec {
     */
   def apply[T <: Data](elts: Iterable[T]): Vec[T] = {
     val res =
-      if (!elts.isEmpty && elts.forall(_.isLit)) new ROM[T](elts.toIndexedSeq)
+      if (!elts.isEmpty && elts.forall(_.isLit)) ROM(elts)
       else new Vec[T](i => elts.head.clone)
     res.self ++= elts
     res

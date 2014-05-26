@@ -110,14 +110,14 @@ L5:
   goto K5;
 }
 void NameSuite_DebugComp_1_t::clock_lo ( dat_t<1> reset ) {
-  { NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0] = NameSuite_DebugComp_1__io_ctrl_wb_wen.values[0]; }
-  { NameSuite_DebugComp_1_dpath__wb_wen.values[0] = NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0]|NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]; }
-  val_t T1__w0;
-  { T1__w0 = TERNARY(NameSuite_DebugComp_1_dpath__wb_wen.values[0], NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0], NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]); }
-  { NameSuite_DebugComp_1_dpath__reset.values[0] = reset.values[0]; }
-  { T0.values[0] = TERNARY(NameSuite_DebugComp_1_dpath__reset.values[0], 0x0L, T1__w0); }
-  { NameSuite_DebugComp_1_dpath__io_ctrl_out.values[0] = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]; }
-  { NameSuite_DebugComp_1__io_ctrl_out.values[0] = NameSuite_DebugComp_1_dpath__io_ctrl_out.values[0]; }
+  { NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0] = NameSuite_DebugComp_1__io_ctrl_wb_wen.values[0];}
+  { NameSuite_DebugComp_1_dpath__wb_wen.values[0] = NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0] | NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0];}
+  val_t T1;
+  { T1 = TERNARY_1(NameSuite_DebugComp_1_dpath__wb_wen.values[0], NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0], NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0]);}
+  { NameSuite_DebugComp_1_dpath__reset.values[0] = reset.values[0];}
+  { T0.values[0] = TERNARY(NameSuite_DebugComp_1_dpath__reset.values[0], 0x0L, T1);}
+  { NameSuite_DebugComp_1_dpath__io_ctrl_out.values[0] = NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0];}
+  { NameSuite_DebugComp_1__io_ctrl_out.values[0] = NameSuite_DebugComp_1_dpath__io_ctrl_out.values[0];}
 }
 void NameSuite_DebugComp_1_t::clock_hi ( dat_t<1> reset ) {
   dat_t<1> NameSuite_DebugComp_1_dpath__wb_reg_ll_wb__shadow = T0;

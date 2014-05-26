@@ -84,11 +84,15 @@ class CppBackend extends Backend {
         super.emitRef(node)
     }
   }
-  def wordMangle(x: Node, w: String): String =
-    if (x.isInObject) s"${emitRef(x)}.values[${w}]"
-    else if (words(x) == 1) emitRef(x)
-    else if (x.isInstanceOf[Literal]) s"T${x.emitIndex}[${w}]"
-    else s"${emitRef(x)}[${w}]"
+  def wordMangle(x: Node, w: String): String = x match {
+    case _: Literal =>
+      if (words(x) == 1) emitRef(x)
+      else s"T${x.emitIndex}[${w}]"
+    case _ =>
+      if (x.isInObject) s"${emitRef(x)}.values[${w}]"
+      else if (words(x) == 1) emitRef(x)
+      else s"${emitRef(x)}[${w}]"
+  }
   def emitLit(value: BigInt, w: Int = 0): String = {
     val hex = value.toString(16)
     "0x" + (if (hex.length > bpw/4*w) hex.slice(hex.length-bpw/4*(w + 1), hex.length-bpw/4*w) else 0) + "L"
@@ -126,7 +130,7 @@ class CppBackend extends Backend {
       case m: Mem[_] =>
         List((s"mem_t<${m.width},${m.n}>", emitRef(m)))
       case r: ROMData =>
-        List((s"mem_t<${r.width},${r.lits.length}>", emitRef(r)))
+        List((s"mem_t<${r.width},${r.n}>", emitRef(r)))
       case c: Clock =>
         List(("int", emitRef(node)),
              ("int", emitRef(node) + "_cnt"))
@@ -164,8 +168,9 @@ class CppBackend extends Backend {
     else s"  {${s.map(" " + _ + ";").reduceLeft(_ + _)}}\n"
   def emitDatRef(x: Node): String =
     if (x.isInObject) emitRef(x)
-    else if (words(x) == 1) s"*reinterpret_cast<dat_t<${x.width}>*>(&${emitRef(x)})"
-    else s"*reinterpret_cast<dat_t<${x.width}>*>(${emitRef(x)})"
+    else if (words(x) > 1) s"*reinterpret_cast<dat_t<${x.width}>*>(${emitRef(x)})"
+    else if (isLit(x)) s"dat_t<${x.width}>(${emitRef(x)})"
+    else s"*reinterpret_cast<dat_t<${x.width}>*>(&${emitRef(x)})"
   def trunc(x: Node): String =
     if (x.width % bpw == 0) ""
     else s"  ${emitWordRef(x, words(x)-1)} = ${emitWordRef(x, words(x)-1)} & ${emitLit((BigInt(1) << (x.width%bpw))-1)};\n"
@@ -282,7 +287,7 @@ class CppBackend extends Backend {
           }
         } else if (o.op == "<<") {
           if (o.width <= bpw) {
-            "  " + emitLoWordRef(o) + " = " + emitLoWordRef(o.inputs(0)) + " << " + emitLoWordRef(o.inputs(1)) + ";\n"
+            "  " + emitLoWordRef(o) + " = " + emitLoWordRef(o.inputs(0)) + " << " + emitLoWordRef(o.inputs(1)) + ";\n" + trunc(o)
           } else {
             var shb = emitLoWordRef(o.inputs(1))
             val res = ArrayBuffer[String]()
@@ -522,8 +527,12 @@ class CppBackend extends Backend {
 
       case r: ROMData =>
         val res = new StringBuilder
-        for (i <- 0 until r.lits.length)
-          res append block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(r.lits(i), j) + ")"))
+        val sparse = !isPow2(r.n) || r.n != r.sparseLits.size
+        if (sparse)
+          res append s"  if (rand_init) ${emitRef(r)}.randomize();\n"
+        for ((i, v) <- r.sparseLits)
+          if (sparse || v.value != 0)
+            res append block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(v, j) + ")"))
         res.toString
 
       case u: Bits => 
@@ -692,7 +701,7 @@ class CppBackend extends Backend {
       case m: Mem[_] =>
         s"""  mem_table["${name}"] = new mem_api<${m.width}, ${m.n}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
       case r: ROMData =>
-        s"""  mem_table["${name}"] = new mem_api<${r.width}, ${r.lits.length}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
+        s"""  mem_table["${name}"] = new mem_api<${r.width}, ${r.n}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
       case c: Clock =>
         s"""  dat_table["${name}"] = new dat_api<${node.width}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
       case _ =>

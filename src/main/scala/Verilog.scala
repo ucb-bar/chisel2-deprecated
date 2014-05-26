@@ -325,8 +325,8 @@ class VerilogBackend extends Backend {
 
       case r: ROMRead =>
         val inits = new StringBuilder
-        for (i <- 0 until r.rom.lits.length)
-          inits append s"    ${i}: ${emitRef(r)} = ${emitRef(r.rom.lits(i))};\n"
+        for ((i, v) <- r.rom.sparseLits)
+          inits append s"    ${i}: ${emitRef(r)} = ${emitRef(v)};\n"
         s"  always @(*) case (${emitRef(r.inputs.head)})\n" +
         inits +
         "`ifndef SYNTHESIS\n" +
