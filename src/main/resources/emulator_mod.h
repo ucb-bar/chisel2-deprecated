@@ -320,7 +320,17 @@ static inline val_t priority_encode_1 (val_t v) {
 #ifdef __GNUC__
   return TERNARY(v != 0, __builtin_ctzll(v), 0);
 #else
-  return val_n_bits() - 1 - log2_1(reverse_1(v));
+  if (v == 0)
+    return 0;
+  val_t r;
+  val_t shift;
+  r     = !(v & 0xFFFFFFFF) << 5; v >>= r;
+  shift = !(v & 0xFFFF    ) << 4; v >>= shift; r |= shift;
+  shift = !(v & 0xFF      ) << 3; v >>= shift; r |= shift;
+  shift = !(v & 0xF       ) << 2; v >>= shift; r |= shift;
+  shift = !(v & 0x3       ) << 1; v >>= shift; r |= shift;
+  shift = !(v & 0x1       ) << 0; v >>= shift; r |= shift;
+  return r;
 #endif
 }
 
