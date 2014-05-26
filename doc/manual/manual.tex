@@ -1530,7 +1530,8 @@ def LFSR16(increment: Bool = Bool(true)): UInt
 \begin{scala}
 // Returns the n-cycle delayed version 
 // of the input signal
-def ShiftRegister[T <: Data](in: T, n: Int): T
+// Has an optional enable signal defaulting to true
+def ShiftRegister[T <: Data](in: T, n: Int, en = Bool(true)): T
 
 def Counter(cond: Bool, n: Int) = {
   val c = RegReset(UInt(0, log2Up(n)))
