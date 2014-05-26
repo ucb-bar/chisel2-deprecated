@@ -346,7 +346,7 @@ val my_bundle = new Bundle {
 & \verb$increment$ & {\em(optional, default True)} shift on next clock \\
 \end{tabular}
 
-\verb$ShiftRegister(n:Int, in:Data, [en:Bool]): Data$ \newline
+\verb$ShiftRegister(in:Data, n:Int, [en:Bool]): Data$ \newline
 \begin{tabular}{l l l}
 & \multicolumn{2}{l}{Shift register, returns \texttt{n}-cycle delayed input \texttt{in}} \\
 & \verb$en$ & {\em(optional, default True)} enable \\
