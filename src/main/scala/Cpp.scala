@@ -84,26 +84,29 @@ class CppBackend extends Backend {
         super.emitRef(node)
     }
   }
-  def wordMangle(x: Node, w: Int): String = {
-    if (w >= words(x)) {
-      "0L"
-    } else {
-      x match {
-        case l: Literal => {
-          val lit = l.value
-          val value = if (lit < 0) (BigInt(1) << x.width) + lit else lit
-          val hex = value.toString(16)
-          if (hex.length > bpw/4*w) "0x" + hex.slice(hex.length-bpw/4*(w + 1), hex.length-bpw/4*w) + "L" else "0L"
-        }
-        case _ => {
-          if (x.isInObject)
-            emitRef(x) + ".values[" + w + "]"
-          else
-            emitRef(x) + "__w" + w
-        }
-      }
-    }
+  def wordMangle(x: Node, w: String): String = x match {
+    case _: Literal =>
+      if (words(x) == 1) emitRef(x)
+      else s"T${x.emitIndex}[${w}]"
+    case _ =>
+      if (x.isInObject) s"${emitRef(x)}.values[${w}]"
+      else if (words(x) == 1) emitRef(x)
+      else s"${emitRef(x)}[${w}]"
   }
+  def emitLit(value: BigInt, w: Int = 0): String = {
+    val hex = value.toString(16)
+    "0x" + (if (hex.length > bpw/4*w) hex.slice(hex.length-bpw/4*(w + 1), hex.length-bpw/4*w) else 0) + "L"
+  }
+  def wordMangle(x: Node, w: Int): String =
+    if (w >= words(x)) "0L"
+    else x match {
+      case l: Literal =>
+        val lit = l.value
+        val value = if (lit < 0) (BigInt(1) << x.width) + lit else lit
+        emitLit(value, w)
+      case _ => wordMangle(x, w.toString)
+    }
+  def isLit(node: Node): Boolean = node.isLit || node.isInstanceOf[Bits] && node.inputs.length == 1 && isLit(node.inputs.head)
   def emitWordRef(node: Node, w: Int): String = {
     node match {
       case x: Binding =>
@@ -127,7 +130,7 @@ class CppBackend extends Backend {
       case m: Mem[_] =>
         List((s"mem_t<${m.width},${m.n}>", emitRef(m)))
       case r: ROMData =>
-        List((s"mem_t<${r.width},${r.lits.length}>", emitRef(r)))
+        List((s"mem_t<${r.width},${r.n}>", emitRef(r)))
       case c: Clock =>
         List(("int", emitRef(node)),
              ("int", emitRef(node) + "_cnt"))
@@ -156,37 +159,39 @@ class CppBackend extends Backend {
   def words(node: Node): Int = (node.width - 1) / bpw + 1
   def fullWords(node: Node): Int = node.width/bpw
   def emitLoWordRef(node: Node): String = emitWordRef(node, 0)
-  def emitTmpDec(node: Node): String = {
-    if (!node.isInObject) {
-      "  val_t " + (0 until words(node)).map(emitRef(node) + "__w" + _).reduceLeft(_ + ", " + _) + ";\n"
-    } else {
-      ""
-    }
-  }
+  def emitTmpDec(node: Node): String =
+    if (node.isInObject) ""
+    else if (words(node) == 1) s"  val_t ${emitRef(node)};\n"
+    else s"  val_t ${emitRef(node)}[${words(node)}];\n"
   def block(s: Seq[String]): String = 
-    if (s.length == 0)
-      ""
-    else
-      "  {" + s.map(" " + _ + ";").reduceLeft(_ + _) + " }\n"
-  def makeArray(s: String, x: Node): List[String] = List("val_t " + s + "[" + words(x) + "]")
-  def toArray(s: String, x: Node): List[String] = makeArray(s, x) ++ (0 until words(x)).map(i => s + "[" + i + "] = " + emitWordRef(x, i))
-  def fromArray(s: String, x: Node) =
-    (0 until words(x)).map(i => emitWordRef(x, i) + " = " + s + "[" + i + "]")
-  def trunc(x: Node): String = {
-    if (words(x) != fullWords(x)) {
-      "  " + emitWordRef(x, words(x)-1) + " = " + emitWordRef(x, words(x)-1) + " & " + ((1L << (x.width-bpw*fullWords(x)))-1) + ";\n"
-    } else {
-      ""
-    }
-  }
+    if (s.length == 0) ""
+    else s"  {${s.map(" " + _ + ";").reduceLeft(_ + _)}}\n"
+  def emitDatRef(x: Node): String =
+    if (x.isInObject) emitRef(x)
+    else if (words(x) > 1) s"*reinterpret_cast<dat_t<${x.width}>*>(${emitRef(x)})"
+    else if (isLit(x)) s"dat_t<${x.width}>(${emitRef(x)})"
+    else s"*reinterpret_cast<dat_t<${x.width}>*>(&${emitRef(x)})"
+  def trunc(x: Node): String =
+    if (x.width % bpw == 0) ""
+    else s"  ${emitWordRef(x, words(x)-1)} = ${emitWordRef(x, words(x)-1)} & ${emitLit((BigInt(1) << (x.width%bpw))-1)};\n"
   def opFoldLeft(o: Op, initial: (String, String) => String, subsequent: (String, String, String) => String) =
     (1 until words(o.inputs(0))).foldLeft(initial(emitLoWordRef(o.inputs(0)), emitLoWordRef(o.inputs(1))))((c, i) => subsequent(c, emitWordRef(o.inputs(0), i), emitWordRef(o.inputs(1), i)))
+
+  def emitLog2(x: Node, priEnc: Boolean = false) = {
+    val (func, range) =
+      if (priEnc) ("priority_encode_1", (0 until words(x.inputs(0))-1))
+      else ("log2_1", (words(x.inputs(0))-1 to 1 by -1))
+    val body = range.map(i => s"${emitWordRef(x.inputs(0), i)} != 0, ${(i*bpw)} + ${func}(${emitWordRef(x.inputs(0), i)})")
+                    .foldRight(s"${func}(${emitLoWordRef(x.inputs(0))})")((x, y) => s"TERNARY(${x}, ${y})")
+    s"  ${emitLoWordRef(x)} = ${body};\n"
+  }
 
   def emitDefLo(node: Node): String = {
     node match {
       case x: Mux =>
+        val op = if (!x.inputs.exists(isLit _)) "TERNARY_1" else "TERNARY"
         emitTmpDec(x) +
-        block((0 until words(x)).map(i => emitWordRef(x, i) + " = TERNARY(" + emitLoWordRef(x.inputs(0)) + ", " + emitWordRef(x.inputs(1), i) + ", " + emitWordRef(x.inputs(2), i) + ")"))
+        block((0 until words(x)).map(i => s"${emitWordRef(x, i)} = ${op}(${emitLoWordRef(x.inputs(0))}, ${emitWordRef(x.inputs(1), i)}, ${emitWordRef(x.inputs(2), i)})"))
 
       case o: Op => {
         emitTmpDec(o) +
@@ -252,6 +257,10 @@ class CppBackend extends Backend {
             "  " + emitLoWordRef(o) + " = fromDouble(round(toDouble(" + emitLoWordRef(o.inputs(0)) + ")));\n"
           else if (o.op == "dToSInt")
             "  " + emitLoWordRef(o) + " = (val_t)(toDouble(" + emitLoWordRef(o.inputs(0)) + "));\n"
+          else if (o.op == "Log2")
+            emitLog2(o)
+          else if (o.op == "PriEnc" || o.op == "OHToUInt")
+            emitLog2(o, true)
           else {
             assert(false, "operator " + o.op + " unsupported")
             ""
@@ -270,31 +279,27 @@ class CppBackend extends Backend {
             res += emitWordRef(o, i) + " = " + emitWordRef(o.inputs(0), i) + o.op + emitWordRef(o.inputs(1), i) + o.op + "__c"
           }
           block(res) + trunc(o)
-        } else if (o.op == "/") {
-          val cmd = "div_n(__d, __x, __y, " + o.width + ", " + o.inputs(0).width + ", " + o.inputs(1).width + ")"
-          block(makeArray("__d", o) ++ toArray("__x", o.inputs(0)) ++ toArray("__y", o.inputs(1)) ++ List(cmd) ++ fromArray("__d", o))
-        } else if (o.op == "*") {
-          if (o.width <= bpw) {
-            "  " + emitLoWordRef(o) + " = " + emitLoWordRef(o.inputs(0)) + " * " + emitLoWordRef(o.inputs(1)) + ";\n"
+        } else if (o.op == "*" || o.op == "/") {
+          if (o.op == "*" && o.width <= bpw) {
+            s"  ${emitLoWordRef(o)} = ${emitLoWordRef(o.inputs(0))} ${o.op} ${emitLoWordRef(o.inputs(1))};\n"
           } else {
-            val cmd = "mul_n(__d, __x, __y, " + o.width + ", " + o.inputs(0).width + ", " + o.inputs(1).width + ")"
-            block(makeArray("__d", o) ++ toArray("__x", o.inputs(0)) ++ toArray("__y", o.inputs(1)) ++ List(cmd) ++ fromArray("__d", o))
+            s"  ${emitDatRef(o)} = ${emitDatRef(o.inputs(0))} ${o.op} ${emitDatRef(o.inputs(1))};\n"
           }
         } else if (o.op == "<<") {
           if (o.width <= bpw) {
-            "  " + emitLoWordRef(o) + " = " + emitLoWordRef(o.inputs(0)) + " << " + emitLoWordRef(o.inputs(1)) + ";\n"
+            "  " + emitLoWordRef(o) + " = " + emitLoWordRef(o.inputs(0)) + " << " + emitLoWordRef(o.inputs(1)) + ";\n" + trunc(o)
           } else {
             var shb = emitLoWordRef(o.inputs(1))
             val res = ArrayBuffer[String]()
-            res ++= toArray("__x", o.inputs(0))
-            res += "val_t __c = 0"
-            res += "val_t __w = " + emitLoWordRef(o.inputs(1)) + " / " + bpw
-            res += "val_t __s = " + emitLoWordRef(o.inputs(1)) + " % " + bpw
-            res += "val_t __r = " + bpw + " - __s"
+            res += s"val_t __c = 0"
+            res += s"val_t __w = ${emitLoWordRef(o.inputs(1))} / ${bpw}"
+            res += s"val_t __s = ${emitLoWordRef(o.inputs(1))} % ${bpw}"
+            res += s"val_t __r = ${bpw} - __s"
             for (i <- 0 until words(o)) {
-              res += "val_t __v" + i + " = MASK(__x[CLAMP(" + i + "-__w,0," + (words(o.inputs(0)) - 1) + ")]," + i + ">=__w&&" + i + "<__w+" + words(o.inputs(0)) + ")"
-              res += emitWordRef(o, i) + " = __v" + i + " << __s | __c"
-              res += "__c = MASK(__v" + i + " >> __r, __s != 0)"
+              val inputWord = wordMangle(o.inputs(0), s"CLAMP(${i}-__w, 0, ${words(o.inputs(0)) - 1})")
+              res += s"val_t __v${i} = MASK(${inputWord}, (${i} >= __w) & (${i} < __w + ${words(o.inputs(0))}))"
+              res += s"${emitWordRef(o, i)} = __v${i} << __s | __c"
+              res += s"__c = MASK(__v${i} >> __r, __s != 0)"
             }
             block(res) + trunc(o)
           }
@@ -302,34 +307,27 @@ class CppBackend extends Backend {
           val arith = o.op == "s>>"
           if (o.inputs(0).width <= bpw) {
             if (arith) {
-              ("  " + emitLoWordRef(o) + " = (sval_t)("
-                + emitLoWordRef(o.inputs(0)) + " << "
-                + (bpw - o.inputs(0).width) + ") >> ("
-                + (bpw - o.inputs(0).width) + " + "
-                + emitLoWordRef(o.inputs(1)) + ");\n" + trunc(o))
+              s"  ${emitLoWordRef(o)} = sval_t(${emitLoWordRef(o.inputs(0))} << ${bpw - o.inputs(0).width}) >> (${bpw - o.inputs(0).width} + ${emitLoWordRef(o.inputs(1))});\n" + trunc(o)
             } else {
-              ("  " + emitLoWordRef(o) + " = "
-                + emitLoWordRef(o.inputs(0)) + " >> "
-                + emitLoWordRef(o.inputs(1)) + ";\n")
+              s"  ${emitLoWordRef(o)} = ${emitLoWordRef(o.inputs(0))} >> ${emitLoWordRef(o.inputs(1))};\n"
             }
           } else {
             var shb = emitLoWordRef(o.inputs(1))
             val res = ArrayBuffer[String]()
-            res ++= toArray("__x", o.inputs(0))
-            res += "val_t __c = 0"
-            res += "val_t __w = " + emitLoWordRef(o.inputs(1)) + " / " + bpw
-            res += "val_t __s = " + emitLoWordRef(o.inputs(1)) + " % " + bpw
-            res += "val_t __r = " + bpw + " - __s"
-            if (arith) {
-              res += "val_t __msb = (sval_t)" + emitWordRef(o.inputs(0), words(o)-1) + (if (o.width % bpw != 0) " << " + (bpw-o.width%bpw) else "") + " >> " + (bpw-1)
-            }
+            res += s"val_t __c = 0"
+            res += s"val_t __w = ${emitLoWordRef(o.inputs(1))} / ${bpw}"
+            res += s"val_t __s = ${emitLoWordRef(o.inputs(1))} % ${bpw}"
+            res += s"val_t __r = ${bpw} - __s"
+            if (arith)
+              res += s"val_t __msb = (sval_t)${emitWordRef(o.inputs(0), words(o)-1)} << ${(bpw - o.width % bpw) % bpw} >> ${(bpw-1)}"
             for (i <- words(o)-1 to 0 by -1) {
-              res += "val_t __v" + i + " = MASK(__x[CLAMP(" + i + "+__w,0," + (words(o.inputs(0))-1) + ")],__w+" + i + "<" + words(o.inputs(0)) + ")"
-              res += emitWordRef(o, i) + " = __v" + i + " >> __s | __c"
-              res += "__c = MASK(__v" + i + " << __r, __s != 0)"
+              val inputWord = wordMangle(o.inputs(0), s"CLAMP(${i}+__w, 0, ${words(o.inputs(0))-1})")
+              res += s"val_t __v${i} = MASK(${inputWord}, __w + ${i} < ${words(o.inputs(0))})"
+              res += s"${emitWordRef(o, i)} = __v${i} >> __s | __c"
+              res += s"__c = MASK(__v${i} << __r, __s != 0)"
               if (arith) {
-                res += emitWordRef(o, i) + " |= MASK(__msb << ((" + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ") % " + bpw + "), " + ((i + 1) * bpw) + " > " + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ")"
-                res += emitWordRef(o, i) + " |= MASK(__msb, " + (i*bpw) + " >= " + (o.width-1) + "-" + emitLoWordRef(o.inputs(1)) + ")"
+                res += s"${emitWordRef(o, i)} |= MASK(__msb << ((${o.width-1}-${emitLoWordRef(o.inputs(1))}) % ${bpw}), ${(i + 1) * bpw} > ${o.width-1} - ${emitLoWordRef(o.inputs(1))})"
+                res += s"${emitWordRef(o, i)} |= MASK(__msb, ${i*bpw} >= ${o.width-1} - ${emitLoWordRef(o.inputs(1))})"
               }
             }
             if (arith) {
@@ -355,7 +353,7 @@ class CppBackend extends Backend {
                       ""
                     })))
         } else if (o.op == "|" || o.op == "&" || o.op == "^") {
-          block((0 until words(o)).map(i => emitWordRef(o, i) + " = " + emitWordRef(o.inputs(0), i) + o.op + emitWordRef(o.inputs(1), i)))
+          block((0 until words(o)).map(i => s"${emitWordRef(o, i)} = ${emitWordRef(o.inputs(0), i)} ${o.op} ${emitWordRef(o.inputs(1), i)}"))
         } else if (o.op == "s<") {
           require(o.inputs(1).litOf.value == 0)
           val shamt = (o.inputs(0).width-1) % bpw
@@ -433,7 +431,8 @@ class CppBackend extends Backend {
           } else if (node.inputs(0).width <= bpw) {
             "  " + emitLoWordRef(node) + " = (" + emitLoWordRef(node.inputs(0)) + " >> " + emitLoWordRef(node.inputs(1)) + ") & 1;\n"
           } else {
-            block(toArray("__e", node.inputs(0)) ++ List(emitLoWordRef(node) + " = __e[" + emitLoWordRef(node.inputs(1)) + "/" + bpw + "] >> (" + emitLoWordRef(node.inputs(1)) + "%" + bpw + ") & 1"))
+            val inputWord = wordMangle(node.inputs(0), emitLoWordRef(node.inputs(1)) + "/" + bpw)
+            s"${emitLoWordRef(node)} = ${inputWord} >> (${emitLoWordRef(node.inputs(1))} % ${bpw}) & 1"
           }
         } else {
           val rsh = node.inputs(2).litValue().toInt
@@ -459,8 +458,8 @@ class CppBackend extends Backend {
           emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
             + " = " + emitWordRef(x.inputs(0), i)))
         } else if (x.inputs.length == 0 && !x.isInObject) {
-          emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
-            + " = rand_val()")) + trunc(x)
+          emitTmpDec(x) + block("val_t __r = rand_val()" +:
+            (0 until words(x)).map(i => s"${emitWordRef(x, i)} = __r")) + trunc(x)
         } else {
           ""
         }
@@ -475,15 +474,6 @@ class CppBackend extends Backend {
           + " = " + emitRef(r.rom) + ".get(" + emitLoWordRef(r.addr) + ", "
           + i + ")"))
 
-      case x: Log2 =>
-        (emitTmpDec(x) + "  " + emitLoWordRef(x) + " = "
-          + (words(x.inputs(0))-1 to 1 by -1).map(
-            i => emitWordRef(x.inputs(0), i) + " != 0, "
-              + (i*bpw) + " + log2_1("
-              + emitWordRef(x.inputs(0), i) + ")").foldRight("log2_1("
-                + emitLoWordRef(x.inputs(0)) + ")")(
-            "TERNARY(" + _ + ", " + _ + ")") + ";\n")
-
       case a: Assert =>
         val cond = emitLoWordRef(a.cond) +
           (if (emitRef(a.cond) == "reset") "" else " || reset.lo_word()")
@@ -495,6 +485,10 @@ class CppBackend extends Backend {
           + s.args.map(emitRef _).foldLeft(CString(s.format))(_ + ", " + _)
           + ");\n"
           + "#endif\n")
+
+      case l: Literal =>
+        if (words(l) == 1) ""
+        else s"  val_t T${l.emitIndex}[] = {" + (0 until words(l)).map(emitWordRef(l, _)).reduce(_+", "+_) + "};\n"
 
       case _ =>
         ""
@@ -533,8 +527,12 @@ class CppBackend extends Backend {
 
       case r: ROMData =>
         val res = new StringBuilder
-        for (i <- 0 until r.lits.length)
-          res append block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(r.lits(i), j) + ")"))
+        val sparse = !isPow2(r.n) || r.n != r.sparseLits.size
+        if (sparse)
+          res append s"  if (rand_init) ${emitRef(r)}.randomize();\n"
+        for ((i, v) <- r.sparseLits)
+          if (sparse || v.value != 0)
+            res append block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(v, j) + ")"))
         res.toString
 
       case u: Bits => 
@@ -703,7 +701,7 @@ class CppBackend extends Backend {
       case m: Mem[_] =>
         s"""  mem_table["${name}"] = new mem_api<${m.width}, ${m.n}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
       case r: ROMData =>
-        s"""  mem_table["${name}"] = new mem_api<${r.width}, ${r.lits.length}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
+        s"""  mem_table["${name}"] = new mem_api<${r.width}, ${r.n}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
       case c: Clock =>
         s"""  dat_table["${name}"] = new dat_api<${node.width}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
       case _ =>
@@ -767,16 +765,16 @@ class CppBackend extends Backend {
     out_h.write("class " + c.name + "_t : public mod_t {\n");
     out_h.write(" public:\n");
     val vcd = new VcdBackend(c)
-    for (m <- c.omods) {
-      if(m.name != "reset") {
-        if (m.isInObject) {
-          out_h.write(emitDec(m));
-        }
-        if (m.isInVCD) {
-          out_h.write(vcd.emitDec(m));
-        }
-      }
+    def headerOrderFunc(a: Node, b: Node) = {
+      // pack smaller objects at start of header for better locality
+      val aMem = a.isInstanceOf[Mem[_]] || a.isInstanceOf[ROMData]
+      val bMem = b.isInstanceOf[Mem[_]] || b.isInstanceOf[ROMData]
+      aMem < bMem || aMem == bMem && a.width < b.width
     }
+    for (m <- c.omods.filter(_.isInObject).sortWith(headerOrderFunc))
+      out_h.write(emitDec(m))
+    for (m <- c.omods.filter(_.isInVCD).sortWith(headerOrderFunc))
+      out_h.write(vcd.emitDec(m))
     for (clock <- Driver.clocks)
       out_h.write(emitDec(clock))
 

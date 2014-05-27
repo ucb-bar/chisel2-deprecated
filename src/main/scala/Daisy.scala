@@ -280,7 +280,7 @@ object DaisyChain extends Backend {
     b.analyses   += ((c: Module) => printOutMappings(c))
   }
 
-  def addNode[T <: Bits](m: Module, gen: => T, name: String = ""): T = {
+  def addNode[T <: Bits](m: Module, gen: T, name: String = ""): T = {
     val res = gen
     if (name != "") res.getNode setName name
     res.getNode.component = m
@@ -547,7 +547,7 @@ object DaisyChain extends Backend {
         } else if (targetPin.dir == OUTPUT && !targetPin.inputs.isEmpty) {
           val pinInput = targetPin.inputs.head.getNode
           val pinWidth = targetPin.width
-          ioBuffers(targetPin) = addReg(c, Reg(init=UInt(pinInput, pinWidth)), bufName)
+          ioBuffers(targetPin) = addReg(c, Reg(UInt(width = pinWidth)), bufName)
           updateReg(ioBuffers(targetPin), firePins(c) -> pinInput)
           wire(ioBuffers(targetPin) -> targetPin)
         }

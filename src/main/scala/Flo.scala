@@ -47,6 +47,7 @@ class FloBackend extends Backend {
   // TODO: SHOULD BE IN ENV VAR
   val floDir = java.lang.System.getenv("DREAMER") + "/emulator/"
   val keywords = new HashSet[String]();
+  override val needsLowering = Set("PriEnc", "OHToUInt")
   var isRnd = false
 
   object DreamerConfiguration {
@@ -113,6 +114,7 @@ class FloBackend extends Backend {
           o.op match {
             case "~" => "not'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
             case "^" => "xorr'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
+            case "Log2" => "log2'" + node.width + " " + emitRef(node.inputs(0)) + "\n"
           }
          } else {
            o.op match {
@@ -169,10 +171,10 @@ class FloBackend extends Backend {
 
       case m: ROMData =>
         val res = new StringBuilder
-        res append emitDec(m) + "mem'" + m.width + " " + m.lits.length + "\n"
+        res append emitDec(m) + "mem'" + m.width + " " + m.n + "\n"
         // emitDec(m) + "mem " + m.n + "\n" + trueAll(emitRef(m) + "__is_all_read", m.reads)
-        for (i <- 0 until m.lits.length)
-          res append "init " + emitRef(m) + " " + i + " " + emitRef(m.lits(i)) + "\n"
+        for ((i, v) <- m.sparseLits)
+          res append "init " + emitRef(m) + " " + i + " " + emitRef(v) + "\n"
         res.toString
 
       case m: MemRead =>
@@ -188,9 +190,6 @@ class FloBackend extends Backend {
         emitDec(m) + "wr'" + m.data.width + " " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + " " + emitRef(m.data) + "\n"
       case x: Reg => // TODO: need resetData treatment
         emitDec(x) + "reg'" + x.width + " 1 " + emitRef(x.next) + "\n"
-
-      case x: Log2 => // TODO: log2 instruction?
-        emitDec(x) + "log2'" + x.width + " " + emitRef(x.inputs(0)) + "\n"
 
       case l: Literal =>
         ""

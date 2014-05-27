@@ -51,7 +51,7 @@ module Queue(input clk, input reset,
   assign io_deq_bits = T0;
   assign T0 = ram[deq_ptr];
   assign do_enq = T3 & T2;
-  assign T2 = do_flow == 1'h0;
+  assign T2 = do_flow ^ 1'h1;
   assign do_flow = 1'h0;
   assign T3 = io_enq_ready & io_enq_valid;
   assign T4 = reset ? 1'h0 : T5;
@@ -61,18 +61,18 @@ module Queue(input clk, input reset,
   assign T8 = do_deq ? T9 : deq_ptr;
   assign T9 = deq_ptr + 1'h1;
   assign do_deq = T11 & T10;
-  assign T10 = do_flow == 1'h0;
+  assign T10 = do_flow ^ 1'h1;
   assign T11 = io_deq_ready & io_deq_valid;
   assign io_deq_valid = T12;
-  assign T12 = empty == 1'h0;
+  assign T12 = empty ^ 1'h1;
   assign empty = ptr_match & T13;
-  assign T13 = maybe_full == 1'h0;
+  assign T13 = maybe_full ^ 1'h1;
   assign T14 = reset ? 1'h0 : T15;
   assign T15 = T16 ? do_enq : maybe_full;
   assign T16 = do_enq != do_deq;
   assign ptr_match = enq_ptr == deq_ptr;
   assign io_enq_ready = T17;
-  assign T17 = full == 1'h0;
+  assign T17 = full ^ 1'h1;
   assign full = ptr_match & maybe_full;
 
   always @(posedge clk) begin

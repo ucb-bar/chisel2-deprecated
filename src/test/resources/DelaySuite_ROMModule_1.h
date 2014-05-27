@@ -5,9 +5,9 @@
 
 class DelaySuite_ROMModule_1_t : public mod_t {
  public:
-  mem_t<4,3> T0;
   dat_t<2> DelaySuite_ROMModule_1__io_addr;
   dat_t<4> DelaySuite_ROMModule_1__io_out;
+  mem_t<4,3> T0;
   int clk;
   int clk_cnt;
 

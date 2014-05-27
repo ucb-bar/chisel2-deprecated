@@ -33,9 +33,9 @@ void VerifSuite_CppAssertComp_1_t::dump_init(FILE *f) {
 void VerifSuite_CppAssertComp_1_t::dump(FILE *f, int t) {
 }
 void VerifSuite_CppAssertComp_1_t::clock_lo ( dat_t<1> reset ) {
-  val_t T1__w0;
-  { T1__w0 = VerifSuite_CppAssertComp_1__io_y.values[0] | VerifSuite_CppAssertComp_1__io_x.values[0] << 8; }
-  { VerifSuite_CppAssertComp_1__io_z.values[0] = T1__w0; }
+  val_t T1;
+  { T1 = VerifSuite_CppAssertComp_1__io_y.values[0] | VerifSuite_CppAssertComp_1__io_x.values[0] << 8;}
+  { VerifSuite_CppAssertComp_1__io_z.values[0] = T1;}
   ASSERT(reset.values[0], "failure");
 }
 void VerifSuite_CppAssertComp_1_t::clock_hi ( dat_t<1> reset ) {

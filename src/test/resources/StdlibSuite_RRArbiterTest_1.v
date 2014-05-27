@@ -147,7 +147,7 @@ module StdlibSuite_RRArbiterTest_1(input clk, input reset,
   assign T30 = T31 & io_out_ready;
   assign T31 = T32;
   assign T32 = T45 | T33;
-  assign T33 = T34 == 1'h0;
+  assign T33 = T34 ^ 1'h1;
   assign T34 = T37 | T35;
   assign T35 = io_in_3_valid & T36;
   assign T36 = R9 < 2'h3;
@@ -164,19 +164,19 @@ module StdlibSuite_RRArbiterTest_1(input clk, input reset,
   assign T46 = T47 & io_out_ready;
   assign T47 = T48;
   assign T48 = T54 | T49;
-  assign T49 = T50 == 1'h0;
+  assign T49 = T50 ^ 1'h1;
   assign T50 = T51 | io_in_0_valid;
   assign T51 = T52 | T35;
   assign T52 = T53 | T38;
   assign T53 = T43 | T41;
   assign T54 = T56 & T55;
   assign T55 = R9 < 2'h1;
-  assign T56 = T43 == 1'h0;
+  assign T56 = T43 ^ 1'h1;
   assign io_in_2_ready = T57;
   assign T57 = T58 & io_out_ready;
   assign T58 = T59;
   assign T59 = T66 | T60;
-  assign T60 = T61 == 1'h0;
+  assign T60 = T61 ^ 1'h1;
   assign T61 = T62 | io_in_1_valid;
   assign T62 = T63 | io_in_0_valid;
   assign T63 = T64 | T35;
@@ -184,13 +184,13 @@ module StdlibSuite_RRArbiterTest_1(input clk, input reset,
   assign T65 = T43 | T41;
   assign T66 = T68 & T67;
   assign T67 = R9 < 2'h2;
-  assign T68 = T69 == 1'h0;
+  assign T68 = T69 ^ 1'h1;
   assign T69 = T43 | T41;
   assign io_in_3_ready = T70;
   assign T70 = T71 & io_out_ready;
   assign T71 = T72;
   assign T72 = T80 | T73;
-  assign T73 = T74 == 1'h0;
+  assign T73 = T74 ^ 1'h1;
   assign T74 = T75 | io_in_2_valid;
   assign T75 = T76 | io_in_1_valid;
   assign T76 = T77 | io_in_0_valid;
@@ -199,7 +199,7 @@ module StdlibSuite_RRArbiterTest_1(input clk, input reset,
   assign T79 = T43 | T41;
   assign T80 = T82 & T81;
   assign T81 = R9 < 2'h3;
-  assign T82 = T83 == 1'h0;
+  assign T82 = T83 ^ 1'h1;
   assign T83 = T84 | T38;
   assign T84 = T43 | T41;
 

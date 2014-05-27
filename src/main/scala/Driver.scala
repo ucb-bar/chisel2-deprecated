@@ -87,6 +87,8 @@ object Driver {
     if(!res) throwException("Module under test FAILED at least one test vector.")
   }
 
+  def elapsedTime: Long = System.currentTimeMillis - startTime
+
   def setTopComponent(mod: Module): Unit = {
     topComponent = mod
     implicitReset.component = Driver.topComponent
@@ -134,6 +136,7 @@ object Driver {
     implicitClock.setName("clk")
     nodes.clear()
     isInGetWidth = false
+    startTime = System.currentTimeMillis
 
     // Backannotation
     isBackannotating = false
@@ -196,6 +199,8 @@ object Driver {
         // DaisyChain flags
         case "--snapshot" => isSnapshotting = true
         case "--counter" => isCounting = true
+        case "--reportDims" => isReportDims = true
+        // Counter backend flags
         case "--backannotation" => isBackannotating = true
         case "--model" => model = args(i + 1) ; i += 1
         //Jackhammer Flags
@@ -276,6 +281,7 @@ object Driver {
   var model = ""
   val signals = LinkedHashSet[Node]()
   var modStackPushed: Boolean = false
+  var startTime = 0L
   /* Jackhammer flags */
   var jackDump: String = null
   var jackDir: String = null

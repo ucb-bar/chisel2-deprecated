@@ -76,16 +76,16 @@ module Arbiter(
   assign io_in_1_ready = T19;
   assign T19 = T20 & io_out_ready;
   assign T20 = T21;
-  assign T21 = io_in_0_valid == 1'h0;
+  assign T21 = io_in_0_valid ^ 1'h1;
   assign io_in_2_ready = T22;
   assign T22 = T23 & io_out_ready;
   assign T23 = T24;
-  assign T24 = T25 == 1'h0;
+  assign T24 = T25 ^ 1'h1;
   assign T25 = io_in_0_valid | io_in_1_valid;
   assign io_in_3_ready = T26;
   assign T26 = T27 & io_out_ready;
   assign T27 = T28;
-  assign T28 = T29 == 1'h0;
+  assign T28 = T29 ^ 1'h1;
   assign T29 = T30 | io_in_2_valid;
   assign T30 = io_in_0_valid | io_in_1_valid;
 endmodule

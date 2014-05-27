@@ -433,6 +433,20 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     count
   }
 
+  def lowerNodes(needsLowering: Set[String]): Unit = if (!needsLowering.isEmpty) {
+    val lowerTo = new HashMap[Node, Node]
+    bfs { x =>
+      for (i <- 0 until x.inputs.length) x.inputs(i) match {
+        case op: Op =>
+          if (needsLowering contains op.op)
+            x.inputs(i) = lowerTo.getOrElseUpdate(op, op.lower)
+        case _ =>
+      }
+    }
+    if (!lowerTo.isEmpty)
+      inferAll
+  }
+
   def forceMatchingWidths {
     bfs(_.forceMatchingWidths)
   }
@@ -482,6 +496,12 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     val roots = new ArrayBuffer[Node];
     for (c <- Driver.components) {
       roots ++= c.debugs
+      if (c.parent == null) {
+        val topIOs = c.io.flatten;
+        for ((name, wire) <- topIOs) {
+          roots += wire
+        }
+      }
     }
     for (b <- Driver.blackboxes)
       roots += b.io;
@@ -531,58 +551,37 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def findOrdering(): Unit = visitNodes(findRoots().toArray);
 
   def findGraphDims(): (Int, Int, Int) = {
-    var maxDepth = 0;
-    val imods = new ArrayBuffer[Node]();
-    for (m <- mods) {
-      m match {
-        case l: Literal =>
-        case i      => imods += m;
-      }
-    }
-    val whist = new HashMap[Int, Int]();
+    val imods = mods.filter(!_.isInstanceOf[Literal])
+    val mhist = new HashMap[String, Int]
+    val whist = new HashMap[Int, Int]
+    val hist = new HashMap[String, Int]
     for (m <- imods) {
-      val w = m.width;
-      if (whist.contains(w)) {
-        whist(w) = whist(w) + 1;
-      } else {
-        whist(w) = 1;
+      mhist(m.component.toString) = 1 + mhist.getOrElse(m.component.toString, 0)
+      whist(m.width) = 1 + whist.getOrElse(m.width, 0)
+      val name = m match {
+        case op: Op => op.op
+        case o      => {
+          val name = m.getClass.getName
+          name.substring(name.indexOf('.') + 1)
+        }
       }
+      hist(name) = 1 + hist.getOrElse(name, 0)
     }
-    val hist = new HashMap[String, Int]();
-    for (m <- imods) {
-      var name = m.getClass().getName();
-      m match {
-        case m: Mux => name = "Mux";
-        case op: Op => name = op.op;
-        case o      => name = name.substring(name.indexOf('.') + 1);
-      }
-      if (hist.contains(name)) {
-        hist(name) = hist(name) + 1;
-      } else {
-        hist(name) = 1;
-      }
-    }
-    for (m <- imods)
-      maxDepth = max(m.depth, maxDepth);
-    // for ((n, c) <- hist)
-    ChiselError.info("%6s: %s".format("name", "count"));
-    for (n <- hist.keys.toList.sortWith((a, b) => a < b))
-      ChiselError.info("%6s: %4d".format(n, hist(n)));
-    ChiselError.info("%6s: %s".format("width", "count"));
+    ChiselError.info("%60s %7s".format("module", "node count"));
+    for (n <- mhist.keys.toList.sortWith((a, b) => mhist(a) > mhist(b)))
+      ChiselError.info("%60s %7d".format(n, mhist(n)))
+    ChiselError.info("%12s %7s".format("name", "count"));
+    for (n <- hist.keys.toList.sortWith((a, b) => hist(a) > hist(b)))
+      ChiselError.info("%12s %7d".format(n, hist(n)))
+    ChiselError.info("%5s %s".format("width", "count"));
     for (w <- whist.keys.toList.sortWith((a, b) => a < b))
-      ChiselError.info("%3d: %4d".format(w, whist(w)));
-    var widths = new Array[Int](maxDepth + 1);
-    for (i <- 0 until maxDepth + 1)
-      widths(i) = 0;
+      ChiselError.info("%5d %7d".format(w, whist(w)))
+    val maxDepth = imods.map(_.depth).foldLeft(0)(_ max _)
+    val widths = new Array[Int](maxDepth + 1)
     for (m <- imods)
-      widths(m.depth) = widths(m.depth) + 1;
-    var numNodes = 0;
-    for (m <- imods)
-      numNodes += 1;
-    var maxWidth = 0;
-    for (i <- 0 until maxDepth + 1)
-      maxWidth = max(maxWidth, widths(i));
-    (numNodes, maxWidth, maxDepth)
+      widths(m.depth) += 1
+    val maxWidth = widths.foldLeft(0)(_ max _)
+    (imods.length, maxWidth, maxDepth)
   }
 
   def collectNodes(c: Module) {
