@@ -44,12 +44,15 @@ object NodeExtract {
       ChiselError.error("Extract(hi = " + hi + ", lo = " + lo + ") requires hi >= lo")
     val w = if (width == -1) hi - lo + 1 else width
     val bits_lit = mod.litOf
+    val mask = (BigInt(1) << w) - BigInt(1)
+    // Currently, we don't restrict literals to their width,
+    // so we can't use the literal directly if it overflows its width.
     // TODO: width is Driver.isInGetWidth dependent
     // What are we trying to accomplish here?
-    if (lo == 0 && w == mod.width) {
+    if (lo == 0 && w == mod.width && ((bits_lit == null) || (bits_lit.value & ~mask) == 0)) {
       mod
     } else if (bits_lit != null) {
-      Literal((bits_lit.value >> lo) & ((BigInt(1) << w) - BigInt(1)), w)
+      Literal((bits_lit.value >> lo) & mask, w)
     } else {
       makeExtract(mod, Literal(hi), Literal(lo), fixWidth(w))
     }
