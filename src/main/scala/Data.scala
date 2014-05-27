@@ -144,7 +144,6 @@ abstract class Data extends Node {
       val constructor = this.getClass.getConstructors.head
       val res = constructor.newInstance(Array.fill(constructor.getParameterTypes.size)(null):_*)
       val nc = res.asInstanceOf[this.type]
-      println("Data.clone - old width " + this.width + ", new width " + nc.width)
       nc
     } catch {
       case npe: java.lang.reflect.InvocationTargetException if npe.getCause.isInstanceOf[java.lang.NullPointerException] =>
