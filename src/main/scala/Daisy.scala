@@ -339,7 +339,7 @@ object DaisyChain extends Backend {
       if (Driver.isSnapshotting) {
         val snapValid = !firePins(m) 
         val snapFire = addNode(m, snapOuts(m).ready && snapValid, "snap_fire")
-        snapCopy(m) = addNode(m, snapFire && (snapCtrls(m) === Bits(0)), "snap_copy")
+        snapCopy(m) = addNode(m, firePins(m) /*snapFire && (snapCtrls(m) === Bits(0))*/, "snap_copy")
         snapRead(m) = addNode(m, snapFire && (snapCtrls(m) === Bits(1)), "snap_read")
         if (m != c) {
           wire(snapValid -> snapOuts(m).valid)
@@ -542,9 +542,9 @@ object DaisyChain extends Backend {
           updateReg(ioBuffers(targetPin), (stepsIn.valid || firePins(c)) -> targetPin)
           for (consumer <- targetPin.consumers) {
             val idx = consumer.inputs indexOf targetPin
-            consumer.inputs(idx) = ioBuffers(targetPin)
+            if (idx >= 0) consumer.inputs(idx) = ioBuffers(targetPin)
           }
-        } else if (targetPin.dir == OUTPUT) {
+        } else if (targetPin.dir == OUTPUT && !targetPin.inputs.isEmpty) {
           val pinInput = targetPin.inputs.head.getNode
           val pinWidth = targetPin.width
           ioBuffers(targetPin) = addReg(c, Reg(init=UInt(pinInput, pinWidth)), bufName)
@@ -596,6 +596,11 @@ object DaisyChain extends Backend {
 
   def findDelays(c: Module) { 
     ChiselError.info("[SnapshotChain] find delay elements")
+    /*** collect inputs ***/
+    for ((n, io) <- c.io.flatten; if io.dir == INPUT && !(keywords contains io.name)) {
+      c.delays ++= DelayElem(io)
+    }
+
     /*** collect delay elements(Reg/Mem) for snapshotting ***/
     val queue = ScalaQueue(c)
     while (!queue.isEmpty) {
@@ -1082,25 +1087,6 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
     expect(cntrOut.bits, expected)
   }
 
-  def dumpCounters() {
-    if (isTrace) println("*** Counter Values ***")
-    for (counter <- counters) {
-      val counterVal = peek(counter.src)
-    }
-
-    if (isTrace) println("*** Counter Chain Copy ***")
-    // Copy activity counter values to shadow counters
-    cntrCopy()
-
-    for ((counter, i) <- counters.zipWithIndex) {
-      if (isTrace) println("*** Counter Chain Read %d ***".format(i))
-      // Read out the cntr chain
-      val cntrValue = cntrRead()
-      // Check the cntr output
-      cntrCheck(counterVals(i))
-    }
-  }
-
   override def poke(data: Bits, x: BigInt) {
     if (isInSnapshot) 
       addPoke(snapshots, t, Poke(data, -1, x))
@@ -1136,13 +1122,16 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
     }
   }
 
+  override def dumpName(data: Node): String = {
+    if (data.name != "")
+      data.chiselName
+    else
+      data.component.getPathName(".") + "." + Driver.backend.emitRef(data)    
+  }
+
   override def dump(): Snapshot = {
     val snap = new Snapshot(t)
-
-    // Copy snapshot values to shadow counters
-    if (isTrace) println("*** Snapshot Chain Copy ***")
-    snapCopy()
-
+    var value = BigInt(0)
     for ((delay, i) <- delays.zipWithIndex) {
       if (isTrace) println("*** Snapshot Chain Read %d ***".format(i))
       // Read out the snap chain
@@ -1150,22 +1139,49 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
       // Check the snap output
       snapCheck(delayPeeks(i))
       delay.src match {
-        case read: MemRead =>
-          snap.pokes += Poke(read.mem, read.addr.litValue(0).toInt, snapValue)
-        case _ =>
-          snap.pokes += Poke(delay.src, -1, snapValue)
-      }
-    }
-
-    // Recover inputs
-    if (!pokez.isEmpty) {
-      for (poke <- pokez.last.pokes) {
-        snap.pokes += poke
+        case read: MemRead if delay.offset > 0 => {
+          value |= (snapValue << delay.offset)
+          snap.pokes -= snap.pokes.last
+          snap.pokes += Poke(read.mem, read.addr.litValue(0).toInt, value)
+        }
+        case read: MemRead => {
+          value = snapValue
+          snap.pokes += Poke(read.mem, read.addr.litValue(0).toInt, value)
+        }
+        case _ if delay.offset > 0 => {
+          value |= (snapValue << delay.offset)
+          snap.pokes -= snap.pokes.last
+          snap.pokes += Poke(delay.src, -1, value)
+        }
+        case _ => {
+          value = snapValue
+          snap.pokes += Poke(delay.src, -1, value)
+        }
       }
     }
 
     snap
   }
+
+  def dumpCounters() {
+    if (isTrace) println("*** Counter Values ***")
+    for (counter <- counters) {
+      val counterVal = peek(counter.src)
+    }
+
+    if (isTrace) println("*** Counter Chain Copy ***")
+    // Copy activity counter values to shadow counters
+    cntrCopy()
+
+    for ((counter, i) <- counters.zipWithIndex) {
+      if (isTrace) println("*** Counter Chain Read %d ***".format(i))
+      // Read out the cntr chain
+      val cntrValue = cntrRead()
+      // Check the cntr output
+      cntrCheck(counterVals(i))
+    }
+  }
+
 
   def extract(value: BigInt, width: Int, offset: Int) =
     (value & (((BigInt(1) << width) - 1) << offset)) >> offset
@@ -1209,6 +1225,22 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
           counterPeeks(i) = curPeek
         }
       }
+      if (Driver.isSnapshotting) {
+        if (isTrace) println("*** READ STATE VALUES ***")
+        delayPeeks.clear
+        delayPeeks ++= delays map { delay => delay.src match {
+          case read: MemRead if delay.limit - delay.offset > 0 =>
+            extract(peekBits(read.mem, read.addr.litValue(0).toInt), 
+                    delay.limit - delay.offset + 1, delay.offset)
+          case read: MemRead =>
+            peekBits(read.mem, read.addr.litValue(0).toInt)
+          case signal if delay.limit - delay.offset > 0 =>
+            extract(peekBits(signal), 
+                    delay.limit - delay.offset + 1, delay.offset)
+          case signal =>
+            peekBits(signal) }
+        }
+      }
       tick()
     }
 
@@ -1219,22 +1251,6 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
 
     /*** Snapshot Sampling ***/
     if (Driver.isSnapshotting && dice == 0 && !isInSnapshot) {
-      // read out signal values
-      if (isTrace) println("*** READ STATE VALUES ***")
-      delayPeeks.clear
-      delayPeeks ++= delays map { delay => delay.src match {
-        case read: MemRead if delay.limit - delay.offset > 0 =>
-          extract(peekBits(read.mem, read.addr.litValue(0).toInt), 
-                  delay.limit - delay.offset + 1, delay.offset)
-        case read: MemRead =>
-          peekBits(read.mem, read.addr.litValue(0).toInt)
-        case signal if delay.limit - delay.offset > 0 =>
-          extract(peekBits(signal), 
-                  delay.limit - delay.offset + 1, delay.offset)
-        case signal =>
-          peekBits(signal) }
-      }
-
       // take a snapshot
       snapshot()
       isInSnapshot = true
@@ -1264,7 +1280,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
   }
 
   override def finish(): Boolean = {
-    addExpects(snapshots)
+    if (isInSnapshot) addExpects(snapshots)
     dumpSnapshots(c.name + ".snaps", snapshots)
     super.finish()
   }

@@ -456,7 +456,7 @@ class VerilogBackend extends Backend {
       harness.write("\n  /*** API variables ***/\n")
       harness.write("  reg[20*8:0] cmd;    // API command\n")    
       harness.write("  reg[1000*8:0] node; // Chisel node name;\n")
-      harness.write("  integer value;      // 'poked' value\n")  
+      harness.write("  reg[127:0] value;   // 'poked' value\n")  
       harness.write("  integer offset;     // mem's offset\n")
       harness.write("  integer steps;      // number of steps\n")
       harness.write("  reg isStep = 0;\n")
@@ -847,8 +847,8 @@ class VerilogBackend extends Backend {
     }
 
     map.append("  task check_value;\n")
-    map.append("    input [63:0] data;\n")
-    map.append("    input [63:0] expected;\n")
+    map.append("    input [255:0] data;\n")
+    map.append("    input [255:0] expected;\n")
     map.append("    begin\n")
     map.append("      if (data == expected)\n")
     map.append("        $display(\"PASS\");\n")
