@@ -252,4 +252,47 @@ class ConnectSuite extends TestSuite {
     assertTrue(!ChiselError.ChiselErrors.isEmpty);
   }
 
+  @Test def testVecInput() {
+    class VecInput extends Module {
+      val io = new Bundle {
+        val in = Vec.fill(2){ UInt(INPUT, 8) }
+        val out0 = UInt(OUTPUT, 8)
+        val out1 = UInt(OUTPUT, 8)
+      }
+      io.out0 := io.in(0)
+      io.out1 := io.in(1)
+    }
+
+    class VecInputTests(c: VecInput) extends Tester(c) {
+      poke(c.io.in, Array[BigInt](0, 1))
+      step(1)
+      expect(c.io.out0, 0)
+      expect(c.io.out1, 1)
+    }
+
+    launchCppTester((m: VecInput) => new VecInputTests(m))
+  }
+
+  @Test def testVecOutput() {
+    class VecOutput extends Module {
+      val io = new Bundle {
+        val in0 = UInt(INPUT, 8)
+        val in1 = UInt(INPUT, 8)
+        val out = Vec.fill(2){ UInt(OUTPUT, 8) }
+      }
+
+      io.out(0) := io.in0
+      io.out(1) := io.in1
+    }
+
+    class VecOutputTests(c: VecOutput) extends Tester(c) {
+      poke(c.io.in0, 0)
+      poke(c.io.in1, 1)
+      step(1)
+      expect(c.io.out, Array[BigInt](0, 1))
+    }
+
+    launchCppTester((m: VecOutput) => new VecOutputTests(m))
+  }
+
 }
