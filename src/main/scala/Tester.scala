@@ -355,7 +355,7 @@ class ManualTester[+T <: Module]
   }
 
   def poke(data: Aggregate, x: Array[BigInt]): Unit = {
-    val kv = (data.flatten.map(x => x._2), x).zipped;
+    val kv = (data.flatten.map(x => x._2), x.reverse).zipped;
     for ((x, y) <- kv)
       poke(x, y)
   }
@@ -408,7 +408,7 @@ class ManualTester[+T <: Module]
   }
 
   def expect (data: Aggregate, expected: Array[BigInt]): Boolean = {
-    val kv = (data.flatten.map(x => x._2), expected).zipped;
+    val kv = (data.flatten.map(x => x._2), expected.reverse).zipped;
     var allGood = true
     for ((d, e) <- kv)
       allGood = expect(d, e) && allGood
