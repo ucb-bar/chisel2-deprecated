@@ -102,15 +102,14 @@ class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
 
   // Return a value or raise an exception.
   def needWidth(): Int = {
-    val w = width
-    if (w == -1) {
+    if (! isKnown ) {
       ChiselError.warning("needWidth but width not set")
       if (throwIfUnsetRef) {
         ChiselError.report()
         throw new Exception("uninitialized width");
       }
     }
-    w
+    width
   }
 
   // Return a value or 0 if the width isn't set
@@ -133,6 +132,9 @@ class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
     w
   }
   
+  // Return true if the width is known (set).
+  def isKnown: Boolean = width_ >= 0
+
   // Define the arithmetic operations so we can deal with unspecified widths
   def BinaryOp(op: String, operand: Int): Width = {
     if (!this.isSet) {

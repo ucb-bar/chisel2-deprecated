@@ -513,4 +513,7 @@ abstract class Node extends nameable {
   }
   // Return a value or raise an exception.
   def needWidth(): Int = _width.needWidth()
+
+  // Return true if the width of this node is known (set).
+  def isKnownWidth: Boolean = _width.isKnown
 }

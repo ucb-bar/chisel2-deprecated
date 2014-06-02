@@ -60,11 +60,11 @@ class Bool extends UInt {
   override protected def colonEquals(src: Bits): Unit = src match {
     case _: Bool => super.colonEquals(src(0))
     case _ => {
-      if (src.getWidth > 1) {
-        throw new Exception("multi bit signal " + src + " converted to Bool");
-      }
-      if (src.getWidth == -1) {
+      val gotWidth = src.getWidth()
+      if (gotWidth < 1) {
         throw new Exception("unable to automatically convert " + src + " to Bool, convert manually instead");
+      } else if (gotWidth > 1) {
+        throw new Exception("multi bit signal " + src + " converted to Bool");
       }
       super.colonEquals(src(0)) // We only have one bit in *src*.
     }

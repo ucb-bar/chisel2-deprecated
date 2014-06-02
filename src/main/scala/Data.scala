@@ -69,11 +69,11 @@ abstract class Data extends Node {
   }
 
   def toBool(): Bool = {
-    if(this.getWidth > 1) {
-      throw new Exception("multi bit signal " + this + " converted to Bool");
-    }
-    if(this.getWidth == -1) {
+    val gotWidth = this.getWidth()
+    if( gotWidth < 1) {
       throw new Exception("unable to automatically convert " + this + " to Bool, convert manually instead")
+    } else if(gotWidth > 1) {
+      throw new Exception("multi bit signal " + this + " converted to Bool");
     }
     chiselCast(this){Bool()};
   }

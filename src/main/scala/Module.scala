@@ -52,7 +52,7 @@ object Module {
     for ((n, io) <- res.wires) {
       if (io.dir == null)
          ChiselErrors += new ChiselError(() => {"All IO's must be ports (dir set): " + io}, io.line)
-      // else if (io.width_ == -1)
+      // else if (! io.isKnownWidth)
       //   ChiselErrors += new ChiselError(() => {"All IO's must have width set: " + io}, io.line)
       io.isIo = true
     }
@@ -375,7 +375,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       for (elm <- nodesList) {
         // TODO: width is Driver.isInGetWidth dependent
         // What are we trying to accomplish here?
-        if (elm.infer || elm.width == -1) {
+        if (elm.infer || ! elm.isKnownWidth ) {
           ChiselError.error("Could not infer the width on: " + elm)
           hasError = true
         }
