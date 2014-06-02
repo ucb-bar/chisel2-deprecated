@@ -46,6 +46,9 @@ abstract trait Num[T <: Data] {
   def <= (b: T): Bool;
   def >  (b: T): Bool;
   def >= (b: T): Bool;
+
+  def min(b: T): T = Mux(this < b, this.asInstanceOf[T], b)
+  def max(b: T): T = Mux(this < b, b, this.asInstanceOf[T])
 }
 
 /** *Data* is part of the *Node* Composite Pattern class hierarchy.
