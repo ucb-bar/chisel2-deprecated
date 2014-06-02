@@ -128,12 +128,10 @@ class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
     neww
   }
 
-  /*
   override def clone(): Width = {
     val w = new Width(this.width_, this.throwIfUnsetRef)
     w
   }
-  */
   
   // Define the arithmetic operations so we can deal with unspecified widths
   def BinaryOp(op: String, operand: Int): Width = {
