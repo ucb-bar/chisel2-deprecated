@@ -135,7 +135,7 @@ abstract class Node extends nameable {
   def componentOf: Module = if (Driver.backend.isEmittingComponents && component != null) component else Driver.topComponent
   // The semantics of width are sufficiently complicated that
   // it deserves its own class
-  var _width = Width(this)
+  var _width = Width()
   val consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
   val inputs = new ArrayBuffer[Node];
   def traceableNodes: Array[Node] = Array[Node]();
@@ -160,7 +160,6 @@ abstract class Node extends nameable {
 
   def isByValue: Boolean = true;
   def width: Int = {
-    assert(this == this._width.node, ChiselError.error("Width object node botch"))
     if (Driver.isInGetWidth) inferWidth(this) else _width.width
   }
 

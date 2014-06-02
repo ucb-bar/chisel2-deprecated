@@ -34,30 +34,31 @@ import Node._
 import ChiselError._
 
 object Width {
-  def apply(n: Node, w: Int = -1, throwUnset: Boolean = true): Width = {
+  def apply(w: Int = -1, throwUnset: Boolean = true): Width = {
     if (w < -1) {
-      ChiselError.warning("Width:apply < -1: " + n)
-      throw new Exception("Width:apply < -1");
+      ChiselError.warning("Width:apply < -1")
+      if (throwUnset) {
+        throw new Exception("Width:apply < -1");
+      }
     }
-    val neww = new Width(n, w, throwUnset)
+    val neww = new Width(w, throwUnset)
     neww
   }
 
   // Implicit conversion to Int - should be removed once
   // all dependent classes understand 'width'
-  implicit def toInt(w: Width): Int = w.needWidth()
+  // implicit def toInt(w: Width): Int = w.needWidth()
 
 }
 
-class Width(_node: Node, _width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
-  val node = _node
+class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
   var width_ = _width
   val throwIfUnsetRef = _throwIfUnset
   val originalSet: Boolean = false
   val debug: Boolean = false
 
   if (debug) {
-    ChiselError.warning("Width: w " + _width + ", throw " + _throwIfUnset + ", at " + node)
+    ChiselError.warning("Width: w " + _width + ", throw " + _throwIfUnset)
   }
   def width_value: Int = width
   def width: Int = width_
@@ -68,8 +69,7 @@ class Width(_node: Node, _width: Int, _throwIfUnset: Boolean) extends Ordered[Wi
   }
 
   def setWidth(w: Int) = {
-    assert(w > -2, ChiselError.error("Width.setWidth: setting width to " + w
-      + " for node " + node))
+    assert(w > -2, ChiselError.error("Width.setWidth: setting width to " + w))
     if (w < 0 && throwIfUnsetRef) {
       throw new Exception("Width:setWidth < -1");
     }
@@ -80,11 +80,13 @@ class Width(_node: Node, _width: Int, _throwIfUnset: Boolean) extends Ordered[Wi
       width_ = w
 
     if (debug) {
-      println("Width(" + this + "):setWidth(" + w + "), " + node)
+      println("Width(" + this + "):setWidth(" + w + ")")
     }
     if (w < -1) {
-      ChiselError.warning("Width:setWidth < -1: " + node)
-      throw new Exception("Width:setWidth < -1");
+      ChiselError.warning("Width:setWidth < -1")
+      if (throwIfUnsetRef) {
+        throw new Exception("Width:setWidth < -1");
+      }
     }
   }
 
@@ -102,8 +104,7 @@ class Width(_node: Node, _width: Int, _throwIfUnset: Boolean) extends Ordered[Wi
   def needWidth(): Int = {
     val w = width
     if (w == -1) {
-      ChiselError.warning("needWidth but width not set: " + node)
-      node.printTree(System.out)
+      ChiselError.warning("needWidth but width not set")
       if (throwIfUnsetRef) {
         ChiselError.report()
         throw new Exception("uninitialized width");
@@ -122,13 +123,30 @@ class Width(_node: Node, _width: Int, _throwIfUnset: Boolean) extends Ordered[Wi
 
   override def toString: String = width_.toString
 
-  def copy(n: Node = null, w: Int = this.width_, t: Boolean = throwIfUnsetRef): Width = {
-    val neww = new Width(n, w, t)
+  def copy(w: Int = this.width_, t: Boolean = this.throwIfUnsetRef): Width = {
+    val neww = new Width(w, t)
     neww
   }
 
-  def clone(n: Node = null): Width = {
-    val w = new Width(n, width_, throwIfUnsetRef)
+  /*
+  override def clone(): Width = {
+    val w = new Width(this.width_, this.throwIfUnsetRef)
     w
+  }
+  */
+  
+  // Define the arithmetic operations so we can deal with unspecified widths
+  def BinaryOp(op: String, operand: Int): Width = {
+    if (!this.isSet) {
+      this
+    } else {
+      op match {
+        case "+" => Width(this.width_ + operand)
+        case "-" => {
+          assert(this.width_ >= operand)
+          Width(this.width_ - operand)
+        }
+      }
+    }
   }
 }
