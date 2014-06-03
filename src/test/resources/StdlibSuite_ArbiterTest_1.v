@@ -43,11 +43,6 @@ module Arbiter(
   wire T23;
   wire T24;
   wire T25;
-  wire T26;
-  wire T27;
-  wire T28;
-  wire T29;
-  wire T30;
 
 
   assign io_chosen = T0;
@@ -70,24 +65,19 @@ module Arbiter(
   assign T14 = T15 ? io_in_3_valid : io_in_2_valid;
   assign T15 = T7[1'h0:1'h0];
   assign T16 = T7[1'h1:1'h1];
-  assign io_in_0_ready = T17;
+  assign io_in_0_ready = io_out_ready;
+  assign io_in_1_ready = T17;
   assign T17 = T18 & io_out_ready;
-  assign T18 = 1'h1;
-  assign io_in_1_ready = T19;
+  assign T18 = io_in_0_valid ^ 1'h1;
+  assign io_in_2_ready = T19;
   assign T19 = T20 & io_out_ready;
-  assign T20 = T21;
-  assign T21 = io_in_0_valid ^ 1'h1;
-  assign io_in_2_ready = T22;
+  assign T20 = T21 ^ 1'h1;
+  assign T21 = io_in_0_valid | io_in_1_valid;
+  assign io_in_3_ready = T22;
   assign T22 = T23 & io_out_ready;
-  assign T23 = T24;
-  assign T24 = T25 ^ 1'h1;
+  assign T23 = T24 ^ 1'h1;
+  assign T24 = T25 | io_in_2_valid;
   assign T25 = io_in_0_valid | io_in_1_valid;
-  assign io_in_3_ready = T26;
-  assign T26 = T27 & io_out_ready;
-  assign T27 = T28;
-  assign T28 = T29 ^ 1'h1;
-  assign T29 = T30 | io_in_2_valid;
-  assign T30 = io_in_0_valid | io_in_1_valid;
 endmodule
 
 module StdlibSuite_ArbiterTest_1(
