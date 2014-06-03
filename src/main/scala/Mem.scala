@@ -124,7 +124,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
     if (seqRead && Driver.isDebugMem) {
       // generate bogus data when reading & writing same address on same cycle
       val random16 = LFSR16()
-      val random_data = Cat(random16, Array.fill((width-1)/16){random16}:_*)
+      val random_data = Cat(random16, Array.fill((needWidth()-1)/16){random16}:_*)
       doWrite(Reg(next=addr), Reg(next=cond), Reg(next=data), null.asInstanceOf[UInt])
       doWrite(addr, cond, random_data, null.asInstanceOf[UInt])
     } else {
@@ -243,8 +243,9 @@ class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) 
 
   override def forceMatchingWidths = {
     super.forceMatchingWidths
-    inputs(2) = inputs(2).matchWidth(mem.width)
-    if (isMasked) inputs(3) = inputs(3).matchWidth(mem.width)
+    val gotWidth = mem.needWidth()
+    inputs(2) = inputs(2).matchWidth(gotWidth)
+    if (isMasked) inputs(3) = inputs(3).matchWidth(gotWidth)
   }
 
   var pairedRead: MemSeqRead = null

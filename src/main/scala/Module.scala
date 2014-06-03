@@ -373,8 +373,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     def verify {
       var hasError = false
       for (elm <- nodesList) {
-        // TODO: width is Driver.isInGetWidth dependent
-        // What are we trying to accomplish here?
         if (elm.infer || ! elm.isKnownWidth ) {
           ChiselError.error("Could not infer the width on: " + elm)
           hasError = true
@@ -544,8 +542,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     val whist = new HashMap[Int, Int]
     val hist = new HashMap[String, Int]
     for (m <- imods) {
+      val w = m.needWidth()
       mhist(m.component.toString) = 1 + mhist.getOrElse(m.component.toString, 0)
-      whist(m.width) = 1 + whist.getOrElse(m.width, 0)
+      whist(w) = 1 + whist.getOrElse(w, 0)
       val name = m match {
         case op: Op => op.op
         case o      => {

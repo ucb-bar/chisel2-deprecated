@@ -92,6 +92,7 @@ object Node {
     for (i <- m.inputs) {
       // TODO: width is Driver.isInGetWidth dependent
       // What are we trying to accomplish here?
+      // NOTE: This MUST use "width" since we may be inside getWidth() and inferring.
       val w = i.width
       if (w > 0) {
         res = res + w
@@ -205,7 +206,7 @@ abstract class Node extends nameable {
   def ##(b: Node): Node  = Op("##", sumWidth _,  this, b );
   def maxNum: BigInt = {
     // XXX This makes sense for UInt, but not in general.
-    val w = if (width < 0) inferWidth(this) else width
+    val w = if (isKnownWidth) width else inferWidth(this)
     litValue((BigInt(1) << w) - 1)
   }
   def minNum: BigInt = litValue(0)
@@ -234,8 +235,8 @@ abstract class Node extends nameable {
     inputs ++= ins
     this
   }
-  def init (n: String, width: (Node) => Int, ins: Node*): Node = {
-    initOf(n, width, ins.toList);
+  def init (n: String, widthFunc: (Node) => Int, ins: Node*): Node = {
+    initOf(n, widthFunc, ins.toList);
   }
   def init (n: String, w: Int, ins: Node*): Node = {
     _width.setWidth(w)
@@ -265,7 +266,7 @@ abstract class Node extends nameable {
     isReg || isUsedByClockHi || Driver.isDebug && !name.isEmpty ||
     Driver.emitTempNodes
 
-  lazy val isInVCD: Boolean = name != "reset" && width > 0 &&
+  lazy val isInVCD: Boolean = name != "reset" && isKnownWidth &&
      (!name.isEmpty || Driver.emitTempNodes) &&
      ((isIo && isInObject) || isReg || Driver.isDebug)
 
@@ -473,7 +474,7 @@ abstract class Node extends nameable {
     var off = 0;
     for ((n, io) <- b.flatten) {
       if (io.dir == OUTPUT) {
-        val w = io.width;
+        val w = io.needWidth();
         res  = NodeExtract(this,off + w - 1, off) :: res;
         off += w;
       }

@@ -118,7 +118,7 @@ class VerilogBackend extends Backend {
 
   override def emitRef(node: Node): String = {
     node match {
-      case x: Literal => emitLit(x.value, x.width)
+      case x: Literal => emitLit(x.value, x.needWidth())
       case _ => super.emitRef(node)
     }
   }
@@ -285,14 +285,15 @@ class VerilogBackend extends Backend {
 
       case x: Extract =>
         node.inputs.tail.foreach(x.validateIndex)
+        val gotWidth = node.inputs(0).needWidth()
         if (node.inputs.length < 3) {
-          if(node.inputs(0).width > 1) {
+          if(gotWidth > 1) {
             "  assign " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + "[" + emitRef(node.inputs(1)) + "];\n"
           } else {
             "  assign " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ";\n"
           }
         } else {
-          if(node.inputs(0).width > 1) {
+          if(gotWidth > 1) {
             "  assign " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + "[" + emitRef(node.inputs(1)) + ":" + emitRef(node.inputs(2)) + "];\n"
           } else {
             "  assign " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ";\n"
@@ -303,7 +304,7 @@ class VerilogBackend extends Backend {
         if(!m.isInline) {
           val configStr =
           (" depth " + m.n +
-            " width " + m.width +
+            " width " + m.needWidth() +
             " ports " + m.ports.map(_.getPortType).reduceLeft(_ + "," + _) +
             "\n")
           val name = getMemName(m, configStr)
@@ -353,6 +354,7 @@ class VerilogBackend extends Backend {
   def emitDecReg(node: Node): String = emitDecBase(node, "reg ")
 
   override def emitDec(node: Node): String = {
+    val gotWidth = node.needWidth()
     val res = 
     node match {
       case x: Bits =>
@@ -363,7 +365,7 @@ class VerilogBackend extends Backend {
         }
 
       case _: Assert =>
-        "  reg" + "[" + (node.width-1) + ":0] " + emitRef(node) + " = 1'b0;\n"
+        "  reg" + "[" + (gotWidth-1) + ":0] " + emitRef(node) + " = 1'b0;\n"
 
       case _: Reg =>
         emitDecReg(node)
@@ -376,7 +378,7 @@ class VerilogBackend extends Backend {
 
       case m: Mem[_] =>
         if (m.isInline) {
-          "  reg [" + (m.width-1) + ":0] " + emitRef(m) + " [" + (m.n-1) + ":0];\n"
+          "  reg [" + (m.needWidth()-1) + ":0] " + emitRef(m) + " [" + (m.n-1) + ":0];\n"
         } else {
           ""
         }
@@ -419,10 +421,12 @@ class VerilogBackend extends Backend {
 
     harness.write("module test;\n")
     for (node <- scanNodes) {
-      harness.write("  reg [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
+      val gotWidth = node.needWidth()
+      harness.write("  reg [" + (gotWidth-1) + ":0] " + emitRef(node) + ";\n")
     }
     for (node <- printNodes) {
-      harness.write("  wire [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
+      val gotWidth = node.needWidth()
+      harness.write("  wire [" + (gotWidth-1) + ":0] " + emitRef(node) + ";\n")
     }
     for (rst <- resets)
       harness.write("  reg %s = 1;\n".format(rst.name))
@@ -601,13 +605,13 @@ class VerilogBackend extends Backend {
     for (wire <- wires ; if !wire.isReg) {
       val shadowName = wire.component.getPathName("_") + "_" + emitRef(wire) + "_shadow"
       shadowNames(wire) = shadowName
-      apis.append("  reg [%d:0] %s = 0;\n".format(wire.width-1, shadowName))
+      apis.append("  reg [%d:0] %s = 0;\n".format(wire.needWidth()-1, shadowName))
     }
     apis.append("  // mem shadows\n")
     for (mem <- mems) {
       val shadowName = mem.component.getPathName("_") + "_" + emitRef(mem) + "_shadow"
       shadowNames(mem) = shadowName
-      apis.append("  reg [%d:0] %s [%d:0];\n".format(mem.width-1, shadowName, mem.n-1))
+      apis.append("  reg [%d:0] %s [%d:0];\n".format(mem.needWidth()-1, shadowName, mem.n-1))
     }
 
     apis.append("\n  integer count;\n")

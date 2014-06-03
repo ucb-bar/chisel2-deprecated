@@ -293,7 +293,7 @@ abstract class Bits extends Data with proc {
 
   override def forceMatchingWidths {
     if(inputs.length == 1 && inputs(0).width != width) {
-      inputs(0) = inputs(0).matchWidth(width)
+      inputs(0) = inputs(0).matchWidth(needWidth())
     }
   }
 

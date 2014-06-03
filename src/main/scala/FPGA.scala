@@ -46,7 +46,7 @@ class FPGABackend extends VerilogBackend
     node match {
       case m: Mem[_] =>
         assert(m.isInline)
-        "  reg [" + (m.width-1) + ":0] " + writeMap(m).map(_ + " [" + (m.n-1) + ":0]").reduceLeft(_ + ", " + _) + ";\n"
+        "  reg [" + (m.needWidth()-1) + ":0] " + writeMap(m).map(_ + " [" + (m.n-1) + ":0]").reduceLeft(_ + ", " + _) + ";\n"
 
       case _ =>
         super.emitDec(node)
@@ -65,7 +65,7 @@ class FPGABackend extends VerilogBackend
 
       case m: MemWrite =>
         // check if byte-wide write enable can be used
-        def litOK(x: Node) = x.isLit && (0 until x.width).forall(i => x.litOf.value.testBit(i) == x.litOf.value.testBit(i/8*8))
+        def litOK(x: Node) = x.isLit && (0 until x.needWidth()).forall(i => x.litOf.value.testBit(i) == x.litOf.value.testBit(i/8*8))
         def extractOK(x: Node) = x.isInstanceOf[Extract] && x.inputs.length == 3 && x.inputs(2).isLit && x.inputs(2).litOf.value % 8 == 0 && x.inputs(1).isLit && (x.inputs(1).litOf.value + 1) % 8 == 0 && useByteMask(x.inputs(0))
         def catOK(x: Node) = x.isInstanceOf[Op] && x.asInstanceOf[Op].op == "##" && x.inputs.forall(i => useByteMask(i))
         def useByteMask(x: Node): Boolean = extractOK(x) || litOK(x) || catOK(x) || x.isInstanceOf[Bits] && x.inputs.length == 1 && useByteMask(x.inputs(0))
@@ -74,10 +74,11 @@ class FPGABackend extends VerilogBackend
         val mw = isMultiWrite(m.mem)
         val meStr = emitRef(m.mem) + (if (mw) "_" + me else "")
         val i = "i" + emitTmp(m)
-        (if (mw) "  wire [" + (m.mem.width - 1) + ":0] " + emitRef(m.mem) + "_w" + me + " = " + writeMap(m.mem, me).map(_ + "[" + emitRef(m.addr) + "]").reduceLeft(_ + " ^ " + _) + ";\n" else "") +
+        val gotWidth = m.mem.needWidth()
+        (if (mw) "  wire [" + (gotWidth - 1) + ":0] " + emitRef(m.mem) + "_w" + me + " = " + writeMap(m.mem, me).map(_ + "[" + emitRef(m.addr) + "]").reduceLeft(_ + " ^ " + _) + ";\n" else "") +
         (if (m.isMasked) {
-          val bm = m.mem.width % 8 == 0 && useByteMask(m.mask)
-          val max = if (bm) m.mem.width/8 else m.mem.width
+          val bm = gotWidth % 8 == 0 && useByteMask(m.mask)
+          val max = if (bm) gotWidth/8 else gotWidth
           val maskIdx = if(bm) i + "*8" else i
           val dataIdx = if (bm) i + "*8+7:" + i + "*8" else i
           "  generate\n" +

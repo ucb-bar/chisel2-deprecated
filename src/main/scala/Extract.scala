@@ -118,7 +118,7 @@ class Extract extends Node {
     val lit = x.litOf
     assert(lit == null || lit.value >= 0 && lit.value < inputs(0).needWidth(),
            ChiselError.error("Extract(" + lit.value + ")" +
-                    " out of range [0," + (inputs(0).width-1) + "]" +
+                    " out of range [0," + (inputs(0).needWidth()-1) + "]" +
                     " of " + inputs(0), line))
   }
 
