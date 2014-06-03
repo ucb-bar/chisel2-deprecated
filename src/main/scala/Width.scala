@@ -52,16 +52,18 @@ object Width {
 }
 
 class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
-  var width_ = _width
+  type WidthType = Int
+  val unSet: WidthType = -1
+  val unSetVal = -1
+  var width_ = if (_width > -1) _width else unSet
   val throwIfUnsetRef = _throwIfUnset
-  val originalSet: Boolean = false
   val debug: Boolean = false
 
   if (debug) {
     ChiselError.warning("Width: w " + _width + ", throw " + _throwIfUnset)
   }
-  def width_value: Int = width
-  def width: Int = width_
+
+  def width: Int = if (width_ == unSet) unSetVal else width_
 
   /** Sets the width of a Node. */
   def width_=(w: Int) {
@@ -70,35 +72,21 @@ class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
 
   def setWidth(w: Int) = {
     assert(w > -2, ChiselError.error("Width.setWidth: setting width to " + w))
-    if (w < 0 && throwIfUnsetRef) {
-      throw new Exception("Width:setWidth < -1");
-    }
-    // The original set code looks wrong. It sets width_ to the previous width
-    if (originalSet)
-      width_ = width
-    else
-      width_ = w
-
-    if (debug) {
-      println("Width(" + this + "):setWidth(" + w + ")")
-    }
-    if (w < -1) {
-      ChiselError.warning("Width:setWidth < -1")
+    if (w < 0) {
       if (throwIfUnsetRef) {
         throw new Exception("Width:setWidth < -1");
       }
+      width_ = unSetVal
+    } else {
+      width_ = w
+    }
+    if (debug) {
+      println("Width(" + this + "):setWidth(" + w + ")")
     }
   }
 
-  // Print a string representation of width
-  // Indicate whether width is actually set or not.
-  def isSet: Boolean = { width_ >= 0 }
-
-  val line: StackTraceElement =
-    if (Driver.getLineNumbers) {
-      val trace = new Throwable().getStackTrace
-      findFirstUserLine(trace) getOrElse trace(0)
-    } else null
+  // Indicate whether width is actually known(set) or not.
+  def isKnown: Boolean = width_ != unSet
 
   // Return a value or raise an exception.
   def needWidth(): Int = {
@@ -114,30 +102,27 @@ class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
 
   // Return a value or 0 if the width isn't set
   def widthOrValue(v: Int): Int = {
-    val w = width
-    if (w >= 0) w else v
+    if (width_ != unSet) width else v
   }
 
   def compare(that: Width) = this.needWidth() - that.needWidth()
 
+  // Print a string representation of width
   override def toString: String = width_.toString
 
-  def copy(w: Int = this.width_, t: Boolean = this.throwIfUnsetRef): Width = {
+  def copy(w: Int = this.width, t: Boolean = this.throwIfUnsetRef): Width = {
     val neww = new Width(w, t)
     neww
   }
 
   override def clone(): Width = {
-    val w = new Width(this.width_, this.throwIfUnsetRef)
+    val w = new Width(this.width, this.throwIfUnsetRef)
     w
   }
   
-  // Return true if the width is known (set).
-  def isKnown: Boolean = width_ >= 0
-
   // Define the arithmetic operations so we can deal with unspecified widths
   def BinaryOp(op: String, operand: Int): Width = {
-    if (!this.isSet) {
+    if (!this.isKnown) {
       this
     } else {
       op match {
