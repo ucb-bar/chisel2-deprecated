@@ -52,10 +52,10 @@ object Width {
 }
 
 class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
-  type WidthType = Int
-  val unSet: WidthType = -1
-  val unSetVal = -1
-  var width_ = if (_width > -1) _width else unSet
+  type WidthType = Option[Int]
+  val unSet: WidthType = None
+  val unSetVal: Int = -1
+  private var widthVal: WidthType = if (_width > -1) Some(_width) else unSet
   val throwIfUnsetRef = _throwIfUnset
   val debug: Boolean = false
 
@@ -63,7 +63,7 @@ class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
     ChiselError.warning("Width: w " + _width + ", throw " + _throwIfUnset)
   }
 
-  def width: Int = if (width_ == unSet) unSetVal else width_
+  def width: Int = if (isKnown) widthVal.get else unSetVal
 
   /** Sets the width of a Node. */
   def width_=(w: Int) {
@@ -76,9 +76,9 @@ class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
       if (throwIfUnsetRef) {
         throw new Exception("Width:setWidth < -1");
       }
-      width_ = unSetVal
+      widthVal = unSet
     } else {
-      width_ = w
+      widthVal = Some(w)
     }
     if (debug) {
       println("Width(" + this + "):setWidth(" + w + ")")
@@ -86,7 +86,7 @@ class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
   }
 
   // Indicate whether width is actually known(set) or not.
-  def isKnown: Boolean = width_ != unSet
+  def isKnown: Boolean = widthVal != unSet
 
   // Return a value or raise an exception.
   def needWidth(): Int = {
@@ -102,13 +102,13 @@ class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
 
   // Return a value or 0 if the width isn't set
   def widthOrValue(v: Int): Int = {
-    if (width_ != unSet) width else v
+    if (widthVal != unSet) widthVal.get else v
   }
 
   def compare(that: Width) = this.needWidth() - that.needWidth()
 
   // Print a string representation of width
-  override def toString: String = width_.toString
+  override def toString: String = widthVal.toString
 
   def copy(w: Int = this.width, t: Boolean = this.throwIfUnsetRef): Width = {
     val neww = new Width(w, t)
@@ -126,10 +126,10 @@ class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
       this
     } else {
       op match {
-        case "+" => Width(this.width_ + operand)
+        case "+" => Width(this.width + operand)
         case "-" => {
-          assert(this.width_ >= operand)
-          Width(this.width_ - operand)
+          assert(this.width >= operand)
+          Width(this.width - operand)
         }
       }
     }
