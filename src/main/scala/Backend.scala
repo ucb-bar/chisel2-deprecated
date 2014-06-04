@@ -87,10 +87,11 @@ abstract class Backend {
     if(x == 0) "" else "    " + genIndent(x-1);
   }
 
+  val nameSpace = new HashMap[Module, HashSet[String]]
   def nameChildren(root: Module) {
     // Name all nodes at this level
     root.io.nameIt("io", true);
-    val nameSpace = new HashSet[String];
+    nameSpace(root) = new HashSet[String];
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], BlackBox and Modules.
      Since we call invoke() to get a proper instance of the correct type,
@@ -111,7 +112,7 @@ abstract class Backend {
              || node.name == null || (node.name == "" && !node.named))) {
              node.nameIt(asValidName(name), false);
            }
-           nameSpace += node.name;
+           nameSpace(root) += node.name;
          }
          case buf: ArrayBuffer[_] => {
            /* We would prefer to match for ArrayBuffer[Node] but that's
@@ -131,7 +132,7 @@ abstract class Backend {
                   parameters, hence generating unnecessary modules. */
                  elm.nameIt(asValidName(name + "_" + i), false);
                }
-               nameSpace += elm.name;
+               nameSpace(root) += elm.name;
                i += 1;
              }
            }
@@ -153,7 +154,7 @@ abstract class Backend {
                   parameters, hence generating unnecessary modules. */
                  elm.nameIt(asValidName(name + "_" + i), false);
                }
-               nameSpace += elm.name;
+               nameSpace(root) += elm.name;
                i += 1;
              }
            }
@@ -163,14 +164,14 @@ abstract class Backend {
              bb.name = name;
              bb.named = true
            };
-           nameSpace += bb.name;
+           nameSpace(root) += bb.name;
          }
          case comp: Module => {
            if(!comp.named) {
              comp.name = asValidName(name);
              comp.named = true
            };
-           nameSpace += comp.name;
+           nameSpace(root) += comp.name;
          }
          case any => {
            /* We have no idea what to do with class members which are
@@ -179,6 +180,7 @@ abstract class Backend {
         }
       }
     }
+
     /* Recursively name the nodes and components inside this root.
      This code must be executed between the root-level naming and the naming
      of bindings otherwise some identifiers will leak into the input/output
@@ -208,12 +210,14 @@ abstract class Backend {
         }
     }
 
+    /*
     for (bind <- root.bindings) {
       var genName = if (bind.targetNode.name == null || bind.targetNode.name.length() == 0) "" else bind.targetComponent.name + "_" + bind.targetNode.name;
       if(nameSpace.contains(genName)) genName += ("_" + bind.emitIndex);
       bind.name = asValidName(genName); // Not using nameIt to avoid override
       bind.named = true;
     }
+    */
   }
 
   /* Returns a string derived from _name_ that can be used as a valid
@@ -232,6 +236,20 @@ abstract class Backend {
         node.named = node.nameHolder.named;
         node.nameHolder.name = "";
       }
+    }
+  }
+
+  def nameBindings(root: Module) {
+    for (c <- root.children) {
+      nameBindings(c)
+    }
+
+    for (bind <- root.bindings) {
+      var genName = if (bind.targetNode.name == null || bind.targetNode.name.length() == 0) "" 
+                    else bind.targetComponent.name + "_" + bind.targetNode.name;
+      if(nameSpace(root) contains genName) genName += ("_" + bind.emitIndex);
+      bind.name = asValidName(genName); // Not using nameIt to avoid override
+      bind.named = true;
     }
   }
 
@@ -529,64 +547,6 @@ abstract class Backend {
     }
   }
 
-  // Assign psuedo names for backannotation
-  def setPseudoNames(c: Module) {
-    ChiselError.info("[Backannotation] pseudo naming")
-
-    c.pName = extractClassName(c)
-
-    val classNames = LinkedHashMap[String, ArrayBuffer[Module]]()
-    for (m <- Driver.sortedComps ; if m.pName == "" && m != c) {
-      val className = extractClassName(m)
-      if (!(classNames contains className)) {
-        classNames(className) = new ArrayBuffer[Module]
-      }
-      classNames(className) += m
-    }
-   
-    for ((name, comps) <- classNames) {
-      if (comps.size > 1) {
-        for ((c, i) <- comps.zipWithIndex) {
-          c.pName = name + "_" + i
-        }
-      } else {
-        comps.head.pName = name
-      }
-    }
-
-    for (m <- Driver.sortedComps) {
-      m dfs { node =>
-        if (!node.isTypeNode && node.pName == "") {
-          if (node.name != "" || node.isLit) {
-            node.pName = node.name 
-          } else if (getPseudoPath(node.component) != "") {
-                     /* This means valid path */
-            val prefix = node match {
-              case _: Reg => "R"
-              case _ => "T"
-            }
-            if (isEmittingComponents) {
-              node.pName = prefix + node.emitIndex
-            } else {
-              node.pName = prefix + node.component.nextIndex
-            }
-          }
-        }
-      }
-    }
-  }
-  
-  def getPseudoPath(c: Module, delim: String = "/"): String =
-    if (c.parent == null) c.pName else getPseudoPath(c.parent) + delim + c.pName
-  def getSignalPathName(n: Node, delim: String = "/", isRealName: Boolean = false): String =
-    if (n == null) {
-      "null" 
-    } else if (isRealName) {
-      n.component.getPathName(delim) + delim + (if (n.name != "") n.name else emitRef(n))
-    } else {
-      getPseudoPath(n.component, delim) + delim + n.pName
-    }
-
   // Write out graph trace to verify backannotation later
   def writeOutTrace(c: Module) {
     ChiselError.info("[Backannotation] write out graph trace")
@@ -602,8 +562,8 @@ abstract class Backend {
           case _: Binding =>
           case _: Literal =>
           case _ => if (!node.isTypeNode) {
-            res append (getSignalPathName(node, isRealName = false) + 
-                        ":" + nodeToString(node, isRealName = false) + "\n")
+            res append (node.component.getPathName(".") + "." + emitRef(node) +
+                       ":" + nodeToString(node) + "\n")
           }
         }
       }
@@ -616,29 +576,12 @@ abstract class Backend {
     }
   }
 
-  def backannotationTransforms { 
-    if (Driver.isBackannotating) {
-      transforms += { c => setPseudoNames(c) }
-    }
-  }
-
-  def backannotationAnalyses {
-    if (Driver.isBackannotating) {
-      analyses += { c => writeOutTrace(c) }
-    }
-  }
-
-  def initBackannotation {
-    backannotationTransforms
-    backannotationAnalyses
-  }
-
   def elaborate(c: Module): Unit = {
     Driver.setTopComponent(c)
 
     /* XXX If we call nameAll here and again further down, we end-up with
-     duplicate names in the generated C++.
-    nameAll(c) */
+     duplicate names in the generated C++. */
+    nameAll(c) 
 
     ChiselError.info("elaborating modules")
     Driver.components.foreach(_.elaborate(0))
@@ -689,6 +632,10 @@ abstract class Backend {
     ChiselError.info("resolving nodes to the components")
     collectNodesIntoComp(initializeDFS)
 
+    /* Give indexes before transformations */
+    c.dfs { emitRef(_) }
+    nameRsts
+
     // two transforms added in Mem.scala (referenced and computePorts)
     ChiselError.info("executing custom transforms")
     execute(c, transforms)
@@ -702,10 +649,10 @@ abstract class Backend {
             createClkDomain(node, clkDomainWalkedNodes)
     ChiselError.checkpoint()
 
-    /* We execute nameAll after traceNodes because bindings would not have been
+    /* XXX We execute nameAll after traceNodes because bindings would not have been
        created yet otherwise. */
-    nameAll(c)
-    nameRsts
+    // Give names to bindings */
+    nameBindings(c)
 
     execute(c, analyses)
 

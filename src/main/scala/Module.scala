@@ -124,7 +124,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   var name: String = "";
   /** Name of the module this component generates (defaults to class name). */
   var moduleName: String = "";
-  var pName = ""
   var named = false;
   val bindings = new ArrayBuffer[Binding];
   var wiresCache: Array[(String, Bits)] = null;
@@ -363,16 +362,12 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     val walked = new HashSet[Node]
     val dfsStack = initializeDFS
 
-    def isVisiting(node: Node) =
-      !(node == null) && !(walked contains node) && 
-      (node.component == this || node.isIo)
-
     while(!dfsStack.isEmpty) {
       val top = dfsStack.pop
       walked += top
       visit(top)
       for(i <- top.inputs) {
-        if (isVisiting(i)) {
+        if (!(i == null) && !(walked contains i)){
           dfsStack push i
           walked += i
         }
@@ -632,7 +627,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   // 4) set variable names
   def markComponent() {
     ownIo();
-    io setPseudoName ("io", true)
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], BlackBox and Modules.
      Since we call invoke() to get a proper instance of the correct type,
@@ -647,32 +641,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         && isPublic(m.getModifiers())) {
          val o = m.invoke(this);
          o match {
-         case node: Node => {
-           node setPseudoName (name, false)
-         }
-         case buf: ArrayBuffer[_] => {
-           /* We would prefer to match for ArrayBuffer[Node] but that's
-            impossible because of JVM constraints which lead to type erasure.
-            XXX Using Seq instead of ArrayBuffer will pick up members defined
-            in Module that are solely there for implementation purposes. */
-           if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
-             val nodebuf = buf.asInstanceOf[Seq[Node]];
-             for((elm, i) <- nodebuf.zipWithIndex){
-               elm setPseudoName (name + "_" + i, false)
-             }
-           }
-         }
-         case buf: collection.IndexedSeq[_] => {
-           if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
-             val nodebuf = buf.asInstanceOf[Seq[Node]];
-             for((elm, i) <- nodebuf.zipWithIndex){
-               elm setPseudoName (name + "_" + i, false)
-             }
-           }
-         }
          case comp: Module => {
            comp.pathParent = this;
-           comp.pName = name
          }
          case any =>
        }

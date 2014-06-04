@@ -61,8 +61,6 @@ object Driver {
 
     if (isSnapshotting || isCounting) DaisyChain(backend)
 
-    Driver.backend.initBackannotation
-
     /* JACK - If dumping design, dump to jackDir with jackNumber points*/
     if (Driver.jackDump != null) { 
       Jackhammer.dump(Driver.jackDir, Driver.jackDump, Driver.jackN) 

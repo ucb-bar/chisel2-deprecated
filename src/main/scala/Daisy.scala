@@ -339,7 +339,7 @@ object DaisyChain extends Backend {
       if (Driver.isSnapshotting) {
         val snapValid = !firePins(m) 
         val snapFire = addNode(m, snapOuts(m).ready && snapValid, "snap_fire")
-        snapCopy(m) = addNode(m, firePins(m) /*snapFire && (snapCtrls(m) === Bits(0))*/, "snap_copy")
+        snapCopy(m) = addNode(m, firePins(m), "snap_copy")
         snapRead(m) = addNode(m, snapFire && (snapCtrls(m) === Bits(1)), "snap_read")
         if (m != c) {
           wire(snapValid -> snapOuts(m).valid)

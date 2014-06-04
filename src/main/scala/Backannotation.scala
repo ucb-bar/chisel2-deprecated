@@ -37,121 +37,100 @@ import scala.collection.mutable.HashMap
 import scala.io.Source
 
 object nodeToString {
-  def name(node: Node, isRealName: Boolean, consumer: Node = null): String = {
-    def getName(node: Node) = {
-      node match {
-        case _: Literal => node.name
-        case _ =>
-          if (!isRealName) node.pName
-          else if (node.name != "") node.name
-          else Driver.backend.emitRef(node)
-      }
-    }
-
+  def name(node: Node, consumer: Node = null): String = {
     node match {
       case b: Binding => 
-        name(b.targetNode, isRealName)
+        name(b.targetNode)
       case io: Bits if io.isIo && io.dir == INPUT && !io.inputs.isEmpty && consumer != null => {
         if ((!consumer.isIo && 
              consumer.component == io.component.parent) ||
             (consumer.isInstanceOf[Bits] && 
              consumer.asInstanceOf[Bits].dir == OUTPUT && 
              consumer.component == io.component.parent)) {
-          getName(io.inputs.head)
+          Driver.backend.emitRef(io.inputs.head)
         } else if (io.component == consumer.component) {
-          getName(io.getNode)
+          Driver.backend.emitRef(io.getNode)
         } else ""
       }
       case _ => 
-        getName(node.getNode)
+        Driver.backend.emitRef(node.getNode)
     }
   }
 
-  def apply(node: Node, isRealName: Boolean = false): String = { 
+  def apply(node: Node): String = { 
     node match {
       case bits  : Bits      => 
         if (bits.dir == OUTPUT && !bits.isTypeNode) 
-          "OUTPUT(%s)".format(name(bits.getNode, isRealName))
+          "OUTPUT(%s)".format(name(bits.getNode))
         else if (bits.dir == INPUT && !bits.isTypeNode) 
-          "INPUT(%s)".format(name(bits.getNode, isRealName))
+          "INPUT(%s)".format(name(bits.getNode))
         else bits match {
-          case bool  : Bool => "Bool(%s)".format(name(bool.getNode, isRealName))
-          case uint  : UInt => "UInt(%s)".format(name(uint.getNode, isRealName))
-          case _ => "Bits(%s)".format(name(bits.getNode, isRealName))
+          case bool  : Bool => "Bool(%s)".format(name(bool.getNode))
+          case uint  : UInt => "UInt(%s)".format(name(uint.getNode))
+          case _ => "Bits(%s)".format(name(bits.getNode))
         }
-      case reg   : Reg       => "Reg(%s)".format(name(reg, isRealName))
+      case reg   : Reg       => "Reg(%s)".format(name(reg))
       case lit   : Literal   => "Lit(%s)".format(lit.name)
       case op    : Op        => 
         if (op.inputs.length == 1) op.op + "[%s]".format(
-          name(op.inputs.head.getNode, isRealName, op))
+          name(op.inputs.head.getNode, op))
         else if (op.op == "Mux") "[%s]?[%s]:[%s]".format(
-          name(op.inputs(0).getNode, isRealName, op),
-          name(op.inputs(1).getNode, isRealName, op),
-          name(op.inputs(2).getNode, isRealName, op)
+          name(op.inputs(0).getNode, op),
+          name(op.inputs(1).getNode, op),
+          name(op.inputs(2).getNode, op)
         )
         else "[%s]%s[%s]".format(
-          name(op.inputs(0).getNode, isRealName, op), 
+          name(op.inputs(0).getNode, op), 
           op.op, 
-          name(op.inputs(1).getNode, isRealName, op) 
+          name(op.inputs(1).getNode, op) 
         )
       case ext   : Extract   => 
-        val hi: String = name(ext.hi.getNode, isRealName, ext)
-        val lo: String = name(ext.lo.getNode, isRealName, ext) 
-        name(ext.inputs.head.getNode, isRealName, ext) + "[" + { if (hi == lo) hi else hi + ":" + lo } + "]"  
-      case bind  : Binding   => "Binding(" + name(bind.targetNode.getNode, isRealName) + ")"
+        val hi: String = name(ext.hi.getNode, ext)
+        val lo: String = name(ext.lo.getNode, ext) 
+        name(ext.inputs.head.getNode, ext) + "[" + { if (hi == lo) hi else hi + ":" + lo } + "]"  
+      case bind  : Binding   => "Binding(" + name(bind.targetNode.getNode) + ")"
       case bundle: Bundle    => 
         if (!bundle.elements.isEmpty) {
           val head = bundle.elements.head._2
           val tail = bundle.elements.tail
-          (tail foldLeft ("Bundle(%s){%s".format(
-              name(bundle, isRealName), 
-              name(head.getNode, isRealName)))) { 
-            (res, elem) => res + "," + name(elem._2.getNode, isRealName)
+          (tail foldLeft ("Bundle(%s){%s".format(name(bundle), name(head.getNode)))) { 
+            (res, elem) => res + "," + name(elem._2.getNode)
           } + "}"
         } else {
-          "Bundle(%s)".format(name(bundle, isRealName))
+          "Bundle(%s)".format(name(bundle))
         }
       case rom   : ROM[_]    => 
         if (!rom.self.isEmpty) {
           val head = rom.self.head
           val tail = rom.self.tail
-          (tail foldLeft ("ROM(%s){%s".format(
-              name(rom, isRealName), 
-              name(head.getNode, isRealName)))) { 
-            (res, node) => res + "," + name(node.getNode, isRealName)
+          (tail foldLeft ("ROM(%s){%s".format(name(rom), name(head.getNode)))) { 
+            (res, node) => res + "," + name(node.getNode)
           } + "}"
         } else {
-          "ROM(%s)".format(name(rom, isRealName))
+          "ROM(%s)".format(name(rom))
         }
       case vec   : Vec[_]    =>
         if (!vec.self.isEmpty) {
           val head = vec.self.head
           val tail = vec.self.tail
-          (tail foldLeft ("Vec(%s){%s".format(
-              name(vec, isRealName),
-              name(head.getNode, isRealName)))) { 
-                (res, node) => res + "," + name(node.getNode, isRealName)
+          (tail foldLeft ("Vec(%s){%s".format(name(vec), name(head.getNode)))) { 
+                (res, node) => res + "," + name(node.getNode)
               } + "}"
         } else {
-          "Vec(%s)".format(name(vec, isRealName))
+          "Vec(%s)".format(name(vec))
         }
-      case mem   : Mem[_]    =>
-        "MEM(%s)[%d]".format(name(mem, isRealName), mem.n)
-      case memacc: MemAccess => "%s[%s]".format(
-        name(memacc.mem, isRealName), nodeToString(memacc.addr, isRealName))
-      case romread: ROMRead => "%s[%s]".format(
-        name(romread.rom, isRealName), nodeToString(romread.addr, isRealName))
+      case mem   : Mem[_]    => "MEM(%s)[%d]".format(name(mem), mem.n)
+      case memacc: MemAccess => "%s[%s]".format(name(memacc.mem), nodeToString(memacc.addr))
+      case romread: ROMRead => "%s[%s]".format(name(romread.rom), nodeToString(romread.addr))
       case romdata: ROMData => {
         if (!romdata.lits.isEmpty) {
           val head = romdata.lits.head
           val tail = romdata.lits.tail
-          (tail foldLeft ("Vec(%s){%s".format(
-              name(romdata, isRealName),
-              name(head.getNode, isRealName)))) { 
-                (res, node) => res + "," + name(node.getNode, isRealName)
+          (tail foldLeft ("Vec(%s){%s".format(name(romdata), name(head.getNode)))) { 
+                (res, node) => res + "," + name(node.getNode)
               } + "}"
         } else {
-          "ROMData(%s)".format(name(romdata, isRealName))
+          "ROMData(%s)".format(name(romdata))
         }
       }
       case _ => if (node == null) "" else node.toString
@@ -159,7 +138,8 @@ object nodeToString {
   }
 }
 
-trait Backannotation extends Backend {
+/*
+object Backannotation extends Backend {
   Driver.isBackannotating = true
 
   lazy val targetdir = ensureDir(Driver.targetDir)
@@ -282,3 +262,4 @@ trait CounterBackannotation extends Backannotation {
     }
   }
 }
+*/

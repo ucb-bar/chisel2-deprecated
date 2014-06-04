@@ -158,11 +158,6 @@ abstract class Node extends nameable {
     }
   }
 
-  def setPseudoName(path: String, isNamingIo: Boolean) {
-    if (!isIo || (isIo && isNamingIo))
-      pName = path
-  }
-
   lazy val chiselName = this match {
     case l: Literal => "";
     case any        =>

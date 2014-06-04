@@ -162,12 +162,4 @@ abstract class Data extends Node {
   }
 }
 
-abstract class Aggregate extends Data {
-  override def setPseudoName(path: String, isNamingIo: Boolean) {
-    if (isTypeNode && comp != null) {
-      comp setPseudoName (path, isNamingIo)
-    } else {
-      super.setPseudoName(path, isNamingIo)
-    }
-  }
-}
+abstract class Aggregate extends Data

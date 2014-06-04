@@ -152,7 +152,7 @@ class RegReset extends Reg {
 
 class Reg extends Delay with proc {
   override def toString: String = {
-    val nom = if (!name.isEmpty) name else pName
+    val nom = if (!name.isEmpty) name else Driver.backend.emitRef(this)
     "REG(" + nom + ")"
   }
 
