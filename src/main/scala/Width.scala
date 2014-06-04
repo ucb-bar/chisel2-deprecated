@@ -45,16 +45,13 @@ object Width {
     neww
   }
 
-  // Implicit conversion to Int - should be removed once
-  // all dependent classes understand 'width'
-  // implicit def toInt(w: Width): Int = w.needWidth()
-
 }
 
 class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
-  type WidthType = Option[Int]
-  val unSet: WidthType = None
-  val unSetVal: Int = -1
+  type WidthType = Option[Int]  // The internal representation of width
+  val unSet: WidthType = None	// The internal "unset" value
+  val unSetVal: Int = -1	// The external "unset" value
+	// Construction: initialize internal state
   private var widthVal: WidthType = if (_width > -1) Some(_width) else unSet
   val throwIfUnsetRef = _throwIfUnset
   val debug: Boolean = false
@@ -63,13 +60,10 @@ class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
     ChiselError.warning("Width: w " + _width + ", throw " + _throwIfUnset)
   }
 
+  // Caller requires a single, integer value (legacy code).
   def width: Int = if (isKnown) widthVal.get else unSetVal
 
-  /** Sets the width of a Node. */
-  def width_=(w: Int) {
-    setWidth(w)
-  }
-
+  //  Set the width of a Node.
   def setWidth(w: Int) = {
     assert(w > -2, ChiselError.error("Width.setWidth: setting width to " + w))
     if (w < 0) {
@@ -85,10 +79,16 @@ class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
     }
   }
 
+  // Syntactic sugar - an attempt to set "width" to an integer.
+  def width_=(w: Int) {
+    setWidth(w)
+  }
+
   // Indicate whether width is actually known(set) or not.
   def isKnown: Boolean = widthVal != unSet
 
-  // Return a value or raise an exception.
+  // Return an "known" integer value or raise an exception
+  //  if called when the width is unknown.
   def needWidth(): Int = {
     if (! isKnown ) {
       ChiselError.warning("needWidth but width not set")
@@ -100,11 +100,12 @@ class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
     width
   }
 
-  // Return a value or 0 if the width isn't set
+  // Return either the width or the specificed value if the width isn't set.
   def widthOrValue(v: Int): Int = {
     if (widthVal != unSet) widthVal.get else v
   }
 
+  // Compare two (known) widths.
   def compare(that: Width) = this.needWidth() - that.needWidth()
 
   // Print a string representation of width
@@ -121,6 +122,7 @@ class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
   }
   
   // Define the arithmetic operations so we can deal with unspecified widths
+  // (Currently unused - mostly a template for how to do this.
   def BinaryOp(op: String, operand: Int): Width = {
     if (!this.isKnown) {
       this
