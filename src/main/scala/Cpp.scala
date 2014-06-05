@@ -611,17 +611,18 @@ class CppBackend extends Backend {
     val c11 = if (hasPrintfs) " -std=c++11 " else ""
     val allFlags = flags + c11 + " -I../ -I" + chiselENV + "/csrc/"
     val dir = Driver.targetDir + "/"
+    val CXX = scala.util.Properties.envOrElse("CXX", "g++" )
     def run(cmd: String) {
       val bashCmd = Seq("bash", "-c", cmd)
       val c = bashCmd.!
       ChiselError.info(cmd + " RET " + c)
     }
     def link(name: String) {
-      val ac = "g++ -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o"
+      val ac = CXX + " -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o"
       run(ac)
     }
     def cc(name: String) {
-      val cmd = "g++ -c -o " + dir + name + ".o " + allFlags + " " + dir + name + ".cpp"
+      val cmd = CXX + " -c -o " + dir + name + ".o " + allFlags + " " + dir + name + ".cpp"
       run(cmd)
     }
     cc(c.name + "-emulator")
