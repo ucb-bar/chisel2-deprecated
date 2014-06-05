@@ -102,7 +102,7 @@ class CppBackend extends Backend {
     else x match {
       case l: Literal =>
         val lit = l.value
-        val value = if (lit < 0) (BigInt(1) << x.width) + lit else lit
+        val value = if (lit < 0) (BigInt(1) << x.needWidth()) + lit else lit
         emitLit(value, w)
       case _ => wordMangle(x, w.toString)
     }
@@ -166,16 +166,18 @@ class CppBackend extends Backend {
   def block(s: Seq[String]): String = 
     if (s.length == 0) ""
     else s"  {${s.map(" " + _ + ";").reduceLeft(_ + _)}}\n"
-  def emitDatRef(x: Node): String =
+  def emitDatRef(x: Node): String = {
     val gotWidth = x.needWidth()
     if (x.isInObject) emitRef(x)
     else if (words(x) > 1) s"*reinterpret_cast<dat_t<${gotWidth}>*>(${emitRef(x)})"
     else if (isLit(x)) s"dat_t<${gotWidth}>(${emitRef(x)})"
-    else s"*reinterpret_cast<dat_t<${gotWwidth}>*>(&${emitRef(x)})"
-  def trunc(x: Node): String =
+    else s"*reinterpret_cast<dat_t<${gotWidth}>*>(&${emitRef(x)})"
+  }
+  def trunc(x: Node): String = {
     val gotWidth = x.needWidth()
     if (gotWidth % bpw == 0) ""
     else s"  ${emitWordRef(x, words(x)-1)} = ${emitWordRef(x, words(x)-1)} & ${emitLit((BigInt(1) << (gotWidth%bpw))-1)};\n"
+  }
   def opFoldLeft(o: Op, initial: (String, String) => String, subsequent: (String, String, String) => String) =
     (1 until words(o.inputs(0))).foldLeft(initial(emitLoWordRef(o.inputs(0)), emitLoWordRef(o.inputs(1))))((c, i) => subsequent(c, emitWordRef(o.inputs(0), i), emitWordRef(o.inputs(1), i)))
 
@@ -779,7 +781,7 @@ class CppBackend extends Backend {
       // pack smaller objects at start of header for better locality
       val aMem = a.isInstanceOf[Mem[_]] || a.isInstanceOf[ROMData]
       val bMem = b.isInstanceOf[Mem[_]] || b.isInstanceOf[ROMData]
-      aMem < bMem || aMem == bMem && a.width < b.width
+      aMem < bMem || aMem == bMem && a.needWidth() < b.needWidth()
     }
     for (m <- c.omods.filter(_.isInObject).sortWith(headerOrderFunc))
       out_h.write(emitDec(m))
