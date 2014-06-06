@@ -858,10 +858,10 @@ class CppBackend extends Backend {
       writeCppFile("  " + emitRef(clock) + "_cnt-=min;\n")
     }
     for (clock <- Driver.clocks) {
-      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
+      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
     }
     for (clock <- Driver.clocks) {
-      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
+      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
     }
     for (clock <- Driver.clocks) {
       writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " +
