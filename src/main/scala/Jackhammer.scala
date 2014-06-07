@@ -122,14 +122,15 @@ object Jackhammer {
   }
 
   def formatDesign(design: Params.Space) : String = {
+    def zpad(hash:String):String = if(hash.length == 8) hash else zpad("0" + hash)
     val str = new StringBuilder("_")
     for((mod,p,gID) <- design) {
-      str ++= p.pname + "-" + p.init+"_"
+      str ++= p.pname+p.init+"_"
     }
     if(str.length<40) {
-      str.toString + MurmurHash3.stringHash(design.toString,1).toHexString 
+      str.toString + "_" + zpad(MurmurHash3.stringHash(design.toString,1).toHexString)
     } else {
-      str.substring(0,40) + "_" + MurmurHash3.stringHash(design.toString,1).toHexString 
+      str.substring(0,40) + "_" + zpad(MurmurHash3.stringHash(design.toString,1).toHexString)
     }
  }
 
