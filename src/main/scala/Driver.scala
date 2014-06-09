@@ -55,14 +55,14 @@ object Driver {
 
   private def execute[T <: Module](gen: () => T): T = {
     /* JACK - If loading design, read design.prm file*/
-    if (Driver.jackLoad != null) { Jackhammer.load(Driver.jackDir, Driver.jackLoad) }
+    if (Driver.pLoad == true) { Params.load(Driver.pPnt) }
     val c = gen()
 
     Driver.backend.initBackannotation
 
-    /* JACK - If dumping design, dump to jackDir with jackNumber points*/
-    if (Driver.jackDump != null) { 
-      Jackhammer.dump(Driver.jackDir, Driver.jackDump, Driver.jackN) 
+    /* Params - If dumping design, dump space to pDir*/
+    if (Driver.pDump == true) { 
+      Params.dump(Driver.pDir)
     } else {
       Driver.backend.elaborate(c)
     }
@@ -207,11 +207,8 @@ object Driver {
         case "--backannotation" => isBackannotating = true
         case "--model" => model = args(i + 1) ; i += 1
         //Jackhammer Flags
-        //case "--jEnable" => jackEnable = true
-        case "--jackDump" => jackDump = args(i+1); i+=1; //mode of dump, can be of set {space, point} (i.e. space.prm, design.prm etc)
-        case "--jackN" => jackN = args(i+1).toInt; i+=1; //number of points (random). Default is exaustive
-        case "--jackDir"  => jackDir = args(i+1); i+=1;  //location of dump or load
-        case "--jackLoad" => jackLoad = args(i+1); i+=1; //design.prm file
+        case "--pDump" => pDump = true; pDir = args(i+1); i+=1;  //dump parameter space
+        case "--pLoad" => pLoad = true; pPnt = args(i+1); i+=1;  //load design.prm file
         case "--dumpTestInput" => dumpTestInput = true
         case "--testerSeed" => {
           testerSeedValid = true
@@ -222,7 +219,6 @@ object Driver {
             isDebug = true
             emitTempNodes = true
         }
-        //case "--jDesign" =>  jackDesign = args(i+1); i+=1
         // Dreamer configuration flags
         case "--numRows" => {
           if (backend.isInstanceOf[FloBackend]) {
@@ -285,11 +281,10 @@ object Driver {
   var modStackPushed: Boolean = false
   var startTime = 0L
   /* Jackhammer flags */
-  var jackDump: String = null
-  var jackDir: String = null
-  var jackLoad: String = null
-  var jackN: Int = 0
-  //var jackDesign: String = null
+  var pDump: Boolean = false
+  var pDir: String = null
+  var pLoad: Boolean = false
+  var pPnt: String = null
 
   // Setting this to TRUE will case the test harness to print its
   // standard input stream to a file.
