@@ -80,7 +80,7 @@ class ConnectSuite extends TestSuite {
     }
     class SuppliesResetsTests(m: SuppliesResetsParent) extends Tester(m) {
       List(true,false,false,false,false,false).zip(
-      List(true,true, true, false,false,false)).map {
+      List(true, true, false,false,false,false)).map {
         case (i, o) =>
           poke(m.io.in,    int(i))
           step(1)
