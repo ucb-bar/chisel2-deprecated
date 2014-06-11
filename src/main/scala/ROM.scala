@@ -67,7 +67,7 @@ class ROMData(elts: SortedMap[Int, Node], val n: Int) extends Node {
   val w = elts.values.map(_.litOf.needWidth()).max
   val sparseLits = {
     inferWidth = fixWidth(w)
-    elts.mapValues(_.matchWidth(w).litOf)
+    elts.mapValues(_.matchWidth(Width(w)).litOf)
   }
   val lits = {
     val dc = UInt.DC(w).litOf
@@ -84,5 +84,5 @@ class ROMRead extends Node {
   override def toString: String = rom + "[" + addr + "]"
 
   override def forceMatchingWidths: Unit =
-    inputs(0) = addr.matchWidth(log2Up(rom.n))
+    inputs(0) = addr.matchWidth(Width(log2Up(rom.n)))
 }

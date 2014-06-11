@@ -61,21 +61,26 @@ class SInt extends Bits with Num[SInt] {
     SInt(x).asInstanceOf[this.type]
   }
 
-  override def matchWidth(w: Int): Node = {
-    val my_width = this.needWidth()
-    if (w > my_width) {
-      if (my_width == 1) {
-        val res = NodeFill(w, this); res.infer
+  override def matchWidth(w: Width): Node = {
+    if (w.isKnown && this.isKnownWidth) {
+      val my_width = this.needWidth()
+      val match_width = w.needWidth()
+      if (match_width > my_width) {
+        if (my_width == 1) {
+          val res = NodeFill(match_width, this); res.infer
+          res
+        } else {
+          val topBit = NodeExtract(this, my_width-1); topBit.infer
+          val fill = NodeFill(match_width - my_width, topBit); fill.infer
+          val res = Concatenate(fill, this); res.infer
+          res
+        }
+      } else if (match_width < my_width) {
+        val res = NodeExtract(this, match_width-1,0); res.infer
         res
       } else {
-        val topBit = NodeExtract(this, my_width-1); topBit.infer
-        val fill = NodeFill(w - my_width, topBit); fill.infer
-        val res = Concatenate(fill, this); res.infer
-        res
+        this
       }
-    } else if (w < my_width) {
-      val res = NodeExtract(this, w-1,0); res.infer
-      res
     } else {
       this
     }

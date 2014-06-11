@@ -335,7 +335,7 @@ trait CounterBackend extends Backend {
           } else {
             val buffer = Reg(UInt(width = signalWidth))
             val xor = signalValue ^ buffer
-            xor.inferWidth = (x: Node) => signalWidth
+            xor.inferWidth = (x: Node) => Width(signalWidth)
             val hd = PopCount(xor)
             addReg(m, buffer, "buffer_%d".format(signal.cntrIdx), 
               Map(firedPins(m) -> signalValue)
@@ -455,7 +455,7 @@ abstract class CounterTester[+T <: Module](c: T, isTrace: Boolean = true) extend
     super.reset(n)
     if (t >= 1) {
       // reset prevPeeks
-      for (signal <- Driver.signals ; if signal.width > 1) {
+      for (signal <- Driver.signals ; if signal.needWidth() > 1) {
         prevPeeks(signal) = 0
       }
     }
@@ -577,7 +577,7 @@ abstract class CounterTester[+T <: Module](c: T, isTrace: Boolean = true) extend
   }
 
   // initialization
-  for (signal <- Driver.signals ; if signal.width > 1) {
+  for (signal <- Driver.signals ; if signal.needWidth() > 1) {
     prevPeeks(signal) = 0
   }
 }

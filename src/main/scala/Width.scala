@@ -123,17 +123,33 @@ class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
   
   // Define the arithmetic operations so we can deal with unspecified widths
   // (Currently unused - mostly a template for how to do this.
-  def BinaryOp(op: String, operand: Int): Width = {
+  def BinaryOp(op: String, operand: Width): Width = {
     if (!this.isKnown) {
       this
+    } else if (! operand.isKnown) {
+      operand
     } else {
       op match {
-        case "+" => Width(this.width + operand)
+        case "+" => Width(this.width + operand.width)
         case "-" => {
-          assert(this.width >= operand)
-          Width(this.width - operand)
+          assert(this.width >= operand.width)
+          Width(this.width - operand.width)
         }
       }
     }
   }
+  
+  // Define addition of two widths
+  def +(w: Width): Width = BinaryOp("+", w)
+  
+  // Define subtraction of one Width from another
+  def -(w: Width): Width = BinaryOp("-", w)
+  
+  // Define addition of an Int to a Width
+  def +(i: Int): Width = BinaryOp("+", Width(i))
+  
+  // Define subtraction of an Int from a Width
+  def -(i: Int): Width = BinaryOp("-", Width(i))
+  
+  implicit def fromInt(i: Int): Width = Width(i)
 }

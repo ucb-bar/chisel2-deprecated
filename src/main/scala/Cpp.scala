@@ -537,9 +537,12 @@ class CppBackend extends Backend {
         val sparse = !isPow2(r.n) || r.n != r.sparseLits.size
         if (sparse)
           res append s"  ${emitRef(r)}.randomize(&__rand_seed);\n"
-        for ((i, v) <- r.sparseLits)
-          if (sparse || v.value != 0)
+        for ((i, v) <- r.sparseLits) {
+          assert(v.value != None)
+          val w = Some(v.value)
+          if (sparse || w != 0)
             res append block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(v, j) + ")"))
+        }
         res.toString
 
       case u: Bits => 

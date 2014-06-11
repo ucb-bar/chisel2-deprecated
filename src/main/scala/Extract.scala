@@ -54,7 +54,9 @@ object NodeExtract {
     } else if (bits_lit != null) {
       Literal((bits_lit.value >> lo) & mask, w)
     } else {
-      makeExtract(mod, Literal(hi), Literal(lo), fixWidth(w))
+      val res = makeExtract(mod, Literal(hi), Literal(lo), fixWidth(w))
+      res.setWidth(w)
+      res
     }
   }
 
@@ -73,9 +75,9 @@ object NodeExtract {
     }
   }
 
-  private def makeExtract(mod: Node, hi: Node, lo: Node, width: (Node) => Int) = {
+  private def makeExtract(mod: Node, hi: Node, lo: Node, widthFunc: (Node) => Width) = {
     val res = new Extract
-    res.init("", width, mod, hi, lo)
+    res.init("", widthFunc, mod, hi, lo)
     res.hi = hi
     res.lo = lo
     res

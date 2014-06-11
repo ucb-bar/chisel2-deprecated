@@ -27,14 +27,21 @@ abstract class Log2Like(x: Bits, name: String) extends Op(name) {
   inputs += x
   inferWidth = log2Width
 
-  private def log2Width(x: Node): Int =
-    if (x.inputs(0).width < 2) x.inputs(0).width // TODO 0WW
-    else log2Up(x.inputs(0).width)
+  private def log2Width(x: Node): Width =
+    if (x.inputs(0).isKnownWidth) {
+      val w = x.inputs(0).needWidth()
+      if (w < 2)
+        Width(w) // TODO 0WW
+      else
+        Width(log2Up(w))
+    } else {
+      Width()
+    }
 }
 
 class Log2(x: Bits) extends Log2Like(x, "Log2") {
   override def lower: Node = {
-    val range = inputs(0).width-1 to 0 by -1
+    val range = inputs(0).needWidth()-1 to 0 by -1
     val in = UInt(inputs(0))
     PriorityMux(range.map(in(_)), range.map(UInt(_)))
   }
@@ -42,7 +49,7 @@ class Log2(x: Bits) extends Log2Like(x, "Log2") {
 
 class PriorityEncoder(x: Bits) extends Log2Like(x, "PriEnc") {
   override def lower: Node = {
-    PriorityMux(UInt(inputs(0)), (0 until inputs(0).width).map(UInt(_)))
+    PriorityMux(UInt(inputs(0)), (0 until inputs(0).needWidth()).map(UInt(_)))
   }
 }
 
@@ -58,6 +65,6 @@ class OHToUInt(x: Bits) extends Log2Like(x, "OHToUInt") {
         Concatenate(LogicalOp(hi, Literal(0, length-half), "!="), doLower(BinaryOp(hi, lo, "|"), half))
       }
     }
-    doLower(inputs(0), inputs(0).width)
+    doLower(inputs(0), inputs(0).needWidth())
   }
 }

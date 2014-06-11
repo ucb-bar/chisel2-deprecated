@@ -293,13 +293,17 @@ abstract class Bits extends Data with proc {
 
   override def forceMatchingWidths {
     if(inputs.length == 1 && inputs(0).width != width) {
-      inputs(0) = inputs(0).matchWidth(needWidth())
+      inputs(0) = inputs(0).matchWidth(width)
     }
   }
 
-  override def matchWidth(w: Int): Node =
-    if (isLit && !litOf.isZ) Literal(litOf.value & ((BigInt(1) << w)-1), w)
+  override def matchWidth(w: Width): Node = {
+    if (w.isKnown && this.isKnownWidth && isLit && !litOf.isZ) {
+      val wi = w.needWidth()   // TODO 0WW
+      Literal(litOf.value & ((BigInt(1) << wi)-1), wi)
+    }
     else super.matchWidth(w)
+  }
 
   // Operators
   protected final def newUnaryOp(opName: String): this.type = {
