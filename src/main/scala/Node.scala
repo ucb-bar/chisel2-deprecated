@@ -49,14 +49,16 @@ object Node {
     s
   }
 
-  def fixWidth(w: Int) = {
-    assert(w != -1, ChiselError.error("invalid width for fixWidth object"));
-    (m: Node) => Width(w)
-  }
+  def fixWidth(w: => Int): (=> Node) => Width = { (n) => {
+    if (n == null) {
+      assert(w != -1, ChiselError.error("invalid width for fixWidth object"));
+      Width(w)
+    } else {
+      Width()
+    }
+  }}
 
-  // TODO: width is Driver.isInGetWidth dependent
-  // What are we trying to accomplish here?
-  def widthOf(i: Int) = { (m: Node) => {
+  def widthOf(i: => Int): (=> Node) => Width = { (m) => {
     try {
       m.inputs(i).width
     } catch {
@@ -67,10 +69,11 @@ object Node {
           }
         }
        Width()
-   }}}
+    }
+  }}
 
   // Compute the maximum width required for a node,
-  def maxWidth(m: Node): Width = {
+  def maxWidth(m: => Node): Width = {
     if (m.inputs exists { ! _.isKnownWidth}) {
       Width()
     } else {
@@ -83,7 +86,7 @@ object Node {
     }
   }
 
-  def minWidth(m: Node): Width = {
+  def minWidth(m: => Node): Width = {
     if (m.inputs exists { ! _.isKnownWidth}) {
       Width()
     } else {
@@ -91,9 +94,9 @@ object Node {
     }
   }
 
-  def maxWidthPlusOne(m: Node): Width = maxWidth(m) + 1
+  def maxWidthPlusOne(m: => Node): Width = maxWidth(m) + 1
 
-  def sumWidth(m: Node): Width = {
+  def sumWidth(m: => Node): Width = {
     var res = Width(0);
     if (m.inputs exists { ! _.isKnownWidth}) {
       res = Width()
@@ -103,15 +106,15 @@ object Node {
     res
   }
 
-  def lshWidthOf(i: Int, n: Node): (Node) => (Width) = {
-    (m: Node) => {
+  def lshWidthOf(i: => Int, n: => Node): (=> Node) => (Width) = {
+    (m) => {
       val w = m.inputs(0)._width.widthOrValue(0) + n.maxNum.toInt;
       Width(w)
     }
   }
 
-  def rshWidthOf(i: Int, n: Node): (Node) => (Width) = {
-    (m: Node) => {
+  def rshWidthOf(i: => Int, n: => Node): (=> Node) => (Width) = {
+    (m) => {
       val w = m.inputs(i)._width.widthOrValue(0) - n.minNum.toInt
       Width(if (w < 0) n.minNum.toInt else w)
     }
@@ -140,7 +143,7 @@ abstract class Node extends nameable {
   val consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
   val inputs = new ArrayBuffer[Node];
   def traceableNodes: Array[Node] = Array[Node]();
-  var inferWidth: (Node) => Width = maxWidth _
+  var inferWidth: (=> Node) => Width = maxWidth
 
   var nameHolder: nameable = null;
   val line: StackTraceElement =
@@ -229,13 +232,13 @@ abstract class Node extends nameable {
   def isReg: Boolean = false
   def isUsedByClockHi: Boolean = consumers.exists(_.usesInClockHi(this))
   def usesInClockHi(i: Node): Boolean = false
-  def initOf (n: String, widthfunc: (Node) => Width, ins: Iterable[Node]): Node = {
+  def initOf (n: String, widthfunc: (=> Node) => Width, ins: Iterable[Node]): Node = {
     name = n;
     inferWidth = widthfunc;
     inputs ++= ins
     this
   }
-  def init (n: String, widthFunc: (Node) => Width, ins: Node*): Node = {
+  def init (n: String, widthFunc: (=> Node) => Width, ins: Node*): Node = {
     initOf(n, widthFunc, ins.toList);
   }
   def init (n: String, w: Int, ins: Node*): Node = {

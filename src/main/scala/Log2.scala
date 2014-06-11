@@ -27,7 +27,7 @@ abstract class Log2Like(x: Bits, name: String) extends Op(name) {
   inputs += x
   inferWidth = log2Width
 
-  private def log2Width(x: Node): Width =
+  private def log2Width(x: => Node): Width =
     if (x.inputs(0).isKnownWidth) {
       val w = x.inputs(0).needWidth()
       if (w < 2)

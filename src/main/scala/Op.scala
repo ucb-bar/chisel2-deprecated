@@ -104,10 +104,10 @@ object BinaryOp {
   }
 
   // width inference functions for signed-unsigned operations
-  private def mulSUWidth(x: Node) = sumWidth(x) - 1
-  private def divUSWidth(x: Node) = widthOf(0)(x) - 1
-  private def modUSWidth(x: Node) = x.inputs(1).needWidth().min(x.inputs(0).needWidth() - 1)
-  private def modSUWidth(x: Node) = x.inputs(0).needWidth().min(x.inputs(1).needWidth() - 1)
+  private def mulSUWidth(x: => Node) = sumWidth(x) - 1
+  private def divUSWidth(x: => Node) = widthOf(0)(x) - 1
+  private def modUSWidth(x: => Node) = x.inputs(1).needWidth().min(x.inputs(0).needWidth() - 1)
+  private def modSUWidth(x: => Node) = x.inputs(0).needWidth().min(x.inputs(1).needWidth() - 1)
 }
 
 
@@ -148,7 +148,7 @@ object ReductionOp {
 }
 
 object Op {
-  def apply (name: String, widthInfer: (Node) => Width, a: Node, b: Node): Node = {
+  def apply (name: String, widthInfer: (=> Node) => Width, a: Node, b: Node): Node = {
     val (a_lit, b_lit) = (a.litOf, b.litOf)
     if (a_lit != null) name match {
       case "==" => if (a_lit.isZ) return zEquals(b, a)
@@ -337,7 +337,7 @@ object Op {
     res.init("", widthInfer, a, b);
     res
   }
-  def apply (name: String, widthInfer: (Node) => Width, a: Node): Node = {
+  def apply (name: String, widthInfer: (=> Node) => Width, a: Node): Node = {
       if (a.litOf != null) {
         if (a.litOf.isZ)
           ChiselError.error({"Operator " + name + " with input " + a + " does not support literals with ?"});

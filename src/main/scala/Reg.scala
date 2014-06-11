@@ -38,7 +38,7 @@ class GetWidthException(s: String) extends Exception(s)
 
 object Reg {
 
-  def regMaxWidth(m: Node) =
+  def regMaxWidth(m: => Node) =
     if (Driver.isInGetWidth) {
       throw new GetWidthException("getWidth was called on a Register or on an object connected in some way to a Register that has a statically uninferrable width")
     } else {
@@ -59,7 +59,7 @@ object Reg {
     XXX Can't specify return type. There is a conflict. It is either
     (Node) => (Int) or Int depending which execution path you believe.
     */
-  def regWidth(r: Node) = {
+  def regWidth(r: => Node) = {
     val rLit = r.litOf
     if (rLit != null && rLit.hasInferredWidth) {
       regMaxWidth _

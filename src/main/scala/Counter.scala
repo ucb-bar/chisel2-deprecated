@@ -33,7 +33,7 @@ package Chisel
 import scala.collection.mutable.HashMap
 import scala.math.pow
 
-// import Width._
+import Node._
 
 trait CounterBackend extends Backend {
   val firedPins = new HashMap[Module, Bool]
@@ -335,7 +335,7 @@ trait CounterBackend extends Backend {
           } else {
             val buffer = Reg(UInt(width = signalWidth))
             val xor = signalValue ^ buffer
-            xor.inferWidth = (x: Node) => Width(signalWidth)
+            xor.inferWidth = fixWidth(signalWidth)
             val hd = PopCount(xor)
             addReg(m, buffer, "buffer_%d".format(signal.cntrIdx), 
               Map(firedPins(m) -> signalValue)

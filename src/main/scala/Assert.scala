@@ -90,10 +90,11 @@ class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
     msg
   }
 
-  inferWidth = (x: Node) => {
+  def argWidth: (=> Node) => Width = { (m) => {
     val argLength = formats.zip(inputs).map{case (a,b) => lengths(a)(b.needWidth())}.sum
     Width(8*(format.length - 2*formats.length + argLength))
-  }
+  }}
+  inferWidth = argWidth
 
   override def isReg: Boolean = true
   override lazy val isInVCD: Boolean = false

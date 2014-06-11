@@ -49,7 +49,7 @@ object NodeExtract {
     // so we can't use the literal directly if it overflows its width.
     // TODO: width is Driver.isInGetWidth dependent
     // What are we trying to accomplish here?
-    if (lo == 0 && w == mod.width && ((bits_lit == null) || (bits_lit.value & ~mask) == 0)) {
+    if (lo == 0 && w == mod.width.needWidth() && ((bits_lit == null) || (bits_lit.value & ~mask) == 0)) {
       mod
     } else if (bits_lit != null) {
       Literal((bits_lit.value >> lo) & mask, w)
@@ -75,7 +75,7 @@ object NodeExtract {
     }
   }
 
-  private def makeExtract(mod: Node, hi: Node, lo: Node, widthFunc: (Node) => Width) = {
+  private def makeExtract(mod: Node, hi: Node, lo: Node, widthFunc: (=> Node) => Width) = {
     val res = new Extract
     res.init("", widthFunc, mod, hi, lo)
     res.hi = hi
