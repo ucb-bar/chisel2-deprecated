@@ -107,6 +107,23 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     elts
   }
 
+  def sumWidth(m: => Node): Width = {
+    m match {
+      case b: Bundle => {
+         var res = Width(0);
+         // If any of our elements widths are unknown, so it ours
+        if (b.elements exists { case(name, io) => ! io.isKnownWidth}) {
+          res = Width()
+        } else {
+          b.elements foreach { case(name, io) => res += io.width }
+        }
+        res
+      }
+      case _ => Node.sumWidth(m)
+    }
+  }
+  inferWidth = sumWidth
+
   /* XXX This method is not private since it is used in Dot.scala. */
   def elements: ArrayBuffer[(String, Data)] = {
     if (elementsCache == null) {

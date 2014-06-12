@@ -109,7 +109,10 @@ class Width(_width: Int, _throwIfUnset: Boolean) extends Ordered[Width] {
   def compare(that: Width) = this.needWidth() - that.needWidth()
 
   // Print a string representation of width
-  override def toString: String = widthVal.toString
+  override def toString: String = (widthVal match {
+    case Some(w) => w
+    case x => x
+  }).toString
 
   def copy(w: Int = this.width, t: Boolean = this.throwIfUnsetRef): Width = {
     val neww = new Width(w, t)

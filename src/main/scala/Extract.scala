@@ -47,9 +47,8 @@ object NodeExtract {
     val mask = (BigInt(1) << w) - BigInt(1)
     // Currently, we don't restrict literals to their width,
     // so we can't use the literal directly if it overflows its width.
-    // TODO: width is Driver.isInGetWidth dependent
-    // What are we trying to accomplish here?
-    if (lo == 0 && w == mod.width.needWidth() && ((bits_lit == null) || (bits_lit.value & ~mask) == 0)) {
+    val wmod = mod.width
+    if (lo == 0 && wmod.isKnown && w == wmod.needWidth() && ((bits_lit == null) || (bits_lit.value & ~mask) == 0)) {
       mod
     } else if (bits_lit != null) {
       Literal((bits_lit.value >> lo) & mask, w)

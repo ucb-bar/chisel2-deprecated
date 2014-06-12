@@ -50,7 +50,7 @@ object Node {
   }
 
   def fixWidth(w: => Int): (=> Node) => Width = { (n) => {
-    if (n == null) {
+    if (n != null) {
       assert(w != -1, ChiselError.error("invalid width for fixWidth object"));
       Width(w)
     } else {
@@ -209,7 +209,11 @@ abstract class Node extends nameable {
   def ##(b: Node): Node  = Op("##", sumWidth _,  this, b );
   def maxNum: BigInt = {
     // XXX This makes sense for UInt, but not in general.
-    val w = if (isKnownWidth) width.needWidth() else inferWidth(this).needWidth()
+    val ww = width
+    val w = if (ww.isKnown) ww.needWidth() else {
+      val ww = inferWidth(this)
+      ww.needWidth()
+    }
     litValue((BigInt(1) << w) - 1)
   }
   def minNum: BigInt = litValue(0)
@@ -254,13 +258,17 @@ abstract class Node extends nameable {
     val res = inferWidth(this);
     if (! res.isKnown) {
       true
-    } else if (res != width) {
-      // NOTE: This should NOT stop us using inferWidth, since the value
-      // we set here may not be correct.
-      _width.setWidth(res.needWidth())
-      true
     } else {
-      false
+      // We have a valid width. If it is different from our current width, update the current width.
+      val w = res.needWidth()
+      if (! _width.isKnown || w != width.needWidth()) {
+        // NOTE: This should NOT stop us using inferWidth, since the value
+        // we set here may not be correct.
+        _width.setWidth(w)
+        true
+      } else {
+        false
+      }
     }
   }
   lazy val isInObject: Boolean =
@@ -430,9 +438,12 @@ abstract class Node extends nameable {
 
   def getWidth(): Int = {
     Driver.isInGetWidth = true
-    val w = width.needWidth()
+    val w = width
     Driver.isInGetWidth = false
-    w
+    if (w.isKnown)
+      w.needWidth()
+    else
+      throwException("Node.getWidth() for node " + this + " returns unknown width")
   }
 
   def removeTypeNodes() {

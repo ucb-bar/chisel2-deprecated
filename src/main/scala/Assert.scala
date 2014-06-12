@@ -44,6 +44,7 @@ class Assert(condIn: Bool, resetIn: Bool, val message: String) extends Delay {
 
 class BitsInObject(x: Node) extends UInt {
   inputs += x
+  inferWidth = widthOf(0)
   override lazy val isInObject: Boolean = true
 }
 
@@ -90,9 +91,19 @@ class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
     msg
   }
 
-  def argWidth: (=> Node) => Width = { (m) => {
-    val argLength = formats.zip(inputs).map{case (a,b) => lengths(a)(b.needWidth())}.sum
-    Width(8*(format.length - 2*formats.length + argLength))
+  def argWidth: (=> Node) => Width = { (x) => {
+    if (x != null) {
+      var unknown = false
+      val argLength = formats.zip(inputs).map{case (a,b) => {
+        lengths(a)({ val w = b.width;if (w.isKnown) w.needWidth() else {unknown = true; 0}})
+      }}.sum
+      if (unknown)
+        Width()
+      else
+        Width(8*(format.length - 2*formats.length + argLength))
+    } else {
+      Width()
+    }
   }}
   inferWidth = argWidth
 
