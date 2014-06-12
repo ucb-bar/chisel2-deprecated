@@ -173,6 +173,12 @@ abstract class Node extends nameable {
     inferWidth = fixWidth(w);
   }
 
+  def width_=(w: Width) {
+    _width = w;
+    // NOTE: This explicitly does not set inferWidth.
+    // See the comments in infer
+  }
+
   def nameIt (path: String, isNamingIo: Boolean) {
     try {
       if (!named && (!isIo || isNamingIo)) {
@@ -260,11 +266,10 @@ abstract class Node extends nameable {
       true
     } else {
       // We have a valid width. If it is different from our current width, update the current width.
-      val w = res.needWidth()
-      if (! _width.isKnown || w != width.needWidth()) {
+      if (res != width) {
         // NOTE: This should NOT stop us using inferWidth, since the value
         // we set here may not be correct.
-        _width.setWidth(w)
+        width = res
         true
       } else {
         false
