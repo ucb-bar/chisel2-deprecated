@@ -258,10 +258,7 @@ class NameSuite extends TestSuite {
       val error = Bool()
       val ppn = UInt(width = 32)
 
-      override def clone = {
-        val res = new UnamedBundle().asInstanceOf[this.type]
-	res
-      }
+      override def clone = new UnamedBundle().asInstanceOf[this.type]
     }
 
     class BlockIO extends Bundle {

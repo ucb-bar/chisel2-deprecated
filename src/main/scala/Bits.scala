@@ -135,7 +135,7 @@ abstract class Bits extends Data with proc {
         + getClass.getName + "("
         + (if (dir == INPUT) "INPUT, "
         else if (dir == OUTPUT) "OUTPUT, " else "")
-        + "width=" + _width
+        + "width=" + width_
         + ", connect to " + inputs.length + " inputs: (")
     var sep = ""
     for( i <- inputs ) {
@@ -287,7 +287,7 @@ abstract class Bits extends Data with proc {
   override def clone: this.type = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
     res.inferWidth = this.inferWidth
-    res._width = this._width.clone()
+    res.width_ = this.width_.clone()
     res.dir = this.dir;
     res
   }

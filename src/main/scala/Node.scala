@@ -77,7 +77,7 @@ object Node {
     var w = Width(0)
     for (i <- m.inputs)
       if (!(i == null || i == m)) {
-        w = w.max(i._width)
+        w = w.max(i.width)
       }
     w
   }
@@ -126,7 +126,7 @@ abstract class Node extends nameable {
   def componentOf: Module = if (Driver.backend.isEmittingComponents && component != null) component else Driver.topComponent
   // The semantics of width are sufficiently complicated that
   // it deserves its own class
-  var _width = Width()
+  var width_ = Width()
   val consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
   val inputs = new ArrayBuffer[Node];
   def traceableNodes: Array[Node] = Array[Node]();
@@ -151,17 +151,17 @@ abstract class Node extends nameable {
 
   def isByValue: Boolean = true;
   def width: Width = {
-    if (Driver.isInGetWidth) inferWidth(this) else _width
+    if (Driver.isInGetWidth) inferWidth(this) else width_
   }
 
   /** Sets the width of a Node. */
   def width_=(w: Int) {
-    _width.setWidth(w);
+    width_.setWidth(w);
     inferWidth = fixWidth(w);
   }
 
   def width_=(w: Width) {
-    _width = w;
+    width_ = w;
     // NOTE: This explicitly does not set inferWidth.
     // See the comments in infer
   }
@@ -239,7 +239,7 @@ abstract class Node extends nameable {
     initOf(n, widthFunc, ins.toList);
   }
   def init (n: String, w: Int, ins: Node*): Node = {
-    _width.setWidth(w)
+    width_ = Width(w)
     initOf(n, fixWidth(w), ins.toList)
   }
   
@@ -254,7 +254,7 @@ abstract class Node extends nameable {
     } else if (res != width) {
         // NOTE: This should NOT stop us using inferWidth, since the value
         // we set here may not be correct.
-      _width = res
+      width_ = res
       true
     } else {
       false
@@ -293,7 +293,7 @@ abstract class Node extends nameable {
     writer.println("component: " + component)
     writer.println("isTypeNode: " + isTypeNode)
     writer.println("depth: " + depth)
-    writer.println("width: " + _width)
+    writer.println("width: " + width_)
     writer.println("index: " + emitIndex)
     writer.println("consumers.length: " + consumers.length)
     writer.println("nameHolder: " + nameHolder)
@@ -519,7 +519,7 @@ abstract class Node extends nameable {
     checkOne(this, x) || checkOne(x, this)
   }
   def setWidth(w: Int) = {
-    _width.setWidth(w)
+    width_.setWidth(w)
     inferWidth = fixWidth(w);
   }
   // Return a value or raise an exception.
