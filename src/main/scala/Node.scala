@@ -74,49 +74,36 @@ object Node {
 
   // Compute the maximum width required for a node,
   def maxWidth(m: => Node): Width = {
-    if (m.inputs exists { ! _.isKnownWidth}) {
-      Width()
-    } else {
-      var w = 0
-      for (i <- m.inputs)
-        if (!(i == null || i == m)) {
-          w = w.max(i._width.widthOrValue(0))
-        }
-      Width(w)
-    }
+    var w = Width(0)
+    for (i <- m.inputs)
+      if (!(i == null || i == m)) {
+        w = w.max(i._width)
+      }
+    w
   }
 
-  def minWidth(m: => Node): Width = {
-    if (m.inputs exists { ! _.isKnownWidth}) {
-      Width()
-    } else {
-      Width(m.inputs.map(_._width.widthOrValue(0)).min)
-    }
-  }
+  def minWidth(m: => Node): Width = m.inputs.map(_.width).min
 
   def maxWidthPlusOne(m: => Node): Width = maxWidth(m) + 1
 
   def sumWidth(m: => Node): Width = {
     var res = Width(0);
-    if (m.inputs exists { ! _.isKnownWidth}) {
-      res = Width()
-    } else {
-      m.inputs foreach ( res += _.width )
-    }
+    for (i <- m.inputs)
+      res = res + i.width;
     res
   }
 
   def lshWidthOf(i: => Int, n: => Node): (=> Node) => (Width) = {
     (m) => {
-      val w = m.inputs(0)._width.widthOrValue(0) + n.maxNum.toInt;
-      Width(w)
+      val res = m.inputs(0).width + n.maxNum.toInt;
+      res
     }
   }
 
   def rshWidthOf(i: => Int, n: => Node): (=> Node) => (Width) = {
     (m) => {
-      val w = m.inputs(i)._width.widthOrValue(0) - n.minNum.toInt
-      Width(if (w < 0) n.minNum.toInt else w)
+      val res = m.inputs(i).width - n.minNum.toInt
+      res
     }
   }
 }
@@ -264,16 +251,13 @@ abstract class Node extends nameable {
     val res = inferWidth(this);
     if (! res.isKnown) {
       true
-    } else {
-      // We have a valid width. If it is different from our current width, update the current width.
-      if (res != width) {
+    } else if (res != width) {
         // NOTE: This should NOT stop us using inferWidth, since the value
         // we set here may not be correct.
-        width = res
-        true
-      } else {
-        false
-      }
+      _width = res
+      true
+    } else {
+      false
     }
   }
   lazy val isInObject: Boolean =
@@ -282,7 +266,7 @@ abstract class Node extends nameable {
     isReg || isUsedByClockHi || Driver.isDebug && !name.isEmpty ||
     Driver.emitTempNodes
 
-  lazy val isInVCD: Boolean = name != "reset" && isKnownWidth &&
+  lazy val isInVCD: Boolean = name != "reset" && needWidth() > 0 &&
      (!name.isEmpty || Driver.emitTempNodes) &&
      ((isIo && isInObject) || isReg || Driver.isDebug)
 
@@ -416,8 +400,9 @@ abstract class Node extends nameable {
   def forceMatchingWidths { }
 
   def matchWidth(w: Width): Node = {
-    if (w.isKnown && this.isKnownWidth) {
-      val my_width = this.needWidth()
+    val this_width = this.width
+    if (w.isKnown && this_width.isKnown) {
+      val my_width = this_width.needWidth()
       val match_width = w.needWidth()
       if (match_width > my_width) {
         val zero = Literal(0, match_width - my_width); zero.infer
@@ -430,6 +415,7 @@ abstract class Node extends nameable {
         this
       }
     } else {
+      ChiselError.error("Node.matchWidth with unknown width: " + w + ", node " + this)
       this
     }
   }
@@ -537,8 +523,8 @@ abstract class Node extends nameable {
     inferWidth = fixWidth(w);
   }
   // Return a value or raise an exception.
-  def needWidth(): Int = _width.needWidth()
+  def needWidth(): Int = width.needWidth()
 
   // Return true if the width of this node is known (set).
-  def isKnownWidth: Boolean = _width.isKnown
+  def isKnownWidth: Boolean = width.isKnown
 }

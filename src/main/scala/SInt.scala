@@ -62,8 +62,9 @@ class SInt extends Bits with Num[SInt] {
   }
 
   override def matchWidth(w: Width): Node = {
-    if (w.isKnown && this.isKnownWidth) {
-      val my_width = this.needWidth()
+    val this_width = this.width
+    if (w.isKnown && this_width.isKnown) {
+      val my_width = this_width.needWidth()
       val match_width = w.needWidth()
       if (match_width > my_width) {
         if (my_width == 1) {
@@ -82,6 +83,7 @@ class SInt extends Bits with Num[SInt] {
         this
       }
     } else {
+      ChiselError.error("SInt.matchWidth with unknown width: " + w + ", node " + this);
       this
     }
   }

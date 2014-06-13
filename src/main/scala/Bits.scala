@@ -31,7 +31,6 @@
 package Chisel
 import Node._
 import ChiselError._
-import Width._
 
 /* backward compatibility */
 object Bits {
@@ -126,15 +125,17 @@ abstract class Bits extends Data with proc {
   override def flatten: Array[(String, Bits)] = Array((name, this));
 
   override def toString: String = {
-    // Now that width is a class with its own toString() method,
-    // conversion should be acceptable.
+    // XXX We cannot print the width here as it would computed the infered
+    // width, hence change the computations. It might be possible to print
+    // width_ but it seems to also have some underlying computations associated
+    // to it.
     var str = (
       "/*" + (if (name != null && !name.isEmpty) name else "?")
         + (if (component != null) (" in " + component) else "") + "*/ "
         + getClass.getName + "("
         + (if (dir == INPUT) "INPUT, "
         else if (dir == OUTPUT) "OUTPUT, " else "")
-        + "width=" + width
+        + "width=" + _width
         + ", connect to " + inputs.length + " inputs: (")
     var sep = ""
     for( i <- inputs ) {
@@ -298,7 +299,7 @@ abstract class Bits extends Data with proc {
   }
 
   override def matchWidth(w: Width): Node = {
-    if (w.isKnown && this.isKnownWidth && isLit && !litOf.isZ) {
+    if (w.isKnown && isLit && !litOf.isZ) {
       val wi = w.needWidth()   // TODO 0WW
       Literal(litOf.value & ((BigInt(1) << wi)-1), wi)
     }

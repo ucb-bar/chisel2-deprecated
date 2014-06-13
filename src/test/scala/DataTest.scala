@@ -83,9 +83,8 @@ class DataSuite extends TestSuite {
     val fixFromLitWithWidth = SInt(42, width = 16);
     assertTrue( fixFromLitWithWidth.isInstanceOf[Literal] );
     assertFalse( fixFromLitWithWidth.named );
-    /* XXX width is -1 here for some reason
-    assertTrue( fixFromLitWithwidth == 16 );
-     */
+    /* XXX width was -1 here for some reason */
+    assertTrue( fixFromLitWithWidth.needWidth() == 16 );
   }
 
   @Ignore @Test def testSIntFromWidthDir() {

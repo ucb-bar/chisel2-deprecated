@@ -107,6 +107,7 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     elts
   }
 
+  /*
   def sumWidth(m: => Node): Width = {
     m match {
       case b: Bundle => {
@@ -123,7 +124,8 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     }
   }
   inferWidth = sumWidth
-
+ */
+  
   /* XXX This method is not private since it is used in Dot.scala. */
   def elements: ArrayBuffer[(String, Data)] = {
     if (elementsCache == null) {

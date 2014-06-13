@@ -542,8 +542,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     val whist = new HashMap[Int, Int]
     val hist = new HashMap[String, Int]
     for (m <- imods) {
-      val w = m.needWidth()
       mhist(m.component.toString) = 1 + mhist.getOrElse(m.component.toString, 0)
+      val w = m.needWidth()
       whist(w) = 1 + whist.getOrElse(w, 0)
       val name = m match {
         case op: Op => op.op

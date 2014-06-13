@@ -107,8 +107,15 @@ class Width(_width: Int) extends Ordered[Width] {
     if (widthVal != unSet) widthVal.get else v
   }
 
-  // Compare two (known) widths.
-  def compare(that: Width) = this.needWidth() - that.needWidth()
+  // Compare two widths. We assume an unknown width is less than any known width
+  def compare(that: Width): Int = {
+    if (this.isKnown && that.isKnown)
+      this.widthVal.get - that.widthVal.get
+    else if (this.isKnown)
+      +1	// that
+    else
+      -1	// this
+  }
 
   // Print a string representation of width
   override def toString: String = (widthVal match {
@@ -137,8 +144,13 @@ class Width(_width: Int) extends Ordered[Width] {
       op match {
         case "+" => Width(this.width + operand.width)
         case "-" => {
-          assert(this.width >= operand.width)
-          Width(this.width - operand.width)
+          val w = this.width - operand.width
+          if (w < 0) {
+            ChiselError.warning("Width.op- clamping width to 0: " + this.width + " < " + operand.width)
+            Width(0)
+          } else {
+            Width(w)
+          }
         }
       }
     }
@@ -158,6 +170,8 @@ class Width(_width: Int) extends Ordered[Width] {
   
   implicit def fromInt(i: Int): Width = Width(i)
   
+  def max(that: Width): Width = if (compare(that) > 0) this else that
+
   // Define the equality trio: hashCode, equals, canEqual
   //   Programming in Scala, Chapter 28: Object Equality
   //   We want defined widths with idential values to produce the same hashCode
@@ -177,4 +191,5 @@ class Width(_width: Int) extends Ordered[Width] {
       false
 }
     def canEqual(other: Any) = other.isInstanceOf[Width]  
+
 }
