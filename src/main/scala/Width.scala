@@ -37,8 +37,8 @@ import ChiselError._
 object Width {
   type WidthType = Option[Int]  // The internal representation of width
   // Class variables.
-  val unSet: WidthType = None	// The internal "unset" value
-  val unSetVal: Int = -1	// The external "unset" value
+  val unSet: WidthType = None   // The internal "unset" value
+  val unSetVal: Int = -1        // The external "unset" value
   val throwIfUnsetRef: Boolean = false
   val debug: Boolean = false
 
@@ -55,7 +55,7 @@ object Width {
 }
 
 class Width(_width: Int) extends Ordered[Width] {
-	// Construction: initialize internal state
+  // Construction: initialize internal state
   private var widthVal: WidthType = if (_width > -1) Some(_width) else unSet
 
   if (debug) {
@@ -63,11 +63,12 @@ class Width(_width: Int) extends Ordered[Width] {
   }
 
   // Caller requires a single, integer value (legacy code).
+  @deprecated("Clients should not expect a Width is directly convertable to an Int", "2.3")
   def width: Int = if (isKnown) widthVal.get else unSetVal
 
   //  Set the width of a Node.
-  def setWidth(w: Int) = {
-    assert(w > -2, ChiselError.error("Width.setWidth: setting width to " + w))
+  def setWidth(w: Int): Unit = {
+    assert(w >= 0, ChiselError.error("Width.setWidth: setting width to " + w))
     if (w < 0) {
       if (throwIfUnsetRef) {
         throw new Exception("Width:setWidth < -1");
@@ -77,10 +78,12 @@ class Width(_width: Int) extends Ordered[Width] {
       widthVal = Some(w)
     }
     if (debug) {
+      // scalastyle:off regex
       println("Width(" + this + "):setWidth(" + w + ")")
     }
   }
 
+  // scalastyle:off method.name
   // Syntactic sugar - an attempt to set "width" to an integer.
   def width_=(w: Int) {
     setWidth(w)
@@ -99,7 +102,7 @@ class Width(_width: Int) extends Ordered[Width] {
         throw new Exception("uninitialized width");
       }
     }
-    width
+    widthVal.get
   }
 
   // Return either the width or the specificed value if the width isn't set.
@@ -109,12 +112,13 @@ class Width(_width: Int) extends Ordered[Width] {
 
   // Compare two widths. We assume an unknown width is less than any known width
   def compare(that: Width): Int = {
-    if (this.isKnown && that.isKnown)
+    if (this.isKnown && that.isKnown) {
       this.widthVal.get - that.widthVal.get
-    else if (this.isKnown)
-      +1	// that
-    else
-      -1	// this
+    } else if (this.isKnown) {
+      + 1       // that
+    } else {
+      - 1       // this
+    }
   }
 
   // Print a string representation of width
@@ -123,30 +127,34 @@ class Width(_width: Int) extends Ordered[Width] {
     case x => x
   }).toString
 
-  def copy(w: Int = this.width): Width = {
+  def copy(w: Int = this.widthVal.get): Width = {
     val neww = new Width(w)
     neww
   }
 
   override def clone(): Width = {
-    val w = new Width(this.width)
-    w
+    if (this.isKnown) {
+      Width(this.widthVal.get)
+    } else {
+      Width()
+    }
   }
-  
+
   // Define the arithmetic operations so we can deal with unspecified widths
   // (Currently unused - mostly a template for how to do this.
-  def BinaryOp(op: String, operand: Width): Width = {
+  def binaryOp(op: String, operand: Width): Width = {
     if (!this.isKnown) {
       this
     } else if (! operand.isKnown) {
       operand
     } else {
+      val (v1,v2) = (this.widthVal.get, operand.widthVal.get)
       op match {
-        case "+" => Width(this.width + operand.width)
+        case "+" => Width(v1 + v2)
         case "-" => {
-          val w = this.width - operand.width
+          val w = v1 - v2
           if (w < 0) {
-            ChiselError.warning("Width.op- clamping width to 0: " + this.width + " < " + operand.width)
+            ChiselError.warning("Width.op- clamping width to 0: " + v1 + " < " + v2)
             Width(0)
           } else {
             Width(w)
@@ -155,21 +163,25 @@ class Width(_width: Int) extends Ordered[Width] {
       }
     }
   }
-  
+
+  // scalastyle:off method.name spaces.after.plus
   // Define addition of two widths
-  def +(w: Width): Width = BinaryOp("+", w)
-  
+  def +(w: Width): Width = binaryOp("+", w)
+
+  // scalastyle:off method.name
   // Define subtraction of one Width from another
-  def -(w: Width): Width = BinaryOp("-", w)
-  
+  def -(w: Width): Width = binaryOp("-", w)
+
+  // scalastyle:off method.name spaces.after.plus
   // Define addition of an Int to a Width
-  def +(i: Int): Width = BinaryOp("+", Width(i))
-  
+  def +(i: Int): Width = binaryOp("+", Width(i))
+
+  // scalastyle:off method.name
   // Define subtraction of an Int from a Width
-  def -(i: Int): Width = BinaryOp("-", Width(i))
-  
+  def -(i: Int): Width = binaryOp("-", Width(i))
+
   implicit def fromInt(i: Int): Width = Width(i)
-  
+
   def max(that: Width): Width = if (compare(that) > 0) this else that
 
   // Define the equality trio: hashCode, equals, canEqual
@@ -179,17 +191,17 @@ class Width(_width: Int) extends Ordered[Width] {
   //   (undefined widths should NOT compare equal)
   //   Since hashCode (and equals) depends on a var, it can change if the value changes.
   //   This will be problematic for collections of widths.
-  override def hashCode = widthVal match {
+  override def hashCode: Int = widthVal match {
     case Some(w) => w * 41
     case _ => super.hashCode
   }
-  override def equals(other: Any) = other match {
+  override def equals(other: Any): Boolean = other match {
     case that: Width =>
       (that canEqual this) && (this.widthVal != unSet)
       (this.widthVal == that.widthVal)
     case _ =>
       false
 }
-    def canEqual(other: Any) = other.isInstanceOf[Width]  
+    def canEqual(other: Any): Boolean = other.isInstanceOf[Width]
 
 }
