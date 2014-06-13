@@ -141,7 +141,6 @@ class Width(_width: Int) extends Ordered[Width] {
   }
 
   // Define the arithmetic operations so we can deal with unspecified widths
-  // (Currently unused - mostly a template for how to do this.
   def binaryOp(op: String, operand: Width): Width = {
     if (!this.isKnown) {
       this
