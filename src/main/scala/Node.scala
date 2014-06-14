@@ -95,15 +95,15 @@ object Node {
 
   def lshWidthOf(i: => Int, n: => Node): (=> Node) => (Width) = {
     (m) => {
-      val res = m.inputs(0).width + n.maxNum.toInt;
-      res
+      n.width
+      if (!n.isLit && !n.isKnownWidth) Width()
+      else m.inputs(0).width + n.litValue((1 << n.needWidth)-1).toInt
     }
   }
 
   def rshWidthOf(i: => Int, n: => Node): (=> Node) => (Width) = {
     (m) => {
-      val res = m.inputs(i).width - n.minNum.toInt
-      res
+      m.inputs(0).width - n.litValue(0).toInt
     }
   }
 }
@@ -200,16 +200,6 @@ abstract class Node extends nameable {
 
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
   def ##(b: Node): Node  = Op("##", sumWidth _,  this, b );
-  def maxNum: BigInt = {
-    // XXX This makes sense for UInt, but not in general.
-    val ww = width
-    val w = if (ww.isKnown) ww.needWidth() else {
-      val ww = inferWidth(this)
-      ww.needWidth()
-    }
-    litValue((BigInt(1) << w) - 1)
-  }
-  def minNum: BigInt = litValue(0)
   final def isLit: Boolean = litOf ne null
   def litOf: Literal = if (getNode != this) getNode.litOf else null
   def litValue(default: BigInt = BigInt(-1)): BigInt =
