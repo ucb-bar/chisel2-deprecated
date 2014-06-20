@@ -95,7 +95,7 @@ object Node {
 
   def lshWidthOf(i: => Int, n: => Node): (=> Node) => (Width) = {
     (m) => {
-      n.width
+      // n.width
       if (!n.isLit && !n.isKnownWidth) Width()
       else m.inputs(0).width + n.litValue((1 << n.needWidth)-1).toInt
     }
@@ -244,6 +244,9 @@ abstract class Node extends nameable {
     } else if (res != width) {
         // NOTE: This should NOT stop us using inferWidth, since the value
         // we set here may not be correct.
+      if (width_.isKnown) {
+        println("Node.infer: changing width from " + width_.needWidth() + " to " + res.needWidth() + ", for node "+ this)
+      }
       width_ = res
       true
     } else {
