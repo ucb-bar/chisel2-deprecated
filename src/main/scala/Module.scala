@@ -329,12 +329,20 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     /* XXX Make sure roots are consistent between initializeBFS, initializeDFS
      and findRoots.
      */
-    for( a <- this.debugs ) {
+    Driver.backend match {
+      case _: VerilogBackend => 
+        for (c <- Driver.components; (n, flat) <- c.io.flatten) 
+          res.push(flat)
+      case _ => 
+        for((n, flat) <- this.io.flatten) 
+          res.push(flat)
+    }
+    for (c <- Driver.components; if !(c.defaultResetPin == null))
+      res.push(c.defaultResetPin)
+    for (c <- Driver.components; a <- c.debugs) 
       res.push(a)
-    }
-    for((n, flat) <- this.io.flatten) {
+    for (b <- Driver.blackboxes; (n, flat) <- b.io.flatten) 
       res.push(flat)
-    }
     res
   }
 
@@ -362,15 +370,28 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     val walked = new HashSet[Node]
     val dfsStack = initializeDFS
 
+    def insertNode(n: Node) {
+      if (!(n == null) && !(walked contains n)) {
+        dfsStack push n
+        walked += n
+      }
+    }
+
     while(!dfsStack.isEmpty) {
       val top = dfsStack.pop
       walked += top
-      visit(top)
-      for(i <- top.inputs) {
-        if (!(i == null) && !(walked contains i)){
-          dfsStack push i
-          walked += i
-        }
+
+      top match {
+        case b: Bundle =>
+        case _ => visit(top)
+      }
+
+      for (node <- traceableNodes)
+        insertNode(node)
+
+      for(i <- top.inputs) { 
+        if (!Driver.backend.isInstanceOf[VerilogBackend] || !i.isIo) 
+          insertNode(i)
       }
     }
   }

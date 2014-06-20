@@ -581,7 +581,7 @@ abstract class Backend {
 
     /* XXX If we call nameAll here and again further down, we end-up with
      duplicate names in the generated C++. */
-    nameAll(c) 
+    nameAll(c)
 
     ChiselError.info("elaborating modules")
     Driver.components.foreach(_.elaborate(0))
@@ -633,8 +633,8 @@ abstract class Backend {
     collectNodesIntoComp(initializeDFS)
 
     /* Give indexes before transformations */
-    c.dfs { emitRef(_) }
     nameRsts
+    c.dfs { emitRef(_) }
 
     // two transforms added in Mem.scala (referenced and computePorts)
     ChiselError.info("executing custom transforms")
