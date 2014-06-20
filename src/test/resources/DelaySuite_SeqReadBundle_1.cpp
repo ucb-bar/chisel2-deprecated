@@ -1,8 +1,9 @@
 #include "DelaySuite_SeqReadBundle_1.h"
 
-void DelaySuite_SeqReadBundle_1_t::init ( bool rand_init ) {
-  if (rand_init) R1.randomize();
-  if (rand_init) DelaySuite_SeqReadBundle_1__mem.randomize();
+void DelaySuite_SeqReadBundle_1_t::init ( val_t rand_init ) {
+  this->__srand(rand_init);
+  R1.randomize(&__rand_seed);
+  DelaySuite_SeqReadBundle_1__mem.randomize(&__rand_seed);
 }
 int DelaySuite_SeqReadBundle_1_t::clock ( dat_t<1> reset ) {
   uint32_t min = ((uint32_t)1<<31)-1;

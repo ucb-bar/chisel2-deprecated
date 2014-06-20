@@ -143,7 +143,7 @@ object UIntToOH
 {
   def apply(in: UInt, width: Int = -1): UInt =
     if (width == -1) UInt(1) << in
-    else UInt(1) << in(log2Up(width)-1,0)
+    else (UInt(1) << in(log2Up(width)-1,0))(width-1,0)
 }
 
 /** Builds a Mux tree out of the input signal vector using a one hot encoded
@@ -254,13 +254,14 @@ object ArbiterCtrl
 
 abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends Module {
   require(isPow2(count))
+  def grant: Seq[Bool]
   val io = new ArbiterIO(gen, n)
   val locked  = if(count > 1) Reg(init=Bool(false)) else Bool(false)
   val lockIdx = if(count > 1) Reg(init=UInt(n-1)) else UInt(n-1)
-  val grant = List.fill(n)(Bool())
   val chosen = UInt(width = log2Up(n))
 
-  (0 until n).map(i => io.in(i).ready := Mux(locked, lockIdx === UInt(i), grant(i)) && io.out.ready)
+  for ((g, i) <- grant.zipWithIndex)
+    io.in(i).ready := Mux(locked, lockIdx === UInt(i), g) && io.out.ready
   io.out.valid := io.in(chosen).valid
   io.out.bits := io.in(chosen).bits
   io.chosen := chosen
@@ -284,9 +285,11 @@ abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLo
 }
 
 class LockingRRArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
-  val last_grant = Reg(init=UInt(0, log2Up(n)))
-  val ctrl = ArbiterCtrl((0 until n).map(i => io.in(i).valid && UInt(i) > last_grant) ++ io.in.map(_.valid))
-  (0 until n).map(i => grant(i) := ctrl(i) && UInt(i) > last_grant || ctrl(i + n))
+  lazy val last_grant = Reg(init=UInt(0, log2Up(n)))
+  override def grant: Seq[Bool] = {
+    val ctrl = ArbiterCtrl((0 until n).map(i => io.in(i).valid && UInt(i) > last_grant) ++ io.in.map(_.valid))
+    (0 until n).map(i => ctrl(i) && UInt(i) > last_grant || ctrl(i + n))
+  }
 
   var choose = UInt(n-1)
   for (i <- n-2 to 0 by -1)
@@ -299,8 +302,7 @@ class LockingRRArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[
 }
 
 class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
-  val ctrl = ArbiterCtrl(io.in.map(_.valid))
-  grant zip ctrl map { case(g, c) => g := c }
+  def grant: Seq[Bool] = ArbiterCtrl(io.in.map(_.valid))
 
   var choose = UInt(n-1)
   for (i <- n-2 to 0 by -1) {
@@ -338,16 +340,26 @@ object FillInterleaved
   def apply(n: Int, in: Seq[Bool]): UInt = Vec(in.map(Fill(n, _))).toBits
 }
 
+class Counter(val n: Int) {
+  val value = if (n == 1) UInt(0) else Reg(init=UInt(0, log2Up(n)))
+  def inc(): Bool = {
+    if (n == 1) Bool(true)
+    else {
+      val wrap = value === UInt(n-1)
+      value := Mux(Bool(!isPow2(n)) && wrap, UInt(0), value + UInt(1))
+      wrap
+    }
+  }
+}
 
 object Counter
 {
+  def apply(n: Int): Counter = new Counter(n)
   def apply(cond: Bool, n: Int): (UInt, Bool) = {
-    val c = Reg(init=UInt(0, log2Up(n)))
-    val wrap = c === UInt(n-1)
-    when (cond) {
-      c := Mux(Bool(!isPow2(n)) && wrap, UInt(0), c + UInt(1))
-    }
-    (c, wrap && cond)
+    val c = new Counter(n)
+    var wrap: Bool = null
+    when (cond) { wrap = c.inc() }
+    (c.value, cond && wrap)
   }
 }
 
@@ -362,40 +374,39 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
 {
   val io = new QueueIO(gen, entries)
 
-  val do_flow = Bool()
+  val ram = Mem(gen, entries)
+  val enq_ptr = Counter(entries)
+  val deq_ptr = Counter(entries)
+  val maybe_full = Reg(init=Bool(false))
+
+  val ptr_match = enq_ptr.value === deq_ptr.value
+  val empty = ptr_match && !maybe_full
+  val full = ptr_match && maybe_full
+  val maybe_flow = Bool(flow) && empty
+  val do_flow = maybe_flow && io.deq.ready
+
   val do_enq = io.enq.ready && io.enq.valid && !do_flow
   val do_deq = io.deq.ready && io.deq.valid && !do_flow
-
-  var enq_ptr = UInt(0)
-  var deq_ptr = UInt(0)
-
-  if (entries > 1) {
-    enq_ptr = Counter(do_enq, entries)._1
-    deq_ptr = Counter(do_deq, entries)._1
+  when (do_enq) {
+    ram(enq_ptr.value) := io.enq.bits
+    enq_ptr.inc()
   }
-
-  val maybe_full = Reg(init=Bool(false))
+  when (do_deq) {
+    deq_ptr.inc()
+  }
   when (do_enq != do_deq) {
     maybe_full := do_enq
   }
 
-  val ram = Mem(gen, entries)
-  when (do_enq) { ram(enq_ptr) := io.enq.bits }
-
-  val ptr_match = enq_ptr === deq_ptr
-  val empty = ptr_match && !maybe_full
-  val full = ptr_match && maybe_full
-  val maybe_flow = Bool(flow) && empty
-  do_flow := maybe_flow && io.deq.ready
-  io.deq.valid :=  !empty || Bool(flow) && io.enq.valid
+  io.deq.valid := !empty || Bool(flow) && io.enq.valid
   io.enq.ready := !full || Bool(pipe) && io.deq.ready
-  io.deq.bits := Mux(maybe_flow, io.enq.bits, ram(deq_ptr))
+  io.deq.bits := Mux(maybe_flow, io.enq.bits, ram(deq_ptr.value))
 
-  val ptr_diff = enq_ptr - deq_ptr
+  val ptr_diff = enq_ptr.value - deq_ptr.value
   if (isPow2(entries)) {
     io.count := Cat(maybe_full && ptr_match, ptr_diff)
   } else {
-    io.count := Mux(ptr_match, Mux(maybe_full, UInt(entries), UInt(0)), Mux(deq_ptr > enq_ptr, UInt(entries) + ptr_diff, ptr_diff))
+    io.count := Mux(ptr_match, Mux(maybe_full, UInt(entries), UInt(0)), Mux(deq_ptr.value > enq_ptr.value, UInt(entries) + ptr_diff, ptr_diff))
   }
 }
 

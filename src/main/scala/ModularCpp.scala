@@ -175,7 +175,7 @@ class ModularCppBackend extends CppBackend {
     }
 
     out_h.write("\n");
-    out_h.write("  void init ( bool rand_init = false );\n");
+    out_h.write("  void init ( val_t rand_init = false );\n");
     for ((vertex, i) <- vertices.zipWithIndex) {
       out_h.write("  void clock_lo_" + i + " ( dat_t<1> reset );\n")
     }
@@ -191,7 +191,7 @@ class ModularCppBackend extends CppBackend {
     out_c.write("#include \"" + c.name + ".h\"\n");
     for (str <- Driver.includeArgs) out_c.write("#include \"" + str + "\"\n")
     out_c.write("\n");
-    out_c.write("void " + c.name + "_t::init ( bool rand_init ) {\n");
+    out_c.write("void " + c.name + "_t::init ( val_t rand_init ) {\n");
     for (vertex <- vertices) {
       for (m <- vertex.sortedNodes) {
         out_c.write(emitInit(m));

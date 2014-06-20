@@ -1,7 +1,8 @@
 #include "NameSuite_DebugComp_1.h"
 
-void NameSuite_DebugComp_1_t::init ( bool rand_init ) {
-  if (rand_init) NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.randomize();
+void NameSuite_DebugComp_1_t::init ( val_t rand_init ) {
+  this->__srand(rand_init);
+  NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.randomize(&__rand_seed);
 }
 int NameSuite_DebugComp_1_t::clock ( dat_t<1> reset ) {
   uint32_t min = ((uint32_t)1<<31)-1;
