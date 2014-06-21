@@ -1027,6 +1027,9 @@ class dat_t {
     dat_t<n> res = mask<n>(n);
     return res;
   }
+  val_t operator [] (size_t i) {
+      return values[i];
+  }
   dat_t<w> operator + ( dat_t<w> o ) {
     dat_t<w> res;
     bit_word_funs<n_words>::add(res.values, values, o.values, w);
