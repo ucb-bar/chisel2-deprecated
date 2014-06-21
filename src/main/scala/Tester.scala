@@ -101,7 +101,7 @@ class ManualTester[+T <: Module]
     if (t > 1 && !snaps.isEmpty) {
       for (out <- outputs) {
         if (isTrace) println("ADDING EXPECT AT T=" + t)
-        snaps.last.expects += Expect(out, t, peekBits(out))
+        snaps.last.expects += Expect(out, t, peek(out))
       }
     }
   }
