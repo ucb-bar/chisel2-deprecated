@@ -168,7 +168,7 @@ class CppBackend extends Backend {
     else s"  {${s.map(" " + _ + ";").reduceLeft(_ + _)}}\n"
   def emitDatRef(x: Node): String =
     if (x.isInObject) emitRef(x)
-    else if (words(x) > 1) s"*reinterpret_cast<dat_t<${x.width}>*>(${emitRef(x)})"
+    else if (words(x) > 1) s"*reinterpret_cast<dat_t<${x.width}>*>(&${emitRef(x)})"
     else if (isLit(x)) s"dat_t<${x.width}>(${emitRef(x)})"
     else s"*reinterpret_cast<dat_t<${x.width}>*>(&${emitRef(x)})"
   def trunc(x: Node): String =
