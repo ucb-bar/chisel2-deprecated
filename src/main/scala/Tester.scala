@@ -396,11 +396,11 @@ class ManualTester[+T <: Module]
     }
   }
 
-  def propagate() = {
+  def clockDown() = {
     val s = emulatorCmd("propagate")
   }
 
-  def tick() = {
+  def clockUp() = {
     val s = emulatorCmd("tick")
   }
 

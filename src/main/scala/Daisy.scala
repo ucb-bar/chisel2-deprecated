@@ -121,7 +121,7 @@ class EventCounter(val signal: Node, val cntrT: CounterType,
   val src = Reg(init = Bits(0, AXISlave.dw))
 }
 
-object addPin {
+object DaisyUtil {
   val tempStack = new ListBuffer[Module]
 
   private def start() {
@@ -136,7 +136,7 @@ object addPin {
     }
   }
 
-  def apply[T <: Data](m: Module, gen: => T, name: String) = {
+  def addPin[T <: Data](m: Module, gen: => T, name: String) = {
     require(name != "")
     start()
     val pin = gen
@@ -155,6 +155,38 @@ object addPin {
     pin
   }
 
+  def addNode[T <: Bits](m: Module, gen: T, name: String = ""): T = {
+    val res = gen
+    start()
+    if (name != "") res.getNode setName name
+    res.getNode.component = m
+    finish()
+    res
+  }
+
+  def addReg[T <: Bits](m: Module, gen: => T, name: String = "") = {
+    start()
+    val res = gen
+    val reg = res.comp match { case r: Reg => r }
+    // assign component
+    reg.component = m
+    // assign clock & reset
+    reg.assignClock(m.clock)
+    reg.assignReset(m.reset)
+    // assign name
+    if (name != "") reg setName name
+    finish()
+    res
+  }
+
+  def updateReg(regType: Bits, updates: (Bool, Node)*) {
+    val reg = regType.comp match { case r: Reg => r }
+    // add updates
+    for ((cond, value) <- updates)
+      reg.doProcAssign(value, cond)
+  }
+
+
   def wire(pair: => ((Node, Node))) {
     start()
     val (input, consumer) = pair
@@ -164,7 +196,7 @@ object addPin {
   }
 }
 
-import addPin.wire
+import DaisyUtil._
 
 // DaisyTransform inserts the step counter and
 // the snapshot and evenet counter pins
@@ -280,33 +312,6 @@ object DaisyChain extends Backend {
     b.analyses   += ((c: Module) => printOutMappings(c))
   }
 
-  def addNode[T <: Bits](m: Module, gen: T, name: String = ""): T = {
-    val res = gen
-    if (name != "") res.getNode setName name
-    res.getNode.component = m
-    res
-  }
-
-  def addReg[T <: Bits](m: Module, gen: => T, name: String = "") = {
-    val res = gen
-    val reg = res.comp match { case r: Reg => r }
-    // assign component
-    reg.component = m
-    // assign clock & reset
-    reg.assignClock(m.clock)
-    reg.assignReset(m.reset)
-    // assign name
-    if (name != "") reg setName name
-    res
-  }
-
-  def updateReg(regType: Bits, updates: (Bool, Node)*) {
-    val reg = regType.comp match { case r: Reg => r }
-    // add updates
-    for ((cond, value) <- updates)
-      reg.doProcAssign(value, cond)
-  }
-
   val ioBuffers = new HashMap[Node, Bits]
   val fires = new HashMap[Module, Bool]
   val firePins = new HashMap[Module, Bool]
@@ -341,18 +346,14 @@ object DaisyChain extends Backend {
         val snapFire = addNode(m, snapOuts(m).ready && snapValid, "snap_fire")
         snapCopy(m) = firePins(m)
         snapRead(m) = addNode(m, snapFire && (snapCtrls(m) === Bits(1)), "snap_read")
-        if (m != c) {
-          wire(snapValid -> snapOuts(m).valid)
-        }
+        if (m != c) wire(snapValid -> snapOuts(m).valid)
       }
       if (Driver.isCounting) {
         val cntrValid = !firePins(m) 
         val cntrFire = addNode(m, cntrOuts(m).ready && cntrValid, "cntr_fire")
         cntrCopy(m) = addNode(m, cntrFire && (cntrCtrls(m) === Bits(0)), "cntr_copy")
         cntrRead(m) = addNode(m, cntrFire && (cntrCtrls(m) === Bits(1)), "cntr_read")
-        if (m != c) {
-          wire(cntrValid -> cntrOuts(m).valid)
-        }
+        if (m != c) wire(cntrValid -> cntrOuts(m).valid)
       }
       m.children foreach (queue enqueue _)
     }
@@ -1196,7 +1197,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
     counterVals.clear
     counterVals ++= Array.fill(counters.size)(BigInt(0))
     for (k <- 0 until n) {
-      propagate()
+      clockDown()
       if (Driver.isCounting) {
         if (isTrace) println("*** READ COUNTER SIGNALS ***")
         for ((counter, i) <- counters.zipWithIndex) {
@@ -1231,7 +1232,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
             peekBits(signal) }
         }
       }
-      tick()
+      clockUp()
     }
 
     for (k <- 0 until n) {
