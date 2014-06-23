@@ -134,6 +134,8 @@ class CppBackend extends Backend {
       case c: Clock =>
         List(("int", emitRef(node)),
              ("int", emitRef(node) + "_cnt"))
+      case _ if node.name == "reset" =>
+        List()
       case _ =>
         List((s"dat_t<${node.width}>", emitRef(node)))
     }

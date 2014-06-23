@@ -78,7 +78,7 @@ class ManualTester[+T <: Module]
 
   val regs  = c.omods.filter(x => x.isInstanceOf[Reg]).map(x => x.getNode);
   val mems  = c.omods.filter(x => x.isInstanceOf[Mem[_]]).map(x => x.getNode);
-  val outputs = c.io.flatten.unzip._2.filter(_.dir == OUTPUT)
+  lazy val outputs = c.io.flatten.unzip._2.filter(_.dir == OUTPUT)
   val mappings = new HashMap[String, Node]()
 
   def dump(): Snapshot = {

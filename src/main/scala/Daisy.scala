@@ -291,8 +291,8 @@ object DaisyChain extends Backend {
   def apply (b: Backend) {
     b.transforms += ((c: Module) => c bfs (_.addConsumers))
     b.transforms += ((c: Module) => addStepCounter(c))
-    b.transforms += ((c: Module) => setClockDomains(c))
     b.transforms += ((c: Module) => reconstructIOs(c))
+    b.transforms += ((c: Module) => setClockDomains(c))
     b.transforms += ((c: Module) => appendFires(top))
     if (Driver.isSnapshotting) {
       b.transforms += (c => findDelays(top))
@@ -951,7 +951,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
   val clockVals = new LinkedHashMap[Clock, Int]
   val clockCnts = new LinkedHashMap[Clock, Int]
 
-  override val outputs = top.io.flatten.unzip._2 filter (x => {
+  override lazy val outputs = top.io.flatten.unzip._2 filter (x => {
     val name = x.chiselName.split('.').last
     x.dir == OUTPUT && !(DaisyChain.keywords contains name)
   })
@@ -1112,13 +1112,6 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
       }
       clockCnts(clock) = clockVals(clock)
     }
-  }
-
-  override def dumpName(data: Node): String = {
-    if (data.name != "")
-      data.chiselName
-    else
-      data.component.getPathName(".") + "." + Driver.backend.emitRef(data)    
   }
 
   override def dump(): Snapshot = {

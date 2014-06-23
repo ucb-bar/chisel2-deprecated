@@ -163,6 +163,8 @@ abstract class Node extends nameable {
     case any        =>
       if (name != "" && (name != "reset") && !(component == null)) 
         component.getPathName(".") + "." + name
+      else if (name == "" && isInObject && !(component == null))
+        component.getPathName(".") + "." + Driver.backend.emitRef(this)
       else
         ""
   }
