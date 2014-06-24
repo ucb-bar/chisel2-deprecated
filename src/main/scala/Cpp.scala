@@ -169,7 +169,7 @@ class CppBackend extends Backend {
   def emitDatRef(x: Node): String = {
     val gotWidth = x.needWidth()
     if (x.isInObject) emitRef(x)
-    else if (words(x) > 1) s"*reinterpret_cast<dat_t<${gotWidth}>*>(${emitRef(x)})"
+    else if (words(x) > 1) s"*reinterpret_cast<dat_t<${gotWidth}>*>(&${emitRef(x)})"
     else if (isLit(x)) s"dat_t<${gotWidth}>(${emitRef(x)})"
     else s"*reinterpret_cast<dat_t<${gotWidth}>*>(&${emitRef(x)})"
   }

@@ -75,6 +75,7 @@ class ROMData(elts: SortedMap[Int, Node], val n: Int) extends Node {
   }
 
   override lazy val isInObject: Boolean = true
+  override lazy val isInVCD: Boolean = Driver.isVCDMem
 }
 
 class ROMRead extends Node {

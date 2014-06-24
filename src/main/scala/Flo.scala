@@ -115,7 +115,7 @@ class FloBackend extends Backend {
           o.op match {
             case "~" => "not'" + gotWidth + " " + emitRef(node.inputs(0))
             case "^" => "xorr'" + gotWidth + " " + emitRef(node.inputs(0))
-            case "Log2" => "log2'" + node.needWidth() + " " + emitRef(node.inputs(0)) + "\n"
+            case "Log2" => "log2'" + node.needWidth() + " " + emitRef(node.inputs(0))
           }
          } else {
            val gotWidth = node.inputs(0).needWidth()
