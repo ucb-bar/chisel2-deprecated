@@ -182,16 +182,26 @@ object DaisyUtil {
   def updateReg(regType: Bits, updates: (Bool, Node)*) {
     val reg = regType.comp match { case r: Reg => r }
     // add updates
-    for ((cond, value) <- updates)
+    for ((cond, value) <- updates.reverse)
       reg.doProcAssign(value, cond)
   }
 
 
-  def wire(pair: => ((Node, Node))) {
+  def wire(pair: => ((Node, Node)), isAND: Boolean = true) {
     start()
     val (input, consumer) = pair
     if (consumer.inputs.isEmpty) consumer.inputs += input
-    else consumer.inputs(0) = input
+    else {
+      (consumer.inputs.head, input) match {
+        case (bool: Bool, input: Bool) => {
+          if (isAND) 
+            consumer.inputs(0) = input && bool
+          else 
+            consumer.inputs(0) = input || bool
+        }
+        case _ => consumer.inputs(0) = input
+      }
+    }
     finish()
   }
 }
@@ -315,6 +325,7 @@ object DaisyChain extends Backend {
   val ioBuffers = new HashMap[Node, Bits]
   val fires = new HashMap[Module, Bool]
   val firePins = new HashMap[Module, Bool]
+  val fireBufs = new HashMap[Module, Bool]
   val enClks = new LinkedHashMap[Clock, HashMap[Module, Bool]]
   val clkRegs = new HashMap[Clock, UInt]
   val clkCnts = new HashMap[Clock, UInt]
@@ -342,18 +353,22 @@ object DaisyChain extends Backend {
       }
 
       if (Driver.isSnapshotting) {
-        val snapValid = !firePins(m) 
-        val snapFire = addNode(m, snapOuts(m).ready && snapValid, "snap_fire")
-        snapCopy(m) = firePins(m)
+        val snapValid = if (m.children.isEmpty) !firePins(m) else {
+          (m.children.tail foldLeft snapOuts(m.children.head).valid)(
+            (res, child) => res && snapOuts(child).valid) } 
+        val snapFire = addNode(m, snapOuts(m).ready && !firePins(m), "snap_fire")
+        snapCopy(m) = addNode(m, snapFire && (snapCtrls(m) === Bits(0)), "snap_copy")
         snapRead(m) = addNode(m, snapFire && (snapCtrls(m) === Bits(1)), "snap_read")
-        if (m != c) wire(snapValid -> snapOuts(m).valid)
+        wire(snapValid -> snapOuts(m).valid)
       }
       if (Driver.isCounting) {
-        val cntrValid = !firePins(m) 
-        val cntrFire = addNode(m, cntrOuts(m).ready && cntrValid, "cntr_fire")
+        val cntrValid = if (m.children.isEmpty) !firePins(m) else {
+          (m.children.tail foldLeft snapOuts(m.children.head).valid)(
+            (res, child) => res && snapOuts(child).valid) } 
+        val cntrFire = addNode(m, cntrOuts(m).ready && !firePins(m), "cntr_fire")
         cntrCopy(m) = addNode(m, cntrFire && (cntrCtrls(m) === Bits(0)), "cntr_copy")
         cntrRead(m) = addNode(m, cntrFire && (cntrCtrls(m) === Bits(1)), "cntr_read")
-        if (m != c) wire(cntrValid -> cntrOuts(m).valid)
+        wire(cntrValid -> cntrOuts(m).valid)
       }
       m.children foreach (queue enqueue _)
     }
@@ -586,6 +601,8 @@ object DaisyChain extends Backend {
     }
   }
 
+  private val raddrEns = new HashMap[Node, Bool]
+  val raddrs = new ArrayBuffer[Node]
   def findDelays(c: Module) { 
     ChiselError.info("[SnapshotChain] find delay elements")
     /*** collect inputs ***/
@@ -602,6 +619,27 @@ object DaisyChain extends Backend {
         _ match {
           case reg: Reg if !(keywords contains reg.name) => 
             m.delays ++= DelayElem(reg)
+          case mem: Mem[_] if mem.seqRead => {
+            if (!(fireBufs contains m)) fireBufs(m) = addReg(m, Reg(next=firePins(m)), "fire_buf")
+            val raddrName = mem.name + "_daisy_raddr"
+            val memSize = UInt(mem.size-1)
+            val raddr = addReg(m, Reg(UInt(width=log2Up(mem.size))), raddrName)
+            val overflow = addReg(m, Reg(UInt(width=1)))
+            val raddrEn = !fireBufs(m) && raddr < memSize && !overflow
+            val raddrEnBuf = addReg(m, Reg(next=raddrEn), mem.name + "_raddr_en")
+            raddrs += raddr.comp
+            keywords += raddrName
+            updateReg(raddr,    raddrEn -> (raddr + UInt(1)),  fireBufs(m) -> UInt(0))
+            updateReg(overflow, raddrEn -> (raddr >= memSize), fireBufs(m) -> Bool(false))
+            for (i <- 0 until mem.size) {
+              val addr = if (i == mem.size-1) raddr else UInt(i)
+              val src = new MemRead(mem, addr)
+              raddrEns(src) = if (i == mem.size-1) raddrEn else raddrEnBuf
+              m.delays ++= DelayElem(src)
+            }
+            // Snapshot is not valid until reading out all SRAM values
+            wire((!raddrEn && !raddrEnBuf) -> snapOuts(m).valid)
+          }
           case mem: Mem[_] =>
             for (i <- 0 until mem.size)
               m.delays ++= DelayElem(new MemRead(mem, UInt(i)))
@@ -617,19 +655,19 @@ object DaisyChain extends Backend {
     updateReg(delayNum, 
       (snapRead(c) && delayNum.orR) -> (delayNum - UInt(1)),
       stepsIn.valid -> UInt(delays.size))
-    wire((snapCopy(c) || delayNum.orR) -> snapOuts(c).valid)
-  }
-
-  def addBuffer(c: Module, i: Int, w: Int, updates: (Bool, Node)) = {
-    val bufName = "buffer_%d".format(i)
-    val buffer = addReg(c, Reg(init=UInt(0, w)), bufName)
-    keywords += bufName
-    updateReg(buffer, updates)
-    buffer
+    // wire(delayNum.orR -> snapOuts(c).valid)
   }
 
   def genCounters(c: Module) {
     ChiselError.info("[CounterChain] generate event counters")
+
+    def addBuffer(c: Module, i: Int, w: Int, updates: (Bool, Node)) = {
+      val bufName = "buffer_%d".format(i)
+      val buffer = addReg(c, Reg(init=UInt(0, w)), bufName)
+      keywords += bufName
+      updateReg(buffer, updates)
+      buffer
+    }
 
     val queue = ScalaQueue(c)
     while (!queue.isEmpty) {
@@ -854,7 +892,17 @@ object DaisyChain extends Backend {
         // daisy_ctrl == 'copy' -> current source
         // daisy_ctrl == 'read' -> next shadow
         addReg(m, s.head.shadow, shadowName)
-        updateReg(s.head.shadow, copy -> src, read -> s.last.shadow) 
+        src match {
+          case mread: MemRead if chainT == SnapshotChain && (raddrEns contains src) =>
+            mread.addr.getNode match {
+              case _: Reg =>
+                updateReg(s.head.shadow, raddrEns(src) -> src, read -> s.last.shadow)
+              case _ =>
+                updateReg(s.head.shadow, (raddrEns(src) || read) -> s.last.shadow)
+            }
+          case _ =>
+            updateReg(s.head.shadow, copy -> src, read -> s.last.shadow) 
+        }
       }
       // visit children
       m.children foreach (queue enqueue _)
@@ -1024,6 +1072,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
     do {
       pokeBits(snapCtrl, 0)
       pokeBits(snapOut.ready, 1)
+      for (raddr <- DaisyChain.raddrs) peekBits(raddr)
       takeSteps(1)
     } while (peek(snapOut.valid) == 0)
     pokeBits(snapOut.ready, 0)
@@ -1035,9 +1084,10 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
       pokeBits(snapCtrl, 1)
       pokeBits(snapOut.ready, 1)
       takeSteps(1)
+      for (raddr <- DaisyChain.raddrs) peekBits(raddr)
     } while (peek(snapOut.valid) == 0)
     pokeBits(snapOut.ready, 0)
-    showCurrentSnapChain()
+    // showCurrentSnapChain()
     peek(snapOut.bits)
   }
 
@@ -1117,6 +1167,10 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
   override def dump(): Snapshot = {
     val snap = new Snapshot(t)
     var value = BigInt(0)
+
+    if (isTrace) println("*** Snapshot Chain Copy ***")
+    snapCopy()
+
     for ((delay, i) <- delays.zipWithIndex) {
       if (isTrace) println("*** Snapshot Chain Read %d ***".format(i))
       // Read out the snap chain
@@ -1128,6 +1182,10 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
           value |= (snapValue << delay.offset)
           snap.pokes -= snap.pokes.last
           snap.pokes += Poke(read.mem, read.addr.litValue(0).toInt, value)
+        }
+        case read: MemRead if read.addr.getNode.isInstanceOf[Reg] => {
+          value = snapValue
+          snap.pokes += Poke(read.mem, read.mem.size-1, value)
         }
         case read: MemRead => {
           value = snapValue
@@ -1171,15 +1229,12 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
     (value & (((BigInt(1) << width) - 1) << offset)) >> offset
 
   def daisyStep(n: Int = 1) { 
+    val dice = rnd.nextInt(1/*30*/)
+
     if (isTrace) {
       println("-------------------------")
       println("|   Daisy Chain Step    |")
       println("-------------------------")
-    }
-
-    /*** Snapshotting and counter dumpig ***/
-    if (t > 0) {
-      if (Driver.isCounting) dumpCounters()
     }
 
     // set the step counter
@@ -1190,7 +1245,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
     counterVals.clear
     counterVals ++= Array.fill(counters.size)(BigInt(0))
     for (k <- 0 until n) {
-      clockDown()
+      takeSteps(1)
       if (Driver.isCounting) {
         if (isTrace) println("*** READ COUNTER SIGNALS ***")
         for ((counter, i) <- counters.zipWithIndex) {
@@ -1209,15 +1264,23 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
           counterPeeks(i) = curPeek
         }
       }
-      if (Driver.isSnapshotting) {
+      if (Driver.isSnapshotting && dice == 0 && !isInSnapshot) {
         if (isTrace) println("*** READ STATE VALUES ***")
         delayPeeks.clear
         delayPeeks ++= delays map { delay => delay.src match {
-          case read: MemRead if delay.limit - delay.offset > 0 =>
-            extract(peekBits(read.mem, read.addr.litValue(0).toInt), 
-                    delay.limit - delay.offset + 1, delay.offset)
-          case read: MemRead =>
-            peekBits(read.mem, read.addr.litValue(0).toInt)
+          case read: MemRead => {
+            val raddr = read.addr.getNode match {
+              case _: Reg => 
+                read.mem.size - 1
+              case _ => 
+                read.addr.litValue(0).toInt
+            }
+            if (delay.limit - delay.offset > 0)
+              extract(peekBits(read.mem, raddr), 
+                      delay.limit - delay.offset + 1, delay.offset)
+            else
+              peekBits(read.mem, raddr)
+          }
           case signal if delay.limit - delay.offset > 0 =>
             extract(peekBits(signal), 
                     delay.limit - delay.offset + 1, delay.offset)
@@ -1225,24 +1288,14 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
             peekBits(signal) }
         }
       }
-      clockUp()
     }
 
-    for (k <- 0 until n) {
+    while (peek(stalled) == 0) {
+      for (raddr <- DaisyChain.raddrs) peekBits(raddr)
       takeSteps(1)
     }
-    while (peek(stalled) == 0)
-      takeSteps(1)
 
-    val dice = rnd.nextInt(30)
-
-    /*** Snapshot Sampling ***/
-    if (Driver.isSnapshotting && dice == 0 && !isInSnapshot) {
-      // take a snapshot
-      snapshot()
-      isInSnapshot = true
-      snapCount = snapsize
-    }
+    for (raddr <- DaisyChain.raddrs) peekBits(raddr)
 
     // set t & delta
     t += n
@@ -1256,6 +1309,16 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
         }
         delta += delta_i
       }
+    }
+
+    /*** Counter dumpig ***/
+    if (Driver.isCounting) dumpCounters()
+    /*** Snapshot sampling ***/
+    if (Driver.isSnapshotting && dice == 0 && !isInSnapshot) {
+      // take a snapshot
+      snapshot()
+      isInSnapshot = true
+      snapCount = snapsize
     }
   }
 
@@ -1273,7 +1336,18 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
     addExpects()
   }
 
+  override def dumpName(data: Node) = {
+    data match {
+      case mem: Mem[_] if mem.seqRead && finished => 
+        super.dumpName(data) + ".sram"
+      case _ => 
+        super.dumpName(data)
+    }
+  }
+
+  var finished = false 
   override def finish(): Boolean = {
+    finished = true
     if (isInSnapshot) addExpects(snapshots)
     dumpSnapshots(c.name + ".snaps", snapshots)
     super.finish()
@@ -1395,7 +1469,7 @@ abstract class DaisyWrapperTester[+T <: DaisyWrapper[_]](c: T, isTrace: Boolean 
       peekValues(i) = peekAddr(i) 
     }
 
-    addExpects
+    addExpects()
   }
 
   // poke 'bits' to the address 'addr'
@@ -1476,11 +1550,5 @@ abstract class DaisyWrapperTester[+T <: DaisyWrapper[_]](c: T, isTrace: Boolean 
   override def reset(n: Int) {
     super.reset(n)
     if (t > 1) for (i <- 0 until c.waddr) pokeValues(i) = 0
-  }
-
-  var finished = false
-  override def finish(): Boolean = {
-    finished = true
-    super.finish()
   }
 }
