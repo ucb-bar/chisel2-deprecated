@@ -594,7 +594,7 @@ protected:
 
 	class string_comparator {
 	public:
-		bool operator()(const char* x, const char* y) {
+		bool operator()(const char* x, const char* y) const {
 			return strcmp(x, y) < 0;
 		}
 	};
