@@ -89,6 +89,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
     }
 
     val addrIsReg = addr.getNode.isInstanceOf[Reg]
+    if (seqRead && addrIsReg) Driver.seqReadAddrs(this) = addr
     val rd = if (seqRead && !Driver.isInlineMem && addrIsReg) {
       (seqreads += new MemSeqRead(this, addr.getNode)).last
     } else {

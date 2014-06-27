@@ -272,6 +272,7 @@ object Driver {
   var implicitReset: Bool = null
   var implicitClock: Clock = null
   var isInGetWidth: Boolean = false
+  val seqReadAddrs = HashMap[Mem[_], UInt]()
   /* DaisyChain flags */
   var isBackannotating = false
   var isSnapshotting = false
