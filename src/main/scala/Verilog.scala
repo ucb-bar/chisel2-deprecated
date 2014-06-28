@@ -416,12 +416,10 @@ class VerilogBackend extends Backend {
     val (_, resets: ArrayBuffer[Bool]) = c.resets.unzip
 
     harness.write("module test;\n")
-    for (node <- scanNodes) {
+    for (node <- scanNodes)
       harness.write("  reg [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
-    }
-    for (node <- printNodes) {
+    for (node <- printNodes)
       harness.write("  wire [" + (node.width-1) + ":0] " + emitRef(node) + ";\n")
-    }
     for (rst <- resets)
       harness.write("  reg %s = 1;\n".format(rst.name))
 
@@ -443,7 +441,7 @@ class VerilogBackend extends Backend {
     } else {
       for (clk <- clocks) {
         val clkLength = 
-            if (clk.srcClock == null) "120" else 
+            if (clk.srcClock == null) "`CLOCK_PERIOD" else 
             clk.srcClock.name + "_length " + clk.initStr
         harness.write("  reg %s = 0;\n".format(clk.name))
         harness.write("  parameter %s_length = %s;\n".format(clk.name, clkLength))
@@ -453,25 +451,15 @@ class VerilogBackend extends Backend {
       }
     }
 
-    if (Driver.isTesting) {
-      harness.write("\n  /*** API variables ***/\n")
-      harness.write("  reg[20*8:0] cmd;    // API command\n")    
-      harness.write("  reg[1000*8:0] node; // Chisel node name;\n")
-      harness.write("  integer value;      // 'poked' value\n")  
-      harness.write("  integer offset;     // mem's offset\n")
-      harness.write("  integer steps;      // number of steps\n")
-      harness.write("  reg isStep = 0;\n\n")
-    }
-
     harness.write("  /*** DUT instantiation ***/\n")
     harness.write("    " + c.moduleName + "\n")
     harness.write("      " + c.moduleName + "(\n")
     if (Driver.isTesting) {
       if (c.clocks.size == 1) {
-        harness.write("        .%s(%s && isStep),\n".format(mainClk.name, mainClk.name))
+        harness.write("        .%s(%s),\n".format(mainClk.name, mainClk.name))
       } else {
         for (clk <- c.clocks)
-          harness.write("        .%s(%s && %s_fire && isStep),\n".format(
+          harness.write("        .%s(%s && %s_fire),\n".format(
             clk.name, mainClk.name, clk.name)
          )
       }
@@ -541,17 +529,20 @@ class VerilogBackend extends Backend {
     }
     
     harness.write("  /*** resets &&  VCD / VPD dumps ***/\n")
+    if (!resets.isEmpty) harness.write("  parameter reset_period = `CLOCK_PERIOD * 4;\n")
     harness.write("  initial begin\n")
     for (rst <- resets)
       harness.write("  %s = 1;\n".format(rst.name))
     if (Driver.isDebug) {
       harness.write("    /*** Debuggin with VPD dump ***/\n")
       harness.write("    $vcdplusfile(\"%s.vpd\");\n".format(ensureDir(Driver.targetDir)+c.name))
-      harness.write("    $vcdpluson;\n")
+      harness.write("    $vcdpluson(0, %s);\n".format(c.name))
     }
-    harness.write("  #250;\n")
-    for (rst <- resets)
-      harness.write("  %s = 0;\n".format(rst.name))
+    if (!Driver.isTesting) {
+      if (!resets.isEmpty) harness.write("  #reset_period;\n")
+      for (rst <- resets)
+        harness.write("  %s = 0;\n".format(rst.name))
+    }
     if (!Driver.isDebug && Driver.isVCD) {
       harness.write("    /*** VCD dump ***/\n")
       var first = true
@@ -561,18 +552,6 @@ class VerilogBackend extends Backend {
       }
       harness.write("    $dumpfile(\"%s.vcd\");\n".format(ensureDir(Driver.targetDir)+c.name))
       harness.write("    $dumpon;\n")
-    }
-    harness.write("  end\n\n")
-
-    harness.write("  /*** ROM & Mem initialization ***/\n")
-    harness.write("  integer i = 0;\n")
-    harness.write("  initial begin\n")
-    harness.write("  #50;\n")
-    for (mem <- mems) {
-      val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
-      harness.write("    for (i = 0 ; i < %d ; i = i + 1) begin\n".format(mem.n))
-      harness.write("      %s[i] = 0;\n".format(pathName))
-      harness.write("    end\n")
     }
     harness.write("  end\n\n")
 
@@ -592,6 +571,16 @@ class VerilogBackend extends Backend {
                    wires: ArrayBuffer[Node], mems: ArrayBuffer[Mem[_]], 
                    scanNodes: Array[Bits], printNodes: Array[Bits]) = {
     val apis = new StringBuilder
+
+    apis.append("\n  /*** API variables ***/\n")
+    apis.append("  reg[20*8:0] cmd;    // API command\n")    
+    apis.append("  reg[1000*8:0] node; // Chisel node name;\n")
+    apis.append("  integer value;      // 'poked' value\n")  
+    apis.append("  integer offset;     // mem's offset\n")
+    apis.append("  integer steps;      // number of steps\n")
+    apis.append("  integer delta;      // number of steps\n")
+    apis.append("  integer min = (1 << 31 -1);\n")
+    apis.append("  reg isStep = 0;\n\n")
 
     apis.append("  /*** Shadow declaration for 'peeking' ***/\n")
     val shadowNames = new HashMap[Node, String]
@@ -619,12 +608,9 @@ class VerilogBackend extends Backend {
     apis.append("  /*** API interpreter ***/\n")
     apis.append("  // process API command at every clock's negedge\n")
     apis.append("  // when the target is stalled\n")
-    apis.append("  if (!isStep%s) begin\n".format(
-      (resets foldLeft "")(_ + " && !" + _.name) +
-      ( if (clocks.size > 1) 
-         (clocks foldLeft "")(_ + " && " + _.name + "_cnt == 0")
-        else "" ) )
-    )
+    apis.append("  while (!isStep) begin\n")
+    for (rst <- resets)
+      apis.append("    %s = 0;\n".format(rst.name))
     apis.append("    "+ fscanf("%s", "cmd"))
     apis.append("    case (cmd)\n")
 
@@ -636,7 +622,6 @@ class VerilogBackend extends Backend {
     for (rst <- resets)
       apis.append("        %s = 1;\n".format(rst.name))
     apis.append("        isStep = 1;\n")
-    apis.append("        " + display("%1d", "steps")) 
     apis.append("      end\n")
 
     apis.append("      // < wire_peek >\n")
@@ -721,7 +706,7 @@ class VerilogBackend extends Backend {
     apis.append("      \"step\": begin\n")
     apis.append("        " + fscanf("%d", "steps"))
     apis.append("        isStep = 1;\n")
-    apis.append("        " + display("%1d", "steps"))
+    apis.append("        delta = 0;\n")
     apis.append("      end\n")
 
     if (clocks.size > 1) {
@@ -733,6 +718,9 @@ class VerilogBackend extends Backend {
       val clkFires  = ((clocks filter (_.srcClock == null)) map (_.name + "_length")).toList
       apis.append("        " + fscanf((clkFormat foldLeft "")(_ + " " + _), clkFires:_*) )
       apis.append("        " + display("%s", "\"ok\""))
+      for (clk <- clocks) {
+        apis.append("        %s_cnt = %s_length;\n".format(clk.name, clk.name))
+      }
       apis.append("      end\n")
     }
 
@@ -743,39 +731,11 @@ class VerilogBackend extends Backend {
     apis.append("    endcase\n")
     apis.append("    end\n\n")
 
-    apis.append("    // decrement step counts\n")
-    apis.append("    if (steps > 0%s) begin \n".format(
-      if (clocks.size > 1) 
-       (clocks foldLeft "")(_ + " && " + _.name + "_cnt == 0")
-      else "" ) )
-    apis.append("      steps = steps - 1;\n")
-    if (clocks.size > 1) {
-      for (clk <- clocks)
-        apis.append("      %s_cnt = %s_length;\n".format(clk.name, clk.name))
-    }
-    apis.append("    end\n")
-    apis.append("    // stall the target when step counts is zero\n")
-    apis.append("    else if (isStep%s) begin \n". format(
-      if (clocks.size > 1) 
-       (clocks foldLeft "")(_ + " && " + _.name + "_cnt == 0")
-      else "" ) )
-    apis.append("      isStep = 0;\n")
-    for (rst <- resets)
-      apis.append("      %s = 0;\n".format(rst.name))
-    if (clocks.size > 1) {
-      for (clk <- clocks)
-        apis.append("      %s_fire = 0;\n".format(clk.name))
-    }
-    apis.append("    end\n")
+    apis.append("    if (count == -1) $finish(1);\n\n")
 
-    apis.append("    if (count == -1) $finish(1);\n")
-    apis.append("  end\n\n")
-
-    apis.append("  integer min = (1 << 31 -1);\n")
-    apis.append("  always @(posedge %s) begin\n".format(mainClk.name))
     if (clocks.size > 1) {
       apis.append("    // fire clocks according to their relative length\n")
-      apis.append("    if (isStep%s) begin\n".format(
+      apis.append("    if (1%s) begin\n".format(
         (resets foldLeft "")(_ + " && !" + _.name)
       ) )
       for (clk <- clocks)
@@ -786,63 +746,79 @@ class VerilogBackend extends Backend {
         apis.append("      if (%s_cnt == 0) %s_fire = 1;\n".format(clk.name, clk.name))
         apis.append("      else %s_fire = 0;\n".format(clk.name))
       }
-      apis.append("      if (!(%s)) begin\n".format(
-        (clocks.tail foldLeft (clocks.head.name + "_cnt == 0"))(_ + " && " + _.name + "_cnt == 0")
-      ) )
       for (clk <- clocks)
-        apis.append("        if (%s_cnt == 0) %s_cnt = %s_length;\n".format(
-          clk.name, clk.name, clk.name) )
-      apis.append("      end\n")
+        apis.append("      if (%s_cnt == 0) %s_cnt = %s_length;\n".format(clk.name, clk.name, clk.name))
       apis.append("    end\n")
 
       apis.append("    // hack to reset\n")
-      apis.append("    else if (isStep%s) begin\n".format(
-        if (resets.isEmpty) ""
-        else ((resets.tail foldLeft (" && (" + resets.head.name))(_ + " || " + _.name)) + ")"
-      ) )
-      for (clk <- clocks) {
-        apis.append("      %s_cnt = 0;\n".format(clk.name, clk.name))
+      apis.append("    else begin\n")
+      for (clk <- clocks)
         apis.append("      %s_fire = 1;\n".format(clk.name, clk.name))
-      }
       apis.append("    end\n\n")
     }
 
+    apis.append("  end\n\n")
+
+    apis.append("  always @(posedge %s) begin\n".format(mainClk.name))
     apis.append("     // copy wires' & mems' value into shadows for 'peeking'\n")
-    apis.append("    if (%sisStep) begin\n".format(
-      if (clocks.size > 1) 
-         (clocks foldLeft "")(_ + _.name + "_fire && ")
-      else "" )
-    )
-    for (wire <- wires ; if !wire.isReg) {
-      val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
-      val wireName = if (printNodes contains wire) emitRef(wire) else pathName
-      apis.append("      %s = %s;\n".format(shadowNames(wire), wireName))
+    if (clocks.size > 1) {
+      for (clk <- clocks) {
+        apis.append("    if (%s) begin\n".format(
+          if (clk == mainClk) "isStep" else clk.name + "_fire"))
+        for (wire <- wires ; if !wire.isReg && wire.clock == clk) {
+          val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
+          val wireName = if (printNodes contains wire) emitRef(wire) else pathName
+          apis.append("      %s = %s;\n".format(shadowNames(wire), wireName))
+        }
+        apis.append("    end\n")
+      }
+    } else {
+      for (wire <- wires ; if !wire.isReg) {
+        val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
+        val wireName = if (printNodes contains wire) emitRef(wire) else pathName
+        apis.append("    %s = %s;\n".format(shadowNames(wire), wireName))
+      }
     }
+
+    apis.append("    // decrement step counts\n")
+    apis.append("    steps = steps - 1;\n")
+    apis.append("    delta = delta + min;\n")
+    apis.append("    // stall the target when step counts is zero\n")
+    apis.append("    if (steps == 0) begin \n")
+    apis.append("      // return delta\n")
+    apis.append("      " + display("%1d", "delta"))
+    apis.append("      isStep = 0;\n")
     apis.append("    end\n")
+
     apis.append("  end\n")
     
     apis.result
   }
 
+  /*** Test bench for replay ***/
   def harnessMap (mainClk: Clock, resets: ArrayBuffer[Bool], scanNodes: Array[Bits], printNodes: Array[Bits]) = {
     val map = new StringBuilder
     val printFormat = printNodes.map(a => a.chiselName + ": 0x%x, ").fold("")((y,z) => z + " " + y)
     val scanFormat = scanNodes.map(a => "%x").fold("")((y,z) => z + " " + y)
 
-    if (Driver.isTesting) {
-      map.append("  integer count;\n")
-      map.append("  always @(negedge %s) begin\n".format(mainClk.name))
-      map.append("  #50;\n")
-      if (!resets.isEmpty)
-        map.append("    if (%s)\n".format(
-          (resets.tail foldLeft ("!" + resets.head.name))(_ + " || !" + _.name)))
-      map.append("      count = $fscanf('h80000000, \"" + scanFormat.slice(0,scanFormat.length-1) + "\"")
-      for (node <- scanNodes)
-        map.append(", " + emitRef(node))
-      map.append(");\n")
-      map.append("      if (count == -1) $finish(1);\n")
-      map.append("  end\n")
+    val shadowNames = new HashMap[Node, String]
+    for (node <- printNodes) {
+      val shadowName = node.component.getPathName("_") + "_" + emitRef(node) + "_shadow"
+      shadowNames(node) = shadowName
+      map.append("  reg [%d:0] %s = 0;\n".format(node.width-1, shadowName))
     }
+
+    map.append("  task check_value;\n")
+    map.append("    input [255:0] data;\n")
+    map.append("    input [255:0] expected;\n")
+    map.append("    begin\n")
+    map.append("      if (data == expected)\n")
+    map.append("        $display(\"PASS\");\n")
+    map.append("      else\n")
+    map.append("        $display(\"FAIL\");\n")
+    map.append("    end\n\n")
+    map.append("  endtask\n\n")
+
     map.append("  always @(posedge %s) begin\n".format(mainClk.name))
     if (!resets.isEmpty)
       map.append("    if (%s)\n".format(
@@ -852,7 +828,10 @@ class VerilogBackend extends Backend {
       map.append(", " + emitRef(node))
     }
     map.append(");\n")
-    map.append("  end\n")
+    for (node <- printNodes) {
+      map.append("    %s = %s;\n".format(shadowNames(node), emitRef(node)))
+    }
+    map.append("  end\n\n")
 
     map.result
   }
@@ -1128,7 +1107,9 @@ class VerilogBackend extends Backend {
     }
     val dir = Driver.targetDir + "/"
     val src = dir + c.name + "-harness.v " + dir + c.name + ".v"
-    val cmd = "vcs -full64 -quiet +vc +v2k -timescale=10ns/10ps " + src + " -o " + dir + c.name + 
+    val cmd = "vcs -full64 -quiet +vc +v2k " +
+              "-timescale=10ns/10ps +define+CLOCK_PERIOD=120 " + 
+              "+vcs+initreg+random " + src + " -o " + dir + c.name + 
               ( if (!Driver.isTesting) " -debug" /* for ucli scripts */
                 else if (Driver.isDebug) " -debug_pp" /* for vpd dump */ 
                 else "" ) 
