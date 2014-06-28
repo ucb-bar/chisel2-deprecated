@@ -537,6 +537,7 @@ class VerilogBackend extends Backend {
       harness.write("    /*** Debuggin with VPD dump ***/\n")
       harness.write("    $vcdplusfile(\"%s.vpd\");\n".format(ensureDir(Driver.targetDir)+c.name))
       harness.write("    $vcdpluson(0, %s);\n".format(c.name))
+      if (Driver.isVCDMem) harness.write("  $vcdplusmemon;\n")
     }
     if (!Driver.isTesting) {
       if (!resets.isEmpty) harness.write("  #reset_period;\n")
@@ -1107,7 +1108,7 @@ class VerilogBackend extends Backend {
     }
     val dir = Driver.targetDir + "/"
     val src = dir + c.name + "-harness.v " + dir + c.name + ".v"
-    val cmd = "vcs -full64 -quiet +vc +v2k " +
+    val cmd = "vcs -full64 -quiet +v2k " +
               "-timescale=10ns/10ps +define+CLOCK_PERIOD=120 " + 
               "+vcs+initreg+random " + src + " -o " + dir + c.name + 
               ( if (!Driver.isTesting) " -debug" /* for ucli scripts */
