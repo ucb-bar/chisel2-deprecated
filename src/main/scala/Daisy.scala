@@ -170,8 +170,7 @@ object DaisyUtil {
     val reg = res.comp match { case r: Reg => r }
     // assign component
     reg.component = m
-    // assign clock & reset
-    reg.assignClock(m.clock)
+    // assign reset
     reg.assignReset(m.reset)
     // assign name
     if (name != "") reg setName name
@@ -223,6 +222,8 @@ object DaisyTransform {
   lazy val snapOut  = addPin(top, Decoupled(UInt(width = AXISlave.dw)), "snap_out")
   lazy val cntrOut  = addPin(top, Decoupled(UInt(width = AXISlave.dw)), "cntr_out")
   lazy val stalled  = addPin(top, Bool(OUTPUT), "stalled")
+  lazy val steps    = addReg(top, Reg(init=UInt(0, AXISlave.dw)), "steps")
+  lazy val stepsOrR = steps.orR
 
   val snapIns = new HashMap[Module, UInt]
   val snapOuts = new HashMap[Module, DecoupledIO[UInt]]
@@ -241,7 +242,9 @@ object DaisyTransform {
 
   def addDaisyPins (c: Module) = {
     ChiselError.info("[DaisyTransform] add daisy pins")
-    val temp = stalled
+    // Initialize the stall and clock pins
+    val temp1 = stalled
+    val temp2 = if (Driver.clocks.size > 1) clockIn else null
     val queue = ScalaQueue(c)
     while (!queue.isEmpty) {
       val m = queue.dequeue
@@ -293,8 +296,8 @@ object DaisyChain extends Backend {
   def apply (b: Backend) {
     b.transforms += ((c: Module) => c bfs (_.addConsumers))
     b.transforms += ((c: Module) => addStepCounter(top))
+    b.transforms += ((c: Module) => setClockDomains(top))
     b.transforms += ((c: Module) => reconstructIOs(c))
-    b.transforms += ((c: Module) => setClockDomains(c))
     b.transforms += ((c: Module) => appendFires(top))
     if (Driver.isSnapshotting) {
       b.transforms += (c => findDelays(top))
@@ -326,11 +329,10 @@ object DaisyChain extends Backend {
 
   def addStepCounter(c: Module) = {
     ChiselError.info("[DaisyChain] add step counters")
-    val steps  = addReg(c, Reg(init=UInt(0, AXISlave.dw)), "steps")
-    val isStep = addNode(c, steps.orR, "is_step")
-    updateReg(steps, isStep -> (steps - UInt(1)), stepsIn.valid -> stepsIn.bits)
+    val isStep = addReg(c, Reg(next=stepsOrR), "is_step")
+    updateReg(steps, stepsOrR -> (steps - UInt(1)), stepsIn.valid -> stepsIn.bits)
     if (stallAck != null)
-      fireIns(c) = addNode(c, isStep || !stallAck, "fire")
+      fireIns(c) = isStep || !stallAck
     else
       fireIns(c) = isStep 
 
@@ -358,7 +360,7 @@ object DaisyChain extends Backend {
       m.children foreach (queue enqueue _)
     }
 
-    wire((!fireIns(top) && !fireBufs(top)) -> stalled)
+    wire((!stepsOrR && !fireIns(top) && !fireBufs(top)) -> stalled)
   }
 
   def setClockDomains(c: Module) = {
@@ -411,7 +413,7 @@ object DaisyChain extends Backend {
         enClks(clock) = HashMap(c -> enClk)
         updateReg(clkCnts(clock), 
           isClkInput(clock)             -> clockIn.bits, 
-          (!enClk && fireIns(c))       -> (clkCnts(clock) - min), 
+          (!enClk && stepsOrR)        -> (clkCnts(clock) - min), 
           (enClk && !isClkInput(clock)) -> clkRegs(clock))
       }
     }
@@ -541,7 +543,7 @@ object DaisyChain extends Backend {
       keywords += bufName
       if (targetPin.dir == INPUT) {
         ioBuffers(targetPin) = addReg(top, Reg(UInt()), bufName)
-        updateReg(ioBuffers(targetPin), (stepsIn.valid || fireIns(top)) -> targetPin)
+        updateReg(ioBuffers(targetPin), (stepsIn.valid || stepsOrR) -> targetPin)
         for (consumer <- targetPin.consumers) {
           val idx = consumer.inputs indexOf targetPin
           if (idx >= 0) consumer.inputs(idx) = ioBuffers(targetPin)
@@ -569,13 +571,14 @@ object DaisyChain extends Backend {
       }
 
       // Make all delay nodes be enabled by the fire signal
-      for (node <- m.nodes ; if !(keywords contains node.name)) {
+      for (node <- m.nodes) {
         val fire = 
           if (Driver.clocks.size <= 1 || node.clock == null) fireIns(m) 
-          else fireIns(m) && enClks(node.clock)(m) 
+          else fireIns(m) && enClks(node.clock)(m)
         node match {
           case reg: Reg => {
-            reg.inputs(0) = Multiplex(fire, reg.next, reg)
+            if (!(keywords contains reg.name))
+              reg.inputs(0) = Multiplex(fire, reg.next, reg)
             if (Driver.clocks.size > 1) reg.assignClock(m.clock)
           }
           case mem: Mem[_] => {
@@ -1222,7 +1225,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
     (value & (((BigInt(1) << width) - 1) << offset)) >> offset
 
   def daisyStep(n: Int = 1) { 
-    val dice = rnd.nextInt(30)
+    val dice = 0 // rnd.nextInt(30)
 
     if (isTrace) {
       println("-------------------------")
@@ -1232,6 +1235,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
 
     // set the step counter
     pokeSteps(n)
+    takeSteps(1)
 
     // run the target until it is stalled
     if (isTrace) println("*** CYCLE THE TARGET ***")
@@ -1303,7 +1307,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
     if (Driver.isSnapshotting && dice == 0 && !isInSnapshot) {
       // take a snapshot
       snapshot()
-      isInSnapshot = true
+      // isInSnapshot = true
       snapCount = snapsize
     }
     /*** Counter dumpig ***/
