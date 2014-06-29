@@ -430,8 +430,8 @@ class VerilogBackend extends Backend {
         for (clk <- clocks) {
           val clkLength = 
             if (clk.srcClock == null) "0" else 
-            clk.srcClock.name + "_period " + clk.initStr
-          harness.write("  integer %s_period = %s;\n".format(clk.name, clkLength))
+            clk.srcClock.name + "_length " + clk.initStr
+          harness.write("  integer %s_length = %s;\n".format(clk.name, clkLength))
           harness.write("  integer %s_cnt = 0;\n".format(clk.name))
           harness.write("  reg %s_fire = 0;\n".format(clk.name))
         }
@@ -444,10 +444,10 @@ class VerilogBackend extends Backend {
             if (clk.srcClock == null) "`CLOCK_PERIOD" else 
             clk.srcClock.name + "_length " + clk.initStr
         harness.write("  reg %s = 0;\n".format(clk.name))
-        harness.write("  parameter %s_period = %s;\n".format(clk.name, clkLength))
+        harness.write("  parameter %s_length = %s;\n".format(clk.name, clkLength))
       }
       for (clk <- clocks) {
-        harness.write("  always #%s_period %s = ~%s;\n".format(clk.name, clk.name, clk.name))
+        harness.write("  always #%s_length %s = ~%s;\n".format(clk.name, clk.name, clk.name))
       }
     }
 
@@ -530,7 +530,7 @@ class VerilogBackend extends Backend {
     }
     
     harness.write("  /*** resets &&  VCD / VPD dumps ***/\n")
-    if (!resets.isEmpty) harness.write("  parameter reset_period = `CLOCK_PERIOD * 4;\n")
+    if (!resets.isEmpty) harness.write("  parameter reset_length = `CLOCK_PERIOD * 4;\n")
     harness.write("  initial begin\n")
     for (rst <- resets)
       harness.write("  %s = 1;\n".format(rst.name))
@@ -541,7 +541,7 @@ class VerilogBackend extends Backend {
       if (Driver.isVCDMem) harness.write("  $vcdplusmemon;\n")
     }
     if (!Driver.isTesting) {
-      if (!resets.isEmpty) harness.write("  #reset_period;\n")
+      if (!resets.isEmpty) harness.write("  #reset_length;\n")
       for (rst <- resets)  harness.write("  %s = 0;\n".format(rst.name))
     }
     if (!Driver.isDebug && Driver.isVCD) {
@@ -743,11 +743,11 @@ class VerilogBackend extends Backend {
       apis.append("      // return: \"ok\" or \"error\"\n")
       apis.append("      \"set_clocks\": begin\n")
       val clkFormat = ((clocks filter (_.srcClock == null)).toList map (x => "%x"))
-      val clkFires  = ((clocks filter (_.srcClock == null)) map (_.name + "_period")).toList
+      val clkFires  = ((clocks filter (_.srcClock == null)) map (_.name + "_length")).toList
       apis.append("        " + fscanf((clkFormat foldLeft "")(_ + " " + _), clkFires:_*) )
       apis.append("        " + display("%s", "\"ok\""))
       for (clk <- clocks) {
-        apis.append("        %s_cnt = %s_period;\n".format(clk.name, clk.name))
+        apis.append("        %s_cnt = %s_length;\n".format(clk.name, clk.name))
       }
       apis.append("      end\n")
     }
