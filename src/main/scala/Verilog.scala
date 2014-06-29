@@ -576,12 +576,13 @@ class VerilogBackend extends Backend {
     apis.append("\n  /*** API variables ***/\n")
     apis.append("  reg[20*8:0] cmd;    // API command\n")    
     apis.append("  reg[1000*8:0] node; // Chisel node name;\n")
-    apis.append("  integer value;      // 'poked' value\n")  
+    apis.append("  reg[255:0] value;   // 'poked' value\n")  
     apis.append("  integer offset;     // mem's offset\n")
     apis.append("  integer steps;      // number of steps\n")
     apis.append("  integer delta;      // number of steps\n")
     apis.append("  integer min = (1 << 31 -1);\n")
-    apis.append("  reg isStep = 0;\n\n")
+    apis.append("  reg isStep = 0;\n")
+    apis.append("  reg isTick = 0;\n\n")
 
     apis.append("  /*** Shadow declaration for 'peeking' ***/\n")
     val shadowNames = new HashMap[Node, String]
@@ -591,12 +592,21 @@ class VerilogBackend extends Backend {
       shadowNames(wire) = shadowName
       apis.append("  reg [%d:0] %s = 0;\n".format(wire.width-1, shadowName))
     }
-    apis.append("  // mem shadows\n")
-    for (mem <- mems) {
-      val shadowName = mem.component.getPathName("_") + "_" + emitRef(mem) + "_shadow"
-      shadowNames(mem) = shadowName
-      apis.append("  reg [%d:0] %s [%d:0];\n".format(mem.width-1, shadowName, mem.n-1))
+
+    apis.append("\n  task propagate;\n")
+    apis.append("    begin\n")
+    apis.append("    // copy wires' & mems' value into shadows for 'peeking'\n")
+    for (clk <- clocks) {
+      if (clk != mainClk) apis.append("      if (%s) begin\n".format(clk.name + "_fire"))
+      for (wire <- wires ; if !wire.isReg) {
+        val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
+        val wireName = if (printNodes contains wire) emitRef(wire) else pathName
+        apis.append("      %s = %s;\n".format(shadowNames(wire), wireName))
+      }
+      if (clk != mainClk) apis.append("      end\n")
     }
+    apis.append("    end\n")
+    apis.append("  endtask\n")
 
     apis.append("\n  integer count;\n")
 
@@ -609,7 +619,7 @@ class VerilogBackend extends Backend {
     apis.append("  /*** API interpreter ***/\n")
     apis.append("  // process API command at every clock's negedge\n")
     apis.append("  // when the target is stalled\n")
-    apis.append("  while (!isStep) begin\n")
+    apis.append("  while (!isStep && !isTick) begin\n")
     for (rst <- resets)
       apis.append("    %s = 0;\n".format(rst.name))
     apis.append("    "+ fscanf("%s", "cmd"))
@@ -682,12 +692,12 @@ class VerilogBackend extends Backend {
     apis.append("        endcase\n")
     apis.append("      end\n")
 
-    apis.append("      // < mem_poke >\n")
-    apis.append("      // inputs: wire's name\n")
-    apis.append("      // return: \"ok\" or \"error\"\n")
-    apis.append("      \"mem_poke\": begin\n")
-    apis.append("        " + fscanf("%s %d 0x%x", "node", "offset", "value")) 
     if (!mems.isEmpty) {
+      apis.append("      // < mem_poke >\n")
+      apis.append("      // inputs: wire's name\n")
+      apis.append("      // return: \"ok\" or \"error\"\n")
+      apis.append("      \"mem_poke\": begin\n")
+      apis.append("        " + fscanf("%s %d 0x%x", "node", "offset", "value")) 
       apis.append("        case (node)\n")
       for (mem <- mems) {
         val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
@@ -698,8 +708,8 @@ class VerilogBackend extends Backend {
       }
       apis.append("          default: " + display("%s", "\"error\""))
       apis.append("        endcase\n")
+      apis.append("      end\n")
     }
-    apis.append("      end\n")
 
     apis.append("      // < step > \n")
     apis.append("      // inputs: # cycles\n")
@@ -708,6 +718,20 @@ class VerilogBackend extends Backend {
     apis.append("        " + fscanf("%d", "steps"))
     apis.append("        isStep = 1;\n")
     apis.append("        delta = 0;\n")
+    apis.append("      end\n")
+
+    apis.append("      // < tick > \n")
+    apis.append("      // Update registers without propagation\n")
+    apis.append("      \"tick\": begin\n")
+    apis.append("        isTick = 1;\n")
+    apis.append("        $display(\"ok\");\n")
+    apis.append("      end\n")
+
+    apis.append("      // < propagate > \n")
+    apis.append("      // Update registers without propagation\n")
+    apis.append("      \"propagate\": begin\n")
+    apis.append("        propagate();\n")
+    apis.append("        $display(\"ok\");\n")
     apis.append("      end\n")
 
     if (clocks.size > 1) {
@@ -736,9 +760,10 @@ class VerilogBackend extends Backend {
 
     if (clocks.size > 1) {
       apis.append("    // fire clocks according to their relative length\n")
-      apis.append("    if (1%s) begin\n".format(
-        (resets foldLeft "")(_ + " && !" + _.name)
-      ) )
+      if (!resets.isEmpty) { 
+        apis.append("    if (!%s) begin\n".format(
+                    (resets.tail foldLeft resets.head.name)(_ + " && !" + _.name) ) )
+      }
       for (clk <- clocks)
         apis.append("      if (%s_length < min) min = %s_cnt;\n".format(clk.name, clk.name))
       for (clk <- clocks)
@@ -749,46 +774,36 @@ class VerilogBackend extends Backend {
       }
       for (clk <- clocks)
         apis.append("      if (%s_cnt == 0) %s_cnt = %s_length;\n".format(clk.name, clk.name, clk.name))
-      apis.append("    end\n")
 
-      apis.append("    // hack to reset\n")
-      apis.append("    else begin\n")
-      for (clk <- clocks)
-        apis.append("      %s_fire = 1;\n".format(clk.name, clk.name))
-      apis.append("    end\n\n")
+      if (!resets.isEmpty) {
+        apis.append("    end\n")
+
+        apis.append("    // hack to reset\n")
+        apis.append("    else begin\n")
+        for (clk <- clocks)
+          apis.append("      %s_fire = 1;\n".format(clk.name, clk.name))
+        apis.append("    end\n\n")
+      }
     }
 
     apis.append("  end\n\n")
 
     apis.append("  always @(posedge %s) begin\n".format(mainClk.name))
-    apis.append("     // copy wires' & mems' value into shadows for 'peeking'\n")
-    if (clocks.size > 1) {
-      for (clk <- clocks) {
-        apis.append("    if (%s) begin\n".format(
-          if (clk == mainClk) "isStep" else clk.name + "_fire"))
-        for (wire <- wires ; if !wire.isReg && wire.clock == clk) {
-          val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
-          val wireName = if (printNodes contains wire) emitRef(wire) else pathName
-          apis.append("      %s = %s;\n".format(shadowNames(wire), wireName))
-        }
-        apis.append("    end\n")
-      }
-    } else {
-      for (wire <- wires ; if !wire.isReg) {
-        val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
-        val wireName = if (printNodes contains wire) emitRef(wire) else pathName
-        apis.append("    %s = %s;\n".format(shadowNames(wire), wireName))
-      }
-    }
-
-    apis.append("    // decrement step counts\n")
-    apis.append("    steps = steps - 1;\n")
-    apis.append("    delta = delta + min;\n")
     apis.append("    // stall the target when step counts is zero\n")
-    apis.append("    if (steps == 0) begin \n")
-    apis.append("      // return delta\n")
-    apis.append("      " + display("%1d", "delta"))
-    apis.append("      isStep = 0;\n")
+    apis.append("    if (isStep) begin\n")
+    apis.append("      // decrement step counts\n")
+    apis.append("      steps = steps - 1;\n")
+    apis.append("      delta = delta + min;\n")
+    apis.append("      if (steps == 0) begin\n")
+    apis.append("        propagate();\n")
+    apis.append("        // return delta\n")
+    apis.append("        " + display("%1d", "delta"))
+    apis.append("        isStep = 0;\n")
+    apis.append("      end\n")
+    apis.append("    end\n\n")
+
+    apis.append("    if (isTick) begin \n")
+    apis.append("      isTick = 0;\n")
     apis.append("    end\n")
 
     apis.append("  end\n")

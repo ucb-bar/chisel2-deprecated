@@ -372,6 +372,14 @@ public:
 		    }
 		    module->clock_lo(dat_t<1>(0));
 		    return itos(cycles);
+		} else if (tokens[0] == "tick") {
+			// BETA FUNCTION: semantics subject to change, use with caution
+			// IN:  tick
+			// OUT: ok (on success)
+			// Update registers without propagation
+			// updating registers.
+		    module->clock_hi(dat_t<1>(0));
+		    return "ok";
 		} else if (tokens[0] == "propagate") {
 			// BETA FUNCTION: semantics subject to change, use with caution
 			// IN:  propagate
