@@ -456,7 +456,7 @@ class ManualTester[+T <: Module]
          command ++= ArrayBuffer(":target-dir", Driver.targetDir)
          command.mkString(" ")
       } else {
-         target + (if (Driver.backend.isInstanceOf[VerilogBackend]) " -q +vcs+initreg+0" else "")
+         target + (if (Driver.backend.isInstanceOf[VerilogBackend]) " -q +vcs+initreg+0 " else "")
       })
     println("SEED " + Driver.testerSeed)
     println("STARTING " + cmd)

@@ -471,6 +471,21 @@ public:
 			bool success = get_mem_by_name(tokens[1])->set_element(tokens[2], tokens[3]);
 			return success ? "ok" : "error";
 
+		} else if (tokens[0] == "trace") {
+			// IN:  trace n <node_name>+
+			// OUT: values
+                        // TODO: ADD MEM PEEK SUPPORT
+                        stringstream ss;
+			if (!check_command_length(tokens, 2)) { return "bad"; }
+			int n = atoi(tokens[1].c_str());
+                        for (int t = 0; t < n; t++) {
+                          for (int i = 2; i < tokens.size(); i++) 
+                            ss << " " << get_dat_by_name(tokens[i])->get_value();
+                          int ret = module->step(false, 1);
+                          // if (!ret)
+                          //   return "error";
+                        }
+                        return ss.str();
 		} else if (tokens[0] == "list_wires") {
 			// IN:  list_wires
 			// OUT: list of wires
