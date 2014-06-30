@@ -622,7 +622,8 @@ object DaisyChain extends Backend {
             val overflow = addReg(m, Reg(Bool()))
             val flag     = addReg(m, Reg(Bool()))
             val raddrEn  = flag && !overflow && !fireBufs(m)
-            updateReg(raddr,    raddrEn -> (raddr + UInt(1)),  daisyCopy(m) -> UInt(0), snapRead(m) -> raddrBuf)
+            updateReg(raddr,    raddrEn -> (raddr + UInt(1)),  daisyCopy(m) -> UInt(0), 
+                                (!fireIns(m) && overflow) -> raddrBuf)
             updateReg(overflow, raddrEn -> (raddr >= memSize), daisyCopy(m) -> Bool(false))
             updateReg(flag,     daisyCopy(m) -> Bool(true),     snapRead(m) -> Bool(false))
             updateReg(raddrBuf, daisyCopy(m) -> raddr) 
@@ -635,7 +636,10 @@ object DaisyChain extends Backend {
                 if (i == mem.size-1) raddrEn        else shiftEn
               m.delays ++= DelayElem(src)
             }
-            wire(!raddrEn -> snapOuts(m).valid)
+
+            val notRaddrEn = !raddrEn
+            wire(notRaddrEn -> snapOuts(m).valid)
+            if (m == c) wire(notRaddrEn -> stalled)
           }
           case mem: Mem[_] =>
             for (i <- 0 until mem.size) m.delays ++= DelayElem(new MemRead(mem, UInt(i)))
@@ -1225,7 +1229,7 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
     (value & (((BigInt(1) << width) - 1) << offset)) >> offset
 
   def daisyStep(n: Int = 1) { 
-    val dice = 0 // rnd.nextInt(30)
+    val dice = rnd.nextInt(30)
 
     if (isTrace) {
       println("-------------------------")
@@ -1287,8 +1291,6 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
       }
     }
 
-    while (peek(stalled) == 0) takeSteps(1)
-
     // set t & delta
     t += n
     if (Driver.clocks.size > 1) {
@@ -1303,15 +1305,18 @@ abstract class DaisyTester[+T <: Module](c: T, isTrace: Boolean = true, val snap
       }
     }
 
+    /*** Counter dumpig ***/
+    if (Driver.isCounting) dumpCounters()
+
     /*** Snapshot sampling ***/
     if (Driver.isSnapshotting && dice == 0 && !isInSnapshot) {
       // take a snapshot
       snapshot()
-      // isInSnapshot = true
+      isInSnapshot = true
       snapCount = snapsize
     }
-    /*** Counter dumpig ***/
-    if (Driver.isCounting) dumpCounters()
+
+    while (peek(stalled) == 0) takeSteps(1)
   }
 
   def addExpects() {
