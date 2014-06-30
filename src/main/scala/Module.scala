@@ -42,22 +42,42 @@ import ChiselError._
 import Module._
 
 object Module {
-  def apply[T <: Module](c: => T): T = {
+  def apply[T<:Module](c: =>T)(implicit _p:Option[Parameters] = None):T = {
     Driver.modStackPushed = true
+    def init(c: =>T):T = {
+      val res = c
+      pop()
+      for ((n, io) <- res.wires) {
+        if (io.dir == null)
+           ChiselErrors += new ChiselError(() => {"All IO's must be ports (dir set): " + io}, io.line)
+        // else if (io.width_ == -1)
+        //   ChiselErrors += new ChiselError(() => {"All IO's must have width set: " + io}, io.line)
+        io.isIo = true
+      }
+      res
+    }
+    _p match {
+      case Some(q: Parameters) => {
+        parStack.push(q.push)
+        val res = init(c)
+        parStack.pop
+        res
+      }
+      case None => {
+        parStack.push(parStack.top.push)
+        val res = init(c)
+        parStack.pop
+        res
+      }
+    }
+  }
+  val parStack = new Stack[Parameters]
+  private def params = if(parStack.isEmpty) Parameters.root(new Collector((a,b,c) => {a},(a:Any) => {a})) else parStack.top
+    //ok this is a bit of a hack but what is a reasonable default world for parameterless modules?
+
     /* *push* is done in the Module constructor because we don't have
      a *this* pointer before then, yet we need to store it before the subclass
      constructors are built. */
-    val res = c
-    pop()
-    for ((n, io) <- res.wires) {
-      if (io.dir == null)
-         ChiselErrors += new ChiselError(() => {"All IO's must be ports (dir set): " + io}, io.line)
-      // else if (io.width_ == -1)
-      //   ChiselErrors += new ChiselError(() => {"All IO's must have width set: " + io}, io.line)
-      io.isIo = true
-    }
-    res
-  }
 
   private def push(c: Module) {
     if (!Driver.modStackPushed) {
@@ -160,6 +180,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
   Driver.components += this
   push(this)
+
+  //Parameter Stuff
+  def params = Module.params
+  params.path = this.getClass :: params.path
 
   var hasExplicitClock = !(clock == null)
   var hasExplicitReset = !(_reset == null)
