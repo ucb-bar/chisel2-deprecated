@@ -948,11 +948,9 @@ struct bit_word_funs<3> {
   }
 };
 
-static val_t rand_val_seed = time(NULL) | 1;
-static val_t rand_val()
-{
-  val_t x = rand_val_seed;
-  rand_val_seed = (x << 1) ^ (-(sval_t(x) < 0) & 0x1B);
+static val_t __rand_val(val_t* seed) {
+  val_t x = *seed;
+  *seed = (x << 1) ^ (-(sval_t(x) < 0) & 0x1B);
   return x;
 }
 
@@ -985,16 +983,11 @@ class dat_t {
       res.push_back(rres[rres.size()-i-1]);
     return res;
   }
-  void randomize() {
+  void randomize(val_t* seed) {
     for (int i = 0; i < n_words; i++)
-      values[i] = rand_val();
+      values[i] = __rand_val(seed);
     if (val_n_word_bits(w))
       values[n_words-1] &= mask_val(val_n_word_bits(w));
-  }
-  static dat_t<w> rand() {
-    dat_t<w> r;
-    r.randomize();
-    return r;
   }
   inline dat_t<w> () {
   }
@@ -1033,6 +1026,9 @@ class dat_t {
   inline dat_t<n> mask(void) {
     dat_t<n> res = mask<n>(n);
     return res;
+  }
+  val_t operator [] (size_t i) {
+      return values[i];
   }
   dat_t<w> operator + ( dat_t<w> o ) {
     dat_t<w> res;
@@ -1488,6 +1484,8 @@ template <int w, int d>
 class mem_t {
  public:
   dat_t<w> contents[d];
+  val_t dummy_seed;
+  val_t* seedp;
 
   int width() {
     return w;
@@ -1501,13 +1499,16 @@ class mem_t {
     return get(idx.lo_word() & (nextpow2_1(d)-1));
   }
   dat_t<w> get (val_t idx) {
-    if (!ispow2(d) && idx >= d)
-      return dat_t<w>::rand();
+    if (!ispow2(d) && idx >= d) {
+      dat_t<w> res;
+      res.randomize(seedp);
+      return res;
+    }
     return contents[idx];
   }
   val_t get (val_t idx, int word) {
     if (!ispow2(d) && idx >= d)
-      return rand_val() & (word == val_n_words(w) && val_n_word_bits(w) ? mask_val(w) : -1L);
+      return __rand_val(seedp) & (word == val_n_words(w) && val_n_word_bits(w) ? mask_val(w) : -1L);
     return contents[idx].values[word];
   }
 
@@ -1534,12 +1535,15 @@ class mem_t {
     }
   }
   mem_t<w,d> () {
+    dummy_seed = 1;
+    seedp = &dummy_seed;
     for (int i = 0; i < d; i++)
       contents[i] = DAT<w>(0);
   }
-  void randomize() {
+  void randomize(val_t* seed) {
+    seedp = seed;
     for (int i = 0; i < d; i++)
-      contents[i].randomize();
+      contents[i].randomize(seed);
   }
   size_t read_hex(const char *hexFileName) {
     ifstream ifp(hexFileName);
@@ -1689,7 +1693,7 @@ class mod_t {
     is_stale(false)
     {}
   std::vector< mod_t* > children;
-  virtual void init ( bool rand_init=false ) { };
+  virtual void init ( val_t rand_init=false ) { };
   virtual void clock_lo ( dat_t<1> reset ) { };
   virtual void clock_hi ( dat_t<1> reset ) { };
   virtual int  clock ( dat_t<1> reset ) { };

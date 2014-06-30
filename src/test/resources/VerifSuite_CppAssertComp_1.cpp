@@ -1,6 +1,7 @@
 #include "VerifSuite_CppAssertComp_1.h"
 
-void VerifSuite_CppAssertComp_1_t::init ( bool rand_init ) {
+void VerifSuite_CppAssertComp_1_t::init ( val_t rand_init ) {
+  this->__srand(rand_init);
 }
 int VerifSuite_CppAssertComp_1_t::clock ( dat_t<1> reset ) {
   uint32_t min = ((uint32_t)1<<31)-1;

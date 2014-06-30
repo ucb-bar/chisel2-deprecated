@@ -92,7 +92,7 @@ class VerifSuite extends TestSuite {
     assertFile(dir.getPath + "/VerifSuite_CppPrintfComp_1.cpp",
 """#include "VerifSuite_CppPrintfComp_1.h"
 
-void VerifSuite_CppPrintfComp_1_t::init ( bool rand_init ) {
+void VerifSuite_CppPrintfComp_1_t::init ( val_t rand_init ) {
 }
 void VerifSuite_CppPrintfComp_1_t::clock_lo ( dat_t<1> reset ) {
   val_t T2__w0;
