@@ -1689,7 +1689,8 @@ template <int w, int d> mem_t<w,d> MEM( void );
 class mod_t {
  public:
 	mod_t():
-	  dumpfile(NULL)
+  dumpfile(NULL),
+    is_stale(false)
     {}
   std::vector< mod_t* > children;
   virtual void init ( val_t rand_init=false ) { };
@@ -1731,7 +1732,18 @@ class mod_t {
     }
     return delta;
   }
+
+  void mark_stale (void) {
+    is_stale = true;
+  }
+
+  void propagate_changes (void) {
+    if (is_stale) clock_lo(LIT<1>(false));
+    is_stale = false;
+  }
+
  protected:
+  bool is_stale;
   FILE* dumpfile;
 };
 
