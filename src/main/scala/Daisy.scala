@@ -40,6 +40,7 @@ import scala.collection.mutable.{Queue => ScalaQueue}
 import scala.math.pow
 import scala.math.max
 import scala.math.min
+import scala.math.ceil
 
 // Counter type definition
 trait CounterType
@@ -58,6 +59,8 @@ object DaisyType {
 abstract class DaisyType(val idx: Int, val limit: Int = 0, val offset: Int = 0) {
   def src: Node
   val shadow = Reg(Bits(width=AXISlave.dw))
+  val shift: Bool = null
+  val copy:  Bool = null
 }
 
 import DaisyType._
@@ -68,27 +71,29 @@ object DelayElem {
     snapIdx = snapIdx + 1
     snapIdx
   }
-  def apply(src: Node) = {
+  def apply(src: Node, shift: Bool = null, copy: Bool = null) = {
     val width = src.width
     val res = new ArrayBuffer[DelayElem]
     if (width > AXISlave.dw) {
       var offset = 0
       while (offset < width) {
         val limit = min(AXISlave.dw-1+offset, width-1)
-        val delay = new DelayElem(src, emitSnapIdx, limit, offset)
+        val delay = new DelayElem(src, emitSnapIdx, limit, offset, shift, copy)
         delays += delay
         res += delay
         offset += AXISlave.dw
       }
     } else {
-      val delay = new DelayElem(src, emitSnapIdx)
+      val delay = new DelayElem(src, emitSnapIdx, 0, 0, shift, copy)
       delays += delay
       res += delay
     }
     res
   }
 }
-class DelayElem(val src: Node, idx: Int, limit: Int = 0, offset: Int = 0) extends DaisyType(idx, limit, offset)
+class DelayElem(val src: Node, idx: Int, limit: Int = 0, offset: Int = 0, 
+                override val shift: Bool = null, 
+                override val copy: Bool = null) extends DaisyType(idx, limit, offset)
 
 object EventCounter {
   var cntrIdx = -1
@@ -325,7 +330,6 @@ object DaisyChain extends Backend {
   val daisyCopy = new HashMap[Module, Bool]
   val snapRead = new HashMap[Module, Bool]
   val cntrRead = new HashMap[Module, Bool]
-  val raddrEns = new HashMap[Node, Bool]
 
   def addStepCounter(c: Module) = {
     ChiselError.info("[DaisyChain] add step counters")
@@ -601,7 +605,8 @@ object DaisyChain extends Backend {
   def findDelays(c: Module) { 
     ChiselError.info("[SnapshotChain] find delay elements")
     /*** collect inputs ***/
-    for ((n, io) <- c.io.flatten; if io.dir == INPUT && !(keywords contains io.name)) {
+    for ((n, io) <- c.io.flatten; 
+    if io.dir == INPUT && !(keywords contains io.name)) {
       c.delays ++= DelayElem(io)
     }
 
@@ -615,34 +620,51 @@ object DaisyChain extends Backend {
           case reg: Reg if !(keywords contains reg.name) => 
             m.delays ++= DelayElem(reg)
           case mem: Mem[_] if mem.seqRead => {
-            val memSize  = UInt(mem.size-1)
             val raddr    = Driver.seqReadAddrs(mem)
-            val bufName  = raddr.comp.name + "_daisy_buf"
-            val raddrBuf = addReg(m, Reg(UInt(width=raddr.width)), bufName)
+            val ratio    = UInt(ceil(mem.width.toDouble / AXISlave.dw).toInt)
+            val memSize  = UInt(mem.size-1)
+            val raddrBuf = addReg(m, Reg(UInt()))
+            val ratioCnt = addReg(m, Reg(UInt()))
             val overflow = addReg(m, Reg(Bool()))
             val flag     = addReg(m, Reg(Bool()))
-            val raddrEn  = flag && !overflow && !fireBufs(m)
-            updateReg(raddr,    raddrEn -> (raddr + UInt(1)),  daisyCopy(m) -> UInt(0), 
+            val daisy    = flag && !overflow && !fireBufs(m)
+            val notDaisy = !daisy
+            val copy     = if (mem.width > AXISlave.dw) daisy && !ratioCnt.orR else daisy
+            val shift    = (if (mem.width > AXISlave.dw) daisy && ratioCnt.orR else daisy) || snapRead(m)
+            updateReg(raddr,    copy -> (raddr + UInt(1)),  daisyCopy(m) -> UInt(0), 
                                 (!fireIns(m) && overflow) -> raddrBuf)
-            updateReg(overflow, raddrEn -> (raddr >= memSize), daisyCopy(m) -> Bool(false))
-            updateReg(flag,     daisyCopy(m) -> Bool(true),     snapRead(m) -> Bool(false))
-            updateReg(raddrBuf, daisyCopy(m) -> raddr) 
-            keywords += bufName
-            val shiftEn = raddrEn || snapRead(m)
-            for (i <- 0 until mem.size) {
-              val src = 
-                if (i == mem.size-1) mem.reads.last else new MemRead(mem, UInt(i))
-              raddrEns(src) = 
-                if (i == mem.size-1) raddrEn        else shiftEn
-              m.delays ++= DelayElem(src)
-            }
+            updateReg(overflow, copy -> (raddr >= memSize), daisyCopy(m) -> Bool(false))
+            updateReg(flag,     daisyCopy(m) -> Bool(true),  snapRead(m) -> Bool(false))
+            updateReg(raddrBuf, daisyCopy(m) -> raddr)
+            if (mem.width > AXISlave.dw) 
+              updateReg(ratioCnt, 
+                        ratioCnt.orR -> (ratioCnt - UInt(1)), daisyCopy(m) -> UInt(0), copy -> ratio)
 
-            val notRaddrEn = !raddrEn
-            wire(notRaddrEn -> snapOuts(m).valid)
-            if (m == c) wire(notRaddrEn -> stalled)
+            keywords += emitRef(raddrBuf)
+            keywords += emitRef(ratioCnt)
+            keywords += emitRef(overflow)
+            keywords += emitRef(flag)
+
+            for (i <- 0 until mem.size) {
+              if (i == mem.size-1) {
+                m.delays ++= DelayElem(mem.reads.last, shift, copy)
+              }
+              else {
+                val src = new MemRead(mem, UInt(i))
+                src.infer
+                m.delays ++= DelayElem(src, shift)
+              }
+            }
+            wire(notDaisy -> snapOuts(m).valid)
+            if (m == c) wire(notDaisy -> stalled)
           }
-          case mem: Mem[_] =>
-            for (i <- 0 until mem.size) m.delays ++= DelayElem(new MemRead(mem, UInt(i)))
+          case mem: Mem[_] => {
+            for (i <- 0 until mem.size) {
+              val read = new MemRead(mem, UInt(i))
+              read.infer
+              m.delays ++= DelayElem(read)
+            }
+          }
           case _ =>
         }
       }
@@ -817,10 +839,10 @@ object DaisyChain extends Backend {
           wire(chain.head.shadow -> daisyOut.bits)
           // snap input -> last shadow 
           addReg(m, chain.last.shadow, shadowName)
-          if (chainT == SnapshotChain && (raddrEns contains src))  
-            updateReg(chain.last.shadow, raddrEns(src) -> src, read -> daisyIn)
+          if (chainT == SnapshotChain && !(chain.last.copy == null))
+            updateReg(chain.last.shadow, chain.last.copy -> src, read -> daisyIn)
           else 
-            updateReg(chain.last.shadow, copy          -> src, read -> daisyIn)
+            updateReg(chain.last.shadow, copy -> src, read -> daisyIn)
         }
         // children & signals
         case (false, false) => {
@@ -852,10 +874,10 @@ object DaisyChain extends Backend {
           wire(chain.head.shadow -> daisyOut.bits)
           // daisy input -> last shadow
           addReg(m, chain.last.shadow, shadowName)
-          if (chainT == SnapshotChain && (raddrEns contains src)) 
-            updateReg(chain.last.shadow, raddrEns(src) -> src, read -> headDaisyOut.bits)
+          if (chainT == SnapshotChain && !(chain.last.copy == null))  
+            updateReg(chain.last.shadow, chain.last.copy -> src, read -> daisyIn)
           else 
-            updateReg(chain.last.shadow, copy          -> src, read -> headDaisyOut.bits)
+            updateReg(chain.last.shadow, copy -> src, read -> daisyIn)
           // daisy input -> last child's snap input
           wire(daisyIn -> lastDaisyIn)
         }
@@ -895,13 +917,14 @@ object DaisyChain extends Backend {
         // daisy_ctrl == 'copy' -> current source
         // daisy_ctrl == 'read' -> next shadow
         addReg(m, s.head.shadow, shadowName)
-        if (chainT == SnapshotChain && (raddrEns contains src)) {
-          val mread = src match { case mr: MemRead => mr }
-          val mem   = mread.mem
-          if (mem.reads contains mread) 
-            updateReg(s.head.shadow, raddrEns(src) -> src, read -> s.last.shadow)
+        if (chainT == SnapshotChain && !(s.head.copy == null)) {
+          if (offset > 0) // not the end point
+            updateReg(s.head.shadow, s.head.copy -> src, s.head.shift -> s.last.shadow)
           else
-            updateReg(s.head.shadow, raddrEns(src) -> s.last.shadow)
+            updateReg(s.head.shadow, s.head.copy -> src, read -> s.last.shadow)
+        }
+        if (chainT == SnapshotChain && !(s.head.shift == null)) {
+          updateReg(s.head.shadow, s.head.shift -> s.last.shadow)
         } else {
           updateReg(s.head.shadow, copy -> src, read -> s.last.shadow) 
         }
