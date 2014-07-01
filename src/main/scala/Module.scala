@@ -72,7 +72,7 @@ object Module {
     }
   }
   val parStack = new Stack[Parameters]
-  private def params = if(parStack.isEmpty) Parameters.root(new Collector((a,b,c) => {a},(a:Any) => {a})) else parStack.top
+  private def params = if(parStack.isEmpty) Parameters.empty else parStack.top
     //ok this is a bit of a hack but what is a reasonable default world for parameterless modules?
 
     /* *push* is done in the Module constructor because we don't have

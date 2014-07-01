@@ -27,6 +27,11 @@ class ParameterUndefinedException(field:Any, cause:Throwable=null)
 // Knobs are top level free variables that go into the constraint solver.
 final case class Knob[T](name:Any)
 
+abstract class ChiselConfig {
+  val top:World.TopDefs
+  val knobVal:Any=>Any
+}
+
 // objects given to the user in mask functions (site,here,up)
 abstract class View {
   // the list of classes in our current path down the heirarchy
@@ -253,6 +258,7 @@ object Parameters {
   def root(w:World) = {
     new Parameters(w, w._topLook())
   }
+  def empty = Parameters.root(new Collector((a,b,c) => {a},(a:Any) => {a})) 
   
   // Mask making helpers
   
