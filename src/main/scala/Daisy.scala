@@ -175,6 +175,8 @@ object DaisyUtil {
     val reg = res.comp match { case r: Reg => r }
     // assign component
     reg.component = m
+    // assign clock
+    reg.assignClock(m.clock)
     // assign reset
     reg.assignReset(m.reset)
     // assign name
@@ -185,9 +187,11 @@ object DaisyUtil {
 
   def updateReg(regType: Bits, updates: (Bool, Node)*) {
     val reg = regType.comp match { case r: Reg => r }
+    val m = reg.component
     // add updates
-    for ((cond, value) <- updates.reverse)
+    for ((cond, value) <- updates.reverse) {
       reg.doProcAssign(value, cond)
+    }
   }
 
 
@@ -312,13 +316,13 @@ object DaisyChain extends Backend {
       b.transforms += (c => genCounters(top))
       b.transforms += (c => genDaisyChain(top, CounterChain))
     }
-    b.transforms += ((c: Module) => c.addClockAndReset)
-    b.transforms += ((c: Module) => gatherClocksAndResets)
-    b.transforms += ((c: Module) => connectResets)
     b.transforms += ((c: Module) => c.inferAll)
     b.transforms += ((c: Module) => c.forceMatchingWidths)
     b.transforms += ((c: Module) => c.removeTypeNodes)
     b.transforms += ((c: Module) => collectNodesIntoComp(initializeDFS))
+    // b.transforms += ((c: Module) => c.addClockAndReset)
+    // b.transforms += ((c: Module) => gatherClocksAndResets)
+    // b.transforms += ((c: Module) => connectResets)
     b.analyses   += ((c: Module) => printOutMappings(c))
   }
 
@@ -774,7 +778,7 @@ object DaisyChain extends Backend {
         case SnapshotChain => "Snapshot"
         case CounterChain  => "Counter"
       } ))
- 
+
     val queue = ScalaQueue(c)
     // Daisy chaining
     while (!queue.isEmpty) {
@@ -796,92 +800,6 @@ object DaisyChain extends Backend {
         case SnapshotChain => m.delays
         case CounterChain  => m.counters
       }
-
-      (m.children.isEmpty, chain.isEmpty) match {
-        // no children & no singals 
-        case (true, true) => {
-          wire(daisyIn -> daisyOut.bits)
-        }
-        // children but no signals
-        case (false, true) => {
-	  val headDaisyOut = chainT match {
-	    case SnapshotChain => snapOuts(m.children.head)
-	    case CounterChain  => cntrOuts(m.children.head)
-	  }
-	  val lastDaisyIn = chainT match {
-	    case SnapshotChain => snapIns(m.children.last)
-	    case CounterChain  => cntrIns(m.children.last)
-	  }
-          // the head child's daisy output -> daisy output
-          wire(headDaisyOut.bits -> daisyOut.bits)
-          // daisy input -> last child's daisy input 
-          wire(daisyIn -> lastDaisyIn)
-        }
-        // no children but signals
-        case (true, false) => {
-          val limit = chain.last.limit
-          val offset = chain.last.offset
-          val src = chain.last.src match {
-            case bits: Bits if chainT == SnapshotChain && limit - offset > 0 =>
-              (ioBuffers getOrElse (bits, bits))(limit, offset)
-            case bits: Bits => 
-              ioBuffers getOrElse (bits, bits)
-            case any if chainT == SnapshotChain && limit - offset > 0 =>
-              UInt(any)(limit, offset)
-            case any => any
-          } 
-          val shadowName = ( chainT match {
-            case SnapshotChain => "snap_shadow_"
-            case CounterChain  => "cntr_shadow_"
-          } ) + chain.last.idx
-          keywords += shadowName
-          // snap output -> head shadow
-          wire(chain.head.shadow -> daisyOut.bits)
-          // snap input -> last shadow 
-          addReg(m, chain.last.shadow, shadowName)
-          if (chainT == SnapshotChain && !(chain.last.copy == null))
-            updateReg(chain.last.shadow, chain.last.copy -> src, read -> daisyIn)
-          else 
-            updateReg(chain.last.shadow, copy -> src, read -> daisyIn)
-        }
-        // children & signals
-        case (false, false) => {
-	  val headDaisyOut = chainT match {
-	    case SnapshotChain => snapOuts(m.children.head)
-	    case CounterChain  => cntrOuts(m.children.head)
-	  }
-	  val lastDaisyIn = chainT match {
-	    case SnapshotChain => snapIns(m.children.last)
-	    case CounterChain  => cntrIns(m.children.last)
-	  }
-          val limit = chain.last.limit
-          val offset = chain.last.offset
-          val src = chain.last.src match {
-            case bits: Bits if chainT == SnapshotChain && limit - offset > 0 =>
-              (ioBuffers getOrElse (bits, bits))(limit, offset)
-            case bits: Bits => 
-              ioBuffers getOrElse (bits, bits)
-            case any if chainT == SnapshotChain && limit - offset > 0 =>
-              UInt(any)(limit, offset)
-            case any => any
-          } 
-          val shadowName = ( chainT match {
-            case SnapshotChain => "snap_shadow_"
-            case CounterChain  => "cntr_shadow_"
-          } ) + chain.last.idx
-          keywords += shadowName
-          // head shadow -> daisy output
-          wire(chain.head.shadow -> daisyOut.bits)
-          // daisy input -> last shadow
-          addReg(m, chain.last.shadow, shadowName)
-          if (chainT == SnapshotChain && !(chain.last.copy == null))  
-            updateReg(chain.last.shadow, chain.last.copy -> src, read -> daisyIn)
-          else 
-            updateReg(chain.last.shadow, copy -> src, read -> daisyIn)
-          // daisy input -> last child's snap input
-          wire(daisyIn -> lastDaisyIn)
-        }
-      }
  
       for (s <- m.children sliding 2 ; if s.size == 2) {
         val curDaisyIn = chainT match {
@@ -896,7 +814,26 @@ object DaisyChain extends Backend {
         wire(nextDaisyOut.bits -> curDaisyIn)
       }
 
-      for (s <- chain sliding 2 ; if s.size == 2) {
+      if (chain.isEmpty) {
+        if (m.children.isEmpty) {
+          wire(daisyIn -> daisyOut.bits)
+        } else {
+	  val headDaisyOut = chainT match {
+	    case SnapshotChain => snapOuts(m.children.head)
+	    case CounterChain  => cntrOuts(m.children.head)
+	  }
+	  val lastDaisyIn = chainT match {
+	    case SnapshotChain => snapIns(m.children.last)
+	    case CounterChain  => cntrIns(m.children.last)
+	  }
+          // the head child's daisy output -> daisy output
+          wire(headDaisyOut.bits -> daisyOut.bits)
+          // daisy input -> last child's daisy input 
+          wire(daisyIn -> lastDaisyIn)
+        }
+      }
+
+      for (s <- chain sliding 2) {
         val limit = s.head.limit
         val offset = s.head.offset
         val src = s.head.src match {
@@ -917,16 +854,42 @@ object DaisyChain extends Backend {
         // daisy_ctrl == 'copy' -> current source
         // daisy_ctrl == 'read' -> next shadow
         addReg(m, s.head.shadow, shadowName)
-        if (chainT == SnapshotChain && !(s.head.copy == null)) {
-          if (offset > 0) // not the end point
-            updateReg(s.head.shadow, s.head.copy -> src, s.head.shift -> s.last.shadow)
-          else
-            updateReg(s.head.shadow, s.head.copy -> src, read -> s.last.shadow)
-        }
-        if (chainT == SnapshotChain && !(s.head.shift == null)) {
-          updateReg(s.head.shadow, s.head.shift -> s.last.shadow)
+        if (s.size == 2) {
+          if (chainT == SnapshotChain && !(s.head.copy == null)) {
+            if (offset > 0) // not the end point
+              updateReg(s.head.shadow, s.head.copy -> src, s.head.shift -> s.last.shadow)
+            else
+              updateReg(s.head.shadow, s.head.copy -> src, read -> s.last.shadow)
+          }
+          if (chainT == SnapshotChain && !(s.head.shift == null)) {
+            updateReg(s.head.shadow, s.head.shift -> s.last.shadow)
+          } else {
+            updateReg(s.head.shadow, copy -> src, read -> s.last.shadow) 
+          }
+        } else if (m.children.isEmpty) {
+          wire(chain.head.shadow -> daisyOut.bits)
+          if (!(s.head.copy == null))
+            updateReg(s.head.shadow, s.head.copy -> src, read -> daisyIn)
+          else 
+            updateReg(s.head.shadow, copy -> src, read -> daisyIn)
         } else {
-          updateReg(s.head.shadow, copy -> src, read -> s.last.shadow) 
+	  val lastDaisyIn = chainT match {
+	    case SnapshotChain => snapIns(m.children.last)
+	    case CounterChain  => cntrIns(m.children.last)
+	  }
+	  val headDaisyOut = chainT match {
+	    case SnapshotChain => snapOuts(m.children.head)
+	    case CounterChain  => cntrOuts(m.children.head)
+	  }
+          // head shadow -> daisy output
+          wire(chain.head.shadow -> daisyOut.bits)
+          // daisy input -> last child's snap input
+           wire(daisyIn -> lastDaisyIn)
+          // has children & signals
+          if (!(s.head.copy == null))  
+            updateReg(s.head.shadow, s.head.copy -> src, read -> headDaisyOut.bits)
+          else 
+            updateReg(s.head.shadow, copy -> src, read -> headDaisyOut.bits)
         }
       }
       // visit children
