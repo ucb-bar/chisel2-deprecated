@@ -64,7 +64,7 @@ object Module {
         res
       }
       case None => {
-        parStack.push(parStack.top.push)
+        if(parStack.isEmpty) parStack.push(Parameters.empty) else parStack.push(parStack.top.push)
         val res = init(c)
         parStack.pop
         res

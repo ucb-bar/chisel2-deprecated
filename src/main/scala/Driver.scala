@@ -32,11 +32,11 @@ package Chisel
 
 import collection.mutable.{ArrayBuffer, HashSet, HashMap, Stack, LinkedHashSet}
 
-object Driver {
-  def apply[T <: Module](args: Array[String], gen: () => T): T = {
+object Driver extends FileSystemUtilities{
+  def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean = true): T = {
     Driver.initChisel(args)
     try {
-      execute(gen)
+      if(wrapped) execute(gen) else executeUnwrapped(gen)
     } finally {
       ChiselError.report
       if (ChiselError.hasErrors && !getLineNumbers) {
@@ -47,27 +47,38 @@ object Driver {
   }
 
   def apply[T <: Module](args: Array[String], gen: () => T,
-                         ftester: T => Tester[T]): T = {
-    val mod = apply(args, gen)
+                         ftester: T => Tester[T], wrapped:Boolean = true): T = {
+    val mod = if(wrapped) apply(args, gen) else apply(args,gen,false)
     if (Driver.isTesting) test(mod, ftester)
     mod
   }
 
-  private def execute[T <: Module](gen: () => T): T = {
-    /* JACK - If loading design, read design.prm file*/
-    if (Driver.pLoad == true) { Params.load(Driver.pPnt) }
-    val c = gen()
-
-    Driver.backend.initBackannotation
-
-    /* Params - If dumping design, dump space to pDir*/
-    if (Driver.pDump == true) { 
-      Params.dump(Driver.pDir)
-    } else {
-      Driver.backend.elaborate(c)
+  private def executeUnwrapped[T <: Module](gen: () => T): T = {
+    if (!Driver.chiselConfigMode.isEmpty && !Driver.chiselConfigClassName.isEmpty) { 
+      val config = Class.forName(chiselConfigClassName.get).newInstance.asInstanceOf[ChiselConfig]
+      val world = if(Driver.chiselConfigMode.get == "collect") new Collector(config.top,config.knobVal) else new Instance(config.top,config.knobVal)
+      val p = Some(Parameters.root(world))
+      val c = execute(() => Module(gen())(p))
+      if(Driver.chiselConfigMode.get == "collect") {
+        val w = createOutputFile(Driver.chiselConfigClassName.get + ".cst")
+        w.write(world.getConstraints)
+      }
+      c
+    } 
+    else {
+      execute(() => Module(gen())(None))
     }
-    if (Driver.isCheckingPorts) Driver.backend.checkPorts(c)
-    if (Driver.isCompiling && Driver.isGenHarness) Driver.backend.compile(c)
+  }
+
+  private def execute[T <: Module](gen: () => T): T = {
+    val c = gen()
+    Driver.backend.initBackannotation
+    /* Params - If dumping design, dump space to pDir*/
+    if (Driver.chiselConfigMode == None || Driver.chiselConfigMode.get == "instance") { 
+      Driver.backend.elaborate(c)
+      if (Driver.isCheckingPorts) Driver.backend.checkPorts(c)
+      if (Driver.isCompiling && Driver.isGenHarness) Driver.backend.compile(c)
+    }
     c
   }
 
@@ -207,8 +218,8 @@ object Driver {
         case "--backannotation" => isBackannotating = true
         case "--model" => model = args(i + 1) ; i += 1
         //Jackhammer Flags
-        case "--pDump" => pDump = true; pDir = args(i+1); i+=1;  //dump parameter space
-        case "--pLoad" => pLoad = true; pPnt = args(i+1); i+=1;  //load design.prm file
+        case "--configCollect"  => chiselConfigMode = Some("collect"); chiselConfigClassName = Some(args(i+1)); i+=1;  //dump constraints in dse dir
+        case "--configInstance" => chiselConfigMode = Some("instance"); chiselConfigClassName = Some(args(i+1)); i+=1;  //use ChiselConfig to supply parameters
         case "--dumpTestInput" => dumpTestInput = true
         case "--testerSeed" => {
           testerSeedValid = true
@@ -280,11 +291,9 @@ object Driver {
   val pseudoMuxes = HashMap[Node, Node]()
   var modStackPushed: Boolean = false
   var startTime = 0L
-  /* Jackhammer flags */
-  var pDump: Boolean = false
-  var pDir: String = null
-  var pLoad: Boolean = false
-  var pPnt: String = null
+  /* ChiselConfig flags */
+  var chiselConfigClassName: Option[String] = None
+  var chiselConfigMode: Option[String] = None
 
   // Setting this to TRUE will case the test harness to print its
   // standard input stream to a file.

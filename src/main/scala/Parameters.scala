@@ -174,6 +174,8 @@ abstract class World(
   def _constrain(e:Ex[Boolean]):Unit
   
   def _knobValue(kname:Any):Any
+
+  def getConstraints:String = ""
 }
 
 // a world responsible for collecting all constraints in the first pass
@@ -240,6 +242,8 @@ class Collector(
   
   def _knobValue(kname:Any):Any =
     knobVal(kname)
+
+  override def getConstraints:String = constraints.map(_.toString).reduce(_ + "\n" + _)
 }
 
 // a world instantianted to a specific mapping of knobs to values
