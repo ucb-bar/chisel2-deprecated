@@ -423,12 +423,13 @@ class ManualTester[+T <: Module]
     val cmd = 
       (if (Driver.backend.isInstanceOf[FloBackend]) {
          val dir = Driver.backend.asInstanceOf[FloBackend].floDir
-	 val command = ArrayBuffer(dir + "fix-console", ":is-debug", "true", ":filename", target + ".hex")
-	 if (Driver.isVCD) { command ++= ArrayBuffer(":is-vcd-dump", "true") }
+         val command = ArrayBuffer(dir + "fix-console", ":is-debug", "true", ":filename", target + ".hex", ":flo-filename", target + ".mwe.flo")
+         if (Driver.isVCD) { command ++= ArrayBuffer(":is-vcd-dump", "true") }
+         if (Driver.emitTempNodes) { command ++= ArrayBuffer(":emit-temp-nodes", "true") }
          command ++= ArrayBuffer(":target-dir", Driver.targetDir)
          command.mkString(" ")
       } else {
-         target + (if (Driver.backend.isInstanceOf[VerilogBackend]) " -q" else "")
+         target + (if (Driver.backend.isInstanceOf[VerilogBackend]) " -q +vcs+initreg+0 " else "")
       })
     println("SEED " + Driver.testerSeed)
     println("STARTING " + cmd)

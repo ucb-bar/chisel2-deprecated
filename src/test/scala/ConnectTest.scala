@@ -80,7 +80,7 @@ class ConnectSuite extends TestSuite {
     }
     class SuppliesResetsTests(m: SuppliesResetsParent) extends Tester(m) {
       List(true,false,false,false,false,false).zip(
-      List(true,true, true, false,false,false)).map {
+      List(true, true, false,false,false,false)).map {
         case (i, o) =>
           poke(m.io.in,    int(i))
           step(1)
@@ -137,7 +137,7 @@ class ConnectSuite extends TestSuite {
       (0 until 4).map { i =>
         poke(m.io.in, i)
         step(1)
-        expect(m.io.out, if(i == 0) 0 else i-1)
+        expect(m.io.out, if(i == 0) 0 else i)
       }
     }
     launchCppTester((m: LogicBtwInstances) => new LogicBtwInstancesTests(m))
@@ -209,7 +209,7 @@ class ConnectSuite extends TestSuite {
     class RegisterHookTests(m: A) extends Tester(m) {
       List(1,     2,     4,     6,     8,     12,    15,   15).zip(
       List(false, true,  true,  false, true,  false, true, false)).zip(
-      List((0,0), (0,0), (0,2), (1,0), (1,0), (2,0), (2,0), (3,3), (3,3))).map { 
+      List((0,0), (0,2), (1,0), (1,0), (2,0), (2,0), (3,3), (3,3))).map { 
         case ((in, en), (im0, im1)) =>
           poke(m.io.wdata, in)
           poke(m.io.wen,   int(en))

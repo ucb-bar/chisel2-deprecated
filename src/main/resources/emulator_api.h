@@ -365,35 +365,42 @@ public:
 			// OUT: actual number of cycles stepped
 			if (!check_command_length(tokens, 1, 1)) { return "error"; }
 			int cycles = atoi(tokens[1].c_str());
+		    module->propagate_changes();
 		    for (int i=0; i<cycles; i++) {
-		    	module->clock_lo(dat_t<1>(0));
-		    	module->clock_hi(dat_t<1>(0));
-			module->dump();
+		    	module->clock(dat_t<1>(0));
 		    }
-		    module->clock_lo(dat_t<1>(0));
 		    return itos(cycles);
+		} else if (tokens[0] == "tick") {
+			// BETA FUNCTION: semantics subject to change, use with caution
+			// IN:  tick
+			// OUT: ok (on success)
+			// Update registers without propagation
+			// updating registers.
+		    module->clock_hi(dat_t<1>(0));
+		    return "ok";
 		} else if (tokens[0] == "propagate") {
 			// BETA FUNCTION: semantics subject to change, use with caution
 			// IN:  propagate
 			// OUT: ok (on success)
 			// This function propagates the combinational logic, without
 			// updating registers.
-		    module->clock_lo(dat_t<1>(0));
-		    return "ok";
+			module->propagate_changes();
+			return "ok";
 		} else if (tokens[0] == "step") {
 			// IN:  step <num_cycles>
 			// OUT: actual number of cycles stepped
 			if (!check_command_length(tokens, 1, 1)) { return "error"; }
 			int n = atoi(tokens[1].c_str());
-		    int ret = module->step(false, n);
-		    return itos(ret);
+			module->propagate_changes();
+			int ret = module->step(false, n);
+			return itos(ret);
 		} else if (tokens[0] == "set_clocks") {
 			// BETA FUNCTION: semantics subject to change, use with caution
 			// IN:  set_clocks
 			// OUT: ???
 			// I'm not really sure what this is supposed to do, but it was
 			// in the old command API, so it's here now
-	        std::vector< int > periods;
+		  std::vector< int > periods;
 	        for (int i = 1; i < tokens.size(); i++) {
 	          int period = atoi(tokens[i].c_str());
 	          periods.push_back(period);
@@ -415,13 +422,13 @@ public:
 		    }
 		    module->clock_lo(dat_t<1>(0));
 		    return itos(cycles);
-
 		} else if (tokens[0] == "peek") {
 			// LEGACY FUNCTION: do not use in new code
 			// IN:  peek <node_name> | peek <mem_name> <mem_index>
 			// OUT: value
 			if (!check_command_length(tokens, 1, 2)) { return "error"; }
 			cerr << "peek is deprecated, use wire_peek or mem_peek" << std::endl;
+			module->propagate_changes();
 			if (tokens.size() == 2) {
 				return get_dat_by_name(tokens[1])->get_value();
 			} else if (tokens.size() == 3) {
@@ -439,31 +446,68 @@ public:
 			} else if (tokens.size() == 4) {
 				success = get_mem_by_name(tokens[1])->set_element(tokens[2], tokens[3]);
 			}
-			return success ? "true" : "false";
-
+			std::string result;
+			if (success) {
+			  result = "true";
+			  module->mark_stale();
+			} else {
+			  result = "false";
+			}
+			return result;
 		} else if (tokens[0] == "wire_peek") {
 			// IN:  wire_peek <node_name>
 			// OUT: value
 			if (!check_command_length(tokens, 1, 1)) { return "error"; }
+			module->propagate_changes();
 			return get_dat_by_name(tokens[1])->get_value();
 		} else if (tokens[0] == "wire_poke") {
 			// IN:  wire_poke <node_name> <value>
 			// OUT: ok (on success)
 			if (!check_command_length(tokens, 2, 2)) { return "error"; }
 			bool success = get_dat_by_name(tokens[1])->set_value(tokens[2]);
-			return success ? "ok" : "error";
+			std::string result;
+			if (success) {
+			  result = "ok";
+			  module->mark_stale();
+			} else {
+			  result = "error";
+			}
+			return result;
 		} else if (tokens[0] == "mem_peek") {
 			// IN:  mem_peek <mem_name> <mem_index>
 			// OUT: value
 			if (!check_command_length(tokens, 2, 2)) { return "error"; }
+			module->propagate_changes();
 			return get_mem_by_name(tokens[1])->get_element(tokens[2]);
 		} else if (tokens[0] == "mem_poke") {
 			// IN:  mem_poke <mem_name> <mem_index> <value>
 			// OUT: ok (on success)
 			if (!check_command_length(tokens, 3, 3)) { return "error"; }
 			bool success = get_mem_by_name(tokens[1])->set_element(tokens[2], tokens[3]);
+			std::string result;
+			if (success) {
+			  result = "ok";
+			  module->mark_stale();
+			} else {
+			  result = "error";
+			}
+			return result;
 			return success ? "ok" : "error";
-
+		} else if (tokens[0] == "trace") {
+			// IN:  trace n <node_name>+
+			// OUT: values
+                        // TODO: ADD MEM PEEK SUPPORT
+                        stringstream ss;
+			if (!check_command_length(tokens, 2)) { return "bad"; }
+			int n = atoi(tokens[1].c_str());
+                        for (int t = 0; t < n; t++) {
+                          for (int i = 2; i < tokens.size(); i++) 
+                            ss << " " << get_dat_by_name(tokens[i])->get_value();
+                          int ret = module->step(false, 1);
+                          // if (!ret)
+                          //   return "error";
+                        }
+                        return ss.str();
 		} else if (tokens[0] == "list_wires") {
 			// IN:  list_wires
 			// OUT: list of wires
@@ -477,7 +521,6 @@ public:
 			} else {
 				return "";
 			}
-
 		} else if (tokens[0] == "list_mems") {
 			// IN:  list_mems
 			// OUT: list of memories
@@ -491,7 +534,6 @@ public:
 			} else {
 				return "";
 			}
-
 		} else if (tokens[0] == "wire_width") {
 			// IN:  wire_width <node>
 			// OUT: bitwidth of wire
@@ -507,7 +549,6 @@ public:
 			// OUT: elements in memory
 			if (!check_command_length(tokens, 1, 1)) { return "error"; }
 			return get_mem_by_name(tokens[1])->get_depth();
-
 		} else if (tokens[0] == "referenced_snapshot_save") {
 			// BETA FUNCTION: semantics subject to change, use with caution
 			// IN:  referenced_snapshot_save <name>
@@ -517,6 +558,7 @@ public:
 			// does not need to have been applied before this, and calls to
 			// clk_lo immediately after restoring may change the state).
 			if (!check_command_length(tokens, 1, 1)) { return "error"; }
+			module->propagate_changes();
 			mod_t *snapshot = module->clone();
 			snapshot_table[tokens[1]] = snapshot;
 			return tokens[1];
@@ -528,8 +570,14 @@ public:
 			mod_t *snapshot = get_snapshot_by_reference(tokens[1]);
 			if (snapshot == NULL) {	return "error";	}
 			bool success = module->set_circuit_from(snapshot);
-			return success ? "ok" : "error";
-
+			std::string result;
+			if (success) {
+			  result = "ok";
+			  module->mark_stale();
+			} else {
+			  result = "error";
+			}
+			return result;
 		} else {
 			std::cerr << "Unknown command: '" << tokens[0] << "'" << std::endl;
 		}
