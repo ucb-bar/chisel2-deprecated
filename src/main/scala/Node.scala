@@ -242,11 +242,8 @@ abstract class Node extends nameable {
     if (! res.isKnown) {
       true
     } else if (res != width) {
-        // NOTE: This should NOT stop us using inferWidth, since the value
-        // we set here may not be correct.
-      if (width_.isKnown) {
-        println("Node.infer: changing width from " + width_.needWidth() + " to " + res.needWidth() + ", for node "+ this)
-      }
+      // NOTE: This should NOT stop us using inferWidth, since the value
+      // we set here may not be correct.
       width_ = res
       true
     } else {
