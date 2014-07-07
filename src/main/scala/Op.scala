@@ -176,10 +176,7 @@ object Op {
         case "&"  => return Literal(av & bv, max(aw, bw));
         case "^"  => return Literal(av ^ bv, max(aw, bw));
         case "<<" => return Literal(av << bv.toInt, aw + bv.toInt);
-        case ">>" => {
-	     println("Literal >>: aw " + aw)
-	     return Literal(av >> bv.toInt, aw - bv.toInt);
-	}
+        case ">>" => return Literal(av >> bv.toInt, aw - bv.toInt);
         case _ => ;
       }
     }
