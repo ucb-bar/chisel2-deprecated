@@ -243,7 +243,7 @@ class Collector(
   def _knobValue(kname:Any):Any =
     knobVal(kname)
 
-  override def getConstraints:String = constraints.map(_.toString).reduce(_ + "\n" + _)
+  override def getConstraints:String = if(constraints.isEmpty) "" else constraints.map(_.toString).reduce(_ + "\n" + _) + "\n"
 }
 
 // a world instantianted to a specific mapping of knobs to values

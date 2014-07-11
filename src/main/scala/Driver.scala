@@ -62,6 +62,7 @@ object Driver extends FileSystemUtilities{
       if(Driver.chiselConfigMode.get == "collect") {
         val w = createOutputFile(Driver.chiselConfigClassName.get + ".cst")
         w.write(world.getConstraints)
+        w.close
       }
       c
     } 
