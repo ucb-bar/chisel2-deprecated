@@ -194,6 +194,8 @@ object Driver {
             backend = new CounterFPGABackend
           } else if (args(i + 1) == "counterw") {
             backend = new CounterWBackend
+          } else if (args(i + 1) == "sysc") {
+            backend = new SysCBackend
           } else {
             backend = Class.forName(args(i + 1)).newInstance.asInstanceOf[Backend]
           }
