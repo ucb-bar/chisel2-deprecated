@@ -366,6 +366,154 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     }
   }
 
+  // A "depth-first" search for width inference.
+  def idfs(visit: Node => Unit): Unit = {
+
+	  def initializeIDFS: Stack[Node] = {
+	    val res = new Stack[Node]
+
+			/* XXX Make sure roots are consistent between initializeBFS, initializeDFS
+   			and findRoots.
+			   */
+	    for (c <- Driver.components; a <- c.debugs)
+	    	res.push(a)
+	    for(b <- Driver.blackboxes)
+	    	res.push(b.io)
+	    for(c <- Driver.components)
+	    	for((n, io) <- c.io.flatten)
+	    		res.push(io)
+
+      res
+    }
+
+    def findSCC():ArrayBuffer[ArrayBuffer[Node]] = {
+      // Tarjan's strongly connected components algorithm to find loops
+      var sccIndex = 0
+      val stack = new Stack[Node]
+      val sccList = new ArrayBuffer[ArrayBuffer[Node]]
+  
+      def tarjanSCC(n: Node): Unit = {
+  
+        n.sccIndex = sccIndex
+        n.sccLowlink = sccIndex
+        sccIndex += 1
+        stack.push(n)
+  
+        for(i <- n.inputs) {
+          if(!(i == null)) {
+            if(i.sccIndex == -1) {
+              tarjanSCC(i)
+              n.sccLowlink = min(n.sccLowlink, i.sccLowlink)
+            } else if(stack.contains(i)) {
+              n.sccLowlink = min(n.sccLowlink, i.sccIndex)
+            }
+          }
+        }
+  
+        if(n.sccLowlink == n.sccIndex) {
+          val scc = new ArrayBuffer[Node]
+  
+          var top: Node = null
+          do {
+            top = stack.pop()
+            scc += top
+          } while (!(n == top))
+          sccList += scc
+        }
+      }
+
+      // Construct the SCC arrays
+      val idfsNodes = initializeIDFS
+      for (node <- idfsNodes) {
+        if(node.sccIndex == -1) {
+          tarjanSCC(node)
+        }
+      }
+    sccList
+    }
+
+    // Walk each of the strongly connected component lists,
+    //  visiting nodes as we do so.
+    val visited = new HashSet[Node]
+
+    // Visit a node and reset it's sccIndex as we do so.
+    def doOneNode(n: Node): Unit = {
+      visit(n)
+      visited += n
+      n.sccIndex = -1
+      n.sccLowlink = -1
+    }
+    
+    // A list of unknown width Nodes, which we'll clean up at the end.
+    val unknownWidthNodes = new scala.collection.mutable.ListBuffer[Node]
+
+    def unknownNodeCollector(node: Node): Unit = {
+      // We want to order the visit so we visit "known" width nodes first.
+      if (!(node.isKnownWidth || (node.inputs forall (_.isKnownWidth)))) {
+        doOneNode(node)
+        // If the last unknown node we saw has all children visited, visit it now.
+        while (! unknownWidthNodes.isEmpty
+            && (unknownWidthNodes.last.inputs forall (visited contains _))) {
+          doOneNode(unknownWidthNodes.last)
+          unknownWidthNodes.trimEnd(1)
+        }
+      } else {
+        // The width of this is uknown, defer it.
+        unknownWidthNodes.append(node)
+      }
+    }
+
+    def processRemainingUnknownNodes() {
+      // Now visit all the remaining unknown width nodes.
+      // We walk the list forward until we find a node with all children visited,
+      //  at which point we visit it, then back up as long as we continue to find
+      //  parents with "visited" children.
+      var index = 0
+      var direction = 1
+      var found = false
+      var notReady = 0
+      while (! unknownWidthNodes.isEmpty) {
+        val node = unknownWidthNodes(index)
+        if (node.inputs forall (visited contains _)) {
+          doOneNode(node)
+          unknownWidthNodes.remove(index)
+          found = true
+          notReady = 0
+          // NOTE: We do not update the index, since we just removed the element
+          //  at that index and thus index is pointing to a new element.
+        } else {
+          index += direction
+          notReady += 1
+        }
+        // Is it time to reverse direction?
+        if (direction < 0 && index < 0) {
+          direction = 1
+          index = 1
+        } else if (direction > 0 && index >= unknownWidthNodes.length) {
+          direction = -1
+          index = unknownWidthNodes.length - 1
+        }
+        // If we've traversed the list twice without finding a new candidate,
+        //  we aren't going to.
+        //  Visit the remaining nodes.
+        if (notReady > (unknownWidthNodes.length * 2)) {
+   //       throw new Exception("No progress inferring width(s): " + notReady + " candidates in " + unknownWidthNodes.length + " list.")
+          for (node <- unknownWidthNodes) {
+            println("idfs: left-over " + node.hashCode + " " + node)
+            doOneNode(node)
+          }
+          unknownWidthNodes.clear()
+        }
+      }
+    }
+
+    for (scclist <- findSCC()) {
+      for (node <- scclist){
+        doOneNode(node)
+      }
+    }
+  }
+
   def inferAll(): Int = {
     val nodesList = ArrayBuffer[Node]()
     bfs { nodesList += _ }
@@ -782,5 +930,20 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
   override val hashCode: Int = Driver.components.size
   override def equals(that: Any) = this eq that.asInstanceOf[AnyRef]
+
+  /* Perform a depth first search of the tree for zero width nodes,
+   *  eliminating them if possible.
+   */
+  def W0Wtransform(): Unit = {
+    val nodesList = ArrayBuffer[Node]()
+    // Construct the depth-first list of nodes.
+    idfs { nodesList += _ }
+    for ( n <- nodesList) {
+      // If this node has any zero width children, have it deal with them.
+      if (n.inputs exists {  _.getWidth == 0 }) {
+        n.W0Wtransform()
+      }
+    }
+  }
 }
 

@@ -123,6 +123,7 @@ object Driver {
     isCheckingPorts = false
     isTesting = false
     isDebugMem = false
+    isSupportW0W = false
     backend = new CppBackend
     topComponent = null
     randInitIOs.clear()
@@ -161,6 +162,8 @@ object Driver {
         case "--wio" => {warnInputs = true; Driver.warnOutputs = true}
         case "--Wconnection" => saveConnectionWarnings = true
         case "--Wcomponent" => saveComponentTrace = true
+        case "--W0W" => isSupportW0W = true
+        case "--noW0W" => isSupportW0W = false
         case "--noCombLoop" => dontFindCombLoop = true
         case "--genHarness" => isGenHarness = true
         case "--debug" => isDebug = true
@@ -264,6 +267,7 @@ object Driver {
   var isCheckingPorts = false
   var isTesting = false
   var isDebugMem = false
+  var isSupportW0W = false
   var backend: Backend = null
   var topComponent: Module = null
   val components = ArrayBuffer[Module]()

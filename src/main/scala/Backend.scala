@@ -667,6 +667,10 @@ abstract class Backend {
 
     ChiselError.info("inferring widths")
     c.inferAll
+    if (Driver.isSupportW0W) {
+      ChiselError.info("eliminating W0W")
+      c.W0Wtransform
+    }
     ChiselError.info("checking widths")
     c.forceMatchingWidths
     ChiselError.info("lowering complex nodes to primitives")

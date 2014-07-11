@@ -53,7 +53,7 @@ abstract class Bits extends Data with proc {
 
   def create(dir: IODirection, width: Int) {
     this.dir = dir;
-    if(width > 0) {
+    if(width > -1) {
       this.init("", width);
     } else {
       this.init("", widthOf(0))

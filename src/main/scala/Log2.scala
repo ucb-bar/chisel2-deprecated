@@ -23,7 +23,8 @@ object OHToUInt
   def apply(in: Bits): UInt = UInt().asTypeFor(new OHToUInt(in))
 }
 
-abstract class Log2Like(x: Bits, name: String) extends Op(name) {
+abstract class Log2Like(x: Bits, name: String) extends Op {
+  val op = name
   inputs += x
   inferWidth = log2Width
 

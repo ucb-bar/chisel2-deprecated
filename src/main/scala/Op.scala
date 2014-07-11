@@ -32,6 +32,7 @@ package Chisel
 import scala.math.max
 import Node._
 import Literal._
+import Op._
 
 object chiselCast {
   def apply[S <: Node, T <: Bits](x: S)(gen: => T): T = {
@@ -42,6 +43,10 @@ object chiselCast {
 }
 
 object UnaryOp {
+  val Op = OpGen1({ new UnaryOp(_: String) }) _
+  def apply(op: String, widthInfer: (=> Node) => Width, x: Node): Node = {
+    Op(op, widthInfer, x)
+  }
   def apply(x: Node, op: String): Node = {
     op match {
       case "~" => Op("~", widthOf(0), x)
@@ -69,6 +74,10 @@ object UnaryOp {
 }
 
 object BinaryOp {
+  val Op = OpGen2({ new BinaryOp(_)}) _
+  def apply(op: String, widthInfer: (=> Node) => Width, x: Node, y: Node): Node = {
+    Op(op, widthInfer, x, y)
+  }
   def apply(x: Node, y: Node, op: String): Node = {
     op match {
       case "<<"  => Op("<<", lshWidthOf(0, y),  x, y )
@@ -112,6 +121,7 @@ object BinaryOp {
 
 
 object LogicalOp {
+  val Op = OpGen2({ new LogicalOp(_)}) _
   def apply(x: Node, y: Node, op: String): Bool = {
     val node = op match {
       case "===" => Op("==",  fixWidth(1), x, y)
@@ -139,6 +149,7 @@ object LogicalOp {
 }
 
 object ReductionOp {
+  val Op = OpGen1({ new ReductionOp(_)}) _
   def apply(x: Node, op: String): Node = {
     op match {
       case "^" => Op("^", fixWidth(1), x)
@@ -148,7 +159,16 @@ object ReductionOp {
 }
 
 object Op {
-  def apply (name: String, widthInfer: (=> Node) => Width, a: Node, b: Node): Node = {
+  val logicalChars = """^([!=<>]=)|([<>])$""".r
+  def apply(name: String, widthInfer: (=> Node) => Width, a: Node, b: Node): Node = {
+    // It's a binary operator. Is it a logical op?
+    if (logicalChars.findFirstIn(name).nonEmpty) {
+      OpGen2({ new LogicalOp(_)})(name, widthInfer, a, b)
+    } else {
+      OpGen2({ new BinaryOp(_)})(name, widthInfer, a, b)
+    }
+  }
+  def OpGen2(makeObj: String => Op)(name: String, widthInfer: (=> Node) => Width, a: Node, b: Node): Node = {
     val (a_lit, b_lit) = (a.litOf, b.litOf)
     if (a_lit != null) name match {
       case "==" => if (a_lit.isZ) return zEquals(b, a)
@@ -330,11 +350,16 @@ object Op {
     }
     if (a.isLit && a.litOf.isZ || b.isLit && b.litOf.isZ)
       ChiselError.error({"Operator " + name + " with inputs " + a + ", " + b + " does not support literals with ?"});
-    val res = new Op(name)
+    val res = makeObj(name)
     res.init("", widthInfer, a, b);
     res
   }
-  def apply (name: String, widthInfer: (=> Node) => Width, a: Node): Node = {
+  def apply(name: String, widthInfer: (=> Node) => Width, a: Node): Node = {
+    // It's a unary operator.
+    OpGen1({ new UnaryOp(_)})(name, widthInfer, a)
+  }
+
+  def OpGen1(makeObj: String => Op)(name: String, widthInfer: (=> Node) => Width, a: Node): Node = {
       if (a.litOf != null) {
         if (a.litOf.isZ)
           ChiselError.error({"Operator " + name + " with input " + a + " does not support literals with ?"});
@@ -385,18 +410,21 @@ object Op {
       }
       }
     }
-    val res = new Op(name)
+    val res = makeObj(name)
     res.init("", widthInfer, a);
     res
   }
 
   private def zEquals(a: Node, b: Node) = {
     val (bits, mask, swidth) = parseLit(b.litOf.name)
+    val Op = OpGen2({ new BinaryOp(_)}) _
     UInt(Op("==", fixWidth(1), Op("&", maxWidth _, a, Literal(BigInt(mask, 2))), Literal(BigInt(bits, 2))))
   }
 }
 
-class Op(val op: String) extends Node {
+abstract class Op extends Node {
+  val op: String
+
   override def toString: String =
     if (inputs.length == 1) {
       op + "(" + inputs(0) + ")"
@@ -425,4 +453,58 @@ class Op(val op: String) extends Node {
   }
 
   def lower: Node = throw new Exception("lowering " + op + " is not supported")
+  def identityFromNode: Int = op match {
+    case "<<"  => 0
+    case ">>"  => 0
+    case "s>>" => 0
+    case "+"   => 0
+    case "*"   => 1
+    case "s*s" => 1
+    case "s*u" => 1
+    case "/"   => 1
+    case "s/s" => 1
+    case "%"   => 1
+    case "s%s" => 1
+    case "^"   => 0
+    case "-"   => 0
+    case "##"  => 0
+    case "&"   => 1
+    case "|"   => 0
+    case "f+"  => 0
+    case "f-"  => 0
+    case "f*"  => 1
+    case "f/"  => 1
+    case "f%"  => 1
+    case "fpow"  => 1
+    case "d+"  => 0
+    case "d-"  => 0
+    case "d*"  => 1
+    case "d/"  => 1
+    case "d%"  => 1
+    case "dpow"  => 1
+  }
+
+  // Transform an operator with one or more zero width children into an operator without.
+  override def W0Wtransform(): Option[Node] = this match {
+    case u: UnaryOp => {
+      None
+    }
+    case l: LogicalOp => {
+      None
+    }
+    case b: BinaryOp => {
+      // Replace any zero width child nodes with the identity element for this operator.
+      // TODO: We may need to refine this since not all children are created equal.
+      for (i <- 0 until inputs.length) {
+        if (inputs(i).getWidth == 0) {
+          inputs(i) = UInt(identityFromNode, 1)
+        }
+      }
+      None
+    }
+  }
 }
+case class LogicalOp(val op: String) extends Op
+case class BinaryOp(val op: String) extends Op
+case class UnaryOp(val op: String) extends Op
+case class ReductionOp(val op: String) extends Op
