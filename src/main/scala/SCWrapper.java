@@ -44,7 +44,7 @@ public class SCWrapper{
 
    public static void genwrapper(ComponentDef c, String filename){
       //Read in template      
-      String template = read_file("src/main/sysc/template.txt");
+      String template = read_resource("template.txt");
 
       //Generate replacements
       String[][] replacements = generate_replacements(c);
@@ -52,6 +52,21 @@ public class SCWrapper{
       //Fill template and write out
       String filled = fill_template(template, replacements);
       write_file(filename, filled);
+
+      //Debug
+      System.out.println(filled);
+   }
+
+   public static void genwrapper(ComponentDef c, java.io.FileWriter filewriter){
+      //Read in template      
+      String template = read_resource("template.txt");
+
+      //Generate replacements
+      String[][] replacements = generate_replacements(c);
+
+      //Fill template and write out
+      String filled = fill_template(template, replacements);
+      write_file(filewriter, filled);
 
       //Debug
       System.out.println(filled);
@@ -178,6 +193,23 @@ public class SCWrapper{
       return buffer.toString();
    }
 
+   public static String read_resource(String resourcename){
+      InputStreamReader resourcestreamReader = new InputStreamReader(SCWrapper.class.getResourceAsStream("resources/" + resourcename));
+      String line = null;
+      StringBuffer buffer = new StringBuffer("");
+      try{
+         BufferedReader reader = new BufferedReader(resourcestreamReader);
+         while((line = reader.readLine()) != null) {
+           buffer.append(line + "\n");
+         }
+         reader.close();
+      }catch(IOException e){
+         System.err.println("Error reading resource " + resourcename);
+         System.exit(-1);
+      }
+      return buffer.toString();
+   }
+
    public static void write_file(String filename, String file){
       try{
          BufferedWriter writer = new BufferedWriter(new FileWriter(filename));
@@ -185,6 +217,17 @@ public class SCWrapper{
          writer.close();
       }catch(IOException e){
          System.err.println("Error writing file " + filename);
+         System.exit(-1);
+      }      
+   }
+
+   public static void write_file(java.io.FileWriter filewriter, String file){
+      try{
+         BufferedWriter writer = new BufferedWriter(filewriter);
+         writer.write(file);
+         writer.close();
+      }catch(IOException e){
+         System.err.println("Error writing file " + filewriter);
          System.exit(-1);
       }      
    }

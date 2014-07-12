@@ -70,8 +70,8 @@ class SysCBackend extends CppBackend {
       println(cdef)
 
       //Generate file
-      val filename = "generated/SCWrapped" + c.name + ".cpp"
-      SCWrapper.genwrapper(cdef, filename)
+      val out_p = createOutputFile("SCWrapped" + c.name + ".cpp");
+      SCWrapper.genwrapper(cdef, out_p)
    }
 }
 
