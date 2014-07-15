@@ -191,129 +191,111 @@ class ZeroWidthTest extends TestSuite {
     }
   }
 
-  /** Multiply an unsigned number by signed number */
-  @Test def testMulUS() {
-    println("\ntestMulUS ...")
-    class MulUS extends Module {
+  /** Multiply an unsigned number by signed 0-width number */
+  @Test def testMulUZ() {
+    println("\ntestMulUZ ...")
+    class MulUZ extends Module {
       val io = new Bundle {
         val x = UInt(INPUT, 32)
-        val y = SInt(INPUT, 32)
+        val y = SInt(INPUT, 0)
         val z = SInt(OUTPUT)
       }
       io.z := io.x * io.y
     }
-    chiselMain(testArgs, () => Module(new MulUS()))
-    assertFile("StdlibSuite_MulUS_1.v")
+    chiselMain(testArgs, () => Module(new MulUZ()))
+    assertFile("ZeroWidthTest_MulUZ_1.v")
   }
 
-  /** Divide an unsigned number by signed number */
-  @Test def testDivUS() {
-    println("\ntestDivUS ...")
-    class DivUS extends Module {
+  /** Divide an unsigned 0-width number by signed number */
+  @Test def testDivZS() {
+    println("\ntestDivZS ...")
+    class DivZS extends Module {
       val io = new Bundle {
-        val x = UInt(INPUT, 32)
+        val x = UInt(INPUT, 0)
         val y = SInt(INPUT, 32)
         val z = SInt(OUTPUT)
       }
       io.z := io.x / io.y
     }
-    chiselMain(testArgs, () => Module(new DivUS()))
-    assertFile("StdlibSuite_DivUS_1.v")
+    chiselMain(testArgs, () => Module(new DivZS()))
+    assertFile("ZeroWidthTest_DivZS_1.v")
   }
 
-  /** Remainer of an unsigned number by signed number */
-  @Test def testRemUS() {
-    println("\ntestRemUS ...")
-    class RemUS extends Module {
+  /** Remainer of an unsigned number by signed 0-width number */
+  @Test def testRemUZ() {
+    println("\ntestRemUZ ...")
+    class RemUZ extends Module {
       val io = new Bundle {
         val x = UInt(INPUT, 32)
-        val y = SInt(INPUT, 32)
+        val y = SInt(INPUT, 0)
         val z = SInt(OUTPUT)
       }
       io.z := io.x % io.y
     }
-    chiselMain(testArgs, () => Module(new RemUS()))
-    assertFile("StdlibSuite_RemUS_1.v")
+    chiselMain(testArgs, () => Module(new RemUZ()))
+    assertFile("ZeroWidthTest_RemUZ_1.v")
   }
 
-  /** Multiply an signed number by an unsigned number */
-  @Test def testMulSU() {
-    println("\ntestMulSU ...")
-    class MulSU extends Module {
+  /** Multiply an signed 0-width number by an unsigned number */
+  @Test def testMulZU() {
+    println("\ntestMulZU ...")
+    class MulZU extends Module {
       val io = new Bundle {
-        val x = SInt(INPUT, 32)
+        val x = SInt(INPUT, 0)
         val y = UInt(INPUT, 32)
         val z = SInt(OUTPUT)
       }
       io.z := io.x * io.y
     }
-    chiselMain(testArgs, () => Module(new MulSU()))
-    assertFile("StdlibSuite_MulSU_1.v")
+    chiselMain(testArgs, () => Module(new MulZU()))
+    assertFile("ZeroWidthTest_MulZU_1.v")
   }
 
-  /** Divide a signed number by an unsigned number */
-  @Test def testDivSU() {
-    println("\ntestDivSU ...")
-    class DivSU extends Module {
+  /** Divide a signed 0-width number by an unsigned number */
+  @Test def testDivZU() {
+    println("\ntestDivZU ...")
+    class DivZU extends Module {
       val io = new Bundle {
-        val x = SInt(INPUT, 32)
+        val x = SInt(INPUT, 0)
         val y = UInt(INPUT, 32)
         val z = SInt(OUTPUT)
       }
       io.z := io.x / io.y
     }
-    chiselMain(testArgs, () => Module(new DivSU()))
-    assertFile("StdlibSuite_DivSU_1.v")
+    chiselMain(testArgs, () => Module(new DivZU()))
+    assertFile("ZeroWidthTest_DivZU_1.v")
   }
 
-  /** Remainer of a signed number by an unsigned number */
-  @Test def testRemSU() {
-    println("\ntestRemSU ...")
-    class RemSU extends Module {
+  /** Remainer of a signed 0-width number by an unsigned number */
+  @Test def testRemZU() {
+    println("\ntestRemZU ...")
+    class RemZU extends Module {
       val io = new Bundle {
-        val x = SInt(INPUT, 32)
+        val x = SInt(INPUT, 0)
         val y = UInt(INPUT, 32)
         val z = SInt(OUTPUT)
       }
       io.z := io.x % io.y
     }
-    chiselMain(testArgs, () => Module(new RemSU()))
-    assertFile("StdlibSuite_RemSU_1.v")
+    chiselMain(testArgs, () => Module(new RemZU()))
+    assertFile("ZeroWidthTest_RemZU_1.v")
   }
 
-  /** Assign a Bundle */
-  @Test def testAssignBundle() {
-    println("\ntestAssignBundle ...")
-    class AssignBundle extends Bundle {
-        val v = Vec.fill(2){UInt(INPUT, 2)}
-    }
-    class AssignBundleComp extends Module {
-      val io = new Bundle {
-        val in = new AssignBundle()
-        val out = new AssignBundle().flip
-      }
-
-      io.out := io.in
-    }
-    chiselMain(testArgs, () => Module(new AssignBundleComp()))
-    assertFile("StdlibSuite_AssignBundleComp_1.v")
-  }
-
-  /** Concatenate two nodes X and Y in a node Z such that
+  /** Concatenate two nodes X and Y (0-width) in a node Z such that
     Z[0..wx+wy] = X[0..wx] :: Y[0..wy]. */
-  @Test def testCat() {
+  @Test def testCatCompW0W() {
     println("\ntestCat ...")
-    class CatComp extends Module {
+    class CatCompW0W extends Module {
       val io = new Bundle {
         val x = UInt(INPUT, 8)
-        val y = UInt(INPUT, 8)
+        val y = UInt(INPUT, 0)
         val z = UInt(OUTPUT)
       }
       io.z := io.x ## io.y
     }
 
-    chiselMain(testArgs, () => Module(new CatComp()))
-    assertFile("StdlibSuite_CatComp_1.v")
+    chiselMain(testArgs, () => Module(new CatCompW0W()))
+    assertFile("ZeroWidthTest_CatCompW0W_1.v")
   }
 
   /** Generate a lookup into an array.
@@ -438,7 +420,7 @@ class ZeroWidthTest extends TestSuite {
     } catch {
       case e: Throwable => e.printStackTrace()
     }
-    assertFile("StdlibSuite_ArbiterTest_1.v")
+    assertFile("ZeroWidthTest_ArbiterTest_1.v")
   }
 
   /** XXX Generate an Arbiter that needs locking.
@@ -476,7 +458,7 @@ class ZeroWidthTest extends TestSuite {
     }
 
     chiselMain(testArgs, () => Module(new RRArbiterTest()))
-    assertFile("StdlibSuite_RRArbiterTest_1.v")
+    assertFile("ZeroWidthTest_RRArbiterTest_1.v")
   }
 
   /** Generate a FillInterleaved
@@ -523,7 +505,7 @@ class ZeroWidthTest extends TestSuite {
     }
 
     chiselMain(testArgs, () => Module(new OHToUIntComp()))
-    assertFile("StdlibSuite_OHToUIntComp_1.v")
+    assertFile("ZeroWidthTest_OHToUIntComp_1.v")
   }
 
   /* Delays an element by a fixed latency. */
@@ -533,7 +515,7 @@ class ZeroWidthTest extends TestSuite {
     }
 
     chiselMain(testArgs, () => Module(new PipeComp()))
-    assertFile("StdlibSuite_PipeComp_1.v")
+    assertFile("ZeroWidthTest_PipeComp_1.v")
   }
 
   /** Generate a PriorityMux
@@ -601,7 +583,7 @@ class ZeroWidthTest extends TestSuite {
     }
 
     chiselMain(testArgs, () => Module(new QueueComp()))
-    assertFile("StdlibSuite_QueueComp_1.v")
+    assertFile("ZeroWidthTest_QueueComp_1.v")
   }
 
   /** Generate a Fill

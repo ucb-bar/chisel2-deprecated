@@ -940,7 +940,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     idfs { nodesList += _ }
     for ( n <- nodesList) {
       // If this node has any zero width children, have it deal with them.
-      if (n.inputs exists {  _.getWidth == 0 }) {
+      if (n.inputs exists {  c => c.inferWidth(c).needWidth == 0 }) {
         n.W0Wtransform()
       }
     }

@@ -482,25 +482,27 @@ abstract class Op extends Node {
     case "d/"  => 1
     case "d%"  => 1
     case "dpow"  => 1
+    case "==" | "!=" | "<" | ">" | "<=" | ">=" => 0
   }
 
   // Transform an operator with one or more zero width children into an operator without.
   override def W0Wtransform(): Unit = this match {
     case UnaryOp(_) => {
       setWidth(0)
+      inputs.remove(0, 1) /* remove our only child */
     }
-    case LogicalOp(_) => {
-      setWidth(0)
-    }
-    case BinaryOp(_) | ReductionOp(_) => {
+    case LogicalOp(_) | BinaryOp(_) | ReductionOp(_) => {
       // If all our children are zero width nodes, so are we.
-      if (inputs.forall(_.getWidth == 0)) {
+      if (inputs.forall(c => c.inferWidth(c).needWidth == 0)) {
         setWidth(0)
+        inputs.remove(0, inputs.length) /* remove all our children */
+        // We assume higer level nodes will eventually remove us.
       } else {
         // Replace any zero width child nodes with the identity element for this operator.
         // TODO: We may need to refine this since not all children are created equal.
         for (i <- 0 until inputs.length) {
-          if (inputs(i).getWidth == 0) {
+          val c = inputs(i)
+          if (c.inferWidth(c).needWidth == 0) {
             inputs(i) = UInt(identityFromNode, 1)
           }
         }
