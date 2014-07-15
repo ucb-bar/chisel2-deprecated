@@ -69,7 +69,7 @@ public class SCWrapper{
       write_file(filewriter, filled);
 
       //Debug
-      System.out.println(filled);
+      // System.out.println(filled);
    }
 
    public static String[][] generate_replacements(ComponentDef c){
@@ -194,7 +194,7 @@ public class SCWrapper{
    }
 
    public static String read_resource(String resourcename){
-      InputStreamReader resourcestreamReader = new InputStreamReader(SCWrapper.class.getResourceAsStream("resources/" + resourcename));
+      InputStreamReader resourcestreamReader = new InputStreamReader(SCWrapper.class.getResourceAsStream("/" + resourcename));
       String line = null;
       StringBuffer buffer = new StringBuffer("");
       try{

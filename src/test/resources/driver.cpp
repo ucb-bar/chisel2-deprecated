@@ -2,9 +2,7 @@
 using namespace std;
 using namespace sc_core;
 using namespace sc_dt;
-//#include "../../../generated/AddFilter.h"
 #include "SCWrappedAddFilter.cpp"
-//#include "../../../generated/SCWrappedMyCounter.cpp"
 
 SC_MODULE(Counter){
   sc_fifo<dat_t<16> > out;
@@ -33,17 +31,12 @@ SC_MODULE(Eater){
   void eater_thread(void){
     while(true){
       dat_t<4> data = in->read();      
-      printf("Output = %lu\n", data.values[0]);
+      printf("Output = %llu\n", data.values[0]);
     }
   }
 };
 
 int sc_main(int sc_argc, char* sc_argv[1]){
-#if 0
-  SCWrappedMyCounter counter("mycounter");
-  Eater eater("muncher");
-  eater.in = counter.out;
-#endif
 
   //Create components
   Counter counter("mycounter");

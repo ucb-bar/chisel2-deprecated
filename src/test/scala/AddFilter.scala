@@ -28,8 +28,8 @@
  MODIFICATIONS.
 */
 
-
 import Chisel._
+import collection.mutable.ArrayBuffer
 
 class AddFilter extends Module {
    val io = new Bundle {
@@ -69,23 +69,33 @@ class CounterTests(c: MyCounter) extends Tester(c) {
 
 object AddFilter {
   def main(args: Array[String]): Unit = {
+    /* Copy the initial arguments.
+     * We may alter these before passing them on.
+     */
+    var argsBuild: ArrayBuffer[String] = ArrayBuffer(args : _*)
+
     //Pull out design name
     var design:String = ""
     for(i <- 0 until args.length){
-       if(args(i).equals("--design"))
+       if(args(i).equals("--design")) {
           design = args(i + 1)
+	  // Remove the arguments that only we understand
+	  argsBuild.remove(i, 2)
+       }
     }
     println(design)
+
+    val argsPass = argsBuild.toArray
 
     //Main
     design match{
        case "AddFilter" => {
-          chiselMainTest(args, () => Module(new AddFilter())){
+          chiselMainTest(argsPass, () => Module(new AddFilter())){
              c => new AddTests(c)
           }
        }
        case "MyCounter" => {       
-          chiselMainTest(args, () => Module(new MyCounter())){
+          chiselMainTest(argsPass, () => Module(new MyCounter())){
              c => new CounterTests(c)
           }
        }
