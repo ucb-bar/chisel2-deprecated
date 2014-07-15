@@ -6,7 +6,7 @@ test:
 
 SYSTEMC := /Users/jrl/noArc/clients/ucb/systemc/systemc-2.3.1
 sysc:
-	g++ AddFilter.cpp bin/Test/resources/driver.cpp \
+	g++ AddFilter.cpp ../src/test/resources/AddFilterSysCdriver.cpp \
 	   -I. -I$(SYSTEMC)/include -L$(SYSTEMC)/lib-macosx64 -lsystemc -o addfilter
 
 .PHONY: test

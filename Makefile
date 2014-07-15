@@ -6,7 +6,7 @@ CLEAN_DIRS	:= doc
 SRC_DIR	?= .
 SYSTEMC ?= $(SRC_DIR)/../../systemc/systemc-2.3.1
 CHISEL_JAR ?= $(SRC_DIR)/target/scala-2.10/chisel_2.10-2.3-SNAPSHOT.jar
-DRIVER	   ?= $(SRC_DIR)/src/test/resources/driver.cpp
+DRIVER	   ?= $(SRC_DIR)/src/test/resources/AddFilterSysCdriver.cpp
 TEST_OUTPUT_DIR ?= ./test-outputs
 
 .PHONY:	smoke publish-local check clean jenkins-build sysctest
