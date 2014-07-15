@@ -133,18 +133,19 @@ class Extract extends Node {
   }
 
   // Eliminate any zero width wires attached to this node.
-  override def W0Wtransform(): Option[Node] = {
+  override def W0Wtransform() {
     /* We require that if the source is zero width,
      *  the high and lo must be n-1 and n respectively.
-     *  If this is true, we replace the Extract with a zero width node.
+     *  If this is true, we ensure our width is zero.
      */
     val hi_lit = inputs(1).litOf
     val lo_lit = inputs(2).litOf
     if (inputs(0).getWidth == 0 && hi_lit != null && lo_lit != null &&
         hi_lit.value == (lo_lit.value - 1)) {
-      Some(UInt(0))
+      setWidth(0)
     } else {
-      None
+      ChiselError.error("Extract(" + inputs(0) + ", " + inputs(1) + ", " + inputs(2) + ")" +
+            " W0Wtransform", line)
     }
   }
 }

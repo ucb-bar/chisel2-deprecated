@@ -485,22 +485,26 @@ abstract class Op extends Node {
   }
 
   // Transform an operator with one or more zero width children into an operator without.
-  override def W0Wtransform(): Option[Node] = this match {
-    case u: UnaryOp => {
-      None
+  override def W0Wtransform(): Unit = this match {
+    case UnaryOp(_) => {
+      setWidth(0)
     }
-    case l: LogicalOp => {
-      None
+    case LogicalOp(_) => {
+      setWidth(0)
     }
-    case b: BinaryOp => {
-      // Replace any zero width child nodes with the identity element for this operator.
-      // TODO: We may need to refine this since not all children are created equal.
-      for (i <- 0 until inputs.length) {
-        if (inputs(i).getWidth == 0) {
-          inputs(i) = UInt(identityFromNode, 1)
+    case BinaryOp(_) | ReductionOp(_) => {
+      // If all our children are zero width nodes, so are we.
+      if (inputs.forall(_.getWidth == 0)) {
+        setWidth(0)
+      } else {
+        // Replace any zero width child nodes with the identity element for this operator.
+        // TODO: We may need to refine this since not all children are created equal.
+        for (i <- 0 until inputs.length) {
+          if (inputs(i).getWidth == 0) {
+            inputs(i) = UInt(identityFromNode, 1)
+          }
         }
       }
-      None
     }
   }
 }
