@@ -605,7 +605,8 @@ class CppBackend extends Backend {
   }
 
   override def compile(c: Module, flagsIn: String) {
-    val flags = if (flagsIn == null) "-O2" else flagsIn
+    val CXXFLAGS = scala.util.Properties.envOrElse("CXXFLAGS", "-O2" )
+    val flags = if (flagsIn == null) CXXFLAGS else flagsIn
 
     val chiselENV = java.lang.System.getenv("CHISEL")
     val c11 = if (hasPrintfs) " -std=c++11 " else ""
