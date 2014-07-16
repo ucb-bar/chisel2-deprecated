@@ -120,4 +120,22 @@ class Mux extends Op {
     if (inputs(1).width != width) inputs(1) = inputs(1).matchWidth(width)
     if (inputs(2).width != width) inputs(2) = inputs(2).matchWidth(width)
   }
+  
+  override def W0Wtransform() {
+    if (inputs(1).width.needWidth == 0 && inputs(2).width.needWidth == 0) {
+      // If both our children are zero width nodes, so are we.
+      setWidth(0)
+      inputs.remove(1, 2) /* remove children 1 & 2 */
+      // We assume higher level nodes will eventually remove us.
+    } else {
+      // Convert any zero-width children into UInt(0).
+      // This has the side-effect that if we have a zero width selector, we'll return the "false" input.
+      for (i <- 0 until inputs.length) {
+        val c = inputs(i)
+        if (c.width.needWidth == 0) {
+          inputs(i) = UInt(0, 1)
+        }
+      }
+    }
+  }
 }

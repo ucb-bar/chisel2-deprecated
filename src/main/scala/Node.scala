@@ -520,5 +520,10 @@ abstract class Node extends nameable {
   def isKnownWidth: Boolean = width.isKnown
 
   // Eliminate any zero width wires attached to this node.
-  def W0Wtransform() { }
+  def W0Wtransform() {
+    // If we're just a type node, we're now a zero-width type node.
+    if (isTypeNode) {
+      setWidth(0)
+    }
+  }
 }

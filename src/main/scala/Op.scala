@@ -496,7 +496,7 @@ abstract class Op extends Node {
       if (inputs.forall(c => c.inferWidth(c).needWidth == 0)) {
         setWidth(0)
         inputs.remove(0, inputs.length) /* remove all our children */
-        // We assume higer level nodes will eventually remove us.
+        // We assume higher level nodes will eventually remove us.
       } else {
         // Replace any zero width child nodes with the identity element for this operator.
         // TODO: We may need to refine this since not all children are created equal.
