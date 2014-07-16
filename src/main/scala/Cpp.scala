@@ -615,7 +615,8 @@ class CppBackend extends Backend {
   }
 
   override def compile(c: Module, flagsIn: String) {
-    val flags = if (flagsIn == null) "-O2" else flagsIn
+    val CXXFLAGS = scala.util.Properties.envOrElse("CXXFLAGS", "-O2" )
+    val flags = if (flagsIn == null) CXXFLAGS else flagsIn
 
     val chiselENV = java.lang.System.getenv("CHISEL")
     val c11 = if (hasPrintfs) " -std=c++11 " else ""
@@ -874,10 +875,10 @@ class CppBackend extends Backend {
       writeCppFile("  " + emitRef(clock) + "_cnt-=min;\n")
     }
     for (clock <- Driver.clocks) {
-      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
+      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
     }
     for (clock <- Driver.clocks) {
-      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
+      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
     }
     for (clock <- Driver.clocks) {
       writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " +
