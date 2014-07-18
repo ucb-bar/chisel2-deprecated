@@ -622,8 +622,11 @@ case class LogicalOp(val op: String) extends Op
 case class BinaryOp(val op: String) extends Op
 case class UnaryOp(val op: String) extends Op {
   override def W0Wtransform(): Unit = {
+    /* Inherit the zero-width from our child. */
     setWidth(0)
-    inputs.remove(0, 1) /* remove our only child */
+     /* remove our only child */
+    inputs(0).parents -= this
+    inputs.remove(0, 1)
     modified = true
   }
 }
