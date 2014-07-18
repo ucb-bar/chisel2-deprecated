@@ -546,8 +546,8 @@ abstract class Op extends Node {
         ChiselError.error({"Op.Review() " + op + " zero-width input " + this})
         return
       }
-      val nonzeroChild = nonzeroIds.head
-      val zeroChild = zeroIds.head
+      val nonzeroChildId = nonzeroIds.head
+      val zeroChildId = zeroIds.head
       this match {
         case UnaryOp(_) => {
           if (nz != 0) {
@@ -560,23 +560,23 @@ abstract class Op extends Node {
               /* We currently handle only a zero-width second argument (inputs(1)),
                *  and expect inputs(0) to be non-zero-width
                */
-              if (nonzeroChild != 0) {
+              if (nonzeroChildId != 0) {
                 ChiselError.error({"Op.Review() " + op + " zero-width operand " + this})
               } else {
-                replaceTree(inputs(nonzeroChild))
+                replaceTree(inputs(nonzeroChildId))
               }
             }
             case "-" | "f-" | "d-" => {
-              if (nonzeroChild != 0) {
+              if (nonzeroChildId != 0) {
                 // Leave the operation intact, but make input(0) non-zero-width
-                inputs(0).setWidth(1)
+                inputs(zeroChildId).setWidth(1)
               } else {
-                replaceTree(inputs(nonzeroChild))
+                replaceTree(inputs(nonzeroChildId))
               }
             }
             // For commutative operators (and "##"), replace us with the other (ostensibly non-zero-width) operand.
             case "+" | "*" | "s*s" | "s*u" | "##" | "^" | "&" | "|" | "f+" | "f*" | "d+" | "d*" => {
-               replaceTree(inputs(nonzeroChild))
+               replaceTree(inputs(nonzeroChildId))
             }
             case _ => ChiselError.info("Op.Review() " + op + " no zero-width optimzation")
           }
@@ -598,10 +598,12 @@ abstract class Op extends Node {
             }
             /* A zero-width node is always less than a non-zero width node. */
             case "<" | "<=" => {
-              replaceTree(if (zeroChild < nonzeroChild) trueNode else falseNode)
+              /* True if the zero-width child is the first operand. */
+              replaceTree(if (zeroChildId < nonzeroChildId) trueNode else falseNode)
             }
             case ">" | ">=" => {
-              replaceTree(if (zeroChild > nonzeroChild) trueNode else falseNode)
+              /* True if the zero-width child is the second operand. */
+              replaceTree(if (zeroChildId > nonzeroChildId) trueNode else falseNode)
             }
             case _ => {
               if (nz != 0) {
