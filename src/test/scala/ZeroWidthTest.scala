@@ -47,7 +47,7 @@ object ZeroWidthTest{
   }
   
 }
-/** This testsuite checks operations using 0-width wires.
+/** This testsuite checks operations using zero-width wires.
 */
 class ZeroWidthTest extends TestSuite {
   val testArgs = Array("--W0W",
@@ -61,22 +61,22 @@ class ZeroWidthTest extends TestSuite {
     Driver.isSupportW0W = true
   }
 
-  /** Generate a 0-width wire (explicitly) */
-  @Test def testImplicit0Width() {
+  /** Generate a zero-width wire (explicitly) */
+  @Test def testImplicitZeroWidth() {
     val res = UInt(0,0)
     assertTrue( res.getWidth == 0 )
     assertTrue( res.litOf.value == 0 )
   }
 
-  /** Generate a 0-width wire from a '>>' */
-  @Test def testRSH0Width() {
+  /** Generate a zero-width wire from a '>>' */
+  @Test def testRSHZeroWidth() {
     val res = UInt(3,2) >> UInt(2)
     assertTrue( res.getWidth == 0 )
     assertTrue( res.litOf.value == 0 )
   }
 
-  /** Generate a 0-width wire from an extraction. */
-  @Test def testExtract0Width() {
+  /** Generate a zero-width wire from an extraction. */
+  @Test def testExtractZeroWidth() {
     val res = UInt(3)((0, 1))
     assertTrue( res.getWidth == 0 )
     assertTrue( res.litOf.value == 0 )
@@ -86,7 +86,7 @@ class ZeroWidthTest extends TestSuite {
   try {
     class OperatorComp extends Module {
       val io = new Bundle {
-        val x = UInt(INPUT, 0)  /* explicitly set x to 0-width */
+        val x = UInt(INPUT, 0)  /* explicitly set x to zero-width */
         val y = UInt(INPUT, 8)
         val ys = SInt(INPUT, 8)
         val z = UInt(OUTPUT)
@@ -191,7 +191,22 @@ class ZeroWidthTest extends TestSuite {
     }
   }
 
-  /** Multiply an unsigned number by signed 0-width number */
+  /** Multiply an unsigned number by an unsigned zero-width number */
+  @Test def testMulUUZ() {
+    println("\ntestMulUUZ ...")
+    class MulUUZ extends Module {
+      val io = new Bundle {
+        val x = UInt(INPUT, 32)
+        val y = UInt(INPUT, 0)
+        val z = UInt(OUTPUT)
+      }
+      io.z := io.x * io.y
+    }
+    chiselMain(testArgs, () => Module(new MulUUZ()))
+    assertFile("ZeroWidthTest_MulUUZ_1.v")
+  }
+
+  /** Multiply an unsigned number by signed zero-width number */
   @Test def testMulUZ() {
     println("\ntestMulUZ ...")
     class MulUZ extends Module {
@@ -206,22 +221,37 @@ class ZeroWidthTest extends TestSuite {
     assertFile("ZeroWidthTest_MulUZ_1.v")
   }
 
-  /** Divide an unsigned 0-width number by signed number */
-  @Test def testDivZS() {
-    println("\ntestDivZS ...")
-    class DivZS extends Module {
+  /** Divide an unsigned number by a zero-width unsigned number */
+  @Test def testDivUUZ() {
+    println("\ntestDivUUZ ...")
+    class DivUUZ extends Module {
       val io = new Bundle {
-        val x = UInt(INPUT, 0)
-        val y = SInt(INPUT, 32)
+        val x = UInt(INPUT, 32)
+        val y = UInt(INPUT, 0)
         val z = SInt(OUTPUT)
       }
       io.z := io.x / io.y
     }
-    chiselMain(testArgs, () => Module(new DivZS()))
-    assertFile("ZeroWidthTest_DivZS_1.v")
+    chiselMain(testArgs, () => Module(new DivUUZ()))
+    assertFile("ZeroWidthTest_DivUUZ_1.v")
   }
 
-  /** Remainer of an unsigned number by signed 0-width number */
+  /** Divide an unsigned zero-width number by an unsigned number - expect an error. */
+  @Test def testDivUZ() {
+    println("\ntestDivUZ ...")
+    class DivUZ extends Module {
+      val io = new Bundle {
+        val x = UInt(INPUT, 0)
+        val y = UInt(INPUT, 32)
+        val z = UInt(OUTPUT)
+      }
+      io.z := io.x / io.y
+    }
+    chiselMain(testArgs, () => Module(new DivUZ()))
+    assertFile("ZeroWidthTest_DivUZ_1.v")
+  }
+
+  /** Remainer of an unsigned number by signed zero-width number */
   @Test def testRemUZ() {
     println("\ntestRemUZ ...")
     class RemUZ extends Module {
@@ -236,7 +266,7 @@ class ZeroWidthTest extends TestSuite {
     assertFile("ZeroWidthTest_RemUZ_1.v")
   }
 
-  /** Multiply an signed 0-width number by an unsigned number */
+  /** Multiply an signed zero-width number by an unsigned number */
   @Test def testMulZU() {
     println("\ntestMulZU ...")
     class MulZU extends Module {
@@ -251,7 +281,7 @@ class ZeroWidthTest extends TestSuite {
     assertFile("ZeroWidthTest_MulZU_1.v")
   }
 
-  /** Divide a signed 0-width number by an unsigned number */
+  /** Divide a signed zero-width number by an unsigned number */
   @Test def testDivZU() {
     println("\ntestDivZU ...")
     class DivZU extends Module {
@@ -266,7 +296,7 @@ class ZeroWidthTest extends TestSuite {
     assertFile("ZeroWidthTest_DivZU_1.v")
   }
 
-  /** Remainer of a signed 0-width number by an unsigned number */
+  /** Remainer of a signed zero-width number by an unsigned number */
   @Test def testRemZU() {
     println("\ntestRemZU ...")
     class RemZU extends Module {
@@ -281,7 +311,7 @@ class ZeroWidthTest extends TestSuite {
     assertFile("ZeroWidthTest_RemZU_1.v")
   }
 
-  /** Concatenate two nodes X and Y (0-width) in a node Z such that
+  /** Concatenate two nodes X and Y (zero-width) in a node Z such that
     Z[0..wx+wy] = X[0..wx] :: Y[0..wy]. */
   @Test def testCatCompW0W() {
     println("\ntestCat ...")
@@ -304,7 +334,7 @@ class ZeroWidthTest extends TestSuite {
     println("\ntestLookup ...")
     class LookupComp extends Module {
       val io = new Bundle {
-        val addr = UInt(INPUT, 8)
+        val addr = UInt(INPUT, 0)
         val data = UInt(OUTPUT)
       }
       io.data := Lookup(io.addr, UInt(0), Array(
@@ -315,68 +345,6 @@ class ZeroWidthTest extends TestSuite {
     chiselMain(testArgs, () => Module(new LookupComp()))
   }
 
-  /** Generate a PopCount
-    */
-  @Test def testPopCount() {
-    println("\ntestPopCount ...")
-    class PopCountComp extends Module {
-      val io = new Bundle {
-        val in = UInt(INPUT, 8)
-        val out = UInt(OUTPUT)
-      }
-      io.out := PopCount(Array(Bool(true), Bool(false)))
-    }
-
-    chiselMain(testArgs, () => Module(new PopCountComp()))
-  }
-
-  /** Generate a Reverse
-    */
-  @Test def testReverse() {
-    println("\ntestReverse ...")
-    class ReverseComp extends Module {
-      val io = new Bundle {
-        val in = UInt(INPUT, 8)
-        val out = UInt(OUTPUT)
-      }
-      io.out := Reverse(io.in)
-    }
-
-    chiselMain(testArgs, () => Module(new ReverseComp()))
-  }
-
-  /** Generate a ShiftRegister
-    */
-  @Test def testShiftRegister() {
-    println("\ntestShiftRegister ...")
-    class ShiftRegisterComp extends Module {
-      val io = new Bundle {
-        val in = UInt(INPUT, 8)
-        val out = UInt(OUTPUT)
-      }
-      io.out := ShiftRegister(io.in, 2)
-    }
-
-    chiselMain(testArgs, () => Module(new ShiftRegisterComp()))
-  }
-
-  /** Generate a UIntToOH
-    */
-  @Test def testUIntToOH() {
-    println("\ntestUIntToOH ...")
-    class UIntToOHComp extends Module {
-      val io = new Bundle {
-        val in = UInt(INPUT, 8)
-        val out0 = UInt(OUTPUT)
-        val out1 = UInt(OUTPUT)
-      }
-      io.out0 := UIntToOH(io.in)
-      io.out1 := UIntToOH(io.in, 4)
-    }
-
-    chiselMain(testArgs, () => Module(new UIntToOHComp()))
-  }
-
   /** Generate a foldR
     */
   @Test def testfoldR() {
@@ -384,221 +352,14 @@ class ZeroWidthTest extends TestSuite {
     class foldRComp extends Module {
       val io = new Bundle {
         val in0 = UInt(INPUT, 8)
-        val in1 = UInt(INPUT, 8)
+        val in1 = UInt(INPUT, 0)
+        val in2 = UInt(INPUT, 8)
         val out = UInt(OUTPUT)
       }
-      io.out := foldR(io.in0 :: io.in1 :: Nil){ _ + _ }
+      io.out := foldR(io.in0 :: io.in1 :: io.in2 :: Nil){ _ + _ }
     }
 
     chiselMain(testArgs, () => Module(new foldRComp()))
-  }
-
-  /** Generate an Arbiter such that first valid wins.
-
-      Arbiter[T <: Data](gen: T,
-           n: Int) extends LockingArbiter[T](gen, n, 1)
-      LockingArbiter[T <: Data](gen: T,
-           n: Int, count: Int, needsLock: Option[T => Bool] = None)
-      LockingArbiterLike[T <: Data](gen: T,
-           n: Int, count: Int, needsLock: Option[T => Bool] = None)
-    */
-  @Test def testArbiter() {
-    println("\ntestArbiter ...")
-    try {
-      def gen = SInt(width=8)
-      val n = 4
-      class ArbiterTest extends Module {
-        val io = new ArbiterIO(gen, n) {
-          val fire = Bool(OUTPUT)
-        }
-        val arb = Module(new Arbiter(gen, n))
-        io <> arb.io
-        io.fire := arb.io.out.fire()
-      }
-
-      chiselMain(testArgs, () => Module(new ArbiterTest()))
-    } catch {
-      case e: Throwable => e.printStackTrace()
-    }
-    assertFile("ZeroWidthTest_ArbiterTest_1.v")
-  }
-
-  /** XXX Generate an Arbiter that needs locking.
-
-      Arbiter[T <: Data](gen: T,
-           n: Int) extends LockingArbiter[T](gen, n, 1)
-      LockingArbiter[T <: Data](gen: T,
-           n: Int, count: Int, needsLock: Option[T => Bool] = None)
-      LockingArbiterLike[T <: Data](gen: T,
-           n: Int, count: Int, needsLock: Option[T => Bool] = None)
-
-  @Test def testArbiterNeedsLock() {
-    class ArbiterNeedsLock extends Arbiter(SInt(width=8), 4,
-      needsLock=Some()) {
-    }
-
-    chiselMain(testArgs, () => Module(new ArbiterNeedsLock()))
-    assertFile(dir.getPath + "/NeedsLock.v",
-"""
-""")
-  }
-    */
-
-  /** Generate a Round-Robin arbiter.
-
-      RRArbiter[T <: Data](gen: T,
-           n: Int) extends LockingRRArbiter[T](gen, n, 1)
-      LockingRRArbiter[T <: Data](gen: T,
-           n: Int, count: Int, needsLock: Option[T => Bool] = None)
-      LockingArbiterLike[T <: Data](gen: T,
-           n: Int, count: Int, needsLock: Option[T => Bool] = None)
-    */
-  @Test def testRRArbiter() {
-    class RRArbiterTest extends RRArbiter(SInt(width=8), 4) {
-    }
-
-    chiselMain(testArgs, () => Module(new RRArbiterTest()))
-    assertFile("ZeroWidthTest_RRArbiterTest_1.v")
-  }
-
-  /** Generate a FillInterleaved
-    */
-  @Test def testFillInterleaved() {
-
-    class FillInterleavedComp extends Module {
-      val io = new Bundle {
-        val in = UInt(INPUT, 8)
-        val out = UInt(OUTPUT)
-      }
-      io.out := FillInterleaved(4, io.in)
-    }
-
-    chiselMain(testArgs, () => Module(new FillInterleavedComp()))
-  }
-
-  /** Generate a Counter
-    */
-  @Test def testCounter() {
-    println("\ntestCounter ...")
-    class CounterComp extends Module {
-      val io = new Bundle {
-        val in = Bool(INPUT)
-        val out = UInt(OUTPUT)
-        val wrap = Bool(OUTPUT)
-      }
-      val (count, wrap) = Counter(io.in, 5)
-      io.out := count
-      io.wrap := wrap
-    }
-    chiselMain(testArgs, () => Module(new CounterComp()))
-  }
-
-  /* XXX. */
-  @Test def testOHToUInt() {
-    println("\ntestOHToUInt ...")
-    class OHToUIntComp extends Module {
-      val io = new Bundle {
-        val in = Bool(INPUT)
-        val out = UInt(OUTPUT)
-      }
-      io.out := OHToUInt(Bool(true) :: io.in :: Bool(false) :: io.in :: Nil)
-    }
-
-    chiselMain(testArgs, () => Module(new OHToUIntComp()))
-    assertFile("ZeroWidthTest_OHToUIntComp_1.v")
-  }
-
-  /* Delays an element by a fixed latency. */
-  @Test def testPipe() {
-    println("\ntestPipe ...")
-    class PipeComp extends Pipe(UInt(width=8), 2) {
-    }
-
-    chiselMain(testArgs, () => Module(new PipeComp()))
-    assertFile("ZeroWidthTest_PipeComp_1.v")
-  }
-
-  /** Generate a PriorityMux
-    */
-  @Test def testPriorityMux() {
-    println("\ntestPriorityMux ...")
-    class PriorityMuxComp extends Module {
-      val io = new Bundle {
-        val in0 = Bool(INPUT)
-        val in1 = Bool(INPUT)
-        val data0 = UInt(INPUT, 16)
-        val data1 = UInt(INPUT, 16)
-        val out0 = UInt(OUTPUT)
-        val out1 = UInt(OUTPUT)
-        val out2 = UInt(OUTPUT)
-      }
-      io.out0 := PriorityMux((io.in0, io.data0) :: (io.in1, io.data1) :: Nil)
-      io.out1 := PriorityMux(io.in0 :: io.in1 :: Nil,
-        io.data0 :: io.data1 :: Nil)
-      io.out2 := PriorityMux(io.in0.toBits, io.data0 :: io.data1 :: Nil)
-    }
-
-    chiselMain(testArgs, () => Module(new PriorityMuxComp()))
-  }
-
-  /** Generate a PriorityEncoder
-    */
-  @Test def testPriorityEncoder() {
-    println("\ntestPriorityEncoder ...")
-    class PriorityEncoderComp extends Module {
-      val io = new Bundle {
-        val in = UInt(INPUT, 8)
-        val out = UInt(OUTPUT)
-      }
-      io.out := PriorityEncoder(io.in)
-    }
-
-    chiselMain(testArgs, () => Module(new PriorityEncoderComp()))
-  }
-
-  /** Generate a PriorityEncoderOH
-    */
-  @Test def testPriorityEncoderOH() {
-    println("\ntestPriorityEncoderOH ...")
-    class PriorityEncoderOHComp extends Module {
-      val io = new Bundle {
-        val in = UInt(INPUT, 8)
-        val out = UInt(OUTPUT)
-      }
-      io.out := PriorityEncoderOH(io.in)
-    }
-
-    chiselMain(testArgs, () => Module(new PriorityEncoderOHComp()))
-  }
-
-  /* Implements a queue of elements (first-in, first-out). */
-  @Test def testQueue() {
-    println("\ntestQueue ...")
-    class QueueComp extends Module {
-      val io = new Bundle {
-        val req = Decoupled(UInt(width=8)).flip
-        val resp = Decoupled(UInt(width=8))
-      }
-      io.resp <> Queue(io.req)
-    }
-
-    chiselMain(testArgs, () => Module(new QueueComp()))
-    assertFile("ZeroWidthTest_QueueComp_1.v")
-  }
-
-  /** Generate a Fill
-    */
-  @Test def testFill() {
-    println("\ntestFill ...")
-    class FillComp extends Module {
-      val io = new Bundle {
-        val in = UInt(INPUT, 8)
-        val out = UInt(OUTPUT)
-      }
-      io.out := Fill(4, io.in)
-    }
-
-    chiselMain(testArgs, () => Module(new FillComp()))
   }
 
   /** Generate a Log2

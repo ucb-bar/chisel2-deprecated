@@ -220,7 +220,7 @@ object Literal {
     val xString = (if (x >= 0) x else (BigInt(1) << w) + x).toString(16)
 
     if(xWidth > width && width != -1) {
-      // Is this a zero width wire with value 0
+      // Is this a zero-width wire with value 0
       if (!(x == 0 && width == 0 && Driver.isSupportW0W)) {
         ChiselError.error({"width " + width + " is too small for literal " + x + ". Smallest allowed width is " + xWidth});
       }

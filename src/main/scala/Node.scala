@@ -33,6 +33,7 @@ package Chisel
 import scala.collection.immutable.Vector
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
+import scala.collection.mutable.HashSet
 import java.io.PrintStream
 
 import Node._;
@@ -51,7 +52,7 @@ object Node {
 
   def fixWidth(w: => Int): (=> Node) => Width = { (n) => {
     if (n != null) {
-      assert(w != -1, ChiselError.error("invalid width for fixWidth object"));
+      assert(w != -1, ChiselError.error({"invalid width for fixWidth object"}));
       Width(w)
     } else {
       Width()
@@ -519,11 +520,40 @@ abstract class Node extends nameable {
   // Return true if the width of this node is known (set).
   def isKnownWidth: Boolean = width.isKnown
 
-  // Eliminate any zero width wires attached to this node.
+  // The following are used for optimizations, notably, dealing with zero-width wires.
+  /* If we've updated this node since our last visit. */
+  var modified = false
+  // Eliminate any zero-width wires attached to this node.
+  // Return true if we modified the node.
   def W0Wtransform() {
     // If we're just a type node, we're now a zero-width type node.
     if (isTypeNode) {
       setWidth(0)
+      modified = true
     }
+  }
+
+  // Review a node for optimization possibilities if its children have been updated.
+  def Review() { }
+  // Parent nodes - used during optimization.
+  var parents = HashSet[Node]()
+
+  // Replace this node with the indicated replacement.
+  def replaceNode(newNode: Node) {
+    val oldNode = this
+
+    /* We are no longer anyone's parent. */
+    for (c <- inputs) {
+      c.parents -= oldNode
+    }
+
+    /* Replace our role as input in our parent nodes with the replacement node. */
+    for (p <- oldNode.parents; i <- 0 until p.inputs.length if p.inputs(i) == oldNode) {
+      newNode.parents += p
+      p.inputs(i) = newNode
+    }
+
+    oldNode.inputs.clear()
+    oldNode.parents.clear()
   }
 }

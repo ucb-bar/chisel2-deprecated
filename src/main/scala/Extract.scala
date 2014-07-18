@@ -132,9 +132,9 @@ class Extract extends Node {
     case _ => false
   }
 
-  // Eliminate any zero width wires attached to this node.
+  // Eliminate any zero-width wires attached to this node.
   override def W0Wtransform() {
-    /* We require that if the source is zero width,
+   /* We require that if the source is zero-width,
      *  the high and lo must be n-1 and n respectively.
      *  If this is true, we ensure our width is zero.
      */
@@ -143,6 +143,7 @@ class Extract extends Node {
     if (inputs(0).getWidth == 0 && hi_lit != null && lo_lit != null &&
         hi_lit.value == (lo_lit.value - 1)) {
       setWidth(0)
+      modified = true
     } else {
       ChiselError.error("Extract(" + inputs(0) + ", " + inputs(1) + ", " + inputs(2) + ")" +
             " W0Wtransform", line)

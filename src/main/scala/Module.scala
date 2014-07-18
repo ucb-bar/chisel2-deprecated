@@ -931,17 +931,26 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   override val hashCode: Int = Driver.components.size
   override def equals(that: Any) = this eq that.asInstanceOf[AnyRef]
 
-  /* Perform a depth first search of the tree for zero width nodes,
+  /* Perform a depth first search of the tree for zero-width nodes,
    *  eliminating them if possible.
    */
   def W0Wtransform(): Unit = {
     val nodesList = ArrayBuffer[Node]()
-    // Construct the depth-first list of nodes.
-    idfs { nodesList += _ }
+    /* Construct the depth-first list of nodes, set them all to unmodified,
+     *  and construct their parent list.
+     */
+    idfs { n => { n.modified = false; nodesList += n ; n.inputs.foreach(_.parents += n)} }
     for ( n <- nodesList) {
-      // If this node has any zero width children, have it deal with them.
+      if (n.isInstanceOf[Mux]) {
+        println("Mux")
+      }
+      // If this node has any zero-width children, have it deal with them.
       if (n.inputs exists {  c => c.inferWidth(c).needWidth == 0 }) {
         n.W0Wtransform()
+      }
+      // If this node or any of its children have been modified, visit it.
+      if (n.modified || (n.inputs exists {  _.modified })) {
+        n.Review()
       }
     }
   }

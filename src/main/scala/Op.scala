@@ -485,32 +485,142 @@ abstract class Op extends Node {
     case "==" | "!=" | "<" | ">" | "<=" | ">=" => 0
   }
 
-  // Transform an operator with one or more zero width children into an operator without.
+  // Transform an operator with one or more zero-width children into an operator without.
   override def W0Wtransform(): Unit = this match {
-    case UnaryOp(_) => {
-      setWidth(0)
-      inputs.remove(0, 1) /* remove our only child */
-    }
     case LogicalOp(_) | BinaryOp(_) | ReductionOp(_) => {
-      // If all our children are zero width nodes, so are we.
+      // If all our children are zero-width nodes, so are we.
       if (inputs.forall(c => c.inferWidth(c).needWidth == 0)) {
         setWidth(0)
         inputs.remove(0, inputs.length) /* remove all our children */
+        modified = true
         // We assume higher level nodes will eventually remove us.
       } else {
-        // Replace any zero width child nodes with the identity element for this operator.
+        // Replace any zero-width child nodes with the identity element for this operator.
         // TODO: We may need to refine this since not all children are created equal.
         for (i <- 0 until inputs.length) {
           val c = inputs(i)
           if (c.inferWidth(c).needWidth == 0) {
-            inputs(i) = UInt(identityFromNode, 1)
+            /* Replace the zero-width node with the identity element for this operation,
+             *  but leave its width at zero. This will allow the optimizer to either remove
+             *  the operation entirely, or replace it with an appropriate constant node.
+             *  We need to create it with a non-zero-width (to avoid complaints from the constructor),
+             *  the force its width to zero.
+             */
+            val identity = UInt(identityFromNode, 1)
+            identity.setWidth(0)
+            inputs(i) = identity
+            modified = true
           }
         }
       }
     }
   }
+
+  // Review this node with an eye to replacing it with an optimized version.
+  override def Review() {
+    def otherOperand(): Option[Node] = {
+      // If one of our inputs is zero-width, replace us with the other (presumably not zero-width).
+      for (i <- 0 to 1) {
+        if (inputs(i).width.needWidth == 0) {
+          assert(inputs(1 - i).width.needWidth != 0)
+          return Some(inputs(1 - i))
+        }
+      }
+      None
+    }
+
+    // If we're zero-width, replace us with a zero-width constant.
+    if (width.needWidth == 0) {
+      replaceNode(UInt(0,0))
+    } else {
+      /* How many zero-width children do we have? Partition the inputs (ids) into two lists:
+       *  zeroIds - those with zero-widths
+       *  nonzeroIds - those with non-zero-widths
+       */
+      val (zeroIds, nonzeroIds) = (0 until inputs.length).partition(i => inputs(i).width.needWidth == 0)
+      val nz = zeroIds.length
+      if (nz == 0)
+        return
+
+      /*
+       * If all our children are zero-width, so are we.
+       */
+      if (nz == inputs.length)
+        replaceNode(UInt(0,0))
+
+      /* Most of the remaining code assumes we have at least one non-zero child.
+       * Complain if that's not the case.
+       * Actually, we're a little stricter here. We assume there are only two children
+       * and one of them is zero-width. Thus, there can only be one non-zero-width child left.
+       */
+      if (nonzeroIds.length != 1) {
+        ChiselError.error({"Op.Review() " + op + " zero-width input " + this})
+        return
+      }
+      val nonzeroChild = nonzeroIds.head
+      this match {
+        case UnaryOp(_) => {
+          if (nz != 0) {
+            ChiselError.error({"Op.Review() " + op + " zero-width input " + this})
+          }
+        }
+        case b: BinaryOp => {
+          op match {
+            case "/" | ">>" | "<<" | "s>>" | "s/s" | "%" | "s%" | "f/" | "f%" | "d/" | "d%" => {
+              /* We currently handle only a zero-width second argument (inputs(1)),
+               *  and expect inputs(0) to be non-zero-width
+               */
+              if (nonzeroChild != 0) {
+                ChiselError.error({"Op.Review() " + op + " zero-width operand " + this})
+              } else {
+                replaceNode(inputs(nonzeroChild))
+              }
+            }
+            case "-" | "f-" | "d-" => {
+              if (nonzeroChild != 0) {
+                // Leave the operation intact, but make input(0) non-zero-width
+                inputs(0).setWidth(1)
+              } else {
+                replaceNode(inputs(nonzeroChild))
+              }
+            }
+            // For commutative operators (and "##"), replace us with the other (ostensibly non-zero-width) operand.
+            case "+" | "*" | "s*s" | "s*u" | "##" | "^" | "&" | "|" | "f+" | "f*" | "d+" | "d*" => {
+               replaceNode(inputs(nonzeroChild))
+            }
+            case _ => ChiselError.info("Op.Review() " + op + " no zero-width optimzation")
+          }
+        }
+        case l: LogicalOp => {
+          op match {
+            case "==" | "!=" => {
+              // Equality tests with a mixture of zero and non-zero-width are always false.
+              if (nz == 1) {
+                replaceNode(UInt(0,0))
+              }
+            }
+            case _ => {
+              if (nz != 0) {
+                ChiselError.error({"Op.Review() " + op + " zero-width input " + this})
+              }
+            }
+          }
+        }
+        case r: ReductionOp => {
+ 
+        }
+      }
+    }
+  }
 }
-case class LogicalOp(val op: String) extends Op
+
+case class LogicalOp(val op: String) extends Op {
+  override def W0Wtransform(): Unit = {
+    setWidth(0)
+    inputs.remove(0, 1) /* remove our only child */
+    modified = true
+  }
+}
 case class BinaryOp(val op: String) extends Op
 case class UnaryOp(val op: String) extends Op
 case class ReductionOp(val op: String) extends Op
