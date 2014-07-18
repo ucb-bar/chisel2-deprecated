@@ -1,0 +1,8 @@
+digraph ZeroWidthTest_MuxCaseComp_1{
+rankdir = LR;
+  io_out[label="io_out:UInt"];
+  io_in0[label="io_in0:UInt"];
+  io_in1[label="io_in1:UInt"];
+  io_default[label="io_default:UInt"];
+  io_in0 -> io_out[label="8"];
+}

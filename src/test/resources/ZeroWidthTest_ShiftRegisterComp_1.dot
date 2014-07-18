@@ -1,0 +1,10 @@
+digraph ZeroWidthTest_ShiftRegisterComp_1{
+rankdir = LR;
+  io_out[label="io_out:UInt"];
+  R0[shape=square,label="R0:Reg"];
+  R1[shape=square,label="R1:Reg"];
+  io_in[label="io_in:UInt"];
+  R0 -> io_out[label="8"];
+  R1 -> R0[label="8"];
+  io_in -> R1[label="8"];
+}

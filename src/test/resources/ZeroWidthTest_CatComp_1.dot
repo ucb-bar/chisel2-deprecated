@@ -1,0 +1,10 @@
+digraph ZeroWidthTest_CatComp_1{
+rankdir = LR;
+  io_z[label="io_z:UInt"];
+  T0[label="##"];
+  io_y[label="io_y:UInt"];
+  io_x[label="io_x:UInt"];
+  T0 -> io_z[label="16"];
+  io_x -> T0[label="8"];
+  io_y -> T0[label="8"];
+}

@@ -1,0 +1,16 @@
+digraph ZeroWidthTest_UIntToOHComp_1{
+rankdir = LR;
+  io_out1[label="io_out1:UInt"];
+  T1[label="T1:Extract(_, 0x3, 0x0)"];
+  T2[label="<<(0x1, _)"];
+  T3[label="T3:Extract(_, 0x1, 0x0)"];
+  io_in[label="io_in:UInt"];
+  io_out0[label="io_out0:UInt"];
+  T0[label="<<(0x1, _)"];
+  T1 -> io_out1[label="4"];
+  T2 -> T1[label="4"];
+  T3 -> T2[label="2"];
+  io_in -> T3[label="8"];
+  T0 -> io_out0[label="256"];
+  io_in -> T0[label="8"];
+}
