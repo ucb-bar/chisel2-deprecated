@@ -50,8 +50,9 @@ object ZeroWidthTest{
 /** This testsuite checks operations using zero-width wires.
 */
 class ZeroWidthTest extends TestSuite {
+  val backend = "dot"
   val testArgs = Array("--W0W",
-      "--backend", "dot",
+      "--backend", backend,
       "--targetDir", dir.getPath.toString()
       )
 
@@ -203,7 +204,7 @@ class ZeroWidthTest extends TestSuite {
       io.z := io.x * io.y
     }
     chiselMain(testArgs, () => Module(new MulUUZ()))
-    assertFile("ZeroWidthTest_MulUUZ_1.v")
+    assertFile("ZeroWidthTest_MulUUZ_1." + backend)
   }
 
   /** Multiply an unsigned number by signed zero-width number */
@@ -218,7 +219,7 @@ class ZeroWidthTest extends TestSuite {
       io.z := io.x * io.y
     }
     chiselMain(testArgs, () => Module(new MulUZ()))
-    assertFile("ZeroWidthTest_MulUZ_1.v")
+    assertFile("ZeroWidthTest_MulUZ_1." + backend)
   }
 
   /** Divide an unsigned number by a zero-width unsigned number */
@@ -233,7 +234,7 @@ class ZeroWidthTest extends TestSuite {
       io.z := io.x / io.y
     }
     chiselMain(testArgs, () => Module(new DivUUZ()))
-    assertFile("ZeroWidthTest_DivUUZ_1.v")
+    assertFile("ZeroWidthTest_DivUUZ_1." + backend)
   }
 
   /** Divide an unsigned zero-width number by an unsigned number - expect an error. */
@@ -248,7 +249,7 @@ class ZeroWidthTest extends TestSuite {
       io.z := io.x / io.y
     }
     chiselMain(testArgs, () => Module(new DivUZ()))
-    assertFile("ZeroWidthTest_DivUZ_1.v")
+    assertFile("ZeroWidthTest_DivUZ_1." + backend)
   }
 
   /** Remainer of an unsigned number by signed zero-width number */
@@ -263,7 +264,7 @@ class ZeroWidthTest extends TestSuite {
       io.z := io.x % io.y
     }
     chiselMain(testArgs, () => Module(new RemUZ()))
-    assertFile("ZeroWidthTest_RemUZ_1.v")
+    assertFile("ZeroWidthTest_RemUZ_1." + backend)
   }
 
   /** Multiply an signed zero-width number by an unsigned number */
@@ -278,7 +279,7 @@ class ZeroWidthTest extends TestSuite {
       io.z := io.x * io.y
     }
     chiselMain(testArgs, () => Module(new MulZU()))
-    assertFile("ZeroWidthTest_MulZU_1.v")
+    assertFile("ZeroWidthTest_MulZU_1." + backend)
   }
 
   /** Divide a signed zero-width number by an unsigned number */
@@ -293,7 +294,7 @@ class ZeroWidthTest extends TestSuite {
       io.z := io.x / io.y
     }
     chiselMain(testArgs, () => Module(new DivZU()))
-    assertFile("ZeroWidthTest_DivZU_1.v")
+    assertFile("ZeroWidthTest_DivZU_1." + backend)
   }
 
   /** Remainer of a signed zero-width number by an unsigned number */
@@ -308,7 +309,7 @@ class ZeroWidthTest extends TestSuite {
       io.z := io.x % io.y
     }
     chiselMain(testArgs, () => Module(new RemZU()))
-    assertFile("ZeroWidthTest_RemZU_1.v")
+    assertFile("ZeroWidthTest_RemZU_1." + backend)
   }
 
   /** Concatenate two nodes X and Y (zero-width) in a node Z such that
@@ -325,7 +326,7 @@ class ZeroWidthTest extends TestSuite {
     }
 
     chiselMain(testArgs, () => Module(new CatCompW0W()))
-    assertFile("ZeroWidthTest_CatCompW0W_1.v")
+    assertFile("ZeroWidthTest_CatCompW0W_1." + backend)
   }
 
   /** Generate a lookup into an array.

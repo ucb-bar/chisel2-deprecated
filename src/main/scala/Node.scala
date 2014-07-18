@@ -534,12 +534,12 @@ abstract class Node extends nameable {
   }
 
   // Review a node for optimization possibilities if its children have been updated.
-  def Review() { }
+  def review() { }
   // Parent nodes - used during optimization.
   var parents = HashSet[Node]()
 
-  // Replace this node with the indicated replacement.
-  def replaceNode(newNode: Node) {
+  // Replace the subtree starting from this node with the indicated replacement.
+  def replaceTree(newNode: Node) {
     val oldNode = this
 
     /* We are no longer anyone's parent. */

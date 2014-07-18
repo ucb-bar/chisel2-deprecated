@@ -517,21 +517,10 @@ abstract class Op extends Node {
   }
 
   // Review this node with an eye to replacing it with an optimized version.
-  override def Review() {
-    def otherOperand(): Option[Node] = {
-      // If one of our inputs is zero-width, replace us with the other (presumably not zero-width).
-      for (i <- 0 to 1) {
-        if (inputs(i).width.needWidth == 0) {
-          assert(inputs(1 - i).width.needWidth != 0)
-          return Some(inputs(1 - i))
-        }
-      }
-      None
-    }
-
+  override def review() {
     // If we're zero-width, replace us with a zero-width constant.
     if (width.needWidth == 0) {
-      replaceNode(UInt(0,0))
+      replaceTree(UInt(0,0))
     } else {
       /* How many zero-width children do we have? Partition the inputs (ids) into two lists:
        *  zeroIds - those with zero-widths
@@ -546,7 +535,7 @@ abstract class Op extends Node {
        * If all our children are zero-width, so are we.
        */
       if (nz == inputs.length)
-        replaceNode(UInt(0,0))
+        replaceTree(UInt(0,0))
 
       /* Most of the remaining code assumes we have at least one non-zero child.
        * Complain if that's not the case.
@@ -558,6 +547,7 @@ abstract class Op extends Node {
         return
       }
       val nonzeroChild = nonzeroIds.head
+      val zeroChild = zeroIds.head
       this match {
         case UnaryOp(_) => {
           if (nz != 0) {
@@ -573,7 +563,7 @@ abstract class Op extends Node {
               if (nonzeroChild != 0) {
                 ChiselError.error({"Op.Review() " + op + " zero-width operand " + this})
               } else {
-                replaceNode(inputs(nonzeroChild))
+                replaceTree(inputs(nonzeroChild))
               }
             }
             case "-" | "f-" | "d-" => {
@@ -581,23 +571,37 @@ abstract class Op extends Node {
                 // Leave the operation intact, but make input(0) non-zero-width
                 inputs(0).setWidth(1)
               } else {
-                replaceNode(inputs(nonzeroChild))
+                replaceTree(inputs(nonzeroChild))
               }
             }
             // For commutative operators (and "##"), replace us with the other (ostensibly non-zero-width) operand.
             case "+" | "*" | "s*s" | "s*u" | "##" | "^" | "&" | "|" | "f+" | "f*" | "d+" | "d*" => {
-               replaceNode(inputs(nonzeroChild))
+               replaceTree(inputs(nonzeroChild))
             }
             case _ => ChiselError.info("Op.Review() " + op + " no zero-width optimzation")
           }
         }
         case l: LogicalOp => {
+          val trueNode = UInt(1,1)
+          trueNode.setWidth(0)
+          val falseNode = UInt(0,1)
+          falseNode.setWidth(0)
           op match {
             case "==" | "!=" => {
               // Equality tests with a mixture of zero and non-zero-width are always false.
               if (nz == 1) {
-                replaceNode(UInt(0,0))
+                replaceTree(falseNode)
+              } else if (nz == 2) {
+              // FIXME - Are zero-width nodes equal?
+                replaceTree(trueNode)
               }
+            }
+            /* A zero-width node is always less than a non-zero width node. */
+            case "<" | "<=" => {
+              replaceTree(if (zeroChild < nonzeroChild) trueNode else falseNode)
+            }
+            case ">" | ">=" => {
+              replaceTree(if (zeroChild > nonzeroChild) trueNode else falseNode)
             }
             case _ => {
               if (nz != 0) {
@@ -614,13 +618,13 @@ abstract class Op extends Node {
   }
 }
 
-case class LogicalOp(val op: String) extends Op {
+case class LogicalOp(val op: String) extends Op
+case class BinaryOp(val op: String) extends Op
+case class UnaryOp(val op: String) extends Op {
   override def W0Wtransform(): Unit = {
     setWidth(0)
     inputs.remove(0, 1) /* remove our only child */
     modified = true
   }
 }
-case class BinaryOp(val op: String) extends Op
-case class UnaryOp(val op: String) extends Op
 case class ReductionOp(val op: String) extends Op

@@ -941,16 +941,13 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
      */
     idfs { n => { n.modified = false; nodesList += n ; n.inputs.foreach(_.parents += n)} }
     for ( n <- nodesList) {
-      if (n.isInstanceOf[Mux]) {
-        println("Mux")
-      }
       // If this node has any zero-width children, have it deal with them.
       if (n.inputs exists {  c => c.inferWidth(c).needWidth == 0 }) {
         n.W0Wtransform()
       }
       // If this node or any of its children have been modified, visit it.
       if (n.modified || (n.inputs exists {  _.modified })) {
-        n.Review()
+        n.review()
       }
     }
   }

@@ -132,20 +132,20 @@ class Mux extends Op {
       // Convert any zero-width children into UInt(0).
       // This has the side-effect that if we have a zero-width selector, we'll return the "false" input.
       for (c <- inputs if c.width.needWidth == 0) {
-        c.replaceNode(UInt(0, 0))
+        c.replaceTree(UInt(0, 0))
         modified = true
       }
     }
   }
 
-  override def Review() {
+  override def review() {
     // Are we zero-width?
     if (width.needWidth == 0) {
       /* Replace us with a zero-width constant. */
-      replaceNode(UInt(0,0))
+      replaceTree(UInt(0,0))
     } else if (inputs(0).width.needWidth == 0) {
       /* Our selector is zero-width. Replace us with the "false" input. */
-      replaceNode(inputs(2))
+      replaceTree(inputs(2))
     }
   }
 }
