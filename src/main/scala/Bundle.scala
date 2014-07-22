@@ -53,8 +53,11 @@ object Bundle {
 /** Defines a collection of datum of different types into a single coherent
   whole.
   */
-class Bundle(view_arg: Seq[String] = null) extends Aggregate {
+class Bundle(view_arg: Seq[String] = null)(implicit _params:Option[Parameters] = None) extends Aggregate {
   var view = view_arg;
+  val P = if(_params == None) {
+    if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
+  } else _params.get
   private var elementsCache: ArrayBuffer[(String, Data)] = null;
 
   /** Populates the cache of elements declared in the Bundle. */

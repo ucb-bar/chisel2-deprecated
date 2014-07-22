@@ -33,7 +33,7 @@ package Chisel
 import collection.mutable.{ArrayBuffer, HashSet, HashMap, Stack, LinkedHashSet}
 
 object Driver extends FileSystemUtilities{
-  def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean = true): T = {
+  def apply[T <: Module](args: Array[String], gen: (p:Parameters) => T, wrapped:Boolean = true): T = {
     Driver.initChisel(args)
     try {
       if(wrapped) execute(gen) else executeUnwrapped(gen)
@@ -63,6 +63,9 @@ object Driver extends FileSystemUtilities{
         val w = createOutputFile(Driver.chiselConfigClassName.get + ".cst")
         w.write(world.getConstraints)
         w.close
+        val v = createOutputFile(Driver.chiselConfigClassName.get + ".knb")
+        v.write(world.getKnobs)
+        v.close
       }
       c
     } 
@@ -278,6 +281,7 @@ object Driver extends FileSystemUtilities{
   val chiselOneHotMap = HashMap[(UInt, Int), UInt]()
   val chiselOneHotBitMap = HashMap[(Bits, Int), Bool]()
   val compStack = Stack[Module]()
+  val parStack = new Stack[Parameters]
   var stackIndent = 0
   val printStackStruct = ArrayBuffer[(Int, Module)]()
   val randInitIOs = ArrayBuffer[Node]()

@@ -58,22 +58,20 @@ object Module {
     }
     _p match {
       case Some(q: Parameters) => {
-        parStack.push(q.push)
+        Driver.parStack.push(q.push)
         val res = init(c)
-        parStack.pop
+        Driver.parStack.pop
         res
       }
       case None => {
-        if(parStack.isEmpty) parStack.push(Parameters.empty) else parStack.push(parStack.top.push)
+        if(Driver.parStack.isEmpty) Driver.parStack.push(Parameters.empty) else Driver.parStack.push(Driver.parStack.top.push)
         val res = init(c)
-        parStack.pop
+        Driver.parStack.pop
         res
       }
     }
   }
-  val parStack = new Stack[Parameters]
-  private def params = if(parStack.isEmpty) Parameters.empty else parStack.top
-    //ok this is a bit of a hack but what is a reasonable default world for parameterless modules?
+  private def P = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
 
     /* *push* is done in the Module constructor because we don't have
      a *this* pointer before then, yet we need to store it before the subclass
@@ -182,8 +180,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   push(this)
 
   //Parameter Stuff
-  def params = Module.params
-  params.path = this.getClass :: params.path
+  def P = Module.P
+  P.path = this.getClass :: P.path
 
   var hasExplicitClock = !(clock == null)
   var hasExplicitReset = !(_reset == null)
