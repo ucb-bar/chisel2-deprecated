@@ -474,4 +474,5 @@ abstract class Node extends nameable {
     }
     checkOne(this, x) || checkOne(x, this)
   }
+  var islandId: Int = 0
 }

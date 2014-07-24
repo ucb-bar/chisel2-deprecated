@@ -123,6 +123,7 @@ object Driver {
     isCheckingPorts = false
     isTesting = false
     isDebugMem = false
+    partitionIslands = false
     backend = new CppBackend
     topComponent = null
     randInitIOs.clear()
@@ -175,6 +176,7 @@ object Driver {
         case "--inlineMem" => isInlineMem = true
         case "--noInlineMem" => isInlineMem = false
         case "--debugMem" => isDebugMem = true
+        case "--partitionIslands" => partitionIslands = true
         case "--backend" => {
           if (args(i + 1) == "v") {
             backend = new VerilogBackend
@@ -194,6 +196,8 @@ object Driver {
             backend = new CounterFPGABackend
           } else if (args(i + 1) == "counterw") {
             backend = new CounterWBackend
+          } else if (args(i + 1) == "pcpp") {
+            backend = new PartionedCppBackend
           } else {
             backend = Class.forName(args(i + 1)).newInstance.asInstanceOf[Backend]
           }
@@ -264,6 +268,7 @@ object Driver {
   var isCheckingPorts = false
   var isTesting = false
   var isDebugMem = false
+  var partitionIslands = false
   var backend: Backend = null
   var topComponent: Module = null
   val components = ArrayBuffer[Module]()

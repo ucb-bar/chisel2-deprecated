@@ -33,9 +33,12 @@ import Node._
 import Reg._
 import ChiselError._
 import scala.collection.mutable.HashSet
+import scala.collection.mutable.ArrayBuffer
+import PartitionIslands._
 
 class DotBackend extends Backend {
   val keywords = new HashSet[String]();
+  val islandIds = ArrayBuffer[Int]()
 
   override def emitRef(node: Node): String = {
     node match {
@@ -91,52 +94,68 @@ class DotBackend extends Backend {
       res.append(indent)
       res.append(innercrossings)
     }
-    for (m <- top.mods) {
-      if (isDottable(m)) {
-        if( m.component == top ) {
-          /* We have to check the node's component agrees because output
-           nodes are part of a component *mods* as well as its parent *mods*! */
-          res.append(indent)
-          res.append(emitRef(m));
-          var label  = "label=\"" + asValidLabel(m)
-          val anyLit = m.inputs.find(x => !isDottable(x));
-          if (!anyLit.isEmpty) {
-            var i = 0;
-            label += "(";
-            for (in <- m.inputs) {
-              if (i != 0) label += ", ";
-              label += (if (in.isLit) emitRef(in) else "_");
-              i += 1;
+    var EOL = "\n"
+    for (islandId <- islandIds) {
+      if (islandId != 0) {
+        res.append("subgraph clusterIsland_" + islandId + " {\n")
+      }
+      for (m <- top.mods) {
+        if (isDottable(m)) {
+          if( m.component == top ) {
+            /* We have to check the node's component agrees because output
+             nodes are part of a component *mods* as well as its parent *mods*! */
+            if (m.islandId == islandId) {
+              res.append(indent)
+              res.append(emitRef(m));
             }
-            label += ")";
-          }
-          label += "\""
-          m match {
-            case reg: Delay => res.append("[shape=square," + label + "];\n")
-            case _ => res.append("[" + label + "];\n")
+            var label  = "label=\"" + asValidLabel(m)
+            val anyLit = m.inputs.find(x => !isDottable(x));
+            if (!anyLit.isEmpty) {
+              var i = 0;
+              label += "(";
+              for (in <- m.inputs) {
+                if (i != 0) label += ", ";
+                label += (if (in.isLit) emitRef(in) else "_");
+                i += 1;
+              }
+              label += ")";
+            }
+            label += "\""
+            if (m.islandId == islandId) {
+              m match {
+                case reg: Delay => res.append("[shape=square," + label + "];" + EOL)
+                case _ => res.append("[" + label + "];" + EOL)
+              }
+            }
           }
         }
       }
-    }
-    for (m <- top.mods) {
-      if( m.component == top ) {
-        /* We have to check the node's component agrees because output
-         nodes are part of a component *mods* as well as its parent *mods*! */
-        for (in <- m.inputs) {
-          if (isDottable(m) && isDottable(in)) {
-            val edge = (emitRef(in) + " -> " + emitRef(m)
-              + "[label=\"" + in.width_ + "\"];\n")
-            /* If the both ends of an edge are on either side of a component
-             boundary, we must add it at the upper level otherwise graphviz
-             will incorrectly draw the input node into the cluster. */
-            if( in.component != top && !top.children.contains(in.component) ) {
-              crossings.append(edge)
-            } else {
-              res.append(indent)
-              res.append(edge);
+      for (m <- top.mods) {
+        if( m.component == top ) {
+          /* We have to check the node's component agrees because output
+           nodes are part of a component *mods* as well as its parent *mods*! */
+          for (in <- m.inputs) {
+            // Draw the vertex after the nodes have been defined.
+            val maxIslandId = math.max(m.islandId, in.islandId)
+            if (isDottable(m) && isDottable(in) && maxIslandId == islandId) {
+              val edge = (emitRef(in) + " -> " + emitRef(m)
+                + "[label=\"" + in.width_ + "\"];"+ EOL)
+              /* If the both ends of an edge are on either side of a component
+               boundary, we must add it at the upper level otherwise graphviz
+               will incorrectly draw the input node into the cluster. */
+              if( in.component != top && !top.children.contains(in.component) ) {
+                crossings.append(edge)
+              } else {
+                res.append(indent)
+                res.append(edge);
+              }
             }
           }
         }
+      }
+      if (islandId != 0) {
+        res.append("label = \"Island_" + islandId + "\";\n")
+        res.append("}\n")
       }
     }
     (res.toString, crossings.toString)
@@ -146,6 +165,12 @@ class DotBackend extends Backend {
   override def elaborate(c: Module): Unit = {
     super.elaborate(c)
 
+    if (Driver.partitionIslands) {
+      val islands = createIslands(c)
+      for (chain <- islands) islandIds += chain.chainId
+    } else {
+      islandIds += 0
+    }
     var gn = -1;
     val out_cd = createOutputFile(c.name + "_c.dot");
     out_cd.write("digraph TopTop {\n");
