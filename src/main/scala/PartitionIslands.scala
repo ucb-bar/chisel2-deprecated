@@ -30,90 +30,150 @@
 
 package Chisel
 
-import scala.collection.mutable.{ArrayBuffer, HashSet, ListBuffer, Queue=>ScalaQueue, Stack}
+import scala.collection.mutable.{ArrayBuffer, Set, HashSet, HashMap, ListBuffer, Queue=>ScalaQueue, Stack}
+import collection.mutable
 
 object PartitionIslands {
-  class NodeChain(theNodes: List[Node], theChainId: Int) {
-    val nodes = theNodes
-    val chainId = theChainId
-  }
+  type IslandNodes = ArrayBuffer[Node]
+  type MarkedNodes = HashMap[Node, Int]
+  val debug: Boolean = false
 
+  class Island(theIslandId: Int, theNodes: IslandNodes, theRoots: IslandNodes) {
+    val nodes = theNodes
+    val islandId = theIslandId
+    val roots = theRoots
+    def isEmpty: Boolean = nodes.isEmpty
+  }
+ 
   /** Indicate whether a node is a root node or not.
-   *  
+   *
    */
   def isRoot(node: Node): Boolean = {
-    (node.asInstanceOf[Bits].dir == OUTPUT && node.consumers.length == 0)
+    (node.isIo && node.asInstanceOf[Bits].dir == OUTPUT && node.consumers.length == 0)
   }
 
   def isSource(node: Node): Boolean = {
-    (node.asInstanceOf[Bits].dir == INPUT && node.inputs.length == 0)
+    (node.isIo && node.asInstanceOf[Bits].dir == INPUT && node.inputs.length == 0)
   }
 
   /** Flood fill the graph, marking all non-root nodes reachable from here.
-   *
+   * We visit inputs and consumers, stopping when we hit a register or memory.
    */
-  def flood(node: Node, islandId: Int, chain: ListBuffer[Node], inputs: ArrayBuffer[Node]) {
-    // Mark this node with its islandId and add it to the island chain.
-    node.islandId = islandId
-    chain += node
-    for (n <- (node.consumers ++ node.inputs)){
-      // If we haven't visited this node before and it's not an input node
-      //  (which we'll handle as part of its own chain), flood from it.
-      if (n.islandId == 0 && ! inputs.contains(n)) {
-        flood(n, islandId, chain, inputs)
+  def flood(sNode: Node, islandId: Int, marked: MarkedNodes, inputs: Set[Node]): Island = {
+    val work = new Stack[Node]
+    val islandNodes = new IslandNodes
+    val islandRoots = new IslandNodes
+    def processLinks(nodes: Seq[Node]) {
+      // Process all unmarked nodes.
+      for (n <- nodes) {
+       if (debug) println(" considering " + n + " marked " + marked.contains(n) + " isInput " + inputs.contains(n))
+       if (!inputs.contains(n)) {
+         if (!marked.contains(n)) {
+            work.push(n)
+            marked += ((n, islandId))
+         }
+       }
       }
     }
+    // We don't add the sNode to the island.
+    // If it's a true input, we put it in island 0 (just to enable us to draw things with the dot backend).
+    // It it's a register, it will be included in the island that provides its input.
+    // Add all the unmarked consumers of this node to the work stack.
+    processLinks(sNode.consumers)
+
+    while (work.length > 0) {
+      val node = work.pop()
+      // We don't add the starting node to the island.
+      // It's either a real input (which is added to island 0), or it's a register or memory
+      // and will be added to the island that produces its input.
+      if (debug) println("  adding " + node)
+      islandNodes += node
+      // Process un-marked inputs.
+      processLinks(node.inputs)
+
+      // If this is an "input" node (a register or memory), don't process its consumers.
+      // They will be handled when we start flooding from this node.
+      processLinks(node.consumers)
+
+      // If we are a register or memory node, or we're a root node, add us to the root nodes for this island.
+      node match {
+        case d: Delay => islandRoots += d
+        case _ => {
+          if (isRoot(node)) {
+            islandRoots += node
+          }
+        }
+      }
+    }
+    new Island(islandId, islandNodes, islandRoots)
   }
   /* Create separately compilable islands of combinational logic.
    *
    */
-  def createIslands(module: Module): ArrayBuffer[NodeChain] = {
-    val res = new ArrayBuffer[NodeChain]
+  def createIslands(module: Module): ArrayBuffer[Island] = {
+    val res = new ArrayBuffer[Island]
     val roots = new ArrayBuffer[Node]
-    val inputs = new ArrayBuffer[Node]
+    val inputs = new HashSet[Node]
+    val delays = new HashSet[Node]
+    val lits = new HashSet[Node]
+    val barren = new HashSet[Node]
+    val bogus = new HashSet[Node]
+    val markedNodes = new MarkedNodes
     // Generate an array of input and output nodes for this module, and initialize the island id for each node.
-    for (node <- module.mods) {
-      node.islandId = 0
+    for (node <- module.omods) {
       if (node.isIo) {
         if (isRoot(node)) {
           roots += node
+          // If this is a root node with no inputs, add it to the bogus list.
+          bogus += node
         } else if (isSource(node)) {
           inputs += node
+        } else if (node.inputs.length == 0 || node.consumers.length == 0) {
+          bogus += node
         }
       } else {
-        if (node.isReg) {
-          inputs += node
+        // If we're a delay node (Reg or Mem), our consumers become inputs
+        node match {
+          case d: Delay => {
+            delays += d
+          }
+          case l: Literal => lits += l
+          case r: MemRead => delays += r
+          case _ => if (node.inputs.length == 0) barren += node
+        }
+      }
+      if (node.inputs.length == 0) {
+        if (!(inputs ++ delays ++ lits ++ barren ++ bogus).contains(node)) {
+          println("createIslands: 0 inputs " + node)
         }
       }
     }
-
-    var chain: ListBuffer[Node] = new ListBuffer()
+    for (n <- bogus) {
+      println("createIslands: bogus " + n)
+    }
     // Flood fill, generating islands
-    var islandId = 0
-    for (inode <- inputs) {
-      for (cnode <- inode.consumers) {
-        islandId += 1
-        // Do we need to save the current chain?
-        if (! chain.isEmpty) {
-          res += new NodeChain(chain.toList, islandId - 1)
-          chain = new ListBuffer()
-        }
-        // Have we dealt with the input node?
-        if (inode.islandId == 0) {
-          inode.islandId = islandId
-          chain += inode
-        }
-        // Have we encountered this consumer node before?
-        if (cnode.islandId == 0) {
-          flood(cnode, islandId, chain, inputs)
-        }
+    var islandId = 1
+    // Add all the real inputs to island 0 (just to give the dot backend a place to put them).
+    val allLeaves = (inputs ++ delays ++ lits ++ barren ++ bogus)
+    val allLeavesBuffer = allLeaves.to[mutable.ArrayBuffer]
+    res += new Island(islandId, allLeavesBuffer, allLeavesBuffer)
+    for (n <- allLeaves) {
+      markedNodes += ((n, islandId))
+    }
+    for (inode <- (allLeaves)) {
+      islandId += 1
+      if (debug) println("creating island " + islandId)
+      val islands = flood(inode, islandId, markedNodes, allLeaves)
+      if (! islands.isEmpty) {
+        res += islands
       }
     }
-    // Do we need to save the current chain?
-    if (! chain.isEmpty) {
-      res += new NodeChain(chain.toList, islandId)
-      chain = new ListBuffer()
+    // Output histogram info for the partitioning
+    println("createIslands: " + res.length + " islands")
+    for (island <- res) {
+      println("  nodes: " + island.nodes.length)
     }
     res
   }
+  
 }

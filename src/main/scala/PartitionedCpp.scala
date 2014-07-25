@@ -44,7 +44,7 @@ class PartionedCppBackend extends CppBackend {
     val islands = createIslands(c)
     for (chain <- islands) {
       renameNodes(c, chain.nodes)
-      val cName = c.name + "chain_" + chain.chainId.toString
+      val cName = c.name + "chain_" + chain.islandId.toString
       val out_h = createOutputFile(cName + ".h")
       val out_c = createOutputFile(cName + ".cpp")
       out_h.write("#ifndef __" + c.name + "__\n");
@@ -86,14 +86,14 @@ class PartionedCppBackend extends CppBackend {
       }
       out_c.write("}\n");
   
-      out_c.write("void " + c.name + "_t::clock_lo_" + chain.chainId + " ( dat_t<1> reset ) {\n")
+      out_c.write("void " + c.name + "_t::clock_lo_" + chain.islandId + " ( dat_t<1> reset ) {\n")
       for (m <- chain.nodes) {
         out_c.write(emitDefLo(m))
       }
       out_c.write("}\n")
   
       out_c.write("void " + c.name + "_t::clock_lo ( dat_t<1> reset ) {\n")
-      out_c.write("  clock_lo_" + chain.chainId + "( reset );\n")
+      out_c.write("  clock_lo_" + chain.islandId + "( reset );\n")
       out_c.write("}\n")
       out_c.write("void " + c.name + "_t::clock_hi ( dat_t<1> reset ) {\n")
       for (m <- chain.nodes) {

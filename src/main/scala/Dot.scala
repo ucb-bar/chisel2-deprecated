@@ -33,12 +33,14 @@ import Node._
 import Reg._
 import ChiselError._
 import scala.collection.mutable.HashSet
+import scala.collection.mutable.HashMap
 import scala.collection.mutable.ArrayBuffer
 import PartitionIslands._
 
 class DotBackend extends Backend {
   val keywords = new HashSet[String]();
-  val islandIds = ArrayBuffer[Int]()
+  var islands = ArrayBuffer[Island]()
+  val nodeIslandIdMap = HashMap[Node, Int]()
 
   override def emitRef(node: Node): String = {
     node match {
@@ -95,16 +97,13 @@ class DotBackend extends Backend {
       res.append(innercrossings)
     }
     var EOL = "\n"
-    for (islandId <- islandIds) {
-      if (islandId != 0) {
-        res.append("subgraph clusterIsland_" + islandId + " {\n")
-      }
+    def outputAnIsland(islandId: Int, nodeIslandId: (Node) => Int) {
       for (m <- top.mods) {
         if (isDottable(m)) {
           if( m.component == top ) {
             /* We have to check the node's component agrees because output
              nodes are part of a component *mods* as well as its parent *mods*! */
-            if (m.islandId == islandId) {
+            if (nodeIslandId(m) == islandId) {
               res.append(indent)
               res.append(emitRef(m));
             }
@@ -121,7 +120,7 @@ class DotBackend extends Backend {
               label += ")";
             }
             label += "\""
-            if (m.islandId == islandId) {
+            if (nodeIslandId(m) == islandId) {
               m match {
                 case reg: Delay => res.append("[shape=square," + label + "];" + EOL)
                 case _ => res.append("[" + label + "];" + EOL)
@@ -136,7 +135,7 @@ class DotBackend extends Backend {
            nodes are part of a component *mods* as well as its parent *mods*! */
           for (in <- m.inputs) {
             // Draw the vertex after the nodes have been defined.
-            val maxIslandId = math.max(m.islandId, in.islandId)
+            val maxIslandId = math.max(nodeIslandId(m), nodeIslandId(in))
             if (isDottable(m) && isDottable(in) && maxIslandId == islandId) {
               val edge = (emitRef(in) + " -> " + emitRef(m)
                 + "[label=\"" + in.width_ + "\"];"+ EOL)
@@ -158,18 +157,48 @@ class DotBackend extends Backend {
         res.append("}\n")
       }
     }
+    if (islands.isEmpty) {
+        outputAnIsland(0, { _ => 0 })
+    } else {
+      for (island <- islands) {
+        val islandId = island.islandId
+        if (islandId != 0) {
+          res.append("subgraph clusterIsland_" + islandId + " {\n")
+        }
+        outputAnIsland(islandId, { nodeIslandIdMap(_) })
+      }
+    }
     (res.toString, crossings.toString)
   }
+      
 
 
   override def elaborate(c: Module): Unit = {
     super.elaborate(c)
 
     if (Driver.partitionIslands) {
-      val islands = createIslands(c)
-      for (chain <- islands) islandIds += chain.chainId
-    } else {
-      islandIds += 0
+      /* We flatten all signals in the toplevel component after we had
+       a change to associate node and components correctly first
+       otherwise we are bound for assertions popping up left and right
+       in the Backend.elaborate method. */
+      for (cc <- Driver.components) {
+        if (!(cc == c)) {
+          c.debugs ++= cc.debugs
+          c.mods   ++= cc.mods;
+        }
+      }
+      c.findConsumers()
+      ChiselError.checkpoint()
+
+      c.collectNodes(c);
+      c.findOrdering(); // search from roots  -- create omods
+      islands = createIslands(c)
+      // Create the map from node to islandId.
+      for (island <- islands) {
+        for (n <- island.nodes) {
+          nodeIslandIdMap += ((n, island.islandId))
+        }
+      }
     }
     var gn = -1;
     val out_cd = createOutputFile(c.name + "_c.dot");
