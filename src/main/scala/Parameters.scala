@@ -18,6 +18,7 @@ package Chisel
 import scala.collection.immutable.{Seq=>Seq, Iterable=>Iterable}
 import scala.{collection=>readonly}
 import scala.collection.mutable
+import scala.reflect.runtime.universe._
 
 class ProgrammerSucks extends RuntimeException
 
@@ -41,12 +42,16 @@ abstract class View {
   
   // use `this` view's behavior to query for a parameters value as if
   // the original site were `site`
-  def apply[T](pname:Any, site:View):T
-  def sym[T](pname:Any, site:View):Ex[T]
+  def apply[T:TypeTag](pname:Any, site:View):T
+  def sym[T:TypeTag](pname:Any, site:View):Ex[T]
   
   // query for a parameters value using the default site
-  final def apply[T](pname:Any):T = apply[T](pname, deftSite)
-  final def sym[T](pname:Any):Ex[T] = sym[T](pname, deftSite)
+  //final def apply[T:TypeTag](pname:Any):T = apply[T](pname, deftSite)
+  final def apply[T:TypeTag](pname:Any):T = apply[T](pname, deftSite)
+  final def apply[T:TypeTag](field:Field[T]):T = apply[T](field.asInstanceOf[Any], deftSite)
+  
+  final def sym[T:TypeTag](pname:Any):Ex[T] = sym[T](pname, deftSite)
+  final def sym[T:TypeTag](field:Field[T]):Ex[T] = sym[T](field.asInstanceOf[Any], deftSite)
 }
 
 /* Wrap a View to make the application return the symbolic expression,
@@ -59,8 +64,8 @@ abstract class View {
  *   vs[Int]("xs") // Ex[_]
 */
 final case class ViewSym(view:View) {
-  def apply[T](f:Any):Ex[T] = view.sym[T](f)
-  def apply[T](f:Any, site:View):Ex[T] = view.sym[T](f, site)
+  def apply[T:TypeTag](f:Any):Ex[T] = view.sym[T](f)
+  def apply[T:TypeTag](f:Any, site:View):Ex[T] = view.sym[T](f, site)
 }
 
 
@@ -68,28 +73,28 @@ final case class ViewSym(view:View) {
 abstract class _Lookup {
   var path:List[Class[_]] = null
   
-  def apply(pname:Any, site:View):Ex[_]
+  def apply[T:TypeTag](pname:Any, site:View):Ex[T]
   
   // build a new Lookup that just defers to this one
   final def push() = {
     val me = this
     new _Lookup {
       this.path = me.path
-      def apply(pname:Any, site:View) = me.apply(pname, site)
+      def apply[T:TypeTag](pname:Any, site:View) = me.apply(pname, site)
     }
   }
 }
 
 // Internal type used as name in all ExVar[T]'s
-sealed abstract class _Var[T]
+sealed abstract class _Var[T:TypeTag]
 
 // Variables which are 'free' parameters when seen from the top level.
-final case class _VarKnob[T](kname:Any) extends _Var[T] {
+final case class _VarKnob[T:TypeTag](kname:Any) extends _Var[T] {
   override def toString = kname.toString
 }
 // Variables whose values are computed by `expr`. The term 'let' comes
 // from the idea of 'let' bindings in functional languages i.e.:
-final case class _VarLet[T](pname:Any,expr:Ex[T]) extends _Var[T] {
+final case class _VarLet[T:TypeTag](pname:Any,expr:Ex[T]) extends _Var[T] {
   override def toString = pname.toString + "{" + expr.toString + "}"
 }
 
@@ -112,16 +117,16 @@ abstract class World(
     val look: _Lookup
     def path = look.path
     
-    def apply[T](pname:Any, site:View):T = {
+    def apply[T:TypeTag](pname:Any, site:View):T = {
       _eval(look(pname, site).asInstanceOf[Ex[T]])
     }
-    def sym[T](pname:Any, site:View):Ex[T] = {
-      _bindLet(pname,look(pname, site).asInstanceOf[Ex[T]])
+    def sym[T:TypeTag](pname:Any, site:View):Ex[T] = {
+      _bindLet[T](pname,look(pname, site).asInstanceOf[Ex[T]])
     }
   }
   
   // evaluate an expression against this world
-  def _eval[T](e:Ex[T]):T = {
+  def _eval[T:TypeTag](e:Ex[T]):T = {
     Ex.eval(e, {
       case v:_VarKnob[_] => _knobValue(v.kname)
       case v:_VarLet[_] => _eval(v.expr.asInstanceOf[Ex[T]])
@@ -152,7 +157,7 @@ abstract class World(
     class TopLookup extends _Lookup {
       this.path = Nil
       
-      def apply(pname:Any, site:View):Ex[_] = {
+      def apply[T:TypeTag](pname:Any, site:View):Ex[T] = {
         val here = _otherView(this, site)
         (
           try topDefs(pname, site, here)
@@ -160,22 +165,24 @@ abstract class World(
             case e:scala.MatchError => throw new ParameterUndefinedException(pname, e)
           }
         ) match {
-          case k:Knob[ty] => ExVar[ty](_VarKnob[ty](k.name))
-          case ex:Ex[ty] => _bindLet(pname,ex)
-          case lit => ExLit(lit)
+          case k:Knob[T] => ExVar[T](_VarKnob[T](k.name))
+          case ex:Ex[T] => _bindLet(pname,ex)
+          case lit => ExLit(lit.asInstanceOf[T])
         }
       }
     }
     new TopLookup
   }
   
-  def _bindLet[T](pname:Any,expr:Ex[T]):Ex[T]
+  def _bindLet[T:TypeTag](pname:Any,expr:Ex[T]):Ex[T]
   
   def _constrain(e:Ex[Boolean]):Unit
   
   def _knobValue(kname:Any):Any
 
   def getConstraints:String = ""
+
+  def getKnobs:String = ""
 }
 
 // a world responsible for collecting all constraints in the first pass
@@ -199,15 +206,27 @@ class Collector(
     }
     ks.toSet
   }
+  def knobNames():Set[String] = {
+    val ks = new mutable.HashSet[String]
+    for(c <- _constraints) {
+      for(e <- Ex.unfurl(c)) {
+        e match {
+          case v:ExVar[_] => ks += v.toString
+          case _ => {}
+        }
+      }
+    }
+    ks.toSet
+  }
   
   def constraints():List[Ex[Boolean]] = {
     _constraints.toList
   }
   
-  def _bindLet[T](pname:Any,expr:Ex[T]):Ex[T] = {
+  def _bindLet[T:TypeTag](pname:Any,expr:Ex[T]):Ex[T] = {
     expr match {
-      case e:ExVar[_] => expr
-      case e:ExLit[_] => expr
+      case e:ExVar[T] => expr
+      case e:ExLit[T] => expr
       case _ => ExVar[T](_VarLet[T](pname,expr))
     }
   }
@@ -244,6 +263,10 @@ class Collector(
     knobVal(kname)
 
   override def getConstraints:String = if(constraints.isEmpty) "" else constraints.map(_.toString).reduce(_ + "\n" + _) + "\n"
+
+  override def getKnobs:String = if(knobNames.isEmpty) "" else {
+    knobNames.reduce(_ + "\n" + _) + "\n"
+  }
 }
 
 // a world instantianted to a specific mapping of knobs to values
@@ -253,7 +276,7 @@ class Instance(
   )
   extends World(topDefs) {
   
-  def _bindLet[T](pname:Any,expr:Ex[T]):Ex[T] = expr
+  def _bindLet[T:TypeTag](pname:Any,expr:Ex[T]):Ex[T] = expr
   def _constrain(e:Ex[Boolean]) = {}
   def _knobValue(kname:Any) = knobVal(kname)
 }
@@ -296,6 +319,8 @@ object Parameters {
   }
 }
 
+class Field[T]
+
 final class Parameters(
     private val _world: World,
     private val _look: _Lookup
@@ -313,8 +338,11 @@ final class Parameters(
   def path = _look.path
   def path_=(x:List[Class[_]]) =
     _look.path = x
-  
+
   def apply[T](field:Any):T =
+    _world._eval(_look(field, _site())).asInstanceOf[T]
+
+  def apply[T](field:Field[T]):T =
     _world._eval(_look(field, _site())).asInstanceOf[T]
   
   def constrain(gen:ViewSym=>Ex[Boolean]) =
@@ -324,13 +352,13 @@ final class Parameters(
     class KidLookup extends _Lookup {
       this.path = _look.path
       
-      def apply(f:Any, site:View):Ex[_] = {
+      def apply[T:TypeTag](f:Any, site:View):Ex[T] = {
         val here = _world._otherView(this, site)
         val up = _world._otherView(_look, site)
         
         mask(f, site, here, up) match {
-          case e:Ex[_] => e
-          case lit => ExLit[Any](lit)
+          case e:Ex[T] => e
+          case lit => ExLit(lit.asInstanceOf[T])
         }
       }
     }
@@ -338,12 +366,15 @@ final class Parameters(
     new Parameters(_world, new KidLookup)
   }
   
-  def alter(mask:(Any,View,View,View)=>Any) =
+  def alter(mask:(/*field*/Any,/*site*/View,/*here*/View,/*up*/View)=>Any) =
     _alter(Parameters.makeMask(mask))
   
   def alter[T](mask:Map[T,Any]) =
     _alter(Parameters.makeMask(mask.asInstanceOf[Map[Any,Any]]))
   
   def alter(mask:PartialFunction[Any,Any]) =
+    _alter(Parameters.makeMask(mask))
+
+  def alterPartial(mask:PartialFunction[Any,Any]) =
     _alter(Parameters.makeMask(mask))
 }

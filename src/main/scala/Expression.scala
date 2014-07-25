@@ -15,17 +15,19 @@ package Chisel
 import scala.collection.immutable.{Seq=>Seq, Iterable=>Iterable}
 import scala.{collection=>readonly}
 import scala.collection.mutable
+import scala.reflect.runtime.universe._
 
-abstract class Ex[T] {
+abstract class Ex[T:TypeTag] {
   override def toString = Ex.pretty(this)
+  val ty = typeOf[T]
 }
 
 case class IntEx (expr:Ex[Int]) {
-  def === (x:IntEx):Ex[Boolean] = ExEq[Int](expr,x.expr)  
+  def === (x:IntEx):Ex[Boolean] = (ExEq[Int](expr,x.expr))
   def +   (x:IntEx):Ex[Int] = ExAdd(expr,x.expr)
   def -   (x:IntEx):Ex[Int] = ExSub(expr,x.expr)
   def *   (x:IntEx):Ex[Int] = ExMul(expr,x.expr)
-  def <   (x:IntEx):Ex[Boolean] = ExLt(expr,x.expr) 
+  def <   (x:IntEx):Ex[Boolean] = ExLt(expr,x.expr)
   def >   (x:IntEx):Ex[Boolean] = ExGt(expr,x.expr)
   def <=  (x:IntEx):Ex[Boolean] = ExLte(expr,x.expr)
   def >=  (x:IntEx):Ex[Boolean] = ExGte(expr,x.expr)
@@ -34,8 +36,8 @@ case class IntEx (expr:Ex[Int]) {
 case class BoolEx (expr:Ex[Boolean]) {
   def &&  (x:BoolEx):Ex[Boolean] = ExAnd(expr,x.expr)
   def ||  (x:BoolEx):Ex[Boolean] = ExOr(expr,x.expr)
-  def === (x:BoolEx):Ex[Boolean] = ExEq[Boolean](expr,x.expr)  
-  def !== (x:BoolEx):Ex[Boolean] = ExEq[Boolean](expr,x.expr)  
+  def === (x:BoolEx):Ex[Boolean] = ExEq[Boolean](expr,x.expr)
+  def !== (x:BoolEx):Ex[Boolean] = ExEq[Boolean](expr,x.expr)
 }
 
 object Implicits {
@@ -45,8 +47,9 @@ object Implicits {
   implicit def BoolToIntEx(b:Boolean):BoolEx = BoolEx(ExLit[Boolean](b))
 }
 
-final case class ExLit[T](value:T) extends Ex[T]
-final case class ExVar[T](name:Any) extends Ex[T]
+final case class ExLit[T:TypeTag](value:T) extends Ex[T]
+final case class ExVar[T:TypeTag](name:Any) extends Ex[T]
+
 
 final case class ExAnd(a:Ex[Boolean], b:Ex[Boolean]) extends Ex[Boolean]
 final case class ExOr(a:Ex[Boolean], b:Ex[Boolean]) extends Ex[Boolean]
@@ -123,15 +126,16 @@ object Ex {
     
     def term(t:Ex[_]):String = {
       val rt = rank(t)
-      if(rt >= r)
-        "(" + t.toString + ")"
-      else
-        t.toString
+      //if(rt >= r)
+        "( " + t.toString + " )"
+      //else
+        //t.toString
     }
-    
+
+    import Implicits._
     e match {
       case ExLit(v) => v.toString
-      case ExVar(nm) => "$"+nm.toString
+      case e:ExVar[_]=> "$"+e.name+":"+e.ty
       case ExAnd(a,b) => term(a)+" && "+term(b)
       case ExOr(a,b) => term(a)+" || "+term(b)
       case ExEq(a,b) => term(a)+" = "+term(b)

@@ -33,7 +33,7 @@ package Chisel
 import collection.mutable.{ArrayBuffer, HashSet, HashMap, Stack, LinkedHashSet}
 
 object Driver extends FileSystemUtilities{
-  def apply[T <: Module](args: Array[String], gen: (p:Parameters) => T, wrapped:Boolean = true): T = {
+  def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean = true): T = {
     Driver.initChisel(args)
     try {
       if(wrapped) execute(gen) else executeUnwrapped(gen)
