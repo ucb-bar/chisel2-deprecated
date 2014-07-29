@@ -30,13 +30,14 @@
 
 package Chisel
 
-import scala.collection.mutable.{ArrayBuffer, Set, HashSet, HashMap, ListBuffer, Queue=>ScalaQueue, Stack}
+import scala.collection.mutable.{ArrayBuffer, Set, HashSet, HashMap, ListBuffer, Map, Queue=>ScalaQueue, Stack}
 import collection.mutable
 
 object PartitionIslands {
   type IslandNodes = ArrayBuffer[Node]
   type MarkedNodes = HashMap[Node, Int]
   val debug: Boolean = false
+  val moveDelays = true
 
   class Island(theIslandId: Int, theNodes: IslandNodes, theRoots: IslandNodes) {
     val nodes = theNodes
@@ -44,7 +45,7 @@ object PartitionIslands {
     val roots = theRoots
     def isEmpty: Boolean = nodes.isEmpty
   }
- 
+
   /** Indicate whether a node is a root node or not.
    *
    */
@@ -66,7 +67,7 @@ object PartitionIslands {
     def processLinks(nodes: Seq[Node]) {
       // Process all unmarked nodes.
       for (n <- nodes) {
-       if (debug) println(" considering " + n + " marked " + marked.contains(n) + " isInput " + inputs.contains(n))
+       if (debug) println(" considering " + n.component.name + "/" + n + " marked " + marked.contains(n) + " isInput " + inputs.contains(n))
        if (!inputs.contains(n)) {
          if (!marked.contains(n)) {
             work.push(n)
@@ -75,38 +76,50 @@ object PartitionIslands {
        }
       }
     }
-    // We don't add the sNode to the island.
-    // If it's a true input, we put it in island 0 (just to enable us to draw things with the dot backend).
-    // It it's a register, it will be included in the island that provides its input.
-    // Add all the unmarked consumers of this node to the work stack.
-    processLinks(sNode.consumers)
 
+    work.push(sNode)
     while (work.length > 0) {
       val node = work.pop()
-      // We don't add the starting node to the island.
-      // It's either a real input (which is added to island 0), or it's a register or memory
-      // and will be added to the island that produces its input.
-      if (debug) println("  adding " + node)
+      if (debug) println("  adding " + node.component.name + "/" + node)
       islandNodes += node
-      // Process un-marked inputs.
-      processLinks(node.inputs)
-
-      // If this is an "input" node (a register or memory), don't process its consumers.
-      // They will be handled when we start flooding from this node.
-      processLinks(node.consumers)
+      // Process un-marked inputs and outputs (consumers).
+      processLinks(node.inputs ++ node.consumers)
 
       // If we are a register or memory node, or we're a root node, add us to the root nodes for this island.
       node match {
-        case d: Delay => islandRoots += d
+        case r: Reg => {
+          islandRoots += node
+        }
+        case m: MemRead => {
+          islandRoots += node
+        }
         case _ => {
           if (isRoot(node)) {
             islandRoots += node
           }
         }
       }
+      
+      // Are we're moving delay (Reg or Mem) nodes to the island that provides their input?
+      if (moveDelays) {
+        // Iterate through our consumers, moving any delay nodes (register or memory read)
+        // into this island - the supplier of their input.
+        for (n <- node.consumers) n match {
+          case r: Reg => {
+            marked(n) = islandId
+            islandNodes += n
+          }
+          case m: MemRead => {
+            marked(n) = islandId
+            islandNodes += n
+          }
+          case _ => ;
+        }
+      }
     }
     new Island(islandId, islandNodes, islandRoots)
   }
+
   /* Create separately compilable islands of combinational logic.
    *
    */
@@ -125,7 +138,9 @@ object PartitionIslands {
         if (isRoot(node)) {
           roots += node
           // If this is a root node with no inputs, add it to the bogus list.
-          bogus += node
+          if (node.inputs.length == 0) {
+            bogus += node
+          }
         } else if (isSource(node)) {
           inputs += node
         } else if (node.inputs.length == 0 || node.consumers.length == 0) {
@@ -134,8 +149,8 @@ object PartitionIslands {
       } else {
         // If we're a delay node (Reg or Mem), our consumers become inputs
         node match {
-          case d: Delay => {
-            delays += d
+          case r: Reg => {
+            delays += r
           }
           case l: Literal => lits += l
           case r: MemRead => delays += r
@@ -151,29 +166,52 @@ object PartitionIslands {
     for (n <- bogus) {
       println("createIslands: bogus " + n)
     }
-    // Flood fill, generating islands
     var islandId = 1
-    // Add all the real inputs to island 0 (just to give the dot backend a place to put them).
-    val allLeaves = (inputs ++ delays ++ lits ++ barren ++ bogus)
-    val allLeavesBuffer = allLeaves.to[mutable.ArrayBuffer]
-    res += new Island(islandId, allLeavesBuffer, allLeavesBuffer)
+    // Add all the real inputs to island 1 (just to give the dot backend a place to put them).
+    val allNonDelayLeaves = (inputs ++ lits ++ barren ++ bogus)
+    val allNonDelayLeavesBuffer = allNonDelayLeaves.to[mutable.ArrayBuffer]
+    val allLeaves = allNonDelayLeaves ++ delays
     for (n <- allLeaves) {
       markedNodes += ((n, islandId))
+      // We'll add delay nodes to the island that supplies their inputs,
+      //  so don't make this an island if it's a delay (Reg or Memory) node.
+      if (!moveDelays || !delays.contains(n)) {
+        val an = new ArrayBuffer[Node]()
+        an += n
+        println("creating island leaf: " + islandId + " on " + n.component.name + "/" + n)
+        res += new Island(islandId, an, an)
+      }
+//      islandId += 1
     }
+    // Flood fill, generating islands
     for (inode <- (allLeaves)) {
-      islandId += 1
-      if (debug) println("creating island " + islandId)
-      val islands = flood(inode, islandId, markedNodes, allLeaves)
-      if (! islands.isEmpty) {
-        res += islands
+      // Flood from all the unmarked consumers of this node.
+      // We don't add the inode to the island.
+      // If it's a true input, it's already been put in its own island.
+      // It it's a Reg or Mem, it will be included in the island that provides its input.
+      for (sNode <- inode.consumers) {
+        islandId += 1
+        if (!markedNodes.contains(sNode)) {
+          if (debug) {
+            println("creating island " + islandId + " on " + sNode.component.name + "/" + sNode)
+          }
+          val island = flood(sNode, islandId, markedNodes, allLeaves)
+          if (! island.isEmpty) {
+            res += island
+          }
+        }
       }
     }
     // Output histogram info for the partitioning
     println("createIslands: " + res.length + " islands")
+    val islandHistogram = Map[Int, Int]()
     for (island <- res) {
-      println("  nodes: " + island.nodes.length)
+      val n = island.nodes.length
+      islandHistogram(n) = islandHistogram.getOrElse(n, 0) + 1
+    }
+    for ((k,v) <- islandHistogram) {
+      println("createIslands: islands " + v + ", nodes " + k)
     }
     res
   }
-  
 }

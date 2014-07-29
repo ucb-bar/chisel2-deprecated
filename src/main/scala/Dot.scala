@@ -69,6 +69,7 @@ class DotBackend extends Backend {
 
 
   private def asValidLabel( node: Node ): String = {
+    val res =
     node match {
       case operator: Op => if (operator.op == "") "?" else operator.op;
       case _             => {
@@ -76,6 +77,7 @@ class DotBackend extends Backend {
         node.name + ":" + typeName
       }
     }
+    node.component.name + "/" + res
   }
 
 
@@ -84,18 +86,24 @@ class DotBackend extends Backend {
     val crossings = new StringBuilder()
     val indent = "  " * (depth + 1)
     for (child <- top.children) {
-      /* Prefix by "cluster" for graphviz to draw a bounding box. */
-      res.append(indent)
-      res.append("subgraph cluster" + emitRef(child) + "{\n")
-      res.append("  " + indent)
-      res.append("label = \"" + child.name + "\"\n")
+      if (! Driver.partitionIslands || false) {
+        /* Prefix by "cluster" for graphviz to draw a bounding box. */
+        res.append(indent)
+        res.append("subgraph cluster" + emitRef(child) + "{\n")
+        res.append("  " + indent)
+        res.append("label = \"" + child.name + "\"\n")
+      }
       val (innertext, innercrossings) = emitModuleText(child, depth + 1)
       res.append(innertext)
-      res.append(indent)
-      res.append("}\n")
-      res.append(indent)
+      if (! Driver.partitionIslands || false) {
+        res.append(indent)
+        res.append("// end " + child.name + "\n")
+        res.append("}\n")
+        res.append(indent)
+      }
       res.append(innercrossings)
     }
+
     var EOL = "\n"
     def outputAnIsland(islandId: Int, nodeIslandId: (Node) => Int) {
       for (m <- top.mods) {
@@ -103,9 +111,15 @@ class DotBackend extends Backend {
           if( m.component == top ) {
             /* We have to check the node's component agrees because output
              nodes are part of a component *mods* as well as its parent *mods*! */
-            if (nodeIslandId(m) == islandId) {
-              res.append(indent)
-              res.append(emitRef(m));
+            try {
+              if (nodeIslandId(m) == islandId) {
+                res.append(indent)
+                res.append(emitRef(m));
+              }
+            } catch {
+              case nse: NoSuchElementException => {
+                println("Missing island: " + m)
+              }
             }
             var label  = "label=\"" + asValidLabel(m)
             val anyLit = m.inputs.find(x => !isDottable(x));
@@ -134,8 +148,15 @@ class DotBackend extends Backend {
           /* We have to check the node's component agrees because output
            nodes are part of a component *mods* as well as its parent *mods*! */
           for (in <- m.inputs) {
+            var maxIslandId = 0
             // Draw the vertex after the nodes have been defined.
-            val maxIslandId = math.max(nodeIslandId(m), nodeIslandId(in))
+            try {
+              maxIslandId = math.max(nodeIslandId(m), nodeIslandId(in))
+            } catch {
+              case nse: NoSuchElementException => {
+                println("Missing island: " + m + " or " + in)
+              }
+            }
             if (isDottable(m) && isDottable(in) && maxIslandId == islandId) {
               val edge = (emitRef(in) + " -> " + emitRef(m)
                 + "[label=\"" + in.width_ + "\"];"+ EOL)
