@@ -36,8 +36,8 @@ import collection.mutable
 object PartitionIslands {
   type IslandNodes = ArrayBuffer[Node]
   type MarkedNodes = HashMap[Node, Int]
-  val debug: Boolean = false
-  val moveDelays = true
+  val debug: Boolean = true
+  val moveDelays = false
 
   class Island(theIslandId: Int, theNodes: IslandNodes, theRoots: IslandNodes) {
     val nodes = theNodes
@@ -181,7 +181,7 @@ object PartitionIslands {
         println("creating island leaf: " + islandId + " on " + n.component.name + "/" + n)
         res += new Island(islandId, an, an)
       }
-//      islandId += 1
+      islandId += 1
     }
     // Flood fill, generating islands
     for (inode <- (allLeaves)) {
