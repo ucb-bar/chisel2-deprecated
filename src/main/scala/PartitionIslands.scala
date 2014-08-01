@@ -62,14 +62,7 @@ object PartitionIslands {
   def flood(sNode: Node, islandId: Int, marked: MarkedNodes, inputs: Set[Node], prefixNodes: Seq[Node]): Island = {
     val work = new Stack[Node]
     val islandNodes = new IslandNodes
-    // If the prefix nodes aren't already marked,
-    //  mark them and add them to this island.
-    for (n <- prefixNodes) {
-      if (!marked.contains(n)) {
-        islandNodes += n
-        marked += ((n, islandId))
-      }
-    }
+    islandNodes ++= prefixNodes
     val islandRoots = new IslandNodes
     def processLinks(nodes: Seq[Node]) {
       // Process all unmarked nodes.
@@ -160,7 +153,7 @@ object PartitionIslands {
         }
         work.pop()
         if (debug) {
-          println("islandsFromNonBitsNode: poped " + iNode.component.name + "/" + iNode)
+          println("islandsFromNonBitsNode: popped " + iNode.component.name + "/" + iNode)
         }
       }
       nIslands
