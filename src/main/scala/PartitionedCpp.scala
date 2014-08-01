@@ -43,7 +43,7 @@ class PartionedCppBackend extends CppBackend {
     val vcd = new VcdBackend(c)
     val islands = createIslands(c)
     for (chain <- islands) {
-      renameNodes(c, chain.nodes)
+      renameNodes(c, chain.nodes.toBuffer)
       val cName = c.name + "chain_" + chain.islandId.toString
       val out_h = createOutputFile(cName + ".h")
       val out_c = createOutputFile(cName + ".cpp")

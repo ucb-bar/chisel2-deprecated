@@ -40,7 +40,7 @@ import PartitionIslands._
 class DotBackend extends Backend {
   val keywords = new HashSet[String]();
   var islands = ArrayBuffer[Island]()
-  val nodeIslandIdMap = HashMap[Node, Int]()
+  val allDottable = false
 
   override def emitRef(node: Node): String = {
     node match {
@@ -57,6 +57,9 @@ class DotBackend extends Backend {
   }
 
   private def isDottable (m: Node): Boolean = {
+    if (allDottable) {
+      true
+    } else
     if (m == m.component.defaultResetPin) {
       false
     } else {
@@ -80,6 +83,9 @@ class DotBackend extends Backend {
     node.component.name + "/" + res
   }
 
+  private def isNodeInIsland(node: Node, island: Island): Boolean = {
+    return island == null || island.nodes.contains(node)
+  }
 
   private def emitModuleText(top: Module, depth: Int ): (String, String) = {
     val res = new StringBuilder()
@@ -105,21 +111,19 @@ class DotBackend extends Backend {
     }
 
     var EOL = "\n"
-    def outputAnIsland(islandId: Int, nodeIslandId: (Node) => Int) {
+    def outputAnIsland(island: Island) {
+      val islandId = if (island == null) 0 else island.islandId
+      if (islandId != 0) {
+        res.append("subgraph clusterIsland_" + islandId + " {\n")
+      }
       for (m <- top.mods) {
         if (isDottable(m)) {
           if( m.component == top ) {
             /* We have to check the node's component agrees because output
              nodes are part of a component *mods* as well as its parent *mods*! */
-            try {
-              if (nodeIslandId(m) == islandId) {
-                res.append(indent)
-                res.append(emitRef(m));
-              }
-            } catch {
-              case nse: NoSuchElementException => {
-                println("Missing island: " + m)
-              }
+            if (isNodeInIsland(m, island)) {
+              res.append(indent)
+              res.append(emitRef(m));
             }
             var label  = "label=\"" + asValidLabel(m)
             val anyLit = m.inputs.find(x => !isDottable(x));
@@ -134,7 +138,7 @@ class DotBackend extends Backend {
               label += ")";
             }
             label += "\""
-            if (nodeIslandId(m) == islandId) {
+            if (isNodeInIsland(m, island)) {
               m match {
                 case reg: Delay => res.append("[shape=square," + label + "];" + EOL)
                 case _ => res.append("[" + label + "];" + EOL)
@@ -148,26 +152,29 @@ class DotBackend extends Backend {
           /* We have to check the node's component agrees because output
            nodes are part of a component *mods* as well as its parent *mods*! */
           for (in <- m.inputs) {
-            var maxIslandId = 0
-            // Draw the vertex after the nodes have been defined.
-            try {
-              maxIslandId = math.max(nodeIslandId(m), nodeIslandId(in))
-            } catch {
-              case nse: NoSuchElementException => {
-                println("Missing island: " + m + " or " + in)
-              }
-            }
-            if (isDottable(m) && isDottable(in) && maxIslandId == islandId) {
-              val edge = (emitRef(in) + " -> " + emitRef(m)
-                + "[label=\"" + in.width_ + "\"];"+ EOL)
-              /* If the both ends of an edge are on either side of a component
-               boundary, we must add it at the upper level otherwise graphviz
-               will incorrectly draw the input node into the cluster. */
-              if( in.component != top && !top.children.contains(in.component) ) {
-                crossings.append(edge)
-              } else {
-                res.append(indent)
-                res.append(edge);
+            if (isNodeInIsland(in, island)) {
+              if (isDottable(m) && isDottable(in)) {
+                val edge = (emitRef(in) + " -> " + emitRef(m)
+                  + "[label=\"" + in.width_ + "\"];"+ EOL)
+                if (islandId != 0) {
+                  // If we're drawing partitioned islands, duplicate the logic
+                  // for boundary crossings below.
+                  if (! (isNodeInIsland(in, island) && (isNodeInIsland(m, island)))) {
+                    crossings.append(edge)
+                  } else {
+                    res.append(indent)
+                    res.append(edge);
+                  }
+                } else
+                /* If the both ends of an edge are on either side of a component
+                 boundary, we must add it at the upper level otherwise graphviz
+                 will incorrectly draw the input node into the cluster. */
+                if( in.component != top && !top.children.contains(in.component) ) {
+                  crossings.append(edge)
+                } else {
+                  res.append(indent)
+                  res.append(edge);
+                }
               }
             }
           }
@@ -179,14 +186,10 @@ class DotBackend extends Backend {
       }
     }
     if (islands.isEmpty) {
-        outputAnIsland(0, { _ => 0 })
+        outputAnIsland(null)
     } else {
       for (island <- islands) {
-        val islandId = island.islandId
-        if (islandId != 0) {
-          res.append("subgraph clusterIsland_" + islandId + " {\n")
-        }
-        outputAnIsland(islandId, { nodeIslandIdMap(_) })
+        outputAnIsland(island)
       }
     }
     (res.toString, crossings.toString)
@@ -214,12 +217,6 @@ class DotBackend extends Backend {
       c.collectNodes(c);
       c.findOrdering(); // search from roots  -- create omods
       islands = createIslands(c)
-      // Create the map from node to islandId.
-      for (island <- islands) {
-        for (n <- island.nodes) {
-          nodeIslandIdMap += ((n, island.islandId))
-        }
-      }
     }
     var gn = -1;
     val out_cd = createOutputFile(c.name + "_c.dot");

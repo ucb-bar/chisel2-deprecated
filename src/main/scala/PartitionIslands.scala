@@ -34,10 +34,9 @@ import scala.collection.mutable.{ArrayBuffer, Set, HashSet, HashMap, ListBuffer,
 import collection.mutable
 
 object PartitionIslands {
-  type IslandNodes = ArrayBuffer[Node]
+  type IslandNodes = HashSet[Node]
   type MarkedNodes = HashMap[Node, Int]
   val debug: Boolean = true
-  val moveDelays = false
 
   class Island(theIslandId: Int, theNodes: IslandNodes, theRoots: IslandNodes) {
     val nodes = theNodes
@@ -60,9 +59,17 @@ object PartitionIslands {
   /** Flood fill the graph, marking all non-root nodes reachable from here.
    * We visit inputs and consumers, stopping when we hit a register or memory.
    */
-  def flood(sNode: Node, islandId: Int, marked: MarkedNodes, inputs: Set[Node]): Island = {
+  def flood(sNode: Node, islandId: Int, marked: MarkedNodes, inputs: Set[Node], prefixNodes: Seq[Node]): Island = {
     val work = new Stack[Node]
     val islandNodes = new IslandNodes
+    // If the prefix nodes aren't already marked,
+    //  mark them and add them to this island.
+    for (n <- prefixNodes) {
+      if (!marked.contains(n)) {
+        islandNodes += n
+        marked += ((n, islandId))
+      }
+    }
     val islandRoots = new IslandNodes
     def processLinks(nodes: Seq[Node]) {
       // Process all unmarked nodes.
@@ -70,6 +77,7 @@ object PartitionIslands {
        if (debug) println(" considering " + n.component.name + "/" + n + " marked " + marked.contains(n) + " isInput " + inputs.contains(n))
        if (!inputs.contains(n)) {
          if (!marked.contains(n)) {
+            if (debug) println("  queuing " + n.component.name + "/" + n)
             work.push(n)
             marked += ((n, islandId))
          }
@@ -78,44 +86,18 @@ object PartitionIslands {
     }
 
     work.push(sNode)
+    marked += ((sNode, islandId))
     while (work.length > 0) {
       val node = work.pop()
       if (debug) println("  adding " + node.component.name + "/" + node)
       islandNodes += node
-      // Process un-marked inputs and outputs (consumers).
-      processLinks(node.inputs ++ node.consumers)
 
-      // If we are a register or memory node, or we're a root node, add us to the root nodes for this island.
-      node match {
-        case r: Reg => {
-          islandRoots += node
-        }
-        case m: MemRead => {
-          islandRoots += node
-        }
-        case _ => {
-          if (isRoot(node)) {
-            islandRoots += node
-          }
-        }
-      }
+      // Process un-marked inputs and outputs (consumers) for non-register nodes.
+      if (debug) println("processLinks: inputs for " + node.component.name + "/" + node)
+      processLinks(node.inputs)
+      if (debug) println("processLinks: consumers for " + node.component.name + "/" + node)
+      processLinks(node.consumers)
       
-      // Are we're moving delay (Reg or Mem) nodes to the island that provides their input?
-      if (moveDelays) {
-        // Iterate through our consumers, moving any delay nodes (register or memory read)
-        // into this island - the supplier of their input.
-        for (n <- node.consumers) n match {
-          case r: Reg => {
-            marked(n) = islandId
-            islandNodes += n
-          }
-          case m: MemRead => {
-            marked(n) = islandId
-            islandNodes += n
-          }
-          case _ => ;
-        }
-      }
     }
     new Island(islandId, islandNodes, islandRoots)
   }
@@ -132,6 +114,57 @@ object PartitionIslands {
     val barren = new HashSet[Node]
     val bogus = new HashSet[Node]
     val markedNodes = new MarkedNodes
+    var islandId = 1
+
+    // Mark all the Bits nodes directly reachable from an initial node.
+    def markBitsNodes(iNode: Node, marked: MarkedNodes, islandId: Int) {
+      // Follow consumers of the initial (input) node,
+      // until we find a non-Bits node from which we will later flood.
+      // We need to mark these nodes now so we don't flood into them during the flooding stage.
+      // The islandId isn't critical here.
+      if (iNode.isInstanceOf[Bits]) {
+        marked += ((iNode, islandId))
+        for (p <- iNode.consumers) {
+          markBitsNodes(p, marked, islandId)
+        }
+      }
+    }
+
+    def islandsFromNonBitsNode(iNode: Node, res: ArrayBuffer[Island], marked: MarkedNodes, inputs: Set[Node], work: Stack[Node]): Int = {
+      // Follow consumers of the initial (input) node, until we find a non-Bits node from which to flood.
+      // Keep track of the chain to that node and insert the nodes on that path into the same island
+      // we create.
+      // This will create multiple islands, one for each non-Bits node origin.
+      // we return the number of islands we created so client code can keep track
+      // of the next available free islandId.
+      var nIslands = 0
+      if (debug) {
+        println("islandsFromNonBitsNode: pushing " + iNode.component.name + "/" + iNode)
+      }
+      work.push(iNode)
+      if (iNode.isInstanceOf[Bits]) {
+        for (p <- iNode.consumers) {
+          nIslands += islandsFromNonBitsNode(p, res, marked, inputs, work)
+        }
+      } else {
+        if (!marked.contains(iNode)) {
+          if (debug) {
+            println("creating island " + islandId + " on " + iNode.component.name + "/" + iNode)
+          }
+          val island = flood(iNode, islandId, marked, inputs, work)
+          if (! island.isEmpty) {
+            res += island
+            nIslands += 1
+            islandId += 1
+          }
+        }
+        work.pop()
+        if (debug) {
+          println("islandsFromNonBitsNode: poped " + iNode.component.name + "/" + iNode)
+        }
+      }
+      nIslands
+    }
     // Generate an array of input and output nodes for this module, and initialize the island id for each node.
     for (node <- module.omods) {
       if (node.isIo) {
@@ -154,6 +187,7 @@ object PartitionIslands {
           }
           case l: Literal => lits += l
           case r: MemRead => delays += r
+          case w: MemWrite => delays += w
           case _ => if (node.inputs.length == 0) barren += node
         }
       }
@@ -166,47 +200,43 @@ object PartitionIslands {
     for (n <- bogus) {
       println("createIslands: bogus " + n)
     }
-    var islandId = 1
     // Add all the real inputs to island 1 (just to give the dot backend a place to put them).
     val allNonDelayLeaves = (inputs ++ lits ++ barren ++ bogus)
     val allNonDelayLeavesBuffer = allNonDelayLeaves.to[mutable.ArrayBuffer]
     val allLeaves = allNonDelayLeaves ++ delays
-    for (n <- allLeaves) {
-      markedNodes += ((n, islandId))
-      // We'll add delay nodes to the island that supplies their inputs,
-      //  so don't make this an island if it's a delay (Reg or Memory) node.
-      if (!moveDelays || !delays.contains(n)) {
-        val an = new ArrayBuffer[Node]()
-        an += n
-        println("creating island leaf: " + islandId + " on " + n.component.name + "/" + n)
-        res += new Island(islandId, an, an)
+    // First we mark all the "input" nodes.
+    // This includes all the "true" input nodes, plus any Reg or Mem nodes,
+    //  plus all Bits nodes directly reachable from an input node.
+    for (inode <- allLeaves) {
+      markedNodes += ((inode, islandId))
+      // Put all input, delay, bogus, and barren nodes in their own island.
+      val an = new IslandNodes
+      an += inode
+      println("creating island leaf: " + islandId + " on " + inode.component.name + "/" + inode)
+      res += new Island(islandId, an, an)
+      // Now mark all the directly-reachable Bits nodes.
+      for ( pNode <-inode.consumers) {
+        markBitsNodes(pNode, markedNodes, islandId)
       }
       islandId += 1
     }
     // Flood fill, generating islands
-    for (inode <- (allLeaves)) {
+    // We build a work stack until we hit a node that is not an instance of Bits,
+    // then we flood from the non-Bits node including all that node's parents in the island.
+    for (inode <- allLeaves) {
       // Flood from all the unmarked consumers of this node.
       // We don't add the inode to the island.
-      // If it's a true input, it's already been put in its own island.
-      // It it's a Reg or Mem, it will be included in the island that provides its input.
-      for (sNode <- inode.consumers) {
-        islandId += 1
-        if (!markedNodes.contains(sNode)) {
-          if (debug) {
-            println("creating island " + islandId + " on " + sNode.component.name + "/" + sNode)
-          }
-          val island = flood(sNode, islandId, markedNodes, allLeaves)
-          if (! island.isEmpty) {
-            res += island
-          }
-        }
+      // It's already been put in its own island.
+      for ( pNode <-inode.consumers) {
+        val work = new Stack[Node]
+        islandsFromNonBitsNode(pNode, res, markedNodes, allLeaves, work)
       }
     }
     // Output histogram info for the partitioning
     println("createIslands: " + res.length + " islands")
     val islandHistogram = Map[Int, Int]()
     for (island <- res) {
-      val n = island.nodes.length
+      val n = island.nodes.size
       islandHistogram(n) = islandHistogram.getOrElse(n, 0) + 1
     }
     for ((k,v) <- islandHistogram) {
