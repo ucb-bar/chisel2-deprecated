@@ -124,6 +124,7 @@ object Driver extends FileSystemUtilities{
     isCSE = false
     isIoDebug = true
     isVCD = false
+    isVCDMem = false
     isReportDims = false
     targetDir = "."
     components.clear()
@@ -183,6 +184,7 @@ object Driver extends FileSystemUtilities{
         case "--ioDebug" => isIoDebug = true
         case "--noIoDebug" => isIoDebug = false
         case "--vcd" => isVCD = true
+        case "--vcdMem" => isVCDMem = true
         case "--v" => backend = new VerilogBackend
         case "--moduleNamePrefix" => Backend.moduleNamePrefix = args(i + 1); i += 1
         case "--inlineMem" => isInlineMem = true
@@ -263,6 +265,7 @@ object Driver extends FileSystemUtilities{
   var isCSE = false
   var isIoDebug = true
   var isVCD = false
+  var isVCDMem = false
   var isInlineMem = true
   var isGenHarness = false
   var isReportDims = false

@@ -168,7 +168,7 @@ class CppBackend extends Backend {
     else s"  {${s.map(" " + _ + ";").reduceLeft(_ + _)}}\n"
   def emitDatRef(x: Node): String =
     if (x.isInObject) emitRef(x)
-    else if (words(x) > 1) s"*reinterpret_cast<dat_t<${x.width}>*>(${emitRef(x)})"
+    else if (words(x) > 1) s"*reinterpret_cast<dat_t<${x.width}>*>(&${emitRef(x)})"
     else if (isLit(x)) s"dat_t<${x.width}>(${emitRef(x)})"
     else s"*reinterpret_cast<dat_t<${x.width}>*>(&${emitRef(x)})"
   def trunc(x: Node): String =
@@ -458,7 +458,7 @@ class CppBackend extends Backend {
           emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
             + " = " + emitWordRef(x.inputs(0), i)))
         } else if (x.inputs.length == 0 && !x.isInObject) {
-          emitTmpDec(x) + block("val_t __r = rand_val()" +:
+          emitTmpDec(x) + block("val_t __r = this->__rand_val()" +:
             (0 until words(x)).map(i => s"${emitWordRef(x, i)} = __r")) + trunc(x)
         } else {
           ""
@@ -520,16 +520,16 @@ class CppBackend extends Backend {
         } else
           ""
       case x: Reg =>
-        "  if (rand_init) " + emitRef(node) + ".randomize();\n"
+        s"  ${emitRef(node)}.randomize(&__rand_seed);\n"
 
       case x: Mem[_] =>
-        "  if (rand_init) " + emitRef(node) + ".randomize();\n"
+        s"  ${emitRef(node)}.randomize(&__rand_seed);\n"
 
       case r: ROMData =>
         val res = new StringBuilder
         val sparse = !isPow2(r.n) || r.n != r.sparseLits.size
         if (sparse)
-          res append s"  if (rand_init) ${emitRef(r)}.randomize();\n"
+          res append s"  ${emitRef(r)}.randomize(&__rand_seed);\n"
         for ((i, v) <- r.sparseLits)
           if (sparse || v.value != 0)
             res append block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(v, j) + ")"))
@@ -537,7 +537,7 @@ class CppBackend extends Backend {
 
       case u: Bits => 
         if (u.driveRand && u.isInObject)
-          "  if (rand_init) " + emitRef(node) + ".randomize();\n"
+          s"   ${emitRef(node)}.randomize(&__rand_seed);\n"
         else
           ""
       case _ =>
@@ -605,23 +605,25 @@ class CppBackend extends Backend {
   }
 
   override def compile(c: Module, flagsIn: String) {
-    val flags = if (flagsIn == null) "-O2" else flagsIn
+    val CXXFLAGS = scala.util.Properties.envOrElse("CXXFLAGS", "-O2" )
+    val flags = if (flagsIn == null) CXXFLAGS else flagsIn
 
     val chiselENV = java.lang.System.getenv("CHISEL")
     val c11 = if (hasPrintfs) " -std=c++11 " else ""
     val allFlags = flags + c11 + " -I../ -I" + chiselENV + "/csrc/"
     val dir = Driver.targetDir + "/"
+    val CXX = scala.util.Properties.envOrElse("CXX", "g++" )
     def run(cmd: String) {
       val bashCmd = Seq("bash", "-c", cmd)
       val c = bashCmd.!
       ChiselError.info(cmd + " RET " + c)
     }
     def link(name: String) {
-      val ac = "g++ -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o"
+      val ac = CXX + " -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o"
       run(ac)
     }
     def cc(name: String) {
-      val cmd = "g++ -c -o " + dir + name + ".o " + allFlags + " " + dir + name + ".cpp"
+      val cmd = CXX + " -c -o " + dir + name + ".o " + allFlags + " " + dir + name + ".cpp"
       run(cmd)
     }
     cc(c.name + "-emulator")
@@ -763,6 +765,10 @@ class CppBackend extends Backend {
     
     // Generate module headers
     out_h.write("class " + c.name + "_t : public mod_t {\n");
+    out_h.write(" private:\n");
+    out_h.write("  val_t __rand_seed;\n");
+    out_h.write("  void __srand(val_t seed) { __rand_seed = seed; }\n");
+    out_h.write("  val_t __rand_val() { return ::__rand_val(&__rand_seed); }\n");
     out_h.write(" public:\n");
     val vcd = new VcdBackend(c)
     def headerOrderFunc(a: Node, b: Node) = {
@@ -779,7 +785,7 @@ class CppBackend extends Backend {
       out_h.write(emitDec(clock))
 
     out_h.write("\n");
-    out_h.write("  void init ( bool rand_init = false );\n");
+    out_h.write("  void init ( val_t rand_init = 0 );\n");
     for ( clock <- Driver.clocks) {
       out_h.write("  void clock_lo" + clkName(clock) + " ( dat_t<1> reset );\n")
       out_h.write("  void clock_hi" + clkName(clock) + " ( dat_t<1> reset );\n")
@@ -792,7 +798,7 @@ class CppBackend extends Backend {
     out_h.write("  bool set_circuit_from(mod_t* src);\n");
     out_h.write("  void print ( FILE* f );\n");
     out_h.write("  void dump ( FILE* f, int t );\n");
-    out_h.write("  void dump_init ( FILE* f );\n");
+    out_h.write("  void dump_init ( FILE* f );\n\n");
     out_h.write("};\n\n");
     out_h.write(Params.toCxxStringParams);
     
@@ -823,7 +829,8 @@ class CppBackend extends Backend {
     createCppFile()
     
     // generate init block
-    writeCppFile("void " + c.name + "_t::init ( bool rand_init ) {\n")
+    writeCppFile("void " + c.name + "_t::init ( val_t rand_init ) {\n")
+    writeCppFile("  this->__srand(rand_init);\n")
     for (m <- c.omods) {
       writeCppFile(emitInit(m))
     }
@@ -858,10 +865,10 @@ class CppBackend extends Backend {
       writeCppFile("  " + emitRef(clock) + "_cnt-=min;\n")
     }
     for (clock <- Driver.clocks) {
-      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
+      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
     }
     for (clock <- Driver.clocks) {
-      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
+      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
     }
     for (clock <- Driver.clocks) {
       writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " +

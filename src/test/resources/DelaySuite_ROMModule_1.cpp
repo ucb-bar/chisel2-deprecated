@@ -1,7 +1,8 @@
 #include "DelaySuite_ROMModule_1.h"
 
-void DelaySuite_ROMModule_1_t::init ( bool rand_init ) {
-  if (rand_init) T0.randomize();
+void DelaySuite_ROMModule_1_t::init ( val_t rand_init ) {
+  this->__srand(rand_init);
+  T0.randomize(&__rand_seed);
   { T0.put(0, 0, 0x1L);}
   { T0.put(1, 0, 0x2L);}
   { T0.put(2, 0, 0x3L);}
@@ -10,8 +11,8 @@ int DelaySuite_ROMModule_1_t::clock ( dat_t<1> reset ) {
   uint32_t min = ((uint32_t)1<<31)-1;
   if (clk_cnt < min) min = clk_cnt;
   clk_cnt-=min;
-  if (clk_cnt == 0) clock_lo( reset );
   if (clk_cnt == 0) clock_hi( reset );
+  if (clk_cnt == 0) clock_lo( reset );
   if (clk_cnt == 0) clk_cnt = clk;
   return min;
 }

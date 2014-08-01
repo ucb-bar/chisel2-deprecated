@@ -1,6 +1,6 @@
 #include "WhenSuite_SwitchClassComp_1.h"
 
-void WhenSuite_SwitchClassComp_1_t::init ( bool rand_init ) {
+void WhenSuite_SwitchClassComp_1_t::init ( val_t rand_init ) {
   nodes.clear();
   mems.clear();
   nodes.push_back(debug_node_t("WhenSuite_SwitchClassComp_1.io_in0", &WhenSuite_SwitchClassComp_1__io_in0));

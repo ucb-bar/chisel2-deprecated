@@ -386,9 +386,10 @@ abstract class Node extends nameable {
   var isWidthWalked = false;
 
   def getWidth(): Int = {
+    val oldDriverisInGetWidth = Driver.isInGetWidth
     Driver.isInGetWidth = true
     val w = width
-    Driver.isInGetWidth = false
+    Driver.isInGetWidth = oldDriverisInGetWidth
     w
   }
 
