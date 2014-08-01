@@ -15,11 +15,9 @@ package Chisel
 import scala.collection.immutable.{Seq=>Seq, Iterable=>Iterable}
 import scala.{collection=>readonly}
 import scala.collection.mutable
-import scala.reflect.runtime.universe._
 
-abstract class Ex[T:TypeTag] {
+abstract class Ex[T] {
   override def toString = Ex.pretty(this)
-  val ty = typeOf[T]
 }
 
 case class IntEx (expr:Ex[Int]) {
@@ -47,8 +45,8 @@ object Implicits {
   implicit def BoolToIntEx(b:Boolean):BoolEx = BoolEx(ExLit[Boolean](b))
 }
 
-final case class ExLit[T:TypeTag](value:T) extends Ex[T]
-final case class ExVar[T:TypeTag](name:Any) extends Ex[T]
+final case class ExLit[T](value:T) extends Ex[T]
+final case class ExVar[T](name:Any) extends Ex[T]
 
 
 final case class ExAnd(a:Ex[Boolean], b:Ex[Boolean]) extends Ex[Boolean]
@@ -135,7 +133,7 @@ object Ex {
     import Implicits._
     e match {
       case ExLit(v) => v.toString
-      case e:ExVar[_]=> "$"+e.name+":"+e.ty
+      case e:ExVar[_]=> "$"+e.name
       case ExAnd(a,b) => term(a)+" && "+term(b)
       case ExOr(a,b) => term(a)+" || "+term(b)
       case ExEq(a,b) => term(a)+" = "+term(b)
