@@ -29,7 +29,9 @@ final case class Knob[T](name:Any)
 
 abstract class ChiselConfig {
   val top:World.TopDefs
-  val knobVal:Any=>Any
+  val knobVal:Any=>Any = {
+    case x if(false) => x
+  }
 }
 
 // objects given to the user in mask functions (site,here,up)
@@ -318,6 +320,11 @@ object Parameters {
 }
 
 class Field[T]
+
+trait PF extends PartialFunction[Any,Any]
+object Alter {
+  def apply(p:PartialFunction[Any,Any]) = p
+}
 
 final class Parameters(
     private val _world: World,

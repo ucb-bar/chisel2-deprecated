@@ -42,20 +42,16 @@ import ChiselError._
 import Module._
 
 object Module {
+  def apply[T<:Module](c: =>T,fun:PartialFunction[Any,Any])(implicit _p:Option[Parameters] = None):T = {
+    val q = _p.getOrElse(params).alterPartial(fun)
+    Driver.modStackPushed = true
+    Driver.parStack.push(q)
+    val res = init(c)
+    Driver.parStack.pop
+    res
+  }
   def apply[T<:Module](c: =>T)(implicit _p:Option[Parameters] = None):T = {
     Driver.modStackPushed = true
-    def init(c: =>T):T = {
-      val res = c
-      pop()
-      for ((n, io) <- res.wires) {
-        if (io.dir == null)
-           ChiselErrors += new ChiselError(() => {"All IO's must be ports (dir set): " + io}, io.line)
-        // else if (io.width_ == -1)
-        //   ChiselErrors += new ChiselError(() => {"All IO's must have width set: " + io}, io.line)
-        io.isIo = true
-      }
-      res
-    }
     _p match {
       case Some(q: Parameters) => {
         Driver.parStack.push(q.push)
@@ -71,7 +67,19 @@ object Module {
       }
     }
   }
-  private def P = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
+  private def init[T<:Module](c: =>T):T = {
+    val res = c
+    pop()
+    for ((n, io) <- res.wires) {
+      if (io.dir == null)
+         ChiselErrors += new ChiselError(() => {"All IO's must be ports (dir set): " + io}, io.line)
+      // else if (io.width_ == -1)
+      //   ChiselErrors += new ChiselError(() => {"All IO's must have width set: " + io}, io.line)
+      io.isIo = true
+    }
+    res
+  }
+  private def params = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
 
     /* *push* is done in the Module constructor because we don't have
      a *this* pointer before then, yet we need to store it before the subclass
@@ -80,7 +88,7 @@ object Module {
   private def push(c: Module) {
     if (!Driver.modStackPushed) {
       ChiselError.error(
-        c.getClass.getName + " was not properly wrapped into a Module() call.")
+        c.getClass.getName + " was not properly wrapped into a module() call.")
     }
     Driver.modStackPushed = false
     Driver.compStack.push(c)
@@ -180,8 +188,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   push(this)
 
   //Parameter Stuff
-  def P = Module.P
-  P.path = this.getClass :: P.path
+  def params = Module.params
+  params.path = this.getClass :: params.path
 
   var hasExplicitClock = !(clock == null)
   var hasExplicitReset = !(_reset == null)
