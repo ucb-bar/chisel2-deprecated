@@ -469,7 +469,7 @@ class NameSuite extends TestSuite {
       io.ctrl_out := dpath.io.ctrl_out
     }
 
-    chiselMain(Array[String]("--backend", "pcpp", "--vcd",
+    chiselMain(Array[String]("--backend", "c", "--vcd",
       "--targetDir", dir.getPath.toString()),
       () => Module(new DebugComp))
     assertFile("NameSuite_DebugComp_1.h")

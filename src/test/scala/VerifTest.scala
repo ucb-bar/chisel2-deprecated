@@ -50,7 +50,7 @@ class VerifSuite extends TestSuite {
       io.z := Cat(io.x, io.y)
     }
 
-    chiselMain(Array[String]("--backend", "pcpp",
+    chiselMain(Array[String]("--backend", "c",
       "--targetDir", dir.getPath.toString()),
       () => Module(new CppAssertComp()))
     assertFile("VerifSuite_CppAssertComp_1.cpp")

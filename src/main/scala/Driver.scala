@@ -196,8 +196,6 @@ object Driver {
             backend = new CounterFPGABackend
           } else if (args(i + 1) == "counterw") {
             backend = new CounterWBackend
-          } else if (args(i + 1) == "pcpp") {
-            backend = new PartionedCppBackend
           } else {
             backend = Class.forName(args(i + 1)).newInstance.asInstanceOf[Backend]
           }

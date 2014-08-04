@@ -38,7 +38,7 @@ import Chisel._
   that will generate basic common graphs of *Node*.
 */
 class StdlibSuite extends TestSuite {
-  val testArgs = Array("--backend", "pcpp",
+  val testArgs = Array("--backend", "v",
       "--targetDir", dir.getPath.toString()
       )
 

@@ -197,7 +197,7 @@ class DataSuite extends TestSuite {
       val io = new BypassDataIO(3)
       io.valid := io.data | UInt(1)
     }
-    chiselMain(Array[String]("--backend", "pcpp",
+    chiselMain(Array[String]("--backend", "c",
       "--targetDir", dir.getPath.toString()),
       () => Module(new BypassDataComp))
     // assertFile("DataSuite_BypassDataComp_1.h")
@@ -254,7 +254,7 @@ class DataSuite extends TestSuite {
         io.r & grant_pass2(size-1, 0), io.r & grant_pass1(size-1, 0));
     }
 
-    chiselMain(Array[String]("--backend", "pcpp",
+    chiselMain(Array[String]("--backend", "c",
       "--targetDir", dir.getPath.toString()),
       () => Module(new CarryChainComp(4)))
     } catch {
