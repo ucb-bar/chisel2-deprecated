@@ -715,6 +715,23 @@ class CppBackend extends Backend {
   def backendElaborate(c: Module) = super.elaborate(c)
 
   override def elaborate(c: Module): Unit = {
+    // Generate CPP files
+    val out_cpps = ArrayBuffer[java.io.FileWriter]()
+    val all_cpp = new StringBuilder
+
+    def createCppFile(suffix: String = "-" + out_cpps.length) = {
+      val f = createOutputFile(c.name + suffix + ".cpp")
+      f.write("#include \"" + c.name + ".h\"\n")
+      for (str <- Driver.includeArgs) f.write("#include \"" + str + "\"\n")
+      f.write("\n")
+      out_cpps += f
+      f
+    }
+    def writeCppFile(s: String) = {
+      out_cpps.last.write(s)
+      all_cpp.append(s)
+    }
+
     println("CPP elaborate")
     super.elaborate(c)
 
@@ -740,14 +757,101 @@ class CppBackend extends Backend {
       ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
 
-    val clkDomains = new HashMap[Clock, (StringBuilder, StringBuilder)]
-    for (clock <- Driver.clocks) {
-      val clock_lo = new StringBuilder
-      val clock_hi = new StringBuilder
-      clkDomains += (clock -> ((clock_lo, clock_hi)))
-      clock_lo.append("void " + c.name + "_t::clock_lo" + clkName(clock) + " ( dat_t<1> reset ) {\n")
-      clock_hi.append("void " + c.name + "_t::clock_hi" + clkName(clock) + " ( dat_t<1> reset ) {\n")
+    // If we're partitioning a monolithic circuit into separate islands
+    // of combinational logic, generate those islands now.
+    var islands = ArrayBuffer[Island]()
+    if (Driver.partitionIslands) {
+      islands = createIslands(c)
     }
+
+    class ClockDomains {
+      type ClockCodeStrings = HashMap[Clock, (StringBuilder, StringBuilder)]
+      val code = new ClockCodeStrings
+      val islandClkCode = new HashMap[Int, ClockCodeStrings]
+      for (clock <- Driver.clocks) {
+        val clock_lo = new StringBuilder
+        val clock_hi = new StringBuilder
+        code += (clock -> ((clock_lo, clock_hi)))
+        clock_lo.append("void " + c.name + "_t::clock_lo" + clkName(clock) + " ( dat_t<1> reset ) {\n")
+        clock_hi.append("void " + c.name + "_t::clock_hi" + clkName(clock) + " ( dat_t<1> reset ) {\n")
+        // If we're generating islands of combinational logic,
+        // have the main clock code call the island specific code.
+        if (!islands.isEmpty) {
+          for (island <- islands) {
+            val islandId = island.islandId
+            clock_lo.append("\t" + c.name + "_t::clock_lo" + clkName(clock) + "_I_" + islandId + "(reset);\n")
+            clock_hi.append("\t" + c.name + "_t::clock_hi" + clkName(clock) + "_I_" + islandId + "(reset);\n")
+            islandClkCode += ((islandId, new ClockCodeStrings))
+            val clock_lo_I = new StringBuilder
+            val clock_hi_I = new StringBuilder
+            islandClkCode(islandId) += (clock -> ((clock_lo_I, clock_hi_I)))
+            clock_lo_I.append("void " + c.name + "_t::clock_lo" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset ) {\n")
+            clock_hi_I.append("void " + c.name + "_t::clock_hi" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset ) {\n")
+          }
+          clock_lo.append("}\n")
+          clock_hi.append("}\n")
+        }
+      }
+
+      def clock(n: Node) = if (n.clock == null) Driver.implicitClock else n.clock
+
+      def populate() {
+        def isNodeInIsland(node: Node, island: Island): Boolean = {
+          return island == null || island.nodes.contains(node)
+        }
+
+        def addClkDefs(n: Node, codeStrings: ClockCodeStrings) {
+          codeStrings(clock(n))._1.append(emitDefLo(n))
+          codeStrings(clock(n))._2.append(emitInitHi(n))
+          codeStrings(clock(n))._2.append(emitDefHi(n))
+        }
+        // Are we generating partitioned islands?
+        if (islands.isEmpty) {
+          // No. Generate and output a single, monolithic function.
+          for (m <- c.omods) {
+            addClkDefs(m, code)
+          }
+          for (clk <- code.keys) {
+            code(clk)._1.append("}\n")
+            code(clk)._2.append("}\n")
+          }
+        } else {
+          for (island <- islands) {
+            val islandId = island.islandId
+            val codeStrings = islandClkCode(islandId)
+            for (m <- c.omods) {
+              if (isNodeInIsland(m, island)) {
+                addClkDefs(m, codeStrings)
+              }
+            }
+            for (clk <- codeStrings.keys) {
+              codeStrings(clk)._1.append("}\n")
+              codeStrings(clk)._2.append("}\n")
+            }
+          }
+        }
+    
+      }
+
+      def outputAllClkDomains() {
+        // Are we generating partitioned islands?
+        if (islands.isEmpty) {
+          for (out <- code.values.map(_._1) ++ code.values.map(_._2)) {
+            createCppFile()
+            writeCppFile(out.result)
+          }
+        } else {
+          for ((i,codeStrings) <- islandClkCode) {
+            for (out <- codeStrings.values.map(_._1) ++ codeStrings.values.map(_._2)) {
+              createCppFile()
+              writeCppFile(out.result)
+            }
+          }
+        }
+      }
+    }
+      
+    val clkDomains = new ClockDomains
 
     if (Driver.isGenHarness) {
       genHarness(c, c.name);
@@ -812,20 +916,6 @@ class CppBackend extends Backend {
     out_h.close();
 
     // Generate CPP files
-    val out_cpps = ArrayBuffer[java.io.FileWriter]()
-    val all_cpp = new StringBuilder
-    def createCppFile(suffix: String = "-" + out_cpps.length) = {
-      val f = createOutputFile(c.name + suffix + ".cpp")
-      f.write("#include \"" + c.name + ".h\"\n")
-      for (str <- Driver.includeArgs) f.write("#include \"" + str + "\"\n")
-      f.write("\n")
-      out_cpps += f
-      f
-    }
-    def writeCppFile(s: String) = {
-      out_cpps.last.write(s)
-      all_cpp.append(s)
-    }
 
     createCppFile()
     
@@ -840,21 +930,8 @@ class CppBackend extends Backend {
     }
     writeCppFile("}\n")
 
-    def clock(n: Node) = if (n.clock == null) Driver.implicitClock else n.clock
-
-    for (m <- c.omods)
-      clkDomains(clock(m))._1.append(emitDefLo(m))
-
-    for (m <- c.omods)
-      clkDomains(clock(m))._2.append(emitInitHi(m))
-
-    for (m <- c.omods)
-      clkDomains(clock(m))._2.append(emitDefHi(m))
-
-    for (clk <- clkDomains.keys) {
-      clkDomains(clk)._1.append("}\n")
-      clkDomains(clk)._2.append("}\n")
-    }
+    clkDomains.populate()
+    
 
     // generate clock(...) function
     writeCppFile("int " + c.name + "_t::clock ( dat_t<1> reset ) {\n")
@@ -921,10 +998,7 @@ class CppBackend extends Backend {
     createCppFile()
     vcd.dumpVCD(writeCppFile)
 
-    for (out <- clkDomains.values.map(_._1) ++ clkDomains.values.map(_._2)) {
-      createCppFile()
-      writeCppFile(out.result)
-    }
+    clkDomains.outputAllClkDomains()
 
     // Generate API functions
     createCppFile()
