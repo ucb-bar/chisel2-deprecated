@@ -36,7 +36,7 @@ import collection.mutable
 object PartitionIslands {
   type IslandNodes = HashSet[Node]
   type MarkedNodes = HashMap[Node, Int]
-  val debug: Boolean = true
+  val debug: Boolean = false
 
   class Island(theIslandId: Int, theNodes: IslandNodes, theRoots: IslandNodes) {
     val nodes = theNodes
