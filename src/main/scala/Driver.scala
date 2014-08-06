@@ -60,12 +60,12 @@ object Driver extends FileSystemUtilities{
       val p = Some(Parameters.root(world))
       val c = execute(() => Module(gen())(p))
       if(Driver.chiselConfigMode.get == "collect") {
-        val w = createOutputFile(Driver.chiselConfigClassName.get + ".cst")
-        w.write(world.getConstraints)
-        w.close
         val v = createOutputFile(Driver.chiselConfigClassName.get + ".knb")
         v.write(world.getKnobs)
         v.close
+        val w = createOutputFile(Driver.chiselConfigClassName.get + ".cst")
+        w.write(world.getConstraints)
+        w.close
       }
       c
     } 

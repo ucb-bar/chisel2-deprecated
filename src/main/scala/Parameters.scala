@@ -65,7 +65,9 @@ abstract class View {
 */
 final case class ViewSym(view:View) {
   def apply[T](f:Any):Ex[T] = view.sym[T](f)
+  def apply[T](f:Field[T]):Ex[T] = view.sym[T](f)
   def apply[T](f:Any, site:View):Ex[T] = view.sym[T](f, site)
+  def apply[T](f:Field[T], site:View):Ex[T] = view.sym[T](f, site)
 }
 
 
@@ -166,7 +168,7 @@ abstract class World(
           }
         ) match {
           case k:Knob[T] => ExVar[T](_VarKnob[T](k.name))
-          case ex:Ex[T] => _bindLet(pname,ex)
+          case ex:Ex[T] => _bindLet[T](pname,ex)
           case lit => ExLit(lit.asInstanceOf[T])
         }
       }
@@ -311,10 +313,12 @@ object Parameters {
   // Lift a PartialFunction to be a mask.
   def makeMask(mask:PartialFunction[Any,Any]) = {
     (f:Any, site:View, here:View, up:View) => {
+        
       if(mask.isDefinedAt(f))
         mask.apply(f)
-      else
+      else {
         up.sym[Any](f, site)
+      }
     }
   }
 }
@@ -350,8 +354,11 @@ final class Parameters(
   def apply[T](field:Field[T]):T =
     _world._eval(_look(field, _site())).asInstanceOf[T]
   
-  def constrain(gen:ViewSym=>Ex[Boolean]) =
-    _world._constrain(gen(new ViewSym(_site())))
+  def constrain(gen:ViewSym=>Ex[Boolean]) = {
+    val g = gen(new ViewSym(_site()))
+    if(!_world._eval(g)) ChiselError.error("Constraint failed: " + g.toString)
+    _world._constrain(g)
+  }
   
   private def _alter(mask:(/*field*/Any,/*site*/View,/*here*/View,/*up*/View)=>Any) = {
     class KidLookup extends _Lookup {

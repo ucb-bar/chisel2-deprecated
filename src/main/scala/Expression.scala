@@ -25,6 +25,7 @@ case class IntEx (expr:Ex[Int]) {
   def +   (x:IntEx):Ex[Int] = ExAdd(expr,x.expr)
   def -   (x:IntEx):Ex[Int] = ExSub(expr,x.expr)
   def *   (x:IntEx):Ex[Int] = ExMul(expr,x.expr)
+  def %   (x:IntEx):Ex[Int] = ExMod(expr,x.expr)
   def <   (x:IntEx):Ex[Boolean] = ExLt(expr,x.expr)
   def >   (x:IntEx):Ex[Boolean] = ExGt(expr,x.expr)
   def <=  (x:IntEx):Ex[Boolean] = ExLte(expr,x.expr)
@@ -61,6 +62,7 @@ final case class ExGte(a:Ex[Int], b:Ex[Int]) extends Ex[Boolean]
 final case class ExAdd(a:Ex[Int], b:Ex[Int]) extends Ex[Int]
 final case class ExSub(a:Ex[Int], b:Ex[Int]) extends Ex[Int]
 final case class ExMul(a:Ex[Int], b:Ex[Int]) extends Ex[Int]
+final case class ExMod(a:Ex[Int], b:Ex[Int]) extends Ex[Int]
 
 object Ex {
   // evaluate an expression given a context that maps variable names to values
@@ -78,6 +80,7 @@ object Ex {
     case ExAdd(a,b) => eval(a,ctx) + eval(b,ctx)
     case ExSub(a,b) => eval(a,ctx) - eval(b,ctx)
     case ExMul(a,b) => eval(a,ctx) * eval(b,ctx)
+    case ExMod(a,b) => eval(a,ctx) % eval(b,ctx)
   }
   
   // get shallow list of subexpressions
@@ -95,6 +98,7 @@ object Ex {
     case ExAdd(a,b) => List(a,b)
     case ExSub(a,b) => List(a,b)
     case ExMul(a,b) => List(a,b)
+    case ExMod(a,b) => List(a,b)
   }
   
   // get all subexpressions including the expression given
@@ -116,6 +120,7 @@ object Ex {
       case e:ExAdd => 20
       case e:ExSub => 20
       case e:ExMul => 20
+      case e:ExMod => 20
       case e:ExLit[_] => 0
       case e:ExVar[_] => 0
     }
@@ -145,6 +150,7 @@ object Ex {
       case ExAdd(a,b) => term(a)+" + "+term(b)
       case ExSub(a,b) => term(a)+" - "+term(b)
       case ExMul(a,b) => term(a)+" * "+term(b)
+      case ExMod(a,b) => term(a)+" % "+term(b)
     }
   }
 }
