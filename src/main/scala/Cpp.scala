@@ -759,9 +759,13 @@ class CppBackend extends Backend {
 
     // If we're partitioning a monolithic circuit into separate islands
     // of combinational logic, generate those islands now.
-    var islands = ArrayBuffer[Island]()
-    if (Driver.partitionIslands) {
-      islands = createIslands(c)
+    val partitionIslands = Driver.partitionIslands
+    val islands = if (partitionIslands) {
+      createIslands(c)
+    } else {
+      val e = ArrayBuffer[Island]()
+      e += new Island(0, new IslandNodes, new IslandNodes)
+      e.toArray
     }
 
     class ClockDomains {
@@ -775,8 +779,9 @@ class CppBackend extends Backend {
         clock_lo.append("void " + c.name + "_t::clock_lo" + clkName(clock) + " ( dat_t<1> reset ) {\n")
         clock_hi.append("void " + c.name + "_t::clock_hi" + clkName(clock) + " ( dat_t<1> reset ) {\n")
         // If we're generating islands of combinational logic,
-        // have the main clock code call the island specific code.
-        if (!islands.isEmpty) {
+        // have the main clock code call the island specific code,
+        // and generate that island specific clock_(hi|lo) code.
+        if (partitionIslands) {
           for (island <- islands) {
             val islandId = island.islandId
             clock_lo.append("\t" + c.name + "_t::clock_lo" + clkName(clock) + "_I_" + islandId + "(reset);\n")
@@ -806,7 +811,7 @@ class CppBackend extends Backend {
           codeStrings(clock(n))._2.append(emitDefHi(n))
         }
         // Are we generating partitioned islands?
-        if (islands.isEmpty) {
+        if (!partitionIslands) {
           // No. Generate and output a single, monolithic function.
           for (m <- c.omods) {
             addClkDefs(m, code)
@@ -835,7 +840,7 @@ class CppBackend extends Backend {
 
       def outputAllClkDomains() {
         // Are we generating partitioned islands?
-        if (islands.isEmpty) {
+        if (!partitionIslands) {
           for (out <- code.values.map(_._1) ++ code.values.map(_._2)) {
             createCppFile()
             writeCppFile(out.result)
@@ -846,6 +851,10 @@ class CppBackend extends Backend {
               createCppFile()
               writeCppFile(out.result)
             }
+          }
+          for (out <- code.values.map(_._1) ++ code.values.map(_._2)) {
+            createCppFile()
+            writeCppFile(out.result)
           }
         }
       }
@@ -892,6 +901,13 @@ class CppBackend extends Backend {
     out_h.write("\n");
     out_h.write("  void init ( val_t rand_init = 0 );\n");
     for ( clock <- Driver.clocks) {
+      if (partitionIslands) {
+        for (island <- islands) {
+          val islandId = island.islandId
+          out_h.write("  void clock_lo" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset );\n")
+          out_h.write("  void clock_hi" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset );\n")
+        }
+      }
       out_h.write("  void clock_lo" + clkName(clock) + " ( dat_t<1> reset );\n")
       out_h.write("  void clock_hi" + clkName(clock) + " ( dat_t<1> reset );\n")
     }

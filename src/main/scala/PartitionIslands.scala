@@ -36,6 +36,7 @@ import collection.mutable
 object PartitionIslands {
   type IslandNodes = HashSet[Node]
   type MarkedNodes = HashMap[Node, Int]
+  type IslandCollection = HashMap[Int, Island]
   val debug: Boolean = false
 
   class Island(theIslandId: Int, theNodes: IslandNodes, theRoots: IslandNodes) {
@@ -98,8 +99,8 @@ object PartitionIslands {
   /* Create separately compilable islands of combinational logic.
    *
    */
-  def createIslands(module: Module): ArrayBuffer[Island] = {
-    val res = new ArrayBuffer[Island]
+  def createIslands(module: Module): Array[Island] = {
+    val res = new IslandCollection
     val roots = new ArrayBuffer[Node]
     val inputs = new HashSet[Node]
     val delays = new HashSet[Node]
@@ -123,7 +124,7 @@ object PartitionIslands {
       }
     }
 
-    def islandsFromNonBitsNode(iNode: Node, res: ArrayBuffer[Island], marked: MarkedNodes, inputs: Set[Node], work: Stack[Node]): Int = {
+    def islandsFromNonBitsNode(iNode: Node, res: IslandCollection, marked: MarkedNodes, inputs: Set[Node], work: Stack[Node]): Int = {
       // Follow consumers of the initial (input) node, until we find a non-Bits node from which to flood.
       // Keep track of the chain to that node and insert the nodes on that path into the same island
       // we create.
@@ -146,10 +147,16 @@ object PartitionIslands {
           }
           val island = flood(iNode, islandId, marked, inputs, work)
           if (! island.isEmpty) {
-            res += island
+            res += ((islandId, island))
             nIslands += 1
             islandId += 1
           }
+        } else {
+          // This node is marked, so we don't want to flood from it,
+          //  but we do want to add ourselves to its island.
+          val floodedIslandId = marked(iNode)
+          val island = res(floodedIslandId)
+          island.nodes ++= work
         }
         work.pop()
         if (debug) {
@@ -179,8 +186,11 @@ object PartitionIslands {
             delays += r
           }
           case l: Literal => lits += l
+          case m: Mem[_] => delays += m
+          /*
           case r: MemRead => delays += r
           case w: MemWrite => delays += w
+          */
           case _ => if (node.inputs.length == 0) barren += node
         }
       }
@@ -206,7 +216,7 @@ object PartitionIslands {
       val an = new IslandNodes
       an += inode
       println("creating island leaf: " + islandId + " on " + inode.component.name + "/" + inode)
-      res += new Island(islandId, an, an)
+      res += ((islandId, new Island(islandId, an, an)))
       // Now mark all the directly-reachable Bits nodes.
       for ( pNode <-inode.consumers) {
         markBitsNodes(pNode, markedNodes, islandId)
@@ -226,15 +236,15 @@ object PartitionIslands {
       }
     }
     // Output histogram info for the partitioning
-    println("createIslands: " + res.length + " islands")
+    println("createIslands: " + res.size + " islands")
     val islandHistogram = Map[Int, Int]()
-    for (island <- res) {
+    for (island <- res.values) {
       val n = island.nodes.size
       islandHistogram(n) = islandHistogram.getOrElse(n, 0) + 1
     }
     for ((k,v) <- islandHistogram) {
       println("createIslands: islands " + v + ", nodes " + k)
     }
-    res
+    res.values.toArray
   }
 }
