@@ -299,10 +299,22 @@ class VerilogBackend extends Backend {
 
       case m: Mem[_] =>
         if(!m.isInline) {
+          def find_gran(x: Node) : Int = {
+            if (x.isInstanceOf[Literal])
+              return x.width
+            else if (x.isInstanceOf[Op])
+              return (x.inputs.map(find_gran(_))).reduceLeft(_ max _)
+            else
+              return -1
+          }
+          val mask_writers = m.writeAccesses.filter(_.isMasked)
+          val mask_grans = mask_writers.map(x => find_gran(x.mask.inputs(0)))
+          val mask_gran = if (!mask_grans.isEmpty && mask_grans.forall(_ == mask_grans(0))) mask_grans(0) else 1
           val configStr =
           (" depth " + m.n +
             " width " + m.width +
             " ports " + m.ports.map(_.getPortType).reduceLeft(_ + "," + _) +
+            (if (mask_gran != 1) " mask_gran " + mask_gran else "") +
             "\n")
           val name = getMemName(m, configStr)
           ChiselError.info("MEM " + name)
