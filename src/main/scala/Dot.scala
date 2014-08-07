@@ -87,18 +87,6 @@ class DotBackend extends Backend {
     return island == null || island.nodes.contains(node)
   }
 
-  // Return the maximum islandId containing the specified node.
-  private def maxIsland(n: Node): Int = {
-    try {
-      islands.filter(island => isNodeInIsland(n, island)).map(_.islandId).reduceLeft(Math.max)
-    } catch {
-      case ex: java.lang.UnsupportedOperationException => {
-        println("Bang!")
-        0
-      }
-    }
-  }
-
   private def emitModuleText(top: Module, depth: Int ): (String, String) = {
     val res = new StringBuilder()
     val crossings = new StringBuilder()
@@ -161,12 +149,10 @@ class DotBackend extends Backend {
       }
       for (m <- top.mods) {
         if( m.component == top && isDottable(m)) {
-          val maxIsland_m = maxIsland(m)
           /* We have to check the node's component agrees because output
            nodes are part of a component *mods* as well as its parent *mods*! */
           for (in <- m.inputs) {
             if (isDottable(in)) {
-              val maxIsland_in = maxIsland(in)
               if (isNodeInIsland(in, island)) {
                 val edge = (emitRef(in) + " -> " + emitRef(m)
                   + "[label=\"" + in.width_ + "\"];"+ EOL)
