@@ -767,11 +767,15 @@ class CppBackend extends Backend {
       e += new Island(0, new IslandNodes, new IslandNodes)
       e.toArray
     }
+    val maxIslandId = islands.map(_.islandId).max
 
     class ClockDomains {
       type ClockCodeStrings = HashMap[Clock, (StringBuilder, StringBuilder)]
       val code = new ClockCodeStrings
       val islandClkCode = new HashMap[Int, ClockCodeStrings]
+      val islandStarted = Array.fill(2, maxIslandId + 1)(0)    // An array to keep track of the first time we added code to an island.
+      val islandOrder = Array.fill(2, islands.size)(0)         // An array to keep track of the order in which we should output island code.
+      var islandSequence = Array.fill(2)(0)
       for (clock <- Driver.clocks) {
         val clock_lo = new StringBuilder
         val clock_hi = new StringBuilder
@@ -784,8 +788,6 @@ class CppBackend extends Backend {
         if (partitionIslands) {
           for (island <- islands) {
             val islandId = island.islandId
-            clock_lo.append("\t" + c.name + "_t::clock_lo" + clkName(clock) + "_I_" + islandId + "(reset);\n")
-            clock_hi.append("\t" + c.name + "_t::clock_hi" + clkName(clock) + "_I_" + islandId + "(reset);\n")
             islandClkCode += ((islandId, new ClockCodeStrings))
             val clock_lo_I = new StringBuilder
             val clock_hi_I = new StringBuilder
@@ -793,8 +795,6 @@ class CppBackend extends Backend {
             clock_lo_I.append("void " + c.name + "_t::clock_lo" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset ) {\n")
             clock_hi_I.append("void " + c.name + "_t::clock_hi" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset ) {\n")
           }
-          clock_lo.append("}\n")
-          clock_hi.append("}\n")
         }
       }
 
@@ -805,11 +805,16 @@ class CppBackend extends Backend {
           return island == null || island.nodes.contains(node)
         }
 
-        def addClkDefs(n: Node, codeStrings: ClockCodeStrings) {
-          codeStrings(clock(n))._1.append(emitDefLo(n))
-          codeStrings(clock(n))._2.append(emitInitHi(n))
-          codeStrings(clock(n))._2.append(emitDefHi(n))
+        def addClkDefs(n: Node, codeStrings: ClockCodeStrings): (Boolean, Boolean) = {
+          val defLo = emitDefLo(n)
+          val initHi = emitInitHi(n)
+          val defHi = emitDefHi(n)
+          codeStrings(clock(n))._1.append(defLo)
+          codeStrings(clock(n))._2.append(initHi)
+          codeStrings(clock(n))._2.append(defHi)
+          (defLo != "", initHi != "" || defHi != "")
         }
+
         // Are we generating partitioned islands?
         if (!partitionIslands) {
           // No. Generate and output a single, monolithic function.
@@ -821,21 +826,36 @@ class CppBackend extends Backend {
             code(clk)._2.append("}\n")
           }
         } else {
-          for (island <- islands) {
-            val islandId = island.islandId
-            val codeStrings = islandClkCode(islandId)
-            for (m <- c.omods) {
+          val addedCode = new Array[Boolean](2)
+          for (m <- c.omods) {
+            for (island <- islands) {
               if (isNodeInIsland(m, island)) {
-                addClkDefs(m, codeStrings)
+                val islandId = island.islandId
+                val codeStrings = islandClkCode(islandId)
+                val addedCodeTuple = addClkDefs(m, codeStrings)
+                addedCode(0) = addedCodeTuple._1
+                addedCode(1) = addedCodeTuple._2
+                // Update the generation number if we added any code to this island.
+                for (lohi <- 0 to 1) {
+                  if (addedCode(lohi)) {
+                    // Is this the first time we've added code to this island?
+                    if (islandStarted(lohi)(islandId) == 0) {
+                      islandOrder(lohi)(islandSequence(lohi)) = islandId
+                      islandSequence(lohi) += 1
+                      islandStarted(lohi)(islandId) = islandSequence(lohi)
+                    }
+                  }
+                }
               }
-            }
-            for (clk <- codeStrings.keys) {
-              codeStrings(clk)._1.append("}\n")
-              codeStrings(clk)._2.append("}\n")
             }
           }
         }
-    
+        for (codeStrings <- islandClkCode.values) {
+          for (clk <- codeStrings.keys) {
+            codeStrings(clk)._1.append("}\n")
+            codeStrings(clk)._2.append("}\n")
+          }
+        }
       }
 
       def outputAllClkDomains() {
@@ -846,15 +866,40 @@ class CppBackend extends Backend {
             writeCppFile(out.result)
           }
         } else {
-          for ((i,codeStrings) <- islandClkCode) {
-            for (out <- codeStrings.values.map(_._1) ++ codeStrings.values.map(_._2)) {
+          // Output the clock code in the correct order.
+          for (islandId <- islandOrder(0) if islandId > 0) {
+            for (out <- islandClkCode(islandId).values.map(_._1)) {
               createCppFile()
               writeCppFile(out.result)
             }
           }
-          for (out <- code.values.map(_._1) ++ code.values.map(_._2)) {
+          for ((clock, clkcodes) <- code) {
+            val (clock_lo, clock_hi) = clkcodes
             createCppFile()
-            writeCppFile(out.result)
+            writeCppFile(clock_lo.result)
+            // Output the actual calls to the island specific clock code.
+            for (islandId <- islandOrder(0) if islandId > 0) {
+              writeCppFile("\t" + c.name + "_t::clock_lo" + clkName(clock) + "_I_" + islandId + "(reset);\n")
+            }
+            writeCppFile("}\n")
+          }
+
+          for (islandId <- islandOrder(1) if islandId > 0) {
+            for (out <- islandClkCode(islandId).values.map(_._2)) {
+              createCppFile()
+              writeCppFile(out.result)
+            }
+          }
+
+          for ((clock, clkcodes) <- code) {
+            val (clock_lo, clock_hi) = clkcodes
+            createCppFile()
+            writeCppFile(clock_hi.result)
+            // Output the actual calls to the island specific clock code.
+            for (islandId <- islandOrder(1) if islandId > 0) {
+              writeCppFile("\t" + c.name + "_t::clock_hi" + clkName(clock) + "_I_" + islandId + "(reset);\n")
+            }
+            writeCppFile("}\n")
           }
         }
       }

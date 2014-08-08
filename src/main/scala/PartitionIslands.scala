@@ -59,6 +59,8 @@ object PartitionIslands {
 
   /** Flood fill the graph, marking all non-root nodes reachable from here.
    * We visit inputs and consumers, stopping when we hit a register or memory.
+   * We process unmarked inputs of marked nodes.
+   * We do not process any consumers of marked nodes.
    */
   def flood(sNode: Node, islandId: Int, marked: MarkedNodes, inputs: Set[Node], prefixNodes: Seq[Node]): Island = {
     val work = new Stack[Node]
@@ -68,14 +70,12 @@ object PartitionIslands {
     def processLinks(nodes: Seq[Node]) {
       // Process all unmarked nodes.
       for (n <- nodes) {
-       if (debug) println(" considering " + n.component.name + "/" + n + " marked " + marked.contains(n) + " isInput " + inputs.contains(n))
-       if (!inputs.contains(n)) {
-         if (!marked.contains(n)) {
-            if (debug) println("  queuing " + n.component.name + "/" + n)
-            work.push(n)
-            marked += ((n, islandId))
-         }
-       }
+        if (debug) println(" considering " + n.component.name + "/" + n + " marked " + marked.contains(n))
+        if (!marked.contains(n)) {
+          if (debug) println("  queuing " + n.component.name + "/" + n)
+          work.push(n)
+          marked += ((n, islandId))
+        }
       }
     }
 
@@ -91,6 +91,10 @@ object PartitionIslands {
       processLinks(node.inputs)
       if (debug) println("processLinks: consumers for " + node.component.name + "/" + node)
       processLinks(node.consumers)
+      // Special case - we want to process any unmarked inputs for consumer nodes which are island boundaries, marked or not.
+      for (c <- node.consumers; if inputs.contains(c) && marked.contains(c)) {
+        processLinks(c.inputs)
+      }
       
     }
     new Island(islandId, islandNodes, islandRoots)
@@ -100,15 +104,18 @@ object PartitionIslands {
    *
    */
   def createIslands(module: Module): Array[Island] = {
+    type NodeSet = HashSet[Node]
     val res = new IslandCollection
     val roots = new ArrayBuffer[Node]
-    val inputs = new HashSet[Node]
-    val delays = new HashSet[Node]
-    val lits = new HashSet[Node]
-    val barren = new HashSet[Node]
-    val bogus = new HashSet[Node]
+    val inputs = new NodeSet
+    val registers = new NodeSet
+    val memories = new NodeSet
+    val lits = new NodeSet
+    val barren = new NodeSet
+    val bogus = new NodeSet
     val markedNodes = new MarkedNodes
     var islandId = 1
+    val doMoveMemories = true
 
     // Mark all the Bits nodes directly reachable from an initial node.
     def markBitsNodes(iNode: Node, marked: MarkedNodes, islandId: Int) {
@@ -165,6 +172,7 @@ object PartitionIslands {
       }
       nIslands
     }
+    var nodeCount = 0
     // Generate an array of input and output nodes for this module, and initialize the island id for each node.
     for (node <- module.omods) {
       if (node.isIo) {
@@ -183,23 +191,25 @@ object PartitionIslands {
         // If we're a delay node (Reg or Mem), our consumers become inputs
         node match {
           case r: Reg => {
-            delays += r
+            registers += r
           }
-          case l: Literal => lits += l
-          case m: Mem[_] => delays += m
+          /* case l: Literal => lits += l */
+          case m: Mem[_] => memories += m
           /*
-          case r: MemRead => delays += r
-          case w: MemWrite => delays += w
+          case r: MemRead => memories += r
+          case w: MemWrite => memories += w
           */
-          case _ => if (node.inputs.length == 0) barren += node
+          case _ => if (false && node.inputs.length == 0) barren += node
         }
       }
-      if (node.inputs.length == 0) {
-        if (!(inputs ++ delays ++ lits ++ barren ++ bogus).contains(node)) {
-          println("createIslands: 0 inputs " + node)
-        }
+      nodeCount += 1
+      if ((nodeCount % 1000) == 0) {
+        println("createIslands: classified " + nodeCount + " nodes.")
       }
     }
+
+    val delays = registers ++ memories
+
     for (n <- bogus) {
       println("createIslands: bogus " + n)
     }
@@ -233,6 +243,46 @@ object PartitionIslands {
       for ( pNode <-inode.consumers) {
         val work = new Stack[Node]
         islandsFromNonBitsNode(pNode, res, markedNodes, allLeaves, work)
+      }
+    }
+
+    // Move from our current island to that of our inputs.
+    // Complain if our inputs aren't all in the same island.
+    def islandHop(s: Node) {
+      val inputsIslandSet = Set[Int]()
+      try {
+        s.inputs.map(inputsIslandSet += markedNodes(_))
+      } catch {
+        case ex: NoSuchElementException => {
+          println("Bang! " + ex)
+        }
+      }
+      if (inputsIslandSet.size != 1) {
+        ChiselError.info("islandHop: node "+ s + " - non-unique input")
+        return
+      }
+      val srcIsland = markedNodes(s)
+      val dstIsland = markedNodes(s.inputs(0))
+      // Remove us from collection of nodes associated with this island.
+      res(srcIsland).nodes -= s
+      // If this island is now empty, remove it from the island set.
+      if (res(srcIsland).nodes.size == 0) {
+        res -= srcIsland
+      }
+      // Add us to the destination island node collection.
+      res(dstIsland).nodes += s
+      // Update our entry in the markedNodes collection to reflect the new island location.
+      // This is not strictly necessary since we're done with the markedNodes collection.
+      markedNodes(s) = dstIsland
+    }
+    // Move memory nodes from their independent island, to the island containing
+    // their single input.
+    // We need to do this so the clock_hi generated code updates the memory state correctly.
+    if (doMoveMemories) {
+      for (m <- registers ++ memories) {
+        // Move from our current island to that of our single input.
+        // islandHop will complain if we don't have a unique input.
+        islandHop(m)
       }
     }
     // Output histogram info for the partitioning
