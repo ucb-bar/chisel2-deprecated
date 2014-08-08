@@ -35,6 +35,7 @@ case class IntEx (expr:Ex[Int]) {
 case class BoolEx (expr:Ex[Boolean]) {
   def &&  (x:BoolEx):Ex[Boolean] = ExAnd(expr,x.expr)
   def ||  (x:BoolEx):Ex[Boolean] = ExOr(expr,x.expr)
+  def ^   (x:BoolEx):Ex[Boolean] = ExXor(expr,x.expr)
   def === (x:BoolEx):Ex[Boolean] = ExEq[Boolean](expr,x.expr)
   def !== (x:BoolEx):Ex[Boolean] = ExEq[Boolean](expr,x.expr)
 }
@@ -52,6 +53,7 @@ final case class ExVar[T](name:Any) extends Ex[T]
 
 final case class ExAnd(a:Ex[Boolean], b:Ex[Boolean]) extends Ex[Boolean]
 final case class ExOr(a:Ex[Boolean], b:Ex[Boolean]) extends Ex[Boolean]
+final case class ExXor(a:Ex[Boolean], b:Ex[Boolean]) extends Ex[Boolean]
 
 final case class ExEq[T](a:Ex[T], b:Ex[T]) extends Ex[Boolean]
 final case class ExNeq[T](a:Ex[T], b:Ex[T]) extends Ex[Boolean]
@@ -71,6 +73,7 @@ object Ex {
     case ExVar(nm) => ctx(nm).asInstanceOf[T]
     case ExAnd(a,b) => eval(a,ctx) && eval(b,ctx)
     case ExOr(a,b) => eval(a,ctx) || eval(b,ctx)
+    case ExXor(a,b) => eval(a,ctx) ^ eval(b,ctx)
     case e:ExEq[u] => eval(e.a,ctx) == eval(e.b,ctx)
     case e:ExNeq[u] => eval(e.a,ctx) != eval(e.b,ctx)
     case ExLt(a,b) => eval(a,ctx) < eval(b,ctx)
@@ -89,6 +92,7 @@ object Ex {
     case ExVar(_) => Nil
     case ExAnd(a,b) => List(a,b)
     case ExOr(a,b) => List(a,b)
+    case ExXor(a,b) => List(a,b)
     case ExEq(a,b) => List(a,b)
     case ExNeq(a,b) => List(a,b)
     case ExLt(a,b) => List(a,b)
@@ -111,6 +115,7 @@ object Ex {
     def rank(e:Ex[_]):Int = e match {
       case e:ExAnd => 40
       case e:ExOr => 50
+      case e:ExXor => 50
       case e:ExEq[_] => 30
       case e:ExNeq[_] => 30
       case e:ExLt => 30
@@ -141,6 +146,7 @@ object Ex {
       case e:ExVar[_]=> "$"+e.name
       case ExAnd(a,b) => term(a)+" && "+term(b)
       case ExOr(a,b) => term(a)+" || "+term(b)
+      case ExXor(a,b) => term(a)+" ^ "+term(b)
       case ExEq(a,b) => term(a)+" = "+term(b)
       case ExNeq(a,b) => term(a)+" != "+term(b)
       case ExLt(a,b) => term(a)+" < "+term(b)
