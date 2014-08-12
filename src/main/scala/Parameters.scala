@@ -19,6 +19,10 @@ import scala.collection.immutable.{Seq=>Seq, Iterable=>Iterable}
 import scala.{collection=>readonly}
 import scala.collection.mutable
 
+abstract trait UsesParameters {
+  def params: Parameters
+}
+
 class ProgrammerSucks extends RuntimeException
 
 class ParameterUndefinedException(field:Any, cause:Throwable=null)
