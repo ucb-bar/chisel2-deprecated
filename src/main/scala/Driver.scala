@@ -41,7 +41,7 @@ object Driver extends FileSystemUtilities{
       ChiselError.report
       if (ChiselError.hasErrors && !getLineNumbers) {
         println("Re-running Chisel in debug mode to obtain erroneous line numbers...")
-        apply(args :+ "--lineNumbers", gen)
+        apply(args :+ "--lineNumbers", gen, wrapped)
       }
     }
   }
