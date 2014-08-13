@@ -41,6 +41,7 @@ class DotBackend extends Backend {
   val keywords = new HashSet[String]();
   var islands = Array[Island]()
   val allDottable = false
+  val useComponentNames = false
 
   override def emitRef(node: Node): String = {
     node match {
@@ -80,7 +81,11 @@ class DotBackend extends Backend {
         node.name + ":" + typeName
       }
     }
-    node.component.name + "/" + res
+    if (useComponentNames) {
+      node.component.name + "/" + res
+    } else {
+      res
+    }
   }
 
   private def isNodeInIsland(node: Node, island: Island): Boolean = {
@@ -92,7 +97,7 @@ class DotBackend extends Backend {
     val crossings = new StringBuilder()
     val indent = "  " * (depth + 1)
     for (child <- top.children) {
-      if (! Driver.partitionIslands || false) {
+      if (! Driver.partitionIslands) {
         /* Prefix by "cluster" for graphviz to draw a bounding box. */
         res.append(indent)
         res.append("subgraph cluster" + emitRef(child) + "{\n")
@@ -101,9 +106,9 @@ class DotBackend extends Backend {
       }
       val (innertext, innercrossings) = emitModuleText(child, depth + 1)
       res.append(innertext)
-      if (! Driver.partitionIslands || false) {
+      if (! Driver.partitionIslands) {
         res.append(indent)
-        res.append("// end " + child.name + "\n")
+//        res.append("// end " + child.name + "\n")
         res.append("}\n")
         res.append(indent)
       }
@@ -112,18 +117,17 @@ class DotBackend extends Backend {
 
     var EOL = "\n"
     def outputAnIsland(island: Island) {
+      val island_res = new StringBuilder()
       val islandId = if (island == null) 0 else island.islandId
-      if (islandId != 0) {
-        res.append("subgraph clusterIsland_" + islandId + " {\n")
-      }
+
       for (m <- top.mods) {
         if (isDottable(m)) {
           if( m.component == top ) {
             /* We have to check the node's component agrees because output
              nodes are part of a component *mods* as well as its parent *mods*! */
             if (isNodeInIsland(m, island)) {
-              res.append(indent)
-              res.append(emitRef(m));
+              island_res.append(indent)
+              island_res.append(emitRef(m));
             }
             var label  = "label=\"" + asValidLabel(m)
             val anyLit = m.inputs.find(x => !isDottable(x));
@@ -140,8 +144,8 @@ class DotBackend extends Backend {
             label += "\""
             if (isNodeInIsland(m, island)) {
               m match {
-                case reg: Delay => res.append("[shape=square," + label + "];" + EOL)
-                case _ => res.append("[" + label + "];" + EOL)
+                case reg: Delay => island_res.append("[shape=square," + label + "];" + EOL)
+                case _ => island_res.append("[" + label + "];" + EOL)
               }
             }
           }
@@ -162,8 +166,8 @@ class DotBackend extends Backend {
                   if (! (isNodeInIsland(in, island) && (isNodeInIsland(m, island)))) {
                     crossings.append(edge)
                   } else {
-                    res.append(indent)
-                    res.append(edge);
+                    island_res.append(indent)
+                    island_res.append(edge);
                   }
                 } else
                 /* If the both ends of an edge are on either side of a component
@@ -172,19 +176,29 @@ class DotBackend extends Backend {
                 if( in.component != top && !top.children.contains(in.component) ) {
                   crossings.append(edge)
                 } else {
-                  res.append(indent)
-                  res.append(edge);
+                  island_res.append(indent)
+                  island_res.append(edge);
                 }
               }
             }
           }
         }
       }
-      if (islandId != 0) {
-        res.append("label = \"Island_" + islandId + "\";\n")
-        res.append("}\n")
+
+      if (island_res.length > 0) {
+        if (islandId != 0) {
+          res.append("subgraph clusterIsland_" + islandId + " {\n")
+        }
+  
+        res.append(island_res)
+  
+        if (islandId != 0) {
+          res.append("label = \"Island_" + islandId + "\";\n")
+          res.append("}\n")
+        }
       }
     }
+
     if (islands.isEmpty) {
         outputAnIsland(null)
     } else {

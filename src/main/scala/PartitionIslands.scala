@@ -70,11 +70,15 @@ object PartitionIslands {
     def processLinks(nodes: Seq[Node]) {
       // Process all unmarked nodes.
       for (n <- nodes) {
-        if (debug) println(" considering " + n.component.name + "/" + n + " marked " + marked.contains(n))
-        if (!marked.contains(n)) {
-          if (debug) println("  queuing " + n.component.name + "/" + n)
-          work.push(n)
-          marked += ((n, islandId))
+        if (n.isInstanceOf[RegReset]) {
+          if (debug) println(" ignoring " + n.component.name + "/" + n + " marked " + marked.contains(n))
+        } else {
+          if (debug) println(" considering " + n.component.name + "/" + n + " marked " + marked.contains(n))
+          if (!marked.contains(n)) {
+            if (debug) println("  queuing " + n.component.name + "/" + n)
+            work.push(n)
+            marked += ((n, islandId))
+          }
         }
       }
     }
@@ -193,7 +197,7 @@ object PartitionIslands {
           case r: Reg => {
             registers += r
           }
-          /* case l: Literal => lits += l */
+          case l: Literal => lits += l
           case m: Mem[_] => memories += m
           /*
           case r: MemRead => memories += r
@@ -240,6 +244,7 @@ object PartitionIslands {
       // Flood from all the unmarked consumers of this node.
       // We don't add the inode to the island.
       // It's already been put in its own island.
+      // When we're all done, we may move this node into the island containing all its inputs.
       for ( pNode <-inode.consumers) {
         val work = new Stack[Node]
         islandsFromNonBitsNode(pNode, res, markedNodes, allLeaves, work)
@@ -285,6 +290,16 @@ object PartitionIslands {
         islandHop(m)
       }
     }
+    // Delete any empty islands and find the one with the most nodes.
+    var islandMaxNodes = (0, 0)
+    for ((k, v) <- res) {
+      val nnodes = v.nodes.size
+      if (nnodes == 0) {
+        res -= k
+      } else if (nnodes > islandMaxNodes._2){
+        islandMaxNodes = (k, nnodes)
+      }
+    }
     // Output histogram info for the partitioning
     println("createIslands: " + res.size + " islands")
     val islandHistogram = Map[Int, Int]()
@@ -295,6 +310,7 @@ object PartitionIslands {
     for ((k,v) <- islandHistogram) {
       println("createIslands: islands " + v + ", nodes " + k)
     }
+    println("createIslands: island " + islandMaxNodes._1 + " has " + islandMaxNodes._2 + " nodes")
     res.values.toArray
   }
 }

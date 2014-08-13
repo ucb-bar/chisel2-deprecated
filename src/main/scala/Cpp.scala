@@ -63,6 +63,10 @@ object CString {
 class CppBackend extends Backend {
   val keywords = new HashSet[String]();
   private var hasPrintfs = false
+  val unOptimizedFiles = HashSet[String]()
+  var maxFiles: Int = 0
+  val minimumLinesPerFile = 32 * 1024
+  val compileInitializationUnoptimized = true
 
   override def emitTmp(node: Node): String = {
     require(false)
@@ -619,17 +623,42 @@ class CppBackend extends Backend {
       val c = bashCmd.!
       ChiselError.info(cmd + " RET " + c)
     }
-    def link(name: String) {
+    def linkOne(name: String) {
       val ac = CXX + " -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o"
       run(ac)
     }
-    def cc(name: String) {
-      val cmd = CXX + " -c -o " + dir + name + ".o " + allFlags + " " + dir + name + ".cpp"
+    def linkMany(name: String, objects: Seq[String]) {
+      val ac = CXX + " -o " + dir + name + " " + objects.map(dir + _ + ".o ").mkString(" ") + dir + name + "-emulator.o"
+      run(ac)
+    }
+    def cc(name: String, flags: String = allFlags) {
+      val cmd = CXX + " -c -o " + dir + name + ".o " + flags + " " + dir + name + ".cpp"
       run(cmd)
     }
     cc(c.name + "-emulator")
-    cc(c.name)
-    link(c.name)
+    // Are we generating unoptimized files?
+    if (unOptimizedFiles.size != 0) {
+      val optOpt = """(-O.)""".r
+      // Generate a version of the flags with -Ox replaced by -O0.
+      val flags = optOpt.replaceAllIn(allFlags, "-O0")
+      // Compile all the unoptimized files at level 0.
+      unOptimizedFiles.map(cc(_, flags))
+      val objects: ArrayBuffer[String] = new ArrayBuffer(maxFiles)
+      // Compile the remainder at the specified optimization level.
+      for (f <- 0 until maxFiles) {
+        val basename = c.name + "-" + f
+        // If we've already compile this file, don't do it again,
+        // but do add it to the list of objects.
+        if (!unOptimizedFiles.contains(basename)) {
+          cc(basename)
+        }
+        objects += basename
+      }
+      linkMany(c.name, objects)
+    } else {
+      cc(c.name)
+      linkOne(c.name)
+    }
   }
 
   def emitDefLos(c: Module): String = {
@@ -716,20 +745,50 @@ class CppBackend extends Backend {
 
   override def elaborate(c: Module): Unit = {
     // Generate CPP files
-    val out_cpps = ArrayBuffer[java.io.FileWriter]()
+    val out_cpps = ArrayBuffer[CppFile]()
     val all_cpp = new StringBuilder
 
-    def createCppFile(suffix: String = "-" + out_cpps.length) = {
-      val f = createOutputFile(c.name + suffix + ".cpp")
-      f.write("#include \"" + c.name + ".h\"\n")
-      for (str <- Driver.includeArgs) f.write("#include \"" + str + "\"\n")
-      f.write("\n")
-      out_cpps += f
-      f
+    def cppFileSuffix = "-" + out_cpps.length
+    class CppFile(val suffix: String = cppFileSuffix) {
+      var lines = 0
+      var done = false
+      val name = c.name + suffix + ".cpp"
+      var fileWriter = createOutputFile(name)
+        fileWriter.write("#include \"" + c.name + ".h\"\n")
+        for (str <- Driver.includeArgs) fileWriter.write("#include \"" + str + "\"\n")
+        fileWriter.write("\n")
+        lines = 3
+
+      def write(s: String) {
+        lines += s.count(_ == '\n')
+        fileWriter.write(s)
+      }
+      
+      def close() {
+        done = true
+        fileWriter.close()
+      }
+      def advance() {
+        this.done = true
+      }
     }
-    def writeCppFile(s: String) = {
+
+    def createCppFile(suffix: String = cppFileSuffix) {
+      // If we're trying to coalesce cpp files (minimumLinesPerFile > 0),
+      //  don't actually create a new file unless we've hit the line limit.
+      if ((out_cpps.size > 0) && (out_cpps.last.lines < minimumLinesPerFile) && !out_cpps.last.done) {
+        out_cpps.last.write("\n\n")
+      } else {
+        out_cpps += new CppFile(suffix)
+        println("CppBackend: createCppFile " + out_cpps.last.name)
+      }
+    }
+    def writeCppFile(s: String) {
       out_cpps.last.write(s)
       all_cpp.append(s)
+    }
+    def advanceCppFile() {
+      out_cpps.last.advance()
     }
 
     println("CPP elaborate")
@@ -770,18 +829,19 @@ class CppBackend extends Backend {
     val maxIslandId = islands.map(_.islandId).max
 
     class ClockDomains {
-      type ClockCodeStrings = HashMap[Clock, (StringBuilder, StringBuilder)]
+      type ClockCodeStrings = HashMap[Clock, (StringBuilder, StringBuilder, StringBuilder)]
       val code = new ClockCodeStrings
       val islandClkCode = new HashMap[Int, ClockCodeStrings]
       val islandStarted = Array.fill(2, maxIslandId + 1)(0)    // An array to keep track of the first time we added code to an island.
       val islandOrder = Array.fill(2, islands.size)(0)         // An array to keep track of the order in which we should output island code.
       var islandSequence = Array.fill(2)(0)
       for (clock <- Driver.clocks) {
-        val clock_lo = new StringBuilder
-        val clock_hi = new StringBuilder
-        code += (clock -> ((clock_lo, clock_hi)))
-        clock_lo.append("void " + c.name + "_t::clock_lo" + clkName(clock) + " ( dat_t<1> reset ) {\n")
-        clock_hi.append("void " + c.name + "_t::clock_hi" + clkName(clock) + " ( dat_t<1> reset ) {\n")
+        val clock_dlo = new StringBuilder
+        val clock_ihi = new StringBuilder
+        val clock_dhi = new StringBuilder
+        code += (clock -> ((clock_dlo, clock_ihi, clock_dhi)))
+        clock_dlo.append("void " + c.name + "_t::clock_lo" + clkName(clock) + " ( dat_t<1> reset ) {\n")
+        clock_ihi.append("void " + c.name + "_t::clock_hi" + clkName(clock) + " ( dat_t<1> reset ) {\n")
         // If we're generating islands of combinational logic,
         // have the main clock code call the island specific code,
         // and generate that island specific clock_(hi|lo) code.
@@ -789,11 +849,12 @@ class CppBackend extends Backend {
           for (island <- islands) {
             val islandId = island.islandId
             islandClkCode += ((islandId, new ClockCodeStrings))
-            val clock_lo_I = new StringBuilder
-            val clock_hi_I = new StringBuilder
-            islandClkCode(islandId) += (clock -> ((clock_lo_I, clock_hi_I)))
-            clock_lo_I.append("void " + c.name + "_t::clock_lo" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset ) {\n")
-            clock_hi_I.append("void " + c.name + "_t::clock_hi" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset ) {\n")
+            val clock_dlo_I = new StringBuilder
+            val clock_ihi_I = new StringBuilder
+            val clock_dhi_I = new StringBuilder
+            islandClkCode(islandId) += (clock -> ((clock_dlo_I, clock_ihi_I, clock_dhi_I)))
+            clock_dlo_I.append("void " + c.name + "_t::clock_lo" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset ) {\n")
+            clock_ihi_I.append("void " + c.name + "_t::clock_hi" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset ) {\n")
           }
         }
       }
@@ -805,14 +866,15 @@ class CppBackend extends Backend {
           return island == null || island.nodes.contains(node)
         }
 
-        def addClkDefs(n: Node, codeStrings: ClockCodeStrings): (Boolean, Boolean) = {
+        // Return true if we actually added any clock code.
+        def addClkDefs(n: Node, codeStrings: ClockCodeStrings): (Boolean, Boolean, Boolean) = {
           val defLo = emitDefLo(n)
           val initHi = emitInitHi(n)
           val defHi = emitDefHi(n)
           codeStrings(clock(n))._1.append(defLo)
           codeStrings(clock(n))._2.append(initHi)
-          codeStrings(clock(n))._2.append(defHi)
-          (defLo != "", initHi != "" || defHi != "")
+          codeStrings(clock(n))._3.append(defHi)
+          (defLo != "", initHi != "", defHi != "")
         }
 
         // Are we generating partitioned islands?
@@ -821,9 +883,11 @@ class CppBackend extends Backend {
           for (m <- c.omods) {
             addClkDefs(m, code)
           }
+          // We're going to merge the clock_hi init and def code into a single function.
+          // Add the closing brace to the def string.
           for (clk <- code.keys) {
             code(clk)._1.append("}\n")
-            code(clk)._2.append("}\n")
+            code(clk)._3.append("}\n")
           }
         } else {
           val addedCode = new Array[Boolean](2)
@@ -835,8 +899,9 @@ class CppBackend extends Backend {
                 val addedCodeTuple = addClkDefs(m, codeStrings)
                 addedCode(0) = addedCodeTuple._1
                 addedCode(1) = addedCodeTuple._2
+                addedCode(2) = addedCodeTuple._3
                 // Update the generation number if we added any code to this island.
-                for (lohi <- 0 to 1) {
+                for (lohi <- 0 to 2) {
                   if (addedCode(lohi)) {
                     // Is this the first time we've added code to this island?
                     if (islandStarted(lohi)(islandId) == 0) {
@@ -849,11 +914,11 @@ class CppBackend extends Backend {
               }
             }
           }
-        }
-        for (codeStrings <- islandClkCode.values) {
-          for (clk <- codeStrings.keys) {
-            codeStrings(clk)._1.append("}\n")
-            codeStrings(clk)._2.append("}\n")
+          for (codeStrings <- islandClkCode.values) {
+            for (clk <- codeStrings.keys) {
+              codeStrings(clk)._1.append("}\n")
+              codeStrings(clk)._3.append("}\n")
+            }
           }
         }
       }
@@ -861,7 +926,7 @@ class CppBackend extends Backend {
       def outputAllClkDomains() {
         // Are we generating partitioned islands?
         if (!partitionIslands) {
-          for (out <- code.values.map(_._1) ++ code.values.map(_._2)) {
+          for (out <- code.values.map(_._1) ++ code.values.map(_._2) ++ code.values.map(_._3)) {
             createCppFile()
             writeCppFile(out.result)
           }
@@ -874,7 +939,7 @@ class CppBackend extends Backend {
             }
           }
           for ((clock, clkcodes) <- code) {
-            val (clock_lo, clock_hi) = clkcodes
+            val (clock_lo, clock_ihi, clock_dhi) = clkcodes
             createCppFile()
             writeCppFile(clock_lo.result)
             // Output the actual calls to the island specific clock code.
@@ -885,16 +950,16 @@ class CppBackend extends Backend {
           }
 
           for (islandId <- islandOrder(1) if islandId > 0) {
-            for (out <- islandClkCode(islandId).values.map(_._2)) {
+            for (out <- islandClkCode(islandId).values.map(_._2) ++ islandClkCode(islandId).values.map(_._3)) {
               createCppFile()
               writeCppFile(out.result)
             }
           }
 
           for ((clock, clkcodes) <- code) {
-            val (clock_lo, clock_hi) = clkcodes
+            val (clock_lo, clock_ihi, clock_dhi) = clkcodes
             createCppFile()
-            writeCppFile(clock_hi.result)
+            writeCppFile(clock_ihi.result ++ clock_dhi.result)
             // Output the actual calls to the island specific clock code.
             for (islandId <- islandOrder(1) if islandId > 0) {
               writeCppFile("\t" + c.name + "_t::clock_hi" + clkName(clock) + "_I_" + islandId + "(reset);\n")
@@ -1059,8 +1124,19 @@ class CppBackend extends Backend {
     createCppFile()
     vcd.dumpVCD(writeCppFile)
 
+    out_cpps.foreach(_.fileWriter.flush())
+    // If we're compiling initialization functions -O0, add the current files
+    //  to the unoptimized file list.
+    //  We strip off the trailing ".cpp" to facilitate creating both ".cpp" and ".o" files.
+    if (compileInitializationUnoptimized) {
+      val trimLength = ".cpp".length()
+      unOptimizedFiles ++= out_cpps.map(_.name.dropRight(trimLength))
+    }
+    // Ensure we start off in a new file before we start outputting the clock_lo/hi.
+    advanceCppFile()
     clkDomains.outputAllClkDomains()
 
+    advanceCppFile()
     // Generate API functions
     createCppFile()
     writeCppFile(s"void ${c.name}_api_t::init_mapping_table() {\n");
@@ -1074,10 +1150,18 @@ class CppBackend extends Backend {
       }
     }
     writeCppFile(s"}\n");
-    
+
+    maxFiles = out_cpps.length
+
+    // We're now going to write the entire contents out to a singe file.
+    // Make sure it's really a new file.
+    advanceCppFile()
     createCppFile("")
     writeCppFile(all_cpp.result)
     out_cpps.foreach(_.close)
+    
+    all_cpp.clear()
+    out_cpps.clear()
 
     def copyToTarget(filename: String) = {
 	  val resourceStream = getClass().getResourceAsStream("/" + filename)
