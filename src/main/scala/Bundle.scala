@@ -55,7 +55,7 @@ object Bundle {
   */
 class Bundle(view_arg: Seq[String] = null)(implicit _params:Option[Parameters] = None) extends Aggregate {
   var view = view_arg;
-  val params = if(_params == None) {
+  override val params = if(_params == None) {
     if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
   } else _params.get
   private var elementsCache: ArrayBuffer[(String, Data)] = null;

@@ -163,6 +163,8 @@ abstract class Data extends Node {
   def setWidth(w: Int) {
     this.width = w;
   }
+
+  val params = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
 }
 
 abstract class Aggregate extends Data {
