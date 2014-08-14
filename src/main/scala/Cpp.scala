@@ -832,9 +832,9 @@ class CppBackend extends Backend {
       type ClockCodeStrings = HashMap[Clock, (StringBuilder, StringBuilder, StringBuilder)]
       val code = new ClockCodeStrings
       val islandClkCode = new HashMap[Int, ClockCodeStrings]
-      val islandStarted = Array.fill(2, maxIslandId + 1)(0)    // An array to keep track of the first time we added code to an island.
-      val islandOrder = Array.fill(2, islands.size)(0)         // An array to keep track of the order in which we should output island code.
-      var islandSequence = Array.fill(2)(0)
+      val islandStarted = Array.fill(3, maxIslandId + 1)(0)    // An array to keep track of the first time we added code to an island.
+      val islandOrder = Array.fill(3, islands.size)(0)         // An array to keep track of the order in which we should output island code.
+      var islandSequence = Array.fill(3)(0)
       for (clock <- Driver.clocks) {
         val clock_dlo = new StringBuilder
         val clock_ihi = new StringBuilder
@@ -890,7 +890,7 @@ class CppBackend extends Backend {
             code(clk)._3.append("}\n")
           }
         } else {
-          val addedCode = new Array[Boolean](2)
+          val addedCode = new Array[Boolean](3)
           for (m <- c.omods) {
             for (island <- islands) {
               if (isNodeInIsland(m, island)) {
@@ -1150,6 +1150,12 @@ class CppBackend extends Backend {
       }
     }
     writeCppFile(s"}\n");
+
+    // Add the init_mapping_table file to the list of unoptimized files.
+    if (compileInitializationUnoptimized) {
+      val trimLength = ".cpp".length()
+      unOptimizedFiles += out_cpps.last.name.dropRight(trimLength)
+    }
 
     maxFiles = out_cpps.length
 
