@@ -926,7 +926,7 @@ class CppBackend extends Backend {
       def outputAllClkDomains() {
         // Are we generating partitioned islands?
         if (!partitionIslands) {
-          for (out <- code.values.map(_._1) ++ code.values.map(_._2) ++ code.values.map(_._3)) {
+          for (out <- code.values.map(_._1) ++ (code.values.map(x => (x._2.append(x._3))))) {
             createCppFile()
             writeCppFile(out.result)
           }
@@ -950,7 +950,7 @@ class CppBackend extends Backend {
           }
 
           for (islandId <- islandOrder(1) if islandId > 0) {
-            for (out <- islandClkCode(islandId).values.map(_._2) ++ islandClkCode(islandId).values.map(_._3)) {
+            for (out <- islandClkCode(islandId).values.map(x => (x._2.append(x._3)))) {
               createCppFile()
               writeCppFile(out.result)
             }
