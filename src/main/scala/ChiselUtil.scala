@@ -439,14 +439,6 @@ class SQueue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: B
   val enq_ptr    = Counter(entries)
   val next_enq_ptr    = new Counter(entries, 1)
   val deq_ptr    = Counter(entries)
-//  val maybe_full = Reg(init=Bool(false))
-
-//  val ptr_match = enq_ptr.value === deq_ptr.value
-//  val empty     = ptr_match && !maybe_full
-//  val full      = ptr_match && maybe_full
-
-//  val do_enq = io.enq.ready && io.enq.valid
-//  val do_deq = io.deq.ready && io.deq.valid
   
   when (io.enq.ready && io.enq.valid) {
     ram(enq_ptr.value) := io.enq.bits
@@ -456,11 +448,6 @@ class SQueue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: B
   when (io.deq.ready && io.deq.valid) {
     deq_ptr.inc()
   }
-  /*
-  when ((io.enq.ready && io.enq.valid) != (io.deq.ready && io.deq.valid)) {
-    maybe_full := io.enq.ready && io.enq.valid
-  }
- */
  
   io.deq.valid := ! /* empty */ (enq_ptr.value === deq_ptr.value)
   io.enq.ready := ! /* full */ (next_enq_ptr.value === deq_ptr.value)

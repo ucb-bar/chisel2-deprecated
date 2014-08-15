@@ -279,10 +279,11 @@ object PartitionIslands {
 
     // Move from our current island to that of our inputs.
     // Do nothing if our inputs aren't all in the same island.
+    // Ignore literals. Their island of residence shouldn't matter.
     def islandHop(s: Node) {
       val inputsIslandSet = Set[Int]()
       try {
-        s.inputs.map(inputsIslandSet += markedNodes(_))
+        s.inputs.filter(!_.isInstanceOf[Literal]).foreach(inputsIslandSet += markedNodes(_))
       } catch {
         case ex: NoSuchElementException => {
           println("Bang! " + ex)
