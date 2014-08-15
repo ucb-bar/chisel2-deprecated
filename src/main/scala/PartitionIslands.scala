@@ -32,19 +32,36 @@ package Chisel
 
 import scala.collection.mutable.{ArrayBuffer, Set, HashSet, HashMap, ListBuffer, Map, Queue=>ScalaQueue, Stack}
 import collection.mutable
+import scala.collection.mutable.Map
 
 object PartitionIslands {
-  type IslandNodes = HashSet[Node]
-  type MarkedNodes = HashMap[Node, Int]
-  type IslandCollection = HashMap[Int, Island]
+  type IslandNodes = scala.collection.immutable.HashSet[Node]
+  type NodeIdIslands = scala.collection.immutable.HashSet[Island]
   val debug: Boolean = false
+  val printHistogram = false
 
-  class Island(theIslandId: Int, theNodes: IslandNodes, theRoots: IslandNodes) {
-    val nodes = theNodes
+  // The external interface - immutable sets.
+  class Island(theIslandId: Int, theNodes: scala.collection.immutable.Set[Node], theRoots: scala.collection.immutable.Set[Node]) {
     val islandId = theIslandId
+    val nodes = theNodes
     val roots = theRoots
     def isEmpty: Boolean = nodes.isEmpty
   }
+
+  // We define this as a class (as opposed to a simple type) in order to specify the size.
+  private class MarkedNodes(isize: Int = 16) extends HashMap[Node, Int] {
+    override def initialSize: Int = isize
+  }
+
+  private type mutableIslandNodes = scala.collection.mutable.HashSet[Node]
+  private class mutableIsland(theIslandId: Int, theNodes: mutableIslandNodes, theRoots: mutableIslandNodes) {
+    val islandId = theIslandId
+    val nodes = theNodes
+    val roots = theRoots
+    def isEmpty: Boolean = nodes.isEmpty
+  }
+
+  private type IslandCollection = HashMap[Int, mutableIsland]
 
   /** Indicate whether a node is a root node or not.
    *
@@ -62,11 +79,11 @@ object PartitionIslands {
    * We process unmarked inputs of marked nodes.
    * We do not process any consumers of marked nodes.
    */
-  def flood(sNode: Node, islandId: Int, marked: MarkedNodes, inputs: Set[Node], prefixNodes: Seq[Node]): Island = {
+  private def flood(sNode: Node, islandId: Int, marked: MarkedNodes, inputs: Set[Node], prefixNodes: Seq[Node]): mutableIsland = {
     val work = new Stack[Node]
-    val islandNodes = new IslandNodes
+    val islandNodes = new mutableIslandNodes
     islandNodes ++= prefixNodes
-    val islandRoots = new IslandNodes
+    val islandRoots = new mutableIslandNodes
     def processLinks(nodes: Seq[Node]) {
       // Process all unmarked nodes.
       for (n <- nodes) {
@@ -101,7 +118,7 @@ object PartitionIslands {
       }
       
     }
-    new Island(islandId, islandNodes, islandRoots)
+    new mutableIsland(islandId, islandNodes, islandRoots)
   }
 
   /* Create separately compilable islands of combinational logic.
@@ -117,9 +134,10 @@ object PartitionIslands {
     val lits = new NodeSet
     val barren = new NodeSet
     val bogus = new NodeSet
-    val markedNodes = new MarkedNodes
+    val markedNodes = new MarkedNodes(module.nodes.size)
     var islandId = 1
     val doMoveMemories = true
+    val mergeSingleNodeIslands = true
 
     // Mark all the Bits nodes directly reachable from an initial node.
     def markBitsNodes(iNode: Node, marked: MarkedNodes, islandId: Int) {
@@ -176,7 +194,10 @@ object PartitionIslands {
       }
       nIslands
     }
+
+    ChiselError.info("creating combinatorial islands")
     var nodeCount = 0
+    var maxNodeId = 0
     // Generate an array of input and output nodes for this module, and initialize the island id for each node.
     for (node <- module.omods) {
       if (node.isIo) {
@@ -207,7 +228,10 @@ object PartitionIslands {
         }
       }
       nodeCount += 1
-      if ((nodeCount % 1000) == 0) {
+      if (node._id > maxNodeId) {
+        maxNodeId = node._id
+      }
+      if (debug && (nodeCount % 1000) == 0) {
         println("createIslands: classified " + nodeCount + " nodes.")
       }
     }
@@ -227,10 +251,12 @@ object PartitionIslands {
     for (inode <- allLeaves) {
       markedNodes += ((inode, islandId))
       // Put all input, delay, bogus, and barren nodes in their own island.
-      val an = new IslandNodes
+      val an = new mutableIslandNodes
       an += inode
-      println("creating island leaf: " + islandId + " on " + inode.component.name + "/" + inode)
-      res += ((islandId, new Island(islandId, an, an)))
+      if (debug) {
+        println("creating island leaf: " + islandId + " on " + inode.component.name + "/" + inode)
+      }
+      res += ((islandId, new mutableIsland(islandId, an, an)))
       // Now mark all the directly-reachable Bits nodes.
       for ( pNode <-inode.consumers) {
         markBitsNodes(pNode, markedNodes, islandId)
@@ -252,7 +278,7 @@ object PartitionIslands {
     }
 
     // Move from our current island to that of our inputs.
-    // Complain if our inputs aren't all in the same island.
+    // Do nothing if our inputs aren't all in the same island.
     def islandHop(s: Node) {
       val inputsIslandSet = Set[Int]()
       try {
@@ -263,7 +289,7 @@ object PartitionIslands {
         }
       }
       if (inputsIslandSet.size != 1) {
-        ChiselError.info("islandHop: node "+ s + " - non-unique input")
+//        ChiselError.info("islandHop: node "+ s + " - non-unique input")
         return
       }
       val srcIsland = markedNodes(s)
@@ -290,27 +316,92 @@ object PartitionIslands {
         islandHop(m)
       }
     }
-    // Delete any empty islands and find the one with the most nodes.
+    // Delete any empty islands, merge single node islands (if configured to do so),
+    //  and find the one with the most nodes.
     var islandMaxNodes = (0, 0)
+    var singleNodeIslandId = 0
+    var singleNodeIslandNodes = 0
+    val countSingleIslandMerges = false
+    val maxNodesPerIsland = 30000
     for ((k, v) <- res) {
-      val nnodes = v.nodes.size
+      var nnode = k
+      var nnodes = v.nodes.size
       if (nnodes == 0) {
         res -= k
-      } else if (nnodes > islandMaxNodes._2){
-        islandMaxNodes = (k, nnodes)
+      } else {
+        if (mergeSingleNodeIslands && nnodes == 1) {
+          // This is a single node island. Combine it with all the other single node islands.
+          singleNodeIslandNodes += 1
+          // Is it time for a new single node island?
+          if ((singleNodeIslandNodes + nnodes >= maxNodesPerIsland) || singleNodeIslandId == 0) {
+            singleNodeIslandId = k
+            singleNodeIslandNodes = 1
+          } else {
+            if (countSingleIslandMerges) {
+              nnodes = singleNodeIslandNodes
+              nnode = singleNodeIslandId
+            }
+            res(singleNodeIslandId).nodes ++= v.nodes
+            res(singleNodeIslandId).roots ++= v.roots
+            res -= k
+          }
+        }
+        // Is this a new maximum?
+        if (nnodes > islandMaxNodes._2) {
+          islandMaxNodes = (nnode, nnodes)
+        }
       }
     }
-    // Output histogram info for the partitioning
-    println("createIslands: " + res.size + " islands")
-    val islandHistogram = Map[Int, Int]()
-    for (island <- res.values) {
-      val n = island.nodes.size
-      islandHistogram(n) = islandHistogram.getOrElse(n, 0) + 1
+    
+    // Construct the delivered data structure, with correctly sized Sets
+    val resArrayBuffer = new ArrayBuffer[Island](res.size)
+    for (islandId <- res.keySet.toList.sorted) {
+      val island = res(islandId)
+      val theNodes = scala.collection.immutable.HashSet.empty ++ island.nodes
+      val theRoots = scala.collection.immutable.HashSet.empty ++ island.roots
+      resArrayBuffer += new Island(islandId, theNodes, theRoots)
+      island.nodes.clear()
+      island.roots.clear()
     }
-    for ((k,v) <- islandHistogram) {
-      println("createIslands: islands " + v + ", nodes " + k)
+    res.clear()
+    
+    if (printHistogram) {
+      // Output histogram info for the partitioning
+      println("createIslands: " + resArrayBuffer.size + " islands, containing " + nodeCount + " nodes")
+      val islandHistogram = Map[Int, Int]()
+      for (island <- resArrayBuffer) {
+        val n = island.nodes.size
+        islandHistogram(n) = islandHistogram.getOrElse(n, 0) + 1
+      }
+      for ((k,v) <- islandHistogram) {
+        println("createIslands: islands " + v + ", nodes " + k)
+      }
+      println("createIslands: island " + islandMaxNodes._1 + " has " + islandMaxNodes._2 + " nodes")
     }
-    println("createIslands: island " + islandMaxNodes._1 + " has " + islandMaxNodes._2 + " nodes")
-    res.values.toArray
+    resArrayBuffer.toArray
+  }
+  
+  // Generate a mapping from node to island, given an array of islands.
+  def generateNodeToIslandArray(islands: Array[Island]): Array[NodeIdIslands] = {
+    if (islands == null || islands.size == 0) {
+      return null
+    } else if (! islands.exists(_.nodes.size > 0)) {
+      // No islands with nodes.
+      // Construct an array with a single entry containing an empty set.
+      return Array[NodeIdIslands](scala.collection.immutable.HashSet.empty)
+    }
+    // Find the maximum node _id
+    val maxIslandId = islands.map(_.nodes.map(_._id).max).max
+    // Generate an array to hold the set of islands per node.
+    val nodeToIslands: Array[NodeIdIslands] = new Array(maxIslandId + 1)
+    for (island <- islands) {
+      for (node <- island.nodes) {
+        if (nodeToIslands(node._id) == null) {
+          nodeToIslands(node._id) = new NodeIdIslands
+        }
+        nodeToIslands(node._id) += island
+      }
+    }
+    nodeToIslands
   }
 }

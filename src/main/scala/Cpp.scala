@@ -67,6 +67,7 @@ class CppBackend extends Backend {
   var maxFiles: Int = 0
   val minimumLinesPerFile = 32 * 1024
   val compileInitializationUnoptimized = true
+  val suppressMonolithicCppFile = compileInitializationUnoptimized
 
   override def emitTmp(node: Node): String = {
     require(false)
@@ -785,7 +786,9 @@ class CppBackend extends Backend {
     }
     def writeCppFile(s: String) {
       out_cpps.last.write(s)
-      all_cpp.append(s)
+      if (! suppressMonolithicCppFile) {
+        all_cpp.append(s)
+      }
     }
     def advanceCppFile() {
       out_cpps.last.advance()
@@ -827,6 +830,7 @@ class CppBackend extends Backend {
       e.toArray
     }
     val maxIslandId = islands.map(_.islandId).max
+    val nodeToIslandArray = generateNodeToIslandArray(islands)
 
     class ClockDomains {
       type ClockCodeStrings = HashMap[Clock, (StringBuilder, StringBuilder, StringBuilder)]
@@ -835,6 +839,8 @@ class CppBackend extends Backend {
       val islandStarted = Array.fill(3, maxIslandId + 1)(0)    // An array to keep track of the first time we added code to an island.
       val islandOrder = Array.fill(3, islands.size)(0)         // An array to keep track of the order in which we should output island code.
       var islandSequence = Array.fill(3)(0)
+      val showProgress = false
+
       for (clock <- Driver.clocks) {
         val clock_dlo = new StringBuilder
         val clock_ihi = new StringBuilder
@@ -862,8 +868,9 @@ class CppBackend extends Backend {
       def clock(n: Node) = if (n.clock == null) Driver.implicitClock else n.clock
 
       def populate() {
+        var nodeCount = 0
         def isNodeInIsland(node: Node, island: Island): Boolean = {
-          return island == null || island.nodes.contains(node)
+          return island == null || nodeToIslandArray(node._id).contains(island)
         }
 
         // Return true if we actually added any clock code.
@@ -913,6 +920,10 @@ class CppBackend extends Backend {
                 }
               }
             }
+            nodeCount += 1
+            if (showProgress && (nodeCount % 1000) == 0) {
+              println("ClockDomains: populated " + nodeCount + " nodes.")
+            }
           }
           for (codeStrings <- islandClkCode.values) {
             for (clk <- codeStrings.keys) {
@@ -936,12 +947,14 @@ class CppBackend extends Backend {
             for (out <- islandClkCode(islandId).values.map(_._1)) {
               createCppFile()
               writeCppFile(out.result)
+              out.clear()         // free the memory.
             }
           }
           for ((clock, clkcodes) <- code) {
             val (clock_lo, clock_ihi, clock_dhi) = clkcodes
             createCppFile()
             writeCppFile(clock_lo.result)
+            clock_lo.clear()      // free the memory
             // Output the actual calls to the island specific clock code.
             for (islandId <- islandOrder(0) if islandId > 0) {
               writeCppFile("\t" + c.name + "_t::clock_lo" + clkName(clock) + "_I_" + islandId + "(reset);\n")
@@ -953,6 +966,7 @@ class CppBackend extends Backend {
             for (out <- islandClkCode(islandId).values.map(x => (x._2.append(x._3)))) {
               createCppFile()
               writeCppFile(out.result)
+              out.clear()         // free the memory.
             }
           }
 
@@ -960,6 +974,8 @@ class CppBackend extends Backend {
             val (clock_lo, clock_ihi, clock_dhi) = clkcodes
             createCppFile()
             writeCppFile(clock_ihi.result ++ clock_dhi.result)
+            clock_ihi.clear()      // free the memory
+            clock_dhi.clear()      // free the memory
             // Output the actual calls to the island specific clock code.
             for (islandId <- islandOrder(1) if islandId > 0) {
               writeCppFile("\t" + c.name + "_t::clock_hi" + clkName(clock) + "_I_" + islandId + "(reset);\n")
@@ -1041,8 +1057,11 @@ class CppBackend extends Backend {
     out_h.write("\n\n#endif\n");
     out_h.close();
 
-    // Generate CPP files
+    ChiselError.info("populating clock domains")
+    clkDomains.populate()
 
+    // Generate CPP files
+    ChiselError.info("generating cpp files")
     createCppFile()
     
     // generate init block
@@ -1055,10 +1074,7 @@ class CppBackend extends Backend {
       writeCppFile(emitInit(clock))
     }
     writeCppFile("}\n")
-
-    clkDomains.populate()
     
-
     // generate clock(...) function
     writeCppFile("int " + c.name + "_t::clock ( dat_t<1> reset ) {\n")
     writeCppFile("  uint32_t min = ((uint32_t)1<<31)-1;\n")
@@ -1159,11 +1175,13 @@ class CppBackend extends Backend {
 
     maxFiles = out_cpps.length
 
-    // We're now going to write the entire contents out to a singe file.
-    // Make sure it's really a new file.
-    advanceCppFile()
-    createCppFile("")
-    writeCppFile(all_cpp.result)
+    if (! suppressMonolithicCppFile) {
+      // We're now going to write the entire contents out to a singe file.
+      // Make sure it's really a new file.
+      advanceCppFile()
+      createCppFile("")
+      writeCppFile(all_cpp.result)
+    }
     out_cpps.foreach(_.close)
     
     all_cpp.clear()
