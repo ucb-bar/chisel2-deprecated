@@ -197,10 +197,10 @@ module HiLoMultiplier(
   wire[15:0] T1;
 
   assign io_Lo = T0;
-  assign T0 = mult[4'hf/* 15*/:1'h0/* 0*/];
+  assign T0 = mult[4'hf:1'h0];
   assign mult = io_A * io_B;
   assign io_Hi = T1;
-  assign T1 = mult[5'h1f/* 31*/:5'h10/* 16*/];
+  assign T1 = mult[5'h1f:5'h10];
 endmodule
 
 \end{scala}
@@ -232,10 +232,10 @@ The Bool class in Chisel is used to represent the result of logical expressions 
 
 \begin{scala}
 val change = io.a === io.b // change gets Bool type
-when (change) { // execute if change is true
-	...
+when (change) {            // exec if change is true
+  ...
 } .otherwise {
-	...
+  ...
 }
 \end{scala}
 
@@ -258,7 +258,8 @@ When assigning values, it is required that you assign a value of the same type. 
     val in  = UInt(INPUT, 2)
     val out = UInt(OUTPUT, 1)
   }
-  io.out := (in === UInt(0)) // attempted Bool assignment to UInt
+  // attempted Bool assignment to UInt
+  io.out := (in === UInt(0)) 
   ...
 \end{scala}
 
