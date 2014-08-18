@@ -62,7 +62,7 @@ object Module {
   private def push(c: Module) {
     if (!Driver.modStackPushed) {
       ChiselError.error(
-        c.getClass.getName + " was not properly wrapped into a module() call.")
+        c.getClass.getName + " was not properly wrapped into a Module() call.")
     }
     Driver.modStackPushed = false
     Driver.compStack.push(c)
