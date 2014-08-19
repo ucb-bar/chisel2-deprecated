@@ -28,12 +28,14 @@ class HelloModule extends Module {
   printf("Hello World!\n")
 }
 
-class HelloModuleTests(c: HelloModule) extends Tester(c) {
+class HelloModuleTests(c: HelloModule) 
+    extends Tester(c) {
 }
 
 object hello {
   def main(args: Array[String]): Unit = {
-    chiselMainTest(Array("--backend", "c", "--genHarness"),
+    chiselMainTest(
+      Array("--backend", "c", "--genHarness"),
       () => Module(new HelloModule()) {
         c => new HelloModuleTests(c)
       })
