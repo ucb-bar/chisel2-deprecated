@@ -206,7 +206,10 @@ class ManualTester[+T <: Module]
       } else {
         cmd = "wire_poke " + dumpName(data);
       }
-      cmd = cmd + " 0x" + x.toString(16);
+      // Don't prefix negative numbers with "0x"
+      val radixPrefix = if (x < 0) " " else " 0x"
+
+      cmd = cmd + radixPrefix + x.toString(16);
       val rtn = emulatorCmd(cmd)
       if (rtn != "ok") {
         System.err.print(s"FAILED: poke(${dumpName(data)}) returned false")

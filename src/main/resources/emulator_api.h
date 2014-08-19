@@ -57,6 +57,13 @@ static void val_set(val_t* dst, val_t nb, val_t num) {
 template <int w>
 bool dat_from_str(std::string in, dat_t<w>& res, int pos = 0) {
     int radix = 10;
+	int negate = 0;
+
+	/* Handle leading minus sign. */
+	if (!in.substr(pos, 1).compare("-")) {
+		pos++;
+		negate = 1;
+	}
 
     if (!in.substr(pos, 1).compare("d")) {
         radix = 10;
@@ -96,7 +103,7 @@ bool dat_from_str(std::string in, dat_t<w>& res, int pos = 0) {
         } else if (c >= 'A' && c <= 'Z') {
             c_val = c - 'A' + 10;
         } else {
-            std::cerr << "dat_from_str: Invalid character '" << c << "'" <<
+            std::cerr << "dat_from_str: Invalid character '" << c << "' in '" << in << "'" <<
             		std::endl;
             return false;
         }
@@ -110,6 +117,9 @@ bool dat_from_str(std::string in, dat_t<w>& res, int pos = 0) {
         res = res + temp_prod;
         curr_base = curr_base * dat_t<log_max_radix+1>(radix);
     }
+	if (negate) {
+		res = -res;
+	}
     return true;
 }
 
