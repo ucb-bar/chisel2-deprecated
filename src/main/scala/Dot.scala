@@ -271,8 +271,12 @@ class DotBackend extends Backend {
     out_d.write("rankdir = LR;\n");
     val (innertext, innercrossings) = emitModuleText(c, 0)
     out_d.write(innertext);
-    Predef.assert(innercrossings.length == 0,
-      {println("length:" + innercrossings.length + ", " + innercrossings)})
+    if (Driver.partitionIslands && innercrossings.length > 0) {
+      out_d.write(innercrossings);
+    } else {
+      Predef.assert(innercrossings.length == 0,
+        {println("length:" + innercrossings.length + ", " + innercrossings)})
+    }
     out_d.write("}");
     out_d.close();
   }

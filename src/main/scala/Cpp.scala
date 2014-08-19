@@ -67,7 +67,7 @@ class CppBackend extends Backend {
   var maxFiles: Int = 0
   val minimumLinesPerFile = 32 * 1024
   val compileInitializationUnoptimized = true
-  val suppressMonolithicCppFile = compileInitializationUnoptimized
+  val suppressMonolithicCppFile = compileInitializationUnoptimized && false
 
   override def emitTmp(node: Node): String = {
     require(false)
@@ -132,7 +132,8 @@ class CppBackend extends Backend {
       case x: Literal =>
         List()
       case x: Reg =>
-        List((s"dat_t<${node.width}>", emitRef(node)))
+        // Add an entry for the shadow register in the main object.
+        List((s"dat_t<${node.width}>", emitRef(node))) ++ List((s"dat_t<${node.width}>", emitRef(node) + s"__shadow"))
       case m: Mem[_] =>
         List((s"mem_t<${m.width},${m.n}>", emitRef(m)))
       case r: ROMData =>
@@ -554,7 +555,8 @@ class CppBackend extends Backend {
   def emitInitHi(node: Node): String = {
     node match {
       case reg: Reg =>
-        s"  dat_t<${node.width}> ${emitRef(reg)}__shadow = ${emitRef(reg.next)};\n"
+//        s"  dat_t<${node.width}> ${emitRef(reg)}__shadow = ${emitRef(reg.next)};\n"
+        s"  ${emitRef(reg)}__shadow = ${emitRef(reg.next)};\n"
 
       case m: MemWrite =>
         block((0 until words(m)).map(i =>
@@ -854,13 +856,17 @@ class CppBackend extends Backend {
         if (partitionIslands) {
           for (island <- islands) {
             val islandId = island.islandId
-            islandClkCode += ((islandId, new ClockCodeStrings))
+            // Do we need a new entry for this mapping?
+            if (!islandClkCode.contains(islandId)) {
+              islandClkCode += ((islandId, new ClockCodeStrings))
+            }
             val clock_dlo_I = new StringBuilder
             val clock_ihi_I = new StringBuilder
             val clock_dhi_I = new StringBuilder
             islandClkCode(islandId) += (clock -> ((clock_dlo_I, clock_ihi_I, clock_dhi_I)))
             clock_dlo_I.append("void " + c.name + "_t::clock_lo" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset ) {\n")
-            clock_ihi_I.append("void " + c.name + "_t::clock_hi" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset ) {\n")
+            clock_ihi_I.append("void " + c.name + "_t::clock_ihi" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset ) {\n")
+            clock_dhi_I.append("void " + c.name + "_t::clock_dhi" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset ) {\n")
           }
         }
       }
@@ -873,14 +879,17 @@ class CppBackend extends Backend {
           return island == null || nodeToIslandArray(node._id).contains(island)
         }
 
-        // Return true if we actually added any clock code.
+        // Return tuple of booleans if we actually added any clock code.
         def addClkDefs(n: Node, codeStrings: ClockCodeStrings): (Boolean, Boolean, Boolean) = {
           val defLo = emitDefLo(n)
           val initHi = emitInitHi(n)
           val defHi = emitDefHi(n)
-          codeStrings(clock(n))._1.append(defLo)
-          codeStrings(clock(n))._2.append(initHi)
-          codeStrings(clock(n))._3.append(defHi)
+          val clockNode = clock(n)
+          if (defLo != "" || initHi != "" || defHi != "") {
+            codeStrings(clockNode)._1.append(defLo)
+            codeStrings(clockNode)._2.append(initHi)
+            codeStrings(clockNode)._3.append(defHi)
+          }
           (defLo != "", initHi != "", defHi != "")
         }
 
@@ -890,7 +899,7 @@ class CppBackend extends Backend {
           for (m <- c.omods) {
             addClkDefs(m, code)
           }
-          // We're going to merge the clock_hi init and def code into a single function.
+          // For the non-patitioned case, we're going to merge the clock_hi init and def code into a single function.
           // Add the closing brace to the def string.
           for (clk <- code.keys) {
             code(clk)._1.append("}\n")
@@ -928,6 +937,7 @@ class CppBackend extends Backend {
           for (codeStrings <- islandClkCode.values) {
             for (clk <- codeStrings.keys) {
               codeStrings(clk)._1.append("}\n")
+              codeStrings(clk)._2.append("}\n")
               codeStrings(clk)._3.append("}\n")
             }
           }
@@ -962,27 +972,40 @@ class CppBackend extends Backend {
             writeCppFile("}\n")
           }
 
+          // Output the island-specific clock init code
           for (islandId <- islandOrder(1) if islandId > 0) {
-            for (out <- islandClkCode(islandId).values.map(x => (x._2.append(x._3)))) {
+            for (out <- islandClkCode(islandId).values.map(_._2)) {
               createCppFile()
               writeCppFile(out.result)
               out.clear()         // free the memory.
             }
           }
 
+          // Output the island-specific clock def code
+          for (islandId <- islandOrder(1) if islandId > 0) {
+            for (out <- islandClkCode(islandId).values.map(_._3)) {
+              createCppFile()
+              writeCppFile(out.result)
+              out.clear()         // free the memory.
+            }
+          }
+
+          // Output the code to call the island-specific clock hi code.
           for ((clock, clkcodes) <- code) {
             val (clock_lo, clock_ihi, clock_dhi) = clkcodes
             createCppFile()
-            writeCppFile(clock_ihi.result ++ clock_dhi.result)
+            writeCppFile(clock_ihi.result)
             clock_ihi.clear()      // free the memory
-            clock_dhi.clear()      // free the memory
             // Output the actual calls to the island specific clock code.
             for (islandId <- islandOrder(1) if islandId > 0) {
-              writeCppFile("\t" + c.name + "_t::clock_hi" + clkName(clock) + "_I_" + islandId + "(reset);\n")
+              writeCppFile("\t" + c.name + "_t::clock_ihi" + clkName(clock) + "_I_" + islandId + "(reset);\n")
+            }
+            for (islandId <- islandOrder(1) if islandId > 0) {
+              writeCppFile("\t" + c.name + "_t::clock_dhi" + clkName(clock) + "_I_" + islandId + "(reset);\n")
             }
             writeCppFile("}\n")
           }
-        }
+       }
       }
     }
       
@@ -1031,7 +1054,8 @@ class CppBackend extends Backend {
         for (island <- islands) {
           val islandId = island.islandId
           out_h.write("  void clock_lo" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset );\n")
-          out_h.write("  void clock_hi" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset );\n")
+          out_h.write("  void clock_ihi" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset );\n")
+          out_h.write("  void clock_dhi" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset );\n")
         }
       }
       out_h.write("  void clock_lo" + clkName(clock) + " ( dat_t<1> reset );\n")

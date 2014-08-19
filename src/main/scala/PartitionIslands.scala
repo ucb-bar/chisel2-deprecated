@@ -38,7 +38,7 @@ object PartitionIslands {
   type IslandNodes = scala.collection.immutable.HashSet[Node]
   type NodeIdIslands = scala.collection.immutable.HashSet[Island]
   val debug: Boolean = false
-  val printHistogram = false
+  val printHistogram = true
 
   // The external interface - immutable sets.
   class Island(theIslandId: Int, theNodes: scala.collection.immutable.Set[Node], theRoots: scala.collection.immutable.Set[Node]) {
@@ -145,7 +145,11 @@ object PartitionIslands {
       // until we find a non-Bits node from which we will later flood.
       // We need to mark these nodes now so we don't flood into them during the flooding stage.
       // The islandId isn't critical here.
-      if (iNode.isInstanceOf[Bits]) {
+      // If we run out of consumers before hitting a non-bits node,
+      //  don't mark the last non-bits node. Otherwise, we won't account for this
+      //  collection and we'll generate an exception when we try to determine the island
+      //  for the intermediate nodes.
+      if (iNode.isInstanceOf[Bits] && iNode.consumers.length > 0) {
         marked += ((iNode, islandId))
         for (p <- iNode.consumers) {
           markBitsNodes(p, marked, islandId)
@@ -165,7 +169,7 @@ object PartitionIslands {
         println("islandsFromNonBitsNode: pushing " + iNode.component.name + "/" + iNode)
       }
       work.push(iNode)
-      if (iNode.isInstanceOf[Bits]) {
+      if (iNode.isInstanceOf[Bits] && iNode.consumers.length > 0) {
         for (p <- iNode.consumers) {
           nIslands += islandsFromNonBitsNode(p, res, marked, inputs, work)
         }
@@ -187,10 +191,10 @@ object PartitionIslands {
           val island = res(floodedIslandId)
           island.nodes ++= work
         }
-        work.pop()
-        if (debug) {
-          println("islandsFromNonBitsNode: popped " + iNode.component.name + "/" + iNode)
-        }
+      }
+      work.pop()
+      if (debug) {
+        println("islandsFromNonBitsNode: popped " + iNode.component.name + "/" + iNode)
       }
       nIslands
     }
@@ -279,16 +283,12 @@ object PartitionIslands {
 
     // Move from our current island to that of our inputs.
     // Do nothing if our inputs aren't all in the same island.
-    // Ignore literals. Their island of residence shouldn't matter.
+    // Ignore literals and registers.
+    // In the case of literals, their island of residence shouldn't matter.
+    // In the case of registers, we don't want to move the between islands.
     def islandHop(s: Node) {
       val inputsIslandSet = Set[Int]()
-      try {
-        s.inputs.filter(!_.isInstanceOf[Literal]).foreach(inputsIslandSet += markedNodes(_))
-      } catch {
-        case ex: NoSuchElementException => {
-          println("Bang! " + ex)
-        }
-      }
+      s.inputs.filter(i => !(i.isInstanceOf[Literal] || i.isInstanceOf[Reg])).foreach(inputsIslandSet += markedNodes(_))
       if (inputsIslandSet.size != 1) {
 //        ChiselError.info("islandHop: node "+ s + " - non-unique input")
         return
