@@ -721,11 +721,11 @@ positive-edge-triggered.
 
 \begin{scala}
 object Mem {
-  def apply[T <: Data](depth: Int, type: T,
+  def apply[T <: Data](type: T, depth: Int, 
           seqRead: Boolean = false): Mem
 }
 
-class Mem[T <: Data](depth: Int, type: T,
+class Mem[T <: Data](type: T, depth: Int, 
       seqRead: Boolean = false)
     extends Updateable {
   def apply(idx: UInt): T
@@ -737,7 +737,7 @@ register file with one write port and two combinational read ports might be
 expressed as follows:
 
 \begin{scala}
-val rf = Mem(32, UInt(width = 64))
+val rf = Mem(UInt(width = 64), 32)
 when (wen) { rf(waddr) := wdata }
 val dout1 = rf(waddr1)
 val dout2 = rf(waddr2)
@@ -749,7 +749,7 @@ one-write SRAM might be described as follows:
 
 \begin{scala}
 val ram1r1w =
-  Mem(1024, UInt(width = 32), seqRead = true)
+  Mem(UInt(width = 32), 1024, seqRead = true)
 val dout = Reg(UInt())
 when (wen) { ram1r1w(waddr) := wdata }
 when (ren) { dout := ram1r1w(raddr) }
@@ -760,7 +760,7 @@ mutually exclusive in the same \code{when} chain:
 
 \begin{scala}
 val ram1p = 
-  Mem(1024, UInt(width = 32), seqRead = true)
+  Mem(UInt(width = 32), 1024, seqRead = true)
 val dout = Reg(UInt())
 when (wen) { ram1p(waddr) := wdata }
 .elsewhen (ren) { dout := ram1p(raddr) }
@@ -774,7 +774,7 @@ Mem also supports write masks for subword writes.  A given bit is written if
 the corresponding mask bit is set.
 
 \begin{scala}
-val ram = Mem(256, UInt(width = 32))
+val ram = Mem(UInt(width = 32), 256)
 when (wen) { ram.write(waddr, wdata, wmask) }
 \end{scala}
 
