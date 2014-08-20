@@ -67,7 +67,9 @@ class CppBackend extends Backend {
   var maxFiles: Int = 0
   val minimumLinesPerFile = 32 * 1024
   val compileInitializationUnoptimized = true
-  val suppressMonolithicCppFile = compileInitializationUnoptimized && false
+  val suppressMonolithicCppFile = compileInitializationUnoptimized /* && false */
+  val shadowRegisterInObject = true
+  val splitLargeFunctions = true
 
   override def emitTmp(node: Node): String = {
     require(false)
@@ -132,8 +134,14 @@ class CppBackend extends Backend {
       case x: Literal =>
         List()
       case x: Reg =>
-        // Add an entry for the shadow register in the main object.
-        List((s"dat_t<${node.width}>", emitRef(node))) ++ List((s"dat_t<${node.width}>", emitRef(node) + s"__shadow"))
+        List((s"dat_t<${node.width}>", emitRef(node))) ++ {
+          // Add an entry for the shadow register in the main object.
+          if (shadowRegisterInObject) {
+            List((s"dat_t<${node.width}>", emitRef(node) + s"__shadow"))
+          } else {
+            Nil
+          }
+        }
       case m: Mem[_] =>
         List((s"mem_t<${m.width},${m.n}>", emitRef(m)))
       case r: ROMData =>
@@ -554,9 +562,14 @@ class CppBackend extends Backend {
 
   def emitInitHi(node: Node): String = {
     node match {
-      case reg: Reg =>
-//        s"  dat_t<${node.width}> ${emitRef(reg)}__shadow = ${emitRef(reg.next)};\n"
-        s"  ${emitRef(reg)}__shadow = ${emitRef(reg.next)};\n"
+      case reg: Reg => {
+        val storagePrefix = if (shadowRegisterInObject) {
+          ""
+        } else {
+          "  dat_t<" + node.width  + ">"
+        }
+        s"${storagePrefix} ${emitRef(reg)}__shadow = ${emitRef(reg.next)};\n"
+      }
 
       case m: MemWrite =>
         block((0 until words(m)).map(i =>
@@ -643,7 +656,7 @@ class CppBackend extends Backend {
     if (unOptimizedFiles.size != 0) {
       val optOpt = """(-O.)""".r
       // Generate a version of the flags with -Ox replaced by -O0.
-      val flags = optOpt.replaceAllIn(allFlags, "-O0")
+      val flags = optOpt.replaceAllIn(allFlags, "-O1")
       // Compile all the unoptimized files at level 0.
       unOptimizedFiles.map(cc(_, flags))
       val objects: ArrayBuffer[String] = new ArrayBuffer(maxFiles)
@@ -796,6 +809,162 @@ class CppBackend extends Backend {
       out_cpps.last.advance()
     }
 
+    // Generate header file
+    def genHeader(vcd: Backend, islands: Array[Island]) {
+      val out_h = createOutputFile(c.name + ".h");
+      out_h.write("#ifndef __" + c.name + "__\n");
+      out_h.write("#define __" + c.name + "__\n\n");
+      out_h.write("#include \"emulator.h\"\n\n");
+      
+      // Generate module headers
+      out_h.write("class " + c.name + "_t : public mod_t {\n");
+      out_h.write(" private:\n");
+      out_h.write("  val_t __rand_seed;\n");
+      out_h.write("  void __srand(val_t seed) { __rand_seed = seed; }\n");
+      out_h.write("  val_t __rand_val() { return ::__rand_val(&__rand_seed); }\n");
+      out_h.write(" public:\n");
+      def headerOrderFunc(a: Node, b: Node) = {
+        // pack smaller objects at start of header for better locality
+        val aMem = a.isInstanceOf[Mem[_]] || a.isInstanceOf[ROMData]
+        val bMem = b.isInstanceOf[Mem[_]] || b.isInstanceOf[ROMData]
+        aMem < bMem || aMem == bMem && a.width < b.width
+      }
+      for (m <- c.omods.filter(_.isInObject).sortWith(headerOrderFunc))
+        out_h.write(emitDec(m))
+      for (m <- c.omods.filter(_.isInVCD).sortWith(headerOrderFunc))
+        out_h.write(vcd.emitDec(m))
+      for (clock <- Driver.clocks)
+        out_h.write(emitDec(clock))
+  
+      out_h.write("\n");
+      out_h.write("  void init ( val_t rand_init = 0 );\n");
+      for ( clock <- Driver.clocks) {
+        val clockNameStr = clkName(clock).toString()
+        for (island <- islands if island.islandId != 0) {
+          val islandId = island.islandId
+          val suffix = clockNameStr + "_I_" + islandId + " ( dat_t<1> reset );\n"
+          out_h.write("  void clock_lo" + suffix)
+          out_h.write("  void clock_ihi" + suffix)
+          out_h.write("  void clock_dhi" + suffix)
+        }
+        out_h.write("  void clock_lo" + clockNameStr + " ( dat_t<1> reset );\n")
+        out_h.write("  void clock_hi" + clockNameStr + " ( dat_t<1> reset );\n")
+      }
+      out_h.write("  int clock ( dat_t<1> reset );\n")
+      if (Driver.clocks.length > 1) {
+        out_h.write("  void setClocks ( std::vector< int >& periods );\n")
+      }
+      out_h.write("  mod_t* clone();\n");
+      out_h.write("  bool set_circuit_from(mod_t* src);\n");
+      out_h.write("  void print ( FILE* f );\n");
+      out_h.write("  void dump ( FILE* f, int t );\n");
+      out_h.write("  void dump_init ( FILE* f );\n\n");
+      out_h.write("};\n\n");
+      out_h.write(Params.toCxxStringParams);
+      
+      // Generate API headers
+      out_h.write(s"class ${c.name}_api_t : public mod_api_t {\n");
+      out_h.write(s"  void init_mapping_table();\n");
+      out_h.write(s"};\n\n");
+      
+      out_h.write("\n\n#endif\n");
+      out_h.close();
+    }
+
+    def genInitMethod() {
+      createCppFile()
+      writeCppFile("void " + c.name + "_t::init ( val_t rand_init ) {\n")
+      writeCppFile("  this->__srand(rand_init);\n")
+      for (m <- c.omods) {
+        writeCppFile(emitInit(m))
+      }
+      for (clock <- Driver.clocks) {
+        writeCppFile(emitInit(clock))
+      }
+      writeCppFile("}\n")
+    }
+
+    def genClockMethod() {
+      createCppFile()
+      writeCppFile("int " + c.name + "_t::clock ( dat_t<1> reset ) {\n")
+      writeCppFile("  uint32_t min = ((uint32_t)1<<31)-1;\n")
+      for (clock <- Driver.clocks) {
+        writeCppFile("  if (" + emitRef(clock) + "_cnt < min) min = " + emitRef(clock) +"_cnt;\n")
+      }
+      for (clock <- Driver.clocks) {
+        writeCppFile("  " + emitRef(clock) + "_cnt-=min;\n")
+      }
+      for (clock <- Driver.clocks) {
+        writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
+      }
+      for (clock <- Driver.clocks) {
+        writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
+      }
+      for (clock <- Driver.clocks) {
+        writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " +
+                    emitRef(clock) + ";\n")
+      }
+      writeCppFile("  return min;\n")
+      writeCppFile("}\n")
+    }
+
+    def genCloneMethod() {
+      createCppFile()
+      writeCppFile(s"mod_t* ${c.name}_t::clone() {\n")
+      writeCppFile(s"  mod_t* cloned = new ${c.name}_t(*this);\n")
+      writeCppFile(s"  return cloned;\n")
+      writeCppFile(s"}\n")
+    }
+
+    def genSetCircuitFromMethod() {
+      createCppFile()
+      writeCppFile(s"bool ${c.name}_t::set_circuit_from(mod_t* src) {\n")
+      writeCppFile(s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(src);\n")
+      writeCppFile(s"  assert(mod_typed);\n")
+      
+      for (m <- c.omods) {
+        if(m.name != "reset" && m.isInObject) {
+          writeCppFile(emitCircuitAssign("mod_typed->", m))
+        }
+      }
+      for (clock <- Driver.clocks) {
+        writeCppFile(emitCircuitAssign("mod_typed->", clock))
+      }
+      writeCppFile("  return true;\n")
+      writeCppFile(s"}\n")
+    }
+
+    def genPrintMethod() {
+      createCppFile()
+      writeCppFile("void " + c.name + "_t::print ( FILE* f ) {\n")
+      for (cc <- Driver.components; p <- cc.printfs) {
+        hasPrintfs = true
+        writeCppFile("#if __cplusplus >= 201103L\n"
+          + "  if (" + emitLoWordRef(p.cond)
+          + ") dat_fprintf<" + p.width + ">(f, "
+          + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
+          + ");\n"
+          + "#endif\n")
+      }
+      if (hasPrintfs)
+        writeCppFile("fflush(f);\n");
+      writeCppFile("}\n")
+    }
+
+    def genInitMappingTableMethod(mappings: ArrayBuffer[Tuple2[String, Node]]) {
+      createCppFile()
+      writeCppFile(s"void ${c.name}_api_t::init_mapping_table() {\n");
+      writeCppFile(s"  dat_table.clear();\n")
+      writeCppFile(s"  mem_table.clear();\n")
+      writeCppFile(s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(module);\n")
+      writeCppFile(s"  assert(mod_typed);\n")
+      for (m <- mappings) {
+        if (m._2.name != "reset" && (m._2.isInObject || m._2.isInVCD)) {
+          writeCppFile(emitMapping(m))
+        }
+      }
+      writeCppFile(s"}\n");
+    }
     println("CPP elaborate")
     super.elaborate(c)
 
@@ -1014,149 +1183,35 @@ class CppBackend extends Backend {
     if (Driver.isGenHarness) {
       genHarness(c, c.name);
     }
-    val out_h = createOutputFile(c.name + ".h");
     if (!Params.space.isEmpty) {
       val out_p = createOutputFile(c.name + ".p");
       out_p.write(Params.toDotpStringParams);
       out_p.close();
     }
-    
-    // Generate header file
-    out_h.write("#ifndef __" + c.name + "__\n");
-    out_h.write("#define __" + c.name + "__\n\n");
-    out_h.write("#include \"emulator.h\"\n\n");
-    
-    // Generate module headers
-    out_h.write("class " + c.name + "_t : public mod_t {\n");
-    out_h.write(" private:\n");
-    out_h.write("  val_t __rand_seed;\n");
-    out_h.write("  void __srand(val_t seed) { __rand_seed = seed; }\n");
-    out_h.write("  val_t __rand_val() { return ::__rand_val(&__rand_seed); }\n");
-    out_h.write(" public:\n");
-    val vcd = new VcdBackend(c)
-    def headerOrderFunc(a: Node, b: Node) = {
-      // pack smaller objects at start of header for better locality
-      val aMem = a.isInstanceOf[Mem[_]] || a.isInstanceOf[ROMData]
-      val bMem = b.isInstanceOf[Mem[_]] || b.isInstanceOf[ROMData]
-      aMem < bMem || aMem == bMem && a.width < b.width
-    }
-    for (m <- c.omods.filter(_.isInObject).sortWith(headerOrderFunc))
-      out_h.write(emitDec(m))
-    for (m <- c.omods.filter(_.isInVCD).sortWith(headerOrderFunc))
-      out_h.write(vcd.emitDec(m))
-    for (clock <- Driver.clocks)
-      out_h.write(emitDec(clock))
 
-    out_h.write("\n");
-    out_h.write("  void init ( val_t rand_init = 0 );\n");
-    for ( clock <- Driver.clocks) {
-      if (partitionIslands) {
-        for (island <- islands) {
-          val islandId = island.islandId
-          out_h.write("  void clock_lo" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset );\n")
-          out_h.write("  void clock_ihi" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset );\n")
-          out_h.write("  void clock_dhi" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset );\n")
-        }
-      }
-      out_h.write("  void clock_lo" + clkName(clock) + " ( dat_t<1> reset );\n")
-      out_h.write("  void clock_hi" + clkName(clock) + " ( dat_t<1> reset );\n")
-    }
-    out_h.write("  int clock ( dat_t<1> reset );\n")
-    if (Driver.clocks.length > 1) {
-      out_h.write("  void setClocks ( std::vector< int >& periods );\n")
-    }
-    out_h.write("  mod_t* clone();\n");
-    out_h.write("  bool set_circuit_from(mod_t* src);\n");
-    out_h.write("  void print ( FILE* f );\n");
-    out_h.write("  void dump ( FILE* f, int t );\n");
-    out_h.write("  void dump_init ( FILE* f );\n\n");
-    out_h.write("};\n\n");
-    out_h.write(Params.toCxxStringParams);
-    
-    // Generate API headers
-    out_h.write(s"class ${c.name}_api_t : public mod_api_t {\n");
-    out_h.write(s"  void init_mapping_table();\n");
-    out_h.write(s"};\n\n");
-    
-    out_h.write("\n\n#endif\n");
-    out_h.close();
+    val vcd = new VcdBackend(c)
+    genHeader(vcd, islands)
 
     ChiselError.info("populating clock domains")
     clkDomains.populate()
 
     // Generate CPP files
     ChiselError.info("generating cpp files")
-    createCppFile()
     
     // generate init block
-    writeCppFile("void " + c.name + "_t::init ( val_t rand_init ) {\n")
-    writeCppFile("  this->__srand(rand_init);\n")
-    for (m <- c.omods) {
-      writeCppFile(emitInit(m))
-    }
-    for (clock <- Driver.clocks) {
-      writeCppFile(emitInit(clock))
-    }
-    writeCppFile("}\n")
+    genInitMethod()
     
     // generate clock(...) function
-    writeCppFile("int " + c.name + "_t::clock ( dat_t<1> reset ) {\n")
-    writeCppFile("  uint32_t min = ((uint32_t)1<<31)-1;\n")
-    for (clock <- Driver.clocks) {
-      writeCppFile("  if (" + emitRef(clock) + "_cnt < min) min = " + emitRef(clock) +"_cnt;\n")
-    }
-    for (clock <- Driver.clocks) {
-      writeCppFile("  " + emitRef(clock) + "_cnt-=min;\n")
-    }
-    for (clock <- Driver.clocks) {
-      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
-    }
-    for (clock <- Driver.clocks) {
-      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
-    }
-    for (clock <- Driver.clocks) {
-      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " +
-                  emitRef(clock) + ";\n")
-    }
-    writeCppFile("  return min;\n")
-    writeCppFile("}\n")
+    genClockMethod()
 
     // generate clone() function
-    writeCppFile(s"mod_t* ${c.name}_t::clone() {\n")
-    writeCppFile(s"  mod_t* cloned = new ${c.name}_t(*this);\n")
-    writeCppFile(s"  return cloned;\n")
-    writeCppFile(s"}\n")
+    genCloneMethod()
     
     // generate set_circuit_from function
-    writeCppFile(s"bool ${c.name}_t::set_circuit_from(mod_t* src) {\n")
-    writeCppFile(s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(src);\n")
-    writeCppFile(s"  assert(mod_typed);\n")
-    
-    for (m <- c.omods) {
-      if(m.name != "reset" && m.isInObject) {
-        writeCppFile(emitCircuitAssign("mod_typed->", m))
-      }
-    }
-    for (clock <- Driver.clocks) {
-      writeCppFile(emitCircuitAssign("mod_typed->", clock))
-    }
-    writeCppFile("  return true;\n")
-    writeCppFile(s"}\n")
+    genSetCircuitFromMethod()
     
     // generate print(...) function
-    writeCppFile("void " + c.name + "_t::print ( FILE* f ) {\n")
-    for (cc <- Driver.components; p <- cc.printfs) {
-      hasPrintfs = true
-      writeCppFile("#if __cplusplus >= 201103L\n"
-        + "  if (" + emitLoWordRef(p.cond)
-        + ") dat_fprintf<" + p.width + ">(f, "
-        + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
-        + ");\n"
-        + "#endif\n")
-    }
-    if (hasPrintfs)
-      writeCppFile("fflush(f);\n");
-    writeCppFile("}\n")
+    genPrintMethod()
     
     createCppFile()
     vcd.dumpVCDInit(writeCppFile)
@@ -1178,18 +1233,7 @@ class CppBackend extends Backend {
 
     advanceCppFile()
     // Generate API functions
-    createCppFile()
-    writeCppFile(s"void ${c.name}_api_t::init_mapping_table() {\n");
-    writeCppFile(s"  dat_table.clear();\n")
-    writeCppFile(s"  mem_table.clear();\n")
-    writeCppFile(s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(module);\n")
-    writeCppFile(s"  assert(mod_typed);\n")
-    for (m <- mappings) {
-      if (m._2.name != "reset" && (m._2.isInObject || m._2.isInVCD)) {
-        writeCppFile(emitMapping(m))
-      }
-    }
-    writeCppFile(s"}\n");
+    genInitMappingTableMethod(mappings)
 
     // Add the init_mapping_table file to the list of unoptimized files.
     if (compileInitializationUnoptimized) {
