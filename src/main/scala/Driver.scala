@@ -124,6 +124,8 @@ object Driver {
     isTesting = false
     isDebugMem = false
     partitionIslands = false
+    lineLimitFunctions = 0
+    minimumLinesPerFile = 0
     backend = new CppBackend
     topComponent = null
     randInitIOs.clear()
@@ -177,6 +179,8 @@ object Driver {
         case "--noInlineMem" => isInlineMem = false
         case "--debugMem" => isDebugMem = true
         case "--partitionIslands" => partitionIslands = true
+        case "--lineLimitFunctions" => lineLimitFunctions = args(i + 1).toInt; i += 1
+        case "--minimumLinesPerFile" => minimumLinesPerFile = args(i + 1).toInt; i += 1
         case "--backend" => {
           if (args(i + 1) == "v") {
             backend = new VerilogBackend
@@ -267,6 +271,8 @@ object Driver {
   var isTesting = false
   var isDebugMem = false
   var partitionIslands = false
+  var lineLimitFunctions = 0
+  var minimumLinesPerFile = 0
   var backend: Backend = null
   var topComponent: Module = null
   val components = ArrayBuffer[Module]()

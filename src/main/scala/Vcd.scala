@@ -148,7 +148,6 @@ class VcdBackend(top: Module) extends Backend {
   }
 
   def dumpVCDInit(write: String => Unit): Unit = {
-    write("void " + top.name + "_t::dump_init(FILE *f) {\n")
     if (Driver.isVCD) {
       write("  fputs(\"$timescale 1ps $end\\n\", f);\n")
       dumpVCDScope(top, write)
@@ -175,7 +174,6 @@ class VcdBackend(top: Module) extends Backend {
         baseIdx += rom.lits.size
       }
     }
-    write("}\n")
   }
 
   def dumpVCD(write: String => Unit): Unit = {

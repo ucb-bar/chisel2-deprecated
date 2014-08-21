@@ -64,8 +64,8 @@ class CppBackend extends Backend {
   val keywords = new HashSet[String]();
   private var hasPrintfs = false
   val unOptimizedFiles = HashSet[String]()
+  var cloneFile: String = ""
   var maxFiles: Int = 0
-  val minimumLinesPerFile = 32 * 1024
   val compileInitializationUnoptimized = true
   val suppressMonolithicCppFile = compileInitializationUnoptimized /* && false */
   val shadowRegisterInObject = true
@@ -655,10 +655,12 @@ class CppBackend extends Backend {
     // Are we generating unoptimized files?
     if (unOptimizedFiles.size != 0) {
       val optOpt = """(-O.)""".r
-      // Generate a version of the flags with -Ox replaced by -O0.
+      // Generate a version of the flags with -Ox replaced by -O1 (or -O0 for the clone file).
       val flags = optOpt.replaceAllIn(allFlags, "-O1")
-      // Compile all the unoptimized files at level 0.
-      unOptimizedFiles.map(cc(_, flags))
+      val cloneFlags = optOpt.replaceAllIn(allFlags, "-O0")
+      // Compile all the unoptimized files at a (possibly) lower level of optimization.
+      cc(cloneFile, cloneFlags)
+      unOptimizedFiles.filter(_ != cloneFile).map(cc(_, flags))
       val objects: ArrayBuffer[String] = new ArrayBuffer(maxFiles)
       // Compile the remainder at the specified optimization level.
       for (f <- 0 until maxFiles) {
@@ -760,6 +762,10 @@ class CppBackend extends Backend {
   def backendElaborate(c: Module) = super.elaborate(c)
 
   override def elaborate(c: Module): Unit = {
+    val minimumLinesPerFile = Driver.minimumLinesPerFile
+    val partitionIslands = Driver.partitionIslands
+    val lineLimitFunctions = Driver.lineLimitFunctions
+
     // Generate CPP files
     val out_cpps = ArrayBuffer[CppFile]()
     val all_cpp = new StringBuilder
@@ -789,6 +795,70 @@ class CppBackend extends Backend {
       }
     }
 
+    class LineLimitedFunction(functionNamePrefix: String, maxLines: Int, functionCodePrefix: String, functionCodeSuffix: String = "}\n", functionSignature: String = " ", functionArgs: String = " ", functionClass: String = c.name + "_t") {
+      var bodyLines = 0
+      val body = new StringBuilder
+      val bodies = new scala.collection.mutable.Queue[String]
+      private def functionName(i: Int): String = {
+        functionNamePrefix + "_" + i.toString
+      }
+      private def newBody() {
+        if (body.length > 0) {
+          bodies += body.result
+          body.clear()
+        }
+        bodyLines = 0
+      }
+      def addString(s: String) {
+        if (s == "") {
+          return
+        }
+        val lines = s.count(_ == '\n')
+        if (maxLines > 0 && lines + bodyLines > maxLines) {
+          newBody()
+        }
+        body.append(s)
+        bodyLines += lines
+      }
+      def genCalls() {
+        var offset = 0
+        while (bodies.length > offset) {
+          val functionCall = functionName(offset) + "(" + functionArgs + ");\n"
+          addString(functionCall)
+          offset += 1
+        }
+      }
+      def done() {
+        // Close off any body building in progress.
+        newBody()
+        if (bodies.length > 1) {
+          genCalls()
+          newBody()
+        }
+      }
+      def getBodies(): String = {
+        val bodycalls = new StringBuilder
+        bodies.length match {
+          case 0 => bodycalls.append(functionCodePrefix + functionCodeSuffix)
+          case 1 => {
+            bodycalls.append(functionCodePrefix)
+            bodycalls.append(bodies.dequeue())
+            bodycalls.append(functionCodeSuffix)
+          }
+          case _ => {
+            for (i <- 0 until bodies.length - 1) {
+              bodycalls.append("void " + functionClass + "::" + functionName(i) + "(" + functionSignature + ") {\n")
+              bodycalls.append(bodies.dequeue())
+              bodycalls.append("}\n")
+            }
+            bodycalls.append(functionCodePrefix)
+            bodycalls.append(bodies.dequeue())
+            bodycalls.append(functionCodeSuffix)
+          }
+        }
+        bodycalls.result
+      }
+    }
     def createCppFile(suffix: String = cppFileSuffix) {
       // If we're trying to coalesce cpp files (minimumLinesPerFile > 0),
       //  don't actually create a new file unless we've hit the line limit.
@@ -810,7 +880,7 @@ class CppBackend extends Backend {
     }
 
     // Generate header file
-    def genHeader(vcd: Backend, islands: Array[Island]) {
+    def genHeader(vcd: Backend, islands: Array[Island], nInitMethods: Int, nSetCircuitMethods: Int, nDumpInitMethods: Int, nInitMappingTableMethods: Int) {
       val out_h = createOutputFile(c.name + ".h");
       out_h.write("#ifndef __" + c.name + "__\n");
       out_h.write("#define __" + c.name + "__\n\n");
@@ -837,12 +907,27 @@ class CppBackend extends Backend {
         out_h.write(emitDec(clock))
   
       out_h.write("\n");
+
+      // If we're generating multiple init methods, wrap them in private/public.
+      if (nInitMethods > 1) {
+        out_h.write(" private:\n");
+        for (i <- 0 until nInitMethods - 1) {
+          out_h.write("  void init_" + i + " ( );\n");
+        }
+        out_h.write(" public:\n");
+      }
       out_h.write("  void init ( val_t rand_init = 0 );\n");
+
+      var generatedPrivateClockPrototypes = false
       for ( clock <- Driver.clocks) {
         val clockNameStr = clkName(clock).toString()
         for (island <- islands if island.islandId != 0) {
           val islandId = island.islandId
           val suffix = clockNameStr + "_I_" + islandId + " ( dat_t<1> reset );\n"
+          if (!generatedPrivateClockPrototypes) {
+            out_h.write(" private:\n");
+            generatedPrivateClockPrototypes = true
+          }
           out_h.write("  void clock_lo" + suffix)
           out_h.write("  void clock_ihi" + suffix)
           out_h.write("  void clock_dhi" + suffix)
@@ -850,20 +935,52 @@ class CppBackend extends Backend {
         out_h.write("  void clock_lo" + clockNameStr + " ( dat_t<1> reset );\n")
         out_h.write("  void clock_hi" + clockNameStr + " ( dat_t<1> reset );\n")
       }
+      if (generatedPrivateClockPrototypes) {
+        out_h.write(" public:\n");
+      }
       out_h.write("  int clock ( dat_t<1> reset );\n")
       if (Driver.clocks.length > 1) {
         out_h.write("  void setClocks ( std::vector< int >& periods );\n")
       }
+
       out_h.write("  mod_t* clone();\n");
+
+      // If we're generating multiple set_circuit methods, wrap them in private/public.
+      if (nSetCircuitMethods > 1) {
+        out_h.write(" private:\n");
+        for (i <- 0 until nSetCircuitMethods - 1) {
+          out_h.write("  void set_circuit_from_" + i + " ( " + c.name + "_t* mod_typed );\n");
+        }
+        out_h.write(" public:\n");
+      }
       out_h.write("  bool set_circuit_from(mod_t* src);\n");
       out_h.write("  void print ( FILE* f );\n");
       out_h.write("  void dump ( FILE* f, int t );\n");
+
+      // If we're generating multiple dump_init methods, wrap them in private/public.
+      if (nDumpInitMethods > 1) {
+        out_h.write(" private:\n");
+        for (i <- 0 until nDumpInitMethods - 1) {
+          out_h.write("  void dump_init_" + i + " ( FILE* f );\n");
+        }
+        out_h.write(" public:\n");
+      }
+
       out_h.write("  void dump_init ( FILE* f );\n\n");
       out_h.write("};\n\n");
       out_h.write(Params.toCxxStringParams);
       
       // Generate API headers
       out_h.write(s"class ${c.name}_api_t : public mod_api_t {\n");
+      // If we're generating multiple init_mapping_table( methods, wrap them in private/public.
+      if (nInitMappingTableMethods > 1) {
+        out_h.write(" private:\n");
+        for (i <- 0 until nInitMappingTableMethods - 1) {
+          out_h.write("  void init_mapping_table_" + i + " ( " + c.name + "_t* mod_typed );\n");
+        }
+        out_h.write(" public:\n");
+      }
+
       out_h.write(s"  void init_mapping_table();\n");
       out_h.write(s"};\n\n");
       
@@ -871,17 +988,21 @@ class CppBackend extends Backend {
       out_h.close();
     }
 
-    def genInitMethod() {
+    def genInitMethod(): Int = {
       createCppFile()
-      writeCppFile("void " + c.name + "_t::init ( val_t rand_init ) {\n")
-      writeCppFile("  this->__srand(rand_init);\n")
+      val head = "void " + c.name + "_t::init ( val_t rand_init ) {\n" +
+                 "  this->__srand(rand_init);\n"
+      val llf = new LineLimitedFunction("init", lineLimitFunctions, head)
       for (m <- c.omods) {
-        writeCppFile(emitInit(m))
+        llf.addString(emitInit(m))
       }
       for (clock <- Driver.clocks) {
-        writeCppFile(emitInit(clock))
+        llf.addString(emitInit(clock))
       }
-      writeCppFile("}\n")
+      llf.done()
+      val nFunctions = llf.bodies.length
+      writeCppFile(llf.getBodies)
+      nFunctions
     }
 
     def genClockMethod() {
@@ -916,22 +1037,25 @@ class CppBackend extends Backend {
       writeCppFile(s"}\n")
     }
 
-    def genSetCircuitFromMethod() {
+    def genSetCircuitFromMethod(): Int = {
       createCppFile()
-      writeCppFile(s"bool ${c.name}_t::set_circuit_from(mod_t* src) {\n")
-      writeCppFile(s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(src);\n")
-      writeCppFile(s"  assert(mod_typed);\n")
-      
+      val head = s"bool ${c.name}_t::set_circuit_from(mod_t* src) {\n" +
+                 s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(src);\n" +
+                 s"  assert(mod_typed);\n"
+      val tail = "  return true;\n}\n"
+      val llf = new LineLimitedFunction("set_circuit_from", lineLimitFunctions, head, tail, c.name + "_t* mod_typed", "mod_typed")
       for (m <- c.omods) {
         if(m.name != "reset" && m.isInObject) {
-          writeCppFile(emitCircuitAssign("mod_typed->", m))
+          llf.addString(emitCircuitAssign("mod_typed->", m))
         }
       }
       for (clock <- Driver.clocks) {
-        writeCppFile(emitCircuitAssign("mod_typed->", clock))
+        llf.addString(emitCircuitAssign("mod_typed->", clock))
       }
-      writeCppFile("  return true;\n")
-      writeCppFile(s"}\n")
+      llf.done()
+      val nFunctions = llf.bodies.length
+      writeCppFile(llf.getBodies)
+      nFunctions
     }
 
     def genPrintMethod() {
@@ -951,20 +1075,36 @@ class CppBackend extends Backend {
       writeCppFile("}\n")
     }
 
-    def genInitMappingTableMethod(mappings: ArrayBuffer[Tuple2[String, Node]]) {
+    def genDumpInitMethod(vcd: VcdBackend): Int = {
       createCppFile()
-      writeCppFile(s"void ${c.name}_api_t::init_mapping_table() {\n");
-      writeCppFile(s"  dat_table.clear();\n")
-      writeCppFile(s"  mem_table.clear();\n")
-      writeCppFile(s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(module);\n")
-      writeCppFile(s"  assert(mod_typed);\n")
+      val head = "void " + c.name + "_t::dump_init(FILE *f) {\n"
+      val llf = new LineLimitedFunction("dump_init", lineLimitFunctions, head, "}\n", "FILE *f", "f")
+      vcd.dumpVCDInit(llf.addString)
+      llf.done()
+      val nFunctions = llf.bodies.length
+      writeCppFile(llf.getBodies)
+      nFunctions
+    }
+
+    def genInitMappingTableMethod(mappings: ArrayBuffer[Tuple2[String, Node]]): Int = {
+      createCppFile()
+      val head = s"void ${c.name}_api_t::init_mapping_table() {\n" +
+                 s"  dat_table.clear();\n" +
+                 s"  mem_table.clear();\n" +
+                 s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(module);\n" +
+                 s"  assert(mod_typed);\n"
+      val llf = new LineLimitedFunction("init_mapping_table", lineLimitFunctions, head, "}\n", c.name + "_t* mod_typed", "mod_typed", c.name + "_api_t")
       for (m <- mappings) {
         if (m._2.name != "reset" && (m._2.isInObject || m._2.isInVCD)) {
-          writeCppFile(emitMapping(m))
+          llf.addString(emitMapping(m))
         }
       }
-      writeCppFile(s"}\n");
+      llf.done()
+      val nFunctions = llf.bodies.length
+      writeCppFile(llf.getBodies)
+      nFunctions
     }
+
     println("CPP elaborate")
     super.elaborate(c)
 
@@ -992,7 +1132,6 @@ class CppBackend extends Backend {
 
     // If we're partitioning a monolithic circuit into separate islands
     // of combinational logic, generate those islands now.
-    val partitionIslands = Driver.partitionIslands
     val islands = if (partitionIslands) {
       createIslands(c)
     } else {
@@ -1190,7 +1329,6 @@ class CppBackend extends Backend {
     }
 
     val vcd = new VcdBackend(c)
-    genHeader(vcd, islands)
 
     ChiselError.info("populating clock domains")
     clkDomains.populate()
@@ -1199,22 +1337,28 @@ class CppBackend extends Backend {
     ChiselError.info("generating cpp files")
     
     // generate init block
-    genInitMethod()
+    val nInitMethods = genInitMethod()
     
     // generate clock(...) function
     genClockMethod()
 
+    advanceCppFile()
+    // generate set_circuit_from function
+    val nSetCircuitFromMethods = genSetCircuitFromMethod()
+
+    advanceCppFile()
     // generate clone() function
     genCloneMethod()
     
-    // generate set_circuit_from function
-    genSetCircuitFromMethod()
-    
-    // generate print(...) function
+    // Make a special note of the clone file. We'll try compiling it -O0.
+    cloneFile = out_cpps.last.name.dropRight(".cpp".length())
+
+    // generate print(...) function.
+    // This will probably end up in the same file as the above clone code.
     genPrintMethod()
-    
-    createCppFile()
-    vcd.dumpVCDInit(writeCppFile)
+
+    advanceCppFile()
+    val nDumpInitMethods = genDumpInitMethod(vcd)
 
     createCppFile()
     vcd.dumpVCD(writeCppFile)
@@ -1233,13 +1377,16 @@ class CppBackend extends Backend {
 
     advanceCppFile()
     // Generate API functions
-    genInitMappingTableMethod(mappings)
+    val nInitMappingTableMethods = genInitMappingTableMethod(mappings)
 
     // Add the init_mapping_table file to the list of unoptimized files.
     if (compileInitializationUnoptimized) {
       val trimLength = ".cpp".length()
       unOptimizedFiles += out_cpps.last.name.dropRight(trimLength)
     }
+
+    // Finally, generate the header - once we know how many methods we'll have.
+    genHeader(vcd, islands, nInitMethods, nSetCircuitFromMethods, nDumpInitMethods, nInitMappingTableMethods)
 
     maxFiles = out_cpps.length
 
