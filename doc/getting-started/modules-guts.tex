@@ -165,20 +165,90 @@ val fifo3 = Module(new FIFO(depth = 32, width = 16))
 
 All of the above definitions pass the same parameters to the FIFO module. Notice that when you explicitly assign the parameter values, they can occur in any order you want such as the definition for fifo3.
 
+\section{Advanced Parametrization}
+
+Although parameters can be passed explicitly through a Module's constructor, this technique does not scale when parameterizing large designs with many parameterized components. For a more detailed explanation of why a better parameterization method is needed, please see XXXX. In addition, XXXX explains heuristics for how to organize and parameterize large designs, which we highly recommend reading prior to using this functionality on complicated designs.
+
+Every Module has its own \verb+params+ object, which acts as a dictionary. Querying this object is shown below.
+
+\begin{scala}
+val width = params[Int]('width')
+\end{scala}
+
+If \verb+params+ is queried and no parameter matches the query, Chisel throws a \verb+ParameterUndefinedException+. Notice the query return type must be provided.
+
+When a parent Module creates a child Module, the parent's \verb+params+ object is automatically cloned and passed to the child. In the following example, suppose the parent's params object returns \verb+10+ when queried for width. Because the \verb+Parent+ \verb+params+ object is automatically cloned for \verb+Child+, the \verb+Child+ query also returns \verb+10+.
+
+\begin{scala}
+class Parent extends Module {
+  val io = new Bundle { ... }
+  val width = params[Int]('width') // returns 10
+  // create child Module implicitly passing params
+  val child = Module(new Child) 
+}
+class Child extends Module {
+  val io = new Bundle { ... }
+  val width = params[Int]('width') // returns 10
+}
+\end{scala}
+
+Suppose a parent Module wants to override or add parameters to its child's \verb+params+ object. This case requires adding a partial function (a Scala way of defining key-value mappings) to the \verb+Child+ Module constructor:
+
+\begin{scala}
+class Parent extends Module {
+  val io = new Bundle { ... }
+  val width = params[Int]('width') // returns 10
+  val n = params[Int]('n') // returns 20
+  val child = Module(new Child,{'n' => 40})
+}
+class Child extends Module {
+  val io = new Bundle { ... }
+  val width = params[Int]('width') // returns 10
+  val n = params[Int]('n') // returns 40
+}
+\end{scala}
+
+A more complicated design may have the following structure:
+
+\begin{scala}
+class Top extends Module {
+  val io = new Bundle { ... }
+  val p = Module(new Parent,{
+    'width' => 10
+    'name' => 'Parent'
+  })
+}
+class Parent extends Module {
+  val io = new Bundle { ... }
+  val width = params[Int]('width')  // returns 10
+  val name = params[String]('name') // returns 'Parent'
+  val child1 = Module(new Child,{'name' => 'Child 1'})
+  val child2 = Module(new Child,{'name' => 'Child 2'})
+}
+class Child extends Module {
+  val io = new Bundle { ... }
+  val width = params[Int]('width')  // returns 10
+  val name = params[String]('name') // returns 'Child 1'
+                                    //   or 'Child 2'
+}
+\end{scala}
+
+For more advanced uses, tips, and tricks, please see XXXX.
+
 \section{Built In Primitives}
 
 Like other HDL, Chisel provides some very basic primitives. These are constructs that are built in to the Chisel compiler and come for free. The Reg, UInt, and Bundle classes are such primitives that has already been covered. Unlike Module instantiations, primitive do not require explicit connections of their io ports to use. Other useful primitive types include the Mem and Vec classes which will be discussed in a more advanced tutorial. In this tutorial we explore the use of the \verb+Mux+ primitive
 
 \subsection{The Mux Class}
 
-The \verb+Mux+ primitive is a two input multiplexor. In order to use the \verb+Mux+ we first need to define the expected syntax of the \verb+Mux+ class. As with any two input multiplexor, it takes three inputs and one output. Two of the inputs correspond to the data values \verb+A+ and \verb+B+ that we would like to select which can be any width and data type as long as they are the same. The third input \verb+select+ which is a Bool type determines which one to output.
+The \verb+Mux+ primitive is a two input multiplexer. In order to use the \verb+Mux+ we first need to define the expected syntax of the \verb+Mux+ class. As with any two input multiplexer, it takes three inputs and one output. Two of the inputs correspond to the data values \verb+A+ and \verb+B+ that we would like to select which can be any width and data type as long as they are the same. The third input \verb+select+ which is a Bool type determines which one to output.
 A \verb+select+ value of \verb+true+ will output the first value \verb+A+, while a \verb+select+ value of \verb+false+ will pass \verb+B+.
 
 \begin{scala}
 val out = Mux(select, A, B)
 \end{scala}
 
-Thus if \verb+A=10+, \verb+B=14+, and \verb+select+ was \verb+true+, the value of \verb+out+ would be assigned 10. Notice how using the \verb+Mux+ primitive type abstracts away the logic structures required if we had wanted to implement the multiplexor explicitly.
+Thus if \verb+A=10+, \verb+B=14+, and \verb+select+ was \verb+true+, the value of \verb+out+ would be assigned 10. Notice how using the \verb+Mux+ primitive type abstracts away the logic structures required if we had wanted to implement the multiplexer explicitly.
 
 % Martin: I would drop the following as it is just confusing in a tutorial
 % state simple that there is a Mux primitive and that is fine.
@@ -194,7 +264,7 @@ Thus if \verb+A=10+, \verb+B=14+, and \verb+select+ was \verb+true+, the value o
 %val out = mux.io.out
 %\end{scala}
 %
-%We see that clearly it is much cleaner to use the primitive \verb+Mux+ type instead of trying to write and implement our own general multiplexor since the \verb+Mux+ type does all the wiring for you.
+%We see that clearly it is much cleaner to use the primitive \verb+Mux+ type instead of trying to write and implement our own general multiplexer since the \verb+Mux+ type does all the wiring for you.
 
 
 %\section{Exercises}
