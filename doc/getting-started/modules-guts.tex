@@ -167,7 +167,7 @@ All of the above definitions pass the same parameters to the FIFO module. Notice
 
 \section{Advanced Parametrization}
 
-Although parameters can be passed explicitly through a Module's constructor, this technique does not scale when parameterizing large designs with many parameterized components. For a more detailed explanation of why a better parameterization method is needed, please see XXXX. In addition, XXXX explains heuristics for how to organize and parameterize large designs, which we highly recommend reading prior to using this functionality on complicated designs.
+Although parameters can be passed explicitly through a Module's constructor, this technique does not scale when parameterizing large designs with many generic components. For a more detailed explanation of why a better parameterization method is needed, please see XXXX. In addition, XXXX explains heuristics for how to organize and parameterize large designs, which we highly recommend one reads prior to using this functionality in a design. The following, however, is a basic introduction.
 
 Every Module has its own \verb+params+ object, which acts as a dictionary. Querying this object is shown below.
 
@@ -199,6 +199,7 @@ class Parent extends Module {
   val io = new Bundle { ... }
   val width = params[Int]('width') // returns 10
   val n = params[Int]('n') // returns 20
+  // Partial function is added to Module constructor
   val child = Module(new Child,{'n' => 40})
 }
 class Child extends Module {
@@ -208,28 +209,29 @@ class Child extends Module {
 }
 \end{scala}
 
-A more complicated design may have the following structure:
+An example which is impossible to do with simple parameterization, but simple with the advanced parameterization, is when using a generic \verb+Mesh+ generator with a custom \verb+MyRouter+ Module. The existing source code might look like:
 
 \begin{scala}
+class Mesh(routerConstructor: () => Router, n:Int) extends Module {
+  val io = new Bundle { ... }
+  val routers = Vec.fill(n){Module(routerConstructor())}
+  hookUpRouters(routers)
+}
+\end{scala}
+
+However, our custom \verb+MyRouter+ Module requires a parameter, \verb+RoutingFunction+ that we want to sweep for a design space evaluation. Using the simple parameterization method would require a change to the \verb+Mesh+ Module's constructor to include \verb+RoutingFunction+. 
+
+Alternatively, one can use the \verb+params+ object to implicitly pass the \verb+RoutingFunction+:
+
+\begin{scala}
+class MyRouter extends Module {
+  val io = new Bundle { ... }
+  val myRoutingFunction = params[RoutingFunction]('r')
+  ...
+}
 class Top extends Module {
   val io = new Bundle { ... }
-  val p = Module(new Parent,{
-    'width' => 10
-    'name' => 'Parent'
-  })
-}
-class Parent extends Module {
-  val io = new Bundle { ... }
-  val width = params[Int]('width')  // returns 10
-  val name = params[String]('name') // returns 'Parent'
-  val child1 = Module(new Child,{'name' => 'Child 1'})
-  val child2 = Module(new Child,{'name' => 'Child 2'})
-}
-class Child extends Module {
-  val io = new Bundle { ... }
-  val width = params[Int]('width')  // returns 10
-  val name = params[String]('name') // returns 'Child 1'
-                                    //   or 'Child 2'
+  val mesh = Module(new Mesh(() => new MyRouter),{'r' => new RoutingFunction})
 }
 \end{scala}
 
