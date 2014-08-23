@@ -329,11 +329,6 @@ object Parameters {
 
 class Field[T]
 
-trait PF extends PartialFunction[Any,Any]
-object Alter {
-  def apply(p:PartialFunction[Any,Any]) = p
-}
-
 final class Parameters(
     private val _world: World,
     private val _look: _Lookup
