@@ -66,8 +66,8 @@ object Driver {
     } else {
       Driver.backend.elaborate(c)
     }
-    if (Driver.isCheckingPorts) Driver.backend.checkPorts(c)
-    if (Driver.isCompiling && Driver.isGenHarness) Driver.backend.compile(c)
+    if (!ChiselError.hasErrors && Driver.isCheckingPorts) Driver.backend.checkPorts(c)
+    if (!ChiselError.hasErrors && Driver.isCompiling && Driver.isGenHarness) Driver.backend.compile(c)
     c
   }
 
@@ -126,6 +126,7 @@ object Driver {
     partitionIslands = false
     lineLimitFunctions = 0
     minimumLinesPerFile = 0
+    shadowRegisterInObject = false
     backend = new CppBackend
     topComponent = null
     randInitIOs.clear()
@@ -181,6 +182,7 @@ object Driver {
         case "--partitionIslands" => partitionIslands = true
         case "--lineLimitFunctions" => lineLimitFunctions = args(i + 1).toInt; i += 1
         case "--minimumLinesPerFile" => minimumLinesPerFile = args(i + 1).toInt; i += 1
+        case "--shadowRegisterInObject" => shadowRegisterInObject = true
         case "--backend" => {
           if (args(i + 1) == "v") {
             backend = new VerilogBackend
@@ -273,6 +275,7 @@ object Driver {
   var partitionIslands = false
   var lineLimitFunctions = 0
   var minimumLinesPerFile = 0
+  var shadowRegisterInObject = false
   var backend: Backend = null
   var topComponent: Module = null
   val components = ArrayBuffer[Module]()

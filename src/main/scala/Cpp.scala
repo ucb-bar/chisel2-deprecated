@@ -64,12 +64,13 @@ class CppBackend extends Backend {
   val keywords = new HashSet[String]();
   private var hasPrintfs = false
   val unOptimizedFiles = HashSet[String]()
+  val unOptimizedO0Files = HashSet[String]()
   var cloneFile: String = ""
   var maxFiles: Int = 0
   val compileInitializationUnoptimized = true
   val suppressMonolithicCppFile = compileInitializationUnoptimized /* && false */
-  val shadowRegisterInObject = true
-  val splitLargeFunctions = true
+  val shadowRegisterInObject = Driver.shadowRegisterInObject || Driver.partitionIslands || Driver.lineLimitFunctions > 0
+  val cloneCompiledO0 = true
 
   override def emitTmp(node: Node): String = {
     require(false)
@@ -656,11 +657,17 @@ class CppBackend extends Backend {
     if (unOptimizedFiles.size != 0) {
       val optOpt = """(-O.)""".r
       // Generate a version of the flags with -Ox replaced by -O1 (or -O0 for the clone file).
-      val flags = optOpt.replaceAllIn(allFlags, "-O1")
-      val cloneFlags = optOpt.replaceAllIn(allFlags, "-O0")
+      val O1flags = optOpt.replaceAllIn(allFlags, "-O1")
+      val O0Flags = optOpt.replaceAllIn(allFlags, "-O0")
       // Compile all the unoptimized files at a (possibly) lower level of optimization.
-      cc(cloneFile, cloneFlags)
-      unOptimizedFiles.filter(_ != cloneFile).map(cc(_, flags))
+      if (cloneCompiledO0) {
+        unOptimizedO0Files += cloneFile
+      }
+      // Compile the O0 files.
+      unOptimizedO0Files.map(cc(_, O0Flags))
+
+      // Compile the remaining (O1) files.
+      unOptimizedFiles.filter( ! unOptimizedO0Files.contains(_) ).map(cc(_, O1flags))
       val objects: ArrayBuffer[String] = new ArrayBuffer(maxFiles)
       // Compile the remainder at the specified optimization level.
       for (f <- 0 until maxFiles) {
@@ -862,7 +869,7 @@ class CppBackend extends Backend {
     def createCppFile(suffix: String = cppFileSuffix) {
       // If we're trying to coalesce cpp files (minimumLinesPerFile > 0),
       //  don't actually create a new file unless we've hit the line limit.
-      if ((out_cpps.size > 0) && (out_cpps.last.lines < minimumLinesPerFile) && !out_cpps.last.done) {
+      if ((out_cpps.size > 0) && (minimumLinesPerFile == 0 || out_cpps.last.lines < minimumLinesPerFile) && !out_cpps.last.done) {
         out_cpps.last.write("\n\n")
       } else {
         out_cpps += new CppFile(suffix)
@@ -1349,8 +1356,8 @@ class CppBackend extends Backend {
     advanceCppFile()
     // generate clone() function
     genCloneMethod()
-    
-    // Make a special note of the clone file. We'll try compiling it -O0.
+
+    // Make a special note of the clone file. We may want to compile it -O0.
     cloneFile = out_cpps.last.name.dropRight(".cpp".length())
 
     // generate print(...) function.
