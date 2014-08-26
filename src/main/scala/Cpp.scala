@@ -68,9 +68,19 @@ class CppBackend extends Backend {
   var cloneFile: String = ""
   var maxFiles: Int = 0
   val compileInitializationUnoptimized = true
+  // Suppress generation of the monolithic .cpp file
   val suppressMonolithicCppFile = compileInitializationUnoptimized /* && false */
-  val shadowRegisterInObject = Driver.shadowRegisterInObject || Driver.partitionIslands || Driver.lineLimitFunctions > 0
+  // Compile the clone method at -O0
   val cloneCompiledO0 = true
+  // Define shadow registers in the circuit object, instead of local registers in the clock hi methods.
+  // This is required if we're generating paritioned combinatorial islands, or we're limiting the size of functions/methods.
+  val shadowRegisterInObject = Driver.shadowRegisterInObject || Driver.partitionIslands || Driver.lineLimitFunctions > 0
+  // Sets to manage allocation and generation of shadow registers
+  val regWritten = HashSet[Node]()
+  val needShadow = HashSet[Node]()
+  val allocatedShadow = HashSet[Node]()
+  var potentialShadowRegisters = 0
+  val allocateOnlyNeededShadowRegisters = Driver.allocateOnlyNeededShadowRegisters
 
   override def emitTmp(node: Node): String = {
     require(false)
@@ -136,9 +146,13 @@ class CppBackend extends Backend {
         List()
       case x: Reg =>
         List((s"dat_t<${node.width}>", emitRef(node))) ++ {
-          // Add an entry for the shadow register in the main object.
-          if (shadowRegisterInObject) {
-            List((s"dat_t<${node.width}>", emitRef(node) + s"__shadow"))
+          if (!allocateOnlyNeededShadowRegisters || needShadow.contains(node)) {
+            // Add an entry for the shadow register in the main object.
+            if (shadowRegisterInObject) {
+              List((s"dat_t<${node.width}>", emitRef(node) + s"__shadow"))
+            } else {
+              Nil
+            }
           } else {
             Nil
           }
@@ -513,7 +527,9 @@ class CppBackend extends Backend {
 
   def emitRefHi(node: Node): String = node match {
     case reg: Reg =>
-      if (reg.next.isReg) emitRef(reg) + "__shadow"
+      if (reg.next.isReg && (!allocateOnlyNeededShadowRegisters || needShadow.contains(reg))) {
+        emitRef(reg) + "__shadow"
+      }
       else emitRef(reg.next)
     case _ => emitRef(node)
   }
@@ -561,15 +577,36 @@ class CppBackend extends Backend {
     }
   }
 
+  // If we write a register node before we use its inputs, we need to shadow it.
+  def determineRequiredShadowRegisters(node: Node) {
+    node match {
+      case reg: Reg => {
+        regWritten += reg
+      }
+      case _ => {
+        for (n <- node.inputs if regWritten.contains(n)) {
+          needShadow += n
+        }
+      }
+    }
+  }
+
   def emitInitHi(node: Node): String = {
     node match {
       case reg: Reg => {
-        val storagePrefix = if (shadowRegisterInObject) {
-          ""
+        potentialShadowRegisters += 1
+        val allocateShadow = !allocateOnlyNeededShadowRegisters || needShadow.contains(reg)
+        if (allocateShadow) {
+          allocatedShadow += reg
+          val storagePrefix = if (shadowRegisterInObject) {
+            ""
+          } else {
+            "  dat_t<" + node.width  + ">"
+          }
+          s"${storagePrefix} ${emitRef(reg)}__shadow = ${emitRef(reg.next)};\n"
         } else {
-          "  dat_t<" + node.width  + ">"
+          s" ${emitRef(reg)} = ${emitRef(reg.next)};\n"
         }
-        s"${storagePrefix} ${emitRef(reg)}__shadow = ${emitRef(reg.next)};\n"
       }
 
       case m: MemWrite =>
@@ -1208,6 +1245,13 @@ class CppBackend extends Backend {
           (defLo != "", initHi != "", defHi != "")
         }
 
+        // Should we determine which shadow registers we need?
+        if (allocateOnlyNeededShadowRegisters || true) {
+          for (n <- c.omods) {
+            determineRequiredShadowRegisters(n)
+          }
+        }
+
         // Are we generating partitioned islands?
         if (!partitionIslands) {
           // No. Generate and output a single, monolithic function.
@@ -1340,6 +1384,7 @@ class CppBackend extends Backend {
     ChiselError.info("populating clock domains")
     clkDomains.populate()
 
+    println("CppBackend::elaborate: need " + needShadow.size + ", redundant " + (potentialShadowRegisters - needShadow.size) + " shadow registers")
     // Generate CPP files
     ChiselError.info("generating cpp files")
     
