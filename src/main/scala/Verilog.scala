@@ -304,7 +304,7 @@ class VerilogBackend extends Backend {
         if(!m.isInline) {
           def find_gran(x: Node) : Int = {
             if (x.isInstanceOf[Literal])
-              return x.width
+              return x.needWidth()
             else if (x.isInstanceOf[UInt])
               return find_gran(x.inputs(0))
             else if (x.isInstanceOf[Op])
