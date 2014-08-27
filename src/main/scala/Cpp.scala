@@ -34,6 +34,8 @@ import scala.math._
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.PrintStream
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import scala.sys.process._
 import sys.process.stringSeqToProcess
 import Node._
@@ -672,6 +674,8 @@ class CppBackend extends Backend {
     val allFlags = flags + c11 + " -I../ -I" + chiselENV + "/csrc/"
     val dir = Driver.targetDir + "/"
     val CXX = scala.util.Properties.envOrElse("CXX", "g++" )
+    val parallelMakeJobs = Driver.parallelMakeJobs
+
     def run(cmd: String) {
       val bashCmd = Seq("bash", "-c", cmd)
       val c = bashCmd.!
@@ -689,37 +693,94 @@ class CppBackend extends Backend {
       val cmd = CXX + " -c -o " + dir + name + ".o " + flags + " " + dir + name + ".cpp"
       run(cmd)
     }
-    cc(c.name + "-emulator")
-    // Are we generating unoptimized files?
-    if (unOptimizedFiles.size != 0) {
-      val optOpt = """(-O.)""".r
-      // Generate a version of the flags with -Ox replaced by -O1 (or -O0 for the clone file).
-      val O1flags = optOpt.replaceAllIn(allFlags, "-O1")
-      val O0Flags = optOpt.replaceAllIn(allFlags, "-O0")
-      // Compile all the unoptimized files at a (possibly) lower level of optimization.
-      if (cloneCompiledO0) {
-        unOptimizedO0Files += cloneFile
-      }
-      // Compile the O0 files.
-      unOptimizedO0Files.map(cc(_, O0Flags))
 
-      // Compile the remaining (O1) files.
-      unOptimizedFiles.filter( ! unOptimizedO0Files.contains(_) ).map(cc(_, O1flags))
-      val objects: ArrayBuffer[String] = new ArrayBuffer(maxFiles)
-      // Compile the remainder at the specified optimization level.
-      for (f <- 0 until maxFiles) {
-        val basename = c.name + "-" + f
-        // If we've already compile this file, don't do it again,
-        // but do add it to the list of objects.
-        if (!unOptimizedFiles.contains(basename)) {
-          cc(basename)
+    def make(args: String) {
+      val cmd = "make " + args
+      run(cmd)
+    }
+
+    def editToTarget(filename: String, replacements: HashMap[String, String]) = {
+      val resourceStream = getClass().getResourceAsStream("/" + filename)
+      if( resourceStream != null ) {
+        val makefile = createOutputFile(filename)
+        val br = new BufferedReader(new InputStreamReader(resourceStream, "US-ASCII"))
+        while(br.ready()) {
+          val inputLine = br.readLine()
+          // Break the line into "tokens"
+          val tokens = inputLine.split("""(?=@\w+@)""")
+          // Reassemble the line plugging in expansions for "macro"
+          val outputLine = tokens.map(s => {
+            if (s.length > 2 && s.charAt(0) == '@' && s.takeRight(1) == "@") {
+              replacements(s)
+            } else {
+              s
+            }
+          }) mkString ""
+          makefile.write(outputLine + "\n")
         }
-        objects += basename
+        makefile.close()
+        br.close()
+      } else {
+        println(s"WARNING: Unable to copy '$filename'" )
       }
-      linkMany(c.name, objects)
+    }
+
+    // Compile all the unoptimized files at a (possibly) lower level of optimization.
+    if (cloneCompiledO0) {
+      unOptimizedO0Files += cloneFile
+    }
+    // Are we using a Makefile template and parallel makes?
+    if (parallelMakeJobs != 0) {
+      val replacements = HashMap[String, String] ()
+      val o0Files = unOptimizedO0Files.map(_ + ".o") mkString " "
+      val o1Files = unOptimizedFiles.filter( ! unOptimizedO0Files.contains(_) ).map(_ + ".o") mkString " "
+      val o2Files = ((for {
+        f <- 0 until maxFiles
+        basename = c.name + "-" + f
+        if !unOptimizedFiles.contains(basename)
+      } yield basename + ".o"
+      ) mkString " ") + " " + c.name + "-emulator.o"
+
+      replacements += (("@HFILES@", ""))
+      replacements += (("@UNOPTIMIZEDO0@", o0Files))
+      replacements += (("@UNOPTIMIZEDO1@", o1Files))
+      replacements += (("@OPTIMIZED@", o2Files))
+      replacements += (("@EXEC@", c.name))
+      replacements += (("@CPPFLAGS@", """(-O.)""".r.replaceAllIn(allFlags, "")))
+      // Read and edit the Makefile template.
+      editToTarget("Makefile", replacements)
+      val nJobs = if (parallelMakeJobs > 0) "-j" + parallelMakeJobs.toString() else "-j"
+      make(nJobs)
     } else {
-      cc(c.name)
-      linkOne(c.name)
+      // No make. Compile everything discretely.
+      cc(c.name + "-emulator")
+      // Are we generating unoptimized files?
+      if (unOptimizedFiles.size != 0) {
+        val optOpt = """(-O.)""".r
+        // Generate a version of the flags with -Ox replaced by -O1 (or -O0 for the clone file).
+        val O1flags = optOpt.replaceAllIn(allFlags, "-O1")
+        val O0Flags = optOpt.replaceAllIn(allFlags, "-O0")
+        // Compile the O0 files.
+        unOptimizedO0Files.map(cc(_, O0Flags))
+  
+        // Compile the remaining (O1) files.
+        unOptimizedFiles.filter( ! unOptimizedO0Files.contains(_) ).map(cc(_, O1flags))
+        val objects: ArrayBuffer[String] = new ArrayBuffer(maxFiles)
+        // Compile the remainder at the specified optimization level.
+        for (f <- 0 until maxFiles) {
+          val basename = c.name + "-" + f
+          // If we've already compile this file, don't do it again,
+          // but do add it to the list of objects.
+          if (!unOptimizedFiles.contains(basename)) {
+            cc(basename)
+          }
+          objects += basename
+        }
+        linkMany(c.name, objects)
+      } else {
+        cc(c.name)
+        linkOne(c.name)
+      }
     }
   }
 

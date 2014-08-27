@@ -128,6 +128,7 @@ object Driver {
     minimumLinesPerFile = 0
     shadowRegisterInObject = false
     allocateOnlyNeededShadowRegisters = false
+    parallelMakeJobs = 0
     backend = new CppBackend
     topComponent = null
     randInitIOs.clear()
@@ -185,6 +186,7 @@ object Driver {
         case "--minimumLinesPerFile" => minimumLinesPerFile = args(i + 1).toInt; i += 1
         case "--shadowRegisterInObject" => shadowRegisterInObject = true
         case "--allocateOnlyNeededShadowRegisters" => allocateOnlyNeededShadowRegisters = true
+        case "--parallelMakeJobs" => parallelMakeJobs = args(i + 1).toInt; i += 1
         case "--backend" => {
           if (args(i + 1) == "v") {
             backend = new VerilogBackend
@@ -279,6 +281,7 @@ object Driver {
   var minimumLinesPerFile = 0
   var shadowRegisterInObject = false
   var allocateOnlyNeededShadowRegisters = false
+  var parallelMakeJobs = 0
   var backend: Backend = null
   var topComponent: Module = null
   val components = ArrayBuffer[Module]()
