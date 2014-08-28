@@ -617,6 +617,7 @@ class CppBackend extends Backend {
   override def compile(c: Module, flagsIn: String) {
     val CXXFLAGS = scala.util.Properties.envOrElse("CXXFLAGS", "-O2" )
     val flags = if (flagsIn == null) CXXFLAGS else flagsIn
+    val LDFLAGS = scala.util.Properties.envOrElse("LDFLAGS", "")
 
     val chiselENV = java.lang.System.getenv("CHISEL")
     val c11 = if (hasPrintfs) " -std=c++11 " else ""
@@ -629,7 +630,7 @@ class CppBackend extends Backend {
       ChiselError.info(cmd + " RET " + c)
     }
     def link(name: String) {
-      val ac = CXX + " -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o"
+      val ac = CXX + " " + LDFLAGS + " -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o"
       run(ac)
     }
     def cc(name: String) {
