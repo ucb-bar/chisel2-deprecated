@@ -129,6 +129,7 @@ object Driver {
     shadowRegisterInObject = false
     allocateOnlyNeededShadowRegisters = false
     parallelMakeJobs = 0
+    isVCDinline = false
     backend = new CppBackend
     topComponent = null
     randInitIOs.clear()
@@ -187,6 +188,7 @@ object Driver {
         case "--shadowRegisterInObject" => shadowRegisterInObject = true
         case "--allocateOnlyNeededShadowRegisters" => allocateOnlyNeededShadowRegisters = true
         case "--parallelMakeJobs" => parallelMakeJobs = args(i + 1).toInt; i += 1
+        case "--isVCDinline" => isVCDinline = true
         case "--backend" => {
           if (args(i + 1) == "v") {
             backend = new VerilogBackend
@@ -282,6 +284,7 @@ object Driver {
   var shadowRegisterInObject = false
   var allocateOnlyNeededShadowRegisters = false
   var parallelMakeJobs = 0
+  var isVCDinline = false
   var backend: Backend = null
   var topComponent: Module = null
   val components = ArrayBuffer[Module]()
