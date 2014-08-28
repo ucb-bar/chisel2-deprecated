@@ -83,6 +83,12 @@ class CppBackend extends Backend {
   val allocatedShadow = HashSet[Node]()
   var potentialShadowRegisters = 0
   val allocateOnlyNeededShadowRegisters = Driver.allocateOnlyNeededShadowRegisters
+  val ignoreShadows = true
+  val shadowPrefix = if (ignoreShadows) {
+    "// "
+  } else {
+    ""
+  }
 
   override def emitTmp(node: Node): String = {
     require(false)
@@ -151,7 +157,7 @@ class CppBackend extends Backend {
           if (!allocateOnlyNeededShadowRegisters || needShadow.contains(node)) {
             // Add an entry for the shadow register in the main object.
             if (shadowRegisterInObject) {
-              List((s"dat_t<${node.width}>", emitRef(node) + s"__shadow"))
+              List((s"${shadowPrefix} dat_t<${node.width}>", shadowPrefix + emitRef(node) + s"__shadow"))
             } else {
               Nil
             }
@@ -605,7 +611,7 @@ class CppBackend extends Backend {
           } else {
             "  dat_t<" + node.width  + ">"
           }
-          s"${storagePrefix} ${emitRef(reg)}__shadow = ${emitRef(reg.next)};\n"
+          s"${shadowPrefix} ${storagePrefix} ${emitRef(reg)}__shadow = ${emitRef(reg.next)};\n"
         } else {
           s" ${emitRef(reg)} = ${emitRef(reg.next)};\n"
         }
