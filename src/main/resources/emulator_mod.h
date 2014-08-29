@@ -1727,8 +1727,11 @@ class mod_t {
     int delta = 0;
     dat_t<1> reset = LIT<1>(is_reset);
     for (int i = 0; i < n; i++) {
-      delta += clock(reset);
+      if (is_reset) {
+	clock_lo(reset);
+      }
       dump();
+      delta += clock(reset);
     }
     return delta;
   }

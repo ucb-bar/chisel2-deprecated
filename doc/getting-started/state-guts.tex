@@ -148,7 +148,7 @@ To instantiate read only memories in Chisel, we use a vector of constant literal
 \begin{footnotesize}
 \begin{scala}
 val numbers = 
-  Vec(UInt(0), UInt(1), UInt(2), UInt(3)){ UInt(width = 2) }
+  Vec(UInt(0),UInt(1),UInt(2),UInt(3)){ UInt(width = 2) }
 \end{scala}
 \end{footnotesize}
 
@@ -187,13 +187,15 @@ It is possible to specify either combinational or synchronous read behavior duri
 For instance, if we wanted a combinational read 128 entry memory of 32 bit UInt types, we would use the following definition:
 
 \begin{scala}
-val asyncMem = Mem(UInt(width = 32), 128, seqRead = false)
+val asyncMem = 
+  Mem(UInt(width = 32), 128, seqRead = false)
 \end{scala}
 
 Likewise, if we wanted a synchronous read 128 entry memory of 32 bit UInt types, we would set the \verb+seqRead+ to true:
 
 \begin{scala}
-val syncMem = Mem(UInt(width = 32), 128, seqRead = true)
+val syncMem = 
+  Mem(UInt(width = 32), 128, seqRead = true)
 \end{scala}
 
 % this needs more elaboration. Memories in hardware are tough...

@@ -171,14 +171,14 @@ Like other HDL, Chisel provides some very basic primitives. These are constructs
 
 \subsection{The Mux Class}
 
-The \verb+Mux+ primitive is a two input multiplexor. In order to use the \verb+Mux+ we first need to define the expected syntax of the \verb+Mux+ class. As with any two input multiplexor, it takes three inputs and one output. Two of the inputs correspond to the data values \verb+A+ and \verb+B+ that we would like to select which can be any width and data type as long as they are the same. The third input \verb+select+ which is a Bool type determines which one to output.
+The \verb+Mux+ primitive is a two input multiplexer. In order to use the \verb+Mux+ we first need to define the expected syntax of the \verb+Mux+ class. As with any two input multiplexer, it takes three inputs and one output. Two of the inputs correspond to the data values \verb+A+ and \verb+B+ that we would like to select which can be any width and data type as long as they are the same. The third input \verb+select+ which is a Bool type determines which one to output.
 A \verb+select+ value of \verb+true+ will output the first value \verb+A+, while a \verb+select+ value of \verb+false+ will pass \verb+B+.
 
 \begin{scala}
 val out = Mux(select, A, B)
 \end{scala}
 
-Thus if \verb+A=10+, \verb+B=14+, and \verb+select+ was \verb+true+, the value of \verb+out+ would be assigned 10. Notice how using the \verb+Mux+ primitive type abstracts away the logic structures required if we had wanted to implement the multiplexor explicitly.
+Thus if \verb+A=10+, \verb+B=14+, and \verb+select+ was \verb+true+, the value of \verb+out+ would be assigned 10. Notice how using the \verb+Mux+ primitive type abstracts away the logic structures required if we had wanted to implement the multiplexer explicitly.
 
 % Martin: I would drop the following as it is just confusing in a tutorial
 % state simple that there is a Mux primitive and that is fine.
@@ -194,7 +194,7 @@ Thus if \verb+A=10+, \verb+B=14+, and \verb+select+ was \verb+true+, the value o
 %val out = mux.io.out
 %\end{scala}
 %
-%We see that clearly it is much cleaner to use the primitive \verb+Mux+ type instead of trying to write and implement our own general multiplexor since the \verb+Mux+ type does all the wiring for you.
+%We see that clearly it is much cleaner to use the primitive \verb+Mux+ type instead of trying to write and implement our own general multiplexer since the \verb+Mux+ type does all the wiring for you.
 
 
 %\section{Exercises}
