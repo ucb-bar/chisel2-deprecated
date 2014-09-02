@@ -126,7 +126,7 @@ object Node {
 
   def rshWidthOf(i: => Int, n: => Node): (=> Node) => (Width) = {
     (m) => {
-      m.inputs(0).width - n.litValue(0).toInt
+      m.inputs(i).width - n.litValue(0).toInt
     }
   }
 }
@@ -449,6 +449,14 @@ abstract class Node extends nameable {
       w.needWidth()
     else
       throwException("Node.getWidth() for node " + this + " returns unknown width")
+  }
+
+  def getWWidth(): Width = {
+    val oldDriverisInGetWidth = Driver.isInGetWidth
+    Driver.isInGetWidth = true
+    val w = width
+    Driver.isInGetWidth = oldDriverisInGetWidth
+    w
   }
 
   def removeTypeNodes() {
