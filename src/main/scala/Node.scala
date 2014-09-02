@@ -42,6 +42,8 @@ import Width._;
 import java.lang.Double.longBitsToDouble
 import java.lang.Float.intBitsToFloat
 
+import java.lang.Thread._
+
 object Node {
   def sprintf(message: String, args: Node*): Bits = {
     val s = Bits().fromNode(new Sprintf(message, args))
@@ -59,11 +61,32 @@ object Node {
   }}
 
   def widthOf(i: => Int): (=> Node) => Width = { (m) => {
+    val debug = false
     try {
+      if (debug && i >= m.inputs.length ) {
+        println("Bad i (" + i + " >= " + m.inputs.length + ")")
+      }
       m.inputs(i).width
     } catch {
         case e: java.lang.IndexOutOfBoundsException => {
-          val error = new ChiselError(() => {m + " in " + m.component + " is unconnected (no input " + i + "). Ensure that it is assigned."}, m.line)
+          val error = new ChiselError(() => {m + " is unconnected ("+ i + " of " + m.inputs.length + "). Ensure that it is assigned."}, m.line)
+	  if (debug) {
+            e.printStackTrace(System.err)
+            var errorChild = ""
+            try {
+              if (m.inputs.length > i) {
+                errorChild = m.inputs(i).toString
+              } else {
+                errorChild = m.inputs.length.toString + " <= " + i 
+              }
+            } catch {
+              case ec: Throwable => {
+                ec.printStackTrace(System.err)
+              }
+            } finally {
+              println(error + " - " + errorChild)
+            }
+          }
           if (!ChiselErrors.contains(error) && !Driver.isInGetWidth) {
             ChiselErrors += error
           }
