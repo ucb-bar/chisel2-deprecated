@@ -142,7 +142,8 @@ abstract class Data extends Node {
   override def clone(): this.type = {
     try {
       val constructor = this.getClass.getConstructors.head
-      val res = constructor.newInstance(Array.fill(constructor.getParameterTypes.size)(null):_*)
+      require(constructor.getParameterTypes.size==0, "Cannot auto-create constructor for Data that requires arguments")
+      val res = constructor.newInstance()
       res.asInstanceOf[this.type]
     } catch {
       case npe: java.lang.reflect.InvocationTargetException if npe.getCause.isInstanceOf[java.lang.NullPointerException] =>

@@ -94,18 +94,19 @@ object isLessThan {
 }
 
 object Mux {
-  def apply[T <: Data](t: Bool, c: T, a: T): T = {
-    val res = Multiplex(t, c.toNode, a.toNode)
-    if (c.isInstanceOf[Bits]) {
-      assert(a.isInstanceOf[Bits])
-      if (c.getClass == a.getClass) {
-        c.fromNode(res)
-      } else {
-        Bits(OUTPUT).fromNode(res).asInstanceOf[T]
-      }
-    } else {
-      c.fromNode(res)
-    }
+  def apply[T<:Data](cond: Bool, tc: T, fc: T): T = {
+    require(tc.getClass == fc.getClass, s"In Mux, tc(${tc.getClass}) and fc(${fc.getClass}) must be same class.")
+    require(tc.flatten.length == fc.flatten.length, "In Mux (of ${tc.getClass}), tc and fc structurally different. Likely due to non-determinism or mutability in a subtype of Aggregate.")
+    val result = tc.clone()
+    val opdescs = result.flatten.zip(tc.flatten.zip(fc.flatten))
+      // opdescs: (result, (tc, fc))
+
+    opdescs.foreach(opdesc => {
+      val op_r = opdesc._1._2; val op_tc = opdesc._2._1._2; val op_fc = opdesc._2._2._2
+      op_r.asTypeFor(Multiplex(cond, op_tc, op_fc))
+    })
+
+    result
   }
 }
 
