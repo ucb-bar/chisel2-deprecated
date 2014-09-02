@@ -7,7 +7,7 @@
 // Portions may be copyrighted by others, as may be noted in specific   //
 // copyright notices within specific files.                             //
 //                                                                      //
-// AUTHOR: J. Bachan                                                    //
+// AUTHOR: J. Bachan, A Izraelevitz, H Cook                             //
 //////////////////////////////////////////////////////////////////////////
 
 // Convention: leading _'s on names means private to the outside world
@@ -36,6 +36,7 @@ abstract class ChiselConfig {
   val knobVal:Any=>Any = {
     case x if(false) => x
   }
+  val topConstraints:List[ViewSym=>Ex[Boolean]] = List( ex => ExLit[Boolean](true) )
 }
 
 // objects given to the user in mask functions (site,here,up)
@@ -119,6 +120,7 @@ abstract class World(
     topDefs: World.TopDefs
   ) {
   
+  val _knobs = new mutable.HashSet[Any]
   abstract class _View extends View {
     val look: _Lookup
     def path = look.path
@@ -134,7 +136,7 @@ abstract class World(
   // evaluate an expression against this world
   def _eval[T](e:Ex[T]):T = {
     Ex.eval(e, {
-      case v:_VarKnob[_] => _knobValue(v.kname)
+      case v:_VarKnob[_] => {_knobs += v.kname; _knobValue(v.kname)}
       case v:_VarLet[_] => _eval(v.expr.asInstanceOf[Ex[T]])
     })
   }
@@ -200,31 +202,10 @@ class Collector(
   
   val _constraints = new mutable.HashSet[Ex[Boolean]]
   
-  def knobs():Set[Any] = {
-    val ks = new mutable.HashSet[Any]
-    for(c <- _constraints) {
-      for(e <- Ex.unfurl(c)) {
-        e match {
-          case ExVar(_VarKnob(k)) => ks += k
-          case _ => {}
-        }
-      }
-    }
-    ks.toSet
+  def knobs():List[Any] = {
+    _knobs.toList
   }
-  def knobNames():Set[String] = {
-    val ks = new mutable.HashSet[String]
-    for(c <- _constraints) {
-      for(e <- Ex.unfurl(c)) {
-        e match {
-          case v:ExVar[_] => ks += v.toString
-          case _ => {}
-        }
-      }
-    }
-    ks.toSet
-  }
-  
+
   def constraints():List[Ex[Boolean]] = {
     _constraints.toList
   }
@@ -270,8 +251,8 @@ class Collector(
 
   override def getConstraints:String = if(constraints.isEmpty) "" else constraints.map("( " + _.toString + " )").reduce(_ +"\n" + _) + "\n"
 
-  override def getKnobs:String = if(knobNames.isEmpty) "" else {
-    knobNames.reduce(_ + "\n" + _) + "\n"
+  override def getKnobs:String = if(knobs.isEmpty) "" else {
+    knobs.map(_.toString).reduce(_ + "\n" + _) + "\n"
   }
 }
 
@@ -383,9 +364,6 @@ final class Parameters(
   def alter[T](mask:Map[T,Any]) =
     _alter(Parameters.makeMask(mask.asInstanceOf[Map[Any,Any]]))
   
-  def alter(mask:PartialFunction[Any,Any]) =
-    _alter(Parameters.makeMask(mask))
-
   def alterPartial(mask:PartialFunction[Any,Any]) =
     _alter(Parameters.makeMask(mask))
 }
