@@ -685,15 +685,15 @@ positive-edge-triggered register defined as follows:
 \begin{scala}
 object Reg {
   def apply[T <: Data]
-    (type: T, updateVal: T = null, resetVal: T = null): T
+    (type: T, next: T = null, init: T = null): T
 }
  
-object RegUpdate {
-  def apply[T <: Data] (updateVal: T, resetVal: T = null): T
+object RegNext {
+  def apply[T <: Data] (next: T, init: T = null): T
 }
 
-object RegReset {
-  def apply[T <: Data] (resetVal: T): T
+object RegInit {
+  def apply[T <: Data] (init: T): T
 }
 
 class Reg extends Updateable
@@ -1039,7 +1039,8 @@ testing circuits by providing test vectors within Scala using
 subclasses of the \code{Tester} class:
 
 \begin{scala}
-class Tester[T <: Module] (val c: T, val isTrace: Boolean = true) {
+class Tester[T <: Module] 
+    (val c: T, val isTrace: Boolean = true) {
   var t: Int
   var ok: Boolean
   val rnd: Random

@@ -1484,15 +1484,15 @@ val mDat = regs(mAddr)
 class DynamicMemorySearch extends Module {
   val io = new Bundle {
     val isWr   = Bool(INPUT)
-    val wrAddr = UInt(INPUT, 3)
-    val data   = UInt(INPUT, 4)
+    val wrAddr = UInt(INPUT,  3)
+    val data   = UInt(INPUT,  4)
     val en     = Bool(INPUT)
     val target = UInt(OUTPUT, 3)
     val done   = Bool(OUTPUT)
   }
   val index  = Reg(init = UInt(0, width = 3))
   val memVal = ...
-  val done = !io.en && ((memVal === io.target) || (index === UInt(7)))
+  val done = !io.en && ((memVal === io.data) || (index === UInt(7)))
   // ...
   when (io.en) {
     index := UInt(0)
