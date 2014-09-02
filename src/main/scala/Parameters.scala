@@ -1,23 +1,69 @@
-//////////////////////////////////////////////////////////////////////////
-// Open System-on-a-Chip (OpenSoC) is Copyright (c) 2014,               //
-// The Regents of the University of California, through Lawrence        //
-// Berkeley National Laboratory (subject to receipt of any required     //
-// approvals from the U.S. Dept. of Energy).  All rights reserved.      //
-//                                                                      //
-// Portions may be copyrighted by others, as may be noted in specific   //
-// copyright notices within specific files.                             //
-//                                                                      //
-// AUTHOR: J. Bachan, A Izraelevitz, H Cook                             //
-//////////////////////////////////////////////////////////////////////////
-
-// Convention: leading _'s on names means private to the outside world
-// but accessible to anything in this file.
+/*
+ Copyright (c) 2014, The Regents of the University of California, through
+ Lawrence Berkeley National Laboratory (subject to receipt of any required
+ approvals from the U.S. Dept. of Energy).  All rights reserved.
+ 
+ If you have questions about your rights to use or distribute this software,
+ please contact Berkeley Lab's Technology Transfer Department at  TTD@lbl.gov.
+ 
+ NOTICE.  This software is owned by the U.S. Department of Energy.  As such, the
+ U.S. Government has been granted for itself and others acting on its behalf a
+ paid-up, nonexclusive, irrevocable, worldwide license in the Software to
+ reproduce, prepare derivative works, and perform publicly and display publicly.
+ Beginning five (5) years after the date permission to assert copyright is
+ obtained from the U.S. Department of Energy, and subject to any subsequent five
+ (5) year renewals, the U.S. Government is granted for itself and others acting
+ on its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the
+ Software to reproduce, prepare derivative works, distribute copies to the
+ public, perform publicly and display publicly, and to permit others to do so.
+ 
+ Redistribution and use in source and binary forms, with or without modification,
+ are permitted provided that the following conditions are met:
+ 
+ (1) Redistributions of source code must retain the above copyright notice, this
+ list of conditions and the following disclaimer.
+ 
+ (2) Redistributions in binary form must reproduce the above copyright notice,
+ this list of conditions and the following disclaimer in the documentation and/or
+ other materials provided with the distribution.
+ 
+ (3) Neither the name of the University of California, Lawrence Berkeley National
+ Laboratory, U.S. Dept. of Energy nor the names of its contributors may be used
+ to endorse or promote products derived from this software without specific prior
+ written permission.
+ 
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+ You are under no obligation whatsoever to provide any bug fixes, patches, or
+ upgrades to the features, functionality or performance of the source code
+ ("Enhancements") to anyone; however, if you choose to make your Enhancements
+ available either publicly, or directly to Lawrence Berkeley National Laboratory,
+ without imposing a separate written license agreement for such Enhancements,
+ then you hereby grant the following license: a  non-exclusive, royalty-free
+ perpetual license to install, use, modify, prepare derivative works, incorporate
+ into other computer software, distribute, and sublicense such enhancements or
+ derivative works thereof, in binary and source code form.
+ 
+ Authors: J. Bachan, A. Izraelevitz, H. Cook
+*/
 
 package Chisel
 
 import scala.collection.immutable.{Seq=>Seq, Iterable=>Iterable}
 import scala.{collection=>readonly}
 import scala.collection.mutable
+
+// Convention: leading _'s on names means private to the outside world
+// but accessible to anything in this file.
 
 abstract trait UsesParameters {
   def params: Parameters
@@ -32,11 +78,11 @@ class ParameterUndefinedException(field:Any, cause:Throwable=null)
 final case class Knob[T](name:Any)
 
 abstract class ChiselConfig {
-  val top:World.TopDefs
-  val knobVal:Any=>Any = {
+  val topDefinitions:World.TopDefs
+  val topConstraints:List[ViewSym=>Ex[Boolean]] = List( ex => ExLit[Boolean](true) )
+  val knobValues:Any=>Any = {
     case x if(false) => x
   }
-  val topConstraints:List[ViewSym=>Ex[Boolean]] = List( ex => ExLit[Boolean](true) )
 }
 
 // objects given to the user in mask functions (site,here,up)
@@ -366,4 +412,153 @@ final class Parameters(
   
   def alterPartial(mask:PartialFunction[Any,Any]) =
     _alter(Parameters.makeMask(mask))
+}
+
+
+/*
+ Expression Library
+*/
+abstract class Ex[T] {
+  override def toString = Ex.pretty(this)
+}
+
+case class IntEx (expr:Ex[Int]) {
+  def === (x:IntEx):Ex[Boolean] = (ExEq[Int](expr,x.expr))
+  def +   (x:IntEx):Ex[Int] = ExAdd(expr,x.expr)
+  def -   (x:IntEx):Ex[Int] = ExSub(expr,x.expr)
+  def *   (x:IntEx):Ex[Int] = ExMul(expr,x.expr)
+  def %   (x:IntEx):Ex[Int] = ExMod(expr,x.expr)
+  def <   (x:IntEx):Ex[Boolean] = ExLt(expr,x.expr)
+  def >   (x:IntEx):Ex[Boolean] = ExGt(expr,x.expr)
+  def <=  (x:IntEx):Ex[Boolean] = ExLte(expr,x.expr)
+  def >=  (x:IntEx):Ex[Boolean] = ExGte(expr,x.expr)
+}
+
+case class BoolEx (expr:Ex[Boolean]) {
+  def &&  (x:BoolEx):Ex[Boolean] = ExAnd(expr,x.expr)
+  def ||  (x:BoolEx):Ex[Boolean] = ExOr(expr,x.expr)
+  def ^   (x:BoolEx):Ex[Boolean] = ExXor(expr,x.expr)
+  def === (x:BoolEx):Ex[Boolean] = ExEq[Boolean](expr,x.expr)
+  def !== (x:BoolEx):Ex[Boolean] = ExEq[Boolean](expr,x.expr)
+}
+
+object Implicits {
+  implicit def ExIntToIntEx(i:Ex[Int]):IntEx = IntEx(i)
+  implicit def IntToIntEx(i:Int):IntEx = IntEx(ExLit[Int](i))
+  implicit def ExBoolToBoolEx(b:Ex[Boolean]):BoolEx = BoolEx(b)
+  implicit def BoolToIntEx(b:Boolean):BoolEx = BoolEx(ExLit[Boolean](b))
+}
+
+final case class ExLit[T](value:T) extends Ex[T]
+final case class ExVar[T](name:Any) extends Ex[T]
+
+
+final case class ExAnd(a:Ex[Boolean], b:Ex[Boolean]) extends Ex[Boolean]
+final case class ExOr(a:Ex[Boolean], b:Ex[Boolean]) extends Ex[Boolean]
+final case class ExXor(a:Ex[Boolean], b:Ex[Boolean]) extends Ex[Boolean]
+
+final case class ExEq[T](a:Ex[T], b:Ex[T]) extends Ex[Boolean]
+final case class ExNeq[T](a:Ex[T], b:Ex[T]) extends Ex[Boolean]
+final case class ExLt(a:Ex[Int], b:Ex[Int]) extends Ex[Boolean]
+final case class ExLte(a:Ex[Int], b:Ex[Int]) extends Ex[Boolean]
+final case class ExGt(a:Ex[Int], b:Ex[Int]) extends Ex[Boolean]
+final case class ExGte(a:Ex[Int], b:Ex[Int]) extends Ex[Boolean]
+final case class ExAdd(a:Ex[Int], b:Ex[Int]) extends Ex[Int]
+final case class ExSub(a:Ex[Int], b:Ex[Int]) extends Ex[Int]
+final case class ExMul(a:Ex[Int], b:Ex[Int]) extends Ex[Int]
+final case class ExMod(a:Ex[Int], b:Ex[Int]) extends Ex[Int]
+
+object Ex {
+  // evaluate an expression given a context that maps variable names to values
+  def eval[T](e:Ex[T], ctx:Any=>Any):T = e match {
+    case ExLit(v) => v.asInstanceOf[T]
+    case ExVar(nm) => ctx(nm).asInstanceOf[T]
+    case ExAnd(a,b) => eval(a,ctx) && eval(b,ctx)
+    case ExOr(a,b) => eval(a,ctx) || eval(b,ctx)
+    case ExXor(a,b) => eval(a,ctx) ^ eval(b,ctx)
+    case e:ExEq[u] => eval(e.a,ctx) == eval(e.b,ctx)
+    case e:ExNeq[u] => eval(e.a,ctx) != eval(e.b,ctx)
+    case ExLt(a,b) => eval(a,ctx) < eval(b,ctx)
+    case ExLte(a,b) => eval(a,ctx) <= eval(b,ctx)
+    case ExGt(a,b) => eval(a,ctx) > eval(b,ctx)
+    case ExGte(a,b) => eval(a,ctx) >= eval(b,ctx)
+    case ExAdd(a,b) => eval(a,ctx) + eval(b,ctx)
+    case ExSub(a,b) => eval(a,ctx) - eval(b,ctx)
+    case ExMul(a,b) => eval(a,ctx) * eval(b,ctx)
+    case ExMod(a,b) => eval(a,ctx) % eval(b,ctx)
+  }
+  
+  // get shallow list of subexpressions
+  def subExs(e:Ex[_]):List[Ex[_]] = e match {
+    case ExLit(_) => Nil
+    case ExVar(_) => Nil
+    case ExAnd(a,b) => List(a,b)
+    case ExOr(a,b) => List(a,b)
+    case ExXor(a,b) => List(a,b)
+    case ExEq(a,b) => List(a,b)
+    case ExNeq(a,b) => List(a,b)
+    case ExLt(a,b) => List(a,b)
+    case ExLte(a,b) => List(a,b)
+    case ExGt(a,b) => List(a,b)
+    case ExGte(a,b) => List(a,b)
+    case ExAdd(a,b) => List(a,b)
+    case ExSub(a,b) => List(a,b)
+    case ExMul(a,b) => List(a,b)
+    case ExMod(a,b) => List(a,b)
+  }
+  
+  // get all subexpressions including the expression given
+  def unfurl(e:Ex[_]):List[Ex[_]] = 
+    e :: (subExs(e) flatMap unfurl)
+  
+  // pretty-print expression
+  def pretty(e:Ex[_]):String = {
+    // precedence rank for deciding where to put parentheses
+    def rank(e:Ex[_]):Int = e match {
+      case e:ExAnd => 40
+      case e:ExOr => 50
+      case e:ExXor => 50
+      case e:ExEq[_] => 30
+      case e:ExNeq[_] => 30
+      case e:ExLt => 30
+      case e:ExLte => 30
+      case e:ExGt => 30
+      case e:ExGte => 30
+      case e:ExAdd => 20
+      case e:ExSub => 20
+      case e:ExMul => 20
+      case e:ExMod => 20
+      case e:ExLit[_] => 0
+      case e:ExVar[_] => 0
+    }
+    
+    val r = rank(e)
+    
+    def term(t:Ex[_]):String = {
+      val rt = rank(t)
+      //if(rt >= r)
+        "( " + t.toString + " )"
+      //else
+        //t.toString
+    }
+
+    import Implicits._
+    e match {
+      case ExLit(v) => v.toString
+      case e:ExVar[_]=> "$"+e.name
+      case ExAnd(a,b) => term(a)+" && "+term(b)
+      case ExOr(a,b) => term(a)+" || "+term(b)
+      case ExXor(a,b) => term(a)+" ^ "+term(b)
+      case ExEq(a,b) => term(a)+" = "+term(b)
+      case ExNeq(a,b) => term(a)+" != "+term(b)
+      case ExLt(a,b) => term(a)+" < "+term(b)
+      case ExLte(a,b) => term(a)+" <= "+term(b)
+      case ExGt(a,b) => term(a)+" > "+term(b)
+      case ExGte(a,b) => term(a)+" >= "+term(b)
+      case ExAdd(a,b) => term(a)+" + "+term(b)
+      case ExSub(a,b) => term(a)+" - "+term(b)
+      case ExMul(a,b) => term(a)+" * "+term(b)
+      case ExMod(a,b) => term(a)+" % "+term(b)
+    }
+  }
 }
