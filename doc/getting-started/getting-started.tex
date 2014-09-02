@@ -19,6 +19,7 @@
 \usepackage{palatino}
 \usepackage{fancybox}
 \usepackage{hyperref}
+\usepackage[svgnames]{xcolor}
 \usepackage[procnames]{listings}
 
 \input{../style/scala.tex}
@@ -46,6 +47,9 @@ EECS Department, UC Berkeley\\
 \newenvironment{example}{\VerbatimEnvironment\begin{footnotesize}\begin{Verbatim}}{\end{Verbatim}\end{footnotesize}}
 \newcommand{\kode}[1]{\begin{footnotesize}{\tt #1}\end{footnotesize}}
 
+\definecolor{RED}{rgb}{1,0,0}
+\def\red#1{{\color{red}#1}}
+\def\problem#1{{\red{#1 Problem}}}
 \def\code#1{{\tt #1}}
 
 \def\note#1{\noindent{\bf [Note: #1]}}
