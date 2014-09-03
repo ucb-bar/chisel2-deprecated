@@ -129,7 +129,8 @@ object Node {
       val a = m.inputs(i).width
       val b = n.litValue(0).toInt
       val w = a - b
-      println("rshWidthOf: " + a + " - " + b + " = " + w + "(" + i + ")")
+      val extra = ": " + m.inputs(i).toString
+      println("rshWidthOf: " + a + " - " + b + " = " + w + "(" + i + ")" + extra)
       w
     }
   }
