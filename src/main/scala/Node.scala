@@ -126,7 +126,11 @@ object Node {
 
   def rshWidthOf(i: => Int, n: => Node): (=> Node) => (Width) = {
     (m) => {
-      m.inputs(i).width - n.litValue(0).toInt
+      val a = m.inputs(i).width
+      val b = n.litValue(0).toInt
+      val w = a - b
+      println("rshWidthOf: " + a + " - " + b + " = " + w + "(" + i + ")")
+      w
     }
   }
 }

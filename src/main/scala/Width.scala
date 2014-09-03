@@ -153,8 +153,8 @@ class Width(_width: Int) extends Ordered[Width] {
         case "-" => {
           val w = v1 - v2
           if (w < 0) {
-            ChiselError.warning("Width.op- clamping width to 0: " + v1 + " < " + v2)
-            Width(0)
+            ChiselError.warning("Width.op- setting width to Width(): " + v1 + " < " + v2)
+            Width()
           } else {
             Width(w)
           }
