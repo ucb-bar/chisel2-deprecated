@@ -179,6 +179,9 @@ abstract class Node extends nameable {
   private[Chisel] def width_=(w: Int) {
     width_.setWidth(w);
     inferWidth = fixWidth(w);
+    if (true) {
+      println("sw: " + width_ + ", " + w + this.toString)
+    }
   }
 
   private[Chisel] def width_=(w: Width) {
@@ -245,7 +248,14 @@ abstract class Node extends nameable {
     initOf(n, widthFunc, ins.toList);
   }
   def init (n: String, w: Int, ins: Node*): Node = {
+<<<<<<< HEAD
     width_ = Width(w)
+=======
+    width_ = w;
+    if (true) {
+      println("iw: " + width_ + ", " + w + this.toString)
+    }
+>>>>>>> 7c7c9f3... Debugging.
     initOf(n, fixWidth(w), ins.toList)
   }
   
@@ -257,9 +267,16 @@ abstract class Node extends nameable {
     val res = inferWidth(this);
     if (! res.isKnown) {
       true
+<<<<<<< HEAD
     } else if (res != widthW) {
       // NOTE: This should NOT stop us using inferWidth, since the value
       // we set here may not be correct.
+=======
+    } else if (res != width) {
+      if (true) {
+        println("in: " + width_ + ", " + res + this.toString)
+      }
+>>>>>>> 7c7c9f3... Debugging.
       width_ = res
       true
     } else {
