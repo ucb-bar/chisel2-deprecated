@@ -129,8 +129,10 @@ object Node {
       val a = m.inputs(i).width
       val b = n.litValue(0).toInt
       val w = a - b
-      val extra = ": " + m.inputs(i).toString
-      println("rshWidthOf: " + a + " - " + b + " = " + w + "(" + i + ")" + extra)
+      if (false) {
+        val extra = ": " + m.inputs(i).toString
+        println("rshWidthOf: " + a + " - " + b + " = " + w + "(" + i + ")" + extra)
+      }
       w
     }
   }
@@ -186,6 +188,9 @@ abstract class Node extends nameable {
   def width_=(w: Int) {
     width_.setWidth(w);
     inferWidth = fixWidth(w);
+    if (true) {
+      println("sw: " + width_ + ", " + w + this.toString)
+    }
   }
 
   def width_=(w: Width) {
@@ -258,6 +263,9 @@ abstract class Node extends nameable {
   }
   def init (n: String, w: Int, ins: Node*): Node = {
     width_ = Width(w)
+    if (true) {
+      println("iw: " + w + ", " + w + this.toString)
+    }
     initOf(n, fixWidth(w), ins.toList)
   }
   
@@ -270,6 +278,9 @@ abstract class Node extends nameable {
     if (! res.isKnown) {
       true
     } else if (res != width) {
+      if (true) {
+        println("in: " + width_ + ", " + res + this.toString)
+      }
       // NOTE: This should NOT stop us using inferWidth, since the value
       // we set here may not be correct.
       width_ = res
