@@ -253,7 +253,7 @@ abstract class Node extends nameable {
 =======
     width_ = w;
     if (true) {
-      println("iw: " + width_ + ", " + w + this.toString)
+      println("iw: " + w + this.toString + this.line)
     }
 >>>>>>> 7c7c9f3... Debugging.
     initOf(n, fixWidth(w), ins.toList)
