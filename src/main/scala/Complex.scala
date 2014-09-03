@@ -62,10 +62,16 @@ class ComplexTest extends Module {
     val in_f = Complex(SInt(width=16),SInt(width=16)).asInput
     val cond = Bool(INPUT)
     val out  = Complex(SInt(width=16),SInt(width=16)).asOutput
+
+    val b_t = UInt(width=1).asInput
+    val b_f = UInt(width=1).asInput
+    val b_o = UInt(width=1).asOutput
   }
 
   val myLit = Complex(SInt(1), SInt(1))
 
   io.out := Mux(io.cond, io.in_t+io.in_f, io.in_t-io.in_f) + myLit
+
+  io.b_o := Mux(io.cond, io.b_t, Bool(false))
 
 }
