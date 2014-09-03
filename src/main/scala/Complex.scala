@@ -56,7 +56,7 @@ class Complex[T<:Data with Num[T]](val real: T, val imag: T) extends Bundle {
   }
 }
 
-class Test extends Module {
+class ComplexTest extends Module {
   val io = new Bundle {
     val in_t = Complex(SInt(width=16),SInt(width=16)).asInput
     val in_f = Complex(SInt(width=16),SInt(width=16)).asInput
