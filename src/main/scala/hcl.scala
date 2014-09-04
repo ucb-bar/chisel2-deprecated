@@ -61,9 +61,18 @@ object chiselMain {
   def apply[T <: Module](args: Array[String], gen: () => T, ftester: T => Tester[T]): T =
     Driver(args, gen, ftester)
 
-  // hack to avoid calling Driver.apply from within sbt
+  // Assumes gen needs to be wrapped in Module()
   def run[T <: Module] (args: Array[String], gen: () => T): T =
-    apply(args, () => Module(gen()))
+    Driver(args, gen, false)
+
+  def run[T <: Module] (args: Array[String], gen: () => T, ftester: T => Tester[T]): T =
+    Driver(args, gen, ftester, false)
+}
+
+//Is this antiquated?
+object chiselMainTest {
+  def apply[T <: Module](args: Array[String], gen: () => T)(tester: T => Tester[T]): T =
+    chiselMain(args, gen, tester)
 }
 
 class ChiselException(message: String, cause: Throwable) extends Exception(message, cause)
@@ -76,10 +85,6 @@ object throwException {
   }
 }
 
-object chiselMainTest {
-  def apply[T <: Module](args: Array[String], gen: () => T)(tester: T => Tester[T]): T =
-    chiselMain(args, gen, tester)
-}
 
 trait proc extends Node {
   protected var procAssigned = false
