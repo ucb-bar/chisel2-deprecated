@@ -222,7 +222,7 @@ object Literal {
     if(xWidth > width && width != -1) {
       ChiselError.error({"width " + width + " is too small for literal " + x + ". Smallest allowed width is " + xWidth});
     }
-    if (true) {
+    if (false) {
       println("Literal: " + xString + "(" + w + ", " + xWidth + ", " + width + ")")
     }
     res.init("0x" + xString, w);
