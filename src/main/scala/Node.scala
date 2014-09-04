@@ -298,7 +298,7 @@ abstract class Node extends nameable {
   }
   def init (n: String, w: Int, ins: Node*): Node = {
     width_ = Width(w)
-    if (true) {
+    if (false) {
       val objectString = this.toString
       val lineString = if (this.line == null) "" else this.line.toString
       println("iw: " + w + objectString + lineString)
@@ -319,7 +319,7 @@ abstract class Node extends nameable {
     if (! res.isKnown) {
       true
     } else if (res != width) {
-      if (true) {
+      if (false) {
         println("in: " + width_ + ", " + res + this.toString)
       }
       // NOTE: This should NOT stop us using inferWidth, since the value

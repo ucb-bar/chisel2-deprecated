@@ -46,6 +46,7 @@ object NodeFill {
       val w = mod.width
       if (true) {
         println("NodeFill: " + w + " - " + n + ", " + mod + mod.line) 
+	mod.printChiselStackTrace()
       }
       if (w.isKnown && w.needWidth == 1) {
         Multiplex(mod, Literal((BigInt(1) << n) - 1, n), Literal(0, n))
