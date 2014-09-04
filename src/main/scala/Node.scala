@@ -303,7 +303,7 @@ abstract class Node extends nameable {
       val lineString = if (this.line == null) "" else this.line.toString
       println("iw: " + w + objectString + lineString)
       // If this is an area of interest, dump the stack.
-      if (objectString == "" && interestingLines.contains(lineString)) {
+      if (false && objectString == "" && interestingLines.contains(lineString)) {
         printChiselStackTrace()
       }
     }
