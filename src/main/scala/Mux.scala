@@ -98,13 +98,9 @@ object Mux {
     // TODO: consider reworking to not use flatten so that can Mux between Vecs of different lengths
     //       or a Bundle and a descendant of that Bundle which adds fields
     //       Will likely require creation of a createMux function
-    def isAncestorOf(possible_parent: Class[_], possible_child: Class[_]): Boolean = {
-      if(possible_parent == possible_child) true
-      else if(possible_child == null || possible_child == classOf[java.lang.Object]) false
-      else isAncestorOf(possible_parent, possible_child.getSuperclass)
-    }
-    val ancestor =  if(isAncestorOf(tc.getClass, fc.getClass)) tc else
-                    if(isAncestorOf(fc.getClass, tc.getClass)) fc else
+    
+    val ancestor =  if(tc.getClass.isAssignableFrom(fc.getClass)) tc else
+                    if(fc.getClass.isAssignableFrom(tc.getClass)) fc else
                       throw new Exception(s"For Mux, tc(${tc.getClass}) or fc(${fc.getClass}) must directly descend from the other.")
     require(tc.flatten.length == fc.flatten.length, "In Mux (of ${ancestor.getClass}), tc and fc too structurally different. Possibly due to non-determinism or mutability in a subtype of Aggregate e.g. a Bundle refinement adding new fields, or two Vecs of differing lengths.")
 
