@@ -124,7 +124,7 @@ class Width(_width: Int) extends Ordered[Width] {
   // Print a string representation of width
   override def toString: String = (widthVal match {
     case Some(w) => w
-    case x => x
+    case x => -1
   }).toString
 
   def copy(w: Int = this.widthVal.get): Width = {

@@ -45,6 +45,18 @@ import java.lang.Float.intBitsToFloat
 import java.lang.Thread._
 
 object Node {
+  val interestingLines = scala.collection.immutable.HashSet(
+    "rocket.CSRFile.<init>(csr.scala:116)",
+    "hardfloat.recodedFloatNToRecodedFloatM$.apply(recodedFloatNToRecodedFloatM.scala:66)",
+    "rocket.BTB.<init>(btb.scala:145)",
+    "Chisel.Queue.<init>(ChiselUtil.scala:390)",
+    "rocket.MSHRFile.<init>(nbdcache.scala:313)",
+    "rocket.MSHRFile.<init>(nbdcache.scala:388)",
+    "uncore.HTIF.<init>(htif.scala:171)",
+    "uncore.BigMem.<init>(llc.scala:26)"
+  )
+  val throwable = new Throwable()
+
   def sprintf(message: String, args: Node*): Bits = {
     val s = Bits().fromNode(new Sprintf(message, args))
     s.setIsTypeNode
@@ -118,9 +130,22 @@ object Node {
 
   def lshWidthOf(i: => Int, n: => Node): (=> Node) => (Width) = {
     (m) => {
-      // n.width
-      if (!n.isLit && !n.isKnownWidth) Width()
-      else m.inputs(0).width + n.litValue((1 << n.needWidth)-1).toInt
+      val w0 = m.inputs(0).width
+      var w = n.width
+      // If we don't know the width, try inferring it.
+      if (!w.isKnown) {
+        w = n.inferWidth(n)
+      }
+      // If we still don't know it, return unknown.
+      if (!w.isKnown) {
+//        ChiselError.warning("lshWidthOf: width not set - " + n)
+        Width()
+      } else if (!w0.isKnown) {
+//        ChiselError.warning("lshWidthOf: child width not set - " + m.inputs(0))
+        Width()
+      } else {
+        w0 + n.litValue((1 << w.needWidth)-1).toInt
+      }
     }
   }
 
@@ -231,6 +256,16 @@ abstract class Node extends nameable {
         ""
   }
 
+  // Print stack frames up to and including the "user" stack frame.
+  def printChiselStackTrace() {
+    val stack = Thread.currentThread().getStackTrace
+    val idx = ChiselError.findFirstUserInd(stack)
+    idx match {
+      case None => {}
+      case Some(x) => for (i <- 0 to x) println(stack(i))
+    }
+  }
+
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
   def ##(b: Node): Node  = Op("##", sumWidth _,  this, b );
   final def isLit: Boolean = litOf ne null
@@ -264,7 +299,13 @@ abstract class Node extends nameable {
   def init (n: String, w: Int, ins: Node*): Node = {
     width_ = Width(w)
     if (true) {
-      println("iw: " + w + ", " + w + this.toString)
+      val objectString = this.toString
+      val lineString = if (this.line == null) "" else this.line.toString
+      println("iw: " + w + objectString + lineString)
+      // If this is an area of interest, dump the stack.
+      if (objectString == "" && interestingLines.contains(lineString)) {
+        printChiselStackTrace()
+      }
     }
     initOf(n, fixWidth(w), ins.toList)
   }
@@ -561,8 +602,14 @@ abstract class Node extends nameable {
     inferWidth = fixWidth(w);
   }
   // Return a value or raise an exception.
-  def needWidth(): Int = width.needWidth()
+  def needWidth(): Int = {
+    val w = width
+    w.needWidth()
+  }
 
   // Return true if the width of this node is known (set).
-  def isKnownWidth: Boolean = width.isKnown
+  def isKnownWidth: Boolean = {
+    val w = width
+    w.isKnown
+  }
 }

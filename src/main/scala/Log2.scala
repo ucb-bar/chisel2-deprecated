@@ -27,9 +27,10 @@ abstract class Log2Like(x: Bits, name: String) extends Op(name) {
   inputs += x
   inferWidth = log2Width
 
-  private def log2Width(x: => Node): Width =
-    if (x.inputs(0).isKnownWidth) {
-      val w = x.inputs(0).needWidth()
+  private def log2Width(x: => Node): Width = {
+    val w0 = x.inputs(0).width
+    if (w0.isKnown) {
+      val w = w0.needWidth()
       if (w < 2)
         Width(w) // TODO 0WW
       else
@@ -37,11 +38,16 @@ abstract class Log2Like(x: Bits, name: String) extends Op(name) {
     } else {
       Width()
     }
+  }
 }
 
 class Log2(x: Bits) extends Log2Like(x, "Log2") {
   override def lower: Node = {
-    val range = inputs(0).needWidth()-1 to 0 by -1
+    val w0 = inputs(0).width
+    if (! w0.isKnown) {
+      ChiselError.warning("Log2: unknown Width - " + inputs(0))
+    }
+    val range = w0.needWidth()-1 to 0 by -1
     val in = UInt(inputs(0))
     PriorityMux(range.map(in(_)), range.map(UInt(_)))
   }
@@ -49,7 +55,11 @@ class Log2(x: Bits) extends Log2Like(x, "Log2") {
 
 class PriorityEncoder(x: Bits) extends Log2Like(x, "PriEnc") {
   override def lower: Node = {
-    PriorityMux(UInt(inputs(0)), (0 until inputs(0).needWidth()).map(UInt(_)))
+    val w0 = inputs(0).width
+    if (! w0.isKnown) {
+      ChiselError.warning("PriorityEncoder: unknown Width - " + inputs(0))
+    }
+    PriorityMux(UInt(inputs(0)), (0 until w0.needWidth()).map(UInt(_)))
   }
 }
 
@@ -65,6 +75,10 @@ class OHToUInt(x: Bits) extends Log2Like(x, "OHToUInt") {
         Concatenate(LogicalOp(hi, Literal(0, length-half), "!="), doLower(BinaryOp(hi, lo, "|"), half))
       }
     }
-    doLower(inputs(0), inputs(0).needWidth())
+    val w0 = inputs(0).width
+    if (! w0.isKnown) {
+      ChiselError.warning("OHToUInt: unknown Width - " + inputs(0))
+    }
+    doLower(inputs(0), w0.needWidth())
   }
 }
