@@ -274,12 +274,12 @@ abstract class Node extends nameable {
     width_ = Width(w)
 =======
     width_ = w;
-    if (true) {
+    if (false) {
       val objectString = this.toString
       val lineString = if (this.line == null) "" else this.line.toString
       println("iw: " + w + objectString + lineString)
       // If this is an area of interest, dump the stack.
-      if (objectString == "" && interestingLines.contains(lineString)) {
+      if (false && objectString == "" && interestingLines.contains(lineString)) {
         printChiselStackTrace()
       }
     }
@@ -301,7 +301,7 @@ abstract class Node extends nameable {
       // we set here may not be correct.
 =======
     } else if (res != width) {
-      if (true) {
+      if (false) {
         println("in: " + width_ + ", " + res + this.toString)
       }
 >>>>>>> 7c7c9f3... Debugging.
