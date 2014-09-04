@@ -41,10 +41,6 @@ object Fill {
 object NodeFill {
   def apply(n: Int, mod: Node): Node = {
     val w = mod.width
-    if (true) {
-      println("NodeFill: " + w + " - " + n + ", " + mod + mod.line) 
-      mod.printChiselStackTrace()
-    }
     if (n == 1) {
       mod
     } else {

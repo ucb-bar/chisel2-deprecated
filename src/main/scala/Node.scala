@@ -42,21 +42,7 @@ import Width._;
 import java.lang.Double.longBitsToDouble
 import java.lang.Float.intBitsToFloat
 
-import java.lang.Thread._
-
 object Node {
-  val interestingLines = scala.collection.immutable.HashSet(
-    "rocket.CSRFile.<init>(csr.scala:116)",
-    "hardfloat.recodedFloatNToRecodedFloatM$.apply(recodedFloatNToRecodedFloatM.scala:66)",
-    "rocket.BTB.<init>(btb.scala:145)",
-    "Chisel.Queue.<init>(ChiselUtil.scala:390)",
-    "rocket.MSHRFile.<init>(nbdcache.scala:313)",
-    "rocket.MSHRFile.<init>(nbdcache.scala:388)",
-    "uncore.HTIF.<init>(htif.scala:171)",
-    "uncore.BigMem.<init>(llc.scala:26)"
-  )
-  val throwable = new Throwable()
-
   def sprintf(message: String, args: Node*): Bits = {
     val s = Bits().fromNode(new Sprintf(message, args))
     s.setIsTypeNode
@@ -73,37 +59,16 @@ object Node {
   }}
 
   def widthOf(i: => Int): (=> Node) => Width = { (m) => {
-    val debug = false
     try {
-      if (debug && i >= m.inputs.length ) {
-        println("Bad i (" + i + " >= " + m.inputs.length + ")")
-      }
       m.inputs(i).width
     } catch {
         case e: java.lang.IndexOutOfBoundsException => {
           val error = new ChiselError(() => {m + " is unconnected ("+ i + " of " + m.inputs.length + "). Ensure that it is assigned."}, m.line)
-	  if (debug) {
-            e.printStackTrace(System.err)
-            var errorChild = ""
-            try {
-              if (m.inputs.length > i) {
-                errorChild = m.inputs(i).toString
-              } else {
-                errorChild = m.inputs.length.toString + " <= " + i 
-              }
-            } catch {
-              case ec: Throwable => {
-                ec.printStackTrace(System.err)
-              }
-            } finally {
-              println(error + " - " + errorChild)
-            }
-          }
           if (!ChiselErrors.contains(error) && !Driver.isInGetWidth) {
             ChiselErrors += error
           }
           Width()
-        }
+       }
     }
   }}
 
@@ -154,10 +119,6 @@ object Node {
       val a = m.inputs(i).width
       val b = n.litValue(0).toInt
       val w = a - b
-      if (false) {
-        val extra = ": " + m.inputs(i).toString
-        println("rshWidthOf: " + a + " - " + b + " = " + w + "(" + i + ")" + extra)
-      }
       w
     }
   }
@@ -213,9 +174,6 @@ abstract class Node extends nameable {
   def width_=(w: Int) {
     width_.setWidth(w);
     inferWidth = fixWidth(w);
-    if (true) {
-      println("sw: " + width_ + ", " + w + this.toString)
-    }
   }
 
   def width_=(w: Width) {
@@ -256,16 +214,6 @@ abstract class Node extends nameable {
         ""
   }
 
-  // Print stack frames up to and including the "user" stack frame.
-  def printChiselStackTrace() {
-    val stack = Thread.currentThread().getStackTrace
-    val idx = ChiselError.findFirstUserInd(stack)
-    idx match {
-      case None => {}
-      case Some(x) => for (i <- 0 to x) println(stack(i))
-    }
-  }
-
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
   def ##(b: Node): Node  = Op("##", sumWidth _,  this, b );
   final def isLit: Boolean = litOf ne null
@@ -298,15 +246,6 @@ abstract class Node extends nameable {
   }
   def init (n: String, w: Int, ins: Node*): Node = {
     width_ = Width(w)
-    if (false) {
-      val objectString = this.toString
-      val lineString = if (this.line == null) "" else this.line.toString
-      println("iw: " + w + objectString + lineString)
-      // If this is an area of interest, dump the stack.
-      if (false && objectString == "" && interestingLines.contains(lineString)) {
-        printChiselStackTrace()
-      }
-    }
     initOf(n, fixWidth(w), ins.toList)
   }
   
@@ -319,9 +258,6 @@ abstract class Node extends nameable {
     if (! res.isKnown) {
       true
     } else if (res != width) {
-      if (false) {
-        println("in: " + width_ + ", " + res + this.toString)
-      }
       // NOTE: This should NOT stop us using inferWidth, since the value
       // we set here may not be correct.
       width_ = res
@@ -497,23 +433,20 @@ abstract class Node extends nameable {
 
   var isWidthWalked = false;
 
-  def getWidth(): Int = {
-    val oldDriverisInGetWidth = Driver.isInGetWidth
-    Driver.isInGetWidth = true
-    val w = width
-    Driver.isInGetWidth = oldDriverisInGetWidth
-    if (w.isKnown)
-      w.needWidth()
-    else
-      throwException("Node.getWidth() for node " + this + " returns unknown width")
-  }
-
-  def getWWidth(): Width = {
+  def getWidthAsWidth(): Width = {
     val oldDriverisInGetWidth = Driver.isInGetWidth
     Driver.isInGetWidth = true
     val w = width
     Driver.isInGetWidth = oldDriverisInGetWidth
     w
+  }
+
+  def getWidth(): Int = {
+    val w = getWidthAsWidth()
+    if (w.isKnown)
+      w.needWidth()
+    else
+      throwException("Node.getWidth() for node " + this + " returns unknown width")
   }
 
   def removeTypeNodes() {

@@ -114,7 +114,7 @@ object Reg {
       res_i.inputs += res_i.comp
     } else for ((res_n, res_i) <- res.flatten) {
       res_i.comp = new Reg
-      val w = res_i.getWWidth
+      val w = res_i.getWidthAsWidth()
       res_i.comp.init("", regWidth(w), res_i.comp)
       res_i.inputs += res_i.comp
     }

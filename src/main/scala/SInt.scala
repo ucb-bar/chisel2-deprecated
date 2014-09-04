@@ -68,9 +68,6 @@ class SInt extends Bits with Num[SInt] {
     if (w.isKnown && this_width.isKnown) {
       val my_width = this_width.needWidth()
       val match_width = w.needWidth()
-      if (true) {
-        println("SInt.matchWidth: " + match_width + ", " + my_width)
-      }
       if (match_width > my_width) {
         if (my_width == 1) {
           val res = NodeFill(match_width, this); res.infer
