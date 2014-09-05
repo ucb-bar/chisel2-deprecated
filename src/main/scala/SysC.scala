@@ -51,16 +51,14 @@ class SysCBackend extends CppBackend {
 
       //Create component definition for System C
       val top_bundle = c.io.asInstanceOf[Bundle] //Is this safe?      
-      val cdef = new ComponentDef()
-      cdef.ctype = c.name + "_t"
-      cdef.name = c.name
+      val cdef = new ComponentDef(c.name + "_t", c.name)
       for ((name, elt) <- top_bundle.elements) {
          elt match {
             case delt:DecoupledIO[Bits] =>
                val is_input = delt.bits.dir == INPUT
                val vtype = "dat_t<" + delt.bits.width + ">"
                val entry = new CEntry(name, is_input, vtype, delt.bits.name, delt.ready.name, delt.valid.name)
-               cdef.entries.add(entry)
+               cdef.entries += (entry)
             case _ =>
                throw new RuntimeException("SystemC requires that all top-level wires are decoupled!")
          }
