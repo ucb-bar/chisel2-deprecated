@@ -32,42 +32,58 @@ package Chisel
 
 import collection.mutable.{ArrayBuffer, HashSet, HashMap, Stack, LinkedHashSet}
 
-object Driver {
-  def apply[T <: Module](args: Array[String], gen: () => T): T = {
+object Driver extends FileSystemUtilities{
+  def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean = true): T = {
     Driver.initChisel(args)
     try {
-      execute(gen)
+      if(wrapped) execute(gen) else executeUnwrapped(gen)
     } finally {
       ChiselError.report
       if (ChiselError.hasErrors && !getLineNumbers) {
         println("Re-running Chisel in debug mode to obtain erroneous line numbers...")
-        apply(args :+ "--lineNumbers", gen)
+        apply(args :+ "--lineNumbers", gen, wrapped)
       }
     }
   }
 
   def apply[T <: Module](args: Array[String], gen: () => T,
-                         ftester: T => Tester[T]): T = {
-    val mod = apply(args, gen)
+                         ftester: T => Tester[T], wrapped:Boolean = true): T = {
+    val mod = if(wrapped) apply(args, gen) else apply(args,gen,false)
     if (Driver.isTesting) test(mod, ftester)
     mod
   }
 
-  private def execute[T <: Module](gen: () => T): T = {
-    /* JACK - If loading design, read design.prm file*/
-    if (Driver.jackLoad != null) { Jackhammer.load(Driver.jackDir, Driver.jackLoad) }
-    val c = gen()
-
-    Driver.backend.initBackannotation
-
-    /* JACK - If dumping design, dump to jackDir with jackNumber points*/
-    if (Driver.jackDump != null) { 
-      Jackhammer.dump(Driver.jackDir, Driver.jackDump, Driver.jackN) 
-    } else {
-      Driver.backend.elaborate(c)
+  private def executeUnwrapped[T <: Module](gen: () => T): T = {
+    if (!Driver.chiselConfigMode.isEmpty && !Driver.chiselConfigClassName.isEmpty) { 
+      val config = Class.forName(chiselConfigClassName.get).newInstance.asInstanceOf[ChiselConfig]
+      val world = if(Driver.chiselConfigMode.get == "collect") new Collector(config.topDefinitions,config.knobValues) else new Instance(config.topDefinitions,config.knobValues)
+      val p = Parameters.root(world)
+      config.topConstraints.foreach(c => p.constrain(c))
+      val c = execute(() => Module(gen())(Some(p)))
+      if(Driver.chiselConfigMode.get == "collect") {
+        val v = createOutputFile(Driver.chiselConfigClassName.get + ".knb")
+        v.write(world.getKnobs)
+        v.close
+        val w = createOutputFile(Driver.chiselConfigClassName.get + ".cst")
+        w.write(world.getConstraints)
+        w.close
+      }
+      c
+    } 
+    else {
+      execute(() => Module(gen())(None))
     }
-    if (Driver.isCheckingPorts) Driver.backend.checkPorts(c)
-    if (Driver.isCompiling && Driver.isGenHarness) Driver.backend.compile(c)
+  }
+
+  private def execute[T <: Module](gen: () => T): T = {
+    val c = gen()
+    Driver.backend.initBackannotation
+    /* Params - If dumping design, dump space to pDir*/
+    if (Driver.chiselConfigMode == None || Driver.chiselConfigMode.get == "instance") { 
+      Driver.backend.elaborate(c)
+      if (Driver.isCheckingPorts) Driver.backend.checkPorts(c)
+      if (Driver.isCompiling && Driver.isGenHarness) Driver.backend.compile(c)
+    }
     c
   }
 
@@ -211,11 +227,8 @@ object Driver {
         case "--backannotation" => isBackannotating = true
         case "--model" => model = args(i + 1) ; i += 1
         //Jackhammer Flags
-        //case "--jEnable" => jackEnable = true
-        case "--jackDump" => jackDump = args(i+1); i+=1; //mode of dump, can be of set {space, point} (i.e. space.prm, design.prm etc)
-        case "--jackN" => jackN = args(i+1).toInt; i+=1; //number of points (random). Default is exaustive
-        case "--jackDir"  => jackDir = args(i+1); i+=1;  //location of dump or load
-        case "--jackLoad" => jackLoad = args(i+1); i+=1; //design.prm file
+        case "--configCollect"  => chiselConfigMode = Some("collect"); chiselConfigClassName = Some(args(i+1)); i+=1;  //dump constraints in dse dir
+        case "--configInstance" => chiselConfigMode = Some("instance"); chiselConfigClassName = Some(args(i+1)); i+=1;  //use ChiselConfig to supply parameters
         case "--dumpTestInput" => dumpTestInput = true
         case "--testerSeed" => {
           testerSeedValid = true
@@ -226,7 +239,6 @@ object Driver {
             isDebug = true
             emitTempNodes = true
         }
-        //case "--jDesign" =>  jackDesign = args(i+1); i+=1
         // Dreamer configuration flags
         case "--numRows" => {
           if (backend.isInstanceOf[FloBackend]) {
@@ -275,6 +287,7 @@ object Driver {
   val chiselOneHotMap = HashMap[(UInt, Int), UInt]()
   val chiselOneHotBitMap = HashMap[(Bits, Int), Bool]()
   val compStack = Stack[Module]()
+  val parStack = new Stack[Parameters]
   var stackIndent = 0
   val printStackStruct = ArrayBuffer[(Int, Module)]()
   val randInitIOs = ArrayBuffer[Node]()
@@ -289,12 +302,9 @@ object Driver {
   val pseudoMuxes = HashMap[Node, Node]()
   var modStackPushed: Boolean = false
   var startTime = 0L
-  /* Jackhammer flags */
-  var jackDump: String = null
-  var jackDir: String = null
-  var jackLoad: String = null
-  var jackN: Int = 0
-  //var jackDesign: String = null
+  /* ChiselConfig flags */
+  var chiselConfigClassName: Option[String] = None
+  var chiselConfigMode: Option[String] = None
 
   // Setting this to TRUE will case the test harness to print its
   // standard input stream to a file.
