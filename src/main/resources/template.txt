@@ -76,4 +76,4 @@ SC_MODULE({!name!}){
       c->clock_hi(reset);
     }
   }
-}
+};
