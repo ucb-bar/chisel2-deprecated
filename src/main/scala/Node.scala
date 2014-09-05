@@ -64,12 +64,12 @@ object Node {
       m.inputs(i).width
     } catch {
         case e: java.lang.IndexOutOfBoundsException => {
-          val error = new ChiselError(() => {m + " in " + m.component + " is unconnected. Ensure that is assigned."}, m.line)
+          val error = new ChiselError(() => {m + " is unconnected ("+ i + " of " + m.inputs.length + "). Ensure that it is assigned."}, m.line)
           if (!ChiselErrors.contains(error) && !Driver.isInGetWidth) {
             ChiselErrors += error
           }
-        }
-       Width()
+          Width()
+       }
     }
   }}
 
@@ -96,15 +96,31 @@ object Node {
 
   def lshWidthOf(i: => Int, n: => Node): (=> Node) => (Width) = {
     (m) => {
-      // n.width
-      if (!n.isLit && !n.isKnownWidth) Width()
-      else m.inputs(0).width + n.litValue((1 << n.needWidth)-1).toInt
+      val w0 = m.inputs(0).width
+      var w = n.width
+      // If we don't know the width, try inferring it.
+      if (!w.isKnown) {
+        w = n.inferWidth(n)
+      }
+      // If we still don't know it, return unknown.
+      if (!w.isKnown) {
+//        ChiselError.warning("lshWidthOf: width not set - " + n)
+        Width()
+      } else if (!w0.isKnown) {
+//        ChiselError.warning("lshWidthOf: child width not set - " + m.inputs(0))
+        Width()
+      } else {
+        w0 + n.litValue((1 << w.needWidth)-1).toInt
+      }
     }
   }
 
   def rshWidthOf(i: => Int, n: => Node): (=> Node) => (Width) = {
     (m) => {
-      m.inputs(0).width - n.litValue(0).toInt
+      val a = m.inputs(i).width
+      val b = n.litValue(0).toInt
+      val w = a - b
+      w
     }
   }
 }
@@ -323,19 +339,24 @@ abstract class Node extends nameable {
       var i = 0;
       for (node <- inputs) {
         if (node != null) {
-           //tmp fix, what happens if multiple componenets reference static nodes?
-          if (node.component == null || !Driver.components.contains(node.component)) {
-            /* If Backend.collectNodesIntoComp does not resolve the component
-             field for all components, we will most likely end-up here. */
-            assert( node.component == nextComp,
-              ChiselError.error((if(node.name != null && !node.name.isEmpty)
-                node.name else "?")
-                + "[" + node.getClass.getName
-                + "] has no match between component "
-                + (if( node.component == null ) "(null)" else node.component)
-                + " and '" + nextComp + "' input of "
-                + (if(this.name != null && !this.name.isEmpty)
-                this.name else "?")))
+          node match {
+            case n: Literal => // Skip the below check for Literals, which can safely be static
+            case _ => {
+             //tmp fix, what happens if multiple componenets reference static nodes?
+              if (node.component == null || !Driver.components.contains(node.component)) {
+                /* If Backend.collectNodesIntoComp does not resolve the component
+                 field for all components, we will most likely end-up here. */
+                assert(node.component == nextComp,
+                  ((if(node.name != null && !node.name.isEmpty)
+                    node.name else "?")
+                    + "[" + node.getClass.getName
+                    + "] has no match between component "
+                    + (if( node.component == null ) "(null)" else node.component)
+                    + " and '" + nextComp + "' input of "
+                    + (if(this.name != null && !this.name.isEmpty)
+                    this.name else "?")))
+              }
+            }
           }
           if (!Driver.backend.isInstanceOf[VerilogBackend] || !node.isIo) {
             stack.push(() => node.traceNode(nextComp, stack));
@@ -418,11 +439,16 @@ abstract class Node extends nameable {
 
   var isWidthWalked = false;
 
-  def getWidth(): Int = {
+  def getWidthAsWidth(): Width = {
     val oldDriverisInGetWidth = Driver.isInGetWidth
     Driver.isInGetWidth = true
     val w = width
     Driver.isInGetWidth = oldDriverisInGetWidth
+    w
+  }
+
+  def getWidth(): Int = {
+    val w = getWidthAsWidth()
     if (w.isKnown)
       w.needWidth()
     else
@@ -515,10 +541,16 @@ abstract class Node extends nameable {
     inferWidth = fixWidth(w);
   }
   // Return a value or raise an exception.
-  def needWidth(): Int = width.needWidth()
+  def needWidth(): Int = {
+    val w = width
+    w.needWidth()
+  }
 
   // Return true if the width of this node is known (set).
-  def isKnownWidth: Boolean = width.isKnown
+  def isKnownWidth: Boolean = {
+    val w = width
+    w.isKnown
+  }
 
   // The following are used for optimizations, notably, dealing with zero-width wires.
   /* If we've updated this node since our last visit. */

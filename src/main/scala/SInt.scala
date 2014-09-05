@@ -53,7 +53,9 @@ class SInt extends Bits with Num[SInt] {
     */
   override def fromNode(n: Node): this.type = {
     val res = SInt(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
-    res.width_ = n.width_.clone()
+    // NOTE: we do not inherit/clone the width.
+    // Doing so breaks code in NodeFill()
+    // res.width_ = n.width_.clone()
     res
   }
 

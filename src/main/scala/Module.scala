@@ -42,11 +42,32 @@ import ChiselError._
 import Module._
 
 object Module {
-  def apply[T <: Module](c: => T): T = {
+  def apply[T<:Module](c: =>T, f: PartialFunction[Any,Any]): T = {
+    val q = params.alterPartial(f)
     Driver.modStackPushed = true
-    /* *push* is done in the Module constructor because we don't have
-     a *this* pointer before then, yet we need to store it before the subclass
-     constructors are built. */
+    Driver.parStack.push(q)
+    val res = init(c)
+    Driver.parStack.pop
+    res
+  }
+  def apply[T<:Module](c: =>T)(implicit _p:Option[Parameters] = None): T = {
+    Driver.modStackPushed = true
+    _p match {
+      case Some(q: Parameters) => {
+        Driver.parStack.push(q.push)
+        val res = init(c)
+        Driver.parStack.pop
+        res
+      }
+      case None => {
+        if(Driver.parStack.isEmpty) Driver.parStack.push(Parameters.empty) else Driver.parStack.push(Driver.parStack.top.push)
+        val res = init(c)
+        Driver.parStack.pop
+        res
+      }
+    }
+  }
+  private def init[T<:Module](c: =>T):T = {
     val res = c
     pop()
     for ((n, io) <- res.wires) {
@@ -58,11 +79,16 @@ object Module {
     }
     res
   }
+  private def params = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
+
+    /* *push* is done in the Module constructor because we don't have
+     a *this* pointer before then, yet we need to store it before the subclass
+     constructors are built. */
 
   private def push(c: Module) {
     if (!Driver.modStackPushed) {
       ChiselError.error(
-        c.getClass.getName + " was not properly wrapped into a Module() call.")
+        c.getClass.getName + " was not properly wrapped into a module() call.")
     }
     Driver.modStackPushed = false
     Driver.compStack.push(c)
@@ -160,6 +186,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
   Driver.components += this
   push(this)
+
+  //Parameter Stuff
+  def params = Module.params
+  params.path = this.getClass :: params.path
 
   var hasExplicitClock = !(clock == null)
   var hasExplicitReset = !(_reset == null)

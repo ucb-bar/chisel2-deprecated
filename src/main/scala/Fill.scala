@@ -40,17 +40,21 @@ object Fill {
 
 object NodeFill {
   def apply(n: Int, mod: Node): Node = {
+    val w = mod.width
     if (n == 1) {
       mod
-    } else if (mod.isKnownWidth && mod.needWidth == 1) {
-      Multiplex(mod, Literal((BigInt(1) << n) - 1, n), Literal(0, n))
     } else {
-      /* Build up a Concatenate tree for more ILP in simulation. */
-      val p2 = Array.ofDim[Node](log2Up(n+1))
-      p2(0) = mod
-      for (i <- 1 until p2.length)
-        p2(i) = Concatenate(p2(i-1), p2(i-1))
-      Concatenate((0 until log2Up(n+1)).filter(i => (n & (1 << i)) != 0).map(p2(_)))
+      if (w.isKnown && w.needWidth == 1) {
+        Multiplex(mod, Literal((BigInt(1) << n) - 1, n), Literal(0, n))
+      } else {
+        /* Build up a Concatenate tree for more ILP in simulation. */
+        var out: Node = null
+        val p2 = Array.ofDim[Node](log2Up(n+1))
+        p2(0) = mod
+        for (i <- 1 until p2.length)
+          p2(i) = Concatenate(p2(i-1), p2(i-1))
+        Concatenate((0 until log2Up(n+1)).filter(i => (n & (1 << i)) != 0).map(p2(_)))
+      }
     }
   }
 }
