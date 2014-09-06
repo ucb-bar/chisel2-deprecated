@@ -95,16 +95,37 @@ object isLessThan {
 
 object Mux {
   def apply[T<:Data](cond: Bool, tc: T, fc: T): T = {
+    // TODO: Replace this runtime check with compiletime check
+    val ancestor =  if(tc.getClass.isAssignableFrom(fc.getClass)) tc else
+                    if(fc.getClass.isAssignableFrom(tc.getClass)) fc else
+                      throw new Exception(s"For Mux, tc(${tc.getClass}) or fc(${fc.getClass}) must directly descend from the other.")
+    Mux[T,T,T](ancestor.clone, cond, tc, fc)
+  }
+
+  // Some special cases to reduce verbosity for certain operations
+  def apply(cond: Bool, tc: UInt, fc: SInt): Bits = {
+    Mux(Bits(): Bits, cond, tc, fc)
+  }
+  def apply(cond: Bool, tc: SInt, fc: UInt): Bits = {
+    Mux(Bits(): Bits, cond, tc, fc)
+  }
+
+  // THIS IS THE MAIN MUX CONSTRUCTOR
+  def apply[RT<:Data,TT<:Data,FT<:Data](result: RT, cond: Bool, tc: TT, fc: FT)(
+   implicit evi_tc: TT <:< RT, evi_fc: FT <:< RT): RT = {
+    // The implicit lines require evidence that TT and RT (the mux inputs) are subtypes of the return.
+    //   This is preferable over [TT<:RT,FT<:RT] as now the scala compiler infer RT as the actual
+    //   type of result (and not the supertype common to result, tc, and fc, which could be none
+    //   of them!).
+
+    // TODO CONSIDER: Should this be private?
+
     // TODO: consider reworking to not use flatten so that can Mux between Vecs of different lengths
     //       or a Bundle and a descendant of that Bundle which adds fields
     //       Will likely require creation of a createMux function
     
-    val ancestor =  if(tc.getClass.isAssignableFrom(fc.getClass)) tc else
-                    if(fc.getClass.isAssignableFrom(tc.getClass)) fc else
-                      throw new Exception(s"For Mux, tc(${tc.getClass}) or fc(${fc.getClass}) must directly descend from the other.")
     require(tc.flatten.length == fc.flatten.length, "In Mux (of ${ancestor.getClass}), tc and fc too structurally different. Possibly due to non-determinism or mutability in a subtype of Aggregate e.g. a Bundle refinement adding new fields, or two Vecs of differing lengths.")
-
-    val result: T = ancestor.clone()
+    
     val opdescs = result.flatten.zip(tc.flatten.zip(fc.flatten))
       // opdescs: (result, (tc, fc))
 
