@@ -41,7 +41,7 @@ class DotBackend extends Backend {
   val keywords = new HashSet[String]();
   var islands = Array[Island]()
   val allDottable = false
-  val useComponentNames = true
+  val useComponentNames = false
 
   override def emitRef(node: Node): String = {
     node match {

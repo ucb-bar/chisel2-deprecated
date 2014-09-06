@@ -83,7 +83,7 @@ class CppBackend extends Backend {
   val allocatedShadow = HashSet[Node]()
   var potentialShadowRegisters = 0
   val allocateOnlyNeededShadowRegisters = Driver.allocateOnlyNeededShadowRegisters
-  val ignoreShadows = true
+  val ignoreShadows = false
   val shadowPrefix = if (ignoreShadows) {
     "// "
   } else {
