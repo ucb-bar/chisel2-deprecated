@@ -1132,14 +1132,15 @@ class VerilogBackend extends Backend {
   override def compile(c: Module, flags: String) {
 
     def run(cmd: String) {
-      val c = Process(cmd).!
+      val bashCmd = Seq("bash", "-c", cmd)
+      val c = bashCmd.!
       ChiselError.info(cmd + " RET " + c)
     }
     val dir = Driver.targetDir + "/"
-    val src = dir + c.name + "-harness.v " + dir + c.name + ".v"
-    val cmd = "vcs -full64 -quiet +v2k " +
+    val src = c.name + "-harness.v " + c.name + ".v"
+    val cmd = "cd " + dir + " && vcs -full64 -quiet +v2k " +
               "-timescale=10ns/10ps +define+CLOCK_PERIOD=120 " + 
-              "+vcs+initreg+random " + src + " -o " + dir + c.name + 
+              "+vcs+initreg+random " + src + " -o " + c.name + 
               ( if (!Driver.isTesting) " -debug" /* for ucli scripts */
                 else if (Driver.isDebug) " -debug_pp" /* for vpd dump */ 
                 else "" ) 
