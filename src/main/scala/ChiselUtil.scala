@@ -403,8 +403,9 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
   val ram = Mem(gen, entries)
   val enq_ptr = Counter(entries)
   val deq_ptr = Counter(entries)
-  if ((Driver.backend.isInstanceOf[CppBackend] || Driver.backend.isInstanceOf[DotBackend]) &&
-      !(pipe || flow)) {
+  if(Driver.useSimpleQueue) {
+//  if ((Driver.backend.isInstanceOf[CppBackend] || Driver.backend.isInstanceOf[DotBackend]) &&
+//      !(pipe || flow || true)) {
     // Use the simple (non-leaky) queue
     val next_enq_ptr    = new Counter(entries, 1)
     when (io.enq.ready && io.enq.valid) {

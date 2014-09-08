@@ -69,9 +69,9 @@ class CppBackend extends Backend {
   val unOptimizedO0Files = HashSet[String]()
   var cloneFile: String = ""
   var maxFiles: Int = 0
-  val compileInitializationUnoptimized = true
+  val compileInitializationUnoptimized = Driver.compileInitializationUnoptimized
   // Suppress generation of the monolithic .cpp file
-  val suppressMonolithicCppFile = compileInitializationUnoptimized /* && false */
+  val suppressMonolithicCppFile = compileInitializationUnoptimized  && false
   // Compile the clone method at -O0
   val cloneCompiledO0 = true
   // Define shadow registers in the circuit object, instead of local registers in the clock hi methods.

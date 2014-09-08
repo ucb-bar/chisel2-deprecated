@@ -230,6 +230,8 @@ object Driver extends FileSystemUtilities{
     minimumLinesPerFile = 0
     shadowRegisterInObject = false
     allocateOnlyNeededShadowRegisters = false
+    compileInitializationUnoptimized = false
+    useSimpleQueue = false
     parallelMakeJobs = 0
     isVCDinline = false
     hasMem = false
@@ -285,6 +287,8 @@ object Driver extends FileSystemUtilities{
         case "--minimumLinesPerFile" => minimumLinesPerFile = args(i + 1).toInt; i += 1
         case "--shadowRegisterInObject" => shadowRegisterInObject = true
         case "--allocateOnlyNeededShadowRegisters" => allocateOnlyNeededShadowRegisters = true
+        case "--compileInitializationUnoptimized" => compileInitializationUnoptimized = true
+        case "--useSimpleQueue" => useSimpleQueue = true
         case "--parallelMakeJobs" => parallelMakeJobs = args(i + 1).toInt; i += 1
         case "--isVCDinline" => isVCDinline = true
         case "--backend" => {
@@ -368,6 +372,8 @@ object Driver extends FileSystemUtilities{
   var minimumLinesPerFile = 0
   var shadowRegisterInObject = false
   var allocateOnlyNeededShadowRegisters = false
+  var compileInitializationUnoptimized = false
+  var useSimpleQueue = false
   var parallelMakeJobs = 0
   var isVCDinline = false
   var hasMem = false
