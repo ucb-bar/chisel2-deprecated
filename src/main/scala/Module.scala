@@ -150,7 +150,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   var name: String = "";
   /** Name of the module this component generates (defaults to class name). */
   var moduleName: String = "";
-  var pName = ""
   var named = false;
   val bindings = new ArrayBuffer[Binding];
   var wiresCache: Array[(String, Bits)] = null;
@@ -261,24 +260,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     // XXX Because We cannot guarentee x is flatten later on in collectComp.
     x.getNode.component = this
     debugs += x.getNode
-  }
-
-  def counter(x: Node) {
-    x.getNode match {
-      case _: VecLike[_] =>
-      case _: Aggregate =>
-      case _: ROMData =>
-      case _: Literal =>
-      case any if !(Driver.signals contains any) => {
-        if (!any.isIo) debug(x)
-        Driver.signals += any
-      }
-      case _ =>
-    }
-  }
-
-  def counter(xs: Node*) {
-    xs.foreach(counter _)
   }
 
   def printf(message: String, args: Node*): Unit = {
@@ -648,7 +629,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   // 4) set variable names
   def markComponent() {
     ownIo();
-    io setPseudoName ("io", true)
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], BlackBox and Modules.
      Since we call invoke() to get a proper instance of the correct type,
@@ -664,7 +644,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
          val o = m.invoke(this);
          o match {
          case node: Node => {
-           node setPseudoName (name, false)
          }
          case buf: ArrayBuffer[_] => {
            /* We would prefer to match for ArrayBuffer[Node] but that's
@@ -674,7 +653,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
              val nodebuf = buf.asInstanceOf[Seq[Node]];
              for((elm, i) <- nodebuf.zipWithIndex){
-               elm setPseudoName (name + "_" + i, false)
              }
            }
          }
@@ -682,13 +660,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
              val nodebuf = buf.asInstanceOf[Seq[Node]];
              for((elm, i) <- nodebuf.zipWithIndex){
-               elm setPseudoName (name + "_" + i, false)
              }
            }
          }
          case comp: Module => {
            comp.pathParent = this;
-           comp.pName = name
          }
          case any =>
        }

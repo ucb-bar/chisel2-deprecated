@@ -167,12 +167,4 @@ abstract class Data extends Node {
   val params = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
 }
 
-abstract class Aggregate extends Data {
-  override def setPseudoName(path: String, isNamingIo: Boolean) {
-    if (isTypeNode && comp != null) {
-      comp setPseudoName (path, isNamingIo)
-    } else {
-      super.setPseudoName(path, isNamingIo)
-    }
-  }
-}
+abstract class Aggregate extends Data

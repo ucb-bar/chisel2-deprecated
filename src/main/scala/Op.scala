@@ -290,8 +290,7 @@ object Op {
     }
 
     }
-    if (Driver.backend.isInstanceOf[CppBackend] || Driver.backend.isInstanceOf[FloBackend] ||
-        Driver.isBackannotating) {
+    if (Driver.backend.isInstanceOf[CppBackend] || Driver.backend.isInstanceOf[FloBackend]) {
       def signAbs(x: Node): (Bool, UInt) = {
         val f = x.asInstanceOf[SInt]
         val s = f < SInt(0)

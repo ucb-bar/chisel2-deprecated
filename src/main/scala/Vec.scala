@@ -257,23 +257,6 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
     }
   }
 
-  override def setPseudoName (path: String, isNamingIo: Boolean) {
-    if (pName == "" || (path != "" && pName != path)) {
-      val prevPrefix = if (pName != "") pName + "_" else ""
-      pName = path
-      val prefix = if (pName != "") pName + "_" else ""
-      for ((elm, i) <- self.zipWithIndex) {
-        val prevElmPrefix = prevPrefix + i
-        val suffix = 
-          if (elm.name startsWith prevElmPrefix) 
-            elm.name substring prevElmPrefix.length
-          else
-            elm.name
-        elm setPseudoName (prefix + i + suffix, isNamingIo)
-      }
-    }
-  }
-
   override def clone(): this.type =
     Vec.tabulate(size)(gen).asInstanceOf[this.type]
     //Vec(this: Seq[T]).asInstanceOf[this.type]

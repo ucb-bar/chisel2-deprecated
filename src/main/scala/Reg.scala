@@ -151,10 +151,7 @@ class RegReset extends Reg {
 }
 
 class Reg extends Delay with proc {
-  override def toString: String = {
-    val nom = if (!name.isEmpty) name else pName
-    "REG(" + nom + ")"
-  }
+  override def toString: String = "REG(" + name + ")"
 
   override def forceMatchingWidths: Unit =
     inputs.transform(_.matchWidth(width))

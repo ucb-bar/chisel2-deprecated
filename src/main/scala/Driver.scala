@@ -77,7 +77,6 @@ object Driver extends FileSystemUtilities{
 
   private def execute[T <: Module](gen: () => T): T = {
     val c = gen()
-    Driver.backend.initBackannotation
     /* Params - If dumping design, dump space to pDir*/
     if (Driver.chiselConfigMode == None || Driver.chiselConfigMode.get == "instance") { 
       Driver.backend.elaborate(c)
@@ -151,12 +150,6 @@ object Driver extends FileSystemUtilities{
     nodes.clear()
     isInGetWidth = false
     startTime = System.currentTimeMillis
-
-    // Backannotation
-    isBackannotating = false
-    model = ""
-    signals.clear
-    pseudoMuxes.clear
     modStackPushed = false
 
     readArgs(args)
@@ -202,14 +195,6 @@ object Driver extends FileSystemUtilities{
             backend = new DotBackend
           } else if (args(i + 1) == "fpga") {
             backend = new FPGABackend
-          } else if (args(i + 1) == "counterc") {
-            backend = new CounterCppBackend
-          } else if (args(i + 1) == "counterv") {
-            backend = new CounterVBackend
-          } else if (args(i + 1) == "counterfpga") {
-            backend = new CounterFPGABackend
-          } else if (args(i + 1) == "counterw") {
-            backend = new CounterWBackend
           } else {
             backend = Class.forName(args(i + 1)).newInstance.asInstanceOf[Backend]
           }
@@ -221,9 +206,6 @@ object Driver extends FileSystemUtilities{
         case "--include" => includeArgs = args(i + 1).split(' ').toList; i += 1
         case "--checkPorts" => isCheckingPorts = true
         case "--reportDims" => isReportDims = true
-        // Counter backend flags
-        case "--backannotation" => isBackannotating = true
-        case "--model" => model = args(i + 1) ; i += 1
         //Jackhammer Flags
         case "--configCollect"  => chiselConfigMode = Some("collect"); chiselConfigClassName = Some(args(i+1)); i+=1;  //dump constraints in dse dir
         case "--configInstance" => chiselConfigMode = Some("instance"); chiselConfigClassName = Some(args(i+1)); i+=1;  //use ChiselConfig to supply parameters
@@ -294,10 +276,6 @@ object Driver extends FileSystemUtilities{
   var implicitClock: Clock = null
   var isInGetWidth: Boolean = false
   /* Backannotation flags */
-  var isBackannotating = false
-  var model = ""
-  val signals = LinkedHashSet[Node]()
-  val pseudoMuxes = HashMap[Node, Node]()
   var modStackPushed: Boolean = false
   var startTime = 0L
   /* ChiselConfig flags */
