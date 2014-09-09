@@ -447,6 +447,7 @@ abstract class Backend extends FileSystemUtilities{
 
   def elaborate(c: Module): Unit = {
     Driver.setTopComponent(c)
+    Driver.sortComponents
 
     /* XXX If we call nameAll here and again further down, we end-up with
      duplicate names in the generated C++.
@@ -466,10 +467,6 @@ abstract class Backend extends FileSystemUtilities{
     execute(c, preElaborateTransforms)
     Driver.components.foreach(_.postMarkNet(0))
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
-
-    levelChildren(c)
-    Driver.sortedComps = gatherChildren(c).sortWith(
-      (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)));
 
     assignClockAndResetToModules
     Driver.sortedComps.map(_.addDefaultReset)

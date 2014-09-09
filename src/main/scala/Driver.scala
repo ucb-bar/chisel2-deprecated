@@ -111,6 +111,28 @@ object Driver extends FileSystemUtilities{
     topComponent.hasExplicitClock = true    
   }
 
+  def sortComponents: Unit = {
+    def levelChildren(root: Module, traversal: Int) {
+      root.level = 0
+      root.traversal = traversal
+      for (child <- root.children) {
+        levelChildren(child, traversal+1)
+        root.level = math.max(root.level, child.level+1)
+      }
+    }
+
+    def gatherChildren(root: Module): ArrayBuffer[Module] = {
+      var result = ArrayBuffer[Module]()
+      for (child <- root.children)
+        result = result ++ gatherChildren(child)
+      result ++ ArrayBuffer[Module](root)
+    }
+
+    levelChildren(topComponent, 0)
+    Driver.sortedComps = gatherChildren(topComponent).sortWith(
+      (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)))
+  }
+
   def initChisel(args: Array[String]): Unit = {
     ChiselError.clear()
     warnInputs = false
