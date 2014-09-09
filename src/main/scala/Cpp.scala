@@ -1006,7 +1006,7 @@ class CppBackend extends Backend {
     }
 
     // Generate header file
-    def genHeader(vcd: Backend, islands: Array[Island], nInitMethods: Int, nSetCircuitMethods: Int, nDumpInitMethods: Int, nInitMappingTableMethods: Int) {
+    def genHeader(vcd: Backend, islands: Array[Island], nInitMethods: Int, nSetCircuitMethods: Int, nDumpInitMethods: Int, nDumpMethods: Int, nInitMappingTableMethods: Int) {
       val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName) 
       val out_h = createOutputFile(n + ".h");
       out_h.write("#ifndef __" + c.name + "__\n");
@@ -1083,7 +1083,6 @@ class CppBackend extends Backend {
       }
       out_h.write("  bool set_circuit_from(mod_t* src);\n");
       out_h.write("  void print ( FILE* f );\n");
-      out_h.write("  void dump ( FILE* f, int t );\n");
 
       // If we're generating multiple dump_init methods, wrap them in private/public.
       if (nDumpInitMethods > 1) {
@@ -1093,9 +1092,20 @@ class CppBackend extends Backend {
         }
         out_h.write(" public:\n");
       }
+      out_h.write("  void dump_init ( FILE* f );\n");
 
-      out_h.write("  void dump_init ( FILE* f );\n\n");
-      out_h.write("};\n\n");
+      // If we're generating multiple dump methods, wrap them in private/public.
+      if (nDumpMethods > 1) {
+        out_h.write(" private:\n");
+        for (i <- 0 until nDumpMethods - 1) {
+          out_h.write("  void dump_" + i + " ( FILE* f );\n");
+        }
+        out_h.write(" public:\n");
+      }
+      out_h.write("  void dump ( FILE* f, int t );\n");
+      
+      // All done with the class definition. Close it off.
+      out_h.write("\n};\n\n");
       out_h.write(Params.toCxxStringParams);
       
       // Generate API headers
@@ -1212,6 +1222,28 @@ class CppBackend extends Backend {
       val nFunctions = llf.bodies.length
       writeCppFile(llf.getBodies)
       nFunctions
+    }
+
+    def genDumpMethod(vcd: VcdBackend): Int = {
+      createCppFile()
+      var head = "void " + c.name + "_t::dump(FILE *f, int t) {\n"
+      val tail = "}\n"
+      // Are we actually generating VCD?
+      if (Driver.isVCD) {
+        // Yes. dump is a real function.
+        head += "  if (t == 0) return dump_init(f);\n" +
+                "  fprintf(f, \"#%d\\n\", t);\n"
+        val llf = new LineLimitedFunction("dump", lineLimitFunctions, head, tail, "FILE *f", "f")
+        vcd.dumpVCD(llf.addString)
+        llf.done()
+        val nFunctions = llf.bodies.length
+        writeCppFile(llf.getBodies)
+        nFunctions
+      } else {
+        // No. Just generate the dummy (nop) function.
+        writeCppFile(head + tail)
+        1
+      }
     }
 
     def genInitMappingTableMethod(mappings: ArrayBuffer[Tuple2[String, Node]]): Int = {
@@ -1498,7 +1530,7 @@ class CppBackend extends Backend {
     val nDumpInitMethods = genDumpInitMethod(vcd)
 
     createCppFile()
-    vcd.dumpVCD(writeCppFile)
+    val nDumpMethods = genDumpMethod(vcd)
 
     out_cpps.foreach(_.fileWriter.flush())
     // If we're compiling initialization functions -O0, add the current files
@@ -1523,7 +1555,7 @@ class CppBackend extends Backend {
     }
 
     // Finally, generate the header - once we know how many methods we'll have.
-    genHeader(vcd, islands, nInitMethods, nSetCircuitFromMethods, nDumpInitMethods, nInitMappingTableMethods)
+    genHeader(vcd, islands, nInitMethods, nSetCircuitFromMethods, nDumpInitMethods, nDumpMethods, nInitMappingTableMethods)
 
     maxFiles = out_cpps.length
 

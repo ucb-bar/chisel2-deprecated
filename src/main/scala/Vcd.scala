@@ -247,18 +247,11 @@ class VcdBackend(top: Module) extends Backend {
   }
 
   def dumpVCD(write: String => Unit): Unit = {
-    write("void " + top.name + "_t::dump(FILE *f, int t) {\n")
-    if (Driver.isVCD) {
-      write("  if (t == 0) return dump_init(f);\n")
-      write("  fprintf(f, \"#%d\\n\", t);\n")
-      if (Driver.isVCDinline) {
-        dumpModsInline(write)
-        
-      } else {
-        dumpModsGoTos(write)
-      }
+    if (Driver.isVCDinline) {
+      dumpModsInline(write)
+    } else {
+      dumpModsGoTos(write)
     }
-    write("}\n")
   }
 
   private val sortedMods = (top.omods foldLeft Array[Node]()){
