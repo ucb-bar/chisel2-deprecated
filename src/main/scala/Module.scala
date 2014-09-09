@@ -221,6 +221,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       scala.Predef.assert(this == w.component,
         ChiselError.error("Statically resolved component differs from dynamically resolved component of IO: " + w + " crashing compiler"))
     }
+    // io naming
+    io nameIt ("io", true)
   }
 
   def findBinding(m: Node): Binding = {
@@ -644,6 +646,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
          val o = m.invoke(this);
          o match {
          case node: Node => {
+           node.getNode match {
+             case _: Literal => 
+             case _ => node.getNode nameIt (backend.asValidName(name), false)
+           }
+           backend.nameSpace += node.getNode.name
          }
          case buf: ArrayBuffer[_] => {
            /* We would prefer to match for ArrayBuffer[Node] but that's
@@ -653,6 +660,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
              val nodebuf = buf.asInstanceOf[Seq[Node]];
              for((elm, i) <- nodebuf.zipWithIndex){
+               elm.getNode match {
+                 case _: Literal =>
+                 case _ => elm.getNode nameIt (backend.asValidName(name + "_" + i), false)
+               }
+               backend.nameSpace += elm.getNode.name
              }
            }
          }
@@ -660,11 +672,28 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
              val nodebuf = buf.asInstanceOf[Seq[Node]];
              for((elm, i) <- nodebuf.zipWithIndex){
+               elm.getNode match {
+                 case _: Literal =>
+                 case _ => elm.getNode nameIt (backend.asValidName(name + "_" + i), false)
+               }
+               backend.nameSpace += elm.getNode.name
              }
            }
          }
+         case bb: BlackBox => {
+           if (!bb.named) {
+             bb.name = name
+             bb.named = true
+           }
+           backend.nameSpace += bb.name
+         }
          case comp: Module => {
            comp.pathParent = this;
+           if (!comp.named) {
+             comp.name = backend.asValidName(name)
+             comp.named = true
+           }
+           backend.nameSpace += comp.name
          }
          case any =>
        }

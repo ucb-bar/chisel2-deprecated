@@ -63,7 +63,7 @@ trait FileSystemUtilities {
 abstract class Backend extends FileSystemUtilities{
   /* Set of keywords which cannot be used as node and component names. */
   val keywords: HashSet[String];
-
+  val nameSpace = HashSet[String]() 
   /* Set of Ops that this backend doesn't natively support and thus must be
      lowered to simpler Ops. */
   val needsLowering = Set[String]()
@@ -89,150 +89,46 @@ abstract class Backend extends FileSystemUtilities{
     if(x == 0) "" else "    " + genIndent(x-1);
   }
 
-  def nameChildren(root: Module) {
-    // Name all nodes at this level
-    root.io.nameIt("io", true);
-    val nameSpace = new HashSet[String];
-    /* We are going through all declarations, which can return Nodes,
-     ArrayBuffer[Node], BlackBox and Modules.
-     Since we call invoke() to get a proper instance of the correct type,
-     we have to insure the method is accessible, thus all fields
-     that will generate C++ or Verilog code must be made public. */
-    for (m <- root.getClass().getDeclaredMethods.sortWith(
-      (x, y) => (x.getName() < y.getName())
-    )) {
-      val name = m.getName();
-      val types = m.getParameterTypes();
-      if (types.length == 0 && root.isValName(name) // patch to avoid defs
-        && isPublic(m.getModifiers())) {
-        val o = m.invoke(root);
-        o match {
-         case node: Node => {
-           /* XXX It seems to always be true. How can name be empty? */
-           if ((node.isTypeNode || name != ""
-             || node.name == null || (node.name == "" && !node.named))) {
-             node.nameIt(asValidName(name), false);
-           }
-           nameSpace += node.name;
-         }
-         case buf: ArrayBuffer[_] => {
-           /* We would prefer to match for ArrayBuffer[Node] but that's
-            impossible because of JVM constraints which lead to type erasure.
-            XXX Using Seq instead of ArrayBuffer will pick up members defined
-            in Module that are solely there for implementation purposes. */
-           if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
-             val nodebuf = buf.asInstanceOf[Seq[Node]];
-             var i = 0;
-             for(elm <- nodebuf){
-               if( elm.isTypeNode || elm.name == null || elm.name.isEmpty ) {
-                 /* XXX This code is sensitive to when Bundle.nameIt is called.
-                  Whether it is called late (elm.name is empty) or we override
-                  any previous name that could have been infered,
-                  this has for side-effect to create modules with the exact
-                  same logic but textually different in input/output
-                  parameters, hence generating unnecessary modules. */
-                 elm.nameIt(asValidName(name + "_" + i), false);
-               }
-               nameSpace += elm.name;
-               i += 1;
-             }
-           }
-         }
-         case buf: collection.IndexedSeq[_] => {
-           /* This is a duplicate of ArrayBuffer[_] that was introduced
-            to support VecLike. ArrayBuffer and IndexedSeq have no parent/child
-            relationship. */
-           if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
-             val nodebuf = buf.asInstanceOf[Seq[Node]];
-             var i = 0;
-             for(elm <- nodebuf){
-               if( elm.isTypeNode || elm.name == null || elm.name.isEmpty ) {
-                 /* XXX This code is sensitive to when Bundle.nameIt is called.
-                  Whether it is called late (elm.name is empty) or we override
-                  any previous name that could have been infered,
-                  this has for side-effect to create modules with the exact
-                  same logic but textually different in input/output
-                  parameters, hence generating unnecessary modules. */
-                 elm.nameIt(asValidName(name + "_" + i), false);
-               }
-               nameSpace += elm.name;
-               i += 1;
-             }
-           }
-         }
-         case bb: BlackBox => {
-           if(!bb.named) {
-             bb.name = name;
-             bb.named = true
-           };
-           nameSpace += bb.name;
-         }
-         case comp: Module => {
-           if(!comp.named) {
-             comp.name = asValidName(name);
-             comp.named = true
-           };
-           nameSpace += comp.name;
-         }
-         case any => {
-           /* We have no idea what to do with class members which are
-            neither of the previous types. Let's discard them. */
-         }
-        }
-      }
-    }
-    /* Recursively name the nodes and components inside this root.
-     This code must be executed between the root-level naming and the naming
-     of bindings otherwise some identifiers will leak into the input/output
-     of a module. */
-    val byNames = LinkedHashMap[String, ArrayBuffer[Module]]();
-    for (c <- root.children) {
-      nameChildren(c);
-      if( c.name.isEmpty ) {
-        /* We don't have a name because we are not dealing with
-         a class member. */
-        val className = extractClassName(c);
-        if( byNames contains className ) {
-          byNames(className).append(c);
-        } else {
-          byNames += (className -> ArrayBuffer[Module](c));
-        }
-      }
-    }
-
-    for( (className, comps) <- byNames ) {
-        if( comps.length > 1 ) {
-          for( (c, index) <- comps.zipWithIndex ) {
-            c.name = className + "_" + index.toString
-          }
-        } else {
-          comps(0).name = className;
-        }
-    }
-
-    for (bind <- root.bindings) {
-      var genName = if (bind.targetNode.name == null || bind.targetNode.name.length() == 0) "" else bind.targetComponent.name + "_" + bind.targetNode.name;
-      if(nameSpace.contains(genName)) genName += ("_" + bind.emitIndex);
-      bind.name = asValidName(genName); // Not using nameIt to avoid override
-      bind.named = true;
-    }
-  }
-
   /* Returns a string derived from _name_ that can be used as a valid
    identifier for the targeted backend. */
   def asValidName( name: String ): String = {
     if (keywords.contains(name)) name + "_" else name;
   }
 
-  def nameAll(root: Module) {
-    root.name = extractClassName(root);
-    nameChildren(root);
-    for( node <- Driver.nodes ) {
-      if( (node.nameHolder != null && !node.nameHolder.name.isEmpty)
-        && !node.named && !node.isInstanceOf[Literal] ){
-        node.name = node.nameHolder.name; // Not using nameIt to avoid override
-        node.named = node.nameHolder.named;
-        node.nameHolder.name = "";
+  def nameAll {
+    // module naming
+    val byNames = LinkedHashMap[String, ArrayBuffer[Module]]();
+    for (c <- Driver.sortedComps) {
+      if( c.name.isEmpty ) {
+        /* We don't have a name because we are not dealing with
+         a class member. */
+        val className = extractClassName(c);
+        if( byNames contains className ) {
+          byNames(className) += c
+        } else {
+          byNames(className) = ArrayBuffer[Module](c)
+        }
+      }
+    }
+
+    for( (className, comps) <- byNames ) {
+      if( comps.length > 1 ) {
+        for( (c, index) <- comps.zipWithIndex ) {
+          c.name = className + "_" + index.toString
+        }
+      } else {
+        comps(0).name = className;
+      }
+    }
+
+    // binding naming
+    for (comp <- Driver.sortedComps) {
+      for (bind <- comp.bindings) {
+        var genName = if (bind.targetNode.name == null || bind.targetNode.name.length() == 0) "" 
+                      else bind.targetComponent.name + "_" + bind.targetNode.name
+        if(nameSpace contains genName) genName += ("_" + bind.emitIndex);
+        bind.name = asValidName(genName); // Not using nameIt to avoid override
+        bind.named = true;
       }
     }
   }
@@ -272,15 +168,33 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
-  def emitRef(c: Module): String =
-    c.name
-
+  def emitRef(c: Module): String = c.name
   def emitDec(node: Node): String = ""
 
   val preElaborateTransforms = ArrayBuffer[(Module) => Unit]()
   val transforms = ArrayBuffer[(Module) => Unit]()
   if (Driver.isCSE) transforms += CSE.transform
   val analyses = ArrayBuffer[(Module) => Unit]()
+
+  def bfsModule(visit: Module => Unit) = {
+    val walked = HashSet[Module]()
+    val queue = ScalaQueue[Module](Driver.topComponent)
+
+    def isVisiting(module: Module) = 
+      !(module == null) && !(walked contains module)
+
+    while(!queue.isEmpty) {
+      val top = queue.dequeue
+      walked += top
+      visit(top)
+      for (child <- top.children) {
+        if (isVisiting(child)) {
+          queue enqueue child
+          walked += child
+        }
+      }
+    }
+  }
 
   def initializeDFS: Stack[Node] = {
     val res = new Stack[Node]
@@ -602,7 +516,7 @@ abstract class Backend extends FileSystemUtilities{
 
     /* We execute nameAll after traceNodes because bindings would not have been
        created yet otherwise. */
-    nameAll(c)
+    nameAll
     nameRsts
 
     execute(c, analyses)
