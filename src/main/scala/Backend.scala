@@ -88,6 +88,34 @@ abstract class Backend extends FileSystemUtilities{
   protected def genIndent(x: Int): String = {
     if(x == 0) "" else "    " + genIndent(x-1);
   }
+  def sortComponents: Unit = {
+    def levelChildren(root: Module, traversal: Int) {
+      root.level = 0
+      root.traversal = traversal
+      for (child <- root.children) {
+        levelChildren(child, traversal+1)
+        root.level = math.max(root.level, child.level+1)
+      }
+    }
+
+    def gatherChildren(root: Module): ArrayBuffer[Module] = {
+      var result = ArrayBuffer[Module]()
+      for (child <- root.children)
+        result = result ++ gatherChildren(child)
+      result ++ ArrayBuffer[Module](root)
+    }
+
+    levelChildren(Driver.topComponent, 0)
+    Driver.sortedComps = gatherChildren(Driver.topComponent).sortWith(
+      (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)))
+  }
+
+  def verifyAllMuxes {
+    Driver.bfs { _ match {
+      case p: proc => p.verifyMuxes
+      case _ =>
+    } }
+  }
 
   /* Returns a string derived from _name_ that can be used as a valid
    identifier for the targeted backend. */
@@ -175,26 +203,6 @@ abstract class Backend extends FileSystemUtilities{
   val transforms = ArrayBuffer[(Module) => Unit]()
   if (Driver.isCSE) transforms += CSE.transform
   val analyses = ArrayBuffer[(Module) => Unit]()
-
-  def bfsModule(visit: Module => Unit) = {
-    val walked = HashSet[Module]()
-    val queue = ScalaQueue[Module](Driver.topComponent)
-
-    def isVisiting(module: Module) = 
-      !(module == null) && !(walked contains module)
-
-    while(!queue.isEmpty) {
-      val top = queue.dequeue
-      walked += top
-      visit(top)
-      for (child <- top.children) {
-        if (isVisiting(child)) {
-          queue enqueue child
-          walked += child
-        }
-      }
-    }
-  }
 
   def initializeDFS: Stack[Node] = {
     val res = new Stack[Node]
@@ -350,23 +358,6 @@ abstract class Backend extends FileSystemUtilities{
 
   def emitDef(node: Node): String = ""
 
-  def levelChildren(root: Module) {
-    root.level = 0;
-    root.traversal = VerilogBackend.traversalIndex;
-    VerilogBackend.traversalIndex = VerilogBackend.traversalIndex + 1;
-    for(child <- root.children) {
-      levelChildren(child)
-      root.level = math.max(root.level, child.level + 1);
-    }
-  }
-
-  def gatherChildren(root: Module): ArrayBuffer[Module] = {
-    var result = new ArrayBuffer[Module]();
-    for (child <- root.children)
-      result = result ++ gatherChildren(child);
-    result ++ ArrayBuffer[Module](root);
-  }
-
   // go through every Module and set its clock and reset field
   def assignClockAndResetToModules {
     for (module <- Driver.sortedComps.reverse) {
@@ -375,6 +366,35 @@ abstract class Backend extends FileSystemUtilities{
       if (!module.hasExplicitReset)
         module.reset_=
     }
+  }
+
+  // for every reachable delay element
+  // assign it a clock and reset where
+  // clock is chosen to be the component's clock if delay does not specify a clock
+  // reset is chosen to be 
+  //          component's explicit reset
+  //          delay's explicit clock's reset
+  //          component's clock's reset
+  def addClocksAndResets {
+    Driver.bfs {
+      _ match {
+        case x: Delay =>
+          val clock = if (x.clock == null) x.component.clock else x.clock
+          val reset =
+            if (x.component.hasExplicitReset) x.component._reset
+            else if (x.clock != null) x.clock.getReset
+            else if (x.component.hasExplicitClock) x.component.clock.getReset
+            else x.component._reset
+          x.assignReset(x.component.addResetPin(reset))
+          x.assignClock(clock)
+          x.component.addClock(clock)
+        case _ =>
+      }
+    }
+  }
+
+  def addDefaultResets {
+    Driver.components foreach (_.addDefaultReset)
   }
 
   // go through every Module, add all clocks+resets used in it's tree to it's list of clocks+resets
@@ -445,10 +465,23 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
-  def elaborate(c: Module): Unit = {
-    Driver.setTopComponent(c)
-    Driver.sortComponents
+  def analyze(c: Module) {
+    ChiselError.info("analyzing modules")
+    /* XXX We should name all signals before error messages are generated
+     so as to give a clue where problems are showing up but that interfers
+     with the *bindings* (see later comment). */
+    Driver.components foreach (_.markComponent)
+    sortComponents
+    verifyAllMuxes
 
+    assignClockAndResetToModules
+    addClocksAndResets
+    Driver.sortedComps.map(_.addDefaultReset)
+    gatherClocksAndResets
+    connectResets
+  }
+
+  def elaborate(c: Module): Unit = {
     /* XXX If we call nameAll here and again further down, we end-up with
      duplicate names in the generated C++.
     nameAll(c) */
@@ -456,23 +489,11 @@ abstract class Backend extends FileSystemUtilities{
     ChiselError.info("elaborating modules")
     Driver.components.foreach(_.elaborate(0))
 
-    /* XXX We should name all signals before error messages are generated
-     so as to give a clue where problems are showing up but that interfers
-     with the *bindings* (see later comment). */
-    for (c <- Driver.components)
-      c.markComponent();
     // XXX This will create nodes after the tree is traversed!
-    c.genAllMuxes;
     ChiselError.checkpoint()
     execute(c, preElaborateTransforms)
     Driver.components.foreach(_.postMarkNet(0))
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
-
-    assignClockAndResetToModules
-    Driver.sortedComps.map(_.addDefaultReset)
-    c.addClockAndReset
-    gatherClocksAndResets
-    connectResets
 
     ChiselError.info("inferring widths")
     c.inferAll

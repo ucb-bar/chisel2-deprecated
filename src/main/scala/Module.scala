@@ -135,7 +135,7 @@ object Module {
          ( + ) sets the default reset signal
          ( + ) overriden if Delay specifies its own clock w/ reset != implicitReset
 */
-abstract class Module(var clock: Clock = null, private var _reset: Bool = null) {
+abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool = null) {
   /** A backend(Backend.scala) might generate multiple module source code
     from one Module, based on the parameters to instanciate the component
     instance. Since we do not want to blindly generate one module per instance

@@ -30,11 +30,11 @@
 
 package Chisel
 
-import collection.mutable.{ArrayBuffer, HashSet, HashMap, Stack, LinkedHashSet}
+import collection.mutable.{ArrayBuffer, HashSet, HashMap, Stack, LinkedHashSet, Queue => ScalaQueue}
 
 object Driver extends FileSystemUtilities{
   def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean = true): T = {
-    Driver.initChisel(args)
+    initChisel(args)
     try {
       if(wrapped) execute(gen) else executeUnwrapped(gen)
     } finally {
@@ -49,22 +49,22 @@ object Driver extends FileSystemUtilities{
   def apply[T <: Module](args: Array[String], gen: () => T,
                          ftester: T => Tester[T], wrapped:Boolean = true): T = {
     val mod = if(wrapped) apply(args, gen) else apply(args,gen,false)
-    if (Driver.isTesting) test(mod, ftester)
+    if (isTesting) test(mod, ftester)
     mod
   }
 
   private def executeUnwrapped[T <: Module](gen: () => T): T = {
-    if (!Driver.chiselConfigMode.isEmpty && !Driver.chiselConfigClassName.isEmpty) { 
+    if (!chiselConfigMode.isEmpty && !chiselConfigClassName.isEmpty) { 
       val config = Class.forName(chiselConfigClassName.get).newInstance.asInstanceOf[ChiselConfig]
-      val world = if(Driver.chiselConfigMode.get == "collect") new Collector(config.topDefinitions,config.knobValues) else new Instance(config.topDefinitions,config.knobValues)
+      val world = if(chiselConfigMode.get == "collect") new Collector(config.topDefinitions,config.knobValues) else new Instance(config.topDefinitions,config.knobValues)
       val p = Parameters.root(world)
       config.topConstraints.foreach(c => p.constrain(c))
       val c = execute(() => Module(gen())(Some(p)))
-      if(Driver.chiselConfigMode.get == "collect") {
-        val v = createOutputFile(Driver.chiselConfigClassName.get + ".knb")
+      if(chiselConfigMode.get == "collect") {
+        val v = createOutputFile(chiselConfigClassName.get + ".knb")
         v.write(world.getKnobs)
         v.close
-        val w = createOutputFile(Driver.chiselConfigClassName.get + ".cst")
+        val w = createOutputFile(chiselConfigClassName.get + ".cst")
         w.write(world.getConstraints)
         w.close
       }
@@ -78,10 +78,12 @@ object Driver extends FileSystemUtilities{
   private def execute[T <: Module](gen: () => T): T = {
     val c = gen()
     /* Params - If dumping design, dump space to pDir*/
-    if (Driver.chiselConfigMode == None || Driver.chiselConfigMode.get == "instance") { 
-      Driver.backend.elaborate(c)
-      if (Driver.isCheckingPorts) Driver.backend.checkPorts(c)
-      if (Driver.isCompiling && Driver.isGenHarness) Driver.backend.compile(c)
+    if (chiselConfigMode == None || chiselConfigMode.get == "instance") { 
+      setTopComponent(c)
+      backend.analyze(c)
+      backend.elaborate(c)
+      if (isCheckingPorts) backend.checkPorts(c)
+      if (isCompiling && isGenHarness) backend.compile(c)
     }
     c
   }
@@ -103,34 +105,36 @@ object Driver extends FileSystemUtilities{
 
   def setTopComponent(mod: Module): Unit = {
     topComponent = mod
-    implicitReset.component = Driver.topComponent
-    implicitClock.component = Driver.topComponent
-    topComponent.reset = Driver.implicitReset
+    implicitReset.component = topComponent
+    implicitClock.component = topComponent
+    topComponent.reset = implicitReset
     topComponent.hasExplicitReset = true
-    topComponent.clock = Driver.implicitClock
+    topComponent.clock = implicitClock
     topComponent.hasExplicitClock = true    
   }
 
-  def sortComponents: Unit = {
-    def levelChildren(root: Module, traversal: Int) {
-      root.level = 0
-      root.traversal = traversal
-      for (child <- root.children) {
-        levelChildren(child, traversal+1)
-        root.level = math.max(root.level, child.level+1)
+  def bfs (visit: Node => Unit) = {
+    // initialize BFS
+    val queue = new ScalaQueue[Node]
+    
+    for (c <- components; a <- c.debugs)
+      queue enqueue a
+    for (b <- blackboxes)
+      queue enqueue b.io
+    for (c <- components; (n, io) <- c.io.flatten)
+      queue enqueue io
+
+    // Do BFS
+    val walked = HashSet[Node]()
+    while (!queue.isEmpty) {
+      val top = queue.dequeue
+      walked += top
+      visit(top)
+      for (i <- top.inputs; if !(i == null) && !(walked contains i)) {
+        queue enqueue i
+        walked += i
       }
     }
-
-    def gatherChildren(root: Module): ArrayBuffer[Module] = {
-      var result = ArrayBuffer[Module]()
-      for (child <- root.children)
-        result = result ++ gatherChildren(child)
-      result ++ ArrayBuffer[Module](root)
-    }
-
-    levelChildren(topComponent, 0)
-    Driver.sortedComps = gatherChildren(topComponent).sortWith(
-      (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)))
   }
 
   def initChisel(args: Array[String]): Unit = {
@@ -189,7 +193,7 @@ object Driver extends FileSystemUtilities{
         }
         case "--wi" => warnInputs = true
         case "--wo" => warnOutputs = true
-        case "--wio" => {warnInputs = true; Driver.warnOutputs = true}
+        case "--wio" => {warnInputs = true; warnOutputs = true}
         case "--Wconnection" => saveConnectionWarnings = true
         case "--Wcomponent" => saveComponentTrace = true
         case "--noCombLoop" => dontFindCombLoop = true
@@ -297,7 +301,6 @@ object Driver extends FileSystemUtilities{
   var implicitReset: Bool = null
   var implicitClock: Clock = null
   var isInGetWidth: Boolean = false
-  /* Backannotation flags */
   var modStackPushed: Boolean = false
   var startTime = 0L
   /* ChiselConfig flags */
