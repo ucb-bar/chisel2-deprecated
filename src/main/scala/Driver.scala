@@ -235,7 +235,6 @@ object Driver extends FileSystemUtilities{
     parallelMakeJobs = 0
     isVCDinline = false
     hasMem = false
-    backend = new CppBackend
     topComponent = null
     clocks.clear()
     implicitReset = Bool(INPUT)
@@ -253,6 +252,7 @@ object Driver extends FileSystemUtilities{
 
   private def readArgs(args: Array[String]): Unit = {
     var i = 0
+    var backendName = "c"     // Default backend is Cpp.
     while (i < args.length) {
       val arg = args(i)
       arg match {
@@ -291,22 +291,7 @@ object Driver extends FileSystemUtilities{
         case "--useSimpleQueue" => useSimpleQueue = true
         case "--parallelMakeJobs" => parallelMakeJobs = args(i + 1).toInt; i += 1
         case "--isVCDinline" => isVCDinline = true
-        case "--backend" => {
-          if (args(i + 1) == "v") {
-            backend = new VerilogBackend
-          } else if (args(i + 1) == "c") {
-            backend = new CppBackend
-          } else if (args(i + 1) == "flo") {
-            backend = new FloBackend
-          } else if (args(i + 1) == "dot") {
-            backend = new DotBackend
-          } else if (args(i + 1) == "fpga") {
-            backend = new FPGABackend
-          } else {
-            backend = Class.forName(args(i + 1)).newInstance.asInstanceOf[Backend]
-          }
-          i += 1
-        }
+        case "--backend" => backendName = args(i + 1); i += 1
         case "--compile" => isCompiling = true
         case "--test" => isTesting = true
         case "--targetDir" => targetDir = args(i + 1); i += 1
@@ -343,6 +328,21 @@ object Driver extends FileSystemUtilities{
         case any => ChiselError.warning("'" + arg + "' is an unknown argument.")
       }
       i += 1
+    }
+    // Check for bogus flags
+    if (!isVCD) {
+      isVCDinline = false
+    }
+    // Set the backend after we've interpreted all the arguments.
+    // (The backend may want to configure itself based on the arguments.)
+    backend = backendName match  {
+      case "v" => new VerilogBackend
+      case "c" => new CppBackend
+      case "flo" => new FloBackend
+      case "dot" => new DotBackend
+      case "fpga" => new FPGABackend
+      case "sysc" => new SysCBackend
+      case _ => Class.forName(backendName).newInstance.asInstanceOf[Backend]
     }
   }
 
