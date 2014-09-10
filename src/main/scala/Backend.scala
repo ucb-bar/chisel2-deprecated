@@ -46,7 +46,21 @@ object Backend {
   var moduleNamePrefix = ""
 }
 
-abstract class Backend {
+trait FileSystemUtilities {
+  /** Ensures a directory *dir* exists on the filesystem. */
+  def ensureDir(dir: String): String = {
+    val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/")
+    new File(d).mkdirs()
+    d
+  }
+
+  def createOutputFile(name: String): java.io.FileWriter = {
+    val baseDir = ensureDir(Driver.targetDir)
+    new java.io.FileWriter(baseDir + name)
+  }
+}
+
+abstract class Backend extends FileSystemUtilities{
   /* Set of keywords which cannot be used as node and component names. */
   val keywords: HashSet[String];
 
@@ -57,23 +71,11 @@ abstract class Backend {
   /* Whether or not this backend decomposes along Module boundaries. */
   def isEmittingComponents: Boolean = false
 
-  def createOutputFile(name: String): java.io.FileWriter = {
-    val baseDir = ensureDir(Driver.targetDir)
-    new java.io.FileWriter(baseDir + name)
-  }
-
   def depthString(depth: Int): String = {
     var res = "";
     for (i <- 0 until depth)
       res += "  ";
     res
-  }
-
-  /** Ensures a directory *dir* exists on the filesystem. */
-  def ensureDir(dir: String): String = {
-    val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/")
-    new File(d).mkdirs()
-    d
   }
 
   def extractClassName(comp: Module): String = {

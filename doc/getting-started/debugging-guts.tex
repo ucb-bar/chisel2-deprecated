@@ -1,0 +1,82 @@
+\section{Debugging Designs}
+
+Chisel provides a number of mechanisms for debugging your designs.  
+A designer can format and print out strings to display signals over time.
+Runtime assertions can be declared with the \verb+assert+ construct.
+Circuits can be displayed with the dot backend.
+Complete signal values can be dumped over time in VCD format.
+Finally, circuits can be interacted with the debug API.
+
+\section{Printf and Sprintf}
+
+Chisel provides the ability to format and print strings for debugging
+purposes.  The \code{printf} and \code{sprintf} construct are similar to their
+C namesakes: they take a format string and a variable number of arguments,
+then print or return a string, respectively.  During simulation, \code{printf}
+prints the formatted string to the console on rising clock edges.
+\code{sprintf}, on the other hand, returns the formatted string as a bit
+vector.
+
+Supported format specifiers are \code{\%b} (binary number), \code{\%d}
+(decimal number), \code{\%x} (hexadecimal number), and \code{\%s} (string
+consisting of a sequence of 8-bit extended ASCII characters).  (\code{\%\%}
+specifies a literal \code{\%}.) Unlike in C, there are no width modifiers: the
+bit width of the corresponding argument determines the width in the string
+representation.
+
+The following example prints the line \code{"0x4142 16706 AB"} on cycles when
+\code{c} is true:
+
+\begin{scala}
+val x = Bits(0x4142)
+val s1 = sprintf("%x %s", x, x);
+when (c) { printf("%d %s\n", x, s1); }
+\end{scala}
+
+\section{Assert}
+
+Runtime assertions are provided by the \code{assert} construct.  During
+simulation, if an assertion's argument is false on a rising clock edge,
+an error is printed and simulation terminates.  For example, the following
+will terminate simulation after ten clock cycles:
+
+\begin{scala}
+val x = Reg(init = UInt(0, 4))
+x := x + UInt(1)
+assert(x < UInt(10))
+\end{scala}
+
+\section{Circuit Graph Visualization}
+
+In Chisel, circuits are constructed using a textual program.
+Sometimes it is useful to see the constructed circuit graph.
+Users can produce at dot graph file viewable by vizgraph using the dot backend.
+
+\todo{finish examples below}
+
+\begin{scala}
+chiselMain ... --backend dot ...
+\end{scala}
+
+\begin{bash}
+vizgraph -pdf test.dot
+\end{bash}
+
+\section{VCD Dumps}
+
+One powerfully way of debugging is by saved the values of all signals and state over time.
+Chisel supports this by running circuits under test while 
+dumping \verb+VCD+ (Value Change Dump) files using the \verb+--vcd+ option:
+
+\begin{bash}
+chiselMainTest ... --vcd ...
+\end{bash}
+
+These VCD files can then viewed using either commercial waveform viewers like \verb+VCS+ or open source ones like \verb+gtkwave+.
+
+\todo{picture of waveform}
+
+% \section{Debug API}
+% 
+% For those that want lower level control over their designs, 
+% they can drive their circuits through a low level debug API.

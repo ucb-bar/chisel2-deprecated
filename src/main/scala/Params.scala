@@ -33,6 +33,7 @@ package Chisel
 
 import Node._
 import Module._
+import JHFormat._
 
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ArrayBuffer
@@ -96,7 +97,7 @@ object IntParam {
 }
 
 object Params {
-  type Space = ArrayBuffer[(String,Param[Any],Int)]
+  type Space = JHFormat.Space
   var space = new Space
   var design = new Space
   var modules = new HashMap[String, Module]
@@ -128,36 +129,23 @@ object Params {
     p
   }
 
-  def load_file(filename: String) : Params.Space = {
-    //val file = io.Source.fromFile(filename).mkString
-    var lines = io.Source.fromFile(filename).getLines
-    var space = new Params.Space
-    while(lines.hasNext) {
-      val line = lines.next()
-      println("Loaded: " + line + "\nfrom " + filename)
-      Params.deserialize(line,space)
-    }
-    //space.map(println(_))
-    space
-  }
-   
-  def dump_file(filename: String, design: Params.Space) = {
-    val string = Params.serialize(design)
+  def dump_file(filename: String, design: Space) = {
+    val string = JHFormat.serialize(design)
     val writer = new PrintWriter(new File(filename))
     println("Dumping to " + filename + ":\n" + string)
     writer.write(string)
     writer.close()
   }
 
-/*
-  def load(filename: String) = {
-    buildingSpace = false
-    design = load_file(filename)
-  }
-
   def dump(dir: String) = {
-    dump_file(dir + "/space.prm", space)
-  }*/
+    buildingSpace = false
+    dump_file(dir + "/" + JHFormat.spaceName, Params.space)
+  }
+  def load(designName: String) = {
+    buildingSpace = false
+    design = JHFormat.deserialize(designName)
+    gID = 0
+  }
  
   def toCxxStringParams : String = {
     var string = new StringBuilder("")
@@ -177,64 +165,6 @@ object Params {
     string.toString
   }
 
-  def serialize[T<:Param[Any]](space: Space) : String = {
-    var string = new StringBuilder("")
-    for ((mname, p, gID) <- space) {
-      string ++= mname + "," + toStringParam(p) + "\n"
-    }
-    string.toString
-  }
-
-  def deserialize(string: String, space: Space) = {
-    val args = string.split(",")
-    val mname = args(0)
-    val ptype = args(1)
-    val gID   = args(2).toInt
-    val pname = args(3)
-    val param = ptype match {
-      case "value"   => { val p = new ValueParam(pname,args(4).toInt)
-        p.gID = gID; p }
-      case "range"   => { val p = new RangeParam(pname,args(4).toInt,args(5).toInt,args(6).toInt)
-        p.gID = gID; p }
-      case "less"    => { val p = new LessParam(pname,args(4).toInt,args(5).toInt,space.find(i => i._3 == args(6).toInt).get._2)
-        p.gID = gID; p }
-      case "lesseq"  => { val p = new LessEqParam(pname,args(4).toInt,args(5).toInt,space.find(i => i._3 == args(6).toInt).get._2)
-        p.gID = gID; p }
-      case "great"   => { val p = new GreaterParam(pname,args(4).toInt,space.find(i => i._3 == args(5).toInt).get._2,args(6).toInt)
-        p.gID = gID; p }
-      case "greateq" => { val p = new GreaterEqParam(pname,args(4).toInt,space.find(i => i._3 == args(5).toInt).get._2,args(6).toInt)
-        p.gID = gID; p }
-      case "divisor" => { val p = new DivisorParam(pname,args(4).toInt,args(5).toInt,args(6).toInt,space.find(i => i._3 == args(7).toInt).get._2)
-        p.gID = gID; p }
-      case "enum"    => { val p = new EnumParam(pname,args(4),args.slice(5,args.length).toList)
-        p.gID = gID; p }
-      case _         => { throw new ParamInvalidException("Unknown parameter"); new ValueParam("error",0) }
-    }
-    space += ((mname,param,gID.toInt))
-  }
-    
-  def toStringParam(param: Param[Any]):String = {
-    param match {
-      case ValueParam(pname, init) =>
-        "value,"   + param.gID + "," + pname + "," + init
-      case RangeParam(pname, init, min, max) =>
-        "range,"   + param.gID + "," + pname + "," + init + "," + min + "," + max
-      case LessParam(pname, init, min, par) =>
-        "less,"    + param.gID + "," + pname + "," + init + "," + min + "," + par.gID
-      case LessEqParam(pname, init, min, par) =>
-        "lesseq,"  + param.gID + "," + pname + "," + init + "," + min + "," + par.gID
-      case GreaterParam(pname, init, par, max) =>
-        "great,"   + param.gID + "," + pname + "," + init + "," + par.gID + "," + max
-      case GreaterEqParam(pname, init, par, max) =>
-        "greateq," + param.gID + "," + pname + "," + init + "," + par.gID + "," + max
-      case DivisorParam(pname, init, min, max, par) =>
-        "divisor," + param.gID + "," + pname + "," + init + "," + min + "," + max + "," + par.gID
-      case EnumParam(pname, init, values) =>
-        "enum,"    + param.gID + "," + pname + "," + init + "," + values.mkString(",")
-      case _ =>
-        throw new ParamInvalidException("Unknown parameter class!"); ""
-    }
-  }
     
   def toCxxStringParam(param: Param[Any]) = {
     param match {

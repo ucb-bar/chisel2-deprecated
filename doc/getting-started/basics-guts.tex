@@ -5,18 +5,17 @@ Once you have acquired the tutorial files you should see the following Chisel tu
 \begin{bash}
 chisel-tutorial/  
   Makefile
-  examples/   # Contains chisel examples
-    Makefile  
-    build.sbt # Contains project description
+  examples/   # chisel examples
+    Makefile  # for running examples
+    build.sbt # project description
     Accumulator.scala ...
-  problems/   # Contains skeletal files for 
-              # tutorial problems
-    Makefile
-    build.sbt # Contains project description
+  problems/   # skeletal files for tutorial problems
+    Makefile  # for running / testing problems
+    build.sbt # project description
     Counter.scala ...
-  solutions/  # Contains solutions to problems
-    Makefile
-    build.sbt # Contains project description
+  solutions/  # solutions to problems
+    Makefile  # for running solutions
+    build.sbt # project description
     Counter.scala ...
 \end{bash}
 
@@ -86,7 +85,8 @@ This will fire off the Chisel emulator that will run the simulation for the comp
 \begin{footnotesize}
 \begin{bash}
 PASSED
-[success] Total time: 2 s, completed Feb 28, 2013 8:14:37 PM
+[success] Total time: 2 s, completed Feb 28, 2013 \
+  8:14:37 PM
 \end{bash}
 \end{footnotesize}
 
@@ -205,6 +205,7 @@ class FullAdder extends Module {
   val b_and_cin = io.b & io.cin
   val a_and_cin = io.a & io.cin
   io.cout := a_and_b | b_and_cin | a_and_cin
+}
 \end{scala}
 
 As a result, the Chisel compiler should infer each of the intermediate values \verb+a_xor_b, a_and_b, b_and_cin,+ and \verb+a_and_cin+ are two bits wide. An inspection of the Verilog code correctly shows that Chisel inferred each of the intermediate wires in the calculation to be 2 bits wide.
@@ -394,9 +395,40 @@ class ShiftRegister extends Module {
 
 This will generate slightly different looking Verilog source code but will still function the same as the previous implementation of the shift register with reset.
 
-%\section{Tutorial Exercises}
+\subsection{\problem{Sequential Circuit}}
 
-%The following exercises can be found in your \verb+\$DIR/chisel-tutorial/src/problems/+ folder. You will find that some parts of the tutorial files have been completed for you and the section that you need to will need to complete is indicated in the file. The solutions to each of these exercises can be found in the \verb+\$DIR/chisel-tutorial/src/solutions/+ folder.
+The following exercises can be found in your
+\verb+$TUT_DIR/problems/+ folder. You will find that some parts of
+the tutorial files have been completed for you and the section that
+you need to will need to complete is indicated in the file. The
+solutions to each of these exercises can be found in the
+\verb+$TUT_DIR/solutions/+ folder.
+
+The first tutorial problem is to write write a sequential circuit that sums \verb+in+ values. 
+You can find the template in \verb+$TUT_DIR/problems/Accumulator.scala+ including a stubbed out version of the circuit:
+\begin{scala}
+class Accumulator extends Module {
+  val io = new Bundle {
+    val in  = UInt(INPUT, 1)
+    val out = UInt(OUTPUT, 8)
+  }
+
+  // flush this out ...
+
+  io.out := UInt(0)
+}
+\end{scala}
+
+\noindent
+and a complete tester that confirms that you have successfully designed the circuit.  Run 
+
+\begin{bash}
+make Accumulator.out
+\end{bash}
+
+\noindent 
+until your circuit passes the tests.
+
 
 %\subsection{Creating a Two Input Multiplexor}
 %
