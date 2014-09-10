@@ -166,17 +166,17 @@ abstract class Node extends nameable {
   Driver.nodes += this
 
   def isByValue: Boolean = true;
-  def width: Width = {
+  private[Chisel] def width: Width = {
     if (Driver.isInGetWidth) inferWidth(this) else width_
   }
 
   /** Sets the width of a Node. */
-  def width_=(w: Int) {
+  private[Chisel] def width_=(w: Int) {
     width_.setWidth(w);
     inferWidth = fixWidth(w);
   }
 
-  def width_=(w: Width) {
+  private[Chisel] def width_=(w: Width) {
     width_ = w;
     // NOTE: This explicitly does not set inferWidth.
     // See the comments in infer

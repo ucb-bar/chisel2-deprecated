@@ -13,3 +13,4 @@ test-reports/
 *.bak
 *.new
 *~
+/eclipse.bin
