@@ -503,6 +503,10 @@ abstract class Backend extends FileSystemUtilities{
     count
   }
 
+  def findConsumers {
+    Driver.bfs (_.addConsumers)
+  }
+
   def analyze(c: Module) {
     ChiselError.info("analyzing modules")
     sortComponents
@@ -512,6 +516,7 @@ abstract class Backend extends FileSystemUtilities{
     Driver.components foreach (_.markComponent)
     verifyAllMuxes
 
+    ChiselError.info("adding clocks and resets")
     assignClockAndResetToModules
     addClocksAndResets
     addDefaultResets
@@ -520,6 +525,12 @@ abstract class Backend extends FileSystemUtilities{
 
     ChiselError.info("inferring widths")
     inferAll
+    ChiselError.info("naming")
+    nameAll
+    nameRsts
+    ChiselError.info("resolving nodes to the components")
+    collectNodesIntoComp(initializeDFS)
+    findConsumers
   }
 
   def elaborate(c: Module): Unit = {
@@ -562,7 +573,6 @@ abstract class Backend extends FileSystemUtilities{
     ChiselError.info("executing custom transforms")
     execute(c, transforms)
 
-    Driver.sortedComps.map(_.nodes.map(_.addConsumers)) // analysis
     c.traceNodes(); // add binding -> transform
     val clkDomainWalkedNodes = new HashSet[Node]
     for (comp <- Driver.sortedComps)
@@ -575,6 +585,7 @@ abstract class Backend extends FileSystemUtilities{
        created yet otherwise. */
     nameAll // analysis
     nameRsts // analysis
+    findConsumers // analysis
 
     execute(c, analyses)
 
