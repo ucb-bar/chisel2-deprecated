@@ -80,8 +80,10 @@ object Driver extends FileSystemUtilities{
     Driver.backend.initBackannotation
     /* Params - If dumping design, dump space to pDir*/
     if (Driver.chiselConfigMode == None || Driver.chiselConfigMode.get == "instance") { 
-      val w = createOutputFile(Driver.chiselConfigClassName.get + ".prm")
-      w.write(Dump.getDump); w.close
+      if(!Dump.dump.isEmpty) {
+        val w = createOutputFile(Driver.chiselConfigClassName.get + ".prm")
+        w.write(Dump.getDump); w.close
+      }
       Driver.backend.elaborate(c)
       if (Driver.isCheckingPorts) Driver.backend.checkPorts(c)
       if (Driver.isCompiling && Driver.isGenHarness) Driver.backend.compile(c)
