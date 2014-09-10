@@ -103,11 +103,19 @@ object Mux {
   }
 
   // Some special cases to reduce verbosity for certain operations
-  def apply(cond: Bool, tc: UInt, fc: SInt): Bits = {
-    Mux(Bits(): Bits, cond, tc, fc)
+  //   This should be cleaned up later ... using imports and type classes perhaps?
+  //   as that would allow the Chisel user to decide which cases they want
+  def apply(cond: Bool, tc: SInt, fc: SInt): SInt = {
+    Mux(SInt(), cond, tc, fc)
   }
-  def apply(cond: Bool, tc: SInt, fc: UInt): Bits = {
-    Mux(Bits(): Bits, cond, tc, fc)
+  def apply(cond: Bool, tc: UInt, fc: UInt): UInt = {
+    Mux(UInt(), cond, tc, fc)
+  }
+  def apply(cond: Bool, tc: Bool, fc: Bool): Bool = {
+    Mux(Bool(), cond, tc, fc)
+  }
+  def apply(cond: Bool, tc: Bits, fc: Bits): Bits = {
+    Mux(UInt(): Bits, cond, tc, fc)
   }
 
   // THIS IS THE MAIN MUX CONSTRUCTOR
