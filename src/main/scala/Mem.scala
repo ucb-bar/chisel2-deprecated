@@ -243,8 +243,8 @@ class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) 
 
   override def forceMatchingWidths = {
     super.forceMatchingWidths
-    inputs(2) = inputs(2).matchWidth(mem.width)
-    if (isMasked) inputs(3) = inputs(3).matchWidth(mem.width)
+    inputs(2) = inputs(2).matchWidth(mem.widthW)
+    if (isMasked) inputs(3) = inputs(3).matchWidth(mem.widthW)
   }
 
   var pairedRead: MemSeqRead = null

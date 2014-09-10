@@ -65,7 +65,7 @@ object Multiplex{
         return c
       }
       if (c.litOf.isKnownWidth && a.litOf.isKnownWidth
-          && c.litOf.width.needWidth() == 1 && a.litOf.width.needWidth() == 1) {
+          && c.litOf.widthW.needWidth() == 1 && a.litOf.widthW.needWidth() == 1) {
         return if (c.litOf.value == 0) LogicalOp(t, Literal(0,1), "===") else t
       }
     }
@@ -153,7 +153,7 @@ class Mux extends Op("Mux") {
   def ::(a: Node): Mux = { inputs(2) = a; this }
 
   override def forceMatchingWidths {
-    if (inputs(1).width != width) inputs(1) = inputs(1).matchWidth(width)
-    if (inputs(2).width != width) inputs(2) = inputs(2).matchWidth(width)
+    if (inputs(1).widthW != widthW) inputs(1) = inputs(1).matchWidth(widthW)
+    if (inputs(2).widthW != widthW) inputs(2) = inputs(2).matchWidth(widthW)
   }
 }

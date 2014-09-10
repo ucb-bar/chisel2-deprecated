@@ -408,8 +408,8 @@ class Op(val op: String) extends Node {
   override def forceMatchingWidths {
     if (inputs.length == 2) {
       if (List("|", "&", "^", "+", "-").contains(op)) {
-        if (inputs(0).width != width) inputs(0) = inputs(0).matchWidth(width)
-        if (inputs(1).width != width) inputs(1) = inputs(1).matchWidth(width)
+        if (inputs(0).widthW != widthW) inputs(0) = inputs(0).matchWidth(widthW)
+        if (inputs(1).widthW != widthW) inputs(1) = inputs(1).matchWidth(widthW)
       } else if (List("==", "!=", "<", "<=").contains(op)) {
         val w = max(inputs(0).needWidth(), inputs(1).needWidth())
         if (inputs(0).needWidth() != w) inputs(0) = inputs(0).matchWidth(Width(w))

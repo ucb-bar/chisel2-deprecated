@@ -28,7 +28,7 @@ abstract class Log2Like(x: Bits, name: String) extends Op(name) {
   inferWidth = log2Width
 
   private def log2Width(x: => Node): Width = {
-    val w0 = x.inputs(0).width
+    val w0 = x.inputs(0).widthW
     if (w0.isKnown) {
       val w = w0.needWidth()
       if (w < 2)
@@ -43,7 +43,7 @@ abstract class Log2Like(x: Bits, name: String) extends Op(name) {
 
 class Log2(x: Bits) extends Log2Like(x, "Log2") {
   override def lower: Node = {
-    val w0 = inputs(0).width
+    val w0 = inputs(0).widthW
     if (! w0.isKnown) {
       ChiselError.warning("Log2: unknown Width - " + inputs(0))
     }
@@ -55,7 +55,7 @@ class Log2(x: Bits) extends Log2Like(x, "Log2") {
 
 class PriorityEncoder(x: Bits) extends Log2Like(x, "PriEnc") {
   override def lower: Node = {
-    val w0 = inputs(0).width
+    val w0 = inputs(0).widthW
     if (! w0.isKnown) {
       ChiselError.warning("PriorityEncoder: unknown Width - " + inputs(0))
     }
@@ -75,7 +75,7 @@ class OHToUInt(x: Bits) extends Log2Like(x, "OHToUInt") {
         Concatenate(LogicalOp(hi, Literal(0, length-half), "!="), doLower(BinaryOp(hi, lo, "|"), half))
       }
     }
-    val w0 = inputs(0).width
+    val w0 = inputs(0).widthW
     if (! w0.isKnown) {
       ChiselError.warning("OHToUInt: unknown Width - " + inputs(0))
     }

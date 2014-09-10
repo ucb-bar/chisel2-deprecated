@@ -223,7 +223,7 @@ class VcdBackend(top: Module) extends Backend {
   private val sortedMems = (top.omods foldLeft Array[Mem[_]]()){
     case (array: Array[Mem[_]], mem: Mem[_]) => if (mem.isInVCD) array ++ Array(mem) else array
     case (array: Array[Mem[_]], node: Node) => array
-  } sortWith (_.width < _.width)
+  } sortWith (_.widthW < _.widthW)
 
   private val sortedROMs = (top.omods foldLeft Array[ROMData]()){
     case (array: Array[ROMData], rom: ROMData) => if (rom.isInVCD) array ++ Array(rom) else array
