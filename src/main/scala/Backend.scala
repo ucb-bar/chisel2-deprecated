@@ -465,20 +465,61 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
+  def inferAll: Int = {
+    val nodesList = ArrayBuffer[Node]()
+    Driver.bfs { nodesList += _ }
+
+    def verify {
+      var hasError = false
+      for (elm <- nodesList) {
+        if (elm.infer || elm.width == -1) {
+          ChiselError.error("Could not infer the width on: " + elm)
+          hasError = true
+        }
+      }
+      if (hasError) throw new Exception("Could not elaborate code due to uninferred width(s)")
+    }
+
+    var count = 0
+    // Infer all node widths by propagating known widths
+    // in a bellman-ford fashion.
+    for(i <- 0 until nodesList.length) {
+      var nbUpdates = 0
+      var done = true;
+      for(elm <- nodesList){
+        val updated = elm.infer
+        if( updated ) { nbUpdates = nbUpdates + 1  }
+        done = done && !updated
+      }
+
+      count += 1
+
+      if(done){
+        verify
+        return count;
+      }
+    }
+    verify
+    count
+  }
+
   def analyze(c: Module) {
     ChiselError.info("analyzing modules")
+    sortComponents
     /* XXX We should name all signals before error messages are generated
      so as to give a clue where problems are showing up but that interfers
      with the *bindings* (see later comment). */
     Driver.components foreach (_.markComponent)
-    sortComponents
     verifyAllMuxes
 
     assignClockAndResetToModules
     addClocksAndResets
-    Driver.sortedComps.map(_.addDefaultReset)
+    addDefaultResets
     gatherClocksAndResets
     connectResets
+
+    ChiselError.info("inferring widths")
+    inferAll
   }
 
   def elaborate(c: Module): Unit = {
@@ -495,14 +536,12 @@ abstract class Backend extends FileSystemUtilities{
     Driver.components.foreach(_.postMarkNet(0))
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
 
-    ChiselError.info("inferring widths")
-    c.inferAll
     ChiselError.info("checking widths")
-    c.forceMatchingWidths
+    c.forceMatchingWidths // transform
     ChiselError.info("lowering complex nodes to primitives")
-    c.lowerNodes(needsLowering)
+    c.lowerNodes(needsLowering) // transform
     ChiselError.info("removing type nodes")
-    val nbNodes = c.removeTypeNodes()
+    val nbNodes = c.removeTypeNodes() // transfrom
     ChiselError.checkpoint()
 
     /* *collectNodesIntoComp* associates components to nodes that were
@@ -517,43 +556,43 @@ abstract class Backend extends FileSystemUtilities{
      nodes and component correctly or call collectNodesIntoComp on return.
      */
     ChiselError.info("resolving nodes to the components")
-    collectNodesIntoComp(initializeDFS)
+    collectNodesIntoComp(initializeDFS) // analysis
 
     // two transforms added in Mem.scala (referenced and computePorts)
     ChiselError.info("executing custom transforms")
     execute(c, transforms)
 
-    Driver.sortedComps.map(_.nodes.map(_.addConsumers))
-    c.traceNodes();
+    Driver.sortedComps.map(_.nodes.map(_.addConsumers)) // analysis
+    c.traceNodes(); // add binding -> transform
     val clkDomainWalkedNodes = new HashSet[Node]
     for (comp <- Driver.sortedComps)
       for (node <- comp.nodes)
         if (node.isInstanceOf[Reg])
-            createClkDomain(node, clkDomainWalkedNodes)
+            createClkDomain(node, clkDomainWalkedNodes) // analysis
     ChiselError.checkpoint()
 
     /* We execute nameAll after traceNodes because bindings would not have been
        created yet otherwise. */
-    nameAll
-    nameRsts
+    nameAll // analysis
+    nameRsts // analysis
 
     execute(c, analyses)
 
     for (comp <- Driver.sortedComps ) {
       // remove unconnected outputs
-      pruneUnconnectedIOs(comp)
+      pruneUnconnectedIOs(comp) // analysis
     }
 
     ChiselError.checkpoint()
 
     if(!Driver.dontFindCombLoop) {
       ChiselError.info("checking for combinational loops")
-      c.findCombLoop();
+      c.findCombLoop(); // analysis
       ChiselError.checkpoint()
       ChiselError.info("NO COMBINATIONAL LOOP FOUND")
     }
     if (Driver.saveComponentTrace) {
-      printStack
+      printStack // analysis
     }
   }
 

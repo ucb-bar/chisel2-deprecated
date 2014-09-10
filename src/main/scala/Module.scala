@@ -379,44 +379,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     }
   }
 
-  def inferAll(): Int = {
-    val nodesList = ArrayBuffer[Node]()
-    bfs { nodesList += _ }
-
-    def verify {
-      var hasError = false
-      for (elm <- nodesList) {
-        if (elm.infer || elm.width == -1) {
-          ChiselError.error("Could not infer the width on: " + elm)
-          hasError = true
-        }
-      }
-      if (hasError) throw new Exception("Could not elaborate code due to uninferred width(s)")
-    }
-
-    var count = 0
-    // Infer all node widths by propagating known widths
-    // in a bellman-ford fashion.
-    for(i <- 0 until nodesList.length) {
-      var nbUpdates = 0
-      var done = true;
-      for(elm <- nodesList){
-        val updated = elm.infer
-        if( updated ) { nbUpdates = nbUpdates + 1  }
-        done = done && !updated
-      }
-
-      count += 1
-
-      if(done){
-        verify
-        return count;
-      }
-    }
-    verify
-    count
-  }
-
   /** All classes inherited from Data are used to add type information
    and do not represent logic itself. */
   def removeTypeNodes(): Int = {
@@ -443,7 +405,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       }
     }
     if (!lowerTo.isEmpty)
-      inferAll
+      backend.inferAll
   }
 
   def forceMatchingWidths {
@@ -455,30 +417,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       addResetPin(_reset)
       if (this != Driver.topComponent && hasExplicitReset)
         defaultResetPin.inputs += _reset
-    }
-  }
-
-  // for every reachable delay element
-  // assign it a clock and reset where
-  // clock is chosen to be the component's clock if delay does not specify a clock
-  // reset is chosen to be 
-  //          component's explicit reset
-  //          delay's explicit clock's reset
-  //          component's clock's reset
-  def addClockAndReset {
-    bfs { _ match {
-        case x: Delay =>
-          val clock = if (x.clock == null) x.component.clock else x.clock
-          val reset =
-            if (x.component.hasExplicitReset) x.component._reset
-            else if (x.clock != null) x.clock.getReset
-            else if (x.component.hasExplicitClock) x.component.clock.getReset
-            else x.component._reset
-          x.assignReset(x.component.addResetPin(reset))
-          x.assignClock(clock)
-          x.component.addClock(clock)
-        case _ =>
-      }
     }
   }
 
@@ -699,15 +637,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
        }
      }
      }
-  }
-
-
-  def genAllMuxes {
-    bfs { _ match {
-        case p: proc => p.verifyMuxes
-        case _ =>
-      }
-    }
   }
 
   /* XXX Not sure what the two following do.
