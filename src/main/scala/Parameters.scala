@@ -93,7 +93,7 @@ object Dump {
   def apply[T](key:Any,value:T):T = {addToDump(key,value); value}
   def apply[T](knob:Knob[T]):Knob[T] = {knobList += knob.name; knob}
   def addToDump(key:Any,value:Any) = dump += ((key,value))
-  def getDump:String = dump.map(_.toString).reduce(_+"\n"+_)
+  def getDump:String = dump.map(_.toString).reduce(_+"\n"+_) + "\n"
 }
 
 // objects given to the user in mask functions (site,here,up)

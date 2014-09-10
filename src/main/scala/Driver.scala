@@ -80,7 +80,7 @@ object Driver extends FileSystemUtilities{
     Driver.backend.initBackannotation
     /* Params - If dumping design, dump space to pDir*/
     if (Driver.chiselConfigMode == None || Driver.chiselConfigMode.get == "instance") { 
-      if(!Dump.dump.isEmpty) {
+      if(Driver.chiselConfigDump && !Dump.dump.isEmpty) {
         val w = createOutputFile(Driver.chiselConfigClassName.get + ".prm")
         w.write(Dump.getDump); w.close
       }
@@ -231,6 +231,7 @@ object Driver extends FileSystemUtilities{
         //Jackhammer Flags
         case "--configCollect"  => chiselConfigMode = Some("collect"); chiselConfigClassName = Some(args(i+1)); i+=1;  //dump constraints in dse dir
         case "--configInstance" => chiselConfigMode = Some("instance"); chiselConfigClassName = Some(args(i+1)); i+=1;  //use ChiselConfig to supply parameters
+        case "--configDump" => chiselConfigDump = true; //when using --configInstance, write Dump parameters to .prm file in targetDir
         case "--dumpTestInput" => dumpTestInput = true
         case "--testerSeed" => {
           testerSeedValid = true
@@ -307,6 +308,7 @@ object Driver extends FileSystemUtilities{
   /* ChiselConfig flags */
   var chiselConfigClassName: Option[String] = None
   var chiselConfigMode: Option[String] = None
+  var chiselConfigDump: Boolean = false
 
   // Setting this to TRUE will case the test harness to print its
   // standard input stream to a file.
