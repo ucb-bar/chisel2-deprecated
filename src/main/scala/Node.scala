@@ -166,13 +166,12 @@ abstract class Node extends nameable {
   Driver.nodes += this
 
   def isByValue: Boolean = true;
-  // We need to duplicate the behavior of getWidth here, due to Register's reticence to use getWidth
   private[Chisel] def width: Int = {
-    val w = getWidthW
+    val w = widthW
     if (w.isKnown)
       w.needWidth()
     else
-      throwException("Node.getWidth() for node " + this + " returns unknown width")
+      throwException("Node.width for node " + this + " returns unknown width")
   }
   private[Chisel] def widthW: Width = {
     if (Driver.isInGetWidth) inferWidth(this) else width_
