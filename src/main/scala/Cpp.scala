@@ -697,7 +697,7 @@ class CppBackend extends Backend {
     val c11 = if (hasPrintfs) " -std=c++11 " else ""
     val cxxFlags = (if (flagsIn == null) CXXFLAGS else flagsIn) + c11
     val cppFlags = scala.util.Properties.envOrElse("CPPFLAGS", "") + " -I../ -I" + chiselENV + "/csrc/"
-    val allFlags = cppFlags + cxxFlags
+    val allFlags = cppFlags + " " + cxxFlags
     val dir = Driver.targetDir + "/"
     val CXX = scala.util.Properties.envOrElse("CXX", "g++" )
     val parallelMakeJobs = Driver.parallelMakeJobs
