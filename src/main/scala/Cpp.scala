@@ -780,7 +780,7 @@ class CppBackend extends Backend {
         // replace any optimization level specified (incorrectly) in CPPFLAGS
         replacements += (("@CPPFLAGS@", """(-O.)""".r.replaceAllIn(cppFlags, "")))
         // replace any optimization level specified in CXXFLAGS
-        replacements += (("@CXXFLAGS@", """(-O.)""".r.replaceAllIn(cppFlags, "")))
+        replacements += (("@CXXFLAGS@", """(-O.)""".r.replaceAllIn(cxxFlags, "")))
         // Read and edit the Makefile template.
         editToTarget("Makefile", replacements)
         val nJobs = if (parallelMakeJobs > 0) "-j" + parallelMakeJobs.toString() else "-j"
