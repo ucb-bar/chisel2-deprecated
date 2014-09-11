@@ -70,8 +70,13 @@ class CppBackend extends Backend {
   var cloneFile: String = ""
   var maxFiles: Int = 0
   val compileInitializationUnoptimized = Driver.compileInitializationUnoptimized
-  // Suppress generation of the monolithic .cpp file
-  val suppressMonolithicCppFile = compileInitializationUnoptimized  && false
+  // If we're dealing with multiple files for the purpose of separate
+  //   optimization levels indicate we expect to compile multiple files.
+  val compileMultipleCppFiles = Driver.compileInitializationUnoptimized
+  // Suppress generation of the monolithic .cpp file if we're compiling
+  // multiple files.
+  // NOTE: For testing purposes, we may want to generate this file anyway.
+  val suppressMonolithicCppFile = !compileMultipleCppFiles  /* || true */
   // Compile the clone method at -O0
   val cloneCompiledO0 = true
   // Define shadow registers in the circuit object, instead of local registers in the clock hi methods.
@@ -686,12 +691,13 @@ class CppBackend extends Backend {
 
   override def compile(c: Module, flagsIn: String) {
     val CXXFLAGS = scala.util.Properties.envOrElse("CXXFLAGS", "-O2" )
-    val flags = if (flagsIn == null) CXXFLAGS else flagsIn
     val LDFLAGS = scala.util.Properties.envOrElse("LDFLAGS", "")
-
     val chiselENV = java.lang.System.getenv("CHISEL")
+
     val c11 = if (hasPrintfs) " -std=c++11 " else ""
-    val allFlags = flags + c11 + " -I../ -I" + chiselENV + "/csrc/"
+    val cxxFlags = (if (flagsIn == null) CXXFLAGS else flagsIn) + c11
+    val cppFlags = scala.util.Properties.envOrElse("CPPFLAGS", "") + " -I../ -I" + chiselENV + "/csrc/"
+    val allFlags = cppFlags + cxxFlags
     val dir = Driver.targetDir + "/"
     val CXX = scala.util.Properties.envOrElse("CXX", "g++" )
     val parallelMakeJobs = Driver.parallelMakeJobs
@@ -715,7 +721,9 @@ class CppBackend extends Backend {
     }
 
     def make(args: String) {
-      val cmd = "make " + args
+      // We explicitly unset CPPFLAGS and CXXFLAGS so the values
+      // set in the Makefile will take effect.
+      val cmd = "unset CPPFLAGS CXXFLAGS; make " + args
       run(cmd)
     }
 
@@ -749,33 +757,40 @@ class CppBackend extends Backend {
     if (cloneCompiledO0) {
       unOptimizedO0Files += cloneFile
     }
-    // Are we using a Makefile template and parallel makes?
-    if (parallelMakeJobs != 0) {
-      val replacements = HashMap[String, String] ()
-      val o0Files = unOptimizedO0Files.map(_ + ".o") mkString " "
-      val o1Files = unOptimizedFiles.filter( ! unOptimizedO0Files.contains(_) ).map(_ + ".o") mkString " "
-      val o2Files = ((for {
-        f <- 0 until maxFiles
-        basename = c.name + "-" + f
-        if !unOptimizedFiles.contains(basename)
-      } yield basename + ".o"
-      ) mkString " ") + " " + c.name + "-emulator.o"
-
-      replacements += (("@HFILES@", ""))
-      replacements += (("@UNOPTIMIZEDO0@", o0Files))
-      replacements += (("@UNOPTIMIZEDO1@", o1Files))
-      replacements += (("@OPTIMIZED@", o2Files))
-      replacements += (("@EXEC@", c.name))
-      replacements += (("@CPPFLAGS@", """(-O.)""".r.replaceAllIn(allFlags, "")))
-      // Read and edit the Makefile template.
-      editToTarget("Makefile", replacements)
-      val nJobs = if (parallelMakeJobs > 0) "-j" + parallelMakeJobs.toString() else "-j"
-      make(nJobs)
-    } else {
-      // No make. Compile everything discretely.
-      cc(c.name + "-emulator")
-      // Are we generating unoptimized files?
-      if (unOptimizedFiles.size != 0) {
+    // Are we compiling multiple cpp files?
+    if (compileMultipleCppFiles) {
+      // Are we using a Makefile template and parallel makes?
+      if (parallelMakeJobs != 0) {
+        // Build the replacement string map for the Makefile template.
+        val replacements = HashMap[String, String] ()
+        val o0Files = unOptimizedO0Files.map(_ + ".o") mkString " "
+        val o1Files = unOptimizedFiles.filter( ! unOptimizedO0Files.contains(_) ).map(_ + ".o") mkString " "
+        val o2Files = ((for {
+          f <- 0 until maxFiles
+          basename = c.name + "-" + f
+          if !unOptimizedFiles.contains(basename)
+        } yield basename + ".o"
+        ) mkString " ") + " " + c.name + "-emulator.o"
+  
+        replacements += (("@HFILES@", ""))
+        replacements += (("@UNOPTIMIZEDO0@", o0Files))
+        replacements += (("@UNOPTIMIZEDO1@", o1Files))
+        replacements += (("@OPTIMIZED@", o2Files))
+        replacements += (("@EXEC@", c.name))
+        // replace any optimization level specified (incorrectly) in CPPFLAGS
+        replacements += (("@CPPFLAGS@", """(-O.)""".r.replaceAllIn(cppFlags, "")))
+        // replace any optimization level specified in CXXFLAGS
+        replacements += (("@CXXFLAGS@", """(-O.)""".r.replaceAllIn(cppFlags, "")))
+        // Read and edit the Makefile template.
+        editToTarget("Makefile", replacements)
+        val nJobs = if (parallelMakeJobs > 0) "-j" + parallelMakeJobs.toString() else "-j"
+        make(nJobs)
+      } else {
+        // No make. Compile everything discretely.
+        cc(c.name + "-emulator")
+        // We should have unoptimized files.
+        assert(unOptimizedFiles.size != 0 || unOptimizedO0Files.size != 0,
+          "no unoptmized files to compile for '--compileMultipleCppFiles'")
         val optOpt = """(-O.)""".r
         // Generate a version of the flags with -Ox replaced by -O1 (or -O0 for the clone file).
         val O1flags = optOpt.replaceAllIn(allFlags, "-O1")
@@ -789,18 +804,19 @@ class CppBackend extends Backend {
         // Compile the remainder at the specified optimization level.
         for (f <- 0 until maxFiles) {
           val basename = c.name + "-" + f
-          // If we've already compile this file, don't do it again,
-          // but do add it to the list of objects.
+          // If we've already compiled this file, don't do it again,
+          // but do add it to the list of objects to be linked.
           if (!unOptimizedFiles.contains(basename)) {
             cc(basename)
           }
           objects += basename
         }
         linkMany(c.name, objects)
-      } else {
-        cc(c.name)
-        linkOne(c.name)
       }
+    } else {
+      cc(c.name + "-emulator")
+      cc(c.name)
+      linkOne(c.name)
     }
   }
 

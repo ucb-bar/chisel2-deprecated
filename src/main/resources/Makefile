@@ -8,6 +8,9 @@ OPTIMIZED = @OPTIMIZED@
 EXEC    = @EXEC@
 
 CPPFLAGS  = @CPPFLAGS@
+CXXFLAGS  = @CXXFLAGS@
+
+# LDFLAGS is inherited from the environment
 
 default:  $(EXEC)
 
