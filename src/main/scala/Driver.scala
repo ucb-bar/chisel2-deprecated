@@ -229,9 +229,8 @@ object Driver extends FileSystemUtilities{
         case "--backannotation" => isBackannotating = true
         case "--model" => model = args(i + 1) ; i += 1
         //Jackhammer Flags
-        case "--configCollect"  => chiselConfigMode = Some("collect"); chiselConfigClassName = Some(args(i+1)); i+=1;  //dump constraints in dse dir
-        case "--project"  => chiselProjectName = Some(args(i+1)); i+=1;  //project containing chiselConfigClassName
-        case "--configInstance" => chiselConfigMode = Some("instance"); chiselConfigClassName = Some(args(i+1)); i+=1;  //use ChiselConfig to supply parameters
+        case "--configCollect"  => chiselConfigMode = Some("collect"); chiselConfigClassName = Some(getArg(args(i+1),1)); chiselProjectName = Some(getArg(args(i+1),0)); i+=1;  //dump constraints in dse dir
+        case "--configInstance" => chiselConfigMode = Some("instance"); chiselConfigClassName = Some(getArg(args(i+1),1)); chiselProjectName = Some(getArg(args(i+1),0)); i+=1;  //use ChiselConfig to supply parameters
         case "--configDump" => chiselConfigDump = true; //when using --configInstance, write Dump parameters to .prm file in targetDir
         case "--dumpTestInput" => dumpTestInput = true
         case "--testerSeed" => {
@@ -319,7 +318,7 @@ object Driver extends FileSystemUtilities{
       if(!s2.isEmpty) s2.get else ""
     }
   }
-
+  def getArg(s:String,i:Int):String = s.split('.')(i)
 
   // Setting this to TRUE will case the test harness to print its
   // standard input stream to a file.
