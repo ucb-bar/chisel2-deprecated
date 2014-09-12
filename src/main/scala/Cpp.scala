@@ -65,8 +65,8 @@ object CString {
 class CppBackend extends Backend {
   val keywords = new HashSet[String]();
   private var hasPrintfs = false
-  val unOptimizedFiles = HashSet[String]()
-  val unOptimizedO0Files = HashSet[String]()
+  val unoptimizedFiles = HashSet[String]()
+  val onceOnlyFiles = HashSet[String]()
   var cloneFile: String = ""
   var maxFiles: Int = 0
   val compileInitializationUnoptimized = Driver.compileInitializationUnoptimized
@@ -690,7 +690,7 @@ class CppBackend extends Backend {
   }
 
   override def compile(c: Module, flagsIn: String) {
-    val CXXFLAGS = scala.util.Properties.envOrElse("CXXFLAGS", "-O2" )
+    val CXXFLAGS = scala.util.Properties.envOrElse("CXXFLAGS", "" )
     val LDFLAGS = scala.util.Properties.envOrElse("LDFLAGS", "")
     val chiselENV = java.lang.System.getenv("CHISEL")
 
@@ -755,32 +755,51 @@ class CppBackend extends Backend {
 
     // Compile all the unoptimized files at a (possibly) lower level of optimization.
     if (cloneCompiledO0) {
-      unOptimizedO0Files += cloneFile
+      onceOnlyFiles += cloneFile
     }
+    // Set the default optimization levels.
+    var optim0 = "-O0"
+    var optim1 = "-O1"
+    var optim2 = "-O2"
+    // Is the caller explicitly setting -Osomething? If yes, we'll honor that setting
+    //  and set our default optimization flags to "".
+    val Oregex = new scala.util.matching.Regex("""[^\w]*(-O.+)""", "explicitO")
+    val Omatch = Oregex.findFirstMatchIn(allFlags)
+    Omatch match {
+      case Some(m) => {
+        println("Cpp: observing explicit '" + m.group("explicitO") + "'")
+        optim0 = ""
+        optim1 = ""
+        optim2 = ""
+      }
+      case _ => {}
+    }
+
     // Are we compiling multiple cpp files?
     if (compileMultipleCppFiles) {
       // Are we using a Makefile template and parallel makes?
       if (parallelMakeJobs != 0) {
         // Build the replacement string map for the Makefile template.
         val replacements = HashMap[String, String] ()
-        val o0Files = unOptimizedO0Files.map(_ + ".o") mkString " "
-        val o1Files = unOptimizedFiles.filter( ! unOptimizedO0Files.contains(_) ).map(_ + ".o") mkString " "
-        val o2Files = ((for {
+        val onceOnlyOFiles = onceOnlyFiles.map(_ + ".o") mkString " "
+        val unoptimizedOFiles = unoptimizedFiles.filter( ! onceOnlyFiles.contains(_) ).map(_ + ".o") mkString " "
+        val optimzedOFiles = ((for {
           f <- 0 until maxFiles
           basename = c.name + "-" + f
-          if !unOptimizedFiles.contains(basename)
+          if !unoptimizedFiles.contains(basename)
         } yield basename + ".o"
         ) mkString " ") + " " + c.name + "-emulator.o"
   
         replacements += (("@HFILES@", ""))
-        replacements += (("@UNOPTIMIZEDO0@", o0Files))
-        replacements += (("@UNOPTIMIZEDO1@", o1Files))
-        replacements += (("@OPTIMIZED@", o2Files))
+        replacements += (("@ONCEONLY@", onceOnlyOFiles))
+        replacements += (("@UNOPTIMIZED@", unoptimizedOFiles))
+        replacements += (("@OPTIMIZED@", optimzedOFiles))
         replacements += (("@EXEC@", c.name))
-        // replace any optimization level specified (incorrectly) in CPPFLAGS
-        replacements += (("@CPPFLAGS@", """(-O.)""".r.replaceAllIn(cppFlags, "")))
-        // replace any optimization level specified in CXXFLAGS
-        replacements += (("@CXXFLAGS@", """(-O.)""".r.replaceAllIn(cxxFlags, "")))
+        replacements += (("@CPPFLAGS@", cppFlags))
+        replacements += (("@CXXFLAGS@", cxxFlags))
+        replacements += (("@OPTIM0@", optim0))
+        replacements += (("@OPTIM1@", optim1))
+        replacements += (("@OPTIM2@", optim2))
         // Read and edit the Makefile template.
         editToTarget("Makefile", replacements)
         val nJobs = if (parallelMakeJobs > 0) "-j" + parallelMakeJobs.toString() else "-j"
@@ -789,25 +808,21 @@ class CppBackend extends Backend {
         // No make. Compile everything discretely.
         cc(c.name + "-emulator")
         // We should have unoptimized files.
-        assert(unOptimizedFiles.size != 0 || unOptimizedO0Files.size != 0,
+        assert(unoptimizedFiles.size != 0 || onceOnlyFiles.size != 0,
           "no unoptmized files to compile for '--compileMultipleCppFiles'")
-        val optOpt = """(-O.)""".r
-        // Generate a version of the flags with -Ox replaced by -O1 (or -O0 for the clone file).
-        val O1flags = optOpt.replaceAllIn(allFlags, "-O1")
-        val O0Flags = optOpt.replaceAllIn(allFlags, "-O0")
         // Compile the O0 files.
-        unOptimizedO0Files.map(cc(_, O0Flags))
+        onceOnlyFiles.map(cc(_, allFlags + " " + optim0))
   
         // Compile the remaining (O1) files.
-        unOptimizedFiles.filter( ! unOptimizedO0Files.contains(_) ).map(cc(_, O1flags))
+        unoptimizedFiles.filter( ! onceOnlyFiles.contains(_) ).map(cc(_, allFlags + " " + optim1))
         val objects: ArrayBuffer[String] = new ArrayBuffer(maxFiles)
         // Compile the remainder at the specified optimization level.
         for (f <- 0 until maxFiles) {
           val basename = c.name + "-" + f
           // If we've already compiled this file, don't do it again,
           // but do add it to the list of objects to be linked.
-          if (!unOptimizedFiles.contains(basename)) {
-            cc(basename)
+          if (!unoptimizedFiles.contains(basename)) {
+            cc(basename, allFlags + " " + optim2)
           }
           objects += basename
         }
@@ -1249,12 +1264,21 @@ class CppBackend extends Backend {
         // Yes. dump is a real function.
         head += "  if (t == 0) return dump_init(f);\n" +
                 "  fprintf(f, \"#%d\\n\", t);\n"
-        val llf = new LineLimitedFunction("dump", lineLimitFunctions, head, tail, "FILE *f", "f")
-        vcd.dumpVCD(llf.addString)
-        llf.done()
-        val nFunctions = llf.bodies.length
-        writeCppFile(llf.getBodies)
-        nFunctions
+        // Are we generating a large dump function with gotos? (i.e., not inline)
+        if (Driver.isVCDinline) {
+          val llf = new LineLimitedFunction("dump", lineLimitFunctions, head, tail, "FILE *f", "f")
+          vcd.dumpVCD(llf.addString)
+          llf.done()
+          val nFunctions = llf.bodies.length
+          writeCppFile(llf.getBodies)
+          nFunctions
+        } else {
+          // We're creating a VCD dump function with gotos.
+          writeCppFile(head)
+          vcd.dumpVCD(writeCppFile)
+          writeCppFile(tail)
+          1
+        }
       } else {
         // No. Just generate the dummy (nop) function.
         writeCppFile(head + tail)
@@ -1554,7 +1578,7 @@ class CppBackend extends Backend {
     //  We strip off the trailing ".cpp" to facilitate creating both ".cpp" and ".o" files.
     if (compileInitializationUnoptimized) {
       val trimLength = ".cpp".length()
-      unOptimizedFiles ++= out_cpps.map(_.name.dropRight(trimLength))
+      unoptimizedFiles ++= out_cpps.map(_.name.dropRight(trimLength))
     }
     // Ensure we start off in a new file before we start outputting the clock_lo/hi.
     advanceCppFile()
@@ -1567,7 +1591,7 @@ class CppBackend extends Backend {
     // Add the init_mapping_table file to the list of unoptimized files.
     if (compileInitializationUnoptimized) {
       val trimLength = ".cpp".length()
-      unOptimizedFiles += out_cpps.last.name.dropRight(trimLength)
+      unoptimizedFiles += out_cpps.last.name.dropRight(trimLength)
     }
 
     // Finally, generate the header - once we know how many methods we'll have.
