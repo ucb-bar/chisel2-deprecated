@@ -749,6 +749,7 @@ abstract class Backend extends FileSystemUtilities{
     nameBindings 
     findConsumers
 
+    ChiselError.info("creating clock domains")
     val clkDomainWalkedNodes = new HashSet[Node]
     for (comp <- Driver.sortedComps)
       for (node <- comp.nodes)
