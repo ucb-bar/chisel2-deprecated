@@ -235,7 +235,7 @@ object Driver extends FileSystemUtilities{
         case "--dumpTestInput" => dumpTestInput = true
         case "--testerSeed" => {
           testerSeedValid = true
-          testerSeed = args(i+1).toInt
+          testerSeed = args(i+1).toLong
           i += 1
         }
         case "--emitTempNodes" => {
