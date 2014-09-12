@@ -1114,33 +1114,34 @@ class VerilogBackend extends Backend {
   override def elaborate(c: Module) {
     super.elaborate(c)
 
-    val out = createOutputFile(c.name + ".v")
+    val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName) 
+    val out = createOutputFile(n + ".v")
     doCompile(c, out, 0)
     ChiselError.checkpoint()
     out.close()
 
     if (!memConfs.isEmpty) {
-      val out_conf = createOutputFile(Driver.topComponent.name + ".conf")
+      val out_conf = createOutputFile(n + ".conf")
       out_conf.write(getMemConfString);
       out_conf.close();
     }
     if (Driver.isGenHarness) {
-      genHarness(c, c.name);
+      genHarness(c, n);
     }
   }
 
   override def compile(c: Module, flags: String) {
-
+    val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName) 
     def run(cmd: String) {
       val bashCmd = Seq("bash", "-c", cmd)
       val c = bashCmd.!
       ChiselError.info(cmd + " RET " + c)
     }
     val dir = Driver.targetDir + "/"
-    val src = c.name + "-harness.v " + c.name + ".v"
+    val src = n + "-harness.v " + n + ".v"
     val cmd = "cd " + dir + " && vcs -full64 -quiet +v2k " +
               "-timescale=10ns/10ps +define+CLOCK_PERIOD=120 " + 
-              "+vcs+initreg+random " + src + " -o " + c.name + 
+              "+vcs+initreg+random " + src + " -o " + n + 
               ( if (!Driver.isTesting) " -debug" /* for ucli scripts */
                 else if (Driver.isDebug) " -debug_pp" /* for vpd dump */ 
                 else "" ) 
