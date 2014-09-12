@@ -49,18 +49,7 @@ object Mem {
     res
   }
 
-  Driver.backend.transforms.prepend { c =>
-    c.bfs { n =>
-      if (n.isInstanceOf[MemAccess]) {
-        n.asInstanceOf[MemAccess].referenced = true
-      }
-    }
-    c.bfs { n =>
-      if (n.isInstanceOf[Mem[_]]) {
-        n.asInstanceOf[Mem[_]].computePorts
-      }
-    }
-  }
+  Driver.hasMem = true
 }
 
 abstract class AccessTracker extends Delay {

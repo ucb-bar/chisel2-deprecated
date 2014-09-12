@@ -379,39 +379,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     }
   }
 
-  /** All classes inherited from Data are used to add type information
-   and do not represent logic itself. */
-  def removeTypeNodes(): Int = {
-    var count = 0
-    bfs {x =>
-      scala.Predef.assert(!x.isTypeNode)
-      count += 1
-      for (i <- 0 until x.inputs.length)
-        if (x.inputs(i) != null && x.inputs(i).isTypeNode) {
-          x.inputs(i) = x.inputs(i).getNode
-        }
-    }
-    count
-  }
-
-  def lowerNodes(needsLowering: Set[String]): Unit = if (!needsLowering.isEmpty) {
-    val lowerTo = new HashMap[Node, Node]
-    bfs { x =>
-      for (i <- 0 until x.inputs.length) x.inputs(i) match {
-        case op: Op =>
-          if (needsLowering contains op.op)
-            x.inputs(i) = lowerTo.getOrElseUpdate(op, op.lower)
-        case _ =>
-      }
-    }
-    if (!lowerTo.isEmpty)
-      backend.inferAll
-  }
-
-  def forceMatchingWidths {
-    bfs(_.forceMatchingWidths)
-  }
-
   def addDefaultReset {
     if (!(defaultResetPin == null)) {
       addResetPin(_reset)

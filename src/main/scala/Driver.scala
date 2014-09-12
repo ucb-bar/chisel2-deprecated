@@ -164,6 +164,7 @@ object Driver extends FileSystemUtilities{
     isCheckingPorts = false
     isTesting = false
     isDebugMem = false
+    hasMem = false
     backend = new CppBackend
     topComponent = null
     randInitIOs.clear()
@@ -284,6 +285,7 @@ object Driver extends FileSystemUtilities{
   var isCheckingPorts = false
   var isTesting = false
   var isDebugMem = false
+  var hasMem = false
   var backend: Backend = null
   var topComponent: Module = null
   val components = ArrayBuffer[Module]()

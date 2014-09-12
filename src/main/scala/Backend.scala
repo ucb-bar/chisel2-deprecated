@@ -507,6 +507,52 @@ abstract class Backend extends FileSystemUtilities{
     Driver.bfs (_.addConsumers)
   }
 
+  def forceMatchingWidths {
+    Driver.bfs (_.forceMatchingWidths)
+  }
+
+  def computeMemPorts {
+    Driver.bfs { _ match {
+      case memacc: MemAccess => memacc.referenced = true
+      case _ =>
+    } }
+    Driver.bfs { _ match {
+      case mem: Mem[_] => mem.computePorts
+      case _ =>
+    } }
+  }
+
+  /** All classes inherited from Data are used to add type information
+   and do not represent logic itself. */
+  def removeTypeNodes = {
+    var count = 0
+    Driver.bfs {x =>
+      scala.Predef.assert(!x.isTypeNode)
+      count += 1
+      for (i <- 0 until x.inputs.length)
+        if (x.inputs(i) != null && x.inputs(i).isTypeNode) {
+          x.inputs(i) = x.inputs(i).getNode
+        }
+    }
+    count
+  }
+
+  def lowerNodes {
+    if (!needsLowering.isEmpty) {
+      val lowerTo = new HashMap[Node, Node]
+      Driver.bfs { x =>
+        for (i <- 0 until x.inputs.length) x.inputs(i) match {
+          case op: Op =>
+            if (needsLowering contains op.op)
+            x.inputs(i) = lowerTo.getOrElseUpdate(op, op.lower)
+          case _ =>
+        }
+      }
+      if (!lowerTo.isEmpty)
+        inferAll
+    }
+  }
+
   def analyze(c: Module) {
     ChiselError.info("analyzing modules")
     sortComponents
@@ -530,7 +576,7 @@ abstract class Backend extends FileSystemUtilities{
     nameRsts
     ChiselError.info("resolving nodes to the components")
     collectNodesIntoComp(initializeDFS)
-    findConsumers
+    // findConsumers
   }
 
   def elaborate(c: Module): Unit = {
@@ -547,12 +593,17 @@ abstract class Backend extends FileSystemUtilities{
     Driver.components.foreach(_.postMarkNet(0))
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
 
+    if (Driver.hasMem) {
+      ChiselError.info("computing memory ports")
+      computeMemPorts
+    }
+
     ChiselError.info("checking widths")
-    c.forceMatchingWidths // transform
+    forceMatchingWidths
     ChiselError.info("lowering complex nodes to primitives")
-    c.lowerNodes(needsLowering) // transform
+    lowerNodes
     ChiselError.info("removing type nodes")
-    val nbNodes = c.removeTypeNodes() // transfrom
+    val nbNodes = removeTypeNodes
     ChiselError.checkpoint()
 
     /* *collectNodesIntoComp* associates components to nodes that were
@@ -566,6 +617,7 @@ abstract class Backend extends FileSystemUtilities{
      Technically all user-defined transforms are responsible to update
      nodes and component correctly or call collectNodesIntoComp on return.
      */
+
     ChiselError.info("resolving nodes to the components")
     collectNodesIntoComp(initializeDFS) // analysis
 
