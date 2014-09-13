@@ -80,7 +80,6 @@ object Driver extends FileSystemUtilities{
     /* Params - If dumping design, dump space to pDir*/
     if (chiselConfigMode == None || chiselConfigMode.get == "instance") { 
       setTopComponent(c)
-      backend.analyze(c)
       backend.elaborate(c)
       if (isCheckingPorts) backend.checkPorts(c)
       if (isCompiling && isGenHarness) backend.compile(c)

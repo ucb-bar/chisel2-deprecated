@@ -148,8 +148,9 @@ abstract class Backend extends FileSystemUtilities{
         comps(0).name = className;
       }
     }
+  }
 
-    // binding naming
+  def nameBindings {
     for (comp <- Driver.sortedComps) {
       for (bind <- comp.bindings) {
         var genName = if (bind.targetNode.name == null || bind.targetNode.name.length() == 0) "" 
@@ -553,12 +554,66 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
-  def analyze(c: Module) {
-    ChiselError.info("analyzing modules")
+  def findCombLoop {
+    // Tarjan's strongly connected components algorithm to find loops
+    var sccIndex = 0
+    val stack = new Stack[Node]
+    val sccList = new ArrayBuffer[ArrayBuffer[Node]]
+
+    def tarjanSCC(n: Node): Unit = {
+      if(n.isInstanceOf[Delay]) throw new Exception("trying to DFS on a register")
+
+      n.sccIndex = sccIndex
+      n.sccLowlink = sccIndex
+      sccIndex += 1
+      stack.push(n)
+
+      for(i <- n.inputs) {
+        if(!(i == null) && !i.isInstanceOf[Delay] && !i.isReg) {
+          if(i.sccIndex == -1) {
+            tarjanSCC(i)
+            n.sccLowlink = math.min(n.sccLowlink, i.sccLowlink)
+          } else if(stack.contains(i)) {
+            n.sccLowlink = math.min(n.sccLowlink, i.sccIndex)
+          }
+        }
+      }
+
+      if(n.sccLowlink == n.sccIndex) {
+        val scc = new ArrayBuffer[Node]
+
+        var top: Node = null
+        do {
+          top = stack.pop()
+          scc += top
+        } while (!(n == top))
+        sccList += scc
+      }
+    }
+
+    Driver.bfs { node =>
+      if(node.sccIndex == -1 && !node.isInstanceOf[Delay] && !(node.isReg)) {
+        tarjanSCC(node)
+      }
+    }
+
+    // check for combinational loops
+    var containsCombPath = false
+    for (nodelist <- sccList) {
+      if(nodelist.length > 1) {
+        containsCombPath = true
+        ChiselError.error("FOUND COMBINATIONAL PATH!")
+        for((node, ind) <- nodelist zip nodelist.indices) {
+          ChiselError.error("  (" + ind +  ")", node.line)
+        }
+      }
+    }
+  }
+
+  def elaborate(c: Module): Unit = {
+    execute(c, preElaborateTransforms)
+    ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
     sortComponents
-    /* XXX We should name all signals before error messages are generated
-     so as to give a clue where problems are showing up but that interfers
-     with the *bindings* (see later comment). */
     Driver.components foreach (_.markComponent)
     verifyAllMuxes
 
@@ -571,31 +626,21 @@ abstract class Backend extends FileSystemUtilities{
 
     ChiselError.info("inferring widths")
     inferAll
-    ChiselError.info("naming")
+    ChiselError.info("giving names")
     nameAll
     nameRsts
-    ChiselError.info("resolving nodes to the components")
-    collectNodesIntoComp(initializeDFS)
-    // findConsumers
-  }
-
-  def elaborate(c: Module): Unit = {
-    /* XXX If we call nameAll here and again further down, we end-up with
-     duplicate names in the generated C++.
-    nameAll(c) */
-
-    ChiselError.info("elaborating modules")
-    Driver.components.foreach(_.elaborate(0))
-
-    // XXX This will create nodes after the tree is traversed!
     ChiselError.checkpoint()
-    execute(c, preElaborateTransforms)
-    Driver.components.foreach(_.postMarkNet(0))
-    ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
 
-    if (Driver.hasMem) {
-      ChiselError.info("computing memory ports")
-      computeMemPorts
+    if (!transforms.isEmpty) {
+      ChiselError.info("executing custom transforms")
+      removeTypeNodes
+      collectNodesIntoComp(initializeDFS)
+      if (Driver.hasMem) {
+        computeMemPorts
+      }
+      findConsumers
+      execute(c, transforms)
+      ChiselError.checkpoint()
     }
 
     ChiselError.info("checking widths")
@@ -619,43 +664,42 @@ abstract class Backend extends FileSystemUtilities{
      */
 
     ChiselError.info("resolving nodes to the components")
-    collectNodesIntoComp(initializeDFS) // analysis
+    collectNodesIntoComp(initializeDFS)
+    if (Driver.hasMem) {
+      ChiselError.info("computing memory ports")
+      computeMemPorts
+    }
 
-    // two transforms added in Mem.scala (referenced and computePorts)
-    ChiselError.info("executing custom transforms")
-    execute(c, transforms)
+    c.traceNodes();
+    findConsumers
+    nameAll 
+    nameRsts
+    nameBindings 
 
-    c.traceNodes(); // add binding -> transform
     val clkDomainWalkedNodes = new HashSet[Node]
     for (comp <- Driver.sortedComps)
       for (node <- comp.nodes)
         if (node.isInstanceOf[Reg])
-            createClkDomain(node, clkDomainWalkedNodes) // analysis
+          createClkDomain(node, clkDomainWalkedNodes)
     ChiselError.checkpoint()
-
-    /* We execute nameAll after traceNodes because bindings would not have been
-       created yet otherwise. */
-    nameAll // analysis
-    nameRsts // analysis
-    findConsumers // analysis
 
     execute(c, analyses)
 
     for (comp <- Driver.sortedComps ) {
       // remove unconnected outputs
-      pruneUnconnectedIOs(comp) // analysis
+      pruneUnconnectedIOs(comp)
     }
 
     ChiselError.checkpoint()
 
     if(!Driver.dontFindCombLoop) {
       ChiselError.info("checking for combinational loops")
-      c.findCombLoop(); // analysis
+      findCombLoop
       ChiselError.checkpoint()
       ChiselError.info("NO COMBINATIONAL LOOP FOUND")
     }
     if (Driver.saveComponentTrace) {
-      printStack // analysis
+      printStack
     }
   }
 
