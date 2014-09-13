@@ -312,10 +312,12 @@ object Driver extends FileSystemUtilities{
   var chiselConfigDump: Boolean = false
 
   def appendString(s1:Option[String],s2:Option[String]):String = {
-    if(!s1.isEmpty) {
-      s1.get + "." + (if(!s2.isEmpty) s2.get else "")
-    } else {
-      if(!s2.isEmpty) s2.get else ""
+    if(s1.isEmpty && s2.isEmpty) "" else {
+      if(!s1.isEmpty) {
+        s1.get + (if(!s2.isEmpty) "." + s2.get else "")
+      } else {
+        if(!s2.isEmpty) s2.get else ""
+      }
     }
   }
   def getArg(s:String,i:Int):String = s.split('.')(i)
