@@ -146,7 +146,7 @@ abstract class Node extends nameable {
       if (!named && (!isIo || isNamingIo)) {
         /* If the name was set explicitely through *setName*,
          we don't override it. */
-        name = path;
+        setName(path)
       }
       while (component.names.getOrElseUpdate(name, this) ne this)
         name += "_"
@@ -162,7 +162,7 @@ abstract class Node extends nameable {
   lazy val chiselName = this match {
     case l: Literal => "";
     case any        =>
-      if (name != "" && (name != "reset") && !(component == null)) 
+      if (named && (name != "reset") && !(component == null)) 
         component.getPathName(".") + "." + name
       else
         ""

@@ -148,7 +148,9 @@ abstract class Backend extends FileSystemUtilities{
         comps(0).name = className;
       }
     }
-    // temporary node naming
+    // temporary node naming:
+    // these names are for the Verilog Backend
+    // and used in custom transforms such as backannotation
     Driver.dfs { _ match {
       case reg: Reg if reg.name == "" => 
         reg.name = "R" + reg.component.nextIndex
@@ -554,7 +556,8 @@ abstract class Backend extends FileSystemUtilities{
          as the io's component and the logic's component is not
          same as output's component unless the logic is an input */
       for ((n, io) <- comp.io.flatten) {
-        if (io.dir == OUTPUT) {
+        // Add bindings only in the Verilog Backend
+        if (io.dir == OUTPUT && this.isInstanceOf[VerilogBackend]) {
           val consumers = io.consumers.clone
           val inputsMap = HashMap[Node, ArrayBuffer[Node]]()
           for (node <- consumers) inputsMap(node) = node.inputs.clone
@@ -679,7 +682,6 @@ abstract class Backend extends FileSystemUtilities{
     // they need to resolve modules
     collectNodesIntoComp
     nameAll
-    nameRsts
     ChiselError.checkpoint()
 
     if (!transforms.isEmpty) {
