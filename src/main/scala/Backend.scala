@@ -273,8 +273,12 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def execute(c: Module, walks: ArrayBuffer[(Module) => Unit]): Unit = {
-    for (w <- walks)
+    for (w <- walks) {
+      removeTypeNodes
+      collectNodesIntoComp
+      findConsumers
       w(c)
+    }
   }
 
   def pruneUnconnectedIOs(m: Module) {
@@ -658,9 +662,25 @@ abstract class Backend extends FileSystemUtilities{
   def elaborate(c: Module): Unit = {
     execute(c, preElaborateTransforms)
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
-    sortComponents
     Driver.components foreach (_.markComponent)
+    sortComponents
     verifyAllMuxes
+
+    ChiselError.info("giving names")
+    nameAll
+    nameRsts
+    ChiselError.checkpoint()
+
+    if (!transforms.isEmpty) {
+      ChiselError.info("executing custom transforms")
+      if (Driver.hasMem) {
+        computeMemPorts
+      }
+      execute(c, transforms)
+      sortComponents
+      verifyAllMuxes
+      ChiselError.checkpoint()
+    }
 
     ChiselError.info("adding clocks and resets")
     assignClockAndResetToModules
@@ -671,23 +691,6 @@ abstract class Backend extends FileSystemUtilities{
 
     ChiselError.info("inferring widths")
     inferAll
-    ChiselError.info("giving names")
-    nameAll
-    nameRsts
-    ChiselError.checkpoint()
-
-    if (!transforms.isEmpty) {
-      ChiselError.info("executing custom transforms")
-      removeTypeNodes
-      collectNodesIntoComp
-      findConsumers
-      if (Driver.hasMem) {
-        computeMemPorts
-      }
-      execute(c, transforms)
-      ChiselError.checkpoint()
-    }
-
     ChiselError.info("checking widths")
     forceMatchingWidths
     ChiselError.info("lowering complex nodes to primitives")
