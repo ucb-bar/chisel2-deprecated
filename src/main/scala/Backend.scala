@@ -279,6 +279,33 @@ abstract class Backend extends FileSystemUtilities{
     }
 
     assert(dfsStack.isEmpty)
+
+    // check module resolution
+    val comps = HashMap[Node, Module]()
+    Driver.dfs { node =>
+      val nextComp = node match {
+        case io: Bits if io.isIo && io.dir == OUTPUT => io.component
+        case io: Bits if io.isIo && io.dir == INPUT  => io.component.parent
+        case _ => comps getOrElse (node, null)
+      }
+      for (input <- node.inputs ; if !(input == null)) {
+        input match {
+          case _: Literal => // Skip the below check for Literals, which can safely be static
+          //tmp fix, what happens if multiple componenets reference static nodes?
+          case _ if input.component == null || !(Driver.components contains input.component) =>
+            /* If Backend.collectNodesIntoComp does not resolve the component
+               field for all components, we will most likely end-up here. */
+            assert(input.component == nextComp,
+              (if (input.name != null && !input.name.isEmpty) input.name else "?") +
+              "[" + input.getClass.getName + "] has no match between component " + 
+              (if (input.component == null ) "(null)" else input.component) + 
+              " and '" + nextComp + "' input of " + 
+              (if (node.name != null && !node.name.isEmpty) node.name else "?"))
+          case _ =>
+        }
+        comps(input) = nextComp
+      }
+    }
   }
 
   def execute(c: Module, walks: ArrayBuffer[(Module) => Unit]): Unit = {

@@ -127,8 +127,6 @@ abstract class Node extends nameable {
   var driveRand = false
   var clock: Clock = null
   var CppVertex: CppVertex = null
-  var counter: Bits = null
-  var shadow: Bits = null
   var cntrIdx = -1
 
   val _id = Driver.nodes.length
@@ -293,25 +291,6 @@ abstract class Node extends nameable {
       var i = 0;
       for (node <- inputs) {
         if (node != null) {
-          node match {
-            case n: Literal => // Skip the below check for Literals, which can safely be static
-            case _ => {
-             //tmp fix, what happens if multiple componenets reference static nodes?
-              if (node.component == null || !Driver.components.contains(node.component)) {
-                /* If Backend.collectNodesIntoComp does not resolve the component
-                 field for all components, we will most likely end-up here. */
-                assert(node.component == nextComp,
-                  ((if(node.name != null && !node.name.isEmpty)
-                    node.name else "?")
-                    + "[" + node.getClass.getName
-                    + "] has no match between component "
-                    + (if( node.component == null ) "(null)" else node.component)
-                    + " and '" + nextComp + "' input of "
-                    + (if(this.name != null && !this.name.isEmpty)
-                    this.name else "?")))
-              }
-            }
-          }
           if (!Driver.backend.isInstanceOf[VerilogBackend] || !node.isIo) {
             stack.push(() => node.traceNode(nextComp, stack));
           }
