@@ -122,6 +122,8 @@ object Driver extends FileSystemUtilities{
       queue enqueue b.io
     for (c <- components; (n, io) <- c.io.flatten)
       queue enqueue io
+    for (c <- components; if !(c.defaultResetPin == null))
+      queue enqueue c.defaultResetPin
 
     // Do BFS
     val walked = HashSet[Node]()
@@ -129,6 +131,19 @@ object Driver extends FileSystemUtilities{
       val top = queue.dequeue
       walked += top
       visit(top)
+      top match {
+        case b: Bundle =>
+          for ((n, io) <- b.flatten; if !(io == null) && !(walked contains io)) {
+            queue enqueue io
+            walked += io
+          }
+        case v: Vec[_] => 
+          for ((n, e) <- v.flatten; if !(e == null) && !(walked contains e)) {
+            queue enqueue e
+            walked += e
+          }
+        case _ =>
+      }
       for (i <- top.inputs; if !(i == null) && !(walked contains i)) {
         queue enqueue i
         walked += i
@@ -139,18 +154,34 @@ object Driver extends FileSystemUtilities{
   def dfs (visit: Node => Unit) = {
     val stack = new Stack[Node]
     // initialize DFS
+    for (c <- components; (n, io) <- c.io.flatten)
+      stack push io
+    for (c <- components; if !(c.defaultResetPin == null))
+      stack push c.defaultResetPin
     for (c <- components; a <- c.debugs)
       stack push a
     for (b <- blackboxes)
       stack push b.io
-    for (c <- components; (n, io) <- c.io.flatten)
-      stack push io
 
+    // Do DFS
     val walked = HashSet[Node]()
     while (!stack.isEmpty) {
       val top = stack.pop
       walked += top
       visit(top)
+      top match {
+        case b: Bundle =>
+          for ((n, io) <- b.flatten; if !(io == null) && !(walked contains io)) {
+            stack push io
+            walked += io
+          }
+        case v: Vec[_] => 
+          for ((n, e) <- v.flatten; if !(e == null) && !(walked contains e)) {
+            stack push e
+            walked += e
+          }
+        case _ =>
+      }
       for (i <- top.inputs; if !(i == null) && !(walked contains i)) {
         stack push i
         walked += i

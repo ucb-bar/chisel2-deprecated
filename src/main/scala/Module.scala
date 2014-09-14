@@ -308,73 +308,81 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       this.clocks += clock
   }
 
-  // COMPILATION OF BODY
-  def initializeBFS: ScalaQueue[Node] = {
-    val res = new ScalaQueue[Node]
+  def bfs (visit: Node => Unit) = {
+    // initialize BFS
+    val queue = new ScalaQueue[Node]
+    
+    for (a <- debugs)
+      queue enqueue a
+    for ((n, io) <- io.flatten)
+      queue enqueue io
+    if (!(defaultResetPin == null))
+      queue enqueue defaultResetPin
 
-    for (c <- Driver.components; a <- c.debugs)
-      res.enqueue(a)
-    for(b <- Driver.blackboxes)
-      res.enqueue(b.io)
-    for(c <- Driver.components)
-      for((n, io) <- c.io.flatten)
-        res.enqueue(io)
-
-    res
-  }
-
-  def initializeDFS: Stack[Node] = {
-    val res = new Stack[Node]
-
-    /* XXX Make sure roots are consistent between initializeBFS, initializeDFS
-     and findRoots.
-     */
-    for( a <- this.debugs ) {
-      res.push(a)
-    }
-    for((n, flat) <- this.io.flatten) {
-      res.push(flat)
-    }
-    res
-  }
-
-  def bfs(visit: Node => Unit): Unit = {
-    val walked = new HashSet[Node]
-    val bfsQueue = initializeBFS
-
-    // conduct bfs to find all reachable nodes
-    while(!bfsQueue.isEmpty){
-      val top = bfsQueue.dequeue
+    // Do BFS
+    val walked = HashSet[Node]()
+    while (!queue.isEmpty) {
+      val top = queue.dequeue
       walked += top
       visit(top)
-      for(i <- top.inputs) {
-        if(!(i == null)) {
-          if(!walked.contains(i)) {
-            bfsQueue.enqueue(i)
-            walked += i
+      top match {
+        case b: Bundle =>
+          for ((n, io) <- b.flatten; 
+          if !(io == null) && !(walked contains io) && io.component == this) {
+            queue enqueue io
+            walked += io
           }
-        }
+        case v: Vec[_] => 
+          for ((n, e) <- v.flatten; 
+          if !(e == null) && !(walked contains e) && e.component == this) {
+            queue enqueue e
+            walked += e
+          }
+        case _ =>
+      }
+      for (i <- top.inputs; 
+      if !(i == null) && !(walked contains i) && i.component == this) {
+        queue enqueue i
+        walked += i
       }
     }
   }
 
   def dfs(visit: Node => Unit): Unit = {
-    val walked = new HashSet[Node]
-    val dfsStack = initializeDFS
+    val stack = new Stack[Node]
+    // initialize DFS
+    for ((n, io) <- io.flatten)
+      stack push io
+    if (!(defaultResetPin == null))
+      stack push defaultResetPin
+    for (a <- debugs)
+      stack push a
 
-    def isVisiting(node: Node) =
-      !(node == null) && !(walked contains node) && 
-      (node.component == this || node.isIo)
-
-    while(!dfsStack.isEmpty) {
-      val top = dfsStack.pop
+    // Do DFS
+    val walked = HashSet[Node]()
+    while (!stack.isEmpty) {
+      val top = stack.pop
       walked += top
       visit(top)
-      for(i <- top.inputs) {
-        if (isVisiting(i)) {
-          dfsStack push i
-          walked += i
-        }
+      top match {
+        case b: Bundle =>
+          for ((n, io) <- b.flatten; 
+          if !(io == null) && !(walked contains io) && io.component == this) {
+            stack push io
+            walked += io
+          }
+        case v: Vec[_] => 
+          for ((n, e) <- v.flatten; 
+          if !(e == null) && !(walked contains e) && e.component == this) {
+            stack push e
+            walked += e
+          }
+        case _ =>
+      }
+      for (i <- top.inputs; 
+      if !(i == null) && !(walked contains i) && i.component == this) {
+        stack push i
+        walked += i
       }
     }
   }
