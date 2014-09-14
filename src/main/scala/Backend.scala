@@ -148,6 +148,14 @@ abstract class Backend extends FileSystemUtilities{
         comps(0).name = className;
       }
     }
+    // temporary node naming
+    Driver.dfs { _ match {
+      case reg: Reg if reg.name == "" => 
+        reg.name = "R" + reg.component.nextIndex
+      case node: Node if !node.isTypeNode && node.name == "" => 
+        node.name = "T" + node.component.nextIndex
+      case _ =>
+    } }
   }
 
   def fullyQualifiedName( m: Node ): String = {
@@ -667,15 +675,20 @@ abstract class Backend extends FileSystemUtilities{
     verifyAllMuxes
 
     ChiselError.info("giving names")
+    // Before giving names to temporary nodes
+    // they need to resolve modules
+    collectNodesIntoComp
     nameAll
     nameRsts
     ChiselError.checkpoint()
 
     if (!transforms.isEmpty) {
-      ChiselError.info("executing custom transforms")
+      inferAll
+      lowerNodes
       if (Driver.hasMem) {
         computeMemPorts
       }
+      ChiselError.info("executing custom transforms")
       execute(c, transforms)
       sortComponents
       verifyAllMuxes
