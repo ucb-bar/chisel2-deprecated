@@ -150,18 +150,6 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
-  def nameBindings {
-    for (comp <- Driver.sortedComps) {
-      for (bind <- comp.bindings) {
-        var genName = if (bind.targetNode.name == null || bind.targetNode.name.length() == 0) "" 
-                      else bind.targetComponent.name + "_" + bind.targetNode.name
-        if(nameSpace contains genName) genName += ("_" + bind.emitIndex);
-        bind.name = asValidName(genName); // Not using nameIt to avoid override
-        bind.named = true;
-      }
-    }
-  }
-
   def fullyQualifiedName( m: Node ): String = {
     m match {
       case l: Literal => l.toString;
@@ -505,6 +493,7 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def findConsumers {
+    Driver.bfs (_.consumers.clear)
     Driver.bfs (_.addConsumers)
   }
 
@@ -551,6 +540,71 @@ abstract class Backend extends FileSystemUtilities{
       }
       if (!lowerTo.isEmpty)
         inferAll
+    }
+  }
+
+  def addBindings {
+    for (comp <- Driver.sortedComps) {
+      /* This code finds an output binding for a node.
+         We search for a binding only if the io is an output
+         and the logic's grandfather component is not the same
+         as the io's component and the logic's component is not
+         same as output's component unless the logic is an input */
+      for ((n, io) <- comp.io.flatten) {
+        if (io.dir == OUTPUT) {
+          val consumers = io.consumers.clone
+          val inputsMap = HashMap[Node, ArrayBuffer[Node]]()
+          for (node <- consumers) inputsMap(node) = node.inputs.clone
+          for (node <- consumers; if !(node == null) && io.component != node.component.parent) {
+            val inputs = inputsMap(node) 
+            val i = inputs indexOf io
+            node match {
+              case bits: Bits if bits.dir == INPUT =>
+                node.inputs(i) = Binding(io, io.component.parent, io.component) 
+              case _ if io.component != node.component =>
+                node.inputs(i) = Binding(io, io.component.parent, io.component) 
+              case _ =>
+            }
+          }
+        }
+        // In this case, we are trying to use the input of a submodule
+        // as part of the logic outside of the submodule.
+        // If the logic is outside the submodule, we do not use
+        // the input name. Instead, we use whatever is driving
+        // the input. In other words, we do not use the Input name,
+        // if the component of the logic is the part of Input's
+        // component. We also do the same when assigning
+        // to the output if the output is the parent
+        // of the subcomponent.
+        else if (io.dir == INPUT) {
+          val consumers = io.consumers.clone
+          val inputsMap = HashMap[Node, ArrayBuffer[Node]]()
+          for (node <- consumers) inputsMap(node) = node.inputs.clone
+          for (node <- consumers; if !(node == null) && io.component == node.component.parent) {
+            val inputs = inputsMap(node)
+            val i = inputs indexOf io
+            node match {
+              case bits: Bits if bits.dir == OUTPUT =>
+                if (io.inputs.length > 0) node.inputs(i) = io.inputs(0)
+              case _ if !node.isIo =>
+                if (io.inputs.length > 0) node.inputs(i) = io.inputs(0)
+              case _ =>
+            }
+          }  
+        }
+      }
+    }
+  }
+
+  def nameBindings {
+    for (comp <- Driver.sortedComps) {
+      for (bind <- comp.bindings) {
+        var genName = if (bind.targetNode.name == null || bind.targetNode.name.length() == 0) "" 
+                      else bind.targetComponent.name + "_" + bind.targetNode.name
+        if(nameSpace contains genName) genName += ("_" + bind.emitIndex);
+        bind.name = asValidName(genName); // Not using nameIt to avoid override
+        bind.named = true;
+      }
     }
   }
 
@@ -635,10 +689,10 @@ abstract class Backend extends FileSystemUtilities{
       ChiselError.info("executing custom transforms")
       removeTypeNodes
       collectNodesIntoComp(initializeDFS)
+      findConsumers
       if (Driver.hasMem) {
         computeMemPorts
       }
-      findConsumers
       execute(c, transforms)
       ChiselError.checkpoint()
     }
@@ -670,11 +724,14 @@ abstract class Backend extends FileSystemUtilities{
       computeMemPorts
     }
 
-    c.traceNodes();
-    findConsumers
     nameAll 
     nameRsts
+
+    findConsumers
+    addBindings
     nameBindings 
+    findConsumers
+    c.traceNodes();
 
     val clkDomainWalkedNodes = new HashSet[Node]
     for (comp <- Driver.sortedComps)

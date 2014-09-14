@@ -609,8 +609,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   /* XXX Not sure what the two following do.
    They never get overridden yet it is called
    for each component (See Backend implementations). */
-  def elaborate(fake: Int = 0) {}
-  def postMarkNet(fake: Int = 0) {}
   def stripComponent(s: String): String = s.split("__").last
 
     /** Returns the absolute path to a component instance from toplevel. */

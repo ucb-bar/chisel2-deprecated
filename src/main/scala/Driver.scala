@@ -136,6 +136,28 @@ object Driver extends FileSystemUtilities{
     }
   }
 
+  def dfs (visit: Node => Unit) = {
+    val stack = new Stack[Node]
+    // initialize DFS
+    for (c <- components; a <- c.debugs)
+      stack push a
+    for (b <- blackboxes)
+      stack push b.io
+    for (c <- components; (n, io) <- c.io.flatten)
+      stack push io
+
+    val walked = HashSet[Node]()
+    while (!stack.isEmpty) {
+      val top = stack.pop
+      walked += top
+      visit(top)
+      for (i <- top.inputs; if !(i == null) && !(walked contains i)) {
+        stack push i
+        walked += i
+      }
+    }
+  }
+
   def initChisel(args: Array[String]): Unit = {
     ChiselError.clear()
     warnInputs = false

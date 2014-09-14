@@ -317,45 +317,7 @@ abstract class Node extends nameable {
           }
           val j = i;
           val n = node;
-          stack.push(() => {
-            /* This code finds an output binding for a node.
-             We search for a binding only if the io is an output
-             and the logic's grandfather component is not the same
-             as the io's component and the logic's component is not
-             same as output's component unless the logic is an input */
-            n match {
-              case io: Bits =>
-                if (io.isIo && io.dir == OUTPUT && !io.isTypeNode &&
-                    (!(component.parent == io.component) &&
-                     !(component == io.component &&
-                       !(this.isInstanceOf[Bits]
-                         && this.asInstanceOf[Bits].dir == INPUT)))) {
-                  val c = n.component.parent;
-                  val b = Binding(n, c, io.component);
-                  inputs(j) = b;
-                  if (!c.isWalked.contains(b)) {
-                    c.mods += b;  c.isWalked += b;
-                  }
-                  // In this case, we are trying to use the input of a submodule
-                  // as part of the logic outside of the submodule.
-                  // If the logic is outside the submodule, we do not use
-                  // the input name. Instead, we use whatever is driving
-                  // the input. In other words, we do not use the Input name,
-                  // if the component of the logic is the part of Input's
-                  // component. We also do the same when assigning
-                  // to the output if the output is the parent
-                  // of the subcomponent.
-                } else if (io.isIo && io.dir == INPUT &&
-                           ((!this.isIo
-                             && this.component == io.component.parent)
-                             || (this.isInstanceOf[Bits]
-                               && this.asInstanceOf[Bits].dir == OUTPUT &&
-                               this.component == io.component.parent))) {
-                  if (io.inputs.length > 0) inputs(j) = io.inputs(0);
-                }
-              case any =>
-            };
-          });
+          // stack.push(() => {});
         }
         i += 1;
       }
