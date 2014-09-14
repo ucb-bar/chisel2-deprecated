@@ -193,23 +193,6 @@ abstract class Backend extends FileSystemUtilities{
   if (Driver.isCSE) transforms += CSE.transform
   val analyses = ArrayBuffer[(Module) => Unit]()
 
-  def initializeDFS: Stack[Node] = {
-    val res = new Stack[Node]
-
-    /* XXX Make sure roots are consistent between initializeBFS, initializeDFS
-     and findRoots.
-     */
-    for( c <- Driver.components ) {
-      for( a <- c.debugs ) {
-        res.push(a)
-      }
-      for((n, flat) <- c.io.flatten) {
-        res.push(flat)
-      }
-    }
-    res
-  }
-
   /** Nodes which are created outside the execution trace from the toplevel
     component constructor (i.e. through the () => Module(new Top()) ChiselMain
     argument) will have a component field set to null. For example, genMuxes,
@@ -236,49 +219,30 @@ abstract class Backend extends FileSystemUtilities{
     case _ => false
   }
 
-  def collectNodesIntoComp(dfsStack: Stack[Node]) {
-    val walked = new HashSet[Node]()
-    walked ++= dfsStack
-    // invariant is everything in the stack is walked and has a non-null component
-    while(!dfsStack.isEmpty) {
-      val node = dfsStack.pop
-      /*
-      we're tracing from outputs -> inputs, so if node is an input, then its
-      inputs belong to the outside component. Otherwise, its inputs are the same
-      as node's inputs.
-      */
-      val curComp = 
-        if ( node.isIo && node.asInstanceOf[Bits].dir == INPUT ) {
+  def collectNodesIntoComp {
+    Driver.dfs { node =>
+      val curComp = node match {
+        case io: Bits if io.isIo && io.dir == INPUT => 
           node.component.parent
-        } else {
+        case _ => 
           node.component
-        }
-      if (node.component == null) {
-        println("NULL NODE COMPONENT " + node)
       }
-      if (!node.component.nodes.contains(node))
+      assert(node.component != null, "NULL NODE COMPONENT " + node.name)
+      if (!(node.component.nodes contains node))
         node.component.nodes += node
       for (input <- node.inputs) {
-        if (input.component != null && input.component != node.component) {
-          if (!input.isLit &&
-              !isBitsIo(input, OUTPUT) && !isBitsIo(node, INPUT) &&
-              // ok if parent referring to any child nodes
-              // not symmetric and only applies to direct children
-              // READ BACK INPUT -- TODO: TIGHTEN THIS UP
-              !isBitsIo(input, INPUT))
-            ChiselErrors += new ChiselError(() => { "Illegal cross module reference between " + node + " and " + input }, node.line)
+        if (!(input.component == null || input.component == node.component) &&
+            !input.isLit && !isBitsIo(input, OUTPUT) && !isBitsIo(node, INPUT) &&
+            // ok if parent referring to any child nodes
+            // not symmetric and only applies to direct children
+            // READ BACK INPUT -- TODO: TIGHTEN THIS UP
+            !isBitsIo(input, INPUT)) {
+          ChiselErrors += new ChiselError(() => { 
+            "Illegal cross module reference between " + node + " and " + input }, node.line)
         }
-        if(!walked.contains(input)) {
-          if( input.component == null ) {
-            input.component = curComp
-          }
-          walked += input
-          dfsStack.push(input)
-        }
+        if (input.component == null) input.component = curComp
       }
     }
-
-    assert(dfsStack.isEmpty)
 
     // check module resolution
     val comps = HashMap[Node, Module]()
@@ -715,7 +679,7 @@ abstract class Backend extends FileSystemUtilities{
     if (!transforms.isEmpty) {
       ChiselError.info("executing custom transforms")
       removeTypeNodes
-      collectNodesIntoComp(initializeDFS)
+      collectNodesIntoComp
       findConsumers
       if (Driver.hasMem) {
         computeMemPorts
@@ -745,7 +709,7 @@ abstract class Backend extends FileSystemUtilities{
      */
 
     ChiselError.info("resolving nodes to the components")
-    collectNodesIntoComp(initializeDFS)
+    collectNodesIntoComp
     if (Driver.hasMem) {
       ChiselError.info("computing memory ports")
       computeMemPorts
