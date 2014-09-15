@@ -749,10 +749,11 @@ class CppBackend extends Backend {
       clock_hi.append("void " + c.name + "_t::clock_hi" + clkName(clock) + " ( dat_t<1> reset ) {\n")
     }
 
+    val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName) 
     if (Driver.isGenHarness) {
-      genHarness(c, c.name);
+      genHarness(c, n);
     }
-    val out_h = createOutputFile(c.name + ".h");
+    val out_h = createOutputFile(n + ".h");
     if (!Params.space.isEmpty) {
       val out_p = createOutputFile(c.name + ".p");
       out_p.write(Params.toDotpStringParams);
@@ -815,8 +816,9 @@ class CppBackend extends Backend {
     val out_cpps = ArrayBuffer[java.io.FileWriter]()
     val all_cpp = new StringBuilder
     def createCppFile(suffix: String = "-" + out_cpps.length) = {
-      val f = createOutputFile(c.name + suffix + ".cpp")
-      f.write("#include \"" + c.name + ".h\"\n")
+      val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName) 
+      val f = createOutputFile(n + suffix + ".cpp")
+      f.write("#include \"" + n + ".h\"\n")
       for (str <- Driver.includeArgs) f.write("#include \"" + str + "\"\n")
       f.write("\n")
       out_cpps += f
