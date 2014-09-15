@@ -159,7 +159,7 @@ class Mux extends Op {
   }
   
   override def W0Wtransform() {
-    if (inputs(1).width.needWidth == 0 && inputs(2).width.needWidth == 0) {
+    if (inputs(1).needWidth == 0 && inputs(2).needWidth == 0) {
       // If both our inputs are zero-width nodes, so are we.
       setWidth(0)
       inputs.remove(1, 2) /* remove children 1 & 2 */
@@ -168,7 +168,7 @@ class Mux extends Op {
     } else {
       // Convert any zero-width children into UInt(0).
       // This has the side-effect that if we have a zero-width selector, we'll return the "false" input.
-      for (c <- inputs if c.width.needWidth == 0) {
+      for (c <- inputs if c.needWidth == 0) {
         c.replaceTree(UInt(0, 0))
         modified = true
       }
@@ -177,10 +177,10 @@ class Mux extends Op {
 
   override def review() {
     // Are we zero-width?
-    if (width.needWidth == 0) {
+    if (needWidth == 0) {
       /* Replace us with a zero-width constant. */
       replaceTree(UInt(0,0))
-    } else if (inputs(0).width.needWidth == 0) {
+    } else if (inputs(0).needWidth == 0) {
       /* Our selector is zero-width. Replace us with the "false" input. */
       replaceTree(inputs(2))
     }

@@ -519,14 +519,14 @@ abstract class Op extends Node {
   // Review this node with an eye to replacing it with an optimized version.
   override def review() {
     // If we're zero-width, replace us with a zero-width constant.
-    if (width.needWidth == 0) {
+    if (needWidth == 0) {
       replaceTree(UInt(0,0))
     } else {
       /* How many zero-width children do we have? Partition the inputs (ids) into two lists:
        *  zeroIds - those with zero-widths
        *  nonzeroIds - those with non-zero-widths
        */
-      val (zeroIds, nonzeroIds) = (0 until inputs.length).partition(i => inputs(i).width.needWidth == 0)
+      val (zeroIds, nonzeroIds) = (0 until inputs.length).partition(i => inputs(i).needWidth == 0)
       val nz = zeroIds.length
       if (nz == 0)
         return
