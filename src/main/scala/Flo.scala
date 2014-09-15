@@ -223,7 +223,6 @@ class FloBackend extends Backend {
         c.debugs     ++= cc.debugs;
       }
     }
-    c.findConsumers()
     ChiselError.checkpoint()
 
     c.findOrdering(); // search from roots  -- create omods

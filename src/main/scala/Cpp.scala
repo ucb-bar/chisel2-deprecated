@@ -730,7 +730,6 @@ class CppBackend extends Backend {
         c.mods   ++= cc.mods;
       }
     }
-    c.findConsumers()
     ChiselError.checkpoint()
 
     c.findOrdering(); // search from roots  -- create omods

@@ -392,12 +392,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     }
   }
 
-  def findConsumers() {
-    for (m <- mods) {
-      m.addConsumers;
-    }
-  }
-
   /** Since we are relying on the out-degree of nodes (i.e. consumers.length),
     this method should only be called after the forward edges have been
     constructed. */
