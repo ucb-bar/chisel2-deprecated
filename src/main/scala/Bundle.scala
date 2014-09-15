@@ -189,14 +189,6 @@ class Bundle(view_arg: Seq[String] = null)(implicit _params:Option[Parameters] =
       elt.removeTypeNodes
   }
 
-  override def traceableNodes: Array[Node] = elements.map(tup => tup._2).toArray;
-
-  override def traceNode(c: Module, stack: Stack[() => Any]) {
-    for((n, i) <- flatten) {
-      stack.push(() => i.traceNode(c, stack))
-    }
-  }
-
   override def apply(name: String): Data = {
     for((n,i) <- elements)
       if(name == n) return i;

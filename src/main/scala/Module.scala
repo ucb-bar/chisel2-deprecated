@@ -493,8 +493,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     (imods.length, maxWidth, maxDepth)
   }
 
-  def traceableNodes: Array[Node] = io.traceableNodes;
-
   def getClassValNames(c: Class[_]): ArrayBuffer[String] = {
     val valnames = new ArrayBuffer[String]()
     for (v <- c.getDeclaredFields) {
@@ -605,32 +603,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   }
   def getPathName(separator: String = "_"): String = {
     if ( parent == null ) name else parent.getPathName(separator) + separator + name;
-  }
-
-  def traceNodes() {
-    val queue = Stack[() => Any]();
-
-    /* XXX Why do we do something different here? */
-    if (!Driver.backend.isInstanceOf[VerilogBackend]) {
-      queue.push(() => io.traceNode(this, queue));
-    } else {
-      for (c <- Driver.components) {
-        queue.push(() => c.io.traceNode(c, queue))
-      }
-    }
-    for (c <- Driver.components) {
-        if (!(c.defaultResetPin == null)) { // must manually add reset pin cuz it isn't part of io
-          queue.push(() => c.defaultResetPin.traceNode(c, queue))
-        }
-    }
-    for (c <- Driver.components; d <- c.debugs)
-      queue.push(() => d.traceNode(c, queue))
-    for (b <- Driver.blackboxes)
-      queue.push(() => b.io.traceNode(this, queue));
-    while (queue.length > 0) {
-      val work = queue.pop();
-      work();
-    }
   }
 
   def isInput(node: Node): Boolean =

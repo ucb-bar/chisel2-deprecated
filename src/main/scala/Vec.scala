@@ -217,17 +217,6 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
       bundle.removeTypeNodes
   }
 
-  override def traceableNodes: Array[Node] = self.toArray
-
-  override def traceNode(c: Module, stack: Stack[() => Any]) {
-    val ins = this.flatten.map(_._2)
-      
-    for(i <- ins) {
-      stack.push(() => i.traceNode(c, stack))
-    }
-    stack.push(() => super.traceNode(c, stack))
-  }
-
   override def flip(): this.type = {
     for(b <- self)
       b.flip();

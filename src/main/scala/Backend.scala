@@ -616,6 +616,12 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
+  def collectNodes {
+    // collect nodes into 'mods', which is used in code generation
+    // TODO: remove 'mods'
+    Driver.dfs { node => node.component.mods += node }
+  }
+
   def findCombLoop {
     // Tarjan's strongly connected components algorithm to find loops
     var sccIndex = 0
@@ -742,13 +748,14 @@ abstract class Backend extends FileSystemUtilities{
     addBindings
     nameBindings 
     findConsumers
-    c.traceNodes();
 
     val clkDomainWalkedNodes = new HashSet[Node]
     for (comp <- Driver.sortedComps)
       for (node <- comp.nodes)
         if (node.isInstanceOf[Reg])
           createClkDomain(node, clkDomainWalkedNodes)
+
+    collectNodes
     ChiselError.checkpoint()
 
     execute(c, analyses)

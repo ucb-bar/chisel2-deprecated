@@ -115,7 +115,6 @@ abstract class Node extends nameable {
   var width_ = -1;
   val consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
   val inputs = new ArrayBuffer[Node];
-  def traceableNodes: Array[Node] = Array[Node]();
   var inferWidth: (Node) => Int = maxWidth;
   var nameHolder: nameable = null;
   val line: StackTraceElement =
@@ -263,44 +262,6 @@ abstract class Node extends nameable {
       } else {
         in.printTree(writer, depth-1, indent + "  ");
       }
-    }
-  }
-
-  def traceNode(c: Module, stack: Stack[() => Any]): Any = {
-    // pushes and pops components as necessary in order to later mark the parent of nodes
-    val (comp, nextComp) =
-      this match {
-        case io: Bits => {
-          if(io.isIo && (io.dir == INPUT || io.dir == OUTPUT)) {
-            (io.component, if (io.dir == OUTPUT) io.component else io.component.parent)
-          } else {
-            (c, c)
-          }
-        }
-        case any    => (c, c);
-      }
-
-    assert( comp != null );
-    if (comp != null && !comp.isWalked.contains(this)) {
-      comp.isWalked += this;
-      for (node <- traceableNodes) {
-        if (node != null) {
-          stack.push(() => node.traceNode(nextComp, stack));
-        }
-      }
-      var i = 0;
-      for (node <- inputs) {
-        if (node != null) {
-          if (!Driver.backend.isInstanceOf[VerilogBackend] || !node.isIo) {
-            stack.push(() => node.traceNode(nextComp, stack));
-          }
-          val j = i;
-          val n = node;
-          // stack.push(() => {});
-        }
-        i += 1;
-      }
-      comp.mods += this;
     }
   }
 

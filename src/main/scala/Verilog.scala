@@ -193,11 +193,11 @@ class VerilogBackend extends Backend {
                     ChiselError.warning("" + io + " CONNECTED TOO MUCH " + io.inputs.length);
                   }
                 portDec = "//" + portDec
-              } else if (!c.isWalked.contains(w)){
+              /* } else if (!c.isWalked.contains(w)){
                   if (Driver.saveConnectionWarnings) {
                     ChiselError.warning(" UNUSED INPUT " + io + " OF " + c + " IS REMOVED");
                   }
-                portDec = "//" + portDec
+                portDec = "//" + portDec // I don't think this is necessary */
               } else {
                 portDec += emitRef(io.inputs(0));
               }
@@ -1079,7 +1079,7 @@ class VerilogBackend extends Backend {
       ChiselError.info(depthString(depth) + "COMPILING " + c
         + " " + c.children.length + " CHILDREN"
         + " (" + c.level + "," + c.traversal + ")");
-      c.findConsumers();
+      // c.findConsumers();
       ChiselError.checkpoint()
 
       if( c.level > level ) {

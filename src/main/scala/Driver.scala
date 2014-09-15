@@ -175,16 +175,22 @@ object Driver extends FileSystemUtilities{
             stack push io
             walked += io
           }
-        case v: Vec[_] => 
+        case v: Vec[_] => {
           for ((n, e) <- v.flatten; if !(e == null) && !(walked contains e)) {
             stack push e
             walked += e
           }
-        case _ =>
-      }
-      for (i <- top.inputs; if !(i == null) && !(walked contains i)) {
-        stack push i
-        walked += i
+          for (i <- top.inputs; if !(i == null) && !(walked contains i) && !i.isIo) {
+            stack push i
+            walked += i
+          }
+        }
+        case _ => {
+          for (i <- top.inputs; if !(i == null) && !(walked contains i) && !i.isIo) {
+            stack push i
+            walked += i
+          }
+        }
       }
     }
   }
