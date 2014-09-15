@@ -506,14 +506,16 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def computeMemPorts {
-    Driver.bfs { _ match {
-      case memacc: MemAccess => memacc.referenced = true
-      case _ =>
-    } }
-    Driver.bfs { _ match {
-      case mem: Mem[_] => mem.computePorts
-      case _ =>
-    } }
+    if (Driver.hasMem) {
+      Driver.bfs { _ match {
+        case memacc: MemAccess => memacc.referenced = true
+        case _ =>
+      } }
+      Driver.bfs { _ match {
+        case mem: Mem[_] => mem.computePorts
+        case _ =>
+      } }
+    }
   }
 
   /** All classes inherited from Data are used to add type information
@@ -585,7 +587,7 @@ abstract class Backend extends FileSystemUtilities{
           val consumers = io.consumers.clone
           val inputsMap = HashMap[Node, ArrayBuffer[Node]]()
           for (node <- consumers) inputsMap(node) = node.inputs.clone
-          for (node <- consumers; if !(node == null) && io.component == node.component.parent) {
+          for (node <- consumers; if !(node == null) && io.component.parent == node.component) {
             val inputs = inputsMap(node)
             val i = inputs indexOf io
             node match {
@@ -692,9 +694,6 @@ abstract class Backend extends FileSystemUtilities{
     if (!transforms.isEmpty) {
       inferAll
       lowerNodes
-      if (Driver.hasMem) {
-        computeMemPorts
-      }
       ChiselError.info("executing custom transforms")
       execute(c, transforms)
       sortComponents
@@ -733,10 +732,9 @@ abstract class Backend extends FileSystemUtilities{
 
     ChiselError.info("resolving nodes to the components")
     collectNodesIntoComp
-    if (Driver.hasMem) {
-      ChiselError.info("computing memory ports")
-      computeMemPorts
-    }
+
+    ChiselError.info("computing memory ports")
+    computeMemPorts
 
     nameAll 
     nameRsts

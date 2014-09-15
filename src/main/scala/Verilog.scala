@@ -1079,7 +1079,6 @@ class VerilogBackend extends Backend {
       ChiselError.info(depthString(depth) + "COMPILING " + c
         + " " + c.children.length + " CHILDREN"
         + " (" + c.level + "," + c.traversal + ")");
-      // c.findConsumers();
       ChiselError.checkpoint()
 
       if( c.level > level ) {
