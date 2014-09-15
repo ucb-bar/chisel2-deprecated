@@ -159,7 +159,9 @@ class Mux extends Op {
   }
   
   override def W0Wtransform() {
-    if (inputs(1).needWidth == 0 && inputs(2).needWidth == 0) {
+    val w1 = inputs(1).widthW
+    val w2 = inputs(2).widthW
+    if (w1.isKnown && w2.isKnown && w1.needWidth == 0 && w2.needWidth == 0) {
       // If both our inputs are zero-width nodes, so are we.
       setWidth(0)
       inputs.remove(1, 2) /* remove children 1 & 2 */
@@ -176,13 +178,17 @@ class Mux extends Op {
   }
 
   override def review() {
+    val w = widthW
     // Are we zero-width?
-    if (needWidth == 0) {
+    if (w.isKnown && w.needWidth == 0) {
       /* Replace us with a zero-width constant. */
       replaceTree(UInt(0,0))
-    } else if (inputs(0).needWidth == 0) {
-      /* Our selector is zero-width. Replace us with the "false" input. */
-      replaceTree(inputs(2))
+    } else {
+      val w0 = inputs(0).widthW
+      if (w0.isKnown && w0.needWidth == 0) {
+        /* Our selector is zero-width. Replace us with the "false" input. */
+        replaceTree(inputs(2))
+      }
     }
   }
 }

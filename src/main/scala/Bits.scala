@@ -294,7 +294,14 @@ abstract class Bits extends Data with proc {
 
   override def forceMatchingWidths {
     if(inputs.length == 1 && inputs(0).widthW != widthW) {
-      inputs(0) = inputs(0).matchWidth(widthW)
+      // Our single child differs.
+      val w = this.widthW
+      val w0 = inputs(0).widthW
+      if (w.isKnown) {
+        inputs(0) = inputs(0).matchWidth(w)
+      } else if (w0.isKnown) {
+        this.matchWidth(w0)
+      }
     }
   }
 

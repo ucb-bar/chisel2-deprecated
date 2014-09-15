@@ -297,7 +297,7 @@ class ZeroWidthTest extends TestSuite {
     assertFile("ZeroWidthTest_DivZU_1." + backend)
   }
 
-  /** Remainer of a signed zero-width number by an unsigned number */
+  /** Remainder of a signed zero-width number by an unsigned number */
   @Test def testRemZU() {
     println("\ntestRemZU ...")
     class RemZU extends Module {
