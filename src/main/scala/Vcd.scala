@@ -44,6 +44,8 @@ class VcdBackend(top: Module) extends Backend {
     emitRef(node)
   override def emitRef(node: Node): String =
     node match {
+      case _: Literal =>
+        node.name
       case _: Reg =>
         if (node.named) node.name else "R" + node.emitIndex
       case _ =>

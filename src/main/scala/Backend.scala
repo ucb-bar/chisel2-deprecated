@@ -286,9 +286,6 @@ abstract class Backend extends FileSystemUtilities{
 
   def execute(c: Module, walks: ArrayBuffer[(Module) => Unit]): Unit = {
     for (w <- walks) {
-      removeTypeNodes
-      collectNodesIntoComp
-      findConsumers
       w(c)
     }
   }
