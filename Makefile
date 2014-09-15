@@ -21,5 +21,5 @@ clean:
 jenkins-build:
 	$(SBT) $(SBT_FLAGS) clean scalastyle scct:test publish-local
 
-check:
+check test:
 	$(SBT) $(SBT_FLAGS) scct:test

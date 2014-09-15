@@ -64,7 +64,7 @@ class SInt extends Bits with Num[SInt] {
   }
 
   override def matchWidth(w: Width): Node = {
-    val this_width = this.width
+    val this_width = this.widthW
     if (w.isKnown && this_width.isKnown) {
       val my_width = this_width.needWidth()
       val match_width = w.needWidth()

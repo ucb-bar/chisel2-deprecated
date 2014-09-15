@@ -95,7 +95,7 @@ class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
     if (x != null) {
       var unknown = false
       val argLength = formats.zip(inputs).map{case (a,b) => {
-        lengths(a)({ val w = b.width;if (w.isKnown) w.needWidth() else {unknown = true; 0}})
+        lengths(a)({ val w = b.widthW;if (w.isKnown) w.needWidth() else {unknown = true; 0}})
       }}.sum
       if (unknown)
         Width()

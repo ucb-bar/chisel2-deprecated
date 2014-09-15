@@ -40,7 +40,7 @@ object Fill {
 
 object NodeFill {
   def apply(n: Int, mod: Node): Node = {
-    val w = mod.width
+    val w = mod.widthW
     if (n == 1) {
       mod
     } else {

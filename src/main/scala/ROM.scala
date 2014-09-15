@@ -80,7 +80,7 @@ class ROMData(elts: SortedMap[Int, Node], val n: Int) extends Node {
 
 class ROMRead extends Node {
   def inputsTailMaxWidth: (=> Node) => Width = { (m) => {
-    m.inputs.map(_.width).tail.max
+    m.inputs.map(_.widthW).tail.max
   }}
   inferWidth = inputsTailMaxWidth
   def addr: Node = inputs(0)

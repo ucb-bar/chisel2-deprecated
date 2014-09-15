@@ -114,7 +114,7 @@ object Reg {
       res_i.inputs += res_i.comp
     } else for ((res_n, res_i) <- res.flatten) {
       res_i.comp = new Reg
-      val w = res_i.getWidthAsWidth()
+      val w = res_i.getWidthW()
       res_i.comp.init("", regWidth(w), res_i.comp)
       res_i.inputs += res_i.comp
     }
@@ -168,7 +168,7 @@ class Reg extends Delay with proc {
   }
 
   override def forceMatchingWidths: Unit =
-    inputs.transform(_.matchWidth(width))
+    inputs.transform(_.matchWidth(widthW))
 
   override def usesInClockHi(n: Node) = n eq next
 
