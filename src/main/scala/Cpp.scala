@@ -733,7 +733,6 @@ class CppBackend extends Backend {
     c.findConsumers()
     ChiselError.checkpoint()
 
-    c.collectNodes(c);
     c.findOrdering(); // search from roots  -- create omods
     val mappings = generateNodeMapping(c.omods);
     renameNodes(c, c.omods);

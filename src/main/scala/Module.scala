@@ -168,10 +168,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   val nodes = new ArrayBuffer[Node]
   val mods = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
-  val signals = new LinkedHashSet[Node]
 
-  val regs  = new ArrayBuffer[Reg];
-  val nexts = new ScalaQueue[Node];
   val names = new HashMap[String, Node]
   var nindex = -1;
   var defaultWidth = 32;
@@ -494,23 +491,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       widths(m.depth) += 1
     val maxWidth = widths.foldLeft(0)(_ max _)
     (imods.length, maxWidth, maxDepth)
-  }
-
-  def collectNodes(c: Module) {
-    for (m <- c.mods) {
-      m match {
-/* XXX deprecated?
-        case io: Bits  =>
-          if (io.dir == INPUT) {
-            inputs += m;
-          } else if (io.dir == OUTPUT) {
-            outputs += m;
-          }
- */
-        case r: Reg    => regs += r;
-        case other     =>
-      }
-    }
   }
 
   def traceableNodes: Array[Node] = io.traceableNodes;

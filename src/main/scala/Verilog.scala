@@ -1082,7 +1082,6 @@ class VerilogBackend extends Backend {
       c.findConsumers();
       ChiselError.checkpoint()
 
-      c.collectNodes(c);
       if( c.level > level ) {
         /* When a component instance instantiates different sets
          of sub-components based on its constructor parameters, the same

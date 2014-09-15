@@ -226,7 +226,6 @@ class FloBackend extends Backend {
     c.findConsumers()
     ChiselError.checkpoint()
 
-    c.collectNodes(c);
     c.findOrdering(); // search from roots  -- create omods
     renameNodes(c, c.omods);
     if (Driver.isReportDims) {
