@@ -71,10 +71,10 @@ abstract trait UsesParameters {
   def params: Parameters
 }
 
-class ProgrammerSucks extends RuntimeException
-
 class ParameterUndefinedException(field:Any, cause:Throwable=null)
   extends RuntimeException("Parameter " + field + " undefined.", cause)
+class KnobUndefinedException(field:Any, cause:Throwable=null)
+  extends RuntimeException("Knob " + field + " undefined.", cause)
 
 // Knobs are top level free variables that go into the constraint solver.
 final case class Knob[T](name:Any)
@@ -83,8 +83,17 @@ abstract class ChiselConfig {
   val topDefinitions:World.TopDefs
   val topConstraints:List[ViewSym=>Ex[Boolean]] = List( ex => ExLit[Boolean](true) )
   val knobValues:Any=>Any = {
-    case x if(false) => x
+    case x => {throw new KnobUndefinedException(x); x}
   }
+}
+
+object Dump {
+  val dump = mutable.Set[Tuple2[Any,Any]]()
+  val knobList = mutable.ListBuffer[Any]()
+  def apply[T](key:Any,value:T):T = {addToDump(key,value); value}
+  def apply[T](knob:Knob[T]):Knob[T] = {knobList += knob.name; knob}
+  def addToDump(key:Any,value:Any) = dump += ((key,value))
+  def getDump:String = dump.map(_.toString).reduce(_+"\n"+_) + "\n"
 }
 
 // objects given to the user in mask functions (site,here,up)
@@ -184,7 +193,11 @@ abstract class World(
   // evaluate an expression against this world
   def _eval[T](e:Ex[T]):T = {
     Ex.eval(e, {
-      case v:_VarKnob[_] => {_knobs += v.kname; _knobValue(v.kname)}
+      case v:_VarKnob[_] => {
+        _knobs += v.kname
+        val e = _knobValue(v.kname)
+        if(Dump.knobList.contains(v.kname)) {Dump.addToDump(v.kname,e);e} else e
+      }
       case v:_VarLet[_] => _eval(v.expr.asInstanceOf[Ex[T]])
     })
   }

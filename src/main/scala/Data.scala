@@ -142,8 +142,22 @@ abstract class Data extends Node {
   override def clone(): this.type = {
     try {
       val constructor = this.getClass.getConstructors.head
-      val res = constructor.newInstance(Array.fill(constructor.getParameterTypes.size)(null):_*)
-      res.asInstanceOf[this.type]
+      
+      if(constructor.getParameterTypes.size == 0) {
+        constructor.newInstance().asInstanceOf[this.type]
+      } else if(constructor.getParameterTypes.size == 1) {
+        val paramtype = constructor.getParameterTypes.head
+        // If only 1 arg and is a Bundle or Module then this is probably the implicit argument
+        //    added by scalac for nested classes and closures. Thus, try faking the constructor
+        //    by not supplying said class or closure (pass null).
+        // CONSIDER: Don't try to create this
+        if(classOf[Bundle].isAssignableFrom(paramtype) || classOf[Module].isAssignableFrom(paramtype)){
+          constructor.newInstance(null).asInstanceOf[this.type]
+        } else throw new Exception("Cannot auto-create constructor for ${this.getClass.getName} that requires arguments")
+      } else {
+       throw new Exception(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments")
+      }
+
     } catch {
       case npe: java.lang.reflect.InvocationTargetException if npe.getCause.isInstanceOf[java.lang.NullPointerException] =>
         throwException("Parameterized Bundle " + this.getClass + " needs clone method. You are probably using an anonymous Bundle object that captures external state and hence is un-cloneable", npe)
