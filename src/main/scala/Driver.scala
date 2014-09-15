@@ -116,14 +116,14 @@ object Driver extends FileSystemUtilities{
     // initialize BFS
     val queue = new ScalaQueue[Node]
    
-    for (a <- topComponent.debugs)
-      queue enqeue a
+    for (c <- components; a <- c.debugs)
+      queue enqueue a
     for (b <- blackboxes)
       queue enqueue b.io
-    for ((n, io) <- topComponent.io.flatten)
+    for (c <- components; (n, io) <- c.io.flatten)
       queue enqueue io
-    if (!(topComponent.defaultResetPin == null))
-      queue enqueue topComponent.defaultResetPin
+    for (c <- components; if !(c.defaultResetPin == null))
+      queue enqueue c.defaultResetPin
 
     // Do BFS
     val walked = HashSet[Node]()
