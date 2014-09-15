@@ -33,13 +33,13 @@ package FixedPoint
 import Chisel._
 
 // Defined format of numbers is 0.[raw] * 2^exp
-abstract class Fix[B<:Bits,T<:Fix[B,T]](val exp: Int, val raw: B) extends Bundle {
+abstract class Fix[B<:Bits with Num[B],T<:Fix[B,T]](val exp: Int, val raw: B) extends Bundle {
   // This type parameterization is necessary so the functions polymorph to the subclass
   def Factory(exp: Int, width: Int): T
   def toRaw(a: Bits): B
   def get_sext(source: Bits): UInt
 
-  def do_add(b: T, isSub: Boolean = false): T = {
+  def aligned_with(b: T): Tuple3[B,B,Int] = {
     val teff_exp = exp-raw.needWidth()
     val beff_exp = b.exp-b.raw.needWidth()
 
@@ -48,16 +48,38 @@ abstract class Fix[B<:Bits,T<:Fix[B,T]](val exp: Int, val raw: B) extends Bundle
     val t_adj_rd = toRaw(if(teff_exp > int_exp) Cat(  raw, UInt(0, width=teff_exp-int_exp)) else   raw)
     val b_adj_rd = toRaw(if(beff_exp > int_exp) Cat(b.raw, UInt(0, width=beff_exp-int_exp)) else b.raw)
 
-    val new_width = math.max(raw.needWidth() + teff_exp-int_exp, b.raw.needWidth() + beff_exp-int_exp)+1
+    (t_adj_rd, b_adj_rd, int_exp)
+  }
+
+  def do_addsub(b: T, isSub: Boolean = false): T = {
+    val (t_adj_rd, b_adj_rd, int_exp) = aligned_with(b)
+
+    val new_width = math.max(exp-int_exp, b.exp-int_exp)+1
+    // note: exp - int_exp = width + eff_exp-int_exp where eff_exp = exp-width
     val new_exp = int_exp + new_width
     val result = Factory(new_exp, new_width)
 
     result.raw := (if(isSub) t_adj_rd - b_adj_rd else t_adj_rd + b_adj_rd)
     result
   }
+
+  def do_lessthan(b: T): Bool = {
+    val (t_adj, b_adj, _) = aligned_with(b)
+    t_adj < b_adj
+  }
+  def do_lesseq(b: T): Bool = {
+    val (t_adj, b_adj, _) = aligned_with(b)
+    t_adj <= b_adj
+  }
+
   def do_mult(b: T): T = {
     val result = Factory(exp+b.exp,raw.needWidth()+b.raw.needWidth())
     result.raw := raw * b.raw
+    return result
+  }
+  def do_divide(b: T): T = {
+    val result = Factory(exp-b.exp,raw.needWidth())
+    result.raw := raw / b.raw
     return result
   }
   def do_truncate(source: T): Unit = {
@@ -97,8 +119,11 @@ class UFix(exp: Int, raw: UInt) extends Fix[UInt,UFix](exp, raw) with Num[UFix] 
   def toRaw(a: Bits) = a.toUInt
   def get_sext(source: Bits) = UInt(0,1)
 
-  def + (b: UFix): UFix = do_add(b)
+  def + (b: UFix): UFix = do_addsub(b)
+  def - (b: UFix): UFix = do_addsub(b, isSub=true)
   def * (b: UFix): UFix = do_mult(b)
+  def / (b: UFix): UFix = do_divide(b)
+  def unary_-(): UFix = (new UFix(exp,UInt(0))) - this
 
   override protected def colonEquals(that: Bundle): Unit = that match {
     case u: UFix => do_truncate(u)
@@ -107,15 +132,13 @@ class UFix(exp: Int, raw: UInt) extends Fix[UInt,UFix](exp, raw) with Num[UFix] 
 
   def <<(b: Int): UFix = new UFix(exp+b, raw)
   def >>(b: Int): UFix = new UFix(exp-b, raw)
+  
+  def <  (b: UFix): Bool = do_lessthan(b)
+  def <= (b: UFix): Bool = do_lesseq(b)
+  def >  (b: UFix): Bool = b.do_lessthan(this)
+  def >= (b: UFix): Bool = b.do_lesseq(this)
 
-  def unary_-(): UFix = throw new Exception("unimplemented unary -");
-  def /  (b: UFix): UFix = throw new Exception("unimplemented /");;
-  def %  (b: UFix): UFix = throw new Exception("unimplemented %");;
-  def -  (b: UFix): UFix = throw new Exception("unimplemented -");;
-  def <  (b: UFix): Bool = throw new Exception("unimplemented <");;
-  def <= (b: UFix): Bool = throw new Exception("unimplemented <=");;
-  def >  (b: UFix): Bool = throw new Exception("unimplemented >");;
-  def >= (b: UFix): Bool = throw new Exception("unimplemented >=");;
+  def %  (b: UFix): UFix = throw new Exception("% unavailable for UFix")
 }
 
 object SFix {
@@ -125,13 +148,12 @@ object SFix {
 class SFix(exp: Int, raw: SInt) extends Fix[SInt,SFix](exp, raw) with Num[SFix] {
   def Factory(exp: Int, width: Int) = SFix(exp, width)
   def toRaw(a: Bits) = a.toSInt
-  def get_sext(source: Bits) = {
-    val gotWidth = source.needWidth()
-    source(gotWidth-1,gotWidth-2)
-  }
-  def + (b: SFix): SFix = do_add(b)
-  def - (b: SFix): SFix = do_add(b, isSub=true)
+  def get_sext(source: Bits) = source(source.needWidth()-1)
+
+  def + (b: SFix): SFix = do_addsub(b)
+  def - (b: SFix): SFix = do_addsub(b, isSub=true)
   def * (b: SFix): SFix = do_mult(b)
+  def / (b: SFix): SFix = do_divide(b)
   def unary_-(): SFix = (new SFix(exp,SInt(0))) - this
 
   override protected def colonEquals(that: Bundle): Unit = that match {
@@ -141,13 +163,13 @@ class SFix(exp: Int, raw: SInt) extends Fix[SInt,SFix](exp, raw) with Num[SFix] 
 
   def <<(b: Int): SFix = new SFix(exp+b, raw)
   def >>(b: Int): SFix = new SFix(exp-b, raw)
+  
+  def <  (b: SFix): Bool = do_lessthan(b)
+  def <= (b: SFix): Bool = do_lesseq(b)
+  def >  (b: SFix): Bool = b.do_lessthan(this)
+  def >= (b: SFix): Bool = b.do_lesseq(this)
 
-  def /  (b: SFix): SFix = throw new Exception("unimplemented /");;
-  def %  (b: SFix): SFix = throw new Exception("unimplemented %");;
-  def <  (b: SFix): Bool = throw new Exception("unimplemented <");;
-  def <= (b: SFix): Bool = throw new Exception("unimplemented <=");;
-  def >  (b: SFix): Bool = throw new Exception("unimplemented >");;
-  def >= (b: SFix): Bool = throw new Exception("unimplemented >=");;
+  def %  (b: SFix): SFix = throw new Exception("% unavailable for UFix")
 }
 
 object QR {
@@ -155,7 +177,7 @@ object QR {
   def genUFix(int: Int, frac: Int) = UFix(int, int+frac)
 }
 
-/*
+
 class Toy extends Module {
   val io = new Bundle {
     val in0 = SFix(2, 4).asInput
@@ -190,4 +212,4 @@ class ToyTester(dut: Toy) extends AdvTester.AdvTester(dut) {
   println("In = %g, %g : Out = %g".format(convert(dut.io.in0), convert(dut.io.in1), convert(dut.io.out)))
   println("Raw output is: %s".format(peek(dut.io.oraw).toByteArray.map("%02X".format(_)).reduce(_+" "+_)))
 }
-*/
+

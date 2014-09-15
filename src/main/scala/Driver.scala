@@ -55,7 +55,7 @@ object Driver extends FileSystemUtilities{
 
   private def executeUnwrapped[T <: Module](gen: () => T): T = {
     if (!Driver.chiselConfigMode.isEmpty && !Driver.chiselConfigClassName.isEmpty) { 
-      val config = Class.forName(chiselConfigClassName.get).newInstance.asInstanceOf[ChiselConfig]
+      val config = Class.forName(appendString(chiselProjectName,chiselConfigClassName)).newInstance.asInstanceOf[ChiselConfig]
       val world = if(Driver.chiselConfigMode.get == "collect") new Collector(config.topDefinitions,config.knobValues) else new Instance(config.topDefinitions,config.knobValues)
       val p = Parameters.root(world)
       config.topConstraints.foreach(c => p.constrain(c))
@@ -83,6 +83,10 @@ object Driver extends FileSystemUtilities{
       Driver.backend.elaborate(c)
       if (Driver.isCheckingPorts) Driver.backend.checkPorts(c)
       if (Driver.isCompiling && Driver.isGenHarness) Driver.backend.compile(c)
+      if(Driver.chiselConfigDump && !Dump.dump.isEmpty) {
+        val w = createOutputFile(appendString(Some(topComponent.name),chiselConfigClassName) + ".prm")
+        w.write(Dump.getDump); w.close
+      }
     }
     c
   }
@@ -225,12 +229,13 @@ object Driver extends FileSystemUtilities{
         case "--backannotation" => isBackannotating = true
         case "--model" => model = args(i + 1) ; i += 1
         //Jackhammer Flags
-        case "--configCollect"  => chiselConfigMode = Some("collect"); chiselConfigClassName = Some(args(i+1)); i+=1;  //dump constraints in dse dir
-        case "--configInstance" => chiselConfigMode = Some("instance"); chiselConfigClassName = Some(args(i+1)); i+=1;  //use ChiselConfig to supply parameters
+        case "--configCollect"  => chiselConfigMode = Some("collect"); chiselConfigClassName = Some(getArg(args(i+1),1)); chiselProjectName = Some(getArg(args(i+1),0)); i+=1;  //dump constraints in dse dir
+        case "--configInstance" => chiselConfigMode = Some("instance"); chiselConfigClassName = Some(getArg(args(i+1),1)); chiselProjectName = Some(getArg(args(i+1),0)); i+=1;  //use ChiselConfig to supply parameters
+        case "--configDump" => chiselConfigDump = true; //when using --configInstance, write Dump parameters to .prm file in targetDir
         case "--dumpTestInput" => dumpTestInput = true
         case "--testerSeed" => {
           testerSeedValid = true
-          testerSeed = args(i+1).toInt
+          testerSeed = args(i+1).toLong
           i += 1
         }
         case "--emitTempNodes" => {
@@ -302,7 +307,20 @@ object Driver extends FileSystemUtilities{
   var startTime = 0L
   /* ChiselConfig flags */
   var chiselConfigClassName: Option[String] = None
+  var chiselProjectName: Option[String] = None
   var chiselConfigMode: Option[String] = None
+  var chiselConfigDump: Boolean = false
+
+  def appendString(s1:Option[String],s2:Option[String]):String = {
+    if(s1.isEmpty && s2.isEmpty) "" else {
+      if(!s1.isEmpty) {
+        s1.get + (if(!s2.isEmpty) "." + s2.get else "")
+      } else {
+        if(!s2.isEmpty) s2.get else ""
+      }
+    }
+  }
+  def getArg(s:String,i:Int):String = s.split('.')(i)
 
   // Setting this to TRUE will case the test harness to print its
   // standard input stream to a file.

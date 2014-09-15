@@ -71,20 +71,10 @@ class Bundle(view_arg: Seq[String] = null)(implicit _params:Option[Parameters] =
       val name = m.getName();
       val modifiers = m.getModifiers();
       val types = m.getParameterTypes();
+
       val rtype = m.getReturnType();
-      var isFound = false;
-      var isInterface = false;
-      var c = rtype;
-      val sc = Class.forName("Chisel.Data");
-      do {
-        if (c == sc) {
-          isFound = true; isInterface = true;
-        } else if (c == null || c == Class.forName("java.lang.Object")) {
-          isFound = true; isInterface = false;
-        } else {
-          c = c.getSuperclass();
-        }
-      } while (!isFound);
+      val isInterface = classOf[Data].isAssignableFrom(rtype);
+
       // TODO: SPLIT THIS OUT TO TOP LEVEL LIST
       if( types.length == 0 && !isStatic(modifiers) && isInterface
         && !(Bundle.keywords contains name)
