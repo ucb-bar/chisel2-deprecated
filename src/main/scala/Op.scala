@@ -413,6 +413,11 @@ class Op(val op: String) extends Node {
         val w = max(inputs(0).width, inputs(1).width)
         if (inputs(0).width != w) inputs(0) = inputs(0).matchWidth(w)
         if (inputs(1).width != w) inputs(1) = inputs(1).matchWidth(w)
+      } else if (List(">>", "s>>").contains(op)) {
+        val wl = log2Up(inputs(0).width)
+        val w = 1 << wl
+        if (inputs(0).width != w ) inputs(0) = inputs(0).matchWidth(w )
+        if (inputs(1).width != wl) inputs(1) = inputs(1).matchWidth(wl)
       }
     }
   }
