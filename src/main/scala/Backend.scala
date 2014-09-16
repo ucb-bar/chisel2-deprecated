@@ -88,6 +88,7 @@ abstract class Backend extends FileSystemUtilities{
   protected def genIndent(x: Int): String = {
     if(x == 0) "" else "    " + genIndent(x-1);
   }
+
   def sortComponents: Unit = {
     def levelChildren(root: Module, traversal: Int) {
       root.level = 0
@@ -108,6 +109,10 @@ abstract class Backend extends FileSystemUtilities{
     levelChildren(Driver.topComponent, 0)
     Driver.sortedComps = gatherChildren(Driver.topComponent).sortWith(
       (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)))
+  }
+
+  def markComponents {
+    Driver.components foreach (_.markComponent)
   }
 
   def verifyAllMuxes {
@@ -240,9 +245,9 @@ abstract class Backend extends FileSystemUtilities{
           node.component
       }
       assert(node.component != null, "NULL NODE COMPONENT " + node.name)
-      if (!(node.component.nodes contains node))
+      if (!node.isTypeNode && !(node.component.nodes contains node))
         node.component.nodes += node
-      for (input <- node.inputs) {
+      for (input <- node.inputs ; if !input.isTypeNode) {
         if (!(input.component == null || input.component == node.component) &&
             !input.isLit && !isBitsIo(input, OUTPUT) && !isBitsIo(node, INPUT) &&
             // ok if parent referring to any child nodes
@@ -255,7 +260,9 @@ abstract class Backend extends FileSystemUtilities{
         if (input.component == null) input.component = curComp
       }
     }
+  }
 
+  def checkModuleResolution {
     // check module resolution
     val comps = HashMap[Node, Module]()
     Driver.dfs { node =>
@@ -324,29 +331,23 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
-  def pruneNodes {
-    val walked = new HashSet[Node]
-    val bfsQueue = new ScalaQueue[Node]
-    for (node <- Driver.randInitIOs) bfsQueue.enqueue(node)
-    var pruneCount = 0
+  def checkPorts {
+    def prettyPrint(n: Node, c: Module) {
+      val dir = if (n.asInstanceOf[Bits].dir == INPUT) "Input" else "Output"
+      val portName = n.name
+      val compName = c.name
+      val compInstName = c.moduleName
+      ChiselError.warning(dir + " port " + portName
+        + " is unconnected in module " + compInstName + " " + compName)
+    }
 
-    // conduct bfs to find all reachable nodes
-    while(!bfsQueue.isEmpty){
-      val top = bfsQueue.dequeue
-      walked += top
-      val prune = top.inputs.map(_.prune).foldLeft(true)(_ && _)
-      pruneCount+= (if (prune) 1 else 0)
-      top.prune = prune
-      for(i <- top.consumers) {
-        if(!(i == null)) {
-          if(!walked.contains(i)) {
-            bfsQueue.enqueue(i)
-            walked += i
-          }
+    for (c <- Driver.components ; if c != Driver.topComponent) {
+      for ((n,i) <- c.io.flatten) {
+        if (i.inputs.length == 0) {          
+          prettyPrint(i, c)
         }
       }
     }
-    ChiselError.warning("Pruned " + pruneCount + " nodes due to unconnected inputs")
   }
 
   def emitDef(node: Node): String = ""
@@ -677,27 +678,32 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
+  /** Prints the call stack of Component as seen by the push/pop runtime. */
+  protected def printStack {
+    var res = ""
+    for((i, c) <- Driver.printStackStruct){
+      res += (genIndent(i) + c.moduleName + " " + c.name + "\n")
+    }
+    ChiselError.info(res)
+  }
+
+
   def elaborate(c: Module): Unit = {
     execute(c, preElaborateTransforms)
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
-    Driver.components foreach (_.markComponent)
+    markComponents
     sortComponents
-    verifyAllMuxes
 
-    ChiselError.info("giving names")
     // Before giving names to temporary nodes
     // they need to resolve modules
     collectNodesIntoComp
+    ChiselError.info("giving names")
     nameAll
     ChiselError.checkpoint()
 
     if (!transforms.isEmpty) {
-      inferAll
-      lowerNodes
       ChiselError.info("executing custom transforms")
       execute(c, transforms)
-      sortComponents
-      verifyAllMuxes
       ChiselError.checkpoint()
     }
 
@@ -716,6 +722,7 @@ abstract class Backend extends FileSystemUtilities{
     lowerNodes
     ChiselError.info("removing type nodes")
     val nbNodes = removeTypeNodes
+    ChiselError.info("compiling %d nodes".format(nbNodes))
     ChiselError.checkpoint()
 
     /* *collectNodesIntoComp* associates components to nodes that were
@@ -732,6 +739,7 @@ abstract class Backend extends FileSystemUtilities{
 
     ChiselError.info("resolving nodes to the components")
     collectNodesIntoComp
+    checkModuleResolution
 
     ChiselError.info("computing memory ports")
     computeMemPorts
@@ -750,63 +758,38 @@ abstract class Backend extends FileSystemUtilities{
         if (node.isInstanceOf[Reg])
           createClkDomain(node, clkDomainWalkedNodes)
 
+    verifyAllMuxes
     collectNodes
     ChiselError.checkpoint()
 
-    execute(c, analyses)
-
-    for (comp <- Driver.sortedComps ) {
+    ChiselError.info("pruning unconnected IOs")
+    for (comp <- Driver.sortedComps) {
       // remove unconnected outputs
       pruneUnconnectedIOs(comp)
     }
 
+    if (Driver.isCheckingPorts) {
+      ChiselError.info("checking for unconnected ports")
+      checkPorts
+    }
+
     ChiselError.checkpoint()
 
-    if(!Driver.dontFindCombLoop) {
+    if (!Driver.dontFindCombLoop) {
       ChiselError.info("checking for combinational loops")
       findCombLoop
       ChiselError.checkpoint()
       ChiselError.info("NO COMBINATIONAL LOOP FOUND")
     }
+
     if (Driver.saveComponentTrace) {
       printStack
     }
+
+    execute(c, analyses)
   }
 
   def compile(c: Module, flags: String = null): Unit = { }
-
-  def checkPorts(topC: Module) {
-
-    def prettyPrint(n: Node, c: Module) {
-      val dir = if (n.asInstanceOf[Bits].dir == INPUT) "Input" else "Output"
-      val portName = n.name
-      val compName = c.name
-      val compInstName = c.moduleName
-      ChiselError.warning(dir + " port " + portName
-        + " is unconnected in module " + compInstName + " " + compName)
-    }
-
-    for (c <- Driver.components) {
-      if (c != topC) {
-        for ((n,i) <- c.io.flatten) {
-          if (i.inputs.length == 0) {
-            prettyPrint(i, c)
-          }
-        }
-      }
-    }
-
-  }
-
-  /** Prints the call stack of Component as seen by the push/pop runtime. */
-  protected def printStack {
-    var res = ""
-    for((i, c) <- Driver.printStackStruct){
-      res += (genIndent(i) + c.moduleName + " " + c.name + "\n")
-    }
-    ChiselError.info(res)
-  }
-
 }
 
 

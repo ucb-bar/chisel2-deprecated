@@ -81,7 +81,6 @@ object Driver extends FileSystemUtilities{
     if (chiselConfigMode == None || chiselConfigMode.get == "instance") { 
       setTopComponent(c)
       backend.elaborate(c)
-      if (isCheckingPorts) backend.checkPorts(c)
       if (isCompiling && isGenHarness) backend.compile(c)
       if(chiselConfigDump && !Dump.dump.isEmpty) {
         val w = createOutputFile(appendString(Some(topComponent.name),chiselConfigClassName) + ".prm")
@@ -229,7 +228,6 @@ object Driver extends FileSystemUtilities{
     hasMem = false
     backend = new CppBackend
     topComponent = null
-    randInitIOs.clear()
     clocks.clear()
     implicitReset = Bool(INPUT)
     implicitReset.isIo = true
@@ -361,7 +359,6 @@ object Driver extends FileSystemUtilities{
   val parStack = new Stack[Parameters]
   var stackIndent = 0
   val printStackStruct = ArrayBuffer[(Int, Module)]()
-  val randInitIOs = ArrayBuffer[Node]()
   val clocks = ArrayBuffer[Clock]()
   var implicitReset: Bool = null
   var implicitClock: Clock = null
