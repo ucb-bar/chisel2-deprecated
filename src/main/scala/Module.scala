@@ -166,7 +166,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def hasWhenCond: Boolean = !whenConds.isEmpty
   def whenCond: Bool = if (hasWhenCond) whenConds.top else trueCond
 
-  val nodes = new ArrayBuffer[Node]
+  val nodes = new LinkedHashSet[Node]
   val mods = new ArrayBuffer[Node];
   val omods = new ArrayBuffer[Node];
   val signals = new LinkedHashSet[Node]
