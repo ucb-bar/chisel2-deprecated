@@ -208,7 +208,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     _reset = r
   }
   def reset_=() {
-    _reset = parent._reset
+    if(parent != null)
+      _reset = parent._reset
+	else
+	  _reset = Driver.implicitReset
   }
 
   override def toString = this.getClass.toString
@@ -480,20 +483,24 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   // clock is chosen to be the component's clock if delay does not specify a clock
   // reset is chosen to be 
   //          component's explicit reset
-  //          delay's explicit clock's reset
-  //          component's clock's reset
+  //          delay's explicit or inferred clock's reset
   def addClockAndReset {
     bfs { _ match {
         case x: Delay =>
           val clock = if (x.clock == null) x.component.clock else x.clock
+          val clockingSource = clock.getClockingSource()
           val reset =
-            if (x.component.hasExplicitReset) x.component._reset
-            else if (x.clock != null) x.clock.getReset
-            else if (x.component.hasExplicitClock) x.component.clock.getReset
-            else x.component._reset
-          x.assignReset(x.component.addResetPin(reset))
-          x.assignClock(clock)
-          x.component.addClock(clock)
+            if (x.component.hasExplicitReset) x.component._reset //legacy hasExplicitReset ?
+            else clock.getReset
+
+          if(x.component != clock.component){
+            x.assignReset(x.component.addResetPin(reset))
+          } else {
+            x.assignReset(reset) //Don't add reset pin for module who create the clock
+          }  
+          
+          x.assignClock(clockingSource)
+          x.component.addClock(clockingSource)
         case _ =>
       }
     }

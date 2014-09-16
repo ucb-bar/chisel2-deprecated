@@ -263,6 +263,8 @@ abstract class Backend extends FileSystemUtilities{
     node match {
       case r: Reg =>
         if (r.name == "") "R" + r.emitIndex else r.name
+      case c: Clock => 
+        c.getClockingSource().name
       case _ =>
         if(node.name == "") {
           "T" + node.emitIndex

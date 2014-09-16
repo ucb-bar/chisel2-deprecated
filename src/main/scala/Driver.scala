@@ -108,10 +108,10 @@ object Driver extends FileSystemUtilities{
 
   def setTopComponent(mod: Module): Unit = {
     topComponent = mod
-    implicitReset.component = Driver.topComponent
-    implicitClock.component = Driver.topComponent
-    topComponent.reset = Driver.implicitReset
-    topComponent.hasExplicitReset = true
+    //implicitReset.component = Driver.topComponent
+    //implicitClock.component = Driver.topComponent
+    //topComponent.reset = Driver.implicitReset
+    //topComponent.hasExplicitReset = true
     topComponent.clock = Driver.implicitClock
     topComponent.hasExplicitClock = true    
   }
@@ -150,7 +150,7 @@ object Driver extends FileSystemUtilities{
     implicitReset = Bool(INPUT)
     implicitReset.isIo = true
     implicitReset.setName("reset")
-    implicitClock = new Clock()
+    implicitClock = new Clock(implicitReset)
     implicitClock.setName("clk")
     nodes.clear()
     isInGetWidth = false
