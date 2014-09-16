@@ -301,10 +301,7 @@ class CppBackend extends Backend {
             res += s"val_t __r = ${bpw} - __s"
             for (i <- 0 until words(o)) {
               val inputWord = wordMangle(o.inputs(0), s"CLAMP(${i}-__w, 0, ${words(o.inputs(0)) - 1})")
-              if (Driver.isDebug == true)
-                res += s"val_t __v${i} = MASK(${inputWord}, (${i} >= __w) & (${i} < __w + ${words(o.inputs(0))}))"
-              else
-                res += s"val_t __v${i} = MASK(${inputWord}.values[0], (${i} >= __w) & (${i} < __w + ${words(o.inputs(0))}))"
+              res += s"val_t __v${i} = MASK(${inputWord}, (${i} >= __w) & (${i} < __w + ${words(o.inputs(0))}))"
               res += s"${emitWordRef(o, i)} = __v${i} << __s | __c"
               res += s"__c = MASK(__v${i} >> __r, __s != 0)"
             }
