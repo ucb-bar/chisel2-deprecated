@@ -46,13 +46,14 @@ class Snapshot(val t: Int) {
 }
 
 class ManualTester[+T <: Module]
-    (val c: T, val isTrace: Boolean = true) {
+    (val c: T, val isT: Boolean = true) {
   var testIn:  InputStream  = null
   var testOut: OutputStream = null
   var testErr: InputStream  = null
   val sb = new StringBuilder()
   var delta = 0
   var t = 0
+  var isTrace = isT
 
   /**
    * Waits until the emulator streams are ready. This is a dirty hack related
