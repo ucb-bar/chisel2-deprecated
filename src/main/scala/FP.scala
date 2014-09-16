@@ -37,8 +37,12 @@ import ChiselError._
 import java.lang.Float.floatToIntBits
 
 object Flo {
-  def apply(x: Float): Flo = Lit(floatToIntBits(x), 32){ Flo() }
-  def apply(x: Double): Flo = Flo(x.toFloat);
+  def apply(x: Float): Flo = {
+    Lit(floatToIntBits(x), 32){ Flo() }
+  }
+  def apply(x: Double): Flo = {
+    Flo(x.toFloat);
+  }
   
   def apply(dir: IODirection = null): Flo = {
     val res = new Flo();
@@ -55,9 +59,9 @@ class Flo extends Bits with Num[Flo] {
 
   type T = Flo;
   override def fromNode(n: Node): this.type = {
-    val res = Flo(OUTPUT).asInstanceOf[this.type]; 
-    res assign n; 
-    res};
+    val res = Flo(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
+    res
+  }
 
   override def fromInt(x: Int): this.type = {
     Flo(x.toFloat).asInstanceOf[this.type]

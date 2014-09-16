@@ -221,7 +221,11 @@ abstract class Node extends nameable {
   def litValue(default: BigInt = BigInt(-1)): BigInt =
     if (isLit) litOf.value
     else default
-  def floLitValue: Float = intBitsToFloat(litValue().toInt)
+  def floLitValue: Float = {
+      val lv = litValue()
+      val iv = lv.toInt
+      intBitsToFloat(iv)
+    }
   def dblLitValue: Double = longBitsToDouble(litValue().toLong)
   // TODO: MOVE TO WIRE
   def assign(src: Node): Unit = throw new Exception("unimplemented assign")
