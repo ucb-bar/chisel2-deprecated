@@ -69,11 +69,11 @@ abstract class Data extends Node {
   }
 
   def toBool(): Bool = {
-    if(this.getWidth > 1) {
-      throw new Exception("multi bit signal " + this + " converted to Bool");
-    }
-    if(this.getWidth == -1) {
+    val gotWidth = this.getWidth()
+    if( gotWidth < 1) {
       throw new Exception("unable to automatically convert " + this + " to Bool, convert manually instead")
+    } else if(gotWidth > 1) {
+      throw new Exception("multi bit signal " + this + " converted to Bool");
     }
     chiselCast(this){Bool()};
   }
@@ -111,8 +111,10 @@ abstract class Data extends Node {
     var ind = 0
     for ((name, io) <- res.flatten.reverse) {
       io.asOutput()
-      io assign NodeExtract(n, ind + io.getWidth-1, ind)
-      ind += io.getWidth
+      val gotWidth = io.getWidth()
+      val assignWidth = if (gotWidth > 0) ind + gotWidth - 1 else -1
+      io assign NodeExtract(n, assignWidth, ind)
+      ind += (if (gotWidth > 0) gotWidth else 0)
     }
     res.setIsTypeNode
     res
@@ -172,10 +174,6 @@ abstract class Data extends Node {
     } else {
       super.nameIt(path, isNamingIo)
     }
-  }
-
-  def setWidth(w: Int) {
-    this.width = w;
   }
 
   val params = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top

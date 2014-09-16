@@ -38,7 +38,7 @@ class GetWidthException(s: String) extends Exception(s)
 
 object Reg {
 
-  def regMaxWidth(m: Node) =
+  def regMaxWidth(m: => Node) =
     if (Driver.isInGetWidth) {
       throw new GetWidthException("getWidth was called on a Register or on an object connected in some way to a Register that has a statically uninferrable width")
     } else {
@@ -46,11 +46,21 @@ object Reg {
     }
 
   // Rule: If no width is specified, use max width. Otherwise, use the specified width.
-  def regWidth(w: Int) =
-    if(w <= 0) {
+/*
+    The (implicit d: DummyImplicit) is to avoid the conflict with the
+    above regWidth(w: => Width) method:
+	  double definition:
+	  method regWidth:(r: => Chisel.Node)(=> Chisel.Node) => Chisel.Width and
+	  method regWidth:(w: => Chisel.Width)(=> Chisel.Node) => Chisel.Width at line 49
+	  have same type after erasure: (r: Function0)Function1
+	  def regWidth(r: => Node) = {
+  */
+
+  def regWidth(w: => Width)(implicit d: DummyImplicit) =
+    if (! w.isKnown) {
       regMaxWidth _ ;
     } else {
-      fixWidth(w)
+      fixWidth(w.needWidth())	 // TODO 0WW
     }
 
   /** Rule: if r is using an inferred width, then don't enforce a width. If it is using a user inferred
@@ -59,7 +69,7 @@ object Reg {
     XXX Can't specify return type. There is a conflict. It is either
     (Node) => (Int) or Int depending which execution path you believe.
     */
-  def regWidth(r: Node) = {
+  def regWidth(r: => Node) = {
     val rLit = r.litOf
     if (rLit != null && rLit.hasInferredWidth) {
       regMaxWidth _
@@ -104,7 +114,8 @@ object Reg {
       res_i.inputs += res_i.comp
     } else for ((res_n, res_i) <- res.flatten) {
       res_i.comp = new Reg
-      res_i.comp.init("", regWidth(res_i.getWidth), res_i.comp)
+      val w = res_i.getWidthW()
+      res_i.comp.init("", regWidth(w), res_i.comp)
       res_i.inputs += res_i.comp
     }
 
@@ -157,7 +168,7 @@ class Reg extends Delay with proc {
   }
 
   override def forceMatchingWidths: Unit =
-    inputs.transform(_.matchWidth(width))
+    inputs.transform(_.matchWidth(widthW))
 
   override def usesInClockHi(n: Node) = n eq next
 

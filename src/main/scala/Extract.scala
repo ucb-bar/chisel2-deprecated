@@ -44,7 +44,10 @@ object NodeExtract {
       ChiselError.error("Extract(hi = " + hi + ", lo = " + lo + ") requires hi >= lo")
     val w = if (width == -1) hi - lo + 1 else width
     val bits_lit = mod.litOf
-    if (lo == 0 && w == mod.width) {
+    // Currently, we don't restrict literals to their width,
+    // so we can't use the literal directly if it overflows its width.
+    val wmod = mod.widthW
+    if (lo == 0 && wmod.isKnown && w == wmod.needWidth()) {
       mod
     } else if (bits_lit != null) {
       Literal((bits_lit.value >> lo) & ((BigInt(1) << w) - BigInt(1)), w)
@@ -68,9 +71,9 @@ object NodeExtract {
     }
   }
 
-  private def makeExtract(mod: Node, hi: Node, lo: Node, width: (Node) => Int) = {
+  private def makeExtract(mod: Node, hi: Node, lo: Node, widthFunc: (=> Node) => Width) = {
     val res = new Extract
-    res.init("", width, mod, hi, lo)
+    res.init("", widthFunc, mod, hi, lo)
     res.hi = hi
     res.lo = lo
     res
@@ -111,9 +114,10 @@ class Extract extends Node {
 
   def validateIndex(x: Node) {
     val lit = x.litOf
-    assert(lit == null || lit.value >= 0 && lit.value < inputs(0).width,
+    val w0 = inputs(0).widthW
+    assert(lit == null || lit.value >= 0 && lit.value < w0.needWidth(),
            ChiselError.error("Extract(" + lit.value + ")" +
-                    " out of range [0," + (inputs(0).width-1) + "]" +
+                    " out of range [0," + (w0.needWidth()-1) + "]" +
                     " of " + inputs(0), line))
   }
 

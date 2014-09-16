@@ -73,7 +73,7 @@ object Module {
     for ((n, io) <- res.wires) {
       if (io.dir == null)
          ChiselErrors += new ChiselError(() => {"All IO's must be ports (dir set): " + io}, io.line)
-      // else if (io.width_ == -1)
+      // else if (! io.isKnownWidth)
       //   ChiselErrors += new ChiselError(() => {"All IO's must have width set: " + io}, io.line)
       io.isIo = true
     }
@@ -403,7 +403,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     def verify {
       var hasError = false
       for (elm <- nodesList) {
-        if (elm.infer || elm.width == -1) {
+        if (elm.infer || ! elm.isKnownWidth ) {
           ChiselError.error("Could not infer the width on: " + elm)
           hasError = true
         }
@@ -573,7 +573,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     val hist = new HashMap[String, Int]
     for (m <- imods) {
       mhist(m.component.toString) = 1 + mhist.getOrElse(m.component.toString, 0)
-      whist(m.width) = 1 + whist.getOrElse(m.width, 0)
+      val w = m.needWidth()
+      whist(w) = 1 + whist.getOrElse(w, 0)
       val name = m match {
         case op: Op => op.op
         case o      => {

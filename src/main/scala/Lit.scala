@@ -267,7 +267,7 @@ class Literal extends Node {
   override def canCSE: Boolean = true
   override def hashCodeForCSE: Int = value.toInt
   override def equalsForCSE(x: Node): Boolean = x match {
-    case x: Literal => value == x.value && isZ == x.isZ && width == x.width
+    case x: Literal => value == x.value && isZ == x.isZ && widthW == x.widthW
     case _ => false
   }
 }

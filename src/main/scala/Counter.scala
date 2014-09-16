@@ -33,6 +33,8 @@ package Chisel
 import scala.collection.mutable.HashMap
 import scala.math.pow
 
+import Node._
+
 trait CounterBackend extends Backend {
   val firedPins = new HashMap[Module, Bool]
   val daisyIns = new HashMap[Module, UInt]
@@ -314,7 +316,7 @@ trait CounterBackend extends Backend {
       val m = queue.dequeue
 
       for (signal <- m.signals) {
-        val signalWidth = signal.width
+        val signalWidth = signal.needWidth()
         val signalValue = 
           if (decoupledPins contains signal) decoupledPins(signal) 
           else UInt(signal)
@@ -333,7 +335,7 @@ trait CounterBackend extends Backend {
           } else {
             val buffer = Reg(UInt(width = signalWidth))
             val xor = signalValue ^ buffer
-            xor.inferWidth = (x: Node) => signalWidth
+            xor.inferWidth = fixWidth(signalWidth)
             val hd = PopCount(xor)
             addReg(m, buffer, "buffer_%d".format(signal.cntrIdx), 
               Map(firedPins(m) -> signalValue)
@@ -453,7 +455,7 @@ abstract class CounterTester[+T <: Module](c: T, isTrace: Boolean = true) extend
     super.reset(n)
     if (t >= 1) {
       // reset prevPeeks
-      for (signal <- Driver.signals ; if signal.width > 1) {
+      for (signal <- Driver.signals ; if signal.needWidth() > 1) {
         prevPeeks(signal) = 0
       }
     }
@@ -539,7 +541,7 @@ abstract class CounterTester[+T <: Module](c: T, isTrace: Boolean = true) extend
     for (i <- 0 until n) {
       for (signal <- Driver.signals) {
         val curPeek = peekBits(signal)
-        if (signal.width == 1) {
+        if (signal.needWidth() == 1) {
           // increment by the signal's value
           counts(signal) += curPeek
         } else {
@@ -575,7 +577,7 @@ abstract class CounterTester[+T <: Module](c: T, isTrace: Boolean = true) extend
   }
 
   // initialization
-  for (signal <- Driver.signals ; if signal.width > 1) {
+  for (signal <- Driver.signals ; if signal.needWidth() > 1) {
     prevPeeks(signal) = 0
   }
 }

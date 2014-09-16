@@ -124,7 +124,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
     if (seqRead && Driver.isDebugMem) {
       // generate bogus data when reading & writing same address on same cycle
       val random16 = LFSR16()
-      val random_data = Cat(random16, Array.fill((width-1)/16){random16}:_*)
+      val random_data = Cat(random16, Array.fill((needWidth()-1)/16){random16}:_*)
       doWrite(Reg(next=addr), Reg(next=cond), Reg(next=data), null.asInstanceOf[UInt])
       doWrite(addr, cond, random_data, null.asInstanceOf[UInt])
     } else {
@@ -187,7 +187,7 @@ abstract class MemAccess(val mem: Mem[_], addri: Node) extends Node {
   def getPortType: String
 
   override def forceMatchingWidths =
-    if (addr.width != log2Up(mem.n)) inputs(0) = addr.matchWidth(log2Up(mem.n))
+    if (addr.needWidth() != log2Up(mem.n)) inputs(0) = addr.matchWidth(Width(log2Up(mem.n)))
 }
 
 class MemRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
@@ -207,7 +207,7 @@ class MemSeqRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
   override def cond = if (inputs.length > 3) inputs(3) else null
 
   override def forceMatchingWidths = {
-    inputs += addrReg.updateValue.matchWidth(log2Up(mem.n))
+    inputs += addrReg.updateValue.matchWidth(Width(log2Up(mem.n)))
     inputs += addrReg.enableSignal
   }
 
@@ -243,8 +243,8 @@ class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) 
 
   override def forceMatchingWidths = {
     super.forceMatchingWidths
-    inputs(2) = inputs(2).matchWidth(mem.width)
-    if (isMasked) inputs(3) = inputs(3).matchWidth(mem.width)
+    inputs(2) = inputs(2).matchWidth(mem.widthW)
+    if (isMasked) inputs(3) = inputs(3).matchWidth(mem.widthW)
   }
 
   var pairedRead: MemSeqRead = null

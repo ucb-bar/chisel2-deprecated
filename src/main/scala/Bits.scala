@@ -287,20 +287,24 @@ abstract class Bits extends Data with proc {
   override def clone: this.type = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
     res.inferWidth = this.inferWidth
-    res.width_ = this.width_;
+    res.width_ = this.width_.clone()
     res.dir = this.dir;
     res
   }
 
   override def forceMatchingWidths {
-    if(inputs.length == 1 && inputs(0).width != width) {
-      inputs(0) = inputs(0).matchWidth(width)
+    if(inputs.length == 1 && inputs(0).widthW != widthW) {
+      inputs(0) = inputs(0).matchWidth(widthW)
     }
   }
 
-  override def matchWidth(w: Int): Node =
-    if (isLit && !litOf.isZ) Literal(litOf.value & ((BigInt(1) << w)-1), w)
+  override def matchWidth(w: Width): Node = {
+    if (w.isKnown && isLit && !litOf.isZ) {
+      val wi = w.needWidth()   // TODO 0WW
+      Literal(litOf.value & ((BigInt(1) << wi)-1), wi)
+    }
     else super.matchWidth(w)
+  }
 
   // Operators
   protected final def newUnaryOp(opName: String): this.type = {

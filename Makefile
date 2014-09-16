@@ -19,7 +19,7 @@ smoke:
 publish-local:
 	$(SBT) $(SBT_FLAGS) publish-local
 
-check:
+check test:
 	$(SBT) $(SBT_FLAGS) scct:test
 
 clean:
