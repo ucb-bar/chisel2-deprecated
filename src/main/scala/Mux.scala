@@ -95,27 +95,12 @@ object isLessThan {
 
 object Mux {
   def apply[T<:Data](cond: Bool, tc: T, fc: T): T = {
-    // TODO: Replace this runtime check with compiletime check
-    val ancestor =  if(tc.getClass.isAssignableFrom(fc.getClass)) tc else
-                    if(fc.getClass.isAssignableFrom(tc.getClass)) fc else
-                      throw new Exception(s"For Mux, tc(${tc.getClass}) or fc(${fc.getClass}) must directly descend from the other.")
-    Mux[T,T,T](ancestor.clone, cond, tc, fc)
-  }
-
-  // Some special cases to reduce verbosity for certain operations
-  //   This should be cleaned up later ... using imports and type classes perhaps?
-  //   as that would allow the Chisel user to decide which cases they want
-  def apply(cond: Bool, tc: SInt, fc: SInt): SInt = {
-    Mux(SInt(), cond, tc, fc)
-  }
-  def apply(cond: Bool, tc: UInt, fc: UInt): UInt = {
-    Mux(UInt(), cond, tc, fc)
-  }
-  def apply(cond: Bool, tc: Bool, fc: Bool): Bool = {
-    Mux(Bool(), cond, tc, fc)
-  }
-  def apply(cond: Bool, tc: Bits, fc: Bits): Bits = {
-    Mux(UInt(): Bits, cond, tc, fc)
+    // TODO: Replace this runtime check with compiletime check using type classes and imports to add special cases
+    val target = if(tc.getClass.isAssignableFrom(fc.getClass)) tc.clone else
+                 if(fc.getClass.isAssignableFrom(tc.getClass)) fc.clone else
+                 if(classOf[Bits].isAssignableFrom(tc.getClass) && classOf[Bits].isAssignableFrom(fc.getClass)) UInt().asInstanceOf[T] else
+                   throw new Exception(s"For Mux, tc(${tc.getClass}) or fc(${fc.getClass}) must directly descend from the other. (Or both descend from Bits)")
+    Mux[T,T,T](target, cond, tc, fc)
   }
 
   // THIS IS THE MAIN MUX CONSTRUCTOR
