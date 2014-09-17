@@ -76,7 +76,7 @@ class CppBackend extends Backend {
   // Suppress generation of the monolithic .cpp file if we're compiling
   // multiple files.
   // NOTE: For testing purposes, we may want to generate this file anyway.
-  val suppressMonolithicCppFile = !compileMultipleCppFiles  /* || true */
+  val suppressMonolithicCppFile = compileMultipleCppFiles  /* || false */
   // Compile the clone method at -O0
   val cloneCompiledO0 = true
   // Define shadow registers in the circuit object, instead of local registers in the clock hi methods.
@@ -932,11 +932,13 @@ class CppBackend extends Backend {
       var done = false
       val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName) 
       val name = n + suffix + ".cpp"
+      val hfilename = n + ".h"
       var fileWriter = createOutputFile(name)
-        fileWriter.write("#include \"" + c.name + ".h\"\n")
-        for (str <- Driver.includeArgs) fileWriter.write("#include \"" + str + "\"\n")
-        fileWriter.write("\n")
-        lines = 3
+      fileWriter.write("#include \"" + hfilename + "\"\n")
+      for (str <- Driver.includeArgs) fileWriter.write("#include \"" + str + "\"\n")
+      fileWriter.write("\n")
+      lines = 3
+
 
       def write(s: String) {
         lines += s.count(_ == '\n')

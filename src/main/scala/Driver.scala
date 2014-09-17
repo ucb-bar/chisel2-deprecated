@@ -275,7 +275,7 @@ object Driver extends FileSystemUtilities{
         case "--noIoDebug" => isIoDebug = false
         case "--vcd" => isVCD = true
         case "--vcdMem" => isVCDMem = true
-        case "--v" => backend = new VerilogBackend
+        case "--v" => backendName = "v"
         case "--moduleNamePrefix" => Backend.moduleNamePrefix = args(i + 1); i += 1
         case "--inlineMem" => isInlineMem = true
         case "--noInlineMem" => isInlineMem = false
