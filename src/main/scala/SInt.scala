@@ -52,28 +52,40 @@ class SInt extends Bits with Num[SInt] {
   /** Factory method to create and assign a *SInt* type to a Node *n*.
     */
   override def fromNode(n: Node): this.type = {
-    SInt(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
+    val res = SInt(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
+    // NOTE: we do not inherit/clone the width.
+    // Doing so breaks code in NodeFill()
+    // res.width_ = n.width_.clone()
+    res
   }
 
   override def fromInt(x: Int): this.type = {
     SInt(x).asInstanceOf[this.type]
   }
 
-  override def matchWidth(w: Int): Node = {
-    if (w > this.width) {
-      if (this.width == 1) {
-        val res = NodeFill(w, this); res.infer
+  override def matchWidth(w: Width): Node = {
+    val this_width = this.widthW
+    if (w.isKnown && this_width.isKnown) {
+      val my_width = this_width.needWidth()
+      val match_width = w.needWidth()
+      if (match_width > my_width) {
+        if (my_width == 1) {
+          val res = NodeFill(match_width, this); res.infer
+          res
+        } else {
+          val topBit = NodeExtract(this, my_width-1); topBit.infer
+          val fill = NodeFill(match_width - my_width, topBit); fill.infer
+          val res = Concatenate(fill, this); res.infer
+          res
+        }
+      } else if (match_width < my_width) {
+        val res = NodeExtract(this, match_width-1,0); res.infer
         res
       } else {
-        val topBit = NodeExtract(this, this.width-1); topBit.infer
-        val fill = NodeFill(w - this.width, topBit); fill.infer
-        val res = Concatenate(fill, this); res.infer
-        res
+        this
       }
-    } else if (w < this.width) {
-      val res = NodeExtract(this, w-1,0); res.infer
-      res
     } else {
+      ChiselError.error("SInt.matchWidth with unknown width: " + w + ", node " + this);
       this
     }
   }

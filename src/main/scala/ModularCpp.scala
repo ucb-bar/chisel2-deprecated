@@ -228,7 +228,7 @@ class ModularCppBackend extends CppBackend {
     for (cc <- Driver.components; p <- cc.printfs)
       out_c.write("#if __cplusplus >= 201103L\n"
         + "  if (" + emitLoWordRef(p.cond)
-        + ") dat_fprintf<" + p.width + ">(f, "
+        + ") dat_fprintf<" + p.needWidth() + ">(f, "
         + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
         + ");\n"
         + "#endif\n")

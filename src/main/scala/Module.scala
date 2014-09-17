@@ -73,7 +73,7 @@ object Module {
     for ((n, io) <- res.wires) {
       if (io.dir == null)
          ChiselErrors += new ChiselError(() => {"All IO's must be ports (dir set): " + io}, io.line)
-      // else if (io.width_ == -1)
+      // else if (! io.isKnownWidth)
       //   ChiselErrors += new ChiselError(() => {"All IO's must have width set: " + io}, io.line)
       io.isIo = true
     }
@@ -362,22 +362,16 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       walked += top
       visit(top)
       top match {
-        case b: Bundle =>
-          for ((n, io) <- b.flatten; 
-          if !(io == null) && !(walked contains io) && io.component == this) {
-            stack push io
-            walked += io
-          }
         case v: Vec[_] => 
           for ((n, e) <- v.flatten; 
-          if !(e == null) && !(walked contains e) && e.component == this) {
+          if !(e == null) && !(walked contains e) && !e.isIo) {
             stack push e
             walked += e
           }
         case _ =>
       }
       for (i <- top.inputs; 
-      if !(i == null) && !(walked contains i) && i.component == this) {
+      if !(i == null) && !(walked contains i) && !i.isIo) {
         stack push i
         walked += i
       }
@@ -460,7 +454,8 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     val hist = new HashMap[String, Int]
     for (m <- imods) {
       mhist(m.component.toString) = 1 + mhist.getOrElse(m.component.toString, 0)
-      whist(m.width) = 1 + whist.getOrElse(m.width, 0)
+      val w = m.needWidth()
+      whist(w) = 1 + whist.getOrElse(w, 0)
       val name = m match {
         case op: Op => op.op
         case o      => {

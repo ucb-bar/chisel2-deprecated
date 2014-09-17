@@ -104,10 +104,10 @@ object BinaryOp {
   }
 
   // width inference functions for signed-unsigned operations
-  private def mulSUWidth(x: Node) = sumWidth(x) - 1
-  private def divUSWidth(x: Node) = widthOf(0)(x) - 1
-  private def modUSWidth(x: Node) = x.inputs(1).width.min(x.inputs(0).width - 1)
-  private def modSUWidth(x: Node) = x.inputs(0).width.min(x.inputs(1).width - 1)
+  private def mulSUWidth(x: => Node) = sumWidth(x) - 1
+  private def divUSWidth(x: => Node) = widthOf(0)(x) - 1
+  private def modUSWidth(x: => Node) = x.inputs(1).needWidth().min(x.inputs(0).needWidth() - 1)
+  private def modSUWidth(x: => Node) = x.inputs(0).needWidth().min(x.inputs(1).needWidth() - 1)
 }
 
 
@@ -148,7 +148,7 @@ object ReductionOp {
 }
 
 object Op {
-  def apply (name: String, widthInfer: (Node) => Int, a: Node, b: Node): Node = {
+  def apply (name: String, widthInfer: (=> Node) => Width, a: Node, b: Node): Node = {
     val (a_lit, b_lit) = (a.litOf, b.litOf)
     if (a_lit != null) name match {
       case "==" => if (a_lit.isZ) return zEquals(b, a)
@@ -161,8 +161,8 @@ object Op {
       case "!=" => if (b_lit.isZ) return !zEquals(a, b)
       case _ => ;
     }
-    if (a_lit != null && b_lit != null) {
-      val (aw, bw) = (a_lit.width, b_lit.width);
+    if (a_lit != null && b_lit != null && a_lit.isKnownWidth && b_lit.isKnownWidth) {
+      val (aw, bw) = (a_lit.needWidth(), b_lit.needWidth());
       val (av, bv) = (a_lit.value, b_lit.value);
       name match {
         case "==" => return Literal(if (av == bv) 1 else 0)
@@ -333,12 +333,13 @@ object Op {
     res.init("", widthInfer, a, b);
     res
   }
-  def apply (name: String, widthInfer: (Node) => Int, a: Node): Node = {
+  def apply (name: String, widthInfer: (=> Node) => Width, a: Node): Node = {
       if (a.litOf != null) {
         if (a.litOf.isZ)
           ChiselError.error({"Operator " + name + " with input " + a + " does not support literals with ?"});
+        val wa = a.litOf.needWidth()
         name match {
-          case "~" => return Literal((-a.litOf.value-1)&((BigInt(1) << a.litOf.width)-1), a.litOf.width);
+          case "~" => return Literal((-a.litOf.value-1)&((BigInt(1) << wa)-1), wa);
           case _ => ;
         }
       }
@@ -406,12 +407,17 @@ class Op(val op: String) extends Node {
   override def forceMatchingWidths {
     if (inputs.length == 2) {
       if (List("|", "&", "^", "+", "-").contains(op)) {
-        if (inputs(0).width != width) inputs(0) = inputs(0).matchWidth(width)
-        if (inputs(1).width != width) inputs(1) = inputs(1).matchWidth(width)
+        if (inputs(0).widthW != widthW) inputs(0) = inputs(0).matchWidth(widthW)
+        if (inputs(1).widthW != widthW) inputs(1) = inputs(1).matchWidth(widthW)
       } else if (List("==", "!=", "<", "<=").contains(op)) {
-        val w = max(inputs(0).width, inputs(1).width)
-        if (inputs(0).width != w) inputs(0) = inputs(0).matchWidth(w)
-        if (inputs(1).width != w) inputs(1) = inputs(1).matchWidth(w)
+        val w = max(inputs(0).needWidth(), inputs(1).needWidth())
+        if (inputs(0).needWidth() != w) inputs(0) = inputs(0).matchWidth(Width(w))
+        if (inputs(1).needWidth() != w) inputs(1) = inputs(1).matchWidth(Width(w))
+      } else if (List(">>", "s>>").contains(op)) {
+        val wl = log2Up(inputs(0).needWidth())
+        val w = 1 << wl
+        if (inputs(0).needWidth() != w ) inputs(0) = inputs(0).matchWidth(Width(w))
+        if (inputs(1).needWidth() != wl) inputs(1) = inputs(1).matchWidth(Width(wl))
       }
     }
   }

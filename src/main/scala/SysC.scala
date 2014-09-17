@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -29,32 +29,47 @@
 */
 
 package Chisel
-import Fill._
-import Lit._
+import scala.collection.mutable.ArrayBuffer
+import scala.math._
+import java.io.InputStream
+import java.io.OutputStream
+import java.io.PrintStream
+import scala.sys.process._
+import sys.process.stringSeqToProcess
+import Node._
+import Reg._
+import ChiselError._
+import Literal._
+import scala.collection.mutable.HashSet
+import scala.collection.mutable.HashMap
 
-object Fill {
-  def apply(n: Int, mod: Bool): UInt = if (n == 1) mod else UInt(0, n) - mod
-  def apply(n: Int, mod: UInt): UInt = UInt(NodeFill(n, mod))
-  def apply(mod: UInt, n: Int): UInt = apply(n, mod)
-}
+class SysCBackend extends CppBackend {
+   override def elaborate(c: Module): Unit = {
+      super.elaborate(c)
+      println(c)
+      println(c.name)
 
-object NodeFill {
-  def apply(n: Int, mod: Node): Node = {
-    val w = mod.widthW
-    if (n == 1) {
-      mod
-    } else {
-      if (w.isKnown && w.needWidth == 1) {
-        Multiplex(mod, Literal((BigInt(1) << n) - 1, n), Literal(0, n))
-      } else {
-        /* Build up a Concatenate tree for more ILP in simulation. */
-        var out: Node = null
-        val p2 = Array.ofDim[Node](log2Up(n+1))
-        p2(0) = mod
-        for (i <- 1 until p2.length)
-          p2(i) = Concatenate(p2(i-1), p2(i-1))
-        Concatenate((0 until log2Up(n+1)).filter(i => (n & (1 << i)) != 0).map(p2(_)))
+      //Create component definition for System C
+      val top_bundle = c.io.asInstanceOf[Bundle] //Is this safe?      
+      val cdef = new ComponentDef(c.name + "_t", c.name)
+      for ((name, elt) <- top_bundle.elements) {
+         elt match {
+            case delt:DecoupledIO[Bits] =>
+               val is_input = delt.bits.dir == INPUT
+               val vtype = "dat_t<" + delt.bits.width + ">"
+               val entry = new CEntry(name, is_input, vtype, delt.bits.name, delt.ready.name, delt.valid.name)
+               cdef.entries += (entry)
+            case _ =>
+               throw new RuntimeException("SystemC requires that all top-level wires are decoupled!")
+         }
       }
-    }
-  }
+
+      //Print out component definition
+      println(cdef)
+
+      //Generate file
+      val out_p = createOutputFile("SCWrapped" + c.name + ".cpp");
+      SCWrapper.genwrapper(cdef, out_p)
+   }
 }
+

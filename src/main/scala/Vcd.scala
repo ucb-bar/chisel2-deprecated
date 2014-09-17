@@ -86,11 +86,11 @@ class VcdBackend(top: Module) extends Backend {
     if (Driver.isVCD && node.isInVCD) {
       node match {
         case m: Mem[_] =>
-          "  mem_t<" + m.width + "," + m.n + "> " + emitRef(node) + "__prev" + ";\n"
+          "  mem_t<" + m.needWidth() + "," + m.n + "> " + emitRef(node) + "__prev" + ";\n"
         case r: ROMData =>
-          "  mem_t<" + r.width + "," + r.lits.size + "> " + emitRef(node) + "__prev" + ";\n"
+          "  mem_t<" + r.needWidth() + "," + r.lits.size + "> " + emitRef(node) + "__prev" + ";\n"
         case _ => 
-          "  dat_t<" + node.width + "> " + emitRef(node) + "__prev" + ";\n" 
+          "  dat_t<" + node.needWidth() + "> " + emitRef(node) + "__prev" + ";\n" 
       }
     }
     else ""
@@ -100,13 +100,13 @@ class VcdBackend(top: Module) extends Backend {
     for (i <- 0 until sortedMods.length) {
       val mod = sortedMods(i)
       if (mod.component == c && !mod.name.isEmpty) 
-        write("  fputs(\"$var wire " + mod.width + " " + varName(i) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\", f);\n") 
+        write("  fputs(\"$var wire " + mod.needWidth() + " " + varName(i) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\", f);\n") 
     }
     var baseIdx = sortedMods.length
     for (mem <- sortedMems) {
       if (mem.component == c && !mem.name.isEmpty) {
         for (offset <- 0 until mem.n) {
-          write("  fputs(\"$var wire " + mem.width + " " + varName(baseIdx + offset) + " " + 
+          write("  fputs(\"$var wire " + mem.needWidth() + " " + varName(baseIdx + offset) + " " + 
             top.stripComponent(emitRef(mem)) + "[%d] $end\\n\", f);\n".format(offset)) 
         }
       }
@@ -115,7 +115,7 @@ class VcdBackend(top: Module) extends Backend {
     for (rom <- sortedROMs) {
       if (rom.component == c && !rom.name.isEmpty) {
         for (offset <- 0 until rom.lits.size) {
-          write("  fputs(\"$var wire " + rom.width + " " + varName(baseIdx + offset) + " " + 
+          write("  fputs(\"$var wire " + rom.needWidth() + " " + varName(baseIdx + offset) + " " + 
             top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset)) 
         }
       }
@@ -132,13 +132,13 @@ class VcdBackend(top: Module) extends Backend {
     for (i <- 0 until sortedMods.length) {
       val mod = sortedMods(i)
       if (mod.name.isEmpty)
-        write("  fputs(\"$var wire " + mod.width + " " + varName(i) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\", f);\n")
+        write("  fputs(\"$var wire " + mod.needWidth() + " " + varName(i) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\", f);\n")
     }
     var baseIdx = sortedMods.length
     for (mem <- sortedMems) {
       if (mem.name.isEmpty) {
         for (offset <- 0 until mem.n) {
-          write("  fputs(\"$var wire " + mem.width + " " + varName(baseIdx + offset) + " " + 
+          write("  fputs(\"$var wire " + mem.needWidth() + " " + varName(baseIdx + offset) + " " + 
             top.stripComponent(emitRef(mem)) + "[%d] $end\\n\", f);\n".format(offset)) 
         }
       }
@@ -147,7 +147,7 @@ class VcdBackend(top: Module) extends Backend {
     for (rom <- sortedROMs) {
       if (rom.name.isEmpty) {
         for (offset <- 0 until rom.lits.size) {
-          write("  fputs(\"$var wire " + rom.width + " " + varName(baseIdx + offset) + " " + 
+          write("  fputs(\"$var wire " + rom.needWidth() + " " + varName(baseIdx + offset) + " " + 
             top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset)) 
         }
       }
@@ -232,7 +232,7 @@ class VcdBackend(top: Module) extends Backend {
   private val sortedMems = (top.omods foldLeft Array[Mem[_]]()){
     case (array: Array[Mem[_]], mem: Mem[_]) => if (mem.isInVCD) array ++ Array(mem) else array
     case (array: Array[Mem[_]], node: Node) => array
-  } sortWith (_.width < _.width)
+  } sortWith (_.widthW < _.widthW)
 
   private val sortedROMs = (top.omods foldLeft Array[ROMData]()){
     case (array: Array[ROMData], rom: ROMData) => if (rom.isInVCD) array ++ Array(rom) else array

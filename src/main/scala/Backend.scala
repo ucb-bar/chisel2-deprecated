@@ -694,9 +694,6 @@ abstract class Backend extends FileSystemUtilities{
     markComponents
     sortComponents
 
-    // Before giving names to temporary nodes
-    // they need to resolve modules
-    collectNodesIntoComp
     ChiselError.info("giving names")
     nameAll
     ChiselError.checkpoint()

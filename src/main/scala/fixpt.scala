@@ -40,8 +40,8 @@ abstract class Fix[B<:Bits with Num[B],T<:Fix[B,T]](val exp: Int, val raw: B) ex
   def get_sext(source: Bits): UInt
 
   def aligned_with(b: T): Tuple3[B,B,Int] = {
-    val teff_exp = exp-raw.width
-    val beff_exp = b.exp-b.raw.width
+    val teff_exp = exp-raw.needWidth()
+    val beff_exp = b.exp-b.raw.needWidth()
 
     val int_exp = math.min(teff_exp, beff_exp)
     // must zero extend on right side to lower effective exponents so everything matches
@@ -73,32 +73,33 @@ abstract class Fix[B<:Bits with Num[B],T<:Fix[B,T]](val exp: Int, val raw: B) ex
   }
 
   def do_mult(b: T): T = {
-    val result = Factory(exp+b.exp,raw.width+b.raw.width)
+    val result = Factory(exp+b.exp,raw.needWidth()+b.raw.needWidth())
     result.raw := raw * b.raw
     return result
   }
   def do_divide(b: T): T = {
-    val result = Factory(exp-b.exp,raw.width)
+    val result = Factory(exp-b.exp,raw.needWidth())
     result.raw := raw / b.raw
     return result
   }
   def do_truncate(source: T): Unit = {
     if(exp > source.exp) {
       val prepend_amt = exp-source.exp // need to extend source since it is too small...
-      val taken_source = math.min(raw.width-prepend_amt, source.raw.width)
-      val append_zs = raw.width-taken_source-prepend_amt
+      val gotWidth = source.raw.needWidth()
+      val taken_source = math.min(raw.needWidth()-prepend_amt, gotWidth)
+      val append_zs = raw.needWidth()-taken_source-prepend_amt
       raw := toRaw(Cat(Fill(prepend_amt, get_sext(source.raw)), (
         if(append_zs>0) (
-          if(taken_source>0) Cat(source.raw(source.raw.width-1, source.raw.width-taken_source), UInt(0, width=append_zs))
+          if(taken_source>0) Cat(source.raw(gotWidth-1, gotWidth-taken_source), UInt(0, width=append_zs))
           else               UInt(0, append_zs)
-        ) else source.raw(source.raw.width-1, source.raw.width-taken_source)
+        ) else source.raw(gotWidth-1, gotWidth-taken_source)
       )))
     }
     else {
-      val msb_extract = source.raw.width-(source.exp-exp)-1
+      val msb_extract = source.raw.needWidth()-(source.exp-exp)-1
       val remaining_source = if(msb_extract>=0) msb_extract+1 else 0
-      val taken_source = math.min(remaining_source, raw.width)
-      val append_zs = raw.width-taken_source
+      val taken_source = math.min(remaining_source, raw.needWidth())
+      val append_zs = raw.needWidth()-taken_source
       raw := toRaw(
         if(append_zs>0) (
           if(taken_source>0) Cat(source.raw(msb_extract, msb_extract-taken_source+1), UInt(0, width=append_zs))
@@ -147,7 +148,7 @@ object SFix {
 class SFix(exp: Int, raw: SInt) extends Fix[SInt,SFix](exp, raw) with Num[SFix] {
   def Factory(exp: Int, width: Int) = SFix(exp, width)
   def toRaw(a: Bits) = a.toSInt
-  def get_sext(source: Bits) = source(source.width-1)
+  def get_sext(source: Bits) = source(source.needWidth()-1)
 
   def + (b: SFix): SFix = do_addsub(b)
   def - (b: SFix): SFix = do_addsub(b, isSub=true)
@@ -198,13 +199,14 @@ class ToyTester(dut: Toy) extends AdvTester.AdvTester(dut) {
   takestep()
   def signed_peek(target: Bits): Double = {
     val raw = peek(target)
-    val max_pos = (BigInt(1) << (target.getWidth-1))-1
-    (if(raw > max_pos) raw - (BigInt(1) << target.getWidth) else raw).toDouble
+    val gotWidth = target.getWidth()
+    val max_pos = (BigInt(1) << (gotWidth-1))-1
+    (if(raw > max_pos) raw - (BigInt(1) << gotWidth) else raw).toDouble
   }
   def convert[T<:Fix[_,_]](target: T): Double = {
     target match {
-      case s: SFix => (signed_peek(s.raw).toDouble * math.pow(2, s.exp-s.raw.width))
-      case u: UFix => (peek(u.raw).toDouble * math.pow(2, u.exp-u.raw.width))
+      case s: SFix => (signed_peek(s.raw).toDouble * math.pow(2, s.exp-s.raw.needWidth()))
+      case u: UFix => (peek(u.raw).toDouble * math.pow(2, u.exp-u.raw.needWidth()))
     }
   }
   println("In = %g, %g : Out = %g".format(convert(dut.io.in0), convert(dut.io.in1), convert(dut.io.out)))
