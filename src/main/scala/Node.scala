@@ -270,20 +270,7 @@ abstract class Node extends nameable {
     initOf(n, widthFunc, ins.toList);
   }
   def init (n: String, w: Int, ins: Node*): Node = {
-<<<<<<< HEAD
     width_ = Width(w)
-=======
-    width_ = w;
-    if (false) {
-      val objectString = this.toString
-      val lineString = if (this.line == null) "" else this.line.toString
-      println("iw: " + w + objectString + lineString)
-      // If this is an area of interest, dump the stack.
-      if (false && objectString == "" && interestingLines.contains(lineString)) {
-        printChiselStackTrace()
-      }
-    }
->>>>>>> 7c7c9f3... Debugging.
     initOf(n, fixWidth(w), ins.toList)
   }
   
@@ -295,16 +282,9 @@ abstract class Node extends nameable {
     val res = inferWidth(this);
     if (! res.isKnown) {
       true
-<<<<<<< HEAD
     } else if (res != widthW) {
       // NOTE: This should NOT stop us using inferWidth, since the value
       // we set here may not be correct.
-=======
-    } else if (res != width) {
-      if (false) {
-        println("in: " + width_ + ", " + res + this.toString)
-      }
->>>>>>> 7c7c9f3... Debugging.
       width_ = res
       true
     } else {
