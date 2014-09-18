@@ -108,10 +108,10 @@ abstract class Data extends Node {
     of *Node* instance which we have lost the concrete type. */
   def fromNode(n: Node): this.type = {
     val res = this.clone
+    val packet = res.flatten.reverse.zip(this.flatten.reverse.map(_._2.getWidth))
     var ind = 0
-    for ((name, io) <- res.flatten.reverse) {
+    for (((name, io), gotWidth) <- packet) {
       io.asOutput()
-      val gotWidth = io.getWidth()
       val assignWidth = if (gotWidth > 0) ind + gotWidth - 1 else -1
       io assign NodeExtract(n, assignWidth, ind)
       ind += (if (gotWidth > 0) gotWidth else 0)
