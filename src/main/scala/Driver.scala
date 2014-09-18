@@ -194,6 +194,8 @@ object Driver extends FileSystemUtilities{
         case "--moduleNamePrefix" => Backend.moduleNamePrefix = args(i + 1); i += 1
         case "--inlineMem" => isInlineMem = true
         case "--noInlineMem" => isInlineMem = false
+        case "--assert" => isAssert = true
+        case "--noAssert" => isAssert = false
         case "--debugMem" => isDebugMem = true
         case "--backend" => {
           if (args(i + 1) == "v") {
@@ -282,6 +284,7 @@ object Driver extends FileSystemUtilities{
   var isCompiling = false
   var isCheckingPorts = false
   var isTesting = false
+  var isAssert = true
   var isDebugMem = false
   var backend: Backend = null
   var topComponent: Module = null

@@ -854,8 +854,10 @@ class VerilogBackend extends Backend {
     for (clock <- c.clocks) {
       clkDomains += (clock -> new StringBuilder)
     }
-    for (p <- c.asserts) {
-      clkDomains(p.clock).append(emitAssert(p))
+    if (Driver.isAssert) {
+      for (p <- c.asserts) {
+        clkDomains(p.clock).append(emitAssert(p))
+      }
     }
     for (m <- c.mods) {
       val clkDomain = clkDomains getOrElse (m.clock, null)
