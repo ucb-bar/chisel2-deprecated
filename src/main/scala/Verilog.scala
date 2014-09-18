@@ -892,7 +892,7 @@ class VerilogBackend extends Backend {
   def emitAssert(a: Assert): String = {
     "`ifndef SYNTHESIS\n" +
     "  if(" + emitRef(a.reset) + ") " + emitRef(a) + " <= 1'b1;\n" +
-    "  if(!" + emitRef(a.cond) + " && " + emitRef(a) +") begin\n" +
+    "  if(!" + emitRef(a.cond) + " && " + emitRef(a) + " && !" + emitRef(a.reset) + ") begin\n" +
     "    $fwrite(32'h80000002, " + CString("ASSERTION FAILED: %s\n") + ", " + CString(a.message) + ");\n" +
     "    $finish;\n" +
     "  end\n" +
