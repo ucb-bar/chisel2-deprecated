@@ -9,11 +9,11 @@ rankdir = LR;
     DotBackendSuite_DAGComp_1_sub__io_ready -> DotBackendSuite_DAGComp_1_sub__stored[label="1"];
   }
   T0 -> DotBackendSuite_DAGComp_1_sub__io_ready[label="1"];
-  io_result[label="io_result:Bool"];
   T0[label="&"];
+  io_result[label="io_result:Bool"];
   io_data1[label="io_data1:Bool"];
   io_data0[label="io_data0:Bool"];
-  DotBackendSuite_DAGComp_1_sub__io_valid -> io_result[label="1"];
   io_data0 -> T0[label="1"];
   io_data1 -> T0[label="1"];
+  DotBackendSuite_DAGComp_1_sub__io_valid -> io_result[label="1"];
 }

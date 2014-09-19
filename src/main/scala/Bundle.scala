@@ -142,16 +142,6 @@ class Bundle(view_arg: Seq[String] = null)(implicit _params:Option[Parameters] =
     }
   }
 
-  override def setPseudoName (path: String, isNamingIo: Boolean) {
-    if (pName == "" || (path != "" && pName != path)) {
-      pName = path
-      val prefix = if (pName != "") pName + "_" else ""
-      for ((n, i) <- elements) {
-        i setPseudoName (prefix + n, isNamingIo)
-      }
-    }
-  }
-
   def +(other: Bundle): Bundle = {
     var elts = ArrayBuffer[(String, Data)]();
     for ((n, i) <- elements)
@@ -187,14 +177,6 @@ class Bundle(view_arg: Seq[String] = null)(implicit _params:Option[Parameters] =
   override def removeTypeNodes() {
     for ((n, elt) <- elements)
       elt.removeTypeNodes
-  }
-
-  override def traceableNodes: Array[Node] = elements.map(tup => tup._2).toArray;
-
-  override def traceNode(c: Module, stack: Stack[() => Any]) {
-    for((n, i) <- flatten) {
-      stack.push(() => i.traceNode(c, stack))
-    }
   }
 
   override def apply(name: String): Data = {

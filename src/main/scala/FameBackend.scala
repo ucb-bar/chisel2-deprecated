@@ -399,10 +399,10 @@ trait Fame1Transform extends Backend {
   }
   
   
-  preElaborateTransforms += ((top: Module) => collectNodesIntoComp(initializeDFS))
+  preElaborateTransforms += ((top: Module) => collectNodesIntoComp)
   preElaborateTransforms += ((top: Module) => appendFireToRegWriteEnables(top))
   preElaborateTransforms += ((top: Module) => appendFireToMemEnables(top))
-  preElaborateTransforms += ((top: Module) => collectNodesIntoComp(initializeDFS))
+  preElaborateTransforms += ((top: Module) => collectNodesIntoComp)
 }
 
 class Fame1CppBackend extends CppBackend with Fame1Transform

@@ -2,10 +2,10 @@ module DelaySuite_RegInitUpdate_1(input clk, input reset,
     output[31:0] io_out
 );
 
-  wire[31:0] T0;
+  wire[31:0] T1;
   reg  res;
-  wire T1;
   wire T2;
+  wire T0;
 
 `ifndef SYNTHESIS
   integer initvar;
@@ -15,16 +15,16 @@ module DelaySuite_RegInitUpdate_1(input clk, input reset,
   end
 `endif
 
-  assign io_out = T0;
-  assign T0 = {31'h0, res};
-  assign T1 = reset ? 1'h0 : T2;
-  assign T2 = res + 1'h1;
+  assign io_out = T1;
+  assign T1 = {31'h0, res};
+  assign T2 = reset ? 1'h0 : T0;
+  assign T0 = res + 1'h1;
 
   always @(posedge clk) begin
     if(reset) begin
       res <= 1'h0;
     end else begin
-      res <= T2;
+      res <= T0;
     end
   end
 endmodule

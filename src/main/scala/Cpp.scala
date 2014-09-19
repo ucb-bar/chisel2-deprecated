@@ -72,18 +72,20 @@ class CppBackend extends Backend {
     }
   }
 
+  // Give different names to temporary nodes in CppBackend
   override def emitRef(node: Node): String = {
     node match {
-      case x: Binding =>
-        emitRef(x.inputs(0))
-
-      case x: Bits =>
-        if (!node.isInObject && node.inputs.length == 1) emitRef(node.inputs(0)) else super.emitRef(node)
-
+      case _: Bits if !node.isInObject && node.inputs.length == 1 => 
+        emitRef(node.inputs(0))
+      case _: Literal =>
+        node.name
+      case _: Reg => 
+        if (node.named) node.name else "R" + node.emitIndex
       case _ =>
-        super.emitRef(node)
+        if (node.named) node.name else "T" + node.emitIndex
     }
   }
+
   def wordMangle(x: Node, w: String): String = x match {
     case _: Literal =>
       if (words(x) == 1) emitRef(x)
@@ -728,6 +730,8 @@ class CppBackend extends Backend {
   override def elaborate(c: Module): Unit = {
     println("CPP elaborate")
     super.elaborate(c)
+    // reset indices for temporary nodes
+    Driver.components foreach (_.nindex = -1)
 
     /* We flatten all signals in the toplevel component after we had
      a change to associate node and components correctly first
@@ -739,10 +743,8 @@ class CppBackend extends Backend {
         c.mods   ++= cc.mods;
       }
     }
-    c.findConsumers()
     ChiselError.checkpoint()
 
-    c.collectNodes(c);
     c.findOrdering(); // search from roots  -- create omods
     val mappings = generateNodeMapping(c.omods);
     renameNodes(c, c.omods);

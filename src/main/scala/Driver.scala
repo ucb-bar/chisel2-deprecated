@@ -30,11 +30,11 @@
 
 package Chisel
 
-import collection.mutable.{ArrayBuffer, HashSet, HashMap, Stack, LinkedHashSet}
+import collection.mutable.{ArrayBuffer, HashSet, HashMap, Stack, LinkedHashSet, Queue => ScalaQueue}
 
 object Driver extends FileSystemUtilities{
   def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean = true): T = {
-    Driver.initChisel(args)
+    initChisel(args)
     try {
       if(wrapped) execute(gen) else executeUnwrapped(gen)
     } finally {
@@ -49,22 +49,22 @@ object Driver extends FileSystemUtilities{
   def apply[T <: Module](args: Array[String], gen: () => T,
                          ftester: T => Tester[T], wrapped:Boolean = true): T = {
     val mod = if(wrapped) apply(args, gen) else apply(args,gen,false)
-    if (Driver.isTesting) test(mod, ftester)
+    if (isTesting) test(mod, ftester)
     mod
   }
 
   private def executeUnwrapped[T <: Module](gen: () => T): T = {
-    if (!Driver.chiselConfigMode.isEmpty && !Driver.chiselConfigClassName.isEmpty) { 
+    if (!chiselConfigMode.isEmpty && !chiselConfigClassName.isEmpty) { 
       val config = Class.forName(appendString(chiselProjectName,chiselConfigClassName)).newInstance.asInstanceOf[ChiselConfig]
-      val world = if(Driver.chiselConfigMode.get == "collect") new Collector(config.topDefinitions,config.knobValues) else new Instance(config.topDefinitions,config.knobValues)
+      val world = if(chiselConfigMode.get == "collect") new Collector(config.topDefinitions,config.knobValues) else new Instance(config.topDefinitions,config.knobValues)
       val p = Parameters.root(world)
       config.topConstraints.foreach(c => p.constrain(c))
       val c = execute(() => Module(gen())(Some(p)))
-      if(Driver.chiselConfigMode.get == "collect") {
-        val v = createOutputFile(Driver.chiselConfigClassName.get + ".knb")
+      if(chiselConfigMode.get == "collect") {
+        val v = createOutputFile(chiselConfigClassName.get + ".knb")
         v.write(world.getKnobs)
         v.close
-        val w = createOutputFile(Driver.chiselConfigClassName.get + ".cst")
+        val w = createOutputFile(chiselConfigClassName.get + ".cst")
         w.write(world.getConstraints)
         w.close
       }
@@ -77,13 +77,12 @@ object Driver extends FileSystemUtilities{
 
   private def execute[T <: Module](gen: () => T): T = {
     val c = gen()
-    Driver.backend.initBackannotation
     /* Params - If dumping design, dump space to pDir*/
-    if (Driver.chiselConfigMode == None || Driver.chiselConfigMode.get == "instance") { 
-      Driver.backend.elaborate(c)
-      if (Driver.isCheckingPorts) Driver.backend.checkPorts(c)
-      if (Driver.isCompiling && Driver.isGenHarness) Driver.backend.compile(c)
-      if(Driver.chiselConfigDump && !Dump.dump.isEmpty) {
+    if (chiselConfigMode == None || chiselConfigMode.get == "instance") { 
+      setTopComponent(c)
+      backend.elaborate(c)
+      if (isCompiling && isGenHarness) backend.compile(c)
+      if(chiselConfigDump && !Dump.dump.isEmpty) {
         val w = createOutputFile(appendString(Some(topComponent.name),chiselConfigClassName) + ".prm")
         w.write(Dump.getDump); w.close
       }
@@ -108,12 +107,95 @@ object Driver extends FileSystemUtilities{
 
   def setTopComponent(mod: Module): Unit = {
     topComponent = mod
-    implicitReset.component = Driver.topComponent
-    implicitClock.component = Driver.topComponent
-    topComponent.reset = Driver.implicitReset
+    implicitReset.component = topComponent
+    implicitClock.component = topComponent
+    topComponent.reset = implicitReset
     topComponent.hasExplicitReset = true
-    topComponent.clock = Driver.implicitClock
+    topComponent.clock = implicitClock
     topComponent.hasExplicitClock = true    
+  }
+
+  def bfs (visit: Node => Unit) = {
+    // initialize BFS
+    val queue = new ScalaQueue[Node]
+   
+    for (c <- components; a <- c.debugs)
+      queue enqueue a
+    for (b <- blackboxes)
+      queue enqueue b.io
+    for (c <- components; (n, io) <- c.io.flatten)
+      queue enqueue io
+    for (c <- components; if !(c.defaultResetPin == null))
+      queue enqueue c.defaultResetPin
+
+    // Do BFS
+    val walked = HashSet[Node]()
+    while (!queue.isEmpty) {
+      val top = queue.dequeue
+      walked += top
+      visit(top)
+      top match {
+        case b: Bundle =>
+          for ((n, io) <- b.flatten; if !(io == null) && !(walked contains io)) {
+            queue enqueue io
+            walked += io
+          }
+        case v: Vec[_] => 
+          for ((n, e) <- v.flatten; if !(e == null) && !(walked contains e)) {
+            queue enqueue e
+            walked += e
+          }
+        case _ =>
+      }
+      for (i <- top.inputs; if !(i == null) && !(walked contains i)) {
+        queue enqueue i
+        walked += i
+      }
+    }
+  }
+
+  def dfs (visit: Node => Unit) = {
+    val stack = new Stack[Node]
+    // initialize DFS
+    for (c <- components; (n, io) <- c.io.flatten)
+      stack push io
+    for (c <- components; if !(c.defaultResetPin == null))
+      stack push c.defaultResetPin
+    for (c <- components; a <- c.debugs)
+      stack push a
+    for (b <- blackboxes)
+      stack push b.io
+
+    // Do DFS
+    val walked = HashSet[Node]()
+    while (!stack.isEmpty) {
+      val top = stack.pop
+      walked += top
+      visit(top)
+      top match {
+        case b: Bundle =>
+          for ((n, io) <- b.flatten; if !(io == null) && !(walked contains io)) {
+            stack push io
+            walked += io
+          }
+        case v: Vec[_] => {
+          for ((n, e) <- v.flatten; if !(e == null) && !(walked contains e)) {
+            stack push e
+            walked += e
+          }
+          for (i <- top.inputs; if !(i == null) && !(walked contains i) && !i.isIo) {
+            stack push i
+            walked += i
+          }
+        }
+        case _ => {
+          for (i <- top.inputs; if !(i == null) && !(walked contains i) && !i.isIo) {
+            stack push i
+            walked += i
+          }
+        }
+      }
+    }
   }
 
   def initChisel(args: Array[String]): Unit = {
@@ -143,9 +225,9 @@ object Driver extends FileSystemUtilities{
     isCheckingPorts = false
     isTesting = false
     isDebugMem = false
+    hasMem = false
     backend = new CppBackend
     topComponent = null
-    randInitIOs.clear()
     clocks.clear()
     implicitReset = Bool(INPUT)
     implicitReset.isIo = true
@@ -155,12 +237,6 @@ object Driver extends FileSystemUtilities{
     nodes.clear()
     isInGetWidth = false
     startTime = System.currentTimeMillis
-
-    // Backannotation
-    isBackannotating = false
-    model = ""
-    signals.clear
-    pseudoMuxes.clear
     modStackPushed = false
 
     readArgs(args)
@@ -178,7 +254,7 @@ object Driver extends FileSystemUtilities{
         }
         case "--wi" => warnInputs = true
         case "--wo" => warnOutputs = true
-        case "--wio" => {warnInputs = true; Driver.warnOutputs = true}
+        case "--wio" => {warnInputs = true; warnOutputs = true}
         case "--Wconnection" => saveConnectionWarnings = true
         case "--Wcomponent" => saveComponentTrace = true
         case "--noCombLoop" => dontFindCombLoop = true
@@ -208,16 +284,6 @@ object Driver extends FileSystemUtilities{
             backend = new DotBackend
           } else if (args(i + 1) == "fpga") {
             backend = new FPGABackend
-          } else if (args(i + 1) == "counterc") {
-            backend = new CounterCppBackend
-          } else if (args(i + 1) == "counterv") {
-            backend = new CounterVBackend
-          } else if (args(i + 1) == "counterfpga") {
-            backend = new CounterFPGABackend
-          } else if (args(i + 1) == "counterw") {
-            backend = new CounterWBackend
-          } else if (args(i + 1) == "sysc") {
-            backend = new SysCBackend
           } else {
             backend = Class.forName(args(i + 1)).newInstance.asInstanceOf[Backend]
           }
@@ -229,9 +295,6 @@ object Driver extends FileSystemUtilities{
         case "--include" => includeArgs = args(i + 1).split(' ').toList; i += 1
         case "--checkPorts" => isCheckingPorts = true
         case "--reportDims" => isReportDims = true
-        // Counter backend flags
-        case "--backannotation" => isBackannotating = true
-        case "--model" => model = args(i + 1) ; i += 1
         //Jackhammer Flags
         case "--configCollect"  => chiselConfigMode = Some("collect"); chiselConfigClassName = Some(getArg(args(i+1),1)); chiselProjectName = Some(getArg(args(i+1),0)); i+=1;  //dump constraints in dse dir
         case "--configInstance" => chiselConfigMode = Some("instance"); chiselConfigClassName = Some(getArg(args(i+1),1)); chiselProjectName = Some(getArg(args(i+1),0)); i+=1;  //use ChiselConfig to supply parameters
@@ -286,6 +349,7 @@ object Driver extends FileSystemUtilities{
   var isTesting = false
   var isAssert = true
   var isDebugMem = false
+  var hasMem = false
   var backend: Backend = null
   var topComponent: Module = null
   val components = ArrayBuffer[Module]()
@@ -298,16 +362,10 @@ object Driver extends FileSystemUtilities{
   val parStack = new Stack[Parameters]
   var stackIndent = 0
   val printStackStruct = ArrayBuffer[(Int, Module)]()
-  val randInitIOs = ArrayBuffer[Node]()
   val clocks = ArrayBuffer[Clock]()
   var implicitReset: Bool = null
   var implicitClock: Clock = null
   var isInGetWidth: Boolean = false
-  /* Backannotation flags */
-  var isBackannotating = false
-  var model = ""
-  val signals = LinkedHashSet[Node]()
-  val pseudoMuxes = HashMap[Node, Node]()
   var modStackPushed: Boolean = false
   var startTime = 0L
   /* ChiselConfig flags */
