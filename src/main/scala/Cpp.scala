@@ -1206,6 +1206,9 @@ class CppBackend extends Backend {
       writeCppFile(s"  mod_t* cloned = new ${c.name}_t(*this);\n")
       writeCppFile(s"  return cloned;\n")
       writeCppFile(s"}\n")
+
+      // Make a special note of the clone file. We may want to compile it -O0.
+      cloneFile = out_cpps.last.name.dropRight(".cpp".length())
     }
 
     def genSetCircuitFromMethod(): Int = {
@@ -1560,9 +1563,6 @@ class CppBackend extends Backend {
     advanceCppFile()
     // generate set_circuit_from function
     val nSetCircuitFromMethods = genSetCircuitFromMethod()
-
-    // Make a special note of the clone file. We may want to compile it -O0.
-    cloneFile = out_cpps.last.name.dropRight(".cpp".length())
 
     // generate print(...) function.
     // This will probably end up in the same file as the above clone code.
