@@ -212,7 +212,7 @@ class TextComparitor {
       if (aResult == None) {
         val testTokens = tokenize(test)
         // Generate the substituted test tokens
-        testTokens.map(test => { if (substitutions.contains(test)) substitutions(test)._1 else test}) mkString
+        (testTokens.map(test => { if (substitutions.contains(test)) substitutions(test)._1 else test})).mkString
       } else {
         test
       }
@@ -263,7 +263,7 @@ object TestComparitor {
     if (master == "" && test == "") {
       if (files.length != 2) {
           println("need two files to compare\n")
-          return 2
+          sys.exit(2)
       }
       masters += files(0)
       tests += files(1)
@@ -272,7 +272,7 @@ object TestComparitor {
       val testFOD = new java.io.File(test)
       if (!(masterFOD.isDirectory() && testFOD.isDirectory())) {
         println("master and test must be directories\n")
-        return 2
+        sys.exit(2)
       }
       if (files.length == 0)
         files = masterFOD.list()
@@ -283,6 +283,6 @@ object TestComparitor {
     }
   
     val result = compareFiles(masters.toArray, tests.toArray)
-    exit(if (result == None) 0 else 1)
+    sys.exit(if (result == None) 0 else 1)
   }
 }
