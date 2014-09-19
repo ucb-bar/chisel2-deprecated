@@ -47,7 +47,7 @@ class ComparitorError (amsg: String, alineNo: Option[Int] = None, alineString: O
 }
 
 object TextComparitor {
-  val tokenRegEx = """(\W+)""".r                      // Break on (but capture) non-word characters.
+  val tokenRegEx = """(?!^)\b""".r                      // Break on (but capture) non-word characters.
   val EOLRegex = """.*\n""".r                         // recognize EOL
   val allowedDifferencePrefixRegex = """\b[RT]""".r   // The only words we allow for substitution are Registers and Temporaries
   def tokenize(s: String): Array[String] = {
