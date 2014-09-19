@@ -217,17 +217,6 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
       bundle.removeTypeNodes
   }
 
-  override def traceableNodes: Array[Node] = self.toArray
-
-  override def traceNode(c: Module, stack: Stack[() => Any]) {
-    val ins = this.flatten.map(_._2)
-      
-    for(i <- ins) {
-      stack.push(() => i.traceNode(c, stack))
-    }
-    stack.push(() => super.traceNode(c, stack))
-  }
-
   override def flip(): this.type = {
     for(b <- self)
       b.flip();
@@ -254,23 +243,6 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
       }
     } else {
       /* We are trying to rename a Vec that has a fixed name. */
-    }
-  }
-
-  override def setPseudoName (path: String, isNamingIo: Boolean) {
-    if (pName == "" || (path != "" && pName != path)) {
-      val prevPrefix = if (pName != "") pName + "_" else ""
-      pName = path
-      val prefix = if (pName != "") pName + "_" else ""
-      for ((elm, i) <- self.zipWithIndex) {
-        val prevElmPrefix = prevPrefix + i
-        val suffix = 
-          if (elm.name startsWith prevElmPrefix) 
-            elm.name substring prevElmPrefix.length
-          else
-            elm.name
-        elm setPseudoName (prefix + i + suffix, isNamingIo)
-      }
     }
   }
 

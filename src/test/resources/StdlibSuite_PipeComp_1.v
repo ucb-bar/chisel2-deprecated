@@ -10,8 +10,8 @@ module StdlibSuite_PipeComp_1(input clk, input reset,
   reg [7:0] R2;
   wire[7:0] T3;
   reg  R4;
-  wire T5;
-  reg  R6;
+  wire T6;
+  reg  R5;
   wire T7;
 
 `ifndef SYNTHESIS
@@ -21,15 +21,15 @@ module StdlibSuite_PipeComp_1(input clk, input reset,
     R0 = {1{$random}};
     R2 = {1{$random}};
     R4 = {1{$random}};
-    R6 = {1{$random}};
+    R5 = {1{$random}};
   end
 `endif
 
   assign io_deq_bits = R0;
   assign T1 = R4 ? R2 : R0;
   assign T3 = io_enq_valid ? io_enq_bits : R2;
-  assign T5 = reset ? 1'h0 : io_enq_valid;
-  assign io_deq_valid = R6;
+  assign T6 = reset ? 1'h0 : io_enq_valid;
+  assign io_deq_valid = R5;
   assign T7 = reset ? 1'h0 : R4;
 
   always @(posedge clk) begin
@@ -45,9 +45,9 @@ module StdlibSuite_PipeComp_1(input clk, input reset,
       R4 <= io_enq_valid;
     end
     if(reset) begin
-      R6 <= 1'h0;
+      R5 <= 1'h0;
     end else begin
-      R6 <= R4;
+      R5 <= R4;
     end
   end
 endmodule

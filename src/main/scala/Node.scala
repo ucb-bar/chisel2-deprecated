@@ -37,6 +37,7 @@ import java.io.PrintStream
 
 import Node._;
 import ChiselError._;
+import Width._;
 
 import java.lang.Double.longBitsToDouble
 import java.lang.Float.intBitsToFloat
@@ -48,52 +49,79 @@ object Node {
     s
   }
 
-  def fixWidth(w: Int) = {
-    assert(w != -1, ChiselError.error("invalid width for fixWidth object"));
-    (m: Node) => w
-  }
+  def fixWidth(w: => Int): (=> Node) => Width = { (n) => {
+    if (n != null) {
+      assert(w != -1, ChiselError.error("invalid width for fixWidth object"));
+      Width(w)
+    } else {
+      Width()
+    }
+  }}
 
-  def widthOf(i: Int) = { (m: Node) => {
+  def widthOf(i: => Int): (=> Node) => Width = { (m) => {
     try {
-      m.inputs(i).width
+      m.inputs(i).widthW
     } catch {
         case e: java.lang.IndexOutOfBoundsException => {
-          val error = new ChiselError(() => {m + " in " + m.component + " is unconnected. Ensure that is assigned."}, m.line)
+          val error = new ChiselError(() => {m + " is unconnected ("+ i + " of " + m.inputs.length + "). Ensure that it is assigned."}, m.line)
           if (!ChiselErrors.contains(error) && !Driver.isInGetWidth) {
             ChiselErrors += error
           }
-          -1
-        }
-    }}}
+          Width()
+       }
+    }
+  }}
 
-  def maxWidth(m: Node): Int = {
-    var w = 0
+  // Compute the maximum width required for a node,
+  def maxWidth(m: => Node): Width = {
+    var w = Width(0)
     for (i <- m.inputs)
       if (!(i == null || i == m)) {
-        w = w.max(i.width)
+        w = w.max(i.widthW)
       }
     w
   }
 
-  def minWidth(m: Node): Int = m.inputs.map(_.width).min
+  def minWidth(m: => Node): Width = m.inputs.map(_.widthW).min
 
-  def maxWidthPlusOne(m: Node): Int = maxWidth(m) + 1;
+  def maxWidthPlusOne(m: => Node): Width = maxWidth(m) + 1
 
-  def sumWidth(m: Node): Int = {
-    var res = 0;
+  def sumWidth(m: => Node): Width = {
+    var res = Width(0);
     for (i <- m.inputs)
-      res = res + i.width;
+      res = res + i.widthW;
     res
   }
 
-  def lshWidthOf(i: Int, n: Node): (Node) => (Int) = {
-    (m: Node) => {
-      val res = m.inputs(0).width + n.maxNum.toInt;
-      res
+  def lshWidthOf(i: => Int, n: => Node): (=> Node) => (Width) = {
+    (m) => {
+      val w0 = m.inputs(0).widthW
+      var w = n.widthW
+      // If we don't know the width, try inferring it.
+      if (!w.isKnown) {
+        w = n.inferWidth(n)
+      }
+      // If we still don't know it, return unknown.
+      if (!w.isKnown) {
+//        ChiselError.warning("lshWidthOf: width not set - " + n)
+        Width()
+      } else if (!w0.isKnown) {
+//        ChiselError.warning("lshWidthOf: child width not set - " + m.inputs(0))
+        Width()
+      } else {
+        w0 + n.litValue((1 << w.needWidth)-1).toInt
+      }
     }
   }
 
-  def rshWidthOf(i: Int, n: Node): (Node) => (Int) = { (m: Node) => m.inputs(i).width - n.minNum.toInt }
+  def rshWidthOf(i: => Int, n: => Node): (=> Node) => (Width) = {
+    (m) => {
+      val a = m.inputs(i).widthW
+      val b = n.litValue(0).toInt
+      val w = a - b
+      w
+    }
+  }
 }
 
 /** *Node* defines the root class of the class hierarchy for
@@ -112,11 +140,13 @@ abstract class Node extends nameable {
   var isTypeNode = false;
   var depth = 0;
   def componentOf: Module = if (Driver.backend.isEmittingComponents && component != null) component else Driver.topComponent
-  var width_ = -1;
+  // The semantics of width are sufficiently complicated that
+  // it deserves its own class
+  var width_ = Width()
   val consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
   val inputs = new ArrayBuffer[Node];
-  def traceableNodes: Array[Node] = Array[Node]();
-  var inferWidth: (Node) => Int = maxWidth;
+  var inferWidth: (=> Node) => Width = maxWidth
+
   var nameHolder: nameable = null;
   val line: StackTraceElement =
     if (Driver.getLineNumbers) {
@@ -127,20 +157,33 @@ abstract class Node extends nameable {
   var driveRand = false
   var clock: Clock = null
   var CppVertex: CppVertex = null
-  var counter: Bits = null
-  var shadow: Bits = null
   var cntrIdx = -1
 
   val _id = Driver.nodes.length
   Driver.nodes += this
 
   def isByValue: Boolean = true;
-  def width: Int = if (Driver.isInGetWidth) inferWidth(this) else width_
+  private[Chisel] def width: Int = {
+    val w = widthW
+    if (w.isKnown)
+      w.needWidth()
+    else
+      throwException("Node.width for node " + this + " returns unknown width")
+  }
+  private[Chisel] def widthW: Width = {
+    if (Driver.isInGetWidth) inferWidth(this) else width_
+  }
 
   /** Sets the width of a Node. */
-  def width_=(w: Int) {
-    width_ = width;
+  private[Chisel] def width_=(w: Int) {
+    width_.setWidth(w);
     inferWidth = fixWidth(w);
+  }
+
+  private[Chisel] def width_=(w: Width) {
+    width_ = w;
+    // NOTE: This explicitly does not set inferWidth.
+    // See the comments in infer
   }
 
   def nameIt (path: String, isNamingIo: Boolean) {
@@ -148,7 +191,7 @@ abstract class Node extends nameable {
       if (!named && (!isIo || isNamingIo)) {
         /* If the name was set explicitely through *setName*,
          we don't override it. */
-        name = path;
+        setName(path)
       }
       while (component.names.getOrElseUpdate(name, this) ne this)
         name += "_"
@@ -161,15 +204,10 @@ abstract class Node extends nameable {
     }
   }
 
-  def setPseudoName(path: String, isNamingIo: Boolean) {
-    if (!isIo || (isIo && isNamingIo))
-      pName = path
-  }
-
   lazy val chiselName = this match {
     case l: Literal => "";
     case any        =>
-      if (name != "" && (name != "reset") && !(component == null)) 
+      if (named && (name != "reset") && !(component == null)) 
         component.getPathName(".") + "." + name
       else
         ""
@@ -177,12 +215,6 @@ abstract class Node extends nameable {
 
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
   def ##(b: Node): Node  = Op("##", sumWidth _,  this, b );
-  def maxNum: BigInt = {
-    // XXX This makes sense for UInt, but not in general.
-    val w = if (width < 0) inferWidth(this) else width
-    litValue((BigInt(1) << w) - 1)
-  }
-  def minNum: BigInt = litValue(0)
   final def isLit: Boolean = litOf ne null
   def litOf: Literal = if (getNode != this) getNode.litOf else null
   def litValue(default: BigInt = BigInt(-1)): BigInt =
@@ -202,24 +234,31 @@ abstract class Node extends nameable {
   def isReg: Boolean = false
   def isUsedByClockHi: Boolean = consumers.exists(_.usesInClockHi(this))
   def usesInClockHi(i: Node): Boolean = false
-  def initOf (n: String, width: (Node) => Int, ins: Iterable[Node]): Node = {
+  def initOf (n: String, widthfunc: (=> Node) => Width, ins: Iterable[Node]): Node = {
     name = n;
-    inferWidth = width;
+    inferWidth = widthfunc;
     inputs ++= ins
     this
   }
-  def init (n: String, width: (Node) => Int, ins: Node*): Node = {
-    initOf(n, width, ins.toList);
+  def init (n: String, widthFunc: (=> Node) => Width, ins: Node*): Node = {
+    initOf(n, widthFunc, ins.toList);
   }
   def init (n: String, w: Int, ins: Node*): Node = {
-    width_ = w;
+    width_ = Width(w)
     initOf(n, fixWidth(w), ins.toList)
   }
+  
+  // Called while we're walking the graph inferring the width of nodes.
+  // We return true if we should continue to walk the graph,
+  // either because there's a node whose width we don't know,
+  // or because we updated a node's width.
   def infer: Boolean = {
     val res = inferWidth(this);
-    if (res == -1) {
+    if (! res.isKnown) {
       true
-    } else if (res != width) {
+    } else if (res != widthW) {
+      // NOTE: This should NOT stop us using inferWidth, since the value
+      // we set here may not be correct.
       width_ = res
       true
     } else {
@@ -232,7 +271,7 @@ abstract class Node extends nameable {
     isReg || isUsedByClockHi || Driver.isDebug && !name.isEmpty ||
     Driver.emitTempNodes
 
-  lazy val isInVCD: Boolean = name != "reset" && width > 0 &&
+  lazy val isInVCD: Boolean = name != "reset" && needWidth() > 0 &&
      (!name.isEmpty || Driver.emitTempNodes) &&
      ((isIo && isInObject) || isReg || Driver.isDebug)
 
@@ -252,14 +291,14 @@ abstract class Node extends nameable {
           writer.println(indent + "(has comp " + bits.comp + ")");
         }
       }
-      case any =>
+      case any => writer.println(indent + this)
     }
     writer.println("sccIndex: " + sccIndex)
     writer.println("sccLowlink: " + sccLowlink)
     writer.println("component: " + component)
     writer.println("isTypeNode: " + isTypeNode)
     writer.println("depth: " + depth)
-    writer.println("width_: " + width_)
+    writer.println("width: " + width_)
     writer.println("index: " + emitIndex)
     writer.println("consumers.length: " + consumers.length)
     writer.println("nameHolder: " + nameHolder)
@@ -273,107 +312,25 @@ abstract class Node extends nameable {
     }
   }
 
-  def traceNode(c: Module, stack: Stack[() => Any]): Any = {
-    // pushes and pops components as necessary in order to later mark the parent of nodes
-    val (comp, nextComp) =
-      this match {
-        case io: Bits => {
-          if(io.isIo && (io.dir == INPUT || io.dir == OUTPUT)) {
-            (io.component, if (io.dir == OUTPUT) io.component else io.component.parent)
-          } else {
-            (c, c)
-          }
-        }
-        case any    => (c, c);
-      }
-
-    assert( comp != null );
-    if (comp != null && !comp.isWalked.contains(this)) {
-      comp.isWalked += this;
-      for (node <- traceableNodes) {
-        if (node != null) {
-          stack.push(() => node.traceNode(nextComp, stack));
-        }
-      }
-      var i = 0;
-      for (node <- inputs) {
-        if (node != null) {
-           //tmp fix, what happens if multiple componenets reference static nodes?
-          if (node.component == null || !Driver.components.contains(node.component)) {
-            /* If Backend.collectNodesIntoComp does not resolve the component
-             field for all components, we will most likely end-up here. */
-            assert( node.component == nextComp,
-              ChiselError.error((if(node.name != null && !node.name.isEmpty)
-                node.name else "?")
-                + "[" + node.getClass.getName
-                + "] has no match between component "
-                + (if( node.component == null ) "(null)" else node.component)
-                + " and '" + nextComp + "' input of "
-                + (if(this.name != null && !this.name.isEmpty)
-                this.name else "?")))
-          }
-          if (!Driver.backend.isInstanceOf[VerilogBackend] || !node.isIo) {
-            stack.push(() => node.traceNode(nextComp, stack));
-          }
-          val j = i;
-          val n = node;
-          stack.push(() => {
-            /* This code finds an output binding for a node.
-             We search for a binding only if the io is an output
-             and the logic's grandfather component is not the same
-             as the io's component and the logic's component is not
-             same as output's component unless the logic is an input */
-            n match {
-              case io: Bits =>
-                if (io.isIo && io.dir == OUTPUT && !io.isTypeNode &&
-                    (!(component.parent == io.component) &&
-                     !(component == io.component &&
-                       !(this.isInstanceOf[Bits]
-                         && this.asInstanceOf[Bits].dir == INPUT)))) {
-                  val c = n.component.parent;
-                  val b = Binding(n, c, io.component);
-                  inputs(j) = b;
-                  if (!c.isWalked.contains(b)) {
-                    c.mods += b;  c.isWalked += b;
-                  }
-                  // In this case, we are trying to use the input of a submodule
-                  // as part of the logic outside of the submodule.
-                  // If the logic is outside the submodule, we do not use
-                  // the input name. Instead, we use whatever is driving
-                  // the input. In other words, we do not use the Input name,
-                  // if the component of the logic is the part of Input's
-                  // component. We also do the same when assigning
-                  // to the output if the output is the parent
-                  // of the subcomponent.
-                } else if (io.isIo && io.dir == INPUT &&
-                           ((!this.isIo
-                             && this.component == io.component.parent)
-                             || (this.isInstanceOf[Bits]
-                               && this.asInstanceOf[Bits].dir == OUTPUT &&
-                               this.component == io.component.parent))) {
-                  if (io.inputs.length > 0) inputs(j) = io.inputs(0);
-                }
-              case any =>
-            };
-          });
-        }
-        i += 1;
-      }
-      comp.mods += this;
-    }
-  }
-
   def forceMatchingWidths { }
 
-  def matchWidth(w: Int): Node = {
-    if (w > this.width) {
-      val zero = Literal(0, w - this.width); zero.infer
-      val res = Concatenate(zero, this); res.infer
-      res
-    } else if (w < this.width) {
-      val res = NodeExtract(this, w-1,0); res.infer
-      res
+  def matchWidth(w: Width): Node = {
+    val this_width = this.widthW
+    if (w.isKnown && this_width.isKnown) {
+      val my_width = this_width.needWidth()
+      val match_width = w.needWidth()
+      if (match_width > my_width) {
+        val zero = Literal(0, match_width - my_width); zero.infer
+        val res = Concatenate(zero, this); res.infer
+        res
+      } else if (match_width < my_width) {
+        val res = NodeExtract(this, match_width-1,0); res.infer
+        res
+      } else {
+        this
+      }
     } else {
+      ChiselError.error("Node.matchWidth with unknown width: " + w + ", node " + this)
       this
     }
   }
@@ -385,12 +342,20 @@ abstract class Node extends nameable {
 
   var isWidthWalked = false;
 
-  def getWidth(): Int = {
+  def getWidthW(): Width = {
     val oldDriverisInGetWidth = Driver.isInGetWidth
     Driver.isInGetWidth = true
-    val w = width
+    val w = widthW
     Driver.isInGetWidth = oldDriverisInGetWidth
     w
+  }
+
+  def getWidth(): Int = {
+    val w = getWidthW()
+    if (w.isKnown)
+      w.needWidth()
+    else
+      throwException("Node.getWidth() for node " + this + " returns unknown width")
   }
 
   def removeTypeNodes() {
@@ -440,7 +405,7 @@ abstract class Node extends nameable {
     var off = 0;
     for ((n, io) <- b.flatten) {
       if (io.dir == OUTPUT) {
-        val w = io.width;
+        val w = io.needWidth();
         res  = NodeExtract(this,off + w - 1, off) :: res;
         off += w;
       }
@@ -473,5 +438,20 @@ abstract class Node extends nameable {
       case _ => false
     }
     checkOne(this, x) || checkOne(x, this)
+  }
+  def setWidth(w: Int) = {
+    width_.setWidth(w)
+    inferWidth = fixWidth(w);
+  }
+  // Return a value or raise an exception.
+  def needWidth(): Int = {
+    val w = widthW
+    w.needWidth()
+  }
+
+  // Return true if the width of this node is known (set).
+  def isKnownWidth: Boolean = {
+    val w = widthW
+    w.isKnown
   }
 }

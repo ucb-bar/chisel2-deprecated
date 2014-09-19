@@ -69,11 +69,11 @@ abstract class Data extends Node {
   }
 
   def toBool(): Bool = {
-    if(this.getWidth > 1) {
-      throw new Exception("multi bit signal " + this + " converted to Bool");
-    }
-    if(this.getWidth == -1) {
+    val gotWidth = this.getWidth()
+    if( gotWidth < 1) {
       throw new Exception("unable to automatically convert " + this + " to Bool, convert manually instead")
+    } else if(gotWidth > 1) {
+      throw new Exception("multi bit signal " + this + " converted to Bool");
     }
     chiselCast(this){Bool()};
   }
@@ -108,11 +108,13 @@ abstract class Data extends Node {
     of *Node* instance which we have lost the concrete type. */
   def fromNode(n: Node): this.type = {
     val res = this.clone
+    val packet = res.flatten.reverse.zip(this.flatten.reverse.map(_._2.getWidth))
     var ind = 0
-    for ((name, io) <- res.flatten.reverse) {
+    for (((name, io), gotWidth) <- packet) {
       io.asOutput()
-      io assign NodeExtract(n, ind + io.getWidth-1, ind)
-      ind += io.getWidth
+      val assignWidth = if (gotWidth > 0) ind + gotWidth - 1 else -1
+      io assign NodeExtract(n, assignWidth, ind)
+      ind += (if (gotWidth > 0) gotWidth else 0)
     }
     res.setIsTypeNode
     res
@@ -142,8 +144,22 @@ abstract class Data extends Node {
   override def clone(): this.type = {
     try {
       val constructor = this.getClass.getConstructors.head
-      val res = constructor.newInstance(Array.fill(constructor.getParameterTypes.size)(null):_*)
-      res.asInstanceOf[this.type]
+      
+      if(constructor.getParameterTypes.size == 0) {
+        constructor.newInstance().asInstanceOf[this.type]
+      } else if(constructor.getParameterTypes.size == 1) {
+        val paramtype = constructor.getParameterTypes.head
+        // If only 1 arg and is a Bundle or Module then this is probably the implicit argument
+        //    added by scalac for nested classes and closures. Thus, try faking the constructor
+        //    by not supplying said class or closure (pass null).
+        // CONSIDER: Don't try to create this
+        if(classOf[Bundle].isAssignableFrom(paramtype) || classOf[Module].isAssignableFrom(paramtype)){
+          constructor.newInstance(null).asInstanceOf[this.type]
+        } else throw new Exception("Cannot auto-create constructor for ${this.getClass.getName} that requires arguments")
+      } else {
+       throw new Exception(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments")
+      }
+
     } catch {
       case npe: java.lang.reflect.InvocationTargetException if npe.getCause.isInstanceOf[java.lang.NullPointerException] =>
         throwException("Parameterized Bundle " + this.getClass + " needs clone method. You are probably using an anonymous Bundle object that captures external state and hence is un-cloneable", npe)
@@ -160,17 +176,5 @@ abstract class Data extends Node {
     }
   }
 
-  def setWidth(w: Int) {
-    this.width = w;
-  }
-}
-
-abstract class Aggregate extends Data {
-  override def setPseudoName(path: String, isNamingIo: Boolean) {
-    if (isTypeNode && comp != null) {
-      comp setPseudoName (path, isNamingIo)
-    } else {
-      super.setPseudoName(path, isNamingIo)
-    }
-  }
+  val params = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
 }

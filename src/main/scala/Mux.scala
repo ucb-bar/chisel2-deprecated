@@ -64,7 +64,8 @@ object Multiplex{
       if (c.litOf.value == a.litOf.value) {
         return c
       }
-      if (c.litOf.width == 1 && a.litOf.width == 1) {
+      if (c.litOf.isKnownWidth && a.litOf.isKnownWidth
+          && c.litOf.widthW.needWidth() == 1 && a.litOf.widthW.needWidth() == 1) {
         return if (c.litOf.value == 0) LogicalOp(t, Literal(0,1), "===") else t
       }
     }
@@ -94,18 +95,40 @@ object isLessThan {
 }
 
 object Mux {
-  def apply[T <: Data](t: Bool, c: T, a: T): T = {
-    val res = Multiplex(t, c.toNode, a.toNode)
-    if (c.isInstanceOf[Bits]) {
-      assert(a.isInstanceOf[Bits])
-      if (c.getClass == a.getClass) {
-        c.fromNode(res)
-      } else {
-        Bits(OUTPUT).fromNode(res).asInstanceOf[T]
-      }
-    } else {
-      c.fromNode(res)
-    }
+  def apply[T<:Data](cond: Bool, tc: T, fc: T): T = {
+    // TODO: Replace this runtime check with compiletime check using type classes and imports to add special cases
+    val target = if(tc.getClass.isAssignableFrom(fc.getClass)) tc.clone else
+                 if(fc.getClass.isAssignableFrom(tc.getClass)) fc.clone else
+                 if(classOf[Bits].isAssignableFrom(tc.getClass) && classOf[Bits].isAssignableFrom(fc.getClass)) UInt().asInstanceOf[T] else
+                   throw new Exception(s"For Mux, tc(${tc.getClass}) or fc(${fc.getClass}) must directly descend from the other. (Or both descend from Bits)")
+    Mux[T,T,T](target, cond, tc, fc)
+  }
+
+  // THIS IS THE MAIN MUX CONSTRUCTOR
+  def apply[RT<:Data,TT<:Data,FT<:Data](result: RT, cond: Bool, tc: TT, fc: FT)(
+   implicit evi_tc: TT <:< RT, evi_fc: FT <:< RT): RT = {
+    // The implicit lines require evidence that TT and RT (the mux inputs) are subtypes of the return.
+    //   This is preferable over [TT<:RT,FT<:RT] as now the scala compiler infer RT as the actual
+    //   type of result (and not the supertype common to result, tc, and fc, which could be none
+    //   of them!).
+
+    // TODO CONSIDER: Should this be private?
+
+    // TODO: consider reworking to not use flatten so that can Mux between Vecs of different lengths
+    //       or a Bundle and a descendant of that Bundle which adds fields
+    //       Will likely require creation of a createMux function
+    
+    require(tc.flatten.length == fc.flatten.length, "In Mux (of ${ancestor.getClass}), tc and fc too structurally different. Possibly due to non-determinism or mutability in a subtype of Aggregate e.g. a Bundle refinement adding new fields, or two Vecs of differing lengths.")
+    
+    val opdescs = result.flatten.zip(tc.flatten.zip(fc.flatten))
+      // opdescs: (result, (tc, fc))
+
+    opdescs.foreach(opdesc => {
+      val op_r = opdesc._1._2; val op_tc = opdesc._2._1._2; val op_fc = opdesc._2._2._2
+      op_r.asTypeFor(Multiplex(cond, op_tc, op_fc))
+    })
+
+    result
   }
 }
 
@@ -115,7 +138,7 @@ class Mux extends Op("Mux") {
   def ::(a: Node): Mux = { inputs(2) = a; this }
 
   override def forceMatchingWidths {
-    if (inputs(1).width != width) inputs(1) = inputs(1).matchWidth(width)
-    if (inputs(2).width != width) inputs(2) = inputs(2).matchWidth(width)
+    if (inputs(1).widthW != widthW) inputs(1) = inputs(1).matchWidth(widthW)
+    if (inputs(2).widthW != widthW) inputs(2) = inputs(2).matchWidth(widthW)
   }
 }

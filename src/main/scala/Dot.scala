@@ -159,7 +159,7 @@ class DotBackend extends Backend {
             if (isDottable(in)) {
               if (isNodeInIsland(in, island)) {
                 val edge = (emitRef(in) + " -> " + emitRef(m)
-                  + "[label=\"" + in.width_ + "\"];"+ EOL)
+                  + "[label=\"" + in.needWidth() + "\"];"+ EOL)
                 if (islandId != 0) {
                   // If we're drawing partitioned islands, duplicate the logic
                   // for boundary crossings below.
@@ -253,7 +253,7 @@ class DotBackend extends Backend {
             out_cd.write(emitRef(d) + "[label=\"" + n + "\"];\n");
             for (in <- d.inputs)
               if (isDottable(in)) {
-                out_cd.write(emitRef(in) + " -> " + emitRef(d) + "[label=\"" + in.width_ + "\"];\n");
+                out_cd.write(emitRef(in) + " -> " + emitRef(d) + "[label=\"" + in.needWidth() + "\"];\n");
               }
         }
       }

@@ -248,7 +248,8 @@ For instance, if you wanted a 128 entry memory of 32 bit UInt values with two co
 
 \begin{scala}
 ...
-val myMem = Mem(UInt(width = 32), 128, seqRead = false)
+val myMem = 
+  Mem(UInt(width = 32), 128, seqRead = false)
 val read_port1 = UInt(width = 32)
 val read_port2 = UInt(width = 32)
 when (re) {
@@ -266,7 +267,8 @@ In order to add synchronous read ports to the Chisel \verb+Mem+ class, Chisel re
 
 \begin{scala}
 ...
-val myMem = Mem(UInt(width = 32), depth = 128, seqRead = true)
+val myMem = 
+  Mem(UInt(width = 32), depth = 128, seqRead = true)
 val read_port = Reg(UInt(width = 32))
 when (re) {
   read_port := myMem(raddr)
@@ -294,7 +296,8 @@ class Stack(depth: Int) extends Module {
   }
   
   // declare the memory for the stack
-  val stack_mem = Mem(UInt(width = 32), depth, seqRead = false)
+  val stack_mem = 
+    Mem(UInt(width = 32), depth, seqRead = false)
   val sp = Reg(init = UInt(0, width = log2Up(depth)))
   val dataOut = Reg(init = UInt(0, width = 32))
   
@@ -318,3 +321,36 @@ class Stack(depth: Int) extends Module {
 
 Since the module is parametrized to be \verb+depth+ entries deep, in order to correctly extract the minimum width of the stack pointer \verb+sp+ we take the \verb+log2Up(depth)+. This takes the base 2 logarithm of \verb+depth+ and rounds up.
 
+\subsection{\problem{Load/Search Mem}}
+
+In this assignment, write a memory module that supports loading elements and searching based on the following template:
+
+\begin{scala}
+class DynamicMemorySearch(val n: Int, val w: Int) extends Module {
+  val io = new Bundle {
+    val isWr   = Bool(INPUT)
+    val wrAddr = UInt(INPUT,  log2Up(n))
+    val data   = UInt(INPUT,  w)
+    val en     = Bool(INPUT)
+    val target = UInt(OUTPUT, log2Up(n))
+    val done   = Bool(OUTPUT)
+  }
+  val index  = Reg(init = UInt(0, width = log2Up(n)))
+  val memVal = UInt(0)
+  /// fill in here
+  io.done   := Bool(false)
+  io.target := index
+}
+\end{scala}
+
+\noindent
+and found in \verb+$TUT_DIR/problems/DynamicMemorySearch.scala+.
+Notice how it support depth and width parameters \verb+n+ and \verb+w+ and 
+how the address width is computed from the depth. Run 
+
+\begin{bash}
+make DynamicMemorySearch.out
+\end{bash}
+
+\noindent 
+until your circuit passes the tests.

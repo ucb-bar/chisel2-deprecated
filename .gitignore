@@ -13,5 +13,4 @@ test-reports/
 *.bak
 *.new
 *~
-eclipse.bin/
-src/main/scala/Chisel/
+/eclipse.bin

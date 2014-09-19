@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -30,7 +30,13 @@
 
 package Chisel
 
-class FPGABackend extends VerilogBackend
-{
-  Driver.isInlineMem = false
+import Node._
+import ChiselError._
+
+abstract class Aggregate extends Data {
+  override def getWidth: Int = this.flatten.map(_._2.getWidth).fold(0)(_+_)
+    // Aggregate classes do not generally 'live' in the graph so width inference
+    //   will not touch these nodes and thus must get their width by looking
+    //   into the container
 }
+

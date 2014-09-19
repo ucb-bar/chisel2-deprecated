@@ -172,14 +172,7 @@ class ValidIO[+T <: Data](gen: T) extends Bundle
   val valid = Bool(OUTPUT)
   val bits = gen.clone.asOutput
   def fire(dummy: Int = 0): Bool = valid
-  override def clone: this.type =
-    try {
-      super.clone()
-    } catch {
-      case e: java.lang.Exception => {
-        new ValidIO(gen).asInstanceOf[this.type]
-      }
-    }
+  override def clone: this.type = new ValidIO(gen).asInstanceOf[this.type]
 }
 
 /** Adds a valid protocol to any interface. The standard used is
@@ -195,14 +188,7 @@ class DecoupledIO[+T <: Data](gen: T) extends Bundle
   val valid = Bool(OUTPUT)
   val bits  = gen.clone.asOutput
   def fire(dummy: Int = 0): Bool = ready && valid
-  override def clone: this.type =
-    try {
-      super.clone()
-    } catch {
-      case e: java.lang.Exception => {
-        new DecoupledIO(gen).asInstanceOf[this.type]
-      }
-    }
+  override def clone: this.type = new DecoupledIO(gen).asInstanceOf[this.type]
 }
 
 /** Adds a ready-valid handshaking protocol to any interface.
