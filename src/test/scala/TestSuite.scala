@@ -14,6 +14,7 @@ class TestSuite extends AssertionsForJUnit {
   }
 
   def assertFile( filename: String ) {
+    val useNewCompare = true
     val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
     val refstring = reffile.mkString
     reffile.close()
@@ -21,7 +22,15 @@ class TestSuite extends AssertionsForJUnit {
       dir.getPath + "/" + filename, "utf-8")
     val teststring = testfile.mkString
     testfile.close()
-    assert(blankLines_re.replaceAllIn(teststring, "") === blankLines_re.replaceAllIn(refstring, ""))
+    if (useNewCompare) {
+      val comparitor = new TextComparitor()
+      val masterText = blankLines_re.replaceAllIn(refstring, "")
+      val testText = blankLines_re.replaceAllIn(teststring, "")
+      val testTextWithSubstitutions = comparitor.substituteTextIfPossible(masterText, testText)
+      assert(masterText === testTextWithSubstitutions)
+    } else {
+      assert(blankLines_re.replaceAllIn(teststring, "") === blankLines_re.replaceAllIn(refstring, ""))
+    }
   }
 
   def launchTester[M <: Module : ClassTag, T <: Tester[M]](b: String, t: M => T) {

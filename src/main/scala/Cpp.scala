@@ -486,7 +486,8 @@ class CppBackend extends Backend {
       case a: Assert =>
         val cond = emitLoWordRef(a.cond) +
           (if (emitRef(a.cond) == "reset") "" else " || reset.lo_word()")
-        "  ASSERT(" + cond + ", " + CString(a.message) + ");\n"
+        if (!Driver.isAssert) ""
+        else "  ASSERT(" + cond + ", " + CString(a.message) + ");\n"
 
       case s: Sprintf =>
         ("#if __cplusplus >= 201103L\n"

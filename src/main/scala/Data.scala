@@ -178,5 +178,3 @@ abstract class Data extends Node {
 
   val params = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
 }
-
-abstract class Aggregate extends Data
