@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -38,13 +38,5 @@ abstract class Aggregate extends Data {
     // Aggregate classes do not generally 'live' in the graph so width inference
     //   will not touch these nodes and thus must get their width by looking
     //   into the container
-
-  override def setPseudoName(path: String, isNamingIo: Boolean) {
-    if (isTypeNode && comp != null) {
-      comp setPseudoName (path, isNamingIo)
-    } else {
-      super.setPseudoName(path, isNamingIo)
-    }
-  }
 }
 
