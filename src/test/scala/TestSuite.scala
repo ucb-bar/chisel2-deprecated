@@ -27,7 +27,7 @@ class TestSuite extends AssertionsForJUnit {
       val testTextWithSubstitutions = comparitor.substituteTextIfPossible(refText, testText)
       assertResult(refText) { testTextWithSubstitutions }
     } else {
-      assertResult(refText) { teststring }
+      assertResult(refText) { testText }
     }
   }
 

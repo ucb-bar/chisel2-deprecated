@@ -627,7 +627,7 @@ class CppBackend extends Backend {
           val storagePrefix = if (shadowRegisterInObject) {
             ""
           } else {
-            "  dat_t<" + node.needWidth()  + ">"
+            " dat_t<" + node.needWidth()  + ">"
           }
           s"${shadowPrefix} ${storagePrefix} ${emitRef(reg)}__shadow = ${emitRef(reg.next)};\n"
         } else {
@@ -1117,16 +1117,6 @@ class CppBackend extends Backend {
       out_h.write("  bool set_circuit_from(mod_t* src);\n");
       out_h.write("  void print ( FILE* f );\n");
 
-      // If we're generating multiple dump_init methods, wrap them in private/public.
-      if (nDumpInitMethods > 1) {
-        out_h.write(" private:\n");
-        for (i <- 0 until nDumpInitMethods - 1) {
-          out_h.write("  void dump_init_" + i + " ( FILE* f );\n");
-        }
-        out_h.write(" public:\n");
-      }
-      out_h.write("  void dump_init ( FILE* f );\n");
-
       // If we're generating multiple dump methods, wrap them in private/public.
       if (nDumpMethods > 1) {
         out_h.write(" private:\n");
@@ -1136,7 +1126,17 @@ class CppBackend extends Backend {
         out_h.write(" public:\n");
       }
       out_h.write("  void dump ( FILE* f, int t );\n");
-      
+ 
+      // If we're generating multiple dump_init methods, wrap them in private/public.
+      if (nDumpInitMethods > 1) {
+        out_h.write(" private:\n");
+        for (i <- 0 until nDumpInitMethods - 1) {
+          out_h.write("  void dump_init_" + i + " ( FILE* f );\n");
+        }
+        out_h.write(" public:\n");
+      }
+      out_h.write("  void dump_init ( FILE* f );\n");
+     
       // All done with the class definition. Close it off.
       out_h.write("\n};\n\n");
       out_h.write(Params.toCxxStringParams);
@@ -1554,12 +1554,12 @@ class CppBackend extends Backend {
     genClockMethod()
 
     advanceCppFile()
-    // generate set_circuit_from function
-    val nSetCircuitFromMethods = genSetCircuitFromMethod()
-
-    advanceCppFile()
     // generate clone() function
     genCloneMethod()
+
+    advanceCppFile()
+    // generate set_circuit_from function
+    val nSetCircuitFromMethods = genSetCircuitFromMethod()
 
     // Make a special note of the clone file. We may want to compile it -O0.
     cloneFile = out_cpps.last.name.dropRight(".cpp".length())

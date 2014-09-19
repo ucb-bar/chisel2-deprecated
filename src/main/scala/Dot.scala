@@ -215,21 +215,6 @@ class DotBackend extends Backend {
     super.elaborate(c)
 
     if (Driver.partitionIslands) {
-      /* We flatten all signals in the toplevel component after we had
-       a change to associate node and components correctly first
-       otherwise we are bound for assertions popping up left and right
-       in the Backend.elaborate method. */
-      for (cc <- Driver.components) {
-        if (!(cc == c)) {
-          c.debugs ++= cc.debugs
-          c.mods   ++= cc.mods;
-        }
-      }
-      c.findConsumers()
-      ChiselError.checkpoint()
-
-      c.collectNodes(c);
-      c.findOrdering(); // search from roots  -- create omods
       islands = createIslands(c)
     }
     var gn = -1;
