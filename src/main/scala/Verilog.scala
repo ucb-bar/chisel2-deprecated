@@ -512,9 +512,9 @@ class VerilogBackend extends Backend {
     val dumpvars = new ArrayBuffer[Node]
 
     // select Chisel nodes for APIs(peek, poke)  and VCD dump
-    for (m <- Driver.components ; mod <- m.mods) { 
-      if (mod.isInObject && !mod.isLit) {
-        mod match {
+    for (m <- Driver.components ; node <- m.nodes) { 
+      if (node.isInObject && !node.isLit) {
+        node match {
           case bool: Bool if resets contains bool => // exclude resets
           case _: Binding =>
           case _: ROMData =>
@@ -531,11 +531,11 @@ class VerilogBackend extends Backend {
             if (included) wires += io
           }
           case mem:  Mem[_] =>  mems += mem
-          case _ => wires += mod
+          case _ => wires += node
         }
       }
-      if (mod.isInVCD) {
-        mod match {
+      if (node.isInVCD) {
+        node match {
           case io: Bits if m != c => {
             var included = true
             if (io.dir == INPUT) {
@@ -548,7 +548,7 @@ class VerilogBackend extends Backend {
             }
             if (included) dumpvars += io
           }
-          case _ => dumpvars += mod
+          case _ => dumpvars += node
         }
       }
     }
@@ -842,7 +842,7 @@ class VerilogBackend extends Backend {
 
   def emitDefs(c: Module): StringBuilder = {
     val res = new StringBuilder()
-    for (m <- c.mods) {
+    for (m <- c.nodes) {
       res.append(emitDef(m))
     }
     for (c <- c.children) {
@@ -862,7 +862,7 @@ class VerilogBackend extends Backend {
         clkDomains(p.clock).append(emitAssert(p))
       }
     }
-    for (m <- c.mods) {
+    for (m <- c.nodes) {
       val clkDomain = clkDomains getOrElse (m.clock, null)
       if (m.clock != null && clkDomain != null)
         clkDomain.append(emitReg(m))
@@ -931,11 +931,11 @@ class VerilogBackend extends Backend {
   }
 
   def emitDecs(c: Module): StringBuilder =
-    c.mods.map(emitDec(_)).addString(new StringBuilder)
+    c.nodes.map(emitDec(_)).addString(new StringBuilder)
 
   def emitInits(c: Module): StringBuilder = {
     val sb = new StringBuilder
-    c.mods.map(emitInit(_)).addString(sb)
+    c.nodes.map(emitInit(_)).addString(sb)
 
     val res = new StringBuilder
     if (!sb.isEmpty) {
@@ -980,9 +980,6 @@ class VerilogBackend extends Backend {
     if (c.clocks.length > 0 || c.resets.size > 0) res.append(",\n") else res.append("\n")
     res.append(ports.map(_.result).reduceLeft(_ + "\n" + _))
     res.append("\n);\n\n");
-    // TODO: NOT SURE EXACTLY WHY I NEED TO PRECOMPUTE TMPS HERE
-    for (m <- c.mods)
-      emitTmp(m);
     res.append(emitDecs(c));
     res.append("\n");
     res.append(emitInits(c));

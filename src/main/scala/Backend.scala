@@ -235,6 +235,7 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def collectNodesIntoComp {
+    Driver.sortedComps foreach (_.nodes.clear)
     Driver.dfs { node =>
       val curComp = node match {
         case io: Bits if io.isIo && io.dir == INPUT => 
@@ -243,8 +244,7 @@ abstract class Backend extends FileSystemUtilities{
           node.component
       }
       assert(node.component != null, "NULL NODE COMPONENT " + node.name)
-      if (!node.isTypeNode && !(node.component.nodes contains node))
-        node.component.nodes += node
+      if (!node.isTypeNode) node.component.nodes += node
       for (input <- node.inputs ; if !input.isTypeNode) {
         if (!(input.component == null || input.component == node.component) &&
             !input.isLit && !isBitsIo(input, OUTPUT) && !isBitsIo(node, INPUT) &&
@@ -815,6 +815,26 @@ abstract class Backend extends FileSystemUtilities{
     ChiselError.info("compiling %d nodes".format(nbNodes))
     ChiselError.checkpoint()
 
+    ChiselError.info("computing memory ports")
+    computeMemPorts
+
+    collectNodesIntoComp
+    findConsumers
+    addBindings
+    findConsumers
+
+    val clkDomainWalkedNodes = new HashSet[Node]
+    for (comp <- Driver.sortedComps)
+      for (node <- comp.nodes)
+        if (node.isInstanceOf[Reg])
+          createClkDomain(node, clkDomainWalkedNodes)
+
+    nameAll 
+    nameRsts
+    nameBindings 
+    verifyAllMuxes
+    collectNodes
+
     /* *collectNodesIntoComp* associates components to nodes that were
      created after the call tree has been executed (ie. in genMuxes
      and forceMatchWidths).
@@ -827,29 +847,10 @@ abstract class Backend extends FileSystemUtilities{
      nodes and component correctly or call collectNodesIntoComp on return.
      */
 
+
     ChiselError.info("resolving nodes to the components")
     collectNodesIntoComp
     checkModuleResolution
-
-    ChiselError.info("computing memory ports")
-    computeMemPorts
-
-    nameAll 
-    nameRsts
-
-    findConsumers
-    addBindings
-    nameBindings 
-    findConsumers
-
-    val clkDomainWalkedNodes = new HashSet[Node]
-    for (comp <- Driver.sortedComps)
-      for (node <- comp.nodes)
-        if (node.isInstanceOf[Reg])
-          createClkDomain(node, clkDomainWalkedNodes)
-
-    verifyAllMuxes
-    collectNodes
     ChiselError.checkpoint()
 
     ChiselError.info("pruning unconnected IOs")

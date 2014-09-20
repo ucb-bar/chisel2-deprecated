@@ -40,7 +40,6 @@ object Binding {
       if (res == null) {
         val res = new Binding(m, ioComp);
         res.component = c;
-        c.nodes += res
         res.init("", widthOf(0), m);
         res.infer;
         c.bindings += res;
