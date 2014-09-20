@@ -191,14 +191,12 @@ abstract class Backend extends FileSystemUtilities{
 
   def emitRef(node: Node): String = {
     node match {
-      case r: Reg =>
-        if (r.name == "") "R" + r.emitIndex else r.name
+      case _: Literal =>
+        node.name
+      case _: Reg =>
+        if (node.named) node.name else "R" + node.emitIndex
       case _ =>
-        if(node.name == "") {
-          "T" + node.emitIndex
-        } else {
-          node.name
-        }
+        if (node.named) node.name else "T" + node.emitIndex
     }
   }
 

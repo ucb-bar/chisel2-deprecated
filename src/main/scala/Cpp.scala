@@ -77,12 +77,8 @@ class CppBackend extends Backend {
     node match {
       case _: Bits if !node.isInObject && node.inputs.length == 1 => 
         emitRef(node.inputs(0))
-      case _: Literal =>
-        node.name
-      case _: Reg => 
-        if (node.named) node.name else "R" + node.emitIndex
       case _ =>
-        if (node.named) node.name else "T" + node.emitIndex
+        super.emitRef(node)
     }
   }
 
