@@ -685,6 +685,101 @@ abstract class Backend extends FileSystemUtilities{
     ChiselError.info(res)
   }
 
+  /** Since we are relying on the out-degree of nodes (i.e. consumers.length),
+    this method should only be called after the forward edges have been
+    constructed. */
+  def findRoots(): ArrayBuffer[Node] = {
+    val roots = new ArrayBuffer[Node];
+    for (c <- Driver.components) {
+      roots ++= c.debugs
+      if (c.parent == null) {
+        val topIOs = c.io.flatten;
+        for ((name, wire) <- topIOs) {
+          roots += wire
+        }
+      }
+    }
+    for (b <- Driver.blackboxes)
+      roots += b.io;
+    for (m <- Driver.topComponent.mods) {
+      m match {
+        case io: Bits => {
+          if (io.dir == OUTPUT) {
+            if (io.consumers.length == 0) roots += m;
+          }
+        }
+        case d: Delay => roots += m;
+        case any      =>
+      }
+    }
+    roots
+  }
+
+  def visitNodes(roots: Array[Node]) {
+    val stack = new Stack[(Int, Node)]();
+    for (root <- roots) {
+      stack.push((0, root));
+    }
+    Driver.topComponent.isWalked.clear();
+    while (stack.length > 0) {
+      val (newDepth, node) = stack.pop();
+      val comp = node.componentOf;
+      if (newDepth == -1) {
+        comp.omods += node;
+      } else {
+        node.depth = math.max(node.depth, newDepth);
+        if (!comp.isWalked.contains(node)) {
+          comp.isWalked += node;
+          stack.push((-1, node));
+          for (i <- node.inputs) {
+            if (i != null) {
+              i match {
+                case d: Delay       => ;
+                case o              => stack.push((newDepth + 1, o));
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  def findOrdering = visitNodes(findRoots().toArray);
+
+  def findGraphDims: (Int, Int, Int) = {
+    val imods = Driver.topComponent.mods.filter(!_.isInstanceOf[Literal])
+    val mhist = new HashMap[String, Int]
+    val whist = new HashMap[Int, Int]
+    val hist = new HashMap[String, Int]
+    for (m <- imods) {
+      mhist(m.component.toString) = 1 + mhist.getOrElse(m.component.toString, 0)
+      val w = m.needWidth()
+      whist(w) = 1 + whist.getOrElse(w, 0)
+      val name = m match {
+        case op: Op => op.op
+        case o      => {
+          val name = m.getClass.getName
+          name.substring(name.indexOf('.') + 1)
+        }
+      }
+      hist(name) = 1 + hist.getOrElse(name, 0)
+    }
+    ChiselError.info("%60s %7s".format("module", "node count"));
+    for (n <- mhist.keys.toList.sortWith((a, b) => mhist(a) > mhist(b)))
+      ChiselError.info("%60s %7d".format(n, mhist(n)))
+    ChiselError.info("%12s %7s".format("name", "count"));
+    for (n <- hist.keys.toList.sortWith((a, b) => hist(a) > hist(b)))
+      ChiselError.info("%12s %7d".format(n, hist(n)))
+    ChiselError.info("%5s %s".format("width", "count"));
+    for (w <- whist.keys.toList.sortWith((a, b) => a < b))
+      ChiselError.info("%5d %7d".format(w, whist(w)))
+    val maxDepth = imods.map(_.depth).foldLeft(0)(_ max _)
+    val widths = new Array[Int](maxDepth + 1)
+    for (m <- imods)
+      widths(m.depth) += 1
+    val maxWidth = widths.foldLeft(0)(_ max _)
+    (imods.length, maxWidth, maxDepth)
+  }
 
   def elaborate(c: Module): Unit = {
     execute(c, preElaborateTransforms)

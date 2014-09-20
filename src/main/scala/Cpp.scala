@@ -741,11 +741,11 @@ class CppBackend extends Backend {
     }
     ChiselError.checkpoint()
 
-    c.findOrdering(); // search from roots  -- create omods
+    findOrdering // search from roots  -- create omods
     val mappings = generateNodeMapping(c.omods);
     renameNodes(c, c.omods);
     if (Driver.isReportDims) {
-      val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
+      val (numNodes, maxWidth, maxDepth) = findGraphDims
       ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
 
