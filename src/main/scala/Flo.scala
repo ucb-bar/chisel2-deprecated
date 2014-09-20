@@ -218,6 +218,8 @@ class FloBackend extends Backend {
 
   override def elaborate(c: Module): Unit = {
     super.elaborate(c)
+    // reset indices for temporary nodes
+    Driver.components foreach (_.nindex = -1)
 
     for (cc <- Driver.components) {
       if (!(cc == c)) {
