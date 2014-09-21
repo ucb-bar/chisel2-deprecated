@@ -166,9 +166,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   def whenCond: Bool = if (hasWhenCond) whenConds.top else trueCond
 
   val nodes = new LinkedHashSet[Node]
-  val mods = new ArrayBuffer[Node];
-  val omods = new ArrayBuffer[Node];
-
   val names = new HashMap[String, Node]
   var nindex = -1;
   var defaultWidth = 32;

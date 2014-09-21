@@ -671,17 +671,16 @@ class CppBackend extends Backend {
   /** Ensures each node such that it has a unique name accross the whole
     hierarchy by prefixing its name by a component path (except for "reset"
     and all nodes in *c*). */
-  def renameNodes(c: Module, nodes: Seq[Node]) {
+  def renameNodes(nodes: ArrayBuffer[Node]) {
+    val comp = Driver.topComponent
     for (m <- nodes) {
       m match {
-        case l: Literal => ;
-        case any        =>
-          if (m.name != "" && !(m == c.defaultResetPin) && !(m.component == null)) {
-            // only modify name if it is not the reset signal or not in top component
-            if(m.name != "reset" || !(m.component == c)) {
-              m.name = m.component.getPathName + "__" + m.name;
-            }
-          }
+        case _: Literal =>
+        case _ if m.named && (m != comp.defaultResetPin) && m.component != null =>
+          // only modify name if it is not the reset signal or not in top component
+          if (m.name != "reset" || m.component != comp)
+            m.name = m.component.getPathName + "__" + m.name
+        case _ =>
       }
     }
   }
@@ -690,15 +689,15 @@ class CppBackend extends Backend {
    * Takes a list of nodes and returns a list of tuples with the names attached.
    * Used to preserve original node names before the rename process.
    */
-  def generateNodeMapping(nodes: Seq[Node]): ArrayBuffer[Tuple2[String, Node]] = {
-    val mappings = new ArrayBuffer[Tuple2[String, Node]]
-    for (m <- nodes) {
+  def generateNodeMapping = {
+    val mappings = new ArrayBuffer[(String, Node)]
+    for (m <- Driver.orderedNodes) {
       if (m.chiselName != "") {
         val mapping = (m.chiselName, m)
         mappings += mapping
       }
     }
-    return mappings
+    mappings
   }
 
   def emitMapping(mapping: Tuple2[String, Node]): String = {
@@ -726,24 +725,16 @@ class CppBackend extends Backend {
   override def elaborate(c: Module): Unit = {
     println("CPP elaborate")
     super.elaborate(c)
-    // reset indices for temporary nodes
-    Driver.components foreach (_.nindex = -1)
 
     /* We flatten all signals in the toplevel component after we had
      a change to associate node and components correctly first
      otherwise we are bound for assertions popping up left and right
      in the Backend.elaborate method. */
-    for (cc <- Driver.components) {
-      if (!(cc == c)) {
-        c.debugs ++= cc.debugs
-        c.mods   ++= cc.mods;
-      }
-    }
+    flattenAll // created Driver.orderedNodes
     ChiselError.checkpoint()
 
-    findOrdering // search from roots  -- create omods
-    val mappings = generateNodeMapping(c.omods);
-    renameNodes(c, c.omods);
+    val mappings = generateNodeMapping
+    renameNodes(Driver.orderedNodes)
     if (Driver.isReportDims) {
       val (numNodes, maxWidth, maxDepth) = findGraphDims
       ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
@@ -788,9 +779,9 @@ class CppBackend extends Backend {
       val bMem = b.isInstanceOf[Mem[_]] || b.isInstanceOf[ROMData]
       aMem < bMem || aMem == bMem && a.needWidth() < b.needWidth()
     }
-    for (m <- c.omods.filter(_.isInObject).sortWith(headerOrderFunc))
+    for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc))
       out_h.write(emitDec(m))
-    for (m <- c.omods.filter(_.isInVCD).sortWith(headerOrderFunc))
+    for (m <- Driver.orderedNodes.filter(_.isInVCD).sortWith(headerOrderFunc))
       out_h.write(vcd.emitDec(m))
     for (clock <- Driver.clocks)
       out_h.write(emitDec(clock))
@@ -843,7 +834,7 @@ class CppBackend extends Backend {
     // generate init block
     writeCppFile("void " + c.name + "_t::init ( val_t rand_init ) {\n")
     writeCppFile("  this->__srand(rand_init);\n")
-    for (m <- c.omods) {
+    for (m <- Driver.orderedNodes) {
       writeCppFile(emitInit(m))
     }
     for (clock <- Driver.clocks) {
@@ -853,13 +844,13 @@ class CppBackend extends Backend {
 
     def clock(n: Node) = if (n.clock == null) Driver.implicitClock else n.clock
 
-    for (m <- c.omods)
+    for (m <- Driver.orderedNodes)
       clkDomains(clock(m))._1.append(emitDefLo(m))
 
-    for (m <- c.omods)
+    for (m <- Driver.orderedNodes)
       clkDomains(clock(m))._2.append(emitInitHi(m))
 
-    for (m <- c.omods)
+    for (m <- Driver.orderedNodes)
       clkDomains(clock(m))._2.append(emitDefHi(m))
 
     for (clk <- clkDomains.keys) {
@@ -900,7 +891,7 @@ class CppBackend extends Backend {
     writeCppFile(s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(src);\n")
     writeCppFile(s"  assert(mod_typed);\n")
     
-    for (m <- c.omods) {
+    for (m <- Driver.orderedNodes) {
       if(m.name != "reset" && m.isInObject) {
         writeCppFile(emitCircuitAssign("mod_typed->", m))
       }

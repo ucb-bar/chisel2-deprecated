@@ -614,12 +614,6 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
-  def collectNodes {
-    // collect nodes into 'mods', which is used in code generation
-    // TODO: remove 'mods'
-    Driver.dfs { node => node.component.mods += node }
-  }
-
   def findCombLoop {
     // Tarjan's strongly connected components algorithm to find loops
     var sccIndex = 0
@@ -685,58 +679,50 @@ abstract class Backend extends FileSystemUtilities{
     ChiselError.info(res)
   }
 
-  /** Since we are relying on the out-degree of nodes (i.e. consumers.length),
-    this method should only be called after the forward edges have been
-    constructed. */
-  def findRoots(): ArrayBuffer[Node] = {
-    val roots = new ArrayBuffer[Node];
-    for (c <- Driver.components) {
-      roots ++= c.debugs
-      if (c.parent == null) {
-        val topIOs = c.io.flatten;
-        for ((name, wire) <- topIOs) {
-          roots += wire
-        }
-      }
-    }
-    for (b <- Driver.blackboxes)
-      roots += b.io;
-    for (m <- Driver.topComponent.mods) {
-      m match {
-        case io: Bits => {
-          if (io.dir == OUTPUT) {
-            if (io.consumers.length == 0) roots += m;
-          }
-        }
-        case d: Delay => roots += m;
-        case any      =>
-      }
-    }
-    roots
-  }
+  def flattenAll {
+    // Reset indices for temporary nodes
+    Driver.components foreach (_.nindex = -1)
 
-  def visitNodes(roots: Array[Node]) {
-    val stack = new Stack[(Int, Node)]();
-    for (root <- roots) {
-      stack.push((0, root));
+    // Flatten all signals
+    val comp = Driver.topComponent
+    for (c <- Driver.components ; if c != comp) {
+      comp.debugs ++= c.debugs
+      comp.nodes ++= c.nodes
     }
-    Driver.topComponent.isWalked.clear();
-    while (stack.length > 0) {
-      val (newDepth, node) = stack.pop();
-      val comp = node.componentOf;
-      if (newDepth == -1) {
-        comp.omods += node;
-      } else {
-        node.depth = math.max(node.depth, newDepth);
-        if (!comp.isWalked.contains(node)) {
-          comp.isWalked += node;
-          stack.push((-1, node));
-          for (i <- node.inputs) {
-            if (i != null) {
-              i match {
-                case d: Delay       => ;
-                case o              => stack.push((newDepth + 1, o));
-              }
+
+    // Find roots
+    val roots = ArrayBuffer[Node]()
+    for (c <- Driver.components)
+      roots ++= c.debugs
+    for ((n, io) <- comp.io.flatten)
+      roots += io
+    for (b <- Driver.blackboxes)
+      roots += b.io
+    for (node <- comp.nodes) {
+      node match {
+        case io: Bits if io.dir == OUTPUT && io.consumers.isEmpty =>
+          roots += node
+        case _: Delay =>
+          roots += node
+        case _ => 
+    } }
+
+    // visit nodes and find ordering
+    val stack = Stack[(Int, Node)]()
+    val walked = HashSet[Node]()
+    for (root <- roots) stack push ((0, root))
+    while (!stack.isEmpty) {
+      val (depth, node) = stack.pop
+      if (depth == -1) Driver.orderedNodes += node
+      else {
+        node.depth = math.max(node.depth, depth)
+        if (!(walked contains node)) {
+          walked += node
+          stack push ((-1, node))
+          for (i <- node.inputs; if !(i == null)) {
+            i match {
+              case _: Delay =>
+              case _ => stack push ((depth + 1, i))
             }
           }
         }
@@ -744,14 +730,12 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
-  def findOrdering = visitNodes(findRoots().toArray);
-
   def findGraphDims: (Int, Int, Int) = {
-    val imods = Driver.topComponent.mods.filter(!_.isInstanceOf[Literal])
+    val nodes = Driver.orderedNodes.filter(!_.isInstanceOf[Literal])
     val mhist = new HashMap[String, Int]
     val whist = new HashMap[Int, Int]
     val hist = new HashMap[String, Int]
-    for (m <- imods) {
+    for (m <- nodes) {
       mhist(m.component.toString) = 1 + mhist.getOrElse(m.component.toString, 0)
       val w = m.needWidth()
       whist(w) = 1 + whist.getOrElse(w, 0)
@@ -773,12 +757,12 @@ abstract class Backend extends FileSystemUtilities{
     ChiselError.info("%5s %s".format("width", "count"));
     for (w <- whist.keys.toList.sortWith((a, b) => a < b))
       ChiselError.info("%5d %7d".format(w, whist(w)))
-    val maxDepth = imods.map(_.depth).foldLeft(0)(_ max _)
+    val maxDepth = nodes.map(_.depth).foldLeft(0)(_ max _)
     val widths = new Array[Int](maxDepth + 1)
-    for (m <- imods)
+    for (m <- nodes)
       widths(m.depth) += 1
     val maxWidth = widths.foldLeft(0)(_ max _)
-    (imods.length, maxWidth, maxDepth)
+    (nodes.length, maxWidth, maxDepth)
   }
 
   def elaborate(c: Module): Unit = {
@@ -833,7 +817,6 @@ abstract class Backend extends FileSystemUtilities{
     nameRsts
     nameBindings 
     verifyAllMuxes
-    collectNodes
 
     /* *collectNodesIntoComp* associates components to nodes that were
      created after the call tree has been executed (ie. in genMuxes
@@ -846,7 +829,6 @@ abstract class Backend extends FileSystemUtilities{
      Technically all user-defined transforms are responsible to update
      nodes and component correctly or call collectNodesIntoComp on return.
      */
-
 
     ChiselError.info("resolving nodes to the components")
     collectNodesIntoComp

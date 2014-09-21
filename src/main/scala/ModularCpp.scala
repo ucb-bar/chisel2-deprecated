@@ -98,7 +98,7 @@ class ModularCppBackend extends CppBackend {
     val res = new ArrayBuffer[CppVertex]
     val roots = new ArrayBuffer[Node]
     val walked = new ArrayBuffer[Node]
-    for (node <- module.mods) {
+    for (node <- module.nodes) {
       if (node.isIo && node.asInstanceOf[Bits].dir == OUTPUT && node.consumers.length == 0)
         roots += node
     }
@@ -148,7 +148,7 @@ class ModularCppBackend extends CppBackend {
     println("HUY: started sort")
     for (vertex <- vertices) {
       vertex.sort()
-      renameNodes(c, vertex.sortedNodes)
+      renameNodes(vertex.sortedNodes)
     }
     println("HUY: finished sort")
 

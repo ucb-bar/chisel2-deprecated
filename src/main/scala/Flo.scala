@@ -201,36 +201,27 @@ class FloBackend extends Backend {
     }
   }
 
-  def renameNodes(c: Module, nodes: Seq[Node]) = {
+  def renameNodes(nodes: ArrayBuffer[Node]) {
+    val comp = Driver.topComponent
     for (m <- nodes) {
       m match {
-        case l: Literal => ;
-        case any        =>
-          if (m.name != "" && !(m == c.reset) && !(m.component == null)) {
-            // only modify name if it is not the reset signal or not in top component
-            if(m.name != "reset" || !(m.component == c)) {
-              m.name = m.component.getPathName(":") + "::" + m.name;
-            }
-          }
+        case _: Literal =>
+        case _ if m.named && (m != comp.defaultResetPin) && m.component != null =>
+          // only modify name if it is not the reset signal or not in top component
+          if (m.name != "reset" || m.component != comp) 
+            m.name = m.component.getPathName(":") + "::" + m.name
+        case _ =>
       }
     }
   }
 
   override def elaborate(c: Module): Unit = {
     super.elaborate(c)
-    // reset indices for temporary nodes
-    Driver.components foreach (_.nindex = -1)
 
-    for (cc <- Driver.components) {
-      if (!(cc == c)) {
-        c.mods       ++= cc.mods;
-        c.debugs     ++= cc.debugs;
-      }
-    }
+    flattenAll
     ChiselError.checkpoint()
 
-    findOrdering // search from roots  -- create omods
-    renameNodes(c, c.omods);
+    renameNodes(Driver.orderedNodes)
     if (Driver.isReportDims) {
       val (numNodes, maxWidth, maxDepth) = findGraphDims
       // ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
@@ -238,7 +229,7 @@ class FloBackend extends Backend {
 
     // Write the generated code to the output file
     val out = createOutputFile(c.name + ".flo");
-    for (m <- c.omods)
+    for (m <- Driver.orderedNodes)
       out.write(emit(m));
     out.close();
   }

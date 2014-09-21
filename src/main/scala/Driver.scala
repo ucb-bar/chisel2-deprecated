@@ -235,6 +235,7 @@ object Driver extends FileSystemUtilities{
     implicitClock = new Clock()
     implicitClock.setName("clk")
     nodes.clear()
+    orderedNodes.clear()
     isInGetWidth = false
     startTime = System.currentTimeMillis
     modStackPushed = false
@@ -355,6 +356,7 @@ object Driver extends FileSystemUtilities{
   val components = ArrayBuffer[Module]()
   var sortedComps: ArrayBuffer[Module] = null
   val nodes = ArrayBuffer[Node]()
+  val orderedNodes = ArrayBuffer[Node]()
   val blackboxes = ArrayBuffer[BlackBox]()
   val chiselOneHotMap = HashMap[(UInt, Int), UInt]()
   val chiselOneHotBitMap = HashMap[(Bits, Int), Bool]()

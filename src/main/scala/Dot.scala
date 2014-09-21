@@ -91,11 +91,11 @@ class DotBackend extends Backend {
       res.append(indent)
       res.append(innercrossings)
     }
-    for (m <- top.mods) {
+    for (m <- top.nodes) {
       if (isDottable(m)) {
         if( m.component == top ) {
           /* We have to check the node's component agrees because output
-           nodes are part of a component *mods* as well as its parent *mods*! */
+           nodes are part of a component *nodes* as well as its parent *nodes*! */
           res.append(indent)
           res.append(emitRef(m));
           var label  = "label=\"" + asValidLabel(m)
@@ -118,10 +118,10 @@ class DotBackend extends Backend {
         }
       }
     }
-    for (m <- top.mods) {
+    for (m <- top.nodes) {
       if( m.component == top ) {
         /* We have to check the node's component agrees because output
-         nodes are part of a component *mods* as well as its parent *mods*! */
+         nodes are part of a component *nodes* as well as its parent *nodes*! */
         for (in <- m.inputs) {
           if (isDottable(m) && isDottable(in)) {
             val edge = (emitRef(in) + " -> " + emitRef(m)
