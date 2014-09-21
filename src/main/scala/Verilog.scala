@@ -1087,7 +1087,7 @@ class VerilogBackend extends Backend {
     // execute addBindings only in the Verilog Backend
     addBindings
     nameBindings
-    findConsumers
+    findConsumers(c)
 
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName) 
     val out = createOutputFile(n + ".v")

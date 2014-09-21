@@ -112,7 +112,10 @@ object Module {
 
   // XXX Remove and instead call current()
   def getComponent(): Module = if(Driver.compStack.length != 0) Driver.compStack.top else null
-  def current: Module = getComponent
+  def current: Module = {
+    val comp = getComponent
+    if (comp == null) Driver.topComponent else comp
+  }
 
   // despite being notionally internal, these have leaked into the API
   def backend: Backend = Driver.backend
