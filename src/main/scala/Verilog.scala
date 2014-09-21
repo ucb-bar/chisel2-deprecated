@@ -1084,6 +1084,10 @@ class VerilogBackend extends Backend {
 
   override def elaborate(c: Module) {
     super.elaborate(c)
+    // execute addBindings only in the Verilog Backend
+    addBindings
+    nameBindings
+    findConsumers
 
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName) 
     val out = createOutputFile(n + ".v")

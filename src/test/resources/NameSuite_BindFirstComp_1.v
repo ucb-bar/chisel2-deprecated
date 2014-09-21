@@ -19,10 +19,10 @@ module NameSuite_BindFirstComp_1(
   wire T1;
   wire T2;
   wire mask_ximm1q_ready;
-  wire dec_io_sigs_enq_ximm1q;
   wire T3;
   wire mask_cmdq_ready;
   wire dec_io_sigs_enq_cmdq;
+  wire dec_io_sigs_enq_ximm1q;
 
 
   assign io_replay = T0;

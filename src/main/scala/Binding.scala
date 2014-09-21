@@ -42,6 +42,7 @@ object Binding {
         res.component = c;
         res.init("", widthOf(0), m);
         res.infer;
+        c.nodes += res
         c.bindings += res;
         res
       } else {
