@@ -204,7 +204,6 @@ abstract class Backend extends FileSystemUtilities{
   def emitRef(c: Module): String = c.name
   def emitDec(node: Node): String = ""
 
-  val preElaborateTransforms = ArrayBuffer[(Module) => Unit]()
   val transforms = ArrayBuffer[(Module) => Unit]()
   if (Driver.isCSE) transforms += CSE.transform
   val analyses = ArrayBuffer[(Module) => Unit]()
@@ -297,8 +296,8 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def pruneUnconnectedIOs(m: Module) {
-    val inputs = m.io.flatten.filter(_._2.dir == INPUT)
-    val outputs = m.io.flatten.filter(_._2.dir == OUTPUT)
+    val inputs = m.wires.filter(_._2.dir == INPUT)
+    val outputs = m.wires.filter(_._2.dir == OUTPUT)
 
     for ((name, i) <- inputs) {
       if (i.inputs.length == 0 && m != Driver.topComponent)
@@ -341,7 +340,7 @@ abstract class Backend extends FileSystemUtilities{
     }
 
     for (c <- Driver.components ; if c != Driver.topComponent) {
-      for ((n,i) <- c.io.flatten) {
+      for ((n,i) <- c.wires) {
         if (i.inputs.length == 0) {          
           prettyPrint(i, c)
         }
@@ -556,7 +555,7 @@ abstract class Backend extends FileSystemUtilities{
          and the logic's grandfather component is not the same
          as the io's component and the logic's component is not
          same as output's component unless the logic is an input */
-      for ((n, io) <- comp.io.flatten) {
+      for ((n, io) <- comp.wires) {
         // Add bindings only in the Verilog Backend
         if (io.dir == OUTPUT) {
           val consumers = io.consumers.clone
@@ -695,7 +694,7 @@ abstract class Backend extends FileSystemUtilities{
     val roots = ArrayBuffer[Node]()
     for (c <- Driver.components)
       roots ++= c.debugs
-    for ((n, io) <- comp.io.flatten)
+    for ((n, io) <- comp.wires)
       roots += io
     for (b <- Driver.blackboxes)
       roots += b.io
@@ -767,7 +766,6 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def elaborate(c: Module): Unit = {
-    execute(c, preElaborateTransforms)
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
     markComponents
     sortComponents
@@ -776,11 +774,9 @@ abstract class Backend extends FileSystemUtilities{
     nameAll
     ChiselError.checkpoint()
 
-    if (!transforms.isEmpty) {
-      ChiselError.info("executing custom transforms")
-      execute(c, transforms)
-      ChiselError.checkpoint()
-    }
+    ChiselError.info("executing custom transforms")
+    execute(c, transforms)
+    ChiselError.checkpoint()
 
     ChiselError.info("adding clocks and resets")
     assignClockAndResetToModules

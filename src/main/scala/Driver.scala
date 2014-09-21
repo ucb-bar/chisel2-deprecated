@@ -123,7 +123,7 @@ object Driver extends FileSystemUtilities{
       queue enqueue a
     for (b <- blackboxes)
       queue enqueue b.io
-    for (c <- components; (n, io) <- c.io.flatten)
+    for (c <- components; (n, io) <- c.wires)
       queue enqueue io
     for (c <- components; if !(c.defaultResetPin == null))
       queue enqueue c.defaultResetPin
@@ -157,7 +157,7 @@ object Driver extends FileSystemUtilities{
   def dfs (visit: Node => Unit) = {
     val stack = new Stack[Node]
     // initialize DFS
-    for (c <- components; (n, io) <- c.io.flatten)
+    for (c <- components; (n, io) <- c.wires)
       stack push io
     for (c <- components; if !(c.defaultResetPin == null))
       stack push c.defaultResetPin

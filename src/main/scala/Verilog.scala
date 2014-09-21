@@ -429,8 +429,8 @@ class VerilogBackend extends Backend {
 
   def genHarness(c: Module, name: String) {
     val harness  = createOutputFile(name + "-harness.v");
-    val printNodes = for ((n, io) <- c.io.flatten ; if io.dir == OUTPUT) yield io
-    val scanNodes = for ((n, io) <- c.io.flatten ; if io.dir == INPUT) yield io
+    val printNodes = for ((n, io) <- c.wires ; if io.dir == OUTPUT) yield io
+    val scanNodes = for ((n, io) <- c.wires ; if io.dir == INPUT) yield io
     val mainClk = Driver.implicitClock
     val clocks = LinkedHashSet(mainClk)
     clocks ++= c.clocks
