@@ -215,6 +215,7 @@ object Driver extends FileSystemUtilities{
     isReportDims = false
     targetDir = "."
     components.clear()
+    sortedComps.clear()
     compStack.clear()
     stackIndent = 0
     printStackStruct.clear()
@@ -354,7 +355,7 @@ object Driver extends FileSystemUtilities{
   var backend: Backend = null
   var topComponent: Module = null
   val components = ArrayBuffer[Module]()
-  var sortedComps: ArrayBuffer[Module] = null
+  val sortedComps = ArrayBuffer[Module]()
   val nodes = ArrayBuffer[Node]()
   val orderedNodes = ArrayBuffer[Node]()
   val blackboxes = ArrayBuffer[BlackBox]()

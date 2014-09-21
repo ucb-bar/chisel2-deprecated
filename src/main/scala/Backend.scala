@@ -100,14 +100,15 @@ abstract class Backend extends FileSystemUtilities{
     }
 
     def gatherChildren(root: Module): ArrayBuffer[Module] = {
-      var result = ArrayBuffer[Module]()
+      val result = ArrayBuffer[Module]()
       for (child <- root.children)
-        result = result ++ gatherChildren(child)
-      result ++ ArrayBuffer[Module](root)
+        result ++= gatherChildren(child)
+      result += root
+      result
     }
 
     levelChildren(Driver.topComponent, 0)
-    Driver.sortedComps = gatherChildren(Driver.topComponent).sortWith(
+    Driver.sortedComps ++= gatherChildren(Driver.topComponent).sortWith(
       (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)))
   }
 

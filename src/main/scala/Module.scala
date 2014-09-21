@@ -152,7 +152,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   var moduleName: String = "";
   var named = false;
   val bindings = new ArrayBuffer[Binding];
-  var wiresCache: Array[(String, Bits)] = null;
   var parent: Module = null;
   val children = ArrayBuffer[Module]()
   val debugs = LinkedHashSet[Node]()
@@ -232,8 +231,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
 
   def nextIndex : Int = { nindex = nindex + 1; nindex }
 
-  var isWalking = new HashSet[Node];
-  var isWalked = new HashSet[Node];
   // override def toString: String = name this one isn't really working...
   def wires: Array[(String, Bits)] = {
     // if (wiresCache == null) {
