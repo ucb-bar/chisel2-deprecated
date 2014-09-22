@@ -1331,7 +1331,7 @@ class CppBackend extends Backend {
     // If we're partitioning a monolithic circuit into separate islands
     // of combinational logic, generate those islands now.
     val islands = if (partitionIslands) {
-      createIslands(c)
+      createIslands()
     } else {
       val e = ArrayBuffer[Island]()
       e += new Island(0, new IslandNodes, new IslandNodes)

@@ -214,8 +214,15 @@ class DotBackend extends Backend {
   override def elaborate(c: Module): Unit = {
     super.elaborate(c)
 
+    /* From Cpp.scala:
+     * We flatten all signals in the toplevel component after we had
+     a change to associate node and components correctly first
+     otherwise we are bound for assertions popping up left and right
+     in the Backend.elaborate method. */
+    flattenAll // created Driver.orderedNodes
+
     if (Driver.partitionIslands) {
-      islands = createIslands(c)
+      islands = createIslands()
     }
     var gn = -1;
     val out_cd = createOutputFile(c.name + "_c.dot");

@@ -124,7 +124,7 @@ object PartitionIslands {
   /* Create separately compilable islands of combinational logic.
    *
    */
-  def createIslands(module: Module): Array[Island] = {
+  def createIslands(): Array[Island] = {
     type NodeSet = HashSet[Node]
     val res = new IslandCollection
     val roots = new ArrayBuffer[Node]
@@ -134,7 +134,7 @@ object PartitionIslands {
     val lits = new NodeSet
     val barren = new NodeSet
     val bogus = new NodeSet
-    val markedNodes = new MarkedNodes(module.nodes.size)
+    val markedNodes = new MarkedNodes(Driver.orderedNodes.size)
     var islandId = 1
     val doMoveMemories = true
     val mergeSingleNodeIslands = true
