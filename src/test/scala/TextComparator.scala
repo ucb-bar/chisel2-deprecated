@@ -220,10 +220,10 @@ class TextComparator {
   }
 }
 
-object TestComparitor {
+object TestComparator {
   def compareFiles(masters: Array[String], tests: Array[String]): Option[ComparatorError] = {
     var finalResult: Option[ComparatorError] = None
-    val comparitor = new TextComparator()
+    val comparator = new TextComparator()
     for ((masterFilePath, testFilePath) <- masters zip tests) {
       val masterFile = fromFile(masterFilePath)
       val original = masterFile.mkString
@@ -231,7 +231,7 @@ object TestComparitor {
       val testFile = fromFile(testFilePath)
       val test = testFile.mkString
       testFile.close()
-      val aResult = comparitor.compareText(original, test)
+      val aResult = comparator.compareText(original, test)
       aResult match {
         case Some(e: Exception) => println(e)
         case None =>{}
