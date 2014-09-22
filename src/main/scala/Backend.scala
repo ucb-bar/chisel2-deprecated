@@ -128,7 +128,7 @@ abstract class Backend extends FileSystemUtilities{
     Driver.components foreach (_.markComponent)
   }
 
-  def verifyAllMuxes(mod: Module) {
+  def verifyAllMuxes {
     Driver.bfs { _ match {
       case p: proc => p.verifyMuxes
       case _ =>
