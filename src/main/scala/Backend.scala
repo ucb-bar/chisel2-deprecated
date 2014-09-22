@@ -71,6 +71,17 @@ abstract class Backend extends FileSystemUtilities{
   /* Whether or not this backend decomposes along Module boundaries. */
   def isEmittingComponents: Boolean = false
 
+  def addPin[T <: Data](m: Module, pin: T, name: String) = {
+    for ((n, io) <- pin.flatten) {
+      io.component = m
+      io.isIo = true
+    }
+    if (name != "")
+      pin. nameIt (name, true)
+    m.io.asInstanceOf[Bundle] += pin
+    pin
+  }
+
   def depthString(depth: Int): String = {
     var res = "";
     for (i <- 0 until depth)
