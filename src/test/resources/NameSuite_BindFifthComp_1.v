@@ -69,9 +69,9 @@ module NameSuite_BindFifthComp_1(input clk,
     output[31:0] io_resp_resp_bits_ppn
 );
 
-  wire[31:0] vdtlb_io_out_resp_bits_ppn;
-  wire vdtlb_io_out_resp_bits_error;
   wire vdtlb_io_out_resp_valid;
+  wire vdtlb_io_out_resp_bits_error;
+  wire[31:0] vdtlb_io_out_resp_bits_ppn;
 
 
   assign io_resp_resp_bits_ppn = vdtlb_io_out_resp_bits_ppn;

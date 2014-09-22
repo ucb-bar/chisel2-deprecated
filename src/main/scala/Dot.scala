@@ -120,7 +120,7 @@ class DotBackend extends Backend {
       val island_res = new StringBuilder()
       val islandId = if (island == null) 0 else island.islandId
 
-      for (m <- top.mods) {
+      for (m <- top.nodes) {
         if (isDottable(m)) {
           if( m.component == top ) {
             /* We have to check the node's component agrees because output
@@ -151,7 +151,7 @@ class DotBackend extends Backend {
           }
         }
       }
-      for (m <- top.mods) {
+      for (m <- top.nodes) {
         if( m.component == top && isDottable(m)) {
           /* We have to check the node's component agrees because output
            nodes are part of a component *mods* as well as its parent *mods*! */

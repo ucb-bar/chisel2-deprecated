@@ -203,7 +203,7 @@ object PartitionIslands {
     var nodeCount = 0
     var maxNodeId = 0
     // Generate an array of input and output nodes for this module, and initialize the island id for each node.
-    for (node <- module.omods) {
+    for (node <- Driver.orderedNodes) {
       if (node.isIo) {
         if (isRoot(node)) {
           roots += node

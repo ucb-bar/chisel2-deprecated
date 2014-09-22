@@ -100,14 +100,15 @@ abstract class Backend extends FileSystemUtilities{
     }
 
     def gatherChildren(root: Module): ArrayBuffer[Module] = {
-      var result = ArrayBuffer[Module]()
+      val result = ArrayBuffer[Module]()
       for (child <- root.children)
-        result = result ++ gatherChildren(child)
-      result ++ ArrayBuffer[Module](root)
+        result ++= gatherChildren(child)
+      result += root
+      result
     }
 
     levelChildren(Driver.topComponent, 0)
-    Driver.sortedComps = gatherChildren(Driver.topComponent).sortWith(
+    Driver.sortedComps ++= gatherChildren(Driver.topComponent).sortWith(
       (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)))
   }
 
@@ -191,21 +192,18 @@ abstract class Backend extends FileSystemUtilities{
 
   def emitRef(node: Node): String = {
     node match {
-      case r: Reg =>
-        if (r.name == "") "R" + r.emitIndex else r.name
+      case _: Literal =>
+        node.name
+      case _: Reg =>
+        if (node.named) node.name else "R" + node.emitIndex
       case _ =>
-        if(node.name == "") {
-          "T" + node.emitIndex
-        } else {
-          node.name
-        }
+        if (node.named) node.name else "T" + node.emitIndex
     }
   }
 
   def emitRef(c: Module): String = c.name
   def emitDec(node: Node): String = ""
 
-  val preElaborateTransforms = ArrayBuffer[(Module) => Unit]()
   val transforms = ArrayBuffer[(Module) => Unit]()
   if (Driver.isCSE) transforms += CSE.transform
   val analyses = ArrayBuffer[(Module) => Unit]()
@@ -237,6 +235,7 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def collectNodesIntoComp {
+    Driver.sortedComps foreach (_.nodes.clear)
     Driver.dfs { node =>
       val curComp = node match {
         case io: Bits if io.isIo && io.dir == INPUT => 
@@ -245,8 +244,7 @@ abstract class Backend extends FileSystemUtilities{
           node.component
       }
       assert(node.component != null, "NULL NODE COMPONENT " + node.name)
-      if (!node.isTypeNode && !(node.component.nodes contains node))
-        node.component.nodes += node
+      if (!node.isTypeNode) node.component.nodes += node
       for (input <- node.inputs ; if !input.isTypeNode) {
         if (!(input.component == null || input.component == node.component) &&
             !input.isLit && !isBitsIo(input, OUTPUT) && !isBitsIo(node, INPUT) &&
@@ -298,8 +296,8 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def pruneUnconnectedIOs(m: Module) {
-    val inputs = m.io.flatten.filter(_._2.dir == INPUT)
-    val outputs = m.io.flatten.filter(_._2.dir == OUTPUT)
+    val inputs = m.wires.filter(_._2.dir == INPUT)
+    val outputs = m.wires.filter(_._2.dir == OUTPUT)
 
     for ((name, i) <- inputs) {
       if (i.inputs.length == 0 && m != Driver.topComponent)
@@ -342,7 +340,7 @@ abstract class Backend extends FileSystemUtilities{
     }
 
     for (c <- Driver.components ; if c != Driver.topComponent) {
-      for ((n,i) <- c.io.flatten) {
+      for ((n,i) <- c.wires) {
         if (i.inputs.length == 0) {          
           prettyPrint(i, c)
         }
@@ -557,9 +555,9 @@ abstract class Backend extends FileSystemUtilities{
          and the logic's grandfather component is not the same
          as the io's component and the logic's component is not
          same as output's component unless the logic is an input */
-      for ((n, io) <- comp.io.flatten) {
+      for ((n, io) <- comp.wires) {
         // Add bindings only in the Verilog Backend
-        if (io.dir == OUTPUT && this.isInstanceOf[VerilogBackend]) {
+        if (io.dir == OUTPUT) {
           val consumers = io.consumers.clone
           val inputsMap = HashMap[Node, ArrayBuffer[Node]]()
           for (node <- consumers) inputsMap(node) = node.inputs.clone
@@ -614,12 +612,6 @@ abstract class Backend extends FileSystemUtilities{
         bind.named = true;
       }
     }
-  }
-
-  def collectNodes {
-    // collect nodes into 'mods', which is used in code generation
-    // TODO: remove 'mods'
-    Driver.dfs { node => node.component.mods += node }
   }
 
   def findCombLoop {
@@ -687,9 +679,93 @@ abstract class Backend extends FileSystemUtilities{
     ChiselError.info(res)
   }
 
+  def flattenAll {
+    // Reset indices for temporary nodes
+    Driver.components foreach (_.nindex = -1)
+
+    // Flatten all signals
+    val comp = Driver.topComponent
+    for (c <- Driver.components ; if c != comp) {
+      comp.debugs ++= c.debugs
+      comp.nodes ++= c.nodes
+    }
+
+    // Find roots
+    val roots = ArrayBuffer[Node]()
+    for (c <- Driver.components)
+      roots ++= c.debugs
+    for ((n, io) <- comp.wires)
+      roots += io
+    for (b <- Driver.blackboxes)
+      roots += b.io
+    for (node <- comp.nodes) {
+      node match {
+        case io: Bits if io.dir == OUTPUT && io.consumers.isEmpty =>
+          roots += node
+        case _: Delay =>
+          roots += node
+        case _ => 
+    } }
+
+    // visit nodes and find ordering
+    val stack = Stack[(Int, Node)]()
+    val walked = HashSet[Node]()
+    for (root <- roots) stack push ((0, root))
+    while (!stack.isEmpty) {
+      val (depth, node) = stack.pop
+      if (depth == -1) Driver.orderedNodes += node
+      else {
+        node.depth = math.max(node.depth, depth)
+        if (!(walked contains node)) {
+          walked += node
+          stack push ((-1, node))
+          for (i <- node.inputs; if !(i == null)) {
+            i match {
+              case _: Delay =>
+              case _ => stack push ((depth + 1, i))
+            }
+          }
+        }
+      }
+    }
+  }
+
+  def findGraphDims: (Int, Int, Int) = {
+    val nodes = Driver.orderedNodes.filter(!_.isInstanceOf[Literal])
+    val mhist = new HashMap[String, Int]
+    val whist = new HashMap[Int, Int]
+    val hist = new HashMap[String, Int]
+    for (m <- nodes) {
+      mhist(m.component.toString) = 1 + mhist.getOrElse(m.component.toString, 0)
+      val w = m.needWidth()
+      whist(w) = 1 + whist.getOrElse(w, 0)
+      val name = m match {
+        case op: Op => op.op
+        case o      => {
+          val name = m.getClass.getName
+          name.substring(name.indexOf('.') + 1)
+        }
+      }
+      hist(name) = 1 + hist.getOrElse(name, 0)
+    }
+    ChiselError.info("%60s %7s".format("module", "node count"));
+    for (n <- mhist.keys.toList.sortWith((a, b) => mhist(a) > mhist(b)))
+      ChiselError.info("%60s %7d".format(n, mhist(n)))
+    ChiselError.info("%12s %7s".format("name", "count"));
+    for (n <- hist.keys.toList.sortWith((a, b) => hist(a) > hist(b)))
+      ChiselError.info("%12s %7d".format(n, hist(n)))
+    ChiselError.info("%5s %s".format("width", "count"));
+    for (w <- whist.keys.toList.sortWith((a, b) => a < b))
+      ChiselError.info("%5d %7d".format(w, whist(w)))
+    val maxDepth = nodes.map(_.depth).foldLeft(0)(_ max _)
+    val widths = new Array[Int](maxDepth + 1)
+    for (m <- nodes)
+      widths(m.depth) += 1
+    val maxWidth = widths.foldLeft(0)(_ max _)
+    (nodes.length, maxWidth, maxDepth)
+  }
 
   def elaborate(c: Module): Unit = {
-    execute(c, preElaborateTransforms)
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
     markComponents
     sortComponents
@@ -698,11 +774,9 @@ abstract class Backend extends FileSystemUtilities{
     nameAll
     ChiselError.checkpoint()
 
-    if (!transforms.isEmpty) {
-      ChiselError.info("executing custom transforms")
-      execute(c, transforms)
-      ChiselError.checkpoint()
-    }
+    ChiselError.info("executing custom transforms")
+    execute(c, transforms)
+    ChiselError.checkpoint()
 
     ChiselError.info("adding clocks and resets")
     assignClockAndResetToModules
@@ -722,6 +796,9 @@ abstract class Backend extends FileSystemUtilities{
     ChiselError.info("compiling %d nodes".format(nbNodes))
     ChiselError.checkpoint()
 
+    ChiselError.info("computing memory ports")
+    computeMemPorts
+
     /* *collectNodesIntoComp* associates components to nodes that were
      created after the call tree has been executed (ie. in genMuxes
      and forceMatchWidths).
@@ -737,17 +814,13 @@ abstract class Backend extends FileSystemUtilities{
     ChiselError.info("resolving nodes to the components")
     collectNodesIntoComp
     checkModuleResolution
+    ChiselError.checkpoint()
 
-    ChiselError.info("computing memory ports")
-    computeMemPorts
-
+    verifyAllMuxes
+    findConsumers
+    // name temporary nodes generated by transforms
     nameAll 
     nameRsts
-
-    findConsumers
-    addBindings
-    nameBindings 
-    findConsumers
 
     ChiselError.info("creating clock domains")
     val clkDomainWalkedNodes = new HashSet[Node]
@@ -755,10 +828,6 @@ abstract class Backend extends FileSystemUtilities{
       for (node <- comp.nodes)
         if (node.isInstanceOf[Reg])
           createClkDomain(node, clkDomainWalkedNodes)
-
-    verifyAllMuxes
-    collectNodes
-    ChiselError.checkpoint()
 
     ChiselError.info("pruning unconnected IOs")
     for (comp <- Driver.sortedComps) {

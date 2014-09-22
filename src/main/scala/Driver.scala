@@ -123,7 +123,7 @@ object Driver extends FileSystemUtilities{
       queue enqueue a
     for (b <- blackboxes)
       queue enqueue b.io
-    for (c <- components; (n, io) <- c.io.flatten)
+    for (c <- components; (n, io) <- c.wires)
       queue enqueue io
     for (c <- components; if !(c.defaultResetPin == null))
       queue enqueue c.defaultResetPin
@@ -157,7 +157,7 @@ object Driver extends FileSystemUtilities{
   def dfs (visit: Node => Unit) = {
     val stack = new Stack[Node]
     // initialize DFS
-    for (c <- components; (n, io) <- c.io.flatten)
+    for (c <- components; (n, io) <- c.wires)
       stack push io
     for (c <- components; if !(c.defaultResetPin == null))
       stack push c.defaultResetPin
@@ -215,6 +215,7 @@ object Driver extends FileSystemUtilities{
     isReportDims = false
     targetDir = "."
     components.clear()
+    sortedComps.clear()
     compStack.clear()
     stackIndent = 0
     printStackStruct.clear()
@@ -243,6 +244,7 @@ object Driver extends FileSystemUtilities{
     implicitClock = new Clock()
     implicitClock.setName("clk")
     nodes.clear()
+    orderedNodes.clear()
     isInGetWidth = false
     startTime = System.currentTimeMillis
     modStackPushed = false
@@ -380,8 +382,9 @@ object Driver extends FileSystemUtilities{
   var backend: Backend = null
   var topComponent: Module = null
   val components = ArrayBuffer[Module]()
-  var sortedComps: ArrayBuffer[Module] = null
+  val sortedComps = ArrayBuffer[Module]()
   val nodes = ArrayBuffer[Node]()
+  val orderedNodes = ArrayBuffer[Node]()
   val blackboxes = ArrayBuffer[BlackBox]()
   val chiselOneHotMap = HashMap[(UInt, Int), UInt]()
   val chiselOneHotBitMap = HashMap[(Bits, Int), Bool]()

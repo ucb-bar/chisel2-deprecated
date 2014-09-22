@@ -254,18 +254,18 @@ class VcdBackend(top: Module) extends Backend {
     }
   }
 
-  private val sortedMods = (top.omods foldLeft Array[Node]()){
+  private val sortedMods = (Driver.orderedNodes foldLeft Array[Node]()){
     case (array: Array[Node], mem: Mem[_]) => array
     case (array: Array[Node], rom: ROMData) => array
     case (array: Array[Node], node: Node) => if (node.isInVCD) array ++ Array(node) else array
   } sortWith (_.width < _.width)
 
-  private val sortedMems = (top.omods foldLeft Array[Mem[_]]()){
+  private val sortedMems = (Driver.orderedNodes foldLeft Array[Mem[_]]()){
     case (array: Array[Mem[_]], mem: Mem[_]) => if (mem.isInVCD) array ++ Array(mem) else array
     case (array: Array[Mem[_]], node: Node) => array
   } sortWith (_.widthW < _.widthW)
 
-  private val sortedROMs = (top.omods foldLeft Array[ROMData]()){
+  private val sortedROMs = (Driver.orderedNodes foldLeft Array[ROMData]()){
     case (array: Array[ROMData], rom: ROMData) => if (rom.isInVCD) array ++ Array(rom) else array
     case (array: Array[ROMData], node: Node) => array
   } sortWith (_.width < _.width)

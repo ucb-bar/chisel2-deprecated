@@ -101,13 +101,13 @@ module StdlibSuite_ArbiterTest_1(
 );
 
   wire T0;
-  wire arb_io_out_valid;
-  wire[1:0] arb_io_chosen;
-  wire[7:0] arb_io_out_bits;
-  wire arb_io_in_0_ready;
-  wire arb_io_in_1_ready;
-  wire arb_io_in_2_ready;
   wire arb_io_in_3_ready;
+  wire arb_io_in_2_ready;
+  wire arb_io_in_1_ready;
+  wire arb_io_in_0_ready;
+  wire arb_io_out_valid;
+  wire[7:0] arb_io_out_bits;
+  wire[1:0] arb_io_chosen;
 
 
   assign io_fire = T0;

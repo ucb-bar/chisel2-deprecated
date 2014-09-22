@@ -109,12 +109,8 @@ class CppBackend extends Backend {
     node match {
       case _: Bits if !node.isInObject && node.inputs.length == 1 => 
         emitRef(node.inputs(0))
-      case _: Literal =>
-        node.name
-      case _: Reg => 
-        if (node.named) node.name else "R" + node.emitIndex
       case _ =>
-        if (node.named) node.name else "T" + node.emitIndex
+        super.emitRef(node)
     }
   }
 
@@ -865,17 +861,16 @@ class CppBackend extends Backend {
   /** Ensures each node such that it has a unique name accross the whole
     hierarchy by prefixing its name by a component path (except for "reset"
     and all nodes in *c*). */
-  def renameNodes(c: Module, nodes: Seq[Node]) {
+  def renameNodes(nodes: ArrayBuffer[Node]) {
+    val comp = Driver.topComponent
     for (m <- nodes) {
       m match {
-        case l: Literal => ;
-        case any        =>
-          if (m.name != "" && !(m == c.defaultResetPin) && !(m.component == null)) {
-            // only modify name if it is not the reset signal or not in top component
-            if(m.name != "reset" || !(m.component == c)) {
-              m.name = m.component.getPathName + "__" + m.name;
-            }
-          }
+        case _: Literal =>
+        case _ if m.named && (m != comp.defaultResetPin) && m.component != null =>
+          // only modify name if it is not the reset signal or not in top component
+          if (m.name != "reset" || m.component != comp)
+            m.name = m.component.getPathName + "__" + m.name
+        case _ =>
       }
     }
   }
@@ -884,15 +879,15 @@ class CppBackend extends Backend {
    * Takes a list of nodes and returns a list of tuples with the names attached.
    * Used to preserve original node names before the rename process.
    */
-  def generateNodeMapping(nodes: Seq[Node]): ArrayBuffer[Tuple2[String, Node]] = {
-    val mappings = new ArrayBuffer[Tuple2[String, Node]]
-    for (m <- nodes) {
+  def generateNodeMapping = {
+    val mappings = new ArrayBuffer[(String, Node)]
+    for (m <- Driver.orderedNodes) {
       if (m.chiselName != "") {
         val mapping = (m.chiselName, m)
         mappings += mapping
       }
     }
-    return mappings
+    mappings
   }
 
   def emitMapping(mapping: Tuple2[String, Node]): String = {
@@ -1060,9 +1055,9 @@ class CppBackend extends Backend {
         val bMem = b.isInstanceOf[Mem[_]] || b.isInstanceOf[ROMData]
         aMem < bMem || aMem == bMem && a.needWidth() < b.needWidth()
       }
-      for (m <- c.omods.filter(_.isInObject).sortWith(headerOrderFunc))
+      for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc))
         out_h.write(emitDec(m))
-      for (m <- c.omods.filter(_.isInVCD).sortWith(headerOrderFunc))
+      for (m <- Driver.orderedNodes.filter(_.isInVCD).sortWith(headerOrderFunc))
         out_h.write(vcd.emitDec(m))
       for (clock <- Driver.clocks)
         out_h.write(emitDec(clock))
@@ -1164,7 +1159,7 @@ class CppBackend extends Backend {
       val head = "void " + c.name + "_t::init ( val_t rand_init ) {\n" +
                  "  this->__srand(rand_init);\n"
       val llf = new LineLimitedFunction("init", lineLimitFunctions, head)
-      for (m <- c.omods) {
+      for (m <- Driver.orderedNodes) {
         llf.addString(emitInit(m))
       }
       for (clock <- Driver.clocks) {
@@ -1218,7 +1213,7 @@ class CppBackend extends Backend {
                  s"  assert(mod_typed);\n"
       val tail = "  return true;\n}\n"
       val llf = new LineLimitedFunction("set_circuit_from", lineLimitFunctions, head, tail, c.name + "_t* mod_typed", "mod_typed")
-      for (m <- c.omods) {
+      for (m <- Driver.orderedNodes) {
         if(m.name != "reset" && m.isInObject) {
           llf.addString(emitCircuitAssign("mod_typed->", m))
         }
@@ -1307,31 +1302,29 @@ class CppBackend extends Backend {
       llf.done()
       val nFunctions = llf.bodies.length
       writeCppFile(llf.getBodies)
+
+      // Add the init_mapping_table file to the list of unoptimized files.
+      if (compileInitializationUnoptimized) {
+        val trimLength = ".cpp".length()
+        unoptimizedFiles += out_cpps.last.name.dropRight(trimLength)
+      }
       nFunctions
     }
 
     println("CPP elaborate")
     super.elaborate(c)
-    // reset indices for temporary nodes
-    Driver.components foreach (_.nindex = -1)
 
     /* We flatten all signals in the toplevel component after we had
      a change to associate node and components correctly first
      otherwise we are bound for assertions popping up left and right
      in the Backend.elaborate method. */
-    for (cc <- Driver.components) {
-      if (!(cc == c)) {
-        c.debugs ++= cc.debugs
-        c.mods   ++= cc.mods;
-      }
-    }
+    flattenAll // created Driver.orderedNodes
     ChiselError.checkpoint()
 
-    c.findOrdering(); // search from roots  -- create omods
-    val mappings = generateNodeMapping(c.omods);
-    renameNodes(c, c.omods);
+    val mappings = generateNodeMapping
+    renameNodes(Driver.orderedNodes)
     if (Driver.isReportDims) {
-      val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
+      val (numNodes, maxWidth, maxDepth) = findGraphDims
       ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
 
@@ -1408,7 +1401,7 @@ class CppBackend extends Backend {
 
         // Should we determine which shadow registers we need?
         if (allocateOnlyNeededShadowRegisters || true) {
-          for (n <- c.omods) {
+          for (n <- Driver.orderedNodes) {
             determineRequiredShadowRegisters(n)
           }
         }
@@ -1416,7 +1409,7 @@ class CppBackend extends Backend {
         // Are we generating partitioned islands?
         if (!partitionIslands) {
           // No. Generate and output a single, monolithic function.
-          for (m <- c.omods) {
+          for (m <- Driver.orderedNodes) {
             addClkDefs(m, code)
           }
           // For the non-patitioned case, we're going to merge the clock_hi init and def code into a single function.
@@ -1427,7 +1420,7 @@ class CppBackend extends Backend {
           }
         } else {
           val addedCode = new Array[Boolean](3)
-          for (m <- c.omods) {
+          for (m <- Driver.orderedNodes) {
             for (island <- islands) {
               if (isNodeInIsland(m, island)) {
                 val islandId = island.islandId
@@ -1589,12 +1582,6 @@ class CppBackend extends Backend {
     advanceCppFile()
     // Generate API functions
     val nInitMappingTableMethods = genInitMappingTableMethod(mappings)
-
-    // Add the init_mapping_table file to the list of unoptimized files.
-    if (compileInitializationUnoptimized) {
-      val trimLength = ".cpp".length()
-      unoptimizedFiles += out_cpps.last.name.dropRight(trimLength)
-    }
 
     // Finally, generate the header - once we know how many methods we'll have.
     genHeader(vcd, islands, nInitMethods, nSetCircuitFromMethods, nDumpInitMethods, nDumpMethods, nInitMappingTableMethods)
