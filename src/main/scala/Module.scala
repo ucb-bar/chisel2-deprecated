@@ -326,18 +326,25 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       walked += top
       visit(top)
       top match {
+        case io: Bits if io.isIo && io.dir == INPUT =>
         case v: Vec[_] => 
           for ((n, e) <- v.flatten; 
           if !(e == null) && !(walked contains e) && !e.isIo) {
             queue enqueue e
             walked += e
           }
-        case _ =>
-      }
-      for (i <- top.inputs; 
-      if !(i == null) && !(walked contains i) && !i.isIo) {
-        queue enqueue i
-        walked += i
+          for (i <- top.inputs; 
+          if !(i == null) && !(walked contains i) && !i.isIo) {
+            queue enqueue i
+            walked += i
+          }
+        case _ => {
+          for (i <- top.inputs; 
+          if !(i == null) && !(walked contains i) && !i.isIo) {
+            queue enqueue i
+            walked += i
+          }
+        }
       }
     }
   }
@@ -359,18 +366,26 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       walked += top
       visit(top)
       top match {
-        case v: Vec[_] => 
+        case io: Bits if io.isIo && io.dir == INPUT =>
+        case v: Vec[_] => {
           for ((n, e) <- v.flatten; 
           if !(e == null) && !(walked contains e) && !e.isIo) {
             stack push e
             walked += e
           }
-        case _ =>
-      }
-      for (i <- top.inputs; 
-      if !(i == null) && !(walked contains i) && !i.isIo) {
-        stack push i
-        walked += i
+          for (i <- top.inputs; 
+          if !(i == null) && !(walked contains i) && !i.isIo) {
+            stack push i
+            walked += i
+          }
+        }
+        case _ => {
+          for (i <- top.inputs; 
+          if !(i == null) && !(walked contains i) && !i.isIo) {
+            stack push i
+            walked += i
+          }
+        }
       }
     }
   }

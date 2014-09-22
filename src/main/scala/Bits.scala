@@ -93,7 +93,7 @@ abstract class Bits extends Data with proc {
   }
 
   override def assign(src: Node): Unit = {
-    if (checkAssign(src)) {
+    if (Driver.topComponent != null || checkAssign(src)) {
       assigned = true
       if (!procAssigned) inputs += src
       else if (defaultMissing) setDefault(src)
@@ -101,7 +101,7 @@ abstract class Bits extends Data with proc {
   }
 
   override def procAssign(src: Node): Unit =
-    if (checkAssign(src))
+    if (Driver.topComponent != null || checkAssign(src))
       super.procAssign(src)
 
   override def defaultRequired: Boolean = true
