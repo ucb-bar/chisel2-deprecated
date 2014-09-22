@@ -310,8 +310,7 @@ object Op {
     }
 
     }
-    if (Driver.backend.isInstanceOf[CppBackend] || Driver.backend.isInstanceOf[FloBackend] ||
-        Driver.isBackannotating) {
+    if (Driver.backend.isInstanceOf[CppBackend] || Driver.backend.isInstanceOf[FloBackend]) {
       def signAbs(x: Node): (Bool, UInt) = {
         val f = x.asInstanceOf[SInt]
         val s = f < SInt(0)
@@ -442,6 +441,11 @@ abstract class Op extends Node {
         val w = max(inputs(0).needWidth(), inputs(1).needWidth())
         if (inputs(0).needWidth() != w) inputs(0) = inputs(0).matchWidth(Width(w))
         if (inputs(1).needWidth() != w) inputs(1) = inputs(1).matchWidth(Width(w))
+      } else if (List(">>", "s>>").contains(op)) {
+        val wl = log2Up(inputs(0).needWidth())
+        val w = 1 << wl
+        if (inputs(0).needWidth() != w ) inputs(0) = inputs(0).matchWidth(Width(w))
+        if (inputs(1).needWidth() != wl) inputs(1) = inputs(1).matchWidth(Width(wl))
       }
     }
   }

@@ -146,7 +146,6 @@ abstract class Node extends nameable {
   var width_ = Width()
   val consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
   val inputs = new ArrayBuffer[Node];
-  def traceableNodes: Array[Node] = Array[Node]();
   var inferWidth: (=> Node) => Width = maxWidth
 
   var nameHolder: nameable = null;
@@ -159,8 +158,6 @@ abstract class Node extends nameable {
   var driveRand = false
   var clock: Clock = null
   var CppVertex: CppVertex = null
-  var counter: Bits = null
-  var shadow: Bits = null
   var cntrIdx = -1
 
   val _id = Driver.nodes.length
@@ -195,7 +192,7 @@ abstract class Node extends nameable {
       if (!named && (!isIo || isNamingIo)) {
         /* If the name was set explicitely through *setName*,
          we don't override it. */
-        name = path;
+        setName(path)
       }
       while (component.names.getOrElseUpdate(name, this) ne this)
         name += "_"
@@ -208,15 +205,10 @@ abstract class Node extends nameable {
     }
   }
 
-  def setPseudoName(path: String, isNamingIo: Boolean) {
-    if (!isIo || (isIo && isNamingIo))
-      pName = path
-  }
-
   lazy val chiselName = this match {
     case l: Literal => "";
     case any        =>
-      if (name != "" && (name != "reset") && !(component == null)) 
+      if (named && (name != "reset") && !(component == null)) 
         component.getPathName(".") + "." + name
       else
         ""
@@ -318,101 +310,6 @@ abstract class Node extends nameable {
       } else {
         in.printTree(writer, depth-1, indent + "  ");
       }
-    }
-  }
-
-  def traceNode(c: Module, stack: Stack[() => Any]): Any = {
-    // pushes and pops components as necessary in order to later mark the parent of nodes
-    val (comp, nextComp) =
-      this match {
-        case io: Bits => {
-          if(io.isIo && (io.dir == INPUT || io.dir == OUTPUT)) {
-            (io.component, if (io.dir == OUTPUT) io.component else io.component.parent)
-          } else {
-            (c, c)
-          }
-        }
-        case any    => (c, c);
-      }
-
-    assert( comp != null );
-    if (comp != null && !comp.isWalked.contains(this)) {
-      comp.isWalked += this;
-      for (node <- traceableNodes) {
-        if (node != null) {
-          stack.push(() => node.traceNode(nextComp, stack));
-        }
-      }
-      var i = 0;
-      for (node <- inputs) {
-        if (node != null) {
-          node match {
-            case n: Literal => // Skip the below check for Literals, which can safely be static
-            case _ => {
-             //tmp fix, what happens if multiple componenets reference static nodes?
-              if (node.component == null || !Driver.components.contains(node.component)) {
-                /* If Backend.collectNodesIntoComp does not resolve the component
-                 field for all components, we will most likely end-up here. */
-                assert(node.component == nextComp,
-                  ((if(node.name != null && !node.name.isEmpty)
-                    node.name else "?")
-                    + "[" + node.getClass.getName
-                    + "] has no match between component "
-                    + (if( node.component == null ) "(null)" else node.component)
-                    + " and '" + nextComp + "' input of "
-                    + (if(this.name != null && !this.name.isEmpty)
-                    this.name else "?")))
-              }
-            }
-          }
-          if (!Driver.backend.isInstanceOf[VerilogBackend] || !node.isIo) {
-            stack.push(() => node.traceNode(nextComp, stack));
-          }
-          val j = i;
-          val n = node;
-          stack.push(() => {
-            /* This code finds an output binding for a node.
-             We search for a binding only if the io is an output
-             and the logic's grandfather component is not the same
-             as the io's component and the logic's component is not
-             same as output's component unless the logic is an input */
-            n match {
-              case io: Bits =>
-                if (io.isIo && io.dir == OUTPUT && !io.isTypeNode &&
-                    (!(component.parent == io.component) &&
-                     !(component == io.component &&
-                       !(this.isInstanceOf[Bits]
-                         && this.asInstanceOf[Bits].dir == INPUT)))) {
-                  val c = n.component.parent;
-                  val b = Binding(n, c, io.component);
-                  inputs(j) = b;
-                  if (!c.isWalked.contains(b)) {
-                    c.mods += b;  c.isWalked += b;
-                  }
-                  // In this case, we are trying to use the input of a submodule
-                  // as part of the logic outside of the submodule.
-                  // If the logic is outside the submodule, we do not use
-                  // the input name. Instead, we use whatever is driving
-                  // the input. In other words, we do not use the Input name,
-                  // if the component of the logic is the part of Input's
-                  // component. We also do the same when assigning
-                  // to the output if the output is the parent
-                  // of the subcomponent.
-                } else if (io.isIo && io.dir == INPUT &&
-                           ((!this.isIo
-                             && this.component == io.component.parent)
-                             || (this.isInstanceOf[Bits]
-                               && this.asInstanceOf[Bits].dir == OUTPUT &&
-                               this.component == io.component.parent))) {
-                  if (io.inputs.length > 0) inputs(j) = io.inputs(0);
-                }
-              case any =>
-            };
-          });
-        }
-        i += 1;
-      }
-      comp.mods += this;
     }
   }
 

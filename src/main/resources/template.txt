@@ -1,0 +1,79 @@
+#include "{!header_file!}"
+
+// ========================================
+// dat_t needs to have this operator defined, so that
+// I'm allowed to use it with System C.
+// But be warned: I don't quite know what I
+// am doing.
+// ========================================
+template <int w>
+inline ostream& operator << (ostream& os, const dat_t<w>& arg){
+  return os;
+}
+
+SC_MODULE({!name!}){
+  {!component_type!}* c;
+  
+  // sc_fifo<dat_t<1> >* in;
+  {!input_fifos!}
+  
+  // sc_fifo<dat_t<1> >* out;
+  {!output_fifos!}
+
+  SC_HAS_PROCESS({!name!});
+  {!name!}(sc_module_name a_name) : sc_module(a_name) {
+    // Initialize Component, Clock in RESET
+    c = new {!component_type!}();
+    c->init();
+
+    // Initialize Output Fifos
+    // out = new sc_fifo<dat_t<1> >(1);
+    {!init_output_fifos!}
+
+    // Clock Initialization?
+    // Don't understand what this is for. Copied from emulator.
+    for(int i = 0; i < 5; i++) {
+      dat_t<1> reset = LIT<1>(1);
+      c->clock_lo(reset);
+      c->clock_hi(reset);
+    }
+
+    //Register Thread
+    SC_THREAD(component_thread);
+  }
+
+  void component_thread(void){
+    //Buffer for input data
+    // dat_t<1> in_data;
+    // int has_in = 0;
+    {!input_buffers!}
+
+    while(true){
+      //Is there input waiting?
+      // if(!has_in){has_in = in->nb_read(in_data);}
+      // c->GCD__io_a = in_data;
+      // c->GCD__io_v1 = LIT<1>(has_in);
+      {!fill_input!}
+
+      //Are output queues ready?      
+      // c->GCD__io_r2 = LIT<1>(out->num_free() > 0);
+      {!check_output!}      
+
+      //Clock Lo
+      dat_t<1> reset = LIT<1>(0);
+      c->clock_lo(reset);
+
+      //Has input been accepted?
+      // if(c->GCD__io_r1.values[0]) has_in = 0;
+      {!check_input!}
+      
+      //Is output ready?
+      // if(c->GCD__io_v2.values[0]) out->nb_write(c->GCD__io_z);
+      {!valid_output!}
+
+      //Clock Hi
+      wait(1.0, SC_SEC);
+      c->clock_hi(reset);
+    }
+  }
+};

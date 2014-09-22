@@ -42,6 +42,15 @@ class VcdBackend(top: Module) extends Backend {
 
   override def emitTmp(node: Node): String =
     emitRef(node)
+  override def emitRef(node: Node): String =
+    node match {
+      case _: Literal =>
+        node.name
+      case _: Reg =>
+        if (node.named) node.name else "R" + node.emitIndex
+      case _ =>
+        if (node.named) node.name else "T" + node.emitIndex
+    }
 
   private def emitDefUnconditional(node: Node, index: Int) =
     "  dat_dump<" + varNameLength(index) + ">(f, " + emitRef(node) + ", 0x" + varNumber(index).toHexString + ");\n"

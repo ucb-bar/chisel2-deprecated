@@ -195,11 +195,11 @@ class VerilogBackend extends Backend {
                     ChiselError.warning("" + io + " CONNECTED TOO MUCH " + io.inputs.length);
                   }
                 portDec = "//" + portDec
-              } else if (!c.isWalked.contains(w)){
+              /* } else if (!c.isWalked.contains(w)){
                   if (Driver.saveConnectionWarnings) {
                     ChiselError.warning(" UNUSED INPUT " + io + " OF " + c + " IS REMOVED");
                   }
-                portDec = "//" + portDec
+                portDec = "//" + portDec // I don't think this is necessary */
               } else {
                 portDec += emitRef(io.inputs(0));
               }
@@ -606,30 +606,6 @@ class VerilogBackend extends Backend {
     apis.append("  reg isStep = 0;\n")
     apis.append("  reg isTick = 0;\n\n")
 
-    apis.append("  /*** Shadow declaration for 'peeking' ***/\n")
-    val shadowNames = new HashMap[Node, String]
-    apis.append("  // wire shadows\n")
-    for (wire <- wires ; if !wire.isReg) {
-      val shadowName = wire.component.getPathName("_") + "_" + emitRef(wire) + "_shadow"
-      shadowNames(wire) = shadowName
-      apis.append("  reg [%d:0] %s = 0;\n".format(wire.needWidth()-1, shadowName))
-    }
-
-    apis.append("\n  task propagate;\n")
-    apis.append("    begin\n")
-    apis.append("    // copy wires' & mems' value into shadows for 'peeking'\n")
-    for (clk <- clocks) {
-      if (clk != mainClk) apis.append("      if (%s) begin\n".format(clk.name + "_fire"))
-      for (wire <- wires ; if !wire.isReg) {
-        val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
-        val wireName = if (printNodes contains wire) emitRef(wire) else pathName
-        apis.append("      %s = %s;\n".format(shadowNames(wire), wireName))
-      }
-      if (clk != mainClk) apis.append("      end\n")
-    }
-    apis.append("    end\n")
-    apis.append("  endtask\n")
-
     apis.append("\n  integer count;\n")
 
     def fscanf(form: String, args: String*) = 
@@ -659,16 +635,15 @@ class VerilogBackend extends Backend {
 
     apis.append("      // < wire_peek >\n")
     apis.append("      // inputs: wire's name\n")
-    apis.append("      // return: wire's value from its shadow\n")
+    apis.append("      // return: wire's value\n")
     apis.append("      \"wire_peek\": begin\n")
     apis.append("        " + fscanf("%s", "node")) 
     apis.append("        case (node)\n")
     if (!wires.isEmpty) {
       for (wire <- wires) {
         val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
-        val wireName = if (shadowNames contains wire) shadowNames(wire) else pathName
         apis.append("          \"%s\": ".format(pathName) + 
-          display("0x%1x", wireName)
+          display("0x%1x", pathName)
         )
       }
     }
@@ -678,7 +653,7 @@ class VerilogBackend extends Backend {
 
     apis.append("      // < mem_peek >\n")
     apis.append("      // inputs: mem's name\n")
-    apis.append("      // return: mem's value from its shadow\n")
+    apis.append("      // return: mem's value\n")
     apis.append("      \"mem_peek\": begin\n")
     apis.append("        " + fscanf("%s %d", "node", "offset"))
     apis.append("        case (node)\n")
@@ -743,16 +718,15 @@ class VerilogBackend extends Backend {
     apis.append("      end\n")
 
     apis.append("      // < tick > \n")
-    apis.append("      // Update registers without propagation\n")
+    apis.append("      // Update registers\n")
     apis.append("      \"tick\": begin\n")
     apis.append("        isTick = 1;\n")
     apis.append("        $display(\"ok\");\n")
     apis.append("      end\n")
 
     apis.append("      // < propagate > \n")
-    apis.append("      // Update registers without propagation\n")
+    apis.append("      // Update registers\n")
     apis.append("      \"propagate\": begin\n")
-    apis.append("        propagate();\n")
     apis.append("        $display(\"ok\");\n")
     apis.append("      end\n")
 
@@ -817,7 +791,6 @@ class VerilogBackend extends Backend {
     apis.append("      steps = steps - 1;\n")
     apis.append("      delta = delta + min;\n")
     apis.append("      if (steps == 0) begin\n")
-    apis.append("        propagate();\n")
     apis.append("        // return delta\n")
     apis.append("        " + display("%1d", "delta"))
     apis.append("        isStep = 0;\n")
@@ -839,13 +812,6 @@ class VerilogBackend extends Backend {
     val printFormat = printNodes.map(a => a.chiselName + ": 0x%x, ").fold("")((y,z) => z + " " + y)
     val scanFormat = scanNodes.map(a => "%x").fold("")((y,z) => z + " " + y)
 
-    val shadowNames = new HashMap[Node, String]
-    for (node <- printNodes) {
-      val shadowName = node.component.getPathName("_") + "_" + emitRef(node) + "_shadow"
-      shadowNames(node) = shadowName
-      map.append("  reg [%d:0] %s = 0;\n".format(node.needWidth()-1, shadowName))
-    }
-
     map.append("  task check_value;\n")
     map.append("    input [255:0] data;\n")
     map.append("    input [255:0] expected;\n")
@@ -866,9 +832,6 @@ class VerilogBackend extends Backend {
       map.append(", " + emitRef(node))
     }
     map.append(");\n")
-    for (node <- printNodes) {
-      map.append("    %s = %s;\n".format(shadowNames(node), emitRef(node)))
-    }
     map.append("  end\n\n")
 
     map.result
@@ -891,8 +854,10 @@ class VerilogBackend extends Backend {
     for (clock <- c.clocks) {
       clkDomains += (clock -> new StringBuilder)
     }
-    for (p <- c.asserts) {
-      clkDomains(p.clock).append(emitAssert(p))
+    if (Driver.isAssert) {
+      for (p <- c.asserts) {
+        clkDomains(p.clock).append(emitAssert(p))
+      }
     }
     for (m <- c.mods) {
       val clkDomain = clkDomains getOrElse (m.clock, null)
@@ -929,7 +894,7 @@ class VerilogBackend extends Backend {
   def emitAssert(a: Assert): String = {
     "`ifndef SYNTHESIS\n" +
     "  if(" + emitRef(a.reset) + ") " + emitRef(a) + " <= 1'b1;\n" +
-    "  if(!" + emitRef(a.cond) + " && " + emitRef(a) +") begin\n" +
+    "  if(!" + emitRef(a.cond) + " && " + emitRef(a) + " && !" + emitRef(a.reset) + ") begin\n" +
     "    $fwrite(32'h80000002, " + CString("ASSERTION FAILED: %s\n") + ", " + CString(a.message) + ");\n" +
     "    $finish;\n" +
     "  end\n" +
@@ -1087,10 +1052,8 @@ class VerilogBackend extends Backend {
       ChiselError.info(depthString(depth) + "COMPILING " + c
         + " " + c.children.length + " CHILDREN"
         + " (" + c.level + "," + c.traversal + ")");
-      c.findConsumers();
       ChiselError.checkpoint()
 
-      c.collectNodes(c);
       if( c.level > level ) {
         /* When a component instance instantiates different sets
          of sub-components based on its constructor parameters, the same
