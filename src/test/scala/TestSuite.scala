@@ -23,10 +23,10 @@ class TestSuite extends AssertionsForJUnit {
     val teststring = testfile.mkString
     testfile.close()
     if (useNewCompare) {
-      val comparitor = new TextComparitor()
+      val comparator = new TextComparator()
       val masterText = blankLines_re.replaceAllIn(refstring, "")
       val testText = blankLines_re.replaceAllIn(teststring, "")
-      val testTextWithSubstitutions = comparitor.substituteTextIfPossible(masterText, testText)
+      val testTextWithSubstitutions = comparator.substituteTextIfPossible(masterText, testText)
       assert(masterText === testTextWithSubstitutions)
     } else {
       assert(blankLines_re.replaceAllIn(teststring, "") === blankLines_re.replaceAllIn(refstring, ""))
