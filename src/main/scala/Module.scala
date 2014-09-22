@@ -67,6 +67,18 @@ object Module {
       }
     }
   }
+
+  // called in custom transforms
+  def apply[T <: Module](c: =>T, parent: Module): T = {
+    Driver.modStackPushed = true
+    Driver.compStack.push(parent)
+    val res = init(c)
+    Driver.compStack.pop
+    Driver.modAdded = true
+    res.markComponent
+    res
+  }
+
   private def init[T<:Module](c: =>T):T = {
     val res = c
     pop()

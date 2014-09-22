@@ -89,7 +89,7 @@ abstract class Backend extends FileSystemUtilities{
     if(x == 0) "" else "    " + genIndent(x-1);
   }
 
-  def sortComponents: Unit = {
+  def sortComponents {
     def levelChildren(root: Module, traversal: Int) {
       root.level = 0
       root.traversal = traversal
@@ -108,6 +108,7 @@ abstract class Backend extends FileSystemUtilities{
     }
 
     levelChildren(Driver.topComponent, 0)
+    Driver.sortedComps.clear
     Driver.sortedComps ++= gatherChildren(Driver.topComponent).sortWith(
       (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)))
   }
@@ -292,6 +293,10 @@ abstract class Backend extends FileSystemUtilities{
   def execute(c: Module, walks: ArrayBuffer[(Module) => Unit]): Unit = {
     for (w <- walks) {
       w(c)
+    }
+    if (Driver.modAdded) {
+      sortComponents
+      Driver.modAdded = false
     }
   }
 
