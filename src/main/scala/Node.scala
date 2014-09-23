@@ -269,11 +269,11 @@ abstract class Node extends nameable {
   lazy val isInObject: Boolean =
     (isIo && (Driver.isIoDebug || component == Driver.topComponent)) ||
     Driver.topComponent.debugs.contains(this) ||
-    isReg || isUsedByClockHi || Driver.isDebug && !name.isEmpty ||
+    isReg || isUsedByClockHi || Driver.isDebug && named ||
     Driver.emitTempNodes
 
   lazy val isInVCD: Boolean = name != "reset" && needWidth() > 0 &&
-     (!name.isEmpty || Driver.emitTempNodes) &&
+     (named || Driver.emitTempNodes) &&
      ((isIo && isInObject) || isReg || Driver.isDebug)
 
   /** Prints all members of a node and recursively its inputs up to a certain

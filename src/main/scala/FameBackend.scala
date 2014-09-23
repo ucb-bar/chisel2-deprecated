@@ -399,9 +399,9 @@ trait Fame1Transform extends Backend {
   }
   
   
-  transforms += ((top: Module) => collectNodesIntoComp)
-  transforms += ((top: Module) => appendFireToRegWriteEnables(top))
-  transforms += ((top: Module) => appendFireToMemEnables(top))
+  transforms += collectNodesIntoComp
+  transforms += appendFireToRegWriteEnables
+  transforms += appendFireToMemEnables
 }
 
 class Fame1CppBackend extends CppBackend with Fame1Transform

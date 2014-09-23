@@ -397,6 +397,7 @@ object Driver extends FileSystemUtilities{
   var implicitClock: Clock = null
   var isInGetWidth: Boolean = false
   var modStackPushed: Boolean = false
+  var modAdded: Boolean = false
   var startTime = 0L
   /* ChiselConfig flags */
   var chiselConfigClassName: Option[String] = None
