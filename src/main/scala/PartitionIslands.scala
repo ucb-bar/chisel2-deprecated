@@ -67,11 +67,11 @@ object PartitionIslands {
    *
    */
   def isRoot(node: Node): Boolean = {
-    (node.isIo && node.asInstanceOf[Bits].dir == OUTPUT && node.consumers.length == 0)
+    (node.isIo && node.asInstanceOf[Bits].dir == OUTPUT && node.consumers.size == 0)
   }
 
   def isSource(node: Node): Boolean = {
-    (node.isIo && node.asInstanceOf[Bits].dir == INPUT && node.inputs.length == 0)
+    (node.isIo && node.asInstanceOf[Bits].dir == INPUT && node.inputs.size == 0)
   }
 
   /** Flood fill the graph, marking all non-root nodes reachable from here.
@@ -111,7 +111,7 @@ object PartitionIslands {
       if (debug) println("processLinks: inputs for " + node.component.name + "/" + node)
       processLinks(node.inputs)
       if (debug) println("processLinks: consumers for " + node.component.name + "/" + node)
-      processLinks(node.consumers)
+      processLinks(node.consumers.toSeq)
       // Special case - we want to process any unmarked inputs for consumer nodes which are island boundaries, marked or not.
       for (c <- node.consumers; if inputs.contains(c) && marked.contains(c)) {
         processLinks(c.inputs)
@@ -149,7 +149,7 @@ object PartitionIslands {
       //  don't mark the last non-bits node. Otherwise, we won't account for this
       //  collection and we'll generate an exception when we try to determine the island
       //  for the intermediate nodes.
-      if (iNode.isInstanceOf[Bits] && iNode.consumers.length > 0) {
+      if (iNode.isInstanceOf[Bits] && iNode.consumers.size > 0) {
         marked += ((iNode, islandId))
         for (p <- iNode.consumers) {
           markBitsNodes(p, marked, islandId)
@@ -169,7 +169,7 @@ object PartitionIslands {
         println("islandsFromNonBitsNode: pushing " + iNode.component.name + "/" + iNode)
       }
       work.push(iNode)
-      if (iNode.isInstanceOf[Bits] && iNode.consumers.length > 0) {
+      if (iNode.isInstanceOf[Bits] && iNode.consumers.size > 0) {
         for (p <- iNode.consumers) {
           nIslands += islandsFromNonBitsNode(p, res, marked, inputs, work)
         }
@@ -208,12 +208,12 @@ object PartitionIslands {
         if (isRoot(node)) {
           roots += node
           // If this is a root node with no inputs, add it to the bogus list.
-          if (node.inputs.length == 0) {
+          if (node.inputs.size == 0) {
             bogus += node
           }
         } else if (isSource(node)) {
           inputs += node
-        } else if (node.inputs.length == 0 || node.consumers.length == 0) {
+        } else if (node.inputs.size == 0 || node.consumers.size == 0) {
           bogus += node
         }
       } else {
@@ -228,7 +228,7 @@ object PartitionIslands {
           case r: MemRead => memories += r
           case w: MemWrite => memories += w
           */
-          case _ => if (false && node.inputs.length == 0) barren += node
+          case _ => if (false && node.inputs.size == 0) barren += node
         }
       }
       nodeCount += 1
