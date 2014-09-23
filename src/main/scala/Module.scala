@@ -67,6 +67,7 @@ object Module {
       }
     }
   }
+
   private def init[T<:Module](c: =>T):T = {
     val res = c
     pop()
@@ -112,7 +113,10 @@ object Module {
 
   // XXX Remove and instead call current()
   def getComponent(): Module = if(Driver.compStack.length != 0) Driver.compStack.top else null
-  def current: Module = getComponent
+  def current: Module = {
+    val comp = getComponent
+    if (comp == null) Driver.topComponent else comp
+  }
 
   // despite being notionally internal, these have leaked into the API
   def backend: Backend = Driver.backend
@@ -293,6 +297,26 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       this.clocks += clock
   }
 
+  def addPin[T <: Data](pin: T, name: String = "") = {
+    for ((n, io) <- pin.flatten) {
+      io.component = this
+      io.isIo = true
+    }
+    if (name != "") pin nameIt (name, true)
+    io.asInstanceOf[Bundle] += pin
+    pin
+  }
+
+  def addModule[T <: Module](c: => T) = {
+    Driver.modStackPushed = true
+    Driver.compStack.push(this)
+    val res = init(c)
+    Driver.compStack.pop
+    Driver.modAdded = true
+    res.markComponent
+    res
+  }
+
   def bfs (visit: Node => Unit) = {
     // initialize BFS
     val queue = new ScalaQueue[Node]
@@ -311,18 +335,25 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       walked += top
       visit(top)
       top match {
+        case io: Bits if io.isIo && io.dir == INPUT =>
         case v: Vec[_] => 
           for ((n, e) <- v.flatten; 
           if !(e == null) && !(walked contains e) && !e.isIo) {
             queue enqueue e
             walked += e
           }
-        case _ =>
-      }
-      for (i <- top.inputs; 
-      if !(i == null) && !(walked contains i) && !i.isIo) {
-        queue enqueue i
-        walked += i
+          for (i <- top.inputs; 
+          if !(i == null) && !(walked contains i) && !i.isIo) {
+            queue enqueue i
+            walked += i
+          }
+        case _ => {
+          for (i <- top.inputs; 
+          if !(i == null) && !(walked contains i) && !i.isIo) {
+            queue enqueue i
+            walked += i
+          }
+        }
       }
     }
   }
@@ -344,18 +375,26 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       walked += top
       visit(top)
       top match {
-        case v: Vec[_] => 
+        case io: Bits if io.isIo && io.dir == INPUT =>
+        case v: Vec[_] => {
           for ((n, e) <- v.flatten; 
           if !(e == null) && !(walked contains e) && !e.isIo) {
             stack push e
             walked += e
           }
-        case _ =>
-      }
-      for (i <- top.inputs; 
-      if !(i == null) && !(walked contains i) && !i.isIo) {
-        stack push i
-        walked += i
+          for (i <- top.inputs; 
+          if !(i == null) && !(walked contains i) && !i.isIo) {
+            stack push i
+            walked += i
+          }
+        }
+        case _ => {
+          for (i <- top.inputs; 
+          if !(i == null) && !(walked contains i) && !i.isIo) {
+            stack push i
+            walked += i
+          }
+        }
       }
     }
   }
