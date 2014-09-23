@@ -301,7 +301,7 @@ abstract class Backend extends FileSystemUtilities{
 
     for ((name, i) <- inputs) {
       if (i.inputs.length == 0 && m != Driver.topComponent)
-        if (i.consumers.length > 0) {
+        if (i.consumers.size > 0) {
           if (Driver.warnInputs)
             ChiselError.warning({"UNCONNECTED INPUT " + emitRef(i) + " in COMPONENT " + i.component +
                                  " has consumers"})
@@ -315,10 +315,10 @@ abstract class Backend extends FileSystemUtilities{
 
     for ((name, o) <- outputs) {
       if (o.inputs.length == 0 && !o.component.isInstanceOf[BlackBox]) {
-        if (o.consumers.length > 0) {
+        if (o.consumers.size > 0) {
           if (Driver.warnOutputs)
             ChiselError.warning({"UNCONNECTED OUTPUT " + emitRef(o) + " in component " + o.component + 
-                                 " has consumers on line " + o.consumers(0).line})
+                                 " has consumers on line " + o.consumers.head.line})
           o.driveRand = true
         } else {
           if (Driver.warnOutputs)

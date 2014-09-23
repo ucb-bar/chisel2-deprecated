@@ -99,7 +99,7 @@ class ModularCppBackend extends CppBackend {
     val roots = new ArrayBuffer[Node]
     val walked = new ArrayBuffer[Node]
     for (node <- module.nodes) {
-      if (node.isIo && node.asInstanceOf[Bits].dir == OUTPUT && node.consumers.length == 0)
+      if (node.isIo && node.asInstanceOf[Bits].dir == OUTPUT && node.consumers.size == 0)
         roots += node
     }
 

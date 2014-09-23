@@ -656,7 +656,7 @@ class CppBackend extends Backend {
       w match {
         case io: Bits =>
           if (io.dir == OUTPUT) {
-            res += "  " + emitRef(io.consumers(0)) + " = " + emitRef(c) + "->" + n + ";\n";
+            res += "  " + emitRef(io.consumers.head) + " = " + emitRef(c) + "->" + n + ";\n";
           }
       };
     }
