@@ -68,17 +68,6 @@ object Module {
     }
   }
 
-  // called in custom transforms
-  def apply[T <: Module](c: =>T, parent: Module): T = {
-    Driver.modStackPushed = true
-    Driver.compStack.push(parent)
-    val res = init(c)
-    Driver.compStack.pop
-    Driver.modAdded = true
-    res.markComponent
-    res
-  }
-
   private def init[T<:Module](c: =>T):T = {
     val res = c
     pop()
@@ -306,6 +295,26 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   def addClock(clock: Clock) {
     if (!this.clocks.contains(clock))
       this.clocks += clock
+  }
+
+  def addPin[T <: Data](pin: T, name: String = "") = {
+    for ((n, io) <- pin.flatten) {
+      io.component = this
+      io.isIo = true
+    }
+    if (name != "") pin nameIt (name, true)
+    io.asInstanceOf[Bundle] += pin
+    pin
+  }
+
+  def addModule[T <: Module](c: => T) = {
+    Driver.modStackPushed = true
+    Driver.compStack.push(this)
+    val res = init(c)
+    Driver.compStack.pop
+    Driver.modAdded = true
+    res.markComponent
+    res
   }
 
   def bfs (visit: Node => Unit) = {
