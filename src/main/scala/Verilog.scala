@@ -478,7 +478,7 @@ class VerilogBackend extends Backend {
 
     harness.write("  /*** DUT instantiation ***/\n")
     harness.write("    " + c.moduleName + "\n")
-    harness.write("      " + c.moduleName + "(\n")
+    harness.write("      " + c.name + "(\n")
     if (Driver.isTesting) {
       if (c.clocks.size == 1) {
         harness.write("        .%s(%s),\n".format(mainClk.name, mainClk.name))
