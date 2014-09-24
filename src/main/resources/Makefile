@@ -11,8 +11,8 @@ OPTIM1	= @OPTIM1@
 OPTIM2	= @OPTIM2@
 CPPFLAGS  = @CPPFLAGS@
 CXXFLAGS  = @CXXFLAGS@
-
-# LDFLAGS is inherited from the environment
+LDFLAGS  = @LDFLAGS@
+CXX			= @CXX@
 
 default:  $(EXEC)
 

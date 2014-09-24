@@ -793,9 +793,11 @@ class CppBackend extends Backend {
         replacements += (("@EXEC@", c.name))
         replacements += (("@CPPFLAGS@", cppFlags))
         replacements += (("@CXXFLAGS@", cxxFlags))
+        replacements += (("@LDFLAGS@", LDFLAGS))
         replacements += (("@OPTIM0@", optim0))
         replacements += (("@OPTIM1@", optim1))
         replacements += (("@OPTIM2@", optim2))
+        replacements += (("@CXX@", CXX))
         // Read and edit the Makefile template.
         editToTarget("Makefile", replacements)
         val nJobs = if (parallelMakeJobs > 0) "-j" + parallelMakeJobs.toString() else "-j"
