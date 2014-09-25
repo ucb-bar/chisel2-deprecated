@@ -76,7 +76,7 @@ class CppBackend extends Backend {
   // Suppress generation of the monolithic .cpp file if we're compiling
   // multiple files.
   // NOTE: For testing purposes, we may want to generate this file anyway.
-  val suppressMonolithicCppFile = compileMultipleCppFiles  /* || false */
+  val suppressMonolithicCppFile = compileMultipleCppFiles  /* && false */
   // Compile the clone method at -O0
   val cloneCompiledO0 = true
   // Define shadow registers in the circuit object, instead of local registers in the clock hi methods.
