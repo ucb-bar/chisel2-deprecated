@@ -14,10 +14,15 @@ WWW_EXTRA := manual.html getting-started.html
 PDF_DIRS	:= installation manual tutorial getting-started dac12-talk
 PDFS      := $(addsuffix .pdf,$(addprefix chisel-,$(PDF_DIRS)))	
 
+LATEX2MAN := latex2man
+MAN_PAGES := chisel.man
+
 srcDir    := .
 installTop:= ../www
 
 vpath %.tex $(srcDir)/bootcamp $(srcDir)/installation $(srcDir)/talks/dac12 $(srcDir)/manual $(srcDir)/tutorial $(srcDir)/getting-started
+
+vpath %.mtt $(srcDir)/bootcamp $(srcDir)/installation $(srcDir)/talks/dac12 $(srcDir)/manual $(srcDir)/tutorial $(srcDir)/getting-started
 
 all: $(WWW_PAGES) $(WWW_EXTRA) $(PDFS)
 
@@ -43,6 +48,21 @@ chisel-%.pdf: %.tex
 	mv $(subst .tex,.html,$(notdir $<)) $@~
 	$(srcDir)/../bin/tex2html.py $@~ $@
 
+%.man: %.mtt
+	# cd into the directory containing the .tex file and massage it
+	cd $(dir $<) && \
+	tagtext=`git describe --tags` ;\
+	set -- `echo $$tagtext | perl -n -e '($$r = $$_) =~ s/-/ /g; print $$r '` ;\
+	tagid=$$1 ;\
+	ncommits=$$2 ;\
+	gcommit=$$3 ;\
+	set -- `git log -1 --format="%ai" $$tagid` ;\
+	tagdate=$$1 ;\
+	tagtime=$$2 ;\
+	tagtzoffset=$$3 ;\
+	sed -e "s/@VERSION@/$$tagid/" -e "s/@DATE@/$$tagdate/" $(notdir $<) > $(basename $@).ttex ;\
+	TEXINPUTS=".:$(PWD)/$(srcDir)/manual:${TEXINPUTS}" latex2man $(basename $@).ttex $@
+
 %.html: $(srcDir)/templates/%.html
 	$(srcDir)/../bin/jinja2html.py $(notdir $<) $@
 
@@ -55,4 +75,5 @@ clean:
 	-rm -f $(WWW_PAGES) $(PDFS) $(WWW_EXTRA) $(addsuffix .1,$(WWW_EXTRA)) $(patsubst %.html,%.css,$(WWW_EXTRA))
 	-rm -f *~ *.aux *.log *.nav *.out *.snm *.toc *.vrb
 	-rm -f *.jpg *.png
+	-rm -f manual/chisel.man manual/chisel.ttex
 
