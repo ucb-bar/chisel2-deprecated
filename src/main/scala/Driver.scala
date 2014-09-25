@@ -226,8 +226,16 @@ object Driver extends FileSystemUtilities{
     isCheckingPorts = false
     isTesting = false
     isDebugMem = false
+    partitionIslands = false
+    lineLimitFunctions = 0
+    minimumLinesPerFile = 0
+    shadowRegisterInObject = false
+    allocateOnlyNeededShadowRegisters = false
+    compileInitializationUnoptimized = false
+    useSimpleQueue = false
+    parallelMakeJobs = 0
+    isVCDinline = false
     hasMem = false
-    backend = new CppBackend
     topComponent = null
     clocks.clear()
     implicitReset = Bool(INPUT)
@@ -246,6 +254,7 @@ object Driver extends FileSystemUtilities{
 
   private def readArgs(args: Array[String]): Unit = {
     var i = 0
+    var backendName = "c"     // Default backend is Cpp.
     while (i < args.length) {
       val arg = args(i)
       arg match {
@@ -268,29 +277,23 @@ object Driver extends FileSystemUtilities{
         case "--noIoDebug" => isIoDebug = false
         case "--vcd" => isVCD = true
         case "--vcdMem" => isVCDMem = true
-        case "--v" => backend = new VerilogBackend
+        case "--v" => backendName = "v"
         case "--moduleNamePrefix" => Backend.moduleNamePrefix = args(i + 1); i += 1
         case "--inlineMem" => isInlineMem = true
         case "--noInlineMem" => isInlineMem = false
         case "--assert" => isAssert = true
         case "--noAssert" => isAssert = false
         case "--debugMem" => isDebugMem = true
-        case "--backend" => {
-          if (args(i + 1) == "v") {
-            backend = new VerilogBackend
-          } else if (args(i + 1) == "c") {
-            backend = new CppBackend
-          } else if (args(i + 1) == "flo") {
-            backend = new FloBackend
-          } else if (args(i + 1) == "dot") {
-            backend = new DotBackend
-          } else if (args(i + 1) == "fpga") {
-            backend = new FPGABackend
-          } else {
-            backend = Class.forName(args(i + 1)).newInstance.asInstanceOf[Backend]
-          }
-          i += 1
-        }
+        case "--partitionIslands" => partitionIslands = true
+        case "--lineLimitFunctions" => lineLimitFunctions = args(i + 1).toInt; i += 1
+        case "--minimumLinesPerFile" => minimumLinesPerFile = args(i + 1).toInt; i += 1
+        case "--shadowRegisterInObject" => shadowRegisterInObject = true
+        case "--allocateOnlyNeededShadowRegisters" => allocateOnlyNeededShadowRegisters = true
+        case "--compileInitializationUnoptimized" => compileInitializationUnoptimized = true
+        case "--useSimpleQueue" => useSimpleQueue = true
+        case "--parallelMakeJobs" => parallelMakeJobs = args(i + 1).toInt; i += 1
+        case "--isVCDinline" => isVCDinline = true
+        case "--backend" => backendName = args(i + 1); i += 1
         case "--compile" => isCompiling = true
         case "--test" => isTesting = true
         case "--targetDir" => targetDir = args(i + 1); i += 1
@@ -328,6 +331,21 @@ object Driver extends FileSystemUtilities{
       }
       i += 1
     }
+    // Check for bogus flags
+    if (!isVCD) {
+      isVCDinline = false
+    }
+    // Set the backend after we've interpreted all the arguments.
+    // (The backend may want to configure itself based on the arguments.)
+    backend = backendName match  {
+      case "v" => new VerilogBackend
+      case "c" => new CppBackend
+      case "flo" => new FloBackend
+      case "dot" => new DotBackend
+      case "fpga" => new FPGABackend
+      case "sysc" => new SysCBackend
+      case _ => Class.forName(backendName).newInstance.asInstanceOf[Backend]
+    }
   }
 
   var warnInputs = false
@@ -351,6 +369,15 @@ object Driver extends FileSystemUtilities{
   var isTesting = false
   var isAssert = true
   var isDebugMem = false
+  var partitionIslands = false
+  var lineLimitFunctions = 0
+  var minimumLinesPerFile = 0
+  var shadowRegisterInObject = false
+  var allocateOnlyNeededShadowRegisters = false
+  var compileInitializationUnoptimized = false
+  var useSimpleQueue = false
+  var parallelMakeJobs = 0
+  var isVCDinline = false
   var hasMem = false
   var backend: Backend = null
   var topComponent: Module = null

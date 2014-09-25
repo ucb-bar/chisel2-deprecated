@@ -33,9 +33,15 @@ import Node._
 import Reg._
 import ChiselError._
 import scala.collection.mutable.HashSet
+import scala.collection.mutable.HashMap
+import scala.collection.mutable.ArrayBuffer
+import PartitionIslands._
 
 class DotBackend extends Backend {
   val keywords = new HashSet[String]();
+  var islands = Array[Island]()
+  val allDottable = false
+  val useComponentNames = false
 
   override def emitRef(node: Node): String = {
     node match {
@@ -52,6 +58,9 @@ class DotBackend extends Backend {
   }
 
   private def isDottable (m: Node): Boolean = {
+    if (allDottable) {
+      true
+    } else
     if (m == m.component.defaultResetPin) {
       false
     } else {
@@ -64,6 +73,7 @@ class DotBackend extends Backend {
 
 
   private def asValidLabel( node: Node ): String = {
+    val res =
     node match {
       case operator: Op => if (operator.op == "") "?" else operator.op;
       case _             => {
@@ -71,81 +81,149 @@ class DotBackend extends Backend {
         node.name + ":" + typeName
       }
     }
+    if (useComponentNames) {
+      node.component.name + "/" + res
+    } else {
+      res
+    }
   }
 
+  private def isNodeInIsland(node: Node, island: Island): Boolean = {
+    return island == null || island.nodes.contains(node)
+  }
 
   private def emitModuleText(top: Module, depth: Int ): (String, String) = {
     val res = new StringBuilder()
     val crossings = new StringBuilder()
     val indent = "  " * (depth + 1)
     for (child <- top.children) {
-      /* Prefix by "cluster" for graphviz to draw a bounding box. */
-      res.append(indent)
-      res.append("subgraph cluster" + emitRef(child) + "{\n")
-      res.append("  " + indent)
-      res.append("label = \"" + child.name + "\"\n")
+      if (! Driver.partitionIslands) {
+        /* Prefix by "cluster" for graphviz to draw a bounding box. */
+        res.append(indent)
+        res.append("subgraph cluster" + emitRef(child) + "{\n")
+        res.append("  " + indent)
+        res.append("label = \"" + child.name + "\"\n")
+      }
       val (innertext, innercrossings) = emitModuleText(child, depth + 1)
       res.append(innertext)
-      res.append(indent)
-      res.append("}\n")
-      res.append(indent)
+      if (! Driver.partitionIslands) {
+        res.append(indent)
+//        res.append("// end " + child.name + "\n")
+        res.append("}\n")
+        res.append(indent)
+      }
       res.append(innercrossings)
     }
-    for (m <- top.nodes) {
-      if (isDottable(m)) {
-        if( m.component == top ) {
-          /* We have to check the node's component agrees because output
-           nodes are part of a component *nodes* as well as its parent *nodes*! */
-          res.append(indent)
-          res.append(emitRef(m));
-          var label  = "label=\"" + asValidLabel(m)
-          val anyLit = m.inputs.find(x => !isDottable(x));
-          if (!anyLit.isEmpty) {
-            var i = 0;
-            label += "(";
-            for (in <- m.inputs) {
-              if (i != 0) label += ", ";
-              label += (if (in.isLit) emitRef(in) else "_");
-              i += 1;
+
+    var EOL = "\n"
+    def outputAnIsland(island: Island) {
+      val island_res = new StringBuilder()
+      val islandId = if (island == null) 0 else island.islandId
+
+      for (m <- top.nodes) {
+        if (isDottable(m)) {
+          if( m.component == top ) {
+            /* We have to check the node's component agrees because output
+             nodes are part of a component *mods* as well as its parent *mods*! */
+            if (isNodeInIsland(m, island)) {
+              island_res.append(indent)
+              island_res.append(emitRef(m));
             }
-            label += ")";
-          }
-          label += "\""
-          m match {
-            case reg: Delay => res.append("[shape=square," + label + "];\n")
-            case _ => res.append("[" + label + "];\n")
+            var label  = "label=\"" + asValidLabel(m)
+            val anyLit = m.inputs.find(x => !isDottable(x));
+            if (!anyLit.isEmpty) {
+              var i = 0;
+              label += "(";
+              for (in <- m.inputs) {
+                if (i != 0) label += ", ";
+                label += (if (in.isLit) emitRef(in) else "_");
+                i += 1;
+              }
+              label += ")";
+            }
+            label += "\""
+            if (isNodeInIsland(m, island)) {
+              m match {
+                case reg: Delay => island_res.append("[shape=square," + label + "];" + EOL)
+                case _ => island_res.append("[" + label + "];" + EOL)
+              }
+            }
           }
         }
       }
-    }
-    for (m <- top.nodes) {
-      if( m.component == top ) {
-        /* We have to check the node's component agrees because output
-         nodes are part of a component *nodes* as well as its parent *nodes*! */
-        for (in <- m.inputs) {
-          if (isDottable(m) && isDottable(in)) {
-            val edge = (emitRef(in) + " -> " + emitRef(m)
-              + "[label=\"" + in.needWidth() + "\"];\n")
-            /* If the both ends of an edge are on either side of a component
-             boundary, we must add it at the upper level otherwise graphviz
-             will incorrectly draw the input node into the cluster. */
-            if( in.component != top && !top.children.contains(in.component) ) {
-              crossings.append(edge)
-            } else {
-              res.append(indent)
-              res.append(edge);
+      for (m <- top.nodes) {
+        if( m.component == top && isDottable(m)) {
+          /* We have to check the node's component agrees because output
+           nodes are part of a component *mods* as well as its parent *mods*! */
+          for (in <- m.inputs) {
+            if (isDottable(in)) {
+              if (isNodeInIsland(in, island)) {
+                val edge = (emitRef(in) + " -> " + emitRef(m)
+                  + "[label=\"" + in.needWidth() + "\"];"+ EOL)
+                if (islandId != 0) {
+                  // If we're drawing partitioned islands, duplicate the logic
+                  // for boundary crossings below.
+                  if (! (isNodeInIsland(in, island) && (isNodeInIsland(m, island)))) {
+                    crossings.append(edge)
+                  } else {
+                    island_res.append(indent)
+                    island_res.append(edge);
+                  }
+                } else
+                /* If the both ends of an edge are on either side of a component
+                 boundary, we must add it at the upper level otherwise graphviz
+                 will incorrectly draw the input node into the cluster. */
+                if( in.component != top && !top.children.contains(in.component) ) {
+                  crossings.append(edge)
+                } else {
+                  island_res.append(indent)
+                  island_res.append(edge);
+                }
+              }
             }
           }
         }
+      }
+
+      if (island_res.length > 0) {
+        if (islandId != 0) {
+          res.append("subgraph clusterIsland_" + islandId + " {\n")
+        }
+  
+        res.append(island_res)
+  
+        if (islandId != 0) {
+          res.append("label = \"Island_" + islandId + "\";\n")
+          res.append("}\n")
+        }
+      }
+    }
+
+    if (islands.isEmpty) {
+        outputAnIsland(null)
+    } else {
+      for (island <- islands) {
+        outputAnIsland(island)
       }
     }
     (res.toString, crossings.toString)
   }
+      
 
 
   override def elaborate(c: Module): Unit = {
     super.elaborate(c)
 
+    /* From Cpp.scala:
+     * We flatten all signals in the toplevel component after we had
+     a change to associate node and components correctly first
+     otherwise we are bound for assertions popping up left and right
+     in the Backend.elaborate method. */
+    flattenAll // created Driver.orderedNodes
+
+    if (Driver.partitionIslands) {
+      islands = createIslands()
+    }
     var gn = -1;
     val out_cd = createOutputFile(c.name + "_c.dot");
     out_cd.write("digraph TopTop {\n");
@@ -185,8 +263,12 @@ class DotBackend extends Backend {
     out_d.write("rankdir = LR;\n");
     val (innertext, innercrossings) = emitModuleText(c, 0)
     out_d.write(innertext);
-    Predef.assert(innercrossings.length == 0,
-      {println("length:" + innercrossings.length + ", " + innercrossings)})
+    if (Driver.partitionIslands && innercrossings.length > 0) {
+      out_d.write(innercrossings);
+    } else {
+      Predef.assert(innercrossings.length == 0,
+        {println("length:" + innercrossings.length + ", " + innercrossings)})
+    }
     out_d.write("}");
     out_d.close();
   }

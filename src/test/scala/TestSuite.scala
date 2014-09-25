@@ -16,20 +16,18 @@ class TestSuite extends AssertionsForJUnit {
   def assertFile( filename: String ) {
     val useNewCompare = true
     val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
-    val refstring = reffile.mkString
+    val refText = blankLines_re.replaceAllIn(reffile.mkString, "")
     reffile.close()
     val testfile = scala.io.Source.fromFile(
       dir.getPath + "/" + filename, "utf-8")
-    val teststring = testfile.mkString
+    val testText = blankLines_re.replaceAllIn(testfile.mkString, "")
     testfile.close()
     if (useNewCompare) {
       val comparator = new TextComparator()
-      val masterText = blankLines_re.replaceAllIn(refstring, "")
-      val testText = blankLines_re.replaceAllIn(teststring, "")
-      val testTextWithSubstitutions = comparator.substituteTextIfPossible(masterText, testText)
-      assert(masterText === testTextWithSubstitutions)
+      val testTextWithSubstitutions = comparator.substituteTextIfPossible(refText, testText)
+      assertResult(refText) { testTextWithSubstitutions }
     } else {
-      assert(blankLines_re.replaceAllIn(teststring, "") === blankLines_re.replaceAllIn(refstring, ""))
+      assertResult(refText) { testText }
     }
   }
 

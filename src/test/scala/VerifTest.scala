@@ -126,7 +126,7 @@ void VerifSuite_CppPrintfComp_1_t::dump(FILE *f, int t) {
       printf("IO = %x", io)
       io.out := io.in + UInt(1)
     }
-    chiselMain(Array[String]("--cpp",
+    chiselMain(Array[String]("--backend", "c",
       "--targetDir", dir.getPath.toString()),
       () => Module(new PrintfBundle()))
     } catch {

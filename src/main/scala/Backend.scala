@@ -838,6 +838,7 @@ abstract class Backend extends FileSystemUtilities{
     nameAll(c)
     nameRsts
 
+    ChiselError.info("creating clock domains")
     val clkDomainWalkedNodes = new HashSet[Node]
     for (comp <- Driver.sortedComps)
       for (node <- comp.nodes)
