@@ -132,7 +132,8 @@ object Mux {
   }
 }
 
-class Mux extends Op("Mux") {
+class Mux extends Op {
+  val op = "Mux"
   override def toString: String =
     inputs(0) + " ? " + inputs(1) + " : " + inputs(2)
   def ::(a: Node): Mux = { inputs(2) = a; this }
@@ -140,5 +141,39 @@ class Mux extends Op("Mux") {
   override def forceMatchingWidths {
     if (inputs(1).widthW != widthW) inputs(1) = inputs(1).matchWidth(widthW)
     if (inputs(2).widthW != widthW) inputs(2) = inputs(2).matchWidth(widthW)
+  }
+  
+  override def W0Wtransform() {
+    val w1 = inputs(1).widthW
+    val w2 = inputs(2).widthW
+    if (w1.isKnown && w2.isKnown && w1.needWidth == 0 && w2.needWidth == 0) {
+      // If both our inputs are zero-width nodes, so are we.
+      setWidth(0)
+      inputs.remove(1, 2) /* remove children 1 & 2 */
+      modified = true
+      // We assume higher level nodes will eventually remove us.
+    } else {
+      // Convert any zero-width children into UInt(0).
+      // This has the side-effect that if we have a zero-width selector, we'll return the "false" input.
+      for (c <- inputs if c.needWidth == 0) {
+        c.replaceTree(UInt(0, 0))
+        modified = true
+      }
+    }
+  }
+
+  override def review() {
+    val w = widthW
+    // Are we zero-width?
+    if (w.isKnown && w.needWidth == 0) {
+      /* Replace us with a zero-width constant. */
+      replaceTree(UInt(0,0))
+    } else {
+      val w0 = inputs(0).widthW
+      if (w0.isKnown && w0.needWidth == 0) {
+        /* Our selector is zero-width. Replace us with the "false" input. */
+        replaceTree(inputs(2))
+      }
+    }
   }
 }

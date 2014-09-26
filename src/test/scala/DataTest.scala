@@ -54,9 +54,9 @@ import Chisel._
 
 class DataSuite extends TestSuite {
 
-  @Ignore @Test def testBoolFromValue() {
+  @Test def testBoolFromValue() {
     val tested = Bool(true);
-    assertTrue( tested.isInstanceOf[Literal] );
+//    assertTrue( tested.isInstanceOf[Literal] );
     assertFalse( tested.named );
   }
 
@@ -72,10 +72,10 @@ class DataSuite extends TestSuite {
     assertFalse( tested.named );
   }
 
-  @Ignore @Test def testSIntFromLit() {
+  @Test def testSIntFromLit() {
     val fixFromLit = SInt(42);
 
-    assertTrue( fixFromLit.isInstanceOf[Literal] );
+ //   assertTrue( fixFromLit.isInstanceOf[Literal] );
     assertFalse( fixFromLit.named );
   }
 

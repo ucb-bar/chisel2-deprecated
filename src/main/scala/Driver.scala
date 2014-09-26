@@ -31,6 +31,7 @@
 package Chisel
 
 import collection.mutable.{ArrayBuffer, HashSet, HashMap, Stack, LinkedHashSet, Queue => ScalaQueue}
+import scala.math.min
 
 object Driver extends FileSystemUtilities{
   def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean = true): T = {
@@ -198,6 +199,89 @@ object Driver extends FileSystemUtilities{
     }
   }
 
+  // A "depth-first" search for width inference.
+  def idfs(visit: Node => Unit): Unit = {
+
+    def initializeIDFS: Stack[Node] = {
+      val res = new Stack[Node]
+      /* XXX Make sure roots are consistent between initializeBFS, initializeDFS
+         and findRoots.
+       */
+      for (c <- components; a <- c.debugs)
+        res.push(a)
+      for(b <- blackboxes)
+        res.push(b.io)
+      for(c <- components; (n, io) <- c.io.flatten)
+          res.push(io)
+    res
+    }
+
+
+    // Walk each of the strongly connected component lists,
+    //  visiting nodes as we do so.
+    val visited = new HashSet[Node]
+
+    // Visit a node and reset it's sccIndex as we do so.
+    def doOneNode(n: Node): Unit = {
+      visit(n)
+      visited += n
+      n.sccIndex = -1
+      n.sccLowlink = -1
+    }
+    
+    def findSCC():ArrayBuffer[ArrayBuffer[Node]] = {
+      // Tarjan's strongly connected components algorithm to find loops
+      var sccIndex = 0
+      val stack = new Stack[Node]
+      val sccList = new ArrayBuffer[ArrayBuffer[Node]]
+  
+      def tarjanSCC(n: Node): Unit = {
+  
+        n.sccIndex = sccIndex
+        n.sccLowlink = sccIndex
+        sccIndex += 1
+        stack.push(n)
+  
+        for(i <- n.inputs) {
+          if(!(i == null)) {
+            if(i.sccIndex == -1) {
+              tarjanSCC(i)
+              n.sccLowlink = min(n.sccLowlink, i.sccLowlink)
+            } else if(stack.contains(i)) {
+              n.sccLowlink = min(n.sccLowlink, i.sccIndex)
+            }
+          }
+        }
+  
+        if(n.sccLowlink == n.sccIndex) {
+          val scc = new ArrayBuffer[Node]
+  
+          var top: Node = null
+          do {
+            top = stack.pop()
+            scc += top
+          } while (!(n == top))
+          sccList += scc
+        }
+      }
+
+      // Construct the SCC arrays
+      val idfsNodes = initializeIDFS
+      for (node <- idfsNodes) {
+        if(node.sccIndex == -1) {
+          tarjanSCC(node)
+        }
+      }
+    sccList
+    }
+
+    for (scclist <- findSCC()) {
+      for (node <- scclist){
+        doOneNode(node)
+      }
+    }
+  }
+
   def initChisel(args: Array[String]): Unit = {
     ChiselError.clear()
     warnInputs = false
@@ -226,6 +310,7 @@ object Driver extends FileSystemUtilities{
     isCheckingPorts = false
     isTesting = false
     isDebugMem = false
+    isSupportW0W = false
     partitionIslands = false
     lineLimitFunctions = 0
     minimumLinesPerFile = 0
@@ -235,6 +320,7 @@ object Driver extends FileSystemUtilities{
     useSimpleQueue = false
     parallelMakeJobs = 0
     isVCDinline = false
+    isSupportW0W = false
     hasMem = false
     topComponent = null
     clocks.clear()
@@ -268,6 +354,8 @@ object Driver extends FileSystemUtilities{
         case "--wio" => {warnInputs = true; warnOutputs = true}
         case "--Wconnection" => saveConnectionWarnings = true
         case "--Wcomponent" => saveComponentTrace = true
+        case "--W0W" => isSupportW0W = true
+        case "--noW0W" => isSupportW0W = false
         case "--noCombLoop" => dontFindCombLoop = true
         case "--genHarness" => isGenHarness = true
         case "--debug" => isDebug = true
@@ -378,6 +466,7 @@ object Driver extends FileSystemUtilities{
   var useSimpleQueue = false
   var parallelMakeJobs = 0
   var isVCDinline = false
+  var isSupportW0W = false
   var hasMem = false
   var backend: Backend = null
   var topComponent: Module = null

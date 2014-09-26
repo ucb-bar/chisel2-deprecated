@@ -1,0 +1,11 @@
+digraph ZeroWidthTest_foldRComp_1{
+rankdir = LR;
+  io_out[label="io_out:UInt"];
+  T0[label="+"];
+  io_in2[label="io_in2:UInt"];
+  io_in0[label="io_in0:UInt"];
+  io_in1[label="io_in1:UInt"];
+  T0 -> io_out[label="8"];
+  io_in0 -> T0[label="8"];
+  io_in2 -> T0[label="8"];
+}

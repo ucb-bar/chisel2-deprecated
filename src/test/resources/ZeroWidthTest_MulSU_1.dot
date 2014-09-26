@@ -1,0 +1,14 @@
+digraph ZeroWidthTest_MulSU_1{
+rankdir = LR;
+  io_z[label="io_z:SInt"];
+  T0[label="s*u"];
+  T1[label="T1:SInt"];
+  T2[label="##(0x0, _)"];
+  io_y[label="io_y:UInt"];
+  io_x[label="io_x:SInt"];
+  T0 -> io_z[label="64"];
+  io_x -> T0[label="32"];
+  T1 -> T0[label="33"];
+  T2 -> T1[label="33"];
+  io_y -> T2[label="32"];
+}

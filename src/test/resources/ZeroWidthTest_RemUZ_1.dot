@@ -1,0 +1,6 @@
+digraph ZeroWidthTest_RemUZ_1{
+rankdir = LR;
+  io_z[label="io_z:SInt(0x0)"];
+  io_y[label="io_y:SInt"];
+  io_x[label="io_x:UInt"];
+}

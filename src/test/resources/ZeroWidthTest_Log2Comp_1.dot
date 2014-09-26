@@ -1,0 +1,10 @@
+digraph ZeroWidthTest_Log2Comp_1{
+rankdir = LR;
+  io_out[label="io_out:UInt"];
+  T0[label="Log2"];
+  T1[label="T1:Extract(_, 0x1, 0x0)"];
+  io_in[label="io_in:UInt"];
+  T0 -> io_out[label="1"];
+  T1 -> T0[label="2"];
+  io_in -> T1[label="8"];
+}
