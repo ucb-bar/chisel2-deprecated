@@ -33,7 +33,7 @@ package Chisel
 import scala.collection.immutable.Vector
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Stack
-import scala.collection.mutable.HashSet
+import scala.collection.mutable.LinkedHashSet
 import java.io.PrintStream
 
 import Node._;
@@ -144,9 +144,9 @@ abstract class Node extends nameable {
   // The semantics of width are sufficiently complicated that
   // it deserves its own class
   var width_ = Width()
-  val consumers = new ArrayBuffer[Node]; // mods that consume one of my outputs
-  val inputs = new ArrayBuffer[Node];
   var inferWidth: (=> Node) => Width = maxWidth
+  val inputs = ArrayBuffer[Node]()
+  val consumers = LinkedHashSet[Node]() // nodes that consume one of my outputs
 
   var nameHolder: nameable = null;
   val line: StackTraceElement =
@@ -269,11 +269,11 @@ abstract class Node extends nameable {
   lazy val isInObject: Boolean =
     (isIo && (Driver.isIoDebug || component == Driver.topComponent)) ||
     Driver.topComponent.debugs.contains(this) ||
-    isReg || isUsedByClockHi || Driver.isDebug && !name.isEmpty ||
+    isReg || isUsedByClockHi || Driver.isDebug && named ||
     Driver.emitTempNodes
 
   lazy val isInVCD: Boolean = name != "reset" && needWidth() > 0 &&
-     (!name.isEmpty || Driver.emitTempNodes) &&
+     (named || Driver.emitTempNodes) &&
      ((isIo && isInObject) || isReg || Driver.isDebug)
 
   /** Prints all members of a node and recursively its inputs up to a certain
@@ -301,7 +301,7 @@ abstract class Node extends nameable {
     writer.println("depth: " + depth)
     writer.println("width: " + width_)
     writer.println("index: " + emitIndex)
-    writer.println("consumers.length: " + consumers.length)
+    writer.println("consumers.size: " + consumers.size)
     writer.println("nameHolder: " + nameHolder)
     writer.println("line: " + line)
     for (in <- inputs) {
@@ -386,9 +386,7 @@ abstract class Node extends nameable {
       /* By construction we should not end-up with null inputs. */
       assert(i != null, ChiselError.error("input " + off
         + " of " + inputs.length + " for node " + this + " is null"))
-      if(!i.consumers.contains(this)) {
-        i.consumers += this;
-      }
+      i.consumers += this
     }
   }
 
@@ -472,7 +470,7 @@ abstract class Node extends nameable {
   // Review a node for optimization possibilities if its children have been updated.
   def review() { }
   // Parent nodes - used during optimization.
-  var parents = HashSet[Node]()
+  var parents = LinkedHashSet[Node]()
 
   // Replace the subtree starting from this node with the indicated replacement.
   def replaceTree(newNode: Node) {

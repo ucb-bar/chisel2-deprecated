@@ -119,7 +119,10 @@ class VerilogBackend extends Backend {
   override def emitRef(node: Node): String = {
     node match {
       case x: Literal => emitLit(x.value, x.needWidth())
-      case _ => super.emitRef(node)
+      case _: Reg =>
+        if (node.name != "") node.name else "R" + node.emitIndex
+      case _ => 
+        if (node.name != "") node.name else "T" + node.emitIndex
     }
   }
 
@@ -204,7 +207,7 @@ class VerilogBackend extends Backend {
                 portDec += emitRef(io.inputs(0));
               }
             } else if(io.dir == OUTPUT) {
-              if (io.consumers.length == 0) {
+              if (io.consumers.size == 0) {
                   // if (Driver.saveConnectionWarnings) {
                   //   ChiselError.warning("" + io + " UNCONNECTED IN " + io.component + " BINDING " + c.findBinding(io));
                   // } removed this warning because pruneUnconnectedsIOs should have picked it up
@@ -213,7 +216,7 @@ class VerilogBackend extends Backend {
                 var consumer: Node = c.parent.findBinding(io);
                 if (consumer == null) {
                   if (Driver.saveConnectionWarnings) {
-                    ChiselError.warning("" + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + io.consumers.length + ") IN " + c.parent);
+                    ChiselError.warning("" + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + io.consumers.size + ") IN " + c.parent);
                   }
                   portDec = "//" + portDec
                 } else {
@@ -379,7 +382,7 @@ class VerilogBackend extends Backend {
         }
 
       case _: Assert =>
-        "  reg" + "[" + (gotWidth-1) + ":0] " + emitRef(node) + " = 1'b0;\n"
+        "  reg" + "[" + (gotWidth-1) + ":0] " + emitRef(node) + ";\n"
 
       case _: Reg =>
         emitDecReg(node)
@@ -420,14 +423,16 @@ class VerilogBackend extends Backend {
         "      " + emitRef(m) + "[initvar] = " + emitRand(m) + ";\n"
       else
         ""
+    case a: Assert =>
+      "    " + emitRef(a) + " = 1'b0;\n"
     case _ =>
       ""
   }
 
   def genHarness(c: Module, name: String) {
     val harness  = createOutputFile(name + "-harness.v");
-    val printNodes = for ((n, io) <- c.io.flatten ; if io.dir == OUTPUT) yield io
-    val scanNodes = for ((n, io) <- c.io.flatten ; if io.dir == INPUT) yield io
+    val printNodes = for ((n, io) <- c.wires ; if io.dir == OUTPUT) yield io
+    val scanNodes = for ((n, io) <- c.wires ; if io.dir == INPUT) yield io
     val mainClk = Driver.implicitClock
     val clocks = LinkedHashSet(mainClk)
     clocks ++= c.clocks
@@ -475,7 +480,7 @@ class VerilogBackend extends Backend {
 
     harness.write("  /*** DUT instantiation ***/\n")
     harness.write("    " + c.moduleName + "\n")
-    harness.write("      " + c.moduleName + "(\n")
+    harness.write("      " + c.name + "(\n")
     if (Driver.isTesting) {
       if (c.clocks.size == 1) {
         harness.write("        .%s(%s),\n".format(mainClk.name, mainClk.name))
@@ -509,43 +514,43 @@ class VerilogBackend extends Backend {
     val dumpvars = new ArrayBuffer[Node]
 
     // select Chisel nodes for APIs(peek, poke)  and VCD dump
-    for (m <- Driver.components ; mod <- m.mods) { 
-      if (mod.isInObject && !mod.isLit) {
-        mod match {
+    for (m <- Driver.components ; node <- m.nodes) { 
+      if (node.isInObject && !node.isLit) {
+        node match {
           case bool: Bool if resets contains bool => // exclude resets
           case _: Binding =>
           case _: ROMData =>
           case io: Bits if m != c => {
             var included = true
             if (io.dir == INPUT) {
-              if (io.inputs.length == 0 || io.inputs.length > 1 || (m.isWalked contains io))
+              if (io.inputs.length == 0 || io.inputs.length > 1)
                 included = false
             }
             else if (io.dir == OUTPUT) {
-              if (io.consumers.length == 0 || m.parent.findBinding(io) == null || io.prune)
+              if (io.consumers.size == 0 || m.parent.findBinding(io) == null || io.prune)
                 included = false
             }
             if (included) wires += io
           }
           case mem:  Mem[_] =>  mems += mem
-          case _ => wires += mod
+          case _ => wires += node
         }
       }
-      if (mod.isInVCD) {
-        mod match {
+      if (node.isInVCD) {
+        node match {
           case io: Bits if m != c => {
             var included = true
             if (io.dir == INPUT) {
-              if (io.inputs.length == 0 || io.inputs.length > 1 || (m.isWalked contains io))
+              if (io.inputs.length == 0 || io.inputs.length > 1)
                 included = false
             }
             else if (io.dir == OUTPUT) {
-              if (io.consumers.length == 0 || m.parent.findBinding(io) == null || io.prune)
+              if (io.consumers.size == 0 || m.parent.findBinding(io) == null || io.prune)
                 included = false
             }
             if (included) dumpvars += io
           }
-          case _ => dumpvars += mod
+          case _ => dumpvars += node
         }
       }
     }
@@ -839,7 +844,7 @@ class VerilogBackend extends Backend {
 
   def emitDefs(c: Module): StringBuilder = {
     val res = new StringBuilder()
-    for (m <- c.mods) {
+    for (m <- c.nodes) {
       res.append(emitDef(m))
     }
     for (c <- c.children) {
@@ -859,7 +864,7 @@ class VerilogBackend extends Backend {
         clkDomains(p.clock).append(emitAssert(p))
       }
     }
-    for (m <- c.mods) {
+    for (m <- c.nodes) {
       val clkDomain = clkDomains getOrElse (m.clock, null)
       if (m.clock != null && clkDomain != null)
         clkDomain.append(emitReg(m))
@@ -928,11 +933,11 @@ class VerilogBackend extends Backend {
   }
 
   def emitDecs(c: Module): StringBuilder =
-    c.mods.map(emitDec(_)).addString(new StringBuilder)
+    c.nodes.map(emitDec(_)).addString(new StringBuilder)
 
   def emitInits(c: Module): StringBuilder = {
     val sb = new StringBuilder
-    c.mods.map(emitInit(_)).addString(sb)
+    c.nodes.map(emitInit(_)).addString(sb)
 
     val res = new StringBuilder
     if (!sb.isEmpty) {
@@ -977,9 +982,6 @@ class VerilogBackend extends Backend {
     if (c.clocks.length > 0 || c.resets.size > 0) res.append(",\n") else res.append("\n")
     res.append(ports.map(_.result).reduceLeft(_ + "\n" + _))
     res.append("\n);\n\n");
-    // TODO: NOT SURE EXACTLY WHY I NEED TO PRECOMPUTE TMPS HERE
-    for (m <- c.mods)
-      emitTmp(m);
     res.append(emitDecs(c));
     res.append("\n");
     res.append(emitInits(c));
@@ -1084,6 +1086,10 @@ class VerilogBackend extends Backend {
 
   override def elaborate(c: Module) {
     super.elaborate(c)
+    // execute addBindings only in the Verilog Backend
+    addBindings
+    nameBindings
+    findConsumers(c)
 
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName) 
     val out = createOutputFile(n + ".v")

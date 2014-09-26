@@ -82,6 +82,20 @@ class VcdBackend(top: Module) extends Backend {
     emitDefUnconditional(node, offset, index) +
     "  goto K" + index + ";\n"
 
+  private def emitDefInline(node: Node, index: Int) =
+    "  if (" + emitRef(node) + " != " + emitRef(node) + "__prev) {\n" +
+    "    " + emitRef(node) + "__prev = " + emitRef(node) + ";\n" +
+    "    " + emitDefUnconditional(node, index) +
+    "  }\n"
+
+  private def emitDefInline(node: Node, offset: Int, index: Int) =
+    "  if (" + emitRef(node) + ".get(0x" + offset.toHexString +") != " + emitRef(node) + 
+    "__prev.get(0x" + offset.toHexString + ")) {\n" +
+    "    " + emitRef(node) + "__prev.get(0x" + offset.toHexString + ") = " + 
+    "    " + emitRef(node) + ".get(0x" + offset.toHexString + ");\n" +
+    "    " + emitDefUnconditional(node, offset, index) +
+    "  }\n"
+
   override def emitDec(node: Node): String =
     if (Driver.isVCD && node.isInVCD) {
       node match {
@@ -157,7 +171,6 @@ class VcdBackend(top: Module) extends Backend {
   }
 
   def dumpVCDInit(write: String => Unit): Unit = {
-    write("void " + top.name + "_t::dump_init(FILE *f) {\n")
     if (Driver.isVCD) {
       write("  fputs(\"$timescale 1ps $end\\n\", f);\n")
       dumpVCDScope(top, write)
@@ -184,57 +197,75 @@ class VcdBackend(top: Module) extends Backend {
         baseIdx += rom.lits.size
       }
     }
-    write("}\n")
+  }
+
+  def dumpModsInline(write: String => Unit) {
+    for (i <- 0 until sortedMods.length)
+      write(emitDefInline(sortedMods(i), i))
+    var baseIdx = sortedMods.length
+    for (mem <- sortedMems) {
+      for (offset <- 0 until mem.n)
+        write(emitDefInline(mem, offset, baseIdx + offset))
+      baseIdx += mem.n
+    }
+    for (rom <- sortedROMs) {
+      for (offset <- 0 until rom.lits.size)
+        write(emitDefInline(rom, offset, baseIdx + offset))
+      baseIdx += rom.lits.size
+    }
+    write("  return;\n")
+  }
+
+  def dumpModsGoTos(write: String => Unit) {
+    for (i <- 0 until sortedMods.length)
+      write(emitDef1(sortedMods(i), i))
+    var baseIdx = sortedMods.length
+    for (mem <- sortedMems) {
+      for (offset <- 0 until mem.n)
+        write(emitDef1(mem, offset, baseIdx + offset))
+      baseIdx += mem.n
+    }
+    for (rom <- sortedROMs) {
+      for (offset <- 0 until rom.lits.size)
+        write(emitDef1(rom, offset, baseIdx + offset))
+      baseIdx += rom.lits.size
+    }
+    write("  return;\n")
+    for (i <- 0 until sortedMods.length)
+      write(emitDef2(sortedMods(i), i))
+    baseIdx = sortedMods.length
+    for (mem <- sortedMems) {
+      for (offset <- 0 until mem.n)
+        write(emitDef2(mem, offset, baseIdx + offset))
+      baseIdx += mem.n
+    }
+    for (rom <- sortedROMs) {
+      for (offset <- 0 until rom.lits.size)
+        write(emitDef2(rom, offset, baseIdx + offset))
+      baseIdx += rom.lits.size
+    }
   }
 
   def dumpVCD(write: String => Unit): Unit = {
-    write("void " + top.name + "_t::dump(FILE *f, int t) {\n")
-    if (Driver.isVCD) {
-      write("  if (t == 0) return dump_init(f);\n")
-      write("  fprintf(f, \"#%d\\n\", t);\n")
-      for (i <- 0 until sortedMods.length)
-        write(emitDef1(sortedMods(i), i))
-      var baseIdx = sortedMods.length
-      for (mem <- sortedMems) {
-        for (offset <- 0 until mem.n)
-          write(emitDef1(mem, offset, baseIdx + offset))
-        baseIdx += mem.n
-      }
-      for (rom <- sortedROMs) {
-        for (offset <- 0 until rom.lits.size)
-          write(emitDef1(rom, offset, baseIdx + offset))
-        baseIdx += rom.lits.size
-      }
-      write("  return;\n")
-      for (i <- 0 until sortedMods.length)
-        write(emitDef2(sortedMods(i), i))
-      baseIdx = sortedMods.length
-      for (mem <- sortedMems) {
-        for (offset <- 0 until mem.n)
-          write(emitDef2(mem, offset, baseIdx + offset))
-        baseIdx += mem.n
-      }
-      for (rom <- sortedROMs) {
-        for (offset <- 0 until rom.lits.size)
-          write(emitDef2(rom, offset, baseIdx + offset))
-        baseIdx += rom.lits.size
-      }
+    if (Driver.isVCDinline) {
+      dumpModsInline(write)
+    } else {
+      dumpModsGoTos(write)
     }
-    write("}\n")
   }
 
-  private val sortedMods = (top.omods foldLeft Array[Node]()){
+  private val sortedMods = (Driver.orderedNodes foldLeft Array[Node]()){
     case (array: Array[Node], mem: Mem[_]) => array
     case (array: Array[Node], rom: ROMData) => array
     case (array: Array[Node], node: Node) => if (node.isInVCD) array ++ Array(node) else array
   } sortWith (_.width < _.width)
 
-  private val sortedMems = (top.omods foldLeft Array[Mem[_]]()){
+  private val sortedMems = (Driver.orderedNodes foldLeft Array[Mem[_]]()){
     case (array: Array[Mem[_]], mem: Mem[_]) => if (mem.isInVCD) array ++ Array(mem) else array
     case (array: Array[Mem[_]], node: Node) => array
   } sortWith (_.widthW < _.widthW)
 
-  private val sortedROMs = (top.omods foldLeft Array[ROMData]()){
+  private val sortedROMs = (Driver.orderedNodes foldLeft Array[ROMData]()){
     case (array: Array[ROMData], rom: ROMData) => if (rom.isInVCD) array ++ Array(rom) else array
     case (array: Array[ROMData], node: Node) => array
   } sortWith (_.width < _.width)

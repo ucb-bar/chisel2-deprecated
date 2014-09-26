@@ -24,10 +24,10 @@ module NameSuite_VariationComp_1(
 );
 
   wire T0;
-  wire block_2_io_replay;
   wire T1;
-  wire block_1_io_replay;
   wire block_0_io_replay;
+  wire block_1_io_replay;
+  wire block_2_io_replay;
 
 
   assign io_replay = T0;

@@ -34,19 +34,19 @@ import scala.util.matching.Regex
 import scala.io.Source._
 import java.io._
 
-import TextComparitor._
+import TextComparator._
 
 /*
- * Comparitor errors.
+ * Comparator errors.
  */
-class ComparitorError (amsg: String, alineNo: Option[Int] = None, alineString: Option[String] = None) extends Exception {
+class ComparatorError (amsg: String, alineNo: Option[Int] = None, alineString: Option[String] = None) extends Exception {
   val msg = "Error: %s" format amsg
   val lineNo = alineNo
   val lineString = alineString
   override def toString = msg
 }
 
-object TextComparitor {
+object TextComparator {
   val tokenRegEx = """(?!^)\b""".r                      // Break on (but capture) non-word characters.
   val EOLRegex = """.*\n""".r                         // recognize EOL
   val allowedDifferencePrefixRegex = """\b[RT]""".r   // The only words we allow for substitution are Registers and Temporaries
@@ -55,7 +55,7 @@ object TextComparitor {
   }
 }
 
-class TextComparitor {
+class TextComparator {
   // The substitution map is used to map one Register or Temporary name into another.
   // For diagnostics, we also record the line number (and the line itself) which triggered the substitution.
   var substitutions = HashMap[String, (String, Int, String)]()
@@ -64,26 +64,26 @@ class TextComparitor {
     Add new substitutions to the map. If we already have a different substitute for any element,
     throw an exception, otherwise return None (indicating success)
    */
-  def addSubstitutions(newSubstitutions: HashMap[String,String], lineNo: Int, lineString: String): Option[ComparitorError] =  {
+  def addSubstitutions(newSubstitutions: HashMap[String,String], lineNo: Int, lineString: String): Option[ComparatorError] =  {
     for ((original, substitute) <- newSubstitutions) {
       // Do we already have this substitution?
-      if (this.substitutions.contains(original)) {
+      if (TextComparator.this.substitutions.contains(original)) {
         // If we do, it better be the same one.
         val (oldValue, oldLineNo, oldLineString) = substitutions(original)
         if (oldValue != substitute) {
           // Oops. We've already set up a different map for this value.
-          throw new ComparitorError("illegal substitution - \"%s\" -> \"%s\" line %d, \"%s\" - already exists - \"%s\" -> \"%s\" line %d, \"%s\"" format (substitute, original, lineNo, lineString, oldValue, original, oldLineNo, oldLineString), Some(lineNo), Some(lineString))
+          throw new ComparatorError("illegal substitution - \"%s\" -> \"%s\" line %d, \"%s\" - already exists - \"%s\" -> \"%s\" line %d, \"%s\"" format (substitute, original, lineNo, lineString, oldValue, original, oldLineNo, oldLineString), Some(lineNo), Some(lineString))
         }
-      } else if (this.substitutions.values.exists(_._1 == substitute)) {
+      } else if (TextComparator.this.substitutions.values.exists(_._1 == substitute)) {
         // The substitution map must be one-to-one, but it appears there is already an entry with this substitution.
         // Retrieve it for the error report.
-        val duplicate = this.substitutions.find({ case (k,(v, i, s)) => v == substitute && k != original})
+        val duplicate = TextComparator.this.substitutions.find({ case (k,(v, i, s)) => v == substitute && k != original})
         duplicate match {
           case Some((oldOriginal, (oldValue, oldLineNo, oldLineString))) => {
-            throw new ComparitorError("illegal substitution - \"%s\" ->  \"%s\" line %d, \"%s\" - duplicate map - \"%s\" -> \"%s\" line %d, \"%s\"" format (substitute, original, lineNo, lineString, oldOriginal, oldValue, oldLineNo, oldLineString), Some(lineNo), Some(lineString))
+            throw new ComparatorError("illegal substitution - \"%s\" ->  \"%s\" line %d, \"%s\" - duplicate map - \"%s\" -> \"%s\" line %d, \"%s\"" format (substitute, original, lineNo, lineString, oldOriginal, oldValue, oldLineNo, oldLineString), Some(lineNo), Some(lineString))
           }
           case _ => {
-            throw new ComparitorError("reality failure - \"%s\" in map but key not found" format (substitute))
+            throw new ComparatorError("reality failure - \"%s\" in map but key not found" format (substitute))
           }
         }
       } else {
@@ -113,21 +113,21 @@ class TextComparitor {
           // This looks like a possible substitution. Remember it.
           substitutions(test) = original
         } else {
-          throw new ComparitorError("illegal substitution - can\'t substitute \"%s\" for \"%s\"" format (original, test), Some(lineNo), Some(testLine))
+          throw new ComparatorError("illegal substitution - can\'t substitute \"%s\" for \"%s\"" format (original, test), Some(lineNo), Some(testLine))
         }
       }
     }
     return Some(substitutions)
   }
 
-  def generateSubstitutes(original: String, test: String): Option[ComparitorError] = {
-    var result: Option[ComparitorError] = None
+  def generateSubstitutes(original: String, test: String): Option[ComparatorError] = {
+    var result: Option[ComparatorError] = None
     try {
       val originalLines = original.split("\n")
       val testLines = test.split("\n")
       // We should have the same number of lines of each.
       if (originalLines.length != testLines.length) {
-        throw new ComparitorError("original(%d) and test(%d) line count differ" format (originalLines.length, testLines.length))
+        throw new ComparatorError("original(%d) and test(%d) line count differ" format (originalLines.length, testLines.length))
       }
       var lineNo = 0
       for ((originalLine, testLine) <- originalLines zip testLines) {
@@ -144,16 +144,16 @@ class TextComparitor {
         }
       }
     } catch {
-      case e: ComparitorError => result = Some(e)
+      case e: ComparatorError => result = Some(e)
     }
   result
   }
 
-  def compareWithSubstitutions(original:String, test: String): Option[ComparitorError] = {
+  def compareWithSubstitutions(original:String, test: String): Option[ComparatorError] = {
     val originalTokens = tokenize(original)
     val testTokens = tokenize(test)
     if (originalTokens.length != testTokens.length)
-        return Some(new ComparitorError("original(%d) and test(%d) token count differ" format (originalTokens.length, testTokens.length)))
+        return Some(new ComparatorError("original(%d) and test(%d) token count differ" format (originalTokens.length, testTokens.length)))
     // We maintain the fiction that we're doing line by line comparisons.
     var originalLine = ""
     var testLine = ""
@@ -169,7 +169,7 @@ class TextComparitor {
         value = test
       }
       if (original != value) {
-        return Some(new ComparitorError("\"%s\" != \"%s\"" format (originalLine, testLine)))
+        return Some(new ComparatorError("\"%s\" != \"%s\"" format (originalLine, testLine)))
       }
       // If this is a newline, reset our accumulated line
       if (EOLRegex.findFirstIn(original) != None)
@@ -182,8 +182,8 @@ class TextComparitor {
     None
   }
 
-  def compareText(original: String, test: String): Option[ComparitorError] = {
-    var aResult: Option[ComparitorError] = None
+  def compareText(original: String, test: String): Option[ComparatorError] = {
+    var aResult: Option[ComparatorError] = None
     // Easy test first.
     if (original != test) {
       aResult = generateSubstitutes(original, test)
@@ -220,10 +220,10 @@ class TextComparitor {
   }
 }
 
-object TestComparitor {
-  def compareFiles(masters: Array[String], tests: Array[String]): Option[ComparitorError] = {
-    var finalResult: Option[ComparitorError] = None
-    val comparitor = new TextComparitor()
+object TestComparator {
+  def compareFiles(masters: Array[String], tests: Array[String]): Option[ComparatorError] = {
+    var finalResult: Option[ComparatorError] = None
+    val comparator = new TextComparator()
     for ((masterFilePath, testFilePath) <- masters zip tests) {
       val masterFile = fromFile(masterFilePath)
       val original = masterFile.mkString
@@ -231,7 +231,7 @@ object TestComparitor {
       val testFile = fromFile(testFilePath)
       val test = testFile.mkString
       testFile.close()
-      val aResult = comparitor.compareText(original, test)
+      val aResult = comparator.compareText(original, test)
       aResult match {
         case Some(e: Exception) => println(e)
         case None =>{}

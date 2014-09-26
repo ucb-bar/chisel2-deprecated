@@ -131,12 +131,15 @@ class AdvTester[+T <: Module](val dut: T) extends Tester[T](dut, false) {
     val inputs = new scala.collection.mutable.Queue[R]()
 
     private var amValid = false
+    private var justFired = false
     private def isReady = (peek(socket.ready) == 1)
-    def isIdle = !amValid && inputs.isEmpty
+    def isIdle = !amValid && inputs.isEmpty && !justFired
 
     def process() = {
+      justFired = false
       if(isReady && amValid) { // Fired last cycle
         amValid = false
+        justFired = true
       }
       if(!amValid && !inputs.isEmpty) {
         amValid = true
@@ -157,11 +160,13 @@ class AdvTester[+T <: Module](val dut: T) extends Tester[T](dut, false) {
   {
     val inputs = new scala.collection.mutable.Queue[R]()
     private var amValid = false
+    private var justFired = false
     
     def isIdle = inputs.isEmpty && !amValid
 
     def process() = {
       // Always advance the input
+      justFired = (amValid==true)
       amValid = false
       if(!inputs.isEmpty) {
         amValid = true
