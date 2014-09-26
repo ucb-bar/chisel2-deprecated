@@ -39,10 +39,14 @@ import Chisel._
 
 object ZeroWidthTest{
   val W0WparameterName = "W0W"
+  val enableW0W = true
 
+  /* Should we enable these tests?
+   * Either look for the JVM setting "W0W", or the value of enableW0W.
+   */
   @BeforeClass def checkSupport() {
     val W0Wparameter = System.getProperty(W0WparameterName)
-    val W0Wenable = if (W0Wparameter == null) false else true
+    val W0Wenable = if (W0Wparameter == null) enableW0W else true
     org.junit.Assume.assumeTrue(W0Wenable)
   }
   
