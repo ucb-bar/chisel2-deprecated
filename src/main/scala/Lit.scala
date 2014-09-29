@@ -155,14 +155,7 @@ object Literal {
     res
   }
   def toLitVal(x: String): BigInt = {
-    if (true) {
-      BigInt(x.substring(2, x.length), 16)
-    } else {
-      var res = BigInt(0);
-      for (c <- x.substring(2, x.length))
-        res = res * 16 + c.asDigit;
-      res
-    }
+    BigInt(x.substring(2, x.length), 16)
   }
 
   def toLitVal(x: String, shamt: Int): BigInt = {
