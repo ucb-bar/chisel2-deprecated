@@ -273,6 +273,25 @@ class ManualTester[+T <: Module]
     allGood
   }
 
+  /* Compare the floating point value of a node with an expected floating point value.
+   * We will tolerate differences in the bottom bit.
+   */
+  def expect (data: Bits, expected: Float): Boolean = {
+    val gotBits = peek(data).toInt
+    val expectedBits = java.lang.Float.floatToIntBits(expected)
+    var gotFLoat = java.lang.Float.intBitsToFloat(gotBits)
+    var expectedFloat = expected
+    if (gotFLoat != expectedFloat) {
+      val gotDiff = gotBits - expectedBits
+      // Do we have a single bit difference?
+      if (abs(gotDiff) <= 1) {
+        expectedFloat = gotFLoat
+      }
+    }
+    expect(gotFLoat == expectedFloat, 
+       "EXPECT " + dumpName(data) + " <- " + gotFLoat + " == " + expectedFloat)
+  }
+
   val rnd = if (Driver.testerSeedValid) new Random(Driver.testerSeed) else new Random()
   var process: Process = null
 
