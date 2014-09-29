@@ -382,7 +382,7 @@ class VerilogBackend extends Backend {
         }
 
       case _: Assert =>
-        "  reg" + "[" + (gotWidth-1) + ":0] " + emitRef(node) + " = 1'b0;\n"
+        "  reg" + "[" + (gotWidth-1) + ":0] " + emitRef(node) + ";\n"
 
       case _: Reg =>
         emitDecReg(node)
@@ -423,6 +423,8 @@ class VerilogBackend extends Backend {
         "      " + emitRef(m) + "[initvar] = " + emitRand(m) + ";\n"
       else
         ""
+    case a: Assert =>
+      "    " + emitRef(a) + " = 1'b0;\n"
     case _ =>
       ""
   }
@@ -478,7 +480,7 @@ class VerilogBackend extends Backend {
 
     harness.write("  /*** DUT instantiation ***/\n")
     harness.write("    " + c.moduleName + "\n")
-    harness.write("      " + c.moduleName + "(\n")
+    harness.write("      " + c.name + "(\n")
     if (Driver.isTesting) {
       if (c.clocks.size == 1) {
         harness.write("        .%s(%s),\n".format(mainClk.name, mainClk.name))

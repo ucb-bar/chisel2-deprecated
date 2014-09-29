@@ -170,8 +170,9 @@ class ManualTester[+T <: Module]
 
   def signed_fix(dtype: Bits, rv: BigInt): BigInt = {
     dtype match {
-      case _: SInt => (if(rv >= (BigInt(1) << dtype.getWidth-1)) (rv - (BigInt(1) << dtype.getWidth)) else rv)
-      /* anything else (i.e., UInt, Flo, or Dbl) */
+      /* Any "signed" node */
+      case _: SInt | _ : Flo | _: Dbl => (if(rv >= (BigInt(1) << dtype.getWidth-1)) (rv - (BigInt(1) << dtype.getWidth)) else rv)
+      /* anything else (i.e., UInt) */
       case _ => (rv)
     }
   }
@@ -206,7 +207,10 @@ class ManualTester[+T <: Module]
       } else {
         cmd = "wire_poke " + dumpName(data);
       }
-      cmd = cmd + " 0x" + x.toString(16);
+      // Don't prefix negative numbers with "0x"
+      val radixPrefix = if (x < 0) " " else " 0x"
+
+      cmd = cmd + radixPrefix + x.toString(16);
       val rtn = emulatorCmd(cmd)
       if (rtn != "ok") {
         System.err.print(s"FAILED: poke(${dumpName(data)}) returned false")
@@ -267,6 +271,34 @@ class ManualTester[+T <: Module]
     for ((d, e) <- kv)
       allGood = expect(d, e) && allGood
     allGood
+  }
+
+  /* We need the following so scala doesn't use our "tolerant" Float version of expect.
+   */
+  def expect (data: Bits, expected: Int): Boolean = {
+    expect(data, BigInt(expected))
+  }
+  def expect (data: Bits, expected: Long): Boolean = {
+    expect(data, BigInt(expected))
+  }
+
+  /* Compare the floating point value of a node with an expected floating point value.
+   * We will tolerate differences in the bottom bit.
+   */
+  def expect (data: Bits, expected: Float): Boolean = {
+    val gotBits = peek(data).toInt
+    val expectedBits = java.lang.Float.floatToIntBits(expected)
+    var gotFLoat = java.lang.Float.intBitsToFloat(gotBits)
+    var expectedFloat = expected
+    if (gotFLoat != expectedFloat) {
+      val gotDiff = gotBits - expectedBits
+      // Do we have a single bit difference?
+      if (abs(gotDiff) <= 1) {
+        expectedFloat = gotFLoat
+      }
+    }
+    expect(gotFLoat == expectedFloat, 
+       "EXPECT " + dumpName(data) + " <- " + gotFLoat + " == " + expectedFloat)
   }
 
   val rnd = if (Driver.testerSeedValid) new Random(Driver.testerSeed) else new Random()

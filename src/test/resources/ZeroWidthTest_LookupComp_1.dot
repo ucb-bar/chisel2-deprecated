@@ -1,0 +1,5 @@
+digraph ZeroWidthTest_LookupComp_1{
+rankdir = LR;
+  io_data[label="io_data:UInt(0x0)"];
+  io_addr[label="io_addr:UInt"];
+}

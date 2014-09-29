@@ -233,7 +233,9 @@ class ModularCppBackend extends CppBackend {
         + ");\n"
         + "#endif\n")
     out_c.write("}\n");
+    out_c.write("void " + c.name + "_t::dump_init(FILE *f) {\n")
     vcd.dumpVCDInit(out_c.write);
+    out_c.write("}\n")
     vcd.dumpVCD(out_c.write);
     out_c.close();
 

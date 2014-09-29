@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -34,6 +34,8 @@ import scala.math._
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.PrintStream
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import scala.sys.process._
 import sys.process.stringSeqToProcess
 import Node._
@@ -42,6 +44,7 @@ import ChiselError._
 import Literal._
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashMap
+import PartitionIslands._
 
 object CString {
   def apply(s: String): String = {
@@ -62,6 +65,35 @@ object CString {
 class CppBackend extends Backend {
   val keywords = new HashSet[String]();
   private var hasPrintfs = false
+  val unoptimizedFiles = HashSet[String]()
+  val onceOnlyFiles = HashSet[String]()
+  var cloneFile: String = ""
+  var maxFiles: Int = 0
+  val compileInitializationUnoptimized = Driver.compileInitializationUnoptimized
+  // If we're dealing with multiple files for the purpose of separate
+  //   optimization levels indicate we expect to compile multiple files.
+  val compileMultipleCppFiles = Driver.compileInitializationUnoptimized
+  // Suppress generation of the monolithic .cpp file if we're compiling
+  // multiple files.
+  // NOTE: For testing purposes, we may want to generate this file anyway.
+  val suppressMonolithicCppFile = compileMultipleCppFiles  /* && false */
+  // Compile the clone method at -O0
+  val cloneCompiledO0 = true
+  // Define shadow registers in the circuit object, instead of local registers in the clock hi methods.
+  // This is required if we're generating paritioned combinatorial islands, or we're limiting the size of functions/methods.
+  val shadowRegisterInObject = Driver.shadowRegisterInObject || Driver.partitionIslands || Driver.lineLimitFunctions > 0
+  // Sets to manage allocation and generation of shadow registers
+  val regWritten = HashSet[Node]()
+  val needShadow = HashSet[Node]()
+  val allocatedShadow = HashSet[Node]()
+  var potentialShadowRegisters = 0
+  val allocateOnlyNeededShadowRegisters = Driver.allocateOnlyNeededShadowRegisters
+  val ignoreShadows = false
+  val shadowPrefix = if (ignoreShadows) {
+    "// "
+  } else {
+    ""
+  }
 
   override def emitTmp(node: Node): String = {
     require(false)
@@ -124,7 +156,18 @@ class CppBackend extends Backend {
       case x: Literal =>
         List()
       case x: Reg =>
-        List((s"dat_t<${node.needWidth()}>", emitRef(node)))
+        List((s"dat_t<${node.needWidth()}>", emitRef(node))) ++ {
+          if (!allocateOnlyNeededShadowRegisters || needShadow.contains(node)) {
+            // Add an entry for the shadow register in the main object.
+            if (shadowRegisterInObject) {
+              List((s"${shadowPrefix} dat_t<${node.needWidth()}>", shadowPrefix + emitRef(node) + s"__shadow"))
+            } else {
+              Nil
+            }
+          } else {
+            Nil
+          }
+        }
       case m: Mem[_] =>
         List((s"mem_t<${m.needWidth()},${m.n}>", emitRef(m)))
       case r: ROMData =>
@@ -503,7 +546,9 @@ class CppBackend extends Backend {
 
   def emitRefHi(node: Node): String = node match {
     case reg: Reg =>
-      if (reg.next.isReg) emitRef(reg) + "__shadow"
+      if (reg.next.isReg && (!allocateOnlyNeededShadowRegisters || needShadow.contains(reg))) {
+        emitRef(reg) + "__shadow"
+      }
       else emitRef(reg.next)
     case _ => emitRef(node)
   }
@@ -554,10 +599,37 @@ class CppBackend extends Backend {
     }
   }
 
+  // If we write a register node before we use its inputs, we need to shadow it.
+  def determineRequiredShadowRegisters(node: Node) {
+    node match {
+      case reg: Reg => {
+        regWritten += reg
+      }
+      case _ => {
+        for (n <- node.inputs if regWritten.contains(n)) {
+          needShadow += n
+        }
+      }
+    }
+  }
+
   def emitInitHi(node: Node): String = {
     node match {
-      case reg: Reg =>
-        s"  dat_t<${node.needWidth()}> ${emitRef(reg)}__shadow = ${emitRef(reg.next)};\n"
+      case reg: Reg => {
+        potentialShadowRegisters += 1
+        val allocateShadow = !allocateOnlyNeededShadowRegisters || needShadow.contains(reg)
+        if (allocateShadow) {
+          allocatedShadow += reg
+          val storagePrefix = if (shadowRegisterInObject) {
+            ""
+          } else {
+            " dat_t<" + node.needWidth()  + ">"
+          }
+          s"${shadowPrefix} ${storagePrefix} ${emitRef(reg)}__shadow = ${emitRef(reg.next)};\n"
+        } else {
+          s" ${emitRef(reg)} = ${emitRef(reg.next)};\n"
+        }
+      }
 
       case m: MemWrite =>
         block((0 until words(m)).map(i =>
@@ -614,31 +686,151 @@ class CppBackend extends Backend {
   }
 
   override def compile(c: Module, flagsIn: String) {
-    val CXXFLAGS = scala.util.Properties.envOrElse("CXXFLAGS", "-O2" )
-    val flags = if (flagsIn == null) CXXFLAGS else flagsIn
+    val CXXFLAGS = scala.util.Properties.envOrElse("CXXFLAGS", "" )
     val LDFLAGS = scala.util.Properties.envOrElse("LDFLAGS", "")
-
     val chiselENV = java.lang.System.getenv("CHISEL")
+
     val c11 = if (hasPrintfs) " -std=c++11 " else ""
-    val allFlags = flags + c11 + " -I../ -I" + chiselENV + "/csrc/"
+    val cxxFlags = (if (flagsIn == null) CXXFLAGS else flagsIn) + c11
+    val cppFlags = scala.util.Properties.envOrElse("CPPFLAGS", "") + " -I../ -I" + chiselENV + "/csrc/"
+    val allFlags = cppFlags + " " + cxxFlags
     val dir = Driver.targetDir + "/"
     val CXX = scala.util.Properties.envOrElse("CXX", "g++" )
+    val parallelMakeJobs = Driver.parallelMakeJobs
+
     def run(cmd: String) {
       val bashCmd = Seq("bash", "-c", cmd)
       val c = bashCmd.!
       ChiselError.info(cmd + " RET " + c)
     }
-    def link(name: String) {
+    def linkOne(name: String) {
       val ac = CXX + " " + LDFLAGS + " -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o"
       run(ac)
     }
-    def cc(name: String) {
-      val cmd = CXX + " -c -o " + dir + name + ".o " + allFlags + " " + dir + name + ".cpp"
+    def linkMany(name: String, objects: Seq[String]) {
+      val ac = CXX + " " + LDFLAGS + " -o " + dir + name + " " + objects.map(dir + _ + ".o ").mkString(" ") + dir + name + "-emulator.o"
+      run(ac)
+    }
+    def cc(name: String, flags: String = allFlags) {
+      val cmd = CXX + " -c -o " + dir + name + ".o " + flags + " " + dir + name + ".cpp"
       run(cmd)
     }
-    cc(c.name + "-emulator")
-    cc(c.name)
-    link(c.name)
+
+    def make(args: String) {
+      // We explicitly unset CPPFLAGS and CXXFLAGS so the values
+      // set in the Makefile will take effect.
+      val cmd = "unset CPPFLAGS CXXFLAGS; make " + args
+      run(cmd)
+    }
+
+    def editToTarget(filename: String, replacements: HashMap[String, String]) = {
+      val resourceStream = getClass().getResourceAsStream("/" + filename)
+      if( resourceStream != null ) {
+        val makefile = createOutputFile(filename)
+        val br = new BufferedReader(new InputStreamReader(resourceStream, "US-ASCII"))
+        while(br.ready()) {
+          val inputLine = br.readLine()
+          // Break the line into "tokens"
+          val tokens = inputLine.split("""(?=@\w+@)""")
+          // Reassemble the line plugging in expansions for "macro"
+          val outputLine = tokens.map(s => {
+            if (s.length > 2 && s.charAt(0) == '@' && s.takeRight(1) == "@") {
+              replacements(s)
+            } else {
+              s
+            }
+          }) mkString ""
+          makefile.write(outputLine + "\n")
+        }
+        makefile.close()
+        br.close()
+      } else {
+        println(s"WARNING: Unable to copy '$filename'" )
+      }
+    }
+
+    // Compile all the unoptimized files at a (possibly) lower level of optimization.
+    if (cloneCompiledO0) {
+      onceOnlyFiles += cloneFile
+    }
+    // Set the default optimization levels.
+    var optim0 = "-O0"
+    var optim1 = "-O1"
+    var optim2 = "-O2"
+    // Is the caller explicitly setting -Osomething? If yes, we'll honor that setting
+    //  and set our default optimization flags to "".
+    val Oregex = new scala.util.matching.Regex("""[^\w]*(-O.+)""", "explicitO")
+    val Omatch = Oregex.findFirstMatchIn(allFlags)
+    Omatch match {
+      case Some(m) => {
+        println("Cpp: observing explicit '" + m.group("explicitO") + "'")
+        optim0 = ""
+        optim1 = ""
+        optim2 = ""
+      }
+      case _ => {}
+    }
+
+    // Are we compiling multiple cpp files?
+    if (compileMultipleCppFiles) {
+      // Are we using a Makefile template and parallel makes?
+      if (parallelMakeJobs != 0) {
+        // Build the replacement string map for the Makefile template.
+        val replacements = HashMap[String, String] ()
+        val onceOnlyOFiles = onceOnlyFiles.map(_ + ".o") mkString " "
+        val unoptimizedOFiles = unoptimizedFiles.filter( ! onceOnlyFiles.contains(_) ).map(_ + ".o") mkString " "
+        val optimzedOFiles = ((for {
+          f <- 0 until maxFiles
+          basename = c.name + "-" + f
+          if !unoptimizedFiles.contains(basename)
+        } yield basename + ".o"
+        ) mkString " ") + " " + c.name + "-emulator.o"
+  
+        replacements += (("@HFILES@", ""))
+        replacements += (("@ONCEONLY@", onceOnlyOFiles))
+        replacements += (("@UNOPTIMIZED@", unoptimizedOFiles))
+        replacements += (("@OPTIMIZED@", optimzedOFiles))
+        replacements += (("@EXEC@", c.name))
+        replacements += (("@CPPFLAGS@", cppFlags))
+        replacements += (("@CXXFLAGS@", cxxFlags))
+        replacements += (("@LDFLAGS@", LDFLAGS))
+        replacements += (("@OPTIM0@", optim0))
+        replacements += (("@OPTIM1@", optim1))
+        replacements += (("@OPTIM2@", optim2))
+        replacements += (("@CXX@", CXX))
+        // Read and edit the Makefile template.
+        editToTarget("Makefile", replacements)
+        val nJobs = if (parallelMakeJobs > 0) "-j" + parallelMakeJobs.toString() else "-j"
+        make(nJobs)
+      } else {
+        // No make. Compile everything discretely.
+        cc(c.name + "-emulator")
+        // We should have unoptimized files.
+        assert(unoptimizedFiles.size != 0 || onceOnlyFiles.size != 0,
+          "no unoptmized files to compile for '--compileMultipleCppFiles'")
+        // Compile the O0 files.
+        onceOnlyFiles.map(cc(_, allFlags + " " + optim0))
+  
+        // Compile the remaining (O1) files.
+        unoptimizedFiles.filter( ! onceOnlyFiles.contains(_) ).map(cc(_, allFlags + " " + optim1))
+        val objects: ArrayBuffer[String] = new ArrayBuffer(maxFiles)
+        // Compile the remainder at the specified optimization level.
+        for (f <- 0 until maxFiles) {
+          val basename = c.name + "-" + f
+          // If we've already compiled this file, don't do it again,
+          // but do add it to the list of objects to be linked.
+          if (!unoptimizedFiles.contains(basename)) {
+            cc(basename, allFlags + " " + optim2)
+          }
+          objects += basename
+        }
+        linkMany(c.name, objects)
+      }
+    } else {
+      cc(c.name + "-emulator")
+      cc(c.name)
+      linkOne(c.name)
+    }
   }
 
   def emitDefLos(c: Module): String = {
@@ -723,6 +915,404 @@ class CppBackend extends Backend {
   def backendElaborate(c: Module) = super.elaborate(c)
 
   override def elaborate(c: Module): Unit = {
+    val minimumLinesPerFile = Driver.minimumLinesPerFile
+    val partitionIslands = Driver.partitionIslands
+    val lineLimitFunctions = Driver.lineLimitFunctions
+
+    // Generate CPP files
+    val out_cpps = ArrayBuffer[CppFile]()
+    val all_cpp = new StringBuilder
+
+    def cppFileSuffix = "-" + out_cpps.length
+    class CppFile(val suffix: String = cppFileSuffix) {
+      var lines = 0
+      var done = false
+      val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName) 
+      val name = n + suffix + ".cpp"
+      val hfilename = n + ".h"
+      var fileWriter = createOutputFile(name)
+      fileWriter.write("#include \"" + hfilename + "\"\n")
+      for (str <- Driver.includeArgs) fileWriter.write("#include \"" + str + "\"\n")
+      fileWriter.write("\n")
+      lines = 3
+
+
+      def write(s: String) {
+        lines += s.count(_ == '\n')
+        fileWriter.write(s)
+      }
+      
+      def close() {
+        done = true
+        fileWriter.close()
+      }
+      def advance() {
+        this.done = true
+      }
+    }
+
+    class LineLimitedFunction(functionNamePrefix: String, maxLines: Int, functionCodePrefix: String, functionCodeSuffix: String = "}\n", functionSignature: String = " ", functionArgs: String = " ", functionClass: String = c.name + "_t") {
+      var bodyLines = 0
+      val body = new StringBuilder
+      val bodies = new scala.collection.mutable.Queue[String]
+      private def functionName(i: Int): String = {
+        functionNamePrefix + "_" + i.toString
+      }
+      private def newBody() {
+        if (body.length > 0) {
+          bodies += body.result
+          body.clear()
+        }
+        bodyLines = 0
+      }
+      def addString(s: String) {
+        if (s == "") {
+          return
+        }
+        val lines = s.count(_ == '\n')
+        if (maxLines > 0 && lines + bodyLines > maxLines) {
+          newBody()
+        }
+        body.append(s)
+        bodyLines += lines
+      }
+      def genCalls() {
+        var offset = 0
+        while (bodies.length > offset) {
+          val functionCall = functionName(offset) + "(" + functionArgs + ");\n"
+          addString(functionCall)
+          offset += 1
+        }
+      }
+      def done() {
+        // Close off any body building in progress.
+        newBody()
+        if (bodies.length > 1) {
+          genCalls()
+          newBody()
+        }
+      }
+      def getBodies(): String = {
+        val bodycalls = new StringBuilder
+        bodies.length match {
+          case 0 => bodycalls.append(functionCodePrefix + functionCodeSuffix)
+          case 1 => {
+            bodycalls.append(functionCodePrefix)
+            bodycalls.append(bodies.dequeue())
+            bodycalls.append(functionCodeSuffix)
+          }
+          case _ => {
+            for (i <- 0 until bodies.length - 1) {
+              bodycalls.append("void " + functionClass + "::" + functionName(i) + "(" + functionSignature + ") {\n")
+              bodycalls.append(bodies.dequeue())
+              bodycalls.append("}\n")
+            }
+            bodycalls.append(functionCodePrefix)
+            bodycalls.append(bodies.dequeue())
+            bodycalls.append(functionCodeSuffix)
+          }
+        }
+        bodycalls.result
+      }
+    }
+    def createCppFile(suffix: String = cppFileSuffix) {
+      // If we're trying to coalesce cpp files (minimumLinesPerFile > 0),
+      //  don't actually create a new file unless we've hit the line limit.
+      if ((out_cpps.size > 0) && (minimumLinesPerFile == 0 || out_cpps.last.lines < minimumLinesPerFile) && !out_cpps.last.done) {
+        out_cpps.last.write("\n\n")
+      } else {
+        out_cpps += new CppFile(suffix)
+        println("CppBackend: createCppFile " + out_cpps.last.name)
+      }
+    }
+    def writeCppFile(s: String) {
+      out_cpps.last.write(s)
+      if (! suppressMonolithicCppFile) {
+        all_cpp.append(s)
+      }
+    }
+    def advanceCppFile() {
+      out_cpps.last.advance()
+    }
+
+    // Generate header file
+    def genHeader(vcd: Backend, islands: Array[Island], nInitMethods: Int, nSetCircuitMethods: Int, nDumpInitMethods: Int, nDumpMethods: Int, nInitMappingTableMethods: Int) {
+      val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName) 
+      val out_h = createOutputFile(n + ".h");
+      out_h.write("#ifndef __" + c.name + "__\n");
+      out_h.write("#define __" + c.name + "__\n\n");
+      out_h.write("#include \"emulator.h\"\n\n");
+      
+      // Generate module headers
+      out_h.write("class " + c.name + "_t : public mod_t {\n");
+      out_h.write(" private:\n");
+      out_h.write("  val_t __rand_seed;\n");
+      out_h.write("  void __srand(val_t seed) { __rand_seed = seed; }\n");
+      out_h.write("  val_t __rand_val() { return ::__rand_val(&__rand_seed); }\n");
+      out_h.write(" public:\n");
+
+      def headerOrderFunc(a: Node, b: Node) = {
+        // pack smaller objects at start of header for better locality
+        val aMem = a.isInstanceOf[Mem[_]] || a.isInstanceOf[ROMData]
+        val bMem = b.isInstanceOf[Mem[_]] || b.isInstanceOf[ROMData]
+        aMem < bMem || aMem == bMem && a.needWidth() < b.needWidth()
+      }
+      for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc))
+        out_h.write(emitDec(m))
+      for (m <- Driver.orderedNodes.filter(_.isInVCD).sortWith(headerOrderFunc))
+        out_h.write(vcd.emitDec(m))
+      for (clock <- Driver.clocks)
+        out_h.write(emitDec(clock))
+  
+      out_h.write("\n");
+
+      // If we're generating multiple init methods, wrap them in private/public.
+      if (nInitMethods > 1) {
+        out_h.write(" private:\n");
+        for (i <- 0 until nInitMethods - 1) {
+          out_h.write("  void init_" + i + " ( );\n");
+        }
+        out_h.write(" public:\n");
+      }
+      out_h.write("  void init ( val_t rand_init = 0 );\n");
+
+      var generatedPrivateClockPrototypes = false
+      for ( clock <- Driver.clocks) {
+        val clockNameStr = clkName(clock).toString()
+        for (island <- islands if island.islandId != 0) {
+          val islandId = island.islandId
+          val suffix = clockNameStr + "_I_" + islandId + " ( dat_t<1> reset );\n"
+          if (!generatedPrivateClockPrototypes) {
+            out_h.write(" private:\n");
+            generatedPrivateClockPrototypes = true
+          }
+          out_h.write("  void clock_lo" + suffix)
+          out_h.write("  void clock_ihi" + suffix)
+          out_h.write("  void clock_dhi" + suffix)
+        }
+        out_h.write("  void clock_lo" + clockNameStr + " ( dat_t<1> reset );\n")
+        out_h.write("  void clock_hi" + clockNameStr + " ( dat_t<1> reset );\n")
+      }
+      if (generatedPrivateClockPrototypes) {
+        out_h.write(" public:\n");
+      }
+      out_h.write("  int clock ( dat_t<1> reset );\n")
+      if (Driver.clocks.length > 1) {
+        out_h.write("  void setClocks ( std::vector< int >& periods );\n")
+      }
+
+      out_h.write("  mod_t* clone();\n");
+
+      // If we're generating multiple set_circuit methods, wrap them in private/public.
+      if (nSetCircuitMethods > 1) {
+        out_h.write(" private:\n");
+        for (i <- 0 until nSetCircuitMethods - 1) {
+          out_h.write("  void set_circuit_from_" + i + " ( " + c.name + "_t* mod_typed );\n");
+        }
+        out_h.write(" public:\n");
+      }
+      out_h.write("  bool set_circuit_from(mod_t* src);\n");
+      out_h.write("  void print ( FILE* f );\n");
+
+      // If we're generating multiple dump methods, wrap them in private/public.
+      if (nDumpMethods > 1) {
+        out_h.write(" private:\n");
+        for (i <- 0 until nDumpMethods - 1) {
+          out_h.write("  void dump_" + i + " ( FILE* f );\n");
+        }
+        out_h.write(" public:\n");
+      }
+      out_h.write("  void dump ( FILE* f, int t );\n");
+ 
+      // If we're generating multiple dump_init methods, wrap them in private/public.
+      if (nDumpInitMethods > 1) {
+        out_h.write(" private:\n");
+        for (i <- 0 until nDumpInitMethods - 1) {
+          out_h.write("  void dump_init_" + i + " ( FILE* f );\n");
+        }
+        out_h.write(" public:\n");
+      }
+      out_h.write("  void dump_init ( FILE* f );\n");
+     
+      // All done with the class definition. Close it off.
+      out_h.write("\n};\n\n");
+      out_h.write(Params.toCxxStringParams);
+      
+      // Generate API headers
+      out_h.write(s"class ${c.name}_api_t : public mod_api_t {\n");
+      // If we're generating multiple init_mapping_table( methods, wrap them in private/public.
+      if (nInitMappingTableMethods > 1) {
+        out_h.write(" private:\n");
+        for (i <- 0 until nInitMappingTableMethods - 1) {
+          out_h.write("  void init_mapping_table_" + i + " ( " + c.name + "_t* mod_typed );\n");
+        }
+        out_h.write(" public:\n");
+      }
+
+      out_h.write(s"  void init_mapping_table();\n");
+      out_h.write(s"};\n\n");
+      
+      out_h.write("\n\n#endif\n");
+      out_h.close();
+    }
+
+    def genInitMethod(): Int = {
+      createCppFile()
+      val head = "void " + c.name + "_t::init ( val_t rand_init ) {\n" +
+                 "  this->__srand(rand_init);\n"
+      val llf = new LineLimitedFunction("init", lineLimitFunctions, head)
+      for (m <- Driver.orderedNodes) {
+        llf.addString(emitInit(m))
+      }
+      for (clock <- Driver.clocks) {
+        llf.addString(emitInit(clock))
+      }
+      llf.done()
+      val nFunctions = llf.bodies.length
+      writeCppFile(llf.getBodies)
+      nFunctions
+    }
+
+    def genClockMethod() {
+      createCppFile()
+      writeCppFile("int " + c.name + "_t::clock ( dat_t<1> reset ) {\n")
+      writeCppFile("  uint32_t min = ((uint32_t)1<<31)-1;\n")
+      for (clock <- Driver.clocks) {
+        writeCppFile("  if (" + emitRef(clock) + "_cnt < min) min = " + emitRef(clock) +"_cnt;\n")
+      }
+      for (clock <- Driver.clocks) {
+        writeCppFile("  " + emitRef(clock) + "_cnt-=min;\n")
+      }
+      for (clock <- Driver.clocks) {
+        writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
+      }
+      for (clock <- Driver.clocks) {
+        writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
+      }
+      for (clock <- Driver.clocks) {
+        writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " +
+                    emitRef(clock) + ";\n")
+      }
+      writeCppFile("  return min;\n")
+      writeCppFile("}\n")
+    }
+
+    def genCloneMethod() {
+      createCppFile()
+      writeCppFile(s"mod_t* ${c.name}_t::clone() {\n")
+      writeCppFile(s"  mod_t* cloned = new ${c.name}_t(*this);\n")
+      writeCppFile(s"  return cloned;\n")
+      writeCppFile(s"}\n")
+
+      // Make a special note of the clone file. We may want to compile it -O0.
+      cloneFile = out_cpps.last.name.dropRight(".cpp".length())
+    }
+
+    def genSetCircuitFromMethod(): Int = {
+      createCppFile()
+      val head = s"bool ${c.name}_t::set_circuit_from(mod_t* src) {\n" +
+                 s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(src);\n" +
+                 s"  assert(mod_typed);\n"
+      val tail = "  return true;\n}\n"
+      val llf = new LineLimitedFunction("set_circuit_from", lineLimitFunctions, head, tail, c.name + "_t* mod_typed", "mod_typed")
+      for (m <- Driver.orderedNodes) {
+        if(m.name != "reset" && m.isInObject) {
+          llf.addString(emitCircuitAssign("mod_typed->", m))
+        }
+      }
+      for (clock <- Driver.clocks) {
+        llf.addString(emitCircuitAssign("mod_typed->", clock))
+      }
+      llf.done()
+      val nFunctions = llf.bodies.length
+      writeCppFile(llf.getBodies)
+      nFunctions
+    }
+
+    def genPrintMethod() {
+      createCppFile()
+      writeCppFile("void " + c.name + "_t::print ( FILE* f ) {\n")
+      for (cc <- Driver.components; p <- cc.printfs) {
+        hasPrintfs = true
+        writeCppFile("#if __cplusplus >= 201103L\n"
+          + "  if (" + emitLoWordRef(p.cond)
+          + ") dat_fprintf<" + p.needWidth() + ">(f, "
+          + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
+          + ");\n"
+          + "#endif\n")
+      }
+      if (hasPrintfs)
+        writeCppFile("fflush(f);\n");
+      writeCppFile("}\n")
+    }
+
+    def genDumpInitMethod(vcd: VcdBackend): Int = {
+      createCppFile()
+      val head = "void " + c.name + "_t::dump_init(FILE *f) {\n"
+      val llf = new LineLimitedFunction("dump_init", lineLimitFunctions, head, "}\n", "FILE *f", "f")
+      vcd.dumpVCDInit(llf.addString)
+      llf.done()
+      val nFunctions = llf.bodies.length
+      writeCppFile(llf.getBodies)
+      nFunctions
+    }
+
+    def genDumpMethod(vcd: VcdBackend): Int = {
+      createCppFile()
+      var head = "void " + c.name + "_t::dump(FILE *f, int t) {\n"
+      val tail = "}\n"
+      // Are we actually generating VCD?
+      if (Driver.isVCD) {
+        // Yes. dump is a real function.
+        head += "  if (t == 0) return dump_init(f);\n" +
+                "  fprintf(f, \"#%d\\n\", t);\n"
+        // Are we generating a large dump function with gotos? (i.e., not inline)
+        if (Driver.isVCDinline) {
+          val llf = new LineLimitedFunction("dump", lineLimitFunctions, head, tail, "FILE *f", "f")
+          vcd.dumpVCD(llf.addString)
+          llf.done()
+          val nFunctions = llf.bodies.length
+          writeCppFile(llf.getBodies)
+          nFunctions
+        } else {
+          // We're creating a VCD dump function with gotos.
+          writeCppFile(head)
+          vcd.dumpVCD(writeCppFile)
+          writeCppFile(tail)
+          1
+        }
+      } else {
+        // No. Just generate the dummy (nop) function.
+        writeCppFile(head + tail)
+        1
+      }
+    }
+
+    def genInitMappingTableMethod(mappings: ArrayBuffer[Tuple2[String, Node]]): Int = {
+      createCppFile()
+      val head = s"void ${c.name}_api_t::init_mapping_table() {\n" +
+                 s"  dat_table.clear();\n" +
+                 s"  mem_table.clear();\n" +
+                 s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(module);\n" +
+                 s"  assert(mod_typed);\n"
+      val llf = new LineLimitedFunction("init_mapping_table", lineLimitFunctions, head, "}\n", c.name + "_t* mod_typed", "mod_typed", c.name + "_api_t")
+      for (m <- mappings) {
+        if (m._2.name != "reset" && (m._2.isInObject || m._2.isInVCD)) {
+          llf.addString(emitMapping(m))
+        }
+      }
+      llf.done()
+      val nFunctions = llf.bodies.length
+      writeCppFile(llf.getBodies)
+
+      // Add the init_mapping_table file to the list of unoptimized files.
+      if (compileInitializationUnoptimized) {
+        val trimLength = ".cpp".length()
+        unoptimizedFiles += out_cpps.last.name.dropRight(trimLength)
+      }
+      nFunctions
+    }
+
     println("CPP elaborate")
     super.elaborate(c)
 
@@ -740,211 +1330,277 @@ class CppBackend extends Backend {
       ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
 
-    val clkDomains = new HashMap[Clock, (StringBuilder, StringBuilder)]
-    for (clock <- Driver.clocks) {
-      val clock_lo = new StringBuilder
-      val clock_hi = new StringBuilder
-      clkDomains += (clock -> ((clock_lo, clock_hi)))
-      clock_lo.append("void " + c.name + "_t::clock_lo" + clkName(clock) + " ( dat_t<1> reset ) {\n")
-      clock_hi.append("void " + c.name + "_t::clock_hi" + clkName(clock) + " ( dat_t<1> reset ) {\n")
+    // If we're partitioning a monolithic circuit into separate islands
+    // of combinational logic, generate those islands now.
+    val islands = if (partitionIslands) {
+      createIslands()
+    } else {
+      val e = ArrayBuffer[Island]()
+      e += new Island(0, new IslandNodes, new IslandNodes)
+      e.toArray
     }
+    val maxIslandId = islands.map(_.islandId).max
+    val nodeToIslandArray = generateNodeToIslandArray(islands)
+
+    class ClockDomains {
+      type ClockCodeStrings = HashMap[Clock, (StringBuilder, StringBuilder, StringBuilder)]
+      val code = new ClockCodeStrings
+      val islandClkCode = new HashMap[Int, ClockCodeStrings]
+      val islandStarted = Array.fill(3, maxIslandId + 1)(0)    // An array to keep track of the first time we added code to an island.
+      val islandOrder = Array.fill(3, islands.size)(0)         // An array to keep track of the order in which we should output island code.
+      var islandSequence = Array.fill(3)(0)
+      val showProgress = false
+
+      for (clock <- Driver.clocks) {
+        val clock_dlo = new StringBuilder
+        val clock_ihi = new StringBuilder
+        val clock_dhi = new StringBuilder
+        code += (clock -> ((clock_dlo, clock_ihi, clock_dhi)))
+        clock_dlo.append("void " + c.name + "_t::clock_lo" + clkName(clock) + " ( dat_t<1> reset ) {\n")
+        clock_ihi.append("void " + c.name + "_t::clock_hi" + clkName(clock) + " ( dat_t<1> reset ) {\n")
+        // If we're generating islands of combinational logic,
+        // have the main clock code call the island specific code,
+        // and generate that island specific clock_(hi|lo) code.
+        if (partitionIslands) {
+          for (island <- islands) {
+            val islandId = island.islandId
+            // Do we need a new entry for this mapping?
+            if (!islandClkCode.contains(islandId)) {
+              islandClkCode += ((islandId, new ClockCodeStrings))
+            }
+            val clock_dlo_I = new StringBuilder
+            val clock_ihi_I = new StringBuilder
+            val clock_dhi_I = new StringBuilder
+            islandClkCode(islandId) += (clock -> ((clock_dlo_I, clock_ihi_I, clock_dhi_I)))
+            clock_dlo_I.append("void " + c.name + "_t::clock_lo" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset ) {\n")
+            clock_ihi_I.append("void " + c.name + "_t::clock_ihi" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset ) {\n")
+            clock_dhi_I.append("void " + c.name + "_t::clock_dhi" + clkName(clock) + "_I_" + islandId + " ( dat_t<1> reset ) {\n")
+          }
+        }
+      }
+
+      def clock(n: Node) = if (n.clock == null) Driver.implicitClock else n.clock
+
+      def populate() {
+        var nodeCount = 0
+        def isNodeInIsland(node: Node, island: Island): Boolean = {
+          return island == null || nodeToIslandArray(node._id).contains(island)
+        }
+
+        // Return tuple of booleans if we actually added any clock code.
+        def addClkDefs(n: Node, codeStrings: ClockCodeStrings): (Boolean, Boolean, Boolean) = {
+          val defLo = emitDefLo(n)
+          val initHi = emitInitHi(n)
+          val defHi = emitDefHi(n)
+          val clockNode = clock(n)
+          if (defLo != "" || initHi != "" || defHi != "") {
+            codeStrings(clockNode)._1.append(defLo)
+            codeStrings(clockNode)._2.append(initHi)
+            codeStrings(clockNode)._3.append(defHi)
+          }
+          (defLo != "", initHi != "", defHi != "")
+        }
+
+        // Should we determine which shadow registers we need?
+        if (allocateOnlyNeededShadowRegisters || true) {
+          for (n <- Driver.orderedNodes) {
+            determineRequiredShadowRegisters(n)
+          }
+        }
+
+        // Are we generating partitioned islands?
+        if (!partitionIslands) {
+          // No. Generate and output a single, monolithic function.
+          for (m <- Driver.orderedNodes) {
+            addClkDefs(m, code)
+          }
+          // For the non-patitioned case, we're going to merge the clock_hi init and def code into a single function.
+          // Add the closing brace to the def string.
+          for (clk <- code.keys) {
+            code(clk)._1.append("}\n")
+            code(clk)._3.append("}\n")
+          }
+        } else {
+          val addedCode = new Array[Boolean](3)
+          for (m <- Driver.orderedNodes) {
+            for (island <- islands) {
+              if (isNodeInIsland(m, island)) {
+                val islandId = island.islandId
+                val codeStrings = islandClkCode(islandId)
+                val addedCodeTuple = addClkDefs(m, codeStrings)
+                addedCode(0) = addedCodeTuple._1
+                addedCode(1) = addedCodeTuple._2
+                addedCode(2) = addedCodeTuple._3
+                // Update the generation number if we added any code to this island.
+                for (lohi <- 0 to 2) {
+                  if (addedCode(lohi)) {
+                    // Is this the first time we've added code to this island?
+                    if (islandStarted(lohi)(islandId) == 0) {
+                      islandOrder(lohi)(islandSequence(lohi)) = islandId
+                      islandSequence(lohi) += 1
+                      islandStarted(lohi)(islandId) = islandSequence(lohi)
+                    }
+                  }
+                }
+              }
+            }
+            nodeCount += 1
+            if (showProgress && (nodeCount % 1000) == 0) {
+              println("ClockDomains: populated " + nodeCount + " nodes.")
+            }
+          }
+          for (codeStrings <- islandClkCode.values) {
+            for (clk <- codeStrings.keys) {
+              codeStrings(clk)._1.append("}\n")
+              codeStrings(clk)._2.append("}\n")
+              codeStrings(clk)._3.append("}\n")
+            }
+          }
+        }
+      }
+
+      def outputAllClkDomains() {
+        // Are we generating partitioned islands?
+        if (!partitionIslands) {
+          for (out <- code.values.map(_._1) ++ (code.values.map(x => (x._2.append(x._3))))) {
+            createCppFile()
+            writeCppFile(out.result)
+          }
+        } else {
+          // Output the clock code in the correct order.
+          for (islandId <- islandOrder(0) if islandId > 0) {
+            for (out <- islandClkCode(islandId).values.map(_._1)) {
+              createCppFile()
+              writeCppFile(out.result)
+              out.clear()         // free the memory.
+            }
+          }
+          for ((clock, clkcodes) <- code) {
+            val (clock_lo, clock_ihi, clock_dhi) = clkcodes
+            createCppFile()
+            writeCppFile(clock_lo.result)
+            clock_lo.clear()      // free the memory
+            // Output the actual calls to the island specific clock code.
+            for (islandId <- islandOrder(0) if islandId > 0) {
+              writeCppFile("\t" + c.name + "_t::clock_lo" + clkName(clock) + "_I_" + islandId + "(reset);\n")
+            }
+            writeCppFile("}\n")
+          }
+
+          // Output the island-specific clock init code
+          for (islandId <- islandOrder(1) if islandId > 0) {
+            for (out <- islandClkCode(islandId).values.map(_._2)) {
+              createCppFile()
+              writeCppFile(out.result)
+              out.clear()         // free the memory.
+            }
+          }
+
+          // Output the island-specific clock def code
+          for (islandId <- islandOrder(1) if islandId > 0) {
+            for (out <- islandClkCode(islandId).values.map(_._3)) {
+              createCppFile()
+              writeCppFile(out.result)
+              out.clear()         // free the memory.
+            }
+          }
+
+          // Output the code to call the island-specific clock hi code.
+          for ((clock, clkcodes) <- code) {
+            val (clock_lo, clock_ihi, clock_dhi) = clkcodes
+            createCppFile()
+            writeCppFile(clock_ihi.result)
+            clock_ihi.clear()      // free the memory
+            // Output the actual calls to the island specific clock code.
+            for (islandId <- islandOrder(1) if islandId > 0) {
+              writeCppFile("\t" + c.name + "_t::clock_ihi" + clkName(clock) + "_I_" + islandId + "(reset);\n")
+            }
+            for (islandId <- islandOrder(1) if islandId > 0) {
+              writeCppFile("\t" + c.name + "_t::clock_dhi" + clkName(clock) + "_I_" + islandId + "(reset);\n")
+            }
+            writeCppFile("}\n")
+          }
+       }
+      }
+    }
+      
+    val clkDomains = new ClockDomains
 
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName) 
     if (Driver.isGenHarness) {
       genHarness(c, n);
     }
-    val out_h = createOutputFile(n + ".h");
     if (!Params.space.isEmpty) {
       val out_p = createOutputFile(c.name + ".p");
       out_p.write(Params.toDotpStringParams);
       out_p.close();
     }
-    
-    // Generate header file
-    out_h.write("#ifndef __" + c.name + "__\n");
-    out_h.write("#define __" + c.name + "__\n\n");
-    out_h.write("#include \"emulator.h\"\n\n");
-    
-    // Generate module headers
-    out_h.write("class " + c.name + "_t : public mod_t {\n");
-    out_h.write(" private:\n");
-    out_h.write("  val_t __rand_seed;\n");
-    out_h.write("  void __srand(val_t seed) { __rand_seed = seed; }\n");
-    out_h.write("  val_t __rand_val() { return ::__rand_val(&__rand_seed); }\n");
-    out_h.write(" public:\n");
+
     val vcd = new VcdBackend(c)
-    def headerOrderFunc(a: Node, b: Node) = {
-      // pack smaller objects at start of header for better locality
-      val aMem = a.isInstanceOf[Mem[_]] || a.isInstanceOf[ROMData]
-      val bMem = b.isInstanceOf[Mem[_]] || b.isInstanceOf[ROMData]
-      aMem < bMem || aMem == bMem && a.needWidth() < b.needWidth()
-    }
-    for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc))
-      out_h.write(emitDec(m))
-    for (m <- Driver.orderedNodes.filter(_.isInVCD).sortWith(headerOrderFunc))
-      out_h.write(vcd.emitDec(m))
-    for (clock <- Driver.clocks)
-      out_h.write(emitDec(clock))
 
-    out_h.write("\n");
-    out_h.write("  void init ( val_t rand_init = 0 );\n");
-    for ( clock <- Driver.clocks) {
-      out_h.write("  void clock_lo" + clkName(clock) + " ( dat_t<1> reset );\n")
-      out_h.write("  void clock_hi" + clkName(clock) + " ( dat_t<1> reset );\n")
-    }
-    out_h.write("  int clock ( dat_t<1> reset );\n")
-    if (Driver.clocks.length > 1) {
-      out_h.write("  void setClocks ( std::vector< int >& periods );\n")
-    }
-    out_h.write("  mod_t* clone();\n");
-    out_h.write("  bool set_circuit_from(mod_t* src);\n");
-    out_h.write("  void print ( FILE* f );\n");
-    out_h.write("  void dump ( FILE* f, int t );\n");
-    out_h.write("  void dump_init ( FILE* f );\n\n");
-    out_h.write("};\n\n");
-    out_h.write(Params.toCxxStringParams);
-    
-    // Generate API headers
-    out_h.write(s"class ${c.name}_api_t : public mod_api_t {\n");
-    out_h.write(s"  void init_mapping_table();\n");
-    out_h.write(s"};\n\n");
-    
-    out_h.write("\n\n#endif\n");
-    out_h.close();
+    ChiselError.info("populating clock domains")
+    clkDomains.populate()
 
+    println("CppBackend::elaborate: need " + needShadow.size + ", redundant " + (potentialShadowRegisters - needShadow.size) + " shadow registers")
     // Generate CPP files
-    val out_cpps = ArrayBuffer[java.io.FileWriter]()
-    val all_cpp = new StringBuilder
-    def createCppFile(suffix: String = "-" + out_cpps.length) = {
-      val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName) 
-      val f = createOutputFile(n + suffix + ".cpp")
-      f.write("#include \"" + n + ".h\"\n")
-      for (str <- Driver.includeArgs) f.write("#include \"" + str + "\"\n")
-      f.write("\n")
-      out_cpps += f
-      f
-    }
-    def writeCppFile(s: String) = {
-      out_cpps.last.write(s)
-      all_cpp.append(s)
-    }
-
-    createCppFile()
+    ChiselError.info("generating cpp files")
     
     // generate init block
-    writeCppFile("void " + c.name + "_t::init ( val_t rand_init ) {\n")
-    writeCppFile("  this->__srand(rand_init);\n")
-    for (m <- Driver.orderedNodes) {
-      writeCppFile(emitInit(m))
-    }
-    for (clock <- Driver.clocks) {
-      writeCppFile(emitInit(clock))
-    }
-    writeCppFile("}\n")
-
-    def clock(n: Node) = if (n.clock == null) Driver.implicitClock else n.clock
-
-    for (m <- Driver.orderedNodes)
-      clkDomains(clock(m))._1.append(emitDefLo(m))
-
-    for (m <- Driver.orderedNodes)
-      clkDomains(clock(m))._2.append(emitInitHi(m))
-
-    for (m <- Driver.orderedNodes)
-      clkDomains(clock(m))._2.append(emitDefHi(m))
-
-    for (clk <- clkDomains.keys) {
-      clkDomains(clk)._1.append("}\n")
-      clkDomains(clk)._2.append("}\n")
-    }
-
+    val nInitMethods = genInitMethod()
+    
     // generate clock(...) function
-    writeCppFile("int " + c.name + "_t::clock ( dat_t<1> reset ) {\n")
-    writeCppFile("  uint32_t min = ((uint32_t)1<<31)-1;\n")
-    for (clock <- Driver.clocks) {
-      writeCppFile("  if (" + emitRef(clock) + "_cnt < min) min = " + emitRef(clock) +"_cnt;\n")
-    }
-    for (clock <- Driver.clocks) {
-      writeCppFile("  " + emitRef(clock) + "_cnt-=min;\n")
-    }
-    for (clock <- Driver.clocks) {
-      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
-    }
-    for (clock <- Driver.clocks) {
-      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
-    }
-    for (clock <- Driver.clocks) {
-      writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " +
-                  emitRef(clock) + ";\n")
-    }
-    writeCppFile("  return min;\n")
-    writeCppFile("}\n")
+    genClockMethod()
 
+    advanceCppFile()
     // generate clone() function
-    writeCppFile(s"mod_t* ${c.name}_t::clone() {\n")
-    writeCppFile(s"  mod_t* cloned = new ${c.name}_t(*this);\n")
-    writeCppFile(s"  return cloned;\n")
-    writeCppFile(s"}\n")
-    
+    genCloneMethod()
+
+    advanceCppFile()
     // generate set_circuit_from function
-    writeCppFile(s"bool ${c.name}_t::set_circuit_from(mod_t* src) {\n")
-    writeCppFile(s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(src);\n")
-    writeCppFile(s"  assert(mod_typed);\n")
-    
-    for (m <- Driver.orderedNodes) {
-      if(m.name != "reset" && m.isInObject) {
-        writeCppFile(emitCircuitAssign("mod_typed->", m))
-      }
-    }
-    for (clock <- Driver.clocks) {
-      writeCppFile(emitCircuitAssign("mod_typed->", clock))
-    }
-    writeCppFile("  return true;\n")
-    writeCppFile(s"}\n")
-    
-    // generate print(...) function
-    writeCppFile("void " + c.name + "_t::print ( FILE* f ) {\n")
-    for (cc <- Driver.components; p <- cc.printfs) {
-      hasPrintfs = true
-      writeCppFile("#if __cplusplus >= 201103L\n"
-        + "  if (" + emitLoWordRef(p.cond)
-        + ") dat_fprintf<" + p.needWidth() + ">(f, "
-        + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
-        + ");\n"
-        + "#endif\n")
-    }
-    if (hasPrintfs)
-      writeCppFile("fflush(f);\n");
-    writeCppFile("}\n")
-    
-    createCppFile()
-    vcd.dumpVCDInit(writeCppFile)
+    val nSetCircuitFromMethods = genSetCircuitFromMethod()
+
+    // generate print(...) function.
+    // This will probably end up in the same file as the above clone code.
+    genPrintMethod()
+
+    advanceCppFile()
+    val nDumpInitMethods = genDumpInitMethod(vcd)
 
     createCppFile()
-    vcd.dumpVCD(writeCppFile)
+    val nDumpMethods = genDumpMethod(vcd)
 
-    for (out <- clkDomains.values.map(_._1) ++ clkDomains.values.map(_._2)) {
-      createCppFile()
-      writeCppFile(out.result)
+    out_cpps.foreach(_.fileWriter.flush())
+    // If we're compiling initialization functions -O0, add the current files
+    //  to the unoptimized file list.
+    //  We strip off the trailing ".cpp" to facilitate creating both ".cpp" and ".o" files.
+    if (compileInitializationUnoptimized) {
+      val trimLength = ".cpp".length()
+      unoptimizedFiles ++= out_cpps.map(_.name.dropRight(trimLength))
     }
+    // Ensure we start off in a new file before we start outputting the clock_lo/hi.
+    advanceCppFile()
+    clkDomains.outputAllClkDomains()
 
+    advanceCppFile()
     // Generate API functions
-    createCppFile()
-    writeCppFile(s"void ${c.name}_api_t::init_mapping_table() {\n");
-    writeCppFile(s"  dat_table.clear();\n")
-    writeCppFile(s"  mem_table.clear();\n")
-    writeCppFile(s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(module);\n")
-    writeCppFile(s"  assert(mod_typed);\n")
-    for (m <- mappings) {
-      if (m._2.name != "reset" && (m._2.isInObject || m._2.isInVCD)) {
-        writeCppFile(emitMapping(m))
-      }
+    val nInitMappingTableMethods = genInitMappingTableMethod(mappings)
+
+    // Finally, generate the header - once we know how many methods we'll have.
+    genHeader(vcd, islands, nInitMethods, nSetCircuitFromMethods, nDumpInitMethods, nDumpMethods, nInitMappingTableMethods)
+
+    maxFiles = out_cpps.length
+
+    if (! suppressMonolithicCppFile) {
+      // We're now going to write the entire contents out to a singe file.
+      // Make sure it's really a new file.
+      advanceCppFile()
+      createCppFile("")
+      writeCppFile(all_cpp.result)
     }
-    writeCppFile(s"}\n");
-    
-    createCppFile("")
-    writeCppFile(all_cpp.result)
     out_cpps.foreach(_.close)
+    
+    all_cpp.clear()
+    out_cpps.clear()
 
     def copyToTarget(filename: String) = {
 	  val resourceStream = getClass().getResourceAsStream("/" + filename)

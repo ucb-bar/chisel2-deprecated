@@ -1,0 +1,12 @@
+digraph ZeroWidthTest_MuxComp_1{
+rankdir = LR;
+  io_out[label="io_out:UInt"];
+  T0[label="Mux"];
+  io_a[label="io_a:UInt"];
+  io_c[label="io_c:UInt"];
+  io_t[label="io_t:Bool"];
+  T0 -> io_out[label="8"];
+  io_t -> T0[label="1"];
+  io_c -> T0[label="8"];
+  io_a -> T0[label="8"];
+}

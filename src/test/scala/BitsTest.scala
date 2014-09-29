@@ -63,13 +63,13 @@ class BitsSuite extends AssertionsForJUnit {
     assertTrue( res.litOf.value == 1 )
   }
 
-  @Ignore("field not showing in Bundle.elements") @Test def testEqlBundle() {
-    val res = Bits(2) === new Bundle{ val abc = Bits(2) }
+  @Test def testEqlBundle() {
+    val res = Bits(2) === new Bundle{ val abc = Bits(2) }.toBits
     assertTrue( res.getWidth == 1 )
   }
 
-  @Ignore("this causes an infinite loop...?") @Test def testEqlVec() {
-    val res = Bits(2) === Vec(Bits(2) :: Nil)
+  @Test def testEqlVec() {
+    val res = Bits(2) === Vec(Bits(2) :: Nil).toBits
     assertTrue( res.getWidth == 1 )
   }
 

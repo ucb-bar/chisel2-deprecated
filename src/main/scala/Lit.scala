@@ -155,10 +155,7 @@ object Literal {
     res
   }
   def toLitVal(x: String): BigInt = {
-    var res = BigInt(0);
-    for (c <- x.substring(2, x.length))
-      res = res * 16 + c.asDigit;
-    res
+    BigInt(x.substring(2, x.length), 16)
   }
 
   def toLitVal(x: String, shamt: Int): BigInt = {
@@ -220,7 +217,10 @@ object Literal {
     val xString = (if (x >= 0) x else (BigInt(1) << w) + x).toString(16)
 
     if(xWidth > width && width != -1) {
-      ChiselError.error({"width " + width + " is too small for literal " + x + ". Smallest allowed width is " + xWidth});
+      // Is this a zero-width wire with value 0
+      if (!(x == 0 && width == 0 && Driver.isSupportW0W)) {
+        ChiselError.error({"width " + width + " is too small for literal " + x + ". Smallest allowed width is " + xWidth});
+      }
     }
     if (false) {
       println("Literal: " + xString + "(" + w + ", " + xWidth + ", " + width + ")")

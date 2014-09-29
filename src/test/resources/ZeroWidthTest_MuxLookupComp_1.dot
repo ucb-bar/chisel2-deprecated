@@ -1,0 +1,25 @@
+digraph ZeroWidthTest_MuxLookupComp_1{
+rankdir = LR;
+  io_out[label="io_out:UInt"];
+  T0[label="Mux"];
+  T1[label="Mux"];
+  io_default[label="io_default:UInt"];
+  io_data1[label="io_data1:UInt"];
+  T2[label="=="];
+  io_in1[label="io_in1:UInt"];
+  io_key[label="io_key:UInt"];
+  io_data0[label="io_data0:UInt"];
+  T3[label="=="];
+  io_in0[label="io_in0:UInt"];
+  T0 -> io_out[label="16"];
+  T3 -> T0[label="1"];
+  io_data0 -> T0[label="16"];
+  T1 -> T0[label="16"];
+  T2 -> T1[label="1"];
+  io_data1 -> T1[label="16"];
+  io_default -> T1[label="16"];
+  io_key -> T2[label="8"];
+  io_in1 -> T2[label="8"];
+  io_key -> T3[label="8"];
+  io_in0 -> T3[label="8"];
+}

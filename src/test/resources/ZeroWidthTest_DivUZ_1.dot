@@ -1,0 +1,6 @@
+digraph ZeroWidthTest_DivUZ_1{
+rankdir = LR;
+  io_z[label="io_z:UInt(0x0)"];
+  io_y[label="io_y:UInt"];
+  io_x[label="io_x:UInt"];
+}

@@ -1,0 +1,12 @@
+digraph ZeroWidthTest_FillComp_1{
+rankdir = LR;
+  io_out[label="io_out:UInt"];
+  T0[label="##"];
+  T1[label="##"];
+  io_in[label="io_in:UInt"];
+  T0 -> io_out[label="32"];
+  T1 -> T0[label="16"];
+  T1 -> T0[label="16"];
+  io_in -> T1[label="8"];
+  io_in -> T1[label="8"];
+}

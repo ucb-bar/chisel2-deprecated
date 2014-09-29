@@ -1,0 +1,5 @@
+digraph ZeroWidthTest_PopCountComp_1{
+rankdir = LR;
+  io_out[label="io_out:UInt(0x1)"];
+  io_in[label="io_in:UInt"];
+}

@@ -55,9 +55,9 @@ class Flo extends Bits with Num[Flo] {
 
   type T = Flo;
   override def fromNode(n: Node): this.type = {
-    val res = Flo(OUTPUT).asInstanceOf[this.type]; 
-    res assign n; 
-    res};
+    val res = Flo(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
+    res
+  }
 
   override def fromInt(x: Int): this.type = {
     Flo(x.toFloat).asInstanceOf[this.type]
@@ -122,9 +122,9 @@ class Dbl extends Bits with Num[Dbl] {
 
   type T = Dbl;
   override def fromNode(n: Node) = {
-    val res = Dbl(OUTPUT).asInstanceOf[this.type]; 
-    res assign n; 
-    res};
+    val res = Dbl(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
+    res
+  }
 
   override def fromInt(x: Int): this.type = {
     Dbl(x.toDouble).asInstanceOf[this.type]

@@ -40,8 +40,11 @@ object NodeExtract {
   // extract bit range
   def apply(mod: Node, hi: Int, lo: Int): Node = apply(mod, hi, lo, -1)
   def apply(mod: Node, hi: Int, lo: Int, width: Int): Node = {
-    if (hi < lo)
-      ChiselError.error("Extract(hi = " + hi + ", lo = " + lo + ") requires hi >= lo")
+    if (hi < lo) {
+      if (!((hi == lo - 1) && Driver.isSupportW0W)) {
+        ChiselError.error("Extract(hi = " + hi + ", lo = " + lo + ") requires hi >= lo")
+      }
+    }
     val w = if (width == -1) hi - lo + 1 else width
     val bits_lit = mod.litOf
     // Currently, we don't restrict literals to their width,
@@ -125,5 +128,23 @@ class Extract extends Node {
   override def equalsForCSE(that: Node): Boolean = that match {
     case _: Extract => CSE.inputsEqual(this, that)
     case _ => false
+  }
+
+  // Eliminate any zero-width wires attached to this node.
+  override def W0Wtransform() {
+   /* We require that if the source is zero-width,
+     *  the high and lo must be n-1 and n respectively.
+     *  If this is true, we ensure our width is zero.
+     */
+    val hi_lit = inputs(1).litOf
+    val lo_lit = inputs(2).litOf
+    if (inputs(0).getWidth == 0 && hi_lit != null && lo_lit != null &&
+        hi_lit.value == (lo_lit.value - 1)) {
+      setWidth(0)
+      modified = true
+    } else {
+      ChiselError.error("Extract(" + inputs(0) + ", " + inputs(1) + ", " + inputs(2) + ")" +
+            " W0Wtransform", line)
+    }
   }
 }

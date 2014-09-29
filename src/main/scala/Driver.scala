@@ -31,6 +31,7 @@
 package Chisel
 
 import collection.mutable.{ArrayBuffer, HashSet, HashMap, Stack, LinkedHashSet, Queue => ScalaQueue}
+import scala.math.min
 
 object Driver extends FileSystemUtilities{
   def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean = true): T = {
@@ -198,6 +199,89 @@ object Driver extends FileSystemUtilities{
     }
   }
 
+  // A "depth-first" search for width inference.
+  def idfs(visit: Node => Unit): Unit = {
+
+    def initializeIDFS: Stack[Node] = {
+      val res = new Stack[Node]
+      /* XXX Make sure roots are consistent between initializeBFS, initializeDFS
+         and findRoots.
+       */
+      for (c <- components; a <- c.debugs)
+        res.push(a)
+      for(b <- blackboxes)
+        res.push(b.io)
+      for(c <- components; (n, io) <- c.io.flatten)
+          res.push(io)
+    res
+    }
+
+
+    // Walk each of the strongly connected component lists,
+    //  visiting nodes as we do so.
+    val visited = new HashSet[Node]
+
+    // Visit a node and reset it's sccIndex as we do so.
+    def doOneNode(n: Node): Unit = {
+      visit(n)
+      visited += n
+      n.sccIndex = -1
+      n.sccLowlink = -1
+    }
+    
+    def findSCC():ArrayBuffer[ArrayBuffer[Node]] = {
+      // Tarjan's strongly connected components algorithm to find loops
+      var sccIndex = 0
+      val stack = new Stack[Node]
+      val sccList = new ArrayBuffer[ArrayBuffer[Node]]
+  
+      def tarjanSCC(n: Node): Unit = {
+  
+        n.sccIndex = sccIndex
+        n.sccLowlink = sccIndex
+        sccIndex += 1
+        stack.push(n)
+  
+        for(i <- n.inputs) {
+          if(!(i == null)) {
+            if(i.sccIndex == -1) {
+              tarjanSCC(i)
+              n.sccLowlink = min(n.sccLowlink, i.sccLowlink)
+            } else if(stack.contains(i)) {
+              n.sccLowlink = min(n.sccLowlink, i.sccIndex)
+            }
+          }
+        }
+  
+        if(n.sccLowlink == n.sccIndex) {
+          val scc = new ArrayBuffer[Node]
+  
+          var top: Node = null
+          do {
+            top = stack.pop()
+            scc += top
+          } while (!(n == top))
+          sccList += scc
+        }
+      }
+
+      // Construct the SCC arrays
+      val idfsNodes = initializeIDFS
+      for (node <- idfsNodes) {
+        if(node.sccIndex == -1) {
+          tarjanSCC(node)
+        }
+      }
+    sccList
+    }
+
+    for (scclist <- findSCC()) {
+      for (node <- scclist){
+        doOneNode(node)
+      }
+    }
+  }
+
   def initChisel(args: Array[String]): Unit = {
     ChiselError.clear()
     warnInputs = false
@@ -226,8 +310,18 @@ object Driver extends FileSystemUtilities{
     isCheckingPorts = false
     isTesting = false
     isDebugMem = false
+    isSupportW0W = false
+    partitionIslands = false
+    lineLimitFunctions = 0
+    minimumLinesPerFile = 0
+    shadowRegisterInObject = false
+    allocateOnlyNeededShadowRegisters = false
+    compileInitializationUnoptimized = false
+    useSimpleQueue = false
+    parallelMakeJobs = 0
+    isVCDinline = false
+    isSupportW0W = false
     hasMem = false
-    backend = new CppBackend
     topComponent = null
     clocks.clear()
     implicitReset = Bool(INPUT)
@@ -246,6 +340,7 @@ object Driver extends FileSystemUtilities{
 
   private def readArgs(args: Array[String]): Unit = {
     var i = 0
+    var backendName = "c"     // Default backend is Cpp.
     while (i < args.length) {
       val arg = args(i)
       arg match {
@@ -259,6 +354,8 @@ object Driver extends FileSystemUtilities{
         case "--wio" => {warnInputs = true; warnOutputs = true}
         case "--Wconnection" => saveConnectionWarnings = true
         case "--Wcomponent" => saveComponentTrace = true
+        case "--W0W" => isSupportW0W = true
+        case "--noW0W" => isSupportW0W = false
         case "--noCombLoop" => dontFindCombLoop = true
         case "--genHarness" => isGenHarness = true
         case "--debug" => isDebug = true
@@ -268,29 +365,23 @@ object Driver extends FileSystemUtilities{
         case "--noIoDebug" => isIoDebug = false
         case "--vcd" => isVCD = true
         case "--vcdMem" => isVCDMem = true
-        case "--v" => backend = new VerilogBackend
+        case "--v" => backendName = "v"
         case "--moduleNamePrefix" => Backend.moduleNamePrefix = args(i + 1); i += 1
         case "--inlineMem" => isInlineMem = true
         case "--noInlineMem" => isInlineMem = false
         case "--assert" => isAssert = true
         case "--noAssert" => isAssert = false
         case "--debugMem" => isDebugMem = true
-        case "--backend" => {
-          if (args(i + 1) == "v") {
-            backend = new VerilogBackend
-          } else if (args(i + 1) == "c") {
-            backend = new CppBackend
-          } else if (args(i + 1) == "flo") {
-            backend = new FloBackend
-          } else if (args(i + 1) == "dot") {
-            backend = new DotBackend
-          } else if (args(i + 1) == "fpga") {
-            backend = new FPGABackend
-          } else {
-            backend = Class.forName(args(i + 1)).newInstance.asInstanceOf[Backend]
-          }
-          i += 1
-        }
+        case "--partitionIslands" => partitionIslands = true
+        case "--lineLimitFunctions" => lineLimitFunctions = args(i + 1).toInt; i += 1
+        case "--minimumLinesPerFile" => minimumLinesPerFile = args(i + 1).toInt; i += 1
+        case "--shadowRegisterInObject" => shadowRegisterInObject = true
+        case "--allocateOnlyNeededShadowRegisters" => allocateOnlyNeededShadowRegisters = true
+        case "--compileInitializationUnoptimized" => compileInitializationUnoptimized = true
+        case "--useSimpleQueue" => useSimpleQueue = true
+        case "--parallelMakeJobs" => parallelMakeJobs = args(i + 1).toInt; i += 1
+        case "--isVCDinline" => isVCDinline = true
+        case "--backend" => backendName = args(i + 1); i += 1
         case "--compile" => isCompiling = true
         case "--test" => isTesting = true
         case "--targetDir" => targetDir = args(i + 1); i += 1
@@ -328,6 +419,21 @@ object Driver extends FileSystemUtilities{
       }
       i += 1
     }
+    // Check for bogus flags
+    if (!isVCD) {
+      isVCDinline = false
+    }
+    // Set the backend after we've interpreted all the arguments.
+    // (The backend may want to configure itself based on the arguments.)
+    backend = backendName match  {
+      case "v" => new VerilogBackend
+      case "c" => new CppBackend
+      case "flo" => new FloBackend
+      case "dot" => new DotBackend
+      case "fpga" => new FPGABackend
+      case "sysc" => new SysCBackend
+      case _ => Class.forName(backendName).newInstance.asInstanceOf[Backend]
+    }
   }
 
   var warnInputs = false
@@ -351,6 +457,16 @@ object Driver extends FileSystemUtilities{
   var isTesting = false
   var isAssert = true
   var isDebugMem = false
+  var partitionIslands = false
+  var lineLimitFunctions = 0
+  var minimumLinesPerFile = 0
+  var shadowRegisterInObject = false
+  var allocateOnlyNeededShadowRegisters = false
+  var compileInitializationUnoptimized = false
+  var useSimpleQueue = false
+  var parallelMakeJobs = 0
+  var isVCDinline = false
+  var isSupportW0W = false
   var hasMem = false
   var backend: Backend = null
   var topComponent: Module = null

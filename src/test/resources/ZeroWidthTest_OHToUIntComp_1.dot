@@ -1,0 +1,17 @@
+digraph ZeroWidthTest_OHToUIntComp_1{
+rankdir = LR;
+  io_out[label="io_out:UInt"];
+  T0[label="OHToUInt"];
+  T1[label="T1:UInt"];
+  T2[label="##"];
+  T3[label="##(_, 0x1)"];
+  io_in[label="io_in:Bool"];
+  T4[label="##(_, 0x0)"];
+  T0 -> io_out[label="2"];
+  T1 -> T0[label="4"];
+  T2 -> T1[label="4"];
+  T4 -> T2[label="2"];
+  T3 -> T2[label="2"];
+  io_in -> T3[label="1"];
+  io_in -> T4[label="1"];
+}

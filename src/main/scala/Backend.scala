@@ -781,6 +781,27 @@ abstract class Backend extends FileSystemUtilities{
     (nodes.length, maxWidth, maxDepth)
   }
 
+  /* Perform a depth first search of the tree for zero-width nodes,
+   *  eliminating them if possible.
+   */
+  def W0Wtransform(): Unit = {
+    val nodesList = ArrayBuffer[Node]()
+    /* Construct the depth-first list of nodes, set them all to unmodified,
+     *  and construct their parent list.
+     */
+    Driver.idfs { n => { n.modified = false; nodesList += n ; n.inputs.foreach(_.parents += n)} }
+    for ( n <- nodesList) {
+      // If this node has any zero-width children, have it deal with them.
+      if (n.inputs exists {  c => c.inferWidth(c).needWidth == 0 }) {
+        n.W0Wtransform()
+      }
+      // If this node or any of its children have been modified, visit it.
+      if (n.modified || (n.inputs exists {  _.modified })) {
+        n.review()
+      }
+    }
+  }
+
   def elaborate(c: Module): Unit = {
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
     markComponents
@@ -803,6 +824,10 @@ abstract class Backend extends FileSystemUtilities{
 
     ChiselError.info("inferring widths")
     inferAll(c)
+    if (Driver.isSupportW0W) {
+      ChiselError.info("eliminating W0W")
+      W0Wtransform
+    }
     ChiselError.info("checking widths")
     forceMatchingWidths
     ChiselError.info("lowering complex nodes to primitives")
@@ -838,6 +863,7 @@ abstract class Backend extends FileSystemUtilities{
     nameAll(c)
     nameRsts
 
+    ChiselError.info("creating clock domains")
     val clkDomainWalkedNodes = new HashSet[Node]
     for (comp <- Driver.sortedComps)
       for (node <- comp.nodes)
