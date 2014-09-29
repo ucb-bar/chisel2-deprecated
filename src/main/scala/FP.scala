@@ -37,12 +37,8 @@ import ChiselError._
 import java.lang.Float.floatToIntBits
 
 object Flo {
-  def apply(x: Float): Flo = {
-    Lit(floatToIntBits(x), 32){ Flo() }
-  }
-  def apply(x: Double): Flo = {
-    Flo(x.toFloat);
-  }
+  def apply(x: Float): Flo = Lit(floatToIntBits(x), 32){ Flo() }
+  def apply(x: Double): Flo = Flo(x.toFloat);
   
   def apply(dir: IODirection = null): Flo = {
     val res = new Flo();
