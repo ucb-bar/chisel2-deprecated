@@ -273,6 +273,15 @@ class ManualTester[+T <: Module]
     allGood
   }
 
+  /* We need the following so scala doesn't use our "tolerant" Float version of expect.
+   */
+  def expect (data: Bits, expected: Int): Boolean = {
+    expect(data, BigInt(expected))
+  }
+  def expect (data: Bits, expected: Long): Boolean = {
+    expect(data, BigInt(expected))
+  }
+
   /* Compare the floating point value of a node with an expected floating point value.
    * We will tolerate differences in the bottom bit.
    */
