@@ -333,7 +333,7 @@ object Parameters {
   def root(w:World) = {
     new Parameters(w, w._topLook())
   }
-  def empty = Parameters.root(new Collector((a,b,c) => {a},(a:Any) => {a})) 
+  def empty = Parameters.root(new Collector((a,b,c) => {throw new ParameterUndefinedException(a); a},(a:Any) => {throw new KnobUndefinedException(a); a})) 
   
   // Mask making helpers
   
