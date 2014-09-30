@@ -558,8 +558,6 @@ class VerilogBackend extends Backend {
     harness.write("  /*** resets &&  VCD / VPD dumps ***/\n")
     if (!resets.isEmpty) harness.write("  parameter reset_period = `CLOCK_PERIOD * 4;\n")
     harness.write("  initial begin\n")
-    for (rst <- resets)
-      harness.write("  %s = 1;\n".format(rst.name))
     if (Driver.isDebug) {
       harness.write("    /*** Debuggin with VPD dump ***/\n")
       harness.write("    $vcdplusfile(\"%s.vpd\");\n".format(ensureDir(Driver.targetDir)+c.name))
@@ -608,8 +606,6 @@ class VerilogBackend extends Backend {
     apis.append("  integer steps;      // number of steps\n")
     apis.append("  integer delta;      // number of steps\n")
     apis.append("  integer min = (1 << 31 -1);\n")
-    apis.append("  reg isStep = 0;\n")
-    apis.append("  reg isTick = 0;\n\n")
 
     apis.append("\n  integer count;\n")
 
@@ -618,11 +614,11 @@ class VerilogBackend extends Backend {
     def display(form: String, args: String*) =
       "$display(\"%s\", %s);\n".format(form, (args.tail foldLeft args.head) (_ + ", " + _)) 
 
-    apis.append("  always @(negedge %s) begin\n".format(mainClk.name))
+    apis.append("  initial begin\n".format(mainClk.name))
     apis.append("  /*** API interpreter ***/\n")
     apis.append("  // process API command at every clock's negedge\n")
     apis.append("  // when the target is stalled\n")
-    apis.append("  while (!isStep && !isTick) begin\n")
+    apis.append("  forever begin #1\n")
     for (rst <- resets)
       apis.append("    %s = 0;\n".format(rst.name))
     apis.append("    "+ fscanf("%s", "cmd"))
@@ -635,7 +631,18 @@ class VerilogBackend extends Backend {
     apis.append("        " + fscanf("%d", "steps"))
     for (rst <- resets)
       apis.append("        %s = 1;\n".format(rst.name))
-    apis.append("        isStep = 1;\n")
+    apis.append("        repeat (steps) @(posedge clk) begin")
+    apis.append("        delta = delta + min;\n")
+    if (clocks.size > 1) {
+      for (clk <- clocks)
+        apis.append("      %s_fire = 1;\n".format(clk.name, clk.name))
+    } 
+    apis.append("        end")
+    apis.append("        // return delta\n")
+    apis.append("        " + display("%1d", "delta"))
+    apis.append("        delta = 0;\n")
+    for (rst <- resets)
+      apis.append("        %s = 0;\n".format(rst.name))
     apis.append("      end\n")
 
     apis.append("      // < wire_peek >\n")
@@ -718,21 +725,24 @@ class VerilogBackend extends Backend {
     apis.append("      // return: # cycles the target will proceed\n") 
     apis.append("      \"step\": begin\n")
     apis.append("        " + fscanf("%d", "steps"))
-    apis.append("        isStep = 1;\n")
+    apis.append("        repeat (steps) @(posedge clk) begin\n")
+    if (clocks.size > 1) {
+      for (clk <- clocks)
+        apis.append("          if (%s_length < min) min = %s_cnt;\n".format(clk.name, clk.name))
+      for (clk <- clocks)
+        apis.append("          %s_cnt = %s_cnt - min;\n".format(clk.name, clk.name))
+      for (clk <- clocks) {
+        apis.append("          if (%s_cnt == 0) %s_fire = 1;\n".format(clk.name, clk.name))
+        apis.append("          else %s_fire = 0;\n".format(clk.name))
+      }
+      for (clk <- clocks)
+        apis.append("          if (%s_cnt == 0) %s_cnt = %s_length;\n".format(clk.name, clk.name, clk.name))
+    }
+    apis.append("          delta = delta + min;\n")
+    apis.append("        end\n")
+    apis.append("        // return delta\n")
+    apis.append("        " + display("%1d", "delta"))
     apis.append("        delta = 0;\n")
-    apis.append("      end\n")
-
-    apis.append("      // < tick > \n")
-    apis.append("      // Update registers\n")
-    apis.append("      \"tick\": begin\n")
-    apis.append("        isTick = 1;\n")
-    apis.append("        $display(\"ok\");\n")
-    apis.append("      end\n")
-
-    apis.append("      // < propagate > \n")
-    apis.append("      // Update registers\n")
-    apis.append("      \"propagate\": begin\n")
-    apis.append("        $display(\"ok\");\n")
     apis.append("      end\n")
 
     if (clocks.size > 1) {
@@ -758,56 +768,7 @@ class VerilogBackend extends Backend {
     apis.append("    end\n\n")
 
     apis.append("    if (count == -1) $finish(1);\n\n")
-
-    if (clocks.size > 1) {
-      apis.append("    // fire clocks according to their relative length\n")
-      if (!resets.isEmpty) { 
-        apis.append("    if (!%s) begin\n".format(
-                    (resets.tail foldLeft resets.head.name)(_ + " && !" + _.name) ) )
-      }
-      for (clk <- clocks)
-        apis.append("      if (%s_length < min) min = %s_cnt;\n".format(clk.name, clk.name))
-      for (clk <- clocks)
-        apis.append("      %s_cnt = %s_cnt - min;\n".format(clk.name, clk.name))
-      for (clk <- clocks) {
-        apis.append("      if (%s_cnt == 0) %s_fire = 1;\n".format(clk.name, clk.name))
-        apis.append("      else %s_fire = 0;\n".format(clk.name))
-      }
-      for (clk <- clocks)
-        apis.append("      if (%s_cnt == 0) %s_cnt = %s_length;\n".format(clk.name, clk.name, clk.name))
-
-      if (!resets.isEmpty) {
-        apis.append("    end\n")
-
-        apis.append("    // hack to reset\n")
-        apis.append("    else begin\n")
-        for (clk <- clocks)
-          apis.append("      %s_fire = 1;\n".format(clk.name, clk.name))
-        apis.append("    end\n\n")
-      }
-    }
-
     apis.append("  end\n\n")
-
-    apis.append("  always @(posedge %s) begin\n".format(mainClk.name))
-    apis.append("    // stall the target when step counts is zero\n")
-    apis.append("    if (isStep) begin\n")
-    apis.append("      // decrement step counts\n")
-    apis.append("      steps = steps - 1;\n")
-    apis.append("      delta = delta + min;\n")
-    apis.append("      if (steps == 0) begin\n")
-    apis.append("        // return delta\n")
-    apis.append("        " + display("%1d", "delta"))
-    apis.append("        isStep = 0;\n")
-    apis.append("      end\n")
-    apis.append("    end\n\n")
-
-    apis.append("    if (isTick) begin \n")
-    apis.append("      isTick = 0;\n")
-    apis.append("    end\n")
-
-    apis.append("  end\n")
-    
     apis.result
   }
 
@@ -816,17 +777,6 @@ class VerilogBackend extends Backend {
     val map = new StringBuilder
     val printFormat = printNodes.map(a => a.chiselName + ": 0x%x, ").fold("")((y,z) => z + " " + y)
     val scanFormat = scanNodes.map(a => "%x").fold("")((y,z) => z + " " + y)
-
-    map.append("  task check_value;\n")
-    map.append("    input [255:0] data;\n")
-    map.append("    input [255:0] expected;\n")
-    map.append("    begin\n")
-    map.append("      if (data == expected)\n")
-    map.append("        $display(\"PASS\");\n")
-    map.append("      else\n")
-    map.append("        $display(\"FAIL\");\n")
-    map.append("    end\n\n")
-    map.append("  endtask\n\n")
 
     map.append("  always @(posedge %s) begin\n".format(mainClk.name))
     if (!resets.isEmpty)
