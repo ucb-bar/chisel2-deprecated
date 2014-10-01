@@ -66,29 +66,83 @@ The outline of this document is as follows: in Section \ref{sec:advanced}, we de
 
 \section{Advanced Parameterization}
 \label{sec:advanced}
-
-Classes
-	P
-	Parameter
-	View
 	
 Every {\em Chisel} Module has a member \code{params} of class \code{Parameters} that provides the mechanism for passing parameters between modules.
 
-This section describes the following features: (1) the \code{Parameters} class and associated methods/members; (2) the basic usage model; (3) syntactic sugar; (4) boilerplate code for exposing parameters to external users/programs.
+This section describes the following features: (1) the \code{Parameters} class and associated methods/members; (2) the basic usage model; (3) syntactic sugar; (4) boilerplate code for exposing parameters to external users/programs; (5) advanced functionality via Views (site, here, up).
 
+\subsection{Classes and Methods}
+The \code{Parameters} class has the following base methods:
 
+  \begin{scala}
+class Parameters {
+  // returns a value of type T
+  def apply[T](key:Any):T 
+  
+  // returns new Parameters class
+  def alter(mask:(Any,View,View,View)=>Any):Parameters 
+  
+  // returns a Module's Parameters instance
+  def params:Parameters
+}
+  \end{scala}
+\code{View} is a class containing a base method:
+  \begin{scala}
+class View {
+  // returns a value of type T
+  def apply[T](key:Any):T 
+}
+  \end{scala}
+\code{Parameters} has a factory object containing one basic method:
+  \begin{scala}
+object Parameters {
+  // returns an empty Parameters instance
+  def empty:Parameters
+}
+  \end{scala}
 
+The \code{Module} factory object now has an additional apply method:
+  \begin{scala}
+object Module {
+  // returns a new Module of type T, initialized with a Parameters instance if  _p !=None.
+  def apply[T<:Module](c: =>T)(implicit _p: Option[Parameters] = None):T
+}
+  \end{scala}
 
-using two approaches to altering the \code{Parameters} object, and two ways to pass a \code{Parameters} object to a child module; (3) three mechanisms with which to enhance the calculation of parameter values and dependencies; (4) the \code{ChiselConfig} object and the other limited boilerplate code necessary to seed top level parameters into a design.
+\subsection{Basic Usage Model}
 
-\subsection{The Parameters Class}
-Every \code{Module} subclass has a \code{params} member of type \code{Parameters}, which is used to store a module's key/value parameter mapping. To access a parameter's value, simple call \code{param}'s apply method with a key:
+This example shows the simplest usage of (1) quering params, (2) altering a Parameters object, and (3) passing a Parameters object to a Module:
+
+\begin{scala}
+class Tile extends Module { 
+  val width = params[Int]('width') 
+}
+object Top {
+  val parameters = Parameters.empty
+  val tile_parameters = parameters.alter( (key,site,here,up) => {
+    case 'width' => 64
+  })
+  def main(args:Array[String]) = {
+    chiselMain(args,()=>Module(new Tile)(Some(tile_parameters)))
+  }
+}
+\end{scala}
+
+Within the Module \code{Tile}, the \code{params} member is queried by calling Parameters.apply with the key and return value type.
+
+In \code{Top}, an empty parameters is created by calling Parameters.empty; then it is altered with a function of type \code{(Any,View,View,View) => Any} to return a new Parameters instance, which is assigned to \code{tile\_parameters}. 
+
+After wrapping \code{tile\_parameters} within \code{Some:Option[Parameters]}, it is passed as a second argument to the Module object when passed to \code{chiselMain}.
+
+\subsection{Syntactic Sugar: Field[T]}
+
+The simple example requires the return type \code{Int} must be included as an argument to the apply method, otherwise the Scala compiler will throw an error:
+
 \begin{scala}
 class Tile extends Module { 
   val width = params[Int]('width') 
 }
 \end{scala}
-The apply method accepts keys of subtype \code{Any} (it does not need to be of type \code{String}). Note, however, the return type \code{Int} must be included as an argument to the apply method, otherwise the Scala compiler will throw an error.
 
 Alternatively, one can create a case object for each key which extends \code{Field[T]} and pass that directly into \code{params} apply method. Because \code{Field} contains the return type information, the type does not need to be passed:
 
@@ -99,9 +153,9 @@ class Tile extends Module {
 }
 \end{scala}
 
-From hereonin, assume the key to every query is a case class that extends \code{Field[T]} with the correct return type.
+For the rest of the document, assume the key to every query is a case class that extends \code{Field[T]} with the correct return type.
 
-\subsection{Passing and Copy/Alter}
+\subsection{Syntactic Sugar: Passing and Altering}
 
 \begin{figure}[h]
 \centering
@@ -116,11 +170,11 @@ Anytime an alteration is performed, {\em Chisel} internally copies the existing 
 
 When instantiating a child, the parent can pass its \code{Parameters} object one of two ways:
 \begin{enumerate}
-  \item Explicitly pass its \code{Parameters} object to its child via a second argument to the Module factory:
+  \item Explicitly pass its \code{Parameters} object to its child via a second argument to the Module factory, wrapped in \code{Option[Parameters]}:
 \begin{scala}
 class Tile extends Module { 
   val width = params(Width) 
-  val core = Module(new Core)(params)
+  val core = Module(new Core)(Some(params))
   // Explicit passing of Tile's params to Core
 }
 \end{scala}
@@ -152,7 +206,7 @@ class Tile extends Module {
     (pname,site,here,up) => pname match {
       case Width => 32
     })
-  val core = Module(new Core)(core_params)
+  val core = Module(new Core)(Some(core_params))
   // Use the Parameter.alter method to return an altered Parameter object. Only use when site, here, or up mechanisms are needed
 }
 \end{scala}
@@ -181,6 +235,7 @@ class Memory extends Module {
 \end{scala}
 
 \subsection{ChiselConfig and Boilerplate}
+\label{sec::config}
 
 {\em Chisel}'s mechanism to seed the top-level parameters is through a \code{ChiselConfig} object. \code{ChiselConfig.topDefinitions} contains the highest parameter definitions and is of the following form:
 \begin{scala}
@@ -242,18 +297,19 @@ Consider the following example:
 class DefaultConfig extends ChiselConfig { 
   val top:World.TopDefs = {
     (pname,site,here) => pname match {
-        case Width => site(Location) match {
-        case Core => 64 // data width
-        case Cache => 128  // cache line width
+       case Width => site(Location) match {
+         case 'core' => 64 // data width
+         case 'cache' => 128  // cache line width
+       }
     }
   }
 }
 class Tile extends Module { 
-  val core = Module(new Core, {case Location => Core})
-  val cache = Module(new Cache, {case Location => Cache})
+  val core = Module(new Core, {case Location => 'core'})
+  val cache = Module(new Cache, {case Location => 'cache'})
 }
 \end{scala}
-The top-level key/value mapping is using \code{site} to query the bottom of the chain for \code{Location}. Depending on what value returns (either \code{Core} or \code{Cache}), the top-level key/value mapping produces a different value (Figure \ref{fig:site}).
+The top-level key/value mapping is using \code{site} to query the bottom of the chain for \code{Location}. Depending on what value returns (either \code{'core'} or \code{'cache'}), the top-level key/value mapping produces a different value (Figure \ref{fig:site}).
 
 \subsection{Using here}
 \label{sec::here}
@@ -587,17 +643,147 @@ class Tile extends Module {
 \end{scala}
 In general one should never use the \code{up} mechanism as it is more verbose. However, it can be useful if the parent is making significant changes to a child's \code{Parameters} object, as all changes can be contained the \code{Parameter.alter} method because one has access to all three central mechanisms (\code{up}, \code{site}, and \code{here}).
 
-\section{Knobs}
+\section{External Interface}
 \label{sec:knobs}
 
 So far, this document has only describe mechanisms to manipulate parameters at a top-level class (\code{ChiselConfig}). However, to actually generate multiple C++ or Verilog designs, we need to manually change these parameters.
 
-Instead, we would prefer to express design constraints such as parameter ranges, dependencies, and constraints, and leave the actual instantiation of a specific design separate from the expression of the valid design space.
+One would prefer to express design constraints (parameter ranges, dependencies, constraints) and leave the actual instantiation of a specific design separate from the expression of the valid design space.
 
-With that motivation, {\em Chisel}
+With that motivation, {\em Chisel} has an additional feature based around the concept of ``Knobs,'' or parameters that are created specifically to explore a design space. This section will describe Knobs and their uses, the Dump Object, adding constraints to parameters/Knobs, and the two modes to running the Chisel compiler: --configCollect and --configInstance.
+
+\subsection{Knobs}
+A generator has some parameters that are fixed, and others that dictate the specific design point being generated. These generator-level parameters, called Knobs, have an additional key-value mapping to allow external programs and users to easily overwrite their values.
+
+Knobs can only be instantiated within a \code{ChiselConfig} subclass's \code{topDefinitions}:
+
+\begin{scala}
+package example
+class MyConfig extends ChiselConfig {
+  val topDefinitions:World.TopDefs = {
+    (pname,site,here) => pname match {
+      case NTiles => Knob('NTILES')
+      case .... => .... // other non-generator parameters go here
+    }
+  }
+  override val knobValues:Any=>Any = {
+    case 'NTILES' => 1 // generator parameter assignment
+  }
+}
+\end{scala}
+
+When the query \code{NTiles} matches within topDefinitions, the \code{Knob('NTILES')} is returned. Internally, Chisel will lookup \code{'NTILES'} within MyConfig.knobValues and return 1. As described in Section \ref{sec::config}, the flag required to execute a generator with this specific config is:
+
+\code{sbt run ... -{-}configInstance example.MyConfig}
+
+Suppose we wanted to instantiate a new design that had two tiles: simply use Scala's class inheritance and overwrite the knobValues method:
+
+\begin{scala}
+package example
+class MyConfig2 extends MyConfig {
+  override val knobValues:Any=>Any = {
+    case 'NTILES' => 2 // will generate new design with 2 tiles
+  }
+}
+\end{scala}
+
+Notice that both classes can exist in the source code, so both designs can be instantiated from the commandline. For the new design with two tiles, simply call:
+
+\code{sbt run ... -{-}configInstance example.MyConfig2}
+
+\subsection{Dump}
+
+Downstream from Chisel, other tools might need to know specific parameter/Knob assignments. If so, just pass the Knob/value to the Dump object, which will write the name and value to a file, then return the Knob/value:
+
+\begin{scala}
+package example
+class MyConfig extends ChiselConfig {
+  val topDefinitions:World.TopDefs = {
+    (pname,site,here) => pname match {
+      case Width => Dump('Width',64) // will return 64. Requires naming the parameter as the 1st argument
+      case NTiles => Dump(Knob('NTILES')) // will return Knob('NTILES'), no name needed
+    }
+  }
+  override val knobValues:Any=>Any = {
+    case 'NTILES' => 1 // generator parameter assignment
+  }
+}
+\end{scala}
+
+The name and value of each dumped parameter will be written to a \code{*.knb} file located in the directory set by \code{-{-}targetDir {\it path}}.
+
+\subsection{Constraints}
+
+Now that external programs/users can easily overwrite a configuration's \code{knobValue} method, we have provided a mechanism for defining legal ranges for Knobs. Within a \code{ChiselConfig}, one can overwrite another method called \code{topConstraints}:
+
+\begin{scala}
+package example
+class MyConfig extends ChiselConfig {
+  val topDefinitions:World.TopDefs = {
+    (pname,site,here) => pname match {
+      case NTiles => Knob('NTILES')
+    }
+  }
+  override val topConstraints:List[ViewSym=>Ex[Boolean]] 
+    = List( { ex => ex(NTiles) >  0 },
+            { ex => ex(NTiles) <= 4 })
+  override val knobValues:Any=>Any = {
+    case 'NTILES' => 1 // generator parameter assignment
+  }
+}
+\end{scala}
+
+Now, if someone tried to instantiate our design with the following configuration and command, it would fail:
+
+\begin{scala}
+package example
+class BadConfig extends ChiselConfig {
+  override val knobValues:Any=>Any = {
+    case 'NTILES' => 5 // would violate our constraint, throws an error
+  }
+}
+
+// throws 'Constriant failed' error
+sbt run ... --configInstance example.BadConfig 
+\end{scala}
+
+Constraints can be declared anywhere in the design, not just at the top level, by calling a Parameter's \code{constrain} method:
+
+\begin{scala}
+package example
+class MyConfig extends ChiselConfig {
+  val topDefinitions:World.TopDefs = {
+    (pname,site,here) => pname match {
+      case NTiles => Knob('NTILES')
+    }
+  }
+  override val knobValues:Any=>Any = {
+    case 'NTILES' => 1 // generator parameter assignment
+  }
+}
+class Tile extends Module {
+  params.constrain( ex => ex(NTiles) >  0 )
+  params.constrain( ex => ex(NTiles) <= 4 )
+}
+object Run { 
+  def main(args: Array[String]): Unit = {
+    chiselMain.run(args, () => new Tile())
+  }
+}
+
+sbt runMain example.Run ... --configInstance example.MyConfig
+\end{scala}
+
+Finally, if a designer wants to know a design's constraints, they can execute Chisel with the \code{-{-}configCollect {\it project\_name.config\_name}} flag, which will dump a list of the constraints to a \code{*.cst} file, located in the path specificed by \code{-{-}targetDir {\it path}}:
+
+\begin{scala}
+sbt runMain example.Run ... --configCollect example.MyConfig --targetDir <path>
+\end{scala}
 
 \section{Design Heuristics}
 \label{sec:heuristics}
+
+TODO
 
 
 % \section{Acknowlegements}
