@@ -80,7 +80,8 @@ abstract class Bits extends Data with proc {
   // internal, non user exposed connectors
   private var assigned = false
   private def checkAssign(src: Node) = {
-    if (this.dir == INPUT && this.component == Module.current && this.isIo) {
+    if (this.dir == INPUT && this.component == Module.current && 
+        this.component.wires.unzip._2.contains(this)) {
       ChiselError.error({"assigning to your own input port " + this + " RHS: " + src});
     }
     if (this.dir == OUTPUT && this.component != Module.current &&
