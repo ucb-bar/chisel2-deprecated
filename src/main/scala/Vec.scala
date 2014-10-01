@@ -275,6 +275,11 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
 
   override val hashCode: Int = _id
   override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
+  
+  // Don't return 0 for getwidth - #247
+  // Return the sum of our constituent widths.
+  override def getWidth(): Int = self.map(_.getWidth).foldLeft(0)(_ + _)
+
 }
 
 trait VecLike[T <: Data] extends collection.IndexedSeq[T] {
