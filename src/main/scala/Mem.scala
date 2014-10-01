@@ -46,10 +46,13 @@ object Mem {
     Reg.validateGen(gen)
     val res = new Mem(() => gen, n, seqRead, orderedWrites)
     if (!(clock == null)) res.clock = clock
+    Driver.hasMem = true
+    Driver.hasSRAM = Driver.hasSRAM | seqRead
+    if (seqRead) {
+      Driver.sramMaxSize = math.max(Driver.sramMaxSize, n)
+    }
     res
   }
-
-  Driver.hasMem = true
 }
 
 abstract class AccessTracker extends Delay {

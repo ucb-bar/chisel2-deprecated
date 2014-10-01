@@ -322,6 +322,8 @@ object Driver extends FileSystemUtilities{
     isVCDinline = false
     isSupportW0W = false
     hasMem = false
+    hasSRAM = false
+    sramMaxSize = 0
     topComponent = null
     clocks.clear()
     implicitReset = Bool(INPUT)
@@ -468,6 +470,8 @@ object Driver extends FileSystemUtilities{
   var isVCDinline = false
   var isSupportW0W = false
   var hasMem = false
+  var hasSRAM = false
+  var sramMaxSize = 0
   var backend: Backend = null
   var topComponent: Module = null
   val components = ArrayBuffer[Module]()
