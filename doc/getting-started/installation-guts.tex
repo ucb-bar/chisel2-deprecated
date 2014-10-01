@@ -1,6 +1,6 @@
 \section{Introduction}
 
-This document is an installation guide for {\em Chisel} (Constructing
+This chapter is an installation guide for {\em Chisel} (Constructing
 Hardware In a Scala Embedded Language) and is intended to prepare your system for subsequent tutorials.  Chisel is a hardware
 construction language embedded in the high-level programming language
 Scala.
@@ -17,10 +17,10 @@ If you are running Mac or a variant of Linux, you will need to install the appro
 
 \subsubsection{Linux}
 
-To prepare your Linux platform for Chisel, you will need to install the following packages:
+Install the following packages:
 
 \begin{enumerate}
-\item \verb|g++|
+\item \verb|g++-4.8|
 \item \verb+openjdk-7-jre+
 \end{enumerate}
 
@@ -87,4 +87,15 @@ Tutorial 6 will explain how to set up your own Chisel project and how to build i
 Tutorial 7 will revisit conditional register updates and explain how to construct memories.
 Finally, tutorial 8 will introduce how to use Scala constructs such as \verb+if...else+ and \verb+for+ loops.
 
-The following set of tutorials were written using the build settings Scala version 2.10 and Chisel version 2.1.
+Along the way there are assignments highlighted with \red{red} titles.  
+These assignments are built around files in the tutorial problems directory.
+In order to check successful completion of the entire set of getting started assignments run:
+\begin{bash}
+cd $TUT_DIR/problems
+make getting-started
+\end{bash}
+
+\noindent
+until no error appears.
+
+The following set of tutorials were written using the build settings Scala version 2.11 and Chisel version 2.2.

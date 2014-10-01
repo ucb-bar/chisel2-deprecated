@@ -26,7 +26,7 @@ class FullAdder extends Module {
   val a_and_b = io.a & io.b
   val b_and_cin = io.b & io.cin
   val a_and_cin = io.a & io.cin
-  #reassignment to io.cout so use :=
+  // reassignment to io.cout so use :=
   io.cout := a_and_b | b_and_cin | a_and_cin
 }
 \end{scala}
@@ -84,7 +84,7 @@ A list of commonly used UInt operations is given in the table below:
 \begin{center}
 \begin{tabular}{| l | l | l | }
 \hline
-Operand & Operation & Output Type \\ \hline
+{\bf Operand} & {\bf Operation} & {\bf Output Type} \\ \hline
 + & Add & UInt  \\ \hline
 - & Subtract & UInt  \\ \hline
 $\ast$ & Multiply & UInt \\ \hline
@@ -162,6 +162,42 @@ val bus = Cat(A, B) // concatenate A and B
 
 Again, the first argument to \verb+Cat+ will be placed in the high part while the second argument gets the low part of \verb+bus+. Thus for this example bits 0 to 31 of \verb+bus+ correspond to \verb+B+, while bits 32 to 63 correspond to \verb+A+. 
 
+\subsection{\problem{LFSR16}}
+
+In this assignment, write the \verb+LFSR16+ circuit as shown below:
+
+\begin{center}
+\includegraphics[width=0.9\columnwidth]{../bootcamp/figs/LFSR16.pdf}
+\end{center}
+
+\noindent
+by filling in the following module:
+
+\begin{scala}
+class LFSR16 extends Module {
+  val io = new Bundle {
+    val inc = Bool(INPUT)
+    val out = UInt(OUTPUT, 16)
+  }
+  // ...
+  io.out := UInt(0)
+}
+\end{scala}
+
+\noindent
+found in \verb+$TUT_DIR/problems/LFSR16.scala+.
+Make sure to define and initialize an internal register to one and 
+update it when \verb+inc+ is asserted.
+Use bit concatentation and bit extraction 
+in conjunction with the xor operator \verb+^+.  Run 
+
+\begin{bash}
+make LFSR16.out
+\end{bash}
+
+\noindent 
+until your circuit passes the tests.
+
 \subsection{UInt Operation Bit Inference}
 
 Note that for some operations such as addition and multiplication, that number of resulting bits of the computation can be greater than the number of bits for the operands. 
@@ -197,10 +233,10 @@ module HiLoMultiplier(
   wire[15:0] T1;
 
   assign io_Lo = T0;
-  assign T0 = mult[4'hf/* 15*/:1'h0/* 0*/];
+  assign T0 = mult[4'hf:1'h0];
   assign mult = io_A * io_B;
   assign io_Hi = T1;
-  assign T1 = mult[5'h1f/* 31*/:5'h10/* 16*/];
+  assign T1 = mult[5'h1f:5'h10];
 endmodule
 
 \end{scala}
@@ -210,7 +246,7 @@ As we get to more complicate designs, it will become more clear that bit inferen
 \begin{center}
 \begin{tabular}{| l | l | l | }
 \hline
-Operation & Result Bit Width \\ \hline
+{\bf Operation} & {\bf Result Bit Width} \\ \hline
 \verb!Z = X + Y! & max(Width(X), Width(Y))  \\ \hline
 \verb+Z = X - Y+ & max(Width(X), Width(Y)) \\ \hline
 \verb+Z = X & Y+ & max(Width(X), Width(Y)) \\ \hline
@@ -232,10 +268,10 @@ The Bool class in Chisel is used to represent the result of logical expressions 
 
 \begin{scala}
 val change = io.a === io.b // change gets Bool type
-when (change) { // execute if change is true
-	...
+when (change) {            // exec if change is true
+  ...
 } .otherwise {
-	...
+  ...
 }
 \end{scala}
 
@@ -258,7 +294,8 @@ When assigning values, it is required that you assign a value of the same type. 
     val in  = UInt(INPUT, 2)
     val out = UInt(OUTPUT, 1)
   }
-  io.out := (in === UInt(0)) // attempted Bool assignment to UInt
+  // attempted Bool assignment to UInt
+  io.out := (in === UInt(0)) 
   ...
 \end{scala}
 

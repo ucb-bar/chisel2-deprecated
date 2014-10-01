@@ -148,4 +148,76 @@ class Counter extends Module {
 \noindent
 In this example, we use calls to subroutines defined in the \verb+Counter+ object in order to perform the appropriate logic. 
 
+\section{\problem{Parameterized Vec Shift Reg}}
+
+The next assignment is to construct a bit shift register with delay parameter.
+The following is a the template from \verb+$TUT_DIR/problems/VecShiftRegisterParam.scala+:
+
+\begin{scala}
+class VecShiftRegisterParam(val n: Int, val w: Int) extends Module {
+  val io = new Bundle {
+    val in  = UInt(INPUT,  w)
+    val out = UInt(OUTPUT, w)
+  }
+  ...
+  io.out := UInt(0)
+}
+\end{scala}
+
+\noindent
+where \verb+out+ is a \verb+n+ cycle delayed copy of values on \verb+in+.  
+Also notice how \verb+val+ is added to each parameter value to 
+allow those values to be accessible from the tester. Run 
+
+\begin{bash}
+make VecShiftRegisterParam.out
+\end{bash}
+
+\noindent 
+until your circuit passes the tests.
+
+\section{\problem{Mul Lookup Table}}
+
+The next assignment is to write a 16x16 multiplication table using \verb+Vec+.
+The following is a the template from \verb+$TUT_DIR/problems/Mul.scala+:
+
+\begin{scala}
+class Mul extends Module {
+  val io = new Bundle {
+    val x   = UInt(INPUT,  4)
+    val y   = UInt(INPUT,  4)
+    val z   = UInt(OUTPUT, 8)
+  }
+  val muls = new ArrayBuffer[UInt]()
+
+  // flush this out ...
+
+  io.z := UInt(0)
+}
+\end{scala}
+
+\noindent
+As a hint build the lookup table using a rom constructed from the \verb+tab+ lookup table represented as a Scala ArrayBuffer with incrementally added elements (using \verb!+=!):
+
+\begin{scala}
+val tab = Vec(muls)
+\end{scala}
+
+\noindent
+and lookup the result using an address formed from the \verb+x+ and \verb+y+ inputs as follows:
+
+\begin{scala}
+io.z := tab(Cat(io.x, io.y))
+\end{scala}
+
+\noindent
+Run 
+
+\begin{bash}
+make Mul.out
+\end{bash}
+
+\noindent 
+until your circuit passes the tests.
+
 % The first call to \verb+counter+ in the \verb+Counter+ module

@@ -56,9 +56,10 @@ object Driver extends FileSystemUtilities{
   private def executeUnwrapped[T <: Module](gen: () => T): T = {
     if (!Driver.chiselConfigMode.isEmpty && !Driver.chiselConfigClassName.isEmpty) { 
       val config = Class.forName(chiselConfigClassName.get).newInstance.asInstanceOf[ChiselConfig]
-      val world = if(Driver.chiselConfigMode.get == "collect") new Collector(config.top,config.knobVal) else new Instance(config.top,config.knobVal)
-      val p = Some(Parameters.root(world))
-      val c = execute(() => Module(gen())(p))
+      val world = if(Driver.chiselConfigMode.get == "collect") new Collector(config.topDefinitions,config.knobValues) else new Instance(config.topDefinitions,config.knobValues)
+      val p = Parameters.root(world)
+      config.topConstraints.foreach(c => p.constrain(c))
+      val c = execute(() => Module(gen())(Some(p)))
       if(Driver.chiselConfigMode.get == "collect") {
         val v = createOutputFile(Driver.chiselConfigClassName.get + ".knb")
         v.write(world.getKnobs)

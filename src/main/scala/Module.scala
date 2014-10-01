@@ -42,15 +42,15 @@ import ChiselError._
 import Module._
 
 object Module {
-  def apply[T<:Module](c: =>T,fun:PartialFunction[Any,Any])(implicit _p:Option[Parameters] = None):T = {
-    val q = _p.getOrElse(params).alterPartial(fun)
+  def apply[T<:Module](c: =>T, f: PartialFunction[Any,Any]): T = {
+    val q = params.alterPartial(f)
     Driver.modStackPushed = true
     Driver.parStack.push(q)
     val res = init(c)
     Driver.parStack.pop
     res
   }
-  def apply[T<:Module](c: =>T)(implicit _p:Option[Parameters] = None):T = {
+  def apply[T<:Module](c: =>T)(implicit _p:Option[Parameters] = None): T = {
     Driver.modStackPushed = true
     _p match {
       case Some(q: Parameters) => {
