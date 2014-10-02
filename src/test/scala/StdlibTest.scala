@@ -344,20 +344,66 @@ try {
       () => Module(new ReverseComp()))
   }
 
-  /** Generate a ShiftRegister
+  /** Generate various ShiftRegisters
     */
   @Test def testShiftRegister() {
     println("\ntestShiftRegister ...")
-    class ShiftRegisterComp extends Module {
+    case class ShiftRegisterComp(nSections: Int) extends Module {
+      class ShiftRegisterSection(delays: Int) extends Module {
+        val io = new Bundle {
+          val in = UInt(INPUT, 8)
+          val out = UInt(OUTPUT)
+        }
+        io.out := ShiftRegister(io.in, delays)
+      }
+
       val io = new Bundle {
         val in = UInt(INPUT, 8)
         val out = UInt(OUTPUT)
+        val stages = new Array[UInt](nSections)
       }
-      io.out := ShiftRegister(io.in, 2)
+
+      var lastin = io.in
+      for (s <- 1 to nSections) {
+        val f = Module(new ShiftRegisterSection(s - 1))
+        f.name = "f" + s.toString
+        f.io.in <> lastin
+        lastin = f.io.out
+        // Save this stage's output somewhere we can read it.
+        io.stages(s - 1) = f.io.out
+      }
+      io.out <> lastin
     }
 
-    chiselMain(testArgs,
-      () => Module(new ShiftRegisterComp()))
+    class ShiftRegisterTester(m: ShiftRegisterComp) extends Tester(m) {
+      // Calculate the total delay.
+      // Each section introduces (sectionIndex) delays
+      // where "sectionIndex" is the 0-origin section number.
+      val totalDelays = (0 until m.nSections).sum
+      for (d <- 0 to totalDelays) {
+        val pokeVal = totalDelays - d
+        poke(m.io.in, pokeVal)
+        // Check each section's expected output.
+        var accumulatedDelay = 0
+        for (s <- 0 until m.nSections) {
+          accumulatedDelay += s
+          // The expected value is either the delayed poked value,
+          // or 0 if we haven't done enough poking.
+          val expected = if (d >= accumulatedDelay) {
+            pokeVal + accumulatedDelay
+          } else {
+            0
+          }
+          expect(m.io.stages(s), expected)
+        }
+        step(1)
+      }
+    }
+
+    val nSections = 3
+    chiselMainTest(Array[String]("--backend", "c",
+      "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
+      () => Module(new ShiftRegisterComp(nSections))) {m => new ShiftRegisterTester(m)}
   }
 
   /** Generate a UIntToOH
