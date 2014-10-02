@@ -1,0 +1,13 @@
+6d072cd initialize register that guards reset for assert checking
+67a3450 Add preliminary man page template.
+2ea8cea Merge pull request #259 from ucb-bar/cpluspartition (C++ compilation speedups)
+bbc039f Merge pull request #260 from ucb-bar/zerowidthwires
+9712fe8 Re-enable testEqlBundle() and testEqlVec() after inserting explicit toBits comversion.
+2247e78 Support poking negative numbers.
+cad3f58 Add "tolerant" Float expect - accept single bit differences between expected and returned values.
+76a2012 Add Int and Long versions of expect() so scala doesn't do an implicit conversion and call the new Float version.
+6f77617 Add 'Throwable' to suppress un-typed catch warning.
+36cd2cf Changed default behavior for Parameter.empty to throw ParameterUndefinedException and KnobUndefinedException
+8774dde Update error in frontend when connecting to your own input
+00ac5dd Return the sum of constituents getWidth instead of 0 for Vec.getWidth (#247).
+160c2d3 Update ShiftRegister to support a parameterized delay of 0.
