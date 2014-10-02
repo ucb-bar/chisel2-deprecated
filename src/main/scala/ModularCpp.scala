@@ -98,8 +98,8 @@ class ModularCppBackend extends CppBackend {
     val res = new ArrayBuffer[CppVertex]
     val roots = new ArrayBuffer[Node]
     val walked = new ArrayBuffer[Node]
-    for (node <- module.mods) {
-      if (node.isIo && node.asInstanceOf[Bits].dir == OUTPUT && node.consumers.length == 0)
+    for (node <- module.nodes) {
+      if (node.isIo && node.asInstanceOf[Bits].dir == OUTPUT && node.consumers.size == 0)
         roots += node
     }
 
@@ -142,15 +142,13 @@ class ModularCppBackend extends CppBackend {
 
   override def elaborate(c: Module): Unit = {
     backendElaborate(c)
-    c.findConsumers()
-    c.verifyAllMuxes
     ChiselError.checkpoint()
 
     val vertices = createVertices(c)
     println("HUY: started sort")
     for (vertex <- vertices) {
       vertex.sort()
-      renameNodes(c, vertex.sortedNodes)
+      renameNodes(vertex.sortedNodes)
     }
     println("HUY: finished sort")
 
@@ -176,7 +174,7 @@ class ModularCppBackend extends CppBackend {
     }
 
     out_h.write("\n");
-    out_h.write("  void init ( bool rand_init = false );\n");
+    out_h.write("  void init ( val_t rand_init = false );\n");
     for ((vertex, i) <- vertices.zipWithIndex) {
       out_h.write("  void clock_lo_" + i + " ( dat_t<1> reset );\n")
     }
@@ -190,9 +188,9 @@ class ModularCppBackend extends CppBackend {
     out_h.close();
 
     out_c.write("#include \"" + c.name + ".h\"\n");
-    for(str <- Module.includeArgs) out_c.write("#include \"" + str + "\"\n");
+    for (str <- Driver.includeArgs) out_c.write("#include \"" + str + "\"\n")
     out_c.write("\n");
-    out_c.write("void " + c.name + "_t::init ( bool rand_init ) {\n");
+    out_c.write("void " + c.name + "_t::init ( val_t rand_init ) {\n");
     for (vertex <- vertices) {
       for (m <- vertex.sortedNodes) {
         out_c.write(emitInit(m));
@@ -227,15 +225,17 @@ class ModularCppBackend extends CppBackend {
     out_c.write("}\n")
 
     out_c.write("void " + c.name + "_t::print ( FILE* f ) {\n");
-    for (cc <- Module.components; p <- cc.printfs)
+    for (cc <- Driver.components; p <- cc.printfs)
       out_c.write("#if __cplusplus >= 201103L\n"
         + "  if (" + emitLoWordRef(p.cond)
-        + ") dat_fprintf<" + p.width + ">(f, "
+        + ") dat_fprintf<" + p.needWidth() + ">(f, "
         + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
         + ");\n"
         + "#endif\n")
     out_c.write("}\n");
+    out_c.write("void " + c.name + "_t::dump_init(FILE *f) {\n")
     vcd.dumpVCDInit(out_c.write);
+    out_c.write("}\n")
     vcd.dumpVCD(out_c.write);
     out_c.close();
 

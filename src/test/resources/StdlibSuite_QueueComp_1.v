@@ -10,22 +10,22 @@ module Queue(input clk, input reset,
   wire[7:0] T0;
   reg [7:0] ram [1:0];
   wire[7:0] T1;
-  wire[7:0] T2;
   wire do_enq;
+  reg  R2;
+  wire T13;
   wire T3;
-  wire do_flow;
   wire T4;
-  reg[0:0] enq_ptr;
-  wire T5;
-  reg[0:0] deq_ptr;
-  wire do_deq;
+  reg  R5;
+  wire T14;
   wire T6;
   wire T7;
+  wire do_deq;
   wire T8;
-  wire T9;
   wire empty;
+  wire T9;
+  reg  maybe_full;
+  wire T15;
   wire T10;
-  reg[0:0] maybe_full;
   wire T11;
   wire ptr_match;
   wire T12;
@@ -34,53 +34,49 @@ module Queue(input clk, input reset,
 `ifndef SYNTHESIS
   integer initvar;
   initial begin
-    #0.001;
-`ifdef RANDOM_SEED
-    initvar = $random(`RANDOM_SEED);
-`endif
-    #0.001;
+    #0.002;
     for (initvar = 0; initvar < 2; initvar = initvar+1)
       ram[initvar] = {1{$random}};
-    enq_ptr = {1{$random}};
-    deq_ptr = {1{$random}};
+    R2 = {1{$random}};
+    R5 = {1{$random}};
     maybe_full = {1{$random}};
   end
 `endif
 
   assign io_deq_bits = T0;
-  assign T0 = ram[deq_ptr];
-  assign T2 = io_enq_bits;
-  assign do_enq = T4 && T3;
-  assign T3 = ! do_flow;
-  assign do_flow = 1'h0;
-  assign T4 = io_enq_ready && io_enq_valid;
-  assign T5 = enq_ptr + 1'h1;
-  assign do_deq = T7 && T6;
-  assign T6 = ! do_flow;
-  assign T7 = io_deq_ready && io_deq_valid;
-  assign T8 = deq_ptr + 1'h1;
-  assign io_deq_valid = T9;
-  assign T9 = ! empty;
-  assign empty = ptr_match && T10;
-  assign T10 = ! maybe_full;
+  assign T0 = ram[R5];
+  assign do_enq = io_enq_ready & io_enq_valid;
+  assign T13 = reset ? 1'h0 : T3;
+  assign T3 = do_enq ? T4 : R2;
+  assign T4 = R2 + 1'h1;
+  assign T14 = reset ? 1'h0 : T6;
+  assign T6 = do_deq ? T7 : R5;
+  assign T7 = R5 + 1'h1;
+  assign do_deq = io_deq_ready & io_deq_valid;
+  assign io_deq_valid = T8;
+  assign T8 = empty ^ 1'h1;
+  assign empty = ptr_match & T9;
+  assign T9 = maybe_full ^ 1'h1;
+  assign T15 = reset ? 1'h0 : T10;
+  assign T10 = T11 ? do_enq : maybe_full;
   assign T11 = do_enq != do_deq;
-  assign ptr_match = enq_ptr == deq_ptr;
+  assign ptr_match = R2 == R5;
   assign io_enq_ready = T12;
-  assign T12 = ! full;
-  assign full = ptr_match && maybe_full;
+  assign T12 = full ^ 1'h1;
+  assign full = ptr_match & maybe_full;
 
   always @(posedge clk) begin
     if (do_enq)
-      ram[enq_ptr] <= T2;
+      ram[R2] <= io_enq_bits;
     if(reset) begin
-      enq_ptr <= 1'h0;
+      R2 <= 1'h0;
     end else if(do_enq) begin
-      enq_ptr <= T5;
+      R2 <= T4;
     end
     if(reset) begin
-      deq_ptr <= 1'h0;
+      R5 <= 1'h0;
     end else if(do_deq) begin
-      deq_ptr <= T8;
+      R5 <= T7;
     end
     if(reset) begin
       maybe_full <= 1'h0;
@@ -99,9 +95,9 @@ module StdlibSuite_QueueComp_1(input clk, input reset,
     output[7:0] io_resp_bits
 );
 
-  wire[7:0] Queue_io_deq_bits;
-  wire Queue_io_deq_valid;
   wire Queue_io_enq_ready;
+  wire Queue_io_deq_valid;
+  wire[7:0] Queue_io_deq_bits;
 
 
   assign io_resp_bits = Queue_io_deq_bits;

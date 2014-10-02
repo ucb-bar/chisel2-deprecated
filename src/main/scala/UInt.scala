@@ -46,11 +46,8 @@ object UInt {
   def apply(x: String, width: Int): UInt = Lit(x, width){UInt()};
   def apply(x: String, base: Char): UInt = Lit(x, base, -1){UInt()};
   def apply(x: String, base: Char, width: Int): UInt = Lit(x, base, width){UInt()};
-  def apply(x: Node): UInt = {
-    val res = new UInt
-    res.inputs += x
-    res
-  }
+  def apply(x: Node): UInt = UInt(x, -1)
+  def apply(x: Node, width: Int): UInt = UInt(width = width).asTypeFor(x)
 
   def apply(dir: IODirection = null, width: Int = -1): UInt = {
     val res = new UInt();
@@ -68,7 +65,11 @@ class UInt extends Bits with Num[UInt] {
   /** Factory method to create and assign a *UInt* type to a Node *n*.
     */
   override def fromNode(n: Node): this.type = {
-    UInt(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
+    val res = UInt(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
+    // NOTE: we do not inherit/clone the width.
+    // Doing so breaks code in NodeFill()
+    // res.width_ = n.width_.clone()
+    res
   }
 
   override def fromInt(x: Int): this.type = {
@@ -77,30 +78,19 @@ class UInt extends Bits with Num[UInt] {
 
   override def toBits: UInt = this
 
-  def toBools: Vec[Bool] = Vec.tabulate(this.getWidth)(i => this(i))
-
   // to support implicit convestions
   def ===(b: UInt): Bool = LogicalOp(this, b, "===")
 
-  def :=(src: UInt) {
-    if(comp != null) {
-      comp procAssign src.toNode;
-    } else {
-      this procAssign src.toNode;
-    }
-  }
-
   // arithmetic operators
   def zext(): SInt = Cat(UInt(0,1), this).toSInt
-  def unary_-(): UInt = newUnaryOp("-");
-  def unary_!(): Bool = Bool(OUTPUT).fromNode(UnaryOp(this, "!"));
-  def << (b: UInt): UInt = newBinaryOp(b, "<<");
+  def unary_-(): UInt = UInt(0) - this
+  def unary_!(): Bool = this === UInt(0)
   def >> (b: UInt): UInt = newBinaryOp(b, ">>");
   def +  (b: UInt): UInt = newBinaryOp(b, "+");
   def *  (b: UInt): UInt = newBinaryOp(b, "*");
   def /  (b: UInt): UInt = newBinaryOp(b, "/");
   def %  (b: UInt): UInt = newBinaryOp(b, "%");
-  def ?  (b: UInt): UInt = newBinaryOp(b, "?");
+  def ?  (b: UInt): UInt = fromNode(Multiplex(this.toBool, b, null))
   def -  (b: UInt): UInt = newBinaryOp(b, "-");
 
   // order operators

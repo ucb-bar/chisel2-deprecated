@@ -2,28 +2,30 @@ module DelaySuite_RegInitUpdate_1(input clk, input reset,
     output[31:0] io_out
 );
 
-  wire[31:0] T0;
-  reg[0:0] res;
-  wire T1;
+  wire[31:0] T1;
+  reg  res;
+  wire T2;
+  wire T0;
 
 `ifndef SYNTHESIS
   integer initvar;
   initial begin
-    #0.001;
-`ifdef RANDOM_SEED
-    initvar = $random(`RANDOM_SEED);
-`endif
-    #0.001;
+    #0.002;
     res = {1{$random}};
   end
 `endif
 
-  assign io_out = T0;
-  assign T0 = {31'h0, res};
-  assign T1 = res + 1'h1;
+  assign io_out = T1;
+  assign T1 = {31'h0, res};
+  assign T2 = reset ? 1'h0 : T0;
+  assign T0 = res + 1'h1;
 
   always @(posedge clk) begin
-    res <= reset ? 1'h0 : T1;
+    if(reset) begin
+      res <= 1'h0;
+    end else begin
+      res <= T0;
+    end
   end
 endmodule
 

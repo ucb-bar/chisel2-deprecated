@@ -31,22 +31,23 @@
 package Chisel
 
 class CSENode(val node: Node) {
-  val isInObject = node.isInObject
   override def hashCode: Int = node.hashCodeForCSE
   override def equals(x: Any): Boolean = x match {
-    case x: CSENode => node.equalsForCSE(x.node) && !x.isInObject
+    case x: CSENode => node.equalsForCSE(x.node)
     case _ => false
   }
 }
 
 object CSE {
   def transform(mod: Module): Unit = {
-    Module.components foreach doCSE
+    Driver.components foreach doCSE
   }
 
   private def doCSE(mod: Module): Unit = while (doCSEOnce(mod)) {}
 
   private def doCSEOnce(mod: Module): Boolean = {
+    def dontTouch(x: Node, replaceWith: Node) =
+      !x.name.isEmpty || x.isInObject && !replaceWith.isInObject
     val cseNodes = new collection.mutable.LinkedHashMap[CSENode, Node]
     val removedNodes = new collection.mutable.LinkedHashMap[Node, Node]
     for (n <- mod.nodes) {
@@ -55,8 +56,12 @@ object CSE {
         val cseTo = cseNodes.get(cseNode)
         if (cseTo.isEmpty)
           cseNodes += cseNode -> n
-        else
+        else if (!dontTouch(n, cseTo.get))
           removedNodes += n -> cseTo.get
+        else if (!dontTouch(cseTo.get, n)) {
+          cseNodes += cseNode -> n
+          removedNodes += cseTo.get -> n
+        }
       }
     }
 
@@ -77,7 +82,7 @@ object CSE {
   }
 
   def inputsEqual(x: Node, y: Node): Boolean = {
-    if (x.width != y.width || x.inputs.length != y.inputs.length)
+    if (x.widthW != y.widthW || x.inputs.length != y.inputs.length)
       return false
     for (i <- 0 until x.inputs.length)
       if (!(x.inputs(i) == y.inputs(i)))

@@ -4,6 +4,7 @@ module NameSuite_InputPortNameComp_1(
 );
 
 
+
   assign io_out = io_in;
 endmodule
 

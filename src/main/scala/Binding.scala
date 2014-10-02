@@ -35,14 +35,14 @@ import Node._
 object Binding {
 
   def apply(m: Node, c: Module, ioComp: Module): Node = {
-    if (Module.isEmittingComponents) {
+    if (Driver.backend.isEmittingComponents) {
       val res = c.findBinding(m);
       if (res == null) {
         val res = new Binding(m, ioComp);
         res.component = c;
-        c.nodes += res
         res.init("", widthOf(0), m);
         res.infer;
+        c.nodes += res
         c.bindings += res;
         res
       } else {

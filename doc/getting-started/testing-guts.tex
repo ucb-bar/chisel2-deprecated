@@ -4,7 +4,7 @@ Chisel's Scala based testbench is the first line of defense against simple bugs 
 
 \subsection{Scala Testbench Example}
 
-Below is the \verb+ByteSelector.scala+ component definition from the previous tutorial and the corresponding Chisel test harness.
+Below is the \verb+ByteSelector.scala+ module definition from the previous tutorial and the corresponding Chisel test harness.
 
 \begin{scala}
 package TutorialExamples
@@ -29,7 +29,8 @@ class ByteSelector extends Module {
   }    
 }
 
-class ByteSelectorTests(c: ByteSelector) extends Tester(c) {
+class ByteSelectorTests(c: ByteSelector) 
+    extends Tester(c) {
   val test_in = 12345678
   for (t <- 0 until 4) {
     poke(c.io.in,     test_in)
@@ -121,7 +122,56 @@ In general, the scala testbench should have the following rough structure:
 \item Repeat until all appropriate test cases verified
 \end{itemize}
 
-For sequential components we may want to delay the output definition to the appropriate time as the \verb+step+ function implicitly advances the clock one period in the simulation. Unlike Verilog, you do not need to explicitly specify the timing advances of the simulation; Chisel will take care of these details for you.
+For sequential modules we may want to delay the output definition to the appropriate time as the \verb+step+ function implicitly advances the clock one period in the simulation. Unlike Verilog, you do not need to explicitly specify the timing advances of the simulation; Chisel will take care of these details for you.
+
+\section{\problem{Max2 Testbench}}
+
+In this assignment, write a tester for the \verb+Max2+ circuit:
+
+\begin{scala}
+class Max2 extends Module {
+  val io = new Bundle {
+    val in0 = UInt(INPUT,  8)
+    val in1 = UInt(INPUT,  8)
+    val out = UInt(OUTPUT, 8)
+  }
+  io.out := Mux(io.in0 > io.in0, io.in0, io.in1)
+}
+\end{scala}
+
+\noindent
+found in \verb+$TUT_DIR/problems/Max2.scala+ by filling in the following tester:
+
+\begin{scala}
+class Max2Tests(c: Max2) extends Tester(c) {
+  for (i <- 0 until 10) {
+    // FILL THIS IN HERE
+    poke(c.io.in0, 0)
+    poke(c.io.in1, 0)
+    // FILL THIS IN HERE
+    step(1)
+    expect(c.io.out, 1)
+  }
+}
+\end{scala}
+
+\noindent 
+using random integers generated as follows:
+
+\begin{scala}
+// returns random int in 0..lim-1
+val in0 = rnd.nextInt(lim) 
+\end{scala}
+
+\noindent
+Run 
+
+\begin{bash}
+make Max2.out
+\end{bash}
+
+\noindent 
+until the circuit passes your tests.
 
 \section{Limitations of the Testbench}
 

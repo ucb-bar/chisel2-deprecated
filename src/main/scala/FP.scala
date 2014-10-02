@@ -55,31 +55,18 @@ class Flo extends Bits with Num[Flo] {
 
   type T = Flo;
   override def fromNode(n: Node): this.type = {
-    val res = Flo(OUTPUT).asInstanceOf[this.type]; 
-    res assign n; 
-    res};
+    val res = Flo(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
+    res
+  }
 
   override def fromInt(x: Int): this.type = {
     Flo(x.toFloat).asInstanceOf[this.type]
   }
 
-  private def colonEqual(src: Flo) = {
-    if(comp != null)
-      comp procAssign src.toNode;
-    else
-      this procAssign src.toNode;
+  override protected def colonEquals(that: Bits): Unit = that match {
+    case _: Flo => super.colonEquals(that)
+    case _ => illegalAssignment(that)
   }
-
-  override def :=[T <: Data](src: T): Unit = {
-    src match {
-      case flo: Flo => 
-        this := flo;
-      case any => 
-	ChiselErrors += new ChiselError(() => { ":= not defined on " + this.getClass + " and " + src.getClass }, this.line)
-    }
-  }
-
-  def :=(src: Flo)  = colonEqual(src);
 
   def gen[T <: Bits](): T = Flo().asInstanceOf[T];
 
@@ -135,31 +122,18 @@ class Dbl extends Bits with Num[Dbl] {
 
   type T = Dbl;
   override def fromNode(n: Node) = {
-    val res = Dbl(OUTPUT).asInstanceOf[this.type]; 
-    res assign n; 
-    res};
+    val res = Dbl(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
+    res
+  }
 
   override def fromInt(x: Int): this.type = {
     Dbl(x.toDouble).asInstanceOf[this.type]
   }
 
-  private def colonEqual(src: Dbl) = {
-    if(comp != null)
-      comp procAssign src.toNode;
-    else
-      this procAssign src.toNode;
+  override protected def colonEquals(that: Bits): Unit = that match {
+    case _: Dbl => super.colonEquals(that)
+    case _ => illegalAssignment(that)
   }
-
-  override def :=[T <: Data](src: T): Unit = {
-    src match {
-      case dbl: Dbl => 
-        this := dbl;
-      case any => 
-	ChiselErrors += new ChiselError(() => { ":= not defined on " + this.getClass + " and " + src.getClass }, this.line)
-    }
-  }
-
-  def :=(src: Dbl)  = colonEqual(src);
 
   def gen[T <: Bits](): T = Dbl().asInstanceOf[T];
 

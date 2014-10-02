@@ -35,27 +35,24 @@ import Lit._
 object NodeExtract {
   // extract one bit
   def apply(mod: Node, bit: Int): Node = apply(mod, bit, bit)
-
-  // extract one bit
-  def apply(mod: Node, bit: Node): Node = {
-    val bitLit = bit.litOf
-    if (bitLit != null) {
-      apply(mod, bitLit.value.toInt)
-    } else if (mod.litOf == null) {
-      makeExtract(mod, bit)
-    } else { // don't use Extract on literals
-      Op(">>", fixWidth(1), mod, bit)
-    }
-  }
+  def apply(mod: Node, bit: Node): Node = apply(mod, bit, bit, 1)
 
   // extract bit range
   def apply(mod: Node, hi: Int, lo: Int): Node = apply(mod, hi, lo, -1)
   def apply(mod: Node, hi: Int, lo: Int, width: Int): Node = {
-    if (hi < lo)
-      ChiselError.error("Extract(hi = " + hi + ", lo = " + lo + ") requires hi >= lo")
+    if (hi < lo) {
+      if (!((hi == lo - 1) && Driver.isSupportW0W)) {
+        ChiselError.error("Extract(hi = " + hi + ", lo = " + lo + ") requires hi >= lo")
+      }
+    }
     val w = if (width == -1) hi - lo + 1 else width
     val bits_lit = mod.litOf
-    if (bits_lit != null) {
+    // Currently, we don't restrict literals to their width,
+    // so we can't use the literal directly if it overflows its width.
+    val wmod = mod.widthW
+    if (lo == 0 && wmod.isKnown && w == wmod.needWidth()) {
+      mod
+    } else if (bits_lit != null) {
       Literal((bits_lit.value >> lo) & ((BigInt(1) << w) - BigInt(1)), w)
     } else {
       makeExtract(mod, Literal(hi), Literal(lo), fixWidth(w))
@@ -69,9 +66,7 @@ object NodeExtract {
     val widthInfer = if (width == -1) widthOf(0) else fixWidth(width)
     if (hiLit != null && loLit != null) {
       apply(mod, hiLit.value.toInt, loLit.value.toInt, width)
-    } else if (mod.litOf == null && (hiLit != null && loLit != null)) {
-      makeExtract(mod, hi, lo, widthInfer)
-    } else { // don't use Extract on literals
+    } else { // avoid extracting from constants and avoid variable part selects
       val rsh = Op(">>", widthInfer, mod, lo)
       val hiMinusLoPlus1 = Op("+", maxWidth _, Op("-", maxWidth _, hi, lo), UInt(1))
       val mask = Op("-", widthInfer, Op("<<", widthInfer, UInt(1), hiMinusLoPlus1), UInt(1))
@@ -79,17 +74,9 @@ object NodeExtract {
     }
   }
 
-  private def makeExtract(mod: Node, bit: Node) = {
+  private def makeExtract(mod: Node, hi: Node, lo: Node, widthFunc: (=> Node) => Width) = {
     val res = new Extract
-    res.init("", fixWidth(1), mod, bit)
-    res.hi = bit
-    res.lo = bit
-    res
-  }
-
-  private def makeExtract(mod: Node, hi: Node, lo: Node, width: (Node) => Int) = {
-    val res = new Extract
-    res.init("", width, mod, hi, lo)
+    res.init("", widthFunc, mod, hi, lo)
     res.hi = hi
     res.lo = lo
     res
@@ -130,18 +117,34 @@ class Extract extends Node {
 
   def validateIndex(x: Node) {
     val lit = x.litOf
-    assert(lit == null || lit.value >= 0 && lit.value < inputs(0).width,
+    val w0 = inputs(0).widthW
+    assert(lit == null || lit.value >= 0 && lit.value < w0.needWidth(),
            ChiselError.error("Extract(" + lit.value + ")" +
-                    " out of range [0," + (inputs(0).width-1) + "]" +
-                    " of " + inputs(0) +
-                    " on line " + line.getLineNumber +
-                    " in class " + line.getClassName +
-                    " in file " + line.getFileName))
+                    " out of range [0," + (w0.needWidth()-1) + "]" +
+                    " of " + inputs(0), line))
   }
 
   override def canCSE: Boolean = true
   override def equalsForCSE(that: Node): Boolean = that match {
     case _: Extract => CSE.inputsEqual(this, that)
     case _ => false
+  }
+
+  // Eliminate any zero-width wires attached to this node.
+  override def W0Wtransform() {
+   /* We require that if the source is zero-width,
+     *  the high and lo must be n-1 and n respectively.
+     *  If this is true, we ensure our width is zero.
+     */
+    val hi_lit = inputs(1).litOf
+    val lo_lit = inputs(2).litOf
+    if (inputs(0).getWidth == 0 && hi_lit != null && lo_lit != null &&
+        hi_lit.value == (lo_lit.value - 1)) {
+      setWidth(0)
+      modified = true
+    } else {
+      ChiselError.error("Extract(" + inputs(0) + ", " + inputs(1) + ", " + inputs(2) + ")" +
+            " W0Wtransform", line)
+    }
   }
 }

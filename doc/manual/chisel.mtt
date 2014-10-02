@@ -1,0 +1,148 @@
+\documentclass[a4paper,english]{article}
+\usepackage{a4wide}
+\usepackage[latin1]{inputenc}
+\usepackage{babel}
+\usepackage{verbatim}
+
+%% do we have the `hyperref package?
+\IfFileExists{hyperref.sty}{
+   \usepackage[bookmarksopen,bookmarksnumbered]{hyperref}
+}{}
+
+%% do we have the `fancyhdr' package?
+\IfFileExists{fancyhdr.sty}{
+\usepackage[fancyhdr]{latex2man}
+}{
+%% do we have the `fancyheadings' package?
+\IfFileExists{fancyheadings.sty}{
+\usepackage[fancy]{latex2man}
+}{
+\usepackage[nofancy]{latex2man}
+\message{no fancyhdr or fancyheadings package present, discard it}
+}}
+
+\setDate{@DATE@}
+
+\setVersion{@VERSION@}
+
+\begin{document}
+
+\begin{Name}{1}{chisel}{Jonathan Bachrach}{Chisel}{\Chisel\\--\\ Constructing Hardware in a Scala Embedded Language}
+
+  \Prog{Chisel} is an open-source hardware construction
+  language developed at UC Berkeley that supports advanced hardware
+  design using highly parameterized generators and layered
+  domain-specific hardware languages.
+\end{Name}
+
+\section{Synopsis}
+%%%%%%%%%%%%%%%%%%
+
+\Prog{java} \Prog{client classes} \Prog{chiseljar} \oArg{options}
+
+\section{Description}
+%%%%%%%%%%%%%%%%%%%%%
+\Prog{Chisel} is linked with client classes and the resulting program
+is executed, building a graph of the hardware, and emitting a
+representation of that graph in a format determined by the selected
+backend.
+
+\section{Options}
+%%%%%%%%%%%%%%%%%
+\begin{Description}[\Opt{--allocateOnlyNeededShadowRegisters}]\setlength{\itemsep}{0cm}
+\item[\Opt{--allocateOnlyNeededShadowRegisters}] (C++) Attempt to allocate
+  only those shadow registers actually required. This reduces the size
+  of the main C++ design object (especially when
+  \Arg{--shadowRegisterInObject} is enabled), which in turn reduces
+  compilation time. It should have no execution-time performance impact.
+\item[\Opt{--assert}] Emit assertions.
+\item[\OptArg{--backend}{\ backendname}] Use the specified backend where
+  \Arg{backendname} is one of
+\begin{itemize}
+  \item[\Arg{c}] C++ emulation
+  \item[\Arg{dot}] dot file drawing
+  \item[\Arg{flo}] Flo
+  \item[\Arg{fpga}] FPGA
+  \item[\Arg{sysc}] SystemC emulation
+  \item[\Arg{v}] Verilog
+\end{itemize}
+\item[\Opt{--checkPorts}] Hmmm
+\item[\Opt{--compile}] Produce backend output
+\item[\Opt{--compileInitializationUnoptimized}] (C++) Compile
+  initialization code at -O0, rarely used code at -O1.
+\item[\OptArg{--configCollect}{\ project.class}] Hmmm
+\item[\Opt{--configDump}] Hmmm
+\item[\OptArg{--configInstance}{\ project.class}] Hmmm
+\item[\Opt{--cse}] Do common subexpression elimination
+\item[\Opt{--debug}] Hmmm
+\item[\Opt{--debugMem}] Hmmm
+\item[\Opt{--dumpTestInput}] Hmmm
+\item[\Opt{--emitTempNodes}] Hmmm
+\item[\Opt{--genHarness}] Hmmm
+\item[\OptArg{--include}{\ includefilenames}] (C++) Generate include
+  file statements for each of the (space-delimited) filenames.
+\item[\Opt{--inlineMem}] Hmmm
+\item[\Opt{--ioDebug}] Hmmm
+\item[\Opt{--isVCDinline}] (C++) Generate VCD dump code without goto
+  branches. Allows compiling smaller VCD dump functions, reducing C++
+  compile times. This will have some impact on execution-time performance.
+\item[\OptArg{--lineLimitFunctions}{\ lines}] (C++) Limit the number of
+  lines in a C++ function/method before splitting it up into multiple
+  functions to reduce C++ compile times. The \Arg{lines} value
+  specifies a loose upper limit on the number of lines output to a
+  single function before that function is split up into smaller
+  functions. This involves a trade-off between compile-time
+  performance and execution-time performance. Smaller functions yield
+  faster compile times, but result in slower execution since instead
+  of calling a single function, calls to multiple functions are
+  generated. Reasonable values for this argument would be in the range
+  from 256 to 2048.
+\item[\Opt{--lineNumbers}] Hmmm
+\item[\OptArg{--minimumLinesPerFile}{\ lines}] (C++) Limit the minimum
+  number of lines per file so as not to produce trivial files. This
+  works in conjunction with \Arg{lineLimitFunctions} to break up a
+  massive single file into multiple smaller (but not too small)
+  files. Reasonable values for this argument would be in the range of
+  1024 to 32768.
+\item[\OptArg{--moduleNamePrefix}{\ }] Hmmm
+\item[\Opt{--noAssert}] Hmmm
+\item[\Opt{--noCombLoop}] Hmmm
+\item[\Opt{--noInlineMem}] Hmmm
+\item[\Opt{--noIoDebug}] Hmmm
+\item[\OptArg{--numCols}{\ columns}] Hmmm
+\item[\OptArg{--numRows}{\ rows}] Hmmm
+\item[\OptArg{--parallelMakeJobs}{\ jobs}] (C++) Generate a
+  \File{Makefile} to compile multiple C++ files in parallel. The
+  \Arg{jobs} argument specifies the amount of parallelism (the
+  argument to the \Arg{-j} option to \Prog{make}). A value of -1 indicates
+  that no value will be passed with the \Arg{-j} argument to
+  \Prog{make}, which in turn should inform \Prog{make} not to limit
+  the number of jobs that can run simultaneously.
+\item[\Opt{--partitionIslands}] (C++, dot) Partition the graph into islands of
+  combinatorial logic that may be compiled and executed in parallel.
+\item[\Opt{--reportDims}] Hmmm
+\item[\Opt{--shadowRegisterInObject}] (C++) Allocate shadow registers
+  in the global emulation object (as opposed to the local clock
+  procedures). This is automatically enabled when
+  \Arg{lineLimitFunctions} is in effect.
+\item[\OptArg{--targetDir}{\ outputdir}] Hmmm
+\item[\Opt{--test}] Hmmm
+\item[\OptArg{--testerSeed}{\ seed}] Hmmm
+\item[\Opt{--v}] Hmmm
+\item[\Opt{--vcd}] Hmmm
+\item[\Opt{--vcdMem}] Hmmm
+\item[\Opt{--Wcomponent}] Hmmm
+\item[\Opt{--Wconnection}] Hmmm
+\item[\Opt{--wi}] Hmmm
+\item[\Opt{--wio}] Hmmm
+\item[\Opt{--wo}] Hmmm
+\end{Description}
+
+\section{Version}
+%%%%%%%%%%%%%%%%%
+
+Version: \Version\ of \Date.
+
+\LatexManEnd
+
+\end{document}

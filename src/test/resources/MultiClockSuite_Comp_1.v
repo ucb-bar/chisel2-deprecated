@@ -3,16 +3,12 @@ module MultiClockSuite_ClockedSubComp_1(input T0,
     output io_valid
 );
 
-  reg[0:0] stored;
+  reg  stored;
 
 `ifndef SYNTHESIS
   integer initvar;
   initial begin
-    #0.001;
-`ifdef RANDOM_SEED
-    initvar = $random(`RANDOM_SEED);
-`endif
-    #0.001;
+    #0.002;
     stored = {1{$random}};
   end
 `endif

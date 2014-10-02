@@ -10,11 +10,7 @@ module DelaySuite_MemReadModule_1(input clk,
 `ifndef SYNTHESIS
   integer initvar;
   initial begin
-    #0.001;
-`ifdef RANDOM_SEED
-    initvar = $random(`RANDOM_SEED);
-`endif
-    #0.001;
+    #0.002;
     for (initvar = 0; initvar < 8; initvar = initvar+1)
       mem[initvar] = {1{$random}};
   end
@@ -23,8 +19,5 @@ module DelaySuite_MemReadModule_1(input clk,
   assign io_out = T0;
   assign T0 = mem[T1];
   assign T1 = io_addr[2'h2:1'h0];
-
-  always @(posedge clk) begin
-  end
 endmodule
 

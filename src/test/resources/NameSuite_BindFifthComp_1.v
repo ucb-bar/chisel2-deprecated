@@ -9,36 +9,49 @@ module NameSuite_Block_2(input clk,
 
   wire[31:0] T0;
   wire[31:0] T1;
-  reg[31:0] tag_ram_1;
-  wire T2;
-  reg[31:0] tag_ram_0;
-  wire[31:0] T3;
+  reg [31:0] tag_ram_1;
+  wire[31:0] T2;
+  wire T3;
   wire T4;
+  wire[1:0] T5;
+  wire T6;
+  wire T7;
+  reg [31:0] tag_ram_0;
+  wire[31:0] T8;
+  wire T9;
+  wire T10;
+  wire[31:0] T11;
+  wire T12;
 
 `ifndef SYNTHESIS
   integer initvar;
   initial begin
-    #0.001;
-`ifdef RANDOM_SEED
-    initvar = $random(`RANDOM_SEED);
-`endif
-    #0.001;
+    #0.002;
     tag_ram_1 = {1{$random}};
     tag_ram_0 = {1{$random}};
   end
 `endif
+
   assign io_out_resp_bits_ppn = T0;
-  assign T0 = T3 | T1;
-  assign T1 = T2 ? tag_ram_1 : 32'h0;
-  assign T2 = tag_ram_0[1'h1:1'h1];
-  assign T3 = T4 ? tag_ram_0 : 32'h0;
-  assign T4 = tag_ram_0[1'h0:1'h0];
+  assign T0 = T11 | T1;
+  assign T1 = T7 ? tag_ram_1 : 32'h0;
+  assign T2 = T3 ? io_in_resp_bits_ppn : tag_ram_1;
+  assign T3 = io_in_resp_valid & T4;
+  assign T4 = T5[1'h1:1'h1];
+  assign T5 = 1'h1 << T6;
+  assign T6 = 1'h0;
+  assign T7 = tag_ram_0[1'h1:1'h1];
+  assign T8 = T9 ? io_in_resp_bits_ppn : tag_ram_0;
+  assign T9 = io_in_resp_valid & T10;
+  assign T10 = T5[1'h0:1'h0];
+  assign T11 = T12 ? tag_ram_0 : 32'h0;
+  assign T12 = tag_ram_0[1'h0:1'h0];
 
   always @(posedge clk) begin
-    if(1'h0) begin
+    if(T3) begin
       tag_ram_1 <= io_in_resp_bits_ppn;
     end
-    if(io_in_resp_valid) begin
+    if(T9) begin
       tag_ram_0 <= io_in_resp_bits_ppn;
     end
   end
@@ -56,9 +69,10 @@ module NameSuite_BindFifthComp_1(input clk,
     output[31:0] io_resp_resp_bits_ppn
 );
 
-  wire[31:0] vdtlb_io_out_resp_bits_ppn;
-  wire vdtlb_io_out_resp_bits_error;
   wire vdtlb_io_out_resp_valid;
+  wire vdtlb_io_out_resp_bits_error;
+  wire[31:0] vdtlb_io_out_resp_bits_ppn;
+
 
   assign io_resp_resp_bits_ppn = vdtlb_io_out_resp_bits_ppn;
   assign io_resp_resp_bits_error = vdtlb_io_out_resp_bits_error;

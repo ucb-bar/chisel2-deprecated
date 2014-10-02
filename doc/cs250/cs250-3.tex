@@ -449,7 +449,7 @@ class GCD_t : public mod_t {
   dat_t<16> GCD__x_shadow;
   dat_t<16> GCD__io_z;
 
-  void init ( bool rand_init = false );
+  void init ( val_t rand_init = 0 );
   void clock_lo ( dat_t<1> reset );
   void clock_hi ( dat_t<1> reset );
   void print ( FILE* f );
@@ -497,7 +497,7 @@ class GCD_t : public mod_t {
 \begin{scala}
 #include "GCD.h"
 
-void GCD_t::init ( bool rand_init ) {
+void GCD_t::init ( val_t rand_init ) {
   { GCD__y.values[0] = rand_init ? rand_val() & 65535 : 0; }
   { GCD__x.values[0] = rand_init ? rand_val() & 65535 : 0; }
 }

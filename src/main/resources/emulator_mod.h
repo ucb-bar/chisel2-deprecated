@@ -35,9 +35,10 @@ using namespace std;
 typedef uint64_t val_t;
 typedef int64_t sval_t;
 typedef uint32_t half_val_t;
-//typedef __uint128_t dub_val_t;
-// typedef uint32_t val_t;
-// typedef uint8_t val_t;
+#if defined(__GNUC__) && defined(__SIZEOF_INT128__)
+#define __HAVE_DUB_VAL_T__
+typedef unsigned __int128 dub_val_t;
+#endif
 
 union flo2int_t {
   float  f;
@@ -73,9 +74,23 @@ inline val_t fromDouble (double x) {
   return f2i.i;
 }
 
+#define TERNARY(c, t, f) ((f) ^ (((f) ^ (t)) & -(c)))
+
+#if defined(__GNUC__) && defined(__x86_64__)
+#define TERNARY_1(c, t, f) ({ \
+  val_t __res; \
+  if (!__builtin_constant_p(c)) { \
+    __res = (f); \
+    val_t __t = (t); \
+    uint8_t __c = (c); \
+    asm ("testb $1, %1; cmovne %2, %0" : "+r"(__res) : "rm"(__c), "rm"(__t) : "cc"); \
+  } else __res = TERNARY(c, t, f); \
+  __res; })
+#else
+#define TERNARY_1(c, t, f) TERNARY(c, t, f)
+#endif
 
 #define MASK(v, c) ((v) & -(val_t)(c))
-#define TERNARY(c, t, f) ((f) ^ (((f) ^ (t)) & -(c)))
 #ifndef MIN
 #define MIN(a, b) TERNARY((a) < (b), (a), (b))
 #endif
@@ -96,19 +111,15 @@ template<uint32_t shifted, bool sticky> struct CeilLog<1, shifted, sticky> {
     static uint32_t const v = sticky ? shifted + 1 : shifted;
 };
 
-inline val_t val_n_bits( void ) { return sizeof(val_t)*8; }
-inline val_t val_all_ones( void ) { return ~((val_t)0); }
-// const val_t val_ones_or_zeroes[2] = { 0L, val_all_ones() };
-// inline val_t val_all_ones_or_zeroes( val_t bit ) { return val_ones_or_zeroes[bit]; }
-inline val_t val_all_ones_or_zeroes( val_t bit ) {
-  return (val_t) ((sval_t) ((sval_t) bit << (val_n_bits() - 1)) >> (val_n_bits() -1));
-  }
-inline val_t val_top_bit( val_t v ) { return (v >> (val_n_bits()-1)); }
-#define val_n_words(n_bits) (1+((n_bits)-1)/(8*sizeof(val_t)))
-#define val_n_half_words(n_bits) (1+((n_bits)-1)/(8*sizeof(half_val_t)))
-inline val_t val_n_full_words( val_t n_bits ) { return n_bits / val_n_bits(); }
-inline val_t val_n_word_bits( val_t n_bits ) { return n_bits % val_n_bits(); }
-inline val_t val_n_half_bits( void ) { return sizeof(half_val_t)*8; }
+#define val_n_bits() (sizeof(val_t)*8)
+#define val_n_half_bits() (val_n_bits()/2)
+#define val_all_ones() val_all_ones_or_zeroes(1)
+#define val_all_ones_or_zeroes(bit) (val_t(0) - val_t(bit))
+#define val_n_words(n_bits) (1+((n_bits)-1)/val_n_bits())
+#define val_n_half_words(n_bits) (1+((n_bits)-1)/val_n_half_bits())
+#define val_top_bit(v) (val_t(v) >> (val_n_bits()-1))
+#define val_n_full_words(n_bits) ((n_bits)/val_n_bits())
+#define val_n_word_bits(n_bits) ((n_bits) % val_n_bits())
 inline val_t val_n_nibs( void ) { return val_n_bits()>>2; }
 inline val_t val_half_mask( void ) { return (((val_t)1)<<(val_n_half_bits()))-1; }
 inline val_t val_lo_half( val_t n_bits ) { return n_bits & val_half_mask(); }
@@ -169,11 +180,12 @@ static void sub_n (val_t d[], val_t s0[], val_t s1[], int nw, int nb) {
   }
 }
 
-static void mul_n (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
+static void mul_n (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
 // Adapted from Hacker's Delight, from Knuth
 #if BYTE_ORDER != LITTLE_ENDIAN
 # error mul_n assumes a little-endian architecture
 #endif
+  int nbd = nb0 + nb1;
   for (int i = 0; i < val_n_words(nbd); i++)
     d[i] = 0;
 
@@ -253,25 +265,18 @@ static void lsh_n (val_t d[], val_t s0[], int amount, int nwd, int nws) {
   int n_shift_words    = amount / val_n_bits();
   int n_rev_shift_bits = val_n_bits() - n_shift_bits;
   int is_zero_carry    = n_shift_bits == 0;
-  for (int i = 0; i < n_shift_words; i++)
+  for (int i = 0; i < nwd; i++)
     d[i] = 0;
   for (int i = 0; i < (nws-n_shift_words); i++) {
     val_t val = s0[i];
     d[i+n_shift_words] = val << n_shift_bits | carry;
     carry              = is_zero_carry ? 0 : val >> n_rev_shift_bits;
   }
-  for (int i = nws-n_shift_words; i < nwd; i++)
-    d[i] = 0;
 }
 
 static inline val_t mask_val(int n) {
   val_t res = val_all_ones() >> (val_n_bits()-n);
   return res;
-}
-
-static void div_n (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
-  assert(MAX(nbd, MAX(nb0, nb1)) <= val_n_bits()); // TODO: generalize
-  d[0] = s1[0] == 0 ? mask_val(nb0) : s0[0] / s1[0];
 }
 
 static inline void mask_n (val_t d[], int nw, int nb) {
@@ -286,9 +291,11 @@ static inline void mask_n (val_t d[], int nw, int nb) {
 }
 
 static inline val_t log2_1 (val_t v) {
+#ifdef __GNUC__
+  return TERNARY(v != 0, val_n_bits() - 1 - __builtin_clzll(v), 0);
+#else
   val_t r;
   val_t shift;
-
   r     = (v > 0xFFFFFFFF) << 5; v >>= r;
   shift = (v > 0xFFFF    ) << 4; v >>= shift; r |= shift;
   shift = (v > 0xFF      ) << 3; v >>= shift; r |= shift;
@@ -296,6 +303,35 @@ static inline val_t log2_1 (val_t v) {
   shift = (v > 0x3       ) << 1; v >>= shift; r |= shift;
   r    |= (v >> 1);
   return r;
+#endif
+}
+
+static inline val_t reverse_1 (val_t v) {
+  v = ((v >>  1) & 0x5555555555555555) | ((v & 0x5555555555555555) <<  1);
+  v = ((v >>  2) & 0x3333333333333333) | ((v & 0x3333333333333333) <<  2);
+  v = ((v >>  4) & 0x0F0F0F0F0F0F0F0F) | ((v & 0x0F0F0F0F0F0F0F0F) <<  4);
+  v = ((v >>  8) & 0x00FF00FF00FF00FF) | ((v & 0x00FF00FF00FF00FF) <<  8);
+  v = ((v >> 16) & 0x0000FFFF0000FFFF) | ((v & 0x0000FFFF0000FFFF) << 16);
+  v = ( v >> 32                      ) | ( v                       << 32);
+  return v;
+}
+
+static inline val_t priority_encode_1 (val_t v) {
+#ifdef __GNUC__
+  return TERNARY(v != 0, __builtin_ctzll(v), 0);
+#else
+  if (v == 0)
+    return 0;
+  val_t r;
+  val_t shift;
+  r     = !(v & 0xFFFFFFFF) << 5; v >>= r;
+  shift = !(v & 0xFFFF    ) << 4; v >>= shift; r |= shift;
+  shift = !(v & 0xFF      ) << 3; v >>= shift; r |= shift;
+  shift = !(v & 0xF       ) << 2; v >>= shift; r |= shift;
+  shift = !(v & 0x3       ) << 1; v >>= shift; r |= shift;
+  shift = !(v & 0x1       ) << 0; v >>= shift; r |= shift;
+  return r;
+#endif
 }
 
 #define ispow2(x) (((x) & ((x)-1)) == 0)
@@ -405,8 +441,8 @@ struct bit_word_funs {
   static void sub (val_t d[], val_t s0[], val_t s1[], int nb) {
     sub_n(d, s0, s1, nw, nb);
   }
-  static void mul (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
-    mul_n(d, s0, s1, nbd, nb0, nb1);
+  static void mul (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
+    mul_n(d, s0, s1, nb0, nb1);
   }
   static void bit_xor (val_t d[], val_t s0[], val_t s1[]) {
     for (int i = 0; i < nw; i++)
@@ -426,68 +462,36 @@ struct bit_word_funs {
     for (int i = 0; i < nw; i++)
       d[i] = ~s0[i] & msk[i];
   }
-  static void ltu (val_t d[], val_t s0[], val_t s1[]) {
+  static bool ltu (val_t s0[], val_t s1[]) {
     val_t diff[nw];
     sub(diff, s0, s1, nw*val_n_bits());
-    d[0] = val_top_bit(diff[nw-1]);
+    return val_top_bit(diff[nw-1]);
   }
-  static void lt (val_t d[], val_t s0[], val_t s1[], int w) {
+  static bool lt (val_t s0[], val_t s1[], int w) {
     int msb_0 = (s0[1] >> (w - (nw-1)*val_n_bits() - 1)) & 0x1;
     int msb_1 = (s1[1] >> (w - (nw-1)*val_n_bits() - 1)) & 0x1;
     if (msb_0 != msb_1) {
-      d[0] = msb_0;
+      return msb_0;
     } else {
       val_t diff[nw];
       sub(diff, s0, s1, nw*val_n_bits());
-      d[0] = val_top_bit(diff[nw-1]);
+      return val_top_bit(diff[nw-1]);
     }
   }
-  static void gtu (val_t d[], val_t s0[], val_t s1[]) {
+  static bool lteu (val_t s0[], val_t s1[]) {
     val_t diff[nw];
     sub(diff, s1, s0, nw*val_n_bits());
-    d[0] = val_top_bit(diff[nw-1]);
+    return !val_top_bit(diff[nw-1]);
   }
-  static void gt (val_t d[], val_t s0[], val_t s1[], int w) {
+  static bool lte (val_t s0[], val_t s1[], int w) {
     int msb_0 = (s0[1] >> (w - (nw-1)*val_n_bits() - 1)) & 0x1;
     int msb_1 = (s1[1] >> (w - (nw-1)*val_n_bits() - 1)) & 0x1;
     if (msb_0 != msb_1) {
-      d[0] = msb_1;
+      return msb_0;
     } else {
       val_t diff[nw];
       sub(diff, s1, s0, nw*val_n_bits());
-      d[0] = val_top_bit(diff[nw-1]);
-    }
-  }
-  static void lteu (val_t d[], val_t s0[], val_t s1[]) {
-    val_t diff[nw];
-    sub(diff, s1, s0, nw*val_n_bits());
-    d[0] = !val_top_bit(diff[nw-1]);
-  }
-  static void lte (val_t d[], val_t s0[], val_t s1[], int w) {
-    int msb_0 = (s0[1] >> (w - (nw-1)*val_n_bits() - 1)) & 0x1;
-    int msb_1 = (s1[1] >> (w - (nw-1)*val_n_bits() - 1)) & 0x1;
-    if (msb_0 != msb_1) {
-      d[0] = msb_0;
-    } else {
-      val_t diff[nw];
-      sub(diff, s1, s0, nw*val_n_bits());
-      d[0] = !val_top_bit(diff[nw-1]);
-    }
-  }
-  static void gteu (val_t d[], val_t s0[], val_t s1[]) {
-    val_t diff[nw];
-    sub(diff, s0, s1, nw*val_n_bits());
-    d[0] = !val_top_bit(diff[nw-1]);
-  }
-  static void gte (val_t d[], val_t s0[], val_t s1[], int w) {
-    int msb_0 = (s0[1] >> (w - (nw-1)*val_n_bits() - 1)) & 0x1;
-    int msb_1 = (s1[1] >> (w - (nw-1)*val_n_bits() - 1)) & 0x1;
-    if (msb_0 != msb_1) {
-      d[0] = msb_1;
-    } else {
-      val_t diff[nw];
-      sub(diff, s0, s1, nw*val_n_bits());
-      d[0] = !val_top_bit(diff[nw-1]);
+      return !val_top_bit(diff[nw-1]);
     }
   }
   static bool eq (val_t s0[], val_t s1[]) {
@@ -577,43 +581,24 @@ struct bit_word_funs<1> {
   static void neg (val_t d[], val_t s0[], int nb) {
     d[0] = (- s0[0]) & mask_val(nb);
   }
-  static void mul (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
-    if (nbd <= val_n_bits())
-      d[0] = (s0[0] * s1[0]) & mask_val(nbd);
-    else
-      mul_n(d, s0, s1, nbd, nb0, nb1);
+  static void mul (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
+    d[0] = s0[0] * s1[0];
   }
-  static void ltu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = (s0[0] < s1[0]);
+  static bool ltu (val_t s0[], val_t s1[]) {
+    return (s0[0] < s1[0]);
   }
-  static void lt (val_t d[], val_t s0[], val_t s1[], int w) {
+  static bool lt (val_t s0[], val_t s1[], int w) {
     sval_t a = s0[0] << (val_n_bits() - w);
     sval_t b = s1[0] << (val_n_bits() - w);
-    d[0] = (a < b);
+    return (a < b);
   }
-  static void gtu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = (s0[0] > s1[0]);
+  static bool lteu (val_t s0[], val_t s1[]) {
+    return (s0[0] <= s1[0]);
   }
-  static void gt (val_t d[], val_t s0[], val_t s1[], int w) {
+  static bool lte (val_t s0[], val_t s1[], int w) {
     sval_t a = s0[0] << (val_n_bits() - w);
     sval_t b = s1[0] << (val_n_bits() - w);
-    d[0] = (a > b);
-  }
-  static void lteu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = (s0[0] <= s1[0]);
-  }
-  static void lte (val_t d[], val_t s0[], val_t s1[], int w) {
-    sval_t a = s0[0] << (val_n_bits() - w);
-    sval_t b = s1[0] << (val_n_bits() - w);
-    d[0] = (a <= b);
-  }
-  static void gteu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = (s0[0] >= s1[0]);
-  }
-  static void gte (val_t d[], val_t s0[], val_t s1[], int w) {
-    sval_t a = s0[0] << (val_n_bits() - w);
-    sval_t b = s1[0] << (val_n_bits() - w);
-    d[0] = (a >= b);
+    return (a <= b);
   }
   static void bit_neg (val_t d[], val_t s0[], int nb) {
     d[0] = ~s0[0] & mask_val(nb);
@@ -699,48 +684,37 @@ struct bit_word_funs<2> {
     d[1] = -s0[1] - (s0[0] != 0);
     d[0] = d0;
   }
-  static void mul (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
-    mul_n(d, s0, s1, nbd, nb0, nb1);
+  static void mul (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
+#ifdef __HAVE_DUB_VAL_T__
+    dub_val_t a = s0[0], b = s1[0];
+    if (nb0 > val_n_bits()) a |= dub_val_t(s0[1]) << val_n_bits();
+    if (nb1 > val_n_bits()) b |= dub_val_t(s1[1]) << val_n_bits();
+    dub_val_t res = a * b;
+    d[0] = res;
+    d[1] = res >> val_n_bits();
+#else
+    mul_n(d, s0, s1, nb0, nb1);
+#endif
   }
-  static void ltu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = ((s0[1] < s1[1]) | (s0[1] == s1[1] & s0[0] < s1[0]));
+  static bool ltu (val_t s0[], val_t s1[]) {
+    return ((s0[1] < s1[1]) | (s0[1] == s1[1] & s0[0] < s1[0]));
   }
-  static void lt (val_t d[], val_t s0[], val_t s1[], int w) {
+  static bool lt (val_t s0[], val_t s1[], int w) {
     int msb_0 = (s0[1] >> (w - val_n_bits() - 1)) & 0x1;
     int msb_1 = (s1[1] >> (w - val_n_bits() - 1)) & 0x1;
     int cond  = msb_0 ^ msb_1;
-    d[0] = (cond && msb_0)
+    return (cond && msb_0)
         || (!cond && ((s0[1] < s1[1]) | (s0[1] == s1[1] & s0[0] < s1[0])));
   }
-  static void gtu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = ((s0[1] > s1[1]) | (s0[1] == s1[1] & s0[0] > s1[0]));
+  static bool lteu (val_t s0[], val_t s1[]) {
+    return ((s0[1] < s1[1]) | (s0[1] == s1[1] & s0[0] <= s1[0]));
   }
-  static void gt (val_t d[], val_t s0[], val_t s1[], int w) {
+  static bool lte (val_t s0[], val_t s1[], int w) {
     int msb_0 = (s0[1] >> (w - val_n_bits() - 1)) & 0x1;
     int msb_1 = (s1[1] >> (w - val_n_bits() - 1)) & 0x1;
     int cond = msb_0 ^ msb_1;
-    d[0] = (cond && msb_1)
-        || (!cond && ((s0[1] > s1[1]) | (s0[1] == s1[1] & s0[0] > s1[0])));
-  }
-  static void lteu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = ((s0[1] < s1[1]) | (s0[1] == s1[1] & s0[0] <= s1[0]));
-  }
-  static void lte (val_t d[], val_t s0[], val_t s1[], int w) {
-    int msb_0 = (s0[1] >> (w - val_n_bits() - 1)) & 0x1;
-    int msb_1 = (s1[1] >> (w - val_n_bits() - 1)) & 0x1;
-    int cond = msb_0 ^ msb_1;
-    d[0] = (cond && msb_0)
+    return (cond && msb_0)
         || (!cond && ((s0[1] < s1[1]) | (s0[1] == s1[1] & s0[0] <= s1[0])));
-  }
-  static void gteu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = ((s0[1] > s1[1]) | (s0[1] == s1[1] & s0[0] >= s1[0]));
-  }
-  static void gte (val_t d[], val_t s0[], val_t s1[], int w) {
-    int msb_0 = (s0[1] >> (w - val_n_bits() - 1)) & 0x1;
-    int msb_1 = (s1[1] >> (w - val_n_bits() - 1)) & 0x1;
-    int cond = msb_0 ^ msb_1;
-    d[0] = (cond && msb_1)
-        || (!cond && ((s0[1] > s1[1]) | (s0[1] == s1[1] & s0[0] >= s1[0])));
   }
   static void bit_xor (val_t d[], val_t s0[], val_t s1[]) {
     d[0] = (s0[0] ^ s1[0]);
@@ -877,48 +851,28 @@ struct bit_word_funs<3> {
   static void neg (val_t d[], val_t s0[], int nb) {
     neg_n(d, s0, 3, nb);
   }
-  static void mul (val_t d[], val_t s0[], val_t s1[], int nbd, int nb0, int nb1) {
-    mul_n(d, s0, s1, nbd, nb0, nb1);
+  static void mul (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
+    mul_n(d, s0, s1, nb0, nb1);
   }
-  static void ltu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = ((s0[2] < s1[2]) | ((s0[2] == s1[2]) & ((s0[1] < s1[1]) | ((s0[1] == s1[1]) & (s0[0] < s1[0])))));
+  static bool ltu (val_t s0[], val_t s1[]) {
+    return ((s0[2] < s1[2]) | ((s0[2] == s1[2]) & ((s0[1] < s1[1]) | ((s0[1] == s1[1]) & (s0[0] < s1[0])))));
   }
-  static void lt (val_t d[], val_t s0[], val_t s1[], int w) {
+  static bool lt (val_t s0[], val_t s1[], int w) {
     int msb_0 = (s0[1] >> (w - 2*val_n_bits() - 1)) & 0x1;
     int msb_1 = (s1[1] >> (w - 2*val_n_bits() - 1)) & 0x1;
     int cond  = msb_0 ^ msb_1;
-    d[0] = (cond && msb_0)
+    return (cond && msb_0)
         || (!cond && (((s0[2] < s1[2]) | ((s0[2] == s1[2]) & ((s0[1] < s1[1]) | ((s0[1] == s1[1]) & (s0[0] < s1[0])))))));
   }
-  static void gtu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = ((s0[2] > s1[2]) | ((s0[2] == s1[2]) & ((s0[1] > s1[1]) | ((s0[1] == s1[1]) & (s0[0] > s1[0])))));
+  static bool lteu (val_t s0[], val_t s1[]) {
+    return ((s0[2] < s1[2]) | ((s0[2] == s1[2]) & ((s0[1] < s1[1]) | ((s0[1] == s1[1]) & (s0[0] <= s1[0])))));
   }
-  static void gt (val_t d[], val_t s0[], val_t s1[], int w) {
+  static bool lte (val_t s0[], val_t s1[], int w) {
     int msb_0 = (s0[1] >> (w - 2*val_n_bits() - 1)) & 0x1;
     int msb_1 = (s1[1] >> (w - 2*val_n_bits() - 1)) & 0x1;
     int cond  = msb_0 ^ msb_1;
-    d[0] = (cond && msb_1)
-        || (!cond && ((s0[2] > s1[2]) | ((s0[2] == s1[2]) & ((s0[1] > s1[1]) | ((s0[1] == s1[1]) & (s0[0] > s1[0]))))));
-  }
-  static void lteu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = ((s0[2] < s1[2]) | ((s0[2] == s1[2]) & ((s0[1] < s1[1]) | ((s0[1] == s1[1]) & (s0[0] <= s1[0])))));
-  }
-  static void lte (val_t d[], val_t s0[], val_t s1[], int w) {
-    int msb_0 = (s0[1] >> (w - 2*val_n_bits() - 1)) & 0x1;
-    int msb_1 = (s1[1] >> (w - 2*val_n_bits() - 1)) & 0x1;
-    int cond  = msb_0 ^ msb_1;
-    d[0] = (cond && msb_0)
+    return (cond && msb_0)
         || (!cond && ((s0[2] < s1[2]) | ((s0[2] == s1[2]) & ((s0[1] < s1[1]) | ((s0[1] == s1[1]) & (s0[0] <= s1[0]))))));
-  }
-  static void gteu (val_t d[], val_t s0[], val_t s1[]) {
-    d[0] = ((s0[2] > s1[2]) | ((s0[2] == s1[2]) & ((s0[1] > s1[1]) | ((s0[1] == s1[1]) & (s0[0] >= s1[0])))));
-  }
-  static void gte (val_t d[], val_t s0[], val_t s1[], int w) {
-    int msb_0 = (s0[1] >> (w - 2*val_n_bits() - 1)) & 0x1;
-    int msb_1 = (s1[1] >> (w - 2*val_n_bits() - 1)) & 0x1;
-    int cond  = msb_0 ^ msb_1;
-    d[0] = (cond && msb_1)
-        || (!cond && ((s0[2] > s1[2]) | ((s0[2] == s1[2]) & ((s0[1] > s1[1]) | ((s0[1] == s1[1]) & (s0[0] >= s1[0]))))));
   }
   static void bit_xor (val_t d[], val_t s0[], val_t s1[]) {
     d[0] = (s0[0] ^ s1[0]);
@@ -994,11 +948,9 @@ struct bit_word_funs<3> {
   }
 };
 
-static val_t rand_val_seed = time(NULL) | 1;
-static val_t rand_val()
-{
-  val_t x = rand_val_seed;
-  rand_val_seed = x>>1 | (x>>0^x>>60^x>>61^x>>63)<<63;
+static val_t __rand_val(val_t* seed) {
+  val_t x = *seed;
+  *seed = (x << 1) ^ (-(sval_t(x) < 0) & 0x1B);
   return x;
 }
 
@@ -1031,16 +983,11 @@ class dat_t {
       res.push_back(rres[rres.size()-i-1]);
     return res;
   }
-  void randomize() {
+  void randomize(val_t* seed) {
     for (int i = 0; i < n_words; i++)
-      values[i] = rand_val();
+      values[i] = __rand_val(seed);
     if (val_n_word_bits(w))
       values[n_words-1] &= mask_val(val_n_word_bits(w));
-  }
-  static dat_t<w> rand() {
-    dat_t<w> r;
-    r.randomize();
-    return r;
   }
   inline dat_t<w> () {
   }
@@ -1053,10 +1000,15 @@ class dat_t {
   inline dat_t<w> (const dat_t<w>& src) {
     bit_word_funs<n_words>::set(values, (val_t*)src.values);
   }
+  static inline dat_t<w> from_vals(val_t val[n_words]) {
+    dat_t<w> res;
+    for (int i = 0; i < n_words; i++)
+      res.values[i] = val[i];
+    return res;
+  }
   inline dat_t<w> (val_t val) {
     values[0] = val;
-    int sww = n_words;
-    for (int i = 1; i < sww; i++)
+    for (int i = 1; i < n_words; i++)
       values[i] = 0;
   }
   template <int sw>
@@ -1075,6 +1027,9 @@ class dat_t {
     dat_t<n> res = mask<n>(n);
     return res;
   }
+  val_t operator [] (size_t i) {
+      return values[i];
+  }
   dat_t<w> operator + ( dat_t<w> o ) {
     dat_t<w> res;
     bit_word_funs<n_words>::add(res.values, values, o.values, w);
@@ -1088,101 +1043,88 @@ class dat_t {
   dat_t<w> operator - ( ) {
     return ~(*this) + DAT<w>(1);
   }
-  dat_t<w+w> operator * ( dat_t<w> o ) {
-    dat_t<w+w> res;
-    bit_word_funs<n_words>::mul(res.values, values, o.values, w+w, w, w);
+  template <int w2>
+  dat_t<w+w2> operator * ( dat_t<w2> o ) {
+    dat_t<w+w2> res;
+    bit_word_funs<val_n_words(w+w2)>::mul(res.values, values, o.values, w, w2);
     return res;
   }
-  dat_t<w+w> fix_times_fix( dat_t<w> o ) {
-    // TODO: CLEANUP AND ADD DIFFERENT WIDTHS FOR EACH OPERAND
-    if (n_words == 1 && ((w + w) <= val_n_bits())) {
-      val_t res = (val_t)(((sval_t)(values[0])) * ((sval_t)(o.values[0])));
-      return DAT<w+w>(res & mask_val(w+w));
+  template <int w2>
+  dat_t<w+w2> fix_times_fix( dat_t<w2> o ) {
+    if (w+w2 <= val_n_bits()) {
+      sval_t a = sval_t(values[0] << (val_n_bits()-w)) >> (val_n_bits()-w);
+      sval_t b = sval_t(o.values[0] << (val_n_bits()-w2)) >> (val_n_bits()-w2);
+      return dat_t<w+w2>((a * b) & mask_val(w+w2));
     } else {
       val_t sgn_a = msb();
       dat_t<w> abs_a = sgn_a ? -(*this) : (*this);
       val_t sgn_b = o.msb();
-      dat_t<w> abs_b = sgn_b ? -o : o;
-      dat_t<w+w> res;
-      bit_word_funs<n_words>::mul(res.values, abs_a.values, abs_b.values, w+w, w, w);
+      dat_t<w2> abs_b = sgn_b ? -o : o;
+      dat_t<w+w2> res = abs_a * abs_b;
       return (sgn_a ^ sgn_b) ? -res : res;
     }
   }
   dat_t<w> operator / ( dat_t<w> o ) {
-    dat_t<w> res;
-    div_n(res.values, values, o.values, w, w, w);
+    dat_t<w> res(0);
+    if (o == 0) {
+      res.fill_bit(1);
+    } else if (n_words == 1) {
+      res.values[0] = values[0] / o.values[0];
+    } else {
+      dat_t<2*w> p = *this, d = o;
+      d = d << w;
+
+      for (int i = w-1; i >= 0; i--) {
+        p = p << 1;
+        if (p >= d) {
+          p = p - d;
+          res.values[i / val_n_bits()] |= val_t(1) << (i % val_n_bits());
+        }
+      }
+    }
     return res;
   }
   dat_t<w> operator % ( dat_t<w> o ) {
     return *this - *this / o * o;
   }
   dat_t<w+w> ufix_times_fix( dat_t<w> o ) {
-    // TODO: CLEANUP AND ADD DIFFERENT WIDTHS FOR EACH OPERAND
-    if (n_words == 1 && ((w + w) <= val_n_bits())) {
-      val_t res = (val_t)(values[0] * ((sval_t)(o.values[0])));
-      return DAT<w+w>(res & mask_val(w+w));
-    } else {
-      dat_t<w> abs_a = (*this);
-      val_t sgn_b = o.msb();
-      dat_t<w> abs_b = sgn_b ? -o : o;
-      dat_t<w+w> res;
-      bit_word_funs<n_words>::mul(res.values, abs_a.values, abs_b.values, w+w, w, w);
-      return sgn_b ? -res : res;
-    }
+    return o.fix_times_ufix(*this);
   }
-  dat_t<w+w> fix_times_ufix( dat_t<w> o ) {
-    // TODO: CLEANUP AND ADD DIFFERENT WIDTHS FOR EACH OPERAND
-    if (n_words == 1 && ((w + w) <= val_n_bits())) {
-      val_t res = (val_t)(((sval_t)(values[0])) * o.values[0]);
-      return DAT<w+w>(res & mask_val(w+w));
+  template<int w2>
+  dat_t<w+w2> fix_times_ufix( dat_t<w2> o ) {
+    if (w+w2 <= val_n_bits()) {
+      sval_t a = sval_t(values[0] << (val_n_bits()-w)) >> (val_n_bits()-w);
+      return dat_t<w+w2>((a * o.values[0]) & mask_val(w+w2));
     } else {
       val_t sgn_a = msb();
       dat_t<w> abs_a = sgn_a ? -(*this) : (*this);
-      dat_t<w> abs_b = o;
-      dat_t<w+w> res;
-      bit_word_funs<n_words>::mul(res.values, abs_a.values, abs_b.values, w+w, w, w);
+      dat_t<w+w2> res = abs_a * o;
       return sgn_a ? -res : res;
     }
   }
-  dat_t<1> operator < ( dat_t<w> o ) {
-    dat_t<1> res;
-    bit_word_funs<n_words>::ltu(res.values, values, o.values);
-    return res;
+  inline bool operator < ( dat_t<w> o ) {
+    return bit_word_funs<n_words>::ltu(values, o.values);
   }
-  dat_t<1> operator > ( dat_t<w> o ) {
-    dat_t<1> res;
-    bit_word_funs<n_words>::gtu(res.values, values, o.values);
-    return res;
+  inline bool operator <= ( dat_t<w> o ) {
+    return bit_word_funs<n_words>::lteu(values, o.values);
   }
-  dat_t<1> operator >= ( dat_t<w> o ) {
-    dat_t<1> res;
-    bit_word_funs<n_words>::gteu(res.values, values, o.values);
-    return res;
+  inline bool operator > ( dat_t<w> o ) {
+    return o < *this;
   }
-  dat_t<1> operator <= ( dat_t<w> o ) {
-    dat_t<1> res;
-    bit_word_funs<n_words>::lteu(res.values, values, o.values);
-    return res;
+  inline bool operator >= ( dat_t<w> o ) {
+    return o <= *this;
   }
-  inline dat_t<1> gt ( dat_t<w> o ) {
-    dat_t<1> res;
-    bit_word_funs<n_words>::gt(res.values, values, o.values, w);
-    return res;
+  inline bool lt ( dat_t<w> o ) {
+    return bit_word_funs<n_words>::lt(values, o.values, w);
   }
-  inline dat_t<1> gte ( dat_t<w> o ) {
-    dat_t<1> res;
-    bit_word_funs<n_words>::gte(res.values, values, o.values, w);
-    return res;
+  inline bool lte ( dat_t<w> o ) {
+    return bit_word_funs<n_words>::lte(values, o.values, w);
   }
-  inline dat_t<1> lt ( dat_t<w> o ) {
-    dat_t<1> res;
-    bit_word_funs<n_words>::lt(res.values, values, o.values, w);
-    return res;
+  inline bool gt ( dat_t<w> o ) {
+    return o.lt(*this);
   }
-  inline dat_t<1> lte ( dat_t<w> o ) {
-    dat_t<1> res;
-    bit_word_funs<n_words>::lte(res.values, values, o.values, w);
-    return res;
+  inline bool gte ( dat_t<w> o ) {
+    return o.lte(*this);
   }
   dat_t<w> operator ^ ( dat_t<w> o ) {
     dat_t<w> res;
@@ -1225,6 +1167,8 @@ class dat_t {
   dat_t<w> operator << ( int amount ) {
     dat_t<w> res;
     bit_word_funs<n_words>::lsh(res.values, values, amount);
+    if (val_n_word_bits(w))
+      res.values[n_words-1] &= mask_val(val_n_word_bits(w));
     return res;
   }
   inline dat_t<w> operator << ( dat_t<w> o ) {
@@ -1322,15 +1266,11 @@ class dat_t {
     bit_word_funs<n_words>::log2(res.values, values);
     return res;
   }
-  inline dat_t<1> bit(val_t b) {
-    int n_full_words = val_n_full_words(b);
-    int n_word_bits  = val_n_word_bits(b);
-    return DAT<1>((values[n_full_words] >> n_word_bits)&1);
+  inline val_t bit(val_t b) {
+    return (values[val_n_full_words(b)] >> val_n_word_bits(b)) & 1;
   }
   inline val_t msb() {
-    int n_full_words = val_n_full_words(w-1);
-    int n_word_bits  = val_n_word_bits(w-1);
-    return (values[n_full_words] >> n_word_bits)&1;
+    return values[n_words-1] >> val_n_word_bits(w-1);
   }
   template <int iw>
   inline dat_t<1> bit(dat_t<iw> b) {
@@ -1377,14 +1317,10 @@ static __inline__ int dat_to_str(char* s, val_t x, int base = 16, char pad = '0'
 
 template <int w>
 int fix_to_str(char* s, dat_t<w> x, int base = 16, char pad = '0') {
-  bool neg = x.bit(w-1).to_bool();
+  bool neg = x.msb();
   s[0] = neg;
   int len = dat_to_str<w>(s+1, neg ? -x : x, base, pad);
   return len+1;
-}
-
-static __inline__ int fix_to_str(char* s, val_t x, int base = 16, char pad = '0') {
-  return fix_to_str(s, dat_t<sizeof(val_t)*8>(x), base, pad);
 }
 
 static __inline__ int flo_digits(int m, int e) {
@@ -1548,6 +1484,8 @@ template <int w, int d>
 class mem_t {
  public:
   dat_t<w> contents[d];
+  val_t dummy_seed;
+  val_t* seedp;
 
   int width() {
     return w;
@@ -1561,13 +1499,16 @@ class mem_t {
     return get(idx.lo_word() & (nextpow2_1(d)-1));
   }
   dat_t<w> get (val_t idx) {
-    if (!ispow2(d) && idx >= d)
-      return dat_t<w>::rand();
+    if (!ispow2(d) && idx >= d) {
+      dat_t<w> res;
+      res.randomize(seedp);
+      return res;
+    }
     return contents[idx];
   }
   val_t get (val_t idx, int word) {
     if (!ispow2(d) && idx >= d)
-      return rand_val() & (word == val_n_words(w) && val_n_word_bits(w) ? mask_val(w) : -1L);
+      return __rand_val(seedp) & (word == val_n_words(w) && val_n_word_bits(w) ? mask_val(w) : -1L);
     return contents[idx].values[word];
   }
 
@@ -1594,12 +1535,15 @@ class mem_t {
     }
   }
   mem_t<w,d> () {
+    dummy_seed = 1;
+    seedp = &dummy_seed;
     for (int i = 0; i < d; i++)
       contents[i] = DAT<w>(0);
   }
-  void randomize() {
+  void randomize(val_t* seed) {
+    seedp = seed;
     for (int i = 0; i < d; i++)
-      contents[i].randomize();
+      contents[i].randomize(seed);
   }
   size_t read_hex(const char *hexFileName) {
     ifstream ifp(hexFileName);
@@ -1639,35 +1583,6 @@ static int  char_to_hex[] = {
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1 };
-
-#define TO_CSTR(d) (d.to_str().c_str())
-
-template <int w>
-void str_to_dat(std::string str, dat_t<w>& res) {
-  val_t word_accum = 0;
-  int digit_val, digit, w_index, bit;
-  for (digit = str.size()-1, w_index = 0, bit = 0; digit >= 0 && w_index < res.n_words; digit--) {
-    digit_val = char_to_hex[str[digit]];
-    if (digit_val >= 0) {
-      word_accum |= ((val_t)digit_val) << bit;
-      bit += 4;
-      if (bit == 64) {
-	res.values[w_index] = word_accum;
-	word_accum          = 0L;
-	bit                 = 0;
-	w_index++;
-      }
-    }
-  }
-  if (bit != 0) {
-    res.values[w_index] = word_accum;
-    ++w_index;
-  }
-  for( ; w_index < res.n_words; ++w_index ) {
-      res.values[w_index] = 0;
-  }
-  assert( res.n_words == w_index );
-}
 
 // dat_from_hex: Read a hex value from a std::string into a given dat_t variable.
 // Author: B. Richards, for parsing data formatted for Verilog $readmemh
@@ -1774,14 +1689,25 @@ template <int w, int d> mem_t<w,d> MEM( void );
 class mod_t {
  public:
 	mod_t():
-	  dumpfile(NULL)
+  dumpfile(NULL),
+    is_stale(false)
     {}
   std::vector< mod_t* > children;
-  virtual void init ( bool rand_init=false ) { };
+  virtual void init ( val_t rand_init=false ) { };
   virtual void clock_lo ( dat_t<1> reset ) { };
   virtual void clock_hi ( dat_t<1> reset ) { };
   virtual int  clock ( dat_t<1> reset ) { };
   virtual void setClocks ( std::vector< int >& periods ) { };
+
+  // Returns a clone of this object's circuit state (both registers and wires).
+  // Currently, it is undefined what happens to other state (like dumpfile and
+  // timestep), so use with care.
+  virtual mod_t* clone() = 0;
+  // Sets this module's circuit state (registers and wires) from the src mod_t.
+  // For mod_t subclasses, src must be the same class.
+  // Returns true on success, and false on failure. Currently, no guarantees
+  // are made about state consistency on failure,
+  virtual bool set_circuit_from(mod_t* src) = 0;
 
   virtual void print ( FILE* f ) { };
   virtual void dump ( FILE* f, int t ) { };
@@ -1801,12 +1727,26 @@ class mod_t {
     int delta = 0;
     dat_t<1> reset = LIT<1>(is_reset);
     for (int i = 0; i < n; i++) {
-      delta += clock(reset);
+      if (is_reset) {
+	clock_lo(reset);
+      }
       dump();
+      delta += clock(reset);
     }
     return delta;
   }
+
+  void mark_stale (void) {
+    is_stale = true;
+  }
+
+  void propagate_changes (void) {
+    if (is_stale) clock_lo(LIT<1>(false));
+    is_stale = false;
+  }
+
  protected:
+  bool is_stale;
   FILE* dumpfile;
 };
 

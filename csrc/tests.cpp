@@ -4,17 +4,21 @@
 
 template <int w> dat_t<w> LITS(const char* str) { 
   dat_t<w> dat;
-  str_to_dat<w>(str, dat);
+  assert(dat_from_str<w>(str, dat));
   return dat;
 }
 
 template <int w>
 void test (const char* name, dat_t<w> tst, dat_t<w> val) {
-  if ((tst == val).to_bool()) {
+  if (tst == val) {
     printf("%9s passed 0x%s\n", name, dat_to_str(val).c_str());
   } else {
     printf("%9s failed 0x%s != 0x%s\n", name, dat_to_str(tst).c_str(), dat_to_str(val).c_str());
   }
+}
+
+void test (const char* name, bool tst, dat_t<1> val) {
+  return test(name, dat_t<1>(tst), val);
 }
 
 int main (int argc, char* argv[]) {
@@ -26,19 +30,12 @@ int main (int argc, char* argv[]) {
 
   printf("N BITS %d\n", CeilLog<sizeof(val_t)*8>::v);
 
-  printf("1<<64 %llx %llx MSK(64) %llx\n", 1L<<64, (1L<<64)-1L, mask_val(64));
   test("ltu-1-0", LIT<2>(1) < LIT<2>(0), LIT<1>(0));
   test("ltu-1-1", LIT<2>(0) < LIT<2>(1), LIT<1>(1));
   test("ltu-1-2", LIT<2>(0) < LIT<2>(0), LIT<1>(0));
-  test("gtu-1-0", LIT<2>(1) > LIT<2>(0), LIT<1>(1));
-  test("gtu-1-1", LIT<2>(0) > LIT<2>(1), LIT<1>(0));
-  test("gtu-1-2", LIT<2>(0) > LIT<2>(0), LIT<1>(0));
   test("lteu-1-0", LIT<2>(1) <= LIT<2>(0), LIT<1>(0));
   test("lteu-1-1", LIT<2>(0) <= LIT<2>(1), LIT<1>(1));
   test("lteu-1-2", LIT<2>(0) <= LIT<2>(0), LIT<1>(1));
-  test("gteu-1-0", LIT<2>(1) >= LIT<2>(0), LIT<1>(1));
-  test("gteu-1-1", LIT<2>(0) >= LIT<2>(1), LIT<1>(0));
-  test("gteu-1-2", LIT<2>(0) >= LIT<2>(0), LIT<1>(1));
   
   test("eq-1-0",  LIT<2>(0) == LIT<2>(0), LIT<1>(1));
   test("eq-1-1",  LIT<2>(0) == LIT<2>(1), LIT<1>(0));
@@ -90,6 +87,8 @@ int main (int argc, char* argv[]) {
   test("add-2-2", (LIT<68>(1) << LIT<7>(64)) + (LIT<68>(1) << LIT<7>(39)), LITS<68>("0x10000008000000000"));
   test("mul-1-0", LITS<64>("0x1f800000020000") * LITS<64>("0x19b6d3007ba345"), LITS<128>("0x329fef68f6a04a380f7468a0000"));
   test("mul-1-1", LITS<64>("0xffffffff80000000") * LITS<64>("0xffffffffffff8000"), LITS<128>("0xffffffff7fff80000000400000000000"));
+  test("div-1-0", LITS<128>("0x329fef68f6a04a380f7468a0000") / LITS<64>("0x1f800000020000"), LITS<128>("0x19b6d3007ba345"));
+  test("div-1-1", LITS<128>("0x329fef68f6a04a380f7468a0000") / LITS<64>("0x19b6d3007ba345"), LITS<128>("0x1f800000020000"));
   test("neg-1-0", -LITS<16>("0x0001"), LITS<16>("0xffff"));
   test("neg-2-0", -LITS<32>("0x3fffc002"), LITS<32>("0xc0003ffe"));
   test("neg-2-1", - (LIT<68>(1) << LIT<7>(39)), LITS<68>("0xfffffff8000000000"));
@@ -118,15 +117,6 @@ int main (int argc, char* argv[]) {
   test("lt-n-0",  LITS<256>("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").lt (LIT<256>(1)), LIT<1>(1));
   test("lt-n-1",  LIT<256>( 1).lt (LITS<256>("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), LIT<1>(0));
   
-  test("gt-1-0",  LIT< 32>(0xffffffff).gt (LIT< 32>(1)), LIT<1>(0));
-  test("gt-1-1",  LIT< 32>( 1).gt (LIT< 32>(0xffffffff)), LIT<1>(1));
-  test("gt-2-0",  LITS< 80>("0xffffffffffffffffffff").gt (LIT< 80>(1)), LIT<1>(0));
-  test("gt-2-1",  LIT< 80>( 1).gt (LITS< 80>("0xffffffffffffffffffff")), LIT<1>(1));
-  test("gt-3-0",  LITS<140>("0xfffffffffffffffffffffffffffffffffff").gt (LIT<140>(1)), LIT<1>(0));
-  test("gt-3-1",  LIT<140>( 1).gt (LITS<140>("0xfffffffffffffffffffffffffffffffffff")), LIT<1>(1));
-  test("gt-n-0",  LITS<256>("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").gt (LIT<256>(1)), LIT<1>(0));
-  test("gt-n-1",  LIT<256>( 1).gt (LITS<256>("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), LIT<1>(1));
-  
   test("lte-1-0", LIT< 32>(0xffffffff).lte(LIT< 32>(1)), LIT<1>(1));
   test("lte-1-1", LIT< 32>( 1).lte(LIT< 32>(0xffffffff)), LIT<1>(0));
   test("lte-2-0", LITS< 80>("0xffffffffffffffffffff").lte(LIT< 80>(1)), LIT<1>(1));
@@ -135,15 +125,6 @@ int main (int argc, char* argv[]) {
   test("lte-3-1", LIT<140>( 1).lte(LITS<140>("0xfffffffffffffffffffffffffffffffffff")), LIT<1>(0));
   test("lte-n-0", LITS<256>("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").lte(LIT<256>(1)), LIT<1>(1));
   test("lte-n-1", LIT<256>( 1).lte(LITS<256>("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), LIT<1>(0));
-  
-  test("gte-1-0", LIT< 32>(0xffffffff).gte(LIT< 32>(1)), LIT<1>(0));
-  test("gte-1-1", LIT< 32>( 1).gte(LIT< 32>(0xffffffff)), LIT<1>(1));
-  test("gte-2-0", LITS< 80>("0xffffffffffffffffffff").gte(LIT< 80>(1)), LIT<1>(0));
-  test("gte-2-1", LIT< 80>( 1).gte(LITS< 80>("0xffffffffffffffffffff")), LIT<1>(1));
-  test("gte-3-0", LITS<140>("0xfffffffffffffffffffffffffffffffffff").gte(LIT<140>(1)), LIT<1>(0));
-  test("gte-3-1", LIT<140>( 1).gte(LITS<140>("0xfffffffffffffffffffffffffffffffffff")), LIT<1>(1));
-  test("gte-n-0", LITS<256>("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").gte(LIT<256>(1)), LIT<1>(0));
-  test("gte-n-1", LIT<256>( 1).gte(LITS<256>("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), LIT<1>(1));
   
   test("rsha-1-0", LIT<2>(1).rsha(LIT<1>(1)), LIT<2>(0));
   test("rsha-1-1", LIT<3>(6).rsha(LIT<2>(2)), LIT<3>(7));

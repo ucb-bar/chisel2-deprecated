@@ -38,10 +38,20 @@ object log2Up
   def apply(in: Int): Int = if(in == 1) 1 else ceil(log(in)/log(2)).toInt
 }
 
+object log2Ceil
+{
+  def apply(in: Int): Int = ceil(log(in)/log(2)).toInt
+}
+
 
 object log2Down
 {
   def apply(x : Int): Int = if (x == 1) 1 else floor(log(x)/log(2.0)).toInt
+}
+
+object log2Floor
+{
+  def apply(x : Int): Int = floor(log(x)/log(2.0)).toInt
 }
 
 
@@ -73,11 +83,11 @@ object LFSR16
   */
 object PopCount
 {
-  def apply(in: Seq[Bool]): UInt = {
+  def apply(in: Iterable[Bool]): UInt = {
     if (in.size == 0) {
       UInt(0)
     } else if (in.size == 1) {
-      in(0)
+      in.head
     } else {
       apply(in.slice(0, in.size/2)) + Cat(UInt(0), apply(in.slice(in.size/2, in.size)))
     }
@@ -89,10 +99,9 @@ object PopCount
 */
 object Reverse
 {
-  def doit(in: UInt, base: Int, length: Int): UInt =
-  {
+  private def doit(in: UInt, length: Int): UInt = {
     if (length == 1) {
-      in(base)
+      in
     } else if (isPow2(length) && length >= 8 && length <= 64) {
       // Do it in logarithmic time to speed up C++.  Neutral for real HW.
       var res = in
@@ -106,10 +115,10 @@ object Reverse
       res
     } else {
       val half = (1 << log2Up(length))/2
-      Cat(doit(in, base, half), doit(in, base + half, length - half))
+      Cat(doit(in(half-1,0), half), doit(in(length-1,half), length-half))
     }
   }
-  def apply(in: UInt): UInt = doit(in, 0, in.getWidth)
+  def apply(in: UInt): UInt = doit(in, in.getWidth)
 }
 
 
@@ -133,8 +142,14 @@ object ShiftRegister
 {
   def apply[T <: Data](in: T, n: Int, en: Bool = Bool(true)): T =
   {
-    if (n == 1) RegEnable(in, en)
-    else RegNext(apply(in, n-1, en))
+    // The order of tests reflects the expected use cases.
+    if (n == 1) {
+      RegEnable(in, en)
+    } else if (n != 0) {
+      RegNext(apply(in, n-1, en))
+    } else {
+      in
+    }
   }
 }
 
@@ -144,7 +159,7 @@ object UIntToOH
 {
   def apply(in: UInt, width: Int = -1): UInt =
     if (width == -1) UInt(1) << in
-    else UInt(1) << in(log2Up(width)-1,0)
+    else (UInt(1) << in(log2Up(width)-1,0))(width-1,0)
 }
 
 /** Builds a Mux tree out of the input signal vector using a one hot encoded
@@ -165,38 +180,15 @@ object Mux1H
   }
   def apply[T <: Data](sel: Bits, in: Iterable[T]): T =
     apply((0 until in.size).map(sel(_)), in)
+  def apply(sel: Bits, in: Bits): Bool = (sel & in).orR
 }
-
-/** Does the inverse of UIntToOH.
-  */
-object OHToUInt
-{
-  def apply(in: Seq[Bool]): UInt = {
-    if (in.size <= 1) return UInt(0)
-    if (in.size == 2) return in(1)
-    if (!isPow2(in.size)) return apply(in.padTo(1 << log2Up(in.size), Bool(false)))
-    val hi = in.slice(in.size/2, in.size)
-    val lo = in.slice(0, in.size/2)
-    Cat(hi.reduceLeft((s1, s2) => {s1 || s2}),
-      apply(hi zip lo map { case (x, y) => (x || y) }))
-  }
-  def apply(in: Bits): UInt = apply((0 until in.getWidth).map(in(_)))
-}
-
 
 class ValidIO[+T <: Data](gen: T) extends Bundle
 {
   val valid = Bool(OUTPUT)
   val bits = gen.clone.asOutput
   def fire(dummy: Int = 0): Bool = valid
-  override def clone: this.type =
-    try {
-      super.clone()
-    } catch {
-      case e: java.lang.Exception => {
-        new ValidIO(gen).asInstanceOf[this.type]
-      }
-    }
+  override def clone: this.type = new ValidIO(gen).asInstanceOf[this.type]
 }
 
 /** Adds a valid protocol to any interface. The standard used is
@@ -206,20 +198,13 @@ object Valid {
   def apply[T <: Data](gen: T): ValidIO[T] = new ValidIO(gen)
 }
 
-class DecoupledIO[T <: Data](gen: T) extends Bundle
+class DecoupledIO[+T <: Data](gen: T) extends Bundle
 {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
   val bits  = gen.clone.asOutput
   def fire(dummy: Int = 0): Bool = ready && valid
-  override def clone: this.type =
-    try {
-      super.clone()
-    } catch {
-      case e: java.lang.Exception => {
-        new DecoupledIO(gen).asInstanceOf[this.type]
-      }
-    }
+  override def clone: this.type = new DecoupledIO(gen).asInstanceOf[this.type]
 }
 
 /** Adds a ready-valid handshaking protocol to any interface.
@@ -271,13 +256,14 @@ object ArbiterCtrl
 
 abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends Module {
   require(isPow2(count))
+  def grant: Seq[Bool]
   val io = new ArbiterIO(gen, n)
   val locked  = if(count > 1) Reg(init=Bool(false)) else Bool(false)
   val lockIdx = if(count > 1) Reg(init=UInt(n-1)) else UInt(n-1)
-  val grant = List.fill(n)(Bool())
   val chosen = UInt(width = log2Up(n))
 
-  (0 until n).map(i => io.in(i).ready := Mux(locked, lockIdx === UInt(i), grant(i)) && io.out.ready)
+  for ((g, i) <- grant.zipWithIndex)
+    io.in(i).ready := Mux(locked, lockIdx === UInt(i), g) && io.out.ready
   io.out.valid := io.in(chosen).valid
   io.out.bits := io.in(chosen).bits
   io.chosen := chosen
@@ -301,9 +287,11 @@ abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLo
 }
 
 class LockingRRArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
-  val last_grant = Reg(init=UInt(0, log2Up(n)))
-  val ctrl = ArbiterCtrl((0 until n).map(i => io.in(i).valid && UInt(i) > last_grant) ++ io.in.map(_.valid))
-  (0 until n).map(i => grant(i) := ctrl(i) && UInt(i) > last_grant || ctrl(i + n))
+  lazy val last_grant = Reg(init=UInt(0, log2Up(n)))
+  override def grant: Seq[Bool] = {
+    val ctrl = ArbiterCtrl((0 until n).map(i => io.in(i).valid && UInt(i) > last_grant) ++ io.in.map(_.valid))
+    (0 until n).map(i => ctrl(i) && UInt(i) > last_grant || ctrl(i + n))
+  }
 
   var choose = UInt(n-1)
   for (i <- n-2 to 0 by -1)
@@ -316,8 +304,7 @@ class LockingRRArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[
 }
 
 class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
-  val ctrl = ArbiterCtrl(io.in.map(_.valid))
-  grant zip ctrl map { case(g, c) => g := c }
+  def grant: Seq[Bool] = ArbiterCtrl(io.in.map(_.valid))
 
   var choose = UInt(n-1)
   for (i <- n-2 to 0 by -1) {
@@ -351,25 +338,30 @@ class Arbiter[T <: Data](gen: T, n: Int) extends LockingArbiter[T](gen, n, 1)
 
 object FillInterleaved
 {
-  def apply(n: Int, in: Bits): UInt =
-  {
-    var out = Fill(n, in(0))
-    for (i <- 1 until in.getWidth)
-      out = Cat(Fill(n, in(i)), out)
-    out
+  def apply(n: Int, in: Bits): UInt = apply(n, in.toBools)
+  def apply(n: Int, in: Seq[Bool]): UInt = Vec(in.map(Fill(n, _))).toBits
+}
+
+class Counter(val n: Int) {
+  val value = if (n == 1) UInt(0) else Reg(init=UInt(0, log2Up(n)))
+  def inc(): Bool = {
+    if (n == 1) Bool(true)
+    else {
+      val wrap = value === UInt(n-1)
+      value := Mux(Bool(!isPow2(n)) && wrap, UInt(0), value + UInt(1))
+      wrap
+    }
   }
 }
 
-
 object Counter
 {
+  def apply(n: Int): Counter = new Counter(n)
   def apply(cond: Bool, n: Int): (UInt, Bool) = {
-    val c = Reg(init=UInt(0, log2Up(n)))
-    val wrap = c === UInt(n-1)
-    when (cond) {
-      c := Mux(Bool(!isPow2(n)) && wrap, UInt(0), c + UInt(1))
-    }
-    (c, wrap && cond)
+    val c = new Counter(n)
+    var wrap: Bool = null
+    when (cond) { wrap = c.inc() }
+    (c.value, cond && wrap)
   }
 }
 
@@ -384,40 +376,39 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
 {
   val io = new QueueIO(gen, entries)
 
-  val do_flow = Bool()
+  val ram = Mem(gen, entries)
+  val enq_ptr = Counter(entries)
+  val deq_ptr = Counter(entries)
+  val maybe_full = Reg(init=Bool(false))
+
+  val ptr_match = enq_ptr.value === deq_ptr.value
+  val empty = ptr_match && !maybe_full
+  val full = ptr_match && maybe_full
+  val maybe_flow = Bool(flow) && empty
+  val do_flow = maybe_flow && io.deq.ready
+
   val do_enq = io.enq.ready && io.enq.valid && !do_flow
   val do_deq = io.deq.ready && io.deq.valid && !do_flow
-
-  var enq_ptr = UInt(0)
-  var deq_ptr = UInt(0)
-
-  if (entries > 1) {
-    enq_ptr = Counter(do_enq, entries)._1
-    deq_ptr = Counter(do_deq, entries)._1
+  when (do_enq) {
+    ram(enq_ptr.value) := io.enq.bits
+    enq_ptr.inc()
   }
-
-  val maybe_full = Reg(init=Bool(false))
+  when (do_deq) {
+    deq_ptr.inc()
+  }
   when (do_enq != do_deq) {
     maybe_full := do_enq
   }
 
-  val ram = Mem(gen, entries)
-  when (do_enq) { ram(enq_ptr) := io.enq.bits }
-
-  val ptr_match = enq_ptr === deq_ptr
-  val empty = ptr_match && !maybe_full
-  val full = ptr_match && maybe_full
-  val maybe_flow = Bool(flow) && empty
-  do_flow := maybe_flow && io.deq.ready
-  io.deq.valid :=  !empty || Bool(flow) && io.enq.valid
+  io.deq.valid := !empty || Bool(flow) && io.enq.valid
   io.enq.ready := !full || Bool(pipe) && io.deq.ready
-  io.deq.bits := Mux(maybe_flow, io.enq.bits, ram(deq_ptr))
+  io.deq.bits := Mux(maybe_flow, io.enq.bits, ram(deq_ptr.value))
 
-  val ptr_diff = enq_ptr - deq_ptr
+  val ptr_diff = enq_ptr.value - deq_ptr.value
   if (isPow2(entries)) {
     io.count := Cat(maybe_full && ptr_match, ptr_diff)
   } else {
-    io.count := Mux(ptr_match, Mux(maybe_full, UInt(entries), UInt(0)), Mux(deq_ptr > enq_ptr, UInt(entries) + ptr_diff, ptr_diff))
+    io.count := Mux(ptr_match, Mux(maybe_full, UInt(entries), UInt(0)), Mux(deq_ptr.value > enq_ptr.value, UInt(entries) + ptr_diff, ptr_diff))
   }
 }
 
@@ -495,30 +486,6 @@ class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) e
   io.deq.bits := mem(rptr_bin(asize-1,0))
 }
 
-object Log2 {
-  def apply (mod: Bits, n: Int): UInt = {
-    def log2it() = {
-      val log2 = new Log2()
-      log2.init("", fixWidth(sizeof(n-1)), mod)
-      UInt().fromNode(log2)
-    }
-    Module.backend match {
-      case x: CppBackend => log2it
-      case x: FloBackend => log2it
-      case _ => {
-        var res = UInt(0);
-        for (i <- 1 until n)
-          res = Mux(mod(i), UInt(i, sizeof(n-1)), res);
-        res
-      }
-    }
-  }
-}
-
-class Log2 extends Node {
-  override def toString: String = "LOG2(" + inputs(0) + ")";
-}
-
 class Pipe[T <: Data](gen: T, latency: Int = 1) extends Module
 {
   val io = new Bundle {
@@ -575,15 +542,6 @@ object PriorityMux
   def apply[T <: Bits](sel: Bits, in: Iterable[T]): T = apply((0 until in.size).map(sel(_)), in)
 }
 
-/** Returns the bit position of the trailing 1 in the input vector
-  with the assumption that multiple bits of the input bit vector can be set
-  */
-object PriorityEncoder
-{
-  def apply(in: Iterable[Bool]): UInt = PriorityMux(in, (0 until in.size).map(UInt(_)))
-  def apply(in: Bits): UInt = apply((0 until in.getWidth).map(in(_)))
-}
-
 /** Returns a bit vector in which only the least-significant 1 bit in
   the input vector, if any, is set.
   */
@@ -599,5 +557,3 @@ object PriorityEncoderOH
   }
   def apply(in: Bits): UInt = encode((0 until in.getWidth).map(i => in(i)))
 }
-
-

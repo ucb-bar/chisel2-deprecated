@@ -45,6 +45,7 @@ object Bool {
 }
 
 class Bool extends UInt {
+  protected[Chisel] var canBeUsedAsDefault: Boolean = false
 
   /** Factory method to create and assign a *Bool* type to a Node *n*.
     */
@@ -56,36 +57,32 @@ class Bool extends UInt {
     Bool(x > 0).asInstanceOf[this.type]
   }
 
-  def :=(src: Bool): Unit = {
-    if(comp != null) {
-      comp procAssign src;
-    } else {
-      this procAssign src;
-    }
-  }
-
-  def := (src: Bits): Unit = {
-    if(src.getWidth > 1) {
-      throw new Exception("multi bit signal " + src + " converted to Bool");
-    }
-    if(src.getWidth == -1) {
-      throw new Exception("unable to automatically convert " + src + " to Bool, convert manually instead");
-    }
-    this := src(0) // We only have one bit in *src*.
-  }
-
-  def && (b: Bool): Bool = if (b.isTrue) this else if (this.isTrue) b else BinaryBoolOp(this, b, "&&");
-  def || (b: Bool): Bool = BinaryBoolOp(this, b, "||");
-
-  def isTrue: Boolean = {
-    if(inputs.length == 0) {
-      false
-    } else {
-      inputs(0) match {
-        case l: Literal => {l.isLit && l.value == 1};
-        case any        => false;
+  override protected def colonEquals(src: Bits): Unit = src match {
+    case _: Bool => super.colonEquals(src(0))
+    case _ => {
+      val gotWidth = src.getWidth()
+      if (gotWidth < 1) {
+        throw new Exception("unable to automatically convert " + src + " to Bool, convert manually instead");
+      } else if (gotWidth > 1) {
+        throw new Exception("multi bit signal " + src + " converted to Bool");
       }
+      super.colonEquals(src(0)) // We only have one bit in *src*.
     }
   }
 
+  def && (b: Bool): Bool =
+    if (this.isLit) { if (isTrue) b else Bool(false) }
+    else if (b.isLit) b && this
+    else if (this._isComplementOf(b)) Bool(false)
+    else newBinaryOp(b, "&")
+
+  def || (b: Bool): Bool =
+    if (this.isLit) { if (isTrue) Bool(true) else b }
+    else if (b.isLit) b || this
+    else if (this._isComplementOf(b)) Bool(true)
+    else newBinaryOp(b, "|")
+
+  override def unary_!(): Bool = this ^ Bool(true)
+
+  def isTrue: Boolean = litValue() == 1
 }

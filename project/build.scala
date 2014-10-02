@@ -5,10 +5,10 @@ object BuildSettings extends Build {
 
   val buildSettings = Defaults.defaultSettings ++ Seq (
     organization := "edu.berkeley.cs",
-    // version := "2.2.7",
+    // version := "2.2.18",
     version := "2.3-SNAPSHOT",
     name := "chisel",
-    scalaVersion := "2.10.3",
+    scalaVersion := "2.10.2",
     //sourceDirectory := new File("@srcTop@"),
     publishMavenStyle := true,
     publishArtifact in Test := false,
@@ -54,6 +54,7 @@ object BuildSettings extends Build {
 
     libraryDependencies += "com.novocode" % "junit-interface" % "0.10" % "test",
     libraryDependencies += "org.scalatest" %% "scalatest" % "1.9.2" % "test",
+    libraryDependencies += "org.scala-lang" % "scala-reflect" % "2.10.2",
 
     // Execute tests in the current project serially.
     // Tests from other projects may still run concurrently.

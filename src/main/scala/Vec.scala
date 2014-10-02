@@ -39,21 +39,6 @@ import scala.math._
 import Vec._
 import Node._
 
-object VecUIntToOH
-{
-  def apply(in: UInt, width: Int): UInt =
-  {
-    if(Module.chiselOneHotMap.contains((in, width))) {
-      Module.chiselOneHotMap((in, width))
-    } else {
-      val out = UInt(1, width)
-      val res = (out << in)(width-1,0)
-      Module.chiselOneHotMap += ((in, width) -> res)
-      res
-    }
-  }
-}
-
 object VecMux {
   def apply(addr: UInt, elts: Seq[Data]): Data = {
     def doit(elts: Seq[Data], pos: Int): Data = {
@@ -74,7 +59,7 @@ object Vec {
     */
   def apply[T <: Data](elts: Iterable[T]): Vec[T] = {
     val res =
-      if (!elts.isEmpty && elts.forall(_.isLit)) new ROM[T](elts.toIndexedSeq)
+      if (!elts.isEmpty && elts.forall(_.isLit)) ROM(elts)
       else new Vec[T](i => elts.head.clone)
     res.self ++= elts
     res
@@ -95,17 +80,6 @@ object Vec {
     Vec.tabulate(n){ i => gen }
   }
 
-  def getEnable(onehot: UInt, i: Int): Bool = {
-    var enable: Bool = null
-      if(Module.chiselOneHotBitMap.contains(onehot, i)){
-        enable = Module.chiselOneHotBitMap(onehot, i)
-      } else {
-        enable = onehot(i)
-        Module.chiselOneHotBitMap += ((onehot, i) -> enable)
-      }
-    enable
-  }
-
   /** Returns an array containing values of a given function over
     a range of integer values starting from 0.
     */
@@ -117,25 +91,12 @@ object Vec {
 
 }
 
-class VecProc extends proc {
-  var addr: UInt = null
-  var elms: ArrayBuffer[Bits] = null
-
-  override def genMuxes(default: Node) {}
-
-  def procAssign(src: Node) {
-    val onehot = VecUIntToOH(addr, elms.length)
-    Module.searchAndMap = true
-    for(i <- 0 until elms.length){
-      when (getEnable(onehot, i)) {
-        if(elms(i).comp != null) {
-          elms(i).comp procAssign src
-        } else {
-          elms(i) procAssign src
-        }
-      }
+class VecProc(enables: Iterable[Bool], elms: Iterable[Data]) extends proc {
+  override def procAssign(src: Node): Unit = {
+    for ((en, elm) <- enables zip elms) when (en) {
+      if(elm.comp != null) elm.comp procAssign src
+      else elm.asInstanceOf[Bits] procAssign src
     }
-    Module.searchAndMap = false
   }
 }
 
@@ -143,7 +104,6 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
   val self = new ArrayBuffer[T]
   val readPortCache = new HashMap[UInt, T]
   var sortedElementsCache: ArrayBuffer[ArrayBuffer[Data]] = null
-  var flattenedVec: Node = null
 
   override def apply(idx: Int): T = self(idx)
 
@@ -170,35 +130,23 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
   def apply(ind: UInt): T =
     read(ind)
 
-  def write(addr: UInt, data: T) {
-    if(data.isInstanceOf[Node]){
-
-      val onehot = VecUIntToOH(addr, length)
-      Module.searchAndMap = true
-      for(i <- 0 until length){
-        when (getEnable(onehot, i)) {
-          this(i).comp procAssign data.toNode
-        }
-      }
-      Module.searchAndMap = false
-    }
-  }
+  def write(addr: UInt, data: T): Unit =
+    this(addr) := data
 
   def read(addr: UInt): T = {
     if(readPortCache.contains(addr)) {
       return readPortCache(addr)
     }
 
+    val iaddr = UInt(width = log2Up(length))
+    iaddr assign addr
+    val enables = (UInt(1) << iaddr).toBools
     val res = this(0).clone
-    val iaddr = UInt(width=log2Up(length))
-    iaddr.inputs += addr
     for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
       io assign VecMux(iaddr, sortedElm)
 
       // setup the comp for writes
-      val io_comp = new VecProc()
-      io_comp.addr = iaddr
-      io_comp.elms = sortedElm.asInstanceOf[ArrayBuffer[Bits]] // XXX ?
+      val io_comp = new VecProc(enables, sortedElm)
       io.comp = io_comp
     }
     readPortCache += (addr -> res)
@@ -208,7 +156,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
 
   override def flatten: Array[(String, Bits)] = {
     val res = new ArrayBuffer[(String, Bits)]
-    for (elm <- self)
+    for (elm <- self.reverse)
       res ++= elm.flatten
     res.toArray
   }
@@ -232,60 +180,41 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
       b <> e;
   }
 
-  def :=[T <: Data](src: Iterable[T]): Unit = {
+  override protected def colonEquals[T <: Data](that: Iterable[T]): Unit = {
+    if (comp != null) {
+      comp procAssign Vec(that)
+    } else {
+      def unidirectional[U <: Data](who: Iterable[(String, Bits)]) =
+        who.forall(_._2.dir == who.head._2.dir)
 
-    // Check matching size
-    assert(this.size == src.size, {
-      ChiselError.error("Can't wire together Vecs of mismatched lengths")
-    })
-
-    // Check LHS to make sure unidirection
-    val dirLHS = this.flatten(0)._2.dir
-    this.flatten.map(x => {assert(x._2.dir == dirLHS, {
-      ChiselError.error("Cannot mix directions on left hand side of :=")
-    })
-    })
-
-    // Check RHS to make sure unidirection
-    val dirRHS = src.head.flatten(0)._2.dir
-    for (elm <- src) {
-      elm.flatten.map(x => {assert(x._2.dir == dirRHS, {
-        ChiselError.error("Cannot mix directions on right hand side of :=")
+      assert(this.size == that.size, {
+        ChiselError.error("Can't wire together Vecs of mismatched lengths")
       })
-      })
-    }
 
-    for((me, other) <- this zip src){
-      me match {
-        case bundle: Bundle =>
-          bundle := other.asInstanceOf[Bundle]
-        case v: Vec[_] =>
-          v := other.asInstanceOf[Vec[Data]]
-        case _ =>
-          me := other
-      }
+      assert(unidirectional(this.flatten), {
+        ChiselError.error("Cannot mix directions on left hand side of :=")
+      })
+
+      assert(unidirectional(that.flatMap(_.flatten)), {
+        ChiselError.error("Cannot mix directions on left hand side of :=")
+      })
+
+      for ((me, other) <- this zip that)
+        me := other
     }
   }
 
-  def := (src: UInt) {
-    for(i <- 0 until length)
-      this(i) := src(i)
+  override protected def colonEquals(that: Bits): Unit = {
+    for (i <- 0 until length)
+      this(i) := that(i)
   }
+
+  // We need this special := because Iterable[T] is not a Data.
+  def :=[T <: Data](that: Iterable[T]): Unit = colonEquals(that)
 
   override def removeTypeNodes() {
     for(bundle <- self)
       bundle.removeTypeNodes
-  }
-
-  override def traceableNodes: Array[Node] = self.toArray
-
-  override def traceNode(c: Module, stack: Stack[() => Any]) {
-    val ins = this.flatten.map(_._2)
-      
-    for(i <- ins) {
-      stack.push(() => i.traceNode(c, stack))
-    }
-    stack.push(() => super.traceNode(c, stack))
   }
 
   override def flip(): this.type = {
@@ -317,49 +246,9 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
     }
   }
 
-  override def setPseudoName (path: String, isNamingIo: Boolean) {
-    if (pName == "" || (path != "" && pName != path)) {
-      val prevPrefix = if (pName != "") pName + "_" else ""
-      pName = path
-      val prefix = if (pName != "") pName + "_" else ""
-      for ((elm, i) <- self.zipWithIndex) {
-        val prevElmPrefix = prevPrefix + i
-        val suffix = 
-          if (elm.name startsWith prevElmPrefix) 
-            elm.name substring prevElmPrefix.length
-          else
-            elm.name
-        elm setPseudoName (prefix + i + suffix, isNamingIo)
-      }
-    }
-  }
-
   override def clone(): this.type =
     Vec.tabulate(size)(gen).asInstanceOf[this.type]
     //Vec(this: Seq[T]).asInstanceOf[this.type]
-
-  override def toNode: Node = {
-    if(flattenedVec == null){
-      val nodes = Vec(this.reverse).flatten.map{case(n, i) => i}
-      flattenedVec = Concatenate(nodes.head, nodes.tail.toList: _*)
-    }
-    flattenedVec
-  }
-
-  override def fromNode(n: Node): this.type = {
-    val res = this.clone
-    var ind = 0
-    for ((name, io) <- res.flatten) {
-      io.asOutput();
-      if(io.width > 1) {
-        io assign NodeExtract(n, ind + io.width-1, ind)
-      } else {
-        io assign NodeExtract(n, ind);
-      }
-      ind += io.width;
-    }
-    res
-  }
 
   override def asDirectionless(): this.type = {
     self.foreach(_.asDirectionless)
@@ -384,8 +273,13 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
 
   def length: Int = self.size
 
-  override val hashCode: Int = System.identityHashCode(this)
+  override val hashCode: Int = _id
   override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
+  
+  // Don't return 0 for getwidth - #247
+  // Return the sum of our constituent widths.
+  override def getWidth(): Int = self.map(_.getWidth).foldLeft(0)(_ + _)
+
 }
 
 trait VecLike[T <: Data] extends collection.IndexedSeq[T] {

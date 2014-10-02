@@ -2,17 +2,13 @@ module DelaySuite_RegNoInitUpdate_1(input clk,
     output[31:0] io_out
 );
 
-  reg[31:0] res;
+  reg [31:0] res;
   wire[31:0] T0;
 
 `ifndef SYNTHESIS
   integer initvar;
   initial begin
-    #0.001;
-`ifdef RANDOM_SEED
-    initvar = $random(`RANDOM_SEED);
-`endif
-    #0.001;
+    #0.002;
     res = {1{$random}};
   end
 `endif

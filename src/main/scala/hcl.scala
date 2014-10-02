@@ -29,61 +29,7 @@
 */
 
 package Chisel
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.Stack
-import scala.collection.mutable.{Queue=>ScalaQueue}
-import Literal._
-import Node._
 import ChiselError._
-
-object when {
-  def execWhen(cond: Bool)(block: => Unit) {
-    Module.current.whenConds.push(Module.current.whenCond && cond)
-    block
-    Module.current.whenConds.pop()
-  }
-  def apply(cond: Bool)(block: => Unit): when = {
-    execWhen(cond){ block }
-    new when(cond);
-  }
-}
-
-class when (prevCond: Bool) {
-  def elsewhen (cond: Bool)(block: => Unit): when = {
-    when.execWhen(!prevCond && cond){ block }
-    new when(prevCond || cond);
-  }
-  def otherwise (block: => Unit) {
-    val cond = !prevCond
-    if (!Module.current.hasWhenCond) cond.canBeUsedAsDefault = true
-    when.execWhen(cond){ block }
-  }
-}
-
-object unless {
-  def apply(c: Bool)(block: => Unit) {
-    when (!c) { block }
-  }
-}
-
-object switch {
-  def apply(c: Bits)(block: => Unit) {
-    Module.current.switchKeys.push(c)
-    block
-    Module.current.switchKeys.pop()
-  }
-}
-object is {
-  def apply(v: Bits)(block: => Unit): Unit =
-    apply(Seq(v))(block)
-  def apply(v: Bits, vr: Bits*)(block: => Unit): Unit =
-    apply(v :: vr.toList)(block)
-  def apply(v: Iterable[Bits])(block: => Unit): Unit = {
-    val keys = Module.current.switchKeys
-    if (keys.isEmpty) ChiselError.error("The 'is' keyword may not be used outside of a switch.")
-    else if (!v.isEmpty) when (v.map(_ === keys.top).reduce(_||_)) { block }
-  }
-}
 
 class TestIO(val format: String, val args: Seq[Data] = null)
 
@@ -101,7 +47,7 @@ object Printer {
   the constructor of a sub class of Module which is passed as a parameter.
   That execution tree is simplified by aggregating all calls which are not
   constructors of a Module instance into the parent which is.
-  The simplified tree (encoded through _Module.children_) forms the basis
+  The simplified tree (encoded through _Driver.children_) forms the basis
   of the generated verilog. Each node in the simplified execution tree is
   a _Module_ instance from which a verilog module is textually derived.
   As an optimization, _Backend_ classes output modules which are
@@ -109,144 +55,25 @@ object Printer {
   _moduleName_ accordingly.
 */
 object chiselMain {
-  def readArgs(args: Array[String]) {
-    var i = 0;
-    while (i < args.length) {
-      val arg = args(i);
-      arg match {
-        case "--Wall" => {
-          Module.saveWidthWarnings = true
-          Module.saveConnectionWarnings = true
-          Module.saveComponentTrace = true
-          Module.isCheckingPorts = true
-        }
-        case "--wi" => Module.warnInputs = true
-        case "--wo" => Module.warnOutputs = true
-        case "--wio" => {Module.warnInputs = true; Module.warnOutputs = true}
-        case "--Wwidth" => Module.saveWidthWarnings = true
-        case "--Wconnection" => Module.saveConnectionWarnings = true
-        case "--Wcomponent" => Module.saveComponentTrace = true
-        case "--noCombLoop" => Module.dontFindCombLoop = true
-        case "--genHarness" => Module.isGenHarness = true;
-        case "--debug" => Module.isDebug = true;
-        case "--cse" => Module.isCSE = true
-        case "--ioDebug" => Module.isIoDebug = true;
-        case "--noIoDebug" => Module.isIoDebug = false;
-        case "--clockGatingUpdates" => Module.isClockGatingUpdates = true;
-        case "--clockGatingUpdatesInline" => Module.isClockGatingUpdatesInline = true;
-        case "--vcd" => Module.isVCD = true;
-        case "--v" => Module.backend = new VerilogBackend
-        case "--moduleNamePrefix" => Backend.moduleNamePrefix = args(i + 1); i += 1
-        case "--inlineMem" => Module.isInlineMem = true;
-        case "--noInlineMem" => Module.isInlineMem = false;
-        case "--backend" => {
-          if (args(i + 1) == "v") {
-            Module.backend = new VerilogBackend
-          } else if (args(i + 1) == "c") {
-            Module.backend = new CppBackend
-          } else if (args(i + 1) == "flo") {
-            Module.backend = new FloBackend
-          } else if (args(i + 1) == "dot") {
-            Module.backend = new DotBackend
-          } else if (args(i + 1) == "fpga") {
-            Module.backend = new FPGABackend
-          } else if (args(i + 1) == "counterc") {
-            Module.backend = new CounterCppBackend
-          } else if (args(i + 1) == "counterv") {
-            Module.backend = new CounterVBackend
-          } else if (args(i + 1) == "counterfpga") {
-            Module.backend = new CounterFPGABackend
-          } else if (args(i + 1) == "counterw") {
-            Module.backend = new CounterWBackend
-          } else {
-            Module.backend = Class.forName(args(i + 1)).newInstance.asInstanceOf[Backend]
-          }
-          i += 1
-        }
-        case "--compile" => Module.isCompiling = true
-        case "--test" => Module.isTesting = true;
-        case "--targetDir" => Module.targetDir = args(i + 1); i += 1;
-        case "--include" => Module.includeArgs = Module.splitArg(args(i + 1)); i += 1;
-        case "--checkPorts" => Module.isCheckingPorts = true
-        case "--prune" => Module.isPruning = true
-        // Counter backend flags
-        case "--backannotation" => Module.isBackannotating = true
-        case "--model" => Module.model = args(i + 1) ; i += 1
-        //Jackhammer Flags
-        //case "--jEnable" => Module.jackEnable = true
-        case "--jackDump" => Module.jackDump = args(i+1); i+=1; //mode of dump (i.e. space.prm, design.prm etc)
-        case "--jackDir"  => Module.jackDir = args(i+1); i+=1;  //location of dump or load
-        case "--jackLoad" => Module.jackLoad = args(i+1); i+=1; //design.prm file
-        case "--dumpTestInput" => Module.dumpTestInput = true;
-        case "--testerSeed" => {
-          Module.testerSeedValid = true
-          Module.testerSeed = args(i+1).toInt
-          i += 1
-        }
-        case "--emitTempNodes" => {
-            Module.isDebug = true
-            Module.emitTempNodes = true
-        }
-        //case "--jDesign" =>  Module.jackDesign = args(i+1); i+=1;
-	// Dreamer configuration flags
-	case "--numRows" => {
-          if (Module.backend.isInstanceOf[FloBackend]) {
-	    Module.backend.asInstanceOf[FloBackend].DreamerConfiguration.numRows = args(i+1).toInt
-          }
-          i += 1
-        }
-	case "--numCols" => {
-          if (Module.backend.isInstanceOf[FloBackend]) {
-	    Module.backend.asInstanceOf[FloBackend].DreamerConfiguration.numCols = args(i+1).toInt
-          }
-          i += 1
-        }
-        case any => ChiselError.warning("'" + arg + "' is an unknown argument.");
-      }
-      i += 1;
-    }
-  }
+  def apply[T <: Module](args: Array[String], gen: () => T): T =
+    Driver(args, gen)
 
-  def run[T <: Module] (args: Array[String], gen: () => T): T = apply(args, () => Module(gen())) // hack to avoid supplying default parameters and invoke Module.apply manually for invocation in sbt
+  def apply[T <: Module](args: Array[String], gen: () => T, ftester: T => Tester[T]): T =
+    Driver(args, gen, ftester)
 
-  def apply[T <: Module]
-      (args: Array[String], gen: () => T, ftester: T => Tester[T] = null): T = {
-    Module.initChisel();
-    readArgs(args)
-    try {
-      /* JACK - If loading design, read design.prm file*/
-      if (Module.jackLoad != null) { Jackhammer.load(Module.jackDir, Module.jackLoad) }
-      val c = gen();
+  // Assumes gen needs to be wrapped in Module()
+  def run[T <: Module] (args: Array[String], gen: () => T): T =
+    Driver(args, gen, false)
 
-      Module.backend.initBackannotation
-
-      /* JACK - If dumping design, dump to jackDir with jackNumber points*/
-      if (Module.jackDump != null) { 
-        Jackhammer.dump(Module.jackDir, Module.jackDump) 
-      } else {
-        Module.backend.elaborate(c)
-      }
-      if (Module.isCheckingPorts) Module.backend.checkPorts(c)
-      if (Module.isCompiling && Module.isGenHarness) Module.backend.compile(c)
-      if (ftester != null && !Module.backend.isInstanceOf[VerilogBackend]) {
-        var res = false
-        var tester: Tester[T] = null
-        try {
-          tester = ftester(c)
-        } finally {
-          if (tester != null && tester.process != null) 
-            res = tester.finish()
-        }
-        println(if (res) "PASSED" else "*** FAILED ***")
-        if(!res) throwException("Module under test FAILED at least one test vector.")
-      }
-      c
-    } finally {
-      ChiselError.report()
-    }
-  }
+  def run[T <: Module] (args: Array[String], gen: () => T, ftester: T => Tester[T]): T =
+    Driver(args, gen, ftester, false)
 }
 
+//Is this antiquated?
+object chiselMainTest {
+  def apply[T <: Module](args: Array[String], gen: () => T)(tester: T => Tester[T]): T =
+    chiselMain(args, gen, tester)
+}
 
 class ChiselException(message: String, cause: Throwable) extends Exception(message, cause)
 
@@ -258,38 +85,50 @@ object throwException {
   }
 }
 
-object chiselMainTest {
-  def apply[T <: Module](args: Array[String], gen: () => T)(tester: T => Tester[T]): T =
-    chiselMain(args, gen, tester)
-}
 
 trait proc extends Node {
-  val muxes = new collection.mutable.HashMap[(Bool, Node), Node]
-  val updates = new collection.mutable.ListBuffer[(Bool, Node)]
-  def genMuxes(default: Node, others: Seq[(Bool, Node)]): Unit = {
-    val update = others.foldLeft(default)((v, u) => Multiplex(u._1, u._2, v))
-    if (inputs.isEmpty) inputs += update else inputs(0) = update
+  protected var procAssigned = false
+
+  protected[Chisel] def verifyMuxes: Unit = {
+    if (!defaultRequired && (inputs.length == 0 || inputs(0) == null))
+      ChiselError.error({"NO UPDATES ON " + this}, this.line)
+    if (defaultRequired && defaultMissing)
+      ChiselError.error({"NO DEFAULT SPECIFIED FOR WIRE: " + this + " in component " + this.component.getClass}, this.line)
   }
-  def genMuxes(default: Node): Unit = {
-    if (updates.length != 0) {
-      val (topCond, topValue) = updates.head
-      val (lastCond, lastValue) = updates.last
-      if (default != null)
-        genMuxes(default, updates)
-      else if (topCond.isTrue)
-        genMuxes(topValue, updates.toList.tail)
-      else if (lastCond.canBeUsedAsDefault)
-        genMuxes(lastValue, updates)
-      else
-        ChiselError.error({"NO DEFAULT SPECIFIED FOR WIRE: " + this + " in component " + this.component.getClass}, this.line)
+
+  protected[Chisel] def doProcAssign(src: Node, cond: Bool): Unit = {
+    if (cond.canBeUsedAsDefault && defaultMissing) {
+      setDefault(src)
+    } else if (procAssigned) {
+      inputs(0) = Multiplex(cond, src, inputs(0))
+    } else if (cond.litValue() != 0) {
+      procAssigned = true
+      val mux = Multiplex(cond, src, default)
+      if (inputs.isEmpty) inputs += mux
+      else { require(inputs(0) == default); inputs(0) = mux }
     }
   }
-  def verifyMuxes: Unit = {
-    if (updates.length == 0 && (inputs.length == 0 || inputs(0) == null))
-      ChiselError.error({"NO UPDATES ON " + this}, this.line)
+
+  protected[Chisel] def procAssign(src: Node): Unit =
+    doProcAssign(src, Module.current.whenCond)
+
+  protected[Chisel] def muxes: Seq[Mux] = {
+    def traverse(x: Node): List[Mux] = x match {
+      case m: Mux => m :: (if (m.inputs(2) eq default) Nil else traverse(m.inputs(2)))
+      case _ => Nil
+    }
+    traverse(inputs(0))
   }
-  def procAssign(src: Node): Unit
-  Module.procs += this;
+
+  protected[Chisel] def next: Node = {
+    val node = getNode
+    if (node.inputs.isEmpty) null else node.inputs(0)
+  }
+  protected def default = if (defaultRequired) null else this
+  protected def defaultRequired: Boolean = false
+  protected def defaultMissing: Boolean =
+    procAssigned && inputs(0).isInstanceOf[Mux] && (muxes.last.inputs(2) eq default)
+  protected def setDefault(src: Node): Unit = muxes.last.inputs(2) = src
 }
 
 trait nameable {
@@ -297,11 +136,10 @@ trait nameable {
   /** _named_ is used to indicates name was set explicitely
    and should not be overriden by a _nameIt_ generator. */
   var named = false
-  var pName = ""
 }
 
 abstract class BlackBox extends Module {
-  Module.blackboxes += this
+  Driver.blackboxes += this
 
   def setVerilogParameters(string: String) {
     this.asInstanceOf[Module].verilog_parameters = string;
@@ -314,6 +152,8 @@ abstract class BlackBox extends Module {
 
 
 class Delay extends Node {
-  override def isReg: Boolean = true;
+  override def isReg: Boolean = true
+  def assignReset(rst: => Bool): Boolean = false
+  def assignClock(clk: Clock): Unit = { clock = clk }
 }
 

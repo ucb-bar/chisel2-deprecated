@@ -7,6 +7,7 @@
 #include <string>
 #include <sstream>
 #include <map>
+#include <cassert>
 
 /**
  * Converts an integer to a std::string without needing additional libraries
@@ -56,6 +57,13 @@ static void val_set(val_t* dst, val_t nb, val_t num) {
 template <int w>
 bool dat_from_str(std::string in, dat_t<w>& res, int pos = 0) {
     int radix = 10;
+    int negate = 0;
+
+    /* Handle leading minus sign. */
+    if (!in.substr(pos, 1).compare("-")) {
+        pos++;
+        negate = 1;
+    }
 
     if (!in.substr(pos, 1).compare("d")) {
         radix = 10;
@@ -76,13 +84,11 @@ bool dat_from_str(std::string in, dat_t<w>& res, int pos = 0) {
         pos += 2;
     }
 
-    val_t radix_val = radix;
-    val_t temp_prod[val_n_words(w)];
-    val_t curr_base[val_n_words(w)];
-    val_t temp_alias[val_n_words(w)];
-    val_t *dest_val = res.values;
-    val_set(curr_base, w, 1);
-    val_empty(dest_val, w);
+    const int log_max_radix = 4;
+    assert(radix <= (1 << log_max_radix));
+
+    dat_t<w> curr_base = 1;
+    res = 0;
 
     for (int rpos=in.length()-1; rpos>=pos; rpos--) {
         char c = in[rpos];
@@ -97,8 +103,7 @@ bool dat_from_str(std::string in, dat_t<w>& res, int pos = 0) {
         } else if (c >= 'A' && c <= 'Z') {
             c_val = c - 'A' + 10;
         } else {
-            std::cerr << "dat_from_str: Invalid character '" << c << "'" <<
-            		std::endl;
+            std::cerr << "dat_from_str: Invalid character '" << c << "' in '" << in << "'" << std::endl;
             return false;
         }
         if (c_val > radix /* || c_val < 0 */) {
@@ -107,11 +112,12 @@ bool dat_from_str(std::string in, dat_t<w>& res, int pos = 0) {
             return false;
         }
 
-        mul_n(temp_prod, curr_base, &c_val, w, w, val_n_bits());
-        val_cpy(temp_alias, dest_val, w);   // copy to prevent aliasing on add
-        add_n(dest_val, temp_alias, temp_prod, val_n_words(w), w);
-        val_cpy(temp_alias, curr_base, w);
-        mul_n(curr_base, temp_alias, &radix_val, w, w, val_n_bits());
+        dat_t<w> temp_prod = curr_base * dat_t<log_max_radix>(c_val);
+        res = res + temp_prod;
+        curr_base = curr_base * dat_t<log_max_radix+1>(radix);
+    }
+    if (negate) {
+        res = -res;
     }
     return true;
 }
@@ -125,10 +131,10 @@ public:
 	{}
 	// returns the fully qualified name of this object (path + dot + name)
 	std::string get_pathname() {
-		if (path.empty()) {
+		if (*path == '\0') {
 			return name;
 		} else {
-			return path + "." + name;
+			return get_path() + "." + name;
 		}
 	}
 	// returns the short name of this object
@@ -140,8 +146,8 @@ public:
 		return path;
 	}
 protected:
-	std::string name;
-	std::string path;
+	const char* name;
+	const char* path;
 };
 
 // API base (non width templated) class for API accessors to dat_t
@@ -334,6 +340,11 @@ public:
 		return true;
 	}
 
+	// Evaluates an API command, returning the reply as a string (without
+	// the trailing newline).
+	// Errors return "error", printing a more detailed description to stderr.
+	// TODO: find a way to pass errors in-line, so transport layers other than
+	// stdin/stdout (like TCP/IP) are possible while also communicating errors.
 	std::string eval_command(string command) {
 		std::vector<std::string> tokens = tokenize(command);
 		if (tokens.size() == 0) {
@@ -342,44 +353,63 @@ public:
 		}
 		if (tokens[0] == "get_host_name") {
 			// IN:  get_host_name
-			// OUT: API host's name
+			// OUT: API host's name (arbitrary string)
 			if (!check_command_length(tokens, 0, 0)) { return "error"; }
 			return get_host_name();
 		} else if (tokens[0] == "get_api_version") {
+			// BETA FUNCTION: semantics subject to change, use with caution
 			// IN:  get_api_version
 			// OUT: API version supported by this host
 			if (!check_command_length(tokens, 0, 0)) { return "error"; }
 			return get_api_version();
 		} else if (tokens[0] == "get_api_support") {
+			// BETA FUNCTION: semantics subject to change, use with caution
 			// IN:  get_api_support
 			// OUT: list of supported API features
 			if (!check_command_length(tokens, 0, 0)) { return "error"; }
 			return get_api_support();
 		} else if (tokens[0] == "clock") {
+			// BETA FUNCTION: semantics subject to change, use with caution
 			// IN:  clock <num_cycles>
 			// OUT: actual number of cycles stepped
 			if (!check_command_length(tokens, 1, 1)) { return "error"; }
 			int cycles = atoi(tokens[1].c_str());
+		    module->propagate_changes();
 		    for (int i=0; i<cycles; i++) {
-		    	module->clock_lo(dat_t<1>(0));
-		    	module->clock_hi(dat_t<1>(0));
-			module->dump();
+		    	module->clock(dat_t<1>(0));
 		    }
-		    module->clock_lo(dat_t<1>(0));
 		    return itos(cycles);
+		} else if (tokens[0] == "tick") {
+			// BETA FUNCTION: semantics subject to change, use with caution
+			// IN:  tick
+			// OUT: ok (on success)
+			// Update registers without propagation
+			// updating registers.
+		    module->clock_hi(dat_t<1>(0));
+		    return "ok";
+		} else if (tokens[0] == "propagate") {
+			// BETA FUNCTION: semantics subject to change, use with caution
+			// IN:  propagate
+			// OUT: ok (on success)
+			// This function propagates the combinational logic, without
+			// updating registers.
+			module->propagate_changes();
+			return "ok";
 		} else if (tokens[0] == "step") {
 			// IN:  step <num_cycles>
 			// OUT: actual number of cycles stepped
 			if (!check_command_length(tokens, 1, 1)) { return "error"; }
 			int n = atoi(tokens[1].c_str());
-		    int ret = module->step(false, n);
-		    return itos(ret);
+			module->propagate_changes();
+			int ret = module->step(false, n);
+			return itos(ret);
 		} else if (tokens[0] == "set_clocks") {
+			// BETA FUNCTION: semantics subject to change, use with caution
 			// IN:  set_clocks
 			// OUT: ???
 			// I'm not really sure what this is supposed to do, but it was
 			// in the old command API, so it's here now
-	        std::vector< int > periods;
+		  std::vector< int > periods;
 	        for (int i = 1; i < tokens.size(); i++) {
 	          int period = atoi(tokens[i].c_str());
 	          periods.push_back(period);
@@ -401,18 +431,20 @@ public:
 		    }
 		    module->clock_lo(dat_t<1>(0));
 		    return itos(cycles);
-
 		} else if (tokens[0] == "peek") {
+			// LEGACY FUNCTION: do not use in new code
 			// IN:  peek <node_name> | peek <mem_name> <mem_index>
 			// OUT: value
 			if (!check_command_length(tokens, 1, 2)) { return "error"; }
 			cerr << "peek is deprecated, use wire_peek or mem_peek" << std::endl;
+			module->propagate_changes();
 			if (tokens.size() == 2) {
 				return get_dat_by_name(tokens[1])->get_value();
 			} else if (tokens.size() == 3) {
 				return get_mem_by_name(tokens[1])->get_element(tokens[2]);
 			}
 		} else if (tokens[0] == "poke") {
+			// LEGACY FUNCTION: do not use in new code
 			// IN:  poke <node_name> <value> | poke <mem_name> <mem_index> <value>
 			// OUT: true (on success), false (on failure)
 			if (!check_command_length(tokens, 2, 3)) { return ""; }
@@ -423,37 +455,74 @@ public:
 			} else if (tokens.size() == 4) {
 				success = get_mem_by_name(tokens[1])->set_element(tokens[2], tokens[3]);
 			}
-			return success ? "true" : "false";
-
+			std::string result;
+			if (success) {
+			  result = "true";
+			  module->mark_stale();
+			} else {
+			  result = "false";
+			}
+			return result;
 		} else if (tokens[0] == "wire_peek") {
 			// IN:  wire_peek <node_name>
 			// OUT: value
 			if (!check_command_length(tokens, 1, 1)) { return "error"; }
+			module->propagate_changes();
 			return get_dat_by_name(tokens[1])->get_value();
 		} else if (tokens[0] == "wire_poke") {
 			// IN:  wire_poke <node_name> <value>
-			// OUT: true (on success), false (on failure)
+			// OUT: ok (on success)
 			if (!check_command_length(tokens, 2, 2)) { return "error"; }
 			bool success = get_dat_by_name(tokens[1])->set_value(tokens[2]);
-			return success ? "true" : "false";
+			std::string result;
+			if (success) {
+			  result = "ok";
+			  module->mark_stale();
+			} else {
+			  result = "error";
+			}
+			return result;
 		} else if (tokens[0] == "mem_peek") {
 			// IN:  mem_peek <mem_name> <mem_index>
 			// OUT: value
 			if (!check_command_length(tokens, 2, 2)) { return "error"; }
+			module->propagate_changes();
 			return get_mem_by_name(tokens[1])->get_element(tokens[2]);
 		} else if (tokens[0] == "mem_poke") {
 			// IN:  mem_poke <mem_name> <mem_index> <value>
-			// OUT: true (on success), false (on failure)
+			// OUT: ok (on success)
 			if (!check_command_length(tokens, 3, 3)) { return "error"; }
 			bool success = get_mem_by_name(tokens[1])->set_element(tokens[2], tokens[3]);
-			return success ? "true" : "false";
-
+			std::string result;
+			if (success) {
+			  result = "ok";
+			  module->mark_stale();
+			} else {
+			  result = "error";
+			}
+			return result;
+			return success ? "ok" : "error";
+		} else if (tokens[0] == "trace") {
+			// IN:  trace n <node_name>+
+			// OUT: values
+                        // TODO: ADD MEM PEEK SUPPORT
+                        stringstream ss;
+			if (!check_command_length(tokens, 2)) { return "bad"; }
+			int n = atoi(tokens[1].c_str());
+                        for (int t = 0; t < n; t++) {
+                          for (int i = 2; i < tokens.size(); i++) 
+                            ss << " " << get_dat_by_name(tokens[i])->get_value();
+                          int ret = module->step(false, 1);
+                          // if (!ret)
+                          //   return "error";
+                        }
+                        return ss.str();
 		} else if (tokens[0] == "list_wires") {
 			// IN:  list_wires
 			// OUT: list of wires
 			if (!check_command_length(tokens, 0, 0)) { return "error"; }
 			std::string out = "";
-			for (std::map<string, dat_api_base*>::iterator it = dat_table.begin(); it != dat_table.end(); it++) {
+			for (std::map<const char*, dat_api_base*>::iterator it = dat_table.begin(); it != dat_table.end(); it++) {
 				out = out + it->second->get_pathname() + " ";
 			}
 			if (out.size() >= 1) {
@@ -461,13 +530,12 @@ public:
 			} else {
 				return "";
 			}
-
 		} else if (tokens[0] == "list_mems") {
 			// IN:  list_mems
 			// OUT: list of memories
 			if (!check_command_length(tokens, 0, 0)) { return "error"; }
 			std::string out = "";
-			for (std::map<string, mem_api_base*>::iterator it = mem_table.begin(); it != mem_table.end(); it++) {
+			for (std::map<const char*, mem_api_base*>::iterator it = mem_table.begin(); it != mem_table.end(); it++) {
 				out = out + it->second->get_pathname() + " ";
 			}
 			if (out.size() >= 1) {
@@ -475,7 +543,6 @@ public:
 			} else {
 				return "";
 			}
-
 		} else if (tokens[0] == "wire_width") {
 			// IN:  wire_width <node>
 			// OUT: bitwidth of wire
@@ -491,7 +558,35 @@ public:
 			// OUT: elements in memory
 			if (!check_command_length(tokens, 1, 1)) { return "error"; }
 			return get_mem_by_name(tokens[1])->get_depth();
-
+		} else if (tokens[0] == "referenced_snapshot_save") {
+			// BETA FUNCTION: semantics subject to change, use with caution
+			// IN:  referenced_snapshot_save <name>
+			// OUT: Reference name (an arbitrary string) for saved snapshot
+			//      of current state, should be equivalent to the input.
+			// Caution: the state may not be self-consistent (i.e. clk_lo
+			// does not need to have been applied before this, and calls to
+			// clk_lo immediately after restoring may change the state).
+			if (!check_command_length(tokens, 1, 1)) { return "error"; }
+			module->propagate_changes();
+			mod_t *snapshot = module->clone();
+			snapshot_table[tokens[1]] = snapshot;
+			return tokens[1];
+		} else if (tokens[0] == "referenced_snapshot_restore") {
+			// BETA FUNCTION: semantics subject to change, use with caution
+			// IN:  referenced_snapshot_restore <name>
+			// OUT: ok (on success)
+			if (!check_command_length(tokens, 1, 1)) { return "error"; }
+			mod_t *snapshot = get_snapshot_by_reference(tokens[1]);
+			if (snapshot == NULL) {	return "error";	}
+			bool success = module->set_circuit_from(snapshot);
+			std::string result;
+			if (success) {
+			  result = "ok";
+			  module->mark_stale();
+			} else {
+			  result = "error";
+			}
+			return result;
 		} else {
 			std::cerr << "Unknown command: '" << tokens[0] << "'" << std::endl;
 		}
@@ -522,26 +617,47 @@ protected:
 	virtual void init_mapping_table() = 0;
 
 	dat_api_base* get_dat_by_name(std::string name) {
-		if (dat_table.find(name) != dat_table.end()) {
-			return dat_table[name];
+		if (dat_table.find(name.c_str()) != dat_table.end()) {
+			return dat_table[name.c_str()];
 		} else {
 			std::cerr << "Unable to find dat '" << name << "'" << std::endl;
 			return &this_dat_dummy;
 		}
 	}
 	mem_api_base* get_mem_by_name(std::string name) {
-		if (mem_table.find(name) != mem_table.end()) {
-			return mem_table[name];
+		if (mem_table.find(name.c_str()) != mem_table.end()) {
+			return mem_table[name.c_str()];
 		} else {
 			std::cerr << "Unable to find mem '" << name << "'" << std::endl;
 			return &this_mem_dummy;
 		}
 	}
 
-	std::map<string, dat_api_base*> dat_table;
-	std::map<string, mem_api_base*> mem_table;
+	mod_t* get_snapshot_by_reference(std::string name) {
+		if (snapshot_table.find(name) != snapshot_table.end()) {
+			return snapshot_table[name];
+		} else {
+			std::cerr << "Unable to find snapshot reference '" << name << "'" << std::endl;
+			return NULL;
+		}
+	}
+
+	class string_comparator {
+	public:
+		bool operator()(const char* x, const char* y) const {
+			return strcmp(x, y) < 0;
+		}
+	};
+
+	std::map<const char*, dat_api_base*, string_comparator> dat_table;
+	std::map<const char*, mem_api_base*, string_comparator> mem_table;
+	// TODO: replace the dummy with explicit NULL checks - this is simple
+	// but a bit inelegant
 	dat_dummy this_dat_dummy;
 	mem_dummy this_mem_dummy;
+
+	// Snapshot functions
+	std::map<std::string, mod_t*> snapshot_table;
 };
 
 #endif

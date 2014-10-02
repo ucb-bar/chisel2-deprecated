@@ -1,0 +1,26 @@
+digraph ZeroWidthTest_CounterComp_1{
+rankdir = LR;
+  io_wrap[label="io_wrap:Bool"];
+  wrap[label="&"];
+  T0[label="==(_, 0x4)"];
+  count[shape=square,label="count:RegReset(_, 0x0)"];
+  T1[label="Mux(_, 0x0, _)"];
+  T2[label="Mux"];
+  T3[label="Mux(_, 0x0, _)"];
+  T4[label="+(_, 0x1)"];
+  io_in[label="io_in:Bool"];
+  io_out[label="io_out:UInt"];
+  wrap -> io_wrap[label="1"];
+  io_in -> wrap[label="1"];
+  T0 -> wrap[label="1"];
+  count -> T0[label="3"];
+  T1 -> count[label="3"];
+  T2 -> T1[label="3"];
+  io_in -> T2[label="1"];
+  T3 -> T2[label="3"];
+  count -> T2[label="3"];
+  T0 -> T3[label="1"];
+  T4 -> T3[label="3"];
+  count -> T4[label="3"];
+  count -> io_out[label="3"];
+}

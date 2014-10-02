@@ -80,7 +80,7 @@ class ConnectSuite extends TestSuite {
     }
     class SuppliesResetsTests(m: SuppliesResetsParent) extends Tester(m) {
       List(true,false,false,false,false,false).zip(
-      List(true,true, true, false,false,false)).map {
+      List(true, true, false,false,false,false)).map {
         case (i, o) =>
           poke(m.io.in,    int(i))
           step(1)
@@ -137,7 +137,7 @@ class ConnectSuite extends TestSuite {
       (0 until 4).map { i =>
         poke(m.io.in, i)
         step(1)
-        expect(m.io.out, if(i == 0) 0 else i-1)
+        expect(m.io.out, if(i == 0) 0 else i)
       }
     }
     launchCppTester((m: LogicBtwInstances) => new LogicBtwInstancesTests(m))
@@ -209,7 +209,7 @@ class ConnectSuite extends TestSuite {
     class RegisterHookTests(m: A) extends Tester(m) {
       List(1,     2,     4,     6,     8,     12,    15,   15).zip(
       List(false, true,  true,  false, true,  false, true, false)).zip(
-      List((0,0), (0,0), (0,2), (1,0), (1,0), (2,0), (2,0), (3,3), (3,3))).map { 
+      List((0,0), (0,2), (1,0), (1,0), (2,0), (2,0), (3,3), (3,3))).map { 
         case ((in, en), (im0, im1)) =>
           poke(m.io.wdata, in)
           poke(m.io.wen,   int(en))
@@ -250,6 +250,49 @@ class ConnectSuite extends TestSuite {
       case _ : Throwable => ;
     }
     assertTrue(!ChiselError.ChiselErrors.isEmpty);
+  }
+
+  @Test def testVecInput() {
+    class VecInput extends Module {
+      val io = new Bundle {
+        val in = Vec.fill(2){ UInt(INPUT, 8) }
+        val out0 = UInt(OUTPUT, 8)
+        val out1 = UInt(OUTPUT, 8)
+      }
+      io.out0 := io.in(0)
+      io.out1 := io.in(1)
+    }
+
+    class VecInputTests(c: VecInput) extends Tester(c) {
+      poke(c.io.in, Array[BigInt](0, 1))
+      step(1)
+      expect(c.io.out0, 0)
+      expect(c.io.out1, 1)
+    }
+
+    launchCppTester((m: VecInput) => new VecInputTests(m))
+  }
+
+  @Test def testVecOutput() {
+    class VecOutput extends Module {
+      val io = new Bundle {
+        val in0 = UInt(INPUT, 8)
+        val in1 = UInt(INPUT, 8)
+        val out = Vec.fill(2){ UInt(OUTPUT, 8) }
+      }
+
+      io.out(0) := io.in0
+      io.out(1) := io.in1
+    }
+
+    class VecOutputTests(c: VecOutput) extends Tester(c) {
+      poke(c.io.in0, 0)
+      poke(c.io.in1, 1)
+      step(1)
+      expect(c.io.out, Array[BigInt](0, 1))
+    }
+
+    launchCppTester((m: VecOutput) => new VecOutputTests(m))
   }
 
 }

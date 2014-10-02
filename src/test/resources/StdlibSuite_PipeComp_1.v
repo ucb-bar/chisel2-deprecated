@@ -5,38 +5,50 @@ module StdlibSuite_PipeComp_1(input clk, input reset,
     output[7:0] io_deq_bits
 );
 
-  reg[7:0] R0;
-  reg[0:0] R1;
-  reg[7:0] R2;
-  reg[0:0] R3;
+  reg [7:0] R0;
+  wire[7:0] T1;
+  reg [7:0] R2;
+  wire[7:0] T3;
+  reg  R4;
+  wire T6;
+  reg  R5;
+  wire T7;
 
 `ifndef SYNTHESIS
   integer initvar;
   initial begin
-    #0.001;
-`ifdef RANDOM_SEED
-    initvar = $random(`RANDOM_SEED);
-`endif
-    #0.001;
+    #0.002;
     R0 = {1{$random}};
-    R1 = {1{$random}};
     R2 = {1{$random}};
-    R3 = {1{$random}};
+    R4 = {1{$random}};
+    R5 = {1{$random}};
   end
 `endif
 
   assign io_deq_bits = R0;
-  assign io_deq_valid = R3;
+  assign T1 = R4 ? R2 : R0;
+  assign T3 = io_enq_valid ? io_enq_bits : R2;
+  assign T6 = reset ? 1'h0 : io_enq_valid;
+  assign io_deq_valid = R5;
+  assign T7 = reset ? 1'h0 : R4;
 
   always @(posedge clk) begin
-    if(R1) begin
+    if(R4) begin
       R0 <= R2;
     end
-    R1 <= reset ? 1'h0 : io_enq_valid;
     if(io_enq_valid) begin
       R2 <= io_enq_bits;
     end
-    R3 <= reset ? 1'h0 : R1;
+    if(reset) begin
+      R4 <= 1'h0;
+    end else begin
+      R4 <= io_enq_valid;
+    end
+    if(reset) begin
+      R5 <= 1'h0;
+    end else begin
+      R5 <= R4;
+    end
   end
 endmodule
 

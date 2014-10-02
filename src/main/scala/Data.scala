@@ -46,6 +46,9 @@ abstract trait Num[T <: Data] {
   def <= (b: T): Bool;
   def >  (b: T): Bool;
   def >= (b: T): Bool;
+
+  def min(b: T): T = Mux(this < b, this.asInstanceOf[T], b)
+  def max(b: T): T = Mux(this < b, b, this.asInstanceOf[T])
 }
 
 /** *Data* is part of the *Node* Composite Pattern class hierarchy.
@@ -65,14 +68,12 @@ abstract class Data extends Node {
       + " and " + right.getClass)
   }
 
-  def toBits(): UInt = chiselCast(this){UInt()};
-
   def toBool(): Bool = {
-    if(this.getWidth > 1) {
-      throw new Exception("multi bit signal " + this + " converted to Bool");
-    }
-    if(this.getWidth == -1) {
+    val gotWidth = this.getWidth()
+    if( gotWidth < 1) {
       throw new Exception("unable to automatically convert " + this + " to Bool, convert manually instead")
+    } else if(gotWidth > 1) {
+      throw new Exception("multi bit signal " + this + " converted to Bool");
     }
     chiselCast(this){Bool()};
   }
@@ -90,7 +91,7 @@ abstract class Data extends Node {
   }
 
   def apply(name: String): Data = null
-  def flatten: Array[(String, Bits)] = Array[(String, Bits)]();
+  def flatten: Array[(String, Bits)]
   def terminate(): Unit = { }
   def flip(): this.type = this;
   def asInput(): this.type = this;
@@ -103,30 +104,62 @@ abstract class Data extends Node {
   def asDirectionless(): this.type
   def isDirectionless: Boolean = true;
 
-  def toNode: Node = this;
-
   /** Factory method to create and assign a leaf-type instance out of a subclass
     of *Node* instance which we have lost the concrete type. */
-  def fromNode(n: Node): this.type;
-  def fromBits(b: Bits): this.type = {
-    val n = fromNode(b)
-    n.setIsTypeNode
-    n
+  def fromNode(n: Node): this.type = {
+    val res = this.clone
+    val packet = res.flatten.reverse.zip(this.flatten.reverse.map(_._2.getWidth))
+    var ind = 0
+    for (((name, io), gotWidth) <- packet) {
+      io.asOutput()
+      val assignWidth = if (gotWidth > 0) ind + gotWidth - 1 else -1
+      io assign NodeExtract(n, assignWidth, ind)
+      ind += (if (gotWidth > 0) gotWidth else 0)
+    }
+    res.setIsTypeNode
+    res
   }
 
-  def :=[T <: Data](data: T): Unit = {
-    if(this.getClass != data.getClass) {
-      ChiselError.error(":= not defined on " + this.getClass
-        + " and " + data.getClass);
-    }
-    comp procAssign data;
+  def fromBits(b: Bits): this.type = this.fromNode(b)
+
+  override lazy val toNode: Node = {
+    val nodes = this.flatten.map(_._2)
+    Concatenate(nodes.head, nodes.tail:_*)
   }
+
+  def :=(that: Data): Unit = that match {
+    case b: Bits => this colonEquals b
+    case b: Bundle => this colonEquals b
+    case b: Vec[_] => this colonEquals b
+    case _ => illegalAssignment(that)
+  }
+
+  protected def colonEquals(that: Bits): Unit = illegalAssignment(that)
+  protected def colonEquals(that: Bundle): Unit = illegalAssignment(that)
+  protected def colonEquals[T <: Data](that: Iterable[T]): Unit = illegalAssignment(that)
+
+  protected def illegalAssignment(that: Any): Unit =
+    ChiselError.error(":= not defined on " + this.getClass + " and " + that.getClass)
 
   override def clone(): this.type = {
     try {
       val constructor = this.getClass.getConstructors.head
-      val res = constructor.newInstance(Array.fill(constructor.getParameterTypes.size)(null):_*)
-      res.asInstanceOf[this.type]
+      
+      if(constructor.getParameterTypes.size == 0) {
+        constructor.newInstance().asInstanceOf[this.type]
+      } else if(constructor.getParameterTypes.size == 1) {
+        val paramtype = constructor.getParameterTypes.head
+        // If only 1 arg and is a Bundle or Module then this is probably the implicit argument
+        //    added by scalac for nested classes and closures. Thus, try faking the constructor
+        //    by not supplying said class or closure (pass null).
+        // CONSIDER: Don't try to create this
+        if(classOf[Bundle].isAssignableFrom(paramtype) || classOf[Module].isAssignableFrom(paramtype)){
+          constructor.newInstance(null).asInstanceOf[this.type]
+        } else throw new Exception("Cannot auto-create constructor for ${this.getClass.getName} that requires arguments")
+      } else {
+       throw new Exception(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments")
+      }
+
     } catch {
       case npe: java.lang.reflect.InvocationTargetException if npe.getCause.isInstanceOf[java.lang.NullPointerException] =>
         throwException("Parameterized Bundle " + this.getClass + " needs clone method. You are probably using an anonymous Bundle object that captures external state and hence is un-cloneable", npe)
@@ -143,17 +176,5 @@ abstract class Data extends Node {
     }
   }
 
-  def setWidth(w: Int) {
-    this.width = w;
-  }
-}
-
-abstract class Aggregate extends Data {
-  override def setPseudoName(path: String, isNamingIo: Boolean) {
-    if (isTypeNode && comp != null) {
-      comp setPseudoName (path, isNamingIo)
-    } else {
-      super.setPseudoName(path, isNamingIo)
-    }
-  }
+  val params = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
 }

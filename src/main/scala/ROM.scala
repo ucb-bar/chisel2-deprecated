@@ -31,44 +31,62 @@
 package Chisel
 import ChiselError._
 import Node._
+import scala.collection.SortedMap
 
-class ROM[T <: Data](elts: IndexedSeq[T]) extends Vec[T](i => elts.head.clone) {
-  private lazy val data = new ROMData(elts)
+object ROM {
+  def apply[T <: Data](elt0: T, elts: T*): ROM[T] = apply(elt0 +: elts.toSeq)
+  def apply[T <: Data](elts: Iterable[T]): ROM[T] = apply(elts.toSeq.zipWithIndex.map { case(z,i) => i -> z })
+  def apply[T <: Data](elt0: (Int, T), elts: (Int, T)*): ROM[T] = apply(elt0 +: elts.toSeq)
+  def apply[T <: Data](elts: Seq[(Int, T)], n: Option[Int]): ROM[T] = new ROM(SortedMap(elts:_*), n)
+  def apply[T <: Data](elts: Seq[(Int, T)], n: Int): ROM[T] = apply(elts, Some(n))
+  def apply[T <: Data](elts: Seq[(Int, T)]): ROM[T] = apply(elts, None)
+  def apply[T <: Data](elts: Array[(Int, T)]): ROM[T] = apply(elts.toSeq, None)
+  def apply[T <: Data](elts: Array[(Int, T)], n: Int): ROM[T] = apply(elts.toSeq, Some(n))
+}
+
+class ROM[T <: Data](elts: SortedMap[Int, T], lengthIn: Option[Int] = None) extends Vec[T](i => elts.head._2.clone) {
+  override val length: Int = lengthIn match {
+    case Some(x) => require(x > elts.keySet.max); x
+    case None => elts.keySet.max + 1
+  }
+  private lazy val data = new ROMData(elts, length)
 
   override def read(addr: UInt): T = {
-    if (elts.length != self.length) {
-      // fall back to Vec.read if the user has appended to us
-      super.read(addr)
-    } else {
-      val res = gen(0)
-      val port = new ROMRead().init("", widthOf(1), addr, data)
-      res assign port
-      res.setIsTypeNode
-      res
-    }
+    val res = gen(0)
+    val port = new ROMRead().init("", widthOf(1), addr, data)
+    res assign port
+    res.setIsTypeNode
+    res
   }
 
   override def write(addr: UInt, data: T): Unit =
     ChiselError.error("Can't write to ROM")
 }
 
-class ROMData(elts: IndexedSeq[Node]) extends Node {
+class ROMData(elts: SortedMap[Int, Node], val n: Int) extends Node {
+  val w = elts.values.map(_.litOf.needWidth()).max
+  val sparseLits = {
+    inferWidth = fixWidth(w)
+    elts.mapValues(_.matchWidth(Width(w)).litOf)
+  }
   val lits = {
-    val width = elts.map(_.litOf.width).max
-    inferWidth = fixWidth(width)
-    elts.map(_.matchWidth(width).litOf)
+    val dc = UInt.DC(w).litOf
+    Array.tabulate(n)(i => sparseLits.getOrElse(i, dc))
   }
 
-  override def isInObject: Boolean = true
-  override def isInVCD: Boolean = false
+  override lazy val isInObject: Boolean = true
+  override lazy val isInVCD: Boolean = Driver.isVCDMem
 }
 
 class ROMRead extends Node {
-  inferWidth = (x: Node) => inputs.map(_.width).tail.max
+  def inputsTailMaxWidth: (=> Node) => Width = { (m) => {
+    m.inputs.map(_.widthW).tail.max
+  }}
+  inferWidth = inputsTailMaxWidth
   def addr: Node = inputs(0)
   def rom: ROMData = inputs(1).asInstanceOf[ROMData]
   override def toString: String = rom + "[" + addr + "]"
 
   override def forceMatchingWidths: Unit =
-    inputs(0) = addr.matchWidth(log2Up(rom.lits.length))
+    inputs(0) = addr.matchWidth(Width(log2Up(rom.n)))
 }

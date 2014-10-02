@@ -35,219 +35,100 @@ import scala.collection.mutable.{LinkedHashSet, HashSet, HashMap}
 import scala.collection.mutable.{Queue=>ScalaQueue}
 import java.lang.reflect.Modifier._
 import scala.sys.process._
-import scala.math.max;
-import Node._
+import scala.math.max
 import Literal._
 import Bundle._
 import ChiselError._
 import Module._
 
 object Module {
-  /* We have to keep a list of public methods which happen to be public,
-   have no arguments yet should not be used to generate C++ or Verilog code. */
-  val keywords = HashSet[String]("test")
+  def apply[T<:Module](c: =>T, f: PartialFunction[Any,Any]): T = {
+    val q = params.alterPartial(f)
+    Driver.modStackPushed = true
+    Driver.parStack.push(q)
+    val res = init(c)
+    Driver.parStack.pop
+    res
+  }
+  def apply[T<:Module](c: =>T)(implicit _p:Option[Parameters] = None): T = {
+    Driver.modStackPushed = true
+    _p match {
+      case Some(q: Parameters) => {
+        Driver.parStack.push(q.push)
+        val res = init(c)
+        Driver.parStack.pop
+        res
+      }
+      case None => {
+        if(Driver.parStack.isEmpty) Driver.parStack.push(Parameters.empty) else Driver.parStack.push(Driver.parStack.top.push)
+        val res = init(c)
+        Driver.parStack.pop
+        res
+      }
+    }
+  }
 
-  var warnInputs = false
-  var warnOutputs = false
-  var saveWidthWarnings = false
-  var saveConnectionWarnings = false
-  var saveComponentTrace = false
-  var dontFindCombLoop = false
-  var isDebug = false;
-  var isCSE = false
-  var isIoDebug = true;
-  var isClockGatingUpdates = false;
-  var isClockGatingUpdatesInline = false;
-  var isVCD = false;
-  var isInlineMem = true;
-  var isGenHarness = false;
-  var isReportDims = false;
-  var isPruning = false;
-  var includeArgs: List[String] = Nil;
-  var targetDir: String = null;
-  var isEmittingComponents = false;
-  var isCompiling = false;
-  var isCheckingPorts = false
-  var isTesting = false;
-  var backend: Backend = null;
-  var topComponent: Module = null;
-  val components = ArrayBuffer[Module]();
-  var sortedComps: ArrayBuffer[Module] = null
-  val procs = ArrayBuffer[proc]();
-  val muxes = ArrayBuffer[Node]();
-  val nodes = ArrayBuffer[Node]()
-  val blackboxes = ArrayBuffer[BlackBox]()
-  var ioMap = new HashMap[Node, Int];
-  var chiselOneHotMap = new HashMap[(UInt, Int), UInt]
-  var chiselOneHotBitMap = new HashMap[(Bits, Int), Bool]
-  var chiselAndMap = new HashMap[(Node, Node), Bool]
-  var searchAndMap = true
-  var ioCount = 0;
-  val compStack = new Stack[Module]();
-  var stackIndent = 0;
-  var printStackStruct = ArrayBuffer[(Int, Module)]();
-  val randInitIOs = new ArrayBuffer[Node]()
-  val clocks = new ArrayBuffer[Clock]()
-  var implicitReset: Bool = null
-  var implicitClock: Clock = null
-  /* Backannotation flags */
-  var isBackannotating = false
-  var model = ""
-  val signals = new ArrayBuffer[Node]
-  val signals_shadow = new HashSet[Node]
-  val pseudoMuxes = new HashMap[Node, Node]
-  /* Jackhammer flags */
-  var jackDump: String = null;
-  var jackDir: String = null;
-  var jackLoad: String = null;
-  //var jackDesign: String = null;
-
-  // Setting this to TRUE will case the test harness to print its
-  // standard input stream to a file.
-  var dumpTestInput = false;
-
-  // Setting this to TRUE will initialize the tester's RNG with the
-  // seed below.
-  var testerSeedValid = false;
-  var testerSeed = System.currentTimeMillis();
-
-  /* Any call to a *Module* constructor without a proper wrapping
-   into a Module.apply() call will be detected when trigger is false. */
-  var trigger: Boolean = false
-
-  // Setting this to TRUE will result in temporary values (ie, nodes
-  // named "T*") to be emited to the VCD file.
-  var emitTempNodes = false;
-
-  def apply[T <: Module](c: => T): T = {
-    trigger = true
-    /* *push* is done in the Module constructor because we don't have
-     a *this* pointer before then, yet we need to store it before the subclass
-     constructors are built. */
+  private def init[T<:Module](c: =>T):T = {
     val res = c
     pop()
     for ((n, io) <- res.wires) {
       if (io.dir == null)
-         ChiselErrors += new ChiselError(() => {"All IO's must be ports (dir set): " + io}, io.line);
-      // else if (io.width_ == -1)
-      //   ChiselErrors += new ChiselError(() => {"All IO's must have width set: " + io}, io.line);
+         ChiselErrors += new ChiselError(() => {"All IO's must be ports (dir set): " + io}, io.line)
+      // else if (! io.isKnownWidth)
+      //   ChiselErrors += new ChiselError(() => {"All IO's must have width set: " + io}, io.line)
       io.isIo = true
     }
     res
   }
+  private def params = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
 
-  def splitArg (s: String) : List[String] = s.split(' ').toList;
-
-  def initChisel () {
-    ChiselError.clear();
-    warnInputs = false
-    warnOutputs = false
-    saveWidthWarnings = false
-    saveConnectionWarnings = false
-    saveComponentTrace = false
-    dontFindCombLoop = false
-    isGenHarness = false;
-    isDebug = false;
-    isCSE = false
-    isIoDebug = true;
-    isClockGatingUpdates = false;
-    isClockGatingUpdatesInline = false;
-    isVCD = false;
-    isReportDims = false;
-    targetDir = "."
-    components.clear();
-    compStack.clear();
-    stackIndent = 0;
-    printStackStruct.clear();
-    procs.clear();
-    muxes.clear();
-    blackboxes.clear();
-    ioMap.clear()
-    chiselOneHotMap.clear()
-    chiselOneHotBitMap.clear()
-    chiselAndMap.clear()
-    searchAndMap = false
-    ioCount = 0;
-    isEmittingComponents = false;
-    isCompiling = false;
-    isCheckingPorts = false
-    isTesting = false;
-    backend = new CppBackend
-    topComponent = null;
-    randInitIOs.clear()
-    clocks.clear()
-    implicitReset = Bool(INPUT)
-    implicitReset.isIo = true
-    implicitReset.setName("reset")
-    implicitClock = new Clock()
-    implicitClock.setName("clk")
-
-    /* Re-initialize global variables defined in object Node {} */
-    nodes.clear()
-    clk = UInt(INPUT, 1)
-    clk.setName("clk")
-
-    isInGetWidth = false
-
-    // Backannotation
-    isBackannotating = false
-    model = ""
-    signals.clear
-  }
-
-  //component stack handling stuff
-
-  def isSubclassOfModule(x: java.lang.Class[_]): Boolean = {
-    val classString = x.toString;
-    if(classString == "class java.lang.Object") {
-      false
-    } else if(classString == "class Chisel.Module") {
-      true
-    } else {
-      isSubclassOfModule(x.getSuperclass)
-    }
-  }
+    /* *push* is done in the Module constructor because we don't have
+     a *this* pointer before then, yet we need to store it before the subclass
+     constructors are built. */
 
   private def push(c: Module) {
-    if( !Module.trigger ) {
+    if (!Driver.modStackPushed) {
       ChiselError.error(
         c.getClass.getName + " was not properly wrapped into a module() call.")
     }
-    Module.trigger = false
-    compStack.push(c);
-    printStackStruct += ((stackIndent, c));
-    stackIndent += 1;
+    Driver.modStackPushed = false
+    Driver.compStack.push(c)
+    Driver.printStackStruct += ((Driver.stackIndent, c))
+    Driver.stackIndent += 1
   }
 
-  def pop(){
-    val c = compStack.pop;
-    if( !compStack.isEmpty ) {
-      val dad = compStack.top;
-      c.parent = dad;
-      dad.children += c;
+  private def pop(){
+    val c = Driver.compStack.pop
+    if( !Driver.compStack.isEmpty ) {
+      val dad = Driver.compStack.top
+      c.parent = dad
+      dad.children += c
     }
-    stackIndent -= 1;
-    c.level = 0;
+    Driver.stackIndent -= 1
+    c.level = 0
     for(child <- c.children) {
-      c.level = math.max(c.level, child.level + 1);
+      c.level = math.max(c.level, child.level + 1)
     }
   }
 
   // XXX Remove and instead call current()
-  def getComponent(): Module = if(compStack.length != 0) compStack.top else null
-  def current: Module = getComponent
+  def getComponent(): Module = if(Driver.compStack.length != 0) Driver.compStack.top else null
+  def current: Module = {
+    val comp = getComponent
+    if (comp == null) Driver.topComponent else comp
+  }
 
-  def setAsTopComponent(mod: Module) {
-    topComponent = mod;
-    implicitReset.component = topComponent
-    implicitClock.component = topComponent
-    topComponent.reset = Module.implicitReset
-    topComponent.hasExplicitReset = true
-    topComponent.clock = Module.implicitClock
-    topComponent.hasExplicitClock = true    
+  // despite being notionally internal, these have leaked into the API
+  def backend: Backend = Driver.backend
+  def components: ArrayBuffer[Module] = Driver.components
+
+  protected[Chisel] def asModule(m: Module)(block: => Unit): Unit = {
+    Driver.modStackPushed = true
+    push(m)
+    block
+    pop()
   }
 }
-
 
 /* ----- RULES FOR CLOCKS AND RESETS -----
    ( + ) clock parameter
@@ -258,7 +139,7 @@ object Module {
          ( + ) sets the default reset signal
          ( + ) overriden if Delay specifies its own clock w/ reset != implicitReset
 */
-abstract class Module(var clock: Clock = null, private var _reset: Bool = null) {
+abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool = null) {
   /** A backend(Backend.scala) might generate multiple module source code
     from one Module, based on the parameters to instanciate the component
     instance. Since we do not want to blindly generate one module per instance
@@ -273,12 +154,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   var name: String = "";
   /** Name of the module this component generates (defaults to class name). */
   var moduleName: String = "";
-  var pName = ""
   var named = false;
   val bindings = new ArrayBuffer[Binding];
-  var wiresCache: Array[(String, Bits)] = null;
   var parent: Module = null;
-  var containsReg = false;
   val children = ArrayBuffer[Module]()
   val debugs = LinkedHashSet[Node]()
   val printfs = ArrayBuffer[Printf]()
@@ -290,13 +168,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def hasWhenCond: Boolean = !whenConds.isEmpty
   def whenCond: Bool = if (hasWhenCond) whenConds.top else trueCond
 
-  val nodes = new ArrayBuffer[Node]
-  val mods = new ArrayBuffer[Node];
-  val omods = new ArrayBuffer[Node];
-  val signals = new ArrayBuffer[Node]
-
-  val regs  = new ArrayBuffer[Reg];
-  val nexts = new ScalaQueue[Node];
+  val nodes = new LinkedHashSet[Node]
   val names = new HashMap[String, Node]
   var nindex = -1;
   var defaultWidth = 32;
@@ -308,8 +180,12 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def hasReset = !(reset == null)
   def hasClock = !(clock == null)
 
-  components += this;
-  push(this);
+  Driver.components += this
+  push(this)
+
+  //Parameter Stuff
+  def params = Module.params
+  params.path = this.getClass :: params.path
 
   var hasExplicitClock = !(clock == null)
   var hasExplicitReset = !(_reset == null)
@@ -333,23 +209,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
   override def toString = this.getClass.toString
 
-  //true if this is a subclass of x
-  def isSubclassOf(x: java.lang.Class[_]): Boolean = {
-    var className: java.lang.Class[_] = this.getClass;
-    while(className.toString != x.toString){
-      if(className.toString == "class Chisel.Module") return false;
-      className = className.getSuperclass;
-    }
-    return true;
-  }
-
-  def depthString(depth: Int): String = {
-    var res = "";
-    for (i <- 0 until depth)
-      res += "  ";
-    res
-  }
-
   // This function sets the IO's component.
   def ownIo() {
     val wires = io.flatten;
@@ -359,6 +218,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       scala.Predef.assert(this == w.component,
         ChiselError.error("Statically resolved component differs from dynamically resolved component of IO: " + w + " crashing compiler"))
     }
+    // io naming
+    io nameIt ("io", true)
   }
 
   def findBinding(m: Node): Binding = {
@@ -374,16 +235,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
   def nextIndex : Int = { nindex = nindex + 1; nindex }
 
-  var isWalking = new HashSet[Node];
-  var isWalked = new HashSet[Node];
   // override def toString: String = name this one isn't really working...
-  def wires: Array[(String, Bits)] = {
-    // if (wiresCache == null) {
-    //   wiresCache = io.flatten;
-    // }
-    // wiresCache
-    io.flatten
-  }
+  def wires: Array[(String, Bits)] = io.flatten
 
   /** Add an assertion in the code generated by a backend. */
   def assert(cond: Bool, message: String): Unit = {
@@ -398,25 +251,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     // XXX Because We cannot guarentee x is flatten later on in collectComp.
     x.getNode.component = this
     debugs += x.getNode
-  }
-
-  def counter(x: Node) {
-    x.getNode match {
-      case _: VecLike[_] =>
-      case _: Aggregate =>
-      case _: ROMData =>
-      case _: Literal =>
-      case any if !(signals_shadow contains any) => {
-        if (!any.isIo) debug(x)
-        signals += any
-        signals_shadow += any
-      }
-      case _ =>
-    }
-  }
-
-  def counter(xs: Node*) {
-    xs.foreach(counter _)
   }
 
   def printf(message: String, args: Node*): Unit = {
@@ -437,25 +271,25 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   // COMPILATION OF REFERENCE
   def emitDec(b: Backend): String = {
     var res = "";
-    val wires = io.flatten;
+    // val wires = io.flatten;
     for ((n, w) <- wires)
       res += b.emitDec(w);
     res
   }
 
-  def addResetPin(reset: Bool) {
-    if (!this.resets.contains(reset)) {
-      val pin = 
-        if (reset == _reset) {
-          this.reset
-        } else {
-          val res = Bool(INPUT)
-          res.isIo = true
-          res.component = this
-          res
-        }
-      this.resets += (reset -> pin)
+  // returns the pin connected to the reset signal, creates a new one if
+  // no such pin exists
+  def addResetPin(reset: Bool): Bool = {
+    def makeIO = {
+      val res = Bool(INPUT)
+      res.isIo = true
+      res.component = this
+      res
     }
+    def pin =
+      if (reset == _reset) this.reset
+      else makeIO
+    this.resets.getOrElseUpdate(reset, pin)
   }
 
   def addClock(clock: Clock) {
@@ -463,73 +297,60 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       this.clocks += clock
   }
 
-  // returns the pin connected to the reset signal, creates a new one if 
-  // no such pin exists
-  def getResetPin(reset: Bool): Bool = {
-    addResetPin(reset)
-    resets(reset)
-  }
-
-  // COMPILATION OF BODY
-  def isInferenceTerminal(m: Node): Boolean = {
-    m.isFixedWidth || (
-      m match {
-        case io: Bits => io.dir != null;
-        case b: Binding => true;
-        case _ => false }
-    )
-    /*
-    var isAllKnown = true;
-    for (i <- m.inputs) {
-      if (i.width == -1)
-        isAllKnown = false;
+  def addPin[T <: Data](pin: T, name: String = "") = {
+    for ((n, io) <- pin.flatten) {
+      io.component = this
+      io.isIo = true
     }
-    isAllKnown
-    */
+    if (name != "") pin nameIt (name, true)
+    io.asInstanceOf[Bundle] += pin
+    pin
   }
 
-  def initializeBFS: ScalaQueue[Node] = {
-    val res = new ScalaQueue[Node]
-
-    for (c <- Module.components; a <- c.debugs)
-      res.enqueue(a)
-    for(b <- Module.blackboxes)
-      res.enqueue(b.io)
-    for(c <- Module.components)
-      for((n, io) <- c.io.flatten)
-        res.enqueue(io)
-
+  def addModule[T <: Module](c: => T) = {
+    Driver.modStackPushed = true
+    Driver.compStack.push(this)
+    val res = init(c)
+    Driver.compStack.pop
+    Driver.modAdded = true
+    res.markComponent
     res
   }
 
-  def initializeDFS: Stack[Node] = {
-    val res = new Stack[Node]
+  def bfs (visit: Node => Unit) = {
+    // initialize BFS
+    val queue = new ScalaQueue[Node]
+    
+    for (a <- debugs)
+      queue enqueue a
+    for ((n, io) <- wires)
+      queue enqueue io
+    if (!(defaultResetPin == null))
+      queue enqueue defaultResetPin
 
-    /* XXX Make sure roots are consistent between initializeBFS, initializeDFS
-     and findRoots.
-     */
-    for( a <- this.debugs ) {
-      res.push(a)
-    }
-    for((n, flat) <- this.io.flatten) {
-      res.push(flat)
-    }
-    res
-  }
-
-  def bfs(visit: Node => Unit): Unit = {
-    val walked = new HashSet[Node]
-    val bfsQueue = initializeBFS
-
-    // conduct bfs to find all reachable nodes
-    while(!bfsQueue.isEmpty){
-      val top = bfsQueue.dequeue
+    // Do BFS
+    val walked = HashSet[Node]()
+    while (!queue.isEmpty) {
+      val top = queue.dequeue
       walked += top
       visit(top)
-      for(i <- top.inputs) {
-        if(!(i == null)) {
-          if(!walked.contains(i)) {
-            bfsQueue.enqueue(i)
+      top match {
+        case io: Bits if io.isIo && io.dir == INPUT =>
+        case v: Vec[_] => 
+          for ((n, e) <- v.flatten; 
+          if !(e == null) && !(walked contains e) && !e.isIo) {
+            queue enqueue e
+            walked += e
+          }
+          for (i <- top.inputs; 
+          if !(i == null) && !(walked contains i) && !i.isIo) {
+            queue enqueue i
+            walked += i
+          }
+        case _ => {
+          for (i <- top.inputs; 
+          if !(i == null) && !(walked contains i) && !i.isIo) {
+            queue enqueue i
             walked += i
           }
         }
@@ -538,272 +359,51 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   def dfs(visit: Node => Unit): Unit = {
-    val walked = new HashSet[Node]
-    val dfsStack = initializeDFS
+    val stack = new Stack[Node]
+    // initialize DFS
+    for ((n, io) <- wires)
+      stack push io
+    if (!(defaultResetPin == null))
+      stack push defaultResetPin
+    for (a <- debugs)
+      stack push a
 
-    def isVisiting(node: Node) =
-      !(node == null) && !(walked contains node) && 
-      (node.component == this || node.isIo)
-
-    while(!dfsStack.isEmpty) {
-      val top = dfsStack.pop
+    // Do DFS
+    val walked = HashSet[Node]()
+    while (!stack.isEmpty) {
+      val top = stack.pop
       walked += top
       visit(top)
-      for(i <- top.inputs) {
-        if (isVisiting(i)) {
-          dfsStack push i
-          walked += i
+      top match {
+        case io: Bits if io.isIo && io.dir == INPUT =>
+        case v: Vec[_] => {
+          for ((n, e) <- v.flatten; 
+          if !(e == null) && !(walked contains e) && !e.isIo) {
+            stack push e
+            walked += e
+          }
+          for (i <- top.inputs; 
+          if !(i == null) && !(walked contains i) && !i.isIo) {
+            stack push i
+            walked += i
+          }
+        }
+        case _ => {
+          for (i <- top.inputs; 
+          if !(i == null) && !(walked contains i) && !i.isIo) {
+            stack push i
+            walked += i
+          }
         }
       }
     }
-  }
-
-  def inferAll(): Int = {
-    val nodesList = ArrayBuffer[Node]()
-    bfs { nodesList += _ }
-
-    def verify {
-      var hasError = false
-      for (elm <- nodesList) {
-        if (elm.infer || elm.width == -1) {
-          ChiselError.error("Could not infer the width on: " + elm)
-          hasError = true
-        }
-      }
-      if (hasError) throw new Exception("Could not elaborate code due to uninferred width(s)")
-    }
-
-    var count = 0
-    // Infer all node widths by propagating known widths
-    // in a bellman-ford fashion.
-    for(i <- 0 until nodesList.length) {
-      var nbUpdates = 0
-      var done = true;
-      for(elm <- nodesList){
-        val updated = elm.infer
-        if( updated ) { nbUpdates = nbUpdates + 1  }
-        done = done && !updated
-      }
-
-      count += 1
-
-      if(done){
-        verify
-        return count;
-      }
-    }
-    verify
-    count
-  }
-
-  /** All classes inherited from Data are used to add type information
-   and do not represent logic itself. */
-  def removeTypeNodes(): Int = {
-    var count = 0
-    bfs {x =>
-      scala.Predef.assert(!x.isTypeNode)
-      count += 1
-      for (i <- 0 until x.inputs.length)
-        if (x.inputs(i) != null && x.inputs(i).isTypeNode) {
-          x.inputs(i) = x.inputs(i).getNode
-        }
-    }
-    count
-  }
-
-  def forceMatchingWidths {
-    bfs(_.forceMatchingWidths)
   }
 
   def addDefaultReset {
     if (!(defaultResetPin == null)) {
       addResetPin(_reset)
-      if (this != topComponent && hasExplicitReset)
+      if (this != Driver.topComponent && hasExplicitReset)
         defaultResetPin.inputs += _reset
-    }
-  }
-
-  // for every reachable delay element
-  // assign it a clock and reset where
-  // clock is chosen to be the component's clock if delay does not specify a clock
-  // reset is chosen to be 
-  //          component's explicit reset
-  //          delay's explicit clock's reset
-  //          component's clock's reset
-  def addClockAndReset {
-    bfs {x => 
-      {
-        if (x.isInstanceOf[Delay]) {
-          val clock = if (x.clock == null) x.component.clock else x.clock
-          if (x.isInstanceOf[Reg] && x.asInstanceOf[Reg].isReset ||
-              x.isInstanceOf[Mem[ _ ]] && !Module.isInlineMem) { // assign resets to regs
-            val reset = 
-              if (x.component.hasExplicitReset)
-                x.component._reset
-              else if (x.clock != null)
-                x.clock.getReset
-              else if (x.component.hasExplicitClock)
-                x.component.clock.getReset
-              else
-                x.component._reset
-            x.inputs += x.component.getResetPin(reset)
-          }
-          x.clock = clock
-          if (x.isInstanceOf[Mem[ _ ]])
-            for (i <- x.inputs)
-              if (i.isInstanceOf[MemWrite]) i.clock = clock
-          x.component.addClock(clock)
-        }
-      }
-    }
-  }
-
-  def findConsumers() {
-    for (m <- mods) {
-      m.addConsumers;
-    }
-  }
-
-  /** Since we are relying on the out-degree of nodes (i.e. consumers.length),
-    this method should only be called after the forward edges have been
-    constructed. */
-  def findRoots(): ArrayBuffer[Node] = {
-    val roots = new ArrayBuffer[Node];
-    for (c <- Module.components) {
-      roots ++= c.debugs
-    }
-    for (b <- Module.blackboxes)
-      roots += b.io;
-    for (m <- mods) {
-      m match {
-        case io: Bits => {
-          if (io.dir == OUTPUT) {
-            if (io.consumers.length == 0) roots += m;
-          }
-        }
-        case d: Delay => roots += m;
-        case any      =>
-      }
-    }
-    roots
-  }
-
-  def visitNodes(roots: Array[Node]) {
-    val stack = new Stack[(Int, Node)]();
-    for (root <- roots) {
-      stack.push((0, root));
-    }
-    isWalked.clear();
-    while (stack.length > 0) {
-      val (newDepth, node) = stack.pop();
-      val comp = node.componentOf;
-      if (newDepth == -1) {
-        comp.omods += node;
-      } else {
-        node.depth = max(node.depth, newDepth);
-        if (!comp.isWalked.contains(node)) {
-          comp.isWalked += node;
-          node.walked = true;
-          stack.push((-1, node));
-          for (i <- node.inputs) {
-            if (i != null) {
-              i match {
-                case d: Delay       => ;
-                case o              => stack.push((newDepth + 1, o));
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  def findOrdering(): Unit = visitNodes(findRoots().toArray);
-
-  def findGraphDims(): (Int, Int, Int) = {
-    var maxDepth = 0;
-    val imods = new ArrayBuffer[Node]();
-    for (m <- mods) {
-      m match {
-        case l: Literal =>
-        case i      => imods += m;
-      }
-    }
-    val whist = new HashMap[Int, Int]();
-    for (m <- imods) {
-      val w = m.width;
-      if (whist.contains(w)) {
-        whist(w) = whist(w) + 1;
-      } else {
-        whist(w) = 1;
-      }
-    }
-    val hist = new HashMap[String, Int]();
-    for (m <- imods) {
-      var name = m.getClass().getName();
-      m match {
-        case m: Mux => name = "Mux";
-        case op: Op => name = op.op;
-        case o      => name = name.substring(name.indexOf('.') + 1);
-      }
-      if (hist.contains(name)) {
-        hist(name) = hist(name) + 1;
-      } else {
-        hist(name) = 1;
-      }
-    }
-    for (m <- imods)
-      maxDepth = max(m.depth, maxDepth);
-    // for ((n, c) <- hist)
-    ChiselError.info("%6s: %s".format("name", "count"));
-    for (n <- hist.keys.toList.sortWith((a, b) => a < b))
-      ChiselError.info("%6s: %4d".format(n, hist(n)));
-    ChiselError.info("%6s: %s".format("width", "count"));
-    for (w <- whist.keys.toList.sortWith((a, b) => a < b))
-      ChiselError.info("%3d: %4d".format(w, whist(w)));
-    var widths = new Array[Int](maxDepth + 1);
-    for (i <- 0 until maxDepth + 1)
-      widths(i) = 0;
-    for (m <- imods)
-      widths(m.depth) = widths(m.depth) + 1;
-    var numNodes = 0;
-    for (m <- imods)
-      numNodes += 1;
-    var maxWidth = 0;
-    for (i <- 0 until maxDepth + 1)
-      maxWidth = max(maxWidth, widths(i));
-    (numNodes, maxWidth, maxDepth)
-  }
-
-  def collectNodes(c: Module) {
-    for (m <- c.mods) {
-      m match {
-/* XXX deprecated?
-        case io: Bits  =>
-          if (io.dir == INPUT) {
-            inputs += m;
-          } else if (io.dir == OUTPUT) {
-            outputs += m;
-          }
- */
-        case r: Reg    => regs += r;
-        case other     =>
-      }
-    }
-  }
-
-  def traceableNodes: Array[Node] = io.traceableNodes;
-
-  /** Returns true if this module or any of its children contains
-    at least one register. */
-  def containsRegInTree: Boolean = {
-    if( containsReg ) {
-      true
-    } else {
-      for(child <- children){
-        if( child.containsRegInTree ) return true
-      }
-      false
     }
   }
 
@@ -811,12 +411,10 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   // 2) name the IO
   // 3) name and set the component of all statically declared nodes through introspection
   // 4) set variable names
-  /* XXX deprecated. make sure containsReg and isClk are set properly. */
   def markComponent() {
     ownIo();
-    io setPseudoName ("io", true)
     /* We are going through all declarations, which can return Nodes,
-     ArrayBuffer[Node], Cell, BlackBox and Modules.
+     ArrayBuffer[Node], BlackBox and Modules.
      Since we call invoke() to get a proper instance of the correct type,
      we have to insure the method is accessible, thus all fields
      that will generate C++ or Verilog code must be made public. */
@@ -825,12 +423,15 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     )) {
        val name = m.getName();
        val types = m.getParameterTypes();
-       if (isPublic(m.getModifiers()) && !(Module.keywords contains name)) {
+       if (isPublic(m.getModifiers()) {
          val o = m.invoke(this);
          o match {
          case node: Node => {
-           if (node.isReg || node.isClkInput) containsReg = true;
-           node setPseudoName (name, false)
+           node.getNode match {
+             case _: Literal => 
+             case _ => node.getNode nameIt (backend.asValidName(name), false)
+           }
+           backend.nameSpace += node.getNode.name
          }
          case buf: ArrayBuffer[_] => {
            /* We would prefer to match for ArrayBuffer[Node] but that's
@@ -840,10 +441,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
              val nodebuf = buf.asInstanceOf[Seq[Node]];
              for((elm, i) <- nodebuf.zipWithIndex){
-               if (elm.isReg || elm.isClkInput) {
-                 containsReg = true;
+               elm.getNode match {
+                 case _: Literal =>
+                 case _ => elm.getNode nameIt (backend.asValidName(name + "_" + i), false)
                }
-               elm setPseudoName (name + "_" + i, false)
+               backend.nameSpace += elm.getNode.name
              }
            }
          }
@@ -851,28 +453,28 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
              val nodebuf = buf.asInstanceOf[Seq[Node]];
              for((elm, i) <- nodebuf.zipWithIndex){
-               if (elm.isReg || elm.isClkInput) {
-                 containsReg = true;
+               elm.getNode match {
+                 case _: Literal =>
+                 case _ => elm.getNode nameIt (backend.asValidName(name + "_" + i), false)
                }
-               elm setPseudoName (name + "_" + i, false)
+               backend.nameSpace += elm.getNode.name
              }
            }
          }
-         // Todo: do we have Cell anymore?
-         case cell: Cell => {
-           if(cell.isReg) containsReg = true;
-           cell.pName = name
-         }
          case bb: BlackBox => {
-           bb.pathParent = this;
-           bb.pName = name
-           for((n, elm) <- io.flatten) {
-             if (elm.isClkInput) containsReg = true
+           if (!bb.named) {
+             bb.name = name
+             bb.named = true
            }
+           backend.nameSpace += bb.name
          }
          case comp: Module => {
            comp.pathParent = this;
-           comp.pName = name
+           if (!comp.named) {
+             comp.name = backend.asValidName(name)
+             comp.named = true
+           }
+           backend.nameSpace += comp.name
          }
          case any =>
        }
@@ -880,34 +482,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
      }
   }
 
-
-  def genAllMuxes {
-    for (p <- procs) {
-      p match {
-        case b: Bits  => if(b.updates.length > 0) b.genMuxes(b.default);
-        case r: Reg  => r.genMuxes(r);
-        case _ =>
-      }
-    }
-    bfs { _ match {
-        case r: Reg => r.verifyMuxes
-        case _ =>
-      }
-    }
-  }
-
-  def verifyAllMuxes {
-    for(m <- Module.muxes) {
-      if(m.inputs(0).width != 1 && m.component != null && (!Module.isEmittingComponents || !m.component.isInstanceOf[BlackBox])) {
-        ChiselError.error({"Mux " + m.name + " has " + m.inputs(0).width + "-bit selector " + m.inputs(0).name}, m.line);
-      }
-    }
-  }
   /* XXX Not sure what the two following do.
    They never get overridden yet it is called
    for each component (See Backend implementations). */
-  def elaborate(fake: Int = 0) {}
-  def postMarkNet(fake: Int = 0) {}
   def stripComponent(s: String): String = s.split("__").last
 
     /** Returns the absolute path to a component instance from toplevel. */
@@ -918,92 +495,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     if ( parent == null ) name else parent.getPathName(separator) + separator + name;
   }
 
-  def traceNodes() {
-    val queue = Stack[() => Any]();
-
-    /* XXX Why do we do something different here? */
-    if (!Module.backend.isInstanceOf[VerilogBackend]) {
-      queue.push(() => io.traceNode(this, queue));
-    } else {
-      for (c <- Module.components) {
-        queue.push(() => c.io.traceNode(c, queue))
-      }
-    }
-    for (c <- Module.components) {
-        if (!(c.defaultResetPin == null)) { // must manually add reset pin cuz it isn't part of io
-          queue.push(() => c.defaultResetPin.traceNode(c, queue))
-        }
-    }
-    for (c <- Module.components; d <- c.debugs)
-      queue.push(() => d.traceNode(c, queue))
-    for (b <- Module.blackboxes)
-      queue.push(() => b.io.traceNode(this, queue));
-    while (queue.length > 0) {
-      val work = queue.pop();
-      work();
-    }
-  }
-
-  def findCombLoop() {
-    // Tarjan's strongly connected components algorithm to find loops
-    var sccIndex = 0
-    val stack = new Stack[Node]
-    val sccList = new ArrayBuffer[ArrayBuffer[Node]]
-
-    def tarjanSCC(n: Node): Unit = {
-      if(n.isInstanceOf[Delay]) throw new Exception("trying to DFS on a register")
-
-      n.sccIndex = sccIndex
-      n.sccLowlink = sccIndex
-      sccIndex += 1
-      stack.push(n)
-
-      for(i <- n.inputs) {
-        if(!(i == null) && !i.isInstanceOf[Delay] && !i.isReg) {
-          if(i.sccIndex == -1) {
-            tarjanSCC(i)
-            n.sccLowlink = min(n.sccLowlink, i.sccLowlink)
-          } else if(stack.contains(i)) {
-            n.sccLowlink = min(n.sccLowlink, i.sccIndex)
-          }
-        }
-      }
-
-      if(n.sccLowlink == n.sccIndex) {
-        val scc = new ArrayBuffer[Node]
-
-        var top: Node = null
-        do {
-          top = stack.pop()
-          scc += top
-        } while (!(n == top))
-        sccList += scc
-      }
-    }
-
-    bfs { node =>
-      if(node.sccIndex == -1 && !node.isInstanceOf[Delay] && !(node.isReg)) {
-        tarjanSCC(node)
-      }
-    }
-
-    // check for combinational loops
-    var containsCombPath = false
-    for (nodelist <- sccList) {
-      if(nodelist.length > 1) {
-        containsCombPath = true
-        ChiselError.error("FOUND COMBINATIONAL PATH!")
-        for((node, ind) <- nodelist zip nodelist.indices) {
-          val ste = node.line
-          ChiselError.error("  (" + ind +  ") on line " + ste.getLineNumber +
-                                  " in class " + ste.getClassName +
-                                  " in file " + ste.getFileName +
-                                  ", " + node.name)
-        }
-      }
-    }
-  }
-
   def isInput(node: Node): Boolean =
     node match { case b:Bits => b.dir == INPUT; case o => false }
   def keepInputs(nodes: Seq[Node]): Seq[Node] =
@@ -1011,7 +502,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def removeInputs(nodes: Seq[Node]): Seq[Node] =
     nodes.filter(n => !isInput(n))
 
-  override val hashCode: Int = components.size
+  override val hashCode: Int = Driver.components.size
   override def equals(that: Any) = this eq that.asInstanceOf[AnyRef]
 }
 

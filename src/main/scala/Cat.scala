@@ -38,7 +38,9 @@ object Cat {
 }
 
 object Concatenate {
-  def apply(mods: Seq[Node]): Node =
-    mods.filter(_ != null).reduceLeft((a, b) => a ## b)
   def apply(mod: Node, mods: Node*): Node = apply(mod :: mods.toList)
+  def apply(mods: Seq[Node]): Node = doCat(mods.filter(_ != null))
+  private def doCat(mods: Seq[Node]): Node =
+    if (mods.tail.isEmpty) mods.head
+    else BinaryOp(doCat(mods.slice(0, mods.length/2)), doCat(mods.slice(mods.length/2, mods.length)), "##")
 }

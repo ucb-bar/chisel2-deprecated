@@ -35,7 +35,7 @@ import scala.collection.mutable.ArrayBuffer
 import Node._
 import ChiselError._
 
-class Assert(condIn: Bool, resetIn: Bool, val message: String) extends Node {
+class Assert(condIn: Bool, resetIn: Bool, val message: String) extends Delay {
   inputs += condIn || resetIn
   inputs += resetIn
   def cond: Node = inputs(0)
@@ -44,13 +44,14 @@ class Assert(condIn: Bool, resetIn: Bool, val message: String) extends Node {
 
 class BitsInObject(x: Node) extends UInt {
   inputs += x
-  override def isInObject: Boolean = true
+  inferWidth = widthOf(0)
+  override lazy val isInObject: Boolean = true
 }
 
 class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
   inputs ++= argsIn.map(a => new BitsInObject(a))
   def args: ArrayBuffer[Node] = inputs
-  override def isInObject: Boolean = true
+  override lazy val isInObject: Boolean = true
   def decIntSize(x: Int) = math.ceil(math.log(2)/math.log(10)*x).toInt
   def decFloSize(m: Int, e: Int) = (2+decIntSize(m)+2+decIntSize(e))
 
@@ -90,13 +91,24 @@ class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
     msg
   }
 
-  inferWidth = (x: Node) => {
-    val argLength = formats.zip(inputs).map{case (a,b) => lengths(a)(b.width)}.sum
-    8*(format.length - 2*formats.length + argLength)
-  }
+  def argWidth: (=> Node) => Width = { (x) => {
+    if (x != null) {
+      var unknown = false
+      val argLength = formats.zip(inputs).map{case (a,b) => {
+        lengths(a)({ val w = b.widthW;if (w.isKnown) w.needWidth() else {unknown = true; 0}})
+      }}.sum
+      if (unknown)
+        Width()
+      else
+        Width(8*(format.length - 2*formats.length + argLength))
+    } else {
+      Width()
+    }
+  }}
+  inferWidth = argWidth
 
   override def isReg: Boolean = true
-  override def isInVCD: Boolean = false
+  override lazy val isInVCD: Boolean = false
 }
 
 class Sprintf(formatIn: String, argsIn: Seq[Node]) extends PrintfBase(formatIn, argsIn)

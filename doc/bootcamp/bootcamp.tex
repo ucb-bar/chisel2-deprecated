@@ -8,7 +8,7 @@
 \input{../style/scala.tex}
 \input{../style/talk.tex}
 
-\title{Chisel Bootcamp 4.1}
+\title{Chisel Bootcamp}
 \author{Jonathan Bachrach}
 \date{\today}
 \institute[UC Berkeley]{EECS UC Berkeley}
@@ -53,70 +53,46 @@
 
 \end{frame}
 
-\begin{frame}[fragile]{CS291C Specific Notes for Bootcamp}
-
-\begin{itemize}
-\item teaching digital circuit design in chisel
-\item will later teach 
-\begin{itemize}
-\item floating point
-\item fixed point 
-\item complex numbers
-\item integration with matlab
-\end{itemize}
-\item new chisel release with DSP support coming soon
-\end{itemize}
-
-\end{frame}
-
-
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
-\begin{frame}[fragile]{Logging into EC2}
+\begin{frame}[fragile]{Development Tool Installation}
 
-\begin{scala}
-ssh ubuntu@xxx
-password: bootcamp
-\end{scala}
-\noindent
-where \code{xxx} corresponds to your EC2 instance written on your airbears slip
+\begin{itemize}
+\item {\bf MacOSX}:
 
+\begin{itemize}
+\item Install XCODE, including console tools.
+\end{itemize}
+
+\item {\bf Linux}: 
+
+\begin{itemize}
+\item To prepare your Linux platform for Chisel, you will need to install the following packages:
+\begin{itemize}
+\item \verb|g++| 
+\item \verb+openjdk-7-jre+
+\end{itemize}
+\item using 
+\begin{itemize}
+\item \verb+sudo apt-get install+
+\end{itemize}
+\end{itemize}
+
+\end{itemize}
 \end{frame}
 \setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
-\begin{frame}[fragile]{Using Screen}
-to prevent lossage of state if disconnected ... when you first log in, type
-\begin{scala}
-screen
-\end{scala}
+\begin{frame}[fragile]{Getting the Chisel Tutorial}
 
-when you log back into the instance, type
-\begin{scala}
-screen -r
-\end{scala}
-
-\end{frame}
-\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
-
-\setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
-\begin{frame}[fragile]{Getting the Latest}
-
-if you don't have chisel-tutorial already
 \begin{scala}
 git clone https://github.com/ucb-bar/chisel-tutorial.git
 cd chisel-tutorial
 \end{scala}
-
-else, get the latest
-\begin{scala}
-cd chisel-tutorial
-git pull
-\end{scala}
-
 \end{frame}
 \setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
 
-\begin{frame}[fragile]{chisel-tutorial repo}
+\setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
+\begin{frame}[fragile]{Chisel Tutorial Contents}
 \begin{FramedSemiVerb}
 chisel-tutorial/  
   Makefile
@@ -134,13 +110,30 @@ chisel-tutorial/
     Counter.scala ...
 \end{FramedSemiVerb}
 \end{frame}
+\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
+
+\setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
+\begin{frame}[fragile]{Test It}
+
+\begin{bash}
+cd $TUT_DIR/examples
+make Parity.out
+\end{bash}
+
+\vspace{1cm}
+\noindent
+If your system is set up correctly, you should see a messsage \verb+[success]+ followed by the total time of the run, and date and time of completion. 
+
+\end{frame}
+\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
+
 
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Get This}
 
 \begin{center}
 \fbox{
-\url{chisel.eecs.berkeley.edu/2.0.6/chisel-bootcamp-20140206.pdf}
+\url{chisel.eecs.berkeley.edu/chisel-bootcamp.pdf}
 }
 \end{center}
 
@@ -1256,6 +1249,9 @@ class VecShiftRegister extends Module {
 \column{0.45\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
+package Tutorial
+import Chisel._
+
 class ByteSelector extends Module {
   val io = new Bundle {
     val in     = UInt(INPUT, 32)
@@ -1266,54 +1262,55 @@ class ByteSelector extends Module {
   ...
 }
 
-class ByteSelectorTests(c: ByteSelector)
-   extends Testy(c) {
+class BSTests(c: ByteSelector) extends Tester(c) {
   val test_in = 12345678
   for (t <- 0 until 4) {
-    poke(c.io.in,     test_in)
+    poke(c.io.in, test_in)
     poke(c.io.offset, t)
-    step()
-    expect(c.io.out, (test_in >> (t * 8)) & 0xFF)
+    step(1)
+    val ref_out = (test_in >> (t * 8)) & 0xFF
+    expect(c.io.out, ref_out)
   }
 }
 \end{scala}
 }
 \begin{center}
-\includegraphics[height=0.2\textheight]{../tutorial/figs/DUT.pdf}
+\includegraphics[width=0.8\textwidth]{../tutorial/figs/DUT.pdf}
 \end{center}
 
 \column{0.45\textwidth}
 {\lstset{basicstyle={\tiny\ttfamily}}
 \begin{scala}
-class Testy[+T <: Module] (val c: T) {
-  // set by expect or user to determine test result
+class Tester[T <: Module]
+    (val c: T, val isTrace: Boolean = true) {
+  var t: Int
   var ok: Boolean
-  // available for random testing
   val rnd: Random
   def reset(n: Int = 1)
   def step(n: Int): Int
+  def peek(data: Aggregate): Array[BigInt]
+  def peekAt(data: Mem[T], index: Int)
+  def peek(data: Bits): BigInt
   def int(x: Boolean): BigInt
   def int(x: Int): BigInt
   def int(x: Bits): BigInt
-  // users use flatten / litValue to convert to BigInts
-  def poke(data: Mem[T], index: Int, x: BigInt): Unit
-  def poke(data: Bits, x: BigInt): Unit
-  def poke(data: CompositeData, x: Array[BigInt]): Unit
-  def peek(data: Mem[T], index: Int): Unit
-  def peek(data: Bits): BigInt
-  def peek(data: CompositeData): Array[BigInt]
+  def poke(data: Aggregate, x: Array[BigInt])
+  def pokeAt(data: Mem[T], index: Int, x: BigInt)
+  def poke(data: Bits, x: BigInt)
   def expect (good: Boolean, msg: String): Boolean
-  def expect (data: Bits, expected: BigInt): Boolean
+  def expect (data: Bits, target: BigInt): Boolean
 }
 \end{scala}
 }
 \begin{tiny}
+\noindent
+which binds a tester to a module
+and allows users to write tests using the given debug protocol.  In particular, users utilize:
 \begin{itemize}
-\item user subclasses \code{Testy} specifying DUT as param + tests in body
-\item \code{poke} sets values,
-\item \code{step} cycles the circuit one time unit,
-\item \code{peek} reads values,
-\item \code{expect} compares peeked circuit value to expected arg
+\item \code{poke} to set input port and state values,
+\item \code{step} to execute the circuit one time unit,
+\item \code{peek} to read port and state values, and
+\item \code{expect} to compare peeked circuit values to expected arguments.
 \end{itemize}
 \end{tiny}
 
@@ -1328,36 +1325,46 @@ class Testy[+T <: Module] (val c: T) {
 > make ByteSelector.out
 STARTING ../emulator/problems/ByteSelector
 ---
-POKE ByteSelector__io_in <- 12345678
-POKE ByteSelector__io_offset <- 0
-STEP 1 <- 0
-PEEK ByteSelector__io_out -> 0x4e
-EXPECT ByteSelector__io_out <- 78 == 78 PASS
-POKE ByteSelector__io_in <- 12345678
-POKE ByteSelector__io_offset <- 1
-STEP 1 <- 0
-PEEK ByteSelector__io_out -> 0x61
-EXPECT ByteSelector__io_out <- 97 == 97 PASS
+INPUTS
+  INPUT(ByteSelector__io_in.ByteSelector) = 12345678
+  INPUT(ByteSelector__io_offset.ByteSelector) = 0
+OUTPUTS
+  READ OUTPUT(ByteSelector__io_out.ByteSelector) = 78
+  EXPECTED: OUTPUT(ByteSelector__io_out.ByteSelector) = 78
+  SUCCESS
+---
+INPUTS
+  INPUT(ByteSelector__io_in.ByteSelector) = 12345678
+  INPUT(ByteSelector__io_offset.ByteSelector) = 1
+OUTPUTS
+  READ OUTPUT(ByteSelector__io_out.ByteSelector) = 97
+  EXPECTED: OUTPUT(ByteSelector__io_out.ByteSelector) = 97
+  SUCCESS
+---
 ...
-POKE ByteSelector__io_in <- 12345678
-POKE ByteSelector__io_offset <- 3
-STEP 1 <- 0
-PEEK ByteSelector__io_out -> 0x00
-EXPECT ByteSelector__io_out <- 0 == 0 PASS
+---
+INPUTS
+  INPUT(ByteSelector__io_in.ByteSelector) = 12345678
+  INPUT(ByteSelector__io_offset.ByteSelector) = 3
+OUTPUTS
+  READ OUTPUT(ByteSelector__io_out.ByteSelector) = 0
+  EXPECTED: OUTPUT(ByteSelector__io_out.ByteSelector) = 0
+  SUCCESS
 PASSED   // Final pass assertion
-[success] Total time: 6 s, completed Feb 23, 2014 9:52:22 PM
+[success] Total time: 26 s, ...
 \end{scala}
 }
 
 \end{frame}
 
-\begin{frame}[fragile]{Testbench Ingredients}
+\begin{frame}{Testbench Ingredients}
 
+In particular, users utilize:
 \begin{itemize}
-\item Set inputs using \verb+poke+
-\item Advance simulation using \verb+step+
-\item Check expected values using \verb+expect+ (and/or \verb+peek+)
-\item Repeat until all appropriate test cases verified
+\item \code{poke} to set input port and state values,
+\item \code{step} to execute the circuit one time unit,
+\item \code{peek} to read port and state values, and
+\item \code{expect} to compare peeked circuit values to expected arguments.
 \end{itemize}
 
 \end{frame}
@@ -1396,15 +1403,14 @@ val x = rnd.nextInt(lim)
 
 {\lstset{basicstyle={\scriptsize\ttfamily}}
 \begin{scala}
-class MaxNTests(c: MaxN) extends Testy(c) {
+class MaxNTests(c: MaxN) extends Tester(c) {
   for (i <- 0 until 10) {
-    var mx = 0
     for (i <- 0 until c.n) {
       // FILL THIS IN HERE
       poke(c.io.ins(0), 0)
     }
-    step()
     // FILL THIS IN HERE
+    step(1)
     expect(c.io.out, 1)
   }
 }
@@ -1425,7 +1431,7 @@ class MemorySearch extends Module {
   }
   val index  = Reg(init = UInt(0, width = 3))
   val list   = Vec(UInt(0), UInt(4), UInt(15), UInt(14), 
-                   UInt(2), UInt(5), UInt(13))
+                   UInt(2), UInt(5), UInt(13)){ UInt(width = 4) }
   val memVal = list(index)
   val done   = !io.en && ((memVal === io.target) || (index === UInt(7)))
   when (io.en) {
@@ -1478,15 +1484,15 @@ val mDat = regs(mAddr)
 class DynamicMemorySearch extends Module {
   val io = new Bundle {
     val isWr   = Bool(INPUT)
-    val wrAddr = UInt(INPUT, 3)
-    val data   = UInt(INPUT, 4)
+    val wrAddr = UInt(INPUT,  3)
+    val data   = UInt(INPUT,  4)
     val en     = Bool(INPUT)
     val target = UInt(OUTPUT, 3)
     val done   = Bool(OUTPUT)
   }
   val index  = Reg(init = UInt(0, width = 3))
   val memVal = ...
-  val done = !io.en && ((memVal === io.target) || (index === UInt(7)))
+  val done = !io.en && ((memVal === io.data) || (index === UInt(7)))
   // ...
   when (io.en) {
     index := UInt(0)
@@ -1740,19 +1746,16 @@ def shiftingFilter[T <: Bits](shift: Int, dtype: T) =
 \begin{frame}[fragile]{Testing Decoupled Circuits}
 
 \begin{itemize}
-\item need to check outputs directly using \verb+peek+
+\item using ovars for outputs
+\item need to check outputs directly using \verb+litValue+
 \end{itemize}
 \begin{scala}
-class GCDTests(c: GCD) extends Testy(c) {
+class GCDTests(c: GCD) extends Tester(c) {
   val (a, b, z) = (64, 48, 16)
-  var t = 0
   do {
-    val first = if (t == 0) 1 else 0;
     poke(c.io.a, a)
     poke(c.io.b, b)
-    poke(c.io.e, first)
-    step()
-    t += 1
+    step(1)
   } while (t <= 1 || peek(c.io.v) == 0)
   expect(c.io.z, z)
 }
@@ -2036,8 +2039,8 @@ class MultiClockDomain extends Module {
   ...
 }
 
-class MultiClockDomainTests(c: MultiClockDomain) extends Testy(c) {
-  // setting up clocks
+class MultiClockDomainTests(c: MultiClockDomain) 
+    extends Tester(c, Array(c.io)) {
   val clocks = new HashMap[Clock, Int]
   clocks(Module.implicitClock) = 2
   clocks(c.fastClock) = 4
@@ -2064,17 +2067,16 @@ Hello/
 \begin{scala}
 package Hello
 import Chisel._
-import scala.collection.mutable.HashMap
 
 class Hello extends Module {
   val io = new Bundle { 
     val out = UInt(OUTPUT, 8) }
-  io.out := UInt(42)
+  io.out := UInt(33)
 }
 
-class HelloTests(c: Hello) extends Testy(c) {
+class HelloTests(c: Hello) extends Tester(c) {
   step(1)
-  expect(c.io.out, 42)
+  expect(c.io.out, 33)
 }
 
 object Hello {

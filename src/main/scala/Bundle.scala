@@ -35,7 +35,6 @@ import scala.collection.mutable.Stack
 import java.lang.reflect.Modifier._
 import Node._;
 import ChiselError._
-import sort._
 
 object Bundle {
   val keywords = HashSet[String]("elements", "flip", "toString",
@@ -49,34 +48,23 @@ object Bundle {
     res
   }
 
-}
-
-object sort {
-  def apply(a: Array[(String, Bits)]): Array[(String, Bits)] = {
-    var i = 0
-    for (j <- 1 until a.length) {
-      val keyElm = a(j);
-      val key = Module.ioMap(keyElm._2)
-      i = j - 1
-
-      while (i >= 0 && Module.ioMap(a(i)._2) > key) {
-        a(i + 1) = a(i)
-        i = i - 1
-      }
-      a(i + 1) = keyElm
-    }
-    a
+  def apply[T <: Bundle](c: => T,  f: PartialFunction[Any,Any]): T = {
+    val q = params.alterPartial(f)
+    Driver.parStack.push(q)
+    val res = c
+    Driver.parStack.pop
+    res
   }
+  private def params = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
 }
 
 /** Defines a collection of datum of different types into a single coherent
   whole.
   */
-class Bundle(view_arg: Seq[String] = null) extends Aggregate {
-  var dir = "";
+class Bundle(view_arg: Seq[String] = null)(implicit _params:Option[Parameters] = None) extends Aggregate {
   var view = view_arg;
+  override val params = if(_params == None) Bundle.params else _params.get
   private var elementsCache: ArrayBuffer[(String, Data)] = null;
-  var bundledElm: Node = null;
 
   /** Populates the cache of elements declared in the Bundle. */
   private def calcElements(view: Seq[String]): ArrayBuffer[(String, Data)] = {
@@ -89,20 +77,10 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
       val name = m.getName();
       val modifiers = m.getModifiers();
       val types = m.getParameterTypes();
+
       val rtype = m.getReturnType();
-      var isFound = false;
-      var isInterface = false;
-      var c = rtype;
-      val sc = Class.forName("Chisel.Data");
-      do {
-        if (c == sc) {
-          isFound = true; isInterface = true;
-        } else if (c == null || c == Class.forName("java.lang.Object")) {
-          isFound = true; isInterface = false;
-        } else {
-          c = c.getSuperclass();
-        }
-      } while (!isFound);
+      val isInterface = classOf[Data].isAssignableFrom(rtype);
+
       // TODO: SPLIT THIS OUT TO TOP LEVEL LIST
       if(!isStatic(modifiers) && isInterface
         && !(Bundle.keywords contains name)
@@ -170,16 +148,6 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     }
   }
 
-  override def setPseudoName (path: String, isNamingIo: Boolean) {
-    if (pName == "" || (path != "" && pName != path)) {
-      pName = path
-      val prefix = if (pName != "") pName + "_" else ""
-      for ((n, i) <- elements) {
-        i setPseudoName (prefix + n, isNamingIo)
-      }
-    }
-  }
-
   def +(other: Bundle): Bundle = {
     var elts = ArrayBuffer[(String, Data)]();
     for ((n, i) <- elements)
@@ -217,14 +185,6 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
       elt.removeTypeNodes
   }
 
-  override def traceableNodes: Array[Node] = elements.map(tup => tup._2).toArray;
-
-  override def traceNode(c: Module, stack: Stack[() => Any]) {
-    for((n, i) <- flatten) {
-      stack.push(() => i.traceNode(c, stack))
-    }
-  }
-
   override def apply(name: String): Data = {
     for((n,i) <- elements)
       if(name == n) return i;
@@ -232,10 +192,8 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     return null;
   }
 
-  override def <>(src: Node) {
-    if(comp == null || (dir == "output" &&
-      src.isInstanceOf[Bundle] &&
-      src.asInstanceOf[Bundle].dir == "output")){
+  override def <>(src: Node): Unit = {
+    if (comp == null) {
       src match {
         case other: Bundle => {
           for ((n, i) <- elements) {
@@ -267,42 +225,21 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     return false;
   }
 
-  override def :=[T <: Data](src: T): Unit = {
-    src match {
-      case bun: Bundle => this := bun
-      case any => super.:=(any)
-    }
-  }
-
-  def :=(src: Bundle): Unit = {
-    if(this.isTypeNode && comp != null) {
+  override protected def colonEquals(src: Bundle): Unit = {
+    if (this.isTypeNode && comp != null) {
       this.comp.procAssign(src.toNode)
-      return
-    }
-    for((n, i) <- elements) {
-      i match {
-        case bundle: Bundle => {
-          if (src.contains(n)) bundle := src(n).asInstanceOf[Bundle]
-        }
-        case bits: Bits => {
-          if (src.contains(n)) bits := src(n).asInstanceOf[Bits]
-        }
-        case vec: Vec[_] => {
-           /* We would prefer to match for Vec[Data] but that's impossible
-            because of JVM constraints which lead to type erasure. */
-          val vecdata = vec.asInstanceOf[Vec[Data]]
-          if (src.contains(n)) vecdata := src(n).asInstanceOf[Vec[Data]]
-        }
-      }
+    } else {
+      for ((n, i) <- elements)
+        if (src contains n)
+          i := src(n)
     }
   }
 
   override def flatten: Array[(String, Bits)] = {
-    var res = ArrayBuffer[(String, Bits)]();
-    for ((n, i) <- elements){
-      res = res ++ i.flatten
-    }
-    sort(res.toArray)
+    val res = ArrayBuffer[(String, Bits)]()
+    for ((n, i) <- elements.sortWith(_._2._id < _._2._id))
+      res ++= i.flatten
+    res.toArray
   }
 
   override def getWidth(): Int = {
@@ -312,47 +249,22 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
     w
   }
 
-  override def toNode: Node = {
-    if(bundledElm == null) {
-      val nodes = flatten.map{case (n, i) => i};
-      bundledElm = Concatenate(nodes.head, nodes.tail.toList: _*)
-    }
-    bundledElm
-  }
-
-  override def fromNode(n: Node): this.type = {
-    val res = this.clone()
-    var ind = 0;
-    for((name, io) <- res.flatten.toList.reverse) {
-      io.asOutput();
-      if(io.width > 1) io assign NodeExtract(n, ind + io.width-1, ind) else io assign NodeExtract(n, ind);
-      ind += io.width;
-    }
-    res.setIsTypeNode
-    res
-  }
-
   override def asDirectionless(): this.type = {
     elements.foreach(_._2.asDirectionless)
-    this.dir = ""
     this
   }
 
   override def asInput(): this.type = {
     elements.foreach(_._2.asInput)
-    this.dir = "input"
     this
   }
 
   override def asOutput(): this.type = {
     elements.foreach(_._2.asOutput)
-    this.dir = "output"
     this
   }
 
-  override def isDirectionless: Boolean = {
-    (dir == "") && elements.map{case (n,i) => i.isDirectionless}.reduce(_&&_)
-  }
+  override def isDirectionless: Boolean = elements.forall(_._2.isDirectionless)
 
   override def setIsTypeNode() {
     isTypeNode = true;

@@ -33,37 +33,28 @@ import Fill._
 import Lit._
 
 object Fill {
+  def apply(n: Int, mod: Bool): UInt = if (n == 1) mod else UInt(0, n) - mod
   def apply(n: Int, mod: UInt): UInt = UInt(NodeFill(n, mod))
   def apply(mod: UInt, n: Int): UInt = apply(n, mod)
 }
 
 object NodeFill {
   def apply(n: Int, mod: Node): Node = {
-    val (bits_lit) = (mod.litOf);
+    val w = mod.widthW
     if (n == 1) {
       mod
-    } else if (mod.isLit) {
-      val value = mod.litOf.value
-      val w = mod.getWidth
-      var res = value
-      for (i <- 1 until n)
-        res = (res << w)|value
-      Literal(res, n * w)
-    } else if (mod.width == 1 && n > 2) {
-      Op("-", Node.fixWidth(n), mod) /* 2's-comp. negation <-> 1-bit fill */
     } else {
-      /* Build up a Concatenate tree for more ILP in simulation. */
-      var out: Node = null
-      var i = 0
-      var cur = mod
-      while ((1 << i) <= n) {
-        if ((n & (1 << i)) != 0) {
-          out = Concatenate(cur, out)
-        }
-        cur = Concatenate(cur, cur)
-        i = i + 1
+      if (w.isKnown && w.needWidth == 1) {
+        Multiplex(mod, Literal((BigInt(1) << n) - 1, n), Literal(0, n))
+      } else {
+        /* Build up a Concatenate tree for more ILP in simulation. */
+        var out: Node = null
+        val p2 = Array.ofDim[Node](log2Up(n+1))
+        p2(0) = mod
+        for (i <- 1 until p2.length)
+          p2(i) = Concatenate(p2(i-1), p2(i-1))
+        Concatenate((0 until log2Up(n+1)).filter(i => (n & (1 << i)) != 0).map(p2(_)))
       }
-      out
     }
   }
 }
