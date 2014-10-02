@@ -754,4 +754,13 @@ try {
     chiselMain(testArgs,
       () => Module(new MuxComp()))
   }
+
+  /** Test Log2Ceil, Log2Floor
+    */
+  @Test def testLog2CeilFloor() {
+    assertResult(1) { log2Ceil(2) }
+    assertResult(0) { log2Ceil(1) }
+    assertResult(1) { log2Floor(2) }
+    assertResult(0) { log2Floor(1) }
+  }
 }
