@@ -44,18 +44,6 @@ import java.lang.Double.longBitsToDouble
 import java.lang.Float.intBitsToFloat
 
 object Node {
-  val interestingLines = scala.collection.immutable.HashSet(
-    "rocket.CSRFile.<init>(csr.scala:116)",
-    "hardfloat.recodedFloatNToRecodedFloatM$.apply(recodedFloatNToRecodedFloatM.scala:66)",
-    "rocket.BTB.<init>(btb.scala:145)",
-    "Chisel.Queue.<init>(ChiselUtil.scala:390)",
-    "rocket.MSHRFile.<init>(nbdcache.scala:313)",
-    "rocket.MSHRFile.<init>(nbdcache.scala:388)",
-    "uncore.HTIF.<init>(htif.scala:171)",
-    "uncore.BigMem.<init>(llc.scala:26)"
-  )
-  val throwable = new Throwable()
-
   def sprintf(message: String, args: Node*): Bits = {
     val s = Bits().fromNode(new Sprintf(message, args))
     s.setIsTypeNode
@@ -191,9 +179,6 @@ abstract class Node extends nameable {
   private[Chisel] def width_=(w: Int) {
     width_.setWidth(w);
     inferWidth = fixWidth(w);
-    if (true) {
-      println("sw: " + width_ + ", " + w + this.toString)
-    }
   }
 
   private[Chisel] def width_=(w: Width) {
@@ -227,16 +212,6 @@ abstract class Node extends nameable {
         component.getPathName(".") + "." + name
       else
         ""
-  }
-
-  // Print stack frames up to and including the "user" stack frame.
-  def printChiselStackTrace() {
-    val stack = Thread.currentThread().getStackTrace
-    val idx = ChiselError.findFirstUserInd(stack)
-    idx match {
-      case None => {}
-      case Some(x) => for (i <- 0 to x) println(stack(i))
-    }
   }
 
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
