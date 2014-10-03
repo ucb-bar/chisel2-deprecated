@@ -101,6 +101,7 @@ class ChiselConfig(
     (pname,site,here) => {
       try this.topDefinitions(pname, site, here)
       catch {
+        case e: scala.ParameterUndefinedException => that(pname, site, here)
         case e: scala.MatchError => that(pname, site, here)
       }
     }
@@ -113,6 +114,7 @@ class ChiselConfig(
     try this.knobValues(x)
     catch {
       case e: KnobUndefinedException => that(x)
+      case e: MatchError => that(x)
     }
   }
 
