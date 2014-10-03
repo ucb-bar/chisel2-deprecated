@@ -38,10 +38,20 @@ object log2Up
   def apply(in: Int): Int = if(in == 1) 1 else ceil(log(in)/log(2)).toInt
 }
 
+object log2Ceil
+{
+  def apply(in: Int): Int = ceil(log(in)/log(2)).toInt
+}
+
 
 object log2Down
 {
   def apply(x : Int): Int = if (x == 1) 1 else floor(log(x)/log(2.0)).toInt
+}
+
+object log2Floor
+{
+  def apply(x : Int): Int = floor(log(x)/log(2.0)).toInt
 }
 
 

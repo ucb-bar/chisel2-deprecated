@@ -60,7 +60,7 @@ object Driver extends FileSystemUtilities{
       val world = if(chiselConfigMode.get == "collect") new Collector(config.topDefinitions,config.knobValues) else new Instance(config.topDefinitions,config.knobValues)
       val p = Parameters.root(world)
       config.topConstraints.foreach(c => p.constrain(c))
-      val c = execute(() => Module(gen())(Some(p)))
+      val c = execute(() => Module(gen())(p))
       if(chiselConfigMode.get == "collect") {
         val v = createOutputFile(chiselConfigClassName.get + ".knb")
         v.write(world.getKnobs)
@@ -72,7 +72,7 @@ object Driver extends FileSystemUtilities{
       c
     } 
     else {
-      execute(() => Module(gen())(None))
+      execute(() => Module(gen()))
     }
   }
 
