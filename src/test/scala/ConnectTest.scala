@@ -295,4 +295,33 @@ class ConnectSuite extends TestSuite {
     launchCppTester((m: VecOutput) => new VecOutputTests(m))
   }
 
+  /** Test repeatedwirenames209
+   *  
+   */
+  @Test def testRepeatedWireNames209() {
+    try {
+      class CordicIO extends Bundle() {
+        val out_broken = Bool(INPUT)
+      }
+      
+      class CordicStage extends Module {
+        val io = new CordicIO()
+        val counter = Reg(init = UInt(0, 1))
+        counter := counter + UInt(1)
+        io.out_broken := counter(0)
+      }
+      
+      class Cordic extends Module {
+        val io = new CordicIO()
+        val stage1 = Module(new CordicStage)
+        val stage2 = Module(new CordicStage)
+      }
+      
+      chiselMain(Array[String]("--v"), () => Module(new Cordic))
+    } catch {
+      case _ : Throwable => ;
+    }
+    assertTrue(!ChiselError.ChiselErrors.isEmpty);
+  }
+
 }
