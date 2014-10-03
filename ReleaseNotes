@@ -16,7 +16,7 @@ and they can select which configuration to use at runtime via the
 Chisel command line. We allow constraints to be placed on parameter
 values and provide hooks for automated design space exploration of
 parameter spaces. A detailed guide to these experimental features is
-available at https://github.com/ucb-bar/chisel/tree/master/doc/parameters
+available at in the Chisel repo at chisel/doc/parameters/parameters.pdf
 
 0-width wire support attempts to eliminate 0-width wires from the
 design by either replacing them with the appropriate identity element,
