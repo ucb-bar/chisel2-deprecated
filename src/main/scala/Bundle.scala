@@ -48,12 +48,15 @@ object Bundle {
     res
   }
 
-  def apply[T <: Bundle](c: => T,  f: PartialFunction[Any,Any]): T = {
-    val q = params.alterPartial(f)
-    Driver.parStack.push(q)
-    val res = c
+  def apply[T <: Bundle](b: => T)(implicit p: Parameters): T = {
+    Driver.parStack.push(p)
+    val res = b
     Driver.parStack.pop
     res
+  }
+  def apply[T <: Bundle](b: => T,  f: PartialFunction[Any,Any]): T = {
+    val q = params.alterPartial(f)
+    apply(b)(q)
   }
   private def params = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
 }
@@ -61,9 +64,8 @@ object Bundle {
 /** Defines a collection of datum of different types into a single coherent
   whole.
   */
-class Bundle(view_arg: Seq[String] = null)(implicit _params:Option[Parameters] = None) extends Aggregate {
+class Bundle(view_arg: Seq[String] = null) extends Aggregate {
   var view = view_arg;
-  override val params = if(_params == None) Bundle.params else _params.get
   private var elementsCache: ArrayBuffer[(String, Data)] = null;
 
   /** Populates the cache of elements declared in the Bundle. */

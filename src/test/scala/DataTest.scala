@@ -274,6 +274,23 @@ class DataSuite extends TestSuite {
     assertTrue( io.in.getWidth() == 16 )
   }
 
+  
+  /** Infinite Width Inference #76
+   *  
+   */
+  @Test def widthInfinInfer() {
+    println("\nwidthInfinInfer ...")
+    class WidthInfinInfer extends Bundle {
+      val num_entries = 2
+      val debug = new Bundle
+      {
+         val entry = Vec.fill(num_entries) { new Bundle {
+            val valid = Bool()
+            val eflags = UInt() // THIS IS THE CULPRIT
+         }}
+       }.asOutput
+    }
+  }
 
 }
 
