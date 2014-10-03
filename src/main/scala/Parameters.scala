@@ -81,9 +81,9 @@ final case class Knob[T](name:Any)
 
 
 class ChiselConfig(
-  val topDefinitions: World.TopDefs = { (a,b,c) => {throw new ParameterUndefinedException(a); a} },
+  val topDefinitions: World.TopDefs = { (a,b,c) => {throw new scala.MatchError(a)}},
   val topConstraints: List[ViewSym=>Ex[Boolean]] = List( ex => ExLit[Boolean](true) ),
-  val knobValues: Any=>Any = { case x => {throw new KnobUndefinedException(x); x} }
+  val knobValues: Any=>Any = { case x => {throw new scala.MatchError(x)}}
 ) {
   type Constraint = ViewSym=>Ex[Boolean]
 
@@ -101,7 +101,6 @@ class ChiselConfig(
     (pname,site,here) => {
       try this.topDefinitions(pname, site, here)
       catch {
-        case e: ParameterUndefinedException => that(pname, site, here)
         case e: scala.MatchError => that(pname, site, here)
       }
     }
@@ -113,7 +112,6 @@ class ChiselConfig(
   def addKnobValues(that: Any=>Any): Any=>Any = { case x =>
     try this.knobValues(x)
     catch {
-      case e: KnobUndefinedException => that(x)
       case e: scala.MatchError => that(x)
     }
   }
@@ -340,8 +338,12 @@ class Collector(
     }
   }
   
-  def _knobValue(kname:Any):Any =
-    knobVal(kname)
+  def _knobValue(kname:Any) = {
+     try knobVal(kname)
+     catch {
+       case e:scala.MatchError => throw new KnobUndefinedException(kname, e)
+     }
+  }
 
   override def getConstraints:String = if(constraints.isEmpty) "" else constraints.map("( " + _.toString + " )").reduce(_ +"\n" + _) + "\n"
 
@@ -359,7 +361,12 @@ class Instance(
   
   def _bindLet[T](pname:Any,expr:Ex[T]):Ex[T] = expr
   def _constrain(e:Ex[Boolean]) = {}
-  def _knobValue(kname:Any) = knobVal(kname)
+  def _knobValue(kname:Any) = {
+     try knobVal(kname)
+     catch {
+       case e:scala.MatchError => throw new KnobUndefinedException(kname, e)
+     }
+  }
 }
 
 object Parameters {
