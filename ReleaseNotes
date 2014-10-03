@@ -1,8 +1,22 @@
-Chisel v2.2.19 10/3/14
+ReleaseNotes for Chisel v2.2.19 10/3/14
 
 This release of Chisel adds support for:
+ - design parameters
  - 0-width wires
  - C++ backend compilation performance
+
+We are introducing experimental support to Chisel to allow module
+designers to specify design parameters that should be configured on
+the fly as the design is elaborated. We provide support for looking up
+parameter values within Chisel Modules and Bundles, as well as scoping
+where certain parameter values are defined and customizing how
+dependent parameters are calculated. Users can define custom
+ChiselConfiguration classes which override default parameter values,
+and they can select which configuration to use at runtime via the
+Chisel command line. We allow constraints to be placed on parameter
+values and provide hooks for automated design space exploration of
+parameter spaces. A detailed guide to these experimental features is
+available at https://github.com/ucb-bar/chisel/tree/master/doc/parameters
 
 0-width wire support attempts to eliminate 0-width wires from the
 design by either replacing them with the appropriate identity element,

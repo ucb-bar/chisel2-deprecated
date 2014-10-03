@@ -1,3 +1,5 @@
+ChangeLog for Chisel v2.2.19 10/3/14
+
 6d072cd initialize register that guards reset for assert checking
 67a3450 Add preliminary man page template.
 2ea8cea Merge pull request #259 from ucb-bar/cpluspartition (C++ compilation speedups)
