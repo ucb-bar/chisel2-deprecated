@@ -423,7 +423,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     )) {
        val name = m.getName();
        val types = m.getParameterTypes();
-       if (isPublic(m.getModifiers()) {
+       if (isPublic(m.getModifiers())) {
          val o = m.invoke(this);
          o match {
          case node: Node => {
