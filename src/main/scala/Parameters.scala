@@ -79,12 +79,43 @@ class KnobUndefinedException(field:Any, cause:Throwable=null)
 // Knobs are top level free variables that go into the constraint solver.
 final case class Knob[T](name:Any)
 
-abstract class ChiselConfig {
-  val topDefinitions:World.TopDefs
-  val topConstraints:List[ViewSym=>Ex[Boolean]] = List( ex => ExLit[Boolean](true) )
-  val knobValues:Any=>Any = {
-    case x => {throw new KnobUndefinedException(x); x}
+
+class ChiselConfig(
+  val topDefinitions: World.TopDefs = { (a,b,c) => {throw new ParameterUndefinedException(a); a} },
+  val topConstraints: List[ViewSym=>Ex[Boolean]] = List( ex => ExLit[Boolean](true) ),
+  val knobValues: Any=>Any = { case x => {throw new KnobUndefinedException(x); x} }
+) {
+  type Constraint = ViewSym=>Ex[Boolean]
+
+  def this(that: ChiselConfig) = this(that.topDefinitions, 
+                                      that.topConstraints, 
+                                      that.knobValues)
+
+  def ++(that: ChiselConfig) = {
+    new ChiselConfig(this.addDefinitions(that.topDefinitions),
+                      this.addConstraints(that.topConstraints),
+                      this.addKnobValues(that.knobValues))
   }
+
+  def addDefinitions(that: World.TopDefs): World.TopDefs = {
+    (pname,site,here) => {
+      try this.topDefinitions(pname, site, here)
+      catch {
+        case e: scala.MatchError => that(pname, site, here)
+      }
+    }
+  }
+
+  def addConstraints(that: List[Constraint]):List[Constraint] = 
+    this.topConstraints ++ that
+
+  def addKnobValues(that: Any=>Any): Any=>Any = { case x =>
+    try this.knobValues(x)
+    catch {
+      case e: KnobUndefinedException => that(x)
+    }
+  }
+
 }
 
 object Dump {
