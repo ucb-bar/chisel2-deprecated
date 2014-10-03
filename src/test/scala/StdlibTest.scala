@@ -763,4 +763,17 @@ try {
     assertResult(1) { log2Floor(2) }
     assertResult(0) { log2Floor(1) }
   }
+  
+  @Test def testLit168 {
+    class DSP extends Module {
+      val io = new Bundle {
+        val s2 = Bits(12)
+      }
+    }
+
+    chiselMain(testArgs,
+      () => Module(new DSP()))
+  }
+
+
 }
