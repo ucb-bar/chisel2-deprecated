@@ -361,7 +361,7 @@ abstract class Bits extends Data with proc {
   }
 
   def toBools: Vec[Bool] = Vec.tabulate(this.getWidth)(i => this(i))
-  
+
   def error(b: Bits): Bits = {
     throw new Exception("+ not defined on " + this.getClass + " and " + b.getClass)
     this

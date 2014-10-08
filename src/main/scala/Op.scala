@@ -217,7 +217,7 @@ object Op {
         case "f<=" => return Bool(fa_val <= fb_val);
         case _ => ;
       }
-      } else if (a_lit != null) { 
+      } else if (a_lit != null) {
         val fa_val = a_lit.floLitValue
         if (fa_val == 0.0) {
           name match {
@@ -231,8 +231,8 @@ object Op {
             case "f*" => return b;
             case _ => ;
           }
-        }        
-      } else if (b_lit != null) { 
+        }
+      } else if (b_lit != null) {
         val fb_val = b_lit.floLitValue
         if (fb_val == 0.0) {
           name match {
@@ -247,10 +247,10 @@ object Op {
             case "f%" => return a;
             case _ => ;
           }
-        }        
+        }
       }
     }
-      
+
     if (a.isInstanceOf[Dbl] && b.isInstanceOf[Dbl]) {
       if (a_lit != null && b_lit != null) {
       val (fa_val, fb_val) = (a_lit.dblLitValue, b_lit.dblLitValue)
@@ -269,7 +269,7 @@ object Op {
         case "d<=" => return Bool(fa_val <= fb_val);
         case _ => ;
       }
-    } else if (a_lit != null) { 
+    } else if (a_lit != null) {
       val fa_val = a_lit.dblLitValue
       // println("FA " + fa_val + " NAME " + name);
       if (fa_val == 0.0) {
@@ -287,8 +287,8 @@ object Op {
           case "d*" => return b;
           case _ => ;
         }
-      }        
-    } else if (b_lit != null) { 
+      }
+    } else if (b_lit != null) {
       val fb_val = b_lit.dblLitValue
       // println("FB " + fb_val + " NAME " + name);
       if (fb_val == 0.0) {
@@ -306,7 +306,7 @@ object Op {
           case "d%" => return a;
           case _ => ;
         }
-      }        
+      }
     }
 
     }
@@ -369,7 +369,7 @@ object Op {
         }
       }
       val a_lit = a.litOf
-    if (a.isInstanceOf[Dbl]) { 
+    if (a.isInstanceOf[Dbl]) {
       if (a_lit != null) {
       val fa_val = a_lit.dblLitValue
       name match {
@@ -619,7 +619,7 @@ abstract class Op extends Node {
           }
         }
         case r: ReductionOp => {
- 
+
         }
       }
     }

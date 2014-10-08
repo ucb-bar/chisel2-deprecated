@@ -89,9 +89,9 @@ class VcdBackend(top: Module) extends Backend {
     "  }\n"
 
   private def emitDefInline(node: Node, offset: Int, index: Int) =
-    "  if (" + emitRef(node) + ".get(0x" + offset.toHexString +") != " + emitRef(node) + 
+    "  if (" + emitRef(node) + ".get(0x" + offset.toHexString +") != " + emitRef(node) +
     "__prev.get(0x" + offset.toHexString + ")) {\n" +
-    "    " + emitRef(node) + "__prev.get(0x" + offset.toHexString + ") = " + 
+    "    " + emitRef(node) + "__prev.get(0x" + offset.toHexString + ") = " +
     "    " + emitRef(node) + ".get(0x" + offset.toHexString + ");\n" +
     "    " + emitDefUnconditional(node, offset, index) +
     "  }\n"
@@ -103,8 +103,8 @@ class VcdBackend(top: Module) extends Backend {
           "  mem_t<" + m.needWidth() + "," + m.n + "> " + emitRef(node) + "__prev" + ";\n"
         case r: ROMData =>
           "  mem_t<" + r.needWidth() + "," + r.lits.size + "> " + emitRef(node) + "__prev" + ";\n"
-        case _ => 
-          "  dat_t<" + node.needWidth() + "> " + emitRef(node) + "__prev" + ";\n" 
+        case _ =>
+          "  dat_t<" + node.needWidth() + "> " + emitRef(node) + "__prev" + ";\n"
       }
     }
     else ""
@@ -113,15 +113,15 @@ class VcdBackend(top: Module) extends Backend {
     write("  fputs(\"" + "$scope module " + c.name + " $end" + "\\n\", f);\n")
     for (i <- 0 until sortedMods.length) {
       val mod = sortedMods(i)
-      if (mod.component == c && !mod.name.isEmpty) 
-        write("  fputs(\"$var wire " + mod.needWidth() + " " + varName(i) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\", f);\n") 
+      if (mod.component == c && !mod.name.isEmpty)
+        write("  fputs(\"$var wire " + mod.needWidth() + " " + varName(i) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\", f);\n")
     }
     var baseIdx = sortedMods.length
     for (mem <- sortedMems) {
       if (mem.component == c && !mem.name.isEmpty) {
         for (offset <- 0 until mem.n) {
-          write("  fputs(\"$var wire " + mem.needWidth() + " " + varName(baseIdx + offset) + " " + 
-            top.stripComponent(emitRef(mem)) + "[%d] $end\\n\", f);\n".format(offset)) 
+          write("  fputs(\"$var wire " + mem.needWidth() + " " + varName(baseIdx + offset) + " " +
+            top.stripComponent(emitRef(mem)) + "[%d] $end\\n\", f);\n".format(offset))
         }
       }
       baseIdx += mem.n
@@ -129,8 +129,8 @@ class VcdBackend(top: Module) extends Backend {
     for (rom <- sortedROMs) {
       if (rom.component == c && !rom.name.isEmpty) {
         for (offset <- 0 until rom.lits.size) {
-          write("  fputs(\"$var wire " + rom.needWidth() + " " + varName(baseIdx + offset) + " " + 
-            top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset)) 
+          write("  fputs(\"$var wire " + rom.needWidth() + " " + varName(baseIdx + offset) + " " +
+            top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset))
         }
       }
       baseIdx += rom.lits.size
@@ -152,8 +152,8 @@ class VcdBackend(top: Module) extends Backend {
     for (mem <- sortedMems) {
       if (mem.name.isEmpty) {
         for (offset <- 0 until mem.n) {
-          write("  fputs(\"$var wire " + mem.needWidth() + " " + varName(baseIdx + offset) + " " + 
-            top.stripComponent(emitRef(mem)) + "[%d] $end\\n\", f);\n".format(offset)) 
+          write("  fputs(\"$var wire " + mem.needWidth() + " " + varName(baseIdx + offset) + " " +
+            top.stripComponent(emitRef(mem)) + "[%d] $end\\n\", f);\n".format(offset))
         }
       }
       baseIdx += mem.n
@@ -161,8 +161,8 @@ class VcdBackend(top: Module) extends Backend {
     for (rom <- sortedROMs) {
       if (rom.name.isEmpty) {
         for (offset <- 0 until rom.lits.size) {
-          write("  fputs(\"$var wire " + rom.needWidth() + " " + varName(baseIdx + offset) + " " + 
-            top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset)) 
+          write("  fputs(\"$var wire " + rom.needWidth() + " " + varName(baseIdx + offset) + " " +
+            top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset))
         }
       }
       baseIdx += rom.lits.size
@@ -187,12 +187,12 @@ class VcdBackend(top: Module) extends Backend {
       }
       var baseIdx = sortedMods.length
       for (mem <- sortedMems) {
-        for (offset <- 0 until mem.n) 
+        for (offset <- 0 until mem.n)
           write(emitDefUnconditional(mem, offset, baseIdx + offset))
         baseIdx += mem.n
       }
       for (rom <- sortedROMs) {
-        for (offset <- 0 until rom.lits.size) 
+        for (offset <- 0 until rom.lits.size)
           write(emitDefUnconditional(rom, offset, baseIdx + offset))
         baseIdx += rom.lits.size
       }

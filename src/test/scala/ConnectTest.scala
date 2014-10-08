@@ -239,7 +239,7 @@ class ConnectSuite extends TestSuite {
     class RegisterHookTests(m: A) extends Tester(m) {
       List(1,     2,     4,     6,     8,     12,    15,   15).zip(
       List(false, true,  true,  false, true,  false, true, false)).zip(
-      List((0,0), (0,2), (1,0), (1,0), (2,0), (2,0), (3,3), (3,3))).map { 
+      List((0,0), (0,2), (1,0), (1,0), (2,0), (2,0), (3,3), (3,3))).map {
         case ((in, en), (im0, im1)) =>
           poke(m.io.wdata, in)
           poke(m.io.wen,   int(en))
@@ -272,8 +272,8 @@ class ConnectSuite extends TestSuite {
         io.output := io.input + foreign.add
       }
 
-      chiselMain(Array[String]("--v", 
-        "--targetDir", dir.getPath.toString()), 
+      chiselMain(Array[String]("--v",
+        "--targetDir", dir.getPath.toString()),
         () => Module(new ForeignRef()))
 
     } catch {
@@ -326,27 +326,27 @@ class ConnectSuite extends TestSuite {
   }
 
   /** Test repeatedwirenames209
-   *  
+   *
    */
   @Test def testRepeatedWireNames209() {
     try {
       class CordicIO extends Bundle() {
         val out_broken = Bool(INPUT)
       }
-      
+
       class CordicStage extends Module {
         val io = new CordicIO()
         val counter = Reg(init = UInt(0, 1))
         counter := counter + UInt(1)
         io.out_broken := counter(0)
       }
-      
+
       class Cordic extends Module {
         val io = new CordicIO()
         val stage1 = Module(new CordicStage)
         val stage2 = Module(new CordicStage)
       }
-      
+
       chiselMain(Array[String]("--v"), () => Module(new Cordic))
     } catch {
       case _ : Throwable => ;
