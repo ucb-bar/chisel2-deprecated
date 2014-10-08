@@ -85,6 +85,7 @@ class ChiselConfig(
   val topConstraints: List[ViewSym=>Ex[Boolean]] = List( ex => ExLit[Boolean](true) ),
   val knobValues: Any=>Any = { case x => {throw new scala.MatchError(x)}}
 ) {
+  import Implicits._
   type Constraint = ViewSym=>Ex[Boolean]
 
   def this(that: ChiselConfig) = this(that.topDefinitions, 
@@ -106,8 +107,10 @@ class ChiselConfig(
     }
   }
 
-  def addConstraints(that: List[Constraint]):List[Constraint] = 
+  def addConstraints(that: List[Constraint]):List[Constraint] = {
     this.topConstraints ++ that
+  }
+
 
   def addKnobValues(that: Any=>Any): Any=>Any = { case x =>
     try this.knobValues(x)
@@ -487,6 +490,25 @@ case class IntEx (expr:Ex[Int]) {
   def >   (x:IntEx):Ex[Boolean] = ExGt(expr,x.expr)
   def <=  (x:IntEx):Ex[Boolean] = ExLte(expr,x.expr)
   def >=  (x:IntEx):Ex[Boolean] = ExGte(expr,x.expr)
+  def in  (x:List[IntEx]):Ex[Boolean] = {
+    val canBound = x.map(_.expr match {
+      case e:ExVar[_] => false
+      case _ => true
+    }).reduce(_ && _)
+    if (canBound) {
+      val max = x.map(i => Ex.eval(i.expr,(x:Any)=>null)).max
+      val min = x.map(i => Ex.eval(i.expr,(x:Any)=>null)).min
+      ExAnd(IntEx(expr) in Range(min,max), IntEx(expr) _in x)
+    } else {
+      IntEx(expr) _in x
+    }
+  }
+  def in  (x:Range):Ex[Boolean] = ExAnd(ExGte(expr,ExLit[Int](x.min)),ExLte(expr,ExLit[Int](x.max)))
+  private def _in (x:List[IntEx]):Ex[Boolean] = {
+    if (x.isEmpty) ExLit[Boolean](false) else {
+      ExOr(IntEx(expr) === x.head,IntEx(expr) _in x.tail)
+    }
+  }
 }
 
 case class BoolEx (expr:Ex[Boolean]) {
@@ -498,15 +520,18 @@ case class BoolEx (expr:Ex[Boolean]) {
 }
 
 object Implicits {
-  implicit def ExIntToIntEx(i:Ex[Int]):IntEx = IntEx(i)
-  implicit def IntToIntEx(i:Int):IntEx = IntEx(ExLit[Int](i))
-  implicit def ExBoolToBoolEx(b:Ex[Boolean]):BoolEx = BoolEx(b)
-  implicit def BoolToIntEx(b:Boolean):BoolEx = BoolEx(ExLit[Boolean](b))
+  //TODO Need to conver List[Int] to ExList
+  implicit def ExInt_IntEx(i:Ex[Int]):IntEx = IntEx(i)
+  implicit def Int_IntEx(i:Int):IntEx = IntEx(ExLit[Int](i))
+  implicit def ExBool_BoolEx(b:Ex[Boolean]):BoolEx = BoolEx(b)
+  implicit def Bool_IntEx(b:Boolean):BoolEx = BoolEx(ExLit[Boolean](b))
+
+  implicit def ListInt_ListExInt(l:List[Int]):List[IntEx] = l.map((x:Int) => IntEx(ExLit[Int](x)))
+  implicit def ListExInt_ListExInt(l:List[Ex[Int]]):List[IntEx] = l.map((x:Ex[Int]) => IntEx(x))
 }
 
 final case class ExLit[T](value:T) extends Ex[T]
 final case class ExVar[T](name:Any) extends Ex[T]
-
 
 final case class ExAnd(a:Ex[Boolean], b:Ex[Boolean]) extends Ex[Boolean]
 final case class ExOr(a:Ex[Boolean], b:Ex[Boolean]) extends Ex[Boolean]
@@ -514,6 +539,7 @@ final case class ExXor(a:Ex[Boolean], b:Ex[Boolean]) extends Ex[Boolean]
 
 final case class ExEq[T](a:Ex[T], b:Ex[T]) extends Ex[Boolean]
 final case class ExNeq[T](a:Ex[T], b:Ex[T]) extends Ex[Boolean]
+
 final case class ExLt(a:Ex[Int], b:Ex[Int]) extends Ex[Boolean]
 final case class ExLte(a:Ex[Int], b:Ex[Int]) extends Ex[Boolean]
 final case class ExGt(a:Ex[Int], b:Ex[Int]) extends Ex[Boolean]
@@ -583,6 +609,7 @@ object Ex {
       case e:ExSub => 20
       case e:ExMul => 20
       case e:ExMod => 20
+      //case e:ExIn => 20
       case e:ExLit[_] => 0
       case e:ExVar[_] => 0
     }
@@ -601,6 +628,7 @@ object Ex {
     e match {
       case ExLit(v) => v.toString
       case e:ExVar[_]=> "$"+e.name
+      //case e:ExList[_]=> "[" + e.list.map(_.toString).reduce(_ + "," + _) + "]"
       case ExAnd(a,b) => term(a)+" && "+term(b)
       case ExOr(a,b) => term(a)+" || "+term(b)
       case ExXor(a,b) => term(a)+" ^ "+term(b)
@@ -614,6 +642,7 @@ object Ex {
       case ExSub(a,b) => term(a)+" - "+term(b)
       case ExMul(a,b) => term(a)+" * "+term(b)
       case ExMod(a,b) => term(a)+" % "+term(b)
+      //case ExIn(a,b) => term(a)+" in ["+term(b)
     }
   }
 }
