@@ -132,7 +132,7 @@ class BitsSuite extends AssertionsForJUnit {
     assertTrue( res.getWidth == 6 )
     assertTrue( res.litOf.value == 44 )
     } catch {
-      case e => e.printStackTrace()
+      case e : Throwable => e.printStackTrace()
     }
   }
 }

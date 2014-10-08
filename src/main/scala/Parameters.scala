@@ -79,12 +79,43 @@ class KnobUndefinedException(field:Any, cause:Throwable=null)
 // Knobs are top level free variables that go into the constraint solver.
 final case class Knob[T](name:Any)
 
-abstract class ChiselConfig {
-  val topDefinitions:World.TopDefs
-  val topConstraints:List[ViewSym=>Ex[Boolean]] = List( ex => ExLit[Boolean](true) )
-  val knobValues:Any=>Any = {
-    case x => {throw new KnobUndefinedException(x); x}
+
+class ChiselConfig(
+  val topDefinitions: World.TopDefs = { (a,b,c) => {throw new scala.MatchError(a)}},
+  val topConstraints: List[ViewSym=>Ex[Boolean]] = List( ex => ExLit[Boolean](true) ),
+  val knobValues: Any=>Any = { case x => {throw new scala.MatchError(x)}}
+) {
+  type Constraint = ViewSym=>Ex[Boolean]
+
+  def this(that: ChiselConfig) = this(that.topDefinitions, 
+                                      that.topConstraints, 
+                                      that.knobValues)
+
+  def ++(that: ChiselConfig) = {
+    new ChiselConfig(this.addDefinitions(that.topDefinitions),
+                      this.addConstraints(that.topConstraints),
+                      this.addKnobValues(that.knobValues))
   }
+
+  def addDefinitions(that: World.TopDefs): World.TopDefs = {
+    (pname,site,here) => {
+      try this.topDefinitions(pname, site, here)
+      catch {
+        case e: scala.MatchError => that(pname, site, here)
+      }
+    }
+  }
+
+  def addConstraints(that: List[Constraint]):List[Constraint] = 
+    this.topConstraints ++ that
+
+  def addKnobValues(that: Any=>Any): Any=>Any = { case x =>
+    try this.knobValues(x)
+    catch {
+      case e: scala.MatchError => that(x)
+    }
+  }
+
 }
 
 object Dump {
@@ -307,8 +338,12 @@ class Collector(
     }
   }
   
-  def _knobValue(kname:Any):Any =
-    knobVal(kname)
+  def _knobValue(kname:Any) = {
+     try knobVal(kname)
+     catch {
+       case e:scala.MatchError => throw new KnobUndefinedException(kname, e)
+     }
+  }
 
   override def getConstraints:String = if(constraints.isEmpty) "" else constraints.map("( " + _.toString + " )").reduce(_ +"\n" + _) + "\n"
 
@@ -326,14 +361,19 @@ class Instance(
   
   def _bindLet[T](pname:Any,expr:Ex[T]):Ex[T] = expr
   def _constrain(e:Ex[Boolean]) = {}
-  def _knobValue(kname:Any) = knobVal(kname)
+  def _knobValue(kname:Any) = {
+     try knobVal(kname)
+     catch {
+       case e:scala.MatchError => throw new KnobUndefinedException(kname, e)
+     }
+  }
 }
 
 object Parameters {
   def root(w:World) = {
     new Parameters(w, w._topLook())
   }
-  def empty = Parameters.root(new Collector((a,b,c) => {a},(a:Any) => {a})) 
+  def empty = Parameters.root(new Collector((a,b,c) => {throw new ParameterUndefinedException(a); a},(a:Any) => {throw new KnobUndefinedException(a); a})) 
   
   // Mask making helpers
   

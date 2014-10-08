@@ -38,10 +38,20 @@ object log2Up
   def apply(in: Int): Int = if(in == 1) 1 else ceil(log(in)/log(2)).toInt
 }
 
+object log2Ceil
+{
+  def apply(in: Int): Int = ceil(log(in)/log(2)).toInt
+}
+
 
 object log2Down
 {
   def apply(x : Int): Int = if (x == 1) 1 else floor(log(x)/log(2.0)).toInt
+}
+
+object log2Floor
+{
+  def apply(x : Int): Int = floor(log(x)/log(2.0)).toInt
 }
 
 
@@ -132,8 +142,14 @@ object ShiftRegister
 {
   def apply[T <: Data](in: T, n: Int, en: Bool = Bool(true)): T =
   {
-    if (n == 1) RegEnable(in, en)
-    else RegNext(apply(in, n-1, en))
+    // The order of tests reflects the expected use cases.
+    if (n == 1) {
+      RegEnable(in, en)
+    } else if (n != 0) {
+      RegNext(apply(in, n-1, en))
+    } else {
+      in
+    }
   }
 }
 

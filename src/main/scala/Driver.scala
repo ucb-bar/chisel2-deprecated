@@ -56,11 +56,20 @@ object Driver extends FileSystemUtilities{
 
   private def executeUnwrapped[T <: Module](gen: () => T): T = {
     if (!chiselConfigMode.isEmpty && !chiselConfigClassName.isEmpty) { 
-      val config = Class.forName(appendString(chiselProjectName,chiselConfigClassName)).newInstance.asInstanceOf[ChiselConfig]
-      val world = if(chiselConfigMode.get == "collect") new Collector(config.topDefinitions,config.knobValues) else new Instance(config.topDefinitions,config.knobValues)
+      val name = appendString(chiselProjectName,chiselConfigClassName)
+      val config = try {
+        Class.forName(name).newInstance.asInstanceOf[ChiselConfig]
+      } catch {
+        case e: java.lang.ClassNotFoundException => 
+          throwException("Could not find the ChiselConfig subclass you asked for (\"" + 
+                          name + "\"), did you misspell it?", e)
+      }
+      val world = if(chiselConfigMode.get == "collect") {
+        new Collector(config.topDefinitions,config.knobValues) 
+      } else { new Instance(config.topDefinitions,config.knobValues) }
       val p = Parameters.root(world)
       config.topConstraints.foreach(c => p.constrain(c))
-      val c = execute(() => Module(gen())(Some(p)))
+      val c = execute(() => Module(gen())(p))
       if(chiselConfigMode.get == "collect") {
         val v = createOutputFile(chiselConfigClassName.get + ".knb")
         v.write(world.getKnobs)
@@ -72,7 +81,7 @@ object Driver extends FileSystemUtilities{
       c
     } 
     else {
-      execute(() => Module(gen())(None))
+      execute(() => Module(gen()))
     }
   }
 

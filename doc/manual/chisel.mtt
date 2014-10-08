@@ -50,8 +50,11 @@ backend.
 \section{Options}
 %%%%%%%%%%%%%%%%%
 \begin{Description}[\Opt{--allocateOnlyNeededShadowRegisters}]\setlength{\itemsep}{0cm}
-\item[\Opt{--allocateOnlyNeededShadowRegisters}] Attempt to allocate
-  only those shadow registers actually required.
+\item[\Opt{--allocateOnlyNeededShadowRegisters}] (C++) Attempt to allocate
+  only those shadow registers actually required. This reduces the size
+  of the main C++ design object (especially when
+  \Arg{--shadowRegisterInObject} is enabled), which in turn reduces
+  compilation time. It should have no execution-time performance impact.
 \item[\Opt{--assert}] Emit assertions.
 \item[\OptArg{--backend}{\ backendname}] Use the specified backend where
   \Arg{backendname} is one of
@@ -66,7 +69,7 @@ backend.
 \item[\Opt{--checkPorts}] Hmmm
 \item[\Opt{--compile}] Produce backend output
 \item[\Opt{--compileInitializationUnoptimized}] (C++) Compile
-  initialization code at -O0
+  initialization code at -O0, rarely used code at -O1.
 \item[\OptArg{--configCollect}{\ project.class}] Hmmm
 \item[\Opt{--configDump}] Hmmm
 \item[\OptArg{--configInstance}{\ project.class}] Hmmm
@@ -82,15 +85,25 @@ backend.
 \item[\Opt{--ioDebug}] Hmmm
 \item[\Opt{--isVCDinline}] (C++) Generate VCD dump code without goto
   branches. Allows compiling smaller VCD dump functions, reducing C++
-  compile times.
+  compile times. This will have some impact on execution-time performance.
 \item[\OptArg{--lineLimitFunctions}{\ lines}] (C++) Limit the number of
   lines in a C++ function/method before splitting it up into multiple
-  functions to reduce C++ compile times.
+  functions to reduce C++ compile times. The \Arg{lines} value
+  specifies a loose upper limit on the number of lines output to a
+  single function before that function is split up into smaller
+  functions. This involves a trade-off between compile-time
+  performance and execution-time performance. Smaller functions yield
+  faster compile times, but result in slower execution since instead
+  of calling a single function, calls to multiple functions are
+  generated. Reasonable values for this argument would be in the range
+  from 256 to 2048.
 \item[\Opt{--lineNumbers}] Hmmm
 \item[\OptArg{--minimumLinesPerFile}{\ lines}] (C++) Limit the minimum
   number of lines per file so as not to produce trivial files. This
-  works in conjunction with \Arg{lineLimitFunctions} so break up a
-  massive single file into multiple smaller (but not too small) files.
+  works in conjunction with \Arg{lineLimitFunctions} to break up a
+  massive single file into multiple smaller (but not too small)
+  files. Reasonable values for this argument would be in the range of
+  1024 to 32768.
 \item[\OptArg{--moduleNamePrefix}{\ }] Hmmm
 \item[\Opt{--noAssert}] Hmmm
 \item[\Opt{--noCombLoop}] Hmmm
@@ -101,7 +114,10 @@ backend.
 \item[\OptArg{--parallelMakeJobs}{\ jobs}] (C++) Generate a
   \File{Makefile} to compile multiple C++ files in parallel. The
   \Arg{jobs} argument specifies the amount of parallelism (the
-  argument to the \Arg{-j} option to \Prog{make}).
+  argument to the \Arg{-j} option to \Prog{make}). A value of -1 indicates
+  that no value will be passed with the \Arg{-j} argument to
+  \Prog{make}, which in turn should inform \Prog{make} not to limit
+  the number of jobs that can run simultaneously.
 \item[\Opt{--partitionIslands}] (C++, dot) Partition the graph into islands of
   combinatorial logic that may be compiled and executed in parallel.
 \item[\Opt{--reportDims}] Hmmm

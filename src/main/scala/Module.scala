@@ -42,30 +42,16 @@ import ChiselError._
 import Module._
 
 object Module {
-  def apply[T<:Module](c: =>T, f: PartialFunction[Any,Any]): T = {
-    val q = params.alterPartial(f)
+  def apply[T <: Module](m: => T)(implicit p: Parameters = params): T = {
     Driver.modStackPushed = true
-    Driver.parStack.push(q)
-    val res = init(c)
+    Driver.parStack.push(p.push)
+    val res = init(m)
     Driver.parStack.pop
     res
   }
-  def apply[T<:Module](c: =>T)(implicit _p:Option[Parameters] = None): T = {
-    Driver.modStackPushed = true
-    _p match {
-      case Some(q: Parameters) => {
-        Driver.parStack.push(q.push)
-        val res = init(c)
-        Driver.parStack.pop
-        res
-      }
-      case None => {
-        if(Driver.parStack.isEmpty) Driver.parStack.push(Parameters.empty) else Driver.parStack.push(Driver.parStack.top.push)
-        val res = init(c)
-        Driver.parStack.pop
-        res
-      }
-    }
+  def apply[T <: Module](m: => T, f: PartialFunction[Any,Any]): T = {
+    val q = params.alterPartial(f)
+    apply(m)(q)
   }
 
   private def init[T<:Module](c: =>T):T = {
