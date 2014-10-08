@@ -171,9 +171,9 @@ abstract class Backend extends FileSystemUtilities{
     // and used in custom transforms such as backannotation
     for (comp <- Driver.sortedComps) {
       comp dfs { _ match {
-        case reg: Reg if reg.name == "" => 
+        case reg: Reg if reg.name == "" =>
           reg.name = "R" + reg.component.nextIndex
-        case node: Node if !node.isTypeNode && node.name == "" => 
+        case node: Node if !node.isTypeNode && node.name == "" =>
           node.name = "T" + node.component.nextIndex
         case _ =>
       } }
@@ -250,9 +250,9 @@ abstract class Backend extends FileSystemUtilities{
     Driver.sortedComps foreach (_.nodes.clear)
     Driver.dfs { node =>
       val curComp = node match {
-        case io: Bits if io.isIo && io.dir == INPUT => 
+        case io: Bits if io.isIo && io.dir == INPUT =>
           node.component.parent
-        case _ => 
+        case _ =>
           node.component
       }
       assert(node.component != null, "NULL NODE COMPONENT " + node.name)
@@ -264,7 +264,7 @@ abstract class Backend extends FileSystemUtilities{
             // not symmetric and only applies to direct children
             // READ BACK INPUT -- TODO: TIGHTEN THIS UP
             !isBitsIo(input, INPUT)) {
-          ChiselErrors += new ChiselError(() => { 
+          ChiselErrors += new ChiselError(() => {
             "Illegal cross module reference between " + node + " and " + input }, node.line)
         }
         if (input.component == null) input.component = curComp
@@ -290,9 +290,9 @@ abstract class Backend extends FileSystemUtilities{
                field for all components, we will most likely end-up here. */
             assert(input.component == nextComp,
               (if (input.name != null && !input.name.isEmpty) input.name else "?") +
-              "[" + input.getClass.getName + "] has no match between component " + 
-              (if (input.component == null ) "(null)" else input.component) + 
-              " and '" + nextComp + "' input of " + 
+              "[" + input.getClass.getName + "] has no match between component " +
+              (if (input.component == null ) "(null)" else input.component) +
+              " and '" + nextComp + "' input of " +
               (if (node.name != null && !node.name.isEmpty) node.name else "?"))
           case _ =>
         }
@@ -333,7 +333,7 @@ abstract class Backend extends FileSystemUtilities{
       if (o.inputs.length == 0 && !o.component.isInstanceOf[BlackBox]) {
         if (o.consumers.size > 0) {
           if (Driver.warnOutputs)
-            ChiselError.warning({"UNCONNECTED OUTPUT " + emitRef(o) + " in component " + o.component + 
+            ChiselError.warning({"UNCONNECTED OUTPUT " + emitRef(o) + " in component " + o.component +
                                  " has consumers on line " + o.consumers.head.line})
           o.driveRand = true
         } else {
@@ -357,7 +357,7 @@ abstract class Backend extends FileSystemUtilities{
 
     for (c <- Driver.components ; if c != Driver.topComponent) {
       for ((n,i) <- c.wires) {
-        if (i.inputs.length == 0) {          
+        if (i.inputs.length == 0) {
           prettyPrint(i, c)
         }
       }
@@ -379,7 +379,7 @@ abstract class Backend extends FileSystemUtilities{
   // for every reachable delay element
   // assign it a clock and reset where
   // clock is chosen to be the component's clock if delay does not specify a clock
-  // reset is chosen to be 
+  // reset is chosen to be
   //          component's explicit reset
   //          delay's explicit clock's reset
   //          component's clock's reset
@@ -413,7 +413,7 @@ abstract class Backend extends FileSystemUtilities{
           parent.addClock(clock)
         }
         for (reset <- child.resets.keys) {
-          // create a reset pin in parent if reset does not originate in parent and 
+          // create a reset pin in parent if reset does not originate in parent and
           // if reset is not an output from one of parent's children
           if (reset.component != parent && !parent.children.contains(reset.component))
             parent.addResetPin(reset)
@@ -434,7 +434,7 @@ abstract class Backend extends FileSystemUtilities{
           if (child.resets(reset).inputs.length == 0)
             if (parent.resets.contains(reset))
               child.resets(reset).inputs += parent.resets(reset)
-            else 
+            else
               child.resets(reset).inputs += reset
         }
       }
@@ -463,7 +463,7 @@ abstract class Backend extends FileSystemUtilities{
           val c2 = clock
           if(!(consumer.clock == null || consumer.clock == clock)) {
             ChiselError.warning({consumer.getClass + " " + emitRef(consumer) + " " + emitDef(consumer) + "in module" +
-                                 consumer.component + " resolves to clock domain " + 
+                                 consumer.component + " resolves to clock domain " +
                                  emitRef(c1) + " and " + emitRef(c2) + " traced from " + root.name})
           } else { consumer.clock = clock }
           walked += consumer
@@ -578,13 +578,13 @@ abstract class Backend extends FileSystemUtilities{
           val inputsMap = HashMap[Node, ArrayBuffer[Node]]()
           for (node <- consumers) inputsMap(node) = node.inputs.clone
           for (node <- consumers; if !(node == null) && io.component != node.component.parent) {
-            val inputs = inputsMap(node) 
+            val inputs = inputsMap(node)
             val i = inputs indexOf io
             node match {
               case bits: Bits if bits.dir == INPUT =>
-                node.inputs(i) = Binding(io, io.component.parent, io.component) 
+                node.inputs(i) = Binding(io, io.component.parent, io.component)
               case _ if io.component != node.component =>
-                node.inputs(i) = Binding(io, io.component.parent, io.component) 
+                node.inputs(i) = Binding(io, io.component.parent, io.component)
               case _ =>
             }
           }
@@ -612,7 +612,7 @@ abstract class Backend extends FileSystemUtilities{
                 if (io.inputs.length > 0) node.inputs(i) = io.inputs(0)
               case _ =>
             }
-          }  
+          }
         }
       }
     }
@@ -621,7 +621,7 @@ abstract class Backend extends FileSystemUtilities{
   def nameBindings {
     for (comp <- Driver.sortedComps) {
       for (bind <- comp.bindings) {
-        var genName = if (bind.targetNode.name == null || bind.targetNode.name.length() == 0) "" 
+        var genName = if (bind.targetNode.name == null || bind.targetNode.name.length() == 0) ""
                       else bind.targetComponent.name + "_" + bind.targetNode.name
         if(nameSpace contains genName) genName += ("_" + bind.emitIndex);
         bind.name = asValidName(genName); // Not using nameIt to avoid override
@@ -720,7 +720,7 @@ abstract class Backend extends FileSystemUtilities{
           roots += node
         case _: Delay =>
           roots += node
-        case _ => 
+        case _ =>
     } }
 
     // visit nodes and find ordering

@@ -109,7 +109,7 @@ class WhenSuite extends TestSuite {
 
     class ElsewhenModuleTests(m: ElsewhenModule) extends Tester(m) {
       List(false, true, false, true,  true, false, true,  true).zip(
-      List(false, true, true,  false, true, true,  false, true)).zipWithIndex.map { 
+      List(false, true, true,  false, true, true,  false, true)).zipWithIndex.map {
         case ((en0, en1), i) =>
           poke(m.io.en0, int(en0))
           poke(m.io.en1, int(en1))
@@ -117,7 +117,7 @@ class WhenSuite extends TestSuite {
           poke(m.io.in1, i+1)
           step(1)
           expect(m.io.out, if(en0) i else if(en1) i+1 else 0)
-      } 
+      }
     }
 
     launchCppTester((m: ElsewhenModule) => new ElsewhenModuleTests(m))
@@ -149,7 +149,7 @@ class WhenSuite extends TestSuite {
     }
 
     class SubmoduleInWhenBlockTests(m: SubmoduleInWhenBlock) extends Tester(m) {
-      List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
+      List(false,true,false,true,false,false,false,true).zipWithIndex.map {
         case (en, i) =>
           poke(m.io.en, int(en))
           poke(m.io.in, i)
@@ -174,7 +174,7 @@ class WhenSuite extends TestSuite {
     }
 
     class UnlessModuleTests(m: UnlessModule) extends Tester(m) {
-      List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
+      List(false,true,false,true,false,false,false,true).zipWithIndex.map {
         case (en, i) =>
           poke(m.io.en, int(en))
           poke(m.io.in, i)
@@ -206,7 +206,7 @@ class WhenSuite extends TestSuite {
         poke(m.io.in, i)
         step(1)
         expect(m.io.out, if(i == 0) (1) else (i % 2))
-      } 
+      }
     }
 
     launchCppTester((m: SwitchModule) => new SwitchModuleTests(m))

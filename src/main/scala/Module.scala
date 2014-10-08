@@ -306,7 +306,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   def bfs (visit: Node => Unit) = {
     // initialize BFS
     val queue = new ScalaQueue[Node]
-    
+
     for (a <- debugs)
       queue enqueue a
     for ((n, io) <- wires)
@@ -322,19 +322,19 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       visit(top)
       top match {
         case io: Bits if io.isIo && io.dir == INPUT =>
-        case v: Vec[_] => 
-          for ((n, e) <- v.flatten; 
+        case v: Vec[_] =>
+          for ((n, e) <- v.flatten;
           if !(e == null) && !(walked contains e) && !e.isIo) {
             queue enqueue e
             walked += e
           }
-          for (i <- top.inputs; 
+          for (i <- top.inputs;
           if !(i == null) && !(walked contains i) && !i.isIo) {
             queue enqueue i
             walked += i
           }
         case _ => {
-          for (i <- top.inputs; 
+          for (i <- top.inputs;
           if !(i == null) && !(walked contains i) && !i.isIo) {
             queue enqueue i
             walked += i
@@ -363,19 +363,19 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       top match {
         case io: Bits if io.isIo && io.dir == INPUT =>
         case v: Vec[_] => {
-          for ((n, e) <- v.flatten; 
+          for ((n, e) <- v.flatten;
           if !(e == null) && !(walked contains e) && !e.isIo) {
             stack push e
             walked += e
           }
-          for (i <- top.inputs; 
+          for (i <- top.inputs;
           if !(i == null) && !(walked contains i) && !i.isIo) {
             stack push i
             walked += i
           }
         }
         case _ => {
-          for (i <- top.inputs; 
+          for (i <- top.inputs;
           if !(i == null) && !(walked contains i) && !i.isIo) {
             stack push i
             walked += i
@@ -407,7 +407,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   // Allow checking if a method name is also the name of a val -- reveals accessors
   def getValNames = {
     val valnames = new ArrayBuffer[String]()
-    valnames ++= getClassValNames(getClass)    
+    valnames ++= getClassValNames(getClass)
     valnames
   }
 
@@ -438,7 +438,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
          o match {
          case node: Node => {
            node.getNode match {
-             case _: Literal => 
+             case _: Literal =>
              case _ => node.getNode nameIt (backend.asValidName(name), false)
            }
            backend.nameSpace += node.getNode.name

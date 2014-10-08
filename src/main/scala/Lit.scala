@@ -125,7 +125,7 @@ object Literal {
       }
     for(c <- x)
       if (c == '_') {
-        
+
       } else if(first) {
         first = false;
         res += sizeof(c.asDigit);

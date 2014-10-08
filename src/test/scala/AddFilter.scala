@@ -94,7 +94,7 @@ object AddFilter {
              c => new AddTests(c)
           }
        }
-       case "MyCounter" => {       
+       case "MyCounter" => {
           chiselMainTest(argsPass, () => Module(new MyCounter())){
              c => new CounterTests(c)
           }
@@ -112,8 +112,8 @@ object AddFilter {
           case "MyCounter" => new MyCounter()
           case _ => new AddFilter()
        }
-    println(component)   
-    
+    println(component)
+
     chiselMainTest(args, () => Module(new AddFilter())) {
       c => new MyTests(c) }
     */

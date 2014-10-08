@@ -144,7 +144,7 @@ abstract class Data extends Node {
   override def clone(): this.type = {
     try {
       val constructor = this.getClass.getConstructors.head
-      
+
       if(constructor.getParameterTypes.size == 0) {
         constructor.newInstance().asInstanceOf[this.type]
       } else if(constructor.getParameterTypes.size == 1) {

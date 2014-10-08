@@ -106,7 +106,7 @@ object Dbl {
 
   def apply(x: Float): Dbl = Dbl(x.toDouble);
   def apply(x: Double): Dbl = Lit(doubleToLongBits(x), 64){ Dbl() }
-  
+
   def apply(dir: IODirection = null): Dbl = {
     val res = new Dbl();
     res.dir = dir;
@@ -149,7 +149,7 @@ class Dbl extends Bits with Num[Dbl] {
   def <  (b: Dbl): Bool = newLogicalOp(b, "d<")
   def <= (b: Dbl): Bool = newLogicalOp(b, "d<=")
   def >= (b: Dbl): Bool = newLogicalOp(b, "d>=")
-  def pow (b: Dbl): Dbl = newBinaryOp(b, "dpow") 
+  def pow (b: Dbl): Dbl = newBinaryOp(b, "dpow")
   def sin: Dbl = newUnaryOp("dsin")
   def cos: Dbl = newUnaryOp("dcos")
   def tan: Dbl = newUnaryOp("dtan")

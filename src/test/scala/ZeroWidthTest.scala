@@ -164,7 +164,7 @@ class ZeroWidthTest extends TestSuite {
         | l | m | n | o
         | r | u | ab | ac
         /* XXX Computing any of those signals throws an exception */
-        | c | c1 | t 
+        | c | c1 | t
       ).toBits
 
       // -- result type is Bool --

@@ -208,7 +208,7 @@ object SCWrapper {
   private def genvar(prefix:  String):  String = {
     val c = unique_counter
     unique_counter += 1
-    prefix + c;        
+    prefix + c;
   }
 
   def read_file(filename: String): String = {
@@ -271,7 +271,7 @@ object SCWrapper {
       case e:IOException => {
         System.err.println("Error writing file " + filewriter)
         System.exit(-1)
-      }      
+      }
     }
   }
 

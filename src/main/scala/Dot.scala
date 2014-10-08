@@ -189,9 +189,9 @@ class DotBackend extends Backend {
         if (islandId != 0) {
           res.append("subgraph clusterIsland_" + islandId + " {\n")
         }
-  
+
         res.append(island_res)
-  
+
         if (islandId != 0) {
           res.append("label = \"Island_" + islandId + "\";\n")
           res.append("}\n")
@@ -208,7 +208,7 @@ class DotBackend extends Backend {
     }
     (res.toString, crossings.toString)
   }
-      
+
 
 
   override def elaborate(c: Module): Unit = {

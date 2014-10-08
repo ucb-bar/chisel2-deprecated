@@ -207,7 +207,7 @@ abstract class Node extends nameable {
   lazy val chiselName = this match {
     case l: Literal => "";
     case any        =>
-      if (named && (name != "reset") && !(component == null)) 
+      if (named && (name != "reset") && !(component == null))
         component.getPathName(".") + "." + name
       else
         ""
@@ -247,7 +247,7 @@ abstract class Node extends nameable {
     width_ = Width(w)
     initOf(n, fixWidth(w), ins.toList)
   }
-  
+
   // Called while we're walking the graph inferring the width of nodes.
   // We return true if we should continue to walk the graph,
   // either because there's a node whose width we don't know,

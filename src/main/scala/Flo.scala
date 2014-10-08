@@ -143,7 +143,7 @@ class FloBackend extends Backend {
 
       case x: Extract =>
         if (node.inputs.length == 2)
-          emitDec(node) + "rsh'" + node.needWidth() + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1)) + "\n"     
+          emitDec(node) + "rsh'" + node.needWidth() + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1)) + "\n"
         else
           emitDec(node) + "rsh'" + node.needWidth() + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(2)) + "\n"
 
@@ -155,7 +155,7 @@ class FloBackend extends Backend {
             // TODO: SHOULD HANDLE TOP OUTPUTS THAT ARE ALSO FANNED OUT -- NEED EXTRA NODE
             if (x.dir == OUTPUT && x.component == Driver.topComponent)
               emitDec(x) + (if (isRnd) "eat" else ("out'" + x.needWidth()))  + " " + emitRef(x.inputs(0)) + "\n"
-            else 
+            else
               emitDec(x) + "mov" + " " + emitRef(x.inputs(0)) + "\n"
           } else if (!node.isInObject && x.inputs.length == 0) {
             emitDec(x) + "rnd'" + x.needWidth() + "\n"
@@ -180,14 +180,14 @@ class FloBackend extends Backend {
         res.toString
 
       case m: MemRead =>
-        // emitDec(m) + "rd'" + node.needWidth() + " " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n" 
-        emitDec(m) + "rd'" + node.needWidth() + " 1 " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n" 
+        // emitDec(m) + "rd'" + node.needWidth() + " " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n"
+        emitDec(m) + "rd'" + node.needWidth() + " 1 " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n"
 
       case m: ROMRead =>
-        emitDec(m) + "rd'" + node.needWidth() + " 1 " + emitRef(m.rom) + " " + emitRef(m.addr) + "\n" 
+        emitDec(m) + "rd'" + node.needWidth() + " 1 " + emitRef(m.rom) + " " + emitRef(m.addr) + "\n"
 
       case m: MemWrite =>
-        if (m.inputs.length == 2) 
+        if (m.inputs.length == 2)
           return ""
         emitDec(m) + "wr'" + m.data.needWidth() + " " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + " " + emitRef(m.data) + "\n"
       case x: Reg => // TODO: need resetData treatment
@@ -208,7 +208,7 @@ class FloBackend extends Backend {
         case _: Literal =>
         case _ if m.named && (m != comp.defaultResetPin) && m.component != null =>
           // only modify name if it is not the reset signal or not in top component
-          if (m.name != "reset" || m.component != comp) 
+          if (m.name != "reset" || m.component != comp)
             m.name = m.component.getPathName(":") + "::" + m.name
         case _ =>
       }

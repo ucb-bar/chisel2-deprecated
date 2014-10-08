@@ -262,21 +262,21 @@ class DataSuite extends TestSuite {
     assertTrue(!ChiselError.ChiselErrors.isEmpty);
   }
 
-  
+
   /* Vec width (#247) */
   @Test def testVecWidth() {
     val io = new Bundle{
-  
+
       val in = Vec.fill(4)(UInt(INPUT,4))
       val out = Vec.fill(4)(UInt(OUTPUT,4))
-    } 
-  
+    }
+
     assertTrue( io.in.getWidth() == 16 )
   }
 
-  
+
   /** Infinite Width Inference #76
-   *  
+   *
    */
   @Test def widthInfinInfer() {
     println("\nwidthInfinInfer ...")

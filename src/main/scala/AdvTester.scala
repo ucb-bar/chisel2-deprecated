@@ -112,7 +112,7 @@ class AdvTester[+T <: Module](val dut: T) extends Tester[T](dut, false) {
     expr
   }
 
-  
+
   class DecoupledSink[T <: Data, R]( socket: DecoupledIO[T], cvt: T=>R ) extends Processable
   {
     var max_count = -1
@@ -139,7 +139,7 @@ class AdvTester[+T <: Module](val dut: T) extends Tester[T](dut, false) {
   }
 
   class ValidSink[T <: Data, R]( socket: ValidIO[T], cvt: T=>R ) extends Processable
-  { 
+  {
     val outputs = new scala.collection.mutable.Queue[R]()
     private def isValid = peek(socket.valid) == 1
 
@@ -185,13 +185,13 @@ class AdvTester[+T <: Module](val dut: T) extends Tester[T](dut, false) {
   object DecoupledSource {
     def apply[T<:Bits](socket: DecoupledIO[T]) = new DecoupledSource(socket, (socket_bits: T, in: BigInt) => reg_poke(socket_bits, in))
   }
-  
+
   class ValidSource[T <: Data, R]( socket: ValidIO[T], post: (T,R)=>Unit ) extends Processable
   {
     val inputs = new scala.collection.mutable.Queue[R]()
     private var amValid = false
     private var justFired = false
-    
+
     def isIdle = inputs.isEmpty && !amValid
 
     def process() = {
