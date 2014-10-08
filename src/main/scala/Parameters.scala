@@ -520,7 +520,6 @@ case class BoolEx (expr:Ex[Boolean]) {
 }
 
 object Implicits {
-  //TODO Need to conver List[Int] to ExList
   implicit def ExInt_IntEx(i:Ex[Int]):IntEx = IntEx(i)
   implicit def Int_IntEx(i:Int):IntEx = IntEx(ExLit[Int](i))
   implicit def ExBool_BoolEx(b:Ex[Boolean]):BoolEx = BoolEx(b)
@@ -609,7 +608,6 @@ object Ex {
       case e:ExSub => 20
       case e:ExMul => 20
       case e:ExMod => 20
-      //case e:ExIn => 20
       case e:ExLit[_] => 0
       case e:ExVar[_] => 0
     }
@@ -628,7 +626,6 @@ object Ex {
     e match {
       case ExLit(v) => v.toString
       case e:ExVar[_]=> "$"+e.name
-      //case e:ExList[_]=> "[" + e.list.map(_.toString).reduce(_ + "," + _) + "]"
       case ExAnd(a,b) => term(a)+" && "+term(b)
       case ExOr(a,b) => term(a)+" || "+term(b)
       case ExXor(a,b) => term(a)+" ^ "+term(b)
@@ -642,7 +639,6 @@ object Ex {
       case ExSub(a,b) => term(a)+" - "+term(b)
       case ExMul(a,b) => term(a)+" * "+term(b)
       case ExMod(a,b) => term(a)+" % "+term(b)
-      //case ExIn(a,b) => term(a)+" in ["+term(b)
     }
   }
 }
