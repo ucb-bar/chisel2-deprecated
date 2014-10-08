@@ -184,7 +184,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   push(this)
 
   //Parameter Stuff
-  def params = Module.params
+  lazy val params = Module.params
   params.path = this.getClass :: params.path
 
   var hasExplicitClock = !(clock == null)
@@ -307,13 +307,32 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     pin
   }
 
-  def addModule[T <: Module](c: => T) = {
+  def addModule[T<:Module](c: =>T, f: PartialFunction[Any,Any]) = {
     Driver.modStackPushed = true
-    Driver.compStack.push(this)
-    val res = init(c)
-    Driver.compStack.pop
     Driver.modAdded = true
-    res.markComponent
+    val q = params.alterPartial(f)
+    Driver.compStack.push(this)
+    Driver.parStack.push(q)
+    val res = init(c)
+    Driver.parStack.pop
+    Driver.compStack.pop
+    res
+  }
+  def addModule[T <: Module](c: => T)(implicit _p:Option[Parameters] = None) = {
+    Driver.modStackPushed = true
+    Driver.modAdded = true
+    Driver.compStack.push(this)
+    _p match {
+      case Some(q: Parameters) => {
+        Driver.parStack.push(q.push)
+      }
+      case None => {
+        Driver.parStack.push(params)
+      }
+    }
+    val res = init(c)
+    Driver.parStack.pop
+    Driver.compStack.pop
     res
   }
 
