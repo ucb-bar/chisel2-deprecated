@@ -1,0 +1,14 @@
+digraph ZeroWidthTest_RemUS_1{
+rankdir = LR;
+  io_z[label="io_z:SInt"];
+  T0[label="s%s"];
+  io_y[label="io_y:SInt"];
+  T1[label="T1:SInt"];
+  T2[label="##(0x0, _)"];
+  io_x[label="io_x:UInt"];
+  T0 -> io_z[label="32"];
+  T1 -> T0[label="33"];
+  io_y -> T0[label="32"];
+  T2 -> T1[label="33"];
+  io_x -> T2[label="32"];
+}

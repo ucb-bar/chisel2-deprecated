@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -64,10 +64,10 @@ class ROM[T <: Data](elts: SortedMap[Int, T], lengthIn: Option[Int] = None) exte
 }
 
 class ROMData(elts: SortedMap[Int, Node], val n: Int) extends Node {
-  val w = elts.values.map(_.litOf.width).max
+  val w = elts.values.map(_.litOf.needWidth()).max
   val sparseLits = {
     inferWidth = fixWidth(w)
-    elts.mapValues(_.matchWidth(w).litOf)
+    elts.mapValues(_.matchWidth(Width(w)).litOf)
   }
   val lits = {
     val dc = UInt.DC(w).litOf
@@ -79,11 +79,14 @@ class ROMData(elts: SortedMap[Int, Node], val n: Int) extends Node {
 }
 
 class ROMRead extends Node {
-  inferWidth = (x: Node) => inputs.map(_.width).tail.max
+  def inputsTailMaxWidth: (=> Node) => Width = { (m) => {
+    m.inputs.map(_.widthW).tail.max
+  }}
+  inferWidth = inputsTailMaxWidth
   def addr: Node = inputs(0)
   def rom: ROMData = inputs(1).asInstanceOf[ROMData]
   override def toString: String = rom + "[" + addr + "]"
 
   override def forceMatchingWidths: Unit =
-    inputs(0) = addr.matchWidth(log2Up(rom.n))
+    inputs(0) = addr.matchWidth(Width(log2Up(rom.n)))
 }

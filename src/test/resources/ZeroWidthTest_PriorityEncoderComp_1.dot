@@ -1,0 +1,8 @@
+digraph ZeroWidthTest_PriorityEncoderComp_1{
+rankdir = LR;
+  io_out[label="io_out:UInt"];
+  T0[label="PriEnc"];
+  io_in[label="io_in:UInt"];
+  T0 -> io_out[label="3"];
+  io_in -> T0[label="8"];
+}

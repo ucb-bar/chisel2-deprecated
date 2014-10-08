@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -53,7 +53,7 @@ abstract class Bits extends Data with proc {
 
   def create(dir: IODirection, width: Int) {
     this.dir = dir;
-    if(width > 0) {
+    if(width > -1) {
       this.init("", width);
     } else {
       this.init("", widthOf(0))
@@ -80,7 +80,8 @@ abstract class Bits extends Data with proc {
   // internal, non user exposed connectors
   private var assigned = false
   private def checkAssign(src: Node) = {
-    if (this.dir == INPUT && this.component == Module.current && this.isIo) {
+    if (this.dir == INPUT && this.component == Module.current &&
+        this.component.wires.unzip._2.contains(this)) {
       ChiselError.error({"assigning to your own input port " + this + " RHS: " + src});
     }
     if (this.dir == OUTPUT && this.component != Module.current &&
@@ -93,7 +94,7 @@ abstract class Bits extends Data with proc {
   }
 
   override def assign(src: Node): Unit = {
-    if (checkAssign(src)) {
+    if (Driver.topComponent != null || checkAssign(src)) {
       assigned = true
       if (!procAssigned) inputs += src
       else if (defaultMissing) setDefault(src)
@@ -101,24 +102,12 @@ abstract class Bits extends Data with proc {
   }
 
   override def procAssign(src: Node): Unit =
-    if (checkAssign(src))
+    if (Driver.topComponent != null || checkAssign(src))
       super.procAssign(src)
 
   override def defaultRequired: Boolean = true
 
   //code generation stuff
-
-  override def setPseudoName (path : String, isNamingIo: Boolean) {
-    if (isIo) {
-      super.setPseudoName(path, isNamingIo)
-    } else if (isTypeNode && comp != null) {
-      comp setPseudoName (path, isNamingIo)
-    } else if (isTypeNode && !inputs.isEmpty && !inputs.head.isLit) {
-      inputs.head setPseudoName (path, isNamingIo)
-    } else {
-      super.setPseudoName(path, isNamingIo)
-    } 
-  }
 
   override def apply(name: String): Data = this
 
@@ -287,20 +276,31 @@ abstract class Bits extends Data with proc {
   override def clone: this.type = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
     res.inferWidth = this.inferWidth
-    res.width_ = this.width_;
+    res.width_ = this.width_.clone()
     res.dir = this.dir;
     res
   }
 
   override def forceMatchingWidths {
-    if(inputs.length == 1 && inputs(0).width != width) {
-      inputs(0) = inputs(0).matchWidth(width)
+    if(inputs.length == 1 && inputs(0).widthW != widthW) {
+      // Our single child differs.
+      val w = this.widthW
+      val w0 = inputs(0).widthW
+      if (w.isKnown) {
+        inputs(0) = inputs(0).matchWidth(w)
+      } else if (w0.isKnown) {
+        this.matchWidth(w0)
+      }
     }
   }
 
-  override def matchWidth(w: Int): Node =
-    if (isLit && !litOf.isZ) Literal(litOf.value & ((BigInt(1) << w)-1), w)
+  override def matchWidth(w: Width): Node = {
+    if (w.isKnown && isLit && !litOf.isZ) {
+      val wi = w.needWidth()   // TODO 0WW
+      Literal(litOf.value & ((BigInt(1) << wi)-1), wi)
+    }
     else super.matchWidth(w)
+  }
 
   // Operators
   protected final def newUnaryOp(opName: String): this.type = {
@@ -361,7 +361,7 @@ abstract class Bits extends Data with proc {
   }
 
   def toBools: Vec[Bool] = Vec.tabulate(this.getWidth)(i => this(i))
-  
+
   def error(b: Bits): Bits = {
     throw new Exception("+ not defined on " + this.getClass + " and " + b.getClass)
     this

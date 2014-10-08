@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -54,9 +54,9 @@ import Chisel._
 
 class DataSuite extends TestSuite {
 
-  @Ignore @Test def testBoolFromValue() {
+  @Test def testBoolFromValue() {
     val tested = Bool(true);
-    assertTrue( tested.isInstanceOf[Literal] );
+//    assertTrue( tested.isInstanceOf[Literal] );
     assertFalse( tested.named );
   }
 
@@ -72,44 +72,43 @@ class DataSuite extends TestSuite {
     assertFalse( tested.named );
   }
 
-  @Ignore @Test def testSIntFromLit() {
+  @Test def testSIntFromLit() {
     val fixFromLit = SInt(42);
 
-    assertTrue( fixFromLit.isInstanceOf[Literal] );
+ //   assertTrue( fixFromLit.isInstanceOf[Literal] );
     assertFalse( fixFromLit.named );
   }
 
-  @Ignore @Test def testSIntFromLitWithWidth() {
+  @Test def testSIntFromLitWithWidth() {
     val fixFromLitWithWidth = SInt(42, width = 16);
-    assertTrue( fixFromLitWithWidth.isInstanceOf[Literal] );
+    // assertTrue( fixFromLitWithWidth.isInstanceOf[Literal] );
     assertFalse( fixFromLitWithWidth.named );
-    /* XXX width is -1 here for some reason
-    assertTrue( fixFromLitWithWidth.width == 16 );
-     */
+    /* XXX width was -1 here for some reason */
+    assertTrue( fixFromLitWithWidth.getWidth() == 16 );
   }
 
-  @Ignore @Test def testSIntFromWidthDir() {
+  @Test def testSIntFromWidthDir() {
     val fixFromWidthDir = SInt(width = 8, dir = INPUT);
-    assertTrue( fixFromWidthDir.width == 8 );
+    assertTrue( fixFromWidthDir.getWidth() == 8 );
     assertTrue( fixFromWidthDir.dir == INPUT );
     assertFalse( fixFromWidthDir.named );
   }
 
   // Testing the UInt factory methods
 
-  @Ignore @Test def testUIntVal() {
+  @Test def testUIntVal() {
     // apply(x: Int): UInt
     val dat = UInt(5)
-    assertTrue( dat.width == 3 );
-    assertTrue( dat.isInstanceOf[Literal] );
+    assertTrue( dat.getWidth() == 3 );
+    // assertTrue( dat.isInstanceOf[Literal] );
     assertFalse( dat.named );
   }
 
-  @Ignore @Test def testUIntValWidth() {
+  @Test def testUIntValWidth() {
     // def apply(x: Int, width: Int): UInt
     val dat = UInt(5, 4)
-    assertTrue( dat.width == 4 )
-    assertTrue( dat.isInstanceOf[Literal] )
+    assertTrue( dat.getWidth() == 4 )
+    // assertTrue( dat.isInstanceOf[Literal] )
     assertFalse( dat.named );
   }
 
@@ -125,27 +124,27 @@ class DataSuite extends TestSuite {
   }
    */
 
-  @Ignore @Test def testUIntStringWidth() {
+  @Test def testUIntStringWidth() {
     // def apply(x: String, width: Int): UInt
     val dat = UInt("101", 4)
-    assertTrue( dat.width == 4 )
-    assertTrue( dat.isInstanceOf[Literal] )
+    assertTrue( dat.getWidth() == 4 )
+    // assertTrue( dat.isInstanceOf[Literal] )
     assertFalse( dat.named )
   }
 
-  @Ignore @Test def testUIntStringBaseBinary() {
+  @Test def testUIntStringBaseBinary() {
     // def apply(x: String, base: Char): UInt
     val dat = UInt("1010", 'b')
-    assertTrue( dat.width == 4 )
-    assertTrue( dat.isInstanceOf[Literal] )
+    assertTrue( dat.getWidth() == 4 )
+    // assertTrue( dat.isInstanceOf[Literal] )
     assertFalse( dat.named )
   }
 
-  @Ignore @Test def testUIntStringBaseOctal() {
+  @Test def testUIntStringBaseOctal() {
     // def apply(x: String, base: Char): UInt
     val dat = UInt("644", 'o')
-    assertTrue( dat.width == 9 );
-    assertTrue( dat.isInstanceOf[Literal] )
+    assertTrue( dat.getWidth() == 9 );
+    // assertTrue( dat.isInstanceOf[Literal] )
     assertFalse( dat.named );
   }
 
@@ -153,7 +152,7 @@ class DataSuite extends TestSuite {
   @Test def testUIntStringBaseDec() {
     // def apply(x: String, base: Char): UInt
     val dat = UInt("199", 'd')
-    assertTrue( dat.width == -1 );
+    assertFalse( dat.width.isSet );
     assertTrue( dat.dir == OUTPUT );
     assertFalse( dat.isSigned );
     assertTrue( dat.assigned );
@@ -161,18 +160,18 @@ class DataSuite extends TestSuite {
   }
    */
 
-  @Ignore @Test def testUIntStringBaseHex() {
+  @Test def testUIntStringBaseHex() {
     // def apply(x: String, base: Char): UInt
     val dat = UInt("abc", 'h')
-    assertTrue( dat.width == 12 )
-    assertTrue( dat.isInstanceOf[Literal] )
+    assertTrue( dat.getWidth() == 12 )
+    // assertTrue( dat.isInstanceOf[Literal] )
     assertFalse( dat.named )
   }
 
   @Test def testUIntDirWidth() {
     // def apply(dir: IODirection = null, width: Int = -1): UInt
     val dat = UInt(INPUT, 4)
-    assertTrue( dat.width == 4 );
+    assertTrue( dat.getWidth() == 4 );
     assertTrue( dat.dir == INPUT );
     assertFalse( dat.named );
   }
@@ -264,6 +263,34 @@ class DataSuite extends TestSuite {
   }
 
 
+  /* Vec width (#247) */
+  @Test def testVecWidth() {
+    val io = new Bundle{
+
+      val in = Vec.fill(4)(UInt(INPUT,4))
+      val out = Vec.fill(4)(UInt(OUTPUT,4))
+    }
+
+    assertTrue( io.in.getWidth() == 16 )
+  }
+
+
+  /** Infinite Width Inference #76
+   *
+   */
+  @Test def widthInfinInfer() {
+    println("\nwidthInfinInfer ...")
+    class WidthInfinInfer extends Bundle {
+      val num_entries = 2
+      val debug = new Bundle
+      {
+         val entry = Vec.fill(num_entries) { new Bundle {
+            val valid = Bool()
+            val eflags = UInt() // THIS IS THE CULPRIT
+         }}
+       }.asOutput
+    }
+  }
 
 }
 

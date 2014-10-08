@@ -1,0 +1,9 @@
+digraph ZeroWidthTest_AssignBundleComp_1{
+rankdir = LR;
+  io_out_v_0[label="io_out_v_0:UInt"];
+  io_in_v_0[label="io_in_v_0:UInt"];
+  io_out_v_1[label="io_out_v_1:UInt"];
+  io_in_v_1[label="io_in_v_1:UInt"];
+  io_in_v_0 -> io_out_v_0[label="2"];
+  io_in_v_1 -> io_out_v_1[label="2"];
+}

@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -40,9 +40,9 @@ object Binding {
       if (res == null) {
         val res = new Binding(m, ioComp);
         res.component = c;
-        c.nodes += res
         res.init("", widthOf(0), m);
         res.infer;
+        c.nodes += res
         c.bindings += res;
         res
       } else {

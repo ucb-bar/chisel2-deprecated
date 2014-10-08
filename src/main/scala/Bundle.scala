@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -48,16 +48,24 @@ object Bundle {
     res
   }
 
+  def apply[T <: Bundle](b: => T)(implicit p: Parameters): T = {
+    Driver.parStack.push(p)
+    val res = b
+    Driver.parStack.pop
+    res
+  }
+  def apply[T <: Bundle](b: => T,  f: PartialFunction[Any,Any]): T = {
+    val q = params.alterPartial(f)
+    apply(b)(q)
+  }
+  private def params = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
 }
 
 /** Defines a collection of datum of different types into a single coherent
   whole.
   */
-class Bundle(view_arg: Seq[String] = null)(implicit _params:Option[Parameters] = None) extends Aggregate {
+class Bundle(view_arg: Seq[String] = null) extends Aggregate {
   var view = view_arg;
-  override val params = if(_params == None) {
-    if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
-  } else _params.get
   private var elementsCache: ArrayBuffer[(String, Data)] = null;
 
   /** Populates the cache of elements declared in the Bundle. */
@@ -71,20 +79,10 @@ class Bundle(view_arg: Seq[String] = null)(implicit _params:Option[Parameters] =
       val name = m.getName();
       val modifiers = m.getModifiers();
       val types = m.getParameterTypes();
+
       val rtype = m.getReturnType();
-      var isFound = false;
-      var isInterface = false;
-      var c = rtype;
-      val sc = Class.forName("Chisel.Data");
-      do {
-        if (c == sc) {
-          isFound = true; isInterface = true;
-        } else if (c == null || c == Class.forName("java.lang.Object")) {
-          isFound = true; isInterface = false;
-        } else {
-          c = c.getSuperclass();
-        }
-      } while (!isFound);
+      val isInterface = classOf[Data].isAssignableFrom(rtype);
+
       // TODO: SPLIT THIS OUT TO TOP LEVEL LIST
       if( types.length == 0 && !isStatic(modifiers) && isInterface
         && !(Bundle.keywords contains name)
@@ -152,16 +150,6 @@ class Bundle(view_arg: Seq[String] = null)(implicit _params:Option[Parameters] =
     }
   }
 
-  override def setPseudoName (path: String, isNamingIo: Boolean) {
-    if (pName == "" || (path != "" && pName != path)) {
-      pName = path
-      val prefix = if (pName != "") pName + "_" else ""
-      for ((n, i) <- elements) {
-        i setPseudoName (prefix + n, isNamingIo)
-      }
-    }
-  }
-
   def +(other: Bundle): Bundle = {
     var elts = ArrayBuffer[(String, Data)]();
     for ((n, i) <- elements)
@@ -197,14 +185,6 @@ class Bundle(view_arg: Seq[String] = null)(implicit _params:Option[Parameters] =
   override def removeTypeNodes() {
     for ((n, elt) <- elements)
       elt.removeTypeNodes
-  }
-
-  override def traceableNodes: Array[Node] = elements.map(tup => tup._2).toArray;
-
-  override def traceNode(c: Module, stack: Stack[() => Any]) {
-    for((n, i) <- flatten) {
-      stack.push(() => i.traceNode(c, stack))
-    }
   }
 
   override def apply(name: String): Data = {

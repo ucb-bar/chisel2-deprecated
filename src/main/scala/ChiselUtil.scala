@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -38,10 +38,20 @@ object log2Up
   def apply(in: Int): Int = if(in == 1) 1 else ceil(log(in)/log(2)).toInt
 }
 
+object log2Ceil
+{
+  def apply(in: Int): Int = ceil(log(in)/log(2)).toInt
+}
+
 
 object log2Down
 {
   def apply(x : Int): Int = if (x == 1) 1 else floor(log(x)/log(2.0)).toInt
+}
+
+object log2Floor
+{
+  def apply(x : Int): Int = floor(log(x)/log(2.0)).toInt
 }
 
 
@@ -132,8 +142,14 @@ object ShiftRegister
 {
   def apply[T <: Data](in: T, n: Int, en: Bool = Bool(true)): T =
   {
-    if (n == 1) RegEnable(in, en)
-    else RegNext(apply(in, n-1, en))
+    // The order of tests reflects the expected use cases.
+    if (n == 1) {
+      RegEnable(in, en)
+    } else if (n != 0) {
+      RegNext(apply(in, n-1, en))
+    } else {
+      in
+    }
   }
 }
 
@@ -172,14 +188,7 @@ class ValidIO[+T <: Data](gen: T) extends Bundle
   val valid = Bool(OUTPUT)
   val bits = gen.clone.asOutput
   def fire(dummy: Int = 0): Bool = valid
-  override def clone: this.type =
-    try {
-      super.clone()
-    } catch {
-      case e: java.lang.Exception => {
-        new ValidIO(gen).asInstanceOf[this.type]
-      }
-    }
+  override def clone: this.type = new ValidIO(gen).asInstanceOf[this.type]
 }
 
 /** Adds a valid protocol to any interface. The standard used is
@@ -195,14 +204,7 @@ class DecoupledIO[+T <: Data](gen: T) extends Bundle
   val valid = Bool(OUTPUT)
   val bits  = gen.clone.asOutput
   def fire(dummy: Int = 0): Bool = ready && valid
-  override def clone: this.type =
-    try {
-      super.clone()
-    } catch {
-      case e: java.lang.Exception => {
-        new DecoupledIO(gen).asInstanceOf[this.type]
-      }
-    }
+  override def clone: this.type = new DecoupledIO(gen).asInstanceOf[this.type]
 }
 
 /** Adds a ready-valid handshaking protocol to any interface.

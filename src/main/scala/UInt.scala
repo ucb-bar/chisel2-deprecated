@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -65,7 +65,11 @@ class UInt extends Bits with Num[UInt] {
   /** Factory method to create and assign a *UInt* type to a Node *n*.
     */
   override def fromNode(n: Node): this.type = {
-    UInt(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
+    val res = UInt(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
+    // NOTE: we do not inherit/clone the width.
+    // Doing so breaks code in NodeFill()
+    // res.width_ = n.width_.clone()
+    res
   }
 
   override def fromInt(x: Int): this.type = {

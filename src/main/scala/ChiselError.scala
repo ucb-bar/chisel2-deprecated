@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -101,6 +101,16 @@ object ChiselError {
       None
     } else {
       Some(idx)
+    }
+  }
+
+  // Print stack frames up to and including the "user" stack frame.
+  def printChiselStackTrace() {
+    val stack = Thread.currentThread().getStackTrace
+    val idx = ChiselError.findFirstUserInd(stack)
+    idx match {
+      case None => {}
+      case Some(x) => for (i <- 0 to x) println(stack(i))
     }
   }
 

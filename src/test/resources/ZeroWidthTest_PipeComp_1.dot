@@ -1,0 +1,29 @@
+digraph ZeroWidthTest_PipeComp_1{
+rankdir = LR;
+  io_deq_bits[label="io_deq_bits:UInt"];
+  R0[shape=square,label="R0:Reg"];
+  T2[label="Mux"];
+  R3[shape=square,label="R3:Reg"];
+  T4[label="Mux"];
+  io_enq_bits[label="io_enq_bits:UInt"];
+  io_enq_valid[label="io_enq_valid:Bool"];
+  R5[shape=square,label="R5:RegReset(_, 0x0)"];
+  T6[label="Mux(_, 0x0, _)"];
+  io_deq_valid[label="io_deq_valid:Bool"];
+  R1[shape=square,label="R1:RegReset(_, 0x0)"];
+  T7[label="Mux(_, 0x0, _)"];
+  R0 -> io_deq_bits[label="8"];
+  T2 -> R0[label="8"];
+  R5 -> T2[label="1"];
+  R3 -> T2[label="8"];
+  R0 -> T2[label="8"];
+  T4 -> R3[label="8"];
+  io_enq_valid -> T4[label="1"];
+  io_enq_bits -> T4[label="8"];
+  R3 -> T4[label="8"];
+  T6 -> R5[label="1"];
+  io_enq_valid -> T6[label="1"];
+  R1 -> io_deq_valid[label="1"];
+  T7 -> R1[label="1"];
+  R5 -> T7[label="1"];
+}

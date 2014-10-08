@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -217,17 +217,6 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
       bundle.removeTypeNodes
   }
 
-  override def traceableNodes: Array[Node] = self.toArray
-
-  override def traceNode(c: Module, stack: Stack[() => Any]) {
-    val ins = this.flatten.map(_._2)
-      
-    for(i <- ins) {
-      stack.push(() => i.traceNode(c, stack))
-    }
-    stack.push(() => super.traceNode(c, stack))
-  }
-
   override def flip(): this.type = {
     for(b <- self)
       b.flip();
@@ -254,23 +243,6 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
       }
     } else {
       /* We are trying to rename a Vec that has a fixed name. */
-    }
-  }
-
-  override def setPseudoName (path: String, isNamingIo: Boolean) {
-    if (pName == "" || (path != "" && pName != path)) {
-      val prevPrefix = if (pName != "") pName + "_" else ""
-      pName = path
-      val prefix = if (pName != "") pName + "_" else ""
-      for ((elm, i) <- self.zipWithIndex) {
-        val prevElmPrefix = prevPrefix + i
-        val suffix = 
-          if (elm.name startsWith prevElmPrefix) 
-            elm.name substring prevElmPrefix.length
-          else
-            elm.name
-        elm setPseudoName (prefix + i + suffix, isNamingIo)
-      }
     }
   }
 
@@ -303,6 +275,11 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
 
   override val hashCode: Int = _id
   override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
+
+  // Don't return 0 for getwidth - #247
+  // Return the sum of our constituent widths.
+  override def getWidth(): Int = self.map(_.getWidth).foldLeft(0)(_ + _)
+
 }
 
 trait VecLike[T <: Data] extends collection.IndexedSeq[T] {

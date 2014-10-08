@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -63,13 +63,13 @@ class BitsSuite extends AssertionsForJUnit {
     assertTrue( res.litOf.value == 1 )
   }
 
-  @Ignore("field not showing in Bundle.elements") @Test def testEqlBundle() {
-    val res = Bits(2) === new Bundle{ val abc = Bits(2) }
+  @Test def testEqlBundle() {
+    val res = Bits(2) === new Bundle{ val abc = Bits(2) }.toBits
     assertTrue( res.getWidth == 1 )
   }
 
-  @Ignore("this causes an infinite loop...?") @Test def testEqlVec() {
-    val res = Bits(2) === Vec(Bits(2) :: Nil)
+  @Test def testEqlVec() {
+    val res = Bits(2) === Vec(Bits(2) :: Nil).toBits
     assertTrue( res.getWidth == 1 )
   }
 
@@ -132,7 +132,7 @@ class BitsSuite extends AssertionsForJUnit {
     assertTrue( res.getWidth == 6 )
     assertTrue( res.litOf.value == 44 )
     } catch {
-      case e => e.printStackTrace()
+      case e : Throwable => e.printStackTrace()
     }
   }
 }

@@ -67,27 +67,27 @@ class FameQueue[T <: Data] (val entries: Int)(data: => T) extends Module
     val deq = new FameDecoupledIO(data)
     val enq = new FameDecoupledIO(data).flip()
   }
-  
+
   val target_queue = Module(new Queue(data, entries))
   val tracker = Module(new FameQueueTracker(entries, entries))
-  
+
   target_queue.io.enq.valid := io.enq.host_valid && io.enq.target.valid
   target_queue.io.enq.bits := io.enq.target.bits
   io.enq.target.ready := target_queue.io.enq.ready
-  
+
   io.deq.target.valid := tracker.io.entry_avail && target_queue.io.deq.valid
   io.deq.target.bits := target_queue.io.deq.bits
   target_queue.io.deq.ready := io.deq.host_ready && io.deq.target.ready && tracker.io.entry_avail
-  
+
   tracker.io.tgt_queue_count := target_queue.io.count
   tracker.io.produce := io.enq.host_valid && io.enq.host_ready
   tracker.io.consume := io.deq.host_valid && io.deq.host_ready
   tracker.io.tgt_enq := target_queue.io.enq.valid && target_queue.io.enq.ready
   tracker.io.tgt_deq := io.deq.target.valid && target_queue.io.deq.ready
 
-  io.enq.host_ready := !tracker.io.full && target_queue.io.enq.ready 
+  io.enq.host_ready := !tracker.io.full && target_queue.io.enq.ready
   io.deq.host_valid := !tracker.io.empty
-  
+
 }
 
 class FameQueueTrackerIO() extends Bundle{
@@ -105,7 +105,7 @@ class FameQueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Module
   val io = new FameQueueTrackerIO()
   val aregs = Vec.fill(num_tgt_cycles){ Reg(init = UInt(0, width = log2Up(num_tgt_entries))) }
   val tail_pointer = Reg(init = UInt(1, width = log2Up(num_tgt_cycles)))
-  
+
   val next_tail_pointer = UInt()
   tail_pointer := next_tail_pointer
   next_tail_pointer := tail_pointer
@@ -231,7 +231,7 @@ class Fame1Wrapper(f: => Module) extends Module {
       transform(false, submodule, module)
     }
   }
-  
+
   val originalModule = Module(f)
   transform(true, originalModule, null)
 
@@ -239,9 +239,9 @@ class Fame1Wrapper(f: => Module) extends Module {
   var num_decoupled_io = 0
   var num_reg_io = 0
   var num_debug_io = 0
-  for ((name, io) <- originalModule.io.asInstanceOf[Bundle].elements){ 
-    io match { 
-      case q : DecoupledIO[_] => num_decoupled_io += 1; 
+  for ((name, io) <- originalModule.io.asInstanceOf[Bundle].elements){
+    io match {
+      case q : DecoupledIO[_] => num_decoupled_io += 1;
       case r : RegIO[_] => num_reg_io += 1;
       case _ => {
         if (name != "is_fire") {
@@ -252,14 +252,14 @@ class Fame1Wrapper(f: => Module) extends Module {
   }
 
   val io = new Fame1WrapperIO(num_decoupled_io, num_reg_io, num_debug_io)
-  
+
   val RegIOs = new HashMap[String, DecoupledIO[Bits]]()
   val DecoupledIOs  = new HashMap[String, FameDecoupledIO[Bits]]()
   val DebugIOs = new HashMap[String, Data]()
 
   var decoupled_counter = 0
   var reg_counter = 0
-  var debug_counter = 0 
+  var debug_counter = 0
   //populate fame1RegIO and fame1DecoupledIO bundles with the elements from the original RegIO and DecoupleIOs
   for ((name, ioNode) <- originalModule.io.asInstanceOf[Bundle].elements) {
     ioNode match {
@@ -275,7 +275,7 @@ class Fame1Wrapper(f: => Module) extends Module {
         } else {
           decoupled.ready := fame1Decoupled.target.ready
           fame1Decoupled.target.bits := decoupled.bits.toBits
-          fame1Decoupled.target.valid := decoupled.valid 
+          fame1Decoupled.target.valid := decoupled.valid
         }
         DecoupledIOs(name) = fame1Decoupled
         decoupled_counter += 1
@@ -324,7 +324,7 @@ class Fame1Wrapper(f: => Module) extends Module {
     fire_tgt_clk = fire_tgt_clk &&
       (if (r.valid.dir == OUTPUT) r.ready else r.valid)
   }
-  
+
   //generate host read and host valid signals
   Fame1Transform.fireSignals(originalModule) := fire_tgt_clk
   for (q <- io.queues) {
@@ -363,7 +363,7 @@ trait Fame1Transform extends Backend {
     findMems(module)
     return mems
   }
-  
+
   private def appendFireToRegWriteEnables(top: Module) = {
     //find all the registers in FAME1 modules
     val regs = new ArrayBuffer[(Module, Reg)]
@@ -378,14 +378,14 @@ trait Fame1Transform extends Backend {
       }
     }
     findRegs(top)
-    
+
     for((module, reg) <- regs) Module.asModule(module) {
       when (!Fame1Transform.fireSignals(module)) {
         reg procAssign reg
       }
     }
   }
- 
+
   private def appendFireToMemEnables(top: Module) = {
     val mems = collectMems(top)
 
@@ -397,12 +397,11 @@ trait Fame1Transform extends Backend {
       }
     }
   }
-  
-  
-  preElaborateTransforms += ((top: Module) => collectNodesIntoComp(initializeDFS))
-  preElaborateTransforms += ((top: Module) => appendFireToRegWriteEnables(top))
-  preElaborateTransforms += ((top: Module) => appendFireToMemEnables(top))
-  preElaborateTransforms += ((top: Module) => collectNodesIntoComp(initializeDFS))
+
+
+  transforms += collectNodesIntoComp
+  transforms += appendFireToRegWriteEnables
+  transforms += appendFireToMemEnables
 }
 
 class Fame1CppBackend extends CppBackend with Fame1Transform

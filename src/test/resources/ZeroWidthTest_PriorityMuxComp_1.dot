@@ -1,0 +1,25 @@
+digraph ZeroWidthTest_PriorityMuxComp_1{
+rankdir = LR;
+  io_out2[label="io_out2:UInt"];
+  T2[label="Mux"];
+  io_data1[label="io_data1:UInt"];
+  io_data0[label="io_data0:UInt"];
+  io_in0[label="io_in0:Bool"];
+  io_out1[label="io_out1:UInt"];
+  T1[label="Mux"];
+  io_out0[label="io_out0:UInt"];
+  T0[label="Mux"];
+  io_in1[label="io_in1:Bool"];
+  T2 -> io_out2[label="16"];
+  io_in0 -> T2[label="1"];
+  io_data0 -> T2[label="16"];
+  io_data1 -> T2[label="16"];
+  T1 -> io_out1[label="16"];
+  io_in0 -> T1[label="1"];
+  io_data0 -> T1[label="16"];
+  io_data1 -> T1[label="16"];
+  T0 -> io_out0[label="16"];
+  io_in0 -> T0[label="1"];
+  io_data0 -> T0[label="16"];
+  io_data1 -> T0[label="16"];
+}

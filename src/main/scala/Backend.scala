@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -63,13 +63,24 @@ trait FileSystemUtilities {
 abstract class Backend extends FileSystemUtilities{
   /* Set of keywords which cannot be used as node and component names. */
   val keywords: HashSet[String];
-
+  val nameSpace = HashSet[String]()
   /* Set of Ops that this backend doesn't natively support and thus must be
      lowered to simpler Ops. */
   val needsLowering = Set[String]()
 
   /* Whether or not this backend decomposes along Module boundaries. */
   def isEmittingComponents: Boolean = false
+
+  def addPin[T <: Data](m: Module, pin: T, name: String) = {
+    for ((n, io) <- pin.flatten) {
+      io.component = m
+      io.isIo = true
+    }
+    if (name != "")
+      pin. nameIt (name, true)
+    m.io.asInstanceOf[Bundle] += pin
+    pin
+  }
 
   def depthString(depth: Int): String = {
     var res = "";
@@ -89,133 +100,39 @@ abstract class Backend extends FileSystemUtilities{
     if(x == 0) "" else "    " + genIndent(x-1);
   }
 
-  def nameChildren(root: Module) {
-    // Name all nodes at this level
-    root.io.nameIt("io", true);
-    val nameSpace = new HashSet[String];
-    /* We are going through all declarations, which can return Nodes,
-     ArrayBuffer[Node], BlackBox and Modules.
-     Since we call invoke() to get a proper instance of the correct type,
-     we have to insure the method is accessible, thus all fields
-     that will generate C++ or Verilog code must be made public. */
-    for (m <- root.getClass().getDeclaredMethods.sortWith(
-      (x, y) => (x.getName() < y.getName())
-    )) {
-      val name = m.getName();
-      val types = m.getParameterTypes();
-      if (types.length == 0 && root.isValName(name) // patch to avoid defs
-        && isPublic(m.getModifiers())) {
-        val o = m.invoke(root);
-        o match {
-         case node: Node => {
-           /* XXX It seems to always be true. How can name be empty? */
-           if ((node.isTypeNode || name != ""
-             || node.name == null || (node.name == "" && !node.named))) {
-             node.nameIt(asValidName(name), false);
-           }
-           nameSpace += node.name;
-         }
-         case buf: ArrayBuffer[_] => {
-           /* We would prefer to match for ArrayBuffer[Node] but that's
-            impossible because of JVM constraints which lead to type erasure.
-            XXX Using Seq instead of ArrayBuffer will pick up members defined
-            in Module that are solely there for implementation purposes. */
-           if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
-             val nodebuf = buf.asInstanceOf[Seq[Node]];
-             var i = 0;
-             for(elm <- nodebuf){
-               if( elm.isTypeNode || elm.name == null || elm.name.isEmpty ) {
-                 /* XXX This code is sensitive to when Bundle.nameIt is called.
-                  Whether it is called late (elm.name is empty) or we override
-                  any previous name that could have been infered,
-                  this has for side-effect to create modules with the exact
-                  same logic but textually different in input/output
-                  parameters, hence generating unnecessary modules. */
-                 elm.nameIt(asValidName(name + "_" + i), false);
-               }
-               nameSpace += elm.name;
-               i += 1;
-             }
-           }
-         }
-         case buf: collection.IndexedSeq[_] => {
-           /* This is a duplicate of ArrayBuffer[_] that was introduced
-            to support VecLike. ArrayBuffer and IndexedSeq have no parent/child
-            relationship. */
-           if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
-             val nodebuf = buf.asInstanceOf[Seq[Node]];
-             var i = 0;
-             for(elm <- nodebuf){
-               if( elm.isTypeNode || elm.name == null || elm.name.isEmpty ) {
-                 /* XXX This code is sensitive to when Bundle.nameIt is called.
-                  Whether it is called late (elm.name is empty) or we override
-                  any previous name that could have been infered,
-                  this has for side-effect to create modules with the exact
-                  same logic but textually different in input/output
-                  parameters, hence generating unnecessary modules. */
-                 elm.nameIt(asValidName(name + "_" + i), false);
-               }
-               nameSpace += elm.name;
-               i += 1;
-             }
-           }
-         }
-         case bb: BlackBox => {
-           if(!bb.named) {
-             bb.name = name;
-             bb.named = true
-           };
-           nameSpace += bb.name;
-         }
-         case comp: Module => {
-           if(!comp.named) {
-             comp.name = asValidName(name);
-             comp.named = true
-           };
-           nameSpace += comp.name;
-         }
-         case any => {
-           /* We have no idea what to do with class members which are
-            neither of the previous types. Let's discard them. */
-         }
-        }
-      }
-    }
-    /* Recursively name the nodes and components inside this root.
-     This code must be executed between the root-level naming and the naming
-     of bindings otherwise some identifiers will leak into the input/output
-     of a module. */
-    val byNames = LinkedHashMap[String, ArrayBuffer[Module]]();
-    for (c <- root.children) {
-      nameChildren(c);
-      if( c.name.isEmpty ) {
-        /* We don't have a name because we are not dealing with
-         a class member. */
-        val className = extractClassName(c);
-        if( byNames contains className ) {
-          byNames(className).append(c);
-        } else {
-          byNames += (className -> ArrayBuffer[Module](c));
-        }
+  def sortComponents {
+    def levelChildren(root: Module, traversal: Int) {
+      root.level = 0
+      root.traversal = traversal
+      for (child <- root.children) {
+        levelChildren(child, traversal+1)
+        root.level = math.max(root.level, child.level+1)
       }
     }
 
-    for( (className, comps) <- byNames ) {
-        if( comps.length > 1 ) {
-          for( (c, index) <- comps.zipWithIndex ) {
-            c.name = className + "_" + index.toString
-          }
-        } else {
-          comps(0).name = className;
-        }
+    def gatherChildren(root: Module): ArrayBuffer[Module] = {
+      val result = ArrayBuffer[Module]()
+      for (child <- root.children)
+        result ++= gatherChildren(child)
+      result += root
+      result
     }
 
-    for (bind <- root.bindings) {
-      var genName = if (bind.targetNode.name == null || bind.targetNode.name.length() == 0) "" else bind.targetComponent.name + "_" + bind.targetNode.name;
-      if(nameSpace.contains(genName)) genName += ("_" + bind.emitIndex);
-      bind.name = asValidName(genName); // Not using nameIt to avoid override
-      bind.named = true;
-    }
+    levelChildren(Driver.topComponent, 0)
+    Driver.sortedComps.clear
+    Driver.sortedComps ++= gatherChildren(Driver.topComponent).sortWith(
+      (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)))
+  }
+
+  def markComponents {
+    Driver.components foreach (_.markComponent)
+  }
+
+  def verifyAllMuxes {
+    Driver.bfs { _ match {
+      case p: proc => p.verifyMuxes
+      case _ =>
+    } }
   }
 
   /* Returns a string derived from _name_ that can be used as a valid
@@ -224,16 +141,42 @@ abstract class Backend extends FileSystemUtilities{
     if (keywords.contains(name)) name + "_" else name;
   }
 
-  def nameAll(root: Module) {
-    root.name = extractClassName(root);
-    nameChildren(root);
-    for( node <- Driver.nodes ) {
-      if( (node.nameHolder != null && !node.nameHolder.name.isEmpty)
-        && !node.named && !node.isInstanceOf[Literal] ){
-        node.name = node.nameHolder.name; // Not using nameIt to avoid override
-        node.named = node.nameHolder.named;
-        node.nameHolder.name = "";
+  def nameAll(mod: Module) {
+    // module naming
+    val byNames = LinkedHashMap[String, ArrayBuffer[Module]]();
+    for (c <- Driver.sortedComps) {
+      if( c.name.isEmpty ) {
+        /* We don't have a name because we are not dealing with
+         a class member. */
+        val className = extractClassName(c);
+        if( byNames contains className ) {
+          byNames(className) += c
+        } else {
+          byNames(className) = ArrayBuffer[Module](c)
+        }
       }
+    }
+
+    for( (className, comps) <- byNames ) {
+      if( comps.length > 1 ) {
+        for( (c, index) <- comps.zipWithIndex ) {
+          c.name = className + "_" + index.toString
+        }
+      } else {
+        comps(0).name = className;
+      }
+    }
+    // temporary node naming:
+    // these names are for the Verilog Backend
+    // and used in custom transforms such as backannotation
+    for (comp <- Driver.sortedComps) {
+      comp dfs { _ match {
+        case reg: Reg if reg.name == "" =>
+          reg.name = "R" + reg.component.nextIndex
+        case node: Node if !node.isTypeNode && node.name == "" =>
+          node.name = "T" + node.component.nextIndex
+        case _ =>
+      } }
     }
   }
 
@@ -261,43 +204,21 @@ abstract class Backend extends FileSystemUtilities{
 
   def emitRef(node: Node): String = {
     node match {
-      case r: Reg =>
-        if (r.name == "") "R" + r.emitIndex else r.name
+      case _: Literal =>
+        node.name
+      case _: Reg =>
+        if (node.named) node.name else "R" + node.emitIndex
       case _ =>
-        if(node.name == "") {
-          "T" + node.emitIndex
-        } else {
-          node.name
-        }
+        if (node.named) node.name else "T" + node.emitIndex
     }
   }
 
-  def emitRef(c: Module): String =
-    c.name
-
+  def emitRef(c: Module): String = c.name
   def emitDec(node: Node): String = ""
 
-  val preElaborateTransforms = ArrayBuffer[(Module) => Unit]()
   val transforms = ArrayBuffer[(Module) => Unit]()
   if (Driver.isCSE) transforms += CSE.transform
   val analyses = ArrayBuffer[(Module) => Unit]()
-
-  def initializeDFS: Stack[Node] = {
-    val res = new Stack[Node]
-
-    /* XXX Make sure roots are consistent between initializeBFS, initializeDFS
-     and findRoots.
-     */
-    for( c <- Driver.components ) {
-      for( a <- c.debugs ) {
-        res.push(a)
-      }
-      for((n, flat) <- c.io.flatten) {
-        res.push(flat)
-      }
-    }
-    res
-  }
 
   /** Nodes which are created outside the execution trace from the toplevel
     component constructor (i.e. through the () => Module(new Top()) ChiselMain
@@ -325,63 +246,78 @@ abstract class Backend extends FileSystemUtilities{
     case _ => false
   }
 
-  def collectNodesIntoComp(dfsStack: Stack[Node]) {
-    val walked = new HashSet[Node]()
-    walked ++= dfsStack
-    // invariant is everything in the stack is walked and has a non-null component
-    while(!dfsStack.isEmpty) {
-      val node = dfsStack.pop
-      /*
-      we're tracing from outputs -> inputs, so if node is an input, then its
-      inputs belong to the outside component. Otherwise, its inputs are the same
-      as node's inputs.
-      */
-      val curComp = 
-        if ( node.isIo && node.asInstanceOf[Bits].dir == INPUT ) {
+  def collectNodesIntoComp(mod: Module) {
+    Driver.sortedComps foreach (_.nodes.clear)
+    Driver.dfs { node =>
+      val curComp = node match {
+        case io: Bits if io.isIo && io.dir == INPUT =>
           node.component.parent
-        } else {
+        case _ =>
           node.component
-        }
-      if (node.component == null) {
-        println("NULL NODE COMPONENT " + node)
       }
-      if (!node.component.nodes.contains(node))
-        node.component.nodes += node
-      for (input <- node.inputs) {
-        if (input.component != null && input.component != node.component) {
-          if (!input.isLit &&
-              !isBitsIo(input, OUTPUT) && !isBitsIo(node, INPUT) &&
-              // ok if parent referring to any child nodes
-              // not symmetric and only applies to direct children
-              // READ BACK INPUT -- TODO: TIGHTEN THIS UP
-              !isBitsIo(input, INPUT))
-            ChiselErrors += new ChiselError(() => { "Illegal cross module reference between " + node + " and " + input }, node.line)
+      assert(node.component != null, "NULL NODE COMPONENT " + node.name)
+      if (!node.isTypeNode) node.component.nodes += node
+      for (input <- node.inputs ; if !input.isTypeNode) {
+        if (!(input.component == null || input.component == node.component) &&
+            !input.isLit && !isBitsIo(input, OUTPUT) && !isBitsIo(node, INPUT) &&
+            // ok if parent referring to any child nodes
+            // not symmetric and only applies to direct children
+            // READ BACK INPUT -- TODO: TIGHTEN THIS UP
+            !isBitsIo(input, INPUT)) {
+          ChiselErrors += new ChiselError(() => {
+            "Illegal cross module reference between " + node + " and " + input }, node.line)
         }
-        if(!walked.contains(input)) {
-          if( input.component == null ) {
-            input.component = curComp
-          }
-          walked += input
-          dfsStack.push(input)
-        }
+        if (input.component == null) input.component = curComp
       }
     }
+  }
 
-    assert(dfsStack.isEmpty)
+  def checkModuleResolution {
+    // check module resolution
+    val comps = HashMap[Node, Module]()
+    Driver.dfs { node =>
+      val nextComp = node match {
+        case io: Bits if io.isIo && io.dir == OUTPUT => io.component
+        case io: Bits if io.isIo && io.dir == INPUT  => io.component.parent
+        case _ => comps getOrElse (node, null)
+      }
+      for (input <- node.inputs ; if !(input == null)) {
+        input match {
+          case _: Literal => // Skip the below check for Literals, which can safely be static
+          //tmp fix, what happens if multiple componenets reference static nodes?
+          case _ if input.component == null || !(Driver.components contains input.component) =>
+            /* If Backend.collectNodesIntoComp does not resolve the component
+               field for all components, we will most likely end-up here. */
+            assert(input.component == nextComp,
+              (if (input.name != null && !input.name.isEmpty) input.name else "?") +
+              "[" + input.getClass.getName + "] has no match between component " +
+              (if (input.component == null ) "(null)" else input.component) +
+              " and '" + nextComp + "' input of " +
+              (if (node.name != null && !node.name.isEmpty) node.name else "?"))
+          case _ =>
+        }
+        comps(input) = nextComp
+      }
+    }
   }
 
   def execute(c: Module, walks: ArrayBuffer[(Module) => Unit]): Unit = {
-    for (w <- walks)
+    for (w <- walks) {
       w(c)
+    }
+    if (Driver.modAdded) {
+      sortComponents
+      Driver.modAdded = false
+    }
   }
 
   def pruneUnconnectedIOs(m: Module) {
-    val inputs = m.io.flatten.filter(_._2.dir == INPUT)
-    val outputs = m.io.flatten.filter(_._2.dir == OUTPUT)
+    val inputs = m.wires.filter(_._2.dir == INPUT)
+    val outputs = m.wires.filter(_._2.dir == OUTPUT)
 
     for ((name, i) <- inputs) {
       if (i.inputs.length == 0 && m != Driver.topComponent)
-        if (i.consumers.length > 0) {
+        if (i.consumers.size > 0) {
           if (Driver.warnInputs)
             ChiselError.warning({"UNCONNECTED INPUT " + emitRef(i) + " in COMPONENT " + i.component +
                                  " has consumers"})
@@ -395,10 +331,10 @@ abstract class Backend extends FileSystemUtilities{
 
     for ((name, o) <- outputs) {
       if (o.inputs.length == 0 && !o.component.isInstanceOf[BlackBox]) {
-        if (o.consumers.length > 0) {
+        if (o.consumers.size > 0) {
           if (Driver.warnOutputs)
-            ChiselError.warning({"UNCONNECTED OUTPUT " + emitRef(o) + " in component " + o.component + 
-                                 " has consumers on line " + o.consumers(0).line})
+            ChiselError.warning({"UNCONNECTED OUTPUT " + emitRef(o) + " in component " + o.component +
+                                 " has consumers on line " + o.consumers.head.line})
           o.driveRand = true
         } else {
           if (Driver.warnOutputs)
@@ -409,49 +345,26 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
-  def pruneNodes {
-    val walked = new HashSet[Node]
-    val bfsQueue = new ScalaQueue[Node]
-    for (node <- Driver.randInitIOs) bfsQueue.enqueue(node)
-    var pruneCount = 0
+  def checkPorts {
+    def prettyPrint(n: Node, c: Module) {
+      val dir = if (n.asInstanceOf[Bits].dir == INPUT) "Input" else "Output"
+      val portName = n.name
+      val compName = c.name
+      val compInstName = c.moduleName
+      ChiselError.warning(dir + " port " + portName
+        + " is unconnected in module " + compInstName + " " + compName)
+    }
 
-    // conduct bfs to find all reachable nodes
-    while(!bfsQueue.isEmpty){
-      val top = bfsQueue.dequeue
-      walked += top
-      val prune = top.inputs.map(_.prune).foldLeft(true)(_ && _)
-      pruneCount+= (if (prune) 1 else 0)
-      top.prune = prune
-      for(i <- top.consumers) {
-        if(!(i == null)) {
-          if(!walked.contains(i)) {
-            bfsQueue.enqueue(i)
-            walked += i
-          }
+    for (c <- Driver.components ; if c != Driver.topComponent) {
+      for ((n,i) <- c.wires) {
+        if (i.inputs.length == 0) {
+          prettyPrint(i, c)
         }
       }
     }
-    ChiselError.warning("Pruned " + pruneCount + " nodes due to unconnected inputs")
   }
 
   def emitDef(node: Node): String = ""
-
-  def levelChildren(root: Module) {
-    root.level = 0;
-    root.traversal = VerilogBackend.traversalIndex;
-    VerilogBackend.traversalIndex = VerilogBackend.traversalIndex + 1;
-    for(child <- root.children) {
-      levelChildren(child)
-      root.level = math.max(root.level, child.level + 1);
-    }
-  }
-
-  def gatherChildren(root: Module): ArrayBuffer[Module] = {
-    var result = new ArrayBuffer[Module]();
-    for (child <- root.children)
-      result = result ++ gatherChildren(child);
-    result ++ ArrayBuffer[Module](root);
-  }
 
   // go through every Module and set its clock and reset field
   def assignClockAndResetToModules {
@@ -463,6 +376,35 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
+  // for every reachable delay element
+  // assign it a clock and reset where
+  // clock is chosen to be the component's clock if delay does not specify a clock
+  // reset is chosen to be
+  //          component's explicit reset
+  //          delay's explicit clock's reset
+  //          component's clock's reset
+  def addClocksAndResets {
+    Driver.bfs {
+      _ match {
+        case x: Delay =>
+          val clock = if (x.clock == null) x.component.clock else x.clock
+          val reset =
+            if (x.component.hasExplicitReset) x.component._reset
+            else if (x.clock != null) x.clock.getReset
+            else if (x.component.hasExplicitClock) x.component.clock.getReset
+            else x.component._reset
+          x.assignReset(x.component.addResetPin(reset))
+          x.assignClock(clock)
+          x.component.addClock(clock)
+        case _ =>
+      }
+    }
+  }
+
+  def addDefaultResets {
+    Driver.components foreach (_.addDefaultReset)
+  }
+
   // go through every Module, add all clocks+resets used in it's tree to it's list of clocks+resets
   def gatherClocksAndResets {
     for (parent <- Driver.sortedComps) {
@@ -471,7 +413,7 @@ abstract class Backend extends FileSystemUtilities{
           parent.addClock(clock)
         }
         for (reset <- child.resets.keys) {
-          // create a reset pin in parent if reset does not originate in parent and 
+          // create a reset pin in parent if reset does not originate in parent and
           // if reset is not an output from one of parent's children
           if (reset.component != parent && !parent.children.contains(reset.component))
             parent.addResetPin(reset)
@@ -492,7 +434,7 @@ abstract class Backend extends FileSystemUtilities{
           if (child.resets(reset).inputs.length == 0)
             if (parent.resets.contains(reset))
               child.resets(reset).inputs += parent.resets(reset)
-            else 
+            else
               child.resets(reset).inputs += reset
         }
       }
@@ -521,7 +463,7 @@ abstract class Backend extends FileSystemUtilities{
           val c2 = clock
           if(!(consumer.clock == null || consumer.clock == clock)) {
             ChiselError.warning({consumer.getClass + " " + emitRef(consumer) + " " + emitDef(consumer) + "in module" +
-                                 consumer.component + " resolves to clock domain " + 
+                                 consumer.component + " resolves to clock domain " +
                                  emitRef(c1) + " and " + emitRef(c2) + " traced from " + root.name})
           } else { consumer.clock = clock }
           walked += consumer
@@ -531,151 +473,372 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
-  // Assign psuedo names for backannotation
-  def setPseudoNames(c: Module) {
-    ChiselError.info("[Backannotation] pseudo naming")
+  def inferAll(mod: Module): Int = {
+    val nodesList = ArrayBuffer[Node]()
+    Driver.bfs { nodesList += _ }
 
-    c.pName = extractClassName(c)
-
-    val classNames = LinkedHashMap[String, ArrayBuffer[Module]]()
-    for (m <- Driver.sortedComps ; if m.pName == "" && m != c) {
-      val className = extractClassName(m)
-      if (!(classNames contains className)) {
-        classNames(className) = new ArrayBuffer[Module]
-      }
-      classNames(className) += m
-    }
-   
-    for ((name, comps) <- classNames) {
-      if (comps.size > 1) {
-        for ((c, i) <- comps.zipWithIndex) {
-          c.pName = name + "_" + i
+    def verify {
+      var hasError = false
+      for (elm <- nodesList) {
+        if (elm.infer || elm.width == -1) {
+          ChiselError.error("Could not infer the width on: " + elm)
+          hasError = true
         }
-      } else {
-        comps.head.pName = name
       }
+      if (hasError) throw new Exception("Could not elaborate code due to uninferred width(s)")
     }
 
-    for (m <- Driver.sortedComps) {
-      m dfs { node =>
-        if (!node.isTypeNode && node.pName == "") {
-          if (node.name != "" || node.isLit) {
-            node.pName = node.name 
-          } else if (getPseudoPath(node.component) != "") {
-                     /* This means valid path */
-            val prefix = node match {
-              case _: Reg => "R"
-              case _ => "T"
+    var count = 0
+    // Infer all node widths by propagating known widths
+    // in a bellman-ford fashion.
+    for(i <- 0 until nodesList.length) {
+      var nbUpdates = 0
+      var done = true;
+      for(elm <- nodesList){
+        val updated = elm.infer
+        if( updated ) { nbUpdates = nbUpdates + 1  }
+        done = done && !updated
+      }
+
+      count += 1
+
+      if(done){
+        verify
+        return count;
+      }
+    }
+    verify
+    count
+  }
+
+  def findConsumers(mod: Module) {
+    Driver.bfs (_.consumers.clear)
+    Driver.bfs (_.addConsumers)
+  }
+
+  def forceMatchingWidths {
+    Driver.bfs (_.forceMatchingWidths)
+  }
+
+  def computeMemPorts(mod: Module) {
+    if (Driver.hasMem) {
+      Driver.bfs { _ match {
+        case memacc: MemAccess => memacc.referenced = true
+        case _ =>
+      } }
+      Driver.bfs { _ match {
+        case mem: Mem[_] => mem.computePorts
+        case _ =>
+      } }
+    }
+  }
+
+  /** All classes inherited from Data are used to add type information
+   and do not represent logic itself. */
+  def removeTypeNodes(mod: Module) = {
+    var count = 0
+    Driver.bfs {x =>
+      scala.Predef.assert(!x.isTypeNode)
+      count += 1
+      for (i <- 0 until x.inputs.length)
+        if (x.inputs(i) != null && x.inputs(i).isTypeNode) {
+          x.inputs(i) = x.inputs(i).getNode
+        }
+    }
+    count
+  }
+
+  def lowerNodes(mod: Module) {
+    if (!needsLowering.isEmpty) {
+      val lowerTo = new HashMap[Node, Node]
+      Driver.bfs { x =>
+        for (i <- 0 until x.inputs.length) x.inputs(i) match {
+          case op: Op =>
+            if (needsLowering contains op.op)
+            x.inputs(i) = lowerTo.getOrElseUpdate(op, op.lower)
+          case _ =>
+        }
+      }
+      if (!lowerTo.isEmpty)
+        inferAll(mod)
+    }
+  }
+
+  def addBindings {
+    for (comp <- Driver.sortedComps) {
+      /* This code finds an output binding for a node.
+         We search for a binding only if the io is an output
+         and the logic's grandfather component is not the same
+         as the io's component and the logic's component is not
+         same as output's component unless the logic is an input */
+      for ((n, io) <- comp.wires) {
+        // Add bindings only in the Verilog Backend
+        if (io.dir == OUTPUT) {
+          val consumers = io.consumers.clone
+          val inputsMap = HashMap[Node, ArrayBuffer[Node]]()
+          for (node <- consumers) inputsMap(node) = node.inputs.clone
+          for (node <- consumers; if !(node == null) && io.component != node.component.parent) {
+            val inputs = inputsMap(node)
+            val i = inputs indexOf io
+            node match {
+              case bits: Bits if bits.dir == INPUT =>
+                node.inputs(i) = Binding(io, io.component.parent, io.component)
+              case _ if io.component != node.component =>
+                node.inputs(i) = Binding(io, io.component.parent, io.component)
+              case _ =>
             }
-            if (isEmittingComponents) {
-              node.pName = prefix + node.emitIndex
-            } else {
-              node.pName = prefix + node.component.nextIndex
+          }
+        }
+        // In this case, we are trying to use the input of a submodule
+        // as part of the logic outside of the submodule.
+        // If the logic is outside the submodule, we do not use
+        // the input name. Instead, we use whatever is driving
+        // the input. In other words, we do not use the Input name,
+        // if the component of the logic is the part of Input's
+        // component. We also do the same when assigning
+        // to the output if the output is the parent
+        // of the subcomponent.
+        else if (io.dir == INPUT) {
+          val consumers = io.consumers.clone
+          val inputsMap = HashMap[Node, ArrayBuffer[Node]]()
+          for (node <- consumers) inputsMap(node) = node.inputs.clone
+          for (node <- consumers; if !(node == null) && io.component.parent == node.component) {
+            val inputs = inputsMap(node)
+            val i = inputs indexOf io
+            node match {
+              case bits: Bits if bits.dir == OUTPUT =>
+                if (io.inputs.length > 0) node.inputs(i) = io.inputs(0)
+              case _ if !node.isIo =>
+                if (io.inputs.length > 0) node.inputs(i) = io.inputs(0)
+              case _ =>
             }
           }
         }
       }
     }
   }
-  
-  def getPseudoPath(c: Module, delim: String = "/"): String =
-    if (c.parent == null) c.pName else getPseudoPath(c.parent) + delim + c.pName
-  def getSignalPathName(n: Node, delim: String = "/", isRealName: Boolean = false): String =
-    if (n == null) {
-      "null" 
-    } else if (isRealName) {
-      n.component.getPathName(delim) + delim + (if (n.name != "") n.name else emitRef(n))
-    } else {
-      getPseudoPath(n.component, delim) + delim + n.pName
+
+  def nameBindings {
+    for (comp <- Driver.sortedComps) {
+      for (bind <- comp.bindings) {
+        var genName = if (bind.targetNode.name == null || bind.targetNode.name.length() == 0) ""
+                      else bind.targetComponent.name + "_" + bind.targetNode.name
+        if(nameSpace contains genName) genName += ("_" + bind.emitIndex);
+        bind.name = asValidName(genName); // Not using nameIt to avoid override
+        bind.named = true;
+      }
+    }
+  }
+
+  def findCombLoop {
+    // Tarjan's strongly connected components algorithm to find loops
+    var sccIndex = 0
+    val stack = new Stack[Node]
+    val sccList = new ArrayBuffer[ArrayBuffer[Node]]
+
+    def tarjanSCC(n: Node): Unit = {
+      if(n.isInstanceOf[Delay]) throw new Exception("trying to DFS on a register")
+
+      n.sccIndex = sccIndex
+      n.sccLowlink = sccIndex
+      sccIndex += 1
+      stack.push(n)
+
+      for(i <- n.inputs) {
+        if(!(i == null) && !i.isInstanceOf[Delay] && !i.isReg) {
+          if(i.sccIndex == -1) {
+            tarjanSCC(i)
+            n.sccLowlink = math.min(n.sccLowlink, i.sccLowlink)
+          } else if(stack.contains(i)) {
+            n.sccLowlink = math.min(n.sccLowlink, i.sccIndex)
+          }
+        }
+      }
+
+      if(n.sccLowlink == n.sccIndex) {
+        val scc = new ArrayBuffer[Node]
+
+        var top: Node = null
+        do {
+          top = stack.pop()
+          scc += top
+        } while (!(n == top))
+        sccList += scc
+      }
     }
 
-  // Write out graph trace to verify backannotation later
-  def writeOutGraph(c: Module) {
-    ChiselError.info("[Backannotation] write out graphs")
-    val dir = ensureDir(Driver.targetDir)
-    val file = new java.io.FileWriter(dir+"%s.trace".format(c.name))
-    val res = new StringBuilder
+    Driver.bfs { node =>
+      if(node.sccIndex == -1 && !node.isInstanceOf[Delay] && !(node.isReg)) {
+        tarjanSCC(node)
+      }
+    }
 
-    for (m <- Driver.sortedComps) {
-      m dfs { node =>
-        node match {
-          case _: Assert =>
-          case _: PrintfBase =>
-          case _: Binding =>
-          case _: Literal =>
-          case _ => if (!node.isTypeNode) {
-            res append (getSignalPathName(node, isRealName = false) + 
-                        ":" + nodeToString(node, isRealName = false) + "\n")
+    // check for combinational loops
+    var containsCombPath = false
+    for (nodelist <- sccList) {
+      if(nodelist.length > 1) {
+        containsCombPath = true
+        ChiselError.error("FOUND COMBINATIONAL PATH!")
+        for((node, ind) <- nodelist zip nodelist.indices) {
+          ChiselError.error("  (" + ind +  ")", node.line)
+        }
+      }
+    }
+  }
+
+  /** Prints the call stack of Component as seen by the push/pop runtime. */
+  protected def printStack {
+    var res = ""
+    for((i, c) <- Driver.printStackStruct){
+      res += (genIndent(i) + c.moduleName + " " + c.name + "\n")
+    }
+    ChiselError.info(res)
+  }
+
+  def flattenAll {
+    // Reset indices for temporary nodes
+    Driver.components foreach (_.nindex = -1)
+
+    // Flatten all signals
+    val comp = Driver.topComponent
+    for (c <- Driver.components ; if c != comp) {
+      comp.debugs ++= c.debugs
+      comp.nodes ++= c.nodes
+    }
+
+    // Find roots
+    val roots = ArrayBuffer[Node]()
+    for (c <- Driver.components)
+      roots ++= c.debugs
+    for ((n, io) <- comp.wires)
+      roots += io
+    for (b <- Driver.blackboxes)
+      roots += b.io
+    for (node <- comp.nodes) {
+      node match {
+        case io: Bits if io.dir == OUTPUT && io.consumers.isEmpty =>
+          roots += node
+        case _: Delay =>
+          roots += node
+        case _ =>
+    } }
+
+    // visit nodes and find ordering
+    val stack = Stack[(Int, Node)]()
+    val walked = HashSet[Node]()
+    for (root <- roots) stack push ((0, root))
+    while (!stack.isEmpty) {
+      val (depth, node) = stack.pop
+      if (depth == -1) Driver.orderedNodes += node
+      else {
+        node.depth = math.max(node.depth, depth)
+        if (!(walked contains node)) {
+          walked += node
+          stack push ((-1, node))
+          for (i <- node.inputs; if !(i == null)) {
+            i match {
+              case _: Delay =>
+              case _ => stack push ((depth + 1, i))
+            }
           }
         }
       }
     }
-  
-    try {
-      file write res.result
-    } finally {
-      file.close
-    }
   }
 
-  def backannotationTransforms { 
-    if (Driver.isBackannotating) {
-      transforms += { c => setPseudoNames(c) }
+  def findGraphDims: (Int, Int, Int) = {
+    val nodes = Driver.orderedNodes.filter(!_.isInstanceOf[Literal])
+    val mhist = new HashMap[String, Int]
+    val whist = new HashMap[Int, Int]
+    val hist = new HashMap[String, Int]
+    for (m <- nodes) {
+      mhist(m.component.toString) = 1 + mhist.getOrElse(m.component.toString, 0)
+      val w = m.needWidth()
+      whist(w) = 1 + whist.getOrElse(w, 0)
+      val name = m match {
+        case op: Op => op.op
+        case o      => {
+          val name = m.getClass.getName
+          name.substring(name.indexOf('.') + 1)
+        }
+      }
+      hist(name) = 1 + hist.getOrElse(name, 0)
     }
+    ChiselError.info("%60s %7s".format("module", "node count"));
+    for (n <- mhist.keys.toList.sortWith((a, b) => mhist(a) > mhist(b)))
+      ChiselError.info("%60s %7d".format(n, mhist(n)))
+    ChiselError.info("%12s %7s".format("name", "count"));
+    for (n <- hist.keys.toList.sortWith((a, b) => hist(a) > hist(b)))
+      ChiselError.info("%12s %7d".format(n, hist(n)))
+    ChiselError.info("%5s %s".format("width", "count"));
+    for (w <- whist.keys.toList.sortWith((a, b) => a < b))
+      ChiselError.info("%5d %7d".format(w, whist(w)))
+    val maxDepth = nodes.map(_.depth).foldLeft(0)(_ max _)
+    val widths = new Array[Int](maxDepth + 1)
+    for (m <- nodes)
+      widths(m.depth) += 1
+    val maxWidth = widths.foldLeft(0)(_ max _)
+    (nodes.length, maxWidth, maxDepth)
   }
 
-  def backannotationAnalyses {
-    if (Driver.isBackannotating) {
-      analyses += { c => writeOutGraph(c) }
+  /* Perform a depth first search of the tree for zero-width nodes,
+   *  eliminating them if possible.
+   */
+  def W0Wtransform(): Unit = {
+    val nodesList = ArrayBuffer[Node]()
+    /* Construct the depth-first list of nodes, set them all to unmodified,
+     *  and construct their parent list.
+     */
+    Driver.idfs { n => { n.modified = false; nodesList += n ; n.inputs.foreach(_.parents += n)} }
+    for ( n <- nodesList) {
+      // If this node has any zero-width children, have it deal with them.
+      if (n.inputs exists {  c => c.inferWidth(c).needWidth == 0 }) {
+        n.W0Wtransform()
+      }
+      // If this node or any of its children have been modified, visit it.
+      if (n.modified || (n.inputs exists {  _.modified })) {
+        n.review()
+      }
     }
-  }
-
-  def initBackannotation {
-    backannotationTransforms
-    backannotationAnalyses
   }
 
   def elaborate(c: Module): Unit = {
-    Driver.setTopComponent(c)
-
-    /* XXX If we call nameAll here and again further down, we end-up with
-     duplicate names in the generated C++.
-    nameAll(c) */
-
-    ChiselError.info("elaborating modules")
-    Driver.components.foreach(_.elaborate(0))
-
-    /* XXX We should name all signals before error messages are generated
-     so as to give a clue where problems are showing up but that interfers
-     with the *bindings* (see later comment). */
-    for (c <- Driver.components)
-      c.markComponent();
-    // XXX This will create nodes after the tree is traversed!
-    c.genAllMuxes;
-    ChiselError.checkpoint()
-    execute(c, preElaborateTransforms)
-    Driver.components.foreach(_.postMarkNet(0))
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
+    markComponents
+    sortComponents
 
-    levelChildren(c)
-    Driver.sortedComps = gatherChildren(c).sortWith(
-      (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)));
+    ChiselError.info("giving names")
+    nameAll(c)
+    ChiselError.checkpoint()
 
+    ChiselError.info("executing custom transforms")
+    execute(c, transforms)
+    ChiselError.checkpoint()
+
+    ChiselError.info("adding clocks and resets")
     assignClockAndResetToModules
-    Driver.sortedComps.map(_.addDefaultReset)
-    c.addClockAndReset
+    addClocksAndResets
+    addDefaultResets
     gatherClocksAndResets
     connectResets
 
     ChiselError.info("inferring widths")
-    c.inferAll
+    inferAll(c)
+    if (Driver.isSupportW0W) {
+      ChiselError.info("eliminating W0W")
+      W0Wtransform
+    }
     ChiselError.info("checking widths")
-    c.forceMatchingWidths
+    forceMatchingWidths
     ChiselError.info("lowering complex nodes to primitives")
-    c.lowerNodes(needsLowering)
+    lowerNodes(c)
     ChiselError.info("removing type nodes")
-    val nbNodes = c.removeTypeNodes()
+    val nbNodes = removeTypeNodes(c)
+    ChiselError.info("compiling %d nodes".format(nbNodes))
     ChiselError.checkpoint()
+
+    ChiselError.info("computing memory ports")
+    computeMemPorts(c)
 
     /* *collectNodesIntoComp* associates components to nodes that were
      created after the call tree has been executed (ie. in genMuxes
@@ -688,81 +851,53 @@ abstract class Backend extends FileSystemUtilities{
      Technically all user-defined transforms are responsible to update
      nodes and component correctly or call collectNodesIntoComp on return.
      */
+
     ChiselError.info("resolving nodes to the components")
-    collectNodesIntoComp(initializeDFS)
+    collectNodesIntoComp(c)
+    checkModuleResolution
+    verifyAllMuxes
+    ChiselError.checkpoint()
 
-    // two transforms added in Mem.scala (referenced and computePorts)
-    ChiselError.info("executing custom transforms")
-    execute(c, transforms)
+    findConsumers(c)
+    // name temporary nodes generated by transforms
+    nameAll(c)
+    nameRsts
 
-    Driver.sortedComps.map(_.nodes.map(_.addConsumers))
-    c.traceNodes();
+    ChiselError.info("creating clock domains")
     val clkDomainWalkedNodes = new HashSet[Node]
     for (comp <- Driver.sortedComps)
       for (node <- comp.nodes)
         if (node.isInstanceOf[Reg])
-            createClkDomain(node, clkDomainWalkedNodes)
-    ChiselError.checkpoint()
+          createClkDomain(node, clkDomainWalkedNodes)
 
-    /* We execute nameAll after traceNodes because bindings would not have been
-       created yet otherwise. */
-    nameAll(c)
-    nameRsts
-
-    execute(c, analyses)
-
-    for (comp <- Driver.sortedComps ) {
+    ChiselError.info("pruning unconnected IOs")
+    for (comp <- Driver.sortedComps) {
       // remove unconnected outputs
       pruneUnconnectedIOs(comp)
     }
 
+    if (Driver.isCheckingPorts) {
+      ChiselError.info("checking for unconnected ports")
+      checkPorts
+    }
+
     ChiselError.checkpoint()
 
-    if(!Driver.dontFindCombLoop) {
+    if (!Driver.dontFindCombLoop) {
       ChiselError.info("checking for combinational loops")
-      c.findCombLoop();
+      findCombLoop
       ChiselError.checkpoint()
       ChiselError.info("NO COMBINATIONAL LOOP FOUND")
     }
+
     if (Driver.saveComponentTrace) {
       printStack
     }
+
+    execute(c, analyses)
   }
 
   def compile(c: Module, flags: String = null): Unit = { }
-
-  def checkPorts(topC: Module) {
-
-    def prettyPrint(n: Node, c: Module) {
-      val dir = if (n.asInstanceOf[Bits].dir == INPUT) "Input" else "Output"
-      val portName = n.name
-      val compName = c.name
-      val compInstName = c.moduleName
-      ChiselError.warning(dir + " port " + portName
-        + " is unconnected in module " + compInstName + " " + compName)
-    }
-
-    for (c <- Driver.components) {
-      if (c != topC) {
-        for ((n,i) <- c.io.flatten) {
-          if (i.inputs.length == 0) {
-            prettyPrint(i, c)
-          }
-        }
-      }
-    }
-
-  }
-
-  /** Prints the call stack of Component as seen by the push/pop runtime. */
-  protected def printStack {
-    var res = ""
-    for((i, c) <- Driver.printStackStruct){
-      res += (genIndent(i) + c.moduleName + " " + c.name + "\n")
-    }
-    ChiselError.info(res)
-  }
-
 }
 
 

@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -125,7 +125,7 @@ object Literal {
       }
     for(c <- x)
       if (c == '_') {
-        
+
       } else if(first) {
         first = false;
         res += sizeof(c.asDigit);
@@ -155,10 +155,7 @@ object Literal {
     res
   }
   def toLitVal(x: String): BigInt = {
-    var res = BigInt(0);
-    for (c <- x.substring(2, x.length))
-      res = res * 16 + c.asDigit;
-    res
+    BigInt(x.substring(2, x.length), 16)
   }
 
   def toLitVal(x: String, shamt: Int): BigInt = {
@@ -220,7 +217,10 @@ object Literal {
     val xString = (if (x >= 0) x else (BigInt(1) << w) + x).toString(16)
 
     if(xWidth > width && width != -1) {
-      ChiselError.error({"width " + width + " is too small for literal " + x + ". Smallest allowed width is " + xWidth});
+      // Is this a zero-width wire with value 0
+      if (!(x == 0 && width == 0 && Driver.isSupportW0W)) {
+        ChiselError.error({"width " + width + " is too small for literal " + x + ". Smallest allowed width is " + xWidth});
+      }
     }
     res.init("0x" + xString, w);
     res.hasInferredWidth = width == -1
@@ -267,7 +267,7 @@ class Literal extends Node {
   override def canCSE: Boolean = true
   override def hashCodeForCSE: Int = value.toInt
   override def equalsForCSE(x: Node): Boolean = x match {
-    case x: Literal => value == x.value && isZ == x.isZ && width == x.width
+    case x: Literal => value == x.value && isZ == x.isZ && widthW == x.widthW
     case _ => false
   }
 }

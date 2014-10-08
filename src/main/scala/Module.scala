@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -42,38 +42,25 @@ import ChiselError._
 import Module._
 
 object Module {
-  def apply[T<:Module](c: =>T, f: PartialFunction[Any,Any]): T = {
-    val q = params.alterPartial(f)
+  def apply[T <: Module](m: => T)(implicit p: Parameters = params): T = {
     Driver.modStackPushed = true
-    Driver.parStack.push(q)
-    val res = init(c)
+    Driver.parStack.push(p.push)
+    val res = init(m)
     Driver.parStack.pop
     res
   }
-  def apply[T<:Module](c: =>T)(implicit _p:Option[Parameters] = None): T = {
-    Driver.modStackPushed = true
-    _p match {
-      case Some(q: Parameters) => {
-        Driver.parStack.push(q.push)
-        val res = init(c)
-        Driver.parStack.pop
-        res
-      }
-      case None => {
-        if(Driver.parStack.isEmpty) Driver.parStack.push(Parameters.empty) else Driver.parStack.push(Driver.parStack.top.push)
-        val res = init(c)
-        Driver.parStack.pop
-        res
-      }
-    }
+  def apply[T <: Module](m: => T, f: PartialFunction[Any,Any]): T = {
+    val q = params.alterPartial(f)
+    apply(m)(q)
   }
+
   private def init[T<:Module](c: =>T):T = {
     val res = c
     pop()
     for ((n, io) <- res.wires) {
       if (io.dir == null)
          ChiselErrors += new ChiselError(() => {"All IO's must be ports (dir set): " + io}, io.line)
-      // else if (io.width_ == -1)
+      // else if (! io.isKnownWidth)
       //   ChiselErrors += new ChiselError(() => {"All IO's must have width set: " + io}, io.line)
       io.isIo = true
     }
@@ -112,7 +99,10 @@ object Module {
 
   // XXX Remove and instead call current()
   def getComponent(): Module = if(Driver.compStack.length != 0) Driver.compStack.top else null
-  def current: Module = getComponent
+  def current: Module = {
+    val comp = getComponent
+    if (comp == null) Driver.topComponent else comp
+  }
 
   // despite being notionally internal, these have leaked into the API
   def backend: Backend = Driver.backend
@@ -130,18 +120,18 @@ object Module {
    ( + ) clock parameter
          ( + ) by default, use parent's clock
          ( + ) sets the default clock domain for all Delay nodes within scope
-         ( + ) overriden if Delay specifies its own clock
+         ( + ) overridden if Delay specifies its own clock
    ( + ) reset parameter
          ( + ) sets the default reset signal
-         ( + ) overriden if Delay specifies its own clock w/ reset != implicitReset
+         ( + ) overridden if Delay specifies its own clock w/ reset != implicitReset
 */
-abstract class Module(var clock: Clock = null, private var _reset: Bool = null) {
+abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool = null) {
   /** A backend(Backend.scala) might generate multiple module source code
-    from one Module, based on the parameters to instanciate the component
+    from one Module, based on the parameters to instantiate the component
     instance. Since we do not want to blindly generate one module per instance
     the backend will keep a cache of each module's implementation source code
     and discard textual duplicates. By walking the nodes from level zero
-    (leafs) to level N (root), we are guarenteed to generate all
+    (leafs) to level N (root), we are guaranteed to generate all
     Module/modules source text before their first instantiation. */
   var level = 0;
   var traversal = 0;
@@ -150,10 +140,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   var name: String = "";
   /** Name of the module this component generates (defaults to class name). */
   var moduleName: String = "";
-  var pName = ""
   var named = false;
   val bindings = new ArrayBuffer[Binding];
-  var wiresCache: Array[(String, Bits)] = null;
   var parent: Module = null;
   val children = ArrayBuffer[Module]()
   val debugs = LinkedHashSet[Node]()
@@ -166,13 +154,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   def hasWhenCond: Boolean = !whenConds.isEmpty
   def whenCond: Bool = if (hasWhenCond) whenConds.top else trueCond
 
-  val nodes = new ArrayBuffer[Node]
-  val mods = new ArrayBuffer[Node];
-  val omods = new ArrayBuffer[Node];
-  val signals = new LinkedHashSet[Node]
-
-  val regs  = new ArrayBuffer[Reg];
-  val nexts = new ScalaQueue[Node];
+  val nodes = new LinkedHashSet[Node]
   val names = new HashMap[String, Node]
   var nindex = -1;
   var defaultWidth = 32;
@@ -222,6 +204,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       scala.Predef.assert(this == w.component,
         ChiselError.error("Statically resolved component differs from dynamically resolved component of IO: " + w + " crashing compiler"))
     }
+    // io naming
+    io nameIt ("io", true)
   }
 
   def findBinding(m: Node): Binding = {
@@ -237,16 +221,8 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
 
   def nextIndex : Int = { nindex = nindex + 1; nindex }
 
-  var isWalking = new HashSet[Node];
-  var isWalked = new HashSet[Node];
   // override def toString: String = name this one isn't really working...
-  def wires: Array[(String, Bits)] = {
-    // if (wiresCache == null) {
-    //   wiresCache = io.flatten;
-    // }
-    // wiresCache
-    io.flatten
-  }
+  def wires: Array[(String, Bits)] = io.flatten
 
   /** Add an assertion in the code generated by a backend. */
   def assert(cond: Bool, message: String): Unit = {
@@ -261,24 +237,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
     // XXX Because We cannot guarentee x is flatten later on in collectComp.
     x.getNode.component = this
     debugs += x.getNode
-  }
-
-  def counter(x: Node) {
-    x.getNode match {
-      case _: VecLike[_] =>
-      case _: Aggregate =>
-      case _: ROMData =>
-      case _: Literal =>
-      case any if !(Driver.signals contains any) => {
-        if (!any.isIo) debug(x)
-        Driver.signals += any
-      }
-      case _ =>
-    }
-  }
-
-  def counter(xs: Node*) {
-    xs.foreach(counter _)
   }
 
   def printf(message: String, args: Node*): Unit = {
@@ -299,7 +257,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   // COMPILATION OF REFERENCE
   def emitDec(b: Backend): String = {
     var res = "";
-    val wires = io.flatten;
+    // val wires = io.flatten;
     for ((n, w) <- wires)
       res += b.emitDec(w);
     res
@@ -325,49 +283,60 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
       this.clocks += clock
   }
 
-  // COMPILATION OF BODY
-  def initializeBFS: ScalaQueue[Node] = {
-    val res = new ScalaQueue[Node]
+  def addPin[T <: Data](pin: T, name: String = "") = {
+    for ((n, io) <- pin.flatten) {
+      io.component = this
+      io.isIo = true
+    }
+    if (name != "") pin nameIt (name, true)
+    io.asInstanceOf[Bundle] += pin
+    pin
+  }
 
-    for (c <- Driver.components; a <- c.debugs)
-      res.enqueue(a)
-    for(b <- Driver.blackboxes)
-      res.enqueue(b.io)
-    for(c <- Driver.components)
-      for((n, io) <- c.io.flatten)
-        res.enqueue(io)
-
+  def addModule[T <: Module](c: => T) = {
+    Driver.modStackPushed = true
+    Driver.compStack.push(this)
+    val res = init(c)
+    Driver.compStack.pop
+    Driver.modAdded = true
+    res.markComponent
     res
   }
 
-  def initializeDFS: Stack[Node] = {
-    val res = new Stack[Node]
+  def bfs (visit: Node => Unit) = {
+    // initialize BFS
+    val queue = new ScalaQueue[Node]
 
-    /* XXX Make sure roots are consistent between initializeBFS, initializeDFS
-     and findRoots.
-     */
-    for( a <- this.debugs ) {
-      res.push(a)
-    }
-    for((n, flat) <- this.io.flatten) {
-      res.push(flat)
-    }
-    res
-  }
+    for (a <- debugs)
+      queue enqueue a
+    for ((n, io) <- wires)
+      queue enqueue io
+    if (!(defaultResetPin == null))
+      queue enqueue defaultResetPin
 
-  def bfs(visit: Node => Unit): Unit = {
-    val walked = new HashSet[Node]
-    val bfsQueue = initializeBFS
-
-    // conduct bfs to find all reachable nodes
-    while(!bfsQueue.isEmpty){
-      val top = bfsQueue.dequeue
+    // Do BFS
+    val walked = HashSet[Node]()
+    while (!queue.isEmpty) {
+      val top = queue.dequeue
       walked += top
       visit(top)
-      for(i <- top.inputs) {
-        if(!(i == null)) {
-          if(!walked.contains(i)) {
-            bfsQueue.enqueue(i)
+      top match {
+        case io: Bits if io.isIo && io.dir == INPUT =>
+        case v: Vec[_] =>
+          for ((n, e) <- v.flatten;
+          if !(e == null) && !(walked contains e) && !e.isIo) {
+            queue enqueue e
+            walked += e
+          }
+          for (i <- top.inputs;
+          if !(i == null) && !(walked contains i) && !i.isIo) {
+            queue enqueue i
+            walked += i
+          }
+        case _ => {
+          for (i <- top.inputs;
+          if !(i == null) && !(walked contains i) && !i.isIo) {
+            queue enqueue i
             walked += i
           }
         }
@@ -376,95 +345,44 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
 
   def dfs(visit: Node => Unit): Unit = {
-    val walked = new HashSet[Node]
-    val dfsStack = initializeDFS
+    val stack = new Stack[Node]
+    // initialize DFS
+    for ((n, io) <- wires)
+      stack push io
+    if (!(defaultResetPin == null))
+      stack push defaultResetPin
+    for (a <- debugs)
+      stack push a
 
-    def isVisiting(node: Node) =
-      !(node == null) && !(walked contains node) && 
-      (node.component == this || node.isIo)
-
-    while(!dfsStack.isEmpty) {
-      val top = dfsStack.pop
+    // Do DFS
+    val walked = HashSet[Node]()
+    while (!stack.isEmpty) {
+      val top = stack.pop
       walked += top
       visit(top)
-      for(i <- top.inputs) {
-        if (isVisiting(i)) {
-          dfsStack push i
-          walked += i
+      top match {
+        case io: Bits if io.isIo && io.dir == INPUT =>
+        case v: Vec[_] => {
+          for ((n, e) <- v.flatten;
+          if !(e == null) && !(walked contains e) && !e.isIo) {
+            stack push e
+            walked += e
+          }
+          for (i <- top.inputs;
+          if !(i == null) && !(walked contains i) && !i.isIo) {
+            stack push i
+            walked += i
+          }
+        }
+        case _ => {
+          for (i <- top.inputs;
+          if !(i == null) && !(walked contains i) && !i.isIo) {
+            stack push i
+            walked += i
+          }
         }
       }
     }
-  }
-
-  def inferAll(): Int = {
-    val nodesList = ArrayBuffer[Node]()
-    bfs { nodesList += _ }
-
-    def verify {
-      var hasError = false
-      for (elm <- nodesList) {
-        if (elm.infer || elm.width == -1) {
-          ChiselError.error("Could not infer the width on: " + elm)
-          hasError = true
-        }
-      }
-      if (hasError) throw new Exception("Could not elaborate code due to uninferred width(s)")
-    }
-
-    var count = 0
-    // Infer all node widths by propagating known widths
-    // in a bellman-ford fashion.
-    for(i <- 0 until nodesList.length) {
-      var nbUpdates = 0
-      var done = true;
-      for(elm <- nodesList){
-        val updated = elm.infer
-        if( updated ) { nbUpdates = nbUpdates + 1  }
-        done = done && !updated
-      }
-
-      count += 1
-
-      if(done){
-        verify
-        return count;
-      }
-    }
-    verify
-    count
-  }
-
-  /** All classes inherited from Data are used to add type information
-   and do not represent logic itself. */
-  def removeTypeNodes(): Int = {
-    var count = 0
-    bfs {x =>
-      scala.Predef.assert(!x.isTypeNode)
-      count += 1
-      for (i <- 0 until x.inputs.length)
-        if (x.inputs(i) != null && x.inputs(i).isTypeNode) {
-          x.inputs(i) = x.inputs(i).getNode
-        }
-    }
-    count
-  }
-
-  def lowerNodes(needsLowering: Set[String]): Unit = if (!needsLowering.isEmpty) {
-    val lowerTo = new HashMap[Node, Node]
-    bfs { x =>
-      for (i <- 0 until x.inputs.length) x.inputs(i) match {
-        case op: Op =>
-          if (needsLowering contains op.op)
-            x.inputs(i) = lowerTo.getOrElseUpdate(op, op.lower)
-        case _ =>
-      }
-    }
-    if (!lowerTo.isEmpty)
-      inferAll
-  }
-
-  def forceMatchingWidths {
-    bfs(_.forceMatchingWidths)
   }
 
   def addDefaultReset {
@@ -474,150 +392,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
         defaultResetPin.inputs += _reset
     }
   }
-
-  // for every reachable delay element
-  // assign it a clock and reset where
-  // clock is chosen to be the component's clock if delay does not specify a clock
-  // reset is chosen to be 
-  //          component's explicit reset
-  //          delay's explicit clock's reset
-  //          component's clock's reset
-  def addClockAndReset {
-    bfs { _ match {
-        case x: Delay =>
-          val clock = if (x.clock == null) x.component.clock else x.clock
-          val reset =
-            if (x.component.hasExplicitReset) x.component._reset
-            else if (x.clock != null) x.clock.getReset
-            else if (x.component.hasExplicitClock) x.component.clock.getReset
-            else x.component._reset
-          x.assignReset(x.component.addResetPin(reset))
-          x.assignClock(clock)
-          x.component.addClock(clock)
-        case _ =>
-      }
-    }
-  }
-
-  def findConsumers() {
-    for (m <- mods) {
-      m.addConsumers;
-    }
-  }
-
-  /** Since we are relying on the out-degree of nodes (i.e. consumers.length),
-    this method should only be called after the forward edges have been
-    constructed. */
-  def findRoots(): ArrayBuffer[Node] = {
-    val roots = new ArrayBuffer[Node];
-    for (c <- Driver.components) {
-      roots ++= c.debugs
-      if (c.parent == null) {
-        val topIOs = c.io.flatten;
-        for ((name, wire) <- topIOs) {
-          roots += wire
-        }
-      }
-    }
-    for (b <- Driver.blackboxes)
-      roots += b.io;
-    for (m <- mods) {
-      m match {
-        case io: Bits => {
-          if (io.dir == OUTPUT) {
-            if (io.consumers.length == 0) roots += m;
-          }
-        }
-        case d: Delay => roots += m;
-        case any      =>
-      }
-    }
-    roots
-  }
-
-  def visitNodes(roots: Array[Node]) {
-    val stack = new Stack[(Int, Node)]();
-    for (root <- roots) {
-      stack.push((0, root));
-    }
-    isWalked.clear();
-    while (stack.length > 0) {
-      val (newDepth, node) = stack.pop();
-      val comp = node.componentOf;
-      if (newDepth == -1) {
-        comp.omods += node;
-      } else {
-        node.depth = max(node.depth, newDepth);
-        if (!comp.isWalked.contains(node)) {
-          comp.isWalked += node;
-          stack.push((-1, node));
-          for (i <- node.inputs) {
-            if (i != null) {
-              i match {
-                case d: Delay       => ;
-                case o              => stack.push((newDepth + 1, o));
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  def findOrdering(): Unit = visitNodes(findRoots().toArray);
-
-  def findGraphDims(): (Int, Int, Int) = {
-    val imods = mods.filter(!_.isInstanceOf[Literal])
-    val mhist = new HashMap[String, Int]
-    val whist = new HashMap[Int, Int]
-    val hist = new HashMap[String, Int]
-    for (m <- imods) {
-      mhist(m.component.toString) = 1 + mhist.getOrElse(m.component.toString, 0)
-      whist(m.width) = 1 + whist.getOrElse(m.width, 0)
-      val name = m match {
-        case op: Op => op.op
-        case o      => {
-          val name = m.getClass.getName
-          name.substring(name.indexOf('.') + 1)
-        }
-      }
-      hist(name) = 1 + hist.getOrElse(name, 0)
-    }
-    ChiselError.info("%60s %7s".format("module", "node count"));
-    for (n <- mhist.keys.toList.sortWith((a, b) => mhist(a) > mhist(b)))
-      ChiselError.info("%60s %7d".format(n, mhist(n)))
-    ChiselError.info("%12s %7s".format("name", "count"));
-    for (n <- hist.keys.toList.sortWith((a, b) => hist(a) > hist(b)))
-      ChiselError.info("%12s %7d".format(n, hist(n)))
-    ChiselError.info("%5s %s".format("width", "count"));
-    for (w <- whist.keys.toList.sortWith((a, b) => a < b))
-      ChiselError.info("%5d %7d".format(w, whist(w)))
-    val maxDepth = imods.map(_.depth).foldLeft(0)(_ max _)
-    val widths = new Array[Int](maxDepth + 1)
-    for (m <- imods)
-      widths(m.depth) += 1
-    val maxWidth = widths.foldLeft(0)(_ max _)
-    (imods.length, maxWidth, maxDepth)
-  }
-
-  def collectNodes(c: Module) {
-    for (m <- c.mods) {
-      m match {
-/* XXX deprecated?
-        case io: Bits  =>
-          if (io.dir == INPUT) {
-            inputs += m;
-          } else if (io.dir == OUTPUT) {
-            outputs += m;
-          }
- */
-        case r: Reg    => regs += r;
-        case other     =>
-      }
-    }
-  }
-
-  def traceableNodes: Array[Node] = io.traceableNodes;
 
   def getClassValNames(c: Class[_]): ArrayBuffer[String] = {
     val valnames = new ArrayBuffer[String]()
@@ -633,7 +407,7 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   // Allow checking if a method name is also the name of a val -- reveals accessors
   def getValNames = {
     val valnames = new ArrayBuffer[String]()
-    valnames ++= getClassValNames(getClass)    
+    valnames ++= getClassValNames(getClass)
     valnames
   }
 
@@ -648,7 +422,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   // 4) set variable names
   def markComponent() {
     ownIo();
-    io setPseudoName ("io", true)
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], BlackBox and Modules.
      Since we call invoke() to get a proper instance of the correct type,
@@ -664,7 +437,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
          val o = m.invoke(this);
          o match {
          case node: Node => {
-           node setPseudoName (name, false)
+           node.getNode match {
+             case _: Literal =>
+             case _ => node.getNode nameIt (backend.asValidName(name), false)
+           }
+           backend.nameSpace += node.getNode.name
          }
          case buf: ArrayBuffer[_] => {
            /* We would prefer to match for ArrayBuffer[Node] but that's
@@ -674,7 +451,11 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
              val nodebuf = buf.asInstanceOf[Seq[Node]];
              for((elm, i) <- nodebuf.zipWithIndex){
-               elm setPseudoName (name + "_" + i, false)
+               elm.getNode match {
+                 case _: Literal =>
+                 case _ => elm.getNode nameIt (backend.asValidName(name + "_" + i), false)
+               }
+               backend.nameSpace += elm.getNode.name
              }
            }
          }
@@ -682,13 +463,28 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
            if(!buf.isEmpty && buf.head.isInstanceOf[Node]){
              val nodebuf = buf.asInstanceOf[Seq[Node]];
              for((elm, i) <- nodebuf.zipWithIndex){
-               elm setPseudoName (name + "_" + i, false)
+               elm.getNode match {
+                 case _: Literal =>
+                 case _ => elm.getNode nameIt (backend.asValidName(name + "_" + i), false)
+               }
+               backend.nameSpace += elm.getNode.name
              }
            }
          }
+         case bb: BlackBox => {
+           if (!bb.named) {
+             bb.name = name
+             bb.named = true
+           }
+           backend.nameSpace += bb.name
+         }
          case comp: Module => {
            comp.pathParent = this;
-           comp.pName = name
+           if (!comp.named) {
+             comp.name = backend.asValidName(name)
+             comp.named = true
+           }
+           backend.nameSpace += comp.name
          }
          case any =>
        }
@@ -696,20 +492,9 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
      }
   }
 
-
-  def genAllMuxes {
-    bfs { _ match {
-        case p: proc => p.verifyMuxes
-        case _ =>
-      }
-    }
-  }
-
   /* XXX Not sure what the two following do.
    They never get overridden yet it is called
    for each component (See Backend implementations). */
-  def elaborate(fake: Int = 0) {}
-  def postMarkNet(fake: Int = 0) {}
   def stripComponent(s: String): String = s.split("__").last
 
     /** Returns the absolute path to a component instance from toplevel. */
@@ -718,88 +503,6 @@ abstract class Module(var clock: Clock = null, private var _reset: Bool = null) 
   }
   def getPathName(separator: String = "_"): String = {
     if ( parent == null ) name else parent.getPathName(separator) + separator + name;
-  }
-
-  def traceNodes() {
-    val queue = Stack[() => Any]();
-
-    /* XXX Why do we do something different here? */
-    if (!Driver.backend.isInstanceOf[VerilogBackend]) {
-      queue.push(() => io.traceNode(this, queue));
-    } else {
-      for (c <- Driver.components) {
-        queue.push(() => c.io.traceNode(c, queue))
-      }
-    }
-    for (c <- Driver.components) {
-        if (!(c.defaultResetPin == null)) { // must manually add reset pin cuz it isn't part of io
-          queue.push(() => c.defaultResetPin.traceNode(c, queue))
-        }
-    }
-    for (c <- Driver.components; d <- c.debugs)
-      queue.push(() => d.traceNode(c, queue))
-    for (b <- Driver.blackboxes)
-      queue.push(() => b.io.traceNode(this, queue));
-    while (queue.length > 0) {
-      val work = queue.pop();
-      work();
-    }
-  }
-
-  def findCombLoop() {
-    // Tarjan's strongly connected components algorithm to find loops
-    var sccIndex = 0
-    val stack = new Stack[Node]
-    val sccList = new ArrayBuffer[ArrayBuffer[Node]]
-
-    def tarjanSCC(n: Node): Unit = {
-      if(n.isInstanceOf[Delay]) throw new Exception("trying to DFS on a register")
-
-      n.sccIndex = sccIndex
-      n.sccLowlink = sccIndex
-      sccIndex += 1
-      stack.push(n)
-
-      for(i <- n.inputs) {
-        if(!(i == null) && !i.isInstanceOf[Delay] && !i.isReg) {
-          if(i.sccIndex == -1) {
-            tarjanSCC(i)
-            n.sccLowlink = min(n.sccLowlink, i.sccLowlink)
-          } else if(stack.contains(i)) {
-            n.sccLowlink = min(n.sccLowlink, i.sccIndex)
-          }
-        }
-      }
-
-      if(n.sccLowlink == n.sccIndex) {
-        val scc = new ArrayBuffer[Node]
-
-        var top: Node = null
-        do {
-          top = stack.pop()
-          scc += top
-        } while (!(n == top))
-        sccList += scc
-      }
-    }
-
-    bfs { node =>
-      if(node.sccIndex == -1 && !node.isInstanceOf[Delay] && !(node.isReg)) {
-        tarjanSCC(node)
-      }
-    }
-
-    // check for combinational loops
-    var containsCombPath = false
-    for (nodelist <- sccList) {
-      if(nodelist.length > 1) {
-        containsCombPath = true
-        ChiselError.error("FOUND COMBINATIONAL PATH!")
-        for((node, ind) <- nodelist zip nodelist.indices) {
-          ChiselError.error("  (" + ind +  ")", node.line)
-        }
-      }
-    }
   }
 
   def isInput(node: Node): Boolean =

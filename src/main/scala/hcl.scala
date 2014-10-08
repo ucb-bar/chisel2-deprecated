@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -136,7 +136,6 @@ trait nameable {
   /** _named_ is used to indicates name was set explicitely
    and should not be overriden by a _nameIt_ generator. */
   var named = false
-  var pName = ""
 }
 
 abstract class BlackBox extends Module {

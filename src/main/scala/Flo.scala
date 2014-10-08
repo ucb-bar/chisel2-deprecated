@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -67,7 +67,7 @@ class FloBackend extends Backend {
     // if (node.litOf == null) {
       node match {
         case x: Literal =>
-          "" + x.value + "'" + cnode.width
+          "" + x.value + "'" + cnode.needWidth()
 
         case x: Binding =>
           emitRef(x.inputs(0))
@@ -87,7 +87,7 @@ class FloBackend extends Backend {
     // if (node.litOf == null) {
       node match {
         case x: Literal =>
-          "" + x.value + "'" + (sum_to.width - other.width)
+          "" + x.value + "'" + (sum_to.needWidth() - other.needWidth())
 
         case x: Binding =>
           emitRef(x.inputs(0))
@@ -111,26 +111,28 @@ class FloBackend extends Backend {
       case o: Op =>
         emitDec(o) +
         (if (o.inputs.length == 1) {
+          val gotWidth = node.inputs(0).needWidth()
           o.op match {
-            case "~" => "not'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
-            case "^" => "xorr'" + node.inputs(0).width + " " + emitRef(node.inputs(0))
-            case "Log2" => "log2'" + node.width + " " + emitRef(node.inputs(0))
+            case "~" => "not'" + gotWidth + " " + emitRef(node.inputs(0))
+            case "^" => "xorr'" + gotWidth + " " + emitRef(node.inputs(0))
+            case "Log2" => "log2'" + node.needWidth() + " " + emitRef(node.inputs(0))
           }
          } else {
+           val gotWidth = node.inputs(0).needWidth()
            o.op match {
-             case "<"  => "lt'"   + node.inputs(0).width + " " + emitRef(node.inputs(0), node.inputs(1)) + " " + emitRef(node.inputs(1), node.inputs(0))
-             case "s<" => "rsh'1 " + emitRef(node.inputs(0)) + " " + (node.inputs(0).width-1)
-             case ">=" => "gte'"  + node.inputs(0).width + " " + emitRef(node.inputs(0), node.inputs(1)) + " " + emitRef(node.inputs(1), node.inputs(0))
-             case "<=" => "gte'"  + node.inputs(0).width + " " + emitRef(node.inputs(1), node.inputs(0)) + " " + emitRef(node.inputs(0), node.inputs(1))
-             case ">"  => "lt'"   + node.inputs(0).width + " " + emitRef(node.inputs(1), node.inputs(0)) + " " + emitRef(node.inputs(0), node.inputs(1))
-             case "+"  => "add'" + node.width + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
-             case "-"  => "sub'" + node.width + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
-             case "*"  => "mul'" + node.width + " " + emitRef(node.inputs(0), node, node.inputs(1)) + " " + emitRef(node.inputs(1), node, node.inputs(0))
-             case "/"  => "div'" + node.width + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
-             case "<<" => "lsh'" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case ">>" => "rsh'" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "s>>" => "arsh'" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
-             case "##" => "cat'" + node.inputs(1).width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
+             case "<"  => "lt'"   + gotWidth + " " + emitRef(node.inputs(0), node.inputs(1)) + " " + emitRef(node.inputs(1), node.inputs(0))
+             case "s<" => "rsh'1 " + emitRef(node.inputs(0)) + " " + (gotWidth-1)
+             case ">=" => "gte'"  + gotWidth + " " + emitRef(node.inputs(0), node.inputs(1)) + " " + emitRef(node.inputs(1), node.inputs(0))
+             case "<=" => "gte'"  + gotWidth + " " + emitRef(node.inputs(1), node.inputs(0)) + " " + emitRef(node.inputs(0), node.inputs(1))
+             case ">"  => "lt'"   + gotWidth + " " + emitRef(node.inputs(1), node.inputs(0)) + " " + emitRef(node.inputs(0), node.inputs(1))
+             case "+"  => "add'" + node.needWidth() + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
+             case "-"  => "sub'" + node.needWidth() + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
+             case "*"  => "mul'" + node.needWidth() + " " + emitRef(node.inputs(0), node, node.inputs(1)) + " " + emitRef(node.inputs(1), node, node.inputs(0))
+             case "/"  => "div'" + node.needWidth() + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
+             case "<<" => "lsh'" + node.needWidth() + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
+             case ">>" => "rsh'" + node.needWidth() + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
+             case "s>>" => "arsh'" + node.needWidth() + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
+             case "##" => "cat'" + node.inputs(1).needWidth() + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1))
              case "|"  => "or" + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
              case "&"  => "and" + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
              case "^"  => "xor" + " " + emitRef(node.inputs(0), node) + " " + emitRef(node.inputs(1), node)
@@ -141,9 +143,9 @@ class FloBackend extends Backend {
 
       case x: Extract =>
         if (node.inputs.length == 2)
-          emitDec(node) + "rsh'" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1)) + "\n"     
+          emitDec(node) + "rsh'" + node.needWidth() + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(1)) + "\n"
         else
-          emitDec(node) + "rsh'" + node.width + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(2)) + "\n"
+          emitDec(node) + "rsh'" + node.needWidth() + " " + emitRef(node.inputs(0)) + " " + emitRef(node.inputs(2)) + "\n"
 
       case x: Bits =>
         if (x.inputs.length == 1) {
@@ -152,44 +154,44 @@ class FloBackend extends Backend {
             // ((x.consumers.length > 1 && x.consumers.forall(x => x.componentOf == Driver.topComponent)) ||
             // TODO: SHOULD HANDLE TOP OUTPUTS THAT ARE ALSO FANNED OUT -- NEED EXTRA NODE
             if (x.dir == OUTPUT && x.component == Driver.topComponent)
-              emitDec(x) + (if (isRnd) "eat" else ("out'" + x.width))  + " " + emitRef(x.inputs(0)) + "\n"
-            else 
+              emitDec(x) + (if (isRnd) "eat" else ("out'" + x.needWidth()))  + " " + emitRef(x.inputs(0)) + "\n"
+            else
               emitDec(x) + "mov" + " " + emitRef(x.inputs(0)) + "\n"
           } else if (!node.isInObject && x.inputs.length == 0) {
-            emitDec(x) + "rnd'" + x.width + "\n"
+            emitDec(x) + "rnd'" + x.needWidth() + "\n"
           } else {
             ""
           }
           // println("--> NO CONSUMERS " + x + " = " + x.consumers.length);
           // ""
         } else
-          emitDec(x) + (if (x.name == "reset") "rst" else ((if (isRnd) "rnd'" else "in'")) + x.width) + "\n"
+          emitDec(x) + (if (x.name == "reset") "rst" else ((if (isRnd) "rnd'" else "in'")) + x.needWidth()) + "\n"
 
       case m: Mem[_] =>
-        emitDec(m) + "mem'" + m.width + " " + m.n + "\n"
+        emitDec(m) + "mem'" + m.needWidth() + " " + m.n + "\n"
         // emitDec(m) + "mem " + m.n + "\n" + trueAll(emitRef(m) + "__is_all_read", m.reads)
 
       case m: ROMData =>
         val res = new StringBuilder
-        res append emitDec(m) + "mem'" + m.width + " " + m.n + "\n"
+        res append emitDec(m) + "mem'" + m.needWidth() + " " + m.n + "\n"
         // emitDec(m) + "mem " + m.n + "\n" + trueAll(emitRef(m) + "__is_all_read", m.reads)
         for ((i, v) <- m.sparseLits)
           res append "init " + emitRef(m) + " " + i + " " + emitRef(v) + "\n"
         res.toString
 
       case m: MemRead =>
-        // emitDec(m) + "rd'" + node.width + " " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n" 
-        emitDec(m) + "rd'" + node.width + " 1 " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n" 
+        // emitDec(m) + "rd'" + node.needWidth() + " " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n"
+        emitDec(m) + "rd'" + node.needWidth() + " 1 " + emitRef(m.mem) + " " + emitRef(m.addr) + "\n"
 
       case m: ROMRead =>
-        emitDec(m) + "rd'" + node.width + " 1 " + emitRef(m.rom) + " " + emitRef(m.addr) + "\n" 
+        emitDec(m) + "rd'" + node.needWidth() + " 1 " + emitRef(m.rom) + " " + emitRef(m.addr) + "\n"
 
       case m: MemWrite =>
-        if (m.inputs.length == 2) 
+        if (m.inputs.length == 2)
           return ""
-        emitDec(m) + "wr'" + m.data.width + " " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + " " + emitRef(m.data) + "\n"
+        emitDec(m) + "wr'" + m.data.needWidth() + " " + emitRef(m.cond) + " " + emitRef(m.mem) + " " + emitRef(m.addr) + " " + emitRef(m.data) + "\n"
       case x: Reg => // TODO: need resetData treatment
-        emitDec(x) + "reg'" + x.width + " 1 " + emitRef(x.next) + "\n"
+        emitDec(x) + "reg'" + x.needWidth() + " 1 " + emitRef(x.next) + "\n"
 
       case l: Literal =>
         ""
@@ -199,17 +201,16 @@ class FloBackend extends Backend {
     }
   }
 
-  def renameNodes(c: Module, nodes: Seq[Node]) = {
+  def renameNodes(nodes: ArrayBuffer[Node]) {
+    val comp = Driver.topComponent
     for (m <- nodes) {
       m match {
-        case l: Literal => ;
-        case any        =>
-          if (m.name != "" && !(m == c.reset) && !(m.component == null)) {
-            // only modify name if it is not the reset signal or not in top component
-            if(m.name != "reset" || !(m.component == c)) {
-              m.name = m.component.getPathName(":") + "::" + m.name;
-            }
-          }
+        case _: Literal =>
+        case _ if m.named && (m != comp.defaultResetPin) && m.component != null =>
+          // only modify name if it is not the reset signal or not in top component
+          if (m.name != "reset" || m.component != comp)
+            m.name = m.component.getPathName(":") + "::" + m.name
+        case _ =>
       }
     }
   }
@@ -217,26 +218,18 @@ class FloBackend extends Backend {
   override def elaborate(c: Module): Unit = {
     super.elaborate(c)
 
-    for (cc <- Driver.components) {
-      if (!(cc == c)) {
-        c.mods       ++= cc.mods;
-        c.debugs     ++= cc.debugs;
-      }
-    }
-    c.findConsumers()
+    flattenAll
     ChiselError.checkpoint()
 
-    c.collectNodes(c);
-    c.findOrdering(); // search from roots  -- create omods
-    renameNodes(c, c.omods);
+    renameNodes(Driver.orderedNodes)
     if (Driver.isReportDims) {
-      val (numNodes, maxWidth, maxDepth) = c.findGraphDims();
+      val (numNodes, maxWidth, maxDepth) = findGraphDims
       // ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
     }
 
     // Write the generated code to the output file
     val out = createOutputFile(c.name + ".flo");
-    for (m <- c.omods)
+    for (m <- Driver.orderedNodes)
       out.write(emit(m));
     out.close();
   }

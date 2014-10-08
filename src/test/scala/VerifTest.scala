@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -85,7 +85,7 @@ class VerifSuite extends TestSuite {
       io.z := Cat(io.x, io.y)
     }
     /** XXX Can't run CppBackend back-to-back in the same process
-      because the emulator resource is closed. 
+      because the emulator resource is closed.
     chiselMain(Array[String]("--backend", "c",
       "--targetDir", dir.getPath.toString()),
       () => Module(new CppPrintfComp()))
@@ -126,7 +126,7 @@ void VerifSuite_CppPrintfComp_1_t::dump(FILE *f, int t) {
       printf("IO = %x", io)
       io.out := io.in + UInt(1)
     }
-    chiselMain(Array[String]("--cpp",
+    chiselMain(Array[String]("--backend", "c",
       "--targetDir", dir.getPath.toString()),
       () => Module(new PrintfBundle()))
     } catch {

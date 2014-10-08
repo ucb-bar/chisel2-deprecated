@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -46,17 +46,18 @@ class Snapshot(val t: Int) {
 }
 
 class ManualTester[+T <: Module]
-    (val c: T, val isTrace: Boolean = true) {
+    (val c: T, val isT: Boolean = true) {
   var testIn:  InputStream  = null
   var testOut: OutputStream = null
   var testErr: InputStream  = null
   val sb = new StringBuilder()
   var delta = 0
   var t = 0
+  var isTrace = isT
 
   /**
    * Waits until the emulator streams are ready. This is a dirty hack related
-   * to the way Process works. TODO: FIXME. 
+   * to the way Process works. TODO: FIXME.
    */
   def waitForStreams() = {
     var waited = 0
@@ -95,9 +96,9 @@ class ManualTester[+T <: Module]
       System.err.print(s"emulatorCmd($str): command should not contain newline")
       return "error"
     }
-    
+
     waitForStreams()
-    
+
     // send command to emulator
     for (e <- str) testOut.write(e);
     testOut.write('\n');
@@ -113,7 +114,7 @@ class ManualTester[+T <: Module]
       sb += c.toChar
       c   = testIn.read
     }
-    
+
     // drain errors
     try {
       while(testErr.available() > 0) {
@@ -122,7 +123,7 @@ class ManualTester[+T <: Module]
     } catch {
       case e : IOException => testErr = null; println("ERR EXCEPTION")
     }
-    
+
     if (sb == "error") {
       System.err.print(s"FAILED: emulatorCmd($str): returned error")
       ok = false
@@ -169,8 +170,9 @@ class ManualTester[+T <: Module]
 
   def signed_fix(dtype: Bits, rv: BigInt): BigInt = {
     dtype match {
-      case _: SInt => (if(rv >= (BigInt(1) << dtype.getWidth-1)) (rv - (BigInt(1) << dtype.getWidth)) else rv)
-      /* anything else (i.e., UInt, Flo, or Dbl) */
+      /* Any "signed" node */
+      case _: SInt | _ : Flo | _: Dbl => (if(rv >= (BigInt(1) << dtype.getWidth-1)) (rv - (BigInt(1) << dtype.getWidth)) else rv)
+      /* anything else (i.e., UInt) */
       case _ => (rv)
     }
   }
@@ -197,7 +199,7 @@ class ManualTester[+T <: Module]
     if (dumpName(data) == "") {
       println("Unable to poke data " + data)
     } else {
-      
+
       if (isTrace) println("  POKE " + dumpName(data) + " " + (if (off >= 0) (off + " ") else "") + "<- " + x)
       var cmd = ""
       if (off != -1) {
@@ -205,7 +207,10 @@ class ManualTester[+T <: Module]
       } else {
         cmd = "wire_poke " + dumpName(data);
       }
-      cmd = cmd + " 0x" + x.toString(16);
+      // Don't prefix negative numbers with "0x"
+      val radixPrefix = if (x < 0) " " else " 0x"
+
+      cmd = cmd + radixPrefix + x.toString(16);
       val rtn = emulatorCmd(cmd)
       if (rtn != "ok") {
         System.err.print(s"FAILED: poke(${dumpName(data)}) returned false")
@@ -256,7 +261,7 @@ class ManualTester[+T <: Module]
 
   def expect (data: Bits, expected: BigInt): Boolean = {
     val got = peek(data)
-    expect(got == expected, 
+    expect(got == expected,
        "EXPECT " + dumpName(data) + " <- " + got + " == " + expected)
   }
 
@@ -268,12 +273,40 @@ class ManualTester[+T <: Module]
     allGood
   }
 
+  /* We need the following so scala doesn't use our "tolerant" Float version of expect.
+   */
+  def expect (data: Bits, expected: Int): Boolean = {
+    expect(data, BigInt(expected))
+  }
+  def expect (data: Bits, expected: Long): Boolean = {
+    expect(data, BigInt(expected))
+  }
+
+  /* Compare the floating point value of a node with an expected floating point value.
+   * We will tolerate differences in the bottom bit.
+   */
+  def expect (data: Bits, expected: Float): Boolean = {
+    val gotBits = peek(data).toInt
+    val expectedBits = java.lang.Float.floatToIntBits(expected)
+    var gotFLoat = java.lang.Float.intBitsToFloat(gotBits)
+    var expectedFloat = expected
+    if (gotFLoat != expectedFloat) {
+      val gotDiff = gotBits - expectedBits
+      // Do we have a single bit difference?
+      if (abs(gotDiff) <= 1) {
+        expectedFloat = gotFLoat
+      }
+    }
+    expect(gotFLoat == expectedFloat,
+       "EXPECT " + dumpName(data) + " <- " + gotFLoat + " == " + expectedFloat)
+  }
+
   val rnd = if (Driver.testerSeedValid) new Random(Driver.testerSeed) else new Random()
   var process: Process = null
 
   def start(): Process = {
     val target = Driver.targetDir + "/" + c.name
-    val cmd = 
+    val cmd =
       (if (Driver.backend.isInstanceOf[FloBackend]) {
          val dir = Driver.backend.asInstanceOf[FloBackend].floDir
          val command = ArrayBuffer(dir + "fix-console", ":is-debug", "true", ":filename", target + ".hex", ":flo-filename", target + ".mwe.flo")
@@ -337,7 +370,7 @@ class MapTester[+T <: Module](c: T, val testNodes: Array[Node]) extends Tester(c
     }
   }
   val (ins, outs) = splitFlattenNodes(testNodes)
-  val testInputNodes    = ins.toArray; 
+  val testInputNodes    = ins.toArray;
   val testNonInputNodes = outs.toArray
   def step(svars: HashMap[Node, Node],
            ovars: HashMap[Node, Node] = new HashMap[Node, Node],
