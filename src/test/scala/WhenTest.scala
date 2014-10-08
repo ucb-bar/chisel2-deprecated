@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -48,7 +48,7 @@ class WhenSuite extends TestSuite {
     }
 
     class WhenModuleTests(m: WhenModule) extends Tester(m) {
-      List(false,true,false,true,false,false,false,true).zipWithIndex.map { 
+      List(false,true,false,true,false,false,false,true).zipWithIndex.map {
         case (en, i) =>
           poke(m.io.en, int(en))
           poke(m.io.in, i)
@@ -75,14 +75,14 @@ class WhenSuite extends TestSuite {
 
     class EmbedWhenModuleTests(m: EmbedWhenModule) extends Tester(m) {
       List(false, true, false, true,  true, false, true,  true).zip(
-      List(false, true, true,  false, true, true,  false, true)).zipWithIndex.map { 
+      List(false, true, true,  false, true, true,  false, true)).zipWithIndex.map {
         case ((en0, en1), i) =>
           poke(m.io.en0, int(en0))
           poke(m.io.en1, int(en1))
           poke(m.io.in,  i)
           step(1)
           expect(m.io.out, if(en0 && en1) i else 0)
-      } 
+      }
     }
 
     launchCppTester((m: EmbedWhenModule) => new EmbedWhenModuleTests(m))

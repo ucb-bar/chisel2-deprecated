@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -64,7 +64,7 @@ class VcdBackend(top: Module) extends Backend {
     "K" + index + ":\n"
 
   private def emitDef1(node: Node, offset: Int, index: Int) =
-    "  if (" + emitRef(node) + ".get(0x" + offset.toHexString +") != " + emitRef(node) + 
+    "  if (" + emitRef(node) + ".get(0x" + offset.toHexString +") != " + emitRef(node) +
     "__prev.get(0x" + offset.toHexString + "))\n" +
     "    goto L" + index + ";\n" +
     "K" + index + ":\n"
@@ -77,7 +77,7 @@ class VcdBackend(top: Module) extends Backend {
 
   private def emitDef2(node: Node, offset: Int, index: Int) =
     "L" + index + ":\n" +
-    "  " + emitRef(node) + "__prev.get(0x" + offset.toHexString + ") = " + 
+    "  " + emitRef(node) + "__prev.get(0x" + offset.toHexString + ") = " +
     emitRef(node) + ".get(0x" + offset.toHexString + ");\n" +
     emitDefUnconditional(node, offset, index) +
     "  goto K" + index + ";\n"

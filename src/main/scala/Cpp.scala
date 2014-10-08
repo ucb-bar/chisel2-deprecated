@@ -372,13 +372,13 @@ class CppBackend extends Backend {
               res += s"${emitWordRef(o, i)} = __v${i} >> __s | __c"
               res += s"__c = MASK(__v${i} << __r, __s != 0)"
               if (arith) {
-	        val gotWidth = o.needWidth()
+                val gotWidth = o.needWidth()
                 res += s"${emitWordRef(o, i)} |= MASK(__msb << ((${gotWidth-1}-${emitLoWordRef(o.inputs(1))}) % ${bpw}), ${(i + 1) * bpw} > ${gotWidth-1} - ${emitLoWordRef(o.inputs(1))})"
                 res += s"${emitWordRef(o, i)} |= MASK(__msb, ${i*bpw} >= ${gotWidth-1} - ${emitLoWordRef(o.inputs(1))})"
               }
             }
             if (arith) {
-	      val gotWidth = o.needWidth()
+              val gotWidth = o.needWidth()
               res += emitLoWordRef(o) + " |= MASK(__msb << ((" + (gotWidth-1) + "-" + emitLoWordRef(o.inputs(1)) + ") % " + bpw + "), " + bpw + " > " + (gotWidth-1) + "-" + emitLoWordRef(o.inputs(1)) + ")"
             }
             block(res) + (if (arith) trunc(o) else "")
@@ -1414,7 +1414,7 @@ class CppBackend extends Backend {
           for (m <- Driver.orderedNodes) {
             addClkDefs(m, code)
           }
-          // For the non-patitioned case, we're going to merge the clock_hi init and def code into a single function.
+          // For the non-partitioned case, we're going to merge the clock_hi init and def code into a single function.
           // Add the closing brace to the def string.
           for (clk <- code.keys) {
             code(clk)._1.append("}\n")
@@ -1603,17 +1603,17 @@ class CppBackend extends Backend {
     out_cpps.clear()
 
     def copyToTarget(filename: String) = {
-	  val resourceStream = getClass().getResourceAsStream("/" + filename)
-	  if( resourceStream != null ) {
-	    val classFile = createOutputFile(filename)
-	    while(resourceStream.available > 0) {
-	      classFile.write(resourceStream.read())
-	    }
-	    classFile.close()
-	    resourceStream.close()
-	  } else {
-		println(s"WARNING: Unable to copy '$filename'" )
-	  }
+      val resourceStream = getClass().getResourceAsStream("/" + filename)
+      if( resourceStream != null ) {
+        val classFile = createOutputFile(filename)
+        while(resourceStream.available > 0) {
+          classFile.write(resourceStream.read())
+        }
+        classFile.close()
+        resourceStream.close()
+      } else {
+        println(s"WARNING: Unable to copy '$filename'" )
+      }
     }
     /* Copy the emulator headers into the targetDirectory. */
     copyToTarget("emulator_mod.h")

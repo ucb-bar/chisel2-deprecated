@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -55,17 +55,17 @@ object Driver extends FileSystemUtilities{
   }
 
   private def executeUnwrapped[T <: Module](gen: () => T): T = {
-    if (!chiselConfigMode.isEmpty && !chiselConfigClassName.isEmpty) { 
+    if (!chiselConfigMode.isEmpty && !chiselConfigClassName.isEmpty) {
       val name = appendString(chiselProjectName,chiselConfigClassName)
       val config = try {
         Class.forName(name).newInstance.asInstanceOf[ChiselConfig]
       } catch {
-        case e: java.lang.ClassNotFoundException => 
-          throwException("Could not find the ChiselConfig subclass you asked for (\"" + 
+        case e: java.lang.ClassNotFoundException =>
+          throwException("Could not find the ChiselConfig subclass you asked for (\"" +
                           name + "\"), did you misspell it?", e)
       }
       val world = if(chiselConfigMode.get == "collect") {
-        new Collector(config.topDefinitions,config.knobValues) 
+        new Collector(config.topDefinitions,config.knobValues)
       } else { new Instance(config.topDefinitions,config.knobValues) }
       val p = Parameters.root(world)
       config.topConstraints.foreach(c => p.constrain(c))
@@ -79,7 +79,7 @@ object Driver extends FileSystemUtilities{
         w.close
       }
       c
-    } 
+    }
     else {
       execute(() => Module(gen()))
     }
