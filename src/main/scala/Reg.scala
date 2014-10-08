@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -49,18 +49,18 @@ object Reg {
 /*
     The (implicit d: DummyImplicit) is to avoid the conflict with the
     above regWidth(w: => Width) method:
-	  double definition:
-	  method regWidth:(r: => Chisel.Node)(=> Chisel.Node) => Chisel.Width and
-	  method regWidth:(w: => Chisel.Width)(=> Chisel.Node) => Chisel.Width at line 49
-	  have same type after erasure: (r: Function0)Function1
-	  def regWidth(r: => Node) = {
+    double definition:
+    method regWidth:(r: => Chisel.Node)(=> Chisel.Node) => Chisel.Width and
+    method regWidth:(w: => Chisel.Width)(=> Chisel.Node) => Chisel.Width at line 49
+    have same type after erasure: (r: Function0)Function1
+    def regWidth(r: => Node) = {
   */
 
   def regWidth(w: => Width)(implicit d: DummyImplicit) =
     if (! w.isKnown) {
       regMaxWidth _ ;
     } else {
-      fixWidth(w.needWidth())	 // TODO 0WW
+      fixWidth(w.needWidth())  // TODO 0WW
     }
 
   /** Rule: if r is using an inferred width, then don't enforce a width. If it is using a user inferred

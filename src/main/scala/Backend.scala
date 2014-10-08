@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -63,7 +63,7 @@ trait FileSystemUtilities {
 abstract class Backend extends FileSystemUtilities{
   /* Set of keywords which cannot be used as node and component names. */
   val keywords: HashSet[String];
-  val nameSpace = HashSet[String]() 
+  val nameSpace = HashSet[String]()
   /* Set of Ops that this backend doesn't natively support and thus must be
      lowered to simpler Ops. */
   val needsLowering = Set[String]()

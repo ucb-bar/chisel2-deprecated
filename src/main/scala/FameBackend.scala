@@ -67,25 +67,25 @@ class FameQueue[T <: Data] (val entries: Int)(data: => T) extends Module
     val deq = new FameDecoupledIO(data)
     val enq = new FameDecoupledIO(data).flip()
   }
-  
+
   val target_queue = Module(new Queue(data, entries))
   val tracker = Module(new FameQueueTracker(entries, entries))
-  
+
   target_queue.io.enq.valid := io.enq.host_valid && io.enq.target.valid
   target_queue.io.enq.bits := io.enq.target.bits
   io.enq.target.ready := target_queue.io.enq.ready
-  
+
   io.deq.target.valid := tracker.io.entry_avail && target_queue.io.deq.valid
   io.deq.target.bits := target_queue.io.deq.bits
   target_queue.io.deq.ready := io.deq.host_ready && io.deq.target.ready && tracker.io.entry_avail
-  
+
   tracker.io.tgt_queue_count := target_queue.io.count
   tracker.io.produce := io.enq.host_valid && io.enq.host_ready
   tracker.io.consume := io.deq.host_valid && io.deq.host_ready
   tracker.io.tgt_enq := target_queue.io.enq.valid && target_queue.io.enq.ready
   tracker.io.tgt_deq := io.deq.target.valid && target_queue.io.deq.ready
 
-  io.enq.host_ready := !tracker.io.full && target_queue.io.enq.ready 
+  io.enq.host_ready := !tracker.io.full && target_queue.io.enq.ready
   io.deq.host_valid := !tracker.io.empty
   
 }

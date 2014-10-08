@@ -1,4 +1,34 @@
 /*
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ California (Regents). All Rights Reserved.  Redistribution and use in
+ source and binary forms, with or without modification, are permitted
+ provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer.
+    * Redistributions in binary form must reproduce the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer in the documentation and/or other materials
+      provided with the distribution.
+    * Neither the name of the Regents nor the names of its contributors
+      may be used to endorse or promote products derived from this
+      software without specific prior written permission.
+
+ IN NO EVENT SHALL REGENTS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
+ SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS,
+ ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+ REGENTS HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ REGENTS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE. THE SOFTWARE AND ACCOMPANYING DOCUMENTATION, IF
+ ANY, PROVIDED HEREUNDER IS PROVIDED "AS IS". REGENTS HAS NO OBLIGATION
+ TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
+ MODIFICATIONS.
+*/
+
+/*
   Written by Stephen Twigg, Eric Love
   Version 0.9
 */
@@ -27,14 +57,14 @@ class AdvTester[+T <: Module](val dut: T) extends Tester[T](dut, false) {
 
   override def poke(port: Bits, target: BigInt) = require(false, "poke hidden for AdvTester, use wire_poke or reg_poke")
   override def poke(port: Aggregate, target: Array[BigInt]) = require(false, "poke hidden for AdvTester, use wire_poke or reg_poke")
-  
+
   val registered_bits_updates = new scala.collection.mutable.HashMap[Bits,BigInt]()
   val registered_aggr_updates = new scala.collection.mutable.HashMap[Aggregate,Array[BigInt]]()
-  
+
   def do_registered_updates() = {
     registered_bits_updates.foreach( kv => wire_poke(kv._1,kv._2) )
     registered_aggr_updates.foreach( kv => wire_poke(kv._1,kv._2) )
-    
+
     registered_bits_updates.clear()
     registered_aggr_updates.clear()
   }
@@ -45,7 +75,7 @@ class AdvTester[+T <: Module](val dut: T) extends Tester[T](dut, false) {
   // Convenience functions
   def Boolean2Int(i: Boolean): Int = (if(i) 1 else 0) // TODO: Investigate name and inclusion as a Chisel Tester auto-convert
 
-  // This function replaces step in the advanced tester and makes sure all tester features are clocked in the appropriate order 
+  // This function replaces step in the advanced tester and makes sure all tester features are clocked in the appropriate order
   def takestep(work: => Unit = {}): Unit = {
     cycles += 1
     step(1)

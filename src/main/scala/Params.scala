@@ -67,7 +67,7 @@ case class ValueParam(pname:String, init: Any) extends Param[Any] {
   val min = init.toString.toInt
 }
 
-case class RangeParam(pname:String, init: Int, min: Int, max: Int) extends Param[Int] 
+case class RangeParam(pname:String, init: Int, min: Int, max: Int) extends Param[Int]
 
 case class LessParam(pname:String, init: Int, min: Int, par: Param[Any]) extends Param[Int] {
   val max = par.max

@@ -48,14 +48,14 @@ class MyCounter extends Module {
    }
 
    val c = Reg(UInt(0, width = 8))
-   
+
    val out = UInt(width = 8)
    out := c
    io.out.bits := out(7,4)
    io.out.valid := out(3,0) === UInt(0)
    when(io.out.ready){
       c := c + UInt(1)
-   }   
+   }
 }
 
 
@@ -79,8 +79,8 @@ object AddFilter {
     for(i <- 0 until args.length){
        if(args(i).equals("--design")) {
           design = args(i + 1)
-	  // Remove the arguments that only we understand
-	  argsBuild.remove(i, 2)
+    // Remove the arguments that only we understand
+    argsBuild.remove(i, 2)
        }
     }
     println(design)
