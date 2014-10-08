@@ -305,18 +305,11 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     Driver.compStack.pop
     res
   }
-  def addModule[T <: Module](c: => T)(implicit _p:Option[Parameters] = None) = {
+  def addModule[T <: Module](c: => T)(implicit p:Parameters = params) = {
     Driver.modStackPushed = true
     Driver.modAdded = true
     Driver.compStack.push(this)
-    _p match {
-      case Some(q: Parameters) => {
-        Driver.parStack.push(q.push)
-      }
-      case None => {
-        Driver.parStack.push(params)
-      }
-    }
+    Driver.parStack.push(p.push)
     val res = init(c)
     res.markComponent
     Driver.parStack.pop
