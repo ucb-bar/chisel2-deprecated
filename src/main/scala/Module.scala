@@ -393,29 +393,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     }
   }
 
-  def getClassValNames(c: Class[_]): ArrayBuffer[String] = {
-    val valnames = new ArrayBuffer[String]()
-    for (v <- c.getDeclaredFields) {
-      v.setAccessible(true)
-      valnames += v.getName
-    }
-    val sc = c.getSuperclass
-    if (sc != null) { valnames ++= getClassValNames(sc) }
-    valnames
-  }
-
-  // Allow checking if a method name is also the name of a val -- reveals accessors
-  def getValNames = {
-    val valnames = new ArrayBuffer[String]()
-    valnames ++= getClassValNames(getClass)    
-    valnames
-  }
-
-  object isValName {
-    val valnames = Module.this.getValNames
-    def apply(name: String) = valnames.contains(name)
-  }
-
   // 1) name the component
   // 2) name the IO
   // 3) name and set the component of all statically declared nodes through introspection
@@ -427,13 +404,12 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
      Since we call invoke() to get a proper instance of the correct type,
      we have to insure the method is accessible, thus all fields
      that will generate C++ or Verilog code must be made public. */
-     for (m <- getClass().getDeclaredMethods.sortWith(
+     for (m <- FindValAccessors(getClass()).sortWith(
       (x, y) => (x.getName() < y.getName())
     )) {
        val name = m.getName();
        val types = m.getParameterTypes();
-       if (types.length == 0 && isValName(name) // patch to avoid defs
-        && isPublic(m.getModifiers())) {
+       if (isPublic(m.getModifiers())) {
          val o = m.invoke(this);
          o match {
          case node: Node => {
