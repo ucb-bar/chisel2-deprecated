@@ -39,7 +39,7 @@ import java.lang.Float.floatToIntBits
 object Flo {
   def apply(x: Float): Flo = Lit(floatToIntBits(x), 32){ Flo() }
   def apply(x: Double): Flo = Flo(x.toFloat);
-  
+
   def apply(dir: IODirection = null): Flo = {
     val res = new Flo();
     res.dir = dir;
@@ -82,7 +82,7 @@ class Flo extends Bits with Num[Flo] {
   def <  (b: Flo): Bool = newLogicalOp(b, "f<")
   def <= (b: Flo): Bool = newLogicalOp(b, "f<=")
   def >= (b: Flo): Bool = newLogicalOp(b, "f>=")
-  def pow (b: Flo): Flo = newBinaryOp(b, "fpow") 
+  def pow (b: Flo): Flo = newBinaryOp(b, "fpow")
   def sin: Flo = newUnaryOp("fsin")
   def cos: Flo = newUnaryOp("fcos")
   def tan: Flo = newUnaryOp("ftan")
@@ -106,7 +106,7 @@ object Dbl {
 
   def apply(x: Float): Dbl = Dbl(x.toDouble);
   def apply(x: Double): Dbl = Lit(doubleToLongBits(x), 64){ Dbl() }
-  
+
   def apply(dir: IODirection = null): Dbl = {
     val res = new Dbl();
     res.dir = dir;
@@ -149,7 +149,7 @@ class Dbl extends Bits with Num[Dbl] {
   def <  (b: Dbl): Bool = newLogicalOp(b, "d<")
   def <= (b: Dbl): Bool = newLogicalOp(b, "d<=")
   def >= (b: Dbl): Bool = newLogicalOp(b, "d>=")
-  def pow (b: Dbl): Dbl = newBinaryOp(b, "dpow") 
+  def pow (b: Dbl): Dbl = newBinaryOp(b, "dpow")
   def sin: Dbl = newUnaryOp("dsin")
   def cos: Dbl = newUnaryOp("dcos")
   def tan: Dbl = newUnaryOp("dtan")

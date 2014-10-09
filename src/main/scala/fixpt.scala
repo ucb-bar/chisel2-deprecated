@@ -132,7 +132,7 @@ class UFix(exp: Int, raw: UInt) extends Fix[UInt,UFix](exp, raw) with Num[UFix] 
 
   def <<(b: Int): UFix = new UFix(exp+b, raw)
   def >>(b: Int): UFix = new UFix(exp-b, raw)
-  
+
   def <  (b: UFix): Bool = do_lessthan(b)
   def <= (b: UFix): Bool = do_lesseq(b)
   def >  (b: UFix): Bool = b.do_lessthan(this)
@@ -163,7 +163,7 @@ class SFix(exp: Int, raw: SInt) extends Fix[SInt,SFix](exp, raw) with Num[SFix] 
 
   def <<(b: Int): SFix = new SFix(exp+b, raw)
   def >>(b: Int): SFix = new SFix(exp-b, raw)
-  
+
   def <  (b: SFix): Bool = do_lessthan(b)
   def <= (b: SFix): Bool = do_lesseq(b)
   def >  (b: SFix): Bool = b.do_lessthan(this)

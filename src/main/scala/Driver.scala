@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -55,17 +55,17 @@ object Driver extends FileSystemUtilities{
   }
 
   private def executeUnwrapped[T <: Module](gen: () => T): T = {
-    if (!chiselConfigMode.isEmpty && !chiselConfigClassName.isEmpty) { 
+    if (!chiselConfigMode.isEmpty && !chiselConfigClassName.isEmpty) {
       val name = appendString(chiselProjectName,chiselConfigClassName)
       val config = try {
         Class.forName(name).newInstance.asInstanceOf[ChiselConfig]
       } catch {
-        case e: java.lang.ClassNotFoundException => 
-          throwException("Could not find the ChiselConfig subclass you asked for (\"" + 
+        case e: java.lang.ClassNotFoundException =>
+          throwException("Could not find the ChiselConfig subclass you asked for (\"" +
                           name + "\"), did you misspell it?", e)
       }
       val world = if(chiselConfigMode.get == "collect") {
-        new Collector(config.topDefinitions,config.knobValues) 
+        new Collector(config.topDefinitions,config.knobValues)
       } else { new Instance(config.topDefinitions,config.knobValues) }
       val p = Parameters.root(world)
       config.topConstraints.foreach(c => p.constrain(c))
@@ -79,7 +79,7 @@ object Driver extends FileSystemUtilities{
         w.close
       }
       c
-    } 
+    }
     else {
       execute(() => Module(gen()))
     }
@@ -88,7 +88,7 @@ object Driver extends FileSystemUtilities{
   private def execute[T <: Module](gen: () => T): T = {
     val c = gen()
     /* Params - If dumping design, dump space to pDir*/
-    if (chiselConfigMode == None || chiselConfigMode.get == "instance") { 
+    if (chiselConfigMode == None || chiselConfigMode.get == "instance") {
       setTopComponent(c)
       backend.elaborate(c)
       if (isCompiling && isGenHarness) backend.compile(c)
@@ -122,13 +122,13 @@ object Driver extends FileSystemUtilities{
     topComponent.reset = implicitReset
     topComponent.hasExplicitReset = true
     topComponent.clock = implicitClock
-    topComponent.hasExplicitClock = true    
+    topComponent.hasExplicitClock = true
   }
 
   def bfs (visit: Node => Unit) = {
     // initialize BFS
     val queue = new ScalaQueue[Node]
-   
+
     for (c <- components; a <- c.debugs)
       queue enqueue a
     for (b <- blackboxes)
@@ -150,7 +150,7 @@ object Driver extends FileSystemUtilities{
             queue enqueue io
             walked += io
           }
-        case v: Vec[_] => 
+        case v: Vec[_] =>
           for ((n, e) <- v.flatten; if !(e == null) && !(walked contains e)) {
             queue enqueue e
             walked += e
@@ -237,20 +237,20 @@ object Driver extends FileSystemUtilities{
       n.sccIndex = -1
       n.sccLowlink = -1
     }
-    
+
     def findSCC():ArrayBuffer[ArrayBuffer[Node]] = {
       // Tarjan's strongly connected components algorithm to find loops
       var sccIndex = 0
       val stack = new Stack[Node]
       val sccList = new ArrayBuffer[ArrayBuffer[Node]]
-  
+
       def tarjanSCC(n: Node): Unit = {
-  
+
         n.sccIndex = sccIndex
         n.sccLowlink = sccIndex
         sccIndex += 1
         stack.push(n)
-  
+
         for(i <- n.inputs) {
           if(!(i == null)) {
             if(i.sccIndex == -1) {
@@ -261,10 +261,10 @@ object Driver extends FileSystemUtilities{
             }
           }
         }
-  
+
         if(n.sccLowlink == n.sccIndex) {
           val scc = new ArrayBuffer[Node]
-  
+
           var top: Node = null
           do {
             top = stack.pop()

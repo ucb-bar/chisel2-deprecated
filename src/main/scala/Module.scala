@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -120,18 +120,18 @@ object Module {
    ( + ) clock parameter
          ( + ) by default, use parent's clock
          ( + ) sets the default clock domain for all Delay nodes within scope
-         ( + ) overriden if Delay specifies its own clock
+         ( + ) overridden if Delay specifies its own clock
    ( + ) reset parameter
          ( + ) sets the default reset signal
-         ( + ) overriden if Delay specifies its own clock w/ reset != implicitReset
+         ( + ) overridden if Delay specifies its own clock w/ reset != implicitReset
 */
 abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool = null) {
   /** A backend(Backend.scala) might generate multiple module source code
-    from one Module, based on the parameters to instanciate the component
+    from one Module, based on the parameters to instantiate the component
     instance. Since we do not want to blindly generate one module per instance
     the backend will keep a cache of each module's implementation source code
     and discard textual duplicates. By walking the nodes from level zero
-    (leafs) to level N (root), we are guarenteed to generate all
+    (leafs) to level N (root), we are guaranteed to generate all
     Module/modules source text before their first instantiation. */
   var level = 0;
   var traversal = 0;
@@ -320,7 +320,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   def bfs (visit: Node => Unit) = {
     // initialize BFS
     val queue = new ScalaQueue[Node]
-    
+
     for (a <- debugs)
       queue enqueue a
     for ((n, io) <- wires)
@@ -336,19 +336,19 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       visit(top)
       top match {
         case io: Bits if io.isIo && io.dir == INPUT =>
-        case v: Vec[_] => 
-          for ((n, e) <- v.flatten; 
+        case v: Vec[_] =>
+          for ((n, e) <- v.flatten;
           if !(e == null) && !(walked contains e) && !e.isIo) {
             queue enqueue e
             walked += e
           }
-          for (i <- top.inputs; 
+          for (i <- top.inputs;
           if !(i == null) && !(walked contains i) && !i.isIo) {
             queue enqueue i
             walked += i
           }
         case _ => {
-          for (i <- top.inputs; 
+          for (i <- top.inputs;
           if !(i == null) && !(walked contains i) && !i.isIo) {
             queue enqueue i
             walked += i
@@ -377,19 +377,19 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       top match {
         case io: Bits if io.isIo && io.dir == INPUT =>
         case v: Vec[_] => {
-          for ((n, e) <- v.flatten; 
+          for ((n, e) <- v.flatten;
           if !(e == null) && !(walked contains e) && !e.isIo) {
             stack push e
             walked += e
           }
-          for (i <- top.inputs; 
+          for (i <- top.inputs;
           if !(i == null) && !(walked contains i) && !i.isIo) {
             stack push i
             walked += i
           }
         }
         case _ => {
-          for (i <- top.inputs; 
+          for (i <- top.inputs;
           if !(i == null) && !(walked contains i) && !i.isIo) {
             stack push i
             walked += i
@@ -421,7 +421,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   // Allow checking if a method name is also the name of a val -- reveals accessors
   def getValNames = {
     val valnames = new ArrayBuffer[String]()
-    valnames ++= getClassValNames(getClass)    
+    valnames ++= getClassValNames(getClass)
     valnames
   }
 
@@ -452,7 +452,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
          o match {
          case node: Node => {
            node.getNode match {
-             case _: Literal => 
+             case _: Literal =>
              case _ => node.getNode nameIt (backend.asValidName(name), false)
            }
            backend.nameSpace += node.getNode.name

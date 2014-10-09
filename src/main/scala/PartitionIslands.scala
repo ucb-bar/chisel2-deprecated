@@ -116,7 +116,7 @@ object PartitionIslands {
       for (c <- node.consumers; if inputs.contains(c) && marked.contains(c)) {
         processLinks(c.inputs)
       }
-      
+
     }
     new mutableIsland(islandId, islandNodes, islandRoots)
   }
@@ -353,7 +353,7 @@ object PartitionIslands {
         }
       }
     }
-    
+
     // Construct the delivered data structure, with correctly sized Sets
     val resArrayBuffer = new ArrayBuffer[Island](res.size)
     for (islandId <- res.keySet.toList.sorted) {
@@ -365,7 +365,7 @@ object PartitionIslands {
       island.roots.clear()
     }
     res.clear()
-    
+
     if (printHistogram) {
       // Output histogram info for the partitioning
       println("createIslands: " + resArrayBuffer.size + " islands, containing " + nodeCount + " nodes")
@@ -381,7 +381,7 @@ object PartitionIslands {
     }
     resArrayBuffer.toArray
   }
-  
+
   // Generate a mapping from node to island, given an array of islands.
   def generateNodeToIslandArray(islands: Array[Island]): Array[NodeIdIslands] = {
     if (islands == null || islands.size == 0) {

@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -125,7 +125,7 @@ object Literal {
       }
     for(c <- x)
       if (c == '_') {
-        
+
       } else if(first) {
         first = false;
         res += sizeof(c.asDigit);

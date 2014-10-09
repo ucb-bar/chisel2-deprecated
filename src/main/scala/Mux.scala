@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -117,9 +117,9 @@ object Mux {
     // TODO: consider reworking to not use flatten so that can Mux between Vecs of different lengths
     //       or a Bundle and a descendant of that Bundle which adds fields
     //       Will likely require creation of a createMux function
-    
+
     require(tc.flatten.length == fc.flatten.length, "In Mux (of ${ancestor.getClass}), tc and fc too structurally different. Possibly due to non-determinism or mutability in a subtype of Aggregate e.g. a Bundle refinement adding new fields, or two Vecs of differing lengths.")
-    
+
     val opdescs = result.flatten.zip(tc.flatten.zip(fc.flatten))
       // opdescs: (result, (tc, fc))
 
@@ -142,7 +142,7 @@ class Mux extends Op {
     if (inputs(1).widthW != widthW) inputs(1) = inputs(1).matchWidth(widthW)
     if (inputs(2).widthW != widthW) inputs(2) = inputs(2).matchWidth(widthW)
   }
-  
+
   override def W0Wtransform() {
     val w1 = inputs(1).widthW
     val w2 = inputs(2).widthW
