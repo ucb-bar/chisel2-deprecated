@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -80,7 +80,7 @@ abstract class Bits extends Data with proc {
   // internal, non user exposed connectors
   private var assigned = false
   private def checkAssign(src: Node) = {
-    if (this.dir == INPUT && this.component == Module.current && 
+    if (this.dir == INPUT && this.component == Module.current &&
         this.component.wires.unzip._2.contains(this)) {
       ChiselError.error({"assigning to your own input port " + this + " RHS: " + src});
     }
@@ -361,7 +361,7 @@ abstract class Bits extends Data with proc {
   }
 
   def toBools: Vec[Bool] = Vec.tabulate(this.getWidth)(i => this(i))
-  
+
   def error(b: Bits): Bits = {
     throw new Exception("+ not defined on " + this.getClass + " and " + b.getClass)
     this

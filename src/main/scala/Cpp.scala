@@ -107,7 +107,7 @@ class CppBackend extends Backend {
   // Give different names to temporary nodes in CppBackend
   override def emitRef(node: Node): String = {
     node match {
-      case _: Bits if !node.isInObject && node.inputs.length == 1 => 
+      case _: Bits if !node.isInObject && node.inputs.length == 1 =>
         emitRef(node.inputs(0))
       case _ =>
         super.emitRef(node)
@@ -179,9 +179,9 @@ class CppBackend extends Backend {
         List((s"dat_t<${node.needWidth()}>", emitRef(node)))
     }
   }
-  
+
   override def emitDec(node: Node): String = {
-    val out = new StringBuilder("") 
+    val out = new StringBuilder("")
     for (varDef <- nodeVars(node)) {
       out.append(s"  ${varDef._1} ${varDef._2};\n")
     }
@@ -189,7 +189,7 @@ class CppBackend extends Backend {
   }
 
   def emitCircuitAssign(srcPrefix:String, node: Node): String = {
-    val out = new StringBuilder("") 
+    val out = new StringBuilder("")
     for (varDef <- nodeVars(node)) {
       out.append(s"  ${varDef._2} = ${srcPrefix}${varDef._2};\n")
     }
@@ -204,7 +204,7 @@ class CppBackend extends Backend {
     if (node.isInObject) ""
     else if (words(node) == 1) s"  val_t ${emitRef(node)};\n"
     else s"  val_t ${emitRef(node)}[${words(node)}];\n"
-  def block(s: Seq[String]): String = 
+  def block(s: Seq[String]): String =
     if (s.length == 0) ""
     else s"  {${s.map(" " + _ + ";").reduceLeft(_ + _)}}\n"
   def emitDatRef(x: Node): String = {
@@ -372,13 +372,13 @@ class CppBackend extends Backend {
               res += s"${emitWordRef(o, i)} = __v${i} >> __s | __c"
               res += s"__c = MASK(__v${i} << __r, __s != 0)"
               if (arith) {
-	        val gotWidth = o.needWidth()
+                val gotWidth = o.needWidth()
                 res += s"${emitWordRef(o, i)} |= MASK(__msb << ((${gotWidth-1}-${emitLoWordRef(o.inputs(1))}) % ${bpw}), ${(i + 1) * bpw} > ${gotWidth-1} - ${emitLoWordRef(o.inputs(1))})"
                 res += s"${emitWordRef(o, i)} |= MASK(__msb, ${i*bpw} >= ${gotWidth-1} - ${emitLoWordRef(o.inputs(1))})"
               }
             }
             if (arith) {
-	      val gotWidth = o.needWidth()
+              val gotWidth = o.needWidth()
               res += emitLoWordRef(o) + " |= MASK(__msb << ((" + (gotWidth-1) + "-" + emitLoWordRef(o.inputs(1)) + ") % " + bpw + "), " + bpw + " > " + (gotWidth-1) + "-" + emitLoWordRef(o.inputs(1)) + ")"
             }
             block(res) + (if (arith) trunc(o) else "")
@@ -589,7 +589,7 @@ class CppBackend extends Backend {
         }
         res.toString
 
-      case u: Bits => 
+      case u: Bits =>
         if (u.driveRand && u.isInObject)
           s"   ${emitRef(node)}.randomize(&__rand_seed);\n"
         else
@@ -785,7 +785,7 @@ class CppBackend extends Backend {
           if !unoptimizedFiles.contains(basename)
         } yield basename + ".o"
         ) mkString " ") + " " + c.name + "-emulator.o"
-  
+
         replacements += (("@HFILES@", ""))
         replacements += (("@ONCEONLY@", onceOnlyOFiles))
         replacements += (("@UNOPTIMIZED@", unoptimizedOFiles))
@@ -810,7 +810,7 @@ class CppBackend extends Backend {
           "no unoptmized files to compile for '--compileMultipleCppFiles'")
         // Compile the O0 files.
         onceOnlyFiles.map(cc(_, allFlags + " " + optim0))
-  
+
         // Compile the remaining (O1) files.
         unoptimizedFiles.filter( ! onceOnlyFiles.contains(_) ).map(cc(_, allFlags + " " + optim1))
         val objects: ArrayBuffer[String] = new ArrayBuffer(maxFiles)
@@ -927,7 +927,7 @@ class CppBackend extends Backend {
     class CppFile(val suffix: String = cppFileSuffix) {
       var lines = 0
       var done = false
-      val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName) 
+      val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
       val name = n + suffix + ".cpp"
       val hfilename = n + ".h"
       var fileWriter = createOutputFile(name)
@@ -941,7 +941,7 @@ class CppBackend extends Backend {
         lines += s.count(_ == '\n')
         fileWriter.write(s)
       }
-      
+
       def close() {
         done = true
         fileWriter.close()
@@ -1037,12 +1037,12 @@ class CppBackend extends Backend {
 
     // Generate header file
     def genHeader(vcd: Backend, islands: Array[Island], nInitMethods: Int, nSetCircuitMethods: Int, nDumpInitMethods: Int, nDumpMethods: Int, nInitMappingTableMethods: Int) {
-      val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName) 
+      val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
       val out_h = createOutputFile(n + ".h");
       out_h.write("#ifndef __" + c.name + "__\n");
       out_h.write("#define __" + c.name + "__\n\n");
       out_h.write("#include \"emulator.h\"\n\n");
-      
+
       // Generate module headers
       out_h.write("class " + c.name + "_t : public mod_t {\n");
       out_h.write(" private:\n");
@@ -1063,7 +1063,7 @@ class CppBackend extends Backend {
         out_h.write(vcd.emitDec(m))
       for (clock <- Driver.clocks)
         out_h.write(emitDec(clock))
-  
+
       out_h.write("\n");
 
       // If we're generating multiple init methods, wrap them in private/public.
@@ -1123,7 +1123,7 @@ class CppBackend extends Backend {
         out_h.write(" public:\n");
       }
       out_h.write("  void dump ( FILE* f, int t );\n");
- 
+
       // If we're generating multiple dump_init methods, wrap them in private/public.
       if (nDumpInitMethods > 1) {
         out_h.write(" private:\n");
@@ -1133,11 +1133,11 @@ class CppBackend extends Backend {
         out_h.write(" public:\n");
       }
       out_h.write("  void dump_init ( FILE* f );\n");
-     
+
       // All done with the class definition. Close it off.
       out_h.write("\n};\n\n");
       out_h.write(Params.toCxxStringParams);
-      
+
       // Generate API headers
       out_h.write(s"class ${c.name}_api_t : public mod_api_t {\n");
       // If we're generating multiple init_mapping_table( methods, wrap them in private/public.
@@ -1151,7 +1151,7 @@ class CppBackend extends Backend {
 
       out_h.write(s"  void init_mapping_table();\n");
       out_h.write(s"};\n\n");
-      
+
       out_h.write("\n\n#endif\n");
       out_h.close();
     }
@@ -1414,7 +1414,7 @@ class CppBackend extends Backend {
           for (m <- Driver.orderedNodes) {
             addClkDefs(m, code)
           }
-          // For the non-patitioned case, we're going to merge the clock_hi init and def code into a single function.
+          // For the non-partitioned case, we're going to merge the clock_hi init and def code into a single function.
           // Add the closing brace to the def string.
           for (clk <- code.keys) {
             code(clk)._1.append("}\n")
@@ -1523,10 +1523,10 @@ class CppBackend extends Backend {
        }
       }
     }
-      
+
     val clkDomains = new ClockDomains
 
-    val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName) 
+    val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
     if (Driver.isGenHarness) {
       genHarness(c, n);
     }
@@ -1544,10 +1544,10 @@ class CppBackend extends Backend {
     println("CppBackend::elaborate: need " + needShadow.size + ", redundant " + (potentialShadowRegisters - needShadow.size) + " shadow registers")
     // Generate CPP files
     ChiselError.info("generating cpp files")
-    
+
     // generate init block
     val nInitMethods = genInitMethod()
-    
+
     // generate clock(...) function
     genClockMethod()
 
@@ -1598,22 +1598,22 @@ class CppBackend extends Backend {
       writeCppFile(all_cpp.result)
     }
     out_cpps.foreach(_.close)
-    
+
     all_cpp.clear()
     out_cpps.clear()
 
     def copyToTarget(filename: String) = {
-	  val resourceStream = getClass().getResourceAsStream("/" + filename)
-	  if( resourceStream != null ) {
-	    val classFile = createOutputFile(filename)
-	    while(resourceStream.available > 0) {
-	      classFile.write(resourceStream.read())
-	    }
-	    classFile.close()
-	    resourceStream.close()
-	  } else {
-		println(s"WARNING: Unable to copy '$filename'" )
-	  }
+      val resourceStream = getClass().getResourceAsStream("/" + filename)
+      if( resourceStream != null ) {
+        val classFile = createOutputFile(filename)
+        while(resourceStream.available > 0) {
+          classFile.write(resourceStream.read())
+        }
+        classFile.close()
+        resourceStream.close()
+      } else {
+        println(s"WARNING: Unable to copy '$filename'" )
+      }
     }
     /* Copy the emulator headers into the targetDirectory. */
     copyToTarget("emulator_mod.h")

@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -157,7 +157,6 @@ abstract class Node extends nameable {
   var prune = false
   var driveRand = false
   var clock: Clock = null
-  var CppVertex: CppVertex = null
   var cntrIdx = -1
 
   val _id = Driver.nodes.length
@@ -208,7 +207,7 @@ abstract class Node extends nameable {
   lazy val chiselName = this match {
     case l: Literal => "";
     case any        =>
-      if (named && (name != "reset") && !(component == null)) 
+      if (named && (name != "reset") && !(component == null))
         component.getPathName(".") + "." + name
       else
         ""
@@ -248,7 +247,7 @@ abstract class Node extends nameable {
     width_ = Width(w)
     initOf(n, fixWidth(w), ins.toList)
   }
-  
+
   // Called while we're walking the graph inferring the width of nodes.
   // We return true if we should continue to walk the graph,
   // either because there's a node whose width we don't know,

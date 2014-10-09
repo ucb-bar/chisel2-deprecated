@@ -67,7 +67,7 @@ case class ValueParam(pname:String, init: Any) extends Param[Any] {
   val min = init.toString.toInt
 }
 
-case class RangeParam(pname:String, init: Int, min: Int, max: Int) extends Param[Int] 
+case class RangeParam(pname:String, init: Int, min: Int, max: Int) extends Param[Int]
 
 case class LessParam(pname:String, init: Int, min: Int, par: Param[Any]) extends Param[Int] {
   val max = par.max
@@ -102,22 +102,22 @@ object Params {
   var design = new Space
   var modules = new HashMap[String, Module]
   var gID: Int = 0
-  
+
   var buildingSpace = true
-  
+
   def getValue(module: Module, pname: String, p: Param[Any]) = {
     val mname= if(module == null) "TOP" else {module.getClass.getName}
     if(buildingSpace) p.init
     else{
       val x = design.find(t => (t._3) == (p.gID))
-      if(x.isEmpty){ 
-        throw new ParamInvalidException("Missing parameter " + pname + " in Module " + mname) 
+      if(x.isEmpty){
+        throw new ParamInvalidException("Missing parameter " + pname + " in Module " + mname)
       } else {
         x.get._2.init
       }
     }
   }
-  
+
   def register(module: Module, pname: String, p: Param[Any]) = {
     val mname= if(module == null) "TOP" else {module.getClass.getName}
     modules(mname) = module
@@ -146,7 +146,7 @@ object Params {
     design = JHFormat.deserialize(designName)
     gID = 0
   }
- 
+
   def toCxxStringParams : String = {
     var string = new StringBuilder("")
     for ((mname, p, gID) <- space) {
@@ -165,7 +165,7 @@ object Params {
     string.toString
   }
 
-    
+
   def toCxxStringParam(param: Param[Any]) = {
     param match {
       // case EnumParam(init, list) =>

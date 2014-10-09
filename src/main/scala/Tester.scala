@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -57,7 +57,7 @@ class ManualTester[+T <: Module]
 
   /**
    * Waits until the emulator streams are ready. This is a dirty hack related
-   * to the way Process works. TODO: FIXME. 
+   * to the way Process works. TODO: FIXME.
    */
   def waitForStreams() = {
     var waited = 0
@@ -96,9 +96,9 @@ class ManualTester[+T <: Module]
       System.err.print(s"emulatorCmd($str): command should not contain newline")
       return "error"
     }
-    
+
     waitForStreams()
-    
+
     // send command to emulator
     for (e <- str) testOut.write(e);
     testOut.write('\n');
@@ -114,7 +114,7 @@ class ManualTester[+T <: Module]
       sb += c.toChar
       c   = testIn.read
     }
-    
+
     // drain errors
     try {
       while(testErr.available() > 0) {
@@ -123,7 +123,7 @@ class ManualTester[+T <: Module]
     } catch {
       case e : IOException => testErr = null; println("ERR EXCEPTION")
     }
-    
+
     if (sb == "error") {
       System.err.print(s"FAILED: emulatorCmd($str): returned error")
       ok = false
@@ -199,7 +199,7 @@ class ManualTester[+T <: Module]
     if (dumpName(data) == "") {
       println("Unable to poke data " + data)
     } else {
-      
+
       if (isTrace) println("  POKE " + dumpName(data) + " " + (if (off >= 0) (off + " ") else "") + "<- " + x)
       var cmd = ""
       if (off != -1) {
@@ -261,7 +261,7 @@ class ManualTester[+T <: Module]
 
   def expect (data: Bits, expected: BigInt): Boolean = {
     val got = peek(data)
-    expect(got == expected, 
+    expect(got == expected,
        "EXPECT " + dumpName(data) + " <- " + got + " == " + expected)
   }
 
@@ -297,7 +297,7 @@ class ManualTester[+T <: Module]
         expectedFloat = gotFLoat
       }
     }
-    expect(gotFLoat == expectedFloat, 
+    expect(gotFLoat == expectedFloat,
        "EXPECT " + dumpName(data) + " <- " + gotFLoat + " == " + expectedFloat)
   }
 
@@ -306,7 +306,7 @@ class ManualTester[+T <: Module]
 
   def start(): Process = {
     val target = Driver.targetDir + "/" + c.name
-    val cmd = 
+    val cmd =
       (if (Driver.backend.isInstanceOf[FloBackend]) {
          val dir = Driver.backend.asInstanceOf[FloBackend].floDir
          val command = ArrayBuffer(dir + "fix-console", ":is-debug", "true", ":filename", target + ".hex", ":flo-filename", target + ".mwe.flo")
@@ -370,7 +370,7 @@ class MapTester[+T <: Module](c: T, val testNodes: Array[Node]) extends Tester(c
     }
   }
   val (ins, outs) = splitFlattenNodes(testNodes)
-  val testInputNodes    = ins.toArray; 
+  val testInputNodes    = ins.toArray;
   val testNonInputNodes = outs.toArray
   def step(svars: HashMap[Node, Node],
            ovars: HashMap[Node, Node] = new HashMap[Node, Node],

@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -275,7 +275,7 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
 
   override val hashCode: Int = _id
   override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
-  
+
   // Don't return 0 for getwidth - #247
   // Return the sum of our constituent widths.
   override def getWidth(): Int = self.map(_.getWidth).foldLeft(0)(_ + _)
