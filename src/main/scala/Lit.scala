@@ -212,7 +212,19 @@ object Literal {
     */
   def apply(x: BigInt, width: Int = -1, signed: Boolean = false): Literal = {
     val res = new Literal();
-    val xWidth = if (signed) x.bitLength + 1 else max(x.bitLength, 1)
+    // Check for signedness
+    // We get unexpected values (one too small) when using .bitLength on negative BigInts,
+    // so use the positive value instead.
+    val bitLength = (if (x >= 0) {
+      x
+    } else {
+      -x
+    }).bitLength
+    val xWidth = if (signed) {
+      bitLength + 1
+    } else {
+      max(bitLength, 1)
+    }
     val w = if(width == -1) xWidth else width
     val xString = (if (x >= 0) x else (BigInt(1) << w) + x).toString(16)
 
