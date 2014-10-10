@@ -50,24 +50,24 @@ object UnaryOp {
   def apply(x: Node, op: String): Node = {
     op match {
       case "~" => Op("~", widthOf(0), x)
-      case "f-" => Op("f-", fixWidth(32), x)
-      case "fsin" => Op("fsin", fixWidth(32), x)
-      case "fcos" => Op("fcos", fixWidth(32), x)
-      case "ftan" => Op("ftan", fixWidth(32), x)
-      case "fsqrt" => Op("fsqrt", fixWidth(32), x)
-      case "flog" => Op("flog", fixWidth(32), x)
-      case "ffloor" => Op("ffloor", fixWidth(32), x)
-      case "fceil" => Op("fceil", fixWidth(32), x)
-      case "fround" => Op("fround", fixWidth(32), x)
-      case "d-" => Op("d-", fixWidth(64), x)
-      case "dsin" => Op("dsin", fixWidth(64), x)
-      case "dcos" => Op("dcos", fixWidth(64), x)
-      case "dtan" => Op("dtan", fixWidth(64), x)
-      case "dsqrt" => Op("dsqrt", fixWidth(64), x)
-      case "dlog" => Op("dlog", fixWidth(64), x)
-      case "dfloor" => Op("dfloor", fixWidth(64), x)
-      case "dceil" => Op("dceil", fixWidth(64), x)
-      case "dround" => Op("dround", fixWidth(64), x)
+      case "f-" => Op("f-", fixWidth(floatWidth), x)
+      case "fsin" => Op("fsin", fixWidth(floatWidth), x)
+      case "fcos" => Op("fcos", fixWidth(floatWidth), x)
+      case "ftan" => Op("ftan", fixWidth(floatWidth), x)
+      case "fsqrt" => Op("fsqrt", fixWidth(floatWidth), x)
+      case "flog" => Op("flog", fixWidth(floatWidth), x)
+      case "ffloor" => Op("ffloor", fixWidth(floatWidth), x)
+      case "fceil" => Op("fceil", fixWidth(floatWidth), x)
+      case "fround" => Op("fround", fixWidth(floatWidth), x)
+      case "d-" => Op("d-", fixWidth(doubleWidth), x)
+      case "dsin" => Op("dsin", fixWidth(doubleWidth), x)
+      case "dcos" => Op("dcos", fixWidth(doubleWidth), x)
+      case "dtan" => Op("dtan", fixWidth(doubleWidth), x)
+      case "dsqrt" => Op("dsqrt", fixWidth(doubleWidth), x)
+      case "dlog" => Op("dlog", fixWidth(doubleWidth), x)
+      case "dfloor" => Op("dfloor", fixWidth(doubleWidth), x)
+      case "dceil" => Op("dceil", fixWidth(doubleWidth), x)
+      case "dround" => Op("dround", fixWidth(doubleWidth), x)
       case any => throw new Exception("Unrecognized operator " + op)
     }
   }
@@ -96,18 +96,18 @@ object BinaryOp {
       case "##"  => Op("##", sumWidth _,  x, y )
       case "&"   => Op("&", maxWidth _, x, y )
       case "|"   => Op("|", maxWidth _, x, y )
-      case "f+"  => Op("f+", fixWidth(32), x, y )
-      case "f-"  => Op("f-", fixWidth(32), x, y )
-      case "f*"  => Op("f*", fixWidth(32), x, y )
-      case "f/"  => Op("f/", fixWidth(32), x, y )
-      case "f%"  => Op("f%", fixWidth(32), x, y )
-      case "fpow"  => Op("fpow", fixWidth(32), x, y )
-      case "d+"  => Op("d+", fixWidth(64), x, y )
-      case "d-"  => Op("d-", fixWidth(64), x, y )
-      case "d*"  => Op("d*", fixWidth(64), x, y )
-      case "d/"  => Op("d/", fixWidth(64), x, y )
-      case "d%"  => Op("d%", fixWidth(64), x, y )
-      case "dpow"  => Op("dpow", fixWidth(64), x, y )
+      case "f+"  => Op("f+", fixWidth(floatWidth), x, y )
+      case "f-"  => Op("f-", fixWidth(floatWidth), x, y )
+      case "f*"  => Op("f*", fixWidth(floatWidth), x, y )
+      case "f/"  => Op("f/", fixWidth(floatWidth), x, y )
+      case "f%"  => Op("f%", fixWidth(floatWidth), x, y )
+      case "fpow"  => Op("fpow", fixWidth(floatWidth), x, y )
+      case "d+"  => Op("d+", fixWidth(doubleWidth), x, y )
+      case "d-"  => Op("d-", fixWidth(doubleWidth), x, y )
+      case "d*"  => Op("d*", fixWidth(doubleWidth), x, y )
+      case "d/"  => Op("d/", fixWidth(doubleWidth), x, y )
+      case "d%"  => Op("d%", fixWidth(doubleWidth), x, y )
+      case "dpow"  => Op("dpow", fixWidth(doubleWidth), x, y )
       case any   => throw new Exception("Unrecognized operator " + op)
     }
   }
@@ -159,6 +159,8 @@ object ReductionOp {
 }
 
 object Op {
+  val floatWidth = 32
+  val doubleWidth = 64
   val logicalChars = """^([!=<>]=)|([<>])$""".r
   def apply(name: String, widthInfer: (=> Node) => Width, a: Node, b: Node): Node = {
     // It's a binary operator. Is it a logical op?
@@ -190,8 +192,10 @@ object Op {
         case "<"  => return Literal(if (av <  bv) 1 else 0);
         case "<=" => return Literal(if (av <= bv) 1 else 0);
         case "##" => return Literal(av << bw | bv, aw + bw);
-        case "+"  => return Literal(av + bv, max(aw, bw))
-        case "-"  => return Literal(av - bv, max(aw, bw))
+        // "+" and "-" may need to widen the result.
+        // Let the Literal code take care of it.
+        case "+"  => return Literal(av + bv)
+        case "-"  => return Literal(av - bv)
         case "|"  => return Literal(av | bv, max(aw, bw));
         case "&"  => return Literal(av & bv, max(aw, bw));
         case "^"  => return Literal(av ^ bv, max(aw, bw));

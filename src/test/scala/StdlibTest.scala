@@ -37,6 +37,14 @@ import Chisel._
 /** This testsuite checks the primitives of the standard library
   that will generate basic common graphs of *Node*.
 */
+// Since we use magic numbers to test edge cases,
+// inhibit the scalastyle warnings.
+// scalastyle:off magic.number
+// scalastyle:off number.of.methods
+// scalastyle:off number.of.types
+// scalastyle:off regex
+// scalastyle:off method.length
+
 class StdlibSuite extends TestSuite {
   val testArgs = Array("--backend", "v",
       "--targetDir", dir.getPath.toString()
@@ -758,9 +766,53 @@ try {
   /** Test Log2Ceil, Log2Floor
     */
   @Test def testLog2CeilFloor() {
+    println("\ntestLog2CeilFloor ...")
     assertResult(1) { log2Ceil(2) }
     assertResult(0) { log2Ceil(1) }
     assertResult(1) { log2Floor(2) }
     assertResult(0) { log2Floor(1) }
+  }
+
+  /** Test width adjustment for Operations on literals.
+   *
+   */
+  @Test def testLitAddSub () {
+    println("\ntestLitAddSub ...")
+    
+    // If we had a "Tester" backend that allowed us to examine
+    // the constructed graph, we wouldn't need this.
+    class LitAddSub extends Module {
+      val io = new Bundle {
+        val out1 = UInt(OUTPUT)
+        val out2 = SInt(OUTPUT)
+      }
+      val res1 = Reg(init = (UInt(7) + UInt(2)))
+      val res2 = Reg(init = (SInt(2) - SInt(4)))
+      // We'd like to just access the 'debug' nodes,
+      // but we get warnings about connections and there
+      // have been cases where unconnected debug node chains
+      // don't have their type nodes removed or their widths
+      // correctly inferred. These shouldn't happen, but ...
+      debug(res1)
+      debug(res2)
+      io.out1 := res1
+      io.out2 := res2
+    }
+    class LitAddSubTester(m: LitAddSub) extends Tester(m) {
+      // (until "expect" learns to deal with 0x and negative numbers...)
+      // Half of these are redundant.
+      val res1 = peek(m.res1)
+      val res2 = peek(m.res2)
+      assertResult(9) { res1 }
+      assertResult(-2) { res2 }
+      val out1 = peek(m.io.out1)
+      val out2 = peek(m.io.out2)
+      assertResult(9) { out1 }
+      assertResult(-2) { out2 }
+    }
+
+    chiselMainTest(Array[String]("--backend", "c",
+      "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
+      () => Module(new LitAddSub())) {m => new LitAddSubTester(m)}
   }
 }
