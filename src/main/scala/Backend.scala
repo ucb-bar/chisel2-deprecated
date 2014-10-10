@@ -367,16 +367,8 @@ abstract class Backend extends FileSystemUtilities{
   def emitDef(node: Node): String = ""
 
   // go through every Module and set its clock and reset field
-  // reset is chosen to be
-  //   component's explicit reset
-  //   else if have explicit clock, that clock domains reset
-  //   else parent's reset
   def assignClockAndResetToModules {
-    for (module <- Driver.sortedComps.reverse) {
-      if (module.clock == null)
-        module.clock = module.parent.clock
-      module.ensureExplicitReset
-    }
+    for (module <- Driver.sortedComps.reverse) { module.ensureExplicitClockReset }
   }
 
   // for every reachable delay element

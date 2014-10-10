@@ -189,12 +189,15 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   def reset_=(r: Bool) {
     _reset = r
   }
-  def ensureExplicitReset() {
-    if(!hasExplicitReset) {
-      _reset =
-        if(hasExplicitClock) clock.getReset 
-        else parent._reset
+  def ensureExplicitClockReset(): Unit = {
+    val (new_clock, new_reset) = (hasExplicitClock, hasExplicitReset) match {
+      case (true, true)   => (clock, _reset)
+      case (true, false)  => (clock, clock.getReset)
+      case (false, true)  => (parent.clock, _reset)
+      case (false, false) => (parent.clock, parent.reset)
     }
+    clock = new_clock
+    reset = new_reset
   }
 
   override def toString = this.getClass.toString
