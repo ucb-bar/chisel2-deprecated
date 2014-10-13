@@ -300,7 +300,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     Driver.compStack.push(this)
     Driver.parStack.push(q)
     val res = init(c)
-    res.markComponent
     Driver.parStack.pop
     Driver.compStack.pop
     res
