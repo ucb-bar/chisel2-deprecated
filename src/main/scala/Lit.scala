@@ -208,6 +208,20 @@ object Literal {
     }
   }
 
+  /** Derive the bit length for a Literal
+   *  
+   */
+  def bitLength(b: BigInt): Int = {
+    // Check for signedness
+    // We have seen unexpected values (one too small) when using .bitLength on negative BigInts,
+    // so use the positive value instead.
+    val usePositiveValueForBitLength = false
+    (if (usePositiveValueForBitLength && b < 0) {
+      -b
+    } else {
+      b
+    }).bitLength
+  }
   /** Creates a *Literal* instance from a scala integer.
     */
   def apply(x: BigInt, width: Int = -1, signed: Boolean = false): Literal = {
@@ -215,15 +229,11 @@ object Literal {
     // Check for signedness
     // We get unexpected values (one too small) when using .bitLength on negative BigInts,
     // so use the positive value instead.
-    val bitLength = (if (x >= 0) {
-      x
-    } else {
-      -x
-    }).bitLength
+    val bl = bitLength(x)
     val xWidth = if (signed) {
-      bitLength + 1
+      bl + 1
     } else {
-      max(bitLength, 1)
+      max(bl, 1)
     }
     val w = if(width == -1) xWidth else width
     val xString = (if (x >= 0) x else (BigInt(1) << w) + x).toString(16)

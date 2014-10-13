@@ -785,9 +785,11 @@ try {
       val io = new Bundle {
         val out1 = UInt(OUTPUT)
         val out2 = SInt(OUTPUT)
+        val out3 = UInt(OUTPUT, width=8)
       }
       val res1 = Reg(init = (UInt(7) + UInt(2)))
       val res2 = Reg(init = (SInt(2) - SInt(4)))
+      val res3 = Reg(init = (UInt(2) - UInt(4)))
       // We'd like to just access the 'debug' nodes,
       // but we get warnings about connections and there
       // have been cases where unconnected debug node chains
@@ -795,20 +797,31 @@ try {
       // correctly inferred. These shouldn't happen, but ...
       debug(res1)
       debug(res2)
+      debug(res3)
       io.out1 := res1
       io.out2 := res2
+      io.out3 := res3
     }
     class LitAddSubTester(m: LitAddSub) extends Tester(m) {
       // (until "expect" learns to deal with 0x and negative numbers...)
       // Half of these are redundant.
       val res1 = peek(m.res1)
       val res2 = peek(m.res2)
+      val res3 = peek(m.res3)
       assertResult(9) { res1 }
       assertResult(-2) { res2 }
+      assertResult(6) { res3 }
       val out1 = peek(m.io.out1)
       val out2 = peek(m.io.out2)
+      val out3 = peek(m.io.out3)
       assertResult(9) { out1 }
       assertResult(-2) { out2 }
+      assertResult(6) { out3 }
+      assertResult(4) {m.res1.getWidth}
+      assertResult(4) {m.res2.getWidth}
+      assertResult(3) {m.res3.getWidth}
+      assertResult(4) {m.io.out2.getWidth}
+      assertResult(8) {m.io.out3.getWidth}
     }
 
     chiselMainTest(Array[String]("--backend", "c",
