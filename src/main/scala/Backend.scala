@@ -307,6 +307,7 @@ abstract class Backend extends FileSystemUtilities{
     }
     if (Driver.modAdded) {
       sortComponents
+      markComponents
       Driver.modAdded = false
     }
   }
