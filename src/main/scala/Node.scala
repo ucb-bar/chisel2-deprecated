@@ -149,10 +149,10 @@ abstract class Node extends nameable {
   val consumers = LinkedHashSet[Node]() // nodes that consume one of my outputs
 
   var nameHolder: nameable = null;
-  val line: StackTraceElement =
+  private val createTrace = new Throwable().getStackTrace
+  def line: StackTraceElement =
     if (Driver.getLineNumbers) {
-      val trace = new Throwable().getStackTrace
-      findFirstUserLine(trace) getOrElse trace(0)
+      findFirstUserLine(createTrace) getOrElse createTrace(0)
     } else null
   var prune = false
   var driveRand = false
