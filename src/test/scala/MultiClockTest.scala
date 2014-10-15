@@ -69,4 +69,48 @@ class MultiClockSuite extends TestSuite {
       () => Module(new Comp()))
     assertFile("MultiClockSuite_Comp_1.v")
   }
+  
+  @Test def testBundleCustomClock() {
+    println("testBundleCustomClock:")
+    class TestMultiClock2 extends Module {
+      class BundleXY extends Bundle{
+        override def clone: this.type = (new BundleXY).asInstanceOf[this.type]
+        val onSignal = Bool()
+      }
+      
+      class TestMultiClock2_subsub(clkB: Clock) extends Module {
+        val io = new Bundle {
+          val in = Bool(INPUT)
+          val out = Bool(OUTPUT)
+        }
+        val r1 = Reg(outType = new BundleXY, clock = clkB)   
+        r1.onSignal := io.in
+      
+        io.out := r1.onSignal
+      }
+      
+      class TestMultiClock2_sub(clkA: Clock,clkB: Clock) extends Module(clkA) {
+        val io = new Bundle {
+          val in = Bool(INPUT)
+          val out = Bool(OUTPUT)
+        }
+        val sub = Module(new TestMultiClock2_subsub(clkB))
+        sub.io <> io
+      }
+    
+      val io = new Bundle {
+        val in = Bool(INPUT)
+        val out = Bool(OUTPUT)
+      }
+      val clkA = new Clock()
+      val clkB = new Clock()
+      val sub = Module(new TestMultiClock2_sub(clkA,clkB))
+      sub.io <> io
+    }
+
+    chiselMain(Array[String]("--v",
+      "--targetDir", dir.getPath.toString()),
+      () => Module(new TestMultiClock2()))
+    assertFile("MultiClockSuite_TestMultiClock2_1.v")
+  }
 }
