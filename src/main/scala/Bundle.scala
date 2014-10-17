@@ -85,6 +85,7 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
 
       // TODO: SPLIT THIS OUT TO TOP LEVEL LIST
       if( types.length == 0 && !isStatic(modifiers) && isInterface
+        && !(name contains '$')
         && !(Bundle.keywords contains name)
         && (view == null || view.contains(name)) ) {
         val o = m.invoke(this);
