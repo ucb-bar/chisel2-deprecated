@@ -117,4 +117,5 @@ class Printf(condIn: Bool, formatIn: String, argsIn: Seq[Node]) extends PrintfBa
   inputs += condIn
   override def args: ArrayBuffer[Node] = inputs.init
   def cond: Node = inputs.last
+  def assignClock(clk: Clock): Unit = { clock = clk }
 }

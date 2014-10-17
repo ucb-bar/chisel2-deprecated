@@ -397,7 +397,11 @@ abstract class Backend extends FileSystemUtilities{
           x.assignReset(x.component.addResetPin(reset))
           x.assignClock(clock)
           x.component.addClock(clock)
-        case _ =>
+         case x: Printf =>
+          val clock = if (x.clock == null) x.component.clock else x.clock
+          x.assignClock(clock)
+          x.component.addClock(clock)
+       case _ =>
       }
     }
   }

@@ -157,19 +157,18 @@ void VerifSuite_CppPrintfComp_1_t::dump(FILE *f, int t) {
   }
 
   @Test def testPrintfVerilogNUL() {
-
+    println("testPrintfVerilogNUL:")
     class VerilogPrintfNULComp extends Module {
       val io = new Bundle {
-        val x = UInt(INPUT, 8)
-        val y = UInt(INPUT, 8)
-        val z = UInt(OUTPUT, 8)
+        val in = Bool(INPUT)
       }
 
-      printf("io: %x %x", io.x, io.y)
+      printf("%b\n", io.in)
     }
 
     chiselMain(Array[String]("--v",
       "--targetDir", dir.getPath.toString()),
       () => Module(new VerilogPrintfNULComp()))
+    assertFile("VerifSuite_VerilogPrintfNULComp_1.v")
   }
 }
