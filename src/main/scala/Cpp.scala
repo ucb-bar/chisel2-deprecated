@@ -646,8 +646,9 @@ class CppBackend extends Backend {
     (if (clock == Driver.implicitClock) "" else "_" + emitRef(clock))
 
   def genHarness(c: Module, name: String) {
-    val harness  = createOutputFile(name + "-emulator.cpp");
-    harness.write("#include \"" + name + ".h\"\n\n");
+    val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
+    val harness  = createOutputFile(n + "-emulator.cpp");
+    harness.write("#include \"" + n + ".h\"\n\n");
     if (Driver.clocks.length > 1) {
       harness.write("void " + c.name + "_t::setClocks ( std::vector< int > &periods ) {\n");
       var i = 0;
@@ -771,6 +772,7 @@ class CppBackend extends Backend {
       case _ => {}
     }
 
+    val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
     // Are we compiling multiple cpp files?
     if (compileMultipleCppFiles) {
       // Are we using a Makefile template and parallel makes?
@@ -781,16 +783,16 @@ class CppBackend extends Backend {
         val unoptimizedOFiles = unoptimizedFiles.filter( ! onceOnlyFiles.contains(_) ).map(_ + ".o") mkString " "
         val optimzedOFiles = ((for {
           f <- 0 until maxFiles
-          basename = c.name + "-" + f
+          basename = n + "-" + f
           if !unoptimizedFiles.contains(basename)
         } yield basename + ".o"
-        ) mkString " ") + " " + c.name + "-emulator.o"
+        ) mkString " ") + " " + n + "-emulator.o"
 
         replacements += (("@HFILES@", ""))
         replacements += (("@ONCEONLY@", onceOnlyOFiles))
         replacements += (("@UNOPTIMIZED@", unoptimizedOFiles))
         replacements += (("@OPTIMIZED@", optimzedOFiles))
-        replacements += (("@EXEC@", c.name))
+        replacements += (("@EXEC@", n))
         replacements += (("@CPPFLAGS@", cppFlags))
         replacements += (("@CXXFLAGS@", cxxFlags))
         replacements += (("@LDFLAGS@", LDFLAGS))
@@ -804,7 +806,7 @@ class CppBackend extends Backend {
         make(nJobs)
       } else {
         // No make. Compile everything discretely.
-        cc(c.name + "-emulator")
+        cc(n + "-emulator")
         // We should have unoptimized files.
         assert(unoptimizedFiles.size != 0 || onceOnlyFiles.size != 0,
           "no unoptmized files to compile for '--compileMultipleCppFiles'")
@@ -816,7 +818,7 @@ class CppBackend extends Backend {
         val objects: ArrayBuffer[String] = new ArrayBuffer(maxFiles)
         // Compile the remainder at the specified optimization level.
         for (f <- 0 until maxFiles) {
-          val basename = c.name + "-" + f
+          val basename = n + "-" + f
           // If we've already compiled this file, don't do it again,
           // but do add it to the list of objects to be linked.
           if (!unoptimizedFiles.contains(basename)) {
@@ -824,12 +826,12 @@ class CppBackend extends Backend {
           }
           objects += basename
         }
-        linkMany(c.name, objects)
+        linkMany(n, objects)
       }
     } else {
-      cc(c.name + "-emulator")
-      cc(c.name)
-      linkOne(c.name)
+      cc(n + "-emulator")
+      cc(n)
+      linkOne(n)
     }
   }
 
@@ -1526,9 +1528,8 @@ class CppBackend extends Backend {
 
     val clkDomains = new ClockDomains
 
-    val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
     if (Driver.isGenHarness) {
-      genHarness(c, n);
+      genHarness(c, c.name);
     }
     if (!Params.space.isEmpty) {
       val out_p = createOutputFile(c.name + ".p");

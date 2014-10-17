@@ -306,7 +306,8 @@ class ManualTester[+T <: Module]
   var process: Process = null
 
   def start(): Process = {
-    val target = Driver.targetDir + "/" + c.name
+    val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
+    val target = Driver.targetDir + "/" + n
     val cmd =
       (if (Driver.backend.isInstanceOf[FloBackend]) {
          val dir = Driver.backend.asInstanceOf[FloBackend].floDir
