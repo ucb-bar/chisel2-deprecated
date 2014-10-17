@@ -402,6 +402,11 @@ public:
 			int n = atoi(tokens[1].c_str());
 			module->propagate_changes();
 			int ret = module->step(false, n);
+			// Do we have print output to report?
+			int nBytes = module->has_output();
+			if (nBytes > 0) {
+				cout << "PRINT" << " " << nBytes << " " << module->drain_output();
+			}
 			return itos(ret);
 		} else if (tokens[0] == "set_clocks") {
 			// BETA FUNCTION: semantics subject to change, use with caution
