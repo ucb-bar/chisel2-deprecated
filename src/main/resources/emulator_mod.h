@@ -1692,9 +1692,9 @@ template <int w, int d> mem_t<w,d> MEM( void );
 class mod_t {
  public:
   mod_t():
-    printStream(),
     dumpfile(NULL),
-    is_stale(false)
+    is_stale(false),
+    printStream()
     {}
   std::vector< mod_t* > children;
   virtual void init ( val_t rand_init=false ) { };
@@ -1758,12 +1758,14 @@ class mod_t {
   std::string drain_output(void) {
 	  return printStream.str();
   }
+
   // Since we have an element with a deleted copy constructor - printStream,
   // we need to provide our own explicit copy constructor.
   mod_t(const mod_t& src) {
+	  children = src.children;
+	  timestep = src.timestep;
 	  is_stale = src.is_stale;
 	  dumpfile = src.dumpfile;
-	  children = src.children;
   }
 
  protected:
