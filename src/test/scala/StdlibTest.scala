@@ -828,4 +828,19 @@ try {
       "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
       () => Module(new LitAddSub())) {m => new LitAddSubTester(m)}
   }
+
+  /** Test width adjustment for Operations on literals.
+   *
+   */
+  @Test def testLitAsPort () {
+    println("\ntestLitAsPort ...")
+    class LitAsPort extends Module {
+      val io = new Bundle {
+        val s2 = Bits(12)
+      }
+    }
+    chiselMain(Array("--backend", "c",
+      "--targetDir", dir.getPath.toString()),
+      () => Module(new LitAsPort()))
+  }
 }
