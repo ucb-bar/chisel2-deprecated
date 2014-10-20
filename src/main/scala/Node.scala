@@ -44,6 +44,7 @@ import java.lang.Double.longBitsToDouble
 import java.lang.Float.intBitsToFloat
 
 object Node {
+  val interestingIds = Set[Int](-1)
   def sprintf(message: String, args: Node*): Bits = {
     val s = Bits().fromNode(new Sprintf(message, args))
     s.setIsTypeNode
@@ -187,14 +188,21 @@ abstract class Node extends nameable {
   }
 
   def nameIt (path: String, isNamingIo: Boolean) {
+    val alwaysDisambiguate = false
     try {
       if (!named && (!isIo || isNamingIo)) {
         /* If the name was set explicitely through *setName*,
          we don't override it. */
         setName(path)
       }
-      while (component.names.getOrElseUpdate(name, this) ne this)
-        name += "_"
+      if (named || alwaysDisambiguate) {
+        while (component.names.getOrElseUpdate(name, this) ne this) {
+          name += "_"
+          println("Node:nameIt " + this._id + " path " + path + " - trying " + name)
+        }
+      } else {
+          println("Node:nameIt skipping disambiguation for node id " + this._id + " path " + path + " - hasn't been named yet.")
+      }
     } catch {
       case e:NullPointerException => {
         println("Node:nameIt() NullPointerException: name '" + name + "'")
@@ -338,6 +346,10 @@ abstract class Node extends nameable {
   def setName(n: String) {
     name = n
     named = true;
+    println("Node: naming " + this._id + " " + n)
+    if (interestingIds contains this._id) {
+      println("Bang!")
+    }
   }
 
   var isWidthWalked = false;
