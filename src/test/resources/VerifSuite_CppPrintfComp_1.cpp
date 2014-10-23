@@ -30,6 +30,12 @@ bool VerifSuite_CppPrintfComp_1_t::set_circuit_from(mod_t* src) {
   clk_cnt = mod_typed->clk_cnt;
   return true;
 }
+void VerifSuite_CppPrintfComp_1_t::print ( FILE* f ) {
+#if __cplusplus >= 201103L
+  if (T1.values[0]) dat_fprintf<104>(f, "display %h %h", T3, T2);
+#endif
+fflush(f);
+}
 void VerifSuite_CppPrintfComp_1_t::print ( std::ostream& s ) {
 #if __cplusplus >= 201103L
   if (T1.values[0]) dat_prints<104>(s, "display %h %h", T3, T2);

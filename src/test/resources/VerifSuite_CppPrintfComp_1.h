@@ -26,6 +26,7 @@ class VerifSuite_CppPrintfComp_1_t : public mod_t {
   int clock ( dat_t<1> reset );
   mod_t* clone();
   bool set_circuit_from(mod_t* src);
+  void print ( FILE* f );
   void print ( std::ostream& s );
   void dump ( FILE* f, int t );
   void dump_init ( FILE* f );
