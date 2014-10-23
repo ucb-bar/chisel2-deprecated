@@ -189,11 +189,15 @@ abstract class Node extends nameable {
   def nameIt (path: String, isNamingIo: Boolean) {
     try {
       if (!named && (!isIo || isNamingIo)) {
-        /* If the name was set explicitely through *setName*,
+        /* If the name was set explicitly through *setName*,
          we don't override it. */
         setName(path)
       }
-      if (named) {
+      // Don't bother trying to make unnamed nodes unambiguous.
+      // TODO - We might want to distinguish generated versus user-specified names.
+      //  and only disambiguate the generated names.
+      //  Ambiguous user-specified names should trigger an error.
+      if (name != "") {
         while (component.names.getOrElseUpdate(name, this) ne this) {
           name += "_"
         }
