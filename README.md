@@ -47,6 +47,7 @@ Edit the source files for your circuit
     }
 
     class HelloModuleTests(c: HelloModule) extends Tester(c) {
+      step(1)
     }
 
     object hello {
