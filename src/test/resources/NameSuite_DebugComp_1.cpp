@@ -32,7 +32,7 @@ bool NameSuite_DebugComp_1_t::set_circuit_from(mod_t* src) {
   clk_cnt = mod_typed->clk_cnt;
   return true;
 }
-void NameSuite_DebugComp_1_t::print ( FILE* f ) {
+void NameSuite_DebugComp_1_t::print ( std::ostream& s ) {
 }
 void NameSuite_DebugComp_1_t::dump_init(FILE *f) {
   fputs("$timescale 1ps $end\n", f);

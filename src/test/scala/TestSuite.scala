@@ -45,7 +45,15 @@ class TestSuite extends AssertionsForJUnit {
 
   def assertFile( filename: String ) {
     val useNewCompare = true
-    val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
+    val url = getClass.getResource(filename)
+    // Did we find the resource?
+    if (url == null) {
+      println("assertFile: \"%s\" not found".format(filename))
+      // Make sure we don't inadvertently pass this test.
+      assertResult(filename) { "" }
+      return
+    }
+    val reffile = scala.io.Source.fromURL(url)
     val refText = blankLines_re.replaceAllIn(reffile.mkString, "")
     reffile.close()
     val testfile = scala.io.Source.fromFile(

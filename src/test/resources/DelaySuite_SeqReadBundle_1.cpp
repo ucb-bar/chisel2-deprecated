@@ -45,7 +45,7 @@ bool DelaySuite_SeqReadBundle_1_t::set_circuit_from(mod_t* src) {
   clk_cnt = mod_typed->clk_cnt;
   return true;
 }
-void DelaySuite_SeqReadBundle_1_t::print ( FILE* f ) {
+void DelaySuite_SeqReadBundle_1_t::print ( std::ostream& s ) {
 }
 void DelaySuite_SeqReadBundle_1_t::dump_init(FILE *f) {
 }

@@ -112,6 +112,23 @@ class ManualTester[+T <: Module]
         Thread.sleep(100)
       }
       sb += c.toChar
+      // Look for a "PRINT" command.
+      if (sb.length == 6 && sb.startsWith("PRINT ")) {
+        do {
+          c = testIn.read
+          sb += c.toChar
+        } while (c != ' ')
+        // Get the PRINT character count.
+        val printCommand = """^PRINT (\d+) """.r
+        val printCommand(nChars) = sb.toString
+        sb.clear()
+        for (i <- 0 until nChars.toInt) {
+          c = testIn.read
+          sb += c.toChar
+        }
+        System.out.print(sb.toString())
+        sb.clear()
+      }
       c   = testIn.read
     }
 
