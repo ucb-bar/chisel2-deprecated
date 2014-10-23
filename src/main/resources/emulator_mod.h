@@ -1410,6 +1410,14 @@ static dat_t<w> dat_format(const char* fmt, Args... args)
 }
 
 template <int w, typename... Args>
+static ssize_t dat_fprintf(FILE *f, const char* fmt, Args... args)
+{
+  char str[w/8+1];
+  dat_format(str, fmt, args...);
+  return fwrite(str, 1, w/8, f);
+}
+
+template <int w, typename... Args>
 static ssize_t dat_prints(std::ostream& s, const char* fmt, Args... args)
 {
   char str[w/8+1];
@@ -1713,6 +1721,7 @@ class mod_t {
   // are made about state consistency on failure,
   virtual bool set_circuit_from(mod_t* src) = 0;
 
+  virtual void print ( FILE* f ) { };
   virtual void print ( std::ostream& s ) { };
   virtual void dump ( FILE* f, int t ) { };
 
