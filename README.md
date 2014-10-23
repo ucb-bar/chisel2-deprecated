@@ -63,7 +63,7 @@ because [recent versions of sbt](http://www.scala-sbt.org/0.13.0/docs/Community/
 generate jars without the scala third-point version number
 (i.e. chisel_2.10-2.0.2.jar instead of chisel_2.10*.2*-2.0.2.jar).
 
-Execute sbt run to generate the C++ simulation source for your circuit, and (assuming you have g++ compiler installed), compile it, and execute it under the tester.
+Execute sbt run to generate the C++ simulation source for your circuit, and (assuming you have a g++ compiler installed), compile it, and execute it under the tester.
 
     $ sbt run
 
