@@ -829,7 +829,7 @@ try {
       () => Module(new LitAddSub())) {m => new LitAddSubTester(m)}
   }
 
-  /** Test width adjustment for Operations on literals.
+  /** Test for issue #168 - lit as port breaks chisel
    *
    */
   @Test def testLitAsPort () {
