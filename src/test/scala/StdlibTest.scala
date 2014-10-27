@@ -834,13 +834,18 @@ try {
    */
   @Test def testLitAsPort () {
     println("\ntestLitAsPort ...")
-    class LitAsPort extends Module {
-      val io = new Bundle {
-        val s2 = Bits(12)
+    try {
+      class LitAsPort extends Module {
+        val io = new Bundle {
+          val s2 = Bits(12)
+        }
       }
+      chiselMain(Array("--backend", "c",
+        "--targetDir", dir.getPath.toString()),
+        () => Module(new LitAsPort()))
+    } catch {
+      case e : java.lang.IllegalStateException => {}
     }
-    chiselMain(Array("--backend", "c",
-      "--targetDir", dir.getPath.toString()),
-      () => Module(new LitAsPort()))
+    assertTrue(!ChiselError.ChiselErrors.isEmpty);
   }
 }
