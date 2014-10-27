@@ -1010,10 +1010,7 @@ class VerilogBackend extends Backend {
     val src = n + "-harness.v " + n + ".v"
     val cmd = "cd " + dir + " && vcs -full64 -quiet +v2k " +
               "-timescale=10ns/10ps +define+CLOCK_PERIOD=120 +vpi -use_vpiobj vpi_user.cc " +
-              "+vcs+initreg+random " + src + " -o " + n +
-              ( if (!Driver.isTesting) " -debug" /* for ucli scripts */
-                else if (Driver.isDebug) " -debug_pp" /* for vpd dump */
-                else "" )
+              "+vcs+initreg+random " + src + " -o " + n + " -debug_pp"
     run(cmd)
   }
 }

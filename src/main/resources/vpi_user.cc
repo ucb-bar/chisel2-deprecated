@@ -82,7 +82,7 @@ int32_t wire_poke_calltf(char *user_data) {
 
     vpiHandle sub_iter = vpi_iterate(vpiModule, mod_handle);
     while (vpiHandle sub_handle = vpi_scan(sub_iter)) {
-      modules.push(mod_handle);
+      modules.push(sub_handle);
     }
   }
 
@@ -146,7 +146,7 @@ int32_t wire_peek_calltf(char *user_data) {
 
     vpiHandle sub_iter = vpi_iterate(vpiModule, mod_handle);
     while (vpiHandle sub_handle = vpi_scan(sub_iter)) {
-      modules.push(mod_handle);
+      modules.push(sub_handle);
     }
   }
 
@@ -250,7 +250,7 @@ int32_t mem_poke_calltf(char *user_data) {
 
     vpiHandle sub_iter = vpi_iterate(vpiModule, mod_handle);
     while (vpiHandle sub_handle = vpi_scan(sub_iter)) {
-      modules.push(mod_handle);
+      modules.push(sub_handle);
     }
   }
 
@@ -331,7 +331,7 @@ int32_t mem_peek_calltf(char *user_data) {
 
     vpiHandle sub_iter = vpi_iterate(vpiModule, mod_handle);
     while (vpiHandle sub_handle = vpi_scan(sub_iter)) {
-      modules.push(mod_handle);
+      modules.push(sub_handle);
     }
   }
 
@@ -341,143 +341,105 @@ int32_t mem_peek_calltf(char *user_data) {
     vpi_printf("error\n");
 }
 
-/*
-void read_file(string filename, set<string> &regpaths, map<string, string> &regvalues) {
-  ifstream in(filename);
-  string line;
-  while (getline(in, line)) {
-    istringstream iss(line);
-    string force, deposit, netpath, regpath;
-    char value;
-    if (iss >> force >> deposit >> netpath >> value) {
-      regpath = netpath.substr(0, netpath.rfind(".")); 
-      regpaths.insert(regpath);
-      regvalues[netpath] = value;
-    }
-  }
-  return;
-}
+/*==========================================================================
+                 Compile Time Functions
+=============================================================================*/
 
-void encode_vpi_vecval (p_vpi_vecval vecval, string value, int offset = 0) {
-  if (value == "1") {
-    vecval->aval |= 1 << offset;
-  } else if (value == "z") {
-    vecval->bval |= 1 << offset;
-  } else if (value == "x") {
-    vecval->aval |= 1 << offset;
-    vecval->bval |= 1 << offset;
-  }
-  return;
-}
-
-int32_t force_regs_calltf(char *user_data) {
-  set<string> regpaths;
-  map<string, string> regvalues;
-  queue<vpiHandle> mod_iters;
-
-  vpi_printf("Start initialization\n");
-  clock_t begin_clock = clock();
-  // Read the top module passed as an argument
-  vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, NULL);
-  vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle);
-  // First argument: force_regs file name
-  s_vpi_value file_s;
-  file_s.format = vpiStringVal;
-  vpi_get_value(vpi_scan(arg_iter), &file_s);
-  istringstream iss(file_s.value.str);
-  string filename;
-  iss >> filename;
-
-  // read force_regs
-  read_file(filename, regpaths, regvalues);
-
-  // Second argument: the Top component
-  mod_iters.push(vpi_iterate(vpiModule, vpi_scan(arg_iter)));
-  vpi_free_object(arg_iter);
-
-  while (!mod_iters.empty()) {
-    vpiHandle mod_iter = mod_iters.front();
-    mod_iters.pop();
-    // Iterate submodules
-    while (vpiHandle mod_handle = vpi_scan(mod_iter)) {
-      // Look for flip-flops
-      if (regpaths.find(vpi_get_str(vpiFullName, mod_handle)) != regpaths.end()) {
-        // Iterate its net -> Find flip-flops' output port Q
-        vpiHandle net_iter = vpi_iterate(vpiNet, mod_handle);
-        while (vpiHandle net_handle = vpi_scan(net_iter)) {
-          string fullpath = vpi_get_str(vpiFullName, net_handle);
-          if (regvalues.find(fullpath) != regvalues.end()) {
-            s_vpi_value net_value;
-            net_value.format = vpiVectorVal;
-            net_value.value.vector = new s_vpi_vecval;
-            net_value.value.vector->aval = 0;
-            net_value.value.vector->bval = 0;
-            encode_vpi_vecval(net_value.value.vector, regvalues[fullpath]);
-            vpi_put_value(net_handle, &net_value, NULL, vpiNoDelay);
-          }
-        }
-        // Iterate its reg -> Find SRAMs' output port
-        vpiHandle reg_iter = vpi_iterate(vpiReg, mod_handle);
-        while (vpiHandle reg_handle = vpi_scan(reg_iter)) {
-          string srampath = vpi_get_str(vpiFullName, reg_handle);
-          string findpath = srampath + "\\[0\\]";
-          if (regvalues.find(findpath) != regvalues.end()) {
-            uint8_t reg_size = vpi_get(vpiSize, reg_handle);
-            uint8_t arr_size = (reg_size - 1) / 32 + 1;
-            s_vpi_value reg_value;
-            reg_value.format = vpiVectorVal;
-            reg_value.value.vector = new s_vpi_vecval[arr_size];
-            for (int i = 0 ; i < arr_size ; i++) {
-              reg_value.value.vector[i].aval = 0;
-              reg_value.value.vector[i].bval = 0;
-              for (int j = 0 ; j < 32 ; j++) {
-                ostringstream fullpath;
-                fullpath << srampath << "\\[" << (i * 32 + j) << "\\]";
-                encode_vpi_vecval(&reg_value.value.vector[i], regvalues[fullpath.str()], j);
-                if (i * 32 + j >= reg_size) break;
-              } 
-            }
-            vpi_put_value(reg_handle, &reg_value, NULL, vpiNoDelay);
-          }
-        }
-      }
-      mod_iters.push(vpi_iterate(vpiModule, mod_handle));
-    }
-  }
-  clock_t end_clock = clock();
-  vpi_printf("initialization time(sec): %.2f\n", 
-             double(end_clock - begin_clock) / CLOCKS_PER_SEC);
-  vpi_printf("Finish initialization\n");
-
-  return 0;
-}
-*/
-
-int32_t force_regs_compiletf (char *user_data) {
+int32_t wire_poke_compiletf (char *user_data) {
   vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, NULL);
   vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle), arg_handle;
   bool error = false;
 
   if (arg_iter == NULL) {
-    vpi_printf("ERROR: $force_regs requires at least two argument(filename, module)\n"); 
+    vpi_printf("ERROR: $wire_poke requires at least two argument(nodename, hex_value)\n"); 
     vpi_control(vpiFinish, 1); /* abort simulation */
     return 0;
   }
 
   arg_handle = vpi_scan(arg_iter);
-  if (vpi_get(vpiType, arg_handle) != vpiReg) {
-    vpi_printf("ERROR: $force_regs requires the first argument as a string variable(filename)\n");
+  if (vpi_get(vpiType, arg_handle) != vpiReg && vpi_get(vpiType, arg_handle) != vpiStringConst) {
+    vpi_printf("ERROR: $wire_poke requires the first argument as a string(nodename)\n");
     error = true;
   }
 
   arg_handle = vpi_scan(arg_iter);
-  if (vpi_get(vpiType, arg_handle) != vpiModule) {
-    vpi_printf("ERROR: $force_regs requires the second argument as a module\n");
+  if (vpi_get(vpiType, arg_handle) != vpiReg && vpi_get(vpiType, arg_handle) != vpiHexConst) {
+    vpi_printf("ERROR: $wire_poke requires the second argument as a hex number(value)\n");
     error = true;
   }
 
   if (vpi_scan(arg_iter) != NULL) {
-    vpi_printf("ERROR: $force_regs requires only two arguments(filename, module))\n");
+    vpi_printf("ERROR: $wire_poke requires only two arguments(nodename, hex_value))\n");
+    error = true;
+  }
+
+  if (error) {
+    vpi_control(vpiFinish, 1); /* abort simulation */
+    return 0;
+  }
+  return 0; 
+}
+
+int32_t wire_peek_compiletf (char *user_data) {
+  vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, NULL);
+  vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle), arg_handle;
+  bool error = false;
+
+  if (arg_iter == NULL) {
+    vpi_printf("ERROR: $wire_peek requires at least one argument(nodename)\n"); 
+    vpi_control(vpiFinish, 1); /* abort simulation */
+    return 0;
+  }
+
+  arg_handle = vpi_scan(arg_iter);
+  if (vpi_get(vpiType, arg_handle) != vpiReg && vpi_get(vpiType, arg_handle) != vpiStringConst) {
+    vpi_printf("ERROR: $wire_peek requires the first argument as a string(nodename)\n");
+    error = true;
+  }
+
+  if (vpi_scan(arg_iter) != NULL) {
+    vpi_printf("ERROR: $wire_peek requires only one arguments(nodename))\n");
+    error = true;
+  }
+
+  if (error) {
+    vpi_control(vpiFinish, 1); /* abort simulation */
+    return 0;
+  }
+  return 0; 
+}
+
+int32_t mem_poke_compiletf (char *user_data) {
+  vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, NULL);
+  vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle), arg_handle;
+  bool error = false;
+
+  if (arg_iter == NULL) {
+    vpi_printf("ERROR: $mem_poke requires at least three argument(nodename, offset, hex_value)\n"); 
+    vpi_control(vpiFinish, 1); /* abort simulation */
+    return 0;
+  }
+
+  arg_handle = vpi_scan(arg_iter);
+  if (vpi_get(vpiType, arg_handle) != vpiReg && vpi_get(vpiType, arg_handle) != vpiStringConst) {
+    vpi_printf("ERROR: $mem_poke requires the first argument as a string(nodename)\n");
+    error = true;
+  }
+
+  arg_handle = vpi_scan(arg_iter);
+  if (vpi_get(vpiType, arg_handle) != vpiIntegerVar && vpi_get(vpiType, arg_handle) != vpiDecConst) {
+    vpi_printf("ERROR: $mem_poke requires the second argument as a integer(offset)\n");
+    error = true;
+  }
+
+  arg_handle = vpi_scan(arg_iter);
+  if (vpi_get(vpiType, arg_handle) != vpiReg && vpi_get(vpiType, arg_handle) != vpiHexConst) {
+    vpi_printf("ERROR: $mem_poke requires the third argument as a hex string(value)\n");
+    error = true;
+  }
+
+  if (vpi_scan(arg_iter) != NULL) {
+    vpi_printf("ERROR: $mem_poke requires only three arguments(nodename, offset, hex_value))\n");
     error = true;
   }
 
@@ -488,25 +450,45 @@ int32_t force_regs_compiletf (char *user_data) {
   return 0; 
 }
  
+int32_t mem_peek_compiletf (char *user_data) {
+  vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, NULL);
+  vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle), arg_handle;
+  bool error = false;
+
+  if (arg_iter == NULL) {
+    vpi_printf("ERROR: $mem_peek requires at least two argument(nodename, offset, hex_value)\n"); 
+    vpi_control(vpiFinish, 1); /* abort simulation */
+    return 0;
+  }
+
+  arg_handle = vpi_scan(arg_iter);
+  if (vpi_get(vpiType, arg_handle) != vpiReg && vpi_get(vpiType, arg_handle) != vpiStringConst) {
+    vpi_printf("ERROR: $mem_peek requires the first argument as a string(nodename)\n");
+    error = true;
+  }
+
+  arg_handle = vpi_scan(arg_iter);
+  if (vpi_get(vpiType, arg_handle) != vpiIntegerVar && vpi_get(vpiType, arg_handle) != vpiDecConst) {
+    vpi_printf("ERROR: $mem_peek requires the second argument as a integer(offset)\n");
+    error = true;
+  }
+
+  if (vpi_scan(arg_iter) != NULL) {
+    vpi_printf("ERROR: $mem_peek requires only two arguments(nodename, offset))\n");
+    error = true;
+  }
+
+  if (error) {
+    vpi_control(vpiFinish, 1); /* abort simulation */
+    return 0;
+  }
+  return 0; 
+}
+ 
+ 
 /*==========================================================================
                  Registration Functions
 =============================================================================*/
-/*
-void force_regs_registration() {
-  s_vpi_systf_data tf_data;
-  
-  tf_data.type      = vpiSysTask;
-  tf_data.tfname    = "$force_regs";
-  tf_data.sizetf    = NULL;
-  tf_data.calltf    = force_regs_calltf;
-  tf_data.compiletf = force_regs_compiletf;
-  tf_data.user_data = NULL;
-
-  vpi_register_systf(&tf_data);
-
-  return;
-}
-*/
 
 void wire_poke_registration() {
   s_vpi_systf_data tf_data;
@@ -515,7 +497,7 @@ void wire_poke_registration() {
   tf_data.tfname    = "$wire_poke";
   tf_data.sizetf    = NULL;
   tf_data.calltf    = wire_poke_calltf;
-  tf_data.compiletf = NULL; // wire_poke_compiletf;
+  tf_data.compiletf = wire_poke_compiletf;
   tf_data.user_data = NULL;
 
   vpi_register_systf(&tf_data);
@@ -530,7 +512,7 @@ void wire_peek_registration() {
   tf_data.tfname    = "$wire_peek";
   tf_data.sizetf    = NULL;
   tf_data.calltf    = wire_peek_calltf;
-  tf_data.compiletf = NULL; // wire_peek_compiletf;
+  tf_data.compiletf = wire_peek_compiletf;
   tf_data.user_data = NULL;
 
   vpi_register_systf(&tf_data);
@@ -545,7 +527,7 @@ void mem_poke_registration() {
   tf_data.tfname    = "$mem_poke";
   tf_data.sizetf    = NULL;
   tf_data.calltf    = mem_poke_calltf;
-  tf_data.compiletf = NULL; // mem_poke_compiletf;
+  tf_data.compiletf = mem_poke_compiletf;
   tf_data.user_data = NULL;
 
   vpi_register_systf(&tf_data);
@@ -560,7 +542,7 @@ void mem_peek_registration() {
   tf_data.tfname    = "$mem_peek";
   tf_data.sizetf    = NULL;
   tf_data.calltf    = mem_peek_calltf;
-  tf_data.compiletf = NULL; // mem_peek_compiletf;
+  tf_data.compiletf = mem_peek_compiletf;
   tf_data.user_data = NULL;
 
   vpi_register_systf(&tf_data);
