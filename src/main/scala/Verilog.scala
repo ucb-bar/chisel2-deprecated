@@ -509,49 +509,23 @@ class VerilogBackend extends Backend {
     harness.write("\n")
     harness.write(" );\n\n")
 
-    val mems =  new ArrayBuffer[Mem[_]]
-    val wires = new ArrayBuffer[Node]
+    // collect Chisel nodes for VCD dump
     val dumpvars = new ArrayBuffer[Node]
-
-    // select Chisel nodes for APIs(peek, poke)  and VCD dump
-    for (m <- Driver.components ; node <- m.nodes) {
-      if (node.isInObject && !node.isLit) {
-        node match {
-          case bool: Bool if resets contains bool => // exclude resets
-          case _: Binding =>
-          case _: ROMData =>
-          case io: Bits if m != c => {
-            var included = true
-            if (io.dir == INPUT) {
-              if (io.inputs.length == 0 || io.inputs.length > 1)
-                included = false
-            }
-            else if (io.dir == OUTPUT) {
-              if (io.consumers.size == 0 || m.parent.findBinding(io) == null || io.prune)
-                included = false
-            }
-            if (included) wires += io
+    for (m <- Driver.components ; node <- m.nodes ; if node.isInVCD) {
+      node match {
+        case io: Bits if m != c => {
+          var included = true
+          if (io.dir == INPUT) {
+            if (io.inputs.length == 0 || io.inputs.length > 1)
+              included = false
           }
-          case mem:  Mem[_] =>  mems += mem
-          case _ => wires += node
-        }
-      }
-      if (node.isInVCD) {
-        node match {
-          case io: Bits if m != c => {
-            var included = true
-            if (io.dir == INPUT) {
-              if (io.inputs.length == 0 || io.inputs.length > 1)
-                included = false
-            }
-            else if (io.dir == OUTPUT) {
-              if (io.consumers.size == 0 || m.parent.findBinding(io) == null || io.prune)
-                included = false
-            }
-            if (included) dumpvars += io
+          else if (io.dir == OUTPUT) {
+            if (io.consumers.size == 0 || m.parent.findBinding(io) == null || io.prune)
+              included = false
           }
-          case _ => dumpvars += node
+          if (included) dumpvars += io
         }
+        case _ => dumpvars += node
       }
     }
 
@@ -581,9 +555,8 @@ class VerilogBackend extends Backend {
     }
     harness.write("  end\n\n")
 
-    // TODO: select interface according to the tester
     if (Driver.isTesting) {
-      harness write harnessAPIs(mainClk, clocks, resets, wires, mems, scanNodes, printNodes)
+      harness write harnessAPIs(mainClk, clocks, resets) 
     } else {
       // for scripts: show the states
       harness write harnessMap(mainClk, resets, scanNodes, printNodes)
@@ -593,9 +566,7 @@ class VerilogBackend extends Backend {
     harness.close();
   }
 
-  def harnessAPIs (mainClk: Clock, clocks: LinkedHashSet[Clock], resets: ArrayBuffer[Bool],
-                   wires: ArrayBuffer[Node], mems: ArrayBuffer[Mem[_]],
-                   scanNodes: Array[Bits], printNodes: Array[Bits]) = {
+  def harnessAPIs (mainClk: Clock, clocks: LinkedHashSet[Clock], resets: ArrayBuffer[Bool]) = {
     val apis = new StringBuilder
 
     apis.append("\n  /*** API variables ***/\n")
@@ -631,7 +602,7 @@ class VerilogBackend extends Backend {
     apis.append("        " + fscanf("%d", "steps"))
     for (rst <- resets)
       apis.append("        %s = 1;\n".format(rst.name))
-    apis.append("        repeat (steps) @(posedge clk) begin")
+    apis.append("        repeat (steps) @(posedge clk) begin\n")
     apis.append("        delta = delta + min;\n")
     if (clocks.size > 1) {
       for (clk <- clocks)
@@ -650,17 +621,7 @@ class VerilogBackend extends Backend {
     apis.append("      // return: wire's value\n")
     apis.append("      \"wire_peek\": begin\n")
     apis.append("        " + fscanf("%s", "node"))
-    apis.append("        case (node)\n")
-    if (!wires.isEmpty) {
-      for (wire <- wires) {
-        val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
-        apis.append("          \"%s\": ".format(pathName) +
-          display("0x%1x", pathName)
-        )
-      }
-    }
-    apis.append("          default: " + display("%s", "\"error\""))
-    apis.append("        endcase\n")
+    apis.append("        $wire_peek(node);\n")
     apis.append("      end\n")
 
     apis.append("      // < mem_peek >\n")
@@ -668,17 +629,7 @@ class VerilogBackend extends Backend {
     apis.append("      // return: mem's value\n")
     apis.append("      \"mem_peek\": begin\n")
     apis.append("        " + fscanf("%s %d", "node", "offset"))
-    apis.append("        case (node)\n")
-    if (!mems.isEmpty) {
-      for (mem <- mems) {
-        val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
-        apis.append("          \"%s\": ".format(pathName) +
-          display("0x%1x", "%s[%s]".format(pathName, "offset"))
-        )
-      }
-    }
-    apis.append("          default: " + display("%s", "\"error\""))
-    apis.append("        endcase\n")
+    apis.append("        $mem_peek(node, offset);\n")
     apis.append("      end\n")
 
     apis.append("      // < wire_poke >\n")
@@ -686,39 +637,16 @@ class VerilogBackend extends Backend {
     apis.append("      // return: \"ok\" or \"error\"\n")
     apis.append("      \"wire_poke\": begin\n")
     apis.append("        " + fscanf("%s 0x%x", "node", "value"))
-    apis.append("        case (node)\n")
-    if (!wires.isEmpty) {
-      for (wire <- wires ; if wire.isReg || (scanNodes contains wire)) {
-        val pathName = wire.component.getPathName(".") + "." + emitRef(wire)
-        val wireName = if (scanNodes contains wire) emitRef(wire) else pathName
-        apis.append("          \"%s\": begin\n".format(pathName))
-        apis.append("            %s = %s;\n".format(wireName, "value"))
-        apis.append("            " + display("%s", "\"ok\""))
-        apis.append("          end\n")
-      }
-    }
-    apis.append("          default: " + display("%s", "\"error\""))
-    apis.append("        endcase\n")
+    apis.append("        $wire_poke(node, value);\n")
     apis.append("      end\n")
 
-    if (!mems.isEmpty) {
-      apis.append("      // < mem_poke >\n")
-      apis.append("      // inputs: wire's name\n")
-      apis.append("      // return: \"ok\" or \"error\"\n")
-      apis.append("      \"mem_poke\": begin\n")
-      apis.append("        " + fscanf("%s %d 0x%x", "node", "offset", "value"))
-      apis.append("        case (node)\n")
-      for (mem <- mems) {
-        val pathName = mem.component.getPathName(".") + "." + emitRef(mem)
-        apis.append("          \"%s\": begin\n".format(pathName))
-        apis.append("            %s[%s] = %s;\n".format(pathName, "offset", "value"))
-        apis.append("            " + display("%s", "\"ok\""))
-        apis.append("          end\n")
-      }
-      apis.append("          default: " + display("%s", "\"error\""))
-      apis.append("        endcase\n")
-      apis.append("      end\n")
-    }
+    apis.append("      // < mem_poke >\n")
+    apis.append("      // inputs: wire's name\n")
+    apis.append("      // return: \"ok\" or \"error\"\n")
+    apis.append("      \"mem_poke\": begin\n")
+    apis.append("        " + fscanf("%s %d 0x%x", "node", "offset", "value"))
+    apis.append("        $mem_poke(node, offset, value);\n")
+    apis.append("      end\n")
 
     apis.append("      // < step > \n")
     apis.append("      // inputs: # cycles\n")
@@ -1058,6 +986,20 @@ class VerilogBackend extends Backend {
   }
 
   override def compile(c: Module, flags: String) {
+    def copyToTarget(filename: String) = {
+          val resourceStream = getClass().getResourceAsStream("/" + filename)
+          if( resourceStream != null ) {
+            val classFile = createOutputFile(filename)
+            while(resourceStream.available > 0) {
+              classFile.write(resourceStream.read())
+            }
+            classFile.close()
+            resourceStream.close()
+          } else {
+                println(s"WARNING: Unable to copy '$filename'" )
+          }
+    }
+    copyToTarget("vpi_user.cc")
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
     def run(cmd: String) {
       val bashCmd = Seq("bash", "-c", cmd)
@@ -1067,7 +1009,7 @@ class VerilogBackend extends Backend {
     val dir = Driver.targetDir + "/"
     val src = n + "-harness.v " + n + ".v"
     val cmd = "cd " + dir + " && vcs -full64 -quiet +v2k " +
-              "-timescale=10ns/10ps +define+CLOCK_PERIOD=120 " +
+              "-timescale=10ns/10ps +define+CLOCK_PERIOD=120 +vpi -use_vpiobj vpi_user.cc " +
               "+vcs+initreg+random " + src + " -o " + n +
               ( if (!Driver.isTesting) " -debug" /* for ucli scripts */
                 else if (Driver.isDebug) " -debug_pp" /* for vpd dump */
