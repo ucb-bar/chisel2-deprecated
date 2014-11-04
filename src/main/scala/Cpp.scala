@@ -544,13 +544,27 @@ class CppBackend extends Backend {
     }
   }
 
-  def emitRefHi(node: Node): String = node match {
-    case reg: Reg =>
-      if (reg.next.isReg && (!allocateOnlyNeededShadowRegisters || needShadow.contains(reg))) {
-        emitRef(reg) + "__shadow"
+  def emitRefHi(node: Node): String = {
+    node match {
+      case reg: Reg => {
+        val next = reg.next
+        // If the input to this register is a register and we're not allocating only needed
+        // shadow registers, assume we need the shadow register copy.
+        // Otherwise, if we're allocating only needed shadow registers and this register
+        // needs a shadow, now is the time to use that shadow.
+	val useShadow = if (allocateOnlyNeededShadowRegisters) {
+          needShadow.contains(reg)
+        } else {
+          next.isReg
+        }
+        if (useShadow) {
+          emitRef(reg) + "__shadow"
+        } else {
+          emitRef(reg.next)
+        }
       }
-      else emitRef(reg.next)
-    case _ => emitRef(node)
+      case _ => emitRef(node)
+    }
   }
 
   def emitDefHi(node: Node): String = {
@@ -599,20 +613,6 @@ class CppBackend extends Backend {
     }
   }
 
-  // If we write a register node before we use its inputs, we need to shadow it.
-  def determineRequiredShadowRegisters(node: Node) {
-    node match {
-      case reg: Reg => {
-        regWritten += reg
-      }
-      case _ => {
-        for (n <- node.inputs if regWritten.contains(n)) {
-          needShadow += n
-        }
-      }
-    }
-  }
-
   def emitInitHi(node: Node): String = {
     node match {
       case reg: Reg => {
@@ -639,6 +639,16 @@ class CppBackend extends Backend {
 
       case _ =>
         ""
+    }
+  }
+
+  // If we write a register node before we use its inputs, we need to shadow it.
+  def determineRequiredShadowRegisters(node: Node) {
+    if (node.isInstanceOf[Reg]) {
+      regWritten += node
+    }
+    for (n <- node.inputs if regWritten.contains(n)) {
+      needShadow += n
     }
   }
 
