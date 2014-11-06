@@ -226,12 +226,9 @@ class ManualTester[+T <: Module]
         cmd = "wire_poke " + dumpName(data);
       }
       // Don't prefix negative numbers with "0x"
-      //      val radixPrefix = if (x < 0) " " else " 0x"
-      //      cmd = cmd + radixPrefix + x.toString(16);
+      val radixPrefix = if (x < 0) " " else " 0x"
 
-      // dump hex value even for negative numbers
-      val hexValue = " 0x%x".format(x.toInt)
-      cmd = cmd + hexValue
+      cmd = cmd + radixPrefix + x.toString(16);
       val rtn = emulatorCmd(cmd)
       if (rtn != "ok") {
         System.err.print(s"FAILED: poke(${dumpName(data)}) returned false")
