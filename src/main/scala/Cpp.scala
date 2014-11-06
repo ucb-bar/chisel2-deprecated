@@ -813,7 +813,7 @@ class CppBackend extends Backend {
         // Read and edit the Makefile template.
         editToTarget("Makefile", replacements)
         val nJobs = if (parallelMakeJobs > 0) "-j" + parallelMakeJobs.toString() else "-j"
-        make(nJobs)
+        make("-C " + Driver.targetDir + " " + nJobs)
       } else {
         // No make. Compile everything discretely.
         cc(n + "-emulator")
