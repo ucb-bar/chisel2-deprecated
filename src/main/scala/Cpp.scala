@@ -30,6 +30,7 @@
 
 package Chisel
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.LinkedHashSet
 import scala.math._
 import java.io.InputStream
 import java.io.OutputStream
@@ -83,13 +84,13 @@ class CppBackend extends Backend {
   // This is required if we're generating paritioned combinatorial islands, or we're limiting the size of functions/methods.
   val shadowRegisterInObject = Driver.shadowRegisterInObject || Driver.partitionIslands || Driver.lineLimitFunctions > 0
   // If we need to put shadow registers in the object, we also should put multi-word literals there as well.
-  val multiwordLiteralInObject = shadowRegisterInObject
+  val allReferredNodesInObject = shadowRegisterInObject
   // Sets to manage allocation and generation of shadow registers
   val regWritten = HashSet[Node]()
   val needShadow = HashSet[Node]()
   val allocatedShadow = HashSet[Node]()
   // List containing nodes we've decided to put in the "object"
-  val putNodeInObject = HashSet[Node]()
+  val putNodeInObject = LinkedHashSet[Node]()
 
   var potentialShadowRegisters = 0
   val allocateOnlyNeededShadowRegisters = Driver.allocateOnlyNeededShadowRegisters
@@ -102,6 +103,9 @@ class CppBackend extends Backend {
 
   override def emitTmp(node: Node): String = {
     require(false)
+    if (allReferredNodesInObject) {
+      putNodeInObject += node
+    }
     if (node.isInObject) {
       emitRef(node)
     } else {
@@ -114,8 +118,11 @@ class CppBackend extends Backend {
     node match {
       case _: Bits if !node.isInObject && node.inputs.length == 1 =>
         emitRef(node.inputs(0))
+      // One word literals are not placed in the object.
+      case l: Literal if words(l) == 1 =>
+        super.emitRef(node)
       case _ =>
-        if (multiwordLiteralInObject) {
+        if (allReferredNodesInObject) {
           putNodeInObject += node
         }
         super.emitRef(node)
@@ -123,7 +130,7 @@ class CppBackend extends Backend {
   }
 
   // Manage a constant pool.
-  val coalesceConstants = multiwordLiteralInObject
+  val coalesceConstants = allReferredNodesInObject
   val constantPool = HashMap[String, Literal]()
   def wordMangle(x: Node, w: String): String = x match {
     case l: Literal =>
@@ -139,7 +146,7 @@ class CppBackend extends Backend {
         }
       }
     case _ =>
-      if (multiwordLiteralInObject) {
+      if (allReferredNodesInObject) {
         putNodeInObject += x
       }
       if (x.isInObject) s"${emitRef(x)}.values[${w}]"
@@ -278,7 +285,7 @@ class CppBackend extends Backend {
   }
 
   def emitDefLo(node: Node): String = {
-    if (multiwordLiteralInObject) {
+    if (allReferredNodesInObject) {
       putNodeInObject += node
     }
     node match {
@@ -1126,12 +1133,23 @@ class CppBackend extends Backend {
         val bMem = b.isInstanceOf[Mem[_]] || b.isInstanceOf[ROMData]
         aMem < bMem || aMem == bMem && a.needWidth() < b.needWidth()
       }
-      for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc))
-        out_h.write(emitDec(m))
-      for (m <- Driver.orderedNodes.filter(_.isInVCD).sortWith(headerOrderFunc))
-        out_h.write(vcd.emitDec(m))
-      for (clock <- Driver.clocks)
-        out_h.write(emitDec(clock))
+      // Are we only putting nodes that are actually referenced in the object?
+      if (allReferredNodesInObject) {
+        // First, add any VCD nodes to the mix.
+        for (m <- Driver.orderedNodes.filter(_.isInVCD))
+          putNodeInObject += m
+        for (m <- putNodeInObject.toSeq.sortWith(headerOrderFunc))
+          out_h.write(emitDec(m))
+        // NOTE: clocks will have been taken care of by the above
+        // (assuming they're actually referenced by the code).
+      } else {
+        for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc))
+          out_h.write(emitDec(m))
+        for (m <- Driver.orderedNodes.filter(_.isInVCD).sortWith(headerOrderFunc))
+          out_h.write(vcd.emitDec(m))
+        for (clock <- Driver.clocks)
+          out_h.write(emitDec(clock))
+      }
 
       out_h.write("\n");
 
@@ -1232,7 +1250,7 @@ class CppBackend extends Backend {
 
       // If we're putting literals in the class as static const's,
       // generate the code to initialize them here.
-      if (multiwordLiteralInObject) {
+      if (allReferredNodesInObject) {
         // Emit code to assign static const literals.
         def emitConstAssignment(l: Literal): String = {
           s"const val_t ${c.name}_t::T${l.emitIndex}[] = {" + (0 until words(l)).map(emitWordRef(l, _)).reduce(_+", "+_) + "};\n"
@@ -1316,7 +1334,7 @@ class CppBackend extends Backend {
 	  // including literals in the objet.
 	  // The literals are declared as "static const" and will be
           // initialized elsewhere.
-	  if (!(multiwordLiteralInObject && m.isInstanceOf[Literal])) {
+	  if (!(allReferredNodesInObject && m.isInstanceOf[Literal])) {
             llf.addString(emitCircuitAssign("mod_typed->", m))
           }
         }
@@ -1745,7 +1763,7 @@ class CppBackend extends Backend {
   // If we're generating multiple functions (and hence, putting all nodes in the main object),
   // return true if this is a node we've decided to put in the main object.
   override def isInObject(n: Node): Boolean = {
-    if (multiwordLiteralInObject) {
+    if (allReferredNodesInObject) {
       putNodeInObject.contains(n)
     } else {
       false
