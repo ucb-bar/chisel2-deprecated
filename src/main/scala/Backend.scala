@@ -903,6 +903,9 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def compile(c: Module, flags: String = null): Unit = { }
+
+  // Allow the backend to decide if this node should be recorded in the "object".
+  def isInObject(n: Node): Boolean = false
 }
 
 

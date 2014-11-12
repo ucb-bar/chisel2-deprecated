@@ -82,10 +82,15 @@ class CppBackend extends Backend {
   // Define shadow registers in the circuit object, instead of local registers in the clock hi methods.
   // This is required if we're generating paritioned combinatorial islands, or we're limiting the size of functions/methods.
   val shadowRegisterInObject = Driver.shadowRegisterInObject || Driver.partitionIslands || Driver.lineLimitFunctions > 0
+  // If we need to put shadow registers in the object, we also should put multi-word literals there as well.
+  val multiwordLiteralInObject = shadowRegisterInObject
   // Sets to manage allocation and generation of shadow registers
   val regWritten = HashSet[Node]()
   val needShadow = HashSet[Node]()
   val allocatedShadow = HashSet[Node]()
+  // List containing nodes we've decided to put in the "object"
+  val putNodeInObject = HashSet[Node]()
+
   var potentialShadowRegisters = 0
   val allocateOnlyNeededShadowRegisters = Driver.allocateOnlyNeededShadowRegisters
   val ignoreShadows = false
@@ -110,15 +115,33 @@ class CppBackend extends Backend {
       case _: Bits if !node.isInObject && node.inputs.length == 1 =>
         emitRef(node.inputs(0))
       case _ =>
+        if (multiwordLiteralInObject) {
+          putNodeInObject += node
+        }
         super.emitRef(node)
     }
   }
 
+  // Manage a constant pool.
+  val coalesceConstants = multiwordLiteralInObject
+  val constantPool = HashMap[String, Literal]()
   def wordMangle(x: Node, w: String): String = x match {
-    case _: Literal =>
-      if (words(x) == 1) emitRef(x)
-      else s"T${x.emitIndex}[${w}]"
+    case l: Literal =>
+      if (words(x) == 1) {
+        emitRef(x)
+      } else {
+        // Are we maintaining a constant pool?
+        if (coalesceConstants) {
+           val cn = constantPool.getOrElseUpdate(l.name, l)
+          s"T${cn.emitIndex}[${w}]"
+        } else {
+          s"T${x.emitIndex}[${w}]"
+        }
+      }
     case _ =>
+      if (multiwordLiteralInObject) {
+        putNodeInObject += x
+      }
       if (x.isInObject) s"${emitRef(x)}.values[${w}]"
       else if (words(x) == 1) emitRef(x)
       else s"${emitRef(x)}[${w}]"
@@ -128,8 +151,9 @@ class CppBackend extends Backend {
     "0x" + (if (hex.length > bpw/4*w) hex.slice(hex.length-bpw/4*(w + 1), hex.length-bpw/4*w) else 0) + "L"
   }
   def wordMangle(x: Node, w: Int): String =
-    if (w >= words(x)) "0L"
-    else x match {
+    if (w >= words(x)) {
+      "0L"
+    }  else x match {
       case l: Literal =>
         val lit = l.value
         val value = if (lit < 0) (BigInt(1) << x.needWidth()) + lit else lit
@@ -153,8 +177,23 @@ class CppBackend extends Backend {
     node match {
       case x: Binding =>
         List()
-      case x: Literal =>
-        List()
+      case l: Literal =>
+        if (l.isInObject && words(l) > 1) {
+          // Are we maintaining a constant pool?
+          if (coalesceConstants) {
+            // Is this the node that actually defines the constant?
+            // If so, output the definition (we must do this only once).
+            if (constantPool.contains(l.name) && constantPool(l.name) == l) {
+              List((s"  static const val_t", s"T${l.emitIndex}[${words(l)}]"))
+            } else {
+              List()
+            }
+          } else {
+            List((s"  static const val_t", s"T${l.emitIndex}[${words(l)}]"))
+          }
+        } else {
+          List()
+        }
       case x: Reg =>
         List((s"dat_t<${node.needWidth()}>", emitRef(node))) ++ {
           if (!allocateOnlyNeededShadowRegisters || needShadow.contains(node)) {
@@ -200,10 +239,17 @@ class CppBackend extends Backend {
   def words(node: Node): Int = (node.needWidth() - 1) / bpw + 1
   def fullWords(node: Node): Int = node.needWidth()/bpw
   def emitLoWordRef(node: Node): String = emitWordRef(node, 0)
-  def emitTmpDec(node: Node): String =
-    if (node.isInObject) ""
-    else if (words(node) == 1) s"  val_t ${emitRef(node)};\n"
-    else s"  val_t ${emitRef(node)}[${words(node)}];\n"
+  // If we're generating multiple functions, literals and temporaries have to live in the main object.
+  // We only get to ask isInObject once, so we'd better arrange for it to give the correct answer before we ask.
+  def emitTmpDec(node: Node): String = {
+    if (node.isInObject) {
+      ""
+    } else if (words(node) == 1) {
+      s"  val_t ${emitRef(node)};\n"
+    } else {
+      s"  val_t ${emitRef(node)}[${words(node)}];\n"
+    }
+  }
   def block(s: Seq[String]): String =
     if (s.length == 0) ""
     else s"  {${s.map(" " + _ + ";").reduceLeft(_ + _)}}\n"
@@ -232,6 +278,9 @@ class CppBackend extends Backend {
   }
 
   def emitDefLo(node: Node): String = {
+    if (multiwordLiteralInObject) {
+      putNodeInObject += node
+    }
     node match {
       case x: Mux =>
         val op = if (!x.inputs.exists(isLit _)) "TERNARY_1" else "TERNARY"
@@ -536,8 +585,16 @@ class CppBackend extends Backend {
           + "#endif\n")
 
       case l: Literal =>
-        if (words(l) == 1) ""
-        else s"  val_t T${l.emitIndex}[] = {" + (0 until words(l)).map(emitWordRef(l, _)).reduce(_+", "+_) + "};\n"
+        // Have we already allocated this literal in the main class definition?
+        if (!l.isInObject) {
+          if (words(l) == 1) {
+            ""
+          } else {
+            s"  val_t T${l.emitIndex}[] = {" + (0 until words(l)).map(emitWordRef(l, _)).reduce(_+", "+_) + "};\n"
+          }
+        } else {
+          ""
+        }
 
       case _ =>
         ""
@@ -1102,11 +1159,11 @@ class CppBackend extends Backend {
           out_h.write("  void clock_ihi" + suffix)
           out_h.write("  void clock_dhi" + suffix)
         }
+        if (generatedPrivateClockPrototypes) {
+          out_h.write(" public:\n");
+        }
         out_h.write("  void clock_lo" + clockNameStr + " ( dat_t<1> reset );\n")
         out_h.write("  void clock_hi" + clockNameStr + " ( dat_t<1> reset );\n")
-      }
-      if (generatedPrivateClockPrototypes) {
-        out_h.write(" public:\n");
       }
       out_h.write("  int clock ( dat_t<1> reset );\n")
       if (Driver.clocks.length > 1) {
@@ -1172,6 +1229,30 @@ class CppBackend extends Backend {
 
     def genInitMethod(): Int = {
       createCppFile()
+
+      // If we're putting literals in the class as static const's,
+      // generate the code to initialize them here.
+      if (multiwordLiteralInObject) {
+        // Emit code to assign static const literals.
+        def emitConstAssignment(l: Literal): String = {
+          s"const val_t ${c.name}_t::T${l.emitIndex}[] = {" + (0 until words(l)).map(emitWordRef(l, _)).reduce(_+", "+_) + "};\n"
+        }
+        var wroteAssignments = false
+        if (coalesceConstants) {
+          for ((v,l) <- constantPool) {
+            writeCppFile(emitConstAssignment(l))
+            wroteAssignments = true
+          }
+        } else {
+          for (l <- Driver.orderedNodes.filter(n => {n.isInObject && n.isInstanceOf[Literal] && words(n) > 1})) {
+            writeCppFile(emitConstAssignment(l.asInstanceOf[Literal]))
+            wroteAssignments = true
+          }
+        }
+        if (wroteAssignments) {
+          writeCppFile("\n")
+        }
+      }
       val head = "void " + c.name + "_t::init ( val_t rand_init ) {\n" +
                  "  this->__srand(rand_init);\n"
       val llf = new LineLimitedFunction("init", lineLimitFunctions, head)
@@ -1231,7 +1312,13 @@ class CppBackend extends Backend {
       val llf = new LineLimitedFunction("set_circuit_from", lineLimitFunctions, head, tail, c.name + "_t* mod_typed", "mod_typed")
       for (m <- Driver.orderedNodes) {
         if(m.name != "reset" && m.isInObject) {
-          llf.addString(emitCircuitAssign("mod_typed->", m))
+	  // Skip the circuit assign if this is a literal and we're
+	  // including literals in the objet.
+	  // The literals are declared as "static const" and will be
+          // initialized elsewhere.
+	  if (!(multiwordLiteralInObject && m.isInstanceOf[Literal])) {
+            llf.addString(emitCircuitAssign("mod_typed->", m))
+          }
         }
       }
       for (clock <- Driver.clocks) {
@@ -1566,12 +1653,16 @@ class CppBackend extends Backend {
       out_p.close();
     }
 
-    val vcd = new VcdBackend(c)
-
     ChiselError.info("populating clock domains")
     clkDomains.populate()
 
     println("CppBackend::elaborate: need " + needShadow.size + ", redundant " + (potentialShadowRegisters - needShadow.size) + " shadow registers")
+
+    // Shouldn't this be conditional on Driver.isVCD?
+    // In any case, defer it until after we've generated the "real"
+    // simulation code.
+    val vcd = new VcdBackend(c)
+
     // Generate CPP files
     ChiselError.info("generating cpp files")
 
@@ -1651,4 +1742,13 @@ class CppBackend extends Backend {
     copyToTarget("emulator.h")
   }
 
+  // If we're generating multiple functions (and hence, putting all nodes in the main object),
+  // return true if this is a node we've decided to put in the main object.
+  override def isInObject(n: Node): Boolean = {
+    if (multiwordLiteralInObject) {
+      putNodeInObject.contains(n)
+    } else {
+      false
+    }
+  }
 }
