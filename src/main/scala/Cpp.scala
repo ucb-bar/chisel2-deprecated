@@ -1595,6 +1595,59 @@ class CppBackend extends Backend {
         }
       }
 
+      // This is the opposite of LineLimitedFunctions.
+      // It collects output until a threshold is reached.
+      //
+      class CoalesceFunctions(limit: Int) {
+        var accumlation = 0
+        var accumlatedFunctionHead = ""
+        var accumlatedFunctionTail = ""
+        val separateFunctions = ArrayBuffer[String]()
+
+        def append(functionDefinition: StringBuilder) {
+          val functionHeadEnd = functionDefinition.indexOf('\n') + 1
+          val functionTailStart = functionDefinition.lastIndexOf('\n', functionDefinition.length - 1) + 1
+          val functionHead = functionDefinition.take(functionHeadEnd)
+          val functionTail = functionDefinition.takeRight(functionDefinition.length - functionTailStart)
+          val functionBody = functionDefinition.substring(functionHeadEnd, functionTailStart)
+          val nLinesApprox = functionBody.count(_ == '\n')
+
+          def newFunction() {
+            accumlation = 0
+            accumlatedFunctionHead = functionHead.toString
+            accumlatedFunctionTail = functionTail.toString
+            separateFunctions.append(accumlatedFunctionHead)
+            writeCppFile(accumlatedFunctionHead)
+          }
+
+          // Are we currently accumulating a function?
+          if (accumlatedFunctionHead == "") {
+            // We are now.
+            newFunction()
+          }
+          // Can we just merge this method in with the previous one?
+          if (accumlation + nLinesApprox > limit) {
+            // No. Time for a new method.
+            // First, close off any accumulated method ..
+            if (accumlation > 0) {
+              writeCppFile(accumlatedFunctionTail)
+              // ... and start a new one.
+              newFunction()
+            }
+          }
+          createCppFile()
+          writeCppFile(functionBody)
+          accumlation += nLinesApprox
+        }
+        
+        def done() {
+          // First, close off any accumulated method.
+          if (accumlation > 0) {
+            writeCppFile(accumlatedFunctionTail)
+          }
+        }
+      }
+ 
       def outputAllClkDomains() {
         // Are we generating partitioned islands?
         if (!partitionIslands) {
@@ -1603,56 +1656,85 @@ class CppBackend extends Backend {
             writeCppFile(out.result)
           }
         } else {
-          // Output the clock code in the correct order.
-          for (islandId <- islandOrder(0) if islandId > 0) {
-            for (out <- islandClkCode(islandId).values.map(_._1)) {
-              createCppFile()
-              writeCppFile(out.result)
-              out.clear()         // free the memory.
+          // We allow for the consolidation of the islands.
+          // Keeping them distinct causes the object to balloon in size,
+          // requiring three methods for each island.
+
+          // We need to generate a function call from the string representing its definition.
+          def methodDefinitionToCallableName(definition: String): String = {
+            val methodNameRE = new scala.util.matching.Regex("""::([^\(]+)""", "methodName")
+            val methodNameMatch = methodNameRE.findFirstMatchIn(definition)
+            methodNameMatch match {
+              case Some(m) => {
+                m.group("methodName") 
+              }
+              case _ => {
+                assert(methodNameMatch.nonEmpty, "Can't parse '%s' for method name".format(definition))
+                "?missingname?"
+              }
             }
           }
+          val accumulatedClockLos = new CoalesceFunctions(lineLimitFunctions)
+          // Output the clock code in the correct order.
+          for (islandId <- islandOrder(0) if islandId > 0) {
+            for ((clock, clkcodes) <- islandClkCode(islandId)) {
+              val clock_lo = clkcodes._1
+              accumulatedClockLos.append(clock_lo)
+              clock_lo.clear()      // free the memory
+            }
+          }
+          accumulatedClockLos.done()
+
+          // Now emit the calls on the accumulated functions from the main clock_lo method.
           for ((clock, clkcodes) <- code) {
-            val (clock_lo, clock_ihi, clock_dhi) = clkcodes
+            val clock_lo = clkcodes._1
             createCppFile()
+            // This is just the definition of the main clock_lo method.
             writeCppFile(clock_lo.result)
             clock_lo.clear()      // free the memory
-            // Output the actual calls to the island specific clock code.
-            for (islandId <- islandOrder(0) if islandId > 0) {
-              writeCppFile("\t" + c.name + "_t::clock_lo" + clkName(clock) + "_I_" + islandId + "(reset);\n")
+            // Output the actual calls to the island specific clock_lo code.
+            for (clockLoSignature <- accumulatedClockLos.separateFunctions) {
+              val clockLoName = methodDefinitionToCallableName(clockLoSignature.toString)
+              writeCppFile("\t" + c.name + "_t::" + clockLoName + "(reset);\n")
             }
             writeCppFile("}\n")
           }
 
-          // Output the island-specific clock init code
+          // Output the island-specific clock_hi init code
+          val accumulatedClockHiIs = new CoalesceFunctions(lineLimitFunctions)
           for (islandId <- islandOrder(1) if islandId > 0) {
-            for (out <- islandClkCode(islandId).values.map(_._2)) {
-              createCppFile()
-              writeCppFile(out.result)
-              out.clear()         // free the memory.
+            for (clockHiI <- islandClkCode(islandId).values.map(_._2)) {
+              accumulatedClockHiIs.append(clockHiI)
+              clockHiI.clear()         // free the memory.
             }
           }
+          accumulatedClockHiIs.done()
 
-          // Output the island-specific clock def code
+          // Output the island-specific clock_hi def code
+          val accumulatedClockHiDs = new CoalesceFunctions(lineLimitFunctions)
           for (islandId <- islandOrder(1) if islandId > 0) {
-            for (out <- islandClkCode(islandId).values.map(_._3)) {
-              createCppFile()
-              writeCppFile(out.result)
-              out.clear()         // free the memory.
+            for (clockHiID <- islandClkCode(islandId).values.map(_._3)) {
+              accumulatedClockHiDs.append(clockHiID)
+              clockHiID.clear()         // free the memory.
             }
           }
+          accumulatedClockHiDs.done()
 
-          // Output the code to call the island-specific clock hi code.
+          // Output the code to call the island-specific clock_hi (init and exec) code.
           for ((clock, clkcodes) <- code) {
-            val (clock_lo, clock_ihi, clock_dhi) = clkcodes
+            val clock_ihi = clkcodes._2
             createCppFile()
+            // This is just the definition of the main clock_hi init method.
             writeCppFile(clock_ihi.result)
             clock_ihi.clear()      // free the memory
             // Output the actual calls to the island specific clock code.
-            for (islandId <- islandOrder(1) if islandId > 0) {
-              writeCppFile("\t" + c.name + "_t::clock_ihi" + clkName(clock) + "_I_" + islandId + "(reset);\n")
+            for (clockHiISignature <- accumulatedClockHiIs.separateFunctions) {
+              val clockHiIName = methodDefinitionToCallableName(clockHiISignature.toString)
+              writeCppFile("\t" + c.name + "_t::" + clockHiIName + "(reset);\n")
             }
-            for (islandId <- islandOrder(1) if islandId > 0) {
-              writeCppFile("\t" + c.name + "_t::clock_dhi" + clkName(clock) + "_I_" + islandId + "(reset);\n")
+            for (clockHiDSignature <- accumulatedClockHiDs.separateFunctions) {
+              val clockHiDName = methodDefinitionToCallableName(clockHiDSignature.toString)
+              writeCppFile("\t" + c.name + "_t::" + clockHiDName + "(reset);\n")
             }
             writeCppFile("}\n")
           }
