@@ -83,7 +83,10 @@ class CppBackend extends Backend {
   // This is required if we're generating paritioned combinatorial islands, or we're limiting the size of functions/methods.
   val shadowRegisterInObject = Driver.shadowRegisterInObject || Driver.partitionIslands || Driver.lineLimitFunctions > 0
   // If we need to put shadow registers in the object, we also should put multi-word literals there as well.
-  val multiwordLiteralInObject = false
+  val multiwordLiteralInObject = shadowRegisterInObject
+  // Should we put unconnected inputs in the object?
+  val unconnectedInputsInObject = Driver.partitionIslands
+  val unconnectedInputs = HashSet[Node]()
   // Sets to manage allocation and generation of shadow registers
   val regWritten = HashSet[Node]()
   val needShadow = HashSet[Node]()
@@ -1283,6 +1286,13 @@ class CppBackend extends Backend {
       createCppFile()
       writeCppFile("int " + c.name + "_t::clock ( dat_t<1> reset ) {\n")
       writeCppFile("  uint32_t min = ((uint32_t)1<<31)-1;\n")
+
+      // Do we have unconnected inputs that need randomizing?
+      for (x <- unconnectedInputs) {
+          writeCppFile(block("val_t __r = this->__rand_val()" +:
+            (0 until words(x)).map(i => s"${emitWordRef(x, i)} = __r")) + trunc(x))
+      }
+
       for (clock <- Driver.clocks) {
         writeCppFile("  if (" + emitRef(clock) + "_cnt < min) min = " + emitRef(clock) +"_cnt;\n")
       }
@@ -1601,6 +1611,7 @@ class CppBackend extends Backend {
             accumlatedFunctionHead = functionDefinition.head
             accumlatedFunctionTail = functionDefinition.tail
             separateFunctions.append(functionDefinition)
+            createCppFile()
             writeCppFile(accumlatedFunctionHead)
           }
 
@@ -1619,7 +1630,6 @@ class CppBackend extends Backend {
               newFunction()
             }
           }
-          createCppFile()
           writeCppFile(functionBody)
           accumlation += nLinesApprox
         }
@@ -1823,13 +1833,18 @@ class CppBackend extends Backend {
     copyToTarget("emulator.h")
   }
 
-  // If we're putting multi-word literals in the main object),
-  // return true if this is a node we've decided to put in the main object.
+  // Return true if we want this node to be included in the main object.
+  // The Driver (and node itself) may also help determine this.
   override def isInObject(n: Node): Boolean = {
-    if (multiwordLiteralInObject) {
-      putNodeInObject.contains(n)
-    } else {
-      false
+    n match {
+      // Should we put multiword literals in the object?
+      case l: Literal if multiwordLiteralInObject && words(n) > 1 => true
+      // Should we put disconnected inputs in the object (we will generated random values for them)
+      case b: Bits if unconnectedInputsInObject && b.inputs.length == 0 => {
+        unconnectedInputs += b
+        true
+      }
+      case _ => false
     }
   }
 }
