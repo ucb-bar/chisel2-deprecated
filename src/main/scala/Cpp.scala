@@ -84,6 +84,7 @@ class CppBackend extends Backend {
   val shadowRegisterInObject = Driver.shadowRegisterInObject || Driver.partitionIslands || Driver.lineLimitFunctions > 0
   // If we need to put shadow registers in the object, we also should put multi-word literals there as well.
   val multiwordLiteralInObject = shadowRegisterInObject
+  val multiwordLiterals = HashSet[Literal]()
   // Should we put unconnected inputs in the object?
   val unconnectedInputsInObject = Driver.partitionIslands
   val unconnectedInputs = HashSet[Node]()
@@ -1253,17 +1254,20 @@ class CppBackend extends Backend {
           s"const val_t ${c.name}_t::T${l.emitIndex}[] = {" + (0 until words(l)).map(emitWordRef(l, _)).reduce(_+", "+_) + "};\n"
         }
         var wroteAssignments = false
+        // Get the literals from the constant pool (if we're using one) ...
         if (coalesceConstants) {
           for ((v,l) <- constantPool) {
             writeCppFile(emitConstAssignment(l))
             wroteAssignments = true
           }
         } else {
-          for (l <- Driver.orderedNodes.filter(n => {n.isInObject && n.isInstanceOf[Literal] && words(n) > 1})) {
-            writeCppFile(emitConstAssignment(l.asInstanceOf[Literal]))
+          // ... or get the literals from their collected usage.
+          for (l <- multiwordLiterals) {
+            writeCppFile(emitConstAssignment(l))
             wroteAssignments = true
           }
         }
+        // Add an additional newline after the assignments.
         if (wroteAssignments) {
           writeCppFile("\n")
         }
@@ -1838,7 +1842,10 @@ class CppBackend extends Backend {
   override def isInObject(n: Node): Boolean = {
     n match {
       // Should we put multiword literals in the object?
-      case l: Literal if multiwordLiteralInObject && words(n) > 1 => true
+      case l: Literal if multiwordLiteralInObject && words(n) > 1 => {
+        multiwordLiterals += l
+        true
+      }
       // Should we put disconnected inputs in the object (we will generated random values for them)
       case b: Bits if unconnectedInputsInObject && b.inputs.length == 0 => {
         unconnectedInputs += b
