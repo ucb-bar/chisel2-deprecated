@@ -83,7 +83,7 @@ class CppBackend extends Backend {
   // This is required if we're generating paritioned combinatorial islands, or we're limiting the size of functions/methods.
   val shadowRegisterInObject = Driver.shadowRegisterInObject || Driver.partitionIslands || Driver.lineLimitFunctions > 0
   // If we need to put shadow registers in the object, we also should put multi-word literals there as well.
-  val multiwordLiteralInObject = shadowRegisterInObject
+  val multiwordLiteralInObject = false
   // Sets to manage allocation and generation of shadow registers
   val regWritten = HashSet[Node]()
   val needShadow = HashSet[Node]()
@@ -115,9 +115,6 @@ class CppBackend extends Backend {
       case _: Bits if !node.isInObject && node.inputs.length == 1 =>
         emitRef(node.inputs(0))
       case _ =>
-        if (multiwordLiteralInObject) {
-          putNodeInObject += node
-        }
         super.emitRef(node)
     }
   }
@@ -139,9 +136,6 @@ class CppBackend extends Backend {
         }
       }
     case _ =>
-      if (multiwordLiteralInObject) {
-        putNodeInObject += x
-      }
       if (x.isInObject) s"${emitRef(x)}.values[${w}]"
       else if (words(x) == 1) emitRef(x)
       else s"${emitRef(x)}[${w}]"
@@ -278,9 +272,6 @@ class CppBackend extends Backend {
   }
 
   def emitDefLo(node: Node): String = {
-    if (multiwordLiteralInObject) {
-      putNodeInObject += node
-    }
     node match {
       case x: Mux =>
         val op = if (!x.inputs.exists(isLit _)) "TERNARY_1" else "TERNARY"
@@ -1832,7 +1823,7 @@ class CppBackend extends Backend {
     copyToTarget("emulator.h")
   }
 
-  // If we're generating multiple functions (and hence, putting all nodes in the main object),
+  // If we're putting multi-word literals in the main object),
   // return true if this is a node we've decided to put in the main object.
   override def isInObject(n: Node): Boolean = {
     if (multiwordLiteralInObject) {
