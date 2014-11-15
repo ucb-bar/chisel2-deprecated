@@ -322,7 +322,9 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
 
     for (a <- debugs)
       queue enqueue a
-    for ((n, io) <- wires)
+    for ((n, io) <- wires ; if io.isIo && io.dir == OUTPUT)
+      queue enqueue io
+    for (child <- children ; (n, io) <- child.wires ; if io.isIo && io.dir == INPUT)
       queue enqueue io
     if (!(defaultResetPin == null))
       queue enqueue defaultResetPin
@@ -334,7 +336,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       walked += top
       visit(top)
       top match {
-        case io: Bits if io.isIo && io.dir == INPUT =>
         case v: Vec[_] =>
           for ((n, e) <- v.flatten;
           if !(e == null) && !(walked contains e) && !e.isIo) {
@@ -360,7 +361,9 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   def dfs(visit: Node => Unit): Unit = {
     val stack = new Stack[Node]
     // initialize DFS
-    for ((n, io) <- wires)
+    for ((n, io) <- wires ; if io.isIo && io.dir == OUTPUT)
+      stack push io
+    for (child <- children ; (n, io) <- child.wires ; if io.isIo && io.dir == INPUT)
       stack push io
     if (!(defaultResetPin == null))
       stack push defaultResetPin
@@ -374,7 +377,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       walked += top
       visit(top)
       top match {
-        case io: Bits if io.isIo && io.dir == INPUT =>
         case v: Vec[_] => {
           for ((n, e) <- v.flatten;
           if !(e == null) && !(walked contains e) && !e.isIo) {
