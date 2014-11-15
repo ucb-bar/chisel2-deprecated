@@ -583,14 +583,14 @@ abstract class Backend extends FileSystemUtilities{
           val inputsMap = HashMap[Node, ArrayBuffer[Node]]()
           for (node <- consumers) inputsMap(node) = node.inputs.clone
           for (node <- consumers; if !(node == null) && io.component != node.component.parent) {
-            val inputs = inputsMap(node)
-            val i = inputs indexOf io
-            node match {
-              case bits: Bits if bits.dir == INPUT =>
-                node.inputs(i) = Binding(io, io.component.parent, io.component)
-              case _ if io.component != node.component =>
-                node.inputs(i) = Binding(io, io.component.parent, io.component)
-              case _ =>
+            for ((input, i) <- inputsMap(node).zipWithIndex ; if input == io) {
+              node match {
+                case bits: Bits if bits.dir == INPUT =>
+                  node.inputs(i) = Binding(io, io.component.parent, io.component)
+                case _ if io.component != node.component =>
+                  node.inputs(i) = Binding(io, io.component.parent, io.component)
+                case _ =>
+              }
             }
           }
         }
@@ -608,14 +608,14 @@ abstract class Backend extends FileSystemUtilities{
           val inputsMap = HashMap[Node, ArrayBuffer[Node]]()
           for (node <- consumers) inputsMap(node) = node.inputs.clone
           for (node <- consumers; if !(node == null) && io.component.parent == node.component) {
-            val inputs = inputsMap(node)
-            val i = inputs indexOf io
-            node match {
-              case bits: Bits if bits.dir == OUTPUT =>
-                if (io.inputs.length > 0) node.inputs(i) = io.inputs(0)
-              case _ if !node.isIo =>
-                if (io.inputs.length > 0) node.inputs(i) = io.inputs(0)
-              case _ =>
+            for ((input, i) <- inputsMap(node).zipWithIndex ; if input == io) {
+              node match {
+                case bits: Bits if bits.dir == OUTPUT =>
+                  if (io.inputs.length > 0) node.inputs(i) = io.inputs(0)
+                case _ if !node.isIo =>
+                  if (io.inputs.length > 0) node.inputs(i) = io.inputs(0)
+                case _ =>
+              }
             }
           }
         }
