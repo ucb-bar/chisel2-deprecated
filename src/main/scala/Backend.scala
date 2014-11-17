@@ -546,7 +546,7 @@ abstract class Backend extends FileSystemUtilities{
       // If this a UInt literal, generate a Chisel error.
       // Issue #168 - lit as port breaks chisel
       if (x.isTypeNode) {
-        ChiselError.error("Real node required here, but 'type' node found", x.line)
+        ChiselError.error("Real node required here, but 'type' node found - did you neglect to insert a node with a direction?", x.line)
       }
       count += 1
       for (i <- 0 until x.inputs.length)
