@@ -63,7 +63,7 @@ object CString {
 }
 
 class CppBackend extends Backend {
-  val keywords = new HashSet[String]();
+  val keywords = Set[String]()
   private var hasPrintfs = false
   val unoptimizedFiles = HashSet[String]()
   val onceOnlyFiles = HashSet[String]()

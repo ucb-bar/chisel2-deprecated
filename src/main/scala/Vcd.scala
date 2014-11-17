@@ -38,7 +38,7 @@ import scala.collection.mutable.HashSet
 import scala.collection.mutable.ArrayBuffer
 
 class VcdBackend(top: Module) extends Backend {
-  val keywords = new HashSet[String]()
+  val keywords = Set[String]()
 
   override def emitTmp(node: Node): String =
     emitRef(node)
