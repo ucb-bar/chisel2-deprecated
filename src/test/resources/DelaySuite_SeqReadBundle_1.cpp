@@ -18,7 +18,7 @@ mod_t* DelaySuite_SeqReadBundle_1_t::clone() {
   mod_t* cloned = new DelaySuite_SeqReadBundle_1_t(*this);
   return cloned;
 }
-bool DelaySuite_SeqReadBundle_1_t::set_circuit_from(mod_t* src) {
+bool DelaySuite_SeqReadBundle_1_t::set_circuit_from ( mod_t* src ) {
   DelaySuite_SeqReadBundle_1_t* mod_typed = dynamic_cast<DelaySuite_SeqReadBundle_1_t*>(src);
   assert(mod_typed);
   DelaySuite_SeqReadBundle_1__io_out_1_a_a = mod_typed->DelaySuite_SeqReadBundle_1__io_out_1_a_a;
@@ -49,9 +49,9 @@ void DelaySuite_SeqReadBundle_1_t::print ( FILE* f ) {
 }
 void DelaySuite_SeqReadBundle_1_t::print ( std::ostream& s ) {
 }
-void DelaySuite_SeqReadBundle_1_t::dump_init(FILE *f) {
+void DelaySuite_SeqReadBundle_1_t::dump_init ( FILE* f ) {
 }
-void DelaySuite_SeqReadBundle_1_t::dump(FILE *f, int t) {
+void DelaySuite_SeqReadBundle_1_t::dump ( FILE* f, int t ) {
 }
 void DelaySuite_SeqReadBundle_1_t::clock_lo ( dat_t<1> reset ) {
   val_t T3[2];
@@ -98,7 +98,7 @@ void DelaySuite_SeqReadBundle_1_t::clock_hi ( dat_t<1> reset ) {
   { if (DelaySuite_SeqReadBundle_1__io_wen.values[0]) DelaySuite_SeqReadBundle_1__mem.put(DelaySuite_SeqReadBundle_1__io_waddr.values[0], 0, T2.values[0]); if (DelaySuite_SeqReadBundle_1__io_wen.values[0]) DelaySuite_SeqReadBundle_1__mem.put(DelaySuite_SeqReadBundle_1__io_waddr.values[0], 1, T2.values[1]);}
   R1 = T0;
 }
-void DelaySuite_SeqReadBundle_1_api_t::init_mapping_table() {
+void DelaySuite_SeqReadBundle_1_api_t::init_mapping_table (  ) {
   dat_table.clear();
   mem_table.clear();
   DelaySuite_SeqReadBundle_1_t* mod_typed = dynamic_cast<DelaySuite_SeqReadBundle_1_t*>(module);

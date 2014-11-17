@@ -16,7 +16,7 @@ mod_t* VerifSuite_CppPrintfComp_1_t::clone() {
   mod_t* cloned = new VerifSuite_CppPrintfComp_1_t(*this);
   return cloned;
 }
-bool VerifSuite_CppPrintfComp_1_t::set_circuit_from(mod_t* src) {
+bool VerifSuite_CppPrintfComp_1_t::set_circuit_from ( mod_t* src ) {
   VerifSuite_CppPrintfComp_1_t* mod_typed = dynamic_cast<VerifSuite_CppPrintfComp_1_t*>(src);
   assert(mod_typed);
   VerifSuite_CppPrintfComp_1__io_y = mod_typed->VerifSuite_CppPrintfComp_1__io_y;
@@ -42,9 +42,9 @@ void VerifSuite_CppPrintfComp_1_t::print ( std::ostream& s ) {
 #endif
 s.flush();
 }
-void VerifSuite_CppPrintfComp_1_t::dump_init(FILE *f) {
+void VerifSuite_CppPrintfComp_1_t::dump_init ( FILE* f ) {
 }
-void VerifSuite_CppPrintfComp_1_t::dump(FILE *f, int t) {
+void VerifSuite_CppPrintfComp_1_t::dump ( FILE* f, int t ) {
 }
 void VerifSuite_CppPrintfComp_1_t::clock_lo ( dat_t<1> reset ) {
   val_t T0;
@@ -56,7 +56,7 @@ void VerifSuite_CppPrintfComp_1_t::clock_lo ( dat_t<1> reset ) {
 }
 void VerifSuite_CppPrintfComp_1_t::clock_hi ( dat_t<1> reset ) {
 }
-void VerifSuite_CppPrintfComp_1_api_t::init_mapping_table() {
+void VerifSuite_CppPrintfComp_1_api_t::init_mapping_table (  ) {
   dat_table.clear();
   mem_table.clear();
   VerifSuite_CppPrintfComp_1_t* mod_typed = dynamic_cast<VerifSuite_CppPrintfComp_1_t*>(module);

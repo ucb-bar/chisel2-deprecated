@@ -276,7 +276,8 @@ abstract class Node extends nameable {
     (isIo && (Driver.isIoDebug || component == Driver.topComponent)) ||
     Driver.topComponent.debugs.contains(this) ||
     isReg || isUsedByClockHi || Driver.isDebug && named ||
-    Driver.emitTempNodes
+    Driver.emitTempNodes ||
+    Driver.backend.isInObject(this)
 
   lazy val isInVCD: Boolean = name != "reset" && needWidth() > 0 &&
      (named || Driver.emitTempNodes) &&
