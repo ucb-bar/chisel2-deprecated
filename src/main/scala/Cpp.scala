@@ -235,7 +235,7 @@ class CppBackend extends Backend {
   def words(node: Node): Int = (node.needWidth() - 1) / bpw + 1
   def fullWords(node: Node): Int = node.needWidth()/bpw
   def emitLoWordRef(node: Node): String = emitWordRef(node, 0)
-  // If we're generating multiple functions, literals and temporaries have to live in the main object.
+  // If we're generating multiple methods, literals and temporaries have to live in the main object.
   // We only get to ask isInObject once, so we'd better arrange for it to give the correct answer before we ask.
   def emitTmpDec(node: Node): String = {
     if (node.isInObject) {
@@ -1018,7 +1018,7 @@ class CppBackend extends Backend {
     // Define some classes to help us deal with C++ methods.
     type CType = String
     case class CTypedName(ctype: CType, name: String)
-    case class CFunction(name: CTypedName, arguments: Array[CTypedName] = Array[CTypedName](), cclass: String = c.name + "_t") {
+    case class CMethod(name: CTypedName, arguments: Array[CTypedName] = Array[CTypedName](), cclass: String = c.name + "_t") {
       val body = new StringBuilder
       val argumentList = arguments.map(a => "%s %s".format(a.ctype, a.name)).mkString(", ")
       val callArgs = arguments.map(_.name).mkString(", ")
@@ -1028,21 +1028,21 @@ class CppBackend extends Backend {
       val prototype = "%s %s( %s );\n".format(name.ctype, name.name, argumentList)
     }
     
-    // Split a large function up into a series of calls to smaller functions.
+    // Split a large method up into a series of calls to smaller methods.
     // We assume the following:
     //  - all state is maintained in the class object (there is no local state
     //    manipulated by individual instructions).
-    // The functionCodePrefix and functionCodeSuffix are lines to be emitted once,
-    // in the top level function.
-    class LineLimitedFunction(function: CFunction, functionCodePrefix: String = "", functionCodeSuffix: String = "", subCallArgs: Array[CTypedName] = Array[CTypedName]()) {
+    // The methodCodePrefix and methodCodeSuffix are lines to be emitted once,
+    // in the top level method.
+    class LineLimitedMethod(method: CMethod, methodCodePrefix: String = "", methodCodeSuffix: String = "", subCallArgs: Array[CTypedName] = Array[CTypedName]()) {
       var bodyLines = 0
       val body = new StringBuilder
       val bodies = new scala.collection.mutable.Queue[String]
       val maxLines = lineLimitFunctions
       val callArgs = subCallArgs.map(_.name).mkString(", ")
       val subArgList = subCallArgs.map(a => "%s %s".format(a.ctype, a.name)).mkString(", ")
-      private def functionName(i: Int): String = {
-        function.name.name + "_" + i.toString
+      private def methodName(i: Int): String = {
+        method.name.name + "_" + i.toString
       }
       private def newBody() {
         if (body.length > 0) {
@@ -1066,8 +1066,8 @@ class CppBackend extends Backend {
       def genCalls() {
         var offset = 0
         while (bodies.length > offset) {
-          val functionCall = functionName(offset) + "(" + callArgs + ");\n"
-          addString(functionCall)
+          val methodCall = methodName(offset) + "(" + callArgs + ");\n"
+          addString(methodCall)
           offset += 1
         }
       }
@@ -1082,23 +1082,23 @@ class CppBackend extends Backend {
       def getBodies(): String = {
         val bodycalls = new StringBuilder
         bodies.length match {
-          case 0 => bodycalls.append(function.head + functionCodePrefix + functionCodeSuffix + function.tail)
+          case 0 => bodycalls.append(method.head + methodCodePrefix + methodCodeSuffix + method.tail)
           case 1 => {
-            bodycalls.append(function.head + functionCodePrefix)
+            bodycalls.append(method.head + methodCodePrefix)
             bodycalls.append(bodies.dequeue())
-            bodycalls.append(functionCodeSuffix + function.tail)
+            bodycalls.append(methodCodeSuffix + method.tail)
           }
           case _ => {
             for (i <- 0 until bodies.length - 1) {
-              // If we want the subfunctions to return something other than "void",
+              // If we want the submethods to return something other than "void",
               // we'll need to generate code to deal with that.
-              bodycalls.append("void %s::%s(%s) {\n".format(function.cclass, functionName(i), subArgList))
+              bodycalls.append("void %s::%s(%s) {\n".format(method.cclass, methodName(i), subArgList))
               bodycalls.append(bodies.dequeue())
               bodycalls.append("}\n")
             }
-            bodycalls.append(function.head + functionCodePrefix)
+            bodycalls.append(method.head + methodCodePrefix)
             bodycalls.append(bodies.dequeue())
-            bodycalls.append(functionCodeSuffix + function.tail)
+            bodycalls.append(methodCodeSuffix + method.tail)
           }
         }
         bodycalls.result
@@ -1270,18 +1270,18 @@ class CppBackend extends Backend {
           writeCppFile("\n")
         }
       }
-      val method = CFunction(CTypedName("void", "init"), Array[CTypedName](CTypedName("val_t", "rand_init")))
-      val llf = new LineLimitedFunction(method, "  this->__srand(rand_init);\n")
+      val method = CMethod(CTypedName("void", "init"), Array[CTypedName](CTypedName("val_t", "rand_init")))
+      val llm = new LineLimitedMethod(method, "  this->__srand(rand_init);\n")
       for (m <- Driver.orderedNodes) {
-        llf.addString(emitInit(m))
+        llm.addString(emitInit(m))
       }
       for (clock <- Driver.clocks) {
-        llf.addString(emitInit(clock))
+        llm.addString(emitInit(clock))
       }
-      llf.done()
-      val nFunctions = llf.bodies.length
-      writeCppFile(llf.getBodies)
-      nFunctions
+      llm.done()
+      val nMethods = llm.bodies.length
+      writeCppFile(llm.getBodies)
+      nMethods
     }
 
     def genClockMethod() {
@@ -1331,8 +1331,8 @@ class CppBackend extends Backend {
       val codePrefix = s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(src);\n" +
                  s"  assert(mod_typed);\n"
       val codeSuffix = "  return true;\n"
-      val method = CFunction(CTypedName("bool", "set_circuit_from"), Array[CTypedName](CTypedName("mod_t*", "src")))
-      val llf = new LineLimitedFunction(method, codePrefix, codeSuffix, Array[CTypedName](CTypedName(s"${c.name}_t*", "mod_typed")))
+      val method = CMethod(CTypedName("bool", "set_circuit_from"), Array[CTypedName](CTypedName("mod_t*", "src")))
+      val llm = new LineLimitedMethod(method, codePrefix, codeSuffix, Array[CTypedName](CTypedName(s"${c.name}_t*", "mod_typed")))
       for (m <- Driver.orderedNodes) {
         if(m.name != "reset" && m.isInObject) {
 	  // Skip the circuit assign if this is a literal and we're
@@ -1340,17 +1340,17 @@ class CppBackend extends Backend {
 	  // The literals are declared as "static const" and will be
           // initialized elsewhere.
 	  if (!(multiwordLiteralInObject && m.isInstanceOf[Literal])) {
-            llf.addString(emitCircuitAssign("mod_typed->", m))
+            llm.addString(emitCircuitAssign("mod_typed->", m))
           }
         }
       }
       for (clock <- Driver.clocks) {
-        llf.addString(emitCircuitAssign("mod_typed->", clock))
+        llm.addString(emitCircuitAssign("mod_typed->", clock))
       }
-      llf.done()
-      val nFunctions = llf.bodies.length
-      writeCppFile(llf.getBodies)
-      nFunctions
+      llm.done()
+      val nMethods = llm.bodies.length
+      writeCppFile(llm.getBodies)
+      nMethods
     }
 
     // For backwards compatibility, output both stream and FILE-based code.
@@ -1389,40 +1389,40 @@ class CppBackend extends Backend {
 
     def genDumpInitMethod(vcd: VcdBackend): Int = {
       createCppFile()
-      val method = CFunction(CTypedName("void", "dump_init"), Array[CTypedName](CTypedName("FILE*", "f")))
-      val llf = new LineLimitedFunction(method, "", "", Array[CTypedName](CTypedName("FILE*", "f")))
-      vcd.dumpVCDInit(llf.addString)
-      llf.done()
-      val nFunctions = llf.bodies.length
-      writeCppFile(llf.getBodies)
-      nFunctions
+      val method = CMethod(CTypedName("void", "dump_init"), Array[CTypedName](CTypedName("FILE*", "f")))
+      val llm = new LineLimitedMethod(method, "", "", Array[CTypedName](CTypedName("FILE*", "f")))
+      vcd.dumpVCDInit(llm.addString)
+      llm.done()
+      val nMethods = llm.bodies.length
+      writeCppFile(llm.getBodies)
+      nMethods
     }
 
     def genDumpMethod(vcd: VcdBackend): Int = {
-      val method = CFunction(CTypedName("void", "dump"), Array[CTypedName](CTypedName("FILE*", "f"), CTypedName("int", "t")))
+      val method = CMethod(CTypedName("void", "dump"), Array[CTypedName](CTypedName("FILE*", "f"), CTypedName("int", "t")))
       createCppFile()
       // Are we actually generating VCD?
       if (Driver.isVCD) {
-        // Yes. dump is a real function.
+        // Yes. dump is a real method.
         val codePrefix = "  if (t == 0) return dump_init(f);\n" +
                 "  fprintf(f, \"#%d\\n\", t);\n"
-        // Are we generating a large dump function with gotos? (i.e., not inline)
+        // Are we generating a large dump method with gotos? (i.e., not inline)
         if (Driver.isVCDinline) {
-          val llf = new LineLimitedFunction(method, codePrefix, "", Array[CTypedName](CTypedName("FILE*", "f")))
-          vcd.dumpVCD(llf.addString)
-          llf.done()
-          val nFunctions = llf.bodies.length
-          writeCppFile(llf.getBodies)
-          nFunctions
+          val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName("FILE*", "f")))
+          vcd.dumpVCD(llm.addString)
+          llm.done()
+          val nMethods = llm.bodies.length
+          writeCppFile(llm.getBodies)
+          nMethods
         } else {
-          // We're creating a VCD dump function with gotos.
+          // We're creating a VCD dump method with gotos.
           writeCppFile(method.head + codePrefix)
           vcd.dumpVCD(writeCppFile)
           writeCppFile(method.tail)
           1
         }
       } else {
-        // No. Just generate the dummy (nop) function.
+        // No. Just generate the dummy (nop) method.
         writeCppFile(method.head + method.tail)
         1
       }
@@ -1430,27 +1430,27 @@ class CppBackend extends Backend {
 
     def genInitMappingTableMethod(mappings: ArrayBuffer[Tuple2[String, Node]]): Int = {
       createCppFile()
-      val method = CFunction(CTypedName("void", "init_mapping_table"), Array[CTypedName](), s"${c.name}_api_t")
+      val method = CMethod(CTypedName("void", "init_mapping_table"), Array[CTypedName](), s"${c.name}_api_t")
       val codePrefix = s"  dat_table.clear();\n" +
                  s"  mem_table.clear();\n" +
                  s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(module);\n" +
                  s"  assert(mod_typed);\n"
-      val llf = new LineLimitedFunction(method, codePrefix, "", Array[CTypedName](CTypedName(s"${c.name}_t*", "mod_typed")))
+      val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName(s"${c.name}_t*", "mod_typed")))
       for (m <- mappings) {
         if (m._2.name != "reset" && (m._2.isInObject || m._2.isInVCD)) {
-          llf.addString(emitMapping(m))
+          llm.addString(emitMapping(m))
         }
       }
-      llf.done()
-      val nFunctions = llf.bodies.length
-      writeCppFile(llf.getBodies)
+      llm.done()
+      val nMethods = llm.bodies.length
+      writeCppFile(llm.getBodies)
 
       // Add the init_mapping_table file to the list of unoptimized files.
       if (compileInitializationUnoptimized) {
         val trimLength = ".cpp".length()
         unoptimizedFiles += out_cpps.last.name.dropRight(trimLength)
       }
-      nFunctions
+      nMethods
     }
 
     println("CPP elaborate")
@@ -1483,7 +1483,7 @@ class CppBackend extends Backend {
     val nodeToIslandArray = generateNodeToIslandArray(islands)
 
     class ClockDomains {
-      type ClockCodeMethods = HashMap[Clock, (CFunction, CFunction, CFunction)]
+      type ClockCodeMethods = HashMap[Clock, (CMethod, CMethod, CMethod)]
       val code = new ClockCodeMethods
       val islandClkCode = new HashMap[Int, ClockCodeMethods]
       val islandStarted = Array.fill(3, maxIslandId + 1)(0)    // An array to keep track of the first time we added code to an island.
@@ -1495,14 +1495,14 @@ class CppBackend extends Backend {
         // All clock methods take the same arguments and return void.
         val clockArgs = Array[CTypedName](CTypedName("dat_t<1>", "reset"))
         val clockLoName = "clock_lo" + clkName(clock)
-        val clock_dlo = new CFunction(CTypedName("void", clockLoName), clockArgs)
+        val clock_dlo = new CMethod(CTypedName("void", clockLoName), clockArgs)
         val clockHiName = "clock_hi" + clkName(clock)
-        val clock_ihi = new CFunction(CTypedName("void", clockHiName), clockArgs)
+        val clock_ihi = new CMethod(CTypedName("void", clockHiName), clockArgs)
         // For simplicity, we define a dummy method for the clock_hi exec code.
         // We won't actually call such a  method - its code will be inserted into the
         // clock_hi method after all the clock_hi initialization code.
         val clockHiDummyName = "clock_hi_dummy" + clkName(clock)
-        val clock_xhi = new CFunction(CTypedName("void", clockHiDummyName), clockArgs)
+        val clock_xhi = new CMethod(CTypedName("void", clockHiDummyName), clockArgs)
         code += (clock -> ((clock_dlo, clock_ihi, clock_xhi)))
         // If we're generating islands of combinational logic,
         // have the main clock code call the island specific code,
@@ -1515,13 +1515,13 @@ class CppBackend extends Backend {
               islandClkCode += ((islandId, new ClockCodeMethods))
             }
             val clockLoName = "clock_lo" + clkName(clock) + "_I_" + islandId
-            val clock_dlo_I = new CFunction(CTypedName("void", clockLoName), clockArgs)
+            val clock_dlo_I = new CMethod(CTypedName("void", clockLoName), clockArgs)
             // Unlike the unpartitioned case, we will generate and call separate
             // initialize and execute clock_hi methods if we're partitioning.
             val clockIHiName = "clock_ihi" + clkName(clock) + "_I_" + islandId
-            val clock_ihi_I = new CFunction(CTypedName("void", clockIHiName), clockArgs)
+            val clock_ihi_I = new CMethod(CTypedName("void", clockIHiName), clockArgs)
             val clockXHiName = "clock_xhi" + clkName(clock) + "_I_" + islandId
-            val clock_xhi_I = new CFunction(CTypedName("void", clockXHiName), clockArgs)
+            val clock_xhi_I = new CMethod(CTypedName("void", clockXHiName), clockArgs)
             islandClkCode(islandId) += (clock -> ((clock_dlo_I, clock_ihi_I, clock_xhi_I)))
           }
         }
@@ -1558,7 +1558,7 @@ class CppBackend extends Backend {
 
         // Are we generating partitioned islands?
         if (!partitionIslands) {
-          // No. Generate and output single, monolithic functions.
+          // No. Generate and output single, monolithic methods.
           for (m <- Driver.orderedNodes) {
             addClkDefs(m, code)
           }
@@ -1596,50 +1596,50 @@ class CppBackend extends Backend {
         }
       }
 
-      // This is the opposite of LineLimitedFunctions.
+      // This is the opposite of LineLimitedMethods.
       // It collects output until a threshold is reached.
-      class CoalesceFunctions(limit: Int) {
+      class CoalesceMethods(limit: Int) {
         var accumlation = 0
-        var accumlatedFunctionHead = ""
-        var accumlatedFunctionTail = ""
-        val separateFunctions = ArrayBuffer[CFunction]()
+        var accumlatedMethodHead = ""
+        var accumlatedMethodTail = ""
+        val separateMethods = ArrayBuffer[CMethod]()
 
-        def append(functionDefinition: CFunction) {
-          val functionBody = functionDefinition.body.toString
-          val nLinesApprox = functionBody.count(_ == '\n')
+        def append(methodDefinition: CMethod) {
+          val methodBody = methodDefinition.body.toString
+          val nLinesApprox = methodBody.count(_ == '\n')
 
-          def newFunction() {
+          def newMethod() {
             accumlation = 0
-            accumlatedFunctionHead = functionDefinition.head
-            accumlatedFunctionTail = functionDefinition.tail
-            separateFunctions.append(functionDefinition)
+            accumlatedMethodHead = methodDefinition.head
+            accumlatedMethodTail = methodDefinition.tail
+            separateMethods.append(methodDefinition)
             createCppFile()
-            writeCppFile(accumlatedFunctionHead)
+            writeCppFile(accumlatedMethodHead)
           }
 
-          // Are we currently accumulating a function?
-          if (accumlatedFunctionHead == "") {
+          // Are we currently accumulating a method?
+          if (accumlatedMethodHead == "") {
             // We are now.
-            newFunction()
+            newMethod()
           }
           // Can we just merge this method in with the previous one?
           if (accumlation + nLinesApprox > limit) {
             // No. Time for a new method.
             // First, close off any accumulated method ..
             if (accumlation > 0) {
-              writeCppFile(accumlatedFunctionTail)
+              writeCppFile(accumlatedMethodTail)
               // ... and start a new one.
-              newFunction()
+              newMethod()
             }
           }
-          writeCppFile(functionBody)
+          writeCppFile(methodBody)
           accumlation += nLinesApprox
         }
         
         def done() {
           // First, close off any accumulated method.
           if (accumlation > 0) {
-            writeCppFile(accumlatedFunctionTail)
+            writeCppFile(accumlatedMethodTail)
           }
         }
       }
@@ -1665,7 +1665,7 @@ class CppBackend extends Backend {
           // Keeping them distinct causes the object to balloon in size,
           // requiring three methods for each island.
 
-          val accumulatedClockLos = new CoalesceFunctions(lineLimitFunctions)
+          val accumulatedClockLos = new CoalesceMethods(lineLimitFunctions)
           // Output the clock code in the correct order.
           for (islandId <- islandOrder(0) if islandId > 0) {
             for ((clock, clkcodes) <- islandClkCode(islandId)) {
@@ -1676,21 +1676,21 @@ class CppBackend extends Backend {
           }
           accumulatedClockLos.done()
 
-          // Now emit the calls on the accumulated functions from the main clock_lo method.
+          // Now emit the calls on the accumulated methods from the main clock_lo method.
           for ((clock, clkcodes) <- code) {
             val clock_lo = clkcodes._1
             createCppFile()
             // This is just the definition of the main clock_lo method.
             writeCppFile(clock_lo.head)
             // Output the actual calls to the island specific clock_lo code.
-            for (clockLoMethod <- accumulatedClockLos.separateFunctions) {
+            for (clockLoMethod <- accumulatedClockLos.separateMethods) {
               writeCppFile("\t" + clockLoMethod.genCall)
             }
             writeCppFile("}\n")
           }
 
           // Output the island-specific clock_hi init code
-          val accumulatedClockHiIs = new CoalesceFunctions(lineLimitFunctions)
+          val accumulatedClockHiIs = new CoalesceMethods(lineLimitFunctions)
           for (islandId <- islandOrder(1) if islandId > 0) {
             for (clockHiI <- islandClkCode(islandId).values.map(_._2)) {
               accumulatedClockHiIs.append(clockHiI)
@@ -1700,7 +1700,7 @@ class CppBackend extends Backend {
           accumulatedClockHiIs.done()
 
           // Output the island-specific clock_hi def code
-          val accumulatedClockHiXs = new CoalesceFunctions(lineLimitFunctions)
+          val accumulatedClockHiXs = new CoalesceMethods(lineLimitFunctions)
           for (islandId <- islandOrder(1) if islandId > 0) {
             for (clockHiX <- islandClkCode(islandId).values.map(_._3)) {
               accumulatedClockHiXs.append(clockHiX)
@@ -1717,19 +1717,19 @@ class CppBackend extends Backend {
             // This is just the definition of the main clock_hi init method.
             writeCppFile(clock_ihi.head)
             // Output the actual calls to the island specific clock code.
-            for (method <- accumulatedClockHiIs.separateFunctions) {
+            for (method <- accumulatedClockHiIs.separateMethods) {
               writeCppFile("\t" + method.genCall)
             }
-            for (method <- accumulatedClockHiXs.separateFunctions) {
+            for (method <- accumulatedClockHiXs.separateMethods) {
               writeCppFile("\t" + method.genCall)
             }
             writeCppFile(clock_xhi.tail)
           }
           
-          // Put the accumulated function definitions where the header
+          // Put the accumulated method definitions where the header
           // generation code can find them.
-          for( function <- accumulatedClockLos.separateFunctions ++ accumulatedClockHiIs.separateFunctions ++ accumulatedClockHiXs.separateFunctions) {
-            clockPrototypes += function.prototype
+          for( method <- accumulatedClockLos.separateMethods ++ accumulatedClockHiIs.separateMethods ++ accumulatedClockHiXs.separateMethods) {
+            clockPrototypes += method.prototype
           }
         }
       }
@@ -1762,18 +1762,18 @@ class CppBackend extends Backend {
     // generate init block
     val nInitMethods = genInitMethod()
 
-    // generate clock(...) function
+    // generate clock(...) method
     genClockMethod()
 
     advanceCppFile()
-    // generate clone() function
+    // generate clone() method
     genCloneMethod()
 
     advanceCppFile()
-    // generate set_circuit_from function
+    // generate set_circuit_from method
     val nSetCircuitFromMethods = genSetCircuitFromMethod()
 
-    // generate print(...) function.
+    // generate print(...) method.
     // This will probably end up in the same file as the above clone code.
     genPrintMethod()
 
@@ -1784,7 +1784,7 @@ class CppBackend extends Backend {
     val nDumpMethods = genDumpMethod(vcd)
 
     out_cpps.foreach(_.fileWriter.flush())
-    // If we're compiling initialization functions -O0, add the current files
+    // If we're compiling initialization methods -O0, add the current files
     //  to the unoptimized file list.
     //  We strip off the trailing ".cpp" to facilitate creating both ".cpp" and ".o" files.
     if (compileInitializationUnoptimized) {
@@ -1796,7 +1796,7 @@ class CppBackend extends Backend {
     clkDomains.outputAllClkDomains()
 
     advanceCppFile()
-    // Generate API functions
+    // Generate API methods
     val nInitMappingTableMethods = genInitMappingTableMethod(mappings)
 
     // Finally, generate the header - once we know how many methods we'll have.
