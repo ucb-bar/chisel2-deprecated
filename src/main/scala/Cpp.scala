@@ -92,8 +92,6 @@ class CppBackend extends Backend {
   val regWritten = HashSet[Node]()
   val needShadow = HashSet[Node]()
   val allocatedShadow = HashSet[Node]()
-  // List containing nodes we've decided to put in the "object"
-  val putNodeInObject = HashSet[Node]()
 
   var potentialShadowRegisters = 0
   val allocateOnlyNeededShadowRegisters = Driver.allocateOnlyNeededShadowRegisters
