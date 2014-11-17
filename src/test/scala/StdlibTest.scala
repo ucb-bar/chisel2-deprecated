@@ -828,4 +828,24 @@ try {
       "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
       () => Module(new LitAddSub())) {m => new LitAddSubTester(m)}
   }
+
+  /** Test for issue #168 - lit as port breaks chisel
+   *
+   */
+  @Test def testLitAsPort () {
+    println("\ntestLitAsPort ...")
+    try {
+      class LitAsPort extends Module {
+        val io = new Bundle {
+          val s2 = Bits(12)
+        }
+      }
+      chiselMain(Array("--backend", "c",
+        "--targetDir", dir.getPath.toString()),
+        () => Module(new LitAsPort()))
+    } catch {
+      case e : java.lang.IllegalStateException => {}
+    }
+    assertTrue(!ChiselError.ChiselErrors.isEmpty);
+  }
 }

@@ -543,7 +543,11 @@ abstract class Backend extends FileSystemUtilities{
   def removeTypeNodes(mod: Module) = {
     var count = 0
     Driver.bfs {x =>
-      scala.Predef.assert(!x.isTypeNode)
+      // If this a UInt literal, generate a Chisel error.
+      // Issue #168 - lit as port breaks chisel
+      if (x.isTypeNode) {
+        ChiselError.error("Real node required here, but 'type' node found - did you neglect to insert a node with a direction?", x.line)
+      }
       count += 1
       for (i <- 0 until x.inputs.length)
         if (x.inputs(i) != null && x.inputs(i).isTypeNode) {
