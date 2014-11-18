@@ -155,10 +155,14 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
   }
 
   override def flatten: Array[(String, Bits)] = {
-    val res = new ArrayBuffer[(String, Bits)]
-    for (elm <- self.reverse)
-      res ++= elm.flatten
-    res.toArray
+    // Todo: why reverse?
+    (self.zipWithIndex.reverse foldLeft Array[(String, Bits)]()){(res, x) => 
+      val (elm, idx) = x
+      res ++ (if (elm.name != "") elm.flatten else elm match {
+        case b: Bits => Array((idx.toString, b))
+        case _ => elm.flatten map (x => (idx.toString + "_" + x._1, x._2))
+      })
+    }
   }
 
   override def <>(src: Node) {

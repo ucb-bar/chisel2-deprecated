@@ -38,7 +38,7 @@ import scala.collection.mutable.ArrayBuffer
 import PartitionIslands._
 
 class DotBackend extends Backend {
-  val keywords = new HashSet[String]();
+  val keywords = Set[String]()
   var islands = Array[Island]()
   val allDottable = false
   val useComponentNames = false
