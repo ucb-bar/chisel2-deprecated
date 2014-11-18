@@ -1,19 +1,27 @@
-ChangeLog for Chisel v2.2.19 10/3/14
+ChangeLog for Chisel v2.2.20 11/18/14
 
-#76  Width inference takes hours, needs to quickly detect and throw error on un-inferable code 
-#83  log2Up(1) returns 1, instead of the correct answer of 0
-#86  Queue is generating incorrect code; io.deq signals don't match io.enq signals. 
-#124 zero width wire support
-#176 Re-enable testEqlBundle() and testEqlVec() after inserting explicit toBits comversion.
-#209 Queue is generating incorrect code; io.deq signals don't match io.enq signals. 
-#247 Vec getWidth return zero
-#248,249 Update ShiftRegister to support a parameterized delay of 0.
-#251 make assertions an option in driver
-#257 initialize register that guards reset for assert checking
-#259 C++ compilation speedups
-#263 No Explicit Error When Writing To Your Inputs 
-
-      Support poking negative numbers.
-      Add "tolerant" Float expect - accept single bit differences between expected and returned values.
-      Changed default behavior for Parameter.empty to throw ParameterUndefinedException and KnobUndefinedException
+#94 printf being discarded during elaboration
+#153 nameIt is way too eager, needs to chill out
+#168 lit as port breaks chisel - flag it as a ChiselError
+#196 README Instructions don't let to a working HelloWorld 
+#209 enerated Verilog repeated wire names (Verilog backend)
+#286 Width Inference Issue (width of operations on literals)
+#290 Register with custom clock for a bundle generate wrong verilog
+#292 Vcd varName,stripComponent code emits invalid variable IDs
+#295 Bundle.calcElements calculates too many
+#298 Printf() doesn't since the switch to the new Tester
+#300 Generated cpp files lack Config substring (C++ backend)
+#319 --parallelMakeJobs doesn't understand --targetDir
+#321 Support poking large numbers - extension of #318
+     Vtests: fix step
+     Deleted unused ModularCpp backend before more bitrot sets in.
+     Cosmetic/scalastyle fixes - no functional changes.
+     Add support for a constant pool (C++ backend)
+     Add hasSRAM & sramMaxSize for custom transforms
+     Fix naming problems when adding modules in custom transforms
+     Parametrization in custom transforms
+     Fix a binding problem
+     Fixes to --partitionIslands
+     Small changes in parameterization
+     Added "in" operator that can be used when defining constraints. Currently only works for List[Int], Range, and List[Chisel.IntEx]
 
