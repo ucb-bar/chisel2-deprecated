@@ -694,8 +694,14 @@ class CppBackend extends Backend {
 
   // If we write a register node before we use its inputs, we need to shadow it.
   def determineRequiredShadowRegisters(node: Node) {
-    if (node.isInstanceOf[Reg]) {
-      regWritten += node
+    node match {
+      case reg: Reg => {
+        regWritten += node
+        if (reg.next.isReg) {
+          needShadow += node
+        }
+      }
+      case _ => {}
     }
     for (n <- node.inputs if regWritten.contains(n)) {
       needShadow += n
