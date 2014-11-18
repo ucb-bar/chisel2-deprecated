@@ -63,7 +63,7 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
   /** Populates the cache of elements declared in the Bundle. */
   private def calcElements(view: Seq[String]) = {
     val c      = getClass
-    var elts   = ArrayBuffer[(String, Data)]() 
+    var elts   = LinkedHashMap[String, Data]() 
     val seen   = HashSet[Object]()
     for (m <- c.getMethods.sortWith(
       (x, y) => (x.getName < y.getName)
@@ -83,9 +83,7 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
         val obj = m invoke this
         if(!(seen contains obj)) {
           obj match {
-            case d: Data => {
-              elts += ((name, d))
-            }
+            case d: Data => elts(name) = d
             case any =>
           }
           seen += obj
@@ -138,15 +136,9 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
     elements foreach (_._2.removeTypeNodes)
   }
 
-  def contains(name: String): Boolean = elements exists (_._1 == name)
+  def contains(name: String): Boolean = elements contains name 
 
-  override def apply(name: String): Data = {
-    val elm = elements find (_._1 == name)
-    elm match {
-      case None => throw new NoSuchElementException
-      case Some((n, io)) => io
-    }
-  }
+  override def apply(name: String): Data = elements(name)
 
   override def <>(src: Node): Unit = {
     if (comp == null) {
@@ -183,7 +175,7 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
   }
 
   override def flatten: Array[(String, Bits)] = {
-    val sortedElems = elements sortWith (_._2._id < _._2._id) 
+    val sortedElems = elements.toArray sortWith (_._2._id < _._2._id) 
     (sortedElems foldLeft Array[(String, Bits)]()){(res, x) => 
       val (n, i) = x
       res ++ (if (i.name != "") i.flatten else i match {
@@ -192,18 +184,6 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
       })
     }
   }
-/*
-foldLeft Array()){
-      (res, (n, i)) => res ++ (i match {
-        case b: Bits if b.name == "" => Array((prefix
-      }
-    }
-    for ((n, i) <- elements.sortWith(_._2._id < _._2._id).toArray) yield (
-      i match {
-        case b: Bits if b.name == "" => Array((prefix + n, b))
-        case _ => i.flatten(prefix + n + "_")
-      })
-*/
 
   override def getWidth: Int = (elements foldLeft 0)(_ + _._2.getWidth)
 
