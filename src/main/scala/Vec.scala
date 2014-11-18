@@ -61,7 +61,6 @@ object Vec {
     val res =
       if (!elts.isEmpty && elts.forall(_.isLit)) ROM(elts)
       else new Vec[T](i => elts.head.clone, elts)
-    // res.self ++= elts
     res
   }
 
