@@ -60,8 +60,8 @@ object Vec {
   def apply[T <: Data](elts: Iterable[T]): Vec[T] = {
     val res =
       if (!elts.isEmpty && elts.forall(_.isLit)) ROM(elts)
-      else new Vec[T](i => elts.head.clone)
-    res.self ++= elts
+      else new Vec[T](i => elts.head.clone, elts)
+    // res.self ++= elts
     res
   }
 
@@ -76,9 +76,8 @@ object Vec {
 
     Note that this means that elem is computed a total of n times.
     */
-  def fill[T <: Data](n: Int)(gen: => T): Vec[T] = {
-    Vec.tabulate(n){ i => gen }
-  }
+  def fill[T <: Data](n: Int)(gen: => T): Vec[T] = 
+    tabulate(n){ i => gen }
 
   /** Returns an array containing values of a given function over
     a range of integer values starting from 0.
@@ -100,8 +99,8 @@ class VecProc(enables: Iterable[Bool], elms: Iterable[Data]) extends proc {
   }
 }
 
-class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with Cloneable {
-  val self = new ArrayBuffer[T] // TODO: immutable container, requiring a lot of fixes
+class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate with VecLike[T] with Cloneable {
+  val self = elts.toVector
   val readPorts = new HashMap[UInt, T]
 
   override def apply(idx: Int): T = self(idx)
