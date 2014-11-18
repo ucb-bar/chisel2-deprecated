@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -262,21 +262,21 @@ class DataSuite extends TestSuite {
     assertTrue(!ChiselError.ChiselErrors.isEmpty);
   }
 
-  
+
   /* Vec width (#247) */
   @Test def testVecWidth() {
     val io = new Bundle{
-  
+
       val in = Vec.fill(4)(UInt(INPUT,4))
       val out = Vec.fill(4)(UInt(OUTPUT,4))
-    } 
-  
+    }
+
     assertTrue( io.in.getWidth() == 16 )
   }
 
-  
+
   /** Infinite Width Inference #76
-   *  
+   *
    */
   @Test def widthInfinInfer() {
     println("\nwidthInfinInfer ...")

@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -189,9 +189,9 @@ class DotBackend extends Backend {
         if (islandId != 0) {
           res.append("subgraph clusterIsland_" + islandId + " {\n")
         }
-  
+
         res.append(island_res)
-  
+
         if (islandId != 0) {
           res.append("label = \"Island_" + islandId + "\";\n")
           res.append("}\n")
@@ -208,7 +208,7 @@ class DotBackend extends Backend {
     }
     (res.toString, crossings.toString)
   }
-      
+
 
 
   override def elaborate(c: Module): Unit = {

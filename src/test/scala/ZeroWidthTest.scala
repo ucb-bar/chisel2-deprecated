@@ -49,7 +49,7 @@ object ZeroWidthTest{
     val W0Wenable = if (W0Wparameter == null) enableW0W else true
     org.junit.Assume.assumeTrue(W0Wenable)
   }
-  
+
 }
 /** This testsuite checks operations using zero-width wires.
 */
@@ -164,7 +164,7 @@ class ZeroWidthTest extends TestSuite {
         | l | m | n | o
         | r | u | ab | ac
         /* XXX Computing any of those signals throws an exception */
-        | c | c1 | t 
+        | c | c1 | t
       ).toBits
 
       // -- result type is Bool --

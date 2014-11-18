@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -117,4 +117,5 @@ class Printf(condIn: Bool, formatIn: String, argsIn: Seq[Node]) extends PrintfBa
   inputs += condIn
   override def args: ArrayBuffer[Node] = inputs.init
   def cond: Node = inputs.last
+  def assignClock(clk: Clock): Unit = { clock = clk }
 }

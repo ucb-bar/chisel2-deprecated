@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -85,6 +85,7 @@ class Bundle(view_arg: Seq[String] = null) extends Aggregate {
 
       // TODO: SPLIT THIS OUT TO TOP LEVEL LIST
       if( types.length == 0 && !isStatic(modifiers) && isInterface
+        && !(name contains '$')
         && !(Bundle.keywords contains name)
         && (view == null || view.contains(name)) ) {
         val o = m.invoke(this);

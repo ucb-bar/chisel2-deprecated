@@ -93,7 +93,7 @@ class TextComparator {
     }
     None
   }
-    
+
   /*
       Compare a line from the original and the test strings and return a likely list of substitutions
       to get them to match.
@@ -198,7 +198,7 @@ class TextComparator {
     }
     aResult
   }
-  
+
   /* If possible, apply substitutions to convert "test" into "original".
    * If not possible, return "text" unaltered.
    */
@@ -281,7 +281,7 @@ object TestComparator {
         tests += test + "/" + f
       }
     }
-  
+
     val result = compareFiles(masters.toArray, tests.toArray)
     sys.exit(if (result == None) 0 else 1)
   }

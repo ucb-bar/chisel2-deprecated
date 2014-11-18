@@ -27,6 +27,7 @@
 #include <map>
 #include <stdlib.h>
 #include <iostream>
+#include <sstream>
 #include <fstream>
 #include <stdexcept>
 
@@ -1409,11 +1410,21 @@ static dat_t<w> dat_format(const char* fmt, Args... args)
 }
 
 template <int w, typename... Args>
-static ssize_t dat_fprintf(FILE* f, const char* fmt, Args... args)
+static ssize_t dat_fprintf(FILE *f, const char* fmt, Args... args)
 {
   char str[w/8+1];
   dat_format(str, fmt, args...);
   return fwrite(str, 1, w/8, f);
+}
+
+template <int w, typename... Args>
+static ssize_t dat_prints(std::ostream& s, const char* fmt, Args... args)
+{
+  char str[w/8+1];
+  dat_format(str, fmt, args...);
+  s.write(str, w/8);
+  ssize_t ret = s.good() ? w/8 : -1;
+  return ret;
 }
 #endif /* C++11 */
 
@@ -1688,9 +1699,10 @@ template <int w, int d> mem_t<w,d> MEM( void );
 
 class mod_t {
  public:
-	mod_t():
-  dumpfile(NULL),
-    is_stale(false)
+  mod_t():
+    dumpfile(NULL),
+    is_stale(false),
+    printStream()
     {}
   std::vector< mod_t* > children;
   virtual void init ( val_t rand_init=false ) { };
@@ -1710,6 +1722,7 @@ class mod_t {
   virtual bool set_circuit_from(mod_t* src) = 0;
 
   virtual void print ( FILE* f ) { };
+  virtual void print ( std::ostream& s ) { };
   virtual void dump ( FILE* f, int t ) { };
 
   void set_dumpfile(FILE* f) {
@@ -1728,8 +1741,10 @@ class mod_t {
     dat_t<1> reset = LIT<1>(is_reset);
     for (int i = 0; i < n; i++) {
       if (is_reset) {
-	clock_lo(reset);
+        clock_lo(reset);
       }
+      // Collect any print output.
+      print(printStream);
       dump();
       delta += clock(reset);
     }
@@ -1745,9 +1760,27 @@ class mod_t {
     is_stale = false;
   }
 
+  int has_output(void) {
+	  return printStream.tellp();
+  }
+
+  std::string drain_output(void) {
+	  return printStream.str();
+  }
+
+  // Since we have an element with a deleted copy constructor - printStream,
+  // we need to provide our own explicit copy constructor.
+  mod_t(const mod_t& src) {
+	  children = src.children;
+	  timestep = src.timestep;
+	  is_stale = src.is_stale;
+	  dumpfile = src.dumpfile;
+  }
+
  protected:
   bool is_stale;
   FILE* dumpfile;
+  std::basic_ostringstream< char > printStream;
 };
 
 #define ASSERT(cond, msg) { \

@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -493,5 +493,51 @@ class NameSuite extends TestSuite {
       "--targetDir", dir.getPath.toString()),
       () => Module(new InputPortNameComp))
     assertFile("NameSuite_InputPortNameComp_1.v");
+  }
+
+  /* XXX test case derived from issue #153 on github.
+   */
+  @Test def testNameItTooEager153() {
+    class MyBundle extends Bundle
+    {
+      val x = Bool()
+      val y = Bool()
+      val z = Bool()
+    }
+    
+    class EntryIO(num_ports: Int) extends Bundle
+    {
+      val vals = Vec.fill(num_ports) { Bool(INPUT) }
+      val out = Bool(OUTPUT)
+    }     
+    
+    class Entry(num_ports: Int) extends Module
+    {
+      val io = new EntryIO(num_ports)
+      io.out := io.vals.reduce(_|_)
+    }  
+    
+    class NameItTooEager153 extends Module {
+     val io = new Bundle {
+         val idx = UInt(INPUT,2)
+         val vals = Vec.fill(4) { Bool(INPUT) }
+         val z = Bool(OUTPUT)
+      }
+    
+      val entry_io = Vec.fill(4) { Module(new Entry(4)).io }
+    
+      for (i <- 0 until 4)
+      {  
+         for (j <- 0 until 4)
+         {  
+            entry_io(i).vals(j) := io.vals(j)
+         }
+      }
+    }
+    
+    chiselMain(Array[String]("--backend", "v",
+        "--targetDir", dir.getPath.toString()),
+        () => Module(new NameItTooEager153()))
+    
   }
 }

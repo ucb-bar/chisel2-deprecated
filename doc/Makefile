@@ -7,7 +7,7 @@
 version   := 2.2.0
 
 PDFLATEX  := pdflatex
-WWW_PAGES := index.html documentation.html download.html faq.html
+WWW_PAGES := index.html documentation.html download.html faq.html releases.html
 WWW_EXTRA := manual.html getting-started.html
 
 # The following subdirectories build documentation correctly.
@@ -19,6 +19,14 @@ MAN_PAGES := chisel.man
 
 srcDir    := .
 installTop:= ../www
+
+# Set the current release info
+# RELEASE_TAGTEXT is something like: v2.2.18 125 g3501d7f
+#  i.e., the output of git describe with dashes replaced by spaces
+RELEASE_TAGTEXT=$(subst -, ,$(shell git describe --tags release))
+RELEASE_TAG=$(firstword $(RELEASE_TAGTEXT))
+RELEASE_DATETEXT=$(shell git log -1 --format="%ai" $(RELEASE_TAG))
+RELEASE_DATE=$(firstword $(RELEASE_DATETEXT))
 
 vpath %.tex $(srcDir)/bootcamp $(srcDir)/installation $(srcDir)/talks/dac12 $(srcDir)/manual $(srcDir)/tutorial $(srcDir)/getting-started
 
@@ -51,20 +59,15 @@ chisel-%.pdf: %.tex
 %.man: %.mtt
 	# cd into the directory containing the .tex file and massage it
 	cd $(dir $<) && \
-	tagtext=`git describe --tags` ;\
-	set -- `echo $$tagtext | perl -n -e '($$r = $$_) =~ s/-/ /g; print $$r '` ;\
-	tagid=$$1 ;\
-	ncommits=$$2 ;\
-	gcommit=$$3 ;\
-	set -- `git log -1 --format="%ai" $$tagid` ;\
-	tagdate=$$1 ;\
-	tagtime=$$2 ;\
-	tagtzoffset=$$3 ;\
-	sed -e "s/@VERSION@/$$tagid/" -e "s/@DATE@/$$tagdate/" $(notdir $<) > $(basename $@).ttex ;\
+	sed -e "s/@VERSION@/$(RELEASE_TAG)/" -e "s/@DATE@/$(RELEASE_DATE)/" $(notdir $<) > $(basename $@).ttex ;\
 	TEXINPUTS=".:$(PWD)/$(srcDir)/manual:${TEXINPUTS}" latex2man $(basename $@).ttex $@
 
-%.html: $(srcDir)/templates/%.html
+%.html: $(srcDir)/templates/%.html $(srcDir)/templates/base.html
 	$(srcDir)/../bin/jinja2html.py $(notdir $<) $@
+
+releases.html:	$(srcDir)/templates/releases.html $(srcDir)/templates/base.html
+	sed -e "s/@VERSION@/$(RELEASE_TAG)/" -e "s/@DATE@/$(RELEASE_DATE)/" $< > $(dir $<)/$@.tmp
+	$(srcDir)/../bin/jinja2html.py $@.tmp $@ && ${RM} $(dir $<)/$@.tmp
 
 clean:
 	-rm -f $(addprefix manual/,*.4ct *.4tc *.css *.dvi *.html *.idv *.lg *.tmp *.xref)

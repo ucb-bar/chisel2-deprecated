@@ -1,3 +1,33 @@
+/*
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ California (Regents). All Rights Reserved.  Redistribution and use in
+ source and binary forms, with or without modification, are permitted
+ provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer.
+    * Redistributions in binary form must reproduce the above
+      copyright notice, this list of conditions and the following
+      two paragraphs of disclaimer in the documentation and/or other materials
+      provided with the distribution.
+    * Neither the name of the Regents nor the names of its contributors
+      may be used to endorse or promote products derived from this
+      software without specific prior written permission.
+
+ IN NO EVENT SHALL REGENTS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
+ SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS,
+ ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+ REGENTS HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ REGENTS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE. THE SOFTWARE AND ACCOMPANYING DOCUMENTATION, IF
+ ANY, PROVIDED HEREUNDER IS PROVIDED "AS IS". REGENTS HAS NO OBLIGATION
+ TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
+ MODIFICATIONS.
+*/
+
 import scala.collection.mutable.ArrayBuffer
 import org.junit.Assert._
 import org.junit.Test
@@ -46,14 +76,14 @@ class ConnectSuite extends TestSuite {
         expect(m.io.out.valid, int(true))
         expect(m.io.in.ready,  int(true))
         expect(m.io.out.bits,  i+1)
-      } 
+      }
     }
     launchCppTester((m: UsesShimParent) => new ShimConnectionsTests(m))
   }
 
   // Test different forms of reset propagation
   @Test def testResetConnections() {
-    class UsesReset(resetSignal: Bool = null) extends Module(_reset = resetSignal) { 
+    class UsesReset(resetSignal: Bool = null) extends Module(_reset = resetSignal) {
       val io = new BoolIO
       val q = Module(new Queue(Bool(), 1))
       q.io.enq.valid := Bool(true)
@@ -209,7 +239,7 @@ class ConnectSuite extends TestSuite {
     class RegisterHookTests(m: A) extends Tester(m) {
       List(1,     2,     4,     6,     8,     12,    15,   15).zip(
       List(false, true,  true,  false, true,  false, true, false)).zip(
-      List((0,0), (0,2), (1,0), (1,0), (2,0), (2,0), (3,3), (3,3))).map { 
+      List((0,0), (0,2), (1,0), (1,0), (2,0), (2,0), (3,3), (3,3))).map {
         case ((in, en), (im0, im1)) =>
           poke(m.io.wdata, in)
           poke(m.io.wen,   int(en))
@@ -242,8 +272,8 @@ class ConnectSuite extends TestSuite {
         io.output := io.input + foreign.add
       }
 
-      chiselMain(Array[String]("--v", 
-        "--targetDir", dir.getPath.toString()), 
+      chiselMain(Array[String]("--v",
+        "--targetDir", dir.getPath.toString()),
         () => Module(new ForeignRef()))
 
     } catch {
@@ -296,27 +326,27 @@ class ConnectSuite extends TestSuite {
   }
 
   /** Test repeatedwirenames209
-   *  
+   *
    */
   @Test def testRepeatedWireNames209() {
     try {
       class CordicIO extends Bundle() {
         val out_broken = Bool(INPUT)
       }
-      
+
       class CordicStage extends Module {
         val io = new CordicIO()
         val counter = Reg(init = UInt(0, 1))
         counter := counter + UInt(1)
         io.out_broken := counter(0)
       }
-      
+
       class Cordic extends Module {
         val io = new CordicIO()
         val stage1 = Module(new CordicStage)
         val stage2 = Module(new CordicStage)
       }
-      
+
       chiselMain(Array[String]("--v"), () => Module(new Cordic))
     } catch {
       case _ : Throwable => ;

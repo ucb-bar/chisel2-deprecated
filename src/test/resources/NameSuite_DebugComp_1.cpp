@@ -17,7 +17,7 @@ mod_t* NameSuite_DebugComp_1_t::clone() {
   mod_t* cloned = new NameSuite_DebugComp_1_t(*this);
   return cloned;
 }
-bool NameSuite_DebugComp_1_t::set_circuit_from(mod_t* src) {
+bool NameSuite_DebugComp_1_t::set_circuit_from ( mod_t* src ) {
   NameSuite_DebugComp_1_t* mod_typed = dynamic_cast<NameSuite_DebugComp_1_t*>(src);
   assert(mod_typed);
   NameSuite_DebugComp_1__io_ctrl_wb_wen = mod_typed->NameSuite_DebugComp_1__io_ctrl_wb_wen;
@@ -34,7 +34,9 @@ bool NameSuite_DebugComp_1_t::set_circuit_from(mod_t* src) {
 }
 void NameSuite_DebugComp_1_t::print ( FILE* f ) {
 }
-void NameSuite_DebugComp_1_t::dump_init(FILE *f) {
+void NameSuite_DebugComp_1_t::print ( std::ostream& s ) {
+}
+void NameSuite_DebugComp_1_t::dump_init ( FILE* f ) {
   fputs("$timescale 1ps $end\n", f);
   fputs("$scope module NameSuite_DebugComp_1 $end\n", f);
   fputs("$var wire 1 \x21 io_ctrl_wb_wen $end\n", f);
@@ -63,7 +65,7 @@ void NameSuite_DebugComp_1_t::dump_init(FILE *f) {
   dat_dump<1>(f, NameSuite_DebugComp_1__io_ctrl_out, 0x26);
   NameSuite_DebugComp_1__io_ctrl_out__prev = NameSuite_DebugComp_1__io_ctrl_out;
 }
-void NameSuite_DebugComp_1_t::dump(FILE *f, int t) {
+void NameSuite_DebugComp_1_t::dump ( FILE* f, int t ) {
   if (t == 0) return dump_init(f);
   fprintf(f, "#%d\n", t);
   if (NameSuite_DebugComp_1__io_ctrl_wb_wen != NameSuite_DebugComp_1__io_ctrl_wb_wen__prev)
@@ -124,7 +126,7 @@ void NameSuite_DebugComp_1_t::clock_hi ( dat_t<1> reset ) {
   dat_t<1> NameSuite_DebugComp_1_dpath__wb_reg_ll_wb__shadow = T0;
   NameSuite_DebugComp_1_dpath__wb_reg_ll_wb = T0;
 }
-void NameSuite_DebugComp_1_api_t::init_mapping_table() {
+void NameSuite_DebugComp_1_api_t::init_mapping_table (  ) {
   dat_table.clear();
   mem_table.clear();
   NameSuite_DebugComp_1_t* mod_typed = dynamic_cast<NameSuite_DebugComp_1_t*>(module);

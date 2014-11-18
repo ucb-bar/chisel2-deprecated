@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -50,24 +50,24 @@ object UnaryOp {
   def apply(x: Node, op: String): Node = {
     op match {
       case "~" => Op("~", widthOf(0), x)
-      case "f-" => Op("f-", fixWidth(32), x)
-      case "fsin" => Op("fsin", fixWidth(32), x)
-      case "fcos" => Op("fcos", fixWidth(32), x)
-      case "ftan" => Op("ftan", fixWidth(32), x)
-      case "fsqrt" => Op("fsqrt", fixWidth(32), x)
-      case "flog" => Op("flog", fixWidth(32), x)
-      case "ffloor" => Op("ffloor", fixWidth(32), x)
-      case "fceil" => Op("fceil", fixWidth(32), x)
-      case "fround" => Op("fround", fixWidth(32), x)
-      case "d-" => Op("d-", fixWidth(64), x)
-      case "dsin" => Op("dsin", fixWidth(64), x)
-      case "dcos" => Op("dcos", fixWidth(64), x)
-      case "dtan" => Op("dtan", fixWidth(64), x)
-      case "dsqrt" => Op("dsqrt", fixWidth(64), x)
-      case "dlog" => Op("dlog", fixWidth(64), x)
-      case "dfloor" => Op("dfloor", fixWidth(64), x)
-      case "dceil" => Op("dceil", fixWidth(64), x)
-      case "dround" => Op("dround", fixWidth(64), x)
+      case "f-" => Op("f-", fixWidth(floatWidth), x)
+      case "fsin" => Op("fsin", fixWidth(floatWidth), x)
+      case "fcos" => Op("fcos", fixWidth(floatWidth), x)
+      case "ftan" => Op("ftan", fixWidth(floatWidth), x)
+      case "fsqrt" => Op("fsqrt", fixWidth(floatWidth), x)
+      case "flog" => Op("flog", fixWidth(floatWidth), x)
+      case "ffloor" => Op("ffloor", fixWidth(floatWidth), x)
+      case "fceil" => Op("fceil", fixWidth(floatWidth), x)
+      case "fround" => Op("fround", fixWidth(floatWidth), x)
+      case "d-" => Op("d-", fixWidth(doubleWidth), x)
+      case "dsin" => Op("dsin", fixWidth(doubleWidth), x)
+      case "dcos" => Op("dcos", fixWidth(doubleWidth), x)
+      case "dtan" => Op("dtan", fixWidth(doubleWidth), x)
+      case "dsqrt" => Op("dsqrt", fixWidth(doubleWidth), x)
+      case "dlog" => Op("dlog", fixWidth(doubleWidth), x)
+      case "dfloor" => Op("dfloor", fixWidth(doubleWidth), x)
+      case "dceil" => Op("dceil", fixWidth(doubleWidth), x)
+      case "dround" => Op("dround", fixWidth(doubleWidth), x)
       case any => throw new Exception("Unrecognized operator " + op)
     }
   }
@@ -96,18 +96,18 @@ object BinaryOp {
       case "##"  => Op("##", sumWidth _,  x, y )
       case "&"   => Op("&", maxWidth _, x, y )
       case "|"   => Op("|", maxWidth _, x, y )
-      case "f+"  => Op("f+", fixWidth(32), x, y )
-      case "f-"  => Op("f-", fixWidth(32), x, y )
-      case "f*"  => Op("f*", fixWidth(32), x, y )
-      case "f/"  => Op("f/", fixWidth(32), x, y )
-      case "f%"  => Op("f%", fixWidth(32), x, y )
-      case "fpow"  => Op("fpow", fixWidth(32), x, y )
-      case "d+"  => Op("d+", fixWidth(64), x, y )
-      case "d-"  => Op("d-", fixWidth(64), x, y )
-      case "d*"  => Op("d*", fixWidth(64), x, y )
-      case "d/"  => Op("d/", fixWidth(64), x, y )
-      case "d%"  => Op("d%", fixWidth(64), x, y )
-      case "dpow"  => Op("dpow", fixWidth(64), x, y )
+      case "f+"  => Op("f+", fixWidth(floatWidth), x, y )
+      case "f-"  => Op("f-", fixWidth(floatWidth), x, y )
+      case "f*"  => Op("f*", fixWidth(floatWidth), x, y )
+      case "f/"  => Op("f/", fixWidth(floatWidth), x, y )
+      case "f%"  => Op("f%", fixWidth(floatWidth), x, y )
+      case "fpow"  => Op("fpow", fixWidth(floatWidth), x, y )
+      case "d+"  => Op("d+", fixWidth(doubleWidth), x, y )
+      case "d-"  => Op("d-", fixWidth(doubleWidth), x, y )
+      case "d*"  => Op("d*", fixWidth(doubleWidth), x, y )
+      case "d/"  => Op("d/", fixWidth(doubleWidth), x, y )
+      case "d%"  => Op("d%", fixWidth(doubleWidth), x, y )
+      case "dpow"  => Op("dpow", fixWidth(doubleWidth), x, y )
       case any   => throw new Exception("Unrecognized operator " + op)
     }
   }
@@ -159,6 +159,8 @@ object ReductionOp {
 }
 
 object Op {
+  val floatWidth = 32
+  val doubleWidth = 64
   val logicalChars = """^([!=<>]=)|([<>])$""".r
   def apply(name: String, widthInfer: (=> Node) => Width, a: Node, b: Node): Node = {
     // It's a binary operator. Is it a logical op?
@@ -190,8 +192,10 @@ object Op {
         case "<"  => return Literal(if (av <  bv) 1 else 0);
         case "<=" => return Literal(if (av <= bv) 1 else 0);
         case "##" => return Literal(av << bw | bv, aw + bw);
-        case "+"  => return Literal(av + bv, max(aw, bw))
-        case "-"  => return Literal(av - bv, max(aw, bw))
+        // "+" and "-" may need to widen the result.
+        // Let the Literal code take care of it, unless an explicit width has been specified.
+        case "+"  => return Literal(av + bv, List(aw, bw, Literal.bitLength((av + bv)).toInt).max)
+        case "-"  => return Literal(av - bv, List(aw, bw, Literal.bitLength((av - bv)).toInt).max)
         case "|"  => return Literal(av | bv, max(aw, bw));
         case "&"  => return Literal(av & bv, max(aw, bw));
         case "^"  => return Literal(av ^ bv, max(aw, bw));
@@ -217,7 +221,7 @@ object Op {
         case "f<=" => return Bool(fa_val <= fb_val);
         case _ => ;
       }
-      } else if (a_lit != null) { 
+      } else if (a_lit != null) {
         val fa_val = a_lit.floLitValue
         if (fa_val == 0.0) {
           name match {
@@ -231,8 +235,8 @@ object Op {
             case "f*" => return b;
             case _ => ;
           }
-        }        
-      } else if (b_lit != null) { 
+        }
+      } else if (b_lit != null) {
         val fb_val = b_lit.floLitValue
         if (fb_val == 0.0) {
           name match {
@@ -247,10 +251,10 @@ object Op {
             case "f%" => return a;
             case _ => ;
           }
-        }        
+        }
       }
     }
-      
+
     if (a.isInstanceOf[Dbl] && b.isInstanceOf[Dbl]) {
       if (a_lit != null && b_lit != null) {
       val (fa_val, fb_val) = (a_lit.dblLitValue, b_lit.dblLitValue)
@@ -269,7 +273,7 @@ object Op {
         case "d<=" => return Bool(fa_val <= fb_val);
         case _ => ;
       }
-    } else if (a_lit != null) { 
+    } else if (a_lit != null) {
       val fa_val = a_lit.dblLitValue
       // println("FA " + fa_val + " NAME " + name);
       if (fa_val == 0.0) {
@@ -287,8 +291,8 @@ object Op {
           case "d*" => return b;
           case _ => ;
         }
-      }        
-    } else if (b_lit != null) { 
+      }
+    } else if (b_lit != null) {
       val fb_val = b_lit.dblLitValue
       // println("FB " + fb_val + " NAME " + name);
       if (fb_val == 0.0) {
@@ -306,7 +310,7 @@ object Op {
           case "d%" => return a;
           case _ => ;
         }
-      }        
+      }
     }
 
     }
@@ -369,7 +373,7 @@ object Op {
         }
       }
       val a_lit = a.litOf
-    if (a.isInstanceOf[Dbl]) { 
+    if (a.isInstanceOf[Dbl]) {
       if (a_lit != null) {
       val fa_val = a_lit.dblLitValue
       name match {
@@ -619,7 +623,7 @@ abstract class Op extends Node {
           }
         }
         case r: ReductionOp => {
- 
+
         }
       }
     }

@@ -1,18 +1,22 @@
-#ifndef __DataSuite_BypassDataComp_1__
-#define __DataSuite_BypassDataComp_1__
+#ifndef __VerifSuite_CppPrintfComp_1__
+#define __VerifSuite_CppPrintfComp_1__
 
 #include "emulator.h"
 
-class DataSuite_BypassDataComp_1_t : public mod_t {
+class VerifSuite_CppPrintfComp_1_t : public mod_t {
  private:
   val_t __rand_seed;
   void __srand(val_t seed) { __rand_seed = seed; }
   val_t __rand_val() { return ::__rand_val(&__rand_seed); }
  public:
-  dat_t<1> DataSuite_BypassDataComp_1__io_valid_0;
-  dat_t<1> DataSuite_BypassDataComp_1__io_valid_1;
-  dat_t<1> DataSuite_BypassDataComp_1__io_valid_2;
-  dat_t<3> DataSuite_BypassDataComp_1__io_data;
+  dat_t<1> reset;
+  dat_t<1> T1;
+  dat_t<8> VerifSuite_CppPrintfComp_1__io_y;
+  dat_t<8> VerifSuite_CppPrintfComp_1__io_x;
+  dat_t<8> T2;
+  dat_t<8> T3;
+  dat_t<16> VerifSuite_CppPrintfComp_1__io_z;
+  dat_t<104> T4;
   int clk;
   int clk_cnt;
 
@@ -29,7 +33,7 @@ class DataSuite_BypassDataComp_1_t : public mod_t {
 
 };
 
-class DataSuite_BypassDataComp_1_api_t : public mod_api_t {
+class VerifSuite_CppPrintfComp_1_api_t : public mod_api_t {
   void init_mapping_table();
 };
 
