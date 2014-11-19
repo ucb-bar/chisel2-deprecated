@@ -451,7 +451,7 @@ class VerilogBackend extends Backend {
 
     // Diffent code generation for clocks
     if (Driver.isCompiling) {
-      harness.write("  reg %s = 1;\n".format(mainClk.name))
+      harness.write("  reg %s = 0;\n".format(mainClk.name))
       if (clocks.size > 1) {
         for (clk <- clocks) {
           val clkLength =
@@ -468,7 +468,7 @@ class VerilogBackend extends Backend {
         val clkLength =
             if (clk.srcClock == null) "`CLOCK_PERIOD" else
             clk.srcClock.name + "_length " + clk.initStr
-        harness.write("  reg %s = 0;\n".format(clk.name))
+        harness.write("  reg %s = 1;\n".format(clk.name))
         harness.write("  parameter %s_length = %s;\n".format(clk.name, clkLength))
       }
       for (clk <- clocks) {
@@ -577,10 +577,8 @@ class VerilogBackend extends Backend {
     def display(form: String, args: String*) =
       "$display(\"%s\", %s);\n".format(form, (args.tail foldLeft args.head) (_ + ", " + _))
 
-    apis.append("  initial begin\n".format(mainClk.name))
+    apis.append("  initial begin\n")
     apis.append("  /*** API interpreter ***/\n")
-    apis.append("  // process API command at every clock's negedge\n")
-    apis.append("  // when the target is stalled\n")
     apis.append("  forever begin\n")
     for (rst <- resets)
       apis.append("    %s = 0;\n".format(rst.name))
@@ -594,7 +592,7 @@ class VerilogBackend extends Backend {
     apis.append("        " + fscanf("%d", "steps"))
     for (rst <- resets)
       apis.append("        %s = 1;\n".format(rst.name))
-    apis.append("        repeat (steps) @(posedge clk) begin\n")
+    apis.append("        repeat (steps) @(negedge %s) begin\n".format(mainClk.name))
     apis.append("        delta = delta + min;\n")
     if (clocks.size > 1) {
       for (clk <- clocks)
@@ -650,7 +648,7 @@ class VerilogBackend extends Backend {
     apis.append("      \"step\": begin\n")
     apis.append("        " + fscanf("%d", "steps"))
     apis.append("        if (is_stale) #0.1 is_stale = 0;\n")
-    apis.append("        repeat (steps) @(negedge clk) begin\n")
+    apis.append("        repeat (steps) @(negedge %s) begin\n".format(mainClk.name))
     if (clocks.size > 1) {
       for (clk <- clocks)
         apis.append("          if (%s_length < min) min = %s_cnt;\n".format(clk.name, clk.name))
