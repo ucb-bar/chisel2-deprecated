@@ -1013,7 +1013,7 @@ class VerilogBackend extends Backend {
     }
     val dir = Driver.targetDir + "/"
     val src = n + "-harness.v " + n + ".v"
-    val cmd = "cd " + dir + " && vcs -full64 -quiet +v2k " +
+    val cmd =  "cd " + dir + " && vcs -full64 -quiet +v2k -Mdir=" + n + ".csrc " +
               "-timescale=1ns/1ps +define+CLOCK_PERIOD=120 +vpi -use_vpiobj vpi_user.cc " +
               "+vcs+initreg+random " + src + " -o " + n + " -debug_pp"
     run(cmd)
