@@ -577,6 +577,7 @@ class VerilogBackend extends Backend {
     apis.append("  integer steps;      // number of steps\n")
     apis.append("  integer delta;      // number of steps\n")
     apis.append("  integer min = (1 << 31 -1);\n")
+    apis.append("  reg is_stale = 0;\n")
 
     apis.append("\n  integer count;\n")
 
@@ -589,7 +590,7 @@ class VerilogBackend extends Backend {
     apis.append("  /*** API interpreter ***/\n")
     apis.append("  // process API command at every clock's negedge\n")
     apis.append("  // when the target is stalled\n")
-    apis.append("  forever begin #1\n")
+    apis.append("  forever begin\n")
     for (rst <- resets)
       apis.append("    %s = 0;\n".format(rst.name))
     apis.append("    "+ fscanf("%s", "cmd"))
@@ -620,6 +621,7 @@ class VerilogBackend extends Backend {
     apis.append("      // inputs: wire's name\n")
     apis.append("      // return: wire's value\n")
     apis.append("      \"wire_peek\": begin\n")
+    apis.append("        if (is_stale) #0.1 is_stale = 0;\n")
     apis.append("        " + fscanf("%s", "node"))
     apis.append("        $wire_peek(node);\n")
     apis.append("      end\n")
@@ -628,6 +630,7 @@ class VerilogBackend extends Backend {
     apis.append("      // inputs: mem's name\n")
     apis.append("      // return: mem's value\n")
     apis.append("      \"mem_peek\": begin\n")
+    apis.append("        if (is_stale) #0.1 is_stale = 0;\n")
     apis.append("        " + fscanf("%s %d", "node", "offset"))
     apis.append("        $mem_peek(node, offset);\n")
     apis.append("      end\n")
@@ -638,6 +641,7 @@ class VerilogBackend extends Backend {
     apis.append("      \"wire_poke\": begin\n")
     apis.append("        " + fscanf("%s 0x%x", "node", "value"))
     apis.append("        $wire_poke(node, value);\n")
+    apis.append("        is_stale = 1;\n")
     apis.append("      end\n")
 
     apis.append("      // < mem_poke >\n")
@@ -646,6 +650,7 @@ class VerilogBackend extends Backend {
     apis.append("      \"mem_poke\": begin\n")
     apis.append("        " + fscanf("%s %d 0x%x", "node", "offset", "value"))
     apis.append("        $mem_poke(node, offset, value);\n")
+    apis.append("        is_stale = 1;\n")
     apis.append("      end\n")
 
     apis.append("      // < step > \n")
@@ -653,7 +658,8 @@ class VerilogBackend extends Backend {
     apis.append("      // return: # cycles the target will proceed\n")
     apis.append("      \"step\": begin\n")
     apis.append("        " + fscanf("%d", "steps"))
-    apis.append("        repeat (steps) @(posedge clk) begin\n")
+    apis.append("        if (is_stale) #0.1 is_stale = 0;\n")
+    apis.append("        repeat (steps) @(negedge clk) begin\n")
     if (clocks.size > 1) {
       for (clk <- clocks)
         apis.append("          if (%s_length < min) min = %s_cnt;\n".format(clk.name, clk.name))
