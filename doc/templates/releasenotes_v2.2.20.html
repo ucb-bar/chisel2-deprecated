@@ -1,0 +1,24 @@
+<p>This release of Chisel is largely a maintenance release.
+See the associated Changelog for issues resolved with this release.
+</p>
+<p>
+There were significant changes to the Bundle and Vec code:
+<ol type="1">
+  <li>Make the flatten methods generate correct element names</li>
+  <li>Internal data structures
+     <ol type="a">
+       <li>Bundle: LinkedHashMap(name & io pairs)</li>
+       <li>Vec: Vector(now Vec is immutable)</li>
+     </ol>
+   </li>
+  <li>Remove legacy code</li>
+</ol>
+</p>
+<p>
+There were significant changes to Verilog testing:
+<ol type="1">
+  <li>Use vpi routines for verilog tests</li>
+  <li>Fix timing and compile errors of verilog tests</li>
+  <li>Generate the same harness regardless of the --test option</li>
+</ol>
+
