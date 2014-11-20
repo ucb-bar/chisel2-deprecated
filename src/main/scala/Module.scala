@@ -284,12 +284,17 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   }
 
   def addPin[T <: Data](pin: T, name: String = "") = {
-    for ((n, io) <- pin.flatten) {
-      io.component = this
-      io.isIo = true
+    io match {
+      case b: Bundle => {
+        for ((n, io) <- pin.flatten) {
+          io.component = this
+          io.isIo = true
+        }
+        if (name != "") pin nameIt (name, true)
+        b.elements += ((pin.name, pin))
+      }
+      case _ => // Is it possible?
     }
-    if (name != "") pin nameIt (name, true)
-    io.asInstanceOf[Bundle] += pin
     pin
   }
 

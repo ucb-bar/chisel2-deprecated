@@ -45,7 +45,7 @@ import scala.collection.mutable.LinkedHashSet
 
 object VerilogBackend {
 
-  val keywords = HashSet[String](
+  val keywords = Set[String](
     "always", "and", "assign", "attribute", "begin", "buf", "bufif0", "bufif1",
     "case", "casex", "casez", "cmos", "deassign", "default", "defparam",
     "disable", "edge", "else", "end", "endattribute", "endcase", "endfunction",

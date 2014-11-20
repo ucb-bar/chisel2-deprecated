@@ -196,7 +196,8 @@ class ManualTester[+T <: Module]
   }
 
   def peekAt[T <: Bits](data: Mem[T], off: Int): BigInt = {
-    signed_fix(data(1), peekBits(data, off))
+    // signed_fix(data(1), peekBits(data, off))
+    peekBits(data, off)
   }
 
   def peek(data: Bits): BigInt = {
