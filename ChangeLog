@@ -1,4 +1,4 @@
-ChangeLog for Chisel v2.2.20 11/18/14
+ChangeLog for Chisel v2.2.20 11/20/14
 
 #94 printf being discarded during elaboration
 #153 nameIt is way too eager, needs to chill out
@@ -13,15 +13,17 @@ ChangeLog for Chisel v2.2.20 11/18/14
 #300 Generated cpp files lack Config substring (C++ backend)
 #319 --parallelMakeJobs doesn't understand --targetDir
 #321 Support poking large numbers - extension of #318
-     Vtests: fix step
-     Deleted unused ModularCpp backend before more bitrot sets in.
-     Cosmetic/scalastyle fixes - no functional changes.
-     Add support for a constant pool (C++ backend)
-     Add hasSRAM & sramMaxSize for custom transforms
-     Fix naming problems when adding modules in custom transforms
-     Parametrization in custom transforms
-     Fix a binding problem
-     Fixes to --partitionIslands
-     Small changes in parameterization
-     Added "in" operator that can be used when defining constraints. Currently only works for List[Int], Range, and List[Chisel.IntEx]
-
+#331 Fill(0, ...) fails with a java exception
+Vtests: fix step
+Deleted unused ModularCpp backend before more bitrot sets in.
+Cosmetic/scalastyle fixes - no functional changes.
+Add support for a constant pool (C++ backend)
+Add hasSRAM & sramMaxSize for custom transforms
+Fix naming problems when adding modules in custom transforms
+Parametrization in custom transforms
+Fix a binding problem
+Fixes to --partitionIslands
+Small changes in parameterization
+Added "in" operator that can be used when defining constraints. Currently only works for List[Int], Range, and List[Chisel.IntEx]
+Significant rewrite of the Bundle and Vec code
+Significant changes to Verilog test code
