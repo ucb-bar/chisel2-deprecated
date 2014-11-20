@@ -33,7 +33,12 @@ import Fill._
 import Lit._
 
 object Fill {
-  def apply(n: Int, mod: Bool): UInt = if (n == 1) mod else UInt(0, n) - mod
+  def apply(n: Int, mod: Bool): UInt = n match {
+    case 0 => UInt(width=0)
+    case 1 => mod
+    case x if n > 1 => UInt(0,n) - mod
+    case _ => throw new IllegalArgumentException(s"n (=$n) must be nonnegative integer.")
+  }
   def apply(n: Int, mod: UInt): UInt = UInt(NodeFill(n, mod))
   def apply(mod: UInt, n: Int): UInt = apply(n, mod)
 }
@@ -41,20 +46,21 @@ object Fill {
 object NodeFill {
   def apply(n: Int, mod: Node): Node = {
     val w = mod.widthW
-    if (n == 1) {
-      mod
-    } else {
-      if (w.isKnown && w.needWidth == 1) {
-        Multiplex(mod, Literal((BigInt(1) << n) - 1, n), Literal(0, n))
-      } else {
-        /* Build up a Concatenate tree for more ILP in simulation. */
-        var out: Node = null
-        val p2 = Array.ofDim[Node](log2Up(n+1))
-        p2(0) = mod
-        for (i <- 1 until p2.length)
-          p2(i) = Concatenate(p2(i-1), p2(i-1))
-        Concatenate((0 until log2Up(n+1)).filter(i => (n & (1 << i)) != 0).map(p2(_)))
-      }
+    n match {
+      case 0 => UInt(width=0)
+      case 1 => mod
+      case x if n > 1 =>
+        if (w.isKnown && w.needWidth == 1) {
+          Multiplex(mod, Literal((BigInt(1) << x) - 1, x), Literal(0, x))
+        } else {
+          /* Build up a Concatenate tree for more ILP in simulation. */
+          val p2 = Array.ofDim[Node](log2Up(x+1))
+          p2(0) = mod
+          for (i <- 1 until p2.length)
+            p2(i) = Concatenate(p2(i-1), p2(i-1))
+          Concatenate((0 until log2Up(x+1)).filter(i => (x & (1 << i)) != 0).map(p2(_)))
+        }
+      case _ => throw new IllegalArgumentException(s"n (=$n) must be nonnegative integer.")
     }
   }
 }

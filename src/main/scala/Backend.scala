@@ -62,7 +62,7 @@ trait FileSystemUtilities {
 
 abstract class Backend extends FileSystemUtilities{
   /* Set of keywords which cannot be used as node and component names. */
-  val keywords: HashSet[String];
+  val keywords: Set[String]
   val nameSpace = HashSet[String]()
   /* Set of Ops that this backend doesn't natively support and thus must be
      lowered to simpler Ops. */
@@ -70,17 +70,6 @@ abstract class Backend extends FileSystemUtilities{
 
   /* Whether or not this backend decomposes along Module boundaries. */
   def isEmittingComponents: Boolean = false
-
-  def addPin[T <: Data](m: Module, pin: T, name: String) = {
-    for ((n, io) <- pin.flatten) {
-      io.component = m
-      io.isIo = true
-    }
-    if (name != "")
-      pin. nameIt (name, true)
-    m.io.asInstanceOf[Bundle] += pin
-    pin
-  }
 
   def depthString(depth: Int): String = {
     var res = "";

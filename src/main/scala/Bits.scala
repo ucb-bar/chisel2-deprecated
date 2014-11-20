@@ -111,7 +111,7 @@ abstract class Bits extends Data with proc {
 
   override def apply(name: String): Data = this
 
-  override def flatten: Array[(String, Bits)] = Array((name, this));
+  override def flatten: Array[(String, Bits)] = Array((name, this))
 
   override def toString: String = {
     // XXX We cannot print the width here as it would computed the infered
