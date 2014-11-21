@@ -32,6 +32,8 @@ import org.junit.Assert._
 import org.junit.Test
 
 import Chisel._
+import Chisel.Implicits._
+import Chisel.AdvTester._
 
 /** This testsuite checks the primitives of the standard library
   that will generate basic common graphs of *Node*.
@@ -123,5 +125,40 @@ class TesterTest extends TestSuite {
     chiselMainTest(Array[String]("--backend", "c",
       "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
       () => Module(new IOSelector())) {m => new VariousPokeTester(m)}
+  }
+
+  /** Test poking negative numbers.
+   *  This is primarily a test of the Tester and its peek/poke/expect interface.
+   *
+   */
+  @Test def testPokeNegTests () {
+    println("\ntestPokeNegTests ...")
+    
+    class PokeNegModule extends Module {
+    
+      val io = new Bundle {  
+        val i_value     = UInt(INPUT, width = 64)
+        val o_value     = UInt(OUTPUT, width = 64)
+      }
+    
+      io.o_value := io.i_value
+    } 
+    
+    class PokeNegTests(c:PokeNegModule) extends AdvTester(c){
+      isTrace = true
+    
+      wire_poke(c.io.i_value, 0x7100a000a000a000L)
+      expect(c.io.o_value, 0x7100a000a000a000L)
+    
+      wire_poke(c.io.i_value, 0x8100a000a000a000L)
+      expect(c.io.o_value, 0x8100a000a000a000L) 
+    
+      wire_poke(c.io.i_value, -1L )
+      expect(c.io.o_value, -1L )
+    }   
+    
+    chiselMainTest(Array[String]("--backend", "c",
+      "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
+      () => Module(new PokeNegModule())) {m => new PokeNegTests(m)}
   }
 }

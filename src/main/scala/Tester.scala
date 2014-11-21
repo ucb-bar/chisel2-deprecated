@@ -219,7 +219,6 @@ class ManualTester[+T <: Module]
       println("Unable to poke data " + data)
     } else {
 
-      if (isTrace) println("  POKE " + dumpName(data) + " " + (if (off >= 0) (off + " ") else "") + "<- " + x)
       var cmd = ""
       if (off != -1) {
         cmd = "mem_poke " + dumpName(data) + " " + off;
@@ -227,9 +226,12 @@ class ManualTester[+T <: Module]
         cmd = "wire_poke " + dumpName(data);
       }
       // Don't prefix negative numbers with "0x"
-      val radixPrefix = if (x < 0) " " else " 0x"
-
-      cmd = cmd + radixPrefix + x.toString(16);
+      val radixPrefix = if (x < 0) " -0x" else " 0x"
+      val xval = radixPrefix + x.abs.toString(16)
+      cmd = cmd + xval
+      if (isTrace) {
+        println("  POKE " + dumpName(data) + " " + (if (off >= 0) (off + " ") else "") + "<- " + xval)
+      }
       val rtn = emulatorCmd(cmd)
       if (rtn != "ok") {
         System.err.print(s"FAILED: poke(${dumpName(data)}) returned false")
@@ -279,8 +281,10 @@ class ManualTester[+T <: Module]
   }
 
   def expect (data: Bits, expected: BigInt): Boolean = {
+    val mask = BigInt((1 << data.needWidth) - 1)
     val got = peek(data)
-    expect(got == expected,
+
+    expect((got & mask) == (expected & mask),
        "EXPECT " + dumpName(data) + " <- " + got + " == " + expected)
   }
 
