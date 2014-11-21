@@ -469,7 +469,7 @@ abstract class Backend extends FileSystemUtilities{
 
   def inferAll(mod: Module): Int = {
     val nodesList = ArrayBuffer[Node]()
-    Driver.bfs { nodesList += _ }
+    Driver.idfs { nodesList += _ }
 
     def verify {
       var hasError = false
@@ -511,7 +511,7 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def forceMatchingWidths {
-    Driver.bfs (_.forceMatchingWidths)
+    Driver.idfs (_.forceMatchingWidths)
   }
 
   def computeMemPorts(mod: Module) {
