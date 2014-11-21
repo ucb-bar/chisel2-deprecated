@@ -437,4 +437,20 @@ class ZeroWidthTest extends TestSuite {
 
     chiselMain(testArgs, () => Module(new MuxComp()))
   }
+
+  /** Reverse produced many width warning messages. 
+    */
+  @Test def testReverseNoisyWidth() {
+    println("\ntesttestReverseNoisyWidth ...")
+    class ReverseNoisyWidth extends Module {
+      val io = new Bundle {
+        val i = UInt(INPUT, width=64)
+        val o = UInt(OUTPUT, width=64)
+      }
+      io.o := Reverse(io.i)
+    }
+
+    chiselMain(testArgs, () => Module(new ReverseNoisyWidth()))
+    assertTrue(ChiselError.ChiselErrors.isEmpty);
+  }
 }
