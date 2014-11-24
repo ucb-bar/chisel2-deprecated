@@ -811,6 +811,7 @@ abstract class Backend extends FileSystemUtilities{
 
     ChiselError.info("executing custom transforms")
     execute(c, transforms)
+    verifyAllMuxes
     ChiselError.checkpoint()
 
     ChiselError.info("adding clocks and resets")
@@ -853,7 +854,6 @@ abstract class Backend extends FileSystemUtilities{
     ChiselError.info("resolving nodes to the components")
     collectNodesIntoComp(c)
     checkModuleResolution
-    verifyAllMuxes
     ChiselError.checkpoint()
 
     findConsumers(c)
