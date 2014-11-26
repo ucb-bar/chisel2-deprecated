@@ -161,7 +161,7 @@ abstract class Backend extends FileSystemUtilities{
     for (comp <- Driver.sortedComps) {
       comp dfs { _ match {
         case reg: Reg if reg.name == "" =>
-          reg.name = "R" + reg.component.nextIndex
+          reg setName "R" + reg.component.nextIndex
         case node: Node if !node.isTypeNode && node.name == "" =>
           node.name = "T" + node.component.nextIndex
         case _ =>
