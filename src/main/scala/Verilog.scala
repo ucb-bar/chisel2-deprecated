@@ -213,17 +213,20 @@ class VerilogBackend extends Backend {
                   // } removed this warning because pruneUnconnectedsIOs should have picked it up
                 portDec = "//" + portDec
               } else {
-                var consumer: Node = c.parent.findBinding(io);
-                if (consumer == null) {
-                  if (Driver.saveConnectionWarnings) {
-                    ChiselError.warning("" + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + io.consumers.size + ") IN " + c.parent);
+                c.parent.findBinding(io) match {
+                  case None => {
+                    if (Driver.saveConnectionWarnings) {
+                      ChiselError.warning("" + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + 
+                                          io.consumers.size + ") IN " + c.parent)
+                    }
+                    portDec = "//" + portDec
                   }
-                  portDec = "//" + portDec
-                } else {
-                  if (io.prune)
-                    portDec = "//" + portDec + emitRef(consumer)
-                  else
-                    portDec += emitRef(consumer); // TODO: FIX THIS?
+                  case Some(consumer) => {
+                    if (io.prune)
+                      portDec = "//" + portDec + emitRef(consumer)
+                    else
+                      portDec += emitRef(consumer); // TODO: FIX THIS?
+                  }
                 }
               }
             }
@@ -518,7 +521,7 @@ class VerilogBackend extends Backend {
               included = false
           }
           else if (io.dir == OUTPUT) {
-            if (io.consumers.size == 0 || m.parent.findBinding(io) == null || io.prune)
+            if (io.consumers.size == 0 || m.parent.findBinding(io) == None || io.prune)
               included = false
           }
           if (included) dumpvars += io

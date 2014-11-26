@@ -35,29 +35,22 @@ import Node._
 object Binding {
 
   def apply(m: Node, c: Module, ioComp: Module): Node = {
-    if (Driver.backend.isEmittingComponents) {
-      val res = c.findBinding(m);
-      if (res == null) {
-        val res = new Binding(m, ioComp);
-        res.component = c;
-        res.init("", widthOf(0), m);
-        res.infer;
+    c.findBinding(m) match {
+      case Some(res) => res
+      case None => {
+        val res = new Binding(m, ioComp)
+        res.component = c
+        res.init("", widthOf(0), m)
+        res.infer
         c.nodes += res
-        c.bindings += res;
+        c.bindings += res
         res
-      } else {
-        res;
       }
-    } else {
-      m
     }
   }
 }
 
-class Binding(tn: Node, tc: Module) extends Node {
-
-  val targetNode: Node = tn;
-  val targetComponent: Module = tc;
+class Binding(val targetNode: Node, val targetComponent: Module) extends Node {
 
   override def toString: String = "BINDING(" + inputs(0) + ")";
 }

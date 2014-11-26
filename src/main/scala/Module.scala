@@ -208,14 +208,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     io nameIt ("io", true)
   }
 
-  def findBinding(m: Node): Binding = {
-    for (b <- bindings) {
-      if (b.inputs(0) == m) {
-        return b
-      }
-    }
-    null
-  }
+  def findBinding(m: Node) = bindings find (_.inputs(0) == m)
 
   def io: Data
 
