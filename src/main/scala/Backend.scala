@@ -468,6 +468,9 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def inferAll(mod: Module): Int = {
+    // Verify all the muxes just before width inference
+    verifyAllMuxes
+
     val nodesList = ArrayBuffer[Node]()
     Driver.idfs { nodesList += _ }
 
@@ -813,7 +816,6 @@ abstract class Backend extends FileSystemUtilities{
 
     ChiselError.info("executing custom transforms")
     execute(c, transforms)
-    verifyAllMuxes
     ChiselError.checkpoint()
 
     ChiselError.info("adding clocks and resets")
