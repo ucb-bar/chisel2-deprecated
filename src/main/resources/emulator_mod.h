@@ -5,7 +5,11 @@
 #define __IS_EMULATOR_MOD__
 
 #pragma GCC diagnostic push
+#ifdef __clang__
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#else
 #pragma GCC diagnostic ignored "-Wpragmas"
+#endif // __clang__
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wsign-compare"
 #pragma GCC diagnostic ignored "-Wparentheses"
