@@ -161,4 +161,46 @@ class TesterTest extends TestSuite {
       "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
       () => Module(new PokeNegModule())) {m => new PokeNegTests(m)}
   }
+
+  /** Test sign bits issues.
+   *  Mishandling of UInts with MSB == 1 #347 
+   *
+   */
+  @Test def testUIntMSB1 () {
+    class HWAssert extends Module {
+      val io = new Bundle(){
+        val in  = UInt(INPUT, width = 32)
+        val out = UInt(OUTPUT, width = 32)
+      }
+    
+      val reg = Reg(next = io.in, init = UInt(0xffffffff))
+    
+      io.out := reg
+    
+      assert(reg != UInt(0xff000000), "Assertion Test")
+    }
+    
+    class UIntMSB1Tests(c:HWAssert) extends Tester(c){
+      peek(c.io.out)
+    
+      poke(c.io.in, 100)
+      step(1)
+      peek(c.io.out)
+    
+      poke(c.io.in, 0x0f000000)
+      step(1)
+      peek(c.io.out)
+    
+      poke(c.io.in, 0xf0000000)
+      step(1)
+      peek(c.io.out)
+    }
+    
+    chiselMainTest(Array[String]("--backend", "c",
+      "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
+      () => Module(new HWAssert())) {m => new UIntMSB1Tests(m)}
+
+    assertFile("TesterTest_HWAssert_1.cpp")
+
+  }
 }
