@@ -199,5 +199,8 @@ class TesterTest extends TestSuite {
     chiselMainTest(Array[String]("--backend", "c",
       "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
       () => Module(new HWAssert())) {m => new UIntMSB1Tests(m)}
+
+    assertFile("TesterTest_HWAssert_1.cpp")
+
   }
 }
