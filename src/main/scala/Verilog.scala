@@ -130,7 +130,7 @@ class VerilogBackend extends Backend {
     emitLit(x, x.bitLength + (if (x < 0) 1 else 0))
   private def emitLit(x: BigInt, w: Int): String = {
     val unsigned = if (x < 0) (BigInt(1) << w) + x else x
-    require(x >= 0)
+    require(unsigned >= 0)
     w + "'h" + unsigned.toString(16)
   }
 
