@@ -135,8 +135,15 @@ object Driver extends FileSystemUtilities{
       queue enqueue b.io
     for (c <- components; (n, io) <- c.wires)
       queue enqueue io
-    for (c <- components; if !(c.defaultResetPin == null))
-      queue enqueue c.defaultResetPin
+    // Ensure any nodes connected to reset are visited.
+    for (c <- components) {
+      if (!(c.defaultResetPin == null)) {
+        queue enqueue c.defaultResetPin
+      }
+      if (!(c._reset == null) && !(c._reset == implicitReset)) {
+        queue enqueue c._reset.getNode
+      }
+    }
 
     // Do BFS
     val walked = HashSet[Node]()
@@ -169,8 +176,15 @@ object Driver extends FileSystemUtilities{
     // initialize DFS
     for (c <- components; (n, io) <- c.wires)
       stack push io
-    for (c <- components; if !(c.defaultResetPin == null))
-      stack push c.defaultResetPin
+    // Ensure any nodes connected to reset are visited.
+    for (c <- components) {
+      if (!(c.defaultResetPin == null)) {
+        stack push c.defaultResetPin
+      }
+      if (!(c._reset == null) && !(c._reset == implicitReset)) {
+        stack push c._reset.getNode
+      }
+    }
     for (c <- components; a <- c.debugs)
       stack push a
     for (b <- blackboxes)
@@ -233,8 +247,17 @@ object Driver extends FileSystemUtilities{
       pushInitialNode(a)
     for(b <- blackboxes)
       pushInitialNode(b.io)
-    for(c <- components; (n, io) <- c.io.flatten) {
+    for(c <- components; (n, io) <- c.wires) {
       pushInitialNode(io)
+    }
+    // Ensure any nodes connected to reset are visited.
+    for (c <- components) {
+      if (!(c.defaultResetPin == null)) {
+        pushInitialNode(c.defaultResetPin)
+      }
+      if (!(c._reset == null) && !(c._reset == implicitReset)) {
+        pushInitialNode(c._reset.getNode)
+      }
     }
     val stack = inputs ++ res
 
@@ -325,7 +348,6 @@ object Driver extends FileSystemUtilities{
     sramMaxSize = 0
     topComponent = null
     clocks.clear()
-    implicitReset = Bool(INPUT)
     implicitReset.isIo = true
     implicitReset.setName("reset")
     implicitClock = new Clock()
@@ -485,7 +507,7 @@ object Driver extends FileSystemUtilities{
   var stackIndent = 0
   val printStackStruct = ArrayBuffer[(Int, Module)]()
   val clocks = ArrayBuffer[Clock]()
-  var implicitReset: Bool = null
+  val implicitReset = Bool(INPUT)
   var implicitClock: Clock = null
   var isInGetWidth: Boolean = false
   var modStackPushed: Boolean = false

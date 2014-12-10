@@ -354,4 +354,44 @@ class ConnectSuite extends TestSuite {
     assertTrue(!ChiselError.ChiselErrors.isEmpty);
   }
 
+  /* Signals only used as resets are trimmed (#346)
+   *
+   * 
+   */
+  @Test def testUnconnectedResets() {
+    class SubModule(reset: Bool) extends Module(null, reset) {
+      class IO extends Bundle {
+        val in = Bool(INPUT)
+        val out = Bool(OUTPUT)
+      }
+      val io = new IO
+    
+      val r = Reg(init = Bool(true))
+      r := io.in
+      io.out := r
+    }
+    
+    class UnconnectedResets extends Module {
+      class IO extends Bundle {
+        val in  = Bool(INPUT)
+        val out = Bool(OUTPUT)
+      }
+      val io = new IO
+    
+      val regs = Vec.fill(3){ Reg(Bool()) }
+      regs(0) := reset
+      for (i <- 1 until 3)
+        regs(i) := regs(i-1)
+    
+      val sub = Module(new SubModule(regs(2)))
+      sub.io.in := io.in
+      io.out := sub.io.out /* | regs(2) */
+    }
+
+    chiselMain(Array[String]("--backend", "v",
+      "--targetDir", dir.getPath.toString()),
+      () => Module(new UnconnectedResets()))
+    
+    assertFile("ConnectSuite_UnconnectedResets_1.v")
+  }
 }

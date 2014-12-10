@@ -225,7 +225,7 @@ class ManualTester[+T <: Module]
       } else {
         cmd = "wire_poke " + dumpName(data);
       }
-      // Don't prefix negative numbers with "0x"
+      // Ensure the sign is before the prefix.
       val radixPrefix = if (x < 0) " -0x" else " 0x"
       val xval = radixPrefix + x.abs.toString(16)
       cmd = cmd + xval
