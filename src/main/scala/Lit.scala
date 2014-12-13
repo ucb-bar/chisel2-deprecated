@@ -155,7 +155,11 @@ object Literal {
     res
   }
   def toLitVal(x: String): BigInt = {
-    BigInt(x.substring(2, x.length), 16)
+    // eliminate the hex prefix from the string.
+    // NOTE: there may be a leading '-'
+    // We need to accept the fact that fundamentally,
+    // all numeric quantities are signed in Java/Scala.
+    BigInt(x.replace("0x", ""), 16)
   }
 
   def toLitVal(x: String, shamt: Int): BigInt = {
@@ -236,7 +240,11 @@ object Literal {
       max(bl, 1)
     }
     val w = if(width == -1) xWidth else width
-    val xString = (if (x >= 0) x else (BigInt(1) << w) + x).toString(16)
+    val xString = if (x >= 0) {
+      "0x" + x.toString(16)
+    } else {
+      "-0x" + (-x).toString(16)
+    }
 
     if(xWidth > width && width != -1) {
       // Is this a zero-width wire with value 0
@@ -244,7 +252,7 @@ object Literal {
         ChiselError.error({"width " + width + " is too small for literal " + x + ". Smallest allowed width is " + xWidth});
       }
     }
-    res.init("0x" + xString, w);
+    res.init(xString, w);
     res.hasInferredWidth = width == -1
     res
   }

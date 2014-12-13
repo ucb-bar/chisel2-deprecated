@@ -1,29 +1,13 @@
-ChangeLog for Chisel v2.2.20 11/20/14
+ChangeLog for Chisel v2.2.21 12/12/2014
 
-#94 printf being discarded during elaboration
-#153 nameIt is way too eager, needs to chill out
-#168 lit as port breaks chisel - flag it as a ChiselError
-#196 README Instructions don't let to a working HelloWorld 
-#209 enerated Verilog repeated wire names (Verilog backend)
-#286 Width Inference Issue (width of operations on literals)
-#290 Register with custom clock for a bundle generate wrong verilog
-#292 Vcd varName,stripComponent code emits invalid variable IDs
-#295 Bundle.calcElements calculates too many
-#298 Printf() doesn't since the switch to the new Tester
-#300 Generated cpp files lack Config substring (C++ backend)
-#319 --parallelMakeJobs doesn't understand --targetDir
-#321 Support poking large numbers - extension of #318
-#331 Fill(0, ...) fails with a java exception
-Vtests: fix step
-Deleted unused ModularCpp backend before more bitrot sets in.
-Cosmetic/scalastyle fixes - no functional changes.
-Add support for a constant pool (C++ backend)
-Add hasSRAM & sramMaxSize for custom transforms
-Fix naming problems when adding modules in custom transforms
-Parametrization in custom transforms
-Fix a binding problem
-Fixes to --partitionIslands
-Small changes in parameterization
-Added "in" operator that can be used when defining constraints. Currently only works for List[Int], Range, and List[Chisel.IntEx]
-Significant rewrite of the Bundle and Vec code
-Significant changes to Verilog test code
+#347 Mishandling of UInts with MSB == 1
+#346 Signals only used as resets are trimmed
+#335 Null Pointer Exception on Floating Output.
+#334 Fix poking Negative Values Fails
+#325 ChiselUtil Reverse: Cpp optimization floods console with warnings
+ Eliminate NullPointerException if computeMemPorts is called before forceMatchingWidth.
+ Reorder Chisel standard passes for performance and flexibility.
+ Simplify and speed up width inference.
+ Placate various C++ compilers (C++ backend).
+ Minor changes to the dot backend for literal node names in debugging support (Dot backend).
+ Fixes to binding and register naming.

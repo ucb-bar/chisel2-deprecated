@@ -250,7 +250,7 @@ class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) 
     }
 
     val wp = getProducts(cond)
-    val rp = getProducts(r.cond)
+    val rp = getProducts(r.addrReg.enableSignal)
     wp.find(wc => rp.exists(rc => rc._isComplementOf(wc)))
   }
   def data = inputs(2)

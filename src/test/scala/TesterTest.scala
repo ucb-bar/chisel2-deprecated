@@ -32,6 +32,8 @@ import org.junit.Assert._
 import org.junit.Test
 
 import Chisel._
+import Chisel.Implicits._
+import Chisel.AdvTester._
 
 /** This testsuite checks the primitives of the standard library
   that will generate basic common graphs of *Node*.
@@ -123,5 +125,82 @@ class TesterTest extends TestSuite {
     chiselMainTest(Array[String]("--backend", "c",
       "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
       () => Module(new IOSelector())) {m => new VariousPokeTester(m)}
+  }
+
+  /** Test poking negative numbers.
+   *  This is primarily a test of the Tester and its peek/poke/expect interface.
+   *
+   */
+  @Test def testPokeNegTests () {
+    println("\ntestPokeNegTests ...")
+    
+    class PokeNegModule extends Module {
+    
+      val io = new Bundle {  
+        val i_value     = UInt(INPUT, width = 64)
+        val o_value     = UInt(OUTPUT, width = 64)
+      }
+    
+      io.o_value := io.i_value
+    } 
+    
+    class PokeNegTests(c:PokeNegModule) extends AdvTester(c){
+      isTrace = true
+    
+      wire_poke(c.io.i_value, 0x7100a000a000a000L)
+      expect(c.io.o_value, 0x7100a000a000a000L)
+    
+      wire_poke(c.io.i_value, 0x8100a000a000a000L)
+      expect(c.io.o_value, 0x8100a000a000a000L) 
+    
+      wire_poke(c.io.i_value, -1L )
+      expect(c.io.o_value, -1L )
+    }   
+    
+    chiselMainTest(Array[String]("--backend", "c",
+      "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
+      () => Module(new PokeNegModule())) {m => new PokeNegTests(m)}
+  }
+
+  /** Test sign bits issues.
+   *  Mishandling of UInts with MSB == 1 #347 
+   *
+   */
+  @Test def testUIntMSB1 () {
+    class HWAssert extends Module {
+      val io = new Bundle(){
+        val in  = UInt(INPUT, width = 32)
+        val out = UInt(OUTPUT, width = 32)
+      }
+    
+      val reg = Reg(next = io.in, init = UInt(0xffffffff))
+    
+      io.out := reg
+    
+      assert(reg != UInt(0xff000000), "Assertion Test")
+    }
+    
+    class UIntMSB1Tests(c:HWAssert) extends Tester(c){
+      peek(c.io.out)
+    
+      poke(c.io.in, 100)
+      step(1)
+      peek(c.io.out)
+    
+      poke(c.io.in, 0x0f000000)
+      step(1)
+      peek(c.io.out)
+    
+      poke(c.io.in, 0xf0000000)
+      step(1)
+      peek(c.io.out)
+    }
+    
+    chiselMainTest(Array[String]("--backend", "c",
+      "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
+      () => Module(new HWAssert())) {m => new UIntMSB1Tests(m)}
+
+    assertFile("TesterTest_HWAssert_1.cpp")
+
   }
 }

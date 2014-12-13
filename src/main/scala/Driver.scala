@@ -135,8 +135,15 @@ object Driver extends FileSystemUtilities{
       queue enqueue b.io
     for (c <- components; (n, io) <- c.wires)
       queue enqueue io
-    for (c <- components; if !(c.defaultResetPin == null))
-      queue enqueue c.defaultResetPin
+    // Ensure any nodes connected to reset are visited.
+    for (c <- components) {
+      if (!(c.defaultResetPin == null)) {
+        queue enqueue c.defaultResetPin
+      }
+      if (!(c._reset == null) && !(c._reset == implicitReset)) {
+        queue enqueue c._reset.getNode
+      }
+    }
 
     // Do BFS
     val walked = HashSet[Node]()
@@ -169,8 +176,15 @@ object Driver extends FileSystemUtilities{
     // initialize DFS
     for (c <- components; (n, io) <- c.wires)
       stack push io
-    for (c <- components; if !(c.defaultResetPin == null))
-      stack push c.defaultResetPin
+    // Ensure any nodes connected to reset are visited.
+    for (c <- components) {
+      if (!(c.defaultResetPin == null)) {
+        stack push c.defaultResetPin
+      }
+      if (!(c._reset == null) && !(c._reset == implicitReset)) {
+        stack push c._reset.getNode
+      }
+    }
     for (c <- components; a <- c.debugs)
       stack push a
     for (b <- blackboxes)
@@ -210,83 +224,82 @@ object Driver extends FileSystemUtilities{
 
   // A "depth-first" search for width inference.
   def idfs(visit: Node => Unit): Unit = {
+    // We "flag" stack items to indicate whether we've dealt with their children or not.
+    val res = new Stack[(Node, Boolean)]
+    val inputs = new Stack[(Node, Boolean)]
+    val stacked = new HashSet[Node]
 
-    def initializeIDFS: Stack[Node] = {
-      val res = new Stack[Node]
-      /* XXX Make sure roots are consistent between initializeBFS, initializeDFS
-         and findRoots.
-       */
-      for (c <- components; a <- c.debugs)
-        res.push(a)
-      for(b <- blackboxes)
-        res.push(b.io)
-      for(c <- components; (n, io) <- c.io.flatten)
-          res.push(io)
-    res
-    }
-
-
-    // Walk each of the strongly connected component lists,
-    //  visiting nodes as we do so.
-    val visited = new HashSet[Node]
-
-    // Visit a node and reset it's sccIndex as we do so.
-    def doOneNode(n: Node): Unit = {
-      visit(n)
-      visited += n
-      n.sccIndex = -1
-      n.sccLowlink = -1
-    }
-
-    def findSCC():ArrayBuffer[ArrayBuffer[Node]] = {
-      // Tarjan's strongly connected components algorithm to find loops
-      var sccIndex = 0
-      val stack = new Stack[Node]
-      val sccList = new ArrayBuffer[ArrayBuffer[Node]]
-
-      def tarjanSCC(n: Node): Unit = {
-
-        n.sccIndex = sccIndex
-        n.sccLowlink = sccIndex
-        sccIndex += 1
-        stack.push(n)
-
-        for(i <- n.inputs) {
-          if(!(i == null)) {
-            if(i.sccIndex == -1) {
-              tarjanSCC(i)
-              n.sccLowlink = min(n.sccLowlink, i.sccLowlink)
-            } else if(stack.contains(i)) {
-              n.sccLowlink = min(n.sccLowlink, i.sccIndex)
-            }
+    // Order the stack so input nodes are handled first.
+    def pushInitialNode(n: Node) {
+      if (!stacked.contains(n)) {
+        stacked += n
+        n match {
+          case b: Bits if b.isIo && b.dir == INPUT => {
+            inputs.push((n, false))
+          }
+          case _ => {
+            res.push((n, false))
           }
         }
-
-        if(n.sccLowlink == n.sccIndex) {
-          val scc = new ArrayBuffer[Node]
-
-          var top: Node = null
-          do {
-            top = stack.pop()
-            scc += top
-          } while (!(n == top))
-          sccList += scc
-        }
       }
-
-      // Construct the SCC arrays
-      val idfsNodes = initializeIDFS
-      for (node <- idfsNodes) {
-        if(node.sccIndex == -1) {
-          tarjanSCC(node)
-        }
+    }
+    for (c <- components; a <- c.debugs)
+      pushInitialNode(a)
+    for(b <- blackboxes)
+      pushInitialNode(b.io)
+    for(c <- components; (n, io) <- c.wires) {
+      pushInitialNode(io)
+    }
+    // Ensure any nodes connected to reset are visited.
+    for (c <- components) {
+      if (!(c.defaultResetPin == null)) {
+        pushInitialNode(c.defaultResetPin)
       }
-    sccList
+      if (!(c._reset == null) && !(c._reset == implicitReset)) {
+        pushInitialNode(c._reset.getNode)
+      }
+    }
+    val stack = inputs ++ res
+
+    // Callers should ensure the node we're pushing isn't already on the stack.
+    def pushBareNode(n: Node) {
+      require(!stacked.contains(n), "idfs: pushNode() node on stack <%s>".format(n.toString()))
+      stacked += n
+      stack.push((n, false))
     }
 
-    for (scclist <- findSCC()) {
-      for (node <- scclist){
-        doOneNode(node)
+    // Walk the graph in depth-first order,
+    //  visiting nodes as we do so.
+    while (!stack.isEmpty) {
+      val (top, dealtWithChildren) = stack.pop
+      // Have we visited all our children
+      if (dealtWithChildren) {
+        // Yes. Visit this node.
+        visit(top)
+      } else {
+        // We still have children to visit.
+        // Put this node back on the stack, with a flag indicating we've dealt with its children
+        stack push ((top, true))
+        top match {
+          case v: Vec[_] => {
+            for ((n, e) <- v.flatten;
+            if !(stacked contains e)) {
+              pushBareNode(e)
+            }
+          }
+          case b: Bundle => {
+            for ((n, e) <- b.flatten;
+            if !(stacked contains e)) {
+              pushBareNode(e)
+            }
+          }
+          case _ => {}
+        }
+        // Push any un-visited children
+        for (c <- top.inputs;
+        if !(stacked contains c)) {
+          pushBareNode(c)
+        }
       }
     }
   }
@@ -335,7 +348,6 @@ object Driver extends FileSystemUtilities{
     sramMaxSize = 0
     topComponent = null
     clocks.clear()
-    implicitReset = Bool(INPUT)
     implicitReset.isIo = true
     implicitReset.setName("reset")
     implicitClock = new Clock()
@@ -495,7 +507,7 @@ object Driver extends FileSystemUtilities{
   var stackIndent = 0
   val printStackStruct = ArrayBuffer[(Int, Module)]()
   val clocks = ArrayBuffer[Clock]()
-  var implicitReset: Bool = null
+  val implicitReset = Bool(INPUT)
   var implicitClock: Clock = null
   var isInGetWidth: Boolean = false
   var modStackPushed: Boolean = false

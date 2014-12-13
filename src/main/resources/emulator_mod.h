@@ -5,6 +5,11 @@
 #define __IS_EMULATOR_MOD__
 
 #pragma GCC diagnostic push
+#ifdef __clang__
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#else
+#pragma GCC diagnostic ignored "-Wpragmas"
+#endif // __clang__
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wsign-compare"
 #pragma GCC diagnostic ignored "-Wparentheses"
@@ -13,6 +18,9 @@
 #pragma GCC diagnostic ignored "-Wtype-limits"
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wreorder"
+#pragma GCC diagnostic ignored "-Wsometimes-uninitialized"
+#pragma GCC diagnostic ignored "-pedantic"
 
 #include <assert.h>
 #include <inttypes.h>
@@ -1575,7 +1583,7 @@ class mem_t {
   }
 };
 
-static char hex_to_char[] = "0123456789abcdef";
+static __attribute__((unused)) char hex_to_char[] = "0123456789abcdef";
 
 static int  char_to_hex[] = {
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,

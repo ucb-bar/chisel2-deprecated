@@ -4,6 +4,12 @@
 
 #include "emulator_mod.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunused-variable"
+
 #include <string>
 #include <sstream>
 #include <map>
@@ -23,7 +29,7 @@ static std::string itos(int in) {
  * Copy one val_t array to another.
  * nb must be the exact number of bits the val_t represents.
  */
-static void val_cpy(val_t* dst, val_t* src, int nb) {
+static __attribute__((unused)) void val_cpy(val_t* dst, val_t* src, int nb) {
     for (int i=0; i<val_n_words(nb); i++) {
         dst[i] = src[i];
     }
@@ -44,7 +50,7 @@ static void val_empty(val_t* dst, int nb) {
  * is capped by the width of a single val_t element.
  * nb must be the exact number of bits the val_t represents.
  */
-static void val_set(val_t* dst, val_t nb, val_t num) {
+static __attribute__((unused)) void val_set(val_t* dst, val_t nb, val_t num) {
     val_empty(dst, nb);
     dst[0] = num;
 }
@@ -664,5 +670,7 @@ protected:
 	// Snapshot functions
 	std::map<std::string, mod_t*> snapshot_table;
 };
+
+#pragma GCC diagnostic pop
 
 #endif
