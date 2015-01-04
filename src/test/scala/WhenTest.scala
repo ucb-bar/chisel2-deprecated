@@ -186,6 +186,41 @@ class WhenSuite extends TestSuite {
     launchCppTester((m: UnlessModule) => new UnlessModuleTests(m))
   }
 
+  // Make sure reg holds its value when c1 && !c2.
+  @Test def testOtherwise() {
+    class OtherwiseModule extends Module {
+      val io = new Bundle {
+        val c1 = Bool(INPUT)
+        val c2 = Bool(INPUT)
+        val out = Bool(OUTPUT)
+      }
+
+      val reg = Reg(init = Bool(false))
+      io.out := reg
+
+      when (io.c1) {
+        when (io.c2) {
+          reg := Bool(true)
+        }
+      }.otherwise {
+        reg := Bool(false)
+      }
+    }
+
+    class OtherwiseModuleTests(m: OtherwiseModule) extends Tester(m) {
+      val a = List(1,1,0,1,0)
+      val b = List(1,0,1,1,0)
+      val o = List(1,1,0,1,0)
+      for ((c1, (c2, out)) <- a zip (b zip o)) {
+        poke(m.io.c1, int(c1))
+        poke(m.io.c2, int(c2))
+        step(1)
+        expect(m.io.out, int(out))
+      }
+    }
+
+    launchCppTester((m: OtherwiseModule) => new OtherwiseModuleTests(m))
+  }
 
   // switch statement, is clauses, and ? literals
   @Test def testSwitch() {
