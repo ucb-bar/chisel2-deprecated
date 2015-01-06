@@ -341,6 +341,7 @@ object Driver extends FileSystemUtilities{
     compileInitializationUnoptimized = false
     useSimpleQueue = false
     parallelMakeJobs = 0
+    useOpenMP = false
     isVCDinline = false
     isSupportW0W = false
     hasMem = false
@@ -403,6 +404,7 @@ object Driver extends FileSystemUtilities{
         case "--compileInitializationUnoptimized" => compileInitializationUnoptimized = true
         case "--useSimpleQueue" => useSimpleQueue = true
         case "--parallelMakeJobs" => parallelMakeJobs = args(i + 1).toInt; i += 1
+        case "--useOpenMP" => useOpenMP = true
         case "--isVCDinline" => isVCDinline = true
         case "--backend" => backendName = args(i + 1); i += 1
         case "--compile" => isCompiling = true
@@ -488,6 +490,7 @@ object Driver extends FileSystemUtilities{
   var compileInitializationUnoptimized = false
   var useSimpleQueue = false
   var parallelMakeJobs = 0
+  var useOpenMP = false
   var isVCDinline = false
   var isSupportW0W = false
   var hasMem = false

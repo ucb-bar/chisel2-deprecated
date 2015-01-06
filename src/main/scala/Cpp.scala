@@ -102,6 +102,8 @@ class CppBackend extends Backend {
     ""
   }
 
+  val useOpenMP = Driver.useOpenMP
+
   override def emitTmp(node: Node): String = {
     require(false)
     if (node.isInObject) {
@@ -758,7 +760,8 @@ class CppBackend extends Backend {
     val chiselENV = java.lang.System.getenv("CHISEL")
 
     val c11 = if (hasPrintfs) " -std=c++11 " else ""
-    val cxxFlags = (if (flagsIn == null) CXXFLAGS else flagsIn) + c11
+    val openMP = if (useOpenMP) " -fopenmp " else ""
+    val cxxFlags = (if (flagsIn == null) CXXFLAGS else flagsIn) + c11 + openMP
     val cppFlags = scala.util.Properties.envOrElse("CPPFLAGS", "") + " -I../ -I" + chiselENV + "/csrc/"
     val allFlags = cppFlags + " " + cxxFlags
     val dir = Driver.targetDir + "/"
@@ -771,11 +774,11 @@ class CppBackend extends Backend {
       ChiselError.info(cmd + " RET " + c)
     }
     def linkOne(name: String) {
-      val ac = CXX + " " + LDFLAGS + " -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o"
+      val ac = CXX + " " + LDFLAGS + openMP + " -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o"
       run(ac)
     }
     def linkMany(name: String, objects: Seq[String]) {
-      val ac = CXX + " " + LDFLAGS + " -o " + dir + name + " " + objects.map(dir + _ + ".o ").mkString(" ") + dir + name + "-emulator.o"
+      val ac = CXX + " " + LDFLAGS + openMP + " -o " + dir + name + " " + objects.map(dir + _ + ".o ").mkString(" ") + dir + name + "-emulator.o"
       run(ac)
     }
     def cc(name: String, flags: String = allFlags) {
@@ -1136,6 +1139,9 @@ class CppBackend extends Backend {
       val out_h = createOutputFile(n + ".h");
       out_h.write("#ifndef __" + c.name + "__\n");
       out_h.write("#define __" + c.name + "__\n\n");
+      if (useOpenMP) {
+        out_h.write("#include \"omp.h\"\n")
+      }
       out_h.write("#include \"emulator.h\"\n\n");
 
       // Generate module headers
@@ -1651,6 +1657,17 @@ class CppBackend extends Backend {
       }
  
       def outputAllClkDomains() {
+        val clockLoWraps = 
+          if (useOpenMP) {
+            Array(" #pragma omp parallel\n {\n  #pragma omp sections\n  {\n",
+                "   #pragma omp section\n   {\n",
+                "   }\n",
+                "  }\n }\n"
+                )
+          } else {
+            Array("", "", "", "")
+          }
+
         // Are we generating partitioned islands?
         if (!partitionIslands) {
           //.values.map(_._1.body) ++ (code.values.map(x => (x._2.append(x._3))))
@@ -1688,10 +1705,16 @@ class CppBackend extends Backend {
             createCppFile()
             // This is just the definition of the main clock_lo method.
             writeCppFile(clock_lo.head)
+
+            writeCppFile(clockLoWraps(0))
+
             // Output the actual calls to the island specific clock_lo code.
             for (clockLoMethod <- accumulatedClockLos.separateMethods) {
+              writeCppFile(clockLoWraps(1))
               writeCppFile("\t" + clockLoMethod.genCall)
+              writeCppFile(clockLoWraps(2))
             }
+            writeCppFile(clockLoWraps(3))
             writeCppFile("}\n")
           }
 
