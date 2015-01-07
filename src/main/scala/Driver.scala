@@ -334,6 +334,7 @@ object Driver extends FileSystemUtilities{
     isDebugMem = false
     isSupportW0W = false
     partitionIslands = false
+    separateIslandState = false
     lineLimitFunctions = 0
     minimumLinesPerFile = 0
     shadowRegisterInObject = false
@@ -397,6 +398,7 @@ object Driver extends FileSystemUtilities{
         case "--noAssert" => isAssert = false
         case "--debugMem" => isDebugMem = true
         case "--partitionIslands" => partitionIslands = true
+        case "--separateIslandState" => separateIslandState = true
         case "--lineLimitFunctions" => lineLimitFunctions = args(i + 1).toInt; i += 1
         case "--minimumLinesPerFile" => minimumLinesPerFile = args(i + 1).toInt; i += 1
         case "--shadowRegisterInObject" => shadowRegisterInObject = true
@@ -483,6 +485,7 @@ object Driver extends FileSystemUtilities{
   var isAssert = true
   var isDebugMem = false
   var partitionIslands = false
+  var separateIslandState= false
   var lineLimitFunctions = 0
   var minimumLinesPerFile = 0
   var shadowRegisterInObject = false

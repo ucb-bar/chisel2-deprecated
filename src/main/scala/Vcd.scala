@@ -30,6 +30,7 @@
 
 package Chisel
 import Node._
+import Node.NodeRefType._
 import Reg._
 import Literal._
 import ChiselError._
@@ -40,9 +41,9 @@ import scala.collection.mutable.ArrayBuffer
 class VcdBackend(top: Module) extends Backend {
   val keywords = Set[String]()
 
-  override def emitTmp(node: Node): String =
-    emitRef(node)
-  override def emitRef(node: Node): String =
+  override def emitTmp(node: Node, refType: NodeRefType = Basic): String =
+    emitRef(node, refType)
+  override def emitRef(node: Node, refType: NodeRefType = Basic): String =
     node match {
       case _: Literal =>
         node.name

@@ -123,6 +123,11 @@ object Node {
       w
     }
   }
+
+  object NodeRefType extends Enumeration {
+    type NodeRefType = Value
+    val Basic, Dec, Read, Write, Addr, ReadAddr, WriteAddr = Value
+  }
 }
 
 /** *Node* defines the root class of the class hierarchy for

@@ -37,6 +37,7 @@ import java.io.OutputStream
 import java.io.PrintStream
 import scala.sys.process._
 import Node._
+import Node.NodeRefType._
 import Reg._
 import ChiselError._
 import Literal._
@@ -56,12 +57,12 @@ class FloBackend extends Backend {
   }
 
   override def emitDec(node: Node): String =
-    emitRef(node) + " = "
+    emitRef(node, Dec) + " = "
 
-  override def emitTmp(node: Node): String =
-    emitRef(node)
+  override def emitTmp(node: Node, refType: NodeRefType = Basic): String =
+    emitRef(node, refType)
 
-  override def emitRef(node: Node): String = { emitRef(node, node) }
+  override def emitRef(node: Node, refType: NodeRefType = Basic): String = { emitRef(node, node) }
 
   def emitRef(node: Node, cnode: Node): String = {
     // if (node.litOf == null) {

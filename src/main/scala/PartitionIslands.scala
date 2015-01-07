@@ -33,21 +33,40 @@ package Chisel
 import scala.collection.mutable.{ArrayBuffer, Set, HashSet, HashMap, ListBuffer, Map, Queue=>ScalaQueue, Stack}
 import collection.mutable
 import scala.collection.mutable.Map
+import PartitionIslands._
 
 object PartitionIslands {
   type IslandNodes = scala.collection.immutable.HashSet[Node]
-  type NodeIdIslands = scala.collection.immutable.HashSet[Island]
+
   val debug: Boolean = false
   val printHistogram = true
 
   // The external interface - immutable sets.
-  class Island(theIslandId: Int, theNodes: scala.collection.immutable.Set[Node], theRoots: scala.collection.immutable.Set[Node]) {
+  class Island(theIslandId: Int, theNodes: scala.collection.immutable.Set[Node], theRoots: scala.collection.immutable.Set[Node]) extends Ordered[Island] {
     val islandId = theIslandId
     val nodes = theNodes
     val roots = theRoots
     def isEmpty: Boolean = nodes.isEmpty
+    // Define the equality trio: hashCode, equals, canEqual
+    //   Programming in Scala, Chapter 28: Object Equality
+    override def hashCode: Int = islandId
+    override def equals(other: Any): Boolean = other match {
+      case that: Island =>
+        (that canEqual this) && (this.islandId == that.islandId)
+      case _ =>
+        false
+    }
+    def canEqual(other: Any): Boolean = other.isInstanceOf[Island]
+    def compare(that: Island) : Int = this.islandId - that.islandId
   }
 
+  type NodeIdIslands = scala.collection.immutable.TreeSet[Island]
+/*
+  class NodeIdIslands() extends NodeIslandSet {
+    def homeIsland: Island = this.head
+    def +=(island: Island): NodeIdIslands = NodeIdIslands(this.toList: _*, island)
+  }
+ */
   // We define this as a class (as opposed to a simple type) in order to specify the size.
   private class MarkedNodes(isize: Int = 16) extends HashMap[Node, Int] {
     override def initialSize: Int = isize
@@ -401,14 +420,14 @@ object PartitionIslands {
     resArrayBuffer.toArray
   }
 
-  // Generate a mapping from node to island, given an array of islands.
+  // Generate a mapping from node to island, giving an array of islands.
   def generateNodeToIslandArray(islands: Array[Island]): Array[NodeIdIslands] = {
     if (islands == null || islands.size == 0) {
       return null
     } else if (! islands.exists(_.nodes.size > 0)) {
       // No islands with nodes.
       // Construct an array with a single entry containing an empty set.
-      return Array[NodeIdIslands](scala.collection.immutable.HashSet.empty)
+      return Array[NodeIdIslands](new NodeIdIslands)
     }
     // Find the maximum node _id
     val maxIslandId = islands.map(_.nodes.map(_._id).max).max

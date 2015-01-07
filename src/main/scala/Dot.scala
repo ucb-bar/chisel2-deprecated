@@ -30,6 +30,7 @@
 
 package Chisel
 import Node._
+import Node.NodeRefType._
 import Reg._
 import ChiselError._
 import scala.collection.mutable.HashSet
@@ -43,7 +44,7 @@ class DotBackend extends Backend {
   val allDottable = false
   val useComponentNames = false
 
-  override def emitRef(node: Node): String = {
+  override def emitRef(node: Node, refType: NodeRefType = Basic): String = {
     node match {
       case r: Reg =>
         if (r.name == "") {

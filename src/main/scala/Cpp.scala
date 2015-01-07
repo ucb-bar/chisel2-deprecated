@@ -39,6 +39,7 @@ import java.io.InputStreamReader
 import scala.sys.process._
 import sys.process.stringSeqToProcess
 import Node._
+import Node.NodeRefType._
 import Reg._
 import ChiselError._
 import Literal._
@@ -80,7 +81,7 @@ class CppBackend extends Backend {
   // Compile the clone method at -O0
   val cloneCompiledO0 = true
   // Define shadow registers in the circuit object, instead of local registers in the clock hi methods.
-  // This is required if we're generating paritioned combinatorial islands, or we're limiting the size of functions/methods.
+  // This is required if we're generating partitioned combinatorial islands, or we're limiting the size of functions/methods.
   val shadowRegisterInObject = Driver.shadowRegisterInObject || Driver.partitionIslands || Driver.lineLimitFunctions > 0
   // If we need to put shadow registers in the object, we also should put multi-word literals there as well.
   val multiwordLiteralInObject = shadowRegisterInObject
@@ -102,24 +103,50 @@ class CppBackend extends Backend {
     ""
   }
 
+  val separateIslandState = Driver.separateIslandState
   val useOpenMP = Driver.useOpenMP
-
-  override def emitTmp(node: Node): String = {
+  // The following definition should be a val, but we can't initialize it before elaborate,
+  // and backend methods may need to refer to it indirectly.
+  var nodeToIslandArray = new Array[NodeIdIslands](0)
+  def nodeHomeIslandId(node: Node): Option[Int] = {
+    try {
+      val homeIsland = nodeToIslandArray(node._id).head
+      if (homeIsland == null) {
+        println("Bang!")
+        None
+      } else {
+        Some(homeIsland.islandId)
+      }
+    } catch {
+        case e: java.lang.NullPointerException => {
+          println("Bang!")
+        }
+        None
+    } 
+  }
+    
+  override def emitTmp(node: Node, refType: NodeRefType = Basic): String = {
     require(false)
-    if (node.isInObject) {
-      emitRef(node)
-    } else {
-      "dat_t<" + node.needWidth() + "> " + emitRef(node)
-    }
+    "dat_t<" + node.needWidth() + "> " + emitRef(node, refType)
   }
 
   // Give different names to temporary nodes in CppBackend
-  override def emitRef(node: Node): String = {
+  override def emitRef(node: Node, refType: NodeRefType = Basic): String = {
     node match {
       case _: Bits if !node.isInObject && node.inputs.length == 1 =>
-        emitRef(node.inputs(0))
-      case _ =>
-        super.emitRef(node)
+        emitRef(node.inputs(0), refType)
+      case _: Clock => super.emitRef(node)
+      case _ => {
+        val prefix = if (refType != Dec && separateIslandState && node.isInObject) {
+          nodeHomeIslandId(node) match {
+            case Some(i: Int) => s"_I_${i}."
+            case None => ""
+          }
+        } else {
+          ""
+        }
+        prefix + super.emitRef(node)
+      }
     }
   }
 
@@ -171,7 +198,7 @@ class CppBackend extends Backend {
   }
 
   // Returns a list of tuples (type, name) of variables needed by a node
-  def nodeVars(node: Node): List[(String, String)] = {
+  def nodeVars(node: Node, refType: NodeRefType = Basic): List[(String, String)] = {
     node match {
       case x: Binding =>
         List()
@@ -193,11 +220,11 @@ class CppBackend extends Backend {
           List()
         }
       case x: Reg =>
-        List((s"dat_t<${node.needWidth()}>", emitRef(node))) ++ {
+        List((s"dat_t<${node.needWidth()}>", emitRef(node, refType))) ++ {
           if (!allocateOnlyNeededShadowRegisters || needShadow.contains(node)) {
             // Add an entry for the shadow register in the main object.
             if (shadowRegisterInObject) {
-              List((s"${shadowPrefix} dat_t<${node.needWidth()}>", shadowPrefix + emitRef(node) + s"__shadow"))
+              List((s"${shadowPrefix} dat_t<${node.needWidth()}>", shadowPrefix + emitRef(node, refType) + s"__shadow"))
             } else {
               Nil
             }
@@ -206,20 +233,20 @@ class CppBackend extends Backend {
           }
         }
       case m: Mem[_] =>
-        List((s"mem_t<${m.needWidth()},${m.n}>", emitRef(m)))
+        List((s"mem_t<${m.needWidth()},${m.n}>", emitRef(m, refType)))
       case r: ROMData =>
-        List((s"mem_t<${r.needWidth()},${r.n}>", emitRef(r)))
+        List((s"mem_t<${r.needWidth()},${r.n}>", emitRef(r, refType)))
       case c: Clock =>
-        List(("int", emitRef(node)),
-             ("int", emitRef(node) + "_cnt"))
+        List(("int", emitRef(node, refType)),
+             ("int", emitRef(node, refType) + "_cnt"))
       case _ =>
-        List((s"dat_t<${node.needWidth()}>", emitRef(node)))
+        List((s"dat_t<${node.needWidth()}>", emitRef(node, refType)))
     }
   }
 
   override def emitDec(node: Node): String = {
     val out = new StringBuilder("")
-    for (varDef <- nodeVars(node)) {
+    for (varDef <- nodeVars(node, Dec)) {
       out.append(s"  ${varDef._1} ${varDef._2};\n")
     }
     out.toString()
@@ -243,9 +270,9 @@ class CppBackend extends Backend {
     if (node.isInObject) {
       ""
     } else if (words(node) == 1) {
-      s"  val_t ${emitRef(node)};\n"
+      s"  val_t ${emitRef(node, Dec)};\n"
     } else {
-      s"  val_t ${emitRef(node)}[${words(node)}];\n"
+      s"  val_t ${emitRef(node, Dec)}[${words(node)}];\n"
     }
   }
   def block(s: Seq[String]): String =
@@ -575,7 +602,7 @@ class CppBackend extends Backend {
       case s: Sprintf =>
         ("#if __cplusplus >= 201103L\n"
           + "  " + emitRef(s) + " = dat_format<" + s.needWidth() + ">("
-          + s.args.map(emitRef _).foldLeft(CString(s.format))(_ + ", " + _)
+          + s.args.map(emitRef(_)).foldLeft(CString(s.format))(_ + ", " + _)
           + ");\n"
           + "#endif\n")
 
@@ -1133,6 +1160,10 @@ class CppBackend extends Backend {
       out_cpps.last.advance()
     }
 
+    def isNodeInIsland(node: Node, island: Island): Boolean = {
+      return island == null || nodeToIslandArray(node._id).contains(island)
+    }
+
     // Generate header file
     def genHeader(vcd: Backend, islands: Array[Island], nInitMethods: Int, nSetCircuitMethods: Int, nDumpInitMethods: Int, nDumpMethods: Int, nInitMappingTableMethods: Int) {
       val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
@@ -1158,8 +1189,22 @@ class CppBackend extends Backend {
         val bMem = b.isInstanceOf[Mem[_]] || b.isInstanceOf[ROMData]
         aMem < bMem || aMem == bMem && a.needWidth() < b.needWidth()
       }
-      for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc))
-        out_h.write(emitDec(m))
+      // Are we generating separate islands of combinational logic?
+      if (separateIslandState) {
+        // We're generating separate islands.
+        // Collect each island's state into its own structure.
+        for (island <- islands) {
+          val islandId = island.islandId
+          out_h.write("   struct {\n")
+          for (m <- Driver.orderedNodes.filter(n => n.isInObject && nodeHomeIslandId(n) == Some(islandId)).sortWith(headerOrderFunc)) {
+            out_h.write(emitDec(m))
+          }
+          out_h.write("   } _I_%s;\n".format(islandId))
+        }
+      } else {
+        for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc))
+          out_h.write(emitDec(m))
+      }
       for (m <- Driver.orderedNodes.filter(_.isInVCD).sortWith(headerOrderFunc))
         out_h.write(vcd.emitDec(m))
       for (clock <- Driver.clocks)
@@ -1374,7 +1419,7 @@ class CppBackend extends Backend {
         writeCppFile("#if __cplusplus >= 201103L\n"
           + "  if (" + emitLoWordRef(p.cond)
           + ") dat_fprintf<" + p.needWidth() + ">(f, "
-          + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
+          + p.args.map(emitRef(_)).foldLeft(CString(p.format))(_ + ", " + _)
           + ");\n"
           + "#endif\n")
       }
@@ -1389,7 +1434,7 @@ class CppBackend extends Backend {
         writeCppFile("#if __cplusplus >= 201103L\n"
           + "  if (" + emitLoWordRef(p.cond)
           + ") dat_prints<" + p.needWidth() + ">(s, "
-          + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
+          + p.args.map(emitRef(_)).foldLeft(CString(p.format))(_ + ", " + _)
           + ");\n"
           + "#endif\n")
       }
@@ -1492,7 +1537,7 @@ class CppBackend extends Backend {
       e.toArray
     }
     val maxIslandId = islands.map(_.islandId).max
-    val nodeToIslandArray = generateNodeToIslandArray(islands)
+    nodeToIslandArray = generateNodeToIslandArray(islands)
 
     class ClockDomains {
       type ClockCodeMethods = HashMap[Clock, (CMethod, CMethod, CMethod)]
@@ -1543,9 +1588,6 @@ class CppBackend extends Backend {
 
       def populate() {
         var nodeCount = 0
-        def isNodeInIsland(node: Node, island: Island): Boolean = {
-          return island == null || nodeToIslandArray(node._id).contains(island)
-        }
 
         // Return tuple of booleans if we actually added any clock code.
         def addClkDefs(n: Node, codeMethods: ClockCodeMethods): (Boolean, Boolean, Boolean) = {

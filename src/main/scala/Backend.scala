@@ -30,6 +30,7 @@
 
 package Chisel
 import Node._
+import Node.NodeRefType._
 import Reg._
 import ChiselError._
 import scala.collection.mutable.ArrayBuffer
@@ -41,6 +42,7 @@ import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.PrintStream
+import Node.NodeRefType._
 
 object Backend {
   var moduleNamePrefix = ""
@@ -188,10 +190,10 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
-  def emitTmp(node: Node): String =
-    emitRef(node)
+  def emitTmp(node: Node, refType: NodeRefType = Basic): String =
+    emitRef(node, refType)
 
-  def emitRef(node: Node): String = {
+  def emitRef(node: Node, refType: NodeRefType = Basic): String = {
     node match {
       case _: Literal =>
         node.name

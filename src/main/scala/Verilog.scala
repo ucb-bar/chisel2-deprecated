@@ -30,6 +30,7 @@
 
 package Chisel
 import Node._
+import Node.NodeRefType._
 import java.io.File;
 import java.io.InputStream
 import java.io.OutputStream
@@ -113,10 +114,10 @@ class VerilogBackend extends Backend {
     if (w == 1) "" else "[" + (w-1) + ":0]"
   }
 
-  override def emitTmp(node: Node): String =
-    emitRef(node)
+  override def emitTmp(node: Node, refType: NodeRefType = Basic): String =
+    emitRef(node, refType)
 
-  override def emitRef(node: Node): String = {
+  override def emitRef(node: Node, refType: NodeRefType = Basic): String = {
     node match {
       case x: Literal => emitLit(x.value, x.needWidth())
       case _: Reg =>
@@ -360,7 +361,7 @@ class VerilogBackend extends Backend {
         "  endcase\n"
 
       case s: Sprintf =>
-        "  always @(*) $sformat(" + emitTmp(s) + ", " + s.args.map(emitRef _).foldLeft(CString(s.format))(_ + ", " + _) + ");\n"
+        "  always @(*) $sformat(" + emitTmp(s) + ", " + s.args.map(emitRef(_)).foldLeft(CString(s.format))(_ + ", " + _) + ");\n"
 
       case _ =>
         ""
@@ -777,7 +778,7 @@ class VerilogBackend extends Backend {
     "    if (`PRINTF_COND)\n" +
     "`endif\n" +
     "      if (" + emitRef(p.cond) + ")\n" +
-    "        $fwrite(32'h80000002, " + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _) + ");\n" +
+    "        $fwrite(32'h80000002, " + p.args.map(emitRef(_)).foldLeft(CString(p.format))(_ + ", " + _) + ");\n" +
     "`endif\n"
   }
   def emitAssert(a: Assert): String = {
