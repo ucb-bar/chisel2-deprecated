@@ -198,7 +198,6 @@ abstract class Node extends nameable {
       //  and only disambiguate the generated names.
       //  Ambiguous user-specified names should trigger an error.
       if (name != "") {
-ChiselError.info(component.name)
         while (component.names.getOrElseUpdate(name, this) ne this) {
           name += "_"
         }
