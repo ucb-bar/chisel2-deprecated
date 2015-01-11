@@ -183,7 +183,7 @@ class VerilogBackend extends Backend {
     var isFirst = true;
     val portDecs = new ArrayBuffer[StringBuilder]
     for ((n, w) <- c.wires) {
-      if(n != "reset") {
+      if(n != "reset" && n != Driver.implicitReset.name) {
         var portDec = "." + n + "( ";
         w match {
           case io: Bits  =>

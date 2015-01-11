@@ -566,7 +566,8 @@ class CppBackend extends Backend {
 
       case a: Assert =>
         val cond = emitLoWordRef(a.cond) +
-          (if (emitRef(a.cond) == "reset") "" else " || reset.lo_word()")
+          (if (emitRef(a.cond) == "reset" || emitRef(a.cond) == Driver.implicitReset.name) "" 
+           else " || " + Driver.implicitReset.name + ".lo_word()")
         if (!Driver.isAssert) ""
         else "  ASSERT(" + cond + ", " + CString(a.message) + ");\n"
 
@@ -938,7 +939,7 @@ class CppBackend extends Backend {
         case _: Literal =>
         case _ if m.named && (m != comp.defaultResetPin) && m.component != null =>
           // only modify name if it is not the reset signal or not in top component
-          if (m.name != "reset" || m.component != comp)
+          if (m.name != "reset" || m.name != Driver.implicitReset.name || m.component != comp)
             m.name = m.component.getPathName + "__" + m.name
         case _ =>
       }
@@ -1340,7 +1341,7 @@ class CppBackend extends Backend {
       val method = CMethod(CTypedName("bool", "set_circuit_from"), Array[CTypedName](CTypedName("mod_t*", "src")))
       val llm = new LineLimitedMethod(method, codePrefix, codeSuffix, Array[CTypedName](CTypedName(s"${c.name}_t*", "mod_typed")))
       for (m <- Driver.orderedNodes) {
-        if(m.name != "reset" && m.isInObject) {
+        if(m.name != "reset" && m.name != Driver.implicitReset.name && m.isInObject) {
 	  // Skip the circuit assign if this is a literal and we're
 	  // including literals in the objet.
 	  // The literals are declared as "static const" and will be
@@ -1443,7 +1444,7 @@ class CppBackend extends Backend {
                  s"  assert(mod_typed);\n"
       val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName(s"${c.name}_t*", "mod_typed")))
       for (m <- mappings) {
-        if (m._2.name != "reset" && (m._2.isInObject || m._2.isInVCD)) {
+        if (m._2.name != "reset" && m._2.name != Driver.implicitReset.name && (m._2.isInObject || m._2.isInVCD)) {
           llm.addString(emitMapping(m))
         }
       }
@@ -1499,7 +1500,7 @@ class CppBackend extends Backend {
 
       for (clock <- Driver.clocks) {
         // All clock methods take the same arguments and return void.
-        val clockArgs = Array[CTypedName](CTypedName("dat_t<1>", "reset"))
+        val clockArgs = Array[CTypedName](CTypedName("dat_t<1>", Driver.implicitReset.name))
         val clockLoName = "clock_lo" + clkName(clock)
         val clock_dlo = new CMethod(CTypedName("void", clockLoName), clockArgs)
         val clockHiName = "clock_hi" + clkName(clock)
