@@ -108,7 +108,7 @@ class CppBackend extends Backend {
   val useOpenMP = Driver.useOpenMP
   val useOpenMPI = Driver.useOpenMPI
   val nTestThreads = Driver.nTestThreads
-  val persistentOpenMPthreads = false
+  val persistentOpenMPthreads = true
   val forceSingleThread = false
 
   // The following definition should be a val, but we can't initialize it before elaborate,
@@ -766,7 +766,8 @@ class CppBackend extends Backend {
     // If we're generating OpenMP multi-threaded clock code,
     //  create the synchronization block.
     if (useOpenMP) {
-      harness.write("\ncomp_sync_block g_comp_sync_block;\n\n")
+      harness.write("\nchisel_sync_omp task_sync(%d);\n".format(nTestThreads))
+      harness.write("comp_sync_block g_comp_sync_block;\n\n")
     }
     harness.write(s"""int main (int argc, char* argv[]) {\n""");
     harness.write(s"""  ${name}_t* module = new ${name}_t();\n""");
@@ -832,7 +833,7 @@ class CppBackend extends Backend {
     {
         @TASKCODE@
         g_comp_sync_block.clock_type = PCT_DONE;
-        g_comp_sync_block.do_clock = true;
+        task_sync.work(true);
     }
 """
       replacements.clear()
@@ -854,6 +855,7 @@ class CppBackend extends Backend {
   override def compile(c: Module, flagsIn: String) {
     val CXXFLAGS = scala.util.Properties.envOrElse("CXXFLAGS", "" )
     val LDFLAGS = scala.util.Properties.envOrElse("LDFLAGS", "")
+    val LIBS = " " + scala.util.Properties.envOrElse("LIBS", "")
     val chiselENV = java.lang.System.getenv("CHISEL")
 
     val c11 = if (hasPrintfs) " -std=c++11 " else ""
@@ -873,11 +875,11 @@ class CppBackend extends Backend {
       ChiselError.info(cmd + " RET " + c)
     }
     def linkOne(name: String) {
-      val ac = CXX + " " + debug + LDFLAGS + openMP + " -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o" + LD_openMPI
+      val ac = CXX + " " + debug + LDFLAGS + openMP + " -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o" + LD_openMPI + LIBS
       run(ac)
     }
     def linkMany(name: String, objects: Seq[String]) {
-      val ac = CXX + " " + debug + LDFLAGS + openMP + " -o " + dir + name + " " + objects.map(dir + _ + ".o ").mkString(" ") + dir + name + "-emulator.o" + LD_openMPI
+      val ac = CXX + " " + debug + LDFLAGS + openMP + " -o " + dir + name + " " + objects.map(dir + _ + ".o ").mkString(" ") + dir + name + "-emulator.o" + LD_openMPI + LIBS
       run(ac)
     }
     def cc(name: String, flags: String = allFlags) {
@@ -1236,7 +1238,9 @@ class CppBackend extends Backend {
       out_h.write("#ifndef __" + c.name + "__\n");
       out_h.write("#define __" + c.name + "__\n\n");
       if (useOpenMP) {
-        out_h.write("#include \"omp.h\"\n")
+        out_h.write("#include \"chisel_sync_omp.h\"\n")
+        out_h.write("extern chisel_sync_omp task_sync;\n")
+//        out_h.write("extern comp_sync_block g_comp_sync_block;\n")
       }
       if (useOpenMPI) {
         out_h.write("#include \"mpi.h\"\n")
@@ -1633,8 +1637,6 @@ class CppBackend extends Backend {
         body.append("""
   g_comp_sync_block.clock_type = clock_type;
   g_comp_sync_block.do_reset = reset.to_bool();
-  g_comp_sync_block.clock_done = 0;
-  g_comp_sync_block.do_clock = true;
 """)
         for(t <- 0 until nTestThreads) {
           val callName = "%s_T%d".format(ptClockName, t)
@@ -1653,6 +1655,7 @@ class CppBackend extends Backend {
       } else if (persistentOpenMPthreads) {
         // Build the replacement string map for the do_clocks method template.
         val replacements = HashMap[String, String] ()
+        replacements += (("@NTESTTHREADS@", nTestThreads.toString))
         replacements += (("@CLOCKLONAME@", clockLoName))
         replacements += (("@CLOCKHINAME@", clockHiName))
         replacements += (("@PT_CLOCKNAME@", ptClockName))
@@ -1665,8 +1668,6 @@ class CppBackend extends Backend {
         body.append(s"""
   g_comp_sync_block.clock_type = clock_type;
   g_comp_sync_block.do_reset = reset.to_bool();
-  g_comp_sync_block.clock_done = 0;
-  g_comp_sync_block.do_clock = true;
 
   #pragma omp parallel num_threads(${nTestThreads})
   {

@@ -1,27 +1,15 @@
 /* parallel clock synchronization code */
-#include <assert.h>
 
 void @MODULENAME@::@DO_CLOCKS@( pt_clock_t clock_type, dat_t<1> reset ) {
-	assert(g_comp_sync_block.clock_done == 0 && !g_comp_sync_block.do_clock);
 	g_comp_sync_block.clock_type = clock_type;
 	g_comp_sync_block.do_reset = reset.to_bool();
-	g_comp_sync_block.clock_done = 0;
-	g_comp_sync_block.do_clock = true;
-	#pragma omp flush(g_comp_sync_block)
+	task_sync.work(true);
 
-	int nthreads_done = 0;
-	do {
-		#pragma omp atomic read
-		nthreads_done = g_comp_sync_block.clock_done;
-	} while(nthreads_done != g_comp_sync_block.nthreads);
+	task_sync.wait_work(true);
 
-	g_comp_sync_block.do_clock = false;
-	#pragma omp flush(g_comp_sync_block)
+	task_sync.work(false);
 
-	do {
-		#pragma omp atomic read
-		nthreads_done = g_comp_sync_block.clock_done;
-	} while(nthreads_done != 0);
+	task_sync.wait_work(false);
 }
 
 void @MODULENAME@::clock_lo( dat_t<1> reset ) {
