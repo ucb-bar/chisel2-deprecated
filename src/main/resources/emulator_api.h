@@ -16,6 +16,17 @@
 #include <cassert>
 
 /**
+ * OpenMP synchronization object used to synchronize persistent multi-threaded clock emulation.
+ */
+enum pt_clock_t { PCT_LO, PCT_HI, PCT_DONE };
+struct comp_sync_block {
+	int nthreads;					// Number of threads executing clock code (a constant)
+	int clock_done;					// Number of threads that have finished clock code
+	pt_clock_t clock_type;			// The type of clock to execute.
+	bool do_reset;					// The value of reset for this clock cycle.
+	bool do_clock;					// Perform a clock cycle.
+};
+/**
  * Converts an integer to a std::string without needing additional libraries
  * or C++11.
  */

@@ -343,6 +343,8 @@ object Driver extends FileSystemUtilities{
     useSimpleQueue = false
     parallelMakeJobs = 0
     useOpenMP = false
+    useOpenMPI = false
+    nTestThreads = 1
     isVCDinline = false
     isSupportW0W = false
     hasMem = false
@@ -407,6 +409,8 @@ object Driver extends FileSystemUtilities{
         case "--useSimpleQueue" => useSimpleQueue = true
         case "--parallelMakeJobs" => parallelMakeJobs = args(i + 1).toInt; i += 1
         case "--useOpenMP" => useOpenMP = true
+        case "--useOpenMPI" => useOpenMPI = true
+        case "--nTestThreads" => nTestThreads = args(i + 1).toInt; i += 1
         case "--isVCDinline" => isVCDinline = true
         case "--backend" => backendName = args(i + 1); i += 1
         case "--compile" => isCompiling = true
@@ -449,6 +453,10 @@ object Driver extends FileSystemUtilities{
     // Check for bogus flags
     if (!isVCD) {
       isVCDinline = false
+    }
+    if (useOpenMP && useOpenMPI) {
+      ChiselError.warning("Can't use both OpenMP and OpenMPI. OpenMPI ignored.")
+      useOpenMPI = false
     }
     // Set the backend after we've interpreted all the arguments.
     // (The backend may want to configure itself based on the arguments.)
@@ -494,6 +502,8 @@ object Driver extends FileSystemUtilities{
   var useSimpleQueue = false
   var parallelMakeJobs = 0
   var useOpenMP = false
+  var useOpenMPI = false
+  var nTestThreads = 1
   var isVCDinline = false
   var isSupportW0W = false
   var hasMem = false

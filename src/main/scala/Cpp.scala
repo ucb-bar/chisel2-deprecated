@@ -46,6 +46,7 @@ import Literal._
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.HashMap
 import PartitionIslands._
+import Util._
 
 object CString {
   def apply(s: String): String = {
@@ -105,6 +106,11 @@ class CppBackend extends Backend {
 
   val separateIslandState = Driver.separateIslandState
   val useOpenMP = Driver.useOpenMP
+  val useOpenMPI = Driver.useOpenMPI
+  val nTestThreads = Driver.nTestThreads
+  val persistentOpenMPthreads = false
+  val forceSingleThread = false
+
   // The following definition should be a val, but we can't initialize it before elaborate,
   // and backend methods may need to refer to it indirectly.
   var nodeToIslandArray = new Array[NodeIdIslands](0)
@@ -756,6 +762,12 @@ class CppBackend extends Backend {
       }
       harness.write("}\n\n");
     }
+      
+    // If we're generating OpenMP multi-threaded clock code,
+    //  create the synchronization block.
+    if (useOpenMP) {
+      harness.write("\ncomp_sync_block g_comp_sync_block;\n\n")
+    }
     harness.write(s"""int main (int argc, char* argv[]) {\n""");
     harness.write(s"""  ${name}_t* module = new ${name}_t();\n""");
     harness.write(s"""  module->init();\n""");
@@ -774,7 +786,65 @@ class CppBackend extends Backend {
     }
     harness.write(s"""  module->set_dumpfile(f);\n""");
     harness.write(s"""  api->set_teefile(tee);\n""");
-    harness.write(s"""  api->read_eval_print_loop();\n""");
+    if (useOpenMP && !forceSingleThread && persistentOpenMPthreads) {
+      // Read and edit the parallel task template.
+      val replacements = HashMap[String, String] ()
+      replacements += (("@NTESTTHREADSP1@", (nTestThreads + 1).toString))
+      // Preserve the "@TASKCODE@" macro. We'll expand it later.
+      replacements += (("@TASKCODE@", "@TASKCODE@"))
+      val taskTemplate = editResource("omp_persistent_tasks.cc", replacements)
+      val taskStart = """\s*// TASK_START""".r
+      val taskEnd = """\s*// TASK_END""".r
+      // Split the template up into sections so we can output the repeated task code.
+      val head = new StringBuilder
+      val task = new StringBuilder
+      val tail = new StringBuilder
+      var section = head
+      for (line <- taskTemplate.split('\n')) {
+        if (taskStart.findFirstIn(line).nonEmpty) {
+          section = task
+          section.append(line + "\n")
+        } else if (taskEnd.findFirstIn(line).nonEmpty) {
+          section.append(line + "\n")
+          section = tail
+        } else {
+          section.append(line + "\n")
+        }
+      }
+
+      // Output the head code
+      harness.write(head.toString)
+
+      // Generate and output the clock thread task code.
+      val taskString = task.toString
+      for (t <- 0 until nTestThreads) {
+        val replacements = HashMap[String, String] ()
+        val callCode = "module->pt_clock_T%d( );".format(t)
+        replacements += (("@TASKCODE@", callCode))
+        replacements += (("@THREADN@", t.toString))
+        val taskCode = editString(taskString, replacements)
+        harness.write(taskCode)
+      }
+
+      // Output the read_eval_print task
+      val replTask = """
+    #pragma omp task
+    {
+        @TASKCODE@
+        g_comp_sync_block.clock_type = PCT_DONE;
+        g_comp_sync_block.do_clock = true;
+    }
+"""
+      replacements.clear()
+      replacements += (("@TASKCODE@", "api->read_eval_print_loop();"))
+      val taskCode = editString(replTask, replacements)
+      harness.write(taskCode)
+      
+      // Output the tail code
+      harness.write(tail.toString)
+    } else {
+      harness.write(s"""  api->read_eval_print_loop();\n""");
+    }
     harness.write(s"""  fclose(f);\n""");
     harness.write(s"""  fclose(tee);\n""");
     harness.write(s"""}\n""");
@@ -788,12 +858,14 @@ class CppBackend extends Backend {
 
     val c11 = if (hasPrintfs) " -std=c++11 " else ""
     val openMP = if (useOpenMP) " -fopenmp " else ""
+    val LD_openMPI = if (useOpenMPI) " -lmpi " else ""
     val cxxFlags = (if (flagsIn == null) CXXFLAGS else flagsIn) + c11 + openMP
     val cppFlags = scala.util.Properties.envOrElse("CPPFLAGS", "") + " -I../ -I" + chiselENV + "/csrc/"
     val allFlags = cppFlags + " " + cxxFlags
     val dir = Driver.targetDir + "/"
     val CXX = scala.util.Properties.envOrElse("CXX", "g++" )
     val parallelMakeJobs = Driver.parallelMakeJobs
+    var debug = ""
 
     def run(cmd: String) {
       val bashCmd = Seq("bash", "-c", cmd)
@@ -801,11 +873,11 @@ class CppBackend extends Backend {
       ChiselError.info(cmd + " RET " + c)
     }
     def linkOne(name: String) {
-      val ac = CXX + " " + LDFLAGS + openMP + " -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o"
+      val ac = CXX + " " + debug + LDFLAGS + openMP + " -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o" + LD_openMPI
       run(ac)
     }
     def linkMany(name: String, objects: Seq[String]) {
-      val ac = CXX + " " + LDFLAGS + openMP + " -o " + dir + name + " " + objects.map(dir + _ + ".o ").mkString(" ") + dir + name + "-emulator.o"
+      val ac = CXX + " " + debug + LDFLAGS + openMP + " -o " + dir + name + " " + objects.map(dir + _ + ".o ").mkString(" ") + dir + name + "-emulator.o" + LD_openMPI
       run(ac)
     }
     def cc(name: String, flags: String = allFlags) {
@@ -821,28 +893,11 @@ class CppBackend extends Backend {
     }
 
     def editToTarget(filename: String, replacements: HashMap[String, String]) = {
-      val resourceStream = getClass().getResourceAsStream("/" + filename)
-      if( resourceStream != null ) {
+      val body = editResource(filename, replacements)
+      if (body != "") {
         val makefile = createOutputFile(filename)
-        val br = new BufferedReader(new InputStreamReader(resourceStream, "US-ASCII"))
-        while(br.ready()) {
-          val inputLine = br.readLine()
-          // Break the line into "tokens"
-          val tokens = inputLine.split("""(?=@\w+@)""")
-          // Reassemble the line plugging in expansions for "macro"
-          val outputLine = tokens.map(s => {
-            if (s.length > 2 && s.charAt(0) == '@' && s.takeRight(1) == "@") {
-              replacements(s)
-            } else {
-              s
-            }
-          }) mkString ""
-          makefile.write(outputLine + "\n")
-        }
+        makefile.write(body)
         makefile.close()
-        br.close()
-      } else {
-        println(s"WARNING: Unable to copy '$filename'" )
       }
     }
 
@@ -856,16 +911,17 @@ class CppBackend extends Backend {
     var optim2 = "-O2"
     // Is the caller explicitly setting -Osomething? If yes, we'll honor that setting
     //  and set our default optimization flags to "".
-    val Oregex = new scala.util.matching.Regex("""[^\w]*(-O.+)""", "explicitO")
-    val Omatch = Oregex.findFirstMatchIn(allFlags)
-    Omatch match {
-      case Some(m) => {
+    val Oregex = new scala.util.matching.Regex("""\W*((-O\w)|(-g\w))\b""", "all", "explicitO", "debug")
+    for (m <- Oregex.findAllMatchIn(allFlags)) {
+      if (m.group("explicitO") != null) {
         println("Cpp: observing explicit '" + m.group("explicitO") + "'")
         optim0 = ""
         optim1 = ""
         optim2 = ""
       }
-      case _ => {}
+      if (m.group("debug") != null) {
+        debug = m.group("debug")
+      }
     }
 
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
@@ -891,7 +947,7 @@ class CppBackend extends Backend {
         replacements += (("@EXEC@", n))
         replacements += (("@CPPFLAGS@", cppFlags))
         replacements += (("@CXXFLAGS@", cxxFlags))
-        replacements += (("@LDFLAGS@", LDFLAGS))
+        replacements += (("@LDFLAGS@", debug + LDFLAGS))
         replacements += (("@OPTIM0@", optim0))
         replacements += (("@OPTIM1@", optim1))
         replacements += (("@OPTIM2@", optim2))
@@ -1023,6 +1079,7 @@ class CppBackend extends Backend {
     val out_cpps = ArrayBuffer[CppFile]()
     val all_cpp = new StringBuilder
 
+    var threadIslands = new Array[ArrayBuffer[Island]](nTestThreads)
     def cppFileSuffix = "-" + out_cpps.length
     class CppFile(val suffix: String = cppFileSuffix) {
       var lines = 0
@@ -1062,6 +1119,10 @@ class CppBackend extends Backend {
       val tail = "}\n"
       val genCall = "%s(%s);\n".format(name.name, callArgs)
       val prototype = "%s %s( %s );\n".format(name.ctype, name.name, argumentList)
+      // We estimate a method's cost (in terms of compute cycles) on the number of items in its body
+      def cost: Int = {
+        body.size
+      }
     }
     
     // Split a large method up into a series of calls to smaller methods.
@@ -1070,7 +1131,7 @@ class CppBackend extends Backend {
     //    manipulated by individual instructions).
     // The methodCodePrefix and methodCodeSuffix are lines to be emitted once,
     // in the top level method.
-    class LineLimitedMethod(method: CMethod, methodCodePrefix: String = "", methodCodeSuffix: String = "", subCallArgs: Array[CTypedName] = Array[CTypedName]()) {
+    class LineLimitedMethod(method: CMethod, methodCodePrefix: String = "", methodCodeSuffix: String = "", subCallArgs: Array[CTypedName] = Array[CTypedName](), methodNameSuffix: String = "") {
       var bodyLines = 0
       val body = new StringBuilder
       val bodies = new scala.collection.mutable.Queue[String]
@@ -1078,7 +1139,11 @@ class CppBackend extends Backend {
       val callArgs = subCallArgs.map(_.name).mkString(", ")
       val subArgList = subCallArgs.map(a => "%s %s".format(a.ctype, a.name)).mkString(", ")
       private def methodName(i: Int): String = {
-        method.name.name + "_" + i.toString
+        if (methodNameSuffix != "") {
+          method.name.name + "_" + methodNameSuffix + "_" + i.toString
+        } else {
+          method.name.name + "_" + i.toString
+        }
       }
       private def newBody() {
         if (body.length > 0) {
@@ -1173,7 +1238,16 @@ class CppBackend extends Backend {
       if (useOpenMP) {
         out_h.write("#include \"omp.h\"\n")
       }
+      if (useOpenMPI) {
+        out_h.write("#include \"mpi.h\"\n")
+      }
       out_h.write("#include \"emulator.h\"\n\n");
+      
+      // If we're generating OpenMP multi-threaded clock code,
+      //  add the synchronization block definition.
+      if (useOpenMP) {
+        out_h.write("\nextern comp_sync_block g_comp_sync_block;\n\n")
+      }
 
       // Generate module headers
       out_h.write("class " + c.name + "_t : public mod_t {\n");
@@ -1221,6 +1295,15 @@ class CppBackend extends Backend {
         out_h.write(" public:\n");
       }
       out_h.write("  void init ( val_t rand_init = 0 );\n");
+
+      // If we're generating parallel execution clock code, output the method signatures.
+      if (useOpenMP && nTestThreads > 1 && threadIslands.size > 1) {
+        for (t <- 0 until nTestThreads) {
+          val clockThreadSuffix = "_T%d".format(t)
+          val ptClockName = "pt_clock" + clockThreadSuffix
+          out_h.write("  void " + ptClockName + " (  );\n");
+        }
+      }
 
       // Do we have already generated clock prototypes?
       if (clockPrototypes.length > 0) {
@@ -1510,6 +1593,110 @@ class CppBackend extends Backend {
       nMethods
     }
 
+    def genParallelClockMethod(thread: Int, islands: ArrayBuffer[Island]) {
+      val clockThreadSuffix = "_T%d".format(thread)
+      val clockArgs = Array[CTypedName]()
+
+      val clockLoName = "clock_lo" + clockThreadSuffix
+      val clockHiName = "clock_hi" + clockThreadSuffix
+      val clockName = "clock" + clockThreadSuffix
+      val ptClockName = "pt_clock" + clockThreadSuffix
+      // Build the replacement string map for the parallel clock method template.
+      val replacements = HashMap[String, String] ()
+
+      replacements += (("@CLOCKLONAME@", clockLoName))
+      replacements += (("@CLOCKHINAME@", clockHiName))
+      replacements += (("@MODULENAME@", c.name + "_t"))
+      replacements += (("@PT_CLOCKNAME@", ptClockName))
+      // Read and edit the parallel clock method template.
+      val body = editResource("pt_clock.cc", replacements)
+      writeCppFile(body)
+    }
+
+    def genParallelClockMethods(threadIslands: Array[ArrayBuffer[Island]]) {
+      createCppFile()
+      for(t <- 0 until threadIslands.size) {
+        genParallelClockMethod(t, threadIslands(t))
+      }
+      val clockArgs = Array[CTypedName](CTypedName("pt_clock_t", "clock_type"), CTypedName("dat_t<1>", "reset"))
+
+      val clockLoName = "clock_lo"
+      val clockHiName = "clock_hi"
+      val ptClockName = "pt_clock"
+      val doClockName = "do_clocks"
+      val method = CMethod(CTypedName("void", doClockName), clockArgs)
+      clockPrototypes += method.prototype
+
+      val body = new StringBuilder("")
+      if (forceSingleThread) {
+        body.append(method.head)
+        body.append("""
+  g_comp_sync_block.clock_type = clock_type;
+  g_comp_sync_block.do_reset = reset.to_bool();
+  g_comp_sync_block.clock_done = 0;
+  g_comp_sync_block.do_clock = true;
+""")
+        for(t <- 0 until nTestThreads) {
+          val callName = "%s_T%d".format(ptClockName, t)
+          body.append("       %s(  );\n".format(callName))
+        }
+        body.append(method.tail)
+        val clockLoHiArgs = Array[CTypedName](CTypedName("dat_t<1>", "reset"))
+        val clockLo = CMethod(CTypedName("void", clockLoName), clockLoHiArgs)
+        body.append(clockLo.head)
+        body.append("       %s(PCT_LO, reset);\n".format(doClockName))
+        body.append(clockLo.tail)
+        val clockHi = CMethod(CTypedName("void", clockHiName), clockLoHiArgs)
+        body.append(clockHi.head)
+        body.append("       %s(PCT_HI, reset);\n".format(doClockName))
+        body.append(clockHi.tail)
+      } else if (persistentOpenMPthreads) {
+        // Build the replacement string map for the do_clocks method template.
+        val replacements = HashMap[String, String] ()
+        replacements += (("@CLOCKLONAME@", clockLoName))
+        replacements += (("@CLOCKHINAME@", clockHiName))
+        replacements += (("@PT_CLOCKNAME@", ptClockName))
+        replacements += (("@MODULENAME@", c.name + "_t"))
+        replacements += (("@DO_CLOCKS@", doClockName))
+        // Read and edit the parallel clock method template.
+        body.append(editResource("do_clocks.cc", replacements))
+      } else {
+        body.append(method.head)
+        body.append(s"""
+  g_comp_sync_block.clock_type = clock_type;
+  g_comp_sync_block.do_reset = reset.to_bool();
+  g_comp_sync_block.clock_done = 0;
+  g_comp_sync_block.do_clock = true;
+
+  #pragma omp parallel num_threads(${nTestThreads})
+  {
+    #pragma omp sections
+    {
+""")
+        for(t <- 0 until nTestThreads) {
+          val callName = "%s_T%d".format(ptClockName, t)
+          body.append("      #pragma omp section\n      {\n")
+          body.append("         %s(  );\n".format(callName))
+          body.append("      }\n")
+        }
+        body.append(s"""
+    }
+  }
+""")
+        body.append(method.tail)
+        val clockLoHiArgs = Array[CTypedName](CTypedName("dat_t<1>", "reset"))
+        val clockLo = CMethod(CTypedName("void", clockLoName), clockLoHiArgs)
+        body.append(clockLo.head)
+        body.append("       %s(PCT_LO, reset);\n".format(doClockName))
+        body.append(clockLo.tail)
+        val clockHi = CMethod(CTypedName("void", clockHiName), clockLoHiArgs)
+        body.append(clockHi.head)
+        body.append("       %s(PCT_HI, reset);\n".format(doClockName))
+        body.append(clockHi.tail)
+      }
+      writeCppFile(body.toString)
+    }
+
     println("CPP elaborate")
     super.elaborate(c)
 
@@ -1541,26 +1728,34 @@ class CppBackend extends Backend {
 
     class ClockDomains {
       type ClockCodeMethods = HashMap[Clock, (CMethod, CMethod, CMethod)]
-      val code = new ClockCodeMethods
+      val threadCode = new Array[ClockCodeMethods](nTestThreads)
+      for (t <- 0 until nTestThreads) {
+        threadCode(t) = new ClockCodeMethods
+      }
       val islandClkCode = new HashMap[Int, ClockCodeMethods]
       val islandStarted = Array.fill(3, maxIslandId + 1)(0)    // An array to keep track of the first time we added code to an island.
       val islandOrder = Array.fill(3, islands.size)(0)         // An array to keep track of the order in which we should output island code.
       var islandSequence = Array.fill(3)(0)
       val showProgress = false
 
-      for (clock <- Driver.clocks) {
         // All clock methods take the same arguments and return void.
-        val clockArgs = Array[CTypedName](CTypedName("dat_t<1>", "reset"))
-        val clockLoName = "clock_lo" + clkName(clock)
-        val clock_dlo = new CMethod(CTypedName("void", clockLoName), clockArgs)
-        val clockHiName = "clock_hi" + clkName(clock)
-        val clock_ihi = new CMethod(CTypedName("void", clockHiName), clockArgs)
-        // For simplicity, we define a dummy method for the clock_hi exec code.
-        // We won't actually call such a  method - its code will be inserted into the
-        // clock_hi method after all the clock_hi initialization code.
-        val clockHiDummyName = "clock_hi_dummy" + clkName(clock)
-        val clock_xhi = new CMethod(CTypedName("void", clockHiDummyName), clockArgs)
-        code += (clock -> ((clock_dlo, clock_ihi, clock_xhi)))
+      val clockArgs = Array[CTypedName](CTypedName("dat_t<1>", "reset"))
+      for (clock <- Driver.clocks) {
+        // If we're generating threaded clock code, we'll need per-thread clock lo,hi.
+        for (t <- 0 until nTestThreads) {
+          val clockThreadSuffix = if (nTestThreads > 1) "_T%d".format(t) else ""
+
+          val clockLoName = "clock_lo" + clockThreadSuffix + clkName(clock)
+          val clock_dlo = new CMethod(CTypedName("void", clockLoName), clockArgs)
+          val clockHiName = "clock_hi" + clockThreadSuffix + clkName(clock)
+          val clock_ihi = new CMethod(CTypedName("void", clockHiName), clockArgs)
+          // For simplicity, we define a dummy method for the clock_hi exec code.
+          // We won't actually call such a  method - its code will be inserted into the
+          // clock_hi method after all the clock_hi initialization code.
+          val clockHiDummyName = "clock_hi_dummy" + clockThreadSuffix + clkName(clock)
+          val clock_xhi = new CMethod(CTypedName("void", clockHiDummyName), clockArgs)
+          threadCode(t) += (clock -> ((clock_dlo, clock_ihi, clock_xhi)))
+        }
         // If we're generating islands of combinational logic,
         // have the main clock code call the island specific code,
         // and generate that island specific clock_(hi|lo) code.
@@ -1584,6 +1779,10 @@ class CppBackend extends Backend {
         }
       }
 
+      // Put all the clock code into a generic structure.
+      // If we're generating multi-threaded clocks,
+      // we'll re-distribute it once we've generated it.
+      val allCode = threadCode(0) // Copy the (possibly non-threaded) method definitions.
       def clock(n: Node) = if (n.clock == null) Driver.implicitClock else n.clock
 
       def populate() {
@@ -1614,7 +1813,7 @@ class CppBackend extends Backend {
         if (!partitionIslands) {
           // No. Generate and output single, monolithic methods.
           for (m <- Driver.orderedNodes) {
-            addClkDefs(m, code)
+            addClkDefs(m, allCode)
           }
 
         } else {
@@ -1645,6 +1844,35 @@ class CppBackend extends Backend {
             nodeCount += 1
             if (showProgress && (nodeCount % 1000) == 0) {
               println("ClockDomains: populated " + nodeCount + " nodes.")
+            }
+          }
+          // Are we partitioning for parallel execution?
+          // If so, build the map of weighted island clock code
+          if (useOpenMP) {
+            var weightedClockCode = scala.collection.mutable.LinkedHashMap[Int, scala.collection.mutable.LinkedHashSet[Island]]()
+            for (island <- islands) {
+              val islandId = island.islandId
+              var weight = 0
+              for ((clock, clkcodes) <- islandClkCode(islandId)) {
+                // Currently, we use a rough estimate of the "cost" of this code
+                //  based on the cost of each clock's component (lo, hi def, hi exec)
+                weight += clkcodes._1.cost + clkcodes._2.cost + clkcodes._3.cost
+              }
+              if (!weightedClockCode.contains(weight)) {
+                weightedClockCode(weight) = scala.collection.mutable.LinkedHashSet[Island]()
+              }
+              weightedClockCode(weight) += island
+            }
+            // Now distribute the clock code between threads.
+            for (t <- 0 until nTestThreads) {
+              threadIslands(t) = ArrayBuffer[Island]()
+            }
+            var t = 0
+            for(k <- weightedClockCode.keys.toSeq.sorted.reverse) {
+              for(island <- weightedClockCode(k)) {
+                threadIslands(t) += island
+                t = (t + 1) % nTestThreads
+              }
             }
           }
         }
@@ -1697,23 +1925,108 @@ class CppBackend extends Backend {
           }
         }
       }
- 
-      def outputAllClkDomains() {
-        val clockLoWraps = 
-          if (useOpenMP) {
-            Array(" #pragma omp parallel\n {\n  #pragma omp sections\n  {\n",
-                "   #pragma omp section\n   {\n",
-                "   }\n",
-                "  }\n }\n"
-                )
-          } else {
-            Array("", "", "", "")
+
+      // Output clock code for islands selected by the selector predicate
+      def outputSelectedIslandClkDomains(theCode: ClockCodeMethods, selector_p: Int => Boolean) {
+        // Keep track of the clocks for which we've generated code.
+        val generatedClocks = scala.collection.mutable.Set[Clock]()
+        // We allow for the consolidation of the islands.
+        // Keeping them distinct causes the object to balloon in size,
+        // requiring three methods for each island.
+        val accumulatedClockLos = new CoalesceMethods(lineLimitFunctions)
+
+        // If we're generating multi-threaded clock code,
+        // we need to output the thread-specific prototypes,
+        // since they aren't included in the "default" module class.
+        val threadMethods = ArrayBuffer[CMethod]()
+
+        // Output the clock code in the correct order.
+        for (islandId <- islandOrder(0) if selector_p(islandId)) {
+          for ((clock, clkcodes) <- islandClkCode(islandId)) {
+            generatedClocks += clock
+            val clock_lo = clkcodes._1
+            accumulatedClockLos.append(clock_lo)
+            clock_lo.body.clear()      // free the memory
           }
+        }
+        accumulatedClockLos.done()
+
+        // Now emit the calls on the accumulated methods from the main clock_lo methods.
+        for ((clock, clkcodes) <- theCode if generatedClocks.contains(clock)) {
+          val clock_lo = clkcodes._1
+          createCppFile()
+          // This is just the definition of the main (or per-thread) clock_lo method.
+          writeCppFile(clock_lo.head)
+
+          // Output the actual calls to the island specific clock_lo code.
+          for (clockLoMethod <- accumulatedClockLos.separateMethods) {
+            writeCppFile("\t" + clockLoMethod.genCall)
+          }
+          writeCppFile("}\n")
+
+          // If we're generating multi-threaded clock code,
+          // add the thread-specific clock_lo prototypes.
+          if (threadIslands.size > 1) {
+            threadMethods += clock_lo
+          }
+        }
+
+        // Output the island-specific clock_hi init code
+        val accumulatedClockHiIs = new CoalesceMethods(lineLimitFunctions)
+        for (islandId <- islandOrder(1) if selector_p(islandId)) {
+          for (clockHiI <- islandClkCode(islandId).values.map(_._2)) {
+            accumulatedClockHiIs.append(clockHiI)
+            clockHiI.body.clear()         // free the memory.
+          }
+        }
+        accumulatedClockHiIs.done()
+
+        // Output the island-specific clock_hi def code
+        val accumulatedClockHiXs = new CoalesceMethods(lineLimitFunctions)
+        for (islandId <- islandOrder(1) if selector_p(islandId)) {
+          for (clockHiX <- islandClkCode(islandId).values.map(_._3)) {
+            accumulatedClockHiXs.append(clockHiX)
+            clockHiX.body.clear()         // free the memory.
+          }
+        }
+        accumulatedClockHiXs.done()
+
+        // Output the code to call the island-specific clock_hi (init and exec) code.
+        for ((clock, clkcodes) <- theCode if generatedClocks.contains(clock)) {
+          val clock_ihi = clkcodes._2
+          val clock_xhi = clkcodes._3
+          createCppFile()
+          // This is just the definition of the main (or per-thread) clock_hi init method.
+          writeCppFile(clock_ihi.head)
+          // Output the actual calls to the island specific clock code.
+          for (method <- accumulatedClockHiIs.separateMethods) {
+            writeCppFile("\t" + method.genCall)
+          }
+          for (method <- accumulatedClockHiXs.separateMethods) {
+            writeCppFile("\t" + method.genCall)
+          }
+          writeCppFile(clock_xhi.tail)
+
+          // If we're generating multi-threaded clock code,
+          // add the thread-specific clock_hi prototypes.
+          if (threadIslands.size > 1) {
+            threadMethods += clock_ihi
+          }
+        }
+        
+        // Put the accumulated method definitions where the header
+        // generation code can find them.
+        for( method <- accumulatedClockLos.separateMethods ++ accumulatedClockHiIs.separateMethods ++ accumulatedClockHiXs.separateMethods ++ threadMethods) {
+          clockPrototypes += method.prototype
+        }
+      }
+
+      def outputAllClkDomains() {
 
         // Are we generating partitioned islands?
         if (!partitionIslands) {
           //.values.map(_._1.body) ++ (code.values.map(x => (x._2.append(x._3))))
-          for ((clock, clockMethods) <- code) {
+          for ((clock, clockMethods) <- allCode) {
             val clockLo = clockMethods._1
             val clockIHi = clockMethods._2
             val clockXHi = clockMethods._3
@@ -1726,81 +2039,15 @@ class CppBackend extends Backend {
             writeCppFile(clockXHi.body.result + clockXHi.tail)
           }
         } else {
-          // We allow for the consolidation of the islands.
-          // Keeping them distinct causes the object to balloon in size,
-          // requiring three methods for each island.
-
-          val accumulatedClockLos = new CoalesceMethods(lineLimitFunctions)
-          // Output the clock code in the correct order.
-          for (islandId <- islandOrder(0) if islandId > 0) {
-            for ((clock, clkcodes) <- islandClkCode(islandId)) {
-              val clock_lo = clkcodes._1
-              accumulatedClockLos.append(clock_lo)
-              clock_lo.body.clear()      // free the memory
+          // Are we executing clock code in separate threads?
+          if (threadIslands.size > 1) {
+            for(t <- 0 until threadIslands.size) {
+              val islandIds = HashSet[Int]() ++ threadIslands(t).map(_.islandId)
+              outputSelectedIslandClkDomains(threadCode(t), islandIds.contains(_))
             }
-          }
-          accumulatedClockLos.done()
-
-          // Now emit the calls on the accumulated methods from the main clock_lo method.
-          for ((clock, clkcodes) <- code) {
-            val clock_lo = clkcodes._1
-            createCppFile()
-            // This is just the definition of the main clock_lo method.
-            writeCppFile(clock_lo.head)
-
-            writeCppFile(clockLoWraps(0))
-
-            // Output the actual calls to the island specific clock_lo code.
-            for (clockLoMethod <- accumulatedClockLos.separateMethods) {
-              writeCppFile(clockLoWraps(1))
-              writeCppFile("\t" + clockLoMethod.genCall)
-              writeCppFile(clockLoWraps(2))
-            }
-            writeCppFile(clockLoWraps(3))
-            writeCppFile("}\n")
-          }
-
-          // Output the island-specific clock_hi init code
-          val accumulatedClockHiIs = new CoalesceMethods(lineLimitFunctions)
-          for (islandId <- islandOrder(1) if islandId > 0) {
-            for (clockHiI <- islandClkCode(islandId).values.map(_._2)) {
-              accumulatedClockHiIs.append(clockHiI)
-              clockHiI.body.clear()         // free the memory.
-            }
-          }
-          accumulatedClockHiIs.done()
-
-          // Output the island-specific clock_hi def code
-          val accumulatedClockHiXs = new CoalesceMethods(lineLimitFunctions)
-          for (islandId <- islandOrder(1) if islandId > 0) {
-            for (clockHiX <- islandClkCode(islandId).values.map(_._3)) {
-              accumulatedClockHiXs.append(clockHiX)
-              clockHiX.body.clear()         // free the memory.
-            }
-          }
-          accumulatedClockHiXs.done()
-
-          // Output the code to call the island-specific clock_hi (init and exec) code.
-          for ((clock, clkcodes) <- code) {
-            val clock_ihi = clkcodes._2
-            val clock_xhi = clkcodes._3
-            createCppFile()
-            // This is just the definition of the main clock_hi init method.
-            writeCppFile(clock_ihi.head)
-            // Output the actual calls to the island specific clock code.
-            for (method <- accumulatedClockHiIs.separateMethods) {
-              writeCppFile("\t" + method.genCall)
-            }
-            for (method <- accumulatedClockHiXs.separateMethods) {
-              writeCppFile("\t" + method.genCall)
-            }
-            writeCppFile(clock_xhi.tail)
-          }
-          
-          // Put the accumulated method definitions where the header
-          // generation code can find them.
-          for( method <- accumulatedClockLos.separateMethods ++ accumulatedClockHiIs.separateMethods ++ accumulatedClockHiXs.separateMethods) {
-            clockPrototypes += method.prototype
+          } else {
+            // Output all island clock code.
+            outputSelectedIslandClkDomains(allCode, _ > 0)
           }
         }
       }
@@ -1866,6 +2113,12 @@ class CppBackend extends Backend {
     advanceCppFile()
     clkDomains.outputAllClkDomains()
 
+    // If we're genereating multi-threaded clock code, output it.
+    if (threadIslands.size > 1) {
+      advanceCppFile()
+      genParallelClockMethods(threadIslands)
+    }
+
     advanceCppFile()
     // Generate API methods
     val nInitMappingTableMethods = genInitMappingTableMethod(mappings)
@@ -1876,7 +2129,7 @@ class CppBackend extends Backend {
     maxFiles = out_cpps.length
 
     if (! suppressMonolithicCppFile) {
-      // We're now going to write the entire contents out to a singe file.
+      // We're now going to write the entire contents out to a single file.
       // Make sure it's really a new file.
       advanceCppFile()
       createCppFile("")

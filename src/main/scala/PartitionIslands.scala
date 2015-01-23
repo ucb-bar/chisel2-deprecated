@@ -41,8 +41,9 @@ object PartitionIslands {
   val debug: Boolean = false
   val printHistogram = true
 
+
   // The external interface - immutable sets.
-  class Island(theIslandId: Int, theNodes: scala.collection.immutable.Set[Node], theRoots: scala.collection.immutable.Set[Node]) extends Ordered[Island] {
+  class Island(theIslandId: Int, theNodes: scala.collection.immutable.Set[Node], theRoots: scala.collection.immutable.Set[Node]) {
     val islandId = theIslandId
     val nodes = theNodes
     val roots = theRoots
@@ -58,6 +59,16 @@ object PartitionIslands {
     }
     def canEqual(other: Any): Boolean = other.isInstanceOf[Island]
     def compare(that: Island) : Int = this.islandId - that.islandId
+  }
+  /* We allow different sorts on islands:
+   *  the default sort-order is by islandId
+   *  orderingByNNodes orders by number of nodes in the island
+   */
+  
+  object Island {
+    implicit def orderingById[ I <: Island]: Ordering[I] =
+      Ordering.by(i => i.islandId)
+    val orderingByNNodes: Ordering[Island] = Ordering.by(i => i.nodes.size)
   }
 
   type NodeIdIslands = scala.collection.immutable.TreeSet[Island]
