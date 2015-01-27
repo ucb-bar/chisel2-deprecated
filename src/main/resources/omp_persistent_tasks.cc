@@ -9,7 +9,7 @@
 		#pragma omp task
 		{
 			do {
-				task_sync.wait_ready();
+				task_sync.worker_wait_ready();
 				pt_clock_t t_clock_type;
 				#pragma omp atomic read
 				t_clock_type = g_comp_sync_block.clock_type;
@@ -19,9 +19,9 @@
 
 				@TASKCODE@
 
-				task_sync.done();
+				task_sync.worker_done();
 
-				task_sync.wait_done();
+				task_sync.worker_wait_done();
 
 			} while(1);
 		}

@@ -20,6 +20,8 @@
  */
 enum pt_clock_t { PCT_LO, PCT_HI, PCT_DONE };
 struct comp_sync_block {
+	int index_lo;					// The current index in the clocks_lo array.
+	int index_hi;					// The current index in the clocks_hi array.
 	pt_clock_t clock_type;			// The type of clock to execute.
 	bool do_reset;					// The value of reset for this clock cycle.
 };
