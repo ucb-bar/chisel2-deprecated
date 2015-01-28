@@ -345,6 +345,8 @@ object Driver extends FileSystemUtilities{
     useOpenMP = false
     useOpenMPI = false
     nTestThreads = 1
+    persistentOpenMPthreads = true
+    useDynamicThreadDispatch = false
     isVCDinline = false
     isSupportW0W = false
     hasMem = false
@@ -400,7 +402,7 @@ object Driver extends FileSystemUtilities{
         case "--noAssert" => isAssert = false
         case "--debugMem" => isDebugMem = true
         case "--partitionIslands" => partitionIslands = true
-        case "--separateIslandState" => separateIslandState = true
+        case "--separateIslandState" => separateIslandState = args(i + 1).toBoolean; i += 1
         case "--lineLimitFunctions" => lineLimitFunctions = args(i + 1).toInt; i += 1
         case "--minimumLinesPerFile" => minimumLinesPerFile = args(i + 1).toInt; i += 1
         case "--shadowRegisterInObject" => shadowRegisterInObject = true
@@ -408,9 +410,11 @@ object Driver extends FileSystemUtilities{
         case "--compileInitializationUnoptimized" => compileInitializationUnoptimized = true
         case "--useSimpleQueue" => useSimpleQueue = true
         case "--parallelMakeJobs" => parallelMakeJobs = args(i + 1).toInt; i += 1
-        case "--useOpenMP" => useOpenMP = true
-        case "--useOpenMPI" => useOpenMPI = true
+        case "--openMP" => useOpenMP = args(i + 1).toBoolean; i += 1
+        case "--openMPI" => useOpenMPI = args(i + 1).toBoolean; i += 1
         case "--nTestThreads" => nTestThreads = args(i + 1).toInt; i += 1
+        case "--persistentOpenMPthreads" => persistentOpenMPthreads = args(i + 1).toBoolean; i += 1
+        case "--dynamicThreadDispatch" => useDynamicThreadDispatch = args(i + 1).toBoolean; i += 1
         case "--isVCDinline" => isVCDinline = true
         case "--backend" => backendName = args(i + 1); i += 1
         case "--compile" => isCompiling = true
@@ -455,8 +459,33 @@ object Driver extends FileSystemUtilities{
       isVCDinline = false
     }
     if (useOpenMP && useOpenMPI) {
-      ChiselError.warning("Can't use both OpenMP and OpenMPI. OpenMPI ignored.")
+      ChiselError.warning("Can't use both openMP and openMPI. openMPI ignored.")
       useOpenMPI = false
+    }
+
+    if (nTestThreads < 1) {
+      ChiselError.warning("Can't use less than one test thread.")
+      nTestThreads = 1
+    } else if (nTestThreads > 1) {
+      if (!(useOpenMP || useOpenMPI)) {
+        ChiselError.warning("Specify either openMP or openMPI for multiple threads. Reverting to a single thread.")
+        nTestThreads = 1
+      }
+    }
+
+    if (separateIslandState) {
+      partitionIslands = true
+    }
+
+    if (useOpenMP || useOpenMPI) {
+      if (!(partitionIslands || nTestThreads == 1)) {
+        ChiselError.warning("Need partitionIslands for multiple threads. Enabling it.")
+        partitionIslands = true
+      }
+    }
+    
+    if (useDynamicThreadDispatch) {
+      persistentOpenMPthreads = true
     }
     // Set the backend after we've interpreted all the arguments.
     // (The backend may want to configure itself based on the arguments.)
@@ -498,12 +527,17 @@ object Driver extends FileSystemUtilities{
   var minimumLinesPerFile = 0
   var shadowRegisterInObject = false
   var allocateOnlyNeededShadowRegisters = false
-  var compileInitializationUnoptimized = false
   var useSimpleQueue = false
+  // Parallel compilation
   var parallelMakeJobs = 0
+  var compileInitializationUnoptimized = false
+  // Parallel execution
   var useOpenMP = false
   var useOpenMPI = false
   var nTestThreads = 1
+  var persistentOpenMPthreads = true
+  var useDynamicThreadDispatch = false
+
   var isVCDinline = false
   var isSupportW0W = false
   var hasMem = false

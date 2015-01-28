@@ -18,10 +18,8 @@
 /**
  * OpenMP synchronization object used to synchronize persistent multi-threaded clock emulation.
  */
-enum pt_clock_t { PCT_LO, PCT_HI, PCT_DONE };
+enum pt_clock_t { PCT_DONE, PCT_LO, PCT_HII, PCT_HIX  };
 struct comp_sync_block {
-	int index_lo;					// The current index in the clocks_lo array.
-	int index_hi;					// The current index in the clocks_hi array.
 	pt_clock_t clock_type;			// The type of clock to execute.
 	bool do_reset;					// The value of reset for this clock cycle.
 };

@@ -40,18 +40,14 @@ import scala.collection.mutable.ArrayBuffer
 
 class VcdBackend(top: Module) extends Backend {
   val keywords = Set[String]()
+  val backend = Driver.backend
 
-  override def emitTmp(node: Node, refType: NodeRefType = Basic): String =
-    emitRef(node, refType)
-  override def emitRef(node: Node, refType: NodeRefType = Basic): String =
-    node match {
-      case _: Literal =>
-        node.name
-      case _: Reg =>
-        if (node.named) node.name else "R" + node.emitIndex
-      case _ =>
-        if (node.named) node.name else "T" + node.emitIndex
-    }
+  override def emitTmp(node: Node, refType: NodeRefType = Basic): String = {
+    backend.emitTmp(node, refType)
+  }
+  override def emitRef(node: Node, refType: NodeRefType = Basic): String = {
+    backend.emitRef(node, refType)
+  }
 
   private def emitDefUnconditional(node: Node, index: Int) =
     "  dat_dump<" + varNameLength(index) + ">(f, " + emitRef(node) + ", 0x" + varNumber(index).toHexString + ");\n"
@@ -96,19 +92,6 @@ class VcdBackend(top: Module) extends Backend {
     "    " + emitRef(node) + ".get(0x" + offset.toHexString + ");\n" +
     "    " + emitDefUnconditional(node, offset, index) +
     "  }\n"
-
-  override def emitDec(node: Node): String =
-    if (Driver.isVCD && node.isInVCD) {
-      node match {
-        case m: Mem[_] =>
-          "  mem_t<" + m.needWidth() + "," + m.n + "> " + emitRef(node) + "__prev" + ";\n"
-        case r: ROMData =>
-          "  mem_t<" + r.needWidth() + "," + r.lits.size + "> " + emitRef(node) + "__prev" + ";\n"
-        case _ =>
-          "  dat_t<" + node.needWidth() + "> " + emitRef(node) + "__prev" + ";\n"
-      }
-    }
-    else ""
 
   def dumpVCDScope(c: Module, write: String => Unit): Unit = {
     write("  fputs(\"" + "$scope module " + c.name + " $end" + "\\n\", f);\n")

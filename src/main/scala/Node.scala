@@ -126,7 +126,7 @@ object Node {
 
   object NodeRefType extends Enumeration {
     type NodeRefType = Value
-    val Basic, Dec, Read, Write, Addr, ReadAddr, WriteAddr = Value
+    val Basic, Dec, VCDDec, Read, Write, Addr, ReadAddr, WriteAddr = Value
   }
 }
 

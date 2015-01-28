@@ -108,9 +108,9 @@ class CppBackend extends Backend {
   val useOpenMP = Driver.useOpenMP
   val useOpenMPI = Driver.useOpenMPI
   val nTestThreads = Driver.nTestThreads
-  val persistentOpenMPthreads = false
+  val persistentOpenMPthreads = Driver.persistentOpenMPthreads
   val forceSingleThread = false
-  val useDynamicDispatch = false
+  val useDynamicThreadDispatch = Driver.useDynamicThreadDispatch
 
   // The following definition should be a val, but we can't initialize it before elaborate,
   // and backend methods may need to refer to it indirectly.
@@ -125,10 +125,14 @@ class CppBackend extends Backend {
         Some(homeIsland.islandId)
       }
     } catch {
-        case e: java.lang.NullPointerException => {
-          println("Bang!")
-        }
-        None
+      case p: java.lang.NullPointerException => {
+        println("Bang!")
+      None
+      }
+      case b: java.lang.ArrayIndexOutOfBoundsException => {
+        println("Bang!")
+      None
+      }
     } 
   }
     
@@ -139,20 +143,35 @@ class CppBackend extends Backend {
 
   // Give different names to temporary nodes in CppBackend
   override def emitRef(node: Node, refType: NodeRefType = Basic): String = {
+    var prefix = ""
+    var suffix = ""
     node match {
       case _: Bits if !node.isInObject && node.inputs.length == 1 =>
         emitRef(node.inputs(0), refType)
       case _: Clock => super.emitRef(node)
       case _ => {
-        val prefix = if (refType != Dec && separateIslandState && node.isInObject) {
-          nodeHomeIslandId(node) match {
-            case Some(i: Int) => s"_I_${i}."
-            case None => ""
+        // Chose the potential prefix and suffix based on the reference type.
+        refType match {
+          case Dec => {}
+          case VCDDec => { suffix = "__prev" }
+          case _ => {
+            if (separateIslandState && node.isInObject) {
+              // If this node is an IO node of type Bool with name "reset", don't apply suffix or prefix.
+              // We don't want to create an internal "reset" piece of state, or we'll never see "reset" arguments
+              // passed to clock code.
+              if (!(node.isIo && node.name == "reset" && node.isInstanceOf[Bool])) {
+                prefix = nodeHomeIslandId(node) match {
+                  case Some(i: Int) => s"_I_${i}."
+                  case None => ""
+                }
+              } else {
+                prefix = ""
+                suffix = ""
+              }
+            }
           }
-        } else {
-          ""
         }
-        prefix + super.emitRef(node)
+        prefix + super.emitRef(node) + suffix
       }
     }
   }
@@ -228,8 +247,8 @@ class CppBackend extends Backend {
         }
       case x: Reg =>
         List((s"dat_t<${node.needWidth()}>", emitRef(node, refType))) ++ {
-          if (!allocateOnlyNeededShadowRegisters || needShadow.contains(node)) {
-            // Add an entry for the shadow register in the main object.
+          if (refType == Dec && (!allocateOnlyNeededShadowRegisters || needShadow.contains(node))) {
+            // If we're declaring, add an entry for the shadow register in the main object.
             if (shadowRegisterInObject) {
               List((s"${shadowPrefix} dat_t<${node.needWidth()}>", shadowPrefix + emitRef(node, refType) + s"__shadow"))
             } else {
@@ -254,6 +273,14 @@ class CppBackend extends Backend {
   override def emitDec(node: Node): String = {
     val out = new StringBuilder("")
     for (varDef <- nodeVars(node, Dec)) {
+      out.append(s"  ${varDef._1} ${varDef._2};\n")
+    }
+    out.toString()
+  }
+
+  def emitVCDDec(node: Node): String = {
+    val out = new StringBuilder("")
+    for (varDef <- nodeVars(node, VCDDec)) {
       out.append(s"  ${varDef._1} ${varDef._2};\n")
     }
     out.toString()
@@ -774,7 +801,7 @@ class CppBackend extends Backend {
       harness.write("\nchisel_sync_omp task_sync(%d);\n".format(nTestThreads))
       harness.write("comp_sync_block g_comp_sync_block;\n\n")
       // Red the task template and split it up into its major sections
-      if (useDynamicDispatch) {
+      if (useDynamicThreadDispatch) {
         val replacements = HashMap[String, String] ()
         replacements += (("@NTESTTHREADS@", (nTestThreads).toString))
         replacements += (("@NTESTTHREADSP1@", (nTestThreads + 1).toString))
@@ -827,7 +854,7 @@ class CppBackend extends Backend {
     harness.write(s"""  api->set_teefile(tee);\n""");
     if (useOpenMP && !forceSingleThread && persistentOpenMPthreads) {
       // Read and edit the parallel task template.
-      if (useDynamicDispatch) {
+      if (useDynamicThreadDispatch) {
         harness.write(task.toString)
         harness.write(tail.toString)
       } else {
@@ -902,7 +929,7 @@ class CppBackend extends Backend {
     val LIBS = " " + scala.util.Properties.envOrElse("LIBS", "")
     val chiselENV = java.lang.System.getenv("CHISEL")
 
-    val c11 = if (hasPrintfs || (useOpenMP & useDynamicDispatch)) " -std=c++11 " else ""
+    val c11 = if (hasPrintfs || (useOpenMP & useDynamicThreadDispatch)) " -std=c++11 " else ""
     val openMP = if (useOpenMP) " -fopenmp " else ""
     val LD_openMPI = if (useOpenMPI) " -lmpi " else ""
     val cxxFlags = (if (flagsIn == null) CXXFLAGS else flagsIn) + c11 + openMP
@@ -957,7 +984,7 @@ class CppBackend extends Backend {
     var optim2 = "-O2"
     // Is the caller explicitly setting -Osomething? If yes, we'll honor that setting
     //  and set our default optimization flags to "".
-    val Oregex = new scala.util.matching.Regex("""\W*((-O\w)|(-g\w))\b""", "all", "explicitO", "debug")
+    val Oregex = new scala.util.matching.Regex("""\W*((-O\w)|(-g\w?))\b""", "all", "explicitO", "debug")
     for (m <- Oregex.findAllMatchIn(allFlags)) {
       if (m.group("explicitO") != null) {
         println("Cpp: observing explicit '" + m.group("explicitO") + "'")
@@ -1125,11 +1152,12 @@ class CppBackend extends Backend {
     val out_cpps = ArrayBuffer[CppFile]()
     val all_cpp = new StringBuilder
 
-    var threadIslands = new Array[ArrayBuffer[Island]]( if (useOpenMP && !useDynamicDispatch) nTestThreads else 0)
+    var threadIslands = new Array[ArrayBuffer[Island]]( if (useOpenMP && !useDynamicThreadDispatch) nTestThreads else 0)
     // If we're doing dynamic dispatch, we build arrays of clock_hi/lo islands
     // from which we'll generate calls on the specific clock_hi/lo code.
     var clockLoIslands = ArrayBuffer[Island]()
     var clockHiIslands =  ArrayBuffer[Island]()
+    var clockHiXslands =  ArrayBuffer[Island]()
 
     def cppFileSuffix = "-" + out_cpps.length
     class CppFile(val suffix: String = cppFileSuffix) {
@@ -1327,14 +1355,19 @@ class CppBackend extends Backend {
           for (m <- Driver.orderedNodes.filter(n => n.isInObject && nodeHomeIslandId(n) == Some(islandId)).sortWith(headerOrderFunc)) {
             out_h.write(emitDec(m))
           }
+          if (Driver.isVCD) {
+            for (m <- Driver.orderedNodes.filter(n => n.isInVCD && nodeHomeIslandId(n) == Some(islandId)).sortWith(headerOrderFunc)) {
+              out_h.write(emitVCDDec(m))
+            }
+          }
           out_h.write("   } _I_%s;\n".format(islandId))
         }
       } else {
         for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc))
           out_h.write(emitDec(m))
+        for (m <- Driver.orderedNodes.filter(_.isInVCD).sortWith(headerOrderFunc))
+          out_h.write(vcd.emitDec(m))
       }
-      for (m <- Driver.orderedNodes.filter(_.isInVCD).sortWith(headerOrderFunc))
-        out_h.write(vcd.emitDec(m))
       for (clock <- Driver.clocks)
         out_h.write(emitDec(clock))
 
@@ -1424,10 +1457,15 @@ struct comp_clock_methods_t {
   const int index_max;
   const clock_code_t *clock_codes;
 };
-
+/*
 struct comp_clocks_t {
     const comp_clock_methods_t hi;
     const comp_clock_methods_t lo;
+};
+*/
+struct comp_current_clock_t {
+    volatile int index;
+    comp_clock_methods_t *methods;
 };
 """)
       }
@@ -1667,6 +1705,7 @@ struct comp_clocks_t {
 
       val clockLoName = "clock_lo" + clockThreadSuffix
       val clockHiName = "clock_hi" + clockThreadSuffix
+      val clockHiXName = "clock_hix" + clockThreadSuffix
       val clockName = "clock" + clockThreadSuffix
       val ptClockName = "pt_clock" + clockThreadSuffix
       // Build the replacement string map for the parallel clock method template.
@@ -1674,6 +1713,7 @@ struct comp_clocks_t {
 
       replacements += (("@CLOCKLONAME@", clockLoName))
       replacements += (("@CLOCKHINAME@", clockHiName))
+      replacements += (("@CLOCKHIXNAME@", clockHiXName))
       replacements += (("@MODULENAME@", c.name + "_t"))
       replacements += (("@PT_CLOCKNAME@", ptClockName))
       // Read and edit the parallel clock method template.
@@ -1690,6 +1730,7 @@ struct comp_clocks_t {
 
       val clockLoName = "clock_lo"
       val clockHiName = "clock_hi"
+      val clockHiXName = "clock_hix"
       val ptClockName = "pt_clock"
       val doClockName = "do_clocks"
       val method = CMethod(CTypedName("void", doClockName), clockArgs)
@@ -1714,14 +1755,21 @@ struct comp_clocks_t {
         body.append(clockLo.tail)
         val clockHi = CMethod(CTypedName("void", clockHiName), clockLoHiArgs)
         body.append(clockHi.head)
-        body.append("       %s(PCT_HI, reset);\n".format(doClockName))
+        body.append("       %s(PCT_HII, reset);\n".format(doClockName))
         body.append(clockHi.tail)
+        if (false) {
+          val clockHiX = CMethod(CTypedName("void", clockHiXName), clockLoHiArgs)
+          body.append(clockHiX.head)
+          body.append("       %s(PCT_HIX, reset);\n".format(doClockName))
+          body.append(clockHiX.tail)
+        }
       } else if (persistentOpenMPthreads) {
         // Build the replacement string map for the do_clocks method template.
         val replacements = HashMap[String, String] ()
         replacements += (("@NTESTTHREADS@", nTestThreads.toString))
         replacements += (("@CLOCKLONAME@", clockLoName))
         replacements += (("@CLOCKHINAME@", clockHiName))
+        replacements += (("@CLOCKHIXNAME@", clockHiXName))
         replacements += (("@PT_CLOCKNAME@", ptClockName))
         replacements += (("@MODULENAME@", c.name + "_t"))
         replacements += (("@DO_CLOCKS@", doClockName))
@@ -1755,46 +1803,45 @@ struct comp_clocks_t {
         body.append(clockLo.tail)
         val clockHi = CMethod(CTypedName("void", clockHiName), clockLoHiArgs)
         body.append(clockHi.head)
-        body.append("       %s(PCT_HI, reset);\n".format(doClockName))
+        body.append("       %s(PCT_HII, reset);\n".format(doClockName))
         body.append(clockHi.tail)
+        if (false) {
+          val clockHiX = CMethod(CTypedName("void", clockHiXName), clockLoHiArgs)
+          body.append(clockHiX.head)
+          body.append("       %s(PCT_HIX, reset);\n".format(doClockName))
+          body.append(clockHiX.tail)
+        }
       }
       writeCppFile(body.toString)
     }
 
 
-    def genParallelClockMethodArrays(clock_his: ArrayBuffer[Island], clock_los: ArrayBuffer[Island]) {
+    def genParallelClockMethodArrays(clock_los: ArrayBuffer[Island], clock_hiis: ArrayBuffer[Island], clock_hixs: ArrayBuffer[Island]) {
       createCppFile()
 
       val moduleName = c.name + "_t"
       val body = new StringBuilder("")
-      val head_hi = """
-static const clock_code_t clocks_hi[] = {
-"""
-      val head_lo = """
-};
-static const clock_code_t clocks_lo[] = {
-"""
-      val tail_lo = """
-};
-"""
+      val head = "static const clock_code_t %s_code[] = {\n"
+      val tail = "\n};\n"
+      val clockIslands = Array[(String, ArrayBuffer[Island])](("clock_lo", clock_los), ("clock_hi", clock_hiis), ("clock_hix", clock_hixs))
       val g_comp_clocks = s"""
-comp_clocks_t g_comp_clocks = {
-    {${clock_his.size - 1}, clocks_hi},
-    {${clock_los.size - 1}, clocks_lo},
+comp_clock_methods_t g_comp_clocks[] = {
+    {${clock_los.size - 1}, clock_lo_code},
+    {${clock_hiis.size - 1}, clock_hi_code},
+    {${clock_hixs.size - 1}, clock_hix_code},
 };
+
+comp_current_clock_t g_current_clock;
 """
-      body.append(head_hi)
-      for (i <- clock_his) {
-        val clockHiName = "%s::clock_hi_I_%d".format(moduleName, i.islandId)
-        body.append("&" + clockHiName + ", ")
+      for ((name, islands) <- clockIslands) {
+        body.append(head.format(name))
+        for (i <- islands) {
+          val clockName = "%s::%s_I_%d".format(moduleName, name, i.islandId)
+          body.append("&" + clockName + ", ")
+        }
+        body.append(tail)
       }
-      body.append(head_lo)
-      for (i <- clock_los) {
-        val clockLoName = "%s::clock_lo_I_%d".format(moduleName, i.islandId)
-        body.append("&" + clockLoName + ", ")
-      }
-      body.append(tail_lo)
-      body.append(g_comp_clocks.format((clock_his.size - 1).toString, (clock_los.size - 1).toString))
+      body.append(g_comp_clocks)
       writeCppFile(body.toString)
     }
 
@@ -1844,20 +1891,20 @@ comp_clocks_t g_comp_clocks = {
       for (clock <- Driver.clocks) {
         // If we're generating threaded clock code without dynamic dispatch,
         //  we'll need per-thread clock lo,hi.
-        val perThreadClocks = if (!useDynamicDispatch) nTestThreads else 1
+        val perThreadClocks = if (!useDynamicThreadDispatch) nTestThreads else 1
         for (t <- 0 until perThreadClocks) {
           val clockThreadSuffix = if (perThreadClocks > 1) "_T%d".format(t) else ""
 
           val clockLoName = "clock_lo" + clockThreadSuffix + clkName(clock)
           val clock_dlo = new CMethod(CTypedName("void", clockLoName), clockArgs)
           val clockHiName = "clock_hi" + clockThreadSuffix + clkName(clock)
-          val clock_ihi = new CMethod(CTypedName("void", clockHiName), clockArgs)
+          val clock_hi = new CMethod(CTypedName("void", clockHiName), clockArgs)
           // For simplicity, we define a dummy method for the clock_hi exec code.
           // We won't actually call such a  method - its code will be inserted into the
           // clock_hi method after all the clock_hi initialization code.
           val clockHiDummyName = "clock_hi_dummy" + clockThreadSuffix + clkName(clock)
           val clock_xhi = new CMethod(CTypedName("void", clockHiDummyName), clockArgs)
-          threadCode(t) += (clock -> ((clock_dlo, clock_ihi, clock_xhi)))
+          threadCode(t) += (clock -> ((clock_dlo, clock_hi, clock_xhi)))
         }
         // If we're generating islands of combinational logic,
         // have the main clock code call the island specific code,
@@ -1873,11 +1920,11 @@ comp_clocks_t g_comp_clocks = {
             val clock_dlo_I = new CMethod(CTypedName("void", clockLoName), clockArgs)
             // Unlike the unpartitioned case, we will generate and call separate
             // initialize and execute clock_hi methods if we're partitioning.
-            val clockIHiName = "clock_hi" + clkName(clock) + "_I_" + islandId
-            val clock_ihi_I = new CMethod(CTypedName("void", clockIHiName), clockArgs)
-            val clockXHiName = "clock_xhi" + clkName(clock) + "_I_" + islandId
+            val clockHiName = "clock_hi" + clkName(clock) + "_I_" + islandId
+            val clock_hi_I = new CMethod(CTypedName("void", clockHiName), clockArgs)
+            val clockXHiName = "clock_hix" + clkName(clock) + "_I_" + islandId
             val clock_xhi_I = new CMethod(CTypedName("void", clockXHiName), clockArgs)
-            islandClkCode(islandId) += (clock -> ((clock_dlo_I, clock_ihi_I, clock_ihi_I)))
+            islandClkCode(islandId) += (clock -> ((clock_dlo_I, clock_hi_I, clock_xhi_I)))
           }
         }
       }
@@ -1952,7 +1999,7 @@ comp_clocks_t g_comp_clocks = {
           // Are we partitioning for parallel execution?
           // If so, build the map of weighted island clock code
           if (useOpenMP) {
-            if (useDynamicDispatch) {
+            if (useDynamicThreadDispatch) {
               var weightedClockCodes_lo = scala.collection.mutable.LinkedHashMap[Int, scala.collection.mutable.LinkedHashSet[Island]]()
               var weightedClockCodes_hi = scala.collection.mutable.LinkedHashMap[Int, scala.collection.mutable.LinkedHashSet[Island]]()
               for (island <- islands) {
@@ -2103,7 +2150,7 @@ comp_clocks_t g_comp_clocks = {
           // If we're generating dynamic threaded clock code,
           //  we call the island-specific clock lows from the multi-thread
           // dispatch, and this aggregator is not required.
-          if (!(useOpenMP && useDynamicDispatch)) {
+          if (!(useOpenMP && useDynamicThreadDispatch)) {
             createCppFile()
             // This is just the definition of the main (or per-thread) clock_lo method.
             writeCppFile(clock_lo.head)
@@ -2122,32 +2169,44 @@ comp_clocks_t g_comp_clocks = {
           }
         }
 
-        // Output the island-specific clock_hi init and def/exec code
-        val accumulatedClockHis = new CoalesceMethods(lineLimitFunctions)
+        // Output the island-specific clock_hi init code
+        val accumulatedClockHiIs = new CoalesceMethods(lineLimitFunctions)
+        val accumulatedClockHiXs = new CoalesceMethods(lineLimitFunctions)
+
         for (islandId <- islandOrder(1) if selector_p(islandId)) {
-          // Extract both init and def/exec code and combine them.
-          for ((clockHiI, clockHiX) <- islandClkCode(islandId).values.map(h => (h._2, h._3))) {
-            val combinedMethod = clockHiI
-            combinedMethod.body ++= clockHiX.body
-            accumulatedClockHis.append(combinedMethod)
+          // Extract init code.
+          for (clockHiI <- islandClkCode(islandId).values.map(_._2)) {
+            accumulatedClockHiIs.append(clockHiI)
             clockHiI.body.clear()         // free the memory.
           }
         }
-        accumulatedClockHis.done()
+        accumulatedClockHiIs.done()
+      // Output the island-specific clock_hi def/exec code
+        for (islandId <- islandOrder(1) if selector_p(islandId)) {
+          // Extract def/exec code.
+          for (clockHi <- islandClkCode(islandId).values.map(_._3)) {
+            accumulatedClockHiXs.append(clockHi)
+            clockHi.body.clear()         // free the memory.
+          }
+        }
+        accumulatedClockHiXs.done()
 
         // Output the code to call the island-specific clock_hi (init and exec) code.
         for ((clock, clkcodes) <- theCode if generatedClocks.contains(clock)) {
-          val clock_ihi = clkcodes._2
+          val clock_hi = clkcodes._2
           val clock_xhi = clkcodes._3
           // If we're generating dynamic threaded clock code,
           //  we call the island-specific clock lows from the multi-thread
           // dispatch, and this aggregator is not required.
-          if (!(useOpenMP && useDynamicDispatch)) {
+          if (!(useOpenMP && useDynamicThreadDispatch)) {
             createCppFile()
             // This is just the definition of the main (or per-thread) clock_hi init method.
-            writeCppFile(clock_ihi.head)
+            writeCppFile(clock_hi.head)
             // Output the actual calls to the island specific clock code.
-            for (method <- accumulatedClockHis.separateMethods) {
+            for (method <- accumulatedClockHiIs.separateMethods) {
+              writeCppFile("\t" + method.genCall)
+            }
+            for (method <- accumulatedClockHiXs.separateMethods) {
               writeCppFile("\t" + method.genCall)
             }
             writeCppFile(clock_xhi.tail)
@@ -2156,13 +2215,13 @@ comp_clocks_t g_comp_clocks = {
           // If we're generating multi-threaded clock code,
           // add the thread-specific clock_hi prototypes.
           if (threadIslands.size > 1) {
-            threadMethods += clock_ihi
+            threadMethods += clock_hi
           }
         }
         
         // Put the accumulated method definitions where the header
         // generation code can find them.
-        for( method <- accumulatedClockLos.separateMethods ++ accumulatedClockHis.separateMethods ++ threadMethods) {
+        for( method <- accumulatedClockLos.separateMethods ++ accumulatedClockHiIs.separateMethods ++ accumulatedClockHiXs.separateMethods ++ threadMethods) {
           clockPrototypes += method.prototype
         }
       }
@@ -2263,9 +2322,9 @@ comp_clocks_t g_comp_clocks = {
     if (threadIslands.size > 1) {
       advanceCppFile()
       genParallelClockMethods(threadIslands)
-    } else if (clockHiIslands.size > 1 || clockLoIslands.size > 1) {
+    } else if (clockLoIslands.size > 1 || clockHiIslands.size > 1 || clockHiXslands.size > 1) {
       advanceCppFile()
-      genParallelClockMethodArrays(clockHiIslands, clockLoIslands)
+      genParallelClockMethodArrays(clockLoIslands, clockHiIslands, clockHiXslands)
       // Generate the threaded top-level clock substitutes.
       genParallelClockMethods(threadIslands)
     }
