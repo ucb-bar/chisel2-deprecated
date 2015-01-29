@@ -1773,8 +1773,9 @@ struct comp_current_clock_t {
         replacements += (("@PT_CLOCKNAME@", ptClockName))
         replacements += (("@MODULENAME@", c.name + "_t"))
         replacements += (("@DO_CLOCKS@", doClockName))
+        val template = if (useDynamicThreadDispatch) {"do_clocks_dynamic.cc"} else {"do_clocks.cc"}
         // Read and edit the parallel clock method template.
-        body.append(editResource("do_clocks.cc", replacements))
+        body.append(editResource(template, replacements))
       } else {
         body.append(method.head)
         body.append(s"""
@@ -2000,45 +2001,45 @@ comp_current_clock_t g_current_clock;
           // If so, build the map of weighted island clock code
           if (useOpenMP) {
             if (useDynamicThreadDispatch) {
-              var weightedClockCodes_lo = scala.collection.mutable.LinkedHashMap[Int, scala.collection.mutable.LinkedHashSet[Island]]()
-              var weightedClockCodes_hi = scala.collection.mutable.LinkedHashMap[Int, scala.collection.mutable.LinkedHashSet[Island]]()
+              // We have three clock types: lo, hi, and hix.
+              val clockCalls = Array(clockLoIslands, clockHiIslands, clockHiXslands)
+              val nClockTypes = clockCalls.size
+              type WeightedClockCodes = scala.collection.mutable.LinkedHashMap[Int, scala.collection.mutable.LinkedHashSet[Island]]
+              var weightedClockCodes = new Array[WeightedClockCodes](nClockTypes)
+              var clockWeights = Array[Int](nClockTypes)
+              for (t <- 0 until nClockTypes) {
+                weightedClockCodes(t) = new WeightedClockCodes
+              }
               for (island <- islands) {
                 val islandId = island.islandId
-                var weight_lo = 0
-                var weight_hi = 0
+                val clockWeights = Array.fill[Int](nClockTypes)(0)
                 for ((clock, clkcodes) <- islandClkCode(islandId)) {
                   // Currently, we use a rough estimate of the "cost" of this code
                   //  based on the cost of each clock's component (lo, hi def, hi exec)
-                  weight_lo += clkcodes._1.cost
-                  weight_hi += clkcodes._2.cost + clkcodes._3.cost
+                  clockWeights(0) += clkcodes._1.cost
+                  clockWeights(1) += clkcodes._2.cost
+                  clockWeights(2) += clkcodes._3.cost
                 }
 
-                if (weight_hi != 0) {
-                  if (!weightedClockCodes_hi.contains(weight_hi)) {
-                    weightedClockCodes_hi(weight_hi) = scala.collection.mutable.LinkedHashSet[Island]()
+                for (t <- 0 until nClockTypes) {
+                  val weight = clockWeights(t)
+                  if (weight != 0) {
+                    if (!weightedClockCodes(t).contains(weight)) {
+                      weightedClockCodes(t)(weight) = scala.collection.mutable.LinkedHashSet[Island]()
+                    }
+                    weightedClockCodes(t)(weight) += island
                   }
-                  weightedClockCodes_hi(weight_hi) += island
                 }
-
-                if (weight_lo != 0) {
-                  if (!weightedClockCodes_lo.contains(weight_lo)) {
-                    weightedClockCodes_lo(weight_lo) = scala.collection.mutable.LinkedHashSet[Island]()
+              }
+                // Build the clocks_hi/clocks_lo arrays.
+              for (t <- 0 until nClockTypes) {
+                for(k <- weightedClockCodes(t).keys.toSeq.sorted.reverse) {
+                  for(island <- weightedClockCodes(t)(k)) {
+                    clockCalls(t) += island
                   }
-                  weightedClockCodes_lo(weight_lo) += island
                 }
               }
 
-              // Build the clocks_hi/clocks_lo arrays.
-              for(k <- weightedClockCodes_hi.keys.toSeq.sorted.reverse) {
-                for(island <- weightedClockCodes_hi(k)) {
-                  clockHiIslands += island
-                }
-              }
-              for(k <- weightedClockCodes_lo.keys.toSeq.sorted.reverse) {
-                for(island <- weightedClockCodes_lo(k)) {
-                  clockLoIslands += island
-                }
-              }
             } else {
               var weightedClockCode = scala.collection.mutable.LinkedHashMap[Int, scala.collection.mutable.LinkedHashSet[Island]]()
               for (island <- islands) {

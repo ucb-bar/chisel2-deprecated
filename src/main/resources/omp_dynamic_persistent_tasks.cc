@@ -1,6 +1,5 @@
 /* This template provides a dynamic persistent-task OpenMP implementation. */
 #define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember))
-extern comp_clock_methods_t g_comp_clocks[];
 extern comp_current_clock_t g_current_clock;
 
 clock_code_t next_clock_code()
@@ -30,25 +29,12 @@ void clock_task(@MODULENAME@ * module)
 		cycles += 1;
 		task_sync.worker_wait_ready();
 		#pragma omp flush(g_comp_sync_block)
-		t_clock_type = g_comp_sync_block.clock_type;
 	    dat_t<1> reset = LIT<1>(g_comp_sync_block.do_reset);
 
-    	g_current_clock.index = 0;
-	    switch (t_clock_type) {
-	    case PCT_DONE:
-	    	return;
-
-	    case PCT_LO:
-	    	g_current_clock.methods = &g_comp_clocks[0];
-			break;
-
-	    case PCT_HII:
-	    	g_current_clock.methods = &g_comp_clocks[1];
-
-	    case PCT_HIX:
-	    	g_current_clock.methods = &g_comp_clocks[2];
-			break;
-	    }
+		#pragma omp atomic read
+		t_clock_type = g_comp_sync_block.clock_type;
+		if (t_clock_type == PCT_DONE)
+			return;
 		while ((clock_code = next_clock_code()) != NULL) {
 			CALL_MEMBER_FN((*module), clock_code)(reset);
 		}
