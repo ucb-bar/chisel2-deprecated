@@ -15,6 +15,7 @@ void @MODULENAME@::@DO_CLOCKS@( pt_clock_t clock_type, dat_t<1> reset ) {
 
     case PCT_HII:
     	g_current_clock.methods = &g_comp_clocks[1];
+    	break;
 
     case PCT_HIX:
     	g_current_clock.methods = &g_comp_clocks[2];

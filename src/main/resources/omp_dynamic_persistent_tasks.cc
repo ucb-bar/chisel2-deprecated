@@ -6,6 +6,7 @@ clock_code_t next_clock_code()
 {
 	clock_code_t result = NULL;
 	int next_index, this_index;
+	#pragma omp flush(g_current_clock)
 	#pragma omp critical (index_increment)
 	{
 		next_index = g_current_clock.index + 1;
@@ -39,9 +40,12 @@ void clock_task(@MODULENAME@ * module)
 			CALL_MEMBER_FN((*module), clock_code)(reset);
 		}
 
+		#pragma omp flush
+
 		task_sync.worker_done();
 
 		task_sync.worker_wait_done();
+
 
 	} while(1);
 }

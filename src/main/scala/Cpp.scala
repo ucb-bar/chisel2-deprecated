@@ -2002,7 +2002,7 @@ comp_current_clock_t g_current_clock;
           if (useOpenMP) {
             if (useDynamicThreadDispatch) {
               // We have three clock types: lo, hi, and hix.
-              val clockCalls = Array(clockLoIslands, clockHiIslands, clockHiXslands)
+              val clockCalls = Array(clockLoIslands, clockHiIslands)
               val nClockTypes = clockCalls.size
               type WeightedClockCodes = scala.collection.mutable.LinkedHashMap[Int, scala.collection.mutable.LinkedHashSet[Island]]
               var weightedClockCodes = new Array[WeightedClockCodes](nClockTypes)
@@ -2017,8 +2017,7 @@ comp_current_clock_t g_current_clock;
                   // Currently, we use a rough estimate of the "cost" of this code
                   //  based on the cost of each clock's component (lo, hi def, hi exec)
                   clockWeights(0) += clkcodes._1.cost
-                  clockWeights(1) += clkcodes._2.cost
-                  clockWeights(2) += clkcodes._3.cost
+                  clockWeights(1) += clkcodes._2.cost + clkcodes._3.cost
                 }
 
                 for (t <- 0 until nClockTypes) {
@@ -2170,27 +2169,20 @@ comp_current_clock_t g_current_clock;
           }
         }
 
-        // Output the island-specific clock_hi init code
-        val accumulatedClockHiIs = new CoalesceMethods(lineLimitFunctions)
-        val accumulatedClockHiXs = new CoalesceMethods(lineLimitFunctions)
+        // Output the island-specific clock_hi init and def/exec code
+        val accumulatedClockHis = new CoalesceMethods(lineLimitFunctions)
 
         for (islandId <- islandOrder(1) if selector_p(islandId)) {
-          // Extract init code.
-          for (clockHiI <- islandClkCode(islandId).values.map(_._2)) {
-            accumulatedClockHiIs.append(clockHiI)
+          // Extract both init and def/exec code and combine them.
+          for ((clockHiI, clockHiX) <- islandClkCode(islandId).values.map(h => (h._2, h._3))) {
+            val combinedMethod = clockHiI
+            combinedMethod.body ++= clockHiX.body
+            accumulatedClockHis.append(combinedMethod)
             clockHiI.body.clear()         // free the memory.
+            clockHiX.body.clear()         // free the memory.
           }
         }
-        accumulatedClockHiIs.done()
-      // Output the island-specific clock_hi def/exec code
-        for (islandId <- islandOrder(1) if selector_p(islandId)) {
-          // Extract def/exec code.
-          for (clockHi <- islandClkCode(islandId).values.map(_._3)) {
-            accumulatedClockHiXs.append(clockHi)
-            clockHi.body.clear()         // free the memory.
-          }
-        }
-        accumulatedClockHiXs.done()
+        accumulatedClockHis.done()
 
         // Output the code to call the island-specific clock_hi (init and exec) code.
         for ((clock, clkcodes) <- theCode if generatedClocks.contains(clock)) {
@@ -2204,10 +2196,7 @@ comp_current_clock_t g_current_clock;
             // This is just the definition of the main (or per-thread) clock_hi init method.
             writeCppFile(clock_hi.head)
             // Output the actual calls to the island specific clock code.
-            for (method <- accumulatedClockHiIs.separateMethods) {
-              writeCppFile("\t" + method.genCall)
-            }
-            for (method <- accumulatedClockHiXs.separateMethods) {
+            for (method <- accumulatedClockHis.separateMethods) {
               writeCppFile("\t" + method.genCall)
             }
             writeCppFile(clock_xhi.tail)
@@ -2222,7 +2211,7 @@ comp_current_clock_t g_current_clock;
         
         // Put the accumulated method definitions where the header
         // generation code can find them.
-        for( method <- accumulatedClockLos.separateMethods ++ accumulatedClockHiIs.separateMethods ++ accumulatedClockHiXs.separateMethods ++ threadMethods) {
+        for( method <- accumulatedClockLos.separateMethods ++ accumulatedClockHis.separateMethods ++ threadMethods) {
           clockPrototypes += method.prototype
         }
       }
