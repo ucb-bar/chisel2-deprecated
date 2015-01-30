@@ -13,13 +13,9 @@ void @MODULENAME@::@DO_CLOCKS@( pt_clock_t clock_type, dat_t<1> reset ) {
     	g_current_clock.methods = &g_comp_clocks[0];
 		break;
 
-    case PCT_HII:
+    case PCT_HI:
     	g_current_clock.methods = &g_comp_clocks[1];
     	break;
-
-    case PCT_HIX:
-    	g_current_clock.methods = &g_comp_clocks[2];
-		break;
     }
 	#pragma omp flush(g_current_clock)
 
@@ -37,6 +33,5 @@ void @MODULENAME@::clock_lo( dat_t<1> reset ) {
 }
 
 void @MODULENAME@::clock_hi( dat_t<1> reset ) {
-	@DO_CLOCKS@( PCT_HII, reset );
-	@DO_CLOCKS@( PCT_HIX, reset );
+	@DO_CLOCKS@( PCT_HI, reset );
 }

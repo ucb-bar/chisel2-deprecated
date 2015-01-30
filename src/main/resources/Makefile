@@ -13,6 +13,7 @@ CPPFLAGS  = @CPPFLAGS@
 CXXFLAGS  = @CXXFLAGS@
 LDFLAGS  = @LDFLAGS@
 CXX			= @CXX@
+LIBS    = @LIBS@
 
 default:  $(EXEC)
 
@@ -22,7 +23,7 @@ clean:
 $(ONCEONLY) $(UNOPTIMIZED) $(OPTIMIZED):  $(HFILES)
 
 $(EXEC):  $(ONCEONLY) $(UNOPTIMIZED) $(OPTIMIZED) Makefile
-	$(CXX) -o $@ $(filter-out Makefile,$^)
+	$(CXX) $(LDFLAGS) -o $@ $(filter-out Makefile,$^) $(LIBS)
 
 $(ONCEONLY): %.o: %.cpp
 	$(CXX) -c -o $@ $(OPTIM0) $(CPPFLAGS) $(CXXFLAGS) $<

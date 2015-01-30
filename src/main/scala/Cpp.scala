@@ -111,6 +111,7 @@ class CppBackend extends Backend {
   val persistentOpenMPthreads = Driver.persistentOpenMPthreads
   val forceSingleThread = false
   val useDynamicThreadDispatch = Driver.useDynamicThreadDispatch
+  val parallelExecution = (useOpenMP || useOpenMPI) && nTestThreads > 1
 
   // The following definition should be a val, but we can't initialize it before elaborate,
   // and backend methods may need to refer to it indirectly.
@@ -1020,11 +1021,12 @@ class CppBackend extends Backend {
         replacements += (("@EXEC@", n))
         replacements += (("@CPPFLAGS@", cppFlags))
         replacements += (("@CXXFLAGS@", cxxFlags))
-        replacements += (("@LDFLAGS@", debug + LDFLAGS))
+        replacements += (("@LDFLAGS@", debug + LDFLAGS + openMP))
         replacements += (("@OPTIM0@", optim0))
         replacements += (("@OPTIM1@", optim1))
         replacements += (("@OPTIM2@", optim2))
         replacements += (("@CXX@", CXX))
+        replacements += (("@LIBS@", LIBS))
         // Read and edit the Makefile template.
         editToTarget("Makefile", replacements)
         val nJobs = if (parallelMakeJobs > 0) "-j" + parallelMakeJobs.toString() else "-j"
@@ -1155,9 +1157,15 @@ class CppBackend extends Backend {
     var threadIslands = new Array[ArrayBuffer[Island]]( if (useOpenMP && !useDynamicThreadDispatch) nTestThreads else 0)
     // If we're doing dynamic dispatch, we build arrays of clock_hi/lo islands
     // from which we'll generate calls on the specific clock_hi/lo code.
-    var clockLoIslands = ArrayBuffer[Island]()
-    var clockHiIslands =  ArrayBuffer[Island]()
-    var clockHiXslands =  ArrayBuffer[Island]()
+    var clockLoIslands = Array[Island]()
+    var clockHiIslands =  Array[Island]()
+    var clockBothIslands =  Array[Island]()
+    // We have two major clock types: lo and hi, and a third pseudo type which is a combination of the two.
+    //  The latter is used to sort clock methods when we allocate both lo and hi to the same thread.
+    val clockCalls = Array(clockLoIslands, clockHiIslands, clockBothIslands)
+    val clockWeightSizes = clockCalls.size
+    type WeightedIslands = scala.collection.mutable.LinkedHashMap[Int, scala.collection.mutable.LinkedHashSet[Island]]
+    val weightedIslands = new Array[WeightedIslands](clockWeightSizes)
 
     def cppFileSuffix = "-" + out_cpps.length
     class CppFile(val suffix: String = cppFileSuffix) {
@@ -1195,6 +1203,7 @@ class CppBackend extends Backend {
       val argumentList = arguments.map(a => "%s %s".format(a.ctype, a.name)).mkString(", ")
       val callArgs = arguments.map(_.name).mkString(", ")
       val head = "%s %s::%s ( %s ) {\n".format(name.ctype, cclass, name.name, argumentList)
+      lazy val address = "&%s::%s".format(cclass, name.name)
       val tail = "}\n"
       val genCall = "%s(%s);\n".format(name.name, callArgs)
       val prototype = "%s %s( %s );\n".format(name.ctype, name.name, argumentList)
@@ -1700,7 +1709,7 @@ struct comp_current_clock_t {
       nMethods
     }
 
-    def genParallelClockMethod(thread: Int, islands: ArrayBuffer[Island]) {
+    def genParallelClockMethod(thread: Int) {
       val clockThreadSuffix = "_T%d".format(thread)
 
       val clockLoName = "clock_lo" + clockThreadSuffix
@@ -1724,7 +1733,7 @@ struct comp_current_clock_t {
     def genParallelClockMethods(threadIslands: Array[ArrayBuffer[Island]]) {
       createCppFile()
       for(t <- 0 until threadIslands.size) {
-        genParallelClockMethod(t, threadIslands(t))
+        genParallelClockMethod(t)
       }
       val clockArgs = Array[CTypedName](CTypedName("pt_clock_t", "clock_type"), CTypedName("dat_t<1>", "reset"))
 
@@ -1817,29 +1826,25 @@ struct comp_current_clock_t {
     }
 
 
-    def genParallelClockMethodArrays(clock_los: ArrayBuffer[Island], clock_hiis: ArrayBuffer[Island], clock_hixs: ArrayBuffer[Island]) {
+    def genParallelClockMethodArrays(clock_lo_methods: Array[CMethod], clock_hi_methods: Array[CMethod]) {
       createCppFile()
 
       val moduleName = c.name + "_t"
       val body = new StringBuilder("")
       val head = "static const clock_code_t %s_code[] = {\n"
       val tail = "\n};\n"
-      val clockIslands = Array[(String, ArrayBuffer[Island])](("clock_lo", clock_los), ("clock_hi", clock_hiis), ("clock_hix", clock_hixs))
+      val clockMethods = Array[(String, Array[CMethod])](("clock_lo", clock_lo_methods), ("clock_hi", clock_hi_methods))
       val g_comp_clocks = s"""
 comp_clock_methods_t g_comp_clocks[] = {
-    {${clock_los.size - 1}, clock_lo_code},
-    {${clock_hiis.size - 1}, clock_hi_code},
-    {${clock_hixs.size - 1}, clock_hix_code},
+    {${clock_lo_methods.size - 1}, clock_lo_code},
+    {${clock_hi_methods.size - 1}, clock_hi_code},
 };
 
 comp_current_clock_t g_current_clock;
 """
-      for ((name, islands) <- clockIslands) {
+      for ((name, methods) <- clockMethods) {
         body.append(head.format(name))
-        for (i <- islands) {
-          val clockName = "%s::%s_I_%d".format(moduleName, name, i.islandId)
-          body.append("&" + clockName + ", ")
-        }
+        body.append(methods.map(_.address).mkString(", "))
         body.append(tail)
       }
       body.append(g_comp_clocks)
@@ -1887,7 +1892,7 @@ comp_current_clock_t g_current_clock;
       var islandSequence = Array.fill(3)(0)
       val showProgress = false
 
-        // All clock methods take the same arguments and return void.
+      // All clock methods take the same arguments and return void.
       val clockArgs = Array[CTypedName](CTypedName("dat_t<1>", "reset"))
       for (clock <- Driver.clocks) {
         // If we're generating threaded clock code without dynamic dispatch,
@@ -1997,79 +2002,8 @@ comp_current_clock_t g_current_clock;
               println("ClockDomains: populated " + nodeCount + " nodes.")
             }
           }
-          // Are we partitioning for parallel execution?
-          // If so, build the map of weighted island clock code
-          if (useOpenMP) {
-            if (useDynamicThreadDispatch) {
-              // We have three clock types: lo, hi, and hix.
-              val clockCalls = Array(clockLoIslands, clockHiIslands)
-              val nClockTypes = clockCalls.size
-              type WeightedClockCodes = scala.collection.mutable.LinkedHashMap[Int, scala.collection.mutable.LinkedHashSet[Island]]
-              var weightedClockCodes = new Array[WeightedClockCodes](nClockTypes)
-              var clockWeights = Array[Int](nClockTypes)
-              for (t <- 0 until nClockTypes) {
-                weightedClockCodes(t) = new WeightedClockCodes
-              }
-              for (island <- islands) {
-                val islandId = island.islandId
-                val clockWeights = Array.fill[Int](nClockTypes)(0)
-                for ((clock, clkcodes) <- islandClkCode(islandId)) {
-                  // Currently, we use a rough estimate of the "cost" of this code
-                  //  based on the cost of each clock's component (lo, hi def, hi exec)
-                  clockWeights(0) += clkcodes._1.cost
-                  clockWeights(1) += clkcodes._2.cost + clkcodes._3.cost
-                }
-
-                for (t <- 0 until nClockTypes) {
-                  val weight = clockWeights(t)
-                  if (weight != 0) {
-                    if (!weightedClockCodes(t).contains(weight)) {
-                      weightedClockCodes(t)(weight) = scala.collection.mutable.LinkedHashSet[Island]()
-                    }
-                    weightedClockCodes(t)(weight) += island
-                  }
-                }
-              }
-                // Build the clocks_hi/clocks_lo arrays.
-              for (t <- 0 until nClockTypes) {
-                for(k <- weightedClockCodes(t).keys.toSeq.sorted.reverse) {
-                  for(island <- weightedClockCodes(t)(k)) {
-                    clockCalls(t) += island
-                  }
-                }
-              }
-
-            } else {
-              var weightedClockCode = scala.collection.mutable.LinkedHashMap[Int, scala.collection.mutable.LinkedHashSet[Island]]()
-              for (island <- islands) {
-                val islandId = island.islandId
-                var weight = 0
-                for ((clock, clkcodes) <- islandClkCode(islandId)) {
-                  // Currently, we use a rough estimate of the "cost" of this code
-                  //  based on the cost of each clock's component (lo, hi def, hi exec)
-                  weight += clkcodes._1.cost + clkcodes._2.cost + clkcodes._3.cost
-                }
-                if (!weightedClockCode.contains(weight)) {
-                  weightedClockCode(weight) = scala.collection.mutable.LinkedHashSet[Island]()
-                }
-                weightedClockCode(weight) += island
-              }
-              // Now distribute the clock code between threads.
-              for (t <- 0 until nTestThreads) {
-                threadIslands(t) = ArrayBuffer[Island]()
-              }
-              var t = 0
-              for(k <- weightedClockCode.keys.toSeq.sorted.reverse) {
-                for(island <- weightedClockCode(k)) {
-                  threadIslands(t) += island
-                  t = (t + 1) % nTestThreads
-                }
-              }
-            }
-          }
         }
       }
-
       // This is the opposite of LineLimitedMethods.
       // It collects output until a threshold is reached.
       class CoalesceMethods(limit: Int) {
@@ -2118,10 +2052,69 @@ comp_current_clock_t g_current_clock;
         }
       }
 
+      /* Aggregate clock methods.
+       * Keeping them distinct causes the object to balloon in size (requiring three methods for each island),
+       * and adds call overhead to the execution time.
+       */
+      def assignIslandWeights() {
+        var clockWeights = Array[Int](clockWeightSizes)
+        for (t <- 0 until clockWeightSizes) {
+          weightedIslands(t) = new WeightedIslands
+        }
+        for (island <- islands) {
+          val islandId = island.islandId
+          val clockWeights = Array.fill[Int](clockWeightSizes)(0)
+          for ((clock, clkcodes) <- islandClkCode(islandId)) {
+            // Currently, we use a rough estimate of the "cost" of this code
+            //  based on the cost of each clock's component (lo, hi def, hi exec)
+            clockWeights(0) += clkcodes._1.cost
+            clockWeights(1) += clkcodes._2.cost + clkcodes._3.cost
+            clockWeights(2) += clockWeights(0) + clockWeights(1)
+          }
+
+          for (t <- 0 until clockWeightSizes) {
+            val weight = clockWeights(t)
+            if (weight != 0) {
+              if (!weightedIslands(t).contains(weight)) {
+                weightedIslands(t)(weight) = scala.collection.mutable.LinkedHashSet[Island]()
+              }
+              weightedIslands(t)(weight) += island
+            }
+          }
+        }
+      }
+      
+      def sortIslandWeights(weightedIslands: WeightedIslands): Array[Island] = {
+        // Build the clock method array (hi or lo or the combination),
+        //  sorted by weight descending, ignoring weightless islands .
+        val allIslands = ArrayBuffer[Island]()
+        for((weight, islands) <- weightedIslands.toSeq.sortWith(_._1 > _._1) if weight > 0) {
+          for(island <- islands) {
+            allIslands += island
+          }
+        }
+        allIslands.toArray
+      }
+
+      def assignClocksToThreads(weightedIslands: WeightedIslands) {
+        // Distribute the clock code between threads.
+        for (t <- 0 until nTestThreads) {
+          threadIslands(t) = ArrayBuffer[Island]()
+        }
+        var t = 0
+        for((weight, islands) <- weightedIslands.toSeq.sortWith(_._1 > _._1) if weight > 0) {
+          for(island <- islands) {
+            threadIslands(t) += island
+            t = (t + 1) % nTestThreads
+          }
+        }
+      }
+
       // Output clock code for islands selected by the selector predicate
-      def outputSelectedIslandClkDomains(theCode: ClockCodeMethods, selector_p: Int => Boolean) {
+      def outputSelectedIslandClkDomains(theCode: ClockCodeMethods, selector_p: Int => Boolean): (Array[CMethod], Array[CMethod]) = {
         // Keep track of the clocks for which we've generated code.
         val generatedClocks = scala.collection.mutable.Set[Clock]()
+      
 
         // If we're generating multi-threaded clock code,
         // we need to output the thread-specific prototypes,
@@ -2131,8 +2124,8 @@ comp_current_clock_t g_current_clock;
         // We allow for the consolidation of the islands.
         // Keeping them distinct causes the object to balloon in size,
         // requiring three methods for each island.
-        val accumulatedClockLos = new CoalesceMethods(lineLimitFunctions)
         // Output the clock code in the correct order.
+        val accumulatedClockLos = new CoalesceMethods(lineLimitFunctions)
         for (islandId <- islandOrder(0) if selector_p(islandId)) {
           for ((clock, clkcodes) <- islandClkCode(islandId)) {
             generatedClocks += clock
@@ -2171,7 +2164,6 @@ comp_current_clock_t g_current_clock;
 
         // Output the island-specific clock_hi init and def/exec code
         val accumulatedClockHis = new CoalesceMethods(lineLimitFunctions)
-
         for (islandId <- islandOrder(1) if selector_p(islandId)) {
           // Extract both init and def/exec code and combine them.
           for ((clockHiI, clockHiX) <- islandClkCode(islandId).values.map(h => (h._2, h._3))) {
@@ -2214,10 +2206,12 @@ comp_current_clock_t g_current_clock;
         for( method <- accumulatedClockLos.separateMethods ++ accumulatedClockHis.separateMethods ++ threadMethods) {
           clockPrototypes += method.prototype
         }
+        (accumulatedClockLos.separateMethods.toArray, accumulatedClockHis.separateMethods.toArray)
       }
 
-      def outputAllClkDomains() {
-
+      def outputAllClkDomains(): (Array[CMethod], Array[CMethod]) = {
+        var clockLoMethods = Array[CMethod]()
+        var clockHiMethods = Array[CMethod]()
         // Are we generating partitioned islands?
         if (!partitionIslands) {
           //.values.map(_._1.body) ++ (code.values.map(x => (x._2.append(x._3))))
@@ -2234,17 +2228,30 @@ comp_current_clock_t g_current_clock;
             writeCppFile(clockXHi.body.result + clockXHi.tail)
           }
         } else {
-          // Are we executing clock code in separate threads?
-          if (threadIslands.size > 1) {
-            for(t <- 0 until threadIslands.size) {
-              val islandIds = HashSet[Int]() ++ threadIslands(t).map(_.islandId)
-              outputSelectedIslandClkDomains(threadCode(t), islandIds.contains(_))
+          if (parallelExecution) {
+            // Weigh the island code so we can sort it by weight.
+            assignIslandWeights()
+            clockLoIslands = sortIslandWeights(weightedIslands(0))
+            clockHiIslands = sortIslandWeights(weightedIslands(1))
+            // If we aren't using dynamic thread dispatch, 
+            //  assign the clock code to threads.
+            if (!useDynamicThreadDispatch) {
+              assignClocksToThreads(weightedIslands(2))
+              for(t <- 0 until threadIslands.size) {
+                val islandIds = HashSet[Int]() ++ threadIslands(t).map(_.islandId)
+                outputSelectedIslandClkDomains(threadCode(t), islandIds.contains(_))
+              }
+            } else {
+              val (tclockLoMethods, tclockHiMethods) = outputSelectedIslandClkDomains(allCode, _ > 0)
+              clockLoMethods = tclockLoMethods
+              clockHiMethods = clockHiMethods
             }
           } else {
             // Output all island clock code.
             outputSelectedIslandClkDomains(allCode, _ > 0)
           }
         }
+        (clockLoMethods, clockHiMethods)
       }
     }
 
@@ -2306,17 +2313,15 @@ comp_current_clock_t g_current_clock;
     }
     // Ensure we start off in a new file before we start outputting the clock_lo/hi.
     advanceCppFile()
-    clkDomains.outputAllClkDomains()
+    val (accumulatedClockLoMethods, accumulatedClockHiMethods) = clkDomains.outputAllClkDomains()
 
     // If we're genereating multi-threaded clock code, output it.
-    if (threadIslands.size > 1) {
+    if (parallelExecution) {
       advanceCppFile()
       genParallelClockMethods(threadIslands)
-    } else if (clockLoIslands.size > 1 || clockHiIslands.size > 1 || clockHiXslands.size > 1) {
-      advanceCppFile()
-      genParallelClockMethodArrays(clockLoIslands, clockHiIslands, clockHiXslands)
-      // Generate the threaded top-level clock substitutes.
-      genParallelClockMethods(threadIslands)
+      if (useDynamicThreadDispatch) {
+        genParallelClockMethodArrays(accumulatedClockLoMethods, accumulatedClockHiMethods)
+      }
     }
 
     advanceCppFile()
