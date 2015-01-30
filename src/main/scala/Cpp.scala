@@ -1374,8 +1374,10 @@ class CppBackend extends Backend {
       } else {
         for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc))
           out_h.write(emitDec(m))
-        for (m <- Driver.orderedNodes.filter(_.isInVCD).sortWith(headerOrderFunc))
-          out_h.write(vcd.emitDec(m))
+        if (Driver.isVCD) {
+          for (m <- Driver.orderedNodes.filter(_.isInVCD).sortWith(headerOrderFunc))
+            out_h.write(emitVCDDec(m))
+        }
       }
       for (clock <- Driver.clocks)
         out_h.write(emitDec(clock))
