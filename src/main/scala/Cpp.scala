@@ -2246,7 +2246,7 @@ comp_current_clock_t g_current_clock;
             } else {
               val (tclockLoMethods, tclockHiMethods) = outputSelectedIslandClkDomains(allCode, _ > 0)
               clockLoMethods = tclockLoMethods
-              clockHiMethods = clockHiMethods
+              clockHiMethods = tclockHiMethods
             }
           } else {
             // Output all island clock code.
