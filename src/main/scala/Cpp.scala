@@ -107,11 +107,11 @@ class CppBackend extends Backend {
   val separateIslandState = Driver.separateIslandState
   val useOpenMP = Driver.useOpenMP
   val useOpenMPI = Driver.useOpenMPI
-  val nTestThreads = Driver.nTestThreads
+  val parallelExecution = (useOpenMP || useOpenMPI) && Driver.nThreads > 1
   val persistentOpenMPthreads = Driver.persistentOpenMPthreads
+  val nTestThreads = if (persistentOpenMPthreads && parallelExecution) Driver.nThreads - 1 else Driver.nThreads
   val forceSingleThread = false
   val useDynamicThreadDispatch = Driver.useDynamicThreadDispatch
-  val parallelExecution = (useOpenMP || useOpenMPI) && nTestThreads > 1
 
   // The following definition should be a val, but we can't initialize it before elaborate,
   // and backend methods may need to refer to it indirectly.
@@ -1395,11 +1395,16 @@ class CppBackend extends Backend {
       out_h.write("  void init ( val_t rand_init = 0 );\n");
 
       // If we're generating parallel execution clock code, output the method signatures.
-      if (useOpenMP && nTestThreads > 1 && threadIslands.size > 1) {
-        for (t <- 0 until nTestThreads) {
-          val clockThreadSuffix = "_T%d".format(t)
-          val ptClockName = "pt_clock" + clockThreadSuffix
-          out_h.write("  void " + ptClockName + " (  );\n");
+      if (useOpenMP && nTestThreads > 1) {
+        if (threadIslands.size > 1) {
+          for (t <- 0 until nTestThreads) {
+            val clockThreadSuffix = "_T%d".format(t)
+            val ptClockName = "pt_clock" + clockThreadSuffix
+            out_h.write("  void " + ptClockName + " (  );\n");
+          }
+        }
+        if (useDynamicThreadDispatch) {
+          out_h.write("  void call_clock_code(dat_t<1> reset);\n");
         }
       }
 
@@ -1766,7 +1771,7 @@ struct comp_current_clock_t {
         body.append(clockLo.tail)
         val clockHi = CMethod(CTypedName("void", clockHiName), clockLoHiArgs)
         body.append(clockHi.head)
-        body.append("       %s(PCT_HII, reset);\n".format(doClockName))
+        body.append("       %s(PCT_HI, reset);\n".format(doClockName))
         body.append(clockHi.tail)
         if (false) {
           val clockHiX = CMethod(CTypedName("void", clockHiXName), clockLoHiArgs)
@@ -1815,14 +1820,8 @@ struct comp_current_clock_t {
         body.append(clockLo.tail)
         val clockHi = CMethod(CTypedName("void", clockHiName), clockLoHiArgs)
         body.append(clockHi.head)
-        body.append("       %s(PCT_HII, reset);\n".format(doClockName))
+        body.append("       %s(PCT_HI, reset);\n".format(doClockName))
         body.append(clockHi.tail)
-        if (false) {
-          val clockHiX = CMethod(CTypedName("void", clockHiXName), clockLoHiArgs)
-          body.append(clockHiX.head)
-          body.append("       %s(PCT_HIX, reset);\n".format(doClockName))
-          body.append(clockHiX.tail)
-        }
       }
       writeCppFile(body.toString)
     }

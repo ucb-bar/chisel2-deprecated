@@ -36,6 +36,10 @@ import scala.math.min
 object Driver extends FileSystemUtilities{
   def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean = true): T = {
     initChisel(args)
+    ChiselError.report
+    if (ChiselError.hasErrors) {
+      exit(1)
+    }
     try {
       if(wrapped) execute(gen) else executeUnwrapped(gen)
     } finally {
@@ -344,8 +348,8 @@ object Driver extends FileSystemUtilities{
     parallelMakeJobs = 0
     useOpenMP = false
     useOpenMPI = false
-    nTestThreads = 1
-    persistentOpenMPthreads = true
+    nThreads = 1
+    persistentOpenMPthreads = false
     useDynamicThreadDispatch = false
     isVCDinline = false
     isSupportW0W = false
@@ -412,7 +416,7 @@ object Driver extends FileSystemUtilities{
         case "--parallelMakeJobs" => parallelMakeJobs = args(i + 1).toInt; i += 1
         case "--openMP" => useOpenMP = args(i + 1).toBoolean; i += 1
         case "--openMPI" => useOpenMPI = args(i + 1).toBoolean; i += 1
-        case "--nTestThreads" => nTestThreads = args(i + 1).toInt; i += 1
+        case "--nThreads" => nThreads = args(i + 1).toInt; i += 1
         case "--persistentOpenMPthreads" => persistentOpenMPthreads = args(i + 1).toBoolean; i += 1
         case "--dynamicThreadDispatch" => useDynamicThreadDispatch = args(i + 1).toBoolean; i += 1
         case "--isVCDinline" => isVCDinline = true
@@ -463,13 +467,20 @@ object Driver extends FileSystemUtilities{
       useOpenMPI = false
     }
 
-    if (nTestThreads < 1) {
+    if (nThreads < 1) {
       ChiselError.warning("Can't use less than one test thread.")
-      nTestThreads = 1
-    } else if (nTestThreads > 1) {
+      nThreads = 1
+    } else if (nThreads > 1) {
       if (!(useOpenMP || useOpenMPI)) {
-        ChiselError.warning("Specify either openMP or openMPI for multiple threads. Reverting to a single thread.")
-        nTestThreads = 1
+        ChiselError.warning("Specify either openMP or openMPI for multiple threads. Reverting to single thread.")
+        nThreads = 1
+      }
+    } else if (nThreads == 1) {
+      if ((useOpenMP || useOpenMPI)) {
+        val threadingType = if (useOpenMP) "openMP" else "openMPI"
+        ChiselError.warning("%s needs multiple threads. Disabling it.".format(threadingType))
+        useOpenMP = false
+        useOpenMPI = false
       }
     }
 
@@ -478,9 +489,10 @@ object Driver extends FileSystemUtilities{
     }
 
     if (useOpenMP || useOpenMPI) {
-      if (!(partitionIslands || nTestThreads == 1)) {
-        ChiselError.warning("Need partitionIslands for multiple threads. Enabling it.")
+      if (!(partitionIslands && separateIslandState)) {
+        ChiselError.warning("Need partitionIslands and separateIslandState for multiple threads. Enabling them.")
         partitionIslands = true
+        separateIslandState = true
       }
     }
     
@@ -534,8 +546,8 @@ object Driver extends FileSystemUtilities{
   // Parallel execution
   var useOpenMP = false
   var useOpenMPI = false
-  var nTestThreads = 1
-  var persistentOpenMPthreads = true
+  var nThreads = 1
+  var persistentOpenMPthreads = false
   var useDynamicThreadDispatch = false
 
   var isVCDinline = false

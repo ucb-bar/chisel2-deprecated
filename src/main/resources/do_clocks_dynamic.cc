@@ -21,6 +21,8 @@ void @MODULENAME@::@DO_CLOCKS@( pt_clock_t clock_type, dat_t<1> reset ) {
 
 	task_sync.master_work(true);
 
+	this->call_clock_code(reset);
+
 	task_sync.master_wait_work(true);
 
 	task_sync.master_work(false);
