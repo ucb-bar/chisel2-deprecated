@@ -38,7 +38,7 @@ object Driver extends FileSystemUtilities{
     initChisel(args)
     ChiselError.report
     if (ChiselError.hasErrors) {
-      exit(1)
+      sys.exit(1)
     }
     try {
       if(wrapped) execute(gen) else executeUnwrapped(gen)
