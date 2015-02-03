@@ -1358,10 +1358,14 @@ class CppBackend extends Backend {
       if (separateIslandState) {
         // We're generating separate islands.
         // Collect each island's state into its own structure.
+        // But first, output any literals. We don't want them to be buried in islands.
+        for (m <- Driver.orderedNodes.filter(n => n.isInObject && n.isInstanceOf[Literal]).sortWith(headerOrderFunc)) {
+          out_h.write(emitDec(m))
+        }
         for (island <- islands) {
           val islandId = island.islandId
           out_h.write("   struct {\n")
-          for (m <- Driver.orderedNodes.filter(n => n.isInObject && nodeHomeIslandId(n) == Some(islandId)).sortWith(headerOrderFunc)) {
+          for (m <- Driver.orderedNodes.filter(n => n.isInObject && !n.isInstanceOf[Literal] && nodeHomeIslandId(n) == Some(islandId)).sortWith(headerOrderFunc)) {
             out_h.write(emitDec(m))
           }
           if (Driver.isVCD) {
@@ -2176,7 +2180,7 @@ comp_current_clock_t g_current_clock;
 
         // Output the island-specific clock_hi def code
         val accumulatedClockHiXs = new CoalesceMethods(lineLimitFunctions)
-        for (islandId <- islandOrder(1) if islandId > 0) {
+        for (islandId <- islandOrder(1) if selector_p(islandId)) {
           for (clockHiX <- islandClkCode(islandId).values.map(_._3)) {
             accumulatedClockHiXs.append(clockHiX)
             clockHiX.body.clear()         // free the memory.

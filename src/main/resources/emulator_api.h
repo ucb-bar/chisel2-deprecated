@@ -18,7 +18,7 @@
 /**
  * OpenMP synchronization object used to synchronize persistent multi-threaded clock emulation.
  */
-enum pt_clock_t { PCT_DONE, PCT_LO, PCT_IHI, PCT_XHI };
+enum pt_clock_t { PCT_DONE, PCT_LO, PCT_HI, PCT_XHI };
 struct comp_sync_block {
 	pt_clock_t clock_type;			// The type of clock to execute.
 	bool do_reset;					// The value of reset for this clock cycle.
@@ -174,8 +174,13 @@ public:
 	virtual std::string get_value() = 0;
 	// sets the value of this wire from a string, returning true on success
 	virtual bool set_value(std::string value) = 0;
+	virtual void set_value(val_t value) = 0;
 	// returns the bitwidth of this wire
 	virtual std::string get_width() = 0;
+	virtual int get_int_width() = 0;
+	virtual val_t * values() = 0;
+	virtual bool to_bool ( void ) = 0;
+	virtual val_t lo_word ( void ) = 0;
 };
 
 // dat_api dummy class, does nothing except for return errors
@@ -193,8 +198,27 @@ public:
 		return false;
 	}
 
+	void set_value(val_t value) {
+	}
+
 	std::string get_width() {
 		return "error";
+	}
+
+	int get_int_width() {
+		return 0;
+	}
+
+	val_t * values() {
+		return NULL;
+	}
+
+	bool to_bool ( void ) {
+		return false;
+	}
+
+	val_t lo_word ( void ) {
+		return 0;
 	}
 };
 
@@ -213,8 +237,28 @@ public:
 		return dat_from_str<w>(value, *dat_ptr);
 	}
 
+	void set_value(val_t value) {
+		*dat_ptr = value;
+	}
+
 	std::string get_width() {
 		return itos(w);
+	}
+
+	int get_int_width() {
+		return w;
+	}
+
+	val_t * values() {
+		return dat_ptr->values;
+	}
+
+	bool to_bool ( void ) {
+		return dat_ptr->to_bool();
+	}
+
+	val_t lo_word ( void ) {
+		return dat_ptr->lo_word();
 	}
 
 protected:
@@ -634,7 +678,7 @@ protected:
 
 	// Mapping table functions
 	virtual void init_mapping_table() = 0;
-
+public:
 	dat_api_base* get_dat_by_name(std::string name) {
 		if (dat_table.find(name.c_str()) != dat_table.end()) {
 			return dat_table[name.c_str()];
@@ -668,6 +712,7 @@ protected:
 		}
 	};
 
+protected:
 	std::map<const char*, dat_api_base*, string_comparator> dat_table;
 	std::map<const char*, mem_api_base*, string_comparator> mem_table;
 	// TODO: replace the dummy with explicit NULL checks - this is simple
