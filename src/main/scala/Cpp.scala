@@ -109,7 +109,7 @@ class CppBackend extends Backend {
   val useOpenMPI = Driver.useOpenMPI
   val parallelExecution = (useOpenMP || useOpenMPI) && Driver.nThreads > 1
   val persistentOpenMPthreads = Driver.persistentOpenMPthreads
-  val nTestThreads = if (persistentOpenMPthreads && parallelExecution) Driver.nThreads - 1 else Driver.nThreads
+  val nTestThreads = if (persistentOpenMPthreads && parallelExecution && Driver.isGenHarness) Driver.nThreads - 1 else Driver.nThreads
   val forceSingleThread = false
   val useDynamicThreadDispatch = Driver.useDynamicThreadDispatch
 
@@ -2301,6 +2301,12 @@ comp_current_clock_t g_current_clock;
 
     // generate clock(...) method
     genClockMethod()
+
+    // If we're not generating a harness, output the multi-threading support code.
+    if (useOpenMP && !Driver.isGenHarness) {
+      writeCppFile("\nchisel_sync_omp task_sync(%d);\n".format(nTestThreads))
+      writeCppFile("comp_sync_block g_comp_sync_block;\n\n")
+    }
 
     advanceCppFile()
     // generate clone() method
