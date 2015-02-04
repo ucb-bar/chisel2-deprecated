@@ -99,7 +99,10 @@ object Mux {
     // TODO: Replace this runtime check with compiletime check using type classes and imports to add special cases
     val target = if(tc.getClass.isAssignableFrom(fc.getClass)) tc.clone else
                  if(fc.getClass.isAssignableFrom(tc.getClass)) fc.clone else
-                 if(classOf[Bits].isAssignableFrom(tc.getClass) && classOf[Bits].isAssignableFrom(fc.getClass)) UInt().asInstanceOf[T] else
+                 if(classOf[Bits].isAssignableFrom(tc.getClass) && classOf[Bits].isAssignableFrom(fc.getClass)) {
+                   ChiselError.warning("Mux of Bits instantiated, emits SInt")
+                   SInt().asInstanceOf[T]
+                 } else
                    throw new Exception(s"For Mux, tc(${tc.getClass}) or fc(${fc.getClass}) must directly descend from the other. (Or both descend from Bits)")
     Mux[T,T,T](target, cond, tc, fc)
   }
