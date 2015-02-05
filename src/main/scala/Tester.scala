@@ -281,7 +281,7 @@ class ManualTester[+T <: Module]
   }
 
   def expect (data: Bits, expected: BigInt): Boolean = {
-    val mask = BigInt((1 << data.needWidth) - 1)
+    val mask = (BigInt(1) << data.needWidth) - 1
     val got = peek(data)
 
     expect((got & mask) == (expected & mask),

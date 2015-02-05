@@ -308,11 +308,14 @@ class VerilogBackend extends Backend {
 
       case m: Mem[_] =>
         if(!m.isInline) {
+          def gcd(a: Int, b: Int) : Int = { if(b == 0) a else gcd(b, a%b) }
           def find_gran(x: Node) : Int = {
             if (x.isInstanceOf[Literal])
               return x.needWidth()
             else if (x.isInstanceOf[UInt])
-              return find_gran(x.inputs(0))
+              return if (x.inputs.length>0) find_gran(x.inputs(0)) else 1
+            else if (x.isInstanceOf[Mux])
+              return gcd(find_gran(x.inputs(1)), find_gran(x.inputs(2)))
             else if (x.isInstanceOf[Op])
               return (x.inputs.map(find_gran(_))).reduceLeft(_ max _)
             else

@@ -174,7 +174,7 @@ class CppBackend extends Backend {
       case x: Binding =>
         List()
       case l: Literal =>
-        if (l.isInObject && words(l) > 1) {
+        if (isInObject(l) && words(l) > 1) {
           // Are we maintaining a constant pool?
           if (coalesceConstants) {
             // Is this the node that actually defines the constant?
