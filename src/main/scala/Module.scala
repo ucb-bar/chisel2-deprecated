@@ -440,9 +440,12 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
      Since we call invoke() to get a proper instance of the correct type,
      we have to insure the method is accessible, thus all fields
      that will generate C++ or Verilog code must be made public. */
-     for (m <- getClass().getDeclaredMethods.sortWith(
-      (x, y) => (x.getName() < y.getName())
-    )) {
+     // get all super classes' methods
+     def getMethods(c: Class[_]): Set[java.lang.reflect.Method] = {
+       if (c.toString.split('.').last == "Module") Set[java.lang.reflect.Method]() 
+       else c.getDeclaredMethods.toSet ++ getMethods(c.getSuperclass)
+     }
+     for (m <- getMethods(getClass).toList.sortWith(_.getName < _.getName)) {
        val name = m.getName();
        val types = m.getParameterTypes();
        if (types.length == 0 && isValName(name) // patch to avoid defs
@@ -478,7 +481,8 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
              for((elm, i) <- nodebuf.zipWithIndex){
                elm.getNode match {
                  case _: Literal =>
-                 case _ => elm.getNode nameIt (backend.asValidName(name + "_" + i), false)
+                 case _ =>
+                   elm.getNode nameIt (backend.asValidName(name + "_" + i), false)
                }
                backend.nameSpace += elm.getNode.name
              }
@@ -492,7 +496,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
            backend.nameSpace += bb.name
          }
          case comp: Module => {
-           comp.pathParent = this;
+           comp.pathParent = this
            if (!comp.named) {
              comp.name = backend.asValidName(name)
              comp.named = true
