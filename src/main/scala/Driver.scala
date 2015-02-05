@@ -346,10 +346,9 @@ object Driver extends FileSystemUtilities{
     compileInitializationUnoptimized = false
     useSimpleQueue = false
     parallelMakeJobs = 0
-    useOpenMP = false
-    useOpenMPI = false
+    threadModel = None
     nThreads = 1
-    persistentOpenMPthreads = false
+    persistentThreads = false
     useDynamicThreadDispatch = false
     isVCDinline = false
     isSupportW0W = false
@@ -414,10 +413,9 @@ object Driver extends FileSystemUtilities{
         case "--compileInitializationUnoptimized" => compileInitializationUnoptimized = true
         case "--useSimpleQueue" => useSimpleQueue = true
         case "--parallelMakeJobs" => parallelMakeJobs = args(i + 1).toInt; i += 1
-        case "--openMP" => useOpenMP = args(i + 1).toBoolean; i += 1
-        case "--openMPI" => useOpenMPI = args(i + 1).toBoolean; i += 1
+        case "--threadModel" => threadModel = Some(args(i + 1)); i += 1
         case "--nThreads" => nThreads = args(i + 1).toInt; i += 1
-        case "--persistentOpenMPthreads" => persistentOpenMPthreads = args(i + 1).toBoolean; i += 1
+        case "--persistentThreads" => persistentThreads = args(i + 1).toBoolean; i += 1
         case "--dynamicThreadDispatch" => useDynamicThreadDispatch = args(i + 1).toBoolean; i += 1
         case "--isVCDinline" => isVCDinline = true
         case "--backend" => backendName = args(i + 1); i += 1
@@ -462,25 +460,26 @@ object Driver extends FileSystemUtilities{
     if (!isVCD) {
       isVCDinline = false
     }
-    if (useOpenMP && useOpenMPI) {
-      ChiselError.warning("Can't use both openMP and openMPI. openMPI ignored.")
-      useOpenMPI = false
-    }
 
+    threadModel match {
+      case Some("openmp") => {}
+      case Some("pthread") => { persistentThreads = true }
+      case Some("openmpi") => {}
+      case None => {}
+      case _ => ChiselError.error("Unrecognized thread model \"%s\"".format(threadModel))
+    }
     if (nThreads < 1) {
-      ChiselError.warning("Can't use less than one test thread.")
+      ChiselError.warning("Can't use less than one thread.")
       nThreads = 1
     } else if (nThreads > 1) {
-      if (!(useOpenMP || useOpenMPI)) {
-        ChiselError.warning("Specify either openMP or openMPI for multiple threads. Reverting to single thread.")
+      if (threadModel == None) {
+        ChiselError.warning("Specify either openmp or openmpi for multiple threads. Reverting to single thread.")
         nThreads = 1
       }
     } else if (nThreads == 1) {
-      if ((useOpenMP || useOpenMPI)) {
-        val threadingType = if (useOpenMP) "openMP" else "openMPI"
-        ChiselError.warning("%s needs multiple threads. Disabling it.".format(threadingType))
-        useOpenMP = false
-        useOpenMPI = false
+      if (threadModel != None) {
+        ChiselError.warning("%s needs multiple threads. Disabling it.".format(Some(threadModel)))
+        threadModel = None
       }
     }
 
@@ -488,7 +487,7 @@ object Driver extends FileSystemUtilities{
       partitionIslands = true
     }
 
-    if (useOpenMP || useOpenMPI) {
+    if (threadModel != None) {
       if (!(partitionIslands && separateIslandState)) {
         ChiselError.warning("Need partitionIslands and separateIslandState for multiple threads. Enabling them.")
         partitionIslands = true
@@ -497,7 +496,7 @@ object Driver extends FileSystemUtilities{
     }
     
     if (useDynamicThreadDispatch) {
-      persistentOpenMPthreads = true
+      persistentThreads = true
     }
     // Set the backend after we've interpreted all the arguments.
     // (The backend may want to configure itself based on the arguments.)
@@ -544,10 +543,9 @@ object Driver extends FileSystemUtilities{
   var parallelMakeJobs = 0
   var compileInitializationUnoptimized = false
   // Parallel execution
-  var useOpenMP = false
-  var useOpenMPI = false
+  var threadModel: Option[String] = None
   var nThreads = 1
-  var persistentOpenMPthreads = false
+  var persistentThreads = false
   var useDynamicThreadDispatch = false
 
   var isVCDinline = false

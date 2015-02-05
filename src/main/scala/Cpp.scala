@@ -105,11 +105,13 @@ class CppBackend extends Backend {
   }
 
   val separateIslandState = Driver.separateIslandState
-  val useOpenMP = Driver.useOpenMP
-  val useOpenMPI = Driver.useOpenMPI
-  val parallelExecution = (useOpenMP || useOpenMPI) && Driver.nThreads > 1
-  val persistentOpenMPthreads = Driver.persistentOpenMPthreads
-  val nTestThreads = if (persistentOpenMPthreads && parallelExecution && Driver.isGenHarness) Driver.nThreads - 1 else Driver.nThreads
+  val useOpenMP = Driver.threadModel == Some("openmp")
+  val useOpenMPI = Driver.threadModel == Some("openmpi")
+  val usePThread = Driver.threadModel == Some("pthread")
+  val parallelExecution = (useOpenMP || useOpenMPI || usePThread) && Driver.nThreads > 1
+  val syncClass = if (useOpenMP) "omp" else "pthread"
+  val persistentThreads = Driver.persistentThreads
+  val nTestThreads = if (persistentThreads && parallelExecution && Driver.isGenHarness) Driver.nThreads - 1 else Driver.nThreads
   val forceSingleThread = false
   val useDynamicThreadDispatch = Driver.useDynamicThreadDispatch
 
@@ -798,8 +800,8 @@ class CppBackend extends Backend {
     val tail = new StringBuilder
     // If we're generating OpenMP multi-threaded clock code,
     //  create the synchronization block.
-    if (useOpenMP) {
-      harness.write("\nchisel_sync_omp task_sync(%d);\n".format(nTestThreads))
+    if (useOpenMP || usePThread) {
+      harness.write("\nchisel_sync_%s task_sync(%d);\n".format(syncClass, nTestThreads))
       harness.write("comp_sync_block g_comp_sync_block;\n\n")
       // Red the task template and split it up into its major sections
       if (useDynamicThreadDispatch) {
@@ -811,12 +813,13 @@ class CppBackend extends Backend {
         val repl = """
           api->read_eval_print_loop();
           g_comp_sync_block.clock_type = PCT_DONE;
-          task_sync.master_work(true);
+          task_sync.master_wait_ready();
+          task_sync.master_work();
 """
         replacements += (("@REPLCODE@", repl))
         replacements += (("@MODULENAME@", moduleName))
         
-        val taskTemplate = editResource("omp_dynamic_persistent_tasks.cc", replacements)
+        val taskTemplate = editResource("%s_dynamic_persistent_tasks.cc".format(syncClass), replacements)
         val mainStart = """\s*// AFTERMAINCODE_START""".r
         val mainEnd = """\s*// AFTERMAINCODE_END""".r
         // Split the template up into sections so we can output the task code.
@@ -853,7 +856,7 @@ class CppBackend extends Backend {
     }
     harness.write(s"""  module->set_dumpfile(f);\n""");
     harness.write(s"""  api->set_teefile(tee);\n""");
-    if (useOpenMP && !forceSingleThread && persistentOpenMPthreads) {
+    if ((useOpenMP || usePThread) && !forceSingleThread && persistentThreads) {
       // Read and edit the parallel task template.
       if (useDynamicThreadDispatch) {
         harness.write(task.toString)
@@ -904,7 +907,7 @@ class CppBackend extends Backend {
       {
           @TASKCODE@
           g_comp_sync_block.clock_type = PCT_DONE;
-          task_sync.master_work(true);
+          task_sync.master_work();
       }
   """
         replacements.clear()
@@ -930,7 +933,7 @@ class CppBackend extends Backend {
     val LIBS = " " + scala.util.Properties.envOrElse("LIBS", "")
     val chiselENV = java.lang.System.getenv("CHISEL")
 
-    val c11 = if (hasPrintfs || (useOpenMP & useDynamicThreadDispatch)) " -std=c++11 " else ""
+    val c11 = if (hasPrintfs || (parallelExecution & useDynamicThreadDispatch)) " -std=c++11 " else ""
     val openMP = if (useOpenMP) " -fopenmp " else ""
     val LD_openMPI = if (useOpenMPI) " -lmpi " else ""
     val cxxFlags = (if (flagsIn == null) CXXFLAGS else flagsIn) + c11 + openMP
@@ -1154,7 +1157,7 @@ class CppBackend extends Backend {
     val out_cpps = ArrayBuffer[CppFile]()
     val all_cpp = new StringBuilder
 
-    var threadIslands = new Array[ArrayBuffer[Island]]( if (useOpenMP && !useDynamicThreadDispatch) nTestThreads else 0)
+    var threadIslands = new Array[ArrayBuffer[Island]]( if (parallelExecution && !useDynamicThreadDispatch) nTestThreads else 0)
     // If we're doing dynamic dispatch, we build arrays of clock_hi/lo islands
     // from which we'll generate calls on the specific clock_hi/lo code.
     var clockLoIslands = Array[Island]()
@@ -1329,6 +1332,10 @@ class CppBackend extends Backend {
         out_h.write("#include \"chisel_sync_omp.h\"\n")
         out_h.write("extern chisel_sync_omp task_sync;\n")
       }
+      if (usePThread) {
+        out_h.write("#include \"chisel_sync_pthread.h\"\n")
+        out_h.write("extern chisel_sync_pthread task_sync;\n")
+      }
       if (useOpenMPI) {
         out_h.write("#include \"mpi.h\"\n")
       }
@@ -1336,7 +1343,7 @@ class CppBackend extends Backend {
       
       // If we're generating OpenMP multi-threaded clock code,
       //  add the synchronization block definition.
-      if (useOpenMP) {
+      if (parallelExecution) {
         out_h.write("\nextern comp_sync_block g_comp_sync_block;\n\n")
       }
 
@@ -1399,7 +1406,7 @@ class CppBackend extends Backend {
       out_h.write("  void init ( val_t rand_init = 0 );\n");
 
       // If we're generating parallel execution clock code, output the method signatures.
-      if (useOpenMP && nTestThreads > 1) {
+      if (parallelExecution && nTestThreads > 1) {
         if (threadIslands.size > 1) {
           for (t <- 0 until nTestThreads) {
             val clockThreadSuffix = "_T%d".format(t)
@@ -1470,7 +1477,7 @@ class CppBackend extends Backend {
       out_h.write("\n};\n\n");
       out_h.write(Params.toCxxStringParams);
 
-      if (useOpenMP) {
+      if (parallelExecution) {
         out_h.write("typedef void(%s::*clock_code_t)(dat_t<1> reset);\n".format(moduleName));
         out_h.write("""
 struct comp_clock_methods_t {
@@ -1783,7 +1790,7 @@ struct comp_current_clock_t {
           body.append("       %s(PCT_HIX, reset);\n".format(doClockName))
           body.append(clockHiX.tail)
         }
-      } else if (persistentOpenMPthreads) {
+      } else if (persistentThreads) {
         // Build the replacement string map for the do_clocks method template.
         val replacements = HashMap[String, String] ()
         replacements += (("@NTESTTHREADS@", nTestThreads.toString))
@@ -1793,7 +1800,7 @@ struct comp_current_clock_t {
         replacements += (("@PT_CLOCKNAME@", ptClockName))
         replacements += (("@MODULENAME@", c.name + "_t"))
         replacements += (("@DO_CLOCKS@", doClockName))
-        val template = if (useDynamicThreadDispatch) {"do_clocks_dynamic.cc"} else {"do_clocks.cc"}
+        val template = (if (useDynamicThreadDispatch) {"%s_do_clocks_dynamic.cc"} else {"%s_do_clocks.cc"}).format(syncClass)
         // Read and edit the parallel clock method template.
         body.append(editResource(template, replacements))
       } else {
@@ -2149,7 +2156,7 @@ comp_current_clock_t g_current_clock;
           // If we're generating dynamic threaded clock code,
           //  we call the island-specific clock lows from the multi-thread
           // dispatch, and this aggregator is not required.
-          if (!(useOpenMP && useDynamicThreadDispatch)) {
+          if (!(parallelExecution && useDynamicThreadDispatch)) {
             createCppFile()
             // This is just the definition of the main (or per-thread) clock_lo method.
             writeCppFile(clock_lo.head)
@@ -2195,7 +2202,7 @@ comp_current_clock_t g_current_clock;
           // If we're generating dynamic threaded clock code,
           //  we call the island-specific clock lows from the multi-thread
           // dispatch, and this aggregator is not required.
-          if (!(useOpenMP && useDynamicThreadDispatch)) {
+          if (!(parallelExecution && useDynamicThreadDispatch)) {
             createCppFile()
             // This is just the definition of the main (or per-thread) clock_hi init method.
             writeCppFile(clock_ihi.head)
@@ -2303,8 +2310,8 @@ comp_current_clock_t g_current_clock;
     genClockMethod()
 
     // If we're not generating a harness, output the multi-threading support code.
-    if (useOpenMP && !Driver.isGenHarness) {
-      writeCppFile("\nchisel_sync_omp task_sync(%d);\n".format(nTestThreads))
+    if (!Driver.isGenHarness && parallelExecution) {
+      writeCppFile("\nchisel_sync_%s task_sync(%d);\n".format(syncClass, nTestThreads))
       writeCppFile("comp_sync_block g_comp_sync_block;\n\n")
     }
 

@@ -1,20 +1,19 @@
-/* This template provides a dynamic persistent-task OpenMP implementation. */
+/* This template provides a dynamic persistent-task pthread implementation. */
 #define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember))
 extern comp_current_clock_t g_current_clock;
+pthread_mutex_t g_clock_code_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void @MODULENAME@::call_clock_code(dat_t<1> reset)
 {
 	clock_code_t clock_code = NULL;
 	int next_index, this_index;
 	do {
-		#pragma omp flush(g_current_clock)
-		#pragma omp critical (index_increment)
+		pthread_mutex_lock(&g_clock_code_mutex);
 		{
 			next_index = g_current_clock.index + 1;
-			#pragma atomic write
 			g_current_clock.index = next_index;
-			#pragma omp flush(g_current_clock)
 		}
+		pthread_mutex_unlock(&g_clock_code_mutex);
 		this_index = next_index - 1;
 		if (this_index <= g_current_clock.methods->index_max) {
 			clock_code = g_current_clock.methods->clock_codes[this_index];
@@ -25,8 +24,9 @@ void @MODULENAME@::call_clock_code(dat_t<1> reset)
 	} while (clock_code != NULL);
 }
 
-void clock_task(@MODULENAME@ * module)
+void * clock_task(void * arg)
 {
+	@MODULENAME@ * module = (@MODULENAME@ *) arg;
 	int cycles = 0;
 	do {
 		clock_code_t clock_code;
@@ -34,16 +34,12 @@ void clock_task(@MODULENAME@ * module)
 		cycles += 1;
 		task_sync.worker_ready();
 		task_sync.worker_wait_work();
-		#pragma omp flush(g_comp_sync_block)
 	    dat_t<1> reset = LIT<1>(g_comp_sync_block.do_reset);
 
-		#pragma omp atomic read
 		t_clock_type = g_comp_sync_block.clock_type;
 		if (t_clock_type == PCT_DONE)
-			return;
+			break;
 		module->call_clock_code(reset);
-
-		#pragma omp flush
 
 		task_sync.worker_done();
 
@@ -51,29 +47,26 @@ void clock_task(@MODULENAME@ * module)
 
 
 	} while(1);
+	return NULL;
 }
 
 // AFTERMAINCODE_START
-    #pragma omp parallel num_threads(@NTESTTHREADSP1@)
 	{
-		#pragma omp single nowait
-		{
-			int nthreads = omp_get_num_threads();
-			for (int t = 0; t < nthreads - 1; t += 1) {
-				// TASK_START
-				#pragma omp task
-				{
-					int myId = omp_get_thread_num();
-					clock_task(module);
-				}
-				// TASK_END
-			}
-			#pragma omp task
+	    const int nthreads = @NTESTTHREADS@;
+	    struct chisel_threads {
+	    	int status;
+	        pthread_t id;
+	    } threads[nthreads];
+		for (int t = 0; t < nthreads; t += 1) {
+			// TASK_START
 			{
-			  @REPLCODE@
+				threads[t].status = pthread_create(&threads[t].id, NULL, &clock_task, module);
 			}
+			// TASK_END
 		}
-		#pragma omp taskwait
+		{
+		  @REPLCODE@
+		}
 	}
 // AFTERMAINCODE_END
 

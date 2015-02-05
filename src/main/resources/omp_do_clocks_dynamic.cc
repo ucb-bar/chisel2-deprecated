@@ -23,15 +23,14 @@ void @MODULENAME@::@DO_CLOCKS@( pt_clock_t clock_type, dat_t<1> reset ) {
     }
 	#pragma omp flush(g_current_clock)
 
-	task_sync.master_work(true);
+	task_sync.master_wait_ready();
+	task_sync.master_work();
 
 	this->call_clock_code(reset);
 
-	task_sync.master_wait_work(true);
+	task_sync.master_wait_done();
+	task_sync.master_rest();
 
-	task_sync.master_work(false);
-
-	task_sync.master_wait_work(false);
 }
 
 void @MODULENAME@::clock_lo( dat_t<1> reset ) {
