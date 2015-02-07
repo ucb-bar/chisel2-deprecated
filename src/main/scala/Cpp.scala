@@ -109,11 +109,19 @@ class CppBackend extends Backend {
   val useOpenMPI = Driver.threadModel == Some("openmpi")
   val usePThread = Driver.threadModel == Some("pthread")
   val parallelExecution = (useOpenMP || useOpenMPI || usePThread) && Driver.nThreads > 1
-  val syncClass = if (useOpenMP) "omp" else "pthread"
+  val syncClass = Driver.threadModel match {
+    case Some("openmp") => "omp"
+    case Some("pthread") => "pthread"
+    case _ => ""
+  }
   val persistentThreads = Driver.persistentThreads
-  val nTestThreads = if (persistentThreads && parallelExecution && Driver.isGenHarness) Driver.nThreads - 1 else Driver.nThreads
+  val nTestThreads = if (persistentThreads && parallelExecution) Driver.nThreads - 1 else Driver.nThreads
   val forceSingleThread = false
   val useDynamicThreadDispatch = Driver.useDynamicThreadDispatch
+  // If we're using dynamic thread dispatch or we're not using OpenMP,
+  // we need to generate the thread synchronization code.
+  val generateThreadClockSyncCode = parallelExecution && useDynamicThreadDispatch
+  val needExplicitThreadStart = parallelExecution && !useOpenMP
 
   // The following definition should be a val, but we can't initialize it before elaborate,
   // and backend methods may need to refer to it indirectly.
@@ -777,156 +785,6 @@ class CppBackend extends Backend {
   def clkName (clock: Clock): String =
     (if (clock == Driver.implicitClock) "" else "_" + emitRef(clock))
 
-  def genHarness(c: Module, name: String) {
-    val moduleName = "%s_t".format(name)
-    val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
-    val harness  = createOutputFile(n + "-emulator.cpp");
-    harness.write("#include \"" + n + ".h\"\n\n");
-    if (Driver.clocks.length > 1) {
-      harness.write("void " + c.name + "_t::setClocks ( std::vector< int > &periods ) {\n");
-      var i = 0;
-      for (clock <- Driver.clocks) {
-        if (clock.srcClock == null) {
-          harness.write("  " + emitRef(clock) + " = periods[" + i + "];\n")
-          harness.write("  " + emitRef(clock) + "_cnt = periods[" + i + "];\n")
-          i += 1;
-        }
-      }
-      harness.write("}\n\n");
-    }
-      
-    val head = new StringBuilder
-    val task = new StringBuilder
-    val tail = new StringBuilder
-    // If we're generating OpenMP multi-threaded clock code,
-    //  create the synchronization block.
-    if (useOpenMP || usePThread) {
-      harness.write("\nchisel_sync_%s task_sync(%d);\n".format(syncClass, nTestThreads))
-      harness.write("comp_sync_block g_comp_sync_block;\n\n")
-      // Red the task template and split it up into its major sections
-      if (useDynamicThreadDispatch) {
-        val replacements = HashMap[String, String] ()
-        replacements += (("@NTESTTHREADS@", (nTestThreads).toString))
-        replacements += (("@NTESTTHREADSP1@", (nTestThreads + 1).toString))
-        // Preserve the "@TASKCODE@" macro. We'll expand it later.
-        replacements += (("@TASKCODE@", "@TASKCODE@"))
-        val repl = """
-          api->read_eval_print_loop();
-          g_comp_sync_block.clock_type = PCT_DONE;
-          task_sync.master_wait_ready();
-          task_sync.master_work();
-"""
-        replacements += (("@REPLCODE@", repl))
-        replacements += (("@MODULENAME@", moduleName))
-        
-        val taskTemplate = editResource("%s_dynamic_persistent_tasks.cc".format(syncClass), replacements)
-        val mainStart = """\s*// AFTERMAINCODE_START""".r
-        val mainEnd = """\s*// AFTERMAINCODE_END""".r
-        // Split the template up into sections so we can output the task code.
-        var section = head
-        for (line <- taskTemplate.split('\n')) {
-          if (mainStart.findFirstIn(line).nonEmpty) {
-            section = task
-            section.append(line + "\n")
-          } else if (mainEnd.findFirstIn(line).nonEmpty) {
-            section.append(line + "\n")
-            section = tail
-          } else {
-            section.append(line + "\n")
-          }
-        }
-        harness.write(head.toString)
-      }
-    }
-    harness.write(s"""int main (int argc, char* argv[]) {\n""");
-    harness.write(s"""  ${moduleName}* module = new ${moduleName}();\n""");
-    harness.write(s"""  module->init();\n""");
-    harness.write(s"""  ${name}_api_t* api = new ${name}_api_t();\n""");
-    harness.write(s"""  api->init(module);\n""");
-    if (Driver.isVCD) {
-      val basedir = ensureDir(Driver.targetDir)
-      harness.write(s"""  FILE *f = fopen("${basedir}${name}.vcd", "w");\n""");
-    } else {
-      harness.write(s"""  FILE *f = NULL;\n""");
-    }
-    if (Driver.dumpTestInput) {
-      harness.write(s"""  FILE *tee = fopen("${name}.stdin", "w");\n""");
-    } else {
-      harness.write(s"""  FILE *tee = NULL;""");
-    }
-    harness.write(s"""  module->set_dumpfile(f);\n""");
-    harness.write(s"""  api->set_teefile(tee);\n""");
-    if ((useOpenMP || usePThread) && !forceSingleThread && persistentThreads) {
-      // Read and edit the parallel task template.
-      if (useDynamicThreadDispatch) {
-        harness.write(task.toString)
-        harness.write(tail.toString)
-      } else {
-        val replacements = HashMap[String, String] ()
-        replacements += (("@NTESTTHREADS@", (nTestThreads).toString))
-        replacements += (("@NTESTTHREADSP1@", (nTestThreads + 1).toString))
-        // Preserve the "@TASKCODE@" macro. We'll expand it later.
-        replacements += (("@TASKCODE@", "@TASKCODE@"))
-        val taskTemplate = editResource("omp_persistent_tasks.cc", replacements)
-        val taskStart = """\s*// TASK_START""".r
-        val taskEnd = """\s*// TASK_END""".r
-        // Split the template up into sections so we can output the repeated task code.
-        val head = new StringBuilder
-        val task = new StringBuilder
-        val tail = new StringBuilder
-        var section = head
-        for (line <- taskTemplate.split('\n')) {
-          if (taskStart.findFirstIn(line).nonEmpty) {
-            section = task
-            section.append(line + "\n")
-          } else if (taskEnd.findFirstIn(line).nonEmpty) {
-            section.append(line + "\n")
-            section = tail
-          } else {
-            section.append(line + "\n")
-          }
-        }
-  
-        // Output the head code
-        harness.write(head.toString)
-  
-        // Generate and output the clock thread task code.
-        val taskString = task.toString
-        for (t <- 0 until nTestThreads) {
-          val replacements = HashMap[String, String] ()
-          val callCode = "module->pt_clock_T%d( );".format(t)
-          replacements += (("@TASKCODE@", callCode))
-          replacements += (("@THREADN@", t.toString))
-          val taskCode = editString(taskString, replacements)
-          harness.write(taskCode)
-        }
-  
-        // Output the read_eval_print task
-        val replTask = """
-      #pragma omp task
-      {
-          @TASKCODE@
-          g_comp_sync_block.clock_type = PCT_DONE;
-          task_sync.master_work();
-      }
-  """
-        replacements.clear()
-        replacements += (("@TASKCODE@", "api->read_eval_print_loop();"))
-        val taskCode = editString(replTask, replacements)
-        harness.write(taskCode)
-        
-        // Output the tail code
-        harness.write(tail.toString)
-      }
-    } else {
-      harness.write(s"""  api->read_eval_print_loop();\n""");
-    }
-    harness.write(s"""  fclose(f);\n""");
-    harness.write(s"""  fclose(tee);\n""");
-    harness.write(s"""}\n""");
-    harness.close();
-  }
-
   override def compile(c: Module, flagsIn: String) {
     val CXXFLAGS = scala.util.Properties.envOrElse("CXXFLAGS", "" )
     val LDFLAGS = scala.util.Properties.envOrElse("LDFLAGS", "")
@@ -1147,6 +1005,12 @@ class CppBackend extends Backend {
   def backendElaborate(c: Module) = super.elaborate(c)
 
   override def elaborate(c: Module): Unit = {
+
+    println("CPP elaborate")
+    super.elaborate(c)
+
+    val moduleName = c.name + "_t"
+    val apiName = c.name + "_api_t"
     val minimumLinesPerFile = Driver.minimumLinesPerFile
     val partitionIslands = Driver.partitionIslands
     val lineLimitFunctions = Driver.lineLimitFunctions
@@ -1320,24 +1184,49 @@ class CppBackend extends Backend {
       return island == null || nodeToIslandArray(node._id).contains(island)
     }
 
+    def genThreadClockSyncCode(write: String => Unit) {
+      val syncDynamicPrefix = syncClass + { if (useDynamicThreadDispatch) "_dynamic" else ""}
+      // Read the task template and edit the @ID@ tokens.
+      val replacements = HashMap[String, String] ()
+      replacements += (("@NTESTTHREADS@", (nTestThreads).toString))
+      replacements += (("@NTESTTHREADSP1@", (nTestThreads + 1).toString))
+      // Preserve the "@TASKCODE@" macro. We may expand it later.
+      replacements += (("@TASKCODE@", "@TASKCODE@"))
+
+      replacements += (("@MODULENAME@", moduleName))
+      
+      val taskTemplate = editResource("%s_persistent_tasks.cc".format(syncDynamicPrefix), replacements)
+      write(taskTemplate.toString)
+    }
+
     // Generate header file
     def genHeader(vcd: Backend, islands: Array[Island], nInitMethods: Int, nSetCircuitMethods: Int, nDumpInitMethods: Int, nDumpMethods: Int, nInitMappingTableMethods: Int) {
       val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
       val out_h = createOutputFile(n + ".h");
       out_h.write("#ifndef __" + c.name + "__\n");
       out_h.write("#define __" + c.name + "__\n\n");
-      val moduleName = c.name + "_t"
+      out_h.write("#define TM_NONE 0\n")
+      out_h.write("#define TM_OPENMP 1\n")
+      out_h.write("#define TM_PTHREAD 2\n")
+      out_h.write("#define TM_OPENMPI 3\n")
+      if (parallelExecution) {
+        out_h.write("#define PERSISTENT_THREADS %d\n".format(if (persistentThreads) 1 else 0))
+        out_h.write("#define DYNAMIC_THREAD_DISPATCH %d\n".format(if (useDynamicThreadDispatch) 1 else 0))
+      }
       if (useOpenMP) {
+        out_h.write("#define THREAD_MODEL TM_OPENMP\n")
         out_h.write("#include \"omp.h\"\n")
         out_h.write("#include \"chisel_sync_omp.h\"\n")
         out_h.write("extern chisel_sync_omp task_sync;\n")
-      }
-      if (usePThread) {
+      } else if (usePThread) {
+        out_h.write("#define THREAD_MODEL TM_PTHREAD\n")
         out_h.write("#include \"chisel_sync_pthread.h\"\n")
         out_h.write("extern chisel_sync_pthread task_sync;\n")
-      }
-      if (useOpenMPI) {
+      } else if (useOpenMPI) {
+        out_h.write("#define THREAD_MODEL TM_OPENMPI\n")
         out_h.write("#include \"mpi.h\"\n")
+      } else {
+        out_h.write("#define THREAD_MODEL TM_NONE\n")
       }
       out_h.write("#include \"emulator.h\"\n\n");
       
@@ -1544,6 +1433,16 @@ struct comp_current_clock_t {
           writeCppFile("\n")
         }
       }
+
+      // If we're going to use multi-threaded execution, output the multi-threading support code.
+      if (parallelExecution) {
+        writeCppFile("chisel_sync_%s task_sync(%d);\n".format(syncClass, nTestThreads))
+        writeCppFile("comp_sync_block g_comp_sync_block;\n\n")
+        if (needExplicitThreadStart) {
+          writeCppFile("static void start_clock_threads(%s * module);\n".format(moduleName))
+        }
+      }
+
       val method = CMethod(CTypedName("void", "init"), Array[CTypedName](CTypedName("val_t", "rand_init")))
       val llm = new LineLimitedMethod(method, "  this->__srand(rand_init);\n")
       for (m <- Driver.orderedNodes) {
@@ -1552,9 +1451,17 @@ struct comp_current_clock_t {
       for (clock <- Driver.clocks) {
         llm.addString(emitInit(clock))
       }
+      if (needExplicitThreadStart) {
+        llm.addString("  start_clock_threads(this);\n")
+      }
       llm.done()
       val nMethods = llm.bodies.length
       writeCppFile(llm.getBodies)
+
+      if (generateThreadClockSyncCode) {
+        genThreadClockSyncCode(writeCppFile)
+      }
+
       nMethods
     }
 
@@ -1841,7 +1748,6 @@ struct comp_current_clock_t {
     def genParallelClockMethodArrays(clock_lo_methods: Array[CMethod], clock_ihi_methods: Array[CMethod], clock_xhi_methods: Array[CMethod]) {
       createCppFile()
 
-      val moduleName = c.name + "_t"
       val body = new StringBuilder("")
       val head = "static const clock_code_t %s_code[] = {\n"
       val tail = "\n};\n"
@@ -1864,8 +1770,88 @@ comp_current_clock_t g_current_clock;
       writeCppFile(body.toString)
     }
 
-    println("CPP elaborate")
-    super.elaborate(c)
+    def genHarness(c: Module, name: String) {
+      val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
+      val harness  = createOutputFile(n + "-emulator.cpp");
+      harness.write("#include \"" + n + ".h\"\n\n");
+      if (Driver.clocks.length > 1) {
+        harness.write("void " + c.name + "_t::setClocks ( std::vector< int > &periods ) {\n");
+        var i = 0;
+        for (clock <- Driver.clocks) {
+          if (clock.srcClock == null) {
+            harness.write("  " + emitRef(clock) + " = periods[" + i + "];\n")
+            harness.write("  " + emitRef(clock) + "_cnt = periods[" + i + "];\n")
+            i += 1;
+          }
+        }
+        harness.write("}\n\n");
+      }
+        
+      val replacements = HashMap[String, String] ()
+      replacements += (("@NTESTTHREADS@", (nTestThreads).toString))
+      replacements += (("@NTESTTHREADSP1@", (nTestThreads + 1).toString))
+      replacements += (("@MODULENAME@", moduleName))
+      replacements += (("@APINAME@", apiName))
+      replacements += (("@SYNCCLASS@", syncClass))
+
+      val VCDCode = if (Driver.isVCD) {
+        val basedir = ensureDir(Driver.targetDir)
+        s"""fopen("${basedir}${name}.vcd", "w")"""
+      } else {
+        "NULL"
+      }
+      replacements += (("@VCDCODE@", VCDCode))
+      val dumpTestInputCode = if (Driver.dumpTestInput) {
+        s"""fopen("${name}.stdin", "w")"""
+      } else {
+        "NULL"
+      }
+      replacements += (("@DUMPTESTINPUTCODE@", dumpTestInputCode))
+      // Preserve the "@TASKCODE@" macro. We'll expand it later.
+      replacements += (("@TASKCODE@", "@TASKCODE@"))
+      replacements += (("@REPLCODE@", "api->read_eval_print_loop();"))
+      
+      val taskTemplate = editResource("harness.cc", replacements)
+      val taskStart = """\s*// TASK_START""".r
+      val taskEnd = """\s*// TASK_END""".r
+      // Split the template up into sections so we can output the repeated task code (if required).
+      val head = new StringBuilder
+      val task = new StringBuilder
+      val tail = new StringBuilder
+      var section = head
+      for (line <- taskTemplate.split('\n')) {
+        if (taskStart.findFirstIn(line).nonEmpty) {
+          section = task
+          section.append(line + "\n")
+        } else if (taskEnd.findFirstIn(line).nonEmpty) {
+          section.append(line + "\n")
+          section = tail
+        } else {
+          section.append(line + "\n")
+        }
+      }
+    
+      // Output the head code
+      harness.write(head.toString)
+
+      if (persistentThreads && !useDynamicThreadDispatch && useOpenMP) {
+        // Generate and output the clock thread task code.
+        val taskString = task.toString
+        for (t <- 0 until nTestThreads) {
+          val replacements = HashMap[String, String] ()
+          val callCode = "module->pt_clock_T%d( );".format(t)
+          replacements += (("@TASKCODE@", callCode))
+          replacements += (("@THREADN@", t.toString))
+          val taskCode = editString(taskString, replacements)
+          harness.write(taskCode)
+        }
+      } else {
+        harness.write(task.toString)
+      }
+      // Output the tail code
+      harness.write(tail.toString)
+      harness.close();
+    }
 
     /* We flatten all signals in the toplevel component after we had
      a change to associate node and components correctly first
@@ -2308,12 +2294,6 @@ comp_current_clock_t g_current_clock;
 
     // generate clock(...) method
     genClockMethod()
-
-    // If we're not generating a harness, output the multi-threading support code.
-    if (!Driver.isGenHarness && parallelExecution) {
-      writeCppFile("\nchisel_sync_%s task_sync(%d);\n".format(syncClass, nTestThreads))
-      writeCppFile("comp_sync_block g_comp_sync_block;\n\n")
-    }
 
     advanceCppFile()
     // generate clone() method

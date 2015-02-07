@@ -26,6 +26,7 @@ void @MODULENAME@::call_clock_code(dat_t<1> reset)
 
 void * clock_task(void * arg)
 {
+	pthread_t myId = pthread_self();
 	@MODULENAME@ * module = (@MODULENAME@ *) arg;
 	int cycles = 0;
 	do {
@@ -42,31 +43,23 @@ void * clock_task(void * arg)
 		module->call_clock_code(reset);
 
 		task_sync.worker_done();
-
 		task_sync.worker_wait_rest();
-
-
 	} while(1);
 	return NULL;
 }
 
-// AFTERMAINCODE_START
-	{
-	    const int nthreads = @NTESTTHREADS@;
-	    struct chisel_threads {
-	    	int status;
-	        pthread_t id;
-	    } threads[nthreads];
-		for (int t = 0; t < nthreads; t += 1) {
-			// TASK_START
-			{
-				threads[t].status = pthread_create(&threads[t].id, NULL, &clock_task, module);
-			}
-			// TASK_END
-		}
-		{
-		  @REPLCODE@
+const int nthreads = @NTESTTHREADS@;
+static struct clock_threads {
+	int status;
+    pthread_t id;
+} threads[nthreads];
+
+static void start_clock_threads(@MODULENAME@ * module)
+{
+	for (int t = 0; t < nthreads; t += 1) {
+		// Ensure we only do this once.
+		if (threads[t].id == 0 || pthread_kill(threads[t].id, 0) != 0) {
+			threads[t].status = pthread_create(&threads[t].id, NULL, &clock_task, module);
 		}
 	}
-// AFTERMAINCODE_END
-
+}

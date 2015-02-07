@@ -52,28 +52,3 @@ void clock_task(@MODULENAME@ * module)
 
 	} while(1);
 }
-
-// AFTERMAINCODE_START
-    #pragma omp parallel num_threads(@NTESTTHREADSP1@)
-	{
-		#pragma omp single nowait
-		{
-			int nthreads = omp_get_num_threads();
-			for (int t = 0; t < nthreads - 1; t += 1) {
-				// TASK_START
-				#pragma omp task
-				{
-					int myId = omp_get_thread_num();
-					clock_task(module);
-				}
-				// TASK_END
-			}
-			#pragma omp task
-			{
-			  @REPLCODE@
-			}
-		}
-		#pragma omp taskwait
-	}
-// AFTERMAINCODE_END
-
