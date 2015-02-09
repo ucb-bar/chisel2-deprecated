@@ -1206,11 +1206,11 @@ class CppBackend extends Backend {
       val out_h = createOutputFile(n + ".h");
       out_h.write("#ifndef __" + c.name + "__\n");
       out_h.write("#define __" + c.name + "__\n\n");
-      out_h.write("#define TM_NONE 0\n")
-      out_h.write("#define TM_OPENMP 1\n")
-      out_h.write("#define TM_PTHREAD 2\n")
-      out_h.write("#define TM_OPENMPI 3\n")
       if (parallelExecution) {
+        out_h.write("#define TM_NONE 0\n")
+        out_h.write("#define TM_OPENMP 1\n")
+        out_h.write("#define TM_PTHREAD 2\n")
+        out_h.write("#define TM_OPENMPI 3\n")
         out_h.write("#define PERSISTENT_THREADS %d\n".format(if (persistentThreads) 1 else 0))
         out_h.write("#define DYNAMIC_THREAD_DISPATCH %d\n".format(if (useDynamicThreadDispatch) 1 else 0))
       }
@@ -1226,8 +1226,6 @@ class CppBackend extends Backend {
       } else if (useOpenMPI) {
         out_h.write("#define THREAD_MODEL TM_OPENMPI\n")
         out_h.write("#include \"mpi.h\"\n")
-      } else {
-        out_h.write("#define THREAD_MODEL TM_NONE\n")
       }
       out_h.write("#include \"emulator.h\"\n\n");
       
