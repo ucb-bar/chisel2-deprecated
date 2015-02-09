@@ -607,7 +607,10 @@ public:
 	void read_eval_print_loop() {
 		while (true) {
 		    std::string str_in;
-		    getline(cin, str_in);
+		    if (getline(cin, str_in) <= 0) {
+		    	break;
+		    }
+
 		    if (teefile != NULL) {
 		        fprintf(teefile, "%s\n", str_in.c_str());
 		        fflush(teefile);
