@@ -708,7 +708,7 @@ Now that we have defined modules, we will discuss how we actually run and test a
 \begin{scala}
 object tutorial {
   def main(args: Array[String]) = {
-    chiselMain(args, () => new Mux2())
+    chiselMain(args, () => Module(new Mux2()))
   }
 }
 \end{scala}
@@ -760,6 +760,7 @@ and allows users to write tests using the given debug protocol.  In particular, 
 \noindent
 Users connect tester instances to modules using:
 
+
 \begin{scala}
 object chiselMainTest {
   def apply[T <: Module]
@@ -800,7 +801,7 @@ assignments for each input of \verb+Mux2+ is set to the appropriate values using
 Finally, the following shows how the tester is invoked:
 
 \begin{scala}
-chiselMainTest(args + "--test", () => new Mux2()){ 
+chiselMainTest(args + "--test", () => Module(new Mux2())){ 
   c => new Mux2Tests(c) 
 }
 \end{scala}
