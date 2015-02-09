@@ -747,8 +747,8 @@ class CppBackend extends Backend {
     harness.write(s"""  module->set_dumpfile(f);\n""");
     harness.write(s"""  api->set_teefile(tee);\n""");
     harness.write(s"""  api->read_eval_print_loop();\n""");
-    harness.write(s"""  fclose(f);\n""");
-    harness.write(s"""  fclose(tee);\n""");
+    harness.write(s"""  if (f) fclose(f);\n""");
+    harness.write(s"""  if (tee) fclose(tee);\n""");
     harness.write(s"""}\n""");
     harness.close();
   }
