@@ -861,7 +861,7 @@ to which the register will be initialized when the global reset for the circuit 
 The \verb!:=! assignment to \verb!x! in \verb!counter! wires an update combinational circuit 
 which increments the counter value unless it hits the \verb+max+ at which point it wraps back to zero.
 Note that when \verb!x! appears on the right-hand side of
-an assigment, its output is referenced, whereas when on the right-hand
+an assigment, its output is referenced, whereas when on the left-hand
 side, its input is referenced.
 
 Counters can be used to build a number of useful sequential circuits.
@@ -875,7 +875,7 @@ def pulse(n: UInt) = counter(n - UInt(1)) === UInt(0)
 \noindent
 A square-wave generator can then be toggled by the pulse train,
 toggling between true and false on each pulse:
-\begin{scala}
+\begin{scala}[escapechar=@]
 // Flip internal state when input true.
 def toggle(p: Bool) = {
   val x = Reg(init = Bool(false))
@@ -883,8 +883,8 @@ def toggle(p: Bool) = {
   x
 }
 
-% MS: a period contains both phases (high and low)
-// Square wave of a given period.
+@% MS: a period contains both phases (high and low)
+@// Square wave of a given period.
 def squareWave(period: UInt) = toggle(pulse(period/2))
 \end{scala}
 
