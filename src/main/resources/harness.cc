@@ -92,6 +92,6 @@ int main (int argc, char* argv[]) {
 #else
   api->read_eval_print_loop();
 #endif //PERSISTENT_THREADS
-  fclose(f);
-  fclose(tee);
+  if (f) fclose(f);
+  if (tee) fclose(tee);
 }
