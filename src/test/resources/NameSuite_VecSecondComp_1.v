@@ -24,6 +24,7 @@ module NameSuite_VecSecondComp_1(input clk,
   reg  r_valid_3;
 
 `ifndef SYNTHESIS
+// synthesis translate_off
   integer initvar;
   initial begin
     #0.002;
@@ -32,6 +33,7 @@ module NameSuite_VecSecondComp_1(input clk,
     r_valid_2 = {1{$random}};
     r_valid_3 = {1{$random}};
   end
+// synthesis translate_on
 `endif
 
   assign io_mem = T0;

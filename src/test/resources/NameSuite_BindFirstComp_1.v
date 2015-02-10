@@ -38,10 +38,12 @@ module NameSuite_BindFirstComp_1(
        .io_sigs_enq_cmdq( dec_io_sigs_enq_cmdq ),
        .io_sigs_enq_ximm1q( dec_io_sigs_enq_ximm1q )
   );
-  `ifndef SYNTHESIS
+`ifndef SYNTHESIS
+// synthesis translate_off
     assign dec.io_valid = {1{$random}};
     assign dec.io_sigs_enq_cmdq = {1{$random}};
     assign dec.io_sigs_enq_ximm1q = {1{$random}};
-  `endif
+// synthesis translate_on
+`endif
 endmodule
 
