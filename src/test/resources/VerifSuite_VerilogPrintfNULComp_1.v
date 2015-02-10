@@ -12,11 +12,13 @@ module VerifSuite_VerilogPrintfNULComp_1(input clk, input reset,
 
   always @(posedge clk) begin
 `ifndef SYNTHESIS
+// synthesis translate_off
 `ifdef PRINTF_COND
     if (`PRINTF_COND)
 `endif
       if (T0)
         $fwrite(32'h80000002, "%b\n", T1);
+// synthesis translate_on
 `endif
   end
 endmodule

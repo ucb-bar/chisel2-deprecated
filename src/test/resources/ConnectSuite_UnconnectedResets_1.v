@@ -7,11 +7,13 @@ module ConnectSuite_SubModule_1(input clk, input reset,
   wire T0;
 
 `ifndef SYNTHESIS
+// synthesis translate_off
   integer initvar;
   initial begin
     #0.002;
     r = {1{$random}};
   end
+// synthesis translate_on
 `endif
 
   assign io_out = r;
@@ -37,6 +39,7 @@ module ConnectSuite_UnconnectedResets_1(input clk, input reset,
   wire sub_io_out;
 
 `ifndef SYNTHESIS
+// synthesis translate_off
   integer initvar;
   initial begin
     #0.002;
@@ -44,6 +47,7 @@ module ConnectSuite_UnconnectedResets_1(input clk, input reset,
     regs_1 = {1{$random}};
     regs_0 = {1{$random}};
   end
+// synthesis translate_on
 `endif
 
   assign io_out = sub_io_out;

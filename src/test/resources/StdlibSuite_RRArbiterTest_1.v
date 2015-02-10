@@ -100,11 +100,13 @@ module StdlibSuite_RRArbiterTest_1(input clk, input reset,
   wire T76;
 
 `ifndef SYNTHESIS
+// synthesis translate_off
   integer initvar;
   initial begin
     #0.002;
     last_grant = {1{$random}};
   end
+// synthesis translate_on
 `endif
 
   assign io_chosen = chosen;

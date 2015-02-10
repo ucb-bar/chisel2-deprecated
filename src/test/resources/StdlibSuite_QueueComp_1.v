@@ -36,6 +36,7 @@ module Queue(input clk, input reset,
   wire full;
 
 `ifndef SYNTHESIS
+// synthesis translate_off
   integer initvar;
   initial begin
     #0.002;
@@ -45,6 +46,7 @@ module Queue(input clk, input reset,
     for (initvar = 0; initvar < 2; initvar = initvar+1)
       ram[initvar] = {1{$random}};
   end
+// synthesis translate_on
 `endif
 
   assign io_count = T0;
