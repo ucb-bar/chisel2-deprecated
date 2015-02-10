@@ -6,11 +6,13 @@ module MultiClockSuite_ClockedSubComp_1(input T0,
   reg  stored;
 
 `ifndef SYNTHESIS
+// synthesis translate_off
   integer initvar;
   initial begin
     #0.002;
     stored = {1{$random}};
   end
+// synthesis translate_on
 `endif
 
   assign io_valid = stored;

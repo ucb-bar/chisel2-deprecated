@@ -242,13 +242,13 @@ class VerilogBackend extends Backend {
     res += portDecs.map(_.result).reduceLeft(_ + "\n" + _)
     res += "\n  );\n";
     if (c.wires.map(_._2.driveRand).reduceLeft(_ || _)) {
-      res += "  `ifndef SYNTHESIS\n"
+      res += if_not_synthesis
       for ((n, w) <- c.wires) {
         if (w.driveRand) {
           res += "    assign " + c.name + "." + n + " = " + emitRand(w) + ";\n"
         }
       }
-      res += "  `endif\n"
+      res += endif_not_synthesis
     }
     res
   }
@@ -355,11 +355,12 @@ class VerilogBackend extends Backend {
           inits append s"    ${i}: ${emitRef(r)} = ${emitRef(v)};\n"
         s"  always @(*) case (${emitRef(r.inputs.head)})\n" +
         inits +
-        "`ifndef SYNTHESIS\n" +
-        s"    default: ${emitRef(r)} = ${emitRand(r)};\n" +
-        "`else\n" +
-        s"    default: ${emitRef(r)} = ${r.needWidth()}'bx;\n" +
-        "`endif\n" +
+        s"    default: begin\n" +
+        s"      ${emitRef(r)} = ${r.needWidth()}'bx;\n" +
+        if_not_synthesis +
+        s"      ${emitRef(r)} = ${emitRand(r)};\n" +
+        endif_not_synthesis +
+        s"    end\n" +
         "  endcase\n"
 
       case s: Sprintf =>
@@ -775,22 +776,22 @@ class VerilogBackend extends Backend {
   }
 
   def emitPrintf(p: Printf): String = {
-    "`ifndef SYNTHESIS\n" +
+    if_not_synthesis +
     "`ifdef PRINTF_COND\n" +
     "    if (`PRINTF_COND)\n" +
     "`endif\n" +
     "      if (" + emitRef(p.cond) + ")\n" +
     "        $fwrite(32'h80000002, " + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _) + ");\n" +
-    "`endif\n"
+    endif_not_synthesis
   }
   def emitAssert(a: Assert): String = {
-    "`ifndef SYNTHESIS\n" +
+    if_not_synthesis +
     "  if(" + emitRef(a.reset) + ") " + emitRef(a) + " <= 1'b1;\n" +
     "  if(!" + emitRef(a.cond) + " && " + emitRef(a) + " && !" + emitRef(a.reset) + ") begin\n" +
     "    $fwrite(32'h80000002, " + CString("ASSERTION FAILED: %s\n") + ", " + CString(a.message) + ");\n" +
     "    $finish;\n" +
     "  end\n" +
-    "`endif\n"
+    endif_not_synthesis
   }
 
   def emitReg(node: Node): String = {
@@ -828,13 +829,13 @@ class VerilogBackend extends Backend {
 
     val res = new StringBuilder
     if (!sb.isEmpty) {
-      res append "`ifndef SYNTHESIS\n"
+      res append if_not_synthesis
       res append "  integer initvar;\n"
       res append "  initial begin\n"
       res append "    #0.002;\n"
       res append sb
       res append "  end\n"
-      res append "`endif\n"
+      res append endif_not_synthesis
     }
     res
   }
@@ -1022,5 +1023,8 @@ class VerilogBackend extends Backend {
               "+vcs+initreg+random " + src + " -o " + n + " -debug_pp"
     run(cmd)
   }
+
+  private def if_not_synthesis = "`ifndef SYNTHESIS\n// synthesis translate_off\n"
+  private def endif_not_synthesis = "// synthesis translate_on\n`endif\n"
 }
 
