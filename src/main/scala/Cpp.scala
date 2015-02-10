@@ -120,7 +120,7 @@ class CppBackend extends Backend {
   val useDynamicThreadDispatch = Driver.useDynamicThreadDispatch
   // If we're using dynamic thread dispatch or we're not using OpenMP,
   // we need to generate the thread synchronization code.
-  val generateThreadClockSyncCode = parallelExecution && useDynamicThreadDispatch
+  val generateThreadClockSyncCode = parallelExecution && persistentThreads && usePThread
   val needExplicitThreadStart = parallelExecution && !useOpenMP
 
   // The following definition should be a val, but we can't initialize it before elaborate,
@@ -1191,11 +1191,15 @@ class CppBackend extends Backend {
       val replacements = HashMap[String, String] ()
       replacements += (("@NTESTTHREADS@", (nTestThreads).toString))
       replacements += (("@NTESTTHREADSP1@", (nTestThreads + 1).toString))
-      // Preserve the "@TASKCODE@" macro. We may expand it later.
-      replacements += (("@TASKCODE@", "@TASKCODE@"))
-
       replacements += (("@MODULENAME@", moduleName))
       
+      // Generate and output the clock thread array initialization code.
+      val clockThreadArrayInitializer = new StringBuilder
+      for (t <- 0 until nTestThreads) {
+        val method = CMethod(CTypedName("void", "pt_clock_T%d".format(t)), Array[CTypedName]())
+        clockThreadArrayInitializer.append("{0, 0, %s },".format(method.address))
+      }
+      replacements += (("@INIT_THREADS_ARRAY@", clockThreadArrayInitializer.toString))
       val taskTemplate = editResource("%s_persistent_tasks.cc".format(syncDynamicPrefix), replacements)
       write(taskTemplate.toString)
     }
