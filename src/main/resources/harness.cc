@@ -19,7 +19,7 @@ int main (int argc, char* argv[]) {
   #if THREAD_MODEL == TM_OPENMP
     #if DYNAMIC_THREAD_DISPATCH
   	    extern void clock_task(MultiFIR_t * module);
-		#pragma omp parallel num_threads(@NTESTTHREADSP1@)
+		#pragma omp parallel num_threads(@NTESTTASKS@)
 		{
 			#pragma omp single nowait
 			{
@@ -42,7 +42,7 @@ int main (int argc, char* argv[]) {
 			#pragma omp taskwait
 		}
     #else
-		#pragma omp parallel num_threads(@NTESTTHREADSP1@)
+		#pragma omp parallel num_threads(@NTESTTASKS@)
 		{
 			#pragma omp single nowait
 			{

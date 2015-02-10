@@ -115,12 +115,15 @@ class CppBackend extends Backend {
     case _ => ""
   }
   val persistentThreads = Driver.persistentThreads
+  // In general, we'll have one more test task than test threads,
+  //  so the master thread can do some work as well.
+  val nTestTasks = Driver.nThreads
   val nTestThreads = if (persistentThreads && parallelExecution) Driver.nThreads - 1 else Driver.nThreads
   val forceSingleThread = false
   val useDynamicThreadDispatch = Driver.useDynamicThreadDispatch
-  // If we're using dynamic thread dispatch or we're not using OpenMP,
+  // If we're using dynamic thread dispatch or we're using pthreads,
   // we need to generate the thread synchronization code.
-  val generateThreadClockSyncCode = parallelExecution && persistentThreads && usePThread
+  val generateThreadClockSyncCode = parallelExecution && (useDynamicThreadDispatch || usePThread)
   val needExplicitThreadStart = parallelExecution && !useOpenMP
 
   // The following definition should be a val, but we can't initialize it before elaborate,
@@ -1022,7 +1025,7 @@ class CppBackend extends Backend {
     val out_cpps = ArrayBuffer[CppFile]()
     val all_cpp = new StringBuilder
 
-    var threadIslands = new Array[ArrayBuffer[Island]]( if (parallelExecution && !useDynamicThreadDispatch) nTestThreads else 0)
+    var threadIslands = new Array[ArrayBuffer[Island]]( if (parallelExecution && !useDynamicThreadDispatch) nTestTasks else 0)
     // If we're doing dynamic dispatch, we build arrays of clock_hi/lo islands
     // from which we'll generate calls on the specific clock_hi/lo code.
     var clockLoIslands = Array[Island]()
@@ -1190,12 +1193,12 @@ class CppBackend extends Backend {
       // Read the task template and edit the @ID@ tokens.
       val replacements = HashMap[String, String] ()
       replacements += (("@NTESTTHREADS@", (nTestThreads).toString))
-      replacements += (("@NTESTTHREADSP1@", (nTestThreads + 1).toString))
+      replacements += (("@NTESTTASKS@", (nTestTasks).toString))
       replacements += (("@MODULENAME@", moduleName))
       
       // Generate and output the clock thread array initialization code.
       val clockThreadArrayInitializer = new StringBuilder
-      for (t <- 0 until nTestThreads) {
+      for (t <- 1 until nTestTasks) {
         val method = CMethod(CTypedName("void", "pt_clock_T%d".format(t)), Array[CTypedName]())
         clockThreadArrayInitializer.append("{0, 0, %s },".format(method.address))
       }
@@ -1298,9 +1301,11 @@ class CppBackend extends Backend {
       out_h.write("  void init ( val_t rand_init = 0 );\n");
 
       // If we're generating parallel execution clock code, output the method signatures.
+      // NOTE: We generate one more of these than actual threads, so we can do some real work
+      // in the master (as opposed to just spinning waiting for slave threads to finish).
       if (parallelExecution && nTestThreads > 1) {
         if (threadIslands.size > 1) {
-          for (t <- 0 until nTestThreads) {
+          for (t <- 0 until nTestTasks) {
             val clockThreadSuffix = "_T%d".format(t)
             val ptClockName = "pt_clock" + clockThreadSuffix
             out_h.write("  void " + ptClockName + " (  );\n");
@@ -1681,7 +1686,7 @@ struct comp_current_clock_t {
   g_comp_sync_block.clock_type = clock_type;
   g_comp_sync_block.do_reset = reset.to_bool();
 """)
-        for(t <- 0 until nTestThreads) {
+        for(t <- 0 until nTestTasks) {
           val callName = "%s_T%d".format(ptClockName, t)
           body.append("       %s(  );\n".format(callName))
         }
@@ -1719,12 +1724,12 @@ struct comp_current_clock_t {
   g_comp_sync_block.clock_type = clock_type;
   g_comp_sync_block.do_reset = reset.to_bool();
 
-  #pragma omp parallel num_threads(${nTestThreads})
+  #pragma omp parallel num_threads(${nTestTasks})
   {
     #pragma omp sections
     {
 """)
-        for(t <- 0 until nTestThreads) {
+        for(t <- 0 until nTestTasks) {
           val callName = "%s_T%d".format(ptClockName, t)
           body.append("      #pragma omp section\n      {\n")
           body.append("         %s(  );\n".format(callName))
@@ -1792,7 +1797,7 @@ comp_current_clock_t g_current_clock;
         
       val replacements = HashMap[String, String] ()
       replacements += (("@NTESTTHREADS@", (nTestThreads).toString))
-      replacements += (("@NTESTTHREADSP1@", (nTestThreads + 1).toString))
+      replacements += (("@NTESTTASKS@", (nTestTasks).toString))
       replacements += (("@MODULENAME@", moduleName))
       replacements += (("@APINAME@", apiName))
       replacements += (("@SYNCCLASS@", syncClass))
@@ -1839,8 +1844,9 @@ comp_current_clock_t g_current_clock;
 
       if (persistentThreads && !useDynamicThreadDispatch && useOpenMP) {
         // Generate and output the clock thread task code.
+        // NOTE: We'll call the code corresponding to task 0 from the master thread directly.
         val taskString = task.toString
-        for (t <- 0 until nTestThreads) {
+        for (t <- 1 until nTestTasks) {
           val replacements = HashMap[String, String] ()
           val callCode = "module->pt_clock_T%d( );".format(t)
           replacements += (("@TASKCODE@", callCode))
@@ -1884,8 +1890,8 @@ comp_current_clock_t g_current_clock;
 
     class ClockDomains {
       type ClockCodeMethods = HashMap[Clock, (CMethod, CMethod, CMethod)]
-      val threadCode = new Array[ClockCodeMethods](nTestThreads)
-      for (t <- 0 until nTestThreads) {
+      val threadCode = new Array[ClockCodeMethods](nTestTasks)
+      for (t <- 0 until nTestTasks) {
         threadCode(t) = new ClockCodeMethods
       }
       val islandClkCode = new HashMap[Int, ClockCodeMethods]
@@ -1899,7 +1905,7 @@ comp_current_clock_t g_current_clock;
       for (clock <- Driver.clocks) {
         // If we're generating threaded clock code without dynamic dispatch,
         //  we'll need per-thread clock lo,hi.
-        val perThreadClocks = if (!useDynamicThreadDispatch) nTestThreads else 1
+        val perThreadClocks = if (!useDynamicThreadDispatch) nTestTasks else 1
         for (t <- 0 until perThreadClocks) {
           val clockThreadSuffix = if (perThreadClocks > 1) "_T%d".format(t) else ""
 
@@ -2100,14 +2106,14 @@ comp_current_clock_t g_current_clock;
 
       def assignClocksToThreads(weightedIslands: WeightedIslands) {
         // Distribute the clock code between threads.
-        for (t <- 0 until nTestThreads) {
+        for (t <- 0 until nTestTasks) {
           threadIslands(t) = ArrayBuffer[Island]()
         }
         var t = 0
         for((weight, islands) <- weightedIslands.toSeq.sortWith(_._1 > _._1) if weight > 0) {
           for(island <- islands) {
             threadIslands(t) += island
-            t = (t + 1) % nTestThreads
+            t = (t + 1) % nTestTasks
           }
         }
       }

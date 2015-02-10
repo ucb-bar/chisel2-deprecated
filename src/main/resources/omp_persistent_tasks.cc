@@ -1,6 +1,6 @@
 /* This template provides a persistent-task OpenMP implementation. */
 
-#pragma omp parallel num_threads(@NTESTTHREADSP1@)
+#pragma omp parallel num_threads(@NTESTTASKS@)
 {
 	#pragma omp single nowait
 	{

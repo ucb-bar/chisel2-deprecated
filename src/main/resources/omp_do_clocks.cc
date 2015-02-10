@@ -9,6 +9,9 @@ void @MODULENAME@::@DO_CLOCKS@( pt_clock_t clock_type, dat_t<1> reset ) {
 
 	task_sync.master_work();
 
+	// Do some real work in master.
+	this->pt_clock_T0();
+
 	task_sync.master_wait_done();
 
 	task_sync.master_rest();
