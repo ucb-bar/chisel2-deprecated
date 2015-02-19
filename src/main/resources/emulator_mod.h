@@ -569,13 +569,13 @@ struct bit_word_funs {
 
 template <>
 struct bit_word_funs<1> {
-  static void fill (val_t d[], val_t s0) {
+  inline static void fill (val_t d[], val_t s0) {
     d[0] = s0;
   }
   static void fill_nb (val_t d[], val_t s0, int nb) {
     d[0] = mask_val(nb) & s0;
   }
-  static void copy (val_t d[], val_t s0[], int sww) {
+  inline static void copy (val_t d[], val_t s0[], int sww) {
     d[0] = s0[0];
   }
   static void mask (val_t d[], int nb) {
@@ -590,10 +590,10 @@ struct bit_word_funs<1> {
   static void neg (val_t d[], val_t s0[], int nb) {
     d[0] = (- s0[0]) & mask_val(nb);
   }
-  static void mul (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
+  inline static void mul (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
     d[0] = s0[0] * s1[0];
   }
-  static bool ltu (val_t s0[], val_t s1[]) {
+  inline static bool ltu (val_t s0[], val_t s1[]) {
     return (s0[0] < s1[0]);
   }
   static bool lt (val_t s0[], val_t s1[], int w) {
@@ -601,7 +601,7 @@ struct bit_word_funs<1> {
     sval_t b = s1[0] << (val_n_bits() - w);
     return (a < b);
   }
-  static bool lteu (val_t s0[], val_t s1[]) {
+  inline static bool lteu (val_t s0[], val_t s1[]) {
     return (s0[0] <= s1[0]);
   }
   static bool lte (val_t s0[], val_t s1[], int w) {
@@ -612,25 +612,25 @@ struct bit_word_funs<1> {
   static void bit_neg (val_t d[], val_t s0[], int nb) {
     d[0] = ~s0[0] & mask_val(nb);
   }
-  static void bit_xor (val_t d[], val_t s0[], val_t s1[]) {
+  inline static void bit_xor (val_t d[], val_t s0[], val_t s1[]) {
     d[0] = (s0[0] ^ s1[0]);
   }
-  static void bit_and (val_t d[], val_t s0[], val_t s1[]) {
+  inline static void bit_and (val_t d[], val_t s0[], val_t s1[]) {
     d[0] = (s0[0] & s1[0]);
   }
-  static void bit_or (val_t d[], val_t s0[], val_t s1[]) {
+  inline static void bit_or (val_t d[], val_t s0[], val_t s1[]) {
     d[0] = (s0[0] | s1[0]);
   }
-  static bool eq (val_t s0[], val_t s1[]) {
+  inline static bool eq (val_t s0[], val_t s1[]) {
     return s0[0] == s1[0];
   }
-  static bool neq (val_t s0[], val_t s1[]) {
+  inline static bool neq (val_t s0[], val_t s1[]) {
     return s0[0] != s1[0];
   }
   static void lsh (val_t d[], val_t s0[], int amount) {
     d[0] = (s0[0] << amount);
   }
-  static void rsh (val_t d[], val_t s0[], int amount) {
+  inline static void rsh (val_t d[], val_t s0[], int amount) {
     d[0] = (s0[0] >> amount);
   }
   static void rsha (val_t d[], val_t s0[], int amount, int w) {
@@ -649,7 +649,7 @@ struct bit_word_funs<1> {
     d[0] = ((s0[0] & msk) << s) | (d[0] & ~(msk << s));
   }
 
-  static void set (val_t d[], val_t s0[]) {
+inline static void set (val_t d[], val_t s0[]) {
     d[0] = s0[0];
   }
   static void log2 (val_t d[], val_t s0[]) {
