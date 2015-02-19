@@ -7,6 +7,7 @@ void @MODULENAME@::@PT_CLOCKNAME@(  ) {
 	switch( g_comp_sync_block.clock_type ) {
 	case PCT_LO: @CLOCKLONAME@( reset ); break;
 	case PCT_HI: @CLOCKHINAME@( reset ); break;
+	case PCT_HIX: @CLOCKHIXNAME@( reset ); break;
 	case PCT_DONE: /* FALL_THROUGH */
 	default:
 		break;

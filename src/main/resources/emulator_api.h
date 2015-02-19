@@ -19,7 +19,7 @@
 /**
  * OpenMP synchronization object used to synchronize persistent multi-threaded clock emulation.
  */
-enum pt_clock_t { PCT_DONE, PCT_LO, PCT_HI, PCT_XHI };
+enum pt_clock_t { PCT_DONE, PCT_LO, PCT_HI, PCT_HIX };
 struct comp_sync_block {
 	pt_clock_t clock_type;			// The type of clock to execute.
 	bool do_reset;					// The value of reset for this clock cycle.
@@ -657,14 +657,14 @@ public:
 		return "error";
 	}
 
-	void read_eval_print_loop() {
+	void read_eval_print_loop(istream& cmdin) {
 		while (true) {
 		    std::string str_in;
 		    do {
-		    	std::getline(cin, str_in);
-		    } while (cin.fail() && errno == EINTR);
+		    	std::getline(cmdin, str_in);
+		    } while (cmdin.fail() && errno == EINTR);
 
-		    if (!cin.good()) {
+		    if (!cmdin.good()) {
 		    	break;
 		    }
 

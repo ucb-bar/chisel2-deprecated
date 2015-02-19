@@ -125,6 +125,7 @@ class CppBackend extends Backend {
   // we need to generate the thread synchronization code.
   val generateThreadClockSyncCode = parallelExecution && (useDynamicThreadDispatch || usePThread)
   val needExplicitThreadStart = parallelExecution && !useOpenMP
+  val padIslandStructures = true
 
   // The following definition should be a val, but we can't initialize it before elaborate,
   // and backend methods may need to refer to it indirectly.
@@ -1275,6 +1276,9 @@ class CppBackend extends Backend {
               out_h.write(emitVCDDec(m))
             }
           }
+          if (padIslandStructures) {
+            out_h.write("unsigned char pad[64];\n")
+          }
           out_h.write("   } _I_%s;\n".format(islandId))
         }
       } else {
@@ -1303,7 +1307,7 @@ class CppBackend extends Backend {
       // If we're generating parallel execution clock code, output the method signatures.
       // NOTE: We generate one more of these than actual threads, so we can do some real work
       // in the master (as opposed to just spinning waiting for slave threads to finish).
-      if (parallelExecution && nTestThreads > 1) {
+      if (parallelExecution && nTestTasks > 1) {
         if (threadIslands.size > 1) {
           for (t <- 0 until nTestTasks) {
             val clockThreadSuffix = "_T%d".format(t)
@@ -1698,6 +1702,7 @@ struct comp_current_clock_t {
         val clockHi = CMethod(CTypedName("void", clockHiName), clockLoHiArgs)
         body.append(clockHi.head)
         body.append("       %s(PCT_HI, reset);\n".format(doClockName))
+        body.append("       %s(PCT_HIX, reset);\n".format(doClockName))
         body.append(clockHi.tail)
         if (false) {
           val clockHiX = CMethod(CTypedName("void", clockHiXName), clockLoHiArgs)
@@ -1747,24 +1752,25 @@ struct comp_current_clock_t {
         val clockHi = CMethod(CTypedName("void", clockHiName), clockLoHiArgs)
         body.append(clockHi.head)
         body.append("       %s(PCT_HI, reset);\n".format(doClockName))
+        body.append("       %s(PCT_HIX, reset);\n".format(doClockName))
         body.append(clockHi.tail)
       }
       writeCppFile(body.toString)
     }
 
 
-    def genParallelClockMethodArrays(clock_lo_methods: Array[CMethod], clock_ihi_methods: Array[CMethod], clock_xhi_methods: Array[CMethod]) {
+    def genParallelClockMethodArrays(clock_lo_methods: Array[CMethod], clock_hii_methods: Array[CMethod], clock_hix_methods: Array[CMethod]) {
       createCppFile()
 
       val body = new StringBuilder("")
       val head = "static const clock_code_t %s_code[] = {\n"
       val tail = "\n};\n"
-      val clockMethods = Array[(String, Array[CMethod])](("clock_lo", clock_lo_methods), ("clock_ihi", clock_ihi_methods), ("clock_xhi", clock_xhi_methods))
+      val clockMethods = Array[(String, Array[CMethod])](("clock_lo", clock_lo_methods), ("clock_hii", clock_hii_methods), ("clock_hix", clock_hix_methods))
       val g_comp_clocks = s"""
 comp_clock_methods_t g_comp_clocks[] = {
     {${clock_lo_methods.size - 1}, clock_lo_code},
-    {${clock_ihi_methods.size - 1}, clock_ihi_code},
-    {${clock_xhi_methods.size - 1}, clock_xhi_code},
+    {${clock_hii_methods.size - 1}, clock_hii_code},
+    {${clock_hix_methods.size - 1}, clock_hix_code},
 };
 
 comp_current_clock_t g_current_clock;
@@ -1913,12 +1919,9 @@ comp_current_clock_t g_current_clock;
           val clock_dlo = new CMethod(CTypedName("void", clockLoName), clockArgs)
           val clockHiName = "clock_hi" + clockThreadSuffix + clkName(clock)
           val clock_hi = new CMethod(CTypedName("void", clockHiName), clockArgs)
-          // For simplicity, we define a dummy method for the clock_hi exec code.
-          // We won't actually call such a  method - its code will be inserted into the
-          // clock_hi method after all the clock_hi initialization code.
-          val clockHiDummyName = "clock_hi_dummy" + clockThreadSuffix + clkName(clock)
-          val clock_xhi = new CMethod(CTypedName("void", clockHiDummyName), clockArgs)
-          threadCode(t) += (clock -> ((clock_dlo, clock_hi, clock_xhi)))
+          val clockHiXName = "clock_hix" + clockThreadSuffix + clkName(clock)
+          val clock_hix = new CMethod(CTypedName("void", clockHiXName), clockArgs)
+          threadCode(t) += (clock -> ((clock_dlo, clock_hi, clock_hix)))
         }
         // If we're generating islands of combinational logic,
         // have the main clock code call the island specific code,
@@ -1934,11 +1937,11 @@ comp_current_clock_t g_current_clock;
             val clock_dlo_I = new CMethod(CTypedName("void", clockLoName), clockArgs)
             // Unlike the unpartitioned case, we will generate and call separate
             // initialize and execute clock_hi methods if we're partitioning.
-            val clockHiName = "clock_hi" + clkName(clock) + "_I_" + islandId
-            val clock_ihi_I = new CMethod(CTypedName("void", clockHiName), clockArgs)
-            val clockXHiName = "clock_xhi" + clkName(clock) + "_I_" + islandId
-            val clock_xhi_I = new CMethod(CTypedName("void", clockXHiName), clockArgs)
-            islandClkCode(islandId) += (clock -> ((clock_dlo_I, clock_ihi_I, clock_xhi_I)))
+            val clockHiIName = "clock_hi" + clkName(clock) + "_I_" + islandId
+            val clock_hii_I = new CMethod(CTypedName("void", clockHiIName), clockArgs)
+            val clockHiXName = "clock_hix" + clkName(clock) + "_I_" + islandId
+            val clock_hix_I = new CMethod(CTypedName("void", clockHiXName), clockArgs)
+            islandClkCode(islandId) += (clock -> ((clock_dlo_I, clock_hii_I, clock_hix_I)))
           }
         }
       }
@@ -2192,29 +2195,38 @@ comp_current_clock_t g_current_clock;
 
         // Output the code to call the island-specific clock_hi (init and exec) code.
         for ((clock, clkcodes) <- theCode if generatedClocks.contains(clock)) {
-          val clock_ihi = clkcodes._2
-          val clock_xhi = clkcodes._3
+          val clock_hii = clkcodes._2
+          val clock_hix = clkcodes._3
           // If we're generating dynamic threaded clock code,
           //  we call the island-specific clock lows from the multi-thread
           // dispatch, and this aggregator is not required.
           if (!(parallelExecution && useDynamicThreadDispatch)) {
             createCppFile()
             // This is just the definition of the main (or per-thread) clock_hi init method.
-            writeCppFile(clock_ihi.head)
+            writeCppFile(clock_hii.head)
             // Output the actual calls to the island specific clock code.
             for (method <- accumulatedClockHiIs.separateMethods) {
               writeCppFile("\t" + method.genCall)
             }
+            // If we aren't going to execute the clock threads in parallel,
+            //  just merge the hix methods in with the hii methods.
+            //  Otherwise, keep them separate so they can be invoked
+            //  on a per-thread basis.
+            if (parallelExecution) {
+              writeCppFile(clock_hii.tail)
+              writeCppFile(clock_hix.head)
+            }
             for (method <- accumulatedClockHiXs.separateMethods) {
               writeCppFile("\t" + method.genCall)
             }
-            writeCppFile(clock_xhi.tail)
+            writeCppFile(clock_hix.tail)
           }
 
           // If we're generating multi-threaded clock code,
           // add the thread-specific clock_hi prototypes.
           if (threadIslands.size > 1) {
-            threadMethods += clock_ihi
+            threadMethods += clock_hii
+            threadMethods += clock_hix
           }
         }
         
@@ -2228,22 +2240,22 @@ comp_current_clock_t g_current_clock;
 
       def outputAllClkDomains(): (Array[CMethod], Array[CMethod], Array[CMethod]) = {
         var clockLoMethods = Array[CMethod]()
-        var clockiHiMethods = Array[CMethod]()
-        var clockxHiMethods = Array[CMethod]()
+        var clockHiIMethods = Array[CMethod]()
+        var clockHiXMethods = Array[CMethod]()
         // Are we generating partitioned islands?
         if (!partitionIslands) {
           //.values.map(_._1.body) ++ (code.values.map(x => (x._2.append(x._3))))
           for ((clock, clockMethods) <- allCode) {
             val clockLo = clockMethods._1
-            val clockIHi = clockMethods._2
-            val clockXHi = clockMethods._3
+            val clockHiI = clockMethods._2
+            val clockHiX = clockMethods._3
             createCppFile()
             writeCppFile(clockLo.head + clockLo.body.result + clockLo.tail)
-            writeCppFile(clockIHi.head + clockIHi.body.result)
+            writeCppFile(clockHiI.head + clockHiI.body.result)
             // Note, we tacitly assume that the clock_hi initialization and execution
             // code have effectively the same signature and tail.
-            assert(clockIHi.tail == clockXHi.tail)
-            writeCppFile(clockXHi.body.result + clockXHi.tail)
+            assert(clockHiI.tail == clockHiX.tail)
+            writeCppFile(clockHiX.body.result + clockHiX.tail)
           }
         } else {
           if (parallelExecution) {
@@ -2260,17 +2272,17 @@ comp_current_clock_t g_current_clock;
                 outputSelectedIslandClkDomains(threadCode(t), islandIds.contains(_))
               }
             } else {
-              val (tclockLoMethods, tclockiHiMethods, tclockxHiMethods) = outputSelectedIslandClkDomains(allCode, _ > 0)
+              val (tclockLoMethods, tclockHiIMethods, tclockHiXMethods) = outputSelectedIslandClkDomains(allCode, _ > 0)
               clockLoMethods = tclockLoMethods
-              clockiHiMethods = tclockiHiMethods
-              clockxHiMethods = tclockxHiMethods
+              clockHiIMethods = tclockHiIMethods
+              clockHiXMethods = tclockHiXMethods
             }
           } else {
             // Output all island clock code.
             outputSelectedIslandClkDomains(allCode, _ > 0)
           }
         }
-        (clockLoMethods, clockiHiMethods, clockxHiMethods)
+        (clockLoMethods, clockHiIMethods, clockHiXMethods)
       }
     }
 
@@ -2332,14 +2344,14 @@ comp_current_clock_t g_current_clock;
     }
     // Ensure we start off in a new file before we start outputting the clock_lo/hi.
     advanceCppFile()
-    val (accumulatedClockLoMethods, accumulatedClockiHiMethods, accumulatedClockxHiMethods) = clkDomains.outputAllClkDomains()
+    val (accumulatedClockLoMethods, accumulatedClockHiIMethods, accumulatedClockHiXMethods) = clkDomains.outputAllClkDomains()
 
     // If we're genereating multi-threaded clock code, output it.
     if (parallelExecution) {
       advanceCppFile()
       genParallelClockMethods(threadIslands)
       if (useDynamicThreadDispatch) {
-        genParallelClockMethodArrays(accumulatedClockLoMethods, accumulatedClockiHiMethods, accumulatedClockxHiMethods)
+        genParallelClockMethodArrays(accumulatedClockLoMethods, accumulatedClockHiIMethods, accumulatedClockHiXMethods)
       }
     }
 

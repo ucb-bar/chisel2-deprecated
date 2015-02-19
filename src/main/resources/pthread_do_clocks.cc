@@ -22,5 +22,5 @@ void @MODULENAME@::clock_lo( dat_t<1> reset ) {
 
 void @MODULENAME@::clock_hi( dat_t<1> reset ) {
 	@DO_CLOCKS@( PCT_HI, reset );
-	@DO_CLOCKS@( PCT_XHI, reset );
+	@DO_CLOCKS@( PCT_HIX, reset );
 }
