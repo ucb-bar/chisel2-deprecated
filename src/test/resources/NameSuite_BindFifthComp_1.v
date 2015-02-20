@@ -48,6 +48,8 @@ module NameSuite_Block_2(input clk,
   assign T10 = T5[1'h0:1'h0];
   assign T11 = T12 ? tag_ram_0 : 32'h0;
   assign T12 = tag_ram_0[1'h0:1'h0];
+  assign io_out_resp_bits_error = {1{$random}};
+  assign io_out_resp_valid = {1{$random}};
 
   always @(posedge clk) begin
     if(T3) begin
