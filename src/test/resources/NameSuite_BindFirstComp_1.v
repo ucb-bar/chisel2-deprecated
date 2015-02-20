@@ -7,6 +7,8 @@ module NameSuite_BlockDecoder_1(
 
 
 
+  assign io_sigs_enq_ximm1q = {1{$random}};
+  assign io_sigs_enq_cmdq = {1{$random}};
   assign io_replay = io_valid;
 endmodule
 

@@ -261,7 +261,8 @@ class VerilogBackend extends Backend {
           ""
         } else {
           if (node.inputs.length == 0) {
-            ChiselError.warning("UNCONNECTED " + node + " IN " + node.component); ""
+            ChiselError.warning("UNCONNECTED " + node + " IN " + node.component)
+            "  assign " + emitTmp(node) + " = " + emitRand(node) + ";\n"
           } else if (node.inputs(0) == null) {
             ChiselError.warning("UNCONNECTED WIRE " + node + " IN " + node.component); ""
           } else {
