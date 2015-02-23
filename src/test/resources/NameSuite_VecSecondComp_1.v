@@ -36,15 +36,19 @@ module NameSuite_VecSecondComp_1(input clk,
 // synthesis translate_on
 `endif
 
+`ifndef SYNTHESIS
+// synthesis translate_off
+  assign io_requestor_0_req_ready = {1{$random}};
+  assign io_requestor_1_req_ready = {1{$random}};
+  assign io_requestor_2_req_ready = {1{$random}};
+  assign io_requestor_3_req_ready = {1{$random}};
+// synthesis translate_on
+`endif
   assign io_mem = T0;
   assign T0 = r_valid_3 ? io_requestor_3_req_ready : T1;
   assign T1 = r_valid_2 ? io_requestor_2_req_ready : T2;
   assign T2 = r_valid_1 ? io_requestor_1_req_ready : T3;
   assign T3 = r_valid_0 ? io_requestor_0_req_ready : io_requestor_0_req_ready;
-  assign io_requestor_0_req_ready = {1{$random}};
-  assign io_requestor_1_req_ready = {1{$random}};
-  assign io_requestor_2_req_ready = {1{$random}};
-  assign io_requestor_3_req_ready = {1{$random}};
 
   always @(posedge clk) begin
     r_valid_0 <= io_requestor_0_req_ready;
