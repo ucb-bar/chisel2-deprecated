@@ -399,6 +399,7 @@ class ConnectSuite extends TestSuite {
     chiselMain(Array[String]("--backend", "v",
         "--targetDir", dir.getPath.toString()),
         () => Module(new UnspecifiedBundleValues()))
+    assertFile("ConnectSuite_UnspecifiedBundleValues_1.v")
   }
 
   /* Signals only used as resets are trimmed (#346)
