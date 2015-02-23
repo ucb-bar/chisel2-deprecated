@@ -34,6 +34,12 @@ module NameSuite_Block_2(input clk,
 // synthesis translate_on
 `endif
 
+`ifndef SYNTHESIS
+// synthesis translate_off
+  assign io_out_resp_bits_error = {1{$random}};
+  assign io_out_resp_valid = {1{$random}};
+// synthesis translate_on
+`endif
   assign io_out_resp_bits_ppn = T0;
   assign T0 = T11 | T1;
   assign T1 = T7 ? tag_ram_1 : 32'h0;
@@ -48,8 +54,6 @@ module NameSuite_Block_2(input clk,
   assign T10 = T5[1'h0:1'h0];
   assign T11 = T12 ? tag_ram_0 : 32'h0;
   assign T12 = tag_ram_0[1'h0:1'h0];
-  assign io_out_resp_bits_error = {1{$random}};
-  assign io_out_resp_valid = {1{$random}};
 
   always @(posedge clk) begin
     if(T3) begin
