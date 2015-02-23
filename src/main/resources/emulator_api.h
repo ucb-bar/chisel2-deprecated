@@ -662,7 +662,7 @@ public:
 		    std::string str_in;
 		    do {
 		    	std::getline(cmdin, str_in);
-		    } while (cmdin.fail() && errno == EINTR);
+		    } while (cmdin.fail() && errno == EINTR && (cmdin.clear(), true));
 
 		    if (!cmdin.good()) {
 		    	break;
