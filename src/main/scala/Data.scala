@@ -92,7 +92,6 @@ abstract class Data extends Node {
 
   def apply(name: String): Data = null
   def flatten: Array[(String, Bits)]
-  def terminate(): Unit = { }
   def flip(): this.type = this;
   def asInput(): this.type = this;
 

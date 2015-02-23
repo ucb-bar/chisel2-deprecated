@@ -62,7 +62,7 @@ trait FileSystemUtilities {
 
 abstract class Backend extends FileSystemUtilities{
   /* Set of keywords which cannot be used as node and component names. */
-  val keywords: HashSet[String];
+  val keywords: Set[String]
   val nameSpace = HashSet[String]()
   /* Set of Ops that this backend doesn't natively support and thus must be
      lowered to simpler Ops. */
@@ -70,17 +70,6 @@ abstract class Backend extends FileSystemUtilities{
 
   /* Whether or not this backend decomposes along Module boundaries. */
   def isEmittingComponents: Boolean = false
-
-  def addPin[T <: Data](m: Module, pin: T, name: String) = {
-    for ((n, io) <- pin.flatten) {
-      io.component = m
-      io.isIo = true
-    }
-    if (name != "")
-      pin. nameIt (name, true)
-    m.io.asInstanceOf[Bundle] += pin
-    pin
-  }
 
   def depthString(depth: Int): String = {
     var res = "";
@@ -172,7 +161,7 @@ abstract class Backend extends FileSystemUtilities{
     for (comp <- Driver.sortedComps) {
       comp dfs { _ match {
         case reg: Reg if reg.name == "" =>
-          reg.name = "R" + reg.component.nextIndex
+          reg setName "R" + reg.component.nextIndex
         case node: Node if !node.isTypeNode && node.name == "" =>
           node.name = "T" + node.component.nextIndex
         case _ =>
@@ -479,8 +468,11 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def inferAll(mod: Module): Int = {
+    // Verify all the muxes just before width inference
+    verifyAllMuxes
+
     val nodesList = ArrayBuffer[Node]()
-    Driver.bfs { nodesList += _ }
+    Driver.idfs { nodesList += _ }
 
     def verify {
       var hasError = false
@@ -522,7 +514,7 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def forceMatchingWidths {
-    Driver.bfs (_.forceMatchingWidths)
+    Driver.idfs (_.forceMatchingWidths)
   }
 
   def computeMemPorts(mod: Module) {
@@ -543,7 +535,11 @@ abstract class Backend extends FileSystemUtilities{
   def removeTypeNodes(mod: Module) = {
     var count = 0
     Driver.bfs {x =>
-      scala.Predef.assert(!x.isTypeNode)
+      // If this a UInt literal, generate a Chisel error.
+      // Issue #168 - lit as port breaks chisel
+      if (x.isTypeNode) {
+        ChiselError.error("Real node required here, but 'type' node found - did you neglect to insert a node with a direction?", x.line)
+      }
       count += 1
       for (i <- 0 until x.inputs.length)
         if (x.inputs(i) != null && x.inputs(i).isTypeNode) {
@@ -577,20 +573,20 @@ abstract class Backend extends FileSystemUtilities{
          as the io's component and the logic's component is not
          same as output's component unless the logic is an input */
       for ((n, io) <- comp.wires) {
-        // Add bindings only in the Verilog Backend
         if (io.dir == OUTPUT) {
-          val consumers = io.consumers.clone
-          val inputsMap = HashMap[Node, ArrayBuffer[Node]]()
-          for (node <- consumers) inputsMap(node) = node.inputs.clone
-          for (node <- consumers; if !(node == null) && io.component != node.component.parent) {
-            val inputs = inputsMap(node)
-            val i = inputs indexOf io
-            node match {
-              case bits: Bits if bits.dir == INPUT =>
-                node.inputs(i) = Binding(io, io.component.parent, io.component)
-              case _ if io.component != node.component =>
-                node.inputs(i) = Binding(io, io.component.parent, io.component)
-              case _ =>
+          for (node <- io.consumers; if !(node == null) && io.component != node.component.parent) {
+            for ((input, i) <- node.inputs.zipWithIndex ; if input eq io) {
+              node match {
+                case bits: Bits if bits.dir == INPUT => {
+                  node.inputs(i) = Binding(io, io.component.parent, io.component)
+                  node.inputs(i).consumers += node
+                }
+                case _ if io.component != node.component => {
+                  node.inputs(i) = Binding(io, io.component.parent, io.component)
+                  node.inputs(i).consumers += node
+                }
+                case _ =>
+              }
             }
           }
         }
@@ -603,19 +599,22 @@ abstract class Backend extends FileSystemUtilities{
         // component. We also do the same when assigning
         // to the output if the output is the parent
         // of the subcomponent.
-        else if (io.dir == INPUT) {
-          val consumers = io.consumers.clone
-          val inputsMap = HashMap[Node, ArrayBuffer[Node]]()
-          for (node <- consumers) inputsMap(node) = node.inputs.clone
-          for (node <- consumers; if !(node == null) && io.component.parent == node.component) {
-            val inputs = inputsMap(node)
-            val i = inputs indexOf io
-            node match {
-              case bits: Bits if bits.dir == OUTPUT =>
-                if (io.inputs.length > 0) node.inputs(i) = io.inputs(0)
-              case _ if !node.isIo =>
-                if (io.inputs.length > 0) node.inputs(i) = io.inputs(0)
-              case _ =>
+        else if (io.dir == INPUT && !io.inputs.isEmpty) {
+          for (node <- io.consumers; if !(node == null) && io.component.parent == node.component) {
+            for ((input, i) <- node.inputs.zipWithIndex ; if input eq io) {
+              node match {
+                case bits: Bits if bits.dir == OUTPUT => {
+                  node.inputs(i) = io.inputs(0)
+                  node.inputs(i).consumers -= io
+                  node.inputs(i).consumers += node
+                }
+                case _ if !node.isIo => {
+                  node.inputs(i) = io.inputs(0)
+                  node.inputs(i).consumers -= io
+                  node.inputs(i).consumers += node
+                }
+                case _ =>
+              }
             }
           }
         }
@@ -626,11 +625,10 @@ abstract class Backend extends FileSystemUtilities{
   def nameBindings {
     for (comp <- Driver.sortedComps) {
       for (bind <- comp.bindings) {
-        var genName = if (bind.targetNode.name == null || bind.targetNode.name.length() == 0) ""
-                      else bind.targetComponent.name + "_" + bind.targetNode.name
-        if(nameSpace contains genName) genName += ("_" + bind.emitIndex);
-        bind.name = asValidName(genName); // Not using nameIt to avoid override
-        bind.named = true;
+        var genName = bind.targetComponent.name + "_" + bind.targetNode.name
+        if(nameSpace contains genName) genName += ("_" + bind.emitIndex)
+        bind.name = asValidName(genName) // Not using nameIt to avoid override
+        bind.named = true
       }
     }
   }
@@ -860,7 +858,6 @@ abstract class Backend extends FileSystemUtilities{
     ChiselError.info("resolving nodes to the components")
     collectNodesIntoComp(c)
     checkModuleResolution
-    verifyAllMuxes
     ChiselError.checkpoint()
 
     findConsumers(c)
@@ -903,6 +900,9 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def compile(c: Module, flags: String = null): Unit = { }
+
+  // Allow the backend to decide if this node should be recorded in the "object".
+  def isInObject(n: Node): Boolean = false
 }
 
 

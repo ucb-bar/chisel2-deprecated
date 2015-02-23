@@ -260,13 +260,24 @@ object PartitionIslands {
       if (debug) {
         println("creating island leaf: " + islandId + " on " + inode.component.name + "/" + inode)
       }
-      res += ((islandId, new mutableIsland(islandId, an, an)))
       // Now mark all the directly-reachable Bits nodes.
       for ( pNode <-inode.consumers) {
         markBitsNodes(pNode, markedNodes, islandId)
       }
       islandId += 1
     }
+
+    // Put all the nodes we've marked into the results.
+    for ((node, island) <- markedNodes) {
+      if (res.contains(island)) {
+        res(island).nodes += node
+      } else {
+        val an = new mutableIslandNodes
+        an += node
+        res += ((island, new mutableIsland(island, an, an)))
+      }
+    }
+
     // Flood fill, generating islands
     // We build a work stack until we hit a node that is not an instance of Bits,
     // then we flood from the non-Bits node including all that node's parents in the island.
@@ -285,7 +296,6 @@ object PartitionIslands {
     // Do nothing if our inputs aren't all in the same island.
     // Ignore literals and registers.
     // In the case of literals, their island of residence shouldn't matter.
-    // In the case of registers, we don't want to move the between islands.
     def islandHop(s: Node) {
       val inputsIslandSet = Set[Int]()
       s.inputs.filter(i => !(i.isInstanceOf[Literal] || i.isInstanceOf[Reg])).foreach(inputsIslandSet += markedNodes(_))
@@ -295,6 +305,15 @@ object PartitionIslands {
       }
       val srcIsland = markedNodes(s)
       val dstIsland = markedNodes(s.inputs(0))
+      // Ensure srcIsland and dstIsland exist.
+      if (!res.contains(srcIsland)) {
+        ChiselError.error("islandHop: node "+ s + " - source island " + srcIsland + " not in results", s.line)
+        return
+      }
+      if (!res.contains(dstIsland)) {
+        ChiselError.error("islandHop: node "+ s.inputs(0) + " - destination island " + dstIsland + " not in results", s.inputs(0).line)
+        return
+      }
       // Remove us from collection of nodes associated with this island.
       res(srcIsland).nodes -= s
       // If this island is now empty, remove it from the island set.

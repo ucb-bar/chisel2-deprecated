@@ -208,9 +208,9 @@ The last update (lexically, per clock) runs
 & \verb$seqRead$ & only update reads on clock edge \\
 \end{tabular}
 \subsubsection{Using}: access elements by indexing: \newline
-\verb$val readVal = mem(addr:UInt/Int)$ \newline
+\verb$val readVal = my_mem(addr:UInt/Int)$ \newline
 \phantom{x} for synchronous read: assign output to \verb$Reg$ \newline
-\verb$mem(addr:UInt/Int) := y$
+\verb$mu_mem(addr:UInt/Int) := y$
 
 \section{Modules } \hrulefill
 \subsubsection{Defining}: subclass \verb$Module$ with elements, code:

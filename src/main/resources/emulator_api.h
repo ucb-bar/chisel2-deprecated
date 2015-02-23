@@ -4,10 +4,17 @@
 
 #include "emulator_mod.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunused-variable"
+
 #include <string>
 #include <sstream>
 #include <map>
 #include <cassert>
+#include <cerrno>
 
 /**
  * Converts an integer to a std::string without needing additional libraries
@@ -23,7 +30,7 @@ static std::string itos(int in) {
  * Copy one val_t array to another.
  * nb must be the exact number of bits the val_t represents.
  */
-static void val_cpy(val_t* dst, val_t* src, int nb) {
+static __attribute__((unused)) void val_cpy(val_t* dst, val_t* src, int nb) {
     for (int i=0; i<val_n_words(nb); i++) {
         dst[i] = src[i];
     }
@@ -44,7 +51,7 @@ static void val_empty(val_t* dst, int nb) {
  * is capped by the width of a single val_t element.
  * nb must be the exact number of bits the val_t represents.
  */
-static void val_set(val_t* dst, val_t nb, val_t num) {
+static __attribute__((unused)) void val_set(val_t* dst, val_t nb, val_t num) {
     val_empty(dst, nb);
     dst[0] = num;
 }
@@ -402,6 +409,11 @@ public:
 			int n = atoi(tokens[1].c_str());
 			module->propagate_changes();
 			int ret = module->step(false, n);
+			// Do we have print output to report?
+			int nBytes = module->has_output();
+			if (nBytes > 0) {
+				cout << "PRINT" << " " << nBytes << " " << module->drain_output();
+			}
 			return itos(ret);
 		} else if (tokens[0] == "set_clocks") {
 			// BETA FUNCTION: semantics subject to change, use with caution
@@ -596,7 +608,14 @@ public:
 	void read_eval_print_loop() {
 		while (true) {
 		    std::string str_in;
-		    getline(cin, str_in);
+		    do {
+		    	std::getline(cin, str_in);
+		    } while (cin.fail() && errno == EINTR);
+
+		    if (!cin.good()) {
+		    	break;
+		    }
+
 		    if (teefile != NULL) {
 		        fprintf(teefile, "%s\n", str_in.c_str());
 		        fflush(teefile);
@@ -659,5 +678,7 @@ protected:
 	// Snapshot functions
 	std::map<std::string, mod_t*> snapshot_table;
 };
+
+#pragma GCC diagnostic pop
 
 #endif

@@ -437,4 +437,41 @@ class ZeroWidthTest extends TestSuite {
 
     chiselMain(testArgs, () => Module(new MuxComp()))
   }
+
+  /** Reverse produced many width warning messages. 
+    */
+  @Test def testReverseNoisyWidth() {
+    println("\ntesttestReverseNoisyWidth ...")
+    class ReverseNoisyWidth extends Module {
+      val io = new Bundle {
+        val i = UInt(INPUT, width=64)
+        val o = UInt(OUTPUT, width=64)
+      }
+      io.o := Reverse(io.i)
+    }
+
+    chiselMain(testArgs, () => Module(new ReverseNoisyWidth()))
+    assertTrue(ChiselError.ChiselErrors.isEmpty);
+  }
+
+  /** Issue #335
+   *  When you have an output that is driven inside of a when statement,
+   *   but is left floating in other cases, a java.lang.NullPointerException
+   *    is thrown during "checking widths".
+   */
+  @Test def testUnRefOutNullPointer() {
+    println("\ntestUnRefOutNullPointer ...")
+    class FloatOutModule extends Module {
+    
+      val io = new Bundle {
+        val i_value     = UInt(INPUT, width = 64)
+        val i_valid     = Bool(INPUT)
+        val o_value     = UInt(OUTPUT, width = 64)
+      }
+    
+      when ( io.i_valid ) {
+        io.o_value := io.i_value
+      }
+    }
+  }
 }

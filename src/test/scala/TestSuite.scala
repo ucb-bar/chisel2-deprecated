@@ -31,9 +31,20 @@
 import org.scalatest.junit.AssertionsForJUnit
 import org.junit.Before
 import java.io.File
+import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 import scala.collection.JavaConversions
 import Chisel._
+import TestSuite._
+
+object TestSuite {
+
+  // Should we enable some global settings?
+  val partitionIslandsParameterName = "partitionIslands"
+  val defaultEnablePartitionIslands = false
+  val partitionIslandsParameter = System.getProperty(partitionIslandsParameterName)
+  val partitionIslandsEnable = if (partitionIslandsParameter == null) defaultEnablePartitionIslands else true
+}
 
 class TestSuite extends AssertionsForJUnit {
 
@@ -45,7 +56,15 @@ class TestSuite extends AssertionsForJUnit {
 
   def assertFile( filename: String ) {
     val useNewCompare = true
-    val reffile = scala.io.Source.fromURL(getClass.getResource(filename))
+    val url = getClass.getResource(filename)
+    // Did we find the resource?
+    if (url == null) {
+      println("assertFile: \"%s\" not found".format(filename))
+      // Make sure we don't inadvertently pass this test.
+      assertResult(filename) { "" }
+      return
+    }
+    val reffile = scala.io.Source.fromURL(url)
     val refText = blankLines_re.replaceAllIn(reffile.mkString, "")
     reffile.close()
     val testfile = scala.io.Source.fromFile(
@@ -61,10 +80,18 @@ class TestSuite extends AssertionsForJUnit {
     }
   }
 
+
   def launchTester[M <: Module : ClassTag, T <: Tester[M]](b: String, t: M => T) {
     val ctor = implicitly[ClassTag[M]].runtimeClass.getConstructors.head
-    chiselMainTest(Array[String]("--backend", b,
-      "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
+    val conditionalArgs = ArrayBuffer[String]()
+
+    if (partitionIslandsEnable) {
+      conditionalArgs += "--partitionIslands"
+    }
+
+    val testArgs = Array[String]("--backend", b,
+      "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test")
+    chiselMainTest(conditionalArgs.toArray ++ testArgs,
       () => Module(ctor.newInstance(this).asInstanceOf[M])) {t}
   }
   def launchCppTester[M <: Module : ClassTag, T <: Tester[M]](t: M => T) = launchTester("c", t)

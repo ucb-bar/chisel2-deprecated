@@ -1,0 +1,13 @@
+ChangeLog for Chisel v2.2.21 12/12/2014
+
+#347 Mishandling of UInts with MSB == 1
+#346 Signals only used as resets are trimmed
+#335 Null Pointer Exception on Floating Output.
+#334 Fix poking Negative Values Fails
+#325 ChiselUtil Reverse: Cpp optimization floods console with warnings
+ Eliminate NullPointerException if computeMemPorts is called before forceMatchingWidth.
+ Reorder Chisel standard passes for performance and flexibility.
+ Simplify and speed up width inference.
+ Placate various C++ compilers (C++ backend).
+ Minor changes to the dot backend for literal node names in debugging support (Dot backend).
+ Fixes to binding and register naming.
