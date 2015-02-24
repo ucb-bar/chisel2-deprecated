@@ -372,7 +372,7 @@ class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
   val count = UInt(OUTPUT, log2Up(entries + 1))
 }
 
-class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Bool = null) extends Module(_reset=_reset)
+class LQueue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Bool = null) extends Module(_reset=_reset)
 {
   val io = new QueueIO(gen, entries)
 
@@ -421,10 +421,10 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
     q.io.enq <> producer.io.out
     consumer.io.in <> q.io.deq
   */
-object Queue
+object LQueue
 {
   def apply[T <: Data](enq: DecoupledIO[T], entries: Int = 2, pipe: Boolean = false): DecoupledIO[T]  = {
-    val q = Module(new Queue(enq.bits.clone, entries, pipe))
+    val q = Module(new LQueue(enq.bits.clone, entries, pipe))
     q.io.enq.valid := enq.valid // not using <> so that override is allowed
     q.io.enq.bits := enq.bits
     enq.ready := q.io.enq.ready
@@ -459,6 +459,40 @@ object SQueue
 {
   def apply[T <: Data](enq: DecoupledIO[T], entries: Int = 2, pipe: Boolean = false): DecoupledIO[T]  = {
     val q = Module(new SQueue(enq.bits.clone, entries, pipe))
+    q.io.enq.valid := enq.valid // not using <> so that override is allowed
+    q.io.enq.bits := enq.bits
+    enq.ready := q.io.enq.ready
+    q.io.deq
+  }
+}
+
+class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Bool = null) extends Module
+{
+  val io = new QueueIO(gen, entries)
+
+  val ram        = Mem(gen, entries)
+  val enq_ptr    = Counter(entries)
+  val next_enq_ptr    = new Counter(entries, 1)
+  val deq_ptr    = Counter(entries)
+  
+  when (io.enq.ready && io.enq.valid) {
+    ram(enq_ptr.value) := io.enq.bits
+    enq_ptr.inc()
+    next_enq_ptr.inc()
+  }
+  when (io.deq.ready && io.deq.valid) {
+    deq_ptr.inc()
+  }
+ 
+  io.deq.valid := ! /* empty */ (enq_ptr.value === deq_ptr.value)
+  io.enq.ready := ! /* full */ (next_enq_ptr.value === deq_ptr.value)
+  io.deq.bits  := ram(deq_ptr.value)
+}
+
+object Queue
+{
+  def apply[T <: Data](enq: DecoupledIO[T], entries: Int = 2, pipe: Boolean = false): DecoupledIO[T]  = {
+    val q = Module(new Queue(enq.bits.clone, entries, pipe))
     q.io.enq.valid := enq.valid // not using <> so that override is allowed
     q.io.enq.bits := enq.bits
     enq.ready := q.io.enq.ready
