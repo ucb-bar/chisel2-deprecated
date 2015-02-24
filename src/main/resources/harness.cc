@@ -38,8 +38,8 @@ int main (int argc, char* argv[]) {
   extern chisel_sync_@SYNCCLASS@ task_sync;
   extern comp_sync_block g_comp_sync_block;
   #if THREAD_MODEL == TM_OPENMP
+    extern void clock_task(MultiFIR_t * module, int task_no);
     #if DYNAMIC_THREAD_DISPATCH
-  	    extern void clock_task(MultiFIR_t * module);
 		#pragma omp parallel num_threads(@NTESTTASKS@)
 		{
 			#pragma omp single nowait
@@ -49,7 +49,7 @@ int main (int argc, char* argv[]) {
 					#pragma omp task
 					{
 						int myId = omp_get_thread_num();
-						clock_task(module);
+						clock_task(module, t);
 					}
 				}
 				#pragma omp task
@@ -65,42 +65,22 @@ int main (int argc, char* argv[]) {
     #else
 		#pragma omp parallel sections num_threads(@NTESTTASKS@)
 		{
-//			#pragma omp single nowait
-//			{
-				// If we aren't using DYNAMIC_THREAD_DISPATCH, this code is duplicated once per thread.
-				// TASK_START
-				#pragma omp section
-				{
-					do {
-						task_sync.worker_ready();
-						task_sync.worker_wait_work();
-						pt_clock_t t_clock_type;
-						#pragma omp atomic read
-						t_clock_type = g_comp_sync_block.clock_type;
-
-						if (t_clock_type == PCT_DONE)
-							break;
-						// This will be something like:
-						//    module->pt_clock_T%d( );
-
-						@TASKCODE@
-
-						task_sync.worker_done();
-						task_sync.worker_wait_rest();
-					} while(1);
-				}
-				// TASK_END
-				// The read_eval_print_loop task.
-				#pragma omp section
-				{
-					api->read_eval_print_loop(*cmdin);
-					// Tell the other threads we're done.
-					task_sync.master_wait_ready();
-					g_comp_sync_block.clock_type = PCT_DONE;
-					task_sync.master_work();
-				}
-//			}
-//			#pragma omp taskwait
+			// If we aren't using DYNAMIC_THREAD_DISPATCH, this code is duplicated once per thread.
+			// TASK_START
+			#pragma omp section
+			{
+				int myId = omp_get_thread_num();
+				clock_task(module, myId);
+			}
+			// TASK_END
+			// The read_eval_print_loop task.
+			#pragma omp section
+			{
+				api->read_eval_print_loop(*cmdin);
+				task_sync.master_wait_ready();
+				g_comp_sync_block.clock_type = PCT_DONE;
+				task_sync.master_work();
+			}
 		}
 	#endif // DYNAMIC_THREAD_DISPATCH
   #else //THREAD_MODEL != TM_OPENMP

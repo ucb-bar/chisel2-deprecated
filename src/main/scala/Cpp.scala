@@ -123,7 +123,7 @@ class CppBackend extends Backend {
   val useDynamicThreadDispatch = Driver.useDynamicThreadDispatch
   // If we're using dynamic thread dispatch or we're using pthreads,
   // we need to generate the thread synchronization code.
-  val generateThreadClockSyncCode = parallelExecution && (useDynamicThreadDispatch || usePThread)
+  val generateThreadClockSyncCode = parallelExecution && (useOpenMP || usePThread)
   val needExplicitThreadStart = parallelExecution && !useOpenMP
   val padIslandStructures = true
 

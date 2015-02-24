@@ -25,7 +25,7 @@ void @MODULENAME@::call_clock_code(dat_t<1> reset)
 	} while (clock_code != NULL);
 }
 
-void clock_task(@MODULENAME@ * module)
+void clock_task(@MODULENAME@ * module, int /* task_no */)
 {
 	int cycles = 0;
 	do {
