@@ -105,14 +105,19 @@ class CppBackend extends Backend {
   }
 
   val separateIslandState = Driver.separateIslandState
+  val noBarrier = Driver.noBarrier
   val useOpenMP = Driver.threadModel == Some("openmp")
   val useOpenMPI = Driver.threadModel == Some("openmpi")
   val usePThread = Driver.threadModel == Some("pthread")
-  val parallelExecution = (useOpenMP || useOpenMPI || usePThread) && Driver.nThreads > 1
-  val syncClass = Driver.threadModel match {
-    case Some("openmp") => "omp"
-    case Some("pthread") => "pthread"
-    case _ => ""
+  val parallelExecution = (useOpenMP || useOpenMPI || usePThread) /* && Driver.nThreads > 1 */
+  val syncClass = if (noBarrier) {
+    "none"
+  } else {
+    Driver.threadModel match {
+      case Some("openmp") => "omp"
+      case Some("pthread") => "pthread"
+      case _ => ""
+    }
   }
   val persistentThreads = Driver.persistentThreads
   // In general, we'll have one more test task than test threads,
@@ -1231,8 +1236,9 @@ class CppBackend extends Backend {
         out_h.write("extern chisel_sync_omp task_sync;\n")
       } else if (usePThread) {
         out_h.write("#define THREAD_MODEL TM_PTHREAD\n")
-        out_h.write("#include \"chisel_sync_pthread.h\"\n")
-        out_h.write("extern chisel_sync_pthread task_sync;\n")
+        val variant = syncClass
+        out_h.write("#include \"chisel_sync_%s.h\"\n".format(variant))
+        out_h.write("extern chisel_sync_%s task_sync;\n".format(variant))
       } else if (useOpenMPI) {
         out_h.write("#define THREAD_MODEL TM_OPENMPI\n")
         out_h.write("#include \"mpi.h\"\n")
@@ -1314,8 +1320,8 @@ class CppBackend extends Backend {
       // If we're generating parallel execution clock code, output the method signatures.
       // NOTE: We generate one more of these than actual threads, so we can do some real work
       // in the master (as opposed to just spinning waiting for slave threads to finish).
-      if (parallelExecution && nTestTasks > 1) {
-        if (threadIslands.size > 1) {
+      if (parallelExecution /* && nTestTasks > 1 */) {
+        if (threadIslands.size > /* 1 */ 0) {
           for (t <- 0 until nTestTasks) {
             val clockThreadSuffix = "_T%d".format(t)
             val ptClockName = "pt_clock" + clockThreadSuffix
@@ -1676,8 +1682,12 @@ struct comp_current_clock_t {
 
     def genParallelClockMethods(threadIslands: Array[ArrayBuffer[Island]]) {
       createCppFile()
-      for(t <- 0 until threadIslands.size) {
-        genParallelClockMethod(t)
+      if (threadIslands.size == 1) {
+        genParallelClockMethod(0)
+      } else {
+        for(t <- 0 until threadIslands.size) {
+          genParallelClockMethod(t)
+        }
       }
       val clockArgs = Array[CTypedName](CTypedName("pt_clock_t", "clock_type"), CTypedName("dat_t<1>", Driver.implicitReset.name))
 
@@ -1920,7 +1930,7 @@ comp_current_clock_t g_current_clock;
         //  we'll need per-thread clock lo,hi.
         val perThreadClocks = if (!useDynamicThreadDispatch) nTestTasks else 1
         for (t <- 0 until perThreadClocks) {
-          val clockThreadSuffix = if (perThreadClocks > 1) "_T%d".format(t) else ""
+          val clockThreadSuffix = if (perThreadClocks > 0) "_T%d".format(t) else ""
 
           val clockLoName = "clock_lo" + clockThreadSuffix + clkName(clock)
           val clock_dlo = new CMethod(CTypedName("void", clockLoName), clockArgs)
@@ -2175,7 +2185,7 @@ comp_current_clock_t g_current_clock;
 
           // If we're generating multi-threaded clock code,
           // add the thread-specific clock_lo prototypes (only if we're actually using them).
-          if (threadIslands.size > 1) {
+          if (threadIslands.size > 0) {
             threadMethods += clock_lo
           }
         }
@@ -2231,7 +2241,7 @@ comp_current_clock_t g_current_clock;
 
           // If we're generating multi-threaded clock code,
           // add the thread-specific clock_hi prototypes.
-          if (threadIslands.size > 1) {
+          if (threadIslands.size > 0) {
             threadMethods += clock_hii
             threadMethods += clock_hix
           }

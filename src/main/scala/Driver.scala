@@ -350,6 +350,7 @@ object Driver extends FileSystemUtilities{
     nThreads = 1
     persistentThreads = false
     useDynamicThreadDispatch = false
+    noBarrier = false
     isVCDinline = false
     isSupportW0W = false
     hasMem = false
@@ -417,6 +418,7 @@ object Driver extends FileSystemUtilities{
         case "--nThreads" => nThreads = args(i + 1).toInt; i += 1
         case "--persistentThreads" => persistentThreads = args(i + 1).toBoolean; i += 1
         case "--dynamicThreadDispatch" => useDynamicThreadDispatch = args(i + 1).toBoolean; i += 1
+        case "--noBarrier" => noBarrier = args(i + 1).toBoolean; i += 1
         case "--isVCDinline" => isVCDinline = true
         case "--backend" => backendName = args(i + 1); i += 1
         case "--compile" => isCompiling = true
@@ -476,10 +478,13 @@ object Driver extends FileSystemUtilities{
         ChiselError.warning("Specify either openmp or openmpi for multiple threads. Reverting to single thread.")
         nThreads = 1
       }
-    } else if (nThreads == 1) {
-      if (threadModel != None) {
-        ChiselError.warning("%s needs multiple threads. Disabling it.".format(Some(threadModel)))
-        threadModel = None
+    } else if (nThreads == 1 && false) {
+      threadModel match {
+        case Some(name) => {
+          ChiselError.warning("%s needs multiple threads. Disabling it.".format(name))
+          threadModel = None
+        }
+        case None => {}
       }
     }
 
@@ -547,6 +552,7 @@ object Driver extends FileSystemUtilities{
   var nThreads = 1
   var persistentThreads = false
   var useDynamicThreadDispatch = false
+  var noBarrier = false
 
   var isVCDinline = false
   var isSupportW0W = false
