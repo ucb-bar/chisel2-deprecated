@@ -1219,6 +1219,8 @@ class CppBackend extends Backend {
         out_h.write("#define TM_OPENMP 1\n")
         out_h.write("#define TM_PTHREAD 2\n")
         out_h.write("#define TM_OPENMPI 3\n")
+        out_h.write("#define NTESTTASKS %d\n".format(nTestTasks))
+        out_h.write("#define NTESTTHREADS %d\n".format(nTestThreads))
         out_h.write("#define PERSISTENT_THREADS %d\n".format(if (persistentThreads) 1 else 0))
         out_h.write("#define DYNAMIC_THREAD_DISPATCH %d\n".format(if (useDynamicThreadDispatch) 1 else 0))
       }
@@ -1267,19 +1269,24 @@ class CppBackend extends Backend {
         }
         for (island <- islands) {
           val islandId = island.islandId
-          out_h.write("   struct {\n")
+          val islandLocals = new StringBuilder
           for (m <- Driver.orderedNodes.filter(n => n.isInObject && !n.isInstanceOf[Literal] && nodeHomeIslandId(n) == Some(islandId)).sortWith(headerOrderFunc)) {
-            out_h.write(emitDec(m))
+            islandLocals.append(emitDec(m))
           }
           if (Driver.isVCD) {
             for (m <- Driver.orderedNodes.filter(n => n.isInVCD && nodeHomeIslandId(n) == Some(islandId)).sortWith(headerOrderFunc)) {
-              out_h.write(emitVCDDec(m))
+              islandLocals.append(emitVCDDec(m))
             }
           }
-          if (padIslandStructures) {
-            out_h.write("unsigned char pad[64];\n")
+          // Did we accumulate any island locals?
+          if (islandLocals.length > 0) {
+            out_h.write("   struct {\n")
+            out_h.write(islandLocals.mkString)
+            if (padIslandStructures) {
+              out_h.write("unsigned char pad[64];\n")
+            }
+            out_h.write("   } _I_%s;\n".format(islandId))
           }
-          out_h.write("   } _I_%s;\n".format(islandId))
         }
       } else {
         for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc))
