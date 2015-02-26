@@ -1935,7 +1935,7 @@ comp_current_clock_t g_current_clock;
         //  we'll need per-thread clock lo,hi.
         val perThreadClocks = if (!useDynamicThreadDispatch) nTestTasks else 1
         for (t <- 0 until perThreadClocks) {
-          val clockThreadSuffix = if (perThreadClocks > 0) "_T%d".format(t) else ""
+          val clockThreadSuffix = if (parallelExecution) "_T%d".format(t) else ""
 
           val clockLoName = "clock_lo" + clockThreadSuffix + clkName(clock)
           val clock_dlo = new CMethod(CTypedName("void", clockLoName), clockArgs)
