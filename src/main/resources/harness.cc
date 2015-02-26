@@ -39,50 +39,19 @@ int main (int argc, char* argv[]) {
   extern comp_sync_block g_comp_sync_block;
   #if THREAD_MODEL == TM_OPENMP
     extern void clock_task(MultiFIR_t * module, int task_no);
-    #if DYNAMIC_THREAD_DISPATCH
-		#pragma omp parallel num_threads(@NTESTTASKS@)
-		{
-			#pragma omp single nowait
-			{
-				int nthreads = omp_get_num_threads();
-				for (int t = 0; t < nthreads - 1; t += 1) {
-					#pragma omp task
-					{
-						int myId = omp_get_thread_num();
-						clock_task(module, t);
-					}
-				}
-				#pragma omp task
-				{
-					api->read_eval_print_loop(*cmdin);
-					task_sync.master_wait_ready();
-					g_comp_sync_block.clock_type = PCT_DONE;
-					task_sync.master_work();
-				}
-			}
-			#pragma omp taskwait
+	#pragma omp parallel num_threads(@NTESTTASKS@)
+	{
+		int myId = omp_get_thread_num();
+		if (myId != 0) {
+			clock_task(module, myId);
+		} else {
+			api->read_eval_print_loop(*cmdin);
+			// Tell the other threads we're done.
+			task_sync.master_wait_ready();
+			g_comp_sync_block.clock_type = PCT_DONE;
+			task_sync.master_work();
 		}
-    #else
-		#pragma omp parallel sections num_threads(@NTESTTASKS@)
-		{
-			// If we aren't using DYNAMIC_THREAD_DISPATCH, this code is duplicated once per thread.
-			// TASK_START
-			#pragma omp section
-			{
-				int myId = omp_get_thread_num();
-				clock_task(module, myId);
-			}
-			// TASK_END
-			// The read_eval_print_loop task.
-			#pragma omp section
-			{
-				api->read_eval_print_loop(*cmdin);
-				task_sync.master_wait_ready();
-				g_comp_sync_block.clock_type = PCT_DONE;
-				task_sync.master_work();
-			}
-		}
-	#endif // DYNAMIC_THREAD_DISPATCH
+	}
   #else //THREAD_MODEL != TM_OPENMP
 	api->read_eval_print_loop(*cmdin);
 	// Signal threads it's time to exit.

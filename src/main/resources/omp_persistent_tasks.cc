@@ -4,7 +4,7 @@
 typedef void(@MODULENAME@::*pt_clock_code_t)(void);
 static @MODULENAME@ * clock_thread_module;
 
-const int nthreads = @NTESTTHREADS@;
+const int nthreads = @NTESTTASKS@;
 static struct clock_thread {
 	int status;
     pthread_t id;

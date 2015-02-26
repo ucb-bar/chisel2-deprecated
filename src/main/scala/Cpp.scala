@@ -110,14 +110,18 @@ class CppBackend extends Backend {
   val useOpenMPI = Driver.threadModel == Some("openmpi")
   val usePThread = Driver.threadModel == Some("pthread")
   val parallelExecution = (useOpenMP || useOpenMPI || usePThread) /* && Driver.nThreads > 1 */
+  // We currently have a few clock task treading models.
+  val clockTaskModel = Driver.threadModel match {
+    case Some("openmp") => "omp"
+    case Some("pthread") => "pthread"
+    case _ => ""
+  }
+  // The synchronization object depends on the clock task threading model,
+  //  unless we're doing "noBarrier" performance testing.
   val syncClass = if (noBarrier) {
     "none"
   } else {
-    Driver.threadModel match {
-      case Some("openmp") => "omp"
-      case Some("pthread") => "pthread"
-      case _ => ""
-    }
+    clockTaskModel
   }
   val persistentThreads = Driver.persistentThreads
   // In general, we'll have one more test task than test threads,
@@ -1195,7 +1199,7 @@ class CppBackend extends Backend {
     }
 
     def genThreadClockSyncCode(write: String => Unit) {
-      val syncDynamicPrefix = syncClass + { if (useDynamicThreadDispatch) "_dynamic" else ""}
+      val clockTaskModelDynamicPrefix = clockTaskModel + { if (useDynamicThreadDispatch) "_dynamic" else ""}
       // Read the task template and edit the @ID@ tokens.
       val replacements = HashMap[String, String] ()
       replacements += (("@NTESTTHREADS@", (nTestThreads).toString))
@@ -1204,12 +1208,12 @@ class CppBackend extends Backend {
       
       // Generate and output the clock thread array initialization code.
       val clockThreadArrayInitializer = new StringBuilder
-      for (t <- 1 until nTestTasks) {
+      for (t <- 0 until nTestTasks) {
         val method = CMethod(CTypedName("void", "pt_clock_T%d".format(t)), Array[CTypedName]())
         clockThreadArrayInitializer.append("{0, 0, %s },".format(method.address))
       }
       replacements += (("@INIT_THREADS_ARRAY@", clockThreadArrayInitializer.toString))
-      val taskTemplate = editResource("%s_persistent_tasks.cc".format(syncDynamicPrefix), replacements)
+      val taskTemplate = editResource("%s_persistent_tasks.cc".format(clockTaskModelDynamicPrefix), replacements)
       write(taskTemplate.toString)
     }
 
@@ -1229,14 +1233,15 @@ class CppBackend extends Backend {
         out_h.write("#define PERSISTENT_THREADS %d\n".format(if (persistentThreads) 1 else 0))
         out_h.write("#define DYNAMIC_THREAD_DISPATCH %d\n".format(if (useDynamicThreadDispatch) 1 else 0))
       }
+      // If we're testing without a barrier, we may use a special syncClass.
+      val variant = syncClass
       if (useOpenMP) {
         out_h.write("#define THREAD_MODEL TM_OPENMP\n")
         out_h.write("#include \"omp.h\"\n")
-        out_h.write("#include \"chisel_sync_omp.h\"\n")
-        out_h.write("extern chisel_sync_omp task_sync;\n")
+        out_h.write("#include \"chisel_sync_%s.h\"\n".format(variant))
+        out_h.write("extern chisel_sync_%s task_sync;\n".format(variant))
       } else if (usePThread) {
         out_h.write("#define THREAD_MODEL TM_PTHREAD\n")
-        val variant = syncClass
         out_h.write("#include \"chisel_sync_%s.h\"\n".format(variant))
         out_h.write("extern chisel_sync_%s task_sync;\n".format(variant))
       } else if (useOpenMPI) {
@@ -1461,7 +1466,7 @@ struct comp_current_clock_t {
 
       // If we're going to use multi-threaded execution, output the multi-threading support code.
       if (parallelExecution) {
-        writeCppFile("chisel_sync_%s task_sync(%d);\n".format(syncClass, nTestThreads))
+        writeCppFile("chisel_sync_%s task_sync(%d);\n".format(syncClass, nTestTasks))
         writeCppFile("comp_sync_block g_comp_sync_block;\n\n")
         if (needExplicitThreadStart) {
           writeCppFile("static void start_clock_threads(%s * module);\n".format(moduleName))
@@ -1737,7 +1742,7 @@ struct comp_current_clock_t {
         replacements += (("@PT_CLOCKNAME@", ptClockName))
         replacements += (("@MODULENAME@", c.name + "_t"))
         replacements += (("@DO_CLOCKS@", doClockName))
-        val template = (if (useDynamicThreadDispatch) {"%s_do_clocks_dynamic.cc"} else {"%s_do_clocks.cc"}).format(syncClass)
+        val template = (if (useDynamicThreadDispatch) {"%s_do_clocks_dynamic.cc"} else {"%s_do_clocks.cc"}).format(clockTaskModel)
         // Read and edit the parallel clock method template.
         body.append(editResource(template, replacements))
       } else {
@@ -2129,11 +2134,14 @@ comp_current_clock_t g_current_clock;
         for (t <- 0 until nTestTasks) {
           threadIslands(t) = ArrayBuffer[Island]()
         }
-        var t = 0
+        var threadWeights = new Array[Int](nTestTasks)
         for((weight, islands) <- weightedIslands.toSeq.sortWith(_._1 > _._1) if weight > 0) {
           for(island <- islands) {
+            // Find the lightest thread
+            val t = threadWeights.zipWithIndex.min._2
+            ChiselError.info("assigning island %d (%d) to thread %d".format(island.islandId, weight, t))
             threadIslands(t) += island
-            t = (t + 1) % nTestTasks
+            threadWeights(t) += weight
           }
         }
       }

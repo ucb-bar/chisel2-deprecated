@@ -3,7 +3,7 @@
 typedef void(@MODULENAME@::*pt_clock_code_t)(void);
 static @MODULENAME@ * clock_thread_module;
 
-const int nthreads = @NTESTTHREADS@;
+const int nthreads = @NTESTTASKS@;
 static struct clock_thread {
 	int status;
     pthread_t id;
@@ -39,7 +39,8 @@ void * clock_task(void * arg)
 static void start_clock_threads(@MODULENAME@ * module)
 {
 	clock_thread_module = module;
-	for (int t = 0; t < nthreads; t += 1) {
+	// The first thread slot is reserved for the master thread.
+	for (int t = 1; t < nthreads; t += 1) {
 		// Ensure we only do this once.
 		if (threads[t].id == 0 || pthread_kill(threads[t].id, 0) != 0) {
 			threads[t].status = pthread_create(&threads[t].id, NULL, &clock_task, &threads[t]);
