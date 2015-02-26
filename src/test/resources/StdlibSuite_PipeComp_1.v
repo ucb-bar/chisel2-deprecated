@@ -15,6 +15,7 @@ module StdlibSuite_PipeComp_1(input clk, input reset,
   wire T7;
 
 `ifndef SYNTHESIS
+// synthesis translate_off
   integer initvar;
   initial begin
     #0.002;
@@ -23,6 +24,7 @@ module StdlibSuite_PipeComp_1(input clk, input reset,
     R4 = {1{$random}};
     R5 = {1{$random}};
   end
+// synthesis translate_on
 `endif
 
   assign io_deq_bits = R0;

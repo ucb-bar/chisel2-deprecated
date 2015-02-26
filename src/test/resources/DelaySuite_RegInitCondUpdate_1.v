@@ -10,11 +10,13 @@ module DelaySuite_RegInitCondUpdate_1(input clk, input reset,
   wire T1;
 
 `ifndef SYNTHESIS
+// synthesis translate_off
   integer initvar;
   initial begin
     #0.002;
     res = {1{$random}};
   end
+// synthesis translate_on
 `endif
 
   assign io_out = T2;

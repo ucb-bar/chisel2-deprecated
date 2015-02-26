@@ -24,6 +24,7 @@ module NameSuite_VecSecondComp_1(input clk,
   reg  r_valid_3;
 
 `ifndef SYNTHESIS
+// synthesis translate_off
   integer initvar;
   initial begin
     #0.002;
@@ -32,8 +33,17 @@ module NameSuite_VecSecondComp_1(input clk,
     r_valid_2 = {1{$random}};
     r_valid_3 = {1{$random}};
   end
+// synthesis translate_on
 `endif
 
+`ifndef SYNTHESIS
+// synthesis translate_off
+  assign io_requestor_0_req_ready = {1{$random}};
+  assign io_requestor_1_req_ready = {1{$random}};
+  assign io_requestor_2_req_ready = {1{$random}};
+  assign io_requestor_3_req_ready = {1{$random}};
+// synthesis translate_on
+`endif
   assign io_mem = T0;
   assign T0 = r_valid_3 ? io_requestor_3_req_ready : T1;
   assign T1 = r_valid_2 ? io_requestor_2_req_ready : T2;

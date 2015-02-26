@@ -225,7 +225,7 @@ class ManualTester[+T <: Module]
       } else {
         cmd = "wire_poke " + dumpName(data);
       }
-      // Ensure the sign is before the prefix.
+      // Don't prefix negative numbers with "0x"
       val radixPrefix = if (x < 0) " -0x" else " 0x"
       val xval = radixPrefix + x.abs.toString(16)
       cmd = cmd + xval
@@ -281,7 +281,7 @@ class ManualTester[+T <: Module]
   }
 
   def expect (data: Bits, expected: BigInt): Boolean = {
-    val mask = BigInt((1 << data.needWidth) - 1)
+    val mask = (BigInt(1) << data.needWidth) - 1
     val got = peek(data)
 
     expect((got & mask) == (expected & mask),

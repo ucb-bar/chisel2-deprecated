@@ -14,6 +14,7 @@
 #include <sstream>
 #include <map>
 #include <cassert>
+#include <cerrno>
 
 /**
  * Converts an integer to a std::string without needing additional libraries
@@ -607,7 +608,14 @@ public:
 	void read_eval_print_loop() {
 		while (true) {
 		    std::string str_in;
-		    getline(cin, str_in);
+		    do {
+		    	std::getline(cin, str_in);
+		    } while (cin.fail() && errno == EINTR);
+
+		    if (!cin.good()) {
+		    	break;
+		    }
+
 		    if (teefile != NULL) {
 		        fprintf(teefile, "%s\n", str_in.c_str());
 		        fflush(teefile);

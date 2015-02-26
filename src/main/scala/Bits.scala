@@ -101,9 +101,14 @@ abstract class Bits extends Data with proc {
     }
   }
 
-  override def procAssign(src: Node): Unit =
-    if (Driver.topComponent != null || checkAssign(src))
-      super.procAssign(src)
+  override def procAssign(src: Node): Unit = {
+    if (Driver.topComponent != null || checkAssign(src)) {
+      if (defaultMissing && Module.current.whenCond.canBeUsedAsDefault)
+        setDefault(src)
+      else
+        super.procAssign(src)
+    }
+  }
 
   override def defaultRequired: Boolean = true
 

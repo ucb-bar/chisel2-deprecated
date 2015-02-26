@@ -97,9 +97,7 @@ trait proc extends Node {
   }
 
   protected[Chisel] def doProcAssign(src: Node, cond: Bool): Unit = {
-    if (cond.canBeUsedAsDefault && defaultMissing) {
-      setDefault(src)
-    } else if (procAssigned) {
+    if (procAssigned) {
       inputs(0) = Multiplex(cond, src, inputs(0))
     } else if (cond.litValue() != 0) {
       procAssigned = true

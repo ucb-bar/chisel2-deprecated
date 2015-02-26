@@ -6,11 +6,13 @@ module MultiClockSuite_TestMultiClock2_1_TestMultiClock2_subsub(input clkB,
   reg  r1_onSignal;
 
 `ifndef SYNTHESIS
+// synthesis translate_off
   integer initvar;
   initial begin
     #0.002;
     r1_onSignal = {1{$random}};
   end
+// synthesis translate_on
 `endif
 
   assign io_out = r1_onSignal;

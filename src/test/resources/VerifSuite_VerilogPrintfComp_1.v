@@ -16,11 +16,13 @@ module VerifSuite_VerilogPrintfComp_1(input clk, input reset,
   wire[15:0] T7;
 
 `ifndef SYNTHESIS
+// synthesis translate_off
   integer initvar;
   initial begin
     #0.002;
     tsc_reg = {1{$random}};
   end
+// synthesis translate_on
 `endif
 
   assign T0 = reset ^ 1'h1;
@@ -40,11 +42,13 @@ module VerifSuite_VerilogPrintfComp_1(input clk, input reset,
       tsc_reg <= T5;
     end
 `ifndef SYNTHESIS
+// synthesis translate_off
 `ifdef PRINTF_COND
     if (`PRINTF_COND)
 `endif
       if (T0)
         $fwrite(32'h80000002, "Cyc= %d io: %h %h", T3, T2, T1);
+// synthesis translate_on
 `endif
   end
 endmodule

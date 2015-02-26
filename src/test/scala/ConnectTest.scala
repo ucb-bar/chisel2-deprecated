@@ -354,6 +354,54 @@ class ConnectSuite extends TestSuite {
     assertTrue(!ChiselError.ChiselErrors.isEmpty);
   }
 
+  /** Test Unspecified Bundle Values.
+   *
+   */
+  @Test def testUnspecifiedBundleValues () {
+    println("\ntestUnspecifiedBundleValues ...")
+    
+    class myBundle extends Bundle
+    {
+       val a = Bool()
+       val b = Bool()
+       override def clone = new myBundle().asInstanceOf[this.type]
+    }
+    
+    class UnspecifiedBundleValues extends Module {
+    
+       val io = new Bundle 
+       {
+          val in = new myBundle().asInput
+          val something = Bool(INPUT)
+          val out = Bool(OUTPUT)
+       }
+    
+       def NullMyBundle(): myBundle =
+       {
+          val bun = new myBundle
+          bun.a := Bool(false)
+          bun
+       }
+    
+       val my_reg = Reg(init= NullMyBundle)
+    
+       when (io.something)
+       {
+          my_reg := io.in
+       }  
+    
+       io.out := my_reg.a || my_reg.b
+    
+    
+       printf("Hello World!\n")
+    }  
+    
+    chiselMain(Array[String]("--backend", "v",
+        "--targetDir", dir.getPath.toString()),
+        () => Module(new UnspecifiedBundleValues()))
+    assertFile("ConnectSuite_UnspecifiedBundleValues_1.v")
+  }
+
   /* Signals only used as resets are trimmed (#346)
    *
    * 

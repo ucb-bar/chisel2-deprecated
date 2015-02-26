@@ -111,9 +111,14 @@ abstract class Data extends Node {
     var ind = 0
     for (((name, io), gotWidth) <- packet) {
       io.asOutput()
-      val assignWidth = if (gotWidth > 0) ind + gotWidth - 1 else -1
-      io assign NodeExtract(n, assignWidth, ind)
-      ind += (if (gotWidth > 0) gotWidth else 0)
+      if(gotWidth > 0) {
+        // Only bother connecting non-zero width wires
+        io assign NodeExtract(n, ind + gotWidth - 1, ind)
+        ind += gotWidth
+      } else {
+        // Give zero-width a dummy connection
+        io assign UInt(width=0)
+      }
     }
     res.setIsTypeNode
     res
