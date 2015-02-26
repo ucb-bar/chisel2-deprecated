@@ -1,13 +1,17 @@
-ChangeLog for Chisel v2.2.21 12/12/2014
+ChangeLog for Chisel v2.2.22 2/26/2015
 
-#347 Mishandling of UInts with MSB == 1
-#346 Signals only used as resets are trimmed
-#335 Null Pointer Exception on Floating Output.
-#334 Fix poking Negative Values Fails
-#325 ChiselUtil Reverse: Cpp optimization floods console with warnings
- Eliminate NullPointerException if computeMemPorts is called before forceMatchingWidth.
- Reorder Chisel standard passes for performance and flexibility.
- Simplify and speed up width inference.
- Placate various C++ compilers (C++ backend).
- Minor changes to the dot backend for literal node names in debugging support (Dot backend).
- Fixes to binding and register naming.
+#363 Convert to C++ getline() semantics
+#363 Break out of read_eval_print_loop() if getline() returns an error.
+#363 Check File pointers are non-NULL before trying to fclose() them.
+#359 Weird compiler error for write-masked Mems in Verilog backend.
+#358 Muxes of type Bits now use SInt (previously, UInt).
+#356: Tester.expect always results a PASS on data wider than 32 bits, even when signal value does not much the expected value.
+#265 Wrong verilog generated from When X{ when Y{ reg := }} otherwise { reg := }.
+#191 Randomize unconnected Verilog wires (as we do for the C++ backend).
+ Fix fromNode involving zero-width wires.
+ Fixes from HPCA workshop.
+ Minor fixes to the tutorial.
+ Use signal names from parent objects (implicit reset may have a different name).
+ Support Quartus' variant of `ifndef SYNTHESIS.
+ Work around bug causing illegal assignment of static const variable.
+ Don't accept negative UInt literals.

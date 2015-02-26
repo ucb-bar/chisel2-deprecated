@@ -1,4 +1,11 @@
-ReleaseNotes for Chisel v2.2.21 12/12/2014
+ReleaseNotes for Chisel v2.2.22 2/26/2015
 
 This release of Chisel is largely a maintenance release.
 See the associated Changelog for issues resolved with this release.
+
+Muxes of type Bits now use SInt (previously, UInt) This fixes issue
+#358 and constitutes behavioral change. To facilitate any necessary
+porting, a warning is now issued when a Mux of type Bits is
+created. This warning will likely be turned off or removed in future
+versions. Justification behind using SInt over UInt is so that
+corresponding sign extension is better aligned to C semantics. 
