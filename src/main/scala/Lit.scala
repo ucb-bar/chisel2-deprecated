@@ -39,11 +39,19 @@ import ChiselError._
 
 /* Factory for literal values to be used by Bits and SInt factories. */
 object Lit {
-  def apply[T <: Bits](n: String, width: Int = -1)(gen: => T): T = {
+  def apply[T <: Bits](n: String)(gen: => T): T = {
+    makeLit(Literal(n, -1))(gen)
+  }
+
+  def apply[T <: Bits](n: String, width: Int)(gen: => T): T = {
     makeLit(Literal(n, width))(gen)
   }
 
-  def apply[T <: Bits](n: String, base: Char, width: Int = -1)(gen: => T): T = {
+  def apply[T <: Bits](n: String, base: Char)(gen: => T): T = {
+    makeLit(Literal(-1, base, n))(gen)
+  }
+
+  def apply[T <: Bits](n: String, base: Char, width: Int)(gen: => T): T = {
     makeLit(Literal(width, base, n))(gen)
   }
 

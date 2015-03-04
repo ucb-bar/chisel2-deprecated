@@ -23,12 +23,12 @@ check test:
 	$(SBT) $(SBT_FLAGS) scct:test
 
 clean:
-	$(SBT) $(SBT_FLAGS) clean
+	$(SBT) $(SBT_FLAGS) +clean
 	for dir in $(CLEAN_DIRS); do $(MAKE) -C $$dir clean; done
 	$(RM) -r $(RM_DIRS)
 
-jenkins-build:
-	$(SBT) $(SBT_FLAGS) clean scalastyle scct:test publish-local
+jenkins-build: clean
+	$(SBT) $(SBT_FLAGS) scalastyle +scct:test +publish-local
 
 sysctest:
 	mkdir -p $(TEST_OUTPUT_DIR)
