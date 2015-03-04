@@ -9,7 +9,7 @@ object BuildSettings extends Build {
     version := "2.3-SNAPSHOT",
     name := "chisel",
     scalaVersion := "2.10.4",
-    crossScalaVersions := Seq("2.10.4", "2.11.4", "2.11.5"),
+    crossScalaVersions := Seq("2.10.4", "2.11.5"),
     //sourceDirectory := new File("@srcTop@"),
     publishMavenStyle := true,
     publishArtifact in Test := false,
