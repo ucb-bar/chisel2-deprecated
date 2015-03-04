@@ -8,7 +8,8 @@ object BuildSettings extends Build {
     // version := "2.2.23",
     version := "2.3-SNAPSHOT",
     name := "chisel",
-    scalaVersion := "2.10.2",
+    scalaVersion := "2.10.4",
+    crossScalaVersions := Seq("2.10.4", "2.11.5"),
     //sourceDirectory := new File("@srcTop@"),
     publishMavenStyle := true,
     publishArtifact in Test := false,
@@ -52,9 +53,9 @@ object BuildSettings extends Build {
       "Sonatype Releases" at "http://oss.sonatype.org/content/repositories/releases"
     ),
 
-    libraryDependencies += "com.novocode" % "junit-interface" % "0.10" % "test",
-    libraryDependencies += "org.scalatest" %% "scalatest" % "1.9.2" % "test",
-    libraryDependencies += "org.scala-lang" % "scala-reflect" % "2.10.2",
+    libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test",
+    libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.4" % "test",
+    libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
 
     // Execute tests in the current project serially.
     // Tests from other projects may still run concurrently.
