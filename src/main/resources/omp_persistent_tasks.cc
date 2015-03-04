@@ -28,7 +28,7 @@ void clock_task(@MODULENAME@ * module, int task_no)
 			return;
 		(module->*call_pt_clock_code)( );
 
-		#pragma omp flush
+//		#pragma omp flush
 
 		task_sync.worker_done();
 

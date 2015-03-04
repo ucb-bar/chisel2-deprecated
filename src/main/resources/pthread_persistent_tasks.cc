@@ -10,6 +10,18 @@ static struct clock_thread {
     pt_clock_code_t thread_pt_clock_code;
 } threads[nthreads] = { @INIT_THREADS_ARRAY@ };
 
+int threadIndex()
+{
+	 pthread_t myTID = pthread_self();
+	 int t;
+	 for (t = nthreads - 1; t > 0; t -= 1) {
+		 if (threads[t].id == myTID)
+			 break;
+	 }
+	 assert( t >= 0);
+	 return t;
+}
+
 void * clock_task(void * arg)
 {
 	pthread_t myId = pthread_self();
@@ -33,6 +45,7 @@ void * clock_task(void * arg)
 		task_sync.worker_done();
 		task_sync.worker_wait_rest();
 	} while(1);
+	printf("cycles %d", cycles);
 	return NULL;
 }
 
@@ -42,7 +55,7 @@ static void start_clock_threads(@MODULENAME@ * module)
 	// The first thread slot is reserved for the master thread.
 	for (int t = 1; t < nthreads; t += 1) {
 		// Ensure we only do this once.
-		if (threads[t].id == 0 || pthread_kill(threads[t].id, 0) != 0) {
+		if (threads[t].id == 0 /* || pthread_kill(threads[t].id, 0) != 0 */) {
 			threads[t].status = pthread_create(&threads[t].id, NULL, &clock_task, &threads[t]);
 		}
 	}

@@ -21,8 +21,8 @@
  */
 enum pt_clock_t { PCT_DONE, PCT_LO, PCT_HI, PCT_HIX };
 struct comp_sync_block {
-	pt_clock_t clock_type;			// The type of clock to execute.
-	bool do_reset;					// The value of reset for this clock cycle.
+	volatile pt_clock_t clock_type;			// The type of clock to execute.
+	volatile bool do_reset;					// The value of reset for this clock cycle.
 };
 /**
  * Converts an integer to a std::string without needing additional libraries
