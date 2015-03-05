@@ -9,7 +9,7 @@ CHISEL_JAR ?= $(SRC_DIR)/target/scala-2.10/chisel_2.10-2.3-SNAPSHOT.jar
 DRIVER	   ?= $(SRC_DIR)/src/test/resources/AddFilterSysCdriver.cpp
 TEST_OUTPUT_DIR ?= ./test-outputs
 
-.PHONY:	smoke publish-local check clean jenkins-build sysctest
+.PHONY:	smoke publish-local check clean jenkins-build sysctest coverage test
 
 default:	publish-local
 
@@ -20,7 +20,11 @@ publish-local:
 	$(SBT) $(SBT_FLAGS) publish-local
 
 check test:
-	$(SBT) $(SBT_FLAGS) scct:test
+	$(SBT) $(SBT_FLAGS) test
+
+coverage:
+	$(SBT) $(SBT_FLAGS) coverage test
+	$(SBT) $(SBT_FLAGS) coverageReport
 
 clean:
 	$(SBT) $(SBT_FLAGS) +clean
@@ -28,7 +32,8 @@ clean:
 	$(RM) -r $(RM_DIRS)
 
 jenkins-build: clean
-	$(SBT) $(SBT_FLAGS) scalastyle +scct:test +publish-local
+	$(SBT) $(SBT_FLAGS) scalastyle coverage +test +publish-local
+	$(SBT) $(SBT_FLAGS) coverageReport
 
 sysctest:
 	mkdir -p $(TEST_OUTPUT_DIR)
