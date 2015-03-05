@@ -32,7 +32,8 @@ clean:
 	$(RM) -r $(RM_DIRS)
 
 jenkins-build: clean
-	$(SBT) $(SBT_FLAGS) scalastyle coverage +test +publish-local
+	$(SBT) $(SBT_FLAGS) scalastyle coverage +test
+	$(SBT) $(SBT_FLAGS) +clean +publish-local
 	$(SBT) $(SBT_FLAGS) coverageReport
 
 sysctest:
