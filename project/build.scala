@@ -53,7 +53,17 @@ object BuildSettings extends Build {
       "Sonatype Releases" at "http://oss.sonatype.org/content/repositories/releases"
     ),
 
-    libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test",
+    /* Bumping "com.novocode" % "junit-interface" % "0.11", causes DelayTest testSeqReadBundle to fail
+     *  in subtly disturbing ways on Linux (but not on Mac):
+     *  - some fields in the generated .h file are re-named,
+     *  - an additional field is added
+     *  - the generated .cpp file has additional differences:
+     *    - different temps in clock_lo
+     *    - missing assignments
+     *    - change of assignment order
+     *    - use of "Tx" vs. "Tx.values"
+     */
+    libraryDependencies += "com.novocode" % "junit-interface" % "0.10" % "test",
     libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.4" % "test",
     libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
 
