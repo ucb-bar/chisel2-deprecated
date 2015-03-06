@@ -34,7 +34,7 @@ import collection.mutable.{ArrayBuffer, HashSet, HashMap, Stack, LinkedHashSet, 
 import scala.math.min
 
 object Driver extends FileSystemUtilities{
-  def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean = true): T = {
+  def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean): T = {
     initChisel(args)
     try {
       if(wrapped) execute(gen) else executeUnwrapped(gen)
@@ -48,8 +48,8 @@ object Driver extends FileSystemUtilities{
   }
 
   def apply[T <: Module](args: Array[String], gen: () => T,
-                         ftester: T => Tester[T], wrapped:Boolean = true): T = {
-    val mod = if(wrapped) apply(args, gen) else apply(args,gen,false)
+                         ftester: T => Tester[T], wrapped:Boolean): T = {
+    val mod = apply(args, gen, wrapped)
     if (isTesting) test(mod, ftester)
     mod
   }

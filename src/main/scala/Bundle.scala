@@ -44,7 +44,7 @@ object Bundle {
     "toBool", "toSInt", "asDirectionless")
 
   def apply[T <: Bundle](b: => T)(implicit p: Parameters): T = {
-    Driver.parStack.push(p)
+    Driver.parStack.push(p.push)
     val res = b
     Driver.parStack.pop
     res
