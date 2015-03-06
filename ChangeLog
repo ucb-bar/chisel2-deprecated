@@ -1,17 +1,5 @@
-ChangeLog for Chisel v2.2.22 2/26/2015
+ChangeLog for Chisel v2.2.23 3/5/2015
 
-#363 Convert to C++ getline() semantics
-#363 Break out of read_eval_print_loop() if getline() returns an error.
-#363 Check File pointers are non-NULL before trying to fclose() them.
-#359 Weird compiler error for write-masked Mems in Verilog backend.
-#358 Muxes of type Bits now use SInt (previously, UInt).
-#356: Tester.expect always results a PASS on data wider than 32 bits, even when signal value does not much the expected value.
-#265 Wrong verilog generated from When X{ when Y{ reg := }} otherwise { reg := }.
-#191 Randomize unconnected Verilog wires (as we do for the C++ backend).
- Fix fromNode involving zero-width wires.
- Fixes from HPCA workshop.
- Minor fixes to the tutorial.
- Use signal names from parent objects (implicit reset may have a different name).
- Support Quartus' variant of `ifndef SYNTHESIS.
- Work around bug causing illegal assignment of static const variable.
- Don't accept negative UInt literals.
+Convert from unsupported sbt-scct to scoverage.
+Initial support for Scala 2.11
+Fix bug in applying new parameters via bundle factory
