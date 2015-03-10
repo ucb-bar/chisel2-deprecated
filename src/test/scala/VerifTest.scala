@@ -57,7 +57,7 @@ class VerifSuite extends TestSuite {
   }
 
   @Test def testAssertVerilog() {
-
+    println("testAssertVerilog:")
     class VerilogAssertComp extends Module {
       val io = new Bundle {
         val x = UInt(INPUT, 8)
@@ -71,10 +71,11 @@ class VerifSuite extends TestSuite {
     chiselMain(Array[String]("--v",
       "--targetDir", dir.getPath.toString()),
       () => Module(new VerilogAssertComp()))
+    assertFile("VerifSuite_VerilogAssertComp_1.v")
   }
 
   @Test def testPrintfCpp() {
-
+    println("testPrintfCpp:")
     class CppPrintfComp extends Module {
       val io = new Bundle {
         val x = UInt(INPUT, 8)
@@ -84,39 +85,17 @@ class VerifSuite extends TestSuite {
       printf("display %x %x", io.x, io.y)
       io.z := Cat(io.x, io.y)
     }
-    /** XXX Can't run CppBackend back-to-back in the same process
-      because the emulator resource is closed.
+
     chiselMain(Array[String]("--backend", "c",
       "--targetDir", dir.getPath.toString()),
       () => Module(new CppPrintfComp()))
-    assertFile(dir.getPath + "/VerifSuite_CppPrintfComp_1.cpp",
-"""#include "VerifSuite_CppPrintfComp_1.h"
-
-void VerifSuite_CppPrintfComp_1_t::init ( val_t rand_init ) {
-}
-void VerifSuite_CppPrintfComp_1_t::clock_lo ( dat_t<1> reset ) {
-  val_t T2__w0;
-  { T2__w0 = VerifSuite_CppPrintfComp_1__io_y.values[0] | VerifSuite_CppPrintfComp_1__io_x.values[0] << 8; }
-  { VerifSuite_CppPrintfComp_1__io_z.values[0] = T2__w0; }
-  T0.values[0] = !reset.values[0];
-}
-void VerifSuite_CppPrintfComp_1_t::clock_hi ( dat_t<1> reset ) {
-}
-void VerifSuite_CppPrintfComp_1_t::print ( FILE* f ) {
-  if (T0.values[0]) dat_fprintf(f, "display %h %h", VerifSuite_CppPrintfComp_1__io_x, VerifSuite_CppPrintfComp_1__io_y);
-}
-bool VerifSuite_CppPrintfComp_1_t::scan ( FILE* f ) {
-  return(!feof(f));
-}
-void VerifSuite_CppPrintfComp_1_t::dump(FILE *f, int t) {
-}
-""")
-      */
+    assertFile("VerifSuite_CppPrintfComp_1.cpp")
+    assertFile("VerifSuite_CppPrintfComp_1.h")
   }
 
   // test that printf of bundles are flagged
   @Test def testPrintfBundle() {
-
+    println("testPrintfBundle:")
     try {
     class PrintfBundle extends Module {
       val io = new Bundle {
@@ -136,7 +115,7 @@ void VerifSuite_CppPrintfComp_1_t::dump(FILE *f, int t) {
   }
 
   @Test def testPrintfVerilog() {
-
+    println("testPrintfVerilog:")
     class VerilogPrintfComp extends Module {
       val io = new Bundle {
         val x = UInt(INPUT, 8)
@@ -154,5 +133,22 @@ void VerifSuite_CppPrintfComp_1_t::dump(FILE *f, int t) {
     chiselMain(Array[String]("--v",
       "--targetDir", dir.getPath.toString()),
       () => Module(new VerilogPrintfComp()))
+    assertFile("VerifSuite_VerilogPrintfComp_1.v")
+  }
+
+  @Test def testPrintfVerilogNUL() {
+    println("testPrintfVerilogNUL:")
+    class VerilogPrintfNULComp extends Module {
+      val io = new Bundle {
+        val in = Bool(INPUT)
+      }
+
+      printf("%b\n", io.in)
+    }
+
+    chiselMain(Array[String]("--v",
+      "--targetDir", dir.getPath.toString()),
+      () => Module(new VerilogPrintfNULComp()))
+    assertFile("VerifSuite_VerilogPrintfNULComp_1.v")
   }
 }

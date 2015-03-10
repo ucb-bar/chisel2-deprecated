@@ -1,0 +1,5 @@
+ChangeLog for Chisel v2.2.24 3/9/2015
+
+Convert from unsupported sbt-scct to scoverage.
+Fix bug in applying new parameters via bundle factory
+Initial support for Scala 2.11

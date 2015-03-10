@@ -55,18 +55,21 @@ object Printer {
   _moduleName_ accordingly.
 */
 object chiselMain {
+  val wrapped = true
+  val unwrapped = false
+
   def apply[T <: Module](args: Array[String], gen: () => T): T =
-    Driver(args, gen)
+    Driver(args, gen, wrapped)
 
   def apply[T <: Module](args: Array[String], gen: () => T, ftester: T => Tester[T]): T =
-    Driver(args, gen, ftester)
+    Driver(args, gen, ftester, wrapped)
 
   // Assumes gen needs to be wrapped in Module()
   def run[T <: Module] (args: Array[String], gen: () => T): T =
-    Driver(args, gen, false)
+    Driver(args, gen, unwrapped)
 
   def run[T <: Module] (args: Array[String], gen: () => T, ftester: T => Tester[T]): T =
-    Driver(args, gen, ftester, false)
+    Driver(args, gen, ftester, unwrapped)
 }
 
 //Is this antiquated?
@@ -97,9 +100,7 @@ trait proc extends Node {
   }
 
   protected[Chisel] def doProcAssign(src: Node, cond: Bool): Unit = {
-    if (cond.canBeUsedAsDefault && defaultMissing) {
-      setDefault(src)
-    } else if (procAssigned) {
+    if (procAssigned) {
       inputs(0) = Multiplex(cond, src, inputs(0))
     } else if (cond.litValue() != 0) {
       procAssigned = true

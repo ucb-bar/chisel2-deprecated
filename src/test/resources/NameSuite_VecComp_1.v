@@ -16,12 +16,14 @@ module NameSuite_VecComp_1(input clk,
   wire[7:0] elts_0;
 
 `ifndef SYNTHESIS
+// synthesis translate_off
   integer initvar;
   initial begin
     #0.002;
     reg_status_im = {1{$random}};
     host_pcr_bits_data = {2{$random}};
   end
+// synthesis translate_on
 `endif
 
   assign io_status_im = reg_status_im;

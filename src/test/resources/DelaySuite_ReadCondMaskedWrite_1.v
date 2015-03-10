@@ -14,12 +14,14 @@ module DelaySuite_ReadCondMaskedWrite_1(input clk,
   wire[2:0] T6;
 
 `ifndef SYNTHESIS
+// synthesis translate_off
   integer initvar;
   initial begin
     #0.002;
     for (initvar = 0; initvar < 8; initvar = initvar+1)
       mem[initvar] = {1{$random}};
   end
+// synthesis translate_on
 `endif
 
   assign io_out = T0;

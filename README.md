@@ -47,11 +47,12 @@ Edit the source files for your circuit
     }
 
     class HelloModuleTests(c: HelloModule) extends Tester(c) {
+      step(1)
     }
 
     object hello {
       def main(args: Array[String]): Unit = {
-        chiselMainTest(Array[String]("--backend", "c", "--testing", "--genHarness"),
+        chiselMainTest(Array[String]("--backend", "c", "--compile", "--test", "--genHarness"),
            () => Module(new HelloModule())){c => new HelloModuleTests(c)}
       }
     }
@@ -62,18 +63,10 @@ because [recent versions of sbt](http://www.scala-sbt.org/0.13.0/docs/Community/
 generate jars without the scala third-point version number
 (i.e. chisel_2.10-2.0.2.jar instead of chisel_2.10*.2*-2.0.2.jar).
 
-Execute sbt run to generate the C++ simulation source for your circuit
+Execute sbt run to generate the C++ simulation source for your circuit, and (assuming you have a g++ compiler installed), compile it, and execute it under the tester.
 
     $ sbt run
 
-Compile the resulting C++ output to generate a simulation executable
-
-    $ g++ -std=c++11 -o HelloModule HelloModule.cpp HelloModule-emulator.cpp
-
-Run the simulation executable for one clock cycle to generate a simulation trace
-
-    $ ./HelloModule 1
-    Hello World!
 
 Going further, you should read on the [sbt directory structure](http://www.scala-sbt.org/release/docs/Getting-Started/Directories.html)
 to organize your files for bigger projects. SBT is the &quot;official&quot;

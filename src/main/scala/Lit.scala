@@ -39,11 +39,19 @@ import ChiselError._
 
 /* Factory for literal values to be used by Bits and SInt factories. */
 object Lit {
-  def apply[T <: Bits](n: String, width: Int = -1)(gen: => T): T = {
+  def apply[T <: Bits](n: String)(gen: => T): T = {
+    makeLit(Literal(n, -1))(gen)
+  }
+
+  def apply[T <: Bits](n: String, width: Int)(gen: => T): T = {
     makeLit(Literal(n, width))(gen)
   }
 
-  def apply[T <: Bits](n: String, base: Char, width: Int = -1)(gen: => T): T = {
+  def apply[T <: Bits](n: String, base: Char)(gen: => T): T = {
+    makeLit(Literal(-1, base, n))(gen)
+  }
+
+  def apply[T <: Bits](n: String, base: Char, width: Int)(gen: => T): T = {
     makeLit(Literal(width, base, n))(gen)
   }
 
@@ -208,11 +216,33 @@ object Literal {
     }
   }
 
+  /** Derive the bit length for a Literal
+   *  
+   */
+  def bitLength(b: BigInt): Int = {
+    // Check for signedness
+    // We have seen unexpected values (one too small) when using .bitLength on negative BigInts,
+    // so use the positive value instead.
+    val usePositiveValueForBitLength = false
+    (if (usePositiveValueForBitLength && b < 0) {
+      -b
+    } else {
+      b
+    }).bitLength
+  }
   /** Creates a *Literal* instance from a scala integer.
     */
   def apply(x: BigInt, width: Int = -1, signed: Boolean = false): Literal = {
     val res = new Literal();
-    val xWidth = if (signed) x.bitLength + 1 else max(x.bitLength, 1)
+    // Check for signedness
+    // We get unexpected values (one too small) when using .bitLength on negative BigInts,
+    // so use the positive value instead.
+    val bl = bitLength(x)
+    val xWidth = if (signed) {
+      bl + 1
+    } else {
+      max(bl, 1)
+    }
     val w = if(width == -1) xWidth else width
     val xString = (if (x >= 0) x else (BigInt(1) << w) + x).toString(16)
 

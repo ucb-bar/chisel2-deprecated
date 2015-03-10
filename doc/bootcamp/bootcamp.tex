@@ -54,6 +54,18 @@
 \end{frame}
 
 \setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
+\begin{frame}[fragile]{Bootcamp Chisel Installation}
+\begin{scala}
+-Install VirtualBox
+-File->Import appliance, chisel-vm.ova
+-Start
+-Login (username: chisel-bootcamp, password: chisel)
+-GTKWave, Emacs, etc. all installed
+\end{scala}
+\end{frame}
+\setbeamercolor{frametitle}{bg=\frametitledefaultcolor}
+
+\setbeamercolor{frametitle}{bg=\frametitleproblemcolor}
 \begin{frame}[fragile]{Development Tool Installation}
 
 \begin{itemize}
@@ -116,9 +128,14 @@ chisel-tutorial/
 \begin{frame}[fragile]{Test It}
 
 \begin{bash}
-cd $TUT_DIR/examples
-make Parity.out
+cd $TUT_DIR
+make 
 \end{bash}
+
+% \begin{bash}
+% cd $TUT_DIR/examples
+% make check Parity.out
+% \end{bash}
 
 \vspace{1cm}
 \noindent
@@ -1222,9 +1239,9 @@ class VecShiftRegister extends Module {
     val ins   = Vec.fill(4){ UInt(INPUT, 1) }
     val load  = Bool(INPUT)
     val shift = Bool(INPUT)
-    val out   = UInt(OUTPUT, 1)
+    val out   = UInt(OUTPUT, 4)
   }
-  val delays = Vec.fill(4){ Reg(UInt()) }
+  val delays = Vec.fill(4){ Reg(UInt(width = 4)) }
   when ( ... ) {
   // fill in here ...
   } .elsewhen (io.shift) {
@@ -1405,7 +1422,7 @@ val x = rnd.nextInt(lim)
 \begin{scala}
 class MaxNTests(c: MaxN) extends Tester(c) {
   for (i <- 0 until 10) {
-    for (i <- 0 until c.n) {
+    for (j <- 0 until c.n) {
       // FILL THIS IN HERE
       poke(c.io.ins(0), 0)
     }
@@ -1971,37 +1988,45 @@ consumer.io.in <> q.io.deq
 \end{frame}
 
 \begin{frame}[fragile]{Multiple Clock Domains}
-Clocks are first class and take an optional reset signal:
+Clocks are first class and take a name argument:
 \begin{scala}
-class Clock (reset: Bool) extends Node { 
-  def reset: Bool // returns reset pin 
+class Clock (val name: String) extends Node { 
+}
+\end{scala}
+\noindent
+and when constructed define a clock at top-level with the given name:
+\begin{scala}
+val clkA = new Clock("A")
+\end{scala}
+
+There is a builtin implicit clock that state elements use by default:
+\begin{scala}
+class Module {
+  def clock(): Clock    
+  def reset(): Bool
+  ...
 }
 \end{scala}
  
-There is a builtin implicit clock that state elements use by default:
-\begin{scala}
-var implicitClock = new Clock( implicitReset )
-\end{scala}
- 
-Clocks can be defined from other clocks:
-\begin{scala} 
-val clock2 = clock1 * 2 
-val clock3 = clock1 / 2 
-\end{scala}
+% Clocks can be defined from other clocks:
+% \begin{scala} 
+% val clock2 = clock1 * 2 
+% val clock3 = clock1 / 2 
+% \end{scala}
 
 \end{frame}
 
 \begin{frame}[fragile]{Specifying a Clock Domain}
 The clock for state elements and modules can be specified:
 \begin{scala} 
-Reg(... clock: Clock = implicitClock) 
-Mem(... clock: Clock = implicitClock) 
-Module(... clock: Clock = implicitClock)
+Reg(... explClock: Clock = clock()) 
+Mem(... explClock: Clock = clock()) 
+Module(... explClock: Clock = clock())
 \end{scala}
 
 For example, a register can be created in a different clock domain as follows:
 \begin{scala} 
-val reg = Reg(UInt(), clock = clock2)
+val reg = Reg(UInt(), explClock = clock2)
 \end{scala}
 
 \end{frame}
@@ -2104,17 +2129,17 @@ libraryDependencies +=
 \begin{frame}[fragile]{Compiling and Running}
 Producing C++
 \begin{bash}
-sbt run --backend c
+sbt run "--backend c"
 \end{bash}
 
 Producing Verilog
 \begin{bash}
-sbt run --backend v
+sbt run "--backend v"
 \end{bash}
 
 Running the Chisel Tests
 \begin{bash}
-sbt run --backend c --compile --test --genHarness
+sbt run "--backend c --compile --test --genHarness"
 \end{bash}
 
 \end{frame}
@@ -2148,7 +2173,7 @@ set hello project up
 \begin{bash}
 cd ~
 mkdir hello
-cp ~/chisel-tutorial/hello/* hello
+cp -r ~/chisel-tutorial/hello/* hello
 cd hello
 sbt run
 \end{bash}
@@ -2235,12 +2260,10 @@ assert(x < UInt(10))
 \begin{center}
 \url{https://chisel.eecs.berkeley.edu/documentation.html} \\[0.25cm]
 \begin{tabular}{rl}
-\textbf{manual} & \code{manual.pdf} \\
-\textbf{bootcamp2014} & \code{bootcamp-20140206.pdf} \\
-\textbf{bootcamp2012} & \code{bootcamp-20121026.pdf} \\
-\textbf{tutorial} & \code{tutorial.pdf} \\
 \textbf{getting started} & \code{getting-started.pdf} \\
-\textbf{cs250 lectures} & \code{cs250-1.pdf}, \code{cs250-2.pdf}, \code{cs250-3.pdf} \\[0.5cm]
+\textbf{tutorial} & \code{tutorial.pdf} \\
+\textbf{manual} & \code{manual.pdf} \\
+% \textbf{bootcamp} & \code{bootcamp.pdf} \\
 \end{tabular}
 \url{https://github.com/ucb-bar/chisel/} \\[0.25cm]
 \begin{tabular}{rl}
@@ -2249,7 +2272,7 @@ assert(x < UInt(10))
 \end{tabular}
 \url{https://chisel.eecs.berkeley.edu/download.html} \\[0.25cm]
 \begin{tabular}{rl}
-\textbf{sodor} & \url{https://github.com/ucb-bar/sodor/} \\
+\textbf{sodor} & \url{https://github.com/ucb-bar/riscv-sodor/} \\
 % \textbf{virtualbox} & \url{https://chisel.eecs.berkeley.edu/chisel-riscv.box} \\
 \end{tabular}
 \end{center}
@@ -2300,10 +2323,10 @@ assert(x < UInt(10))
 
 \begin{frame}{Thanks}
 \begin{itemize}
-\item \textbf{Arrangements} -- Borivoje Nikolic
-\item \textbf{Educational Machines} -- Michael Zimmer
-\item \textbf{Bootcamp Materials} -- Vincent Lee, Stephen Twigg, Huy Vo
-\item \textbf{Funding} -- Department of Energy, Department of Defense
+\item \textbf{Arrangements} -- HPCA folks
+\item \textbf{USB Sticks} -- Albert Magyar + Jim Lawson
+\item \textbf{Bootcamp Materials} -- JB, Vincent Lee, Stephen Twigg, Huy Vo
+\item \textbf{Funding} -- Department of Energy, Department of Defense, StarNet, C-Far, LBNL, Intel, Google, LG, Nvidia, Samsung, Oracle, Huawei
 \end{itemize}
 \end{frame}
 

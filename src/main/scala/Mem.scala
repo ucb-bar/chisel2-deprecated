@@ -182,7 +182,7 @@ abstract class MemAccess(val mem: Mem[_], addri: Node) extends Node {
     if (addr.needWidth() != log2Up(mem.n)) inputs(0) = addr.matchWidth(Width(log2Up(mem.n)))
 }
 
-class MemRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
+class MemRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri) {
   override def cond = Bool(true)
 
   inputs += mem
@@ -192,7 +192,7 @@ class MemRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
   override def getPortType: String = "cread"
 }
 
-class MemSeqRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
+class MemSeqRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri) {
   val addrReg = addri.asInstanceOf[Reg]
   override def isReg = true
   override def addr = if (inputs.length > 2) inputs(2) else null
@@ -210,7 +210,7 @@ class MemSeqRead(mem: Mem[_], addri: Node) extends MemAccess(mem, addri) {
   override def getPortType: String = "read"
 }
 
-class PutativeMemWrite(mem: Mem[_], addri: UInt) extends Node with proc {
+class PutativeMemWrite(mem: Mem[_ <: Data], addri: UInt) extends Node with proc {
   override def procAssign(src: Node) =
     mem.doWrite(addri, Module.current.whenCond, src, null)
 }
@@ -221,7 +221,7 @@ class MemReadWrite(val read: MemSeqRead, val write: MemWrite) extends MemAccess(
   override def getPortType = if (write.isMasked) "mrw" else "rw"
 }
 
-class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) extends MemAccess(mem, addri) {
+class MemWrite(mem: Mem[_ <: Data], condi: Bool, addri: Node, datai: Node, maski: Node) extends MemAccess(mem, addri) {
   override def cond = inputs(1)
   def cond_=(c: Bool) = inputs(1) = c
   clock = mem.clock
@@ -250,7 +250,7 @@ class MemWrite(mem: Mem[_], condi: Bool, addri: Node, datai: Node, maski: Node) 
     }
 
     val wp = getProducts(cond)
-    val rp = getProducts(r.cond)
+    val rp = getProducts(r.addrReg.enableSignal)
     wp.find(wc => rp.exists(rc => rc._isComplementOf(wc)))
   }
   def data = inputs(2)

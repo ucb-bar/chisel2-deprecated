@@ -101,9 +101,14 @@ abstract class Bits extends Data with proc {
     }
   }
 
-  override def procAssign(src: Node): Unit =
-    if (Driver.topComponent != null || checkAssign(src))
-      super.procAssign(src)
+  override def procAssign(src: Node): Unit = {
+    if (Driver.topComponent != null || checkAssign(src)) {
+      if (defaultMissing && Module.current.whenCond.canBeUsedAsDefault)
+        setDefault(src)
+      else
+        super.procAssign(src)
+    }
+  }
 
   override def defaultRequired: Boolean = true
 
@@ -111,7 +116,7 @@ abstract class Bits extends Data with proc {
 
   override def apply(name: String): Data = this
 
-  override def flatten: Array[(String, Bits)] = Array((name, this));
+  override def flatten: Array[(String, Bits)] = Array((name, this))
 
   override def toString: String = {
     // XXX We cannot print the width here as it would computed the infered

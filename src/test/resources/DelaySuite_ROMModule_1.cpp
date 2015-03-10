@@ -20,7 +20,7 @@ mod_t* DelaySuite_ROMModule_1_t::clone() {
   mod_t* cloned = new DelaySuite_ROMModule_1_t(*this);
   return cloned;
 }
-bool DelaySuite_ROMModule_1_t::set_circuit_from(mod_t* src) {
+bool DelaySuite_ROMModule_1_t::set_circuit_from ( mod_t* src ) {
   DelaySuite_ROMModule_1_t* mod_typed = dynamic_cast<DelaySuite_ROMModule_1_t*>(src);
   assert(mod_typed);
   T0 = mod_typed->T0;
@@ -32,9 +32,11 @@ bool DelaySuite_ROMModule_1_t::set_circuit_from(mod_t* src) {
 }
 void DelaySuite_ROMModule_1_t::print ( FILE* f ) {
 }
-void DelaySuite_ROMModule_1_t::dump_init(FILE *f) {
+void DelaySuite_ROMModule_1_t::print ( std::ostream& s ) {
 }
-void DelaySuite_ROMModule_1_t::dump(FILE *f, int t) {
+void DelaySuite_ROMModule_1_t::dump_init ( FILE* f ) {
+}
+void DelaySuite_ROMModule_1_t::dump ( FILE* f, int t ) {
 }
 void DelaySuite_ROMModule_1_t::clock_lo ( dat_t<1> reset ) {
   val_t T1;
@@ -43,7 +45,7 @@ void DelaySuite_ROMModule_1_t::clock_lo ( dat_t<1> reset ) {
 }
 void DelaySuite_ROMModule_1_t::clock_hi ( dat_t<1> reset ) {
 }
-void DelaySuite_ROMModule_1_api_t::init_mapping_table() {
+void DelaySuite_ROMModule_1_api_t::init_mapping_table (  ) {
   dat_table.clear();
   mem_table.clear();
   DelaySuite_ROMModule_1_t* mod_typed = dynamic_cast<DelaySuite_ROMModule_1_t*>(module);

@@ -425,7 +425,6 @@ object Queue
 {
   def apply[T <: Data](enq: DecoupledIO[T], entries: Int = 2, pipe: Boolean = false): DecoupledIO[T]  = {
     val q = Module(new Queue(enq.bits.clone, entries, pipe))
-    q.io.view(q.io.elements.filter(j => j._1 != "count")) // count io is not being used if called functionally
     q.io.enq.valid := enq.valid // not using <> so that override is allowed
     q.io.enq.bits := enq.bits
     enq.ready := q.io.enq.ready

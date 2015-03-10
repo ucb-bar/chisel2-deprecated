@@ -1,0 +1,33 @@
+<p>
+This release of Chisel is largely a maintenance release.
+See the associated Changelog for issues resolved with this release.
+</p>
+<p>
+This release provides initial support for Scala 2.11.
+
+In order to use the 2.11 version of the code, change the scalaVersion
+definition in your build.sbt (or build.scala) file from
+<pre><code>
+scalaVersion := "2.10.x"
+</code></pre>
+to:
+<pre><code>
+scalaVersion := "2.11.4"
+</code></pre>
+</p>
+<p>
+NOTE: Expect three warnings when compiling under Scala 2.11:
+</p>
+<pre><code>
+[warn] src/main/scala/Parameters.scala:272: abstract type T in type pattern Chisel.Ex[T] is unchecked since it is eliminated by erasure
+[warn]           case ex:Ex[T] => _bindLet[T](pname,ex)
+[warn]                   ^
+[warn] src/main/scala/Parameters.scala:271: abstract type T in type pattern Chisel.Knob[T] is unchecked since it is eliminated by erasure
+[warn]           case k:Knob[T] => ExVar[T](_VarKnob[T](k.name))
+[warn]                  ^
+[warn] src/main/scala/Parameters.scala:272: abstract type T in type pattern Chisel.Ex[T] is unchecked since it is eliminated by erasure
+[warn]           case ex:Ex[T] => _bindLet[T](pname,ex)
+[warn]                   ^
+model contains 286 documentable templates
+[warn] three warnings found
+</code></pre>

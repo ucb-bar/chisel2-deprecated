@@ -218,15 +218,12 @@ class Fame1Wrapper(f: => Module) extends Module {
   def transform(isTop: Boolean, module: Module, parent: Module): Unit = {
     Fame1Transform.fame1Modules += module
     val isFire = Bool(INPUT)
-    isFire.isIo = true
-    isFire.setName("is_fire")
-    isFire.component = module
+    module.addPin(isFire, "is_fire")
     Fame1Transform.fireSignals(module) = isFire
     if(!isTop){
       Predef.assert(Fame1Transform.fireSignals(parent) != null)
       isFire := Fame1Transform.fireSignals(parent)
     }
-    module.io.asInstanceOf[Bundle] += isFire
     for(submodule <- module.children){
       transform(false, submodule, module)
     }
