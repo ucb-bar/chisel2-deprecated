@@ -1,4 +1,4 @@
-module MultiClockSuite_ClockedSubComp_1(input T0,
+module MultiClockSuite_ClockedSubComp_1(input T0, input reset,
     input  io_ready,
     output io_valid
 );
@@ -22,7 +22,7 @@ module MultiClockSuite_ClockedSubComp_1(input T0,
   end
 endmodule
 
-module MultiClockSuite_Comp_1(input T0,
+module MultiClockSuite_Comp_1(input T0, input reset,
     input  io_data0,
     input  io_data1,
     output io_result
@@ -34,7 +34,7 @@ module MultiClockSuite_Comp_1(input T0,
 
   assign T0 = io_data0 & io_data1;
   assign io_result = sub_io_valid;
-  MultiClockSuite_ClockedSubComp_1 sub(.T0(T0),
+  MultiClockSuite_ClockedSubComp_1 sub(.T0(T0), .reset(reset),
        .io_ready( T0 ),
        .io_valid( sub_io_valid )
   );

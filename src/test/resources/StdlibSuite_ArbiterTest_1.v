@@ -1,4 +1,4 @@
-module Arbiter(
+module Arbiter(input reset,
     output io_in_3_ready,
     input  io_in_3_valid,
     input [7:0] io_in_3_bits,
@@ -80,7 +80,7 @@ module Arbiter(
   assign T23 = io_in_0_valid | io_in_1_valid;
 endmodule
 
-module StdlibSuite_ArbiterTest_1(
+module StdlibSuite_ArbiterTest_1(input reset,
     output io_in_3_ready,
     input  io_in_3_valid,
     input [7:0] io_in_3_bits,
@@ -119,7 +119,7 @@ module StdlibSuite_ArbiterTest_1(
   assign io_in_1_ready = arb_io_in_1_ready;
   assign io_in_2_ready = arb_io_in_2_ready;
   assign io_in_3_ready = arb_io_in_3_ready;
-  Arbiter arb(
+  Arbiter arb(.reset(reset),
        .io_in_3_ready( arb_io_in_3_ready ),
        .io_in_3_valid( io_in_3_valid ),
        .io_in_3_bits( io_in_3_bits ),

@@ -1,4 +1,4 @@
-module StdlibSuite_CatComp_1(
+module StdlibSuite_CatComp_1(input reset,
     input [7:0] io_x,
     input [7:0] io_y,
     output[15:0] io_z

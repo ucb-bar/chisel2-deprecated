@@ -1,4 +1,4 @@
-module NameSuite_ListLookupsComp_1(
+module NameSuite_ListLookupsComp_1(input reset,
     input [31:0] io_inst,
     output io_sigs_valid
 );

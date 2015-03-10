@@ -1,4 +1,4 @@
-module DelaySuite_RegNoInitUpdate_1(input clk,
+module DelaySuite_RegNoInitUpdate_1(input clk, input reset,
     output[31:0] io_out
 );
 

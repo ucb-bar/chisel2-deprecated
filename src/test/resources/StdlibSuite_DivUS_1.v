@@ -1,4 +1,4 @@
-module StdlibSuite_DivUS_1(
+module StdlibSuite_DivUS_1(input reset,
     input [31:0] io_x,
     input [31:0] io_y,
     output[32:0] io_z

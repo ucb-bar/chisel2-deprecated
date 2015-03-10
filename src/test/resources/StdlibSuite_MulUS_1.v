@@ -1,4 +1,4 @@
-module StdlibSuite_MulUS_1(
+module StdlibSuite_MulUS_1(input reset,
     input [31:0] io_x,
     input [31:0] io_y,
     output[63:0] io_z

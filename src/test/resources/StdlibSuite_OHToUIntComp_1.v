@@ -1,4 +1,4 @@
-module StdlibSuite_OHToUIntComp_1(
+module StdlibSuite_OHToUIntComp_1(input reset,
     input  io_in,
     output[1:0] io_out
 );

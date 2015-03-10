@@ -1,4 +1,4 @@
-module NameSuite_Block_2(input clk,
+module NameSuite_Block_2(input clk, input reset,
     input  io_in_resp_valid,
     input  io_in_resp_bits_error,
     input [31:0] io_in_resp_bits_ppn,
@@ -65,7 +65,7 @@ module NameSuite_Block_2(input clk,
   end
 endmodule
 
-module NameSuite_BindFifthComp_1(input clk,
+module NameSuite_BindFifthComp_1(input clk, input reset,
     input  io_imem_ptw_resp_valid,
     input  io_imem_ptw_resp_bits_error,
     input [31:0] io_imem_ptw_resp_bits_ppn,
@@ -85,7 +85,7 @@ module NameSuite_BindFifthComp_1(input clk,
   assign io_resp_resp_bits_ppn = vdtlb_io_out_resp_bits_ppn;
   assign io_resp_resp_bits_error = vdtlb_io_out_resp_bits_error;
   assign io_resp_resp_valid = vdtlb_io_out_resp_valid;
-  NameSuite_Block_2 vdtlb(.clk(clk),
+  NameSuite_Block_2 vdtlb(.clk(clk), .reset(reset),
        .io_in_resp_valid( io_imem_ptw_resp_valid ),
        .io_in_resp_bits_error( io_imem_ptw_resp_bits_error ),
        .io_in_resp_bits_ppn( io_imem_ptw_resp_bits_ppn ),

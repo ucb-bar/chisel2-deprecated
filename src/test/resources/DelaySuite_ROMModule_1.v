@@ -1,4 +1,4 @@
-module DelaySuite_ROMModule_1(
+module DelaySuite_ROMModule_1(input reset,
     input [1:0] io_addr,
     output[3:0] io_out
 );
