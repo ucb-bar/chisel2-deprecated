@@ -38,7 +38,7 @@ import scala.collection.mutable.ArrayBuffer
 import PartitionIslands._
 
 class DotBackend extends Backend {
-  val keywords = new HashSet[String]();
+  val keywords = Set[String]()
   var islands = Array[Island]()
   val allDottable = false
   val useComponentNames = false
@@ -49,6 +49,10 @@ class DotBackend extends Backend {
         if (r.name == "") {
           r.name = "R" + r.emitIndex
         }
+      // If we're explicitly outputting literal nodes, make sure they have a legitimate name and not just a number.
+      case l: Literal => if (allDottable) {
+        return "L" + l.toString
+      }
       case _ =>
         if(node.name == "") {
           node.name = "T" + node.emitIndex

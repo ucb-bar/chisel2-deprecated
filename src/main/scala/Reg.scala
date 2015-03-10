@@ -126,10 +126,12 @@ object Reg {
     res.setIsTypeNode
 
     // set clock
-    if (res.comp != null)
-      res.comp.clock = clock
-    else
-      res.clock = clock
+    for ((name, sig) <- res.flatten) {
+      if (sig.comp != null)
+        sig.comp.clock = clock
+      else
+        sig.clock = clock
+    }
 
     res
   }

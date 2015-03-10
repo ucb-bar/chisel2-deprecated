@@ -44,7 +44,8 @@ object ROM {
   def apply[T <: Data](elts: Array[(Int, T)], n: Int): ROM[T] = apply(elts.toSeq, Some(n))
 }
 
-class ROM[T <: Data](elts: SortedMap[Int, T], lengthIn: Option[Int] = None) extends Vec[T](i => elts.head._2.clone) {
+class ROM[T <: Data](elts: SortedMap[Int, T], lengthIn: Option[Int] = None) extends Vec[T](i => elts.head._2.clone, Nil) {
+  override val self = elts.unzip._2.toVector
   override val length: Int = lengthIn match {
     case Some(x) => require(x > elts.keySet.max); x
     case None => elts.keySet.max + 1

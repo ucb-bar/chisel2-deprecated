@@ -215,14 +215,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     io nameIt ("io", true)
   }
 
-  def findBinding(m: Node): Binding = {
-    for (b <- bindings) {
-      if (b.inputs(0) == m) {
-        return b
-      }
-    }
-    null
-  }
+  def findBinding(m: Node) = bindings find (_.inputs(0) == m)
 
   def io: Data
 
@@ -291,12 +284,17 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   }
 
   def addPin[T <: Data](pin: T, name: String = "") = {
-    for ((n, io) <- pin.flatten) {
-      io.component = this
-      io.isIo = true
+    io match {
+      case b: Bundle => {
+        for ((n, io) <- pin.flatten) {
+          io.component = this
+          io.isIo = true
+        }
+        if (name != "") pin nameIt (name, true)
+        b.elements += ((pin.name, pin))
+      }
+      case _ => // Is it possible?
     }
-    if (name != "") pin nameIt (name, true)
-    io.asInstanceOf[Bundle] += pin
     pin
   }
 
@@ -329,7 +327,9 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
 
     for (a <- debugs)
       queue enqueue a
-    for ((n, io) <- wires)
+    for ((n, io) <- wires ; if io.isIo && io.dir == OUTPUT)
+      queue enqueue io
+    for (child <- children ; (n, io) <- child.wires ; if io.isIo && io.dir == INPUT)
       queue enqueue io
     if (!(defaultResetPin == null))
       queue enqueue defaultResetPin
@@ -341,7 +341,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       walked += top
       visit(top)
       top match {
-        case io: Bits if io.isIo && io.dir == INPUT =>
         case v: Vec[_] =>
           for ((n, e) <- v.flatten;
           if !(e == null) && !(walked contains e) && !e.isIo) {
@@ -367,7 +366,9 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   def dfs(visit: Node => Unit): Unit = {
     val stack = new Stack[Node]
     // initialize DFS
-    for ((n, io) <- wires)
+    for ((n, io) <- wires ; if io.isIo && io.dir == OUTPUT)
+      stack push io
+    for (child <- children ; (n, io) <- child.wires ; if io.isIo && io.dir == INPUT)
       stack push io
     if (!(defaultResetPin == null))
       stack push defaultResetPin
@@ -381,7 +382,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       walked += top
       visit(top)
       top match {
-        case io: Bits if io.isIo && io.dir == INPUT =>
         case v: Vec[_] => {
           for ((n, e) <- v.flatten;
           if !(e == null) && !(walked contains e) && !e.isIo) {
@@ -447,9 +447,12 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
      Since we call invoke() to get a proper instance of the correct type,
      we have to insure the method is accessible, thus all fields
      that will generate C++ or Verilog code must be made public. */
-     for (m <- getClass().getDeclaredMethods.sortWith(
-      (x, y) => (x.getName() < y.getName())
-    )) {
+     // get all super classes' methods
+     def getMethods(c: Class[_]): Set[java.lang.reflect.Method] = {
+       if (c.toString.split('.').last == "Module") Set[java.lang.reflect.Method]() 
+       else c.getDeclaredMethods.toSet ++ getMethods(c.getSuperclass)
+     }
+     for (m <- getMethods(getClass).toList.sortWith(_.getName < _.getName)) {
        val name = m.getName();
        val types = m.getParameterTypes();
        if (types.length == 0 && isValName(name) // patch to avoid defs
@@ -485,7 +488,8 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
              for((elm, i) <- nodebuf.zipWithIndex){
                elm.getNode match {
                  case _: Literal =>
-                 case _ => elm.getNode nameIt (backend.asValidName(name + "_" + i), false)
+                 case _ =>
+                   elm.getNode nameIt (backend.asValidName(name + "_" + i), false)
                }
                backend.nameSpace += elm.getNode.name
              }
@@ -499,7 +503,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
            backend.nameSpace += bb.name
          }
          case comp: Module => {
-           comp.pathParent = this;
+           comp.pathParent = this
            if (!comp.named) {
              comp.name = backend.asValidName(name)
              comp.named = true

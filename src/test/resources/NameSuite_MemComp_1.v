@@ -9,11 +9,13 @@ module NameSuite_MemComp_1(input clk,
   wire[7:0] T1;
 
 `ifndef SYNTHESIS
+// synthesis translate_off
   integer initvar;
   initial begin
     #0.002;
     raddr = {1{$random}};
   end
+// synthesis translate_on
 `endif
 
   assign io_rdata = T0;

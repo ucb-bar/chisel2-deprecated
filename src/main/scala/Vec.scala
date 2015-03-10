@@ -60,8 +60,7 @@ object Vec {
   def apply[T <: Data](elts: Iterable[T]): Vec[T] = {
     val res =
       if (!elts.isEmpty && elts.forall(_.isLit)) ROM(elts)
-      else new Vec[T](i => elts.head.clone)
-    res.self ++= elts
+      else new Vec[T](i => elts.head.clone, elts)
     res
   }
 
@@ -76,9 +75,8 @@ object Vec {
 
     Note that this means that elem is computed a total of n times.
     */
-  def fill[T <: Data](n: Int)(gen: => T): Vec[T] = {
-    Vec.tabulate(n){ i => gen }
-  }
+  def fill[T <: Data](n: Int)(gen: => T): Vec[T] = 
+    tabulate(n){ i => gen }
 
   /** Returns an array containing values of a given function over
     a range of integer values starting from 0.
@@ -100,65 +98,56 @@ class VecProc(enables: Iterable[Bool], elms: Iterable[Data]) extends proc {
   }
 }
 
-class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with Cloneable {
-  val self = new ArrayBuffer[T]
-  val readPortCache = new HashMap[UInt, T]
-  var sortedElementsCache: ArrayBuffer[ArrayBuffer[Data]] = null
+class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate with VecLike[T] with Cloneable {
+  val self = elts.toVector
+  val readPorts = new HashMap[UInt, T]
 
   override def apply(idx: Int): T = self(idx)
 
-  def sortedElements: ArrayBuffer[ArrayBuffer[Data]] = {
-    if (sortedElementsCache == null) {
-      sortedElementsCache = new ArrayBuffer[ArrayBuffer[Data]]
-
-      // create buckets for each elm in data type
-      for(i <- 0 until this(0).flatten.length)
-        sortedElementsCache += new ArrayBuffer[Data]
-
-      // fill out buckets
-      for(elm <- this) {
-        for(((n, io), i) <- elm.flatten zip elm.flatten.indices) {
-          //val bits = io.toBits
-          //bits.comp = io.comp
-          sortedElementsCache(i) += io.asInstanceOf[Data]
-        }
-      }
-    }
-    sortedElementsCache
+  // TODO: better way to generated this structure?
+  lazy val sortedElements: Array[ArrayBuffer[Data]] = {
+    // create buckets for each elm in data type
+    val buckets = (for (i <- 0 until this(0).flatten.length) yield (new ArrayBuffer[Data])).toArray
+    // fill out buckets
+    for (elm <- this ; ((n, io), i) <- elm.flatten.zipWithIndex) buckets(i) += io 
+     
+    buckets
   }
 
   def apply(ind: UInt): T =
     read(ind)
 
   def write(addr: UInt, data: T): Unit =
-    this(addr) := data
+    read(addr) := data
 
   def read(addr: UInt): T = {
-    if(readPortCache.contains(addr)) {
-      return readPortCache(addr)
+    if (readPorts contains addr) {
+      readPorts(addr)
+    } else {
+      val iaddr = UInt(width = log2Up(length))
+      iaddr assign addr
+      val enables = (UInt(1) << iaddr).toBools
+      val res = this(0).clone
+      for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
+        io assign VecMux(iaddr, sortedElm)
+        // setup the comp for writes
+        io.comp = new VecProc(enables, sortedElm)
+      }
+      readPorts(addr) = res
+      res.setIsTypeNode
+      res
     }
-
-    val iaddr = UInt(width = log2Up(length))
-    iaddr assign addr
-    val enables = (UInt(1) << iaddr).toBools
-    val res = this(0).clone
-    for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
-      io assign VecMux(iaddr, sortedElm)
-
-      // setup the comp for writes
-      val io_comp = new VecProc(enables, sortedElm)
-      io.comp = io_comp
-    }
-    readPortCache += (addr -> res)
-    res.setIsTypeNode
-    res
   }
 
   override def flatten: Array[(String, Bits)] = {
-    val res = new ArrayBuffer[(String, Bits)]
-    for (elm <- self.reverse)
-      res ++= elm.flatten
-    res.toArray
+    // Todo: why reverse?
+    (self.zipWithIndex.reverse foldLeft Array[(String, Bits)]()){(res, x) => 
+      val (elm, idx) = x
+      res ++ (if (elm.name != "") elm.flatten else elm match {
+        case b: Bits => Array((idx.toString, b))
+        case _ => elm.flatten map (x => (idx.toString + "_" + x._1, x._2))
+      })
+    }
   }
 
   override def <>(src: Node) {
@@ -167,17 +156,18 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
         for((b, o) <- self zip other.self)
           b <> o
       }
+      case _ =>
     }
   }
 
   def <>(src: Vec[T]) {
     for((b, e) <- self zip src)
-      b <> e;
+      b <> e
   }
 
   def <>(src: Iterable[T]) {
     for((b, e) <- self zip src)
-      b <> e;
+      b <> e
   }
 
   override protected def colonEquals[T <: Data](that: Iterable[T]): Unit = {
@@ -187,11 +177,11 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
       def unidirectional[U <: Data](who: Iterable[(String, Bits)]) =
         who.forall(_._2.dir == who.head._2.dir)
 
-      assert(this.size == that.size, {
+      assert(size == that.size, {
         ChiselError.error("Can't wire together Vecs of mismatched lengths")
       })
 
-      assert(unidirectional(this.flatten), {
+      assert(unidirectional(flatten), {
         ChiselError.error("Cannot mix directions on left hand side of :=")
       })
 
@@ -212,14 +202,12 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
   // We need this special := because Iterable[T] is not a Data.
   def :=[T <: Data](that: Iterable[T]): Unit = colonEquals(that)
 
-  override def removeTypeNodes() {
-    for(bundle <- self)
-      bundle.removeTypeNodes
+  override def removeTypeNodes {
+    self foreach (_.removeTypeNodes)
   }
 
   override def flip(): this.type = {
-    for(b <- self)
-      b.flip();
+    self foreach (_.flip)
     this
   }
 
@@ -266,9 +254,8 @@ class Vec[T <: Data](val gen: (Int) => T) extends Aggregate with VecLike[T] with
   }
 
   override def setIsTypeNode() {
-    isTypeNode = true;
-    for(elm <- self)
-      elm.setIsTypeNode
+    isTypeNode = true
+    self foreach (_.setIsTypeNode)
   }
 
   def length: Int = self.size
@@ -289,7 +276,7 @@ trait VecLike[T <: Data] extends collection.IndexedSeq[T] {
 
   def forall(p: T => Bool): Bool = (this map p).fold(Bool(true))(_&&_)
   def exists(p: T => Bool): Bool = (this map p).fold(Bool(false))(_||_)
-  def contains[T <: Bits](x: T): Bool = this.exists(_ === x)
+  def contains(x: T) (implicit evidence: T <:< Bits): Bool = this.exists(_ === x)
   def count(p: T => Bool): UInt = PopCount((this map p).toSeq)
 
   private def indexWhereHelper(p: T => Bool) = this map p zip (0 until length).map(i => UInt(i))

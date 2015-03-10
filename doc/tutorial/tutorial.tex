@@ -24,6 +24,13 @@
 
 \lstset{frame=, basicstyle={\footnotesize\ttfamily}}
 
+\newcommand{\todo}[1]{\emph{TODO: #1}}
+\newcommand{\comment}[1]{\emph{Comment: #1}}
+
+% uncomment following for final submission
+\renewcommand{\todo}[1]{}
+\renewcommand{\comment}[1]{}
+
 \newenvironment{commentary}
 { \vspace{-0.1in}
   \begin{quotation}
@@ -331,19 +338,19 @@ Example & Explanation \\
 \multicolumn{2}{|l|}{Bitwise operators.  Valid on SInt, UInt, Bool.} \\
 \hline
 \hline
-\verb!val invertedX = ~x!                    &   Bitwise-NOT  \\
-\verb!val hiBits = x & UInt("h_ffff_0000") ! &   Bitwise-AND  \\
-\verb!val flagsOut = flagsIn | overflow !    &   Bitwise-OR   \\
-\verb!val flagsOut = flagsIn ^ toggle !      &   Bitwise-XOR  \\
+\verb!val invertedX = ~x!                    &   Bitwise NOT  \\
+\verb!val hiBits = x & UInt("h_ffff_0000") ! &   Bitwise AND  \\
+\verb!val flagsOut = flagsIn | overflow !    &   Bitwise OR   \\
+\verb!val flagsOut = flagsIn ^ toggle !      &   Bitwise XOR  \\
 \hline
 \hline
 \multicolumn{2}{|l|}{Bitwise reductions.  Valid on SInt and
   UInt.  Returns Bool. } \\
 \hline
 \hline
-\verb!val allSet = andR(x) ! & AND-reduction  \\
-\verb!val anySet = orR(x)  ! & OR-reduction   \\
-\verb!val parity = xorR(x) !  & XOR-reduction  \\
+\verb!val allSet = andR(x) ! & AND reduction  \\
+\verb!val anySet = orR(x)  ! & OR reduction   \\
+\verb!val parity = xorR(x) !  & XOR reduction  \\
 \hline
 \hline
 \multicolumn{2}{|l|}{Equality comparison. Valid on SInt, 
@@ -375,28 +382,28 @@ bit position. \\
 \hline
 \multicolumn{2}{|l|}{Logical operations.  Valid on Bools. } \\
 \hline
-\verb@val sleep = !busy@  & Logical NOT. \\
-\verb@val hit = tagMatch && valid @  & Logical AND. \\
-\verb@val stall = src1busy || src2busy@  & Logical OR. \\
-\verb@val out = Mux(sel, inTrue, inFalse)@  & Two-input mux where sel is a Bool. \\ % {\bf Why?} \\
+\verb@val sleep = !busy@  & Logical NOT \\
+\verb@val hit = tagMatch && valid @  & Logical AND \\
+\verb@val stall = src1busy || src2busy@  & Logical OR \\
+\verb@val out = Mux(sel, inTrue, inFalse)@  & Two-input mux where sel is a Bool \\ % {\bf Why?} \\
 \hline
 \hline
 \multicolumn{2}{|l|}{Arithmetic operations.  Valid on Nums: SInt and UInt. } \\
 \hline
-\verb@val sum = a + b@  & Addition. \\
-\verb@val diff = a - b @  & Subtraction. \\
-\verb@val prod = a * b @  & Multiplication. \\
-\verb@val div = a / b @  & Division. \\
+\verb@val sum = a + b@  & Addition \\
+\verb@val diff = a - b @  & Subtraction \\
+\verb@val prod = a * b @  & Multiplication \\
+\verb@val div = a / b @  & Division \\
 \verb@val mod = a % b @  & Modulus \\
 \hline
 \hline
 \multicolumn{2}{|l|}{Arithmetic comparisons.  Valid on Nums: SInt and
   UInt. Returns Bool.} \\
 \hline
-\verb@val gt = a > b@  & Greater than. \\
-\verb@val gte = a >= b@  & Greater than or equal. \\
-\verb@val lt = a < b@  & Less than. \\
-\verb@val lte = a <= b@  & Less than or equal. \\
+\verb@val gt = a > b@  & Greater than \\
+\verb@val gte = a >= b@  & Greater than or equal \\
+\verb@val lt = a < b@  & Less than \\
+\verb@val lte = a <= b@  & Less than or equal \\
 \hline
 \end{tabular}
 \end{center}
@@ -429,6 +436,8 @@ calculates node output bit widths from their respective input bit widths accordi
 \noindent
 where for instance $wz$ is the bit width of wire $z$, and the \verb+&+
 rule applies to all bitwise logical operations.
+
+\comment{maxNum and MinNum need to be explained.}
 
 The bit-width inference process continues until no bit width changes.
 Except for right shifts by known constant amounts, the bit-width
@@ -539,7 +548,7 @@ inside the trailing curly brackets, as we have to pass the bitwidth
 parameter into the \code{SInt} constructor.)
 
 The set of primitive classes
-(\code{SInt},\code{UInt},\code{Bool}) plus the aggregate
+(\code{SInt}, \code{UInt}, and \code{Bool}) plus the aggregate
 classes (\code{Bundles} and \code{Vec}s) all inherit from a common
 superclass, \code{Data}.  Every object that ultimately inherits from
 \code{Data} can be represented as a bit vector in a hardware design.
@@ -585,7 +594,7 @@ class Decoupled extends Bundle {
 \end{scala}
 
 \noindent
-After defining \code{FIFOInput}, it becomes a new type that can be
+After defining \code{Decoupled}, it becomes a new type that can be
 used as needed for module interfaces or for named collections of
 wires.
 
@@ -708,7 +717,7 @@ Now that we have defined modules, we will discuss how we actually run and test a
 \begin{scala}
 object tutorial {
   def main(args: Array[String]) = {
-    chiselMain(args, () => new Mux2())
+    chiselMain(args, () => Module(new Mux2()))
   }
 }
 \end{scala}
@@ -760,6 +769,7 @@ and allows users to write tests using the given debug protocol.  In particular, 
 \noindent
 Users connect tester instances to modules using:
 
+
 \begin{scala}
 object chiselMainTest {
   def apply[T <: Module]
@@ -769,7 +779,7 @@ object chiselMainTest {
 \end{scala}
 
 \noindent
-When \code{-{-}test} is given as an argument to \code{chiselMain}, a
+When \code{-{-}test} is given as an argument to \code{chiselMainTest}, a
 tester instance runs the Design Under Test (DUT) in a separate
 process with \code{stdin} and \code{stdout} connected so that debug commands can 
 be sent to the DUT and responses can be received from the DUT as shown in
@@ -797,10 +807,12 @@ class Mux2Tests(c: Mux2) extends Tester(c) {
 
 \noindent
 assignments for each input of \verb+Mux2+ is set to the appropriate values using \verb+poke+. For this particular example, we are testing the \verb+Mux2+ by hardcoding the inputs to some known values and checking if the output corresponds to the known one. To do this, on each iteration we generate appropriate inputs to the module and tell the simulation to assign these values to the inputs of the device we are testing \verb+c+, step the circuit, and test the expected value.  
+\comment{Maybe elaborate a little bit what a step does. I assume it is one clock tick
+Is a step needed as well for testing plain combinational circuits?}
 Finally, the following shows how the tester is invoked:
 
 \begin{scala}
-chiselMainTest(args + "--test", () => new Mux2()){ 
+chiselMainTest(args + "--test", () => Module(new Mux2())){ 
   c => new Mux2Tests(c) 
 }
 \end{scala}
@@ -815,16 +827,18 @@ Other command arguments are as follows:
 \verb+--debug+ & put all wires in class file \\
 \end{tabular}
 
+\comment{What does it mean to generate a harness file?}
+
 \section{State Elements}
 \label{sec:sequential}
 
 % SINGLE CLK and RESET
 
 The simplest form of state element supported by Chisel is a
-positive-edge-triggered register, which can be instantiated
-functionally as:
+positive edge-triggered register, which can be instantiated
+as:
 \begin{scala}
-Reg(next = in)
+val reg = Reg(next = in)
 \end{scala}
 
 \noindent
@@ -849,7 +863,7 @@ around back to zero (i.e., modulo \verb!max+1!), we write:
 \begin{scala}
 def counter(max: UInt) = {
   val x = Reg(init = UInt(0, max.getWidth))
-  x := Mux(x == max, UInt(0), x + UInt(1))
+  x := Mux(x === max, UInt(0), x + UInt(1))
   x
 }
 \end{scala}
@@ -861,7 +875,7 @@ to which the register will be initialized when the global reset for the circuit 
 The \verb!:=! assignment to \verb!x! in \verb!counter! wires an update combinational circuit 
 which increments the counter value unless it hits the \verb+max+ at which point it wraps back to zero.
 Note that when \verb!x! appears on the right-hand side of
-an assigment, its output is referenced, whereas when on the right-hand
+an assigment, its output is referenced, whereas when on the left-hand
 side, its input is referenced.
 
 Counters can be used to build a number of useful sequential circuits.
@@ -875,7 +889,7 @@ def pulse(n: UInt) = counter(n - UInt(1)) === UInt(0)
 \noindent
 A square-wave generator can then be toggled by the pulse train,
 toggling between true and false on each pulse:
-\begin{scala}
+\begin{scala}[escapechar=@]
 // Flip internal state when input true.
 def toggle(p: Bool) = {
   val x = Reg(init = Bool(false))
@@ -883,7 +897,6 @@ def toggle(p: Bool) = {
   x
 }
 
-% MS: a period contains both phases (high and low)
 // Square wave of a given period.
 def squareWave(period: UInt) = toggle(pulse(period/2))
 \end{scala}

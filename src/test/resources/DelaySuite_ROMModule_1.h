@@ -22,6 +22,7 @@ class DelaySuite_ROMModule_1_t : public mod_t {
   mod_t* clone();
   bool set_circuit_from(mod_t* src);
   void print ( FILE* f );
+  void print ( std::ostream& s );
   void dump ( FILE* f, int t );
   void dump_init ( FILE* f );
 
