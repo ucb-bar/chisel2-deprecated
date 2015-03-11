@@ -27,9 +27,7 @@ To start working on a circuit with Chisel, create simple build.sbt
 and scala source file containing your Chisel code as follow.
 
     $ cat build.sbt
-    scalaVersion := "2.10.2"
-
-    addSbtPlugin("com.github.scct" % "sbt-scct" % "0.2.1")
+    scalaVersion := "2.10.4"
 
     libraryDependencies += "edu.berkeley.cs" %% "chisel" % "latest.release"
 
@@ -79,12 +77,31 @@ Chisel is implemented 100% in Scala!
 Chisel developers
 -----------------
 
-Before you generate a pull request, run the following commands
-to insure all unit tests (with code coverage) pass
-and to check for coding style compliance respectively.
+You should have git, make, scala, and sbt installed on your
+development system. First, clone the Chisel repository and change to
+the project directory:
 
-    $ sbt scct:test
-    $ sbt scalastyle
+    $ git clone https://github.com/ucb-bar/chisel.git
+    $ cd chisel
+
+Compile and install your local copy of Chisel:
+
+    $ make clean test publish-local
+
+In order to use your local copy of Chisel in your own projects, you
+will need to update your build.sbt files so the Chisel library
+dependency is satisfied by your local copy. Replace
+
+    libraryDependencies += "edu.berkeley.cs" %% "chisel" % "latest.release"
+
+with:
+
+    libraryDependencies += "edu.berkeley.cs" %% "chisel" % "2.3-SNAPSHOT"
+
+Before you generate a pull request, run the following command
+to insure all unit tests pass.
+
+    $ make test
 
 You can follow Chisel metrics on style compliance and code coverage
 on the [website](https://chisel.eecs.berkeley.edu/unit_test_trends.html).
@@ -96,7 +113,7 @@ After editing the chisel code base, delete the local jar cache directory
 to make sure you are not picking up incorrect jar files, then publish
 the Chisel jar locally and remake your third-party project. Example:
 
-    $ cat *srcTop*/chisel/build.sbt
+    $ cat *srcTop*/chisel/project/build.scala
     ...
     version := "2.3-SNAPSHOT"
     ...
@@ -106,30 +123,6 @@ the Chisel jar locally and remake your third-party project. Example:
     libraryDependencies += "edu.berkeley.cs" %% "chisel" % "2.3-SNAPSHOT"
     ...
 
-    $ rm -rf ~/.sbt ~/.ivy2
-    $ cd *srcTop*/chisel && sbt publish-local
+    $ cd *srcTop*/chisel && make publish-local
     $ cd *srcTop*/riscv-sodor && make run-emulator
 
-Publishing to public Maven repo:
-
-    $ diff -u build.sbt
-    -version := "2.3-SNAPSHOT"
-    +version := "2.3"
-
-    $ sbt publish-signed
-
-Making the Chisel jar file with Maven (>=3.0.4)
-
-Some of the library jars in /lib are not available in the central Maven repository.
-They can be installed to your local repo using the script 'install_maven_libs':
-
-    $ ./install_maven_libs
-
-Build Chisel with:
-
-    $ mvn install
-
-Two maven profiles to skip the tests or ignore failures respectively
-
-    $ mvn install -Pskip
-    $ mvn install -Pignore
