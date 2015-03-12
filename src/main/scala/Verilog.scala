@@ -1059,5 +1059,43 @@ class VerilogBackend extends Backend {
 
   private def if_not_synthesis = "`ifndef SYNTHESIS\n// synthesis translate_off\n"
   private def endif_not_synthesis = "// synthesis translate_on\n`endif\n"
+
+  // The Verilog backend provides its own name scoping code.
+  // We do this in order to share submodules (issue #374  - Multiply instantiated modules in Chisel
+  //  result in redundant (functionally equivalent) module definitions in generated Verilog.
+  override def scopeNames() {
+    if (false) {
+      super.scopeNames()
+    } else {
+      // We assume the LinkedHashMap has been built from the inputs (children) up. 
+      val byNames = LinkedHashMap[String, ArrayBuffer[Module]]();
+      for (c <- Driver.sortedComps) {
+        if( c.name.isEmpty ) {
+          /* We don't have a name because we are not dealing with
+           a class member. */
+          val className = extractClassName(c);
+          if( byNames contains className ) {
+            byNames(className) += c
+          } else {
+            byNames(className) = ArrayBuffer[Module](c)
+          }
+        }
+      }
+      for( (className, comps) <- byNames ) {
+        if( comps.length > 1 ) {
+          // Group modules by their parents.
+          val compByParent = comps.groupBy(_.parent)
+          for ( (p, ml) <- compByParent) {
+            for (i <- 0 until ml.length) {
+              ml(i).name = className + "_" + i
+            }
+          }
+        } else {
+          comps(0).name = className;
+        }
+      }
+    }
+  }
+
 }
 
