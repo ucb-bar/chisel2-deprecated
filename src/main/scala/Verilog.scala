@@ -1064,35 +1064,38 @@ class VerilogBackend extends Backend {
   // We do this in order to share submodules (issue #374  - Multiply instantiated modules in Chisel
   //  result in redundant (functionally equivalent) module definitions in generated Verilog.
   override def scopeNames() {
-    if (false) {
-      super.scopeNames()
-    } else {
-      // We assume the LinkedHashMap has been built from the inputs (children) up. 
-      val byNames = LinkedHashMap[String, ArrayBuffer[Module]]();
-      for (c <- Driver.sortedComps) {
-        if( c.name.isEmpty ) {
-          /* We don't have a name because we are not dealing with
-           a class member. */
-          val className = extractClassName(c);
-          if( byNames contains className ) {
-            byNames(className) += c
-          } else {
-            byNames(className) = ArrayBuffer[Module](c)
-          }
+    // We assume the LinkedHashMap has been built from the inputs (children) up.
+    // This duplicates code in Backend::scopeNames(), but we do so in order
+    // to control how the byNames Map is constructed.
+    val byNames = LinkedHashMap[String, ArrayBuffer[Module]]();
+    for (c <- Driver.sortedComps) {
+      if( c.name.isEmpty ) {
+        /* We don't have a name because we are not dealing with
+         a class member. */
+        val className = extractClassName(c);
+        if( byNames contains className ) {
+          byNames(className) += c
+        } else {
+          byNames(className) = ArrayBuffer[Module](c)
         }
       }
-      for( (className, comps) <- byNames ) {
-        if( comps.length > 1 ) {
-          // Group modules by their parents.
-          val compByParent = comps.groupBy(_.parent)
-          for ( (p, ml) <- compByParent) {
-            for (i <- 0 until ml.length) {
-              ml(i).name = className + "_" + i
-            }
+    }
+    // We only need unique names on a per-module basis, and in fact,
+    //  we want sub-modules to have the same names within their common
+    //  parent, so our simple module merging code works.
+    for( (className, comps) <- byNames ) {
+      if( comps.length > 1 ) {
+        // Group modules by their parents.
+        val compByParent = comps.groupBy(_.parent)
+        // Ensure that multiple sub-modules within a parent
+        //  have unique names.
+        for ( (p, ml) <- compByParent) {
+          for (i <- 0 until ml.length) {
+            ml(i).name = className + "_" + i
           }
-        } else {
-          comps(0).name = className;
         }
+      } else {
+        comps(0).name = className;
       }
     }
   }
