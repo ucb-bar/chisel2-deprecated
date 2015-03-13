@@ -1712,6 +1712,7 @@ class mod_t {
     is_stale(false),
     printStream()
     {}
+  virtual ~mod_t() {}
   std::vector< mod_t* > children;
   virtual void init ( val_t rand_init=false ) { };
   virtual void clock_lo ( dat_t<1> reset ) { };
