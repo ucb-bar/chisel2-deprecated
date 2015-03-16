@@ -729,14 +729,14 @@ class CppBackend extends Backend {
         s"  ${emitRef(node)}.randomize(&__rand_seed);\n"
 
       case r: ROMData =>
+        val BIZero = BigInt(0)
         val res = new StringBuilder
         val sparse = !isPow2(r.n) || r.n != r.sparseLits.size
         if (sparse)
           res append s"  ${emitRef(r)}.randomize(&__rand_seed);\n"
         for ((i, v) <- r.sparseLits) {
-          assert(v.value != None)
-          val w = Some(v.value)
-          if (sparse || w != 0)
+          val w = v.value
+          if (sparse || w != BIZero)
             res append block((0 until words(r)).map(j => emitRef(r) + ".put(" + i + ", " + j + ", " + emitWordRef(v, j) + ")"))
         }
         res.toString

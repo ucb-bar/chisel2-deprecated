@@ -34,6 +34,12 @@ module NameSuite_Block_2(input clk,
 // synthesis translate_on
 `endif
 
+`ifndef SYNTHESIS
+// synthesis translate_off
+  assign io_out_resp_bits_error = {1{$random}};
+  assign io_out_resp_valid = {1{$random}};
+// synthesis translate_on
+`endif
   assign io_out_resp_bits_ppn = T0;
   assign T0 = T11 | T1;
   assign T1 = T7 ? tag_ram_1 : 32'h0;

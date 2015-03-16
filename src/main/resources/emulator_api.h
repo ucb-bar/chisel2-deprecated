@@ -289,7 +289,7 @@ public:
 	mem_dummy() :
 		mem_api_base("error", "")
 	{}
-	string get_element(std::string index) {
+	std::string get_element(std::string index) {
 		return "error";
 	}
 
@@ -404,7 +404,7 @@ public:
 	// Errors return "error", printing a more detailed description to stderr.
 	// TODO: find a way to pass errors in-line, so transport layers other than
 	// stdin/stdout (like TCP/IP) are possible while also communicating errors.
-	std::string eval_command(string command) {
+	std::string eval_command(std::string command) {
 		std::vector<std::string> tokens = tokenize(command);
 		if (tokens.size() == 0) {
 			std::cerr << "Empty command: '" << command << "'" << std::endl;
@@ -513,7 +513,7 @@ public:
 			// OUT: true (on success), false (on failure)
 			if (!check_command_length(tokens, 2, 3)) { return ""; }
 			cerr << "poke is deprecated, use wire_poke or mem_poke" << std::endl;
-			bool success;
+			bool success = false;
 			if (tokens.size() == 3) {
 				success = get_dat_by_name(tokens[1])->set_value(tokens[2]);
 			} else if (tokens.size() == 4) {

@@ -5,10 +5,11 @@ object BuildSettings extends Build {
 
   val buildSettings = Defaults.defaultSettings ++ Seq (
     organization := "edu.berkeley.cs",
-    // version := "2.2.22",
+    // version := "2.2.25",
     version := "2.3-SNAPSHOT",
     name := "chisel",
-    scalaVersion := "2.10.2",
+    scalaVersion := "2.10.4",
+    crossScalaVersions := Seq("2.10.4", "2.11.5"),
     //sourceDirectory := new File("@srcTop@"),
     publishMavenStyle := true,
     publishArtifact in Test := false,
@@ -52,17 +53,26 @@ object BuildSettings extends Build {
       "Sonatype Releases" at "http://oss.sonatype.org/content/repositories/releases"
     ),
 
+    /* Bumping "com.novocode" % "junit-interface" % "0.11", causes DelayTest testSeqReadBundle to fail
+     *  in subtly disturbing ways on Linux (but not on Mac):
+     *  - some fields in the generated .h file are re-named,
+     *  - an additional field is added
+     *  - the generated .cpp file has additional differences:
+     *    - different temps in clock_lo
+     *    - missing assignments
+     *    - change of assignment order
+     *    - use of "Tx" vs. "Tx.values"
+     */
     libraryDependencies += "com.novocode" % "junit-interface" % "0.10" % "test",
-    libraryDependencies += "org.scalatest" %% "scalatest" % "1.9.2" % "test",
-    libraryDependencies += "org.scala-lang" % "scala-reflect" % "2.10.2",
+    libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.4" % "test",
+    libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
 
     // Execute tests in the current project serially.
     // Tests from other projects may still run concurrently.
     parallelExecution in Test := false,
-    parallelExecution in ScctPlugin.ScctTest := false,
     scalacOptions ++= Seq("-deprecation", "-feature", "-language:reflectiveCalls", "-language:implicitConversions", "-language:existentials")
   ) ++ org.scalastyle.sbt.ScalastylePlugin.Settings
 
-  lazy val root = Project("chisel", file("."), settings=buildSettings) settings (ScctPlugin.instrumentSettings: _*)
+  lazy val root = Project("chisel", file("."), settings=buildSettings)
 }
 

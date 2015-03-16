@@ -262,9 +262,11 @@ class VerilogBackend extends Backend {
           ""
         } else {
           if (node.inputs.length == 0) {
-            ChiselError.warning("UNCONNECTED " + node + " IN " + node.component); ""
+            ChiselError.warning("UNCONNECTED " + node + " IN " + node.component)
+            "  assign " + emitTmp(node) + " = " + emitRand(node) + ";\n"
           } else if (node.inputs(0) == null) {
-            ChiselError.warning("UNCONNECTED WIRE " + node + " IN " + node.component); ""
+            ChiselError.warning("UNCONNECTED WIRE " + node + " IN " + node.component)
+            "  assign " + emitTmp(node) + " = " + emitRand(node) + ";\n"
           } else {
             "  assign " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ";\n"
           }
@@ -731,11 +733,42 @@ class VerilogBackend extends Backend {
     base.result
   }
 
+  // Is the specified node synthesizeable?
+  // This could be expanded. For the moment, we're flagging unconnected Bits,
+  // for which we generate un-synthesizable random values.
+  def synthesizeable(node: Node): Boolean = {
+    node match {
+      case x: Bits =>
+        if (x.isIo && x.dir == INPUT) {
+          true
+        } else if (node.inputs.length > 0 && node.inputs(0) != null) {
+          true
+        } else {
+          false
+        }
+      case _ => true
+    }
+  }
+
   def emitDefs(c: Module): StringBuilder = {
+    val resSimulate = new StringBuilder()
+    val resSynthesis = new StringBuilder()
     val res = new StringBuilder()
     for (m <- c.nodes) {
-      res.append(emitDef(m))
+      val resNode = if (synthesizeable(m)) {
+        resSynthesis
+      } else {
+        resSimulate
+      }
+      resNode.append(emitDef(m))
     }
+    // Did we generate any non-synthesizable definitions?
+    if (resSimulate.length > 0) {
+      res.append(if_not_synthesis)
+      res ++= resSimulate
+      res.append(endif_not_synthesis)
+    }
+    res ++= resSynthesis
     for (c <- c.children) {
       res.append(emitDef(c))
     }
