@@ -1,4 +1,4 @@
-module NameSuite_InputPortNameComp_1(
+module NameSuite_InputPortNameComp_1(input reset,
     input [19:0] io_in,
     output[19:0] io_out
 );

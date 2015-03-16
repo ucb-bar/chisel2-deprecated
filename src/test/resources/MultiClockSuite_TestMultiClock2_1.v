@@ -1,4 +1,4 @@
-module MultiClockSuite_TestMultiClock2_1_TestMultiClock2_subsub(input clkB,
+module MultiClockSuite_TestMultiClock2_1_TestMultiClock2_subsub(input clkB, input reset,
     input  io_in,
     output io_out
 );
@@ -22,7 +22,7 @@ module MultiClockSuite_TestMultiClock2_1_TestMultiClock2_subsub(input clkB,
   end
 endmodule
 
-module MultiClockSuite_TestMultiClock2_1_TestMultiClock2_sub(input clkB,
+module MultiClockSuite_TestMultiClock2_1_TestMultiClock2_sub(input clkB, input reset,
     input  io_in,
     output io_out
 );
@@ -31,13 +31,13 @@ module MultiClockSuite_TestMultiClock2_1_TestMultiClock2_sub(input clkB,
 
 
   assign io_out = sub_io_out;
-  MultiClockSuite_TestMultiClock2_1_TestMultiClock2_subsub sub(.clkB(clkB),
+  MultiClockSuite_TestMultiClock2_1_TestMultiClock2_subsub sub(.clkB(clkB), .reset(reset),
        .io_in( io_in ),
        .io_out( sub_io_out )
   );
 endmodule
 
-module MultiClockSuite_TestMultiClock2_1(input clkB,
+module MultiClockSuite_TestMultiClock2_1(input clkB, input reset,
     input  io_in,
     output io_out
 );
@@ -46,7 +46,7 @@ module MultiClockSuite_TestMultiClock2_1(input clkB,
 
 
   assign io_out = sub_io_out;
-  MultiClockSuite_TestMultiClock2_1_TestMultiClock2_sub sub(.clkB(clkB),
+  MultiClockSuite_TestMultiClock2_1_TestMultiClock2_sub sub(.clkB(clkB), .reset(reset),
        .io_in( io_in ),
        .io_out( sub_io_out )
   );

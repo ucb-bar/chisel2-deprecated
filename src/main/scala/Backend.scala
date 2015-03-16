@@ -358,31 +358,19 @@ abstract class Backend extends FileSystemUtilities{
 
   // go through every Module and set its clock and reset field
   def assignClockAndResetToModules {
-    for (module <- Driver.sortedComps.reverse) {
-      if (module.clock == null)
-        module.clock = module.parent.clock
-      if (!module.hasExplicitReset)
-        module.reset_=
-    }
+    for (module <- Driver.sortedComps.reverse) { module.ensureExplicitClockReset }
   }
 
   // for every reachable delay element
   // assign it a clock and reset where
   // clock is chosen to be the component's clock if delay does not specify a clock
-  // reset is chosen to be
-  //          component's explicit reset
-  //          delay's explicit clock's reset
-  //          component's clock's reset
+  // reset is always the component's explicit reset (as a prior pass has ensured this is set)
   def addClocksAndResets {
     Driver.bfs {
       _ match {
         case x: Delay =>
           val clock = if (x.clock == null) x.component.clock else x.clock
-          val reset =
-            if (x.component.hasExplicitReset) x.component._reset
-            else if (x.clock != null) x.clock.getReset
-            else if (x.component.hasExplicitClock) x.component.clock.getReset
-            else x.component._reset
+          val reset = x.component._reset
           x.assignReset(x.component.addResetPin(reset))
           x.assignClock(clock)
           x.component.addClock(clock)

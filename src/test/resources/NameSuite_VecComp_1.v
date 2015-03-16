@@ -1,4 +1,4 @@
-module NameSuite_VecComp_1(input clk,
+module NameSuite_VecComp_1(input clk, input reset,
     input [63:0] io_pcr_req_data,
     input  io_r_en,
     input [4:0] io_r_addr,

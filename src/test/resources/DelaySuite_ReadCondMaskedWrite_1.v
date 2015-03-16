@@ -1,4 +1,4 @@
-module DelaySuite_ReadCondMaskedWrite_1(input clk,
+module DelaySuite_ReadCondMaskedWrite_1(input clk, input reset,
     input  io_enable,
     input [31:0] io_addr,
     output[31:0] io_out

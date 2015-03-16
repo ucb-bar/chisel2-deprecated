@@ -1,4 +1,4 @@
-module DelaySuite_MemReadModule_1(input clk,
+module DelaySuite_MemReadModule_1(input clk, input reset,
     input [31:0] io_addr,
     output[31:0] io_out
 );

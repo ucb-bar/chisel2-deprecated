@@ -1,4 +1,4 @@
-module NameSuite_BindFourthComp_1(
+module NameSuite_BindFourthComp_1(input reset,
     input [4:0] io_in,
     output[4:0] io_out
 );

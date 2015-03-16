@@ -1,4 +1,4 @@
-module NameSuite_BlockDecoder_1(
+module NameSuite_BlockDecoder_1(input reset,
     input  io_valid,
     output io_replay,
     output io_sigs_enq_cmdq,
@@ -16,7 +16,7 @@ module NameSuite_BlockDecoder_1(
   assign io_replay = io_valid;
 endmodule
 
-module NameSuite_BindFirstComp_1(
+module NameSuite_BindFirstComp_1(input reset,
     input  io_valid,
     output io_replay
 );
@@ -38,7 +38,7 @@ module NameSuite_BindFirstComp_1(
   assign mask_ximm1q_ready = dec_io_sigs_enq_ximm1q ^ 1'h1;
   assign T3 = mask_cmdq_ready ^ 1'h1;
   assign mask_cmdq_ready = dec_io_sigs_enq_cmdq ^ 1'h1;
-  NameSuite_BlockDecoder_1 dec(
+  NameSuite_BlockDecoder_1 dec(.reset(reset),
        //.io_valid(  )
        //.io_replay(  )
        .io_sigs_enq_cmdq( dec_io_sigs_enq_cmdq ),

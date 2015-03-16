@@ -176,21 +176,28 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   var hasExplicitClock = !(clock == null)
   var hasExplicitReset = !(_reset == null)
 
-  var defaultResetPin: Bool = null
-  def reset = {
-    if (defaultResetPin == null) {
-      defaultResetPin = Bool(INPUT)
-      defaultResetPin.isIo = true
-      defaultResetPin.component = this
-      defaultResetPin.setName("reset")
-    }
-    defaultResetPin
+  lazy val defaultResetPin: Bool = {
+    val tmp = Bool(INPUT)
+    tmp.isIo = true
+    tmp.component = this
+    tmp.setName("reset")
+    tmp
   }
+  // TODO: ISSUE: This getter/setter discrepancy is ridiculous -ST
+  def reset = defaultResetPin
+
   def reset_=(r: Bool) {
     _reset = r
   }
-  def reset_=() {
-    _reset = parent._reset
+  def ensureExplicitClockReset(): Unit = {
+    val (new_clock, new_reset) = (hasExplicitClock, hasExplicitReset) match {
+      case (true, true)   => (clock, _reset)
+      case (true, false)  => (clock, clock.getReset)
+      case (false, true)  => (parent.clock, _reset)
+      case (false, false) => (parent.clock, parent.reset)
+    }
+    clock = new_clock
+    reset = new_reset
   }
 
   override def toString = this.getClass.toString

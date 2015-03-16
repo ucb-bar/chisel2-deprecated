@@ -1,4 +1,4 @@
-module NameSuite_VecSecondComp_1(input clk,
+module NameSuite_VecSecondComp_1(input clk, input reset,
     output io_requestor_3_req_ready,
     input  io_requestor_3_req_valid,
     input  io_requestor_3_req_bits_ready,

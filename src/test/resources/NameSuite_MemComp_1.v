@@ -1,4 +1,4 @@
-module NameSuite_MemComp_1(input clk,
+module NameSuite_MemComp_1(input clk, input reset,
     input  io_ren,
     input [7:0] io_raddr,
     output[64:0] io_rdata
