@@ -130,8 +130,7 @@ abstract class Backend extends FileSystemUtilities{
     if (keywords.contains(name)) name + "_" else name;
   }
 
-  def nameAll(mod: Module) {
-    // module naming
+  def scopeNames() {
     val byNames = LinkedHashMap[String, ArrayBuffer[Module]]();
     for (c <- Driver.sortedComps) {
       if( c.name.isEmpty ) {
@@ -145,7 +144,6 @@ abstract class Backend extends FileSystemUtilities{
         }
       }
     }
-
     for( (className, comps) <- byNames ) {
       if( comps.length > 1 ) {
         for( (c, index) <- comps.zipWithIndex ) {
@@ -155,6 +153,14 @@ abstract class Backend extends FileSystemUtilities{
         comps(0).name = className;
       }
     }
+  }
+
+  def nameAll(mod: Module) {
+    // module naming
+
+    // Apply whatever name scoping rules are appropriate for the backend.
+    scopeNames()
+
     // temporary node naming:
     // these names are for the Verilog Backend
     // and used in custom transforms such as backannotation
