@@ -272,6 +272,9 @@ abstract class Node extends nameable {
       false
     }
   }
+  
+  def isTopLevelIO: Boolean = isIo && (component == Driver.topComponent)
+
   lazy val isInObject: Boolean =
     (isIo && (Driver.isIoDebug || component == Driver.topComponent)) ||
     Driver.topComponent.debugs.contains(this) ||
