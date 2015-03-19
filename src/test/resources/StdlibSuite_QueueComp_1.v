@@ -4,89 +4,95 @@ module Queue(input clk, input reset,
     input [7:0] io_enq_bits,
     input  io_deq_ready,
     output io_deq_valid,
-    output[7:0] io_deq_bits
-    //output[1:0] io_count
+    output[7:0] io_deq_bits,
+    output[1:0] io_count
 );
 
-  wire[7:0] T0;
-  reg [7:0] ram [1:0];
-  wire[7:0] T1;
+  wire[1:0] T0;
+  wire ptr_diff;
+  reg  R1;
+  wire T15;
   wire T2;
-  reg  R3;
-  wire T17;
-  wire T4;
+  wire T3;
+  wire do_deq;
+  reg  R4;
+  wire T16;
   wire T5;
-  reg  R6;
-  wire T18;
+  wire T6;
+  wire do_enq;
   wire T7;
+  wire ptr_match;
+  reg  maybe_full;
+  wire T17;
   wire T8;
   wire T9;
-  wire T10;
-  wire T11;
+  wire[7:0] T10;
+  reg [7:0] ram [1:0];
+  wire[7:0] T11;
   wire T12;
+  wire empty;
   wire T13;
-  reg  R14;
-  wire T19;
-  wire T15;
-  wire T16;
+  wire T14;
+  wire full;
 
 `ifndef SYNTHESIS
 // synthesis translate_off
   integer initvar;
   initial begin
     #0.002;
+    R1 = {1{$random}};
+    R4 = {1{$random}};
+    maybe_full = {1{$random}};
     for (initvar = 0; initvar < 2; initvar = initvar+1)
       ram[initvar] = {1{$random}};
-    R3 = {1{$random}};
-    R6 = {1{$random}};
-    R14 = {1{$random}};
   end
 // synthesis translate_on
 `endif
 
-`ifndef SYNTHESIS
-// synthesis translate_off
-//  assign io_count = {1{$random}};
-// synthesis translate_on
-`endif
-  assign io_deq_bits = T0;
-  assign T0 = ram[R6];
-  assign T2 = io_enq_ready & io_enq_valid;
-  assign T17 = reset ? 1'h0 : T4;
-  assign T4 = T2 ? T5 : R3;
-  assign T5 = R3 + 1'h1;
-  assign T18 = reset ? 1'h0 : T7;
-  assign T7 = T9 ? T8 : R6;
-  assign T8 = R6 + 1'h1;
-  assign T9 = io_deq_ready & io_deq_valid;
-  assign io_deq_valid = T10;
-  assign T10 = T11 ^ 1'h1;
-  assign T11 = R3 == R6;
-  assign io_enq_ready = T12;
-  assign T12 = T13 ^ 1'h1;
-  assign T13 = R14 == R6;
-  assign T19 = reset ? 1'h1 : T15;
-  assign T15 = T2 ? T16 : R14;
-  assign T16 = R14 + 1'h1;
+  assign io_count = T0;
+  assign T0 = {T7, ptr_diff};
+  assign ptr_diff = R4 - R1;
+  assign T15 = reset ? 1'h0 : T2;
+  assign T2 = do_deq ? T3 : R1;
+  assign T3 = R1 + 1'h1;
+  assign do_deq = io_deq_ready & io_deq_valid;
+  assign T16 = reset ? 1'h0 : T5;
+  assign T5 = do_enq ? T6 : R4;
+  assign T6 = R4 + 1'h1;
+  assign do_enq = io_enq_ready & io_enq_valid;
+  assign T7 = maybe_full & ptr_match;
+  assign ptr_match = R4 == R1;
+  assign T17 = reset ? 1'h0 : T8;
+  assign T8 = T9 ? do_enq : maybe_full;
+  assign T9 = do_enq != do_deq;
+  assign io_deq_bits = T10;
+  assign T10 = ram[R1];
+  assign io_deq_valid = T12;
+  assign T12 = empty ^ 1'h1;
+  assign empty = ptr_match & T13;
+  assign T13 = maybe_full ^ 1'h1;
+  assign io_enq_ready = T14;
+  assign T14 = full ^ 1'h1;
+  assign full = ptr_match & maybe_full;
 
   always @(posedge clk) begin
-    if (T2)
-      ram[R3] <= io_enq_bits;
     if(reset) begin
-      R3 <= 1'h0;
-    end else if(T2) begin
-      R3 <= T5;
+      R1 <= 1'h0;
+    end else if(do_deq) begin
+      R1 <= T3;
     end
     if(reset) begin
-      R6 <= 1'h0;
+      R4 <= 1'h0;
+    end else if(do_enq) begin
+      R4 <= T6;
+    end
+    if(reset) begin
+      maybe_full <= 1'h0;
     end else if(T9) begin
-      R6 <= T8;
+      maybe_full <= do_enq;
     end
-    if(reset) begin
-      R14 <= 1'h1;
-    end else if(T2) begin
-      R14 <= T16;
-    end
+    if (do_enq)
+      ram[R4] <= io_enq_bits;
   end
 endmodule
 

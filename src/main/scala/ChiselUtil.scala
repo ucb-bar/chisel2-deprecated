@@ -466,29 +466,55 @@ object SQueue
   }
 }
 
-class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Bool = null) extends Module
+class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Bool = null) extends Module(_reset=_reset)
 {
   val io = new QueueIO(gen, entries)
 
-  val ram        = Mem(gen, entries)
-  val enq_ptr    = Counter(entries)
-  val next_enq_ptr    = new Counter(entries, 1)
-  val deq_ptr    = Counter(entries)
-  
-  when (io.enq.ready && io.enq.valid) {
+  val ram = Mem(gen, entries)
+  val enq_ptr = Counter(entries)
+  val deq_ptr = Counter(entries)
+  val maybe_full = Reg(init=Bool(false))
+
+  val ptr_match = enq_ptr.value === deq_ptr.value
+  val empty = ptr_match && !maybe_full
+  val full = ptr_match && maybe_full
+  val maybe_flow = Bool(flow) && empty
+  val do_flow = maybe_flow && io.deq.ready
+
+  val do_enq = io.enq.ready && io.enq.valid && !do_flow
+  val do_deq = io.deq.ready && io.deq.valid && !do_flow
+  when (do_enq) {
     ram(enq_ptr.value) := io.enq.bits
     enq_ptr.inc()
-    next_enq_ptr.inc()
   }
-  when (io.deq.ready && io.deq.valid) {
+  when (do_deq) {
     deq_ptr.inc()
   }
- 
-  io.deq.valid := ! /* empty */ (enq_ptr.value === deq_ptr.value)
-  io.enq.ready := ! /* full */ (next_enq_ptr.value === deq_ptr.value)
-  io.deq.bits  := ram(deq_ptr.value)
+  when (do_enq != do_deq) {
+    maybe_full := do_enq
+  }
+
+  io.deq.valid := !empty || Bool(flow) && io.enq.valid
+  io.enq.ready := !full || Bool(pipe) && io.deq.ready
+  io.deq.bits := Mux(maybe_flow, io.enq.bits, ram(deq_ptr.value))
+
+  val ptr_diff = enq_ptr.value - deq_ptr.value
+  if (isPow2(entries)) {
+    io.count := Cat(maybe_full && ptr_match, ptr_diff)
+  } else {
+    io.count := Mux(ptr_match, Mux(maybe_full, UInt(entries), UInt(0)), Mux(deq_ptr.value > enq_ptr.value, UInt(entries) + ptr_diff, ptr_diff))
+  }
 }
 
+/** Generic hardware queue. Required parameter entries controls
+  the depth of the queues. The width of the queue is determined
+  from the inputs.
+
+  Example usage:
+    val q = new Queue(UInt(), 16)
+    q.io.enq <> producer.io.out
+    consumer.io.in <> q.io.deq
+  */
 object Queue
 {
   def apply[T <: Data](enq: DecoupledIO[T], entries: Int = 2, pipe: Boolean = false): DecoupledIO[T]  = {
