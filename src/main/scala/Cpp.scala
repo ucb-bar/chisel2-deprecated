@@ -806,6 +806,8 @@ class CppBackend extends Backend {
     val chiselENV = java.lang.System.getenv("CHISEL")
 
     val c11 = if (hasPrintfs || (parallelExecution & useDynamicThreadDispatch)) " -std=c++11 " else ""
+    val pe_support_file = if (parallelExecution) "chisel_sync_%s".format(clockTaskModel) else ""
+    val pe_support_ofile = if (pe_support_file != "") " " + pe_support_file + ".o" else ""
     val openMP = if (useOpenMP) " -fopenmp " else ""
     val LD_openMPI = if (useOpenMPI) " -lmpi " else ""
     val cxxFlags = (if (flagsIn == null) CXXFLAGS else flagsIn) + c11 + openMP
@@ -822,7 +824,8 @@ class CppBackend extends Backend {
       ChiselError.info(cmd + " RET " + c)
     }
     def linkOne(name: String) {
-      val ac = CXX + " " + debug + LDFLAGS + openMP + " -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o" + LD_openMPI + LIBS
+      val dir_pe_support_ofile = if (pe_support_ofile != "") dir + pe_support_ofile + " " else ""
+      val ac = CXX + " " + debug + LDFLAGS + openMP + " -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o " + dir_pe_support_ofile + LD_openMPI + LIBS
       run(ac)
     }
     def linkMany(name: String, objects: Seq[String]) {
@@ -882,13 +885,13 @@ class CppBackend extends Backend {
         val replacements = HashMap[String, String] ()
         val onceOnlyOFiles = onceOnlyFiles.map(_ + ".o") mkString " "
         val unoptimizedOFiles = unoptimizedFiles.filter( ! onceOnlyFiles.contains(_) ).map(_ + ".o") mkString " "
+
         val optimzedOFiles = ((for {
           f <- 0 until maxFiles
           basename = n + "-" + f
           if !unoptimizedFiles.contains(basename)
         } yield basename + ".o"
-        ) mkString " ") + " " + n + "-emulator.o"
-
+        ) mkString " ") + " " + n + "-emulator.o" + pe_support_ofile
         replacements += (("@HFILES@", ""))
         replacements += (("@ONCEONLY@", onceOnlyOFiles))
         replacements += (("@UNOPTIMIZED@", unoptimizedOFiles))
@@ -928,11 +931,18 @@ class CppBackend extends Backend {
           }
           objects += basename
         }
+        if (pe_support_file != "") {
+          cc(pe_support_file, allFlags + " " + optim2)
+          objects += pe_support_file
+        }
         linkMany(n, objects)
       }
     } else {
       cc(n + "-emulator")
       cc(n)
+      if (pe_support_file != "") {
+        cc(pe_support_file)
+      }
       linkOne(n)
     }
   }
@@ -2418,6 +2428,17 @@ comp_current_clock_t g_current_clock;
     copyToTarget("emulator_mod.h")
     copyToTarget("emulator_api.h")
     copyToTarget("emulator.h")
+    if (parallelExecution) {
+      if (clockTaskModel == "") {
+        ChiselError.error("Unimplemented parallel execution model.")
+      } else {
+        copyToTarget("chisel_sync.h")
+        for (suffix <- List("h", "cpp")) {
+          val pe_support_file = "chisel_sync_%s.%s".format(clockTaskModel, suffix)
+          copyToTarget(pe_support_file)
+        }
+      }
+    }
   }
 
   // Return true if we want this node to be included in the main object.

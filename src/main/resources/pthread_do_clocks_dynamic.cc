@@ -21,6 +21,9 @@ void @MODULENAME@::@DO_CLOCKS@( pt_clock_t clock_type, dat_t<1> reset ) {
     case PCT_HIX:
     	g_current_clock.methods = &g_comp_clocks[2];
     	break;
+
+    case PCT_DONE:
+    	return;
     }
 	pthread_mutex_unlock(&g_clock_code_mutex);
 
