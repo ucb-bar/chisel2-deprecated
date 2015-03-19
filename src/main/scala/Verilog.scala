@@ -72,7 +72,7 @@ class VerilogBackend extends Backend {
 
   override def isEmittingComponents: Boolean = true
 
-  val flushedTexts = HashSet[String]()
+  val emittedModules = HashSet[String]()
 
   val memConfs = HashMap[String, String]()
   val compIndices = HashMap[String, Int]()
@@ -913,9 +913,10 @@ class VerilogBackend extends Backend {
     res.result();
   }
 
-  def flushModules( out: java.io.FileWriter,
-    defs: LinkedHashMap[String, LinkedHashMap[String, ArrayBuffer[Module] ]],
-    level: Int ) {
+  def flushModules(
+    defs: LinkedHashMap[String, LinkedHashMap[String,ArrayBuffer[Module]]],
+    level: Int ): Unit =
+  {
     for( (className, modules) <- defs ) {
       var index = 0
       for ( (text, comps) <- modules) {
@@ -925,18 +926,14 @@ class VerilogBackend extends Backend {
           className;
         }
         index = index + 1
-        var textLevel = 0;
         for( flushComp <- comps ) {
-          textLevel = flushComp.level;
           if( flushComp.level == level && flushComp.moduleName == "") {
             flushComp.moduleName = moduleName
           }
         }
-        if( textLevel == level ) {
-          /* XXX We write the module source text in *emitChildren* instead
-                 of here so as to generate a minimal "diff -u" with the previous
-                 implementation. */
-        }
+      /* XXX We write the module source text in *emitChildren* instead
+             of here so as to generate a minimal "diff -u" with the previous
+             implementation. */
       }
     }
   }
@@ -944,23 +941,29 @@ class VerilogBackend extends Backend {
 
   def emitChildren(top: Module,
     defs: LinkedHashMap[String, LinkedHashMap[String, ArrayBuffer[Module] ]],
-    out: java.io.FileWriter, depth: Int) {
+    out: java.io.FileWriter, depth: Int): Unit =
+  {
     if (top.isInstanceOf[BlackBox])
       return
 
+    // First, emit my children
     for (child <- top.children) {
       emitChildren(child, defs, out, depth + 1);
     }
+
+    // Now, find and emit me
+    // Note: emittedModules used to ensure modules only emitted once
+    //    regardless of how many times used (e.g. when folded)
     val className = extractClassName(top);
-    for( (text, comps) <- defs(className)) {
-      if( comps contains top ) {
-        if( !(flushedTexts contains text) ) {
-          out.append("module " + top.moduleName + "(")
-          out.append(text);
-          flushedTexts += text
-        }
-        return;
-      }
+    for{
+      (text, comps) <- defs(className)
+      if comps contains top
+      if !(emittedModules contains top.moduleName)
+    } {
+      out.append(s"module ${top.moduleName}(")
+      out.append(text);
+      emittedModules += top.moduleName
+      return
     }
   }
 
@@ -985,7 +988,7 @@ class VerilogBackend extends Backend {
          If that were not the case, we could flush modules as soon as
          the source text for all components at a certain level in the tree
          has been generated. */
-        flushModules(out, defs, level);
+        flushModules(defs, level);
         level = c.level
       }
       val res = emitModuleText(c);
@@ -1001,7 +1004,7 @@ class VerilogBackend extends Backend {
         defs(className) += (res -> ArrayBuffer[Module](c));
       }
     }
-    flushModules(out, defs, level);
+    flushModules(defs, level);
     emitChildren(top, defs, out, depth);
   }
 
