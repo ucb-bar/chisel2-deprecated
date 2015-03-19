@@ -277,6 +277,9 @@ abstract class Node extends nameable {
       false
     }
   }
+  
+  def isTopLevelIO: Boolean = isIo && (component == Driver.topComponent)
+
   lazy val isInObject: Boolean =
     (isIo && (Driver.isIoDebug || component == Driver.topComponent)) ||
     Driver.topComponent.debugs.contains(this) ||
@@ -437,7 +440,11 @@ abstract class Node extends nameable {
   lazy val emitIndex: Int = componentOf.nextIndex
 
   override def hashCode: Int = _id
-  override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
+  override def equals(that: Any): Boolean = that match {
+    case n: Node => this eq n
+    case null => false
+    case _ => ChiselError.error("can't compare Node " + this + " and non-Node " + that); false
+  }
 
   def canCSE: Boolean = false
   def hashCodeForCSE: Int = inputs.head.hashCode

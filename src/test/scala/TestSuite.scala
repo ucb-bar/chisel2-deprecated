@@ -28,7 +28,7 @@
  MODIFICATIONS.
 */
 
-import org.scalatest.junit.AssertionsForJUnit
+import org.scalatest.junit.JUnitSuite
 import org.junit.Before
 import java.io.File
 import scala.collection.mutable.ArrayBuffer
@@ -46,7 +46,7 @@ object TestSuite {
   val partitionIslandsEnable = if (partitionIslandsParameter == null) defaultEnablePartitionIslands else true
 }
 
-class TestSuite extends AssertionsForJUnit {
+abstract class TestSuite extends JUnitSuite {
 
   val dir = new File("test-outputs")
   val blankLines_re = """(?m)^\s*$[\r\n]+""".r

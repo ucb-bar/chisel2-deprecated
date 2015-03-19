@@ -634,7 +634,7 @@ class CppBackend extends Backend {
         if (x.isInObject && x.inputs.length == 1) {
           emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
             + " = " + emitWordRef(x.inputs(0), i)))
-        } else if (x.inputs.length == 0 && !x.isInObject) {
+        } else if (x.inputs.length == 0 && !(x.isTopLevelIO && x.dir == INPUT)) {
           emitTmpDec(x) + block("val_t __r = this->__rand_val()" +:
             (0 until words(x)).map(i => s"${emitWordRef(x, i)} = __r")) + trunc(x)
         } else {
