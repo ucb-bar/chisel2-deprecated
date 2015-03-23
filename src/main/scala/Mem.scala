@@ -31,6 +31,7 @@
 package Chisel
 import ChiselError._
 import Node._
+import Chisel.Library.LFSR16
 import scala.reflect._
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 

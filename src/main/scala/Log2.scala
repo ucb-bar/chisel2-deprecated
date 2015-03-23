@@ -35,15 +35,6 @@ object Log2 {
   def apply(x: Bits, n: Int): UInt = apply(x(n-1,0))
 }
 
-/** Returns the bit position of the trailing 1 in the input vector
-  with the assumption that multiple bits of the input bit vector can be set
-  */
-object PriorityEncoder
-{
-  def apply(in: Iterable[Bool]): UInt = PriorityMux(in, (0 until in.size).map(UInt(_)))
-  def apply(in: Bits): UInt = UInt().asTypeFor(new PriorityEncoder(in))
-}
-
 /** Does the inverse of UIntToOH.
   */
 object OHToUInt

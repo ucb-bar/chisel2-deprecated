@@ -29,6 +29,7 @@
 */
 
 package Chisel
+import Chisel.Library.Queue
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.HashSet

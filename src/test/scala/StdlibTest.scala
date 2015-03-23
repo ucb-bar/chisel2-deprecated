@@ -33,6 +33,7 @@ import org.junit.Assert._
 import org.junit.Test
 
 import Chisel._
+import Chisel.Library._
 
 /** This testsuite checks the primitives of the standard library
   that will generate basic common graphs of *Node*.

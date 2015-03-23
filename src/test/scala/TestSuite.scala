@@ -35,6 +35,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 import scala.collection.JavaConversions
 import Chisel._
+import Chisel.Library._
 import TestSuite._
 
 object TestSuite {
