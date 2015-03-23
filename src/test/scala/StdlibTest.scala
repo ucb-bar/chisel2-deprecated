@@ -848,4 +848,32 @@ try {
     }
     assertTrue(!ChiselError.ChiselErrors.isEmpty);
   }
+
+  /** Test for issue #384 - Data width lost in Vec
+   *
+   */
+  @Test def testVecSIntWidth () {
+    class VecSIntWidth extends Module {
+      val io = new Bundle {
+        val addr = UInt(INPUT,  8)
+        val out  = UInt(OUTPUT, 8)
+      }
+      val r = Vec((0 until 4).map(i => SInt(i, width = 32)))
+      io.out := r(io.addr)
+    }
+
+    class VecSIntWidthTester(m: VecSIntWidth) extends Tester(m) {
+      for (t <- 0 until 16) {
+        val addr = rnd.nextInt(4)
+        poke(m.io.addr, addr)
+        step(1)
+        expect(m.io.out, addr)
+      }
+    }
+
+    chiselMainTest(Array[String]("--backend", "c",
+      "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
+      () => Module(new VecSIntWidth())) {m => new VecSIntWidthTester(m)}
+  }
+
 }
