@@ -72,6 +72,7 @@ object ChiselError {
   }
 
   def findFirstUserInd(stack: Array[StackTraceElement]): Option[Int] = {
+    var seenChiselMain = false
     def isUserCode(ste: StackTraceElement): Boolean = {
       val className = ste.getClassName()
       try {
@@ -85,8 +86,14 @@ object ChiselError {
          */
           val dotPos = className.lastIndexOf('.')
           if( dotPos > 0 ) {
+            if (className == "Chisel.chiselMain$") {
+              seenChiselMain = true
+            }
             (className.subSequence(0, dotPos) != "Chisel") && !className.contains("scala") &&
             !className.contains("java") && !className.contains("$$")
+          } else if (seenChiselMain) {
+            // If we're above ChiselMain, we must be in "user" code.
+            true
           } else {
             false
           }
