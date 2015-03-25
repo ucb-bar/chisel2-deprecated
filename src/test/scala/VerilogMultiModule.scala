@@ -33,7 +33,7 @@ import org.junit.Test
 import org.junit.Ignore
 
 import Chisel._
-
+import Chisel.Library._
 
 class VerilogMultiModule extends TestSuite {
   @Test def testVerilogMultiModule() {
