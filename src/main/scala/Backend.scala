@@ -595,6 +595,8 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def addBindings {
+    // IMPORTANT INVARIANT FOR THIS FUNCTION
+    //   After every graph manipulation, consumers for each node MUST be kept consistent!
     for (comp <- Driver.sortedComps) {
       /* This code finds an output binding for a node.
          We search for a binding only if the io is an output
@@ -603,19 +605,13 @@ abstract class Backend extends FileSystemUtilities{
          same as output's component unless the logic is an input */
       for ((n, io) <- comp.wires) {
         if (io.dir == OUTPUT) {
-          for (node <- io.consumers; if !(node == null) && io.component != node.component.parent) {
+          // IMPORTANT: the toSet call makes an immutable copy, allows for manipulation of io.consumers
+          for (node <- io.consumers.toSet; if !(node == null) && io.component != node.component && io.component != node.component.parent) {
             for ((input, i) <- node.inputs.zipWithIndex ; if input eq io) {
-              node match {
-                case bits: Bits if bits.dir == INPUT => {
-                  node.inputs(i) = Binding(io, io.component.parent, io.component)
-                  node.inputs(i).consumers += node
-                }
-                case _ if io.component != node.component => {
-                  node.inputs(i) = Binding(io, io.component.parent, io.component)
-                  node.inputs(i).consumers += node
-                }
-                case _ =>
-              }
+              // note: after this redirection: node.inputs(i) == io
+              node.inputs(i).consumers -= node
+              node.inputs(i) = Binding(io, io.component.parent, io.component)
+              node.inputs(i).consumers += node
             }
           }
         }
@@ -629,21 +625,13 @@ abstract class Backend extends FileSystemUtilities{
         // to the output if the output is the parent
         // of the subcomponent.
         else if (io.dir == INPUT && !io.inputs.isEmpty) {
-          for (node <- io.consumers; if !(node == null) && io.component.parent == node.component) {
+          // IMPORTANT: the toSet call makes an immutable copy, allows for manipulation of io.consumers
+          for (node <- io.consumers.toSet; if !(node == null) && io.component != node.component && io.component != node.component.parent) {
             for ((input, i) <- node.inputs.zipWithIndex ; if input eq io) {
-              node match {
-                case bits: Bits if bits.dir == OUTPUT => {
-                  node.inputs(i) = io.inputs(0)
-                  node.inputs(i).consumers -= io
-                  node.inputs(i).consumers += node
-                }
-                case _ if !node.isIo => {
-                  node.inputs(i) = io.inputs(0)
-                  node.inputs(i).consumers -= io
-                  node.inputs(i).consumers += node
-                }
-                case _ =>
-              }
+              // note: after this redirection: node.inputs(i) == io
+              node.inputs(i).consumers -= node
+              node.inputs(i) = io.inputs(0)
+              node.inputs(i).consumers += node
             }
           }
         }

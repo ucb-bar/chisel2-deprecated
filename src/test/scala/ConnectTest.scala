@@ -442,4 +442,46 @@ class ConnectSuite extends TestSuite {
     
     assertFile("ConnectSuite_UnconnectedResets_1.v")
   }
+
+  // Should be able to use submodule inputs to drive own logic
+  @Test def testSubmoduleInputUse() {
+    class PassThrough extends Module {
+      val io = new Bundle {
+        val ptin  = UInt(width=8).asInput
+        val ptout = UInt(width=8).asOutput
+      }
+      io.ptout := io.ptin
+    }
+    class SubmoduleInputUse extends Module {
+      val io = new Bundle {
+        val in  = UInt(width=8).asInput
+        val out1 = UInt(width=8).asOutput
+        val out2a = UInt(width=8).asOutput
+        val out2b = UInt(width=8).asOutput
+        val out3  = UInt(width=8).asOutput
+      }
+      // The ordering of these vals is important
+      //   as this order triggered an old (fixed) bug
+      val pt3 = Module(new PassThrough)
+      val pt2b = Module(new PassThrough)
+      val pt2a = Module(new PassThrough)
+      val pt1 = Module(new PassThrough)
+
+      pt1.io.ptin := io.in
+      pt2a.io.ptin := pt1.io.ptout
+      pt2b.io.ptin := pt2a.io.ptin
+      pt3.io.ptin := io.out2b
+
+      io.out3  := pt3.io.ptout
+      io.out2b := pt2b.io.ptout
+      io.out2a := pt2a.io.ptout
+      io.out1  := pt2a.io.ptin
+    }
+
+    chiselMain(Array[String]("--backend", "v",
+      "--targetDir", dir.getPath.toString()),
+      () => Module(new SubmoduleInputUse()))
+    
+    assertFile("ConnectSuite_SubmoduleInputUse_1.v")
+  }
 }
