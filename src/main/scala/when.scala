@@ -49,7 +49,7 @@ class when (prevCond: Bool) {
   }
   def otherwise (block: => Unit) {
     val cond = !prevCond
-    cond.canBeUsedAsDefault = !Module.current.hasWhenCond
+    //cond.canBeUsedAsDefault = !Module.current.hasWhenCond
     when.execWhen(cond){ block }
   }
 }
