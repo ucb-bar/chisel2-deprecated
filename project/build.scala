@@ -3,13 +3,14 @@ import Keys._
 
 object BuildSettings extends Build {
 
-  val buildSettings = Defaults.defaultSettings ++ Seq (
+  val commonSettings = Defaults.defaultSettings ++ Seq (
     organization := "edu.berkeley.cs",
     // version := "2.2.26",
     version := "2.3-SNAPSHOT",
-    name := "chisel",
     scalaVersion := "2.10.4",
-    crossScalaVersions := Seq("2.10.4", "2.11.5"),
+    crossScalaVersions := Seq("2.10.4", "2.11.5")
+  )
+  val commonArtifactSettings = commonSettings ++ Seq (
     //sourceDirectory := new File("@srcTop@"),
     publishMavenStyle := true,
     publishArtifact in Test := false,
@@ -73,6 +74,36 @@ object BuildSettings extends Build {
     scalacOptions ++= Seq("-deprecation", "-feature", "-language:reflectiveCalls", "-language:implicitConversions", "-language:existentials")
   ) ++ org.scalastyle.sbt.ScalastylePlugin.Settings
 
-  lazy val root = Project("chisel", file("."), settings=buildSettings)
+  lazy val core = (project in file("core")).
+    settings(commonArtifactSettings: _*).
+    settings(
+      name := "chisel"
+    )
+  lazy val library = (project in file("library")).dependsOn(core % "compile->compile;test->test").
+    settings(commonArtifactSettings: _*).
+    settings(
+      name := "chisel_library"
+    )
+
+  lazy val root = (project in file(".")).
+    aggregate(core, library).
+    settings(commonSettings: _*).
+    settings(
+      publishArtifact := false,
+      publish := {},
+      publishLocal := {}
+//      publishSigned := {}
+//      publishLocalSigned := {}
+    )
+
+  Keys.`package` := {
+    (Keys.`package` in (core, Compile)).value
+    (Keys.`package` in (library, Compile)).value
+  }
+
+//  test in library := (test in library).dependsOn(test in core).value
+    parallelExecution in test in ThisBuild := false
+
+//  lazy val root = Project("chisel", file("."), settings=buildSettings)
 }
 

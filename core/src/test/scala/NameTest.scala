@@ -35,7 +35,6 @@ import org.junit.Test
 import org.junit.Ignore
 
 import Chisel._
-import Chisel.Library._
 
 /* XXX Throws an error "Test NodeSuite.testBindComp3 failed: Parameterized
  Bundle class NodeSuite$Status$1 needs clone method" when Status is declared

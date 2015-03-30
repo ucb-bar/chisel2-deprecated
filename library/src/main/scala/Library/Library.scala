@@ -28,7 +28,6 @@
  MODIFICATIONS.
 */
 
-package Chisel
 package Library
 
 import Chisel._
@@ -394,14 +393,4 @@ object PriorityEncoderOH
     Vec.tabulate(in.size)(enc(_))
   }
   def apply(in: Bits): UInt = encode((0 until in.getWidth).map(i => in(i)))
-}
-
-
-/** Returns the bit position of the trailing 1 in the input vector
-  with the assumption that multiple bits of the input bit vector can be set
-  */
-object PriorityEncoder
-{
-  def apply(in: Iterable[Bool]): UInt = PriorityMux(in, (0 until in.size).map(UInt(_)))
-  def apply(in: Bits): UInt = UInt().asTypeFor(new PriorityEncoder(in))
 }

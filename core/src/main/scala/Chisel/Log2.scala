@@ -75,6 +75,16 @@ class Log2(x: Bits) extends Log2Like(x, "Log2") {
   }
 }
 
+
+/** Returns the bit position of the trailing 1 in the input vector
+  with the assumption that multiple bits of the input bit vector can be set
+  */
+object PriorityEncoder
+{
+  def apply(in: Iterable[Bool]): UInt = PriorityMux(in, (0 until in.size).map(UInt(_)))
+  def apply(in: Bits): UInt = UInt().asTypeFor(new PriorityEncoder(in))
+}
+
 class PriorityEncoder(x: Bits) extends Log2Like(x, "PriEnc") {
   override def lower: Node = {
     val w0 = inputs(0).widthW

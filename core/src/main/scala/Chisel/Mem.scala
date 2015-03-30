@@ -31,7 +31,6 @@
 package Chisel
 import ChiselError._
 import Node._
-import Chisel.Library.LFSR16
 import scala.reflect._
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 
@@ -112,6 +111,19 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
   }
 
   def write(addr: UInt, dataIn: T): Unit = {
+    /** linear feedback shift register
+      */
+    object LFSR16
+    {
+      def apply(increment: Bool = Bool(true)): UInt =
+      {
+        val width = 16
+        val lfsr = Reg(init=UInt(1, width))
+        when (increment) { lfsr := Cat(lfsr(0)^lfsr(2)^lfsr(3)^lfsr(5), lfsr(width-1,1)) }
+        lfsr
+      }
+    }
+
     val cond = Module.current.whenCond
     val data = dataIn.toBits
     if (seqRead && Driver.isDebugMem) {

@@ -29,7 +29,7 @@
 */
 
 import Chisel._
-import Chisel.Library._
+import Library._
 import collection.mutable.ArrayBuffer
 
 class AddFilter extends Module {

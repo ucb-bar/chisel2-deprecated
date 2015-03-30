@@ -36,7 +36,6 @@ import org.junit.Test
 import org.junit.Ignore
 
 import Chisel._
-import Chisel.Library._
 
 object ZeroWidthTest{
   val W0WparameterName = "W0W"
