@@ -443,4 +443,133 @@ class ConnectSuite extends TestSuite {
     
     assertFile("ConnectSuite_UnconnectedResets_1.v")
   }
+
+  // Should be able to use submodule inputs to drive own logic
+  @Test def testSubmoduleInputUse() {
+    class PassThrough extends Module {
+      val io = new Bundle {
+        val ptin  = UInt(width=8).asInput
+        val ptout = UInt(width=8).asOutput
+      }
+      io.ptout := io.ptin
+    }
+    class SubmoduleInputUse extends Module {
+      val io = new Bundle {
+        val in  = UInt(width=8).asInput
+        val out1 = UInt(width=8).asOutput
+        val out2a = UInt(width=8).asOutput
+        val out2b = UInt(width=8).asOutput
+        val out3  = UInt(width=8).asOutput
+      }
+      // The ordering of these vals is important
+      //   as this order triggered an old (fixed) bug
+      val pt3 = Module(new PassThrough)
+      val pt2b = Module(new PassThrough)
+      val pt2a = Module(new PassThrough)
+      val pt1 = Module(new PassThrough)
+
+      pt1.io.ptin := io.in
+      pt2a.io.ptin := pt1.io.ptout
+      pt2b.io.ptin := pt2a.io.ptin
+      pt3.io.ptin := io.out2b
+
+      io.out3  := pt3.io.ptout
+      io.out2b := pt2b.io.ptout
+      io.out2a := pt2a.io.ptout
+      io.out1  := pt2a.io.ptin
+    }
+
+    chiselMain(Array[String]("--backend", "v",
+      "--targetDir", dir.getPath.toString()),
+      () => Module(new SubmoduleInputUse()))
+    
+    assertFile("ConnectSuite_SubmoduleInputUse_1.v")
+  }
+  
+  // More extensive test that submodule bindings are connected to appropriate logic
+  @Test def testAddBindings() {
+    class CrossingBlock extends Module {
+      val io = new Bundle {
+        val i1 = UInt(width=8).asInput
+        val i2 = UInt(width=8).asInput
+        val o1 = UInt(width=8).asOutput
+        val o2 = UInt(width=8).asOutput
+      }
+      io.o2 := io.o1 + io.i2
+      io.o1 := io.i1
+    }
+    class BindingTestInternal extends Module {
+      val io = new Bundle {
+        val in1 = UInt(width=8).asInput
+        val in2 = UInt(width=8).asInput
+        val in3 = UInt(width=8).asInput
+        val in4 = UInt(width=8).asInput
+        val out1 = UInt(width=8).asOutput
+        val out2 = UInt(width=8).asOutput
+        val out3 = UInt(width=8).asOutput
+        val out4 = UInt(width=8).asOutput
+        val out5 = UInt(width=8).asOutput
+        val out6 = UInt(width=8).asOutput
+        val out7 = UInt(width=8).asOutput
+        val out8 = UInt(width=8).asOutput
+        val out9 = UInt(width=8).asOutput
+      }
+      val cb5 = Module(new CrossingBlock)
+      val cb4 = Module(new CrossingBlock)
+      val cb3 = Module(new CrossingBlock)
+      val cb2 = Module(new CrossingBlock)
+      val cb1 = Module(new CrossingBlock)
+
+      cb1.io.i1 := io.in1
+      cb1.io.i2 := io.in2
+      io.out1 := cb1.io.o1
+      io.out2 := cb1.io.i2
+
+      cb2.io.i1 := cb1.io.o2
+      cb2.io.i2 := io.out1
+      io.out3 := cb2.io.o1
+      io.out4 := cb2.io.o2
+
+      cb3.io.i1 := cb1.io.i1 + UInt(1)
+      cb3.io.i2 := cb2.io.i1
+      io.out5 := cb3.io.o1 + cb3.io.o2 + io.out4
+
+      cb4.io.i1 := io.in3
+      cb4.io.i2 := cb4.io.i1
+      io.out6 := cb4.io.o1
+      io.out7 := cb4.io.o2
+
+      cb5.io.i1 := io.in4
+      cb5.io.i2 := cb5.io.o1
+      io.out8   := cb5.io.o2
+
+      io.out9 := io.out7
+    }
+
+    class BindingTest extends Module {
+      val io = new Bundle {
+        val in1 = UInt(width=8).asInput
+        val in2 = UInt(width=8).asInput
+        val in3 = UInt(width=8).asInput
+        val in4 = UInt(width=8).asInput
+        val out1 = UInt(width=8).asOutput
+        val out2 = UInt(width=8).asOutput
+        val out3 = UInt(width=8).asOutput
+        val out4 = UInt(width=8).asOutput
+        val out5 = UInt(width=8).asOutput
+        val out6 = UInt(width=8).asOutput
+        val out7 = UInt(width=8).asOutput
+        val out8 = UInt(width=8).asOutput
+        val out9 = UInt(width=8).asOutput
+      }
+      val myTest = Module(new BindingTestInternal)
+      myTest.io <> io
+    }
+
+    chiselMain(Array[String]("--backend", "v",
+      "--targetDir", dir.getPath.toString()),
+      () => Module(new BindingTest()))
+    
+    assertFile("ConnectSuite_BindingTest_1.v")
+  }
 }

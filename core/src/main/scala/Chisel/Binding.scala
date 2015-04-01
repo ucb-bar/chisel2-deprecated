@@ -52,5 +52,5 @@ object Binding {
 
 class Binding(val targetNode: Node, val targetComponent: Module) extends Node {
 
-  override def toString: String = "BINDING(" + inputs(0) + ")";
+  override def toString: String = "BINDING(" + inputs(0) + ", of " + component + ", called " + name + ")";
 }

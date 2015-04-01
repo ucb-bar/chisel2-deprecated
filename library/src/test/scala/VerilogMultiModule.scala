@@ -40,8 +40,8 @@ class VerilogMultiModule extends TestSuite {
     // A class to generate multiple "filter" sections.
     // The default is two sections.
     // For any module with more than one section, Queues are used to interconnect sections.
-    case class MultiMultiFIR (nSections: Int = 2) extends Module {
-      case class MultiFIR (nSections: Int = 2) extends Module {
+    class MultiMultiFIR (nSections: Int = 2) extends Module {
+      class MultiFIR (nSections: Int = 2) extends Module {
         class FilterSection(coeffs: Array[Flo]) extends Module {
           val io = new Bundle {
             val in = Decoupled(Flo(INPUT)).flip
