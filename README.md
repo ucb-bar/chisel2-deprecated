@@ -140,3 +140,8 @@ apt-get installs should work for ubuntu 14.04 LTS
     $ sudo apt-get install texlive-latex-recommended texlive-latex-extra
     $ sudo apt-get install texlive-fonts-recommended texlive-fonts-extra
 
+To generate all the documentation:
+
+    $ cd doc
+    $ make
+
