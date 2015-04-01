@@ -171,7 +171,9 @@ abstract class Node extends nameable {
       throwException("Node.width for node " + this + " returns unknown width")
   }
   private[Chisel] def widthW: Width = {
-    if (Driver.isInGetWidth) inferWidth(this) else width_
+    val selfresult = if (Driver.isInGetWidth) inferWidth(this) else width_
+    if(!selfresult.isKnown && isTypeNode && !inputs.isEmpty) getNode.widthW
+    else selfresult
   }
 
   /** Sets the width of a Node. */

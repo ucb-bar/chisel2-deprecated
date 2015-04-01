@@ -197,7 +197,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     _reset = parent._reset
   }
 
-  override def toString = this.getClass.toString
+  override def toString = s"<${this.name} (${this.getClass.toString})>"
 
   // This function sets the IO's component.
   def ownIo() {
