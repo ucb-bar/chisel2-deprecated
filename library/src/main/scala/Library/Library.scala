@@ -28,6 +28,7 @@
  MODIFICATIONS.
 */
 
+package Chisel
 package Library
 
 import Chisel._

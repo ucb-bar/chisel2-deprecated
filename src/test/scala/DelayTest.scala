@@ -35,7 +35,7 @@ import org.junit.Ignore
 import org.junit.Test
 
 import Chisel._
-import Library._
+import Chisel.Library._
 
 
 /** This testsuite checks all methods in the Bits class.

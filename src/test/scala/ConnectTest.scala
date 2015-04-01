@@ -34,7 +34,7 @@ import org.junit.Test
 import org.junit.Ignore
 
 import Chisel._
-import Library._
+import Chisel.Library._
 
 class RegStatus extends Bundle {
   val im0 = UInt(width = 2)
