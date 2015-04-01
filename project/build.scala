@@ -1,15 +1,46 @@
 import sbt._
 import Keys._
 
+/** These definitions partition Chisel into two components:
+  * - core (main compiler)
+  * - library (standard components)
+  * All the work (except for testing) happens in the subprojects.
+  * We use the root aggregate project for testing since there doesn't
+  * appear to be a way to force sbt 0.13 to test subprojects sequentially,
+  * despite the plethora of instructions on the net describing how to do so.
+  * See https://github.com/sbt/sbt/issues/882
+ */
 object BuildSettings extends Build {
 
+  // Common settings for all projects/subprojects
   val commonSettings = Defaults.defaultSettings ++ Seq (
     organization := "edu.berkeley.cs",
     // version := "2.2.26",
     version := "2.3-SNAPSHOT",
     scalaVersion := "2.10.4",
-    crossScalaVersions := Seq("2.10.4", "2.11.5")
-  )
+    crossScalaVersions := Seq("2.10.4", "2.11.5"),
+
+    /* Bumping "com.novocode" % "junit-interface" % "0.11", causes DelayTest testSeqReadBundle to fail
+     *  in subtly disturbing ways on Linux (but not on Mac):
+     *  - some fields in the generated .h file are re-named,
+     *  - an additional field is added
+     *  - the generated .cpp file has additional differences:
+     *    - different temps in clock_lo
+     *    - missing assignments
+     *    - change of assignment order
+     *    - use of "Tx" vs. "Tx.values"
+     */
+    libraryDependencies += "com.novocode" % "junit-interface" % "0.10" % "test",
+    libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.4" % "test",
+    libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
+
+    // Execute tests in the current project serially.
+    // Tests from other projects may still run concurrently.
+    parallelExecution in Test := false,
+    scalacOptions ++= Seq("-deprecation", "-feature", "-language:reflectiveCalls", "-language:implicitConversions", "-language:existentials")
+  ) ++ org.scalastyle.sbt.ScalastylePlugin.Settings
+
+  // Common settings for all subprojects (where the real work happens).
   val commonArtifactSettings = commonSettings ++ Seq (
     //sourceDirectory := new File("@srcTop@"),
     publishMavenStyle := true,
@@ -52,58 +83,32 @@ object BuildSettings extends Build {
     resolvers ++= Seq(
       "Sonatype Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots",
       "Sonatype Releases" at "http://oss.sonatype.org/content/repositories/releases"
-    ),
-
-    /* Bumping "com.novocode" % "junit-interface" % "0.11", causes DelayTest testSeqReadBundle to fail
-     *  in subtly disturbing ways on Linux (but not on Mac):
-     *  - some fields in the generated .h file are re-named,
-     *  - an additional field is added
-     *  - the generated .cpp file has additional differences:
-     *    - different temps in clock_lo
-     *    - missing assignments
-     *    - change of assignment order
-     *    - use of "Tx" vs. "Tx.values"
-     */
-    libraryDependencies += "com.novocode" % "junit-interface" % "0.10" % "test",
-    libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.4" % "test",
-    libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
-
-    // Execute tests in the current project serially.
-    // Tests from other projects may still run concurrently.
-    parallelExecution in Test := false,
-    scalacOptions ++= Seq("-deprecation", "-feature", "-language:reflectiveCalls", "-language:implicitConversions", "-language:existentials")
-  ) ++ org.scalastyle.sbt.ScalastylePlugin.Settings
+    )
+  )
 
   lazy val core = (project in file("core")).
     settings(commonArtifactSettings: _*).
     settings(
-      name := "chisel"
+      name := "chisel",
+      test := {} /* no tests */
     )
-  lazy val library = (project in file("library")).dependsOn(core % "compile->compile;test->test").
+  lazy val library = (project in file("library")).dependsOn(core).
     settings(commonArtifactSettings: _*).
     settings(
-      name := "chisel_library"
+      name := "chisel_library",
+      test := {} /* no tests */
     )
 
   lazy val root = (project in file(".")).
-    aggregate(core, library).
+    aggregate(core, library).dependsOn(core % "test", library % "test").
     settings(commonSettings: _*).
     settings(
+      // Don't publish anything in the root project.
       publishArtifact := false,
       publish := {},
-      publishLocal := {}
-//      publishSigned := {}
-//      publishLocalSigned := {}
+      publishLocal := {},
+      com.typesafe.sbt.pgp.PgpKeys.publishSigned := {},
+      com.typesafe.sbt.pgp.PgpKeys.publishLocalSigned := {}
     )
-
-  Keys.`package` := {
-    (Keys.`package` in (core, Compile)).value
-    (Keys.`package` in (library, Compile)).value
-  }
-
-//  test in library := (test in library).dependsOn(test in core).value
-    parallelExecution in test in ThisBuild := false
-
-//  lazy val root = Project("chisel", file("."), settings=buildSettings)
 }
 
