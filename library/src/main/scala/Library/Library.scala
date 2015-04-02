@@ -37,6 +37,10 @@ import scala.math._
   */
 object LFSR16
 {
+  /** Creates a 16-bit linear feedback shift register.
+    *  
+    *  @param increment controls cycling of the LFSR.
+    */  
   def apply(increment: Bool = Bool(true)): UInt =
   {
     val width = 16
@@ -50,6 +54,13 @@ object LFSR16
   */
 object ShiftRegister
 {
+  /** Creates a shift register for a specific signal with a specific delay.
+    *  
+    *  @tparam T type of input (and delayed output).
+    *  @param in input signal to be delayed.
+    *  @param n Number of cycles of delay.
+    *  @param en Optional enable signal.
+    */  
   def apply[T <: Data](in: T, n: Int, en: Bool = Bool(true)): T =
   {
     // The order of tests reflects the expected use cases.
@@ -67,6 +78,11 @@ object ShiftRegister
   */
 object UIntToOH
 {
+  /** Creates a one hot encoder of the input.
+    *  
+    *  @param in UInt input signal.
+    *  @param width If provided, specifies the output width, otherwise inferred from the input.
+    */  
   def apply(in: UInt, width: Int = -1): UInt =
     if (width == -1) UInt(1) << in
     else (UInt(1) << in(log2Up(width)-1,0))(width-1,0)
