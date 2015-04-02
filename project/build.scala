@@ -3,18 +3,8 @@ import Keys._
 import sbtunidoc.Plugin._
 import sbtunidoc.Plugin.UnidocKeys._
 
-/** These definitions partition Chisel into two components:
-  * - core (main compiler)
-  * - library (standard components)
-  * All the work (except for testing) happens in the subprojects.
-  * We use the root aggregate project for testing since there doesn't
-  * appear to be a way to force sbt 0.13 to test subprojects sequentially,
-  * despite the plethora of instructions on the net describing how to do so.
-  * See https://github.com/sbt/sbt/issues/882
- */
 object BuildSettings extends Build {
 
-  // Common settings for all projects/subprojects
   val commonSettings = Defaults.defaultSettings ++ Seq (
     organization := "edu.berkeley.cs",
     // version := "2.2.26",
@@ -88,8 +78,27 @@ object BuildSettings extends Build {
     resolvers ++= Seq(
       "Sonatype Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots",
       "Sonatype Releases" at "http://oss.sonatype.org/content/repositories/releases"
-    )
-  )
+    ),
+
+    /* Bumping "com.novocode" % "junit-interface" % "0.11", causes DelayTest testSeqReadBundle to fail
+     *  in subtly disturbing ways on Linux (but not on Mac):
+     *  - some fields in the generated .h file are re-named,
+     *  - an additional field is added
+     *  - the generated .cpp file has additional differences:
+     *    - different temps in clock_lo
+     *    - missing assignments
+     *    - change of assignment order
+     *    - use of "Tx" vs. "Tx.values"
+     */
+    libraryDependencies += "com.novocode" % "junit-interface" % "0.10" % "test",
+    libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.4" % "test",
+    libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
+
+    // Execute tests in the current project serially.
+    // Tests from other projects may still run concurrently.
+    parallelExecution in Test := false,
+    scalacOptions ++= Seq("-deprecation", "-feature", "-language:reflectiveCalls", "-language:implicitConversions", "-language:existentials")
+  ) ++ org.scalastyle.sbt.ScalastylePlugin.Settings
 
   lazy val customUnidocSettings = unidocSettings ++ Seq (
     doc in Compile := (doc in ScalaUnidoc).value,
@@ -99,14 +108,12 @@ object BuildSettings extends Build {
   lazy val core = (project in file("core")).
     settings(commonArtifactSettings: _*).
     settings(
-      name := "chisel",
-      test := {} /* no tests */
+      name := "chisel"
     )
-  lazy val library = (project in file("library")).dependsOn(core).
+  lazy val library = (project in file("library")).dependsOn(core % "compile->compile;test->test").
     settings(commonArtifactSettings: _*).
     settings(
-      name := "chisel_library",
-      test := {} /* no tests */
+      name := "chisel_library"
     )
 
   lazy val root = (project in file("."))
