@@ -187,24 +187,26 @@ class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T 
 }
 
 /** Hardware module that is used to sequence n producers into 1 consumer.
-  Producers are chosen in round robin order.
-
-  Example usage:
-    val arb = new RRArbiter(2, UInt())
-    arb.io.in(0) <> producer0.io.out
-    arb.io.in(1) <> producer1.io.out
-    consumer.io.in <> arb.io.out
+  * Producers are chosen in round robin order.
+  *
+  * @example {{{
+  *  val arb = new RRArbiter(2, UInt())
+  *  arb.io.in(0) <> producer0.io.out
+  *  arb.io.in(1) <> producer1.io.out
+  *  consumer.io.in <> arb.io.out
+  *  }}}
   */
 class RRArbiter[T <: Data](gen:T, n: Int) extends LockingRRArbiter[T](gen, n, 1)
 
 /** Hardware module that is used to sequence n producers into 1 consumer.
- Priority is given to lower producer
-
- Example usage:
-   val arb = Module(new Arbiter(2, UInt()))
-   arb.io.in(0) <> producer0.io.out
-   arb.io.in(1) <> producer1.io.out
-   consumer.io.in <> arb.io.out
+  * Priority is given to lower producer
+  *
+  * @example {{{
+  * val arb = Module(new Arbiter(2, UInt()))
+  * arb.io.in(0) <> producer0.io.out
+  * arb.io.in(1) <> producer1.io.out
+  * consumer.io.in <> arb.io.out
+  * }}}
  */
 class Arbiter[T <: Data](gen: T, n: Int) extends LockingArbiter[T](gen, n, 1)
 
@@ -286,16 +288,22 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
 }
 
 /** Generic hardware queue. Required parameter entries controls
-  the depth of the queues. The width of the queue is determined
-  from the inputs.
-
-  Example usage:
-    val q = new Queue(UInt(), 16)
-    q.io.enq <> producer.io.out
-    consumer.io.in <> q.io.deq
+  * the depth of the queues. The width of the queue is determined
+  * from the inputs.
+  *
+  * @example {{{
+  *  val q = new Queue(UInt(), 16)
+  *  q.io.enq <> producer.io.out
+  *  consumer.io.in <> q.io.deq
+  *  }}}
   */
 object Queue
 {
+  /** Create a hardware queue.
+    *  @tparam T Type of queue elements.
+    *  @param entries Depth of queue.
+    *  @param pipe FIXME
+    */
   def apply[T <: Data](enq: DecoupledIO[T], entries: Int = 2, pipe: Boolean = false): DecoupledIO[T]  = {
     val q = Module(new Queue(enq.bits.clone, entries, pipe))
     q.io.enq.valid := enq.valid // not using <> so that override is allowed
@@ -369,13 +377,14 @@ class Pipe[T <: Data](gen: T, latency: Int = 1) extends Module
 }
 
 /** A hardware module that delays data coming down the pipeline
-  by the number of cycles set by the latency parameter. Functionality
-  is similar to ShiftRegister but this exposes a Pipe interface.
-
-  Example usage:
-    val pipe = new Pipe(UInt())
-    pipe.io.enq <> produce.io.out
-    consumer.io.in <> pipe.io.deq
+  * by the number of cycles set by the latency parameter. Functionality
+  * is similar to ShiftRegister but this exposes a Pipe interface.
+  *
+  * @example {{{
+  *  val pipe = new Pipe(UInt())
+  *  pipe.io.enq <> produce.io.out
+  *  consumer.io.in <> pipe.io.deq
+  *  }}}
   */
 object Pipe
 {
@@ -397,7 +406,7 @@ object Pipe
 }
 
 /** Returns a bit vector in which only the least-significant 1 bit in
-  the input vector, if any, is set.
+  * the input vector, if any, is set.
   */
 object PriorityEncoderOH
 {

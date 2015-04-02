@@ -130,15 +130,16 @@ object Module {
          ( + ) overridden if Delay specifies its own clock w/ reset != implicitReset
 */
 abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool = null) {
-  /** A backend(Backend.scala) might generate multiple module source code
-    from one Module, based on the parameters to instantiate the component
-    instance. Since we do not want to blindly generate one module per instance
-    the backend will keep a cache of each module's implementation source code
-    and discard textual duplicates. By walking the nodes from level zero
-    (leafs) to level N (root), we are guaranteed to generate all
-    Module/modules source text before their first instantiation. */
-  var level = 0;
-  var traversal = 0;
+  /* A backend(Backend.scala) might generate multiple module source code
+     from one Module, based on the parameters to instantiate the component
+     instance. Since we do not want to blindly generate one module per instance
+     the backend will keep a cache of each module's implementation source code
+     and discard textual duplicates. By walking the nodes from level zero
+     (leafs) to level N (root), we are guaranteed to generate all
+     Module/modules source text before their first instantiation.
+  */
+  private[Chisel] var level = 0;
+  private[Chisel] var traversal = 0;
   var ioVal: Data = null;
   /** Name of the instance. */
   var name: String = "";
@@ -161,7 +162,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   val nodes = new LinkedHashSet[Node]
   val names = new HashMap[String, Node]
   var nindex = -1;
-  var defaultWidth = 32;
   var pathParent: Module = null;
   var verilog_parameters = "";
   val clocks = new ArrayBuffer[Clock]
@@ -200,7 +200,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   override def toString = s"<${this.name} (${this.getClass.toString})>"
 
   // This function sets the IO's component.
-  def ownIo() {
+  private[Chisel] def ownIo() {
     val wires = io.flatten;
     for ((n, w) <- wires) {
       // This assert is a sanity check to make sure static resolution
@@ -216,7 +216,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
 
   def io: Data
 
-  def nextIndex : Int = { nindex = nindex + 1; nindex }
+  private[Chisel] def nextIndex : Int = { nindex = nindex + 1; nindex }
 
   // override def toString: String = name this one isn't really working...
   def wires: Array[(String, Bits)] = io.flatten
@@ -246,13 +246,14 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
         ChiselErrors += new ChiselError(() => { "unable to printf aggregate argument " + arg }, arg.line)
   }
 
+  /** Connect '''Module''' io's together. */
   def <>(src: Module) {
     io <> src.io
   }
 
   def apply(name: String): Data = io(name);
   // COMPILATION OF REFERENCE
-  def emitDec(b: Backend): String = {
+  private[Chisel] def emitDec(b: Backend): String = {
     var res = "";
     // val wires = io.flatten;
     for ((n, w) <- wires)
@@ -260,8 +261,10 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     res
   }
 
-  // returns the pin connected to the reset signal, creates a new one if
-  // no such pin exists
+  /** Returns the pin connected to the reset signal,
+    * creating a new one if no such pin exists.
+    * @param reset FIXME
+    */
   def addResetPin(reset: Bool): Bool = {
     def makeIO = {
       val res = Bool(INPUT)
@@ -275,6 +278,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     this.resets.getOrElseUpdate(reset, pin)
   }
 
+  /** Add the specified clock to the '''Module'''. */
   def addClock(clock: Clock) {
     if (!this.clocks.contains(clock))
       this.clocks += clock
@@ -318,7 +322,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     res
   }
 
-  def bfs (visit: Node => Unit) = {
+  private[Chisel] def bfs (visit: Node => Unit) = {
     // initialize BFS
     val queue = new ScalaQueue[Node]
 
@@ -360,7 +364,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     }
   }
 
-  def dfs(visit: Node => Unit): Unit = {
+  private[Chisel] def dfs(visit: Node => Unit): Unit = {
     val stack = new Stack[Node]
     // initialize DFS
     for ((n, io) <- wires ; if io.isIo && io.dir == OUTPUT)
@@ -437,7 +441,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   // 2) name the IO
   // 3) name and set the component of all statically declared nodes through introspection
   // 4) set variable names
-  def markComponent() {
+  private[Chisel] def markComponent() {
     ownIo();
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], BlackBox and Modules.

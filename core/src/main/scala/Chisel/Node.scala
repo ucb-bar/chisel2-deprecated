@@ -125,13 +125,13 @@ object Node {
   }
 }
 
-/** *Node* defines the root class of the class hierarchy for
-  a [Composite Pattern](http://en.wikipedia.org/wiki/Composite_pattern).
-
-  A digital logic graph is encoded as adjacency graph where instances
-  of *Node* describe vertices and *inputs*, *consumers* member fields
-  are used to traverse the directed graph respectively backward (from
-  output to input) and forward (from input to output).
+/** '''Node''' defines the root class of the class hierarchy for
+  * a [[http://en.wikipedia.org/wiki/Composite_pattern Composite Pattern]].
+  *
+  * A digital logic graph is encoded as an adjacency graph where instances
+  * of '''Node''' describe vertices and '''inputs''' and '''consumers''' member fields
+  * are used to traverse the directed graph respectively backward (from
+  * output to input) and forward (from input to output).
   */
 abstract class Node extends nameable {
   var sccIndex = -1
@@ -233,6 +233,7 @@ abstract class Node extends nameable {
   def dblLitValue: Double = longBitsToDouble(litValue().toLong)
   // TODO: MOVE TO WIRE
   def assign(src: Node): Unit = throw new Exception("unimplemented assign")
+  /** Wire nodes together. */
   def <>(src: Node): Unit = throw new Exception("unimplemented <>")
   def ^^(src: Node): Unit = src <> this
 
