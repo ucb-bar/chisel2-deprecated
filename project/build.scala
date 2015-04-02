@@ -1,5 +1,7 @@
 import sbt._
 import Keys._
+import sbtunidoc.Plugin._
+import sbtunidoc.Plugin.UnidocKeys._
 
 /** These definitions partition Chisel into two components:
   * - core (main compiler)
@@ -37,6 +39,9 @@ object BuildSettings extends Build {
     // Execute tests in the current project serially.
     // Tests from other projects may still run concurrently.
     parallelExecution in Test := false,
+    // unify scaladoc across multiple projects.
+    autoAPIMappings := true,
+
     scalacOptions ++= Seq("-deprecation", "-feature", "-language:reflectiveCalls", "-language:implicitConversions", "-language:existentials")
   ) ++ org.scalastyle.sbt.ScalastylePlugin.Settings
 
@@ -86,6 +91,11 @@ object BuildSettings extends Build {
     )
   )
 
+  lazy val customUnidocSettings = unidocSettings ++ Seq (
+    doc in Compile := (doc in ScalaUnidoc).value,
+    target in unidoc in ScalaUnidoc := crossTarget.value / "api"
+  )
+
   lazy val core = (project in file("core")).
     settings(commonArtifactSettings: _*).
     settings(
@@ -100,15 +110,19 @@ object BuildSettings extends Build {
     )
 
   lazy val root = (project in file(".")).
-    aggregate(core, library).dependsOn(core % "test", library % "test").
     settings(commonSettings: _*).
+    settings(customUnidocSettings: _*).
     settings(
+      name := "ChiselRoot",
+      scalacOptions in (ScalaUnidoc, unidoc) += "-Ymacro-no-expand",
       // Don't publish anything in the root project.
       publishArtifact := false,
       publish := {},
       publishLocal := {},
       com.typesafe.sbt.pgp.PgpKeys.publishSigned := {},
-      com.typesafe.sbt.pgp.PgpKeys.publishLocalSigned := {}
-    )
+      com.typesafe.sbt.pgp.PgpKeys.publishLocalSigned := {},
+      aggregate in doc := false
+    ).
+    aggregate(core, library).dependsOn(core % "test", library % "test")
 }
 

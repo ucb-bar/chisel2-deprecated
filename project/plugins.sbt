@@ -8,3 +8,5 @@ addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "0.3.2")
 
 addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.0.4")
 
+addSbtPlugin("com.eed3si9n" % "sbt-unidoc" % "0.3.2")
+
