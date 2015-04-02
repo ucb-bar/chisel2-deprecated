@@ -109,10 +109,10 @@ object BuildSettings extends Build {
       test := {} /* no tests */
     )
 
-  lazy val root = (project in file(".")).
-    settings(commonSettings: _*).
-    settings(customUnidocSettings: _*).
-    settings(
+  lazy val root = (project in file("."))
+    .settings(commonSettings: _*)
+    .settings(customUnidocSettings: _*)
+    .settings(
       name := "ChiselRoot",
       scalacOptions in (ScalaUnidoc, unidoc) += "-Ymacro-no-expand",
       // Don't publish anything in the root project.
@@ -122,7 +122,7 @@ object BuildSettings extends Build {
       com.typesafe.sbt.pgp.PgpKeys.publishSigned := {},
       com.typesafe.sbt.pgp.PgpKeys.publishLocalSigned := {},
       aggregate in doc := false
-    ).
-    aggregate(core, library).dependsOn(core % "test", library % "test")
+    )
+    .aggregate(core, library).dependsOn(core % "test", library % "test")
 }
 
