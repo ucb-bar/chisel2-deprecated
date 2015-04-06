@@ -279,7 +279,7 @@ class ConnectSuite extends TestSuite {
     } catch {
       case _ : Throwable => ;
     }
-    assertTrue(!ChiselError.ChiselErrors.isEmpty);
+    assertTrue(ChiselError.hasErrors);
   }
 
   @Test def testVecInput() {
@@ -351,7 +351,7 @@ class ConnectSuite extends TestSuite {
     } catch {
       case _ : Throwable => ;
     }
-    assertTrue(!ChiselError.ChiselErrors.isEmpty);
+    assertTrue(ChiselError.hasErrors);
   }
 
   /** Test Unspecified Bundle Values.
