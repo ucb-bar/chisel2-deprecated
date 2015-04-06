@@ -1,5 +1,14 @@
-ChangeLog for Chisel v2.2.24 3/9/2015
+ChangeLog for Chisel v2.2.25 3/25/2015
 
-Convert from unsupported sbt-scct to scoverage.
-Fix bug in applying new parameters via bundle factory
-Initial support for Scala 2.11
+Detect and issue an error for double Module() wrapping - #385
+Fix Data width lost in Vec #384.
+For test, use JUnitSuite over AssertionsForJUnit
+In Verilog, fix bug for similar modules, some not emitted
+Better Namespace conflict resolution for Verilog
+Fix for multiply instantiated modules in Chisel result in redundant (functionally equivalent) module definitions in generated Verilog #374 
+In CPP, better detection of signals to randomize
+Disallow comparisons between Nodes and non-Nodes
+Include type of missing Parameter in error message
+Address issue with width-inference of right-shift
+Update emulator_{api,mod}.h to eliminate C++ compiler warnings.
+Update README to reflect current build procedure.

@@ -3,6 +3,12 @@
 # and the different tools for text to pdf:
 #     $ port install texlive-latex-extra texlive-latex-recommended \
 #           texlive-htmlxml ImageMagick
+#
+# For building on Ubuntu 14.04 LTS, the following packages should be
+# installed with "apt-get install":
+#  python-bs4 imagemagick source-highlight tex4ht texlive-latex-base \
+#  texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended \
+#  texlive-fonts-extra
 
 version   := 2.2.0
 
@@ -46,12 +52,27 @@ install: all
 	install -m 644 $(WWW_EXTRA) $(PDFS) $(installTop)/$(version)
 	install -m 644 $(WWW_PAGES) $(installTop)
 
-
+# NOTE: We follow the recommended practice of running the *latex tools twice
+# so references (citations and figures) are correctly handled.
+# NOTE: There are problems with running pdflatex after htlatex due to the
+# manual.aux file left over by the latter. We see:
+#  ./manual.tex:113: Undefined control sequence.
+#  <argument> ...tring :autoref\endcsname {\@captype 
+#                                                    }1
+#  l.113 Figure~\ref{fig:node-hierarchy}
+# This was reported at:
+# http://tex.stackexchange.com/questions/117802/running-pdflatex-after-htlatex-causes-hyperref-error-undefined-control-sequence
+# but apparently went away after upgrading to texlive 2013.
+# It fails on ubuntu 14.04 LTS and texlive-latex-recommended 2013.20140215-1
+# if we don't remove the manual.aux file
 chisel-%.pdf: %.tex
+	rm -f $(subst .tex,.aux,$<)
+	cd $(dir $<) && TEXINPUTS=".:$(PWD)/$(srcDir)/manual:${TEXINPUTS}" pdflatex -file-line-error -interaction nonstopmode -output-directory $(PWD) $(notdir $<)
 	cd $(dir $<) && TEXINPUTS=".:$(PWD)/$(srcDir)/manual:${TEXINPUTS}" pdflatex -file-line-error -interaction nonstopmode -output-directory $(PWD) $(notdir $<)
 	mv $(subst .tex,.pdf,$(notdir $<)) $@
 
 %.html: %.tex
+	cd $(dir $<) && TEXINPUTS=".:$(PWD)/$(srcDir)/manual:${TEXINPUTS}" htlatex $(notdir $<) $(PWD)/$(srcDir)/html.cfg "" -d/$(PWD)/
 	cd $(dir $<) && TEXINPUTS=".:$(PWD)/$(srcDir)/manual:${TEXINPUTS}" htlatex $(notdir $<) $(PWD)/$(srcDir)/html.cfg "" -d/$(PWD)/
 	mv $(subst .tex,.html,$(notdir $<)) $@~
 	$(srcDir)/../bin/tex2html.py $@~ $@
@@ -78,5 +99,5 @@ clean:
 	-rm -f $(WWW_PAGES) $(PDFS) $(WWW_EXTRA) $(addsuffix .1,$(WWW_EXTRA)) $(patsubst %.html,%.css,$(WWW_EXTRA))
 	-rm -f *~ *.aux *.log *.nav *.out *.snm *.toc *.vrb
 	-rm -f *.jpg *.png
-	-rm -f manual/chisel.man manual/chisel.ttex
+	-rm -f manual/chisel.man manual/chisel.ttex manual/*.aux manual/*.log manual/*.out manual/*.pdf
 

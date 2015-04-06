@@ -84,16 +84,20 @@ object Module {
   }
 
   private def pop(){
-    val c = Driver.compStack.pop
-    if( !Driver.compStack.isEmpty ) {
-      val dad = Driver.compStack.top
-      c.parent = dad
-      dad.children += c
-    }
-    Driver.stackIndent -= 1
-    c.level = 0
-    for(child <- c.children) {
-      c.level = math.max(c.level, child.level + 1)
+    if (Driver.compStack.isEmpty) {
+      ChiselError.error("Empty driver component stack. Do you have a bare module wrapping a bare module?")
+    } else {
+      val c = Driver.compStack.pop
+      if( !Driver.compStack.isEmpty ) {
+        val dad = Driver.compStack.top
+        c.parent = dad
+        dad.children += c
+      }
+      Driver.stackIndent -= 1
+      c.level = 0
+      for(child <- c.children) {
+        c.level = math.max(c.level, child.level + 1)
+      }
     }
   }
 
@@ -193,7 +197,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     _reset = parent._reset
   }
 
-  override def toString = this.getClass.toString
+  override def toString = s"<${this.name} (${this.getClass.toString})>"
 
   // This function sets the IO's component.
   def ownIo() {

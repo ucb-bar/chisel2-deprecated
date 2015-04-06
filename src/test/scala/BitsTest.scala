@@ -29,7 +29,6 @@
 */
 
 import scala.collection.mutable.ArrayBuffer
-import org.scalatest.junit.AssertionsForJUnit
 import scala.collection.mutable.ListBuffer
 import org.junit.Assert._
 import org.junit.Test
@@ -41,7 +40,7 @@ import Chisel._
 
 /** This testsuite checks all methods in the Bits class.
 */
-class BitsSuite extends AssertionsForJUnit {
+class BitsSuite extends TestSuite {
 
   /** Extract a bit from a constant at a fixed position */
   @Test def testExtractConstantFixed() {

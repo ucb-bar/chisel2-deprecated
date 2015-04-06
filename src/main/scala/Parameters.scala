@@ -72,7 +72,7 @@ abstract trait UsesParameters {
 }
 
 class ParameterUndefinedException(field:Any, cause:Throwable=null)
-  extends RuntimeException("Parameter " + field + " undefined.", cause)
+  extends RuntimeException(s"Parameter ${field.toString} (of type ${field.getClass}) undefined.", cause)
 class KnobUndefinedException(field:Any, cause:Throwable=null)
   extends RuntimeException("Knob " + field + " undefined.", cause)
 

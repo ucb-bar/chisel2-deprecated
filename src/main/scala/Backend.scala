@@ -130,42 +130,71 @@ abstract class Backend extends FileSystemUtilities{
     if (keywords.contains(name)) name + "_" else name;
   }
 
-  def nameAll(mod: Module) {
-    // module naming
-    val byNames = LinkedHashMap[String, ArrayBuffer[Module]]();
-    for (c <- Driver.sortedComps) {
-      if( c.name.isEmpty ) {
-        /* We don't have a name because we are not dealing with
-         a class member. */
-        val className = extractClassName(c);
-        if( byNames contains className ) {
-          byNames(className) += c
-        } else {
-          byNames(className) = ArrayBuffer[Module](c)
-        }
+  def nameAll() {
+    // Helper classes to get unique names for everything
+    class NameSpace {
+      private[this] val namespace = scala.collection.mutable.HashSet[String]() // shouldn't need to be a LinkedHashSet
+      private[this] def ensureUnique(candidate: String): String = {
+        if(namespace(candidate.toLowerCase)) {
+          // Use a for comprehension to return all available names (lazily)
+          (for{
+            idx <- Stream.from(1)
+            new_cand = s"${candidate}_${idx}"
+            if !namespace(new_cand.toLowerCase)
+          } yield new_cand).head // only use the first one
+        } else candidate
+      }
+      def reserveName(name: String): Unit = assert(name == getUniqueName(name))
+      def getUniqueName(candidate: String): String = {
+        val unique_name = ensureUnique(candidate)
+        namespace += unique_name.toLowerCase
+        unique_name
       }
     }
+    object NameSpace {
+      private[this] val namespaces_cache = LinkedHashMap[Module,NameSpace]()
+      def apply(target: Module): NameSpace = namespaces_cache.getOrElseUpdate(target, new NameSpace)
+    }
+    
+    val childrenOfParent = Driver.sortedComps.groupBy(_.parent)
+    // Now, go through each module and assign unique names
+    for(comp <- Driver.sortedComps) {
+      val namespace = NameSpace(comp)
 
-    for( (className, comps) <- byNames ) {
-      if( comps.length > 1 ) {
-        for( (c, index) <- comps.zipWithIndex ) {
-          c.name = className + "_" + index.toString
-        }
-      } else {
-        comps(0).name = className;
-      }
-    }
-    // temporary node naming:
-    // these names are for the Verilog Backend
-    // and used in custom transforms such as backannotation
-    for (comp <- Driver.sortedComps) {
+      if(comp.name.isEmpty) comp.name = extractClassName(comp)
+        // ensure this component has a name
+      val children = childrenOfParent.getOrElse(comp, Seq.empty)
+      assert(children.filter(_.name.isEmpty).isEmpty, "Chisel Internal Error: Unnamed Children")
+        // since sortedComps, all children should have names due to check above
+      
+      // ensure all nodes in the design has SOME name
       comp dfs { _ match {
         case reg: Reg if reg.name == "" =>
           reg setName "R" + reg.component.nextIndex
+
         case node: Node if !node.isTypeNode && node.name == "" =>
           node.name = "T" + node.component.nextIndex
         case _ =>
       } }
+
+      // Now, ensure everything has a UNIQUE name
+      // First, reserve all the IO names
+      comp.io.flatten map(_._2) foreach(n => namespace.reserveName(n.name))
+      // TODO: Reserve other things like clock, reset, etc.
+      // Second, give module instances high priority for names
+      children.foreach(c => c.name = namespace.getUniqueName(c.name))
+      // Then, check all other nodes in the design
+      comp dfs { _ match {
+        case reg: Reg =>
+          reg setName namespace.getUniqueName(reg.name)
+        case node: Node if !node.isTypeNode && !node.isLit && !node.isIo => {
+          // the isLit check should not be necessary
+          // the isIo check is also strange and happens because parents see child io in the DFS
+          node.name = namespace.getUniqueName(node.name)
+        }
+        case _ =>
+      } }
+
     }
   }
 
@@ -566,54 +595,49 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def addBindings {
+    // IMPORTANT INVARIANT FOR THIS FUNCTION
+    //   After every graph manipulation, consumers for each node MUST be kept consistent!
     for (comp <- Driver.sortedComps) {
-      /* This code finds an output binding for a node.
-         We search for a binding only if the io is an output
-         and the logic's grandfather component is not the same
-         as the io's component and the logic's component is not
-         same as output's component unless the logic is an input */
+      // For a module input or output, logic needs to be adjusted if
+      //   the consumer is NOT in a direct submodule
+      //     (likely as an input since as output/internal wire is illegal cross-module reference)
+      //  AND
+      //   consumer is either in a different module (including submodule) OR is an input
+      //     (since, in the input case, the connection is really being done in the parent)
       for ((n, io) <- comp.wires) {
+        // OUTPUT logic is adjusted by creating a Binding node in parent
+        //   and then having all subsequent logic use that
         if (io.dir == OUTPUT) {
-          for (node <- io.consumers; if !(node == null) && io.component != node.component.parent) {
-            for ((input, i) <- node.inputs.zipWithIndex ; if input eq io) {
-              node match {
-                case bits: Bits if bits.dir == INPUT => {
-                  node.inputs(i) = Binding(io, io.component.parent, io.component)
-                  node.inputs(i).consumers += node
-                }
-                case _ if io.component != node.component => {
-                  node.inputs(i) = Binding(io, io.component.parent, io.component)
-                  node.inputs(i).consumers += node
-                }
-                case _ =>
+          // IMPORTANT: the toSet call makes an immutable copy, allows for manipulation of io.consumers
+          for (node <- io.consumers.toSet; if !(node == null) && io.component != node.component.parent) {
+            if(node match {
+              case _ if io.component != node.component => true
+              case b: Bits if (b.dir == INPUT) && io.component == node.component => true
+              case _ => false
+            }) {
+              for ((input, i) <- node.inputs.zipWithIndex ; if input eq io) {
+                // note: after this redirection: node.inputs(i) == io
+                node.inputs(i).consumers -= node
+                node.inputs(i) = Binding(io, io.component.parent, io.component)
+                node.inputs(i).consumers += node
               }
             }
           }
         }
-        // In this case, we are trying to use the input of a submodule
-        // as part of the logic outside of the submodule.
-        // If the logic is outside the submodule, we do not use
-        // the input name. Instead, we use whatever is driving
-        // the input. In other words, we do not use the Input name,
-        // if the component of the logic is the part of Input's
-        // component. We also do the same when assigning
-        // to the output if the output is the parent
-        // of the subcomponent.
+        // INPUT logic is adjusted by having consumers use that input's producer
         else if (io.dir == INPUT && !io.inputs.isEmpty) {
-          for (node <- io.consumers; if !(node == null) && io.component.parent == node.component) {
-            for ((input, i) <- node.inputs.zipWithIndex ; if input eq io) {
-              node match {
-                case bits: Bits if bits.dir == OUTPUT => {
-                  node.inputs(i) = io.inputs(0)
-                  node.inputs(i).consumers -= io
-                  node.inputs(i).consumers += node
-                }
-                case _ if !node.isIo => {
-                  node.inputs(i) = io.inputs(0)
-                  node.inputs(i).consumers -= io
-                  node.inputs(i).consumers += node
-                }
-                case _ =>
+          // IMPORTANT: the toSet call makes an immutable copy, allows for manipulation of io.consumers
+          for (node <- io.consumers.toSet; if !(node == null) && io.component != node.component.parent) {
+            if(node match {
+              case _ if io.component != node.component => true
+              case b: Bits if (b.dir == INPUT) && io.component == node.component => true
+              case _ => false
+            }) {
+              for ((input, i) <- node.inputs.zipWithIndex ; if input eq io) {
+                // note: after this redirection: node.inputs(i) == io
+                node.inputs(i).consumers -= node
+                node.inputs(i) = io.inputs(0)
+                node.inputs(i).consumers += node
               }
             }
           }
@@ -811,7 +835,7 @@ abstract class Backend extends FileSystemUtilities{
     sortComponents
 
     ChiselError.info("giving names")
-    nameAll(c)
+    nameAll
     ChiselError.checkpoint()
 
     ChiselError.info("executing custom transforms")
@@ -862,7 +886,7 @@ abstract class Backend extends FileSystemUtilities{
 
     findConsumers(c)
     // name temporary nodes generated by transforms
-    nameAll(c)
+    nameAll
     nameRsts
 
     ChiselError.info("creating clock domains")

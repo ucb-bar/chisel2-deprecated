@@ -29,50 +29,39 @@
 */
 
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.ListBuffer
 import org.junit.Assert._
 import org.junit.Test
-import org.junit.Before
-import org.junit.After
-import org.junit.rules.TemporaryFolder;
 
 import Chisel._
 
-
-/** This testsuite checks the generation of dot graphs.
+/** This testsuite various issues with dealing with Module.
 */
-class DotBackendSuite extends TestSuite {
+class ModuleTests extends TestSuite {
+  val testArgs = Array("--targetDir", dir.getPath.toString())
 
-  /** Checks generation of simple dataflow graph */
-  @Test def testSimple() {
-
-    class DAGSubComp extends Module {
-      val io = new Bundle {
-        val ready = Bool(INPUT)
-        val valid = Bool(OUTPUT)
+  /** Catch attempts to wrap a Module with a Module (directly). */
+  @Test def testModuleWrap() {
+    println("\ntestModuleWrap ...")
+    try {
+      class ModuleOne extends Module {
+        val io = new Bundle {
+          val x = UInt(INPUT, 32)
+          val y = SInt(INPUT, 32)
+          val z = SInt(OUTPUT)
+        }
+        io.z := io.x * io.y
       }
-      val stored = Reg(next=io.ready)
-      io.valid := stored
+      chiselMain(testArgs,
+        () => Module(
+                Module(
+                  new ModuleOne()
+                  )
+                )
+              )
+    } catch {
+      case e : java.lang.IllegalStateException => {}
     }
-
-    class DAGComp extends Module {
-      val io = new Bundle {
-        val data0 = Bool(INPUT)
-        val data1 = Bool(INPUT)
-        val result = Bool(OUTPUT) // XXX If we don't explicitely specify
-        // OUTPUT here, dot and verilog is generated correctly but
-        // not c++. This is an interaction between Module.findRoots
-        // and class Bool { def apply(): Bool = Bool(null); }
-      }
-      val sub = Module(new DAGSubComp())
-      sub.io.ready := io.data0 & io.data1
-      io.result := sub.io.valid
-    }
-
-    chiselMain(Array[String](
-      "--backend", "Chisel.DotBackend",
-      "--targetDir", dir.getPath.toString()),
-      () => Module(new DAGComp()))
-    assertFile("DotBackendSuite_DAGComp_1.dot")
+    assertTrue(!ChiselError.ChiselErrors.isEmpty);
   }
+
 }

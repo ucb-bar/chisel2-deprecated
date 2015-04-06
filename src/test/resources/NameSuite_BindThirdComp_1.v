@@ -16,7 +16,7 @@ module NameSuite_BindThirdComp_1(
   wire T0;
   wire T1;
   wire T2;
-  wire NameSuite_Comp_1_0_io_out_ren;
+  wire NameSuite_Comp_1_io_out_ren;
   wire NameSuite_Comp_1_1_io_out_ren;
   wire NameSuite_Comp_1_2_io_out_ren;
   wire NameSuite_Comp_1_3_io_out_ren;
@@ -25,13 +25,13 @@ module NameSuite_BindThirdComp_1(
   assign io_result = T0;
   assign T0 = T1 | NameSuite_Comp_1_3_io_out_ren;
   assign T1 = T2 | NameSuite_Comp_1_2_io_out_ren;
-  assign T2 = NameSuite_Comp_1_0_io_out_ren | NameSuite_Comp_1_1_io_out_ren;
-  NameSuite_Comp_1 NameSuite_Comp_1_0(
+  assign T2 = NameSuite_Comp_1_io_out_ren | NameSuite_Comp_1_1_io_out_ren;
+  NameSuite_Comp_1 NameSuite_Comp_1(
        .io_in_ren( io_in_ren ),
-       .io_out_ren( NameSuite_Comp_1_0_io_out_ren )
+       .io_out_ren( NameSuite_Comp_1_io_out_ren )
   );
   NameSuite_Comp_1 NameSuite_Comp_1_1(
-       .io_in_ren( NameSuite_Comp_1_0_io_out_ren ),
+       .io_in_ren( NameSuite_Comp_1_io_out_ren ),
        .io_out_ren( NameSuite_Comp_1_1_io_out_ren )
   );
   NameSuite_Comp_1 NameSuite_Comp_1_2(
