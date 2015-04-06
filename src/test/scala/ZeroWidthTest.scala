@@ -451,7 +451,7 @@ class ZeroWidthTest extends TestSuite {
     }
 
     chiselMain(testArgs, () => Module(new ReverseNoisyWidth()))
-    assertTrue(ChiselError.ChiselErrors.isEmpty);
+    assertTrue(ChiselError.isEmpty);
   }
 
   /** Issue #335

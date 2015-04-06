@@ -61,7 +61,7 @@ class ModuleTests extends TestSuite {
     } catch {
       case e : java.lang.IllegalStateException => {}
     }
-    assertTrue(!ChiselError.ChiselErrors.isEmpty);
+    assertTrue(ChiselError.hasErrors);
   }
 
 }
