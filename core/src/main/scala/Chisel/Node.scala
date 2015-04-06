@@ -65,8 +65,8 @@ object Node {
     } catch {
         case e: java.lang.IndexOutOfBoundsException => {
           val error = new ChiselError(() => {m + " is unconnected ("+ i + " of " + m.inputs.length + "). Ensure that it is assigned."}, m.line)
-          if (!ChiselErrors.contains(error) && !Driver.isInGetWidth) {
-            ChiselErrors += error
+          if (!ChiselError.contains(error) && !Driver.isInGetWidth) {
+            ChiselError.error(error)
           }
           Width()
        }
@@ -376,8 +376,8 @@ abstract class Node extends nameable {
     for(i <- 0 until inputs.length) {
       if(inputs(i) == null){
         val error = new ChiselError(() => {"NULL Input for " + this.getClass + " " + this + " in Module " + component}, this.line);
-        if (!ChiselErrors.contains(error)) {
-          ChiselErrors += error
+        if (!ChiselError.contains(error)) {
+          ChiselError.error(error)
         }
       }
       else if(inputs(i).isTypeNode) {

@@ -203,7 +203,7 @@ class DataSuite extends TestSuite {
     } catch {
       case _ : Throwable => ;
     }
-    assertTrue(!ChiselError.ChiselErrors.isEmpty);
+    assertTrue(ChiselError.hasErrors);
   }
 
   // tests assigning to non parent's outputs
@@ -233,7 +233,7 @@ class DataSuite extends TestSuite {
     } catch {
       case _ : Throwable => ;
     }
-    assertTrue(!ChiselError.ChiselErrors.isEmpty);
+    assertTrue(ChiselError.hasErrors);
   }
 
   /** Test case derived from issue #1 reported on github.
@@ -259,7 +259,7 @@ class DataSuite extends TestSuite {
     } catch {
       case _ : Throwable => ;
     }
-    assertTrue(!ChiselError.ChiselErrors.isEmpty);
+    assertTrue(ChiselError.hasErrors);
   }
 
 
