@@ -572,7 +572,7 @@ class VerilogBackend extends Backend {
     apis.append("\n  /*** API variables ***/\n")
     apis.append("  reg[20*8:0] cmd;    // API command\n")
     apis.append("  reg[1000*8:0] node; // Chisel node name;\n")
-    apis.append("  reg[255:0] value;   // 'poked' value\n")
+    apis.append("  reg[2047:0] value;   // 'poked' value\n")
     apis.append("  integer offset;     // mem's offset\n")
     apis.append("  integer steps;      // number of steps\n")
     apis.append("  integer delta;      // number of steps\n")
