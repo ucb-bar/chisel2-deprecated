@@ -45,23 +45,26 @@ object TestSuite {
   val defaultEnablePartitionIslands = false
   val partitionIslandsParameter = System.getProperty(partitionIslandsParameterName)
   val partitionIslandsEnable = if (partitionIslandsParameter == null) defaultEnablePartitionIslands else true
+  // Set up default test output directory.
+  val testOutputDir = "test-outputs"
+  var targetDirOption: String = testOutputDir
 }
 
 abstract class TestSuite extends JUnitSuite with BeforeAndAfterAllConfigMap {
-  // Set up default test output directory.
-  val testOutputDir = "test-outputs"
-  var dir = new File(testOutputDir)
+  val dir = new File(targetDirOption)
+  val blankLines_re = """(?m)^\s*$[\r\n]+""".r
 
-  // If we have a target directory key in the config map, use that.
+  // If we have a target directory key in the ConfigMap, use that.
+  // NOTE: This is called before we start constructing TestSuite objects,
+  // so the targetDirOption set here overrides the values set in the companion object.
   override def beforeAll(cm: ConfigMap) {
-    val targetDirOption = cm.getWithDefault("testOutputDir", testOutputDir)
-    dir = new File(targetDirOption)
-    println("testOutputDir: %s".format(targetDirOption))
+    targetDirOption = cm.getWithDefault("testOutputDir", testOutputDir)
+    dir.mkdir
   }
 
-  val blankLines_re = """(?m)^\s*$[\r\n]+""".r
+  // Although we currently do nothing in this method,
+  //  ZeroWidthTest overrides it in order to enable W0W tests.
   @Before def initialize() {
-    dir.mkdir
   }
 
   def assertFile( filename: String ) {

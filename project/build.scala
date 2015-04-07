@@ -28,13 +28,17 @@ object BuildSettings extends Build {
 
     // Execute tests in the current project serially.
     // Tests from other projects may still run concurrently.
-//    parallelExecution in Test := false,
-    // Since we share test-output directories across subprojects,
-    // we need to ensure they run serially.
-    // The library project dependsOn attempts to do this without success.
-    // Or, we could have the tests use different test-output directories,
-    // but this appears to be non-trivial as well.
-    parallelExecution in Global := false,
+    parallelExecution in Test := false,
+    // Since we don't share test-output directories across subprojects,
+    // we can run them in parallel.
+    // If we had to run them serially, the concurrentRestrictions on Tags
+    // appears to work in sbt 0.13.8
+//    concurrentRestrictions in Global := Seq(
+//      Tags.limit(Tags.Test, 1),
+//      Tags.exclusive(Tags.Test)),
+    // If the concurrentRestrictions doesn't work, we need to disable
+    // parallelExecution globally.
+//    parallelExecution in Global := false,
     // unify scaladoc across multiple projects.
     autoAPIMappings := true,
 
@@ -103,7 +107,9 @@ object BuildSettings extends Build {
     // Execute tests in the current project serially.
     // Tests from other projects may still run concurrently.
     parallelExecution in Test := false,
-    scalacOptions ++= Seq("-deprecation", "-feature", "-language:reflectiveCalls", "-language:implicitConversions", "-language:existentials")
+    scalacOptions ++= Seq("-deprecation", "-feature", "-language:reflectiveCalls", "-language:implicitConversions", "-language:existentials"),
+    // Specify a subproject-specific test output directory ConfigMap entry.
+    testOptions in Test += Tests.Argument("-DtestOutputDir=" + target.value + "/test-outputs")
   ) ++ org.scalastyle.sbt.ScalastylePlugin.Settings
 
   lazy val customUnidocSettings = unidocSettings ++ Seq (
@@ -114,14 +120,13 @@ object BuildSettings extends Build {
   lazy val core = (project in file("core")).
     settings(commonArtifactSettings: _*).
     settings(
-      name := "chisel",
-      testOptions in Test += Tests.Argument("-DtestOutputDir=" + target + "/test-outputs")
+      name := "chisel"
     )
+
   lazy val library = (project in file("library")).dependsOn(core % "compile->compile;test->test").
     settings(commonArtifactSettings: _*).
     settings(
-      name := "chisel_library",
-      testOptions in Test += Tests.Argument("-DtestOutputDir=" + target + "/test-outputs")
+      name := "chisel_library"
     )
 
   lazy val root = (project in file(".")).dependsOn(core, library)
@@ -137,7 +142,7 @@ object BuildSettings extends Build {
       com.typesafe.sbt.pgp.PgpKeys.publishSigned := {},
       com.typesafe.sbt.pgp.PgpKeys.publishLocalSigned := {},
       // Don't run tests in the root project.
-//      test := {},
+      test := {},
       aggregate in doc := false
     )
     .aggregate(core, library)
