@@ -29,6 +29,7 @@
 */
 
 import org.scalatest.junit.JUnitSuite
+import org.scalatest._
 import org.junit.Before
 import java.io.File
 import scala.collection.mutable.ArrayBuffer
@@ -46,9 +47,18 @@ object TestSuite {
   val partitionIslandsEnable = if (partitionIslandsParameter == null) defaultEnablePartitionIslands else true
 }
 
-abstract class TestSuite extends JUnitSuite {
+abstract class TestSuite extends JUnitSuite with BeforeAndAfterAllConfigMap {
+  // Set up default test output directory.
+  val testOutputDir = "test-outputs"
+  var dir = new File(testOutputDir)
 
-  val dir = new File("test-outputs")
+  // If we have a target directory key in the config map, use that.
+  override def beforeAll(cm: ConfigMap) {
+    val targetDirOption = cm.getWithDefault("testOutputDir", testOutputDir)
+    dir = new File(targetDirOption)
+    println("testOutputDir: %s".format(targetDirOption))
+  }
+
   val blankLines_re = """(?m)^\s*$[\r\n]+""".r
   @Before def initialize() {
     dir.mkdir

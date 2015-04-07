@@ -28,7 +28,13 @@ object BuildSettings extends Build {
 
     // Execute tests in the current project serially.
     // Tests from other projects may still run concurrently.
-    parallelExecution in Test := false,
+//    parallelExecution in Test := false,
+    // Since we share test-output directories across subprojects,
+    // we need to ensure they run serially.
+    // The library project dependsOn attempts to do this without success.
+    // Or, we could have the tests use different test-output directories,
+    // but this appears to be non-trivial as well.
+    parallelExecution in Global := false,
     // unify scaladoc across multiple projects.
     autoAPIMappings := true,
 
@@ -108,15 +114,17 @@ object BuildSettings extends Build {
   lazy val core = (project in file("core")).
     settings(commonArtifactSettings: _*).
     settings(
-      name := "chisel"
+      name := "chisel",
+      testOptions in Test += Tests.Argument("-DtestOutputDir=" + target + "/test-outputs")
     )
   lazy val library = (project in file("library")).dependsOn(core % "compile->compile;test->test").
     settings(commonArtifactSettings: _*).
     settings(
-      name := "chisel_library"
+      name := "chisel_library",
+      testOptions in Test += Tests.Argument("-DtestOutputDir=" + target + "/test-outputs")
     )
 
-  lazy val root = (project in file("."))
+  lazy val root = (project in file(".")).dependsOn(core, library)
     .settings(commonSettings: _*)
     .settings(customUnidocSettings: _*)
     .settings(
@@ -128,8 +136,12 @@ object BuildSettings extends Build {
       publishLocal := {},
       com.typesafe.sbt.pgp.PgpKeys.publishSigned := {},
       com.typesafe.sbt.pgp.PgpKeys.publishLocalSigned := {},
+      // Don't run tests in the root project.
+//      test := {},
       aggregate in doc := false
     )
-    .aggregate(core, library).dependsOn(core % "test", library % "test")
+    .aggregate(core, library)
+
+//    test in library := (test in library).dependsOn(test in core).value
 }
 
