@@ -59,9 +59,9 @@ object Module {
     pop()
     for ((n, io) <- res.wires) {
       if (io.dir == null)
-         ChiselErrors += new ChiselError(() => {"All IO's must be ports (dir set): " + io}, io.line)
+         ChiselError.error(new ChiselError(() => {"All IO's must be ports (dir set): " + io}, io.line))
       // else if (! io.isKnownWidth)
-      //   ChiselErrors += new ChiselError(() => {"All IO's must have width set: " + io}, io.line)
+      //   ChiselError.error(new ChiselError(() => {"All IO's must have width set: " + io}, io.line))
       io.isIo = true
     }
     res
@@ -197,7 +197,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     _reset = parent._reset
   }
 
-  override def toString = this.getClass.toString
+  override def toString = s"<${this.name} (${this.getClass.toString})>"
 
   // This function sets the IO's component.
   def ownIo() {
@@ -243,7 +243,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     p.inputs.foreach(debug _)
     for (arg <- args)
       if (arg.isInstanceOf[Aggregate])
-        ChiselErrors += new ChiselError(() => { "unable to printf aggregate argument " + arg }, arg.line)
+        ChiselError.error(new ChiselError(() => { "unable to printf aggregate argument " + arg }, arg.line))
   }
 
   def <>(src: Module) {

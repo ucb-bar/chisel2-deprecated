@@ -126,3 +126,22 @@ the Chisel jar locally and remake your third-party project. Example:
     $ cd *srcTop*/chisel && make publish-local
     $ cd *srcTop*/riscv-sodor && make run-emulator
 
+
+Documentation
+-------------
+
+In order to generate the Chisel documentation (html and pdf formats),
+you'll need the LaTeX tools, tex4ht, texlive, python bs4
+BeautifulSoup, imagemagick, and source-highlight. The following
+apt-get installs should work for ubuntu 14.04 LTS
+
+    $ sudo apt-get install python-bs4 imagemagick source-highlight
+    $ sudo apt-get install tex4ht texlive-latex-base
+    $ sudo apt-get install texlive-latex-recommended texlive-latex-extra
+    $ sudo apt-get install texlive-fonts-recommended texlive-fonts-extra
+
+To generate all the documentation:
+
+    $ cd doc
+    $ make
+

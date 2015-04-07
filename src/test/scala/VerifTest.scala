@@ -111,7 +111,7 @@ class VerifSuite extends TestSuite {
     } catch {
       case _ : Throwable => ;
     }
-    assertTrue(!ChiselError.ChiselErrors.isEmpty);
+    assertTrue(ChiselError.hasErrors);
   }
 
   @Test def testPrintfVerilog() {
