@@ -29,7 +29,6 @@
 */
 
 package Chisel
-import Chisel.Library.Queue
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.HashSet
@@ -54,6 +53,76 @@ object FameDecoupledIO
   }
 }
 
+class FCounter(val n: Int) {
+  val value = if (n == 1) UInt(0) else Reg(init=UInt(0, log2Up(n)))
+  def inc(): Bool = {
+    if (n == 1) Bool(true)
+    else {
+      val wrap = value === UInt(n-1)
+      value := Mux(Bool(!isPow2(n)) && wrap, UInt(0), value + UInt(1))
+      wrap
+    }
+  }
+}
+
+private object FCounter
+{
+  def apply(n: Int): FCounter = new FCounter(n)
+  def apply(cond: Bool, n: Int): (UInt, Bool) = {
+    val c = new FCounter(n)
+    var wrap: Bool = null
+    when (cond) { wrap = c.inc() }
+    (c.value, cond && wrap)
+  }
+}
+
+class FQueueIO[T <: Data](gen: T, entries: Int) extends Bundle
+{
+  val enq   = Decoupled(gen.clone).flip
+  val deq   = Decoupled(gen.clone)
+  val count = UInt(OUTPUT, log2Up(entries + 1))
+}
+
+class FQueue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Bool = null) extends Module(_reset=_reset)
+{
+  val io = new FQueueIO(gen, entries)
+
+  val ram = Mem(gen, entries)
+  val enq_ptr = FCounter(entries)
+  val deq_ptr = FCounter(entries)
+  val maybe_full = Reg(init=Bool(false))
+
+  val ptr_match = enq_ptr.value === deq_ptr.value
+  val empty = ptr_match && !maybe_full
+  val full = ptr_match && maybe_full
+  val maybe_flow = Bool(flow) && empty
+  val do_flow = maybe_flow && io.deq.ready
+
+  val do_enq = io.enq.ready && io.enq.valid && !do_flow
+  val do_deq = io.deq.ready && io.deq.valid && !do_flow
+  when (do_enq) {
+    ram(enq_ptr.value) := io.enq.bits
+    enq_ptr.inc()
+  }
+  when (do_deq) {
+    deq_ptr.inc()
+  }
+  when (do_enq != do_deq) {
+    maybe_full := do_enq
+  }
+
+  io.deq.valid := !empty || Bool(flow) && io.enq.valid
+  io.enq.ready := !full || Bool(pipe) && io.deq.ready
+  io.deq.bits := Mux(maybe_flow, io.enq.bits, ram(deq_ptr.value))
+
+  val ptr_diff = enq_ptr.value - deq_ptr.value
+  if (isPow2(entries)) {
+    io.count := Cat(maybe_full && ptr_match, ptr_diff)
+  } else {
+    io.count := Mux(ptr_match, Mux(maybe_full, UInt(entries), UInt(0)), Mux(deq_ptr.value > enq_ptr.value, UInt(entries) + ptr_diff, ptr_diff))
+  }
+}
+
 class FameDecoupledIO[+T <: Data](data: T) extends Bundle
 {
   val host_valid = Bool(OUTPUT)
@@ -69,7 +138,7 @@ class FameQueue[T <: Data] (val entries: Int)(data: => T) extends Module
     val enq = new FameDecoupledIO(data).flip()
   }
 
-  val target_queue = Module(new Queue(data, entries))
+  val target_queue = Module(new FQueue(data, entries))
   val tracker = Module(new FameQueueTracker(entries, entries))
 
   target_queue.io.enq.valid := io.enq.host_valid && io.enq.target.valid

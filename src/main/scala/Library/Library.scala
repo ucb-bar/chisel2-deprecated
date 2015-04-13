@@ -37,6 +37,10 @@ import scala.math._
   */
 object LFSR16
 {
+  /** Creates a 16-bit linear feedback shift register.
+    *  
+    *  @param increment controls cycling of the LFSR.
+    */  
   def apply(increment: Bool = Bool(true)): UInt =
   {
     val width = 16
@@ -50,6 +54,13 @@ object LFSR16
   */
 object ShiftRegister
 {
+  /** Creates a shift register for a specific signal with a specific delay.
+    *  
+    *  @tparam T type of input (and delayed output).
+    *  @param in input signal to be delayed.
+    *  @param n Number of cycles of delay.
+    *  @param en Optional enable signal.
+    */  
   def apply[T <: Data](in: T, n: Int, en: Bool = Bool(true)): T =
   {
     // The order of tests reflects the expected use cases.
@@ -67,6 +78,11 @@ object ShiftRegister
   */
 object UIntToOH
 {
+  /** Creates a one hot encoder of the input.
+    *  
+    *  @param in UInt input signal.
+    *  @param width If provided, specifies the output width, otherwise inferred from the input.
+    */  
   def apply(in: UInt, width: Int = -1): UInt =
     if (width == -1) UInt(1) << in
     else (UInt(1) << in(log2Up(width)-1,0))(width-1,0)
@@ -89,7 +105,15 @@ class DeqIO[T <: Data](gen: T) extends DecoupledIO(gen)
   override def clone: this.type = { new DeqIO(gen).asInstanceOf[this.type]; }
 }
 
-
+/** An interface Bundle with ready/valid wires.
+  *
+  * @constructor wrap a an object with a DecoupledIOC interface.
+  * @tparam T The type of the source object (must be a subtype of Data).
+  * @param gen The source object.
+  *
+  *The standard used is that the consumer uses the flipped interface.
+  * @see [[Chisel.DecoupledIO]],[[Chisel.ValidIO]]
+  */
 class DecoupledIOC[+T <: Data](gen: T) extends Bundle
 {
   val ready = Bool(INPUT)
@@ -171,25 +195,27 @@ class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T 
 }
 
 /** Hardware module that is used to sequence n producers into 1 consumer.
-  Producers are chosen in round robin order.
-
-  Example usage:
-    val arb = new RRArbiter(2, UInt())
-    arb.io.in(0) <> producer0.io.out
-    arb.io.in(1) <> producer1.io.out
-    consumer.io.in <> arb.io.out
+  * Producers are chosen in round robin order.
+  *
+  * @example {{{
+  *  val arb = new RRArbiter(2, UInt())
+  *  arb.io.in(0) <> producer0.io.out
+  *  arb.io.in(1) <> producer1.io.out
+  *  consumer.io.in <> arb.io.out
+  *  }}}
   */
 class RRArbiter[T <: Data](gen:T, n: Int) extends LockingRRArbiter[T](gen, n, 1)
 
 /** Hardware module that is used to sequence n producers into 1 consumer.
- Priority is given to lower producer
-
- Example usage:
-   val arb = Module(new Arbiter(2, UInt()))
-   arb.io.in(0) <> producer0.io.out
-   arb.io.in(1) <> producer1.io.out
-   consumer.io.in <> arb.io.out
- */
+  * Priority is given to lower producer
+  *
+  * @example {{{
+  * val arb = Module(new Arbiter(2, UInt()))
+  * arb.io.in(0) <> producer0.io.out
+  * arb.io.in(1) <> producer1.io.out
+  * consumer.io.in <> arb.io.out
+  * }}}
+  */
 class Arbiter[T <: Data](gen: T, n: Int) extends LockingArbiter[T](gen, n, 1)
 
 
@@ -199,8 +225,23 @@ object FillInterleaved
   def apply(n: Int, in: Seq[Bool]): UInt = Vec(in.map(Fill(n, _))).toBits
 }
 
+/** A counter that counts up to a maximum value then wraps around back to zero.
+  *
+  * @param n maximum value
+  *
+  * A Counter with maximum value 1
+  * Counters are typically created via the Counter companion object.
+  */
 class Counter(val n: Int) {
+  /** The Counter's value: either a constant 0 (for Counters with a
+    * maximum value of 1) or a register large enough to contain the
+    * maximum value.
+    */
   val value = if (n == 1) UInt(0) else Reg(init=UInt(0, log2Up(n)))
+  /** The Counter's increment method.
+    *
+    * @return a Bool indicating whether or not the Counter wrapped.
+    */
   def inc(): Bool = {
     if (n == 1) Bool(true)
     else {
@@ -211,9 +252,36 @@ class Counter(val n: Int) {
   }
 }
 
+/** Factory for [[Chisel.Library.Counter]] instances. */
 object Counter
 {
+  /** Creates a counter.
+    *
+    * @param n Maximum Counter value.
+    * @return new Counter.
+    */
   def apply(n: Int): Counter = new Counter(n)
+
+  /** Creates a counter whose increment is controlled by a Bool signal.
+    *
+    * @param cond A Bool used to enable calls to the inc method.
+    * @param n Maximum Counter value.
+    * @return A (UInt, Bool) tuple of the counter value and
+    *  whether wrapping occured or not.
+    *
+    * @example {{{
+    * class CounterComp extends Module {
+    *   val io = new Bundle {
+    *    val in = Bool(INPUT)
+    *    val out = UInt(OUTPUT)
+    *    val wrap = Bool(OUTPUT)
+    *   }
+    *   val (count, wrap) = Counter(io.in, 5)
+    *   io.out := count
+    *   io.wrap := wrap
+    * }
+    * }}}
+    */
   def apply(cond: Bool, n: Int): (UInt, Bool) = {
     val c = new Counter(n)
     var wrap: Bool = null
@@ -270,16 +338,22 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
 }
 
 /** Generic hardware queue. Required parameter entries controls
-  the depth of the queues. The width of the queue is determined
-  from the inputs.
-
-  Example usage:
-    val q = new Queue(UInt(), 16)
-    q.io.enq <> producer.io.out
-    consumer.io.in <> q.io.deq
+  * the depth of the queues. The width of the queue is determined
+  * from the inputs.
+  *
+  * @example {{{
+  *  val q = new Queue(UInt(), 16)
+  *  q.io.enq <> producer.io.out
+  *  consumer.io.in <> q.io.deq
+  *  }}}
   */
 object Queue
 {
+  /** Create a hardware queue.
+    *  @tparam T Type of queue elements.
+    *  @param entries Depth of queue.
+    *  @param pipe FIXME
+    */
   def apply[T <: Data](enq: DecoupledIO[T], entries: Int = 2, pipe: Boolean = false): DecoupledIO[T]  = {
     val q = Module(new Queue(enq.bits.clone, entries, pipe))
     q.io.enq.valid := enq.valid // not using <> so that override is allowed
@@ -353,13 +427,14 @@ class Pipe[T <: Data](gen: T, latency: Int = 1) extends Module
 }
 
 /** A hardware module that delays data coming down the pipeline
-  by the number of cycles set by the latency parameter. Functionality
-  is similar to ShiftRegister but this exposes a Pipe interface.
-
-  Example usage:
-    val pipe = new Pipe(UInt())
-    pipe.io.enq <> produce.io.out
-    consumer.io.in <> pipe.io.deq
+  * by the number of cycles set by the latency parameter. Functionality
+  * is similar to ShiftRegister but this exposes a Pipe interface.
+  *
+  * @example {{{
+  *  val pipe = new Pipe(UInt())
+  *  pipe.io.enq <> produce.io.out
+  *  consumer.io.in <> pipe.io.deq
+  *  }}}
   */
 object Pipe
 {
@@ -381,7 +456,7 @@ object Pipe
 }
 
 /** Returns a bit vector in which only the least-significant 1 bit in
-  the input vector, if any, is set.
+  * the input vector, if any, is set.
   */
 object PriorityEncoderOH
 {
@@ -394,14 +469,4 @@ object PriorityEncoderOH
     Vec.tabulate(in.size)(enc(_))
   }
   def apply(in: Bits): UInt = encode((0 until in.getWidth).map(i => in(i)))
-}
-
-
-/** Returns the bit position of the trailing 1 in the input vector
-  with the assumption that multiple bits of the input bit vector can be set
-  */
-object PriorityEncoder
-{
-  def apply(in: Iterable[Bool]): UInt = PriorityMux(in, (0 until in.size).map(UInt(_)))
-  def apply(in: Bits): UInt = UInt().asTypeFor(new PriorityEncoder(in))
 }

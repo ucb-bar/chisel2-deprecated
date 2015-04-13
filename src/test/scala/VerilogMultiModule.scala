@@ -32,8 +32,8 @@ import org.junit.Assert._
 import org.junit.Test
 import org.junit.Ignore
 
+import Chisel.Library.Queue
 import Chisel._
-import Chisel.Library._
 
 class VerilogMultiModule extends TestSuite {
   @Test def testVerilogMultiModule() {
