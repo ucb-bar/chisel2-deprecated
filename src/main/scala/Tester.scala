@@ -330,17 +330,22 @@ class ManualTester[+T <: Module]
   def start(): Process = {
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
     val target = Driver.targetDir + "/" + n
-    val cmd =
-      (if (Driver.backend.isInstanceOf[FloBackend]) {
+    // If the caller has provided a specific command to execute, use it.
+    val cmd = Driver.testCommand match {
+      case Some(name: String) => name
+      case None => {
+        if (Driver.backend.isInstanceOf[FloBackend]) {
          val dir = Driver.backend.asInstanceOf[FloBackend].floDir
          val command = ArrayBuffer(dir + "fix-console", ":is-debug", "true", ":filename", target + ".hex", ":flo-filename", target + ".mwe.flo")
          if (Driver.isVCD) { command ++= ArrayBuffer(":is-vcd-dump", "true") }
          if (Driver.emitTempNodes) { command ++= ArrayBuffer(":emit-temp-nodes", "true") }
          command ++= ArrayBuffer(":target-dir", Driver.targetDir)
          command.mkString(" ")
-      } else {
-         target + (if (Driver.backend.isInstanceOf[VerilogBackend]) " -q +vcs+initreg+0 " else "")
-      })
+        } else {
+           target + (if (Driver.backend.isInstanceOf[VerilogBackend]) " -q +vcs+initreg+0 " else "")
+        }
+      }
+    }
     println("SEED " + Driver.testerSeed)
     println("STARTING " + cmd)
     val processBuilder = Process(cmd)
