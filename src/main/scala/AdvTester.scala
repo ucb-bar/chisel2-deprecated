@@ -34,7 +34,6 @@
 */
 package Chisel.AdvTester // May eventually add this to the base Chisel package
 import Chisel._
-import Library._
 import scala.reflect.ClassTag
 import scala.collection.mutable.ArrayBuffer
 
