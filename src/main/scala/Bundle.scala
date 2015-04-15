@@ -95,6 +95,18 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
 
   lazy val elements = calcElements(view)
 
+  def fromMap(elemmap: Map[String, Data]): this.type = {
+    // only well defined for 'flat' bundles, for now
+    val result = this.clone
+    elemmap.foreach({case (subfield: String, source: Data) => {
+      result.elements.get(subfield) match {
+        case Some(sink: Data) => sink := source
+        case None => ChiselError.error(s"In fromMap, Map attempts to index subfield ${subfield}, which does not exist in ${result.getClass.getName}")
+      }
+    }})
+    result.asInstanceOf[this.type]
+  }
+
   override def toString: String = {
     var res = "BUNDLE("
     var sep = ""
