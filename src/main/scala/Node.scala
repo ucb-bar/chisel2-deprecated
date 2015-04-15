@@ -125,17 +125,17 @@ object Node {
   }
 }
 
-/** *Node* defines the root class of the class hierarchy for
-  a [Composite Pattern](http://en.wikipedia.org/wiki/Composite_pattern).
-
-  A digital logic graph is encoded as adjacency graph where instances
-  of *Node* describe vertices and *inputs*, *consumers* member fields
-  are used to traverse the directed graph respectively backward (from
-  output to input) and forward (from input to output).
+/** '''Node''' defines the root class of the class hierarchy for
+  * a [[http://en.wikipedia.org/wiki/Composite_pattern Composite Pattern]].
+  *
+  * A digital logic graph is encoded as an adjacency graph where instances
+  * of '''Node''' describe vertices and '''inputs''' and '''consumers''' member fields
+  * are used to traverse the directed graph respectively backward (from
+  * output to input) and forward (from input to output).
   */
 abstract class Node extends nameable {
-  var sccIndex = -1
-  var sccLowlink = -1
+  private[Chisel] var sccIndex = -1
+  private[Chisel] var sccLowlink = -1
   /* Assigned in Binding and Mod.reset */
   var component: Module = Module.getComponent
   var isTypeNode = false;
@@ -144,20 +144,20 @@ abstract class Node extends nameable {
   // The semantics of width are sufficiently complicated that
   // it deserves its own class
   var width_ = Width()
-  var inferWidth: (=> Node) => Width = maxWidth
+  private[Chisel] var inferWidth: (=> Node) => Width = maxWidth
   val inputs = ArrayBuffer[Node]()
   val consumers = LinkedHashSet[Node]() // nodes that consume one of my outputs
 
-  var nameHolder: nameable = null;
+  private[Chisel] var nameHolder: nameable = null;
   val line: StackTraceElement =
     if (Driver.getLineNumbers) {
       val trace = new Throwable().getStackTrace
       findFirstUserLine(trace) getOrElse trace(0)
     } else null
-  var prune = false
+  private[Chisel] var prune = false
   var driveRand = false
   var clock: Clock = null
-  var cntrIdx = -1
+  private[Chisel] var cntrIdx = -1
 
   val _id = Driver.nodes.length
   Driver.nodes += this
@@ -188,7 +188,7 @@ abstract class Node extends nameable {
     // See the comments in infer
   }
 
-  def nameIt (path: String, isNamingIo: Boolean) {
+  private[Chisel] def nameIt (path: String, isNamingIo: Boolean) {
     try {
       if (!named && (!isIo || isNamingIo)) {
         /* If the name was set explicitly through *setName*,
@@ -233,6 +233,7 @@ abstract class Node extends nameable {
   def dblLitValue: Double = longBitsToDouble(litValue().toLong)
   // TODO: MOVE TO WIRE
   def assign(src: Node): Unit = throw new Exception("unimplemented assign")
+  /** Wire nodes together. */
   def <>(src: Node): Unit = throw new Exception("unimplemented <>")
   def ^^(src: Node): Unit = src <> this
 
@@ -241,8 +242,8 @@ abstract class Node extends nameable {
   def isIo = _isIo
   def isIo_=(isIo: Boolean) = _isIo = isIo
   def isReg: Boolean = false
-  def isUsedByClockHi: Boolean = consumers.exists(_.usesInClockHi(this))
-  def usesInClockHi(i: Node): Boolean = false
+  private[Chisel] def isUsedByClockHi: Boolean = consumers.exists(_.usesInClockHi(this))
+  private[Chisel] def usesInClockHi(i: Node): Boolean = false
   def initOf (n: String, widthfunc: (=> Node) => Width, ins: Iterable[Node]): Node = {
     name = n;
     inferWidth = widthfunc;
@@ -261,7 +262,7 @@ abstract class Node extends nameable {
   // We return true if we should continue to walk the graph,
   // either because there's a node whose width we don't know,
   // or because we updated a node's width.
-  def infer: Boolean = {
+  private[Chisel] def infer: Boolean = {
     val res = inferWidth(this);
     if (! res.isKnown) {
       true
@@ -277,14 +278,14 @@ abstract class Node extends nameable {
   
   def isTopLevelIO: Boolean = isIo && (component == Driver.topComponent)
 
-  lazy val isInObject: Boolean =
+  private[Chisel] lazy val isInObject: Boolean =
     (isIo && (Driver.isIoDebug || component == Driver.topComponent)) ||
     Driver.topComponent.debugs.contains(this) ||
     isReg || isUsedByClockHi || Driver.isDebug && named ||
     Driver.emitTempNodes ||
     Driver.backend.isInObject(this)
 
-  lazy val isInVCD: Boolean = name != "reset" && needWidth() > 0 &&
+  private[Chisel] lazy val isInVCD: Boolean = name != "reset" && needWidth() > 0 &&
      (named || Driver.emitTempNodes) &&
      ((isIo && isInObject) || isReg || Driver.isDebug)
 
@@ -325,9 +326,9 @@ abstract class Node extends nameable {
     }
   }
 
-  def forceMatchingWidths { }
+  private[Chisel] def forceMatchingWidths { }
 
-  def matchWidth(w: Width): Node = {
+  private[Chisel] def matchWidth(w: Width): Node = {
     val this_width = this.widthW
     if (w.isKnown && this_width.isKnown) {
       val my_width = this_width.needWidth()
@@ -353,8 +354,12 @@ abstract class Node extends nameable {
     named = true;
   }
 
-  var isWidthWalked = false;
+  private[Chisel] var isWidthWalked = false;
 
+  /** Return the [[Chisel.Width]] (inferring if necessary) of the object.
+    * @note the Width may be unknown, in which case an Width object
+    * with an unknown value is returned.
+    */
   def getWidthW(): Width = {
     val oldDriverisInGetWidth = Driver.isInGetWidth
     Driver.isInGetWidth = true
@@ -363,6 +368,9 @@ abstract class Node extends nameable {
     w
   }
 
+  /** Return the integer value of the object's Width.
+    * @throws ChiselException If the Width is unknown.
+    */
   def getWidth(): Int = {
     val w = getWidthW()
     if (w.isKnown)
@@ -371,7 +379,7 @@ abstract class Node extends nameable {
       throwException("Node.getWidth() for node " + this + " returns unknown width")
   }
 
-  def removeTypeNodes() {
+  private[Chisel] def removeTypeNodes() {
     for(i <- 0 until inputs.length) {
       if(inputs(i) == null){
         val error = new ChiselError(() => {"NULL Input for " + this.getClass + " " + this + " in Module " + component}, this.line);
@@ -393,7 +401,7 @@ abstract class Node extends nameable {
 
   def toNode: Node = this
 
-  def addConsumers() {
+  private[Chisel] def addConsumers() {
     for ((i, off) <- inputs.zipWithIndex) {
       /* By construction we should not end-up with null inputs. */
       assert(i != null, ChiselError.error("input " + off
@@ -423,7 +431,7 @@ abstract class Node extends nameable {
     }
     res.reverse
   }
-  def maybeFlatten: Seq[Node] = {
+  private[Chisel] def maybeFlatten: Seq[Node] = {
     this match {
       case b: Bundle =>
         val buf = ArrayBuffer[Node]();
@@ -434,7 +442,7 @@ abstract class Node extends nameable {
     }
   }
 
-  lazy val emitIndex: Int = componentOf.nextIndex
+  private[Chisel] lazy val emitIndex: Int = componentOf.nextIndex
 
   override def hashCode: Int = _id
   override def equals(that: Any): Boolean = that match {
@@ -443,9 +451,9 @@ abstract class Node extends nameable {
     case _ => ChiselError.error("can't compare Node " + this + " and non-Node " + that); false
   }
 
-  def canCSE: Boolean = false
-  def hashCodeForCSE: Int = inputs.head.hashCode
-  def equalsForCSE(x: Node): Boolean = false
+  private[Chisel] def canCSE: Boolean = false
+  private[Chisel] def hashCodeForCSE: Int = inputs.head.hashCode
+  private[Chisel] def equalsForCSE(x: Node): Boolean = false
 
   def _isComplementOf(x: Node): Boolean = {
     def checkOne(x: Node, y: Node) = x.getNode match {
@@ -472,10 +480,10 @@ abstract class Node extends nameable {
 
   // The following are used for optimizations, notably, dealing with zero-width wires.
   /* If we've updated this node since our last visit. */
-  var modified = false
+  private[Chisel] var modified = false
   // Eliminate any zero-width wires attached to this node.
   // Return true if we modified the node.
-  def W0Wtransform() {
+  private[Chisel] def W0Wtransform() {
     // If we're just a type node, we're now a zero-width type node.
     if (isTypeNode) {
       setWidth(0)
@@ -484,12 +492,12 @@ abstract class Node extends nameable {
   }
 
   // Review a node for optimization possibilities if its children have been updated.
-  def review() { }
+  private[Chisel] def review() { }
   // Parent nodes - used during optimization.
   var parents = LinkedHashSet[Node]()
 
   // Replace the subtree starting from this node with the indicated replacement.
-  def replaceTree(newNode: Node) {
+  private[Chisel] def replaceTree(newNode: Node) {
     val oldNode = this
 
     /* We are no longer anyone's parent. */

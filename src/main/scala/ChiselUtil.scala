@@ -183,35 +183,91 @@ object Mux1H
   def apply(sel: Bits, in: Bits): Bool = (sel & in).orR
 }
 
+/** Adds a valid protocol to any interface.
+  *
+  * @constructor wrap an object with a ValidIO interface.
+  * @param gen The source object.
+  * @tparam T The type of the source object (must be a subtype of Data).
+  *
+  * The standard used is that the consumer uses the flipped interface.
+  *
+  * @note Objects may be created from [[Chisel.Valid]]
+  */
 class ValidIO[+T <: Data](gen: T) extends Bundle
 {
   val valid = Bool(OUTPUT)
   val bits = gen.clone.asOutput
+
+  /** Return the state of the valid signal.
+    *
+    * @param dummy ignored.
+    * @return the valid signal
+    * @todo Shouldn't this be wouldFire?
+    * It doesn't appear to alter the state of the object.
+    */
   def fire(dummy: Int = 0): Bool = valid
+
+  /** Clone the object.
+    * @return a new object of the same type.
+    */
   override def clone: this.type = new ValidIO(gen).asInstanceOf[this.type]
 }
 
-/** Adds a valid protocol to any interface. The standard used is
-  that the consumer uses the flipped interface.
-*/
+/** Factory object for ValidIOs.
+  * @todo Shouldn't this be ValidIO?
+  */
 object Valid {
+  /** Create a new [[Chisel.ValidIO]] object.
+    *
+    * @tparam T The type of the source object (must be a subtype of Data).
+    * @param gen The source object.
+    * @return a ValidIO Bundle with valid (output) and bits(output)
+    *  representing the source object.
+    */
   def apply[T <: Data](gen: T): ValidIO[T] = new ValidIO(gen)
 }
 
+/** Adds a ready/valid protocol to any interface.
+  *
+  * @constructor wrap an object with a DecoupledIO interface.
+  * @param gen The source object.
+  * @tparam T The type of the source object (must be a subtype of Data).
+  *
+  *The standard used is that the consumer uses the flipped interface.
+  *
+  * @note Objects may be created from [[Chisel.Decoupled]]
+  */
 class DecoupledIO[+T <: Data](gen: T) extends Bundle
 {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
   val bits  = gen.clone.asOutput
+
+  /** Return the state of valid && ready.
+    *
+    * @param dummy ignored.
+    * @return valid && ready.
+    * @todo Shouldn't this be wouldFire?
+    * It doesn't appear to alter the state of the object.
+    */
   def fire(dummy: Int = 0): Bool = ready && valid
+  /** Clone the object.
+    * @return a new object of the same type.
+    */
   override def clone: this.type = new DecoupledIO(gen).asInstanceOf[this.type]
 }
 
-/** Adds a ready-valid handshaking protocol to any interface.
-  The standard used is that the consumer uses the flipped
-  interface.
+/** Factory method for [[Chisel.DecoupledIO]]
+  * @todo Shouldn't this be DecoupledIO?
   */
 object Decoupled {
+  /** Create a new [[Chisel.DecoupledIO]] object.
+    *
+    * @tparam T The type of the source object (must be a subtype of Data).
+    * @param gen The source object.
+    * @return a DecoupledIO Bundle with ready(input), valid (output)
+    *  and bits(output) representing the source object.
+    */
   def apply[T <: Data](gen: T): DecoupledIO[T] = new DecoupledIO(gen)
 }
 

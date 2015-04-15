@@ -34,6 +34,7 @@ import Node._
 import Width._
 import ChiselError._
 
+/** Factory object to construct Width objects. */
 object Width {
   type WidthType = Option[Int]  // The internal representation of width
   // Class variables.
@@ -42,6 +43,9 @@ object Width {
   val throwIfUnsetRef: Boolean = false
   val debug: Boolean = false
 
+  /** Create a Width object with the specified value.
+    * @param w Int width value; -1 (the default) indicates the Width is unknown.
+    */
   def apply(w: Int = -1): Width = {
     if (w < -1) {
       ChiselError.warning("Width:apply < -1")
@@ -54,6 +58,22 @@ object Width {
   }
 }
 
+/** Represent the width of a Chisel object.
+  *
+  * @constructor Create a Width object.
+  * @param _width Integer value of Width. -1 indicates unknown.
+  * @note Width objects may also be constructed via the Width companion object.
+  *
+  * We define the equality trio: hashCode, equals, canEqual for Width objects
+  * (see ''Programming in Scala, Chapter 28: Object Equality'').
+  * We want defined Widths with idential values to produce the same hashCode
+  * but undefined Widths should have different hashCodes
+  * (undefined Widths should NOT compare equal)
+  * Since hashCode (and equals) depends on a var, it can change if the value changes.
+  * This will be problematic for collections of Widths, if the value of
+  * individual objects changes after they've been place in the collection.
+  *
+  */
 class Width(_width: Int) extends Ordered[Width] {
   // Construction: initialize internal state
   private var widthVal: WidthType = if (_width > -1) Some(_width) else unSet
@@ -66,7 +86,10 @@ class Width(_width: Int) extends Ordered[Width] {
   @deprecated("Clients should not expect a Width is directly convertable to an Int", "2.3")
   def width: Int = if (isKnown) widthVal.get else unSetVal
 
-  //  Set the width of a Node.
+  /** Set the width (known) of a Width object explicitly.
+    * @param w Int width value.
+    * @throws Exception if w is < 0.
+    */
   def setWidth(w: Int): Unit = {
     assert(w >= 0, ChiselError.error("Width.setWidth: setting width to " + w))
     if (w < 0) {
@@ -89,11 +112,13 @@ class Width(_width: Int) extends Ordered[Width] {
     setWidth(w)
   }
 
-  // Indicate whether width is actually known(set) or not.
+  /** Return a Boolean Indicating whether Width is actually known(set) or not. */
   def isKnown: Boolean = widthVal != unSet
 
-  // Return an "known" integer value or raise an exception
-  //  if called when the width is unknown.
+  /** Return an "known" integer value or raise an exception.
+    * @return Int width value
+    * @throws Exception if Width value is unknown.
+    */
   def needWidth(): Int = {
     if (! isKnown ) {
       ChiselError.warning("needWidth but width not set")
@@ -105,12 +130,16 @@ class Width(_width: Int) extends Ordered[Width] {
     widthVal.get
   }
 
-  // Return either the width or the specificed value if the width isn't set.
+  /** Return either the integer Width value or the specified value if the width isn't set. */
   def widthOrValue(v: Int): Int = {
     if (widthVal != unSet) widthVal.get else v
   }
 
-  // Compare two widths. We assume an unknown width is less than any known width
+  /** Compare two Widths.
+    * We assume an unknown Width is less than any known Width.
+    * @return the difference in Width values if both are known,
+    * or 1 if this.Width is known, or -1 if this.Width is unknown.
+    */
   def compare(that: Width): Int = {
     if (this.isKnown && that.isKnown) {
       this.widthVal.get - that.widthVal.get
@@ -121,17 +150,24 @@ class Width(_width: Int) extends Ordered[Width] {
     }
   }
 
-  // Print a string representation of width
+  /** Return a string representation of a Width object. */
   override def toString: String = (widthVal match {
     case Some(w) => w
     case x => x
   }).toString
 
+
+  /** Generate a new Width object.
+    *
+    * @param w Int Width value, defaults to the Width value of the object being copied.
+    * @return a new Width object.
+    */
   def copy(w: Int = this.widthVal.get): Width = {
     val neww = new Width(w)
     neww
   }
 
+  /** Clone a Width object. */
   override def clone(): Width = {
     if (this.isKnown) {
       Width(this.widthVal.get)
@@ -140,8 +176,8 @@ class Width(_width: Int) extends Ordered[Width] {
     }
   }
 
-  // Define the arithmetic operations so we can deal with unspecified widths
-  def binaryOp(op: String, operand: Width): Width = {
+  /** Define the arithmetic operations so we can deal with unspecified widths. */
+  private def binaryOp(op: String, operand: Width): Width = {
     if (!this.isKnown) {
       this
     } else if (! operand.isKnown) {
@@ -162,43 +198,43 @@ class Width(_width: Int) extends Ordered[Width] {
   }
 
   // scalastyle:off method.name spaces.after.plus
-  // Define addition of two widths
+  /** Add two Width objects. */
   def +(w: Width): Width = binaryOp("+", w)
 
   // scalastyle:off method.name
-  // Define subtraction of one Width from another
+  /** Subtract the specified Width subtrahend from a Width object. */
   def -(w: Width): Width = binaryOp("-", w)
 
   // scalastyle:off method.name spaces.after.plus
-  // Define addition of an Int to a Width
+  /** Add an Int to a Width. */
   def +(i: Int): Width = binaryOp("+", Width(i))
 
   // scalastyle:off method.name
-  // Define subtraction of an Int from a Width
+  /** Subtract an Int from a Width. */
   def -(i: Int): Width = binaryOp("-", Width(i))
 
+  /** Convert (implicitly) from an Int to a Width. */
   implicit def fromInt(i: Int): Width = Width(i)
 
+  /** Return the maximum of two Widths. */
   def max(that: Width): Width = if (compare(that) > 0) this else that
 
-  // Define the equality trio: hashCode, equals, canEqual
-  //   Programming in Scala, Chapter 28: Object Equality
-  //   We want defined widths with idential values to produce the same hashCode
-  //   but undefined widths should have different hashCodes
-  //   (undefined widths should NOT compare equal)
-  //   Since hashCode (and equals) depends on a var, it can change if the value changes.
-  //   This will be problematic for collections of widths.
+  /** Compute the Int hashcode for a Width object.  */
   override def hashCode: Int = widthVal match {
     case Some(w) => w * 41
     case _ => super.hashCode
   }
+
+  /** Determine Width equality.  */
   override def equals(other: Any): Boolean = other match {
     case that: Width =>
       (that canEqual this) && (this.widthVal != unSet)
       (this.widthVal == that.widthVal)
     case _ =>
       false
-}
-    def canEqual(other: Any): Boolean = other.isInstanceOf[Width]
+  }
+
+  /** Determine if two Widths are comparable. */
+  def canEqual(other: Any): Boolean = other.isInstanceOf[Width]
 
 }
