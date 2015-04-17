@@ -331,6 +331,7 @@ object Driver extends FileSystemUtilities{
     isCompiling = false
     isCheckingPorts = false
     isTesting = false
+    testCommand = None
     isDebugMem = false
     isSupportW0W = false
     partitionIslands = false
@@ -407,6 +408,7 @@ object Driver extends FileSystemUtilities{
         case "--backend" => backendName = args(i + 1); i += 1
         case "--compile" => isCompiling = true
         case "--test" => isTesting = true
+        case "--testCommand" => testCommand = Some(args(i + 1)); i += 1
         case "--targetDir" => targetDir = args(i + 1); i += 1
         case "--include" => includeArgs = args(i + 1).split(' ').toList; i += 1
         case "--checkPorts" => isCheckingPorts = true
@@ -449,12 +451,13 @@ object Driver extends FileSystemUtilities{
     // Set the backend after we've interpreted all the arguments.
     // (The backend may want to configure itself based on the arguments.)
     backend = backendName match  {
-      case "v" => new VerilogBackend
       case "c" => new CppBackend
-      case "flo" => new FloBackend
       case "dot" => new DotBackend
+      case "flo" => new FloBackend
       case "fpga" => new FPGABackend
+      case "null" => new NullBackend
       case "sysc" => new SysCBackend
+      case "v" => new VerilogBackend
       case _ => Class.forName(backendName).newInstance.asInstanceOf[Backend]
     }
   }
@@ -478,6 +481,7 @@ object Driver extends FileSystemUtilities{
   var isCompiling = false
   var isCheckingPorts = false
   var isTesting = false
+  var testCommand: Option[String] = None
   var isAssert = true
   var isDebugMem = false
   var partitionIslands = false
