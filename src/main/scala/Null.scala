@@ -28,40 +28,9 @@
  MODIFICATIONS.
 */
 
-import scala.collection.mutable.ArrayBuffer
-import org.junit.Assert._
-import org.junit.Test
+package Chisel
 
-import Chisel._
-
-/** This testsuite various issues with dealing with Module.
-*/
-class ModuleTests extends TestSuite {
-  val testArgs = Array("--targetDir", dir.getPath.toString())
-
-  /** Catch attempts to wrap a Module with a Module (directly). */
-  @Test def testModuleWrap() {
-    println("\ntestModuleWrap ...")
-    try {
-      class ModuleOne extends Module {
-        val io = new Bundle {
-          val x = UInt(INPUT, 32)
-          val y = SInt(INPUT, 32)
-          val z = SInt(OUTPUT)
-        }
-        io.z := io.x * io.y
-      }
-      chiselMain(testArgs,
-        () => Module(
-                Module(
-                  new ModuleOne()
-                  )
-                )
-              )
-    } catch {
-      case e : java.lang.IllegalStateException => {}
-    }
-    assertTrue(ChiselError.hasErrors);
-  }
-
+class NullBackend extends Backend {
+  val keywords = Set[String]()
+  // Use the common (abstract) Backend for everything else.
 }

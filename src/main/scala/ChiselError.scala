@@ -31,13 +31,25 @@
 package Chisel
 import scala.collection.mutable.ArrayBuffer
 
+// Disable println warnings. It's what we do.
+// scalastyle:off regex
 /** This Singleton implements a log4j compatible interface.
   It is used through out the Chisel package to report errors and warnings
   detected at runtime.
   */
 object ChiselError {
   var hasErrors: Boolean = false;
-  val ChiselErrors = new ArrayBuffer[ChiselError];
+  private val ChiselErrors = new ArrayBuffer[ChiselError];
+
+  def contains(chiselError: ChiselError): Boolean = {
+    ChiselErrors.contains(chiselError)
+  }
+
+  def isEmpty: Boolean = {
+    ChiselErrors.isEmpty
+  }
+
+  def getErrorList: List[ChiselError] = ChiselErrors.toList
 
   def clear() {
     ChiselErrors.clear()
@@ -45,9 +57,14 @@ object ChiselError {
   }
 
   /** emit an error message */
-  def error(mf: => String, line: StackTraceElement) {
+  def error(chiselError: ChiselError) {
     hasErrors = true
-    ChiselErrors += new ChiselError(() => mf, line)
+    ChiselErrors += chiselError
+  }
+
+  def error(mf: => String, line: StackTraceElement) {
+    val chiselError = new ChiselError(() => mf, line)
+    error(chiselError)
   }
 
   def error(m: String) {
@@ -155,14 +172,17 @@ val errlevel: Int = 0) {
   val line = errline
   val msgFun = errmsgFun
 
-  def isError = (level == 0)
-  def isWarning = (level == 1)
+  def isError: Boolean = (level == 0)
+  def isWarning : Boolean = (level == 1)
 
   def print() {
     /* Following conventions for error formatting */
     val levelstr =
-      if (isError) ChiselError.tag("error", Console.RED)
-      else ChiselError.tag("warn", Console.YELLOW)
+      if (isError) {
+        ChiselError.tag("error", Console.RED)
+      } else {
+        ChiselError.tag("warn", Console.YELLOW)
+      }
     if( line != null ) {
       println(levelstr + " " + line.getFileName + ":" +
         line.getLineNumber + ": " + msgFun() +

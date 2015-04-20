@@ -846,7 +846,7 @@ try {
     } catch {
       case e : java.lang.IllegalStateException => {}
     }
-    assertTrue(!ChiselError.ChiselErrors.isEmpty);
+    assertTrue(ChiselError.hasErrors);
   }
 
   /** Test for issue #384 - Data width lost in Vec

@@ -282,8 +282,8 @@ abstract class Backend extends FileSystemUtilities{
             // not symmetric and only applies to direct children
             // READ BACK INPUT -- TODO: TIGHTEN THIS UP
             !isBitsIo(input, INPUT)) {
-          ChiselErrors += new ChiselError(() => {
-            "Illegal cross module reference between " + node + " and " + input }, node.line)
+          ChiselError.error(new ChiselError(() => {
+            "Illegal cross module reference between " + node + " and " + input }, node.line))
         }
         if (input.component == null) input.component = curComp
       }
