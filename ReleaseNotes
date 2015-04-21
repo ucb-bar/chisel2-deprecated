@@ -1,4 +1,4 @@
-ReleaseNotes for Chisel v2.2.26 4/22/2015
+ReleaseNotes for Chisel v2.2.26 4/21/2015
 
 This release of Chisel adds support for "test only" operation, to
 support environments where the construction of the test simulator is
