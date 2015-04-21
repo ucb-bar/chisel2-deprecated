@@ -1710,7 +1710,7 @@ class CppBackend extends Backend {
 
           // Output the island-specific clock_hi def code
           val accumulatedClockHiXs = new CoalesceMethods(lineLimitFunctions)
-          for (islandId <- islandOrder(1) if islandId > 0) {
+          for (islandId <- islandOrder(2) if islandId > 0) {
             for (clockHiX <- islandClkCode(islandId).values.map(_._3)) {
               accumulatedClockHiXs.append(clockHiX)
               clockHiX.body.clear()         // free the memory.
