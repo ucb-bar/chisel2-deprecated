@@ -6,7 +6,7 @@ object BuildSettings extends Build {
   val buildSettings = Defaults.defaultSettings ++ Seq (
     organization := "edu.berkeley.cs",
     // version := "2.2.26",
-    version := "2.3-SNAPSHOT",
+    version := "2.2.26",
     name := "chisel",
     scalaVersion := "2.10.4",
     crossScalaVersions := Seq("2.10.4", "2.11.5"),
