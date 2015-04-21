@@ -1,4 +1,4 @@
-ChangeLog for Chisel v2.2.26 4/22/2015
+ChangeLog for Chisel v2.2.26 4/21/2015
 
 #393 Ensure we fail if errors are detected.
 #384 Re-work 398c10c fix. This fixes the old issue with SInt ROM generation while still retaining working behavior in deployment (ie. on reference-chip).
