@@ -336,7 +336,7 @@ object Driver extends FileSystemUtilities{
     isSupportW0W = false
     partitionIslands = false
     lineLimitFunctions = 0
-    minimumLinesPerFile = 0
+    minimumLinesPerFile = 32768
     shadowRegisterInObject = false
     allocateOnlyNeededShadowRegisters = false
     compileInitializationUnoptimized = false
@@ -486,7 +486,7 @@ object Driver extends FileSystemUtilities{
   var isDebugMem = false
   var partitionIslands = false
   var lineLimitFunctions = 0
-  var minimumLinesPerFile = 0
+  var minimumLinesPerFile = 32768
   var shadowRegisterInObject = false
   var allocateOnlyNeededShadowRegisters = false
   var compileInitializationUnoptimized = false

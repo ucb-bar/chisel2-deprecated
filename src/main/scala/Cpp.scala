@@ -1161,7 +1161,7 @@ class CppBackend extends Backend {
     def createCppFile(suffix: String = cppFileSuffix) {
       // If we're trying to coalesce cpp files (minimumLinesPerFile > 0),
       //  don't actually create a new file unless we've hit the line limit.
-      if ((out_cpps.size > 0) && (!compileMultipleCppFiles || (minimumLinesPerFile == 0 || out_cpps.last.lines < minimumLinesPerFile)) ) {
+      if ((out_cpps.size > 0) && (!compileMultipleCppFiles || out_cpps.last.lines < minimumLinesPerFile) ) {
         out_cpps.last.write("\n\n")
       } else {
         if (out_cpps.size > 0) {
