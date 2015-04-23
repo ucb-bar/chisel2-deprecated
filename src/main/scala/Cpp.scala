@@ -1752,6 +1752,12 @@ class CppBackend extends Backend {
       out_p.close();
     }
 
+    ChiselError.info("populating clock domains")
+    val clkDomains = new ClockDomains
+    clkDomains.populate()
+
+    println("CppBackend::elaborate: need " + needShadow.size + ", redundant " + (potentialShadowRegisters - needShadow.size) + " shadow registers")
+
     // Shouldn't this be conditional on Driver.isVCD?
     // In any case, defer it until after we've generated the "real"
     // simulation code.
@@ -1795,14 +1801,7 @@ class CppBackend extends Backend {
       unoptimizedFiles ++= out_cpps.map(_.name.dropRight(trimLength))
     }
     // Ensure we start off in a new file before we start outputting the clock_lo/hi.
-    eliminateAuxilliaryData()
-    val clkDomains = new ClockDomains
-
-    ChiselError.info("populating clock domains")
-    clkDomains.populate()
-
-    println("CppBackend::elaborate: need " + needShadow.size + ", redundant " + (potentialShadowRegisters - needShadow.size) + " shadow registers")
-
+    createCppFile()
     clkDomains.outputAllClkDomains()
 
     // Generate API methods
