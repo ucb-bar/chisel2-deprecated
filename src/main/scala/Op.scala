@@ -637,7 +637,7 @@ case class UnaryOp(val op: String) extends Op {
     /* Inherit the zero-width from our child. */
     setWidth(0)
      /* remove our only child */
-    inputs(0).parents -= this
+    inputs(0).consumers -= this
     inputs.remove(0, 1)
     modified = true
   }

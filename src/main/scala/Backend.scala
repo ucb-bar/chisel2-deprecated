@@ -816,7 +816,7 @@ abstract class Backend extends FileSystemUtilities{
     /* Construct the depth-first list of nodes, set them all to unmodified,
      *  and construct their parent list.
      */
-    Driver.idfs { n => { n.modified = false; nodesList += n ; n.inputs.foreach(_.parents += n)} }
+    Driver.idfs { n => { n.modified = false; nodesList += n ; n.inputs.foreach(_.consumers += n)} }
     for ( n <- nodesList) {
       // If this node has any zero-width children, have it deal with them.
       if (n.inputs exists {  c => c.inferWidth(c).needWidth == 0 }) {
