@@ -48,6 +48,12 @@ class Complex[T<:Data with Num[T]](val real: T, val imag: T) extends Bundle with
     new Complex(real.clone, imag.clone).asInstanceOf[this.type]
   }
 
+  override protected def checkPort(obj : Any, name : String) : Boolean = name match {
+    case "real" => true
+    case "imag" => true
+    case _      => false
+  }
+
   def * (r: Complex[T]): Complex[T] =
   {
     val a = real; val b = imag; val c = r.real; val d = r.imag;
@@ -100,7 +106,8 @@ class Complex[T<:Data with Num[T]](val real: T, val imag: T) extends Bundle with
   {
     this.abs2 >= b.abs2
   }
-  def abs2 : T = {
+  def abs2 : T =
+  {
     real * real + imag * imag
   }
   def / (r: T): Complex[T] =
