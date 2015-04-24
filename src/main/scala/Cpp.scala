@@ -603,7 +603,7 @@ class CppBackend extends Backend {
         // shadow registers, assume we need the shadow register copy.
         // Otherwise, if we're allocating only needed shadow registers and this register
         // needs a shadow, now is the time to use that shadow.
-	val useShadow = if (allocateOnlyNeededShadowRegisters) {
+	      val useShadow = if (allocateOnlyNeededShadowRegisters) {
           needShadow.contains(reg)
         } else {
           next.isReg
@@ -669,6 +669,8 @@ class CppBackend extends Backend {
       case reg: Reg => {
         potentialShadowRegisters += 1
         val allocateShadow = !allocateOnlyNeededShadowRegisters || needShadow.contains(reg)
+        // If this isn't a shadow register, we've determined we don't need a shadow register
+        // for this register, so we don't need to initialize it.
         if (allocateShadow) {
           allocatedShadow += reg
           val storagePrefix = if (shadowRegisterInObject) {
@@ -678,7 +680,7 @@ class CppBackend extends Backend {
           }
           s"${shadowPrefix} ${storagePrefix} ${emitRef(reg)}__shadow = ${emitRef(reg.next)};\n"
         } else {
-          s" ${emitRef(reg)} = ${emitRef(reg.next)};\n"
+          ""
         }
       }
 
@@ -1708,7 +1710,7 @@ class CppBackend extends Backend {
 
           // Output the island-specific clock_hi def code
           val accumulatedClockHiXs = new CoalesceMethods(lineLimitFunctions)
-          for (islandId <- islandOrder(1) if islandId > 0) {
+          for (islandId <- islandOrder(2) if islandId > 0) {
             for (clockHiX <- islandClkCode(islandId).values.map(_._3)) {
               accumulatedClockHiXs.append(clockHiX)
               clockHiX.body.clear()         // free the memory.

@@ -1,14 +1,10 @@
-ChangeLog for Chisel v2.2.25 3/25/2015
+ChangeLog for Chisel v2.2.26 4/21/2015
 
-Detect and issue an error for double Module() wrapping - #385
-Fix Data width lost in Vec #384.
-For test, use JUnitSuite over AssertionsForJUnit
-In Verilog, fix bug for similar modules, some not emitted
-Better Namespace conflict resolution for Verilog
-Fix for multiply instantiated modules in Chisel result in redundant (functionally equivalent) module definitions in generated Verilog #374 
-In CPP, better detection of signals to randomize
-Disallow comparisons between Nodes and non-Nodes
-Include type of missing Parameter in error message
-Address issue with width-inference of right-shift
-Update emulator_{api,mod}.h to eliminate C++ compiler warnings.
-Update README to reflect current build procedure.
+#393 Ensure we fail if errors are detected.
+#384 Re-work 398c10c fix. This fixes the old issue with SInt ROM generation while still retaining working behavior in deployment (ie. on reference-chip).
+#315 Fixes for --allocateOnlyNeededShadowRegisters (don't clobber unshadowed register and keep code order correct).
+ Support for test only mode.
+ Add fromMap Method for Bundles (experimental)
+ Update instructions and commands for generating documentation.
+ Fix various bugs with addBindings
+ Chisel error line number reporting - anything above Chisel.chiselMain is user code.

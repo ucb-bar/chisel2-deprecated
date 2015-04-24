@@ -1,16 +1,17 @@
-ReleaseNotes for Chisel v2.2.26 4/21/2015
-
-This release of Chisel adds support for "test only" operation, to
+<p>This release of Chisel adds support for "test only" operation, to
 support environments where the construction of the test simulator is
 decoupled from test execution.
-
+</p>
+<p>
 To this end, the following new options have been added:
- - a new backend - "null"
- - a "--testCommand <path-to-executable>" option specifying the path to the test executable.
-
-Using the tutorial "Hello" project as an example, build the test
+ <ul>
+   <li>a new backend - "null"</li>
+   <li>a "--testCommand <i>path-to-executable</i>" option specifying the path to the test executable.</li>
+ </ul>
+</p>
+<p>Using the tutorial "Hello" project as an example, build the test
 simulator:
-
+<pre><code>
  $ sbt  "run hello --genHarness --compile --backend c --vcd"
  [info] Loading global plugins from ...
  [info] ...
@@ -46,9 +47,9 @@ simulator:
  [info] [1.514] g++ -c -o ./Hello.o  -I../ -Inull/csrc/  ./Hello.cpp RET 0
  [info] [1.573] g++  -o ./Hello ./Hello.o ./Hello-emulator.o RET 0
  [success] Total time: 4 s, completed Apr 17, 2015 8:27:09 AM
-
+</code></pre>
 run the tests:
-
+<pre><code>
  $ sbt  "run hello --test --backend null --vcd --testCommand ./Hello"
  [info] Loading global plugins from ...
  [info] Loading project definition from .../chisel-tutorial/hello/project
@@ -78,5 +79,8 @@ run the tests:
  RAN 1 CYCLES PASSED
  PASSED
  [success] Total time: 0 s, completed Apr 17, 2015 8:28:19 AM
+</code></pre>
 
+<p>
 See the associated Changelog for additional issues resolved with this release.
+</p>
