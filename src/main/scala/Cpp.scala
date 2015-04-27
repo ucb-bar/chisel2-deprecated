@@ -1623,23 +1623,21 @@ class CppBackend extends Backend {
           // We're generating partitioned islands
           val addedCode = new Array[Boolean](3)
           for (m <- Driver.orderedNodes) {
-            for (island <- islands) {
-              if (isNodeInIsland(m, island)) {
-                val islandId = island.islandId
-                val codeMethods = islandClkCode(islandId)
-                val addedCodeTuple = addClkDefs(m, codeMethods)
-                addedCode(0) = addedCodeTuple._1
-                addedCode(1) = addedCodeTuple._2
-                addedCode(2) = addedCodeTuple._3
-                // Update the generation number if we added any code to this island.
-                for (lohi <- 0 to 2) {
-                  if (addedCode(lohi)) {
-                    // Is this the first time we've added code to this island?
-                    if (islandStarted(lohi)(islandId) == 0) {
-                      islandOrder(lohi)(islandSequence(lohi)) = islandId
-                      islandSequence(lohi) += 1
-                      islandStarted(lohi)(islandId) = islandSequence(lohi)
-                    }
+            for (island <- nodeToIslandArray(m._id)) {
+              val islandId = island.islandId
+              val codeMethods = islandClkCode(islandId)
+              val addedCodeTuple = addClkDefs(m, codeMethods)
+              addedCode(0) = addedCodeTuple._1
+              addedCode(1) = addedCodeTuple._2
+              addedCode(2) = addedCodeTuple._3
+              // Update the generation number if we added any code to this island.
+              for (lohi <- 0 to 2) {
+                if (addedCode(lohi)) {
+                  // Is this the first time we've added code to this island?
+                  if (islandStarted(lohi)(islandId) == 0) {
+                    islandOrder(lohi)(islandSequence(lohi)) = islandId
+                    islandSequence(lohi) += 1
+                    islandStarted(lohi)(islandId) = islandSequence(lohi)
                   }
                 }
               }
