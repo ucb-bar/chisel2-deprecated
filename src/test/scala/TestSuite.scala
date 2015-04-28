@@ -34,6 +34,7 @@ import java.io.File
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 import scala.collection.JavaConversions
+import scala.util.Properties
 import Chisel._
 import TestSuite._
 
@@ -41,9 +42,7 @@ object TestSuite {
 
   // Should we enable some global settings?
   val partitionIslandsParameterName = "partitionIslands"
-  val defaultEnablePartitionIslands = false
-  val partitionIslandsParameter = System.getProperty(partitionIslandsParameterName)
-  val partitionIslandsEnable = if (partitionIslandsParameter == null) defaultEnablePartitionIslands else true
+  val partitionIslandsArguments = Properties.envOrElse(partitionIslandsParameterName, "")
 }
 
 abstract class TestSuite extends JUnitSuite {
@@ -83,16 +82,18 @@ abstract class TestSuite extends JUnitSuite {
 
   def launchTester[M <: Module : ClassTag, T <: Tester[M]](b: String, t: M => T) {
     val ctor = implicitly[ClassTag[M]].runtimeClass.getConstructors.head
-    val conditionalArgs = ArrayBuffer[String]()
-
-    if (partitionIslandsEnable) {
-      conditionalArgs += "--partitionIslands"
-    }
 
     val testArgs = Array[String]("--backend", b,
       "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test")
-    chiselMainTest(conditionalArgs.toArray ++ testArgs,
+    chiselMainTest(testArgs,
       () => Module(ctor.newInstance(this).asInstanceOf[M])) {t}
+    // If this is a test of the Cpp backend, launch it again with some Cpp specific arguments,
+    //  if "partitionIslands" is defined in the environment and isn't one of the specified test arguments.
+    if (b == "c" && partitionIslandsArguments != "" && !testArgs.contains("--partitionIslands")) {
+      val cppArgs = partitionIslandsArguments.split(' ')
+      chiselMainTest(testArgs ++ cppArgs,
+        () => Module(ctor.newInstance(this).asInstanceOf[M])) {t}
+    }
   }
   def launchCppTester[M <: Module : ClassTag, T <: Tester[M]](t: M => T) = launchTester("c", t)
   def launchVerilogTester[M <: Module : ClassTag, T <: Tester[M]](t: M => T) = launchTester("v", t)
