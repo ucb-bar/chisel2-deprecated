@@ -51,7 +51,10 @@ class Complex[T<:Data with Num[T]](val real: T, val imag: T) extends Bundle with
   override protected def checkPort(obj : Any, name : String) : Boolean = name match {
     case "real" => true
     case "imag" => true
-    case _      => false
+    case "abs2" => false
+    case "conj" => false
+    case "unary_-" => false
+    case _      => true
   }
 
   def * (r: Complex[T]): Complex[T] =
