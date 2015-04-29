@@ -30,6 +30,7 @@
 
 package Chisel
 import ChiselError._
+import scala.util.Properties
 
 class TestIO(val format: String, val args: Seq[Data] = null)
 
@@ -158,3 +159,31 @@ class Delay extends Node {
   def assignClock(clk: Clock): Unit = { clock = clk }
 }
 
+  /** If there is an environment variable `chiselArguments`, construct an `Array[String]`
+    *  of its value split on ' ', otherwise, return a 0 length `Array[String]`
+    *  
+    *  This makes it easy to merge with command line arguments and have the latter take precedence.
+    * {{{
+    *  def main(args: Array[String]) {
+    *      val readArgs(chiselEnvironmentArguments ++ args)
+    *      ...
+    *  }
+    * }}}
+    */
+object chiselEnvironmentArguments {
+  /** The ''name'' of the environment variable containing the arguments. */
+  val chiselArgumentNameDefault = "chiselArguments"
+
+  /**
+    * @return value of environment variable `chiselArguments` split on ' ' or a 0 length Array[String]
+    *  
+    */
+  def apply(envName: String = chiselArgumentNameDefault): Array[String] = {
+    val chiselArgumentString = Properties.envOrElse(envName, "")
+    if (chiselArgumentString != "") {
+      chiselArgumentString.split(' ')
+    } else {
+      new Array[String](0)
+    }
+  }
+}
