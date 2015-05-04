@@ -183,6 +183,11 @@ object Op {
       case "!=" => if (b_lit.isZ) return !zEquals(a, b)
       case _ => ;
     }
+    // isZ is unsupported for all other operators. 
+    if (a.isLit && a.litOf.isZ || b.isLit && b.litOf.isZ) {
+      ChiselError.error({"Operator " + name + " with inputs " + a + ", " + b + " does not support literals with ?"});
+      return Literal(0)
+    }
     if (a_lit != null && b_lit != null && a_lit.isKnownWidth && b_lit.isKnownWidth) {
       val (aw, bw) = (a_lit.needWidth(), b_lit.needWidth());
       val (av, bv) = (a_lit.value, b_lit.value);
