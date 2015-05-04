@@ -876,4 +876,24 @@ try {
       () => Module(new VecSIntWidth())) {m => new VecSIntWidthTester(m)}
   }
 
+  /** Test for issue #407 - Don't care in literal ("?") exhibits bizarre behavior
+   */
+  @Test def testLitDontCare () {
+    println("\ntestLitDontCare ...")
+    try {
+      class LitDontCare extends Module {
+        val io = new Bundle {
+          val in = UInt(INPUT,  8)
+          val out  = UInt(OUTPUT, 8)
+        }
+        io.out := Mux(io.in === (UInt("b?110") | UInt("b1???")), io.in, UInt(0))
+      }
+  
+      chiselMain(testArgs,
+        () => Module(new LitDontCare()))
+    } catch {
+      case e : java.lang.IllegalStateException => {}
+    }
+    assertTrue(ChiselError.hasErrors);
+  }
 }
