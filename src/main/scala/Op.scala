@@ -197,10 +197,9 @@ object Op {
         case "<"  => return Literal(if (av <  bv) 1 else 0);
         case "<=" => return Literal(if (av <= bv) 1 else 0);
         case "##" => return Literal(av << bw | bv, aw + bw);
-        // "+" and "-" may need to widen the result.
-        // Let the Literal code take care of it, unless an explicit width has been specified.
-        case "+"  => return Literal(av + bv, List(aw, bw, Literal.bitLength((av + bv)).toInt).max)
-        case "-"  => return Literal(av - bv, List(aw, bw, Literal.bitLength((av - bv)).toInt).max)
+        // "+" and "-" should NOT widen the result.
+        case "+"  => return Literal(av + bv, max(aw, bw))
+        case "-"  => return Literal(av - bv, max(aw, bw))
         case "|"  => return Literal(av | bv, max(aw, bw));
         case "&"  => return Literal(av & bv, max(aw, bw));
         case "^"  => return Literal(av ^ bv, max(aw, bw));
