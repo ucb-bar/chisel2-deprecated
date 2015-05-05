@@ -161,4 +161,54 @@ class TesterTest extends TestSuite {
       "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
       () => Module(new PokeNegModule())) {m => new PokeNegTests(m)}
   }
+
+  /** Test poking wide numbers.
+   *  This is primarily a test of the Tester and its peek/poke/expect interface.
+   *
+   */
+  @Test def testPokeWide () {
+    println("\ntestPokeWide ...")
+
+    // We'd like to use something like assume() here, but it generates
+    // a TestCanceledException. There should be a programmatic way to skip
+    // tests (without failing) but make a note of the fact.
+    if (!Driver.isVCSAvailable) {
+      assert(true, "vcs unavailable - skipping testPokeWide")
+    } else {
+      class PokeWideModule extends Module {
+      
+        val io = new Bundle {  
+          val i_value     = UInt(INPUT, width = 64)
+          val o_value     = UInt(OUTPUT, width = 64)
+        }
+      
+        io.o_value := io.i_value
+      } 
+      
+      class PokeWideTests(c:PokeWideModule) extends AdvTester(c){
+        isTrace = true
+      
+        wire_poke(c.io.i_value, 0x7100a000a000a000L)
+        expect(c.io.o_value, 0x7100a000a000a000L)
+      
+        // We need to construct the next number carefully.
+        //  We don't want it flagged as a negative number,
+        //  so we manually construct it by shifting a positive number.
+        //  (0x8100a000a000a000L is interpreted as a negative 64-bit number.
+        val notNeg = BigInt(0x8100a000a000a00L) << 4
+        wire_poke(c.io.i_value, notNeg)
+        expect(c.io.o_value, notNeg) 
+
+        // "-1" is not a legal poke value for the Verilog tester..
+        // All poke values must be hex strings for Verilog.
+        // See harnessAPIs() in Verilog.scala
+        //wire_poke(c.io.i_value, -1L )
+        //expect(c.io.o_value, -1L )
+      }   
+  
+      chiselMainTest(Array[String]("--backend", "v",
+        "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
+        () => Module(new PokeWideModule())) {m => new PokeWideTests(m)}
+    }
+  }
 }

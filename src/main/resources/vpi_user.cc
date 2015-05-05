@@ -20,11 +20,6 @@ int32_t wire_poke_calltf(char *user_data) {
   s_vpi_value node_s;
   node_s.format = vpiStringVal;
   vpi_get_value(vpi_scan(arg_iter), &node_s);
-  // Second argument: <value>
-  s_vpi_value value_s;
-  value_s.format = vpiIntVal;
-  vpi_get_value(vpi_scan(arg_iter), &value_s);
-  vpi_free_object(arg_iter);
 
   vpiHandle test_handle = vpi_scan(vpi_iterate(vpiModule, NULL));
   vpiHandle top_handle = vpi_scan(vpi_iterate(vpiModule, test_handle));
@@ -36,6 +31,12 @@ int32_t wire_poke_calltf(char *user_data) {
   ostringstream oss;
   oss << testname << "." << nodename;
   string nodepath = oss.str();
+
+  // Second argument: <value>
+  s_vpi_value value_s;
+  value_s.format = vpiHexStrVal;
+  vpi_get_value(vpi_scan(arg_iter), &value_s);
+  vpi_free_object(arg_iter);
 
   // Examine the regs in the testbench
   // in order to give the correct input values

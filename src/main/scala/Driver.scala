@@ -31,6 +31,7 @@
 package Chisel
 
 import collection.mutable.{ArrayBuffer, HashSet, HashMap, Stack, LinkedHashSet, Queue => ScalaQueue}
+import scala.sys.process._
 import scala.math.min
 
 object Driver extends FileSystemUtilities{
@@ -546,4 +547,11 @@ object Driver extends FileSystemUtilities{
   // Setting this to TRUE will result in temporary values (ie, nodes
   // named "T*") to be emited to the VCD file.
   var emitTempNodes = false
+
+  // Indicate if an external command is available.
+  def isCommandAvailable(cmd: String): Boolean = {
+    Seq("bash", "-c", "which %s".format(cmd)).! == 0
+  }
+  
+  lazy val isVCSAvailable = isCommandAvailable("vcs")
 }

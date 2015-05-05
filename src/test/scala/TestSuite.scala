@@ -34,7 +34,6 @@ import java.io.File
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 import scala.collection.JavaConversions
-import scala.util.Properties
 import Chisel._
 import TestSuite._
 
@@ -42,7 +41,7 @@ object TestSuite {
 
   // Should we enable some global settings?
   val partitionIslandsParameterName = "partitionIslands"
-  val partitionIslandsArguments = Properties.envOrElse(partitionIslandsParameterName, "")
+  val partitionIslandsArguments = chiselEnvironmentArguments(partitionIslandsParameterName)
 }
 
 abstract class TestSuite extends JUnitSuite {
@@ -89,9 +88,8 @@ abstract class TestSuite extends JUnitSuite {
       () => Module(ctor.newInstance(this).asInstanceOf[M])) {t}
     // If this is a test of the Cpp backend, launch it again with some Cpp specific arguments,
     //  if "partitionIslands" is defined in the environment and isn't one of the specified test arguments.
-    if (b == "c" && partitionIslandsArguments != "" && !testArgs.contains("--partitionIslands")) {
-      val cppArgs = partitionIslandsArguments.split(' ')
-      chiselMainTest(testArgs ++ cppArgs,
+    if (b == "c" && partitionIslandsArguments.size != 0 && !testArgs.contains("--partitionIslands")) {
+      chiselMainTest(partitionIslandsArguments ++ testArgs,
         () => Module(ctor.newInstance(this).asInstanceOf[M])) {t}
     }
   }

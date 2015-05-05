@@ -9,7 +9,7 @@ CHISEL_JAR ?= $(SRC_DIR)/target/scala-2.10/chisel_2.10-2.3-SNAPSHOT.jar
 DRIVER	   ?= $(SRC_DIR)/src/test/resources/AddFilterSysCdriver.cpp
 TEST_OUTPUT_DIR ?= ./test-outputs
 
-.PHONY:	smoke publish-local check clean jenkins-build sysctest coverage test
+.PHONY:	smoke publish-local check clean jenkins-build sysctest coverage scaladoc test
 
 default:	publish-local
 
@@ -30,6 +30,9 @@ clean:
 	$(SBT) $(SBT_FLAGS) +clean
 	for dir in $(CLEAN_DIRS); do $(MAKE) -C $$dir clean; done
 	$(RM) -r $(RM_DIRS)
+
+scaladoc:
+	$(SBT) $(SBT_FLAGS) doc test:doc
 
 # Start off clean, then run tests for all supported configurations, and publish those versions of the code.
 # Then run coverage and style tests (for developer's use).

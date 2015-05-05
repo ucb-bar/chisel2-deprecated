@@ -183,6 +183,11 @@ object Op {
       case "!=" => if (b_lit.isZ) return !zEquals(a, b)
       case _ => ;
     }
+    // isZ is unsupported for all other operators. 
+    if (a.isLit && a.litOf.isZ || b.isLit && b.litOf.isZ) {
+      ChiselError.error({"Operator " + name + " with inputs " + a + ", " + b + " does not support literals with ?"});
+      return Literal(0)
+    }
     if (a_lit != null && b_lit != null && a_lit.isKnownWidth && b_lit.isKnownWidth) {
       val (aw, bw) = (a_lit.needWidth(), b_lit.needWidth());
       val (av, bv) = (a_lit.value, b_lit.value);
@@ -192,10 +197,9 @@ object Op {
         case "<"  => return Literal(if (av <  bv) 1 else 0);
         case "<=" => return Literal(if (av <= bv) 1 else 0);
         case "##" => return Literal(av << bw | bv, aw + bw);
-        // "+" and "-" may need to widen the result.
-        // Let the Literal code take care of it, unless an explicit width has been specified.
-        case "+"  => return Literal(av + bv, List(aw, bw, Literal.bitLength((av + bv)).toInt).max)
-        case "-"  => return Literal(av - bv, List(aw, bw, Literal.bitLength((av - bv)).toInt).max)
+        // "+" and "-" should NOT widen the result.
+        case "+"  => return Literal(av + bv, max(aw, bw))
+        case "-"  => return Literal(av - bv, max(aw, bw))
         case "|"  => return Literal(av | bv, max(aw, bw));
         case "&"  => return Literal(av & bv, max(aw, bw));
         case "^"  => return Literal(av ^ bv, max(aw, bw));
