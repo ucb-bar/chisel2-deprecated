@@ -1047,17 +1047,25 @@ class VerilogBackend extends Backend {
     }
     copyToTarget("vpi_user.cc")
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
-    def run(cmd: String) {
+    def run(cmd: String): Boolean = {
       val bashCmd = Seq("bash", "-c", cmd)
       val c = bashCmd.!
-      ChiselError.info(cmd + " RET " + c)
+      if (c == 0) {
+        ChiselError.info(cmd + " RET " + c)
+        true
+      } else {
+        ChiselError.error(cmd + " RET " + c)
+        false
+      }
     }
     val dir = Driver.targetDir + "/"
     val src = n + "-harness.v " + n + ".v"
     val cmd =  "cd " + dir + " && vcs -full64 -quiet +v2k -Mdir=" + n + ".csrc " +
               "-timescale=1ns/1ps +define+CLOCK_PERIOD=120 +vpi -use_vpiobj vpi_user.cc " +
               "+vcs+initreg+random " + src + " -o " + n + " -debug_pp"
-    run(cmd)
+    if (!run(cmd)) {
+      throwException("vcs command failed")
+    }
   }
 
   private def if_not_synthesis = "`ifndef SYNTHESIS\n// synthesis translate_off\n"

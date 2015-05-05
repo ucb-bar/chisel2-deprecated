@@ -161,4 +161,46 @@ class TesterTest extends TestSuite {
       "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
       () => Module(new PokeNegModule())) {m => new PokeNegTests(m)}
   }
+
+  /** Test poking wide numbers.
+   *  This is primarily a test of the Tester and its peek/poke/expect interface.
+   *
+   */
+  @Test def testPokeWide () {
+    println("\ntestPokeWide ...")
+    
+    class PokeWideModule extends Module {
+    
+      val io = new Bundle {  
+        val i_value     = UInt(INPUT, width = 64)
+        val o_value     = UInt(OUTPUT, width = 64)
+      }
+    
+      io.o_value := io.i_value
+    } 
+    
+    class PokeWideTests(c:PokeWideModule) extends AdvTester(c){
+      isTrace = true
+    
+      wire_poke(c.io.i_value, 0x7100a000a000a000L)
+      expect(c.io.o_value, 0x7100a000a000a000L)
+    
+      wire_poke(c.io.i_value, 0x8100a000a000a000L)
+      expect(c.io.o_value, 0x8100a000a000a000L) 
+    
+      wire_poke(c.io.i_value, -1L )
+      expect(c.io.o_value, -1L )
+    }   
+
+    // Run this with the Verilog backend (if "vcs" is available).
+    try {
+      chiselMainTest(Array[String]("--backend", "v",
+        "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
+        () => Module(new PokeWideModule())) {m => new PokeWideTests(m)}
+    } catch {
+         case e: ChiselException => {
+           assertTrue(e.getMessage() == "vcs command failed")
+         }
+    }
+  }
 }
