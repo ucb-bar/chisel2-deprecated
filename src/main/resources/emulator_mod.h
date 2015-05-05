@@ -1539,7 +1539,7 @@ class mem_t {
     if (ispow2(d) || idx < d)
       contents[idx] = val;
   }
-  val_t put (val_t idx, int word, val_t val) {
+  void put (val_t idx, int word, val_t val) {
     if (ispow2(d) || idx < d)
       contents[idx].values[word] = val;
   }
