@@ -572,7 +572,7 @@ class VerilogBackend extends Backend {
     apis.append("\n  /*** API variables ***/\n")
     apis.append("  reg[20*8:0] cmd;    // API command\n")
     apis.append("  reg[1000*8:0] node; // Chisel node name;\n")
-    apis.append("  reg[255:0] value;   // 'poked' value\n")
+    apis.append("  reg[2047:0] value;   // 'poked' value\n")
     apis.append("  integer offset;     // mem's offset\n")
     apis.append("  integer steps;      // number of steps\n")
     apis.append("  integer delta;      // number of steps\n")
@@ -1047,17 +1047,25 @@ class VerilogBackend extends Backend {
     }
     copyToTarget("vpi_user.cc")
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
-    def run(cmd: String) {
+    def run(cmd: String): Boolean = {
       val bashCmd = Seq("bash", "-c", cmd)
       val c = bashCmd.!
-      ChiselError.info(cmd + " RET " + c)
+      if (c == 0) {
+        ChiselError.info(cmd + " RET " + c)
+        true
+      } else {
+        ChiselError.error(cmd + " RET " + c)
+        false
+      }
     }
     val dir = Driver.targetDir + "/"
     val src = n + "-harness.v " + n + ".v"
     val cmd =  "cd " + dir + " && vcs -full64 -quiet +v2k -Mdir=" + n + ".csrc " +
               "-timescale=1ns/1ps +define+CLOCK_PERIOD=120 +vpi -use_vpiobj vpi_user.cc " +
               "+vcs+initreg+random " + src + " -o " + n + " -debug_pp"
-    run(cmd)
+    if (!run(cmd)) {
+      throwException("vcs command failed")
+    }
   }
 
   private def if_not_synthesis = "`ifndef SYNTHESIS\n// synthesis translate_off\n"
