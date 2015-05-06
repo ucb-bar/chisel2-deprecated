@@ -165,7 +165,7 @@ class Delay extends Node {
     *  This makes it easy to merge with command line arguments and have the latter take precedence.
     * {{{
     *  def main(args: Array[String]) {
-    *      val readArgs(chiselEnvironmentArguments ++ args)
+    *      val readArgs(chiselEnvironmentArguments() ++ args)
     *      ...
     *  }
     * }}}
