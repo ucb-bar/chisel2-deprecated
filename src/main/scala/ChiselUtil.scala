@@ -556,3 +556,27 @@ object PriorityEncoderOH
   }
   def apply(in: Bits): UInt = encode((0 until in.getWidth).map(i => in(i)))
 }
+
+/** Wrap a Chisel data type with a `Wire`.
+  *
+  * This is a no-op in Chisel 2.2. It will be required for Chisel 3.0
+  */
+object Wire
+{
+  def apply[T <: Data](t: T = null, init: T = null): T = {
+    val mType = if (t == null) init else t
+    if(mType == null) {
+      ChiselError.error("cannot infer type of Init.")
+      UInt().asInstanceOf[T]
+    } else {
+      val x = mType.clone
+      // Should this be part of 'clone'
+      // x.component = mType.component
+      if (init != null) {
+        x assign init
+      }
+      x
+    }
+  }
+}
+
