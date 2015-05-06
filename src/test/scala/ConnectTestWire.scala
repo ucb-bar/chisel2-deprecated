@@ -362,6 +362,6 @@ class ConnectWireSuite extends TestSuite {
       "--targetDir", dir.getPath.toString()),
       () => Module(new BindingTest()))
     
-    assertFile("ConnectSuite_BindingTest_1.v")
+    assertFile("ConnectWireSuite_BindingTest_1.v")
   }
 }
