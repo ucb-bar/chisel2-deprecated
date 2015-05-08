@@ -266,10 +266,10 @@ class CppBackend extends Backend {
 
   def emitLog2(x: Node, priEnc: Boolean = false) = {
     val (func, range) =
-      if (priEnc) ("priority_encode_1", (0 until words(x.inputs(0))-1))
-      else ("log2_1", (words(x.inputs(0))-1 to 1 by -1))
-    val body = range.map(i => s"${emitWordRef(x.inputs(0), i)} != 0, ${(i*bpw)} + ${func}(${emitWordRef(x.inputs(0), i)})")
-                    .foldRight(s"${func}(${emitLoWordRef(x.inputs(0))})")((x, y) => s"TERNARY(${x}, ${y})")
+      if (priEnc) ("priority_encode_1", (0 until words(x.inputs(0))))
+      else ("log2_1", (words(x.inputs(0))-1 to 0 by -1))
+    val body = range.map(i => s"${emitWordRef(x.inputs(0), i)} != 0, ${i*bpw} + ${func}(${emitWordRef(x.inputs(0), i)})")
+                    .foldRight("0")((x, y) => s"TERNARY(${x}, ${y})")
     s"  ${emitLoWordRef(x)} = ${body};\n"
   }
 
