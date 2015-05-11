@@ -82,7 +82,7 @@ abstract class TestSuite extends JUnitSuite {
   def launchTester[M <: Module : ClassTag, T <: Tester[M]](b: String, t: M => T) {
     val ctor = implicitly[ClassTag[M]].runtimeClass.getConstructors.head
 
-    val testArgs = Array[String]("--backend", b,
+    val testArgs = chiselEnvironmentArguments() ++ Array[String]("--backend", b,
       "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test")
     chiselMainTest(testArgs,
       () => Module(ctor.newInstance(this).asInstanceOf[M])) {t}

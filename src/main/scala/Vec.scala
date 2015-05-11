@@ -55,6 +55,9 @@ object VecMux {
 
 object Vec {
 
+  def apply[T <: Data](gen: T, n: Int): Vec[T] = 
+    /* new */ Vec((0 until n).map(i => gen.clone))
+
   /** Returns a new *Vec* from a sequence of *Data* nodes.
     */
   def apply[T <: Data](elts: Iterable[T]): Vec[T] = {
