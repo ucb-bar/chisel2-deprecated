@@ -485,8 +485,6 @@ abstract class Node extends nameable {
 
   // Review a node for optimization possibilities if its children have been updated.
   def review() { }
-  // Parent nodes - used during optimization.
-  var parents = LinkedHashSet[Node]()
 
   // Replace the subtree starting from this node with the indicated replacement.
   def replaceTree(newNode: Node) {
@@ -494,16 +492,16 @@ abstract class Node extends nameable {
 
     /* We are no longer anyone's parent. */
     for (c <- inputs) {
-      c.parents -= oldNode
+      c.consumers -= oldNode
     }
 
     /* Replace our role as input in our parent nodes with the replacement node. */
-    for (p <- oldNode.parents; i <- 0 until p.inputs.length if p.inputs(i) == oldNode) {
-      newNode.parents += p
+    for (p <- oldNode.consumers; i <- 0 until p.inputs.length if p.inputs(i) == oldNode) {
+      newNode.consumers += p
       p.inputs(i) = newNode
     }
 
     oldNode.inputs.clear()
-    oldNode.parents.clear()
+    oldNode.consumers.clear()
   }
 }

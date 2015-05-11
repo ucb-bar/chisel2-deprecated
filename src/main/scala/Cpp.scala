@@ -65,42 +65,32 @@ object CString {
 class CppBackend extends Backend {
   val keywords = Set[String]()
   private var hasPrintfs = false
-  val unoptimizedFiles = HashSet[String]()
-  val onceOnlyFiles = HashSet[String]()
-  var cloneFile: String = ""
-  var maxFiles: Int = 0
-  val compileInitializationUnoptimized = Driver.compileInitializationUnoptimized
+  protected[this] val unoptimizedFiles = HashSet[String]()
+  protected[this] val onceOnlyFiles = HashSet[String]()
+  protected[this] var cloneFile: String = ""
+  protected[this] var maxFiles: Int = 0
+  protected[this] val compileInitializationUnoptimized = Driver.compileInitializationUnoptimized
   // If we're dealing with multiple files for the purpose of separate
   //   optimization levels indicate we expect to compile multiple files.
-  val compileMultipleCppFiles = Driver.compileInitializationUnoptimized
-  // Suppress generation of the monolithic .cpp file if we're compiling
-  // multiple files.
-  // NOTE: For testing purposes, we may want to generate this file anyway.
-  val suppressMonolithicCppFile = compileMultipleCppFiles  /* && false */
+  protected[this] val compileMultipleCppFiles = Driver.compileInitializationUnoptimized
   // Compile the clone method at -O0
-  val cloneCompiledO0 = true
+  protected[this] val cloneCompiledO0 = true
   // Define shadow registers in the circuit object, instead of local registers in the clock hi methods.
   // This is required if we're generating paritioned combinatorial islands, or we're limiting the size of functions/methods.
-  val shadowRegisterInObject = Driver.shadowRegisterInObject || Driver.partitionIslands || Driver.lineLimitFunctions > 0
+  protected[this] val shadowRegisterInObject = Driver.shadowRegisterInObject || Driver.partitionIslands || Driver.lineLimitFunctions > 0
   // If we need to put shadow registers in the object, we also should put multi-word literals there as well.
-  val multiwordLiteralInObject = shadowRegisterInObject
-  val multiwordLiterals = HashSet[Literal]()
+  protected[this] val multiwordLiteralInObject = shadowRegisterInObject
+  protected[this] val multiwordLiterals = HashSet[Literal]()
   // Should we put unconnected inputs in the object?
-  val unconnectedInputsInObject = Driver.partitionIslands
-  val unconnectedInputs = HashSet[Node]()
+  protected[this] val unconnectedInputsInObject = Driver.partitionIslands
+  protected[this] val unconnectedInputs = HashSet[Node]()
   // Sets to manage allocation and generation of shadow registers
-  val regWritten = HashSet[Node]()
-  val needShadow = HashSet[Node]()
-  val allocatedShadow = HashSet[Node]()
+  protected[this] val regWritten = HashSet[Node]()
+  protected[this] val needShadow = HashSet[Node]()
+  protected[this] val allocatedShadow = HashSet[Node]()
 
-  var potentialShadowRegisters = 0
-  val allocateOnlyNeededShadowRegisters = Driver.allocateOnlyNeededShadowRegisters
-  val ignoreShadows = false
-  val shadowPrefix = if (ignoreShadows) {
-    "// "
-  } else {
-    ""
-  }
+  protected[this] var potentialShadowRegisters = 0
+  protected[this] val allocateOnlyNeededShadowRegisters = Driver.allocateOnlyNeededShadowRegisters
 
   override def emitTmp(node: Node): String = {
     require(false)
@@ -122,9 +112,15 @@ class CppBackend extends Backend {
   }
 
   // Manage a constant pool.
-  val coalesceConstants = multiwordLiteralInObject
-  val constantPool = HashMap[String, Literal]()
-  def wordMangle(x: Node, w: String): String = x match {
+  protected[this] val coalesceConstants = multiwordLiteralInObject
+  protected[this] val constantPool = HashMap[String, Literal]()
+
+  protected[this] def emitLit(value: BigInt, w: Int = 0): String = {
+    val hex = value.toString(16)
+    "0x" + (if (hex.length > bpw/4*w) hex.slice(hex.length-bpw/4*(w + 1), hex.length-bpw/4*w) else 0) + "L"
+  }
+
+  protected[this] def wordMangle(x: Node, w: String): String = x match {
     case l: Literal =>
       if (words(x) == 1) {
         emitRef(x)
@@ -142,11 +138,8 @@ class CppBackend extends Backend {
       else if (words(x) == 1) emitRef(x)
       else s"${emitRef(x)}[${w}]"
   }
-  def emitLit(value: BigInt, w: Int = 0): String = {
-    val hex = value.toString(16)
-    "0x" + (if (hex.length > bpw/4*w) hex.slice(hex.length-bpw/4*(w + 1), hex.length-bpw/4*w) else 0) + "L"
-  }
-  def wordMangle(x: Node, w: Int): String =
+
+  protected[this] def wordMangle(x: Node, w: Int): String =
     if (w >= words(x)) {
       "0L"
     }  else x match {
@@ -156,7 +149,9 @@ class CppBackend extends Backend {
         emitLit(value, w)
       case _ => wordMangle(x, w.toString)
     }
-  def isLit(node: Node): Boolean = node.isLit || node.isInstanceOf[Bits] && node.inputs.length == 1 && isLit(node.inputs.head)
+
+  protected[this] def isLit(node: Node): Boolean = node.isLit || node.isInstanceOf[Bits] && node.inputs.length == 1 && isLit(node.inputs.head)
+
   def emitWordRef(node: Node, w: Int): String = {
     node match {
       case x: Binding =>
@@ -169,7 +164,7 @@ class CppBackend extends Backend {
   }
 
   // Returns a list of tuples (type, name) of variables needed by a node
-  def nodeVars(node: Node): List[(String, String)] = {
+  protected[this] def nodeVars(node: Node): List[(String, String)] = {
     node match {
       case x: Binding =>
         List()
@@ -195,7 +190,7 @@ class CppBackend extends Backend {
           if (!allocateOnlyNeededShadowRegisters || needShadow.contains(node)) {
             // Add an entry for the shadow register in the main object.
             if (shadowRegisterInObject) {
-              List((s"${shadowPrefix} dat_t<${node.needWidth()}>", shadowPrefix + emitRef(node) + s"__shadow"))
+              List((s" dat_t<${node.needWidth()}>", emitRef(node) + s"__shadow"))
             } else {
               Nil
             }
@@ -223,7 +218,7 @@ class CppBackend extends Backend {
     out.toString()
   }
 
-  def emitCircuitAssign(srcPrefix:String, node: Node): String = {
+  protected[this] def emitCircuitAssign(srcPrefix:String, node: Node): String = {
     val out = new StringBuilder("")
     for (varDef <- nodeVars(node)) {
       out.append(s"  ${varDef._2} = ${srcPrefix}${varDef._2};\n")
@@ -231,9 +226,9 @@ class CppBackend extends Backend {
     out.toString()
   }
 
-  val bpw = 64
-  def words(node: Node): Int = (node.needWidth() - 1) / bpw + 1
-  def fullWords(node: Node): Int = node.needWidth()/bpw
+  protected[this] val bpw = 64
+  protected[this] def words(node: Node): Int = (node.needWidth() - 1) / bpw + 1
+  protected[this] def fullWords(node: Node): Int = node.needWidth()/bpw
   def emitLoWordRef(node: Node): String = emitWordRef(node, 0)
   // If we're generating multiple methods, literals and temporaries have to live in the main object.
   // We only get to ask isInObject once, so we'd better arrange for it to give the correct answer before we ask.
@@ -678,7 +673,7 @@ class CppBackend extends Backend {
           } else {
             " dat_t<" + node.needWidth()  + ">"
           }
-          s"${shadowPrefix} ${storagePrefix} ${emitRef(reg)}__shadow = ${emitRef(reg.next)};\n"
+          s" ${storagePrefix} ${emitRef(reg)}__shadow = ${emitRef(reg.next)};\n"
         } else {
           ""
         }
@@ -696,7 +691,7 @@ class CppBackend extends Backend {
   }
 
   // If we write a register node before we use its inputs, we need to shadow it.
-  def determineRequiredShadowRegisters(node: Node) {
+  protected[this] def determineRequiredShadowRegisters(node: Node) {
     node match {
       case reg: Reg => {
         regWritten += node
@@ -711,10 +706,10 @@ class CppBackend extends Backend {
     }
   }
 
-  def clkName (clock: Clock): String =
+  protected[this] def clkName (clock: Clock): String =
     (if (clock == Driver.implicitClock) "" else "_" + emitRef(clock))
 
-  def genHarness(c: Module, name: String) {
+  protected[this] def genHarness(c: Module, name: String) {
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
     val harness  = createOutputFile(n + "-emulator.cpp");
     harness.write("#include \"" + n + ".h\"\n\n");
@@ -931,7 +926,7 @@ class CppBackend extends Backend {
     res
   }
 
-  /** Ensures each node such that it has a unique name accross the whole
+  /** Ensures each node such that it has a unique name across the whole
     hierarchy by prefixing its name by a component path (except for "reset"
     and all nodes in *c*). */
   def renameNodes(nodes: ArrayBuffer[Node]) {
@@ -994,9 +989,13 @@ class CppBackend extends Backend {
 
     // Generate CPP files
     val out_cpps = ArrayBuffer[CppFile]()
-    val all_cpp = new StringBuilder
 
-    def cppFileSuffix = "-" + out_cpps.length
+    def cppFileSuffix: String = if (compileMultipleCppFiles) {
+        "-" + out_cpps.length
+      } else {
+        ""
+      }
+
     class CppFile(val suffix: String = cppFileSuffix) {
       var lines = 0
       var done = false
@@ -1018,9 +1017,6 @@ class CppBackend extends Backend {
       def close() {
         done = true
         fileWriter.close()
-      }
-      def advance() {
-        this.done = true
       }
     }
 
@@ -1113,24 +1109,70 @@ class CppBackend extends Backend {
         bodycalls.result
       }
     }
+
+    // This is the opposite of LineLimitedMethods.
+    // It collects output until a threshold is reached.
+    class CoalesceMethods(limit: Int) {
+      var accumlation = 0
+      var accumlatedMethodHead = ""
+      var accumlatedMethodTail = ""
+      val separateMethods = ArrayBuffer[CMethod]()
+
+      def append(methodDefinition: CMethod) {
+        val methodBody = methodDefinition.body.toString
+        val nLinesApprox = methodBody.count(_ == '\n')
+
+        def newMethod() {
+          accumlation = 0
+          accumlatedMethodHead = methodDefinition.head
+          accumlatedMethodTail = methodDefinition.tail
+          separateMethods.append(methodDefinition)
+          createCppFile()
+          writeCppFile(accumlatedMethodHead)
+        }
+
+        // Are we currently accumulating a method?
+        if (accumlatedMethodHead == "") {
+          // We are now.
+          newMethod()
+        }
+        // Can we just merge this method in with the previous one?
+        if (accumlation + nLinesApprox > limit) {
+          // No. Time for a new method.
+          // First, close off any accumulated method ..
+          if (accumlation > 0) {
+            writeCppFile(accumlatedMethodTail)
+            // ... and start a new one.
+            newMethod()
+          }
+        }
+        writeCppFile(methodBody)
+        accumlation += nLinesApprox
+      }
+      
+      def done() {
+        // First, close off any accumulated method.
+        if (accumlation > 0) {
+          writeCppFile(accumlatedMethodTail)
+        }
+      }
+    }
+ 
     def createCppFile(suffix: String = cppFileSuffix) {
       // If we're trying to coalesce cpp files (minimumLinesPerFile > 0),
       //  don't actually create a new file unless we've hit the line limit.
-      if ((out_cpps.size > 0) && (minimumLinesPerFile == 0 || out_cpps.last.lines < minimumLinesPerFile) && !out_cpps.last.done) {
+      if ((out_cpps.size > 0) && (!compileMultipleCppFiles || out_cpps.last.lines < minimumLinesPerFile) ) {
         out_cpps.last.write("\n\n")
       } else {
+        if (out_cpps.size > 0) {
+          out_cpps.last.close()
+        }
         out_cpps += new CppFile(suffix)
         println("CppBackend: createCppFile " + out_cpps.last.name)
       }
     }
     def writeCppFile(s: String) {
       out_cpps.last.write(s)
-      if (! suppressMonolithicCppFile) {
-        all_cpp.append(s)
-      }
-    }
-    def advanceCppFile() {
-      out_cpps.last.advance()
     }
 
     // Generate header file
@@ -1251,7 +1293,6 @@ class CppBackend extends Backend {
     }
 
     def genInitMethod(): Int = {
-      createCppFile()
 
       // If we're putting literals in the class as static const's,
       // generate the code to initialize them here.
@@ -1294,7 +1335,6 @@ class CppBackend extends Backend {
     }
 
     def genClockMethod() {
-      createCppFile()
       writeCppFile("int " + c.name + "_t::clock ( dat_t<1> reset ) {\n")
       writeCppFile("  uint32_t min = ((uint32_t)1<<31)-1;\n")
 
@@ -1325,7 +1365,6 @@ class CppBackend extends Backend {
     }
 
     def genCloneMethod() {
-      createCppFile()
       writeCppFile(s"mod_t* ${c.name}_t::clone() {\n")
       writeCppFile(s"  mod_t* cloned = new ${c.name}_t(*this);\n")
       writeCppFile(s"  return cloned;\n")
@@ -1336,7 +1375,6 @@ class CppBackend extends Backend {
     }
 
     def genSetCircuitFromMethod(): Int = {
-      createCppFile()
       val codePrefix = s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(src);\n" +
                  s"  assert(mod_typed);\n"
       val codeSuffix = "  return true;\n"
@@ -1364,7 +1402,6 @@ class CppBackend extends Backend {
 
     // For backwards compatibility, output both stream and FILE-based code.
     def genPrintMethod() {
-      createCppFile()
       writeCppFile("void " + c.name + "_t::print ( FILE* f ) {\n")
       for (cc <- Driver.components; p <- cc.printfs) {
         hasPrintfs = true
@@ -1397,7 +1434,6 @@ class CppBackend extends Backend {
     }
 
     def genDumpInitMethod(vcd: VcdBackend): Int = {
-      createCppFile()
       val method = CMethod(CTypedName("void", "dump_init"), Array[CTypedName](CTypedName("FILE*", "f")))
       val llm = new LineLimitedMethod(method, "", "", Array[CTypedName](CTypedName("FILE*", "f")))
       vcd.dumpVCDInit(llm.addString)
@@ -1409,7 +1445,6 @@ class CppBackend extends Backend {
 
     def genDumpMethod(vcd: VcdBackend): Int = {
       val method = CMethod(CTypedName("void", "dump"), Array[CTypedName](CTypedName("FILE*", "f"), CTypedName("int", "t")))
-      createCppFile()
       // Are we actually generating VCD?
       if (Driver.isVCD) {
         // Yes. dump is a real method.
@@ -1438,7 +1473,6 @@ class CppBackend extends Backend {
     }
 
     def genInitMappingTableMethod(mappings: ArrayBuffer[Tuple2[String, Node]]): Int = {
-      createCppFile()
       val method = CMethod(CTypedName("void", "init_mapping_table"), Array[CTypedName](), s"${c.name}_api_t")
       val codePrefix = s"  dat_table.clear();\n" +
                  s"  mem_table.clear();\n" +
@@ -1490,6 +1524,19 @@ class CppBackend extends Backend {
     }
     val maxIslandId = islands.map(_.islandId).max
     val nodeToIslandArray = generateNodeToIslandArray(islands)
+
+    /** Walk the node structure, eliminating unnecessary data structures.
+      *  
+      */
+    def eliminateAuxilliaryData() {
+      for (n <- Driver.orderedNodes) {
+        if (n.consumers.size > 1) {
+          val consumerHead = n.consumers.head
+          n.consumers.clear
+          n.consumers += consumerHead
+        }
+      }
+    }
 
     class ClockDomains {
       type ClockCodeMethods = HashMap[Clock, (CMethod, CMethod, CMethod)]
@@ -1576,23 +1623,21 @@ class CppBackend extends Backend {
           // We're generating partitioned islands
           val addedCode = new Array[Boolean](3)
           for (m <- Driver.orderedNodes) {
-            for (island <- islands) {
-              if (isNodeInIsland(m, island)) {
-                val islandId = island.islandId
-                val codeMethods = islandClkCode(islandId)
-                val addedCodeTuple = addClkDefs(m, codeMethods)
-                addedCode(0) = addedCodeTuple._1
-                addedCode(1) = addedCodeTuple._2
-                addedCode(2) = addedCodeTuple._3
-                // Update the generation number if we added any code to this island.
-                for (lohi <- 0 to 2) {
-                  if (addedCode(lohi)) {
-                    // Is this the first time we've added code to this island?
-                    if (islandStarted(lohi)(islandId) == 0) {
-                      islandOrder(lohi)(islandSequence(lohi)) = islandId
-                      islandSequence(lohi) += 1
-                      islandStarted(lohi)(islandId) = islandSequence(lohi)
-                    }
+            for (island <- nodeToIslandArray(m._id)) {
+              val islandId = island.islandId
+              val codeMethods = islandClkCode(islandId)
+              val addedCodeTuple = addClkDefs(m, codeMethods)
+              addedCode(0) = addedCodeTuple._1
+              addedCode(1) = addedCodeTuple._2
+              addedCode(2) = addedCodeTuple._3
+              // Update the generation number if we added any code to this island.
+              for (lohi <- 0 to 2) {
+                if (addedCode(lohi)) {
+                  // Is this the first time we've added code to this island?
+                  if (islandStarted(lohi)(islandId) == 0) {
+                    islandOrder(lohi)(islandSequence(lohi)) = islandId
+                    islandSequence(lohi) += 1
+                    islandStarted(lohi)(islandId) = islandSequence(lohi)
                   }
                 }
               }
@@ -1605,54 +1650,6 @@ class CppBackend extends Backend {
         }
       }
 
-      // This is the opposite of LineLimitedMethods.
-      // It collects output until a threshold is reached.
-      class CoalesceMethods(limit: Int) {
-        var accumlation = 0
-        var accumlatedMethodHead = ""
-        var accumlatedMethodTail = ""
-        val separateMethods = ArrayBuffer[CMethod]()
-
-        def append(methodDefinition: CMethod) {
-          val methodBody = methodDefinition.body.toString
-          val nLinesApprox = methodBody.count(_ == '\n')
-
-          def newMethod() {
-            accumlation = 0
-            accumlatedMethodHead = methodDefinition.head
-            accumlatedMethodTail = methodDefinition.tail
-            separateMethods.append(methodDefinition)
-            createCppFile()
-            writeCppFile(accumlatedMethodHead)
-          }
-
-          // Are we currently accumulating a method?
-          if (accumlatedMethodHead == "") {
-            // We are now.
-            newMethod()
-          }
-          // Can we just merge this method in with the previous one?
-          if (accumlation + nLinesApprox > limit) {
-            // No. Time for a new method.
-            // First, close off any accumulated method ..
-            if (accumlation > 0) {
-              writeCppFile(accumlatedMethodTail)
-              // ... and start a new one.
-              newMethod()
-            }
-          }
-          writeCppFile(methodBody)
-          accumlation += nLinesApprox
-        }
-        
-        def done() {
-          // First, close off any accumulated method.
-          if (accumlation > 0) {
-            writeCppFile(accumlatedMethodTail)
-          }
-        }
-      }
- 
       def outputAllClkDomains() {
         // Are we generating partitioned islands?
         if (!partitionIslands) {
@@ -1744,8 +1741,6 @@ class CppBackend extends Backend {
       }
     }
 
-    val clkDomains = new ClockDomains
-
     if (Driver.isGenHarness) {
       genHarness(c, c.name);
     }
@@ -1756,6 +1751,7 @@ class CppBackend extends Backend {
     }
 
     ChiselError.info("populating clock domains")
+    val clkDomains = new ClockDomains
     clkDomains.populate()
 
     println("CppBackend::elaborate: need " + needShadow.size + ", redundant " + (potentialShadowRegisters - needShadow.size) + " shadow registers")
@@ -1769,30 +1765,32 @@ class CppBackend extends Backend {
     ChiselError.info("generating cpp files")
 
     // generate init block
+    createCppFile()
     val nInitMethods = genInitMethod()
 
     // generate clock(...) method
+    createCppFile()
     genClockMethod()
 
-    advanceCppFile()
     // generate clone() method
+    createCppFile()
     genCloneMethod()
 
-    advanceCppFile()
     // generate set_circuit_from method
+    createCppFile()
     val nSetCircuitFromMethods = genSetCircuitFromMethod()
 
     // generate print(...) method.
     // This will probably end up in the same file as the above clone code.
+    createCppFile()
     genPrintMethod()
 
-    advanceCppFile()
+    createCppFile()
     val nDumpInitMethods = genDumpInitMethod(vcd)
 
     createCppFile()
     val nDumpMethods = genDumpMethod(vcd)
 
-    out_cpps.foreach(_.fileWriter.flush())
     // If we're compiling initialization methods -O0, add the current files
     //  to the unoptimized file list.
     //  We strip off the trailing ".cpp" to facilitate creating both ".cpp" and ".o" files.
@@ -1801,11 +1799,11 @@ class CppBackend extends Backend {
       unoptimizedFiles ++= out_cpps.map(_.name.dropRight(trimLength))
     }
     // Ensure we start off in a new file before we start outputting the clock_lo/hi.
-    advanceCppFile()
+    createCppFile()
     clkDomains.outputAllClkDomains()
 
-    advanceCppFile()
     // Generate API methods
+    createCppFile()
     val nInitMappingTableMethods = genInitMappingTableMethod(mappings)
 
     // Finally, generate the header - once we know how many methods we'll have.
@@ -1813,16 +1811,8 @@ class CppBackend extends Backend {
 
     maxFiles = out_cpps.length
 
-    if (! suppressMonolithicCppFile) {
-      // We're now going to write the entire contents out to a singe file.
-      // Make sure it's really a new file.
-      advanceCppFile()
-      createCppFile("")
-      writeCppFile(all_cpp.result)
-    }
     out_cpps.foreach(_.close)
 
-    all_cpp.clear()
     out_cpps.clear()
 
     def copyToTarget(filename: String) = {

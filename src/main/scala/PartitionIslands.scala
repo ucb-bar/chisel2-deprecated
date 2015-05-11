@@ -401,7 +401,7 @@ object PartitionIslands {
     resArrayBuffer.toArray
   }
 
-  // Generate a mapping from node to island, given an array of islands.
+  // Generate a mapping from node to islands, given an array of islands.
   def generateNodeToIslandArray(islands: Array[Island]): Array[NodeIdIslands] = {
     if (islands == null || islands.size == 0) {
       return null
