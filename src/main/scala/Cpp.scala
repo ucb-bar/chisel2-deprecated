@@ -1660,6 +1660,7 @@ class CppBackend extends Backend {
             val clockXHi = clockMethods._3
             createCppFile()
             writeCppFile(clockLo.head + clockLo.body.result + clockLo.tail)
+            createCppFile()
             writeCppFile(clockIHi.head + clockIHi.body.result)
             // Note, we tacitly assume that the clock_hi initialization and execution
             // code have effectively the same signature and tail.
