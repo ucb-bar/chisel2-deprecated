@@ -337,7 +337,7 @@ object Driver extends FileSystemUtilities{
     isSupportW0W = false
     partitionIslands = false
     lineLimitFunctions = 0
-    minimumLinesPerFile = 32768
+    minimumLinesPerFile = 10000
     shadowRegisterInObject = false
     allocateOnlyNeededShadowRegisters = false
     compileInitializationUnoptimized = false
