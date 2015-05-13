@@ -36,9 +36,25 @@ object Complex {
   def apply[T<:Data with Num[T]](real: T, imag: T) = new Complex(real, imag)
 }
 
-class Complex[T<:Data with Num[T]](val real: T, val imag: T) extends Bundle {
+object conjugate {
+  def apply[T<: Data with Num[T]](x : T) : T = x match {
+    case x : Complex[_] => x.conj.asInstanceOf[T]
+    case _ => x
+  }
+}
+
+class Complex[T<:Data with Num[T]](val real: T, val imag: T) extends Bundle with Num[Complex[T]] {
   override def clone() = {
     new Complex(real.clone, imag.clone).asInstanceOf[this.type]
+  }
+
+  override protected def checkPort(obj : Any, name : String) : Boolean = name match {
+    case "real" => true
+    case "imag" => true
+    case "abs2" => false
+    case "conj" => false
+    case "unary_-" => false
+    case _      => true
   }
 
   def * (r: Complex[T]): Complex[T] =
@@ -60,11 +76,42 @@ class Complex[T<:Data with Num[T]](val real: T, val imag: T) extends Bundle {
     }
   }
 
-  def / (r: Complex[T]): Complex[T] = ???
-
+  def conj : Complex[T] =
+  {
+    new Complex(real, -imag)
+  }
+  def / (r: Complex[T]): Complex[T] =
+  {
+    this * r.conj / r.abs2
+  }
   def * (r: T): Complex[T] =
   {
     new Complex(real*r, imag*r)
+  }
+  def % (r : Complex[T]): Complex[T] =
+  {
+    // this is bad, but what can we do?
+    new Complex(real % r.real, imag % r.imag)
+  }
+  def < (b : Complex[T]) : Bool =
+  {
+    this.abs2 < b.abs2
+  }
+  def <= (b : Complex[T]) : Bool =
+  {
+    this.abs2 <= b.abs2
+  }
+  def > (b : Complex[T]) : Bool =
+  {
+    this.abs2 > b.abs2
+  }
+  def >= (b : Complex[T]) : Bool =
+  {
+    this.abs2 >= b.abs2
+  }
+  def abs2 : T =
+  {
+    real * real + imag * imag
   }
   def / (r: T): Complex[T] =
   {
