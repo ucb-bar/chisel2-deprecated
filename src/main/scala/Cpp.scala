@@ -288,7 +288,7 @@ class CppBackend extends Backend {
           } else if (o.op == "~") {
             block((0 until words(o)).map(i => emitWordRef(o, i) + " = ~" + emitWordRef(o.inputs(0), i))) + trunc(o)
           } else if (o.op == "f-")
-            "  " + emitLoWordRef(o) + " = fromFloat(-(toFloat(" + emitLoWordRef(o.inputs(0)) + "));\n"
+            "  " + emitLoWordRef(o) + " = fromFloat(-(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
           else if (o.op == "fsin")
             "  " + emitLoWordRef(o) + " = fromFloat(sin(toFloat(" + emitLoWordRef(o.inputs(0)) + ")));\n"
           else if (o.op == "fcos")
@@ -474,6 +474,8 @@ class CppBackend extends Backend {
             "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") != toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "f>") {
             "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") > toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "f<") {
+            "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") < toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "f<=") {
             "  " + emitLoWordRef(o) + " = toFloat(" + emitLoWordRef(o.inputs(0)) + ") <= toFloat(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "f>=") {

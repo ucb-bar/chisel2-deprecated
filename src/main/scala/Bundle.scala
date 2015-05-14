@@ -79,7 +79,8 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
       if( types.length == 0 && !isStatic(modifiers) && isInterface
         && !(name contains '$')
         && !(Bundle.keywords contains name)
-        && (view == null || (view contains name)) ) {
+        && (view == null || (view contains name))
+        && checkPort(m, name)) {
         val obj = m invoke this
         if(!(seen contains obj)) {
           obj match {
@@ -92,6 +93,8 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
     }
     elts
   }
+
+  protected def checkPort(obj : Any, name : String) : Boolean = true
 
   lazy val elements = calcElements(view)
 

@@ -172,7 +172,7 @@ abstract class Backend extends FileSystemUtilities{
         case reg: Reg if reg.name == "" =>
           reg setName "R" + reg.component.nextIndex
 
-        case node: Node if !node.isTypeNode && node.name == "" =>
+        case node: Node if !node.isTypeNode && node.name == "" && node.component != null =>
           node.name = "T" + node.component.nextIndex
         case _ =>
       } }
