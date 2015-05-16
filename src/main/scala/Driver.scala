@@ -312,29 +312,23 @@ object Driver extends FileSystemUtilities{
     saveConnectionWarnings = false
     saveComponentTrace = false
     dontFindCombLoop = false
-    isGenHarness = false
     isDebug = false
     getLineNumbers = false
     isCSE = false
     isIoDebug = true
     isVCD = false
     isVCDMem = false
+    isInlineMem = true
+    isGenHarness = false
     isReportDims = false
+    includeArgs = Nil
     targetDir = "."
-    components.clear()
-    sortedComps.clear()
-    compStack.clear()
-    stackIndent = 0
-    printStackStruct.clear()
-    blackboxes.clear()
-    chiselOneHotMap.clear()
-    chiselOneHotBitMap.clear()
     isCompiling = false
     isCheckingPorts = false
     isTesting = false
     testCommand = None
+    isAssert = true
     isDebugMem = false
-    isSupportW0W = false
     partitionIslands = false
     lineLimitFunctions = 0
     minimumLinesPerFile = 10000
@@ -348,17 +342,31 @@ object Driver extends FileSystemUtilities{
     hasMem = false
     hasSRAM = false
     sramMaxSize = 0
+    backend = null
     topComponent = null
+    components.clear()
+    sortedComps.clear()
+    nodes.clear()
+    orderedNodes.clear()
+    blackboxes.clear()
+    chiselOneHotMap.clear()
+    chiselOneHotBitMap.clear()
+    compStack.clear()
+    parStack.clear()
+    stackIndent = 0
+    printStackStruct.clear()
     clocks.clear()
     implicitReset.isIo = true
     implicitReset.setName("reset")
     implicitClock = new Clock()
     implicitClock.setName("clk")
-    nodes.clear()
-    orderedNodes.clear()
     isInGetWidth = false
-    startTime = System.currentTimeMillis
     modStackPushed = false
+    chiselConfigClassName = None
+    chiselProjectName = None
+    chiselConfigMode = None
+    chiselConfigDump = false
+    startTime = System.currentTimeMillis
 
     readArgs(args)
   }
@@ -487,7 +495,7 @@ object Driver extends FileSystemUtilities{
   var isDebugMem = false
   var partitionIslands = false
   var lineLimitFunctions = 0
-  var minimumLinesPerFile = 32768
+  var minimumLinesPerFile = 10000
   var shadowRegisterInObject = false
   var allocateOnlyNeededShadowRegisters = false
   var compileInitializationUnoptimized = false
@@ -517,12 +525,12 @@ object Driver extends FileSystemUtilities{
   var isInGetWidth: Boolean = false
   var modStackPushed: Boolean = false
   var modAdded: Boolean = false
-  var startTime = 0L
   /* ChiselConfig flags */
   var chiselConfigClassName: Option[String] = None
   var chiselProjectName: Option[String] = None
   var chiselConfigMode: Option[String] = None
   var chiselConfigDump: Boolean = false
+  var startTime = 0L
 
   def appendString(s1:Option[String],s2:Option[String]):String = {
     if(s1.isEmpty && s2.isEmpty) "" else {
