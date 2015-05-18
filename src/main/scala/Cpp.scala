@@ -1162,11 +1162,12 @@ class CppBackend extends Backend {
  
     def createCppFile(suffix: String = cppFileSuffix) {
       // If we're trying to coalesce cpp files (minimumLinesPerFile > 0),
-      //  don't actually create a new file unless we've hit the line limit.
-      if ((out_cpps.size > 0) && (!compileMultipleCppFiles || out_cpps.last.lines < minimumLinesPerFile) ) {
+      //  don't actually create a new file unless the current file has been closed or we've hit the line limit.
+      if ((out_cpps.size > 0) && (!compileMultipleCppFiles || (!out_cpps.last.done && out_cpps.last.lines < minimumLinesPerFile)) ) {
         out_cpps.last.write("\n\n")
       } else {
-        if (out_cpps.size > 0) {
+        // If the current file hasn't been closed, do so now.
+        if (out_cpps.size > 0 && !out_cpps.last.done) {
           out_cpps.last.close()
         }
         out_cpps += new CppFile(suffix)
@@ -1175,6 +1176,13 @@ class CppBackend extends Backend {
     }
     def writeCppFile(s: String) {
       out_cpps.last.write(s)
+    }
+
+    // If we're generating multiple cpp files, now is a good time to advance to the next.
+    def advanceCppFile() {
+      if (compileMultipleCppFiles) {
+        out_cpps.last.close()
+      }
     }
 
     // Generate header file
@@ -1802,10 +1810,12 @@ class CppBackend extends Backend {
       unoptimizedFiles ++= out_cpps.map(_.name.dropRight(trimLength))
     }
     // Ensure we start off in a new file before we start outputting the clock_lo/hi.
+    advanceCppFile()
     createCppFile()
     clkDomains.outputAllClkDomains()
 
     // Generate API methods
+    advanceCppFile()
     createCppFile()
     val nInitMappingTableMethods = genInitMappingTableMethod(mappings)
 
