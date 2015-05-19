@@ -1,10 +1,16 @@
-ChangeLog for Chisel v2.2.26 4/21/2015
+ChangeLog for Chisel v2.2.27 5/19/2015
 
-#393 Ensure we fail if errors are detected.
-#384 Re-work 398c10c fix. This fixes the old issue with SInt ROM generation while still retaining working behavior in deployment (ie. on reference-chip).
-#315 Fixes for --allocateOnlyNeededShadowRegisters (don't clobber unshadowed register and keep code order correct).
- Support for test only mode.
- Add fromMap Method for Bundles (experimental)
- Update instructions and commands for generating documentation.
- Fix various bugs with addBindings
- Chisel error line number reporting - anything above Chisel.chiselMain is user code.
+#424 Ensure all driver variables are initialized in initChisel().
+#410 Correct signature for mem_t::put().
+#407 Flag the use of "?" in anything other than comparisons as unsupported.
+#406 Literal "+" and "-" shouldn't widen.
+#401 Change wire_poke VPI routine to enable POKE on wires and ports wider than 32 bits under VCS simulation.
+ Reduce resources consumed during graph construction and C++ generation.
+ Ensure we generate multiple cpp files (when instructed to do so).
+ Fix bug in VendingMachine Enum example.
+ Update Complex type (inherit Num trait, introduce conjugate).
+ Fix null pointer exception for nodes with no component.
+ Add a hook to calcElements in Bundle to let subclasses of Bundle filter out unwanted member, do type checking, etc.
+ Fix priority encoder for C++ for >64 bits
+ Add Wire() no-op (support for Chisel3) and associated tests.
+ Add MInt() for masked bit comparisons (support for Chisel3); add MInt() test.
