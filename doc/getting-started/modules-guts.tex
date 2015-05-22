@@ -187,7 +187,7 @@ All of the above definitions pass the same parameters to the FIFO module. Notice
 
 \section{Advanced Parametrization}
 
-Although parameters can be passed explicitly through a Module's constructor, this technique does not scale when parameterizing large designs with many generic components. For a more detailed explanation of why a better parameterization method is needed, please see XXXX. In addition, XXXX explains heuristics for how to organize and parameterize large designs, which we highly recommend one reads prior to using this functionality in a design. The following, however, is a basic introduction.
+Although parameters can be passed explicitly through a Module's constructor, this technique does not scale when parameterizing large designs with many generic components. For a more detailed explanation of why a better parameterization method is needed, please see the Advanced Parameterization Manual. In addition, this manual explains heuristics for how to organize and parameterize large designs, which we highly recommend one reads prior to using this functionality in a design. The following, however, is a basic introduction.
 
 Every Module has its own \verb+params+ object, which acts as a dictionary. Querying this object is shown below.
 
@@ -255,7 +255,7 @@ class Top extends Module {
 }
 \end{scala}
 
-For more advanced uses, tips, and tricks, please see XXXX.
+For more advanced uses, tips, and tricks, please see the Advanced Parameterization Manual, in the documentation section of the website or the doc/parameters directory of the git repo.
 
 \section{Built In Primitives}
 

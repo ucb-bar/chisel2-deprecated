@@ -36,7 +36,11 @@
 EECS Department, UC Berkeley\\
 {\tt  adamiz@eecs.berkeley.edu}
 }
+\IfFileExists{\jobname_date.sty}
+{\usepackage{\jobname_date}}
+{
 \date{\today}
+}
 
 \newenvironment{example}{\VerbatimEnvironment\begin{footnotesize}\begin{Verbatim}}{\end{Verbatim}\end{footnotesize}}
 \newcommand{\kode}[1]{\begin{footnotesize}{\tt #1}\end{footnotesize}}
@@ -159,7 +163,7 @@ For the rest of the document, assume the key to every query is a case class that
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=3in]{figs/alter}
+\includegraphics[width=3in]{figs/alter.pdf}
 \caption{An example of Memory's key/value chain and flat map.}
 \label{fig:alter}
 \end{figure}
@@ -266,8 +270,8 @@ To instantiate a design with a specific \code{ChiselConfig}, simply call the {\e
 \begin{figure*}
 \begin{center}
 \begin{tabular}{cc}
-\includegraphics[height=2.0in]{figs/sitea} &
-\includegraphics[height=2.0in]{figs/siteb} \\
+\includegraphics[height=2.0in]{figs/sitea.pdf} &
+\includegraphics[height=2.0in]{figs/siteb.pdf} \\
 (a) Core's key/value chain and flat map & (b) Cache's key/value chain and flat map \\
 \end{tabular}
 \end{center}
@@ -316,7 +320,7 @@ The top-level key/value mapping is using \code{site} to query the bottom of the 
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=3in]{figs/here}
+\includegraphics[width=3in]{figs/here.pdf}
 \caption{Instead of using 128 or 4 directly, we can access it via here(Sets) and here(Ways), respectively.}
 \label{fig:alter}
 \end{figure}
@@ -349,7 +353,7 @@ The three goals of any parameterization scheme are: (1) all searchable parameter
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=3in]{figs/ex1}
+\includegraphics[width=3in]{figs/ex1.pdf}
 \caption{For a few number of parameters, the simplest scheme is to pass them directly via constructor arguments.}
 \label{fig:ex1}
 \end{figure}
@@ -373,7 +377,7 @@ No source code changes are necessary to explore our parameter space, and all sea
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=3in]{figs/ex2}
+\includegraphics[width=3in]{figs/ex2.pdf}
 \caption{For disjoint parameter sets, we can group sets of parameters into configuration objects to pass as constructor arguments.}
 \label{fig:ex2}
 \end{figure}
@@ -405,7 +409,7 @@ class Tile (val tc:TileConfig) extends Module {
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=3in]{figs/ex3}
+\includegraphics[width=3in]{figs/ex3.pdf}
 \caption{For location-independent parameters, every module has a parameter dictionary, which they can copy and alter before passing to each child module.}
 \label{fig:ex3}
 \end{figure}
@@ -496,7 +500,7 @@ Although this parameterization method is reasonably verbose, it scales well with
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=3in]{figs/ex4}
+\includegraphics[width=3in]{figs/ex4.pdf}
 \caption{For location-dependent parameters, we can use the \code{site} mechanism to customize these parameters at the top level.}
 \label{fig:ex4}
 \end{figure}
@@ -575,7 +579,7 @@ class Memory extends Module {
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=1.5in]{figs/ex5}
+\includegraphics[width=1.5in]{figs/ex5.pdf}
 \caption{To derive a parameter from another top-level parameter, we can use the here functionality to avoid duplicating a parameter value.}
 \label{fig:ex5}
 \end{figure}
@@ -613,7 +617,7 @@ class DefaultConfig() extends ChiselConfig {
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=1.5in]{figs/ex6}
+\includegraphics[width=1.5in]{figs/ex6.pdf}
 \caption{To rename or programmatically alter a parameter based on the previous value, one can use the up mechanism to query the parent's \code{Parameters} object.}
 \label{fig:ex6}
 \end{figure}
