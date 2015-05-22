@@ -14,11 +14,22 @@ version   := 2.2.0
 
 PDFLATEX  := pdflatex
 WWW_PAGES := index.html documentation.html download.html faq.html releases.html
-WWW_EXTRA := manual.html getting-started.html
+WWW_EXTRA := manual.html getting-started.html parameters.html
 
 # The following subdirectories build documentation correctly.
-PDF_DIRS	:= installation manual tutorial getting-started dac12-talk
-PDFS      := $(addsuffix .pdf,$(addprefix chisel-,$(PDF_DIRS)))	
+PDF_DIRS	:= installation manual tutorial getting-started talks/dac12 parameters cheatsheet
+# Define a function to map PDF_DIRS to a PDF base name.
+# Basically, every directory is the base name of the pdf except for dac12-talk.
+pdf_base_name_from_dir = $(subst talks/dac12,dac12-talk,$(1))
+# Define a map function to apply a function to multiple arguments.
+map = $(foreach arg,$(2),$(call $(1),$(arg)))
+
+PDFS := $(addsuffix .pdf,$(addprefix chisel-,$(call map,pdf_base_name_from_dir,$(PDF_DIRS))))
+
+# Suffixes for tex temporary files we'll clean
+TEX_SUFFIXES := 4ct 4tc aux css dvi html idv lg log out tmp xref
+TEX_TEMP_FILES := $(foreach dir,$(PDF_DIRS),$(foreach suffix,$(TEX_SUFFIXES),$(dir)/$(call pdf_base_name_from_dir,$(dir)).$(suffix)))
+STY_TEMP_FILES := $(foreach dir,$(PDF_DIRS),$(dir)/$(call pdf_base_name_from_dir,$(dir))_date.sty)
 
 LATEX2MAN := latex2man
 MAN_PAGES := chisel.man
@@ -34,9 +45,9 @@ RELEASE_TAG=$(firstword $(RELEASE_TAGTEXT))
 RELEASE_DATETEXT=$(shell git log -1 --format="%ai" $(RELEASE_TAG))
 RELEASE_DATE=$(firstword $(RELEASE_DATETEXT))
 
-vpath %.tex $(srcDir)/bootcamp $(srcDir)/installation $(srcDir)/talks/dac12 $(srcDir)/manual $(srcDir)/tutorial $(srcDir)/getting-started
+vpath %.tex $(addprefix $(srcDir)/,$(PDF_DIRS))
 
-vpath %.mtt $(srcDir)/bootcamp $(srcDir)/installation $(srcDir)/talks/dac12 $(srcDir)/manual $(srcDir)/tutorial $(srcDir)/getting-started
+vpath %.mtt $(addprefix $(srcDir)/,$(PDF_DIRS))
 
 all: $(WWW_PAGES) $(WWW_EXTRA) $(PDFS)
 
@@ -65,15 +76,13 @@ install: all
 # but apparently went away after upgrading to texlive 2013.
 # It fails on ubuntu 14.04 LTS and texlive-latex-recommended 2013.20140215-1
 # if we don't remove the manual.aux file
-chisel-%.pdf: %.tex
+chisel-%.pdf: %.tex %_date.sty
 	rm -f $(subst .tex,.aux,$<)
-	cd $(dir $<) && TEXINPUTS=".:$(PWD)/$(srcDir)/manual:${TEXINPUTS}" pdflatex -file-line-error -interaction nonstopmode -output-directory $(PWD) $(notdir $<)
-	cd $(dir $<) && TEXINPUTS=".:$(PWD)/$(srcDir)/manual:${TEXINPUTS}" pdflatex -file-line-error -interaction nonstopmode -output-directory $(PWD) $(notdir $<)
+	cd $(dir $<) && for c in 0 1; do pdflatex -file-line-error -interaction nonstopmode -output-directory $(PWD) $(notdir $<) ; done
 	mv $(subst .tex,.pdf,$(notdir $<)) $@
 
-%.html: %.tex
-	cd $(dir $<) && TEXINPUTS=".:$(PWD)/$(srcDir)/manual:${TEXINPUTS}" htlatex $(notdir $<) $(PWD)/$(srcDir)/html.cfg "" -d/$(PWD)/
-	cd $(dir $<) && TEXINPUTS=".:$(PWD)/$(srcDir)/manual:${TEXINPUTS}" htlatex $(notdir $<) $(PWD)/$(srcDir)/html.cfg "" -d/$(PWD)/
+%.html: %.tex %_date.sty
+	cd $(dir $<) && for c in 0 1; do htlatex $(notdir $<) $(PWD)/$(srcDir)/html.cfg "" -d/$(PWD)/ ; done
 	mv $(subst .tex,.html,$(notdir $<)) $@~
 	$(srcDir)/../bin/tex2html.py $@~ $@
 
@@ -81,7 +90,7 @@ chisel-%.pdf: %.tex
 	# cd into the directory containing the .tex file and massage it
 	cd $(dir $<) && \
 	sed -e "s/@VERSION@/$(RELEASE_TAG)/" -e "s/@DATE@/$(RELEASE_DATE)/" $(notdir $<) > $(basename $@).ttex ;\
-	TEXINPUTS=".:$(PWD)/$(srcDir)/manual:${TEXINPUTS}" latex2man $(basename $@).ttex $@
+	latex2man $(basename $@).ttex $@
 
 %.html: $(srcDir)/templates/%.html $(srcDir)/templates/base.html
 	$(srcDir)/../bin/jinja2html.py $(notdir $<) $@
@@ -91,13 +100,21 @@ releases.html:	$(srcDir)/templates/releases.html $(srcDir)/templates/base.html
 	$(srcDir)/../bin/jinja2html.py $@.tmp $@ && ${RM} $(dir $<)/$@.tmp
 
 clean:
-	-rm -f $(addprefix manual/,*.4ct *.4tc *.css *.dvi *.html *.idv *.lg *.tmp *.xref)
+	-rm -f $(TEX_TEMP_FILES)
+	-rm -f $(STY_TEMP_FILES)
+	# Remove any .png files that are created from pdfs
+	-rm -f $(subst .pdf,.png,$(wildcard parameters/figs/*.pdf))
 	-rm -f $(addprefix manual/figs/,bits-1.png bits-and.png bits-or-and.png node-hierarchy.png type-hierarchy.png)
-	-rm -f $(addprefix tutorial/,*.4ct *.4tc *.css *.dvi *.html *.idv *.lg *.tmp *.xref)
 	-rm -f $(addprefix tutorial/figs/,DUT.png DUT.svg condupdates.png)
-	-rm -f $(addprefix getting-started/,*.4ct *.4tc *.css *.dvi *.html *.idv *.lg *.tmp *.xref) getting-started?.html
 	-rm -f $(WWW_PAGES) $(PDFS) $(WWW_EXTRA) $(addsuffix .1,$(WWW_EXTRA)) $(patsubst %.html,%.css,$(WWW_EXTRA))
 	-rm -f *~ *.aux *.log *.nav *.out *.snm *.toc *.vrb
 	-rm -f *.jpg *.png
 	-rm -f manual/chisel.man manual/chisel.ttex manual/*.aux manual/*.log manual/*.out manual/*.pdf
+	-rm -f bootcamp/figs/LFSR16.png
+	-rm -f getting-started/getting-started?.html getting-started?.html
 
+# Generate a date (optional) for the document based on the latest
+# git commit of any of its (obvious) constituent parts.
+%_date.sty:	%.tex
+	for f in $(wildcard $(dir $<)*.tex); do git log -n 1 --format="%at" -- $$f; done | sort -nr | head -1 | gawk '{print "\\date{",strftime("%B %e, %Y", $$1),"}"}' > $@
+	cmp $@ $(dir $<)$@ || cp $@ $(dir $<)
