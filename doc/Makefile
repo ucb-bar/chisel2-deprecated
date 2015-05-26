@@ -59,9 +59,9 @@ pdf: $(PDFS)
 
 install: all
 	install -d $(installTop)/$(version)/figs
-	install -m 644 $(wildcard $(srcDir)/manual/figs/*.png $(srcDir)/tutorial/figs/*.png) $(installTop)/$(version)/figs
-	install -m 644 $(WWW_EXTRA) $(PDFS) $(installTop)/$(version)
-	install -m 644 $(WWW_PAGES) $(installTop)
+	install -m 664 $(foreach figdir,manual parameters tutorial,$(wildcard $(srcDir)/$(figdir)/figs/*.png)) $(installTop)/$(version)/figs
+	install -m 664 $(WWW_EXTRA) $(PDFS) $(installTop)/$(version)
+	install -m 664 $(WWW_PAGES) $(installTop)
 
 # NOTE: We follow the recommended practice of running the *latex tools twice
 # so references (citations and figures) are correctly handled.

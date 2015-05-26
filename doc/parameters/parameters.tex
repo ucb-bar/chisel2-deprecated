@@ -322,7 +322,7 @@ The top-level key/value mapping is using \code{site} to query the bottom of the 
 \centering
 \includegraphics[width=3in]{figs/here.pdf}
 \caption{Instead of using 128 or 4 directly, we can access it via here(Sets) and here(Ways), respectively.}
-\label{fig:alter}
+\label{fig:alter2}
 \end{figure}
 
 If a parameter is a deterministic function of other parameters expressed at the same group in the key/value mapping chain, one does not want to duplicate a value, as giving a new value would require multiple changes. Instead, one can use the \code{here} mechanism to query the same group of key/value mappings that \code{here} was called:
