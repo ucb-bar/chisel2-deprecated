@@ -52,7 +52,7 @@ backend.
 \begin{Description}[\Opt{allocateOnlyNeededShadowRegisters}]\setlength{\itemsep}{0cm}
 \item[--\Opt{allocateOnlyNeededShadowRegisters}] (C++) Attempt to allocate
   only those shadow registers actually required. This reduces the size
-  of the main C++ designp object (especially when
+  of the main C++ design object (especially when
   \Arg{--shadowRegisterInObject} is enabled), which in turn reduces
   compilation time. It should have no execution-time performance impact.
 \item[--\Opt{assert}] Emit assertions.
