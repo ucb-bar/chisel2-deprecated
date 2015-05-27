@@ -124,7 +124,14 @@ object ChiselError {
       println("COULDN'T FIND LINE NUMBER (" + stack(1) + ")")
       None
     } else {
-      Some(idx)
+      // There may be an anonymous method in this class which we skipped
+      //  since it has "$$" in its name. If we find such a method lower
+      //  down on the stack, return its index.
+      val userStackElement = stack(idx)
+      val userClassName = userStackElement.getClassName()
+      val userFileName = userStackElement.getFileName()
+      val lowestIdx = stack.indexWhere(ste => ste.getClassName().startsWith(userClassName) && ste.getFileName() == userFileName)
+      Some(lowestIdx)
     }
   }
 
