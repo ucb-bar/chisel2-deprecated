@@ -54,7 +54,7 @@ class SysCBackend extends CppBackend {
       //  No, but it will throw an exception that should explain the issue reasonably
       val cdef = new ComponentDef(c.name + "_t", c.name)
       for ((name, elt) <- top_bundle.elements) {
-         elt match {
+         val valid = elt match {
             case delt:DecoupledIO[_] =>
               delt.bits match {
                 case bits: Bits => {
@@ -62,12 +62,20 @@ class SysCBackend extends CppBackend {
                   val vtype = "dat_t<" + bits.width + ">" // direct use of width here?
                   val entry = new CEntry(name, is_input, vtype, bits.name, delt.ready.name, delt.valid.name)
                   cdef.entries += (entry)
+                  true
                  }
-                case _ =>
-                  throw new RuntimeException("SystemC requires that all top-level wires are decoupled bits!")
+                case _ => false
                }
-            case _ =>
-               throw new RuntimeException("SystemC requires that all top-level wires are decoupled bits!")
+            case _ => false
+         }
+         if (!valid) {
+           val invalidIOMessage = "SystemC requires that all top-level wires are decoupled bits!"
+           // If we have a line number for the element, use it.
+           if (elt.line != null) {
+             ChiselError.error(invalidIOMessage, elt.line)
+           } else {
+             ChiselError.error(invalidIOMessage)
+           }
          }
       }
 

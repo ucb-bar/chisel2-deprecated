@@ -85,6 +85,8 @@ object throwException {
   def apply(s: String, t: Throwable = null) = {
     val xcpt = new ChiselException(s, t)
     findFirstUserLine(xcpt.getStackTrace) foreach { u => xcpt.setStackTrace(Array(u)) }
+    // Record this as an error (for tests and error reporting).
+    ChiselError.error(s)
     throw xcpt
   }
 }
