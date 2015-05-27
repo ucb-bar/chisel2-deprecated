@@ -528,7 +528,7 @@ struct bit_word_funs {
 
   static void inject (val_t d[], val_t s0[], int e, int s) {
     // Opposite of extract: Assign s0 to a subfield of d.
-    // const int bw = e-s+1;
+    const int bw = e-s+1;
     val_t msk[nw];
     val_t msk_lsh[nw];
     val_t s0_lsh[nw];
