@@ -4,24 +4,6 @@
 #ifndef __IS_EMULATOR_MOD__
 #define __IS_EMULATOR_MOD__
 
-#pragma GCC diagnostic push
-#ifdef __clang__
-#pragma GCC diagnostic ignored "-Wunknown-pragmas"
-#else
-#pragma GCC diagnostic ignored "-Wpragmas"
-#endif // __clang__
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wsign-compare"
-#pragma GCC diagnostic ignored "-Wparentheses"
-#pragma GCC diagnostic ignored "-Wreturn-type"
-#pragma GCC diagnostic ignored "-Wchar-subscripts"
-#pragma GCC diagnostic ignored "-Wtype-limits"
-#pragma GCC diagnostic ignored "-Wunused-function"
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#pragma GCC diagnostic ignored "-Wreorder"
-#pragma GCC diagnostic ignored "-Wsometimes-uninitialized"
-#pragma GCC diagnostic ignored "-pedantic"
-
 #include <assert.h>
 #include <inttypes.h>
 #include <stdio.h>
@@ -1714,10 +1696,10 @@ class mod_t {
     {}
   virtual ~mod_t() {}
   std::vector< mod_t* > children;
-  virtual void init ( val_t rand_init=false ) { };
-  virtual void clock_lo ( dat_t<1> reset ) { };
-  virtual void clock_hi ( dat_t<1> reset ) { };
-  virtual int  clock ( dat_t<1> reset ) { };
+  virtual void init ( val_t rand_init=false ) = 0;
+  virtual void clock_lo ( dat_t<1> reset ) = 0;
+  virtual void clock_hi ( dat_t<1> reset ) = 0;
+  virtual int  clock ( dat_t<1> reset ) = 0;
   virtual void setClocks ( std::vector< int >& periods ) { };
 
   // Returns a clone of this object's circuit state (both registers and wires).
@@ -1797,5 +1779,4 @@ class mod_t {
     throw std::runtime_error("Assertion failed: " msg); \
 }
 
-#pragma GCC diagnostic pop
 #endif
