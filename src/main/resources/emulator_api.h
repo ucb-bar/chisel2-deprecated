@@ -4,12 +4,6 @@
 
 #include "emulator_mod.h"
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
-#pragma GCC diagnostic ignored "-Wsign-compare"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wunused-variable"
-
 #include <string>
 #include <sstream>
 #include <map>
@@ -524,9 +518,7 @@ public:
                         for (int t = 0; t < n; t++) {
                           for (int i = 2; i < tokens.size(); i++) 
                             ss << " " << get_dat_by_name(tokens[i])->get_value();
-                          int ret = module->step(false, 1);
-                          // if (!ret)
-                          //   return "error";
+                          module->step(false, 1); // not using the int (error code) return
                         }
                         return ss.str();
 		} else if (tokens[0] == "list_wires") {
@@ -678,7 +670,5 @@ protected:
 	// Snapshot functions
 	std::map<std::string, mod_t*> snapshot_table;
 };
-
-#pragma GCC diagnostic pop
 
 #endif
