@@ -566,6 +566,7 @@ class CppBackend extends Backend {
           (if (emitRef(a.cond) == "reset" || emitRef(a.cond) == Driver.implicitReset.name) "" 
            else " || " + Driver.implicitReset.name + ".lo_word()")
         if (!Driver.isAssert) ""
+        else if (Driver.isAssertWarn) "  WARN(" + cond + ", " + CString(a.message) + ");\n"
         else "  ASSERT(" + cond + ", " + CString(a.message) + ");\n"
 
       case s: Sprintf =>
