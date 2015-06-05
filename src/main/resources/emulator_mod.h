@@ -1779,4 +1779,9 @@ class mod_t {
     throw std::runtime_error("Assertion failed: " msg); \
 }
 
+#define WARN(cond, msg) { \
+  if (!(cond)) \
+    printf("Assertion failed: %s\n", msg); \
+}
+
 #endif

@@ -328,6 +328,7 @@ object Driver extends FileSystemUtilities{
     isTesting = false
     testCommand = None
     isAssert = true
+    isAssertWarn = false
     isDebugMem = false
     partitionIslands = false
     lineLimitFunctions = 0
@@ -405,6 +406,7 @@ object Driver extends FileSystemUtilities{
         case "--inlineMem" => isInlineMem = true
         case "--noInlineMem" => isInlineMem = false
         case "--assert" => isAssert = true
+        case "--assertWarn" => isAssertWarn = true
         case "--noAssert" => isAssert = false
         case "--debugMem" => isDebugMem = true
         case "--partitionIslands" => partitionIslands = true
@@ -496,6 +498,7 @@ object Driver extends FileSystemUtilities{
   var isTesting = false
   var testCommand: Option[String] = None
   var isAssert = true
+  var isAssertWarn = false
   var isDebugMem = false
   var partitionIslands = false
   var lineLimitFunctions = 0
