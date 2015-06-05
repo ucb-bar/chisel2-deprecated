@@ -180,6 +180,8 @@ abstract class MemAccess(val mem: Mem[_], addri: Node) extends Node {
 
   override def forceMatchingWidths =
     if (addr.needWidth() != log2Up(mem.n)) inputs(0) = addr.matchWidth(Width(log2Up(mem.n)))
+
+  setIsAssignable(true)
 }
 
 class MemRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri) {

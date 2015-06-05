@@ -63,6 +63,7 @@ object Module {
       // else if (! io.isKnownWidth)
       //   ChiselError.error(new ChiselError(() => {"All IO's must have width set: " + io}, io.line))
       io.isIo = true
+      io.setIsAssignable(true)
     }
     res
   }
@@ -200,7 +201,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   override def toString = s"<${this.name} (${this.getClass.toString})>"
 
   // This function sets the IO's component.
-  def ownIo() {
+  private def ownIo() {
     val wires = io.flatten;
     for ((n, w) <- wires) {
       // This assert is a sanity check to make sure static resolution
@@ -535,5 +536,32 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
 
   override val hashCode: Int = Driver.components.size
   override def equals(that: Any) = this eq that.asInstanceOf[AnyRef]
+  private[Chisel] val assignments = ArrayBuffer[(Node, Node)]()
+  private[Chisel] def addAssignment(assignee: Node, src: Node) = {
+    assignments += ((assignee, src))
+  }
+  
+  // Chisel3 - verify assignment semantics
+  private[Chisel] def verify: Boolean = {
+    var verified = true
+    if (Driver.minimumCompatibility > "2") {
+      for ((dest, src) <- assignments) {
+        val nodesToWrap = scala.collection.mutable.MutableList[Node]()
+        if (!dest.isAssignable) {
+          nodesToWrap += dest
+        }
+        if (!src.isAssignable) {
+          nodesToWrap += src
+        }
+        if (nodesToWrap.length > 0) {
+          val plural = if (nodesToWrap.length > 1) "s" else ""
+          val nodeStrings = nodesToWrap.map(_.toString()).mkString(", ")
+          ChiselError.warning("Chisel3 compatibility: node%s %s should be wrapped in a Wire()".format(plural, nodeStrings))
+          verified = false
+        }
+      }
+    }
+    verified
+  }
 }
 

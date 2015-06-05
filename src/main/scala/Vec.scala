@@ -103,8 +103,10 @@ class VecProc(enables: Iterable[Bool], elms: Iterable[Data]) extends proc {
 
 class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate with VecLike[T] with Cloneable {
   val self = elts.toVector
+  if (self != null && self.length > 1 && self(0).getNode.isInstanceOf[Reg]) {
+    ChiselError.warning("Vec[Reg] is deprecated. Please use Reg[Vec]")
+  }
   val readPorts = new HashMap[UInt, T]
-
   override def apply(idx: Int): T = self(idx)
 
   // TODO: better way to generated this structure?
@@ -128,11 +130,11 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
       readPorts(addr)
     } else {
       val iaddr = UInt(width = log2Up(length))
-      iaddr assign addr
+      iaddr iassign addr
       val enables = (UInt(1) << iaddr).toBools
       val res = this(0).clone
       for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
-        io assign VecMux(iaddr, sortedElm)
+        io iassign VecMux(iaddr, sortedElm)
         // setup the comp for writes
         io.comp = new VecProc(enables, sortedElm)
       }

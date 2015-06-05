@@ -304,7 +304,7 @@ class Fame1Wrapper(f: => Module) extends Module {
             DebugIOs(name) = io.debug(debug_counter)
           } else {
             io.debug(debug_counter).asOutput
-            io.debug(debug_counter) assign ioNode.toBits
+            io.debug(debug_counter) iassign ioNode.toBits
             DebugIOs(name) = io.debug(debug_counter)
           }
           debug_counter += 1

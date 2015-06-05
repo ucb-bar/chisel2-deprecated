@@ -72,12 +72,12 @@ class ConnectWireSuite extends TestSuite {
       val io = new DecoupledUIntIO
       def makeShim(in: DecoupledIO[UInt]): DecoupledIO[UInt] = {
         val out = Wire(Decoupled(UInt()))
-        out.bits := in.bits + UInt(1)
+        out.bits := Wire(in.bits + UInt(1))
         out.valid := in.valid
         in.ready := out.ready
         out
       }
-      val s = makeShim(io.in)
+      val s = Wire(makeShim(io.in))
       io.out.bits := s.bits
       io.out.valid := s.valid
       s.ready := io.out.ready
@@ -164,7 +164,7 @@ class ConnectWireSuite extends TestSuite {
         }
         val reg_status = Reg(new CWTRegStatus)
         when (io.wen) {
-          reg_status := new CWTRegStatus().fromBits(io.wdata)
+          reg_status := Wire(new CWTRegStatus().fromBits(io.wdata))
         }
         io.status := reg_status
       }

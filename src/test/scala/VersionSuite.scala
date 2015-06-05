@@ -27,46 +27,49 @@
  TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
  MODIFICATIONS.
 */
-import org.junit.Assert._
+
+import scala.collection.mutable.ArrayBuffer
+import org.scalatest._
+//import org.junit.Assert._
 import org.junit.Test
-import org.junit.Ignore
 
-//package ChiselTests
 import Chisel._
+class VersionSuite extends TestSuite {
+  @Test def testValidVersions() {
+    val versions = Array[(Version, Version, String)](
+      ("", "99.99.99", "!="),
+      ("", "", "=="),
+      ("3", "2.99.99", "!="),
+      ("4", "3", "!="),
+      ("3", "3.99.99", "!="),
+      ("3.99.99", "3", "!="),
+      ("3.0", "2.9", "!="),
+      ("3.9", "3", "!="),
+      ("3.9", "3.0", "!="),
+      ("3.9", "3.9.99", "!="),
+      ("3.2.1", "3.2.1", "==")
 
-
-/** This testsuite checks the SystemC backend implementation.
-*/
-class SystemCSuite extends TestSuite {
-  // Test top-level IOs are decoupled.
-  @Test def testTopLevelIO() {
-
-    class SystemCModuleGood extends Module {
-       val io = new Bundle {
-         val a = Decoupled( UInt(width = 16) ).flip()
-         val b = Decoupled( UInt(width = 16) )
-       }
-    
-       io.b.bits := Wire(io.a.bits + UInt(10))
-       io.a.ready := io.b.ready
-       io.b.valid := io.a.valid
+        )
+    for((v1, v2, eq) <- versions) {
+      assert(v1 >= v2)
+      if (eq == "==") {
+        assert(v1 == v2)
+      } else {
+        assert(v1 != v2)
+      }
     }
+  }
 
-    class SystemCModuleBad extends Module {
-       val io = new Bundle {
-         val a = UInt(INPUT, width = 16)
-         val b = UInt(OUTPUT, width = 16)
-       }
-    
-       io.b := Wire(io.a + UInt(10))
+  @Test def testInvalidVersions() {
+    val versions = Array[String](
+      ("foo"),
+      ("3..5"),
+      ("3.4.5.6")
+        )
+    for(s <- versions) {
+      intercept[IllegalArgumentException] {
+        val v = Version(s)
+      }
     }
-
-    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath, "--backend", "sysc")
-
-    chiselMain(testArgs.toArray, () => Module(new SystemCModuleGood()))
-    assertFalse(ChiselError.hasErrors)
-
-    chiselMain(testArgs.toArray, () => Module(new SystemCModuleBad()))
-    assertTrue(ChiselError.hasErrors)
   }
 }

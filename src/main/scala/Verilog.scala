@@ -50,7 +50,7 @@ object VerilogBackend {
     "case", "casex", "casez", "cmos", "deassign", "default", "defparam",
     "disable", "edge", "else", "end", "endattribute", "endcase", "endfunction",
     "endmodule", "endprimitive", "endspecify", "endtable", "endtask", "event",
-    "for", "force", "forever", "fork", "function", "highz0", "highz1", "if",
+    "for", "force", "forever", "fork", "function", "highz0", "highz1", "iassign", "if",
     "ifnone", "initial", "inout", "input", "integer", "initvar", "join",
     "medium", "module", "large", "macromodule", "nand", "negedge", "nmos",
     "nor", "not", "notif0", "notif1", "or", "output", "parameter", "pmos",

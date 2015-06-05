@@ -233,6 +233,7 @@ abstract class Node extends nameable {
   def dblLitValue: Double = longBitsToDouble(litValue().toLong)
   // TODO: MOVE TO WIRE
   def assign(src: Node): Unit = throw new Exception("unimplemented assign")
+  protected[Chisel] def iassign(src: Node): Unit = throw new Exception("unimplemented iassign")
   def <>(src: Node): Unit = throw new Exception("unimplemented <>")
   def ^^(src: Node): Unit = src <> this
 
@@ -504,4 +505,13 @@ abstract class Node extends nameable {
     oldNode.inputs.clear()
     oldNode.consumers.clear()
   }
+
+  // Chisel3 - This node may participate in assignment (:=, <>) statements.
+  // This is limited to registers, ports, and wires
+  private var _isAssignable = false
+  protected[Chisel] def isAssignable = this.getNode._isAssignable
+  private[Chisel] def setIsAssignable(value: Boolean) {
+    this.getNode._isAssignable = value
+  }
+
 }

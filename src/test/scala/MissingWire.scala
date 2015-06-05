@@ -27,46 +27,44 @@
  TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
  MODIFICATIONS.
 */
+
+import Chisel._
 import org.junit.Assert._
 import org.junit.Test
 import org.junit.Ignore
 
-//package ChiselTests
-import Chisel._
+class MissingWireSuite extends TestSuite {
+  @Test def testMissingWire() {
+    println("\ntestMissingWire ...")
 
-
-/** This testsuite checks the SystemC backend implementation.
-*/
-class SystemCSuite extends TestSuite {
-  // Test top-level IOs are decoupled.
-  @Test def testTopLevelIO() {
-
-    class SystemCModuleGood extends Module {
-       val io = new Bundle {
-         val a = Decoupled( UInt(width = 16) ).flip()
-         val b = Decoupled( UInt(width = 16) )
-       }
+    class OptionalWire(noWire: Boolean) extends Module {
     
-       io.b.bits := Wire(io.a.bits + UInt(10))
-       io.a.ready := io.b.ready
-       io.b.valid := io.a.valid
+      val io = new Bundle {
+        val out = UInt(OUTPUT, 16)
+      }
+
+      val aLit = UInt(42, 16)
+      // The following should fail without a Wire wrapper.
+      if (noWire) {
+        io.out := aLit
+      } else {
+        io.out := Wire(aLit)
+      }
     }
 
-    class SystemCModuleBad extends Module {
-       val io = new Bundle {
-         val a = UInt(INPUT, width = 16)
-         val b = UInt(OUTPUT, width = 16)
-       }
-    
-       io.b := Wire(io.a + UInt(10))
+    class WireTester(c: OptionalWire) extends Tester(c) {
+      expect(c.io.out, 42)
     }
 
-    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath, "--backend", "sysc")
-
-    chiselMain(testArgs.toArray, () => Module(new SystemCModuleGood()))
-    assertFalse(ChiselError.hasErrors)
-
-    chiselMain(testArgs.toArray, () => Module(new SystemCModuleBad()))
+    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
+          "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c", "--genHarness", "--compile", "--test")
+    intercept[IllegalStateException] {
+      // This should fail since we don't use a Wire wrapper
+      chiselMainTest(testArgs, () => Module(new OptionalWire(true))){ c => new WireTester(c) }
+    }
     assertTrue(ChiselError.hasErrors)
+    
+    // This should pass
+    chiselMainTest(testArgs, () => Module(new OptionalWire(false))){ c => new WireTester(c) }
   }
 }

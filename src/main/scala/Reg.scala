@@ -175,4 +175,5 @@ class Reg extends Delay with proc {
   protected[Chisel] def isEnable: Boolean = next.isInstanceOf[Mux] && (next.inputs(2) eq this)
   protected[Chisel] def enableSignal: Node = if (isEnable) next.inputs(0) else Bool(true)
   protected[Chisel] def updateValue: Node = if (isEnable) next.inputs(1) else next
+  setIsAssignable(true)
 }

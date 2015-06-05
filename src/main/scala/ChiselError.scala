@@ -79,9 +79,13 @@ object ChiselError {
 
   /** emit a warning message */
   def warning(m: => String) {
-    val stack = Thread.currentThread().getStackTrace
-    ChiselErrors += new ChiselError(() => m,
-      findFirstUserLine(stack) getOrElse stack(0), 1)
+    if (Driver.wError) {
+      error(m)
+    } else {
+      val stack = Thread.currentThread().getStackTrace
+      ChiselErrors += new ChiselError(() => m,
+        findFirstUserLine(stack) getOrElse stack(0), 1)
+    }
   }
 
   def findFirstUserLine(stack: Array[StackTraceElement]): Option[StackTraceElement] = {
@@ -107,7 +111,7 @@ object ChiselError {
               seenChiselMain = true
             }
             (className.subSequence(0, dotPos) != "Chisel") && !className.contains("scala") &&
-            !className.contains("java") && !className.contains("$$")
+            !className.contains("java") && !className.contains("$$") && !className.startsWith("sun.")
           } else if (seenChiselMain) {
             // If we're above ChiselMain, we must be in "user" code.
             true

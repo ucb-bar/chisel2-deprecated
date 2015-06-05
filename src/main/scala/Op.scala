@@ -108,6 +108,8 @@ object BinaryOp {
       case "d/"  => Op("d/", fixWidth(doubleWidth), x, y )
       case "d%"  => Op("d%", fixWidth(doubleWidth), x, y )
       case "dpow"  => Op("dpow", fixWidth(doubleWidth), x, y )
+      case "+&"   => Op("+", maxWidthPlusOne _,  x, y )
+      case "-&"   => Op("-", maxWidthPlusOne _,  x, y )
       case any   => throw new Exception("Unrecognized operator " + op)
     }
   }

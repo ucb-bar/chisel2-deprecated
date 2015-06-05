@@ -40,7 +40,7 @@ import ChiselError._
 object Bundle {
   val keywords = Set("elements", "flip", "toString",
     "flatten", "binding", "asInput", "asOutput", "unary_$tilde",
-    "unary_$bang", "unary_$minus", "clone", "toUInt", "toBits",
+    "unary_$bang", "unary_$minus", "clone", "cloneType", "toUInt", "toBits",
     "toBool", "toSInt", "asDirectionless")
 
   def apply[T <: Bundle](b: => T)(implicit p: Parameters): T = {
@@ -60,6 +60,15 @@ object Bundle {
   whole.
   */
 class Bundle(val view: Seq[String] = null) extends Aggregate {
+  // We can't use super class methods for cloning.
+  private def getCloneMethod(c: Class[_]): java.lang.reflect.Method = {
+    if (c.getDeclaredMethods().contains("clone")) {
+      c.getDeclaredMethod("clone")
+    } else {
+      null
+    }
+  }
+
   /** Populates the cache of elements declared in the Bundle. */
   private def calcElements(view: Seq[String]) = {
     val c      = getClass
@@ -81,7 +90,17 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
         && !(Bundle.keywords contains name)
         && (view == null || (view contains name))
         && checkPort(m, name)) {
-        val obj = m invoke this
+        // If the object has a clone method, use that
+        val obj = {
+          val c = m.getClass()
+          val cloneMethod = getCloneMethod(c)
+          if (cloneMethod != null) {
+            cloneMethod invoke this
+          } else {
+            // No clone method. Invoke the default constructor
+            m invoke this
+          }
+        }
         if(!(seen contains obj)) {
           obj match {
             case d: Data => elts(name) = d
@@ -223,4 +242,29 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
     isTypeNode = true
     elements foreach (_._2.setIsTypeNode)
   }
+  
+  override def clone(): this.type = {
+    val useSuper = true
+    if (useSuper) {
+      val rest = super.clone()
+      // Evaluate the elements.
+      val dummy = rest.elements.size
+      rest
+    } else {
+      try {
+        val constructor = this.getClass.getConstructors.head
+        val res = constructor.newInstance(Array.fill(constructor.getParameterTypes.size)(null):_*)
+        val rest = res.asInstanceOf[this.type]
+        // Evaluate the elements.
+        val dummy = rest.elements.size
+        rest
+      } catch {
+        case npe: java.lang.reflect.InvocationTargetException if npe.getCause.isInstanceOf[java.lang.NullPointerException] =>
+          throwException("Parameterized Bundle " + this.getClass + " needs clone method. You are probably using an anonymous Bundle object that captures external state and hence is un-cloneable", npe)
+        case e: java.lang.Exception =>
+          throwException("Parameterized Bundle " + this.getClass + " needs clone method", e)
+      }
+    }
+  }
 }
+    

@@ -98,6 +98,12 @@ class UInt extends Bits with Num[UInt] {
   def %  (b: UInt): UInt = newBinaryOp(b, "%");
   def ?  (b: UInt): UInt = fromNode(Multiplex(this.toBool, b, null))
   def -  (b: UInt): UInt = newBinaryOp(b, "-");
+  def >> (i: Int): UInt = newBinaryOp(UInt(i), "s>>") // chisel3
+  def << (i: Int): UInt = newBinaryOp(UInt(i), "<<") // chisel3
+  def +%  (b: UInt): UInt = newBinaryOp(b, "+") // chisel3 add-wrap
+  def +&  (b: UInt): UInt = newBinaryOp(b, "+&") // chisel3 add (width +1)
+  def -%  (b: UInt): UInt = newBinaryOp(b, "-") // chisel3 sub-wrap
+  def -&  (b: UInt): UInt = newBinaryOp(b, "-&") // chisel3 sub (width +1)
 
   // order operators
   def <  (b: UInt): Bool = newLogicalOp(b, "<");

@@ -113,11 +113,11 @@ abstract class Data extends Node {
       io.asOutput()
       if(gotWidth > 0) {
         // Only bother connecting non-zero width wires
-        io assign NodeExtract(n, ind + gotWidth - 1, ind)
+        io iassign NodeExtract(n, ind + gotWidth - 1, ind)
         ind += gotWidth
       } else {
         // Give zero-width a dummy connection
-        io assign UInt(width=0)
+        io iassign UInt(width=0)
       }
     }
     res.setIsTypeNode
@@ -131,11 +131,13 @@ abstract class Data extends Node {
     Concatenate(nodes.head, nodes.tail:_*)
   }
 
-  def :=(that: Data): Unit = that match {
-    case b: Bits => this colonEquals b
-    case b: Bundle => this colonEquals b
-    case b: Vec[_] => this colonEquals b
-    case _ => illegalAssignment(that)
+  def :=(that: Data): Unit = {
+    that match {
+      case b: Bits => this colonEquals b
+      case b: Bundle => this colonEquals b
+      case b: Vec[_] => this colonEquals b
+      case _ => illegalAssignment(that)
+    }
   }
 
   protected def colonEquals(that: Bits): Unit = illegalAssignment(that)
@@ -145,23 +147,56 @@ abstract class Data extends Node {
   protected def illegalAssignment(that: Any): Unit =
     ChiselError.error(":= not defined on " + this.getClass + " and " + that.getClass)
 
-  override def clone(): this.type = {
-    try {
-      val constructor = this.getClass.getConstructors.head
+  // Chisel3 prep
+  def cloneType(): this.type = this.clone()
 
-      if(constructor.getParameterTypes.size == 0) {
-        constructor.newInstance().asInstanceOf[this.type]
-      } else if(constructor.getParameterTypes.size == 1) {
-        val paramtype = constructor.getParameterTypes.head
-        // If only 1 arg and is a Bundle or Module then this is probably the implicit argument
-        //    added by scalac for nested classes and closures. Thus, try faking the constructor
-        //    by not supplying said class or closure (pass null).
-        // CONSIDER: Don't try to create this
-        if(classOf[Bundle].isAssignableFrom(paramtype) || classOf[Module].isAssignableFrom(paramtype)){
-          constructor.newInstance(null).asInstanceOf[this.type]
-        } else throw new Exception("Cannot auto-create constructor for ${this.getClass.getName} that requires arguments")
+  override def clone(): this.type = {
+    def getCloneMethod(c: Class[_]): java.lang.reflect.Method = {
+      if (c.getDeclaredMethods().contains("clone")) {
+        c.getDeclaredMethod("clone")
       } else {
-       throw new Exception(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments")
+        null
+      }
+    }
+
+    def getEnclosingInstanceName(c: Class[_]): Option[java.lang.reflect.Method] = {
+      c.getDeclaredMethods.find(_.getName.contains("$outer"))
+    }
+
+    try {
+      val clazz = this.getClass
+      val cloneMethod = getCloneMethod(clazz)
+      if (cloneMethod != null) {
+        cloneMethod.invoke(this).asInstanceOf[this.type]
+      } else {
+        val constructor = clazz.getConstructors.head
+        if(constructor.getParameterTypes.size == 0) {
+          val obj = constructor.newInstance()
+          obj.asInstanceOf[this.type]
+        } else {
+          val params = constructor.getParameterTypes.toList
+          if(constructor.getParameterTypes.size == 1) {
+            val parentInstanceMethod = getEnclosingInstanceName(clazz)
+//            val parentInstance = parent.get(this)
+            val paramtype = constructor.getParameterTypes.head
+            // If only 1 arg and is a Bundle or Module then this is probably the implicit argument
+            //    added by scalac for nested classes and closures. Thus, try faking the constructor
+            //    by not supplying said class or closure (pass null).
+            // CONSIDER: Don't try to create this
+            if(classOf[Bundle].isAssignableFrom(paramtype) || classOf[Module].isAssignableFrom(paramtype)){
+              constructor.newInstance(null).asInstanceOf[this.type]
+            } else {
+              parentInstanceMethod match {
+                case Some(m) if paramtype.isAssignableFrom(m.getReturnType) => {
+                  constructor.newInstance(null).asInstanceOf[this.type]
+                }
+                case _ => throwException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
+              }
+            }
+          } else {
+           throwException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
+          }
+        }
       }
 
     } catch {
@@ -181,4 +216,10 @@ abstract class Data extends Node {
   }
 
   def params = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
+
+  // Chisel3 - save assignments so we can issue a warning if they may violate Chisel3 semantics.
+  private def addAssignment(src:Node) {
+    component.addAssignment(this, src)
+  }
+
 }

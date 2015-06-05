@@ -63,7 +63,8 @@ abstract class Bits extends Data with proc {
   /** assigns this instance as the data type for *node*.
     */
   protected[Chisel] final def asTypeFor(node: Node): this.type = {
-    this assign node
+    // Generate an internal assignment
+    this iassign node
     this.setIsTypeNode
     if(!node.isInstanceOf[Literal]) node.nameHolder = this
     this
@@ -93,7 +94,14 @@ abstract class Bits extends Data with proc {
     !assigned
   }
 
+  // Generic (external) assignment, subject to compatibility checks.
   override def assign(src: Node): Unit = {
+//    checkCompatibility(src)
+    iassign(src)
+  }
+
+  // Internal assignment - no compatibility checks
+  protected[Chisel] override def iassign(src: Node): Unit = {
     if (Driver.topComponent != null || checkAssign(src)) {
       assigned = true
       if (!procAssigned) inputs += src
@@ -102,6 +110,7 @@ abstract class Bits extends Data with proc {
   }
 
   override def procAssign(src: Node): Unit = {
+//    checkCompatibility(src)
     if (Driver.topComponent != null || checkAssign(src)) {
       if (defaultMissing && Module.current.whenCond.canBeUsedAsDefault)
         setDefault(src)
@@ -173,6 +182,7 @@ abstract class Bits extends Data with proc {
   }
 
   override def <>(src: Node) {
+    checkCompatibility(src)
     if (dir == INPUT) {
       src match {
       case other: Bits =>
@@ -326,6 +336,7 @@ abstract class Bits extends Data with proc {
 
   /** Assignment operator */
   override protected def colonEquals(that: Bits): Unit = {
+    checkCompatibility(that)
     (if (comp != null) comp else this) procAssign that
   }
 
@@ -481,6 +492,49 @@ abstract class Bits extends Data with proc {
       case b: Bits => newBinaryOp(b, "##");
       case _ =>
         (this.asInstanceOf[Data] ## right).asInstanceOf[this.type];
+    }
+  }
+
+  // Chisel3 - save assignments so we can issue a warning if they may violate Chisel3 semantics.
+  private def addAssignment(src:Node) {
+    component.addAssignment(this, src)
+  }
+
+  // Check version compatibility (assignment)
+  private def checkCompatibility(src: Node) {
+    if (Driver.minimumCompatibility > "2") {
+      val deferChecking = false
+      if (deferChecking) {
+        addAssignment(src)
+      } else {
+        val checkPorts = scala.collection.mutable.MutableList[Node]()
+        val nodesToWrap = scala.collection.mutable.MutableList[Node]()
+        // Do the easy checks first.
+        if (!this.isAssignable) {
+          checkPorts += this
+        }
+        if (!src.isAssignable) {
+          checkPorts += src
+        }
+        // Do we need to go further?
+        if (checkPorts.length > 0) {
+          for (n <- checkPorts) {
+            // See if this node is a port in its containing module.
+            val containingModule = n.component
+            val ports = containingModule.io.flatten.map(_._2.getNode)
+            if (ports.contains(n.getNode)) {
+              n.setIsAssignable(true)
+            } else {
+               nodesToWrap += n
+            }
+          }
+          if (nodesToWrap.length > 0) {
+              val plural = if (nodesToWrap.length > 1) "s" else ""
+              val nodeStrings = nodesToWrap.map(_.toString()).mkString(", ")
+              ChiselError.warning("Chisel3 compatibility: node%s %s should be wrapped in a Wire()".format(plural, nodeStrings))
+          }
+        }
+      }
     }
   }
 }

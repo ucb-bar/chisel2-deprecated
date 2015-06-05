@@ -43,7 +43,7 @@ class WhenSuite extends TestSuite {
         val in = UInt(INPUT,4)
         val out = UInt(OUTPUT,4)
       }
-      io.out := UInt(0)
+      io.out := Wire(UInt(0))
       when(io.en) { io.out := io.in }
     }
 
@@ -69,7 +69,7 @@ class WhenSuite extends TestSuite {
         val in = UInt(INPUT,4)
         val out = UInt(OUTPUT,4)
       }
-      io.out := UInt(0)
+      io.out := Wire(UInt(0))
       when(io.en0) { when(io.en1) { io.out := io.in } }
     }
 
@@ -103,7 +103,7 @@ class WhenSuite extends TestSuite {
       } .elsewhen(io.en1) {
         io.out := io.in1
       } .otherwise {
-        io.out := UInt(0)
+        io.out := Wire(UInt(0))
       }
     }
 
@@ -140,12 +140,17 @@ class WhenSuite extends TestSuite {
         val in = UInt(INPUT,4)
         val out = UInt(OUTPUT,4)
       }
-      io.out := UInt(0)
+      io.out := Wire(UInt(0))
       when( io.en ) {
         val sub = Module(new Submodule)
         io.out := sub.io.out
+        // The following generates a warning when it can't find 'en' in sub.io
         io <> sub.io /* connect only io.in to sub.io.in */
       }
+    }
+    
+    def noWerror(srcArgs: Array[String]): Array[String] = {
+      srcArgs.filterNot(_ == "--wError")
     }
 
     class SubmoduleInWhenBlockTests(m: SubmoduleInWhenBlock) extends Tester(m) {
@@ -158,7 +163,7 @@ class WhenSuite extends TestSuite {
       }
     }
 
-    launchCppTester((m: SubmoduleInWhenBlock) => new SubmoduleInWhenBlockTests(m))
+    launchCppTester({(m: SubmoduleInWhenBlock) => new SubmoduleInWhenBlockTests(m)}, Some(noWerror _))
   }
 
   // Unless statement with elsewhen and otherwise clause
@@ -170,7 +175,7 @@ class WhenSuite extends TestSuite {
         val out = UInt(OUTPUT,4)
       }
       io.out := io.in
-      unless(io.en) { io.out := UInt(0) }
+      unless(io.en) { io.out := Wire(UInt(0)) }
     }
 
     class UnlessModuleTests(m: UnlessModule) extends Tester(m) {
@@ -200,10 +205,10 @@ class WhenSuite extends TestSuite {
 
       when (io.c1) {
         when (io.c2) {
-          reg := Bool(true)
+          reg := Wire(Bool(true))
         }
       }.otherwise {
-        reg := Bool(false)
+        reg := Wire(Bool(false))
       }
     }
 
@@ -229,10 +234,10 @@ class WhenSuite extends TestSuite {
         val in = UInt(INPUT,4)
         val out = Bool(OUTPUT)
       }
-      io.out := Bool(false)
+      io.out := Wire(Bool(false))
       switch(io.in) {
-        is(UInt(0)) { io.out := Bool(true) }
-        is(Bits("b???1")) { io.out := Bool(true) }
+        is(UInt(0)) { io.out := Wire(Bool(true)) }
+        is(Bits("b???1")) { io.out := Wire(Bool(true)) }
       }
     }
 
