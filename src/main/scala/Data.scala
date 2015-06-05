@@ -131,13 +131,11 @@ abstract class Data extends Node {
     Concatenate(nodes.head, nodes.tail:_*)
   }
 
-  def :=(that: Data): Unit = {
-    that match {
-      case b: Bits => this colonEquals b
-      case b: Bundle => this colonEquals b
-      case b: Vec[_] => this colonEquals b
-      case _ => illegalAssignment(that)
-    }
+  def :=(that: Data): Unit = that match {
+    case b: Bits => this colonEquals b
+    case b: Bundle => this colonEquals b
+    case b: Vec[_] => this colonEquals b
+    case _ => illegalAssignment(that)
   }
 
   protected def colonEquals(that: Bits): Unit = illegalAssignment(that)
@@ -216,10 +214,4 @@ abstract class Data extends Node {
   }
 
   def params = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
-
-  // Chisel3 - save assignments so we can issue a warning if they may violate Chisel3 semantics.
-  private def addAssignment(src:Node) {
-    component.addAssignment(this, src)
-  }
-
 }
