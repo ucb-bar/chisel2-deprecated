@@ -64,7 +64,7 @@ abstract class Bits extends Data with proc {
     */
   protected[Chisel] final def asTypeFor(node: Node): this.type = {
     // Generate an internal assignment
-    this iassign node
+    this assign node
     this.setIsTypeNode
     if(!node.isInstanceOf[Literal]) node.nameHolder = this
     this
@@ -94,14 +94,7 @@ abstract class Bits extends Data with proc {
     !assigned
   }
 
-  // Generic (external) assignment, subject to compatibility checks.
   override def assign(src: Node): Unit = {
-//    checkCompatibility(src)
-    iassign(src)
-  }
-
-  // Internal assignment - no compatibility checks
-  protected[Chisel] override def iassign(src: Node): Unit = {
     if (Driver.topComponent != null || checkAssign(src)) {
       assigned = true
       if (!procAssigned) inputs += src

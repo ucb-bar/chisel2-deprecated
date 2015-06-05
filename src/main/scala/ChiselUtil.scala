@@ -573,7 +573,7 @@ object Wire
         val x = mType.clone
         // Should this be part of 'clone'
         // x.component = mType.component
-        x iassign init
+        x assign init
         x
       } else {
         t

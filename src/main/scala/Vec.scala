@@ -130,11 +130,11 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
       readPorts(addr)
     } else {
       val iaddr = UInt(width = log2Up(length))
-      iaddr iassign addr
+      iaddr assign addr
       val enables = (UInt(1) << iaddr).toBools
       val res = this(0).clone
       for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
-        io iassign VecMux(iaddr, sortedElm)
+        io assign VecMux(iaddr, sortedElm)
         // setup the comp for writes
         io.comp = new VecProc(enables, sortedElm)
       }

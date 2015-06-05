@@ -113,11 +113,11 @@ abstract class Data extends Node {
       io.asOutput()
       if(gotWidth > 0) {
         // Only bother connecting non-zero width wires
-        io iassign NodeExtract(n, ind + gotWidth - 1, ind)
+        io assign NodeExtract(n, ind + gotWidth - 1, ind)
         ind += gotWidth
       } else {
         // Give zero-width a dummy connection
-        io iassign UInt(width=0)
+        io assign UInt(width=0)
       }
     }
     res.setIsTypeNode

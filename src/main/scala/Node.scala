@@ -233,7 +233,6 @@ abstract class Node extends nameable {
   def dblLitValue: Double = longBitsToDouble(litValue().toLong)
   // TODO: MOVE TO WIRE
   def assign(src: Node): Unit = throw new Exception("unimplemented assign")
-  protected[Chisel] def iassign(src: Node): Unit = throw new Exception("unimplemented iassign")
   def <>(src: Node): Unit = throw new Exception("unimplemented <>")
   def ^^(src: Node): Unit = src <> this
 

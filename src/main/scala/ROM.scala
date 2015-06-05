@@ -55,7 +55,7 @@ class ROM[T <: Data](elts: SortedMap[Int, T], lengthIn: Option[Int] = None) exte
   override def read(addr: UInt): T = {
     val res = gen(0)
     val port = new ROMRead().init("", widthOf(1), addr, data)
-    res iassign port
+    res assign port
     res.setIsTypeNode
     res
   }
