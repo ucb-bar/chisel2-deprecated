@@ -559,7 +559,7 @@ object PriorityEncoderOH
 
 /** Wrap a Chisel data type with a `Wire`.
   *
-  * This is a no-op in Chisel 2.2. It will be required for Chisel 3.0
+  * This sets the isAssignable state. It will be required for Chisel 3.0
   */
 object Wire
 {
@@ -573,7 +573,10 @@ object Wire
         val x = mType.clone
         // Should this be part of 'clone'
         // x.component = mType.component
-        x assign init
+        // Until we get an internal := that avoids the compatibility check.
+        x.setIsAssignable(true)
+        init.setIsAssignable(true)
+        x := init
         x
       } else {
         t
