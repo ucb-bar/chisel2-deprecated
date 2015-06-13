@@ -90,17 +90,8 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
         && !(Bundle.keywords contains name)
         && (view == null || (view contains name))
         && checkPort(m, name)) {
-        // If the object has a clone method, use that
-        val obj = {
-          val c = m.getClass()
-          val cloneMethod = getCloneMethod(c)
-          if (cloneMethod != null) {
-            cloneMethod invoke this
-          } else {
-            // No clone method. Invoke the default constructor
-            m invoke this
-          }
-        }
+        // Fetch the actual object
+        val obj = m invoke this
         if(!(seen contains obj)) {
           obj match {
             case d: Data => elts(name) = d
