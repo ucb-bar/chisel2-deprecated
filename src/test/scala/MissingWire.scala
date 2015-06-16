@@ -46,10 +46,14 @@ class MissingWireSuite extends TestSuite {
       val aLit = UInt(42, 16)
       // The following should fail without a Wire wrapper.
       if (noWire) {
-        io.out := aLit
+        val aTemp = UInt(width=16)
+        aTemp := aLit
+        io.out := aTemp
       } else {
-        io.out := Wire(aLit)
-      }
+        val aTemp = Wire(UInt(width=16))
+        aTemp := aLit
+        io.out := aTemp
+}
     }
 
     class WireTester(c: OptionalWire) extends Tester(c) {
