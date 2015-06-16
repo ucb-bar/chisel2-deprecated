@@ -77,15 +77,18 @@ object ChiselError {
   def info(m: String): Unit =
     println(tag("info", Console.MAGENTA) + " [%2.3f] ".format(Driver.elapsedTime/1e3) + m)
 
+  def warning(m: => String, errline: StackTraceElement) {
+    if (Driver.wError) {
+      error(m, errline)
+    } else {
+      ChiselErrors += new ChiselError(() => m, errline, 1)
+    }
+  }
+
   /** emit a warning message */
   def warning(m: => String) {
-    if (Driver.wError) {
-      error(m)
-    } else {
-      val stack = Thread.currentThread().getStackTrace
-      ChiselErrors += new ChiselError(() => m,
-        findFirstUserLine(stack) getOrElse stack(0), 1)
-    }
+    val stack = Thread.currentThread().getStackTrace
+    warning(m, findFirstUserLine(stack) getOrElse stack(0))
   }
 
   def findFirstUserLine(stack: Array[StackTraceElement]): Option[StackTraceElement] = {
