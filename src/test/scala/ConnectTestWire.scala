@@ -71,8 +71,8 @@ class ConnectWireSuite extends TestSuite {
     class UsesShim extends Module {
       val io = new DecoupledUIntIO
       def makeShim(in: DecoupledIO[UInt]): DecoupledIO[UInt] = {
-        val out = Wire(Decoupled(UInt()))
-        out.bits := Wire(in.bits + UInt(1))
+        val out = Decoupled(UInt())
+        out.bits := in.bits + UInt(1)
         out.valid := in.valid
         in.ready := out.ready
         out
@@ -117,7 +117,7 @@ class ConnectWireSuite extends TestSuite {
           val status = new WireStatus().asOutput
         }
         val subModule = new GenWiring[WireStatus](WireStatus)
-        io <> Wire(subModule.io)
+        io <> subModule.io
       }
       chiselMain(Array[String]("--backend", "c", "--compile",
         "--targetDir", dir.getPath.toString()),
@@ -133,8 +133,8 @@ class ConnectWireSuite extends TestSuite {
     try {
       class WireHookReassignmentToWire extends Module {
         case class WireStatus() extends Bundle {
-          val im0 = Wire(init = UInt(0, 2))
-          val im1 = Wire(init = UInt(1, 2))
+          val im0 = UInt(0, 2)
+          val im1 = UInt(1, 2)
         }
     
         val io = new Bundle {
@@ -143,7 +143,7 @@ class ConnectWireSuite extends TestSuite {
           val status = new WireStatus().asOutput
         }
         val subModule = new GenWiring[WireStatus](WireStatus)
-        io <> Wire(subModule.io)
+        io <> subModule.io
       }
       chiselMain(Array[String]("--backend", "c", "--compile", 
         "--targetDir", dir.getPath.toString()),
@@ -164,7 +164,7 @@ class ConnectWireSuite extends TestSuite {
         }
         val reg_status = Reg(new CWTRegStatus)
         when (io.wen) {
-          reg_status := Wire(new CWTRegStatus().fromBits(io.wdata))
+          reg_status := new CWTRegStatus().fromBits(io.wdata)
         }
         io.status := reg_status
       }
@@ -201,15 +201,15 @@ class ConnectWireSuite extends TestSuite {
           val status = new CWTRegStatus().asOutput
         }
         val subModule = Module(new GenWiring[CWTRegStatus](() => new CWTRegStatus) )
-        val subModuleIOWire = Wire(subModule.io)
+        val subModuleIOWire = subModule.io
         if (false) {
-          io <> Wire(subModule.io)
+          io <> subModule.io
         } else if (true) {
           io <> subModule.io
         } else {
-          subModule.io.wen := Wire(io.wen).asOutput
-          subModule.io.wdata := Wire(io.wdata).asOutput
-          io.status := Wire(subModule.io.status).asInput
+          subModule.io.wen := io.wen.asOutput
+          subModule.io.wdata := io.wdata.asOutput
+          io.status := subModule.io.status.asInput
         }
       }
   
@@ -238,7 +238,7 @@ class ConnectWireSuite extends TestSuite {
   @Test def testWireVecInput() {
     class VecInput extends Module {
       val io = new Bundle {
-        val in = Vec.fill(2){ Wire(UInt(INPUT, 8)) }
+        val in = Vec.fill(2){ UInt(INPUT, 8) }
         val out0 = UInt(OUTPUT, 8)
         val out1 = UInt(OUTPUT, 8)
       }
@@ -261,7 +261,7 @@ class ConnectWireSuite extends TestSuite {
       val io = new Bundle {
         val in0 = UInt(INPUT, 8)
         val in1 = UInt(INPUT, 8)
-        val out = Vec.fill(2){ Wire(UInt(OUTPUT, 8)) }
+        val out = Vec.fill(2){ UInt(OUTPUT, 8) }
       }
 
       io.out(0) := io.in0
@@ -282,29 +282,29 @@ class ConnectWireSuite extends TestSuite {
   @Test def testWireAddBindings() {
     class CrossingBlock extends Module {
       val io = new Bundle {
-        val i1 = Wire(UInt(width=8)).asInput
-        val i2 = Wire(UInt(width=8)).asInput
-        val o1 = Wire(UInt(width=8)).asOutput
-        val o2 = Wire(UInt(width=8)).asOutput
+        val i1 = UInt(width=8).asInput
+        val i2 = UInt(width=8).asInput
+        val o1 = UInt(width=8).asOutput
+        val o2 = UInt(width=8).asOutput
       }
       io.o2 := io.o1 + io.i2
       io.o1 := io.i1
     }
     class BindingTestInternal extends Module {
       val io = new Bundle {
-        val in1 = Wire(UInt(width=8)).asInput
-        val in2 = Wire(UInt(width=8)).asInput
-        val in3 = Wire(UInt(width=8)).asInput
-        val in4 = Wire(UInt(width=8)).asInput
-        val out1 = Wire(UInt(width=8)).asOutput
-        val out2 = Wire(UInt(width=8)).asOutput
-        val out3 = Wire(UInt(width=8)).asOutput
-        val out4 = Wire(UInt(width=8)).asOutput
-        val out5 = Wire(UInt(width=8)).asOutput
-        val out6 = Wire(UInt(width=8)).asOutput
-        val out7 = Wire(UInt(width=8)).asOutput
-        val out8 = Wire(UInt(width=8)).asOutput
-        val out9 = Wire(UInt(width=8)).asOutput
+        val in1 = UInt(width=8).asInput
+        val in2 = UInt(width=8).asInput
+        val in3 = UInt(width=8).asInput
+        val in4 = UInt(width=8).asInput
+        val out1 = UInt(width=8).asOutput
+        val out2 = UInt(width=8).asOutput
+        val out3 = UInt(width=8).asOutput
+        val out4 = UInt(width=8).asOutput
+        val out5 = UInt(width=8).asOutput
+        val out6 = UInt(width=8).asOutput
+        val out7 = UInt(width=8).asOutput
+        val out8 = UInt(width=8).asOutput
+        val out9 = UInt(width=8).asOutput
       }
       val cb5 = Module(new CrossingBlock)
       val cb4 = Module(new CrossingBlock)
@@ -340,19 +340,19 @@ class ConnectWireSuite extends TestSuite {
 
     class BindingTest extends Module {
       val io = new Bundle {
-        val in1 = Wire(UInt(width=8)).asInput
-        val in2 = Wire(UInt(width=8)).asInput
-        val in3 = Wire(UInt(width=8)).asInput
-        val in4 = Wire(UInt(width=8)).asInput
-        val out1 = Wire(UInt(width=8)).asOutput
-        val out2 = Wire(UInt(width=8)).asOutput
-        val out3 = Wire(UInt(width=8)).asOutput
-        val out4 = Wire(UInt(width=8)).asOutput
-        val out5 = Wire(UInt(width=8)).asOutput
-        val out6 = Wire(UInt(width=8)).asOutput
-        val out7 = Wire(UInt(width=8)).asOutput
-        val out8 = Wire(UInt(width=8)).asOutput
-        val out9 = Wire(UInt(width=8)).asOutput
+        val in1 = UInt(width=8).asInput
+        val in2 = UInt(width=8).asInput
+        val in3 = UInt(width=8).asInput
+        val in4 = UInt(width=8).asInput
+        val out1 = UInt(width=8).asOutput
+        val out2 = UInt(width=8).asOutput
+        val out3 = UInt(width=8).asOutput
+        val out4 = UInt(width=8).asOutput
+        val out5 = UInt(width=8).asOutput
+        val out6 = UInt(width=8).asOutput
+        val out7 = UInt(width=8).asOutput
+        val out8 = UInt(width=8).asOutput
+        val out9 = UInt(width=8).asOutput
       }
       val myTest = Module(new BindingTestInternal)
       myTest.io <> io

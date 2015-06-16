@@ -47,13 +47,13 @@ class ComplexSuite extends TestSuite {
         val out = new Complex(Bits(width = W), Bits(width = W)).asOutput
       }
       when (io.e) {
-//        val w = Wire(new Complex(Bits(width = W), Bits(width = W)), init = )
+//        val w = new Complex(Bits(width = W), Bits(width = W))
 //        w := io.in
         io.out.real := io.in.real
         io.out.imag := io.in.imag
       } .otherwise {
-        io.out.real := Wire(Bits(0))
-        io.out.imag := Wire(Bits(0))
+        io.out.real := Bits(0)
+        io.out.imag := Bits(0)
       }
     }
     
@@ -94,9 +94,9 @@ class ComplexSuite extends TestSuite {
     
       val myLit = Complex(SInt(1, W), SInt(1, W))
     
-      io.out := Wire(Mux(io.cond, io.in_t+io.in_f, io.in_t-io.in_f) + myLit)
+      io.out := Mux(io.cond, io.in_t+io.in_f, io.in_t-io.in_f) + myLit
     
-      io.b_o := Wire(Mux(io.cond, io.b_t, Bool(false)))
+      io.b_o := Mux(io.cond, io.b_t, Bool(false))
     
     }
     

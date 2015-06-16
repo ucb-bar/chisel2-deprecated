@@ -43,7 +43,7 @@ class WhenSuite extends TestSuite {
         val in = UInt(INPUT,4)
         val out = UInt(OUTPUT,4)
       }
-      io.out := Wire(UInt(0))
+      io.out := UInt(0)
       when(io.en) { io.out := io.in }
     }
 
@@ -69,7 +69,7 @@ class WhenSuite extends TestSuite {
         val in = UInt(INPUT,4)
         val out = UInt(OUTPUT,4)
       }
-      io.out := Wire(UInt(0))
+      io.out := UInt(0)
       when(io.en0) { when(io.en1) { io.out := io.in } }
     }
 
@@ -103,7 +103,7 @@ class WhenSuite extends TestSuite {
       } .elsewhen(io.en1) {
         io.out := io.in1
       } .otherwise {
-        io.out := Wire(UInt(0))
+        io.out := UInt(0)
       }
     }
 
@@ -140,7 +140,7 @@ class WhenSuite extends TestSuite {
         val in = UInt(INPUT,4)
         val out = UInt(OUTPUT,4)
       }
-      io.out := Wire(UInt(0))
+      io.out := UInt(0)
       when( io.en ) {
         val sub = Module(new Submodule)
         io.out := sub.io.out
@@ -175,7 +175,7 @@ class WhenSuite extends TestSuite {
         val out = UInt(OUTPUT,4)
       }
       io.out := io.in
-      unless(io.en) { io.out := Wire(UInt(0)) }
+      unless(io.en) { io.out := UInt(0) }
     }
 
     class UnlessModuleTests(m: UnlessModule) extends Tester(m) {
@@ -205,10 +205,10 @@ class WhenSuite extends TestSuite {
 
       when (io.c1) {
         when (io.c2) {
-          reg := Wire(Bool(true))
+          reg := Bool(true)
         }
       }.otherwise {
-        reg := Wire(Bool(false))
+        reg := Bool(false)
       }
     }
 
@@ -234,10 +234,10 @@ class WhenSuite extends TestSuite {
         val in = UInt(INPUT,4)
         val out = Bool(OUTPUT)
       }
-      io.out := Wire(Bool(false))
+      io.out := Bool(false)
       switch(io.in) {
-        is(UInt(0)) { io.out := Wire(Bool(true)) }
-        is(Bits("b???1")) { io.out := Wire(Bool(true)) }
+        is(UInt(0)) { io.out := Bool(true) }
+        is(Bits("b???1")) { io.out := Bool(true) }
       }
     }
 

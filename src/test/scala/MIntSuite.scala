@@ -42,10 +42,10 @@ class MIntSuite extends TestSuite {
         val in = UInt(INPUT,4)
         val out = Bool(OUTPUT)
       }
-      io.out := Wire(Bool(false))
+      io.out := Bool(false)
       switch(io.in) {
-        is(UInt(0)) { io.out := Wire(Bool(true)) }
-        is(MInt("b???1")) { io.out := Wire(Bool(true)) }
+        is(UInt(0)) { io.out := Bool(true) }
+        is(MInt("b???1")) { io.out := Bool(true) }
       }
     }
 

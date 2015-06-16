@@ -47,7 +47,7 @@ class SystemCSuite extends TestSuite {
          val b = Decoupled( UInt(width = 16) )
        }
     
-       io.b.bits := Wire(io.a.bits + UInt(10))
+       io.b.bits := io.a.bits + UInt(10)
        io.a.ready := io.b.ready
        io.b.valid := io.a.valid
     }
@@ -58,7 +58,7 @@ class SystemCSuite extends TestSuite {
          val b = UInt(OUTPUT, width = 16)
        }
     
-       io.b := Wire(io.a + UInt(10))
+       io.b := io.a + UInt(10)
     }
 
     val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath, "--backend", "sysc")

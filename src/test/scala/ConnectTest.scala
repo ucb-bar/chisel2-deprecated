@@ -51,7 +51,7 @@ class ConnectSuite extends TestSuite {
       val io = new DecoupledUIntIO
       def makeShim(in: DecoupledIO[UInt]): DecoupledIO[UInt] = {
         val out = Wire(Decoupled(UInt()))
-        out.bits := Wire(in.bits + UInt(1))
+        out.bits := in.bits + UInt(1)
         out.valid := in.valid
         in.ready := out.ready
         out
@@ -86,10 +86,10 @@ class ConnectSuite extends TestSuite {
     class UsesReset(resetSignal: Bool = null) extends Module(_reset = resetSignal) {
       val io = new BoolIO
       val q = Module(new Queue(Bool(), 1))
-      q.io.enq.valid := Wire(Bool(true))
+      q.io.enq.valid := Bool(true)
       q.io.enq.bits := io.in
-      q.io.deq.ready := Wire(Bool(true))
-      io.out := Wire(q.io.deq.bits || reset)
+      q.io.deq.ready := Bool(true)
+      io.out := q.io.deq.bits || reset
     }
     class SuppliesResets extends Module {
       val io = new BoolIO
@@ -100,7 +100,7 @@ class ConnectSuite extends TestSuite {
       a0.io.in := io.in
       a1.io.in := io.in
       a2.io.in := io.in
-      io.out := Wire(a0.io.out || a1.io.out || a2.io.out || delayed)
+      io.out := a0.io.out || a1.io.out || a2.io.out || delayed
     }
     class SuppliesResetsParent extends Module {
       val io = new BoolIO
@@ -189,7 +189,7 @@ class ConnectSuite extends TestSuite {
     class C extends B {
       val aInC = Module(new A)
       aInC.io.in := io.in
-      io.out := Wire(aInC.io.out | aInB.io.out)
+      io.out := aInC.io.out | aInB.io.out
     }
     class OneInstancePerRelationTests(m: C) extends Tester(m) {
       (0 until 4).map { i =>
@@ -232,7 +232,7 @@ class ConnectSuite extends TestSuite {
       }
       val reg_status = Reg(new RegStatus)
       when (io.wen) {
-        reg_status := Wire(new RegStatus().fromBits(io.wdata))
+        reg_status := new RegStatus().fromBits(io.wdata)
       }
       io.status := reg_status
     }
@@ -390,7 +390,7 @@ class ConnectSuite extends TestSuite {
           my_reg := io.in
        }  
     
-       io.out := Wire(my_reg.a || my_reg.b)
+       io.out := my_reg.a || my_reg.b
     
     
        printf("Hello World!\n")
