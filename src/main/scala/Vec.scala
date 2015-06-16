@@ -130,6 +130,7 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
       readPorts(addr)
     } else {
       val iaddr = UInt(width = log2Up(length))
+      iaddr.setIsAssignable(true)
       iaddr assign addr
       val enables = (UInt(1) << iaddr).toBools
       val res = this(0).clone
@@ -140,6 +141,7 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
       }
       readPorts(addr) = res
       res.setIsTypeNode
+      res.setIsAssignable(true)
       res
     }
   }

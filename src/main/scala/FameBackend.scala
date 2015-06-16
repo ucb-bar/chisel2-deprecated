@@ -106,7 +106,7 @@ class FameQueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Module
   val aregs = Vec.fill(num_tgt_cycles){ Reg(init = UInt(0, width = log2Up(num_tgt_entries))) }
   val tail_pointer = Reg(init = UInt(1, width = log2Up(num_tgt_cycles)))
 
-  val next_tail_pointer = UInt()
+  val next_tail_pointer = Wire(UInt())
   tail_pointer := next_tail_pointer
   next_tail_pointer := tail_pointer
   when(io.produce && !io.consume){
@@ -115,7 +115,7 @@ class FameQueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Module
     next_tail_pointer := tail_pointer - UInt(1)
   }
   for (i <- 1 until num_tgt_cycles - 1){
-    val next_reg_val = UInt()
+    val next_reg_val = Wire(UInt())
     aregs(i) := next_reg_val
     next_reg_val := aregs(i)
     when(UInt(i) === tail_pointer){
@@ -147,7 +147,7 @@ class FameQueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Module
       }
     }
   }
-  val next_reg_val0 = UInt()
+  val next_reg_val0 = Wire(UInt())
   aregs(0) := next_reg_val0
   next_reg_val0 := aregs(0)
   when(UInt(0) === tail_pointer){
@@ -180,7 +180,7 @@ class FameQueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Module
       next_reg_val0 := aregs(1)
     }
   }
-  val next_reg_val_last = UInt()
+  val next_reg_val_last = Wire(UInt())
   aregs(num_tgt_cycles - 1) := next_reg_val_last
   next_reg_val_last := aregs(num_tgt_cycles - 1)
   when(UInt(num_tgt_cycles - 1) === tail_pointer){
@@ -217,7 +217,7 @@ class Fame1WrapperIO(num_queues: Int, num_regs: Int, num_debug: Int) extends Bun
 class Fame1Wrapper(f: => Module) extends Module {
   def transform(isTop: Boolean, module: Module, parent: Module): Unit = {
     Fame1Transform.fame1Modules += module
-    val isFire = Bool(INPUT)
+    val isFire = Wire(Bool(INPUT))
     module.addPin(isFire, "is_fire")
     Fame1Transform.fireSignals(module) = isFire
     if(!isTop){
@@ -293,7 +293,7 @@ class Fame1Wrapper(f: => Module) extends Module {
       case _ => {
         if (name != "is_fire") {
           Predef.assert(ioNode.isInstanceOf[Bits])
-          val elementClone = ioNode.clone
+          val elementClone = Wire(ioNode.clone)
           elementClone.isIo = true
           elementClone.setName(name)
           DebugIOs(name) = elementClone
@@ -313,7 +313,7 @@ class Fame1Wrapper(f: => Module) extends Module {
     }
   }
   //generate fire_tgt_clk signal
-  var fire_tgt_clk = Bool(true)
+  var fire_tgt_clk = Wire(Bool(true))
   for (q <- io.queues)
     fire_tgt_clk = fire_tgt_clk &&
       (if (q.host_valid.dir == OUTPUT) q.host_ready else q.host_valid)

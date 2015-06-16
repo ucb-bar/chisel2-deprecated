@@ -537,17 +537,19 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   override val hashCode: Int = Driver.components.size
   override def equals(that: Any) = this eq that.asInstanceOf[AnyRef]
   // Chisel3
-  private[Chisel] val assignments = ArrayBuffer[(Node, Node, StackTraceElement)]()
+  private[Chisel] val assignments = HashMap[Node, StackTraceElement]()
   private[Chisel] def addAssignment(assignee: Node, src: Node) = {
     val stack = Thread.currentThread().getStackTrace
-    assignments += ((assignee, src, findFirstUserLine(stack) getOrElse stack(0)))
+    if (!assignments.contains(assignee)) {
+      assignments += ((assignee, findFirstUserLine(stack) getOrElse stack(0)))
+    }
   }
   
   // Chisel3 - verify assignment semantics
   private[Chisel] def verify: Boolean = {
     var verified = true
     if (Driver.minimumCompatibility > "2") {
-      for ((dest, src, errline) <- assignments) {
+      for ((dest, errline) <- assignments) {
         val nodesToWrap = scala.collection.mutable.MutableList[Node]()
         if (!dest.isAssignable) {
           nodesToWrap += dest
