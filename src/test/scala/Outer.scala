@@ -16,7 +16,7 @@ class Outer extends Module {
   }
   // val c = Module(new Inner)
   val c = Array(Module(new Inner))
-  // val w = Bits(NO_DIR, 8)
+  // val w = Wire(Bits(NO_DIR, 8))
   // w := io.in
   c(0).io.in := io.in
   io.out  := (c(0).io.out * Bits(2))(7,0)
