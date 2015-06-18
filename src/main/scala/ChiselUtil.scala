@@ -574,6 +574,9 @@ object Wire
       ChiselError.error("cannot infer type of Init.")
       UInt().asInstanceOf[T]
     } else {
+      if (t != null && !t.isTypeOnly) {
+        ChiselError.error("Wire() must not wrap a node with data %s".format(t))
+      }
       if (init != null) {
         val x = mType.clone
         // Should this be part of 'clone'

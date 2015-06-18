@@ -53,7 +53,7 @@ class MissingWireSuite extends TestSuite {
         val aTemp = Wire(UInt(width=16))
         aTemp := aLit
         io.out := aTemp
-}
+      }
     }
 
     class WireTester(c: OptionalWire) extends Tester(c) {
@@ -70,5 +70,44 @@ class MissingWireSuite extends TestSuite {
     
     // This should pass
     chiselMainTest(testArgs, () => Module(new OptionalWire(false))){ c => new WireTester(c) }
+    assertFalse(ChiselError.hasErrors)
+  }
+
+  @Test def testBadWireWrap() {
+    println("\ntestBadWireWrap ...")
+
+    class OptionalWire(noWire: Boolean) extends Module {
+    
+      val io = new Bundle {
+        val out = UInt(OUTPUT, 16)
+      }
+
+      val aLit = UInt(42, 16)
+      // The following should pass without a Wire wrapper.
+      if (noWire) {
+        val aTemp = aLit
+        io.out := aTemp
+      } else {
+        val aTemp = Wire(aLit)
+        io.out := aTemp
+      }
+    }
+
+    class WireTester(c: OptionalWire) extends Tester(c) {
+      expect(c.io.out, 42)
+    }
+
+    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
+          "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c", "--genHarness", "--compile", "--test")
+    
+    // This should pass (no Wire() wrapper)
+    chiselMainTest(testArgs, () => Module(new OptionalWire(true))){ c => new WireTester(c) }
+    assertFalse(ChiselError.hasErrors)
+
+    // This should fail since we use a Wire wrapper around a node with data
+    intercept[IllegalStateException] {
+      chiselMainTest(testArgs, () => Module(new OptionalWire(false))){ c => new WireTester(c) }
+    }
+    assertTrue(ChiselError.hasErrors)
   }
 }
