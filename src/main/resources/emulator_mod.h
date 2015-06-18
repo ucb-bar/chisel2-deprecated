@@ -1756,7 +1756,10 @@ class mod_t {
   }
 
   std::string drain_output(void) {
-	  return printStream.str();
+	  std::string result = printStream.str();
+	  printStream.clear();
+	  printStream.str(std::string());
+	  return result;
   }
 
   // Since we have an element with a deleted copy constructor - printStream,

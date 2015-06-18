@@ -54,6 +54,7 @@ class ManualTester[+T <: Module]
   var delta = 0
   var t = 0
   var isTrace = isT
+  var testOutputString = "" // output available to test code.
 
   /**
    * Waits until the emulator streams are ready. This is a dirty hack related
@@ -126,8 +127,10 @@ class ManualTester[+T <: Module]
           c = testIn.read
           sb += c.toChar
         }
-        System.out.print(sb.toString())
+        // Put any generated output somewhere we can access it.
+        testOutputString = sb.toString()
         sb.clear()
+        System.out.print(testOutputString)
       }
       c   = testIn.read
     }
