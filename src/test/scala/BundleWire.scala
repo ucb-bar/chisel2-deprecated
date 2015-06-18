@@ -43,9 +43,9 @@ class BundleWireSuite extends TestSuite {
         }
       }
     }
-    chiselMainTest(Array[String]("--backend", "c",
-      "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
-      () => Module(new BundleWire())) {m => new BundleWireTester(m)}
+    val args = chiselEnvironmentArguments() ++ Array[String]("--backend", "c",
+      "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test")
+    chiselMainTest(args, () => Module(new BundleWire())) {m => new BundleWireTester(m)}
   }
 }
 

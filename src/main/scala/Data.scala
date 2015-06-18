@@ -214,4 +214,13 @@ abstract class Data extends Node {
   }
 
   def params = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
+
+  // Chisel3 - type-only nodes (no data - initialization or assignment
+  override def isTypeOnly = {
+    if (isTypeNode && comp != null) {
+      comp.isTypeOnly
+    } else {
+      super.isTypeOnly
+    }
+  }
 }

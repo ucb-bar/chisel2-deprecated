@@ -512,5 +512,7 @@ abstract class Node extends nameable {
   private[Chisel] def setIsAssignable(value: Boolean) {
     this.getNode._isAssignable = value
   }
-
+  // Chisel3 - type-only nodes (no data - initialization or assignment
+  protected[Chisel] def _isTypeOnly = true
+  protected[Chisel] def isTypeOnly: Boolean = this.getNode._isTypeOnly
 }

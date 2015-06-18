@@ -257,5 +257,10 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
       }
     }
   }
+
+  // Chisel3 - type-only nodes (no data - initialization or assignment
+  override def isTypeOnly: Boolean = {
+    elements.forall(_._2.isTypeOnly)
+  }
 }
     

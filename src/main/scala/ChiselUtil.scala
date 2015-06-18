@@ -557,9 +557,14 @@ object PriorityEncoderOH
   def apply(in: Bits): UInt = encode((0 until in.getWidth).map(i => in(i)))
 }
 
-/** Wrap a Chisel data type with a `Wire`.
+/** Chisel3 - Wrap a Chisel data type with a `Wire`.
   *
   * This sets the isAssignable state. It will be required for Chisel 3.0
+  * The logic is:
+  *  - for each element in a module:
+  *    - is that element assigned to?
+  *    - is that element defined with only a type (no compute logic)?
+  *    If so, the element's definition must be wrapped in a Wire.
   */
 object Wire
 {
@@ -573,17 +578,13 @@ object Wire
         val x = mType.clone
         // Should this be part of 'clone'
         // x.component = mType.component
-        // Until we get an internal := that avoids the compatibility check.
-        x.setIsAssignable(true)
-        init.setIsAssignable(true)
         x := init
         x
       } else {
-        t
+        t.clone
       }
     }
     res.setIsAssignable(true)
     res
   }
 }
-

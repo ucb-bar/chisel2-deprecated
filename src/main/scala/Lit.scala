@@ -300,4 +300,5 @@ class Literal extends Node {
     case x: Literal => value == x.value && isZ == x.isZ && widthW == x.widthW
     case _ => false
   }
+  override def _isTypeOnly = false
 }

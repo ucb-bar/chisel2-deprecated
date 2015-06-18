@@ -71,13 +71,13 @@ class ConnectWireSuite extends TestSuite {
     class UsesShim extends Module {
       val io = new DecoupledUIntIO
       def makeShim(in: DecoupledIO[UInt]): DecoupledIO[UInt] = {
-        val out = Decoupled(UInt())
+        val out = Wire(Decoupled(UInt()))
         out.bits := in.bits + UInt(1)
         out.valid := in.valid
         in.ready := out.ready
         out
       }
-      val s = Wire(makeShim(io.in))
+      val s = makeShim(io.in)
       io.out.bits := s.bits
       io.out.valid := s.valid
       s.ready := io.out.ready

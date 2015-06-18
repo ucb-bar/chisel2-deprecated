@@ -103,7 +103,7 @@ class FameQueueTrackerIO() extends Bundle{
 
 class FameQueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Module{
   val io = new FameQueueTrackerIO()
-  val aregs = Vec.fill(num_tgt_cycles){ Reg(init = UInt(0, width = log2Up(num_tgt_entries))) }
+  val aregs = Reg { Vec(UInt(0, width = log2Up(num_tgt_entries)), num_tgt_cycles) }
   val tail_pointer = Reg(init = UInt(1, width = log2Up(num_tgt_cycles)))
 
   val next_tail_pointer = Wire(UInt())
@@ -313,7 +313,7 @@ class Fame1Wrapper(f: => Module) extends Module {
     }
   }
   //generate fire_tgt_clk signal
-  var fire_tgt_clk = Wire(Bool(true))
+  var fire_tgt_clk = Bool(true)
   for (q <- io.queues)
     fire_tgt_clk = fire_tgt_clk &&
       (if (q.host_valid.dir == OUTPUT) q.host_ready else q.host_valid)

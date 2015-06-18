@@ -486,45 +486,10 @@ abstract class Bits extends Data with proc {
     }
   }
 
-  // Chisel3 - save assignments so we can issue a warning if they violate Chisel3 semantics.
-  private def addAssignment(src:Node) {
-    // Force the evaluation of "line" so we can print a reasonable warning message.
-    val dummy = src.line
-    component.addAssignment(this, src)
-  }
-
-  // Chisel3 - Check version compatibility (assignment)
+  // Chisel3 - Check version compatibility (assignments requiring Wire() wrappers)
   private def checkCompatibility(src: Node) {
     if (Driver.minimumCompatibility > "2") {
-      val deferChecking = true
-      if (deferChecking) {
-        addAssignment(src)
-      } else {
-        val checkPorts = scala.collection.mutable.MutableList[Node]()
-        val nodesToWrap = scala.collection.mutable.MutableList[Node]()
-        // Do the easy checks first.
-        if (!this.isAssignable) {
-          checkPorts += this
-        }
-        // Do we need to go further?
-        if (checkPorts.length > 0) {
-          for (n <- checkPorts) {
-            // See if this node is a port in its containing module.
-            val containingModule = n.component
-            val ports = containingModule.io.flatten.map(_._2.getNode)
-            if (ports.contains(n.getNode)) {
-              n.setIsAssignable(true)
-            } else {
-               nodesToWrap += n
-            }
-          }
-          if (nodesToWrap.length > 0) {
-              val plural = if (nodesToWrap.length > 1) "s" else ""
-              val nodeStrings = nodesToWrap.map(_.toString()).mkString(", ")
-              ChiselError.warning("Chisel3 compatibility: node%s %s should be wrapped in a Wire()".format(plural, nodeStrings))
-          }
-        }
-      }
+      component.addAssignment(this, src)
     }
   }
 }

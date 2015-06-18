@@ -274,6 +274,10 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
   // Return the sum of our constituent widths.
   override def getWidth(): Int = self.map(_.getWidth).foldLeft(0)(_ + _)
 
+  // Chisel3 - type-only nodes (no data - initialization or assignment
+  override def isTypeOnly: Boolean = {
+    self forall (_.isTypeOnly)
+  }
 }
 
 trait VecLike[T <: Data] extends collection.IndexedSeq[T] {

@@ -174,6 +174,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
     for (w <- writes) w.clock = clk
     super.assignClock(clk)
   }
+  override def _isTypeOnly = false
 }
 
 abstract class MemAccess(val mem: Mem[_], addri: Node) extends Node {

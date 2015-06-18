@@ -56,7 +56,7 @@ class ConnectSuite extends TestSuite {
         in.ready := out.ready
         out
       }
-      val s = Wire(makeShim(io.in))
+      val s = makeShim(io.in)
       io.out.bits := s.bits
       io.out.valid := s.valid
       s.ready := io.out.ready

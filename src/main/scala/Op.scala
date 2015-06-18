@@ -634,6 +634,7 @@ abstract class Op extends Node {
       }
     }
   }
+  override def _isTypeOnly = false
 }
 
 case class LogicalOp(val op: String) extends Op
