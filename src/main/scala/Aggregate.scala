@@ -38,7 +38,6 @@ abstract class Aggregate extends Data {
     // Aggregate classes do not generally 'live' in the graph so width inference
     //   will not touch these nodes and thus must get their width by looking
     //   into the container
-  override def isAssignable: Boolean = this.flatten.forall(_._2.isAssignable)
-  override def setIsAssignable(value: Boolean): Unit = this.flatten.map(_._2.setIsAssignable(value))
+  override def isWired: Boolean = this.flatten.forall(_._2.isWired)
+  override def setIsWired(value: Boolean): Unit = this.flatten.map(_._2.setIsWired(value))
 }
-

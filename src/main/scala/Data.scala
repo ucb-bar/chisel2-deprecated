@@ -215,7 +215,14 @@ abstract class Data extends Node {
 
   def params = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
 
-  // Chisel3 - type-only nodes (no data - initialization or assignment
+  // Chisel3 - This node has been wrapped in Wire() and may participate in assignment (:=, <>) statements.
+  private var _isWired = false
+  def isWired = _isWired
+  def setIsWired(value: Boolean) {
+    _isWired = value
+  }
+
+  // Chisel3 - type-only nodes (no data - initialization or assignment) - used for verifying Wire() wrapping
   override def isTypeOnly = {
     if (isTypeNode && comp != null) {
       comp.isTypeOnly

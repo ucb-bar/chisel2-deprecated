@@ -505,14 +505,19 @@ abstract class Node extends nameable {
     oldNode.consumers.clear()
   }
 
-  // Chisel3 - This node may participate in assignment (:=, <>) statements.
-  // This is limited to registers, ports, and wires
-  private var _isAssignable = false
-  protected[Chisel] def isAssignable = this.getNode._isAssignable
-  private[Chisel] def setIsAssignable(value: Boolean) {
-    this.getNode._isAssignable = value
+  // Chisel3 - type-only nodes (no data - no initialization or assignment)
+  // This is used to determine which nodes must be Wire() wrapped,
+  //  and whether Wire() wrapping of the node is legal or not.
+  protected[Chisel] def isTypeOnly: Boolean = {
+    // If we're the last node in a type chain, the chain is type only.
+    // Nodes with real data will override this definition.
+    // NOTE: We don't look at this node's inputs, since if this is an assignment,
+    //  they will be the source of the assignment, and they will most likely be data carrying nodes.
+    val gNode = getNode
+    if (gNode == this) {
+      true
+    } else {
+      gNode.isTypeOnly
+    }
   }
-  // Chisel3 - type-only nodes (no data - initialization or assignment
-  protected[Chisel] def _isTypeOnly = true
-  protected[Chisel] def isTypeOnly: Boolean = this.getNode._isTypeOnly
 }

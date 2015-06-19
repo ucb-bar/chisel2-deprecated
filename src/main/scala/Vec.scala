@@ -130,7 +130,7 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
       readPorts(addr)
     } else {
       val iaddr = UInt(width = log2Up(length))
-      iaddr.setIsAssignable(true)
+      iaddr.setIsWired(true)
       iaddr assign addr
       val enables = (UInt(1) << iaddr).toBools
       val res = this(0).clone
@@ -141,7 +141,7 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
       }
       readPorts(addr) = res
       res.setIsTypeNode
-      res.setIsAssignable(true)
+      res.setIsWired(true)
       res
     }
   }
@@ -274,7 +274,7 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
   // Return the sum of our constituent widths.
   override def getWidth(): Int = self.map(_.getWidth).foldLeft(0)(_ + _)
 
-  // Chisel3 - type-only nodes (no data - initialization or assignment
+  // Chisel3 - type-only nodes (no data - initialization or assignment) - used for verifying Wire() wrapping
   override def isTypeOnly: Boolean = {
     self forall (_.isTypeOnly)
   }

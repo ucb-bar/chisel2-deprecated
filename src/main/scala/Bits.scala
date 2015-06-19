@@ -489,7 +489,7 @@ abstract class Bits extends Data with proc {
   // Chisel3 - Check version compatibility (assignments requiring Wire() wrappers)
   private def checkCompatibility(src: Node) {
     if (Driver.minimumCompatibility > "2") {
-      component.addAssignment(this, src)
+      component.addAssignment(this)
     }
   }
 }

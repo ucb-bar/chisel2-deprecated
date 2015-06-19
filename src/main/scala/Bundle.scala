@@ -258,9 +258,8 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
     }
   }
 
-  // Chisel3 - type-only nodes (no data - initialization or assignment
+  // Chisel3 - type-only nodes (no data - initialization or assignment) - used for verifying Wire() wrapping
   override def isTypeOnly: Boolean = {
     elements.forall(_._2.isTypeOnly)
   }
 }
-    

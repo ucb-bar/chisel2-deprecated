@@ -634,7 +634,8 @@ abstract class Op extends Node {
       }
     }
   }
-  override def _isTypeOnly = false
+  // Chisel3 - this node contains data - used for verifying Wire() wrapping
+  override def isTypeOnly = false
 }
 
 case class LogicalOp(val op: String) extends Op

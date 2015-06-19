@@ -300,5 +300,6 @@ class Literal extends Node {
     case x: Literal => value == x.value && isZ == x.isZ && widthW == x.widthW
     case _ => false
   }
-  override def _isTypeOnly = false
+  // Chisel3 - this node contains data - used for verifying Wire() wrapping
+  override def isTypeOnly = false
 }

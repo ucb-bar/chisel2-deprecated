@@ -559,7 +559,7 @@ object PriorityEncoderOH
 
 /** Chisel3 - Wrap a Chisel data type with a `Wire`.
   *
-  * This sets the isAssignable state. It will be required for Chisel 3.0
+  * This sets the isWired state. It will be required for Chisel 3.0
   * The logic is:
   *  - for each element in a module:
   *    - is that element assigned to?
@@ -587,7 +587,7 @@ object Wire
         t.clone
       }
     }
-    res.setIsAssignable(true)
+    res.setIsWired(true)
     res
   }
 }

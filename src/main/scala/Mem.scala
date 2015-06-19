@@ -174,7 +174,8 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
     for (w <- writes) w.clock = clk
     super.assignClock(clk)
   }
-  override def _isTypeOnly = false
+  // Chisel3 - this node contains data - used for verifying Wire() wrapping
+  override def isTypeOnly = false
 }
 
 abstract class MemAccess(val mem: Mem[_], addri: Node) extends Node {
@@ -189,7 +190,8 @@ abstract class MemAccess(val mem: Mem[_], addri: Node) extends Node {
   override def forceMatchingWidths =
     if (addr.needWidth() != log2Up(mem.n)) inputs(0) = addr.matchWidth(Width(log2Up(mem.n)))
 
-  setIsAssignable(true)
+  // Chisel3 - this node contains data - used for verifying Wire() wrapping
+  override def isTypeOnly = false
 }
 
 class MemRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri) {
@@ -223,6 +225,8 @@ class MemSeqRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri)
 class PutativeMemWrite(mem: Mem[_ <: Data], addri: UInt) extends Node with proc {
   override def procAssign(src: Node) =
     mem.doWrite(addri, Module.current.whenCond, src, null)
+  // Chisel3 - this node contains data - used for verifying Wire() wrapping
+  override def isTypeOnly = false
 }
 
 class MemReadWrite(val read: MemSeqRead, val write: MemWrite) extends MemAccess(read.mem, null)
