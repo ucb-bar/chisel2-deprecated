@@ -270,7 +270,7 @@ class NameSuite extends TestSuite {
         val in = new BlockIO()
         val out = new BlockIO().flip
       }
-      val tag_ram = Vec.fill(2){ Reg(io.in.resp.bits.ppn) }
+      val tag_ram = Reg(Vec(2, io.in.resp.bits.ppn))
       when (io.in.resp.valid) {
         tag_ram(UInt(0)) := io.in.resp.bits.ppn
       }

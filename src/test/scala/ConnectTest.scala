@@ -426,7 +426,7 @@ class ConnectSuite extends TestSuite {
       }
       val io = new IO
     
-      val regs = Vec.fill(3){ Reg(Bool()) }
+      val regs = Reg(Vec(3, Bool()))
       regs(0) := reset
       for (i <- 1 until 3)
         regs(i) := regs(i-1)
