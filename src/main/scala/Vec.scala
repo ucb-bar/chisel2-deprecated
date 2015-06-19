@@ -90,6 +90,7 @@ object Vec {
   def tabulate[T <: Data](n1: Int, n2: Int)(f: (Int, Int) => T): Vec[Vec[T]] =
     tabulate(n1)(i1 => tabulate(n2)(f(i1, _)))
 
+  def apply[T <: Data](n: Int, gen: => T): Vec[T] = fill(n)(gen)
 }
 
 class VecProc(enables: Iterable[Bool], elms: Iterable[Data]) extends proc {
@@ -103,7 +104,7 @@ class VecProc(enables: Iterable[Bool], elms: Iterable[Data]) extends proc {
 
 class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate with VecLike[T] with Cloneable {
   val self = elts.toVector
-  if (self != null && self.length > 1 && self(0).getNode.isInstanceOf[Reg]) {
+  if (self != null && !self.isEmpty && self(0).getNode.isInstanceOf[Reg]) {
     ChiselError.warning("Vec[Reg] is deprecated. Please use Reg[Vec]")
   }
   val readPorts = new HashMap[UInt, T]

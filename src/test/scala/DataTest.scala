@@ -188,7 +188,7 @@ class DataSuite extends TestSuite {
     try {
     class BypassDataIO(num_bypass_ports:Int) extends Bundle() {
       val data = UInt(INPUT, width=num_bypass_ports)
-      val valid = Vec.fill(num_bypass_ports){ Bool() }
+      val valid = Vec(num_bypass_ports,  Bool() )
         // XXX Module.findRoots does not support Vec as a graph root.
       def get_num_ports: Int = num_bypass_ports
     }
@@ -267,8 +267,8 @@ class DataSuite extends TestSuite {
   @Test def testVecWidth() {
     val io = new Bundle{
 
-      val in = Vec.fill(4)(UInt(INPUT,4))
-      val out = Vec.fill(4)(UInt(OUTPUT,4))
+      val in = Vec(4, UInt(INPUT,4))
+      val out = Vec(4, UInt(OUTPUT,4))
     }
 
     assertTrue( io.in.getWidth() == 16 )
@@ -284,10 +284,10 @@ class DataSuite extends TestSuite {
       val num_entries = 2
       val debug = new Bundle
       {
-         val entry = Vec.fill(num_entries) { new Bundle {
+         val entry = Vec(num_entries,   new Bundle {
             val valid = Bool()
             val eflags = UInt() // THIS IS THE CULPRIT
-         }}
+         })
        }.asOutput
     }
   }

@@ -352,7 +352,7 @@ class NameSuite extends TestSuite {
 
     class VecSecondComp extends Module {
       val io = new Bundle {
-        val requestor = Vec.fill(4) { new BlockIO() }.flip
+        val requestor = Vec(4,   new BlockIO() ).flip
         val mem = Bool(OUTPUT)
       }
 
@@ -507,7 +507,7 @@ class NameSuite extends TestSuite {
     
     class EntryIO(num_ports: Int) extends Bundle
     {
-      val vals = Vec.fill(num_ports) { Bool(INPUT) }
+      val vals = Vec(num_ports,   Bool(INPUT) )
       val out = Bool(OUTPUT)
     }     
     
@@ -520,11 +520,11 @@ class NameSuite extends TestSuite {
     class NameItTooEager153 extends Module {
      val io = new Bundle {
          val idx = UInt(INPUT,2)
-         val vals = Vec.fill(4) { Bool(INPUT) }
+         val vals = Vec(4,   Bool(INPUT) )
          val z = Bool(OUTPUT)
       }
     
-      val entry_io = Vec.fill(4) { Module(new Entry(4)).io }
+      val entry_io = Vec(4,   Module(new Entry(4)).io )
     
       for (i <- 0 until 4)
       {  
