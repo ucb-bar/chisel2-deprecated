@@ -55,7 +55,7 @@ object UInt {
     res
   }
 
-  def DC(width: Int): UInt = Lit("b" + "?"*width, width){UInt()}
+  def DC(width: Int): MInt = MInt.DC(width)
 
   private def checkSign(x: BigInt) = {
     if (x < 0)
@@ -75,6 +75,14 @@ class UInt extends Bits with Num[UInt] {
     // NOTE: we do not inherit/clone the width.
     // Doing so breaks code in NodeFill()
     // res.width_ = n.width_.clone()
+    // Chisel3 compatibility - generic don't care UInts are deprecated.
+    n match {
+      case l: Literal =>
+        if (l.isZ) {
+          ChiselError.warning("General don't care UInts are deprecated. Please use MInt().")
+        }
+      case _ =>
+    }
     res
   }
 
@@ -84,7 +92,7 @@ class UInt extends Bits with Num[UInt] {
 
   override def toBits: UInt = this
 
-  // to support implicit convestions
+  // to support implicit conversions
   def ===(b: UInt): Bool = LogicalOp(this, b, "===")
 
   // arithmetic operators

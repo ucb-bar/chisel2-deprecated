@@ -237,7 +237,7 @@ class WhenSuite extends TestSuite {
       io.out := Bool(false)
       switch(io.in) {
         is(UInt(0)) { io.out := Bool(true) }
-        is(Bits("b???1")) { io.out := Bool(true) }
+        is(MInt("b???1")) { io.out := Bool(true) }
       }
     }
 

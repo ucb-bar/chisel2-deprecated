@@ -43,7 +43,7 @@ object Bits {
 
   def apply(dir: IODirection = null, width: Int = -1): UInt = UInt(dir, width);
 
-  def DC(width: Int): UInt = UInt.DC(width)
+  def DC(width: Int): MInt = MInt.DC(width)
 }
 
 

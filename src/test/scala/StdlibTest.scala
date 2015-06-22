@@ -902,7 +902,7 @@ try {
           val in = UInt(INPUT,  8)
           val out  = UInt(OUTPUT, 8)
         }
-        io.out := Mux(io.in === (UInt("b?110") | UInt("b1???")), io.in, UInt(0))
+        io.out := Mux(io.in === (MInt("b?110") | MInt("b1???")), io.in, UInt(0))
       }
   
       chiselMain(testArgs,

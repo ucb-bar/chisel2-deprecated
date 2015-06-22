@@ -62,8 +62,8 @@ class MInt(val value: String) extends UInt {
   val (bits, mask, swidth) = parseLit(value)
   def zEquals(other: Bits): Bool = 
     (Bits(toLitVal(mask, 2)) & other) === Bits(toLitVal(bits, 2))
-//  def === (other: Bits): Bool = zEquals(other)
-//  def != (other: Bits): Bool  = !zEquals(other)
+  def === (other: Bits): Bool = zEquals(other)
+  override def != (other: Bits): Bool  = !zEquals(other)
 
   // Far too much magic happens here.
   override def fromNode(n: Node): this.type = {
@@ -73,8 +73,70 @@ class MInt(val value: String) extends UInt {
         this.asTypeFor(n).asInstanceOf[this.type]
       }
       case _ => {
-        super.fromNode(n)
+        ChiselError.error("Only literals (and other MInts), may be converted into MInts")
+        MInt("b0").asInstanceOf[this.type]
       }
     }
   }
+
+  def badOp(op: String) {
+    ChiselError.error("Operator %s is illegal for MInts".format(op))
+  }
+
+  def badOpUInt(op: String): UInt = {
+    badOp(op)
+    UInt(0)
+  }
+
+  def badOpSInt(op: String): SInt = {
+    badOp(op)
+    SInt(0)
+  }
+
+  def badOpBool(op: String): Bool = {
+    badOp(op)
+    Bool(false)
+  }
+
+  def badOpThis(op: String): this.type = {
+    badOp(op)
+    this
+  }
+
+  // arithmetic operators
+  override def zext(): SInt = badOpSInt("zext")
+  override def unary_-(): UInt = badOpUInt("-")
+  override def unary_!(): Bool = badOpBool("!")
+  override def >> (b: UInt): UInt = badOpUInt(">>")
+  override def +  (b: UInt): UInt = badOpUInt("+")
+  override def *  (b: UInt): UInt = badOpUInt("*")
+  override def /  (b: UInt): UInt = badOpUInt("/")
+  override def %  (b: UInt): UInt = badOpUInt("%")
+  override def ?  (b: UInt): UInt = badOpUInt("?")
+  override def -  (b: UInt): UInt = badOpUInt("-")
+  override def >> (i: Int): UInt = badOpUInt(">>") // chisel3
+  override def << (i: Int): UInt = badOpUInt("<<") // chisel3
+  override def +%  (b: UInt): UInt = badOpUInt("+") // chisel3 add-wrap
+  override def +&  (b: UInt): UInt = badOpUInt("+&") // chisel3 add (width +1)
+  override def -%  (b: UInt): UInt = badOpUInt("-") // chisel3 sub-wrap
+  override def -&  (b: UInt): UInt = badOpUInt("-&") // chisel3 sub (width +1)
+
+  // logical operators
+  override def & (b: Bits): this.type = badOpThis("&")
+  override def | (b: Bits): this.type = badOpThis("|")
+  override def ^ (b: Bits): this.type = badOpThis("^")
+  override def <<(b: UInt): this.type = badOpThis("<<")
+ 
+  // order operators
+  override def <  (b: UInt): Bool = badOpBool("<")
+  override def <= (b: UInt): Bool = badOpBool("<=")
+  override def >  (b: UInt): Bool = badOpBool(">")
+  override def >= (b: UInt): Bool = badOpBool(">=")
+
+  //UInt op SInt arithmetic
+  override def +   (b: SInt): SInt = badOpSInt("+")
+  override def *   (b: SInt): SInt = badOpSInt("*")
+  override def -   (b: SInt): SInt = badOpSInt("-")
+  override def /   (b: SInt): SInt = badOpSInt("/")
+  override def %   (b: SInt): SInt = badOpSInt("%")
 }

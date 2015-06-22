@@ -37,6 +37,7 @@ import Chisel._
 class MIntSuite extends TestSuite {
   // MInt ? literals
   @Test def testMInt() {
+    println("\ntestMInt...")
     class MIntModule extends Module {
       val io = new Bundle {
         val in = UInt(INPUT,4)
@@ -60,4 +61,29 @@ class MIntSuite extends TestSuite {
     launchCppTester((m: MIntModule) => new MIntModuleTests(m))
   }
 
+  @Test def testMIntBool() {
+    println("\ntestMIntBool...")
+    class MIntBoolModule extends Module {
+      val io = new Bundle {
+        val in = Bool(INPUT)
+        val out = Bool(OUTPUT)
+      }
+      io.out := Bool(false)
+      val testDC = Bool.DC
+      val testTrue = Bool(true)
+      switch(io.in) {
+        is(testDC) { io.out := Bool(true) }
+      }
+    }
+
+    class MIntBoolModuleTests(m: MIntBoolModule) extends Tester(m) {
+      (0 until 8).map { i =>
+        poke(m.io.in, i)
+        step(1)
+        expect(m.io.out, 1)
+      }
+    }
+
+    launchCppTester((m: MIntBoolModule) => new MIntBoolModuleTests(m))
+  }
 }
