@@ -55,7 +55,9 @@ object UInt {
     res
   }
 
-  def DC(width: Int): MInt = MInt.DC(width)
+// FIXME: This should return a MInt, not a UInt
+//  def DC(width: Int): MInt = MInt.DC(width)
+  def DC(width: Int): UInt = Lit("b" + "?"*width, width){UInt()}
 
   private def checkSign(x: BigInt) = {
     if (x < 0)
