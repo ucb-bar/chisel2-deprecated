@@ -60,15 +60,6 @@ object Bundle {
   whole.
   */
 class Bundle(val view: Seq[String] = null) extends Aggregate {
-  // We can't use super class methods for cloning.
-  private def getCloneMethod(c: Class[_]): java.lang.reflect.Method = {
-    if (c.getDeclaredMethods().contains("clone")) {
-      c.getDeclaredMethod("clone")
-    } else {
-      null
-    }
-  }
-
   /** Populates the cache of elements declared in the Bundle. */
   private def calcElements(view: Seq[String]) = {
     val c      = getClass
@@ -232,30 +223,6 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
   override def setIsTypeNode {
     isTypeNode = true
     elements foreach (_._2.setIsTypeNode)
-  }
-  
-  override def clone(): this.type = {
-    val useSuper = true
-    if (useSuper) {
-      val rest = super.clone()
-      // Evaluate the elements.
-      val dummy = rest.elements.size
-      rest
-    } else {
-      try {
-        val constructor = this.getClass.getConstructors.head
-        val res = constructor.newInstance(Array.fill(constructor.getParameterTypes.size)(null):_*)
-        val rest = res.asInstanceOf[this.type]
-        // Evaluate the elements.
-        val dummy = rest.elements.size
-        rest
-      } catch {
-        case npe: java.lang.reflect.InvocationTargetException if npe.getCause.isInstanceOf[java.lang.NullPointerException] =>
-          throwException("Parameterized Bundle " + this.getClass + " needs clone method. You are probably using an anonymous Bundle object that captures external state and hence is un-cloneable", npe)
-        case e: java.lang.Exception =>
-          throwException("Parameterized Bundle " + this.getClass + " needs clone method", e)
-      }
-    }
   }
 
   // Chisel3 - type-only nodes (no data - initialization or assignment) - used for verifying Wire() wrapping

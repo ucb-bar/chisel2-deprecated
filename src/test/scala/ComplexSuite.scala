@@ -47,7 +47,7 @@ class ComplexSuite extends TestSuite {
         val out = new Complex(Bits(width = W), Bits(width = W)).asOutput
       }
       when (io.e) {
-//        val w = new Complex(Bits(width = W), Bits(width = W))
+//        val w = Wire(new Complex(Bits(width = W), Bits(width = W)))
 //        w := io.in
         io.out.real := io.in.real
         io.out.imag := io.in.imag

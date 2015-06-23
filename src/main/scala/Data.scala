@@ -157,10 +157,6 @@ abstract class Data extends Node {
       }
     }
 
-    def getEnclosingInstanceName(c: Class[_]): Option[java.lang.reflect.Method] = {
-      c.getDeclaredMethods.find(_.getName.contains("$outer"))
-    }
-
     try {
       val clazz = this.getClass
       val cloneMethod = getCloneMethod(clazz)
@@ -174,8 +170,6 @@ abstract class Data extends Node {
         } else {
           val params = constructor.getParameterTypes.toList
           if(constructor.getParameterTypes.size == 1) {
-            val parentInstanceMethod = getEnclosingInstanceName(clazz)
-//            val parentInstance = parent.get(this)
             val paramtype = constructor.getParameterTypes.head
             // If only 1 arg and is a Bundle or Module then this is probably the implicit argument
             //    added by scalac for nested classes and closures. Thus, try faking the constructor
@@ -184,12 +178,7 @@ abstract class Data extends Node {
             if(classOf[Bundle].isAssignableFrom(paramtype) || classOf[Module].isAssignableFrom(paramtype)){
               constructor.newInstance(null).asInstanceOf[this.type]
             } else {
-              parentInstanceMethod match {
-                case Some(m) if paramtype.isAssignableFrom(m.getReturnType) => {
-                  constructor.newInstance(null).asInstanceOf[this.type]
-                }
-                case _ => throwException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
-              }
+              throwException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
             }
           } else {
            throwException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
