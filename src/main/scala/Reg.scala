@@ -101,7 +101,7 @@ object Reg {
       throw new Exception("cannot infer type of Reg.")
     }
 
-    val gen = mType.clone
+    val gen = mType.cloneType
     validateGen(gen)
 
     // asOutput flip the direction and returns this.

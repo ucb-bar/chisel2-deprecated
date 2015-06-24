@@ -186,7 +186,7 @@ class DelaySuite extends TestSuite {
         val b = UInt(width = 16)
       }
       val a_b = UInt(width = 32) // this tests name mangling
-      override def clone = new A().asInstanceOf[this.type]
+      override def cloneType = new A().asInstanceOf[this.type]
     }
     class SeqReadBundle extends Module {
       val io = new Bundle {
@@ -197,7 +197,7 @@ class DelaySuite extends TestSuite {
         val in = Vec(2, new A()).asInput
         val out = Vec(2, new A()).asOutput
       }
-      val mem = Mem(io.in.clone, 16, seqRead = true)
+      val mem = Mem(io.in.cloneType, 16, seqRead = true)
       when (io.wen) { mem(io.waddr) := io.in }
       io.out := mem(RegEnable(io.raddr, io.ren))
     }

@@ -92,6 +92,13 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
         }
       }
     }
+    // Chisel3 - compatibility - use cloneType instead of clone
+    if (Driver.minimumCompatibility > "2") {
+      val methodNames = c.getMethods.map(_.getName())
+      if (methodNames.contains("clone") && !methodNames.contains("cloneType")) {
+        ChiselError.warning("method \"clone\" is deprecated. Please use \"cloneType\"")
+      }
+    }
     elts
   }
 
@@ -101,7 +108,7 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
 
   def fromMap(elemmap: Map[String, Data]): this.type = {
     // only well defined for 'flat' bundles, for now
-    val result = this.clone
+    val result = this.cloneType
     elemmap.foreach({case (subfield: String, source: Data) => {
       result.elements.get(subfield) match {
         case Some(sink: Data) => sink := source

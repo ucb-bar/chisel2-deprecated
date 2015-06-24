@@ -106,7 +106,7 @@ abstract class Data extends Node {
   /** Factory method to create and assign a leaf-type instance out of a subclass
     of *Node* instance which we have lost the concrete type. */
   def fromNode(n: Node): this.type = {
-    val res = this.clone
+    val res = this.cloneType
     val packet = res.flatten.reverse.zip(this.flatten.reverse.map(_._2.getWidth))
     var ind = 0
     for (((name, io), gotWidth) <- packet) {
@@ -146,11 +146,13 @@ abstract class Data extends Node {
     ChiselError.error(":= not defined on " + this.getClass + " and " + that.getClass)
 
   // Chisel3 prep
-  def cloneType(): this.type = this.clone()
+  override def clone(): this.type = this.cloneType()
 
-  override def clone(): this.type = {
+  def cloneType(): this.type = {
     def getCloneMethod(c: Class[_]): java.lang.reflect.Method = {
-      if (c.getDeclaredMethods().contains("clone")) {
+      if (c.getDeclaredMethods().contains("cloneType")) {
+        c.getDeclaredMethod("cloneType")
+      } else if (c.getDeclaredMethods().contains("clone")) {
         c.getDeclaredMethod("clone")
       } else {
         null
@@ -188,9 +190,9 @@ abstract class Data extends Node {
 
     } catch {
       case npe: java.lang.reflect.InvocationTargetException if npe.getCause.isInstanceOf[java.lang.NullPointerException] =>
-        throwException("Parameterized Bundle " + this.getClass + " needs clone method. You are probably using an anonymous Bundle object that captures external state and hence is un-cloneable", npe)
+        throwException("Parameterized Bundle " + this.getClass + " needs cloneType method. You are probably using an anonymous Bundle object that captures external state and hence is un-cloneable", npe)
       case e: java.lang.Exception =>
-        throwException("Parameterized Bundle " + this.getClass + " needs clone method", e)
+        throwException("Parameterized Bundle " + this.getClass + " needs cloneType method", e)
     }
   }
 

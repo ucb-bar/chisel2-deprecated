@@ -97,8 +97,8 @@ object isLessThan {
 object Mux {
   def apply[T<:Data](cond: Bool, tc: T, fc: T): T = {
     // TODO: Replace this runtime check with compiletime check using type classes and imports to add special cases
-    val target = if(tc.getClass.isAssignableFrom(fc.getClass)) tc.clone else
-                 if(fc.getClass.isAssignableFrom(tc.getClass)) fc.clone else
+    val target = if(tc.getClass.isAssignableFrom(fc.getClass)) tc.cloneType else
+                 if(fc.getClass.isAssignableFrom(tc.getClass)) fc.cloneType else
                  if(classOf[Bits].isAssignableFrom(tc.getClass) && classOf[Bits].isAssignableFrom(fc.getClass)) {
                    ChiselError.warning("Mux of Bits instantiated, emits SInt")
                    SInt().asInstanceOf[T]

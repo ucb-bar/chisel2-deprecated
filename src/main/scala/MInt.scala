@@ -56,8 +56,7 @@ object MInt {
 
 class MInt(val value: String) extends UInt {
   // Since we have a constructor parameter, we need a clone method.
-  override def clone: this.type = 
-    new MInt(value).asInstanceOf[this.type]
+  override def cloneType: this.type = new MInt(value).asInstanceOf[this.type]
   def fromInt(x: BigInt): MInt = MInt(x.toString(2)).asInstanceOf[this.type]
   val (bits, mask, swidth) = parseLit(value)
   def zEquals(other: Bits): Bool = 

@@ -42,7 +42,7 @@ object Mem {
   def apply[T <: Data](out: T, n: Int, seqRead: Boolean = false,
                        orderedWrites: Boolean = false,
                        clock: Clock = null): Mem[T] = {
-    val gen = out.clone
+    val gen = out.cloneType
     Reg.validateGen(gen)
     val res = new Mem(() => gen, n, seqRead, orderedWrites)
     if (!(clock == null)) res.clock = clock
@@ -63,6 +63,9 @@ abstract class AccessTracker extends Delay {
 class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val orderedWrites: Boolean, deprecateSeqRead: Option[Boolean] = None) extends AccessTracker with VecLike[T] {
   if (seqRead) {
     require(!orderedWrites) // sad reality of realizable SRAMs
+    // Should we issue a "deprecated" message?
+    //  If we aren't explicitly instructed either way, it must be an "old" call,
+    //  in which case, only issue the message if we're compatibility checking.
     if (deprecateSeqRead match {
       case Some(b: Boolean) => b
       case None => Driver.minimumCompatibility > "2"
@@ -152,7 +155,8 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
 
   override def toString: String = "TMEM(" + ")"
 
-  override def clone = new Mem(gen, n, seqRead, orderedWrites)
+  def cloneType = new Mem(gen, n, seqRead, orderedWrites)
+  override def clone = cloneType
 
   def computePorts = {
     reads --= reads.filterNot(_.used)
@@ -278,7 +282,7 @@ class MemWrite(mem: Mem[_ <: Data], condi: Bool, addri: Node, datai: Node, maski
 // Chisel3
 object SeqMem {
   def apply[T <: Data](out: T, n: Int): SeqMem[T] = {
-    val gen = out.clone
+    val gen = out.cloneType
     Reg.validateGen(gen)
     val res = new SeqMem(() => gen, n)
     Driver.hasMem = true

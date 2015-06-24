@@ -364,7 +364,7 @@ class ConnectSuite extends TestSuite {
     {
        val a = Bool()
        val b = Bool()
-       override def clone = new myBundle().asInstanceOf[this.type]
+       override def cloneType = new myBundle().asInstanceOf[this.type]
     }
     
     class UnspecifiedBundleValues extends Module {

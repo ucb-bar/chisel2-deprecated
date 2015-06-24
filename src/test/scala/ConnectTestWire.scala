@@ -60,7 +60,7 @@ case class GenWiring[SB <: Bundle](val newStatusInstance: () => SB) extends Modu
   io.status := wire_status
   
   // Since we're parameterized, we need a clone method.
-  override def clone() = {
+  def cloneType = {
     new GenWiring[SB](newStatusInstance).asInstanceOf[this.type]
   }
 }

@@ -56,14 +56,14 @@ object VecMux {
 object Vec {
 
   def apply[T <: Data](gen: T, n: Int): Vec[T] = 
-    /* new */ Vec((0 until n).map(i => gen.clone))
+    /* new */ Vec((0 until n).map(i => gen.cloneType))
 
   /** Returns a new *Vec* from a sequence of *Data* nodes.
     */
   def apply[T <: Data](elts: Iterable[T]): Vec[T] = {
     val res =
       if (!elts.isEmpty && elts.forall(_.isLit)) ROM(elts)
-      else new Vec[T](i => elts.head.clone, elts)
+      else new Vec[T](i => elts.head.cloneType, elts)
     res
   }
 
@@ -104,7 +104,7 @@ class VecProc(enables: Iterable[Bool], elms: Iterable[Data]) extends proc {
 
 class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate with VecLike[T] with Cloneable {
   val self = elts.toVector
-  if (self != null && !self.isEmpty && self(0).getNode.isInstanceOf[Reg]) {
+  if (self != null && !self.isEmpty && self(0).getNode.isInstanceOf[Reg] && Driver.minimumCompatibility > "2") {
     ChiselError.warning("Vec(Reg) is deprecated. Please use Reg(Vec)")
   }
   val readPorts = new HashMap[UInt, T]
@@ -134,7 +134,7 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
       iaddr.setIsWired(true)
       iaddr assign addr
       val enables = (UInt(1) << iaddr).toBools
-      val res = this(0).clone
+      val res = this(0).cloneType
       for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
         io assign VecMux(iaddr, sortedElm)
         // setup the comp for writes
@@ -242,7 +242,7 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
     }
   }
 
-  override def clone(): this.type =
+  override def cloneType(): this.type =
     Vec.tabulate(size)(gen).asInstanceOf[this.type]
     //Vec(this: Seq[T]).asInstanceOf[this.type]
 
