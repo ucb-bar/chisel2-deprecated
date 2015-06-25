@@ -101,7 +101,7 @@ object Reg {
       throw new Exception("cannot infer type of Reg.")
     }
 
-    val gen = mType.clone
+    val gen = mType.cloneType
     validateGen(gen)
 
     // asOutput flip the direction and returns this.
@@ -175,4 +175,6 @@ class Reg extends Delay with proc {
   protected[Chisel] def isEnable: Boolean = next.isInstanceOf[Mux] && (next.inputs(2) eq this)
   protected[Chisel] def enableSignal: Node = if (isEnable) next.inputs(0) else Bool(true)
   protected[Chisel] def updateValue: Node = if (isEnable) next.inputs(1) else next
+  // Chisel3 - this node contains data - used for verifying Wire() wrapping
+  override def isTypeOnly = false
 }

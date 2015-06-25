@@ -50,7 +50,7 @@ class ConnectSuite extends TestSuite {
     class UsesShim extends Module {
       val io = new DecoupledUIntIO
       def makeShim(in: DecoupledIO[UInt]): DecoupledIO[UInt] = {
-        val out = Decoupled(UInt())
+        val out = Wire(Decoupled(UInt()))
         out.bits := in.bits + UInt(1)
         out.valid := in.valid
         in.ready := out.ready
@@ -285,7 +285,7 @@ class ConnectSuite extends TestSuite {
   @Test def testVecInput() {
     class VecInput extends Module {
       val io = new Bundle {
-        val in = Vec.fill(2){ UInt(INPUT, 8) }
+        val in = Vec(2,  UInt(INPUT, 8) )
         val out0 = UInt(OUTPUT, 8)
         val out1 = UInt(OUTPUT, 8)
       }
@@ -308,7 +308,7 @@ class ConnectSuite extends TestSuite {
       val io = new Bundle {
         val in0 = UInt(INPUT, 8)
         val in1 = UInt(INPUT, 8)
-        val out = Vec.fill(2){ UInt(OUTPUT, 8) }
+        val out = Vec(2,  UInt(OUTPUT, 8) )
       }
 
       io.out(0) := io.in0
@@ -364,7 +364,7 @@ class ConnectSuite extends TestSuite {
     {
        val a = Bool()
        val b = Bool()
-       override def clone = new myBundle().asInstanceOf[this.type]
+       override def cloneType = new myBundle().asInstanceOf[this.type]
     }
     
     class UnspecifiedBundleValues extends Module {
@@ -426,7 +426,7 @@ class ConnectSuite extends TestSuite {
       }
       val io = new IO
     
-      val regs = Vec.fill(3){ Reg(Bool()) }
+      val regs = Reg(Vec(3, Bool()))
       regs(0) := reset
       for (i <- 1 until 3)
         regs(i) := regs(i-1)

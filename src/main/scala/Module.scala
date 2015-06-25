@@ -200,7 +200,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   override def toString = s"<${this.name} (${this.getClass.toString})>"
 
   // This function sets the IO's component.
-  def ownIo() {
+  private def ownIo() {
     val wires = io.flatten;
     for ((n, w) <- wires) {
       // This assert is a sanity check to make sure static resolution
@@ -535,5 +535,70 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
 
   override val hashCode: Int = Driver.components.size
   override def equals(that: Any) = this eq that.asInstanceOf[AnyRef]
-}
+  // Chisel3
+  private[Chisel] val assignments = HashMap[Data, StackTraceElement]()
+  private[Chisel] def addAssignment(assignee: Data) = {
+    val stack = Thread.currentThread().getStackTrace
+    if (!assignments.contains(assignee)) {
+      assignments += ((assignee, findFirstUserLine(stack) getOrElse stack(0)))
+    }
+  }
+  
+  /** verifyWireWrap (Chisel3) - verify assignment semantics (type-only nodes must be wire-wrapped)
+    *  @return - HashMap of source lines (and associated nodes) requiring Wire() wrapping.
+    */
+  type neededWireWraps = HashMap[StackTraceElement, ArrayBuffer[Data]]
+  private[Chisel] def verifyWireWrap: neededWireWraps = {
+    // Go through all assignments for this module and add those needing Wire()-wrap to a map.
+    val wireWrapLineToNode = new neededWireWraps()
+    def nodeNeedsWire(node: Data, errorLine: StackTraceElement) {
+      // Add this node to the list of nodes for this line
+      if (!wireWrapLineToNode.contains(errorLine)) {
+        wireWrapLineToNode(errorLine) = ArrayBuffer[Data]()
+      }
+      wireWrapLineToNode(errorLine) += node
+    }
+    for ((node, assignmentLine) <- assignments) {
+      // Is the node type-only (no data) and isn't io and hasn't been Wire() wrapped?
+      if (node.isTypeOnly && !(node.isWired || node.isIo)) {
+        // Do we have line numbers?
+        val errorLine = if (node.line != null) {
+          node.line
+        } else {
+          assignmentLine
+        }
+        nodeNeedsWire(node, errorLine)
+      }
+    }
+    wireWrapLineToNode
+  }
+  
+  /** reportWireWrap (Chisel3) - report type-only nodes requiring Wire() wrapping.
+    *  @param - HashMap of source lines (and associated nodes) requiring Wire() wrapping.
+    */
+  private[Chisel] def reportWireWrap(lineNodes: neededWireWraps) {
+    // For extra credit, sort the map keys (file and line number)
+    for ((errorLine, nodes) <- lineNodes) {
+      val nodeNames = nodes.map(_.name).mkString(", ")
+      val plural = if (nodes.length > 1) "s" else ""
+      val errorString = "Chisel3 compatibility: node%s %s should be wrapped in a Wire()".format(plural, nodeNames)
+      ChiselError.warning(errorString, errorLine)
+    }
+  }
 
+  /** verify module.
+    *  @return - true means there are no issues with the module, false means there are issues and they have been reported.
+    */
+  private[Chisel] def verify: Boolean = {
+    var result = true
+    // If we're verifying Chisel3 compatibility, verify Wire() wrapping.
+    if (Driver.minimumCompatibility > "2") {
+      val neededWireWraps = verifyWireWrap
+      if (!neededWireWraps.isEmpty) {
+        reportWireWrap(neededWireWraps)
+        result = false
+      }
+    }
+    result
+  }
+}

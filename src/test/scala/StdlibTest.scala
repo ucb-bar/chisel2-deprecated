@@ -269,7 +269,7 @@ try {
   @Test def testAssignBundle() {
     println("\ntestAssignBundle ...")
     class AssignBundle extends Bundle {
-        val v = Vec.fill(2){UInt(INPUT, 2)}
+        val v = Vec(2, UInt(INPUT, 2))
     }
     class AssignBundleComp extends Module {
       val io = new Bundle {
@@ -902,7 +902,7 @@ try {
           val in = UInt(INPUT,  8)
           val out  = UInt(OUTPUT, 8)
         }
-        io.out := Mux(io.in === (UInt("b?110") | UInt("b1???")), io.in, UInt(0))
+        io.out := Mux(io.in === (MInt("b?110") | MInt("b1???")), io.in, UInt(0))
       }
   
       chiselMain(testArgs,

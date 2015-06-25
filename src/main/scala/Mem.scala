@@ -42,7 +42,7 @@ object Mem {
   def apply[T <: Data](out: T, n: Int, seqRead: Boolean = false,
                        orderedWrites: Boolean = false,
                        clock: Clock = null): Mem[T] = {
-    val gen = out.clone
+    val gen = out.cloneType
     Reg.validateGen(gen)
     val res = new Mem(() => gen, n, seqRead, orderedWrites)
     if (!(clock == null)) res.clock = clock
@@ -60,9 +60,19 @@ abstract class AccessTracker extends Delay {
   def readAccesses: ArrayBuffer[_ <: MemAccess]
 }
 
-class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val orderedWrites: Boolean) extends AccessTracker with VecLike[T] {
-  if (seqRead)
+class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val orderedWrites: Boolean, deprecateSeqRead: Option[Boolean] = None) extends AccessTracker with VecLike[T] {
+  if (seqRead) {
     require(!orderedWrites) // sad reality of realizable SRAMs
+    // Should we issue a "deprecated" message?
+    //  If we aren't explicitly instructed either way, it must be an "old" call,
+    //  in which case, only issue the message if we're compatibility checking.
+    if (deprecateSeqRead match {
+      case Some(b: Boolean) => b
+      case None => Driver.minimumCompatibility > "2"
+      }) {
+      ChiselError.warning("Mem(..., seqRead) is deprecated. Please use SeqMem(...)")
+    }
+  }
   def writeAccesses: ArrayBuffer[MemWrite] = writes ++ readwrites.map(_.write)
   def readAccesses: ArrayBuffer[_ <: MemAccess] = reads ++ seqreads ++ readwrites.map(_.read)
   def ports: ArrayBuffer[_ <: MemAccess] = writes ++ reads ++ seqreads ++ readwrites
@@ -145,7 +155,8 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
 
   override def toString: String = "TMEM(" + ")"
 
-  override def clone = new Mem(gen, n, seqRead, orderedWrites)
+  def cloneType = new Mem(gen, n, seqRead, orderedWrites)
+  override def clone = cloneType
 
   def computePorts = {
     reads --= reads.filterNot(_.used)
@@ -167,6 +178,8 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
     for (w <- writes) w.clock = clk
     super.assignClock(clk)
   }
+  // Chisel3 - this node contains data - used for verifying Wire() wrapping
+  override def isTypeOnly = false
 }
 
 abstract class MemAccess(val mem: Mem[_], addri: Node) extends Node {
@@ -180,6 +193,9 @@ abstract class MemAccess(val mem: Mem[_], addri: Node) extends Node {
 
   override def forceMatchingWidths =
     if (addr.needWidth() != log2Up(mem.n)) inputs(0) = addr.matchWidth(Width(log2Up(mem.n)))
+
+  // Chisel3 - this node contains data - used for verifying Wire() wrapping
+  override def isTypeOnly = false
 }
 
 class MemRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri) {
@@ -213,6 +229,8 @@ class MemSeqRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri)
 class PutativeMemWrite(mem: Mem[_ <: Data], addri: UInt) extends Node with proc {
   override def procAssign(src: Node) =
     mem.doWrite(addri, Module.current.whenCond, src, null)
+  // Chisel3 - this node contains data - used for verifying Wire() wrapping
+  override def isTypeOnly = false
 }
 
 class MemReadWrite(val read: MemSeqRead, val write: MemWrite) extends MemAccess(read.mem, null)
@@ -259,4 +277,25 @@ class MemWrite(mem: Mem[_ <: Data], condi: Bool, addri: Node, datai: Node, maski
   override def toString: String = mem + "[" + addr + "] = " + data + " COND " + cond
   override def getPortType: String = if (isMasked) "mwrite" else "write"
   override def usesInClockHi(n: Node) = inputs.contains(n)
+}
+
+// Chisel3
+object SeqMem {
+  def apply[T <: Data](out: T, n: Int): SeqMem[T] = {
+    val gen = out.cloneType
+    Reg.validateGen(gen)
+    val res = new SeqMem(() => gen, n)
+    Driver.hasMem = true
+    Driver.hasSRAM = Driver.hasSRAM
+    Driver.sramMaxSize = math.max(Driver.sramMaxSize, n)
+    res
+  }
+}
+
+class SeqMem[T <: Data](gen: () => T, n: Int) extends Mem(gen, n, true, false, Some(false)) {
+
+  def apply(addr: UInt, enable: Bool): T = {
+    super.apply(Reg(next = addr))
+  }
+  override def apply(addr: UInt):T = apply(addr, Bool(true))
 }

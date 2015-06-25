@@ -24,7 +24,7 @@ class Risc extends Module {
 
   val ra = Mux(rai === Bits(0), Bits(0), file(rai))
   val rb = Mux(rbi === Bits(0), Bits(0), file(rbi))
-  val rc = Wire(Bits(width = 32))
+  val rc = Bits(width = 32)
 
   io.valid := Bool(false)
   io.out   := Bits(0)

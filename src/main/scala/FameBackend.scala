@@ -58,7 +58,7 @@ class FameDecoupledIO[+T <: Data](data: T) extends Bundle
   val host_valid = Bool(OUTPUT)
   val host_ready = Bool(INPUT)
   val target = new DecoupledIO(data)
-  override def clone: this.type = { new FameDecoupledIO(data).asInstanceOf[this.type]}
+  override def cloneType: this.type = new FameDecoupledIO(data).asInstanceOf[this.type]
 }
 
 class FameQueue[T <: Data] (val entries: Int)(data: => T) extends Module
@@ -103,10 +103,10 @@ class FameQueueTrackerIO() extends Bundle{
 
 class FameQueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Module{
   val io = new FameQueueTrackerIO()
-  val aregs = Vec.fill(num_tgt_cycles){ Reg(init = UInt(0, width = log2Up(num_tgt_entries))) }
+  val aregs = Reg { Vec(UInt(0, width = log2Up(num_tgt_entries)), num_tgt_cycles) }
   val tail_pointer = Reg(init = UInt(1, width = log2Up(num_tgt_cycles)))
 
-  val next_tail_pointer = UInt()
+  val next_tail_pointer = Wire(UInt())
   tail_pointer := next_tail_pointer
   next_tail_pointer := tail_pointer
   when(io.produce && !io.consume){
@@ -115,7 +115,7 @@ class FameQueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Module
     next_tail_pointer := tail_pointer - UInt(1)
   }
   for (i <- 1 until num_tgt_cycles - 1){
-    val next_reg_val = UInt()
+    val next_reg_val = Wire(UInt())
     aregs(i) := next_reg_val
     next_reg_val := aregs(i)
     when(UInt(i) === tail_pointer){
@@ -147,7 +147,7 @@ class FameQueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Module
       }
     }
   }
-  val next_reg_val0 = UInt()
+  val next_reg_val0 = Wire(UInt())
   aregs(0) := next_reg_val0
   next_reg_val0 := aregs(0)
   when(UInt(0) === tail_pointer){
@@ -180,7 +180,7 @@ class FameQueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Module
       next_reg_val0 := aregs(1)
     }
   }
-  val next_reg_val_last = UInt()
+  val next_reg_val_last = Wire(UInt())
   aregs(num_tgt_cycles - 1) := next_reg_val_last
   next_reg_val_last := aregs(num_tgt_cycles - 1)
   when(UInt(num_tgt_cycles - 1) === tail_pointer){
@@ -205,19 +205,19 @@ class FameQueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Module
 
 class RegIO[T <: Data](data: T) extends Bundle
 {
-  val bits = data.clone.asOutput
+  val bits = data.cloneType.asOutput
 }
 
 class Fame1WrapperIO(num_queues: Int, num_regs: Int, num_debug: Int) extends Bundle {
-  val queues = Vec.fill(num_queues){ new FameDecoupledIO(Bits())}
-  val regs = Vec.fill(num_regs){ new DecoupledIO(Bits())}
-  val debug = Vec.fill(num_debug){Bits()}
+  val queues = Vec(num_queues,  new FameDecoupledIO(Bits()))
+  val regs = Vec(num_regs,  new DecoupledIO(Bits()))
+  val debug = Vec(num_debug, Bits())
 }
 
 class Fame1Wrapper(f: => Module) extends Module {
   def transform(isTop: Boolean, module: Module, parent: Module): Unit = {
     Fame1Transform.fame1Modules += module
-    val isFire = Bool(INPUT)
+    val isFire = Wire(Bool(INPUT))
     module.addPin(isFire, "is_fire")
     Fame1Transform.fireSignals(module) = isFire
     if(!isTop){
@@ -267,7 +267,7 @@ class Fame1Wrapper(f: => Module) extends Module {
           fame1Decoupled.flip()
           fame1Decoupled.target.ready := decoupled.ready
           decoupled.valid := fame1Decoupled.target.valid
-          val decoupledBitsClone = decoupled.bits.clone()
+          val decoupledBitsClone = decoupled.bits.cloneType()
           decoupled.bits := decoupledBitsClone.fromBits(fame1Decoupled.target.bits)
         } else {
           decoupled.ready := fame1Decoupled.target.ready
@@ -282,7 +282,7 @@ class Fame1Wrapper(f: => Module) extends Module {
         val fame1RegIO = io.regs(reg_counter)
         if (is_flip) {
           fame1RegIO.flip()
-          val regBitsClone = reg.bits.clone()
+          val regBitsClone = reg.bits.cloneType()
           reg.bits := regBitsClone.fromBits(fame1RegIO.bits)
         } else {
           fame1RegIO.bits := reg.bits.toBits
@@ -293,7 +293,7 @@ class Fame1Wrapper(f: => Module) extends Module {
       case _ => {
         if (name != "is_fire") {
           Predef.assert(ioNode.isInstanceOf[Bits])
-          val elementClone = ioNode.clone
+          val elementClone = Wire(ioNode.cloneType)
           elementClone.isIo = true
           elementClone.setName(name)
           DebugIOs(name) = elementClone

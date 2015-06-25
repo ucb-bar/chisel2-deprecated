@@ -44,8 +44,8 @@ object conjugate {
 }
 
 class Complex[T<:Data with Num[T]](val real: T, val imag: T) extends Bundle with Num[Complex[T]] {
-  override def clone() = {
-    new Complex(real.clone, imag.clone).asInstanceOf[this.type]
+  override def cloneType() = {
+    new Complex(real.cloneType, imag.cloneType).asInstanceOf[this.type]
   }
 
   override protected def checkPort(obj : Any, name : String) : Boolean = name match {
