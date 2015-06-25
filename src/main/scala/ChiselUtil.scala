@@ -151,6 +151,17 @@ object ShiftRegister
       in
     }
   }
+  def apply[T <: Data](in: T, init: T, n: Int, en: Bool = Bool(true)): T =
+  {
+    // The order of tests reflects the expected use cases.
+    if (n == 1) {
+      RegEnable(in, init, en)
+    } else if (n != 0) {
+      RegNext(apply(in, init, n-1, en), init)
+    } else {
+      in
+    }
+  }
 }
 
 /** Returns the one hot encoding of the input UInt.
