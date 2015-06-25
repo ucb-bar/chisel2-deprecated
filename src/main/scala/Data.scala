@@ -150,9 +150,10 @@ abstract class Data extends Node {
 
   def cloneType(): this.type = {
     def getCloneMethod(c: Class[_]): java.lang.reflect.Method = {
-      if (c.getDeclaredMethods().contains("cloneType")) {
+      val methodNames = c.getDeclaredMethods.map(_.getName())
+      if (methodNames.contains("cloneType")) {
         c.getDeclaredMethod("cloneType")
-      } else if (c.getDeclaredMethods().contains("clone")) {
+      } else if (methodNames.contains("clone")) {
         c.getDeclaredMethod("clone")
       } else {
         null

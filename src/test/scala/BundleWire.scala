@@ -10,7 +10,9 @@ class BundleWireSuite extends TestSuite {
     class Coord extends Bundle {
       val x = UInt(width = 32)
       val y = UInt(width = 32)
-      override def cloneType: this.type = {
+      // We leave this as "clone" (we support the more correct "cloneType")
+      //  to ensure that the "old" usage is still supported.
+      override def clone: this.type = {
         val res = new Coord()
         res.x.dir = this.x.dir
         res.y.dir = this.y.dir
