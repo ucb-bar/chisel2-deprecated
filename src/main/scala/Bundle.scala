@@ -94,9 +94,16 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
     }
     // Chisel3 - compatibility - use cloneType instead of clone
     if (Driver.minimumCompatibility > "2") {
-      val methodNames = c.getMethods.map(_.getName())
+      val methodNames = c.getDeclaredMethods.map(_.getName())
       if (methodNames.contains("clone") && !methodNames.contains("cloneType")) {
-        ChiselError.warning("method \"clone\" is deprecated. Please use \"cloneType\"")
+        // Use the line number for the bunde definition (if we have it).
+        val errorLine = if (line != null) {
+          line
+        } else {
+          val stack = Thread.currentThread().getStackTrace
+          findFirstUserLine(stack) getOrElse stack(0)
+        }
+        ChiselError.warning("method \"clone\" is deprecated. Please use \"cloneType\"", errorLine)
       }
     }
     elts
