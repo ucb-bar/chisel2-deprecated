@@ -12,6 +12,7 @@
 
 version   := 2.2.0
 
+SUPPORT ?= ~/bin
 PDFLATEX  := pdflatex
 WWW_PAGES := index.html documentation.html download.html faq.html releases.html
 WWW_EXTRA := manual.html getting-started.html parameters.html
@@ -95,9 +96,8 @@ chisel-%.pdf: %.tex %_date.sty
 %.html: $(srcDir)/templates/%.html $(srcDir)/templates/base.html
 	$(srcDir)/../bin/jinja2html.py $(notdir $<) $@
 
-releases.html:	$(srcDir)/templates/releases.html $(srcDir)/templates/base.html
-	sed -e "s/@VERSION@/$(RELEASE_TAG)/" -e "s/@DATE@/$(RELEASE_DATE)/" $< > $(dir $<)/$@.tmp
-	$(srcDir)/../bin/jinja2html.py $@.tmp $@ && ${RM} $(dir $<)/$@.tmp
+releases.html:	$(srcDir)/templates/releases.html $(srcDir)/templates/base.html FORCE
+	$(SUPPORT)/chgrelfromgit/prepreleases.py $< $@
 
 clean:
 	-rm -f $(TEX_TEMP_FILES)
@@ -118,3 +118,6 @@ clean:
 %_date.sty:	%.tex
 	for f in $(wildcard $(dir $<)*.tex); do git log -n 1 --format="%at" -- $$f; done | sort -nr | head -1 | gawk '{print "\\date{",strftime("%B %e, %Y", $$1),"}"}' > $@
 	cmp $@ $(dir $<)$@ || cp $@ $(dir $<)
+
+.PHONY: FORCE
+FORCE:

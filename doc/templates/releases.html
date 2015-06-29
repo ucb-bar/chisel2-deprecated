@@ -7,69 +7,23 @@
   </div>
 
   <h2>Chisel 2.2.x</h2>
-  <p>
-  <h3>ReleaseNotes for Chisel @VERSION@ @DATE@</h3>
-  {% include "releasenotes_@VERSION@.html" %}
-  </p>
-  <p>
-  <h3>ChangeLog for Chisel @VERSION@ @DATE@</h3>
-  {% include "changelog_@VERSION@.html" %}
-  </p>
-  <p>
-  <h3>ReleaseNotes for Chisel v2.2.26 2015-04-21</h3>
-  {% include "releasenotes_v2.2.26.html" %}
-  </p>
-  <p>
-  <h3>ChangeLog for Chisel v2.2.26 2015-04-21</h3>
-  {% include "changelog_v2.2.26.html" %}
-  </p>
-  <p>
-  <h3>ReleaseNotes for Chisel v2.2.25 2015-03-25</h3>
-  {% include "releasenotes_v2.2.25.html" %}
-  </p>
-  <p>
-  <h3>ChangeLog for Chisel v2.2.25 2015-03-25</h3>
-  {% include "changelog_v2.2.25.html" %}
-  </p>
-  <p>
-  <h3>ReleaseNotes for Chisel v2.2.24 2015-03-09</h3>
-  {% include "releasenotes_v2.2.24.html" %}
-  </p>
-  <p>
-  <h3>ChangeLog for Chisel v2.2.24 2015-03-09</h3>
-  {% include "changelog_v2.2.24.html" %}
-  </p>
-  <p>
-  <h3>ReleaseNotes for Chisel v2.2.22 2015-02-26</h3>
-  {% include "releasenotes_v2.2.22.html" %}
-  </p>
-  <p>
-  <h3>ChangeLog for Chisel v2.2.22 2015-02-26</h3>
-  {% include "changelog_v2.2.22.html" %}
-  </p>
-  <p>
-  <h3>ReleaseNotes for Chisel v2.2.21 2014-12-12</h3>
-  {% include "releasenotes_v2.2.21.html" %}
-  </p>
-  <p>
-  <h3>ChangeLog for Chisel v2.2.21 2014-12-12</h3>
-  {% include "changelog_v2.2.21.html" %}
-  </p>
-  <p>
-  <h3>ReleaseNotes for Chisel v2.2.20 2014-11-20</h3>
-  {% include "releasenotes_v2.2.20.html" %}
-  </p>
-  <p>
-  <h3>ChangeLog for Chisel v2.2.20 2014-11-20</h3>
-  {% include "changelog_v2.2.20.html" %}
-  </p>
-  <p>
-  <h3>ReleaseNotes for Chisel v2.2.19 2014-10-03</h3>
-  {% include "releasenotes_v2.2.19.html" %}
-  </p>
-  <p>
-  <h3>ChangeLog for Chisel v2.2.19 2014-10-03</h3>
-  {% include "changelog_v2.2.19.html" %}
-  </p>
+  {% for release in releases %}
+    <p>
+    <h3>ReleaseNotes for Chisel {{ release['version'] }} {{ release['date'] }}</h3>
+    {% if release['relnotetext'] is defined %}
+      {{ release['relnotetext'] }}
+    {% else %}
+      {% include "releasenotes_" + release['version'] + ".html" %}
+    {% endif %}
+    </p>
+    <p>
+    <h3>ChangeLog for Chisel {{ release['version'] }} {{ release['date'] }}</h3>
+    {% if release['chglogtext'] is defined %}
+      {{ release['chglogtext'] }}
+    {% else %}
+      {% include "changelog_" + release['version'] + ".html" %}
+    {% endif %}
+    </p>
+  {% endfor %}
 </section>
 {% endblock %}
