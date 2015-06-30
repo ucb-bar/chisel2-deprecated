@@ -1,0 +1,7 @@
+digraph ZeroWidthTest_MulZS_1{
+rankdir = LR;
+  io_z[label="io_z:SInt"];
+  io_y[label="io_y:SInt"];
+  io_x[label="io_x:UInt"];
+  io_y -> io_z[label="32"];
+}
