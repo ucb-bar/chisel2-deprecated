@@ -74,7 +74,7 @@ class MultiClockSuite extends TestSuite {
     println("testBundleCustomClock:")
     class TestMultiClock2 extends Module {
       class BundleXY extends Bundle{
-        override def clone: this.type = (new BundleXY).asInstanceOf[this.type]
+        override def cloneType: this.type = (new BundleXY).asInstanceOf[this.type]
         val onSignal = Bool()
       }
       

@@ -79,11 +79,19 @@ abstract class TestSuite extends JUnitSuite {
   }
 
 
-  def launchTester[M <: Module : ClassTag, T <: Tester[M]](b: String, t: M => T) {
+  def launchTester[M <: Module : ClassTag, T <: Tester[M]](b: String, t: M => T, fArg: Option[(Array[String]) => Array[String]] = None) {
     val ctor = implicitly[ClassTag[M]].runtimeClass.getConstructors.head
 
-    val testArgs = chiselEnvironmentArguments() ++ Array[String]("--backend", b,
+    val baseArgs = chiselEnvironmentArguments() ++ Array[String]("--backend", b,
       "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test")
+    val testArgs = fArg match {
+      case Some(f) => {
+        f(baseArgs)
+      }
+      case None => {
+        baseArgs
+      }
+    }
     chiselMainTest(testArgs,
       () => Module(ctor.newInstance(this).asInstanceOf[M])) {t}
     // If this is a test of the Cpp backend, launch it again with some Cpp specific arguments,
@@ -93,8 +101,8 @@ abstract class TestSuite extends JUnitSuite {
         () => Module(ctor.newInstance(this).asInstanceOf[M])) {t}
     }
   }
-  def launchCppTester[M <: Module : ClassTag, T <: Tester[M]](t: M => T) = launchTester("c", t)
-  def launchVerilogTester[M <: Module : ClassTag, T <: Tester[M]](t: M => T) = launchTester("v", t)
+  def launchCppTester[M <: Module : ClassTag, T <: Tester[M]](t: M => T, fArg: Option[(Array[String]) => Array[String]] = None) = launchTester("c", t, fArg)
+  def launchVerilogTester[M <: Module : ClassTag, T <: Tester[M]](t: M => T, fArg: Option[(Array[String]) => Array[String]] = None) = launchTester("v", t, fArg)
 
 
   class BoolIO extends Bundle {

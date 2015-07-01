@@ -55,6 +55,8 @@ object UInt {
     res
   }
 
+// FIXME: This should return a MInt, not a UInt
+//  def DC(width: Int): MInt = MInt.DC(width)
   def DC(width: Int): UInt = Lit("b" + "?"*width, width){UInt()}
 
   private def checkSign(x: BigInt) = {
@@ -75,6 +77,14 @@ class UInt extends Bits with Num[UInt] {
     // NOTE: we do not inherit/clone the width.
     // Doing so breaks code in NodeFill()
     // res.width_ = n.width_.clone()
+    n match {
+      case l: Literal =>
+        if (l.isZ && Driver.minimumCompatibility > "2") {
+          // Chisel3 compatibility - generic don't care UInts/Bits are deprecated.
+          ChiselError.warning("General don't care UInts are deprecated. Please use MInt().")
+        }
+      case _ =>
+    }
     res
   }
 
@@ -84,7 +94,7 @@ class UInt extends Bits with Num[UInt] {
 
   override def toBits: UInt = this
 
-  // to support implicit convestions
+  // to support implicit conversions
   def ===(b: UInt): Bool = LogicalOp(this, b, "===")
 
   // arithmetic operators
@@ -98,6 +108,12 @@ class UInt extends Bits with Num[UInt] {
   def %  (b: UInt): UInt = newBinaryOp(b, "%");
   def ?  (b: UInt): UInt = fromNode(Multiplex(this.toBool, b, null))
   def -  (b: UInt): UInt = newBinaryOp(b, "-");
+  def >> (i: Int): UInt = newBinaryOp(UInt(i), ">>") // chisel3
+  def << (i: Int): UInt = newBinaryOp(UInt(i), "<<") // chisel3
+  def +%  (b: UInt): UInt = newBinaryOp(b, "+") // chisel3 add-wrap
+  def +&  (b: UInt): UInt = newBinaryOp(b, "+&") // chisel3 add (width +1)
+  def -%  (b: UInt): UInt = newBinaryOp(b, "-") // chisel3 sub-wrap
+  def -&  (b: UInt): UInt = newBinaryOp(b, "-&") // chisel3 sub (width +1)
 
   // order operators
   def <  (b: UInt): Bool = newLogicalOp(b, "<");

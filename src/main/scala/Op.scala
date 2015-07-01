@@ -108,6 +108,8 @@ object BinaryOp {
       case "d/"  => Op("d/", fixWidth(doubleWidth), x, y )
       case "d%"  => Op("d%", fixWidth(doubleWidth), x, y )
       case "dpow"  => Op("dpow", fixWidth(doubleWidth), x, y )
+      case "+&"   => Op("+", maxWidthPlusOne _,  x, y )
+      case "-&"   => Op("-", maxWidthPlusOne _,  x, y )
       case any   => throw new Exception("Unrecognized operator " + op)
     }
   }
@@ -632,6 +634,8 @@ abstract class Op extends Node {
       }
     }
   }
+  // Chisel3 - this node contains data - used for verifying Wire() wrapping
+  override def isTypeOnly = false
 }
 
 case class LogicalOp(val op: String) extends Op

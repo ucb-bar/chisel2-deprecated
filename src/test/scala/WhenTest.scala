@@ -144,8 +144,13 @@ class WhenSuite extends TestSuite {
       when( io.en ) {
         val sub = Module(new Submodule)
         io.out := sub.io.out
+        // The following generates a warning when it can't find 'en' in sub.io
         io <> sub.io /* connect only io.in to sub.io.in */
       }
+    }
+    
+    def noWerror(srcArgs: Array[String]): Array[String] = {
+      srcArgs.filterNot(_ == "--wError")
     }
 
     class SubmoduleInWhenBlockTests(m: SubmoduleInWhenBlock) extends Tester(m) {
@@ -158,7 +163,7 @@ class WhenSuite extends TestSuite {
       }
     }
 
-    launchCppTester((m: SubmoduleInWhenBlock) => new SubmoduleInWhenBlockTests(m))
+    launchCppTester({(m: SubmoduleInWhenBlock) => new SubmoduleInWhenBlockTests(m)}, Some(noWerror _))
   }
 
   // Unless statement with elsewhen and otherwise clause
@@ -232,7 +237,7 @@ class WhenSuite extends TestSuite {
       io.out := Bool(false)
       switch(io.in) {
         is(UInt(0)) { io.out := Bool(true) }
-        is(Bits("b???1")) { io.out := Bool(true) }
+        is(MInt("b???1")) { io.out := Bool(true) }
       }
     }
 

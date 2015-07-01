@@ -40,7 +40,7 @@ import ChiselError._
 object Bundle {
   val keywords = Set("elements", "flip", "toString",
     "flatten", "binding", "asInput", "asOutput", "unary_$tilde",
-    "unary_$bang", "unary_$minus", "clone", "toUInt", "toBits",
+    "unary_$bang", "unary_$minus", "clone", "cloneType", "toUInt", "toBits",
     "toBool", "toSInt", "asDirectionless")
 
   def apply[T <: Bundle](b: => T)(implicit p: Parameters): T = {
@@ -81,6 +81,7 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
         && !(Bundle.keywords contains name)
         && (view == null || (view contains name))
         && checkPort(m, name)) {
+        // Fetch the actual object
         val obj = m invoke this
         if(!(seen contains obj)) {
           obj match {
@@ -89,6 +90,20 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
           }
           seen += obj
         }
+      }
+    }
+    // Chisel3 - compatibility - use cloneType instead of clone
+    if (Driver.minimumCompatibility > "2") {
+      val methodNames = c.getDeclaredMethods.map(_.getName())
+      if (methodNames.contains("clone") && !methodNames.contains("cloneType")) {
+        // Use the line number for the bunde definition (if we have it).
+        val errorLine = if (line != null) {
+          line
+        } else {
+          val stack = Thread.currentThread().getStackTrace
+          findFirstUserLine(stack) getOrElse stack(0)
+        }
+        ChiselError.warning("method \"clone\" is deprecated. Please use \"cloneType\"", errorLine)
       }
     }
     elts
@@ -100,7 +115,7 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
 
   def fromMap(elemmap: Map[String, Data]): this.type = {
     // only well defined for 'flat' bundles, for now
-    val result = this.clone
+    val result = this.cloneType
     elemmap.foreach({case (subfield: String, source: Data) => {
       result.elements.get(subfield) match {
         case Some(sink: Data) => sink := source
@@ -222,5 +237,10 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
   override def setIsTypeNode {
     isTypeNode = true
     elements foreach (_._2.setIsTypeNode)
+  }
+
+  // Chisel3 - type-only nodes (no data - initialization or assignment) - used for verifying Wire() wrapping
+  override def isTypeOnly: Boolean = {
+    elements.forall(_._2.isTypeOnly)
   }
 }

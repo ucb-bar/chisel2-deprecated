@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014, 2015 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -28,16 +28,48 @@
  MODIFICATIONS.
 */
 
-package Chisel
+import scala.collection.mutable.ArrayBuffer
+import org.scalatest._
+//import org.junit.Assert._
+import org.junit.Test
 
-import Node._
-import ChiselError._
+import Chisel._
+class VersionSuite extends TestSuite {
+  @Test def testValidVersions() {
+    val versions = Array[(Version, Version, String)](
+      ("", "99.99.99", "!="),
+      ("", "", "=="),
+      ("3", "2.99.99", "!="),
+      ("4", "3", "!="),
+      ("3", "3.99.99", "!="),
+      ("3.99.99", "3", "!="),
+      ("3.0", "2.9", "!="),
+      ("3.9", "3", "!="),
+      ("3.9", "3.0", "!="),
+      ("3.9", "3.9.99", "!="),
+      ("3.2.1", "3.2.1", "==")
 
-abstract class Aggregate extends Data {
-  override def getWidth: Int = this.flatten.map(_._2.getWidth).fold(0)(_+_)
-    // Aggregate classes do not generally 'live' in the graph so width inference
-    //   will not touch these nodes and thus must get their width by looking
-    //   into the container
-  override def isWired: Boolean = this.flatten.forall(_._2.isWired)
-  override def setIsWired(value: Boolean): Unit = this.flatten.map(_._2.setIsWired(value))
+        )
+    for((v1, v2, eq) <- versions) {
+      assert(v1 >= v2)
+      if (eq == "==") {
+        assert(v1 == v2)
+      } else {
+        assert(v1 != v2)
+      }
+    }
+  }
+
+  @Test def testInvalidVersions() {
+    val versions = Array[String](
+      ("foo"),
+      ("3..5"),
+      ("3.4.5.6")
+        )
+    for(s <- versions) {
+      intercept[IllegalArgumentException] {
+        val v = Version(s)
+      }
+    }
+  }
 }
