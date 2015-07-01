@@ -126,14 +126,14 @@ class Fixed(var fractionalWidth : Int = 0) extends Bits with Num[Fixed] {
         fromSInt(this.toSInt - b.toSInt)
     }
 
-    def *& (b : Fixed) : Fixed ={
+    def *& (b : Fixed) : Fixed = {
         checkAligned(b)
         val temp = this.toSInt * b.toSInt
         val res = temp + ((temp & UInt(1)<<UInt(this.fractionalWidth-1))<<UInt(1))
         fromSInt(res >> UInt(this.fractionalWidth))
     }
     
-    def * (b : Fixed) : Fixed ={
+    def * (b : Fixed) : Fixed = {
         checkAligned(b)
         val temp = this.toSInt * b.toSInt
         fromSInt(temp >> UInt(this.fractionalWidth))
@@ -142,10 +142,5 @@ class Fixed(var fractionalWidth : Int = 0) extends Bits with Num[Fixed] {
     def / (b : Fixed) : Fixed = {
         checkAligned(b)
         fromSInt((this.toSInt << UInt(this.fractionalWidth)) / b.toSInt)
-    }
-
-    def % (b : Fixed) : Fixed = {
-        checkAligned(b)
-        fromSInt(this.toSInt % b.toSInt)
     }
 }
