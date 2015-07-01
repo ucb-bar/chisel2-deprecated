@@ -73,6 +73,8 @@ class Fixed(var fractionalWidth : Int = 0) extends Bits with Num[Fixed] {
     res
   }
 
+  def getFractionalWidth : Int = this.fractionalWidth
+
     def checkAligned(b : Fixed) = if(this.fractionalWidth != b.fractionalWidth) ChiselError.error(this.fractionalWidth + " Fractional Bits does not match " + b.fractionalWidth)
 
     def fromSInt(s : SInt) : Fixed = {
@@ -101,13 +103,18 @@ class Fixed(var fractionalWidth : Int = 0) extends Bits with Num[Fixed] {
         checkAligned(b)
         this.toSInt <= b.toSInt
     }
+    
+    def === (b : Fixed) : Bool = {
+        checkAligned(b)
+        this.toSInt === b.toSInt
+    }
 
     def >> (b : UInt) : Fixed = {
         fromSInt(this.toSInt >> b)
     }
 
     // Arithmetic Operators
-    def unary_-() : Fixed = Fixed(0, this.needWidth(), this.fractionalWidth) - this
+    def unary_-() : Fixed = Fixed(0, this.getWidth(), this.fractionalWidth) - this
 
     def + (b : Fixed) : Fixed = {
         checkAligned(b)
