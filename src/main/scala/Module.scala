@@ -58,8 +58,11 @@ object Module {
     val res = c
     pop()
     for ((n, io) <- res.wires) {
-      if (io.dir == null)
-         ChiselError.error(new ChiselError(() => {"All IO's must be ports (dir set): " + io}, io.line))
+      if (io.dir == null) {
+        val io_str = "<" + n + " (" + io.getClass.getName + ")>"
+        ChiselError.error(new ChiselError(() => {
+           "All IO's must be ports (dir set): " + io_str + " in " + res }, io.line))
+      }
       // else if (! io.isKnownWidth)
       //   ChiselError.error(new ChiselError(() => {"All IO's must have width set: " + io}, io.line))
       io.isIo = true
@@ -205,8 +208,12 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     for ((n, w) <- wires) {
       // This assert is a sanity check to make sure static resolution
       // of IOs didn't fail
-      scala.Predef.assert(this == w.component,
-        ChiselError.error("Statically resolved component differs from dynamically resolved component of IO: " + w + " crashing compiler"))
+      if (this != w.component) {
+        val io_str = "<" + n + " (" + w.getClass.getName + ")>"
+        ChiselError.error("Statically resolved component(" + this + 
+          ") differs from dynamically resolved component(" + w.component + 
+          ") of IO: " + io_str + " crashing compiler")
+      }
     }
     // io naming
     io nameIt ("io", true)
@@ -281,18 +288,19 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   }
 
   def addPin[T <: Data](pin: T, name: String = "") = {
+    val gen = pin.clone
     io match {
       case b: Bundle => {
-        for ((n, io) <- pin.flatten) {
+        for ((n, io) <- gen.flatten) {
           io.component = this
           io.isIo = true
         }
-        if (name != "") pin nameIt (name, true)
-        b.elements += ((pin.name, pin))
+        if (name != "") gen nameIt (name, true)
+        b.elements += ((gen.name, gen))
       }
       case _ => // Is it possible?
     }
-    pin
+    gen
   }
 
   def addModule[T<:Module](c: =>T, f: PartialFunction[Any,Any]) = {
@@ -438,7 +446,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   // 3) name and set the component of all statically declared nodes through introspection
   // 4) set variable names
   def markComponent() {
-    ownIo();
+    ownIo()
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], BlackBox and Modules.
      Since we call invoke() to get a proper instance of the correct type,
