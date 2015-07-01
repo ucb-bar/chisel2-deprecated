@@ -68,7 +68,7 @@ class Fixed(var fractionalWidth : Int = 0) extends Bits with Num[Fixed] {
         Fixed(x, this.getWidth(), this.fractionalWidth).asInstanceOf[this.type]
     }
 
-  override def clone: this.type = {
+  override def cloneType: this.type = {
     val res = Fixed(this.dir, this.getWidth(), this.fractionalWidth).asInstanceOf[this.type];
     res
   }
@@ -142,5 +142,10 @@ class Fixed(var fractionalWidth : Int = 0) extends Bits with Num[Fixed] {
     def / (b : Fixed) : Fixed = {
         checkAligned(b)
         fromSInt((this.toSInt << UInt(this.fractionalWidth)) / b.toSInt)
+    }
+
+    def % (b : Fixed) : Fixed = {
+      ChiselError.error("% currently not supported")
+      Fixed(0, this.getWidth, this.fractionalWidth)
     }
 }
