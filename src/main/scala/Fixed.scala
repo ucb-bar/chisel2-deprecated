@@ -144,8 +144,5 @@ class Fixed(var fractionalWidth : Int = 0) extends Bits with Num[Fixed] {
         fromSInt((this.toSInt << UInt(this.fractionalWidth)) / b.toSInt)
     }
 
-    def % (b : Fixed) : Fixed = {
-      ChiselError.error("% currently not supported")
-      Fixed(0, this.getWidth, this.fractionalWidth)
-    }
+    def % (b : Fixed) : Fixed = (this / b) & Fill(this.fractionalWidth, UInt(1))
 }

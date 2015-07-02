@@ -423,4 +423,42 @@ class FixedSuite extends TestSuite {
 
     launchCppTester((c: FixedVec2) => new FixedVec2Tests(c))
   }
+  
+  @Test def testFixedMod() {
+    class FixedMod extends Module {
+      val io = new Bundle {
+        val a = Fixed(INPUT, 32, 16)
+        val b = Fixed(INPUT, 32, 16)
+        val c = Fixed(OUTPUT, 32, 16)
+      }
+      io.c := io.a % io.b
+    }
+
+    class FixedModTests(c : FixedMod) extends Tester(c) {
+      val trials = 10
+      val r = scala.util.Random
+
+      for (i <- 0 until trials) {
+
+        // For the testing find two numbers that we also give a number that is representable in fixed point
+        var inA = BigInt(r.nextInt(1 << 30))
+        var inB = BigInt(r.nextInt(1 << 30))
+        var doubleA = toDouble(inA, 16)
+        var doubleB = toDouble(inB, 16)
+        while(  scala.math.abs(toDouble(toFixedT(doubleA / doubleB, 16), 16) - doubleA/doubleB) > scala.math.pow(2, -17)) {
+          inA = BigInt(r.nextInt(1 << 30))
+          inB = BigInt(r.nextInt(1 << 30))
+          doubleA = toDouble(inA, 16)
+          doubleB = toDouble(inB, 16)
+        }
+        poke(c.io.a, inA)
+        poke(c.io.b, inB)
+        val div = toDouble(inA, 16) / toDouble(inB, 16)
+        val mod = div - div.toInt.toDouble
+        expect(c.io.c, toFixedT(mod, 16))
+      }
+    }
+
+    launchCppTester((c: FixedMod) => new FixedModTests(c))
+  }
 }
