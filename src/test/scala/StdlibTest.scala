@@ -269,7 +269,7 @@ try {
   @Test def testAssignBundle() {
     println("\ntestAssignBundle ...")
     class AssignBundle extends Bundle {
-        val v = Vec(2, UInt(INPUT, 2))
+        val v = Vec(UInt(INPUT, 2), 2)
     }
     class AssignBundleComp extends Module {
       val io = new Bundle {

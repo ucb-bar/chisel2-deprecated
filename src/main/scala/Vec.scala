@@ -55,8 +55,8 @@ object VecMux {
 
 object Vec {
 
-  def apply[T <: Data](gen: T, n: Int): Vec[T] = 
-    /* new */ Vec((0 until n).map(i => gen.cloneType))
+  def apply[T <: Data](gen: => T, n: Int): Vec[T] = 
+    /* new */ Vec((0 until n).map(i => gen))
 
   /** Returns a new *Vec* from a sequence of *Data* nodes.
     */
@@ -89,8 +89,6 @@ object Vec {
 
   def tabulate[T <: Data](n1: Int, n2: Int)(f: (Int, Int) => T): Vec[Vec[T]] =
     tabulate(n1)(i1 => tabulate(n2)(f(i1, _)))
-
-  def apply[T <: Data](n: Int, gen: => T): Vec[T] = fill(n)(gen)
 }
 
 class VecProc(enables: Iterable[Bool], elms: Iterable[Data]) extends proc {

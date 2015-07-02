@@ -209,9 +209,9 @@ class RegIO[T <: Data](data: T) extends Bundle
 }
 
 class Fame1WrapperIO(num_queues: Int, num_regs: Int, num_debug: Int) extends Bundle {
-  val queues = Vec(num_queues,  new FameDecoupledIO(Bits()))
-  val regs = Vec(num_regs,  new DecoupledIO(Bits()))
-  val debug = Vec(num_debug, Bits())
+  val queues = Vec(new FameDecoupledIO(Bits()), num_queues)
+  val regs = Vec(new DecoupledIO(Bits()), num_regs)
+  val debug = Vec(Bits(), num_debug)
 }
 
 class Fame1Wrapper(f: => Module) extends Module {

@@ -270,7 +270,7 @@ class NameSuite extends TestSuite {
         val in = new BlockIO()
         val out = new BlockIO().flip
       }
-      val tag_ram = Reg(Vec(2, io.in.resp.bits.ppn))
+      val tag_ram = Reg(Vec(io.in.resp.bits.ppn, 2))
       when (io.in.resp.valid) {
         tag_ram(UInt(0)) := io.in.resp.bits.ppn
       }
@@ -352,7 +352,7 @@ class NameSuite extends TestSuite {
 
     class VecSecondComp extends Module {
       val io = new Bundle {
-        val requestor = Vec(4,   new BlockIO() ).flip
+        val requestor = Vec(new BlockIO(), 4).flip
         val mem = Bool(OUTPUT)
       }
 
@@ -507,7 +507,7 @@ class NameSuite extends TestSuite {
     
     class EntryIO(num_ports: Int) extends Bundle
     {
-      val vals = Vec(num_ports,   Bool(INPUT) )
+      val vals = Vec(Bool(INPUT), num_ports)
       val out = Bool(OUTPUT)
     }     
     
@@ -520,11 +520,11 @@ class NameSuite extends TestSuite {
     class NameItTooEager153 extends Module {
      val io = new Bundle {
          val idx = UInt(INPUT,2)
-         val vals = Vec(4,   Bool(INPUT) )
+         val vals = Vec(Bool(INPUT), 4)
          val z = Bool(OUTPUT)
       }
     
-      val entry_io = Vec(4,   Module(new Entry(4)).io )
+      val entry_io = Vec(Module(new Entry(4)).io, 4)
     
       for (i <- 0 until 4)
       {  

@@ -285,7 +285,7 @@ class ConnectSuite extends TestSuite {
   @Test def testVecInput() {
     class VecInput extends Module {
       val io = new Bundle {
-        val in = Vec(2,  UInt(INPUT, 8) )
+        val in = Vec(UInt(INPUT, 8), 2)
         val out0 = UInt(OUTPUT, 8)
         val out1 = UInt(OUTPUT, 8)
       }
@@ -308,7 +308,7 @@ class ConnectSuite extends TestSuite {
       val io = new Bundle {
         val in0 = UInt(INPUT, 8)
         val in1 = UInt(INPUT, 8)
-        val out = Vec(2,  UInt(OUTPUT, 8) )
+        val out = Vec(UInt(OUTPUT, 8), 2)
       }
 
       io.out(0) := io.in0
@@ -426,7 +426,7 @@ class ConnectSuite extends TestSuite {
       }
       val io = new IO
     
-      val regs = Reg(Vec(3, Bool()))
+      val regs = Reg(Vec(Bool(), 3))
       regs(0) := reset
       for (i <- 1 until 3)
         regs(i) := regs(i-1)

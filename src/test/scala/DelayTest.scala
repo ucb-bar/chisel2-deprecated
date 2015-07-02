@@ -194,8 +194,8 @@ class DelaySuite extends TestSuite {
         val raddr = UInt(INPUT, width = 4)
         val wen = Bool(INPUT)
         val waddr = UInt(INPUT, width = 4)
-        val in = Vec(2, new A()).asInput
-        val out = Vec(2, new A()).asOutput
+        val in = Vec(new A(), 2).asInput
+        val out = Vec(new A(), 2).asOutput
       }
       val mem = Mem(io.in.cloneType, 16, seqRead = true)
       when (io.wen) { mem(io.waddr) := io.in }

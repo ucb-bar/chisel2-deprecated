@@ -242,7 +242,7 @@ class DecoupledIOC[+T <: Data](gen: T) extends Bundle
 
 
 class ArbiterIO[T <: Data](gen: T, n: Int) extends Bundle {
-  val in  = Vec(n,  Decoupled(gen) ).flip
+  val in  = Vec(Decoupled(gen), n).flip
   val out = Decoupled(gen)
   val chosen = UInt(OUTPUT, log2Up(n))
 }

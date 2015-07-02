@@ -238,7 +238,7 @@ class ConnectWireSuite extends TestSuite {
   @Test def testWireVecInput() {
     class VecInput extends Module {
       val io = new Bundle {
-        val in = Vec(2,  UInt(INPUT, 8) )
+        val in = Vec(UInt(INPUT, 8), 2)
         val out0 = UInt(OUTPUT, 8)
         val out1 = UInt(OUTPUT, 8)
       }
@@ -261,7 +261,7 @@ class ConnectWireSuite extends TestSuite {
       val io = new Bundle {
         val in0 = UInt(INPUT, 8)
         val in1 = UInt(INPUT, 8)
-        val out = Vec(2,  UInt(OUTPUT, 8) )
+        val out = Vec(UInt(OUTPUT, 8), 2)
       }
 
       io.out(0) := io.in0
