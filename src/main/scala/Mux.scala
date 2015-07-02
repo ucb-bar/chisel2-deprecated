@@ -96,6 +96,12 @@ object isLessThan {
 
 object Mux {
   def apply[T<:Data](cond: Bool, tc: T, fc: T): T = {
+    // Chisel3 - Check version compatibility (args to Mux must be derived from the same UInt/SInt parent)
+    if (Driver.minimumCompatibility > "2") {
+      if (tc.isInstanceOf[UInt] != fc.isInstanceOf[UInt]) {
+        ChiselError.warning("Unable to have mixed type mux CON " + tc + " ALT " + fc)
+      }
+    }
     // TODO: Replace this runtime check with compiletime check using type classes and imports to add special cases
     val target = if(tc.getClass.isAssignableFrom(fc.getClass)) tc.cloneType else
                  if(fc.getClass.isAssignableFrom(tc.getClass)) fc.cloneType else
@@ -103,7 +109,7 @@ object Mux {
                    ChiselError.warning("Mux of Bits instantiated, emits SInt")
                    SInt().asInstanceOf[T]
                  } else
-                   throw new Exception(s"For Mux, tc(${tc.getClass}) or fc(${fc.getClass}) must directly descend from the other. (Or both descend from Bits)")
+                   throwException(s"For Mux, tc(${tc.getClass}) or fc(${fc.getClass}) must directly descend from the other. (Or both descend from Bits)")
     Mux[T,T,T](target, cond, tc, fc)
   }
 
