@@ -140,7 +140,8 @@ object RegEnable
   */
 object ShiftRegister
 {
-  def apply[T <: Data](in: T, n: Int, en: Bool = Bool(true)): T =
+  def apply[T <: Data](in: T, n: Int) : T = apply(in, n, Bool(true))
+  def apply[T <: Data](in: T, n: Int, en: Bool) : T =
   {
     // The order of tests reflects the expected use cases.
     if (n == 1) {
@@ -151,7 +152,9 @@ object ShiftRegister
       in
     }
   }
-  def apply[T <: Data](in: T, init: T, n: Int, en: Bool = Bool(true)): T =
+  
+  def apply[T <: Data](in: T, init: T, n: Int) : T = apply(in, init, n, Bool(true))
+  def apply[T <: Data](in: T, init: T, n: Int, en: Bool) : T =
   {
     // The order of tests reflects the expected use cases.
     if (n == 1) {
