@@ -465,9 +465,9 @@ class FixedSuite extends TestSuite {
   @Test def testFixedNDiv() {
     class FixedNDiv extends Module {
       val io = new Bundle {
-        val a = Fixed(INPUT, 32, 16)
-        val b = Fixed(INPUT, 32, 16)
-        val c = Fixed(OUTPUT, 32, 16)
+        val a = Fixed(INPUT, 16, 8)
+        val b = Fixed(INPUT, 16, 8)
+        val c = Fixed(OUTPUT, 16, 8)
       }
       io.c := io.a /& io.b
     }
@@ -479,20 +479,20 @@ class FixedSuite extends TestSuite {
       for (i <- 0 until trials) {
 
         // For the testing find two numbers that we also give a number that is representable in fixed point
-        var inA = BigInt(r.nextInt(1 << 30))
-        var inB = BigInt(r.nextInt(1 << 30))
-        var doubleA = toDouble(inA, 16)
-        var doubleB = toDouble(inB, 16)
-        while(  scala.math.abs(toDouble(toFixedT(doubleA / doubleB, 16), 16) - doubleA/doubleB) > scala.math.pow(2, -17)) {
-          inA = BigInt(r.nextInt(1 << 30))
-          inB = BigInt(r.nextInt(1 << 30))
-          doubleA = toDouble(inA, 16)
-          doubleB = toDouble(inB, 16)
+        var inA = BigInt(r.nextInt(1 << 14))
+        var inB = BigInt(r.nextInt(1 << 14))
+        var doubleA = toDouble(inA, 8)
+        var doubleB = toDouble(inB, 8)
+        while(  scala.math.abs(toDouble(toFixedT(doubleA / doubleB, 8), 8) - doubleA/doubleB) > scala.math.pow(2, -9)) {
+          inA = BigInt(r.nextInt(1 << 14))
+          inB = BigInt(r.nextInt(1 << 14))
+          doubleA = toDouble(inA, 8)
+          doubleB = toDouble(inB, 8)
         }
         poke(c.io.a, inA)
         poke(c.io.b, inB)
-        val div = toDouble(inA, 16) / toDouble(inB, 16)
-        expect(c.io.c, toFixedT(div, 16))
+        val div = toDouble(inA, 8) / toDouble(inB, 8)
+        expect(c.io.c, toFixedT(div, 8))
       }
     }
 

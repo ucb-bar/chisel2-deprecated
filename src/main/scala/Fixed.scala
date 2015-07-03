@@ -146,11 +146,29 @@ class Fixed(var fractionalWidth : Int = 0) extends Bits with Num[Fixed] {
         fromSInt((this.toSInt << UInt(this.fractionalWidth)) / b.toSInt)
     }
 
-    def /& (b : Fixed) : Fixed = {
+    // Newton-Rhapson to find 1/x - x_(t+1) = x_t(2 - a*x_t)
+    def performNR(in : Fixed, xt : Fixed) : Fixed = xt*(Fixed(2, in.getWidth, in.fractionalWidth) - in*xt)
+
+    def tailNR(in : Fixed, xt : Fixed, it : Int) : Fixed = {
+      val nxt = performNR(in, xt)
+      if (it == 0) nxt else tailNR(nxt, in, it - 1)
+    }
+
+    //def /& (b : Fixed): Fixed = this /&(false, scala.math.min(this.fractionalWidth, 6), 4, b)
+
+
+    def /& (b : Fixed, pipeline : Boolean = false, lookUpPrecision : Int = this.fractionalWidth/4, numNR : Int = 2) = {
         checkAligned(b)
-        // Need Look up table
-        val lookUp = (1 until scala.math.pow(2, this.getWidth - this.fractionalWidth).toInt).map(i => 1/toDouble(BigInt(i), 1))
-        this / b
+
+        val lookUp = (0 until scala.math.pow(2, b.getWidth - b.fractionalWidth + lookUpPrecision).toInt).map(i => if (i == 0) Fixed(0, b.getWidth, b.fractionalWidth) else Fixed(1/toDouble(BigInt(i), 1 + lookUpPrecision), b.getWidth, b.fractionalWidth))
+        // Put lookUp into ROM
+        val lookUpTable = Vec(lookUp)
+
+        val lp = b(b.getWidth - 1, b.fractionalWidth - 1 - lookUpPrecision)
+        val x0 = lookUpTable(lp)
+        val repb = tailNR(b, x0, numNR)
+        this * repb
+
     }
 
     def % (b : Fixed) : Fixed = (this / b) & Fill(this.fractionalWidth, UInt(1))
