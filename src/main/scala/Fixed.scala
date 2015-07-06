@@ -149,15 +149,18 @@ class Fixed(var fractionalWidth : Int = 0) extends Bits with Num[Fixed] {
     // Newton-Rhapson to find 1/x - x_(t+1) = x_t(2 - a*x_t)
     def performNR(in : Fixed, xt : Fixed) : Fixed = xt*(Fixed(2, in.getWidth, in.fractionalWidth) - in*xt)
 
-    def tailNR(in : Fixed, xt : Fixed, it : Int) : Fixed = {
+    def tailNR(in : Fixed, xt : Fixed, it : Int, pipeline : Boolean) : Fixed = {
       val nxt = performNR(in, xt)
-      if (it == 0) nxt else tailNR(nxt, in, it - 1)
+      val xtn = if (pipeline) Reg(init=Fixed(0, in.getWidth, in.fractionalWidth), next=nxt) else nxt
+      if (it == 0) nxt else tailNR(in, xtn, it - 1, pipeline)
     }
 
-    //def /& (b : Fixed): Fixed = this /&(false, scala.math.min(this.fractionalWidth, 6), 4, b)
+    def /& (b : Fixed) : Fixed = this /& (b, false, b.fractionalWidth/4, 4)
+    def /& (b : Fixed, pipeline : Boolean) : Fixed = this /& (b, pipeline, b.fractionalWidth/4, 4)
+    def /& (b : Fixed, numNR :  Int) : Fixed = this /& (b, false, b.fractionalWidth/4, numNR)
+    def /& (b : Fixed, lookUpPrecision : Int, numNR : Int) : Fixed = this /& (b, false, lookUpPrecision, numNR)
 
-
-    def /& (b : Fixed, pipeline : Boolean = false, lookUpPrecision : Int = this.fractionalWidth/4, numNR : Int = 2) = {
+    def /& (b : Fixed, pipeline : Boolean, lookUpPrecision : Int, numNR : Int) = {
         checkAligned(b)
 
         val lookUp = (0 until scala.math.pow(2, b.getWidth - b.fractionalWidth + lookUpPrecision).toInt).map(i => if (i == 0) Fixed(0, b.getWidth, b.fractionalWidth) else Fixed(1/toDouble(BigInt(i), 1 + lookUpPrecision), b.getWidth, b.fractionalWidth))
@@ -166,9 +169,8 @@ class Fixed(var fractionalWidth : Int = 0) extends Bits with Num[Fixed] {
 
         val lp = b(b.getWidth - 1, b.fractionalWidth - 1 - lookUpPrecision)
         val x0 = lookUpTable(lp)
-        val repb = tailNR(b, x0, numNR)
+        val repb = tailNR(b, x0, numNR, pipeline)
         this * repb
-
     }
 
     def % (b : Fixed) : Fixed = (this / b) & Fill(this.fractionalWidth, UInt(1))

@@ -46,6 +46,27 @@ class FixedSuite extends TestSuite {
   def toFixed(x : Double, fracWidth : Int) : BigInt = BigInt(scala.math.round(x*scala.math.pow(2, fracWidth)))
   def toDouble(x : BigInt, fracWidth : Int) : Double = x.toDouble/scala.math.pow(2, fracWidth)
 
+  // Newton-Rhapson to find 1/x - x_(t+1) = x_t(2 - a*x_t)
+  def performNR(in : Double, xt : Double) : Double = xt*(2.0 - in*xt)
+
+  def tailNR(in : Double, xt : Double, it : Int) : Double = {
+    val nxt = performNR(in, xt)
+    if (it == 0) nxt else tailNR(in, nxt, it - 1)
+  }
+
+
+  @Test def testNewtonRhapson() {
+    val r = scala.util.Random
+    val in = BigInt(r.nextInt(1 << 30))
+    val b = toDouble(in, 8)
+    val x0 = BigDecimal(1.0/b).setScale(16, BigDecimal.RoundingMode.HALF_UP).toDouble
+    val numNR = 8
+    val repb = tailNR(b, x0, numNR)
+
+    assertTrue(1.0/b - repb < java.lang.Double.MIN_VALUE)
+  }
+
+
   @Test def testConversion() {
     val r = scala.util.Random
     val in = BigInt(r.nextInt(1 << 30))
@@ -471,6 +492,7 @@ class FixedSuite extends TestSuite {
       }
       io.c := io.a /& io.b
     }
+    
 
     class FixedNDivTests(c : FixedNDiv) extends Tester(c) {
       val trials = 10
@@ -491,8 +513,16 @@ class FixedSuite extends TestSuite {
         }
         poke(c.io.a, inA)
         poke(c.io.b, inB)
-        val div = toDouble(inA, 8) / toDouble(inB, 8)
-        expect(c.io.c, toFixedT(div, 8))
+        val a = toDouble(inA, 8)
+        val b = toDouble(inB, 8)
+        val x0 = BigDecimal(1.0/b).setScale(16, BigDecimal.RoundingMode.HALF_UP).toDouble
+        val numNR = 4
+        val repb = tailNR(b, x0, numNR)
+        val div = a * repb
+        val nrDiv = peek(c.io.c)
+        val err = scala.math.abs(toDouble(nrDiv, 8) - div)
+        val res = if (err < toDouble(BigInt(scala.math.pow(2, 7).toInt), 8)) true else false
+        expect(true, "Error: " + err.toString)
       }
     }
 
