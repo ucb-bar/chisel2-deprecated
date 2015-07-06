@@ -1193,8 +1193,6 @@ class VendingMachine extends Module {
 \noindent
 Here is the vending machine FSM defined with \code{switch} statement:
 \begin{scala}
-import Chisel._
-
 class VendingMachine extends Module {
   val io = new Bundle {
     val nickel = Bool(dir = INPUT)
